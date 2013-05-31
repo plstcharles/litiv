@@ -6,6 +6,7 @@
 
 #define WRITE_OUTPUT
 #define DISPLAY_OUTPUT
+#define WRITE_DISPLAY_OUTPUT
 
 inline void writeResult(	const std::string& sResultsPath,
 							const std::string& sCatName,
@@ -20,6 +21,25 @@ inline void writeResult(	const std::string& sResultsPath,
 	std::stringstream sResultFilePath;
 	sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << buffer << sResultSuffix;
 	cv::imwrite(sResultFilePath.str(), res, vnComprParams);
+}
+
+inline cv::Mat getDisplayResult(const cv::Mat& bgDescImg,
+								const cv::Mat& currDescImg,
+								const cv::Mat& currImg,
+								const cv::Mat& currResult) {
+	cv::Mat currDescDiff, currDescDiffBYTE, currDescImgBYTE, currResultBYTE;
+	LBSP::calcDescImgDiff(bgDescImg,currDescImg,currDescDiff);
+	currDescDiff.convertTo(currDescDiffBYTE,CV_8UC3);
+	currDescImg.convertTo(currDescImgBYTE,CV_8UC3);
+	cv::cvtColor(currResult,currResultBYTE,CV_GRAY2BGR);
+	cv::Mat display1H,display2H;
+	cv::hconcat(currImg,currDescImgBYTE,display1H);
+	int type1 = currResultBYTE.type();
+	int type2 = currDescDiffBYTE.type();
+	cv::hconcat(currResultBYTE,currDescDiffBYTE,display2H);
+	cv::Mat display;
+	cv::vconcat(display1H,display2H,display);
+	return display;
 }
 
 int main( int argc, char** argv ) {
@@ -73,9 +93,10 @@ int main( int argc, char** argv ) {
 													);		// note: the extractor will remove keypoints that are out of bounds itself
 				LBSP extractor(30);
 				DetectChange DC(28);
-
-
 				cv::Mat imgA = cv::imread(pCurrSequence->vsInputFramePaths[0], cv::IMREAD_COLOR);
+#ifdef WRITE_DISPLAY_OUTPUT
+				cv::VideoWriter oWriter(sResultsPath+"/"+oCurrCategory.sName+"/"+pCurrSequence->sName+".avi",CV_FOURCC('X','V','I','D'),30,imgA.size()*2,true);
+#endif
 				cv::GaussianBlur(imgA, imgA, cv::Size2i(5,5), 3,3);
 				if(keypointsA.capacity()<(size_t)(imgA.cols*imgA.rows))
 					keypointsA.reserve(imgA.cols*imgA.rows);
@@ -85,6 +106,14 @@ int main( int argc, char** argv ) {
 				LBSP::recreateDescImage(imgA.channels(),imgA.rows,imgA.cols,keypointsA,descriptorsA,descimage);
 				DC.setBGModel(descimage, imgA);
 				DC.compute_Hamming(descimage, imgres);
+#ifdef DISPLAY_OUTPUT
+				cv::Mat display = getDisplayResult(DC.getBGDesc(),descimage,imgA,imgres);
+				cv::imshow("display", display);
+#ifdef WRITE_DISPLAY_OUTPUT
+				oWriter.write(display);
+#endif
+				cv::waitKey(1);
+#endif
 #ifdef WRITE_OUTPUT
 				writeResult(sResultsPath,oCurrCategory.sName,pCurrSequence->sName,sResultPrefix,1,sResultSuffix,imgres,compression_params);
 #endif
@@ -108,12 +137,11 @@ int main( int argc, char** argv ) {
 					else
 						DC.compute_Hamming(descimage, imgres);
 #ifdef DISPLAY_OUTPUT
-					cv::imshow("in", imgA);
-					cv::imshow("res", imgres);
-					cv::imshow("desc", descimage);
-					cv::Mat descdiff;
-					LBSP::calcDescImgDiff(DC.getBGDesc(),descimage,descdiff);
-					cv::imshow("descdiff", descdiff);
+					cv::Mat display = getDisplayResult(DC.getBGDesc(),descimage,imgA,imgres);
+					cv::imshow("display", display);
+#ifdef WRITE_DISPLAY_OUTPUT
+					oWriter.write(display);
+#endif
 					cv::waitKey(1);
 #endif
 #ifdef WRITE_OUTPUT
