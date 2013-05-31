@@ -34,8 +34,6 @@ inline cv::Mat getDisplayResult(const cv::Mat& bgDescImg,
 	cv::cvtColor(currResult,currResultBYTE,CV_GRAY2BGR);
 	cv::Mat display1H,display2H;
 	cv::hconcat(currImg,currDescImgBYTE,display1H);
-	int type1 = currResultBYTE.type();
-	int type2 = currDescDiffBYTE.type();
 	cv::hconcat(currResultBYTE,currDescDiffBYTE,display2H);
 	cv::Mat display;
 	cv::vconcat(display1H,display2H,display);
@@ -105,7 +103,7 @@ int main( int argc, char** argv ) {
 				extractor.compute(imgA, keypointsA, descriptorsA);
 				LBSP::recreateDescImage(imgA.channels(),imgA.rows,imgA.cols,keypointsA,descriptorsA,descimage);
 				DC.setBGModel(descimage, imgA);
-				DC.compute_Hamming(descimage, imgres);
+				DC.compute(descimage, imgres);
 #ifdef DISPLAY_OUTPUT
 				cv::Mat display = getDisplayResult(DC.getBGDesc(),descimage,imgA,imgres);
 				cv::imshow("display", display);
@@ -135,7 +133,7 @@ int main( int argc, char** argv ) {
 							std::cout << "all code stable!" << std::endl;
 					}
 					else
-						DC.compute_Hamming(descimage, imgres);
+						DC.compute(descimage, imgres);
 #ifdef DISPLAY_OUTPUT
 					cv::Mat display = getDisplayResult(DC.getBGDesc(),descimage,imgA,imgres);
 					cv::imshow("display", display);
