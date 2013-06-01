@@ -2,13 +2,14 @@
 #include "LBSP.h"
 #include <iostream>
 
-DetectChange::DetectChange(int threshold, int streak)
+DetectChange::DetectChange(int threshold, int fgStreak, int trnStreak)
 	:	 m_nTotalThreshold(threshold)
-		,m_nSingleChannelThreshold(threshold/3+1) // e.g. 30 bit tot thres => 11 bit change in a single channel is enough to consider FG
-		,m_nStreak(streak)
+		,m_nSingleChannelThreshold(threshold/3+2) // e.g. 30 bit tot thres => 12 bit change in a single channel is enough to consider FG
+		,m_nStreak(fgStreak)
+		,m_nTrainingStreak(trnStreak)
 		,m_nUntrainedElems(-1)
 		,m_nTotElems(-1) {
-	CV_Assert(threshold>0 && m_nStreak>0 && m_nStreak<UCHAR_MAX);
+	CV_Assert(threshold>0 && m_nStreak>0 && m_nTrainingStreak>0 && m_nStreak<UCHAR_MAX && m_nTrainingStreak<UCHAR_MAX);
 }
 
 void DetectChange::setBGModel(const cv::Mat &descImg, const cv::Mat &bgImg) {
@@ -16,7 +17,7 @@ void DetectChange::setBGModel(const cv::Mat &descImg, const cv::Mat &bgImg) {
 	m_oBGDesc2 = descImg.clone();
 	m_oBGImg = bgImg.clone();
 	m_oBGImg2 = bgImg.clone();
-	m_oFreq = cv::Mat::zeros(descImg.rows,descImg.cols,CV_8UC1);
+	m_oTrainingFreq = cv::Mat::zeros(descImg.rows,descImg.cols,CV_8UC1);
 	m_oFGFreq = cv::Mat::zeros(descImg.rows,descImg.cols,CV_8UC1);
 	m_oStable = cv::Mat::zeros(descImg.rows,descImg.cols,CV_8UC1);
 	m_nUntrainedElems = descImg.rows*descImg.cols;
@@ -43,7 +44,7 @@ void DetectChange::compute(const cv::Mat &descImg, cv::Mat &fgMask) const {
 				}
 			}
 			else {
-				total = cv::normHamming(&planes1[0].data[planes1[0].step[0]*i+planes1[0].step[1]*j],
+				total = 3*cv::normHamming(&planes1[0].data[planes1[0].step[0]*i+planes1[0].step[1]*j],
 										&planes2[0].data[planes2[0].step[0]*i+planes2[0].step[1]*j],
 										LBSP::LBSP_DESC_SIZE);
 			}
@@ -83,7 +84,7 @@ bool DetectChange::trainandcompute(const cv::Mat &descImg1, const cv::Mat &descI
 				}
 			}
 			else {
-				total = cv::normHamming(&planesDESC[0].data[planesDESC[0].step[0]*i+planesDESC[0].step[1]*j],
+				total = 3*cv::normHamming(&planesDESC[0].data[planesDESC[0].step[0]*i+planesDESC[0].step[1]*j],
 										&planesBGM[0].data[planesBGM[0].step[0]*i+planesBGM[0].step[1]*j],
 										LBSP::LBSP_DESC_SIZE);
 			}
@@ -91,7 +92,7 @@ bool DetectChange::trainandcompute(const cv::Mat &descImg1, const cv::Mat &descI
 				fgMask.at<uchar>(i,j) = UCHAR_MAX;
 				if(m_oFGFreq.at<uchar>(i,j)<UCHAR_MAX)
 					m_oFGFreq.at<uchar>(i,j)++;
-				if(m_oStable.at<uchar>(i,j)!=1 && m_oFGFreq.at<uchar>(i,j)>=m_nStreak) {
+				if(m_oStable.at<uchar>(i,j)!=1 && m_oFGFreq.at<uchar>(i,j)>m_nStreak) {
 					for(int n=0; n<nChannels; ++n) {
 						planesBGM[n].at<unsigned short>(i,j)=planesDESC3[n].at<unsigned short>(i,j);
 						planesBGI[n].at<uchar>(i,j)=planesIM[n].at<uchar>(i,j);
@@ -108,9 +109,9 @@ bool DetectChange::trainandcompute(const cv::Mat &descImg1, const cv::Mat &descI
 			if(m_oStable.at<uchar>(i,j)!=1) {
 				// Case 1: labeled as background
 				if(total<m_nTotalThreshold) {
-					if(m_oFreq.at<uchar>(i,j)<UCHAR_MAX)
-						m_oFreq.at<uchar>(i,j)++;
-					if(m_oFreq.at<uchar>(i,j)>=m_nStreak) {
+					if(m_oTrainingFreq.at<uchar>(i,j)<UCHAR_MAX)
+						m_oTrainingFreq.at<uchar>(i,j)++;
+					if(m_oTrainingFreq.at<uchar>(i,j)>=m_nTrainingStreak) {
 						//for(int n=0; n<nChannels; ++n) {
 						//	planesBGM[0].at<unsigned short>(i,j)=planesBGM2[0].at<unsigned short>(i,j);
 						//	planesBGM[1].at<unsigned short>(i,j)=planesBGM2[1].at<unsigned short>(i,j);
@@ -137,14 +138,14 @@ bool DetectChange::trainandcompute(const cv::Mat &descImg1, const cv::Mat &descI
 						}
 					}
 					else {
-						total = cv::normHamming(&planesDESC2[0].data[planesDESC2[0].step[0]*i+planesDESC2[0].step[1]*j],
+						total = 3*cv::normHamming(&planesDESC2[0].data[planesDESC2[0].step[0]*i+planesDESC2[0].step[1]*j],
 												&planesBGM2[0].data[planesBGM2[0].step[0]*i+planesBGM2[0].step[1]*j],
 												LBSP::LBSP_DESC_SIZE);
 					}
 					if(total<m_nTotalThreshold)	{
-						if(m_oFreq.at<uchar>(i,j)<UCHAR_MAX)
-							m_oFreq.at<uchar>(i,j)++;
-						if(m_oFreq.at<uchar>(i,j)>=m_nStreak) {
+						if(m_oTrainingFreq.at<uchar>(i,j)<UCHAR_MAX)
+							m_oTrainingFreq.at<uchar>(i,j)++;
+						if(m_oTrainingFreq.at<uchar>(i,j)>=m_nTrainingStreak) {
 							for(int n=0; n<nChannels; ++n) {
 								planesBGM[n].at<unsigned short>(i,j)=planesBGM2[n].at<unsigned short>(i,j);
 								planesBGI[n].at<uchar>(i,j)=planesBGI2[n].at<uchar>(i,j);
@@ -154,7 +155,7 @@ bool DetectChange::trainandcompute(const cv::Mat &descImg1, const cv::Mat &descI
 						}
 					}
 					else {
-						m_oFreq.at<uchar>(i,j) = 0;
+						m_oTrainingFreq.at<uchar>(i,j) = 0;
 						for(int n=0; n<nChannels; ++n) {
 							planesBGM2[n].at<unsigned short>(i,j)=planesDESC3[n].at<unsigned short>(i,j);
 							planesBGI2[n].at<uchar>(i,j)=planesIM[n].at<uchar>(i,j);

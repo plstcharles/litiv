@@ -90,12 +90,12 @@ int main( int argc, char** argv ) {
 													false	// var img bound with scale
 													);		// note: the extractor will remove keypoints that are out of bounds itself
 				LBSP extractor(30);
-				DetectChange DC(28);
+				DetectChange DC(28,50,30);
 				cv::Mat imgA = cv::imread(pCurrSequence->vsInputFramePaths[0], cv::IMREAD_COLOR);
 #ifdef WRITE_DISPLAY_OUTPUT
 				cv::VideoWriter oWriter(sResultsPath+"/"+oCurrCategory.sName+"/"+pCurrSequence->sName+".avi",CV_FOURCC('X','V','I','D'),30,imgA.size()*2,true);
 #endif
-				cv::GaussianBlur(imgA, imgA, cv::Size2i(5,5), 3,3);
+				cv::GaussianBlur(imgA, imgA, cv::Size2i(5,5), 3, 3);
 				if(keypointsA.capacity()<(size_t)(imgA.cols*imgA.rows))
 					keypointsA.reserve(imgA.cols*imgA.rows);
 				detector.detect(imgA, keypointsA);
@@ -116,10 +116,9 @@ int main( int argc, char** argv ) {
 				writeResult(sResultsPath,oCurrCategory.sName,pCurrSequence->sName,sResultPrefix,1,sResultSuffix,imgres,compression_params);
 #endif
 				for(size_t k=1; k<pCurrSequence->vsInputFramePaths.size(); k++) {
-					//if(!(k%100))
-						std::cout << "\t\t[F:" << k << "/" << pCurrSequence->vsInputFramePaths.size() << "]" << std::endl;
+					std::cout << "\t\t[F:" << k << "/" << pCurrSequence->vsInputFramePaths.size() << "]" << std::endl;
 					imgA = cv::imread(pCurrSequence->vsInputFramePaths[k], cv::IMREAD_COLOR);
-					cv::GaussianBlur(imgA, imgA, cv::Size2i(5,5), 3,3);
+					cv::GaussianBlur(imgA, imgA, cv::Size2i(5,5), 3, 3);
 					if(k==500) training=false;
 					LBSP::computeImpl(imgA,DC.getBGImage(),keypointsA,descriptorsA,extractor.getAbsThreshold());
 					LBSP::recreateDescImage(imgA.channels(),imgA.rows,imgA.cols,keypointsA,descriptorsA,descimage);

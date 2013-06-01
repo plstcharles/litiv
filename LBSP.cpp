@@ -5,14 +5,16 @@
 LBSP::LBSP(int threshold)
 	:	 m_bUseRelativeThreshold(false)
 		,m_fThreshold(-1) // unused
-		,m_nThreshold(threshold)
+		,m_nThreshold((uchar)threshold)
 		,m_oRefImage() // invalid ref
-{}
+{
+	CV_Assert(threshold<=UCHAR_MAX);
+}
 
 LBSP::LBSP(float threshold)
 	:	 m_bUseRelativeThreshold(true)
 		,m_fThreshold(threshold)
-		,m_nThreshold(-1) // unused
+		,m_nThreshold(UCHAR_MAX) // unused
 		,m_oRefImage() // invalid ref
 {}
 
@@ -45,7 +47,7 @@ float LBSP::getRelThreshold() const {
 	return m_fThreshold;
 }
 
-int LBSP::getAbsThreshold() const {
+uchar LBSP::getAbsThreshold() const {
 	return m_nThreshold;
 }
 
@@ -53,7 +55,7 @@ void LBSP::computeImpl(	const cv::Mat& origImage,
 						const cv::Mat& refImage,
 						std::vector<cv::KeyPoint>& keypoints,
 						cv::Mat& descriptors,
-						int _t) {
+						uchar _t) {
 	CV_Assert(refImage.empty() || (refImage.size==origImage.size && refImage.type()==origImage.type() && refImage.channels()==origImage.channels()));
 	CV_Assert(LBSP_DESC_SIZE==2); // @@@ also relies on a constant desc size
 #ifdef LBSP_VALIDATE_KEYPOINTS_INTERNALLY
