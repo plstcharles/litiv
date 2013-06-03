@@ -1,22 +1,25 @@
 #include "LBSP.h"
+#include "HammingDist.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/features2d/features2d.hpp>
 
 LBSP::LBSP(int threshold)
 	:	 m_bUseRelativeThreshold(false)
 		,m_fThreshold(-1) // unused
-		,m_nThreshold((uchar)threshold)
+		,m_nThreshold(threshold)
 		,m_oRefImage() // invalid ref
 {
-	CV_Assert(threshold<=UCHAR_MAX);
+	CV_Assert(m_nThreshold<=UCHAR_MAX);
 }
 
 LBSP::LBSP(float threshold)
 	:	 m_bUseRelativeThreshold(true)
 		,m_fThreshold(threshold)
-		,m_nThreshold(UCHAR_MAX) // unused
-		,m_oRefImage() // invalid ref
-{}
+		,m_nThreshold(-1)
+		,m_oRefImage() {
+	CV_Assert(m_fThreshold>0);
+}
 
 void LBSP::read(const cv::FileNode& fn) {
     // ... = fn["..."];
@@ -27,16 +30,17 @@ void LBSP::write(cv::FileStorage& fs) const {
 }
 
 void LBSP::setReference(const cv::Mat& img) {
+	CV_DbgAssert(img.empty() || img.type()==CV_8UC1 || img.type()==CV_8UC3);
 	m_oRefImage = img;
 }
 
 int LBSP::descriptorSize() const {
-	return LBSP_DESC_SIZE;
+	return DESC_SIZE;
 }
 
 int LBSP::descriptorType() const {
-	assert(LBSP_DESC_SIZE==2); // @@@@ currently only accepting 16 bit patterns, == unsigned short
-	return CV_16UC1;
+	CV_Assert(DESC_SIZE==2); // @@@@ currently only using 16 bit patterns, == unsigned short
+	return CV_16U;
 }
 
 bool LBSP::isUsingRelThreshold() const {
@@ -47,113 +51,138 @@ float LBSP::getRelThreshold() const {
 	return m_fThreshold;
 }
 
-uchar LBSP::getAbsThreshold() const {
+int LBSP::getAbsThreshold() const {
 	return m_nThreshold;
 }
 
-void LBSP::computeImpl(	const cv::Mat& origImage,
-						const cv::Mat& refImage,
-						std::vector<cv::KeyPoint>& keypoints,
-						cv::Mat& descriptors,
-						uchar _t) {
-	CV_Assert(refImage.empty() || (refImage.size==origImage.size && refImage.type()==origImage.type() && refImage.channels()==origImage.channels()));
-	CV_Assert(LBSP_DESC_SIZE==2); // @@@ also relies on a constant desc size
-#ifdef LBSP_VALIDATE_KEYPOINTS_INTERNALLY
-	removeBorderKeypoints(keypoints,origImage.size(),LBSP_PATCH_SIZE/2);
-#endif
-	std::vector<cv::Mat> desc_planes(origImage.channels());
-	for(int n=0; n<origImage.channels(); ++n)
-		desc_planes[n] = cv::Mat(keypoints.size(),1,CV_16UC1);
-	std::vector<cv::Mat> img_planes, ref_planes;
-	cv::split(origImage,img_planes);
-	if(!refImage.empty())
-		cv::split(refImage,ref_planes);
-	else
-		ref_planes = img_planes;
-	unsigned short _res;
-	for(size_t n=0; n<img_planes.size(); ++n) {
-		const uchar* _data = img_planes[n].data;
-		const int _step_row = img_planes[n].step[0];
-		const int _step_col = img_planes[n].step[1];
-		for(size_t k=0; k<keypoints.size(); ++k) {
-			if(	keypoints[k].pt.x < LBSP_PATCH_SIZE/2 ||
-				keypoints[k].pt.x >= (origImage.cols-LBSP_PATCH_SIZE/2) ||
-				keypoints[k].pt.y < LBSP_PATCH_SIZE/2 ||
-				keypoints[k].pt.y >= (origImage.rows-LBSP_PATCH_SIZE/2))
-				desc_planes[n].at<unsigned short>(k) = USHRT_MAX;
-			else {
-				const int _x = (int)keypoints[k].pt.x;
-				const int _y = (int)keypoints[k].pt.y;
-				const uchar _ref = ref_planes[n].data[_step_row*(_y)+_step_col*(_x)];
-#include "LBSP16bitsdbcross_abs.i"
-				desc_planes[n].at<unsigned short>(k) = _res;
-			}
+static inline void lbsp_computeImpl(const cv::Mat& oInputImg,
+									const cv::Mat& oRefImg,
+									const std::vector<cv::KeyPoint>& voKeyPoints,
+									cv::Mat& oDesc,
+									int nThreshold) {
+	CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
+	CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
+	CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
+	CV_DbgAssert(nThreshold<=UCHAR_MAX);
+	cv::Mat _oRefImg = oRefImg;
+	if(_oRefImg.empty()) // default back to intra-frame comparisons
+		_oRefImg = oInputImg;
+	const uchar _t = (uchar)nThreshold;
+	const int nChannels = oInputImg.channels();
+	if(nChannels==1) {
+		oDesc.create(voKeyPoints.size(),1,CV_16UC1);
+		unsigned short _res;
+		const int _step_row = oInputImg.step.p[0];
+		CV_DbgAssert(oInputImg.step.p[1]==1);
+		const uchar* _data = oInputImg.data;
+		const uchar* _refdata = _oRefImg.data;
+		for(size_t k=0; k<voKeyPoints.size(); ++k) {
+			const int _x = (int)voKeyPoints[k].pt.x;
+			const int _y = (int)voKeyPoints[k].pt.y;
+#include "LBSP_16bits_dbcross_1ch_abs.i"
+			oDesc.at<unsigned short>(k) = _res;
 		}
 	}
-	cv::merge(desc_planes,descriptors);
+	else { //nChannels==3
+		oDesc.create(voKeyPoints.size(),1,CV_16UC3);
+		unsigned short _res[3];
+		const int _step_row = oInputImg.step.p[0];
+		CV_DbgAssert(oInputImg.step.p[1]==3);
+		const uchar* _data = oInputImg.data;
+		const uchar* _refdata = _oRefImg.data;
+		for(size_t k=0; k<voKeyPoints.size(); ++k) {
+			const int _x = (int)voKeyPoints[k].pt.x;
+			const int _y = (int)voKeyPoints[k].pt.y;
+#include "LBSP_16bits_dbcross_3ch_abs.i"
+			for(int n=0; n<3; ++n)
+				((unsigned short*)(oDesc.data + oDesc.step.p[0]*k))[n] = _res[n];
+		}
+	}
 }
 
-void LBSP::computeImpl(	const cv::Mat& origImage,
-						const cv::Mat& refImage,
-						std::vector<cv::KeyPoint>& keypoints,
-						cv::Mat& descriptors,
-						float _t) {
+static inline void lbsp_computeImpl(const cv::Mat& origImage,
+									const cv::Mat& refImage,
+									const std::vector<cv::KeyPoint>& keypoints,
+									cv::Mat& descriptors,
+									float _t) {
 	// @@@@@@@@@@@@@@@@@@@@@@
 	CV_Assert(false);
 }
 
 void LBSP::computeImpl(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, cv::Mat& descriptors) const {
+#if LBSP_VALIDATE_KEYPOINTS_INTERNALLY
+	cv::KeyPointsFilter::runByImageBorder(keypoints,image.size(),PATCH_SIZE/2);
+	CV_DbgAssert(!keypoints.empty());
+#endif //LBSP_VALIDATE_KEYPOINTS_INTERNALLY
 	if(m_bUseRelativeThreshold)
-		LBSP::computeImpl(image,m_oRefImage,keypoints,descriptors,m_fThreshold);
+		lbsp_computeImpl(image,m_oRefImage,keypoints,descriptors,m_fThreshold);
 	else
-		LBSP::computeImpl(image,m_oRefImage,keypoints,descriptors,m_nThreshold);
+		lbsp_computeImpl(image,m_oRefImage,keypoints,descriptors,m_nThreshold);
 }
 
-#ifdef LBSP_VALIDATE_KEYPOINTS_INTERNALLY
-void LBSP::recreateDescImage(int nChannels, int nRows, int nCols, const std::vector<cv::KeyPoint>& keypoints, const cv::Mat& descriptors, cv::Mat& output) {
-	CV_Assert(!keypoints.empty());
-#else
-cv::Mat LBSP::recreateDescImage(int nChannels, int nRows, int nCols, const cv::Mat& descriptors, cv::Mat& output) {
-#endif
-	CV_Assert(!descriptors.empty() && nChannels>0 && nCols>0 && nRows>0);
-	CV_Assert(LBSP_DESC_SIZE==2); // @@@ also relies on a constant desc size
-	std::vector<cv::Mat> res_planes(nChannels);
-	for(int n=0; n<nChannels; ++n)
-#ifdef LBSP_VALIDATE_KEYPOINTS_INTERNALLY
-		res_planes[n] = cv::Mat::zeros(nRows,nCols,CV_16UC1);
-#else
-		res_planes[n] = cv::Mat(nRows,nCols,CV_16UC1);
-#endif
-	std::vector<cv::Mat> desc_planes;
-	cv::split(descriptors,desc_planes);
-	for(size_t n=0; n<desc_planes.size(); ++n)
-#ifdef LBSP_VALIDATE_KEYPOINTS_INTERNALLY
-		for(size_t k=0; k<keypoints.size(); ++k)
-			res_planes[n].at<unsigned short>(keypoints[k].pt) = desc_planes[n].at<unsigned short>(k);
-#else
-		for(int i=0; i<nRows; ++i)
-			for(int j=0; j<nCols; ++j)
-				res_planes[n].at<unsigned short>(i,j) = desc_planes[n].at<unsigned short>(i+(j*nRows));
-#endif
-	cv::merge(res_planes, output);
+void LBSP::recreateDescImage(cv::Size size, const std::vector<cv::KeyPoint>& keypoints, const cv::Mat& descriptors, cv::Mat& output) {
+	CV_DbgAssert(!keypoints.empty());
+	CV_DbgAssert(!descriptors.empty());
+	CV_DbgAssert(size.width>0 && size.height>0);
+	CV_DbgAssert(DESC_SIZE==2); // @@@ also relies on a constant desc size
+	CV_DbgAssert(descriptors.type()==CV_16UC1 || descriptors.type()==CV_16UC3);
+	const int nChannels = descriptors.channels();
+	const int nKeyPoints = (int)keypoints.size();
+	if(nChannels==1) {
+		output.create(size,CV_16UC1);
+		output = cv::Scalar_<ushort>(0);
+		for(int k=0; k<nKeyPoints; ++k)
+			output.at<ushort>(keypoints[k].pt) = descriptors.at<ushort>(k);
+	}
+	else { //nChannels==3
+		output.create(size,CV_16UC3);
+		output = cv::Scalar_<ushort>(0,0,0);
+		CV_DbgAssert(output.step.p[0]==(size_t)size.width*6 && descriptors.step.p[0]==6);
+		for(int k=0; k<nKeyPoints; ++k) {
+			unsigned short* output_ptr = (unsigned short*)(output.data + output.step.p[0]*(int)keypoints[k].pt.y);
+			const unsigned short* desc_ptr = (unsigned short*)(descriptors.data + descriptors.step.p[0]*k);
+			const int idx = 3*(int)keypoints[k].pt.x;
+			for(int n=0; n<3; ++n)
+				output_ptr[idx+n] = desc_ptr[n];
+		}
+	}
 }
 
-void LBSP::calcDescImgDiff(const cv::Mat& descImg1, const cv::Mat& descImg2, cv::Mat& output) {
-	CV_Assert(descImg1.size()==descImg2.size() && descImg1.type()==descImg2.type());
-	CV_Assert(LBSP_DESC_SIZE==2 && LBSP_DESC_SIZE*8<=UCHAR_MAX); // @@@ also relies on a constant desc size
-	CV_Assert(descImg1.type()==CV_16UC1 || descImg1.type()==CV_16UC3);
-	int multFact = UCHAR_MAX/(LBSP_DESC_SIZE*8);
-	std::vector<cv::Mat> res_planes(descImg1.channels());
-	for(int n=0; n<descImg1.channels(); ++n)
-		res_planes[n] = cv::Mat(descImg1.size(),CV_8UC1);
-	std::vector<cv::Mat> descImg1_planes, descImg2_planes;
-	cv::split(descImg1,descImg1_planes);
-	cv::split(descImg2,descImg2_planes);
-	for(size_t n=0; n<descImg1_planes.size(); ++n)
-		for(int i=0; i<descImg1.rows; ++i)
-			for(int j=0; j<descImg1.cols; ++j)
-				res_planes[n].at<uchar>(i,j) = multFact*cv::normHamming(&descImg1_planes[n].data[descImg1_planes[n].step[0]*i+descImg1_planes[n].step[1]*j],
-																		&descImg2_planes[n].data[descImg2_planes[n].step[0]*i+descImg2_planes[n].step[1]*j],
-																		LBSP_DESC_SIZE);
-	cv::merge(res_planes, output);
+void LBSP::calcDescImgDiff(const cv::Mat& desc1, const cv::Mat& desc2, cv::Mat& output) {
+	CV_DbgAssert(desc1.size()==desc2.size() && desc1.type()==desc2.type());
+	CV_DbgAssert(DESC_SIZE==2); // @@@ also relies on a constant desc size
+	CV_DbgAssert(desc1.type()==CV_16UC1 || desc1.type()==CV_16UC3);
+	CV_DbgAssert(CV_MAT_DEPTH(desc1.type())==CV_16U);
+	CV_DbgAssert(DESC_SIZE*8<=UCHAR_MAX);
+	const int nScaleFactor = UCHAR_MAX/(DESC_SIZE*8);
+	const int nChannels = CV_MAT_CN(desc1.type());
+	if(nChannels==1) {
+		output.create(desc1.size(),CV_8UC1);
+		CV_DbgAssert(desc1.step.p[0]==desc2.step.p[0] && desc1.step.p[1]==desc2.step.p[1] && desc1.step.p[1]==2);
+		for(int i=0; i<desc1.rows; ++i) {
+			const int idx = desc1.step.p[0]*i;
+			for(int j=0; j<desc1.cols; ++j)
+				output.at<uchar>(i,j) = nScaleFactor*hdist_ushort_8bitLUT(((unsigned short*)(desc1.data+idx))[j],((unsigned short*)(desc2.data+idx))[j]);
+		}
+	}
+	else { //nChannels==3
+		output.create(desc1.size(),CV_8UC3);
+		CV_DbgAssert(desc1.step.p[0]==desc2.step.p[0] && desc1.step.p[1]==desc2.step.p[1] && desc1.step.p[1]==6);
+		const int _step_row = desc1.step.p[0];
+		for(int i=0; i<desc1.rows; ++i) {
+			const unsigned short* desc1_ptr = (unsigned short*)(desc1.data + _step_row*i);
+			const unsigned short* desc2_ptr = (unsigned short*)(desc2.data + _step_row*i);
+			uchar* output_ptr = output.data + output.step.p[0]*i;
+			for(int j=0; j<desc1.cols; ++j) {
+				for(int n=0;n<3; ++n) {
+					int idx = 3*j+n;
+					output_ptr[idx] = nScaleFactor*hdist_ushort_8bitLUT(desc1_ptr[idx],desc2_ptr[idx]);
+				}
+			}
+		}
+	}
+}
+
+void LBSP::validateKeyPoints(std::vector<cv::KeyPoint>& keypoints, cv::Size imgsize) {
+	cv::KeyPointsFilter::runByImageBorder(keypoints,imgsize,PATCH_SIZE/2);
 }

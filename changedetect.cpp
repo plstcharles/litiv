@@ -1,12 +1,21 @@
 #include <opencv2/opencv.hpp>
 #include "LBSP.h"
-#include "DetectChange.h"
+#include "BackgroundSubtractorLBSP.h"
 #include <stdio.h>
 #include "DatasetUtils.h"
 
-#define WRITE_OUTPUT
-#define DISPLAY_OUTPUT
-#define WRITE_DISPLAY_OUTPUT
+#define WRITE_OUTPUT 1
+#define DISPLAY_OUTPUT 1
+#define WRITE_DISPLAY_OUTPUT 1
+
+const double dLearningRate = -1;
+const int nFGThreshold = 9;
+const int nFGSCThreshold = 11;
+const int nDescThreshold = 30;
+
+inline void WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bBottom=false) {
+	cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-10):10),cv::FONT_HERSHEY_PLAIN,0.7,cv::Scalar(255,0,0),1,CV_AA);
+}
 
 inline void writeResult(	const std::string& sResultsPath,
 							const std::string& sCatName,
@@ -23,43 +32,55 @@ inline void writeResult(	const std::string& sResultsPath,
 	cv::imwrite(sResultFilePath.str(), res, vnComprParams);
 }
 
-inline cv::Mat getDisplayResult(const cv::Mat& bgDescImg,
-								const cv::Mat& currDescImg,
-								const cv::Mat& currImg,
-								const cv::Mat& currResult) {
-	cv::Mat currDescDiff, currDescDiffBYTE, currDescImgBYTE, currResultBYTE;
-	LBSP::calcDescImgDiff(bgDescImg,currDescImg,currDescDiff);
-	currDescDiff.convertTo(currDescDiffBYTE,CV_8UC3);
-	currDescImg.convertTo(currDescImgBYTE,CV_8UC3);
-	cv::cvtColor(currResult,currResultBYTE,CV_GRAY2BGR);
-	cv::Mat display1H,display2H;
-	cv::hconcat(currImg,currDescImgBYTE,display1H);
-	cv::hconcat(currResultBYTE,currDescDiffBYTE,display2H);
+inline cv::Mat getDisplayResult(const cv::Mat& oInputImg,
+								const cv::Mat& oBGImg,
+								const cv::Mat& oBGDesc,
+								const cv::Mat& oFGMask,
+								std::vector<cv::KeyPoint> voKeyPoints) {
+	// note: this function is definitely NOT efficient in any way; it is only intended for debug purposes.
+	LBSP oExtractor(nDescThreshold);
+	oExtractor.setReference(oBGImg);
+	cv::Mat oInputDesc, oInputDescImg, oInputDescImgBYTE, oBGDescImg, oBGDescImgBYTE;
+	cv::Mat oDescDiffImg, oDescImgDiffBYTE, oFGMaskBYTE;
+	oExtractor.compute(oInputImg,voKeyPoints,oInputDesc);
+	LBSP::recreateDescImage(oInputImg.size(),voKeyPoints,oInputDesc,oInputDescImg);
+	LBSP::recreateDescImage(oInputImg.size(),voKeyPoints,oBGDesc,oBGDescImg);
+	LBSP::calcDescImgDiff(oInputDescImg,oBGDescImg,oDescDiffImg);
+	oInputDescImg.convertTo(oInputDescImgBYTE,CV_8UC3);
+	oBGDescImg.convertTo(oBGDescImgBYTE,CV_8UC3);
+	oDescDiffImg.convertTo(oDescImgDiffBYTE,CV_8UC3);
+	if(oInputImg.channels()==3)
+		cv::cvtColor(oFGMask,oFGMaskBYTE,CV_GRAY2BGR);
+	else
+		oFGMaskBYTE = oFGMask;
+	cv::Mat display1H,display2H,display3H;
+	cv::hconcat(oInputImg,oBGImg,display1H);
+	cv::hconcat(oInputDescImgBYTE,oBGDescImgBYTE,display2H);
+	cv::hconcat(oFGMaskBYTE,oDescImgDiffBYTE,display3H);
 	cv::Mat display;
 	cv::vconcat(display1H,display2H,display);
+	cv::vconcat(display,display3H,display);
 	return display;
 }
 
 int main( int argc, char** argv ) {
-	
-	bool training=true;
-	std::vector<CategoryInfo> voCategories;
 #ifndef WIN32
 	std::string sDatasetPath = "/shared/datasets/CDNet/dataset/";
 	std::string sResultsPath = "/shared/datasets/CDNet/results/";
-#else
+#else //WIN32
 	std::string sDatasetPath = "E:/datasets/CDNet/dataset/";
 	std::string sResultsPath = "E:/datasets/CDNet/results/";
-#endif
+#endif //WIN32
 	std::string sInputPrefix = "input/";
 	std::string sInputSuffix = ".jpg";
 	std::string sGroundtruthPrefix = "groundtruth/gt";
 	std::string sGroundtruthSuffix = ".png";
 	std::string sResultPrefix = "bin";
 	std::string sResultSuffix = ".png";
+	std::vector<CategoryInfo> voCategories;
 	std::cout << "Parsing dataset..." << std::endl;
 	try {
-		voCategories.push_back(CategoryInfo("baseline", sDatasetPath+"baseline"));
+		//voCategories.push_back(CategoryInfo("baseline", sDatasetPath+"baseline"));
 		//voCategories.push_back(CategoryInfo("cameraJitter", sDatasetPath+"cameraJitter"));
 		//voCategories.push_back(CategoryInfo("dynamicBackground", sDatasetPath+"dynamicBackground"));
 		//voCategories.push_back(CategoryInfo("intermittentObjectMotion", sDatasetPath+"intermittentObjectMotion"));
@@ -67,6 +88,9 @@ int main( int argc, char** argv ) {
 		voCategories.push_back(CategoryInfo("thermal", sDatasetPath+"thermal"));
 	} catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
 	std::cout << "Parsing complete. [" << voCategories.size() << " categories]" << std::endl << std::endl;
+	std::vector<int> vnCompressionParams;
+	vnCompressionParams.push_back(CV_IMWRITE_PNG_COMPRESSION);
+	vnCompressionParams.push_back(9);
 	for(size_t i=0; i<voCategories.size(); i++) {
 		CategoryInfo& oCurrCategory = voCategories[i];
 		std::cout << "Processing category " << i+1 << "/" << voCategories.size() << "... (" << oCurrCategory.sName << ")" << std::endl;
@@ -75,75 +99,32 @@ int main( int argc, char** argv ) {
 				SequenceInfo* pCurrSequence = oCurrCategory.vpSequences[j];
 				std::cout << "\tProcessing sequence " << j+1 << "/" << oCurrCategory.vpSequences.size() << "... (" << pCurrSequence->sName << ")" << std::endl;
 				assert(pCurrSequence->vsInputFramePaths.size()>1);
-				std::vector<cv::KeyPoint> keypointsA;
-				cv::Mat descriptorsA;
-				cv::Mat descimage, descimage2, descimage3, imgprev, imgres;
-				std::vector<int> compression_params;
-				compression_params.push_back(CV_IMWRITE_PNG_COMPRESSION);
-				compression_params.push_back(9);
-				cv::DenseFeatureDetector detector(	1.0f,	// init feature scale
-													1,		// feature scale levels
-													1.0f,	// feature scale mult
-													1,		// init xy step
-													0,		// init img bound
-													true,	// var xy step with scale
-													false	// var img bound with scale
-													);		// note: the extractor will remove keypoints that are out of bounds itself
-				LBSP extractor(30);
-				DetectChange DC(28,50,30);
-				cv::Mat imgA = cv::imread(pCurrSequence->vsInputFramePaths[0], cv::IMREAD_COLOR);
-#ifdef WRITE_DISPLAY_OUTPUT
-				cv::VideoWriter oWriter(sResultsPath+"/"+oCurrCategory.sName+"/"+pCurrSequence->sName+".avi",CV_FOURCC('X','V','I','D'),30,imgA.size()*2,true);
-#endif
-				cv::GaussianBlur(imgA, imgA, cv::Size2i(5,5), 3, 3);
-				if(keypointsA.capacity()<(size_t)(imgA.cols*imgA.rows))
-					keypointsA.reserve(imgA.cols*imgA.rows);
-				detector.detect(imgA, keypointsA);
-				extractor.setReference(cv::Mat());
-				extractor.compute(imgA, keypointsA, descriptorsA);
-				LBSP::recreateDescImage(imgA.channels(),imgA.rows,imgA.cols,keypointsA,descriptorsA,descimage);
-				DC.setBGModel(descimage, imgA);
-				DC.compute(descimage, imgres);
-#ifdef DISPLAY_OUTPUT
-				cv::Mat display = getDisplayResult(DC.getBGDesc(),descimage,imgA,imgres);
-				cv::imshow("display", display);
-#ifdef WRITE_DISPLAY_OUTPUT
-				oWriter.write(display);
-#endif
-				cv::waitKey(1);
-#endif
-#ifdef WRITE_OUTPUT
-				writeResult(sResultsPath,oCurrCategory.sName,pCurrSequence->sName,sResultPrefix,1,sResultSuffix,imgres,compression_params);
-#endif
-				for(size_t k=1; k<pCurrSequence->vsInputFramePaths.size(); k++) {
+				cv::Mat oFGMask, oInputImg = cv::imread(pCurrSequence->vsInputFramePaths[0], (oCurrCategory.sName=="thermal")?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+				BackgroundSubtractorLBSP oBGSubtr(nDescThreshold,nFGThreshold,nFGSCThreshold);
+				oBGSubtr.initialize(oInputImg.size(),oInputImg.type());
+#if DISPLAY_OUTPUT && WRITE_DISPLAY_OUTPUT
+				cv::VideoWriter oWriter(sResultsPath+"/"+oCurrCategory.sName+"/"+pCurrSequence->sName+".avi",CV_FOURCC('X','V','I','D'),30,oInputImg.size()*2,true);
+#endif //DISPLAY_OUTPUT && WRITE_DISPLAY_OUTPUT
+				for(size_t k=0; k<pCurrSequence->vsInputFramePaths.size(); k++) {
 					std::cout << "\t\t[F:" << k << "/" << pCurrSequence->vsInputFramePaths.size() << "]" << std::endl;
-					imgA = cv::imread(pCurrSequence->vsInputFramePaths[k], cv::IMREAD_COLOR);
-					cv::GaussianBlur(imgA, imgA, cv::Size2i(5,5), 3, 3);
-					if(k==500) training=false;
-					LBSP::computeImpl(imgA,DC.getBGImage(),keypointsA,descriptorsA,extractor.getAbsThreshold());
-					LBSP::recreateDescImage(imgA.channels(),imgA.rows,imgA.cols,keypointsA,descriptorsA,descimage);
-					if(training) {
-						LBSP::computeImpl(imgA,DC.getBGImage2(),keypointsA,descriptorsA,extractor.getAbsThreshold());
-						LBSP::recreateDescImage(imgA.channels(),imgA.rows,imgA.cols,keypointsA,descriptorsA,descimage2);
-						LBSP::computeImpl(imgA,cv::Mat(),keypointsA,descriptorsA,extractor.getAbsThreshold());
-						LBSP::recreateDescImage(imgA.channels(),imgA.rows,imgA.cols,keypointsA,descriptorsA,descimage3);
-						training = DC.trainandcompute(descimage, descimage2, descimage3, imgA, imgres);
-						if(!training)
-							std::cout << "all code stable!" << std::endl;
-					}
-					else
-						DC.compute(descimage, imgres);
-#ifdef DISPLAY_OUTPUT
-					cv::Mat display = getDisplayResult(DC.getBGDesc(),descimage,imgA,imgres);
+					oInputImg = cv::imread(pCurrSequence->vsInputFramePaths[k], (oCurrCategory.sName=="thermal")?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+#if DISPLAY_OUTPUT
+					cv::Mat oLastBGImg = oBGSubtr.getCurrentBGImage();
+					cv::Mat oLastBGDesc = oBGSubtr.getCurrentBGDescriptors();
+#endif //DISPLAY_OUTPUT
+					cv::GaussianBlur(oInputImg, oInputImg, cv::Size2i(5,5), 3, 3);
+					oBGSubtr(oInputImg, oFGMask, dLearningRate);
+#if DISPLAY_OUTPUT
+					cv::Mat display = getDisplayResult(oInputImg,oLastBGImg,oLastBGDesc,oFGMask,oBGSubtr.getBGKeyPoints());
 					cv::imshow("display", display);
-#ifdef WRITE_DISPLAY_OUTPUT
+#if WRITE_DISPLAY_OUTPUT
 					oWriter.write(display);
-#endif
+#endif //WRITE_DISPLAY_OUTPUT
 					cv::waitKey(1);
-#endif
-#ifdef WRITE_OUTPUT
-					writeResult(sResultsPath,oCurrCategory.sName,pCurrSequence->sName,sResultPrefix,k+1,sResultSuffix,imgres,compression_params);
-#endif
+#endif //DISPLAY_OUTPUT
+#if WRITE_OUTPUT
+					writeResult(sResultsPath,oCurrCategory.sName,pCurrSequence->sName,sResultPrefix,k+1,sResultSuffix,oFGMask,vnCompressionParams);
+#endif //WRITE_OUTPUT
 				}
 			}
 			catch(cv::Exception& e) {std::cout << e.what() << std::endl;}

@@ -1,4 +1,5 @@
-// note: this is the LBSP 16 bit double-cross pattern as used in the original article by G.-A. Bilodeau et al
+// note: this is the LBSP 16 bit double-cross single channel pattern as used in
+// the original article by G.-A. Bilodeau et al.
 // 
 //  O   O   O         15 .. 14 .. 13
 //    O	O O           .. 12 11 10 ..
@@ -8,20 +9,20 @@
 //
 // must be defined externally:
 //		_t			(uchar, absolute threshold used for comparisons)
-//		_ref		(uchar, reference value used for comparisons)
-//		_data		(uchar*, image data to be covered by the pattern)
+//		_data		(uchar*, single-channel data to be covered by the pattern)
+//		_refdata	(uchar*, single-channel data to be used for comparisons)
 //		_y			(int, pattern rows location in the image data)
 //		_x			(int, pattern cols location in the image data)
 //		_step_row	(int, step size between rows, including padding)
-//		_step_col	(int, step size between cols, including padding)
-//		_res		(uint16, 16 bit result vector)
+//		_res		(ushort, 16 bit result vector)
 
 #if defined(_val) || defined(_absdiff)
 #error "definitions clash detected"
 #endif
-#define _val(a,b) _data[_step_row*(_y+b)+_step_col*(_x+a)]
+#define _val(x,y) _data[_step_row*(_y+y)+_x+x]
 #define _absdiff(a,b) (a<b?b-a:a-b)
-	    
+
+const uchar _ref = _refdata[_step_row*(_y)+_x];
 _res= ((_absdiff(_val(-2, 2),_ref) > _t) << 15)
 	+ ((_absdiff(_val( 0, 2),_ref) > _t) << 14)
 	+ ((_absdiff(_val( 2, 2),_ref) > _t) << 13)
