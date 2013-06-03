@@ -4,9 +4,9 @@
 #include <stdio.h>
 #include "DatasetUtils.h"
 
-#define WRITE_OUTPUT 1
-#define DISPLAY_OUTPUT 1
-#define WRITE_DISPLAY_OUTPUT 1
+#define WRITE_OUTPUT 0
+#define DISPLAY_OUTPUT 0
+#define WRITE_DISPLAY_OUTPUT 0
 
 const double dLearningRate = -1;
 const int nFGThreshold = 9;
@@ -80,7 +80,7 @@ int main( int argc, char** argv ) {
 	std::vector<CategoryInfo> voCategories;
 	std::cout << "Parsing dataset..." << std::endl;
 	try {
-		//voCategories.push_back(CategoryInfo("baseline", sDatasetPath+"baseline"));
+		voCategories.push_back(CategoryInfo("baseline", sDatasetPath+"baseline"));
 		//voCategories.push_back(CategoryInfo("cameraJitter", sDatasetPath+"cameraJitter"));
 		//voCategories.push_back(CategoryInfo("dynamicBackground", sDatasetPath+"dynamicBackground"));
 		//voCategories.push_back(CategoryInfo("intermittentObjectMotion", sDatasetPath+"intermittentObjectMotion"));
@@ -101,7 +101,7 @@ int main( int argc, char** argv ) {
 				assert(pCurrSequence->vsInputFramePaths.size()>1);
 				cv::Mat oFGMask, oInputImg = cv::imread(pCurrSequence->vsInputFramePaths[0], (oCurrCategory.sName=="thermal")?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
 				BackgroundSubtractorLBSP oBGSubtr(nDescThreshold,nFGThreshold,nFGSCThreshold);
-				oBGSubtr.initialize(oInputImg.size(),oInputImg.type());
+				oBGSubtr.initialize(oInputImg);
 #if DISPLAY_OUTPUT && WRITE_DISPLAY_OUTPUT
 				cv::VideoWriter oWriter(sResultsPath+"/"+oCurrCategory.sName+"/"+pCurrSequence->sName+".avi",CV_FOURCC('X','V','I','D'),30,oInputImg.size()*2,true);
 #endif //DISPLAY_OUTPUT && WRITE_DISPLAY_OUTPUT
