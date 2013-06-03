@@ -19,6 +19,8 @@
 	used to determine if a pixel is foreground/background.
 
 	For more details on the different parameters, go to @@@@@@@@@@@@@@.
+
+	This algorithm is currently NOT thread-safe.
  */
 class BackgroundSubtractorLBSP : public cv::BackgroundSubtractor {
 public:
@@ -36,13 +38,8 @@ public:
 								);
 	//! default destructor
 	virtual ~BackgroundSubtractorLBSP();
-
-
-	// @@@@@ NOTE: might need to mutex the functions below...
-
-
 	//! (re)initiaization method; needs to be called before starting background subtraction (note: also reinitializes the keypoints vector)
-	virtual void initialize(const cv::Size& oFrameSize, int nFrameType);
+	virtual void initialize(const cv::Mat& oInitImg);
 	//! primary model update function
 	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRate=-1.0);
 	//! @@@@@@@@@@@@ ????
@@ -81,7 +78,5 @@ private:
 	bool m_bInitialized;
 	//! LBSP feature extractor
 	LBSP m_oExtractor;
-
-	bool gotbgmodel; // @@@@@@@@@@@
 };
 
