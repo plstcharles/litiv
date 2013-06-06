@@ -1,11 +1,15 @@
 #pragma once
-#ifndef DATASETUTILS_H_
-#define DATASETUTILS_H_
 
 #include <string>
 #include <vector>
 #include <stdexcept>
 #include <algorithm>
+#include <stdio.h>
+#include <stdlib.h>
+#include <iostream>
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 #ifdef WIN32
 #include <windows.h>
 #else
@@ -182,5 +186,3 @@ struct CategoryInfo {
 	std::string sName;
 	std::vector<SequenceInfo*> vpSequences;
 };
-
-#endif /* DATASETUTILS_H_ */
