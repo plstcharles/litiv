@@ -4,12 +4,14 @@
 #include <opencv2/video/background_segm.hpp>
 #include "LBSP.h"
 
-//! defines the default absolute threshold to be used when evaluating if a pixel is foreground or not
+//! defines the default value for BackgroundSubtractorLBSP::m_nFGThreshold
 #define BGSLBSP_DEFAULT_FG_THRESHOLD (9)
-//! defines the extra threshold value (over m_nFGThreshold) a single channel needs so we can automatically consider the whole pixel (and any other channel) as foreground
+//! defines the default difference between BackgroundSubtractorLBSP::m_nFGThreshold and BackgroundSubtractorLBSP::m_nFGSCThreshold
 #define BGSLBSP_DEFAULT_FG_SINGLECHANNEL_THRESHOLD_DIFF (2)
-//! defines the default absolute threshold a single channel needs so we can automatically consider the whole pixel (and any other channel) as foreground
+//! defines the default value for BackgroundSubtractorLBSP::m_nFGSCThreshold
 #define BGSLBSP_DEFAULT_FG_SINGLECHANNEL_THRESHOLD (BGSLBSP_DEFAULT_FG_THRESHOLD+BGSLBSP_DEFAULT_FG_SINGLECHANNEL_THRESHOLD_DIFF)
+//! defines the default value for BackgroundSubtractorLBSP::m_nBGSamples
+#define BGSLBSP_DEFAULT_BG_SAMPLES (8)
 
 /*!
 	Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
@@ -29,12 +31,14 @@ public:
 	//! full constructor based on the absolute LBSP extractor, with algorithm parameters passed as arguments
 	BackgroundSubtractorLBSP(	int nDescThreshold,
 								int nFGThreshold=BGSLBSP_DEFAULT_FG_THRESHOLD,
-								int nFGSCThreshold=BGSLBSP_DEFAULT_FG_SINGLECHANNEL_THRESHOLD
+								int nFGSCThreshold=BGSLBSP_DEFAULT_FG_SINGLECHANNEL_THRESHOLD,
+								int nBGSamples=BGSLBSP_DEFAULT_BG_SAMPLES
 								);
 	//! full constructor based on the relative LBSP extractor, with algorithm parameters passed as arguments
 	BackgroundSubtractorLBSP(	float fDescThreshold,
 								int nFGThreshold=BGSLBSP_DEFAULT_FG_THRESHOLD,
-								int nFGSCThreshold=BGSLBSP_DEFAULT_FG_SINGLECHANNEL_THRESHOLD
+								int nFGSCThreshold=BGSLBSP_DEFAULT_FG_SINGLECHANNEL_THRESHOLD,
+								int nBGSamples=BGSLBSP_DEFAULT_BG_SAMPLES
 								);
 	//! default destructor
 	virtual ~BackgroundSubtractorLBSP();
@@ -46,33 +50,33 @@ public:
 	virtual cv::AlgorithmInfo* info() const;
 	//! returns a copy of the latest reconstructed background image
 	cv::Mat getCurrentBGImage() const;
-	//! returns a copy of the latest background descriptors vector (note: these are paired with the model's keypoints list)
+	//! returns a copy of the latest background descriptors image
 	cv::Mat getCurrentBGDescriptors() const;
-	//! returns a displayable representation of the model's latest background descriptors vector
-	cv::Mat getCurrentBGDescriptorsImage() const;
 	//! returns the keypoints list used for descriptor extraction (note: by default, they are generated from the DenseFeatureDetector class, but the border points are removed)
 	std::vector<cv::KeyPoint> getBGKeyPoints() const;
-	//! sets the keypoints to be used for descriptor extraction, effectively setting the BGModel ROI (note: this function will remove all border points and bases itself on the current input size)
+	//! sets the keypoints to be used for descriptor extraction, effectively setting the BGModel ROI (note: this function will remove all border keypoints, and reinits the model's samples buffers)
 	void setBGKeyPoints(std::vector<cv::KeyPoint>& keypoints);
 
 private:
-	//! background image used as the reference image for comparisons
-	cv::Mat m_oBGImg;
-	//! background descriptors vector used as the reference vector for comparisons
-	cv::Mat m_oBGDesc;
-	//! contains the current background keypoints used for descriptor extraction
-	std::vector<cv::KeyPoint> m_voBGKeyPoints;
-	//! contains the current input image size
+	//! number of different samples per pixel/block to be taken from input frames to build the background model
+	const int m_nBGSamples;
+	//! background model pixel samples used as references for LBSP computations
+	std::vector<cv::Mat> m_voBGImg;
+	//! background model descriptors samples used as references for change detection (tied to m_voKeyPoints but shaped like the input frames)
+	std::vector<cv::Mat> m_voBGDesc;
+	//! background model keypoints used for LBSP descriptor extraction (specific to the input image size)
+	std::vector<cv::KeyPoint> m_voKeyPoints;
+	//! input image size
 	cv::Size m_oImgSize;
-	//! contains the current input image channel size
+	//! input image channel size
 	int m_nImgChannels;
-	//! contains the current input image type
+	//! input image type
 	int m_nImgType;
-	//! absolute descriptor change threshold used for foreground evaluation
+	//! absolute per-channel hamming distance threshold, used to calculate m_nCurrFGThreshold based on the number of channels in the input image
 	const int m_nFGThreshold;
-	//! absolute descriptor single-channel change threshold used for foreground evaluation (used along with m_nFGThreshold when m_nImgChannels>1)
+	//! absolute single-channel hamming distance override threshold, used for change detection along with m_nCurrFGThreshold only when m_nImgChannels>1
 	const int m_nFGSCThreshold;
-	//! m_nFGThreshold, adjusted for the current number of channels
+	//! absolute total hamming distance threshold, used for change detection
 	int m_nCurrFGThreshold;
 	//! defines whether or not the subtractor is fully initialized
 	bool m_bInitialized;

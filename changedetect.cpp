@@ -1,11 +1,8 @@
-#include <opencv2/opencv.hpp>
-#include "LBSP.h"
 #include "BackgroundSubtractorLBSP.h"
-#include <stdio.h>
 #include "DatasetUtils.h"
 
 #define WRITE_OUTPUT 0
-#define DISPLAY_OUTPUT 0
+#define DISPLAY_OUTPUT 1
 #define WRITE_DISPLAY_OUTPUT 0
 
 const double dLearningRate = -1;
@@ -40,23 +37,21 @@ inline cv::Mat getDisplayResult(const cv::Mat& oInputImg,
 	// note: this function is definitely NOT efficient in any way; it is only intended for debug purposes.
 	LBSP oExtractor(nDescThreshold);
 	oExtractor.setReference(oBGImg);
-	cv::Mat oInputDesc, oInputDescImg, oInputDescImgBYTE, oBGDescImg, oBGDescImgBYTE;
-	cv::Mat oDescDiffImg, oDescImgDiffBYTE, oFGMaskBYTE;
-	oExtractor.compute(oInputImg,voKeyPoints,oInputDesc);
-	LBSP::recreateDescImage(oInputImg.size(),voKeyPoints,oInputDesc,oInputDescImg);
-	LBSP::recreateDescImage(oInputImg.size(),voKeyPoints,oBGDesc,oBGDescImg);
-	LBSP::calcDescImgDiff(oInputDescImg,oBGDescImg,oDescDiffImg);
-	oInputDescImg.convertTo(oInputDescImgBYTE,CV_8UC3);
-	oBGDescImg.convertTo(oBGDescImgBYTE,CV_8UC3);
-	oDescDiffImg.convertTo(oDescImgDiffBYTE,CV_8UC3);
+	cv::Mat oInputDesc, oInputDescBYTE, oBGDescBYTE;
+	cv::Mat oDescDiff, oDescDiffBYTE, oFGMaskBYTE;
+	oExtractor.compute2(oInputImg,voKeyPoints,oInputDesc);
+	LBSP::calcDescImgDiff(oInputDesc,oBGDesc,oDescDiff);
+	oInputDesc.convertTo(oInputDescBYTE,CV_8UC3);
+	oBGDesc.convertTo(oBGDescBYTE,CV_8UC3);
+	oDescDiff.convertTo(oDescDiffBYTE,CV_8UC3);
 	if(oInputImg.channels()==3)
 		cv::cvtColor(oFGMask,oFGMaskBYTE,CV_GRAY2BGR);
 	else
 		oFGMaskBYTE = oFGMask;
 	cv::Mat display1H,display2H,display3H;
 	cv::hconcat(oInputImg,oBGImg,display1H);
-	cv::hconcat(oInputDescImgBYTE,oBGDescImgBYTE,display2H);
-	cv::hconcat(oFGMaskBYTE,oDescImgDiffBYTE,display3H);
+	cv::hconcat(oInputDescBYTE,oBGDescBYTE,display2H);
+	cv::hconcat(oFGMaskBYTE,oDescDiffBYTE,display3H);
 	cv::Mat display;
 	cv::vconcat(display1H,display2H,display);
 	cv::vconcat(display,display3H,display);
@@ -64,6 +59,9 @@ inline cv::Mat getDisplayResult(const cv::Mat& oInputImg,
 }
 
 int main( int argc, char** argv ) {
+	srand(0);
+	setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stderr, NULL, _IONBF, 0);
 #ifndef WIN32
 	std::string sDatasetPath = "/shared/datasets/CDNet/dataset/";
 	std::string sResultsPath = "/shared/datasets/CDNet/results/";
