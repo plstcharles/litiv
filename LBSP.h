@@ -59,8 +59,8 @@ public:
 	void compute2(const std::vector<cv::Mat>& imageCollection, std::vector<std::vector<cv::KeyPoint> >& pointCollection, std::vector<cv::Mat>& descCollection) const;
 
 	// utility functions, shortcut/lightweight/direct single-point LBSP computation functions for extra class flexibility
-	static void computeSingle(const cv::Mat1b& image, const cv::Mat1b& ref, cv::KeyPoint& keypoint, int threshold, ushort& descriptor);
-	static void computeSingle(const cv::Mat3b& image, const cv::Mat3b& ref, cv::KeyPoint& keypoint, int threshold, ushort descriptor[3]);
+	static void computeSingle(const cv::Mat& image, const cv::Mat& ref, const cv::KeyPoint& keypoint, int threshold, unsigned short& descriptor);
+	static void computeSingle(const cv::Mat& image, const cv::Mat& ref, const cv::KeyPoint& keypoint, int threshold, unsigned short* descriptors);
 
 protected:
 	//! classic 'compute' implementation, based on the regular DescriptorExtractor::computeImpl arguments & expected output
