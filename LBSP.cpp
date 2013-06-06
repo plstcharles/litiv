@@ -170,7 +170,7 @@ void LBSP::compute2(const std::vector<cv::Mat>& imageCollection, std::vector<std
         compute2(imageCollection[i], pointCollection[i], descCollection[i]);
 }
 
-void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const cv::KeyPoint& oKeyPoint, int nThreshold, unsigned short& _res) {
+void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const int nThreshold, unsigned short& _res) {
 	CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 	CV_DbgAssert(oInputImg.type()==CV_8UC1);
 	CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
@@ -180,12 +180,10 @@ void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const
 	const int _step_row = oInputImg.step.p[0];
 	const uchar* _data = oInputImg.data;
 	const uchar* _refdata = oRefImg.empty()?oInputImg.data:oRefImg.data;
-	const int _x = (int)oKeyPoint.pt.x;
-	const int _y = (int)oKeyPoint.pt.y;
 #include "LBSP_16bits_dbcross_1ch_abs.i"
 }
 
-void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const cv::KeyPoint& oKeyPoint, int nThreshold, unsigned short* _res) {
+void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const int nThreshold, unsigned short* _res) {
 	CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 	CV_DbgAssert(oInputImg.type()==CV_8UC3);
 	CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
@@ -195,8 +193,6 @@ void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const
 	const int _step_row = oInputImg.step.p[0];
 	const uchar* _data = oInputImg.data;
 	const uchar* _refdata = oRefImg.empty()?oInputImg.data:oRefImg.data;
-	const int _x = (int)oKeyPoint.pt.x;
-	const int _y = (int)oKeyPoint.pt.y;
 #include "LBSP_16bits_dbcross_3ch_abs.i"
 }
 

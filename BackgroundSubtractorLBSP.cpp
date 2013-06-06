@@ -3,13 +3,11 @@
 #include "HammingDist.h"
 #include <iostream>
 
-#define N_SAMPLES_NEEDED_FOR_BG 2
-
 // floor(fspecial('gaussian', 5, 0.7)*512)
-static const int nSamplesInitPatternWidth = 5;
-static const int nSamplesInitPatternHeight = 5;
-static const int nSamplesInitPatternTot = 502;
-static const int anSamplesInitPattern[25] = {
+static const int s_nSamplesInitPatternWidth = 5;
+static const int s_nSamplesInitPatternHeight = 5;
+static const int s_nSamplesInitPatternTot = 502;
+static const int s_anSamplesInitPattern[25] = {
 	0,     1,     2,     1,     0,
 	1,    21,    59,    21,     1,
 	2,    59,   166,    59,     2,
@@ -17,31 +15,52 @@ static const int anSamplesInitPattern[25] = {
 	0,     1,     2,     1,     0,
 };
 
-static inline void getRandSamplePosition(int& x_sample, int& y_sample, const int x_orig, const int y_orig, const int border, const cv::Size& size) {
-	int r = 1+rand()%nSamplesInitPatternTot;
-	for(x_sample=0; x_sample<nSamplesInitPatternWidth; ++x_sample) {
-		for(y_sample=0; y_sample<nSamplesInitPatternHeight; ++y_sample) {
-			r -= anSamplesInitPattern[x_sample*nSamplesInitPatternWidth + y_sample];
+static inline void getRandSamplePosition(int& x_sample, int& y_sample, const int x_orig, const int y_orig, const int border, const cv::Size& imgsize) {
+	int r = 1+rand()%s_nSamplesInitPatternTot;
+	for(x_sample=0; x_sample<s_nSamplesInitPatternWidth; ++x_sample) {
+		for(y_sample=0; y_sample<s_nSamplesInitPatternHeight; ++y_sample) {
+			r -= s_anSamplesInitPattern[x_sample*s_nSamplesInitPatternWidth + y_sample];
 			if(r<=0)
 				goto stop;
 		}
 	}
 	stop:
-	x_sample += x_orig-nSamplesInitPatternWidth/2;
-	y_sample += y_orig-nSamplesInitPatternHeight/2;
+	x_sample += x_orig-s_nSamplesInitPatternWidth/2;
+	y_sample += y_orig-s_nSamplesInitPatternHeight/2;
 	if(x_sample<border)
 		x_sample = border;
-	else if(x_sample>=size.width-border)
-		x_sample = size.width-border-1;
+	else if(x_sample>=imgsize.width-border)
+		x_sample = imgsize.width-border-1;
 	if(y_sample<border)
 		y_sample = border;
-	else if(y_sample>=size.height-border)
-		y_sample = size.height-border-1;
-	//printf("orig: [%d,%d]\t sample: [%d,%d]\n",x_orig,y_orig,x_sample,y_sample);
+	else if(y_sample>=imgsize.height-border)
+		y_sample = imgsize.height-border-1;
+}
+
+static const int s_anNeighborPatternSize = 8;
+static const int s_anNeighborPattern[8][2] = {
+	{-1, 1},  { 0, 1},  { 1, 1},
+	{-1, 0},            { 1, 0},
+	{-1,-1},  { 0,-1},  { 1,-1},
+};
+
+static inline void getRandNeighborPosition(int& x_neighbor, int& y_neighbor, const int x_orig, const int y_orig, const int border, const cv::Size& imgsize) {
+	int r = rand()%s_anNeighborPatternSize;
+	x_neighbor = x_orig+s_anNeighborPattern[r][0];
+	y_neighbor = y_orig+s_anNeighborPattern[r][1];
+	if(x_neighbor<border)
+		x_neighbor = border;
+	else if(x_neighbor>=imgsize.width-border)
+		x_neighbor = imgsize.width-border-1;
+	if(y_neighbor<border)
+		y_neighbor = border;
+	else if(y_neighbor>=imgsize.height-border)
+		y_neighbor = imgsize.height-border-1;
 }
 
 BackgroundSubtractorLBSP::BackgroundSubtractorLBSP()
 	:	 m_nBGSamples(BGSLBSP_DEFAULT_BG_SAMPLES)
+		,m_nRequiredBGSamples(BGSLBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES)
 		,m_voBGImg(BGSLBSP_DEFAULT_BG_SAMPLES)
 		,m_voBGDesc(BGSLBSP_DEFAULT_BG_SAMPLES)
 	 	,m_nFGThreshold(BGSLBSP_DEFAULT_FG_THRESHOLD)
@@ -55,8 +74,10 @@ BackgroundSubtractorLBSP::BackgroundSubtractorLBSP()
 BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(  int nDescThreshold
 													,int nFGThreshold
 													,int nFGSCThreshold
-													,int nBGSamples )
+													,int nBGSamples
+													,int nRequiredBGSamples)
 	:	 m_nBGSamples(nBGSamples)
+		,m_nRequiredBGSamples(nRequiredBGSamples)
 		,m_voBGImg(nBGSamples)
 		,m_voBGDesc(nBGSamples)
 		,m_nFGThreshold(nFGThreshold)
@@ -70,8 +91,10 @@ BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(  int nDescThreshold
 BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(	 float fDescThreshold
 													,int nFGThreshold
 													,int nFGSCThreshold
-													,int nBGSamples )
+													,int nBGSamples
+													,int nRequiredBGSamples)
 	:	 m_nBGSamples(nBGSamples)
+		,m_nRequiredBGSamples(nRequiredBGSamples)
 		,m_voBGImg(nBGSamples)
 		,m_voBGDesc(nBGSamples)
 		,m_nFGThreshold(nFGThreshold)
@@ -105,17 +128,17 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg) {
 	m_oExtractor.compute2(oInitImg,m_voKeyPoints,oInitDesc);
 	CV_Assert(m_voBGImg.size()==(size_t)m_nBGSamples);
 	const int nKeyPoints = (int)m_voKeyPoints.size();
-	int _y_sample, _x_sample;
+	int y_sample, x_sample;
 	if(m_nImgChannels==1) {
 		for(int s=0; s<m_nBGSamples; s++) {
 			m_voBGImg[s].create(m_oImgSize,m_nImgType);
 			m_voBGDesc[s].create(m_oImgSize,CV_16UC1);
 			for(int k=0; k<nKeyPoints; ++k) {
-				const int _y_orig = (int)m_voKeyPoints[k].pt.y;
-				const int _x_orig = (int)m_voKeyPoints[k].pt.x;
-				getRandSamplePosition(_x_sample,_y_sample,_x_orig,_y_orig,LBSP::DESC_SIZE/2,m_oImgSize);
-				m_voBGImg[s].at<uchar>(_y_orig,_x_orig) = oInitImg.at<uchar>(_y_sample,_x_sample);
-				m_voBGDesc[s].at<unsigned short>(_y_orig,_x_orig) = oInitDesc.at<unsigned short>(_y_sample,_x_sample);
+				const int y_orig = (int)m_voKeyPoints[k].pt.y;
+				const int x_orig = (int)m_voKeyPoints[k].pt.x;
+				getRandSamplePosition(x_sample,y_sample,x_orig,y_orig,LBSP::DESC_SIZE/2,m_oImgSize);
+				m_voBGImg[s].at<uchar>(y_orig,x_orig) = oInitImg.at<uchar>(y_sample,x_sample);
+				m_voBGDesc[s].at<unsigned short>(y_orig,x_orig) = oInitDesc.at<unsigned short>(y_sample,x_sample);
 			}
 		}
 	}
@@ -124,13 +147,13 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg) {
 			m_voBGImg[s].create(m_oImgSize,m_nImgType);
 			m_voBGDesc[s].create(m_oImgSize,CV_16UC3);
 			for(int k=0; k<nKeyPoints; ++k) {
-				const int _y_orig = (int)m_voKeyPoints[k].pt.y;
-				const int _x_orig = (int)m_voKeyPoints[k].pt.x;
-				getRandSamplePosition(_x_sample,_y_sample,_x_orig,_y_orig,LBSP::DESC_SIZE/2,m_oImgSize);
-				const int idx_orig_img = oInitImg.step.p[0]*_y_orig + oInitImg.step.p[1]*_x_orig;
-				const int idx_orig_desc = oInitDesc.step.p[0]*_y_orig + oInitDesc.step.p[1]*_x_orig;
-				const int idx_rand_img = oInitImg.step.p[0]*_y_sample + oInitImg.step.p[1]*_x_sample;
-				const int idx_rand_desc = oInitDesc.step.p[0]*_y_sample + oInitDesc.step.p[1]*_x_sample;
+				const int y_orig = (int)m_voKeyPoints[k].pt.y;
+				const int x_orig = (int)m_voKeyPoints[k].pt.x;
+				getRandSamplePosition(x_sample,y_sample,x_orig,y_orig,LBSP::DESC_SIZE/2,m_oImgSize);
+				const int idx_orig_img = oInitImg.step.p[0]*y_orig + oInitImg.step.p[1]*x_orig;
+				const int idx_orig_desc = oInitDesc.step.p[0]*y_orig + oInitDesc.step.p[1]*x_orig;
+				const int idx_rand_img = oInitImg.step.p[0]*y_sample + oInitImg.step.p[1]*x_sample;
+				const int idx_rand_desc = oInitDesc.step.p[0]*y_sample + oInitDesc.step.p[1]*x_sample;
 				uchar* bgimg_ptr = m_voBGImg[s].data+idx_orig_img;
 				const uchar* initimg_ptr = oInitImg.data+idx_rand_img;
 				unsigned short* bgdesc_ptr = (unsigned short*)(m_voBGDesc[s].data+idx_orig_desc);
@@ -147,40 +170,60 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg) {
 
 void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray _fgmask, double learningRate) {
 	CV_DbgAssert(m_bInitialized);
+	CV_DbgAssert(learningRate>0);
 	cv::Mat oInputImg = _image.getMat(), oInputDesc;
 	CV_DbgAssert(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize);
 	_fgmask.create(m_oImgSize,CV_8UC1);
 	cv::Mat oFGMask = _fgmask.getMat();
 	oFGMask = cv::Scalar_<uchar>(0);
-
 	const int nKeyPoints = (int)m_voKeyPoints.size();
 	const int nDescThreshold = m_oExtractor.getAbsThreshold();
+	const int nLearningRate = (int)learningRate;
 	if(m_nImgChannels==1) {
 		unsigned short inputdesc;
 		for(int k=0; k<nKeyPoints; ++k) {
+			const int x = (int)m_voKeyPoints[k].pt.x;
+			const int y = (int)m_voKeyPoints[k].pt.y;
 			int nGoodSamplesCount=0, nSampleIdx=0;
-			while(nGoodSamplesCount<N_SAMPLES_NEEDED_FOR_BG && nSampleIdx<m_nBGSamples) {
-				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],m_voKeyPoints[k],nDescThreshold,inputdesc);
-				if(hdist_ushort_8bitLUT(inputdesc,m_voBGDesc[nSampleIdx].at<unsigned short>(m_voKeyPoints[k].pt))<=m_nCurrFGThreshold)
+			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
+				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,nDescThreshold,inputdesc);
+				if(hdist_ushort_8bitLUT(inputdesc,m_voBGDesc[nSampleIdx].at<unsigned short>(y,x))<=m_nCurrFGThreshold)
 					nGoodSamplesCount++;
 				nSampleIdx++;
 			}
-			if(nGoodSamplesCount<N_SAMPLES_NEEDED_FOR_BG)
+			if(nGoodSamplesCount<m_nRequiredBGSamples)
 				oFGMask.at<uchar>(m_voKeyPoints[k].pt) = UCHAR_MAX;
 			else {
-				// @@@@@ randomly update BG model
+				if((rand()%nLearningRate)==0) {
+					int s_rand = rand()%m_nBGSamples;
+					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,nDescThreshold,inputdesc);
+					m_voBGDesc[s_rand].at<unsigned short>(y,x) = inputdesc;
+					m_voBGImg[s_rand].at<uchar>(y,x) = oInputImg.at<uchar>(y,x);
+				}
+				if((rand()%nLearningRate)==0) {
+					int s_rand = rand()%m_nBGSamples;
+					int x_rand,y_rand;
+					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::DESC_SIZE/2,m_oImgSize);
+					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,nDescThreshold,inputdesc);
+					m_voBGDesc[s_rand].at<unsigned short>(y_rand,x_rand) = inputdesc;
+					m_voBGImg[s_rand].at<uchar>(y_rand,x_rand) = oInputImg.at<uchar>(y,x);
+				}
 			}
 		}
 	}
 	else { //m_nImgChannels==3
 		unsigned short inputdesc[3];
 		int hdist[3];
+		const int desc_row_step = m_voBGDesc[0].step.p[0];
+		CV_DbgAssert(m_voBGDesc[0].step.p[1]==6);
 		for(int k=0; k<nKeyPoints; ++k) {
+			const int x = (int)m_voKeyPoints[k].pt.x;
+			const int y = (int)m_voKeyPoints[k].pt.y;
+			const int idx_desc = desc_row_step*y + 6*x;
 			int nGoodSamplesCount=0, nSampleIdx=0;
-			while(nGoodSamplesCount<N_SAMPLES_NEEDED_FOR_BG && nSampleIdx<m_nBGSamples) {
-				CV_DbgAssert(m_voBGDesc[nSampleIdx].step.p[1]==6);
-				const unsigned short* bgdesc_ptr = (unsigned short*)(m_voBGDesc[nSampleIdx].data + m_voBGDesc[nSampleIdx].step.p[0]*(int)m_voKeyPoints[k].pt.y + 6*(int)m_voKeyPoints[k].pt.x);
-				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],m_voKeyPoints[k],nDescThreshold,inputdesc);
+			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
+				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,nDescThreshold,inputdesc);
+				const unsigned short* bgdesc_ptr = (unsigned short*)(m_voBGDesc[nSampleIdx].data+idx_desc);
 				for(int n=0;n<3; ++n) {
 					hdist[n] = hdist_ushort_8bitLUT(inputdesc[n],bgdesc_ptr[n]);
 					if(hdist[n]>m_nFGSCThreshold)
@@ -194,10 +237,29 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 				skip:
 				nSampleIdx++;
 			}
-			if(nGoodSamplesCount<N_SAMPLES_NEEDED_FOR_BG)
+			if(nGoodSamplesCount<m_nRequiredBGSamples)
 				oFGMask.at<uchar>(m_voKeyPoints[k].pt) = UCHAR_MAX;
 			else {
-				// @@@@@ randomly update BG model
+				if((rand()%nLearningRate)==0) {
+					int s_rand = rand()%m_nBGSamples;
+					unsigned short* bgdesc_ptr = ((unsigned short*)(m_voBGDesc[s_rand].data + desc_row_step*y + 6*x));
+					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,nDescThreshold,bgdesc_ptr);
+					const int img_row_step = m_voBGImg[0].step.p[0];
+					for(int n=0; n<3; ++n)
+						*(m_voBGImg[s_rand].data + img_row_step*y + 3*x + n) = *(oInputImg.data + img_row_step*y + 3*x + n);
+					CV_DbgAssert(m_voBGImg[s_rand].at<cv::Vec3b>(y,x)==oInputImg.at<cv::Vec3b>(y,x));
+				}
+				if((rand()%nLearningRate)==0) {
+					int s_rand = rand()%m_nBGSamples;
+					int x_rand,y_rand;
+					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::DESC_SIZE/2,m_oImgSize);
+					unsigned short* bgdesc_ptr = ((unsigned short*)(m_voBGDesc[s_rand].data + desc_row_step*y_rand + 6*x_rand));
+					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,nDescThreshold,bgdesc_ptr);
+					const int img_row_step = m_voBGImg[0].step.p[0];
+					for(int n=0; n<3; ++n)
+						*(m_voBGImg[s_rand].data + img_row_step*y_rand + 3*x_rand + n) = *(oInputImg.data + img_row_step*y + 3*x + n);
+					CV_DbgAssert(m_voBGImg[s_rand].at<cv::Vec3b>(y_rand,x_rand)==oInputImg.at<cv::Vec3b>(y,x));
+				}
 			}
 		}
 	}
