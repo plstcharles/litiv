@@ -5,7 +5,7 @@
 #define DISPLAY_OUTPUT 1
 #define WRITE_DISPLAY_OUTPUT 0
 
-const double dLearningRate = -1;
+const double dLearningRate = 16;
 const int nFGThreshold = 9;
 const int nFGSCThreshold = 11;
 const int nDescThreshold = 30;
@@ -103,7 +103,7 @@ int main( int argc, char** argv ) {
 #if DISPLAY_OUTPUT && WRITE_DISPLAY_OUTPUT
 				cv::VideoWriter oWriter(sResultsPath+"/"+oCurrCategory.sName+"/"+pCurrSequence->sName+".avi",CV_FOURCC('X','V','I','D'),30,oInputImg.size()*2,true);
 #endif //DISPLAY_OUTPUT && WRITE_DISPLAY_OUTPUT
-				for(size_t k=0; k<pCurrSequence->vsInputFramePaths.size(); k++) {
+				for(size_t k=400; k<pCurrSequence->vsInputFramePaths.size(); k++) {
 					std::cout << "\t\t[F:" << k << "/" << pCurrSequence->vsInputFramePaths.size() << "]" << std::endl;
 					oInputImg = cv::imread(pCurrSequence->vsInputFramePaths[k], (oCurrCategory.sName=="thermal")?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
 #if DISPLAY_OUTPUT
@@ -123,8 +123,8 @@ int main( int argc, char** argv ) {
 #if WRITE_OUTPUT
 					writeResult(sResultsPath,oCurrCategory.sName,pCurrSequence->sName,sResultPrefix,k+1,sResultSuffix,oFGMask,vnCompressionParams);
 #endif //WRITE_OUTPUT
-					if(k==100)
-						return 0;
+					if(k==1000)
+						break;;
 				}
 			}
 			catch(cv::Exception& e) {std::cout << e.what() << std::endl;}

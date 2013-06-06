@@ -58,9 +58,10 @@ public:
 	//! batch version of LBSP::compute2(const cv::Mat& image, ...), also similar to DescriptorExtractor::compute(const std::vector<cv::Mat>& imageCollection, ...)
 	void compute2(const std::vector<cv::Mat>& imageCollection, std::vector<std::vector<cv::KeyPoint> >& pointCollection, std::vector<cv::Mat>& descCollection) const;
 
-	// utility functions, shortcut/lightweight/direct single-point LBSP computation functions for extra class flexibility
-	static void computeSingle(const cv::Mat& image, const cv::Mat& ref, const cv::KeyPoint& keypoint, int threshold, unsigned short& descriptor);
-	static void computeSingle(const cv::Mat& image, const cv::Mat& ref, const cv::KeyPoint& keypoint, int threshold, unsigned short* descriptors);
+	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel version)
+	static void computeSingle(const cv::Mat& image, const cv::Mat& ref, const int posX, const int posY, const int threshold, unsigned short& descriptor);
+	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (3-channels version)
+	static void computeSingle(const cv::Mat& image, const cv::Mat& ref, const int posX, const int posY, const int threshold, unsigned short* descriptors);
 
 protected:
 	//! classic 'compute' implementation, based on the regular DescriptorExtractor::computeImpl arguments & expected output
