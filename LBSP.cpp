@@ -64,39 +64,30 @@ static inline void lbsp_computeImpl(	const cv::Mat& oInputImg,
 	CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
 	CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
 	CV_DbgAssert(nThreshold>0 && nThreshold<=UCHAR_MAX);
-	cv::Mat _oRefImg = oRefImg;
-	if(_oRefImg.empty()) // default back to intra-frame comparisons
-		_oRefImg = oInputImg;
 	const uchar _t = (uchar)nThreshold;
 	const int nChannels = oInputImg.channels();
+	const int _step_row = oInputImg.step.p[0];
+	const uchar* _data = oInputImg.data;
+	const uchar* _refdata = oRefImg.empty()?oInputImg.data:oRefImg.data;
+	const int nKeyPoints = (int)voKeyPoints.size();
 	if(nChannels==1) {
-		oDesc.create(voKeyPoints.size(),1,CV_16UC1);
-		unsigned short _res;
-		const int _step_row = oInputImg.step.p[0];
+		oDesc.create(nKeyPoints,1,CV_16UC1);
 		CV_DbgAssert(oInputImg.step.p[1]==1);
-		const uchar* _data = oInputImg.data;
-		const uchar* _refdata = _oRefImg.data;
-		for(size_t k=0; k<voKeyPoints.size(); ++k) {
+		for(int k=0; k<nKeyPoints; ++k) {
 			const int _x = (int)voKeyPoints[k].pt.x;
 			const int _y = (int)voKeyPoints[k].pt.y;
+			unsigned short& _res = oDesc.at<unsigned short>(k);
 #include "LBSP_16bits_dbcross_1ch_abs.i"
-			oDesc.at<unsigned short>(k) = _res;
 		}
 	}
 	else { //nChannels==3
-		oDesc.create(voKeyPoints.size(),1,CV_16UC3);
-		unsigned short _res[3];
-		const int _step_row = oInputImg.step.p[0];
+		oDesc.create(nKeyPoints,1,CV_16UC3);
 		CV_DbgAssert(oInputImg.step.p[1]==3);
-		const uchar* _data = oInputImg.data;
-		const uchar* _refdata = _oRefImg.data;
-		for(size_t k=0; k<voKeyPoints.size(); ++k) {
+		for(int k=0; k<nKeyPoints; ++k) {
 			const int _x = (int)voKeyPoints[k].pt.x;
 			const int _y = (int)voKeyPoints[k].pt.y;
+			unsigned short* _res = ((unsigned short*)(oDesc.data + oDesc.step.p[0]*k));
 #include "LBSP_16bits_dbcross_3ch_abs.i"
-			unsigned short* desc_ptr = ((unsigned short*)(oDesc.data + oDesc.step.p[0]*k));
-			for(int n=0; n<3; ++n)
-				desc_ptr[n] = _res[n];
 		}
 	}
 }
@@ -110,39 +101,30 @@ static inline void lbsp_computeImpl2(	const cv::Mat& oInputImg,
 	CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
 	CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
 	CV_DbgAssert(nThreshold>0 && nThreshold<=UCHAR_MAX);
-	cv::Mat _oRefImg = oRefImg;
-	if(_oRefImg.empty()) // default back to intra-frame comparisons
-		_oRefImg = oInputImg;
 	const uchar _t = (uchar)nThreshold;
 	const int nChannels = oInputImg.channels();
+	const int _step_row = oInputImg.step.p[0];
+	const uchar* _data = oInputImg.data;
+	const uchar* _refdata = oRefImg.empty()?oInputImg.data:oRefImg.data;
+	const int nKeyPoints = (int)voKeyPoints.size();
 	if(nChannels==1) {
 		oDesc.create(oInputImg.size(),CV_16UC1);
-		unsigned short _res;
-		const int _step_row = oInputImg.step.p[0];
 		CV_DbgAssert(oInputImg.step.p[1]==1);
-		const uchar* _data = oInputImg.data;
-		const uchar* _refdata = _oRefImg.data;
-		for(size_t k=0; k<voKeyPoints.size(); ++k) {
+		for(int k=0; k<nKeyPoints; ++k) {
 			const int _x = (int)voKeyPoints[k].pt.x;
 			const int _y = (int)voKeyPoints[k].pt.y;
+			unsigned short& _res = oDesc.at<unsigned short>(_y,_x);
 #include "LBSP_16bits_dbcross_1ch_abs.i"
-			oDesc.at<unsigned short>(_y,_x) = _res;
 		}
 	}
 	else { //nChannels==3
 		oDesc.create(oInputImg.size(),CV_16UC3);
-		unsigned short _res[3];
-		const int _step_row = oInputImg.step.p[0];
 		CV_DbgAssert(oInputImg.step.p[1]==3);
-		const uchar* _data = oInputImg.data;
-		const uchar* _refdata = _oRefImg.data;
-		for(size_t k=0; k<voKeyPoints.size(); ++k) {
+		for(int k=0; k<nKeyPoints; ++k) {
 			const int _x = (int)voKeyPoints[k].pt.x;
 			const int _y = (int)voKeyPoints[k].pt.y;
+			unsigned short* _res = ((unsigned short*)(oDesc.data + oDesc.step.p[0]*_y + oDesc.step.p[1]*_x));
 #include "LBSP_16bits_dbcross_3ch_abs.i"
-			unsigned short* desc_ptr = ((unsigned short*)(oDesc.data + oDesc.step.p[0]*_y + oDesc.step.p[1]*_x));
-			for(int n=0; n<3; ++n)
-				desc_ptr[n] = _res[n];
 		}
 	}
 }
@@ -188,37 +170,31 @@ void LBSP::compute2(const std::vector<cv::Mat>& imageCollection, std::vector<std
         compute2(imageCollection[i], pointCollection[i], descCollection[i]);
 }
 
-void LBSP::computeSingle(const cv::Mat1b& oInputImg, const cv::Mat1b& oRefImg, cv::KeyPoint& oKeyPoint, int nThreshold, ushort& _res) {
+void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const cv::KeyPoint& oKeyPoint, int nThreshold, unsigned short& _res) {
 	CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 	CV_DbgAssert(oInputImg.type()==CV_8UC1);
 	CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
 	CV_DbgAssert(nThreshold>0 && nThreshold<=UCHAR_MAX);
-	cv::Mat _oRefImg = oRefImg;
-	if(_oRefImg.empty()) // default back to intra-frame comparisons
-		_oRefImg = oInputImg;
+	CV_DbgAssert(oInputImg.step.p[1]==1);
 	const uchar _t = (uchar)nThreshold;
 	const int _step_row = oInputImg.step.p[0];
-	CV_DbgAssert(oInputImg.step.p[1]==1);
 	const uchar* _data = oInputImg.data;
-	const uchar* _refdata = _oRefImg.data;
+	const uchar* _refdata = oRefImg.empty()?oInputImg.data:oRefImg.data;
 	const int _x = (int)oKeyPoint.pt.x;
 	const int _y = (int)oKeyPoint.pt.y;
 #include "LBSP_16bits_dbcross_1ch_abs.i"
 }
 
-void LBSP::computeSingle(const cv::Mat3b& oInputImg, const cv::Mat3b& oRefImg, cv::KeyPoint& oKeyPoint, int nThreshold, ushort _res[3]) {
+void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const cv::KeyPoint& oKeyPoint, int nThreshold, unsigned short* _res) {
 	CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 	CV_DbgAssert(oInputImg.type()==CV_8UC3);
 	CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
 	CV_DbgAssert(nThreshold>0 && nThreshold<=UCHAR_MAX);
-	cv::Mat _oRefImg = oRefImg;
-	if(_oRefImg.empty()) // default back to intra-frame comparisons
-		_oRefImg = oInputImg;
+	CV_DbgAssert(oInputImg.step.p[1]==3);
 	const uchar _t = (uchar)nThreshold;
 	const int _step_row = oInputImg.step.p[0];
-	CV_DbgAssert(oInputImg.step.p[1]==3);
 	const uchar* _data = oInputImg.data;
-	const uchar* _refdata = _oRefImg.data;
+	const uchar* _refdata = oRefImg.empty()?oInputImg.data:oRefImg.data;
 	const int _x = (int)oKeyPoint.pt.x;
 	const int _y = (int)oKeyPoint.pt.y;
 #include "LBSP_16bits_dbcross_3ch_abs.i"

@@ -123,6 +123,8 @@ int main( int argc, char** argv ) {
 #if WRITE_OUTPUT
 					writeResult(sResultsPath,oCurrCategory.sName,pCurrSequence->sName,sResultPrefix,k+1,sResultSuffix,oFGMask,vnCompressionParams);
 #endif //WRITE_OUTPUT
+					if(k==100)
+						return 0;
 				}
 			}
 			catch(cv::Exception& e) {std::cout << e.what() << std::endl;}

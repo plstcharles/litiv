@@ -154,12 +154,13 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 	oFGMask = cv::Scalar_<uchar>(0);
 
 	const int nKeyPoints = (int)m_voKeyPoints.size();
+	const int nDescThreshold = m_oExtractor.getAbsThreshold();
 	if(m_nImgChannels==1) {
 		unsigned short inputdesc;
 		for(int k=0; k<nKeyPoints; ++k) {
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<N_SAMPLES_NEEDED_FOR_BG && nSampleIdx<m_nBGSamples) {
-				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],m_voKeyPoints[k],m_oExtractor.getAbsThreshold(),inputdesc);
+				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],m_voKeyPoints[k],nDescThreshold,inputdesc);
 				if(hdist_ushort_8bitLUT(inputdesc,m_voBGDesc[nSampleIdx].at<unsigned short>(m_voKeyPoints[k].pt))<=m_nCurrFGThreshold)
 					nGoodSamplesCount++;
 				nSampleIdx++;
@@ -179,7 +180,7 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 			while(nGoodSamplesCount<N_SAMPLES_NEEDED_FOR_BG && nSampleIdx<m_nBGSamples) {
 				CV_DbgAssert(m_voBGDesc[nSampleIdx].step.p[1]==6);
 				const unsigned short* bgdesc_ptr = (unsigned short*)(m_voBGDesc[nSampleIdx].data + m_voBGDesc[nSampleIdx].step.p[0]*(int)m_voKeyPoints[k].pt.y + 6*(int)m_voKeyPoints[k].pt.x);
-				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],m_voKeyPoints[k],m_oExtractor.getAbsThreshold(),inputdesc);
+				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],m_voKeyPoints[k],nDescThreshold,inputdesc);
 				for(int n=0;n<3; ++n) {
 					hdist[n] = hdist_ushort_8bitLUT(inputdesc[n],bgdesc_ptr[n]);
 					if(hdist[n]>m_nFGSCThreshold)
