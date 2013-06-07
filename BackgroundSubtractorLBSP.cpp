@@ -210,7 +210,7 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 			}
 		}
 	}
-	cv::medianBlur(oFGMask,oFGMask,3);
+	cv::medianBlur(oFGMask,oFGMask,5);
 }
 
 cv::AlgorithmInfo* BackgroundSubtractorLBSP::info() const {
