@@ -48,7 +48,7 @@ public:
 	//! (re)initiaization method; needs to be called before starting background subtraction (note: also reinitializes the keypoints vector)
 	virtual void initialize(const cv::Mat& oInitImg);
 	//! primary model update function; the learning param is reinterpreted as an integer and should be >= 0 (smaller values == faster adaptation)
-	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRate=-1.0);
+	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRate=32);
 	//! @@@@@@@@@@@@ ????
 	virtual cv::AlgorithmInfo* info() const;
 	//! returns a copy of the latest reconstructed background image
