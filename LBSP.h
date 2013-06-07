@@ -3,7 +3,7 @@
 #include <opencv2/features2d/features2d.hpp>
 
 //! defines the default absolute threshold to be used when computing LBSP pattern comparisons
-#define LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD 10
+#define LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD 30
 //! defines the default relative threshold to be used when computing LBSP pattern comparisons
 #define LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD 0.1f
 
@@ -25,10 +25,12 @@ public:
 	//! utility, specifies the number of bytes per descriptor (should be the same as calling 'descriptorSize()')
 	static const int DESC_SIZE = 2;
 
+	//! default constructor, falls back to using absolute threshold with default params
+	LBSP();
 	//! constructor 1, threshold = absolute intensity 'similarity' threshold used when computing comparisons
-	explicit LBSP(int threshold=LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD);
+	explicit LBSP(int threshold/*=LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD*/);
 	//! constructor 2, threshold = relative intensity 'similarity' threshold used when computing comparisons
-	explicit LBSP(float threshold=LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD);
+	explicit LBSP(float threshold/*=LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD*/);
 	//! load extractor params from the specified file node @@@@ not impl
 	virtual void read(const cv::FileNode&);
 	//! write extractor params to the specified file storage @@@@ not impl

@@ -5,11 +5,6 @@
 #define DISPLAY_OUTPUT 1
 #define WRITE_DISPLAY_OUTPUT 0
 
-const double dLearningRate = 16;
-const int nFGThreshold = 9;
-const int nFGSCThreshold = 11;
-const int nDescThreshold = 30;
-
 inline void WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bBottom=false) {
 	cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-10):10),cv::FONT_HERSHEY_PLAIN,0.7,cv::Scalar(255,0,0),1,CV_AA);
 }
@@ -35,10 +30,9 @@ inline cv::Mat getDisplayResult(const cv::Mat& oInputImg,
 								const cv::Mat& oFGMask,
 								std::vector<cv::KeyPoint> voKeyPoints) {
 	// note: this function is definitely NOT efficient in any way; it is only intended for debug purposes.
-	LBSP oExtractor(nDescThreshold);
-	oExtractor.setReference(oBGImg);
 	cv::Mat oInputDesc, oInputDescBYTE, oBGDescBYTE;
 	cv::Mat oDescDiff, oDescDiffBYTE, oFGMaskBYTE;
+	LBSP oExtractor;
 	oExtractor.compute2(oInputImg,voKeyPoints,oInputDesc);
 	LBSP::calcDescImgDiff(oInputDesc,oBGDesc,oDescDiff);
 	oInputDesc.convertTo(oInputDescBYTE,CV_8UC3);
@@ -98,7 +92,7 @@ int main( int argc, char** argv ) {
 				std::cout << "\tProcessing sequence " << j+1 << "/" << pCurrCategory->vpSequences.size() << "... (" << pCurrSequence->sName << ")" << std::endl;
 				assert(pCurrSequence->vsInputFramePaths.size()>1);
 				cv::Mat oFGMask, oInputImg = cv::imread(pCurrSequence->vsInputFramePaths[0], (pCurrCategory->sName=="thermal")?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
-				BackgroundSubtractorLBSP oBGSubtr(nDescThreshold,nFGThreshold,nFGSCThreshold);
+				BackgroundSubtractorLBSP oBGSubtr;
 				oBGSubtr.initialize(oInputImg);
 #if DISPLAY_OUTPUT && WRITE_DISPLAY_OUTPUT
 				cv::VideoWriter oWriter(sResultsPath+"/"+pCurrCategory->sName+"/"+pCurrSequence->sName+".avi",CV_FOURCC('X','V','I','D'),30,oInputImg.size()*2,true);
@@ -111,7 +105,7 @@ int main( int argc, char** argv ) {
 					cv::Mat oLastBGDesc = oBGSubtr.getCurrentBGDescriptors();
 #endif //DISPLAY_OUTPUT
 					cv::GaussianBlur(oInputImg, oInputImg, cv::Size2i(5,5), 3, 3);
-					oBGSubtr(oInputImg, oFGMask, dLearningRate);
+					oBGSubtr(oInputImg, oFGMask);
 #if DISPLAY_OUTPUT
 					cv::Mat display = getDisplayResult(oInputImg,oLastBGImg,oLastBGDesc,oFGMask,oBGSubtr.getBGKeyPoints());
 					cv::imshow("display", display);

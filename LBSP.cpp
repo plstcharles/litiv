@@ -4,12 +4,19 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
 
+LBSP::LBSP()
+	:	 m_bUseRelativeThreshold(false)
+		,m_fThreshold(-1) // unused
+		,m_nThreshold(LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD)
+		,m_oRefImage() {
+	CV_DbgAssert(m_nThreshold>0 && m_nThreshold<=UCHAR_MAX);
+}
+
 LBSP::LBSP(int threshold)
 	:	 m_bUseRelativeThreshold(false)
 		,m_fThreshold(-1) // unused
 		,m_nThreshold(threshold)
-		,m_oRefImage() // invalid ref
-{
+		,m_oRefImage() {
 	CV_DbgAssert(m_nThreshold>0 && m_nThreshold<=UCHAR_MAX);
 }
 
@@ -18,7 +25,7 @@ LBSP::LBSP(float threshold)
 		,m_fThreshold(threshold)
 		,m_nThreshold(-1)
 		,m_oRefImage() {
-	CV_Assert(m_fThreshold>0 && m_fThreshold<=1);
+	CV_Assert(m_fThreshold>=0 && m_fThreshold<=1);
 }
 
 void LBSP::read(const cv::FileNode& fn) {
