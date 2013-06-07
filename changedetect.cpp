@@ -66,8 +66,8 @@ int main( int argc, char** argv ) {
 	std::string sDatasetPath = "/shared/datasets/CDNet/dataset/";
 	std::string sResultsPath = "/shared/datasets/CDNet/results/";
 #else //WIN32
-	std::string sDatasetPath = "E:/datasets/CDNet/dataset/";
-	std::string sResultsPath = "E:/datasets/CDNet/results/";
+	std::string sDatasetPath = "C:/datasets/CDNet/dataset/";
+	std::string sResultsPath = "C:/datasets/CDNet/results/";
 #endif //WIN32
 	std::string sInputPrefix = "input/";
 	std::string sInputSuffix = ".jpg";
@@ -75,37 +75,37 @@ int main( int argc, char** argv ) {
 	std::string sGroundtruthSuffix = ".png";
 	std::string sResultPrefix = "bin";
 	std::string sResultSuffix = ".png";
-	std::vector<CategoryInfo> voCategories;
+	std::vector<CategoryInfo*> vpCategories;
 	std::cout << "Parsing dataset..." << std::endl;
 	try {
-		voCategories.push_back(CategoryInfo("baseline", sDatasetPath+"baseline"));
+		vpCategories.push_back(new CategoryInfo("baseline", sDatasetPath+"baseline"));
 		//voCategories.push_back(CategoryInfo("cameraJitter", sDatasetPath+"cameraJitter"));
 		//voCategories.push_back(CategoryInfo("dynamicBackground", sDatasetPath+"dynamicBackground"));
 		//voCategories.push_back(CategoryInfo("intermittentObjectMotion", sDatasetPath+"intermittentObjectMotion"));
 		//voCategories.push_back(CategoryInfo("shadow", sDatasetPath+"shadow"));
-		voCategories.push_back(CategoryInfo("thermal", sDatasetPath+"thermal"));
+		vpCategories.push_back(new CategoryInfo("thermal", sDatasetPath+"thermal"));
 	} catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
-	std::cout << "Parsing complete. [" << voCategories.size() << " categories]" << std::endl << std::endl;
+	std::cout << "Parsing complete. [" << vpCategories.size() << " categories]" << std::endl << std::endl;
 	std::vector<int> vnCompressionParams;
 	vnCompressionParams.push_back(CV_IMWRITE_PNG_COMPRESSION);
 	vnCompressionParams.push_back(9);
-	for(size_t i=0; i<voCategories.size(); i++) {
-		CategoryInfo& oCurrCategory = voCategories[i];
-		std::cout << "Processing category " << i+1 << "/" << voCategories.size() << "... (" << oCurrCategory.sName << ")" << std::endl;
-		for(size_t j=0; j<oCurrCategory.vpSequences.size(); j++) {
+	for(size_t i=0; i<vpCategories.size(); i++) {
+		CategoryInfo* pCurrCategory = vpCategories[i];
+		std::cout << "Processing category " << i+1 << "/" << vpCategories.size() << "... (" << pCurrCategory->sName << ")" << std::endl;
+		for(size_t j=0; j<pCurrCategory->vpSequences.size(); j++) {
 			try {
-				SequenceInfo* pCurrSequence = oCurrCategory.vpSequences[j];
-				std::cout << "\tProcessing sequence " << j+1 << "/" << oCurrCategory.vpSequences.size() << "... (" << pCurrSequence->sName << ")" << std::endl;
+				SequenceInfo* pCurrSequence = pCurrCategory->vpSequences[j];
+				std::cout << "\tProcessing sequence " << j+1 << "/" << pCurrCategory->vpSequences.size() << "... (" << pCurrSequence->sName << ")" << std::endl;
 				assert(pCurrSequence->vsInputFramePaths.size()>1);
-				cv::Mat oFGMask, oInputImg = cv::imread(pCurrSequence->vsInputFramePaths[0], (oCurrCategory.sName=="thermal")?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+				cv::Mat oFGMask, oInputImg = cv::imread(pCurrSequence->vsInputFramePaths[0], (pCurrCategory->sName=="thermal")?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
 				BackgroundSubtractorLBSP oBGSubtr(nDescThreshold,nFGThreshold,nFGSCThreshold);
 				oBGSubtr.initialize(oInputImg);
 #if DISPLAY_OUTPUT && WRITE_DISPLAY_OUTPUT
-				cv::VideoWriter oWriter(sResultsPath+"/"+oCurrCategory.sName+"/"+pCurrSequence->sName+".avi",CV_FOURCC('X','V','I','D'),30,oInputImg.size()*2,true);
+				cv::VideoWriter oWriter(sResultsPath+"/"+pCurrCategory->sName+"/"+pCurrSequence->sName+".avi",CV_FOURCC('X','V','I','D'),30,oInputImg.size()*2,true);
 #endif //DISPLAY_OUTPUT && WRITE_DISPLAY_OUTPUT
-				for(size_t k=400; k<pCurrSequence->vsInputFramePaths.size(); k++) {
+				for(size_t k=0; k<pCurrSequence->vsInputFramePaths.size(); k++) {
 					std::cout << "\t\t[F:" << k << "/" << pCurrSequence->vsInputFramePaths.size() << "]" << std::endl;
-					oInputImg = cv::imread(pCurrSequence->vsInputFramePaths[k], (oCurrCategory.sName=="thermal")?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+					oInputImg = cv::imread(pCurrSequence->vsInputFramePaths[k], (pCurrCategory->sName=="thermal")?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
 #if DISPLAY_OUTPUT
 					cv::Mat oLastBGImg = oBGSubtr.getCurrentBGImage();
 					cv::Mat oLastBGDesc = oBGSubtr.getCurrentBGDescriptors();
@@ -121,10 +121,8 @@ int main( int argc, char** argv ) {
 					cv::waitKey(1);
 #endif //DISPLAY_OUTPUT
 #if WRITE_OUTPUT
-					writeResult(sResultsPath,oCurrCategory.sName,pCurrSequence->sName,sResultPrefix,k+1,sResultSuffix,oFGMask,vnCompressionParams);
+					writeResult(sResultsPath,pCurrCategory->sName,pCurrSequence->sName,sResultPrefix,k+1,sResultSuffix,oFGMask,vnCompressionParams);
 #endif //WRITE_OUTPUT
-					if(k==1000)
-						break;;
 				}
 			}
 			catch(cv::Exception& e) {std::cout << e.what() << std::endl;}
@@ -132,4 +130,8 @@ int main( int argc, char** argv ) {
 			catch(...) {std::cout << "Caught unknown exception." << std::endl;}
 		}
 	}
+	for(size_t i=0; i<vpCategories.size(); i++) {
+		delete vpCategories[i];
+	}
+	vpCategories.clear();
 }

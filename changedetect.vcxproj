@@ -20,14 +20,14 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v110</PlatformToolset>
+    <PlatformToolset>v100</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <PlatformToolset>v110</PlatformToolset>
+    <PlatformToolset>v100</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -59,14 +59,14 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\opencv\build\x86\vc10\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opencv_features2d245d.lib;opencv_core245d.lib;opencv_highgui245d.lib;opencv_imgproc245d.lib;opencv_objdetect245d.lib;opencv_contrib245d.lib;opencv_nonfree245d.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opencv_features2d245d.lib;opencv_core245d.lib;opencv_highgui245d.lib;opencv_imgproc245d.lib;opencv_objdetect245d.lib;opencv_contrib245d.lib;opencv_nonfree245d.lib;opencv_video245d.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <Optimization>MaxSpeed</Optimization>
+      <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -75,6 +75,8 @@
       </PrecompiledHeaderFile>
       <MultiProcessorCompilation>false</MultiProcessorCompilation>
       <OpenMPSupport>true</OpenMPSupport>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -82,21 +84,24 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>C:\opencv\build\x86\vc10\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>opencv_features2d245.lib;opencv_core245.lib;opencv_highgui245.lib;opencv_imgproc245.lib;opencv_objdetect245.lib;opencv_contrib245.lib;opencv_nonfree245.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opencv_features2d245.lib;opencv_core245.lib;opencv_highgui245.lib;opencv_imgproc245.lib;opencv_objdetect245.lib;opencv_contrib245.lib;opencv_nonfree245.lib;opencv_video245.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <None Include="LBSP_16bits_dbcross_1ch_abs.i" />
+    <None Include="LBSP_16bits_dbcross_3ch_abs.i" />
     <None Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="LBSP.cpp" />
-    <ClCompile Include="changedetect.cpp" />
-    <ClCompile Include="DetectChange.cpp" />
+    <ClInclude Include="BackgroundSubtractorLBSP.h" />
+    <ClInclude Include="DatasetUtils.h" />
+    <ClInclude Include="HammingDist.h" />
+    <ClInclude Include="LBSP.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="LBSP.h" />
-    <ClInclude Include="DatasetUtils.h" />
-    <ClInclude Include="DetectChange.h" />
+    <ClCompile Include="BackgroundSubtractorLBSP.cpp" />
+    <ClCompile Include="changedetect.cpp" />
+    <ClCompile Include="LBSP.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

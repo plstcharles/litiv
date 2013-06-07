@@ -16,27 +16,36 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="ReadMe.txt" />
+    <None Include="LBSP_16bits_dbcross_1ch_abs.i">
+      <Filter>Fichiers sources</Filter>
+    </None>
+    <None Include="LBSP_16bits_dbcross_3ch_abs.i">
+      <Filter>Fichiers sources</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BackgroundSubtractorLBSP.h">
+      <Filter>Fichiers d%27en-tête</Filter>
+    </ClInclude>
+    <ClInclude Include="DatasetUtils.h">
+      <Filter>Fichiers d%27en-tête</Filter>
+    </ClInclude>
+    <ClInclude Include="HammingDist.h">
+      <Filter>Fichiers d%27en-tête</Filter>
+    </ClInclude>
+    <ClInclude Include="LBSP.h">
+      <Filter>Fichiers d%27en-tête</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="BackgroundSubtractorLBSP.cpp">
+      <Filter>Fichiers sources</Filter>
+    </ClCompile>
     <ClCompile Include="changedetect.cpp">
       <Filter>Fichiers sources</Filter>
     </ClCompile>
     <ClCompile Include="LBSP.cpp">
       <Filter>Fichiers sources</Filter>
     </ClCompile>
-    <ClCompile Include="DetectChange.cpp">
-      <Filter>Fichiers sources</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="LBSP.h">
-      <Filter>Fichiers d%27en-tête</Filter>
-    </ClInclude>
-    <ClInclude Include="DetectChange.h">
-      <Filter>Fichiers d%27en-tête</Filter>
-    </ClInclude>
-    <ClInclude Include="DatasetUtils.h">
-      <Filter>Fichiers d%27en-tête</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>

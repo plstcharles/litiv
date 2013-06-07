@@ -36,6 +36,7 @@ static inline void GetFilesFromDir(const std::string& sDirPath, std::vector<std:
 			vsFilePaths.reserve(nFiles);
 			h = FindFirstFile(dir.c_str(),&ffd);
 			assert(h!=INVALID_HANDLE_VALUE);
+			ret = TRUE;
 			while(ret) {
 				if(!(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
 					std::wstring file(ffd.cFileName);
@@ -87,6 +88,7 @@ static inline void GetSubDirsFromDir(const std::string& sDirPath, std::vector<st
 			vsSubDirPaths.reserve(nFiles);
 			h = FindFirstFile(dir.c_str(),&ffd);
 			assert(h!=INVALID_HANDLE_VALUE);
+			ret = TRUE;
 			while(ret) {
 				if(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
 					std::wstring subdir(ffd.cFileName);
