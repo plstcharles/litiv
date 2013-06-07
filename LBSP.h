@@ -3,7 +3,7 @@
 #include <opencv2/features2d/features2d.hpp>
 
 //! defines the default absolute threshold to be used when computing LBSP pattern comparisons
-#define LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD 25
+#define LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD 15
 //! defines the default relative threshold to be used when computing LBSP pattern comparisons
 #define LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD 0.1f
 

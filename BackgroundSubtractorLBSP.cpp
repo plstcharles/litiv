@@ -3,6 +3,7 @@
 #include "HammingDist.h"
 #include "RandUtils.h"
 #include <iostream>
+#include <opencv2/imgproc/imgproc.hpp>
 
 BackgroundSubtractorLBSP::BackgroundSubtractorLBSP()
 	:	 m_nBGSamples(BGSLBSP_DEFAULT_BG_SAMPLES)
@@ -209,6 +210,7 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 			}
 		}
 	}
+	cv::medianBlur(oFGMask,oFGMask,3);
 }
 
 cv::AlgorithmInfo* BackgroundSubtractorLBSP::info() const {

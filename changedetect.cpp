@@ -1,7 +1,7 @@
 #include "BackgroundSubtractorLBSP.h"
 #include "DatasetUtils.h"
 
-#define WRITE_OUTPUT 1
+#define WRITE_OUTPUT 0
 #define DISPLAY_OUTPUT 1
 #define WRITE_DISPLAY_OUTPUT 1
 
@@ -30,22 +30,34 @@ inline cv::Mat getDisplayResult(const cv::Mat& oInputImg,
 								const cv::Mat& oFGMask,
 								std::vector<cv::KeyPoint> voKeyPoints) {
 	// note: this function is definitely NOT efficient in any way; it is only intended for debug purposes.
-	cv::Mat oInputDesc, oInputDescBYTE, oBGDescBYTE;
-	cv::Mat oDescDiff, oDescDiffBYTE, oFGMaskBYTE;
+	cv::Mat oInputImgBYTE3, oBGImgBYTE3, oBGDescBYTE, oBGDescBYTE3, oFGMaskBYTE3;
+	cv::Mat oInputDesc, oInputDescBYTE, oInputDescBYTE3;
+	cv::Mat oDescDiff, oDescDiffBYTE, oDescDiffBYTE3;
 	LBSP oExtractor;
 	oExtractor.compute2(oInputImg,voKeyPoints,oInputDesc);
 	LBSP::calcDescImgDiff(oInputDesc,oBGDesc,oDescDiff);
-	oInputDesc.convertTo(oInputDescBYTE,CV_8UC3);
-	oBGDesc.convertTo(oBGDescBYTE,CV_8UC3);
-	oDescDiff.convertTo(oDescDiffBYTE,CV_8UC3);
-	if(oInputImg.channels()==3)
-		cv::cvtColor(oFGMask,oFGMaskBYTE,CV_GRAY2BGR);
-	else
-		oFGMaskBYTE = oFGMask;
+	oInputDesc.convertTo(oInputDescBYTE,CV_8U);
+	oBGDesc.convertTo(oBGDescBYTE,CV_8U);
+	oDescDiff.convertTo(oDescDiffBYTE,CV_8U);
+	cv::cvtColor(oFGMask,oFGMaskBYTE3,CV_GRAY2RGB);
+	if(oInputImg.channels()!=3) {
+		cv::cvtColor(oInputImg,oInputImgBYTE3,CV_GRAY2RGB);
+		cv::cvtColor(oBGImg,oBGImgBYTE3,CV_GRAY2RGB);
+		cv::cvtColor(oInputDescBYTE,oInputDescBYTE3,CV_GRAY2RGB);
+		cv::cvtColor(oBGDescBYTE,oBGDescBYTE3,CV_GRAY2RGB);
+		cv::cvtColor(oDescDiffBYTE,oDescDiffBYTE3,CV_GRAY2RGB);
+	}
+	else {
+		oInputImgBYTE3 = oInputImg;
+		oBGImgBYTE3 = oBGImg;
+		oInputDescBYTE3 = oInputDescBYTE;
+		oBGDescBYTE3 = oBGDescBYTE;
+		oDescDiffBYTE3 = oDescDiffBYTE;
+	}
 	cv::Mat display1H,display2H,display3H;
-	cv::hconcat(oInputImg,oBGImg,display1H);
-	cv::hconcat(oInputDescBYTE,oBGDescBYTE,display2H);
-	cv::hconcat(oFGMaskBYTE,oDescDiffBYTE,display3H);
+	cv::hconcat(oInputImgBYTE3,oBGImgBYTE3,display1H);
+	cv::hconcat(oInputDescBYTE3,oBGDescBYTE3,display2H);
+	cv::hconcat(oFGMaskBYTE3,oDescDiffBYTE3,display3H);
 	cv::Mat display;
 	cv::vconcat(display1H,display2H,display);
 	cv::vconcat(display,display3H,display);
