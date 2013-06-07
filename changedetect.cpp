@@ -1,9 +1,9 @@
 #include "BackgroundSubtractorLBSP.h"
 #include "DatasetUtils.h"
 
-#define WRITE_OUTPUT 0
+#define WRITE_OUTPUT 1
 #define DISPLAY_OUTPUT 1
-#define WRITE_DISPLAY_OUTPUT 0
+#define WRITE_DISPLAY_OUTPUT 1
 
 inline void WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bBottom=false) {
 	cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-10):10),cv::FONT_HERSHEY_PLAIN,0.7,cv::Scalar(255,0,0),1,CV_AA);
@@ -95,7 +95,10 @@ int main( int argc, char** argv ) {
 				BackgroundSubtractorLBSP oBGSubtr;
 				oBGSubtr.initialize(oInputImg);
 #if DISPLAY_OUTPUT && WRITE_DISPLAY_OUTPUT
-				cv::VideoWriter oWriter(sResultsPath+"/"+pCurrCategory->sName+"/"+pCurrSequence->sName+".avi",CV_FOURCC('X','V','I','D'),30,oInputImg.size()*2,true);
+				cv::Size oWriterInputSize = oInputImg.size();
+				oWriterInputSize.height*=3;
+				oWriterInputSize.width*=2;
+				cv::VideoWriter oWriter(sResultsPath+"/"+pCurrCategory->sName+"/"+pCurrSequence->sName+".avi",CV_FOURCC('X','V','I','D'),30,oWriterInputSize,true);
 #endif //DISPLAY_OUTPUT && WRITE_DISPLAY_OUTPUT
 				for(size_t k=0; k<pCurrSequence->vsInputFramePaths.size(); k++) {
 					std::cout << "\t\t[F:" << k << "/" << pCurrSequence->vsInputFramePaths.size() << "]" << std::endl;
@@ -105,7 +108,7 @@ int main( int argc, char** argv ) {
 					cv::Mat oLastBGDesc = oBGSubtr.getCurrentBGDescriptors();
 #endif //DISPLAY_OUTPUT
 					cv::GaussianBlur(oInputImg, oInputImg, cv::Size2i(5,5), 3, 3);
-					oBGSubtr(oInputImg, oFGMask);
+					oBGSubtr(oInputImg, oFGMask, k<=100?(BGSLBSP_DEFAULT_LEARNING_RATE/8):BGSLBSP_DEFAULT_LEARNING_RATE);
 #if DISPLAY_OUTPUT
 					cv::Mat display = getDisplayResult(oInputImg,oLastBGImg,oLastBGDesc,oFGMask,oBGSubtr.getBGKeyPoints());
 					cv::imshow("display", display);

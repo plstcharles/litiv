@@ -5,15 +5,17 @@
 #include "LBSP.h"
 
 //! defines the default value for BackgroundSubtractorLBSP::m_nFGThreshold
-#define BGSLBSP_DEFAULT_FG_THRESHOLD (9)
+#define BGSLBSP_DEFAULT_FG_THRESHOLD (4)
 //! defines the default difference between BackgroundSubtractorLBSP::m_nFGThreshold and BackgroundSubtractorLBSP::m_nFGSCThreshold
-#define BGSLBSP_DEFAULT_FG_SINGLECHANNEL_THRESHOLD_DIFF (2)
+#define BGSLBSP_DEFAULT_FG_SINGLECHANNEL_THRESHOLD_DIFF (3)
 //! defines the default value for BackgroundSubtractorLBSP::m_nFGSCThreshold
 #define BGSLBSP_DEFAULT_FG_SINGLECHANNEL_THRESHOLD (BGSLBSP_DEFAULT_FG_THRESHOLD+BGSLBSP_DEFAULT_FG_SINGLECHANNEL_THRESHOLD_DIFF)
 //! defines the default value for BackgroundSubtractorLBSP::m_nBGSamples
-#define BGSLBSP_DEFAULT_BG_SAMPLES (10)
+#define BGSLBSP_DEFAULT_BG_SAMPLES (15)
 //! defines the default value for BackgroundSubtractorLBSP::m_nRequiredBGSamples
-#define BGSLBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES (3)
+#define BGSLBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES (2)
+//! defines the default value for the learning rate passed to BackgroundSubtractorLBSP::operator()
+#define BGSLBSP_DEFAULT_LEARNING_RATE (28)
 
 
 /*!
