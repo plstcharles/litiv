@@ -1,5 +1,5 @@
 #include "LBSP.h"
-#include "HammingDist.h"
+#include "DistanceUtils.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
@@ -183,6 +183,8 @@ void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const
 	CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
 	CV_DbgAssert(nThreshold>0 && nThreshold<=UCHAR_MAX);
 	CV_DbgAssert(oInputImg.step.p[1]==1);
+	CV_DbgAssert(_x>=LBSP::PATCH_SIZE/2 && _y>=LBSP::PATCH_SIZE/2);
+	CV_DbgAssert(_x<oInputImg.cols-LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-LBSP::PATCH_SIZE/2);
 	const uchar _t = (uchar)nThreshold;
 	const int _step_row = oInputImg.step.p[0];
 	const uchar* _data = oInputImg.data;
@@ -196,6 +198,8 @@ void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const
 	CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
 	CV_DbgAssert(nThreshold>0 && nThreshold<=UCHAR_MAX);
 	CV_DbgAssert(oInputImg.step.p[1]==3);
+	CV_DbgAssert(_x>=LBSP::PATCH_SIZE/2 && _y>=LBSP::PATCH_SIZE/2);
+	CV_DbgAssert(_x<oInputImg.cols-LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-LBSP::PATCH_SIZE/2);
 	const uchar _t = (uchar)nThreshold;
 	const int _step_row = oInputImg.step.p[0];
 	const uchar* _data = oInputImg.data;

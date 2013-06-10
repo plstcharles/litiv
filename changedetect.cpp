@@ -119,7 +119,7 @@ int main( int argc, char** argv ) {
 					cv::Mat oLastBGImg = oBGSubtr.getCurrentBGImage();
 					cv::Mat oLastBGDesc = oBGSubtr.getCurrentBGDescriptors();
 #endif //DISPLAY_OUTPUT
-					cv::GaussianBlur(oInputImg, oInputImg, cv::Size2i(5,5), 3, 3);
+					//cv::GaussianBlur(oInputImg, oInputImg, cv::Size2i(5,5), 3, 3);
 					oBGSubtr(oInputImg, oFGMask, k<=50?1:BGSLBSP_DEFAULT_LEARNING_RATE);
 #if DISPLAY_OUTPUT
 					cv::Mat display = getDisplayResult(oInputImg,oLastBGImg,oLastBGDesc,oFGMask,oBGSubtr.getBGKeyPoints());

@@ -1,6 +1,6 @@
 #include "BackgroundSubtractorLBSP.h"
 #include "LBSP.h"
-#include "HammingDist.h"
+#include "DistanceUtils.h"
 #include "RandUtils.h"
 #include <iostream>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -136,8 +136,12 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
 				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,nDescThreshold,inputdesc);
-				if(hdist_ushort_8bitLUT(inputdesc,m_voBGDesc[nSampleIdx].at<unsigned short>(y,x))<=m_nCurrFGThreshold)
-					nGoodSamplesCount++;
+				if(hdist_ushort_8bitLUT(inputdesc,m_voBGDesc[nSampleIdx].at<unsigned short>(y,x))<=m_nCurrFGThreshold) {
+					const int idx_img = oInputImg.step.p[0]*y + x;
+					CV_DbgAssert(*(oInputImg.data+idx_img)==oInputImg.at<uchar>(y,x));
+					if(absdiff(*(oInputImg.data+idx_img),*(m_voBGImg[nSampleIdx].data+idx_img))<=nDescThreshold)
+						nGoodSamplesCount++;
+				}
 				nSampleIdx++;
 			}
 			if(nGoodSamplesCount<m_nRequiredBGSamples)
@@ -178,8 +182,11 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 					if(hdist[n]>m_nFGSCThreshold)
 						goto skip;
 				}
-				if(hdist[0]+hdist[1]+hdist[2]<=m_nCurrFGThreshold)
-					goto count;
+				if(hdist[0]+hdist[1]+hdist[2]<=m_nCurrFGThreshold) { // @@@@@@@@@@ this is only the L1 dist, L2 might be better
+					const int idx_img = oInputImg.step.p[0]*y + 3*x;
+					if(L1dist(oInputImg.data+idx_img,m_voBGImg[nSampleIdx].data+idx_img)<=3*nDescThreshold) // @@@@@@@@@@ this is only the L1 dist, L2 might be better
+						goto count;
+				}
 				goto skip;
 				count:
 				nGoodSamplesCount++;
