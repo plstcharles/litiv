@@ -5,65 +5,6 @@
 #define DISPLAY_OUTPUT 1
 #define WRITE_DISPLAY_OUTPUT 0
 
-inline void WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bBottom=false) {
-	cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-10):10),cv::FONT_HERSHEY_PLAIN,0.7,cv::Scalar(255,0,0),1,CV_AA);
-}
-
-inline void writeResult(	const std::string& sResultsPath,
-							const std::string& sCatName,
-							const std::string& sSeqName,
-							const std::string& sResultPrefix,
-							int framenum,
-							const std::string& sResultSuffix,
-							const cv::Mat& res,
-							const std::vector<int>& vnComprParams) {
-	char buffer[10];
-	sprintf(buffer,"%06d",framenum);
-	std::stringstream sResultFilePath;
-	sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << buffer << sResultSuffix;
-	cv::imwrite(sResultFilePath.str(), res, vnComprParams);
-}
-
-inline cv::Mat getDisplayResult(const cv::Mat& oInputImg,
-								const cv::Mat& oBGImg,
-								const cv::Mat& oBGDesc,
-								const cv::Mat& oFGMask,
-								std::vector<cv::KeyPoint> voKeyPoints) {
-	// note: this function is definitely NOT efficient in any way; it is only intended for debug purposes.
-	cv::Mat oInputImgBYTE3, oBGImgBYTE3, oBGDescBYTE, oBGDescBYTE3, oFGMaskBYTE3;
-	cv::Mat oInputDesc, oInputDescBYTE, oInputDescBYTE3;
-	cv::Mat oDescDiff, oDescDiffBYTE, oDescDiffBYTE3;
-	LBSP oExtractor;
-	oExtractor.compute2(oInputImg,voKeyPoints,oInputDesc);
-	LBSP::calcDescImgDiff(oInputDesc,oBGDesc,oDescDiff);
-	oInputDesc.convertTo(oInputDescBYTE,CV_8U);
-	oBGDesc.convertTo(oBGDescBYTE,CV_8U);
-	oDescDiff.convertTo(oDescDiffBYTE,CV_8U);
-	cv::cvtColor(oFGMask,oFGMaskBYTE3,CV_GRAY2RGB);
-	if(oInputImg.channels()!=3) {
-		cv::cvtColor(oInputImg,oInputImgBYTE3,CV_GRAY2RGB);
-		cv::cvtColor(oBGImg,oBGImgBYTE3,CV_GRAY2RGB);
-		cv::cvtColor(oInputDescBYTE,oInputDescBYTE3,CV_GRAY2RGB);
-		cv::cvtColor(oBGDescBYTE,oBGDescBYTE3,CV_GRAY2RGB);
-		cv::cvtColor(oDescDiffBYTE,oDescDiffBYTE3,CV_GRAY2RGB);
-	}
-	else {
-		oInputImgBYTE3 = oInputImg;
-		oBGImgBYTE3 = oBGImg;
-		oInputDescBYTE3 = oInputDescBYTE;
-		oBGDescBYTE3 = oBGDescBYTE;
-		oDescDiffBYTE3 = oDescDiffBYTE;
-	}
-	cv::Mat display1H,display2H,display3H;
-	cv::hconcat(oInputImgBYTE3,oBGImgBYTE3,display1H);
-	cv::hconcat(oInputDescBYTE3,oBGDescBYTE3,display2H);
-	cv::hconcat(oFGMaskBYTE3,oDescDiffBYTE3,display3H);
-	cv::Mat display;
-	cv::vconcat(display1H,display2H,display);
-	cv::vconcat(display,display3H,display);
-	return display;
-}
-
 int main( int argc, char** argv ) {
 	srand(0);
 	setvbuf(stdout, NULL, _IONBF, 0);
@@ -85,10 +26,10 @@ int main( int argc, char** argv ) {
 	std::cout << "Parsing dataset..." << std::endl;
 	try {
 		vpCategories.push_back(new CategoryInfo("baseline", sDatasetPath+"baseline"));
-		//voCategories.push_back(CategoryInfo("cameraJitter", sDatasetPath+"cameraJitter"));
-		//voCategories.push_back(CategoryInfo("dynamicBackground", sDatasetPath+"dynamicBackground"));
-		//voCategories.push_back(CategoryInfo("intermittentObjectMotion", sDatasetPath+"intermittentObjectMotion"));
-		//voCategories.push_back(CategoryInfo("shadow", sDatasetPath+"shadow"));
+		vpCategories.push_back(new CategoryInfo("cameraJitter", sDatasetPath+"cameraJitter"));
+		vpCategories.push_back(new CategoryInfo("dynamicBackground", sDatasetPath+"dynamicBackground"));
+		vpCategories.push_back(new CategoryInfo("intermittentObjectMotion", sDatasetPath+"intermittentObjectMotion"));
+		vpCategories.push_back(new CategoryInfo("shadow", sDatasetPath+"shadow"));
 		vpCategories.push_back(new CategoryInfo("thermal", sDatasetPath+"thermal"));
 	} catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
 	std::cout << "Parsing complete. [" << vpCategories.size() << " categories]" << std::endl << std::endl;
@@ -120,9 +61,9 @@ int main( int argc, char** argv ) {
 					cv::Mat oLastBGDesc = oBGSubtr.getCurrentBGDescriptors();
 #endif //DISPLAY_OUTPUT
 					//cv::GaussianBlur(oInputImg, oInputImg, cv::Size2i(5,5), 3, 3);
-					oBGSubtr(oInputImg, oFGMask, k<=50?1:BGSLBSP_DEFAULT_LEARNING_RATE);
+					oBGSubtr(oInputImg, oFGMask, k<=100?1:BGSLBSP_DEFAULT_LEARNING_RATE);
 #if DISPLAY_OUTPUT
-					cv::Mat display = getDisplayResult(oInputImg,oLastBGImg,oLastBGDesc,oFGMask,oBGSubtr.getBGKeyPoints());
+					cv::Mat display = GetDisplayResult(oInputImg,oLastBGImg,oLastBGDesc,oFGMask,oBGSubtr.getBGKeyPoints(),k);
 					cv::imshow("display", display);
 #if WRITE_DISPLAY_OUTPUT
 					oWriter.write(display);
@@ -130,7 +71,7 @@ int main( int argc, char** argv ) {
 					cv::waitKey(1);
 #endif //DISPLAY_OUTPUT
 #if WRITE_OUTPUT
-					writeResult(sResultsPath,pCurrCategory->sName,pCurrSequence->sName,sResultPrefix,k+1,sResultSuffix,oFGMask,vnCompressionParams);
+					WriteResult(sResultsPath,pCurrCategory->sName,pCurrSequence->sName,sResultPrefix,k+1,sResultSuffix,oFGMask,vnCompressionParams);
 #endif //WRITE_OUTPUT
 				}
 			}

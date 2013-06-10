@@ -17,6 +17,75 @@
 #include <sys/stat.h>
 #endif
 
+static inline void WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bBottom=false) {
+	cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-15):15),cv::FONT_HERSHEY_PLAIN,1.0,cv::Scalar(0,0,255),1,CV_AA);
+}
+
+static inline void WriteResult(	const std::string& sResultsPath,
+								const std::string& sCatName,
+								const std::string& sSeqName,
+								const std::string& sResultPrefix,
+								int framenum,
+								const std::string& sResultSuffix,
+								const cv::Mat& res,
+								const std::vector<int>& vnComprParams) {
+	char buffer[10];
+	sprintf(buffer,"%06d",framenum);
+	std::stringstream sResultFilePath;
+	sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << buffer << sResultSuffix;
+	cv::imwrite(sResultFilePath.str(), res, vnComprParams);
+}
+
+static inline cv::Mat GetDisplayResult(	const cv::Mat& oInputImg,
+										const cv::Mat& oBGImg,
+										const cv::Mat& oBGDesc,
+										const cv::Mat& oFGMask,
+										std::vector<cv::KeyPoint> voKeyPoints,
+										size_t nFrame) {
+	// note: this function is definitely NOT efficient in any way; it is only intended for debug purposes.
+	cv::Mat oInputImgBYTE3, oBGImgBYTE3, oBGDescBYTE, oBGDescBYTE3, oFGMaskBYTE3;
+	cv::Mat oInputDesc, oInputDescBYTE, oInputDescBYTE3;
+	cv::Mat oDescDiff, oDescDiffBYTE, oDescDiffBYTE3;
+	LBSP oExtractor;
+	oExtractor.setReference(oBGImg);
+	oExtractor.compute2(oInputImg,voKeyPoints,oInputDesc);
+	LBSP::calcDescImgDiff(oInputDesc,oBGDesc,oDescDiff);
+	oInputDesc.convertTo(oInputDescBYTE,CV_8U);
+	oBGDesc.convertTo(oBGDescBYTE,CV_8U);
+	oDescDiff.convertTo(oDescDiffBYTE,CV_8U);
+	cv::cvtColor(oFGMask,oFGMaskBYTE3,CV_GRAY2RGB);
+	if(oInputImg.channels()!=3) {
+		cv::cvtColor(oInputImg,oInputImgBYTE3,CV_GRAY2RGB);
+		cv::cvtColor(oBGImg,oBGImgBYTE3,CV_GRAY2RGB);
+		cv::cvtColor(oInputDescBYTE,oInputDescBYTE3,CV_GRAY2RGB);
+		cv::cvtColor(oBGDescBYTE,oBGDescBYTE3,CV_GRAY2RGB);
+		cv::cvtColor(oDescDiffBYTE,oDescDiffBYTE3,CV_GRAY2RGB);
+	}
+	else {
+		oInputImgBYTE3 = oInputImg;
+		oBGImgBYTE3 = oBGImg;
+		oInputDescBYTE3 = oInputDescBYTE;
+		oBGDescBYTE3 = oBGDescBYTE;
+		oDescDiffBYTE3 = oDescDiffBYTE;
+	}
+	cv::Mat display1H,display2H,display3H;
+	std::stringstream sstr;
+	sstr << "Input Img #" << nFrame;
+	WriteOnImage(oInputImgBYTE3,sstr.str());
+	WriteOnImage(oBGImgBYTE3,"BGModel Img");
+	WriteOnImage(oInputDescBYTE3,"Input Desc");
+	WriteOnImage(oBGDescBYTE3,"BGModel Desc");
+	WriteOnImage(oFGMaskBYTE3,"Detection Result");
+	WriteOnImage(oDescDiffBYTE3,"BGModel-Input Desc Diff");
+	cv::hconcat(oInputImgBYTE3,oBGImgBYTE3,display1H);
+	cv::hconcat(oInputDescBYTE3,oBGDescBYTE3,display2H);
+	cv::hconcat(oFGMaskBYTE3,oDescDiffBYTE3,display3H);
+	cv::Mat display;
+	cv::vconcat(display1H,display2H,display);
+	cv::vconcat(display,display3H,display);
+	return display;
+}
+
 static inline void GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths) {
 	vsFilePaths.clear();
 #ifdef WIN32

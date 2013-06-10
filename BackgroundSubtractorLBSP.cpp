@@ -139,7 +139,7 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 				if(hdist_ushort_8bitLUT(inputdesc,m_voBGDesc[nSampleIdx].at<unsigned short>(y,x))<=m_nCurrFGThreshold) {
 					const int idx_img = oInputImg.step.p[0]*y + x;
 					CV_DbgAssert(*(oInputImg.data+idx_img)==oInputImg.at<uchar>(y,x));
-					if(absdiff(*(oInputImg.data+idx_img),*(m_voBGImg[nSampleIdx].data+idx_img))<=nDescThreshold)
+					if(absdiff_uchar(*(oInputImg.data+idx_img),*(m_voBGImg[nSampleIdx].data+idx_img))<=nDescThreshold)
 						nGoodSamplesCount++;
 				}
 				nSampleIdx++;
@@ -165,28 +165,35 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 		}
 	}
 	else { //m_nImgChannels==3
+		const int nDesc3ChThreshold = nDescThreshold*3;
+		const int nDescSCThreshold = nDescThreshold*BGSLBSP_DEFAULT_FG_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR;
 		unsigned short inputdesc[3];
-		int hdist[3];
+		int hdist[3], l1dist[3];
 		const int desc_row_step = m_voBGDesc[0].step.p[0];
-		CV_DbgAssert(m_voBGDesc[0].step.p[1]==6);
+		const int img_row_step = m_voBGImg[0].step.p[0];
+		CV_DbgAssert(m_voBGDesc[0].step.p[1]==6 && m_voBGImg[0].step.p[1]==3);
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
 			const int idx_desc = desc_row_step*y + 6*x;
+			const int idx_img = img_row_step*y + 3*x;
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
 				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,nDescThreshold,inputdesc);
 				const unsigned short* bgdesc_ptr = (unsigned short*)(m_voBGDesc[nSampleIdx].data+idx_desc);
+				const uchar* inputimg_ptr = oInputImg.data+idx_img;
+				const uchar* bgimg_ptr = m_voBGImg[nSampleIdx].data+idx_img;
 				for(int n=0;n<3; ++n) {
 					hdist[n] = hdist_ushort_8bitLUT(inputdesc[n],bgdesc_ptr[n]);
 					if(hdist[n]>m_nFGSCThreshold)
 						goto skip;
+					l1dist[n] = absdiff_uchar(inputimg_ptr[n],bgimg_ptr[n]);
+					if(l1dist[n]>nDescSCThreshold)
+						goto skip;
 				}
-				if(hdist[0]+hdist[1]+hdist[2]<=m_nCurrFGThreshold) { // @@@@@@@@@@ this is only the L1 dist, L2 might be better
-					const int idx_img = oInputImg.step.p[0]*y + 3*x;
-					if(L1dist(oInputImg.data+idx_img,m_voBGImg[nSampleIdx].data+idx_img)<=3*nDescThreshold) // @@@@@@@@@@ this is only the L1 dist, L2 might be better
-						goto count;
-				}
+				// @@@@@@@@@@ this is only the L1 dist, L2 might be better
+				if(hdist[0]+hdist[1]+hdist[2]<=m_nCurrFGThreshold && l1dist[0]+l1dist[1]+l1dist[2]<=nDesc3ChThreshold)
+					goto count;
 				goto skip;
 				count:
 				nGoodSamplesCount++;
