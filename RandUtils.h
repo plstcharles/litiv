@@ -10,7 +10,6 @@ static const int s_anSamplesInitPattern[9] = {
 	19,    31,    19,
 };
 
-
 static inline void getRandSamplePosition(int& x_sample, int& y_sample, const int x_orig, const int y_orig, const int border, const cv::Size& imgsize) {
 	int r = 1+rand()%s_nSamplesInitPatternTot;
 	for(x_sample=0; x_sample<s_nSamplesInitPatternWidth; ++x_sample) {

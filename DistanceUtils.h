@@ -2,6 +2,22 @@
 
 #include <opencv2/core/types_c.h>
 
+//! computes the absolute difference between two unsigned char values
+static inline int absdiff(uchar a, uchar b) {
+	return (a<b?b-a:a-b);
+}
+
+static inline int L2dist_sqr(uchar* a, uchar* b) {
+	const int d0 = absdiff(a[0],b[0]);
+	const int d1 = absdiff(a[1],b[1]);
+	const int d2 = absdiff(a[2],b[2]);
+	return d0*d0 + d1*d1 + d2*d2;
+}
+
+static inline int L1dist(uchar* a, uchar* b) {
+	return absdiff(a[0],b[0])+absdiff(a[1],b[1])+absdiff(a[2],b[2]);
+}
+
 //! popcount LUT for 8bit vectors
 static const uchar popcount_LUT8[256] = {
 	0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
