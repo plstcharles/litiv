@@ -93,6 +93,8 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg) {
 		for(int s=0; s<m_nBGSamples; s++) {
 			m_voBGImg[s].create(m_oImgSize,m_nImgType);
 			m_voBGDesc[s].create(m_oImgSize,CV_16UC3);
+			m_voBGImg[s] = cv::Scalar(0,0,0);
+			m_voBGDesc[s] = cv::Scalar(0,0,0);
 			for(int k=0; k<nKeyPoints; ++k) {
 				const int y_orig = (int)m_voKeyPoints[k].pt.y;
 				const int x_orig = (int)m_voKeyPoints[k].pt.x;
