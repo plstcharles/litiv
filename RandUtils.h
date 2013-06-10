@@ -1,8 +1,8 @@
 #pragma once
 
+// init pattern, based on 'floor(fspecial('gaussian', 3, 1)*256)'
 static const int s_nSamplesInitPatternWidth = 3;
 static const int s_nSamplesInitPatternHeight = 3;
-// floor(fspecial('gaussian', 3, 1)*256)
 static const int s_nSamplesInitPatternTot = 252;
 static const int s_anSamplesInitPattern[9] = {
 	19,    31,    19,
@@ -10,6 +10,7 @@ static const int s_anSamplesInitPattern[9] = {
 	19,    31,    19,
 };
 
+//! returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
 static inline void getRandSamplePosition(int& x_sample, int& y_sample, const int x_orig, const int y_orig, const int border, const cv::Size& imgsize) {
 	int r = 1+rand()%s_nSamplesInitPatternTot;
 	for(x_sample=0; x_sample<s_nSamplesInitPatternWidth; ++x_sample) {
@@ -32,7 +33,7 @@ static inline void getRandSamplePosition(int& x_sample, int& y_sample, const int
 		y_sample = imgsize.height-border-1;
 }
 
-// simple 8-connected neighbors
+// simple 8-connected neighbors pattern
 static const int s_anNeighborPatternSize = 8;
 static const int s_anNeighborPattern[8][2] = {
 	{-1, 1},  { 0, 1},  { 1, 1},
@@ -40,6 +41,7 @@ static const int s_anNeighborPattern[8][2] = {
 	{-1,-1},  { 0,-1},  { 1,-1},
 };
 
+//! returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
 static inline void getRandNeighborPosition(int& x_neighbor, int& y_neighbor, const int x_orig, const int y_orig, const int border, const cv::Size& imgsize) {
 	int r = rand()%s_anNeighborPatternSize;
 	x_neighbor = x_orig+s_anNeighborPattern[r][0];
