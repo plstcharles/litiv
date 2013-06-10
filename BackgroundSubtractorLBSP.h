@@ -5,7 +5,7 @@
 #include "LBSP.h"
 
 //! defines the default value for BackgroundSubtractorLBSP::m_nFGThreshold
-#define BGSLBSP_DEFAULT_FG_THRESHOLD (4)
+#define BGSLBSP_DEFAULT_FG_THRESHOLD (5)
 //! defines the default difference between BackgroundSubtractorLBSP::m_nFGThreshold and BackgroundSubtractorLBSP::m_nFGSCThreshold
 #define BGSLBSP_DEFAULT_FG_SINGLECHANNEL_THRESHOLD_DIFF (3)
 //! defines the default value for BackgroundSubtractorLBSP::m_nFGSCThreshold

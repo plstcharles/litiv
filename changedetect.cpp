@@ -3,7 +3,7 @@
 
 #define WRITE_OUTPUT 0
 #define DISPLAY_OUTPUT 1
-#define WRITE_DISPLAY_OUTPUT 1
+#define WRITE_DISPLAY_OUTPUT 0
 
 inline void WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bBottom=false) {
 	cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-10):10),cv::FONT_HERSHEY_PLAIN,0.7,cv::Scalar(255,0,0),1,CV_AA);
