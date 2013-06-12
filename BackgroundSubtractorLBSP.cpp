@@ -7,49 +7,44 @@
 #include <opencv2/highgui/highgui.hpp>
 
 BackgroundSubtractorLBSP::BackgroundSubtractorLBSP()
-	:	 m_nBGSamples(BGSLBSP_DEFAULT_BG_SAMPLES)
+	:	 m_nBGSamples(BGSLBSP_DEFAULT_NB_BG_SAMPLES)
 		,m_nRequiredBGSamples(BGSLBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES)
-		,m_voBGImg(BGSLBSP_DEFAULT_BG_SAMPLES)
-		,m_voBGDesc(BGSLBSP_DEFAULT_BG_SAMPLES)
-	 	,m_nFGThreshold(BGSLBSP_DEFAULT_FG_THRESHOLD)
-		,m_nFGSCThreshold(BGSLBSP_DEFAULT_FG_SINGLECHANNEL_THRESHOLD)
+		,m_voBGImg(BGSLBSP_DEFAULT_NB_BG_SAMPLES)
+		,m_voBGDesc(BGSLBSP_DEFAULT_NB_BG_SAMPLES)
+	 	,m_nDescDistThreshold(BGSLBSP_DEFAULT_DESC_DIST_THRESHOLD)
+		,m_nColorDistThreshold(LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD)
 		,m_bInitialized(false)
 		,m_oExtractor(LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD) {
-	CV_Assert(m_nFGThreshold>0 && m_nFGSCThreshold>0);
 	CV_Assert(m_nBGSamples>0);
 }
 
-BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(  int nDescThreshold
-													,int nFGThreshold
-													,int nFGSCThreshold
+BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(  int nLBSPThreshold
+													,int nDescDistThreshold
 													,int nBGSamples
 													,int nRequiredBGSamples)
 	:	 m_nBGSamples(nBGSamples)
 		,m_nRequiredBGSamples(nRequiredBGSamples)
 		,m_voBGImg(nBGSamples)
 		,m_voBGDesc(nBGSamples)
-		,m_nFGThreshold(nFGThreshold)
-		,m_nFGSCThreshold(nFGSCThreshold)
+		,m_nDescDistThreshold(nDescDistThreshold)
+		,m_nColorDistThreshold(nLBSPThreshold)
 		,m_bInitialized(false)
-		,m_oExtractor(nDescThreshold) {
-	CV_Assert(m_nFGThreshold>0 && m_nFGSCThreshold>0);
+		,m_oExtractor(nLBSPThreshold) {
 	CV_Assert(m_nBGSamples>0);
 }
 
-BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(	 float fDescThreshold
-													,int nFGThreshold
-													,int nFGSCThreshold
+BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(	 float fLBSPThreshold
+													,int nDescDistThreshold
 													,int nBGSamples
 													,int nRequiredBGSamples)
 	:	 m_nBGSamples(nBGSamples)
 		,m_nRequiredBGSamples(nRequiredBGSamples)
 		,m_voBGImg(nBGSamples)
 		,m_voBGDesc(nBGSamples)
-		,m_nFGThreshold(nFGThreshold)
-		,m_nFGSCThreshold(nFGSCThreshold)
+		,m_nDescDistThreshold(nDescDistThreshold)
+		,m_nColorDistThreshold(LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD) // @@@@@@@@@ not using relative...
 		,m_bInitialized(false)
-		,m_oExtractor(fDescThreshold) {
-	CV_Assert(m_nFGThreshold>0 && m_nFGSCThreshold>0);
+		,m_oExtractor(fLBSPThreshold) {
 	CV_Assert(m_nBGSamples>0);
 }
 
@@ -61,7 +56,6 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg) {
 	m_oImgSize = oInitImg.size();
 	m_nImgType = oInitImg.type();
 	m_nImgChannels = oInitImg.channels();
-	m_nCurrFGThreshold = m_nFGThreshold*m_nImgChannels;
 
 	// init keypoints used for the extractor :
 	cv::DenseFeatureDetector oKPDDetector(1.f, 1, 1.f, 1, 0, true, false);
@@ -127,20 +121,21 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 	cv::Mat oFGMask = _fgmask.getMat();
 	oFGMask = cv::Scalar_<uchar>(0);
 	const int nKeyPoints = (int)m_voKeyPoints.size();
-	const int nDescThreshold = m_oExtractor.getAbsThreshold();
 	const int nLearningRate = (int)learningRate;
 	if(m_nImgChannels==1) {
+		const int nCurrFGDescThreshold = m_nDescDistThreshold/**LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT*/;
+		const int nCurrFGColorThreshold = m_nColorDistThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT;
 		unsigned short inputdesc;
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
-				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,nDescThreshold,inputdesc);
-				if(hdist_ushort_8bitLUT(inputdesc,m_voBGDesc[nSampleIdx].at<unsigned short>(y,x))<=m_nCurrFGThreshold) {
+				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,m_nColorDistThreshold,inputdesc);
+				if(hdist_ushort_8bitLUT(inputdesc,m_voBGDesc[nSampleIdx].at<unsigned short>(y,x))<=nCurrFGDescThreshold) {
 					const int idx_img = oInputImg.step.p[0]*y + x;
 					CV_DbgAssert(*(oInputImg.data+idx_img)==oInputImg.at<uchar>(y,x));
-					if(absdiff_uchar(*(oInputImg.data+idx_img),*(m_voBGImg[nSampleIdx].data+idx_img))<=nDescThreshold)
+					if(absdiff_uchar(*(oInputImg.data+idx_img),*(m_voBGImg[nSampleIdx].data+idx_img))<=nCurrFGColorThreshold)
 						nGoodSamplesCount++;
 				}
 				nSampleIdx++;
@@ -150,7 +145,7 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 			else {
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
-					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,nDescThreshold,inputdesc);
+					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_nColorDistThreshold,inputdesc);
 					m_voBGDesc[s_rand].at<unsigned short>(y,x) = inputdesc;
 					m_voBGImg[s_rand].at<uchar>(y,x) = oInputImg.at<uchar>(y,x);
 				}
@@ -158,7 +153,7 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 					int s_rand = rand()%m_nBGSamples;
 					int x_rand,y_rand;
 					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::DESC_SIZE/2,m_oImgSize);
-					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,nDescThreshold,inputdesc);
+					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_nColorDistThreshold,inputdesc);
 					m_voBGDesc[s_rand].at<unsigned short>(y_rand,x_rand) = inputdesc;
 					m_voBGImg[s_rand].at<uchar>(y_rand,x_rand) = oInputImg.at<uchar>(y,x);
 				}
@@ -166,8 +161,10 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 		}
 	}
 	else { //m_nImgChannels==3
-		const int nDesc3ChThreshold = nDescThreshold*3;
-		const int nDescSCThreshold = nDescThreshold*BGSLBSP_DEFAULT_FG_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR;
+		const int nCurrFGDescThreshold = m_nDescDistThreshold*3;
+		const int nCurrFGColorThreshold = m_nColorDistThreshold*3;
+		const int nCurrSCFGDescThreshold = m_nDescDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR;
+		const int nCurrSCFGColorThreshold = m_nColorDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR;
 		unsigned short inputdesc[3];
 		int hdist[3], l1dist[3];
 		const int desc_row_step = m_voBGDesc[0].step.p[0];
@@ -180,7 +177,7 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 			const int idx_img = img_row_step*y + 3*x;
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
-				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,nDescThreshold,inputdesc);
+				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,m_nColorDistThreshold,inputdesc);
 				const unsigned short* bgdesc_ptr = (unsigned short*)(m_voBGDesc[nSampleIdx].data+idx_desc);
 				const uchar* inputimg_ptr = oInputImg.data+idx_img;
 				const uchar* bgimg_ptr = m_voBGImg[nSampleIdx].data+idx_img;
@@ -206,14 +203,14 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 				}*/
 				for(int n=0;n<3; ++n) {
 					hdist[n] = hdist_ushort_8bitLUT(inputdesc[n],bgdesc_ptr[n]);
-					if(hdist[n]>m_nFGSCThreshold)
+					if(hdist[n]>nCurrSCFGDescThreshold)
 						goto skip;
 					l1dist[n] = absdiff_uchar(inputimg_ptr[n],bgimg_ptr[n]);
-					if(l1dist[n]>nDescSCThreshold)
+					if(l1dist[n]>nCurrSCFGColorThreshold)
 						goto skip;
 				}
 				// @@@@@@@@@@ this is only the L1 dist, L2 might be better
-				if(hdist[0]+hdist[1]+hdist[2]<=m_nCurrFGThreshold && l1dist[0]+l1dist[1]+l1dist[2]<=nDesc3ChThreshold)
+				if(hdist[0]+hdist[1]+hdist[2]<=nCurrFGDescThreshold && l1dist[0]+l1dist[1]+l1dist[2]<=nCurrFGColorThreshold)
 					nGoodSamplesCount++;
 				skip:
 				nSampleIdx++;
@@ -224,7 +221,7 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
 					unsigned short* bgdesc_ptr = ((unsigned short*)(m_voBGDesc[s_rand].data + desc_row_step*y + 6*x));
-					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,nDescThreshold,bgdesc_ptr);
+					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_nColorDistThreshold,bgdesc_ptr);
 					const int img_row_step = m_voBGImg[0].step.p[0];
 					for(int n=0; n<3; ++n)
 						*(m_voBGImg[s_rand].data + img_row_step*y + 3*x + n) = *(oInputImg.data + img_row_step*y + 3*x + n);
@@ -235,7 +232,7 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 					int x_rand,y_rand;
 					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::DESC_SIZE/2,m_oImgSize);
 					unsigned short* bgdesc_ptr = ((unsigned short*)(m_voBGDesc[s_rand].data + desc_row_step*y_rand + 6*x_rand));
-					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,nDescThreshold,bgdesc_ptr);
+					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_nColorDistThreshold,bgdesc_ptr);
 					const int img_row_step = m_voBGImg[0].step.p[0];
 					for(int n=0; n<3; ++n)
 						*(m_voBGImg[s_rand].data + img_row_step*y_rand + 3*x_rand + n) = *(oInputImg.data + img_row_step*y + 3*x + n);

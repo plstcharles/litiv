@@ -2,12 +2,12 @@
 
 #include <opencv2/features2d/features2d.hpp>
 
-//! defines the default absolute threshold to be used when computing LBSP pattern comparisons
-#define LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD 23
-//! defines the default relative threshold to be used when computing LBSP pattern comparisons
-#define LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD 0.1f
+//! defines the default value for LBSP::m_nThreshold
+#define LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD (23)
+//! defines the default value for LBSP::m_fThreshold
+#define LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD (0.1f)
 //! defines the internal threshold adjustment factor to use when treating single channel images (based on the assumption that grayscale images have less noise per channel...)
-#define LBSP_SCH_THRS_ADPT_FACT 0.6
+#define LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.6)
 
 //! defines if the provided keypoints should be validated when passed to 'compute' functions or not; setting to zero might improve performance, but is less safe
 #define LBSP_VALIDATE_KEYPOINTS_INTERNALLY 0
