@@ -200,7 +200,7 @@ struct SequenceInfo {
 	SequenceInfo(const std::string& name, const std::string& dir) {
 		sName = name;
 
-		// amongst possible subdirs at this level, we expect a 'groundtruth' and an 'input' directory (throws if not found)
+		// amongst possible subdirs at this level, we expect a 'groundtruth' and an 'input' directory for the CDNet dataset (throws if not found)
 		std::vector<std::string> vsSubDirs;
 		GetSubDirsFromDir(dir,vsSubDirs);
 		auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),dir+"/groundtruth");

@@ -182,26 +182,6 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 				const unsigned short* bgdesc_ptr = (unsigned short*)(m_voBGDesc[nSampleIdx].data+idx_desc);
 				const uchar* inputimg_ptr = oInputImg.data+idx_img;
 				const uchar* bgimg_ptr = m_voBGImg[nSampleIdx].data+idx_img;
-				/*const int x_test = 205;
-				const int y_test = oInputImg.rows-135;
-				if(x==x_test && y==y_test && nLearningRate==10000) {
-					int dummy=1;
-					dummy++;
-					cv::Rect roi(x_test-10,y_test-10,20,20);
-					cv::Mat mini_img_resized, mini_img = oInputImg(roi).clone();
-					cv::Mat mini_bgimg_resized, mini_bgimg = m_voBGImg[nSampleIdx](roi).clone();
-					cv::Mat mini_desc_resized, mini_desc = m_voBGDesc[nSampleIdx](roi).clone();
-					cv::circle(mini_img,cv::Point(10,10),5,cv::Scalar(0,255,0),0);
-					cv::circle(mini_bgimg,cv::Point(10,10),5,cv::Scalar(0,255,0),0);
-					cv::circle(mini_desc,cv::Point(10,10),5,cv::Scalar(0,USHRT_MAX,0),0);
-					cv::resize(mini_img,mini_img_resized,cv::Size(200,200),0,0,cv::INTER_NEAREST);
-					cv::resize(mini_bgimg,mini_bgimg_resized,cv::Size(200,200),0,0,cv::INTER_NEAREST);
-					cv::resize(mini_desc,mini_desc_resized,cv::Size(200,200),0,0,cv::INTER_NEAREST);
-					cv::imshow("test img",mini_img_resized);
-					cv::imshow("test bgimg",mini_bgimg_resized);
-					cv::imshow("test desc",mini_desc_resized);
-					cv::waitKey(0);
-				}*/
 				for(int n=0;n<3; ++n) {
 					hdist[n] = hdist_ushort_8bitLUT(inputdesc[n],bgdesc_ptr[n]);
 					if(hdist[n]>nCurrSCDescDistThreshold)
