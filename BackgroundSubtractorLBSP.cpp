@@ -78,7 +78,7 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg) {
 			for(int k=0; k<nKeyPoints; ++k) {
 				const int y_orig = (int)m_voKeyPoints[k].pt.y;
 				const int x_orig = (int)m_voKeyPoints[k].pt.x;
-				getRandSamplePosition(x_sample,y_sample,x_orig,y_orig,LBSP::DESC_SIZE/2,m_oImgSize);
+				getRandSamplePosition(x_sample,y_sample,x_orig,y_orig,LBSP::PATCH_SIZE/2,m_oImgSize);
 				m_voBGImg[s].at<uchar>(y_orig,x_orig) = oInitImg.at<uchar>(y_sample,x_sample);
 				m_voBGDesc[s].at<unsigned short>(y_orig,x_orig) = oInitDesc.at<unsigned short>(y_sample,x_sample);
 			}
@@ -88,12 +88,12 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg) {
 		for(int s=0; s<m_nBGSamples; s++) {
 			m_voBGImg[s].create(m_oImgSize,m_nImgType);
 			m_voBGDesc[s].create(m_oImgSize,CV_16UC3);
-			m_voBGImg[s] = cv::Scalar(0,0,0);
-			m_voBGDesc[s] = cv::Scalar(0,0,0);
+			m_voBGImg[s] = cv::Scalar_<uchar>(0,0,0);
+			m_voBGDesc[s] = cv::Scalar_<ushort>(0,0,0);
 			for(int k=0; k<nKeyPoints; ++k) {
 				const int y_orig = (int)m_voKeyPoints[k].pt.y;
 				const int x_orig = (int)m_voKeyPoints[k].pt.x;
-				getRandSamplePosition(x_sample,y_sample,x_orig,y_orig,LBSP::DESC_SIZE/2,m_oImgSize);
+				getRandSamplePosition(x_sample,y_sample,x_orig,y_orig,LBSP::PATCH_SIZE/2,m_oImgSize);
 				const int idx_orig_img = oInitImg.step.p[0]*y_orig + oInitImg.step.p[1]*x_orig;
 				const int idx_orig_desc = oInitDesc.step.p[0]*y_orig + oInitDesc.step.p[1]*x_orig;
 				const int idx_rand_img = oInitImg.step.p[0]*y_sample + oInitImg.step.p[1]*x_sample;
@@ -153,7 +153,7 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
 					int x_rand,y_rand;
-					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::DESC_SIZE/2,m_oImgSize);
+					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,nCurrColorDistThreshold,nCurrInputDesc);
 					m_voBGDesc[s_rand].at<unsigned short>(y_rand,x_rand) = nCurrInputDesc;
 					m_voBGImg[s_rand].at<uchar>(y_rand,x_rand) = oInputImg.at<uchar>(y,x);
@@ -170,7 +170,6 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 		int anDescDist[3], anColorDist[3];
 		const int desc_row_step = m_voBGDesc[0].step.p[0];
 		const int img_row_step = m_voBGImg[0].step.p[0];
-		CV_DbgAssert(m_voBGDesc[0].step.p[1]==6 && m_voBGImg[0].step.p[1]==3);
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
@@ -210,7 +209,7 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
 					int x_rand,y_rand;
-					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::DESC_SIZE/2,m_oImgSize);
+					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 					unsigned short* bgdesc_ptr = ((unsigned short*)(m_voBGDesc[s_rand].data + desc_row_step*y_rand + 6*x_rand));
 					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_nColorDistThreshold,bgdesc_ptr);
 					const int img_row_step = m_voBGImg[0].step.p[0];
