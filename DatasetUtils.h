@@ -19,7 +19,7 @@
 #endif
 
 static inline void WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bBottom=false) {
-	cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-15):15),cv::FONT_HERSHEY_PLAIN,1.0,cv::Scalar(0,0,255),1,CV_AA);
+	cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-15):15),cv::FONT_HERSHEY_PLAIN,1.0,cv::Scalar_<uchar>(0,0,255),1,CV_AA);
 }
 
 static inline void WriteResult(	const std::string& sResultsPath,
