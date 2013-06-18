@@ -1,11 +1,11 @@
 // note: this is the LBSP 16 bit double-cross indiv RGB pattern as used in
 // the original article by G.-A. Bilodeau et al.
 // 
-//  O   O   O         15 ..  8 .. 13
-//    O O O           ..  4  3  6 ..
-//  O O X O O    =>    9  0  X  1 11
-//    O O O           ..  7  2  5 ..
-//  O   O   O         12 .. 10 .. 14
+//  O   O   O          4 ..  3 ..  6
+//    O O O           .. 15  8 13 ..
+//  O O X O O    =>    0  9  X 11  1
+//    O O O           .. 12 10 14 ..
+//  O   O   O          7 ..  2 ..  5
 //           3x                     3x
 //
 // must be defined externally:
@@ -26,22 +26,22 @@
 
 for(int n=0; n<3; ++n) {
 	const uchar _ref = _refdata[_step_row*(_y)+3*(_x)+n];
-	_res[n] = ((absdiff_uchar(_val(-2, 2, n),_ref) > _t) << 15)
-			+ ((absdiff_uchar(_val( 2,-2, n),_ref) > _t) << 14)
-			+ ((absdiff_uchar(_val( 2, 2, n),_ref) > _t) << 13)
-			+ ((absdiff_uchar(_val(-2,-2, n),_ref) > _t) << 12)
-			+ ((absdiff_uchar(_val( 2, 0, n),_ref) > _t) << 11)
-			+ ((absdiff_uchar(_val( 0,-2, n),_ref) > _t) << 10)
-			+ ((absdiff_uchar(_val(-2, 0, n),_ref) > _t) << 9)
-			+ ((absdiff_uchar(_val( 0, 2, n),_ref) > _t) << 8)
-			+ ((absdiff_uchar(_val(-1,-1, n),_ref) > _t) << 7)
-			+ ((absdiff_uchar(_val( 1, 1, n),_ref) > _t) << 6)
-			+ ((absdiff_uchar(_val( 1,-1, n),_ref) > _t) << 5)
-			+ ((absdiff_uchar(_val(-1, 1, n),_ref) > _t) << 4)
-			+ ((absdiff_uchar(_val( 0, 1, n),_ref) > _t) << 3)
-			+ ((absdiff_uchar(_val( 0,-1, n),_ref) > _t) << 2)
-			+ ((absdiff_uchar(_val( 1, 0, n),_ref) > _t) << 1)
-			+ ((absdiff_uchar(_val(-1, 0, n),_ref) > _t));
+	_res[n] = ((absdiff_uchar(_val(-1, 1, n),_ref) > _t) << 15)
+			+ ((absdiff_uchar(_val( 1,-1, n),_ref) > _t) << 14)
+			+ ((absdiff_uchar(_val( 1, 1, n),_ref) > _t) << 13)
+			+ ((absdiff_uchar(_val(-1,-1, n),_ref) > _t) << 12)
+			+ ((absdiff_uchar(_val( 1, 0, n),_ref) > _t) << 11)
+			+ ((absdiff_uchar(_val( 0,-1, n),_ref) > _t) << 10)
+			+ ((absdiff_uchar(_val(-1, 0, n),_ref) > _t) << 9)
+			+ ((absdiff_uchar(_val( 0, 1, n),_ref) > _t) << 8)
+			+ ((absdiff_uchar(_val(-2,-2, n),_ref) > _t) << 7)
+			+ ((absdiff_uchar(_val( 2, 2, n),_ref) > _t) << 6)
+			+ ((absdiff_uchar(_val( 2,-2, n),_ref) > _t) << 5)
+			+ ((absdiff_uchar(_val(-2, 2, n),_ref) > _t) << 4)
+			+ ((absdiff_uchar(_val( 0, 2, n),_ref) > _t) << 3)
+			+ ((absdiff_uchar(_val( 0,-2, n),_ref) > _t) << 2)
+			+ ((absdiff_uchar(_val( 2, 0, n),_ref) > _t) << 1)
+			+ ((absdiff_uchar(_val(-2, 0, n),_ref) > _t));
 }
 
 #undef _val
