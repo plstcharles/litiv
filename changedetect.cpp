@@ -8,6 +8,7 @@ int AnalyzeSequence(int nThreadIdx, const CategoryInfo* pCurrCategory, const Seq
 #define WRITE_ANALYSIS_RESULTS 0
 #define DISPLAY_ANALYSIS_DEBUG_RESULTS 1
 #define WRITE_ANALYSIS_DEBUG_RESULTS 0
+#define USE_RELATIVE_LBSP_COMPARISONS 0
 const std::string g_sResultPrefix("bin"); // based on the CDNet result image template
 const std::string g_sResultSuffix(".png"); // based on the CDNet result image template
 #if WIN32 && _MSC_VER <= 1600
@@ -18,7 +19,7 @@ const std::string g_sDatasetPath("C:/datasets/CDNet/dataset/");
 const std::string g_sResultsPath("C:/datasets/CDNet/results_test/");
 const int g_anResultsComprParams[2] = {CV_IMWRITE_PNG_COMPRESSION,9}; // lower to increase processing speed
 const std::vector<int> g_vnResultsComprParams(g_anResultsComprParams,g_anResultsComprParams+2);
-const size_t g_nMaxThreads = 2;
+const size_t g_nMaxThreads = 4;
 HANDLE g_hThreadEvent[g_nMaxThreads] = {0};
 HANDLE g_hThreads[g_nMaxThreads] = {0};
 void* g_apThreadDataStruct[g_nMaxThreads][2] = {0};
@@ -32,7 +33,7 @@ DWORD WINAPI AnalyzeSequenceEntryPoint(LPVOID lpParam) {
 const std::string g_sDatasetPath("/shared/datasets/CDNet/dataset/");
 const std::string g_sResultsPath("/shared/datasets/CDNet/results_test/");
 const std::vector<int> g_vnResultsComprParams = {CV_IMWRITE_PNG_COMPRESSION,9}; // lower to increase processing speed
-const size_t g_nMaxThreads = (std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():2);
+const size_t g_nMaxThreads = (std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():1);
 std::atomic_size_t g_nActiveThreads(0);
 #endif //!WIN32 || _MSC_VER > 1600
 
@@ -101,7 +102,11 @@ int AnalyzeSequence(int nThreadIdx, const CategoryInfo* pCurrCategory, const Seq
 		CV_DbgAssert(pCurrSequence->vsInputFramePaths.size()>1);
 		const int nInputFlags = (pCurrCategory->sName=="thermal")?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR; // force thermal sequences to be loaded as grayscale (faster processing, better noise compensation)
 		cv::Mat oFGMask, oInputImg = cv::imread(pCurrSequence->vsInputFramePaths[0],nInputFlags);
+#if USE_RELATIVE_LBSP_COMPARISONS
+		BackgroundSubtractorLBSP oBGSubtr(LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD);
+#else
 		BackgroundSubtractorLBSP oBGSubtr;
+#endif
 		oBGSubtr.initialize(oInputImg);
 #if DISPLAY_ANALYSIS_DEBUG_RESULTS
 		std::string sDebugDisplayName = pCurrCategory->sName + std::string(" -- ") + pCurrSequence->sName;

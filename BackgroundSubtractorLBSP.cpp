@@ -20,6 +20,7 @@ BackgroundSubtractorLBSP::BackgroundSubtractorLBSP()
 
 BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(  int nLBSPThreshold
 													,int nDescDistThreshold
+													,int nColorDistThreshold
 													,int nBGSamples
 													,int nRequiredBGSamples)
 	:	 m_nBGSamples(nBGSamples)
@@ -27,7 +28,7 @@ BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(  int nLBSPThreshold
 		,m_voBGImg(nBGSamples)
 		,m_voBGDesc(nBGSamples)
 		,m_nDescDistThreshold(nDescDistThreshold)
-		,m_nColorDistThreshold(nLBSPThreshold)
+		,m_nColorDistThreshold(nColorDistThreshold)
 		,m_bInitialized(false)
 		,m_oExtractor(nLBSPThreshold) {
 	CV_Assert(m_nBGSamples>0);
@@ -35,6 +36,7 @@ BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(  int nLBSPThreshold
 
 BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(	 float fLBSPThreshold
 													,int nDescDistThreshold
+													,int nColorDistThreshold
 													,int nBGSamples
 													,int nRequiredBGSamples)
 	:	 m_nBGSamples(nBGSamples)
@@ -42,7 +44,7 @@ BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(	 float fLBSPThreshold
 		,m_voBGImg(nBGSamples)
 		,m_voBGDesc(nBGSamples)
 		,m_nDescDistThreshold(nDescDistThreshold)
-		,m_nColorDistThreshold(LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD) // @@@@@@@@@ not using relative...
+		,m_nColorDistThreshold(nColorDistThreshold)
 		,m_bInitialized(false)
 		,m_oExtractor(fLBSPThreshold) {
 	CV_Assert(m_nBGSamples>0);
@@ -50,18 +52,22 @@ BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(	 float fLBSPThreshold
 
 BackgroundSubtractorLBSP::~BackgroundSubtractorLBSP() {}
 
-void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg) {
+void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg, const std::vector<cv::KeyPoint>& voKeyPoints) {
 	CV_Assert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
 	CV_Assert(oInitImg.type()==CV_8UC1 || oInitImg.type()==CV_8UC3);
 	m_oImgSize = oInitImg.size();
 	m_nImgType = oInitImg.type();
 	m_nImgChannels = oInitImg.channels();
 
-	// init keypoints used for the extractor :
-	cv::DenseFeatureDetector oKPDDetector(1.f, 1, 1.f, 1, 0, true, false);
-	if(m_voKeyPoints.capacity()<(size_t)(m_oImgSize.width*m_oImgSize.height))
-		m_voKeyPoints.reserve(m_oImgSize.width*m_oImgSize.height);
-	oKPDDetector.detect(cv::Mat(m_oImgSize,m_nImgType), m_voKeyPoints);
+	if(voKeyPoints.empty()) {
+		// init keypoints used for the extractor :
+		cv::DenseFeatureDetector oKPDDetector(1.f, 1, 1.f, 1, 0, true, false);
+		if(m_voKeyPoints.capacity()<(size_t)(m_oImgSize.width*m_oImgSize.height))
+			m_voKeyPoints.reserve(m_oImgSize.width*m_oImgSize.height);
+		oKPDDetector.detect(cv::Mat(m_oImgSize,m_nImgType), m_voKeyPoints);
+	}
+	else
+		m_voKeyPoints = voKeyPoints;
 	LBSP::validateKeyPoints(m_voKeyPoints,m_oImgSize);
 	CV_Assert(!m_voKeyPoints.empty());
 
@@ -115,7 +121,7 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg) {
 void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray _fgmask, double learningRate) {
 	CV_DbgAssert(m_bInitialized);
 	CV_DbgAssert(learningRate>0);
-	cv::Mat oInputImg = _image.getMat(), oInputDesc;
+	cv::Mat oInputImg = _image.getMat();
 	CV_DbgAssert(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize);
 	_fgmask.create(m_oImgSize,CV_8UC1);
 	cv::Mat oFGMask = _fgmask.getMat();
@@ -123,20 +129,20 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 	const int nKeyPoints = (int)m_voKeyPoints.size();
 	const int nLearningRate = (int)learningRate;
 	if(m_nImgChannels==1) {
-		// note: modulation is commented here since noise doesn't affect the pattern that much, considering we use the modulated color threshold to build it
-		const int nCurrDescDistThreshold = m_nDescDistThreshold/**LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT*/;
-		const int nCurrColorDistThreshold = m_nColorDistThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT;
 		unsigned short nCurrInputDesc;
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
-				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,nCurrColorDistThreshold,nCurrInputDesc);
-				if(hdist_ushort_8bitLUT(nCurrInputDesc,m_voBGDesc[nSampleIdx].at<unsigned short>(y,x))<=nCurrDescDistThreshold) {
+				if(m_oExtractor.isUsingRelThreshold())
+					LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,m_oExtractor.getRelThreshold(),nCurrInputDesc);
+				else
+					LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,m_oExtractor.getAbsThreshold(),nCurrInputDesc);
+				if(hdist_ushort_8bitLUT(nCurrInputDesc,m_voBGDesc[nSampleIdx].at<unsigned short>(y,x))<=m_nDescDistThreshold) {
 					const int idx_img = oInputImg.step.p[0]*y + x;
 					CV_DbgAssert(*(oInputImg.data+idx_img)==oInputImg.at<uchar>(y,x));
-					if(absdiff_uchar(*(oInputImg.data+idx_img),*(m_voBGImg[nSampleIdx].data+idx_img))<=nCurrColorDistThreshold)
+					if(absdiff_uchar(*(oInputImg.data+idx_img),*(m_voBGImg[nSampleIdx].data+idx_img))<=m_nColorDistThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT)
 						nGoodSamplesCount++;
 				}
 				nSampleIdx++;
@@ -146,7 +152,10 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 			else {
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
-					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,nCurrColorDistThreshold,nCurrInputDesc);
+					if(m_oExtractor.isUsingRelThreshold())
+						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_oExtractor.getRelThreshold(),nCurrInputDesc);
+					else
+						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_oExtractor.getAbsThreshold(),nCurrInputDesc);
 					m_voBGDesc[s_rand].at<unsigned short>(y,x) = nCurrInputDesc;
 					m_voBGImg[s_rand].at<uchar>(y,x) = oInputImg.at<uchar>(y,x);
 				}
@@ -154,7 +163,10 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 					int s_rand = rand()%m_nBGSamples;
 					int x_rand,y_rand;
 					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
-					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,nCurrColorDistThreshold,nCurrInputDesc);
+					if(m_oExtractor.isUsingRelThreshold())
+						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_oExtractor.getRelThreshold(),nCurrInputDesc);
+					else
+						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_oExtractor.getAbsThreshold(),nCurrInputDesc);
 					m_voBGDesc[s_rand].at<unsigned short>(y_rand,x_rand) = nCurrInputDesc;
 					m_voBGImg[s_rand].at<uchar>(y_rand,x_rand) = oInputImg.at<uchar>(y,x);
 				}
@@ -164,8 +176,8 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 	else { //m_nImgChannels==3
 		const int nCurrDescDistThreshold = m_nDescDistThreshold*3;
 		const int nCurrColorDistThreshold = m_nColorDistThreshold*3;
-		const int nCurrSCDescDistThreshold = m_nDescDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR;
-		const int nCurrSCColorDistThreshold = m_nColorDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR;
+		const int nCurrSCDescDistThreshold = (int)(m_nDescDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);
+		const int nCurrSCColorDistThreshold = (int)(m_nColorDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);
 		unsigned short anCurrInputDesc[3];
 		int anDescDist[3], anColorDist[3];
 		const int desc_row_step = m_voBGDesc[0].step.p[0];
@@ -177,7 +189,10 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 			const int idx_img = img_row_step*y + 3*x;
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
-				LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,m_nColorDistThreshold,anCurrInputDesc);
+				if(m_oExtractor.isUsingRelThreshold())
+					LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,m_oExtractor.getRelThreshold(),anCurrInputDesc);
+				else
+					LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,m_oExtractor.getAbsThreshold(),anCurrInputDesc);
 				const unsigned short* bgdesc_ptr = (unsigned short*)(m_voBGDesc[nSampleIdx].data+idx_desc);
 				const uchar* inputimg_ptr = oInputImg.data+idx_img;
 				const uchar* bgimg_ptr = m_voBGImg[nSampleIdx].data+idx_img;
@@ -200,7 +215,10 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
 					unsigned short* bgdesc_ptr = ((unsigned short*)(m_voBGDesc[s_rand].data + desc_row_step*y + 6*x));
-					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_nColorDistThreshold,bgdesc_ptr);
+					if(m_oExtractor.isUsingRelThreshold())
+						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_oExtractor.getRelThreshold(),bgdesc_ptr);
+					else
+						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_oExtractor.getAbsThreshold(),bgdesc_ptr);
 					const int img_row_step = m_voBGImg[0].step.p[0];
 					for(int n=0; n<3; ++n)
 						*(m_voBGImg[s_rand].data + img_row_step*y + 3*x + n) = *(oInputImg.data + img_row_step*y + 3*x + n);
@@ -211,7 +229,10 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 					int x_rand,y_rand;
 					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 					unsigned short* bgdesc_ptr = ((unsigned short*)(m_voBGDesc[s_rand].data + desc_row_step*y_rand + 6*x_rand));
-					LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_nColorDistThreshold,bgdesc_ptr);
+					if(m_oExtractor.isUsingRelThreshold())
+						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_oExtractor.getRelThreshold(),bgdesc_ptr);
+					else
+						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_oExtractor.getAbsThreshold(),bgdesc_ptr);
 					const int img_row_step = m_voBGImg[0].step.p[0];
 					for(int n=0; n<3; ++n)
 						*(m_voBGImg[s_rand].data + img_row_step*y_rand + 3*x_rand + n) = *(oInputImg.data + img_row_step*y + 3*x + n);
@@ -243,7 +264,5 @@ std::vector<cv::KeyPoint> BackgroundSubtractorLBSP::getBGKeyPoints() const {
 void BackgroundSubtractorLBSP::setBGKeyPoints(std::vector<cv::KeyPoint>& keypoints) {
 	m_oExtractor.validateKeyPoints(keypoints,m_oImgSize);
 	CV_Assert(!keypoints.empty());
-	// @@@@ NOT IMPL
-	CV_Assert(false);
-	// need to reinit sample buffers...
+	m_voKeyPoints = keypoints;
 }

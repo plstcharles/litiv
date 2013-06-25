@@ -25,8 +25,10 @@ LBSP::LBSP(float threshold)
 		,m_fThreshold(threshold)
 		,m_nThreshold(-1)
 		,m_oRefImage() {
-	CV_Assert(m_fThreshold>=0 && m_fThreshold<=1);
+	CV_Assert(m_fThreshold>0 && m_fThreshold<1);
 }
+
+LBSP::~LBSP() {}
 
 void LBSP::read(const cv::FileNode& fn) {
     // ... = fn["..."];
@@ -98,6 +100,43 @@ static inline void lbsp_computeImpl(	const cv::Mat& oInputImg,
 	}
 }
 
+static inline void lbsp_computeImpl(	const cv::Mat& oInputImg,
+										const cv::Mat& oRefImg,
+										const std::vector<cv::KeyPoint>& voKeyPoints,
+										cv::Mat& oDesc,
+										float fThreshold) {
+	CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
+	CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
+	CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
+	const int nChannels = oInputImg.channels();
+	const int _step_row = oInputImg.step.p[0];
+	const uchar* _data = oInputImg.data;
+	const uchar* _refdata = oRefImg.empty()?oInputImg.data:oRefImg.data;
+	const int nKeyPoints = (int)voKeyPoints.size();
+	if(nChannels==1) {
+		CV_DbgAssert(fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT>0 && fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT<1);
+		const float _t = fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT;
+		oDesc.create(nKeyPoints,1,CV_16UC1);
+		for(int k=0; k<nKeyPoints; ++k) {
+			const int _x = (int)voKeyPoints[k].pt.x;
+			const int _y = (int)voKeyPoints[k].pt.y;
+			unsigned short& _res = oDesc.at<unsigned short>(k);
+#include "LBSP_16bits_dbcross_1ch_rel.i"
+		}
+	}
+	else { //nChannels==3
+		CV_DbgAssert(fThreshold>0 && fThreshold<1);
+		const float _t = fThreshold;
+		oDesc.create(nKeyPoints,1,CV_16UC3);
+		for(int k=0; k<nKeyPoints; ++k) {
+			const int _x = (int)voKeyPoints[k].pt.x;
+			const int _y = (int)voKeyPoints[k].pt.y;
+			unsigned short* _res = ((unsigned short*)(oDesc.data + oDesc.step.p[0]*k));
+#include "LBSP_16bits_dbcross_3ch_rel.i"
+		}
+	}
+}
+
 static inline void lbsp_computeImpl2(	const cv::Mat& oInputImg,
 										const cv::Mat& oRefImg,
 										const std::vector<cv::KeyPoint>& voKeyPoints,
@@ -135,22 +174,41 @@ static inline void lbsp_computeImpl2(	const cv::Mat& oInputImg,
 	}
 }
 
-static inline void lbsp_computeImpl(const cv::Mat& origImage,
-									const cv::Mat& refImage,
-									const std::vector<cv::KeyPoint>& keypoints,
-									cv::Mat& descriptors,
-									float _t) {
-	// @@@@@@@@@@@@@@@@@@@@@@
-	CV_Assert(false);
-}
-
-static inline void lbsp_computeImpl2(const cv::Mat& origImage,
-									const cv::Mat& refImage,
-									const std::vector<cv::KeyPoint>& keypoints,
-									cv::Mat& descriptors,
-									float _t) {
-	// @@@@@@@@@@@@@@@@@@@@@@
-	CV_Assert(false);
+static inline void lbsp_computeImpl2(	const cv::Mat& oInputImg,
+										const cv::Mat& oRefImg,
+										const std::vector<cv::KeyPoint>& voKeyPoints,
+										cv::Mat& oDesc,
+										float fThreshold) {
+	CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
+	CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
+	CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
+	const int nChannels = oInputImg.channels();
+	const int _step_row = oInputImg.step.p[0];
+	const uchar* _data = oInputImg.data;
+	const uchar* _refdata = oRefImg.empty()?oInputImg.data:oRefImg.data;
+	const int nKeyPoints = (int)voKeyPoints.size();
+	if(nChannels==1) {
+		CV_DbgAssert(fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT>0 && fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT<1);
+		const float _t = fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT;
+		oDesc.create(oInputImg.size(),CV_16UC1);
+		for(int k=0; k<nKeyPoints; ++k) {
+			const int _x = (int)voKeyPoints[k].pt.x;
+			const int _y = (int)voKeyPoints[k].pt.y;
+			unsigned short& _res = oDesc.at<unsigned short>(_y,_x);
+#include "LBSP_16bits_dbcross_1ch_rel.i"
+		}
+	}
+	else { //nChannels==3
+		CV_DbgAssert(fThreshold>0 && fThreshold<1);
+		const float _t = fThreshold;
+		oDesc.create(oInputImg.size(),CV_16UC3);
+		for(int k=0; k<nKeyPoints; ++k) {
+			const int _x = (int)voKeyPoints[k].pt.x;
+			const int _y = (int)voKeyPoints[k].pt.y;
+			unsigned short* _res = ((unsigned short*)(oDesc.data + oDesc.step.p[0]*_y + oDesc.step.p[1]*_x));
+#include "LBSP_16bits_dbcross_3ch_rel.i"
+		}
+	}
 }
 
 void LBSP::compute2(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, cv::Mat& descriptors) const {
@@ -190,6 +248,20 @@ void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const
 #include "LBSP_16bits_dbcross_1ch_abs.i"
 }
 
+void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const float fThreshold, unsigned short& _res) {
+	CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
+	CV_DbgAssert(oInputImg.type()==CV_8UC1);
+	CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
+	CV_DbgAssert(fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT>0 && fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT<1);
+	CV_DbgAssert(_x>=LBSP::PATCH_SIZE/2 && _y>=LBSP::PATCH_SIZE/2);
+	CV_DbgAssert(_x<oInputImg.cols-LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-LBSP::PATCH_SIZE/2);
+	const float _t = fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT;
+	const int _step_row = oInputImg.step.p[0];
+	const uchar* _data = oInputImg.data;
+	const uchar* _refdata = oRefImg.empty()?oInputImg.data:oRefImg.data;
+#include "LBSP_16bits_dbcross_1ch_rel.i"
+}
+
 void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const int nThreshold, unsigned short* _res) {
 	CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 	CV_DbgAssert(oInputImg.type()==CV_8UC3);
@@ -202,6 +274,20 @@ void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const
 	const uchar* _data = oInputImg.data;
 	const uchar* _refdata = oRefImg.empty()?oInputImg.data:oRefImg.data;
 #include "LBSP_16bits_dbcross_3ch_abs.i"
+}
+
+void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const float fThreshold, unsigned short* _res) {
+	CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
+	CV_DbgAssert(oInputImg.type()==CV_8UC3);
+	CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
+	CV_DbgAssert(fThreshold>0 && fThreshold<1);
+	CV_DbgAssert(_x>=LBSP::PATCH_SIZE/2 && _y>=LBSP::PATCH_SIZE/2);
+	CV_DbgAssert(_x<oInputImg.cols-LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-LBSP::PATCH_SIZE/2);
+	const float _t = fThreshold;
+	const int _step_row = oInputImg.step.p[0];
+	const uchar* _data = oInputImg.data;
+	const uchar* _refdata = oRefImg.empty()?oInputImg.data:oRefImg.data;
+#include "LBSP_16bits_dbcross_3ch_rel.i"
 }
 
 void LBSP::computeImpl(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, cv::Mat& descriptors) const {
