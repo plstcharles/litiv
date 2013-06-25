@@ -13,15 +13,13 @@
 //! defines the default value for the learning rate passed to BackgroundSubtractorLBSP::operator()
 #define BGSLBSP_DEFAULT_LEARNING_RATE (16)
 //! defines the internal threshold adjustment factor to use when determining if the variation of a single channel is enough to declare the pixel as foreground
-#define BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR (1.5)
-
+#define BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR (1.50f)
 
 /*!
 	Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
 
 	Note: both grayscale and RGB/BGR images may be used with this extractor (parameters
-	are adjusted automatically). When processing grayscale images, only m_nFGThreshold is
-	used to determine if a pixel is foreground/background.
+	are adjusted automatically).
 
 	For more details on the different parameters, go to @@@@@@@@@@@@@@.
 
@@ -29,33 +27,35 @@
  */
 class BackgroundSubtractorLBSP : public cv::BackgroundSubtractor {
 public:
-	//! default constructor (also using default LBSP descriptor extractor params)
+	//! default constructor (also uses the default LBSP descriptor extractor constructor & params)
 	BackgroundSubtractorLBSP();
-	//! full constructor based on the absolute LBSP extractor, with algorithm parameters passed as arguments
+	//! full constructor used to intialize an 'absolute' LBSP-based background subtractor
 	BackgroundSubtractorLBSP(	int nLBSPThreshold,
 								int nDescDistThreshold=BGSLBSP_DEFAULT_DESC_DIST_THRESHOLD,
+								int nColorDistThreshold=LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD,
 								int nBGSamples=BGSLBSP_DEFAULT_NB_BG_SAMPLES,
 								int nRequiredBGSamples=BGSLBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES);
-	//! full constructor based on the relative LBSP extractor, with algorithm parameters passed as arguments
+	//! full constructor used to intialize a 'relative' LBSP-based background subtractor
 	BackgroundSubtractorLBSP(	float fLBSPThreshold,
 								int nDescDistThreshold=BGSLBSP_DEFAULT_DESC_DIST_THRESHOLD,
+								int nColorDistThreshold=LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD,
 								int nBGSamples=BGSLBSP_DEFAULT_NB_BG_SAMPLES,
 								int nRequiredBGSamples=BGSLBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES);
 	//! default destructor
 	virtual ~BackgroundSubtractorLBSP();
 	//! (re)initiaization method; needs to be called before starting background subtraction (note: also reinitializes the keypoints vector)
-	virtual void initialize(const cv::Mat& oInitImg);
-	//! primary model update function; the learning param is reinterpreted as an integer and should be >= 0 (smaller values == faster adaptation)
-	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRate=32);
+	virtual void initialize(const cv::Mat& oInitImg, const std::vector<cv::KeyPoint>& voKeyPoints=std::vector<cv::KeyPoint>());
+	//! primary model update function; the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
+	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSLBSP_DEFAULT_LEARNING_RATE);
 	//! @@@@@@@@@@@@ ????
 	virtual cv::AlgorithmInfo* info() const;
-	//! returns a copy of the latest reconstructed background image
+	//! returns a copy of the latest reconstructed background image (in this case, since we're using a ViBe-like method, it returns the first sample set)
 	cv::Mat getCurrentBGImage() const;
-	//! returns a copy of the latest background descriptors image
+	//! returns a copy of the latest background descriptors image (in this case, since we're using a ViBe-like method, it returns the first sample set)
 	cv::Mat getCurrentBGDescriptors() const;
-	//! returns the keypoints list used for descriptor extraction (note: by default, they are generated from the DenseFeatureDetector class, but the border points are removed)
+	//! returns the keypoints list used for descriptor extraction (note: by default, these are generated from the DenseFeatureDetector class, and the border points are removed)
 	std::vector<cv::KeyPoint> getBGKeyPoints() const;
-	//! sets the keypoints to be used for descriptor extraction, effectively setting the BGModel ROI (note: this function will remove all border keypoints, and reinits the model's samples buffers)
+	//! sets the keypoints to be used for descriptor extraction, effectively setting the BGModel ROI (note: this function will remove all border keypoints)
 	void setBGKeyPoints(std::vector<cv::KeyPoint>& keypoints);
 
 private:
