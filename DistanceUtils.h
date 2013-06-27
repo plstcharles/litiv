@@ -4,7 +4,7 @@
 
 //! computes the absolute difference between two unsigned char values
 static inline int absdiff_uchar(uchar a, uchar b) {
-	return (a<b?b-a:a-b);
+	return abs(a-b); // should return the same as (a<b?b-a:a-b), but faster when properly optimized
 }
 
 //! computes the L1 distance between two 3-ch unsigned char vectors
@@ -14,10 +14,7 @@ static inline int L1dist_uchar(uchar* a, uchar* b) {
 
 //! computes the squared L2 distance between two 3-ch unsigned char vectors
 static inline int L2sqrdist_uchar(uchar* a, uchar* b) {
-	const int d0 = absdiff_uchar(a[0],b[0]);
-	const int d1 = absdiff_uchar(a[1],b[1]);
-	const int d2 = absdiff_uchar(a[2],b[2]);
-	return d0*d0 + d1*d1 + d2*d2;
+	return (absdiff_uchar(a[0],b[0])^2)+(absdiff_uchar(a[1],b[1])^2)+(absdiff_uchar(a[2],b[2])^2);
 }
 
 //! popcount LUT for 8bit vectors

@@ -6,9 +6,9 @@ int AnalyzeSequence(int nThreadIdx, const CategoryInfo* pCurrCategory, const Seq
 ////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
 #define WRITE_ANALYSIS_RESULTS 0
-#define DISPLAY_ANALYSIS_DEBUG_RESULTS 1
+#define DISPLAY_ANALYSIS_DEBUG_RESULTS 0
 #define WRITE_ANALYSIS_DEBUG_RESULTS 0
-#define USE_RELATIVE_LBSP_COMPARISONS 0
+#define USE_RELATIVE_LBSP_COMPARISONS 1
 const std::string g_sResultPrefix("bin"); // based on the CDNet result image template
 const std::string g_sResultSuffix(".png"); // based on the CDNet result image template
 #if WIN32 && _MSC_VER <= 1600

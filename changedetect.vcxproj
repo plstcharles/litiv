@@ -89,14 +89,16 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="LBSP_16bits_dbcross_1ch_abs.i" />
+    <None Include="LBSP_16bits_dbcross_1ch_rel.i" />
     <None Include="LBSP_16bits_dbcross_3ch_abs.i" />
-    <None Include="ReadMe.txt" />
+    <None Include="LBSP_16bits_dbcross_3ch_rel.i" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BackgroundSubtractorLBSP.h" />
     <ClInclude Include="DatasetUtils.h" />
-    <ClInclude Include="HammingDist.h" />
+    <ClInclude Include="DistanceUtils.h" />
     <ClInclude Include="LBSP.h" />
+    <ClInclude Include="RandUtils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BackgroundSubtractorLBSP.cpp" />

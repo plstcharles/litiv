@@ -79,9 +79,13 @@ private:
 	const int m_nDescDistThreshold;
 	//! absolute per-channel color distance threshold (based on the provided LBSP threshold)
 	const int m_nColorDistThreshold;
+	//! defines if we're using a relative threshold when extracting LBSP features (kept here since we don't keep an LBSP object)
+	const bool m_bLBSPUsingRelThreshold;
+	//! LBSP absolute internal threshold (kept here since we don't keep an LBSP object)
+	const int m_nLBSPThreshold;
+	//! LBSP relative internal threshold (kept here since we don't keep an LBSP object)
+	const float m_fLBSPThreshold;
 	//! defines whether or not the subtractor is fully initialized
 	bool m_bInitialized;
-	//! LBSP feature extractor
-	LBSP m_oExtractor;
 };
 

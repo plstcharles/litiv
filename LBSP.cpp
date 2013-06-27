@@ -9,7 +9,7 @@ LBSP::LBSP()
 		,m_fThreshold(-1) // unused
 		,m_nThreshold(LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD)
 		,m_oRefImage() {
-	CV_DbgAssert(m_nThreshold>0 && m_nThreshold<=UCHAR_MAX);
+	CV_Assert(m_nThreshold>0 && m_nThreshold<=UCHAR_MAX);
 }
 
 LBSP::LBSP(int threshold)
@@ -17,7 +17,7 @@ LBSP::LBSP(int threshold)
 		,m_fThreshold(-1) // unused
 		,m_nThreshold(threshold)
 		,m_oRefImage() {
-	CV_DbgAssert(m_nThreshold>0 && m_nThreshold<=UCHAR_MAX);
+	CV_Assert(m_nThreshold>0 && m_nThreshold<=UCHAR_MAX);
 }
 
 LBSP::LBSP(float threshold)
