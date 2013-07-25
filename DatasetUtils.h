@@ -18,6 +18,11 @@
 #include <sys/stat.h>
 #endif
 
+#define CDNET_DB_NAME 		"CDNet"
+#define WALLFLOWER_DB_NAME 	"WALLFLOWER"
+
+class SequenceInfo;
+
 static inline void WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bBottom=false) {
 	cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-15):15),cv::FONT_HERSHEY_PLAIN,1.0,cv::Scalar_<uchar>(0,0,255),1,CV_AA);
 }
@@ -35,56 +40,6 @@ static inline void WriteResult(	const std::string& sResultsPath,
 	std::stringstream sResultFilePath;
 	sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << buffer << sResultSuffix;
 	cv::imwrite(sResultFilePath.str(), res, vnComprParams);
-}
-
-static inline cv::Mat GetDisplayResult(	const cv::Mat& oInputImg,
-										const cv::Mat& oBGImg,
-										const cv::Mat& oBGDesc,
-										const cv::Mat& oFGMask,
-										std::vector<cv::KeyPoint> voKeyPoints,
-										size_t nFrame) {
-	// note: this function is definitely NOT efficient in any way; it is only intended for debug purposes.
-	cv::Mat oInputImgBYTE3, oBGImgBYTE3, oBGDescBYTE, oBGDescBYTE3, oFGMaskBYTE3;
-	cv::Mat oInputDesc, oInputDescBYTE, oInputDescBYTE3;
-	cv::Mat oDescDiff, oDescDiffBYTE, oDescDiffBYTE3;
-	LBSP oExtractor;
-	oExtractor.setReference(oBGImg);
-	oExtractor.compute2(oInputImg,voKeyPoints,oInputDesc);
-	LBSP::calcDescImgDiff(oInputDesc,oBGDesc,oDescDiff);
-	oInputDesc.convertTo(oInputDescBYTE,CV_8U);
-	oBGDesc.convertTo(oBGDescBYTE,CV_8U);
-	oDescDiff.convertTo(oDescDiffBYTE,CV_8U);
-	cv::cvtColor(oFGMask,oFGMaskBYTE3,CV_GRAY2RGB);
-	if(oInputImg.channels()!=3) {
-		cv::cvtColor(oInputImg,oInputImgBYTE3,CV_GRAY2RGB);
-		cv::cvtColor(oBGImg,oBGImgBYTE3,CV_GRAY2RGB);
-		cv::cvtColor(oInputDescBYTE,oInputDescBYTE3,CV_GRAY2RGB);
-		cv::cvtColor(oBGDescBYTE,oBGDescBYTE3,CV_GRAY2RGB);
-		cv::cvtColor(oDescDiffBYTE,oDescDiffBYTE3,CV_GRAY2RGB);
-	}
-	else {
-		oInputImgBYTE3 = oInputImg;
-		oBGImgBYTE3 = oBGImg;
-		oInputDescBYTE3 = oInputDescBYTE;
-		oBGDescBYTE3 = oBGDescBYTE;
-		oDescDiffBYTE3 = oDescDiffBYTE;
-	}
-	cv::Mat display1H,display2H,display3H;
-	std::stringstream sstr;
-	sstr << "Input Img #" << nFrame;
-	WriteOnImage(oInputImgBYTE3,sstr.str());
-	WriteOnImage(oBGImgBYTE3,"BGModel Img");
-	WriteOnImage(oInputDescBYTE3,"Input Desc");
-	WriteOnImage(oBGDescBYTE3,"BGModel Desc");
-	WriteOnImage(oFGMaskBYTE3,"Detection Result");
-	WriteOnImage(oDescDiffBYTE3,"BGModel-Input Desc Diff");
-	cv::hconcat(oInputImgBYTE3,oBGImgBYTE3,display1H);
-	cv::hconcat(oInputDescBYTE3,oBGDescBYTE3,display2H);
-	cv::hconcat(oFGMaskBYTE3,oDescDiffBYTE3,display3H);
-	cv::Mat display;
-	cv::vconcat(display1H,display2H,display);
-	cv::vconcat(display,display3H,display);
-	return display;
 }
 
 static inline void GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths) {
@@ -194,67 +149,32 @@ static inline void GetSubDirsFromDir(const std::string& sDirPath, std::vector<st
 #endif
 }
 
-struct SequenceInfo {
-	SequenceInfo(const std::string& name) {
-		sName = name;
-	}
-	SequenceInfo(const std::string& name, const std::string& dir) {
-		sName = name;
-
-		// amongst possible subdirs at this level, we expect a 'groundtruth' and an 'input' directory for the CDNet dataset (throws if not found)
-		std::vector<std::string> vsSubDirs;
-		GetSubDirsFromDir(dir,vsSubDirs);
-		auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),dir+"/groundtruth");
-		auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),dir+"/input");
-		if(gtDir==vsSubDirs.end() || inputDir==vsSubDirs.end())
-			throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess the required groundtruth and input directories.");
-		GetFilesFromDir(*inputDir,vsInputFramePaths);
-		GetFilesFromDir(*gtDir,vsGTFramePaths);
-		if(vsGTFramePaths.size()!=vsInputFramePaths.size())
-			throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess same amount of GT & input frames.");
-
-		// amongst possible files at this level, we expect a 'ROI.bmp' file to specify the sequence's region of interest (throws if not found)
-		oROI = cv::imread(dir+"/ROI.bmp");
-		if(oROI.empty())
-			throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess a ROI.bmp file.");
-	}
-	SequenceInfo(const std::string& name, const std::vector<std::string>& inputframes, const std::vector<std::string>& gtframes, const cv::Mat& roi) {
-		sName = name;
-		vsInputFramePaths = inputframes;
-		vsGTFramePaths = gtframes;
-		oROI = roi;
-	}
-	std::string sName;
-	std::vector<std::string> vsInputFramePaths;
-	std::vector<std::string> vsGTFramePaths;
-	cv::Mat oROI;
+class CategoryInfo {
+public:
+	CategoryInfo(const std::string& name, const std::string& dir, const std::string& dbname);
+	~CategoryInfo();
+	const std::string m_sName;
+	const std::string m_sDBName;
+	std::vector<SequenceInfo*> m_vpSequences;
 };
 
-struct CategoryInfo {
-	CategoryInfo(const std::string& name) {
-		sName = name;
-	}
-	CategoryInfo(const std::string& name, const std::string& dir) {
-		sName = name;
-		// all subdirs are considered sequence directories for this category; no parsing is done for files at this level.
-		std::vector<std::string> vsSequencePaths;
-		GetSubDirsFromDir(dir,vsSequencePaths);
-		for(size_t i=0; i<vsSequencePaths.size(); i++) {
-			size_t pos = vsSequencePaths[i].find_last_of("/\\");
-			if(pos==std::string::npos)
-				vpSequences.push_back(new SequenceInfo(vsSequencePaths[i],vsSequencePaths[i]));
-			else
-				vpSequences.push_back(new SequenceInfo(vsSequencePaths[i].substr(pos+1),vsSequencePaths[i]));
-		}
-	}
-	CategoryInfo(const std::string& name, const std::vector<SequenceInfo*>& sequences) {
-		sName = name;
-		vpSequences = sequences;
-	}
-	~CategoryInfo() {
-		for(size_t i=0; i<vpSequences.size(); i++)
-			delete vpSequences[i];
-	}
-	std::string sName;
-	std::vector<SequenceInfo*> vpSequences;
+class SequenceInfo {
+public:
+	SequenceInfo(const std::string& name, const std::string& dir, const std::string& dbname, CategoryInfo* parent);
+	cv::Mat GetInputFrameFromIndex(size_t idx);
+	cv::Mat GetGTFrameFromIndex(size_t idx);
+	size_t GetNbInputFrames() const;
+	size_t GetNbGTFrames() const;
+	cv::Size GetFrameSize() const;
+	cv::Mat GetSequenceROI() const;
+	const std::string m_sName;
+	const std::string m_sDBName;
+private:
+	std::vector<std::string> m_vsInputFramePaths;
+	std::vector<std::string> m_vsGTFramePaths;
+	cv::Mat m_oROI;
+	cv::Size m_oSize;
+	CategoryInfo* m_pParent;
+	const int m_nIMReadInputFlags;
+	size_t m_nTestGTIndex;
 };
