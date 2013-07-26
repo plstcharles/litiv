@@ -263,12 +263,12 @@ cv::AlgorithmInfo* BackgroundSubtractorLBSP::info() const {
 	return NULL;
 }
 
-cv::Mat BackgroundSubtractorLBSP::getCurrentBGImage() const {
-	return m_voBGImg[0].clone();
+void BackgroundSubtractorLBSP::getBackgroundImage(cv::OutputArray backgroundImage) const {
+	m_voBGImg[0].copyTo(backgroundImage);
 }
 
-cv::Mat BackgroundSubtractorLBSP::getCurrentBGDescriptors() const {
-	return m_voBGDesc[0].clone();
+void BackgroundSubtractorLBSP::getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const {
+	m_voBGDesc[0].copyTo(backgroundDescImage);
 }
 
 std::vector<cv::KeyPoint> BackgroundSubtractorLBSP::getBGKeyPoints() const {
