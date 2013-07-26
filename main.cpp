@@ -148,12 +148,13 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 				std::cout << "\t\t" << std::setw(12) << pCurrSequence->m_sName << " @ F:" << k << "/" << nNbInputFrames << std::endl;
 			oInputImg = pCurrSequence->GetInputFrameFromIndex(k);
 #if DISPLAY_ANALYSIS_DEBUG_RESULTS
-			cv::Mat oLastBGImg = oBGSubtr.getCurrentBGImage();
-			cv::Mat oLastBGDesc = oBGSubtr.getCurrentBGDescriptors();
+			cv::Mat oLastBGImg,oLastBGDescImg;
+			oBGSubtr.getBackgroundImage(oLastBGImg);
+			oBGSubtr.getBackgroundDescriptorsImage(oLastBGDescImg);
 #endif //DISPLAY_ANALYSIS_DEBUG_RESULTS
 			oBGSubtr(oInputImg, oFGMask, k<=100?1:BGSLBSP_DEFAULT_LEARNING_RATE);
 #if DISPLAY_ANALYSIS_DEBUG_RESULTS
-			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oLastBGDesc,oFGMask,oBGSubtr.getBGKeyPoints(),k);
+			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oLastBGDescImg,oFGMask,oBGSubtr.getBGKeyPoints(),k);
 			cv::imshow(sDebugDisplayName, oDebugDisplayFrame);
 #if WRITE_ANALYSIS_DEBUG_RESULTS
 			oWriter.write(oDebugDisplayFrame);
