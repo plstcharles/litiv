@@ -8,20 +8,56 @@
 #include <stdlib.h>
 #include <iostream>
 #include <iomanip>
+#include <unordered_map>
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #ifdef WIN32
 #include <windows.h>
 #else
+#define sprintf_s sprintf
 #include <dirent.h>
 #include <sys/stat.h>
 #endif
 
-#define CDNET_DB_NAME 		"CDNet"
-#define WALLFLOWER_DB_NAME 	"WALLFLOWER"
+#define CDNET_DB_NAME 			"CDNet"
+#define WALLFLOWER_DB_NAME 		"WALLFLOWER"
+#define PETS2001_D3TC1_DB_NAME	"PETS2001_D3TC1"
 
 class SequenceInfo;
+
+class CategoryInfo {
+public:
+	CategoryInfo(const std::string& name, const std::string& dir, const std::string& dbname);
+	~CategoryInfo();
+	const std::string m_sName;
+	const std::string m_sDBName;
+	std::vector<SequenceInfo*> m_vpSequences;
+};
+
+class SequenceInfo {
+public:
+	SequenceInfo(const std::string& name, const std::string& dir, const std::string& dbname, CategoryInfo* parent);
+	cv::Mat GetInputFrameFromIndex(size_t idx);
+	cv::Mat GetGTFrameFromIndex(size_t idx);
+	size_t GetNbInputFrames() const;
+	size_t GetNbGTFrames() const;
+	cv::Size GetFrameSize() const;
+	cv::Mat GetSequenceROI() const;
+	const std::string m_sName;
+	const std::string m_sDBName;
+private:
+	std::vector<std::string> m_vsInputFramePaths;
+	std::vector<std::string> m_vsGTFramePaths;
+	cv::VideoCapture m_voVideoReader;
+	size_t m_nNextFrame;
+	size_t m_nTotalNbFrames;
+	cv::Mat m_oROI;
+	cv::Size m_oSize;
+	CategoryInfo* m_pParent;
+	const int m_nIMReadInputFlags;
+	std::unordered_map<size_t,size_t> m_mTestGTIndexes;
+};
 
 static inline void WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bBottom=false) {
 	cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-15):15),cv::FONT_HERSHEY_PLAIN,1.0,cv::Scalar_<uchar>(0,0,255),1,CV_AA);
@@ -36,7 +72,7 @@ static inline void WriteResult(	const std::string& sResultsPath,
 								const cv::Mat& res,
 								const std::vector<int>& vnComprParams) {
 	char buffer[10];
-	sprintf(buffer,"%06d",framenum);
+	sprintf_s(buffer,"%06d",framenum);
 	std::stringstream sResultFilePath;
 	sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << buffer << sResultSuffix;
 	cv::imwrite(sResultFilePath.str(), res, vnComprParams);
@@ -148,33 +184,3 @@ static inline void GetSubDirsFromDir(const std::string& sDirPath, std::vector<st
 	}
 #endif
 }
-
-class CategoryInfo {
-public:
-	CategoryInfo(const std::string& name, const std::string& dir, const std::string& dbname);
-	~CategoryInfo();
-	const std::string m_sName;
-	const std::string m_sDBName;
-	std::vector<SequenceInfo*> m_vpSequences;
-};
-
-class SequenceInfo {
-public:
-	SequenceInfo(const std::string& name, const std::string& dir, const std::string& dbname, CategoryInfo* parent);
-	cv::Mat GetInputFrameFromIndex(size_t idx);
-	cv::Mat GetGTFrameFromIndex(size_t idx);
-	size_t GetNbInputFrames() const;
-	size_t GetNbGTFrames() const;
-	cv::Size GetFrameSize() const;
-	cv::Mat GetSequenceROI() const;
-	const std::string m_sName;
-	const std::string m_sDBName;
-private:
-	std::vector<std::string> m_vsInputFramePaths;
-	std::vector<std::string> m_vsGTFramePaths;
-	cv::Mat m_oROI;
-	cv::Size m_oSize;
-	CategoryInfo* m_pParent;
-	const int m_nIMReadInputFlags;
-	size_t m_nTestGTIndex;
-};
