@@ -2,7 +2,11 @@
 
 CategoryInfo::CategoryInfo(const std::string& name, const std::string& dir, const std::string& dbname)
 	:	 m_sName(name)
-		,m_sDBName(dbname) {
+		,m_sDBName(dbname)
+		,nTP(0)
+		,nTN(0)
+		,nFP(0)
+		,nFN(0) {
 	std::cout << "\tParsing dir '" << dir << "' for category '" << name << "'... ";
 	std::vector<std::string> vsSequencePaths;
 	if(m_sDBName==CDNET_DB_NAME || m_sDBName==WALLFLOWER_DB_NAME || m_sDBName==PETS2001_D3TC1_DB_NAME/*|| m_sDBName==...*/) {
@@ -32,6 +36,10 @@ CategoryInfo::~CategoryInfo() {
 SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, const std::string& dbname, CategoryInfo* parent)
 	:	 m_sName(name)
 		,m_sDBName(dbname)
+		,nTP(0)
+		,nTN(0)
+		,nFP(0)
+		,nFN(0)
 		,m_pParent(parent)
 		,m_nIMReadInputFlags((parent->m_sName=="thermal")?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR) { // force thermal sequences to be loaded as grayscale (faster processing, better noise compensation))
 	if(m_sDBName==CDNET_DB_NAME) {
@@ -45,7 +53,7 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 		GetFilesFromDir(*gtDir,m_vsGTFramePaths);
 		if(m_vsGTFramePaths.size()!=m_vsInputFramePaths.size())
 			throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess same amount of GT & input frames.");
-		m_oROI = cv::imread(dir+"/ROI.bmp");
+		m_oROI = cv::imread(dir+"/ROI.bmp",cv::IMREAD_GRAYSCALE);
 		if(m_oROI.empty())
 			throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess a ROI.bmp file.");
 		m_oSize = m_oROI.size();

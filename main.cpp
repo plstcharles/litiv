@@ -5,6 +5,7 @@
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
 #define WRITE_BGSUB_IMG_OUTPUT			1
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT	1
+#define WRITE_BGSUB_METRICS_ANALYSIS	1
 /////////////////////////////////////////
 #define DISPLAY_BGSUB_DEBUG_OUTPUT		1
 /////////////////////////////////////////
@@ -83,9 +84,17 @@ int main( int argc, char** argv ) {
 			vpCategories.push_back(new CategoryInfo(g_asDatasetCategories[i], g_sDatasetPath+g_asDatasetCategories[i], g_sDatasetName));
 	} catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
 	size_t nSeqTotal = 0;
-	for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory)
+	size_t nFramesTotal = 0;
+	for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory) {
 		nSeqTotal += (*pCurrCategory)->m_vpSequences.size();
+		for(auto pCurrSequence=(*pCurrCategory)->m_vpSequences.begin(); pCurrSequence!=(*pCurrCategory)->m_vpSequences.end(); ++pCurrSequence)
+			nFramesTotal += (*pCurrSequence)->GetNbInputFrames();
+	}
 	std::cout << "Parsing complete. [" << vpCategories.size() << " category(ies), "  << nSeqTotal  << " sequence(s)]" << std::endl << std::endl;
+	time_t startup = time(NULL);
+	tm* startup_tm = localtime(&startup);
+	std::cout << "[" << (startup_tm->tm_year + 1900) << '/' << (startup_tm->tm_mon + 1) << '/' <<  startup_tm->tm_mday << " -- ";
+	std::cout << startup_tm->tm_hour << ':' << startup_tm->tm_min << ':' << startup_tm->tm_sec << ']' << std::endl;
 	if(nSeqTotal) {
 		// since the algorithm isn't implemented to be parallelized yet, we parallelize the sequence treatment instead
 		std::cout << "Running LBSP background subtraction with " << ((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads) << " thread(s)..." << std::endl;
@@ -116,13 +125,39 @@ int main( int argc, char** argv ) {
 				g_hThreads[ret] = CreateThread(NULL,NULL,AnalyzeSequenceEntryPoint,(LPVOID)ret,0,NULL);
 			}
 		}
-		WaitForMultipleObjects((g_nMaxThreads>nSeqTotal)?:nSeqTotal:g_nMaxThreads,g_hThreads,TRUE,INFINITE);
+		WaitForMultipleObjects((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads,g_hThreads,TRUE,INFINITE);
 		for(size_t n=0; n<g_nMaxThreads; ++n) {
 			CloseHandle(g_hThreadEvent[n]);
 			CloseHandle(g_hThreads[n]);
 		}
 #endif //USE_WINDOWS_API
+#if WRITE_BGSUB_METRICS_ANALYSIS
+		std::cout << "Summing and writing metrics results..." << std::endl;
+		size_t nGlobalTP=0, nGlobalTN=0, nGlobalFP=0, nGlobalFN=0;
+		for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory) {
+			for(auto pCurrSequence=(*pCurrCategory)->m_vpSequences.begin(); pCurrSequence!=(*pCurrCategory)->m_vpSequences.end(); ++pCurrSequence) {
+				(*pCurrCategory)->nTP += (*pCurrSequence)->nTP;
+				(*pCurrCategory)->nTN += (*pCurrSequence)->nTN;
+				(*pCurrCategory)->nFP += (*pCurrSequence)->nFP;
+				(*pCurrCategory)->nFN += (*pCurrSequence)->nFN;
+			}
+			WriteMetrics(g_sResultsPath+(*pCurrCategory)->m_sName+".txt",(*pCurrCategory)->nTP,(*pCurrCategory)->nTN,(*pCurrCategory)->nFP,(*pCurrCategory)->nFN);
+			nGlobalTP += (*pCurrCategory)->nTP;
+			nGlobalTN += (*pCurrCategory)->nTN;
+			nGlobalFP += (*pCurrCategory)->nFP;
+			nGlobalFN += (*pCurrCategory)->nFN;
+		}
+		WriteMetrics(g_sResultsPath+"METRICS_TOTAL.txt",nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+#endif
+		std::cout << "All done." << std::endl;
 	}
+	else
+		std::cout << "No sequences found, all done." << std::endl;
+	time_t shutdown = time(NULL);
+	tm* shutdown_tm = localtime(&shutdown);
+	std::cout << "[" << (shutdown_tm->tm_year + 1900) << '/' << (shutdown_tm->tm_mon + 1) << '/' <<  shutdown_tm->tm_mday << " -- ";
+	std::cout << shutdown_tm->tm_hour << ':' << shutdown_tm->tm_min << ':' << shutdown_tm->tm_sec << ']' << std::endl;
+	std::cout << "\t ... session averaged " << ((double)nFramesTotal)/(shutdown-startup) << " fps." << std::endl;
 	// let memory 'leak' here, exits faster once job is done...
 	//for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory)
 	//	delete *pCurrCategory;
@@ -147,7 +182,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		cv::Size oDebugWriterInputSize = oInputImg.size();
 		oDebugWriterInputSize.height*=3;
 		oDebugWriterInputSize.width*=2;
-		cv::VideoWriter oDebugWriter(g_sResultsPath+"/"+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,oDebugWriterInputSize,true);
+		cv::VideoWriter oDebugWriter(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,oDebugWriterInputSize,true);
 #endif //WRITE_BGSUB_DEBUG_IMG_OUTPUT
 		const size_t nNbInputFrames = pCurrSequence->GetNbInputFrames();
 		for(size_t k=0; k<nNbInputFrames; k++) {
@@ -178,6 +213,10 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #if WRITE_BGSUB_IMG_OUTPUT
 			WriteResult(g_sResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix,oFGMask,g_vnResultsComprParams);
 #endif //WRITE_BGSUB_IMG_OUTPUT
+#if WRITE_BGSUB_METRICS_ANALYSIS
+			CalcMetricsFromResult(oFGMask,pCurrSequence->GetGTFrameFromIndex(k),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN);
+			WriteMetrics(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".txt",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN);
+#endif //WRITE_BGSUB_METRICS_ANALYSIS
 		}
 	}
 	catch(cv::Exception& e) {std::cout << e.what() << std::endl;}
