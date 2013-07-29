@@ -1,34 +1,49 @@
 #include "BackgroundSubtractorLBSP.h"
 #include "DatasetUtils.h"
 
-//////////////////////////////////////////
+/////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
-#define WRITE_ANALYSIS_RESULTS			0
-#define DISPLAY_ANALYSIS_DEBUG_RESULTS	1
-#define WRITE_ANALYSIS_DEBUG_RESULTS	0
+#define WRITE_BGSUB_IMG_OUTPUT			1
+#define WRITE_BGSUB_DEBUG_IMG_OUTPUT	1
+/////////////////////////////////////////
+#define DISPLAY_BGSUB_DEBUG_OUTPUT		1
+/////////////////////////////////////////
 #define USE_RELATIVE_LBSP_COMPARISONS	1
-#define USE_CDNET_DATASET				1
+/////////////////////////////////////////
+#define USE_CDNET_DATASET				0
 #define USE_WALLFLOWER_DATASET			0
+#define USE_PETS2001_D3TC1_DATASET		1
+////////////////////////////////////////////////////////////////////////
 #define DATASET_ROOT_DIR 				std::string("/shared/datasets/")
-//////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 
-#if !USE_CDNET_DATASET && !USE_WALLFLOWER_DATASET
+#if (USE_CDNET_DATASET+USE_WALLFLOWER_DATASET+USE_PETS2001_D3TC1_DATASET)==0
 #error "No dataset specified."
-#elif USE_CDNET_DATASET && USE_WALLFLOWER_DATASET
+#elif (USE_CDNET_DATASET+USE_WALLFLOWER_DATASET+USE_PETS2001_D3TC1_DATASET)>1
 #error "Multiple datasets specified."
 #elif USE_CDNET_DATASET
-const std::string g_sDatasetName("CDNet");
+const std::string g_sDatasetName(CDNET_DB_NAME);
 const std::string g_sDatasetPath(DATASET_ROOT_DIR+"CDNet/dataset/");
 const std::string g_sResultsPath(DATASET_ROOT_DIR+"CDNet/results_test/");
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
+const char* g_asDatasetCategories[] = {"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"};
 const int g_nResultIdxOffset = 1;
 #elif USE_WALLFLOWER_DATASET
-const std::string g_sDatasetName("WALLFLOWER");
-const std::string g_sDatasetPath(DATASET_ROOT_DIR+"Wallflower/dataset");
+const std::string g_sDatasetName(WALLFLOWER_DB_NAME);
+const std::string g_sDatasetPath(DATASET_ROOT_DIR+"Wallflower/dataset/");
 const std::string g_sResultsPath(DATASET_ROOT_DIR+"Wallflower/results_test/");
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
+const char* g_asDatasetCategories[] = {"global"};
+const int g_nResultIdxOffset = 0;
+#elif USE_PETS2001_D3TC1_DATASET
+const std::string g_sDatasetName(PETS2001_D3TC1_DB_NAME);
+const std::string g_sDatasetPath(DATASET_ROOT_DIR+"PETS2001/DATASET3/");
+const std::string g_sResultsPath(DATASET_ROOT_DIR+"PETS2001/DATASET3/RESULTS/");
+const std::string g_sResultPrefix("bin");
+const std::string g_sResultSuffix(".png");
+const char* g_asDatasetCategories[] = {"TESTING"};
 const int g_nResultIdxOffset = 0;
 #endif
 
@@ -64,16 +79,8 @@ int main( int argc, char** argv ) {
 	std::vector<CategoryInfo*> vpCategories;
 	std::cout << "Parsing dataset '"<< g_sDatasetName << "'..." << std::endl;
 	try {
-#if USE_CDNET_DATASET
-		vpCategories.push_back(new CategoryInfo("baseline", g_sDatasetPath+"baseline", g_sDatasetName));
-		vpCategories.push_back(new CategoryInfo("cameraJitter", g_sDatasetPath+"cameraJitter", g_sDatasetName));
-		vpCategories.push_back(new CategoryInfo("dynamicBackground", g_sDatasetPath+"dynamicBackground", g_sDatasetName));
-		vpCategories.push_back(new CategoryInfo("intermittentObjectMotion", g_sDatasetPath+"intermittentObjectMotion", g_sDatasetName));
-		vpCategories.push_back(new CategoryInfo("shadow", g_sDatasetPath+"shadow", g_sDatasetName));
-		vpCategories.push_back(new CategoryInfo("thermal", g_sDatasetPath+"thermal", g_sDatasetName));
-#elif USE_WALLFLOWER_DATASET
-		vpCategories.push_back(new CategoryInfo("global", g_sDatasetPath, g_sDatasetName));
-#endif
+		for(size_t i=0; i<sizeof(g_asDatasetCategories)/sizeof(char*); ++i)
+			vpCategories.push_back(new CategoryInfo(g_asDatasetCategories[i], g_sDatasetPath+g_asDatasetCategories[i], g_sDatasetName));
 	} catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
 	size_t nSeqTotal = 0;
 	for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory)
@@ -81,7 +88,7 @@ int main( int argc, char** argv ) {
 	std::cout << "Parsing complete. [" << vpCategories.size() << " category(ies), "  << nSeqTotal  << " sequence(s)]" << std::endl << std::endl;
 	if(nSeqTotal) {
 		// since the algorithm isn't implemented to be parallelized yet, we parallelize the sequence treatment instead
-		std::cout << "Running LBSP background subtraction with " << g_nMaxThreads << " thread(s)..." << std::endl;
+		std::cout << "Running LBSP background subtraction with " << ((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads) << " thread(s)..." << std::endl;
 		size_t nSeqProcessed = 1;
 #ifndef USE_WINDOWS_API
 		for(auto& pCurrCategory : vpCategories) {
@@ -109,7 +116,7 @@ int main( int argc, char** argv ) {
 				g_hThreads[ret] = CreateThread(NULL,NULL,AnalyzeSequenceEntryPoint,(LPVOID)ret,0,NULL);
 			}
 		}
-		WaitForMultipleObjects(g_nMaxThreads,g_hThreads,TRUE,INFINITE);
+		WaitForMultipleObjects((g_nMaxThreads>nSeqTotal)?:nSeqTotal:g_nMaxThreads,g_hThreads,TRUE,INFINITE);
 		for(size_t n=0; n<g_nMaxThreads; ++n) {
 			CloseHandle(g_hThreadEvent[n]);
 			CloseHandle(g_hThreads[n]);
@@ -129,41 +136,48 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		cv::Mat oFGMask, oInputImg = pCurrSequence->GetInputFrameFromIndex(0);
 #if USE_RELATIVE_LBSP_COMPARISONS
 		BackgroundSubtractorLBSP oBGSubtr(LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD);
-#else
+#else //!USE_RELATIVE_LBSP_COMPARISONS
 		BackgroundSubtractorLBSP oBGSubtr;
-#endif
+#endif //!USE_RELATIVE_LBSP_COMPARISONS
 		oBGSubtr.initialize(oInputImg);
-#if DISPLAY_ANALYSIS_DEBUG_RESULTS
+#if DISPLAY_BGSUB_DEBUG_OUTPUT
 		std::string sDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName;
-#if WRITE_ANALYSIS_DEBUG_RESULTS
-		cv::Size oWriterInputSize = oInputImg.size();
-		oWriterInputSize.height*=3;
-		oWriterInputSize.width*=2;
-		cv::VideoWriter oWriter(g_sResultsPath+"/"+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,oWriterInputSize,true);
-#endif //WRITE_ANALYSIS_DEBUG_RESULTS
 #endif //DISPLAY_ANALYSIS_DEBUG_RESULTS
+#if WRITE_BGSUB_DEBUG_IMG_OUTPUT
+		cv::Size oDebugWriterInputSize = oInputImg.size();
+		oDebugWriterInputSize.height*=3;
+		oDebugWriterInputSize.width*=2;
+		cv::VideoWriter oDebugWriter(g_sResultsPath+"/"+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,oDebugWriterInputSize,true);
+#endif //WRITE_BGSUB_DEBUG_IMG_OUTPUT
 		const size_t nNbInputFrames = pCurrSequence->GetNbInputFrames();
 		for(size_t k=0; k<nNbInputFrames; k++) {
 			if(!(k%100))
 				std::cout << "\t\t" << std::setw(12) << pCurrSequence->m_sName << " @ F:" << k << "/" << nNbInputFrames << std::endl;
 			oInputImg = pCurrSequence->GetInputFrameFromIndex(k);
-#if DISPLAY_ANALYSIS_DEBUG_RESULTS
+#if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 			cv::Mat oLastBGImg,oLastBGDescImg;
 			oBGSubtr.getBackgroundImage(oLastBGImg);
 			oBGSubtr.getBackgroundDescriptorsImage(oLastBGDescImg);
-#endif //DISPLAY_ANALYSIS_DEBUG_RESULTS
+#endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 			oBGSubtr(oInputImg, oFGMask, k<=100?1:BGSLBSP_DEFAULT_LEARNING_RATE);
-#if DISPLAY_ANALYSIS_DEBUG_RESULTS
+#if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oLastBGDescImg,oFGMask,oBGSubtr.getBGKeyPoints(),k);
-			cv::imshow(sDebugDisplayName, oDebugDisplayFrame);
-#if WRITE_ANALYSIS_DEBUG_RESULTS
-			oWriter.write(oDebugDisplayFrame);
-#endif //WRITE_ANALYSIS_DEBUG_RESULTS
+#endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
+#if WRITE_BGSUB_DEBUG_IMG_OUTPUT
+			oDebugWriter.write(oDebugDisplayFrame);
+#endif //WRITE_BGSUB_DEBUG_IMG_OUTPUT
+#if DISPLAY_BGSUB_DEBUG_OUTPUT
+			cv::Mat oDebugDisplayFrameResized;
+			if(oDebugDisplayFrame.cols>1280 || oDebugDisplayFrame.rows>960)
+				cv::resize(oDebugDisplayFrame,oDebugDisplayFrameResized,cv::Size(oDebugDisplayFrame.cols/2,oDebugDisplayFrame.rows/2));
+			else
+				oDebugDisplayFrameResized = oDebugDisplayFrame;
+			cv::imshow(sDebugDisplayName, oDebugDisplayFrameResized);
 			cv::waitKey(1);
-#endif //DISPLAY_ANALYSIS_DEBUG_RESULTS
-#if WRITE_ANALYSIS_RESULTS
+#endif //DISPLAY_BGSUB_DEBUG_OUTPUT
+#if WRITE_BGSUB_IMG_OUTPUT
 			WriteResult(g_sResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix,oFGMask,g_vnResultsComprParams);
-#endif //WRITE_ANALYSIS_RESULTS
+#endif //WRITE_BGSUB_IMG_OUTPUT
 		}
 	}
 	catch(cv::Exception& e) {std::cout << e.what() << std::endl;}
