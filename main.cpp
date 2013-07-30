@@ -1,19 +1,22 @@
 #include "BackgroundSubtractorLBSP.h"
+#include "BackgroundSubtractorViBe.h"
 #include "DatasetUtils.h"
 
 /////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
+/////////////////////////////////////////
 #define WRITE_BGSUB_IMG_OUTPUT			1
-#define WRITE_BGSUB_DEBUG_IMG_OUTPUT	1
+#define WRITE_BGSUB_DEBUG_IMG_OUTPUT	0
 #define WRITE_BGSUB_METRICS_ANALYSIS	1
 /////////////////////////////////////////
 #define DISPLAY_BGSUB_DEBUG_OUTPUT		1
 /////////////////////////////////////////
+#define USE_LBSP_BASED_BG_SUBTRACTOR	0
 #define USE_RELATIVE_LBSP_COMPARISONS	1
 /////////////////////////////////////////
-#define USE_CDNET_DATASET				0
+#define USE_CDNET_DATASET				1
 #define USE_WALLFLOWER_DATASET			0
-#define USE_PETS2001_D3TC1_DATASET		1
+#define USE_PETS2001_D3TC1_DATASET		0
 ////////////////////////////////////////////////////////////////////////
 #define DATASET_ROOT_DIR 				std::string("/shared/datasets/")
 ////////////////////////////////////////////////////////////////////////
@@ -49,7 +52,11 @@ const int g_nResultIdxOffset = 0;
 #endif
 
 int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence);
+#if USE_LBSP_BASED_BG_SUBTRACTOR
 cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oBGDesc, const cv::Mat& oFGMask, std::vector<cv::KeyPoint> voKeyPoints, size_t nFrame);
+#else //!USE_LBSP_BASED_BG_SUBTRACTOR
+cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, size_t nFrame);
+#endif //!USE_LBSP_BASED_BG_SUBTRACTOR
 
 #if WIN32 && _MSC_VER <= 1600 // no c++11 support
 #define USE_WINDOWS_API
@@ -169,11 +176,15 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		CV_DbgAssert(pCurrCategory && pCurrSequence);
 		CV_DbgAssert(pCurrSequence->GetNbInputFrames()>1);
 		cv::Mat oFGMask, oInputImg = pCurrSequence->GetInputFrameFromIndex(0);
+#if USE_LBSP_BASED_BG_SUBTRACTOR
 #if USE_RELATIVE_LBSP_COMPARISONS
 		BackgroundSubtractorLBSP oBGSubtr(LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD);
 #else //!USE_RELATIVE_LBSP_COMPARISONS
 		BackgroundSubtractorLBSP oBGSubtr;
 #endif //!USE_RELATIVE_LBSP_COMPARISONS
+#else //!USE_LBSP_BASED_BG_SUBTRACTOR
+		BackgroundSubtractorViBe oBGSubtr;
+#endif //!USE_LBSP_BASED_BG_SUBTRACTOR
 		oBGSubtr.initialize(oInputImg);
 #if DISPLAY_BGSUB_DEBUG_OUTPUT
 		std::string sDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName;
@@ -190,13 +201,24 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 				std::cout << "\t\t" << std::setw(12) << pCurrSequence->m_sName << " @ F:" << k << "/" << nNbInputFrames << std::endl;
 			oInputImg = pCurrSequence->GetInputFrameFromIndex(k);
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
-			cv::Mat oLastBGImg,oLastBGDescImg;
+			cv::Mat oLastBGImg;
 			oBGSubtr.getBackgroundImage(oLastBGImg);
+#if USE_LBSP_BASED_BG_SUBTRACTOR
+			cv::Mat oLastBGDescImg;
 			oBGSubtr.getBackgroundDescriptorsImage(oLastBGDescImg);
+#endif //USE_LBSP_BASED_BG_SUBTRACTOR
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
+#if USE_LBSP_BASED_BG_SUBTRACTOR
 			oBGSubtr(oInputImg, oFGMask, k<=100?1:BGSLBSP_DEFAULT_LEARNING_RATE);
+#else //!USE_LBSP_BASED_BG_SUBTRACTOR
+			oBGSubtr(oInputImg, oFGMask, BGSLBSP_DEFAULT_LEARNING_RATE);
+#endif //!USE_LBSP_BASED_BG_SUBTRACTOR
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
+#if USE_LBSP_BASED_BG_SUBTRACTOR
 			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oLastBGDescImg,oFGMask,oBGSubtr.getBGKeyPoints(),k);
+#else //!USE_LBSP_BASED_BG_SUBTRACTOR
+			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oFGMask,k);
+#endif //USE_LBSP_BASED_BG_SUBTRACTOR
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if WRITE_BGSUB_DEBUG_IMG_OUTPUT
 			oDebugWriter.write(oDebugDisplayFrame);
@@ -232,6 +254,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 	return 0;
 }
 
+#if USE_LBSP_BASED_BG_SUBTRACTOR
 cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oBGDesc, const cv::Mat& oFGMask, std::vector<cv::KeyPoint> voKeyPoints, size_t nFrame) {
 	// note: this function is definitely NOT efficient in any way; it is only intended for debug purposes.
 	cv::Mat oInputImgBYTE3, oBGImgBYTE3, oBGDescBYTE, oBGDescBYTE3, oFGMaskBYTE3;
@@ -276,3 +299,24 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 	cv::vconcat(display,display3H,display);
 	return display;
 }
+#else //!USE_LBSP_BASED_BG_SUBTRACTOR
+cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, size_t nFrame) {
+	// note: this function is definitely NOT efficient in any way; it is only intended for debug purposes.
+	CV_Assert(oInputImg.type()==oBGImg.type() && oBGImg.type()==CV_8UC3);
+	CV_Assert(oFGMask.type()==CV_8UC1);
+	CV_Assert(oInputImg.size()==oBGImg.size() && oBGImg.size()==oFGMask.size());
+	cv::Mat oInputImgBYTE3,oBGImgBYTE3,oFGMaskBYTE3;
+	cv::cvtColor(oFGMask,oFGMaskBYTE3,CV_GRAY2RGB);
+	oInputImgBYTE3 = oInputImg;
+	oBGImgBYTE3 = oBGImg;
+	cv::Mat display1H,display2H;
+	std::stringstream sstr;
+	sstr << "Input Img #" << nFrame;
+	WriteOnImage(oInputImgBYTE3,sstr.str());
+	WriteOnImage(oBGImgBYTE3,"BGModel Img");
+	WriteOnImage(oFGMaskBYTE3,"Detection Result");
+	cv::hconcat(oInputImgBYTE3,oBGImgBYTE3,display1H);
+	cv::hconcat(display1H,oFGMaskBYTE3,display2H);
+	return display2H;
+}
+#endif //!USE_LBSP_BASED_BG_SUBTRACTOR
