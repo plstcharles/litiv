@@ -143,20 +143,22 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 	const int nKeyPoints = (int)m_voKeyPoints.size();
 	const int nLearningRate = (int)learningRate;
 	if(m_nImgChannels==1) {
-		unsigned short nCurrInputDesc;
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
 			int nGoodSamplesCount=0, nSampleIdx=0;
+			unsigned short nCurrInputDesc;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
 				if(m_bLBSPUsingRelThreshold)
 					LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,m_fLBSPThreshold,nCurrInputDesc);
 				else
 					LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,m_nLBSPThreshold,nCurrInputDesc);
 				if(hdist_ushort_8bitLUT(nCurrInputDesc,m_voBGDesc[nSampleIdx].at<unsigned short>(y,x))<=m_nDescDistThreshold) {
+#if BGSLBSP_USE_COLOR_COMPLEMENT
 					const int idx_img = oInputImg.step.p[0]*y + x;
 					CV_DbgAssert(*(oInputImg.data+idx_img)==oInputImg.at<uchar>(y,x));
 					if(absdiff_uchar(*(oInputImg.data+idx_img),*(m_voBGImg[nSampleIdx].data+idx_img))<=m_nColorDistThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT)
+#endif //BGSLBSP_USE_COLOR_COMPLEMENT
 						nGoodSamplesCount++;
 				}
 				nSampleIdx++;
@@ -166,61 +168,94 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 			else {
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
+					unsigned short& bgdesc = m_voBGDesc[s_rand].at<unsigned short>(y,x);
 					if(m_bLBSPUsingRelThreshold)
-						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_fLBSPThreshold,nCurrInputDesc);
+						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_fLBSPThreshold,bgdesc);
 					else
-						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_nLBSPThreshold,nCurrInputDesc);
-					m_voBGDesc[s_rand].at<unsigned short>(y,x) = nCurrInputDesc;
+						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_nLBSPThreshold,bgdesc);
 					m_voBGImg[s_rand].at<uchar>(y,x) = oInputImg.at<uchar>(y,x);
 				}
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
 					int x_rand,y_rand;
 					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
+					unsigned short& bgdesc = m_voBGDesc[s_rand].at<unsigned short>(y_rand,x_rand);
+#if BGSLBSP_USE_SELF_DIFFUSION
 					if(m_bLBSPUsingRelThreshold)
-						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_fLBSPThreshold,nCurrInputDesc);
+						LBSP::computeSingle(oInputImg,cv::Mat(),x_rand,y_rand,m_fLBSPThreshold,bgdesc);
 					else
-						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_nLBSPThreshold,nCurrInputDesc);
-					m_voBGDesc[s_rand].at<unsigned short>(y_rand,x_rand) = nCurrInputDesc;
+						LBSP::computeSingle(oInputImg,cv::Mat(),x_rand,y_rand,m_nLBSPThreshold,bgdesc);
+					m_voBGImg[s_rand].at<uchar>(y_rand,x_rand) = oInputImg.at<uchar>(y_rand,x_rand);
+#else //!BGSLBSP_USE_SELF_DIFFUSION
+					if(m_bLBSPUsingRelThreshold)
+						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_fLBSPThreshold,bgdesc);
+					else
+						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_nLBSPThreshold,bgdesc);
 					m_voBGImg[s_rand].at<uchar>(y_rand,x_rand) = oInputImg.at<uchar>(y,x);
+#endif //!BGSLBSP_USE_SELF_DIFFUSION
 				}
 			}
 		}
 	}
 	else { //m_nImgChannels==3
 		const int nCurrDescDistThreshold = m_nDescDistThreshold*3;
+#if BGSLBSP_USE_COLOR_COMPLEMENT
 		const int nCurrColorDistThreshold = m_nColorDistThreshold*3;
+#endif //BGSLBSP_USE_COLOR_COMPLEMENT
+#if BGSLBSP_USE_SC_THRS_VALIDATION
 		const int nCurrSCDescDistThreshold = (int)(m_nDescDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);
+#if BGSLBSP_USE_COLOR_COMPLEMENT
 		const int nCurrSCColorDistThreshold = (int)(m_nColorDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);
-		unsigned short anCurrInputDesc[3];
-		int anDescDist[3], anColorDist[3];
+#endif //BGSLBSP_USE_COLOR_COMPLEMENT
+#endif //BGSLBSP_USE_SC_THRS_VALIDATION
+		int anDescDist[3];
+#if BGSLBSP_USE_COLOR_COMPLEMENT
+		int anColorDist[3];
+#endif //BGSLBSP_USE_COLOR_COMPLEMENT
 		const int desc_row_step = m_voBGDesc[0].step.p[0];
 		const int img_row_step = m_voBGImg[0].step.p[0];
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
 			const int idx_desc = desc_row_step*y + 6*x;
+#if BGSLBSP_USE_COLOR_COMPLEMENT
 			const int idx_img = img_row_step*y + 3*x;
+#endif //BGSLBSP_USE_COLOR_COMPLEMENT
 			int nGoodSamplesCount=0, nSampleIdx=0;
+			unsigned short anCurrInputDesc[3];
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
 				if(m_bLBSPUsingRelThreshold)
 					LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,m_fLBSPThreshold,anCurrInputDesc);
 				else
 					LBSP::computeSingle(oInputImg,m_voBGImg[nSampleIdx],x,y,m_nLBSPThreshold,anCurrInputDesc);
 				const unsigned short* bgdesc_ptr = (unsigned short*)(m_voBGDesc[nSampleIdx].data+idx_desc);
+#if BGSLBSP_USE_COLOR_COMPLEMENT
 				const uchar* inputimg_ptr = oInputImg.data+idx_img;
 				const uchar* bgimg_ptr = m_voBGImg[nSampleIdx].data+idx_img;
+#endif //BGSLBSP_USE_COLOR_COMPLEMENT
 				for(int n=0;n<3; ++n) {
 					anDescDist[n] = hdist_ushort_8bitLUT(anCurrInputDesc[n],bgdesc_ptr[n]);
+#if BGSLBSP_USE_SC_THRS_VALIDATION
 					if(anDescDist[n]>nCurrSCDescDistThreshold)
 						goto skip;
+#endif //BGSLBSP_USE_SC_THRS_VALIDATION
+#if BGSLBSP_USE_COLOR_COMPLEMENT
 					anColorDist[n] = absdiff_uchar(inputimg_ptr[n],bgimg_ptr[n]);
+#if BGSLBSP_USE_SC_THRS_VALIDATION
 					if(anColorDist[n]>nCurrSCColorDistThreshold)
 						goto skip;
+#endif //BGSLBSP_USE_SC_THRS_VALIDATION
+#endif //BGSLBSP_USE_COLOR_COMPLEMENT
 				}
+#if BGSLBSP_USE_COLOR_COMPLEMENT
 				if(anDescDist[0]+anDescDist[1]+anDescDist[2]<=nCurrDescDistThreshold && anColorDist[0]+anColorDist[1]+anColorDist[2]<=nCurrColorDistThreshold)
+#else //!BGSLBSP_USE_COLOR_COMPLEMENT
+				if(anDescDist[0]+anDescDist[1]+anDescDist[2]<=nCurrDescDistThreshold)
+#endif //!BGSLBSP_USE_COLOR_COMPLEMENT
 					nGoodSamplesCount++;
+#if BGSLBSP_USE_SC_THRS_VALIDATION
 				skip:
+#endif //BGSLBSP_USE_SC_THRS_VALIDATION
 				nSampleIdx++;
 			}
 			if(nGoodSamplesCount<m_nRequiredBGSamples)
@@ -243,6 +278,15 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 					int x_rand,y_rand;
 					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 					unsigned short* bgdesc_ptr = ((unsigned short*)(m_voBGDesc[s_rand].data + desc_row_step*y_rand + 6*x_rand));
+#if BGSLBSP_USE_SELF_DIFFUSION
+					if(m_bLBSPUsingRelThreshold)
+						LBSP::computeSingle(oInputImg,cv::Mat(),x_rand,y_rand,m_fLBSPThreshold,bgdesc_ptr);
+					else
+						LBSP::computeSingle(oInputImg,cv::Mat(),x_rand,y_rand,m_nLBSPThreshold,bgdesc_ptr);
+					const int img_row_step = m_voBGImg[0].step.p[0];
+					for(int n=0; n<3; ++n)
+						*(m_voBGImg[s_rand].data + img_row_step*y_rand + 3*x_rand + n) = *(oInputImg.data + img_row_step*y_rand + 3*x_rand + n);
+#else //!BGSLBSP_USE_SELF_DIFFUSION
 					if(m_bLBSPUsingRelThreshold)
 						LBSP::computeSingle(oInputImg,cv::Mat(),x,y,m_fLBSPThreshold,bgdesc_ptr);
 					else
@@ -250,12 +294,12 @@ void BackgroundSubtractorLBSP::operator()(cv::InputArray _image, cv::OutputArray
 					const int img_row_step = m_voBGImg[0].step.p[0];
 					for(int n=0; n<3; ++n)
 						*(m_voBGImg[s_rand].data + img_row_step*y_rand + 3*x_rand + n) = *(oInputImg.data + img_row_step*y + 3*x + n);
-					CV_DbgAssert(m_voBGImg[s_rand].at<cv::Vec3b>(y_rand,x_rand)==oInputImg.at<cv::Vec3b>(y,x));
+#endif //!BGSLBSP_USE_SELF_DIFFUSION
 				}
 			}
 		}
 	}
-	cv::medianBlur(oFGMask,oFGMask,9);
+	cv::medianBlur(oFGMask,oFGMask,9); // give user access to mblur params... @@@@@
 }
 
 cv::AlgorithmInfo* BackgroundSubtractorLBSP::info() const {
