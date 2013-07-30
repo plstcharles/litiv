@@ -26,6 +26,13 @@
 #define WALLFLOWER_DB_NAME 		"WALLFLOWER"
 #define PETS2001_D3TC1_DB_NAME	"PETS2001_D3TC1"
 
+// as defined in the CDNet scripts/dataset
+#define VAL_POSITIVE 	255
+#define VAL_NEGATIVE 	0
+#define VAL_OUTOFSCOPE	85
+#define VAL_UNKNOWN		170
+#define VAL_SHADOW		50
+
 class SequenceInfo;
 
 class CategoryInfo {
@@ -195,33 +202,32 @@ static inline void GetSubDirsFromDir(const std::string& sDirPath, std::vector<st
 #endif
 }
 
-static inline void CalcMetricsFromResult(cv::Mat oInputFrame, cv::Mat oGTFrame, size_t& nTP, size_t& nTN, size_t& nFP, size_t& nFN) {
-
-	// TEST 255-a AND 0+a, MAKE SURE THERE IS NO BLUR... @@@@@@@@@@@@@@@@@@@@@@@@
-	// ADD SUPPORT FOR SHADOW ERRORS? @@@@@@@@@@@@@@@@
-
-	CV_DbgAssert(oInputFrame.type()==CV_8U && oGTFrame.type()==CV_8U);
-	CV_DbgAssert(oInputFrame.channels()==1 && oInputFrame.channels()==1);
-	CV_DbgAssert(oInputFrame.size()==oGTFrame.size());
+static inline void CalcMetricsFromResult(const cv::Mat& oInputFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI, size_t& nTP, size_t& nTN, size_t& nFP, size_t& nFN) {
+	CV_DbgAssert(oInputFrame.type()==CV_8UC1 && oGTFrame.type()==CV_8UC1 && oROI.type()==CV_8UC1);
+	CV_DbgAssert(oInputFrame.size()==oGTFrame.size() && oInputFrame.size()==oROI.size());
 	const int step_row = oInputFrame.step.p[0];
 	for(int i=0; i<oInputFrame.rows; ++i) {
 		const int step_idx = step_row*i;
 		const uchar* input_step_ptr = oInputFrame.data+step_idx;
 		const uchar* gt_step_ptr = oGTFrame.data+step_idx;
+		const uchar* roi_step_ptr = oROI.data+step_idx;
 		for(int j=0; j<oInputFrame.cols; ++j) {
-			// note: GT frame regions with val!=(255 or 0) == not in the ROI (i.e. to be ignored)
-			// note2: input frames should always have val=(255 or 0)
-			if(gt_step_ptr[j]==UCHAR_MAX) {
-				if(input_step_ptr[j]==UCHAR_MAX)
-					++nTP;
-				else // input_step_ptr[j]==0
-					++nFN;
-			}
-			else if(gt_step_ptr[j]==0) {
-				if(input_step_ptr[j]==0)
-					++nTN;
-				else // input_step_ptr[j]==UCHAR_MAX
-					++nFP;
+			if(	gt_step_ptr[j]!=VAL_OUTOFSCOPE &&
+				gt_step_ptr[j]!=VAL_UNKNOWN &&
+				roi_step_ptr[j]!=VAL_NEGATIVE ) {
+				if(input_step_ptr[j]==VAL_POSITIVE) {
+					if(gt_step_ptr[j]==VAL_POSITIVE)
+						++nTP;
+					else // gt_step_ptr[j]==VAL_NEGATIVE
+						++nFP;
+				}
+				else { // input_step_ptr[j]==VAL_NEGATIVE
+					if(gt_step_ptr[j]==VAL_POSITIVE)
+						++nFN;
+					else // gt_step_ptr[j]==VAL_NEGATIVE
+						++nTN;
+				}
+				// ADD SUPPORT FOR SHADOW ERRORS? @@@@@@@@@@@@@@@@
 			}
 		}
 	}
