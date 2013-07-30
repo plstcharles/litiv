@@ -86,7 +86,7 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 		cv::Mat oTempImg = cv::imread(m_vsGTFramePaths[0]);
 		if(oTempImg.empty())
 			throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess a valid GT file.");
-		m_oROI = cv::Mat::ones(oTempImg.size(),oTempImg.type());
+		m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(VAL_POSITIVE));
 		m_oSize = oTempImg.size();
 		m_nTotalNbFrames = m_vsInputFramePaths.size();
 	}
@@ -112,7 +112,7 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 		cv::Mat oTempImg = cv::imread(m_vsGTFramePaths[0]);
 		if(oTempImg.empty())
 			throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess valid GT file(s).");
-		m_oROI = cv::Mat::ones(oTempImg.size(),oTempImg.type());
+		m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(VAL_POSITIVE));
 		m_oSize = oTempImg.size();
 		m_nNextFrame = 0;
 		m_nTotalNbFrames = (size_t)m_voVideoReader.get(CV_CAP_PROP_FRAME_COUNT);
@@ -166,16 +166,15 @@ cv::Mat SequenceInfo::GetInputFrameFromIndex(size_t idx) {
 }
 
 cv::Mat SequenceInfo::GetGTFrameFromIndex(size_t idx) {
-	if(m_sDBName==CDNET_DB_NAME) {
-		CV_DbgAssert(idx>=0 && idx<m_vsInputFramePaths.size());
+	CV_DbgAssert(idx>=0 && idx<m_nTotalNbFrames);
+	if(m_sDBName==CDNET_DB_NAME)
 		return cv::imread(m_vsGTFramePaths[idx],cv::IMREAD_GRAYSCALE);
-	}
 	else if(m_sDBName==WALLFLOWER_DB_NAME || m_sDBName==PETS2001_D3TC1_DB_NAME) {
 		auto res = m_mTestGTIndexes.find(idx);
 		if(res!=m_mTestGTIndexes.end())
 			return cv::imread(m_vsGTFramePaths[res->second],cv::IMREAD_GRAYSCALE);
 		else
-			return cv::Mat(m_oSize,CV_8UC1,cv::Scalar(128));
+			return cv::Mat(m_oSize,CV_8UC1,cv::Scalar(VAL_OUTOFSCOPE));
 	}
 	/*else if(m_sDBName==...) {
 		// ...

@@ -214,10 +214,12 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 			WriteResult(g_sResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix,oFGMask,g_vnResultsComprParams);
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #if WRITE_BGSUB_METRICS_ANALYSIS
-			CalcMetricsFromResult(oFGMask,pCurrSequence->GetGTFrameFromIndex(k),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN);
-			WriteMetrics(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".txt",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN);
-#endif //WRITE_BGSUB_METRICS_ANALYSIS
+			CalcMetricsFromResult(oFGMask,pCurrSequence->GetGTFrameFromIndex(k),pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN);
 		}
+		WriteMetrics(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".txt",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN);
+#else //!WRITE_BGSUB_METRICS_ANALYSIS
+		}
+#endif //!WRITE_BGSUB_METRICS_ANALYSIS
 	}
 	catch(cv::Exception& e) {std::cout << e.what() << std::endl;}
 	catch(std::runtime_error& e) {std::cout << e.what() << std::endl;}
