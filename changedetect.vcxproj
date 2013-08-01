@@ -95,6 +95,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BackgroundSubtractorLBSP.h" />
+    <ClInclude Include="BackgroundSubtractorViBe.h" />
     <ClInclude Include="DatasetUtils.h" />
     <ClInclude Include="DistanceUtils.h" />
     <ClInclude Include="LBSP.h" />
@@ -102,6 +103,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="BackgroundSubtractorLBSP.cpp" />
+    <ClCompile Include="BackgroundSubtractorViBe.cpp" />
     <ClCompile Include="DatasetUtils.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="LBSP.cpp" />

@@ -16,6 +16,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #ifdef WIN32
 #include <windows.h>
+#include <stdint.h>
 #else
 #define sprintf_s sprintf
 #include <dirent.h>
