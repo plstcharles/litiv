@@ -140,7 +140,7 @@ int main( int argc, char** argv ) {
 #endif //USE_WINDOWS_API
 #if WRITE_BGSUB_METRICS_ANALYSIS
 		std::cout << "Summing and writing metrics results..." << std::endl;
-		size_t nGlobalTP=0, nGlobalTN=0, nGlobalFP=0, nGlobalFN=0;
+		uint64_t nGlobalTP=0, nGlobalTN=0, nGlobalFP=0, nGlobalFN=0;
 		for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory) {
 			for(auto pCurrSequence=(*pCurrCategory)->m_vpSequences.begin(); pCurrSequence!=(*pCurrCategory)->m_vpSequences.end(); ++pCurrSequence) {
 				(*pCurrCategory)->nTP += (*pCurrSequence)->nTP;
