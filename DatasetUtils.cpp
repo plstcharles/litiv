@@ -184,3 +184,113 @@ cv::Mat SequenceInfo::GetGTFrameFromIndex(size_t idx) {
 	else
 		throw std::runtime_error(std::string("Unknown database name."));
 }
+
+AdvancedMetrics::AdvancedMetrics(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN, uint64_t nSE)
+	:	 dRecall((double)nTP/(nTP+nFN))
+		,dSpecficity((double)nTN/(nTN+nFP))
+		,dFPR((double)nFP/(nFP+nTN))
+		,dFNR((double)nFN/(nTN+nFP))
+		,dPBC(100.0*(nFN+nFP)/(nTP+nFP+nFN+nTN))
+		,dPrecision((double)nTP/(nTP+nFP))
+		,dFMeasure(2.0*(dRecall*dPrecision)/(dRecall+dPrecision))
+		,bAveraged(false) {}
+
+AdvancedMetrics::AdvancedMetrics(const SequenceInfo* pSeq)
+	:	 dRecall((double)pSeq->nTP/(pSeq->nTP+pSeq->nFN))
+		,dSpecficity((double)pSeq->nTN/(pSeq->nTN+pSeq->nFP))
+		,dFPR((double)pSeq->nFP/(pSeq->nFP+pSeq->nTN))
+		,dFNR((double)pSeq->nFN/(pSeq->nTN+pSeq->nFP))
+		,dPBC(100.0*(pSeq->nFN+pSeq->nFP)/(pSeq->nTP+pSeq->nFP+pSeq->nFN+pSeq->nTN))
+		,dPrecision((double)pSeq->nTP/(pSeq->nTP+pSeq->nFP))
+		,dFMeasure(2.0*(dRecall*dPrecision)/(dRecall+dPrecision))
+		,bAveraged(false) {}
+
+AdvancedMetrics::AdvancedMetrics(const CategoryInfo* pCat, bool bAverage)
+	:	 bAveraged(bAverage) {
+	CV_Assert(!pCat->m_vpSequences.empty());
+	if(!bAverage) {
+		dRecall = ((double)pCat->nTP/(pCat->nTP+pCat->nFN));
+		dSpecficity = ((double)pCat->nTN/(pCat->nTN+pCat->nFP));
+		dFPR = ((double)pCat->nFP/(pCat->nFP+pCat->nTN));
+		dFNR = ((double)pCat->nFN/(pCat->nTN+pCat->nFP));
+		dPBC = (100.0*(pCat->nFN+pCat->nFP)/(pCat->nTP+pCat->nFP+pCat->nFN+pCat->nTN));
+		dPrecision = ((double)pCat->nTP/(pCat->nTP+pCat->nFP));
+		dFMeasure = (2.0*(dRecall*dPrecision)/(dRecall+dPrecision));
+	}
+	else {
+		dRecall = 0;
+		dSpecficity = 0;
+		dFPR = 0;
+		dFNR = 0;
+		dPBC = 0;
+		dPrecision = 0;
+		dFMeasure = 0;
+		const size_t nSeq = pCat->m_vpSequences.size();
+		for(size_t i=0; i<nSeq; ++i) {
+			AdvancedMetrics temp(pCat->m_vpSequences[i]);
+			dRecall += temp.dRecall;
+			dSpecficity += temp.dSpecficity;
+			dFPR += temp.dFPR;
+			dFNR += temp.dFNR;
+			dPBC += temp.dPBC;
+			dPrecision += temp.dPrecision;
+			dFMeasure += temp.dFMeasure;
+		}
+		dRecall /= nSeq;
+		dSpecficity /= nSeq;
+		dFPR /= nSeq;
+		dFNR /= nSeq;
+		dPBC /= nSeq;
+		dPrecision /= nSeq;
+		dFMeasure /= nSeq;
+	}
+}
+
+AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool bAverage)
+	:	 bAveraged(bAverage) {
+	CV_Assert(!vpCat.empty());
+	const size_t nCat = vpCat.size();
+	if(!bAverage) {
+		uint64_t nGlobalTP=0, nGlobalTN=0, nGlobalFP=0, nGlobalFN=0, nGlobalSE=0;
+		for(size_t i=0; i<nCat; ++i) {
+			nGlobalTP += vpCat[i]->nTP;
+			nGlobalTN += vpCat[i]->nTN;
+			nGlobalFP += vpCat[i]->nFP;
+			nGlobalFN += vpCat[i]->nFN;
+			nGlobalSE += vpCat[i]->nSE;
+		}
+		dRecall = ((double)nGlobalTP/(nGlobalTP+nGlobalFN));
+		dSpecficity = ((double)nGlobalTN/(nGlobalTN+nGlobalFP));
+		dFPR = ((double)nGlobalFP/(nGlobalFP+nGlobalTN));
+		dFNR = ((double)nGlobalFN/(nGlobalTN+nGlobalFP));
+		dPBC = (100.0*(nGlobalFN+nGlobalFP)/(nGlobalTP+nGlobalFP+nGlobalFN+nGlobalTN));
+		dPrecision = ((double)nGlobalTP/(nGlobalTP+nGlobalFP));
+		dFMeasure = (2.0*(dRecall*dPrecision)/(dRecall+dPrecision));
+	}
+	else {
+		dRecall = 0;
+		dSpecficity = 0;
+		dFPR = 0;
+		dFNR = 0;
+		dPBC = 0;
+		dPrecision = 0;
+		dFMeasure = 0;
+		for(size_t i=0; i<nCat; ++i) {
+			AdvancedMetrics temp(vpCat[i],true);
+			dRecall += temp.dRecall;
+			dSpecficity += temp.dSpecficity;
+			dFPR += temp.dFPR;
+			dFNR += temp.dFNR;
+			dPBC += temp.dPBC;
+			dPrecision += temp.dPrecision;
+			dFMeasure += temp.dFMeasure;
+		}
+		dRecall /= nCat;
+		dSpecficity /= nCat;
+		dFPR /= nCat;
+		dFNR /= nCat;
+		dPBC /= nCat;
+		dPrecision /= nCat;
+		dFMeasure /= nCat;
+	}
+}

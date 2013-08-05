@@ -9,9 +9,9 @@
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT	0
 #define WRITE_BGSUB_METRICS_ANALYSIS	0
 /////////////////////////////////////////
-#define DISPLAY_BGSUB_DEBUG_OUTPUT		1
+#define DISPLAY_BGSUB_DEBUG_OUTPUT		0
 /////////////////////////////////////////
-#define USE_LBSP_BASED_BG_SUBTRACTOR	0
+#define USE_LBSP_BASED_BG_SUBTRACTOR	1
 #define USE_RELATIVE_LBSP_COMPARISONS	1
 /////////////////////////////////////////
 #define USE_CDNET_DATASET				1
@@ -140,23 +140,17 @@ int main( int argc, char** argv ) {
 #endif //USE_WINDOWS_API
 #if WRITE_BGSUB_METRICS_ANALYSIS
 		std::cout << "Summing and writing metrics results..." << std::endl;
-		uint64_t nGlobalTP=0, nGlobalTN=0, nGlobalFP=0, nGlobalFN=0, nGlobalSE=0;
-		for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory) {
-			for(auto pCurrSequence=(*pCurrCategory)->m_vpSequences.begin(); pCurrSequence!=(*pCurrCategory)->m_vpSequences.end(); ++pCurrSequence) {
-				(*pCurrCategory)->nTP += (*pCurrSequence)->nTP;
-				(*pCurrCategory)->nTN += (*pCurrSequence)->nTN;
-				(*pCurrCategory)->nFP += (*pCurrSequence)->nFP;
-				(*pCurrCategory)->nFN += (*pCurrSequence)->nFN;
-				(*pCurrCategory)->nSE += (*pCurrSequence)->nSE;
+		for(size_t c=0; c<vpCategories.size(); ++c) {
+			for(size_t s=0; s<vpCategories[c]->m_vpSequences.size(); ++s) {
+				vpCategories[c]->nTP += vpCategories[c]->m_vpSequences[s]->nTP;
+				vpCategories[c]->nTN += vpCategories[c]->m_vpSequences[s]->nTN;
+				vpCategories[c]->nFP += vpCategories[c]->m_vpSequences[s]->nFP;
+				vpCategories[c]->nFN += vpCategories[c]->m_vpSequences[s]->nFN;
+				vpCategories[c]->nSE += vpCategories[c]->m_vpSequences[s]->nSE;
 			}
-			WriteMetrics(g_sResultsPath+(*pCurrCategory)->m_sName+".txt",(*pCurrCategory)->nTP,(*pCurrCategory)->nTN,(*pCurrCategory)->nFP,(*pCurrCategory)->nFN,(*pCurrCategory)->nSE);
-			nGlobalTP += (*pCurrCategory)->nTP;
-			nGlobalTN += (*pCurrCategory)->nTN;
-			nGlobalFP += (*pCurrCategory)->nFP;
-			nGlobalFN += (*pCurrCategory)->nFN;
-			nGlobalSE += (*pCurrCategory)->nSE;
+			WriteMetrics(g_sResultsPath+vpCategories[c]->m_sName+".txt",vpCategories[c]);
 		}
-		WriteMetrics(g_sResultsPath+"METRICS_TOTAL.txt",nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN,nGlobalSE);
+		WriteMetrics(g_sResultsPath+"METRICS_TOTAL.txt",vpCategories);
 #endif
 		std::cout << "All done." << std::endl;
 	}
@@ -240,7 +234,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #if WRITE_BGSUB_METRICS_ANALYSIS
 			CalcMetricsFromResult(oFGMask,pCurrSequence->GetGTFrameFromIndex(k),pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
 		}
-		WriteMetrics(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".txt",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
+		WriteMetrics(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".txt",pCurrSequence);
 #else //!WRITE_BGSUB_METRICS_ANALYSIS
 		}
 #endif //!WRITE_BGSUB_METRICS_ANALYSIS
