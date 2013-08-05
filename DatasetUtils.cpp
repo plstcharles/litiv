@@ -1,6 +1,6 @@
 #include "DatasetUtils.h"
 
-CategoryInfo::CategoryInfo(const std::string& name, const std::string& dir, const std::string& dbname)
+CategoryInfo::CategoryInfo(const std::string& name, const std::string& dir, const std::string& dbname, bool forceGrayscale)
 	:	 m_sName(name)
 		,m_sDBName(dbname)
 		,nTP(0)
@@ -23,9 +23,9 @@ CategoryInfo::CategoryInfo(const std::string& name, const std::string& dir, cons
 	for(auto iter=vsSequencePaths.begin(); iter!=vsSequencePaths.end(); ++iter) {
 		size_t pos = iter->find_last_of("/\\");
 		if(pos==std::string::npos)
-			m_vpSequences.push_back(new SequenceInfo(*iter,*iter,dbname,this));
+			m_vpSequences.push_back(new SequenceInfo(*iter,*iter,dbname,this,forceGrayscale));
 		else
-			m_vpSequences.push_back(new SequenceInfo(iter->substr(pos+1),*iter,dbname,this));
+			m_vpSequences.push_back(new SequenceInfo(iter->substr(pos+1),*iter,dbname,this,forceGrayscale));
 	}
 }
 
@@ -34,7 +34,7 @@ CategoryInfo::~CategoryInfo() {
 		delete m_vpSequences[i];
 }
 
-SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, const std::string& dbname, CategoryInfo* parent)
+SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, const std::string& dbname, CategoryInfo* parent, bool forceGrayscale)
 	:	 m_sName(name)
 		,m_sDBName(dbname)
 		,nTP(0)
@@ -43,7 +43,7 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 		,nFN(0)
 		,nSE(0)
 		,m_pParent(parent)
-		,m_nIMReadInputFlags((parent->m_sName=="thermal")?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR) { // force thermal sequences to be loaded as grayscale (faster processing, better noise compensation))
+		,m_nIMReadInputFlags(forceGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR) {
 	if(m_sDBName==CDNET_DB_NAME) {
 		std::vector<std::string> vsSubDirs;
 		GetSubDirsFromDir(dir,vsSubDirs);

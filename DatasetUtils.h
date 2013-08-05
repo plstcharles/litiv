@@ -38,7 +38,7 @@ class SequenceInfo;
 
 class CategoryInfo {
 public:
-	CategoryInfo(const std::string& name, const std::string& dir, const std::string& dbname);
+	CategoryInfo(const std::string& name, const std::string& dir, const std::string& dbname, bool forceGrayscale=false);
 	~CategoryInfo();
 	const std::string m_sName;
 	const std::string m_sDBName;
@@ -48,7 +48,7 @@ public:
 
 class SequenceInfo {
 public:
-	SequenceInfo(const std::string& name, const std::string& dir, const std::string& dbname, CategoryInfo* parent);
+	SequenceInfo(const std::string& name, const std::string& dir, const std::string& dbname, CategoryInfo* parent, bool forceGrayscale=false);
 	cv::Mat GetInputFrameFromIndex(size_t idx);
 	cv::Mat GetGTFrameFromIndex(size_t idx);
 	size_t GetNbInputFrames() const;

@@ -5,9 +5,9 @@
 /////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
 /////////////////////////////////////////
-#define WRITE_BGSUB_IMG_OUTPUT			1
+#define WRITE_BGSUB_IMG_OUTPUT			0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT	0
-#define WRITE_BGSUB_METRICS_ANALYSIS	1
+#define WRITE_BGSUB_METRICS_ANALYSIS	0
 /////////////////////////////////////////
 #define DISPLAY_BGSUB_DEBUG_OUTPUT		1
 /////////////////////////////////////////
@@ -44,7 +44,7 @@ const int g_nResultIdxOffset = 0;
 #elif USE_PETS2001_D3TC1_DATASET
 const std::string g_sDatasetName(PETS2001_D3TC1_DB_NAME);
 const std::string g_sDatasetPath(DATASET_ROOT_DIR+"PETS2001/DATASET3/");
-const std::string g_sResultsPath(DATASET_ROOT_DIR+"PETS2001/DATASET3/RESULTS/");
+const std::string g_sResultsPath(DATASET_ROOT_DIR+"PETS2001/DATASET3/results_test/");
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
 const char* g_asDatasetCategories[] = {"TESTING"};
@@ -88,7 +88,7 @@ int main( int argc, char** argv ) {
 	std::cout << "Parsing dataset '"<< g_sDatasetName << "'..." << std::endl;
 	try {
 		for(size_t i=0; i<sizeof(g_asDatasetCategories)/sizeof(char*); ++i)
-			vpCategories.push_back(new CategoryInfo(g_asDatasetCategories[i], g_sDatasetPath+g_asDatasetCategories[i], g_sDatasetName));
+			vpCategories.push_back(new CategoryInfo(g_asDatasetCategories[i], g_sDatasetPath+g_asDatasetCategories[i], g_sDatasetName, (std::string("thermal")==g_asDatasetCategories[i])?true:false));
 	} catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
 	size_t nSeqTotal = 0;
 	size_t nFramesTotal = 0;

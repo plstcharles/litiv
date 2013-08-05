@@ -25,7 +25,7 @@ void BackgroundSubtractorViBe::initialize(const cv::Mat& oInitImg) {
 	if(oInitImg.type()==CV_8UC3)
 		oInitImgRGB = oInitImg;
 	else
-		oInitImg.convertTo(oInitImgRGB,CV_GRAY2RGB);
+		cv::cvtColor(oInitImg,oInitImgRGB,CV_GRAY2RGB);
 	m_oImgSize = oInitImgRGB.size();
 	CV_Assert(m_voBGImg.size()==(size_t)m_nBGSamples);
 	int y_sample, x_sample;
@@ -52,7 +52,7 @@ void BackgroundSubtractorViBe::operator()(cv::InputArray _image, cv::OutputArray
 	if(oInputImg.type()==CV_8UC3)
 		oInputImgRGB = oInputImg;
 	else
-		oInputImg.convertTo(oInputImgRGB,CV_GRAY2RGB);
+		cv::cvtColor(oInputImg,oInputImgRGB,CV_GRAY2RGB);
 	_fgmask.create(m_oImgSize,CV_8UC1);
 	cv::Mat oFGMask = _fgmask.getMat();
 	oFGMask = cv::Scalar_<uchar>(0);
@@ -69,7 +69,9 @@ void BackgroundSubtractorViBe::operator()(cv::InputArray _image, cv::OutputArray
 					if(dist[c]>nCurrSCColorDistThreshold)
 						goto skip;
 #endif //BGSVIBE_USE_SC_THRS_VALIDATION
-				if(cv::norm(oInputImgRGB.at<cv::Vec3b>(y,x),m_voBGImg[nSampleIdx].at<cv::Vec3b>(y,x))<m_nColorDistThreshold)
+				// unlike what was stated in their 2011 paper, the real vibe algorithm uses L1 (abs diff) distance instead of L2 (euclidean)
+				//if(cv::norm(oInputImgRGB.at<cv::Vec3b>(y,x),m_voBGImg[nSampleIdx].at<cv::Vec3b>(y,x))<m_nColorDistThreshold*3)
+				if(L1dist_uchar(oInputImgRGB.at<cv::Vec3b>(y,x),m_voBGImg[nSampleIdx].at<cv::Vec3b>(y,x))<m_nColorDistThreshold*3)
 					nGoodSamplesCount++;
 #if BGSVIBE_USE_SC_THRS_VALIDATION
 				skip:
