@@ -43,7 +43,7 @@ public:
 	const std::string m_sName;
 	const std::string m_sDBName;
 	std::vector<SequenceInfo*> m_vpSequences;
-	uint64_t nTP, nTN, nFP, nFN;
+	uint64_t nTP, nTN, nFP, nFN, nSE;
 };
 
 class SequenceInfo {
@@ -57,7 +57,7 @@ public:
 	cv::Mat GetSequenceROI() const;
 	const std::string m_sName;
 	const std::string m_sDBName;
-	uint64_t nTP, nTN, nFP, nFN;
+	uint64_t nTP, nTN, nFP, nFN, nSE;
 private:
 	std::vector<std::string> m_vsInputFramePaths;
 	std::vector<std::string> m_vsGTFramePaths;
@@ -90,9 +90,19 @@ static inline void WriteResult(	const std::string& sResultsPath,
 	cv::imwrite(sResultFilePath.str(), res, vnComprParams);
 }
 
-static inline void WriteMetrics(const std::string sResultsFileName, uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN) {
+static inline void WriteMetrics(const std::string sResultsFileName, uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN, uint64_t nSE) {
 	std::ofstream oMetricsOutput(sResultsFileName);
-	oMetricsOutput << nTP << " " << nFP << " " << nFN << " " << nTN << std::endl; // order similar to the files saved by the CDNet analysis script
+	oMetricsOutput << "nTP nFP nFN nTN nSE" << std::endl; // order similar to the files saved by the CDNet analysis script
+	oMetricsOutput << nTP << " " << nFP << " " << nFN << " " << nTN << " " << nSE << std::endl;
+	double dRecall = (double)nTP/(nTP+nFN);
+	double dSpecficity = (double)nTN/(nTN+nFP);
+	double dFPR = (double)nFP/(nFP+nTN);
+	double dFNR = (double)nFN/(nTN+nFP);
+	double dPBC = 100.0*(nFN+nFP)/(nTP+nFP+nFN+nTN);
+	double dPrecision = (double)nTP/(nTP+nFP);
+	double dFMeasure = 2.0*(dRecall*dPrecision)/(dRecall+dPrecision);
+	oMetricsOutput << "Rcl Spc FPR FNR PBC Prc FMs" << std::endl; // order similar to the files saved by the CDNet analysis script
+	oMetricsOutput << dRecall << " " << dSpecficity << " " << dFPR << " " << dFNR << " " << dPBC << " " << dPrecision << " " << dFMeasure << std::endl;
 	oMetricsOutput.close();
 }
 
@@ -203,7 +213,7 @@ static inline void GetSubDirsFromDir(const std::string& sDirPath, std::vector<st
 #endif
 }
 
-static inline void CalcMetricsFromResult(const cv::Mat& oInputFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI, uint64_t& nTP, uint64_t& nTN, uint64_t& nFP, uint64_t& nFN) {
+static inline void CalcMetricsFromResult(const cv::Mat& oInputFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI, uint64_t& nTP, uint64_t& nTN, uint64_t& nFP, uint64_t& nFN, uint64_t& nSE) {
 	CV_DbgAssert(oInputFrame.type()==CV_8UC1 && oGTFrame.type()==CV_8UC1 && oROI.type()==CV_8UC1);
 	CV_DbgAssert(oInputFrame.size()==oGTFrame.size() && oInputFrame.size()==oROI.size());
 	const int step_row = oInputFrame.step.p[0];
@@ -228,7 +238,10 @@ static inline void CalcMetricsFromResult(const cv::Mat& oInputFrame, const cv::M
 					else // gt_step_ptr[j]==VAL_NEGATIVE
 						++nTN;
 				}
-				// ADD SUPPORT FOR SHADOW ERRORS? @@@@@@@@@@@@@@@@
+				if(gt_step_ptr[j]==VAL_SHADOW) {
+					if(input_step_ptr[j]==VAL_POSITIVE)
+						++nSE;
+				}
 			}
 		}
 	}

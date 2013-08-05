@@ -6,7 +6,8 @@ CategoryInfo::CategoryInfo(const std::string& name, const std::string& dir, cons
 		,nTP(0)
 		,nTN(0)
 		,nFP(0)
-		,nFN(0) {
+		,nFN(0)
+		,nSE(0) {
 	std::cout << "\tParsing dir '" << dir << "' for category '" << name << "'... ";
 	std::vector<std::string> vsSequencePaths;
 	if(m_sDBName==CDNET_DB_NAME || m_sDBName==WALLFLOWER_DB_NAME || m_sDBName==PETS2001_D3TC1_DB_NAME/*|| m_sDBName==...*/) {
@@ -40,6 +41,7 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 		,nTN(0)
 		,nFP(0)
 		,nFN(0)
+		,nSE(0)
 		,m_pParent(parent)
 		,m_nIMReadInputFlags((parent->m_sName=="thermal")?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR) { // force thermal sequences to be loaded as grayscale (faster processing, better noise compensation))
 	if(m_sDBName==CDNET_DB_NAME) {
