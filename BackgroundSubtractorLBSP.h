@@ -17,7 +17,7 @@
 //! defines whether we should use the selected pixel's characteristics during diffusion or not (1=PBAS-like diffusion, 0=ViBe-like)
 #define BGSLBSP_USE_SELF_DIFFUSION 0
 //! defines whether we should use single channel variation checks for fg/bg segmentation validation or not
-#define BGSLBSP_USE_SC_THRS_VALIDATION 0
+#define BGSLBSP_USE_SC_THRS_VALIDATION 1
 //! defines whether we should complement the LBSP core component using color or not
 #define BGSLBSP_USE_COLOR_COMPLEMENT 1
 
