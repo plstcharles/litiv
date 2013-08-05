@@ -140,21 +140,23 @@ int main( int argc, char** argv ) {
 #endif //USE_WINDOWS_API
 #if WRITE_BGSUB_METRICS_ANALYSIS
 		std::cout << "Summing and writing metrics results..." << std::endl;
-		uint64_t nGlobalTP=0, nGlobalTN=0, nGlobalFP=0, nGlobalFN=0;
+		uint64_t nGlobalTP=0, nGlobalTN=0, nGlobalFP=0, nGlobalFN=0, nGlobalSE=0;
 		for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory) {
 			for(auto pCurrSequence=(*pCurrCategory)->m_vpSequences.begin(); pCurrSequence!=(*pCurrCategory)->m_vpSequences.end(); ++pCurrSequence) {
 				(*pCurrCategory)->nTP += (*pCurrSequence)->nTP;
 				(*pCurrCategory)->nTN += (*pCurrSequence)->nTN;
 				(*pCurrCategory)->nFP += (*pCurrSequence)->nFP;
 				(*pCurrCategory)->nFN += (*pCurrSequence)->nFN;
+				(*pCurrCategory)->nSE += (*pCurrSequence)->nSE;
 			}
-			WriteMetrics(g_sResultsPath+(*pCurrCategory)->m_sName+".txt",(*pCurrCategory)->nTP,(*pCurrCategory)->nTN,(*pCurrCategory)->nFP,(*pCurrCategory)->nFN);
+			WriteMetrics(g_sResultsPath+(*pCurrCategory)->m_sName+".txt",(*pCurrCategory)->nTP,(*pCurrCategory)->nTN,(*pCurrCategory)->nFP,(*pCurrCategory)->nFN,(*pCurrCategory)->nSE);
 			nGlobalTP += (*pCurrCategory)->nTP;
 			nGlobalTN += (*pCurrCategory)->nTN;
 			nGlobalFP += (*pCurrCategory)->nFP;
 			nGlobalFN += (*pCurrCategory)->nFN;
+			nGlobalSE += (*pCurrCategory)->nSE;
 		}
-		WriteMetrics(g_sResultsPath+"METRICS_TOTAL.txt",nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+		WriteMetrics(g_sResultsPath+"METRICS_TOTAL.txt",nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN,nGlobalSE);
 #endif
 		std::cout << "All done." << std::endl;
 	}
@@ -236,9 +238,9 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 			WriteResult(g_sResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix,oFGMask,g_vnResultsComprParams);
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #if WRITE_BGSUB_METRICS_ANALYSIS
-			CalcMetricsFromResult(oFGMask,pCurrSequence->GetGTFrameFromIndex(k),pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN);
+			CalcMetricsFromResult(oFGMask,pCurrSequence->GetGTFrameFromIndex(k),pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
 		}
-		WriteMetrics(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".txt",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN);
+		WriteMetrics(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".txt",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
 #else //!WRITE_BGSUB_METRICS_ANALYSIS
 		}
 #endif //!WRITE_BGSUB_METRICS_ANALYSIS
