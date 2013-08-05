@@ -71,6 +71,22 @@ private:
 	std::unordered_map<size_t,size_t> m_mTestGTIndexes;
 };
 
+class AdvancedMetrics {
+public:
+	AdvancedMetrics(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN, uint64_t nSE);
+	AdvancedMetrics(const SequenceInfo* pSeq);
+	AdvancedMetrics(const CategoryInfo* pCat, bool bAverage=false);
+	AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool bAverage=false);
+	double dRecall;
+	double dSpecficity;
+	double dFPR;
+	double dFNR;
+	double dPBC;
+	double dPrecision;
+	double dFMeasure;
+	bool bAveraged;
+};
+
 static inline void WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bBottom=false) {
 	cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-15):15),cv::FONT_HERSHEY_PLAIN,1.0,cv::Scalar_<uchar>(0,0,255),1,CV_AA);
 }
@@ -90,19 +106,52 @@ static inline void WriteResult(	const std::string& sResultsPath,
 	cv::imwrite(sResultFilePath.str(), res, vnComprParams);
 }
 
-static inline void WriteMetrics(const std::string sResultsFileName, uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN, uint64_t nSE) {
+static inline void WriteMetrics(const std::string sResultsFileName, const SequenceInfo* pSeq) {
 	std::ofstream oMetricsOutput(sResultsFileName);
+	AdvancedMetrics temp(pSeq);
+	oMetricsOutput << "Results for sequence '" << pSeq->m_sName << "' :" << std::endl;
+	oMetricsOutput << std::endl;
 	oMetricsOutput << "nTP nFP nFN nTN nSE" << std::endl; // order similar to the files saved by the CDNet analysis script
-	oMetricsOutput << nTP << " " << nFP << " " << nFN << " " << nTN << " " << nSE << std::endl;
-	double dRecall = (double)nTP/(nTP+nFN);
-	double dSpecficity = (double)nTN/(nTN+nFP);
-	double dFPR = (double)nFP/(nFP+nTN);
-	double dFNR = (double)nFN/(nTN+nFP);
-	double dPBC = 100.0*(nFN+nFP)/(nTP+nFP+nFN+nTN);
-	double dPrecision = (double)nTP/(nTP+nFP);
-	double dFMeasure = 2.0*(dRecall*dPrecision)/(dRecall+dPrecision);
+	oMetricsOutput << pSeq->nTP << " " << pSeq->nFP << " " << pSeq->nFN << " " << pSeq->nTN << " " << pSeq->nSE << std::endl;
+	oMetricsOutput << std::endl;
+	oMetricsOutput << "Precise metrics :" << std::endl;
 	oMetricsOutput << "Rcl Spc FPR FNR PBC Prc FMs" << std::endl; // order similar to the files saved by the CDNet analysis script
-	oMetricsOutput << dRecall << " " << dSpecficity << " " << dFPR << " " << dFNR << " " << dPBC << " " << dPrecision << " " << dFMeasure << std::endl;
+	oMetricsOutput << temp.dRecall << " " << temp.dSpecficity << " " << temp.dFPR << " " << temp.dFNR << " " << temp.dPBC << " " << temp.dPrecision << " " << temp.dFMeasure << std::endl;
+	oMetricsOutput.close();
+}
+
+static inline void WriteMetrics(const std::string sResultsFileName, const CategoryInfo* pCat) {
+	std::ofstream oMetricsOutput(sResultsFileName);
+	AdvancedMetrics precise(pCat, false);
+	AdvancedMetrics averaged(pCat, true);
+	oMetricsOutput << "Results for category '" << pCat->m_sName << "' :" << std::endl;
+	oMetricsOutput << std::endl;
+	oMetricsOutput << "nTP nFP nFN nTN nSE" << std::endl; // order similar to the files saved by the CDNet analysis script
+	oMetricsOutput << pCat->nTP << " " << pCat->nFP << " " << pCat->nFN << " " << pCat->nTN << " " << pCat->nSE << std::endl;
+	oMetricsOutput << std::endl;
+	oMetricsOutput << "Precise metrics :" << std::endl;
+	oMetricsOutput << "Rcl Spc FPR FNR PBC Prc FMs" << std::endl; // order similar to the files saved by the CDNet analysis script
+	oMetricsOutput << precise.dRecall << " " << precise.dSpecficity << " " << precise.dFPR << " " << precise.dFNR << " " << precise.dPBC << " " << precise.dPrecision << " " << precise.dFMeasure << std::endl;
+	oMetricsOutput << std::endl;
+	oMetricsOutput << "Averaged metrics :" << std::endl;
+	oMetricsOutput << "Rcl Spc FPR FNR PBC Prc FMs" << std::endl; // order similar to the files saved by the CDNet analysis script
+	oMetricsOutput << averaged.dRecall << " " << averaged.dSpecficity << " " << averaged.dFPR << " " << averaged.dFNR << " " << averaged.dPBC << " " << averaged.dPrecision << " " << averaged.dFMeasure << std::endl;
+	oMetricsOutput.close();
+}
+
+static inline void WriteMetrics(const std::string sResultsFileName, const std::vector<CategoryInfo*>& vpCat) {
+	std::ofstream oMetricsOutput(sResultsFileName);
+	AdvancedMetrics precise(vpCat, false);
+	AdvancedMetrics averaged(vpCat, true);
+	oMetricsOutput << "Overall results :" << std::endl;
+	oMetricsOutput << std::endl;
+	oMetricsOutput << "Precise metrics :" << std::endl;
+	oMetricsOutput << "Rcl Spc FPR FNR PBC Prc FMs" << std::endl; // order similar to the files saved by the CDNet analysis script
+	oMetricsOutput << precise.dRecall << " " << precise.dSpecficity << " " << precise.dFPR << " " << precise.dFNR << " " << precise.dPBC << " " << precise.dPrecision << " " << precise.dFMeasure << std::endl;
+	oMetricsOutput << std::endl;
+	oMetricsOutput << "Averaged metrics :" << std::endl;
+	oMetricsOutput << "Rcl Spc FPR FNR PBC Prc FMs" << std::endl; // order similar to the files saved by the CDNet analysis script
+	oMetricsOutput << averaged.dRecall << " " << averaged.dSpecficity << " " << averaged.dFPR << " " << averaged.dFNR << " " << averaged.dPBC << " " << averaged.dPrecision << " " << averaged.dFMeasure << std::endl;
 	oMetricsOutput.close();
 }
 
