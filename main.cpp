@@ -103,7 +103,7 @@ int main( int argc, char** argv ) {
 	std::cout << "[" << (startup_tm->tm_year + 1900) << '/' << (startup_tm->tm_mon + 1) << '/' <<  startup_tm->tm_mday << " -- ";
 	std::cout << startup_tm->tm_hour << ':' << startup_tm->tm_min << ':' << startup_tm->tm_sec << ']' << std::endl;
 	if(nSeqTotal) {
-		// since the algorithm isn't implemented to be parallelized yet, we parallelize the sequence treatment instead
+		// since the algorithm isn't implemented to be parallelised yet, we parallelise the sequence treatment instead
 		std::cout << "Running LBSP background subtraction with " << ((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads) << " thread(s)..." << std::endl;
 		size_t nSeqProcessed = 1;
 #ifndef USE_WINDOWS_API
