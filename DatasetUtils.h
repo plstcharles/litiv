@@ -113,9 +113,10 @@ static inline void WriteMetrics(const std::string sResultsFileName, const Sequen
 	oMetricsOutput << std::endl;
 	oMetricsOutput << "nTP nFP nFN nTN nSE" << std::endl; // order similar to the files saved by the CDNet analysis script
 	oMetricsOutput << pSeq->nTP << " " << pSeq->nFP << " " << pSeq->nFN << " " << pSeq->nTN << " " << pSeq->nSE << std::endl;
-	oMetricsOutput << std::endl;
+	oMetricsOutput << std::endl << std::endl;
+	oMetricsOutput << std::fixed << std::setprecision(8);
 	oMetricsOutput << "Precise metrics :" << std::endl;
-	oMetricsOutput << "Rcl Spc FPR FNR PBC Prc FMs" << std::endl; // order similar to the files saved by the CDNet analysis script
+	oMetricsOutput << "Rcl        Spc        FPR        FNR        PBC        Prc        FMs       " << std::endl;
 	oMetricsOutput << temp.dRecall << " " << temp.dSpecficity << " " << temp.dFPR << " " << temp.dFNR << " " << temp.dPBC << " " << temp.dPrecision << " " << temp.dFMeasure << std::endl;
 	oMetricsOutput.close();
 }
@@ -128,13 +129,14 @@ static inline void WriteMetrics(const std::string sResultsFileName, const Catego
 	oMetricsOutput << std::endl;
 	oMetricsOutput << "nTP nFP nFN nTN nSE" << std::endl; // order similar to the files saved by the CDNet analysis script
 	oMetricsOutput << pCat->nTP << " " << pCat->nFP << " " << pCat->nFN << " " << pCat->nTN << " " << pCat->nSE << std::endl;
-	oMetricsOutput << std::endl;
+	oMetricsOutput << std::endl << std::endl;
+	oMetricsOutput << std::fixed << std::setprecision(8);
 	oMetricsOutput << "Precise metrics :" << std::endl;
-	oMetricsOutput << "Rcl Spc FPR FNR PBC Prc FMs" << std::endl; // order similar to the files saved by the CDNet analysis script
+	oMetricsOutput << "Rcl        Spc        FPR        FNR        PBC        Prc        FMs       " << std::endl;
 	oMetricsOutput << precise.dRecall << " " << precise.dSpecficity << " " << precise.dFPR << " " << precise.dFNR << " " << precise.dPBC << " " << precise.dPrecision << " " << precise.dFMeasure << std::endl;
 	oMetricsOutput << std::endl;
 	oMetricsOutput << "Averaged metrics :" << std::endl;
-	oMetricsOutput << "Rcl Spc FPR FNR PBC Prc FMs" << std::endl; // order similar to the files saved by the CDNet analysis script
+	oMetricsOutput << "Rcl        Spc        FPR        FNR        PBC        Prc        FMs       " << std::endl;
 	oMetricsOutput << averaged.dRecall << " " << averaged.dSpecficity << " " << averaged.dFPR << " " << averaged.dFNR << " " << averaged.dPBC << " " << averaged.dPrecision << " " << averaged.dFMeasure << std::endl;
 	oMetricsOutput.close();
 }
@@ -143,15 +145,36 @@ static inline void WriteMetrics(const std::string sResultsFileName, const std::v
 	std::ofstream oMetricsOutput(sResultsFileName);
 	AdvancedMetrics precise(vpCat, false);
 	AdvancedMetrics averaged(vpCat, true);
+	oMetricsOutput << std::fixed << std::setprecision(8);
 	oMetricsOutput << "Overall results :" << std::endl;
 	oMetricsOutput << std::endl;
 	oMetricsOutput << "Precise metrics :" << std::endl;
-	oMetricsOutput << "Rcl Spc FPR FNR PBC Prc FMs" << std::endl; // order similar to the files saved by the CDNet analysis script
-	oMetricsOutput << precise.dRecall << " " << precise.dSpecficity << " " << precise.dFPR << " " << precise.dFNR << " " << precise.dPBC << " " << precise.dPrecision << " " << precise.dFMeasure << std::endl;
+	oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FMs       " << std::endl;
+	for(size_t i=0; i<vpCat.size(); ++i) {
+		AdvancedMetrics temp_precise(vpCat[i],false);
+		std::string sName = vpCat[i]->m_sName;
+		if(sName.size()>10)
+			sName = sName.substr(0,10);
+		else if(sName.size()<10)
+			sName += std::string(10-sName.size(),' ');
+		oMetricsOutput << sName << " " << temp_precise.dRecall << " " << temp_precise.dSpecficity << " " << temp_precise.dFPR << " " << temp_precise.dFNR << " " << temp_precise.dPBC << " " << temp_precise.dPrecision << " " << temp_precise.dFMeasure << std::endl;
+	}
+	oMetricsOutput << "---------------------------------------------------------------------------------------" << std::endl;
+	oMetricsOutput << "overall    " << precise.dRecall << " " << precise.dSpecficity << " " << precise.dFPR << " " << precise.dFNR << " " << precise.dPBC << " " << precise.dPrecision << " " << precise.dFMeasure << std::endl;
 	oMetricsOutput << std::endl;
 	oMetricsOutput << "Averaged metrics :" << std::endl;
-	oMetricsOutput << "Rcl Spc FPR FNR PBC Prc FMs" << std::endl; // order similar to the files saved by the CDNet analysis script
-	oMetricsOutput << averaged.dRecall << " " << averaged.dSpecficity << " " << averaged.dFPR << " " << averaged.dFNR << " " << averaged.dPBC << " " << averaged.dPrecision << " " << averaged.dFMeasure << std::endl;
+	oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FMs       " << std::endl;
+	for(size_t i=0; i<vpCat.size(); ++i) {
+		AdvancedMetrics temp_averaged(vpCat[i],true);
+		std::string sName = vpCat[i]->m_sName;
+		if(sName.size()>10)
+			sName = sName.substr(0,10);
+		else if(sName.size()<10)
+			sName += std::string(10-sName.size(),' ');
+		oMetricsOutput << sName << " " << temp_averaged.dRecall << " " << temp_averaged.dSpecficity << " " << temp_averaged.dFPR << " " << temp_averaged.dFNR << " " << temp_averaged.dPBC << " " << temp_averaged.dPrecision << " " << temp_averaged.dFMeasure << std::endl;
+	}
+	oMetricsOutput << "---------------------------------------------------------------------------------------" << std::endl;
+	oMetricsOutput << "overall    " << averaged.dRecall << " " << averaged.dSpecficity << " " << averaged.dFPR << " " << averaged.dFNR << " " << averaged.dPBC << " " << averaged.dPrecision << " " << averaged.dFMeasure << std::endl;
 	oMetricsOutput.close();
 }
 
