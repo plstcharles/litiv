@@ -4,25 +4,27 @@
 #include <opencv2/video/background_segm.hpp>
 #include "LBSP.h"
 
-//! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
-#define BGSLBSP_DEFAULT_DESC_DIST_THRESHOLD (4)
-//! defines the default value for BackgroundSubtractorLBSP::m_nBGSamples
-#define BGSLBSP_DEFAULT_NB_BG_SAMPLES (35)
-//! defines the default value for BackgroundSubtractorLBSP::m_nRequiredBGSamples
-#define BGSLBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES (2)
-//! defines the default value for the learning rate passed to BackgroundSubtractorLBSP::operator()
-#define BGSLBSP_DEFAULT_LEARNING_RATE (16)
+//! defines the default value for BackgroundSubtractorViBeLBSP::m_nDescDistThreshold
+#define BGSVIBELBSP_DEFAULT_DESC_DIST_THRESHOLD (4)
+//! defines the default value for BackgroundSubtractorViBeLBSP::m_nColorDistThreshold
+#define BGSVIBELBSP_DEFAULT_COLOR_DIST_THRESHOLD (LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD)
+//! defines the default value for BackgroundSubtractorViBeLBSP::m_nBGSamples
+#define BGSVIBELBSP_DEFAULT_NB_BG_SAMPLES (35)
+//! defines the default value for BackgroundSubtractorViBeLBSP::m_nRequiredBGSamples
+#define BGSVIBELBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES (2)
+//! defines the default value for the learning rate passed to BackgroundSubtractorViBeLBSP::operator()
+#define BGSVIBELBSP_DEFAULT_LEARNING_RATE (16)
 //! defines the internal threshold adjustment factor to use when determining if the variation of a single channel is enough to declare the pixel as foreground
-#define BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR (1.50f)
+#define BGSVIBELBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR (1.50f)
 //! defines whether we should use the selected pixel's characteristics during diffusion or not (1=PBAS-like diffusion, 0=ViBe-like)
-#define BGSLBSP_USE_SELF_DIFFUSION 0
+#define BGSVIBELBSP_USE_SELF_DIFFUSION 0
 //! defines whether we should use single channel variation checks for fg/bg segmentation validation or not
-#define BGSLBSP_USE_SC_THRS_VALIDATION 1
+#define BGSVIBELBSP_USE_SC_THRS_VALIDATION 1
 //! defines whether we should complement the LBSP core component using color or not
-#define BGSLBSP_USE_COLOR_COMPLEMENT 1
+#define BGSVIBELBSP_USE_COLOR_COMPLEMENT 1
 
 /*!
-	Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
+	ViBe-Based Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
 
 	Note: both grayscale and RGB/BGR images may be used with this extractor (parameters
 	are adjusted automatically).
@@ -31,28 +33,28 @@
 
 	This algorithm is currently NOT thread-safe.
  */
-class BackgroundSubtractorLBSP : public cv::BackgroundSubtractor {
+class BackgroundSubtractorViBeLBSP : public cv::BackgroundSubtractor {
 public:
 	//! default constructor (also uses the default LBSP descriptor extractor constructor & params)
-	BackgroundSubtractorLBSP();
+	BackgroundSubtractorViBeLBSP();
 	//! full constructor used to intialize an 'absolute' LBSP-based background subtractor
-	BackgroundSubtractorLBSP(	int nLBSPThreshold,
-								int nDescDistThreshold=BGSLBSP_DEFAULT_DESC_DIST_THRESHOLD,
-								int nColorDistThreshold=LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD,
-								int nBGSamples=BGSLBSP_DEFAULT_NB_BG_SAMPLES,
-								int nRequiredBGSamples=BGSLBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES);
+	BackgroundSubtractorViBeLBSP(	int nLBSPThreshold,
+									int nDescDistThreshold=BGSVIBELBSP_DEFAULT_DESC_DIST_THRESHOLD,
+									int nColorDistThreshold=BGSVIBELBSP_DEFAULT_COLOR_DIST_THRESHOLD,
+									int nBGSamples=BGSVIBELBSP_DEFAULT_NB_BG_SAMPLES,
+									int nRequiredBGSamples=BGSVIBELBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES);
 	//! full constructor used to intialize a 'relative' LBSP-based background subtractor
-	BackgroundSubtractorLBSP(	float fLBSPThreshold,
-								int nDescDistThreshold=BGSLBSP_DEFAULT_DESC_DIST_THRESHOLD,
-								int nColorDistThreshold=LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD,
-								int nBGSamples=BGSLBSP_DEFAULT_NB_BG_SAMPLES,
-								int nRequiredBGSamples=BGSLBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES);
+	BackgroundSubtractorViBeLBSP(	float fLBSPThreshold,
+									int nDescDistThreshold=BGSVIBELBSP_DEFAULT_DESC_DIST_THRESHOLD,
+									int nColorDistThreshold=BGSVIBELBSP_DEFAULT_COLOR_DIST_THRESHOLD,
+									int nBGSamples=BGSVIBELBSP_DEFAULT_NB_BG_SAMPLES,
+									int nRequiredBGSamples=BGSVIBELBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES);
 	//! default destructor
-	virtual ~BackgroundSubtractorLBSP();
+	virtual ~BackgroundSubtractorViBeLBSP();
 	//! (re)initiaization method; needs to be called before starting background subtraction (note: also reinitializes the keypoints vector)
 	virtual void initialize(const cv::Mat& oInitImg, const std::vector<cv::KeyPoint>& voKeyPoints=std::vector<cv::KeyPoint>());
 	//! primary model update function; the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
-	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSLBSP_DEFAULT_LEARNING_RATE);
+	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSVIBELBSP_DEFAULT_LEARNING_RATE);
 	//! @@@@@@@@@@@@ ????
 	virtual cv::AlgorithmInfo* info() const;
 	//! returns a copy of the latest reconstructed background image (in this case, since we're using a ViBe-like method, it returns the first sample set)
