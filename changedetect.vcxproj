@@ -94,7 +94,8 @@
     <None Include="LBSP_16bits_dbcross_3ch_rel.i" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BackgroundSubtractorLBSP.h" />
+    <ClInclude Include="BackgroundSubtractorPBASLBSP.h" />
+    <ClInclude Include="BackgroundSubtractorViBeLBSP.h" />
     <ClInclude Include="BackgroundSubtractorViBe.h" />
     <ClInclude Include="DatasetUtils.h" />
     <ClInclude Include="DistanceUtils.h" />
@@ -102,7 +103,8 @@
     <ClInclude Include="RandUtils.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="BackgroundSubtractorLBSP.cpp" />
+    <ClCompile Include="BackgroundSubtractorPBASLBSP.cpp" />
+    <ClCompile Include="BackgroundSubtractorViBeLBSP.cpp" />
     <ClCompile Include="BackgroundSubtractorViBe.cpp" />
     <ClCompile Include="DatasetUtils.cpp" />
     <ClCompile Include="main.cpp" />
