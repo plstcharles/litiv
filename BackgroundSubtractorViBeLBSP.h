@@ -15,7 +15,7 @@
 //! defines the default value for the learning rate passed to BackgroundSubtractorViBeLBSP::operator()
 #define BGSVIBELBSP_DEFAULT_LEARNING_RATE (16)
 //! defines the internal threshold adjustment factor to use when determining if the variation of a single channel is enough to declare the pixel as foreground
-#define BGSVIBELBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR (1.50f)
+#define BGSVIBELBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR (1.60f)
 //! defines whether we should use the selected pixel's characteristics during diffusion or not (1=PBAS-like diffusion, 0=ViBe-like)
 #define BGSVIBELBSP_USE_SELF_DIFFUSION 0
 //! defines whether we should use single channel variation checks for fg/bg segmentation validation or not
