@@ -1,8 +1,4 @@
 #include "LBSP.h"
-#include "DistanceUtils.h"
-#include <opencv2/core/core.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/features2d/features2d.hpp>
 
 LBSP::LBSP()
 	:	 m_bUseRelativeThreshold(false)
@@ -291,6 +287,10 @@ void LBSP::computeSingle(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const
 }
 
 void LBSP::computeImpl(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, cv::Mat& descriptors) const {
+	if(image.empty() || keypoints.empty()) {
+		descriptors.release();
+		return;
+	}
 #if LBSP_VALIDATE_KEYPOINTS_INTERNALLY
 	cv::KeyPointsFilter::runByImageBorder(keypoints,image.size(),PATCH_SIZE/2);
 	CV_DbgAssert(!keypoints.empty());
