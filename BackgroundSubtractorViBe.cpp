@@ -64,14 +64,16 @@ void BackgroundSubtractorViBe::operator()(cv::InputArray _image, cv::OutputArray
 #endif //BGSVIBE_USE_SC_THRS_VALIDATION
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
+				const cv::Vec3b& in = oInputImgRGB.at<cv::Vec3b>(y,x);
+				const cv::Vec3b& bg = m_voBGImg[nSampleIdx].at<cv::Vec3b>(y,x);
 #if BGSVIBE_USE_SC_THRS_VALIDATION
 				for(int c=0; c<3; c++)
-					if(dist[c]>nCurrSCColorDistThreshold)
+					if(absdiff_uchar(in[c],bg[c])>nCurrSCColorDistThreshold)
 						goto skip;
 #endif //BGSVIBE_USE_SC_THRS_VALIDATION
 				// unlike what was stated in their 2011 paper, the real vibe algorithm uses L1 (abs diff) distance instead of L2 (euclidean)
 				//if(cv::norm(oInputImgRGB.at<cv::Vec3b>(y,x),m_voBGImg[nSampleIdx].at<cv::Vec3b>(y,x))<m_nColorDistThreshold*3)
-				if(L1dist_uchar(oInputImgRGB.at<cv::Vec3b>(y,x),m_voBGImg[nSampleIdx].at<cv::Vec3b>(y,x))<m_nColorDistThreshold*3)
+				if(L1dist_uchar(in,bg)<m_nColorDistThreshold*3)
 					nGoodSamplesCount++;
 #if BGSVIBE_USE_SC_THRS_VALIDATION
 				skip:

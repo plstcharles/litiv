@@ -34,6 +34,8 @@
 #define VAL_UNKNOWN		170
 #define VAL_SHADOW		50
 
+#define USE_BROKEN_FNR_FUNCTION 1
+
 class SequenceInfo;
 
 class CategoryInfo {

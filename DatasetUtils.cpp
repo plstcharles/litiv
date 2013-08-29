@@ -189,7 +189,11 @@ AdvancedMetrics::AdvancedMetrics(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint6
 	:	 dRecall((double)nTP/(nTP+nFN))
 		,dSpecficity((double)nTN/(nTN+nFP))
 		,dFPR((double)nFP/(nFP+nTN))
+#if USE_BROKEN_FNR_FUNCTION
 		,dFNR((double)nFN/(nTN+nFP))
+#else //!USE_BROKEN_FNR_FUNCTION
+		,dFNR((double)nFN/(nTP+nFN))
+#endif //!USE_BROKEN_FNR_FUNCTION
 		,dPBC(100.0*(nFN+nFP)/(nTP+nFP+nFN+nTN))
 		,dPrecision((double)nTP/(nTP+nFP))
 		,dFMeasure(2.0*(dRecall*dPrecision)/(dRecall+dPrecision))
@@ -199,7 +203,11 @@ AdvancedMetrics::AdvancedMetrics(const SequenceInfo* pSeq)
 	:	 dRecall((double)pSeq->nTP/(pSeq->nTP+pSeq->nFN))
 		,dSpecficity((double)pSeq->nTN/(pSeq->nTN+pSeq->nFP))
 		,dFPR((double)pSeq->nFP/(pSeq->nFP+pSeq->nTN))
+#if USE_BROKEN_FNR_FUNCTION
 		,dFNR((double)pSeq->nFN/(pSeq->nTN+pSeq->nFP))
+#else //!USE_BROKEN_FNR_FUNCTION
+		,dFNR((double)pSeq->nFN/(pSeq->nTP+pSeq->nFN))
+#endif //!USE_BROKEN_FNR_FUNCTION
 		,dPBC(100.0*(pSeq->nFN+pSeq->nFP)/(pSeq->nTP+pSeq->nFP+pSeq->nFN+pSeq->nTN))
 		,dPrecision((double)pSeq->nTP/(pSeq->nTP+pSeq->nFP))
 		,dFMeasure(2.0*(dRecall*dPrecision)/(dRecall+dPrecision))
@@ -212,7 +220,11 @@ AdvancedMetrics::AdvancedMetrics(const CategoryInfo* pCat, bool bAverage)
 		dRecall = ((double)pCat->nTP/(pCat->nTP+pCat->nFN));
 		dSpecficity = ((double)pCat->nTN/(pCat->nTN+pCat->nFP));
 		dFPR = ((double)pCat->nFP/(pCat->nFP+pCat->nTN));
+#if USE_BROKEN_FNR_FUNCTION
 		dFNR = ((double)pCat->nFN/(pCat->nTN+pCat->nFP));
+#else //!USE_BROKEN_FNR_FUNCTION
+		dFNR = ((double)pCat->nFN/(pCat->nTP+pCat->nFN));
+#endif //!USE_BROKEN_FNR_FUNCTION
 		dPBC = (100.0*(pCat->nFN+pCat->nFP)/(pCat->nTP+pCat->nFP+pCat->nFN+pCat->nTN));
 		dPrecision = ((double)pCat->nTP/(pCat->nTP+pCat->nFP));
 		dFMeasure = (2.0*(dRecall*dPrecision)/(dRecall+dPrecision));
@@ -262,7 +274,11 @@ AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool b
 		dRecall = ((double)nGlobalTP/(nGlobalTP+nGlobalFN));
 		dSpecficity = ((double)nGlobalTN/(nGlobalTN+nGlobalFP));
 		dFPR = ((double)nGlobalFP/(nGlobalFP+nGlobalTN));
+#if USE_BROKEN_FNR_FUNCTION
 		dFNR = ((double)nGlobalFN/(nGlobalTN+nGlobalFP));
+#else //!USE_BROKEN_FNR_FUNCTION
+		dFNR = ((double)nGlobalFN/(nGlobalTP+nGlobalFN));
+#endif //!USE_BROKEN_FNR_FUNCTION
 		dPBC = (100.0*(nGlobalFN+nGlobalFP)/(nGlobalTP+nGlobalFP+nGlobalFN+nGlobalTN));
 		dPrecision = ((double)nGlobalTP/(nGlobalTP+nGlobalFP));
 		dFMeasure = (2.0*(dRecall*dPrecision)/(dRecall+dPrecision));

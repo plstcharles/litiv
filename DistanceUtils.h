@@ -24,11 +24,21 @@ static inline int L2sqrdist_uchar(const uchar* a, const uchar* b) {
 	return (absdiff_uchar(a[0],b[0])^2)+(absdiff_uchar(a[1],b[1])^2)+(absdiff_uchar(a[2],b[2])^2);
 }
 
+//! computes the L2 distance between two 3-ch unsigned char vectors
+static inline float L2dist_uchar(const uchar* a, const uchar* b) {
+	return sqrt((float)L2sqrdist_uchar(a,b));
+}
+
 //! computes the squared L2 distance between two 3-ch opencv unsigned char vectors
 static inline int L2sqrdist_uchar(const cv::Vec3b& a, const cv::Vec3b& b) {
 	const uchar a_array[3] = {a[0],a[1],a[2]};
 	const uchar b_array[3] = {b[0],b[1],b[2]};
 	return L2sqrdist_uchar(a_array,b_array);
+}
+
+//! computes the squared L2 distance between two 3-ch opencv unsigned char vectors
+static inline float L2dist_uchar(const cv::Vec3b& a, const cv::Vec3b& b) {
+	return sqrt((float)L2sqrdist_uchar(a,b));
 }
 
 //! popcount LUT for 8bit vectors
