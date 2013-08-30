@@ -88,10 +88,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <None Include="LBSP_16bits_dbcross_1ch_abs.i" />
-    <None Include="LBSP_16bits_dbcross_1ch_rel.i" />
-    <None Include="LBSP_16bits_dbcross_3ch_abs.i" />
-    <None Include="LBSP_16bits_dbcross_3ch_rel.i" />
+    <None Include="LBSP_16bits_dbcross_1ch.i" />
+    <None Include="LBSP_16bits_dbcross_3ch.i" />
+    <None Include="LBSP_16bits_dbcross_s3ch.i" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BackgroundSubtractorPBASLBSP.h" />

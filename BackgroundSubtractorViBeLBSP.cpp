@@ -160,17 +160,19 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 			const int uchar_idx = oInputImg.step.p[0]*y + x;
 			const int ushrt_idx = uchar_idx*2;
 			int nGoodSamplesCount=0, nSampleIdx=0;
-			unsigned short nCurrInputDesc;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
-				if(m_bLBSPUsingRelThreshold)
-					LBSP::computeGrayscaleRelativeDescriptor(oInputImg,m_voBGImg[nSampleIdx],x,y,m_fLBSPThreshold,nCurrInputDesc);
-				else
-					LBSP::computeGrayscaleAbsoluteDescriptor(oInputImg,m_voBGImg[nSampleIdx],x,y,m_nLBSPThreshold,nCurrInputDesc);
-				if(hdist_ushort_8bitLUT(nCurrInputDesc,*((unsigned short*)(m_voBGDesc[nSampleIdx].data+ushrt_idx)))<=m_nDescDistThreshold) {
 #if BGSVIBELBSP_USE_COLOR_COMPLEMENT
-					if(absdiff_uchar(oInputImg.data[uchar_idx],m_voBGImg[nSampleIdx].data[uchar_idx])<=m_nColorDistThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT)
-#endif //BGSVIBELBSP_USE_COLOR_COMPLEMENT
-						nGoodSamplesCount++;
+				if(absdiff_uchar(oInputImg.data[uchar_idx],m_voBGImg[nSampleIdx].data[uchar_idx])<=m_nColorDistThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT) {
+#else //!BGSVIBELBSP_USE_COLOR_COMPLEMENT
+				{
+#endif //!BGSVIBELBSP_USE_COLOR_COMPLEMENT
+					unsigned short nCurrInputDesc;
+					if(m_bLBSPUsingRelThreshold)
+						LBSP::computeGrayscaleRelativeDescriptor(oInputImg,m_voBGImg[nSampleIdx],x,y,m_fLBSPThreshold,nCurrInputDesc);
+					else
+						LBSP::computeGrayscaleAbsoluteDescriptor(oInputImg,m_voBGImg[nSampleIdx],x,y,m_nLBSPThreshold,nCurrInputDesc);
+					if(hdist_ushort_8bitLUT(nCurrInputDesc,*((unsigned short*)(m_voBGDesc[nSampleIdx].data+ushrt_idx)))<=m_nDescDistThreshold)
+							nGoodSamplesCount++;
 				}
 				nSampleIdx++;
 			}
@@ -193,9 +195,9 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 					unsigned short& bgdesc = m_voBGDesc[s_rand].at<unsigned short>(y_rand,x_rand);
 #if BGSVIBELBSP_USE_SELF_DIFFUSION
 					if(m_bLBSPUsingRelThreshold)
-						LBSP::computeSingle(oInputImg,cv::Mat(),x_rand,y_rand,m_fLBSPThreshold,bgdesc);
+						LBSP::computeGrayscaleRelativeDescriptor(oInputImg,cv::Mat(),x_rand,y_rand,m_fLBSPThreshold,bgdesc);
 					else
-						LBSP::computeSingle(oInputImg,cv::Mat(),x_rand,y_rand,m_nLBSPThreshold,bgdesc);
+						LBSP::computeGrayscaleAbsoluteDescriptor(oInputImg,cv::Mat(),x_rand,y_rand,m_nLBSPThreshold,bgdesc);
 					m_voBGImg[s_rand].at<uchar>(y_rand,x_rand) = oInputImg.at<uchar>(y_rand,x_rand);
 #else //!BGSVIBELBSP_USE_SELF_DIFFUSION
 					if(m_bLBSPUsingRelThreshold)
@@ -219,9 +221,7 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 		const int nCurrSCColorDistThreshold = (int)(m_nColorDistThreshold*BGSVIBELBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);
 #endif //BGSVIBELBSP_USE_COLOR_COMPLEMENT
 #endif //BGSVIBELBSP_USE_SC_THRS_VALIDATION
-		int anDescDist[3];
 #if BGSVIBELBSP_USE_COLOR_COMPLEMENT
-		int anColorDist[3];
 #endif //BGSVIBELBSP_USE_COLOR_COMPLEMENT
 		const int desc_row_step = m_voBGDesc[0].step.p[0];
 		const int img_row_step = m_voBGImg[0].step.p[0];
@@ -232,35 +232,39 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 			const int rgbimg_idx = base_idx*3;
 			const int descimg_idx = base_idx*6;
 			int nGoodSamplesCount=0, nSampleIdx=0;
-			unsigned short nCurrInputDesc;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
 				const unsigned short* bgdesc_ptr = (unsigned short*)(m_voBGDesc[nSampleIdx].data+descimg_idx);
 #if BGSVIBELBSP_USE_COLOR_COMPLEMENT
 				const uchar* inputimg_ptr = oInputImg.data+rgbimg_idx;
 				const uchar* bgimg_ptr = m_voBGImg[nSampleIdx].data+rgbimg_idx;
+				int nTotColorDist = 0;
 #endif //BGSVIBELBSP_USE_COLOR_COMPLEMENT
+				int nTotDescDist = 0;
 				for(int c=0;c<3; ++c) {
 #if BGSVIBELBSP_USE_COLOR_COMPLEMENT
-					anColorDist[c] = absdiff_uchar(inputimg_ptr[c],bgimg_ptr[c]);
+					int nColorDist = absdiff_uchar(inputimg_ptr[c],bgimg_ptr[c]);
 #if BGSVIBELBSP_USE_SC_THRS_VALIDATION
-					if(anColorDist[c]>nCurrSCColorDistThreshold)
+					if(nColorDist>nCurrSCColorDistThreshold)
 						goto skip;
 #endif //BGSVIBELBSP_USE_SC_THRS_VALIDATION
 #endif //BGSVIBELBSP_USE_COLOR_COMPLEMENT
+					unsigned short nCurrInputDesc;
 					if(m_bLBSPUsingRelThreshold)
 						LBSP::computeSingleRGBRelativeDescriptor(oInputImg,m_voBGImg[nSampleIdx],x,y,c,m_fLBSPThreshold,nCurrInputDesc);
 					else
 						LBSP::computeSingleRGBAbsoluteDescriptor(oInputImg,m_voBGImg[nSampleIdx],x,y,c,m_nLBSPThreshold,nCurrInputDesc);
-					anDescDist[c] = hdist_ushort_8bitLUT(nCurrInputDesc,bgdesc_ptr[c]);
+					int nDescDist = hdist_ushort_8bitLUT(nCurrInputDesc,bgdesc_ptr[c]);
 #if BGSVIBELBSP_USE_SC_THRS_VALIDATION
-					if(anDescDist[c]>nCurrSCDescDistThreshold)
+					if(nDescDist>nCurrSCDescDistThreshold)
 						goto skip;
 #endif //BGSVIBELBSP_USE_SC_THRS_VALIDATION
+					nTotColorDist += nColorDist;
+					nTotDescDist += nDescDist;
 				}
 #if BGSVIBELBSP_USE_COLOR_COMPLEMENT
-				if(anDescDist[0]+anDescDist[1]+anDescDist[2]<=nCurrDescDistThreshold && anColorDist[0]+anColorDist[1]+anColorDist[2]<=nCurrColorDistThreshold)
+				if(nTotDescDist<=nCurrDescDistThreshold && nTotColorDist<=nCurrColorDistThreshold)
 #else //!BGSVIBELBSP_USE_COLOR_COMPLEMENT
-				if(anDescDist[0]+anDescDist[1]+anDescDist[2]<=nCurrDescDistThreshold)
+				if(nTotDescDist<=nCurrDescDistThreshold)
 #endif //!BGSVIBELBSP_USE_COLOR_COMPLEMENT
 					nGoodSamplesCount++;
 #if BGSVIBELBSP_USE_SC_THRS_VALIDATION
@@ -289,9 +293,9 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 					unsigned short* bgdesc_ptr = ((unsigned short*)(m_voBGDesc[s_rand].data + desc_row_step*y_rand + 6*x_rand));
 #if BGSVIBELBSP_USE_SELF_DIFFUSION
 					if(m_bLBSPUsingRelThreshold)
-						LBSP::computeSingle(oInputImg,cv::Mat(),x_rand,y_rand,m_fLBSPThreshold,bgdesc_ptr);
+						LBSP::computeRGBRelativeDescriptor(oInputImg,cv::Mat(),x_rand,y_rand,m_fLBSPThreshold,bgdesc_ptr);
 					else
-						LBSP::computeSingle(oInputImg,cv::Mat(),x_rand,y_rand,m_nLBSPThreshold,bgdesc_ptr);
+						LBSP::computeRGBAbsoluteDescriptor(oInputImg,cv::Mat(),x_rand,y_rand,m_nLBSPThreshold,bgdesc_ptr);
 					for(int n=0; n<3; ++n)
 						*(m_voBGImg[s_rand].data + img_row_step*y_rand + 3*x_rand + n) = *(oInputImg.data + img_row_step*y_rand + 3*x_rand + n);
 #else //!BGSVIBELBSP_USE_SELF_DIFFUSION
