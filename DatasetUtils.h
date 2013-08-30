@@ -14,11 +14,11 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-#ifdef WIN32
+#if WIN32 && !__MINGW32__
 #include <windows.h>
 #include <stdint.h>
+#define sprintf sprintf_s
 #else
-#define sprintf_s sprintf
 #include <dirent.h>
 #include <sys/stat.h>
 #endif
@@ -102,7 +102,7 @@ static inline void WriteResult(	const std::string& sResultsPath,
 								const cv::Mat& res,
 								const std::vector<int>& vnComprParams) {
 	char buffer[10];
-	sprintf_s(buffer,"%06d",framenum);
+	sprintf(buffer,"%06d",framenum);
 	std::stringstream sResultFilePath;
 	sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << buffer << sResultSuffix;
 	cv::imwrite(sResultFilePath.str(), res, vnComprParams);
@@ -182,7 +182,7 @@ static inline void WriteMetrics(const std::string sResultsFileName, const std::v
 
 static inline void GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths) {
 	vsFilePaths.clear();
-#ifdef WIN32
+#if WIN32 && !__MINGW32__
 	WIN32_FIND_DATA ffd;
 	std::wstring dir(sDirPath.begin(),sDirPath.end());
 	dir += L"/*";
@@ -234,7 +234,7 @@ static inline void GetFilesFromDir(const std::string& sDirPath, std::vector<std:
 
 static inline void GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths) {
 	vsSubDirPaths.clear();
-#ifdef WIN32
+#if WIN32 && !__MINGW32__
 	WIN32_FIND_DATA ffd;
 	std::wstring dir(sDirPath.begin(),sDirPath.end());
 	dir += L"/*";

@@ -61,11 +61,11 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, size_t nFrame);
 #endif //USE_VIBE_BG_SUBTRACTOR
 
-#if WIN32 && _MSC_VER <= 1600 // no c++11 support
+#if (WIN32 || __MINGW32__) && (!defined(_MSC_VER) || _MSC_VER <= 1600) // no c++11 support
 #define USE_WINDOWS_API
 #include <windows.h>
 #include <process.h>
-const int g_anResultsComprParams[2] = {CV_IMWRITE_PNG_COMPRESSION,9}; // lower to increase processing speed
+const int g_anResultsComprParams[2] = {CV_IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
 const std::vector<int> g_vnResultsComprParams(g_anResultsComprParams,g_anResultsComprParams+2);
 const size_t g_nMaxThreads = 4;
 HANDLE g_hThreadEvent[g_nMaxThreads] = {0};
@@ -74,14 +74,14 @@ void* g_apThreadDataStruct[g_nMaxThreads][2] = {0};
 DWORD WINAPI AnalyzeSequenceEntryPoint(LPVOID lpParam) {
 	return AnalyzeSequence((int)(lpParam),(CategoryInfo*)g_apThreadDataStruct[(int)(lpParam)][0],(SequenceInfo*)g_apThreadDataStruct[(int)(lpParam)][1]);
 }
-#else //!WIN32 || _MSC_VER > 1600
+#else //!((WIN32 || __MINGW32__) && (!defined(_MSC_VER) || _MSC_VER <= 1600))
 #include <thread>
 #include <chrono>
 #include <atomic>
-const std::vector<int> g_vnResultsComprParams = {CV_IMWRITE_PNG_COMPRESSION,9}; // lower to increase processing speed
+const std::vector<int> g_vnResultsComprParams = {CV_IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
 const size_t g_nMaxThreads = (std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():1);
 std::atomic_size_t g_nActiveThreads(0);
-#endif //!WIN32 || _MSC_VER > 1600
+#endif //!((WIN32 || __MINGW32__) && (!defined(_MSC_VER) || _MSC_VER <= 1600))
 
 ///////////////////////////////////
 int main( int argc, char** argv ) {
