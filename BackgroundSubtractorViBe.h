@@ -12,7 +12,7 @@
 //! defines the default value for the learning rate passed to BackgroundSubtractorViBe::operator() (the 'subsampling' factor in the original ViBe paper)
 #define BGSVIBE_DEFAULT_LEARNING_RATE (16)
 //! defines the internal threshold adjustment factor to use when determining if the variation of a single channel is enough to declare the pixel as foreground
-#define BGSVIBE_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR (1.50f)
+#define BGSVIBE_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR (1.60f)
 //! defines whether we should use single channel variation checks for fg/bg segmentation validation or not
 #define BGSVIBE_USE_SC_THRS_VALIDATION 0
 
