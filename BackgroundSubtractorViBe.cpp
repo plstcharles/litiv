@@ -161,5 +161,16 @@ cv::AlgorithmInfo* BackgroundSubtractorViBe::info() const {
 }
 
 void BackgroundSubtractorViBe::getBackgroundImage(cv::OutputArray backgroundImage) const {
-	m_voBGImg[0].copyTo(backgroundImage);
+	CV_DbgAssert(!m_voBGImg.empty());
+	cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_8UC3);
+	for(int n=0; n<m_nBGSamples; ++n) {
+		for(int i=0; i<m_oImgSize.height; ++i) {
+			for(int j=0; j<m_oImgSize.width; ++j) {
+				for(int c=0; c<3; ++c) {
+					oAvgBGImg.data[oAvgBGImg.step.p[0]*i+oAvgBGImg.step.p[1]*j+c] += m_voBGImg[n].data[oAvgBGImg.step.p[0]*i+oAvgBGImg.step.p[1]*j+c]/m_nBGSamples;
+				}
+			}
+		}
+	}
+	oAvgBGImg.copyTo(backgroundImage);
 }
