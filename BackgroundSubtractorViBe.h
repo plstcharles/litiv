@@ -40,7 +40,7 @@ public:
 	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSVIBE_DEFAULT_LEARNING_RATE);
 	//! @@@@@@@@@@@@ ????
 	virtual cv::AlgorithmInfo* info() const;
-	//! returns a copy of the latest reconstructed background image (in this case, it returns the first sample set)
+	//! returns a copy of the latest reconstructed background image
 	void getBackgroundImage(cv::OutputArray backgroundImage) const;
 
 private:

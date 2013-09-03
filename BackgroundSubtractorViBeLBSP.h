@@ -57,9 +57,9 @@ public:
 	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSVIBELBSP_DEFAULT_LEARNING_RATE);
 	//! @@@@@@@@@@@@ ????
 	virtual cv::AlgorithmInfo* info() const;
-	//! returns a copy of the latest reconstructed background image (in this case, since we're using a ViBe-like method, it returns the first sample set)
+	//! returns a copy of the latest reconstructed background image
 	void getBackgroundImage(cv::OutputArray backgroundImage) const;
-	//! returns a copy of the latest background descriptors image (in this case, since we're using a ViBe-like method, it returns the first sample set)
+	//! returns a copy of the latest reconstructed background descriptors image
 	void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const;
 	//! returns the keypoints list used for descriptor extraction (note: by default, these are generated from the DenseFeatureDetector class, and the border points are removed)
 	std::vector<cv::KeyPoint> getBGKeyPoints() const;

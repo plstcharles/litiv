@@ -61,9 +61,9 @@ public:
 	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=BGSPBASLBSP_DEFAULT_LEARNING_RATE_OVERRIDE);
 	//! @@@@@@@@@@@@ ????
 	virtual cv::AlgorithmInfo* info() const;
-	//! returns a copy of the latest reconstructed background image (in this case, it returns the first sample set)
+	//! returns a copy of the latest reconstructed background image
 	void getBackgroundImage(cv::OutputArray backgroundImage) const;
-	//! returns a copy of the latest reconstructed background descriptors image (in this case, it returns the first sample set)
+	//! returns a copy of the latest reconstructed background descriptors image
 	void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const;
 	//! returns the keypoints list used for descriptor extraction (note: by default, these are generated from the DenseFeatureDetector class, and the border points are removed)
 	std::vector<cv::KeyPoint> getBGKeyPoints() const;
@@ -93,8 +93,12 @@ private:
 	const int m_nDefaultColorDistThreshold;
 	//! per-pixel distance thresholds ('R(x)' in the original PBAS paper)
 	cv::Mat m_oDistThresholdFrame;
+	//! per-pixel distance thresholds variation
+	cv::Mat m_oDistThresholdVariationFrame;
 	//! per-pixel mean minimal decision distances ('D(x)' in the original PBAS paper)
 	cv::Mat m_oMeanMinDistFrame;
+	//! the last foreground mask returned by the method (used for blinking pixel detection)
+	cv::Mat m_oLastFGMask;
 	//! absolute default update rate threshold (the default 'T(x)' value in the original PBAS paper)
 	const float m_fDefaultUpdateRate;
 	//! per-pixel update rate ('T(x)' in the original PBAS paper)

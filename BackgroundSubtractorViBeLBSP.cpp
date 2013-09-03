@@ -319,11 +319,36 @@ cv::AlgorithmInfo* BackgroundSubtractorViBeLBSP::info() const {
 }
 
 void BackgroundSubtractorViBeLBSP::getBackgroundImage(cv::OutputArray backgroundImage) const {
-	m_voBGImg[0].copyTo(backgroundImage);
+	CV_DbgAssert(!m_voBGImg.empty());
+	cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_8UC(m_nImgChannels));
+	for(int n=0; n<m_nBGSamples; ++n) {
+		for(int i=0; i<m_oImgSize.height; ++i) {
+			for(int j=0; j<m_oImgSize.width; ++j) {
+				for(int c=0; c<m_nImgChannels; ++c) {
+					oAvgBGImg.data[oAvgBGImg.step.p[0]*i+oAvgBGImg.step.p[1]*j+c] += m_voBGImg[n].data[oAvgBGImg.step.p[0]*i+oAvgBGImg.step.p[1]*j+c]/m_nBGSamples;
+				}
+			}
+		}
+	}
+	oAvgBGImg.copyTo(backgroundImage);
 }
 
 void BackgroundSubtractorViBeLBSP::getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const {
-	m_voBGDesc[0].copyTo(backgroundDescImage);
+	CV_DbgAssert(!m_voBGImg.empty());
+	CV_DbgAssert(LBSP::DESC_SIZE==2);
+	cv::Mat oAvgBGDescImg = cv::Mat::zeros(m_oImgSize,CV_16UC(m_nImgChannels));
+	for(int n=0; n<m_nBGSamples; ++n) {
+		for(int i=0; i<m_oImgSize.height; ++i) {
+			for(int j=0; j<m_oImgSize.width; ++j) {
+				unsigned short* avg = (unsigned short*)(oAvgBGDescImg.data+oAvgBGDescImg.step.p[0]*i+oAvgBGDescImg.step.p[1]*j);
+				unsigned short* sample = (unsigned short*)(m_voBGDesc[n].data+oAvgBGDescImg.step.p[0]*i+oAvgBGDescImg.step.p[1]*j);
+				for(int c=0; c<m_nImgChannels; ++c) {
+					avg[c] += sample[c]/m_nBGSamples;
+				}
+			}
+		}
+	}
+	oAvgBGDescImg.copyTo(backgroundDescImage);
 }
 
 std::vector<cv::KeyPoint> BackgroundSubtractorViBeLBSP::getBGKeyPoints() const {

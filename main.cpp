@@ -56,8 +56,10 @@ const int g_nResultIdxOffset = 0;
 
 int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence);
 #if !USE_VIBE_BG_SUBTRACTOR
+cv::Size g_oDisplayOutputSize(960,240);
 cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oBGDesc, const cv::Mat& oFGMask, std::vector<cv::KeyPoint> voKeyPoints, size_t nFrame);
 #else //USE_VIBE_BG_SUBTRACTOR
+cv::Size g_oDisplayOutputSize(800,240);
 cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, size_t nFrame);
 #endif //USE_VIBE_BG_SUBTRACTOR
 
@@ -192,10 +194,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		std::string sDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName;
 #endif //DISPLAY_ANALYSIS_DEBUG_RESULTS
 #if WRITE_BGSUB_DEBUG_IMG_OUTPUT
-		cv::Size oDebugWriterInputSize = oInputImg.size();
-		oDebugWriterInputSize.height*=3;
-		oDebugWriterInputSize.width*=2;
-		cv::VideoWriter oDebugWriter(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,oDebugWriterInputSize,true);
+		cv::VideoWriter oDebugWriter(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,g_oDisplayOutputSize,true);
 #endif //WRITE_BGSUB_DEBUG_IMG_OUTPUT
 		const size_t nNbInputFrames = pCurrSequence->GetNbInputFrames();
 		for(size_t k=0; k<nNbInputFrames; k++) {
@@ -264,6 +263,7 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 	cv::Mat oInputImgBYTE3, oBGImgBYTE3, oBGDescBYTE, oBGDescBYTE3, oFGMaskBYTE3;
 	cv::Mat oInputDesc, oInputDescBYTE, oInputDescBYTE3;
 	cv::Mat oDescDiff, oDescDiffBYTE, oDescDiffBYTE3;
+	cv::Mat oImgDiffBYTE3;
 	LBSP oExtractor;
 	oExtractor.setReference(oBGImg);
 	oExtractor.compute2(oInputImg,voKeyPoints,oInputDesc);
@@ -286,22 +286,31 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 		oBGDescBYTE3 = oBGDescBYTE;
 		oDescDiffBYTE3 = oDescDiffBYTE;
 	}
-	cv::Mat display1H,display2H,display3H;
+
+	cv::absdiff(oInputImgBYTE3,oBGImgBYTE3,oImgDiffBYTE3);
+	cv::Mat displayH,displayV1,displayV2;
+	cv::resize(oInputImgBYTE3,oInputImgBYTE3,cv::Size(320,240));
+	cv::resize(oBGImgBYTE3,oBGImgBYTE3,cv::Size(160,120));
+	cv::resize(oImgDiffBYTE3,oImgDiffBYTE3,cv::Size(160,120));
+	cv::resize(oBGDescBYTE3,oBGDescBYTE3,cv::Size(160,120));
+	cv::resize(oDescDiffBYTE3,oDescDiffBYTE3,cv::Size(160,120));
+	cv::resize(oFGMaskBYTE3,oFGMaskBYTE3,cv::Size(320,240));
+
 	std::stringstream sstr;
-	sstr << "Input Img #" << nFrame;
+	sstr << "Input Image #" << nFrame;
 	WriteOnImage(oInputImgBYTE3,sstr.str());
-	WriteOnImage(oBGImgBYTE3,"BGModel Img");
-	WriteOnImage(oInputDescBYTE3,"Input Desc");
-	WriteOnImage(oBGDescBYTE3,"BGModel Desc");
-	WriteOnImage(oFGMaskBYTE3,"Detection Result");
-	WriteOnImage(oDescDiffBYTE3,"BGModel-Input Desc Diff");
-	cv::hconcat(oInputImgBYTE3,oBGImgBYTE3,display1H);
-	cv::hconcat(oInputDescBYTE3,oBGDescBYTE3,display2H);
-	cv::hconcat(oFGMaskBYTE3,oDescDiffBYTE3,display3H);
-	cv::Mat display;
-	cv::vconcat(display1H,display2H,display);
-	cv::vconcat(display,display3H,display);
-	return display;
+	WriteOnImage(oBGImgBYTE3,"Reference Image");
+	WriteOnImage(oImgDiffBYTE3,"Diff Image");
+	WriteOnImage(oBGDescBYTE3,"Reference DescImage");
+	WriteOnImage(oDescDiffBYTE3,"Diff DescImage");
+	WriteOnImage(oFGMaskBYTE3,"Segmentation Result");
+
+	cv::vconcat(oBGImgBYTE3,oImgDiffBYTE3,displayV1);
+	cv::vconcat(oBGDescBYTE3,oDescDiffBYTE3,displayV2);
+	cv::hconcat(oInputImgBYTE3,displayV1,displayH);
+	cv::hconcat(displayH,displayV2,displayH);
+	cv::hconcat(displayH,oFGMaskBYTE3,displayH);
+	return displayH;
 }
 #else //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
 cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, size_t nFrame) {
@@ -309,18 +318,29 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 	CV_Assert(oInputImg.type()==oBGImg.type() && oBGImg.type()==CV_8UC3);
 	CV_Assert(oFGMask.type()==CV_8UC1);
 	CV_Assert(oInputImg.size()==oBGImg.size() && oBGImg.size()==oFGMask.size());
-	cv::Mat oInputImgBYTE3,oBGImgBYTE3,oFGMaskBYTE3;
+	cv::Mat oInputImgBYTE3,oBGImgBYTE3,oFGMaskBYTE3,oImgDiffBYTE3;
 	cv::cvtColor(oFGMask,oFGMaskBYTE3,CV_GRAY2RGB);
 	oInputImgBYTE3 = oInputImg;
 	oBGImgBYTE3 = oBGImg;
-	cv::Mat display1H,display2H;
+	cv::absdiff(oInputImgBYTE3,oBGImgBYTE3,oImgDiffBYTE3);
+	cv::Mat displayH,displayV;
+
+	cv::resize(oInputImgBYTE3,oInputImgBYTE3,cv::Size(320,240));
+	cv::resize(oBGImgBYTE3,oBGImgBYTE3,cv::Size(160,120));
+	cv::resize(oImgDiffBYTE3,oImgDiffBYTE3,cv::Size(160,120));
+	cv::resize(oFGMaskBYTE3,oFGMaskBYTE3,cv::Size(320,240));
+
+
 	std::stringstream sstr;
-	sstr << "Input Img #" << nFrame;
+	sstr << "Input Image #" << nFrame;
 	WriteOnImage(oInputImgBYTE3,sstr.str());
-	WriteOnImage(oBGImgBYTE3,"BGModel Img");
-	WriteOnImage(oFGMaskBYTE3,"Detection Result");
-	cv::hconcat(oInputImgBYTE3,oBGImgBYTE3,display1H);
-	cv::hconcat(display1H,oFGMaskBYTE3,display2H);
-	return display2H;
+	WriteOnImage(oBGImgBYTE3,"Reference Image");
+	WriteOnImage(oImgDiffBYTE3,"Diff Image");
+	WriteOnImage(oFGMaskBYTE3,"Segmentation Result");
+
+	cv::vconcat(oBGImgBYTE3,oImgDiffBYTE3,displayV);
+	cv::hconcat(oInputImgBYTE3,displayV,displayH);
+	cv::hconcat(displayH,oFGMaskBYTE3,displayH);
+	return displayH;
 }
 #endif //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)

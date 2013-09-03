@@ -4,13 +4,20 @@
 #include <iostream>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <iomanip>
 
 #define R_OFFST (0.1000f)
-#define R_SCALE (1.2500f)
-#define R_INCR  (1.0050f)
-#define R_DECR  (0.9975f)
-#define R_LOWER (0.8000f)
-#define R_UPPER (2.6000f)
+#define R_SCALE (1.7500f)
+#define R_INCR  (1.0750f)
+#define R_DECR  (0.9750f)
+#define R_LOWER (0.6500f)
+#define R_UPPER (2.0000f)
+
+#define R2_OFFST (0.075f)
+#define R2_INCR  (0.003f)
+#define R2_DECR  (0.002f)
+#define R2_LOWER (1.000f)
+#define R2_UPPER (1.080f)
 
 #define T_OFFST (0.0001f)
 #define T_SCALE (1.0000f)
@@ -104,10 +111,14 @@ void BackgroundSubtractorPBASLBSP::initialize(const cv::Mat& oInitImg, const std
 	m_nImgChannels = oInitImg.channels();
 	m_oDistThresholdFrame.create(m_oImgSize,CV_32FC1);
 	m_oDistThresholdFrame = cv::Scalar(1.0f);
+	m_oDistThresholdVariationFrame.create(m_oImgSize,CV_32FC1);
+	m_oDistThresholdVariationFrame = cv::Scalar(R2_LOWER);
 	m_oUpdateRateFrame.create(m_oImgSize,CV_32FC1);
 	m_oUpdateRateFrame = cv::Scalar(m_fDefaultUpdateRate);
 	m_oMeanMinDistFrame.create(m_oImgSize,CV_32FC1);
 	m_oMeanMinDistFrame = cv::Scalar(0.0f);
+	m_oLastFGMask.create(m_oImgSize,CV_8UC1);
+	m_oLastFGMask = cv::Scalar(0);
 
 	if(voKeyPoints.empty()) {
 		// init keypoints used for the extractor :
@@ -196,6 +207,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			int nMinColorDist=nChannelSize;
 			int nMinDescDist=nDescSize;
 			float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+flt32_idx);
+			float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+flt32_idx);
 			const int nCurrColorDistThreshold = (int)((*pfCurrDistThresholdFactor)*m_nDefaultColorDistThreshold);
 			const int nCurrDescDistThreshold = (int)((*pfCurrDistThresholdFactor)*m_nDefaultDescDistThreshold);;
 			int nGoodSamplesCount=0, nSampleIdx=0;
@@ -261,12 +273,20 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 				if((*pfCurrLearningRate)<T_LOWER)
 					*pfCurrLearningRate = T_LOWER;
 			}
+			if((*pfCurrMeanMinDist)>R2_OFFST && (oFGMask.data[uchar_idx]!=m_oLastFGMask.data[uchar_idx])) {
+				if((*pfCurrDistThresholdVariationFactor)<R2_UPPER)
+					(*pfCurrDistThresholdVariationFactor) += R2_INCR;
+			}
+			else {
+				if((*pfCurrDistThresholdVariationFactor)>R2_LOWER)
+					(*pfCurrDistThresholdVariationFactor) -= R2_DECR/((*pfCurrMeanMinDist)/R2_OFFST);
+			}
 			if((*pfCurrDistThresholdFactor)<R_LOWER+(*pfCurrMeanMinDist)*R_SCALE+R_OFFST) {
 				if((*pfCurrDistThresholdFactor)<R_UPPER)
-					(*pfCurrDistThresholdFactor) *= R_INCR;
+					(*pfCurrDistThresholdFactor) *= R_INCR*(*pfCurrDistThresholdVariationFactor);
 			}
 			else if((*pfCurrDistThresholdFactor)>R_LOWER)
-				(*pfCurrDistThresholdFactor) *= R_DECR;
+				(*pfCurrDistThresholdFactor) *= R_DECR*(*pfCurrDistThresholdVariationFactor);
 		}
 	}
 	else { //m_nImgChannels==3
@@ -284,6 +304,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			int nMinTotColorDist=nTotChannelSize;
 			int nMinTotDescDist=nTotDescSize;
 			float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+flt32_idx);
+			float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+flt32_idx);
 			const int nCurrTotColorDistThreshold = (int)((*pfCurrDistThresholdFactor)*m_nDefaultColorDistThreshold*3);
 			const int nCurrTotDescDistThreshold = (int)((*pfCurrDistThresholdFactor)*m_nDefaultDescDistThreshold*3);
 #if BGSPBASLBSP_USE_SC_THRS_VALIDATION
@@ -376,34 +397,42 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 				if((*pfCurrLearningRate)<T_LOWER)
 					*pfCurrLearningRate = T_LOWER;
 			}
+			if((*pfCurrMeanMinDist)>R2_OFFST && (oFGMask.data[base_idx]!=m_oLastFGMask.data[base_idx])) {
+				if((*pfCurrDistThresholdVariationFactor)<R2_UPPER)
+					(*pfCurrDistThresholdVariationFactor) += R2_INCR;
+			}
+			else {
+				if((*pfCurrDistThresholdVariationFactor)>R2_LOWER)
+					(*pfCurrDistThresholdVariationFactor) -= R2_DECR/((*pfCurrMeanMinDist)/R2_OFFST);
+			}
 			if((*pfCurrDistThresholdFactor)<R_LOWER+(*pfCurrMeanMinDist)*R_SCALE+R_OFFST) {
 				if((*pfCurrDistThresholdFactor)<R_UPPER)
-					(*pfCurrDistThresholdFactor) *= R_INCR;
+					(*pfCurrDistThresholdFactor) *= R_INCR*(*pfCurrDistThresholdVariationFactor);
 			}
 			else if((*pfCurrDistThresholdFactor)>R_LOWER)
-				(*pfCurrDistThresholdFactor) *= R_DECR;
+				(*pfCurrDistThresholdFactor) *= R_DECR*(*pfCurrDistThresholdVariationFactor);
 		}
 	}
-	/*
-	double min,max;
-	cv::minMaxIdx(m_oDistThresholdFrame,&min,&max);
-	std::cout << "m_oDistThresholdFrame -- min = " << min << ", max = " << max << std::endl;
-	cv::minMaxIdx(m_oMeanMinDistFrame,&min,&max);
-	std::cout << "m_oMeanMinDistFrame   -- min = " << min << ", max = " << max << std::endl;
-	*/
-	/*cv::Mat oMeanMinDistFrameNormalized, oDistThresholdFrameNormalized, oUpdateRateFrameNormalized;
+	/*cv::Mat oMeanMinDistFrameNormalized, oDistThresholdFrameNormalized, oDistThresholdVariationFrameNormalized, oUpdateRateFrameNormalized;
 	oMeanMinDistFrameNormalized = m_oMeanMinDistFrame;
-	oDistThresholdFrameNormalized = (m_oDistThresholdFrame-cv::Scalar(R_LOWER))/R_UPPER;
-	oUpdateRateFrameNormalized = (m_oUpdateRateFrame-cv::Scalar(T_LOWER))/T_UPPER;
+	oDistThresholdFrameNormalized = (m_oDistThresholdFrame-cv::Scalar(R_LOWER))/(R_UPPER-R_LOWER);
+	oDistThresholdVariationFrameNormalized = (m_oDistThresholdVariationFrame-cv::Scalar(R2_LOWER))/(R2_UPPER-R2_LOWER);
+	oUpdateRateFrameNormalized = (m_oUpdateRateFrame-cv::Scalar(T_LOWER))/(T_UPPER-T_LOWER);
 	cv::Point dbg1(60,40), dbg2(218,132);
 	cv::circle(oMeanMinDistFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oMeanMinDistFrameNormalized,dbg2,5,cv::Scalar(1.0f));
 	cv::circle(oDistThresholdFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oDistThresholdFrameNormalized,dbg2,5,cv::Scalar(1.0f));
+	cv::circle(oDistThresholdVariationFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oDistThresholdVariationFrameNormalized,dbg2,5,cv::Scalar(1.0f));
 	cv::circle(oUpdateRateFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oUpdateRateFrameNormalized,dbg2,5,cv::Scalar(1.0f));
 	cv::imshow("m(x)",oMeanMinDistFrameNormalized);
 	cv::imshow("r(x)",oDistThresholdFrameNormalized);
+	cv::imshow("r2(x)",oDistThresholdVariationFrameNormalized);
 	cv::imshow("t(x)",oUpdateRateFrameNormalized);
+	std::cout << std::fixed << std::setprecision(5) << " m(" << dbg1 << ") = " << m_oMeanMinDistFrame.at<float>(dbg1) << "  ,  m(" << dbg2 << ") = " << m_oMeanMinDistFrame.at<float>(dbg2) << std::endl;
+	std::cout << std::fixed << std::setprecision(5) << " r(" << dbg1 << ") = " << m_oDistThresholdFrame.at<float>(dbg1) << "  ,  r(" << dbg2 << ") = " << m_oDistThresholdFrame.at<float>(dbg2) << std::endl;
+	std::cout << std::fixed << std::setprecision(5) << "r2(" << dbg1 << ") = " << m_oDistThresholdVariationFrame.at<float>(dbg1) << "  , r2(" << dbg2 << ") = " << m_oDistThresholdVariationFrame.at<float>(dbg2) << std::endl;
 	cv::waitKey(1);*/
-	cv::medianBlur(oFGMask,oFGMask,9); // give user access to mblur params... @@@@@
+	cv::medianBlur(oFGMask,oFGMask,7); // give user access to mblur params... @@@@@
+	oFGMask.copyTo(m_oLastFGMask);
 }
 
 cv::AlgorithmInfo* BackgroundSubtractorPBASLBSP::info() const {
@@ -412,11 +441,36 @@ cv::AlgorithmInfo* BackgroundSubtractorPBASLBSP::info() const {
 }
 
 void BackgroundSubtractorPBASLBSP::getBackgroundImage(cv::OutputArray backgroundImage) const {
-	m_voBGImg[0].copyTo(backgroundImage);
+	CV_DbgAssert(!m_voBGImg.empty());
+	cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_8UC(m_nImgChannels));
+	for(int n=0; n<m_nBGSamples; ++n) {
+		for(int i=0; i<m_oImgSize.height; ++i) {
+			for(int j=0; j<m_oImgSize.width; ++j) {
+				for(int c=0; c<m_nImgChannels; ++c) {
+					oAvgBGImg.data[oAvgBGImg.step.p[0]*i+oAvgBGImg.step.p[1]*j+c] += m_voBGImg[n].data[oAvgBGImg.step.p[0]*i+oAvgBGImg.step.p[1]*j+c]/m_nBGSamples;
+				}
+			}
+		}
+	}
+	oAvgBGImg.copyTo(backgroundImage);
 }
 
 void BackgroundSubtractorPBASLBSP::getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const {
-	m_voBGDesc[0].copyTo(backgroundDescImage);
+	CV_DbgAssert(!m_voBGImg.empty());
+	CV_DbgAssert(LBSP::DESC_SIZE==2);
+	cv::Mat oAvgBGDescImg = cv::Mat::zeros(m_oImgSize,CV_16UC(m_nImgChannels));
+	for(int n=0; n<m_nBGSamples; ++n) {
+		for(int i=0; i<m_oImgSize.height; ++i) {
+			for(int j=0; j<m_oImgSize.width; ++j) {
+				unsigned short* avg = (unsigned short*)(oAvgBGDescImg.data+oAvgBGDescImg.step.p[0]*i+oAvgBGDescImg.step.p[1]*j);
+				unsigned short* sample = (unsigned short*)(m_voBGDesc[n].data+oAvgBGDescImg.step.p[0]*i+oAvgBGDescImg.step.p[1]*j);
+				for(int c=0; c<m_nImgChannels; ++c) {
+					avg[c] += sample[c]/m_nBGSamples;
+				}
+			}
+		}
+	}
+	oAvgBGDescImg.copyTo(backgroundDescImage);
 }
 
 std::vector<cv::KeyPoint> BackgroundSubtractorPBASLBSP::getBGKeyPoints() const {
