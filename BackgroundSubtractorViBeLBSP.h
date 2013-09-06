@@ -7,7 +7,7 @@
 //! defines the default value for BackgroundSubtractorViBeLBSP::m_nDescDistThreshold
 #define BGSVIBELBSP_DEFAULT_DESC_DIST_THRESHOLD (4)
 //! defines the default value for BackgroundSubtractorViBeLBSP::m_nColorDistThreshold
-#define BGSVIBELBSP_DEFAULT_COLOR_DIST_THRESHOLD (LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD)
+#define BGSVIBELBSP_DEFAULT_COLOR_DIST_THRESHOLD (30)
 //! defines the default value for BackgroundSubtractorViBeLBSP::m_nBGSamples
 #define BGSVIBELBSP_DEFAULT_NB_BG_SAMPLES (35)
 //! defines the default value for BackgroundSubtractorViBeLBSP::m_nRequiredBGSamples
@@ -71,9 +71,9 @@ private:
 	const int m_nBGSamples;
 	//! number of similar samples needed to consider the current pixel/block as 'background'
 	const int m_nRequiredBGSamples;
-	//! background model pixel samples used as references for LBSP computations
+	//! background model pixel intensity samples
 	std::vector<cv::Mat> m_voBGImg;
-	//! background model descriptors samples used as references for change detection (tied to m_voKeyPoints but shaped like the input frames)
+	//! background model descriptors samples (tied to m_voKeyPoints but shaped like the input frames)
 	std::vector<cv::Mat> m_voBGDesc;
 	//! background model keypoints used for LBSP descriptor extraction (specific to the input image size)
 	std::vector<cv::KeyPoint> m_voKeyPoints;

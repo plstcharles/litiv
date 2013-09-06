@@ -1,13 +1,13 @@
-#include "BackgroundSubtractorViBe.h"
+#include "BackgroundSubtractorViBe_3ch.h"
 #include "DistanceUtils.h"
 #include "RandUtils.h"
 #include <iostream>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
-BackgroundSubtractorViBe::BackgroundSubtractorViBe(	 int nColorDistThreshold
-													,int nBGSamples
-													,int nRequiredBGSamples)
+BackgroundSubtractorViBe_3ch::BackgroundSubtractorViBe_3ch(	 int nColorDistThreshold
+															,int nBGSamples
+															,int nRequiredBGSamples)
 	:	 m_nBGSamples(nBGSamples)
 		,m_nRequiredBGSamples(nRequiredBGSamples)
 		,m_voBGImg(nBGSamples)
@@ -16,9 +16,9 @@ BackgroundSubtractorViBe::BackgroundSubtractorViBe(	 int nColorDistThreshold
 	CV_Assert(m_nBGSamples>0);
 }
 
-BackgroundSubtractorViBe::~BackgroundSubtractorViBe() {}
+BackgroundSubtractorViBe_3ch::~BackgroundSubtractorViBe_3ch() {}
 
-void BackgroundSubtractorViBe::initialize(const cv::Mat& oInitImg) {
+void BackgroundSubtractorViBe_3ch::initialize(const cv::Mat& oInitImg) {
 	CV_Assert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
 	CV_Assert(oInitImg.type()==CV_8UC3 || oInitImg.type()==CV_8UC1);
 	cv::Mat oInitImgRGB;
@@ -43,7 +43,7 @@ void BackgroundSubtractorViBe::initialize(const cv::Mat& oInitImg) {
 	m_bInitialized = true;
 }
 
-void BackgroundSubtractorViBe::operator()(cv::InputArray _image, cv::OutputArray _fgmask, double learningRate) {
+void BackgroundSubtractorViBe_3ch::operator()(cv::InputArray _image, cv::OutputArray _fgmask, double learningRate) {
 #if 1
 	CV_DbgAssert(m_bInitialized);
 	CV_DbgAssert(learningRate>0);
@@ -155,22 +155,25 @@ void BackgroundSubtractorViBe::operator()(cv::InputArray _image, cv::OutputArray
 #endif
 }
 
-cv::AlgorithmInfo* BackgroundSubtractorViBe::info() const {
+cv::AlgorithmInfo* BackgroundSubtractorViBe_3ch::info() const {
 	CV_Assert(false); // NOT IMPL @@@@@
 	return NULL;
 }
 
-void BackgroundSubtractorViBe::getBackgroundImage(cv::OutputArray backgroundImage) const {
+void BackgroundSubtractorViBe_3ch::getBackgroundImage(cv::OutputArray backgroundImage) const {
 	CV_DbgAssert(!m_voBGImg.empty());
-	cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_8UC3);
+	cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_32FC3);
 	for(int n=0; n<m_nBGSamples; ++n) {
-		for(int i=0; i<m_oImgSize.height; ++i) {
-			for(int j=0; j<m_oImgSize.width; ++j) {
-				for(int c=0; c<3; ++c) {
-					oAvgBGImg.data[oAvgBGImg.step.p[0]*i+oAvgBGImg.step.p[1]*j+c] += m_voBGImg[n].data[oAvgBGImg.step.p[0]*i+oAvgBGImg.step.p[1]*j+c]/m_nBGSamples;
-				}
+		for(int y=0; y<m_oImgSize.height; ++y) {
+			for(int x=0; x<m_oImgSize.width; ++x) {
+				int uchar_idx = m_oImgSize.width*3*y + 3*x;
+				int flt32_idx = uchar_idx*4;
+				float* oAvgBgImgPtr = (float*)(oAvgBGImg.data+flt32_idx);
+				uchar* oBGImgPtr = m_voBGImg[n].data+uchar_idx;
+				for(int c=0; c<3; ++c)
+					oAvgBgImgPtr[c] += ((float)oBGImgPtr[c])/m_nBGSamples;
 			}
 		}
 	}
-	oAvgBGImg.copyTo(backgroundImage);
+	oAvgBGImg.convertTo(backgroundImage,CV_8UC3);
 }

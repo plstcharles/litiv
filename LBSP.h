@@ -57,7 +57,7 @@ public:
 	void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat>& voDescCollection) const;
 
 	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel-absolute version)
-	inline static void computeGrayscaleAbsoluteDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const int nThreshold, unsigned short& _res) {
+	inline static void computeGrayscaleAbsoluteDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const int nThreshold, ushort& _res) {
 		CV_DbgAssert(!oInputImg.empty());
 		CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 		CV_DbgAssert(oInputImg.type()==CV_8UC1);
@@ -73,7 +73,7 @@ public:
 	}
 
 	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel-relative version)
-	inline static void computeGrayscaleRelativeDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const float fThreshold, unsigned short& _res) {
+	inline static void computeGrayscaleRelativeDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const float fThreshold, ushort& _res) {
 		CV_DbgAssert(!oInputImg.empty());
 		CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 		CV_DbgAssert(oInputImg.type()==CV_8UC1);
@@ -89,7 +89,7 @@ public:
 	}
 
 	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (3-channels-absolute version)
-	inline static void computeRGBAbsoluteDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const int nThreshold, unsigned short* _res) {
+	inline static void computeRGBAbsoluteDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const int nThreshold, ushort* _res) {
 		CV_DbgAssert(!oInputImg.empty());
 		CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 		CV_DbgAssert(oInputImg.type()==CV_8UC3);
@@ -105,7 +105,7 @@ public:
 	}
 
 	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (3-channels-relative version)
-	inline static void computeRGBRelativeDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const float fThreshold, unsigned short* _res) {
+	inline static void computeRGBRelativeDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const float fThreshold, ushort* _res) {
 		CV_DbgAssert(!oInputImg.empty());
 		CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 		CV_DbgAssert(oInputImg.type()==CV_8UC3);
@@ -121,7 +121,7 @@ public:
 	}
 
 	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel-RGB-absolute version)
-	inline static void computeSingleRGBAbsoluteDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const int _c, const int nThreshold, unsigned short& _res) {
+	inline static void computeSingleRGBAbsoluteDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const int _c, const int nThreshold, ushort& _res) {
 		CV_DbgAssert(!oInputImg.empty());
 		CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 		CV_DbgAssert(oInputImg.type()==CV_8UC3);
@@ -138,7 +138,7 @@ public:
 	}
 
 	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel-RGB-relative version)
-	inline static void computeSingleRGBRelativeDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const int _c, const float fThreshold, unsigned short& _res) {
+	inline static void computeSingleRGBRelativeDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const int _c, const float fThreshold, ushort& _res) {
 		CV_DbgAssert(!oInputImg.empty());
 		CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 		CV_DbgAssert(oInputImg.type()==CV_8UC3);

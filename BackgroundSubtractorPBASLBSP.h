@@ -7,7 +7,7 @@
 //! defines the default value for BackgroundSubtractorPBASLBSP::m_nDefaultDescDistThreshold
 #define BGSPBASLBSP_DEFAULT_DESC_DIST_THRESHOLD (4)
 //! defines the default value for BackgroundSubtractorPBASLBSP::m_nDefaultColorDistThreshold
-#define BGSPBASLBSP_DEFAULT_COLOR_DIST_THRESHOLD (LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD)
+#define BGSPBASLBSP_DEFAULT_COLOR_DIST_THRESHOLD (30)
 //! defines the default value for BackgroundSubtractorPBASLBSP::m_nBGSamples
 #define BGSPBASLBSP_DEFAULT_NB_BG_SAMPLES (35)
 //! defines the default value for BackgroundSubtractorPBASLBSP::m_nRequiredBGSamples
@@ -24,9 +24,17 @@
 #define BGSPBASLBSP_USE_SC_THRS_VALIDATION 1
 //! defines whether we should complement the LBSP core component using color or not
 #define BGSPBASLBSP_USE_COLOR_COMPLEMENT 1
+//! defines whether to use or not the R2 acceleration thresholds to modulate R(x) variations
+#define BGSPBASLBSP_USE_R2_ACCELERATION 1
+//! defines whether to use or not the advanced morphological operations
+#define BGSPBASLBSP_USE_ADVANCED_MORPH_OPS 1
+//! defines whether to use or not the gradient complement in intensity distances
+#define BGSPBASLBSP_USE_GRADIENT_COMPLEMENT 1
+//! defines whether to use the gradient complement inlined or mixed with color
+#define BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR 1
 
 /*!
-	PBAS foreground-background segmentation algorithm.
+	PBAS-Based Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
 
 	Note: both grayscale and RGB/BGR images may be used with this extractor (parameters
 	are adjusted automatically).
@@ -75,9 +83,11 @@ private:
 	const int m_nBGSamples;
 	//! number of similar samples needed to consider the current pixel/block as 'background' ('#_min' in the original ViBe/PBAS papers)
 	const int m_nRequiredBGSamples;
-	//! background model pixel samples
+	//! background model pixel intensity samples
 	std::vector<cv::Mat> m_voBGImg;
-	//! background model descriptors samples used as references for change detection (tied to m_voKeyPoints but shaped like the input frames)
+	//! background model pixel gradient samples
+	std::vector<cv::Mat> m_voBGGrad;
+	//! background model descriptors samples (tied to m_voKeyPoints but shaped like the input frames)
 	std::vector<cv::Mat> m_voBGDesc;
 	//! background model keypoints used for LBSP descriptor extraction (specific to the input image size)
 	std::vector<cv::KeyPoint> m_voKeyPoints;
@@ -103,6 +113,8 @@ private:
 	cv::Mat m_oFloodedFGMask;
 	//! absolute default update rate threshold (the default 'T(x)' value in the original PBAS paper)
 	const float m_fDefaultUpdateRate;
+	//! mean gradient magnitude distance over the past frame
+	float m_fFormerMeanGradDist;
 	//! per-pixel update rate ('T(x)' in the original PBAS paper)
 	cv::Mat m_oUpdateRateFrame;
 	//! defines if we're using a relative threshold when extracting LBSP features (kept here since we don't keep an LBSP object)
