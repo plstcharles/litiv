@@ -14,10 +14,10 @@
 #define R_UPPER (2.0000f)
 
 #define R2_OFFST (0.075f)
-#define R2_INCR  (0.003f)
-#define R2_DECR  (0.002f)
-#define R2_LOWER (1.000f)
-#define R2_UPPER (1.080f)
+#define R2_INCR  (0.005f)
+#define R2_DECR  (0.001f)
+#define R2_LOWER (0.950f)
+#define R2_UPPER (1.050f)
 
 #define T_OFFST (0.0001f)
 #define T_SCALE (1.0000f)
@@ -119,6 +119,8 @@ void BackgroundSubtractorPBASLBSP::initialize(const cv::Mat& oInitImg, const std
 	m_oMeanMinDistFrame = cv::Scalar(0.0f);
 	m_oLastFGMask.create(m_oImgSize,CV_8UC1);
 	m_oLastFGMask = cv::Scalar(0);
+	m_oFloodedFGMask.create(m_oImgSize,CV_8UC1);
+	m_oFloodedFGMask = cv::Scalar(0);
 
 	if(voKeyPoints.empty()) {
 		// init keypoints used for the extractor :
@@ -279,7 +281,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			}
 			else {
 				if((*pfCurrDistThresholdVariationFactor)>R2_LOWER)
-					(*pfCurrDistThresholdVariationFactor) -= R2_DECR/((*pfCurrMeanMinDist)/R2_OFFST);
+					(*pfCurrDistThresholdVariationFactor) -= R2_DECR;
 			}
 			if((*pfCurrDistThresholdFactor)<R_LOWER+(*pfCurrMeanMinDist)*R_SCALE+R_OFFST) {
 				if((*pfCurrDistThresholdFactor)<R_UPPER)
@@ -297,10 +299,10 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
-			const int base_idx = oInputImg.cols*y + x;
-			const int rgbimg_idx = base_idx*3;
-			const int descimg_idx = base_idx*6;
-			const int flt32_idx = base_idx*4;
+			const int uchar_idx = oInputImg.cols*y + x;
+			const int rgbimg_idx = uchar_idx*3;
+			const int descimg_idx = uchar_idx*6;
+			const int flt32_idx = uchar_idx*4;
 			int nMinTotColorDist=nTotChannelSize;
 			int nMinTotDescDist=nTotDescSize;
 			float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+flt32_idx);
@@ -353,7 +355,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(N_SAMPLES_FOR_MEAN-1) + (((float)nMinTotColorDist/nTotChannelSize)+((float)nMinTotDescDist/nTotDescSize))/2)/N_SAMPLES_FOR_MEAN;
 			float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+flt32_idx));
 			if(nGoodSamplesCount<m_nRequiredBGSamples) {
-				oFGMask.data[base_idx] = UCHAR_MAX;
+				oFGMask.data[uchar_idx] = UCHAR_MAX;
 				*pfCurrLearningRate += T_INCR/((*pfCurrMeanMinDist)*T_SCALE+T_OFFST);
 				if((*pfCurrLearningRate)>T_UPPER)
 					*pfCurrLearningRate = T_UPPER;
@@ -397,13 +399,13 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 				if((*pfCurrLearningRate)<T_LOWER)
 					*pfCurrLearningRate = T_LOWER;
 			}
-			if((*pfCurrMeanMinDist)>R2_OFFST && (oFGMask.data[base_idx]!=m_oLastFGMask.data[base_idx])) {
+			if((*pfCurrMeanMinDist)>R2_OFFST && (oFGMask.data[uchar_idx]!=m_oLastFGMask.data[uchar_idx])) {
 				if((*pfCurrDistThresholdVariationFactor)<R2_UPPER)
 					(*pfCurrDistThresholdVariationFactor) += R2_INCR;
 			}
 			else {
 				if((*pfCurrDistThresholdVariationFactor)>R2_LOWER)
-					(*pfCurrDistThresholdVariationFactor) -= R2_DECR/((*pfCurrMeanMinDist)/R2_OFFST);
+					(*pfCurrDistThresholdVariationFactor) -= R2_DECR;
 			}
 			if((*pfCurrDistThresholdFactor)<R_LOWER+(*pfCurrMeanMinDist)*R_SCALE+R_OFFST) {
 				if((*pfCurrDistThresholdFactor)<R_UPPER)
@@ -431,8 +433,23 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 	std::cout << std::fixed << std::setprecision(5) << " r(" << dbg1 << ") = " << m_oDistThresholdFrame.at<float>(dbg1) << "  ,  r(" << dbg2 << ") = " << m_oDistThresholdFrame.at<float>(dbg2) << std::endl;
 	std::cout << std::fixed << std::setprecision(5) << "r2(" << dbg1 << ") = " << m_oDistThresholdVariationFrame.at<float>(dbg1) << "  , r2(" << dbg2 << ") = " << m_oDistThresholdVariationFrame.at<float>(dbg2) << std::endl;
 	cv::waitKey(1);*/
-	cv::medianBlur(oFGMask,oFGMask,7); // give user access to mblur params... @@@@@
 	oFGMask.copyTo(m_oLastFGMask);
+	//cv::imshow("pure seg",oFGMask);
+	cv::medianBlur(oFGMask,oFGMask,3);
+	//cv::imshow("median3",oFGMask);
+	oFGMask.copyTo(m_oFloodedFGMask);
+	cv::dilate(m_oFloodedFGMask,m_oFloodedFGMask,cv::Mat());
+	//cv::imshow("median3 + dilate3",m_oFloodedFGMask);
+	cv::erode(m_oFloodedFGMask,m_oFloodedFGMask,cv::Mat());
+	//cv::imshow("median3 + dilate3 + erode3",m_oFloodedFGMask);
+	cv::floodFill(m_oFloodedFGMask,cv::Point(0,0),255);
+	cv::bitwise_not(m_oFloodedFGMask,m_oFloodedFGMask);
+	//cv::imshow("median3 de3 fill region",m_oFloodedFGMask);
+	cv::bitwise_or(m_oFloodedFGMask,m_oLastFGMask,oFGMask);
+	//cv::imshow("median3 post-fill",oFGMask);
+	cv::medianBlur(oFGMask,oFGMask,9);
+	//cv::imshow("median3 post-fill, +median9 ",oFGMask);
+	//cv::waitKey(0);
 }
 
 cv::AlgorithmInfo* BackgroundSubtractorPBASLBSP::info() const {

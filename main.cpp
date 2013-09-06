@@ -15,6 +15,7 @@
 #define USE_VIBE_LBSP_BG_SUBTRACTOR		0
 #define USE_PBAS_LBSP_BG_SUBTRACTOR		1
 #define USE_VIBE_BG_SUBTRACTOR			0
+/////////////////////////////////////////
 #define USE_RELATIVE_LBSP_COMPARISONS	1
 /////////////////////////////////////////
 #define USE_CDNET_DATASET				1
