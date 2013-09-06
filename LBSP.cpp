@@ -80,7 +80,7 @@ static inline void lbsp_computeImpl(	const cv::Mat& oInputImg,
 			const int _x = (int)voKeyPoints[k].pt.x;
 			const int _y = (int)voKeyPoints[k].pt.y;
 			const uchar _ref = _refdata[_step_row*(_y)+_x];
-			unsigned short& _res = oDesc.at<unsigned short>(k);
+			ushort& _res = oDesc.at<ushort>(k);
 			#include "LBSP_16bits_dbcross_1ch.i"
 		}
 	}
@@ -92,7 +92,7 @@ static inline void lbsp_computeImpl(	const cv::Mat& oInputImg,
 			const int _x = (int)voKeyPoints[k].pt.x;
 			const int _y = (int)voKeyPoints[k].pt.y;
 			const uchar* _ref = _refdata+_step_row*(_y)+3*(_x);
-			unsigned short* _res = ((unsigned short*)(oDesc.data + oDesc.step.p[0]*k));
+			ushort* _res = ((ushort*)(oDesc.data + oDesc.step.p[0]*k));
 			#include "LBSP_16bits_dbcross_3ch.i"
 		}
 	}
@@ -118,7 +118,7 @@ static inline void lbsp_computeImpl(	const cv::Mat& oInputImg,
 			const int _x = (int)voKeyPoints[k].pt.x;
 			const int _y = (int)voKeyPoints[k].pt.y;
 			const uchar _ref = _refdata[_step_row*(_y)+_x];
-			unsigned short& _res = oDesc.at<unsigned short>(k);
+			ushort& _res = oDesc.at<ushort>(k);
 			const uchar _t = (uchar)(_ref*fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 			#include "LBSP_16bits_dbcross_1ch.i"
 		}
@@ -130,7 +130,7 @@ static inline void lbsp_computeImpl(	const cv::Mat& oInputImg,
 			const int _x = (int)voKeyPoints[k].pt.x;
 			const int _y = (int)voKeyPoints[k].pt.y;
 			const uchar* _ref = _refdata+_step_row*(_y)+3*(_x);
-			unsigned short* _res = ((unsigned short*)(oDesc.data + oDesc.step.p[0]*k));
+			ushort* _res = ((ushort*)(oDesc.data + oDesc.step.p[0]*k));
 			const uchar _t[3] = {(uchar)(_ref[0]*fThreshold),(uchar)(_ref[1]*fThreshold),(uchar)(_ref[2]*fThreshold)};
 			#include "LBSP_16bits_dbcross_3ch.i"
 		}
@@ -158,7 +158,7 @@ static inline void lbsp_computeImpl2(	const cv::Mat& oInputImg,
 			const int _x = (int)voKeyPoints[k].pt.x;
 			const int _y = (int)voKeyPoints[k].pt.y;
 			const uchar _ref = _refdata[_step_row*(_y)+_x];
-			unsigned short& _res = oDesc.at<unsigned short>(_y,_x);
+			ushort& _res = oDesc.at<ushort>(_y,_x);
 			#include "LBSP_16bits_dbcross_1ch.i"
 		}
 	}
@@ -170,7 +170,7 @@ static inline void lbsp_computeImpl2(	const cv::Mat& oInputImg,
 			const int _x = (int)voKeyPoints[k].pt.x;
 			const int _y = (int)voKeyPoints[k].pt.y;
 			const uchar* _ref = _refdata+_step_row*(_y)+3*(_x);
-			unsigned short* _res = ((unsigned short*)(oDesc.data + oDesc.step.p[0]*_y + oDesc.step.p[1]*_x));
+			ushort* _res = ((ushort*)(oDesc.data + oDesc.step.p[0]*_y + oDesc.step.p[1]*_x));
 			#include "LBSP_16bits_dbcross_3ch.i"
 		}
 	}
@@ -196,7 +196,7 @@ static inline void lbsp_computeImpl2(	const cv::Mat& oInputImg,
 			const int _x = (int)voKeyPoints[k].pt.x;
 			const int _y = (int)voKeyPoints[k].pt.y;
 			const uchar _ref = _refdata[_step_row*(_y)+_x];
-			unsigned short& _res = oDesc.at<unsigned short>(_y,_x);
+			ushort& _res = oDesc.at<ushort>(_y,_x);
 			const uchar _t = (uchar)(_ref*fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 			#include "LBSP_16bits_dbcross_1ch.i"
 		}
@@ -208,7 +208,7 @@ static inline void lbsp_computeImpl2(	const cv::Mat& oInputImg,
 			const int _x = (int)voKeyPoints[k].pt.x;
 			const int _y = (int)voKeyPoints[k].pt.y;
 			const uchar* _ref = _refdata+_step_row*(_y)+3*(_x);
-			unsigned short* _res = ((unsigned short*)(oDesc.data + oDesc.step.p[0]*_y + oDesc.step.p[1]*_x));
+			ushort* _res = ((ushort*)(oDesc.data + oDesc.step.p[0]*_y + oDesc.step.p[1]*_x));
 			const uchar _t[3] = {(uchar)(_ref[0]*fThreshold),(uchar)(_ref[1]*fThreshold),(uchar)(_ref[2]*fThreshold)};
 			#include "LBSP_16bits_dbcross_3ch.i"
 		}
@@ -271,8 +271,8 @@ void LBSP::reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoi
 		oOutput.create(oSize,CV_16UC3);
 		oOutput = cv::Scalar_<ushort>(0,0,0);
 		for(int k=0; k<nKeyPoints; ++k) {
-			unsigned short* output_ptr = (unsigned short*)(oOutput.data + oOutput.step.p[0]*(int)voKeypoints[k].pt.y);
-			const unsigned short* desc_ptr = (unsigned short*)(oDescriptors.data + oDescriptors.step.p[0]*k);
+			ushort* output_ptr = (ushort*)(oOutput.data + oOutput.step.p[0]*(int)voKeypoints[k].pt.y);
+			const ushort* desc_ptr = (ushort*)(oDescriptors.data + oDescriptors.step.p[0]*k);
 			const int idx = 3*(int)voKeypoints[k].pt.x;
 			for(int n=0; n<3; ++n)
 				output_ptr[idx+n] = desc_ptr[n];
@@ -294,8 +294,8 @@ void LBSP::calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat
 		oOutput.create(oDesc1.size(),CV_8UC1);
 		for(int i=0; i<oDesc1.rows; ++i) {
 			const int idx = _step_row*i;
-			const unsigned short* desc1_ptr = (unsigned short*)(oDesc1.data+idx);
-			const unsigned short* desc2_ptr = (unsigned short*)(oDesc2.data+idx);
+			const ushort* desc1_ptr = (ushort*)(oDesc1.data+idx);
+			const ushort* desc2_ptr = (ushort*)(oDesc2.data+idx);
 			for(int j=0; j<oDesc1.cols; ++j)
 				oOutput.at<uchar>(i,j) = nScaleFactor*hdist_ushort_8bitLUT(desc1_ptr[j],desc2_ptr[j]);
 		}
@@ -304,8 +304,8 @@ void LBSP::calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat
 		oOutput.create(oDesc1.size(),CV_8UC3);
 		for(int i=0; i<oDesc1.rows; ++i) {
 			const int idx =  _step_row*i;
-			const unsigned short* desc1_ptr = (unsigned short*)(oDesc1.data+idx);
-			const unsigned short* desc2_ptr = (unsigned short*)(oDesc2.data+idx);
+			const ushort* desc1_ptr = (ushort*)(oDesc1.data+idx);
+			const ushort* desc2_ptr = (ushort*)(oDesc2.data+idx);
 			uchar* output_ptr = oOutput.data + oOutput.step.p[0]*i;
 			for(int j=0; j<oDesc1.cols; ++j) {
 				for(int n=0;n<3; ++n) {

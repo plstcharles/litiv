@@ -1,6 +1,8 @@
 #include "BackgroundSubtractorPBASLBSP.h"
 #include "BackgroundSubtractorViBeLBSP.h"
-#include "BackgroundSubtractorViBe.h"
+#include "BackgroundSubtractorViBe_1ch.h"
+#include "BackgroundSubtractorViBe_3ch.h"
+#include "BackgroundSubtractorPBAS.h"
 #include "DatasetUtils.h"
 
 /////////////////////////////////////////
@@ -13,8 +15,9 @@
 #define DISPLAY_BGSUB_DEBUG_OUTPUT		1
 /////////////////////////////////////////
 #define USE_VIBE_LBSP_BG_SUBTRACTOR		0
-#define USE_PBAS_LBSP_BG_SUBTRACTOR		1
+#define USE_PBAS_LBSP_BG_SUBTRACTOR		0
 #define USE_VIBE_BG_SUBTRACTOR			0
+#define USE_PBAS_BG_SUBTRACTOR			1
 /////////////////////////////////////////
 #define USE_RELATIVE_LBSP_COMPARISONS	1
 /////////////////////////////////////////
@@ -25,7 +28,7 @@
 #define DATASET_ROOT_DIR 				std::string("/shared/datasets/")
 ////////////////////////////////////////////////////////////////////////
 
-#if (USE_VIBE_LBSP_BG_SUBTRACTOR+USE_PBAS_LBSP_BG_SUBTRACTOR+USE_VIBE_BG_SUBTRACTOR)!=1
+#if (USE_VIBE_LBSP_BG_SUBTRACTOR+USE_PBAS_LBSP_BG_SUBTRACTOR+USE_VIBE_BG_SUBTRACTOR+USE_PBAS_BG_SUBTRACTOR)!=1
 #error "Must specify a single algorithm."
 #elif (USE_CDNET_DATASET+USE_WALLFLOWER_DATASET+USE_PETS2001_D3TC1_DATASET)!=1
 #error "Must specify a single dataset."
@@ -56,13 +59,13 @@ const int g_nResultIdxOffset = 0;
 #endif
 
 int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence);
-#if !USE_VIBE_BG_SUBTRACTOR
+#if !USE_VIBE_BG_SUBTRACTOR && !USE_PBAS_BG_SUBTRACTOR
 cv::Size g_oDisplayOutputSize(960,240);
 cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oBGDesc, const cv::Mat& oFGMask, std::vector<cv::KeyPoint> voKeyPoints, size_t nFrame);
-#else //USE_VIBE_BG_SUBTRACTOR
+#else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 cv::Size g_oDisplayOutputSize(800,240);
 cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, size_t nFrame);
-#endif //USE_VIBE_BG_SUBTRACTOR
+#endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 
 #if (WIN32 || __MINGW32__) && (!defined(_MSC_VER) || _MSC_VER <= 1600) // no c++11 support
 #define USE_WINDOWS_API
@@ -178,19 +181,30 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		CV_DbgAssert(pCurrCategory && pCurrSequence);
 		CV_DbgAssert(pCurrSequence->GetNbInputFrames()>1);
 		cv::Mat oFGMask, oInputImg = pCurrSequence->GetInputFrameFromIndex(0);
+		const int m_nInputChannels = oInputImg.channels();
 #if USE_VIBE_LBSP_BG_SUBTRACTOR
 		BackgroundSubtractorViBeLBSP
 #elif USE_PBAS_LBSP_BG_SUBTRACTOR
 		BackgroundSubtractorPBASLBSP
 #elif USE_VIBE_BG_SUBTRACTOR
-		BackgroundSubtractorViBe
-#endif //USE_VIBE_BG_SUBTRACTOR
-#if USE_RELATIVE_LBSP_COMPARISONS && !USE_VIBE_BG_SUBTRACTOR
+		BackgroundSubtractorViBe_1ch
+#elif USE_PBAS_BG_SUBTRACTOR
+		BackgroundSubtractorPBAS
+#endif //USE_PBAS_BG_SUBTRACTOR
+#if !(USE_VIBE_BG_SUBTRACTOR||USE_PBAS_BG_SUBTRACTOR)
+#if USE_RELATIVE_LBSP_COMPARISONS
 		oBGSubtr(LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD);
-#else //!(USE_RELATIVE_LBSP_COMPARISONS && !USE_VIBE_BG_SUBTRACTOR)
+#else //!USE_RELATIVE_LBSP_COMPARISONS
 		oBGSubtr;
-#endif //!(USE_RELATIVE_LBSP_COMPARISONS && !USE_VIBE_BG_SUBTRACTOR)
+#endif //!USE_RELATIVE_LBSP_COMPARISONS
 		oBGSubtr.initialize(oInputImg);
+#else
+		oBGSubtr[m_nInputChannels];
+		std::vector<cv::Mat> voInputImg;
+		cv::split(oInputImg,voInputImg);
+		for(int c=0; c<m_nInputChannels; ++c)
+			oBGSubtr[c].initialize(voInputImg[c]);
+#endif //(USE_VIBE_BG_SUBTRACTOR||USE_PBAS_BG_SUBTRACTOR))
 #if DISPLAY_BGSUB_DEBUG_OUTPUT
 		std::string sDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName;
 #endif //DISPLAY_ANALYSIS_DEBUG_RESULTS
@@ -204,19 +218,36 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 			oInputImg = pCurrSequence->GetInputFrameFromIndex(k);
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 			cv::Mat oLastBGImg;
-			oBGSubtr.getBackgroundImage(oLastBGImg);
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
+			oBGSubtr.getBackgroundImage(oLastBGImg);
 			cv::Mat oLastBGDescImg;
 			oBGSubtr.getBackgroundDescriptorsImage(oLastBGDescImg);
-#endif //USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
+#else //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
+			std::vector<cv::Mat> voLastBGImg(m_nInputChannels);
+			for(int c=0; c<m_nInputChannels; ++c)
+				oBGSubtr[c].getBackgroundImage(voLastBGImg[c]);
+			cv::merge(voLastBGImg,oLastBGImg);
+#endif //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if USE_VIBE_LBSP_BG_SUBTRACTOR
 			oBGSubtr(oInputImg, oFGMask, k<=100?1:BGSVIBELBSP_DEFAULT_LEARNING_RATE);
 #elif USE_PBAS_LBSP_BG_SUBTRACTOR
 			oBGSubtr(oInputImg, oFGMask, k<=100?1:BGSPBASLBSP_DEFAULT_LEARNING_RATE_OVERRIDE);
-#elif USE_VIBE_BG_SUBTRACTOR
-			oBGSubtr(oInputImg, oFGMask);
-#endif //!USE_VIBE_BG_SUBTRACTOR
+#elif USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
+			cv::split(oInputImg,voInputImg);
+			std::vector<cv::Mat> voFGMask(m_nInputChannels);
+			for(int c=0; c<m_nInputChannels; ++c) {
+#if USE_PBAS_BG_SUBTRACTOR
+				oBGSubtr[c](voInputImg[c], voFGMask[c], k<=100?1:BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE);
+#else //!USE_PBAS_BG_SUBTRACTOR
+				oBGSubtr[c](voInputImg[c], voFGMask[c], k<=100?1:BGSVIBE_DEFAULT_LEARNING_RATE);
+#endif //!USE_PBAS_BG_SUBTRACTOR
+				if(c==0)
+					oFGMask = voFGMask[0];
+				else
+					cv::bitwise_or(oFGMask,voFGMask[c],oFGMask);
+			}
+#endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
 			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oLastBGDescImg,oFGMask,oBGSubtr.getBGKeyPoints(),k);
