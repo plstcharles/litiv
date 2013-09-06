@@ -99,6 +99,8 @@ private:
 	cv::Mat m_oMeanMinDistFrame;
 	//! the last foreground mask returned by the method (used for blinking pixel detection)
 	cv::Mat m_oLastFGMask;
+	//! the 'flooded' foreground mask, using for filling holes in blobs
+	cv::Mat m_oFloodedFGMask;
 	//! absolute default update rate threshold (the default 'T(x)' value in the original PBAS paper)
 	const float m_fDefaultUpdateRate;
 	//! per-pixel update rate ('T(x)' in the original PBAS paper)
