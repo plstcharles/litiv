@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="lbsp" />
+		<Option pch_mode="2" />
+		<Option compiler="gcc" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin/Debug/lbsp" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Debug/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-g" />
+				</Compiler>
+			</Target>
+			<Target title="Release">
+				<Option output="bin/Release/lbsp" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj/Release/" />
+				<Option type="1" />
+				<Option compiler="gcc" />
+				<Compiler>
+					<Add option="-O2" />
+				</Compiler>
+				<Linker>
+					<Add option="-s" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="-std=c++0x" />
+			<Add option="-Wall" />
+			<Add option="-fexceptions" />
+			<Add directory="G:/opencv/build/include" />
+		</Compiler>
+		<Linker>
+			<Add library="opencv_core243.dll" />
+			<Add library="opencv_video243.dll" />
+			<Add library="opencv_features2d243.dll" />
+			<Add library="opencv_highgui243.dll" />
+			<Add library="opencv_imgproc243.dll" />
+			<Add library="opencv_objdetect243.dll" />
+			<Add library="opencv_contrib243.dll" />
+			<Add library="opencv_nonfree243.dll" />
+			<Add directory="G:/opencv/build/x86/mingw/lib" />
+		</Linker>
+		<Unit filename="BackgroundSubtractorPBASLBSP.cpp" />
+		<Unit filename="BackgroundSubtractorPBASLBSP.h" />
+		<Unit filename="BackgroundSubtractorViBe.cpp" />
+		<Unit filename="BackgroundSubtractorViBe.h" />
+		<Unit filename="BackgroundSubtractorViBeLBSP.cpp" />
+		<Unit filename="BackgroundSubtractorViBeLBSP.h" />
+		<Unit filename="DatasetUtils.cpp" />
+		<Unit filename="DatasetUtils.h" />
+		<Unit filename="DistanceUtils.h" />
+		<Unit filename="LBSP.cpp" />
+		<Unit filename="LBSP.h" />
+		<Unit filename="LBSP_16bits_dbcross_1ch_abs.i" />
+		<Unit filename="LBSP_16bits_dbcross_1ch_rel.i" />
+		<Unit filename="LBSP_16bits_dbcross_3ch_abs.i" />
+		<Unit filename="LBSP_16bits_dbcross_3ch_rel.i" />
+		<Unit filename="RandUtils.h" />
+		<Unit filename="main.cpp" />
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+			<lib_finder disable_auto="1" />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

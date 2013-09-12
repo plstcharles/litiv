@@ -11,7 +11,7 @@
 #define R_INCR  (1.0500f)
 #define R_DECR  (0.9500f)
 #define R_LOWER (0.6000f)
-#define R_UPPER (5.0000f)
+#define R_UPPER (99.0000f)
 #if BGSPBAS_USE_R2_ACCELERATION
 #define R2_OFFST (0.075f)
 #define R2_INCR  (0.005f)
@@ -19,7 +19,7 @@
 #define R2_LOWER (0.950f)
 #define R2_UPPER (1.050f)
 #endif //BGSPBAS_USE_R2_ACCELERATION
-#define T_OFFST (0.0001f)
+#define T_OFFST (1.0f/UCHAR_MAX)
 #define T_SCALE (1.0000f)
 #define T_DECR  (0.0500f)
 #define T_INCR  (1.0000f)
@@ -238,7 +238,7 @@ void BackgroundSubtractorPBAS::operator()(cv::InputArray _image, cv::OutputArray
 #if BGSPBAS_USE_GRADIENT_COMPLEMENT
 	m_fFormerMeanGradDist = std::max(((float)nFrameTotGradDist)/nFrameTotBadSamplesCount,20.0f);
 #endif //BGSPBAS_USE_GRADIENT_COMPLEMENT
-	if(curr_debug_id==0) {
+	/*if(curr_debug_id==0) {
 		cv::Point dbg1(60,40), dbg2(218,132);
 		cv::Mat oMeanMinDistFrameNormalized = m_oMeanMinDistFrame;
 		cv::circle(oMeanMinDistFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oMeanMinDistFrameNormalized,dbg2,5,cv::Scalar(1.0f));
@@ -259,7 +259,7 @@ void BackgroundSubtractorPBAS::operator()(cv::InputArray _image, cv::OutputArray
 		cv::imshow("t(x)",oUpdateRateFrameNormalized);
 		std::cout << std::fixed << std::setprecision(5) << " t(" << dbg1 << ") = " << m_oUpdateRateFrame.at<float>(dbg1) << "  ,  t(" << dbg2 << ") = " << m_oUpdateRateFrame.at<float>(dbg2) << std::endl;
 		cv::waitKey(1);
-	}
+	}*/
 #if BGSPBAS_USE_ADVANCED_MORPH_OPS || BGSPBAS_USE_R2_ACCELERATION
 	oFGMask.copyTo(m_oLastFGMask);
 #endif //BGSPBAS_USE_ADVANCED_MORPH_OPS || BGSPBAS_USE_R2_ACCELERATION

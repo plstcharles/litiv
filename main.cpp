@@ -1,9 +1,10 @@
+#include "PlatformUtils.h"
+#include "DatasetUtils.h"
 #include "BackgroundSubtractorPBASLBSP.h"
 #include "BackgroundSubtractorViBeLBSP.h"
 #include "BackgroundSubtractorViBe_1ch.h"
 #include "BackgroundSubtractorViBe_3ch.h"
 #include "BackgroundSubtractorPBAS.h"
-#include "DatasetUtils.h"
 
 /////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
@@ -19,14 +20,22 @@
 #define USE_VIBE_BG_SUBTRACTOR			0
 #define USE_PBAS_BG_SUBTRACTOR			1
 /////////////////////////////////////////
+#if (USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
 #define USE_RELATIVE_LBSP_COMPARISONS	1
+#endif //(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
 /////////////////////////////////////////
 #define USE_CDNET_DATASET				1
 #define USE_WALLFLOWER_DATASET			0
 #define USE_PETS2001_D3TC1_DATASET		0
-////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////
+#define DEFAULT_NB_THREADS				4
+/////////////////////////////////////////
+#define FORCE_STDOUT_FLUSH_FOR_ECLIPSE	0
+/////////////////////////////////////////////////////////////////////
 #define DATASET_ROOT_DIR 				std::string("/shared/datasets/")
-////////////////////////////////////////////////////////////////////////
+#define RESULTS_ROOT_DIR 				std::string("~/datasets/")
+#define RESULTS_OUTPUT_DIR_NAME			std::string("results_test")
+/////////////////////////////////////////////////////////////////////
 
 #if (USE_VIBE_LBSP_BG_SUBTRACTOR+USE_PBAS_LBSP_BG_SUBTRACTOR+USE_VIBE_BG_SUBTRACTOR+USE_PBAS_BG_SUBTRACTOR)!=1
 #error "Must specify a single algorithm."
@@ -34,24 +43,24 @@
 #error "Must specify a single dataset."
 #elif USE_CDNET_DATASET
 const std::string g_sDatasetName(CDNET_DB_NAME);
-const std::string g_sDatasetPath(DATASET_ROOT_DIR+"CDNet/dataset/");
-const std::string g_sResultsPath(DATASET_ROOT_DIR+"CDNet/results_test/");
+const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/CDNet/dataset/");
+const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet/"+RESULTS_OUTPUT_DIR_NAME);
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
 const char* g_asDatasetCategories[] = {"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"};
 const int g_nResultIdxOffset = 1;
 #elif USE_WALLFLOWER_DATASET
 const std::string g_sDatasetName(WALLFLOWER_DB_NAME);
-const std::string g_sDatasetPath(DATASET_ROOT_DIR+"Wallflower/dataset/");
-const std::string g_sResultsPath(DATASET_ROOT_DIR+"Wallflower/results_test/");
+const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/Wallflower/dataset/");
+const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/Wallflower/"+RESULTS_OUTPUT_DIR_NAME);
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
 const char* g_asDatasetCategories[] = {"global"};
 const int g_nResultIdxOffset = 0;
 #elif USE_PETS2001_D3TC1_DATASET
 const std::string g_sDatasetName(PETS2001_D3TC1_DB_NAME);
-const std::string g_sDatasetPath(DATASET_ROOT_DIR+"PETS2001/DATASET3/");
-const std::string g_sResultsPath(DATASET_ROOT_DIR+"PETS2001/DATASET3/results_test/");
+const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/PETS2001/DATASET3/");
+const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/PETS2001/DATASET3/"+RESULTS_OUTPUT_DIR_NAME);
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
 const char* g_asDatasetCategories[] = {"TESTING"};
@@ -67,32 +76,38 @@ cv::Size g_oDisplayOutputSize(800,240);
 cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, size_t nFrame);
 #endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 
-#if (WIN32 || __MINGW32__) && (!defined(_MSC_VER) || _MSC_VER <= 1600) // no c++11 support
-#define USE_WINDOWS_API
+#if PLATFORM_SUPPORTS_CPP11
+#include <thread>
+#include <chrono>
+#include <atomic>
+const size_t g_nMaxThreads = /*std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():*/DEFAULT_NB_THREADS;
+std::atomic_size_t g_nActiveThreads(0);
+#if WRITE_BGSUB_IMG_OUTPUT
+const std::vector<int> g_vnResultsComprParams = {CV_IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
+#endif //WRITE_BGSUB_IMG_OUTPUT
+#elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
 #include <windows.h>
 #include <process.h>
-const int g_anResultsComprParams[2] = {CV_IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
-const std::vector<int> g_vnResultsComprParams(g_anResultsComprParams,g_anResultsComprParams+2);
-const size_t g_nMaxThreads = 4;
+const size_t g_nMaxThreads = DEFAULT_NB_THREADS;
 HANDLE g_hThreadEvent[g_nMaxThreads] = {0};
 HANDLE g_hThreads[g_nMaxThreads] = {0};
 void* g_apThreadDataStruct[g_nMaxThreads][2] = {0};
 DWORD WINAPI AnalyzeSequenceEntryPoint(LPVOID lpParam) {
 	return AnalyzeSequence((int)(lpParam),(CategoryInfo*)g_apThreadDataStruct[(int)(lpParam)][0],(SequenceInfo*)g_apThreadDataStruct[(int)(lpParam)][1]);
 }
-#else //!((WIN32 || __MINGW32__) && (!defined(_MSC_VER) || _MSC_VER <= 1600))
-#include <thread>
-#include <chrono>
-#include <atomic>
-const std::vector<int> g_vnResultsComprParams = {CV_IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
-const size_t g_nMaxThreads = (std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():1);
-std::atomic_size_t g_nActiveThreads(0);
-#endif //!((WIN32 || __MINGW32__) && (!defined(_MSC_VER) || _MSC_VER <= 1600))
+#if WRITE_BGSUB_IMG_OUTPUT
+const int g_anResultsComprParams[2] = {CV_IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
+const std::vector<int> g_vnResultsComprParams(g_anResultsComprParams,g_anResultsComprParams+2);
+#endif //WRITE_BGSUB_IMG_OUTPUT
+#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+#error "Missing implementation for threads/mutexes/atomic variables on this platform."
+#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 
-///////////////////////////////////
 int main( int argc, char** argv ) {
 	srand(0); // for now, assures that two consecutive runs on the same data return the same results
+#if FORCE_STDOUT_FLUSH_FOR_ECLIPSE
 	setvbuf(stdout, NULL, _IONBF, 0); // fixes output flush problems when using the eclipse built-in console
+#endif //FORCE_STDOUT_FLUSH_FOR_ECLIPSE
 	std::vector<CategoryInfo*> vpCategories;
 	std::cout << "Parsing dataset '"<< g_sDatasetName << "'..." << std::endl;
 	try {
@@ -115,7 +130,7 @@ int main( int argc, char** argv ) {
 		// since the algorithm isn't implemented to be parallelised yet, we parallelise the sequence treatment instead
 		std::cout << "Running LBSP background subtraction with " << ((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads) << " thread(s)..." << std::endl;
 		size_t nSeqProcessed = 1;
-#ifndef USE_WINDOWS_API
+#if PLATFORM_SUPPORTS_CPP11
 		for(auto& pCurrCategory : vpCategories) {
 			for(auto& pCurrSequence : pCurrCategory->m_vpSequences) {
 				while(g_nActiveThreads>=g_nMaxThreads)
@@ -128,7 +143,7 @@ int main( int argc, char** argv ) {
 		}
 		while(g_nActiveThreads>0)
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-#else //USE_WINDOWS_API
+#elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
 		for(size_t n=0; n<g_nMaxThreads; ++n)
 			g_hThreadEvent[n] = CreateEvent(NULL,FALSE,TRUE,NULL);
 		for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory) {
@@ -146,7 +161,9 @@ int main( int argc, char** argv ) {
 			CloseHandle(g_hThreadEvent[n]);
 			CloseHandle(g_hThreads[n]);
 		}
-#endif //USE_WINDOWS_API
+#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+#error "Missing implementation for threads/mutexes/atomic variables on this platform."
+#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #if WRITE_BGSUB_METRICS_ANALYSIS
 		std::cout << "Summing and writing metrics results..." << std::endl;
 		for(size_t c=0; c<vpCategories.size(); ++c) {
@@ -198,7 +215,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		oBGSubtr;
 #endif //!USE_RELATIVE_LBSP_COMPARISONS
 		oBGSubtr.initialize(oInputImg);
-#else
+#else //(USE_VIBE_BG_SUBTRACTOR||USE_PBAS_BG_SUBTRACTOR))
 		oBGSubtr[m_nInputChannels];
 		std::vector<cv::Mat> voInputImg;
 		cv::split(oInputImg,voInputImg);
@@ -281,11 +298,13 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 	catch(cv::Exception& e) {std::cout << e.what() << std::endl;}
 	catch(std::runtime_error& e) {std::cout << e.what() << std::endl;}
 	catch(...) {std::cout << "Caught unknown exception." << std::endl;}
-#ifndef USE_WINDOWS_API
+#if PLATFORM_SUPPORTS_CPP11
 	g_nActiveThreads--;
-#else //USE_WINDOWS_API
+#elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
 	SetEvent(g_hThreadEvent[nThreadIdx]);
-#endif //USE_WINDOWS_API
+#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+#error "Missing implementation for threads/mutexes/atomic variables on this platform."
+#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 	return 0;
 }
 

@@ -44,7 +44,6 @@ void BackgroundSubtractorViBe_3ch::initialize(const cv::Mat& oInitImg) {
 }
 
 void BackgroundSubtractorViBe_3ch::operator()(cv::InputArray _image, cv::OutputArray _fgmask, double learningRate) {
-#if 1
 	CV_DbgAssert(m_bInitialized);
 	CV_DbgAssert(learningRate>0);
 	cv::Mat oInputImg = _image.getMat();
@@ -94,65 +93,6 @@ void BackgroundSubtractorViBe_3ch::operator()(cv::InputArray _image, cv::OutputA
 			}
 		}
 	}
-#else
-	int width = m_oImgSize.width;
-	int height = m_oImgSize.height;
-	cv::Mat image =_image.getMat();
-	_fgmask.create(m_oImgSize,CV_8UC1);
-	cv::Mat segmentationMap = _fgmask.getMat();
-
-	int nbSamples = 20;                   		// number of samples per pixel
-	CV_Assert(nbSamples==(int)m_voBGImg.size());
-	int reqMatches = 2;                   		// #_min
-	int radius = 20;                      		// R
-	int subsamplingFactor = 16;           		// amount of random subsampling
-	std::vector<cv::Mat>& samples = m_voBGImg;	// background model
-	try {
-		for (int x = 0; x < width; x++){
-			for (int y = 0; y < height; y++){
-				// comparison with the model
-				int count = 0, index = 0, distance = 0;
-				while ((count < reqMatches) && (index < nbSamples)){
-					const cv::Vec3b& px_in = image.at<cv::Vec3b>(y,x);
-					const cv::Vec3b& px_bg = samples[index].at<cv::Vec3b>(y,x);
-					distance = cv::norm(px_in, px_bg);
-					if (distance < radius)
-						count++;
-					index++;
-				}
-				// pixel classification according to reqMatches
-				if (count >= reqMatches){ // the pixel belongs to the background
-					// stores the result in the segmentation map
-					segmentationMap.at<uchar>(y,x) = 0;
-					// gets a random number between 0 and subsamplingFactor-1
-					int randomNumber = (rand()%subsamplingFactor);
-					// update of the current pixel model
-					if (randomNumber == 0){ // random subsampling
-						// other random values are ignored
-						randomNumber = (rand()%nbSamples);
-						samples[randomNumber].at<cv::Vec3b>(y,x) = image.at<cv::Vec3b>(y,x);
-					}
-					// update of a neighboring pixel model
-					randomNumber = (rand()%subsamplingFactor);
-					if (randomNumber == 0){ // random subsampling
-						// chooses a neighboring pixel randomly
-						int neighborX, neighborY;
-						getRandNeighborPosition(neighborX,neighborY,x,y,0,m_oImgSize);
-						// chooses the value to be replaced randomly
-						randomNumber = (rand()%nbSamples);
-						samples[randomNumber].at<cv::Vec3b>(neighborY,neighborX) = image.at<cv::Vec3b>(y,x);
-					}
-				}
-				else // the pixel belongs to the foreground
-					// stores the result in the segmentation map
-					segmentationMap.at<uchar>(y,x) = 255;
-			}
-		}
-	}
-	catch(cv::Exception& e) {
-		int dummy=1;
-	}
-#endif
 }
 
 cv::AlgorithmInfo* BackgroundSubtractorViBe_3ch::info() const {

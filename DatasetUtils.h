@@ -1,27 +1,18 @@
 #pragma once
 
-#include <string>
-#include <vector>
 #include <stdexcept>
 #include <algorithm>
-#include <stdio.h>
-#include <stdlib.h>
 #include <iostream>
 #include <fstream>
 #include <iomanip>
 #include <ctime>
 #include <unordered_map>
+#include <queue>
+
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-#if WIN32 && !__MINGW32__
-#include <windows.h>
-#include <stdint.h>
-#define sprintf sprintf_s
-#else
-#include <dirent.h>
-#include <sys/stat.h>
-#endif
+#include "PlatformUtils.h"
 
 #define CDNET_DB_NAME 			"CDNet"
 #define WALLFLOWER_DB_NAME 		"WALLFLOWER"
@@ -35,6 +26,7 @@
 #define VAL_SHADOW		50
 
 #define USE_BROKEN_FNR_FUNCTION 1
+#define MAX_NB_FRAMES_PRECACHED 20
 
 class SequenceInfo;
 
@@ -61,10 +53,15 @@ public:
 	const std::string m_sDBName;
 	uint64_t nTP, nTN, nFP, nFN, nSE;
 private:
+	void PrecacheInputFramesFromIndex(size_t n);
+	void PrecacheGTFramesFromIndex(size_t n);
 	std::vector<std::string> m_vsInputFramePaths;
 	std::vector<std::string> m_vsGTFramePaths;
+	std::queue<cv::Mat> m_qoInputFrameCache;
+	std::queue<cv::Mat> m_qoGTFrameCache;
 	cv::VideoCapture m_voVideoReader;
-	size_t m_nNextFrame;
+	size_t m_nNextExpectedInputFrameIdx;
+	size_t m_nNextExpectedGTFrameIdx;
 	size_t m_nTotalNbFrames;
 	cv::Mat m_oROI;
 	cv::Size m_oSize;
@@ -178,113 +175,6 @@ static inline void WriteMetrics(const std::string sResultsFileName, const std::v
 	oMetricsOutput << "---------------------------------------------------------------------------------------" << std::endl;
 	oMetricsOutput << "overall    " << averaged.dRecall << " " << averaged.dSpecficity << " " << averaged.dFPR << " " << averaged.dFNR << " " << averaged.dPBC << " " << averaged.dPrecision << " " << averaged.dFMeasure << std::endl;
 	oMetricsOutput.close();
-}
-
-static inline void GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths) {
-	vsFilePaths.clear();
-#if WIN32 && !__MINGW32__
-	WIN32_FIND_DATA ffd;
-	std::wstring dir(sDirPath.begin(),sDirPath.end());
-	dir += L"/*";
-	BOOL ret = TRUE;
-	HANDLE h;
-	h = FindFirstFile(dir.c_str(),&ffd);
-	if(h!=INVALID_HANDLE_VALUE) {
-		size_t nFiles=0;
-		while(ret) {
-			nFiles++;
-			ret = FindNextFile(h, &ffd);
-		}
-		if(nFiles>0) {
-			vsFilePaths.reserve(nFiles);
-			h = FindFirstFile(dir.c_str(),&ffd);
-			assert(h!=INVALID_HANDLE_VALUE);
-			ret = TRUE;
-			while(ret) {
-				if(!(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
-					std::wstring file(ffd.cFileName);
-					vsFilePaths.push_back(sDirPath + "/" + std::string(file.begin(),file.end()));
-				}
-				ret = FindNextFile(h, &ffd);
-			}
-		}
-	}
-#else
-	DIR *dp;
-	struct dirent *dirp;
-	if((dp  = opendir(sDirPath.c_str()))!=NULL) {
-		size_t nFiles=0;
-		while((dirp = readdir(dp)) != NULL)
-			nFiles++;
-		if(nFiles>0) {
-			vsFilePaths.reserve(nFiles);
-			rewinddir(dp);
-			while((dirp = readdir(dp)) != NULL) {
-				struct stat sb;
-				std::string sFullPath = sDirPath + "/" + dirp->d_name;
-				int ret = stat(sFullPath.c_str(),&sb);
-				if(!ret && S_ISREG(sb.st_mode))
-					vsFilePaths.push_back(sFullPath);
-			}
-		}
-		closedir(dp);
-	}
-#endif
-}
-
-static inline void GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths) {
-	vsSubDirPaths.clear();
-#if WIN32 && !__MINGW32__
-	WIN32_FIND_DATA ffd;
-	std::wstring dir(sDirPath.begin(),sDirPath.end());
-	dir += L"/*";
-	BOOL ret = TRUE;
-	HANDLE h;
-	h = FindFirstFile(dir.c_str(),&ffd);
-	if(h!=INVALID_HANDLE_VALUE) {
-		size_t nFiles=0;
-		while(ret) {
-			nFiles++;
-			ret = FindNextFile(h, &ffd);
-		}
-		if(nFiles>0) {
-			vsSubDirPaths.reserve(nFiles);
-			h = FindFirstFile(dir.c_str(),&ffd);
-			assert(h!=INVALID_HANDLE_VALUE);
-			ret = TRUE;
-			while(ret) {
-				if(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-					std::wstring subdir(ffd.cFileName);
-					if(subdir!=L"." && subdir!=L"..")
-						vsSubDirPaths.push_back(sDirPath + "/" + std::string(subdir.begin(),subdir.end()));
-				}
-				ret = FindNextFile(h, &ffd);
-			}
-		}
-	}
-#else
-	DIR *dp;
-	struct dirent *dirp;
-	if((dp  = opendir(sDirPath.c_str()))!=NULL) {
-		size_t nFiles=0;
-		while((dirp = readdir(dp)) != NULL)
-			nFiles++;
-		if(nFiles>0) {
-			vsSubDirPaths.reserve(nFiles);
-			rewinddir(dp);
-			while((dirp = readdir(dp)) != NULL) {
-				struct stat sb;
-				std::string sFullPath = sDirPath + "/" + dirp->d_name;
-				int ret = stat(sFullPath.c_str(),&sb);
-				if(!ret && S_ISDIR(sb.st_mode)
-						&& strcmp(dirp->d_name,".")
-						&& strcmp(dirp->d_name,".."))
-					vsSubDirPaths.push_back(sFullPath);
-			}
-		}
-		closedir(dp);
-	}
-#endif
 }
 
 static inline void CalcMetricsFromResult(const cv::Mat& oInputFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI, uint64_t& nTP, uint64_t& nTN, uint64_t& nFP, uint64_t& nFN, uint64_t& nSE) {
