@@ -42,6 +42,9 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 		,nFP(0)
 		,nFN(0)
 		,nSE(0)
+		,m_nNextExpectedInputFrameIdx(0)
+		,m_nNextExpectedGTFrameIdx(0)
+		,m_nTotalNbFrames(0)
 		,m_pParent(parent)
 		,m_nIMReadInputFlags(forceGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR) {
 	if(m_sDBName==CDNET_DB_NAME) {
@@ -116,7 +119,7 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 			throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess valid GT file(s).");
 		m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(VAL_POSITIVE));
 		m_oSize = oTempImg.size();
-		m_nNextFrame = 0;
+		m_nNextExpectedInputFrameIdx = 0;
 		m_nTotalNbFrames = (size_t)m_voVideoReader.get(CV_CAP_PROP_FRAME_COUNT);
 	}
 	/*else if(m_sDBName==...) {
@@ -154,10 +157,10 @@ cv::Mat SequenceInfo::GetInputFrameFromIndex(size_t idx) {
 	else if(m_sDBName==PETS2001_D3TC1_DB_NAME) {
 		CV_DbgAssert(idx>=0 && idx<m_voVideoReader.get(CV_CAP_PROP_FRAME_COUNT));
 		cv::Mat oFrame;
-		if(m_nNextFrame!=idx)
+		if(m_nNextExpectedInputFrameIdx!=idx)
 			m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,idx);
 		m_voVideoReader >> oFrame;
-		++m_nNextFrame;
+		++m_nNextExpectedInputFrameIdx;
 		return oFrame;
 	}
 	/*else if(m_sDBName==...) {
