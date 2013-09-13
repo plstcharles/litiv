@@ -151,8 +151,6 @@ void BackgroundSubtractorPBAS::operator()(cv::InputArray _image, cv::OutputArray
 				int nColorDist = absdiff_uchar(oInputImg.data[uchar_idx],m_voBGImg[nSampleIdx].data[uchar_idx]);
 				int nGradDist = absdiff_uchar(oBlurredInputImg_AbsGrad.data[uchar_idx],m_voBGGrad[nSampleIdx].data[uchar_idx]);
 				int nTotDist = std::min(nColorDist+(int)((GRAD_WEIGHT_ALPHA/m_fFormerMeanGradDist)*nGradDist),nChannelSize);
-				//if(nTotDist<0)
-				//	std::cout << "omg nTotDist=" << nTotDist << ", " << nColorDist << " " << m_fFormerMeanGradDist << " " << nGradDist << std::endl;
 #else //!BGSPBAS_USE_GRADIENT_COMPLEMENT
 				int nTotDist = absdiff_uchar(oInputImg.data[uchar_idx],m_voBGImg[nSampleIdx].data[uchar_idx]);
 #endif //!BGSPBAS_USE_GRADIENT_COMPLEMENT
@@ -171,8 +169,6 @@ void BackgroundSubtractorPBAS::operator()(cv::InputArray _image, cv::OutputArray
 			}
 			float* pfCurrMeanMinDist = ((float*)(m_oMeanMinDistFrame.data+flt32_idx));
 			*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(N_SAMPLES_FOR_MEAN-1) + ((float)nMinDist/nChannelSize))/N_SAMPLES_FOR_MEAN;
-			//if((*pfCurrMeanMinDist)<0)
-			//	std::cout << "omg *pfCurrMeanMinDist=" << *pfCurrMeanMinDist << ", " << nMinDist << std::endl;
 			float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+flt32_idx));
 			if(nGoodSamplesCount<m_nRequiredBGSamples) {
 				oFGMask.data[uchar_idx] = UCHAR_MAX;

@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <ctime>
 #include <unordered_map>
-#include <queue>
+#include <deque>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
@@ -26,7 +26,13 @@
 #define VAL_SHADOW		50
 
 #define USE_BROKEN_FNR_FUNCTION 1
-#define MAX_NB_FRAMES_PRECACHED 20
+#define USE_PRECACHED_IO 1
+#if USE_PRECACHED_IO
+#define MAX_NB_PRECACHED_FRAMES 100
+#define PRECACHE_REFILL_THRESHOLD (MAX_NB_PRECACHED_FRAMES/4)
+#define REQUEST_TIMEOUT_MS 5
+#define QUERY_TIMEOUT_MS 10
+#endif //USE_PRECACHED_IO
 
 class SequenceInfo;
 
@@ -38,13 +44,22 @@ public:
 	const std::string m_sDBName;
 	std::vector<SequenceInfo*> m_vpSequences;
 	uint64_t nTP, nTN, nFP, nFN, nSE;
+private:
+#if PLATFORM_SUPPORTS_CPP11
+	CategoryInfo& operator=(const CategoryInfo&) = delete;
+	CategoryInfo(const CategoryInfo&) = delete;
+#else //!PLATFORM_SUPPORTS_CPP11
+	CategoryInfo& operator=(const CategoryInfo&);
+	CategoryInfo(const CategoryInfo&);
+#endif //!PLATFORM_SUPPORTS_CPP11
 };
 
 class SequenceInfo {
 public:
 	SequenceInfo(const std::string& name, const std::string& dir, const std::string& dbname, CategoryInfo* parent, bool forceGrayscale=false);
-	cv::Mat GetInputFrameFromIndex(size_t idx);
-	cv::Mat GetGTFrameFromIndex(size_t idx);
+	~SequenceInfo();
+	const cv::Mat& GetInputFrameFromIndex(size_t idx);
+	const cv::Mat& GetGTFrameFromIndex(size_t idx);
 	size_t GetNbInputFrames() const;
 	size_t GetNbGTFrames() const;
 	cv::Size GetFrameSize() const;
@@ -53,21 +68,49 @@ public:
 	const std::string m_sDBName;
 	uint64_t nTP, nTN, nFP, nFN, nSE;
 private:
-	void PrecacheInputFramesFromIndex(size_t n);
-	void PrecacheGTFramesFromIndex(size_t n);
+#if USE_PRECACHED_IO
+	void PrecacheInputFrames();
+	void PrecacheGTFrames();
+#if PLATFORM_SUPPORTS_CPP11
+	std::thread m_hInputFramePrecacher,m_hGTFramePrecacher;
+	std::mutex m_oInputFrameSyncMutex,m_oGTFrameSyncMutex;
+	std::mutex m_oInputFrameReqMutex,m_oGTFrameReqMutex;
+	std::condition_variable m_oInputFrameReqCondVar,m_oGTFrameReqCondVar;
+	std::condition_variable m_oInputFrameSyncCondVar,m_oGTFrameSyncCondVar;
+#elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
+	HANDLE m_oSemaphore; @@@@@@
+#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+#error "Missing implementation for semaphores on this platform."
+#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+	bool m_bIsExiting;
+	size_t m_nRequestInputFrameIndex,m_nRequestGTFrameIndex;
+	std::deque<cv::Mat> m_qoInputFrameCache,m_qoGTFrameCache;
+	size_t m_nNextExpectedInputFrameIdx,m_nNextExpectedGTFrameIdx;
+	size_t m_nNextPrecachedInputFrameIdx,m_nNextPrecachedGTFrameIdx;
+	cv::Mat m_oReqInputFrame,m_oReqGTFrame;
+#else //!USE_PRECACHED_IO
+	size_t m_nLastReqInputFrameIndex,m_nLastReqGTFrameIndex;
+	cv::Mat m_oLastReqInputFrame,m_oLastReqGTFrame;
+#endif //!USE_PRECACHED_IO
 	std::vector<std::string> m_vsInputFramePaths;
 	std::vector<std::string> m_vsGTFramePaths;
-	std::queue<cv::Mat> m_qoInputFrameCache;
-	std::queue<cv::Mat> m_qoGTFrameCache;
 	cv::VideoCapture m_voVideoReader;
-	size_t m_nNextExpectedInputFrameIdx;
-	size_t m_nNextExpectedGTFrameIdx;
+	size_t m_nNextExpectedVideoReaderFrameIdx;
 	size_t m_nTotalNbFrames;
 	cv::Mat m_oROI;
 	cv::Size m_oSize;
 	CategoryInfo* m_pParent;
 	const int m_nIMReadInputFlags;
 	std::unordered_map<size_t,size_t> m_mTestGTIndexes;
+	cv::Mat GetInputFrameFromIndex_Internal(size_t idx);
+	cv::Mat GetGTFrameFromIndex_Internal(size_t idx);
+#if PLATFORM_SUPPORTS_CPP11
+	SequenceInfo& operator=(const SequenceInfo&) = delete;
+	SequenceInfo(const CategoryInfo&) = delete;
+#else //!PLATFORM_SUPPORTS_CPP11
+	SequenceInfo& operator=(const SequenceInfo&);
+	SequenceInfo(const SequenceInfo&);
+#endif //!PLATFORM_SUPPORTS_CPP11
 };
 
 class AdvancedMetrics {

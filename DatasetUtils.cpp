@@ -42,8 +42,17 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 		,nFP(0)
 		,nFN(0)
 		,nSE(0)
+#if USE_PRECACHED_IO
+		,m_bIsExiting(false)
 		,m_nNextExpectedInputFrameIdx(0)
 		,m_nNextExpectedGTFrameIdx(0)
+		,m_nNextPrecachedInputFrameIdx(0)
+		,m_nNextPrecachedGTFrameIdx(0)
+#else //!USE_PRECACHED_IO
+		,m_nLastReqInputFrameIndex(UINT_MAX)
+		,m_nLastReqGTFrameIndex(UINT_MAX)
+#endif //!USE_PRECACHED_IO
+		,m_nNextExpectedVideoReaderFrameIdx(0)
 		,m_nTotalNbFrames(0)
 		,m_pParent(parent)
 		,m_nIMReadInputFlags(forceGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR) {
@@ -119,7 +128,7 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 			throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess valid GT file(s).");
 		m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(VAL_POSITIVE));
 		m_oSize = oTempImg.size();
-		m_nNextExpectedInputFrameIdx = 0;
+		m_nNextExpectedVideoReaderFrameIdx = 0;
 		m_nTotalNbFrames = (size_t)m_voVideoReader.get(CV_CAP_PROP_FRAME_COUNT);
 	}
 	/*else if(m_sDBName==...) {
@@ -127,6 +136,31 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 	}*/
 	else
 		throw std::runtime_error(std::string("Unknown database name, cannot use any known parsing strategy."));
+#if USE_PRECACHED_IO
+#if PLATFORM_SUPPORTS_CPP11
+	m_hInputFramePrecacher = std::thread(&SequenceInfo::PrecacheInputFrames,this);
+	m_hGTFramePrecacher = std::thread(&SequenceInfo::PrecacheGTFrames,this);
+#elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
+	@@@@@@@
+#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+#error "Missing implementation for precached io support on this platform."
+#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+#endif //USE_PRECACHED_IO
+}
+
+SequenceInfo::~SequenceInfo() {
+#if USE_PRECACHED_IO
+	m_bIsExiting = true;
+#if PLATFORM_SUPPORTS_CPP11
+	m_hInputFramePrecacher.join();
+	m_hGTFramePrecacher.join();
+#elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
+	CloseHandle(...);
+	@@@@@@@@@@
+#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+#error "Missing implementation for precached io support on this platform."
+#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+#endif //USE_PRECACHED_IO
 }
 
 size_t SequenceInfo::GetNbInputFrames() const {
@@ -145,48 +179,230 @@ cv::Mat SequenceInfo::GetSequenceROI() const {
 	return m_oROI;
 }
 
-cv::Mat SequenceInfo::GetInputFrameFromIndex(size_t idx) {
-	if(m_sDBName==CDNET_DB_NAME) {
-		CV_DbgAssert(idx>=0 && idx<m_vsInputFramePaths.size());
-		return cv::imread(m_vsInputFramePaths[idx],m_nIMReadInputFlags);
-	}
-	else if(m_sDBName==WALLFLOWER_DB_NAME) {
-		CV_DbgAssert(idx>=0 && idx<m_vsInputFramePaths.size());
-		return cv::imread(m_vsInputFramePaths[idx],m_nIMReadInputFlags);
-	}
+cv::Mat SequenceInfo::GetInputFrameFromIndex_Internal(size_t idx) {
+	CV_DbgAssert(idx>=0 && idx<m_nTotalNbFrames);
+	cv::Mat oFrame;
+	if(m_sDBName==CDNET_DB_NAME || m_sDBName==WALLFLOWER_DB_NAME)
+		oFrame = cv::imread(m_vsInputFramePaths[idx],m_nIMReadInputFlags);
 	else if(m_sDBName==PETS2001_D3TC1_DB_NAME) {
-		CV_DbgAssert(idx>=0 && idx<m_voVideoReader.get(CV_CAP_PROP_FRAME_COUNT));
-		cv::Mat oFrame;
-		if(m_nNextExpectedInputFrameIdx!=idx)
+		if(m_nNextExpectedVideoReaderFrameIdx!=idx)
 			m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,idx);
 		m_voVideoReader >> oFrame;
-		++m_nNextExpectedInputFrameIdx;
-		return oFrame;
+		++m_nNextExpectedVideoReaderFrameIdx;
 	}
 	/*else if(m_sDBName==...) {
 		// ...
 	}*/
-	else
-		throw std::runtime_error(std::string("Unknown database name."));
+	CV_DbgAssert(oFrame.size()==m_oSize);
+	return oFrame;
 }
 
-cv::Mat SequenceInfo::GetGTFrameFromIndex(size_t idx) {
+cv::Mat SequenceInfo::GetGTFrameFromIndex_Internal(size_t idx) {
 	CV_DbgAssert(idx>=0 && idx<m_nTotalNbFrames);
+	cv::Mat oFrame;
 	if(m_sDBName==CDNET_DB_NAME)
-		return cv::imread(m_vsGTFramePaths[idx],cv::IMREAD_GRAYSCALE);
+		oFrame = cv::imread(m_vsGTFramePaths[idx],cv::IMREAD_GRAYSCALE);
 	else if(m_sDBName==WALLFLOWER_DB_NAME || m_sDBName==PETS2001_D3TC1_DB_NAME) {
 		auto res = m_mTestGTIndexes.find(idx);
 		if(res!=m_mTestGTIndexes.end())
-			return cv::imread(m_vsGTFramePaths[res->second],cv::IMREAD_GRAYSCALE);
+			oFrame = cv::imread(m_vsGTFramePaths[res->second],cv::IMREAD_GRAYSCALE);
 		else
-			return cv::Mat(m_oSize,CV_8UC1,cv::Scalar(VAL_OUTOFSCOPE));
+			oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar(VAL_OUTOFSCOPE));
 	}
 	/*else if(m_sDBName==...) {
 		// ...
 	}*/
-	else
-		throw std::runtime_error(std::string("Unknown database name."));
+	CV_DbgAssert(oFrame.size()==m_oSize);
+	return oFrame;
 }
+
+const cv::Mat& SequenceInfo::GetInputFrameFromIndex(size_t idx) {
+#if USE_PRECACHED_IO
+#if PLATFORM_SUPPORTS_CPP11
+	std::unique_lock<std::mutex> req_lock(m_oInputFrameReqMutex);
+	std::unique_lock<std::mutex> sync_lock(m_oInputFrameSyncMutex);
+	m_nRequestInputFrameIndex = idx;
+	//std::cout << " # pre-notify request" << std::endl;
+	std::cv_status res;
+	//bool test = false;
+	do {
+		m_oInputFrameReqCondVar.notify_one();
+		//if(!test) test = true;
+		//else std::cout << " # retrying request..." << std::endl;
+		res = m_oInputFrameSyncCondVar.wait_for(sync_lock,std::chrono::milliseconds(REQUEST_TIMEOUT_MS));
+	} while(res==std::cv_status::timeout);
+	//std::cout << " # post-wait for sync" << std::endl;
+	return m_oReqInputFrame;
+#elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
+	... @@@@@@@@@
+#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+#error "Missing implementation for precached io support on this platform."
+#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+#else //!USE_PRECACHED_IO
+	if(m_nLastReqInputFrameIndex!=idx) {
+		m_oLastReqInputFrame = GetInputFrameFromIndex_Internal(idx);
+		m_nLastReqInputFrameIndex = idx;
+	}
+	return m_oLastReqInputFrame;
+#endif //!USE_PRECACHED_IO
+}
+
+const cv::Mat& SequenceInfo::GetGTFrameFromIndex(size_t idx) {
+#if USE_PRECACHED_IO
+#if PLATFORM_SUPPORTS_CPP11
+	std::unique_lock<std::mutex> req_lock(m_oGTFrameReqMutex);
+	std::unique_lock<std::mutex> sync_lock(m_oGTFrameSyncMutex);
+	m_nRequestGTFrameIndex = idx;
+	//std::cout << " # pre-notify request" << std::endl;
+	std::cv_status res;
+	//bool test = false;
+	do {
+		m_oGTFrameReqCondVar.notify_one();
+		//if(!test) test = true;
+		//else std::cout << " # retrying request..." << std::endl;
+		res = m_oGTFrameSyncCondVar.wait_for(sync_lock,std::chrono::milliseconds(REQUEST_TIMEOUT_MS));
+	} while(res==std::cv_status::timeout);
+	//std::cout << " # post-wait for sync" << std::endl;
+	return m_oReqGTFrame;
+#elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
+	... @@@@@@@@@
+#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+#error "Missing implementation for precached io support on this platform."
+#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+#else //!USE_PRECACHED_IO
+	if(m_nLastReqGTFrameIndex!=idx) {
+		m_oLastReqGTFrame = GetGTFrameFromIndex_Internal(idx);
+		m_nLastReqGTFrameIndex = idx;
+	}
+	return m_oLastReqGTFrame;
+#endif //!USE_PRECACHED_IO
+}
+
+#if USE_PRECACHED_IO
+
+void SequenceInfo::PrecacheInputFrames() {
+#if PLATFORM_SUPPORTS_CPP11
+	std::unique_lock<std::mutex> sync_lock(m_oInputFrameSyncMutex);
+	//std::cout << " @ prefilling precache buffers... (" << MAX_NB_PRECACHED_FRAMES << " frames)" << std::endl;
+	while(m_qoInputFrameCache.size()<MAX_NB_PRECACHED_FRAMES && m_nNextPrecachedInputFrameIdx<m_nTotalNbFrames)
+		m_qoInputFrameCache.push_back(GetInputFrameFromIndex_Internal(m_nNextPrecachedInputFrameIdx++));
+	while(!m_bIsExiting) {
+		if(m_oInputFrameReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(QUERY_TIMEOUT_MS))!=std::cv_status::timeout) {
+			CV_DbgAssert(m_nRequestInputFrameIndex>=0 && m_nRequestInputFrameIndex<m_nTotalNbFrames);
+			if(m_nRequestInputFrameIndex!=m_nNextExpectedInputFrameIdx-1) {
+				if(!m_qoInputFrameCache.empty() && m_nRequestInputFrameIndex==m_nNextExpectedInputFrameIdx) {
+					m_oReqInputFrame = m_qoInputFrameCache.front();
+					m_qoInputFrameCache.pop_front();
+				}
+				else {
+					if(!m_qoInputFrameCache.empty()) {
+						//std::cout << " @ answering request manually, out of order (req=" << m_nRequestInputFrameIndex << ", expected=" << m_nNextExpectedInputFrameIdx <<") ";
+						CV_DbgAssert((m_nNextPrecachedInputFrameIdx-m_qoInputFrameCache.size())==m_nNextExpectedInputFrameIdx);
+						if(m_nRequestInputFrameIndex<m_nNextPrecachedInputFrameIdx && m_nRequestInputFrameIndex>m_nNextExpectedInputFrameIdx) {
+							//std::cout << " -- popping " << m_nRequestInputFrameIndex-m_nNextExpectedInputFrameIdx << " item(s) from cache" << std::endl;
+							while(m_nRequestInputFrameIndex-m_nNextExpectedInputFrameIdx>0) {
+								m_qoInputFrameCache.pop_front();
+								++m_nNextExpectedInputFrameIdx;
+							}
+							m_oReqInputFrame = m_qoInputFrameCache.front();
+							m_qoInputFrameCache.pop_front();
+						}
+						else {
+							//std::cout << " -- destroying cache" << std::endl;
+							m_qoInputFrameCache.clear();
+							m_oReqInputFrame = GetInputFrameFromIndex_Internal(m_nRequestInputFrameIndex);
+							m_nNextPrecachedInputFrameIdx = m_nRequestInputFrameIndex+1;
+						}
+					}
+					else {
+						//std::cout << " @ answering request manually, precaching is falling behind" << std::endl;
+						m_oReqInputFrame = GetInputFrameFromIndex_Internal(m_nRequestInputFrameIndex);
+						m_nNextPrecachedInputFrameIdx = m_nRequestInputFrameIndex+1;
+					}
+				}
+			}
+			//else std::cout << " @ answering request using last frame" << std::endl;
+			m_nNextExpectedInputFrameIdx = m_nRequestInputFrameIndex+1;
+			m_oInputFrameSyncCondVar.notify_one();
+		}
+		else {
+			CV_DbgAssert((m_nNextPrecachedInputFrameIdx-m_nNextExpectedInputFrameIdx)==m_qoInputFrameCache.size());
+			if(m_qoInputFrameCache.size()<PRECACHE_REFILL_THRESHOLD && m_nNextPrecachedInputFrameIdx<m_nTotalNbFrames) {
+				//std::cout << " @ filling precache buffer... (" << MAX_NB_PRECACHED_FRAMES-m_qoInputFrameCache.size() << " frames)" << std::endl;
+				while(m_qoInputFrameCache.size()<MAX_NB_PRECACHED_FRAMES && m_nNextPrecachedInputFrameIdx<m_nTotalNbFrames)
+					m_qoInputFrameCache.push_back(GetInputFrameFromIndex_Internal(m_nNextPrecachedInputFrameIdx++));
+			}
+		}
+	}
+#elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
+	... @@@@@@@
+#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+#error "Missing implementation for precached io support on this platform."
+#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+}
+
+void SequenceInfo::PrecacheGTFrames() {
+#if PLATFORM_SUPPORTS_CPP11
+	std::unique_lock<std::mutex> sync_lock(m_oGTFrameSyncMutex);
+	//std::cout << " @ prefilling precache buffers... (" << MAX_NB_PRECACHED_FRAMES << " frames)" << std::endl;
+	while(m_qoGTFrameCache.size()<MAX_NB_PRECACHED_FRAMES && m_nNextPrecachedGTFrameIdx<m_nTotalNbFrames)
+		m_qoGTFrameCache.push_back(GetGTFrameFromIndex_Internal(m_nNextPrecachedGTFrameIdx++));
+	while(!m_bIsExiting) {
+		if(m_oGTFrameReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(QUERY_TIMEOUT_MS))!=std::cv_status::timeout) {
+			CV_DbgAssert(m_nRequestGTFrameIndex>=0 && m_nRequestGTFrameIndex<m_nTotalNbFrames);
+			if(m_nRequestGTFrameIndex!=m_nNextExpectedGTFrameIdx-1) {
+				if(!m_qoGTFrameCache.empty() && m_nRequestGTFrameIndex==m_nNextExpectedGTFrameIdx) {
+					m_oReqGTFrame = m_qoGTFrameCache.front();
+					m_qoGTFrameCache.pop_front();
+				}
+				else {
+					if(!m_qoGTFrameCache.empty()) {
+						//std::cout << " @ answering request manually, out of order (req=" << m_nRequestGTFrameIndex << ", expected=" << m_nNextExpectedGTFrameIdx <<") ";
+						CV_DbgAssert((m_nNextPrecachedGTFrameIdx-m_qoGTFrameCache.size())==m_nNextExpectedGTFrameIdx);
+						if(m_nRequestGTFrameIndex<m_nNextPrecachedGTFrameIdx && m_nRequestGTFrameIndex>m_nNextExpectedGTFrameIdx) {
+							//std::cout << " -- popping " << m_nRequestGTFrameIndex-m_nNextExpectedGTFrameIdx << " item(s) from cache" << std::endl;
+							while(m_nRequestGTFrameIndex-m_nNextExpectedGTFrameIdx>0) {
+								m_qoGTFrameCache.pop_front();
+								++m_nNextExpectedGTFrameIdx;
+							}
+							m_oReqGTFrame = m_qoGTFrameCache.front();
+							m_qoGTFrameCache.pop_front();
+						}
+						else {
+							//std::cout << " -- destroying cache" << std::endl;
+							m_qoGTFrameCache.clear();
+							m_oReqGTFrame = GetGTFrameFromIndex_Internal(m_nRequestGTFrameIndex);
+							m_nNextPrecachedGTFrameIdx = m_nRequestGTFrameIndex+1;
+						}
+					}
+					else {
+						//std::cout << " @ answering request manually, precaching is falling behind" << std::endl;
+						m_oReqGTFrame = GetGTFrameFromIndex_Internal(m_nRequestGTFrameIndex);
+						m_nNextPrecachedGTFrameIdx = m_nRequestGTFrameIndex+1;
+					}
+				}
+			}
+			//else std::cout << " @ answering request using last frame" << std::endl;
+			m_nNextExpectedGTFrameIdx = m_nRequestGTFrameIndex+1;
+			m_oGTFrameSyncCondVar.notify_one();
+		}
+		else {
+			CV_DbgAssert((m_nNextPrecachedGTFrameIdx-m_nNextExpectedGTFrameIdx)==m_qoGTFrameCache.size());
+			if(m_qoGTFrameCache.size()<PRECACHE_REFILL_THRESHOLD && m_nNextPrecachedGTFrameIdx<m_nTotalNbFrames) {
+				//std::cout << " @ filling precache buffer... (" << MAX_NB_PRECACHED_FRAMES-m_qoGTFrameCache.size() << " frames)" << std::endl;
+				while(m_qoGTFrameCache.size()<MAX_NB_PRECACHED_FRAMES && m_nNextPrecachedGTFrameIdx<m_nTotalNbFrames)
+					m_qoGTFrameCache.push_back(GetGTFrameFromIndex_Internal(m_nNextPrecachedGTFrameIdx++));
+			}
+		}
+	}
+#elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
+	... @@@@@@@
+#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+#error "Missing implementation for precached io support on this platform."
+#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+}
+
+#endif //USE_PRECACHED_IO
 
 AdvancedMetrics::AdvancedMetrics(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN, uint64_t nSE)
 	:	 dRecall((double)nTP/(nTP+nFN))
