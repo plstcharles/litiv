@@ -10,14 +10,14 @@
 #define R_SCALE (1.7500f)
 #define R_INCR  (1.0750f)
 #define R_DECR  (0.9750f)
-#define R_LOWER (0.6000f)
+#define R_LOWER (0.8000f)
 #define R_UPPER (1.7000f)
 #if BGSPBASLBSP_USE_R2_ACCELERATION
-#define R2_OFFST (0.075f)
-#define R2_INCR  (0.005f)
+#define R2_OFFST (0.085f)
+#define R2_INCR  (0.008f)
 #define R2_DECR  (0.001f)
-#define R2_LOWER (0.950f)
-#define R2_UPPER (1.050f)
+#define R2_LOWER (0.960f)
+#define R2_UPPER (1.060f)
 #endif //BGSPBASLBSP_USE_R2_ACCELERATION
 #define T_OFFST (0.0001f)
 #define T_SCALE (1.0000f)
@@ -28,7 +28,7 @@
 
 #define GRAD_WEIGHT_ALPHA (10.0f)
 
-#define N_SAMPLES_FOR_MEAN (m_nBGSamples)
+#define N_SAMPLES_FOR_MEAN (25)
 
 BackgroundSubtractorPBASLBSP::BackgroundSubtractorPBASLBSP()
 	:	 m_nBGSamples(BGSPBASLBSP_DEFAULT_NB_BG_SAMPLES)

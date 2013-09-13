@@ -215,7 +215,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #endif //!USE_RELATIVE_LBSP_COMPARISONS
 		oBGSubtr.initialize(oInitImg);
 #else //(USE_VIBE_BG_SUBTRACTOR||USE_PBAS_BG_SUBTRACTOR))
-		oBGSubtr[m_nInputChannels];
+		oBGSubtr[3];
 		std::vector<cv::Mat> voInputImg;
 		cv::split(oInitImg,voInputImg);
 		for(int c=0; c<m_nInputChannels; ++c)
