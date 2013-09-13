@@ -601,7 +601,6 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 	}
 #if BGSPBASLBSP_USE_GRADIENT_COMPLEMENT
 	m_fFormerMeanGradDist = std::max(((float)nFrameTotGradDist)/nFrameTotBadSamplesCount,20.0f);
-	//std::cout << "m_fFormerMeanGradDist = " << m_fFormerMeanGradDist << std::endl;
 #endif //BGSPBASLBSP_USE_GRADIENT_COMPLEMENT
 	cv::Point dbg1(60,40), dbg2(218,132);
 	cv::Mat oMeanMinDistFrameNormalized = m_oMeanMinDistFrame;

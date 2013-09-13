@@ -11,9 +11,9 @@
 /////////////////////////////////////////
 #define WRITE_BGSUB_IMG_OUTPUT			0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT	0
-#define WRITE_BGSUB_METRICS_ANALYSIS	0
+#define WRITE_BGSUB_METRICS_ANALYSIS	1
 /////////////////////////////////////////
-#define DISPLAY_BGSUB_DEBUG_OUTPUT		1
+#define DISPLAY_BGSUB_DEBUG_OUTPUT		0
 /////////////////////////////////////////
 #define USE_VIBE_LBSP_BG_SUBTRACTOR		0
 #define USE_PBAS_LBSP_BG_SUBTRACTOR		0
@@ -28,13 +28,13 @@
 #define USE_WALLFLOWER_DATASET			0
 #define USE_PETS2001_D3TC1_DATASET		0
 /////////////////////////////////////////
-#define DEFAULT_NB_THREADS				4
+#define DEFAULT_NB_THREADS				8
 /////////////////////////////////////////
 #define FORCE_STDOUT_FLUSH_FOR_ECLIPSE	0
 /////////////////////////////////////////////////////////////////////
-#define DATASET_ROOT_DIR 				std::string("/shared/datasets/")
-#define RESULTS_ROOT_DIR 				std::string("~/datasets/")
-#define RESULTS_OUTPUT_DIR_NAME			std::string("results_test")
+#define DATASET_ROOT_DIR 				std::string("/tmp/datasets/")
+#define RESULTS_ROOT_DIR 				std::string("/usagers/pistc/datasets/")
+#define RESULTS_OUTPUT_DIR_NAME			std::string("results_testpbas_iocache")
 /////////////////////////////////////////////////////////////////////
 
 #if (USE_VIBE_LBSP_BG_SUBTRACTOR+USE_PBAS_LBSP_BG_SUBTRACTOR+USE_VIBE_BG_SUBTRACTOR+USE_PBAS_BG_SUBTRACTOR)!=1
@@ -68,6 +68,8 @@ const int g_nResultIdxOffset = 0;
 #endif
 
 int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence);
+
+#if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if !USE_VIBE_BG_SUBTRACTOR && !USE_PBAS_BG_SUBTRACTOR
 cv::Size g_oDisplayOutputSize(960,240);
 cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oBGDesc, const cv::Mat& oFGMask, std::vector<cv::KeyPoint> voKeyPoints, size_t nFrame);
@@ -75,19 +77,15 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 cv::Size g_oDisplayOutputSize(800,240);
 cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, size_t nFrame);
 #endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
+#endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 
 #if PLATFORM_SUPPORTS_CPP11
-#include <thread>
-#include <chrono>
-#include <atomic>
 const size_t g_nMaxThreads = /*std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():*/DEFAULT_NB_THREADS;
 std::atomic_size_t g_nActiveThreads(0);
 #if WRITE_BGSUB_IMG_OUTPUT
 const std::vector<int> g_vnResultsComprParams = {CV_IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
-#include <windows.h>
-#include <process.h>
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;
 HANDLE g_hThreadEvent[g_nMaxThreads] = {0};
 HANDLE g_hThreads[g_nMaxThreads] = {0};
@@ -197,8 +195,9 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 	try {
 		CV_DbgAssert(pCurrCategory && pCurrSequence);
 		CV_DbgAssert(pCurrSequence->GetNbInputFrames()>1);
-		cv::Mat oFGMask, oInputImg = pCurrSequence->GetInputFrameFromIndex(0);
-		const int m_nInputChannels = oInputImg.channels();
+		cv::Mat oFGMask;
+		cv::Mat oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
+		const int m_nInputChannels = oInitImg.channels();
 #if USE_VIBE_LBSP_BG_SUBTRACTOR
 		BackgroundSubtractorViBeLBSP
 #elif USE_PBAS_LBSP_BG_SUBTRACTOR
@@ -214,11 +213,11 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #else //!USE_RELATIVE_LBSP_COMPARISONS
 		oBGSubtr;
 #endif //!USE_RELATIVE_LBSP_COMPARISONS
-		oBGSubtr.initialize(oInputImg);
+		oBGSubtr.initialize(oInitImg);
 #else //(USE_VIBE_BG_SUBTRACTOR||USE_PBAS_BG_SUBTRACTOR))
 		oBGSubtr[m_nInputChannels];
 		std::vector<cv::Mat> voInputImg;
-		cv::split(oInputImg,voInputImg);
+		cv::split(oInitImg,voInputImg);
 		for(int c=0; c<m_nInputChannels; ++c)
 			oBGSubtr[c].initialize(voInputImg[c]);
 #endif //(USE_VIBE_BG_SUBTRACTOR||USE_PBAS_BG_SUBTRACTOR))
@@ -232,7 +231,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		for(size_t k=0; k<nNbInputFrames; k++) {
 			if(!(k%100))
 				std::cout << "\t\t" << std::setw(12) << pCurrSequence->m_sName << " @ F:" << k << "/" << nNbInputFrames << std::endl;
-			oInputImg = pCurrSequence->GetInputFrameFromIndex(k);
+			const cv::Mat& oInputImg = pCurrSequence->GetInputFrameFromIndex(k);
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 			cv::Mat oLastBGImg;
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
@@ -308,6 +307,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 	return 0;
 }
 
+#if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
 cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oBGDesc, const cv::Mat& oFGMask, std::vector<cv::KeyPoint> voKeyPoints, size_t nFrame) {
 	// note: this function is definitely NOT efficient in any way; it is only intended for debug purposes.
@@ -395,3 +395,4 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 	return displayH;
 }
 #endif //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
+#endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
