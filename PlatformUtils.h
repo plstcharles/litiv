@@ -7,6 +7,7 @@
 #include <queue>
 #include <string>
 #include <vector>
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -15,7 +16,6 @@
 #include <windows.h>
 #include <stdint.h>
 #include <process.h>
-#define sprintf sprintf_s
 #else //!PLATFORM_USES_WIN32API
 #include <dirent.h>
 #include <sys/stat.h>

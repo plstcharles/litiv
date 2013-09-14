@@ -67,28 +67,35 @@ public:
 	const std::string m_sName;
 	const std::string m_sDBName;
 	uint64_t nTP, nTN, nFP, nFN, nSE;
-private:
 #if USE_PRECACHED_IO
+	void StartPrecaching();
+	void StopPrecaching();
+private:
 	void PrecacheInputFrames();
 	void PrecacheGTFrames();
 #if PLATFORM_SUPPORTS_CPP11
 	std::thread m_hInputFramePrecacher,m_hGTFramePrecacher;
 	std::mutex m_oInputFrameSyncMutex,m_oGTFrameSyncMutex;
-	std::mutex m_oInputFrameReqMutex,m_oGTFrameReqMutex;
 	std::condition_variable m_oInputFrameReqCondVar,m_oGTFrameReqCondVar;
 	std::condition_variable m_oInputFrameSyncCondVar,m_oGTFrameSyncCondVar;
 #elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
-	HANDLE m_oSemaphore; @@@@@@
+	HANDLE m_hInputFramePrecacher,m_hGTFramePrecacher;
+	static DWORD WINAPI PrecacheInputFramesEntryPoint(LPVOID lpParam) {try{((SequenceInfo*)lpParam)->PrecacheInputFrames();}catch(...){return-1;}return 0;}
+	static DWORD WINAPI PrecacheGTFramesEntryPoint(LPVOID lpParam) {try{((SequenceInfo*)lpParam)->PrecacheGTFrames();}catch(...){return-1;} return 0;}
+	CRITICAL_SECTION m_oInputFrameSyncMutex,m_oGTFrameSyncMutex;
+	CONDITION_VARIABLE m_oInputFrameReqCondVar,m_oGTFrameReqCondVar;
+	CONDITION_VARIABLE m_oInputFrameSyncCondVar,m_oGTFrameSyncCondVar;
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for semaphores on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-	bool m_bIsExiting;
+	bool m_bIsPrecaching;
 	size_t m_nRequestInputFrameIndex,m_nRequestGTFrameIndex;
 	std::deque<cv::Mat> m_qoInputFrameCache,m_qoGTFrameCache;
 	size_t m_nNextExpectedInputFrameIdx,m_nNextExpectedGTFrameIdx;
 	size_t m_nNextPrecachedInputFrameIdx,m_nNextPrecachedGTFrameIdx;
 	cv::Mat m_oReqInputFrame,m_oReqGTFrame;
 #else //!USE_PRECACHED_IO
+private:
 	size_t m_nLastReqInputFrameIndex,m_nLastReqGTFrameIndex;
 	cv::Mat m_oLastReqInputFrame,m_oLastReqGTFrame;
 #endif //!USE_PRECACHED_IO

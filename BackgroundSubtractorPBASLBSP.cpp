@@ -602,7 +602,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 #if BGSPBASLBSP_USE_GRADIENT_COMPLEMENT
 	m_fFormerMeanGradDist = std::max(((float)nFrameTotGradDist)/nFrameTotBadSamplesCount,20.0f);
 #endif //BGSPBASLBSP_USE_GRADIENT_COMPLEMENT
-	cv::Point dbg1(60,40), dbg2(218,132);
+	/*cv::Point dbg1(60,40), dbg2(218,132);
 	cv::Mat oMeanMinDistFrameNormalized = m_oMeanMinDistFrame;
 	cv::circle(oMeanMinDistFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oMeanMinDistFrameNormalized,dbg2,5,cv::Scalar(1.0f));
 	cv::imshow("m(x)",oMeanMinDistFrameNormalized);
@@ -621,7 +621,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 	cv::circle(oUpdateRateFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oUpdateRateFrameNormalized,dbg2,5,cv::Scalar(1.0f));
 	cv::imshow("t(x)",oUpdateRateFrameNormalized);
 	std::cout << std::fixed << std::setprecision(5) << " t(" << dbg1 << ") = " << m_oUpdateRateFrame.at<float>(dbg1) << "  ,  t(" << dbg2 << ") = " << m_oUpdateRateFrame.at<float>(dbg2) << std::endl;
-	cv::waitKey(1);
+	cv::waitKey(1);*/
 #if BGSPBASLBSP_USE_ADVANCED_MORPH_OPS || BGSPBASLBSP_USE_R2_ACCELERATION
 	oFGMask.copyTo(m_oLastFGMask);
 #endif //BGSPBASLBSP_USE_ADVANCED_MORPH_OPS || BGSPBASLBSP_USE_R2_ACCELERATION

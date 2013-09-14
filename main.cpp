@@ -195,6 +195,9 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 	try {
 		CV_DbgAssert(pCurrCategory && pCurrSequence);
 		CV_DbgAssert(pCurrSequence->GetNbInputFrames()>1);
+#if USE_PRECACHED_IO
+		pCurrSequence->StartPrecaching();
+#endif //USE_PRECACHED_IO
 		cv::Mat oFGMask;
 		cv::Mat oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
 		const int m_nInputChannels = oInitImg.channels();
