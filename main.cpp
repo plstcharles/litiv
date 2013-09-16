@@ -200,7 +200,6 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #endif //USE_PRECACHED_IO
 		cv::Mat oFGMask;
 		cv::Mat oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
-		const int m_nInputChannels = oInitImg.channels();
 #if USE_VIBE_LBSP_BG_SUBTRACTOR
 		BackgroundSubtractorViBeLBSP
 #elif USE_PBAS_LBSP_BG_SUBTRACTOR
@@ -219,6 +218,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		oBGSubtr.initialize(oInitImg);
 #else //(USE_VIBE_BG_SUBTRACTOR||USE_PBAS_BG_SUBTRACTOR))
 		oBGSubtr[3];
+		const int m_nInputChannels = oInitImg.channels();
 		std::vector<cv::Mat> voInputImg;
 		cv::split(oInitImg,voInputImg);
 		for(int c=0; c<m_nInputChannels; ++c)
@@ -322,9 +322,9 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 	oExtractor.setReference(oBGImg);
 	oExtractor.compute2(oInputImg,voKeyPoints,oInputDesc);
 	LBSP::calcDescImgDiff(oInputDesc,oBGDesc,oDescDiff);
-	oInputDesc.convertTo(oInputDescBYTE,CV_8U);
-	oBGDesc.convertTo(oBGDescBYTE,CV_8U);
-	oDescDiff.convertTo(oDescDiffBYTE,CV_8U);
+	oInputDesc.convertTo(oInputDescBYTE,CV_8U,(double)UCHAR_MAX/USHRT_MAX);
+	oBGDesc.convertTo(oBGDescBYTE,CV_8U,(double)UCHAR_MAX/USHRT_MAX);
+	oDescDiffBYTE = oDescDiff;
 	cv::cvtColor(oFGMask,oFGMaskBYTE3,CV_GRAY2RGB);
 	if(oInputImg.channels()!=3) {
 		cv::cvtColor(oInputImg,oInputImgBYTE3,CV_GRAY2RGB);

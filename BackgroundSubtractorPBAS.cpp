@@ -296,5 +296,5 @@ void BackgroundSubtractorPBAS::getBackgroundImage(cv::OutputArray backgroundImag
 			}
 		}
 	}
-	oAvgBGImg.convertTo(backgroundImage,CV_8UC1);
+	oAvgBGImg.convertTo(backgroundImage,CV_8U);
 }

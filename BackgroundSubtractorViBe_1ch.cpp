@@ -86,5 +86,5 @@ void BackgroundSubtractorViBe_1ch::getBackgroundImage(cv::OutputArray background
 			}
 		}
 	}
-	oAvgBGImg.convertTo(backgroundImage,CV_8UC1);
+	oAvgBGImg.convertTo(backgroundImage,CV_8U);
 }
