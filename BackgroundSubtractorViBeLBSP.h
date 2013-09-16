@@ -22,6 +22,10 @@
 #define BGSVIBELBSP_USE_SC_THRS_VALIDATION 1
 //! defines whether we should complement the LBSP core component using color or not
 #define BGSVIBELBSP_USE_COLOR_COMPLEMENT 1
+//! defines whether we should extract inter-LBSP or intra-LBSP descriptors from processed frames
+#define BGSVIBELBSP_EXTRACT_INTER_LBSP 1
+//! defines whether we should use inter-LBSP or intra-LBSP descriptors in the model
+#define BGSVIBELBSP_MODEL_INTER_LBSP 1
 
 /*!
 	ViBe-Based Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
