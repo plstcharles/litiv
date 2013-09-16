@@ -44,7 +44,7 @@
 #elif USE_CDNET_DATASET
 const std::string g_sDatasetName(CDNET_DB_NAME);
 const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/CDNet/dataset/");
-const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet/"+RESULTS_OUTPUT_DIR_NAME);
+const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet/"+RESULTS_OUTPUT_DIR_NAME+"/");
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
 const char* g_asDatasetCategories[] = {"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"};
@@ -52,7 +52,7 @@ const int g_nResultIdxOffset = 1;
 #elif USE_WALLFLOWER_DATASET
 const std::string g_sDatasetName(WALLFLOWER_DB_NAME);
 const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/Wallflower/dataset/");
-const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/Wallflower/"+RESULTS_OUTPUT_DIR_NAME);
+const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/Wallflower/"+RESULTS_OUTPUT_DIR_NAME+"/");
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
 const char* g_asDatasetCategories[] = {"global"};
@@ -60,7 +60,7 @@ const int g_nResultIdxOffset = 0;
 #elif USE_PETS2001_D3TC1_DATASET
 const std::string g_sDatasetName(PETS2001_D3TC1_DB_NAME);
 const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/PETS2001/DATASET3/");
-const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/PETS2001/DATASET3/"+RESULTS_OUTPUT_DIR_NAME);
+const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/PETS2001/DATASET3/"+RESULTS_OUTPUT_DIR_NAME+"/");
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
 const char* g_asDatasetCategories[] = {"TESTING"};
