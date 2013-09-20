@@ -214,15 +214,19 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			const int uchar_idx = oInputImg.step.p[0]*y + x;
 			const int ushrt_idx = uchar_idx*2;
 			const int flt32_idx = uchar_idx*4;
+#if BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
+			float fMinSumDist=(float)nChannelSize;
+#else //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
 			int nMinColorDist=nChannelSize;
-#if !BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
 			int nMinGradDist=nChannelSize;
-#endif //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
+#endif //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR)
 			int nMinDescDist=nDescSize;
 			float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+flt32_idx);
-			const int nCurrColorDistThreshold = (int)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold);
-#if !BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
-			const int nCurrGradDistThreshold = (int)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold/*m_nGradDistThreshold@@@@*/);
+#if BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
+			const float fCurrSumDistThreshold = (*pfCurrDistThresholdFactor)*m_nColorDistThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT;
+#else //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
+			const int nCurrColorDistThreshold = (int)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+			const int nCurrGradDistThreshold = (int)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold/*m_nGradDistThreshold@@@@*/*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 #endif //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
 			const int nCurrDescDistThreshold = (int)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold);
 			int nGoodSamplesCount=0, nSampleIdx=0;
@@ -232,15 +236,15 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 #if BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
 				nGradDist = absdiff_uchar(oBlurredInputImg_AbsGrad.data[uchar_idx],m_voBGGrad[nSampleIdx].data[uchar_idx]);
 				nColorDist = absdiff_uchar(oInputImg.data[uchar_idx],m_voBGImg[nSampleIdx].data[uchar_idx]);
-				int nTotIntDist = std::min(nColorDist+(int)((BGSPBASLBSP_GRAD_WEIGHT_ALPHA/m_fFormerMeanGradDist)*nGradDist),nChannelSize);
-				if(nTotIntDist>nCurrColorDistThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT)
+				const float fSumDist = std::min(((BGSPBASLBSP_GRAD_WEIGHT_ALPHA/m_fFormerMeanGradDist)*nGradDist)+nColorDist,(float)nChannelSize);
+				if(fSumDist>fCurrSumDistThreshold)
 					goto failedcheck1ch;
 #else //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
 				nGradDist = absdiff_uchar(oBlurredInputImg_AbsGrad.data[uchar_idx],m_voBGGrad[nSampleIdx].data[uchar_idx]);
-				if(nGradDist>nCurrGradDistThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT)
+				if(nGradDist>nCurrGradDistThreshold)
 					goto failedcheck1ch;
 				nColorDist = absdiff_uchar(oInputImg.data[uchar_idx],m_voBGImg[nSampleIdx].data[uchar_idx]);
-				if(nColorDist>nCurrColorDistThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT)
+				if(nColorDist>nCurrColorDistThreshold)
 					goto failedcheck1ch;
 #endif //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
 				if(m_bLBSPUsingRelThreshold)
@@ -251,8 +255,8 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 				if(nDescDist>nCurrDescDistThreshold)
 					goto failedcheck1ch;
 #if BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
-				if(nMinColorDist>nTotIntDist)
-					nMinColorDist = nTotIntDist;
+				if(fMinSumDist>fSumDist)
+					fMinSumDist = fSumDist;
 #else //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
 				if(nMinColorDist>nColorDist)
 					nMinColorDist = nColorDist;
@@ -270,8 +274,11 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 				nSampleIdx++;
 			}
 			float* pfCurrMeanMinDist = ((float*)(m_oMeanMinDistFrame.data+flt32_idx));
-			// @@@@@@@ note: if not mixing color and gradient, gradient has no weight in MeanMinDist
-			*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1) + (((float)nMinColorDist/nChannelSize)+((float)nMinDescDist/nDescSize))/2)/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
+#if BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
+			*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1) + ((fMinSumDist/nChannelSize)+((float)nMinDescDist/nDescSize))/2)/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
+#else //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
+			*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1) + (((float)nMinColorDist/nChannelSize)+((float)nMinGradDist/nChannelSize)+((float)nMinDescDist/nDescSize))/3)/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
+#endif //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
 			float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+flt32_idx));
 			if(nGoodSamplesCount<m_nRequiredBGSamples) {
 				oFGMask.data[uchar_idx] = UCHAR_MAX;
