@@ -8,7 +8,7 @@
 
 BackgroundSubtractorViBeLBSP::BackgroundSubtractorViBeLBSP()
 	:	 BackgroundSubtractorLBSP()
-	 	,m_nBGSamples(BGSVIBELBSP_DEFAULT_NB_BG_SAMPLES)
+		,m_nBGSamples(BGSVIBELBSP_DEFAULT_NB_BG_SAMPLES)
 		,m_nRequiredBGSamples(BGSVIBELBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES)
 		,m_nColorDistThreshold(BGSVIBELBSP_DEFAULT_COLOR_DIST_THRESHOLD) {
 	CV_Assert(m_nBGSamples>0);
