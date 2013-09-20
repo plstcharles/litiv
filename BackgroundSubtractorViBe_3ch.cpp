@@ -8,13 +8,7 @@
 BackgroundSubtractorViBe_3ch::BackgroundSubtractorViBe_3ch(	 int nColorDistThreshold
 															,int nBGSamples
 															,int nRequiredBGSamples)
-	:	 m_nBGSamples(nBGSamples)
-		,m_nRequiredBGSamples(nRequiredBGSamples)
-		,m_voBGImg(nBGSamples)
-		,m_nColorDistThreshold(nColorDistThreshold)
-		,m_bInitialized(false) {
-	CV_Assert(m_nBGSamples>0);
-}
+	:	BackgroundSubtractorViBe(nColorDistThreshold,nBGSamples,nRequiredBGSamples) {}
 
 BackgroundSubtractorViBe_3ch::~BackgroundSubtractorViBe_3ch() {}
 
@@ -47,6 +41,7 @@ void BackgroundSubtractorViBe_3ch::operator()(cv::InputArray _image, cv::OutputA
 	CV_DbgAssert(m_bInitialized);
 	CV_DbgAssert(learningRate>0);
 	cv::Mat oInputImg = _image.getMat();
+	CV_DbgAssert((oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3) && oInputImg.size()==m_oImgSize);
 	cv::Mat oInputImgRGB;
 	if(oInputImg.type()==CV_8UC3)
 		oInputImgRGB = oInputImg;
@@ -93,27 +88,4 @@ void BackgroundSubtractorViBe_3ch::operator()(cv::InputArray _image, cv::OutputA
 			}
 		}
 	}
-}
-
-cv::AlgorithmInfo* BackgroundSubtractorViBe_3ch::info() const {
-	CV_Assert(false); // NOT IMPL @@@@@
-	return NULL;
-}
-
-void BackgroundSubtractorViBe_3ch::getBackgroundImage(cv::OutputArray backgroundImage) const {
-	CV_DbgAssert(!m_voBGImg.empty());
-	cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_32FC3);
-	for(int n=0; n<m_nBGSamples; ++n) {
-		for(int y=0; y<m_oImgSize.height; ++y) {
-			for(int x=0; x<m_oImgSize.width; ++x) {
-				int uchar_idx = m_oImgSize.width*3*y + 3*x;
-				int flt32_idx = uchar_idx*4;
-				float* oAvgBgImgPtr = (float*)(oAvgBGImg.data+flt32_idx);
-				uchar* oBGImgPtr = m_voBGImg[n].data+uchar_idx;
-				for(int c=0; c<3; ++c)
-					oAvgBgImgPtr[c] += ((float)oBGImgPtr[c])/m_nBGSamples;
-			}
-		}
-	}
-	oAvgBGImg.convertTo(backgroundImage,CV_8U);
 }
