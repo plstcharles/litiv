@@ -4,21 +4,22 @@
 #include "BackgroundSubtractorViBeLBSP.h"
 #include "BackgroundSubtractorViBe_1ch.h"
 #include "BackgroundSubtractorViBe_3ch.h"
-#include "BackgroundSubtractorPBAS.h"
+#include "BackgroundSubtractorPBAS_1ch.h"
+#include "BackgroundSubtractorPBAS_3ch.h"
 
 /////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
 /////////////////////////////////////////
 #define WRITE_BGSUB_IMG_OUTPUT			0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT	0
-#define WRITE_BGSUB_METRICS_ANALYSIS	1
+#define WRITE_BGSUB_METRICS_ANALYSIS	0
 /////////////////////////////////////////
-#define DISPLAY_BGSUB_DEBUG_OUTPUT		0
+#define DISPLAY_BGSUB_DEBUG_OUTPUT		1
 /////////////////////////////////////////
 #define USE_VIBE_LBSP_BG_SUBTRACTOR		0
-#define USE_PBAS_LBSP_BG_SUBTRACTOR		0
+#define USE_PBAS_LBSP_BG_SUBTRACTOR		1
 #define USE_VIBE_BG_SUBTRACTOR			0
-#define USE_PBAS_BG_SUBTRACTOR			1
+#define USE_PBAS_BG_SUBTRACTOR			0
 /////////////////////////////////////////
 #if (USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
 #define USE_RELATIVE_LBSP_COMPARISONS	1
@@ -28,11 +29,11 @@
 #define USE_WALLFLOWER_DATASET			0
 #define USE_PETS2001_D3TC1_DATASET		0
 /////////////////////////////////////////
-#define DEFAULT_NB_THREADS				8
+#define DEFAULT_NB_THREADS				1
 /////////////////////////////////////////
 #define FORCE_STDOUT_FLUSH_FOR_ECLIPSE	0
 /////////////////////////////////////////////////////////////////////
-#define DATASET_ROOT_DIR 				std::string("/tmp/datasets/")
+#define DATASET_ROOT_DIR 				std::string("/shared/datasets/")
 #define RESULTS_ROOT_DIR 				std::string("/usagers/pistc/datasets/")
 #define RESULTS_OUTPUT_DIR_NAME			std::string("results_testpbas_iocache")
 /////////////////////////////////////////////////////////////////////
@@ -192,6 +193,11 @@ int main( int argc, char** argv ) {
 }
 
 int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence) {
+#if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
+		BackgroundSubtractorLBSP* pBGS = NULL;
+#else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
+		cv::BackgroundSubtractor* pBGS = NULL;
+#endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 	try {
 		CV_DbgAssert(pCurrCategory && pCurrSequence);
 		CV_DbgAssert(pCurrSequence->GetNbInputFrames()>1);
@@ -201,29 +207,39 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		cv::Mat oFGMask;
 		cv::Mat oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
 #if USE_VIBE_LBSP_BG_SUBTRACTOR
-		BackgroundSubtractorViBeLBSP
-#elif USE_PBAS_LBSP_BG_SUBTRACTOR
-		BackgroundSubtractorPBASLBSP
-#elif USE_VIBE_BG_SUBTRACTOR
-		BackgroundSubtractorViBe_1ch
-#elif USE_PBAS_BG_SUBTRACTOR
-		BackgroundSubtractorPBAS
-#endif //USE_PBAS_BG_SUBTRACTOR
-#if !(USE_VIBE_BG_SUBTRACTOR||USE_PBAS_BG_SUBTRACTOR)
 #if USE_RELATIVE_LBSP_COMPARISONS
-		oBGSubtr(LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD);
+		pBGS = new BackgroundSubtractorViBeLBSP(LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD);
 #else //!USE_RELATIVE_LBSP_COMPARISONS
-		oBGSubtr;
+		pBGS = new BackgroundSubtractorViBeLBSP();
 #endif //!USE_RELATIVE_LBSP_COMPARISONS
-		oBGSubtr.initialize(oInitImg);
-#else //(USE_VIBE_BG_SUBTRACTOR||USE_PBAS_BG_SUBTRACTOR))
-		oBGSubtr[3];
+		const double dDefaultLearningRate = BGSVIBELBSP_DEFAULT_LEARNING_RATE;
+		pBGS->initialize(oInitImg);
+#elif USE_PBAS_LBSP_BG_SUBTRACTOR
+#if USE_RELATIVE_LBSP_COMPARISONS
+		pBGS = new BackgroundSubtractorPBASLBSP(LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD);
+#else //!USE_RELATIVE_LBSP_COMPARISONS
+		pBGS = new BackgroundSubtractorPBASLBSP();
+#endif //!USE_RELATIVE_LBSP_COMPARISONS
+		const double dDefaultLearningRate = BGSPBASLBSP_DEFAULT_LEARNING_RATE_OVERRIDE;
+		pBGS->initialize(oInitImg);
+#else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 		const int m_nInputChannels = oInitImg.channels();
-		std::vector<cv::Mat> voInputImg;
-		cv::split(oInitImg,voInputImg);
-		for(int c=0; c<m_nInputChannels; ++c)
-			oBGSubtr[c].initialize(voInputImg[c]);
-#endif //(USE_VIBE_BG_SUBTRACTOR||USE_PBAS_BG_SUBTRACTOR))
+#if USE_VIBE_BG_SUBTRACTOR
+		if(m_nInputChannels==3)
+			pBGS = new BackgroundSubtractorViBe_3ch();
+		else
+			pBGS = new BackgroundSubtractorViBe_1ch();
+		((BackgroundSubtractorPBAS*)pBGS)->initialize(oInitImg);
+		const double dDefaultLearningRate = BGSVIBE_DEFAULT_LEARNING_RATE;
+#else //USE_PBAS_BG_SUBTRACTOR
+		if(m_nInputChannels==3)
+			pBGS = new BackgroundSubtractorPBAS_3ch();
+		else
+			pBGS = new BackgroundSubtractorPBAS_1ch();
+		((BackgroundSubtractorPBAS*)pBGS)->initialize(oInitImg);
+		const double dDefaultLearningRate = BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE;
+#endif //USE_PBAS_BG_SUBTRACTOR
+#endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 #if DISPLAY_BGSUB_DEBUG_OUTPUT
 		std::string sDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName;
 #endif //DISPLAY_ANALYSIS_DEBUG_RESULTS
@@ -234,42 +250,27 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		for(size_t k=0; k<nNbInputFrames; k++) {
 			if(!(k%100))
 				std::cout << "\t\t" << std::setw(12) << pCurrSequence->m_sName << " @ F:" << k << "/" << nNbInputFrames << std::endl;
+			std::chrono::high_resolution_clock::time_point pre_query = std::chrono::high_resolution_clock::now();
 			const cv::Mat& oInputImg = pCurrSequence->GetInputFrameFromIndex(k);
+			std::chrono::high_resolution_clock::time_point post_query = std::chrono::high_resolution_clock::now();
+			std::cout << "frame query = " << std::fixed << std::setprecision(3) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_query-pre_query).count())/1000 << " ms, ";
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 			cv::Mat oLastBGImg;
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
-			oBGSubtr.getBackgroundImage(oLastBGImg);
+			pBGS->getBackgroundImage(oLastBGImg);
 			cv::Mat oLastBGDescImg;
-			oBGSubtr.getBackgroundDescriptorsImage(oLastBGDescImg);
-#else //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
-			std::vector<cv::Mat> voLastBGImg(m_nInputChannels);
-			for(int c=0; c<m_nInputChannels; ++c)
-				oBGSubtr[c].getBackgroundImage(voLastBGImg[c]);
-			cv::merge(voLastBGImg,oLastBGImg);
+			((BackgroundSubtractorLBSP*)pBGS)->getBackgroundDescriptorsImage(oLastBGDescImg);
+#else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
+			pBGS->getBackgroundImage(oLastBGImg);
 #endif //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
-#if USE_VIBE_LBSP_BG_SUBTRACTOR
-			oBGSubtr(oInputImg, oFGMask, k<=100?1:BGSVIBELBSP_DEFAULT_LEARNING_RATE);
-#elif USE_PBAS_LBSP_BG_SUBTRACTOR
-			oBGSubtr(oInputImg, oFGMask, k<=100?1:BGSPBASLBSP_DEFAULT_LEARNING_RATE_OVERRIDE);
-#elif USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
-			cv::split(oInputImg,voInputImg);
-			std::vector<cv::Mat> voFGMask(m_nInputChannels);
-			for(int c=0; c<m_nInputChannels; ++c) {
-#if USE_PBAS_BG_SUBTRACTOR
-				oBGSubtr[c](voInputImg[c], voFGMask[c], k<=100?1:BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE);
-#else //!USE_PBAS_BG_SUBTRACTOR
-				oBGSubtr[c](voInputImg[c], voFGMask[c], k<=100?1:BGSVIBE_DEFAULT_LEARNING_RATE);
-#endif //!USE_PBAS_BG_SUBTRACTOR
-				if(c==0)
-					oFGMask = voFGMask[0];
-				else
-					cv::bitwise_or(oFGMask,voFGMask[c],oFGMask);
-			}
-#endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
+			std::chrono::high_resolution_clock::time_point pre_process = std::chrono::high_resolution_clock::now();
+			(*pBGS)(oInputImg, oFGMask, k<=100?1:dDefaultLearningRate);
+			std::chrono::high_resolution_clock::time_point post_process = std::chrono::high_resolution_clock::now();
+			std::cout << "frame process = " << std::fixed << std::setprecision(3) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_process-pre_process).count())/1000 << " ms." << std::endl;
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
-			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oLastBGDescImg,oFGMask,oBGSubtr.getBGKeyPoints(),k);
+			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oLastBGDescImg,oFGMask,pBGS->getBGKeyPoints(),k);
 #else //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
 			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oFGMask,k);
 #endif //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
@@ -300,6 +301,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 	catch(cv::Exception& e) {std::cout << e.what() << std::endl;}
 	catch(std::runtime_error& e) {std::cout << e.what() << std::endl;}
 	catch(...) {std::cout << "Caught unknown exception." << std::endl;}
+	if(pBGS) delete pBGS;
 #if PLATFORM_SUPPORTS_CPP11
 	g_nActiveThreads--;
 #elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
