@@ -230,7 +230,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 #endif //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
 			const int nCurrDescDistThreshold = (int)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold);
 			int nGoodSamplesCount=0, nSampleIdx=0;
-			int nColorDist,nGradDist,nDescDist;
+			int nColorDist, nGradDist, nDescDist;
 			ushort nCurrInputDesc;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
 #if BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
@@ -402,23 +402,23 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 #endif //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
 				int nTotDescDist = 0;
 				for(int c=0;c<3; ++c) {
+					const int nGradDist = absdiff_uchar(input_grad_ptr[c],bg_grad_ptr[c]);
+					nTotGradDist += nGradDist; // we need to do it first since we might jump out if a test fails... (required for nFrameTotGradDist)
 #if BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
 					const int nColorDist = absdiff_uchar(input_img_ptr[c],bg_img_ptr[c]);
-					const int nGradDist = absdiff_uchar(input_grad_ptr[c],bg_grad_ptr[c]);
 					const float fSumDist = std::min(((BGSPBASLBSP_GRAD_WEIGHT_ALPHA/m_fFormerMeanGradDist)*nGradDist)+nColorDist,(float)nChannelSize);
 #if BGSLBSP_USE_SC_THRS_VALIDATION
 					if(fSumDist>fCurrSCTotSumDistThreshold)
 						goto failedcheck3ch;
 #endif //BGSLBSP_USE_SC_THRS_VALIDATION
 #else //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
+#if BGSLBSP_USE_SC_THRS_VALIDATION
+					if(nGradDist>nCurrSCGradDistThreshold)
+						goto failedcheck3ch;
+#endif //BGSLBSP_USE_SC_THRS_VALIDATION
 					const int nColorDist = absdiff_uchar(input_img_ptr[c],bg_img_ptr[c]);
 #if BGSLBSP_USE_SC_THRS_VALIDATION
 					if(nColorDist>nCurrSCColorDistThreshold)
-						goto failedcheck3ch;
-#endif //BGSLBSP_USE_SC_THRS_VALIDATION
-					const int nGradDist = absdiff_uchar(input_grad_ptr[c],bg_grad_ptr[c]);
-#if BGSLBSP_USE_SC_THRS_VALIDATION
-					if(nGradDist>nCurrSCGradDistThreshold)
 						goto failedcheck3ch;
 #endif //BGSLBSP_USE_SC_THRS_VALIDATION
 #endif //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
@@ -433,10 +433,8 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 #endif //BGSLBSP_USE_SC_THRS_VALIDATION
 #if BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
 					fTotSumDist += fSumDist;
-					nTotGradDist += nGradDist;
 #else //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
 					nTotColorDist += nColorDist;
-					nTotGradDist += nGradDist;
 #endif //!BGSPBASLBSP_MIX_GRADIENT_WITH_COLOR
 					nTotDescDist += nDescDist;
 				}
