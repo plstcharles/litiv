@@ -93,27 +93,35 @@
     <None Include="LBSP_16bits_dbcross_s3ch.i" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BackgroundSubtractorLBSP.h" />
+    <ClInclude Include="BackgroundSubtractorPBAS.h" />
+    <ClInclude Include="BackgroundSubtractorPBAS_1ch.h" />
+    <ClInclude Include="BackgroundSubtractorPBAS_3ch.h" />
     <ClInclude Include="BackgroundSubtractorPBASLBSP.h" />
-    <ClInclude Include="BackgroundSubtractorViBeLBSP.h" />
+    <ClInclude Include="BackgroundSubtractorViBe.h" />
     <ClInclude Include="BackgroundSubtractorViBe_1ch.h" />
     <ClInclude Include="BackgroundSubtractorViBe_3ch.h" />
-    <ClInclude Include="BackgroundSubtractorPBAS.h" />
+    <ClInclude Include="BackgroundSubtractorViBeLBSP.h" />
     <ClInclude Include="DatasetUtils.h" />
-    <ClInclude Include="PlatformUtils.h" />
     <ClInclude Include="DistanceUtils.h" />
     <ClInclude Include="LBSP.h" />
+    <ClInclude Include="PlatformUtils.h" />
     <ClInclude Include="RandUtils.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="BackgroundSubtractorLBSP.cpp" />
+    <ClCompile Include="BackgroundSubtractorPBAS.cpp" />
+    <ClCompile Include="BackgroundSubtractorPBAS_1ch.cpp" />
+    <ClCompile Include="BackgroundSubtractorPBAS_3ch.cpp" />
     <ClCompile Include="BackgroundSubtractorPBASLBSP.cpp" />
-    <ClCompile Include="BackgroundSubtractorViBeLBSP.cpp" />
+    <ClCompile Include="BackgroundSubtractorViBe.cpp" />
     <ClCompile Include="BackgroundSubtractorViBe_1ch.cpp" />
     <ClCompile Include="BackgroundSubtractorViBe_3ch.cpp" />
-    <ClCompile Include="BackgroundSubtractorPBAS.cpp" />
+    <ClCompile Include="BackgroundSubtractorViBeLBSP.cpp" />
     <ClCompile Include="DatasetUtils.cpp" />
-    <ClCompile Include="PlatformUtils.cpp" />
-    <ClCompile Include="main.cpp" />
     <ClCompile Include="LBSP.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="PlatformUtils.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
