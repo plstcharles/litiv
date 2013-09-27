@@ -12,7 +12,7 @@
 /////////////////////////////////////////
 #define WRITE_BGSUB_IMG_OUTPUT			0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT	0
-#define WRITE_BGSUB_METRICS_ANALYSIS	0
+#define WRITE_BGSUB_METRICS_ANALYSIS	1
 /////////////////////////////////////////
 #define DISPLAY_BGSUB_DEBUG_OUTPUT		1
 /////////////////////////////////////////
@@ -22,7 +22,10 @@
 #define USE_PBAS_BG_SUBTRACTOR			0
 /////////////////////////////////////////
 #if (USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
-#define USE_RELATIVE_LBSP_COMPARISONS	1
+#define USE_RELATIVE_LBSP_COMPARISONS	0
+#if USE_PBAS_LBSP_BG_SUBTRACTOR
+#define USE_DELAYED_FRAME_ANALYSIS		1
+#endif //USE_PBAS_LBSP_BG_SUBTRACTOR
 #endif //(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
 /////////////////////////////////////////
 #define USE_CDNET_DATASET				1
@@ -34,8 +37,8 @@
 #define FORCE_STDOUT_FLUSH_FOR_ECLIPSE	0
 /////////////////////////////////////////////////////////////////////
 #define DATASET_ROOT_DIR 				std::string("/shared/datasets/")
-#define RESULTS_ROOT_DIR 				std::string("/usagers/pistc/datasets/")
-#define RESULTS_OUTPUT_DIR_NAME			std::string("results_testpbas_iocache")
+#define RESULTS_ROOT_DIR 				std::string("/shared/datasets/")
+#define RESULTS_OUTPUT_DIR_NAME			std::string("results_test")
 /////////////////////////////////////////////////////////////////////
 
 #if (USE_VIBE_LBSP_BG_SUBTRACTOR+USE_PBAS_LBSP_BG_SUBTRACTOR+USE_VIBE_BG_SUBTRACTOR+USE_PBAS_BG_SUBTRACTOR)!=1
@@ -73,10 +76,10 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if !USE_VIBE_BG_SUBTRACTOR && !USE_PBAS_BG_SUBTRACTOR
 cv::Size g_oDisplayOutputSize(960,240);
-cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oBGDesc, const cv::Mat& oFGMask, std::vector<cv::KeyPoint> voKeyPoints, size_t nFrame);
+cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oBGDesc, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, std::vector<cv::KeyPoint> voKeyPoints, size_t nFrame);
 #else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 cv::Size g_oDisplayOutputSize(800,240);
-cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, size_t nFrame);
+cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, const cv::Mat& oFGMask, size_t nFrame);
 #endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 
@@ -204,8 +207,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #if USE_PRECACHED_IO
 		pCurrSequence->StartPrecaching();
 #endif //USE_PRECACHED_IO
-		cv::Mat oFGMask;
-		cv::Mat oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
+		cv::Mat oFGMask, oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
 #if USE_VIBE_LBSP_BG_SUBTRACTOR
 #if USE_RELATIVE_LBSP_COMPARISONS
 		pBGS = new BackgroundSubtractorViBeLBSP(LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD);
@@ -216,9 +218,9 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		pBGS->initialize(oInitImg);
 #elif USE_PBAS_LBSP_BG_SUBTRACTOR
 #if USE_RELATIVE_LBSP_COMPARISONS
-		pBGS = new BackgroundSubtractorPBASLBSP(LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD);
+		pBGS = new BackgroundSubtractorPBASLBSP(LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD,USE_DELAYED_FRAME_ANALYSIS);
 #else //!USE_RELATIVE_LBSP_COMPARISONS
-		pBGS = new BackgroundSubtractorPBASLBSP();
+		pBGS = new BackgroundSubtractorPBASLBSP(USE_DELAYED_FRAME_ANALYSIS);
 #endif //!USE_RELATIVE_LBSP_COMPARISONS
 		const double dDefaultLearningRate = BGSPBASLBSP_DEFAULT_LEARNING_RATE_OVERRIDE;
 		pBGS->initialize(oInitImg);
@@ -268,11 +270,15 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 			(*pBGS)(oInputImg, oFGMask, k<=100?1:dDefaultLearningRate);
 			std::chrono::high_resolution_clock::time_point post_process = std::chrono::high_resolution_clock::now();
 			std::cout << "frame process = " << std::fixed << std::setprecision(3) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_process-pre_process).count())/1000 << " ms." << std::endl;
+#if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS
+			const size_t nCurrGTIndex = (USE_DELAYED_FRAME_ANALYSIS && k>0)?(k-1):k;
+			cv::Mat oGTImg = pCurrSequence->GetGTFrameFromIndex(nCurrGTIndex);
+#endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
-			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oLastBGDescImg,oFGMask,pBGS->getBGKeyPoints(),k);
+			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oLastBGDescImg,oFGMask,oGTImg,pBGS->getBGKeyPoints(),nCurrGTIndex);
 #else //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
-			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oFGMask,k);
+			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oFGMask,oGTImg,k);
 #endif //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if WRITE_BGSUB_DEBUG_IMG_OUTPUT
@@ -291,7 +297,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 			WriteResult(g_sResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix,oFGMask,g_vnResultsComprParams);
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #if WRITE_BGSUB_METRICS_ANALYSIS
-			CalcMetricsFromResult(oFGMask,pCurrSequence->GetGTFrameFromIndex(k),pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
+			CalcMetricsFromResult(oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
 		}
 		WriteMetrics(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".txt",pCurrSequence);
 #else //!WRITE_BGSUB_METRICS_ANALYSIS
@@ -314,7 +320,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
-cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oBGDesc, const cv::Mat& oFGMask, std::vector<cv::KeyPoint> voKeyPoints, size_t nFrame) {
+cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oBGDesc, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, std::vector<cv::KeyPoint> voKeyPoints, size_t nFrame) {
 	// note: this function is definitely NOT efficient in any way; it is only intended for debug purposes.
 	cv::Mat oInputImgBYTE3, oBGImgBYTE3, oBGDescBYTE, oBGDescBYTE3, oFGMaskBYTE3;
 	cv::Mat oInputDesc, oInputDescBYTE, oInputDescBYTE3;
@@ -327,7 +333,22 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 	oInputDesc.convertTo(oInputDescBYTE,CV_8U,(double)UCHAR_MAX/USHRT_MAX);
 	oBGDesc.convertTo(oBGDescBYTE,CV_8U,(double)UCHAR_MAX/USHRT_MAX);
 	oDescDiffBYTE = oDescDiff;
-	cv::cvtColor(oFGMask,oFGMaskBYTE3,CV_GRAY2RGB);
+	cv::Mat oFGMask_INVERTED, oGTFGMask_INVERTED;
+	cv::bitwise_not(oFGMask,oFGMask_INVERTED);
+	cv::bitwise_not(oGTFGMask,oGTFGMask_INVERTED);
+	cv::Mat oTPMask, oFPMask, oFNMask;
+	cv::bitwise_and(oFGMask,oGTFGMask,oTPMask);
+	cv::bitwise_and(oFGMask,oGTFGMask_INVERTED,oFPMask);
+	cv::bitwise_and(oFGMask_INVERTED,oGTFGMask,oFNMask);
+	cv::Mat oGoodFGMask=oTPMask, oBadFGMask;
+	cv::bitwise_or(oFPMask,oFNMask,oBadFGMask);
+	cv::Mat oEmptyFGMask = cv::Mat::zeros(oFGMask.size(),CV_8UC1);
+	std::vector<cv::Mat> voFGMaskBYTE3;
+	voFGMaskBYTE3.push_back(oEmptyFGMask);
+	voFGMaskBYTE3.push_back(oGoodFGMask);
+	voFGMaskBYTE3.push_back(oBadFGMask);
+	cv::merge(voFGMaskBYTE3,oFGMaskBYTE3);
+	//cv::cvtColor(oFGMask,oFGMaskBYTE3,CV_GRAY2RGB);
 	if(oInputImg.channels()!=3) {
 		cv::cvtColor(oInputImg,oInputImgBYTE3,CV_GRAY2RGB);
 		cv::cvtColor(oBGImg,oBGImgBYTE3,CV_GRAY2RGB);
@@ -369,13 +390,28 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 	return displayH;
 }
 #else //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
-cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, size_t nFrame) {
+cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, size_t nFrame) {
 	// note: this function is definitely NOT efficient in any way; it is only intended for debug purposes.
 	CV_Assert(oInputImg.type()==oBGImg.type() && oBGImg.type()==CV_8UC3);
 	CV_Assert(oFGMask.type()==CV_8UC1);
 	CV_Assert(oInputImg.size()==oBGImg.size() && oBGImg.size()==oFGMask.size());
 	cv::Mat oInputImgBYTE3,oBGImgBYTE3,oFGMaskBYTE3,oImgDiffBYTE3;
-	cv::cvtColor(oFGMask,oFGMaskBYTE3,CV_GRAY2RGB);
+	cv::Mat oFGMask_INVERTED, oGTFGMask_INVERTED;
+	cv::bitwise_not(oFGMask,oFGMask_INVERTED);
+	cv::bitwise_not(oGTFGMask,oGTFGMask_INVERTED);
+	cv::Mat oTPMask, oFPMask, oFNMask;
+	cv::bitwise_and(oFGMask,oGTFGMask,oTPMask);
+	cv::bitwise_and(oFGMask,oGTFGMask_INVERTED,oFPMask);
+	cv::bitwise_and(oFGMask_INVERTED,oGTFGMask,oFNMask);
+	cv::Mat oGoodFGMask=oTPMask, oBadFGMask;
+	cv::bitwise_or(oFPMask,oFNMask,oBadFGMask);
+	cv::Mat oEmptyFGMask = cv::Mat::zeros(oFGMask.size(),CV_8UC1);
+	std::vector<cv::Mat> voFGMaskBYTE3;
+	voFGMaskBYTE3.push_back(oEmptyFGMask);
+	voFGMaskBYTE3.push_back(oGoodFGMask);
+	voFGMaskBYTE3.push_back(oBadFGMask);
+	cv::merge(voFGMaskBYTE3,oFGMaskBYTE3);
+	//cv::cvtColor(oFGMask,oFGMaskBYTE3,CV_GRAY2RGB);
 	oInputImgBYTE3 = oInputImg;
 	oBGImgBYTE3 = oBGImg;
 	cv::absdiff(oInputImgBYTE3,oBGImgBYTE3,oImgDiffBYTE3);
