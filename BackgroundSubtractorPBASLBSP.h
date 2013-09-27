@@ -18,19 +18,19 @@
 //! defines the default value for the learning rate passed to BackgroundSubtractorViBeLBSP::operator()
 #define BGSPBASLBSP_DEFAULT_LEARNING_RATE_OVERRIDE (-1.0)
 //! parameters used for dynamic threshold adjustments
-#define BGSPBASLBSP_R_OFFST (0.1000f)
-#define BGSPBASLBSP_R_SCALE (1.7500f)
-#define BGSPBASLBSP_R_INCR  (1.0750f)
-#define BGSPBASLBSP_R_DECR  (0.9750f)
+#define BGSPBASLBSP_R_OFFST (0.0000f)
+#define BGSPBASLBSP_R_SCALE (3.5000f)
+#define BGSPBASLBSP_R_INCR  (0.0150f)
+#define BGSPBASLBSP_R_DECR  (0.0150f)
 #define BGSPBASLBSP_R_LOWER (0.8000f)
-#define BGSPBASLBSP_R_UPPER (1.7000f)
+#define BGSPBASLBSP_R_UPPER (3.0000f)
 //! parameters used for adjusting the variation speed of dynamic thresholds
 #if BGSPBASLBSP_USE_R2_ACCELERATION
 #define BGSPBASLBSP_R2_OFFST (0.085f)
-#define BGSPBASLBSP_R2_INCR  (0.008f)
-#define BGSPBASLBSP_R2_DECR  (0.001f)
-#define BGSPBASLBSP_R2_LOWER (0.960f)
-#define BGSPBASLBSP_R2_UPPER (1.060f)
+#define BGSPBASLBSP_R2_INCR  (0.160f)
+#define BGSPBASLBSP_R2_DECR  (0.010f)
+#define BGSPBASLBSP_R2_LOWER (0.200f)
+#define BGSPBASLBSP_R2_UPPER (5.000f)
 #endif //BGSPBASLBSP_USE_R2_ACCELERATION
 //! parameters used for dynamic learning rate adjustments
 #define BGSPBASLBSP_T_OFFST (0.0001f)
