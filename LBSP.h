@@ -6,9 +6,9 @@
 #include "DistanceUtils.h"
 
 //! defines the default value for LBSP::m_nThreshold
-#define LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD (22)
+#define LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD (25)
 //! defines the default value for LBSP::m_fThreshold
-#define LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD (0.290f)
+#define LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD (0.300f)
 //! defines the internal threshold adjustment factor to use when treating single channel images (based on the assumption that grayscale images have less noise per channel...)
 #define LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.400f)
 //! defines if the provided keypoints should be validated when passed to 'compute' functions or not; setting to zero might improve performance, but is generally less safe against OOB exceptions

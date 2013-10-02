@@ -20,17 +20,17 @@
 //! parameters used for dynamic threshold adjustments
 #define BGSPBASLBSP_R_OFFST (0.0000f)
 #define BGSPBASLBSP_R_SCALE (3.5000f)
-#define BGSPBASLBSP_R_INCR  (0.0150f)
-#define BGSPBASLBSP_R_DECR  (0.0150f)
+#define BGSPBASLBSP_R_INCR  (0.0750f)
+#define BGSPBASLBSP_R_DECR  (0.0250f)
 #define BGSPBASLBSP_R_LOWER (0.8000f)
-#define BGSPBASLBSP_R_UPPER (3.0000f)
+#define BGSPBASLBSP_R_UPPER (3.5000f)
 //! parameters used for adjusting the variation speed of dynamic thresholds
 #if BGSPBASLBSP_USE_R2_ACCELERATION
 #define BGSPBASLBSP_R2_OFFST (0.085f)
-#define BGSPBASLBSP_R2_INCR  (0.160f)
-#define BGSPBASLBSP_R2_DECR  (0.010f)
-#define BGSPBASLBSP_R2_LOWER (0.200f)
-#define BGSPBASLBSP_R2_UPPER (5.000f)
+#define BGSPBASLBSP_R2_INCR  (0.200f)
+#define BGSPBASLBSP_R2_DECR  (0.025f)
+#define BGSPBASLBSP_R2_LOWER (0.001f)
+#define BGSPBASLBSP_R2_UPPER (15.00f)
 #endif //BGSPBASLBSP_USE_R2_ACCELERATION
 //! parameters used for dynamic learning rate adjustments
 #define BGSPBASLBSP_T_OFFST (0.0001f)
