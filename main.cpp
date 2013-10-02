@@ -22,7 +22,7 @@
 #define USE_PBAS_BG_SUBTRACTOR			0
 /////////////////////////////////////////
 #if (USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
-#define USE_RELATIVE_LBSP_COMPARISONS	0
+#define USE_RELATIVE_LBSP_COMPARISONS	1
 #if USE_PBAS_LBSP_BG_SUBTRACTOR
 #define USE_DELAYED_FRAME_ANALYSIS		1
 #endif //USE_PBAS_LBSP_BG_SUBTRACTOR
@@ -79,7 +79,7 @@ cv::Size g_oDisplayOutputSize(960,240);
 cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oBGDesc, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, std::vector<cv::KeyPoint> voKeyPoints, size_t nFrame);
 #else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 cv::Size g_oDisplayOutputSize(800,240);
-cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, const cv::Mat& oFGMask, size_t nFrame);
+cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, size_t nFrame);
 #endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 
@@ -271,7 +271,11 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 			std::chrono::high_resolution_clock::time_point post_process = std::chrono::high_resolution_clock::now();
 			std::cout << "frame process = " << std::fixed << std::setprecision(3) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_process-pre_process).count())/1000 << " ms." << std::endl;
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS
-			const size_t nCurrGTIndex = (USE_DELAYED_FRAME_ANALYSIS && k>0)?(k-1):k;
+#if USE_DELAYED_FRAME_ANALYSIS
+			const size_t nCurrGTIndex = (k>0)?(k-1):k;
+#else //!USE_DELAYED_FRAME_ANALYSIS
+			const size_t nCurrGTIndex = k;
+#endif //!USE_DELAYED_FRAME_ANALYSIS
 			cv::Mat oGTImg = pCurrSequence->GetGTFrameFromIndex(nCurrGTIndex);
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
