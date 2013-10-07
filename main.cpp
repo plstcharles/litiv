@@ -10,31 +10,36 @@
 /////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
 /////////////////////////////////////////
+#define DEFAULT_NB_THREADS				4
+/////////////////////////////////////////
 #define WRITE_BGSUB_IMG_OUTPUT			0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT	0
 #define WRITE_BGSUB_METRICS_ANALYSIS	1
 /////////////////////////////////////////
-#define DISPLAY_BGSUB_DEBUG_OUTPUT		1
+#define DISPLAY_BGSUB_DEBUG_OUTPUT		0
+#if DEFAULT_NB_THREADS==1
+#define ENABLE_DISPLAY_MOUSE_DEBUG		1
+#define ENABLE_FRAME_TIMERS				1
+#endif //DEFAULT_NB_THREADS==1
 /////////////////////////////////////////
 #define USE_VIBE_LBSP_BG_SUBTRACTOR		0
 #define USE_PBAS_LBSP_BG_SUBTRACTOR		1
 #define USE_VIBE_BG_SUBTRACTOR			0
 #define USE_PBAS_BG_SUBTRACTOR			0
 /////////////////////////////////////////
-#if (USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
+#if USE_VIBE_LBSP_BG_SUBTRACTOR
 #define USE_RELATIVE_LBSP_COMPARISONS	1
+#endif //USE_VIBE_LBSP_BG_SUBTRACTOR
 #if USE_PBAS_LBSP_BG_SUBTRACTOR
 #define USE_DELAYED_FRAME_ANALYSIS		1
 #endif //USE_PBAS_LBSP_BG_SUBTRACTOR
-#endif //(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
+#if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
+#define LIMIT_KEYPTS_TO_SEQUENCE_ROI	1
+#endif
 /////////////////////////////////////////
 #define USE_CDNET_DATASET				1
 #define USE_WALLFLOWER_DATASET			0
 #define USE_PETS2001_D3TC1_DATASET		0
-/////////////////////////////////////////
-#define DEFAULT_NB_THREADS				1
-/////////////////////////////////////////
-#define FORCE_STDOUT_FLUSH_FOR_ECLIPSE	0
 /////////////////////////////////////////////////////////////////////
 #define DATASET_ROOT_DIR 				std::string("/shared/datasets/")
 #define RESULTS_ROOT_DIR 				std::string("/shared/datasets/")
@@ -51,7 +56,7 @@ const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/CDNet/dataset/");
 const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet/"+RESULTS_OUTPUT_DIR_NAME+"/");
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
-const char* g_asDatasetCategories[] = {"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"};
+const char* g_asDatasetCategories[] = {"dynamicBackground","shadow","baseline","intermittentObjectMotion","cameraJitter","thermal"};
 const int g_nResultIdxOffset = 1;
 #elif USE_WALLFLOWER_DATASET
 const std::string g_sDatasetName(WALLFLOWER_DB_NAME);
@@ -69,10 +74,16 @@ const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
 const char* g_asDatasetCategories[] = {"TESTING"};
 const int g_nResultIdxOffset = 0;
-#endif
-
-int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence);
-
+#endif //USE_PETS2001_D3TC1_DATASET
+#if ENABLE_DISPLAY_MOUSE_DEBUG
+static int *pnLatestMouseX=NULL, *pnLatestMouseY=NULL;
+void OnMouseEvent(int event, int x, int y, int, void*) {
+	if(event!=cv::EVENT_MOUSEMOVE || !x || !y)
+		return;
+	*pnLatestMouseX = x;
+	*pnLatestMouseY = y;
+}
+#endif //ENABLE_DISPLAY_MOUSE_DEBUG
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if !USE_VIBE_BG_SUBTRACTOR && !USE_PBAS_BG_SUBTRACTOR
 cv::Size g_oDisplayOutputSize(960,240);
@@ -82,14 +93,18 @@ cv::Size g_oDisplayOutputSize(800,240);
 cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, size_t nFrame);
 #endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
-
+#if DEFAULT_NB_THREADS<1
+#error "Bad default number of threads specified."
+#endif //DEFAULT_NB_THREADS<1
 #if PLATFORM_SUPPORTS_CPP11
+int AnalyzeSequence(CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence);
 const size_t g_nMaxThreads = /*std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():*/DEFAULT_NB_THREADS;
 std::atomic_size_t g_nActiveThreads(0);
 #if WRITE_BGSUB_IMG_OUTPUT
 const std::vector<int> g_vnResultsComprParams = {CV_IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
+int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence);
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;
 HANDLE g_hThreadEvent[g_nMaxThreads] = {0};
 HANDLE g_hThreads[g_nMaxThreads] = {0};
@@ -105,11 +120,8 @@ const std::vector<int> g_vnResultsComprParams(g_anResultsComprParams,g_anResults
 #error "Missing implementation for threads/mutexes/atomic variables on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 
-int main( int argc, char** argv ) {
+int main() {
 	srand(0); // for now, assures that two consecutive runs on the same data return the same results
-#if FORCE_STDOUT_FLUSH_FOR_ECLIPSE
-	setvbuf(stdout, NULL, _IONBF, 0); // fixes output flush problems when using the eclipse built-in console
-#endif //FORCE_STDOUT_FLUSH_FOR_ECLIPSE
 	std::vector<CategoryInfo*> vpCategories;
 	std::cout << "Parsing dataset '"<< g_sDatasetName << "'..." << std::endl;
 	try {
@@ -140,7 +152,7 @@ int main( int argc, char** argv ) {
 				std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << pCurrCategory->m_sName << ":" << pCurrSequence->m_sName << ")" << std::endl;
 				g_nActiveThreads++;
 				nSeqProcessed++;
-				std::thread(AnalyzeSequence,-1,pCurrCategory,pCurrSequence).detach();
+				std::thread(AnalyzeSequence,pCurrCategory,pCurrSequence).detach();
 			}
 		}
 		while(g_nActiveThreads>0)
@@ -166,6 +178,12 @@ int main( int argc, char** argv ) {
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for threads/mutexes/atomic variables on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+		time_t shutdown = time(NULL);
+		tm* shutdown_tm = localtime(&shutdown);
+		std::cout << "[" << (shutdown_tm->tm_year + 1900) << '/' << (shutdown_tm->tm_mon + 1) << '/' <<  shutdown_tm->tm_mday << " -- ";
+		std::cout << shutdown_tm->tm_hour << ':' << shutdown_tm->tm_min << ':' << shutdown_tm->tm_sec << ']' << std::endl;
+		double dFinalFPS = ((double)nFramesTotal)/(shutdown-startup);
+		std::cout << "\t ... session completed at a total of " << dFinalFPS << " fps." << std::endl;
 #if WRITE_BGSUB_METRICS_ANALYSIS
 		std::cout << "Summing and writing metrics results..." << std::endl;
 		for(size_t c=0; c<vpCategories.size(); ++c) {
@@ -178,24 +196,24 @@ int main( int argc, char** argv ) {
 			}
 			WriteMetrics(g_sResultsPath+vpCategories[c]->m_sName+".txt",vpCategories[c]);
 		}
-		WriteMetrics(g_sResultsPath+"METRICS_TOTAL.txt",vpCategories);
+		WriteMetrics(g_sResultsPath+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
 #endif
 		std::cout << "All done." << std::endl;
 	}
 	else
 		std::cout << "No sequences found, all done." << std::endl;
-	time_t shutdown = time(NULL);
-	tm* shutdown_tm = localtime(&shutdown);
-	std::cout << "[" << (shutdown_tm->tm_year + 1900) << '/' << (shutdown_tm->tm_mon + 1) << '/' <<  shutdown_tm->tm_mday << " -- ";
-	std::cout << shutdown_tm->tm_hour << ':' << shutdown_tm->tm_min << ':' << shutdown_tm->tm_sec << ']' << std::endl;
-	std::cout << "\t ... session averaged " << ((double)nFramesTotal)/(shutdown-startup) << " fps." << std::endl;
+
 	// let memory 'leak' here, exits faster once job is done...
 	//for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory)
 	//	delete *pCurrCategory;
 	//vpCategories.clear();
 }
 
+#if PLATFORM_SUPPORTS_CPP11
+int AnalyzeSequence(CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence) {
+#elif PLATFORM_USES_WIN32API
 int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence) {
+#endif //PLATFORM_USES_WIN32API
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
 		BackgroundSubtractorLBSP* pBGS = NULL;
 #else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
@@ -217,11 +235,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		const double dDefaultLearningRate = BGSVIBELBSP_DEFAULT_LEARNING_RATE;
 		pBGS->initialize(oInitImg);
 #elif USE_PBAS_LBSP_BG_SUBTRACTOR
-#if USE_RELATIVE_LBSP_COMPARISONS
-		pBGS = new BackgroundSubtractorPBASLBSP(LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD,USE_DELAYED_FRAME_ANALYSIS);
-#else //!USE_RELATIVE_LBSP_COMPARISONS
 		pBGS = new BackgroundSubtractorPBASLBSP(USE_DELAYED_FRAME_ANALYSIS);
-#endif //!USE_RELATIVE_LBSP_COMPARISONS
 		const double dDefaultLearningRate = BGSPBASLBSP_DEFAULT_LEARNING_RATE_OVERRIDE;
 		pBGS->initialize(oInitImg);
 #else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
@@ -242,20 +256,45 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		const double dDefaultLearningRate = BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE;
 #endif //USE_PBAS_BG_SUBTRACTOR
 #endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
+#if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
+#if ENABLE_DISPLAY_MOUSE_DEBUG
+		pnLatestMouseX = &pBGS->nDebugCoordX;
+		pnLatestMouseY = &pBGS->nDebugCoordY;
+#endif //ENABLE_DISPLAY_MOUSE_DEBUG
+#if LIMIT_KEYPTS_TO_SEQUENCE_ROI
+		std::vector<cv::KeyPoint> voKPs = pBGS->getBGKeyPoints();
+		pCurrSequence->ValidateKeyPoints(voKPs);
+		pBGS->setBGKeyPoints(voKPs);
+#endif //LIMIT_KEYPTS_TO_SEQUENCE_ROI
+#endif //USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
 #if DISPLAY_BGSUB_DEBUG_OUTPUT
 		std::string sDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName;
+		cv::namedWindow(sDebugDisplayName);
 #endif //DISPLAY_ANALYSIS_DEBUG_RESULTS
+#if ENABLE_DISPLAY_MOUSE_DEBUG
+		std::string sMouseDebugDisplayName = "test";//pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName + " [MOUSE DEBUG]";
+		cv::namedWindow(sMouseDebugDisplayName,0);
+		cv::setMouseCallback(sMouseDebugDisplayName,OnMouseEvent,NULL);
+#endif //ENABLE_DISPLAY_MOUSE_DEBUG
 #if WRITE_BGSUB_DEBUG_IMG_OUTPUT
 		cv::VideoWriter oDebugWriter(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,g_oDisplayOutputSize,true);
 #endif //WRITE_BGSUB_DEBUG_IMG_OUTPUT
+		time_t startup = time(NULL);
 		const size_t nNbInputFrames = pCurrSequence->GetNbInputFrames();
 		for(size_t k=0; k<nNbInputFrames; k++) {
 			if(!(k%100))
 				std::cout << "\t\t" << std::setw(12) << pCurrSequence->m_sName << " @ F:" << k << "/" << nNbInputFrames << std::endl;
+#if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
 			std::chrono::high_resolution_clock::time_point pre_query = std::chrono::high_resolution_clock::now();
+#endif //ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
 			const cv::Mat& oInputImg = pCurrSequence->GetInputFrameFromIndex(k);
+#if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
 			std::chrono::high_resolution_clock::time_point post_query = std::chrono::high_resolution_clock::now();
 			std::cout << "frame query = " << std::fixed << std::setprecision(3) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_query-pre_query).count())/1000 << " ms, ";
+#endif //ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
+#if ENABLE_DISPLAY_MOUSE_DEBUG
+			cv::imshow(sMouseDebugDisplayName,oInputImg);
+#endif //ENABLE_DISPLAY_MOUSE_DEBUG
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 			cv::Mat oLastBGImg;
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
@@ -266,10 +305,14 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 			pBGS->getBackgroundImage(oLastBGImg);
 #endif //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
+#if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
 			std::chrono::high_resolution_clock::time_point pre_process = std::chrono::high_resolution_clock::now();
+#endif //ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
 			(*pBGS)(oInputImg, oFGMask, k<=100?1:dDefaultLearningRate);
+#if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
 			std::chrono::high_resolution_clock::time_point post_process = std::chrono::high_resolution_clock::now();
 			std::cout << "frame process = " << std::fixed << std::setprecision(3) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_process-pre_process).count())/1000 << " ms." << std::endl;
+#endif //ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS
 #if USE_DELAYED_FRAME_ANALYSIS
 			const size_t nCurrGTIndex = (k>0)?(k-1):k;
@@ -303,10 +346,21 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #if WRITE_BGSUB_METRICS_ANALYSIS
 			CalcMetricsFromResult(oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
 		}
+		time_t shutdown = time(NULL);
+		pCurrSequence->m_dAvgFPS = ((double)nNbInputFrames)/(shutdown-startup);
 		WriteMetrics(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".txt",pCurrSequence);
 #else //!WRITE_BGSUB_METRICS_ANALYSIS
 		}
 #endif //!WRITE_BGSUB_METRICS_ANALYSIS
+#if DISPLAY_BGSUB_DEBUG_OUTPUT
+		cv::destroyWindow(sDebugDisplayName);
+#endif //DISPLAY_BGSUB_DEBUG_OUTPUT
+#if ENABLE_DISPLAY_MOUSE_DEBUG
+		cv::setMouseCallback(sMouseDebugDisplayName,OnMouseEvent,NULL);
+		pnLatestMouseX = NULL;
+		pnLatestMouseY = NULL;
+		cv::destroyWindow(sMouseDebugDisplayName);
+#endif //ENABLE_DISPLAY_MOUSE_DEBUG
 	}
 	catch(cv::Exception& e) {std::cout << e.what() << std::endl;}
 	catch(std::runtime_error& e) {std::cout << e.what() << std::endl;}

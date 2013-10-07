@@ -30,7 +30,7 @@ public:
 	//! default constructor (also uses the default LBSP descriptor extractor constructor & params)
 	BackgroundSubtractorViBeLBSP();
 	//! full constructor used to intialize an 'absolute' LBSP-based background subtractor
-	BackgroundSubtractorViBeLBSP(	int nLBSPThreshold,
+	BackgroundSubtractorViBeLBSP(	uchar nLBSPThreshold,
 									int nDescDistThreshold=BGSLBSP_DEFAULT_DESC_DIST_THRESHOLD,
 									int nColorDistThreshold=BGSVIBELBSP_DEFAULT_COLOR_DIST_THRESHOLD,
 									int nBGSamples=BGSVIBELBSP_DEFAULT_NB_BG_SAMPLES,

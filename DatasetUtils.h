@@ -12,6 +12,7 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/features2d/features2d.hpp>
 #include "PlatformUtils.h"
 
 #define CDNET_DB_NAME 			"CDNet"
@@ -44,6 +45,7 @@ public:
 	const std::string m_sDBName;
 	std::vector<SequenceInfo*> m_vpSequences;
 	uint64_t nTP, nTN, nFP, nFN, nSE;
+	double m_dAvgFPS;
 private:
 #if PLATFORM_SUPPORTS_CPP11
 	CategoryInfo& operator=(const CategoryInfo&) = delete;
@@ -64,9 +66,11 @@ public:
 	size_t GetNbGTFrames() const;
 	cv::Size GetFrameSize() const;
 	cv::Mat GetSequenceROI() const;
+	void ValidateKeyPoints(std::vector<cv::KeyPoint>& voKPs) const;
 	const std::string m_sName;
 	const std::string m_sDBName;
 	uint64_t nTP, nTN, nFP, nFN, nSE;
+	double m_dAvgFPS;
 #if USE_PRECACHED_IO
 	void StartPrecaching();
 	void StopPrecaching();
@@ -133,6 +137,7 @@ public:
 	double dPBC;
 	double dPrecision;
 	double dFMeasure;
+	double dFPS; // note: always averaged
 	bool bAveraged;
 };
 
@@ -164,15 +169,17 @@ static inline void WriteMetrics(const std::string sResultsFileName, const Sequen
 	oMetricsOutput << pSeq->nTP << " " << pSeq->nFP << " " << pSeq->nFN << " " << pSeq->nTN << " " << pSeq->nSE << std::endl;
 	oMetricsOutput << std::endl << std::endl;
 	oMetricsOutput << std::fixed << std::setprecision(8);
-	oMetricsOutput << "Precise metrics :" << std::endl;
+	oMetricsOutput << "Cumulative metrics :" << std::endl;
 	oMetricsOutput << "Rcl        Spc        FPR        FNR        PBC        Prc        FMs       " << std::endl;
 	oMetricsOutput << temp.dRecall << " " << temp.dSpecficity << " " << temp.dFPR << " " << temp.dFNR << " " << temp.dPBC << " " << temp.dPrecision << " " << temp.dFMeasure << std::endl;
+	oMetricsOutput << std::endl << std::endl;
+	oMetricsOutput << "Sequence FPS: " << pSeq->m_dAvgFPS << std::endl;
 	oMetricsOutput.close();
 }
 
 static inline void WriteMetrics(const std::string sResultsFileName, const CategoryInfo* pCat) {
 	std::ofstream oMetricsOutput(sResultsFileName);
-	AdvancedMetrics precise(pCat, false);
+	AdvancedMetrics cumulative(pCat, false);
 	AdvancedMetrics averaged(pCat, true);
 	oMetricsOutput << "Results for category '" << pCat->m_sName << "' :" << std::endl;
 	oMetricsOutput << std::endl;
@@ -180,36 +187,38 @@ static inline void WriteMetrics(const std::string sResultsFileName, const Catego
 	oMetricsOutput << pCat->nTP << " " << pCat->nFP << " " << pCat->nFN << " " << pCat->nTN << " " << pCat->nSE << std::endl;
 	oMetricsOutput << std::endl << std::endl;
 	oMetricsOutput << std::fixed << std::setprecision(8);
-	oMetricsOutput << "Precise metrics :" << std::endl;
+	oMetricsOutput << "Cumulative metrics :" << std::endl;
 	oMetricsOutput << "Rcl        Spc        FPR        FNR        PBC        Prc        FMs       " << std::endl;
-	oMetricsOutput << precise.dRecall << " " << precise.dSpecficity << " " << precise.dFPR << " " << precise.dFNR << " " << precise.dPBC << " " << precise.dPrecision << " " << precise.dFMeasure << std::endl;
+	oMetricsOutput << cumulative.dRecall << " " << cumulative.dSpecficity << " " << cumulative.dFPR << " " << cumulative.dFNR << " " << cumulative.dPBC << " " << cumulative.dPrecision << " " << cumulative.dFMeasure << std::endl;
 	oMetricsOutput << std::endl;
 	oMetricsOutput << "Averaged metrics :" << std::endl;
 	oMetricsOutput << "Rcl        Spc        FPR        FNR        PBC        Prc        FMs       " << std::endl;
 	oMetricsOutput << averaged.dRecall << " " << averaged.dSpecficity << " " << averaged.dFPR << " " << averaged.dFNR << " " << averaged.dPBC << " " << averaged.dPrecision << " " << averaged.dFMeasure << std::endl;
+	oMetricsOutput << std::endl << std::endl;
+	oMetricsOutput << "All Sequences Average FPS: " << averaged.dFPS << std::endl;
 	oMetricsOutput.close();
 }
 
-static inline void WriteMetrics(const std::string sResultsFileName, const std::vector<CategoryInfo*>& vpCat) {
+static inline void WriteMetrics(const std::string sResultsFileName, const std::vector<CategoryInfo*>& vpCat, double dTotalFPS) {
 	std::ofstream oMetricsOutput(sResultsFileName);
-	AdvancedMetrics precise(vpCat, false);
+	AdvancedMetrics cumulative(vpCat, false);
 	AdvancedMetrics averaged(vpCat, true);
 	oMetricsOutput << std::fixed << std::setprecision(8);
 	oMetricsOutput << "Overall results :" << std::endl;
 	oMetricsOutput << std::endl;
-	oMetricsOutput << "Precise metrics :" << std::endl;
+	oMetricsOutput << "Cumulative metrics :" << std::endl;
 	oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FMs       " << std::endl;
 	for(size_t i=0; i<vpCat.size(); ++i) {
-		AdvancedMetrics temp_precise(vpCat[i],false);
+		AdvancedMetrics temp_cumulative(vpCat[i],false);
 		std::string sName = vpCat[i]->m_sName;
 		if(sName.size()>10)
 			sName = sName.substr(0,10);
 		else if(sName.size()<10)
 			sName += std::string(10-sName.size(),' ');
-		oMetricsOutput << sName << " " << temp_precise.dRecall << " " << temp_precise.dSpecficity << " " << temp_precise.dFPR << " " << temp_precise.dFNR << " " << temp_precise.dPBC << " " << temp_precise.dPrecision << " " << temp_precise.dFMeasure << std::endl;
+		oMetricsOutput << sName << " " << temp_cumulative.dRecall << " " << temp_cumulative.dSpecficity << " " << temp_cumulative.dFPR << " " << temp_cumulative.dFNR << " " << temp_cumulative.dPBC << " " << temp_cumulative.dPrecision << " " << temp_cumulative.dFMeasure << std::endl;
 	}
 	oMetricsOutput << "---------------------------------------------------------------------------------------" << std::endl;
-	oMetricsOutput << "overall    " << precise.dRecall << " " << precise.dSpecficity << " " << precise.dFPR << " " << precise.dFNR << " " << precise.dPBC << " " << precise.dPrecision << " " << precise.dFMeasure << std::endl;
+	oMetricsOutput << "overall    " << cumulative.dRecall << " " << cumulative.dSpecficity << " " << cumulative.dFPR << " " << cumulative.dFNR << " " << cumulative.dPBC << " " << cumulative.dPrecision << " " << cumulative.dFMeasure << std::endl;
 	oMetricsOutput << std::endl;
 	oMetricsOutput << "Averaged metrics :" << std::endl;
 	oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FMs       " << std::endl;
@@ -224,6 +233,9 @@ static inline void WriteMetrics(const std::string sResultsFileName, const std::v
 	}
 	oMetricsOutput << "---------------------------------------------------------------------------------------" << std::endl;
 	oMetricsOutput << "overall    " << averaged.dRecall << " " << averaged.dSpecficity << " " << averaged.dFPR << " " << averaged.dFNR << " " << averaged.dPBC << " " << averaged.dPrecision << " " << averaged.dFMeasure << std::endl;
+	oMetricsOutput << std::endl << std::endl;
+	oMetricsOutput << "All Sequences Average FPS: " << averaged.dFPS << std::endl;
+	oMetricsOutput << "Total FPS: " << dTotalFPS << std::endl;
 	oMetricsOutput.close();
 }
 

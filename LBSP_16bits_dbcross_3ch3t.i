@@ -1,6 +1,6 @@
 // note: this is the LBSP 16 bit double-cross indiv RGB pattern as used in
 // the original article by G.-A. Bilodeau et al.
-// 
+//
 //  O   O   O          4 ..  3 ..  6
 //    O O O           .. 15  8 13 ..
 //  O O X O O    =>    0  9  X 11  1
@@ -44,4 +44,3 @@ for(int n=0; n<3; ++n) {
 }
 
 #undef _val
-		
