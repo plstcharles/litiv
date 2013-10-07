@@ -13,8 +13,6 @@
 //! defines whether we should use inter-LBSP or intra-LBSP descriptors in the model
 #define BGSLBSP_MODEL_INTER_LBSP 0
 
-//! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
-#define BGSLBSP_DEFAULT_DESC_DIST_THRESHOLD (5)
 //! defines the internal threshold adjustment factor to use when determining if the variation of a single channel is enough to declare the pixel as foreground
 #define BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR (1.60f)
 
@@ -27,12 +25,10 @@
  */
 class BackgroundSubtractorLBSP : public cv::BackgroundSubtractor {
 public:
-	//! default constructor (also uses the default LBSP descriptor extractor constructor & params)
-	BackgroundSubtractorLBSP();
 	//! full constructor used to intialize an 'absolute' LBSP-based background subtractor
-	BackgroundSubtractorLBSP(uchar nLBSPThreshold, int nDescDistThreshold=BGSLBSP_DEFAULT_DESC_DIST_THRESHOLD);
+	explicit BackgroundSubtractorLBSP(uchar nLBSPThreshold, int nDescDistThreshold);
 	//! full constructor used to intialize a 'relative' LBSP-based background subtractor
-	BackgroundSubtractorLBSP(float fLBSPThreshold, int nDescDistThreshold=BGSLBSP_DEFAULT_DESC_DIST_THRESHOLD);
+	explicit BackgroundSubtractorLBSP(float fLBSPThreshold, int nDescDistThreshold);
 	//! default destructor
 	virtual ~BackgroundSubtractorLBSP();
 	//! (re)initiaization method; needs to be called before starting background subtraction

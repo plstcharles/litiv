@@ -6,16 +6,6 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <iomanip>
 
-BackgroundSubtractorViBeLBSP::BackgroundSubtractorViBeLBSP()
-	:	 BackgroundSubtractorLBSP()
-		,m_nBGSamples(BGSVIBELBSP_DEFAULT_NB_BG_SAMPLES)
-		,m_nRequiredBGSamples(BGSVIBELBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES)
-		,m_nColorDistThreshold(BGSVIBELBSP_DEFAULT_COLOR_DIST_THRESHOLD) {
-	CV_Assert(m_nBGSamples>0);
-	CV_Assert(m_nRequiredBGSamples<=m_nBGSamples && m_nRequiredBGSamples>0);
-	CV_Assert(m_nColorDistThreshold>0);
-}
-
 BackgroundSubtractorViBeLBSP::BackgroundSubtractorViBeLBSP(  uchar nLBSPThreshold
 															,int nDescDistThreshold
 															,int nColorDistThreshold
@@ -69,11 +59,11 @@ void BackgroundSubtractorViBeLBSP::initialize(const cv::Mat& oInitImg, const std
 	cv::Mat oInitDesc;
 	// create an extractor this one time, for a batch job
 	if(m_bLBSPUsingRelThreshold) {
-		LBSP oExtractor(m_fLBSPThreshold);
+		LBSP oExtractor(m_nImgChannels==3?m_fLBSPThreshold:(m_fLBSPThreshold*BGSVIBELBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT));
 		oExtractor.compute2(oInitImg,m_voKeyPoints,oInitDesc);
 	}
 	else {
-		LBSP oExtractor(m_nLBSPThreshold);
+		LBSP oExtractor(m_nImgChannels==3?m_nLBSPThreshold:(uchar)(m_nLBSPThreshold*BGSVIBELBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT));
 		oExtractor.compute2(oInitImg,m_voKeyPoints,oInitDesc);
 	}
 	m_voBGImg.resize(m_nBGSamples);
@@ -137,12 +127,12 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
 			const int uchar_idx = oInputImg.step.p[0]*y + x;
-			const int descimg_idx = uchar_idx*2;
+			const int ushrt_idx = uchar_idx*2;
 			const uchar nCurrColorInt = oInputImg.data[uchar_idx];
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			ushort nCurrInputDesc;
 #if !BGSLBSP_EXTRACT_INTER_LBSP
-			const uchar nCurrLBSPThreshold = (uchar)((m_bLBSPUsingRelThreshold?(m_fLBSPThreshold*nCurrColorInt):(m_nLBSPThreshold))*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+			const uchar nCurrLBSPThreshold = (uchar)((m_bLBSPUsingRelThreshold?(m_fLBSPThreshold*nCurrColorInt):(m_nLBSPThreshold))*BGSVIBELBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 			LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColorInt,x,y,nCurrLBSPThreshold,nCurrInputDesc);
 #endif //!BGSLBSP_EXTRACT_INTER_LBSP
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
@@ -150,14 +140,14 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 				{
 #if BGSVIBELBSP_USE_COLOR_COMPLEMENT
 					const int nColorDist = absdiff_uchar(nCurrColorInt,nBGColorInt);
-					if(nColorDist>m_nColorDistThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT)
+					if(nColorDist>m_nColorDistThreshold*BGSVIBELBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT)
 						goto failedcheck1ch;
 #endif //BGSVIBELBSP_USE_COLOR_COMPLEMENT
 #if BGSLBSP_EXTRACT_INTER_LBSP
-					const uchar nBGLBSPThreshold = (uchar)((m_bLBSPUsingRelThreshold?(m_fLBSPThreshold*nBGColorInt):(m_nLBSPThreshold))*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+					const uchar nBGLBSPThreshold = (uchar)((m_bLBSPUsingRelThreshold?(m_fLBSPThreshold*nBGColorInt):(m_nLBSPThreshold))*BGSVIBELBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 					LBSP::computeGrayscaleDescriptor(oInputImg,nBGColorInt,x,y,nBGLBSPThreshold,nCurrInputDesc);
 #endif //BGSLBSP_EXTRACT_INTER_LBSP
-					const int nDescDist = hdist_ushort_8bitLUT(nCurrInputDesc,*((ushort*)(m_voBGDesc[nSampleIdx].data+descimg_idx)));
+					const int nDescDist = hdist_ushort_8bitLUT(nCurrInputDesc,*((ushort*)(m_voBGDesc[nSampleIdx].data+ushrt_idx)));
 					if(nDescDist>m_nDescDistThreshold)
 						goto failedcheck1ch;
 					nGoodSamplesCount++;
@@ -170,11 +160,11 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 			else {
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
-					ushort& nRandInputDesc = *((ushort*)(m_voBGDesc[s_rand].data+descimg_idx));
+					ushort& nRandInputDesc = *((ushort*)(m_voBGDesc[s_rand].data+ushrt_idx));
 #if (!BGSLBSP_MODEL_INTER_LBSP && !BGSLBSP_EXTRACT_INTER_LBSP) || (BGSLBSP_MODEL_INTER_LBSP && BGSLBSP_EXTRACT_INTER_LBSP)
 					nRandInputDesc = nCurrInputDesc;
 #elif !BGSLBSP_MODEL_INTER_LBSP && BGSLBSP_EXTRACT_INTER_LBSP
-					const uchar nCurrLBSPThreshold = (uchar)((m_bLBSPUsingRelThreshold?(m_fLBSPThreshold*nCurrColorInt):(m_nLBSPThreshold))*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+					const uchar nCurrLBSPThreshold = (uchar)((m_bLBSPUsingRelThreshold?(m_fLBSPThreshold*nCurrColorInt):(m_nLBSPThreshold))*BGSVIBELBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 					LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColorInt,x,y,nCurrLBSPThreshold,nRandInputDesc);
 #else //BGSLBSP_MODEL_INTER_LBSP && !BGSLBSP_EXTRACT_INTER_LBSP
 #error "Illogical model desc <-> extracted desc association."
@@ -189,12 +179,12 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 #if BGSVIBELBSP_USE_SELF_DIFFUSION
 #if BGSLBSP_MODEL_INTER_LBSP
 					const uchar nRandBGColorInt = m_voBGImg[nSampleIdx].at<uchar>(y_rand,x_rand);
-					const uchar nRandBGLBSPThreshold = (uchar)((m_bLBSPUsingRelThreshold?(m_fLBSPThreshold*nRandBGColorInt):(m_nLBSPThreshold))*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+					const uchar nRandBGLBSPThreshold = (uchar)((m_bLBSPUsingRelThreshold?(m_fLBSPThreshold*nRandBGColorInt):(m_nLBSPThreshold))*BGSVIBELBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 					LBSP::computeGrayscaleDescriptor(oInputImg,nRandBGColorInt,x_rand,y_rand,nRandBGLBSPThreshold,nRandInputDesc);
 					m_voBGImg[s_rand].at<uchar>(y_rand,x_rand) = oInputImg.at<uchar>(y_rand,x_rand);
 #else //!BGSLBSP_MODEL_INTER_LBSP
 					const uchar nRandColorInt = oInputImg.at<uchar>(y_rand,x_rand);
-					const uchar nRandLBSPThreshold = (uchar)((m_bLBSPUsingRelThreshold?(m_fLBSPThreshold*nRandColorInt):(m_nLBSPThreshold))*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+					const uchar nRandLBSPThreshold = (uchar)((m_bLBSPUsingRelThreshold?(m_fLBSPThreshold*nRandColorInt):(m_nLBSPThreshold))*BGSVIBELBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 					LBSP::computeGrayscaleDescriptor(oInputImg,nRandColorInt,x_rand,y_rand,nRandLBSPThreshold,nRandInputDesc);
 					m_voBGImg[s_rand].at<uchar>(y_rand,x_rand) = nRandColorInt;
 #endif //!BGSLBSP_MODEL_INTER_LBSP
@@ -202,7 +192,7 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 #if (!BGSLBSP_MODEL_INTER_LBSP && !BGSLBSP_EXTRACT_INTER_LBSP) || (BGSLBSP_MODEL_INTER_LBSP && BGSLBSP_EXTRACT_INTER_LBSP)
 					nRandInputDesc = nCurrInputDesc;
 #elif !BGSLBSP_MODEL_INTER_LBSP && BGSLBSP_EXTRACT_INTER_LBSP
-					const uchar nCurrLBSPThreshold = (uchar)((m_bLBSPUsingRelThreshold?(m_fLBSPThreshold*nCurrColorInt):(m_nLBSPThreshold))*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+					const uchar nCurrLBSPThreshold = (uchar)((m_bLBSPUsingRelThreshold?(m_fLBSPThreshold*nCurrColorInt):(m_nLBSPThreshold))*BGSVIBELBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 					LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColorInt,x,y,nCurrLBSPThreshold,nRandInputDesc);
 #else //BGSLBSP_MODEL_INTER_LBSP && !BGSLBSP_EXTRACT_INTER_LBSP
 #error "Illogical model desc <-> extracted desc association."
@@ -232,9 +222,9 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
 			const int uchar_idx = oInputImg.cols*y + x;
-			const int rgbimg_idx = uchar_idx*3;
-			const int descimg_idx = uchar_idx*6;
-			const uchar* const anCurrColorInt = oInputImg.data+rgbimg_idx;
+			const int uchar_rgb_idx = uchar_idx*3;
+			const int ushrt_rgb_idx = uchar_rgb_idx*2;
+			const uchar* const anCurrColorInt = oInputImg.data+uchar_rgb_idx;
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			ushort anCurrInputDesc[3];
 #if !BGSLBSP_EXTRACT_INTER_LBSP
@@ -246,8 +236,8 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 				LBSP::computeRGBDescriptor(oInputImg,anCurrColorInt,x,y,m_nLBSPThreshold,anCurrInputDesc);
 #endif //!BGSLBSP_EXTRACT_INTER_LBSP
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
-				const ushort* const anBGDesc = (ushort*)(m_voBGDesc[nSampleIdx].data+descimg_idx);
-				const uchar* const anBGColorInt = m_voBGImg[nSampleIdx].data+rgbimg_idx;
+				const ushort* const anBGDesc = (ushort*)(m_voBGDesc[nSampleIdx].data+ushrt_rgb_idx);
+				const uchar* const anBGColorInt = m_voBGImg[nSampleIdx].data+uchar_rgb_idx;
 #if BGSVIBELBSP_USE_COLOR_COMPLEMENT
 				int nTotColorDist = 0;
 #endif //BGSVIBELBSP_USE_COLOR_COMPLEMENT
@@ -288,7 +278,7 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 			else {
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
-					ushort* anRandInputDesc = ((ushort*)(m_voBGDesc[s_rand].data+descimg_idx));
+					ushort* anRandInputDesc = ((ushort*)(m_voBGDesc[s_rand].data+ushrt_rgb_idx));
 #if (!BGSLBSP_MODEL_INTER_LBSP && !BGSLBSP_EXTRACT_INTER_LBSP) || (BGSLBSP_MODEL_INTER_LBSP && BGSLBSP_EXTRACT_INTER_LBSP)
 					for(int c=0; c<3; ++c)
 						anRandInputDesc[c] = anCurrInputDesc[c];
@@ -303,7 +293,7 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 #error "Illogical model desc <-> extracted desc association."
 #endif //BGSLBSP_MODEL_INTER_LBSP && !BGSLBSP_EXTRACT_INTER_LBSP
 					for(int c=0; c<3; ++c)
-						*(m_voBGImg[s_rand].data+rgbimg_idx+c) = anCurrColorInt[c];
+						*(m_voBGImg[s_rand].data+uchar_rgb_idx+c) = anCurrColorInt[c];
 				}
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;

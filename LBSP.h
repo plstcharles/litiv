@@ -5,12 +5,6 @@
 #include <opencv2/features2d/features2d.hpp>
 #include "DistanceUtils.h"
 
-//! defines the default value for LBSP::m_nThreshold
-#define LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD (25)
-//! defines the default value for LBSP::m_fThreshold
-#define LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD (0.300f)
-//! defines the internal threshold adjustment factor to use when treating single channel images (based on the assumption that grayscale images have less noise per channel...)
-#define LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.400f)
 //! defines if the provided keypoints should be validated when passed to 'compute' functions or not; setting to zero might improve performance, but is generally less safe against OOB exceptions
 #define LBSP_VALIDATE_KEYPOINTS_INTERNALLY 0
 
@@ -26,12 +20,10 @@
  */
 class LBSP : public cv::DescriptorExtractor {
 public:
-	//! default constructor, falls back to using absolute threshold with default params
-	LBSP();
 	//! constructor 1, threshold = absolute intensity 'similarity' threshold used when computing comparisons
-	explicit LBSP(uchar nThreshold/*=LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD*/);
+	explicit LBSP(uchar nThreshold);
 	//! constructor 2, threshold = relative intensity 'similarity' threshold used when computing comparisons
-	explicit LBSP(float fThreshold/*=LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD*/);
+	explicit LBSP(float fThreshold);
 	//! default destructor
 	virtual ~LBSP();
 	//! loads extractor params from the specified file node @@@@ not impl

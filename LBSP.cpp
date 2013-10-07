@@ -1,11 +1,5 @@
 #include "LBSP.h"
 
-LBSP::LBSP()
-	:	 m_bUseRelativeThreshold(false)
-		,m_fThreshold(0) // unused
-		,m_nThreshold(LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD)
-		,m_oRefImage() {}
-
 LBSP::LBSP(uchar nThreshold)
 	:	 m_bUseRelativeThreshold(false)
 		,m_fThreshold(0) // unused
@@ -69,7 +63,6 @@ static inline void lbsp_computeImpl(	const cv::Mat& oInputImg,
 	const uchar* _refdata = oRefImg.empty()?oInputImg.data:oRefImg.data;
 	const int nKeyPoints = (int)voKeyPoints.size();
 	if(nChannels==1) {
-		_t = (uchar)(_t*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 		oDesc.create(nKeyPoints,1,CV_16UC1);
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int _x = (int)voKeyPoints[k].pt.x;
@@ -112,7 +105,7 @@ static inline void lbsp_computeImpl(	const cv::Mat& oInputImg,
 			const int _y = (int)voKeyPoints[k].pt.y;
 			const uchar _ref = _refdata[_step_row*(_y)+_x];
 			ushort& _res = oDesc.at<ushort>(k);
-			const uchar _t = (uchar)(_ref*fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+			const uchar _t = (uchar)(_ref*fThreshold);
 			#include "LBSP_16bits_dbcross_1ch.i"
 		}
 	}
@@ -143,7 +136,6 @@ static inline void lbsp_computeImpl2(	const cv::Mat& oInputImg,
 	const uchar* _refdata = oRefImg.empty()?oInputImg.data:oRefImg.data;
 	const int nKeyPoints = (int)voKeyPoints.size();
 	if(nChannels==1) {
-		_t = (uchar)(_t*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 		oDesc.create(oInputImg.size(),CV_16UC1);
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int _x = (int)voKeyPoints[k].pt.x;
@@ -186,7 +178,7 @@ static inline void lbsp_computeImpl2(	const cv::Mat& oInputImg,
 			const int _y = (int)voKeyPoints[k].pt.y;
 			const uchar _ref = _refdata[_step_row*(_y)+_x];
 			ushort& _res = oDesc.at<ushort>(_y,_x);
-			const uchar _t = (uchar)(_ref*fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+			const uchar _t = (uchar)(_ref*fThreshold);
 			#include "LBSP_16bits_dbcross_1ch.i"
 		}
 	}
