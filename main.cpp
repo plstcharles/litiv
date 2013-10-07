@@ -228,9 +228,9 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		cv::Mat oFGMask, oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
 #if USE_VIBE_LBSP_BG_SUBTRACTOR
 #if USE_RELATIVE_LBSP_COMPARISONS
-		pBGS = new BackgroundSubtractorViBeLBSP(LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD);
+		pBGS = new BackgroundSubtractorViBeLBSP(BGSVIBELBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
 #else //!USE_RELATIVE_LBSP_COMPARISONS
-		pBGS = new BackgroundSubtractorViBeLBSP();
+		pBGS = new BackgroundSubtractorViBeLBSP(BGSVIBELBSP_DEFAULT_LBSP_ABS_SIMILARITY_THRESHOLD);
 #endif //!USE_RELATIVE_LBSP_COMPARISONS
 		const double dDefaultLearningRate = BGSVIBELBSP_DEFAULT_LEARNING_RATE;
 		pBGS->initialize(oInitImg);
@@ -272,7 +272,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		cv::namedWindow(sDebugDisplayName);
 #endif //DISPLAY_ANALYSIS_DEBUG_RESULTS
 #if ENABLE_DISPLAY_MOUSE_DEBUG
-		std::string sMouseDebugDisplayName = "test";//pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName + " [MOUSE DEBUG]";
+		std::string sMouseDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName + " [MOUSE DEBUG]";
 		cv::namedWindow(sMouseDebugDisplayName,0);
 		cv::setMouseCallback(sMouseDebugDisplayName,OnMouseEvent,NULL);
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
@@ -384,7 +384,11 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 	cv::Mat oInputDesc, oInputDescBYTE, oInputDescBYTE3;
 	cv::Mat oDescDiff, oDescDiffBYTE, oDescDiffBYTE3;
 	cv::Mat oImgDiffBYTE3;
-	LBSP oExtractor;
+#if USE_VIBE_LBSP_BG_SUBTRACTOR
+	LBSP oExtractor(USE_RELATIVE_LBSP_COMPARISONS?BGSVIBELBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD:BGSVIBELBSP_DEFAULT_LBSP_ABS_SIMILARITY_THRESHOLD);
+#else //USE_PBAS_LBSP_BG_SUBTRACTOR
+	LBSP oExtractor(BGSPBASLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
+#endif //USE_PBAS_LBSP_BG_SUBTRACTOR
 	oExtractor.setReference(oBGImg);
 	oExtractor.compute2(oInputImg,voKeyPoints,oInputDesc);
 	LBSP::calcDescImgDiff(oInputDesc,oBGDesc,oDescDiff);

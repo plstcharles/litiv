@@ -6,9 +6,17 @@
 #define BGSPBASLBSP_USE_SELF_DIFFUSION 0
 //! defines whether to use or not the R2 acceleration thresholds to modulate R(x) variations
 #define BGSPBASLBSP_USE_R2_ACCELERATION 1
+//! defines whether to use or not the R(x)-based rel/abs LBSP cutoff configuration
+#define BGSPBASLBSP_USE_LBSP_TYPE_CUTOFF 0
+//! defines whether to use or not the LBSP-desc-dist-based threshold checks & skips
+#define BGSPBASLBSP_USE_DESC_DIST_CHECKS 0
 
+//! defines the default value for BackgroundSubtractorViBe::m_fLBSPThreshold
+#define BGSPBASLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.300f)
 //! defines the default value for BackgroundSubtractorPBASLBSP::m_nDefaultColorDistThreshold
 #define BGSPBASLBSP_DEFAULT_COLOR_DIST_THRESHOLD (30)
+//! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
+#define BGSPBASLBSP_DEFAULT_DESC_DIST_THRESHOLD (6)
 //! defines the default value for BackgroundSubtractorPBASLBSP::m_nBGSamples
 #define BGSPBASLBSP_DEFAULT_NB_BG_SAMPLES (35)
 //! defines the default value for BackgroundSubtractorPBASLBSP::m_nRequiredBGSamples
@@ -17,6 +25,8 @@
 #define BGSPBASLBSP_DEFAULT_LEARNING_RATE (16.0f)
 //! defines the default value for the learning rate passed to BackgroundSubtractorViBeLBSP::operator()
 #define BGSPBASLBSP_DEFAULT_LEARNING_RATE_OVERRIDE (-1.0)
+//! defines the internal threshold adjustment factor to use when treating single channel images (based on the assumption that grayscale images have less noise per channel...)
+#define BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.350f)
 //! parameters used for dynamic threshold adjustments
 #define BGSPBASLBSP_R_OFFST (0.0000f)
 #define BGSPBASLBSP_R_SCALE (3.5000f)
@@ -25,17 +35,11 @@
 #define BGSPBASLBSP_R_LOWER (0.8000f)
 #define BGSPBASLBSP_R_UPPER (3.5000f)
 //! parameters used for adjusting the variation speed of dynamic thresholds
-#if BGSPBASLBSP_USE_R2_ACCELERATION
 #define BGSPBASLBSP_R2_OFFST (0.085f)
 #define BGSPBASLBSP_R2_INCR  (0.200f)
 #define BGSPBASLBSP_R2_DECR  (0.025f)
 #define BGSPBASLBSP_R2_LOWER (0.001f)
 #define BGSPBASLBSP_R2_UPPER (15.00f)
-#endif //BGSPBASLBSP_USE_R2_ACCELERATION
-//! defines the default cutoff R(x) value to switch between the relative and absolute LBSP approaches
-#define BGSPBASLBSP_DEFAULT_REL_LBSP_CUTOFF_R_VAL (1.500f)
-#define BGSPBASLBSP_DEFAULT_REL_LBSP_CUTOFF_R_VAL_BUFFER (0.650f)
-#define BGSPBASLBSP_DEF_ABS_LBSP_THRES 25
 //! parameters used for dynamic learning rate adjustments
 #define BGSPBASLBSP_T_OFFST (0.0001f)
 #define BGSPBASLBSP_T_SCALE (1.0000f)
@@ -47,6 +51,10 @@
 #define BGSPBASLBSP_GRAD_WEIGHT_ALPHA (10.0f)
 //! number of samples used to create running averages for model variation computations
 #define BGSPBASLBSP_N_SAMPLES_FOR_MEAN (25)
+//! defines the default cutoff values to switch between the relative and absolute LBSP approaches
+#define BGSPBASLBSP_DEFAULT_REL_LBSP_CUTOFF_R_VAL (1.500f)
+#define BGSPBASLBSP_DEFAULT_REL_LBSP_CUTOFF_R_VAL_BUFFER (0.650f)
+#define BGSPBASLBSP_DEF_ABS_LBSP_THRES ((uchar)25)
 
 /*!
 	PBAS-Based Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
@@ -62,8 +70,8 @@ class BackgroundSubtractorPBASLBSP : public BackgroundSubtractorLBSP {
 public:
 	//! full constructor
 	BackgroundSubtractorPBASLBSP(	bool bDelayedAnalysis=true,
-									float fLBSPThreshold=LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD,
-									int nInitDescDistThreshold=BGSLBSP_DEFAULT_DESC_DIST_THRESHOLD,
+									float fLBSPThreshold=BGSPBASLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
+									int nInitDescDistThreshold=BGSPBASLBSP_DEFAULT_DESC_DIST_THRESHOLD,
 									int nInitColorDistThreshold=BGSPBASLBSP_DEFAULT_COLOR_DIST_THRESHOLD,
 									float fInitUpdateRate=BGSPBASLBSP_DEFAULT_LEARNING_RATE,
 									int nBGSamples=BGSPBASLBSP_DEFAULT_NB_BG_SAMPLES,

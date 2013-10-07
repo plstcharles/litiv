@@ -7,16 +7,6 @@
 #include <iomanip>
 #include <exception>
 
-BackgroundSubtractorLBSP::BackgroundSubtractorLBSP()
-	:	 nDebugCoordX(0),nDebugCoordY(0)
-		,m_nDescDistThreshold(BGSLBSP_DEFAULT_DESC_DIST_THRESHOLD)
-		,m_bLBSPUsingRelThreshold(false)
-		,m_nLBSPThreshold(LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD)
-		,m_fLBSPThreshold(-1)
-		,m_bInitialized(false) {
-	CV_Assert(m_nDescDistThreshold>0);
-}
-
 BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(uchar nLBSPThreshold, int nDescDistThreshold)
 	:	 nDebugCoordX(0),nDebugCoordY(0)
 		,m_nDescDistThreshold(nDescDistThreshold)
