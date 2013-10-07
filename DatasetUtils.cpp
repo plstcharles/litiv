@@ -7,7 +7,8 @@ CategoryInfo::CategoryInfo(const std::string& name, const std::string& dir, cons
 		,nTN(0)
 		,nFP(0)
 		,nFN(0)
-		,nSE(0) {
+		,nSE(0)
+		,m_dAvgFPS(-1) {
 	std::cout << "\tParsing dir '" << dir << "' for category '" << name << "'... ";
 	std::vector<std::string> vsSequencePaths;
 	if(m_sDBName==CDNET_DB_NAME || m_sDBName==WALLFLOWER_DB_NAME || m_sDBName==PETS2001_D3TC1_DB_NAME/*|| m_sDBName==...*/) {
@@ -42,6 +43,7 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 		,nFP(0)
 		,nFN(0)
 		,nSE(0)
+		,m_dAvgFPS(-1)
 #if USE_PRECACHED_IO
 		,m_bIsPrecaching(false)
 		,m_nNextExpectedInputFrameIdx(0)
@@ -164,6 +166,15 @@ cv::Size SequenceInfo::GetFrameSize() const {
 
 cv::Mat SequenceInfo::GetSequenceROI() const {
 	return m_oROI;
+}
+
+void SequenceInfo::ValidateKeyPoints(std::vector<cv::KeyPoint>& voKPs) const {
+	std::vector<cv::KeyPoint> voNewKPs;
+	for(size_t k=0; k<voKPs.size(); ++k) {
+		if(m_oROI.at<uchar>(voKPs[k].pt)>0)
+			voNewKPs.push_back(voKPs[k]);
+	}
+	voKPs = voNewKPs;
 }
 
 cv::Mat SequenceInfo::GetInputFrameFromIndex_Internal(size_t idx) {
@@ -478,7 +489,7 @@ void SequenceInfo::StopPrecaching() {
 
 #endif //USE_PRECACHED_IO
 
-AdvancedMetrics::AdvancedMetrics(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN, uint64_t nSE)
+AdvancedMetrics::AdvancedMetrics(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN, uint64_t /*nSE*/)
 	:	 dRecall((double)nTP/(nTP+nFN))
 		,dSpecficity((double)nTN/(nTN+nFP))
 		,dFPR((double)nFP/(nFP+nTN))
@@ -504,6 +515,7 @@ AdvancedMetrics::AdvancedMetrics(const SequenceInfo* pSeq)
 		,dPBC(100.0*(pSeq->nFN+pSeq->nFP)/(pSeq->nTP+pSeq->nFP+pSeq->nFN+pSeq->nTN))
 		,dPrecision((double)pSeq->nTP/(pSeq->nTP+pSeq->nFP))
 		,dFMeasure(2.0*(dRecall*dPrecision)/(dRecall+dPrecision))
+		,dFPS(pSeq->m_dAvgFPS)
 		,bAveraged(false) {}
 
 AdvancedMetrics::AdvancedMetrics(const CategoryInfo* pCat, bool bAverage)
@@ -521,6 +533,7 @@ AdvancedMetrics::AdvancedMetrics(const CategoryInfo* pCat, bool bAverage)
 		dPBC = (100.0*(pCat->nFN+pCat->nFP)/(pCat->nTP+pCat->nFP+pCat->nFN+pCat->nTN));
 		dPrecision = ((double)pCat->nTP/(pCat->nTP+pCat->nFP));
 		dFMeasure = (2.0*(dRecall*dPrecision)/(dRecall+dPrecision));
+		dFPS = pCat->m_dAvgFPS;
 	}
 	else {
 		dRecall = 0;
@@ -530,6 +543,7 @@ AdvancedMetrics::AdvancedMetrics(const CategoryInfo* pCat, bool bAverage)
 		dPBC = 0;
 		dPrecision = 0;
 		dFMeasure = 0;
+		dFPS = 0;
 		const size_t nSeq = pCat->m_vpSequences.size();
 		for(size_t i=0; i<nSeq; ++i) {
 			AdvancedMetrics temp(pCat->m_vpSequences[i]);
@@ -540,6 +554,7 @@ AdvancedMetrics::AdvancedMetrics(const CategoryInfo* pCat, bool bAverage)
 			dPBC += temp.dPBC;
 			dPrecision += temp.dPrecision;
 			dFMeasure += temp.dFMeasure;
+			dFPS += temp.dFPS;
 		}
 		dRecall /= nSeq;
 		dSpecficity /= nSeq;
@@ -548,6 +563,7 @@ AdvancedMetrics::AdvancedMetrics(const CategoryInfo* pCat, bool bAverage)
 		dPBC /= nSeq;
 		dPrecision /= nSeq;
 		dFMeasure /= nSeq;
+		dFPS /= nSeq;
 	}
 }
 
@@ -557,12 +573,14 @@ AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool b
 	const size_t nCat = vpCat.size();
 	if(!bAverage) {
 		uint64_t nGlobalTP=0, nGlobalTN=0, nGlobalFP=0, nGlobalFN=0, nGlobalSE=0;
+		dFPS=0;
 		for(size_t i=0; i<nCat; ++i) {
 			nGlobalTP += vpCat[i]->nTP;
 			nGlobalTN += vpCat[i]->nTN;
 			nGlobalFP += vpCat[i]->nFP;
 			nGlobalFN += vpCat[i]->nFN;
 			nGlobalSE += vpCat[i]->nSE;
+			dFPS += vpCat[i]->m_dAvgFPS;
 		}
 		dRecall = ((double)nGlobalTP/(nGlobalTP+nGlobalFN));
 		dSpecficity = ((double)nGlobalTN/(nGlobalTN+nGlobalFP));
@@ -575,6 +593,7 @@ AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool b
 		dPBC = (100.0*(nGlobalFN+nGlobalFP)/(nGlobalTP+nGlobalFP+nGlobalFN+nGlobalTN));
 		dPrecision = ((double)nGlobalTP/(nGlobalTP+nGlobalFP));
 		dFMeasure = (2.0*(dRecall*dPrecision)/(dRecall+dPrecision));
+		dFPS /= nCat;
 	}
 	else {
 		dRecall = 0;
@@ -584,6 +603,7 @@ AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool b
 		dPBC = 0;
 		dPrecision = 0;
 		dFMeasure = 0;
+		dFPS = 0;
 		for(size_t i=0; i<nCat; ++i) {
 			AdvancedMetrics temp(vpCat[i],true);
 			dRecall += temp.dRecall;
@@ -593,6 +613,7 @@ AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool b
 			dPBC += temp.dPBC;
 			dPrecision += temp.dPrecision;
 			dFMeasure += temp.dFMeasure;
+			dFPS += temp.dFPS;
 		}
 		dRecall /= nCat;
 		dSpecficity /= nCat;
@@ -601,5 +622,6 @@ AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool b
 		dPBC /= nCat;
 		dPrecision /= nCat;
 		dFMeasure /= nCat;
+		dFPS /= nCat;
 	}
 }

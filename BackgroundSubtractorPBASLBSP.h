@@ -32,6 +32,10 @@
 #define BGSPBASLBSP_R2_LOWER (0.001f)
 #define BGSPBASLBSP_R2_UPPER (15.00f)
 #endif //BGSPBASLBSP_USE_R2_ACCELERATION
+//! defines the default cutoff R(x) value to switch between the relative and absolute LBSP approaches
+#define BGSPBASLBSP_DEFAULT_REL_LBSP_CUTOFF_R_VAL (1.500f)
+#define BGSPBASLBSP_DEFAULT_REL_LBSP_CUTOFF_R_VAL_BUFFER (0.650f)
+#define BGSPBASLBSP_DEF_ABS_LBSP_THRES 25
 //! parameters used for dynamic learning rate adjustments
 #define BGSPBASLBSP_T_OFFST (0.0001f)
 #define BGSPBASLBSP_T_SCALE (1.0000f)
@@ -56,17 +60,9 @@
  */
 class BackgroundSubtractorPBASLBSP : public BackgroundSubtractorLBSP {
 public:
-	//! default constructor (also uses the default LBSP descriptor extractor constructor & params)
-	BackgroundSubtractorPBASLBSP(bool bDelayedAnalysis);
-	//! full constructor used to intialize an 'absolute' LBSP-based background subtractor
-	BackgroundSubtractorPBASLBSP(	int nLBSPThreshold, bool bDelayedAnalysis,
-									int nInitDescDistThreshold=BGSLBSP_DEFAULT_DESC_DIST_THRESHOLD,
-									int nInitColorDistThreshold=BGSPBASLBSP_DEFAULT_COLOR_DIST_THRESHOLD,
-									float fInitUpdateRate=BGSPBASLBSP_DEFAULT_LEARNING_RATE,
-									int nBGSamples=BGSPBASLBSP_DEFAULT_NB_BG_SAMPLES,
-									int nRequiredBGSamples=BGSPBASLBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES);
-	//! full constructor used to intialize a 'relative' LBSP-based background subtractor
-	BackgroundSubtractorPBASLBSP(	float fLBSPThreshold, bool bDelayedAnalysis,
+	//! full constructor
+	BackgroundSubtractorPBASLBSP(	bool bDelayedAnalysis=true,
+									float fLBSPThreshold=LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD,
 									int nInitDescDistThreshold=BGSLBSP_DEFAULT_DESC_DIST_THRESHOLD,
 									int nInitColorDistThreshold=BGSPBASLBSP_DEFAULT_COLOR_DIST_THRESHOLD,
 									float fInitUpdateRate=BGSPBASLBSP_DEFAULT_LEARNING_RATE,
@@ -104,6 +100,8 @@ protected:
 	cv::Mat m_oMeanNbBlinksFrame; // @@@@@@@@
 	// @@@@@@@@@@@@
 	cv::Mat m_oBlinksFrame; // @@@@@@@@
+	// @@@@@@@@@@@@
+	cv::Mat m_oRelLBSPThresFrame; // @@@@@@@@
 	//! absolute default update rate threshold (the default 'T(x)' value in the original PBAS paper)
 	const float m_fDefaultUpdateRate;
 	//! mean gradient magnitude distance over the past frame

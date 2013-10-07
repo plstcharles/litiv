@@ -29,7 +29,7 @@ public:
 	//! default constructor, falls back to using absolute threshold with default params
 	LBSP();
 	//! constructor 1, threshold = absolute intensity 'similarity' threshold used when computing comparisons
-	explicit LBSP(int nThreshold/*=LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD*/);
+	explicit LBSP(uchar nThreshold/*=LBSP_DEFAULT_ABS_SIMILARITY_THRESHOLD*/);
 	//! constructor 2, threshold = relative intensity 'similarity' threshold used when computing comparisons
 	explicit LBSP(float fThreshold/*=LBSP_DEFAULT_REL_SIMILARITY_THRESHOLD*/);
 	//! default destructor
@@ -49,108 +49,59 @@ public:
 	//! returns the current relative threshold used for comparisons (-1 = invalid/not used)
 	virtual float getRelThreshold() const;
 	//! returns the current absolute threshold used for comparisons (-1 = invalid/not used)
-	virtual int getAbsThreshold() const;
+	virtual uchar getAbsThreshold() const;
 
 	//! similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix (possibly slower, but the result can be displayed)
 	void compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const;
 	//! batch version of LBSP::compute2(const cv::Mat& image, ...), also similar to DescriptorExtractor::compute(const std::vector<cv::Mat>& imageCollection, ...)
 	void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat>& voDescCollection) const;
 
-	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel-absolute version)
-	inline static void computeGrayscaleAbsoluteDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const int nThreshold, ushort& _res) {
+	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel version)
+	inline static void computeGrayscaleDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const uchar _t, ushort& _res) {
 		CV_DbgAssert(!oInputImg.empty());
-		CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 		CV_DbgAssert(oInputImg.type()==CV_8UC1);
 		CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
-		CV_DbgAssert(nThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT>0 && nThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT<=UCHAR_MAX);
-		CV_DbgAssert(_x>=LBSP::PATCH_SIZE/2 && _y>=LBSP::PATCH_SIZE/2);
-		CV_DbgAssert(_x<oInputImg.cols-LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-LBSP::PATCH_SIZE/2);
+		CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
+		CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
 		const int _step_row = oInputImg.step.p[0];
-		const uchar* _data = oInputImg.data;
-		const uchar _ref = (oRefImg.empty()?oInputImg.data:oRefImg.data)[_step_row*(_y)+_x];
-		const uchar _t = (uchar)(nThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+		const uchar* const _data = oInputImg.data;
 		#include "LBSP_16bits_dbcross_1ch.i"
 	}
 
-	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel-relative version)
-	inline static void computeGrayscaleRelativeDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const float fThreshold, ushort& _res) {
+	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (3-channels version)
+	inline static void computeRGBDescriptor(const cv::Mat& oInputImg, const uchar* const _ref,  const int _x, const int _y, const uchar* const _t, ushort* _res) {
 		CV_DbgAssert(!oInputImg.empty());
-		CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
-		CV_DbgAssert(oInputImg.type()==CV_8UC1);
-		CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
-		CV_DbgAssert(fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT>0 && fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT<1);
-		CV_DbgAssert(_x>=LBSP::PATCH_SIZE/2 && _y>=LBSP::PATCH_SIZE/2);
-		CV_DbgAssert(_x<oInputImg.cols-LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-LBSP::PATCH_SIZE/2);
-		const int _step_row = oInputImg.step.p[0];
-		const uchar* _data = oInputImg.data;
-		const uchar _ref = (oRefImg.empty()?oInputImg.data:oRefImg.data)[_step_row*(_y)+_x];
-		const uchar _t = (uchar)(_ref*fThreshold*LBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
-		#include "LBSP_16bits_dbcross_1ch.i"
-	}
-
-	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (3-channels-absolute version)
-	inline static void computeRGBAbsoluteDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const int nThreshold, ushort* _res) {
-		CV_DbgAssert(!oInputImg.empty());
-		CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 		CV_DbgAssert(oInputImg.type()==CV_8UC3);
 		CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
-		CV_DbgAssert(nThreshold>0 && nThreshold<=UCHAR_MAX);
-		CV_DbgAssert(_x>=LBSP::PATCH_SIZE/2 && _y>=LBSP::PATCH_SIZE/2);
-		CV_DbgAssert(_x<oInputImg.cols-LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-LBSP::PATCH_SIZE/2);
+		CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
+		CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
 		const int _step_row = oInputImg.step.p[0];
-		const uchar* _data = oInputImg.data;
-		const uchar* _ref = (oRefImg.empty()?oInputImg.data:oRefImg.data)+_step_row*(_y)+3*(_x);
-		const uchar _t[3] = {(uchar)nThreshold,(uchar)nThreshold,(uchar)nThreshold};
-		#include "LBSP_16bits_dbcross_3ch.i"
+		const uchar* const _data = oInputImg.data;
+		#include "LBSP_16bits_dbcross_3ch3t.i"
 	}
 
-	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (3-channels-relative version)
-	inline static void computeRGBRelativeDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const float fThreshold, ushort* _res) {
+	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (3-channels version)
+	inline static void computeRGBDescriptor(const cv::Mat& oInputImg, const uchar* const _ref,  const int _x, const int _y, const uchar _t, ushort* _res) {
 		CV_DbgAssert(!oInputImg.empty());
-		CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 		CV_DbgAssert(oInputImg.type()==CV_8UC3);
 		CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
-		CV_DbgAssert(fThreshold>0 && fThreshold<1);
-		CV_DbgAssert(_x>=LBSP::PATCH_SIZE/2 && _y>=LBSP::PATCH_SIZE/2);
-		CV_DbgAssert(_x<oInputImg.cols-LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-LBSP::PATCH_SIZE/2);
+		CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
+		CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
 		const int _step_row = oInputImg.step.p[0];
-		const uchar* _data = oInputImg.data;
-		const uchar* _ref = (oRefImg.empty()?oInputImg.data:oRefImg.data)+_step_row*(_y)+3*(_x);
-		const uchar _t[3] = {(uchar)(_ref[0]*fThreshold),(uchar)(_ref[1]*fThreshold),(uchar)(_ref[2]*fThreshold)};
-		#include "LBSP_16bits_dbcross_3ch.i"
+		const uchar* const _data = oInputImg.data;
+		#include "LBSP_16bits_dbcross_3ch1t.i"
 	}
 
-	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel-RGB-absolute version)
-	inline static void computeSingleRGBAbsoluteDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const int _c, const int nThreshold, ushort& _res) {
+	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel-RGB version)
+	inline static void computeSingleRGBDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const int _c, const uchar _t, ushort& _res) {
 		CV_DbgAssert(!oInputImg.empty());
-		CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 		CV_DbgAssert(oInputImg.type()==CV_8UC3);
 		CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
-		CV_DbgAssert(nThreshold>0 && nThreshold<=UCHAR_MAX);
-		CV_DbgAssert(_x>=LBSP::PATCH_SIZE/2 && _y>=LBSP::PATCH_SIZE/2);
-		CV_DbgAssert(_x<oInputImg.cols-LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-LBSP::PATCH_SIZE/2);
+		CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
+		CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
 		CV_DbgAssert(_c>=0 && _c<3);
 		const int _step_row = oInputImg.step.p[0];
-		const uchar* _data = oInputImg.data;
-		const uchar _ref = (oRefImg.empty()?oInputImg.data:oRefImg.data)[_step_row*(_y)+3*(_x)+_c];
-		const uchar _t = (uchar)nThreshold;
-		#include "LBSP_16bits_dbcross_s3ch.i"
-	}
-
-	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel-RGB-relative version)
-	inline static void computeSingleRGBRelativeDescriptor(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const int _x, const int _y, const int _c, const float fThreshold, ushort& _res) {
-		CV_DbgAssert(!oInputImg.empty());
-		CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
-		CV_DbgAssert(oInputImg.type()==CV_8UC3);
-		CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
-		CV_DbgAssert(fThreshold>0 && fThreshold<1);
-		CV_DbgAssert(_x>=LBSP::PATCH_SIZE/2 && _y>=LBSP::PATCH_SIZE/2);
-		CV_DbgAssert(_x<oInputImg.cols-LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-LBSP::PATCH_SIZE/2);
-		CV_DbgAssert(_c>=0 && _c<3);
-		const int _step_row = oInputImg.step.p[0];
-		const uchar* _data = oInputImg.data;
-		const uchar _ref = (oRefImg.empty()?oInputImg.data:oRefImg.data)[_step_row*(_y)+3*(_x)+_c];
-		const uchar _t = (uchar)(_ref*fThreshold);
+		const uchar* const _data = oInputImg.data;
 		#include "LBSP_16bits_dbcross_s3ch.i"
 	}
 
@@ -161,9 +112,9 @@ public:
 	//! utility function, used to filter out bad keypoints that would trigger out of bounds error because they're too close to the image border
 	static void validateKeyPoints(std::vector<cv::KeyPoint>& voKeypoints, cv::Size oImgSize);
 	//! utility, specifies the pixel size of the pattern used (width and height)
-	static const int PATCH_SIZE = 5;
+	static const size_t PATCH_SIZE = 5;
 	//! utility, specifies the number of bytes per descriptor (should be the same as calling 'descriptorSize()')
-	static const int DESC_SIZE = 2;
+	static const size_t DESC_SIZE = 2;
 
 protected:
 	//! classic 'compute' implementation, based on the regular DescriptorExtractor::computeImpl arguments & expected output
@@ -171,7 +122,7 @@ protected:
 
 	const bool m_bUseRelativeThreshold;
 	const float m_fThreshold;
-	const int m_nThreshold;
+	const uchar m_nThreshold;
 	cv::Mat m_oRefImage;
 };
 
