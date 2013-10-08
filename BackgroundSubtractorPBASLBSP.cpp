@@ -287,19 +287,24 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 				if((rand()%nLearningRate)==0) {
 					int x_rand,y_rand;
 					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
-					int s_rand = rand()%m_nBGSamples;
+					const int uchar_randidx = oInputImg.cols*y_rand + x_rand;
+					const int flt32_randidx = uchar_randidx*4;
+					if(m_oPureFGMask_last.data[uchar_randidx]==0 || (*(float*)(m_oMeanLastDistFrame.data+flt32_randidx))<BGSPBASLBSP_D_SPREAD_MAX) {
+						const int ushrt_randidx = uchar_randidx*2;
+						int s_rand = rand()%m_nBGSamples;
 #if BGSPBASLBSP_USE_SELF_DIFFUSION
-					ushort& nRandIntraDesc = m_voBGDesc[s_rand].at<ushort>(y_rand,x_rand);
-					const uchar nRandColorInt = oInputImg.at<uchar>(y_rand,x_rand);
-					const uchar nRandLBSPThreshold = (uchar)((bUseRelLBSP?(m_fLBSPThreshold*nRandColorInt):(BGSPBASLBSP_DEF_ABS_LBSP_THRES))*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
-					LBSP::computeGrayscaleDescriptor(oInputImg,nRandColorInt,x_rand,y_rand,nRandLBSPThreshold,nRandIntraDesc);
-					//m_voBGGrad[s_rand].at<uchar>(y_rand,x_rand) = oBlurredInputImg_AbsGrad.at<uchar>(y_rand,x_rand);
-					m_voBGImg[s_rand].at<uchar>(y_rand,x_rand) = nRandColorInt;
+						ushort& nRandIntraDesc = *((ushort*)(m_voBGDesc[s_rand].data+ushrt_randidx));
+						const uchar nRandColorInt = oInputImg.data[uchar_randidx];
+						const uchar nRandLBSPThreshold = (uchar)((bUseRelLBSP?(m_fLBSPThreshold*nRandColorInt):(BGSPBASLBSP_DEF_ABS_LBSP_THRES))*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+						LBSP::computeGrayscaleDescriptor(oInputImg,nRandColorInt,x_rand,y_rand,nRandLBSPThreshold,nRandIntraDesc);
+						//m_voBGGrad[s_rand].data[uchar_randidx] = oBlurredInputImg_AbsGrad.data[uchar_randidx];
+						m_voBGImg[s_rand].data[uchar_randidx] = nRandColorInt;
 #else //!BGSPBASLBSP_USE_SELF_DIFFUSION
-					m_voBGDesc[s_rand].at<ushort>(y_rand,x_rand) = nCurrIntraDesc;
-					//m_voBGGrad[s_rand].at<uchar>(y_rand,x_rand) = oBlurredInputImg_AbsGrad.data[uchar_idx];
-					m_voBGImg[s_rand].at<uchar>(y_rand,x_rand) = nCurrColorInt;
+						*((ushort*)(m_voBGDesc[s_rand].data+ushrt_randidx)) = nCurrIntraDesc;
+						//m_voBGGrad[s_rand].data[uchar_randidx] = oBlurredInputImg_AbsGrad.data[uchar_idx];
+						m_voBGImg[s_rand].data[uchar_randidx] = nCurrColorInt;
 #endif //!BGSPBASLBSP_USE_SELF_DIFFUSION
+					}
 				}
 				*pfCurrLearningRate -= BGSPBASLBSP_T_DECR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
 				if((*pfCurrLearningRate)<BGSPBASLBSP_T_LOWER)
@@ -356,8 +361,6 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 		}
 	}
 	else { //m_nImgChannels==3
-		const int desc_row_step = m_voBGDesc[0].step.p[0];
-		const int img_row_step = m_voBGImg[0].step.p[0];
 		static const int nTotChannelSize = nChannelSize*3;
 		static const int nTotDescSize = nDescSize*3;
 		for(int k=0; k<nKeyPoints; ++k) {
@@ -459,29 +462,35 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 					}
 				}
 				if((rand()%nLearningRate)==0) {
-					int s_rand = rand()%m_nBGSamples;
 					int x_rand,y_rand;
 					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
+					const int uchar_randidx = oInputImg.cols*y_rand + x_rand;
+					const int flt32_randidx = uchar_randidx*4;
+					if(m_oPureFGMask_last.data[uchar_randidx]==0 || (*(float*)(m_oMeanLastDistFrame.data+flt32_randidx))<BGSPBASLBSP_D_SPREAD_MAX) {
+						const int ushrt_rgb_randidx = uchar_randidx*6;
+						const int uchar_rgb_randidx = uchar_randidx*3;
+						int s_rand = rand()%m_nBGSamples;
 #if BGSPBASLBSP_USE_SELF_DIFFUSION
-					ushort* anRandIntraDesc = ((ushort*)(m_voBGDesc[s_rand].data + desc_row_step*y_rand + 6*x_rand));
-					const uchar* const anRandIntraLBSPRef = oInputImg.data+img_row_step*y_rand+3*x_rand;
-					if(bUseRelLBSP) {
-						const uchar anRandIntraLBSPThresholds[3] = {(uchar)(anRandIntraLBSPRef[0]*m_fLBSPThreshold),(uchar)(anRandIntraLBSPRef[1]*m_fLBSPThreshold),(uchar)(anRandIntraLBSPRef[2]*m_fLBSPThreshold)};
-						LBSP::computeRGBDescriptor(oInputImg,anRandIntraLBSPRef,x_rand,y_rand,anRandIntraLBSPThresholds,anRandIntraDesc);
-					}
-					else
-						LBSP::computeRGBDescriptor(oInputImg,anRandIntraLBSPRef,x_rand,y_rand,BGSPBASLBSP_DEF_ABS_LBSP_THRES,anRandIntraDesc);
-					for(int c=0; c<3; ++c) {
-						//*(m_voBGGrad[s_rand].data + img_row_step*y_rand + 3*x_rand + c) = *(oBlurredInputImg_AbsGrad.data + img_row_step*y_rand + 3*x_rand + c);
-						*(m_voBGImg[s_rand].data + img_row_step*y_rand + 3*x_rand + c) = anRandIntraLBSPRef[c];
-					}
+						ushort* anRandIntraDesc = ((ushort*)(m_voBGDesc[s_rand].data + ushrt_rgb_randidx));
+						const uchar* const anRandIntraLBSPRef = oInputImg.data+uchar_rgb_randidx;
+						if(bUseRelLBSP) {
+							const uchar anRandIntraLBSPThresholds[3] = {(uchar)(anRandIntraLBSPRef[0]*m_fLBSPThreshold),(uchar)(anRandIntraLBSPRef[1]*m_fLBSPThreshold),(uchar)(anRandIntraLBSPRef[2]*m_fLBSPThreshold)};
+							LBSP::computeRGBDescriptor(oInputImg,anRandIntraLBSPRef,x_rand,y_rand,anRandIntraLBSPThresholds,anRandIntraDesc);
+						}
+						else
+							LBSP::computeRGBDescriptor(oInputImg,anRandIntraLBSPRef,x_rand,y_rand,BGSPBASLBSP_DEF_ABS_LBSP_THRES,anRandIntraDesc);
+						for(int c=0; c<3; ++c) {
+							//*(m_voBGGrad[s_rand].data+uchar_rgb_randidx+c) = *(oBlurredInputImg_AbsGrad.data+uchar_rgb_randidx+c);
+							*(m_voBGImg[s_rand].data+uchar_rgb_randidx+c) = anRandIntraLBSPRef[c];
+						}
 #else //!BGSPBASLBSP_USE_SELF_DIFFUSION
-					for(int c=0; c<3; ++c) {
-						*((ushort*)(m_voBGDesc[s_rand].data + desc_row_step*y_rand + 6*x_rand + 2*c)) = anCurrIntraDesc[c];
-						//*(m_voBGGrad[s_rand].data + img_row_step*y_rand + 3*x_rand + c) = *(oBlurredInputImg_AbsGrad.data+rgbimg_idx+c);
-						*(m_voBGImg[s_rand].data + img_row_step*y_rand + 3*x_rand + c) = anCurrColorInt[c];
-					}
+						for(int c=0; c<3; ++c) {
+							*((ushort*)(m_voBGDesc[s_rand].data+ushrt_rgb_randidx+2*c)) = anCurrIntraDesc[c];
+							//*(m_voBGGrad[s_rand].data+uchar_rgb_randidx+c) = *(oBlurredInputImg_AbsGrad.data+rgbimg_idx+c);
+							*(m_voBGImg[s_rand].data+uchar_rgb_randidx+c) = anCurrColorInt[c];
+						}
 #endif //!BGSPBASLBSP_USE_SELF_DIFFUSION
+					}
 				}
 				*pfCurrLearningRate -= BGSPBASLBSP_T_DECR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
 				if((*pfCurrLearningRate)<BGSPBASLBSP_T_LOWER)

@@ -36,8 +36,8 @@
 #define BGSPBAS_R2_UPPER (1.050f)
 #endif //BGSPBAS_USE_R2_ACCELERATION
 //! parameters used for dynamic learning rate adjustments
-#define BGSPBAS_T_OFFST (1.0f/UCHAR_MAX)
-#define BGSPBAS_T_SCALE (1.0000f)
+#define BGSPBAS_T_OFFST (1.0000f)
+#define BGSPBAS_T_SCALE (255.00f)
 #define BGSPBAS_T_DECR  (0.0500f)
 #define BGSPBAS_T_INCR  (1.0000f)
 #define BGSPBAS_T_LOWER (2.0000f)
