@@ -56,6 +56,8 @@
 #define BGSPBASLBSP_DEFAULT_REL_LBSP_CUTOFF_R_VAL_BUFFER (0.650f)
 #define BGSPBASLBSP_DEF_ABS_LBSP_THRES ((uchar)25)
 
+#define BGSPBASLBSP_D_SPREAD_MAX (0.004f)
+
 /*!
 	PBAS-Based Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
 
