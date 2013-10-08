@@ -363,9 +363,9 @@ void SequenceInfo::PrecacheInputFrames() {
 			}
 		}
 	}
-#if PLATFORM_USES_WIN32API
+#if !PLATFORM_SUPPORTS_CPP11 && PLATFORM_USES_WIN32API
 	LeaveCriticalSection(&m_oInputFrameSyncMutex);
-#endif
+#endif //!PLATFORM_SUPPORTS_CPP11 && PLATFORM_USES_WIN32API
 }
 
 void SequenceInfo::PrecacheGTFrames() {
@@ -441,9 +441,9 @@ void SequenceInfo::PrecacheGTFrames() {
 			}
 		}
 	}
-#if PLATFORM_USES_WIN32API
+#if !PLATFORM_SUPPORTS_CPP11 && PLATFORM_USES_WIN32API
 	LeaveCriticalSection(&m_oGTFrameSyncMutex);
-#endif
+#endif //!PLATFORM_SUPPORTS_CPP11 && PLATFORM_USES_WIN32API
 }
 
 void SequenceInfo::StartPrecaching() {

@@ -1,8 +1,7 @@
 #pragma once
 
-// note: PLATFORM_SUPPORTS_CPP11 assumes that if compiling on linux and __cplusplus is 'bugged' (i.e. GCC<4.7), we can use C++11 if GCC>4.6 (which is definitely not true unless compiled with -std=c++0x or -std=c++11)
-#define PLATFORM_SUPPORTS_CPP11 ((defined(WIN32) && defined(_MSC_VER) && _MSC_VER > 1600) || __cplusplus>199711L || (defined(__GNUC__) && __GNUC__>=4 && __GNUC_MINOR__>=6))
-#define PLATFORM_USES_WIN32API (WIN32 && !__MINGW32__)
+#define PLATFORM_SUPPORTS_CPP11 ((_MSC_VER > 1600) || (__GNUC__>=4 && __GNUC_MINOR__>=6))
+#define PLATFORM_USES_WIN32API (WINVER>0 && WINVER>=_WIN32_WINNT_VISTA)
 
 #include <queue>
 #include <string>
