@@ -42,7 +42,7 @@ static inline float L2dist_uchar(const cv::Vec3b& a, const cv::Vec3b& b) {
 }
 
 //! popcount LUT for 8bit vectors
-static const uchar popcount_LUT8[256] = {
+static const int popcount_LUT8[256] = {
 	0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
 	1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
 	1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
@@ -62,13 +62,16 @@ static const uchar popcount_LUT8[256] = {
 };
 
 //! computes the population count of a 16 bits vector using an 8 bits popcount LUT
-static inline uchar popcount_ushort_8bitsLUT(ushort x) {
+static inline int popcount_ushort_8bitsLUT(ushort x) {
 	return popcount_LUT8[(uchar)x] + popcount_LUT8[(uchar)(x>>8)];
 }
 
 //! computes the hamming distance between two 16 bits vectors (min=0, max=16)
-static inline uchar hdist_ushort_8bitLUT(ushort a, ushort b) {
+static inline int hdist_ushort_8bitLUT(ushort a, ushort b) {
 	return popcount_ushort_8bitsLUT(a^b);
 }
 
-
+//! computes the sum (L1?) of hamming distances between two 3-ch 16 bits vectors (min=0, max=48)
+static inline int hdist_ushort_8bitLUT(const ushort* a, const ushort* b) {
+	return popcount_ushort_8bitsLUT(a[0]^b[0])+popcount_ushort_8bitsLUT(a[1]^b[1])+popcount_ushort_8bitsLUT(a[2]^b[2]);
+}

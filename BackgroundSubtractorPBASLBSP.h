@@ -110,6 +110,12 @@ protected:
 	cv::Mat m_oBlinksFrame; // @@@@@@@@
 	// @@@@@@@@@@@@
 	cv::Mat m_oRelLBSPThresFrame; // @@@@@@@@
+	// @@@@@@@@@@@@
+	cv::Mat m_oLastColorFrame; // @@@@@@@@
+	// @@@@@@@@@@@@
+	cv::Mat m_oLastDescFrame; // @@@@@@@@
+	// @@@@@@@@@@@@
+	cv::Mat m_oMeanLastDistFrame; // @@@@@@@@
 	//! absolute default update rate threshold (the default 'T(x)' value in the original PBAS paper)
 	const float m_fDefaultUpdateRate;
 	//! mean gradient magnitude distance over the past frame
