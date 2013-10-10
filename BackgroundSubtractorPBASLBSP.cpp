@@ -59,8 +59,11 @@ void BackgroundSubtractorPBASLBSP::initialize(const cv::Mat& oInitImg, const std
 	m_oRelLBSPThresFrame.create(m_oImgSize,CV_8UC1); // @@@@@@@@@@
 	m_oRelLBSPThresFrame = cv::Scalar(UCHAR_MAX/2); // @@@@@@@@@@
 
-	m_oMeanLastDistFrame.create(m_oImgSize,CV_32FC1);
-	m_oMeanLastDistFrame = cv::Scalar(0.0f);
+	m_oMeanLastDistFrame.create(m_oImgSize,CV_32FC1); // @@@@@@@@@@
+	m_oMeanLastDistFrame = cv::Scalar(0.0f); // @@@@@@@@@@
+
+	m_oMeanSegmResFrame.create(m_oImgSize,CV_32FC1); // @@@@@@@@@@
+	m_oMeanSegmResFrame = cv::Scalar(0.0f); // @@@@@@@@@@
 
 	m_oTempFGMask.create(m_oImgSize,CV_8UC1);
 	m_oTempFGMask = cv::Scalar(0);
@@ -217,7 +220,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
-			const int uchar_idx = oInputImg.cols*y + x;
+			const int uchar_idx = m_oImgSize.width*y + x;
 			const int ushrt_idx = uchar_idx*2;
 			const int flt32_idx = uchar_idx*4;
 			const uchar nCurrColorInt = oInputImg.data[uchar_idx];
@@ -271,13 +274,24 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			float* pfCurrMeanLastDist = ((float*)(m_oMeanLastDistFrame.data+flt32_idx));
 			*pfCurrMeanLastDist = ((*pfCurrMeanLastDist)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1) + ((float)(absdiff_uchar(nLastColorInt,nCurrColorInt))/nChannelSize+(float)(hdist_ushort_8bitLUT(nLastIntraDesc,nCurrIntraDesc))/nDescSize)/2)/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
 			float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+flt32_idx));
+			float* pfCurrMeanSegmRes = ((float*)(m_oMeanSegmResFrame.data+flt32_idx));
+			bool bUpdateModel = true;
 			if(nGoodSamplesCount<m_nRequiredBGSamples) {
+				if(((*pfCurrMeanSegmRes)<BGSPBASLBSP_GHOST_DETECTION_S_MIN || (*pfCurrMeanLastDist)>BGSPBASLBSP_GHOST_DETECTION_D_SPREAD_MAX))
+					bUpdateModel = false;
 				oCurrFGMask.data[uchar_idx] = UCHAR_MAX;
+				*pfCurrMeanSegmRes = ((*pfCurrMeanSegmRes)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1) + 1.0f)/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
 				*pfCurrLearningRate += BGSPBASLBSP_T_INCR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
 				if((*pfCurrLearningRate)>BGSPBASLBSP_T_UPPER)
 					*pfCurrLearningRate = BGSPBASLBSP_T_UPPER;
 			}
 			else {
+				*pfCurrMeanSegmRes = ((*pfCurrMeanSegmRes)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1))/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
+				*pfCurrLearningRate -= BGSPBASLBSP_T_DECR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
+				if((*pfCurrLearningRate)<BGSPBASLBSP_T_LOWER)
+					*pfCurrLearningRate = BGSPBASLBSP_T_LOWER;
+			}
+			if(bUpdateModel) {
 				const int nLearningRate = learningRateOverride>0?(int)ceil(learningRateOverride):(int)ceil((*pfCurrLearningRate));
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
@@ -287,28 +301,23 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 				if((rand()%nLearningRate)==0) {
 					int x_rand,y_rand;
 					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
-					const int uchar_randidx = oInputImg.cols*y_rand + x_rand;
-					const int flt32_randidx = uchar_randidx*4;
-					if(m_oPureFGMask_last.data[uchar_randidx]==0 || (*(float*)(m_oMeanLastDistFrame.data+flt32_randidx))<BGSPBASLBSP_D_SPREAD_MAX) {
-						const int ushrt_randidx = uchar_randidx*2;
-						int s_rand = rand()%m_nBGSamples;
+					const int uchar_randidx = m_oImgSize.width*y_rand + x_rand;
+					//const int flt32_randidx = uchar_randidx*4;
+					const int ushrt_randidx = uchar_randidx*2;
+					int s_rand = rand()%m_nBGSamples;
 #if BGSPBASLBSP_USE_SELF_DIFFUSION
-						ushort& nRandIntraDesc = *((ushort*)(m_voBGDesc[s_rand].data+ushrt_randidx));
-						const uchar nRandColorInt = oInputImg.data[uchar_randidx];
-						const uchar nRandLBSPThreshold = (uchar)((bUseRelLBSP?(m_fLBSPThreshold*nRandColorInt):(BGSPBASLBSP_DEF_ABS_LBSP_THRES))*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
-						LBSP::computeGrayscaleDescriptor(oInputImg,nRandColorInt,x_rand,y_rand,nRandLBSPThreshold,nRandIntraDesc);
-						//m_voBGGrad[s_rand].data[uchar_randidx] = oBlurredInputImg_AbsGrad.data[uchar_randidx];
-						m_voBGImg[s_rand].data[uchar_randidx] = nRandColorInt;
+					ushort& nRandIntraDesc = *((ushort*)(m_voBGDesc[s_rand].data+ushrt_randidx));
+					const uchar nRandColorInt = oInputImg.data[uchar_randidx];
+					const uchar nRandLBSPThreshold = (uchar)((bUseRelLBSP?(m_fLBSPThreshold*nRandColorInt):(BGSPBASLBSP_DEF_ABS_LBSP_THRES))*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+					LBSP::computeGrayscaleDescriptor(oInputImg,nRandColorInt,x_rand,y_rand,nRandLBSPThreshold,nRandIntraDesc);
+					//m_voBGGrad[s_rand].data[uchar_randidx] = oBlurredInputImg_AbsGrad.data[uchar_randidx];
+					m_voBGImg[s_rand].data[uchar_randidx] = nRandColorInt;
 #else //!BGSPBASLBSP_USE_SELF_DIFFUSION
-						*((ushort*)(m_voBGDesc[s_rand].data+ushrt_randidx)) = nCurrIntraDesc;
-						//m_voBGGrad[s_rand].data[uchar_randidx] = oBlurredInputImg_AbsGrad.data[uchar_idx];
-						m_voBGImg[s_rand].data[uchar_randidx] = nCurrColorInt;
+					*((ushort*)(m_voBGDesc[s_rand].data+ushrt_randidx)) = nCurrIntraDesc;
+					//m_voBGGrad[s_rand].data[uchar_randidx] = oBlurredInputImg_AbsGrad.data[uchar_idx];
+					m_voBGImg[s_rand].data[uchar_randidx] = nCurrColorInt;
 #endif //!BGSPBASLBSP_USE_SELF_DIFFUSION
-					}
 				}
-				*pfCurrLearningRate -= BGSPBASLBSP_T_DECR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
-				if((*pfCurrLearningRate)<BGSPBASLBSP_T_LOWER)
-					*pfCurrLearningRate = BGSPBASLBSP_T_LOWER;
 			}
 #if BGSPBASLBSP_USE_R2_ACCELERATION
 			float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+flt32_idx);
@@ -366,7 +375,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
-			const int uchar_idx = oInputImg.cols*y + x;
+			const int uchar_idx = m_oImgSize.width*y + x;
 			const int flt32_idx = uchar_idx*4;
 			const int uchar_rgb_idx = uchar_idx*3;
 			const int ushrt_rgb_idx = uchar_rgb_idx*2;
@@ -445,13 +454,24 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			float* pfCurrMeanLastDist = ((float*)(m_oMeanLastDistFrame.data+flt32_idx));
 			*pfCurrMeanLastDist = ((*pfCurrMeanLastDist)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1) + ((float)(L1dist_uchar(anLastColorInt,anCurrColorInt))/nTotChannelSize+(float)(hdist_ushort_8bitLUT(anLastIntraDesc,anCurrIntraDesc))/nTotDescSize)/2)/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
 			float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+flt32_idx));
+			float* pfCurrMeanSegmRes = ((float*)(m_oMeanSegmResFrame.data+flt32_idx));
+			bool bUpdateModel = true;
 			if(nGoodSamplesCount<m_nRequiredBGSamples) {
+				if(((*pfCurrMeanSegmRes)<BGSPBASLBSP_GHOST_DETECTION_S_MIN || (*pfCurrMeanLastDist)>BGSPBASLBSP_GHOST_DETECTION_D_SPREAD_MAX))
+					bUpdateModel = false;
 				oCurrFGMask.data[uchar_idx] = UCHAR_MAX;
+				*pfCurrMeanSegmRes = ((*pfCurrMeanSegmRes)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1) + 1.0f)/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
 				*pfCurrLearningRate += BGSPBASLBSP_T_INCR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
 				if((*pfCurrLearningRate)>BGSPBASLBSP_T_UPPER)
 					*pfCurrLearningRate = BGSPBASLBSP_T_UPPER;
 			}
 			else {
+				*pfCurrMeanSegmRes = ((*pfCurrMeanSegmRes)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1))/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
+				*pfCurrLearningRate -= BGSPBASLBSP_T_DECR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
+				if((*pfCurrLearningRate)<BGSPBASLBSP_T_LOWER)
+					*pfCurrLearningRate = BGSPBASLBSP_T_LOWER;
+			}
+			if(bUpdateModel) {
 				const int nLearningRate = learningRateOverride>0?(int)ceil(learningRateOverride):(int)ceil((*pfCurrLearningRate));
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
@@ -464,37 +484,32 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 				if((rand()%nLearningRate)==0) {
 					int x_rand,y_rand;
 					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
-					const int uchar_randidx = oInputImg.cols*y_rand + x_rand;
-					const int flt32_randidx = uchar_randidx*4;
-					if(m_oPureFGMask_last.data[uchar_randidx]==0 || (*(float*)(m_oMeanLastDistFrame.data+flt32_randidx))<BGSPBASLBSP_D_SPREAD_MAX) {
-						const int ushrt_rgb_randidx = uchar_randidx*6;
-						const int uchar_rgb_randidx = uchar_randidx*3;
-						int s_rand = rand()%m_nBGSamples;
+					const int uchar_randidx = m_oImgSize.width*y_rand + x_rand;
+					//const int flt32_randidx = uchar_randidx*4;
+					const int ushrt_rgb_randidx = uchar_randidx*6;
+					const int uchar_rgb_randidx = uchar_randidx*3;
+					int s_rand = rand()%m_nBGSamples;
 #if BGSPBASLBSP_USE_SELF_DIFFUSION
-						ushort* anRandIntraDesc = ((ushort*)(m_voBGDesc[s_rand].data + ushrt_rgb_randidx));
-						const uchar* const anRandIntraLBSPRef = oInputImg.data+uchar_rgb_randidx;
-						if(bUseRelLBSP) {
-							const uchar anRandIntraLBSPThresholds[3] = {(uchar)(anRandIntraLBSPRef[0]*m_fLBSPThreshold),(uchar)(anRandIntraLBSPRef[1]*m_fLBSPThreshold),(uchar)(anRandIntraLBSPRef[2]*m_fLBSPThreshold)};
-							LBSP::computeRGBDescriptor(oInputImg,anRandIntraLBSPRef,x_rand,y_rand,anRandIntraLBSPThresholds,anRandIntraDesc);
-						}
-						else
-							LBSP::computeRGBDescriptor(oInputImg,anRandIntraLBSPRef,x_rand,y_rand,BGSPBASLBSP_DEF_ABS_LBSP_THRES,anRandIntraDesc);
-						for(int c=0; c<3; ++c) {
-							//*(m_voBGGrad[s_rand].data+uchar_rgb_randidx+c) = *(oBlurredInputImg_AbsGrad.data+uchar_rgb_randidx+c);
-							*(m_voBGImg[s_rand].data+uchar_rgb_randidx+c) = anRandIntraLBSPRef[c];
-						}
-#else //!BGSPBASLBSP_USE_SELF_DIFFUSION
-						for(int c=0; c<3; ++c) {
-							*((ushort*)(m_voBGDesc[s_rand].data+ushrt_rgb_randidx+2*c)) = anCurrIntraDesc[c];
-							//*(m_voBGGrad[s_rand].data+uchar_rgb_randidx+c) = *(oBlurredInputImg_AbsGrad.data+rgbimg_idx+c);
-							*(m_voBGImg[s_rand].data+uchar_rgb_randidx+c) = anCurrColorInt[c];
-						}
-#endif //!BGSPBASLBSP_USE_SELF_DIFFUSION
+					ushort* anRandIntraDesc = ((ushort*)(m_voBGDesc[s_rand].data + ushrt_rgb_randidx));
+					const uchar* const anRandIntraLBSPRef = oInputImg.data+uchar_rgb_randidx;
+					if(bUseRelLBSP) {
+						const uchar anRandIntraLBSPThresholds[3] = {(uchar)(anRandIntraLBSPRef[0]*m_fLBSPThreshold),(uchar)(anRandIntraLBSPRef[1]*m_fLBSPThreshold),(uchar)(anRandIntraLBSPRef[2]*m_fLBSPThreshold)};
+						LBSP::computeRGBDescriptor(oInputImg,anRandIntraLBSPRef,x_rand,y_rand,anRandIntraLBSPThresholds,anRandIntraDesc);
 					}
+					else
+						LBSP::computeRGBDescriptor(oInputImg,anRandIntraLBSPRef,x_rand,y_rand,BGSPBASLBSP_DEF_ABS_LBSP_THRES,anRandIntraDesc);
+					for(int c=0; c<3; ++c) {
+						//*(m_voBGGrad[s_rand].data+uchar_rgb_randidx+c) = *(oBlurredInputImg_AbsGrad.data+uchar_rgb_randidx+c);
+						*(m_voBGImg[s_rand].data+uchar_rgb_randidx+c) = anRandIntraLBSPRef[c];
+					}
+#else //!BGSPBASLBSP_USE_SELF_DIFFUSION
+					for(int c=0; c<3; ++c) {
+						*((ushort*)(m_voBGDesc[s_rand].data+ushrt_rgb_randidx+2*c)) = anCurrIntraDesc[c];
+						//*(m_voBGGrad[s_rand].data+uchar_rgb_randidx+c) = *(oBlurredInputImg_AbsGrad.data+rgbimg_idx+c);
+						*(m_voBGImg[s_rand].data+uchar_rgb_randidx+c) = anCurrColorInt[c];
+					}
+#endif //!BGSPBASLBSP_USE_SELF_DIFFUSION
 				}
-				*pfCurrLearningRate -= BGSPBASLBSP_T_DECR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
-				if((*pfCurrLearningRate)<BGSPBASLBSP_T_LOWER)
-					*pfCurrLearningRate = BGSPBASLBSP_T_LOWER;
 			}
 #if BGSPBASLBSP_USE_R2_ACCELERATION
 			float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+flt32_idx);
@@ -565,6 +580,10 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 	cv::circle(oMeanLastDistFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
 	cv::imshow("d(x)",oMeanLastDistFrameNormalized);
 	std::cout << std::fixed << std::setprecision(5) << " d(" << dbgpt << ") = " << m_oMeanLastDistFrame.at<float>(dbgpt) << std::endl;
+	cv::Mat oMeanSegmResFrameNormalized; m_oMeanSegmResFrame.copyTo(oMeanSegmResFrameNormalized);
+	cv::circle(oMeanSegmResFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
+	cv::imshow("s(x)",oMeanSegmResFrameNormalized);
+	std::cout << std::fixed << std::setprecision(5) << " s(" << dbgpt << ") = " << m_oMeanSegmResFrame.at<float>(dbgpt) << std::endl;
 	cv::Mat oDistThresholdFrameNormalized; m_oDistThresholdFrame.convertTo(oDistThresholdFrameNormalized,CV_32FC1,1.0f/BGSPBASLBSP_R_UPPER,-BGSPBASLBSP_R_LOWER/BGSPBASLBSP_R_UPPER);
 	cv::circle(oDistThresholdFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
 	cv::imshow("r(x)",oDistThresholdFrameNormalized);
