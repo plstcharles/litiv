@@ -221,7 +221,7 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
-			const int uchar_idx = oInputImg.cols*y + x;
+			const int uchar_idx = m_oImgSize.width*y + x;
 			const int uchar_rgb_idx = uchar_idx*3;
 			const int ushrt_rgb_idx = uchar_rgb_idx*2;
 			const uchar* const anCurrColorInt = oInputImg.data+uchar_rgb_idx;

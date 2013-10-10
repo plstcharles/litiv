@@ -56,7 +56,11 @@
 #define BGSPBASLBSP_DEFAULT_REL_LBSP_CUTOFF_R_VAL_BUFFER (0.650f)
 #define BGSPBASLBSP_DEF_ABS_LBSP_THRES ((uchar)25)
 
-#define BGSPBASLBSP_D_SPREAD_MAX (0.004f)
+#define BGSPBASLBSP_GHOST_DETECTION_D_SPREAD_MAX (0.01f)
+#define BGSPBASLBSP_GHOST_DETECTION_S_MIN (0.99f)
+
+//#define BGSPBASLBSP_GHOST_DETECTION_D_SPREAD_MAX (0.08f)
+//#define BGSPBASLBSP_GHOST_DETECTION_S_MIN (0.9999f)
 
 /*!
 	PBAS-Based Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
@@ -118,6 +122,8 @@ protected:
 	cv::Mat m_oLastDescFrame; // @@@@@@@@
 	// @@@@@@@@@@@@
 	cv::Mat m_oMeanLastDistFrame; // @@@@@@@@
+	// @@@@@@@@@@@@
+	cv::Mat m_oMeanSegmResFrame; // @@@@@@@@
 	//! absolute default update rate threshold (the default 'T(x)' value in the original PBAS paper)
 	const float m_fDefaultUpdateRate;
 	//! mean gradient magnitude distance over the past frame
