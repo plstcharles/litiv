@@ -1,7 +1,10 @@
 #pragma once
 
 #define PLATFORM_SUPPORTS_CPP11 ((_MSC_VER > 1600) || (__GNUC__>=4 && __GNUC_MINOR__>=6))
-#define PLATFORM_USES_WIN32API (WINVER>0 && WINVER>=_WIN32_WINNT_VISTA)
+#ifdef WIN32
+#include <windows.h>
+#define PLATFORM_USES_WIN32API (WINVER>0x0599)
+#endif //WIN32
 
 #include <queue>
 #include <string>
@@ -10,9 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-
 #if PLATFORM_USES_WIN32API
-#include <windows.h>
 #include <stdint.h>
 #include <process.h>
 #else //!PLATFORM_USES_WIN32API
