@@ -275,10 +275,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			*pfCurrMeanLastDist = ((*pfCurrMeanLastDist)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1) + ((float)(absdiff_uchar(nLastColorInt,nCurrColorInt))/nChannelSize+(float)(hdist_ushort_8bitLUT(nLastIntraDesc,nCurrIntraDesc))/nDescSize)/2)/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
 			float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+flt32_idx));
 			float* pfCurrMeanSegmRes = ((float*)(m_oMeanSegmResFrame.data+flt32_idx));
-			bool bUpdateModel = true;
 			if(nGoodSamplesCount<m_nRequiredBGSamples) {
-				if(((*pfCurrMeanSegmRes)<BGSPBASLBSP_GHOST_DETECTION_S_MIN || (*pfCurrMeanLastDist)>BGSPBASLBSP_GHOST_DETECTION_D_SPREAD_MAX))
-					bUpdateModel = false;
 				oCurrFGMask.data[uchar_idx] = UCHAR_MAX;
 				*pfCurrMeanSegmRes = ((*pfCurrMeanSegmRes)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1) + 1.0f)/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
 				*pfCurrLearningRate += BGSPBASLBSP_T_INCR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
@@ -290,19 +287,20 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 				*pfCurrLearningRate -= BGSPBASLBSP_T_DECR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
 				if((*pfCurrLearningRate)<BGSPBASLBSP_T_LOWER)
 					*pfCurrLearningRate = BGSPBASLBSP_T_LOWER;
-			}
-			if(bUpdateModel) {
 				const int nLearningRate = learningRateOverride>0?(int)ceil(learningRateOverride):(int)ceil((*pfCurrLearningRate));
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
 					*((ushort*)(m_voBGDesc[s_rand].data+ushrt_idx)) = nCurrIntraDesc;
 					m_voBGImg[s_rand].data[uchar_idx] = nCurrColorInt;
 				}
-				if((rand()%nLearningRate)==0) {
-					int x_rand,y_rand;
-					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
-					const int uchar_randidx = m_oImgSize.width*y_rand + x_rand;
-					//const int flt32_randidx = uchar_randidx*4;
+				int x_rand,y_rand;
+				getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
+				int n_rand = rand();
+				const int uchar_randidx = m_oImgSize.width*y_rand + x_rand;
+				const int flt32_randidx = uchar_randidx*4;
+				const float fRandMeanLastDist = *((float*)(m_oMeanLastDistFrame.data+flt32_randidx));
+				const float fRandMeanSegmRes = *((float*)(m_oMeanSegmResFrame.data+flt32_randidx));
+				if((n_rand%(nLearningRate)==0) || (fRandMeanSegmRes>BGSPBASLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSPBASLBSP_GHOST_DETECTION_D_SPREAD_MAX*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT && (n_rand%4)==0)) {
 					const int ushrt_randidx = uchar_randidx*2;
 					int s_rand = rand()%m_nBGSamples;
 #if BGSPBASLBSP_USE_SELF_DIFFUSION
@@ -455,10 +453,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			*pfCurrMeanLastDist = ((*pfCurrMeanLastDist)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1) + ((float)(L1dist_uchar(anLastColorInt,anCurrColorInt))/nTotChannelSize+(float)(hdist_ushort_8bitLUT(anLastIntraDesc,anCurrIntraDesc))/nTotDescSize)/2)/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
 			float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+flt32_idx));
 			float* pfCurrMeanSegmRes = ((float*)(m_oMeanSegmResFrame.data+flt32_idx));
-			bool bUpdateModel = true;
 			if(nGoodSamplesCount<m_nRequiredBGSamples) {
-				if(((*pfCurrMeanSegmRes)<BGSPBASLBSP_GHOST_DETECTION_S_MIN || (*pfCurrMeanLastDist)>BGSPBASLBSP_GHOST_DETECTION_D_SPREAD_MAX))
-					bUpdateModel = false;
 				oCurrFGMask.data[uchar_idx] = UCHAR_MAX;
 				*pfCurrMeanSegmRes = ((*pfCurrMeanSegmRes)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1) + 1.0f)/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
 				*pfCurrLearningRate += BGSPBASLBSP_T_INCR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
@@ -470,8 +465,6 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 				*pfCurrLearningRate -= BGSPBASLBSP_T_DECR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
 				if((*pfCurrLearningRate)<BGSPBASLBSP_T_LOWER)
 					*pfCurrLearningRate = BGSPBASLBSP_T_LOWER;
-			}
-			if(bUpdateModel) {
 				const int nLearningRate = learningRateOverride>0?(int)ceil(learningRateOverride):(int)ceil((*pfCurrLearningRate));
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
@@ -481,11 +474,14 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 						*(m_voBGImg[s_rand].data+uchar_rgb_idx+c) = anCurrColorInt[c];
 					}
 				}
-				if((rand()%nLearningRate)==0) {
-					int x_rand,y_rand;
-					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
-					const int uchar_randidx = m_oImgSize.width*y_rand + x_rand;
-					//const int flt32_randidx = uchar_randidx*4;
+				int x_rand,y_rand;
+				getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
+				int n_rand = rand();
+				const int uchar_randidx = m_oImgSize.width*y_rand + x_rand;
+				const int flt32_randidx = uchar_randidx*4;
+				const float fRandMeanLastDist = *((float*)(m_oMeanLastDistFrame.data+flt32_randidx));
+				const float fRandMeanSegmRes = *((float*)(m_oMeanSegmResFrame.data+flt32_randidx));
+				if((n_rand%(nLearningRate)==0) || (fRandMeanSegmRes>BGSPBASLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSPBASLBSP_GHOST_DETECTION_D_SPREAD_MAX && (n_rand%4)==0)) {
 					const int ushrt_rgb_randidx = uchar_randidx*6;
 					const int uchar_rgb_randidx = uchar_randidx*3;
 					int s_rand = rand()%m_nBGSamples;
