@@ -9,7 +9,7 @@
 //! defines whether to use or not the R(x)-based rel/abs LBSP cutoff configuration
 #define BGSPBASLBSP_USE_LBSP_TYPE_CUTOFF 0
 //! defines whether to use or not the LBSP-desc-dist-based threshold checks & skips
-#define BGSPBASLBSP_USE_DESC_DIST_CHECKS 0
+#define BGSPBASLBSP_USE_DESC_DIST_CHECKS 1
 
 //! defines the default value for BackgroundSubtractorViBe::m_fLBSPThreshold
 #define BGSPBASLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.300f)
@@ -57,10 +57,7 @@
 #define BGSPBASLBSP_DEF_ABS_LBSP_THRES ((uchar)25)
 
 #define BGSPBASLBSP_GHOST_DETECTION_D_SPREAD_MAX (0.01f)
-#define BGSPBASLBSP_GHOST_DETECTION_S_MIN (0.99f)
-
-//#define BGSPBASLBSP_GHOST_DETECTION_D_SPREAD_MAX (0.08f)
-//#define BGSPBASLBSP_GHOST_DETECTION_S_MIN (0.9999f)
+#define BGSPBASLBSP_GHOST_DETECTION_S_MIN (0.995f)
 
 /*!
 	PBAS-Based Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.

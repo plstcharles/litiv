@@ -3,11 +3,11 @@
 // init pattern, based on 'floor(fspecial('gaussian', 3, 1)*256)'
 static const int s_nSamplesInitPatternWidth = 3;
 static const int s_nSamplesInitPatternHeight = 3;
-static const int s_nSamplesInitPatternTot = 252;
-static const int s_anSamplesInitPattern[9] = {
-	19,    31,    19,
-	31,    52,    31,
-	19,    31,    19,
+static const int s_nSamplesInitPatternTot = 256;
+static const int s_anSamplesInitPattern[3][3] = {
+	{19,    32,    19,},
+	{32,    52,    32,},
+	{19,    32,    19,},
 };
 
 //! returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
@@ -15,7 +15,7 @@ static inline void getRandSamplePosition(int& x_sample, int& y_sample, const int
 	int r = 1+rand()%s_nSamplesInitPatternTot;
 	for(x_sample=0; x_sample<s_nSamplesInitPatternWidth; ++x_sample) {
 		for(y_sample=0; y_sample<s_nSamplesInitPatternHeight; ++y_sample) {
-			r -= s_anSamplesInitPattern[x_sample*s_nSamplesInitPatternWidth + y_sample];
+			r -= s_anSamplesInitPattern[y_sample][x_sample];
 			if(r<=0)
 				goto stop;
 		}
