@@ -15,7 +15,7 @@
 #define bUseRelLBSP true
 #endif //!BGSPBASLBSP_USE_LBSP_TYPE_CUTOFF
 
-BackgroundSubtractorPBASLBSP::BackgroundSubtractorPBASLBSP(	 bool bDelayedAnalysis
+BackgroundSubtractorPBASLBSP::BackgroundSubtractorPBASLBSP(	 bool /*bDelayedAnalysis*/
 															,float fLBSPThreshold
 															,int nInitDescDistThreshold
 															,int nInitColorDistThreshold
@@ -23,7 +23,7 @@ BackgroundSubtractorPBASLBSP::BackgroundSubtractorPBASLBSP(	 bool bDelayedAnalys
 															,int nBGSamples
 															,int nRequiredBGSamples)
 	:	 BackgroundSubtractorLBSP(fLBSPThreshold,nInitDescDistThreshold)
-		,m_bDelayAnalysis(bDelayedAnalysis)
+		//,m_bDelayAnalysis(bDelayedAnalysis)
 		,m_nBGSamples(nBGSamples)
 		,m_nRequiredBGSamples(nRequiredBGSamples)
 		,m_nColorDistThreshold(nInitColorDistThreshold)
@@ -67,20 +67,25 @@ void BackgroundSubtractorPBASLBSP::initialize(const cv::Mat& oInitImg, const std
 
 	m_oTempFGMask.create(m_oImgSize,CV_8UC1);
 	m_oTempFGMask = cv::Scalar(0);
+	m_oPureFGBlinkMask_curr.create(m_oImgSize,CV_8UC1);
+	m_oPureFGBlinkMask_curr = cv::Scalar(0);
+	m_oPureFGBlinkMask_last.create(m_oImgSize,CV_8UC1);
+	m_oPureFGBlinkMask_last = cv::Scalar(0);
+
 	m_oPureFGMask_last.create(m_oImgSize,CV_8UC1);
 	m_oPureFGMask_last = cv::Scalar(0);
 	m_oFGMask_last.create(m_oImgSize,CV_8UC1);
 	m_oFGMask_last = cv::Scalar(0);
 	m_oFGMask_last_dilated.create(m_oImgSize,CV_8UC1);
 	m_oFGMask_last_dilated = cv::Scalar(0);
-	if(m_bDelayAnalysis) {
+	/*if(m_bDelayAnalysis) {
 		m_oPureFGMask_old.create(m_oImgSize,CV_8UC1);
 		m_oPureFGMask_old = cv::Scalar(0);
 		m_oFGMask_old.create(m_oImgSize,CV_8UC1);
 		m_oFGMask_old = cv::Scalar(0);
 		m_oFGMask_old_dilated.create(m_oImgSize,CV_8UC1);
 		m_oFGMask_old_dilated = cv::Scalar(0);
-	}
+	}*/
 
 	/*cv::Mat oBlurredInitImg;
 	cv::GaussianBlur(oInitImg,oBlurredInitImg,cv::Size(3,3),0,0,cv::BORDER_DEFAULT);
@@ -300,7 +305,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 				const int flt32_randidx = uchar_randidx*4;
 				const float fRandMeanLastDist = *((float*)(m_oMeanLastDistFrame.data+flt32_randidx));
 				const float fRandMeanSegmRes = *((float*)(m_oMeanSegmResFrame.data+flt32_randidx));
-				if((n_rand%(nLearningRate)==0) || (fRandMeanSegmRes>BGSPBASLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSPBASLBSP_GHOST_DETECTION_D_SPREAD_MAX*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT && (n_rand%4)==0)) {
+				if((n_rand%(nLearningRate)==0) || (fRandMeanSegmRes>BGSPBASLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSPBASLBSP_GHOST_DETECTION_D_MAX*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT && (n_rand%4)==0)) {
 					const int ushrt_randidx = uchar_randidx*2;
 					int s_rand = rand()%m_nBGSamples;
 #if BGSPBASLBSP_USE_SELF_DIFFUSION
@@ -319,7 +324,8 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			}
 #if BGSPBASLBSP_USE_R2_ACCELERATION
 			float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+flt32_idx);
-			if((*pfCurrMeanMinDist)>BGSPBASLBSP_R2_OFFST && m_oBlinksFrame.data[uchar_idx]>0) {
+			//if((*pfCurrMeanMinDist)>BGSPBASLBSP_R2_OFFST && m_oBlinksFrame.data[uchar_idx]>0) {
+			if((*pfCurrMeanMinDist)>BGSPBASLBSP_R2_OFFST && (m_oBlinksFrame.data[uchar_idx]>0 || ((*pfCurrMeanSegmRes)>BGSPBASLBSP_HIGH_VAR_DETECTION_S_MIN && (*pfCurrMeanLastDist)>BGSPBASLBSP_HIGH_VAR_DETECTION_D_MIN))) {
 				if((*pfCurrDistThresholdVariationFactor)<BGSPBASLBSP_R2_UPPER) {
 					(*pfCurrDistThresholdVariationFactor) += BGSPBASLBSP_R2_INCR;
 					if((*pfCurrDistThresholdVariationFactor)>BGSPBASLBSP_R2_UPPER)
@@ -359,10 +365,10 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 					(*pfCurrDistThresholdFactor) = BGSPBASLBSP_R_LOWER;
 			}
 #endif //!BGSPBASLBSP_USE_R2_ACCELERATION
-			if(m_bDelayAnalysis)
+			/*if(m_bDelayAnalysis)
 				m_oBlinksFrame.data[uchar_idx] = ((m_oPureFGMask_last.data[uchar_idx]!=oCurrFGMask.data[uchar_idx]||m_oPureFGMask_last.data[uchar_idx]!=m_oPureFGMask_old.data[uchar_idx]) && m_oFGMask_old_dilated.data[uchar_idx]==0)?UCHAR_MAX:0;
 			else
-				m_oBlinksFrame.data[uchar_idx] = (m_oPureFGMask_last.data[uchar_idx]!=oCurrFGMask.data[uchar_idx])?UCHAR_MAX:0;
+				m_oBlinksFrame.data[uchar_idx] = (m_oPureFGMask_last.data[uchar_idx]!=oCurrFGMask.data[uchar_idx])?UCHAR_MAX:0;*/
 			nLastIntraDesc = nCurrIntraDesc;
 			nLastColorInt = nCurrColorInt;
 		}
@@ -481,7 +487,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 				const int flt32_randidx = uchar_randidx*4;
 				const float fRandMeanLastDist = *((float*)(m_oMeanLastDistFrame.data+flt32_randidx));
 				const float fRandMeanSegmRes = *((float*)(m_oMeanSegmResFrame.data+flt32_randidx));
-				if((n_rand%(nLearningRate)==0) || (fRandMeanSegmRes>BGSPBASLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSPBASLBSP_GHOST_DETECTION_D_SPREAD_MAX && (n_rand%4)==0)) {
+				if((n_rand%(nLearningRate)==0) || (fRandMeanSegmRes>BGSPBASLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSPBASLBSP_GHOST_DETECTION_D_MAX && (n_rand%4)==0)) {
 					const int ushrt_rgb_randidx = uchar_randidx*6;
 					const int uchar_rgb_randidx = uchar_randidx*3;
 					int s_rand = rand()%m_nBGSamples;
@@ -509,7 +515,8 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			}
 #if BGSPBASLBSP_USE_R2_ACCELERATION
 			float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+flt32_idx);
-			if((*pfCurrMeanMinDist)>BGSPBASLBSP_R2_OFFST && m_oBlinksFrame.data[uchar_idx]>0) {
+			//if((*pfCurrMeanMinDist)>BGSPBASLBSP_R2_OFFST && m_oBlinksFrame.data[uchar_idx]>0) {
+			if((*pfCurrMeanMinDist)>BGSPBASLBSP_R2_OFFST && (m_oBlinksFrame.data[uchar_idx]>0 || ((*pfCurrMeanSegmRes)>BGSPBASLBSP_HIGH_VAR_DETECTION_S_MIN && (*pfCurrMeanLastDist)>BGSPBASLBSP_HIGH_VAR_DETECTION_D_MIN))) {
 				if((*pfCurrDistThresholdVariationFactor)<BGSPBASLBSP_R2_UPPER) {
 					(*pfCurrDistThresholdVariationFactor) += BGSPBASLBSP_R2_INCR;
 					if((*pfCurrDistThresholdVariationFactor)>BGSPBASLBSP_R2_UPPER)
@@ -549,10 +556,10 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 					(*pfCurrDistThresholdFactor) = BGSPBASLBSP_R_LOWER;
 			}
 #endif //!BGSPBASLBSP_USE_R2_ACCELERATION
-			if(m_bDelayAnalysis)
+			/*if(m_bDelayAnalysis)
 				m_oBlinksFrame.data[uchar_idx] = ((m_oPureFGMask_last.data[uchar_idx]!=oCurrFGMask.data[uchar_idx]||m_oPureFGMask_last.data[uchar_idx]!=m_oPureFGMask_old.data[uchar_idx]) && m_oFGMask_old_dilated.data[uchar_idx]==0)?UCHAR_MAX:0;
 			else
-				m_oBlinksFrame.data[uchar_idx] = (m_oPureFGMask_last.data[uchar_idx]!=oCurrFGMask.data[uchar_idx])?UCHAR_MAX:0;
+				m_oBlinksFrame.data[uchar_idx] = (m_oPureFGMask_last.data[uchar_idx]!=oCurrFGMask.data[uchar_idx])?UCHAR_MAX:0;*/
 			for(int c=0; c<3; ++c) {
 				anLastIntraDesc[c] = anCurrIntraDesc[c];
 				anLastColorInt[c] = anCurrColorInt[c];
@@ -613,30 +620,29 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 	cv::imshow("m_oBlinksFrame",m_oBlinksFrame);
 	cv::imshow("m_oMeanNbBlinksFrame",m_oMeanNbBlinksFrame);*/
 #endif //DISPLAY_PBASLBSP_DEBUG_FRAMES
-#if BGSLBSP_USE_ADVANCED_MORPH_OPS || BGSPBASLBSP_USE_R2_ACCELERATION
-	m_oPureFGMask_last.copyTo(m_oPureFGMask_old); // @@@@@@@@
+
+	cv::bitwise_xor(oCurrFGMask,m_oPureFGMask_last,m_oPureFGBlinkMask_curr);
+	cv::bitwise_or(m_oPureFGBlinkMask_curr,m_oPureFGBlinkMask_last,m_oBlinksFrame);
+	cv::bitwise_not(m_oFGMask_last_dilated,m_oTempFGMask);
+	cv::bitwise_and(m_oBlinksFrame,m_oTempFGMask,m_oBlinksFrame);
+
+	m_oPureFGBlinkMask_curr.copyTo(m_oPureFGBlinkMask_last);
 	oCurrFGMask.copyTo(m_oPureFGMask_last);
-#endif //BGSLBSP_USE_ADVANCED_MORPH_OPS || BGSPBASLBSP_USE_R2_ACCELERATION
-#if BGSLBSP_USE_ADVANCED_MORPH_OPS
-	cv::medianBlur(oCurrFGMask,m_oTempFGMask,3);
-	cv::morphologyEx(m_oTempFGMask,m_oTempFGMask,cv::MORPH_CLOSE,cv::Mat());
+
+	//cv::medianBlur(oCurrFGMask,m_oTempFGMask,3);
+	//cv::morphologyEx(m_oTempFGMask,m_oTempFGMask,cv::MORPH_CLOSE,cv::Mat());
+	cv::morphologyEx(oCurrFGMask,m_oTempFGMask,cv::MORPH_CLOSE,cv::Mat());
 	cv::floodFill(m_oTempFGMask,cv::Point(0,0),UCHAR_MAX);
 	cv::bitwise_not(m_oTempFGMask,m_oTempFGMask);
-	cv::bitwise_or(m_oTempFGMask,m_oPureFGMask_last,oCurrFGMask);
-#endif //BGSLBSP_USE_ADVANCED_MORPH_OPS
-	if(m_bDelayAnalysis) {
-		m_oFGMask_last.copyTo(m_oFGMask_old);
-		m_oFGMask_last_dilated.copyTo(m_oFGMask_old_dilated);
-	}
+	cv::bitwise_or(oCurrFGMask,m_oTempFGMask,oCurrFGMask);
+
 	cv::medianBlur(oCurrFGMask,m_oFGMask_last,9);
-	if(m_bDelayAnalysis) {
-		cv::dilate(m_oFGMask_last,m_oFGMask_last_dilated,cv::Mat());
-		cv::bitwise_not(m_oFGMask_last_dilated,m_oTempFGMask);
-		cv::bitwise_and(m_oTempFGMask,m_oBlinksFrame,m_oBlinksFrame);
-		m_oFGMask_old.copyTo(oCurrFGMask);
-	}
-	else
-		m_oFGMask_last.copyTo(oCurrFGMask);
+
+	cv::dilate(m_oFGMask_last,m_oFGMask_last_dilated,cv::Mat());
+	cv::bitwise_not(m_oFGMask_last_dilated,m_oTempFGMask);
+	cv::bitwise_and(m_oBlinksFrame,m_oTempFGMask,m_oBlinksFrame);
+
+	m_oFGMask_last.copyTo(oCurrFGMask);
 }
 
 void BackgroundSubtractorPBASLBSP::getBackgroundImage(cv::OutputArray backgroundImage) const {
