@@ -30,9 +30,6 @@
 #if USE_VIBE_LBSP_BG_SUBTRACTOR
 #define USE_RELATIVE_LBSP_COMPARISONS	1
 #endif //USE_VIBE_LBSP_BG_SUBTRACTOR
-#if USE_PBAS_LBSP_BG_SUBTRACTOR
-#define USE_DELAYED_FRAME_ANALYSIS		0
-#endif //USE_PBAS_LBSP_BG_SUBTRACTOR
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
 #define LIMIT_KEYPTS_TO_SEQUENCE_ROI	1
 #endif
@@ -235,8 +232,8 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		const double dDefaultLearningRate = BGSVIBELBSP_DEFAULT_LEARNING_RATE;
 		pBGS->initialize(oInitImg);
 #elif USE_PBAS_LBSP_BG_SUBTRACTOR
-		pBGS = new BackgroundSubtractorPBASLBSP(USE_DELAYED_FRAME_ANALYSIS);
-		const double dDefaultLearningRate = BGSPBASLBSP_DEFAULT_LEARNING_RATE_OVERRIDE;
+		pBGS = new BackgroundSubtractorPBASLBSP();
+		const double dDefaultLearningRate = 0;
 		pBGS->initialize(oInitImg);
 #else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 		const int m_nInputChannels = oInitImg.channels();
@@ -314,16 +311,11 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 			std::cout << "frame process = " << std::fixed << std::setprecision(3) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_process-pre_process).count())/1000 << " ms." << std::endl;
 #endif //ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS
-#if USE_DELAYED_FRAME_ANALYSIS
-			const size_t nCurrGTIndex = (k>0)?(k-1):k;
-#else //!USE_DELAYED_FRAME_ANALYSIS
-			const size_t nCurrGTIndex = k;
-#endif //!USE_DELAYED_FRAME_ANALYSIS
-			cv::Mat oGTImg = pCurrSequence->GetGTFrameFromIndex(nCurrGTIndex);
+			cv::Mat oGTImg = pCurrSequence->GetGTFrameFromIndex(k);
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR
-			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oLastBGDescImg,oFGMask,oGTImg,pBGS->getBGKeyPoints(),nCurrGTIndex);
+			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oLastBGDescImg,oFGMask,oGTImg,pBGS->getBGKeyPoints(),k);
 #else //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)
 			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oFGMask,oGTImg,k);
 #endif //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR)

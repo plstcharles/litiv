@@ -27,7 +27,7 @@ BackgroundSubtractorPBAS::BackgroundSubtractorPBAS(	 int nInitColorDistThreshold
 BackgroundSubtractorPBAS::~BackgroundSubtractorPBAS() {}
 
 cv::AlgorithmInfo* BackgroundSubtractorPBAS::info() const {
-	CV_DbgAssert(false); // NOT IMPL @@@@@
+	CV_Assert(false); // NOT IMPL @@@@@
 	return NULL;
 }
 
