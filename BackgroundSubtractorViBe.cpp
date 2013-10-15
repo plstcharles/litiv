@@ -19,7 +19,7 @@ BackgroundSubtractorViBe::BackgroundSubtractorViBe(	 int nColorDistThreshold
 BackgroundSubtractorViBe::~BackgroundSubtractorViBe() {}
 
 cv::AlgorithmInfo* BackgroundSubtractorViBe::info() const {
-	CV_DbgAssert(false); // NOT IMPL @@@@@
+	CV_Assert(false); // NOT IMPL @@@@@
 	return NULL;
 }
 

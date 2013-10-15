@@ -35,13 +35,13 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg) {
 }
 
 cv::AlgorithmInfo* BackgroundSubtractorLBSP::info() const {
-	CV_DbgAssert(false); // NOT IMPL @@@@@
+	CV_Assert(false); // NOT IMPL @@@@@
 	return NULL;
 }
 
 void BackgroundSubtractorLBSP::getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const {
-	CV_DbgAssert(LBSP::DESC_SIZE==2);
-	CV_DbgAssert(m_bInitialized);
+	CV_Assert(LBSP::DESC_SIZE==2);
+	CV_Assert(m_bInitialized);
 	cv::Mat oAvgBGDesc = cv::Mat::zeros(m_oImgSize,CV_32FC(m_nImgChannels));
 	for(size_t n=0; n<m_voBGDesc.size(); ++n) {
 		for(int y=0; y<m_oImgSize.height; ++y) {
