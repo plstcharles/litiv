@@ -178,7 +178,7 @@ void SequenceInfo::ValidateKeyPoints(std::vector<cv::KeyPoint>& voKPs) const {
 }
 
 cv::Mat SequenceInfo::GetInputFrameFromIndex_Internal(size_t idx) {
-	CV_DbgAssert(idx>=0 && idx<m_nTotalNbFrames);
+	CV_DbgAssert(idx<m_nTotalNbFrames);
 	cv::Mat oFrame;
 	if(m_sDBName==CDNET_DB_NAME || m_sDBName==WALLFLOWER_DB_NAME)
 		oFrame = cv::imread(m_vsInputFramePaths[idx],m_nIMReadInputFlags);
@@ -196,7 +196,7 @@ cv::Mat SequenceInfo::GetInputFrameFromIndex_Internal(size_t idx) {
 }
 
 cv::Mat SequenceInfo::GetGTFrameFromIndex_Internal(size_t idx) {
-	CV_DbgAssert(idx>=0 && idx<m_nTotalNbFrames);
+	CV_DbgAssert(idx<m_nTotalNbFrames);
 	cv::Mat oFrame;
 	if(m_sDBName==CDNET_DB_NAME)
 		oFrame = cv::imread(m_vsGTFramePaths[idx],cv::IMREAD_GRAYSCALE);
@@ -311,7 +311,7 @@ void SequenceInfo::PrecacheInputFrames() {
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for precached io support on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-			CV_DbgAssert(m_nRequestInputFrameIndex>=0 && m_nRequestInputFrameIndex<m_nTotalNbFrames);
+			CV_DbgAssert(m_nRequestInputFrameIndex<m_nTotalNbFrames);
 			if(m_nRequestInputFrameIndex!=m_nNextExpectedInputFrameIdx-1) {
 				if(!m_qoInputFrameCache.empty() && m_nRequestInputFrameIndex==m_nNextExpectedInputFrameIdx) {
 					m_oReqInputFrame = m_qoInputFrameCache.front();
@@ -389,7 +389,7 @@ void SequenceInfo::PrecacheGTFrames() {
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for precached io support on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-			CV_DbgAssert(m_nRequestGTFrameIndex>=0 && m_nRequestGTFrameIndex<m_nTotalNbFrames);
+			CV_DbgAssert(m_nRequestGTFrameIndex<m_nTotalNbFrames);
 			if(m_nRequestGTFrameIndex!=m_nNextExpectedGTFrameIdx-1) {
 				if(!m_qoGTFrameCache.empty() && m_nRequestGTFrameIndex==m_nNextExpectedGTFrameIdx) {
 					m_oReqGTFrame = m_qoGTFrameCache.front();

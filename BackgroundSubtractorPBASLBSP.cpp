@@ -185,15 +185,25 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			if(nGoodSamplesCount<m_nRequiredBGSamples) {
 				oCurrFGMask.data[uchar_idx] = UCHAR_MAX;
 				*pfCurrMeanSegmRes = ((*pfCurrMeanSegmRes)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1) + 1.0f)/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
-				*pfCurrLearningRate += BGSPBASLBSP_T_INCR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
+				/**pfCurrLearningRate += BGSPBASLBSP_T_INCR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
 				if((*pfCurrLearningRate)>BGSPBASLBSP_T_UPPER)
-					*pfCurrLearningRate = BGSPBASLBSP_T_UPPER;
+					*pfCurrLearningRate = BGSPBASLBSP_T_UPPER;*/
+				if((*pfCurrLearningRate)<BGSPBASLBSP_T_UPPER) {
+					*pfCurrLearningRate += BGSPBASLBSP_T_INCR/(*pfCurrMeanMinDist);
+					if((*pfCurrLearningRate)>BGSPBASLBSP_T_UPPER)
+						*pfCurrLearningRate = BGSPBASLBSP_T_UPPER;
+				}
 			}
 			else {
 				*pfCurrMeanSegmRes = ((*pfCurrMeanSegmRes)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1))/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
-				*pfCurrLearningRate -= BGSPBASLBSP_T_DECR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
+				/**pfCurrLearningRate -= BGSPBASLBSP_T_DECR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
 				if((*pfCurrLearningRate)<BGSPBASLBSP_T_LOWER)
-					*pfCurrLearningRate = BGSPBASLBSP_T_LOWER;
+					*pfCurrLearningRate = BGSPBASLBSP_T_LOWER;*/
+				if((*pfCurrLearningRate)>BGSPBASLBSP_T_LOWER) {
+					*pfCurrLearningRate -= BGSPBASLBSP_T_DECR/(*pfCurrMeanMinDist);
+					if((*pfCurrLearningRate)<BGSPBASLBSP_T_LOWER)
+						*pfCurrLearningRate = BGSPBASLBSP_T_LOWER;
+				}
 				const int nLearningRate = learningRateOverride>0?(int)ceil(learningRateOverride):(int)ceil((*pfCurrLearningRate));
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
@@ -216,20 +226,26 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			}
 			float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+flt32_idx);
 			if((*pfCurrMeanMinDist)>BGSPBASLBSP_R2_OFFST && (m_oBlinksFrame.data[uchar_idx]>0 || ((*pfCurrMeanSegmRes)>BGSPBASLBSP_HIGH_VAR_DETECTION_S_MIN && (*pfCurrMeanLastDist)>BGSPBASLBSP_HIGH_VAR_DETECTION_D_MIN))) {
-				if((*pfCurrDistThresholdVariationFactor)<BGSPBASLBSP_R2_UPPER) {
+				/*if((*pfCurrDistThresholdVariationFactor)<BGSPBASLBSP_R2_UPPER) {
 					(*pfCurrDistThresholdVariationFactor) += BGSPBASLBSP_R2_INCR;
 					if((*pfCurrDistThresholdVariationFactor)>BGSPBASLBSP_R2_UPPER)
 						(*pfCurrDistThresholdVariationFactor) = BGSPBASLBSP_R2_UPPER;
-				}
+				}*/
+				(*pfCurrDistThresholdVariationFactor) += BGSPBASLBSP_R2_INCR;
 			}
 			else {
-				if((*pfCurrDistThresholdVariationFactor)>BGSPBASLBSP_R2_LOWER) {
+				/*if((*pfCurrDistThresholdVariationFactor)>BGSPBASLBSP_R2_LOWER) {
 					(*pfCurrDistThresholdVariationFactor) -= BGSPBASLBSP_R2_DECR;
 					if((*pfCurrDistThresholdVariationFactor)<BGSPBASLBSP_R2_LOWER)
 						(*pfCurrDistThresholdVariationFactor) = BGSPBASLBSP_R2_LOWER;
+				}*/
+				if((*pfCurrDistThresholdVariationFactor)>0) {
+					(*pfCurrDistThresholdVariationFactor) -= BGSPBASLBSP_R2_DECR;
+					if((*pfCurrDistThresholdVariationFactor)<0)
+						(*pfCurrDistThresholdVariationFactor) = 0;
 				}
 			}
-			if((*pfCurrDistThresholdFactor)<BGSPBASLBSP_R_LOWER+(*pfCurrMeanMinDist)*BGSPBASLBSP_R_SCALE+BGSPBASLBSP_R_OFFST) {
+			if((*pfCurrDistThresholdFactor)<BGSPBASLBSP_R_LOWER+(*pfCurrMeanMinDist)*BGSPBASLBSP_R_SCALE) {
 				if((*pfCurrDistThresholdFactor)<BGSPBASLBSP_R_UPPER) {
 					(*pfCurrDistThresholdFactor) += BGSPBASLBSP_R_INCR*(*pfCurrDistThresholdVariationFactor);
 					if((*pfCurrDistThresholdFactor)>BGSPBASLBSP_R_UPPER)
@@ -316,15 +332,25 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			if(nGoodSamplesCount<m_nRequiredBGSamples) {
 				oCurrFGMask.data[uchar_idx] = UCHAR_MAX;
 				*pfCurrMeanSegmRes = ((*pfCurrMeanSegmRes)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1) + 1.0f)/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
-				*pfCurrLearningRate += BGSPBASLBSP_T_INCR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
+				/**pfCurrLearningRate += BGSPBASLBSP_T_INCR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
 				if((*pfCurrLearningRate)>BGSPBASLBSP_T_UPPER)
-					*pfCurrLearningRate = BGSPBASLBSP_T_UPPER;
+					*pfCurrLearningRate = BGSPBASLBSP_T_UPPER;*/
+				if((*pfCurrLearningRate)<BGSPBASLBSP_T_UPPER) {
+					*pfCurrLearningRate += BGSPBASLBSP_T_INCR/(*pfCurrMeanMinDist);
+					if((*pfCurrLearningRate)>BGSPBASLBSP_T_UPPER)
+						*pfCurrLearningRate = BGSPBASLBSP_T_UPPER;
+				}
 			}
 			else {
 				*pfCurrMeanSegmRes = ((*pfCurrMeanSegmRes)*(BGSPBASLBSP_N_SAMPLES_FOR_MEAN-1))/BGSPBASLBSP_N_SAMPLES_FOR_MEAN;
-				*pfCurrLearningRate -= BGSPBASLBSP_T_DECR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
+				/**pfCurrLearningRate -= BGSPBASLBSP_T_DECR/((*pfCurrMeanMinDist)*BGSPBASLBSP_T_SCALE+BGSPBASLBSP_T_OFFST);
 				if((*pfCurrLearningRate)<BGSPBASLBSP_T_LOWER)
-					*pfCurrLearningRate = BGSPBASLBSP_T_LOWER;
+					*pfCurrLearningRate = BGSPBASLBSP_T_LOWER;*/
+				if((*pfCurrLearningRate)>BGSPBASLBSP_T_LOWER) {
+					*pfCurrLearningRate -= BGSPBASLBSP_T_DECR/(*pfCurrMeanMinDist);
+					if((*pfCurrLearningRate)<BGSPBASLBSP_T_LOWER)
+						*pfCurrLearningRate = BGSPBASLBSP_T_LOWER;
+				}
 				const int nLearningRate = learningRateOverride>0?(int)ceil(learningRateOverride):(int)ceil((*pfCurrLearningRate));
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
@@ -352,20 +378,26 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			}
 			float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+flt32_idx);
 			if((*pfCurrMeanMinDist)>BGSPBASLBSP_R2_OFFST && (m_oBlinksFrame.data[uchar_idx]>0 || ((*pfCurrMeanSegmRes)>BGSPBASLBSP_HIGH_VAR_DETECTION_S_MIN && (*pfCurrMeanLastDist)>BGSPBASLBSP_HIGH_VAR_DETECTION_D_MIN))) {
-				if((*pfCurrDistThresholdVariationFactor)<BGSPBASLBSP_R2_UPPER) {
+				/*if((*pfCurrDistThresholdVariationFactor)<BGSPBASLBSP_R2_UPPER) {
 					(*pfCurrDistThresholdVariationFactor) += BGSPBASLBSP_R2_INCR;
 					if((*pfCurrDistThresholdVariationFactor)>BGSPBASLBSP_R2_UPPER)
 						(*pfCurrDistThresholdVariationFactor) = BGSPBASLBSP_R2_UPPER;
-				}
+				}*/
+				(*pfCurrDistThresholdVariationFactor) += BGSPBASLBSP_R2_INCR;
 			}
 			else {
-				if((*pfCurrDistThresholdVariationFactor)>BGSPBASLBSP_R2_LOWER) {
+				/*if((*pfCurrDistThresholdVariationFactor)>BGSPBASLBSP_R2_LOWER) {
 					(*pfCurrDistThresholdVariationFactor) -= BGSPBASLBSP_R2_DECR;
 					if((*pfCurrDistThresholdVariationFactor)<BGSPBASLBSP_R2_LOWER)
 						(*pfCurrDistThresholdVariationFactor) = BGSPBASLBSP_R2_LOWER;
+				}*/
+				if((*pfCurrDistThresholdVariationFactor)>0) {
+					(*pfCurrDistThresholdVariationFactor) -= BGSPBASLBSP_R2_DECR;
+					if((*pfCurrDistThresholdVariationFactor)<0)
+						(*pfCurrDistThresholdVariationFactor) = 0;
 				}
 			}
-			if((*pfCurrDistThresholdFactor)<BGSPBASLBSP_R_LOWER+(*pfCurrMeanMinDist)*BGSPBASLBSP_R_SCALE+BGSPBASLBSP_R_OFFST) {
+			if((*pfCurrDistThresholdFactor)<BGSPBASLBSP_R_LOWER+(*pfCurrMeanMinDist)*BGSPBASLBSP_R_SCALE) {
 				if((*pfCurrDistThresholdFactor)<BGSPBASLBSP_R_UPPER) {
 					(*pfCurrDistThresholdFactor) += BGSPBASLBSP_R_INCR*(*pfCurrDistThresholdVariationFactor);
 					if((*pfCurrDistThresholdFactor)>BGSPBASLBSP_R_UPPER)
@@ -402,8 +434,8 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 	cv::circle(oDistThresholdFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
 	cv::imshow("r(x)",oDistThresholdFrameNormalized);
 	std::cout << std::fixed << std::setprecision(5) << " r(" << dbgpt << ") = " << m_oDistThresholdFrame.at<float>(dbgpt) << std::endl;
-	cv::Mat oDistThresholdVariationFrameNormalized; m_oDistThresholdVariationFrame.convertTo(oDistThresholdVariationFrameNormalized,CV_32FC1,1.0f/BGSPBASLBSP_R2_UPPER,-BGSPBASLBSP_R2_LOWER/BGSPBASLBSP_R2_UPPER);
-	cv::circle(oDistThresholdVariationFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
+	cv::Mat oDistThresholdVariationFrameNormalized; cv::normalize(m_oDistThresholdVariationFrame,oDistThresholdVariationFrameNormalized,0,255,cv::NORM_MINMAX,CV_8UC1);
+	cv::circle(oDistThresholdVariationFrameNormalized,dbgpt,5,cv::Scalar(255));
 	cv::imshow("r2(x)",oDistThresholdVariationFrameNormalized);
 	std::cout << std::fixed << std::setprecision(5) << "r2(" << dbgpt << ") = " << m_oDistThresholdVariationFrame.at<float>(dbgpt) << std::endl;
 	cv::Mat oUpdateRateFrameNormalized; m_oUpdateRateFrame.convertTo(oUpdateRateFrameNormalized,CV_32FC1,1.0f/BGSPBASLBSP_T_UPPER,-BGSPBASLBSP_T_LOWER/BGSPBASLBSP_T_UPPER);
@@ -417,8 +449,9 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 	cv::bitwise_and(m_oBlinksFrame,m_oTempFGMask,m_oBlinksFrame);
 	m_oPureFGBlinkMask_curr.copyTo(m_oPureFGBlinkMask_last);
 	oCurrFGMask.copyTo(m_oPureFGMask_last);
-	cv::medianBlur(oCurrFGMask,m_oTempFGMask,3);
-	cv::morphologyEx(m_oTempFGMask,m_oTempFGMask,cv::MORPH_CLOSE,cv::Mat());
+	//cv::medianBlur(oCurrFGMask,m_oTempFGMask,3);
+	//cv::morphologyEx(m_oTempFGMask,m_oTempFGMask,cv::MORPH_CLOSE,cv::Mat());
+	cv::morphologyEx(oCurrFGMask,m_oTempFGMask,cv::MORPH_CLOSE,cv::Mat());
 	cv::floodFill(m_oTempFGMask,cv::Point(0,0),UCHAR_MAX);
 	cv::bitwise_not(m_oTempFGMask,m_oTempFGMask);
 	cv::bitwise_or(oCurrFGMask,m_oTempFGMask,oCurrFGMask);
