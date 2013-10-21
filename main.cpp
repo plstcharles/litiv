@@ -418,6 +418,14 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 		oDescDiffBYTE3 = oDescDiffBYTE;
 	}
 
+#if ENABLE_DISPLAY_MOUSE_DEBUG
+	if(pnLatestMouseX&&pnLatestMouseY) {
+		cv::Point dbgpt(*pnLatestMouseX,*pnLatestMouseY);
+		cv::circle(oInputImgBYTE3,dbgpt,5,cv::Scalar(255,255,255));
+		cv::circle(oFGMaskBYTE3,dbgpt,5,cv::Scalar(255,255,255));
+	}
+#endif //ENABLE_DISPLAY_MOUSE_DEBUG
+
 	cv::absdiff(oInputImgBYTE3,oBGImgBYTE3,oImgDiffBYTE3);
 	cv::Mat displayH,displayV1,displayV2;
 	cv::resize(oInputImgBYTE3,oInputImgBYTE3,cv::Size(320,240));
