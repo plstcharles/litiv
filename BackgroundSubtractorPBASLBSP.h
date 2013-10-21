@@ -8,8 +8,6 @@
 #define BGSPBASLBSP_DEFAULT_DESC_DIST_THRESHOLD (7)
 //! defines the default value for BackgroundSubtractorPBASLBSP::m_nDefaultColorDistThreshold
 #define BGSPBASLBSP_DEFAULT_COLOR_DIST_THRESHOLD (30)
-//! defines the default value for BackgroundSubtractorPBASLBSP::m_fDefaultUpdateRate
-#define BGSPBASLBSP_DEFAULT_LEARNING_RATE (16.0f)
 //! defines the default value for BackgroundSubtractorPBASLBSP::m_nBGSamples
 #define BGSPBASLBSP_DEFAULT_NB_BG_SAMPLES (35)
 //! defines the default value for BackgroundSubtractorPBASLBSP::m_nRequiredBGSamples
@@ -25,7 +23,6 @@
 //! defines the internal threshold adjustment factor to use when treating single channel images
 #define BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.350f)
 //! parameters used for dynamic distance threshold adjustments ('R(x)')
-#define BGSPBASLBSP_R_OFFST (0.0000f)
 #define BGSPBASLBSP_R_SCALE (3.5000f)
 #define BGSPBASLBSP_R_INCR  (0.0750f)
 #define BGSPBASLBSP_R_DECR  (0.0250f)
@@ -35,13 +32,9 @@
 #define BGSPBASLBSP_R2_OFFST (0.085f)
 #define BGSPBASLBSP_R2_INCR  (0.200f)
 #define BGSPBASLBSP_R2_DECR  (0.025f)
-#define BGSPBASLBSP_R2_LOWER (0.001f)
-#define BGSPBASLBSP_R2_UPPER (999.00f)
 //! parameters used for dynamic learning rates adjustments  ('T(x)')
-#define BGSPBASLBSP_T_OFFST (0.0001f)
-#define BGSPBASLBSP_T_SCALE (1.0000f)
 #define BGSPBASLBSP_T_DECR  (0.0500f)
-#define BGSPBASLBSP_T_INCR  (1.0000f)
+#define BGSPBASLBSP_T_INCR  (0.5000f)
 #define BGSPBASLBSP_T_LOWER (2.0000f)
 #define BGSPBASLBSP_T_UPPER (256.00f)
 
