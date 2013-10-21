@@ -20,6 +20,8 @@
 //! defines the threshold values used to detect high variation regions that are often labelled as foreground and trigger a local, gradual change in distance thresholds
 #define BGSPBASLBSP_HIGH_VAR_DETECTION_S_MIN (0.850f)
 #define BGSPBASLBSP_HIGH_VAR_DETECTION_D_MIN (0.175f)
+#define BGSPBASLBSP_HIGH_VAR_DETECTION_S_MIN2 (0.100f)
+#define BGSPBASLBSP_HIGH_VAR_DETECTION_D_MIN2 (0.225f)
 //! defines the internal threshold adjustment factor to use when treating single channel images
 #define BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.350f)
 //! parameters used for dynamic distance threshold adjustments ('R(x)')
@@ -29,7 +31,7 @@
 #define BGSPBASLBSP_R_LOWER (0.8000f)
 #define BGSPBASLBSP_R_UPPER (3.5000f)
 //! parameters used for adjusting the variation speed of dynamic distance thresholds  ('R2(x)')
-#define BGSPBASLBSP_R2_OFFST (0.085f)
+#define BGSPBASLBSP_R2_OFFST (0.070f)
 #define BGSPBASLBSP_R2_INCR  (0.200f)
 #define BGSPBASLBSP_R2_DECR  (0.025f)
 //! parameters used for dynamic learning rates adjustments  ('T(x)')
