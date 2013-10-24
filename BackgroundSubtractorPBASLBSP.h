@@ -107,5 +107,8 @@ protected:
 	cv::Mat m_oTempFGMask;
 	cv::Mat m_oPureFGBlinkMask_curr;
 	cv::Mat m_oPureFGBlinkMask_last;
+
+	//! pre-allocated internal LBSP threshold values for all possible 8-bit intensity values
+	uchar m_nLBSPThreshold_8bitLUT[256];
 };
 
