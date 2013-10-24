@@ -10,95 +10,6 @@
 #define DISPLAY_PBASLBSP_DEBUG_FRAMES 0
 // local define for the gradient proportion value used in color+grad distance calculations
 #define OVERLOAD_GRAD_PROP ((1.0f-std::pow(((*pfCurrDistThresholdFactor)-BGSPBASLBSP_R_LOWER)/(BGSPBASLBSP_R_UPPER-BGSPBASLBSP_R_LOWER),2))*0.5f)
-/*
-lin_rel = 0.3;
-range_min = 0;
-range_max = 255;
-input_min = 0;
-input_max = 255;
-output_min = 10;
-output_max = input_max*lin_rel;
-logst_min = -6;
-logst_max = 6;
-*/
-// local relative LBSP threshold lookup table (with logistic growth)
-/*static uchar s_nLogisticRelLBSPThreshold_8bitLUT[256] = {
-	  11,   11,   11,   11,   11,   12,   12,   12,   12,   12,   12,   12,   12,   12,   12,   12,
-	  12,   12,   12,   12,   13,   13,   13,   13,   13,   13,   13,   13,   13,   13,   13,   14,
-	  14,   14,   14,   14,   14,   14,   14,   15,   15,   15,   15,   15,   15,   15,   16,   16,
-	  16,   16,   16,   16,   17,   17,   17,   17,   17,   17,   18,   18,   18,   18,   19,   19,
-	  19,   19,   19,   20,   20,   20,   20,   21,   21,   21,   22,   22,   22,   22,   23,   23,
-	  23,   24,   24,   24,   25,   25,   25,   26,   26,   26,   27,   27,   27,   28,   28,   28,
-	  29,   29,   30,   30,   30,   31,   31,   32,   32,   33,   33,   33,   34,   34,   35,   35,
-	  36,   36,   36,   37,   37,   38,   38,   39,   39,   40,   40,   41,   41,   42,   42,   43,
-	  43,   43,   44,   44,   45,   45,   46,   46,   47,   47,   48,   48,   49,   49,   49,   50,
-	  50,   51,   51,   52,   52,   53,   53,   53,   54,   54,   55,   55,   55,   56,   56,   57,
-	  57,   57,   58,   58,   59,   59,   59,   60,   60,   60,   61,   61,   61,   62,   62,   62,
-	  63,   63,   63,   63,   64,   64,   64,   65,   65,   65,   65,   66,   66,   66,   66,   67,
-	  67,   67,   67,   67,   68,   68,   68,   68,   68,   69,   69,   69,   69,   69,   69,   70,
-	  70,   70,   70,   70,   70,   71,   71,   71,   71,   71,   71,   71,   71,   72,   72,   72,
-	  72,   72,   72,   72,   72,   72,   73,   73,   73,   73,   73,   73,   73,   73,   73,   73,
-	  73,   73,   73,   74,   74,   74,   74,   74,   74,   74,   74,   74,   74,   74,   74,   74,
-};*/
-// local relative LBSP threshold lookup table (with linear growth)
-/*static uchar s_nLinearRelLBSPThreshold_8bitLUT[256] = {
-	   0,    0,    0,    0,    1,    1,    1,    2,    2,    2,    3,    3,    3,    3,    4,    4,
-	   4,    5,    5,    5,    6,    6,    6,    6,    7,    7,    7,    8,    8,    8,    9,    9,
-	   9,    9,   10,   10,   10,   11,   11,   11,   12,   12,   12,   12,   13,   13,   13,   14,
-	  14,   14,   15,   15,   15,   15,   16,   16,   16,   17,   17,   17,   18,   18,   18,   18,
-	  19,   19,   19,   20,   20,   20,   21,   21,   21,   21,   22,   22,   22,   23,   23,   23,
-	  24,   24,   24,   24,   25,   25,   25,   26,   26,   26,   27,   27,   27,   27,   28,   28,
-	  28,   29,   29,   29,   30,   30,   30,   30,   31,   31,   31,   32,   32,   32,   33,   33,
-	  33,   33,   34,   34,   34,   35,   35,   35,   36,   36,   36,   36,   37,   37,   37,   38,
-	  38,   38,   39,   39,   39,   39,   40,   40,   40,   41,   41,   41,   42,   42,   42,   42,
-	  43,   43,   43,   44,   44,   44,   45,   45,   45,   45,   46,   46,   46,   47,   47,   47,
-	  48,   48,   48,   48,   49,   49,   49,   50,   50,   50,   51,   51,   51,   51,   52,   52,
-	  52,   53,   53,   53,   54,   54,   54,   54,   55,   55,   55,   56,   56,   56,   57,   57,
-	  57,   57,   58,   58,   58,   59,   59,   59,   60,   60,   60,   60,   61,   61,   61,   62,
-	  62,   62,   63,   63,   63,   63,   64,   64,   64,   65,   65,   65,   66,   66,   66,   66,
-	  67,   67,   67,   68,   68,   68,   69,   69,   69,   69,   70,   70,   70,   71,   71,   71,
-	  72,   72,   72,   72,   73,   73,   73,   74,   74,   74,   75,   75,   75,   75,   76,   76,
-};*/
-// local relative LBSP threshold lookup table (with half logistic, half linear growth)
-/*static uchar s_nLogLinRelLBSPThreshold_8bitLUT[256] = {
-	  11,   11,   11,   11,   11,   12,   12,   12,   12,   12,   12,   12,   12,   12,   12,   12,
-	  12,   12,   12,   12,   13,   13,   13,   13,   13,   13,   13,   13,   13,   13,   13,   14,
-	  14,   14,   14,   14,   14,   14,   14,   15,   15,   15,   15,   15,   15,   15,   16,   16,
-	  16,   16,   16,   16,   17,   17,   17,   17,   17,   17,   18,   18,   18,   18,   19,   19,
-	  19,   19,   19,   20,   20,   20,   20,   21,   21,   21,   22,   22,   22,   22,   23,   23,
-	  23,   24,   24,   24,   25,   25,   25,   26,   26,   26,   27,   27,   27,   28,   28,   28,
-	  29,   29,   30,   30,   30,   31,   31,   32,   32,   33,   33,   33,   34,   34,   35,   35,
-	  36,   36,   36,   37,   37,   38,   38,   39,   39,   40,   40,   41,   41,   42,   42,   43,
-	  38,   38,   39,   39,   39,   39,   40,   40,   40,   41,   41,   41,   42,   42,   42,   42,
-	  43,   43,   43,   44,   44,   44,   45,   45,   45,   45,   46,   46,   46,   47,   47,   47,
-	  48,   48,   48,   48,   49,   49,   49,   50,   50,   50,   51,   51,   51,   51,   52,   52,
-	  52,   53,   53,   53,   54,   54,   54,   54,   55,   55,   55,   56,   56,   56,   57,   57,
-	  57,   57,   58,   58,   58,   59,   59,   59,   60,   60,   60,   60,   61,   61,   61,   62,
-	  62,   62,   63,   63,   63,   63,   64,   64,   64,   65,   65,   65,   66,   66,   66,   66,
-	  67,   67,   67,   68,   68,   68,   69,   69,   69,   69,   70,   70,   70,   71,   71,   71,
-	  72,   72,   72,   72,   73,   73,   73,   74,   74,   74,   75,   75,   75,   75,   76,   76,
-};*/
-// local relative LBSP threshold lookup table (with smoothed half logistic, half linear growth)
-static uchar s_nSmoothLogLinRelLBSPThreshold_8bitLUT[256] = {
-	  11,   11,   11,   11,   11,   12,   12,   12,   12,   12,   12,   12,   12,   12,   12,   12,
-	  12,   12,   12,   12,   13,   13,   13,   13,   13,   13,   13,   13,   13,   13,   13,   14,
-	  14,   14,   14,   14,   14,   14,   14,   15,   15,   15,   15,   15,   15,   15,   16,   16,
-	  16,   16,   16,   16,   17,   17,   17,   17,   17,   17,   18,   18,   18,   18,   19,   19,
-	  19,   19,   19,   20,   20,   20,   20,   21,   21,   21,   22,   22,   22,   22,   23,   23,
-	  23,   24,   24,   24,   25,   25,   25,   26,   26,   26,   27,   27,   27,   27,   28,   28,
-	  28,   29,   29,   29,   30,   30,   30,   30,   31,   31,   31,   32,   32,   32,   33,   33,
-	  33,   33,   34,   34,   34,   35,   35,   35,   36,   36,   36,   36,   37,   37,   37,   38,
-	  38,   38,   39,   39,   39,   39,   40,   40,   40,   41,   41,   41,   42,   42,   42,   42,
-	  43,   43,   43,   44,   44,   44,   45,   45,   45,   45,   46,   46,   46,   47,   47,   47,
-	  48,   48,   48,   48,   49,   49,   49,   50,   50,   50,   51,   51,   51,   51,   52,   52,
-	  52,   53,   53,   53,   54,   54,   54,   54,   55,   55,   55,   56,   56,   56,   57,   57,
-	  57,   57,   58,   58,   58,   59,   59,   59,   60,   60,   60,   60,   61,   61,   61,   62,
-	  62,   62,   63,   63,   63,   63,   64,   64,   64,   65,   65,   65,   66,   66,   66,   66,
-	  67,   67,   67,   68,   68,   68,   69,   69,   69,   69,   70,   70,   70,   71,   71,   71,
-	  72,   72,   72,   72,   73,   73,   73,   74,   74,   74,   75,   75,   75,   75,   76,   76,
-};
-// local define for the LBSP threshold LUT to use
-#define LBSP_THRESHOLD_8bitLUT(x) s_nSmoothLinLogRelLBSPThreshold_8bitLUT[x]
 
 BackgroundSubtractorPBASLBSP::BackgroundSubtractorPBASLBSP(	 float fLBSPThreshold
 															,int nInitDescDistThreshold
@@ -161,7 +72,7 @@ void BackgroundSubtractorPBASLBSP::initialize(const cv::Mat& oInitImg, const std
 	CV_Assert(!m_voKeyPoints.empty());
 	// init bg model samples :
 	oInitImg.copyTo(m_oLastColorFrame);
-	// create an extractor, this one time, for a batch job (and using a linear relative threshold relation)
+	// create an extractor, this one time, for a batch job
 	LBSP oExtractor(m_nImgChannels==3?m_fLBSPThreshold:(m_fLBSPThreshold*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT));
 	oExtractor.compute2(m_oLastColorFrame,m_voKeyPoints,m_oLastDescFrame);
 	m_voBGImg.resize(m_nBGSamples);
@@ -181,6 +92,10 @@ void BackgroundSubtractorPBASLBSP::initialize(const cv::Mat& oInitImg, const std
 				m_voBGImg[s].at<uchar>(y_orig,x_orig) = m_oLastColorFrame.at<uchar>(y_sample,x_sample);
 				m_voBGDesc[s].at<ushort>(y_orig,x_orig) = m_oLastDescFrame.at<ushort>(y_sample,x_sample);
 			}
+		}
+		for(int t=0; t<=UCHAR_MAX; ++t) {
+			int nCurrLBSPThreshold = (int)(t*m_fLBSPThreshold*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+			m_nLBSPThreshold_8bitLUT[t]=nCurrLBSPThreshold>UCHAR_MAX?UCHAR_MAX:(uchar)nCurrLBSPThreshold;
 		}
 	}
 	else { //m_nImgChannels==3
@@ -207,6 +122,10 @@ void BackgroundSubtractorPBASLBSP::initialize(const cv::Mat& oInitImg, const std
 					bg_desc_ptr[n] = init_desc_ptr[n];
 				}
 			}
+		}
+		for(int t=0; t<=UCHAR_MAX; ++t) {
+			int nCurrLBSPThreshold = (int)(t*m_fLBSPThreshold);
+			m_nLBSPThreshold_8bitLUT[t]=nCurrLBSPThreshold>UCHAR_MAX?UCHAR_MAX:(uchar)nCurrLBSPThreshold;
 		}
 	}
 	m_bInitialized = true;
@@ -236,9 +155,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			const int nCurrColorDistThreshold = (int)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 			const int nCurrDescDistThreshold = (int)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold); // not adjusted like ^^, the internal LBSP thresholds are instead
 			ushort nCurrInterDesc, nCurrIntraDesc;
-			//const uchar nCurrIntraLBSPThreshold = (uchar)(m_fLBSPThreshold*nCurrColorInt*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
-			const uchar nCurrIntraLBSPThreshold = (uchar)(LBSP_THRESHOLD_8bitLUT(nCurrColorInt)*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
-			LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColorInt,x,y,nCurrIntraLBSPThreshold,nCurrIntraDesc);
+			LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColorInt,x,y,m_nLBSPThreshold_8bitLUT[nCurrColorInt],nCurrIntraDesc);
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
 				const uchar nBGColorInt = m_voBGImg[nSampleIdx].data[uchar_idx];
@@ -247,9 +164,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 					if(nColorDist>nCurrColorDistThreshold)
 						goto failedcheck1ch;
 					const ushort& nBGIntraDesc = *((ushort*)(m_voBGDesc[nSampleIdx].data+ushrt_idx));
-					//const uchar nBGInterLBSPThreshold = (uchar)(m_fLBSPThreshold*nBGColorInt*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
-					const uchar nBGInterLBSPThreshold = (uchar)(LBSP_THRESHOLD_8bitLUT(nBGColorInt)*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
-					LBSP::computeGrayscaleDescriptor(oInputImg,nBGColorInt,x,y,nBGInterLBSPThreshold,nCurrInterDesc);
+					LBSP::computeGrayscaleDescriptor(oInputImg,nBGColorInt,x,y,m_nLBSPThreshold_8bitLUT[nBGColorInt],nCurrInterDesc);
 					const int nDescDist = (hdist_ushort_8bitLUT(nCurrInterDesc,nBGIntraDesc)+hdist_ushort_8bitLUT(nCurrIntraDesc,nBGIntraDesc))/2;
 					if(nDescDist>nCurrDescDistThreshold)
 						goto failedcheck1ch;
@@ -379,8 +294,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			const int nCurrSCDescDistThreshold = (int)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);
 #endif //BGSLBSP_USE_SC_THRS_VALIDATION
 			ushort anCurrInterDesc[3], anCurrIntraDesc[3];
-			//const uchar anCurrIntraLBSPThresholds[3] = {(uchar)(anCurrColorInt[0]*m_fLBSPThreshold),(uchar)(anCurrColorInt[1]*m_fLBSPThreshold),(uchar)(anCurrColorInt[2]*m_fLBSPThreshold)};
-			const uchar anCurrIntraLBSPThresholds[3] = {LBSP_THRESHOLD_8bitLUT(anCurrColorInt[0]),LBSP_THRESHOLD_8bitLUT(anCurrColorInt[1]),LBSP_THRESHOLD_8bitLUT(anCurrColorInt[2])};
+			const uchar anCurrIntraLBSPThresholds[3] = {m_nLBSPThreshold_8bitLUT[anCurrColorInt[0]],m_nLBSPThreshold_8bitLUT[anCurrColorInt[1]],m_nLBSPThreshold_8bitLUT[anCurrColorInt[2]]};
 			LBSP::computeRGBDescriptor(oInputImg,anCurrColorInt,x,y,anCurrIntraLBSPThresholds,anCurrIntraDesc);
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
@@ -394,9 +308,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 					if(nColorDist>nCurrSCColorDistThreshold)
 						goto failedcheck3ch;
 #endif //BGSLBSP_USE_SC_THRS_VALIDATION
-					//const uchar nBGInterLBSPThreshold = (uchar)(m_fLBSPThreshold*anBGColorInt[c]);
-					const uchar nBGInterLBSPThreshold = LBSP_THRESHOLD_8bitLUT(anBGColorInt[c]);
-					LBSP::computeSingleRGBDescriptor(oInputImg,anBGColorInt[c],x,y,c,nBGInterLBSPThreshold,anCurrInterDesc[c]);
+					LBSP::computeSingleRGBDescriptor(oInputImg,anBGColorInt[c],x,y,c,m_nLBSPThreshold_8bitLUT[anBGColorInt[c]],anCurrInterDesc[c]);
 					const int nDescDist = (hdist_ushort_8bitLUT(anCurrInterDesc[c],anBGIntraDesc[c])+hdist_ushort_8bitLUT(anCurrIntraDesc[c],anBGIntraDesc[c]))/2;
 #if BGSLBSP_USE_SC_THRS_VALIDATION
 					if(nDescDist>nCurrSCDescDistThreshold)
