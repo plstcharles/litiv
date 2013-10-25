@@ -223,7 +223,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 				const int flt32_randidx = uchar_randidx*4;
 				const float fRandMeanLastDist = *((float*)(m_oMeanLastDistFrame.data+flt32_randidx));
 				const float fRandMeanSegmRes = *((float*)(m_oMeanSegmResFrame.data+flt32_randidx));
-				if((n_rand%(nLearningRate)==0) || (fRandMeanSegmRes>BGSPBASLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSPBASLBSP_GHOST_DETECTION_D_MAX*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT && (n_rand%4)==0)) {
+				if((n_rand%(nLearningRate)==0) || (fRandMeanSegmRes>BGSPBASLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSPBASLBSP_GHOST_DETECTION_D_MAX && (n_rand%4)==0)) {
 					const int ushrt_randidx = uchar_randidx*2;
 					int s_rand = rand()%m_nBGSamples;
 					*((ushort*)(m_voBGDesc[s_rand].data+ushrt_randidx)) = nCurrIntraDesc;
