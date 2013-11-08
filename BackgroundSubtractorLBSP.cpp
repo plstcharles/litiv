@@ -43,15 +43,15 @@ void BackgroundSubtractorLBSP::getBackgroundDescriptorsImage(cv::OutputArray bac
 	CV_Assert(LBSP::DESC_SIZE==2);
 	CV_Assert(m_bInitialized);
 	cv::Mat oAvgBGDesc = cv::Mat::zeros(m_oImgSize,CV_32FC(m_nImgChannels));
-	for(size_t n=0; n<m_voBGDesc.size(); ++n) {
+	for(size_t n=0; n<m_voBGDescSamples.size(); ++n) {
 		for(int y=0; y<m_oImgSize.height; ++y) {
 			for(int x=0; x<m_oImgSize.width; ++x) {
-				int desc_idx = m_voBGDesc[n].step.p[0]*y + m_voBGDesc[n].step.p[1]*x;
+				int desc_idx = m_voBGDescSamples[n].step.p[0]*y + m_voBGDescSamples[n].step.p[1]*x;
 				int flt32_idx = desc_idx*2;
 				float* oAvgBgDescPtr = (float*)(oAvgBGDesc.data+flt32_idx);
-				ushort* oBGDescPtr = (ushort*)(m_voBGDesc[n].data+desc_idx);
+				ushort* oBGDescPtr = (ushort*)(m_voBGDescSamples[n].data+desc_idx);
 				for(int c=0; c<m_nImgChannels; ++c)
-					oAvgBgDescPtr[c] += ((float)oBGDescPtr[c])/m_voBGDesc.size();
+					oAvgBgDescPtr[c] += ((float)oBGDescPtr[c])/m_voBGDescSamples.size();
 			}
 		}
 	}

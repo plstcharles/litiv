@@ -62,7 +62,7 @@ protected:
 	//! number of similar samples needed to consider the current pixel/block as 'background'
 	const int m_nRequiredBGSamples;
 	//! background model pixel intensity samples
-	std::vector<cv::Mat> m_voBGImg;
+	std::vector<cv::Mat> m_voBGColorSamples;
 	//! absolute per-channel color distance threshold (based on the provided LBSP threshold)
 	const int m_nColorDistThreshold;
 };

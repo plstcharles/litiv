@@ -40,11 +40,11 @@ public:
 	//! @@@@@@@@@@@@ ????
 	virtual cv::AlgorithmInfo* info() const;
 	//! returns a copy of the latest reconstructed background descriptors image
-	void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const;
+	virtual void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const;
 	//! returns the keypoints list used for descriptor extraction (note: by default, these are generated from the DenseFeatureDetector class, and the border points are removed)
-	std::vector<cv::KeyPoint> getBGKeyPoints() const;
+	virtual std::vector<cv::KeyPoint> getBGKeyPoints() const;
 	//! sets the keypoints to be used for descriptor extraction, effectively setting the BGModel ROI (note: this function will remove all border keypoints)
-	void setBGKeyPoints(std::vector<cv::KeyPoint>& keypoints);
+	virtual void setBGKeyPoints(std::vector<cv::KeyPoint>& keypoints);
 
 
 	// ######## DEBUG PURPOSES ONLY ##########
@@ -52,7 +52,7 @@ public:
 
 protected:
 	//! background model descriptors samples (tied to m_voKeyPoints but shaped like the input frames)
-	std::vector<cv::Mat> m_voBGDesc;
+	std::vector<cv::Mat> m_voBGDescSamples;
 	//! background model keypoints used for LBSP descriptor extraction (specific to the input image size)
 	std::vector<cv::KeyPoint> m_voKeyPoints;
 	//! input image size
