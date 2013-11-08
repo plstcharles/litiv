@@ -6,7 +6,7 @@
 #define BGSPBASLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.300f)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
 #define BGSPBASLBSP_DEFAULT_DESC_DIST_THRESHOLD (7)
-//! defines the default value for BackgroundSubtractorPBASLBSP::m_nDefaultColorDistThreshold
+//! defines the default value for BackgroundSubtractorPBASLBSP::m_nColorDistThreshold
 #define BGSPBASLBSP_DEFAULT_COLOR_DIST_THRESHOLD (30)
 //! defines the default value for BackgroundSubtractorPBASLBSP::m_nBGSamples
 #define BGSPBASLBSP_DEFAULT_NB_BG_SAMPLES (35)
@@ -75,8 +75,8 @@ protected:
 	//! number of similar samples needed to consider the current pixel/block as 'background' (same as '#_min' in ViBe/PBAS)
 	const int m_nRequiredBGSamples;
 
-	//! background model pixel intensity samples (equivalent to 'B(x)' in PBAS, but also paired with BackgroundSubtractorLBSP::m_voBGDesc to create our complete model)
-	std::vector<cv::Mat> m_voBGImg;
+	//! background model pixel color intensity samples (equivalent to 'B(x)' in PBAS, but also paired with BackgroundSubtractorLBSP::m_voBGDescSamples to create our complete model)
+	std::vector<cv::Mat> m_voBGColorSamples;
 
 	//! per-pixel distance thresholds (equivalent to 'R(x)' in PBAS, but used as a relative value to determine both intensity and descriptor variation thresholds)
 	cv::Mat m_oDistThresholdFrame;
