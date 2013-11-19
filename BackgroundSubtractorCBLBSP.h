@@ -37,9 +37,9 @@
 #define BGSCBLBSP_R2_DECR  (0.100f)
 //! parameters used for dynamic learning rates adjustments  ('T(x)')
 #define BGSCBLBSP_T_DECR  (0.0250f)
-#define BGSCBLBSP_T_INCR  (0.5000f)
+#define BGSCBLBSP_T_INCR  (0.2500f)
 #define BGSCBLBSP_T_LOWER (2.0000f)
-#define BGSCBLBSP_T_UPPER (256.00f)
+#define BGSCBLBSP_T_UPPER (64.000f)
 
 /*!
 	CB-Based Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
@@ -81,7 +81,6 @@ protected:
 		int nWID;
 		int nFirstOcc;
 		int nLastOcc;
-		int nBlinks;
 		int nOccurrences;
 	};
 	class GlobalWord {
@@ -117,12 +116,16 @@ protected:
 	const int m_nColorDistThreshold;
 	//! number of different local words per pixel/block to be taken from input frames to build the background model (similar to 'N' in ViBe/PBAS)
 	const int m_nLocalWords;
+	//! number of local words (offset via index from the end) that can be randomly updated when needed
+	const int m_nLastLocalWordReplaceableIdxs;
 	//! number of different global words to be taken from input frames to build the background model
 	const int m_nGlobalWords;
 	//! total number of local dictionaries (depends on the input frame size and nb of channels)
 	int m_nLocalDictionaries;
-	//! common WID seed (if implemented as atomic, might be useful later for threaded operations)
+	//! WID seed (if implemented as atomic, might be useful later for threaded operations)
 	int m_nCurrWIDSeed;
+	//! current frame index, used to keep track of word occurrence information
+	int m_nFrameIndex;
 
 	//! background model local words dictionaries (1x dictionary/subregion)
 	LocalWord*** m_aapLocalWords; // @@@@@@@@ IMPLEMENT A SIMPLE BUBBLE SORT FOR 1-SWAP-PASS/CYCLE ? @@@@@@ create map to keep track of wid => dictionary index?
@@ -143,6 +146,8 @@ protected:
 	cv::Mat m_oBlinksFrame;
 	//! per-pixel update rates ('T(x)' in PBAS, which contains pixel-level 'sigmas', as referred to in ViBe)
 	cv::Mat m_oUpdateRateFrame;
+	//! per-pixel word weight thresholds @@@@@@@@ curr used for debug
+	cv::Mat m_oWeightThresholdFrame;
 	//! copy of previously used pixel intensities used to calculate 'D_last(x)'
 	cv::Mat m_oLastColorFrame;
 	//! copy of previously used descriptors used to calculate 'D_last(x)'

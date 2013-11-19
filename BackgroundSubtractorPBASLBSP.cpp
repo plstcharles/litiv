@@ -7,7 +7,7 @@
 #include <iomanip>
 
 // local define used for debug purposes only
-#define DISPLAY_PBASLBSP_DEBUG_FRAMES 0
+#define DISPLAY_DEBUG_FRAMES 0
 // local define for the gradient proportion value used in color+grad distance calculations
 #define OVERLOAD_GRAD_PROP ((1.0f-std::pow(((*pfCurrDistThresholdFactor)-BGSPBASLBSP_R_LOWER)/(BGSPBASLBSP_R_UPPER-BGSPBASLBSP_R_LOWER),2))*0.5f)
 
@@ -96,7 +96,7 @@ void BackgroundSubtractorPBASLBSP::initialize(const cv::Mat& oInitImg, const std
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
-			CV_DbgAssert(m_oLastColorFrame.step.p[0]==m_oLastColorFrame.cols && m_oLastColorFrame.step.p[1]==1);
+			CV_DbgAssert((int)m_oLastColorFrame.step.p[0]==m_oLastColorFrame.cols && m_oLastColorFrame.step.p[1]==1);
 			const int idx_color = m_oLastColorFrame.cols*y_orig + x_orig;
 			CV_DbgAssert(m_oLastDescFrame.step.p[0]==m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==m_oLastColorFrame.step.p[1]*2);
 			const int idx_desc = idx_color*2;
@@ -106,7 +106,7 @@ void BackgroundSubtractorPBASLBSP::initialize(const cv::Mat& oInitImg, const std
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
-			CV_DbgAssert(m_oLastColorFrame.step.p[0]==m_oLastColorFrame.cols && m_oLastColorFrame.step.p[1]==1);
+			CV_DbgAssert((int)m_oLastColorFrame.step.p[0]==m_oLastColorFrame.cols && m_oLastColorFrame.step.p[1]==1);
 			const int idx_orig_color = m_oLastColorFrame.cols*y_orig + x_orig;
 			CV_DbgAssert(m_oLastDescFrame.step.p[0]==m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==m_oLastColorFrame.step.p[1]*2);
 			const int idx_orig_desc = idx_orig_color*2;
@@ -128,7 +128,7 @@ void BackgroundSubtractorPBASLBSP::initialize(const cv::Mat& oInitImg, const std
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
-			CV_DbgAssert(m_oLastColorFrame.step.p[0]==3*m_oLastColorFrame.cols && m_oLastColorFrame.step.p[1]==3);
+			CV_DbgAssert((int)m_oLastColorFrame.step.p[0]==3*m_oLastColorFrame.cols && m_oLastColorFrame.step.p[1]==3);
 			const int idx_color = 3*(m_oLastColorFrame.cols*y_orig + x_orig);
 			CV_DbgAssert(m_oLastDescFrame.step.p[0]==m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==m_oLastColorFrame.step.p[1]*2);
 			const int idx_desc = idx_color*2;
@@ -141,7 +141,7 @@ void BackgroundSubtractorPBASLBSP::initialize(const cv::Mat& oInitImg, const std
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
-			CV_DbgAssert(m_oLastColorFrame.step.p[0]==3*m_oLastColorFrame.cols && m_oLastColorFrame.step.p[1]==3);
+			CV_DbgAssert((int)m_oLastColorFrame.step.p[0]==3*m_oLastColorFrame.cols && m_oLastColorFrame.step.p[1]==3);
 			const int idx_orig_color = 3*(m_oLastColorFrame.cols*y_orig + x_orig);
 			CV_DbgAssert(m_oLastDescFrame.step.p[0]==m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==m_oLastColorFrame.step.p[1]*2);
 			const int idx_orig_desc = idx_orig_color*2;
@@ -180,8 +180,8 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			const int ushrt_idx = uchar_idx*2;
 			const int flt32_idx = uchar_idx*4;
 			const uchar nCurrColor = oInputImg.data[uchar_idx];
-			int nMinSumDist=s_nColorMaxDataRange_1ch;
 			int nMinDescDist=s_nDescMaxDataRange_1ch;
+			int nMinSumDist=s_nColorMaxDataRange_1ch;
 			float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+flt32_idx);
 			const int nCurrColorDistThreshold = (int)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 			const int nCurrDescDistThreshold = (int)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold); // not adjusted like ^^, the internal LBSP thresholds are instead
@@ -189,7 +189,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 			LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColor,x,y,m_nLBSPThreshold_8bitLUT[nCurrColor],nCurrIntraDesc);
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
-				const uchar nBGColor = m_voBGColorSamples[nSampleIdx].data[uchar_idx];
+				const uchar& nBGColor = m_voBGColorSamples[nSampleIdx].data[uchar_idx];
 				{
 					const int nColorDist = absdiff_uchar(nCurrColor,nBGColor);
 					if(nColorDist>nCurrColorDistThreshold)
@@ -407,8 +407,8 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 				const float fRandMeanLastDist = *((float*)(m_oMeanLastDistFrame.data+flt32_randidx));
 				const float fRandMeanSegmRes = *((float*)(m_oMeanSegmResFrame.data+flt32_randidx));
 				if((n_rand%(nLearningRate)==0) || (fRandMeanSegmRes>BGSPBASLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSPBASLBSP_GHOST_DETECTION_D_MAX && (n_rand%4)==0)) {
-					const int ushrt_rgb_randidx = uchar_randidx*6;
 					const int uchar_rgb_randidx = uchar_randidx*3;
+					const int ushrt_rgb_randidx = uchar_rgb_randidx*2;
 					int s_rand = rand()%m_nBGSamples;
 					for(int c=0; c<3; ++c) {
 						*((ushort*)(m_voBGDescSamples[s_rand].data+ushrt_rgb_randidx+2*c)) = anCurrIntraDesc[c];
