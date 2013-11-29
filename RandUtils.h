@@ -1,13 +1,27 @@
 #pragma once
 
-// init pattern, based on 'floor(fspecial('gaussian', 3, 1)*256)'
+/*// init pattern, based on 'floor(fspecial('gaussian', 3, 1)*256)'
 static const int s_nSamplesInitPatternWidth = 3;
 static const int s_nSamplesInitPatternHeight = 3;
 static const int s_nSamplesInitPatternTot = 256;
-static const int s_anSamplesInitPattern[3][3] = {
+static const int s_anSamplesInitPattern[s_nSamplesInitPatternHeight][s_nSamplesInitPatternWidth] = {
 	{19,    32,    19,},
 	{32,    52,    32,},
 	{19,    32,    19,},
+};*/
+
+// init pattern, based on 'floor(fspecial('gaussian',7,1)*4096)'
+static const int s_nSamplesInitPatternWidth = 7;
+static const int s_nSamplesInitPatternHeight = 7;
+static const int s_nSamplesInitPatternTot = 4096;
+static const int s_anSamplesInitPattern[s_nSamplesInitPatternHeight][s_nSamplesInitPatternWidth] = {
+	{0,     0,     4,     7,     4,     0,     0,},
+	{0,    11,    53,    88,    53,    11,     0,},
+	{4,    53,   240,   399,   240,    53,     4,},
+	{7,    88,   399,   660,   399,    88,     7,},
+	{4,    53,   240,   399,   240,    53,     4,},
+	{0,    11,    53,    88,    53,    11,     0,},
+	{0,     0,     4,     7,     4,     0,     0,},
 };
 
 //! returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
