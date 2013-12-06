@@ -89,10 +89,8 @@ void BackgroundSubtractorPBASLBSP::initialize(const cv::Mat& oInitImg, const std
 	}
 	const int nKeyPoints = (int)m_voKeyPoints.size();
 	if(m_nImgChannels==1) {
-		for(int t=0; t<=UCHAR_MAX; ++t) {
-			int nCurrLBSPThreshold = (int)(t*m_fLBSPThreshold*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
-			m_nLBSPThreshold_8bitLUT[t]=nCurrLBSPThreshold>UCHAR_MAX?UCHAR_MAX:(uchar)nCurrLBSPThreshold;
-		}
+		for(int t=0; t<=UCHAR_MAX; ++t)
+			m_nLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(t*m_fLBSPThreshold*BGSPBASLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
@@ -121,10 +119,8 @@ void BackgroundSubtractorPBASLBSP::initialize(const cv::Mat& oInitImg, const std
 		}
 	}
 	else { //m_nImgChannels==3
-		for(int t=0; t<=UCHAR_MAX; ++t) {
-			int nCurrLBSPThreshold = (int)(t*m_fLBSPThreshold);
-			m_nLBSPThreshold_8bitLUT[t]=nCurrLBSPThreshold>UCHAR_MAX?UCHAR_MAX:(uchar)nCurrLBSPThreshold;
-		}
+		for(int t=0; t<=UCHAR_MAX; ++t)
+			m_nLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(t*m_fLBSPThreshold);
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
