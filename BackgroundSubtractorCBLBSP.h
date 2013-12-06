@@ -3,9 +3,9 @@
 #include "BackgroundSubtractorLBSP.h"
 
 //! defines the default value for BackgroundSubtractorLBSP::m_fLBSPThreshold
-#define BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.300f)
+#define BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.365f)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
-#define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (7)
+#define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (4)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nColorDistThreshold
 #define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (30)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nLocalWords
@@ -72,47 +72,25 @@ public:
 	virtual void setBGKeyPoints(std::vector<cv::KeyPoint>& keypoints);
 
 protected:
-	class LocalWord {
-	public:
-		LocalWord(int& nWIDSeed);
-		virtual float distance(LocalWord* w)=0;
-		virtual float weight(int nCurrFrame);
+	struct LocalWord {
 		int nWID;
 		int nFirstOcc;
 		int nLastOcc;
 		int nOccurrences;
 	};
-	class GlobalWord {
-	public:
-		GlobalWord(cv::Size oFrameSize);
+	struct GlobalWord {
 		cv::Mat oSpatioOccMap;
 	};
-	class LocalWord_1ch : public LocalWord {
-	public:
-		LocalWord_1ch(int& nWIDSeed);
-		virtual float distance(LocalWord* w);
-		virtual float distance(uchar color, ushort desc);
+	struct LocalWord_1ch : LocalWord {
 		uchar nColor;
 		ushort nDesc;
 	};
-	class LocalWord_3ch : public LocalWord {
-	public:
-		LocalWord_3ch(int& nWIDSeed);
-		virtual float distance(LocalWord* w);
-		virtual float distance(const uchar* color, const ushort* desc);
+	struct LocalWord_3ch : LocalWord {
 		uchar anColor[3];
 		ushort anDesc[3];
 	};
-	class GlobalWord_1ch : public LocalWord_1ch, public GlobalWord {
-	public:
-		GlobalWord_1ch(int& nWIDSeed, cv::Size oFrameSize);
-		virtual float distance(LocalWord* w);
-	};
-	class GlobalWord_3ch : public LocalWord_3ch, public GlobalWord {
-	public:
-		GlobalWord_3ch(int& nWIDSeed, cv::Size oFrameSize);
-		virtual float distance(LocalWord* w);
-	};
+	struct GlobalWord_1ch : LocalWord_1ch, GlobalWord {};
+	struct GlobalWord_3ch : LocalWord_3ch, GlobalWord {};
 	//! absolute color distance threshold ('R' or 'radius' in the original ViBe paper, used as the default/initial 'R(x)' value here, paired with BackgroundSubtractorLBSP::m_nDescDistThreshold)
 	const int m_nColorDistThreshold;
 	//! number of different local words per pixel/block to be taken from input frames to build the background model (similar to 'N' in ViBe/PBAS)
@@ -173,5 +151,8 @@ protected:
 
 	//! internal cleanup function for the dictionary structures
 	void CleanupDictionaries();
+	//! internal weight lookup function for local words
+	static float GetLocalWordWeight(const LocalWord* w, int nCurrFrame);
+	//! internal weight lookup function for global words
+	static float GetGlobalWordWeight(const GlobalWord* w, int nCurrFrame);
 };
-
