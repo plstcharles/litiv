@@ -281,7 +281,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const int nCurrDescDistThreshold = m_nDescDistThreshold;//(int)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold); // not adjusted like ^^, the internal LBSP thresholds are instead
 			ushort nCurrInterDesc, nCurrIntraDesc;
 			LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColor,x,y,m_nLBSPThreshold_8bitLUT[nCurrColor],nCurrIntraDesc);
-			int nGoodWordsCount=0, nWordIdx=0;
+			int nPotentialWordsCount=0, nGoodWordsCount=0, nWordIdx=0;
 			//LocalWord_1ch* pBestLocalWord = NULL;
 			//float fBestLocalWordWeight = 0;
 			//int nBestLocalWordColorDist = INT_MAX; @@@@
@@ -296,7 +296,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					const ushort& nBGIntraDesc = pCurrLocalWord->nDesc;
 					LBSP::computeGrayscaleDescriptor(oInputImg,nBGColor,x,y,m_nLBSPThreshold_8bitLUT[nBGColor],nCurrInterDesc);
 					//const int nDescDist = (hdist_ushort_8bitLUT(nCurrInterDesc,nBGIntraDesc)+hdist_ushort_8bitLUT(nCurrIntraDesc,nBGIntraDesc))/2;
-					const int nDescDist = hdist_ushort_8bitLUT(nCurrInterDesc,nBGIntraDesc)/2;
+					const int nDescDist = hdist_ushort_8bitLUT(nCurrInterDesc,nBGIntraDesc);
 					if(nDescDist>nCurrDescDistThreshold)
 						goto failedcheck1ch;
 					const float fCurrLocalWordWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
@@ -306,6 +306,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 						//fBestLocalWordWeight = fCurrLocalWordWeight;
 						//pBestLocalWord = pCurrLocalWord;
 					}
+					++nPotentialWordsCount;
 					pCurrLocalWord->nLastOcc = m_nFrameIndex;
 					++pCurrLocalWord->nOccurrences;
 					if(/*nColorDist<nCurrColorDistThreshold/2 && */nDescDist<=nCurrDescDistThreshold/2 && (rand()%nLearningRate)==0) {
@@ -339,8 +340,8 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				// == foreground
 				oCurrFGMask.data[uchar_idx] = UCHAR_MAX;
 				//if(pBestLocalWord==NULL) {
-				// @@@@@@@@@@ add 'potential' good word count? i.e. only based on representation dist, not weight
-				/*if(nGoodWordsCount==0) BAD IF ONLY ONE WORD IS OK IN THE WHOLE DICT*/ {
+				if(nPotentialWordsCount<LOCAL_WORD_COUNT_THRESHOLD) {
+				//if(nGoodWordsCount==0) { // BAD IF ONLY ONE WORD IS OK IN THE WHOLE DICT
 					nWordIdx = m_nLocalWords-(rand()%m_nLastLocalWordReplaceableIdxs)-1;
 					LocalWord_1ch* pNewLocalWord = (LocalWord_1ch*)m_aapLocalWords[ldict_idx][nWordIdx];
 					pNewLocalWord->nColor = nCurrColor;
@@ -387,7 +388,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			ushort anCurrInterDesc[3], anCurrIntraDesc[3];
 			const uchar anCurrIntraLBSPThresholds[3] = {m_nLBSPThreshold_8bitLUT[anCurrColor[0]],m_nLBSPThreshold_8bitLUT[anCurrColor[1]],m_nLBSPThreshold_8bitLUT[anCurrColor[2]]};
 			LBSP::computeRGBDescriptor(oInputImg,anCurrColor,x,y,anCurrIntraLBSPThresholds,anCurrIntraDesc);
-			int nGoodWordsCount=0, nWordIdx=0;
+			int nPotentialWordsCount=0, nGoodWordsCount=0, nWordIdx=0;
 			//LocalWord_3ch* pBestLocalWord = NULL;
 			//float fBestLocalWordWeight = 0;
 			//int nBestLocalWordColorDist = INT_MAX; @@@@
@@ -423,6 +424,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 						//fBestLocalWordWeight = fCurrLocalWordWeight;
 						//pBestLocalWord = pCurrLocalWord;
 					}
+					++nPotentialWordsCount;
 					pCurrLocalWord->nLastOcc = m_nFrameIndex;
 					++pCurrLocalWord->nOccurrences;
 					if(/*nTotColorDist<nCurrTotColorDistThreshold/2 && */nTotDescDist<=nCurrTotDescDistThreshold/2 && (rand()%nLearningRate)==0) {
@@ -460,8 +462,8 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				// == foreground
 				oCurrFGMask.data[uchar_idx] = UCHAR_MAX;
 				//if(pBestLocalWord==NULL) {
-				// @@@@@@@@@@ add 'potential' good word count? i.e. only based on representation dist, not weight
-				/*if(nGoodWordsCount==0) BAD IF ONLY ONE WORD IS OK IN THE WHOLE DICT*/ {
+				if(nPotentialWordsCount<LOCAL_WORD_COUNT_THRESHOLD) {
+				//if(nGoodWordsCount==0) { // BAD IF ONLY ONE WORD IS OK IN THE WHOLE DICT
 					nWordIdx = m_nLocalWords-(rand()%m_nLastLocalWordReplaceableIdxs)-1;
 					LocalWord_3ch* pNewLocalWord = (LocalWord_3ch*)m_aapLocalWords[ldict_idx][nWordIdx];
 					for(int c=0; c<3; ++c) {
