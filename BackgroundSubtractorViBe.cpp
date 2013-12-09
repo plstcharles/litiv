@@ -29,10 +29,10 @@ void BackgroundSubtractorViBe::getBackgroundImage(cv::OutputArray backgroundImag
 	for(int n=0; n<m_nBGSamples; ++n) {
 		for(int y=0; y<m_oImgSize.height; ++y) {
 			for(int x=0; x<m_oImgSize.width; ++x) {
-				int uchar_idx = m_voBGImg[n].step.p[0]*y + m_voBGImg[n].step.p[1]*x;
-				int flt32_idx = uchar_idx*4;
-				float* oAvgBgImgPtr = (float*)(oAvgBGImg.data+flt32_idx);
-				uchar* oBGImgPtr = m_voBGImg[n].data+uchar_idx;
+				int idx_uchar = m_voBGImg[n].step.p[0]*y + m_voBGImg[n].step.p[1]*x;
+				int idx_flt32 = idx_uchar*4;
+				float* oAvgBgImgPtr = (float*)(oAvgBGImg.data+idx_flt32);
+				uchar* oBGImgPtr = m_voBGImg[n].data+idx_uchar;
 				for(int c=0; c<m_voBGImg[n].channels(); ++c)
 					oAvgBgImgPtr[c] += ((float)oBGImgPtr[c])/m_nBGSamples;
 			}

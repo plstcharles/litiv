@@ -244,10 +244,10 @@ static inline void CalcMetricsFromResult(const cv::Mat& oInputFrame, const cv::M
 	CV_DbgAssert(oInputFrame.size()==oGTFrame.size() && oInputFrame.size()==oROI.size());
 	const int step_row = oInputFrame.step.p[0];
 	for(int i=0; i<oInputFrame.rows; ++i) {
-		const int step_idx = step_row*i;
-		const uchar* input_step_ptr = oInputFrame.data+step_idx;
-		const uchar* gt_step_ptr = oGTFrame.data+step_idx;
-		const uchar* roi_step_ptr = oROI.data+step_idx;
+		const int idx_nstep = step_row*i;
+		const uchar* input_step_ptr = oInputFrame.data+idx_nstep;
+		const uchar* gt_step_ptr = oGTFrame.data+idx_nstep;
+		const uchar* roi_step_ptr = oROI.data+idx_nstep;
 		for(int j=0; j<oInputFrame.cols; ++j) {
 			if(	gt_step_ptr[j]!=VAL_OUTOFSCOPE &&
 				gt_step_ptr[j]!=VAL_UNKNOWN &&

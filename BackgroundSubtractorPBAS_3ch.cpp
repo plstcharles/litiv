@@ -105,10 +105,10 @@ void BackgroundSubtractorPBAS_3ch::operator()(cv::InputArray _image, cv::OutputA
 	static const int nChannelSize = UCHAR_MAX;
 	for(int y=0; y<m_oImgSize.height; ++y) {
 		for(int x=0; x<m_oImgSize.width; ++x) {
-			const int uchar_idx = oInputImgRGB.cols*y + x;
-			const int flt32_idx = uchar_idx*4;
+			const int idx_uchar = oInputImgRGB.cols*y + x;
+			const int idx_flt32 = idx_uchar*4;
 			float fMinDist=(float)nChannelSize;
-			float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+flt32_idx);
+			float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+idx_flt32);
 			const float fCurrDistThreshold = ((*pfCurrDistThresholdFactor)*m_nDefaultColorDistThreshold);
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
@@ -130,11 +130,11 @@ void BackgroundSubtractorPBAS_3ch::operator()(cv::InputArray _image, cv::OutputA
 				}
 				nSampleIdx++;
 			}
-			float* pfCurrMeanMinDist = ((float*)(m_oMeanMinDistFrame.data+flt32_idx));
+			float* pfCurrMeanMinDist = ((float*)(m_oMeanMinDistFrame.data+idx_flt32));
 			*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(BGSPBAS_N_SAMPLES_FOR_MEAN-1) + (fMinDist/nChannelSize))/BGSPBAS_N_SAMPLES_FOR_MEAN;
-			float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+flt32_idx));
+			float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+idx_flt32));
 			if(nGoodSamplesCount<m_nRequiredBGSamples) {
-				oFGMask.data[uchar_idx] = UCHAR_MAX;
+				oFGMask.data[idx_uchar] = UCHAR_MAX;
 				*pfCurrLearningRate += BGSPBAS_T_INCR/((*pfCurrMeanMinDist)*BGSPBAS_T_SCALE+BGSPBAS_T_OFFST);
 				if((*pfCurrLearningRate)>BGSPBAS_T_UPPER)
 					*pfCurrLearningRate = BGSPBAS_T_UPPER;
@@ -163,8 +163,8 @@ void BackgroundSubtractorPBAS_3ch::operator()(cv::InputArray _image, cv::OutputA
 					*pfCurrLearningRate = BGSPBAS_T_LOWER;
 			}
 #if BGSPBAS_USE_R2_ACCELERATION
-			float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+flt32_idx);
-			if((*pfCurrMeanMinDist)>BGSPBAS_R2_OFFST && (oFGMask.data[uchar_idx]!=m_oLastFGMask.data[uchar_idx])) {
+			float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+idx_flt32);
+			if((*pfCurrMeanMinDist)>BGSPBAS_R2_OFFST && (oFGMask.data[idx_uchar]!=m_oLastFGMask.data[idx_uchar])) {
 				if((*pfCurrDistThresholdVariationFactor)<BGSPBAS_R2_UPPER)
 					(*pfCurrDistThresholdVariationFactor) += BGSPBAS_R2_INCR;
 			}

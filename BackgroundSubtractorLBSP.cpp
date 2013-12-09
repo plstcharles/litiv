@@ -46,10 +46,10 @@ void BackgroundSubtractorLBSP::getBackgroundDescriptorsImage(cv::OutputArray bac
 	for(size_t n=0; n<m_voBGDescSamples.size(); ++n) {
 		for(int y=0; y<m_oImgSize.height; ++y) {
 			for(int x=0; x<m_oImgSize.width; ++x) {
-				int desc_idx = m_voBGDescSamples[n].step.p[0]*y + m_voBGDescSamples[n].step.p[1]*x;
-				int flt32_idx = desc_idx*2;
-				float* oAvgBgDescPtr = (float*)(oAvgBGDesc.data+flt32_idx);
-				ushort* oBGDescPtr = (ushort*)(m_voBGDescSamples[n].data+desc_idx);
+				int idx_ndesc = m_voBGDescSamples[n].step.p[0]*y + m_voBGDescSamples[n].step.p[1]*x;
+				int idx_flt32 = idx_ndesc*2;
+				float* oAvgBgDescPtr = (float*)(oAvgBGDesc.data+idx_flt32);
+				ushort* oBGDescPtr = (ushort*)(m_voBGDescSamples[n].data+idx_ndesc);
 				for(int c=0; c<m_nImgChannels; ++c)
 					oAvgBgDescPtr[c] += ((float)oBGDescPtr[c])/m_voBGDescSamples.size();
 			}

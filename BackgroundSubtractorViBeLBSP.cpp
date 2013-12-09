@@ -126,9 +126,9 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
-			const int uchar_idx = oInputImg.step.p[0]*y + x;
-			const int ushrt_idx = uchar_idx*2;
-			const uchar nCurrColor = oInputImg.data[uchar_idx];
+			const int idx_uchar = oInputImg.step.p[0]*y + x;
+			const int idx_ushrt = idx_uchar*2;
+			const uchar nCurrColor = oInputImg.data[idx_uchar];
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			ushort nCurrInputDesc;
 #if !BGSLBSP_EXTRACT_INTER_LBSP
@@ -136,7 +136,7 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 			LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColor,x,y,nCurrLBSPThreshold,nCurrInputDesc);
 #endif //!BGSLBSP_EXTRACT_INTER_LBSP
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
-				const uchar nBGColor = m_voBGColorSamples[nSampleIdx].data[uchar_idx];
+				const uchar nBGColor = m_voBGColorSamples[nSampleIdx].data[idx_uchar];
 				{
 #if BGSVIBELBSP_USE_COLOR_COMPLEMENT
 					const int nColorDist = absdiff_uchar(nCurrColor,nBGColor);
@@ -147,7 +147,7 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 					const uchar nBGLBSPThreshold = (uchar)((m_bLBSPUsingRelThreshold?(m_fLBSPThreshold*nBGColor):(m_nLBSPThreshold))*BGSVIBELBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 					LBSP::computeGrayscaleDescriptor(oInputImg,nBGColor,x,y,nBGLBSPThreshold,nCurrInputDesc);
 #endif //BGSLBSP_EXTRACT_INTER_LBSP
-					const int nDescDist = hdist_ushort_8bitLUT(nCurrInputDesc,*((ushort*)(m_voBGDescSamples[nSampleIdx].data+ushrt_idx)));
+					const int nDescDist = hdist_ushort_8bitLUT(nCurrInputDesc,*((ushort*)(m_voBGDescSamples[nSampleIdx].data+idx_ushrt)));
 					if(nDescDist>m_nDescDistThreshold)
 						goto failedcheck1ch;
 					nGoodSamplesCount++;
@@ -156,11 +156,11 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 				nSampleIdx++;
 			}
 			if(nGoodSamplesCount<m_nRequiredBGSamples)
-				oFGMask.data[uchar_idx] = UCHAR_MAX;
+				oFGMask.data[idx_uchar] = UCHAR_MAX;
 			else {
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
-					ushort& nRandInputDesc = *((ushort*)(m_voBGDescSamples[s_rand].data+ushrt_idx));
+					ushort& nRandInputDesc = *((ushort*)(m_voBGDescSamples[s_rand].data+idx_ushrt));
 #if (!BGSLBSP_MODEL_INTER_LBSP && !BGSLBSP_EXTRACT_INTER_LBSP) || (BGSLBSP_MODEL_INTER_LBSP && BGSLBSP_EXTRACT_INTER_LBSP)
 					nRandInputDesc = nCurrInputDesc;
 #elif !BGSLBSP_MODEL_INTER_LBSP && BGSLBSP_EXTRACT_INTER_LBSP
@@ -169,7 +169,7 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 #else //BGSLBSP_MODEL_INTER_LBSP && !BGSLBSP_EXTRACT_INTER_LBSP
 #error "Illogical model desc <-> extracted desc association."
 #endif //BGSLBSP_MODEL_INTER_LBSP && !BGSLBSP_EXTRACT_INTER_LBSP
-					m_voBGColorSamples[s_rand].data[uchar_idx] = nCurrColor;
+					m_voBGColorSamples[s_rand].data[idx_uchar] = nCurrColor;
 				}
 				if((rand()%nLearningRate)==0) {
 					int x_rand,y_rand;
@@ -221,10 +221,10 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 		for(int k=0; k<nKeyPoints; ++k) {
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
-			const int uchar_idx = m_oImgSize.width*y + x;
-			const int uchar_rgb_idx = uchar_idx*3;
-			const int ushrt_rgb_idx = uchar_rgb_idx*2;
-			const uchar* const anCurrColor = oInputImg.data+uchar_rgb_idx;
+			const int idx_uchar = m_oImgSize.width*y + x;
+			const int idx_uchar_rgb = idx_uchar*3;
+			const int idx_ushrt_rgb = idx_uchar_rgb*2;
+			const uchar* const anCurrColor = oInputImg.data+idx_uchar_rgb;
 			int nGoodSamplesCount=0, nSampleIdx=0;
 			ushort anCurrInputDesc[3];
 #if !BGSLBSP_EXTRACT_INTER_LBSP
@@ -236,8 +236,8 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 				LBSP::computeRGBDescriptor(oInputImg,anCurrColor,x,y,m_nLBSPThreshold,anCurrInputDesc);
 #endif //!BGSLBSP_EXTRACT_INTER_LBSP
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
-				const ushort* const anBGDesc = (ushort*)(m_voBGDescSamples[nSampleIdx].data+ushrt_rgb_idx);
-				const uchar* const anBGColor = m_voBGColorSamples[nSampleIdx].data+uchar_rgb_idx;
+				const ushort* const anBGDesc = (ushort*)(m_voBGDescSamples[nSampleIdx].data+idx_ushrt_rgb);
+				const uchar* const anBGColor = m_voBGColorSamples[nSampleIdx].data+idx_uchar_rgb;
 #if BGSVIBELBSP_USE_COLOR_COMPLEMENT
 				int nTotColorDist = 0;
 #endif //BGSVIBELBSP_USE_COLOR_COMPLEMENT
@@ -274,11 +274,11 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 				nSampleIdx++;
 			}
 			if(nGoodSamplesCount<m_nRequiredBGSamples)
-				oFGMask.data[uchar_idx] = UCHAR_MAX;
+				oFGMask.data[idx_uchar] = UCHAR_MAX;
 			else {
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
-					ushort* anRandInputDesc = ((ushort*)(m_voBGDescSamples[s_rand].data+ushrt_rgb_idx));
+					ushort* anRandInputDesc = ((ushort*)(m_voBGDescSamples[s_rand].data+idx_ushrt_rgb));
 #if (!BGSLBSP_MODEL_INTER_LBSP && !BGSLBSP_EXTRACT_INTER_LBSP) || (BGSLBSP_MODEL_INTER_LBSP && BGSLBSP_EXTRACT_INTER_LBSP)
 					for(int c=0; c<3; ++c)
 						anRandInputDesc[c] = anCurrInputDesc[c];
@@ -293,7 +293,7 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 #error "Illogical model desc <-> extracted desc association."
 #endif //BGSLBSP_MODEL_INTER_LBSP && !BGSLBSP_EXTRACT_INTER_LBSP
 					for(int c=0; c<3; ++c)
-						*(m_voBGColorSamples[s_rand].data+uchar_rgb_idx+c) = anCurrColor[c];
+						*(m_voBGColorSamples[s_rand].data+idx_uchar_rgb+c) = anCurrColor[c];
 				}
 				if((rand()%nLearningRate)==0) {
 					int s_rand = rand()%m_nBGSamples;
@@ -350,10 +350,10 @@ void BackgroundSubtractorViBeLBSP::getBackgroundImage(cv::OutputArray background
 	for(int s=0; s<m_nBGSamples; ++s) {
 		for(int y=0; y<m_oImgSize.height; ++y) {
 			for(int x=0; x<m_oImgSize.width; ++x) {
-				int img_idx = m_voBGColorSamples[s].step.p[0]*y + m_voBGColorSamples[s].step.p[1]*x;
-				int flt32_idx = img_idx*4;
-				float* oAvgBgImgPtr = (float*)(oAvgBGImg.data+flt32_idx);
-				uchar* oBGImgPtr = m_voBGColorSamples[s].data+img_idx;
+				int idx_nimg = m_voBGColorSamples[s].step.p[0]*y + m_voBGColorSamples[s].step.p[1]*x;
+				int idx_flt32 = idx_nimg*4;
+				float* oAvgBgImgPtr = (float*)(oAvgBGImg.data+idx_flt32);
+				uchar* oBGImgPtr = m_voBGColorSamples[s].data+idx_nimg;
 				for(int c=0; c<m_nImgChannels; ++c)
 					oAvgBgImgPtr[c] += ((float)oBGImgPtr[c])/m_nBGSamples;
 			}
