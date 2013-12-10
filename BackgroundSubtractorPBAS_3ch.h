@@ -2,11 +2,6 @@
 
 #include "BackgroundSubtractorPBAS.h"
 
-//! defines the internal threshold adjustment factor to use when determining if the variation of a single channel is enough to declare the pixel as foreground
-#define BGSPBAS_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR (1.60f)
-//! defines whether we should use single channel variation checks for fg/bg segmentation validation or not
-#define BGSPBAS_USE_SC_THRS_VALIDATION 0
-
 /*!
 	PBAS foreground-background segmentation algorithm (3ch/RGB version).
 
@@ -17,10 +12,10 @@
 class BackgroundSubtractorPBAS_3ch : public BackgroundSubtractorPBAS {
 public:
 	//! full constructor
-	BackgroundSubtractorPBAS_3ch(	int nInitColorDistThreshold=BGSPBAS_DEFAULT_COLOR_DIST_THRESHOLD,
+	BackgroundSubtractorPBAS_3ch(	size_t nInitColorDistThreshold=BGSPBAS_DEFAULT_COLOR_DIST_THRESHOLD,
 									float fInitUpdateRate=BGSPBAS_DEFAULT_LEARNING_RATE,
-									int nBGSamples=BGSPBAS_DEFAULT_NB_BG_SAMPLES,
-									int nRequiredBGSamples=BGSPBAS_DEFAULT_REQUIRED_NB_BG_SAMPLES);
+									size_t nBGSamples=BGSPBAS_DEFAULT_NB_BG_SAMPLES,
+									size_t nRequiredBGSamples=BGSPBAS_DEFAULT_REQUIRED_NB_BG_SAMPLES);
 	//! default destructor
 	virtual ~BackgroundSubtractorPBAS_3ch();
 	//! (re)initiaization method; needs to be called before starting background subtraction

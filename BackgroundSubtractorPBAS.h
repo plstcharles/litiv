@@ -46,6 +46,10 @@
 #define BGSPBAS_GRAD_WEIGHT_ALPHA (10.0f)
 //! number of samples used to create running averages for model variation computations
 #define BGSPBAS_N_SAMPLES_FOR_MEAN (m_nBGSamples)
+//! defines the internal threshold adjustment factor to use when determining if the variation of a single channel is enough to declare the pixel as foreground
+#define BGSPBAS_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR (1.60f)
+//! defines whether we should use single channel variation checks for fg/bg segmentation validation or not
+#define BGSPBAS_USE_SC_THRS_VALIDATION 0
 
 /*!
 	PBAS foreground-background segmentation algorithm (abstract version).
@@ -57,10 +61,10 @@
 class BackgroundSubtractorPBAS : public cv::BackgroundSubtractor {
 public:
 	//! full constructor
-	BackgroundSubtractorPBAS(	int nInitColorDistThreshold=BGSPBAS_DEFAULT_COLOR_DIST_THRESHOLD,
+	BackgroundSubtractorPBAS(	size_t nInitColorDistThreshold=BGSPBAS_DEFAULT_COLOR_DIST_THRESHOLD,
 								float fInitUpdateRate=BGSPBAS_DEFAULT_LEARNING_RATE,
-								int nBGSamples=BGSPBAS_DEFAULT_NB_BG_SAMPLES,
-								int nRequiredBGSamples=BGSPBAS_DEFAULT_REQUIRED_NB_BG_SAMPLES);
+								size_t nBGSamples=BGSPBAS_DEFAULT_NB_BG_SAMPLES,
+								size_t nRequiredBGSamples=BGSPBAS_DEFAULT_REQUIRED_NB_BG_SAMPLES);
 	//! default destructor
 	virtual ~BackgroundSubtractorPBAS();
 	//! (re)initiaization method; needs to be called before starting background subtraction
@@ -74,9 +78,9 @@ public:
 
 protected:
 	//! number of different samples per pixel/block to be taken from input frames to build the background model ('N' in the original ViBe/PBAS papers)
-	const int m_nBGSamples;
+	const size_t m_nBGSamples;
 	//! number of similar samples needed to consider the current pixel/block as 'background' ('#_min' in the original ViBe/PBAS papers)
-	const int m_nRequiredBGSamples;
+	const size_t m_nRequiredBGSamples;
 	//! background model pixel intensity samples
 	std::vector<cv::Mat> m_voBGImg;
 	//! background model pixel gradient samples
@@ -84,7 +88,7 @@ protected:
 	//! input image size
 	cv::Size m_oImgSize;
 	//! absolute color distance threshold ('R' or 'radius' in the original ViBe paper, and the default 'R(x)' value in the original PBAS paper)
-	const int m_nDefaultColorDistThreshold;
+	const size_t m_nDefaultColorDistThreshold;
 	//! per-pixel distance thresholds ('R(x)' in the original PBAS paper)
 	cv::Mat m_oDistThresholdFrame;
 	//! per-pixel distance thresholds variation

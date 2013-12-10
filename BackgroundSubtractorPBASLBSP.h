@@ -54,10 +54,10 @@ class BackgroundSubtractorPBASLBSP : public BackgroundSubtractorLBSP {
 public:
 	//! full constructor
 	BackgroundSubtractorPBASLBSP(	float fLBSPThreshold=BGSPBASLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
-									int nInitDescDistThreshold=BGSPBASLBSP_DEFAULT_DESC_DIST_THRESHOLD,
-									int nInitColorDistThreshold=BGSPBASLBSP_DEFAULT_COLOR_DIST_THRESHOLD,
-									int nBGSamples=BGSPBASLBSP_DEFAULT_NB_BG_SAMPLES,
-									int nRequiredBGSamples=BGSPBASLBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES);
+									size_t nInitDescDistThreshold=BGSPBASLBSP_DEFAULT_DESC_DIST_THRESHOLD,
+									size_t nInitColorDistThreshold=BGSPBASLBSP_DEFAULT_COLOR_DIST_THRESHOLD,
+									size_t nBGSamples=BGSPBASLBSP_DEFAULT_NB_BG_SAMPLES,
+									size_t nRequiredBGSamples=BGSPBASLBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES);
 	//! default destructor
 	virtual ~BackgroundSubtractorPBASLBSP();
 	//! (re)initiaization method; needs to be called before starting background subtraction (note: also reinitializes the keypoints vector)
@@ -69,11 +69,11 @@ public:
 
 protected:
 	//! absolute color distance threshold ('R' or 'radius' in the original ViBe paper, used as the default/initial 'R(x)' value here, paired with BackgroundSubtractorLBSP::m_nDescDistThreshold)
-	const int m_nColorDistThreshold;
+	const size_t m_nColorDistThreshold;
 	//! number of different samples per pixel/block to be taken from input frames to build the background model (same as 'N' in ViBe/PBAS)
-	const int m_nBGSamples;
+	const size_t m_nBGSamples;
 	//! number of similar samples needed to consider the current pixel/block as 'background' (same as '#_min' in ViBe/PBAS)
-	const int m_nRequiredBGSamples;
+	const size_t m_nRequiredBGSamples;
 
 	//! background model pixel color intensity samples (equivalent to 'B(x)' in PBAS, but also paired with BackgroundSubtractorLBSP::m_voBGDescSamples to create our complete model)
 	std::vector<cv::Mat> m_voBGColorSamples;
@@ -109,6 +109,6 @@ protected:
 	cv::Mat m_oPureFGBlinkMask_last;
 
 	//! pre-allocated internal LBSP threshold values for all possible 8-bit intensity values
-	uchar m_nLBSPThreshold_8bitLUT[256];
+	size_t m_nLBSPThreshold_8bitLUT[256];
 };
 

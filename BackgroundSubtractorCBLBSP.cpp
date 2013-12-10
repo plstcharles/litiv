@@ -25,20 +25,20 @@
 // local define for the neighborhood init iter count
 #define LOCAL_WORD_INIT_ITER_COUNT (s_nSamplesInitPatternWidth*s_nSamplesInitPatternHeight*2)
 // local define for the occurrence incr used for word initialization
-#define LOCAL_WORD_INIT_OCCUR_COUNT (int(LWORD_WEIGHT_OFFSET*LOCAL_WORD_WEIGHT_THRESHOLD)+16)
+#define LOCAL_WORD_INIT_OCCUR_COUNT ((size_t)(LWORD_WEIGHT_OFFSET*LOCAL_WORD_WEIGHT_THRESHOLD)+16)
 // local define for the word count needed to consider a pixel background
 #define LOCAL_WORD_COUNT_THRESHOLD 2
 
-static const int s_nColorMaxDataRange_1ch = UCHAR_MAX;
-static const int s_nDescMaxDataRange_1ch = LBSP::DESC_SIZE*8;
-static const int s_nColorMaxDataRange_3ch = s_nColorMaxDataRange_1ch*3;
-static const int s_nDescMaxDataRange_3ch = s_nDescMaxDataRange_1ch*3;
+static const size_t s_nColorMaxDataRange_1ch = UCHAR_MAX;
+static const size_t s_nDescMaxDataRange_1ch = LBSP::DESC_SIZE*8;
+static const size_t s_nColorMaxDataRange_3ch = s_nColorMaxDataRange_1ch*3;
+static const size_t s_nDescMaxDataRange_3ch = s_nDescMaxDataRange_1ch*3;
 
 BackgroundSubtractorCBLBSP::BackgroundSubtractorCBLBSP(	 float fLBSPThreshold
-														,int nInitDescDistThreshold
-														,int nInitColorDistThreshold
-														,int nLocalWords
-														,int nGlobalWords)
+														,size_t nInitDescDistThreshold
+														,size_t nInitColorDistThreshold
+														,size_t nLocalWords
+														,size_t nGlobalWords)
 	:	 BackgroundSubtractorLBSP(fLBSPThreshold,nInitDescDistThreshold)
 		,m_nColorDistThreshold(nInitColorDistThreshold)
 		,m_nLocalWords(nLocalWords)
@@ -84,42 +84,43 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 	memset(m_aapLocalDicts,0,sizeof(LocalWord*)*m_nLocalDictionaries*m_nLocalWords);
 	m_apGlobalDict = new GlobalWord*[m_nGlobalWords];
 	memset(m_apGlobalDict,0,sizeof(GlobalWord*)*m_nGlobalWords);
-	m_oLastColorFrame.create(m_oImgSize,CV_8UC(m_nImgChannels));
+	m_oLastColorFrame.create(m_oImgSize,CV_8UC((int)m_nImgChannels));
 	m_oLastColorFrame = cv::Scalar_<uchar>::all(0);
-	m_oLastDescFrame.create(m_oImgSize,CV_16UC(m_nImgChannels));
+	m_oLastDescFrame.create(m_oImgSize,CV_16UC((int)m_nImgChannels));
 	m_oLastDescFrame = cv::Scalar_<ushort>::all(0);
-	const int nKeyPoints = (int)m_voKeyPoints.size();
+	const size_t nKeyPoints = m_voKeyPoints.size();
 	if(m_nImgChannels==1) {
-		for(int t=0; t<=UCHAR_MAX; ++t)
+		for(size_t t=0; t<=UCHAR_MAX; ++t)
 			m_nLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(t*m_fLBSPThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
-		for(int k=0; k<nKeyPoints; ++k) {
+		for(size_t k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
-			CV_DbgAssert((int)m_oLastColorFrame.step.p[0]==m_oImgSize.width && m_oLastColorFrame.step.p[1]==1);
-			const int idx_uchar = m_oImgSize.width*y_orig + x_orig;
-			const int idx_color = idx_uchar;
+			CV_DbgAssert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width && m_oLastColorFrame.step.p[1]==1);
+			const size_t idx_uchar = m_oImgSize.width*y_orig + x_orig;
+			const size_t idx_color = idx_uchar;
 			CV_DbgAssert(m_oLastDescFrame.step.p[0]==m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==m_oLastColorFrame.step.p[1]*2);
-			const int idx_desc = idx_color*2;
+			const size_t idx_desc = idx_color*2;
 			m_oLastColorFrame.data[idx_color] = oInitImg.data[idx_color];
 			LBSP::computeGrayscaleDescriptor(oInitImg,oInitImg.data[idx_color],x_orig,y_orig,m_nLBSPThreshold_8bitLUT[oInitImg.data[idx_color]],*((ushort*)(m_oLastDescFrame.data+idx_desc)));
 		}
-		const int nColorDistThreshold = (int)(m_nColorDistThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
-		const int nDescDistThreshold = m_nDescDistThreshold;
+		const size_t nColorDistThreshold = (size_t)(m_nColorDistThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+		const size_t nDescDistThreshold = m_nDescDistThreshold;
 		m_apLocalWordList_1ch = new LocalWord_1ch[nKeyPoints*m_nLocalWords];
+		memset(m_apLocalWordList_1ch,0,sizeof(LocalWord_1ch)*nKeyPoints*m_nLocalWords);
 		LocalWord_1ch* apWordListIter = m_apLocalWordList_1ch;
-		for(int k=0; k<nKeyPoints; ++k) {
+		for(size_t k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
-			const int idx_orig_uchar = m_oImgSize.width*y_orig + x_orig;
-			const int idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
+			const size_t idx_orig_uchar = m_oImgSize.width*y_orig + x_orig;
+			const size_t idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
 			for(size_t n=0; n<LOCAL_WORD_INIT_ITER_COUNT; ++n) {
 				int y_sample, x_sample;
 				getRandSamplePosition(x_sample,y_sample,x_orig,y_orig,LBSP::PATCH_SIZE/2,m_oImgSize);
-				const int idx_sample_color = m_oImgSize.width*y_sample + x_sample;
-				const int idx_sample_desc = idx_sample_color*2;
+				const size_t idx_sample_color = m_oImgSize.width*y_sample + x_sample;
+				const size_t idx_sample_desc = idx_sample_color*2;
 				const uchar nSampleColor = m_oLastColorFrame.data[idx_sample_color];
 				const ushort nSampleIntraDesc = *((ushort*)(m_oLastDescFrame.data+idx_sample_desc));
-				int nWordIdx=0;
+				size_t nWordIdx=0;
 				while(nWordIdx<m_nLocalWords) {
 					LocalWord_1ch* pCurrLocalWord = ((LocalWord_1ch*)m_aapLocalDicts[idx_orig_ldict+nWordIdx]);
 					if(pCurrLocalWord && absdiff_uchar(nSampleColor,pCurrLocalWord->nColor)<nColorDistThreshold && hdist_ushort_8bitLUT(nSampleIntraDesc,pCurrLocalWord->nDesc)<nDescDistThreshold) {
@@ -135,8 +136,6 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 						pCurrLocalWord = (LocalWord_1ch*)m_aapLocalDicts[idx_orig_ldict+nWordIdx];
 					else {
 						pCurrLocalWord = apWordListIter++;
-						pCurrLocalWord->nLastOcc = 0;
-						pCurrLocalWord->nFirstOcc = -1;
 						m_aapLocalDicts[idx_orig_ldict+nWordIdx] = pCurrLocalWord;
 					}
 					pCurrLocalWord->nColor = nSampleColor;
@@ -149,16 +148,14 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 				}
 			}
 			CV_Assert(m_aapLocalDicts[idx_orig_ldict]);
-			for(int nWordIdx=1; nWordIdx<m_nLocalWords; ++nWordIdx) {
+			for(size_t nWordIdx=1; nWordIdx<m_nLocalWords; ++nWordIdx) {
 				LocalWord_1ch* pCurrLocalWord = (LocalWord_1ch*)m_aapLocalDicts[idx_orig_ldict+nWordIdx];
 				if(!pCurrLocalWord) {
 					pCurrLocalWord = apWordListIter++;
-					pCurrLocalWord->nLastOcc = 0;
-					pCurrLocalWord->nFirstOcc = -1;
 					pCurrLocalWord->nOccurrences = (LOCAL_WORD_INIT_OCCUR_COUNT*(m_nLocalWords-nWordIdx))/m_nLocalWords;
-					int nRandWordIdx = (rand()%nWordIdx);
+					const size_t nRandWordIdx = (rand()%nWordIdx);
 					const LocalWord_1ch* pRefLocalWord = (LocalWord_1ch*)m_aapLocalDicts[idx_orig_ldict+nRandWordIdx];
-					int nRandColorOffset = (rand()%(m_nColorDistThreshold+1))-m_nColorDistThreshold/2;
+					const int nRandColorOffset = (rand()%(m_nColorDistThreshold+1))-(int)m_nColorDistThreshold/2;
 					pCurrLocalWord->nColor = cv::saturate_cast<uchar>((int)pRefLocalWord->nColor+nRandColorOffset);
 					pCurrLocalWord->nDesc = pRefLocalWord->nDesc;
 					m_aapLocalDicts[idx_orig_ldict+nWordIdx] = pCurrLocalWord;
@@ -168,39 +165,40 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 		CV_Assert(m_apLocalWordList_1ch==(apWordListIter-nKeyPoints*m_nLocalWords));
 	}
 	else { //m_nImgChannels==3
-		for(int t=0; t<=UCHAR_MAX; ++t)
+		for(size_t t=0; t<=UCHAR_MAX; ++t)
 			m_nLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(t*m_fLBSPThreshold);
-		for(int k=0; k<nKeyPoints; ++k) {
+		for(size_t k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
-			CV_DbgAssert((int)m_oLastColorFrame.step.p[0]==3*m_oImgSize.width && m_oLastColorFrame.step.p[1]==3);
-			const int idx_uchar = m_oImgSize.width*y_orig + x_orig;
-			const int idx_color = idx_uchar*3;
+			CV_DbgAssert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width*3 && m_oLastColorFrame.step.p[1]==3);
+			const size_t idx_uchar = m_oImgSize.width*y_orig + x_orig;
+			const size_t idx_color = idx_uchar*3;
 			CV_DbgAssert(m_oLastDescFrame.step.p[0]==m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==m_oLastColorFrame.step.p[1]*2);
-			const int idx_desc = idx_color*2;
-			for(int c=0; c<3; ++c) {
-				int nCurrBGInitColor = oInitImg.data[idx_color+c];
+			const size_t idx_desc = idx_color*2;
+			for(size_t c=0; c<3; ++c) {
+				const uchar nCurrBGInitColor = oInitImg.data[idx_color+c];
 				m_oLastColorFrame.data[idx_color+c] = nCurrBGInitColor;
 				LBSP::computeSingleRGBDescriptor(oInitImg,nCurrBGInitColor,x_orig,y_orig,c,m_nLBSPThreshold_8bitLUT[nCurrBGInitColor],((ushort*)(m_oLastDescFrame.data+idx_desc))[c]);
 			}
 		}
-		const int nTotColorDistThreshold = m_nColorDistThreshold*3;
-		const int nTotDescDistThreshold = m_nDescDistThreshold*3;
+		const size_t nTotColorDistThreshold = m_nColorDistThreshold*3;
+		const size_t nTotDescDistThreshold = m_nDescDistThreshold*3;
 		m_apLocalWordList_3ch = new LocalWord_3ch[nKeyPoints*m_nLocalWords];
+		memset(m_apLocalWordList_3ch,0,sizeof(LocalWord_3ch)*nKeyPoints*m_nLocalWords);
 		LocalWord_3ch* apWordListIter = m_apLocalWordList_3ch;
-		for(int k=0; k<nKeyPoints; ++k) {
+		for(size_t k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
-			const int idx_orig_uchar = m_oImgSize.width*y_orig + x_orig;
-			const int idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
+			const size_t idx_orig_uchar = m_oImgSize.width*y_orig + x_orig;
+			const size_t idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
 			for(size_t n=0; n<LOCAL_WORD_INIT_ITER_COUNT; ++n) {
 				int y_sample, x_sample;
 				getRandSamplePosition(x_sample,y_sample,x_orig,y_orig,LBSP::PATCH_SIZE/2,m_oImgSize);
-				const int idx_sample_color = (m_oImgSize.width*y_sample + x_sample)*3;
-				const int idx_sample_desc = idx_sample_color*2;
-				const uchar* anSampleColor = m_oLastColorFrame.data+idx_sample_color;
-				const ushort* anSampleIntraDesc = ((ushort*)(m_oLastDescFrame.data+idx_sample_desc));
-				int nWordIdx=0;
+				const size_t idx_sample_color = (m_oImgSize.width*y_sample + x_sample)*3;
+				const size_t idx_sample_desc = idx_sample_color*2;
+				const uchar* const anSampleColor = m_oLastColorFrame.data+idx_sample_color;
+				const ushort* const anSampleIntraDesc = ((ushort*)(m_oLastDescFrame.data+idx_sample_desc));
+				size_t nWordIdx=0;
 				while(nWordIdx<m_nLocalWords) {
 					LocalWord_3ch* pCurrLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_orig_ldict+nWordIdx];
 					if(pCurrLocalWord && L1dist_uchar(anSampleColor,pCurrLocalWord->anColor)<nTotColorDistThreshold && hdist_ushort_8bitLUT(anSampleIntraDesc,pCurrLocalWord->anDesc)<nTotDescDistThreshold) {
@@ -216,11 +214,9 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 						pCurrLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_orig_ldict+nWordIdx];
 					else {
 						pCurrLocalWord = apWordListIter++;
-						pCurrLocalWord->nLastOcc = 0;
-						pCurrLocalWord->nFirstOcc = -1;
 						m_aapLocalDicts[idx_orig_ldict+nWordIdx] = pCurrLocalWord;
 					}
-					for(int c=0; c<3; ++c) {
+					for(size_t c=0; c<3; ++c) {
 						pCurrLocalWord->anColor[c] = anSampleColor[c];
 						pCurrLocalWord->anDesc[c] = anSampleIntraDesc[c];
 					}
@@ -232,17 +228,15 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 				}
 			}
 			CV_Assert(m_aapLocalDicts[idx_orig_ldict]);
-			for(int nWordIdx=1; nWordIdx<m_nLocalWords; ++nWordIdx) {
+			for(size_t nWordIdx=1; nWordIdx<m_nLocalWords; ++nWordIdx) {
 				LocalWord_3ch* pCurrLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_orig_ldict+nWordIdx];
 				if(!pCurrLocalWord) {
 					pCurrLocalWord = apWordListIter++;
-					pCurrLocalWord->nLastOcc = 0;
-					pCurrLocalWord->nFirstOcc = -1;
 					pCurrLocalWord->nOccurrences = (LOCAL_WORD_INIT_OCCUR_COUNT*(m_nLocalWords-nWordIdx))/m_nLocalWords;
-					int nRandWordIdx = (rand()%nWordIdx);
+					const size_t nRandWordIdx = (rand()%nWordIdx);
 					const LocalWord_3ch* pRefLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_orig_ldict+nRandWordIdx];
-					int nRandColorOffset = (rand()%(m_nColorDistThreshold+1))-m_nColorDistThreshold/2;
-					for(int c=0; c<3; ++c) {
+					const int nRandColorOffset = (rand()%(m_nColorDistThreshold+1))-(int)m_nColorDistThreshold/2;
+					for(size_t c=0; c<3; ++c) {
 						pCurrLocalWord->anColor[c] = cv::saturate_cast<uchar>((int)pRefLocalWord->anColor[c]+nRandColorOffset);
 						pCurrLocalWord->anDesc[c] = pRefLocalWord->anDesc[c];
 					}
@@ -263,45 +257,45 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 	cv::Mat oCurrFGMask = _fgmask.getMat();
 	memset(oCurrFGMask.data,0,oCurrFGMask.cols*oCurrFGMask.rows);
 	++m_nFrameIndex;
-	const int nKeyPoints = (int)m_voKeyPoints.size();
+	const size_t nKeyPoints = m_voKeyPoints.size();
 	if(m_nImgChannels==1) {
-		for(int k=0; k<nKeyPoints; ++k) {
+		for(size_t k=0; k<nKeyPoints; ++k) {
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
-			const int idx_uchar = m_oImgSize.width*y + x;
-			const int idx_ldict = idx_uchar*m_nLocalWords;
-			//const int idx_ushrt = idx_uchar*2;
-			//const int idx_flt32 = idx_uchar*4;
+			const size_t idx_uchar = m_oImgSize.width*y + x;
+			const size_t idx_ldict = idx_uchar*m_nLocalWords;
+			//const size_t idx_ushrt = idx_uchar*2;
+			//const size_t idx_flt32 = idx_uchar*4;
 			const uchar nCurrColor = oInputImg.data[idx_uchar];
-			//int nMinDescDist=s_nDescMaxDataRange_1ch;
-			//int nMinSumDist=s_nColorMaxDataRange_1ch;
+			//size_t nMinDescDist=s_nDescMaxDataRange_1ch;
+			//size_t nMinSumDist=s_nColorMaxDataRange_1ch;
 			//float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+idx_flt32);
 			//float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+idx_flt32);
 			//float* pfCurrWeightThreshold = ((float*)(m_oWeightThresholdFrame.data+idx_flt32));
 			//float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+idx_flt32));
-			const int nLearningRate = learningRateOverride>0?(int)ceil(learningRateOverride):LOCAL_WORD_REPRESENTATION_UPDATE_RATE;//(int)ceil((*pfCurrLearningRate));
-			const int nCurrColorDistThreshold = (int)(m_nColorDistThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);//(int)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
-			const int nCurrDescDistThreshold = m_nDescDistThreshold;//(int)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold); // not adjusted like ^^, the internal LBSP thresholds are instead
+			const size_t nLearningRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):LOCAL_WORD_REPRESENTATION_UPDATE_RATE;//(size_t)ceil((*pfCurrLearningRate));
+			const size_t nCurrColorDistThreshold = (size_t)(m_nColorDistThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);//(size_t)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+			const size_t nCurrDescDistThreshold = m_nDescDistThreshold;//(size_t)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold); // not adjusted like ^^, the internal LBSP thresholds are instead
 			ushort nCurrInterDesc, nCurrIntraDesc;
 			LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColor,x,y,m_nLBSPThreshold_8bitLUT[nCurrColor],nCurrIntraDesc);
-			int nPotentialWordsCount=0, nGoodWordsCount=0, nWordIdx=0;
+			size_t nPotentialWordsCount=0, nGoodWordsCount=0, nWordIdx=0;
 			float fPotentialWordsWeightSum = 0.0f;
 			//LocalWord_1ch* pBestLocalWord = nullptr;
 			//float fBestLocalWordWeight = 0;
-			//int nBestLocalWordColorDist = INT_MAX; @@@@
-			//int nBestLocalWordDescDist = INT_MAX; @@@@
+			//size_t nBestLocalWordColorDist = INT_MAX; @@@@
+			//size_t nBestLocalWordDescDist = INT_MAX; @@@@
 			//while(nWordIdx<m_nLocalWords && nGoodWordsCount<LOCAL_WORD_COUNT_THRESHOLD) {
 			while(nWordIdx<m_nLocalWords && nGoodWordsCount<LOCAL_WORD_COUNT_THRESHOLD && fPotentialWordsWeightSum<LOCAL_WORD_WEIGHT_SUM_THRESHOLD) {
 				LocalWord_1ch* pCurrLocalWord = (LocalWord_1ch*)m_aapLocalDicts[idx_ldict+nWordIdx];
 				const uchar& nBGColor = pCurrLocalWord->nColor;
 				{
-					const int nColorDist = absdiff_uchar(nCurrColor,nBGColor);
+					const size_t nColorDist = absdiff_uchar(nCurrColor,nBGColor);
 					if(nColorDist>nCurrColorDistThreshold)
 						goto failedcheck1ch;
 					const ushort& nBGIntraDesc = pCurrLocalWord->nDesc;
 					LBSP::computeGrayscaleDescriptor(oInputImg,nBGColor,x,y,m_nLBSPThreshold_8bitLUT[nBGColor],nCurrInterDesc);
-					//const int nDescDist = (hdist_ushort_8bitLUT(nCurrInterDesc,nBGIntraDesc)+hdist_ushort_8bitLUT(nCurrIntraDesc,nBGIntraDesc))/2;
-					const int nDescDist = hdist_ushort_8bitLUT(nCurrInterDesc,nBGIntraDesc);
+					//const size_t nDescDist = (hdist_ushort_8bitLUT(nCurrInterDesc,nBGIntraDesc)+hdist_ushort_8bitLUT(nCurrIntraDesc,nBGIntraDesc))/2;
+					const size_t nDescDist = hdist_ushort_8bitLUT(nCurrInterDesc,nBGIntraDesc);
 					if(nDescDist>nCurrDescDistThreshold)
 						goto failedcheck1ch;
 					const float fCurrLocalWordWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
@@ -332,11 +326,11 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				if((rand()%nLearningRate)==0) {
 					int x_rand,y_rand;
 					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
-					const int idx_rand_uchar = (m_oImgSize.width*y_rand + x_rand);
-					const int idx_rand_ldict = idx_rand_uchar*m_nLocalWords;
+					const size_t idx_rand_uchar = (m_oImgSize.width*y_rand + x_rand);
+					const size_t idx_rand_ldict = idx_rand_uchar*m_nLocalWords;
 					if(m_aapLocalDicts[idx_rand_ldict]) {
 						// @@@ check if word already exists in targeted ldict? (dont add if it does, but increase occ count?)
-						const int nRandWordIdx = m_nLocalWords-(rand()%m_nLastLocalWordReplaceableIdxs)-1;
+						const size_t nRandWordIdx = m_nLocalWords-(rand()%m_nLastLocalWordReplaceableIdxs)-1;
 						LocalWord_1ch* pRandLocalWord = (LocalWord_1ch*)m_aapLocalDicts[idx_rand_ldict+nRandWordIdx];
 						pRandLocalWord->nColor = nCurrColor;
 						pRandLocalWord->nDesc = nCurrIntraDesc;
@@ -373,55 +367,55 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 		}
 	}
 	else { //m_nImgChannels==3
-		for(int k=0; k<nKeyPoints; ++k) {
+		for(size_t k=0; k<nKeyPoints; ++k) {
 			const int x = (int)m_voKeyPoints[k].pt.x;
 			const int y = (int)m_voKeyPoints[k].pt.y;
-			const int idx_uchar = m_oImgSize.width*y + x;
-			const int idx_ldict = idx_uchar*m_nLocalWords;
-			//const int idx_flt32 = idx_uchar*4;
-			const int idx_uchar_rgb = idx_uchar*3;
-			//const int idx_ushrt_rgb = idx_uchar_rgb*2;
+			const size_t idx_uchar = m_oImgSize.width*y + x;
+			const size_t idx_ldict = idx_uchar*m_nLocalWords;
+			//const size_t idx_flt32 = idx_uchar*4;
+			const size_t idx_uchar_rgb = idx_uchar*3;
+			//const size_t idx_ushrt_rgb = idx_uchar_rgb*2;
 			const uchar* const anCurrColor = oInputImg.data+idx_uchar_rgb;
-			//int nMinTotDescDist=s_nDescMaxDataRange_3ch;
-			//int nMinTotSumDist=s_nColorMaxDataRange_3ch;
+			//size_t nMinTotDescDist=s_nDescMaxDataRange_3ch;
+			//size_t nMinTotSumDist=s_nColorMaxDataRange_3ch;
 			//float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+idx_flt32);
 			//float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+idx_flt32);
 			//float* pfCurrWeightThreshold = ((float*)(m_oWeightThresholdFrame.data+idx_flt32));
 			//float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+idx_flt32));
-			const int nLearningRate = learningRateOverride>0?(int)ceil(learningRateOverride):LOCAL_WORD_REPRESENTATION_UPDATE_RATE;//(int)ceil((*pfCurrLearningRate));
-			const int nCurrTotColorDistThreshold = m_nColorDistThreshold*3;//(int)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold*3);
-			const int nCurrTotDescDistThreshold = m_nDescDistThreshold*3;//(int)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold*3);
+			const size_t nLearningRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):LOCAL_WORD_REPRESENTATION_UPDATE_RATE;//(size_t)ceil((*pfCurrLearningRate));
+			const size_t nCurrTotColorDistThreshold = m_nColorDistThreshold*3;//(size_t)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold*3);
+			const size_t nCurrTotDescDistThreshold = m_nDescDistThreshold*3;//(size_t)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold*3);
 #if BGSLBSP_USE_SC_THRS_VALIDATION
-			const int nCurrSCColorDistThreshold = (int)(m_nColorDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);//(int)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);
-			const int nCurrSCDescDistThreshold = (int)(m_nDescDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);//(int)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);
+			const size_t nCurrSCColorDistThreshold = (size_t)(m_nColorDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);//(size_t)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);
+			const size_t nCurrSCDescDistThreshold = (size_t)(m_nDescDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);//(size_t)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);
 #endif //BGSLBSP_USE_SC_THRS_VALIDATION
 			ushort anCurrInterDesc[3], anCurrIntraDesc[3];
-			const uchar anCurrIntraLBSPThresholds[3] = {m_nLBSPThreshold_8bitLUT[anCurrColor[0]],m_nLBSPThreshold_8bitLUT[anCurrColor[1]],m_nLBSPThreshold_8bitLUT[anCurrColor[2]]};
+			const size_t anCurrIntraLBSPThresholds[3] = {m_nLBSPThreshold_8bitLUT[anCurrColor[0]],m_nLBSPThreshold_8bitLUT[anCurrColor[1]],m_nLBSPThreshold_8bitLUT[anCurrColor[2]]};
 			LBSP::computeRGBDescriptor(oInputImg,anCurrColor,x,y,anCurrIntraLBSPThresholds,anCurrIntraDesc);
-			int nPotentialWordsCount=0, nGoodWordsCount=0, nWordIdx=0;
+			size_t nPotentialWordsCount=0, nGoodWordsCount=0, nWordIdx=0;
 			float fPotentialWordsWeightSum = 0.0f;
 			//LocalWord_3ch* pBestLocalWord = nullptr;
 			//float fBestLocalWordWeight = 0;
-			//int nBestLocalWordColorDist = INT_MAX; @@@@
-			//int nBestLocalWordDescDist = INT_MAX; @@@@
+			//size_t nBestLocalWordColorDist = INT_MAX; @@@@
+			//size_t nBestLocalWordDescDist = INT_MAX; @@@@
 			//while(nWordIdx<m_nLocalWords && nGoodWordsCount<LOCAL_WORD_COUNT_THRESHOLD) {
 			while(nWordIdx<m_nLocalWords && nGoodWordsCount<LOCAL_WORD_COUNT_THRESHOLD && fPotentialWordsWeightSum<LOCAL_WORD_WEIGHT_SUM_THRESHOLD) {
 				LocalWord_3ch* pCurrLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_ldict+nWordIdx];
 				const uchar* const anBGColor = pCurrLocalWord->anColor;
 				const ushort* const anBGIntraDesc = pCurrLocalWord->anDesc;
-				int nTotColorDist = 0;
-				int nTotDescDist = 0;
-				//int nTotSumDist = 0;
-				for(int c=0;c<3; ++c) {
-					const int nColorDist = absdiff_uchar(anCurrColor[c],anBGColor[c]);
+				size_t nTotColorDist = 0;
+				size_t nTotDescDist = 0;
+				//size_t nTotSumDist = 0;
+				for(size_t c=0;c<3; ++c) {
+					const size_t nColorDist = absdiff_uchar(anCurrColor[c],anBGColor[c]);
 					if(nColorDist>nCurrSCColorDistThreshold)
 						goto failedcheck3ch;
 					LBSP::computeSingleRGBDescriptor(oInputImg,anBGColor[c],x,y,c,m_nLBSPThreshold_8bitLUT[anBGColor[c]],anCurrInterDesc[c]);
-					//const int nDescDist = (hdist_ushort_8bitLUT(anCurrInterDesc[c],anBGIntraDesc[c])+hdist_ushort_8bitLUT(anCurrIntraDesc[c],anBGIntraDesc[c]))/2;
-					const int nDescDist = hdist_ushort_8bitLUT(anCurrInterDesc[c],anBGIntraDesc[c]);
+					//const size_t nDescDist = (hdist_ushort_8bitLUT(anCurrInterDesc[c],anBGIntraDesc[c])+hdist_ushort_8bitLUT(anCurrIntraDesc[c],anBGIntraDesc[c]))/2;
+					const size_t nDescDist = hdist_ushort_8bitLUT(anCurrInterDesc[c],anBGIntraDesc[c]);
 					if(nDescDist>nCurrSCDescDistThreshold)
 						goto failedcheck3ch;
-					//const int nSumDist = std::min((int)(OVERLOAD_GRAD_PROP*nDescDist)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch);
+					//const size_t nSumDist = std::min((size_t)(OVERLOAD_GRAD_PROP*nDescDist)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch);
 					//if(nSumDist>nCurrSCColorDistThreshold)
 					//	goto failedcheck3ch;
 					nTotColorDist += nColorDist;
@@ -441,7 +435,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					pCurrLocalWord->nLastOcc = m_nFrameIndex;
 					++pCurrLocalWord->nOccurrences;
 					if(/*nTotColorDist<nCurrTotColorDistThreshold/2 && */nTotDescDist<=nCurrTotDescDistThreshold/2 && (rand()%nLearningRate)==0) {
-						for(int c=0; c<3; ++c) {
+						for(size_t c=0; c<3; ++c) {
 							pCurrLocalWord->anColor[c] = anCurrColor[c];
 							pCurrLocalWord->anDesc[c] = anCurrIntraDesc[c];
 						}
@@ -459,13 +453,13 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				if((rand()%nLearningRate)==0) {
 					int x_rand,y_rand;
 					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
-					const int idx_rand_uchar = (m_oImgSize.width*y_rand + x_rand);
-					const int idx_rand_ldict = idx_rand_uchar*m_nLocalWords;
+					const size_t idx_rand_uchar = (m_oImgSize.width*y_rand + x_rand);
+					const size_t idx_rand_ldict = idx_rand_uchar*m_nLocalWords;
 					if(m_aapLocalDicts[idx_rand_ldict]) {
 						// @@@ check if word already exists in targeted ldict? (dont add if it does, but increase occ count?)
-						const int nRandWordIdx = m_nLocalWords-(rand()%m_nLastLocalWordReplaceableIdxs)-1;
+						const size_t nRandWordIdx = m_nLocalWords-(rand()%m_nLastLocalWordReplaceableIdxs)-1;
 						LocalWord_3ch* pRandLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_rand_ldict+nRandWordIdx];
-						for(int c=0; c<3; ++c) {
+						for(size_t c=0; c<3; ++c) {
 							pRandLocalWord->anColor[c] = anCurrColor[c];
 							pRandLocalWord->anDesc[c] = anCurrIntraDesc[c];
 						}
@@ -483,7 +477,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				//if(nGoodWordsCount==0) { // BAD IF ONLY ONE WORD IS OK IN THE WHOLE DICT
 					nWordIdx = m_nLocalWords-(rand()%m_nLastLocalWordReplaceableIdxs)-1;
 					LocalWord_3ch* pNewLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_ldict+nWordIdx];
-					for(int c=0; c<3; ++c) {
+					for(size_t c=0; c<3; ++c) {
 						pNewLocalWord->anColor[c] = anCurrColor[c];
 						pNewLocalWord->anDesc[c] = anCurrIntraDesc[c];
 					}
@@ -499,7 +493,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					std::swap(m_aapLocalDicts[idx_ldict+nWordIdx],m_aapLocalDicts[idx_ldict+nWordIdx-1]);
 				}
 			}
-			/*for(int c=0; c<3; ++c) {
+			/*for(size_t c=0; c<3; ++c) {
 				anLastIntraDesc[c] = anCurrIntraDesc[c];
 				anLastColor[c] = anCurrColor[c];
 			}*/
@@ -511,16 +505,16 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 
 void BackgroundSubtractorCBLBSP::getBackgroundImage(cv::OutputArray backgroundImage) const {
 	CV_Assert(m_bInitialized);
-	cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_32FC(m_nImgChannels));
+	cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
 	// @@@@@@ TO BE REWRITTEN FOR WORD-BASED RECONSTRUCTION
-	/*for(int w=0; w<m_nLocalWords; ++w) {
+	/*for(size_t w=0; w<m_nLocalWords; ++w) {
 		for(int y=0; y<m_oImgSize.height; ++y) {
 			for(int x=0; x<m_oImgSize.width; ++x) {
-				int idx_nimg = m_voBGColorSamples[w].step.p[0]*y + m_voBGColorSamples[w].step.p[1]*x;
-				int idx_flt32 = idx_nimg*4;
+				const size_t idx_nimg = m_voBGColorSamples[w].step.p[0]*y + m_voBGColorSamples[w].step.p[1]*x;
+				const size_t idx_flt32 = idx_nimg*4;
 				float* oAvgBgImgPtr = (float*)(oAvgBGImg.data+idx_flt32);
-				uchar* oBGImgPtr = m_voBGColorSamples[w].data+idx_nimg;
-				for(int c=0; c<m_nImgChannels; ++c)
+				const uchar* const oBGImgPtr = m_voBGColorSamples[w].data+idx_nimg;
+				for(size_t c=0; c<m_nImgChannels; ++c)
 					oAvgBgImgPtr[c] += ((float)oBGImgPtr[c])/m_nLocalWords;
 			}
 		}
@@ -531,16 +525,16 @@ void BackgroundSubtractorCBLBSP::getBackgroundImage(cv::OutputArray backgroundIm
 void BackgroundSubtractorCBLBSP::getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const {
 	CV_Assert(LBSP::DESC_SIZE==2);
 	CV_Assert(m_bInitialized);
-	cv::Mat oAvgBGDesc = cv::Mat::zeros(m_oImgSize,CV_32FC(m_nImgChannels));
+	cv::Mat oAvgBGDesc = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
 	// @@@@@@ TO BE REWRITTEN FOR WORD-BASED RECONSTRUCTION
 	/*for(size_t n=0; n<m_voBGDescSamples.size(); ++n) {
 		for(int y=0; y<m_oImgSize.height; ++y) {
 			for(int x=0; x<m_oImgSize.width; ++x) {
-				int idx_ndesc = m_voBGDescSamples[n].step.p[0]*y + m_voBGDescSamples[n].step.p[1]*x;
-				int idx_flt32 = idx_ndesc*2;
+				const size_t idx_ndesc = m_voBGDescSamples[n].step.p[0]*y + m_voBGDescSamples[n].step.p[1]*x;
+				const size_t idx_flt32 = idx_ndesc*2;
 				float* oAvgBgDescPtr = (float*)(oAvgBGDesc.data+idx_flt32);
-				ushort* oBGDescPtr = (ushort*)(m_voBGDescSamples[n].data+idx_ndesc);
-				for(int c=0; c<m_nImgChannels; ++c)
+				const ushort* const oBGDescPtr = (ushort*)(m_voBGDescSamples[n].data+idx_ndesc);
+				for(size_t c=0; c<m_nImgChannels; ++c)
 					oAvgBgDescPtr[c] += ((float)oBGDescPtr[c])/m_voBGDescSamples.size();
 			}
 		}
@@ -581,14 +575,14 @@ void BackgroundSubtractorCBLBSP::CleanupDictionaries() {
 	}
 }
 
-float BackgroundSubtractorCBLBSP::GetLocalWordWeight(const LocalWord* w, int nCurrFrame) {
+float BackgroundSubtractorCBLBSP::GetLocalWordWeight(const LocalWord* w, size_t nCurrFrame) {
 	return (float)(w->nOccurrences)/((w->nLastOcc-w->nFirstOcc)/2+(nCurrFrame-w->nLastOcc)/4+LWORD_WEIGHT_OFFSET);
 	// @@@@@@ weight should not directly depend on nCurrFrame, it might be better as:
 	// weight = ((float)(w->nOccurrences)/((w->nLastOcc-w->nFirstOcc)+LWORD_WEIGHT_OFFSET))
 	// readjustedweight = weight * (something that depends on nCurrFrame)?
 }
 
-float BackgroundSubtractorCBLBSP::GetGlobalWordWeight(const GlobalWord* /*w*/, int /*nCurrFrame*/) {
+float BackgroundSubtractorCBLBSP::GetGlobalWordWeight(const GlobalWord* /*w*/, size_t /*nCurrFrame*/) {
 	return -1; //@@@@
 }
 

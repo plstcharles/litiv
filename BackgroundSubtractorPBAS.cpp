@@ -6,10 +6,10 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <iomanip>
 
-BackgroundSubtractorPBAS::BackgroundSubtractorPBAS(	 int nInitColorDistThreshold
+BackgroundSubtractorPBAS::BackgroundSubtractorPBAS(	 size_t nInitColorDistThreshold
 													,float fInitUpdateRate
-													,int nBGSamples
-													,int nRequiredBGSamples)
+													,size_t nBGSamples
+													,size_t nRequiredBGSamples)
 	:	 m_nBGSamples(nBGSamples)
 		,m_nRequiredBGSamples(nRequiredBGSamples)
 		,m_voBGImg(nBGSamples)
@@ -18,9 +18,7 @@ BackgroundSubtractorPBAS::BackgroundSubtractorPBAS(	 int nInitColorDistThreshold
 		,m_fDefaultUpdateRate(fInitUpdateRate)
 		,m_fFormerMeanGradDist(20)
 		,m_bInitialized(false) {
-	CV_Assert(m_nBGSamples>0);
-	CV_Assert(m_nRequiredBGSamples<=m_nBGSamples && m_nRequiredBGSamples>0);
-	CV_Assert(m_nDefaultColorDistThreshold>0);
+	CV_Assert(m_nRequiredBGSamples<=m_nBGSamples);
 	CV_Assert(m_fDefaultUpdateRate>0 && m_fDefaultUpdateRate<=UCHAR_MAX);
 }
 
@@ -37,11 +35,11 @@ void BackgroundSubtractorPBAS::getBackgroundImage(cv::OutputArray backgroundImag
 	for(size_t n=0; n<m_voBGImg.size(); ++n) {
 		for(int y=0; y<m_oImgSize.height; ++y) {
 			for(int x=0; x<m_oImgSize.width; ++x) {
-				int idx_uchar = m_voBGImg[n].step.p[0]*y + m_voBGImg[n].step.p[1]*x;
-				int idx_flt32 = idx_uchar*4;
+				const size_t idx_uchar = m_voBGImg[n].step.p[0]*y + m_voBGImg[n].step.p[1]*x;
+				const size_t idx_flt32 = idx_uchar*4;
 				float* oAvgBgImgPtr = (float*)(oAvgBGImg.data+idx_flt32);
-				uchar* oBGImgPtr = m_voBGImg[n].data+idx_uchar;
-				for(int c=0; c<m_voBGImg[n].channels(); ++c)
+				const uchar* const oBGImgPtr = m_voBGImg[n].data+idx_uchar;
+				for(size_t c=0; c<(size_t)m_voBGImg[n].channels(); ++c)
 					oAvgBgImgPtr[c] += ((float)oBGImgPtr[c])/m_voBGImg.size();
 			}
 		}
