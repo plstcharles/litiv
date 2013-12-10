@@ -61,7 +61,7 @@ public:
 	//! default destructor
 	virtual ~BackgroundSubtractorCBLBSP();
 	//! (re)initiaization method; needs to be called before starting background subtraction (note: also reinitializes the keypoints vector)
-	virtual void initialize(const cv::Mat& oInitImg, const std::vector<cv::KeyPoint>& voKeyPoints);
+	virtual void initialize(const cv::Mat& oInitImg, const std::vector<cv::KeyPoint>& voKeyPoints); // @@@@@@@@@@ currently always reinits internal memory structs without reusing old words, if KPs match
 	//! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
 	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=0);
 	//! returns a copy of the latest reconstructed background image
@@ -73,13 +73,11 @@ public:
 
 protected:
 	struct LocalWord {
-		int nWID;
 		int nFirstOcc;
 		int nLastOcc;
 		int nOccurrences;
-	};
-	struct GlobalWord {
-		cv::Mat oSpatioOccMap;
+	protected:
+		~LocalWord(); // only used to prevent internal polymorphism (keeps algo cost down)
 	};
 	struct LocalWord_1ch : LocalWord {
 		uchar nColor;
@@ -89,8 +87,22 @@ protected:
 		uchar anColor[3];
 		ushort anDesc[3];
 	};
-	struct GlobalWord_1ch : LocalWord_1ch, GlobalWord {};
-	struct GlobalWord_3ch : LocalWord_3ch, GlobalWord {};
+	struct GlobalWord {
+		int nFirstOcc;
+		int nLastOcc;
+		int nOccurrences;
+		cv::Mat oSpatioOccMap;
+	protected:
+		~GlobalWord(); // only used to prevent internal polymorphism (keeps algo cost down)
+	};
+	struct GlobalWord_1ch : GlobalWord {
+		uchar nMinColor;
+		uchar nMaxColor;
+	};
+	struct GlobalWord_3ch : GlobalWord {
+		uchar anMinColor[3];
+		uchar anMaxColor[3];
+	};
 	//! absolute color distance threshold ('R' or 'radius' in the original ViBe paper, used as the default/initial 'R(x)' value here, paired with BackgroundSubtractorLBSP::m_nDescDistThreshold)
 	const int m_nColorDistThreshold;
 	//! number of different local words per pixel/block to be taken from input frames to build the background model (similar to 'N' in ViBe/PBAS)
@@ -101,15 +113,17 @@ protected:
 	const int m_nGlobalWords;
 	//! total number of local dictionaries (depends on the input frame size and nb of channels)
 	int m_nLocalDictionaries;
-	//! WID seed (if implemented as atomic, might be useful later for threaded operations)
-	int m_nCurrWIDSeed;
 	//! current frame index, used to keep track of word occurrence information
 	int m_nFrameIndex;
 
-	//! background model local words dictionaries (1x dictionary/subregion)
-	LocalWord*** m_aapLocalWords; // @@@@@@@@ IMPLEMENT A SIMPLE BUBBLE SORT FOR 1-SWAP-PASS/CYCLE ? @@@@@@ create map to keep track of wid => dictionary index?
-	//! background model global words dictionary
-	GlobalWord** m_apGlobalWords; // @@@@@@@@ IMPLEMENT A SIMPLE BUBBLE SORT FOR 1-SWAP-PASS/CYCLE ?
+	//! background model local word list & dictionaries
+	LocalWord** m_aapLocalDicts;
+	LocalWord_1ch* m_apLocalWordList_1ch;
+	LocalWord_3ch* m_apLocalWordList_3ch;
+	//! background model global word list & dictionary (1x dictionary for the whole model)
+	GlobalWord** m_apGlobalDict;
+	GlobalWord_1ch* m_apGlobalWordList_1ch;
+	GlobalWord_3ch* m_apGlobalWordList_3ch;
 
 	//! per-pixel distance thresholds (equivalent to 'R(x)' in PBAS, but used as a relative value to determine both intensity and descriptor variation thresholds)
 	//cv::Mat m_oDistThresholdFrame;
