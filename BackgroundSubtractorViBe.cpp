@@ -20,7 +20,7 @@ BackgroundSubtractorViBe::~BackgroundSubtractorViBe() {}
 
 cv::AlgorithmInfo* BackgroundSubtractorViBe::info() const {
 	CV_Assert(false); // NOT IMPL @@@@@
-	return NULL;
+	return nullptr;
 }
 
 void BackgroundSubtractorViBe::getBackgroundImage(cv::OutputArray backgroundImage) const {

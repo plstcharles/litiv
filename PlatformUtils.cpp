@@ -32,14 +32,14 @@ void GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFi
 #else //!PLATFORM_USES_WIN32API
 	DIR *dp;
 	struct dirent *dirp;
-	if((dp  = opendir(sDirPath.c_str()))!=NULL) {
+	if((dp  = opendir(sDirPath.c_str()))!=nullptr) {
 		size_t nFiles=0;
-		while((dirp = readdir(dp)) != NULL)
+		while((dirp = readdir(dp))!=nullptr)
 			nFiles++;
 		if(nFiles>0) {
 			vsFilePaths.reserve(nFiles);
 			rewinddir(dp);
-			while((dirp = readdir(dp)) != NULL) {
+			while((dirp = readdir(dp))!=nullptr) {
 				struct stat sb;
 				std::string sFullPath = sDirPath + "/" + dirp->d_name;
 				int ret = stat(sFullPath.c_str(),&sb);
@@ -85,14 +85,14 @@ void GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vs
 #else //!PLATFORM_USES_WIN32API
 	DIR *dp;
 	struct dirent *dirp;
-	if((dp  = opendir(sDirPath.c_str()))!=NULL) {
+	if((dp  = opendir(sDirPath.c_str()))!=nullptr) {
 		size_t nFiles=0;
-		while((dirp = readdir(dp)) != NULL)
+		while((dirp = readdir(dp))!=nullptr)
 			nFiles++;
 		if(nFiles>0) {
 			vsSubDirPaths.reserve(nFiles);
 			rewinddir(dp);
-			while((dirp = readdir(dp)) != NULL) {
+			while((dirp = readdir(dp))!=nullptr) {
 				struct stat sb;
 				std::string sFullPath = sDirPath + "/" + dirp->d_name;
 				int ret = stat(sFullPath.c_str(),&sb);

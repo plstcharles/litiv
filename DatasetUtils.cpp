@@ -291,7 +291,7 @@ const cv::Mat& SequenceInfo::GetGTFrameFromIndex(size_t idx) {
 #if USE_PRECACHED_IO
 
 void SequenceInfo::PrecacheInputFrames() {
-	srand((size_t)time(NULL)*m_nTotalNbFrames*m_sName.size());
+	srand((size_t)time(nullptr)*m_nTotalNbFrames*m_sName.size());
 #if PLATFORM_SUPPORTS_CPP11
 	std::unique_lock<std::mutex> sync_lock(m_oInputFrameSyncMutex);
 #elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
@@ -369,7 +369,7 @@ void SequenceInfo::PrecacheInputFrames() {
 }
 
 void SequenceInfo::PrecacheGTFrames() {
-	srand((size_t)time(NULL)*m_nTotalNbFrames*m_sName.size());
+	srand((size_t)time(nullptr)*m_nTotalNbFrames*m_sName.size());
 #if PLATFORM_SUPPORTS_CPP11
 	std::unique_lock<std::mutex> sync_lock(m_oGTFrameSyncMutex);
 #elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11

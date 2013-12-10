@@ -28,7 +28,7 @@ BackgroundSubtractorPBAS::~BackgroundSubtractorPBAS() {}
 
 cv::AlgorithmInfo* BackgroundSubtractorPBAS::info() const {
 	CV_Assert(false); // NOT IMPL @@@@@
-	return NULL;
+	return nullptr;
 }
 
 void BackgroundSubtractorPBAS::getBackgroundImage(cv::OutputArray backgroundImage) const {
