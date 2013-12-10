@@ -3,24 +3,24 @@
 #include <opencv2/core/types_c.h>
 
 //! computes the absolute difference between two unsigned char values
-static inline int absdiff_uchar(uchar a, uchar b) {
-	return abs(a-b); // should return the same as (a<b?b-a:a-b), but faster when properly optimized
+static inline size_t absdiff_uchar(uchar a, uchar b) {
+	return (size_t)abs(a-b); // should return the same as (a<b?b-a:a-b), but faster when properly optimized
 }
 
 //! computes the L1 distance between two 3-ch unsigned char vectors
-static inline int L1dist_uchar(const uchar* a, const uchar* b) {
+static inline size_t L1dist_uchar(const uchar* a, const uchar* b) {
 	return absdiff_uchar(a[0],b[0])+absdiff_uchar(a[1],b[1])+absdiff_uchar(a[2],b[2]);
 }
 
 //! computes the L1 distance between two 3-ch opencv unsigned char vectors
-static inline int L1dist_uchar(const cv::Vec3b& a, const cv::Vec3b& b) {
+static inline size_t L1dist_uchar(const cv::Vec3b& a, const cv::Vec3b& b) {
 	const uchar a_array[3] = {a[0],a[1],a[2]};
 	const uchar b_array[3] = {b[0],b[1],b[2]};
 	return L1dist_uchar(a_array,b_array);
 }
 
 //! computes the squared L2 distance between two 3-ch unsigned char vectors
-static inline int L2sqrdist_uchar(const uchar* a, const uchar* b) {
+static inline size_t L2sqrdist_uchar(const uchar* a, const uchar* b) {
 	return (absdiff_uchar(a[0],b[0])^2)+(absdiff_uchar(a[1],b[1])^2)+(absdiff_uchar(a[2],b[2])^2);
 }
 
@@ -30,7 +30,7 @@ static inline float L2dist_uchar(const uchar* a, const uchar* b) {
 }
 
 //! computes the squared L2 distance between two 3-ch opencv unsigned char vectors
-static inline int L2sqrdist_uchar(const cv::Vec3b& a, const cv::Vec3b& b) {
+static inline size_t L2sqrdist_uchar(const cv::Vec3b& a, const cv::Vec3b& b) {
 	const uchar a_array[3] = {a[0],a[1],a[2]};
 	const uchar b_array[3] = {b[0],b[1],b[2]};
 	return L2sqrdist_uchar(a_array,b_array);
@@ -42,7 +42,7 @@ static inline float L2dist_uchar(const cv::Vec3b& a, const cv::Vec3b& b) {
 }
 
 //! popcount LUT for 8bit vectors
-static const int popcount_LUT8[256] = {
+static const size_t popcount_LUT8[256] = {
 	0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
 	1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
 	1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
@@ -62,16 +62,16 @@ static const int popcount_LUT8[256] = {
 };
 
 //! computes the population count of a 16 bits vector using an 8 bits popcount LUT
-static inline int popcount_ushort_8bitsLUT(ushort x) {
+static inline size_t popcount_ushort_8bitsLUT(ushort x) {
 	return popcount_LUT8[(uchar)x] + popcount_LUT8[(uchar)(x>>8)];
 }
 
 //! computes the hamming distance between two 16 bits vectors (min=0, max=16)
-static inline int hdist_ushort_8bitLUT(ushort a, ushort b) {
+static inline size_t hdist_ushort_8bitLUT(ushort a, ushort b) {
 	return popcount_ushort_8bitsLUT(a^b);
 }
 
 //! computes the sum (L1?) of hamming distances between two 3-ch 16 bits vectors (min=0, max=48)
-static inline int hdist_ushort_8bitLUT(const ushort* a, const ushort* b) {
+static inline size_t hdist_ushort_8bitLUT(const ushort* a, const ushort* b) {
 	return popcount_ushort_8bitsLUT(a[0]^b[0])+popcount_ushort_8bitsLUT(a[1]^b[1])+popcount_ushort_8bitsLUT(a[2]^b[2]);
 }

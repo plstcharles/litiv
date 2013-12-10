@@ -9,13 +9,13 @@
 //          (single/3x)            (single/3x)
 //
 // must be defined externally:
-//		_t				(uchar, absolute threshold used for comparisons)
+//		_t				(size_t, absolute threshold used for comparisons)
 //		_ref			(uchar, 'central' value used for comparisons)
 //		_data			(uchar*, triple-channel data to be covered by the pattern)
 //		_y				(int, pattern rows location in the image data)
 //		_x				(int, pattern cols location in the image data)
-//		_c				(int, pattern channel location in the image data)
-//		_step_row		(int, step size between rows, including padding)
+//		_c				(size_t, pattern channel location in the image data)
+//		_step_row		(size_t, step size between rows, including padding)
 //		_res			(ushort, 16 bit result vector)
 //		absdiff_uchar	(function, returns the absolute difference between two uchars)
 

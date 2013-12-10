@@ -22,7 +22,7 @@ CategoryInfo::CategoryInfo(const std::string& name, const std::string& dir, cons
 	else
 		throw std::runtime_error(std::string("Unknown database name, cannot use any known parsing strategy."));
 	for(auto iter=vsSequencePaths.begin(); iter!=vsSequencePaths.end(); ++iter) {
-		size_t pos = iter->find_last_of("/\\");
+		const size_t pos = iter->find_last_of("/\\");
 		if(pos==std::string::npos)
 			m_vpSequences.push_back(new SequenceInfo(*iter,*iter,dbname,this,forceGrayscale));
 		else
@@ -184,7 +184,7 @@ cv::Mat SequenceInfo::GetInputFrameFromIndex_Internal(size_t idx) {
 		oFrame = cv::imread(m_vsInputFramePaths[idx],m_nIMReadInputFlags);
 	else if(m_sDBName==PETS2001_D3TC1_DB_NAME) {
 		if(m_nNextExpectedVideoReaderFrameIdx!=idx)
-			m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,idx);
+			m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,(double)idx);
 		m_voVideoReader >> oFrame;
 		++m_nNextExpectedVideoReaderFrameIdx;
 	}
@@ -291,7 +291,7 @@ const cv::Mat& SequenceInfo::GetGTFrameFromIndex(size_t idx) {
 #if USE_PRECACHED_IO
 
 void SequenceInfo::PrecacheInputFrames() {
-	srand((size_t)time(nullptr)*m_nTotalNbFrames*m_sName.size());
+	srand((unsigned int)(time(nullptr)*m_nTotalNbFrames*m_sName.size()));
 #if PLATFORM_SUPPORTS_CPP11
 	std::unique_lock<std::mutex> sync_lock(m_oInputFrameSyncMutex);
 #elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
@@ -299,7 +299,7 @@ void SequenceInfo::PrecacheInputFrames() {
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for precached io support on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-	size_t nInitFramesToPrecache = MAX_NB_PRECACHED_FRAMES/2 + rand()%(MAX_NB_PRECACHED_FRAMES/2);
+	const size_t nInitFramesToPrecache = MAX_NB_PRECACHED_FRAMES/2 + rand()%(MAX_NB_PRECACHED_FRAMES/2);
 	//std::cout << " @ initializing precaching with " << nInitFramesToPrecache << " frames " << std::endl;
 	while(m_qoInputFrameCache.size()<nInitFramesToPrecache && m_nNextPrecachedInputFrameIdx<m_nTotalNbFrames)
 		m_qoInputFrameCache.push_back(GetInputFrameFromIndex_Internal(m_nNextPrecachedInputFrameIdx++));
@@ -369,7 +369,7 @@ void SequenceInfo::PrecacheInputFrames() {
 }
 
 void SequenceInfo::PrecacheGTFrames() {
-	srand((size_t)time(nullptr)*m_nTotalNbFrames*m_sName.size());
+	srand((unsigned int)(time(nullptr)*m_nTotalNbFrames*m_sName.size()));
 #if PLATFORM_SUPPORTS_CPP11
 	std::unique_lock<std::mutex> sync_lock(m_oGTFrameSyncMutex);
 #elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
@@ -377,7 +377,7 @@ void SequenceInfo::PrecacheGTFrames() {
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for precached io support on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-	size_t nInitFramesToPrecache = PRECACHE_REFILL_THRESHOLD/2 + rand()%(MAX_NB_PRECACHED_FRAMES/2);
+	const size_t nInitFramesToPrecache = PRECACHE_REFILL_THRESHOLD/2 + rand()%(MAX_NB_PRECACHED_FRAMES/2);
 	//std::cout << " @ initializing precaching with " << nInitFramesToPrecache << " frames " << std::endl;
 	while(m_qoGTFrameCache.size()<nInitFramesToPrecache && m_nNextPrecachedGTFrameIdx<m_nTotalNbFrames)
 		m_qoGTFrameCache.push_back(GetGTFrameFromIndex_Internal(m_nNextPrecachedGTFrameIdx++));

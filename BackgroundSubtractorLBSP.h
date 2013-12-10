@@ -26,9 +26,9 @@
 class BackgroundSubtractorLBSP : public cv::BackgroundSubtractor {
 public:
 	//! full constructor used to intialize an 'absolute' LBSP-based background subtractor
-	explicit BackgroundSubtractorLBSP(uchar nLBSPThreshold, int nDescDistThreshold);
+	explicit BackgroundSubtractorLBSP(size_t nLBSPThreshold, size_t nDescDistThreshold);
 	//! full constructor used to intialize a 'relative' LBSP-based background subtractor
-	explicit BackgroundSubtractorLBSP(float fLBSPThreshold, int nDescDistThreshold);
+	explicit BackgroundSubtractorLBSP(float fLBSPThreshold, size_t nDescDistThreshold);
 	//! default destructor
 	virtual ~BackgroundSubtractorLBSP();
 	//! (re)initiaization method; needs to be called before starting background subtraction
@@ -58,15 +58,15 @@ protected:
 	//! input image size
 	cv::Size m_oImgSize;
 	//! input image channel size
-	int m_nImgChannels;
+	size_t m_nImgChannels;
 	//! input image type
 	int m_nImgType;
 	//! absolute per-channel descriptor hamming distance threshold
-	const int m_nDescDistThreshold;
+	const size_t m_nDescDistThreshold;
 	//! defines if we're using a relative threshold when extracting LBSP features (kept here since we don't keep an LBSP object)
 	const bool m_bLBSPUsingRelThreshold;
 	//! LBSP absolute internal threshold (kept here since we don't keep an LBSP object)
-	const uchar m_nLBSPThreshold;
+	const size_t m_nLBSPThreshold;
 	//! LBSP relative internal threshold (kept here since we don't keep an LBSP object)
 	const float m_fLBSPThreshold;
 	//! defines whether or not the subtractor is fully initialized

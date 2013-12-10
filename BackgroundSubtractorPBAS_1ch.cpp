@@ -6,10 +6,10 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <iomanip>
 
-BackgroundSubtractorPBAS_1ch::BackgroundSubtractorPBAS_1ch(	 int nInitColorDistThreshold
+BackgroundSubtractorPBAS_1ch::BackgroundSubtractorPBAS_1ch(	 size_t nInitColorDistThreshold
 															,float fInitUpdateRate
-															,int nBGSamples
-															,int nRequiredBGSamples)
+															,size_t nBGSamples
+															,size_t nRequiredBGSamples)
 	:	BackgroundSubtractorPBAS(nInitColorDistThreshold,fInitUpdateRate,nBGSamples,nRequiredBGSamples) {}
 
 BackgroundSubtractorPBAS_1ch::~BackgroundSubtractorPBAS_1ch() {}
@@ -44,7 +44,7 @@ void BackgroundSubtractorPBAS_1ch::initialize(const cv::Mat& oInitImg) {
 	cv::convertScaleAbs(oBlurredInitImg_GradY,oBlurredInitImg_AbsGradY);
 	cv::Mat oBlurredInitImg_AbsGrad;
 	cv::addWeighted(oBlurredInitImg_AbsGradX,0.5,oBlurredInitImg_AbsGradY,0.5,0,oBlurredInitImg_AbsGrad);
-	for(int s=0; s<m_nBGSamples; s++) {
+	for(size_t s=0; s<m_nBGSamples; s++) {
 		m_voBGImg[s].create(m_oImgSize,CV_8UC1);
 		m_voBGImg[s] = cv::Scalar(0);
 		m_voBGGrad[s].create(m_oImgSize,CV_8UC1);
@@ -90,20 +90,20 @@ void BackgroundSubtractorPBAS_1ch::operator()(cv::InputArray _image, cv::OutputA
 	//cv::Mat oNewDistImgDiff;
 	//cv::absdiff(oNewDistImg,oSampleColorAbsDiff,oNewDistImgDiff);
 	//cv::imshow("diff oNewDistImg",oNewDistImgDiff);
-	int nFrameTotGradDist=0;
-	int nFrameTotBadSamplesCount=1;
-	static const int nChannelSize = UCHAR_MAX;
+	size_t nFrameTotGradDist=0;
+	size_t nFrameTotBadSamplesCount=1;
+	static const size_t nChannelSize = UCHAR_MAX;
 	for(int y=0; y<m_oImgSize.height; ++y) {
 		for(int x=0; x<m_oImgSize.width; ++x) {
-			const int idx_uchar = oInputImg.step.p[0]*y + x;
-			const int idx_flt32 = idx_uchar*4;
+			const size_t idx_uchar = oInputImg.step.p[0]*y + x;
+			const size_t idx_flt32 = idx_uchar*4;
 			float fMinDist=(float)nChannelSize;
 			float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+idx_flt32);
 			const float fCurrDistThreshold = ((*pfCurrDistThresholdFactor)*m_nDefaultColorDistThreshold);
-			int nGoodSamplesCount=0, nSampleIdx=0;
+			size_t nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
-				const int nColorDist = absdiff_uchar(oInputImg.data[idx_uchar],m_voBGImg[nSampleIdx].data[idx_uchar]);
-				const int nGradDist = absdiff_uchar(oBlurredInputImg_AbsGrad.data[idx_uchar],m_voBGGrad[nSampleIdx].data[idx_uchar]);
+				const size_t nColorDist = absdiff_uchar(oInputImg.data[idx_uchar],m_voBGImg[nSampleIdx].data[idx_uchar]);
+				const size_t nGradDist = absdiff_uchar(oBlurredInputImg_AbsGrad.data[idx_uchar],m_voBGGrad[nSampleIdx].data[idx_uchar]);
 				const float fSumDist = std::min(((BGSPBAS_GRAD_WEIGHT_ALPHA/m_fFormerMeanGradDist)*nGradDist)+nColorDist,(float)nChannelSize);
 				if(fSumDist<=fCurrDistThreshold) {
 					if(fMinDist>fSumDist)
@@ -126,16 +126,16 @@ void BackgroundSubtractorPBAS_1ch::operator()(cv::InputArray _image, cv::OutputA
 					*pfCurrLearningRate = BGSPBAS_T_UPPER;
 			}
 			else {
-				const int nLearningRate = learningRateOverride>0?(int)ceil(learningRateOverride):(int)ceil((*pfCurrLearningRate));
+				const size_t nLearningRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate));
 				if((rand()%nLearningRate)==0) {
-					int s_rand = rand()%m_nBGSamples;
+					const size_t s_rand = rand()%m_nBGSamples;
 					m_voBGImg[s_rand].data[idx_uchar] = oInputImg.data[idx_uchar];
 					m_voBGGrad[s_rand].data[idx_uchar] = oBlurredInputImg_AbsGrad.data[idx_uchar];
 				}
 				if((rand()%nLearningRate)==0) {
 					int x_rand,y_rand;
 					getRandNeighborPosition(x_rand,y_rand,x,y,0,m_oImgSize);
-					int s_rand = rand()%m_nBGSamples;
+					const size_t s_rand = rand()%m_nBGSamples;
 #if BGSPBAS_USE_SELF_DIFFUSION
 					m_voBGImg[s_rand].at<uchar>(y_rand,x_rand) = oInputImg.at<uchar>(y_rand,x_rand);
 					m_voBGGrad[s_rand].at<uchar>(y_rand,x_rand) = oBlurredInputImg_AbsGrad.at<uchar>(y_rand,x_rand);

@@ -56,7 +56,7 @@ const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet/"+RESULTS_OUTPUT_DIR_N
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
 const char* g_asDatasetCategories[] = {"baseline"};//{"dynamicBackground","shadow","baseline","intermittentObjectMotion","cameraJitter","thermal"};
-const int g_nResultIdxOffset = 1;
+const size_t g_nResultIdxOffset = 1;
 #elif USE_WALLFLOWER_DATASET
 const std::string g_sDatasetName(WALLFLOWER_DB_NAME);
 const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/Wallflower/dataset/");
@@ -64,7 +64,7 @@ const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/Wallflower/"+RESULTS_OUTPUT_
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
 const char* g_asDatasetCategories[] = {"global"};
-const int g_nResultIdxOffset = 0;
+const size_t g_nResultIdxOffset = 0;
 #elif USE_PETS2001_D3TC1_DATASET
 const std::string g_sDatasetName(PETS2001_D3TC1_DB_NAME);
 const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/PETS2001/DATASET3/");
@@ -72,7 +72,7 @@ const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/PETS2001/DATASET3/"+RESULTS_
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
 const char* g_asDatasetCategories[] = {"TESTING"};
-const int g_nResultIdxOffset = 0;
+const size_t g_nResultIdxOffset = 0;
 #endif //USE_PETS2001_D3TC1_DATASET
 #if ENABLE_DISPLAY_MOUSE_DEBUG
 static int *pnLatestMouseX=nullptr, *pnLatestMouseY=nullptr;
@@ -169,7 +169,7 @@ int main() {
 				g_hThreads[ret] = CreateThread(NULL,NULL,AnalyzeSequenceEntryPoint,(LPVOID)ret,0,NULL);
 			}
 		}
-		WaitForMultipleObjects((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads,g_hThreads,TRUE,INFINITE);
+		WaitForMultipleObjects((DWORD)((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads),g_hThreads,TRUE,INFINITE);
 		for(size_t n=0; n<g_nMaxThreads; ++n) {
 			CloseHandle(g_hThreadEvent[n]);
 			CloseHandle(g_hThreads[n]);
@@ -242,7 +242,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		const double dDefaultLearningRate = 0;
 		pBGS->initialize(oInitImg);
 #else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
-		const int m_nInputChannels = oInitImg.channels();
+		const size_t m_nInputChannels = (size_t)oInitImg.channels();
 #if USE_VIBE_BG_SUBTRACTOR
 		if(m_nInputChannels==3)
 			pBGS = new BackgroundSubtractorViBe_3ch();

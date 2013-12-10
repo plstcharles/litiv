@@ -149,12 +149,12 @@ static inline void WriteResult(	const std::string& sResultsPath,
 								const std::string& sCatName,
 								const std::string& sSeqName,
 								const std::string& sResultPrefix,
-								int framenum,
+								size_t framenum,
 								const std::string& sResultSuffix,
 								const cv::Mat& res,
 								const std::vector<int>& vnComprParams) {
 	char buffer[10];
-	sprintf(buffer,"%06d",framenum);
+	sprintf(buffer,"%06zu",framenum);
 	std::stringstream sResultFilePath;
 	sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << buffer << sResultSuffix;
 	cv::imwrite(sResultFilePath.str(), res, vnComprParams);
@@ -242,9 +242,9 @@ static inline void WriteMetrics(const std::string sResultsFileName, const std::v
 static inline void CalcMetricsFromResult(const cv::Mat& oInputFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI, uint64_t& nTP, uint64_t& nTN, uint64_t& nFP, uint64_t& nFN, uint64_t& nSE) {
 	CV_DbgAssert(oInputFrame.type()==CV_8UC1 && oGTFrame.type()==CV_8UC1 && oROI.type()==CV_8UC1);
 	CV_DbgAssert(oInputFrame.size()==oGTFrame.size() && oInputFrame.size()==oROI.size());
-	const int step_row = oInputFrame.step.p[0];
-	for(int i=0; i<oInputFrame.rows; ++i) {
-		const int idx_nstep = step_row*i;
+	const size_t step_row = oInputFrame.step.p[0];
+	for(size_t i=0; i<(size_t)oInputFrame.rows; ++i) {
+		const size_t idx_nstep = step_row*i;
 		const uchar* input_step_ptr = oInputFrame.data+idx_nstep;
 		const uchar* gt_step_ptr = oGTFrame.data+idx_nstep;
 		const uchar* roi_step_ptr = oROI.data+idx_nstep;

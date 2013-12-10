@@ -5,9 +5,9 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
-BackgroundSubtractorViBe_3ch::BackgroundSubtractorViBe_3ch(	 int nColorDistThreshold
-															,int nBGSamples
-															,int nRequiredBGSamples)
+BackgroundSubtractorViBe_3ch::BackgroundSubtractorViBe_3ch(	 size_t nColorDistThreshold
+															,size_t nBGSamples
+															,size_t nRequiredBGSamples)
 	:	BackgroundSubtractorViBe(nColorDistThreshold,nBGSamples,nRequiredBGSamples) {}
 
 BackgroundSubtractorViBe_3ch::~BackgroundSubtractorViBe_3ch() {}
@@ -23,7 +23,7 @@ void BackgroundSubtractorViBe_3ch::initialize(const cv::Mat& oInitImg) {
 	m_oImgSize = oInitImgRGB.size();
 	CV_Assert(m_voBGImg.size()==(size_t)m_nBGSamples);
 	int y_sample, x_sample;
-	for(int s=0; s<m_nBGSamples; s++) {
+	for(size_t s=0; s<m_nBGSamples; s++) {
 		m_voBGImg[s].create(m_oImgSize,CV_8UC3);
 		m_voBGImg[s] = cv::Scalar(0,0,0);
 		for(int y_orig=0; y_orig<m_oImgSize.height; y_orig++) {
@@ -50,18 +50,18 @@ void BackgroundSubtractorViBe_3ch::operator()(cv::InputArray _image, cv::OutputA
 	_fgmask.create(m_oImgSize,CV_8UC1);
 	cv::Mat oFGMask = _fgmask.getMat();
 	oFGMask = cv::Scalar_<uchar>(0);
-	const int nLearningRate = (int)learningRate;
+	const size_t nLearningRate = (size_t)ceil(learningRate);
 	for(int y=0; y<m_oImgSize.height; y++) {
 		for(int x=0; x<m_oImgSize.width; x++) {
 #if BGSVIBE_USE_SC_THRS_VALIDATION
-			const int nCurrSCColorDistThreshold = (int)(m_nColorDistThreshold*BGSVIBE_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR)/3;
+			const size_t nCurrSCColorDistThreshold = (size_t)(m_nColorDistThreshold*BGSVIBE_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR)/3;
 #endif //BGSVIBE_USE_SC_THRS_VALIDATION
-			int nGoodSamplesCount=0, nSampleIdx=0;
+			size_t nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
 				const cv::Vec3b& in = oInputImgRGB.at<cv::Vec3b>(y,x);
 				const cv::Vec3b& bg = m_voBGImg[nSampleIdx].at<cv::Vec3b>(y,x);
 #if BGSVIBE_USE_SC_THRS_VALIDATION
-				for(int c=0; c<3; c++)
+				for(size_t c=0; c<3; c++)
 					if(absdiff_uchar(in[c],bg[c])>nCurrSCColorDistThreshold)
 						goto skip;
 #endif //BGSVIBE_USE_SC_THRS_VALIDATION
@@ -80,9 +80,9 @@ void BackgroundSubtractorViBe_3ch::operator()(cv::InputArray _image, cv::OutputA
 				if((rand()%nLearningRate)==0)
 					m_voBGImg[rand()%m_nBGSamples].at<cv::Vec3b>(y,x)=oInputImgRGB.at<cv::Vec3b>(y,x);
 				if((rand()%nLearningRate)==0) {
-					int s_rand = rand()%m_nBGSamples;
 					int x_rand,y_rand;
 					getRandNeighborPosition(x_rand,y_rand,x,y,0,m_oImgSize);
+					const size_t s_rand = rand()%m_nBGSamples;
 					m_voBGImg[s_rand].at<cv::Vec3b>(y_rand,x_rand) = oInputImgRGB.at<cv::Vec3b>(y,x);
 				}
 			}

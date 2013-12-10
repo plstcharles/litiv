@@ -54,10 +54,10 @@ class BackgroundSubtractorCBLBSP : public BackgroundSubtractorLBSP {
 public:
 	//! full constructor
 	BackgroundSubtractorCBLBSP(	float fLBSPThreshold=BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
-								int nInitDescDistThreshold=BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD,
-								int nInitColorDistThreshold=BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD,
-								int nLocalWords=BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS,
-								int nGlobalWords=BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS);
+								size_t nInitDescDistThreshold=BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD,
+								size_t nInitColorDistThreshold=BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD,
+								size_t nLocalWords=BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS,
+								size_t nGlobalWords=BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS);
 	//! default destructor
 	virtual ~BackgroundSubtractorCBLBSP();
 	//! (re)initiaization method; needs to be called before starting background subtraction (note: also reinitializes the keypoints vector)
@@ -73,9 +73,9 @@ public:
 
 protected:
 	struct LocalWord {
-		int nFirstOcc;
-		int nLastOcc;
-		int nOccurrences;
+		size_t nFirstOcc;
+		size_t nLastOcc;
+		size_t nOccurrences;
 	protected:
 		~LocalWord(); // only used to prevent internal polymorphism (keeps algo cost down)
 	};
@@ -88,9 +88,9 @@ protected:
 		ushort anDesc[3];
 	};
 	struct GlobalWord {
-		int nFirstOcc;
-		int nLastOcc;
-		int nOccurrences;
+		size_t nFirstOcc;
+		size_t nLastOcc;
+		size_t nOccurrences;
 		cv::Mat oSpatioOccMap;
 	protected:
 		~GlobalWord(); // only used to prevent internal polymorphism (keeps algo cost down)
@@ -104,17 +104,17 @@ protected:
 		uchar anMaxColor[3];
 	};
 	//! absolute color distance threshold ('R' or 'radius' in the original ViBe paper, used as the default/initial 'R(x)' value here, paired with BackgroundSubtractorLBSP::m_nDescDistThreshold)
-	const int m_nColorDistThreshold;
+	const size_t m_nColorDistThreshold;
 	//! number of different local words per pixel/block to be taken from input frames to build the background model (similar to 'N' in ViBe/PBAS)
-	const int m_nLocalWords;
+	const size_t m_nLocalWords;
 	//! number of local words (offset via index from the end) that can be randomly updated when needed
-	const int m_nLastLocalWordReplaceableIdxs;
+	const size_t m_nLastLocalWordReplaceableIdxs;
 	//! number of different global words to be taken from input frames to build the background model
-	const int m_nGlobalWords;
+	const size_t m_nGlobalWords;
 	//! total number of local dictionaries (depends on the input frame size and nb of channels)
-	int m_nLocalDictionaries;
+	size_t m_nLocalDictionaries;
 	//! current frame index, used to keep track of word occurrence information
-	int m_nFrameIndex;
+	size_t m_nFrameIndex;
 
 	//! background model local word list & dictionaries
 	LocalWord** m_aapLocalDicts;
@@ -158,7 +158,7 @@ protected:
 	//cv::Mat m_oPureFGBlinkMask_last;
 
 	//! pre-allocated internal LBSP threshold values for all possible 8-bit intensity values
-	uchar m_nLBSPThreshold_8bitLUT[256];
+	size_t m_nLBSPThreshold_8bitLUT[256];
 
 	//! background model pixel color intensity samples (UNUSED, LEFT FOR DEBUG PURPOSES ONLY, SAME AS BackgroundSubtractorLBSP::m_voBGDescSamples @@@@ )
 	//std::vector<cv::Mat> m_voBGColorSamples;
@@ -166,7 +166,7 @@ protected:
 	//! internal cleanup function for the dictionary structures
 	void CleanupDictionaries();
 	//! internal weight lookup function for local words
-	static float GetLocalWordWeight(const LocalWord* w, int nCurrFrame);
+	static float GetLocalWordWeight(const LocalWord* w, size_t nCurrFrame);
 	//! internal weight lookup function for global words
-	static float GetGlobalWordWeight(const GlobalWord* w, int nCurrFrame);
+	static float GetGlobalWordWeight(const GlobalWord* w, size_t nCurrFrame);
 };
