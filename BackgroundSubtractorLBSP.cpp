@@ -36,7 +36,7 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg) {
 
 cv::AlgorithmInfo* BackgroundSubtractorLBSP::info() const {
 	CV_Assert(false); // NOT IMPL @@@@@
-	return NULL;
+	return nullptr;
 }
 
 void BackgroundSubtractorLBSP::getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const {

@@ -75,7 +75,7 @@ const char* g_asDatasetCategories[] = {"TESTING"};
 const int g_nResultIdxOffset = 0;
 #endif //USE_PETS2001_D3TC1_DATASET
 #if ENABLE_DISPLAY_MOUSE_DEBUG
-static int *pnLatestMouseX=NULL, *pnLatestMouseY=NULL;
+static int *pnLatestMouseX=nullptr, *pnLatestMouseY=nullptr;
 void OnMouseEvent(int event, int x, int y, int, void*) {
 	if(event!=cv::EVENT_MOUSEMOVE || !x || !y)
 		return;
@@ -135,7 +135,7 @@ int main() {
 			nFramesTotal += (*pCurrSequence)->GetNbInputFrames();
 	}
 	std::cout << "Parsing complete. [" << vpCategories.size() << " category(ies), "  << nSeqTotal  << " sequence(s)]" << std::endl << std::endl;
-	time_t startup = time(NULL);
+	time_t startup = time(nullptr);
 	tm* startup_tm = localtime(&startup);
 	std::cout << "[" << (startup_tm->tm_year + 1900) << '/' << (startup_tm->tm_mon + 1) << '/' <<  startup_tm->tm_mday << " -- ";
 	std::cout << startup_tm->tm_hour << ':' << startup_tm->tm_min << ':' << startup_tm->tm_sec << ']' << std::endl;
@@ -177,7 +177,7 @@ int main() {
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for threads/mutexes/atomic variables on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-		time_t shutdown = time(NULL);
+		time_t shutdown = time(nullptr);
 		tm* shutdown_tm = localtime(&shutdown);
 		std::cout << "[" << (shutdown_tm->tm_year + 1900) << '/' << (shutdown_tm->tm_mon + 1) << '/' <<  shutdown_tm->tm_mday << " -- ";
 		std::cout << shutdown_tm->tm_hour << ':' << shutdown_tm->tm_min << ':' << shutdown_tm->tm_sec << ']' << std::endl;
@@ -214,9 +214,9 @@ int AnalyzeSequence(CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence) {
 int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence) {
 #endif //PLATFORM_USES_WIN32API
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
-		BackgroundSubtractorLBSP* pBGS = NULL;
+		BackgroundSubtractorLBSP* pBGS = nullptr;
 #else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
-		cv::BackgroundSubtractor* pBGS = NULL;
+		cv::BackgroundSubtractor* pBGS = nullptr;
 #endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 	try {
 		CV_DbgAssert(pCurrCategory && pCurrSequence);
@@ -277,12 +277,12 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #if ENABLE_DISPLAY_MOUSE_DEBUG
 		std::string sMouseDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName + " [MOUSE DEBUG]";
 		cv::namedWindow(sMouseDebugDisplayName,0);
-		cv::setMouseCallback(sMouseDebugDisplayName,OnMouseEvent,NULL);
+		cv::setMouseCallback(sMouseDebugDisplayName,OnMouseEvent,nullptr);
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
 #if WRITE_BGSUB_DEBUG_IMG_OUTPUT
 		cv::VideoWriter oDebugWriter(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,g_oDisplayOutputSize,true);
 #endif //WRITE_BGSUB_DEBUG_IMG_OUTPUT
-		time_t startup = time(NULL);
+		time_t startup = time(nullptr);
 		const size_t nNbInputFrames = pCurrSequence->GetNbInputFrames();
 		for(size_t k=0; k<nNbInputFrames; k++) {
 			if(!(k%100))
@@ -344,7 +344,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #if WRITE_BGSUB_METRICS_ANALYSIS
 			CalcMetricsFromResult(oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
 		}
-		time_t shutdown = time(NULL);
+		time_t shutdown = time(nullptr);
 		pCurrSequence->m_dAvgFPS = ((double)nNbInputFrames)/(shutdown-startup);
 		WriteMetrics(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".txt",pCurrSequence);
 #else //!WRITE_BGSUB_METRICS_ANALYSIS
@@ -354,9 +354,9 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		cv::destroyWindow(sDebugDisplayName);
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT
 #if ENABLE_DISPLAY_MOUSE_DEBUG
-		cv::setMouseCallback(sMouseDebugDisplayName,OnMouseEvent,NULL);
-		pnLatestMouseX = NULL;
-		pnLatestMouseY = NULL;
+		cv::setMouseCallback(sMouseDebugDisplayName,OnMouseEvent,nullptr);
+		pnLatestMouseX = nullptr;
+		pnLatestMouseY = nullptr;
 		cv::destroyWindow(sMouseDebugDisplayName);
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
 	}
