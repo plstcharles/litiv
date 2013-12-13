@@ -7,7 +7,7 @@
 #include <iomanip>
 
 // local define used for debug purposes only
-#define DISPLAY_DEBUG_FRAMES 0
+#define DISPLAY_PBASLBSP_DEBUG_FRAMES 0
 // local define for the gradient proportion value used in color+grad distance calculations
 #define OVERLOAD_GRAD_PROP ((1.0f-std::pow(((*pfCurrDistThresholdFactor)-BGSPBASLBSP_R_LOWER)/(BGSPBASLBSP_R_UPPER-BGSPBASLBSP_R_LOWER),2))*0.5f)
 
