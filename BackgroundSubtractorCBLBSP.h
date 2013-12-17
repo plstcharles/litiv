@@ -158,7 +158,7 @@ protected:
 	//cv::Mat m_oPureFGBlinkMask_last;
 
 	//! pre-allocated internal LBSP threshold values for all possible 8-bit intensity values
-	size_t m_nLBSPThreshold_8bitLUT[256];
+	size_t m_anLBSPThreshold_8bitLUT[256];
 
 	//! background model pixel color intensity samples (UNUSED, LEFT FOR DEBUG PURPOSES ONLY, SAME AS BackgroundSubtractorLBSP::m_voBGDescSamples @@@@ )
 	//std::vector<cv::Mat> m_voBGColorSamples;
