@@ -154,7 +154,7 @@ static inline void WriteResult(	const std::string& sResultsPath,
 								const cv::Mat& res,
 								const std::vector<int>& vnComprParams) {
 	char buffer[10];
-	sprintf(buffer,"%06zu",framenum);
+	sprintf(buffer,"%06lu",framenum);
 	std::stringstream sResultFilePath;
 	sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << buffer << sResultSuffix;
 	cv::imwrite(sResultFilePath.str(), res, vnComprParams);
