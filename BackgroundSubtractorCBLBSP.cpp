@@ -319,14 +319,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 #endif //DISPLAY_CBLBSP_DEBUG_FRAMES
 					pCurrLocalWord->nLastOcc = m_nFrameIndex;
 					++pCurrLocalWord->nOccurrences;
-					float fCurrLocalWordWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
-					if(fCurrLocalWordWeight>LWORD_INIT_WEIGHT)
-						fPotentialWordsWeightSum += fCurrLocalWordWeight;
-					else {
-						pCurrLocalWord->nOccurrences = 1;
-						pCurrLocalWord->nFirstOcc = m_nFrameIndex;
-						pCurrLocalWord->nLastOcc = m_nFrameIndex;
-					}
+					fPotentialWordsWeightSum += GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
 					if(!m_oFGMask_last.data[idx_uchar] && nIntraDescDist<=nCurrDescDistThreshold/2 && nColorDist>=nCurrColorDistThreshold/2 && (rand()%nCurrLearningRate)==0) {
 						pCurrLocalWord->nColor = nCurrColor;
 						//pCurrLocalWord->nDesc = nCurrIntraDesc; @@@@@
@@ -491,14 +484,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 #endif //DISPLAY_CBLBSP_DEBUG_FRAMES
 					pCurrLocalWord->nLastOcc = m_nFrameIndex;
 					++pCurrLocalWord->nOccurrences;
-					float fCurrLocalWordWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
-					if(fCurrLocalWordWeight>LWORD_INIT_WEIGHT)
-						fPotentialWordsWeightSum += fCurrLocalWordWeight;
-					else {
-						pCurrLocalWord->nOccurrences = 1;
-						pCurrLocalWord->nFirstOcc = m_nFrameIndex;
-						pCurrLocalWord->nLastOcc = m_nFrameIndex;
-					}
+					fPotentialWordsWeightSum += GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
 					if(!m_oFGMask_last.data[idx_uchar] && nTotIntraDescDist<=nCurrTotDescDistThreshold/2 && nTotColorDist>=nCurrTotColorDistThreshold/2 && (rand()%nCurrLearningRate)==0) {
 						for(size_t c=0; c<3; ++c) {
 							pCurrLocalWord->anColor[c] = anCurrColor[c];
