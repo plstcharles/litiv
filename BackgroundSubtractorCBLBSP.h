@@ -88,20 +88,18 @@ protected:
 		ushort anDesc[3];
 	};
 	struct GlobalWord {
-		size_t nFirstOcc;
-		size_t nLastOcc;
-		size_t nOccurrences;
+		float fLatestWeight;
 		cv::Mat oSpatioOccMap;
 	protected:
 		~GlobalWord(); // only used to prevent internal polymorphism (keeps algo cost down)
 	};
 	struct GlobalWord_1ch : GlobalWord {
-		uchar nMinColor;
-		uchar nMaxColor;
+		uchar nColor;
+		size_t nDescBITS; // 'smoothness' indicator
 	};
 	struct GlobalWord_3ch : GlobalWord {
-		uchar anMinColor[3];
-		uchar anMaxColor[3];
+		uchar anColor[3];
+		size_t nDescBITS; // 'smoothness' indicator
 	};
 	//! absolute color distance threshold ('R' or 'radius' in the original ViBe paper, used as the default/initial 'R(x)' value here, paired with BackgroundSubtractorLBSP::m_nDescDistThreshold)
 	const size_t m_nColorDistThreshold;
