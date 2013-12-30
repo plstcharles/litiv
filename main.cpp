@@ -15,12 +15,12 @@
 /////////////////////////////////////////
 #define WRITE_BGSUB_IMG_OUTPUT			0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT	0
-#define WRITE_BGSUB_METRICS_ANALYSIS	1
+#define WRITE_BGSUB_METRICS_ANALYSIS	0
 /////////////////////////////////////////
-#define DISPLAY_BGSUB_DEBUG_OUTPUT		1
+#define DISPLAY_BGSUB_DEBUG_OUTPUT		0
 #if DEFAULT_NB_THREADS==1
-#define ENABLE_DISPLAY_MOUSE_DEBUG		1
-#define ENABLE_FRAME_TIMERS				1
+#define ENABLE_DISPLAY_MOUSE_DEBUG		0
+#define ENABLE_FRAME_TIMERS				0
 #endif //DEFAULT_NB_THREADS==1
 /////////////////////////////////////////
 #define USE_CB_LBSP_BG_SUBTRACTOR		1
@@ -219,8 +219,8 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		cv::BackgroundSubtractor* pBGS = nullptr;
 #endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 	try {
-		CV_DbgAssert(pCurrCategory && pCurrSequence);
-		CV_DbgAssert(pCurrSequence->GetNbInputFrames()>1);
+		CV_Assert(pCurrCategory && pCurrSequence);
+		CV_Assert(pCurrSequence->GetNbInputFrames()>1);
 #if USE_PRECACHED_IO
 		pCurrSequence->StartPrecaching();
 #endif //USE_PRECACHED_IO
@@ -282,7 +282,9 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #if WRITE_BGSUB_DEBUG_IMG_OUTPUT
 		cv::VideoWriter oDebugWriter(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,g_oDisplayOutputSize,true);
 #endif //WRITE_BGSUB_DEBUG_IMG_OUTPUT
+#if WRITE_BGSUB_METRICS_ANALYSIS
 		time_t startup = time(nullptr);
+#endif //WRITE_BGSUB_METRICS_ANALYSIS
 		const size_t nNbInputFrames = pCurrSequence->GetNbInputFrames();
 		for(size_t k=0; k<nNbInputFrames; k++) {
 			if(!(k%100))
