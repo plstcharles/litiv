@@ -886,18 +886,15 @@ void BackgroundSubtractorCBLBSP::CleanupDictionaries() {
 		delete[] m_apGlobalWordList_3ch;
 		m_apGlobalWordList_3ch = nullptr;
 	}
-	if(m_aapLocalDicts) {
-		delete[] m_aapLocalDicts;
-		m_aapLocalDicts = nullptr;
-	}
 	if(m_apGlobalDict) {
 		delete[] m_apGlobalDict;
 		m_apGlobalDict = nullptr;
 	}
+#endif //USE_GLOBAL_WORDS
 }
 
 float BackgroundSubtractorCBLBSP::GetLocalWordWeight(const LocalWord* w, size_t nCurrFrame) {
-	return (float)(w->nOccurrences)/((w->nLastOcc-w->nFirstOcc)/2+(nCurrFrame-w->nLastOcc)/4+LWORD_WEIGHT_OFFSET);
+	return (float)(w->nOccurrences)/((w->nLastOcc-w->nFirstOcc)/2+(nCurrFrame-w->nLastOcc)+LWORD_WEIGHT_OFFSET);
 }
 
 float BackgroundSubtractorCBLBSP::GetGlobalWordWeight(const GlobalWord* /*w*/, size_t /*nCurrFrame*/) {
