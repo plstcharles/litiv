@@ -2,6 +2,10 @@
 
 #include <opencv2/core/types_c.h>
 
+// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+// STATIC_ALLOC 16-BIT POPCOUNT LUT AND FILL ON RUNTIME?
+// @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
 //! computes the absolute difference of two unsigned char values
 static inline size_t absdiff_uchar(uchar a, uchar b) {
 	return (size_t)abs((int)a-(int)b); // should return the same as (a<b?b-a:a-b), but faster when properly optimized

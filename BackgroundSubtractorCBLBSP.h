@@ -11,7 +11,7 @@
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nLocalWords
 #define BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS (35)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nGlobalWords
-#define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS (200)
+#define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS (100)
 //! defines the number of samples to use when computing running averages
 //#define BGSCBLBSP_N_SAMPLES_FOR_MEAN (25)
 //! defines the threshold values used to detect long-term ghosting and trigger a fast edge-based absorption in the model
@@ -106,11 +106,13 @@ protected:
 	//! number of different local words per pixel/block to be taken from input frames to build the background model (similar to 'N' in ViBe/PBAS)
 	const size_t m_nLocalWords;
 	//! number of local words (offset via index from the end) that can be randomly updated when needed
-	const size_t m_nLastLocalWordReplaceableIdxs;
+	const size_t m_nLocalWordReplaceableIdxs;
 	//! number of different global words to be taken from input frames to build the background model
 	const size_t m_nGlobalWords;
-	//! total number of local dictionaries (depends on the input frame size and nb of channels)
-	size_t m_nLocalDictionaries;
+	//! number of global words (offset via index from the end) that can be randomly updated when needed
+	const size_t m_nGlobalWordReplaceableIdxs;
+	//! total maximum number of local dictionaries (depends on the input frame size)
+	size_t m_nMaxLocalDictionaries;
 	//! current frame index, used to keep track of word occurrence information
 	size_t m_nFrameIndex;
 
@@ -122,6 +124,7 @@ protected:
 	GlobalWord** m_apGlobalDict;
 	GlobalWord_1ch* m_apGlobalWordList_1ch;
 	GlobalWord_3ch* m_apGlobalWordList_3ch;
+	GlobalWord** m_apGlobalWordLookupTable;
 
 	//! per-pixel distance thresholds (equivalent to 'R(x)' in PBAS, but used as a relative value to determine both intensity and descriptor variation thresholds)
 	//cv::Mat m_oDistThresholdFrame;
@@ -166,5 +169,5 @@ protected:
 	//! internal weight lookup function for local words
 	static float GetLocalWordWeight(const LocalWord* w, size_t nCurrFrame);
 	//! internal weight lookup function for global words
-	static float GetGlobalWordWeight(const GlobalWord* w, size_t nCurrFrame);
+	static float GetGlobalWordWeight(const GlobalWord* w);
 };
