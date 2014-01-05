@@ -46,6 +46,8 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 		,m_dAvgFPS(-1)
 #if USE_PRECACHED_IO
 		,m_bIsPrecaching(false)
+		,m_nRequestInputFrameIndex(SIZE_MAX)
+		,m_nRequestGTFrameIndex(SIZE_MAX)
 		,m_nNextExpectedInputFrameIdx(0)
 		,m_nNextExpectedGTFrameIdx(0)
 		,m_nNextPrecachedInputFrameIdx(0)
@@ -501,6 +503,7 @@ AdvancedMetrics::AdvancedMetrics(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint6
 		,dPBC(100.0*(nFN+nFP)/(nTP+nFP+nFN+nTN))
 		,dPrecision((double)nTP/(nTP+nFP))
 		,dFMeasure(2.0*(dRecall*dPrecision)/(dRecall+dPrecision))
+		,dFPS(0.0)
 		,bAveraged(false) {}
 
 AdvancedMetrics::AdvancedMetrics(const SequenceInfo* pSeq)
