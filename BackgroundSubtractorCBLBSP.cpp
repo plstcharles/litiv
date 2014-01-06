@@ -626,8 +626,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 						pLastMatchedGlobalWord = nullptr;
 					m_apGlobalWordLookupTable[idx_uchar] = pLastMatchedGlobalWord;
 				}
-				const float fLastMatchedGlobalWord_LocalWeight = *(float*)(pLastMatchedGlobalWord->oSpatioOccMap.data+idx_flt32);
-				if(fLastMatchedGlobalWord_LocalWeight+fPotentialLocalWordsWeightSum<LWORD_WEIGHT_SUM_THRESHOLD) {
+				if(!pLastMatchedGlobalWord || *(float*)(pLastMatchedGlobalWord->oSpatioOccMap.data+idx_flt32)+fPotentialLocalWordsWeightSum<LWORD_WEIGHT_SUM_THRESHOLD) {
 					oCurrFGMask.data[idx_uchar] = UCHAR_MAX;
 					if(fPotentialLocalWordsWeightSum<=LWORD_INIT_WEIGHT) {
 						const size_t nNewLocalWordIdx = m_nLocalWords-(rand()%m_nLocalWordReplaceableIdxs)-1;
@@ -840,8 +839,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 						pLastMatchedGlobalWord = nullptr;
 					m_apGlobalWordLookupTable[idx_uchar] = pLastMatchedGlobalWord;
 				}
-				const float fLastMatchedGlobalWord_LocalWeight = *(float*)(pLastMatchedGlobalWord->oSpatioOccMap.data+idx_flt32);
-				if(fLastMatchedGlobalWord_LocalWeight+fPotentialLocalWordsWeightSum<LWORD_WEIGHT_SUM_THRESHOLD) {
+				if(!pLastMatchedGlobalWord || *(float*)(pLastMatchedGlobalWord->oSpatioOccMap.data+idx_flt32)+fPotentialLocalWordsWeightSum<LWORD_WEIGHT_SUM_THRESHOLD) {
 					oCurrFGMask.data[idx_uchar] = UCHAR_MAX;
 					if(fPotentialLocalWordsWeightSum<=LWORD_INIT_WEIGHT) {
 						const size_t nNewLocalWordIdx = m_nLocalWords-(rand()%m_nLocalWordReplaceableIdxs)-1;
@@ -1084,7 +1082,7 @@ float BackgroundSubtractorCBLBSP::GetLocalWordWeight(const LocalWord* w, size_t 
 }
 
 float BackgroundSubtractorCBLBSP::GetGlobalWordWeight(const GlobalWord* w) {
-	return cv::sum(w->oSpatioOccMap).val[0];
+	return (float)cv::sum(w->oSpatioOccMap).val[0];
 }
 
 BackgroundSubtractorCBLBSP::LocalWord::~LocalWord() {}
