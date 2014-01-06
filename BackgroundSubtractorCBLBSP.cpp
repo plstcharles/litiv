@@ -9,7 +9,7 @@
 // @@@@@@ FOR FEEDBACK LOOPS, VARYING WEIGHT THRESHOLD > VARYING DIST THRESHOLD
 
 // local define used for debug purposes only
-#define DISPLAY_CBLBSP_DEBUG_INFO 1
+#define DISPLAY_CBLBSP_DEBUG_INFO 0
 // local define used to specify whether to use global words or not
 #define USE_GLOBAL_WORDS 1
 // local define for the gradient proportion value used in color+grad distance calculations

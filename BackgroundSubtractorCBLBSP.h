@@ -3,15 +3,15 @@
 #include "BackgroundSubtractorLBSP.h"
 
 //! defines the default value for BackgroundSubtractorLBSP::m_fLBSPThreshold
-#define BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.365f)
+#define BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.300f)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
 #define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (4)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nColorDistThreshold
-#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (30)
+#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (24)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nLocalWords
-#define BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS (35)
+#define BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS (24) // @@@@@@ define a lword/channel ratio instead?
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nGlobalWords
-#define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS (100)
+#define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS (32) // @@@@@@ define gword/px ratio instead?
 //! defines the number of samples to use when computing running averages
 //#define BGSCBLBSP_N_SAMPLES_FOR_MEAN (25)
 //! defines the threshold values used to detect long-term ghosting and trigger a fast edge-based absorption in the model

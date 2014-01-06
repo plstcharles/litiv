@@ -11,17 +11,17 @@
 /////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
 /////////////////////////////////////////
-#define DEFAULT_NB_THREADS				1
+#define DEFAULT_NB_THREADS				4
 /////////////////////////////////////////
 #define WRITE_BGSUB_IMG_OUTPUT			0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT	0
-#define WRITE_BGSUB_METRICS_ANALYSIS	0
+#define WRITE_BGSUB_METRICS_ANALYSIS	1
 /////////////////////////////////////////
 #define DISPLAY_BGSUB_DEBUG_OUTPUT		0
-#if DEFAULT_NB_THREADS==1
+#if DEFAULT_NB_THREADS==1 && DISPLAY_BGSUB_DEBUG_OUTPUT
 #define ENABLE_DISPLAY_MOUSE_DEBUG		0
 #define ENABLE_FRAME_TIMERS				0
-#endif //DEFAULT_NB_THREADS==1
+#endif //DEFAULT_NB_THREADS==1 && DISPLAY_BGSUB_DEBUG_OUTPUT
 /////////////////////////////////////////
 #define USE_CB_LBSP_BG_SUBTRACTOR		1
 #define USE_VIBE_LBSP_BG_SUBTRACTOR		0
@@ -40,8 +40,8 @@
 #define USE_WALLFLOWER_DATASET			0
 #define USE_PETS2001_D3TC1_DATASET		0
 /////////////////////////////////////////////////////////////////////
-#define DATASET_ROOT_DIR 				std::string("/shared/datasets/")
-#define RESULTS_ROOT_DIR 				std::string("/shared/datasets/")
+#define DATASET_ROOT_DIR 				std::string("/tmp/datasets/")
+#define RESULTS_ROOT_DIR 				std::string("/tmp/datasets/")
 #define RESULTS_OUTPUT_DIR_NAME			std::string("results_test")
 /////////////////////////////////////////////////////////////////////
 
