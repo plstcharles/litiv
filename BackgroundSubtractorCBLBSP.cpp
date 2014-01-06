@@ -170,7 +170,7 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 					pCurrLocalWord->nOccurrences = (size_t)(LWORD_WEIGHT_OFFSET*std::pow(fDevalFactor,2));
 					const size_t nRandLocalWordIdx = (rand()%nLocalWordIdx);
 					const LocalWord_1ch* pRefLocalWord = (LocalWord_1ch*)m_aapLocalDicts[idx_orig_ldict+nRandLocalWordIdx];
-					const int nRandColorOffset = (rand()%(m_nColorDistThreshold+1))-(int)m_nColorDistThreshold/2;
+					const int nRandColorOffset = (rand()%(nColorDistThreshold+1))-(int)nColorDistThreshold/2;
 					pCurrLocalWord->nColor = cv::saturate_cast<uchar>((int)pRefLocalWord->nColor+nRandColorOffset);
 					pCurrLocalWord->nDesc = pRefLocalWord->nDesc;
 					m_aapLocalDicts[idx_orig_ldict+nLocalWordIdx] = pCurrLocalWord;
