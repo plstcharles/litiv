@@ -8,10 +8,10 @@
 #define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (4)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nColorDistThreshold
 #define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (24)
-//! defines the default value for BackgroundSubtractorCBLBSP::m_nLocalWords
-#define BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS_PER_CH (8)
-//! defines the default value for BackgroundSubtractorCBLBSP::m_nGlobalWords
-#define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS_PER_PX_CH (0.00015f)
+//! defines the default value for BackgroundSubtractorCBLBSP::m_fLocalWordsPerChannel
+#define BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS_PER_CH (8.0f)
+//! defines the default value for BackgroundSubtractorCBLBSP::m_fGlobalWordsPerPixelChannel
+#define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS_PER_CH (12.0f)
 //! defines the number of samples to use when computing running averages
 //#define BGSCBLBSP_N_SAMPLES_FOR_MEAN (25)
 //! defines the threshold values used to detect long-term ghosting and trigger a fast edge-based absorption in the model
@@ -56,8 +56,8 @@ public:
 	BackgroundSubtractorCBLBSP(	float fLBSPThreshold=BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
 								size_t nInitDescDistThreshold=BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD,
 								size_t nInitColorDistThreshold=BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD,
-								size_t nLocalWordsPerChannel=BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS_PER_CH,
-								size_t nGlobalWordsPerPixelChannel=BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS_PER_PX_CH);
+								float fLocalWordsPerChannel=BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS_PER_CH,
+								float fGlobalWordsPerChannel=BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS_PER_CH);
 	//! default destructor
 	virtual ~BackgroundSubtractorCBLBSP();
 	//! (re)initiaization method; needs to be called before starting background subtraction (note: also reinitializes the keypoints vector)
@@ -104,13 +104,13 @@ protected:
 	//! absolute color distance threshold ('R' or 'radius' in the original ViBe paper, used as the default/initial 'R(x)' value here, paired with BackgroundSubtractorLBSP::m_nDescDistThreshold)
 	const size_t m_nColorDistThreshold;
 	//! number of local words per channel used to build a background submodel (for a single pixel)
-	const size_t m_nLocalWordsPerChannel;
+	const float m_fLocalWordsPerChannel;
 	//! number of local words (offset via index from the end) that can be randomly selected for a forced update (only usable after initialisation)
 	size_t m_nLocalWordReplaceableIdxs;
 	//! number of local words used to build a background submodel (for a single pixel, similar to 'N' in ViBe/PBAS -- only usable after initialisation)
 	size_t m_nLocalWords;
 	//! number of global words per pixel, per channel used to build a complete background model
-	const size_t m_nGlobalWordsPerPixelChannel;
+	const float m_fGlobalWordsPerChannel;
 	//! number of global words (offset via index from the end) that can be randomly selected for a forced update (only usable after initialisation)
 	size_t m_nGlobalWordReplaceableIdxs;
 	//! number of global words used to build a complete background model (only usable after initialisation)
