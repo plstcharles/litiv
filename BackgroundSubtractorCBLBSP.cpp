@@ -41,14 +41,16 @@ static const size_t s_nDescMaxDataRange_3ch = s_nDescMaxDataRange_1ch*3;
 BackgroundSubtractorCBLBSP::BackgroundSubtractorCBLBSP(	 float fLBSPThreshold
 														,size_t nInitDescDistThreshold
 														,size_t nInitColorDistThreshold
-														,size_t nLocalWords
-														,size_t nGlobalWords)
+														,size_t nLocalWordsPerChannel
+														,size_t nGlobalWordsPerPixelChannel)
 	:	 BackgroundSubtractorLBSP(fLBSPThreshold,nInitDescDistThreshold)
 		,m_nColorDistThreshold(nInitColorDistThreshold)
-		,m_nLocalWords(nLocalWords)
-		,m_nLocalWordReplaceableIdxs(m_nLocalWords<LWORD_REPLACEABLE_FRAC?1:(m_nLocalWords/LWORD_REPLACEABLE_FRAC))
-		,m_nGlobalWords(nGlobalWords)
-		,m_nGlobalWordReplaceableIdxs(m_nGlobalWords<GWORD_REPLACEABLE_FRAC?1:(m_nGlobalWords/GWORD_REPLACEABLE_FRAC))
+		,m_nLocalWordsPerChannel(nLocalWordsPerChannel)
+		,m_nLocalWordReplaceableIdxs(0)
+		,m_nLocalWords(0)
+		,m_nGlobalWordsPerPixelChannel(nGlobalWordsPerPixelChannel)
+		,m_nGlobalWordReplaceableIdxs(0)
+		,m_nGlobalWords(0)
 		,m_nMaxLocalDictionaries(0)
 		,m_nFrameIndex(SIZE_MAX)
 		,m_aapLocalDicts(nullptr)
@@ -58,7 +60,7 @@ BackgroundSubtractorCBLBSP::BackgroundSubtractorCBLBSP(	 float fLBSPThreshold
 		,m_apGlobalWordList_1ch(nullptr)
 		,m_apGlobalWordList_3ch(nullptr)
 		,m_apGlobalWordLookupTable(nullptr) {
-	CV_Assert(m_nLocalWords>0 && m_nGlobalWords>0);
+	CV_Assert(m_nLocalWordsPerChannel>0 && m_nGlobalWordsPerPixelChannel>0);
 	CV_Assert(m_nLocalWordReplaceableIdxs>0);
 	CV_Assert(m_nColorDistThreshold>0);
 }
@@ -80,13 +82,17 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 		voNewKeyPoints = voKeyPoints;
 	LBSP::validateKeyPoints(voNewKeyPoints,oInitImg.size());
 	CV_Assert(!voNewKeyPoints.empty());
+	CleanupDictionaries();
 	m_voKeyPoints = voNewKeyPoints;
 	m_oImgSize = oInitImg.size();
 	m_nImgType = oInitImg.type();
 	m_nImgChannels = oInitImg.channels();
 	m_nMaxLocalDictionaries = oInitImg.cols*oInitImg.rows;
+	m_nLocalWords = m_nLocalWordsPerChannel*m_nImgChannels;
+	m_nLocalWordReplaceableIdxs = m_nLocalWords<LWORD_REPLACEABLE_FRAC?1:(m_nLocalWords/LWORD_REPLACEABLE_FRAC);
+	m_nGlobalWords = (size_t)(m_nImgChannels*m_nMaxLocalDictionaries*m_nGlobalWordsPerPixelChannel);
+	m_nGlobalWordReplaceableIdxs = m_nGlobalWords<GWORD_REPLACEABLE_FRAC?1:(m_nGlobalWords/GWORD_REPLACEABLE_FRAC);
 	m_nFrameIndex = 0;
-	CleanupDictionaries();
 	m_aapLocalDicts = new LocalWord*[m_nMaxLocalDictionaries*m_nLocalWords];
 	memset(m_aapLocalDicts,0,sizeof(LocalWord*)*m_nMaxLocalDictionaries*m_nLocalWords);
 #if USE_GLOBAL_WORDS
