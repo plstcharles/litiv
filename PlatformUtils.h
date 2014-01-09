@@ -17,6 +17,7 @@
 
 #include <queue>
 #include <string>
+#include <algorithm>
 #include <vector>
 #include <assert.h>
 #include <stdio.h>

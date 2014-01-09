@@ -46,6 +46,7 @@ void GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFi
 				if(!ret && S_ISREG(sb.st_mode))
 					vsFilePaths.push_back(sFullPath);
 			}
+			std::sort(vsFilePaths.begin(),vsFilePaths.end());
 		}
 		closedir(dp);
 	}
@@ -101,6 +102,7 @@ void GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vs
 						&& strcmp(dirp->d_name,".."))
 					vsSubDirPaths.push_back(sFullPath);
 			}
+			std::sort(vsSubDirPaths.begin(),vsSubDirPaths.end());
 		}
 		closedir(dp);
 	}
