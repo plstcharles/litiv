@@ -11,7 +11,7 @@
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fLocalWordsPerChannel
 #define BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS_PER_CH (8.0f)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fGlobalWordsPerPixelChannel
-#define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS_PER_CH (12.0f)
+#define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS_PER_CH (10.0f)
 //! defines the number of samples to use when computing running averages
 //#define BGSCBLBSP_N_SAMPLES_FOR_MEAN (25)
 //! defines the threshold values used to detect long-term ghosting and trigger a fast edge-based absorption in the model
@@ -105,14 +105,10 @@ protected:
 	const size_t m_nColorDistThreshold;
 	//! number of local words per channel used to build a background submodel (for a single pixel)
 	const float m_fLocalWordsPerChannel;
-	//! number of local words (offset via index from the end) that can be randomly selected for a forced update (only usable after initialisation)
-	size_t m_nLocalWordReplaceableIdxs;
 	//! number of local words used to build a background submodel (for a single pixel, similar to 'N' in ViBe/PBAS -- only usable after initialisation)
 	size_t m_nLocalWords;
 	//! number of global words per pixel, per channel used to build a complete background model
 	const float m_fGlobalWordsPerChannel;
-	//! number of global words (offset via index from the end) that can be randomly selected for a forced update (only usable after initialisation)
-	size_t m_nGlobalWordReplaceableIdxs;
 	//! number of global words used to build a complete background model (only usable after initialisation)
 	size_t m_nGlobalWords;
 	//! total maximum number of local dictionaries (depends on the input frame size)
