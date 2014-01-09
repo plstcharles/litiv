@@ -189,13 +189,20 @@ static inline void WriteMetrics(const std::string sResultsFileName, const Catego
 	oMetricsOutput << pCat->nTP << " " << pCat->nFP << " " << pCat->nFN << " " << pCat->nTN << " " << pCat->nSE << std::endl;
 	oMetricsOutput << std::endl << std::endl;
 	oMetricsOutput << std::fixed << std::setprecision(8);
-	oMetricsOutput << "Cumulative metrics :" << std::endl;
-	oMetricsOutput << "Rcl        Spc        FPR        FNR        PBC        Prc        FMs       " << std::endl;
-	oMetricsOutput << cumulative.dRecall << " " << cumulative.dSpecficity << " " << cumulative.dFPR << " " << cumulative.dFNR << " " << cumulative.dPBC << " " << cumulative.dPrecision << " " << cumulative.dFMeasure << std::endl;
-	oMetricsOutput << std::endl;
-	oMetricsOutput << "Averaged metrics :" << std::endl;
-	oMetricsOutput << "Rcl        Spc        FPR        FNR        PBC        Prc        FMs       " << std::endl;
-	oMetricsOutput << averaged.dRecall << " " << averaged.dSpecficity << " " << averaged.dFPR << " " << averaged.dFNR << " " << averaged.dPBC << " " << averaged.dPrecision << " " << averaged.dFMeasure << std::endl;
+	oMetricsOutput << "Sequence Metrics :" << std::endl;
+	oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FMs       " << std::endl;
+	for(size_t i=0; i<pCat->m_vpSequences.size(); ++i) {
+		AdvancedMetrics temp_seqmetrics(pCat->m_vpSequences[i]);
+		std::string sName = pCat->m_vpSequences[i]->m_sName;
+		if(sName.size()>10)
+			sName = sName.substr(0,10);
+		else if(sName.size()<10)
+			sName += std::string(10-sName.size(),' ');
+		oMetricsOutput << sName << " " << temp_seqmetrics.dRecall << " " << temp_seqmetrics.dSpecficity << " " << temp_seqmetrics.dFPR << " " << temp_seqmetrics.dFNR << " " << temp_seqmetrics.dPBC << " " << temp_seqmetrics.dPrecision << " " << temp_seqmetrics.dFMeasure << std::endl;
+	}
+	oMetricsOutput << "---------------------------------------------------------------------------------------" << std::endl;
+	oMetricsOutput << "cumulative " << cumulative.dRecall << " " << cumulative.dSpecficity << " " << cumulative.dFPR << " " << cumulative.dFNR << " " << cumulative.dPBC << " " << cumulative.dPrecision << " " << cumulative.dFMeasure << std::endl;
+	oMetricsOutput << "averaged   " << averaged.dRecall << " " << averaged.dSpecficity << " " << averaged.dFPR << " " << averaged.dFNR << " " << averaged.dPBC << " " << averaged.dPrecision << " " << averaged.dFMeasure << std::endl;
 	oMetricsOutput << std::endl << std::endl;
 	oMetricsOutput << "All Sequences Average FPS: " << averaged.dFPS << std::endl;
 	oMetricsOutput.close();
