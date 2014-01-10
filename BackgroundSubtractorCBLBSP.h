@@ -135,7 +135,7 @@ protected:
 	//! per-pixel mean distances between consecutive frames ('D_last(x)', used to detect ghosts and high variation regions in the sequence)
 	cv::Mat m_oMeanLastDistFrame;
 	//! per-pixel mean segmentation results ('S(x)', used to detect ghosts and high variation regions in the sequence)
-	//cv::Mat m_oMeanSegmResFrame;
+	cv::Mat m_oMeanSegmResFrame;
 	//! per-pixel blink detection results ('Z(x)', used to determine which frame regions should be assigned stronger 'R(x)' variations)
 	cv::Mat m_oBlinksFrame;
 	//! per-pixel update rates ('T(x)' in PBAS, which contains pixel-level 'sigmas', as referred to in ViBe)
