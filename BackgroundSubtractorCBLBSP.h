@@ -18,10 +18,10 @@
 #define BGSCBLBSP_GHOST_DETECTION_D_MAX (0.01f)
 #define BGSCBLBSP_GHOST_DETECTION_S_MIN (0.995f)
 //! defines the threshold values used to detect high variation regions that are often labelled as foreground and trigger a local, gradual change in distance thresholds
-//#define BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN (0.850f)
-//#define BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN (0.175f)
-//#define BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 (0.100f)
-//#define BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2 (0.225f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN (0.850f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN (0.175f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 (0.100f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2 (0.225f)
 //! defines the internal threshold adjustment factor to use when treating single channel images
 #define BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.350f) // or (0.500f) for final version? ... more consistent across categories
 //! parameters used for dynamic distance threshold adjustments ('R(x)')
