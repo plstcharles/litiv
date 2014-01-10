@@ -133,7 +133,7 @@ protected:
 	//! per-pixel mean minimal distances from the model ('D_min(x)' in PBAS, used to control variation magnitude and direction of 'T(x)' and 'R(x)')
 	cv::Mat m_oMeanMinDistFrame;
 	//! per-pixel mean distances between consecutive frames ('D_last(x)', used to detect ghosts and high variation regions in the sequence)
-	//cv::Mat m_oMeanLastDistFrame;
+	cv::Mat m_oMeanLastDistFrame;
 	//! per-pixel mean segmentation results ('S(x)', used to detect ghosts and high variation regions in the sequence)
 	//cv::Mat m_oMeanSegmResFrame;
 	//! per-pixel blink detection results ('Z(x)', used to determine which frame regions should be assigned stronger 'R(x)' variations)
