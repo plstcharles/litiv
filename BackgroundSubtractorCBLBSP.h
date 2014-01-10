@@ -35,10 +35,10 @@
 //#define BGSCBLBSP_R2_INCR  (0.800f)
 //#define BGSCBLBSP_R2_DECR  (0.100f)
 //! parameters used for dynamic learning rates adjustments  ('T(x)')
-//#define BGSCBLBSP_T_DECR  (0.0250f)
-//#define BGSCBLBSP_T_INCR  (0.2500f)
-//#define BGSCBLBSP_T_LOWER (2.0000f)
-//#define BGSCBLBSP_T_UPPER (64.000f)
+#define BGSCBLBSP_T_DECR  (0.0250f)
+#define BGSCBLBSP_T_INCR  (0.2500f)
+#define BGSCBLBSP_T_LOWER (2.0000f)
+#define BGSCBLBSP_T_UPPER (64.000f)
 
 /*!
 	CB-Based Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
@@ -139,7 +139,7 @@ protected:
 	//! per-pixel blink detection results ('Z(x)', used to determine which frame regions should be assigned stronger 'R(x)' variations)
 	cv::Mat m_oBlinksFrame;
 	//! per-pixel update rates ('T(x)' in PBAS, which contains pixel-level 'sigmas', as referred to in ViBe)
-	//cv::Mat m_oUpdateRateFrame;
+	cv::Mat m_oUpdateRateFrame;
 	//! per-pixel word weight thresholds @@@@@@@@ curr used for debug
 	//cv::Mat m_oWeightThresholdFrame;
 	//! copy of previously used pixel intensities used to calculate 'D_last(x)'
