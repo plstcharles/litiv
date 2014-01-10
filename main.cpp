@@ -55,7 +55,7 @@ const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/CDNet/dataset/");
 const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet/"+RESULTS_OUTPUT_DIR_NAME+"/");
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
-const char* g_asDatasetCategories[] = {"baseline"};//{"dynamicBackground","shadow","baseline","intermittentObjectMotion","cameraJitter","thermal"};
+const char* g_asDatasetCategories[] = {"dynamicBackground","shadow","baseline","intermittentObjectMotion","cameraJitter","thermal"};
 const size_t g_nResultIdxOffset = 1;
 #elif USE_WALLFLOWER_DATASET
 const std::string g_sDatasetName(WALLFLOWER_DB_NAME);
@@ -186,14 +186,16 @@ int main() {
 #if WRITE_BGSUB_METRICS_ANALYSIS
 		std::cout << "Summing and writing metrics results..." << std::endl;
 		for(size_t c=0; c<vpCategories.size(); ++c) {
-			for(size_t s=0; s<vpCategories[c]->m_vpSequences.size(); ++s) {
-				vpCategories[c]->nTP += vpCategories[c]->m_vpSequences[s]->nTP;
-				vpCategories[c]->nTN += vpCategories[c]->m_vpSequences[s]->nTN;
-				vpCategories[c]->nFP += vpCategories[c]->m_vpSequences[s]->nFP;
-				vpCategories[c]->nFN += vpCategories[c]->m_vpSequences[s]->nFN;
-				vpCategories[c]->nSE += vpCategories[c]->m_vpSequences[s]->nSE;
+			if(!vpCategories[c]->m_vpSequences.empty()) {
+				for(size_t s=0; s<vpCategories[c]->m_vpSequences.size(); ++s) {
+					vpCategories[c]->nTP += vpCategories[c]->m_vpSequences[s]->nTP;
+					vpCategories[c]->nTN += vpCategories[c]->m_vpSequences[s]->nTN;
+					vpCategories[c]->nFP += vpCategories[c]->m_vpSequences[s]->nFP;
+					vpCategories[c]->nFN += vpCategories[c]->m_vpSequences[s]->nFN;
+					vpCategories[c]->nSE += vpCategories[c]->m_vpSequences[s]->nSE;
+				}
+				WriteMetrics(g_sResultsPath+vpCategories[c]->m_sName+".txt",vpCategories[c]);
 			}
-			WriteMetrics(g_sResultsPath+vpCategories[c]->m_sName+".txt",vpCategories[c]);
 		}
 		WriteMetrics(g_sResultsPath+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
 #endif
