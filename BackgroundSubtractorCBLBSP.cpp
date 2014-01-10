@@ -102,8 +102,8 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 	m_oMeanMinDistFrame = cv::Scalar(0.0f);
 	m_oBlinksFrame.create(m_oImgSize,CV_8UC1);
 	m_oBlinksFrame = cv::Scalar_<uchar>(0);
-	//m_oMeanLastDistFrame.create(m_oImgSize,CV_32FC1);
-	//m_oMeanLastDistFrame = cv::Scalar(0.0f);
+	m_oMeanLastDistFrame.create(m_oImgSize,CV_32FC1);
+	m_oMeanLastDistFrame = cv::Scalar(0.0f);
 	//m_oMeanSegmResFrame.create(m_oImgSize,CV_32FC1);
 	//m_oMeanSegmResFrame = cv::Scalar(0.0f);
 	m_oTempFGMask.create(m_oImgSize,CV_8UC1);
@@ -497,7 +497,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const int y = (int)m_voKeyPoints[k].pt.y;
 			const size_t idx_uchar = m_oImgSize.width*y + x;
 			const size_t idx_ldict = idx_uchar*m_nLocalWords;
-			//const size_t idx_ushrt = idx_uchar*2;
+			const size_t idx_ushrt = idx_uchar*2;
 			const size_t idx_flt32 = idx_uchar*4;
 			const uchar nCurrColor = oInputImg.data[idx_uchar];
 			size_t nMinDescDist=s_nDescMaxDataRange_1ch;
@@ -569,8 +569,10 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			}
 			float* pfCurrMeanMinDist = ((float*)(m_oMeanMinDistFrame.data+idx_flt32));
 			*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(BGSCBLBSP_N_SAMPLES_FOR_MEAN-1) + ((float)nMinColorDist/s_nColorMaxDataRange_1ch+(float)nMinDescDist/s_nDescMaxDataRange_1ch)/2)/BGSCBLBSP_N_SAMPLES_FOR_MEAN;
-			//ushort& nLastIntraDesc = *((ushort*)(m_oLastDescFrame.data+idx_ushrt));
-			//uchar& nLastColor = m_oLastColorFrame.data[idx_uchar];
+			ushort& nLastIntraDesc = *((ushort*)(m_oLastDescFrame.data+idx_ushrt));
+			uchar& nLastColor = m_oLastColorFrame.data[idx_uchar];
+			float* pfCurrMeanLastDist = ((float*)(m_oMeanLastDistFrame.data+idx_flt32));
+			*pfCurrMeanLastDist = ((*pfCurrMeanLastDist)*(BGSCBLBSP_N_SAMPLES_FOR_MEAN-1) + ((float)(absdiff_uchar(nLastColor,nCurrColor))/s_nColorMaxDataRange_1ch+(float)(hdist_ushort_8bitLUT(nLastIntraDesc,nCurrIntraDesc))/s_nDescMaxDataRange_1ch)/2)/BGSCBLBSP_N_SAMPLES_FOR_MEAN; // @@@@ add bit trick?
 			if(fPotentialLocalWordsWeightSum>=LWORD_WEIGHT_SUM_THRESHOLD) {
 				// == background
 				if((rand()%nCurrLocalWordUpdateRate)==0) {
@@ -677,8 +679,8 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				}
 				++nLocalWordIdx;
 			}
-			//nLastIntraDesc = nCurrIntraDesc;
-			//nLastColor = nCurrColor;
+			nLastIntraDesc = nCurrIntraDesc;
+			nLastColor = nCurrColor;
 #if DISPLAY_CBLBSP_DEBUG_INFO
 			if(y==nDebugCoordY && x==nDebugCoordX) {
 				for(size_t c=0; c<3; ++c) {
@@ -699,7 +701,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const size_t idx_ldict = idx_uchar*m_nLocalWords;
 			const size_t idx_flt32 = idx_uchar*4;
 			const size_t idx_uchar_rgb = idx_uchar*3;
-			//const size_t idx_ushrt_rgb = idx_uchar_rgb*2;
+			const size_t idx_ushrt_rgb = idx_uchar_rgb*2;
 			const uchar* const anCurrColor = oInputImg.data+idx_uchar_rgb;
 			size_t nMinTotDescDist=s_nDescMaxDataRange_3ch;
 			size_t nMinTotColorDist=s_nColorMaxDataRange_3ch;
@@ -786,8 +788,10 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			}
 			float* pfCurrMeanMinDist = ((float*)(m_oMeanMinDistFrame.data+idx_flt32));
 			*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(BGSCBLBSP_N_SAMPLES_FOR_MEAN-1) + ((float)nMinTotColorDist/s_nColorMaxDataRange_3ch+(float)nMinTotDescDist/s_nDescMaxDataRange_3ch)/2)/BGSCBLBSP_N_SAMPLES_FOR_MEAN;
-			//ushort* anLastIntraDesc = ((ushort*)(m_oLastDescFrame.data+idx_ushrt_rgb));
-			//uchar* anLastColor = m_oLastColorFrame.data+idx_uchar_rgb;
+			ushort* anLastIntraDesc = ((ushort*)(m_oLastDescFrame.data+idx_ushrt_rgb));
+			uchar* anLastColor = m_oLastColorFrame.data+idx_uchar_rgb;
+			float* pfCurrMeanLastDist = ((float*)(m_oMeanLastDistFrame.data+idx_flt32));
+			*pfCurrMeanLastDist = ((*pfCurrMeanLastDist)*(BGSCBLBSP_N_SAMPLES_FOR_MEAN-1) + ((float)(L1dist_uchar(anLastColor,anCurrColor))/s_nColorMaxDataRange_3ch+(float)(hdist_ushort_8bitLUT(anLastIntraDesc,anCurrIntraDesc))/s_nDescMaxDataRange_3ch)/2)/BGSCBLBSP_N_SAMPLES_FOR_MEAN; // @@@@ add bit trick?
 			if(fPotentialLocalWordsWeightSum>=LWORD_WEIGHT_SUM_THRESHOLD) {
 				// == background
 				if((rand()%nCurrLocalWordUpdateRate)==0) {
@@ -899,10 +903,10 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				}
 				++nLocalWordIdx;
 			}
-			//for(size_t c=0; c<3; ++c) {
-			//	anLastIntraDesc[c] = anCurrIntraDesc[c];
-			//	anLastColor[c] = anCurrColor[c];
-			//}
+			for(size_t c=0; c<3; ++c) {
+				anLastIntraDesc[c] = anCurrIntraDesc[c];
+				anLastColor[c] = anCurrColor[c];
+			}
 #if DISPLAY_CBLBSP_DEBUG_INFO
 			if(y==nDebugCoordY && x==nDebugCoordX) {
 				for(size_t c=0; c<3; ++c) {
@@ -1004,12 +1008,12 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 		cv::resize(oMeanMinDistFrameNormalized,oMeanMinDistFrameNormalized,cv::Size(320,240));
 		cv::imshow("d_min(x)",oMeanMinDistFrameNormalized);
 		std::cout << std::fixed << std::setprecision(5) << " d_min(" << dbgpt << ") = " << m_oMeanMinDistFrame.at<float>(dbgpt) << std::endl;
-		/*cv::Mat oMeanLastDistFrameNormalized; m_oMeanLastDistFrame.copyTo(oMeanLastDistFrameNormalized);
+		cv::Mat oMeanLastDistFrameNormalized; m_oMeanLastDistFrame.copyTo(oMeanLastDistFrameNormalized);
 		cv::circle(oMeanLastDistFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
 		cv::resize(oMeanLastDistFrameNormalized,oMeanLastDistFrameNormalized,cv::Size(320,240));
 		cv::imshow("d_last(x)",oMeanLastDistFrameNormalized);
 		std::cout << std::fixed << std::setprecision(5) << " d_last(" << dbgpt << ") = " << m_oMeanLastDistFrame.at<float>(dbgpt) << std::endl;
-		cv::Mat oMeanSegmResFrameNormalized; m_oMeanSegmResFrame.copyTo(oMeanSegmResFrameNormalized);
+		/*cv::Mat oMeanSegmResFrameNormalized; m_oMeanSegmResFrame.copyTo(oMeanSegmResFrameNormalized);
 		cv::circle(oMeanSegmResFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
 		cv::resize(oMeanSegmResFrameNormalized,oMeanSegmResFrameNormalized,cv::Size(320,240));
 		cv::imshow("s(x)",oMeanSegmResFrameNormalized);
