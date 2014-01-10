@@ -15,8 +15,8 @@
 //! defines the number of samples to use when computing running averages
 #define BGSCBLBSP_N_SAMPLES_FOR_MEAN (25)
 //! defines the threshold values used to detect long-term ghosting and trigger a fast edge-based absorption in the model
-//#define BGSCBLBSP_GHOST_DETECTION_D_MAX (0.01f)
-//#define BGSCBLBSP_GHOST_DETECTION_S_MIN (0.995f)
+#define BGSCBLBSP_GHOST_DETECTION_D_MAX (0.01f)
+#define BGSCBLBSP_GHOST_DETECTION_S_MIN (0.995f)
 //! defines the threshold values used to detect high variation regions that are often labelled as foreground and trigger a local, gradual change in distance thresholds
 //#define BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN (0.850f)
 //#define BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN (0.175f)
