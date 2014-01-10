@@ -92,12 +92,36 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 	m_apGlobalWordLookupTable = new GlobalWord*[m_nMaxLocalDictionaries];
 	memset(m_apGlobalWordLookupTable,0,sizeof(GlobalWord*)*m_nMaxLocalDictionaries);
 #endif //USE_GLOBAL_WORDS
+	//m_oDistThresholdFrame.create(m_oImgSize,CV_32FC1);
+	//m_oDistThresholdFrame = cv::Scalar(1.0f);
+	//m_oDistThresholdVariationFrame.create(m_oImgSize,CV_32FC1);
+	//m_oDistThresholdVariationFrame = cv::Scalar(1.0f);
+	//m_oUpdateRateFrame.create(m_oImgSize,CV_32FC1);
+	//m_oUpdateRateFrame = cv::Scalar(BGSPBASLBSP_T_LOWER);
+	//m_oMeanMinDistFrame.create(m_oImgSize,CV_32FC1);
+	//m_oMeanMinDistFrame = cv::Scalar(0.0f);
+	m_oBlinksFrame.create(m_oImgSize,CV_8UC1);
+	m_oBlinksFrame = cv::Scalar_<uchar>(0);
+	//m_oMeanLastDistFrame.create(m_oImgSize,CV_32FC1);
+	//m_oMeanLastDistFrame = cv::Scalar(0.0f);
+	//m_oMeanSegmResFrame.create(m_oImgSize,CV_32FC1);
+	//m_oMeanSegmResFrame = cv::Scalar(0.0f);
+	m_oTempFGMask.create(m_oImgSize,CV_8UC1);
+	m_oTempFGMask = cv::Scalar_<uchar>(0);
+	m_oPureFGBlinkMask_curr.create(m_oImgSize,CV_8UC1);
+	m_oPureFGBlinkMask_curr = cv::Scalar_<uchar>(0);
+	m_oPureFGBlinkMask_last.create(m_oImgSize,CV_8UC1);
+	m_oPureFGBlinkMask_last = cv::Scalar_<uchar>(0);
+	m_oPureFGMask_last.create(m_oImgSize,CV_8UC1);
+	m_oPureFGMask_last = cv::Scalar_<uchar>(0);
+	m_oFGMask_last.create(m_oImgSize,CV_8UC1);
+	m_oFGMask_last = cv::Scalar_<uchar>(0);
+	m_oFGMask_last_dilated.create(m_oImgSize,CV_8UC1);
+	m_oFGMask_last_dilated = cv::Scalar_<uchar>(0);
 	m_oLastColorFrame.create(m_oImgSize,CV_8UC((int)m_nImgChannels));
 	m_oLastColorFrame = cv::Scalar_<uchar>::all(0);
 	m_oLastDescFrame.create(m_oImgSize,CV_16UC((int)m_nImgChannels));
 	m_oLastDescFrame = cv::Scalar_<ushort>::all(0);
-	m_oFGMask_last.create(m_oImgSize,CV_8UC1);
-	m_oFGMask_last = cv::Scalar_<uchar>(0);
 	const size_t nKeyPoints = m_voKeyPoints.size();
 	if(m_nImgChannels==1) {
 		for(size_t t=0; t<=UCHAR_MAX; ++t)
@@ -995,7 +1019,20 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 		std::cout << std::fixed << std::setprecision(5) << " t(" << dbgpt << ") = " << m_oUpdateRateFrame.at<float>(dbgpt) << std::endl;*/
 	}
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
+	cv::bitwise_xor(oCurrFGMask,m_oPureFGMask_last,m_oPureFGBlinkMask_curr);
+	cv::bitwise_or(m_oPureFGBlinkMask_curr,m_oPureFGBlinkMask_last,m_oBlinksFrame);
+	cv::bitwise_not(m_oFGMask_last_dilated,m_oTempFGMask);
+	cv::bitwise_and(m_oBlinksFrame,m_oTempFGMask,m_oBlinksFrame);
+	m_oPureFGBlinkMask_curr.copyTo(m_oPureFGBlinkMask_last);
+	oCurrFGMask.copyTo(m_oPureFGMask_last);
+	cv::morphologyEx(oCurrFGMask,m_oTempFGMask,cv::MORPH_CLOSE,cv::Mat());
+	cv::floodFill(m_oTempFGMask,cv::Point(0,0),UCHAR_MAX);
+	cv::bitwise_not(m_oTempFGMask,m_oTempFGMask);
+	cv::bitwise_or(oCurrFGMask,m_oTempFGMask,oCurrFGMask);
 	cv::medianBlur(oCurrFGMask,m_oFGMask_last,9);
+	cv::dilate(m_oFGMask_last,m_oFGMask_last_dilated,cv::Mat());
+	cv::bitwise_not(m_oFGMask_last_dilated,m_oTempFGMask);
+	cv::bitwise_and(m_oBlinksFrame,m_oTempFGMask,m_oBlinksFrame);
 	m_oFGMask_last.copyTo(oCurrFGMask);
 }
 
