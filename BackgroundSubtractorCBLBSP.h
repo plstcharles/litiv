@@ -25,15 +25,15 @@
 //! defines the internal threshold adjustment factor to use when treating single channel images
 #define BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.350f) // or (0.500f) for final version? ... more consistent across categories
 //! parameters used for dynamic distance threshold adjustments ('R(x)')
-//#define BGSCBLBSP_R_SCALE (3.5000f)
-//#define BGSCBLBSP_R_INCR  (0.0850f)
-//#define BGSCBLBSP_R_DECR  (0.0300f)
-//#define BGSCBLBSP_R_LOWER (0.8000f)
-//#define BGSCBLBSP_R_UPPER (3.5000f)
+#define BGSCBLBSP_R_SCALE (3.5000f)
+#define BGSCBLBSP_R_INCR  (0.0850f)
+#define BGSCBLBSP_R_DECR  (0.0300f)
+#define BGSCBLBSP_R_LOWER (0.8000f)
+#define BGSCBLBSP_R_UPPER (3.5000f)
 //! parameters used for adjusting the variation speed of dynamic distance thresholds  ('R2(x)')
-//#define BGSCBLBSP_R2_OFFST (0.100f)
-//#define BGSCBLBSP_R2_INCR  (0.800f)
-//#define BGSCBLBSP_R2_DECR  (0.100f)
+#define BGSCBLBSP_R2_OFFST (0.100f)
+#define BGSCBLBSP_R2_INCR  (0.800f)
+#define BGSCBLBSP_R2_DECR  (0.100f)
 //! parameters used for dynamic learning rates adjustments  ('T(x)')
 #define BGSCBLBSP_T_DECR  (0.0250f)
 #define BGSCBLBSP_T_INCR  (0.2500f)
@@ -127,9 +127,9 @@ protected:
 	GlobalWord** m_apGlobalWordLookupTable;
 
 	//! per-pixel distance thresholds (equivalent to 'R(x)' in PBAS, but used as a relative value to determine both intensity and descriptor variation thresholds)
-	//cv::Mat m_oDistThresholdFrame;
+	cv::Mat m_oDistThresholdFrame;
 	//! per-pixel distance threshold variation modulators ('R2(x)', relative value used to modulate 'R(x)' variations)
-	//cv::Mat m_oDistThresholdVariationFrame;
+	cv::Mat m_oDistThresholdVariationFrame;
 	//! per-pixel mean minimal distances from the model ('D_min(x)' in PBAS, used to control variation magnitude and direction of 'T(x)' and 'R(x)')
 	cv::Mat m_oMeanMinDistFrame;
 	//! per-pixel mean distances between consecutive frames ('D_last(x)', used to detect ghosts and high variation regions in the sequence)

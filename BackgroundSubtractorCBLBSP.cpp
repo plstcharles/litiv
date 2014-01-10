@@ -92,10 +92,10 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 	m_apGlobalWordLookupTable = new GlobalWord*[m_nMaxLocalDictionaries];
 	memset(m_apGlobalWordLookupTable,0,sizeof(GlobalWord*)*m_nMaxLocalDictionaries);
 #endif //USE_GLOBAL_WORDS
-	//m_oDistThresholdFrame.create(m_oImgSize,CV_32FC1);
-	//m_oDistThresholdFrame = cv::Scalar(1.0f);
-	//m_oDistThresholdVariationFrame.create(m_oImgSize,CV_32FC1);
-	//m_oDistThresholdVariationFrame = cv::Scalar(1.0f);
+	m_oDistThresholdFrame.create(m_oImgSize,CV_32FC1);
+	m_oDistThresholdFrame = cv::Scalar(1.0f);
+	m_oDistThresholdVariationFrame.create(m_oImgSize,CV_32FC1);
+	m_oDistThresholdVariationFrame = cv::Scalar(1.0f);
 	m_oUpdateRateFrame.create(m_oImgSize,CV_32FC1);
 	m_oUpdateRateFrame = cv::Scalar(BGSCBLBSP_T_LOWER);
 	m_oMeanMinDistFrame.create(m_oImgSize,CV_32FC1);
@@ -502,7 +502,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const uchar nCurrColor = oInputImg.data[idx_uchar];
 			size_t nMinDescDist=s_nDescMaxDataRange_1ch;
 			size_t nMinColorDist=s_nColorMaxDataRange_1ch;
-			//float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+idx_flt32);
+			float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+idx_flt32);
 			//float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+idx_flt32);
 			//float* pfCurrWeightThreshold = ((float*)(m_oWeightThresholdFrame.data+idx_flt32));
 			float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+idx_flt32));
@@ -696,6 +696,28 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				}
 				++nLocalWordIdx;
 			}
+			float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+idx_flt32);
+			if( ((*pfCurrMeanMinDist)>BGSCBLBSP_R2_OFFST && m_oBlinksFrame.data[idx_uchar]>0) /*||
+				((*pfCurrMeanSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN && (*pfCurrMeanLastDist)>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN) ||
+				((*pfCurrMeanSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 && (*pfCurrMeanLastDist)>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2)*/)
+				(*pfCurrDistThresholdVariationFactor) += BGSCBLBSP_R2_INCR;
+			else if((*pfCurrDistThresholdVariationFactor)>0) {
+				(*pfCurrDistThresholdVariationFactor) -= BGSCBLBSP_R2_DECR;
+				if((*pfCurrDistThresholdVariationFactor)<0)
+					(*pfCurrDistThresholdVariationFactor) = 0;
+			}
+			if((*pfCurrDistThresholdFactor)<BGSCBLBSP_R_LOWER+(*pfCurrMeanMinDist)*BGSCBLBSP_R_SCALE) {
+				if((*pfCurrDistThresholdFactor)<BGSCBLBSP_R_UPPER) {
+					(*pfCurrDistThresholdFactor) += BGSCBLBSP_R_INCR*(*pfCurrDistThresholdVariationFactor);
+					if((*pfCurrDistThresholdFactor)>BGSCBLBSP_R_UPPER)
+						(*pfCurrDistThresholdFactor) = BGSCBLBSP_R_UPPER;
+				}
+			}
+			else if((*pfCurrDistThresholdFactor)>BGSCBLBSP_R_LOWER) {
+				(*pfCurrDistThresholdFactor) -= BGSCBLBSP_R_DECR/(*pfCurrDistThresholdVariationFactor);
+				if((*pfCurrDistThresholdFactor)<BGSCBLBSP_R_LOWER)
+					(*pfCurrDistThresholdFactor) = BGSCBLBSP_R_LOWER;
+			}
 			nLastIntraDesc = nCurrIntraDesc;
 			nLastColor = nCurrColor;
 #if DISPLAY_CBLBSP_DEBUG_INFO
@@ -722,7 +744,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const uchar* const anCurrColor = oInputImg.data+idx_uchar_rgb;
 			size_t nMinTotDescDist=s_nDescMaxDataRange_3ch;
 			size_t nMinTotColorDist=s_nColorMaxDataRange_3ch;
-			//float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+idx_flt32);
+			float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+idx_flt32);
 			//float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+idx_flt32);
 			//float* pfCurrWeightThreshold = ((float*)(m_oWeightThresholdFrame.data+idx_flt32));
 			float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+idx_flt32));
@@ -937,6 +959,28 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				}
 				++nLocalWordIdx;
 			}
+			float* pfCurrDistThresholdVariationFactor = (float*)(m_oDistThresholdVariationFrame.data+idx_flt32);
+			if( ((*pfCurrMeanMinDist)>BGSCBLBSP_R2_OFFST && m_oBlinksFrame.data[idx_uchar]>0) /*||
+				((*pfCurrMeanSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN && (*pfCurrMeanLastDist)>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN) ||
+				((*pfCurrMeanSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 && (*pfCurrMeanLastDist)>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2)*/)
+				(*pfCurrDistThresholdVariationFactor) += BGSCBLBSP_R2_INCR;
+			else if((*pfCurrDistThresholdVariationFactor)>0) {
+				(*pfCurrDistThresholdVariationFactor) -= BGSCBLBSP_R2_DECR;
+				if((*pfCurrDistThresholdVariationFactor)<0)
+					(*pfCurrDistThresholdVariationFactor) = 0;
+			}
+			if((*pfCurrDistThresholdFactor)<BGSCBLBSP_R_LOWER+(*pfCurrMeanMinDist)*BGSCBLBSP_R_SCALE) {
+				if((*pfCurrDistThresholdFactor)<BGSCBLBSP_R_UPPER) {
+					(*pfCurrDistThresholdFactor) += BGSCBLBSP_R_INCR*(*pfCurrDistThresholdVariationFactor);
+					if((*pfCurrDistThresholdFactor)>BGSCBLBSP_R_UPPER)
+						(*pfCurrDistThresholdFactor) = BGSCBLBSP_R_UPPER;
+				}
+			}
+			else if((*pfCurrDistThresholdFactor)>BGSCBLBSP_R_LOWER) {
+				(*pfCurrDistThresholdFactor) -= BGSCBLBSP_R_DECR/(*pfCurrDistThresholdVariationFactor);
+				if((*pfCurrDistThresholdFactor)<BGSCBLBSP_R_LOWER)
+					(*pfCurrDistThresholdFactor) = BGSCBLBSP_R_LOWER;
+			}
 			for(size_t c=0; c<3; ++c) {
 				anLastIntraDesc[c] = anCurrIntraDesc[c];
 				anLastColor[c] = anCurrColor[c];
@@ -1052,7 +1096,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 		cv::resize(oMeanSegmResFrameNormalized,oMeanSegmResFrameNormalized,cv::Size(320,240));
 		cv::imshow("s(x)",oMeanSegmResFrameNormalized);
 		std::cout << std::fixed << std::setprecision(5) << " s(" << dbgpt << ") = " << m_oMeanSegmResFrame.at<float>(dbgpt) << std::endl;
-		/*cv::Mat oDistThresholdFrameNormalized; m_oDistThresholdFrame.convertTo(oDistThresholdFrameNormalized,CV_32FC1,1.0f/BGSPBASLBSP_R_UPPER,-BGSPBASLBSP_R_LOWER/BGSPBASLBSP_R_UPPER);
+		cv::Mat oDistThresholdFrameNormalized; m_oDistThresholdFrame.convertTo(oDistThresholdFrameNormalized,CV_32FC1,1.0f/BGSCBLBSP_R_UPPER,-BGSCBLBSP_R_LOWER/BGSCBLBSP_R_UPPER);
 		cv::circle(oDistThresholdFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
 		cv::resize(oDistThresholdFrameNormalized,oDistThresholdFrameNormalized,cv::Size(320,240));
 		cv::imshow("r(x)",oDistThresholdFrameNormalized);
@@ -1061,7 +1105,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 		cv::circle(oDistThresholdVariationFrameNormalized,dbgpt,5,cv::Scalar(255));
 		cv::resize(oDistThresholdVariationFrameNormalized,oDistThresholdVariationFrameNormalized,cv::Size(320,240));
 		cv::imshow("r2(x)",oDistThresholdVariationFrameNormalized);
-		std::cout << std::fixed << std::setprecision(5) << "r2(" << dbgpt << ") = " << m_oDistThresholdVariationFrame.at<float>(dbgpt) << std::endl;*/
+		std::cout << std::fixed << std::setprecision(5) << "r2(" << dbgpt << ") = " << m_oDistThresholdVariationFrame.at<float>(dbgpt) << std::endl;
 		cv::Mat oUpdateRateFrameNormalized; m_oUpdateRateFrame.convertTo(oUpdateRateFrameNormalized,CV_32FC1,1.0f/BGSCBLBSP_T_UPPER,-BGSCBLBSP_T_LOWER/BGSCBLBSP_T_UPPER);
 		cv::circle(oUpdateRateFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
 		cv::resize(oUpdateRateFrameNormalized,oUpdateRateFrameNormalized,cv::Size(320,240));
