@@ -218,13 +218,15 @@ static inline void WriteMetrics(const std::string sResultsFileName, const std::v
 	oMetricsOutput << "Cumulative metrics :" << std::endl;
 	oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FMs       " << std::endl;
 	for(size_t i=0; i<vpCat.size(); ++i) {
-		AdvancedMetrics temp_cumulative(vpCat[i],false);
-		std::string sName = vpCat[i]->m_sName;
-		if(sName.size()>10)
-			sName = sName.substr(0,10);
-		else if(sName.size()<10)
-			sName += std::string(10-sName.size(),' ');
-		oMetricsOutput << sName << " " << temp_cumulative.dRecall << " " << temp_cumulative.dSpecficity << " " << temp_cumulative.dFPR << " " << temp_cumulative.dFNR << " " << temp_cumulative.dPBC << " " << temp_cumulative.dPrecision << " " << temp_cumulative.dFMeasure << std::endl;
+		if(!vpCat[i]->m_vpSequences.empty()) {
+			AdvancedMetrics temp_cumulative(vpCat[i],false);
+			std::string sName = vpCat[i]->m_sName;
+			if(sName.size()>10)
+				sName = sName.substr(0,10);
+			else if(sName.size()<10)
+				sName += std::string(10-sName.size(),' ');
+			oMetricsOutput << sName << " " << temp_cumulative.dRecall << " " << temp_cumulative.dSpecficity << " " << temp_cumulative.dFPR << " " << temp_cumulative.dFNR << " " << temp_cumulative.dPBC << " " << temp_cumulative.dPrecision << " " << temp_cumulative.dFMeasure << std::endl;
+		}
 	}
 	oMetricsOutput << "---------------------------------------------------------------------------------------" << std::endl;
 	oMetricsOutput << "overall    " << cumulative.dRecall << " " << cumulative.dSpecficity << " " << cumulative.dFPR << " " << cumulative.dFNR << " " << cumulative.dPBC << " " << cumulative.dPrecision << " " << cumulative.dFMeasure << std::endl;
@@ -232,13 +234,15 @@ static inline void WriteMetrics(const std::string sResultsFileName, const std::v
 	oMetricsOutput << "Averaged metrics :" << std::endl;
 	oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FMs       " << std::endl;
 	for(size_t i=0; i<vpCat.size(); ++i) {
-		AdvancedMetrics temp_averaged(vpCat[i],true);
-		std::string sName = vpCat[i]->m_sName;
-		if(sName.size()>10)
-			sName = sName.substr(0,10);
-		else if(sName.size()<10)
-			sName += std::string(10-sName.size(),' ');
-		oMetricsOutput << sName << " " << temp_averaged.dRecall << " " << temp_averaged.dSpecficity << " " << temp_averaged.dFPR << " " << temp_averaged.dFNR << " " << temp_averaged.dPBC << " " << temp_averaged.dPrecision << " " << temp_averaged.dFMeasure << std::endl;
+		if(!vpCat[i]->m_vpSequences.empty()) {
+			AdvancedMetrics temp_averaged(vpCat[i],true);
+			std::string sName = vpCat[i]->m_sName;
+			if(sName.size()>10)
+				sName = sName.substr(0,10);
+			else if(sName.size()<10)
+				sName += std::string(10-sName.size(),' ');
+			oMetricsOutput << sName << " " << temp_averaged.dRecall << " " << temp_averaged.dSpecficity << " " << temp_averaged.dFPR << " " << temp_averaged.dFNR << " " << temp_averaged.dPBC << " " << temp_averaged.dPrecision << " " << temp_averaged.dFMeasure << std::endl;
+		}
 	}
 	oMetricsOutput << "---------------------------------------------------------------------------------------" << std::endl;
 	oMetricsOutput << "overall    " << averaged.dRecall << " " << averaged.dSpecficity << " " << averaged.dFPR << " " << averaged.dFNR << " " << averaged.dPBC << " " << averaged.dPrecision << " " << averaged.dFMeasure << std::endl;

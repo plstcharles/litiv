@@ -574,17 +574,24 @@ AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool b
 	:	 bAveraged(bAverage) {
 	CV_Assert(!vpCat.empty());
 	const size_t nCat = vpCat.size();
+	size_t nBadCat = 0;
 	if(!bAverage) {
 		uint64_t nGlobalTP=0, nGlobalTN=0, nGlobalFP=0, nGlobalFN=0, nGlobalSE=0;
 		dFPS=0;
 		for(size_t i=0; i<nCat; ++i) {
-			nGlobalTP += vpCat[i]->nTP;
-			nGlobalTN += vpCat[i]->nTN;
-			nGlobalFP += vpCat[i]->nFP;
-			nGlobalFN += vpCat[i]->nFN;
-			nGlobalSE += vpCat[i]->nSE;
-			dFPS += vpCat[i]->m_dAvgFPS;
+			if(vpCat[i]->m_vpSequences.empty()) {
+				++nBadCat;
+			}
+			else {
+				nGlobalTP += vpCat[i]->nTP;
+				nGlobalTN += vpCat[i]->nTN;
+				nGlobalFP += vpCat[i]->nFP;
+				nGlobalFN += vpCat[i]->nFN;
+				nGlobalSE += vpCat[i]->nSE;
+				dFPS += vpCat[i]->m_dAvgFPS;
+			}
 		}
+		CV_Assert(nBadCat<nCat);
 		dRecall = ((double)nGlobalTP/(nGlobalTP+nGlobalFN));
 		dSpecficity = ((double)nGlobalTN/(nGlobalTN+nGlobalFP));
 		dFPR = ((double)nGlobalFP/(nGlobalFP+nGlobalTN));
@@ -596,7 +603,7 @@ AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool b
 		dPBC = (100.0*(nGlobalFN+nGlobalFP)/(nGlobalTP+nGlobalFP+nGlobalFN+nGlobalTN));
 		dPrecision = ((double)nGlobalTP/(nGlobalTP+nGlobalFP));
 		dFMeasure = (2.0*(dRecall*dPrecision)/(dRecall+dPrecision));
-		dFPS /= nCat;
+		dFPS /= (nCat-nBadCat);
 	}
 	else {
 		dRecall = 0;
@@ -608,23 +615,29 @@ AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool b
 		dFMeasure = 0;
 		dFPS = 0;
 		for(size_t i=0; i<nCat; ++i) {
-			AdvancedMetrics temp(vpCat[i],true);
-			dRecall += temp.dRecall;
-			dSpecficity += temp.dSpecficity;
-			dFPR += temp.dFPR;
-			dFNR += temp.dFNR;
-			dPBC += temp.dPBC;
-			dPrecision += temp.dPrecision;
-			dFMeasure += temp.dFMeasure;
-			dFPS += temp.dFPS;
+			if(vpCat[i]->m_vpSequences.empty()) {
+				++nBadCat;
+			}
+			else {
+				AdvancedMetrics temp(vpCat[i],true);
+				dRecall += temp.dRecall;
+				dSpecficity += temp.dSpecficity;
+				dFPR += temp.dFPR;
+				dFNR += temp.dFNR;
+				dPBC += temp.dPBC;
+				dPrecision += temp.dPrecision;
+				dFMeasure += temp.dFMeasure;
+				dFPS += temp.dFPS;
+			}
 		}
-		dRecall /= nCat;
-		dSpecficity /= nCat;
-		dFPR /= nCat;
-		dFNR /= nCat;
-		dPBC /= nCat;
-		dPrecision /= nCat;
-		dFMeasure /= nCat;
-		dFPS /= nCat;
+		CV_Assert(nBadCat<nCat);
+		dRecall /= (nCat-nBadCat);
+		dSpecficity /= (nCat-nBadCat);
+		dFPR /= (nCat-nBadCat);
+		dFNR /= (nCat-nBadCat);
+		dPBC /= (nCat-nBadCat);
+		dPrecision /= (nCat-nBadCat);
+		dFMeasure /= (nCat-nBadCat);
+		dFPS /= (nCat-nBadCat);
 	}
 }
