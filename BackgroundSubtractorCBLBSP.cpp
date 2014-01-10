@@ -13,7 +13,7 @@
 // local define used to specify whether to use global words or not
 #define USE_GLOBAL_WORDS 1
 // local define for the gradient proportion value used in color+grad distance calculations
-//#define OVERLOAD_GRAD_PROP ((1.0f-std::pow(((*pfCurrDistThresholdFactor)-BGSCBLBSP_R_LOWER)/(BGSCBLBSP_R_UPPER-BGSCBLBSP_R_LOWER),2))*0.5f)
+#define OVERLOAD_GRAD_PROP ((1.0f-std::pow(((*pfCurrDistThresholdFactor)-BGSCBLBSP_R_LOWER)/(BGSCBLBSP_R_UPPER-BGSCBLBSP_R_LOWER),2))*0.5f)
 // local define for the lword representation update rate
 #define LWORD_REPRESENTATION_UPDATE_RATE 16
 // local define for the gword representation update rate
@@ -539,6 +539,9 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 						if(nInterDescDist>nCurrDescDistThreshold)
 							goto failedcheck1ch;
 					}
+					const size_t nSumDist = std::min((size_t)(OVERLOAD_GRAD_PROP*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT*nIntraDescDist)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch); // @@@@ (inter+intra)/2?
+					if(nSumDist>nCurrColorDistThreshold)
+						goto failedcheck1ch;
 #if DISPLAY_CBLBSP_DEBUG_INFO
 					vsWordModList[idx_ldict+nLocalWordIdx] += "MATCHED ";
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
@@ -761,37 +764,41 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				size_t nTotColorDist = 0;
 				size_t nTotIntraDescDist = 0;
 				size_t nTotInterDescDist = 0;
+				size_t nTotSumDist = 0;
 				const uchar* const anCurrLocalWordColor = pCurrLocalWord->anColor;
 				const ushort* const anCurrLocalWordIntraDesc = pCurrLocalWord->anDesc;
 				for(size_t c=0;c<3; ++c) {
 					const size_t nColorDist = absdiff_uchar(anCurrColor[c],anCurrLocalWordColor[c]);
 					if(nColorDist>nCurrSCColorDistThreshold)
 						goto failedcheck3ch;
+					size_t nIntraDescDist, nInterDescDist;
 					if(popcount_ushort_8bitsLUT(anCurrLocalWordIntraDesc[c])<s_nDescMaxDataRange_1ch/2) {
-						const size_t nIntraDescDist = hdist_ushort_8bitLUT(anCurrIntraDesc[c],anCurrLocalWordIntraDesc[c]);
+						nIntraDescDist = hdist_ushort_8bitLUT(anCurrIntraDesc[c],anCurrLocalWordIntraDesc[c]);
 						if(nIntraDescDist>nCurrSCDescDistThreshold)
 							goto failedcheck3ch;
 						LBSP::computeSingleRGBDescriptor(oInputImg,anCurrLocalWordColor[c],x,y,c,m_anLBSPThreshold_8bitLUT[anCurrLocalWordColor[c]],anCurrInterDesc[c]);
-						const size_t nInterDescDist = hdist_ushort_8bitLUT(anCurrInterDesc[c],anCurrLocalWordIntraDesc[c]);
+						nInterDescDist = hdist_ushort_8bitLUT(anCurrInterDesc[c],anCurrLocalWordIntraDesc[c]);
 						if(nInterDescDist>nCurrSCDescDistThreshold)
 							goto failedcheck3ch;
-						nTotIntraDescDist += nIntraDescDist;
-						nTotInterDescDist += nInterDescDist;
 					}
 					else {
-						const size_t nIntraDescDist_BITS = gdist_ushort_8bitLUT(anCurrIntraDesc[c],anCurrLocalWordIntraDesc[c]);
-						if(nIntraDescDist_BITS>nCurrSCDescDistThreshold)
+						nIntraDescDist = gdist_ushort_8bitLUT(anCurrIntraDesc[c],anCurrLocalWordIntraDesc[c]);
+						if(nIntraDescDist>nCurrSCDescDistThreshold)
 							goto failedcheck3ch;
 						LBSP::computeSingleRGBDescriptor(oInputImg,anCurrLocalWordColor[c],x,y,c,m_anLBSPThreshold_8bitLUT[anCurrLocalWordColor[c]],anCurrInterDesc[c]);
-						const size_t nInterDescDist_BITS = gdist_ushort_8bitLUT(anCurrInterDesc[c],anCurrLocalWordIntraDesc[c]);
-						if(nInterDescDist_BITS>nCurrSCDescDistThreshold)
+						nInterDescDist = gdist_ushort_8bitLUT(anCurrInterDesc[c],anCurrLocalWordIntraDesc[c]);
+						if(nInterDescDist>nCurrSCDescDistThreshold)
 							goto failedcheck3ch;
-						nTotIntraDescDist += nIntraDescDist_BITS;
-						nTotInterDescDist += nInterDescDist_BITS;
 					}
+					const size_t nSumDist = std::min((size_t)(OVERLOAD_GRAD_PROP*nIntraDescDist)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch); // @@@@ (inter+intra)/2?
+					if(nSumDist>nCurrSCColorDistThreshold)
+						goto failedcheck3ch;
 					nTotColorDist += nColorDist;
+					nTotIntraDescDist += nIntraDescDist;
+					nTotInterDescDist += nInterDescDist;
+					nTotSumDist += nSumDist;
 				}
-				if(nTotInterDescDist<=nCurrTotDescDistThreshold && nTotIntraDescDist<=nCurrTotDescDistThreshold && nTotColorDist<=nCurrTotColorDistThreshold) {
+				if(nTotColorDist<=nCurrTotColorDistThreshold && nTotInterDescDist<=nCurrTotDescDistThreshold && nTotIntraDescDist<=nCurrTotDescDistThreshold && nTotSumDist<nCurrTotColorDistThreshold) {
 #if DISPLAY_CBLBSP_DEBUG_INFO
 					vsWordModList[idx_ldict+nLocalWordIdx] += "MATCHED ";
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
