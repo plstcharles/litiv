@@ -502,6 +502,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const uchar nCurrColor = oInputImg.data[idx_uchar];
 			size_t nMinDescDist=s_nDescMaxDataRange_1ch;
 			size_t nMinColorDist=s_nColorMaxDataRange_1ch;
+			size_t nMinSumDist=s_nColorMaxDataRange_1ch;
 			float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+idx_flt32);
 			//float* pfCurrWeightThreshold = ((float*)(m_oWeightThresholdFrame.data+idx_flt32));
 			float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+idx_flt32));
@@ -539,7 +540,8 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 						if(nInterDescDist>nCurrDescDistThreshold)
 							goto failedcheck1ch;
 					}
-					const size_t nSumDist = std::min((size_t)(OVERLOAD_GRAD_PROP*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT*nIntraDescDist)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch); // @@@@ (inter+intra)/2?
+					const size_t nDescDist = (nIntraDescDist+nInterDescDist)/2;
+					const size_t nSumDist = std::min((size_t)(OVERLOAD_GRAD_PROP*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT*nDescDist)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch);
 					if(nSumDist>nCurrColorDistThreshold)
 						goto failedcheck1ch;
 #if DISPLAY_CBLBSP_DEBUG_INFO
@@ -548,17 +550,19 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					pCurrLocalWord->nLastOcc = m_nFrameIndex;
 					++pCurrLocalWord->nOccurrences;
 					fPotentialLocalWordsWeightSum += GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
-					if(!m_oFGMask_last.data[idx_uchar] && nIntraDescDist<=nCurrDescDistThreshold/2 && nColorDist>=nCurrColorDistThreshold/2 && (rand()%nCurrLocalWordUpdateRate)==0) {
+					if(!m_oFGMask_last.data[idx_uchar] && nDescDist<=nCurrDescDistThreshold/2 && nColorDist>=nCurrColorDistThreshold/2 && (rand()%nCurrLocalWordUpdateRate)==0) { // @@@@ using (intra+inter)/2...
 						pCurrLocalWord->nColor = nCurrColor;
 						//pCurrLocalWord->nDesc = nCurrIntraDesc; @@@@@
 #if DISPLAY_CBLBSP_DEBUG_INFO
 						vsWordModList[idx_ldict+nLocalWordIdx] += "UPDATED ";
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 					}
-					if(nMinDescDist>nIntraDescDist) // @@@@ (inter+intra)/2?
-						nMinDescDist = nIntraDescDist;
-					if(nMinColorDist>nColorDist) // @@@@ sum dist?
+					if(nMinDescDist>nDescDist)
+						nMinDescDist = nDescDist;
+					if(nMinColorDist>nColorDist)
 						nMinColorDist = nColorDist;
+					if(nMinSumDist>nSumDist)
+						nMinSumDist = nSumDist;
 				}
 				failedcheck1ch:
 				if(nLocalWordIdx>0 && GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_nFrameIndex)>GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx-1],m_nFrameIndex)) {
@@ -570,7 +574,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				++nLocalWordIdx;
 			}
 			float* pfCurrMeanMinDist = ((float*)(m_oMeanMinDistFrame.data+idx_flt32));
-			*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(BGSCBLBSP_N_SAMPLES_FOR_MEAN-1) + ((float)nMinColorDist/s_nColorMaxDataRange_1ch+(float)nMinDescDist/s_nDescMaxDataRange_1ch)/2)/BGSCBLBSP_N_SAMPLES_FOR_MEAN;
+			*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(BGSCBLBSP_N_SAMPLES_FOR_MEAN-1) + ((float)nMinSumDist/s_nColorMaxDataRange_1ch+(float)nMinDescDist/s_nDescMaxDataRange_1ch)/2)/BGSCBLBSP_N_SAMPLES_FOR_MEAN;
 			ushort& nLastIntraDesc = *((ushort*)(m_oLastDescFrame.data+idx_ushrt));
 			uchar& nLastColor = m_oLastColorFrame.data[idx_uchar];
 			float* pfCurrMeanLastDist = ((float*)(m_oMeanLastDistFrame.data+idx_flt32));
@@ -746,6 +750,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const uchar* const anCurrColor = oInputImg.data+idx_uchar_rgb;
 			size_t nMinTotDescDist=s_nDescMaxDataRange_3ch;
 			size_t nMinTotColorDist=s_nColorMaxDataRange_3ch;
+			size_t nMinTotSumDist = s_nColorMaxDataRange_3ch;
 			float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+idx_flt32);
 			//float* pfCurrWeightThreshold = ((float*)(m_oWeightThresholdFrame.data+idx_flt32));
 			float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+idx_flt32));
@@ -762,8 +767,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			while(nLocalWordIdx<m_nLocalWords && fPotentialLocalWordsWeightSum<LWORD_WEIGHT_SUM_THRESHOLD) {
 				LocalWord_3ch* pCurrLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_ldict+nLocalWordIdx];
 				size_t nTotColorDist = 0;
-				size_t nTotIntraDescDist = 0;
-				size_t nTotInterDescDist = 0;
+				size_t nTotDescDist = 0;
 				size_t nTotSumDist = 0;
 				const uchar* const anCurrLocalWordColor = pCurrLocalWord->anColor;
 				const ushort* const anCurrLocalWordIntraDesc = pCurrLocalWord->anDesc;
@@ -790,22 +794,22 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 						if(nInterDescDist>nCurrSCDescDistThreshold)
 							goto failedcheck3ch;
 					}
-					const size_t nSumDist = std::min((size_t)(OVERLOAD_GRAD_PROP*nIntraDescDist)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch); // @@@@ (inter+intra)/2?
+					const size_t nDescDist = (nIntraDescDist+nInterDescDist)/2;
+					const size_t nSumDist = std::min((size_t)(OVERLOAD_GRAD_PROP*nDescDist)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch);
 					if(nSumDist>nCurrSCColorDistThreshold)
 						goto failedcheck3ch;
 					nTotColorDist += nColorDist;
-					nTotIntraDescDist += nIntraDescDist;
-					nTotInterDescDist += nInterDescDist;
+					nTotDescDist += nDescDist;
 					nTotSumDist += nSumDist;
 				}
-				if(nTotColorDist<=nCurrTotColorDistThreshold && nTotInterDescDist<=nCurrTotDescDistThreshold && nTotIntraDescDist<=nCurrTotDescDistThreshold && nTotSumDist<nCurrTotColorDistThreshold) {
+				if(nTotColorDist<=nCurrTotColorDistThreshold && nTotDescDist<=nCurrTotDescDistThreshold && nTotSumDist<nCurrTotColorDistThreshold) {
 #if DISPLAY_CBLBSP_DEBUG_INFO
 					vsWordModList[idx_ldict+nLocalWordIdx] += "MATCHED ";
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 					pCurrLocalWord->nLastOcc = m_nFrameIndex;
 					++pCurrLocalWord->nOccurrences;
 					fPotentialLocalWordsWeightSum += GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
-					if(!m_oFGMask_last.data[idx_uchar] && nTotIntraDescDist<=nCurrTotDescDistThreshold/2 && nTotColorDist>=nCurrTotColorDistThreshold/2 && (rand()%nCurrLocalWordUpdateRate)==0) {
+					if(!m_oFGMask_last.data[idx_uchar] && nTotDescDist<=nCurrTotDescDistThreshold/2 && nTotColorDist>=nCurrTotColorDistThreshold/2 && (rand()%nCurrLocalWordUpdateRate)==0) { // @@@@ using (intra+inter)/2...
 						for(size_t c=0; c<3; ++c) {
 							pCurrLocalWord->anColor[c] = anCurrColor[c];
 							//pCurrLocalWord->anDesc[c] = anCurrIntraDesc[c]; @@@@@
@@ -814,10 +818,12 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 						vsWordModList[idx_ldict+nLocalWordIdx] += "UPDATED ";
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 					}
-					if(nMinTotDescDist>nTotIntraDescDist) // @@@@ (inter+intra)/2?
-						nMinTotDescDist = nTotIntraDescDist;
-					if(nMinTotColorDist>nTotColorDist) // @@@@ sum dist?
+					if(nMinTotDescDist>nTotDescDist)
+						nMinTotDescDist = nTotDescDist;
+					if(nMinTotColorDist>nTotColorDist)
 						nMinTotColorDist = nTotColorDist;
+					if(nMinTotSumDist>nTotSumDist)
+						nMinTotSumDist = nTotSumDist;
 				}
 				failedcheck3ch:
 				if(nLocalWordIdx>0 && GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_nFrameIndex)>GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx-1],m_nFrameIndex)) {
@@ -829,7 +835,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				++nLocalWordIdx;
 			}
 			float* pfCurrMeanMinDist = ((float*)(m_oMeanMinDistFrame.data+idx_flt32));
-			*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(BGSCBLBSP_N_SAMPLES_FOR_MEAN-1) + ((float)nMinTotColorDist/s_nColorMaxDataRange_3ch+(float)nMinTotDescDist/s_nDescMaxDataRange_3ch)/2)/BGSCBLBSP_N_SAMPLES_FOR_MEAN;
+			*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(BGSCBLBSP_N_SAMPLES_FOR_MEAN-1) + ((float)nMinTotSumDist/s_nColorMaxDataRange_3ch+(float)nMinTotDescDist/s_nDescMaxDataRange_3ch)/2)/BGSCBLBSP_N_SAMPLES_FOR_MEAN;
 			ushort* anLastIntraDesc = ((ushort*)(m_oLastDescFrame.data+idx_ushrt_rgb));
 			uchar* anLastColor = m_oLastColorFrame.data+idx_uchar_rgb;
 			float* pfCurrMeanLastDist = ((float*)(m_oMeanLastDistFrame.data+idx_flt32));
