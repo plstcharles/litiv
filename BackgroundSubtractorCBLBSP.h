@@ -13,7 +13,7 @@
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fGlobalWordsPerPixelChannel
 #define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS_PER_CH (10.0f)
 //! defines the number of samples to use when computing running averages
-//#define BGSCBLBSP_N_SAMPLES_FOR_MEAN (25)
+#define BGSCBLBSP_N_SAMPLES_FOR_MEAN (25)
 //! defines the threshold values used to detect long-term ghosting and trigger a fast edge-based absorption in the model
 //#define BGSCBLBSP_GHOST_DETECTION_D_MAX (0.01f)
 //#define BGSCBLBSP_GHOST_DETECTION_S_MIN (0.995f)
@@ -131,7 +131,7 @@ protected:
 	//! per-pixel distance threshold variation modulators ('R2(x)', relative value used to modulate 'R(x)' variations)
 	//cv::Mat m_oDistThresholdVariationFrame;
 	//! per-pixel mean minimal distances from the model ('D_min(x)' in PBAS, used to control variation magnitude and direction of 'T(x)' and 'R(x)')
-	//cv::Mat m_oMeanMinDistFrame;
+	cv::Mat m_oMeanMinDistFrame;
 	//! per-pixel mean distances between consecutive frames ('D_last(x)', used to detect ghosts and high variation regions in the sequence)
 	//cv::Mat m_oMeanLastDistFrame;
 	//! per-pixel mean segmentation results ('S(x)', used to detect ghosts and high variation regions in the sequence)
