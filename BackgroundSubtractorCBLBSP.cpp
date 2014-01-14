@@ -525,6 +525,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const uchar nCurrIntraDescBITS = popcount_ushort_8bitsLUT(nCurrIntraDesc);
 			size_t nLocalWordIdx = 0;
 			float fPotentialLocalWordsWeightSum = 0.0f;
+			float fMaxLocalWordWeight = 0.0f;
 			while(nLocalWordIdx<m_nLocalWords && fPotentialLocalWordsWeightSum<LWORD_WEIGHT_SUM_THRESHOLD) {
 				LocalWord_1ch* pCurrLocalWord = (LocalWord_1ch*)m_aapLocalDicts[idx_ldict+nLocalWordIdx];
 				{
@@ -559,7 +560,9 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 					pCurrLocalWord->nLastOcc = m_nFrameIndex;
 					++pCurrLocalWord->nOccurrences;
-					fPotentialLocalWordsWeightSum += GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
+					const float fCurrLocalWordWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
+					fPotentialLocalWordsWeightSum += fCurrLocalWordWeight;
+					fMaxLocalWordWeight = std::max(fMaxLocalWordWeight,fCurrLocalWordWeight);
 					if(!m_oFGMask_last.data[idx_uchar] && nDescDist<=nCurrDescDistThreshold/2 && nColorDist>=nCurrColorDistThreshold/2 && (rand()%nCurrLocalWordUpdateRate)==0) { // @@@@ using (intra+inter)/2...
 						pCurrLocalWord->nColor = nCurrColor;
 #if DISPLAY_CBLBSP_DEBUG_INFO
@@ -628,7 +631,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 							pRandLocalWord->nColor = nCurrColor;
 							pRandLocalWord->nDesc = nCurrIntraDesc;
 							pRandLocalWord->nDescBITS = nCurrIntraDescBITS;
-							pRandLocalWord->nOccurrences = (size_t)(LWORD_WEIGHT_OFFSET*(LWORD_WEIGHT_SUM_THRESHOLD-fPotentialRandLocalWordsWeightSum)/2);
+							pRandLocalWord->nOccurrences = (size_t)(LWORD_WEIGHT_OFFSET*fMaxLocalWordWeight*0.5f);
 							pRandLocalWord->nFirstOcc = m_nFrameIndex;
 							pRandLocalWord->nLastOcc = m_nFrameIndex;
 #if DISPLAY_CBLBSP_DEBUG_INFO
@@ -777,6 +780,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const uchar nCurrIntraDescBITS = anCurrIntraDescBITS[0]+anCurrIntraDescBITS[1]+anCurrIntraDescBITS[2];
 			size_t nLocalWordIdx = 0;
 			float fPotentialLocalWordsWeightSum = 0.0f;
+			float fMaxLocalWordWeight = 0.0f;
 			while(nLocalWordIdx<m_nLocalWords && fPotentialLocalWordsWeightSum<LWORD_WEIGHT_SUM_THRESHOLD) {
 				LocalWord_3ch* pCurrLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_ldict+nLocalWordIdx];
 				size_t nTotColorDist = 0;
@@ -819,7 +823,9 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 					pCurrLocalWord->nLastOcc = m_nFrameIndex;
 					++pCurrLocalWord->nOccurrences;
-					fPotentialLocalWordsWeightSum += GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
+					const float fCurrLocalWordWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
+					fPotentialLocalWordsWeightSum += fCurrLocalWordWeight;
+					fMaxLocalWordWeight = std::max(fMaxLocalWordWeight,fCurrLocalWordWeight);
 					if(!m_oFGMask_last.data[idx_uchar] && nTotDescDist<=nCurrTotDescDistThreshold/2 && nTotColorDist>=nCurrTotColorDistThreshold/2 && (rand()%nCurrLocalWordUpdateRate)==0) { // @@@@ using (intra+inter)/2...
 						for(size_t c=0; c<3; ++c)
 							pCurrLocalWord->anColor[c] = anCurrColor[c];
@@ -892,7 +898,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 								pRandLocalWord->anDescBITS[c] = anCurrIntraDescBITS[c];
 							}
 							pRandLocalWord->nDescBITS = nCurrIntraDescBITS;
-							pRandLocalWord->nOccurrences = (size_t)(LWORD_WEIGHT_OFFSET*(LWORD_WEIGHT_SUM_THRESHOLD-fPotentialRandLocalWordsWeightSum)/2);
+							pRandLocalWord->nOccurrences = (size_t)(LWORD_WEIGHT_OFFSET*fMaxLocalWordWeight*0.5f);
 							pRandLocalWord->nFirstOcc = m_nFrameIndex;
 							pRandLocalWord->nLastOcc = m_nFrameIndex;
 #if DISPLAY_CBLBSP_DEBUG_INFO
