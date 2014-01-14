@@ -25,7 +25,7 @@
 // local define for the gword decimation factor
 #define GWORD_WEIGHT_DECIMATION_FACTOR 0.9f
 // local define for the amount of weight offset to apply to words, making sure new words aren't always better than old ones
-#define LWORD_WEIGHT_OFFSET 2500
+#define LWORD_WEIGHT_OFFSET 1500
 // local define for the initial weight of a new word (used to make sure old words aren't worse off than new seeds)
 #define LWORD_INIT_WEIGHT (1.0f/LWORD_WEIGHT_OFFSET)
 
