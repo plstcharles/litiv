@@ -46,7 +46,7 @@ static inline float L2dist_uchar(const cv::Vec3b& a, const cv::Vec3b& b) {
 }
 
 //! popcount LUT for 8bit vectors
-static const size_t popcount_LUT8[256] = {
+static const uchar popcount_LUT8[256] = {
 	0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
 	1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
 	1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
@@ -66,12 +66,12 @@ static const size_t popcount_LUT8[256] = {
 };
 
 //! computes the population count of a 16bit vector using an 8bit popcount LUT (min=0, max=48)
-static inline size_t popcount_ushort_8bitsLUT(ushort x) {
+static inline uchar popcount_ushort_8bitsLUT(ushort x) {
 	return popcount_LUT8[(uchar)x] + popcount_LUT8[(uchar)(x>>8)];
 }
 
 //! computes the population count of 3x16bit vectors using an 8bit popcount LUT (min=0, max=48)
-static inline size_t popcount_ushort_8bitsLUT(const ushort* x) {
+static inline uchar popcount_ushort_8bitsLUT(const ushort* x) {
 	return	popcount_LUT8[(uchar)x[0]] + popcount_LUT8[(uchar)(x[0]>>8)]
 		  + popcount_LUT8[(uchar)x[1]] + popcount_LUT8[(uchar)(x[1]>>8)]
 		  + popcount_LUT8[(uchar)x[2]] + popcount_LUT8[(uchar)(x[2]>>8)];

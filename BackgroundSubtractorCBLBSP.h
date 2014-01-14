@@ -81,10 +81,13 @@ protected:
 	};
 	struct LocalWord_1ch : LocalWord {
 		uchar nColor;
+		uchar nDescBITS;
 		ushort nDesc;
 	};
 	struct LocalWord_3ch : LocalWord {
 		uchar anColor[3];
+		uchar anDescBITS[3];
+		uchar nDescBITS;
 		ushort anDesc[3];
 	};
 	struct GlobalWord {
@@ -95,11 +98,11 @@ protected:
 	};
 	struct GlobalWord_1ch : GlobalWord {
 		uchar nColor;
-		size_t nDescBITS; // 'smoothness' indicator
+		uchar nDescBITS; // 'smoothness' indicator
 	};
 	struct GlobalWord_3ch : GlobalWord {
 		uchar anColor[3];
-		size_t nDescBITS; // 'smoothness' indicator
+		uchar nDescBITS; // 'smoothness' indicator
 	};
 	//! absolute color distance threshold ('R' or 'radius' in the original ViBe paper, used as the default/initial 'R(x)' value here, paired with BackgroundSubtractorLBSP::m_nDescDistThreshold)
 	const size_t m_nColorDistThreshold;
