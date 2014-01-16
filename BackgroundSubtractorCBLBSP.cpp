@@ -25,7 +25,7 @@
 // local define for the gword decimation factor
 #define GWORD_WEIGHT_DECIMATION_FACTOR 0.9f
 // local define for the amount of weight offset to apply to words, making sure new words aren't always better than old ones
-#define LWORD_WEIGHT_OFFSET 1500
+#define LWORD_WEIGHT_OFFSET 750
 // local define for the initial weight of a new word (used to make sure old words aren't worse off than new seeds)
 #define LWORD_INIT_WEIGHT (1.0f/LWORD_WEIGHT_OFFSET)
 
@@ -512,7 +512,6 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const size_t idx_flt32 = idx_uchar*4;
 			const uchar nCurrColor = oInputImg.data[idx_uchar];
 			size_t nMinDescDist=s_nDescMaxDataRange_1ch;
-			size_t nMinColorDist=s_nColorMaxDataRange_1ch;
 			size_t nMinSumDist=s_nColorMaxDataRange_1ch;
 			float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+idx_flt32);
 			//float* pfCurrWeightThreshold = ((float*)(m_oWeightThresholdFrame.data+idx_flt32));
@@ -571,8 +570,6 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					}
 					if(nMinDescDist>nDescDist)
 						nMinDescDist = nDescDist;
-					if(nMinColorDist>nColorDist)
-						nMinColorDist = nColorDist;
 					if(nMinSumDist>nSumDist)
 						nMinSumDist = nSumDist;
 				}
@@ -610,7 +607,10 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					const float fRandMeanSegmRes = *((float*)(m_oMeanSegmResFrame.data+idx_rand_flt32));
 					const size_t n_rand = rand();
 					const size_t nCurrLocalWordNeighborSpreadRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate)); // @@@@ use neighbor's update rate?
-					if((n_rand%nCurrLocalWordNeighborSpreadRate)==0 || (fRandMeanSegmRes>BGSCBLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSCBLBSP_GHOST_DETECTION_D_MAX && (n_rand%4)==0)) { // @@@@@
+					if((n_rand%nCurrLocalWordNeighborSpreadRate)==0 ||
+						(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN) ||
+						(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2) ||
+						(fRandMeanSegmRes>BGSCBLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSCBLBSP_GHOST_DETECTION_D_MAX && (n_rand%4)==0)) {
 						size_t nRandLocalWordIdx = 0;
 						float fPotentialRandLocalWordsWeightSum = 0.0f;
 						while(nRandLocalWordIdx<m_nLocalWords && fPotentialRandLocalWordsWeightSum<LWORD_WEIGHT_SUM_THRESHOLD) {
@@ -631,7 +631,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 							pRandLocalWord->nColor = nCurrColor;
 							pRandLocalWord->nDesc = nCurrIntraDesc;
 							pRandLocalWord->nDescBITS = nCurrIntraDescBITS;
-							pRandLocalWord->nOccurrences = (size_t)(LWORD_WEIGHT_OFFSET*fMaxLocalWordWeight*0.5f);
+							pRandLocalWord->nOccurrences = (size_t)(LWORD_WEIGHT_OFFSET*fMaxLocalWordWeight*0.25f);
 							pRandLocalWord->nFirstOcc = m_nFrameIndex;
 							pRandLocalWord->nLastOcc = m_nFrameIndex;
 #if DISPLAY_CBLBSP_DEBUG_INFO
@@ -763,7 +763,6 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const size_t idx_ushrt_rgb = idx_uchar_rgb*2;
 			const uchar* const anCurrColor = oInputImg.data+idx_uchar_rgb;
 			size_t nMinTotDescDist=s_nDescMaxDataRange_3ch;
-			size_t nMinTotColorDist=s_nColorMaxDataRange_3ch;
 			size_t nMinTotSumDist = s_nColorMaxDataRange_3ch;
 			float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+idx_flt32);
 			//float* pfCurrWeightThreshold = ((float*)(m_oWeightThresholdFrame.data+idx_flt32));
@@ -817,7 +816,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					nTotDescDist += nDescDist;
 					nTotSumDist += nSumDist;
 				}
-				if(nTotColorDist<=nCurrTotColorDistThreshold && nTotDescDist<=nCurrTotDescDistThreshold && nTotSumDist<nCurrTotColorDistThreshold) {
+				if(nTotDescDist<=nCurrTotDescDistThreshold && nTotSumDist<nCurrTotColorDistThreshold) {
 #if DISPLAY_CBLBSP_DEBUG_INFO
 					vsWordModList[idx_ldict+nLocalWordIdx] += "MATCHED ";
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
@@ -835,8 +834,6 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					}
 					if(nMinTotDescDist>nTotDescDist)
 						nMinTotDescDist = nTotDescDist;
-					if(nMinTotColorDist>nTotColorDist)
-						nMinTotColorDist = nTotColorDist;
 					if(nMinTotSumDist>nTotSumDist)
 						nMinTotSumDist = nTotSumDist;
 				}
@@ -874,7 +871,10 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					const float fRandMeanSegmRes = *((float*)(m_oMeanSegmResFrame.data+idx_rand_flt32));
 					const size_t n_rand = rand();
 					const size_t nCurrLocalWordNeighborSpreadRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate)); // @@@@ use neighbor's update rate?
-					if((n_rand%nCurrLocalWordNeighborSpreadRate)==0 || (fRandMeanSegmRes>BGSCBLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSCBLBSP_GHOST_DETECTION_D_MAX && (n_rand%4)==0)) { // @@@@@
+					if((n_rand%nCurrLocalWordNeighborSpreadRate)==0 ||
+						(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN) ||
+						(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2) ||
+						(fRandMeanSegmRes>BGSCBLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSCBLBSP_GHOST_DETECTION_D_MAX && (n_rand%4)==0)) {
 						size_t nRandLocalWordIdx = 0;
 						float fPotentialRandLocalWordsWeightSum = 0.0f;
 						while(nRandLocalWordIdx<m_nLocalWords && fPotentialRandLocalWordsWeightSum<LWORD_WEIGHT_SUM_THRESHOLD) {
@@ -898,7 +898,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 								pRandLocalWord->anDescBITS[c] = anCurrIntraDescBITS[c];
 							}
 							pRandLocalWord->nDescBITS = nCurrIntraDescBITS;
-							pRandLocalWord->nOccurrences = (size_t)(LWORD_WEIGHT_OFFSET*fMaxLocalWordWeight*0.5f);
+							pRandLocalWord->nOccurrences = (size_t)(LWORD_WEIGHT_OFFSET*fMaxLocalWordWeight*0.25f);
 							pRandLocalWord->nFirstOcc = m_nFrameIndex;
 							pRandLocalWord->nLastOcc = m_nFrameIndex;
 #if DISPLAY_CBLBSP_DEBUG_INFO
