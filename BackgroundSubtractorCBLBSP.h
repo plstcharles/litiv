@@ -3,11 +3,11 @@
 #include "BackgroundSubtractorLBSP.h"
 
 //! defines the default value for BackgroundSubtractorLBSP::m_fLBSPThreshold
-#define BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.300f)
+#define BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.250f)
 //! defines the default offset LBSP threshold value
 #define BGSCBLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (3)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
-#define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (5)
+#define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (4)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nColorDistThreshold
 #define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (24)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fLocalWordsPerChannel

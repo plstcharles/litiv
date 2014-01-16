@@ -617,7 +617,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 						while(nRandLocalWordIdx<m_nLocalWords && fPotentialRandLocalWordsWeightSum<LWORD_WEIGHT_SUM_THRESHOLD) {
 							LocalWord_1ch* pRandLocalWord = (LocalWord_1ch*)m_aapLocalDicts[idx_rand_ldict+nRandLocalWordIdx];
 							if(absdiff_uchar(nCurrColor,pRandLocalWord->nColor)<=nCurrColorDistThreshold/2 // @@@ thrs/2
-									&& ((pRandLocalWord->nDescBITS<s_nDescDistTypeCutoff_1ch && nCurrIntraDescBITS<s_nDescDistTypeCutoff_1ch)?hdist_ushort_8bitLUT(nCurrIntraDesc,pRandLocalWord->nDesc):absdiff_uchar(nCurrIntraDescBITS,pRandLocalWord->nDescBITS))<=nCurrDescDistThreshold/2) {
+									&& ((pRandLocalWord->nDescBITS<s_nDescDistTypeCutoff_1ch || nCurrIntraDescBITS<s_nDescDistTypeCutoff_1ch)?hdist_ushort_8bitLUT(nCurrIntraDesc,pRandLocalWord->nDesc):absdiff_uchar(nCurrIntraDescBITS,pRandLocalWord->nDescBITS))<=nCurrDescDistThreshold/2) {
 								++pRandLocalWord->nOccurrences;
 								fPotentialRandLocalWordsWeightSum += GetLocalWordWeight(pRandLocalWord,m_nFrameIndex);
 #if DISPLAY_CBLBSP_DEBUG_INFO
@@ -881,7 +881,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 						while(nRandLocalWordIdx<m_nLocalWords && fPotentialRandLocalWordsWeightSum<LWORD_WEIGHT_SUM_THRESHOLD) {
 							LocalWord_3ch* pRandLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_rand_ldict+nRandLocalWordIdx];
 							if(L1dist_uchar(anCurrColor,pRandLocalWord->anColor)<=nCurrTotColorDistThreshold/2 // @@@ thrs/2
-									&& ((pRandLocalWord->nDescBITS<s_nDescDistTypeCutoff_3ch && nCurrIntraDescBITS<s_nDescDistTypeCutoff_3ch)?hdist_ushort_8bitLUT(anCurrIntraDesc,pRandLocalWord->anDesc):absdiff_uchar(nCurrIntraDescBITS,pRandLocalWord->nDescBITS))<=nCurrTotDescDistThreshold/2) {
+									&& ((pRandLocalWord->nDescBITS<s_nDescDistTypeCutoff_3ch || nCurrIntraDescBITS<s_nDescDistTypeCutoff_3ch)?hdist_ushort_8bitLUT(anCurrIntraDesc,pRandLocalWord->anDesc):absdiff_uchar(nCurrIntraDescBITS,pRandLocalWord->nDescBITS))<=nCurrTotDescDistThreshold/2) {
 								++pRandLocalWord->nOccurrences;
 								fPotentialRandLocalWordsWeightSum += GetLocalWordWeight(pRandLocalWord,m_nFrameIndex);
 #if DISPLAY_CBLBSP_DEBUG_INFO
