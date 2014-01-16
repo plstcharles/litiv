@@ -71,6 +71,9 @@ public:
 	const std::string m_sDBName;
 	uint64_t nTP, nTN, nFP, nFN, nSE;
 	double m_dAvgFPS;
+	double m_dExpectedLoad;
+	double m_dExpectedROILoad;
+	CategoryInfo* m_pParent;
 #if USE_PRECACHED_IO
 	void StartPrecaching();
 	void StopPrecaching();
@@ -110,7 +113,6 @@ private:
 	size_t m_nTotalNbFrames;
 	cv::Mat m_oROI;
 	cv::Size m_oSize;
-	CategoryInfo* m_pParent;
 	const int m_nIMReadInputFlags;
 	std::unordered_map<size_t,size_t> m_mTestGTIndexes;
 	cv::Mat GetInputFrameFromIndex_Internal(size_t idx);

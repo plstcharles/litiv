@@ -129,11 +129,15 @@ int main() {
 	} catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
 	size_t nSeqTotal = 0;
 	size_t nFramesTotal = 0;
+	std::multimap<double,SequenceInfo*> mSeqLoads;
 	for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory) {
 		nSeqTotal += (*pCurrCategory)->m_vpSequences.size();
-		for(auto pCurrSequence=(*pCurrCategory)->m_vpSequences.begin(); pCurrSequence!=(*pCurrCategory)->m_vpSequences.end(); ++pCurrSequence)
+		for(auto pCurrSequence=(*pCurrCategory)->m_vpSequences.begin(); pCurrSequence!=(*pCurrCategory)->m_vpSequences.end(); ++pCurrSequence) {
 			nFramesTotal += (*pCurrSequence)->GetNbInputFrames();
+			mSeqLoads.emplace((*pCurrSequence)->m_dExpectedROILoad,(*pCurrSequence));
+		}
 	}
+	CV_Assert(mSeqLoads.size()==nSeqTotal);
 	std::cout << "Parsing complete. [" << vpCategories.size() << " category(ies), "  << nSeqTotal  << " sequence(s)]" << std::endl << std::endl;
 	time_t startup = time(nullptr);
 	tm* startup_tm = localtime(&startup);
@@ -144,30 +148,26 @@ int main() {
 		std::cout << "Running LBSP background subtraction with " << ((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads) << " thread(s)..." << std::endl;
 		size_t nSeqProcessed = 1;
 #if PLATFORM_SUPPORTS_CPP11
-		for(auto& pCurrCategory : vpCategories) {
-			for(auto& pCurrSequence : pCurrCategory->m_vpSequences) {
-				while(g_nActiveThreads>=g_nMaxThreads)
-					std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-				std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << pCurrCategory->m_sName << ":" << pCurrSequence->m_sName << ")" << std::endl;
-				g_nActiveThreads++;
-				nSeqProcessed++;
-				std::thread(AnalyzeSequence,pCurrCategory,pCurrSequence).detach();
-			}
+		for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
+			while(g_nActiveThreads>=g_nMaxThreads)
+				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+			std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << oSeqIter->first << ")" << std::endl;
+			g_nActiveThreads++;
+			nSeqProcessed++;
+			std::thread(AnalyzeSequence,oSeqIter->second->m_pParent,oSeqIter->second).detach();
 		}
 		while(g_nActiveThreads>0)
 			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 #elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
 		for(size_t n=0; n<g_nMaxThreads; ++n)
 			g_hThreadEvent[n] = CreateEvent(NULL,FALSE,TRUE,NULL);
-		for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory) {
-			for(auto pCurrSequence=(*pCurrCategory)->m_vpSequences.begin(); pCurrSequence!=(*pCurrCategory)->m_vpSequences.end(); ++pCurrSequence) {
-				DWORD ret = WaitForMultipleObjects(g_nMaxThreads,g_hThreadEvent,FALSE,INFINITE);
-				std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << (*pCurrCategory)->m_sName << ":" << (*pCurrSequence)->m_sName << ")" << std::endl;
-				nSeqProcessed++;
-				g_apThreadDataStruct[ret][0] = (*pCurrCategory);
-				g_apThreadDataStruct[ret][1] = (*pCurrSequence);
-				g_hThreads[ret] = CreateThread(NULL,NULL,AnalyzeSequenceEntryPoint,(LPVOID)ret,0,NULL);
-			}
+		for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
+			DWORD ret = WaitForMultipleObjects(g_nMaxThreads,g_hThreadEvent,FALSE,INFINITE);
+			std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << oSeqIter->first << ")" << std::endl;
+			nSeqProcessed++;
+			g_apThreadDataStruct[ret][0] = oSeqIter->second->m_pParent;
+			g_apThreadDataStruct[ret][1] = oSeqIter->second;
+			g_hThreads[ret] = CreateThread(NULL,NULL,AnalyzeSequenceEntryPoint,(LPVOID)ret,0,NULL);
 		}
 		WaitForMultipleObjects((DWORD)((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads),g_hThreads,TRUE,INFINITE);
 		for(size_t n=0; n<g_nMaxThreads; ++n) {

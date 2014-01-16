@@ -44,6 +44,9 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 		,nFN(0)
 		,nSE(0)
 		,m_dAvgFPS(-1)
+		,m_dExpectedLoad(0)
+		,m_dExpectedROILoad(0)
+		,m_pParent(parent)
 #if USE_PRECACHED_IO
 		,m_bIsPrecaching(false)
 		,m_nRequestInputFrameIndex(SIZE_MAX)
@@ -58,7 +61,6 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 #endif //!USE_PRECACHED_IO
 		,m_nNextExpectedVideoReaderFrameIdx(0)
 		,m_nTotalNbFrames(0)
-		,m_pParent(parent)
 		,m_nIMReadInputFlags(forceGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR) {
 	if(m_sDBName==CDNET_DB_NAME) {
 		std::vector<std::string> vsSubDirs;
@@ -76,6 +78,8 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 			throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess a ROI.bmp file.");
 		m_oSize = m_oROI.size();
 		m_nTotalNbFrames = m_vsInputFramePaths.size();
+		m_dExpectedLoad = m_oSize.height*m_oSize.width*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
+		m_dExpectedROILoad = cv::countNonZero(m_oROI)*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
 		// note: in this case, no need to use m_vnTestGTIndexes since all # of gt frames == # of test frames (but we assume the frames returned by 'GetFilesFromDir' are ordered correctly...)
 	}
 	else if(m_sDBName==WALLFLOWER_DB_NAME) {
@@ -107,6 +111,7 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 		m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(VAL_POSITIVE));
 		m_oSize = oTempImg.size();
 		m_nTotalNbFrames = m_vsInputFramePaths.size();
+		m_dExpectedLoad = m_dExpectedROILoad = m_oSize.height*m_oSize.width*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
 	}
 	else if(m_sDBName==PETS2001_D3TC1_DB_NAME) {
 		std::vector<std::string> vsVideoSeqPaths;
@@ -134,6 +139,7 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 		m_oSize = oTempImg.size();
 		m_nNextExpectedVideoReaderFrameIdx = 0;
 		m_nTotalNbFrames = (size_t)m_voVideoReader.get(CV_CAP_PROP_FRAME_COUNT);
+		m_dExpectedLoad = m_dExpectedROILoad = m_oSize.height*m_oSize.width*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
 	}
 	/*else if(m_sDBName==...) {
 		// ...
