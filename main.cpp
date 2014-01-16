@@ -134,7 +134,7 @@ int main() {
 		nSeqTotal += (*pCurrCategory)->m_vpSequences.size();
 		for(auto pCurrSequence=(*pCurrCategory)->m_vpSequences.begin(); pCurrSequence!=(*pCurrCategory)->m_vpSequences.end(); ++pCurrSequence) {
 			nFramesTotal += (*pCurrSequence)->GetNbInputFrames();
-			mSeqLoads.emplace((*pCurrSequence)->m_dExpectedROILoad,(*pCurrSequence));
+			mSeqLoads.insert(std::pair<double,SequenceInfo*>((*pCurrSequence)->m_dExpectedROILoad,(*pCurrSequence)));
 		}
 	}
 	CV_Assert(mSeqLoads.size()==nSeqTotal);
