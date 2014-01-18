@@ -28,7 +28,7 @@ public:
 	//! full constructor used to intialize an 'absolute' LBSP-based background subtractor
 	explicit BackgroundSubtractorLBSP(size_t nLBSPThreshold, size_t nDescDistThreshold);
 	//! full constructor used to intialize a 'relative' LBSP-based background subtractor
-	explicit BackgroundSubtractorLBSP(float fLBSPThreshold, size_t nDescDistThreshold);
+	explicit BackgroundSubtractorLBSP(float fLBSPThreshold, size_t nDescDistThreshold, size_t nLBSPThresholdOffset=0);
 	//! default destructor
 	virtual ~BackgroundSubtractorLBSP();
 	//! (re)initiaization method; needs to be called before starting background subtraction
@@ -63,12 +63,12 @@ protected:
 	int m_nImgType;
 	//! absolute per-channel descriptor hamming distance threshold
 	const size_t m_nDescDistThreshold;
-	//! defines if we're using a relative threshold when extracting LBSP features (kept here since we don't keep an LBSP object)
-	const bool m_bLBSPUsingRelThreshold;
+	//! defines if we're only using an absolute threshold when extracting LBSP features
+	const bool m_bOnlyUsingAbsThreshold;
 	//! LBSP absolute internal threshold (kept here since we don't keep an LBSP object)
-	const size_t m_nLBSPThreshold;
+	const size_t m_nAbsLBSPThreshold;
 	//! LBSP relative internal threshold (kept here since we don't keep an LBSP object)
-	const float m_fLBSPThreshold;
+	const float m_fRelLBSPThreshold;
 	//! defines whether or not the subtractor is fully initialized
 	bool m_bInitialized;
 };

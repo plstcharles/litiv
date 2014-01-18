@@ -4,6 +4,8 @@
 
 //! defines the default value for BackgroundSubtractorLBSP::m_fLBSPThreshold
 #define BGSPBASLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.300f)
+//! defines the default offset LBSP threshold value
+#define BGSPBASLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (0)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
 #define BGSPBASLBSP_DEFAULT_DESC_DIST_THRESHOLD (7)
 //! defines the default value for BackgroundSubtractorPBASLBSP::m_nColorDistThreshold
@@ -54,6 +56,7 @@ class BackgroundSubtractorPBASLBSP : public BackgroundSubtractorLBSP {
 public:
 	//! full constructor
 	BackgroundSubtractorPBASLBSP(	float fLBSPThreshold=BGSPBASLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
+									size_t nLBSPThresholdOffset=BGSPBASLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
 									size_t nInitDescDistThreshold=BGSPBASLBSP_DEFAULT_DESC_DIST_THRESHOLD,
 									size_t nInitColorDistThreshold=BGSPBASLBSP_DEFAULT_COLOR_DIST_THRESHOLD,
 									size_t nBGSamples=BGSPBASLBSP_DEFAULT_NB_BG_SAMPLES,

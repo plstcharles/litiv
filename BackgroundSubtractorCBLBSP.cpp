@@ -37,11 +37,12 @@ static const size_t s_nDescMaxDataRange_3ch = s_nDescMaxDataRange_1ch*3;
 static const size_t s_nDescDistTypeCutoff_3ch = s_nDescDistTypeCutoff_1ch*3;
 
 BackgroundSubtractorCBLBSP::BackgroundSubtractorCBLBSP(	 float fLBSPThreshold
+														,size_t nLBSPThresholdOffset
 														,size_t nInitDescDistThreshold
 														,size_t nInitColorDistThreshold
 														,float fLocalWordsPerChannel
 														,float fGlobalWordsPerChannel)
-	:	 BackgroundSubtractorLBSP(fLBSPThreshold,nInitDescDistThreshold)
+	:	 BackgroundSubtractorLBSP(fLBSPThreshold,nInitDescDistThreshold,nLBSPThresholdOffset)
 		,m_nColorDistThreshold(nInitColorDistThreshold)
 		,m_fLocalWordsPerChannel(fLocalWordsPerChannel)
 		,m_nLocalWords(0)
@@ -127,7 +128,7 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 	const size_t nKeyPoints = m_voKeyPoints.size();
 	if(m_nImgChannels==1) {
 		for(size_t t=0; t<=UCHAR_MAX; ++t)
-			m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(t*m_fLBSPThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT); // @@@@@ use a*x+b instead of just a*x?
+			m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(t*m_fRelLBSPThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT+m_nAbsLBSPThreshold);
 		for(size_t k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
@@ -299,7 +300,7 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 	}
 	else { //m_nImgChannels==3
 		for(size_t t=0; t<=UCHAR_MAX; ++t)
-			m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(t*m_fLBSPThreshold); // @@@@@ use a*x+b instead of just a*x?
+			m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(t*m_fRelLBSPThreshold+m_nAbsLBSPThreshold);
 		for(size_t k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
