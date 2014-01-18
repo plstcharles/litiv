@@ -631,11 +631,13 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					const size_t idx_rand_flt32 = idx_rand_uchar*4;
 					const float fRandMeanLastDist = *((float*)(m_oMeanLastDistFrame.data+idx_rand_flt32));
 					const float fRandMeanSegmRes = *((float*)(m_oMeanSegmResFrame.data+idx_rand_flt32));
+					//const float fRandLearningRate = *((float*)(m_oUpdateRateFrame.data+idx_rand_flt32));
 					const size_t n_rand = rand();
-					const size_t nCurrLocalWordNeighborSpreadRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate)); // @@@@ use neighbor's update rate?
+					//const size_t nCurrLocalWordNeighborSpreadRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil(fRandLearningRate);
+					const size_t nCurrLocalWordNeighborSpreadRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate));
 					if((n_rand%nCurrLocalWordNeighborSpreadRate)==0 || ((n_rand%4)==0 && (
-						(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN) ||
-						(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2) ||
+						//(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN) ||
+						//(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2) ||
 						(fRandMeanSegmRes>BGSCBLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSCBLBSP_GHOST_DETECTION_D_MAX)))) {
 						size_t nRandLocalWordIdx = 0;
 						float fPotentialRandLocalWordsWeightSum = 0.0f;
@@ -904,11 +906,13 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					const size_t idx_rand_flt32 = idx_rand_uchar*4;
 					const float fRandMeanLastDist = *((float*)(m_oMeanLastDistFrame.data+idx_rand_flt32));
 					const float fRandMeanSegmRes = *((float*)(m_oMeanSegmResFrame.data+idx_rand_flt32));
+					//const float fRandLearningRate = *((float*)(m_oUpdateRateFrame.data+idx_rand_flt32));
 					const size_t n_rand = rand();
-					const size_t nCurrLocalWordNeighborSpreadRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate)); // @@@@ use neighbor's update rate?
+					//const size_t nCurrLocalWordNeighborSpreadRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil(fRandLearningRate);
+					const size_t nCurrLocalWordNeighborSpreadRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate));
 					if((n_rand%nCurrLocalWordNeighborSpreadRate)==0 || ((n_rand%4)==0 && (
-						(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN) ||
-						(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2) ||
+						//(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN) ||
+						//(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2) ||
 						(fRandMeanSegmRes>BGSCBLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSCBLBSP_GHOST_DETECTION_D_MAX)))) {
 						size_t nRandLocalWordIdx = 0;
 						float fPotentialRandLocalWordsWeightSum = 0.0f;
