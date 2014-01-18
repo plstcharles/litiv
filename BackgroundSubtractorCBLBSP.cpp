@@ -516,7 +516,11 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 	uchar anDBGColor[3] = {0,0,0};
 	ushort anDBGIntraDesc[3] = {0,0,0};
 	bool bDBGMaskResult = false;
+	bool bDBGMaskModifiedByGDict = false;
+	GlobalWord* pDBGGlobalWordModifier = nullptr;
+	float fDBGGlobalWordModifierLocalWeight = 0.0f;
 	size_t idx_dbg_ldict = UINT_MAX;
+	size_t nDBGWordOccIncr = nWordOccIncr;
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 	if(m_nImgChannels==1) {
 		for(size_t k=0; k<nKeyPoints; ++k) {
@@ -733,6 +737,13 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 					}
 				}
+#if DISPLAY_CBLBSP_DEBUG_INFO
+				else if(y==nDebugCoordY && x==nDebugCoordX) {
+					bDBGMaskModifiedByGDict = true;
+					pDBGGlobalWordModifier = pLastMatchedGlobalWord;
+					fDBGGlobalWordModifierLocalWeight = *(float*)(pLastMatchedGlobalWord->oSpatioOccMap.data+idx_flt32);
+				}
+#endif //DISPLAY_CBLBSP_DEBUG_INFO
 			}
 			while(nLocalWordIdx<m_nLocalWords) {
 				if(nLocalWordIdx>0 && GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_nFrameIndex)>GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx-1],m_nFrameIndex)) {
@@ -775,6 +786,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				}
 				bDBGMaskResult = (oCurrFGMask.data[idx_uchar]==UCHAR_MAX);
 				idx_dbg_ldict = idx_ldict;
+				nDBGWordOccIncr = std::max(nDBGWordOccIncr,nCurrWordOccIncr);
 			}
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 		}
@@ -1015,6 +1027,13 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 					}
 				}
+#if DISPLAY_CBLBSP_DEBUG_INFO
+				else if(y==nDebugCoordY && x==nDebugCoordX) {
+					bDBGMaskModifiedByGDict = true;
+					pDBGGlobalWordModifier = pLastMatchedGlobalWord;
+					fDBGGlobalWordModifierLocalWeight = *(float*)(pLastMatchedGlobalWord->oSpatioOccMap.data+idx_flt32);
+				}
+#endif //DISPLAY_CBLBSP_DEBUG_INFO
 			}
 			while(nLocalWordIdx<m_nLocalWords) {
 				if(nLocalWordIdx>0 && GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_nFrameIndex)>GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx-1],m_nFrameIndex)) {
@@ -1059,6 +1078,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				}
 				bDBGMaskResult = (oCurrFGMask.data[idx_uchar]==UCHAR_MAX);
 				idx_dbg_ldict = idx_ldict;
+				nDBGWordOccIncr = std::max(nDBGWordOccIncr,nCurrWordOccIncr);
 			}
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 		}
@@ -1134,9 +1154,20 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 		printf("\nDBG[%2d,%2d] : \n",nDebugCoordX,nDebugCoordY);
 		printf("\t Color=[%03d,%03d,%03d]\n",(int)anDBGColor[0],(int)anDBGColor[1],(int)anDBGColor[2]);
 		printf("\t IntraDesc=[%05d,%05d,%05d], IntraDescBITS=[%02lu,%02lu,%02lu]\n",anDBGIntraDesc[0],anDBGIntraDesc[1],anDBGIntraDesc[2],(size_t)popcount_ushort_8bitsLUT(anDBGIntraDesc[0]),(size_t)popcount_ushort_8bitsLUT(anDBGIntraDesc[1]),(size_t)popcount_ushort_8bitsLUT(anDBGIntraDesc[2]));
-		printf("\t FG_Mask=[%s]\n",(bDBGMaskResult?"TRUE":"FALSE"));
+		char gword_dbg_str[1024] = "\0";
+		if(bDBGMaskModifiedByGDict) {
+			if(m_nImgChannels==1) {
+				GlobalWord_1ch* pDBGGlobalWordModifier_1ch = (GlobalWord_1ch*)pDBGGlobalWordModifier;
+				sprintf(gword_dbg_str,"* aided by gword weight=[%02.03f], nColor=[%03d], nDescBITS=[%02lu]",fDBGGlobalWordModifierLocalWeight,(int)pDBGGlobalWordModifier_1ch->nColor,(size_t)pDBGGlobalWordModifier_1ch->nDescBITS);
+			}
+			else { //m_nImgChannels==3
+				GlobalWord_3ch* pDBGGlobalWordModifier_3ch = (GlobalWord_3ch*)pDBGGlobalWordModifier;
+				sprintf(gword_dbg_str,"* aided by gword weight=[%02.03f], anColor=[%03d,%03d,%03d], nDescBITS=[%02lu]",fDBGGlobalWordModifierLocalWeight,(int)pDBGGlobalWordModifier_3ch->anColor[0],(int)pDBGGlobalWordModifier_3ch->anColor[1],(int)pDBGGlobalWordModifier_3ch->anColor[2],(size_t)pDBGGlobalWordModifier_3ch->nDescBITS);
+			}
+		}
+		printf("\t FG_Mask=[%s] %s\n",(bDBGMaskResult?"TRUE":"FALSE"),gword_dbg_str);
 		printf("----\n");
-		printf("DBG_LDICT : \n");
+		printf("DBG_LDICT : (%lu occincr per match)\n",nDBGWordOccIncr);
 		for(size_t nDBGWordIdx=0; nDBGWordIdx<m_nLocalWords; ++nDBGWordIdx) {
 			if(m_nImgChannels==1) {
 				LocalWord_1ch* pDBGLocalWord = (LocalWord_1ch*)m_aapLocalDicts[idx_dbg_ldict+nDBGWordIdx];
