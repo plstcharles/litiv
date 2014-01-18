@@ -1221,7 +1221,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 	cv::bitwise_not(m_oTempFGMask,m_oTempFGMask);
 	cv::bitwise_or(oCurrFGMask,m_oTempFGMask,oCurrFGMask);
 	cv::medianBlur(oCurrFGMask,m_oFGMask_last,9);
-	cv::dilate(m_oFGMask_last,m_oFGMask_last_dilated,cv::Mat());
+	cv::dilate(m_oFGMask_last,m_oFGMask_last_dilated,cv::Mat(),cv::Point(-1,-1),2);
 	cv::bitwise_not(m_oFGMask_last_dilated,m_oTempFGMask);
 	cv::bitwise_and(m_oBlinksFrame,m_oTempFGMask,m_oBlinksFrame);
 	m_oFGMask_last.copyTo(oCurrFGMask);
