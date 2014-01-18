@@ -534,7 +534,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+idx_flt32));
 			const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate));
 			const size_t nCurrColorDistThreshold = (size_t)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
-			const size_t nCurrDescDistThreshold = m_nDescDistThreshold;//(size_t)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold); // not adjusted like ^^, the internal LBSP thresholds are instead
+			const size_t nCurrDescDistThreshold = (size_t)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold); // not adjusted like ^^, the internal LBSP thresholds are instead
 			ushort nCurrInterDesc, nCurrIntraDesc;
 			LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColor,x,y,m_anLBSPThreshold_8bitLUT[nCurrColor],nCurrIntraDesc);
 			const uchar nCurrIntraDescBITS = popcount_ushort_8bitsLUT(nCurrIntraDesc);
@@ -788,9 +788,9 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+idx_flt32));
 			const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate));
 			const size_t nCurrTotColorDistThreshold = (size_t)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold*3);
-			const size_t nCurrTotDescDistThreshold = m_nDescDistThreshold*3;//(size_t)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold*3);
+			const size_t nCurrTotDescDistThreshold = (size_t)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold*3);
 			const size_t nCurrSCColorDistThreshold = (size_t)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);
-			const size_t nCurrSCDescDistThreshold = (size_t)(m_nDescDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);//(size_t)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);
+			const size_t nCurrSCDescDistThreshold = (size_t)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold*BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR);
 			ushort anCurrInterDesc[3], anCurrIntraDesc[3];
 			const size_t anCurrIntraLBSPThresholds[3] = {m_anLBSPThreshold_8bitLUT[anCurrColor[0]],m_anLBSPThreshold_8bitLUT[anCurrColor[1]],m_anLBSPThreshold_8bitLUT[anCurrColor[2]]};
 			LBSP::computeRGBDescriptor(oInputImg,anCurrColor,x,y,anCurrIntraLBSPThresholds,anCurrIntraDesc);
