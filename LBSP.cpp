@@ -1,15 +1,15 @@
 #include "LBSP.h"
 
 LBSP::LBSP(size_t nThreshold)
-	:	 m_bUseRelativeThreshold(false)
+	:	 m_bOnlyUsingAbsThreshold(true)
 		,m_fThreshold(0) // unused
 		,m_nThreshold(nThreshold)
 		,m_oRefImage() {}
 
-LBSP::LBSP(float fThreshold)
-	:	 m_bUseRelativeThreshold(true)
+LBSP::LBSP(float fThreshold, size_t nThresholdOffset)
+	:	 m_bOnlyUsingAbsThreshold(false)
 		,m_fThreshold(fThreshold)
-		,m_nThreshold(0) // unused
+		,m_nThreshold(nThresholdOffset)
 		,m_oRefImage() {
 	CV_Assert(m_fThreshold>=0);
 }
@@ -38,7 +38,7 @@ int LBSP::descriptorType() const {
 }
 
 bool LBSP::isUsingRelThreshold() const {
-	return m_bUseRelativeThreshold;
+	return !m_bOnlyUsingAbsThreshold;
 }
 
 float LBSP::getRelThreshold() const {
@@ -88,7 +88,8 @@ static inline void lbsp_computeImpl(	const cv::Mat& oInputImg,
 										const cv::Mat& oRefImg,
 										const std::vector<cv::KeyPoint>& voKeyPoints,
 										cv::Mat& oDesc,
-										float fThreshold) {
+										float fThreshold,
+										size_t nThresholdOffset) {
 	CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 	CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
 	CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
@@ -105,7 +106,7 @@ static inline void lbsp_computeImpl(	const cv::Mat& oInputImg,
 			const int _y = (int)voKeyPoints[k].pt.y;
 			const uchar _ref = _refdata[_step_row*(_y)+_x];
 			ushort& _res = oDesc.at<ushort>((int)k);
-			const size_t _t = (size_t)(_ref*fThreshold);
+			const size_t _t = (size_t)(_ref*fThreshold)+nThresholdOffset;
 			#include "LBSP_16bits_dbcross_1ch.i"
 		}
 	}
@@ -116,7 +117,7 @@ static inline void lbsp_computeImpl(	const cv::Mat& oInputImg,
 			const int _y = (int)voKeyPoints[k].pt.y;
 			const uchar* _ref = _refdata+_step_row*(_y)+3*(_x);
 			ushort* _res = ((ushort*)(oDesc.data + oDesc.step.p[0]*k));
-			const size_t _t[3] = {(size_t)(_ref[0]*fThreshold),(size_t)(_ref[1]*fThreshold),(size_t)(_ref[2]*fThreshold)};
+			const size_t _t[3] = {(size_t)(_ref[0]*fThreshold)+nThresholdOffset,(size_t)(_ref[1]*fThreshold)+nThresholdOffset,(size_t)(_ref[2]*fThreshold)+nThresholdOffset};
 			#include "LBSP_16bits_dbcross_3ch3t.i"
 		}
 	}
@@ -161,7 +162,8 @@ static inline void lbsp_computeImpl2(	const cv::Mat& oInputImg,
 										const cv::Mat& oRefImg,
 										const std::vector<cv::KeyPoint>& voKeyPoints,
 										cv::Mat& oDesc,
-										float fThreshold) {
+										float fThreshold,
+										size_t nThresholdOffset) {
 	CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
 	CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
 	CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
@@ -178,7 +180,7 @@ static inline void lbsp_computeImpl2(	const cv::Mat& oInputImg,
 			const int _y = (int)voKeyPoints[k].pt.y;
 			const uchar _ref = _refdata[_step_row*(_y)+_x];
 			ushort& _res = oDesc.at<ushort>(_y,_x);
-			const size_t _t = (size_t)(_ref*fThreshold);
+			const size_t _t = (size_t)(_ref*fThreshold)+nThresholdOffset;
 			#include "LBSP_16bits_dbcross_1ch.i"
 		}
 	}
@@ -189,7 +191,7 @@ static inline void lbsp_computeImpl2(	const cv::Mat& oInputImg,
 			const int _y = (int)voKeyPoints[k].pt.y;
 			const uchar* _ref = _refdata+_step_row*(_y)+3*(_x);
 			ushort* _res = ((ushort*)(oDesc.data + oDesc.step.p[0]*_y + oDesc.step.p[1]*_x));
-			const size_t _t[3] = {(size_t)(_ref[0]*fThreshold),(size_t)(_ref[1]*fThreshold),(size_t)(_ref[2]*fThreshold)};
+			const size_t _t[3] = {(size_t)(_ref[0]*fThreshold)+nThresholdOffset,(size_t)(_ref[1]*fThreshold)+nThresholdOffset,(size_t)(_ref[2]*fThreshold)+nThresholdOffset};
 			#include "LBSP_16bits_dbcross_3ch3t.i"
 		}
 	}
@@ -205,10 +207,10 @@ void LBSP::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoint
     cv::KeyPointsFilter::runByKeypointSize(keypoints,std::numeric_limits<float>::epsilon());
 	CV_DbgAssert(!keypoints.empty());
 #endif //LBSP_VALIDATE_KEYPOINTS_INTERNALLY
-	if(m_bUseRelativeThreshold)
-		lbsp_computeImpl2(oImage,m_oRefImage,voKeypoints,oDescriptors,m_fThreshold);
-	else
+	if(m_bOnlyUsingAbsThreshold)
 		lbsp_computeImpl2(oImage,m_oRefImage,voKeypoints,oDescriptors,m_nThreshold);
+	else
+		lbsp_computeImpl2(oImage,m_oRefImage,voKeypoints,oDescriptors,m_fThreshold,m_nThreshold);
 }
 
 void LBSP::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat>& voDescCollection) const {
@@ -227,10 +229,10 @@ void LBSP::computeImpl(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypo
 	cv::KeyPointsFilter::runByImageBorder(voKeypoints,oImage.size(),PATCH_SIZE/2);
 	CV_DbgAssert(!voKeypoints.empty());
 #endif //LBSP_VALIDATE_KEYPOINTS_INTERNALLY
-	if(m_bUseRelativeThreshold)
-		lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,oDescriptors,m_fThreshold);
-	else
+	if(m_bOnlyUsingAbsThreshold)
 		lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,oDescriptors,m_nThreshold);
+	else
+		lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,oDescriptors,m_fThreshold,m_nThreshold);
 }
 
 void LBSP::reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoints, const cv::Mat& oDescriptors, cv::Mat& oOutput) {

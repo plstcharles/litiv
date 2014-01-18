@@ -9,20 +9,24 @@
 
 BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(size_t nLBSPThreshold, size_t nDescDistThreshold)
 	:	 nDebugCoordX(0),nDebugCoordY(0)
+		,m_nImgChannels(0)
+		,m_nImgType(0)
 		,m_nDescDistThreshold(nDescDistThreshold)
-		,m_bLBSPUsingRelThreshold(false)
-		,m_nLBSPThreshold(nLBSPThreshold)
-		,m_fLBSPThreshold(-1)
+		,m_bOnlyUsingAbsThreshold(true)
+		,m_nAbsLBSPThreshold(nLBSPThreshold)
+		,m_fRelLBSPThreshold(0)
 		,m_bInitialized(false) {}
 
-BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(float fLBSPThreshold, size_t nDescDistThreshold)
+BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(float fLBSPThreshold, size_t nDescDistThreshold, size_t nLBSPThresholdOffset)
 	:	 nDebugCoordX(0),nDebugCoordY(0)
+		,m_nImgChannels(0)
+		,m_nImgType(0)
 		,m_nDescDistThreshold(nDescDistThreshold)
-		,m_bLBSPUsingRelThreshold(true)
-		,m_nLBSPThreshold(-1)
-		,m_fLBSPThreshold(fLBSPThreshold)
+		,m_bOnlyUsingAbsThreshold(false)
+		,m_nAbsLBSPThreshold(nLBSPThresholdOffset)
+		,m_fRelLBSPThreshold(fLBSPThreshold)
 		,m_bInitialized(false) {
-	CV_Assert(m_fLBSPThreshold>=0);
+	CV_Assert(m_fRelLBSPThreshold>=0);
 }
 
 BackgroundSubtractorLBSP::~BackgroundSubtractorLBSP() {}

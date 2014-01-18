@@ -23,7 +23,7 @@ public:
 	//! constructor 1, threshold = absolute intensity 'similarity' threshold used when computing comparisons
 	explicit LBSP(size_t nThreshold);
 	//! constructor 2, threshold = relative intensity 'similarity' threshold used when computing comparisons
-	explicit LBSP(float fThreshold);
+	explicit LBSP(float fThreshold, size_t nThresholdOffset=0);
 	//! default destructor
 	virtual ~LBSP();
 	//! loads extractor params from the specified file node @@@@ not impl
@@ -111,7 +111,7 @@ protected:
 	//! classic 'compute' implementation, based on the regular DescriptorExtractor::computeImpl arguments & expected output
 	virtual void computeImpl(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const;
 
-	const bool m_bUseRelativeThreshold;
+	const bool m_bOnlyUsingAbsThreshold;
 	const float m_fThreshold;
 	const size_t m_nThreshold;
 	cv::Mat m_oRefImage;

@@ -11,6 +11,8 @@
 #define BGSVIBELBSP_DEFAULT_LBSP_ABS_SIMILARITY_THRESHOLD (30)
 //! defines the default value for BackgroundSubtractorViBe::m_fLBSPThreshold (if needed)
 #define BGSVIBELBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.365f)
+//! defines the default offset LBSP threshold value (only used along with a relative threshold)
+#define BGSVIBELBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (0)
 //! defines the default value for BackgroundSubtractorViBeLBSP::m_nColorDistThreshold
 #define BGSVIBELBSP_DEFAULT_COLOR_DIST_THRESHOLD (30)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
@@ -43,6 +45,7 @@ public:
 											size_t nRequiredBGSamples=BGSVIBELBSP_DEFAULT_REQUIRED_NB_BG_SAMPLES);
 	//! full constructor used to intialize a 'relative' LBSP-based background subtractor
 	explicit BackgroundSubtractorViBeLBSP(	float fLBSPThreshold/*=BGSVIBELBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD*/,
+											size_t nLBSPThresholdOffset=BGSVIBELBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
 											size_t nDescDistThreshold=BGSVIBELBSP_DEFAULT_DESC_DIST_THRESHOLD,
 											size_t nColorDistThreshold=BGSVIBELBSP_DEFAULT_COLOR_DIST_THRESHOLD,
 											size_t nBGSamples=BGSVIBELBSP_DEFAULT_NB_BG_SAMPLES,
