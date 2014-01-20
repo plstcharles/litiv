@@ -9,13 +9,13 @@
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
 #define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (4)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nColorDistThreshold
-#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (24)
+#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (20)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fLocalWordsPerChannel
 #define BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS_PER_CH (8.0f)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fGlobalWordsPerPixelChannel
 #define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS_PER_CH (10.0f)
 //! defines the number of samples to use when computing running averages
-#define BGSCBLBSP_N_SAMPLES_FOR_MEAN (25)
+#define BGSCBLBSP_N_SAMPLES_FOR_MEAN (20)
 //! defines the threshold values used to detect long-term ghosting and trigger a fast edge-based absorption in the model
 #define BGSCBLBSP_GHOST_DETECTION_D_MAX (0.010f)
 #define BGSCBLBSP_GHOST_DETECTION_S_MIN (0.995f)
@@ -29,13 +29,13 @@
 //! defines the internal threshold adjustment factor to use when treating single channel images
 #define BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.350f) // or (0.500f) for final version? ... more consistent across categories
 //! parameters used for dynamic distance threshold adjustments ('R(x)')
-#define BGSCBLBSP_R_SCALE (3.5000f)
+#define BGSCBLBSP_R_SCALE (4.0000f)
 #define BGSCBLBSP_R_INCR  (0.0850f)
 #define BGSCBLBSP_R_DECR  (0.0300f)
 #define BGSCBLBSP_R_LOWER (0.8000f)
-#define BGSCBLBSP_R_UPPER (3.5000f)
+#define BGSCBLBSP_R_UPPER (4.0000f)
 //! parameters used for adjusting the variation speed of dynamic distance thresholds  ('R2(x)')
-#define BGSCBLBSP_R2_OFFST (0.100f)
+#define BGSCBLBSP_R2_OFFST (0.075f)
 #define BGSCBLBSP_R2_INCR  (0.800f)
 #define BGSCBLBSP_R2_DECR  (0.100f)
 //! parameters used for dynamic learning rates adjustments  ('T(x)')
@@ -163,6 +163,8 @@ protected:
 
 	//! pre-allocated CV_8UC1 matrix used to speed up morph ops
 	cv::Mat m_oTempFGMask;
+	cv::Mat m_oTempFGMask2;
+	cv::Mat m_oFGMask_last_dilated_inverted;
 	cv::Mat m_oPureFGBlinkMask_curr;
 	cv::Mat m_oPureFGBlinkMask_last;
 
