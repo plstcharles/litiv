@@ -7,42 +7,42 @@
 //! defines the default offset LBSP threshold value
 #define BGSCBLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (3)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
-#define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (4)
+#define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (5)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nColorDistThreshold
-#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (20)
+#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (24)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fLocalWordsPerChannel
 #define BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS_PER_CH (8.0f)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fGlobalWordsPerPixelChannel
 #define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS_PER_CH (10.0f)
 //! defines the number of samples to use when computing running averages
-#define BGSCBLBSP_N_SAMPLES_FOR_MEAN (20)
+#define BGSCBLBSP_N_SAMPLES_FOR_MEAN (50)
 //! defines the threshold values used to detect long-term ghosting and trigger a fast edge-based absorption in the model
 #define BGSCBLBSP_GHOST_DETECTION_D_MAX (0.010f)
 #define BGSCBLBSP_GHOST_DETECTION_S_MIN (0.995f)
 #define BGSCBLBSP_GHOST_DETECTION_S_MIN2 (0.999f)
 #define BGSCBLBSP_GHOST_DETECTION_D_MAX2 (0.015f)
 //! defines the threshold values used to detect high variation regions that are often labelled as foreground and trigger a local, gradual change in distance thresholds
-#define BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN (0.850f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN (0.175f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 (0.100f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2 (0.225f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN (0.995f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN (0.150f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 (0.600f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2 (0.600f)
 //! defines the internal threshold adjustment factor to use when treating single channel images
 #define BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.350f) // or (0.500f) for final version? ... more consistent across categories
 //! parameters used for dynamic distance threshold adjustments ('R(x)')
 #define BGSCBLBSP_R_SCALE (4.0000f)
-#define BGSCBLBSP_R_INCR  (0.0850f)
-#define BGSCBLBSP_R_DECR  (0.0300f)
+#define BGSCBLBSP_R_INCR  (0.0400f)
+#define BGSCBLBSP_R_DECR  (0.0200f)
 #define BGSCBLBSP_R_LOWER (0.8000f)
 #define BGSCBLBSP_R_UPPER (4.0000f)
 //! parameters used for adjusting the variation speed of dynamic distance thresholds  ('R2(x)')
-#define BGSCBLBSP_R2_OFFST (0.075f)
-#define BGSCBLBSP_R2_INCR  (0.800f)
-#define BGSCBLBSP_R2_DECR  (0.100f)
+#define BGSCBLBSP_R2_OFFST (0.100f)
+#define BGSCBLBSP_R2_INCR  (1.000f)
+#define BGSCBLBSP_R2_DECR  (0.150f)
 //! parameters used for dynamic learning rates adjustments  ('T(x)')
-#define BGSCBLBSP_T_DECR  (0.0250f)
-#define BGSCBLBSP_T_INCR  (0.2500f)
+#define BGSCBLBSP_T_DECR  (0.0002f)
+#define BGSCBLBSP_T_INCR  (0.0040f)
 #define BGSCBLBSP_T_LOWER (2.0000f)
-#define BGSCBLBSP_T_UPPER (256.00f)
+#define BGSCBLBSP_T_UPPER (200.00f)
 
 /*!
 	CB-Based Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
