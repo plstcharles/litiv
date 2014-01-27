@@ -653,6 +653,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					if((n_rand%nCurrLocalWordNeighborSpreadRate)==0 || ((n_rand%4)==0 && (
 						//(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN) ||
 						//(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2) ||
+						(fRandMeanSegmRes>BGSCBLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSCBLBSP_GHOST_DETECTION_D_MAX) ||
 						(fRandMeanSegmRes>BGSCBLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSCBLBSP_GHOST_DETECTION_D_MAX)))) {
 						size_t nRandLocalWordIdx = 0;
 						float fPotentialRandLocalWordsWeightSum = 0.0f;
@@ -960,6 +961,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					if((n_rand%nCurrLocalWordNeighborSpreadRate)==0 || ((n_rand%4)==0 && (
 						//(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN) ||
 						//(fRandMeanSegmRes>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 && fRandMeanLastDist>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2) ||
+						(fRandMeanSegmRes>BGSCBLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSCBLBSP_GHOST_DETECTION_D_MAX) ||
 						(fRandMeanSegmRes>BGSCBLBSP_GHOST_DETECTION_S_MIN && fRandMeanLastDist<BGSCBLBSP_GHOST_DETECTION_D_MAX)))) {
 						size_t nRandLocalWordIdx = 0;
 						float fPotentialRandLocalWordsWeightSum = 0.0f;
@@ -1135,43 +1137,10 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 		}
 	}
-/*#if DISPLAY_CBLBSP_DEBUG_INFO
-	cv::Mat gwords_coverage(m_oImgSize,CV_32FC1);
-	gwords_coverage = cv::Scalar(0.0f);
-	for(size_t nDBGWordIdx=0; nDBGWordIdx<m_nGlobalWords; ++nDBGWordIdx)
-		cv::max(gwords_coverage,m_apGlobalDict[nDBGWordIdx]->oSpatioOccMap,gwords_coverage);
-	cv::imshow("gwords_coverage",gwords_coverage);
-	std::string asDBGStrings[5] = {"gword[0]","gword[1]","gword[2]","gword[3]","gword[4]"};
-	for(size_t nDBGWordIdx=0; nDBGWordIdx<m_nGlobalWords && nDBGWordIdx<5; ++nDBGWordIdx)
-		cv::imshow(asDBGStrings[nDBGWordIdx],m_apGlobalDict[nDBGWordIdx]->oSpatioOccMap);
-	double minVal,maxVal;
-	cv::minMaxIdx(gwords_coverage,&minVal,&maxVal);
-	std::cout << " " << m_nFrameIndex << " : gwords_coverage min=" << minVal << ", max=" << maxVal << std::endl;
-#endif*/ //DISPLAY_CBLBSP_DEBUG_INFO
 	for(size_t nGlobalWordIdx=1; nGlobalWordIdx<m_nGlobalWords; ++nGlobalWordIdx)
 		if(m_apGlobalDict[nGlobalWordIdx]->fLatestWeight>m_apGlobalDict[nGlobalWordIdx-1]->fLatestWeight)
 			std::swap(m_apGlobalDict[nGlobalWordIdx],m_apGlobalDict[nGlobalWordIdx-1]);
-	/*
-	if(!(m_nFrameIndex%nCurrGlobalWordUpdateRate)) {
-#if DISPLAY_CBLBSP_DEBUG_INFO
-		std::cout << "\tBlurring gword occurrence maps..." << std::endl;
-#endif //DISPLAY_CBLBSP_DEBUG_INFO
-	*/
-		for(size_t nGlobalWordIdx=0; nGlobalWordIdx<m_nGlobalWords; ++nGlobalWordIdx) {
-			if(m_apGlobalDict[nGlobalWordIdx]->fLatestWeight==0.0f)
-				continue;
-			//cv::imshow("gword_oSpatioOccMap",m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap);
-			//cv::GaussianBlur(m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap,m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap,cv::Size(7,7),0,0,cv::BORDER_REPLICATE);
-			cv::blur(m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap,m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap,cv::Size(7,7),cv::Point(-1,-1),cv::BORDER_REPLICATE);
-			//cv::imshow("gword_oSpatioOccMap_blurred",m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap);
-			//cv::waitKey(0);
-		}
-	//}
 	if(!(m_nFrameIndex%(nCurrGlobalWordUpdateRate))) {
-#if DISPLAY_CBLBSP_DEBUG_INFO
-		std::cout << "\tDecimating gword weights..." << std::endl;
-#endif //DISPLAY_CBLBSP_DEBUG_INFO
-		// INCORPORATE DECIMATE TO THE MAIN KEYPOINT LOOP??? @@@@@@@@@@@@@@@@@@@@
 		for(size_t nGlobalWordIdx=0; nGlobalWordIdx<m_nGlobalWords; ++nGlobalWordIdx) {
 			if(m_apGlobalDict[nGlobalWordIdx]->fLatestWeight==0.0f)
 				continue;
@@ -1182,27 +1151,25 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			else {
 				m_apGlobalDict[nGlobalWordIdx]->fLatestWeight *= GWORD_WEIGHT_DECIMATION_FACTOR;
 				m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap *= GWORD_WEIGHT_DECIMATION_FACTOR;
+				cv::blur(m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap,m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap,cv::Size(7,7),cv::Point(-1,-1),cv::BORDER_REPLICATE);
 			}
-		}
-	}
-	if(!(m_nFrameIndex%2048)) {
-#if DISPLAY_CBLBSP_DEBUG_INFO
-		std::cout << "\tRecalculating gword weights to correct drift..." << std::endl;
-#endif //DISPLAY_CBLBSP_DEBUG_INFO
-		for(size_t nGlobalWordIdx=0; nGlobalWordIdx<m_nGlobalWords; ++nGlobalWordIdx) {
-			if(m_apGlobalDict[nGlobalWordIdx]->fLatestWeight==0.0f)
-				continue;
-#if DISPLAY_CBLBSP_DEBUG_INFO
-			float fDBGWordWeight = GetGlobalWordWeight(m_apGlobalDict[nGlobalWordIdx]);
-			std::cout << "\t\tgword[" << nGlobalWordIdx << "] -- calc=" << m_apGlobalDict[nGlobalWordIdx]->fLatestWeight << ", true=" << fDBGWordWeight << " (" << (std::abs(m_apGlobalDict[nGlobalWordIdx]->fLatestWeight-fDBGWordWeight)/m_apGlobalDict[nGlobalWordIdx]->fLatestWeight)*100.0f << "% diff)" << std::endl;
-#endif //DISPLAY_CBLBSP_DEBUG_INFO
-			m_apGlobalDict[nGlobalWordIdx]->fLatestWeight = GetGlobalWordWeight(m_apGlobalDict[nGlobalWordIdx]);
 		}
 	}
 #if DISPLAY_CBLBSP_DEBUG_INFO
 	if(idx_dbg_ldict!=UINT_MAX) {
 		std::cout << std::endl;
 		cv::Point dbgpt(nDebugCoordX,nDebugCoordY);
+		/*cv::Mat gwords_coverage(m_oImgSize,CV_32FC1);
+		gwords_coverage = cv::Scalar(0.0f);
+		for(size_t nDBGWordIdx=0; nDBGWordIdx<m_nGlobalWords; ++nDBGWordIdx)
+			cv::max(gwords_coverage,m_apGlobalDict[nDBGWordIdx]->oSpatioOccMap,gwords_coverage);
+		cv::imshow("gwords_coverage",gwords_coverage);
+		std::string asDBGStrings[5] = {"gword[0]","gword[1]","gword[2]","gword[3]","gword[4]"};
+		for(size_t nDBGWordIdx=0; nDBGWordIdx<m_nGlobalWords && nDBGWordIdx<5; ++nDBGWordIdx)
+			cv::imshow(asDBGStrings[nDBGWordIdx],m_apGlobalDict[nDBGWordIdx]->oSpatioOccMap);
+		double minVal,maxVal;
+		cv::minMaxIdx(gwords_coverage,&minVal,&maxVal);
+		std::cout << " " << m_nFrameIndex << " : gwords_coverage min=" << minVal << ", max=" << maxVal << std::endl;*/
 		if(false) {
 			printf("\nDBG[%2d,%2d] : \n",nDebugCoordX,nDebugCoordY);
 			printf("\t Color=[%03d,%03d,%03d]\n",(int)anDBGColor[0],(int)anDBGColor[1],(int)anDBGColor[2]);
@@ -1277,13 +1244,10 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 	cv::bitwise_and(m_oBlinksFrame,m_oFGMask_last_dilated_inverted,m_oBlinksFrame);
 	cv::bitwise_and(m_oPureFGMask_last,m_oFGMask_last_dilated_inverted,m_oTempFGMask2);
 	cv::bitwise_not(m_oFGMask_last_dilated,m_oFGMask_last_dilated_inverted);
-	cv::imshow("m_oTempFGMask2, pre-curr-cutout",m_oTempFGMask2);
 	cv::bitwise_and(m_oBlinksFrame,m_oFGMask_last_dilated_inverted,m_oBlinksFrame);
 	cv::bitwise_and(m_oTempFGMask2,m_oFGMask_last_dilated_inverted,m_oTempFGMask2);
-	cv::imshow("m_oTempFGMask2, post-curr-cutout",m_oTempFGMask2);
 	cv::bitwise_or(m_oBlinksFrame,m_oTempFGMask2,m_oBlinksFrame);
 	m_oFGMask_last.copyTo(oCurrFGMask);
-	cv::imshow("m_oBlinksFrame, final",m_oBlinksFrame);
 }
 
 void BackgroundSubtractorCBLBSP::getBackgroundImage(cv::OutputArray backgroundImage) const {
