@@ -783,8 +783,10 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			}*/
 			if( (fCurrDistFactor>BGSCBLBSP_R2_OFFST && m_oBlinksFrame.data[idx_uchar]>0) ||
 				((*pfCurrMeanSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN && fCurrDistFactor>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN) ||
-				((*pfCurrMeanSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 && fCurrDistFactor>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2))
-				(*pfCurrDistThresholdVariationFactor) += BGSCBLBSP_R2_INCR;
+				((*pfCurrMeanSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 && fCurrDistFactor>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2)) {
+				if((*pfCurrDistThresholdVariationFactor)<BGSCBLBSP_R2_UPPER)
+					(*pfCurrDistThresholdVariationFactor) += BGSCBLBSP_R2_INCR;
+			}
 			else if((*pfCurrDistThresholdVariationFactor)>0) {
 				//(*pfCurrDistThresholdVariationFactor) -= BGSCBLBSP_R2_DECR;
 				(*pfCurrDistThresholdVariationFactor) -= (m_oFGMask_last.data[idx_uchar]>0)?BGSCBLBSP_R2_DECR/4:BGSCBLBSP_R2_DECR;
@@ -801,7 +803,10 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				}
 			}
 			else if((*pfCurrDistThresholdFactor)>BGSCBLBSP_R_LOWER) {
-				(*pfCurrDistThresholdFactor) -= BGSCBLBSP_R_DECR/(*pfCurrDistThresholdVariationFactor);
+				if((*pfCurrDistThresholdVariationFactor)>BGSCBLBSP_R2_DECR)
+					(*pfCurrDistThresholdFactor) -= BGSCBLBSP_R_DECR/(*pfCurrDistThresholdVariationFactor);
+				else
+					(*pfCurrDistThresholdFactor) -= BGSCBLBSP_R_DECR/BGSCBLBSP_R2_DECR;
 				if((*pfCurrDistThresholdFactor)<BGSCBLBSP_R_LOWER)
 					(*pfCurrDistThresholdFactor) = BGSCBLBSP_R_LOWER;
 			}
@@ -1098,8 +1103,10 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			}*/
 			if( (fCurrDistFactor>BGSCBLBSP_R2_OFFST && m_oBlinksFrame.data[idx_uchar]>0) ||
 				((*pfCurrMeanSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN && fCurrDistFactor>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN) ||
-				((*pfCurrMeanSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 && fCurrDistFactor>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2))
-				(*pfCurrDistThresholdVariationFactor) += BGSCBLBSP_R2_INCR;
+				((*pfCurrMeanSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN2 && fCurrDistFactor>BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN2)) {
+				if((*pfCurrDistThresholdVariationFactor)<BGSCBLBSP_R2_UPPER)
+					(*pfCurrDistThresholdVariationFactor) += BGSCBLBSP_R2_INCR;
+			}
 			else if((*pfCurrDistThresholdVariationFactor)>0) {
 				//(*pfCurrDistThresholdVariationFactor) -= BGSCBLBSP_R2_DECR;
 				(*pfCurrDistThresholdVariationFactor) -= (m_oFGMask_last.data[idx_uchar]>0)?BGSCBLBSP_R2_DECR/4:BGSCBLBSP_R2_DECR;
@@ -1116,7 +1123,10 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				}
 			}
 			else if((*pfCurrDistThresholdFactor)>BGSCBLBSP_R_LOWER) {
-				(*pfCurrDistThresholdFactor) -= BGSCBLBSP_R_DECR/(*pfCurrDistThresholdVariationFactor);
+				if((*pfCurrDistThresholdVariationFactor)>BGSCBLBSP_R2_DECR)
+					(*pfCurrDistThresholdFactor) -= BGSCBLBSP_R_DECR/(*pfCurrDistThresholdVariationFactor);
+				else
+					(*pfCurrDistThresholdFactor) -= BGSCBLBSP_R_DECR/BGSCBLBSP_R2_DECR;
 				if((*pfCurrDistThresholdFactor)<BGSCBLBSP_R_LOWER)
 					(*pfCurrDistThresholdFactor) = BGSCBLBSP_R_LOWER;
 			}
@@ -1152,6 +1162,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				m_apGlobalDict[nGlobalWordIdx]->fLatestWeight *= GWORD_WEIGHT_DECIMATION_FACTOR;
 				m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap *= GWORD_WEIGHT_DECIMATION_FACTOR;
 				cv::blur(m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap,m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap,cv::Size(7,7),cv::Point(-1,-1),cv::BORDER_REPLICATE);
+				//cv::GaussianBlur(m_oDistThresholdVariationFrame,m_oDistThresholdVariationFrame,cv::Size(5,5),0);
 			}
 		}
 	}
