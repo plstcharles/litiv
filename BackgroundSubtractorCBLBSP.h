@@ -17,10 +17,10 @@
 //! defines the number of samples to use when computing running averages
 #define BGSCBLBSP_N_SAMPLES_FOR_MEAN (100)
 //! defines the threshold values used to detect long-term ghosting and trigger a fast edge-based absorption in the model
-#define BGSCBLBSP_GHOST_DETECTION_S_MIN (0.995f)
-#define BGSCBLBSP_GHOST_DETECTION_D_MAX (0.010f)
-#define BGSCBLBSP_GHOST_DETECTION_S_MIN2 (0.999f)
-#define BGSCBLBSP_GHOST_DETECTION_D_MAX2 (0.015f)
+#define BGSCBLBSP_GHOST_DETECTION_S_MIN (0.8500f)
+#define BGSCBLBSP_GHOST_DETECTION_D_MAX (0.0075f)
+#define BGSCBLBSP_GHOST_DETECTION_S_MIN2 (0.9500f)
+#define BGSCBLBSP_GHOST_DETECTION_D_MAX2 (0.0125f)
 //! defines the threshold values used to detect high variation regions that are often labelled as foreground and trigger a local, gradual change in distance thresholds
 #define BGSCBLBSP_HIGH_VAR_DETECTION_S_MIN (0.925f)
 #define BGSCBLBSP_HIGH_VAR_DETECTION_D_MIN (0.525f)
@@ -35,7 +35,7 @@
 #define BGSCBLBSP_R_LOWER (0.6000f)
 #define BGSCBLBSP_R_UPPER (3.0000f)
 //! parameters used for adjusting the variation speed of dynamic distance thresholds  ('R2(x)')
-#define BGSCBLBSP_R2_OFFST (0.000f)
+#define BGSCBLBSP_R2_OFFST (0.100f)
 #define BGSCBLBSP_R2_INCR  (1.000f)
 #define BGSCBLBSP_R2_DECR  (0.150f)
 //! parameters used for dynamic learning rates adjustments  ('T(x)')
