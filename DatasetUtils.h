@@ -66,6 +66,7 @@ public:
 	size_t GetNbGTFrames() const;
 	cv::Size GetFrameSize() const;
 	cv::Mat GetSequenceROI() const;
+	std::vector<cv::KeyPoint> GetKeyPointsFromROI() const;
 	void ValidateKeyPoints(std::vector<cv::KeyPoint>& voKPs) const;
 	const std::string m_sName;
 	const std::string m_sDBName;

@@ -176,6 +176,15 @@ cv::Mat SequenceInfo::GetSequenceROI() const {
 	return m_oROI;
 }
 
+std::vector<cv::KeyPoint> SequenceInfo::GetKeyPointsFromROI() const {
+	std::vector<cv::KeyPoint> voNewKPs;
+	cv::DenseFeatureDetector oKPDDetector(1.f, 1, 1.f, 1, 0, true, false);
+	voNewKPs.reserve(m_oROI.rows*m_oROI.cols);
+	oKPDDetector.detect(cv::Mat(m_oROI.size(),m_oROI.type()),voNewKPs);
+	ValidateKeyPoints(voNewKPs);
+	return voNewKPs;
+}
+
 void SequenceInfo::ValidateKeyPoints(std::vector<cv::KeyPoint>& voKPs) const {
 	std::vector<cv::KeyPoint> voNewKPs;
 	for(size_t k=0; k<voKPs.size(); ++k) {
