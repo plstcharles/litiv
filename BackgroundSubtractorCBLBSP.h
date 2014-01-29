@@ -43,7 +43,7 @@
 #define BGSCBLBSP_T_DECR  (0.0002f)
 #define BGSCBLBSP_T_INCR  (0.0040f)
 #define BGSCBLBSP_T_LOWER (2.0000f)
-#define BGSCBLBSP_T_UPPER (200.00f)
+#define BGSCBLBSP_T_UPPER (64.000f)
 
 /*!
 	CB-Based Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
@@ -76,7 +76,7 @@ public:
 	virtual void getBackgroundImage(cv::OutputArray backgroundImage) const;
 	//! returns a copy of the latest reconstructed background descriptors image
 	virtual void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const;
-	//! sets the keypoints to be used for descriptor extraction, effectively setting the BGModel ROI (note: this function will remove all border keypoints and allocate new words where needed)
+	//! sets the keypoints to be used for descriptor extraction, effectively setting the BGModel ROI (@@@@@@ note: cannot be used once model is initialized)
 	virtual void setBGKeyPoints(std::vector<cv::KeyPoint>& keypoints);
 
 protected:

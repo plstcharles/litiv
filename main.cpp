@@ -217,6 +217,11 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #endif //PLATFORM_USES_WIN32API
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
 		BackgroundSubtractorLBSP* pBGS = nullptr;
+#if LIMIT_KEYPTS_TO_SEQUENCE_ROI
+		std::vector<cv::KeyPoint> voKPs = pCurrSequence->GetKeyPointsFromROI();
+#else //!LIMIT_KEYPTS_TO_SEQUENCE_ROI
+		std::vector<cv::KeyPoint> voKPs;
+#endif //!LIMIT_KEYPTS_TO_SEQUENCE_ROI
 #else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 		cv::BackgroundSubtractor* pBGS = nullptr;
 #endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
@@ -234,15 +239,15 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		pBGS = new BackgroundSubtractorViBeLBSP(BGSVIBELBSP_DEFAULT_LBSP_ABS_SIMILARITY_THRESHOLD);
 #endif //!USE_RELATIVE_LBSP_COMPARISONS
 		const double dDefaultLearningRate = BGSVIBELBSP_DEFAULT_LEARNING_RATE;
-		pBGS->initialize(oInitImg);
+		pBGS->initialize(oInitImg,voKPs);
 #elif USE_PBAS_LBSP_BG_SUBTRACTOR
 		pBGS = new BackgroundSubtractorPBASLBSP();
 		const double dDefaultLearningRate = 0;
-		pBGS->initialize(oInitImg);
+		pBGS->initialize(oInitImg,voKPs);
 #elif USE_CB_LBSP_BG_SUBTRACTOR
 		pBGS = new BackgroundSubtractorCBLBSP();
 		const double dDefaultLearningRate = 0;
-		pBGS->initialize(oInitImg);
+		pBGS->initialize(oInitImg,voKPs);
 #else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 		const size_t m_nInputChannels = (size_t)oInitImg.channels();
 #if USE_VIBE_BG_SUBTRACTOR
@@ -266,11 +271,6 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		pnLatestMouseX = &pBGS->nDebugCoordX;
 		pnLatestMouseY = &pBGS->nDebugCoordY;
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
-#if LIMIT_KEYPTS_TO_SEQUENCE_ROI
-		std::vector<cv::KeyPoint> voKPs = pBGS->getBGKeyPoints();
-		pCurrSequence->ValidateKeyPoints(voKPs);
-		pBGS->setBGKeyPoints(voKPs);
-#endif //LIMIT_KEYPTS_TO_SEQUENCE_ROI
 #endif //USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
 #if DISPLAY_BGSUB_DEBUG_OUTPUT
 		std::string sDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName;
