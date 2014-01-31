@@ -124,8 +124,10 @@ int main() {
 	std::vector<CategoryInfo*> vpCategories;
 	std::cout << "Parsing dataset '"<< g_sDatasetName << "'..." << std::endl;
 	try {
-		for(size_t i=0; i<sizeof(g_asDatasetCategories)/sizeof(char*); ++i)
-			vpCategories.push_back(new CategoryInfo(g_asDatasetCategories[i], g_sDatasetPath+g_asDatasetCategories[i], g_sDatasetName, (std::string("thermal")==g_asDatasetCategories[i])?true:false));
+		for(size_t i=0; i<sizeof(g_asDatasetCategories)/sizeof(char*); ++i) {
+			bool bIsThermal = (std::string(g_asDatasetCategories[i]).find("thermal")!=std::string::npos);
+			vpCategories.push_back(new CategoryInfo(g_asDatasetCategories[i], g_sDatasetPath+g_asDatasetCategories[i], g_sDatasetName, bIsThermal));
+		}
 	} catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
 	size_t nSeqTotal = 0;
 	size_t nFramesTotal = 0;
