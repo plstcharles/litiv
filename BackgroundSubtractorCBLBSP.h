@@ -17,8 +17,8 @@
 //! defines the number of samples to use when computing running averages
 #define BGSCBLBSP_N_SAMPLES_FOR_MEAN (100)
 //! defines the threshold values used to detect long-term ghosting and trigger a fast edge-based absorption in the model
-#define BGSCBLBSP_GHOST_DETECTION_SAVG_MIN (0.8500f)
-#define BGSCBLBSP_GHOST_DETECTION_ZAVG_MIN (0.8500f)
+#define BGSCBLBSP_GHOST_DETECTION_SAVG_MIN (0.9750f)
+#define BGSCBLBSP_GHOST_DETECTION_ZAVG_MIN (0.9750f)
 #define BGSCBLBSP_GHOST_DETECTION_DMIX_MAX (0.6000f)
 #define BGSCBLBSP_GHOST_DETECTION_DLST_MAX (0.0075f)
 //! defines the threshold values used to detect high variation regions that are often labelled as foreground and trigger a local, gradual change in distance thresholds
@@ -27,12 +27,12 @@
 #define BGSCBLBSP_HIGH_VAR_DETECTION_DMIX_MIN (0.625f)
 #define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN (0.150f)
 //! defines the internal threshold adjustment factor to use when treating single channel images
-#define BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.350f) // or (0.500f) for final version? ... more consistent across categories
+#define BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.400f)
 //! parameters used for dynamic distance threshold adjustments ('R(x)')
-#define BGSCBLBSP_R_SCALE (6.0000f)
+#define BGSCBLBSP_R_SCALE (5.0000f)
 #define BGSCBLBSP_R_INCR  (0.0300f)
 #define BGSCBLBSP_R_DECR  (0.0150f)
-#define BGSCBLBSP_R_LOWER (0.6000f)
+#define BGSCBLBSP_R_LOWER (0.7500f)
 #define BGSCBLBSP_R_UPPER (3.0000f)
 //! parameters used for adjusting the variation speed of dynamic distance thresholds  ('R2(x)')
 #define BGSCBLBSP_R2_OFFST (0.100f)
@@ -175,6 +175,7 @@ protected:
 	//! pre-allocated CV_8UC1 matrix used to speed up morph ops
 	cv::Mat m_oTempFGMask;
 	cv::Mat m_oTempFGMask2;
+	cv::Mat m_oFGMask_PreFlood;
 	cv::Mat m_oFGMask_last_dilated_inverted;
 	cv::Mat m_oPureFGBlinkMask_curr;
 	cv::Mat m_oPureFGBlinkMask_last;
