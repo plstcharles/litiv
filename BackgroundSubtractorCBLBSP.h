@@ -3,47 +3,52 @@
 #include "BackgroundSubtractorLBSP.h"
 
 //! defines the default value for BackgroundSubtractorLBSP::m_fLBSPThreshold
-#define BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.250f)
+#define BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.300f)
 //! defines the default offset LBSP threshold value
-#define BGSCBLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (3)
+#define BGSCBLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (0)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
-#define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (6)
+#define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (7)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nColorDistThreshold
-#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (20)
+#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (30)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fLocalWordsPerChannel
 #define BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS_PER_CH (8.0f)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fGlobalWordsPerPixelChannel
 #define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS_PER_CH (10.0f)
 //! defines the number of samples to use when computing running averages
 #define BGSCBLBSP_N_SAMPLES_FOR_MEAN (100)
-//! defines the threshold values used to detect long-term ghosting and trigger a fast edge-based absorption in the model
-#define BGSCBLBSP_GHOST_DETECTION_SAVG_MIN (0.9750f)
-#define BGSCBLBSP_GHOST_DETECTION_ZAVG_MIN (0.9750f)
-#define BGSCBLBSP_GHOST_DETECTION_DMIX_MAX (0.6000f)
-#define BGSCBLBSP_GHOST_DETECTION_DLST_MAX (0.0075f)
-//! defines the threshold values used to detect high variation regions that are often labelled as foreground and trigger a local, gradual change in distance thresholds
-#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN (0.625f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_ZAVG_MIN (0.625f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_DMIX_MIN (0.625f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN (0.150f)
+//! defines the threshold values used to detect long-term ghosting
+#define BGSCBLBSP_GHOST_DETECTION_SAVG_MIN (0.9000f)
+#define BGSCBLBSP_GHOST_DETECTION_ZAVG_MIN (0.9000f)
+#define BGSCBLBSP_GHOST_DETECTION_DLST_MAX (0.0080f)
+//! defines the threshold values used to detect high variation regions
+#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN1 (0.625f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN1 (0.175f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN2 (0.500f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN2 (0.200f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN3 (0.335f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN3 (0.225f)
+//! defines the threshold values used to detect unstable regions and edges
+#define BGSCBLBSP_INSTBLTY_DETECTION_SAVG_MIN   (0.200f)
+#define BGSCBLBSP_INSTBLTY_DETECTION_ZAVG_OFFST (0.010f)
+#define BGSCBLBSP_INSTBLTY_DETECTION_FACTR_MIN  (4.000f)
 //! defines the internal threshold adjustment factor to use when treating single channel images
 #define BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.400f)
 //! parameters used for dynamic distance threshold adjustments ('R(x)')
-#define BGSCBLBSP_R_SCALE (5.0000f)
-#define BGSCBLBSP_R_INCR  (0.0300f)
+#define BGSCBLBSP_R_SCALE (4.0000f)
+#define BGSCBLBSP_R_INCR  (0.0500f)
 #define BGSCBLBSP_R_DECR  (0.0150f)
-#define BGSCBLBSP_R_LOWER (0.7500f)
-#define BGSCBLBSP_R_UPPER (3.0000f)
+#define BGSCBLBSP_R_LOWER (0.6000f)
+#define BGSCBLBSP_R_UPPER (3.5000f)
 //! parameters used for adjusting the variation speed of dynamic distance thresholds  ('R2(x)')
-#define BGSCBLBSP_R2_OFFST (0.100f)
+#define BGSCBLBSP_R2_OFFST (0.100f) // bump up since highvar regions can now incr r2? @@@@@
 #define BGSCBLBSP_R2_INCR  (1.000f)
 #define BGSCBLBSP_R2_DECR  (0.100f)
-#define BGSCBLBSP_R2_UPPER (5.000f)
+#define BGSCBLBSP_R2_UPPER (10.00f)
 //! parameters used for dynamic learning rates adjustments  ('T(x)')
-#define BGSCBLBSP_T_DECR  (0.0002f)
-#define BGSCBLBSP_T_INCR  (0.0040f)
+#define BGSCBLBSP_T_DECR  (2.0000f)
+#define BGSCBLBSP_T_INCR  (8.0000f)
 #define BGSCBLBSP_T_LOWER (2.0000f)
-#define BGSCBLBSP_T_UPPER (64.000f)
+#define BGSCBLBSP_T_UPPER (256.00f)
 
 /*!
 	CB-Based Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
@@ -139,40 +144,42 @@ protected:
 	GlobalWord_3ch* m_apGlobalWordList_3ch, *m_apGlobalWordListIter_3ch;
 	GlobalWord** m_apGlobalWordLookupTable;
 
-	//! per-pixel distance thresholds (equivalent to 'R(x)' in PBAS, but used as a relative value to determine both intensity and descriptor variation thresholds)
+	//! per-pixel distance thresholds ('R(x)')
 	cv::Mat m_oDistThresholdFrame;
-	//! per-pixel distance threshold variation modulators ('R2(x)', relative value used to modulate 'R(x)' variations)
+	//! per-pixel distance threshold variation modulators ('R2(x)')
 	cv::Mat m_oDistThresholdVariationFrame;
-	//! per-pixel mean minimal distances from the model ('D_min(x)' in PBAS, used to control variation magnitude and direction of 'T(x)' and 'R(x)')
+	//! per-pixel mean minimal model distances ('D_min(x)')
 	cv::Mat m_oMeanMinDistFrame;
-	//! per-pixel mean distances between consecutive frames ('D_last(x)', used to detect ghosts and high variation regions in the sequence)
+	//! per-pixel mean distances between consecutive frames ('D_last(x)')
 	cv::Mat m_oMeanLastDistFrame;
-	//! per-pixel mean raw segmentation results ('Savg(x)', used to detect ghosts and high variation regions in the sequence)
+	//! per-pixel mean raw segmentation results ('Savg(x)')
 	cv::Mat m_oMeanRawSegmResFrame;
-	//! per-pixel mean final segmentation results ('Zavg(x)', used to detect ghosts and high variation regions in the sequence)
+	//! per-pixel mean final segmentation results ('Zavg(x)')
 	cv::Mat m_oMeanFinalSegmResFrame;
-	//! per-pixel blink detection results (used to determine which frame regions should be assigned stronger 'R(x)' variations via 'R2(x)')
+	//! per-pixel blink detection results (@@@@@ unnamed)
 	cv::Mat m_oBlinksFrame;
-	//! per-pixel update rates ('T(x)' in PBAS, which contains pixel-level 'sigmas', as referred to in ViBe)
+	//! per-pixel update rates ('T(x)')
 	cv::Mat m_oUpdateRateFrame;
-	//! per-pixel word weight thresholds @@@@@@@@ curr used for debug
+	//! per-pixel word weight thresholds (@@@@@ unnamed)
 	//cv::Mat m_oWeightThresholdFrame;
-	//! copy of previously used pixel intensities used to calculate 'D_last(x)'
+	//! copy of previously used pixel intensities (used to calculate 'D_last(x)')
 	cv::Mat m_oLastColorFrame;
-	//! copy of previously used descriptors used to calculate 'D_last(x)'
+	//! copy of previously used descriptors (used to calculate 'D_last(x)')
 	cv::Mat m_oLastDescFrame;
-	//! the foreground mask generated by the method at [t-1] (without post-proc, used for blinking px detection)
+	//! the raw foreground mask generated by the method at [t-1]
 	cv::Mat m_oPureFGMask_last;
-	//! the foreground mask generated by the method at [t-1] (with post-proc)
+	//! the final foreground mask generated by the method at [t-1]
 	cv::Mat m_oFGMask_last;
-	//! the foreground mask generated by the method at [t-1] (with post-proc + dilatation, used for blinking px validation)
+	//! the dilated final foreground mask generated by the method at [t-1]
 	cv::Mat m_oFGMask_last_dilated;
-	//! a lookup mat used to keep track of high variation regions (for neighbor-spread ops)
+	//! a lookup map used to keep track of high variation regions
 	cv::Mat m_oHighVarRegionMask;
-	//! a lookup mat used to keep track of ghost regions (for neighbor-spread ops)
+	//! a lookup map used to keep track of ghost regions
 	cv::Mat m_oGhostRegionMask;
+	//! a lookup map used to keep track of unstable regions
+	cv::Mat m_oUnstableRegionMask;
 
-	//! pre-allocated CV_8UC1 matrix used to speed up morph ops
+	//! pre-allocated CV_8UC1 matrix used to speed up morph ops and keep by-products
 	cv::Mat m_oTempFGMask;
 	cv::Mat m_oTempFGMask2;
 	cv::Mat m_oFGMask_PreFlood;
