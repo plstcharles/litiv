@@ -40,13 +40,13 @@
 #define BGSCBLBSP_R_LOWER (0.6000f)
 #define BGSCBLBSP_R_UPPER (3.5000f)
 //! parameters used for adjusting the variation speed of dynamic distance thresholds  ('R2(x)')
-#define BGSCBLBSP_R2_OFFST (0.100f) // bump up since highvar regions can now incr r2? @@@@@
-#define BGSCBLBSP_R2_INCR  (1.000f)
-#define BGSCBLBSP_R2_DECR  (0.100f)
+#define BGSCBLBSP_R2_OFFST (0.150f)
+#define BGSCBLBSP_R2_INCR  (1.500f)
+#define BGSCBLBSP_R2_DECR  (0.150f)
 #define BGSCBLBSP_R2_UPPER (10.00f)
 //! parameters used for dynamic learning rates adjustments  ('T(x)')
 #define BGSCBLBSP_T_DECR  (2.0000f)
-#define BGSCBLBSP_T_INCR  (8.0000f)
+#define BGSCBLBSP_T_INCR  (16.000f)
 #define BGSCBLBSP_T_LOWER (2.0000f)
 #define BGSCBLBSP_T_UPPER (256.00f)
 
