@@ -110,7 +110,7 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 	m_oDistThresholdFrame.create(m_oImgSize,CV_32FC1);
 	m_oDistThresholdFrame = cv::Scalar(1.0f);
 	m_oDistThresholdVariationFrame.create(m_oImgSize,CV_32FC1);
-	m_oDistThresholdVariationFrame = cv::Scalar(BGSCBLBSP_R2_UPPER);
+	m_oDistThresholdVariationFrame = cv::Scalar(1.0f);
 	m_oUpdateRateFrame.create(m_oImgSize,CV_32FC1);
 	m_oUpdateRateFrame = cv::Scalar(BGSCBLBSP_T_LOWER);
 	m_oMeanMinDistFrame.create(m_oImgSize,CV_32FC1);
@@ -152,9 +152,9 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 	m_oLastDescFrame.create(m_oImgSize,CV_16UC((int)m_nImgChannels));
 	m_oLastDescFrame = cv::Scalar_<ushort>::all(0);
 	const size_t nKeyPoints = m_voKeyPoints.size();
-	for(size_t t=0; t<=UCHAR_MAX; ++t)
-		m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(t*m_fRelLBSPThreshold+m_nAbsLBSPThreshold);
 	if(m_nImgChannels==1) {
+		for(size_t t=0; t<=UCHAR_MAX; ++t)
+			m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(t*m_fRelLBSPThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT+m_nAbsLBSPThreshold);
 		for(size_t k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
@@ -175,6 +175,8 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 #endif //USE_GLOBAL_WORDS
 	}
 	else { //m_nImgChannels==3
+		for(size_t t=0; t<=UCHAR_MAX; ++t)
+			m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(t*m_fRelLBSPThreshold+m_nAbsLBSPThreshold);
 		for(size_t k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
