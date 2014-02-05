@@ -9,7 +9,7 @@
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
 #define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (6)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nColorDistThreshold
-#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (24)
+#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (26)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fLocalWordsPerChannel
 #define BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS_PER_CH (8.0f)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fGlobalWordsPerPixelChannel
