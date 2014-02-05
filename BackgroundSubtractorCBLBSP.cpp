@@ -19,7 +19,7 @@
 // local define used to specify whether to use the 'color distortion trick' for lword intensities or not
 #define USE_LWORD_CDIST_TRICK 0
 // local define used to specify whether to use the 'color distortion trick' for gword intensities or not
-#define USE_GWORD_CDIST_TRICK 0
+#define USE_GWORD_CDIST_TRICK 1
 // local define for the gradient proportion value used in color+grad distance calculations
 #define OVERLOAD_GRAD_PROP ((1.0f-std::pow(((*pfCurrDistThresholdFactor)-BGSCBLBSP_R_LOWER)/(BGSCBLBSP_R_UPPER-BGSCBLBSP_R_LOWER),2))*0.5f)
 // local define for the gword representation update rate
@@ -955,7 +955,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				}
 			}
 			else if((*pfCurrDistThresholdVariationFactor)>0) {
-				(*pfCurrDistThresholdVariationFactor) -= m_oFGMask_last.data[idx_uchar]?BGSCBLBSP_R2_DECR/2:BGSCBLBSP_R2_DECR;
+				(*pfCurrDistThresholdVariationFactor) -= m_oFGMask_last.data[idx_uchar]?BGSCBLBSP_R2_DECR/8:BGSCBLBSP_R2_DECR;
 				if((*pfCurrDistThresholdVariationFactor)<0)
 					(*pfCurrDistThresholdVariationFactor) = 0;
 			}
@@ -1350,7 +1350,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				}
 			}
 			else if((*pfCurrDistThresholdVariationFactor)>0) {
-				(*pfCurrDistThresholdVariationFactor) -= m_oFGMask_last.data[idx_uchar]?BGSCBLBSP_R2_DECR/2:BGSCBLBSP_R2_DECR;
+				(*pfCurrDistThresholdVariationFactor) -= m_oFGMask_last.data[idx_uchar]?BGSCBLBSP_R2_DECR/8:BGSCBLBSP_R2_DECR;
 				if((*pfCurrDistThresholdVariationFactor)<0)
 					(*pfCurrDistThresholdVariationFactor) = 0;
 			}
