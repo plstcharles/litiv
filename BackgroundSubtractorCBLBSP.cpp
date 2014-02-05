@@ -708,6 +708,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColor,x,y,m_anLBSPThreshold_8bitLUT[nCurrColor],nCurrIntraDesc);
 			const uchar nCurrIntraDescBITS = popcount_ushort_8bitsLUT(nCurrIntraDesc);
 			m_oGhostRegionMask.data[idx_uchar] = (((*pfCurrMeanRawSegmRes)>BGSCBLBSP_GHOST_DETECTION_SAVG_MIN || (*pfCurrMeanFinalSegmRes)>BGSCBLBSP_GHOST_DETECTION_ZAVG_MIN) && (*pfCurrMeanLastDist)<BGSCBLBSP_GHOST_DETECTION_DLST_MAX)?UCHAR_MAX:0;
+			//m_oGhostRegionMask.data[idx_uchar] = (((*pfCurrMeanRawSegmRes)>BGSCBLBSP_GHOST_DETECTION_SAVG_MIN || (*pfCurrMeanFinalSegmRes)>BGSCBLBSP_GHOST_DETECTION_ZAVG_MIN) && (*pfCurrMeanLastDist)<BGSCBLBSP_GHOST_DETECTION_DLST_MAX && (*pfCurrLearningRate)>=BGSCBLBSP_T_UPPER)?UCHAR_MAX:0;
 			m_oHighVarRegionMask.data[idx_uchar] = (	(((*pfCurrMeanRawSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN1 || (*pfCurrMeanFinalSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN1) && (*pfCurrMeanLastDist)>BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN1)
 													||	(((*pfCurrMeanRawSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN2 || (*pfCurrMeanFinalSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN2) && (*pfCurrMeanLastDist)>BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN2)
 													||	(((*pfCurrMeanRawSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN3 || (*pfCurrMeanFinalSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN3) && (*pfCurrMeanLastDist)>BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN3)
@@ -931,7 +932,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				}
 				++nLocalWordIdx;
 			}
-			if(m_oFGMask_last.data[idx_uchar] && (*pfCurrLearningRate)<BGSCBLBSP_T_UPPER) {
+			if(m_oFGMask_last_dilated.data[idx_uchar] && (*pfCurrLearningRate)<BGSCBLBSP_T_UPPER) {
 				//*pfCurrLearningRate += BGSCBLBSP_T_INCR/(*pfCurrMeanMinDist);
 				//*pfCurrLearningRate += BGSCBLBSP_T_INCR/(*pfCurrMeanLastDist);
 				*pfCurrLearningRate += BGSCBLBSP_T_INCR;
@@ -1026,6 +1027,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const uchar anCurrIntraDescBITS[3] = {popcount_ushort_8bitsLUT(anCurrIntraDesc[0]),popcount_ushort_8bitsLUT(anCurrIntraDesc[1]),popcount_ushort_8bitsLUT(anCurrIntraDesc[2])};
 			const uchar nCurrIntraDescBITS = anCurrIntraDescBITS[0]+anCurrIntraDescBITS[1]+anCurrIntraDescBITS[2];
 			m_oGhostRegionMask.data[idx_uchar] = (((*pfCurrMeanRawSegmRes)>BGSCBLBSP_GHOST_DETECTION_SAVG_MIN || (*pfCurrMeanFinalSegmRes)>BGSCBLBSP_GHOST_DETECTION_ZAVG_MIN) && (*pfCurrMeanLastDist)<BGSCBLBSP_GHOST_DETECTION_DLST_MAX)?UCHAR_MAX:0;
+			//m_oGhostRegionMask.data[idx_uchar] = (((*pfCurrMeanRawSegmRes)>BGSCBLBSP_GHOST_DETECTION_SAVG_MIN || (*pfCurrMeanFinalSegmRes)>BGSCBLBSP_GHOST_DETECTION_ZAVG_MIN) && (*pfCurrMeanLastDist)<BGSCBLBSP_GHOST_DETECTION_DLST_MAX && (*pfCurrLearningRate)>=BGSCBLBSP_T_UPPER)?UCHAR_MAX:0;
 			m_oHighVarRegionMask.data[idx_uchar] = (	(((*pfCurrMeanRawSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN1 || (*pfCurrMeanFinalSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN1) && (*pfCurrMeanLastDist)>BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN1)
 													||	(((*pfCurrMeanRawSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN2 || (*pfCurrMeanFinalSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN2) && (*pfCurrMeanLastDist)>BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN2)
 													||	(((*pfCurrMeanRawSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN3 || (*pfCurrMeanFinalSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN3) && (*pfCurrMeanLastDist)>BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN3)
@@ -1326,7 +1328,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				}
 				++nLocalWordIdx;
 			}
-			if(m_oFGMask_last.data[idx_uchar] && (*pfCurrLearningRate)<BGSCBLBSP_T_UPPER) {
+			if(m_oFGMask_last_dilated.data[idx_uchar] && (*pfCurrLearningRate)<BGSCBLBSP_T_UPPER) {
 				//*pfCurrLearningRate += BGSCBLBSP_T_INCR/(*pfCurrMeanMinDist);
 				//*pfCurrLearningRate += BGSCBLBSP_T_INCR/(*pfCurrMeanLastDist);
 				*pfCurrLearningRate += BGSCBLBSP_T_INCR;
