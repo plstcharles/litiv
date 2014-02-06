@@ -9,7 +9,7 @@
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
 #define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (5)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nColorDistThreshold
-#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (24)
+#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (25)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fLocalWordsPerChannel
 #define BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS_PER_CH (7.0f)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fGlobalWordsPerPixelChannel
@@ -34,19 +34,19 @@
 //! defines the internal threshold adjustment factor to use when treating single channel images
 #define BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.350f)
 //! parameters used for dynamic distance threshold adjustments ('R(x)')
-#define BGSCBLBSP_R_SCALE (4.0000f)
+#define BGSCBLBSP_R_SCALE (3.5000f)
 #define BGSCBLBSP_R_INCR  (0.0850f)
 #define BGSCBLBSP_R_DECR  (0.0300f)
 #define BGSCBLBSP_R_LOWER (0.8000f)
-#define BGSCBLBSP_R_UPPER (4.0000f)
+#define BGSCBLBSP_R_UPPER (3.5000f)
 //! parameters used for adjusting the variation speed of dynamic distance thresholds  ('R2(x)')
 #define BGSCBLBSP_R2_OFFST (0.100f)
 #define BGSCBLBSP_R2_INCR  (0.800f)
 #define BGSCBLBSP_R2_DECR  (0.100f)
 #define BGSCBLBSP_R2_UPPER (999.00f)
 //! parameters used for dynamic learning rates adjustments  ('T(x)')
-#define BGSCBLBSP_T_DECR  (1.0000f)
-#define BGSCBLBSP_T_INCR  (20.000f)
+#define BGSCBLBSP_T_DECR  (0.0250f)
+#define BGSCBLBSP_T_INCR  (0.5000f)
 #define BGSCBLBSP_T_LOWER (2.0000f)
 #define BGSCBLBSP_T_UPPER (256.00f)
 
