@@ -243,7 +243,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 					m_voBGColorSamples[s_rand].data[idx_uchar] = nCurrColor;
 				}
 				int x_rand,y_rand;
-				getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
+				getRandNeighborPosition_3x3(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 				const size_t n_rand = rand();
 				const size_t idx_rand_uchar = m_oImgSize.width*y_rand + x_rand;
 				const size_t idx_rand_flt32 = idx_rand_uchar*4;
@@ -395,7 +395,7 @@ void BackgroundSubtractorPBASLBSP::operator()(cv::InputArray _image, cv::OutputA
 					}
 				}
 				int x_rand,y_rand;
-				getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
+				getRandNeighborPosition_3x3(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 				const size_t n_rand = rand();
 				const size_t idx_rand_uchar = m_oImgSize.width*y_rand + x_rand;
 				const size_t idx_rand_flt32 = idx_rand_uchar*4;

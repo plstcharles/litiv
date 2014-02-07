@@ -148,7 +148,7 @@ void BackgroundSubtractorPBAS_3ch::operator()(cv::InputArray _image, cv::OutputA
 				}
 				if((rand()%nLearningRate)==0) {
 					int x_rand,y_rand;
-					getRandNeighborPosition(x_rand,y_rand,x,y,0,m_oImgSize);
+					getRandNeighborPosition_3x3(x_rand,y_rand,x,y,0,m_oImgSize);
 					const size_t s_rand = rand()%m_nBGSamples;
 #if BGSPBAS_USE_SELF_DIFFUSION
 					m_voBGImg[s_rand].at<cv::Vec3b>(y_rand,x_rand) = oInputImgRGB.at<cv::Vec3b>(y_rand,x_rand);
