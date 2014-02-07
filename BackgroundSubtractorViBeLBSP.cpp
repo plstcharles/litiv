@@ -170,7 +170,7 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 				}
 				if((rand()%nLearningRate)==0) {
 					int x_rand,y_rand;
-					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
+					getRandNeighborPosition_3x3(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 					const size_t s_rand = rand()%m_nBGSamples;
 					ushort& nRandInputDesc = m_voBGDescSamples[s_rand].at<ushort>(y_rand,x_rand);
 #if BGSVIBELBSP_USE_SELF_DIFFUSION
@@ -294,7 +294,7 @@ void BackgroundSubtractorViBeLBSP::operator()(cv::InputArray _image, cv::OutputA
 				}
 				if((rand()%nLearningRate)==0) {
 					int x_rand,y_rand;
-					getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
+					getRandNeighborPosition_3x3(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 					const size_t s_rand = rand()%m_nBGSamples;
 					ushort* anRandInputDesc = ((ushort*)(m_voBGDescSamples[s_rand].data + desc_row_step*y_rand + 6*x_rand));
 #if BGSVIBELBSP_USE_SELF_DIFFUSION

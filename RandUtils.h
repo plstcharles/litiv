@@ -47,19 +47,44 @@ static inline void getRandSamplePosition(int& x_sample, int& y_sample, const int
 		y_sample = imgsize.height-border-1;
 }
 
-// simple 8-connected neighbors pattern
-static const int s_anNeighborPatternSize = 8;
-static const int s_anNeighborPattern[8][2] = {
+// simple 8-connected (3x3) neighbors pattern
+static const int s_anNeighborPatternSize_3x3 = 8;
+static const int s_anNeighborPattern_3x3[8][2] = {
 	{-1, 1},  { 0, 1},  { 1, 1},
 	{-1, 0},            { 1, 0},
 	{-1,-1},  { 0,-1},  { 1,-1},
 };
 
 //! returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-static inline void getRandNeighborPosition(int& x_neighbor, int& y_neighbor, const int x_orig, const int y_orig, const int border, const cv::Size& imgsize) {
-	int r = rand()%s_anNeighborPatternSize;
-	x_neighbor = x_orig+s_anNeighborPattern[r][0];
-	y_neighbor = y_orig+s_anNeighborPattern[r][1];
+static inline void getRandNeighborPosition_3x3(int& x_neighbor, int& y_neighbor, const int x_orig, const int y_orig, const int border, const cv::Size& imgsize) {
+	int r = rand()%s_anNeighborPatternSize_3x3;
+	x_neighbor = x_orig+s_anNeighborPattern_3x3[r][0];
+	y_neighbor = y_orig+s_anNeighborPattern_3x3[r][1];
+	if(x_neighbor<border)
+		x_neighbor = border;
+	else if(x_neighbor>=imgsize.width-border)
+		x_neighbor = imgsize.width-border-1;
+	if(y_neighbor<border)
+		y_neighbor = border;
+	else if(y_neighbor>=imgsize.height-border)
+		y_neighbor = imgsize.height-border-1;
+}
+
+// 5x5 neighbors pattern
+static const int s_anNeighborPatternSize_5x5 = 24;
+static const int s_anNeighborPattern_5x5[24][2] = {
+	{-2, 2},  {-1, 2},  { 0, 2},  { 1, 2},  { 2, 2},
+	{-2, 1},  {-1, 1},  { 0, 1},  { 1, 1},  { 2, 1},
+	{-2, 0},  {-1, 0},            { 1, 0},  { 2, 0},
+	{-2,-1},  {-1,-1},  { 0,-1},  { 1,-1},  { 2,-1},
+	{-2,-2},  {-1,-2},  { 0,-2},  { 1,-2},  { 2,-2},
+};
+
+//! returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
+static inline void getRandNeighborPosition_5x5(int& x_neighbor, int& y_neighbor, const int x_orig, const int y_orig, const int border, const cv::Size& imgsize) {
+	int r = rand()%s_anNeighborPatternSize_5x5;
+	x_neighbor = x_orig+s_anNeighborPattern_3x3[r][0];
+	y_neighbor = y_orig+s_anNeighborPattern_3x3[r][1];
 	if(x_neighbor<border)
 		x_neighbor = border;
 	else if(x_neighbor>=imgsize.width-border)
