@@ -789,7 +789,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(nSamplesForMean-1) + (float)nMinSumDist/s_nColorMaxDataRange_1ch)/nSamplesForMean;
 				*pfCurrMeanRawSegmRes = ((*pfCurrMeanRawSegmRes)*(nSamplesForMean-1))/nSamplesForMean;
 				int x_rand,y_rand;
-				getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
+				getRandNeighborPosition_5x5(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 				const size_t idx_rand_uchar = (m_oImgSize.width*y_rand + x_rand);
 				const size_t idx_rand_ldict = idx_rand_uchar*m_nLocalWords;
 				if(m_aapLocalDicts[idx_rand_ldict]) {
@@ -1150,7 +1150,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(nSamplesForMean-1) + (float)nMinTotSumDist/s_nColorMaxDataRange_3ch)/nSamplesForMean;
 				*pfCurrMeanRawSegmRes = ((*pfCurrMeanRawSegmRes)*(nSamplesForMean-1))/nSamplesForMean;
 				int x_rand,y_rand;
-				getRandNeighborPosition(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
+				getRandNeighborPosition_5x5(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 				const size_t idx_rand_uchar = (m_oImgSize.width*y_rand + x_rand);
 				const size_t idx_rand_ldict = idx_rand_uchar*m_nLocalWords;
 				if(m_aapLocalDicts[idx_rand_ldict]) {
@@ -1159,9 +1159,8 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					//const size_t nCurrLocalWordNeighborSpreadRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil(fRandLearningRate);
 					const size_t nCurrLocalWordNeighborSpreadRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate));
 					if((rand()%nCurrLocalWordNeighborSpreadRate)==0 || m_oUnstableRegionMask.data[idx_uchar]) {
-						size_t nRandLocalWordIdx = 0;//, nBestRandLocalWordOccCount = 0;
+						size_t nRandLocalWordIdx = 0;
 						float fPotentialRandLocalWordsWeightSum = 0.0f;
-						//LocalWord_3ch* pBestRandLocalWord = nullptr; @@@@@@@@@@@
 						while(nRandLocalWordIdx<m_nLocalWords && fPotentialRandLocalWordsWeightSum<fLocalWordsWeightSumThreshold) {
 							LocalWord_3ch* pRandLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_rand_ldict+nRandLocalWordIdx];
 #if USE_LWORD_CDIST_TRICK
@@ -1178,7 +1177,8 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 								pRandLocalWord->nOccurrences += nCurrWordOccIncr;
 								pRandLocalWord->nLastOcc = m_nFrameIndex;
 								fPotentialRandLocalWordsWeightSum += GetLocalWordWeight(pRandLocalWord,m_nFrameIndex);
-								if(nRandTotIntraDescDist<=nCurrTotDescDistThreshold/2 && (rand()%nCurrLocalWordNeighborSpreadRate)==0) {
+								if(cdist_uchar(anCurrColor,pRandLocalWord->anColor)<=m_nColorDistThreshold && nRandTotIntraDescDist<=nCurrTotDescDistThreshold/2 && (rand()%nCurrLocalWordNeighborSpreadRate)==0) {
+								//if(nRandTotIntraDescDist<=nCurrTotDescDistThreshold/2 && (rand()%nCurrLocalWordNeighborSpreadRate)==0) {
 								//if(nRandTotDescDist<=nCurrTotDescDistThreshold/2 && ((rand()%nCurrLocalWordNeighborSpreadRate)==0 || m_oUnstableRegionMask.data[idx_uchar])) {
 									for(size_t c=0; c<3; ++c)
 										pRandLocalWord->anColor[c] = anCurrColor[c];
