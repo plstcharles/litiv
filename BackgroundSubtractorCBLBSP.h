@@ -3,60 +3,57 @@
 #include "BackgroundSubtractorLBSP.h"
 
 //! defines the default value for BackgroundSubtractorLBSP::m_fLBSPThreshold
-#define BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.333f)
+#define BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.300f)
 //! defines the default offset LBSP threshold value
 #define BGSCBLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (3)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
-#define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (6)
+#define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (5)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nColorDistThreshold
-#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (30)
+#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (24)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fLocalWordsPerChannel
 #define BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS_PER_CH (7.0f)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fGlobalWordsPerPixelChannel
-#define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS_PER_CH (10.0f)
+#define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS_PER_CH (30.0f)
 //! defines the number of samples to use when computing running averages
 #define BGSCBLBSP_N_SAMPLES_FOR_MEAN (100)
 //! defines the threshold values used to detect long-term ghosting
-#define BGSCBLBSP_GHOST_DETECTION_SAVG_MIN1 (0.9000f)
-#define BGSCBLBSP_GHOST_DETECTION_DLST_MAX1 (0.0060f)
-#define BGSCBLBSP_GHOST_DETECTION_SAVG_MIN2 (0.99999f)
+#define BGSCBLBSP_GHOST_DETECTION_SAVG_MIN1 (9.995f)
+#define BGSCBLBSP_GHOST_DETECTION_DLST_MAX1 (-0.005f)
+#define BGSCBLBSP_GHOST_DETECTION_SAVG_MIN2 (9.99999f)
 //! defines the threshold values used to detect high variation regions
-#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN1 (0.950f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN1 (0.975f)
 #define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN1 (0.125f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN2 (0.875f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN2 (0.900f)
 #define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN2 (0.150f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN3 (0.450f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN3 (0.175f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN4 (0.350f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN4 (0.200f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN5 (0.225f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN5 (0.225f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN3 (0.150f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN3 (0.200f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN4 (0.125f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN4 (0.225f)
+//! defines the threshold values used to detect burst variation regions
+#define BGSCBLBSP_BURST_VAR_DETECTION_SAVG_MIN1 (0.950f)
+#define BGSCBLBSP_BURST_VAR_DETECTION_DLST_MIN1 (0.235f)
+#define BGSCBLBSP_BURST_VAR_DETECTION_SAVG_MIN2 (0.100f)
+#define BGSCBLBSP_BURST_VAR_DETECTION_DLST_MIN2 (0.260f)
 //! defines the threshold values used to detect unstable regions and edges
-#define BGSCBLBSP_INSTBLTY_DETECTION_SAVG_MIN   (0.200f)
-#define BGSCBLBSP_INSTBLTY_DETECTION_ZAVG_OFFST (0.025f)
-#define BGSCBLBSP_INSTBLTY_DETECTION_FACTR_MIN  (4.000f)
-#define BGSCBLBSP_INSTBLTY_R2_SPREAD_THRESHOLD  (10.00f)
-//! defines the threshold values used to 'boost' illumination variation updates in static regions
-//#define BGSCBLBSP_ILLUM_UPDT_BOOST_SAVG_MIN (0.800f)
-#define BGSCBLBSP_ILLUM_UPDT_BOOST_SAVG_MIN (0.900f)
+#define BGSCBLBSP_INSTBLTY_DETECTION_SEGM_DIFF (0.150f)
 //! defines the internal threshold adjustment factor to use when treating single channel images
 #define BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.350f)
 //! parameters used for dynamic distance threshold adjustments ('R(x)')
-#define BGSCBLBSP_R_SCALE (3.5000f)
-#define BGSCBLBSP_R_INCR  (0.0850f)
-#define BGSCBLBSP_R_DECR  (0.0300f)
-#define BGSCBLBSP_R_LOWER (0.8000f)
-#define BGSCBLBSP_R_UPPER (3.5000f)
+#define BGSCBLBSP_R_INCR  (0.0100f)
+#define BGSCBLBSP_R_DECR  (0.0100f)
+#define BGSCBLBSP_R_LOWER (1.0000f)
+#define BGSCBLBSP_R_UPPER (4.0000f)
 //! parameters used for adjusting the variation speed of dynamic distance thresholds  ('R2(x)')
 #define BGSCBLBSP_R2_OFFST (0.100f)
-#define BGSCBLBSP_R2_INCR  (0.800f)
-#define BGSCBLBSP_R2_DECR  (0.100f)
-#define BGSCBLBSP_R2_UPPER (999.00f)
+#define BGSCBLBSP_R2_INCR  (1.000f)
+#define BGSCBLBSP_R2_DECR  (0.125f)
+#define BGSCBLBSP_R2_LOWER (0.125f)
+#define BGSCBLBSP_R2_UPPER (1000.f)
 //! parameters used for dynamic learning rates adjustments  ('T(x)')
-#define BGSCBLBSP_T_DECR  (0.0050f)
-#define BGSCBLBSP_T_INCR  (0.1000f)
+#define BGSCBLBSP_T_DECR  (0.2500f)
+#define BGSCBLBSP_T_INCR  (0.5000f)
 #define BGSCBLBSP_T_LOWER (2.0000f)
-#define BGSCBLBSP_T_UPPER (256.00f)
+#define BGSCBLBSP_T_UPPER (64.000f)
 
 /*!
 	CB-Based Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
@@ -160,9 +157,13 @@ protected:
 	cv::Mat m_oMeanMinDistFrame;
 	//! per-pixel mean distances between consecutive frames ('D_last(x)')
 	cv::Mat m_oMeanLastDistFrame;
-	//! per-pixel mean raw segmentation results ('Savg(x)')
+	//! per-pixel mean distances between consecutive frames (burst version -- 'D_last_burst(x)')
+	cv::Mat m_oMeanLastDistFrame_burst;
+	//! per-pixel mean raw segmentation results ('S_avg(x)')
 	cv::Mat m_oMeanRawSegmResFrame;
-	//! per-pixel mean final segmentation results ('Zavg(x)')
+	//! per-pixel mean raw segmentation results (burst version -- 'S_avg_burst(x)')
+	cv::Mat m_oMeanRawSegmResFrame_burst;
+	//! per-pixel mean final segmentation results ('Z_avg(x)')
 	cv::Mat m_oMeanFinalSegmResFrame;
 	//! per-pixel blink detection results (@@@@@ unnamed)
 	cv::Mat m_oBlinksFrame;
