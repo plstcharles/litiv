@@ -61,8 +61,8 @@
 		<Unit filename="BackgroundSubtractorPBAS_3ch.h" />
 		<Unit filename="BackgroundSubtractorViBe.cpp" />
 		<Unit filename="BackgroundSubtractorViBe.h" />
-		<Unit filename="BackgroundSubtractorViBeLBSP.cpp" />
-		<Unit filename="BackgroundSubtractorViBeLBSP.h" />
+		<Unit filename="BackgroundSubtractorLOBSTER.cpp" />
+		<Unit filename="BackgroundSubtractorLOBSTER.h" />
 		<Unit filename="BackgroundSubtractorViBe_1ch.cpp" />
 		<Unit filename="BackgroundSubtractorViBe_1ch.h" />
 		<Unit filename="BackgroundSubtractorViBe_3ch.cpp" />

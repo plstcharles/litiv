@@ -2,7 +2,7 @@
 #include "DatasetUtils.h"
 #include "BackgroundSubtractorCBLBSP.h"
 #include "BackgroundSubtractorPBASLBSP.h"
-#include "BackgroundSubtractorViBeLBSP.h"
+#include "BackgroundSubtractorLOBSTER.h"
 #include "BackgroundSubtractorViBe_1ch.h"
 #include "BackgroundSubtractorViBe_3ch.h"
 #include "BackgroundSubtractorPBAS_1ch.h"
@@ -11,17 +11,17 @@
 /////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
 /////////////////////////////////////////
-#define DEFAULT_NB_THREADS				4
+#define DEFAULT_NB_THREADS				1
 /////////////////////////////////////////
 #define WRITE_BGSUB_IMG_OUTPUT			0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT	0
 #define WRITE_BGSUB_METRICS_ANALYSIS	1
 /////////////////////////////////////////
-#define DISPLAY_BGSUB_DEBUG_OUTPUT		0
-#if DEFAULT_NB_THREADS==1 && DISPLAY_BGSUB_DEBUG_OUTPUT
-#define ENABLE_DISPLAY_MOUSE_DEBUG		0
+#if DEFAULT_NB_THREADS==1
+#define DISPLAY_BGSUB_DEBUG_OUTPUT		1
+#define ENABLE_DISPLAY_MOUSE_DEBUG		1
 #define ENABLE_FRAME_TIMERS				0
-#endif //DEFAULT_NB_THREADS==1 && DISPLAY_BGSUB_DEBUG_OUTPUT
+#endif //DEFAULT_NB_THREADS==1
 /////////////////////////////////////////
 #define USE_CB_LBSP_BG_SUBTRACTOR		1
 #define USE_VIBE_LBSP_BG_SUBTRACTOR		0
@@ -41,7 +41,7 @@
 #define USE_PETS2001_D3TC1_DATASET		0
 /////////////////////////////////////////////////////////////////////
 #define DATASET_ROOT_DIR 				std::string("/tmp/datasets/")
-#define RESULTS_ROOT_DIR 				std::string("/tmp/datasets/")
+#define RESULTS_ROOT_DIR 				std::string("/shared/datasets/")
 #define RESULTS_OUTPUT_DIR_NAME			std::string("results_test")
 /////////////////////////////////////////////////////////////////////
 
@@ -55,7 +55,15 @@ const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/CDNet/dataset/");
 const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet/"+RESULTS_OUTPUT_DIR_NAME+"/");
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
-const char* g_asDatasetCategories[] = {"dynamicBackground","shadow","baseline","intermittentObjectMotion","cameraJitter","thermal"};
+//const char* g_asDatasetCategories[] = {"baseline"};
+//const char* g_asDatasetCategories[] = {"baseline_office"};
+//const char* g_asDatasetCategories[] = {"baseline","shadow_cubicle"};
+const char* g_asDatasetCategories[] = {"dynamicBackground_fountain02"};
+//const char* g_asDatasetCategories[] = {"shadow_cubicle"};
+//const char* g_asDatasetCategories[] = {"dynamicBackground_boats","dynamicBackground_fountain01","dynamicBackground_fountain02","dynamicBackground_overpass","cameraJitter_sidewalk"};
+//const char* g_asDatasetCategories[] = {"shadow_cubicle","intermittentObjectMotion_tramstop","intermittentObjectMotion_winterDriveway"};
+//const char* g_asDatasetCategories[] = {"thermal_lakeSide"};
+//const char* g_asDatasetCategories[] = {"dynamicBackground","shadow","baseline","intermittentObjectMotion","cameraJitter","thermal"};
 const size_t g_nResultIdxOffset = 1;
 #elif USE_WALLFLOWER_DATASET
 const std::string g_sDatasetName(WALLFLOWER_DB_NAME);
@@ -84,13 +92,9 @@ void OnMouseEvent(int event, int x, int y, int, void*) {
 }
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
-#if !USE_VIBE_BG_SUBTRACTOR && !USE_PBAS_BG_SUBTRACTOR
 cv::Size g_oDisplayOutputSize(960,240);
-cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oBGDesc, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, std::vector<cv::KeyPoint> voKeyPoints, size_t nFrame);
-#else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
-cv::Size g_oDisplayOutputSize(800,240);
-cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, size_t nFrame);
-#endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
+bool g_bContinuousUpdates = false;
+cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, const cv::Mat& oROI, size_t nFrame);
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if DEFAULT_NB_THREADS<1
 #error "Bad default number of threads specified."
@@ -236,11 +240,11 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		cv::Mat oFGMask, oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
 #if USE_VIBE_LBSP_BG_SUBTRACTOR
 #if USE_RELATIVE_LBSP_COMPARISONS
-		pBGS = new BackgroundSubtractorViBeLBSP(BGSVIBELBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
+		pBGS = new BackgroundSubtractorLOBSTER(BGSLOBSTER_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
 #else //!USE_RELATIVE_LBSP_COMPARISONS
-		pBGS = new BackgroundSubtractorViBeLBSP(BGSVIBELBSP_DEFAULT_LBSP_ABS_SIMILARITY_THRESHOLD);
+		pBGS = new BackgroundSubtractorLOBSTER(BGSLOBSTER_DEFAULT_LBSP_ABS_SIMILARITY_THRESHOLD);
 #endif //!USE_RELATIVE_LBSP_COMPARISONS
-		const double dDefaultLearningRate = BGSVIBELBSP_DEFAULT_LEARNING_RATE;
+		const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
 		pBGS->initialize(oInitImg,voKPs);
 #elif USE_PBAS_LBSP_BG_SUBTRACTOR
 		pBGS = new BackgroundSubtractorPBASLBSP();
@@ -306,13 +310,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 			cv::Mat oLastBGImg;
-#if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
 			pBGS->getBackgroundImage(oLastBGImg);
-			cv::Mat oLastBGDescImg;
-			((BackgroundSubtractorLBSP*)pBGS)->getBackgroundDescriptorsImage(oLastBGDescImg);
-#else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
-			pBGS->getBackgroundImage(oLastBGImg);
-#endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
 			std::chrono::high_resolution_clock::time_point pre_process = std::chrono::high_resolution_clock::now();
@@ -326,11 +324,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 			cv::Mat oGTImg = pCurrSequence->GetGTFrameFromIndex(k);
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
-#if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
-			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oLastBGDescImg,oFGMask,oGTImg,pBGS->getBGKeyPoints(),k);
-#else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
-			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oFGMask,oGTImg,k);
-#endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
+			cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),k);
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if WRITE_BGSUB_DEBUG_IMG_OUTPUT
 			oDebugWriter.write(oDebugDisplayFrame);
@@ -342,7 +336,13 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 			else
 				oDebugDisplayFrameResized = oDebugDisplayFrame;
 			cv::imshow(sDebugDisplayName, oDebugDisplayFrameResized);
-			cv::waitKey(0);
+			int nKeyPressed;
+			if(g_bContinuousUpdates)
+				nKeyPressed = cv::waitKey(1);
+			else
+				nKeyPressed = cv::waitKey(0);
+			if(nKeyPressed==32)
+				g_bContinuousUpdates = !g_bContinuousUpdates;
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT
 #if WRITE_BGSUB_IMG_OUTPUT
 			WriteResult(g_sResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix,oFGMask,g_vnResultsComprParams);
@@ -381,55 +381,19 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 }
 
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
-#if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
-cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oBGDesc, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, std::vector<cv::KeyPoint> voKeyPoints, size_t nFrame) {
+// NOTE : current impl is most likely broken for pure vibe/pbas subtractors.
+cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, const cv::Mat& oROI, size_t nFrame) {
 	// note: this function is definitely NOT efficient in any way; it is only intended for debug purposes.
-	cv::Mat oInputImgBYTE3, oBGImgBYTE3, oBGDescBYTE, oBGDescBYTE3, oFGMaskBYTE3;
-	cv::Mat oInputDesc, oInputDescBYTE, oInputDescBYTE3;
-	cv::Mat oDescDiff, oDescDiffBYTE, oDescDiffBYTE3;
-	cv::Mat oImgDiffBYTE3;
-#if USE_VIBE_LBSP_BG_SUBTRACTOR
-	LBSP oExtractor(USE_RELATIVE_LBSP_COMPARISONS?BGSVIBELBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD:BGSVIBELBSP_DEFAULT_LBSP_ABS_SIMILARITY_THRESHOLD);
-#else //USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
-	LBSP oExtractor(BGSPBASLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
-#endif //USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
-	oExtractor.setReference(oBGImg);
-	oExtractor.compute2(oInputImg,voKeyPoints,oInputDesc);
-	LBSP::calcDescImgDiff(oInputDesc,oBGDesc,oDescDiff);
-	oInputDesc.convertTo(oInputDescBYTE,CV_8U,(double)UCHAR_MAX/USHRT_MAX);
-	oBGDesc.convertTo(oBGDescBYTE,CV_8U,(double)UCHAR_MAX/USHRT_MAX);
-	oDescDiffBYTE = oDescDiff;
-	cv::Mat oFGMask_INVERTED, oGTFGMask_INVERTED;
-	cv::bitwise_not(oFGMask,oFGMask_INVERTED);
-	cv::bitwise_not(oGTFGMask,oGTFGMask_INVERTED);
-	cv::Mat oTPMask, oFPMask, oFNMask;
-	cv::bitwise_and(oFGMask,oGTFGMask,oTPMask);
-	cv::bitwise_and(oFGMask,oGTFGMask_INVERTED,oFPMask);
-	cv::bitwise_and(oFGMask_INVERTED,oGTFGMask,oFNMask);
-	cv::Mat oGoodFGMask=oTPMask, oBadFGMask;
-	cv::bitwise_or(oFPMask,oFNMask,oBadFGMask);
-	cv::Mat oEmptyFGMask = cv::Mat::zeros(oFGMask.size(),CV_8UC1);
-	std::vector<cv::Mat> voFGMaskBYTE3;
-	voFGMaskBYTE3.push_back(oEmptyFGMask);
-	voFGMaskBYTE3.push_back(oGoodFGMask);
-	voFGMaskBYTE3.push_back(oBadFGMask);
-	cv::merge(voFGMaskBYTE3,oFGMaskBYTE3);
-	//cv::cvtColor(oFGMask,oFGMaskBYTE3,CV_GRAY2RGB);
+	cv::Mat oInputImgBYTE3, oBGImgBYTE3, oFGMaskBYTE3;
 	if(oInputImg.channels()!=3) {
 		cv::cvtColor(oInputImg,oInputImgBYTE3,CV_GRAY2RGB);
 		cv::cvtColor(oBGImg,oBGImgBYTE3,CV_GRAY2RGB);
-		cv::cvtColor(oInputDescBYTE,oInputDescBYTE3,CV_GRAY2RGB);
-		cv::cvtColor(oBGDescBYTE,oBGDescBYTE3,CV_GRAY2RGB);
-		cv::cvtColor(oDescDiffBYTE,oDescDiffBYTE3,CV_GRAY2RGB);
 	}
 	else {
 		oInputImgBYTE3 = oInputImg;
 		oBGImgBYTE3 = oBGImg;
-		oInputDescBYTE3 = oInputDescBYTE;
-		oBGDescBYTE3 = oBGDescBYTE;
-		oDescDiffBYTE3 = oDescDiffBYTE;
 	}
-
+	oFGMaskBYTE3 = GetColoredSegmFrameFromResult(oFGMask,oGTFGMask,oROI);
 #if ENABLE_DISPLAY_MOUSE_DEBUG
 	if(pnLatestMouseX&&pnLatestMouseY) {
 		cv::Point dbgpt(*pnLatestMouseX,*pnLatestMouseY);
@@ -437,77 +401,19 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 		cv::circle(oFGMaskBYTE3,dbgpt,5,cv::Scalar(255,255,255));
 	}
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
-
-	cv::absdiff(oInputImgBYTE3,oBGImgBYTE3,oImgDiffBYTE3);
 	cv::Mat displayH,displayV1,displayV2;
 	cv::resize(oInputImgBYTE3,oInputImgBYTE3,cv::Size(320,240));
-	cv::resize(oBGImgBYTE3,oBGImgBYTE3,cv::Size(160,120));
-	cv::resize(oImgDiffBYTE3,oImgDiffBYTE3,cv::Size(160,120));
-	cv::resize(oBGDescBYTE3,oBGDescBYTE3,cv::Size(160,120));
-	cv::resize(oDescDiffBYTE3,oDescDiffBYTE3,cv::Size(160,120));
+	cv::resize(oBGImgBYTE3,oBGImgBYTE3,cv::Size(320,240));
 	cv::resize(oFGMaskBYTE3,oFGMaskBYTE3,cv::Size(320,240));
 
 	std::stringstream sstr;
 	sstr << "Input Image #" << nFrame;
 	WriteOnImage(oInputImgBYTE3,sstr.str());
 	WriteOnImage(oBGImgBYTE3,"Reference Image");
-	WriteOnImage(oImgDiffBYTE3,"Diff Image");
-	WriteOnImage(oBGDescBYTE3,"Reference DescImage");
-	WriteOnImage(oDescDiffBYTE3,"Diff DescImage");
 	WriteOnImage(oFGMaskBYTE3,"Segmentation Result");
 
-	cv::vconcat(oBGImgBYTE3,oImgDiffBYTE3,displayV1);
-	cv::vconcat(oBGDescBYTE3,oDescDiffBYTE3,displayV2);
-	cv::hconcat(oInputImgBYTE3,displayV1,displayH);
-	cv::hconcat(displayH,displayV2,displayH);
+	cv::hconcat(oInputImgBYTE3,oBGImgBYTE3,displayH);
 	cv::hconcat(displayH,oFGMaskBYTE3,displayH);
 	return displayH;
 }
-#else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
-cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, size_t nFrame) {
-	// note: this function is definitely NOT efficient in any way; it is only intended for debug purposes.
-	CV_Assert(oInputImg.type()==oBGImg.type() && oBGImg.type()==CV_8UC3);
-	CV_Assert(oFGMask.type()==CV_8UC1);
-	CV_Assert(oInputImg.size()==oBGImg.size() && oBGImg.size()==oFGMask.size());
-	cv::Mat oInputImgBYTE3,oBGImgBYTE3,oFGMaskBYTE3,oImgDiffBYTE3;
-	cv::Mat oFGMask_INVERTED, oGTFGMask_INVERTED;
-	cv::bitwise_not(oFGMask,oFGMask_INVERTED);
-	cv::bitwise_not(oGTFGMask,oGTFGMask_INVERTED);
-	cv::Mat oTPMask, oFPMask, oFNMask;
-	cv::bitwise_and(oFGMask,oGTFGMask,oTPMask);
-	cv::bitwise_and(oFGMask,oGTFGMask_INVERTED,oFPMask);
-	cv::bitwise_and(oFGMask_INVERTED,oGTFGMask,oFNMask);
-	cv::Mat oGoodFGMask=oTPMask, oBadFGMask;
-	cv::bitwise_or(oFPMask,oFNMask,oBadFGMask);
-	cv::Mat oEmptyFGMask = cv::Mat::zeros(oFGMask.size(),CV_8UC1);
-	std::vector<cv::Mat> voFGMaskBYTE3;
-	voFGMaskBYTE3.push_back(oEmptyFGMask);
-	voFGMaskBYTE3.push_back(oGoodFGMask);
-	voFGMaskBYTE3.push_back(oBadFGMask);
-	cv::merge(voFGMaskBYTE3,oFGMaskBYTE3);
-	//cv::cvtColor(oFGMask,oFGMaskBYTE3,CV_GRAY2RGB);
-	oInputImgBYTE3 = oInputImg;
-	oBGImgBYTE3 = oBGImg;
-	cv::absdiff(oInputImgBYTE3,oBGImgBYTE3,oImgDiffBYTE3);
-	cv::Mat displayH,displayV;
-
-	cv::resize(oInputImgBYTE3,oInputImgBYTE3,cv::Size(320,240));
-	cv::resize(oBGImgBYTE3,oBGImgBYTE3,cv::Size(160,120));
-	cv::resize(oImgDiffBYTE3,oImgDiffBYTE3,cv::Size(160,120));
-	cv::resize(oFGMaskBYTE3,oFGMaskBYTE3,cv::Size(320,240));
-
-
-	std::stringstream sstr;
-	sstr << "Input Image #" << nFrame;
-	WriteOnImage(oInputImgBYTE3,sstr.str());
-	WriteOnImage(oBGImgBYTE3,"Reference Image");
-	WriteOnImage(oImgDiffBYTE3,"Diff Image");
-	WriteOnImage(oFGMaskBYTE3,"Segmentation Result");
-
-	cv::vconcat(oBGImgBYTE3,oImgDiffBYTE3,displayV);
-	cv::hconcat(oInputImgBYTE3,displayV,displayH);
-	cv::hconcat(displayH,oFGMaskBYTE3,displayH);
-	return displayH;
-}
-#endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT

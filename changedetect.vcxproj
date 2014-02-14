@@ -175,7 +175,7 @@
     <ClInclude Include="BackgroundSubtractorViBe.h" />
     <ClInclude Include="BackgroundSubtractorViBe_1ch.h" />
     <ClInclude Include="BackgroundSubtractorViBe_3ch.h" />
-    <ClInclude Include="BackgroundSubtractorViBeLBSP.h" />
+    <ClInclude Include="BackgroundSubtractorLOBSTER.h" />
     <ClInclude Include="DatasetUtils.h" />
     <ClInclude Include="DistanceUtils.h" />
     <ClInclude Include="LBSP.h" />
@@ -192,7 +192,7 @@
     <ClCompile Include="BackgroundSubtractorViBe.cpp" />
     <ClCompile Include="BackgroundSubtractorViBe_1ch.cpp" />
     <ClCompile Include="BackgroundSubtractorViBe_3ch.cpp" />
-    <ClCompile Include="BackgroundSubtractorViBeLBSP.cpp" />
+    <ClCompile Include="BackgroundSubtractorLOBSTER.cpp" />
     <ClCompile Include="DatasetUtils.cpp" />
     <ClCompile Include="LBSP.cpp" />
     <ClCompile Include="main.cpp" />

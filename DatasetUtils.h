@@ -288,3 +288,48 @@ static inline void CalcMetricsFromResult(const cv::Mat& oInputFrame, const cv::M
 		}
 	}
 }
+
+static inline cv::Mat GetColoredSegmFrameFromResult(const cv::Mat& oInputFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI) {
+	CV_DbgAssert(oInputFrame.type()==CV_8UC1 && oGTFrame.type()==CV_8UC1 && oROI.type()==CV_8UC1);
+	CV_DbgAssert(oInputFrame.size()==oGTFrame.size() && oInputFrame.size()==oROI.size());
+	cv::Mat oResult(oInputFrame.size(),CV_8UC3,cv::Scalar_<uchar>(0));
+	const size_t step_row = oInputFrame.step.p[0];
+	for(size_t i=0; i<(size_t)oInputFrame.rows; ++i) {
+		const size_t idx_nstep = step_row*i;
+		const uchar* input_step_ptr = oInputFrame.data+idx_nstep;
+		const uchar* gt_step_ptr = oGTFrame.data+idx_nstep;
+		const uchar* roi_step_ptr = oROI.data+idx_nstep;
+		uchar* res_step_ptr = oResult.data+idx_nstep*3;
+		for(int j=0; j<oInputFrame.cols; ++j) {
+			if(	gt_step_ptr[j]!=VAL_OUTOFSCOPE &&
+				gt_step_ptr[j]!=VAL_UNKNOWN &&
+				roi_step_ptr[j]!=VAL_NEGATIVE ) {
+				if(input_step_ptr[j]==VAL_POSITIVE) {
+					if(gt_step_ptr[j]==VAL_POSITIVE)
+						res_step_ptr[j*3+1] = UCHAR_MAX;
+					else if(gt_step_ptr[j]==VAL_NEGATIVE)
+						res_step_ptr[j*3+2] = UCHAR_MAX;
+					else if(gt_step_ptr[j]==VAL_SHADOW) {
+						res_step_ptr[j*3+1] = UCHAR_MAX/2;
+						res_step_ptr[j*3+2] = UCHAR_MAX;
+					}
+					else {
+						for(size_t c=0; c<3; ++c)
+							res_step_ptr[j*3+c] = UCHAR_MAX/3;
+					}
+				}
+				else { // input_step_ptr[j]==VAL_NEGATIVE
+					if(gt_step_ptr[j]==VAL_POSITIVE) {
+						res_step_ptr[j*3] = UCHAR_MAX/2;
+						res_step_ptr[j*3+2] = UCHAR_MAX;
+					}
+				}
+			}
+			else {
+				for(size_t c=0; c<3; ++c)
+					res_step_ptr[j*3+c] = input_step_ptr[j];
+			}
+		}
+	}
+	return oResult;
+}

@@ -19,7 +19,9 @@
 /*!
 	Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm (abstract version).
 
-	For more details on the different parameters, go to @@@@@@@@@@@@@@.
+	For more details on the different parameters, see P.-L. St-Charles and G.-A. Bilodeau, "Improving Background
+	Subtraction using Local Binary Similarity Patterns", in WACV 2014, or G.-A. Bilodeau et al, "Change Detection
+	in Feature Space Using Local Binary Similarity Patterns", in CRV 2013.
 
 	This algorithm is currently NOT thread-safe.
  */

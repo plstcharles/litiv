@@ -18,7 +18,7 @@
 #define BGSPBAS_DEFAULT_REQUIRED_NB_BG_SAMPLES (2)
 //! defines the default value for BackgroundSubtractorPBAS::m_fDefaultUpdateRate
 #define BGSPBAS_DEFAULT_LEARNING_RATE (16.0f)
-//! defines the default value for the learning rate passed to BackgroundSubtractorViBeLBSP::operator()
+//! defines the default value for the learning rate passed to BackgroundSubtractorPBAS::operator()
 #define BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE (-1.0)
 //! parameters used for dynamic threshold adjustments
 #define BGSPBAS_R_OFFST (0.0000f)
