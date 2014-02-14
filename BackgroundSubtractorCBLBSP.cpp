@@ -745,8 +745,10 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const size_t nCurrWordOccIncr = std::max((size_t)m_oGhostRegionMask.data[idx_uchar],nDefaultWordOccIncr);
 			size_t nLocalWordIdx = 0;
 			float fPotentialLocalWordsWeightSum = 0.0f;
+			float fLastLocalWordWeight = FLT_MAX;
 			while(nLocalWordIdx<m_nLocalWords && fPotentialLocalWordsWeightSum<fLocalWordsWeightSumThreshold) {
 				LocalWord_1ch* pCurrLocalWord = (LocalWord_1ch*)m_aapLocalDicts[idx_ldict+nLocalWordIdx];
+				const float fCurrLocalWordWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
 				{
 					const size_t nColorDist = absdiff_uchar(nCurrColor,pCurrLocalWord->nColor);
 					size_t nIntraDescDist, nInterDescDist;
@@ -775,7 +777,6 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 					}
 					if(nDescDist<=nCurrDescDistThreshold && nSumDist<=nCurrColorDistThreshold) {
-						const float fCurrLocalWordWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
 						fPotentialLocalWordsWeightSum += fCurrLocalWordWeight;
 						pCurrLocalWord->nLastOcc = m_nFrameIndex;
 						if((!m_oFGMask_last.data[idx_uchar] || m_oGhostRegionMask.data[idx_uchar] || m_oUnstableRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar]) && fCurrLocalWordWeight<LWORD_MAX_WEIGHT)
@@ -792,12 +793,26 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					}
 				}
 				//failedcheck1ch:
-				if(nLocalWordIdx>0 && GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_nFrameIndex)>GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx-1],m_nFrameIndex)) {
+				if(fCurrLocalWordWeight>fLastLocalWordWeight) {
 					std::swap(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_aapLocalDicts[idx_ldict+nLocalWordIdx-1]);
 #if DISPLAY_CBLBSP_DEBUG_INFO
 					std::swap(vsWordModList[idx_ldict+nLocalWordIdx],vsWordModList[idx_ldict+nLocalWordIdx-1]);
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 				}
+				else
+					fLastLocalWordWeight = fCurrLocalWordWeight;
+				++nLocalWordIdx;
+			}
+			while(nLocalWordIdx<m_nLocalWords) {
+				const float fCurrLocalWordWeight = GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_nFrameIndex);
+				if(fCurrLocalWordWeight>fLastLocalWordWeight) {
+					std::swap(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_aapLocalDicts[idx_ldict+nLocalWordIdx-1]);
+#if DISPLAY_CBLBSP_DEBUG_INFO
+					std::swap(vsWordModList[idx_ldict+nLocalWordIdx],vsWordModList[idx_ldict+nLocalWordIdx-1]);
+#endif //DISPLAY_CBLBSP_DEBUG_INFO
+				}
+				else
+					fLastLocalWordWeight = fCurrLocalWordWeight;
 				++nLocalWordIdx;
 			}
 			if(fPotentialLocalWordsWeightSum>=fLocalWordsWeightSumThreshold) {
@@ -884,15 +899,6 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 						*pfLastMatchedGlobalWord_LocalWeight += fPotentialLocalWordsWeightSum;
 					}
 				}
-			}
-			while(nLocalWordIdx<m_nLocalWords) {
-				if(nLocalWordIdx>0 && GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_nFrameIndex)>GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx-1],m_nFrameIndex)) {
-					std::swap(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_aapLocalDicts[idx_ldict+nLocalWordIdx-1]);
-#if DISPLAY_CBLBSP_DEBUG_INFO
-					std::swap(vsWordModList[idx_ldict+nLocalWordIdx],vsWordModList[idx_ldict+nLocalWordIdx-1]);
-#endif //DISPLAY_CBLBSP_DEBUG_INFO
-				}
-				++nLocalWordIdx;
 			}
 			// == neighb updt
 			if((!oCurrFGMask.data[idx_uchar] || !m_oFGMask_last.data[idx_uchar]) && (m_oGhostRegionMask.data[idx_uchar] || m_oUnstableRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0)) {
@@ -1059,8 +1065,10 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const size_t nCurrWordOccIncr = std::max((size_t)m_oGhostRegionMask.data[idx_uchar],nDefaultWordOccIncr);
 			size_t nLocalWordIdx = 0;
 			float fPotentialLocalWordsWeightSum = 0.0f;
+			float fLastLocalWordWeight = FLT_MAX;
 			while(nLocalWordIdx<m_nLocalWords && fPotentialLocalWordsWeightSum<fLocalWordsWeightSumThreshold) {
 				LocalWord_3ch* pCurrLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_ldict+nLocalWordIdx];
+				const float fCurrLocalWordWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
 				{
 #if USE_SC_THRS_VALIDATION
 #if USE_LWORD_CDIST_TRICK
@@ -1158,7 +1166,6 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					const size_t nTotSumDist = std::min((size_t)(OVERLOAD_GRAD_PROP*nTotDescDist)*(s_nColorMaxDataRange_3ch/s_nDescMaxDataRange_3ch)+nTotColorDist,s_nColorMaxDataRange_3ch);
 #endif //!USE_SC_THRS_VALIDATION
 					if(nTotDescDist<=nCurrTotDescDistThreshold && nTotSumDist<=nCurrTotColorDistThreshold) {
-						const float fCurrLocalWordWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
 						fPotentialLocalWordsWeightSum += fCurrLocalWordWeight;
 						pCurrLocalWord->nLastOcc = m_nFrameIndex;
 						if((!m_oFGMask_last.data[idx_uchar] || m_oGhostRegionMask.data[idx_uchar] || m_oUnstableRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar]) && fCurrLocalWordWeight<LWORD_MAX_WEIGHT)
@@ -1175,12 +1182,26 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					}
 				}
 				failedcheck3ch:
-				if(nLocalWordIdx>0 && GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_nFrameIndex)>GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx-1],m_nFrameIndex)) {
+				if(fCurrLocalWordWeight>fLastLocalWordWeight) {
 					std::swap(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_aapLocalDicts[idx_ldict+nLocalWordIdx-1]);
 #if DISPLAY_CBLBSP_DEBUG_INFO
 					std::swap(vsWordModList[idx_ldict+nLocalWordIdx],vsWordModList[idx_ldict+nLocalWordIdx-1]);
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 				}
+				else
+					fLastLocalWordWeight = fCurrLocalWordWeight;
+				++nLocalWordIdx;
+			}
+			while(nLocalWordIdx<m_nLocalWords) {
+				const float fCurrLocalWordWeight = GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_nFrameIndex);
+				if(fCurrLocalWordWeight>fLastLocalWordWeight) {
+					std::swap(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_aapLocalDicts[idx_ldict+nLocalWordIdx-1]);
+#if DISPLAY_CBLBSP_DEBUG_INFO
+					std::swap(vsWordModList[idx_ldict+nLocalWordIdx],vsWordModList[idx_ldict+nLocalWordIdx-1]);
+#endif //DISPLAY_CBLBSP_DEBUG_INFO
+				}
+				else
+					fLastLocalWordWeight = fCurrLocalWordWeight;
 				++nLocalWordIdx;
 			}
 			if(fPotentialLocalWordsWeightSum>=fLocalWordsWeightSumThreshold) {
@@ -1287,15 +1308,6 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 						*pfLastMatchedGlobalWord_LocalWeight += fPotentialLocalWordsWeightSum;
 					}
 				}
-			}
-			while(nLocalWordIdx<m_nLocalWords) {
-				if(nLocalWordIdx>0 && GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_nFrameIndex)>GetLocalWordWeight(m_aapLocalDicts[idx_ldict+nLocalWordIdx-1],m_nFrameIndex)) {
-					std::swap(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_aapLocalDicts[idx_ldict+nLocalWordIdx-1]);
-#if DISPLAY_CBLBSP_DEBUG_INFO
-					std::swap(vsWordModList[idx_ldict+nLocalWordIdx],vsWordModList[idx_ldict+nLocalWordIdx-1]);
-#endif //DISPLAY_CBLBSP_DEBUG_INFO
-				}
-				++nLocalWordIdx;
 			}
 			// == neighb updt
 			if((!oCurrFGMask.data[idx_uchar] || !m_oFGMask_last.data[idx_uchar]) && (m_oGhostRegionMask.data[idx_uchar] || m_oUnstableRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0)) {
