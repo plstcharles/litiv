@@ -45,9 +45,7 @@ void BackgroundSubtractorViBe_1ch::operator()(cv::InputArray _image, cv::OutputA
 		for(int x=0; x<m_oImgSize.width; x++) {
 			size_t nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
-				// unlike what was stated in their 2011 paper, the real vibe algorithm uses L1 (abs diff) distance instead of L2 (euclidean)
-				//if(cv::norm(in,bg)<m_nColorDistThreshold*3)
-				if(L1dist_uchar(oInputImg.at<uchar>(y,x),m_voBGImg[nSampleIdx].at<uchar>(y,x))<m_nColorDistThreshold*3)
+				if(absdiff_uchar(oInputImg.at<uchar>(y,x),m_voBGImg[nSampleIdx].at<uchar>(y,x))<m_nColorDistThreshold)
 					nGoodSamplesCount++;
 				nSampleIdx++;
 			}

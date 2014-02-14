@@ -20,12 +20,16 @@ static inline size_t L1dist_uchar(const uchar* a, const uchar* b) {
 static inline size_t cdist_uchar(const uchar* curr, const uchar* bg) {
 	size_t curr_int_sqr = curr[0]*curr[0] + curr[1]*curr[1] + curr[2]*curr[2];
 	size_t bg_int_sqr = bg[0]*bg[0] + bg[1]*bg[1] + bg[2]*bg[2];
-	size_t mix_int_sqr = std::pow((curr[0]*bg[0] + curr[1]*bg[1] + curr[2]*bg[2]),2);
-	return bg_int_sqr>0?sqrt(curr_int_sqr-(mix_int_sqr/bg_int_sqr)):sqrt(curr_int_sqr);
+	if(bg_int_sqr) {
+		size_t mix_int_sqr = std::pow((curr[0]*bg[0] + curr[1]*bg[1] + curr[2]*bg[2]),2);
+		return (size_t)sqrt(curr_int_sqr-(mix_int_sqr/bg_int_sqr));
+	}
+	else
+		return (size_t)sqrt(curr_int_sqr);
 }
 
 //! computes the L1 distance between two opencv unsigned char vectors (RGB)
-static inline size_t L1dist_uchar(const cv::Vec3b& a, const cv::Vec3b& b) {
+static inline size_t L1dist_vec3b(const cv::Vec3b& a, const cv::Vec3b& b) {
 	const uchar a_array[3] = {a[0],a[1],a[2]};
 	const uchar b_array[3] = {b[0],b[1],b[2]};
 	return L1dist_uchar(a_array,b_array);
@@ -42,15 +46,15 @@ static inline float L2dist_uchar(const uchar* a, const uchar* b) {
 }
 
 //! computes the squared L2 distance between two opencv unsigned char vectors (RGB)
-static inline size_t L2sqrdist_uchar(const cv::Vec3b& a, const cv::Vec3b& b) {
+static inline size_t L2sqrdist_vec3b(const cv::Vec3b& a, const cv::Vec3b& b) {
 	const uchar a_array[3] = {a[0],a[1],a[2]};
 	const uchar b_array[3] = {b[0],b[1],b[2]};
 	return L2sqrdist_uchar(a_array,b_array);
 }
 
 //! computes the squared L2 distance between two opencv unsigned char vectors (RGB)
-static inline float L2dist_uchar(const cv::Vec3b& a, const cv::Vec3b& b) {
-	return sqrt((float)L2sqrdist_uchar(a,b));
+static inline float L2dist_vec3b(const cv::Vec3b& a, const cv::Vec3b& b) {
+	return sqrt((float)L2sqrdist_vec3b(a,b));
 }
 
 //! popcount LUT for 8bit vectors
