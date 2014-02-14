@@ -12,10 +12,6 @@
 #define DISPLAY_CBLBSP_DEBUG_INFO 0
 // local define used to specify the bootstrap window size
 #define BOOTSTRAP_WIN_SIZE 250
-// local define used to specify the word occ incr count when a region is 'unstable'
-#define UNSTABLE_REGION_OCC_INCR 1
-// local define used to specify the word occ incr count when a region is 'highly unstable'
-#define HIGHVAR_REGION_OCC_INCR 1
 // local define used to specify the persistence of a local illumination update indicator
 #define ILLUMUPDT_REGION_DEFAULT_VAL 20
 // local define used to specify whether to use single channel analysis or not (for RGB images only)
@@ -46,6 +42,10 @@
 #define LWORD_MAX_WEIGHT 4.0f
 // local define used to specify the debug window size
 #define DEBUG_WINDOW_SIZE cv::Size(320,240)
+// local define used to specify the color dist threshold offset used for unstable regions
+#define UNSTAB_COLOR_DIST_OFFSET 0
+// local define used to specify the desc dist threshold offset used for unstable regions
+#define UNSTAB_DESC_DIST_OFFSET 2
 
 static const size_t s_nColorMaxDataRange_1ch = UCHAR_MAX;
 static const size_t s_nDescMaxDataRange_1ch = LBSP::DESC_SIZE*8;
@@ -83,7 +83,6 @@ BackgroundSubtractorCBLBSP::BackgroundSubtractorCBLBSP(	 float fLBSPThreshold
 		,m_apGlobalWordListIter_3ch(nullptr)
 		,m_apGlobalWordLookupTable(nullptr) {
 	CV_Assert(m_fLocalWordsPerChannel>=1.0f && m_fGlobalWordsPerChannel>=1.0f);
-	CV_Assert(m_nColorDistThreshold>0);
 }
 
 BackgroundSubtractorCBLBSP::~BackgroundSubtractorCBLBSP() {
@@ -149,6 +148,8 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 	m_oPureFGBlinkMask_curr = cv::Scalar_<uchar>(0);
 	m_oPureFGBlinkMask_last.create(m_oImgSize,CV_8UC1);
 	m_oPureFGBlinkMask_last = cv::Scalar_<uchar>(0);
+	m_oTempGlobalWordWeightDiffFactor.create(m_oImgSize,CV_32FC1);
+	m_oTempGlobalWordWeightDiffFactor = cv::Scalar(-GWORD_WEIGHT_DECIMATION_FACTOR);
 	m_oPureFGMask_last.create(m_oImgSize,CV_8UC1);
 	m_oPureFGMask_last = cv::Scalar_<uchar>(0);
 	m_oFGMask_last.create(m_oImgSize,CV_8UC1);
@@ -233,9 +234,9 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 			const size_t idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
 			const size_t idx_orig_flt32 = idx_orig_uchar*4;
 			const float fCurrDistThresholdFactor = *(float*)(m_oDistThresholdFrame.data+idx_orig_flt32);
-			const size_t nCurrColorDistThreshold = (size_t)(fCurrDistThresholdFactor*m_nColorDistThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+			const size_t nCurrColorDistThreshold = (size_t)((fCurrDistThresholdFactor*m_nColorDistThreshold+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_COLOR_DIST_OFFSET))*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 			//const size_t nCurrDescDistThreshold = (size_t)(fCurrDistThresholdFactor*m_nDescDistThreshold);
-			const size_t nCurrDescDistThreshold = (1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+1;
+			const size_t nCurrDescDistThreshold = (1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_DESC_DIST_OFFSET);
 			for(size_t nLocalWordIdx=0;nLocalWordIdx<m_nLocalWords;++nLocalWordIdx) {
 				LocalWord_1ch* pCurrLocalWord = ((LocalWord_1ch*)m_aapLocalDicts[idx_orig_ldict+nLocalWordIdx]);
 				if(pCurrLocalWord) {
@@ -325,9 +326,9 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 			const size_t idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
 			const size_t idx_orig_flt32 = idx_orig_uchar*4;
 			const float fCurrDistThresholdFactor = *(float*)(m_oDistThresholdFrame.data+idx_orig_flt32);
-			const size_t nCurrColorDistThreshold = (size_t)(fCurrDistThresholdFactor*m_nColorDistThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+			const size_t nCurrColorDistThreshold = (size_t)((fCurrDistThresholdFactor*m_nColorDistThreshold+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_COLOR_DIST_OFFSET))*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 			//const size_t nCurrDescDistThreshold = (size_t)(fCurrDistThresholdFactor*m_nDescDistThreshold);
-			const size_t nCurrDescDistThreshold = (1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+1;
+			const size_t nCurrDescDistThreshold = (1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_DESC_DIST_OFFSET);
 			CV_Assert(m_aapLocalDicts[idx_orig_ldict]);
 			const LocalWord_1ch* pRefBestLocalWord = (LocalWord_1ch*)m_aapLocalDicts[idx_orig_ldict];
 			const float fRefBestLocalWordWeight = GetLocalWordWeight(pRefBestLocalWord,m_nFrameIndex);
@@ -372,7 +373,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 				size_t nLookupMapIdx = 0;
 				const size_t nColorDistThreshold = (size_t)(m_nColorDistThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 				//const size_t nDescDistThreshold = m_nDescDistThreshold;
-				const size_t nDescDistThreshold = 3;
+				const size_t nDescDistThreshold = 2+m_nDescDistThreshold;
 				while(nLookupMapIdx<nKeyPoints && (size_t)(m_apGlobalWordListIter_1ch-m_apGlobalWordList_1ch)<m_nGlobalWords) {
 					if(m_aapLocalDicts[nLookupMapIdx*m_nLocalWords] && oGlobalDictPresenceLookupMap.data[nLookupMapIdx]<UCHAR_MAX && !m_oFGMask_last_dilated.data[nLookupMapIdx]) {
 						const LocalWord_1ch* pRefLocalWord = (LocalWord_1ch*)m_aapLocalDicts[nLookupMapIdx*m_nLocalWords+nLocalDictWordIdxOffset];
@@ -443,9 +444,9 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 			const size_t idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
 			const size_t idx_orig_flt32 = idx_orig_uchar*4;
 			const float fCurrDistThresholdFactor = *(float*)(m_oDistThresholdFrame.data+idx_orig_flt32);
-			const size_t nCurrTotColorDistThreshold = (size_t)(fCurrDistThresholdFactor*m_nColorDistThreshold)*3;
+			const size_t nCurrTotColorDistThreshold = (size_t)((fCurrDistThresholdFactor*m_nColorDistThreshold)+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_COLOR_DIST_OFFSET))*3;
 			//const size_t nCurrTotDescDistThreshold = (size_t)(fCurrDistThresholdFactor*m_nDescDistThreshold)*3;
-			const size_t nCurrTotDescDistThreshold = ((1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+1)*3;
+			const size_t nCurrTotDescDistThreshold = ((1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_DESC_DIST_OFFSET))*3;
 			for(size_t nLocalWordIdx=0;nLocalWordIdx<m_nLocalWords;++nLocalWordIdx) {
 				LocalWord_3ch* pCurrLocalWord = ((LocalWord_3ch*)m_aapLocalDicts[idx_orig_ldict+nLocalWordIdx]);
 				if(pCurrLocalWord) {
@@ -546,9 +547,9 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 			const size_t idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
 			const size_t idx_orig_flt32 = idx_orig_uchar*4;
 			const float fCurrDistThresholdFactor = *(float*)(m_oDistThresholdFrame.data+idx_orig_flt32);
-			const size_t nCurrTotColorDistThreshold = (size_t)(fCurrDistThresholdFactor*m_nColorDistThreshold)*3;
+			const size_t nCurrTotColorDistThreshold = (size_t)((fCurrDistThresholdFactor*m_nColorDistThreshold)+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_COLOR_DIST_OFFSET))*3;
 			//const size_t nCurrTotDescDistThreshold = (size_t)(fCurrDistThresholdFactor*m_nDescDistThreshold)*3;
-			const size_t nCurrTotDescDistThreshold = ((1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+1)*3;
+			const size_t nCurrTotDescDistThreshold = ((1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_orig_uchar]+UNSTAB_DESC_DIST_OFFSET))*3;
 			CV_Assert(m_aapLocalDicts[idx_orig_ldict]);
 			const LocalWord_3ch* pRefBestLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_orig_ldict];
 			const float fRefBestLocalWordWeight = GetLocalWordWeight(pRefBestLocalWord,m_nFrameIndex);
@@ -597,7 +598,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 			if(nLocalDictWordIdxOffset<m_nLocalWords) {
 				size_t nLookupMapIdx = 0;
 				const size_t nTotColorDistThreshold = m_nColorDistThreshold*3;
-				const size_t nTotDescDistThreshold = 9;
+				const size_t nTotDescDistThreshold = (2+m_nDescDistThreshold)*3;
 				while(nLookupMapIdx<nKeyPoints && (size_t)(m_apGlobalWordListIter_3ch-m_apGlobalWordList_3ch)<m_nGlobalWords) {
 					if(m_aapLocalDicts[nLookupMapIdx*m_nLocalWords] && oGlobalDictPresenceLookupMap.data[nLookupMapIdx]<UCHAR_MAX && !m_oFGMask_last_dilated.data[nLookupMapIdx]) {
 						const LocalWord_3ch* pRefLocalWord = (LocalWord_3ch*)m_aapLocalDicts[nLookupMapIdx*m_nLocalWords+nLocalDictWordIdxOffset];
@@ -679,8 +680,6 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 	const size_t nSamplesForMean = std::min(++m_nFrameIndex,(size_t)BGSCBLBSP_N_SAMPLES_FOR_MEAN);
 	const size_t nSamplesForMean_burst = std::min(m_nFrameIndex,(size_t)BGSCBLBSP_N_SAMPLES_FOR_MEAN/4);
 	const size_t nCurrGlobalWordUpdateRate = GWORD_UPDATE_RATE;
-	const bool bRecalcGlobalWords = !(m_nFrameIndex%(nCurrGlobalWordUpdateRate<<6));
-	const bool bUpdateGlobalWords = !(m_nFrameIndex%(nCurrGlobalWordUpdateRate));
 #if DISPLAY_CBLBSP_DEBUG_INFO
 	std::vector<std::string> vsWordModList(m_nMaxLocalDictionaries*m_nLocalWords);
 	uchar anDBGColor[3] = {0,0,0};
@@ -719,9 +718,9 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			ushort& nLastIntraDesc = *((ushort*)(m_oLastDescFrame.data+idx_ushrt));
 			uchar& nLastColor = m_oLastColorFrame.data[idx_uchar];
 			const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate));
-			const size_t nCurrColorDistThreshold = (size_t)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+			const size_t nCurrColorDistThreshold = (size_t)((((*pfCurrDistThresholdFactor)*m_nColorDistThreshold)+(m_oUnstableRegionMask.data[idx_uchar]*UNSTAB_COLOR_DIST_OFFSET))*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 			//const size_t nCurrDescDistThreshold = (size_t)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold);
-			const size_t nCurrDescDistThreshold = (1<<((size_t)floor(*pfCurrDistThresholdFactor+0.5f)))+1;
+			const size_t nCurrDescDistThreshold = (1<<((size_t)floor(*pfCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_uchar]*UNSTAB_DESC_DIST_OFFSET);
 			ushort nCurrInterDesc, nCurrIntraDesc;
 			LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColor,x,y,m_anLBSPThreshold_8bitLUT[nCurrColor],nCurrIntraDesc);
 			const uchar nCurrIntraDescBITS = popcount_ushort_8bitsLUT(nCurrIntraDesc);
@@ -739,8 +738,8 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 													||	((*pfCurrMeanRawSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN4 && (*pfCurrMeanLastDist)>BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN4)
 													||	((*pfCurrMeanRawSegmRes_burst)>BGSCBLBSP_BURST_VAR_DETECTION_SAVG_MIN1 && (*pfCurrMeanLastDist_burst)>BGSCBLBSP_BURST_VAR_DETECTION_DLST_MIN1)
 													||	((*pfCurrMeanRawSegmRes_burst)>BGSCBLBSP_BURST_VAR_DETECTION_SAVG_MIN2 && (*pfCurrMeanLastDist_burst)>BGSCBLBSP_BURST_VAR_DETECTION_DLST_MIN2)
-												   )?HIGHVAR_REGION_OCC_INCR:0;
-			m_oUnstableRegionMask.data[idx_uchar] = (m_nFrameIndex<BOOTSTRAP_WIN_SIZE || (*pfCurrMeanRawSegmRes-*pfCurrMeanFinalSegmRes)>BGSCBLBSP_INSTBLTY_DETECTION_SEGM_DIFF || (!m_oFGMask_last.data[idx_uchar] && m_oFGMask_last2.data[idx_uchar]))?UNSTABLE_REGION_OCC_INCR:0;
+												   )?1:0;
+			m_oUnstableRegionMask.data[idx_uchar] = (m_nFrameIndex<BOOTSTRAP_WIN_SIZE || (*pfCurrMeanRawSegmRes-*pfCurrMeanFinalSegmRes)>BGSCBLBSP_INSTBLTY_DETECTION_SEGM_DIFF || (!m_oFGMask_last.data[idx_uchar] && m_oFGMask_last2.data[idx_uchar]))?1:0;
 			if(m_oIllumUpdtRegionMask.data[idx_uchar]) m_oIllumUpdtRegionMask.data[idx_uchar] = m_oIllumUpdtRegionMask.data[idx_uchar]-1;
 			const size_t nCurrWordOccIncr = std::max((size_t)m_oGhostRegionMask.data[idx_uchar],nDefaultWordOccIncr);
 			size_t nLocalWordIdx = 0;
@@ -779,7 +778,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					if(nDescDist<=nCurrDescDistThreshold && nSumDist<=nCurrColorDistThreshold) {
 						fPotentialLocalWordsWeightSum += fCurrLocalWordWeight;
 						pCurrLocalWord->nLastOcc = m_nFrameIndex;
-						if((!m_oFGMask_last.data[idx_uchar] || m_oGhostRegionMask.data[idx_uchar] || m_oUnstableRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar]) && fCurrLocalWordWeight<LWORD_MAX_WEIGHT)
+						if((!m_oFGMask_last.data[idx_uchar] || m_oGhostRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar]) && fCurrLocalWordWeight<LWORD_MAX_WEIGHT)
 							pCurrLocalWord->nOccurrences += nCurrWordOccIncr;
 						if(nMinColorDist>nColorDist)
 							nMinColorDist = nColorDist;
@@ -820,7 +819,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(nSamplesForMean-1) + (float)nMinSumDist/s_nColorMaxDataRange_1ch)/nSamplesForMean;
 				*pfCurrMeanRawSegmRes = ((*pfCurrMeanRawSegmRes)*(nSamplesForMean-1))/nSamplesForMean;
 				*pfCurrMeanRawSegmRes_burst = ((*pfCurrMeanRawSegmRes_burst)*(nSamplesForMean_burst-1))/nSamplesForMean_burst;
-				if(m_oGhostRegionMask.data[idx_uchar] || m_oUnstableRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0) {
+				if(m_oGhostRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0) {
 					GlobalWord_1ch* pLastMatchedGlobalWord = (GlobalWord_1ch*)m_apGlobalWordLookupTable[idx_uchar];
 					if(!pLastMatchedGlobalWord
 							|| absdiff_uchar(pLastMatchedGlobalWord->nColor,nCurrColor)>nCurrColorDistThreshold
@@ -892,7 +891,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					vsWordModList[idx_ldict+nNewLocalWordIdx] += "NEW ";
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 				}
-				if((pLastMatchedGlobalWord && !m_oFGMask_last.data[idx_uchar]) && (m_oUnstableRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0)) {
+				if(pLastMatchedGlobalWord && !m_oFGMask_last.data[idx_uchar] && (m_oGhostRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0)) {
 					float* pfLastMatchedGlobalWord_LocalWeight = (float*)(pLastMatchedGlobalWord->oSpatioOccMap.data+idx_flt32);
 					if((*pfLastMatchedGlobalWord_LocalWeight)<fPotentialLocalWordsWeightSum) {
 						pLastMatchedGlobalWord->fLatestWeight += fPotentialLocalWordsWeightSum;
@@ -901,7 +900,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				}
 			}
 			// == neighb updt
-			if((!oCurrFGMask.data[idx_uchar] || !m_oFGMask_last.data[idx_uchar]) && (m_oGhostRegionMask.data[idx_uchar] || m_oUnstableRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0)) {
+			if((!oCurrFGMask.data[idx_uchar] || !m_oFGMask_last.data[idx_uchar]) && (m_oGhostRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0)) {
 				int x_rand,y_rand;
 				getRandNeighborPosition_5x5(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 				const size_t idx_rand_uchar = (m_oImgSize.width*y_rand + x_rand);
@@ -984,14 +983,6 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			}
 			nLastIntraDesc = nCurrIntraDesc;
 			nLastColor = nCurrColor;
-			if(bUpdateGlobalWords && !m_oFGMask_last.data[idx_uchar]) {
-				for(size_t nGlobalWordIdx=0; nGlobalWordIdx<m_nGlobalWords; ++nGlobalWordIdx) {
-					float* pfCurrGlobalWord_LocalWeight = (float*)(m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap.data+idx_flt32);
-					const float fDecimationDiff = (*pfCurrGlobalWord_LocalWeight)*GWORD_WEIGHT_DECIMATION_FACTOR;
-					m_apGlobalDict[nGlobalWordIdx]->fLatestWeight -= fDecimationDiff;
-					(*pfCurrGlobalWord_LocalWeight) -= fDecimationDiff;
-				}
-			}
 #if DISPLAY_CBLBSP_DEBUG_INFO
 			if(y==nDebugCoordY && x==nDebugCoordX) {
 				for(size_t c=0; c<3; ++c) {
@@ -1033,13 +1024,13 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			ushort* anLastIntraDesc = ((ushort*)(m_oLastDescFrame.data+idx_ushrt_rgb));
 			uchar* anLastColor = m_oLastColorFrame.data+idx_uchar_rgb;
 			const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate));
-			const size_t nCurrColorDistThreshold = (size_t)((*pfCurrDistThresholdFactor)*m_nColorDistThreshold);
+			const size_t nCurrColorDistThreshold = (size_t)(((*pfCurrDistThresholdFactor)*m_nColorDistThreshold)+(m_oUnstableRegionMask.data[idx_uchar]*UNSTAB_COLOR_DIST_OFFSET));
 			//const size_t nCurrDescDistThreshold = (size_t)((*pfCurrDistThresholdFactor)*m_nDescDistThreshold);
-			const size_t nCurrDescDistThreshold = (1<<((size_t)floor(*pfCurrDistThresholdFactor+0.5f)))+1; // min=3, max=17
+			const size_t nCurrDescDistThreshold = (1<<((size_t)floor(*pfCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_uchar]*UNSTAB_DESC_DIST_OFFSET);
 			const size_t nCurrTotColorDistThreshold = nCurrColorDistThreshold*3;
-			const size_t nCurrTotDescDistThreshold = nCurrDescDistThreshold*3; // min=9, max=51
+			const size_t nCurrTotDescDistThreshold = nCurrDescDistThreshold*3;
 			const size_t nCurrSCColorDistThreshold = (3*nCurrTotColorDistThreshold)/4;
-			const size_t nCurrSCDescDistThreshold = (3*nCurrTotDescDistThreshold)/4; // min=6, max=38
+			const size_t nCurrSCDescDistThreshold = (3*nCurrTotDescDistThreshold)/4;
 			ushort anCurrInterDesc[3], anCurrIntraDesc[3];
 			const size_t anCurrIntraLBSPThresholds[3] = {m_anLBSPThreshold_8bitLUT[anCurrColor[0]],m_anLBSPThreshold_8bitLUT[anCurrColor[1]],m_anLBSPThreshold_8bitLUT[anCurrColor[2]]};
 			LBSP::computeRGBDescriptor(oInputImg,anCurrColor,x,y,anCurrIntraLBSPThresholds,anCurrIntraDesc);
@@ -1059,8 +1050,8 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 													||	((*pfCurrMeanRawSegmRes)>BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN4 && (*pfCurrMeanLastDist)>BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN4)
 													||	((*pfCurrMeanRawSegmRes_burst)>BGSCBLBSP_BURST_VAR_DETECTION_SAVG_MIN1 && (*pfCurrMeanLastDist_burst)>BGSCBLBSP_BURST_VAR_DETECTION_DLST_MIN1)
 													||	((*pfCurrMeanRawSegmRes_burst)>BGSCBLBSP_BURST_VAR_DETECTION_SAVG_MIN2 && (*pfCurrMeanLastDist_burst)>BGSCBLBSP_BURST_VAR_DETECTION_DLST_MIN2)
-												   )?HIGHVAR_REGION_OCC_INCR:0;
-			m_oUnstableRegionMask.data[idx_uchar] = (m_nFrameIndex<BOOTSTRAP_WIN_SIZE || (*pfCurrMeanRawSegmRes-*pfCurrMeanFinalSegmRes)>BGSCBLBSP_INSTBLTY_DETECTION_SEGM_DIFF || (!m_oFGMask_last.data[idx_uchar] && m_oFGMask_last2.data[idx_uchar]))?UNSTABLE_REGION_OCC_INCR:0;
+												   )?1:0;
+			m_oUnstableRegionMask.data[idx_uchar] = (m_nFrameIndex<BOOTSTRAP_WIN_SIZE || (*pfCurrMeanRawSegmRes-*pfCurrMeanFinalSegmRes)>BGSCBLBSP_INSTBLTY_DETECTION_SEGM_DIFF || (!m_oFGMask_last.data[idx_uchar] && m_oFGMask_last2.data[idx_uchar]))?1:0;
 			if(m_oIllumUpdtRegionMask.data[idx_uchar]) m_oIllumUpdtRegionMask.data[idx_uchar] = m_oIllumUpdtRegionMask.data[idx_uchar]-1;
 			const size_t nCurrWordOccIncr = std::max((size_t)m_oGhostRegionMask.data[idx_uchar],nDefaultWordOccIncr);
 			size_t nLocalWordIdx = 0;
@@ -1168,7 +1159,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					if(nTotDescDist<=nCurrTotDescDistThreshold && nTotSumDist<=nCurrTotColorDistThreshold) {
 						fPotentialLocalWordsWeightSum += fCurrLocalWordWeight;
 						pCurrLocalWord->nLastOcc = m_nFrameIndex;
-						if((!m_oFGMask_last.data[idx_uchar] || m_oGhostRegionMask.data[idx_uchar] || m_oUnstableRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar]) && fCurrLocalWordWeight<LWORD_MAX_WEIGHT)
+						if((!m_oFGMask_last.data[idx_uchar] || m_oGhostRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar]) && fCurrLocalWordWeight<LWORD_MAX_WEIGHT)
 							pCurrLocalWord->nOccurrences += nCurrWordOccIncr;
 						if(nMinTotColorDist>nTotColorDist)
 							nMinTotColorDist = nTotColorDist;
@@ -1209,7 +1200,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				*pfCurrMeanMinDist = ((*pfCurrMeanMinDist)*(nSamplesForMean-1) + (float)nMinTotSumDist/s_nColorMaxDataRange_3ch)/nSamplesForMean;
 				*pfCurrMeanRawSegmRes = ((*pfCurrMeanRawSegmRes)*(nSamplesForMean-1))/nSamplesForMean;
 				*pfCurrMeanRawSegmRes_burst = ((*pfCurrMeanRawSegmRes_burst)*(nSamplesForMean_burst-1))/nSamplesForMean_burst;
-				if(m_oGhostRegionMask.data[idx_uchar] || m_oUnstableRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0) {
+				if(m_oGhostRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0) {
 					GlobalWord_3ch* pLastMatchedGlobalWord = (GlobalWord_3ch*)m_apGlobalWordLookupTable[idx_uchar];
 					if(!pLastMatchedGlobalWord
 #if USE_GWORD_CDIST_TRICK
@@ -1301,7 +1292,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					vsWordModList[idx_ldict+nNewLocalWordIdx] += "NEW ";
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 				}
-				if((pLastMatchedGlobalWord && !m_oFGMask_last.data[idx_uchar]) && (m_oUnstableRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0)) {
+				if(pLastMatchedGlobalWord && !m_oFGMask_last.data[idx_uchar] && (m_oGhostRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0)) {
 					float* pfLastMatchedGlobalWord_LocalWeight = (float*)(pLastMatchedGlobalWord->oSpatioOccMap.data+idx_flt32);
 					if((*pfLastMatchedGlobalWord_LocalWeight)<fPotentialLocalWordsWeightSum) {
 						pLastMatchedGlobalWord->fLatestWeight += fPotentialLocalWordsWeightSum;
@@ -1310,7 +1301,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				}
 			}
 			// == neighb updt
-			if((!oCurrFGMask.data[idx_uchar] || !m_oFGMask_last.data[idx_uchar]) && (m_oGhostRegionMask.data[idx_uchar] || m_oUnstableRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0)) {
+			if((!oCurrFGMask.data[idx_uchar] || !m_oFGMask_last.data[idx_uchar]) && (m_oGhostRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0)) {
 				int x_rand,y_rand;
 				getRandNeighborPosition_5x5(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 				const size_t idx_rand_uchar = (m_oImgSize.width*y_rand + x_rand);
@@ -1402,14 +1393,6 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				anLastIntraDesc[c] = anCurrIntraDesc[c];
 				anLastColor[c] = anCurrColor[c];
 			}
-			if(bUpdateGlobalWords && !m_oFGMask_last.data[idx_uchar]) {
-				for(size_t nGlobalWordIdx=0; nGlobalWordIdx<m_nGlobalWords; ++nGlobalWordIdx) {
-					float* pfCurrGlobalWord_LocalWeight = (float*)(m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap.data+idx_flt32);
-					const float fDecimationDiff = (*pfCurrGlobalWord_LocalWeight)*GWORD_WEIGHT_DECIMATION_FACTOR;
-					m_apGlobalDict[nGlobalWordIdx]->fLatestWeight -= fDecimationDiff;
-					(*pfCurrGlobalWord_LocalWeight) -= fDecimationDiff;
-				}
-			}
 #if DISPLAY_CBLBSP_DEBUG_INFO
 			if(y==nDebugCoordY && x==nDebugCoordX) {
 				for(size_t c=0; c<3; ++c) {
@@ -1424,6 +1407,8 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 		}
 	}
+	const bool bRecalcGlobalWords = !(m_nFrameIndex%(nCurrGlobalWordUpdateRate<<5));
+	const bool bUpdateGlobalWords = !(m_nFrameIndex%(nCurrGlobalWordUpdateRate));
 	for(size_t nGlobalWordIdx=0; nGlobalWordIdx<m_nGlobalWords; ++nGlobalWordIdx) {
 		if(bRecalcGlobalWords && m_apGlobalDict[nGlobalWordIdx]->fLatestWeight>0.0f) {
 			m_apGlobalDict[nGlobalWordIdx]->fLatestWeight = GetGlobalWordWeight(m_apGlobalDict[nGlobalWordIdx]);
@@ -1432,8 +1417,11 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap = cv::Scalar(0.0f);
 			}
 		}
-		if(bUpdateGlobalWords && m_apGlobalDict[nGlobalWordIdx]->fLatestWeight>0.0f)
+		if(bUpdateGlobalWords && m_apGlobalDict[nGlobalWordIdx]->fLatestWeight>0.0f) {
+			cv::accumulateProduct(m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap,m_oTempGlobalWordWeightDiffFactor,m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap,m_oFGMask_last_dilated_inverted);
+			m_apGlobalDict[nGlobalWordIdx]->fLatestWeight *= (1.0f-GWORD_WEIGHT_DECIMATION_FACTOR);
 			cv::blur(m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap,m_apGlobalDict[nGlobalWordIdx]->oSpatioOccMap,cv::Size(7,7),cv::Point(-1,-1),cv::BORDER_REPLICATE);
+		}
 		if(nGlobalWordIdx>0 && m_apGlobalDict[nGlobalWordIdx]->fLatestWeight>m_apGlobalDict[nGlobalWordIdx-1]->fLatestWeight)
 			std::swap(m_apGlobalDict[nGlobalWordIdx],m_apGlobalDict[nGlobalWordIdx-1]);
 	}
@@ -1528,7 +1516,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 		cv::imshow("t(x)",oUpdateRateFrameNormalized);
 		std::cout << std::fixed << std::setprecision(5) << "      t(" << dbgpt << ") = " << m_oUpdateRateFrame.at<float>(dbgpt) << std::endl;
 		cv::imshow("s(x)",oCurrFGMask);
-		cv::Mat oHighVarRegionMaskNormalized; m_oHighVarRegionMask.copyTo(oHighVarRegionMaskNormalized); oHighVarRegionMaskNormalized*=(UCHAR_MAX/HIGHVAR_REGION_OCC_INCR);
+		cv::Mat oHighVarRegionMaskNormalized; m_oHighVarRegionMask.copyTo(oHighVarRegionMaskNormalized); oHighVarRegionMaskNormalized*=UCHAR_MAX;
 		cv::circle(oHighVarRegionMaskNormalized,dbgpt,5,cv::Scalar(255));
 		cv::resize(oHighVarRegionMaskNormalized,oHighVarRegionMaskNormalized,DEBUG_WINDOW_SIZE);
 		cv::imshow("m_oHighVarRegionMask",oHighVarRegionMaskNormalized);
@@ -1536,7 +1524,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 		cv::circle(oGhostRegionMaskNormalized,dbgpt,5,cv::Scalar(255));
 		cv::resize(oGhostRegionMaskNormalized,oGhostRegionMaskNormalized,DEBUG_WINDOW_SIZE);
 		cv::imshow("m_oGhostRegionMask",oGhostRegionMaskNormalized);
-		cv::Mat oUnstableRegionMaskNormalized; m_oUnstableRegionMask.copyTo(oUnstableRegionMaskNormalized); oUnstableRegionMaskNormalized*=(UCHAR_MAX/UNSTABLE_REGION_OCC_INCR);
+		cv::Mat oUnstableRegionMaskNormalized; m_oUnstableRegionMask.copyTo(oUnstableRegionMaskNormalized); oUnstableRegionMaskNormalized*=UCHAR_MAX;
 		cv::circle(oUnstableRegionMaskNormalized,dbgpt,5,cv::Scalar(255));
 		cv::resize(oUnstableRegionMaskNormalized,oUnstableRegionMaskNormalized,DEBUG_WINDOW_SIZE);
 		cv::imshow("m_oUnstableRegionMask",oUnstableRegionMaskNormalized);
@@ -1547,7 +1535,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 	}
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 
-	/*cv::Mat oHighVarRegionMaskNormalized; m_oHighVarRegionMask.copyTo(oHighVarRegionMaskNormalized); oHighVarRegionMaskNormalized*=(UCHAR_MAX/HIGHVAR_REGION_OCC_INCR);
+	/*cv::Mat oHighVarRegionMaskNormalized; m_oHighVarRegionMask.copyTo(oHighVarRegionMaskNormalized); oHighVarRegionMaskNormalized*=UCHAR_MAX;
 	//cv::circle(oHighVarRegionMaskNormalized,dbgpt,5,cv::Scalar(255));
 	cv::resize(oHighVarRegionMaskNormalized,oHighVarRegionMaskNormalized,DEBUG_WINDOW_SIZE);
 	cv::imshow("m_oHighVarRegionMask",oHighVarRegionMaskNormalized);
@@ -1555,7 +1543,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 	//cv::circle(oGhostRegionMaskNormalized,dbgpt,5,cv::Scalar(255));
 	cv::resize(oGhostRegionMaskNormalized,oGhostRegionMaskNormalized,DEBUG_WINDOW_SIZE);
 	cv::imshow("m_oGhostRegionMask",oGhostRegionMaskNormalized);
-	cv::Mat oUnstableRegionMaskNormalized; m_oUnstableRegionMask.copyTo(oUnstableRegionMaskNormalized); oUnstableRegionMaskNormalized*=(UCHAR_MAX/UNSTABLE_REGION_OCC_INCR);
+	cv::Mat oUnstableRegionMaskNormalized; m_oUnstableRegionMask.copyTo(oUnstableRegionMaskNormalized); oUnstableRegionMaskNormalized*=UCHAR_MAX;
 	//cv::circle(oUnstableRegionMaskNormalized,dbgpt,5,cv::Scalar(255));
 	cv::resize(oUnstableRegionMaskNormalized,oUnstableRegionMaskNormalized,DEBUG_WINDOW_SIZE);
 	cv::imshow("m_oUnstableRegionMask",oUnstableRegionMaskNormalized);
