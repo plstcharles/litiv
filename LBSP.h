@@ -14,7 +14,8 @@
 	Note 1: both grayscale and RGB/BGR images may be used with this extractor.
 	Note 2: using LBSP::compute2(...) is logically equivalent to using LBSP::compute(...) followed by LBSP::reshapeDesc(...).
 
-	For more details on the different parameters, go to @@@@@@@@@@@@@@.
+	For more details on the different parameters, see G.-A. Bilodeau et al, "Change Detection in Feature Space Using Local
+	Binary Similarity Patterns", in CRV 2013.
 
 	This algorithm is currently NOT thread-safe.
  */
