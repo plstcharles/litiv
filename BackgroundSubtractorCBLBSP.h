@@ -7,13 +7,13 @@
 //! defines the default offset LBSP threshold value
 #define BGSCBLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (3)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
-#define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (5)
+#define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (4)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nColorDistThreshold
-#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (24)
+#define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (25)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fLocalWordsPerChannel
 #define BGSCBLBSP_DEFAULT_NB_LOCAL_WORDS_PER_CH (7.0f)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fGlobalWordsPerPixelChannel
-#define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS_PER_CH (30.0f)
+#define BGSCBLBSP_DEFAULT_NB_GLOBAL_WORDS_PER_CH (10.0f)
 //! defines the number of samples to use when computing running averages
 #define BGSCBLBSP_N_SAMPLES_FOR_MEAN (100)
 //! defines the threshold values used to detect long-term ghosting
@@ -50,10 +50,10 @@
 #define BGSCBLBSP_R2_LOWER (0.125f)
 #define BGSCBLBSP_R2_UPPER (1000.f)
 //! parameters used for dynamic learning rates adjustments  ('T(x)')
-#define BGSCBLBSP_T_DECR  (0.2500f)
-#define BGSCBLBSP_T_INCR  (0.5000f)
+#define BGSCBLBSP_T_DECR  (0.5000f)
+#define BGSCBLBSP_T_INCR  (1.0000f)
 #define BGSCBLBSP_T_LOWER (2.0000f)
-#define BGSCBLBSP_T_UPPER (64.000f)
+#define BGSCBLBSP_T_UPPER (256.00f)
 
 /*!
 	CB-Based Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
