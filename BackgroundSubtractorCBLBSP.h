@@ -7,7 +7,7 @@
 //! defines the default offset LBSP threshold value
 #define BGSCBLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (3)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
-#define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (4)
+#define BGSCBLBSP_DEFAULT_DESC_DIST_THRESHOLD (1)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_nColorDistThreshold
 #define BGSCBLBSP_DEFAULT_COLOR_DIST_THRESHOLD (25)
 //! defines the default value for BackgroundSubtractorCBLBSP::m_fLocalWordsPerChannel
@@ -21,19 +21,19 @@
 #define BGSCBLBSP_GHOST_DETECTION_DLST_MAX1 (-0.005f)
 #define BGSCBLBSP_GHOST_DETECTION_SAVG_MIN2 (9.99999f)
 //! defines the threshold values used to detect high variation regions
-#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN1 (0.975f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN1 (0.125f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN2 (0.900f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN2 (0.150f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN3 (0.150f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN3 (0.200f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN4 (0.125f)
-#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN4 (0.225f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN1 (1.975f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN1 (-0.125f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN2 (1.900f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN2 (-0.150f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN3 (1.150f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN3 (-0.200f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_SAVG_MIN4 (1.125f)
+#define BGSCBLBSP_HIGH_VAR_DETECTION_DLST_MIN4 (-0.225f)
 //! defines the threshold values used to detect burst variation regions
-#define BGSCBLBSP_BURST_VAR_DETECTION_SAVG_MIN1 (0.950f)
-#define BGSCBLBSP_BURST_VAR_DETECTION_DLST_MIN1 (0.235f)
-#define BGSCBLBSP_BURST_VAR_DETECTION_SAVG_MIN2 (0.100f)
-#define BGSCBLBSP_BURST_VAR_DETECTION_DLST_MIN2 (0.260f)
+#define BGSCBLBSP_BURST_VAR_DETECTION_SAVG_MIN1 (1.950f)
+#define BGSCBLBSP_BURST_VAR_DETECTION_DLST_MIN1 (-0.235f)
+#define BGSCBLBSP_BURST_VAR_DETECTION_SAVG_MIN2 (1.100f)
+#define BGSCBLBSP_BURST_VAR_DETECTION_DLST_MIN2 (-0.260f)
 //! defines the threshold values used to detect unstable regions and edges
 #define BGSCBLBSP_INSTBLTY_DETECTION_SEGM_DIFF (0.150f)
 //! defines the internal threshold adjustment factor to use when treating single channel images
@@ -190,13 +190,14 @@ protected:
 	//! a lookup-map used to keep track of illumination updates
 	cv::Mat m_oIllumUpdtRegionMask;
 
-	//! pre-allocated CV_8UC1 matrix used to speed up morph ops and keep by-products
+	//! pre-allocated matrices used to speed up morph ops and keep by-products
 	cv::Mat m_oTempFGMask;
 	cv::Mat m_oTempFGMask2;
 	cv::Mat m_oFGMask_PreFlood;
 	cv::Mat m_oFGMask_last_dilated_inverted;
 	cv::Mat m_oPureFGBlinkMask_curr;
 	cv::Mat m_oPureFGBlinkMask_last;
+	cv::Mat m_oTempGlobalWordWeightDiffFactor;
 
 	//! pre-allocated internal LBSP threshold values for all possible 8-bit intensity values
 	size_t m_anLBSPThreshold_8bitLUT[256];
