@@ -67,7 +67,7 @@ void BackgroundSubtractorViBe_3ch::operator()(cv::InputArray _image, cv::OutputA
 #endif //BGSVIBE_USE_SC_THRS_VALIDATION
 				// unlike what was stated in their 2011 paper, the real vibe algorithm uses L1 (abs diff) distance instead of L2 (euclidean)
 				//if(cv::norm(in,bg)<m_nColorDistThreshold*3)
-				if(L1dist_uchar(in,bg)<m_nColorDistThreshold*3)
+				if(L1dist_vec3b(in,bg)<m_nColorDistThreshold*3)
 					nGoodSamplesCount++;
 #if BGSVIBE_USE_SC_THRS_VALIDATION
 				skip:
