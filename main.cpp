@@ -18,8 +18,8 @@
 #define WRITE_BGSUB_METRICS_ANALYSIS	1
 /////////////////////////////////////////
 #if DEFAULT_NB_THREADS==1
-#define DISPLAY_BGSUB_DEBUG_OUTPUT		1
-#define ENABLE_DISPLAY_MOUSE_DEBUG		1
+#define DISPLAY_BGSUB_DEBUG_OUTPUT		0
+#define ENABLE_DISPLAY_MOUSE_DEBUG		0
 #define ENABLE_FRAME_TIMERS				0
 #endif //DEFAULT_NB_THREADS==1
 /////////////////////////////////////////
@@ -41,7 +41,7 @@
 #define USE_PETS2001_D3TC1_DATASET		0
 /////////////////////////////////////////////////////////////////////
 #define DATASET_ROOT_DIR 				std::string("/tmp/datasets/")
-#define RESULTS_ROOT_DIR 				std::string("/shared/datasets/")
+#define RESULTS_ROOT_DIR 				std::string("/tmp/datasets/")
 #define RESULTS_OUTPUT_DIR_NAME			std::string("results_test")
 /////////////////////////////////////////////////////////////////////
 
@@ -56,14 +56,15 @@ const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet/"+RESULTS_OUTPUT_DIR_N
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
 //const char* g_asDatasetCategories[] = {"baseline"};
-//const char* g_asDatasetCategories[] = {"baseline_office"};
+//const char* g_asDatasetCategories[] = {"baseline_highway"};
+//const char* g_asDatasetCategories[] = {"cameraJitter_sidewalk"};
 //const char* g_asDatasetCategories[] = {"baseline","shadow_cubicle"};
-const char* g_asDatasetCategories[] = {"dynamicBackground_fountain02"};
+//const char* g_asDatasetCategories[] = {"dynamicBackground_fountain02"};
 //const char* g_asDatasetCategories[] = {"shadow_cubicle"};
 //const char* g_asDatasetCategories[] = {"dynamicBackground_boats","dynamicBackground_fountain01","dynamicBackground_fountain02","dynamicBackground_overpass","cameraJitter_sidewalk"};
 //const char* g_asDatasetCategories[] = {"shadow_cubicle","intermittentObjectMotion_tramstop","intermittentObjectMotion_winterDriveway"};
 //const char* g_asDatasetCategories[] = {"thermal_lakeSide"};
-//const char* g_asDatasetCategories[] = {"dynamicBackground","shadow","baseline","intermittentObjectMotion","cameraJitter","thermal"};
+const char* g_asDatasetCategories[] = {"dynamicBackground","shadow","baseline","intermittentObjectMotion","cameraJitter","thermal"};
 const size_t g_nResultIdxOffset = 1;
 #elif USE_WALLFLOWER_DATASET
 const std::string g_sDatasetName(WALLFLOWER_DB_NAME);
@@ -303,7 +304,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 			const cv::Mat& oInputImg = pCurrSequence->GetInputFrameFromIndex(k);
 #if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
 			std::chrono::high_resolution_clock::time_point post_query = std::chrono::high_resolution_clock::now();
-			std::cout << "frame query = " << std::fixed << std::setprecision(3) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_query-pre_query).count())/1000 << " ms, ";
+			std::cout << "t = " << k << ", query=" << std::fixed << std::setprecision(1) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_query-pre_query).count())/1000 << ", ";
 #endif //ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
 #if ENABLE_DISPLAY_MOUSE_DEBUG
 			cv::imshow(sMouseDebugDisplayName,oInputImg);
@@ -318,7 +319,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 			(*pBGS)(oInputImg, oFGMask, k<=100?1:dDefaultLearningRate);
 #if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
 			std::chrono::high_resolution_clock::time_point post_process = std::chrono::high_resolution_clock::now();
-			std::cout << "frame process = " << std::fixed << std::setprecision(3) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_process-pre_process).count())/1000 << " ms." << std::endl;
+			std::cout << "proc=" << std::fixed << std::setprecision(1) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_process-pre_process).count())/1000 << "." << std::endl;
 #endif //ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS
 			cv::Mat oGTImg = pCurrSequence->GetGTFrameFromIndex(k);
