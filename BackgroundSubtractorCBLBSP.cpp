@@ -16,14 +16,6 @@
 #define USE_SC_THRS_VALIDATION 1
 // local define used to specify whether to use hard desc dist threshold checks or not
 #define USE_HARD_SC_DESC_DIST_CHECKS 0
-// local define used to specify whether to use the 'bit trick' for LBSP descriptors or not
-#define USE_BIT_TRICK 0
-// local define used to specify whether to use the 'color distortion trick' for lword intensities or not
-#define USE_LWORD_CDIST_TRICK 0
-// local define used to specify whether to use the 'color distortion trick' for gword intensities or not
-#define USE_GWORD_CDIST_TRICK 1
-// local define for the gradient proportion value used in color+grad distance calculations
-#define OVERLOAD_GRAD_PROP ((1.0f-std::pow(((*pfCurrDistThresholdFactor)-BGSCBLBSP_R_LOWER)/(BGSCBLBSP_R_UPPER-BGSCBLBSP_R_LOWER),2))*0.5f)
 // local define for the base nb of local words
 #define LWORD_BASE_COUNT 3
 // local define for the base nb of global words
@@ -81,10 +73,6 @@ static const size_t s_nColorMaxDataRange_1ch = UCHAR_MAX;
 static const size_t s_nDescMaxDataRange_1ch = LBSP::DESC_SIZE*8;
 static const size_t s_nColorMaxDataRange_3ch = s_nColorMaxDataRange_1ch*3;
 static const size_t s_nDescMaxDataRange_3ch = s_nDescMaxDataRange_1ch*3;
-#if USE_BIT_TRICK
-static const size_t s_nDescDistTypeCutoff_1ch = s_nDescMaxDataRange_1ch/2;
-static const size_t s_nDescDistTypeCutoff_3ch = s_nDescDistTypeCutoff_1ch*3;
-#endif //USE_BIT_TRICK
 
 BackgroundSubtractorCBLBSP::BackgroundSubtractorCBLBSP(	 float fLBSPThreshold
 														,size_t nLBSPThresholdOffset
@@ -293,11 +281,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 					LocalWord_1ch* pCurrLocalWord = ((LocalWord_1ch*)m_aapLocalDicts[idx_orig_ldict+nLocalWordIdx]);
 					if(pCurrLocalWord
 							&& absdiff_uchar(nSampleColor,pCurrLocalWord->nColor)<=nCurrColorDistThreshold
-#if USE_BIT_TRICK
-							&& ((pCurrLocalWord->nDescBITS<s_nDescDistTypeCutoff_1ch && nSampleIntraDescBITS<s_nDescDistTypeCutoff_1ch)?hdist_ushort_8bitLUT(nSampleIntraDesc,pCurrLocalWord->nDesc):(absdiff_uchar(nSampleIntraDescBITS,pCurrLocalWord->nDescBITS)+hdist_ushort_8bitLUT(nSampleIntraDesc,pCurrLocalWord->nDesc))/2)<=nCurrDescDistThreshold) {
-#else //!USE_BIT_TRICK
 							&& hdist_ushort_8bitLUT(nSampleIntraDesc,pCurrLocalWord->nDesc)<=nCurrDescDistThreshold) {
-#endif //!USE_BIT_TRICK
 						pCurrLocalWord->nOccurrences += nLocalWordOccIncr;
 						pCurrLocalWord->nLastOcc = m_nFrameIndex;
 						break;
@@ -500,16 +484,8 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 				for(nLocalWordIdx=0;nLocalWordIdx<m_nLocalWords;++nLocalWordIdx) {
 					LocalWord_3ch* pCurrLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_orig_ldict+nLocalWordIdx];
 					if(pCurrLocalWord
-#if USE_LWORD_CDIST_TRICK
-							&& (L1dist_uchar(anSampleColor,pCurrLocalWord->anColor)/2+cdist_uchar(anSampleColor,pCurrLocalWord->anColor)*6)<=nCurrTotColorDistThreshold
-#else //!USE_LWORD_CDIST_TRICK
 							&& L1dist_uchar(anSampleColor,pCurrLocalWord->anColor)<=nCurrTotColorDistThreshold
-#endif //!USE_LWORD_CDIST_TRICK
-#if USE_BIT_TRICK
-							&& ((pCurrLocalWord->nDescBITS<s_nDescDistTypeCutoff_3ch && nSampleIntraDescBITS<s_nDescDistTypeCutoff_3ch)?hdist_ushort_8bitLUT(anSampleIntraDesc,pCurrLocalWord->anDesc):(absdiff_uchar(nSampleIntraDescBITS,pCurrLocalWord->nDescBITS)+hdist_ushort_8bitLUT(anSampleIntraDesc,pCurrLocalWord->anDesc))/2)<=nCurrTotDescDistThreshold) {
-#else //!USE_BIT_TRICK
 							&& hdist_ushort_8bitLUT(anSampleIntraDesc,pCurrLocalWord->anDesc)<=nCurrTotDescDistThreshold) {
-#endif //!USE_BIT_TRICK
 						pCurrLocalWord->nOccurrences += nLocalWordOccIncr;
 						pCurrLocalWord->nLastOcc = m_nFrameIndex;
 						break;
@@ -582,11 +558,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 			for(nGlobalWordIdx=0;nGlobalWordIdx<m_nGlobalWords;++nGlobalWordIdx) {
 				pCurrGlobalWord = (GlobalWord_3ch*)m_apGlobalDict[nGlobalWordIdx];
 				if(pCurrGlobalWord
-#if USE_GWORD_CDIST_TRICK
 						&& (L1dist_uchar(pRefBestLocalWord->anColor,pCurrGlobalWord->anColor)/2+cdist_uchar(pRefBestLocalWord->anColor,pCurrGlobalWord->anColor)*6)<=nCurrTotColorDistThreshold
-#else //!USE_GWORD_CDIST_TRICK
-						&& L1dist_uchar(pRefBestLocalWord->anColor,pCurrGlobalWord->anColor)<=nCurrTotColorDistThreshold
-#endif //!USE_GWORD_CDIST_TRICK
 						&& absdiff_uchar(pRefBestLocalWord->nDescBITS,pCurrGlobalWord->nDescBITS)<=nCurrTotDescDistThreshold/2)
 					break;
 			}
@@ -632,11 +604,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 						for(nGlobalWordIdx=0;nGlobalWordIdx<m_nGlobalWords;++nGlobalWordIdx) {
 							pCurrGlobalWord = (GlobalWord_3ch*)m_apGlobalDict[nGlobalWordIdx];
 							if(pCurrGlobalWord
-#if USE_GWORD_CDIST_TRICK
 									&& (L1dist_uchar(pRefLocalWord->anColor,pCurrGlobalWord->anColor)/2+cdist_uchar(pRefLocalWord->anColor,pCurrGlobalWord->anColor)*6)<=nTotColorDistThreshold
-#else //!USE_GWORD_CDIST_TRICK
-									&& L1dist_uchar(pRefLocalWord->anColor,pCurrGlobalWord->anColor)<=nTotColorDistThreshold
-#endif //!USE_GWORD_CDIST_TRICK
 									&& absdiff_uchar(pRefLocalWord->nDescBITS,pCurrGlobalWord->nDescBITS)<=nTotDescDistThreshold)
 								break;
 						}
@@ -759,6 +727,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const float fLocalWordsWeightSumThreshold = fBestLocalWordWeight/((*pfCurrDistThresholdFactor)*2);
 			ushort& nLastIntraDesc = *((ushort*)(m_oLastDescFrame.data+idx_ushrt));
 			uchar& nLastColor = m_oLastColorFrame.data[idx_uchar];
+			const float fCurrGradBoostProp = (1.0f-std::pow(((*pfCurrDistThresholdFactor)-BGSCBLBSP_R_LOWER)/(BGSCBLBSP_R_UPPER-BGSCBLBSP_R_LOWER),2))/2;
 			const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate));
 			const size_t nCurrColorDistThreshold = (size_t)((((*pfCurrDistThresholdFactor)*m_nColorDistThreshold)+(m_oUnstableRegionMask.data[idx_uchar]*UNSTAB_COLOR_DIST_OFFSET))*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 			const size_t nCurrDescDistThreshold = (1<<((size_t)floor(*pfCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_uchar]*UNSTAB_DESC_DIST_OFFSET);
@@ -791,23 +760,11 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				const float fCurrLocalWordWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
 				{
 					const size_t nColorDist = absdiff_uchar(nCurrColor,pCurrLocalWord->nColor);
-					size_t nIntraDescDist, nInterDescDist;
-#if USE_BIT_TRICK
-					if(pCurrLocalWord->nDescBITS<s_nDescDistTypeCutoff_1ch && nCurrIntraDescBITS<s_nDescDistTypeCutoff_1ch) {
-#else //!USE_BIT_TRICK
-					if(true) {
-#endif //!USE_BIT_TRICK
-						nIntraDescDist = hdist_ushort_8bitLUT(nCurrIntraDesc,pCurrLocalWord->nDesc);
-						LBSP::computeGrayscaleDescriptor(oInputImg,pCurrLocalWord->nColor,x,y,m_anLBSPThreshold_8bitLUT[pCurrLocalWord->nColor],nCurrInterDesc);
-						nInterDescDist = hdist_ushort_8bitLUT(nCurrInterDesc,pCurrLocalWord->nDesc);
-					}
-					else {
-						nIntraDescDist = (absdiff_uchar(nCurrIntraDescBITS,pCurrLocalWord->nDescBITS)+hdist_ushort_8bitLUT(nCurrIntraDesc,pCurrLocalWord->nDesc))/2;
-						LBSP::computeGrayscaleDescriptor(oInputImg,pCurrLocalWord->nColor,x,y,m_anLBSPThreshold_8bitLUT[pCurrLocalWord->nColor],nCurrInterDesc);
-						nInterDescDist = (absdiff_uchar(popcount_ushort_8bitsLUT(nCurrInterDesc),pCurrLocalWord->nDescBITS)+hdist_ushort_8bitLUT(nCurrInterDesc,pCurrLocalWord->nDesc))/2;
-					}
+					size_t nIntraDescDist = hdist_ushort_8bitLUT(nCurrIntraDesc,pCurrLocalWord->nDesc);
+					LBSP::computeGrayscaleDescriptor(oInputImg,pCurrLocalWord->nColor,x,y,m_anLBSPThreshold_8bitLUT[pCurrLocalWord->nColor],nCurrInterDesc);
+					size_t nInterDescDist = hdist_ushort_8bitLUT(nCurrInterDesc,pCurrLocalWord->nDesc);
 					const size_t nDescDist = (nIntraDescDist+nInterDescDist)/2;
-					const size_t nSumDist = std::min((size_t)(OVERLOAD_GRAD_PROP*nDescDist)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch);
+					const size_t nSumDist = std::min((size_t)(fCurrGradBoostProp*nDescDist)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch);
 					if( (*pfCurrDistThresholdFactor)<BGSCBLBSP_INSTBLTY_DETECTION_MIN_R_VAL && nColorDist>=(3*nCurrColorDistThreshold)/4 && nIntraDescDist<=nCurrDescDistThreshold/4 &&
 						nColorDist<=(5*nCurrColorDistThreshold)/4 && (m_oIllumUpdtRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0)) {
 						pCurrLocalWord->nColor = nCurrColor;
@@ -955,11 +912,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					while(nRandLocalWordIdx<m_nLocalWords && fPotentialRandLocalWordsWeightSum<fLocalWordsWeightSumThreshold) {
 						LocalWord_1ch* pRandLocalWord = (LocalWord_1ch*)m_aapLocalDicts[idx_rand_ldict+nRandLocalWordIdx];
 						const size_t nRandColorDist = absdiff_uchar(nCurrColor,pRandLocalWord->nColor);
-#if USE_BIT_TRICK
-						const size_t nRandIntraDescDist = ((pRandLocalWord->nDescBITS<s_nDescDistTypeCutoff_1ch && nCurrIntraDescBITS<s_nDescDistTypeCutoff_1ch)?hdist_ushort_8bitLUT(nCurrIntraDesc,pRandLocalWord->nDesc):(absdiff_uchar(nCurrIntraDescBITS,pRandLocalWord->nDescBITS)+hdist_ushort_8bitLUT(nCurrIntraDesc,pRandLocalWord->nDesc))/2);
-#else //!USE_BIT_TRICK
 						const size_t nRandIntraDescDist = hdist_ushort_8bitLUT(nCurrIntraDesc,pRandLocalWord->nDesc);
-#endif //!USE_BIT_TRICK
 						if(nRandColorDist<=nCurrColorDistThreshold && nRandIntraDescDist<=nCurrDescDistThreshold) {
 							const float fRandLocalWordWeight = GetLocalWordWeight(pRandLocalWord,m_nFrameIndex);
 							fPotentialRandLocalWordsWeightSum += fRandLocalWordWeight;
@@ -1073,6 +1026,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			const float fLocalWordsWeightSumThreshold = fBestLocalWordWeight/((*pfCurrDistThresholdFactor)*2);
 			ushort* anLastIntraDesc = ((ushort*)(m_oLastDescFrame.data+idx_ushrt_rgb));
 			uchar* anLastColor = m_oLastColorFrame.data+idx_uchar_rgb;
+			const float fCurrGradBoostProp = (1.0f-std::pow(((*pfCurrDistThresholdFactor)-BGSCBLBSP_R_LOWER)/(BGSCBLBSP_R_UPPER-BGSCBLBSP_R_LOWER),2))/2;
 			const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate));
 			const size_t nCurrColorDistThreshold = (size_t)(((*pfCurrDistThresholdFactor)*m_nColorDistThreshold)+(m_oUnstableRegionMask.data[idx_uchar]*UNSTAB_COLOR_DIST_OFFSET));
 			const size_t nCurrDescDistThreshold = (1<<((size_t)floor(*pfCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_uchar]*UNSTAB_DESC_DIST_OFFSET);
@@ -1115,58 +1069,31 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				const float fCurrLocalWordWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIndex);
 				{
 #if USE_SC_THRS_VALIDATION
-#if USE_LWORD_CDIST_TRICK
-					const size_t nColorCDist = cdist_uchar(anCurrColor,pCurrLocalWord->anColor);
-#endif //USE_LWORD_CDIST_TRICK
 					size_t nTotColorDist = 0;
 					size_t nTotIntraDescDist = 0;
 					size_t nTotDescDist = 0;
 					size_t nTotSumDist = 0;
 					for(size_t c=0;c<3; ++c) {
-#if USE_LWORD_CDIST_TRICK
-						const size_t nColorDist = absdiff_uchar(anCurrColor[c],pCurrLocalWord->anColor[c])/2+nColorCDist;
-#else //!USE_LWORD_CDIST_TRICK
 						const size_t nColorDist = absdiff_uchar(anCurrColor[c],pCurrLocalWord->anColor[c]);
-#endif //!USE_LWORD_CDIST_TRICK
 						if(nColorDist>nCurrSCColorDistThreshold)
 							goto failedcheck3ch;
-						size_t nIntraDescDist, nInterDescDist;
-#if USE_BIT_TRICK
-						if(pCurrLocalWord->nDescBITS<s_nDescDistTypeCutoff_3ch && nCurrIntraDescBITS<s_nDescDistTypeCutoff_3ch) {
-#else //!USE_BIT_TRICK
-						if(true) {
-#endif //!USE_BIT_TRICK
-							nIntraDescDist = hdist_ushort_8bitLUT(anCurrIntraDesc[c],pCurrLocalWord->anDesc[c]);
+						size_t nIntraDescDist = hdist_ushort_8bitLUT(anCurrIntraDesc[c],pCurrLocalWord->anDesc[c]);
 #if USE_HARD_SC_DESC_DIST_CHECKS
-							if(nIntraDescDist>nCurrSCDescDistThreshold)
-								goto failedcheck3ch;
+						if(nIntraDescDist>nCurrSCDescDistThreshold)
+							goto failedcheck3ch;
 #endif //USE_HARD_SC_DESC_DIST_CHECKS
-							LBSP::computeSingleRGBDescriptor(oInputImg,pCurrLocalWord->anColor[c],x,y,c,m_anLBSPThreshold_8bitLUT[pCurrLocalWord->anColor[c]],anCurrInterDesc[c]);
-							nInterDescDist = hdist_ushort_8bitLUT(anCurrInterDesc[c],pCurrLocalWord->anDesc[c]);
+						LBSP::computeSingleRGBDescriptor(oInputImg,pCurrLocalWord->anColor[c],x,y,c,m_anLBSPThreshold_8bitLUT[pCurrLocalWord->anColor[c]],anCurrInterDesc[c]);
+						size_t nInterDescDist = hdist_ushort_8bitLUT(anCurrInterDesc[c],pCurrLocalWord->anDesc[c]);
 #if USE_HARD_SC_DESC_DIST_CHECKS
-							if(nInterDescDist>nCurrSCDescDistThreshold)
-								goto failedcheck3ch;
+						if(nInterDescDist>nCurrSCDescDistThreshold)
+							goto failedcheck3ch;
 #endif //USE_HARD_DESC_DIST_CHECKS
-						}
-						else {
-							nIntraDescDist = (absdiff_uchar(anCurrIntraDescBITS[c],pCurrLocalWord->anDescBITS[c])+hdist_ushort_8bitLUT(anCurrIntraDesc[c],pCurrLocalWord->anDesc[c]))/2;
-#if USE_HARD_SC_DESC_DIST_CHECKS
-							if(nIntraDescDist>nCurrSCDescDistThreshold)
-								goto failedcheck3ch;
-#endif //USE_HARD_SC_DESC_DIST_CHECKS
-							LBSP::computeSingleRGBDescriptor(oInputImg,pCurrLocalWord->anColor[c],x,y,c,m_anLBSPThreshold_8bitLUT[pCurrLocalWord->anColor[c]],anCurrInterDesc[c]);
-							nInterDescDist = (absdiff_uchar(popcount_ushort_8bitsLUT(anCurrInterDesc[c]),pCurrLocalWord->anDescBITS[c])+hdist_ushort_8bitLUT(anCurrInterDesc[c],pCurrLocalWord->anDesc[c]))/2;
-#if USE_HARD_SC_DESC_DIST_CHECKS
-							if(nInterDescDist>nCurrSCDescDistThreshold)
-								goto failedcheck3ch;
-#endif //USE_HARD_SC_DESC_DIST_CHECKS
-						}
 						const size_t nDescDist = (nIntraDescDist+nInterDescDist)/2;
 #if !USE_HARD_SC_DESC_DIST_CHECKS
 						if(nDescDist>nCurrSCDescDistThreshold)
 							goto failedcheck3ch;
 #endif //!USE_HARD_SC_DESC_DIST_CHECKS
-						const size_t nSumDist = std::min((size_t)(OVERLOAD_GRAD_PROP*nDescDist)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch);
+						const size_t nSumDist = std::min((size_t)(fCurrGradBoostProp*nDescDist)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch);
 						if(nSumDist>nCurrSCColorDistThreshold)
 							goto failedcheck3ch;
 						nTotColorDist += nColorDist;
@@ -1185,29 +1112,17 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 					}
 #if !USE_SC_THRS_VALIDATION
-#if USE_LWORD_CDIST_TRICK
-					const size_t nTotColorDist = L1dist_uchar(anCurrColor,pCurrLocalWord->anColor)/2+cdist_uchar(anCurrColor,pCurrLocalWord->anColor)*6;
-#else //!USE_LWORD_CDIST_TRICK
 					const size_t nTotColorDist = L1dist_uchar(anCurrColor,pCurrLocalWord->anColor);
-#endif //!USE_LWORD_CDIST_TRICK
 					if(nTotColorDist>nCurrTotColorDistThreshold)
 						goto failedcheck3ch;
-#if USE_BIT_TRICK
-					const size_t nTotIntraDescDist = (pCurrLocalWord->nDescBITS<s_nDescDistTypeCutoff_3ch && nCurrIntraDescBITS<s_nDescDistTypeCutoff_3ch)?hdist_ushort_8bitLUT(anCurrIntraDesc,pCurrLocalWord->anDesc):(absdiff_uchar(nCurrIntraDescBITS,pCurrLocalWord->nDescBITS)+hdist_ushort_8bitLUT(anCurrIntraDesc,pCurrLocalWord->anDesc))/2;
-#else //!USE_BIT_TRICK
 					const size_t nTotIntraDescDist = hdist_ushort_8bitLUT(anCurrIntraDesc,pCurrLocalWord->anDesc);
-#endif //!USE_BIT_TRICK
 					const size_t anCurrInterLBSPThresholds[3] = {m_anLBSPThreshold_8bitLUT[pCurrLocalWord->anColor[0]],m_anLBSPThreshold_8bitLUT[pCurrLocalWord->anColor[1]],m_anLBSPThreshold_8bitLUT[pCurrLocalWord->anColor[2]]};
 					LBSP::computeRGBDescriptor(oInputImg,pCurrLocalWord->anColor,x,y,anCurrInterLBSPThresholds,anCurrInterDesc);
-#if USE_BIT_TRICK
-					const size_t nTotInterDescDist = (pCurrLocalWord->nDescBITS<s_nDescDistTypeCutoff_3ch && nCurrIntraDescBITS<s_nDescDistTypeCutoff_3ch)?hdist_ushort_8bitLUT(anCurrInterDesc,pCurrLocalWord->anDesc):(absdiff_uchar(popcount_ushort_8bitsLUT(anCurrInterDesc),pCurrLocalWord->nDescBITS)+hdist_ushort_8bitLUT(anCurrInterDesc,pCurrLocalWord->anDesc))/2;
-#else //!USE_BIT_TRICK
 					const size_t nTotInterDescDist = hdist_ushort_8bitLUT(anCurrInterDesc,pCurrLocalWord->anDesc);
-#endif //!USE_BIT_TRICK
 					const size_t nTotDescDist = (nTotIntraDescDist+nTotInterDescDist)/2;
 					if(nTotDescDist>nCurrTotDescDistThreshold)
 						goto failedcheck3ch;
-					const size_t nTotSumDist = std::min((size_t)(OVERLOAD_GRAD_PROP*nTotDescDist)*(s_nColorMaxDataRange_3ch/s_nDescMaxDataRange_3ch)+nTotColorDist,s_nColorMaxDataRange_3ch);
+					const size_t nTotSumDist = std::min((size_t)(fCurrGradBoostProp*nTotDescDist)*(s_nColorMaxDataRange_3ch/s_nDescMaxDataRange_3ch)+nTotColorDist,s_nColorMaxDataRange_3ch);
 #endif //!USE_SC_THRS_VALIDATION
 					if(nTotDescDist<=nCurrTotDescDistThreshold && nTotSumDist<=nCurrTotColorDistThreshold) {
 						fPotentialLocalWordsWeightSum += fCurrLocalWordWeight;
@@ -1227,7 +1142,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				}
 				failedcheck3ch:
 				if(fCurrLocalWordWeight>fLastLocalWordWeight) {
-					std::swap(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_aapLocalDicts[idx_ldict+nLocalWordIdx-1]); // @@@@@ ALREADY HAVE PTR AS 'TMP', CAN SWAP BY HAND...
+					std::swap(m_aapLocalDicts[idx_ldict+nLocalWordIdx],m_aapLocalDicts[idx_ldict+nLocalWordIdx-1]);
 #if DISPLAY_CBLBSP_DEBUG_INFO
 					std::swap(vsWordModList[idx_ldict+nLocalWordIdx],vsWordModList[idx_ldict+nLocalWordIdx-1]);
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
@@ -1262,20 +1177,12 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				if(m_oGhostRegionMask.data[idx_uchar] || m_oHighVarRegionMask.data[idx_uchar] || (rand()%nCurrLocalWordUpdateRate)==0) {
 					GlobalWord_3ch* pLastMatchedGlobalWord = (GlobalWord_3ch*)m_apGlobalWordLookupTable[idx_uchar];
 					if(!pLastMatchedGlobalWord
-#if USE_GWORD_CDIST_TRICK
 							|| (L1dist_uchar(anCurrColor,pLastMatchedGlobalWord->anColor)/2+cdist_uchar(anCurrColor,pLastMatchedGlobalWord->anColor)*6)>nCurrTotColorDistThreshold
-#else //!USE_GWORD_CDIST_TRICK
-							|| L1dist_uchar(anCurrColor,pLastMatchedGlobalWord->anColor)>nCurrTotColorDistThreshold
-#endif //!USE_GWORD_CDIST_TRICK
 							|| absdiff_uchar(nCurrIntraDescBITS,pLastMatchedGlobalWord->nDescBITS)>nCurrTotDescDistThreshold/2) {
 						size_t nGlobalWordIdx;
 						for(nGlobalWordIdx=0;nGlobalWordIdx<m_nGlobalWords;++nGlobalWordIdx) {
 							pLastMatchedGlobalWord = (GlobalWord_3ch*)m_apGlobalDict[nGlobalWordIdx];
-#if USE_GWORD_CDIST_TRICK
 							if((L1dist_uchar(anCurrColor,pLastMatchedGlobalWord->anColor)/2+cdist_uchar(anCurrColor,pLastMatchedGlobalWord->anColor)*6)<=nCurrTotColorDistThreshold
-#else //!USE_GWORD_CDIST_TRICK
-							if(L1dist_uchar(anCurrColor,pLastMatchedGlobalWord->anColor)<=nCurrTotColorDistThreshold
-#endif //!USE_GWORD_CDIST_TRICK
 									&& absdiff_uchar(nCurrIntraDescBITS,pLastMatchedGlobalWord->nDescBITS)<=nCurrTotDescDistThreshold/2)
 								break;
 						}
@@ -1306,20 +1213,12 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 				*pfCurrMeanRawSegmRes_burst = (*pfCurrMeanRawSegmRes_burst)*(1.0f-fRollAvgFactor_burst) + fRollAvgFactor_burst;
 				GlobalWord_3ch* pLastMatchedGlobalWord = (GlobalWord_3ch*)m_apGlobalWordLookupTable[idx_uchar];
 				if(!pLastMatchedGlobalWord
-#if USE_GWORD_CDIST_TRICK
 						|| (L1dist_uchar(anCurrColor,pLastMatchedGlobalWord->anColor)/2+cdist_uchar(anCurrColor,pLastMatchedGlobalWord->anColor)*6)>nCurrTotColorDistThreshold
-#else //!USE_GWORD_CDIST_TRICK
-						|| L1dist_uchar(anCurrColor,pLastMatchedGlobalWord->anColor)>nCurrTotColorDistThreshold
-#endif //!USE_GWORD_CDIST_TRICK
 						|| absdiff_uchar(nCurrIntraDescBITS,pLastMatchedGlobalWord->nDescBITS)>nCurrTotDescDistThreshold/2) {
 					size_t nGlobalWordIdx;
 					for(nGlobalWordIdx=0;nGlobalWordIdx<m_nGlobalWords;++nGlobalWordIdx) {
 						pLastMatchedGlobalWord = (GlobalWord_3ch*)m_apGlobalDict[nGlobalWordIdx];
-#if USE_GWORD_CDIST_TRICK
 						if((L1dist_uchar(anCurrColor,pLastMatchedGlobalWord->anColor)/2+cdist_uchar(anCurrColor,pLastMatchedGlobalWord->anColor)*6)<=nCurrTotColorDistThreshold
-#else //!USE_GWORD_CDIST_TRICK
-						if(L1dist_uchar(anCurrColor,pLastMatchedGlobalWord->anColor)<=nCurrTotColorDistThreshold
-#endif //!USE_GWORD_CDIST_TRICK
 								&& absdiff_uchar(nCurrIntraDescBITS,pLastMatchedGlobalWord->nDescBITS)<=nCurrTotDescDistThreshold/2)
 							break;
 					}
@@ -1379,16 +1278,8 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 					float fPotentialRandLocalWordsWeightSum = 0.0f;
 					while(nRandLocalWordIdx<m_nLocalWords && fPotentialRandLocalWordsWeightSum<fLocalWordsWeightSumThreshold) {
 						LocalWord_3ch* pRandLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_rand_ldict+nRandLocalWordIdx];
-#if USE_LWORD_CDIST_TRICK
-						const size_t nRandTotColorDist = L1dist_uchar(anCurrColor,pRandLocalWord->anColor)/2+cdist_uchar(anCurrColor,pRandLocalWord->anColor)*6;
-#else //!USE_LWORD_CDIST_TRICK
 						const size_t nRandTotColorDist = L1dist_uchar(anCurrColor,pRandLocalWord->anColor);
-#endif //!USE_LWORD_CDIST_TRICK
-#if USE_BIT_TRICK
-						const size_t nRandTotIntraDescDist = ((pRandLocalWord->nDescBITS<s_nDescDistTypeCutoff_3ch && nCurrIntraDescBITS<s_nDescDistTypeCutoff_3ch)?hdist_ushort_8bitLUT(anCurrIntraDesc,pRandLocalWord->anDesc):(absdiff_uchar(nCurrIntraDescBITS,pRandLocalWord->nDescBITS)+hdist_ushort_8bitLUT(anCurrIntraDesc,pRandLocalWord->anDesc))/2);
-#else //!USE_BIT_TRICK
 						const size_t nRandTotIntraDescDist = hdist_ushort_8bitLUT(anCurrIntraDesc,pRandLocalWord->anDesc);
-#endif //!USE_BIT_TRICK
 						if(nRandTotColorDist<=nCurrTotColorDistThreshold && nRandTotIntraDescDist<=nCurrTotDescDistThreshold) {
 							const float fRandLocalWordWeight = GetLocalWordWeight(pRandLocalWord,m_nFrameIndex);
 							fPotentialRandLocalWordsWeightSum += fRandLocalWordWeight;
