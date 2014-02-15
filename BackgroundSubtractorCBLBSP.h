@@ -35,9 +35,10 @@
 #define BGSCBLBSP_BURST_VAR_DETECTION_SAVG_MIN2 (1.100f)
 #define BGSCBLBSP_BURST_VAR_DETECTION_DLST_MIN2 (-0.260f)
 //! defines the threshold values used to detect unstable regions and edges
-#define BGSCBLBSP_INSTBLTY_DETECTION_SEGM_DIFF (0.150f)
+#define BGSCBLBSP_INSTBLTY_DETECTION_SEGM_DIFF (0.250f)
+#define BGSCBLBSP_INSTBLTY_DETECTION_MIN_R_VAL (3.000f)
 //! defines the internal threshold adjustment factor to use when treating single channel images
-#define BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.350f)
+#define BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.400f)
 //! parameters used for dynamic distance threshold adjustments ('R(x)')
 #define BGSCBLBSP_R_INCR  (0.0100f)
 #define BGSCBLBSP_R_DECR  (0.0100f)
@@ -155,6 +156,8 @@ protected:
 	cv::Mat m_oDistThresholdVariationFrame;
 	//! per-pixel mean minimal model distances ('D_min(x)')
 	cv::Mat m_oMeanMinDistFrame;
+	//! per-pixel mean minimal model distances (burst version -- 'D_min_burst(x)')
+	cv::Mat m_oMeanMinDistFrame_burst;
 	//! per-pixel mean distances between consecutive frames ('D_last(x)')
 	cv::Mat m_oMeanLastDistFrame;
 	//! per-pixel mean distances between consecutive frames (burst version -- 'D_last_burst(x)')
@@ -191,9 +194,8 @@ protected:
 	cv::Mat m_oIllumUpdtRegionMask;
 
 	//! pre-allocated matrices used to speed up morph ops and keep by-products
-	cv::Mat m_oTempFGMask;
-	cv::Mat m_oTempFGMask2;
 	cv::Mat m_oFGMask_PreFlood;
+	cv::Mat m_oFGMask_FloodedHoles;
 	cv::Mat m_oFGMask_last_dilated_inverted;
 	cv::Mat m_oPureFGBlinkMask_curr;
 	cv::Mat m_oPureFGBlinkMask_last;
