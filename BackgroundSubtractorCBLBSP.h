@@ -104,13 +104,10 @@ protected:
 	};
 	struct LocalWord_1ch : LocalWord {
 		uchar nColor;
-		uchar nDescBITS;
 		ushort nDesc;
 	};
 	struct LocalWord_3ch : LocalWord {
 		uchar anColor[3];
-		uchar anDescBITS[3];
-		uchar nDescBITS;
 		ushort anDesc[3];
 	};
 	struct GlobalWord {
