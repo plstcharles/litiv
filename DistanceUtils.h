@@ -28,6 +28,19 @@ static inline size_t cdist_uchar(const uchar* curr, const uchar* bg) {
 		return (size_t)sqrt((float)curr_int_sqr);
 }
 
+//! computes the square integer color distortion between two unsigned char vectors (RGB) -- 'fast' but slightly innacurate version
+static inline size_t cdistsqr_uchar(const uchar* curr, const uchar* bg) {
+	size_t curr_int_sqr = curr[0]*curr[0] + curr[1]*curr[1] + curr[2]*curr[2];
+	size_t bg_int_sqr = bg[0]*bg[0] + bg[1]*bg[1] + bg[2]*bg[2];
+	if(bg_int_sqr) {
+		size_t mix_int = (curr[0]*bg[0] + curr[1]*bg[1] + curr[2]*bg[2]);
+		size_t mix_int_sqr = mix_int*mix_int;;
+		return curr_int_sqr-(mix_int_sqr/bg_int_sqr);
+	}
+	else
+		return curr_int_sqr;
+}
+
 //! computes the L1 distance between two opencv unsigned char vectors (RGB)
 static inline size_t L1dist_vec3b(const cv::Vec3b& a, const cv::Vec3b& b) {
 	const uchar a_array[3] = {a[0],a[1],a[2]};
