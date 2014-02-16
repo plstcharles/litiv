@@ -21,11 +21,11 @@ static inline size_t cdist_uchar(const uchar* curr, const uchar* bg) {
 	size_t curr_int_sqr = curr[0]*curr[0] + curr[1]*curr[1] + curr[2]*curr[2];
 	size_t bg_int_sqr = bg[0]*bg[0] + bg[1]*bg[1] + bg[2]*bg[2];
 	if(bg_int_sqr) {
-		size_t mix_int_sqr = std::pow((curr[0]*bg[0] + curr[1]*bg[1] + curr[2]*bg[2]),2);
+		float mix_int_sqr = std::pow((float)(curr[0]*bg[0] + curr[1]*bg[1] + curr[2]*bg[2]),2);
 		return (size_t)sqrt(curr_int_sqr-(mix_int_sqr/bg_int_sqr));
 	}
 	else
-		return (size_t)sqrt(curr_int_sqr);
+		return (size_t)sqrt((float)curr_int_sqr);
 }
 
 //! computes the L1 distance between two opencv unsigned char vectors (RGB)
