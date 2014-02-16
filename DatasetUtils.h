@@ -166,7 +166,7 @@ static inline void WriteResult(	const std::string& sResultsPath,
 static inline void WriteMetrics(const std::string sResultsFileName, const SequenceInfo* pSeq) {
 	std::ofstream oMetricsOutput(sResultsFileName);
 	AdvancedMetrics temp(pSeq);
-	std::cout << "\t\t" << std::setw(12) << pSeq->m_sName << ":  Rcl=" << temp.dRecall << ", Prc=" << temp.dPrecision << ", FMs=" << temp.dFMeasure << std::endl;
+	std::cout << "\t\t" << std::setw(12) << pSeq->m_sName << ":  Rcl=" << std::fixed << std::setprecision(8) << temp.dRecall << ", Prc=" << temp.dPrecision << ", FMs=" << temp.dFMeasure << std::endl;
 	oMetricsOutput << "Results for sequence '" << pSeq->m_sName << "' :" << std::endl;
 	oMetricsOutput << std::endl;
 	oMetricsOutput << "nTP nFP nFN nTN nSE" << std::endl; // order similar to the files saved by the CDNet analysis script
