@@ -19,8 +19,8 @@ static inline size_t L1dist_uchar(const uchar* a, const uchar* b) {
 //! computes the color distortion between two unsigned char vectors (RGB)
 static inline size_t cdist_uchar(const uchar* curr, const uchar* bg) {
 	size_t curr_int_sqr = curr[0]*curr[0] + curr[1]*curr[1] + curr[2]*curr[2];
-	size_t bg_int_sqr = bg[0]*bg[0] + bg[1]*bg[1] + bg[2]*bg[2];
-	if(bg_int_sqr) {
+	if(bg[0] || bg[1] || bg[2]) {
+		size_t bg_int_sqr = bg[0]*bg[0] + bg[1]*bg[1] + bg[2]*bg[2];
 		float mix_int_sqr = std::pow((float)(curr[0]*bg[0] + curr[1]*bg[1] + curr[2]*bg[2]),2);
 		return (size_t)sqrt(curr_int_sqr-(mix_int_sqr/bg_int_sqr));
 	}
@@ -31,10 +31,10 @@ static inline size_t cdist_uchar(const uchar* curr, const uchar* bg) {
 //! computes the square integer color distortion between two unsigned char vectors (RGB) -- 'fast' but slightly innacurate version
 static inline size_t cdistsqr_uchar(const uchar* curr, const uchar* bg) {
 	size_t curr_int_sqr = curr[0]*curr[0] + curr[1]*curr[1] + curr[2]*curr[2];
-	size_t bg_int_sqr = bg[0]*bg[0] + bg[1]*bg[1] + bg[2]*bg[2];
-	if(bg_int_sqr) {
+	if(bg[0] || bg[1] || bg[2]) {
+		size_t bg_int_sqr = bg[0]*bg[0] + bg[1]*bg[1] + bg[2]*bg[2];
 		size_t mix_int = (curr[0]*bg[0] + curr[1]*bg[1] + curr[2]*bg[2]);
-		size_t mix_int_sqr = mix_int*mix_int;;
+		size_t mix_int_sqr = mix_int*mix_int;
 		return curr_int_sqr-(mix_int_sqr/bg_int_sqr);
 	}
 	else
