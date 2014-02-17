@@ -11,7 +11,7 @@
 /////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
 /////////////////////////////////////////
-#define DEFAULT_NB_THREADS				1
+#define DEFAULT_NB_THREADS				4
 /////////////////////////////////////////
 #define WRITE_BGSUB_IMG_OUTPUT			0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT	0
@@ -56,11 +56,12 @@ const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet/"+RESULTS_OUTPUT_DIR_N
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
 //const char* g_asDatasetCategories[] = {"baseline"};
-//const char* g_asDatasetCategories[] = {"baseline_highway"};
-//const char* g_asDatasetCategories[] = {"cameraJitter_sidewalk"};
+//const char* g_asDatasetCategories[] = {"baseline_office"};
+//const char* g_asDatasetCategories[] = {"cameraJitter_boulevard"};
 //const char* g_asDatasetCategories[] = {"baseline","shadow_cubicle"};
-//const char* g_asDatasetCategories[] = {"dynamicBackground_fountain02"};
-//const char* g_asDatasetCategories[] = {"shadow_cubicle"};
+//const char* g_asDatasetCategories[] = {"dynamicBackground_fountain01"};
+//const char* g_asDatasetCategories[] = {"shadow_bungalows"};
+//const char* g_asDatasetCategories[] = {"intermittentObjectMotion_streetLight"};
 //const char* g_asDatasetCategories[] = {"dynamicBackground_boats","dynamicBackground_fountain01","dynamicBackground_fountain02","dynamicBackground_overpass","cameraJitter_sidewalk"};
 //const char* g_asDatasetCategories[] = {"shadow_cubicle","intermittentObjectMotion_tramstop","intermittentObjectMotion_winterDriveway"};
 //const char* g_asDatasetCategories[] = {"thermal_lakeSide"};
@@ -158,7 +159,7 @@ int main() {
 		for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
 			while(g_nActiveThreads>=g_nMaxThreads)
 				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-			std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << oSeqIter->first << ")" << std::endl;
+			std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific <<  oSeqIter->first << ")" << std::endl;
 			g_nActiveThreads++;
 			nSeqProcessed++;
 			std::thread(AnalyzeSequence,oSeqIter->second->m_pParent,oSeqIter->second).detach();
@@ -170,7 +171,7 @@ int main() {
 			g_hThreadEvent[n] = CreateEvent(NULL,FALSE,TRUE,NULL);
 		for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
 			DWORD ret = WaitForMultipleObjects(g_nMaxThreads,g_hThreadEvent,FALSE,INFINITE);
-			std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << oSeqIter->first << ")" << std::endl;
+			std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << oSeqIter->first << ")" << std::endl;
 			nSeqProcessed++;
 			g_apThreadDataStruct[ret][0] = oSeqIter->second->m_pParent;
 			g_apThreadDataStruct[ret][1] = oSeqIter->second;
