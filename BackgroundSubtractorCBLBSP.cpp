@@ -341,7 +341,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 			CV_Assert(m_aapLocalDicts[idx_orig_ldict]);
 			const LocalWord_1ch* pRefBestLocalWord = (LocalWord_1ch*)m_aapLocalDicts[idx_orig_ldict];
 			const float fRefBestLocalWordWeight = GetLocalWordWeight(pRefBestLocalWord,m_nFrameIndex);
-			const size_t nRefBestLocalWordDescBITS = popcount_ushort_8bitsLUT(pRefBestLocalWord->nDesc);
+			const uchar nRefBestLocalWordDescBITS = popcount_ushort_8bitsLUT(pRefBestLocalWord->nDesc);
 			size_t nGlobalWordIdx; GlobalWord_1ch* pCurrGlobalWord;
 			for(nGlobalWordIdx=0;nGlobalWordIdx<m_nGlobalWords;++nGlobalWordIdx) {
 				pCurrGlobalWord = (GlobalWord_1ch*)m_apGlobalDict[nGlobalWordIdx];
@@ -387,7 +387,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 					if(m_aapLocalDicts[nLookupMapIdx*m_nLocalWords] && oGlobalDictPresenceLookupMap.data[nLookupMapIdx]<UCHAR_MAX && !m_oFGMask_last_dilated.data[nLookupMapIdx]) {
 						const LocalWord_1ch* pRefLocalWord = (LocalWord_1ch*)m_aapLocalDicts[nLookupMapIdx*m_nLocalWords+nLocalDictWordIdxOffset];
 						const float fRefLocalWordWeight = GetLocalWordWeight(pRefLocalWord,m_nFrameIndex);
-						const size_t nRefLocalWordDescBITS = popcount_ushort_8bitsLUT(pRefLocalWord->nDesc);
+						const uchar nRefLocalWordDescBITS = popcount_ushort_8bitsLUT(pRefLocalWord->nDesc);
 						size_t nGlobalWordIdx; GlobalWord_1ch* pCurrGlobalWord;
 						for(nGlobalWordIdx=0;nGlobalWordIdx<m_nGlobalWords;++nGlobalWordIdx) {
 							pCurrGlobalWord = (GlobalWord_1ch*)m_apGlobalDict[nGlobalWordIdx];
@@ -547,7 +547,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 			CV_Assert(m_aapLocalDicts[idx_orig_ldict]);
 			const LocalWord_3ch* pRefBestLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_orig_ldict];
 			const float fRefBestLocalWordWeight = GetLocalWordWeight(pRefBestLocalWord,m_nFrameIndex);
-			const size_t nRefBestLocalWordDescBITS = popcount_ushort_8bitsLUT(pRefBestLocalWord->anDesc);
+			const uchar nRefBestLocalWordDescBITS = popcount_ushort_8bitsLUT(pRefBestLocalWord->anDesc);
 			size_t nGlobalWordIdx; GlobalWord_3ch* pCurrGlobalWord;
 			for(nGlobalWordIdx=0;nGlobalWordIdx<m_nGlobalWords;++nGlobalWordIdx) {
 				pCurrGlobalWord = (GlobalWord_3ch*)m_apGlobalDict[nGlobalWordIdx];
@@ -594,7 +594,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 					if(m_aapLocalDicts[nLookupMapIdx*m_nLocalWords] && oGlobalDictPresenceLookupMap.data[nLookupMapIdx]<UCHAR_MAX && !m_oFGMask_last_dilated.data[nLookupMapIdx]) {
 						const LocalWord_3ch* pRefLocalWord = (LocalWord_3ch*)m_aapLocalDicts[nLookupMapIdx*m_nLocalWords+nLocalDictWordIdxOffset];
 						const float fRefLocalWordWeight = GetLocalWordWeight(pRefLocalWord,m_nFrameIndex);
-						const size_t nRefLocalWordDescBITS = popcount_ushort_8bitsLUT(pRefLocalWord->anDesc);
+						const uchar nRefLocalWordDescBITS = popcount_ushort_8bitsLUT(pRefLocalWord->anDesc);
 						size_t nGlobalWordIdx; GlobalWord_3ch* pCurrGlobalWord;
 						for(nGlobalWordIdx=0;nGlobalWordIdx<m_nGlobalWords;++nGlobalWordIdx) {
 							pCurrGlobalWord = (GlobalWord_3ch*)m_apGlobalDict[nGlobalWordIdx];

@@ -55,16 +55,6 @@ const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/CDNet/dataset/");
 const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet/"+RESULTS_OUTPUT_DIR_NAME+"/");
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
-//const char* g_asDatasetCategories[] = {"baseline"};
-//const char* g_asDatasetCategories[] = {"baseline_office"};
-//const char* g_asDatasetCategories[] = {"cameraJitter_boulevard"};
-//const char* g_asDatasetCategories[] = {"baseline","shadow_cubicle"};
-//const char* g_asDatasetCategories[] = {"dynamicBackground_fountain01"};
-//const char* g_asDatasetCategories[] = {"shadow_bungalows"};
-//const char* g_asDatasetCategories[] = {"intermittentObjectMotion_streetLight"};
-//const char* g_asDatasetCategories[] = {"dynamicBackground_boats","dynamicBackground_fountain01","dynamicBackground_fountain02","dynamicBackground_overpass","cameraJitter_sidewalk"};
-//const char* g_asDatasetCategories[] = {"shadow_cubicle","intermittentObjectMotion_tramstop","intermittentObjectMotion_winterDriveway"};
-//const char* g_asDatasetCategories[] = {"thermal_lakeSide"};
 const char* g_asDatasetCategories[] = {"dynamicBackground","shadow","baseline","intermittentObjectMotion","cameraJitter","thermal"};
 const size_t g_nResultIdxOffset = 1;
 #elif USE_WALLFLOWER_DATASET
@@ -126,7 +116,6 @@ const std::vector<int> g_vnResultsComprParams(g_anResultsComprParams,g_anResults
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 
 int main() {
-	srand(0); // for now, assures that two consecutive runs on the same data return the same results
 	std::vector<CategoryInfo*> vpCategories;
 	std::cout << "Parsing dataset '"<< g_sDatasetName << "'..." << std::endl;
 	try {
@@ -211,7 +200,6 @@ int main() {
 	}
 	else
 		std::cout << "No sequences found, all done." << std::endl;
-
 	// let memory 'leak' here, exits faster once job is done...
 	//for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory)
 	//	delete *pCurrCategory;
@@ -223,15 +211,16 @@ int AnalyzeSequence(CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence) {
 #elif PLATFORM_USES_WIN32API
 int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence) {
 #endif //PLATFORM_USES_WIN32API
+	srand(0); // for now, assures that two consecutive runs on the same data return the same results
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
-		BackgroundSubtractorLBSP* pBGS = nullptr;
+	BackgroundSubtractorLBSP* pBGS = nullptr;
 #if LIMIT_KEYPTS_TO_SEQUENCE_ROI
-		std::vector<cv::KeyPoint> voKPs = pCurrSequence->GetKeyPointsFromROI();
+	std::vector<cv::KeyPoint> voKPs = pCurrSequence->GetKeyPointsFromROI();
 #else //!LIMIT_KEYPTS_TO_SEQUENCE_ROI
-		std::vector<cv::KeyPoint> voKPs;
+	std::vector<cv::KeyPoint> voKPs;
 #endif //!LIMIT_KEYPTS_TO_SEQUENCE_ROI
 #else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
-		cv::BackgroundSubtractor* pBGS = nullptr;
+	cv::BackgroundSubtractor* pBGS = nullptr;
 #endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 	try {
 		CV_Assert(pCurrCategory && pCurrSequence);
