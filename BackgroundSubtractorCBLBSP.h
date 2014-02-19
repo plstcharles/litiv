@@ -84,7 +84,7 @@ public:
 	//! (re)initiaization method; needs to be called before starting background subtraction (note: also reinitializes the keypoints vector)
 	virtual void initialize(const cv::Mat& oInitImg, const std::vector<cv::KeyPoint>& voKeyPoints); // @@@@@@@@@@ currently always reinits internal memory structs without reusing old words, if KPs match
 	//! refreshes all local (+ global) dictionaries based on the last analyzed frame
-	virtual void refreshModel(size_t nBaseOccCount, size_t nOverallMatchOccIncr, size_t nUniversalOccDecr);
+	virtual void refreshModel(size_t nBaseOccCount, size_t nOverallMatchOccIncr, float fOccDecrFrac, bool bForceFGUpdate=false);
 	//! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
 	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=0);
 	//! returns a copy of the latest reconstructed background image
@@ -140,6 +140,8 @@ protected:
 	size_t m_nMaxLocalDictionaries;
 	//! current frame index, used to keep track of word occurrence information
 	size_t m_nFrameIndex;
+	//! current number of bad continuous frames detected (used to reset the model when it gets high)
+	size_t m_nModelResetFrameCount;
 
 	//! background model local word list & dictionaries
 	LocalWord** m_aapLocalDicts;
