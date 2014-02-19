@@ -40,6 +40,10 @@
 #define USE_INTERNAL_HRCS 0
 // local define used to activate memory checks throughout different algorithm sections
 #define USE_INTERNAL_RCHECKS 0
+// local define used to determine at what continuous final FG-to-BG ratio to reset the model
+#define MODEL_RESET_MIN_FINAL_FG_RATIO 0.75f
+// local define used to determine how long the min ratio must be kept for a model reset
+#define MODEL_RESET_MIN_FRAME_COUNT 10
 
 #if USE_INTERNAL_HRCS
 #include "PlatformUtils.h"
@@ -89,6 +93,7 @@ BackgroundSubtractorCBLBSP::BackgroundSubtractorCBLBSP(	 float fLBSPThreshold
 		,m_nGlobalWords(0)
 		,m_nMaxLocalDictionaries(0)
 		,m_nFrameIndex(SIZE_MAX)
+		,m_nModelResetFrameCount(0)
 		,m_aapLocalDicts(nullptr)
 		,m_apLocalWordList_1ch(nullptr)
 		,m_apLocalWordListIter_1ch(nullptr)
@@ -130,6 +135,7 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 	m_nLocalWords = ((size_t)(m_fLocalWordsPerChannel*m_nImgChannels)) + LWORD_BASE_COUNT;
 	m_nGlobalWords = ((size_t)(m_fGlobalWordsPerChannel*m_nImgChannels)) + GWORD_BASE_COUNT;
 	m_nFrameIndex = 0;
+	m_nModelResetFrameCount = 0;
 	m_aapLocalDicts = new LocalWord*[m_nMaxLocalDictionaries*m_nLocalWords];
 	memset(m_aapLocalDicts,0,sizeof(LocalWord*)*m_nMaxLocalDictionaries*m_nLocalWords);
 	m_apGlobalDict = new GlobalWord*[m_nGlobalWords];
@@ -234,33 +240,32 @@ void BackgroundSubtractorCBLBSP::initialize(const cv::Mat& oInitImg, const std::
 		m_apGlobalWordListIter_3ch = m_apGlobalWordList_3ch;
 	}
 	m_bInitializedInternalStructs = true;
-	refreshModel(1,1,0);
+	refreshModel(1,1,0.0f);
 	m_bInitialized = true;
 }
 
-void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOverallMatchOccIncr, size_t nUniversalOccDecr) {
+void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOverallMatchOccIncr, float fOccDecrFrac, bool bForceFGUpdate) {
 	// == refresh
 	CV_Assert(m_bInitializedInternalStructs);
+	CV_Assert(fOccDecrFrac>=0.0f && fOccDecrFrac<=1.0f);
 	const size_t nKeyPoints = m_voKeyPoints.size();
 	if(m_nImgChannels==1) {
 		for(size_t k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
 			const size_t idx_orig_uchar = m_oImgSize.width*y_orig + x_orig;
-			if(m_oFGMask_last_dilated.data[idx_orig_uchar])
+			if(!bForceFGUpdate && m_oFGMask_last_dilated.data[idx_orig_uchar])
 				continue;
 			const size_t idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
 			const size_t idx_orig_flt32 = idx_orig_uchar*4;
 			const float fCurrDistThresholdFactor = *(float*)(m_oDistThresholdFrame.data+idx_orig_flt32);
 			const size_t nCurrColorDistThreshold = (size_t)((fCurrDistThresholdFactor*m_nColorDistThreshold-((!m_oUnstableRegionMask.data[idx_orig_uchar])*UNSTAB_COLOR_DIST_OFFSET))*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 			const size_t nCurrDescDistThreshold = ((size_t)1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_DESC_DIST_OFFSET);
-			for(size_t nLocalWordIdx=0;nLocalWordIdx<m_nLocalWords;++nLocalWordIdx) {
-				LocalWord_1ch* pCurrLocalWord = ((LocalWord_1ch*)m_aapLocalDicts[idx_orig_ldict+nLocalWordIdx]);
-				if(pCurrLocalWord) {
-					if(pCurrLocalWord->nOccurrences>nUniversalOccDecr)
-						pCurrLocalWord->nOccurrences -= nUniversalOccDecr;
-					else
-						pCurrLocalWord->nOccurrences = 1;
+			if(fOccDecrFrac>0.0f) {
+				for(size_t nLocalWordIdx=0;nLocalWordIdx<m_nLocalWords;++nLocalWordIdx) {
+					LocalWord_1ch* pCurrLocalWord = ((LocalWord_1ch*)m_aapLocalDicts[idx_orig_ldict+nLocalWordIdx]);
+					if(pCurrLocalWord)
+						pCurrLocalWord->nOccurrences -= (size_t)(fOccDecrFrac*pCurrLocalWord->nOccurrences);
 				}
 			}
 			const size_t nLocalIters = (s_nSamplesInitPatternWidth*s_nSamplesInitPatternHeight)*2;
@@ -269,7 +274,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 				int y_sample, x_sample;
 				getRandSamplePosition(x_sample,y_sample,x_orig,y_orig,LBSP::PATCH_SIZE/2,m_oImgSize);
 				const size_t idx_sample_uchar = m_oImgSize.width*y_sample + x_sample;
-				if(m_oFGMask_last_dilated.data[idx_sample_uchar])
+				if(!bForceFGUpdate && m_oFGMask_last_dilated.data[idx_sample_uchar])
 					continue;
 				const size_t idx_sample_color = idx_sample_uchar;
 				const size_t idx_sample_desc = idx_sample_color*2;
@@ -331,7 +336,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
 			const size_t idx_orig_uchar = m_oImgSize.width*y_orig + x_orig;
-			if(m_oFGMask_last_dilated.data[idx_orig_uchar])
+			if(!bForceFGUpdate && m_oFGMask_last_dilated.data[idx_orig_uchar])
 				continue;
 			const size_t idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
 			const size_t idx_orig_flt32 = idx_orig_uchar*4;
@@ -384,7 +389,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 				const size_t nColorDistThreshold = (size_t)(m_nColorDistThreshold*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 				const size_t nDescDistThreshold = 2+m_nDescDistThreshold;
 				while(nLookupMapIdx<nKeyPoints && (size_t)(m_apGlobalWordListIter_1ch-m_apGlobalWordList_1ch)<m_nGlobalWords) {
-					if(m_aapLocalDicts[nLookupMapIdx*m_nLocalWords] && oGlobalDictPresenceLookupMap.data[nLookupMapIdx]<UCHAR_MAX && !m_oFGMask_last_dilated.data[nLookupMapIdx]) {
+					if(m_aapLocalDicts[nLookupMapIdx*m_nLocalWords] && oGlobalDictPresenceLookupMap.data[nLookupMapIdx]<UCHAR_MAX && (!m_oFGMask_last_dilated.data[nLookupMapIdx]||bForceFGUpdate)) {
 						const LocalWord_1ch* pRefLocalWord = (LocalWord_1ch*)m_aapLocalDicts[nLookupMapIdx*m_nLocalWords+nLocalDictWordIdxOffset];
 						const float fRefLocalWordWeight = GetLocalWordWeight(pRefLocalWord,m_nFrameIndex);
 						const uchar nRefLocalWordDescBITS = popcount_ushort_8bitsLUT(pRefLocalWord->nDesc);
@@ -449,20 +454,18 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
 			const size_t idx_orig_uchar = m_oImgSize.width*y_orig + x_orig;
-			if(m_oFGMask_last_dilated.data[idx_orig_uchar])
+			if(!bForceFGUpdate && m_oFGMask_last_dilated.data[idx_orig_uchar])
 				continue;
 			const size_t idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
 			const size_t idx_orig_flt32 = idx_orig_uchar*4;
 			const float fCurrDistThresholdFactor = *(float*)(m_oDistThresholdFrame.data+idx_orig_flt32);
 			const size_t nCurrTotColorDistThreshold = (size_t)((fCurrDistThresholdFactor*m_nColorDistThreshold)-((!m_oUnstableRegionMask.data[idx_orig_uchar])*UNSTAB_COLOR_DIST_OFFSET))*3;
 			const size_t nCurrTotDescDistThreshold = (((size_t)1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_DESC_DIST_OFFSET))*3;
-			for(size_t nLocalWordIdx=0;nLocalWordIdx<m_nLocalWords;++nLocalWordIdx) {
-				LocalWord_3ch* pCurrLocalWord = ((LocalWord_3ch*)m_aapLocalDicts[idx_orig_ldict+nLocalWordIdx]);
-				if(pCurrLocalWord) {
-					if(pCurrLocalWord->nOccurrences>nUniversalOccDecr)
-						pCurrLocalWord->nOccurrences -= nUniversalOccDecr;
-					else
-						pCurrLocalWord->nOccurrences = 1;
+			if(fOccDecrFrac>0.0f) {
+				for(size_t nLocalWordIdx=0;nLocalWordIdx<m_nLocalWords;++nLocalWordIdx) {
+					LocalWord_3ch* pCurrLocalWord = ((LocalWord_3ch*)m_aapLocalDicts[idx_orig_ldict+nLocalWordIdx]);
+					if(pCurrLocalWord)
+						pCurrLocalWord->nOccurrences -= (size_t)(fOccDecrFrac*pCurrLocalWord->nOccurrences);
 				}
 			}
 			const size_t nLocalIters = (s_nSamplesInitPatternWidth*s_nSamplesInitPatternHeight)*2;
@@ -471,7 +474,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 				int y_sample, x_sample;
 				getRandSamplePosition(x_sample,y_sample,x_orig,y_orig,LBSP::PATCH_SIZE/2,m_oImgSize);
 				const size_t idx_sample_uchar = m_oImgSize.width*y_sample + x_sample;
-				if(m_oFGMask_last_dilated.data[idx_sample_uchar])
+				if(!bForceFGUpdate && m_oFGMask_last_dilated.data[idx_sample_uchar])
 					continue;
 				const size_t idx_sample_color = idx_sample_uchar*3;
 				const size_t idx_sample_desc = idx_sample_color*2;
@@ -537,7 +540,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
 			const size_t idx_orig_uchar = m_oImgSize.width*y_orig + x_orig;
-			if(m_oFGMask_last_dilated.data[idx_orig_uchar])
+			if(!bForceFGUpdate && m_oFGMask_last_dilated.data[idx_orig_uchar])
 				continue;
 			const size_t idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
 			const size_t idx_orig_flt32 = idx_orig_uchar*4;
@@ -591,7 +594,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 				const size_t nTotColorDistThreshold = m_nColorDistThreshold*3;
 				const size_t nTotDescDistThreshold = (2+m_nDescDistThreshold)*3;
 				while(nLookupMapIdx<nKeyPoints && (size_t)(m_apGlobalWordListIter_3ch-m_apGlobalWordList_3ch)<m_nGlobalWords) {
-					if(m_aapLocalDicts[nLookupMapIdx*m_nLocalWords] && oGlobalDictPresenceLookupMap.data[nLookupMapIdx]<UCHAR_MAX && !m_oFGMask_last_dilated.data[nLookupMapIdx]) {
+					if(m_aapLocalDicts[nLookupMapIdx*m_nLocalWords] && oGlobalDictPresenceLookupMap.data[nLookupMapIdx]<UCHAR_MAX && (!m_oFGMask_last_dilated.data[nLookupMapIdx]||bForceFGUpdate)) {
 						const LocalWord_3ch* pRefLocalWord = (LocalWord_3ch*)m_aapLocalDicts[nLookupMapIdx*m_nLocalWords+nLocalDictWordIdxOffset];
 						const float fRefLocalWordWeight = GetLocalWordWeight(pRefLocalWord,m_nFrameIndex);
 						const uchar nRefLocalWordDescBITS = popcount_ushort_8bitsLUT(pRefLocalWord->anDesc);
@@ -1540,6 +1543,14 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 	cv::bitwise_and(m_oBlinksFrame,m_oFGMask_last_dilated_inverted,m_oBlinksFrame);
 	m_oFGMask_last.copyTo(oCurrFGMask);
 	cv::addWeighted(m_oMeanFinalSegmResFrame,(1.0f-fRollAvgFactor),m_oFGMask_last,(1.0/UCHAR_MAX)*fRollAvgFactor,0,m_oMeanFinalSegmResFrame,CV_32F);
+	const float fFinalFGRatio = (float)cv::sum(m_oFGMask_last).val[0]/(nKeyPoints*256);
+	if(fFinalFGRatio>MODEL_RESET_MIN_FINAL_FG_RATIO) {
+		++m_nModelResetFrameCount;
+		if(m_nModelResetFrameCount>=MODEL_RESET_MIN_FRAME_COUNT)
+			refreshModel(1,LWORD_WEIGHT_OFFSET/2,0.5f,true);
+	}
+	else if(m_nModelResetFrameCount)
+		m_nModelResetFrameCount = 0;
 #if USE_INTERNAL_HRCS
 	std::chrono::high_resolution_clock::time_point post_morphops = std::chrono::high_resolution_clock::now();
 	std::cout << "morphops=" << std::fixed << std::setprecision(1) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_morphops-post_gword_calcs).count())/1000 << ", ";
