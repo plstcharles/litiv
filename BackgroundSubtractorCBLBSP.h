@@ -39,7 +39,7 @@
 #define BGSCBLBSP_BURST_VAR_DETECTION_SAVG_MIN2 (1.100f)
 #define BGSCBLBSP_BURST_VAR_DETECTION_DLST_MIN2 (-0.260f)
 //! defines the threshold values used to detect unstable regions and edges
-#define BGSCBLBSP_INSTBLTY_DETECTION_SEGM_DIFF (0.250f)
+#define BGSCBLBSP_INSTBLTY_DETECTION_SEGM_DIFF (0.200f)
 #define BGSCBLBSP_INSTBLTY_DETECTION_MIN_R_VAL (3.000f)
 //! defines the internal threshold adjustment factor to use when treating single channel images
 #define BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT (0.400f)
