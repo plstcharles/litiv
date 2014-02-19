@@ -33,7 +33,7 @@
 // local define used to specify the debug window size
 #define DEBUG_WINDOW_SIZE cv::Size(320,240)
 // local define used to specify the color dist threshold offset used for unstable regions
-#define UNSTAB_COLOR_DIST_OFFSET 0
+#define UNSTAB_COLOR_DIST_OFFSET 5
 // local define used to specify the desc dist threshold offset used for unstable regions
 #define UNSTAB_DESC_DIST_OFFSET 2
 // local define used to activate internal HRC's to time different algorithm sections
@@ -252,7 +252,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 			const size_t idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
 			const size_t idx_orig_flt32 = idx_orig_uchar*4;
 			const float fCurrDistThresholdFactor = *(float*)(m_oDistThresholdFrame.data+idx_orig_flt32);
-			const size_t nCurrColorDistThreshold = (size_t)((fCurrDistThresholdFactor*m_nColorDistThreshold+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_COLOR_DIST_OFFSET))*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+			const size_t nCurrColorDistThreshold = (size_t)((fCurrDistThresholdFactor*m_nColorDistThreshold-((!m_oUnstableRegionMask.data[idx_orig_uchar])*UNSTAB_COLOR_DIST_OFFSET))*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 			const size_t nCurrDescDistThreshold = ((size_t)1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_DESC_DIST_OFFSET);
 			for(size_t nLocalWordIdx=0;nLocalWordIdx<m_nLocalWords;++nLocalWordIdx) {
 				LocalWord_1ch* pCurrLocalWord = ((LocalWord_1ch*)m_aapLocalDicts[idx_orig_ldict+nLocalWordIdx]);
@@ -336,7 +336,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 			const size_t idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
 			const size_t idx_orig_flt32 = idx_orig_uchar*4;
 			const float fCurrDistThresholdFactor = *(float*)(m_oDistThresholdFrame.data+idx_orig_flt32);
-			const size_t nCurrColorDistThreshold = (size_t)((fCurrDistThresholdFactor*m_nColorDistThreshold+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_COLOR_DIST_OFFSET))*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+			const size_t nCurrColorDistThreshold = (size_t)((fCurrDistThresholdFactor*m_nColorDistThreshold-((!m_oUnstableRegionMask.data[idx_orig_uchar])*UNSTAB_COLOR_DIST_OFFSET))*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 			const size_t nCurrDescDistThreshold = ((size_t)1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_DESC_DIST_OFFSET);
 			CV_Assert(m_aapLocalDicts[idx_orig_ldict]);
 			const LocalWord_1ch* pRefBestLocalWord = (LocalWord_1ch*)m_aapLocalDicts[idx_orig_ldict];
@@ -454,7 +454,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 			const size_t idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
 			const size_t idx_orig_flt32 = idx_orig_uchar*4;
 			const float fCurrDistThresholdFactor = *(float*)(m_oDistThresholdFrame.data+idx_orig_flt32);
-			const size_t nCurrTotColorDistThreshold = (size_t)((fCurrDistThresholdFactor*m_nColorDistThreshold)+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_COLOR_DIST_OFFSET))*3;
+			const size_t nCurrTotColorDistThreshold = (size_t)((fCurrDistThresholdFactor*m_nColorDistThreshold)-((!m_oUnstableRegionMask.data[idx_orig_uchar])*UNSTAB_COLOR_DIST_OFFSET))*3;
 			const size_t nCurrTotDescDistThreshold = (((size_t)1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_DESC_DIST_OFFSET))*3;
 			for(size_t nLocalWordIdx=0;nLocalWordIdx<m_nLocalWords;++nLocalWordIdx) {
 				LocalWord_3ch* pCurrLocalWord = ((LocalWord_3ch*)m_aapLocalDicts[idx_orig_ldict+nLocalWordIdx]);
@@ -542,7 +542,7 @@ void BackgroundSubtractorCBLBSP::refreshModel(size_t nBaseOccCount, size_t nOver
 			const size_t idx_orig_ldict = idx_orig_uchar*m_nLocalWords;
 			const size_t idx_orig_flt32 = idx_orig_uchar*4;
 			const float fCurrDistThresholdFactor = *(float*)(m_oDistThresholdFrame.data+idx_orig_flt32);
-			const size_t nCurrTotColorDistThreshold = (size_t)((fCurrDistThresholdFactor*m_nColorDistThreshold)+(m_oUnstableRegionMask.data[idx_orig_uchar]*UNSTAB_COLOR_DIST_OFFSET))*3;
+			const size_t nCurrTotColorDistThreshold = (size_t)((fCurrDistThresholdFactor*m_nColorDistThreshold)-((!m_oUnstableRegionMask.data[idx_orig_uchar])*UNSTAB_COLOR_DIST_OFFSET))*3;
 			const size_t nCurrTotDescDistThreshold = (((size_t)1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_orig_uchar]+UNSTAB_DESC_DIST_OFFSET))*3;
 			CV_Assert(m_aapLocalDicts[idx_orig_ldict]);
 			const LocalWord_3ch* pRefBestLocalWord = (LocalWord_3ch*)m_aapLocalDicts[idx_orig_ldict];
@@ -724,7 +724,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			uchar& nLastColor = m_oLastColorFrame.data[idx_uchar];
 			const float fCurrGradBoostProp = (1.0f-std::pow(((*pfCurrDistThresholdFactor)-BGSCBLBSP_R_LOWER)/(BGSCBLBSP_R_UPPER-BGSCBLBSP_R_LOWER),2))/2;
 			const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate));
-			const size_t nCurrColorDistThreshold = (size_t)((((*pfCurrDistThresholdFactor)*m_nColorDistThreshold)+(m_oUnstableRegionMask.data[idx_uchar]*UNSTAB_COLOR_DIST_OFFSET))*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
+			const size_t nCurrColorDistThreshold = (size_t)((((*pfCurrDistThresholdFactor)*m_nColorDistThreshold)-((!m_oUnstableRegionMask.data[idx_uchar])*UNSTAB_COLOR_DIST_OFFSET))*BGSCBLBSP_SINGLECHANNEL_THRESHOLD_MODULATION_FACT);
 			const size_t nCurrDescDistThreshold = ((size_t)1<<((size_t)floor(*pfCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_uchar]*UNSTAB_DESC_DIST_OFFSET);
 			ushort nCurrInterDesc, nCurrIntraDesc;
 			LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColor,x,y,m_anLBSPThreshold_8bitLUT[nCurrColor],nCurrIntraDesc);
@@ -1021,7 +1021,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			uchar* anLastColor = m_oLastColorFrame.data+idx_uchar_rgb;
 			const float fCurrGradBoostProp = (1.0f-std::pow(((*pfCurrDistThresholdFactor)-BGSCBLBSP_R_LOWER)/(BGSCBLBSP_R_UPPER-BGSCBLBSP_R_LOWER),2))/2;
 			const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate));
-			const size_t nCurrColorDistThreshold = (size_t)(((*pfCurrDistThresholdFactor)*m_nColorDistThreshold)+(m_oUnstableRegionMask.data[idx_uchar]*UNSTAB_COLOR_DIST_OFFSET));
+			const size_t nCurrColorDistThreshold = (size_t)(((*pfCurrDistThresholdFactor)*m_nColorDistThreshold)-((!m_oUnstableRegionMask.data[idx_uchar])*UNSTAB_COLOR_DIST_OFFSET));
 			const size_t nCurrDescDistThreshold = ((size_t)1<<((size_t)floor(*pfCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_uchar]*UNSTAB_DESC_DIST_OFFSET);
 			const size_t nCurrTotColorDistThreshold = nCurrColorDistThreshold*3;
 			const size_t nCurrTotDescDistThreshold = nCurrDescDistThreshold*3;
