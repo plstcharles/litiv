@@ -151,7 +151,8 @@ protected:
 	GlobalWord** m_apGlobalDict;
 	GlobalWord_1ch* m_apGlobalWordList_1ch, *m_apGlobalWordListIter_1ch;
 	GlobalWord_3ch* m_apGlobalWordList_3ch, *m_apGlobalWordListIter_3ch;
-	GlobalWord** m_apGlobalWordLookupTable;
+	GlobalWord** m_apGlobalWordLookupTable_BG;
+	GlobalWord** m_apGlobalWordLookupTable_FG;
 
 	//! per-pixel distance thresholds ('R(x)')
 	cv::Mat m_oDistThresholdFrame;
