@@ -7,7 +7,7 @@
  // @@@@@ TEST HIGHVAR WiTH UNSTABLE AS REQUIREMENT
 
 //! defines the default value for BackgroundSubtractorLBSP::m_fLBSPThreshold
-#define BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.300f)
+#define BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.333f)
 //! defines the default offset LBSP threshold value
 #define BGSCBLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (10)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
