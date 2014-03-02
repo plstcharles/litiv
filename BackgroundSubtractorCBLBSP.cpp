@@ -691,6 +691,7 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 	float fDBGLocalWordsWeightSumThreshold = 0.0f;
 	size_t idx_dbg_ldict = UINT_MAX;
 	size_t nDBGWordOccIncr = nDefaultWordOccIncr;
+	cv::Mat oDBGWeightThresholds(m_oImgSize,CV_32FC1,0.0f);
 #endif //DISPLAY_CBLBSP_DEBUG_INFO
 #if USE_INTERNAL_HRCS
 	float fPrepTimeSum_MS = 0.0f;
@@ -729,6 +730,9 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			float* pfCurrMeanFinalSegmRes = ((float*)(m_oMeanFinalSegmResFrame.data+idx_flt32));
 			const float fBestLocalWordWeight = GetLocalWordWeight(m_aapLocalDicts[idx_ldict],m_nFrameIndex);
 			const float fLocalWordsWeightSumThreshold = fBestLocalWordWeight/((*pfCurrDistThresholdFactor)*2);
+#if DISPLAY_CBLBSP_DEBUG_INFO
+			oDBGWeightThresholds.at<float>(y,x) = fLocalWordsWeightSumThreshold;
+#endif //DISPLAY_CBLBSP_DEBUG_INFO
 			ushort& nLastIntraDesc = *((ushort*)(m_oLastDescFrame.data+idx_ushrt));
 			uchar& nLastColor = m_oLastColorFrame.data[idx_uchar];
 			const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate));
@@ -1023,6 +1027,9 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 			float* pfCurrMeanFinalSegmRes = ((float*)(m_oMeanFinalSegmResFrame.data+idx_flt32));
 			const float fBestLocalWordWeight = GetLocalWordWeight(m_aapLocalDicts[idx_ldict],m_nFrameIndex);
 			const float fLocalWordsWeightSumThreshold = fBestLocalWordWeight/((*pfCurrDistThresholdFactor)*2);
+#if DISPLAY_CBLBSP_DEBUG_INFO
+			oDBGWeightThresholds.at<float>(y,x) = fLocalWordsWeightSumThreshold;
+#endif //DISPLAY_CBLBSP_DEBUG_INFO
 			ushort* anLastIntraDesc = ((ushort*)(m_oLastDescFrame.data+idx_ushrt_rgb));
 			uchar* anLastColor = m_oLastColorFrame.data+idx_uchar_rgb;
 			const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil((*pfCurrLearningRate));
@@ -1452,61 +1459,73 @@ void BackgroundSubtractorCBLBSP::operator()(cv::InputArray _image, cv::OutputArr
 		cv::circle(oMeanMinDistFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
 		cv::resize(oMeanMinDistFrameNormalized,oMeanMinDistFrameNormalized,DEBUG_WINDOW_SIZE);
 		cv::imshow("d_min(x)",oMeanMinDistFrameNormalized);
+		//cv::imwrite("d_min_lt.png",oMeanMinDistFrameNormalized*255);
 		std::cout << std::fixed << std::setprecision(5) << "  d_min(" << dbgpt << ") = " << m_oMeanMinDistFrame.at<float>(dbgpt) << std::endl;
 		cv::Mat oMeanMinDistFrameNormalized_burst; m_oMeanMinDistFrame_burst.copyTo(oMeanMinDistFrameNormalized_burst);
 		cv::circle(oMeanMinDistFrameNormalized_burst,dbgpt,5,cv::Scalar(1.0f));
 		cv::resize(oMeanMinDistFrameNormalized_burst,oMeanMinDistFrameNormalized_burst,DEBUG_WINDOW_SIZE);
 		cv::imshow("d_min_burst(x)",oMeanMinDistFrameNormalized_burst);
+		//cv::imwrite("d_min_st.png",oMeanMinDistFrameNormalized_burst*255);
 		std::cout << std::fixed << std::setprecision(5) << " d_min2(" << dbgpt << ") = " << m_oMeanMinDistFrame_burst.at<float>(dbgpt) << std::endl;
-		cv::Mat oMeanLastDistFrameNormalized; m_oMeanLastDistFrame.copyTo(oMeanLastDistFrameNormalized);
+		/*cv::Mat oMeanLastDistFrameNormalized; m_oMeanLastDistFrame.copyTo(oMeanLastDistFrameNormalized);
 		cv::circle(oMeanLastDistFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
 		cv::resize(oMeanLastDistFrameNormalized,oMeanLastDistFrameNormalized,DEBUG_WINDOW_SIZE);
 		cv::imshow("d_last(x)",oMeanLastDistFrameNormalized);
-		std::cout << std::fixed << std::setprecision(5) << " d_last(" << dbgpt << ") = " << m_oMeanLastDistFrame.at<float>(dbgpt) << std::endl;
-		cv::Mat oMeanLastDistFrameNormalized_burst; m_oMeanLastDistFrame_burst.copyTo(oMeanLastDistFrameNormalized_burst);
+		std::cout << std::fixed << std::setprecision(5) << " d_last(" << dbgpt << ") = " << m_oMeanLastDistFrame.at<float>(dbgpt) << std::endl;*/
+		/*cv::Mat oMeanLastDistFrameNormalized_burst; m_oMeanLastDistFrame_burst.copyTo(oMeanLastDistFrameNormalized_burst);
 		cv::circle(oMeanLastDistFrameNormalized_burst,dbgpt,5,cv::Scalar(1.0f));
 		cv::resize(oMeanLastDistFrameNormalized_burst,oMeanLastDistFrameNormalized_burst,DEBUG_WINDOW_SIZE);
 		cv::imshow("d_last_burst(x)",oMeanLastDistFrameNormalized_burst);
-		std::cout << std::fixed << std::setprecision(5) << " d_lst2(" << dbgpt << ") = " << m_oMeanLastDistFrame_burst.at<float>(dbgpt) << std::endl;
+		std::cout << std::fixed << std::setprecision(5) << " d_lst2(" << dbgpt << ") = " << m_oMeanLastDistFrame_burst.at<float>(dbgpt) << std::endl;*/
 		cv::Mat oMeanRawSegmResFrameNormalized; m_oMeanRawSegmResFrame.copyTo(oMeanRawSegmResFrameNormalized);
 		cv::circle(oMeanRawSegmResFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
 		cv::resize(oMeanRawSegmResFrameNormalized,oMeanRawSegmResFrameNormalized,DEBUG_WINDOW_SIZE);
 		cv::imshow("s_avg(x)",oMeanRawSegmResFrameNormalized);
+		//cv::imwrite("s_avg.png",oMeanRawSegmResFrameNormalized*255);
 		std::cout << std::fixed << std::setprecision(5) << "  s_avg(" << dbgpt << ") = " << m_oMeanRawSegmResFrame.at<float>(dbgpt) << std::endl;
-		cv::Mat oMeanRawSegmResFrameNormalized_burst; m_oMeanRawSegmResFrame_burst.copyTo(oMeanRawSegmResFrameNormalized_burst);
+		/*cv::Mat oMeanRawSegmResFrameNormalized_burst; m_oMeanRawSegmResFrame_burst.copyTo(oMeanRawSegmResFrameNormalized_burst);
 		cv::circle(oMeanRawSegmResFrameNormalized_burst,dbgpt,5,cv::Scalar(1.0f));
 		cv::resize(oMeanRawSegmResFrameNormalized_burst,oMeanRawSegmResFrameNormalized_burst,DEBUG_WINDOW_SIZE);
 		cv::imshow("s_avg_burst(x)",oMeanRawSegmResFrameNormalized_burst);
-		std::cout << std::fixed << std::setprecision(5) << " s_avg2(" << dbgpt << ") = " << m_oMeanRawSegmResFrame_burst.at<float>(dbgpt) << std::endl;
+		std::cout << std::fixed << std::setprecision(5) << " s_avg2(" << dbgpt << ") = " << m_oMeanRawSegmResFrame_burst.at<float>(dbgpt) << std::endl;*/
 		cv::Mat oMeanFinalSegmResFrameNormalized; m_oMeanFinalSegmResFrame.copyTo(oMeanFinalSegmResFrameNormalized);
 		cv::circle(oMeanFinalSegmResFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
 		cv::resize(oMeanFinalSegmResFrameNormalized,oMeanFinalSegmResFrameNormalized,DEBUG_WINDOW_SIZE);
 		cv::imshow("z_avg(x)",oMeanFinalSegmResFrameNormalized);
+		//cv::imwrite("z_avg.png",oMeanFinalSegmResFrameNormalized*255);
 		std::cout << std::fixed << std::setprecision(5) << "  z_avg(" << dbgpt << ") = " << m_oMeanFinalSegmResFrame.at<float>(dbgpt) << std::endl;
-		cv::Mat oDistThresholdFrameNormalized; m_oDistThresholdFrame.convertTo(oDistThresholdFrameNormalized,CV_32FC1,1.0f/BGSCBLBSP_R_UPPER,-BGSCBLBSP_R_LOWER/BGSCBLBSP_R_UPPER);
+		cv::Mat oDistThresholdFrameNormalized; m_oDistThresholdFrame.convertTo(oDistThresholdFrameNormalized,CV_32FC1,1.0f/4.0f,-BGSCBLBSP_R_LOWER/4.0f);
 		cv::circle(oDistThresholdFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
 		cv::resize(oDistThresholdFrameNormalized,oDistThresholdFrameNormalized,DEBUG_WINDOW_SIZE);
 		cv::imshow("r(x)",oDistThresholdFrameNormalized);
+		//cv::imwrite("r.png",oDistThresholdFrameNormalized*255);
 		std::cout << std::fixed << std::setprecision(5) << "      r(" << dbgpt << ") = " << m_oDistThresholdFrame.at<float>(dbgpt) << std::endl;
 		cv::Mat oDistThresholdVariationFrameNormalized; cv::normalize(m_oDistThresholdVariationFrame,oDistThresholdVariationFrameNormalized,0,255,cv::NORM_MINMAX,CV_8UC1);
 		cv::circle(oDistThresholdVariationFrameNormalized,dbgpt,5,cv::Scalar(255));
 		cv::resize(oDistThresholdVariationFrameNormalized,oDistThresholdVariationFrameNormalized,DEBUG_WINDOW_SIZE);
 		cv::imshow("r2(x)",oDistThresholdVariationFrameNormalized);
+		//cv::imwrite("r2.png",oDistThresholdVariationFrameNormalized);
 		std::cout << std::fixed << std::setprecision(5) << "     r2(" << dbgpt << ") = " << m_oDistThresholdVariationFrame.at<float>(dbgpt) << std::endl;
 		cv::Mat oUpdateRateFrameNormalized; m_oUpdateRateFrame.convertTo(oUpdateRateFrameNormalized,CV_32FC1,1.0f/BGSCBLBSP_T_UPPER,-BGSCBLBSP_T_LOWER/BGSCBLBSP_T_UPPER);
 		cv::circle(oUpdateRateFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
 		cv::resize(oUpdateRateFrameNormalized,oUpdateRateFrameNormalized,DEBUG_WINDOW_SIZE);
 		cv::imshow("t(x)",oUpdateRateFrameNormalized);
+		//cv::imwrite("t.png",oUpdateRateFrameNormalized*255);
 		std::cout << std::fixed << std::setprecision(5) << "      t(" << dbgpt << ") = " << m_oUpdateRateFrame.at<float>(dbgpt) << std::endl;
 		cv::imshow("s(x)",oCurrFGMask);
-		cv::Mat oGhostRegionMaskNormalized; m_oGhostRegionMask.copyTo(oGhostRegionMaskNormalized);
+		//cv::imwrite("s.png",oCurrFGMask);
+		//cv::imwrite("i.png",oInputImg);
+		cv::imshow("oDBGWeightThresholds",oDBGWeightThresholds);
+		//cv::imwrite("w.png",oDBGWeightThresholds*255);
+		/*cv::Mat oGhostRegionMaskNormalized; m_oGhostRegionMask.copyTo(oGhostRegionMaskNormalized);
 		cv::circle(oGhostRegionMaskNormalized,dbgpt,5,cv::Scalar(255));
 		cv::resize(oGhostRegionMaskNormalized,oGhostRegionMaskNormalized,DEBUG_WINDOW_SIZE);
-		cv::imshow("m_oGhostRegionMask",oGhostRegionMaskNormalized);
+		cv::imshow("m_oGhostRegionMask",oGhostRegionMaskNormalized);*/
 		cv::Mat oUnstableRegionMaskNormalized; m_oUnstableRegionMask.copyTo(oUnstableRegionMaskNormalized); oUnstableRegionMaskNormalized*=UCHAR_MAX;
 		cv::circle(oUnstableRegionMaskNormalized,dbgpt,5,cv::Scalar(255));
 		cv::resize(oUnstableRegionMaskNormalized,oUnstableRegionMaskNormalized,DEBUG_WINDOW_SIZE);
 		cv::imshow("m_oUnstableRegionMask",oUnstableRegionMaskNormalized);
+		//cv::imwrite("u.png",oUnstableRegionMaskNormalized);
 		cv::Mat oIllumUpdtRegionMaskNormalized; m_oIllumUpdtRegionMask.copyTo(oIllumUpdtRegionMaskNormalized); oIllumUpdtRegionMaskNormalized*=(UCHAR_MAX/ILLUMUPDT_REGION_DEFAULT_VAL);
 		cv::circle(oIllumUpdtRegionMaskNormalized,dbgpt,5,cv::Scalar(255));
 		cv::resize(oIllumUpdtRegionMaskNormalized,oIllumUpdtRegionMaskNormalized,DEBUG_WINDOW_SIZE);
