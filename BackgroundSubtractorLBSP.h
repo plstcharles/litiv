@@ -4,18 +4,6 @@
 #include <opencv2/video/background_segm.hpp>
 #include "LBSP.h"
 
-//! defines whether we should use single channel variation checks for fg/bg segmentation validation or not
-#define BGSLBSP_USE_SC_THRS_VALIDATION 1
-//! defines whether to use or not the advanced morphological operations
-#define BGSLBSP_USE_ADVANCED_MORPH_OPS 1
-//! defines whether we should extract inter-LBSP or intra-LBSP descriptors from processed frames
-#define BGSLBSP_EXTRACT_INTER_LBSP 1
-//! defines whether we should use inter-LBSP or intra-LBSP descriptors in the model
-#define BGSLBSP_MODEL_INTER_LBSP 0
-
-//! defines the internal threshold adjustment factor to use when determining if the variation of a single channel is enough to declare the pixel as foreground
-#define BGSLBSP_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR (1.60f)
-
 /*!
 	Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm (abstract version).
 
@@ -27,10 +15,8 @@
  */
 class BackgroundSubtractorLBSP : public cv::BackgroundSubtractor {
 public:
-	//! full constructor used to intialize an 'absolute' LBSP-based background subtractor
-	explicit BackgroundSubtractorLBSP(size_t nLBSPThreshold, size_t nDescDistThreshold);
-	//! full constructor used to intialize a 'relative' LBSP-based background subtractor
-	explicit BackgroundSubtractorLBSP(float fLBSPThreshold, size_t nDescDistThreshold, size_t nLBSPThresholdOffset=0);
+	//! full constructor
+	BackgroundSubtractorLBSP(float fRelLBSPThreshold, size_t nDescDistThreshold, size_t nLBSPThresholdOffset=0);
 	//! default destructor
 	virtual ~BackgroundSubtractorLBSP();
 	//! (re)initiaization method; needs to be called before starting background subtraction
@@ -39,7 +25,7 @@ public:
 	virtual void initialize(const cv::Mat& oInitImg, const std::vector<cv::KeyPoint>& voKeyPoints)=0;
 	//! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
 	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRate=0)=0;
-	//! @@@@@@@@@@@@ ????
+	//! unused, always returns nullptr
 	virtual cv::AlgorithmInfo* info() const;
 	//! returns a copy of the latest reconstructed background descriptors image
 	virtual void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const;
@@ -47,7 +33,6 @@ public:
 	virtual std::vector<cv::KeyPoint> getBGKeyPoints() const;
 	//! sets the keypoints to be used for descriptor extraction, effectively setting the BGModel ROI (note: this function will remove all border keypoints)
 	virtual void setBGKeyPoints(std::vector<cv::KeyPoint>& keypoints);
-
 
 	// ######## DEBUG PURPOSES ONLY ##########
 	int nDebugCoordX, nDebugCoordY;
@@ -63,14 +48,14 @@ protected:
 	size_t m_nImgChannels;
 	//! input image type
 	int m_nImgType;
-	//! absolute per-channel descriptor hamming distance threshold
+	//! absolute descriptor distance threshold
 	const size_t m_nDescDistThreshold;
-	//! defines if we're only using an absolute threshold when extracting LBSP features
-	const bool m_bOnlyUsingAbsThreshold;
-	//! LBSP absolute internal threshold (kept here since we don't keep an LBSP object)
-	const size_t m_nAbsLBSPThreshold;
+	//! LBSP internal threshold offset value -- used to reduce texture noise in dark regions
+	const size_t m_nLBSPThresholdOffset;
 	//! LBSP relative internal threshold (kept here since we don't keep an LBSP object)
 	const float m_fRelLBSPThreshold;
+	//! pre-allocated internal LBSP threshold values for all possible 8-bit intensity values
+	size_t m_anLBSPThreshold_8bitLUT[UCHAR_MAX+1];
 	//! defines whether or not the subtractor is fully initialized
 	bool m_bInitialized;
 };

@@ -22,9 +22,9 @@
 class LBSP : public cv::DescriptorExtractor {
 public:
 	//! constructor 1, threshold = absolute intensity 'similarity' threshold used when computing comparisons
-	explicit LBSP(size_t nThreshold);
+	LBSP(size_t nThreshold);
 	//! constructor 2, threshold = relative intensity 'similarity' threshold used when computing comparisons
-	explicit LBSP(float fThreshold, size_t nThresholdOffset=0);
+	LBSP(float fRelThreshold, size_t nThresholdOffset=0);
 	//! default destructor
 	virtual ~LBSP();
 	//! loads extractor params from the specified file node @@@@ not impl
@@ -113,7 +113,7 @@ protected:
 	virtual void computeImpl(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const;
 
 	const bool m_bOnlyUsingAbsThreshold;
-	const float m_fThreshold;
+	const float m_fRelThreshold;
 	const size_t m_nThreshold;
 	cv::Mat m_oRefImage;
 };

@@ -7,17 +7,17 @@
  // @@@@@ TEST HIGHVAR WiTH UNSTABLE AS REQUIREMENT
  // @@@@@ ADD MINIMAL R(x) THRESHOLD FOR GLOBAL DICT?
 
-//! defines the default value for BackgroundSubtractorLBSP::m_fLBSPThreshold
+//! defines the default value for BackgroundSubtractorLBSP::m_fRelLBSPThreshold
 #define BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.333f)
-//! defines the default offset LBSP threshold value
+//! defines the default value for BackgroundSubtractorLBSP::m_nLBSPThresholdOffset
 #define BGSCBLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (10)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
 #define BGSCBLBSP_DEFAULT_MIN_DESC_DIST_THRESHOLD (1)
-//! defines the default value for BackgroundSubtractorCBLBSP::m_nColorDistThreshold
+//! defines the default value for BackgroundSubtractorCBLBSP::m_nMinColorDistThreshold
 #define BGSCBLBSP_DEFAULT_MIN_COLOR_DIST_THRESHOLD (25)
-//! defines the default value for BackgroundSubtractorCBLBSP::m_fLocalWordsPerChannel
+//! defines the default value for BackgroundSubtractorCBLBSP::m_nMaxLocalWords
 #define BGSCBLBSP_DEFAULT_MAX_NB_LOCAL_WORDS (24)
-//! defines the default value for BackgroundSubtractorCBLBSP::m_fGlobalWordsPerPixelChannel
+//! defines the default value for BackgroundSubtractorCBLBSP::m_nMaxGlobalWords
 #define BGSCBLBSP_DEFAULT_MAX_NB_GLOBAL_WORDS (30)
 //! defines the number of samples to use when computing running averages
 #define BGSCBLBSP_N_SAMPLES_FOR_ST_MVAVGS (25)
@@ -49,7 +49,7 @@
 class BackgroundSubtractorCBLBSP : public BackgroundSubtractorLBSP {
 public:
 	//! full constructor
-	BackgroundSubtractorCBLBSP(	float fLBSPRelThreshold=BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
+	BackgroundSubtractorCBLBSP(	float fRelLBSPThreshold=BGSCBLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
 								size_t nLBSPThresholdOffset=BGSCBLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
 								size_t nMinDescDistThreshold=BGSCBLBSP_DEFAULT_MIN_DESC_DIST_THRESHOLD,
 								size_t nMinColorDistThreshold=BGSCBLBSP_DEFAULT_MIN_COLOR_DIST_THRESHOLD,
@@ -103,7 +103,7 @@ protected:
 	//! indicates whether internal structures have already been initialized (LBSP lookup tables, word lists, etc.)
 	bool m_bInitializedInternalStructs;
 	//! absolute minimal color distance threshold ('R' or 'radius' in the original ViBe paper, used as the default/initial 'R(x)' value here, paired with BackgroundSubtractorLBSP::m_nDescDistThreshold)
-	const size_t m_nColorDistThreshold;
+	const size_t m_nMinColorDistThreshold;
 	//! max/current number of local words used to build background submodels (for a single pixel, similar to 'N' in ViBe/PBAS -- may vary based on the channel size)
 	size_t m_nMaxLocalWords,m_nLocalWords;
 	//! max/current number of global words used to build the global background model (may vary based on the channel size)
@@ -166,9 +166,6 @@ protected:
 	cv::Mat m_oRawFGBlinkMask_curr;
 	cv::Mat m_oRawFGBlinkMask_last;
 	cv::Mat m_oTempGlobalWordWeightDiffFactor;
-
-	//! pre-allocated internal LBSP threshold values for all possible 8-bit intensity values
-	size_t m_anLBSPThreshold_8bitLUT[256];
 
 	//! internal cleanup function for the dictionary structures
 	void CleanupDictionaries();

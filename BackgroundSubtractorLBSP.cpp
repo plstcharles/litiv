@@ -7,24 +7,13 @@
 #include <iomanip>
 #include <exception>
 
-BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(size_t nLBSPThreshold, size_t nDescDistThreshold)
+BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(float fRelLBSPThreshold, size_t nDescDistThreshold, size_t nLBSPThresholdOffset)
 	:	 nDebugCoordX(0),nDebugCoordY(0)
 		,m_nImgChannels(0)
 		,m_nImgType(0)
 		,m_nDescDistThreshold(nDescDistThreshold)
-		,m_bOnlyUsingAbsThreshold(true)
-		,m_nAbsLBSPThreshold(nLBSPThreshold)
-		,m_fRelLBSPThreshold(0)
-		,m_bInitialized(false) {}
-
-BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(float fLBSPThreshold, size_t nDescDistThreshold, size_t nLBSPThresholdOffset)
-	:	 nDebugCoordX(0),nDebugCoordY(0)
-		,m_nImgChannels(0)
-		,m_nImgType(0)
-		,m_nDescDistThreshold(nDescDistThreshold)
-		,m_bOnlyUsingAbsThreshold(false)
-		,m_nAbsLBSPThreshold(nLBSPThresholdOffset)
-		,m_fRelLBSPThreshold(fLBSPThreshold)
+		,m_nLBSPThresholdOffset(nLBSPThresholdOffset)
+		,m_fRelLBSPThreshold(fRelLBSPThreshold)
 		,m_bInitialized(false) {
 	CV_Assert(m_fRelLBSPThreshold>=0);
 }
@@ -36,7 +25,6 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg) {
 }
 
 cv::AlgorithmInfo* BackgroundSubtractorLBSP::info() const {
-	CV_Assert(false); // NOT IMPL @@@@@
 	return nullptr;
 }
 
