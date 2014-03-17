@@ -21,6 +21,7 @@
 #define DISPLAY_BGSUB_DEBUG_OUTPUT		0
 #define ENABLE_DISPLAY_MOUSE_DEBUG		0
 #define ENABLE_FRAME_TIMERS				0
+#define WRITE_BGSUB_SEGM_AVI_OUTPUT		0
 #endif //DEFAULT_NB_THREADS==1
 /////////////////////////////////////////
 #define USE_CB_LBSP_BG_SUBTRACTOR		1
@@ -36,9 +37,11 @@
 #define LIMIT_KEYPTS_TO_SEQUENCE_ROI	1
 #endif
 /////////////////////////////////////////
-#define USE_CDNET_DATASET				1
+#define USE_CDNET2012_DATASET			1
+#define USE_CDNET2014_DATASET			0
 #define USE_WALLFLOWER_DATASET			0
 #define USE_PETS2001_D3TC1_DATASET		0
+#define USE_SINGLE_AVI_FILE				0
 /////////////////////////////////////////////////////////////////////
 #define DATASET_ROOT_DIR 				std::string("/tmp/datasets/")
 #define RESULTS_ROOT_DIR 				std::string("/tmp/datasets/")
@@ -47,15 +50,23 @@
 
 #if (USE_VIBE_LBSP_BG_SUBTRACTOR+USE_PBAS_LBSP_BG_SUBTRACTOR+USE_VIBE_BG_SUBTRACTOR+USE_PBAS_BG_SUBTRACTOR+USE_CB_LBSP_BG_SUBTRACTOR)!=1
 #error "Must specify a single algorithm."
-#elif (USE_CDNET_DATASET+USE_WALLFLOWER_DATASET+USE_PETS2001_D3TC1_DATASET)!=1
+#elif (USE_CDNET2012_DATASET+USE_CDNET2014_DATASET+USE_WALLFLOWER_DATASET+USE_PETS2001_D3TC1_DATASET+USE_SINGLE_AVI_FILE)!=1
 #error "Must specify a single dataset."
-#elif USE_CDNET_DATASET
+#elif USE_CDNET2012_DATASET
 const std::string g_sDatasetName(CDNET_DB_NAME);
 const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/CDNet/dataset/");
 const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet/"+RESULTS_OUTPUT_DIR_NAME+"/");
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
-const char* g_asDatasetCategories[] = {"dynamicBackground","shadow","baseline","intermittentObjectMotion","cameraJitter","thermal"};
+const char* g_asDatasetCategories[] = {"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"};
+const size_t g_nResultIdxOffset = 1;
+#elif USE_CDNET2014_DATASET
+const std::string g_sDatasetName(CDNET_DB_NAME);
+const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/CDNet2014/dataset/");
+const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet2014/"+RESULTS_OUTPUT_DIR_NAME+"/");
+const std::string g_sResultPrefix("bin");
+const std::string g_sResultSuffix(".png");
+const char* g_asDatasetCategories[] = {"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"};
 const size_t g_nResultIdxOffset = 1;
 #elif USE_WALLFLOWER_DATASET
 const std::string g_sDatasetName(WALLFLOWER_DB_NAME);
@@ -73,7 +84,15 @@ const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
 const char* g_asDatasetCategories[] = {"TESTING"};
 const size_t g_nResultIdxOffset = 0;
-#endif //USE_PETS2001_D3TC1_DATASET
+#elif USE_SINGLE_AVI_FILE
+const std::string g_sDatasetName(SINGLE_AVI_TEST_NAME);
+const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/avitest/");
+const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/avitest/"+RESULTS_OUTPUT_DIR_NAME+"/");
+const std::string g_sResultPrefix("");
+const std::string g_sResultSuffix("");
+const char* g_asDatasetCategories[] = {"gait_analysis"};
+const size_t g_nResultIdxOffset = 0;
+#endif //USE_SINGLE_AVI_FILE
 #if ENABLE_DISPLAY_MOUSE_DEBUG
 static int *pnLatestMouseX=nullptr, *pnLatestMouseY=nullptr;
 void OnMouseEvent(int event, int x, int y, int, void*) {
@@ -120,7 +139,7 @@ int main() {
 	std::cout << "Parsing dataset '"<< g_sDatasetName << "'..." << std::endl;
 	try {
 		for(size_t i=0; i<sizeof(g_asDatasetCategories)/sizeof(char*); ++i) {
-			bool bIsThermal = (std::string(g_asDatasetCategories[i]).find("thermal")!=std::string::npos);
+			bool bIsThermal = (std::string(g_asDatasetCategories[i]).find("thermal")!=std::string::npos) || (std::string(g_asDatasetCategories[i]).find("turbulence")!=std::string::npos);
 			vpCategories.push_back(new CategoryInfo(g_asDatasetCategories[i], g_sDatasetPath+g_asDatasetCategories[i], g_sDatasetName, bIsThermal));
 		}
 	} catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
@@ -281,6 +300,9 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #if WRITE_BGSUB_DEBUG_IMG_OUTPUT
 		cv::VideoWriter oDebugWriter(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,g_oDisplayOutputSize,true);
 #endif //WRITE_BGSUB_DEBUG_IMG_OUTPUT
+#if WRITE_BGSUB_SEGM_AVI_OUTPUT
+		cv::VideoWriter oSegmWriter(g_sResultsPath+"/"+pCurrSequence->m_sName+"segm.avi",CV_FOURCC('F','F','V','1'),30,pCurrSequence->GetSize(),false);
+#endif //WRITE_BGSUB_SEGM_AVI_OUTPUT
 #if WRITE_BGSUB_METRICS_ANALYSIS
 		time_t startup = time(nullptr);
 #endif //WRITE_BGSUB_METRICS_ANALYSIS
@@ -311,6 +333,9 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 			std::chrono::high_resolution_clock::time_point post_process = std::chrono::high_resolution_clock::now();
 			std::cout << "proc=" << std::fixed << std::setprecision(1) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_process-pre_process).count())/1000 << "." << std::endl;
 #endif //ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
+#if WRITE_BGSUB_SEGM_AVI_OUTPUT
+			oSegmWriter.write(oFGMask);
+#endif //WRITE_BGSUB_SEGM_AVI_OUTPUT
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS
 			cv::Mat oGTImg = pCurrSequence->GetGTFrameFromIndex(k);
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS
