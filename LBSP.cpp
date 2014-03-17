@@ -2,16 +2,16 @@
 
 LBSP::LBSP(size_t nThreshold)
 	:	 m_bOnlyUsingAbsThreshold(true)
-		,m_fThreshold(0) // unused
+		,m_fRelThreshold(0) // unused
 		,m_nThreshold(nThreshold)
 		,m_oRefImage() {}
 
-LBSP::LBSP(float fThreshold, size_t nThresholdOffset)
+LBSP::LBSP(float fRelThreshold, size_t nThresholdOffset)
 	:	 m_bOnlyUsingAbsThreshold(false)
-		,m_fThreshold(fThreshold)
+		,m_fRelThreshold(fRelThreshold)
 		,m_nThreshold(nThresholdOffset)
 		,m_oRefImage() {
-	CV_Assert(m_fThreshold>=0);
+	CV_Assert(m_fRelThreshold>=0);
 }
 
 LBSP::~LBSP() {}
@@ -42,7 +42,7 @@ bool LBSP::isUsingRelThreshold() const {
 }
 
 float LBSP::getRelThreshold() const {
-	return m_fThreshold;
+	return m_fRelThreshold;
 }
 
 size_t LBSP::getAbsThreshold() const {
@@ -210,7 +210,7 @@ void LBSP::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoint
 	if(m_bOnlyUsingAbsThreshold)
 		lbsp_computeImpl2(oImage,m_oRefImage,voKeypoints,oDescriptors,m_nThreshold);
 	else
-		lbsp_computeImpl2(oImage,m_oRefImage,voKeypoints,oDescriptors,m_fThreshold,m_nThreshold);
+		lbsp_computeImpl2(oImage,m_oRefImage,voKeypoints,oDescriptors,m_fRelThreshold,m_nThreshold);
 }
 
 void LBSP::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat>& voDescCollection) const {
@@ -232,7 +232,7 @@ void LBSP::computeImpl(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypo
 	if(m_bOnlyUsingAbsThreshold)
 		lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,oDescriptors,m_nThreshold);
 	else
-		lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,oDescriptors,m_fThreshold,m_nThreshold);
+		lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,oDescriptors,m_fRelThreshold,m_nThreshold);
 }
 
 void LBSP::reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoints, const cv::Mat& oDescriptors, cv::Mat& oOutput) {

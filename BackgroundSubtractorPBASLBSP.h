@@ -2,9 +2,9 @@
 
 #include "BackgroundSubtractorLBSP.h"
 
-//! defines the default value for BackgroundSubtractorLBSP::m_fLBSPThreshold
+//! defines the default value for BackgroundSubtractorLBSP::m_fRelLBSPThreshold
 #define BGSPBASLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.300f)
-//! defines the default offset LBSP threshold value
+//! defines the default value for BackgroundSubtractorLBSP::m_nLBSPThresholdOffset
 #define BGSPBASLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (0)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
 #define BGSPBASLBSP_DEFAULT_DESC_DIST_THRESHOLD (7)
@@ -110,8 +110,5 @@ protected:
 	cv::Mat m_oTempFGMask;
 	cv::Mat m_oPureFGBlinkMask_curr;
 	cv::Mat m_oPureFGBlinkMask_last;
-
-	//! pre-allocated internal LBSP threshold values for all possible 8-bit intensity values
-	size_t m_nLBSPThreshold_8bitLUT[256];
 };
 
