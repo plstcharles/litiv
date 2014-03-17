@@ -18,8 +18,9 @@
 #define CDNET_DB_NAME 			"CDNet"
 #define WALLFLOWER_DB_NAME 		"WALLFLOWER"
 #define PETS2001_D3TC1_DB_NAME	"PETS2001_D3TC1"
+#define SINGLE_AVI_TEST_NAME 	"AVI_TEST"
 
-// as defined in the CDNet scripts/dataset
+// as defined in the 2012 CDNet scripts/dataset
 #define VAL_POSITIVE 	255
 #define VAL_NEGATIVE 	0
 #define VAL_OUTOFSCOPE	85
@@ -75,6 +76,7 @@ public:
 	double m_dExpectedLoad;
 	double m_dExpectedROILoad;
 	CategoryInfo* m_pParent;
+	cv::Size GetSize() {return m_oSize;}
 #if USE_PRECACHED_IO
 	void StartPrecaching();
 	void StopPrecaching();

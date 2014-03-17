@@ -16,6 +16,11 @@ CategoryInfo::CategoryInfo(const std::string& name, const std::string& dir, cons
 		GetSubDirsFromDir(dir,vsSequencePaths);
 		std::cout << "(" << vsSequencePaths.size() << " subdir sequences)" << std::endl;
 	}
+	else if(m_sDBName==SINGLE_AVI_TEST_NAME) {
+		// all files are considered sequences
+		GetFilesFromDir(dir,vsSequencePaths);
+		std::cout << "(" << vsSequencePaths.size() << " sequences)" << std::endl;
+	}
 	/*else if(m_sDBName==...) {
 			// ...
 	}*/
@@ -141,6 +146,22 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 		m_nTotalNbFrames = (size_t)m_voVideoReader.get(CV_CAP_PROP_FRAME_COUNT);
 		m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
 	}
+	else if(m_sDBName==SINGLE_AVI_TEST_NAME) {
+		m_voVideoReader.open(dir);
+		if(!m_voVideoReader.isOpened())
+			throw std::runtime_error(std::string("Bad video file ('")+dir+std::string("'), could not be opened."));
+		m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,0.0);
+		cv::Mat oTempImg;
+		m_voVideoReader >> oTempImg;
+		m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,0.0);
+		if(oTempImg.empty())
+			throw std::runtime_error(std::string("Bad video file ('")+dir+std::string("'), could not be read."));
+		m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(VAL_POSITIVE));
+		m_oSize = oTempImg.size();
+		m_nNextExpectedVideoReaderFrameIdx = 0;
+		m_nTotalNbFrames = (size_t)m_voVideoReader.get(CV_CAP_PROP_FRAME_COUNT);
+		m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
+	}
 	/*else if(m_sDBName==...) {
 		// ...
 	}*/
@@ -199,7 +220,7 @@ cv::Mat SequenceInfo::GetInputFrameFromIndex_Internal(size_t idx) {
 	cv::Mat oFrame;
 	if(m_sDBName==CDNET_DB_NAME || m_sDBName==WALLFLOWER_DB_NAME)
 		oFrame = cv::imread(m_vsInputFramePaths[idx],m_nIMReadInputFlags);
-	else if(m_sDBName==PETS2001_D3TC1_DB_NAME) {
+	else if(m_sDBName==PETS2001_D3TC1_DB_NAME || m_sDBName==SINGLE_AVI_TEST_NAME) {
 		if(m_nNextExpectedVideoReaderFrameIdx!=idx)
 			m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,(double)idx);
 		m_voVideoReader >> oFrame;
@@ -223,6 +244,9 @@ cv::Mat SequenceInfo::GetGTFrameFromIndex_Internal(size_t idx) {
 			oFrame = cv::imread(m_vsGTFramePaths[res->second],cv::IMREAD_GRAYSCALE);
 		else
 			oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar(VAL_OUTOFSCOPE));
+	}
+	else if(m_sDBName==SINGLE_AVI_TEST_NAME) {
+		oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar(VAL_OUTOFSCOPE));
 	}
 	/*else if(m_sDBName==...) {
 		// ...
