@@ -177,8 +177,8 @@ void BackgroundSubtractorLOBSTER::operator()(cv::InputArray _image, cv::OutputAr
 	else { //m_nImgChannels==3
 		const size_t nCurrDescDistThreshold = m_nDescDistThreshold*3;
 		const size_t nCurrColorDistThreshold = m_nColorDistThreshold*3;
-		const size_t nCurrSCDescDistThreshold = m_nDescDistThreshold/2;
-		const size_t nCurrSCColorDistThreshold = m_nColorDistThreshold/2;
+		const size_t nCurrSCDescDistThreshold = nCurrDescDistThreshold/2;
+		const size_t nCurrSCColorDistThreshold = nCurrColorDistThreshold/2;
 		const size_t desc_row_step = m_voBGDescSamples[0].step.p[0];
 		const size_t img_row_step = m_voBGColorSamples[0].step.p[0];
 		for(size_t k=0; k<nKeyPoints; ++k) {
