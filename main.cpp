@@ -250,7 +250,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
 		pBGS->initialize(oInitImg,voKPs);
 #elif USE_PBAS_LBSP_BG_SUBTRACTOR
-		pBGS = new BackgroundSubtractorPBASLBSP();
+		pBGS = new BackgroundSubtractorSuBSENSE();
 		const double dDefaultLearningRate = 0;
 		pBGS->initialize(oInitImg,voKPs);
 #elif USE_CB_LBSP_BG_SUBTRACTOR

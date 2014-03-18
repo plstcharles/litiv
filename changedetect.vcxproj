@@ -171,7 +171,7 @@
     <ClInclude Include="BackgroundSubtractorPBAS.h" />
     <ClInclude Include="BackgroundSubtractorPBAS_1ch.h" />
     <ClInclude Include="BackgroundSubtractorPBAS_3ch.h" />
-    <ClInclude Include="BackgroundSubtractorPBASLBSP.h" />
+    <ClInclude Include="BackgroundSubtractorSuBSENSE.h" />
     <ClInclude Include="BackgroundSubtractorViBe.h" />
     <ClInclude Include="BackgroundSubtractorViBe_1ch.h" />
     <ClInclude Include="BackgroundSubtractorViBe_3ch.h" />
@@ -188,7 +188,7 @@
     <ClCompile Include="BackgroundSubtractorPBAS.cpp" />
     <ClCompile Include="BackgroundSubtractorPBAS_1ch.cpp" />
     <ClCompile Include="BackgroundSubtractorPBAS_3ch.cpp" />
-    <ClCompile Include="BackgroundSubtractorPBASLBSP.cpp" />
+    <ClCompile Include="BackgroundSubtractorSuBSENSE.cpp" />
     <ClCompile Include="BackgroundSubtractorViBe.cpp" />
     <ClCompile Include="BackgroundSubtractorViBe_1ch.cpp" />
     <ClCompile Include="BackgroundSubtractorViBe_3ch.cpp" />
