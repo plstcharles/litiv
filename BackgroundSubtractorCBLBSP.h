@@ -39,8 +39,8 @@
 /*!
 	CB-Based Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm.
 
-	Note: both grayscale and RGB/BGR images may be used with this extractor (parameters
-	are adjusted automatically).
+	Note: both grayscale and RGB/BGR images may be used with this extractor (parameters are adjusted automatically).
+	For optimal grayscale results, use CV_8UC1 frames instead of CV_8UC3.
 
 	For more details on the different parameters, go to @@@@@@@@@@@@@@.
 
