@@ -30,9 +30,6 @@
 #define USE_VIBE_BG_SUBTRACTOR			0
 #define USE_PBAS_BG_SUBTRACTOR			0
 /////////////////////////////////////////
-#if USE_VIBE_LBSP_BG_SUBTRACTOR
-#define USE_RELATIVE_LBSP_COMPARISONS	1
-#endif //USE_VIBE_LBSP_BG_SUBTRACTOR
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
 #define LIMIT_KEYPTS_TO_SEQUENCE_ROI	1
 #endif
@@ -249,11 +246,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #endif //USE_PRECACHED_IO
 		cv::Mat oFGMask, oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
 #if USE_VIBE_LBSP_BG_SUBTRACTOR
-#if USE_RELATIVE_LBSP_COMPARISONS
-		pBGS = new BackgroundSubtractorLOBSTER(BGSLOBSTER_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
-#else //!USE_RELATIVE_LBSP_COMPARISONS
-		pBGS = new BackgroundSubtractorLOBSTER(BGSLOBSTER_DEFAULT_LBSP_ABS_SIMILARITY_THRESHOLD);
-#endif //!USE_RELATIVE_LBSP_COMPARISONS
+		pBGS = new BackgroundSubtractorLOBSTER();
 		const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
 		pBGS->initialize(oInitImg,voKPs);
 #elif USE_PBAS_LBSP_BG_SUBTRACTOR
