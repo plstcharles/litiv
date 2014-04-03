@@ -1,6 +1,6 @@
 #pragma once
 
-/*// init pattern, based on 'floor(fspecial('gaussian', 3, 1)*256)'
+/*// gaussian 3x3 pattern, based on 'floor(fspecial('gaussian', 3, 1)*256)'
 static const int s_nSamplesInitPatternWidth = 3;
 static const int s_nSamplesInitPatternHeight = 3;
 static const int s_nSamplesInitPatternTot = 256;
@@ -10,7 +10,7 @@ static const int s_anSamplesInitPattern[s_nSamplesInitPatternHeight][s_nSamplesI
 	{19,    32,    19,},
 };*/
 
-// init pattern, based on 'floor(fspecial('gaussian',7,1)*4096)'
+// gaussian 7x7 pattern, based on 'floor(fspecial('gaussian',7,1)*4096)'
 static const int s_nSamplesInitPatternWidth = 7;
 static const int s_nSamplesInitPatternHeight = 7;
 static const int s_nSamplesInitPatternTot = 4096;
