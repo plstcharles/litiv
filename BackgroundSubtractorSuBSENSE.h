@@ -3,38 +3,41 @@
 #include "BackgroundSubtractorLBSP.h"
 
 //! defines the default value for BackgroundSubtractorLBSP::m_fRelLBSPThreshold
-#define BGSSUBSENSE_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.333f)
+#define BGSSUBSENSE_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.300f)
 //! defines the default value for BackgroundSubtractorLBSP::m_nLBSPThresholdOffset
-#define BGSSUBSENSE_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (10)
+#define BGSSUBSENSE_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (0)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
-#define BGSSUBSENSE_DEFAULT_DESC_DIST_THRESHOLD (1)
+#define BGSSUBSENSE_DEFAULT_DESC_DIST_THRESHOLD (3)
 //! defines the default value for BackgroundSubtractorSuBSENSE::m_nMinColorDistThreshold
-#define BGSSUBSENSE_DEFAULT_COLOR_DIST_THRESHOLD (25)
+#define BGSSUBSENSE_DEFAULT_COLOR_DIST_THRESHOLD (30)
 //! defines the default value for BackgroundSubtractorSuBSENSE::m_nBGSamples
 #define BGSSUBSENSE_DEFAULT_NB_BG_SAMPLES (35)
 //! defines the default value for BackgroundSubtractorSuBSENSE::m_nRequiredBGSamples
 #define BGSSUBSENSE_DEFAULT_REQUIRED_NB_BG_SAMPLES (2)
 //! defines the number of samples to use when computing running averages
-#define BGSSUBSENSE_N_SAMPLES_FOR_MVAVGS (25)
-//! defines the threshold values used to detect long-term ghosting and trigger a fast edge-based absorption in the model
-#define BGSSUBSENSE_GHOST_DETECTION_D_MAX (0.01f)
+#define BGSSUBSENSE_N_SAMPLES_FOR_ST_MVAVGS (30)
+#define BGSSUBSENSE_N_SAMPLES_FOR_LT_MVAVGS (120)
+//! defines the threshold value(s) used to detect long-term ghosting and trigger a fast edge-based absorption in the model
+#define BGSSUBSENSE_GHOST_DETECTION_D_MAX (0.010f)
 #define BGSSUBSENSE_GHOST_DETECTION_S_MIN (0.995f)
-//! defines the threshold values used to detect high variation regions that are often labelled as foreground and trigger a local, gradual change in distance thresholds
+//! defines the threshold value(s) used to detect high variation regions that are often labelled as foreground and trigger a local, gradual change in distance thresholds
 #define BGSSUBSENSE_HIGH_VAR_DETECTION_S_MIN (0.850f)
-#define BGSSUBSENSE_HIGH_VAR_DETECTION_D_MIN (0.175f)
+#define BGSSUBSENSE_HIGH_VAR_DETECTION_D_MIN (0.150f)
 #define BGSSUBSENSE_HIGH_VAR_DETECTION_S_MIN2 (0.100f)
-#define BGSSUBSENSE_HIGH_VAR_DETECTION_D_MIN2 (0.225f)
-//! defines the threshold values used to detect unstable regions and edges
+#define BGSSUBSENSE_HIGH_VAR_DETECTION_D_MIN2 (0.200f)
+//! defines the threshold value(s) used to nullify detections in certain regions for shot periods of time
+#define BGSSUBSENSE_DEAD_REGION_R_MIN (3.75f)
+//! defines the threshold value(s) used to detect unstable regions and edges
 #define BGSSUBSENSE_INSTBLTY_DETECTION_SEGM_DIFF (0.200f)
 #define BGSSUBSENSE_INSTBLTY_DETECTION_MIN_R_VAL (3.000f)
-//! parameters used for dynamic distance threshold adjustments ('R(x)')
+//! parameter(s) used for dynamic distance threshold adjustments ('R(x)')
 #define BGSSUBSENSE_R_VAR (0.01f)
-//! parameters used for adjusting the variation speed of dynamic distance thresholds  ('R2(x)')
+//! parameter(s) used for adjusting the variation speed of dynamic distance thresholds  ('R2(x)')
 #define BGSSUBSENSE_R2_INCR  (1.000f)
 #define BGSSUBSENSE_R2_DECR  (0.100f)
-//! parameters used for dynamic learning rates adjustments  ('T(x)')
-#define BGSSUBSENSE_T_DECR  (0.0250f)
-#define BGSSUBSENSE_T_INCR  (0.5000f)
+//! parameter(s) used for dynamic learning rates adjustments  ('T(x)')
+#define BGSSUBSENSE_T_DECR  (0.2500f)
+#define BGSSUBSENSE_T_INCR  (1.0000f)
 #define BGSSUBSENSE_T_LOWER (2.0000f)
 #define BGSSUBSENSE_T_UPPER (256.00f)
 
@@ -81,6 +84,8 @@ protected:
 	size_t m_nFrameIndex;
 	//! current number of bad continuous frames detected (used to reset the model when it gets high)
 	size_t m_nModelResetFrameCount;
+	//! current kernel size for median blur post-proc filtering
+	int m_nMedianBlurKernelSize;
 
 	//! background model pixel color intensity samples (equivalent to 'B(x)' in PBAS, but also paired with BackgroundSubtractorLBSP::m_voBGDescSamples to create our complete model)
 	std::vector<cv::Mat> m_voBGColorSamples;
@@ -92,15 +97,17 @@ protected:
 	//! per-pixel distance threshold variation modulators ('R2(x)', relative value used to modulate 'R(x)' variations)
 	cv::Mat m_oDistThresholdVariationFrame;
 	//! per-pixel mean minimal distances from the model ('D_min(x)' in PBAS, used to control variation magnitude and direction of 'T(x)' and 'R(x)')
-	cv::Mat m_oMeanMinDistFrame;
+	cv::Mat m_oMeanMinDistFrame_LT, m_oMeanMinDistFrame_ST;
 	//! per-pixel mean distances between consecutive frames ('D_last(x)', used to detect ghosts and high variation regions in the sequence)
-	cv::Mat m_oMeanLastDistFrame;
+	cv::Mat m_oMeanLastDistFrame_LT, m_oMeanLastDistFrame_ST;
 	//! per-pixel mean raw segmentation results
-	cv::Mat m_oMeanRawSegmResFrame;
+	cv::Mat m_oMeanRawSegmResFrame_LT, m_oMeanRawSegmResFrame_ST;
 	//! per-pixel mean final segmentation results
-	cv::Mat m_oMeanFinalSegmResFrame;
+	cv::Mat m_oMeanFinalSegmResFrame_LT, m_oMeanFinalSegmResFrame_ST;
 	//! a lookup map used to keep track of unstable regions
 	cv::Mat m_oUnstableRegionMask;
+	//! a lookup map used to keep track of 'dead' regions (i.e. nullified detection zones)
+	cv::Mat m_oDeadRegionMask;
 	//! per-pixel blink detection results ('Z(x)', used to determine which frame regions should be assigned stronger 'R(x)' variations)
 	cv::Mat m_oBlinksFrame;
 	//! copy of previously used pixel intensities used to calculate 'D_last(x)'
@@ -113,6 +120,7 @@ protected:
 	cv::Mat m_oFGMask_last;
 
 	//! pre-allocated CV_8UC1 matrix used to speed up morph ops
+	cv::Mat m_oFGMask_ActiveMask;
 	cv::Mat m_oFGMask_PreFlood;
 	cv::Mat m_oFGMask_FloodedHoles;
 	cv::Mat m_oFGMask_last_dilated;
