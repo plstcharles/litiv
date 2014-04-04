@@ -45,7 +45,8 @@ BackgroundSubtractorSuBSENSE::BackgroundSubtractorSuBSENSE(	 float fRelLBSPThres
 		,m_nRequiredBGSamples(nRequiredBGSamples)
 		,m_nFrameIndex(SIZE_MAX)
 		,m_nModelResetFrameCount(0)
-		,m_nMedianBlurKernelSize(3) {
+		,m_nMedianBlurKernelSize(3)
+		,m_bUse3x3Spread(true) {
 	CV_Assert(m_nBGSamples>0 && m_nRequiredBGSamples<=m_nBGSamples);
 	CV_Assert(m_nMinColorDistThreshold>=STAB_COLOR_DIST_OFFSET);
 }
@@ -85,6 +86,7 @@ void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const std
 		m_nMedianBlurKernelSize = nRawMedianBlurKernelSize;
 	else
 		m_nMedianBlurKernelSize = nRawMedianBlurKernelSize-1;
+	m_bUse3x3Spread = (m_oImgSize.height*m_oImgSize.width)>DEFAULT_IMG_ROI_SIZE*2?false:true;
 	std::cout << "m_oImgSize=" << m_oImgSize << " => m_nMedianBlurKernelSize=" << m_nMedianBlurKernelSize << std::endl;
 	m_oUpdateRateFrame.create(m_oImgSize,CV_32FC1);
 	m_oUpdateRateFrame = cv::Scalar(BGSSUBSENSE_T_LOWER);
@@ -326,7 +328,10 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 					m_voBGColorSamples[s_rand].data[idx_uchar] = nCurrColor;
 				}
 				int x_rand,y_rand;
-				getRandNeighborPosition_5x5(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
+				if(m_bUse3x3Spread)
+					getRandNeighborPosition_3x3(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
+				else
+					getRandNeighborPosition_5x5(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 				const size_t n_rand = rand();
 				const size_t idx_rand_uchar = m_oImgSize.width*y_rand + x_rand;
 				const size_t idx_rand_flt32 = idx_rand_uchar*4;
@@ -466,7 +471,10 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 					}
 				}
 				int x_rand,y_rand;
-				getRandNeighborPosition_5x5(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
+				if(m_bUse3x3Spread)
+					getRandNeighborPosition_3x3(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
+				else
+					getRandNeighborPosition_5x5(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 				const size_t n_rand = rand();
 				const size_t idx_rand_uchar = m_oImgSize.width*y_rand + x_rand;
 				const size_t idx_rand_flt32 = idx_rand_uchar*4;

@@ -83,8 +83,8 @@ static const int s_anNeighborPattern_5x5[24][2] = {
 //! returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
 static inline void getRandNeighborPosition_5x5(int& x_neighbor, int& y_neighbor, const int x_orig, const int y_orig, const int border, const cv::Size& imgsize) {
 	int r = rand()%s_anNeighborPatternSize_5x5;
-	x_neighbor = x_orig+s_anNeighborPattern_3x3[r][0];
-	y_neighbor = y_orig+s_anNeighborPattern_3x3[r][1];
+	x_neighbor = x_orig+s_anNeighborPattern_5x5[r][0];
+	y_neighbor = y_orig+s_anNeighborPattern_5x5[r][1];
 	if(x_neighbor<border)
 		x_neighbor = border;
 	else if(x_neighbor>=imgsize.width-border)
