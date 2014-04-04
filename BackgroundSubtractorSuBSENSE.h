@@ -86,6 +86,8 @@ protected:
 	size_t m_nModelResetFrameCount;
 	//! current kernel size for median blur post-proc filtering
 	int m_nMedianBlurKernelSize;
+	//! specifies the px update spread range
+	bool m_bUse3x3Spread;
 
 	//! background model pixel color intensity samples (equivalent to 'B(x)' in PBAS, but also paired with BackgroundSubtractorLBSP::m_voBGDescSamples to create our complete model)
 	std::vector<cv::Mat> m_voBGColorSamples;
