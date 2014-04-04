@@ -25,10 +25,8 @@
 #define BGSSUBSENSE_HIGH_VAR_DETECTION_D_MIN (0.150f)
 #define BGSSUBSENSE_HIGH_VAR_DETECTION_S_MIN2 (0.100f)
 #define BGSSUBSENSE_HIGH_VAR_DETECTION_D_MIN2 (0.200f)
-//! defines the threshold value(s) used to nullify detections in certain regions for shot periods of time
-#define BGSSUBSENSE_DEAD_REGION_R_MIN (3.75f)
 //! defines the threshold value(s) used to detect unstable regions and edges
-#define BGSSUBSENSE_INSTBLTY_DETECTION_SEGM_DIFF (0.200f)
+#define BGSSUBSENSE_INSTBLTY_DETECTION_SEGM_DIFF (0.150f)
 #define BGSSUBSENSE_INSTBLTY_DETECTION_MIN_R_VAL (3.000f)
 //! parameter(s) used for dynamic distance threshold adjustments ('R(x)')
 #define BGSSUBSENSE_R_VAR (0.01f)
@@ -38,7 +36,7 @@
 //! parameter(s) used for dynamic learning rates adjustments  ('T(x)')
 #define BGSSUBSENSE_T_DECR  (0.2500f)
 #define BGSSUBSENSE_T_INCR  (1.0000f)
-#define BGSSUBSENSE_T_LOWER (2.0000f)
+#define BGSSUBSENSE_T_LOWER (1.0000f)
 #define BGSSUBSENSE_T_UPPER (256.00f)
 
 /*!
@@ -108,8 +106,6 @@ protected:
 	cv::Mat m_oMeanFinalSegmResFrame_LT, m_oMeanFinalSegmResFrame_ST;
 	//! a lookup map used to keep track of unstable regions
 	cv::Mat m_oUnstableRegionMask;
-	//! a lookup map used to keep track of 'dead' regions (i.e. nullified detection zones)
-	cv::Mat m_oDeadRegionMask;
 	//! per-pixel blink detection results ('Z(x)', used to determine which frame regions should be assigned stronger 'R(x)' variations)
 	cv::Mat m_oBlinksFrame;
 	//! copy of previously used pixel intensities used to calculate 'D_last(x)'
@@ -122,7 +118,6 @@ protected:
 	cv::Mat m_oFGMask_last;
 
 	//! pre-allocated CV_8UC1 matrix used to speed up morph ops
-	cv::Mat m_oFGMask_ActiveMask;
 	cv::Mat m_oFGMask_PreFlood;
 	cv::Mat m_oFGMask_FloodedHoles;
 	cv::Mat m_oFGMask_last_dilated;
