@@ -5,9 +5,6 @@
 #include <opencv2/features2d/features2d.hpp>
 #include "DistanceUtils.h"
 
-//! defines if the provided keypoints should be validated when passed to 'compute' functions or not; setting to zero might improve performance, but is generally less safe against OOB exceptions
-#define LBSP_VALIDATE_KEYPOINTS_INTERNALLY 0
-
 /*!
 	Local Binary Similarity Pattern (LBSP) feature extractor
 
@@ -100,7 +97,7 @@ public:
 	//! utility function, used to reshape a descriptors matrix to its input image size via their keypoint locations
 	static void reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoints, const cv::Mat& oDescriptors, cv::Mat& oOutput);
 	//! utility function, used to illustrate the difference between two descriptor images
-	static void calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat& oOutput);
+	static void calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat& oOutput, bool bForceMergeChannels=false);
 	//! utility function, used to filter out bad keypoints that would trigger out of bounds error because they're too close to the image border
 	static void validateKeyPoints(std::vector<cv::KeyPoint>& voKeypoints, cv::Size oImgSize);
 	//! utility, specifies the pixel size of the pattern used (width and height)
@@ -117,4 +114,3 @@ protected:
 	const size_t m_nThreshold;
 	cv::Mat m_oRefImage;
 };
-

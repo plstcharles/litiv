@@ -350,6 +350,8 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 				nKeyPressed = cv::waitKey(1);
 			else
 				nKeyPressed = cv::waitKey(0);
+			if(nKeyPressed!=-1)
+				std::cout << "nKeyPressed = " << nKeyPressed << std::endl;
 			if(nKeyPressed==32)
 				g_bContinuousUpdates = !g_bContinuousUpdates;
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT
