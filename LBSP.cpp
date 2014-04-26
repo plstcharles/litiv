@@ -198,15 +198,13 @@ static inline void lbsp_computeImpl2(	const cv::Mat& oInputImg,
 }
 
 void LBSP::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const {
-    if(oImage.empty() || voKeypoints.empty()) {
+	CV_Assert(!oImage.empty());
+    cv::KeyPointsFilter::runByImageBorder(voKeypoints,oImage.size(),PATCH_SIZE/2);
+    cv::KeyPointsFilter::runByKeypointSize(voKeypoints,std::numeric_limits<float>::epsilon());
+    if(voKeypoints.empty()) {
         oDescriptors.release();
         return;
     }
-#if LBSP_VALIDATE_KEYPOINTS_INTERNALLY
-    cv::KeyPointsFilter::runByImageBorder(keypoints,image.size(),PATCH_SIZE/2);
-    cv::KeyPointsFilter::runByKeypointSize(keypoints,std::numeric_limits<float>::epsilon());
-	CV_DbgAssert(!keypoints.empty());
-#endif //LBSP_VALIDATE_KEYPOINTS_INTERNALLY
 	if(m_bOnlyUsingAbsThreshold)
 		lbsp_computeImpl2(oImage,m_oRefImage,voKeypoints,oDescriptors,m_nThreshold);
 	else
@@ -221,14 +219,13 @@ void LBSP::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<s
 }
 
 void LBSP::computeImpl(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const {
-	if(oImage.empty() || voKeypoints.empty()) {
+	CV_Assert(!oImage.empty());
+	cv::KeyPointsFilter::runByImageBorder(voKeypoints,oImage.size(),PATCH_SIZE/2);
+	cv::KeyPointsFilter::runByKeypointSize(voKeypoints,std::numeric_limits<float>::epsilon());
+	if(voKeypoints.empty()) {
 		oDescriptors.release();
 		return;
 	}
-#if LBSP_VALIDATE_KEYPOINTS_INTERNALLY
-	cv::KeyPointsFilter::runByImageBorder(voKeypoints,oImage.size(),PATCH_SIZE/2);
-	CV_DbgAssert(!voKeypoints.empty());
-#endif //LBSP_VALIDATE_KEYPOINTS_INTERNALLY
 	if(m_bOnlyUsingAbsThreshold)
 		lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,oDescriptors,m_nThreshold);
 	else
@@ -262,14 +259,14 @@ void LBSP::reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoi
 	}
 }
 
-void LBSP::calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat& oOutput) {
+void LBSP::calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat& oOutput, bool bForceMergeChannels) {
 	CV_DbgAssert(oDesc1.size()==oDesc2.size() && oDesc1.type()==oDesc2.type());
 	CV_DbgAssert(DESC_SIZE==2); // @@@ also relies on a constant desc size
 	CV_DbgAssert(oDesc1.type()==CV_16UC1 || oDesc1.type()==CV_16UC3);
 	CV_DbgAssert(CV_MAT_DEPTH(oDesc1.type())==CV_16U);
 	CV_DbgAssert(DESC_SIZE*8<=UCHAR_MAX);
 	CV_DbgAssert(oDesc1.step.p[0]==oDesc2.step.p[0] && oDesc1.step.p[1]==oDesc2.step.p[1]);
-	const size_t nScaleFactor = UCHAR_MAX/(DESC_SIZE*8);
+	const float fScaleFactor = (float)UCHAR_MAX/(DESC_SIZE*8);
 	const size_t nChannels = CV_MAT_CN(oDesc1.type());
 	const size_t _step_row = oDesc1.step.p[0];
 	if(nChannels==1) {
@@ -279,20 +276,27 @@ void LBSP::calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat
 			const ushort* const desc1_ptr = (ushort*)(oDesc1.data+idx);
 			const ushort* const desc2_ptr = (ushort*)(oDesc2.data+idx);
 			for(int j=0; j<oDesc1.cols; ++j)
-				oOutput.at<uchar>(i,j) = (uchar)(nScaleFactor*hdist_ushort_8bitLUT(desc1_ptr[j],desc2_ptr[j]));
+				oOutput.at<uchar>(i,j) = (uchar)(fScaleFactor*hdist_ushort_8bitLUT(desc1_ptr[j],desc2_ptr[j]));
 		}
 	}
 	else { //nChannels==3
-		oOutput.create(oDesc1.size(),CV_8UC3);
+		if(bForceMergeChannels)
+			oOutput.create(oDesc1.size(),CV_8UC1);
+		else
+			oOutput.create(oDesc1.size(),CV_8UC3);
 		for(int i=0; i<oDesc1.rows; ++i) {
 			const size_t idx =  _step_row*i;
 			const ushort* const desc1_ptr = (ushort*)(oDesc1.data+idx);
 			const ushort* const desc2_ptr = (ushort*)(oDesc2.data+idx);
 			uchar* output_ptr = oOutput.data + oOutput.step.p[0]*i;
 			for(int j=0; j<oDesc1.cols; ++j) {
-				for(size_t n=0;n<3; ++n) {
-					const size_t idx2 = 3*j+n;
-					output_ptr[idx2] = (uchar)(nScaleFactor*hdist_ushort_8bitLUT(desc1_ptr[idx2],desc2_ptr[idx2]));
+				if(bForceMergeChannels)
+					output_ptr[j] = (uchar)((fScaleFactor*hdist_ushort_8bitLUT(desc1_ptr+j,desc2_ptr+j))/3);
+				else {
+					for(size_t n=0;n<3; ++n) {
+						const size_t idx2 = 3*j+n;
+						output_ptr[idx2] = (uchar)(fScaleFactor*hdist_ushort_8bitLUT(desc1_ptr[idx2],desc2_ptr[idx2]));
+					}
 				}
 			}
 		}
