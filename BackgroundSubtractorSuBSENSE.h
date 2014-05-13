@@ -3,7 +3,7 @@
 #include "BackgroundSubtractorLBSP.h"
 
 //! defines the default value for BackgroundSubtractorLBSP::m_fRelLBSPThreshold
-#define BGSSUBSENSE_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.300f)
+#define BGSSUBSENSE_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.333f)
 //! defines the default value for BackgroundSubtractorLBSP::m_nLBSPThresholdOffset
 #define BGSSUBSENSE_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (0)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
@@ -11,8 +11,7 @@
 //! defines the default value for BackgroundSubtractorSuBSENSE::m_nMinColorDistThreshold
 #define BGSSUBSENSE_DEFAULT_COLOR_DIST_THRESHOLD (30)
 //! defines the default value for BackgroundSubtractorSuBSENSE::m_nBGSamples
-//#define BGSSUBSENSE_DEFAULT_NB_BG_SAMPLES (50)
-#define BGSSUBSENSE_DEFAULT_NB_BG_SAMPLES (35)
+#define BGSSUBSENSE_DEFAULT_NB_BG_SAMPLES (50)
 //! defines the default value for BackgroundSubtractorSuBSENSE::m_nRequiredBGSamples
 #define BGSSUBSENSE_DEFAULT_REQUIRED_NB_BG_SAMPLES (2)
 //! defines the number of samples to use when computing running averages
@@ -69,6 +68,8 @@ public:
 	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=0);
 	//! returns a copy of the latest reconstructed background image
 	void getBackgroundImage(cv::OutputArray backgroundImage) const;
+	//! turns automatic model resets on or off
+	void setAutomaticModelResets(bool);
 
 protected:
 	//! indicates whether internal structures have already been initialized (LBSP lookup tables, samples, etc.)
@@ -79,10 +80,12 @@ protected:
 	const size_t m_nBGSamples;
 	//! number of similar samples needed to consider the current pixel/block as 'background' (same as '#_min' in ViBe/PBAS)
 	const size_t m_nRequiredBGSamples;
-	//! current frame index
-	size_t m_nFrameIndex;
-	//! last calculated mean color diff ratio
-	float m_fLastColorDiffRatio;
+	//! current frame index & frame count since last model reset
+	size_t m_nFrameIndex, m_nFramesSinceLastReset;
+	//! last calculated mean color diff ratio & non-zero desc ratio
+	float m_fLastColorDiffRatio, m_fLastNonZeroDescRatio;
+	//! specifies whether automatic model resets are enabled or not
+	bool m_bModelResetsEnabled;
 	//! current model reset cooldown timer
 	size_t m_nModelResetCooldown;
 	//! current learning rate caps

@@ -6,31 +6,26 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <iomanip>
 
-static int test_reset=0;
-
-#define USE_MEAN_MIN_DIST_WITH_INTERS_COUNT 1
 #define NONZERO_DESC_POPCOUNT_MIN 2
 #define NONZERO_ADJUSTMENT_RATIO_MIN 0.050f
 #define NONZERO_ADJUSTMENT_RATIO_MAX 0.400f
-#define SPREAD_3X3_MIN_R_DIST_FACT 1.25f
 #define COLOR_DIFF_RATIO_RESET_THRESHOLD 18
-
 // local define used for debug purposes only
 #define DISPLAY_SUBSENSE_DEBUG_INFO 0
 // local define used to specify the debug window size
 #define DEBUG_WINDOW_SIZE cv::Size(320,240)
+// local define used to determine the default image ROI size
+#define DEFAULT_IMG_ROI_SIZE (320*240)
 // local define used to specify the color dist threshold offset used for unstable regions
 #define STAB_COLOR_DIST_OFFSET 6
 // local define used to specify the desc dist threshold offset used for unstable regions
 #define UNSTAB_DESC_DIST_OFFSET 3
-// local define used to determine the default image ROI size
-#define DEFAULT_IMG_ROI_SIZE (320*240)
 // local define used to determine the median blur kernel size
 #define DEFAULT_MEDIAN_BLUR_KERNEL_SIZE (9)
 // local define used to determine which model regions are 'super-stable'
-#define SUPER_STABLE_REGION_DMIN 0.025f
+#define SUPER_STABLE_REGION_DMIN 0.020f
 // local define used to set the sub-min R threshold
-#define SUPER_STABLE_REGION_RMIN 0.750f
+#define SUPER_STABLE_REGION_RMIN 0.800f
 
 static const size_t s_nColorMaxDataRange_1ch = UCHAR_MAX;
 static const size_t s_nDescMaxDataRange_1ch = LBSP::DESC_SIZE*8;
@@ -49,7 +44,10 @@ BackgroundSubtractorSuBSENSE::BackgroundSubtractorSuBSENSE(	 float fRelLBSPThres
 		,m_nBGSamples(nBGSamples)
 		,m_nRequiredBGSamples(nRequiredBGSamples)
 		,m_nFrameIndex(SIZE_MAX)
+		,m_nFramesSinceLastReset(0)
 		,m_fLastColorDiffRatio(0.0f)
+		,m_fLastNonZeroDescRatio(0.0f)
+		,m_bModelResetsEnabled(true)
 		,m_nModelResetCooldown(0)
 		,m_nCurrLearningRateLowerCap(BGSSUBSENSE_T_LOWER)
 		,m_nCurrLearningRateUpperCap(BGSSUBSENSE_T_UPPER)
@@ -88,11 +86,14 @@ void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const std
 	m_nImgType = oInitImg.type();
 	m_nImgChannels = oInitImg.channels();
 	m_nFrameIndex = 0;
+	m_nFramesSinceLastReset = 0;
 	m_fLastColorDiffRatio = 0.0f;
+	m_fLastNonZeroDescRatio = 0.0f;
+	m_bModelResetsEnabled = true;
 	m_nModelResetCooldown = 0;
 	m_nCurrLearningRateLowerCap = BGSSUBSENSE_T_LOWER;
 	m_nCurrLearningRateUpperCap = BGSSUBSENSE_T_UPPER;
-	if(m_oImgSize.height*m_oImgSize.width>DEFAULT_IMG_ROI_SIZE) {
+	if(m_oImgSize.height*m_oImgSize.width>DEFAULT_IMG_ROI_SIZE && m_voKeyPoints.size()>DEFAULT_IMG_ROI_SIZE/2) {
 		const int nRawMedianBlurKernelSize = std::min((int)floor((float)(m_oImgSize.height*m_oImgSize.width)/DEFAULT_IMG_ROI_SIZE+0.5f)+DEFAULT_MEDIAN_BLUR_KERNEL_SIZE,14);
 		if((nRawMedianBlurKernelSize%2)==1)
 			m_nMedianBlurKernelSize = nRawMedianBlurKernelSize;
@@ -101,8 +102,8 @@ void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const std
 	}
 	else
 		m_nMedianBlurKernelSize = DEFAULT_MEDIAN_BLUR_KERNEL_SIZE;
-	m_bUse3x3Spread = (m_oImgSize.height*m_oImgSize.width)>DEFAULT_IMG_ROI_SIZE*2?false:true;
-	std::cout << m_oImgSize << " => m_nMedianBlurKernelSize=" << m_nMedianBlurKernelSize << ", with 3x3Spread=" << m_bUse3x3Spread << std::endl;
+	m_bUse3x3Spread = !((m_oImgSize.height*m_oImgSize.width)>DEFAULT_IMG_ROI_SIZE*2);
+	//std::cout << m_oImgSize << " => m_nMedianBlurKernelSize=" << m_nMedianBlurKernelSize << ", with 3x3Spread=" << m_bUse3x3Spread << std::endl;
 	m_oUpdateRateFrame.create(m_oImgSize,CV_32FC1);
 	m_oUpdateRateFrame = cv::Scalar(BGSSUBSENSE_T_LOWER);
 	m_oDistThresholdFrame.create(m_oImgSize,CV_32FC1);
@@ -166,7 +167,7 @@ void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const std
 	const size_t nKeyPoints = m_voKeyPoints.size();
 	if(m_nImgChannels==1) {
 		for(size_t t=0; t<=UCHAR_MAX; ++t)
-			m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>((t*m_fRelLBSPThreshold+m_nLBSPThresholdOffset)/2);
+			m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>((t*m_fRelLBSPThreshold+m_nLBSPThresholdOffset)/3);
 		for(size_t k=0; k<nKeyPoints; ++k) {
 			const int y_orig = (int)m_voKeyPoints[k].pt.y;
 			const int x_orig = (int)m_voKeyPoints[k].pt.x;
@@ -322,18 +323,11 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 			const float fNormalizedLastDist = ((float)absdiff_uchar(nLastColor,nCurrColor)/s_nColorMaxDataRange_1ch+(float)hdist_ushort_8bitLUT(nLastIntraDesc,nCurrIntraDesc)/s_nDescMaxDataRange_1ch)/2;
 			*pfCurrMeanLastDist_LT = (*pfCurrMeanLastDist_LT)*(1.0f-fRollAvgFactor_LT) + fNormalizedLastDist*fRollAvgFactor_LT;
 			*pfCurrMeanLastDist_ST = (*pfCurrMeanLastDist_ST)*(1.0f-fRollAvgFactor_ST) + fNormalizedLastDist*fRollAvgFactor_ST;
-#if !USE_MEAN_MIN_DIST_WITH_INTERS_COUNT
-			const float fNormalizedMinDist = ((float)nMinSumDist/s_nColorMaxDataRange_1ch+(float)nMinDescDist/s_nDescMaxDataRange_1ch)/2;
-			*pfCurrMeanMinDist_LT = (*pfCurrMeanMinDist_LT)*(1.0f-fRollAvgFactor_LT) + fNormalizedMinDist*fRollAvgFactor_LT;
-			*pfCurrMeanMinDist_ST = (*pfCurrMeanMinDist_ST)*(1.0f-fRollAvgFactor_ST) + fNormalizedMinDist*fRollAvgFactor_ST;
-#endif //!USE_MEAN_MIN_DIST_WITH_INTERS_COUNT
 			if(nGoodSamplesCount<m_nRequiredBGSamples) {
 				// == foreground
-#if USE_MEAN_MIN_DIST_WITH_INTERS_COUNT
 				const float fNormalizedMinDist = std::min(1.0f,((float)nMinSumDist/s_nColorMaxDataRange_1ch+(float)nMinDescDist/s_nDescMaxDataRange_1ch)/2 + (float)(m_nRequiredBGSamples-nGoodSamplesCount)/m_nRequiredBGSamples);
 				*pfCurrMeanMinDist_LT = (*pfCurrMeanMinDist_LT)*(1.0f-fRollAvgFactor_LT) + fNormalizedMinDist*fRollAvgFactor_LT;
 				*pfCurrMeanMinDist_ST = (*pfCurrMeanMinDist_ST)*(1.0f-fRollAvgFactor_ST) + fNormalizedMinDist*fRollAvgFactor_ST;
-#endif //USE_MEAN_MIN_DIST_WITH_INTERS_COUNT
 				*pfCurrMeanRawSegmRes_LT = (*pfCurrMeanRawSegmRes_LT)*(1.0f-fRollAvgFactor_LT) + fRollAvgFactor_LT;
 				*pfCurrMeanRawSegmRes_ST = (*pfCurrMeanRawSegmRes_ST)*(1.0f-fRollAvgFactor_ST) + fRollAvgFactor_ST;
 				oCurrFGMask.data[idx_uchar] = UCHAR_MAX;
@@ -345,11 +339,9 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 			}
 			else {
 				// == background
-#if USE_MEAN_MIN_DIST_WITH_INTERS_COUNT
 				const float fNormalizedMinDist = ((float)nMinSumDist/s_nColorMaxDataRange_1ch+(float)nMinDescDist/s_nDescMaxDataRange_1ch)/2;
 				*pfCurrMeanMinDist_LT = (*pfCurrMeanMinDist_LT)*(1.0f-fRollAvgFactor_LT) + fNormalizedMinDist*fRollAvgFactor_LT;
 				*pfCurrMeanMinDist_ST = (*pfCurrMeanMinDist_ST)*(1.0f-fRollAvgFactor_ST) + fNormalizedMinDist*fRollAvgFactor_ST;
-#endif //USE_MEAN_MIN_DIST_WITH_INTERS_COUNT
 				*pfCurrMeanRawSegmRes_LT = (*pfCurrMeanRawSegmRes_LT)*(1.0f-fRollAvgFactor_LT);
 				*pfCurrMeanRawSegmRes_ST = (*pfCurrMeanRawSegmRes_ST)*(1.0f-fRollAvgFactor_ST);
 				const size_t nLearningRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil(*pfCurrLearningRate);
@@ -359,8 +351,7 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 					m_voBGColorSamples[s_rand].data[idx_uchar] = nCurrColor;
 				}
 				int x_rand,y_rand;
-				//const bool bCurrUsing3x3Spread = m_bUse3x3Spread && !m_oUnstableRegionMask.data[idx_uchar];
-				const bool bCurrUsing3x3Spread = m_bUse3x3Spread && (!m_oUnstableRegionMask.data[idx_uchar] || (*pfCurrDistThresholdFactor)<SPREAD_3X3_MIN_R_DIST_FACT);
+				const bool bCurrUsing3x3Spread = m_bUse3x3Spread && !m_oUnstableRegionMask.data[idx_uchar];
 				if(bCurrUsing3x3Spread)
 					getRandNeighborPosition_3x3(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 				else
@@ -370,7 +361,6 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 				const size_t idx_rand_flt32 = idx_rand_uchar*4;
 				const float fRandMeanLastDist_ST = *((float*)(m_oMeanLastDistFrame_ST.data+idx_rand_flt32));
 				const float fRandMeanRawSegmRes_ST = *((float*)(m_oMeanRawSegmResFrame_ST.data+idx_rand_flt32));
-				//if((n_rand%(bCurrUsing3x3Spread?nLearningRate:std::max(nLearningRate/2,(size_t)BGSSUBSENSE_T_LOWER)))==0
 				if((n_rand%(bCurrUsing3x3Spread?nLearningRate:(nLearningRate/2+1)))==0
 					|| (fRandMeanRawSegmRes_ST>BGSSUBSENSE_GHOST_DETECTION_S_MIN && fRandMeanLastDist_ST<BGSSUBSENSE_GHOST_DETECTION_D_MAX && (n_rand%4)==0)) {
 					const size_t idx_rand_ushrt = idx_rand_uchar*2;
@@ -380,12 +370,12 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 				}
 			}
 			if((*pfCurrLearningRate)<BGSSUBSENSE_T_UPPER && m_oFGMask_last.data[idx_uchar]) {
-				*pfCurrLearningRate += BGSSUBSENSE_T_INCR/std::max(*pfCurrMeanMinDist_LT,*pfCurrMeanMinDist_ST);
+				*pfCurrLearningRate += BGSSUBSENSE_T_INCR/(std::max(*pfCurrMeanMinDist_LT,*pfCurrMeanMinDist_ST)*(*pfCurrDistThresholdVariationFactor));
 				if((*pfCurrLearningRate)>m_nCurrLearningRateUpperCap)
 					*pfCurrLearningRate = m_nCurrLearningRateUpperCap;
 			}
 			else if((*pfCurrLearningRate)>m_nCurrLearningRateLowerCap) {
-				*pfCurrLearningRate -= BGSSUBSENSE_T_DECR/std::max(*pfCurrMeanMinDist_LT,*pfCurrMeanMinDist_ST);
+				*pfCurrLearningRate -= BGSSUBSENSE_T_DECR*(*pfCurrDistThresholdVariationFactor-BGSSUBSENSE_R2_DECR)/std::max(*pfCurrMeanMinDist_LT,*pfCurrMeanMinDist_ST);
 				if((*pfCurrLearningRate)<m_nCurrLearningRateLowerCap)
 					*pfCurrLearningRate = m_nCurrLearningRateLowerCap;
 			}
@@ -395,7 +385,6 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 				(*pfCurrDistThresholdVariationFactor) += BGSSUBSENSE_R2_INCR;
 			}
 			else if((*pfCurrDistThresholdVariationFactor)>BGSSUBSENSE_R2_DECR) {
-				//(*pfCurrDistThresholdVariationFactor) -= m_oFGMask_last.data[idx_uchar]?BGSSUBSENSE_R2_DECR/8:m_oUnstableRegionMask.data[idx_uchar]?BGSSUBSENSE_R2_DECR/4:BGSSUBSENSE_R2_DECR;
 				(*pfCurrDistThresholdVariationFactor) -= m_oFGMask_last.data[idx_uchar]?BGSSUBSENSE_R2_DECR/4:m_oUnstableRegionMask.data[idx_uchar]?BGSSUBSENSE_R2_DECR/2:BGSSUBSENSE_R2_DECR;
 				if((*pfCurrDistThresholdVariationFactor)<BGSSUBSENSE_R2_DECR)
 					(*pfCurrDistThresholdVariationFactor) = BGSSUBSENSE_R2_DECR;
@@ -447,8 +436,7 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 			const size_t nCurrDescDistThreshold = ((size_t)1<<((size_t)floor(*pfCurrDistThresholdFactor+0.5f)))+m_nDescDistThreshold+(m_oUnstableRegionMask.data[idx_uchar]*UNSTAB_DESC_DIST_OFFSET);
 			const size_t nCurrTotColorDistThreshold = nCurrColorDistThreshold*3;
 			const size_t nCurrTotDescDistThreshold = nCurrDescDistThreshold*3;
-			const size_t nCurrSCColorDistThreshold = (3*nCurrTotColorDistThreshold)/4;
-			//const size_t nCurrSCDescDistThreshold = (3*nCurrTotDescDistThreshold)/4;
+			const size_t nCurrSCColorDistThreshold = nCurrTotColorDistThreshold/2;
 			ushort anCurrInterDesc[3], anCurrIntraDesc[3];
 			const size_t anCurrIntraLBSPThresholds[3] = {m_anLBSPThreshold_8bitLUT[anCurrColor[0]],m_anLBSPThreshold_8bitLUT[anCurrColor[1]],m_anLBSPThreshold_8bitLUT[anCurrColor[2]]};
 			LBSP::computeRGBDescriptor(oInputImg,anCurrColor,x,y,anCurrIntraLBSPThresholds,anCurrIntraDesc);
@@ -467,8 +455,6 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 					LBSP::computeSingleRGBDescriptor(oInputImg,anBGColor[c],x,y,c,m_anLBSPThreshold_8bitLUT[anBGColor[c]],anCurrInterDesc[c]);
 					size_t nInterDescDist = hdist_ushort_8bitLUT(anCurrInterDesc[c],anBGIntraDesc[c]);
 					const size_t nDescDist = (nIntraDescDist+nInterDescDist)/2;
-					//if(nDescDist>nCurrSCDescDistThreshold)
-					//	goto failedcheck3ch;
 					const size_t nSumDist = std::min((nDescDist/2)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch);
 					if(nSumDist>nCurrSCColorDistThreshold)
 						goto failedcheck3ch;
@@ -488,18 +474,11 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 			const float fNormalizedLastDist = ((float)L1dist_uchar(anLastColor,anCurrColor)/s_nColorMaxDataRange_3ch+(float)hdist_ushort_8bitLUT(anLastIntraDesc,anCurrIntraDesc)/s_nDescMaxDataRange_3ch)/2;
 			*pfCurrMeanLastDist_LT = (*pfCurrMeanLastDist_LT)*(1.0f-fRollAvgFactor_LT) + fNormalizedLastDist*fRollAvgFactor_LT;
 			*pfCurrMeanLastDist_ST = (*pfCurrMeanLastDist_ST)*(1.0f-fRollAvgFactor_ST) + fNormalizedLastDist*fRollAvgFactor_ST;
-#if !USE_MEAN_MIN_DIST_WITH_INTERS_COUNT
-			const float fNormalizedMinDist = ((float)nMinTotSumDist/s_nColorMaxDataRange_3ch+(float)nMinTotDescDist/s_nDescMaxDataRange_3ch)/2;
-			*pfCurrMeanMinDist_LT = (*pfCurrMeanMinDist_LT)*(1.0f-fRollAvgFactor_LT) + fNormalizedMinDist*fRollAvgFactor_LT;
-			*pfCurrMeanMinDist_ST = (*pfCurrMeanMinDist_ST)*(1.0f-fRollAvgFactor_ST) + fNormalizedMinDist*fRollAvgFactor_ST;
-#endif //!USE_MEAN_MIN_DIST_WITH_INTERS_COUNT
 			if(nGoodSamplesCount<m_nRequiredBGSamples) {
 				// == foreground
-#if USE_MEAN_MIN_DIST_WITH_INTERS_COUNT
 				const float fNormalizedMinDist = std::min(1.0f,((float)nMinTotSumDist/s_nColorMaxDataRange_3ch+(float)nMinTotDescDist/s_nDescMaxDataRange_3ch)/2 + (float)(m_nRequiredBGSamples-nGoodSamplesCount)/m_nRequiredBGSamples);
 				*pfCurrMeanMinDist_LT = (*pfCurrMeanMinDist_LT)*(1.0f-fRollAvgFactor_LT) + fNormalizedMinDist*fRollAvgFactor_LT;
 				*pfCurrMeanMinDist_ST = (*pfCurrMeanMinDist_ST)*(1.0f-fRollAvgFactor_ST) + fNormalizedMinDist*fRollAvgFactor_ST;
-#endif //USE_MEAN_MIN_DIST_WITH_INTERS_COUNT
 				*pfCurrMeanRawSegmRes_LT = (*pfCurrMeanRawSegmRes_LT)*(1.0f-fRollAvgFactor_LT) + fRollAvgFactor_LT;
 				*pfCurrMeanRawSegmRes_ST = (*pfCurrMeanRawSegmRes_ST)*(1.0f-fRollAvgFactor_ST) + fRollAvgFactor_ST;
 				oCurrFGMask.data[idx_uchar] = UCHAR_MAX;
@@ -513,11 +492,9 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 			}
 			else {
 				// == background
-#if USE_MEAN_MIN_DIST_WITH_INTERS_COUNT
 				const float fNormalizedMinDist = ((float)nMinTotSumDist/s_nColorMaxDataRange_3ch+(float)nMinTotDescDist/s_nDescMaxDataRange_3ch)/2;
 				*pfCurrMeanMinDist_LT = (*pfCurrMeanMinDist_LT)*(1.0f-fRollAvgFactor_LT) + fNormalizedMinDist*fRollAvgFactor_LT;
 				*pfCurrMeanMinDist_ST = (*pfCurrMeanMinDist_ST)*(1.0f-fRollAvgFactor_ST) + fNormalizedMinDist*fRollAvgFactor_ST;
-#endif //USE_MEAN_MIN_DIST_WITH_INTERS_COUNT
 				*pfCurrMeanRawSegmRes_LT = (*pfCurrMeanRawSegmRes_LT)*(1.0f-fRollAvgFactor_LT);
 				*pfCurrMeanRawSegmRes_ST = (*pfCurrMeanRawSegmRes_ST)*(1.0f-fRollAvgFactor_ST);
 				const size_t nLearningRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil(*pfCurrLearningRate);
@@ -529,8 +506,7 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 					}
 				}
 				int x_rand,y_rand;
-				//const bool bCurrUsing3x3Spread = m_bUse3x3Spread && !m_oUnstableRegionMask.data[idx_uchar];
-				const bool bCurrUsing3x3Spread = m_bUse3x3Spread && (!m_oUnstableRegionMask.data[idx_uchar] || (*pfCurrDistThresholdFactor)<SPREAD_3X3_MIN_R_DIST_FACT);
+				const bool bCurrUsing3x3Spread = m_bUse3x3Spread && !m_oUnstableRegionMask.data[idx_uchar];
 				if(bCurrUsing3x3Spread)
 					getRandNeighborPosition_3x3(x_rand,y_rand,x,y,LBSP::PATCH_SIZE/2,m_oImgSize);
 				else
@@ -540,7 +516,6 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 				const size_t idx_rand_flt32 = idx_rand_uchar*4;
 				const float fRandMeanLastDist_ST = *((float*)(m_oMeanLastDistFrame_ST.data+idx_rand_flt32));
 				const float fRandMeanRawSegmRes_ST = *((float*)(m_oMeanRawSegmResFrame_ST.data+idx_rand_flt32));
-				//if((n_rand%(bCurrUsing3x3Spread?nLearningRate:std::max(nLearningRate/2,(size_t)BGSSUBSENSE_T_LOWER)))==0
 				if((n_rand%(bCurrUsing3x3Spread?nLearningRate:(nLearningRate/2+1)))==0
 					|| (fRandMeanRawSegmRes_ST>BGSSUBSENSE_GHOST_DETECTION_S_MIN && fRandMeanLastDist_ST<BGSSUBSENSE_GHOST_DETECTION_D_MAX && (n_rand%4)==0)) {
 					const size_t idx_rand_uchar_rgb = idx_rand_uchar*3;
@@ -553,12 +528,12 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 				}
 			}
 			if((*pfCurrLearningRate)<BGSSUBSENSE_T_UPPER && m_oFGMask_last.data[idx_uchar]) {
-				*pfCurrLearningRate += BGSSUBSENSE_T_INCR/std::max(*pfCurrMeanMinDist_LT,*pfCurrMeanMinDist_ST);
+				*pfCurrLearningRate += BGSSUBSENSE_T_INCR/(std::max(*pfCurrMeanMinDist_LT,*pfCurrMeanMinDist_ST)*(*pfCurrDistThresholdVariationFactor));
 				if((*pfCurrLearningRate)>m_nCurrLearningRateUpperCap)
 					*pfCurrLearningRate = m_nCurrLearningRateUpperCap;
 			}
 			else if((*pfCurrLearningRate)>m_nCurrLearningRateLowerCap) {
-				*pfCurrLearningRate -= BGSSUBSENSE_T_DECR/std::max(*pfCurrMeanMinDist_LT,*pfCurrMeanMinDist_ST);
+				*pfCurrLearningRate -= BGSSUBSENSE_T_DECR*(*pfCurrDistThresholdVariationFactor-BGSSUBSENSE_R2_DECR)/std::max(*pfCurrMeanMinDist_LT,*pfCurrMeanMinDist_ST);
 				if((*pfCurrLearningRate)<m_nCurrLearningRateLowerCap)
 					*pfCurrLearningRate = m_nCurrLearningRateLowerCap;
 			}
@@ -568,7 +543,6 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 				(*pfCurrDistThresholdVariationFactor) += BGSSUBSENSE_R2_INCR;
 			}
 			else if((*pfCurrDistThresholdVariationFactor)>BGSSUBSENSE_R2_DECR) {
-				//(*pfCurrDistThresholdVariationFactor) -= m_oFGMask_last.data[idx_uchar]?BGSSUBSENSE_R2_DECR/8:m_oUnstableRegionMask.data[idx_uchar]?BGSSUBSENSE_R2_DECR/4:BGSSUBSENSE_R2_DECR;
 				(*pfCurrDistThresholdVariationFactor) -= m_oFGMask_last.data[idx_uchar]?BGSSUBSENSE_R2_DECR/4:m_oUnstableRegionMask.data[idx_uchar]?BGSSUBSENSE_R2_DECR/2:BGSSUBSENSE_R2_DECR;
 				if((*pfCurrDistThresholdVariationFactor)<BGSSUBSENSE_R2_DECR)
 					(*pfCurrDistThresholdVariationFactor) = BGSSUBSENSE_R2_DECR;
@@ -595,18 +569,6 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 		}
 	}
 #if DISPLAY_SUBSENSE_DEBUG_INFO
-	/*cv::Mat oMeanMinDistFrameNormalized_ST; m_oMeanMinDistFrame_ST.copyTo(oMeanMinDistFrameNormalized_ST);
-	cv::resize(oMeanMinDistFrameNormalized_ST,oMeanMinDistFrameNormalized_ST,DEBUG_WINDOW_SIZE);
-	cv::imshow("d_min_st(x)",oMeanMinDistFrameNormalized_ST);
-	cv::Mat oMeanMinDistFrameNormalized_LT; m_oMeanMinDistFrame_LT.copyTo(oMeanMinDistFrameNormalized_LT);
-	cv::resize(oMeanMinDistFrameNormalized_LT,oMeanMinDistFrameNormalized_LT,DEBUG_WINDOW_SIZE);
-	cv::imshow("d_min_lt(x)",oMeanMinDistFrameNormalized_LT);
-	cv::Mat oMeanLastDistFrameNormalized_ST; m_oMeanLastDistFrame_ST.copyTo(oMeanLastDistFrameNormalized_ST);
-	cv::resize(oMeanLastDistFrameNormalized_ST,oMeanLastDistFrameNormalized_ST,DEBUG_WINDOW_SIZE);
-	cv::imshow("d_last_st(x)",oMeanLastDistFrameNormalized_ST);
-	cv::Mat oMeanLastDistFrameNormalized_LT; m_oMeanLastDistFrame_LT.copyTo(oMeanLastDistFrameNormalized_LT);
-	cv::resize(oMeanLastDistFrameNormalized_LT,oMeanLastDistFrameNormalized_LT,DEBUG_WINDOW_SIZE);
-	cv::imshow("d_last_lt(x)",oMeanLastDistFrameNormalized_LT);*/
 	std::cout << std::endl;
 	cv::Point dbgpt(nDebugCoordX,nDebugCoordY);
 	cv::Mat oMeanMinDistFrameNormalized; m_oMeanMinDistFrame_ST.copyTo(oMeanMinDistFrameNormalized);
@@ -649,19 +611,14 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 	cv::bitwise_or(m_oRawFGBlinkMask_curr,m_oRawFGBlinkMask_last,m_oBlinksFrame);
 	m_oRawFGBlinkMask_curr.copyTo(m_oRawFGBlinkMask_last);
 	oCurrFGMask.copyTo(m_oRawFGMask_last);
-	//cv::imshow("orig raw",oCurrFGMask);
 	cv::morphologyEx(oCurrFGMask,m_oFGMask_PreFlood,cv::MORPH_CLOSE,cv::Mat());
-	//cv::imshow("post-1close",m_oFGMask_PreFlood);
 	m_oFGMask_PreFlood.copyTo(m_oFGMask_FloodedHoles);
 	cv::floodFill(m_oFGMask_FloodedHoles,cv::Point(0,0),UCHAR_MAX);
 	cv::bitwise_not(m_oFGMask_FloodedHoles,m_oFGMask_FloodedHoles);
-	//cv::imshow("post-1close, flooded+inverted",m_oFGMask_FloodedHoles);
 	cv::erode(m_oFGMask_PreFlood,m_oFGMask_PreFlood,cv::Mat(),cv::Point(-1,-1),2);
-	//cv::imshow("post-1close, 2eroded",m_oFGMask_PreFlood);
 	cv::bitwise_or(oCurrFGMask,m_oFGMask_FloodedHoles,oCurrFGMask);
 	cv::bitwise_or(oCurrFGMask,m_oFGMask_PreFlood,oCurrFGMask);
 	cv::medianBlur(oCurrFGMask,m_oFGMask_last,m_nMedianBlurKernelSize);
-	//cv::imshow("result",m_oFGMask_last);
 	cv::dilate(m_oFGMask_last,m_oFGMask_last_dilated,cv::Mat(),cv::Point(-1,-1),3);
 	cv::bitwise_and(m_oBlinksFrame,m_oFGMask_last_dilated_inverted,m_oBlinksFrame);
 	cv::bitwise_not(m_oFGMask_last_dilated,m_oFGMask_last_dilated_inverted);
@@ -673,32 +630,33 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 	cv::addWeighted(m_oMeanFinalSegmResFrame_LT,(1.0f-fRollAvgFactor_LT),m_oFGMask_last,(1.0/UCHAR_MAX)*fRollAvgFactor_LT,0,m_oMeanFinalSegmResFrame_LT,CV_32F);
 	cv::addWeighted(m_oMeanFinalSegmResFrame_ST,(1.0f-fRollAvgFactor_ST),m_oFGMask_last,(1.0/UCHAR_MAX)*fRollAvgFactor_ST,0,m_oMeanFinalSegmResFrame_ST,CV_32F);
 	const float fCurrNonZeroDescRatio = (float)nNonZeroDescCount/nKeyPoints;
-	std::cout << "\t nzdesc = " << (int)(fCurrNonZeroDescRatio*100) << "%" << std::endl;
-	if(fCurrNonZeroDescRatio<NONZERO_ADJUSTMENT_RATIO_MIN) {
-		std::cout << "\t LBSP-- : [";
+	//std::cout << "\t nzdesc = " << (int)(fCurrNonZeroDescRatio*100) << "%" << std::endl;
+	if(fCurrNonZeroDescRatio<NONZERO_ADJUSTMENT_RATIO_MIN && m_fLastNonZeroDescRatio<NONZERO_ADJUSTMENT_RATIO_MIN) {
+		//std::cout << "\t LBSP-- : [";
 	    for(size_t t=0; t<=UCHAR_MAX; ++t) {
 	        if(m_anLBSPThreshold_8bitLUT[t]>m_nLBSPThresholdOffset+ceil(t*m_fRelLBSPThreshold/4))
 	            --m_anLBSPThreshold_8bitLUT[t];
-	        std::cout << m_anLBSPThreshold_8bitLUT[t] << " ";
+	    //    std::cout << m_anLBSPThreshold_8bitLUT[t] << " ";
 	    }
-	    std::cout << "];" << std::endl;
+	    //std::cout << "];" << std::endl;
 	}
-	else if(fCurrNonZeroDescRatio>NONZERO_ADJUSTMENT_RATIO_MAX) {
-		std::cout << "\t LBSP++ : [";
+	else if(fCurrNonZeroDescRatio>NONZERO_ADJUSTMENT_RATIO_MAX && m_fLastNonZeroDescRatio>NONZERO_ADJUSTMENT_RATIO_MAX) {
+		//std::cout << "\t LBSP++ : [";
 	    for(size_t t=0; t<=UCHAR_MAX; ++t) {
 	        if(m_anLBSPThreshold_8bitLUT[t]<(UCHAR_MAX*m_fRelLBSPThreshold))
 	            ++m_anLBSPThreshold_8bitLUT[t];
-	        std::cout << m_anLBSPThreshold_8bitLUT[t] << " ";
+	    //    std::cout << m_anLBSPThreshold_8bitLUT[t] << " ";
 	    }
-	    std::cout << "];" << std::endl;
+	    //std::cout << "];" << std::endl;
 	}
+	m_fLastNonZeroDescRatio = fCurrNonZeroDescRatio;
 	size_t nTotColorDiff = 0;
 	for(int i=0; i<m_oMeanDownSampledLastDistFrame_ST.rows; ++i) {
 		const size_t idx1 = m_oMeanDownSampledLastDistFrame_ST.step.p[0]*i;
 		for(int j=0; j<m_oMeanDownSampledLastDistFrame_ST.cols; ++j) {
 			const size_t idx2 = idx1+m_oMeanDownSampledLastDistFrame_ST.step.p[1]*j;
 			if(m_nImgChannels==1)
-				nTotColorDiff += (size_t)fabs((*(float*)(m_oMeanDownSampledLastDistFrame_ST.data+idx2))-(*(float*)(m_oMeanDownSampledLastDistFrame_LT.data+idx2)));
+				nTotColorDiff += (size_t)fabs((*(float*)(m_oMeanDownSampledLastDistFrame_ST.data+idx2))-(*(float*)(m_oMeanDownSampledLastDistFrame_ST.data+idx2)));
 			else //m_nImgChannels==3
 				nTotColorDiff += std::max((size_t)fabs((*(float*)(m_oMeanDownSampledLastDistFrame_ST.data+idx2))-(*(float*)(m_oMeanDownSampledLastDistFrame_LT.data+idx2))),
 								std::max((size_t)fabs((*(float*)(m_oMeanDownSampledLastDistFrame_ST.data+idx2+4))-(*(float*)(m_oMeanDownSampledLastDistFrame_LT.data+idx2+4))),
@@ -706,26 +664,21 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 		}
 	}
 	m_fLastColorDiffRatio = (float)nTotColorDiff/(m_oMeanDownSampledLastDistFrame_ST.rows*m_oMeanDownSampledLastDistFrame_ST.cols);
-	std::cout << "\t totcolordiff = " << (int)(m_fLastColorDiffRatio) << "%" << std::endl;
-	if(m_fLastColorDiffRatio>=COLOR_DIFF_RATIO_RESET_THRESHOLD && m_nModelResetCooldown==0) {
-		refreshModel(0.50f);
-		m_nModelResetCooldown = BGSSUBSENSE_N_SAMPLES_FOR_ST_MVAVGS;
-		m_oUpdateRateFrame = cv::Scalar(1.0f);
-		m_oDistThresholdFrame = cv::Scalar(1.0f);
-		m_oDistThresholdVariationFrame = cv::Scalar(2.0f);
-		m_oMeanMinDistFrame_LT = cv::Scalar(0.0f);
-		m_oMeanMinDistFrame_ST = cv::Scalar(0.0f);
-		m_oUnstableRegionMask = cv::Scalar_<uchar>(0);
-		m_oBlinksFrame = cv::Scalar_<uchar>(0);
-		int test_reset_local = ++test_reset;
-		std::stringstream sstr;
-		sstr << "reset_n" << test_reset_local << "_f" << m_nFrameIndex << ".png";
-		std::cout << sstr.str() << std::endl;
-		cv::imwrite(sstr.str(),oInputImg);
+	if(m_bModelResetsEnabled) {
+		if(m_nFramesSinceLastReset>1000)
+			m_bModelResetsEnabled = false;
+		else if(m_fLastColorDiffRatio>=COLOR_DIFF_RATIO_RESET_THRESHOLD && m_nModelResetCooldown==0) {
+			m_nFramesSinceLastReset = 0;
+			refreshModel(0.10f);
+			m_nModelResetCooldown = BGSSUBSENSE_N_SAMPLES_FOR_ST_MVAVGS;
+			m_oUpdateRateFrame = cv::Scalar(1.0f);
+		}
+		else
+			++m_nFramesSinceLastReset;
 	}
-	m_nCurrLearningRateLowerCap = (size_t)(m_fLastColorDiffRatio>=COLOR_DIFF_RATIO_RESET_THRESHOLD/2?BGSSUBSENSE_T_LOWER/2:BGSSUBSENSE_T_LOWER);
+	m_nCurrLearningRateLowerCap = (size_t)(m_fLastColorDiffRatio>=COLOR_DIFF_RATIO_RESET_THRESHOLD/2?BGSSUBSENSE_T_LOWER/2:(m_fLastColorDiffRatio<1.0f?BGSSUBSENSE_T_LOWER*2:BGSSUBSENSE_T_LOWER));
 	m_nCurrLearningRateUpperCap = (size_t)(m_fLastColorDiffRatio>=COLOR_DIFF_RATIO_RESET_THRESHOLD/3?std::max((int)BGSSUBSENSE_T_UPPER>>(int)(m_fLastColorDiffRatio/2),1):BGSSUBSENSE_T_UPPER);
-	std::cout << "\t [lower,upper] caps = [" << m_nCurrLearningRateLowerCap << "," << m_nCurrLearningRateUpperCap << "]" << std::endl;
+	//std::cout << "\t [lower,upper] caps = [" << m_nCurrLearningRateLowerCap << "," << m_nCurrLearningRateUpperCap << "]" << std::endl;
 	if(m_nModelResetCooldown>0)
 		--m_nModelResetCooldown;
 }
@@ -746,4 +699,8 @@ void BackgroundSubtractorSuBSENSE::getBackgroundImage(cv::OutputArray background
 		}
 	}
 	oAvgBGImg.convertTo(backgroundImage,CV_8U);
+}
+
+void BackgroundSubtractorSuBSENSE::setAutomaticModelResets(bool b) {
+	m_bModelResetsEnabled = b;
 }
