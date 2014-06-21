@@ -4,8 +4,6 @@
 
 //! defines the default value for BackgroundSubtractorLBSP::m_fRelLBSPThreshold
 #define BGSSUBSENSE_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.333f)
-//! defines the default value for BackgroundSubtractorLBSP::m_nLBSPThresholdOffset
-#define BGSSUBSENSE_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (0)
 //! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
 #define BGSSUBSENSE_DEFAULT_DESC_DIST_THRESHOLD (3)
 //! defines the default value for BackgroundSubtractorSuBSENSE::m_nMinColorDistThreshold
@@ -14,30 +12,8 @@
 #define BGSSUBSENSE_DEFAULT_NB_BG_SAMPLES (50)
 //! defines the default value for BackgroundSubtractorSuBSENSE::m_nRequiredBGSamples
 #define BGSSUBSENSE_DEFAULT_REQUIRED_NB_BG_SAMPLES (2)
-//! defines the number of samples to use when computing running averages
-#define BGSSUBSENSE_N_SAMPLES_FOR_ST_MVAVGS (25)
-#define BGSSUBSENSE_N_SAMPLES_FOR_LT_MVAVGS (100)
-//! defines the threshold value(s) used to detect long-term ghosting and trigger a fast edge-based absorption in the model
-#define BGSSUBSENSE_GHOST_DETECTION_D_MAX (0.010f)
-#define BGSSUBSENSE_GHOST_DETECTION_S_MIN (0.995f)
-//! defines the threshold value(s) used to detect high variation regions that are often labelled as foreground and trigger a local, gradual change in distance thresholds
-#define BGSSUBSENSE_HIGH_VAR_DETECTION_S_MIN (0.850f)
-#define BGSSUBSENSE_HIGH_VAR_DETECTION_D_MIN (0.175f)
-#define BGSSUBSENSE_HIGH_VAR_DETECTION_S_MIN2 (0.100f)
-#define BGSSUBSENSE_HIGH_VAR_DETECTION_D_MIN2 (0.225f)
-//! defines the threshold value(s) used to detect unstable regions and edges
-#define BGSSUBSENSE_INSTBLTY_DETECTION_SEGM_DIFF (0.150f)
-#define BGSSUBSENSE_INSTBLTY_DETECTION_MIN_R_VAL (3.000f)
-//! parameter(s) used for dynamic distance threshold adjustments ('R(x)')
-#define BGSSUBSENSE_R_VAR (0.01f)
-//! parameter(s) used for adjusting the variation speed of dynamic distance thresholds  ('R2(x)')
-#define BGSSUBSENSE_R2_INCR  (1.000f)
-#define BGSSUBSENSE_R2_DECR  (0.100f)
-//! parameter(s) used for dynamic learning rates adjustments  ('T(x)')
-#define BGSSUBSENSE_T_DECR  (0.2500f)
-#define BGSSUBSENSE_T_INCR  (0.5000f)
-#define BGSSUBSENSE_T_LOWER (2.0000f)
-#define BGSSUBSENSE_T_UPPER (256.00f)
+//! defines the default value for BackgroundSubtractorSuBSENSE::m_nSamplesForMovingAvgs
+#define BGSSUBSENSE_DEFAULT_N_SAMPLES_FOR_MV_AVGS (25)
 
 /*!
 	Self-Balanced Sensitivity segmenTER (SuBSENSE) foreground-background segmentation algorithm.
@@ -45,7 +21,8 @@
 	Note: both grayscale and RGB/BGR images may be used with this extractor (parameters are adjusted automatically).
 	For optimal grayscale results, use CV_8UC1 frames instead of CV_8UC3.
 
-	For more details on the different parameters, go to @@@@@@@@@@@@@@.
+	For more details on the different parametersor on the algorithm itself, see P.-L. St-Charles et al.,
+	"Flexible Background Subtraction With Self-Balanced Local Sensitivity", in CVPRW 2014.
 
 	This algorithm is currently NOT thread-safe.
  */
@@ -53,11 +30,11 @@ class BackgroundSubtractorSuBSENSE : public BackgroundSubtractorLBSP {
 public:
 	//! full constructor
 	BackgroundSubtractorSuBSENSE(	float fRelLBSPThreshold=BGSSUBSENSE_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
-									size_t nLBSPThresholdOffset=BGSSUBSENSE_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
 									size_t nMinDescDistThreshold=BGSSUBSENSE_DEFAULT_DESC_DIST_THRESHOLD,
 									size_t nMinColorDistThreshold=BGSSUBSENSE_DEFAULT_COLOR_DIST_THRESHOLD,
 									size_t nBGSamples=BGSSUBSENSE_DEFAULT_NB_BG_SAMPLES,
-									size_t nRequiredBGSamples=BGSSUBSENSE_DEFAULT_REQUIRED_NB_BG_SAMPLES);
+									size_t nRequiredBGSamples=BGSSUBSENSE_DEFAULT_REQUIRED_NB_BG_SAMPLES,
+									size_t nSamplesForMovingAvgs=BGSSUBSENSE_DEFAULT_N_SAMPLES_FOR_MV_AVGS);
 	//! default destructor
 	virtual ~BackgroundSubtractorSuBSENSE();
 	//! (re)initiaization method; needs to be called before starting background subtraction (note: also reinitializes the keypoints vector)
@@ -68,8 +45,8 @@ public:
 	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=0);
 	//! returns a copy of the latest reconstructed background image
 	void getBackgroundImage(cv::OutputArray backgroundImage) const;
-	//! turns automatic model resets on or off
-	void setAutomaticModelResets(bool);
+	//! turns automatic model reset on or off
+	void setAutomaticModelReset(bool);
 
 protected:
 	//! indicates whether internal structures have already been initialized (LBSP lookup tables, samples, etc.)
@@ -80,20 +57,24 @@ protected:
 	const size_t m_nBGSamples;
 	//! number of similar samples needed to consider the current pixel/block as 'background' (same as '#_min' in ViBe/PBAS)
 	const size_t m_nRequiredBGSamples;
-	//! current frame index & frame count since last model reset
-	size_t m_nFrameIndex, m_nFramesSinceLastReset;
-	//! last calculated mean color diff ratio & non-zero desc ratio
-	float m_fLastColorDiffRatio, m_fLastNonZeroDescRatio;
-	//! specifies whether automatic model resets are enabled or not
-	bool m_bModelResetsEnabled;
-	//! current model reset cooldown timer
-	size_t m_nModelResetCooldown;
+	//! number of samples to use to compute the learning rate of moving averages
+	const size_t m_nSamplesForMovingAvgs;
+	//! current frame index, frame count since last model reset & model reset cooldown counters
+	size_t m_nFrameIndex, m_nFramesSinceLastReset, m_nModelResetCooldown;
+	//! last calculated non-zero desc ratio
+	float m_fLastNonZeroDescRatio;
+	//! specifies whether automatic model reset is enabled or not
+	bool m_bAutoModelResetEnabled;
+	//! specifies whether Tmin/Tmax scaling is enabled or not
+	bool m_bLearningRateScalingEnabled;
 	//! current learning rate caps
-	size_t m_nCurrLearningRateLowerCap, m_nCurrLearningRateUpperCap;
+	float m_fCurrLearningRateLowerCap, m_fCurrLearningRateUpperCap;
 	//! current kernel size for median blur post-proc filtering
 	int m_nMedianBlurKernelSize;
 	//! specifies the px update spread range
 	bool m_bUse3x3Spread;
+	//! specifies the downsampled frame size (used for cam motion analysis)
+	cv::Size m_oDownSampledFrameSize;
 
 	//! background model pixel color intensity samples (equivalent to 'B(x)' in PBAS, but also paired with BackgroundSubtractorLBSP::m_voBGDescSamples to create our complete model)
 	std::vector<cv::Mat> m_voBGColorSamples;
@@ -102,21 +83,21 @@ protected:
 	cv::Mat m_oUpdateRateFrame;
 	//! per-pixel distance thresholds (equivalent to 'R(x)' in PBAS, but used as a relative value to determine both intensity and descriptor variation thresholds)
 	cv::Mat m_oDistThresholdFrame;
-	//! per-pixel distance threshold variation modulators ('R2(x)', relative value used to modulate 'R(x)' variations)
-	cv::Mat m_oDistThresholdVariationFrame;
+	//! per-pixel distance variation modulators ('v(x)', relative value used to modulate 'R(x)' and 'T(x)' variations)
+	cv::Mat m_oVariationModulatorFrame;
+	//! per-pixel mean distances between consecutive frames ('D_last(x)', used to detect ghosts and high variation regions in the sequence)
+	cv::Mat m_oMeanLastDistFrame;
 	//! per-pixel mean minimal distances from the model ('D_min(x)' in PBAS, used to control variation magnitude and direction of 'T(x)' and 'R(x)')
 	cv::Mat m_oMeanMinDistFrame_LT, m_oMeanMinDistFrame_ST;
-	//! per-pixel mean distances between consecutive frames ('D_last(x)', used to detect ghosts and high variation regions in the sequence)
-	cv::Mat m_oMeanLastDistFrame_LT, m_oMeanLastDistFrame_ST;
 	//! per-pixel mean downsampled distances between consecutive frames (used to analyze camera movement and control max learning rates globally)
 	cv::Mat m_oMeanDownSampledLastDistFrame_LT, m_oMeanDownSampledLastDistFrame_ST;
 	//! per-pixel mean raw segmentation results
 	cv::Mat m_oMeanRawSegmResFrame_LT, m_oMeanRawSegmResFrame_ST;
 	//! per-pixel mean final segmentation results
 	cv::Mat m_oMeanFinalSegmResFrame_LT, m_oMeanFinalSegmResFrame_ST;
-	//! a lookup map used to keep track of unstable regions
+	//! a lookup map used to keep track of unstable regions (based on segm. noise & local dist. thresholds)
 	cv::Mat m_oUnstableRegionMask;
-	//! per-pixel blink detection results ('Z(x)', used to determine which frame regions should be assigned stronger 'R(x)' variations)
+	//! per-pixel blink detection results ('Z(x)')
 	cv::Mat m_oBlinksFrame;
 	//! pre-allocated matrix used to downsample (1/8) the input frame when needed
 	cv::Mat m_oDownSampledColorFrame;

@@ -9,6 +9,7 @@
 
 BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(float fRelLBSPThreshold, size_t nDescDistThreshold, size_t nLBSPThresholdOffset)
 	:	 nDebugCoordX(0),nDebugCoordY(0)
+		,m_nKeyPoints(0)
 		,m_nImgChannels(0)
 		,m_nImgType(0)
 		,m_nDescDistThreshold(nDescDistThreshold)
@@ -55,4 +56,5 @@ void BackgroundSubtractorLBSP::setBGKeyPoints(std::vector<cv::KeyPoint>& keypoin
 	LBSP::validateKeyPoints(keypoints,m_oImgSize);
 	CV_Assert(!keypoints.empty());
 	m_voKeyPoints = keypoints;
+	m_nKeyPoints = keypoints.size();
 }

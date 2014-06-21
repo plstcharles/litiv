@@ -42,6 +42,8 @@ protected:
 	std::vector<cv::Mat> m_voBGDescSamples;
 	//! background model keypoints used for LBSP descriptor extraction (specific to the input image size)
 	std::vector<cv::KeyPoint> m_voKeyPoints;
+	//! defines the current number of used keypoints (always tied to m_voKeyPoints)
+	size_t m_nKeyPoints;
 	//! input image size
 	cv::Size m_oImgSize;
 	//! input image channel size
