@@ -271,6 +271,7 @@ void LBSP::calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat
 	const size_t _step_row = oDesc1.step.p[0];
 	if(nChannels==1) {
 		oOutput.create(oDesc1.size(),CV_8UC1);
+		oOutput = cv::Scalar(0);
 		for(int i=0; i<oDesc1.rows; ++i) {
 			const size_t idx = _step_row*i;
 			const ushort* const desc1_ptr = (ushort*)(oDesc1.data+idx);
@@ -284,19 +285,19 @@ void LBSP::calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat
 			oOutput.create(oDesc1.size(),CV_8UC1);
 		else
 			oOutput.create(oDesc1.size(),CV_8UC3);
+		oOutput = cv::Scalar::all(0);
 		for(int i=0; i<oDesc1.rows; ++i) {
 			const size_t idx =  _step_row*i;
 			const ushort* const desc1_ptr = (ushort*)(oDesc1.data+idx);
 			const ushort* const desc2_ptr = (ushort*)(oDesc2.data+idx);
 			uchar* output_ptr = oOutput.data + oOutput.step.p[0]*i;
 			for(int j=0; j<oDesc1.cols; ++j) {
-				if(bForceMergeChannels)
-					output_ptr[j] = (uchar)((fScaleFactor*hdist_ushort_8bitLUT(desc1_ptr+j,desc2_ptr+j))/3);
-				else {
-					for(size_t n=0;n<3; ++n) {
-						const size_t idx2 = 3*j+n;
+				for(size_t n=0;n<3; ++n) {
+					const size_t idx2 = 3*j+n;
+					if(bForceMergeChannels)
+						output_ptr[j] += (uchar)((fScaleFactor*hdist_ushort_8bitLUT(desc1_ptr[idx2],desc2_ptr[idx2]))/3);
+					else
 						output_ptr[idx2] = (uchar)(fScaleFactor*hdist_ushort_8bitLUT(desc1_ptr[idx2],desc2_ptr[idx2]));
-					}
 				}
 			}
 		}
