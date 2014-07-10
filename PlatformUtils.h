@@ -1,7 +1,7 @@
 #pragma once
 
 #define PLATFORM_SUPPORTS_CPP11 ((_MSC_VER > 1600) || (__GNUC__>=4 && __GNUC_MINOR__>=6))
-#ifdef WIN32
+#if (defined WIN32 || defined _WIN32 || defined WIN64 || defined _WIN64)
 #include <windows.h>
 #define PLATFORM_USES_WIN32API (WINVER>0x0599)
 #ifdef _DEBUG
@@ -11,8 +11,8 @@
 #ifndef DBG_NEW
 #define DBG_NEW new ( _NORMAL_BLOCK , __FILE__ , __LINE__ )
 #define new DBG_NEW
-#endif
-#endif
+#endif //!DBG_NEW
+#endif //_DEBUG
 #endif //WIN32
 
 #include <queue>
@@ -29,6 +29,7 @@
 #else //!PLATFORM_USES_WIN32API
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #endif //!PLATFORM_USES_WIN32API
 #if PLATFORM_SUPPORTS_CPP11
 #include <thread>
@@ -40,3 +41,4 @@
 
 void GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths);
 void GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths);
+bool CreateDirIfNotExist(const std::string& sDirPath);
