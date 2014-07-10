@@ -108,3 +108,16 @@ void GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vs
 	}
 #endif //!PLATFORM_USES_WIN32API
 }
+
+bool CreateDirIfNotExist(const std::string& sDirPath) {
+#if PLATFORM_USES_WIN32API
+	std::wstring dir(sDirPath.begin(),sDirPath.end());
+	return CreateDirectory(dir.c_str(),NULL)!=ERROR_PATH_NOT_FOUND;
+#else //!PLATFORM_USES_WIN32API
+	struct stat st;
+	if(stat(sDirPath.c_str(),&st)==-1)
+		return !mkdir(sDirPath.c_str(),0777);
+	else
+		return (stat(sDirPath.c_str(),&st)==0 && S_ISDIR(st.st_mode));
+#endif //!PLATFORM_USES_WIN32API
+}
