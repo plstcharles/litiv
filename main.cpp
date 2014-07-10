@@ -24,8 +24,8 @@
 #define WRITE_BGSUB_SEGM_AVI_OUTPUT		0
 #endif //DEFAULT_NB_THREADS==1
 /////////////////////////////////////////
-#define USE_CB_LBSP_BG_SUBTRACTOR		1
-#define USE_VIBE_LBSP_BG_SUBTRACTOR		0
+#define USE_CB_LBSP_BG_SUBTRACTOR		0
+#define USE_VIBE_LBSP_BG_SUBTRACTOR		1
 #define USE_PBAS_LBSP_BG_SUBTRACTOR		0
 #define USE_VIBE_BG_SUBTRACTOR			0
 #define USE_PBAS_BG_SUBTRACTOR			0
@@ -43,8 +43,13 @@
 #define DATASET_ROOT_DIR 				std::string("/tmp/datasets/")
 #define RESULTS_ROOT_DIR 				std::string("/tmp/datasets/")
 #define RESULTS_OUTPUT_DIR_NAME			std::string("results_test")
+#define TOTAL_NB_ITERS					1
+#define TOTAL_NB_PASSES					1
 /////////////////////////////////////////////////////////////////////
 
+#if (TOTAL_NB_ITERS<=0 || TOTAL_NB_PASSES<=0)
+#error "Must run at least 1 iteration & 1 pass."
+#endif //(TOTAL_NB_ITERS<=0 || TOTAL_NB_PASSES<=0)
 #if (USE_VIBE_LBSP_BG_SUBTRACTOR+USE_PBAS_LBSP_BG_SUBTRACTOR+USE_VIBE_BG_SUBTRACTOR+USE_PBAS_BG_SUBTRACTOR+USE_CB_LBSP_BG_SUBTRACTOR)!=1
 #error "Must specify a single algorithm."
 #elif (USE_CDNET2012_DATASET+USE_CDNET2014_DATASET+USE_WALLFLOWER_DATASET+USE_PETS2001_D3TC1_DATASET+USE_SINGLE_AVI_FILE)!=1
@@ -130,14 +135,20 @@ const std::vector<int> g_vnResultsComprParams(g_anResultsComprParams,g_anResults
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for threads/mutexes/atomic variables on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+#if TOTAL_NB_ITERS>1
+const int g_nBGSamplesIncrPerIter = 5;
+int g_nCurrIter;
+#endif //TOTAL_NB_ITERS>1
 
 int main() {
 	std::vector<CategoryInfo*> vpCategories;
 	std::cout << "Parsing dataset '"<< g_sDatasetName << "'..." << std::endl;
 	try {
-		for(size_t i=0; i<sizeof(g_asDatasetCategories)/sizeof(char*); ++i) {
-			bool bIsThermal = (std::string(g_asDatasetCategories[i]).find("thermal")!=std::string::npos) || (std::string(g_asDatasetCategories[i]).find("turbulence")!=std::string::npos);
-			vpCategories.push_back(new CategoryInfo(g_asDatasetCategories[i], g_sDatasetPath+g_asDatasetCategories[i], g_sDatasetName, bIsThermal));
+		for(size_t p=0; p<TOTAL_NB_PASSES; ++p) {
+			for(size_t i=0; i<sizeof(g_asDatasetCategories)/sizeof(char*); ++i) {
+				bool bIsThermal = (std::string(g_asDatasetCategories[i]).find("thermal")!=std::string::npos) || (std::string(g_asDatasetCategories[i]).find("turbulence")!=std::string::npos);
+				vpCategories.push_back(new CategoryInfo(g_asDatasetCategories[i], g_sDatasetPath+g_asDatasetCategories[i], g_sDatasetName, bIsThermal));
+			}
 		}
 	} catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
 	size_t nSeqTotal = 0;
@@ -152,66 +163,101 @@ int main() {
 	}
 	CV_Assert(mSeqLoads.size()==nSeqTotal);
 	std::cout << "Parsing complete. [" << vpCategories.size() << " category(ies), "  << nSeqTotal  << " sequence(s)]" << std::endl << std::endl;
-	time_t startup = time(nullptr);
-	tm* startup_tm = localtime(&startup);
-	std::cout << "[" << (startup_tm->tm_year + 1900) << '/' << (startup_tm->tm_mon + 1) << '/' <<  startup_tm->tm_mday << " -- ";
-	std::cout << startup_tm->tm_hour << ':' << startup_tm->tm_min << ':' << startup_tm->tm_sec << ']' << std::endl;
 	if(nSeqTotal) {
 		// since the algorithm isn't implemented to be parallelised yet, we parallelise the sequence treatment instead
 		std::cout << "Running LBSP background subtraction with " << ((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads) << " thread(s)..." << std::endl;
-		size_t nSeqProcessed = 1;
+#if TOTAL_NB_ITERS>1
+		for(g_nCurrIter=1; g_nCurrIter<=TOTAL_NB_ITERS; ++g_nCurrIter) {
+			std::cout << std::endl << std::endl << "Processing iteration " << g_nCurrIter << "/" << TOTAL_NB_ITERS << "..." << std::endl << std::endl;
+			std::stringstream ssCurrResultsPath;
+			ssCurrResultsPath << g_sResultsPath << "iter" << std::setfill('0') << std::setw(3) << g_nCurrIter << "/";
+			for(size_t c=0; c<vpCategories.size(); ++c) {
+				vpCategories[c]->nTP = 0;
+				vpCategories[c]->nTN = 0;
+				vpCategories[c]->nFP = 0;
+				vpCategories[c]->nFN = 0;
+				vpCategories[c]->nSE = 0;
+				for(size_t s=0; s<vpCategories[c]->m_vpSequences.size(); ++s) {
+					vpCategories[c]->m_vpSequences[s]->nTP = 0;
+					vpCategories[c]->m_vpSequences[s]->nTN = 0;
+					vpCategories[c]->m_vpSequences[s]->nFP = 0;
+					vpCategories[c]->m_vpSequences[s]->nFN = 0;
+					vpCategories[c]->m_vpSequences[s]->nSE = 0;
+				}
+			}
+#endif //TOTAL_NB_ITERS>1
+			size_t nSeqProcessed = 1;
+			time_t startup = time(nullptr);
+			tm* startup_tm = localtime(&startup);
+			std::cout << "[" << (startup_tm->tm_year + 1900) << '/' << (startup_tm->tm_mon + 1) << '/' <<  startup_tm->tm_mday << " -- ";
+			std::cout << startup_tm->tm_hour << ':' << startup_tm->tm_min << ':' << startup_tm->tm_sec << ']' << std::endl;
 #if PLATFORM_SUPPORTS_CPP11
-		for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
-			while(g_nActiveThreads>=g_nMaxThreads)
+			for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
+				while(g_nActiveThreads>=g_nMaxThreads)
+					std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+				std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific <<  oSeqIter->first << ")" << std::endl;
+				g_nActiveThreads++;
+				nSeqProcessed++;
+				std::thread(AnalyzeSequence,oSeqIter->second->m_pParent,oSeqIter->second).detach();
+			}
+			while(g_nActiveThreads>0)
 				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-			std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific <<  oSeqIter->first << ")" << std::endl;
-			g_nActiveThreads++;
-			nSeqProcessed++;
-			std::thread(AnalyzeSequence,oSeqIter->second->m_pParent,oSeqIter->second).detach();
-		}
-		while(g_nActiveThreads>0)
-			std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 #elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
-		for(size_t n=0; n<g_nMaxThreads; ++n)
-			g_hThreadEvent[n] = CreateEvent(NULL,FALSE,TRUE,NULL);
-		for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
-			DWORD ret = WaitForMultipleObjects(g_nMaxThreads,g_hThreadEvent,FALSE,INFINITE);
-			std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << oSeqIter->first << ")" << std::endl;
-			nSeqProcessed++;
-			g_apThreadDataStruct[ret][0] = oSeqIter->second->m_pParent;
-			g_apThreadDataStruct[ret][1] = oSeqIter->second;
-			g_hThreads[ret] = CreateThread(NULL,NULL,AnalyzeSequenceEntryPoint,(LPVOID)ret,0,NULL);
-		}
-		WaitForMultipleObjects((DWORD)((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads),g_hThreads,TRUE,INFINITE);
-		for(size_t n=0; n<g_nMaxThreads; ++n) {
-			CloseHandle(g_hThreadEvent[n]);
-			CloseHandle(g_hThreads[n]);
-		}
+			for(size_t n=0; n<g_nMaxThreads; ++n)
+				g_hThreadEvent[n] = CreateEvent(NULL,FALSE,TRUE,NULL);
+			for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
+				DWORD ret = WaitForMultipleObjects(g_nMaxThreads,g_hThreadEvent,FALSE,INFINITE);
+				std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << oSeqIter->first << ")" << std::endl;
+				nSeqProcessed++;
+				g_apThreadDataStruct[ret][0] = oSeqIter->second->m_pParent;
+				g_apThreadDataStruct[ret][1] = oSeqIter->second;
+				g_hThreads[ret] = CreateThread(NULL,NULL,AnalyzeSequenceEntryPoint,(LPVOID)ret,0,NULL);
+			}
+			WaitForMultipleObjects((DWORD)((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads),g_hThreads,TRUE,INFINITE);
+			for(size_t n=0; n<g_nMaxThreads; ++n) {
+				CloseHandle(g_hThreadEvent[n]);
+				CloseHandle(g_hThreads[n]);
+			}
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for threads/mutexes/atomic variables on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-		time_t shutdown = time(nullptr);
-		tm* shutdown_tm = localtime(&shutdown);
-		std::cout << "[" << (shutdown_tm->tm_year + 1900) << '/' << (shutdown_tm->tm_mon + 1) << '/' <<  shutdown_tm->tm_mday << " -- ";
-		std::cout << shutdown_tm->tm_hour << ':' << shutdown_tm->tm_min << ':' << shutdown_tm->tm_sec << ']' << std::endl;
-		double dFinalFPS = ((double)nFramesTotal)/(shutdown-startup);
-		std::cout << "\t ... session completed at a total of " << dFinalFPS << " fps." << std::endl;
+			time_t shutdown = time(nullptr);
+			tm* shutdown_tm = localtime(&shutdown);
+			std::cout << "[" << (shutdown_tm->tm_year + 1900) << '/' << (shutdown_tm->tm_mon + 1) << '/' <<  shutdown_tm->tm_mday << " -- ";
+			std::cout << shutdown_tm->tm_hour << ':' << shutdown_tm->tm_min << ':' << shutdown_tm->tm_sec << ']' << std::endl;
+			double dFinalFPS = ((double)nFramesTotal)/(shutdown-startup);
+			std::cout << "\t ... session completed at a total of " << dFinalFPS << " fps." << std::endl;
 #if WRITE_BGSUB_METRICS_ANALYSIS
-		std::cout << "Summing and writing metrics results..." << std::endl;
-		for(size_t c=0; c<vpCategories.size(); ++c) {
-			if(!vpCategories[c]->m_vpSequences.empty()) {
-				for(size_t s=0; s<vpCategories[c]->m_vpSequences.size(); ++s) {
-					vpCategories[c]->nTP += vpCategories[c]->m_vpSequences[s]->nTP;
-					vpCategories[c]->nTN += vpCategories[c]->m_vpSequences[s]->nTN;
-					vpCategories[c]->nFP += vpCategories[c]->m_vpSequences[s]->nFP;
-					vpCategories[c]->nFN += vpCategories[c]->m_vpSequences[s]->nFN;
-					vpCategories[c]->nSE += vpCategories[c]->m_vpSequences[s]->nSE;
+			std::cout << "Summing and writing metrics results..." << std::endl;
+#if TOTAL_NB_ITERS>1
+			CreateDirIfNotExist(ssCurrResultsPath.str());
+#else //TOTAL_NB_ITERS==1
+			CreateDirIfNotExist(g_sResultsPath);
+#endif //TOTAL_NB_ITERS==1
+			for(size_t c=0; c<vpCategories.size(); ++c) {
+				if(!vpCategories[c]->m_vpSequences.empty()) {
+					for(size_t s=0; s<vpCategories[c]->m_vpSequences.size(); ++s) {
+						vpCategories[c]->nTP += vpCategories[c]->m_vpSequences[s]->nTP;
+						vpCategories[c]->nTN += vpCategories[c]->m_vpSequences[s]->nTN;
+						vpCategories[c]->nFP += vpCategories[c]->m_vpSequences[s]->nFP;
+						vpCategories[c]->nFN += vpCategories[c]->m_vpSequences[s]->nFN;
+						vpCategories[c]->nSE += vpCategories[c]->m_vpSequences[s]->nSE;
+					}
+#if TOTAL_NB_ITERS>1
+					WriteMetrics(ssCurrResultsPath.str()+vpCategories[c]->m_sName+".txt",vpCategories[c]);
 				}
-				WriteMetrics(g_sResultsPath+vpCategories[c]->m_sName+".txt",vpCategories[c]);
 			}
+			WriteMetrics(ssCurrResultsPath.str()+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
+#else //TOTAL_NB_ITERS==1
+					WriteMetrics(g_sResultsPath+vpCategories[c]->m_sName+".txt",vpCategories[c]);
+				}
+			}
+			WriteMetrics(g_sResultsPath+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
+#endif //TOTAL_NB_ITERS==1
+#endif //WRITE_BGSUB_METRICS_ANALYSIS
+#if TOTAL_NB_ITERS>1
 		}
-		WriteMetrics(g_sResultsPath+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
-#endif
+#endif //TOTAL_NB_ITERS>1
 		std::cout << "All done." << std::endl;
 	}
 	else
@@ -228,6 +274,7 @@ int AnalyzeSequence(CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence) {
 int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence) {
 #endif //PLATFORM_USES_WIN32API
 	srand(0); // for now, assures that two consecutive runs on the same data return the same results
+	//srand((unsigned int)time(NULL));
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
 	BackgroundSubtractorLBSP* pBGS = nullptr;
 #if LIMIT_KEYPTS_TO_SEQUENCE_ROI
@@ -246,7 +293,16 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #endif //USE_PRECACHED_IO
 		cv::Mat oFGMask, oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
 #if USE_VIBE_LBSP_BG_SUBTRACTOR
+#if TOTAL_NB_ITERS>1
+		pBGS = new BackgroundSubtractorLOBSTER(	BGSLOBSTER_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
+												BGSLOBSTER_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
+												BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD,
+												BGSLOBSTER_DEFAULT_COLOR_DIST_THRESHOLD,
+												g_nBGSamplesIncrPerIter*g_nCurrIter,
+												BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES);
+#else //TOTAL_NB_ITERS==1
 		pBGS = new BackgroundSubtractorLOBSTER();
+#endif //TOTAL_NB_ITERS==1
 		const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
 		pBGS->initialize(oInitImg,voKPs);
 #elif USE_PBAS_LBSP_BG_SUBTRACTOR
