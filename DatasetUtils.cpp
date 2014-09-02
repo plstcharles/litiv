@@ -193,7 +193,7 @@ cv::Size SequenceInfo::GetFrameSize() const {
 	return m_oSize;
 }
 
-cv::Mat SequenceInfo::GetSequenceROI() const {
+const cv::Mat& SequenceInfo::GetSequenceROI() const {
 	return m_oROI;
 }
 
