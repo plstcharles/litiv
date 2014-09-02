@@ -47,8 +47,8 @@
 			<Add library="opencv_nonfree243.dll" />
 			<Add directory="G:/opencv/build_mingw64/lib" />
 		</Linker>
-		<Unit filename="BackgroundSubtractorCBLBSP.cpp" />
-		<Unit filename="BackgroundSubtractorCBLBSP.h" />
+		<Unit filename="BackgroundSubtractorPAWCS.cpp" />
+		<Unit filename="BackgroundSubtractorPAWCS.h" />
 		<Unit filename="BackgroundSubtractorLBSP.cpp" />
 		<Unit filename="BackgroundSubtractorLBSP.h" />
 		<Unit filename="BackgroundSubtractorPBAS.cpp" />

@@ -1,6 +1,6 @@
 #include "PlatformUtils.h"
 #include "DatasetUtils.h"
-#include "BackgroundSubtractorCBLBSP.h"
+#include "BackgroundSubtractorPAWCS.h"
 #include "BackgroundSubtractorSuBSENSE.h"
 #include "BackgroundSubtractorLOBSTER.h"
 #include "BackgroundSubtractorViBe_1ch.h"
@@ -24,14 +24,14 @@
 #define WRITE_BGSUB_SEGM_AVI_OUTPUT		0
 #endif //DEFAULT_NB_THREADS==1
 /////////////////////////////////////////
-#define USE_CB_LBSP_BG_SUBTRACTOR		0
-#define USE_VIBE_LBSP_BG_SUBTRACTOR		1
+#define USE_CB_LBSP_BG_SUBTRACTOR		1
+#define USE_VIBE_LBSP_BG_SUBTRACTOR		0
 #define USE_PBAS_LBSP_BG_SUBTRACTOR		0
 #define USE_VIBE_BG_SUBTRACTOR			0
 #define USE_PBAS_BG_SUBTRACTOR			0
 /////////////////////////////////////////
-#if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
-#define LIMIT_KEYPTS_TO_SEQUENCE_ROI	1
+#if (USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR)
+#define LIMIT_MODEL_TO_SEQUENCE_ROI	1
 #endif
 /////////////////////////////////////////
 #define USE_CDNET2012_DATASET			1
@@ -280,11 +280,11 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 	//srand((unsigned int)time(NULL));
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
 	BackgroundSubtractorLBSP* pBGS = nullptr;
-#if LIMIT_KEYPTS_TO_SEQUENCE_ROI
-	std::vector<cv::KeyPoint> voKPs = pCurrSequence->GetKeyPointsFromROI();
-#else //!LIMIT_KEYPTS_TO_SEQUENCE_ROI
-	std::vector<cv::KeyPoint> voKPs;
-#endif //!LIMIT_KEYPTS_TO_SEQUENCE_ROI
+#if LIMIT_MODEL_TO_SEQUENCE_ROI
+	cv::Mat oSequenceROI = pCurrSequence->GetSequenceROI();
+#else //!LIMIT_MODEL_TO_SEQUENCE_ROI
+	cv::Mat oSequenceROI;
+#endif //!LIMIT_MODEL_TO_SEQUENCE_ROI
 #else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 	cv::BackgroundSubtractor* pBGS = nullptr;
 #endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
@@ -307,15 +307,15 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 		pBGS = new BackgroundSubtractorLOBSTER();
 #endif //TOTAL_NB_ITERS==1
 		const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
-		pBGS->initialize(oInitImg,voKPs);
+		pBGS->initialize(oInitImg,oSequenceROI);
 #elif USE_PBAS_LBSP_BG_SUBTRACTOR
 		pBGS = new BackgroundSubtractorSuBSENSE();
 		const double dDefaultLearningRate = 0;
 		pBGS->initialize(oInitImg,voKPs);
 #elif USE_CB_LBSP_BG_SUBTRACTOR
-		pBGS = new BackgroundSubtractorCBLBSP();
+		pBGS = new BackgroundSubtractorPAWCS();
 		const double dDefaultLearningRate = 0;
-		pBGS->initialize(oInitImg,voKPs);
+		pBGS->initialize(oInitImg,oSequenceROI);
 #else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 		const size_t m_nInputChannels = (size_t)oInitImg.channels();
 #if USE_VIBE_BG_SUBTRACTOR

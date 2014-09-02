@@ -307,3 +307,12 @@ void LBSP::calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat
 void LBSP::validateKeyPoints(std::vector<cv::KeyPoint>& voKeypoints, cv::Size oImgSize) {
 	cv::KeyPointsFilter::runByImageBorder(voKeypoints,oImgSize,PATCH_SIZE/2);
 }
+
+void LBSP::validateROI(cv::Mat& oROI) {
+	CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
+	cv::Mat oROI_new(oROI.size(),CV_8UC1,cv::Scalar_<uchar>(0));
+	const size_t nBorderSize = PATCH_SIZE/2;
+	const cv::Rect nROI_inner(nBorderSize,nBorderSize,oROI.cols-nBorderSize*2,oROI.rows-nBorderSize*2);
+	cv::Mat(oROI,nROI_inner).copyTo(cv::Mat(oROI_new,nROI_inner));
+	oROI = oROI_new;
+}
