@@ -10,18 +10,18 @@ static const int s_anSamplesInitPattern[s_nSamplesInitPatternHeight][s_nSamplesI
 	{19,    32,    19,},
 };*/
 
-// gaussian 7x7 pattern, based on 'floor(fspecial('gaussian',7,1)*4096)'
+// gaussian 7x7 pattern, based on 'floor(fspecial('gaussian',7,2)*512)'
 static const int s_nSamplesInitPatternWidth = 7;
 static const int s_nSamplesInitPatternHeight = 7;
-static const int s_nSamplesInitPatternTot = 4096;
+static const int s_nSamplesInitPatternTot = 512;
 static const int s_anSamplesInitPattern[s_nSamplesInitPatternHeight][s_nSamplesInitPatternWidth] = {
-	{0,     0,     4,     7,     4,     0,     0,},
-	{0,    11,    53,    88,    53,    11,     0,},
-	{4,    53,   240,   399,   240,    53,     4,},
-	{7,    88,   399,   660,   399,    88,     7,},
-	{4,    53,   240,   399,   240,    53,     4,},
-	{0,    11,    53,    88,    53,    11,     0,},
-	{0,     0,     4,     7,     4,     0,     0,},
+	{2,     4,     6,     7,     6,     4,     2,},
+	{4,     8,    12,    14,    12,     8,     4,},
+	{6,    12,    21,    25,    21,    12,     6,},
+	{7,    14,    25,    28,    25,    14,     7,},
+	{6,    12,    21,    25,    21,    12,     6,},
+	{4,     8,    12,    14,    12,     8,     4,},
+	{2,     4,     6,     7,     6,     4,     2,},
 };
 
 //! returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
