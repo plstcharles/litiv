@@ -28,6 +28,16 @@ static inline size_t cdist_uchar(const uchar* curr, const uchar* bg) {
 		return (size_t)sqrt((float)curr_int_sqr);
 }
 
+//! computes a color distortion-distance mix using the two individual distances
+static inline size_t cmixdist(size_t nL1Distance, size_t nCDistortion) {
+	return (nL1Distance/2+nCDistortion*4);
+}
+
+//! computes a color distortion-distance mix between two unsigned char vectors (RGB)
+static inline size_t cmixdist_uchar(const uchar* curr, const uchar* bg) {
+	return cmixdist(L1dist_uchar(curr,bg),cdist_uchar(curr,bg));
+}
+
 //! computes the L1 distance between two opencv unsigned char vectors (RGB)
 static inline size_t L1dist_vec3b(const cv::Vec3b& a, const cv::Vec3b& b) {
 	const uchar a_array[3] = {a[0],a[1],a[2]};
