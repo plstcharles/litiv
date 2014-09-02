@@ -5,7 +5,7 @@
 #include "LBSP.h"
 
 /*!
-	Local Binary Similarity Pattern (LBSP) foreground-background segmentation algorithm (abstract version).
+	Local Binary Similarity Pattern (LBSP)-based change detection algorithm (abstract version/base class).
 
 	For more details on the different parameters, see P.-L. St-Charles and G.-A. Bilodeau, "Improving Background
 	Subtraction using Local Binary Similarity Patterns", in WACV 2014, or G.-A. Bilodeau et al, "Change Detection
@@ -16,49 +16,67 @@
 class BackgroundSubtractorLBSP : public cv::BackgroundSubtractor {
 public:
 	//! full constructor
-	BackgroundSubtractorLBSP(float fRelLBSPThreshold, size_t nDescDistThreshold, size_t nLBSPThresholdOffset=0);
+	BackgroundSubtractorLBSP(float fRelLBSPThreshold, size_t nLBSPThresholdOffset=0);
 	//! default destructor
 	virtual ~BackgroundSubtractorLBSP();
 	//! (re)initiaization method; needs to be called before starting background subtraction
 	virtual void initialize(const cv::Mat& oInitImg);
-	//! (re)initiaization method; needs to be called before starting background subtraction (note: also reinitializes the keypoints vector)
-	virtual void initialize(const cv::Mat& oInitImg, const std::vector<cv::KeyPoint>& voKeyPoints)=0;
+	//! (re)initiaization method; needs to be called before starting background subtraction
+	virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI)=0;
 	//! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
 	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRate=0)=0;
 	//! unused, always returns nullptr
 	virtual cv::AlgorithmInfo* info() const;
-	//! returns a copy of the latest reconstructed background descriptors image
-	virtual void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const;
-	//! returns the keypoints list used for descriptor extraction (note: by default, these are generated from the DenseFeatureDetector class, and the border points are removed)
-	virtual std::vector<cv::KeyPoint> getBGKeyPoints() const;
-	//! sets the keypoints to be used for descriptor extraction, effectively setting the BGModel ROI (note: this function will remove all border keypoints)
-	virtual void setBGKeyPoints(std::vector<cv::KeyPoint>& keypoints);
-
-	// ######## DEBUG PURPOSES ONLY ##########
-	int nDebugCoordX, nDebugCoordY;
+	//! returns a copy of the ROI used for descriptor extraction
+	virtual cv::Mat getROICopy() const;
+	//! sets the ROI to be used for descriptor extraction (note: this function will reinit the model and return the usable ROI)
+	virtual void setROI(cv::Mat& oROI);
+	//! turns automatic model reset on or off
+	void setAutomaticModelReset(bool);
 
 protected:
-	//! background model descriptors samples (tied to m_voKeyPoints but shaped like the input frames)
-	std::vector<cv::Mat> m_voBGDescSamples;
-	//! background model keypoints used for LBSP descriptor extraction (specific to the input image size)
-	std::vector<cv::KeyPoint> m_voKeyPoints;
-	//! defines the current number of used keypoints (always tied to m_voKeyPoints)
-	size_t m_nKeyPoints;
+	struct PxInfoBase {
+		int nImgCoord_Y;
+		int nImgCoord_X;
+		size_t nModelIdx;
+	};
+	//! background model ROI used for LBSP descriptor extraction (specific to the input image size)
+	cv::Mat m_oROI;
 	//! input image size
 	cv::Size m_oImgSize;
 	//! input image channel size
 	size_t m_nImgChannels;
 	//! input image type
 	int m_nImgType;
-	//! absolute descriptor distance threshold
-	const size_t m_nDescDistThreshold;
-	//! LBSP internal threshold offset value -- used to reduce texture noise in dark regions
+	//! LBSP internal threshold offset value, used to reduce texture noise in dark regions
 	const size_t m_nLBSPThresholdOffset;
 	//! LBSP relative internal threshold (kept here since we don't keep an LBSP object)
 	const float m_fRelLBSPThreshold;
-	//! pre-allocated internal LBSP threshold values for all possible 8-bit intensity values
+	//! total number of pixels (depends on the input frame size) & total number of relevant pixels
+	size_t m_nTotPxCount, m_nTotRelevantPxCount;
+	//! current frame index, frame count since last model reset & model reset cooldown counters
+	size_t m_nFrameIndex, m_nFramesSinceLastReset, m_nModelResetCooldown;
+	//! pre-allocated internal LBSP threshold values LUT for all possible 8-bit intensities
 	size_t m_anLBSPThreshold_8bitLUT[UCHAR_MAX+1];
-	//! defines whether or not the subtractor is fully initialized
+	//! internal pixel index LUT for all relevant analysis regions (based on the provided ROI)
+	size_t* m_aPxIdxLUT;
+	//! internal pixel info LUT for all possible pixel indexes
+	PxInfoBase* m_aPxInfoLUT;
+	//! default kernel size for median blur post-proc filtering
+	const int m_nDefaultMedianBlurKernelSize;
+	//! specifies whether the algorithm is fully initialized or not
 	bool m_bInitialized;
+	//! specifies whether automatic model resets are enabled or not
+	bool m_bAutoModelResetEnabled;
+	//! copy of latest pixel intensities (used when refreshing model)
+	cv::Mat m_oLastColorFrame;
+	//! copy of latest descriptors (used when refreshing model)
+	cv::Mat m_oLastDescFrame;
+	//! the foreground mask generated by the method at [t-1]
+	cv::Mat m_oLastFGMask;
+
+public:
+	// ######## DEBUG PURPOSES ONLY ##########
+	int nDebugCoordX, nDebugCoordY;
 };
 

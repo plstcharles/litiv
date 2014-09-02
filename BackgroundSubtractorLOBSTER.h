@@ -6,7 +6,7 @@
 #define BGSLOBSTER_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.365f)
 //! defines the default value for BackgroundSubtractorLBSP::m_nLBSPThresholdOffset
 #define BGSLOBSTER_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (0)
-//! defines the default value for BackgroundSubtractorLBSP::m_nDescDistThreshold
+//! defines the default value for BackgroundSubtractorLOBSTER::m_nDescDistThreshold
 #define BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD (4)
 //! defines the default value for BackgroundSubtractorLOBSTER::m_nColorDistThreshold
 #define BGSLOBSTER_DEFAULT_COLOR_DIST_THRESHOLD (30)
@@ -18,7 +18,7 @@
 #define BGSLOBSTER_DEFAULT_LEARNING_RATE (16)
 
 /*!
-	LOcal Binary Similarity segmenTER (LOBSTER) foreground-background segmentation algorithm.
+	LOcal Binary Similarity segmenTER (LOBSTER) change detection algorithm.
 
 	Note: both grayscale and RGB/BGR images may be used with this extractor (parameters are adjusted automatically).
 	For optimal grayscale results, use CV_8UC1 frames instead of CV_8UC3.
@@ -39,21 +39,29 @@ public:
 								size_t nRequiredBGSamples=BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES);
 	//! default destructor
 	virtual ~BackgroundSubtractorLOBSTER();
-	//! (re)initiaization method; needs to be called before starting background subtraction (note: also reinitializes the keypoints vector)
-	virtual void initialize(const cv::Mat& oInitImg, const std::vector<cv::KeyPoint>& voKeyPoints);
+	//! (re)initiaization method; needs to be called before starting background subtraction
+	virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
+	//! refreshes all samples based on the last analyzed frame
+	virtual void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
 	//! primary model update function; the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
 	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
 	//! returns a copy of the latest reconstructed background image
 	void getBackgroundImage(cv::OutputArray backgroundImage) const;
+	//! returns a copy of the latest reconstructed background descriptors image
+	virtual void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const;
 
 protected:
+	//! absolute color distance threshold
+	const size_t m_nColorDistThreshold;
+	//! absolute descriptor distance threshold
+	const size_t m_nDescDistThreshold;
 	//! number of different samples per pixel/block to be taken from input frames to build the background model
 	const size_t m_nBGSamples;
 	//! number of similar samples needed to consider the current pixel/block as 'background'
 	const size_t m_nRequiredBGSamples;
 	//! background model pixel intensity samples
 	std::vector<cv::Mat> m_voBGColorSamples;
-	//! absolute per-channel color distance threshold (based on the provided LBSP threshold)
-	const size_t m_nColorDistThreshold;
+	//! background model descriptors samples
+	std::vector<cv::Mat> m_voBGDescSamples;
 };
 

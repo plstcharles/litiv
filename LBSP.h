@@ -100,6 +100,8 @@ public:
 	static void calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat& oOutput, bool bForceMergeChannels=false);
 	//! utility function, used to filter out bad keypoints that would trigger out of bounds error because they're too close to the image border
 	static void validateKeyPoints(std::vector<cv::KeyPoint>& voKeypoints, cv::Size oImgSize);
+	//! utility function, used to filter out bad pixels in a ROI that would trigger out of bounds error because they're too close to the image border
+	static void validateROI(cv::Mat& oROI);
 	//! utility, specifies the pixel size of the pattern used (width and height)
 	static const size_t PATCH_SIZE = 5;
 	//! utility, specifies the number of bytes per descriptor (should be the same as calling 'descriptorSize()')
