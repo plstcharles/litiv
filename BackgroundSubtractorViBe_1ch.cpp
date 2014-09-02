@@ -33,10 +33,10 @@ void BackgroundSubtractorViBe_1ch::initialize(const cv::Mat& oInitImg) {
 }
 
 void BackgroundSubtractorViBe_1ch::operator()(cv::InputArray _image, cv::OutputArray _fgmask, double learningRate) {
-	CV_DbgAssert(m_bInitialized);
-	CV_DbgAssert(learningRate>0);
+	CV_Assert(m_bInitialized);
+	CV_Assert(learningRate>0);
 	cv::Mat oInputImg = _image.getMat();
-	CV_DbgAssert(oInputImg.type()==CV_8UC1 && oInputImg.size()==m_oImgSize);
+	CV_Assert(oInputImg.type()==CV_8UC1 && oInputImg.size()==m_oImgSize);
 	_fgmask.create(m_oImgSize,CV_8UC1);
 	cv::Mat oFGMask = _fgmask.getMat();
 	oFGMask = cv::Scalar_<uchar>(0);
