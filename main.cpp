@@ -141,6 +141,9 @@ int g_nCurrIter;
 #endif //TOTAL_NB_ITERS>1
 
 int main() {
+#if PLATFORM_USES_WIN32API
+	SetConsoleWindowSize(80,40,1000);
+#endif //PLATFORM_USES_WIN32API
 	std::vector<CategoryInfo*> vpCategories;
 	std::cout << "Parsing dataset '"<< g_sDatasetName << "'..." << std::endl;
 	try {
@@ -410,6 +413,8 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 				std::cout << "nKeyPressed = " << nKeyPressed << std::endl;
 			if(nKeyPressed==32)
 				g_bContinuousUpdates = !g_bContinuousUpdates;
+			else if(nKeyPressed==(int)'q')
+				break;
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT
 #if WRITE_BGSUB_IMG_OUTPUT
 			WriteResult(g_sResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix,oFGMask,g_vnResultsComprParams);

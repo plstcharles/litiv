@@ -1,5 +1,13 @@
 #pragma once
 
+#include <queue>
+#include <string>
+#include <algorithm>
+#include <vector>
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 #define PLATFORM_SUPPORTS_CPP11 ((_MSC_VER > 1600) || (__GNUC__>=4 && __GNUC_MINOR__>=6))
 #if (defined WIN32 || defined _WIN32 || defined WIN64 || defined _WIN64)
 #include <windows.h>
@@ -14,18 +22,10 @@
 #endif //!DBG_NEW
 #endif //_DEBUG
 #endif //WIN32
-
-#include <queue>
-#include <string>
-#include <algorithm>
-#include <vector>
-#include <assert.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
 #if PLATFORM_USES_WIN32API
 #include <stdint.h>
 #include <process.h>
+void SetConsoleWindowSize(int x, int y, int buffer_lines=-1);
 #else //!PLATFORM_USES_WIN32API
 #include <dirent.h>
 #include <sys/stat.h>
