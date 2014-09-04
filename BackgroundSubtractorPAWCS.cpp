@@ -1466,11 +1466,9 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 			}
 		}
 		if(bUpdateGlobalWords && m_apGlobalWordDict[nGlobalWordIdx]->fLatestWeight>0.0f) {
-			const float fGlobalWordAvgFramePresenceLevel = (float)cv::countNonZero(m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap>LWORD_MAX_WEIGHT/4)/(m_nTotRelevantPxCount/(GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO*GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO));
 			cv::accumulateProduct(m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,m_oTempGlobalWordWeightDiffFactor,m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,oLastFGMask_dilated_inverted_downscaled);
 			m_apGlobalWordDict[nGlobalWordIdx]->fLatestWeight *= 0.9f;
-			cv::blur(m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,fGlobalWordAvgFramePresenceLevel<LWORD_MAX_WEIGHT/2?cv::Size(3,3):cv::Size(5,5),cv::Point(-1,-1),cv::BORDER_REPLICATE);
-			//cv::blur(m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,cv::Size(3,3),cv::Point(-1,-1),cv::BORDER_REPLICATE);
+			cv::blur(m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,cv::Size(3,3),cv::Point(-1,-1),cv::BORDER_REPLICATE);
 		}
 		if(nGlobalWordIdx>0 && m_apGlobalWordDict[nGlobalWordIdx]->fLatestWeight>m_apGlobalWordDict[nGlobalWordIdx-1]->fLatestWeight)
 			std::swap(m_apGlobalWordDict[nGlobalWordIdx],m_apGlobalWordDict[nGlobalWordIdx-1]);
