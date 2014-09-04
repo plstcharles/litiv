@@ -1050,16 +1050,16 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 #if USE_FEEDBACK_ADJUSTMENTS
 			if(m_oLastFGMask.data[nPxIter] || (std::min(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)<UNSTABLE_REG_RATIO_MIN && nCurrRegionSegmVal))
 				fCurrLearningRate = std::min(fCurrLearningRate+FEEDBACK_T_INCR/(std::max(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)*fCurrDistThresholdVariationFactor),FEEDBACK_T_UPPER);
-			else if(fCurrLearningRate>FEEDBACK_T_LOWER)
+			else
 				fCurrLearningRate = std::max(fCurrLearningRate-FEEDBACK_T_DECR*fCurrDistThresholdVariationFactor/std::max(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST),FEEDBACK_T_LOWER);
 			if(std::max(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)>UNSTABLE_REG_RATIO_MIN && m_oBlinksFrame.data[nPxIter])
 				(fCurrDistThresholdVariationFactor) += bBootstrapping?FEEDBACK_V_INCR*2:FEEDBACK_V_INCR;
-			else if(fCurrDistThresholdVariationFactor>FEEDBACK_V_DECR)
+			else
 				fCurrDistThresholdVariationFactor = std::max(fCurrDistThresholdVariationFactor-FEEDBACK_V_DECR*((bBootstrapping||bCurrRegionIsFlat)?2:m_oLastFGMask.data[nPxIter]?0.5f:1),FEEDBACK_V_DECR);
 			if(fCurrDistThresholdFactor<std::pow(1.0f+std::min(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)*2,2))
 				fCurrDistThresholdFactor += FEEDBACK_R_VAR*(fCurrDistThresholdVariationFactor-FEEDBACK_V_DECR);
 			else
-				fCurrDistThresholdFactor -= std::max(fCurrDistThresholdFactor-FEEDBACK_R_VAR/fCurrDistThresholdVariationFactor,1.0f);
+				fCurrDistThresholdFactor = std::max(fCurrDistThresholdFactor-FEEDBACK_R_VAR/fCurrDistThresholdVariationFactor,1.0f);
 #endif //USE_FEEDBACK_ADJUSTMENTS
 			nLastIntraDesc = nCurrIntraDesc;
 			nLastColor = nCurrColor;
@@ -1410,16 +1410,16 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 #if USE_FEEDBACK_ADJUSTMENTS
 			if(m_oLastFGMask.data[nPxIter] || (std::min(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)<UNSTABLE_REG_RATIO_MIN && nCurrRegionSegmVal))
 				fCurrLearningRate = std::min(fCurrLearningRate+FEEDBACK_T_INCR/(std::max(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)*fCurrDistThresholdVariationFactor),FEEDBACK_T_UPPER);
-			else if(fCurrLearningRate>FEEDBACK_T_LOWER)
+			else
 				fCurrLearningRate = std::max(fCurrLearningRate-FEEDBACK_T_DECR*fCurrDistThresholdVariationFactor/std::max(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST),FEEDBACK_T_LOWER);
 			if(std::max(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)>UNSTABLE_REG_RATIO_MIN && m_oBlinksFrame.data[nPxIter])
 				(fCurrDistThresholdVariationFactor) += bBootstrapping?FEEDBACK_V_INCR*2:FEEDBACK_V_INCR;
-			else if(fCurrDistThresholdVariationFactor>FEEDBACK_V_DECR)
+			else
 				fCurrDistThresholdVariationFactor = std::max(fCurrDistThresholdVariationFactor-FEEDBACK_V_DECR*((bBootstrapping||bCurrRegionIsFlat)?2:m_oLastFGMask.data[nPxIter]?0.5f:1),FEEDBACK_V_DECR);
 			if(fCurrDistThresholdFactor<std::pow(1.0f+std::min(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)*2,2))
 				fCurrDistThresholdFactor += FEEDBACK_R_VAR*(fCurrDistThresholdVariationFactor-FEEDBACK_V_DECR);
 			else
-				fCurrDistThresholdFactor -= std::max(fCurrDistThresholdFactor-FEEDBACK_R_VAR/fCurrDistThresholdVariationFactor,1.0f);
+				fCurrDistThresholdFactor = std::max(fCurrDistThresholdFactor-FEEDBACK_R_VAR/fCurrDistThresholdVariationFactor,1.0f);
 #endif //USE_FEEDBACK_ADJUSTMENTS
 			for(size_t c=0; c<3; ++c) {
 				anLastIntraDesc[c] = anCurrIntraDesc[c];
