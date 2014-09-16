@@ -200,7 +200,7 @@ int main() {
 #if EVAL_RESULTS_ONLY
 			std::cout << "Running background subtraction evaluation..." << std::endl;
 			for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
-				std::cout << "\t Processing Seq. " << oSeqIter->second->m_sName << "  [" << nSeqProcessed << "/" << mSeqLoads.size() << "]" << std::endl;
+				std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific <<  oSeqIter->first << ")" << std::endl;
 				for(size_t k=0; k<oSeqIter->second->GetNbGTFrames(); ++k) {
 					cv::Mat oGTImg = oSeqIter->second->GetGTFrameFromIndex(k);
 					cv::Mat oFGMask = ReadResult(g_sResultsPath,oSeqIter->second->m_pParent->m_sName,oSeqIter->second->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix);
