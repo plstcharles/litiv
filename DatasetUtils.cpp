@@ -81,6 +81,7 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 		m_oROI = cv::imread(dir+"/ROI.bmp",cv::IMREAD_GRAYSCALE);
 		if(m_oROI.empty())
 			throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess a ROI.bmp file.");
+		m_oROI = m_oROI>0;
 		m_oSize = m_oROI.size();
 		m_nTotalNbFrames = m_vsInputFramePaths.size();
 		m_dExpectedLoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
