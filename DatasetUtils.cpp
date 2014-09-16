@@ -186,7 +186,7 @@ size_t SequenceInfo::GetNbInputFrames() const {
 }
 
 size_t SequenceInfo::GetNbGTFrames() const {
-	return m_mTestGTIndexes.size();
+	return m_mTestGTIndexes.empty()?m_vsGTFramePaths.size():m_mTestGTIndexes.size();
 }
 
 cv::Size SequenceInfo::GetFrameSize() const {

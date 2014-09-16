@@ -179,7 +179,7 @@ static inline cv::Mat ReadResult(	const std::string& sResultsPath,
 	sprintf(buffer,"%06lu",framenum);
 	std::stringstream sResultFilePath;
 	sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << buffer << sResultSuffix;
-	return cv::imread(sResultFilePath.str());
+	return cv::imread(sResultFilePath.str(),cv::IMREAD_GRAYSCALE);
 }
 
 static inline void WriteMetrics(const std::string sResultsFileName, const SequenceInfo* pSeq) {
