@@ -172,8 +172,11 @@ int main() {
 	if(nSeqTotal) {
 #if DEFAULT_NB_THREADS>1
 		// since the algorithm isn't implemented to be parallelised yet, we parallelise the sequence treatment instead
-		std::cout << "Running LBSP background subtraction with " << ((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads) << " thread(s)..." << std::endl;
-#endif //!(DEFAULT_NB_THREADS>1)
+		std::cout << "Running background subtraction with " << ((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads) << " thread(s)..." << std::endl;
+#else //DEFAULT_NB_THREADS==1
+		std::cout << "Running background subtraction..." << std::endl;
+#endif //DEFAULT_NB_THREADS==1
+		size_t nSeqProcessed = 1;
 #if TOTAL_NB_ITERS>1
 		for(g_nCurrIter=1; g_nCurrIter<=TOTAL_NB_ITERS; ++g_nCurrIter) {
 			std::cout << std::endl << std::endl << "Processing iteration " << g_nCurrIter << "/" << TOTAL_NB_ITERS << "..." << std::endl << std::endl;
@@ -195,15 +198,17 @@ int main() {
 			}
 #endif //TOTAL_NB_ITERS>1
 #if EVAL_RESULTS_ONLY
+			std::cout << "Running background subtraction evaluation..." << std::endl;
 			for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
+				std::cout << "\t Processing Seq. " << oSeqIter->second->m_sName << "  [" << nSeqProcessed << "/" << mSeqLoads.size() << "]" << std::endl;
 				for(size_t k=0; k<oSeqIter->second->GetNbGTFrames(); ++k) {
 					cv::Mat oGTImg = oSeqIter->second->GetGTFrameFromIndex(k);
 					cv::Mat oFGMask = ReadResult(g_sResultsPath,oSeqIter->second->m_pParent->m_sName,oSeqIter->second->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix);
 					CalcMetricsFromResult(oFGMask,oGTImg,oSeqIter->second->GetSequenceROI(),oSeqIter->second->nTP,oSeqIter->second->nTN,oSeqIter->second->nFP,oSeqIter->second->nFN,oSeqIter->second->nSE);
 				}
+				++nSeqProcessed;
 			}
 #else //!EVAL_RESULTS_ONLY
-			size_t nSeqProcessed = 1;
 			time_t startup = time(nullptr);
 			tm* startup_tm = localtime(&startup);
 			std::cout << "[" << (startup_tm->tm_year + 1900) << '/' << (startup_tm->tm_mon + 1) << '/' <<  startup_tm->tm_mday << " -- ";

@@ -222,7 +222,7 @@ static inline void WriteMetrics(const std::string sResultsFileName, CategoryInfo
 			sName += std::string(10-sName.size(),' ');
 		oMetricsOutput << sName << " " << temp_seqmetrics.dRecall << " " << temp_seqmetrics.dSpecficity << " " << temp_seqmetrics.dFPR << " " << temp_seqmetrics.dFNR << " " << temp_seqmetrics.dPBC << " " << temp_seqmetrics.dPrecision << " " << temp_seqmetrics.dFMeasure << " " << temp_seqmetrics.dMCC << std::endl;
 	}
-	oMetricsOutput << "---------------------------------------------------------------------------------------" << std::endl;
+	oMetricsOutput << "--------------------------------------------------------------------------------------------------" << std::endl;
 	oMetricsOutput << std::string(USE_AVERAGE_METRICS?"averaged   ":"cumulative ") << met.dRecall << " " << met.dSpecficity << " " << met.dFPR << " " << met.dFNR << " " << met.dPBC << " " << met.dPrecision << " " << met.dFMeasure << " " << met.dMCC << std::endl;
 	oMetricsOutput << std::endl << std::endl;
 	oMetricsOutput << "All Sequences Average FPS: " << met.dFPS << std::endl;
@@ -249,7 +249,7 @@ static inline void WriteMetrics(const std::string sResultsFileName, std::vector<
 			oMetricsOutput << sName << " " << temp_met.dRecall << " " << temp_met.dSpecficity << " " << temp_met.dFPR << " " << temp_met.dFNR << " " << temp_met.dPBC << " " << temp_met.dPrecision << " " << temp_met.dFMeasure << " " << temp_met.dMCC << std::endl;
 		}
 	}
-	oMetricsOutput << "---------------------------------------------------------------------------------------" << std::endl;
+	oMetricsOutput << "--------------------------------------------------------------------------------------------------" << std::endl;
 	oMetricsOutput << "overall    " << met.dRecall << " " << met.dSpecficity << " " << met.dFPR << " " << met.dFNR << " " << met.dPBC << " " << met.dPrecision << " " << met.dFMeasure << " " << met.dMCC << std::endl;
 	oMetricsOutput << std::endl << std::endl;
 	oMetricsOutput << "All Sequences Average FPS: " << met.dFPS << std::endl;
