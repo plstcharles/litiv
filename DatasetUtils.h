@@ -39,6 +39,13 @@
 
 class SequenceInfo;
 
+static inline bool compare_lowercase(const std::string& i, const std::string& j) {
+	std::string i_lower(i), j_lower(j);
+	std::transform(i_lower.begin(),i_lower.end(),i_lower.begin(),tolower);
+	std::transform(j_lower.begin(),j_lower.end(),j_lower.begin(),tolower);
+	return i_lower<j_lower;
+}
+
 class CategoryInfo {
 public:
 	CategoryInfo(const std::string& name, const std::string& dir, const std::string& dbname, bool forceGrayscale=false);
@@ -48,7 +55,7 @@ public:
 	std::vector<SequenceInfo*> m_vpSequences;
 	uint64_t nTP, nTN, nFP, nFN, nSE;
 	double m_dAvgFPS;
-	static bool compare(const CategoryInfo* i, const CategoryInfo* j) {return i->m_sName<j->m_sName;}
+	static inline bool compare(const CategoryInfo* i, const CategoryInfo* j) {return compare_lowercase(i->m_sName,j->m_sName);}
 private:
 #if PLATFORM_SUPPORTS_CPP11
 	CategoryInfo& operator=(const CategoryInfo&) = delete;
@@ -79,7 +86,7 @@ public:
 	double m_dExpectedROILoad;
 	CategoryInfo* m_pParent;
 	cv::Size GetSize() {return m_oSize;}
-	static bool compare(const SequenceInfo* i, const SequenceInfo* j) {return i->m_sName<j->m_sName;}
+	static inline bool compare(const SequenceInfo* i, const SequenceInfo* j) {return compare_lowercase(i->m_sName,j->m_sName);}
 #if USE_PRECACHED_IO
 	void StartPrecaching();
 	void StopPrecaching();
