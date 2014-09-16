@@ -11,8 +11,9 @@
 /////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
 /////////////////////////////////////////
-#define DEFAULT_NB_THREADS				4
+#define DEFAULT_NB_THREADS				1
 /////////////////////////////////////////
+#define EVAL_RESULTS_ONLY               1
 #define WRITE_BGSUB_IMG_OUTPUT			0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT	0
 #define WRITE_BGSUB_METRICS_ANALYSIS	1
@@ -40,14 +41,16 @@
 #define USE_PETS2001_D3TC1_DATASET		0
 #define USE_SINGLE_AVI_FILE				0
 /////////////////////////////////////////////////////////////////////
-#define DATASET_ROOT_DIR 				std::string("/tmp/datasets/")
-#define RESULTS_ROOT_DIR 				std::string("/tmp/datasets/")
+#define DATASET_ROOT_DIR 				std::string("/shared/datasets/")
+#define RESULTS_ROOT_DIR 				std::string("/shared/datasets/")
 #define RESULTS_OUTPUT_DIR_NAME			std::string("results_test")
 #define TOTAL_NB_ITERS					1
 #define TOTAL_NB_PASSES					1
 /////////////////////////////////////////////////////////////////////
 
-#if (TOTAL_NB_ITERS<=0 || TOTAL_NB_PASSES<=0)
+#if EVAL_RESULTS_ONLY && (DEFAULT_NB_THREADS>1 || !WRITE_BGSUB_METRICS_ANALYSIS)
+#error "Eval-only mode must run with 1 thread & write results somewhere."
+#elif (TOTAL_NB_ITERS<=0 || TOTAL_NB_PASSES<=0)
 #error "Must run at least 1 iteration & 1 pass."
 #endif //(TOTAL_NB_ITERS<=0 || TOTAL_NB_PASSES<=0)
 #if (USE_VIBE_LBSP_BG_SUBTRACTOR+USE_PBAS_LBSP_BG_SUBTRACTOR+USE_VIBE_BG_SUBTRACTOR+USE_PBAS_BG_SUBTRACTOR+USE_CB_LBSP_BG_SUBTRACTOR)!=1
@@ -167,8 +170,10 @@ int main() {
 	CV_Assert(mSeqLoads.size()==nSeqTotal);
 	std::cout << "Parsing complete. [" << vpCategories.size() << " category(ies), "  << nSeqTotal  << " sequence(s)]" << std::endl << std::endl;
 	if(nSeqTotal) {
+#if DEFAULT_NB_THREADS>1
 		// since the algorithm isn't implemented to be parallelised yet, we parallelise the sequence treatment instead
 		std::cout << "Running LBSP background subtraction with " << ((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads) << " thread(s)..." << std::endl;
+#endif //!(DEFAULT_NB_THREADS>1)
 #if TOTAL_NB_ITERS>1
 		for(g_nCurrIter=1; g_nCurrIter<=TOTAL_NB_ITERS; ++g_nCurrIter) {
 			std::cout << std::endl << std::endl << "Processing iteration " << g_nCurrIter << "/" << TOTAL_NB_ITERS << "..." << std::endl << std::endl;
@@ -189,6 +194,15 @@ int main() {
 				}
 			}
 #endif //TOTAL_NB_ITERS>1
+#if EVAL_RESULTS_ONLY
+			for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
+				for(size_t k=0; k<oSeqIter->second->GetNbGTFrames(); ++k) {
+					cv::Mat oGTImg = oSeqIter->second->GetGTFrameFromIndex(k);
+					cv::Mat oFGMask = ReadResult(g_sResultsPath,oSeqIter->second->m_pParent->m_sName,oSeqIter->second->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix);
+					CalcMetricsFromResult(oFGMask,oGTImg,oSeqIter->second->GetSequenceROI(),oSeqIter->second->nTP,oSeqIter->second->nTN,oSeqIter->second->nFP,oSeqIter->second->nFN,oSeqIter->second->nSE);
+				}
+			}
+#else //!EVAL_RESULTS_ONLY
 			size_t nSeqProcessed = 1;
 			time_t startup = time(nullptr);
 			tm* startup_tm = localtime(&startup);
@@ -230,6 +244,7 @@ int main() {
 			std::cout << shutdown_tm->tm_hour << ':' << shutdown_tm->tm_min << ':' << shutdown_tm->tm_sec << ']' << std::endl;
 			double dFinalFPS = ((double)nFramesTotal)/(shutdown-startup);
 			std::cout << "\t ... session completed at a total of " << dFinalFPS << " fps." << std::endl;
+#endif //!EVAL_RESULTS_ONLY
 #if WRITE_BGSUB_METRICS_ANALYSIS
 			std::cout << "Summing and writing metrics results..." << std::endl;
 #if TOTAL_NB_ITERS>1
@@ -250,12 +265,20 @@ int main() {
 					WriteMetrics(ssCurrResultsPath.str()+vpCategories[c]->m_sName+".txt",vpCategories[c]);
 				}
 			}
+#if EVAL_RESULTS_ONLY
+			WriteMetrics(ssCurrResultsPath.str()+"METRICS_TOTAL.txt",vpCategories,0.0);
+#else //!EVAL_RESULTS_ONLY
 			WriteMetrics(ssCurrResultsPath.str()+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
+#endif //!EVAL_RESULTS_ONLY
 #else //TOTAL_NB_ITERS==1
 					WriteMetrics(g_sResultsPath+vpCategories[c]->m_sName+".txt",vpCategories[c]);
 				}
 			}
+#if EVAL_RESULTS_ONLY
+			WriteMetrics(g_sResultsPath+"METRICS_TOTAL.txt",vpCategories,0.0);
+#else //!EVAL_RESULTS_ONLY
 			WriteMetrics(g_sResultsPath+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
+#endif //!EVAL_RESULTS_ONLY
 #endif //TOTAL_NB_ITERS==1
 #endif //WRITE_BGSUB_METRICS_ANALYSIS
 #if TOTAL_NB_ITERS>1

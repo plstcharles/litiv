@@ -542,6 +542,7 @@ AdvancedMetrics::AdvancedMetrics(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint6
 		,dPBC(100.0*(nFN+nFP)/(nTP+nFP+nFN+nTN))
 		,dPrecision((double)nTP/(nTP+nFP))
 		,dFMeasure(2.0*(dRecall*dPrecision)/(dRecall+dPrecision))
+		,dMCC((((double)nTP*nTN)-(nFP*nFN))/sqrt(((double)nTP+nFP)*(nTP+nFN)*(nTN+nFP)*(nTN+nFN)))
 		,dFPS(0.0)
 		,bAveraged(false) {}
 
@@ -557,6 +558,7 @@ AdvancedMetrics::AdvancedMetrics(const SequenceInfo* pSeq)
 		,dPBC(100.0*(pSeq->nFN+pSeq->nFP)/(pSeq->nTP+pSeq->nFP+pSeq->nFN+pSeq->nTN))
 		,dPrecision((double)pSeq->nTP/(pSeq->nTP+pSeq->nFP))
 		,dFMeasure(2.0*(dRecall*dPrecision)/(dRecall+dPrecision))
+		,dMCC((((double)pSeq->nTP*pSeq->nTN)-(pSeq->nFP*pSeq->nFN))/sqrt(((double)pSeq->nTP+pSeq->nFP)*(pSeq->nTP+pSeq->nFN)*(pSeq->nTN+pSeq->nFP)*(pSeq->nTN+pSeq->nFN)))
 		,dFPS(pSeq->m_dAvgFPS)
 		,bAveraged(false) {}
 
@@ -575,6 +577,7 @@ AdvancedMetrics::AdvancedMetrics(const CategoryInfo* pCat, bool bAverage)
 		dPBC = (100.0*(pCat->nFN+pCat->nFP)/(pCat->nTP+pCat->nFP+pCat->nFN+pCat->nTN));
 		dPrecision = ((double)pCat->nTP/(pCat->nTP+pCat->nFP));
 		dFMeasure = (2.0*(dRecall*dPrecision)/(dRecall+dPrecision));
+		dMCC = (((double)pCat->nTP*pCat->nTN)-(pCat->nFP*pCat->nFN))/sqrt(((double)pCat->nTP+pCat->nFP)*(pCat->nTP+pCat->nFN)*(pCat->nTN+pCat->nFP)*(pCat->nTN+pCat->nFN));
 		dFPS = pCat->m_dAvgFPS;
 	}
 	else {
@@ -585,6 +588,7 @@ AdvancedMetrics::AdvancedMetrics(const CategoryInfo* pCat, bool bAverage)
 		dPBC = 0;
 		dPrecision = 0;
 		dFMeasure = 0;
+		dMCC = 0;
 		dFPS = 0;
 		const size_t nSeq = pCat->m_vpSequences.size();
 		for(size_t i=0; i<nSeq; ++i) {
@@ -596,6 +600,7 @@ AdvancedMetrics::AdvancedMetrics(const CategoryInfo* pCat, bool bAverage)
 			dPBC += temp.dPBC;
 			dPrecision += temp.dPrecision;
 			dFMeasure += temp.dFMeasure;
+			dMCC += temp.dMCC;
 			dFPS += temp.dFPS;
 		}
 		dRecall /= nSeq;
@@ -605,6 +610,7 @@ AdvancedMetrics::AdvancedMetrics(const CategoryInfo* pCat, bool bAverage)
 		dPBC /= nSeq;
 		dPrecision /= nSeq;
 		dFMeasure /= nSeq;
+		dMCC /= nSeq;
 		dFPS /= nSeq;
 	}
 }
@@ -642,6 +648,7 @@ AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool b
 		dPBC = (100.0*(nGlobalFN+nGlobalFP)/(nGlobalTP+nGlobalFP+nGlobalFN+nGlobalTN));
 		dPrecision = ((double)nGlobalTP/(nGlobalTP+nGlobalFP));
 		dFMeasure = (2.0*(dRecall*dPrecision)/(dRecall+dPrecision));
+		dMCC = (((double)nGlobalTP*nGlobalTN)-(nGlobalFP*nGlobalFN))/sqrt(((double)nGlobalTP+nGlobalFP)*(nGlobalTP+nGlobalFN)*(nGlobalTN+nGlobalFP)*(nGlobalTN+nGlobalFN));
 		dFPS /= (nCat-nBadCat);
 	}
 	else {
@@ -652,6 +659,7 @@ AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool b
 		dPBC = 0;
 		dPrecision = 0;
 		dFMeasure = 0;
+		dMCC = 0;
 		dFPS = 0;
 		for(size_t i=0; i<nCat; ++i) {
 			if(vpCat[i]->m_vpSequences.empty()) {
@@ -666,6 +674,7 @@ AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool b
 				dPBC += temp.dPBC;
 				dPrecision += temp.dPrecision;
 				dFMeasure += temp.dFMeasure;
+				dMCC += temp.dMCC;
 				dFPS += temp.dFPS;
 			}
 		}
@@ -677,6 +686,7 @@ AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool b
 		dPBC /= (nCat-nBadCat);
 		dPrecision /= (nCat-nBadCat);
 		dFMeasure /= (nCat-nBadCat);
+		dMCC /= (nCat-nBadCat);
 		dFPS /= (nCat-nBadCat);
 	}
 }
