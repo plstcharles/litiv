@@ -82,6 +82,7 @@ BackgroundSubtractorSuBSENSE::~BackgroundSubtractorSuBSENSE() {
 void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
 	// == init
 	CV_Assert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
+	CV_Assert(oInitImg.isContinuous());
 	CV_Assert(oInitImg.type()==CV_8UC3 || oInitImg.type()==CV_8UC1);
 	if(oInitImg.type()==CV_8UC3) {
 		std::vector<cv::Mat> voInitImgChannels;
@@ -291,6 +292,7 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 	CV_Assert(m_bInitialized);
 	cv::Mat oInputImg = _image.getMat();
 	CV_Assert(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize);
+	CV_Assert(oInputImg.isContinuous());
 	_fgmask.create(m_oImgSize,CV_8UC1);
 	cv::Mat oCurrFGMask = _fgmask.getMat();
 	memset(oCurrFGMask.data,0,oCurrFGMask.cols*oCurrFGMask.rows);

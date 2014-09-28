@@ -14,6 +14,7 @@ BackgroundSubtractorViBe_1ch::~BackgroundSubtractorViBe_1ch() {}
 
 void BackgroundSubtractorViBe_1ch::initialize(const cv::Mat& oInitImg) {
 	CV_Assert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
+	CV_Assert(oInitImg.isContinuous());
 	CV_Assert(oInitImg.type()==CV_8UC1);
 	m_oImgSize = oInitImg.size();
 	CV_Assert(m_voBGImg.size()==(size_t)m_nBGSamples);
