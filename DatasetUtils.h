@@ -15,6 +15,10 @@
 #include <opencv2/features2d/features2d.hpp>
 #include "PlatformUtils.h"
 
+#define USE_AVERAGE_METRICS      1
+#define USE_BROKEN_FNR_FUNCTION  0
+#define USE_PRECACHED_IO         0
+
 #define CDNET_DB_NAME            "CDNet"
 #define WALLFLOWER_DB_NAME       "WALLFLOWER"
 #define PETS2001_D3TC1_DB_NAME   "PETS2001_D3TC1"
@@ -27,14 +31,20 @@
 #define VAL_UNKNOWN      170
 #define VAL_SHADOW       50
 
-#define USE_AVERAGE_METRICS 1
-#define USE_BROKEN_FNR_FUNCTION 0
-#define USE_PRECACHED_IO 0
+#define METRIC_RECALL(TP,TN,FP,FN)       ((double)TP/(TP+FN))
+#define METRIC_PRECISION(TP,TN,FP,FN)    ((double)TP/(TP+FP))
+#define METRIC_SPECIFICITY(TP,TN,FP,FN)  ((double)TN/(TN+FP))
+#define METRIC_FALSEPOSRATE(TP,TN,FP,FN) ((double)FP/(FP+TN))
+#define METRIC_FALSENEGRATE(TP,TN,FP,FN) ((double)FN/(USE_BROKEN_FNR_FUNCTION?(TN+FP):(TP+FN)))
+#define METRIC_PERCENTBADCL(TP,TN,FP,FN) (100.0*(FN+FP)/(TP+FP+FN+TN))
+#define METRIC_FMEASURE(TP,TN,FP,FN)     (2.0*(METRIC_RECALL(TP,TN,FP,FN)*METRIC_PRECISION(TP,TN,FP,FN))/(METRIC_RECALL(TP,TN,FP,FN)+METRIC_PRECISION(TP,TN,FP,FN)))
+#define METRIC_MATTCORRCOEF(TP,TN,FP,FN) ((((double)TP*TN)-(FP*FN))/sqrt(((double)TP+FP)*(TP+FN)*(TN+FP)*(TN+FN)))
+
 #if USE_PRECACHED_IO
-#define MAX_NB_PRECACHED_FRAMES 100
+#define MAX_NB_PRECACHED_FRAMES   100
 #define PRECACHE_REFILL_THRESHOLD (MAX_NB_PRECACHED_FRAMES/4)
-#define REQUEST_TIMEOUT_MS 1
-#define QUERY_TIMEOUT_MS 10
+#define REQUEST_TIMEOUT_MS        1
+#define QUERY_TIMEOUT_MS          10
 #endif //USE_PRECACHED_IO
 
 class SequenceInfo;
@@ -264,17 +274,17 @@ static inline void WriteMetrics(const std::string sResultsFileName, std::vector<
     oMetricsOutput.close();
 }
 
-static inline void CalcMetricsFromResult(const cv::Mat& oInputFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI, uint64_t& nTP, uint64_t& nTN, uint64_t& nFP, uint64_t& nFN, uint64_t& nSE) {
-    CV_DbgAssert(oInputFrame.type()==CV_8UC1 && oGTFrame.type()==CV_8UC1 && oROI.type()==CV_8UC1);
-    CV_DbgAssert(oInputFrame.size()==oGTFrame.size() && oInputFrame.size()==oROI.size());
-    const size_t step_row = oInputFrame.step.p[0];
-    for(size_t i=0; i<(size_t)oInputFrame.rows; ++i) {
+static inline void CalcMetricsFromResult(const cv::Mat& oSegmResFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI, uint64_t& nTP, uint64_t& nTN, uint64_t& nFP, uint64_t& nFN, uint64_t& nSE) {
+    CV_DbgAssert(oSegmResFrame.type()==CV_8UC1 && oGTFrame.type()==CV_8UC1 && oROI.type()==CV_8UC1);
+    CV_DbgAssert(oSegmResFrame.size()==oGTFrame.size() && oSegmResFrame.size()==oROI.size());
+    const size_t step_row = oSegmResFrame.step.p[0];
+    for(size_t i=0; i<(size_t)oSegmResFrame.rows; ++i) {
         const size_t idx_nstep = step_row*i;
-        const uchar* input_step_ptr = oInputFrame.data+idx_nstep;
+        const uchar* input_step_ptr = oSegmResFrame.data+idx_nstep;
         const uchar* gt_step_ptr = oGTFrame.data+idx_nstep;
         const uchar* roi_step_ptr = oROI.data+idx_nstep;
-        for(int j=0; j<oInputFrame.cols; ++j) {
-            if(    gt_step_ptr[j]!=VAL_OUTOFSCOPE &&
+        for(int j=0; j<oSegmResFrame.cols; ++j) {
+            if( gt_step_ptr[j]!=VAL_OUTOFSCOPE &&
                 gt_step_ptr[j]!=VAL_UNKNOWN &&
                 roi_step_ptr[j]!=VAL_NEGATIVE ) {
                 if(input_step_ptr[j]==VAL_POSITIVE) {
@@ -298,19 +308,19 @@ static inline void CalcMetricsFromResult(const cv::Mat& oInputFrame, const cv::M
     }
 }
 
-static inline cv::Mat GetColoredSegmFrameFromResult(const cv::Mat& oInputFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI) {
-    CV_DbgAssert(oInputFrame.type()==CV_8UC1 && oGTFrame.type()==CV_8UC1 && oROI.type()==CV_8UC1);
-    CV_DbgAssert(oInputFrame.size()==oGTFrame.size() && oInputFrame.size()==oROI.size());
-    cv::Mat oResult(oInputFrame.size(),CV_8UC3,cv::Scalar_<uchar>(0));
-    const size_t step_row = oInputFrame.step.p[0];
-    for(size_t i=0; i<(size_t)oInputFrame.rows; ++i) {
+static inline cv::Mat GetColoredSegmFrameFromResult(const cv::Mat& oSegmResFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI) {
+    CV_DbgAssert(oSegmResFrame.type()==CV_8UC1 && oGTFrame.type()==CV_8UC1 && oROI.type()==CV_8UC1);
+    CV_DbgAssert(oSegmResFrame.size()==oGTFrame.size() && oSegmResFrame.size()==oROI.size());
+    cv::Mat oResult(oSegmResFrame.size(),CV_8UC3,cv::Scalar_<uchar>(0));
+    const size_t step_row = oSegmResFrame.step.p[0];
+    for(size_t i=0; i<(size_t)oSegmResFrame.rows; ++i) {
         const size_t idx_nstep = step_row*i;
-        const uchar* input_step_ptr = oInputFrame.data+idx_nstep;
+        const uchar* input_step_ptr = oSegmResFrame.data+idx_nstep;
         const uchar* gt_step_ptr = oGTFrame.data+idx_nstep;
         const uchar* roi_step_ptr = oROI.data+idx_nstep;
         uchar* res_step_ptr = oResult.data+idx_nstep*3;
-        for(int j=0; j<oInputFrame.cols; ++j) {
-            if(    gt_step_ptr[j]!=VAL_OUTOFSCOPE &&
+        for(int j=0; j<oSegmResFrame.cols; ++j) {
+            if( gt_step_ptr[j]!=VAL_OUTOFSCOPE &&
                 gt_step_ptr[j]!=VAL_UNKNOWN &&
                 roi_step_ptr[j]!=VAL_NEGATIVE ) {
                 if(input_step_ptr[j]==VAL_POSITIVE) {
