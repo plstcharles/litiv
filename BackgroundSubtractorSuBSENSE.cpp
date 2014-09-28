@@ -330,13 +330,13 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
 				const uchar& nBGColor = m_voBGColorSamples[nSampleIdx].data[nPxIter];
 				{
-					const size_t nColorDist = absdiff_uchar(nCurrColor,nBGColor);
+					const size_t nColorDist = L1dist(nCurrColor,nBGColor);
 					if(nColorDist>nCurrColorDistThreshold)
 						goto failedcheck1ch;
 					const ushort& nBGIntraDesc = *((ushort*)(m_voBGDescSamples[nSampleIdx].data+nDescIter));
-					const size_t nIntraDescDist = hdist_ushort_8bitLUT(nCurrIntraDesc,nBGIntraDesc);
+					const size_t nIntraDescDist = hdist(nCurrIntraDesc,nBGIntraDesc);
 					LBSP::computeGrayscaleDescriptor(oInputImg,nBGColor,nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[nBGColor],nCurrInterDesc);
-					const size_t nInterDescDist = hdist_ushort_8bitLUT(nCurrInterDesc,nBGIntraDesc);
+					const size_t nInterDescDist = hdist(nCurrInterDesc,nBGIntraDesc);
 					const size_t nDescDist = (nIntraDescDist+nInterDescDist)/2;
 					if(nDescDist>nCurrDescDistThreshold)
 						goto failedcheck1ch;
@@ -352,7 +352,7 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 				failedcheck1ch:
 				nSampleIdx++;
 			}
-			const float fNormalizedLastDist = ((float)absdiff_uchar(nLastColor,nCurrColor)/s_nColorMaxDataRange_1ch+(float)hdist_ushort_8bitLUT(nLastIntraDesc,nCurrIntraDesc)/s_nDescMaxDataRange_1ch)/2;
+			const float fNormalizedLastDist = ((float)L1dist(nLastColor,nCurrColor)/s_nColorMaxDataRange_1ch+(float)hdist(nLastIntraDesc,nCurrIntraDesc)/s_nDescMaxDataRange_1ch)/2;
 			*pfCurrMeanLastDist = (*pfCurrMeanLastDist)*(1.0f-fRollAvgFactor_ST) + fNormalizedLastDist*fRollAvgFactor_ST;
 			if(nGoodSamplesCount<m_nRequiredBGSamples) {
 				// == foreground
@@ -424,7 +424,7 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 				if((*pfCurrDistThresholdFactor)<1.0f)
 					(*pfCurrDistThresholdFactor) = 1.0f;
 			}
-			if(popcount_ushort_8bitsLUT(nCurrIntraDesc)>=2)
+			if(popcount(nCurrIntraDesc)>=2)
 				++nNonZeroDescCount;
 			nLastIntraDesc = nCurrIntraDesc;
 			nLastColor = nCurrColor;
@@ -469,12 +469,12 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 				size_t nTotDescDist = 0;
 				size_t nTotSumDist = 0;
 				for(size_t c=0;c<3; ++c) {
-					const size_t nColorDist = absdiff_uchar(anCurrColor[c],anBGColor[c]);
+					const size_t nColorDist = L1dist(anCurrColor[c],anBGColor[c]);
 					if(nColorDist>nCurrSCColorDistThreshold)
 						goto failedcheck3ch;
-					size_t nIntraDescDist = hdist_ushort_8bitLUT(anCurrIntraDesc[c],anBGIntraDesc[c]);
+					const size_t nIntraDescDist = hdist(anCurrIntraDesc[c],anBGIntraDesc[c]);
 					LBSP::computeSingleRGBDescriptor(oInputImg,anBGColor[c],nCurrImgCoord_X,nCurrImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[anBGColor[c]],anCurrInterDesc[c]);
-					size_t nInterDescDist = hdist_ushort_8bitLUT(anCurrInterDesc[c],anBGIntraDesc[c]);
+					const size_t nInterDescDist = hdist(anCurrInterDesc[c],anBGIntraDesc[c]);
 					const size_t nDescDist = (nIntraDescDist+nInterDescDist)/2;
 					const size_t nSumDist = std::min((nDescDist/2)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch);
 					if(nSumDist>nCurrSCColorDistThreshold)
@@ -492,7 +492,7 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 				failedcheck3ch:
 				nSampleIdx++;
 			}
-			const float fNormalizedLastDist = ((float)L1dist_uchar(anLastColor,anCurrColor)/s_nColorMaxDataRange_3ch+(float)hdist_ushort_8bitLUT(anLastIntraDesc,anCurrIntraDesc)/s_nDescMaxDataRange_3ch)/2;
+			const float fNormalizedLastDist = ((float)L1dist<3>(anLastColor,anCurrColor)/s_nColorMaxDataRange_3ch+(float)hdist<3>(anLastIntraDesc,anCurrIntraDesc)/s_nDescMaxDataRange_3ch)/2;
 			*pfCurrMeanLastDist = (*pfCurrMeanLastDist)*(1.0f-fRollAvgFactor_ST) + fNormalizedLastDist*fRollAvgFactor_ST;
 			if(nGoodSamplesCount<m_nRequiredBGSamples) {
 				// == foreground
@@ -571,7 +571,7 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 				if((*pfCurrDistThresholdFactor)<1.0f)
 					(*pfCurrDistThresholdFactor) = 1.0f;
 			}
-			if(popcount_ushort_8bitsLUT(anCurrIntraDesc)>=4)
+			if(popcount<3>(anCurrIntraDesc)>=4)
 				++nNonZeroDescCount;
 			for(size_t c=0; c<3; ++c) {
 				anLastIntraDesc[c] = anCurrIntraDesc[c];

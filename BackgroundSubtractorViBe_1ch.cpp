@@ -46,7 +46,7 @@ void BackgroundSubtractorViBe_1ch::operator()(cv::InputArray _image, cv::OutputA
 		for(int x=0; x<m_oImgSize.width; x++) {
 			size_t nGoodSamplesCount=0, nSampleIdx=0;
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
-				if(absdiff_uchar(oInputImg.at<uchar>(y,x),m_voBGImg[nSampleIdx].at<uchar>(y,x))<m_nColorDistThreshold)
+				if(L1dist(oInputImg.at<uchar>(y,x),m_voBGImg[nSampleIdx].at<uchar>(y,x))<m_nColorDistThreshold)
 					nGoodSamplesCount++;
 				nSampleIdx++;
 			}
