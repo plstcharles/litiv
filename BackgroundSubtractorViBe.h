@@ -15,6 +15,8 @@
 #define BGSVIBE_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR (1.60f)
 //! defines whether we should use single channel variation checks for fg/bg segmentation validation or not
 #define BGSVIBE_USE_SC_THRS_VALIDATION 0
+//! defines whether we should use L1 distance or L2 distance for change detection
+#define BGSVIBE_USE_L1_DISTANCE_CHECK 0
 
 /*!
 	ViBe foreground-background segmentation algorithm (abstract version).
