@@ -162,7 +162,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="LBSP_16bits_dbcross_1ch.i" />
-    <None Include="LBSP_16bits_dbcross_3ch.i" />
+    <None Include="LBSP_16bits_dbcross_3ch1t.i" />
+    <None Include="LBSP_16bits_dbcross_3ch3t.i" />
     <None Include="LBSP_16bits_dbcross_s3ch.i" />
   </ItemGroup>
   <ItemGroup>
