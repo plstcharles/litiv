@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #define PLATFORM_SUPPORTS_CPP11 ((_MSC_VER > 1600) || (__GNUC__>=4 && __GNUC_MINOR__>=6))
 #if (defined WIN32 || defined _WIN32 || defined WIN64 || defined _WIN64)
+#define NOMINMAX
 #include <windows.h>
 #define PLATFORM_USES_WIN32API (WINVER>0x0599)
 #ifdef _DEBUG
@@ -25,6 +26,16 @@
 #if PLATFORM_USES_WIN32API
 #include <stdint.h>
 #include <process.h>
+#define TIMER_INIT \
+	LARGE_INTEGER frequency; \
+	LARGE_INTEGER t1,t2; \
+	double elapsedTime; \
+	QueryPerformanceFrequency(&frequency);
+#define TIMER_START QueryPerformanceCounter(&t1);
+#define TIMER_STOP \
+	QueryPerformanceCounter(&t2); \
+	elapsedTime=(float)(t2.QuadPart-t1.QuadPart)/frequency.QuadPart; \
+	std::cout << elapsedTime << " sec" << std::endl;
 void SetConsoleWindowSize(int x, int y, int buffer_lines=-1);
 #else //!PLATFORM_USES_WIN32API
 #include <dirent.h>
