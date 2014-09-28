@@ -30,6 +30,7 @@ BackgroundSubtractorLOBSTER::~BackgroundSubtractorLOBSTER() {
 
 void BackgroundSubtractorLOBSTER::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
 	CV_Assert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
+	CV_Assert(oInitImg.isContinuous());
 	CV_Assert(oInitImg.type()==CV_8UC1 || oInitImg.type()==CV_8UC3);
 	if(oInitImg.type()==CV_8UC3) {
 		std::vector<cv::Mat> voInitImgChannels;
@@ -170,6 +171,7 @@ void BackgroundSubtractorLOBSTER::operator()(cv::InputArray _image, cv::OutputAr
 	CV_Assert(learningRate>0);
 	cv::Mat oInputImg = _image.getMat();
 	CV_Assert(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize);
+	CV_Assert(oInputImg.isContinuous());
 	_fgmask.create(m_oImgSize,CV_8UC1);
 	cv::Mat oCurrFGMask = _fgmask.getMat();
 	oCurrFGMask = cv::Scalar_<uchar>(0);
