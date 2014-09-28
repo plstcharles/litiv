@@ -532,34 +532,26 @@ void SequenceInfo::StopPrecaching() {
 #endif //USE_PRECACHED_IO
 
 AdvancedMetrics::AdvancedMetrics(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN, uint64_t /*nSE*/)
-    :    dRecall((double)nTP/(nTP+nFN))
-        ,dSpecficity((double)nTN/(nTN+nFP))
-        ,dFPR((double)nFP/(nFP+nTN))
-#if USE_BROKEN_FNR_FUNCTION
-        ,dFNR((double)nFN/(nTN+nFP))
-#else //!USE_BROKEN_FNR_FUNCTION
-        ,dFNR((double)nFN/(nTP+nFN))
-#endif //!USE_BROKEN_FNR_FUNCTION
-        ,dPBC(100.0*(nFN+nFP)/(nTP+nFP+nFN+nTN))
-        ,dPrecision((double)nTP/(nTP+nFP))
-        ,dFMeasure(2.0*(dRecall*dPrecision)/(dRecall+dPrecision))
-        ,dMCC((((double)nTP*nTN)-(nFP*nFN))/sqrt(((double)nTP+nFP)*(nTP+nFN)*(nTN+nFP)*(nTN+nFN)))
+    :    dRecall(METRIC_RECALL(nTP,nTN,nFP,nFN))
+        ,dSpecficity(METRIC_SPECIFICITY(nTP,nTN,nFP,nFN))
+        ,dFPR(METRIC_FALSEPOSRATE(nTP,nTN,nFP,nFN))
+        ,dFNR(METRIC_FALSENEGRATE(nTP,nTN,nFP,nFN))
+        ,dPBC(METRIC_PERCENTBADCL(nTP,nTN,nFP,nFN))
+        ,dPrecision(METRIC_PRECISION(nTP,nTN,nFP,nFN))
+        ,dFMeasure(METRIC_FMEASURE(nTP,nTN,nFP,nFN))
+        ,dMCC(METRIC_MATTCORRCOEF(nTP,nTN,nFP,nFN))
         ,dFPS(0.0)
         ,bAveraged(false) {}
 
 AdvancedMetrics::AdvancedMetrics(const SequenceInfo* pSeq)
-    :    dRecall((double)pSeq->nTP/(pSeq->nTP+pSeq->nFN))
-        ,dSpecficity((double)pSeq->nTN/(pSeq->nTN+pSeq->nFP))
-        ,dFPR((double)pSeq->nFP/(pSeq->nFP+pSeq->nTN))
-#if USE_BROKEN_FNR_FUNCTION
-        ,dFNR((double)pSeq->nFN/(pSeq->nTN+pSeq->nFP))
-#else //!USE_BROKEN_FNR_FUNCTION
-        ,dFNR((double)pSeq->nFN/(pSeq->nTP+pSeq->nFN))
-#endif //!USE_BROKEN_FNR_FUNCTION
-        ,dPBC(100.0*(pSeq->nFN+pSeq->nFP)/(pSeq->nTP+pSeq->nFP+pSeq->nFN+pSeq->nTN))
-        ,dPrecision((double)pSeq->nTP/(pSeq->nTP+pSeq->nFP))
-        ,dFMeasure(2.0*(dRecall*dPrecision)/(dRecall+dPrecision))
-        ,dMCC((((double)pSeq->nTP*pSeq->nTN)-(pSeq->nFP*pSeq->nFN))/sqrt(((double)pSeq->nTP+pSeq->nFP)*(pSeq->nTP+pSeq->nFN)*(pSeq->nTN+pSeq->nFP)*(pSeq->nTN+pSeq->nFN)))
+    :    dRecall(METRIC_RECALL(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
+        ,dSpecficity(METRIC_SPECIFICITY(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
+        ,dFPR(METRIC_FALSEPOSRATE(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
+        ,dFNR(METRIC_FALSENEGRATE(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
+        ,dPBC(METRIC_PERCENTBADCL(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
+        ,dPrecision(METRIC_PRECISION(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
+        ,dFMeasure(METRIC_FMEASURE(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
+        ,dMCC(METRIC_MATTCORRCOEF(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
         ,dFPS(pSeq->m_dAvgFPS)
         ,bAveraged(false) {}
 
@@ -567,18 +559,14 @@ AdvancedMetrics::AdvancedMetrics(const CategoryInfo* pCat, bool bAverage)
     :     bAveraged(bAverage) {
     CV_Assert(!pCat->m_vpSequences.empty());
     if(!bAverage) {
-        dRecall = ((double)pCat->nTP/(pCat->nTP+pCat->nFN));
-        dSpecficity = ((double)pCat->nTN/(pCat->nTN+pCat->nFP));
-        dFPR = ((double)pCat->nFP/(pCat->nFP+pCat->nTN));
-#if USE_BROKEN_FNR_FUNCTION
-        dFNR = ((double)pCat->nFN/(pCat->nTN+pCat->nFP));
-#else //!USE_BROKEN_FNR_FUNCTION
-        dFNR = ((double)pCat->nFN/(pCat->nTP+pCat->nFN));
-#endif //!USE_BROKEN_FNR_FUNCTION
-        dPBC = (100.0*(pCat->nFN+pCat->nFP)/(pCat->nTP+pCat->nFP+pCat->nFN+pCat->nTN));
-        dPrecision = ((double)pCat->nTP/(pCat->nTP+pCat->nFP));
-        dFMeasure = (2.0*(dRecall*dPrecision)/(dRecall+dPrecision));
-        dMCC = (((double)pCat->nTP*pCat->nTN)-(pCat->nFP*pCat->nFN))/sqrt(((double)pCat->nTP+pCat->nFP)*(pCat->nTP+pCat->nFN)*(pCat->nTN+pCat->nFP)*(pCat->nTN+pCat->nFN));
+        dRecall = METRIC_RECALL(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
+        dSpecficity = METRIC_SPECIFICITY(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
+        dFPR = METRIC_FALSEPOSRATE(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
+        dFNR = METRIC_FALSENEGRATE(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
+        dPBC = METRIC_PERCENTBADCL(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
+        dPrecision = METRIC_PRECISION(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
+        dFMeasure = METRIC_FMEASURE(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
+        dMCC = METRIC_MATTCORRCOEF(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
         dFPS = pCat->m_dAvgFPS;
     }
     else {
@@ -638,18 +626,14 @@ AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool b
             }
         }
         CV_Assert(nBadCat<nCat);
-        dRecall = ((double)nGlobalTP/(nGlobalTP+nGlobalFN));
-        dSpecficity = ((double)nGlobalTN/(nGlobalTN+nGlobalFP));
-        dFPR = ((double)nGlobalFP/(nGlobalFP+nGlobalTN));
-#if USE_BROKEN_FNR_FUNCTION
-        dFNR = ((double)nGlobalFN/(nGlobalTN+nGlobalFP));
-#else //!USE_BROKEN_FNR_FUNCTION
-        dFNR = ((double)nGlobalFN/(nGlobalTP+nGlobalFN));
-#endif //!USE_BROKEN_FNR_FUNCTION
-        dPBC = (100.0*(nGlobalFN+nGlobalFP)/(nGlobalTP+nGlobalFP+nGlobalFN+nGlobalTN));
-        dPrecision = ((double)nGlobalTP/(nGlobalTP+nGlobalFP));
-        dFMeasure = (2.0*(dRecall*dPrecision)/(dRecall+dPrecision));
-        dMCC = (((double)nGlobalTP*nGlobalTN)-(nGlobalFP*nGlobalFN))/sqrt(((double)nGlobalTP+nGlobalFP)*(nGlobalTP+nGlobalFN)*(nGlobalTN+nGlobalFP)*(nGlobalTN+nGlobalFN));
+        dRecall = METRIC_RECALL(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+        dSpecficity = METRIC_SPECIFICITY(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+        dFPR = METRIC_FALSEPOSRATE(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+        dFNR = METRIC_FALSENEGRATE(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+        dPBC = METRIC_PERCENTBADCL(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+        dPrecision = METRIC_PRECISION(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+        dFMeasure = METRIC_FMEASURE(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+        dMCC = METRIC_MATTCORRCOEF(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
         dFPS /= (nCat-nBadCat);
     }
     else {
