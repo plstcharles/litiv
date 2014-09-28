@@ -17,7 +17,7 @@
 //      _c              (size_t, pattern channel location in the image data)
 //      _step_row       (size_t, step size between rows, including padding)
 //      _res            (ushort, 16 bit result vector)
-//      L1dist      (function, returns the absolute difference between two uchars)
+//       L1dist         (function, returns the absolute difference between two uchars)
 
 #ifdef _val
 #error "definitions clash detected"
