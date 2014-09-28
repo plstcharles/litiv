@@ -13,7 +13,7 @@
 //////////////////////////////////////////
 #define DEFAULT_NB_THREADS               1
 //////////////////////////////////////////
-#define EVAL_RESULTS_ONLY                1
+#define EVAL_RESULTS_ONLY                0
 #define WRITE_BGSUB_IMG_OUTPUT           0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
 #define WRITE_BGSUB_METRICS_ANALYSIS     1
@@ -339,7 +339,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #elif USE_PBAS_LBSP_BG_SUBTRACTOR
         pBGS = new BackgroundSubtractorSuBSENSE();
         const double dDefaultLearningRate = 0;
-        pBGS->initialize(oInitImg,voKPs);
+        pBGS->initialize(oInitImg,oSequenceROI);
 #elif USE_CB_LBSP_BG_SUBTRACTOR
         pBGS = new BackgroundSubtractorPAWCS();
         const double dDefaultLearningRate = 0;

@@ -22,10 +22,10 @@ BackgroundSubtractorLOBSTER::BackgroundSubtractorLOBSTER(	 float fRelLBSPThresho
 }
 
 BackgroundSubtractorLOBSTER::~BackgroundSubtractorLOBSTER() {
-	if(m_aPxIdxLUT) {
+	if(m_aPxIdxLUT)
 		delete[] m_aPxIdxLUT;
-		m_aPxIdxLUT = nullptr;
-	}
+	if(m_aPxInfoLUT)
+	    delete[] m_aPxInfoLUT;
 }
 
 void BackgroundSubtractorLOBSTER::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
@@ -78,7 +78,10 @@ void BackgroundSubtractorLOBSTER::initialize(const cv::Mat& oInitImg, const cv::
 	}
 	if(m_aPxIdxLUT)
 		delete[] m_aPxIdxLUT;
+	if(m_aPxInfoLUT)
+	    delete[] m_aPxInfoLUT;
 	m_aPxIdxLUT = new size_t[m_nTotRelevantPxCount];
+	m_aPxInfoLUT = new PxInfoBase[m_nTotPxCount];
 	if(m_nImgChannels==1) {
 		CV_Assert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width && m_oLastColorFrame.step.p[1]==1);
 		CV_Assert(m_oLastDescFrame.step.p[0]==m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==m_oLastColorFrame.step.p[1]*2);
