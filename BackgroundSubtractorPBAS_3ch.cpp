@@ -190,28 +190,28 @@ void BackgroundSubtractorPBAS_3ch::operator()(cv::InputArray _image, cv::OutputA
 		}
 	}
 	m_fFormerMeanGradDist = std::max(fFrameTotGradDist/nFrameTotBadSamplesCount,20.0f);
-	//if(curr_debug_id==0) {
-		cv::Point dbg1(60,40), dbg2(218,132);
-		cv::Mat oMeanMinDistFrameNormalized = m_oMeanMinDistFrame;
-		cv::circle(oMeanMinDistFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oMeanMinDistFrameNormalized,dbg2,5,cv::Scalar(1.0f));
-		cv::imshow("m(x)",oMeanMinDistFrameNormalized);
-		std::cout << std::fixed << std::setprecision(5) << " m(" << dbg1 << ") = " << m_oMeanMinDistFrame.at<float>(dbg1) << "  ,  m(" << dbg2 << ") = " << m_oMeanMinDistFrame.at<float>(dbg2) << std::endl;
-		cv::Mat oDistThresholdFrameNormalized = (m_oDistThresholdFrame-cv::Scalar(BGSPBAS_R_LOWER))/(BGSPBAS_R_UPPER-BGSPBAS_R_LOWER);
-		cv::circle(oDistThresholdFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oDistThresholdFrameNormalized,dbg2,5,cv::Scalar(1.0f));
-		cv::imshow("r(x)",oDistThresholdFrameNormalized);
-		std::cout << std::fixed << std::setprecision(5) << " r(" << dbg1 << ") = " << m_oDistThresholdFrame.at<float>(dbg1) << "  ,  r(" << dbg2 << ") = " << m_oDistThresholdFrame.at<float>(dbg2) << std::endl;
+#if DEBUG
+    cv::Point dbg1(60,40), dbg2(218,132);
+    cv::Mat oMeanMinDistFrameNormalized = m_oMeanMinDistFrame;
+    cv::circle(oMeanMinDistFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oMeanMinDistFrameNormalized,dbg2,5,cv::Scalar(1.0f));
+    cv::imshow("m(x)",oMeanMinDistFrameNormalized);
+    std::cout << std::fixed << std::setprecision(5) << " m(" << dbg1 << ") = " << m_oMeanMinDistFrame.at<float>(dbg1) << "  ,  m(" << dbg2 << ") = " << m_oMeanMinDistFrame.at<float>(dbg2) << std::endl;
+    cv::Mat oDistThresholdFrameNormalized = (m_oDistThresholdFrame-cv::Scalar(BGSPBAS_R_LOWER))/(BGSPBAS_R_UPPER-BGSPBAS_R_LOWER);
+    cv::circle(oDistThresholdFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oDistThresholdFrameNormalized,dbg2,5,cv::Scalar(1.0f));
+    cv::imshow("r(x)",oDistThresholdFrameNormalized);
+    std::cout << std::fixed << std::setprecision(5) << " r(" << dbg1 << ") = " << m_oDistThresholdFrame.at<float>(dbg1) << "  ,  r(" << dbg2 << ") = " << m_oDistThresholdFrame.at<float>(dbg2) << std::endl;
 #if BGSPBAS_USE_R2_ACCELERATION
-		cv::Mat oDistThresholdVariationFrameNormalized = (m_oDistThresholdVariationFrame-cv::Scalar(R2_LOWER))/(R2_UPPER-R2_LOWER);
-		cv::circle(oDistThresholdVariationFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oDistThresholdVariationFrameNormalized,dbg2,5,cv::Scalar(1.0f));
-		cv::imshow("r2(x)",oDistThresholdVariationFrameNormalized);
-		std::cout << std::fixed << std::setprecision(5) << "r2(" << dbg1 << ") = " << m_oDistThresholdVariationFrame.at<float>(dbg1) << "  , r2(" << dbg2 << ") = " << m_oDistThresholdVariationFrame.at<float>(dbg2) << std::endl;
+    cv::Mat oDistThresholdVariationFrameNormalized = (m_oDistThresholdVariationFrame-cv::Scalar(R2_LOWER))/(R2_UPPER-R2_LOWER);
+    cv::circle(oDistThresholdVariationFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oDistThresholdVariationFrameNormalized,dbg2,5,cv::Scalar(1.0f));
+    cv::imshow("r2(x)",oDistThresholdVariationFrameNormalized);
+    std::cout << std::fixed << std::setprecision(5) << "r2(" << dbg1 << ") = " << m_oDistThresholdVariationFrame.at<float>(dbg1) << "  , r2(" << dbg2 << ") = " << m_oDistThresholdVariationFrame.at<float>(dbg2) << std::endl;
 #endif //BGSPBAS_USE_R2_ACCELERATION
-		cv::Mat oUpdateRateFrameNormalized = (m_oUpdateRateFrame-cv::Scalar(BGSPBAS_T_LOWER))/(BGSPBAS_T_UPPER-BGSPBAS_T_LOWER);
-		cv::circle(oUpdateRateFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oUpdateRateFrameNormalized,dbg2,5,cv::Scalar(1.0f));
-		cv::imshow("t(x)",oUpdateRateFrameNormalized);
-		std::cout << std::fixed << std::setprecision(5) << " t(" << dbg1 << ") = " << m_oUpdateRateFrame.at<float>(dbg1) << "  ,  t(" << dbg2 << ") = " << m_oUpdateRateFrame.at<float>(dbg2) << std::endl;
-		cv::waitKey(1);
-	//}
+    cv::Mat oUpdateRateFrameNormalized = (m_oUpdateRateFrame-cv::Scalar(BGSPBAS_T_LOWER))/(BGSPBAS_T_UPPER-BGSPBAS_T_LOWER);
+    cv::circle(oUpdateRateFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oUpdateRateFrameNormalized,dbg2,5,cv::Scalar(1.0f));
+    cv::imshow("t(x)",oUpdateRateFrameNormalized);
+    std::cout << std::fixed << std::setprecision(5) << " t(" << dbg1 << ") = " << m_oUpdateRateFrame.at<float>(dbg1) << "  ,  t(" << dbg2 << ") = " << m_oUpdateRateFrame.at<float>(dbg2) << std::endl;
+    cv::waitKey(1);
+#endif //DEBUG
 #if BGSPBAS_USE_ADVANCED_MORPH_OPS || BGSPBAS_USE_R2_ACCELERATION
 	oFGMask.copyTo(m_oLastFGMask);
 #endif //BGSPBAS_USE_ADVANCED_MORPH_OPS || BGSPBAS_USE_R2_ACCELERATION
