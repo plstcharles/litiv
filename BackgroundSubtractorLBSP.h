@@ -68,6 +68,8 @@ protected:
 	bool m_bInitialized;
 	//! specifies whether automatic model resets are enabled or not
 	bool m_bAutoModelResetEnabled;
+	//! specifies whether the camera is considered moving or not
+	bool m_bUsingMovingCamera;
 	//! copy of latest pixel intensities (used when refreshing model)
 	cv::Mat m_oLastColorFrame;
 	//! copy of latest descriptors (used when refreshing model)

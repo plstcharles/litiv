@@ -25,6 +25,7 @@ BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(float fRelLBSPThreshold, size
 		,m_nDefaultMedianBlurKernelSize(DEFAULT_MEDIAN_BLUR_KERNEL_SIZE)
 		,m_bInitialized(false)
 		,m_bAutoModelResetEnabled(true)
+		,m_bUsingMovingCamera(false)
 		,nDebugCoordX(0),nDebugCoordY(0) {
 	CV_Assert(m_fRelLBSPThreshold>=0);
 }
