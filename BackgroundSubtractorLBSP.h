@@ -78,5 +78,6 @@ protected:
 public:
 	// ######## DEBUG PURPOSES ONLY ##########
 	int nDebugCoordX, nDebugCoordY;
+	std::string sDebugName;
 };
 

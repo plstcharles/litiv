@@ -363,6 +363,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #endif //USE_PBAS_BG_SUBTRACTOR
 #endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
+		pBGS->sDebugName = pCurrCategory->m_sName+"_"+pCurrSequence->m_sName;
 #if ENABLE_DISPLAY_MOUSE_DEBUG
 		pnLatestMouseX = &pBGS->nDebugCoordX;
 		pnLatestMouseY = &pBGS->nDebugCoordY;
