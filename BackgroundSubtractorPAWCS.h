@@ -37,7 +37,7 @@ public:
 	//! (re)initiaization method; needs to be called before starting background subtraction
 	virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
 	//! refreshes all local (+ global) dictionaries based on the last analyzed frame
-	virtual void refreshModel(size_t nBaseOccCount, size_t nOverallMatchOccIncr, float fOccDecrFrac, bool bForceFGUpdate=false);
+	virtual void refreshModel(size_t nBaseOccCount, float fOccDecrFrac, bool bForceFGUpdate=false);
 	//! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
 	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=0);
 	//! returns a copy of the latest reconstructed background image
@@ -46,10 +46,10 @@ public:
 	virtual void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const;
 
 protected:
-	template<size_t N>
+	template<size_t nChannels>
 	struct ColorLBSPFeature {
-		uchar anColor[N];
-		ushort anDesc[N];
+		uchar anColor[nChannels];
+		ushort anDesc[nChannels];
 	};
 	struct LocalWordBase {
 		size_t nFirstOcc;
@@ -87,8 +87,8 @@ protected:
 	size_t m_nMaxGlobalWords, m_nCurrGlobalWords;
 	//! number of samples to use to compute the learning rate of moving averages
 	const size_t m_nSamplesForMovingAvgs;
-	//! last calculated non-zero desc ratio
-	float m_fLastNonZeroDescRatio;
+	//! last calculated non-flat/illumupdt region ratio
+	float m_fLastNonFlatRegionRatio, m_fLastIllumUpdtRegionRatio;
 	//! current kernel size for median blur post-proc filtering
 	int m_nMedianBlurKernelSize;
 	//! specifies the downsampled frame size used for cam motion analysis & gword lookup maps
@@ -97,6 +97,10 @@ protected:
 	cv::Mat m_oDownSampledROI_MotionAnalysis;
 	//! total pixel count for the downsampled ROIs
 	size_t m_nDownSampledROIPxCount;
+	//! current local word weight offset
+	size_t m_nLocalWordWeightOffset;
+	//! current learning rate ceiling
+	float m_fLearningRateCeiling;
 
 	//! word lists & dictionaries
 	LocalWordBase** m_apLocalWordDict;
@@ -144,7 +148,7 @@ protected:
 	//! internal cleanup function for the dictionary structures
 	void CleanupDictionaries();
 	//! internal weight lookup function for local words
-	static float GetLocalWordWeight(const LocalWordBase* w, size_t nCurrFrame);
+	static float GetLocalWordWeight(const LocalWordBase* w, size_t nCurrFrame, size_t nOffset);
 	//! internal weight lookup function for global words
 	static float GetGlobalWordWeight(const GlobalWordBase* w);
 };

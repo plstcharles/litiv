@@ -115,10 +115,10 @@ void BackgroundSubtractorPBAS_3ch::operator()(cv::InputArray _image, cv::OutputA
 			while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
 				const cv::Vec3b& in_color = oInputImgRGB.at<cv::Vec3b>(y,x);
 				const cv::Vec3b& bg_color = m_voBGImg[nSampleIdx].at<cv::Vec3b>(y,x);
-				const float fColorDist = L2dist_vec3b(in_color,bg_color);
+				const float fColorDist = L2dist_<3>(in_color,bg_color);
 				const cv::Vec3b& in_grad = oBlurredInputImg_AbsGrad.at<cv::Vec3b>(y,x);
 				const cv::Vec3b& bg_grad = m_voBGGrad[nSampleIdx].at<cv::Vec3b>(y,x);
-				const float fGradDist = L2dist_vec3b(in_grad,bg_grad);
+				const float fGradDist = L2dist_<3>(in_grad,bg_grad);
 				const float fSumDist = std::min(((BGSPBAS_GRAD_WEIGHT_ALPHA/m_fFormerMeanGradDist)*fGradDist)+fColorDist,(float)nChannelSize);
 				if(fSumDist<=fCurrDistThreshold) {
 					if(fMinDist>fSumDist)
