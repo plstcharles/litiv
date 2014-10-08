@@ -87,8 +87,8 @@ protected:
 	size_t m_nMaxGlobalWords, m_nCurrGlobalWords;
 	//! number of samples to use to compute the learning rate of moving averages
 	const size_t m_nSamplesForMovingAvgs;
-	//! last calculated non-flat/illumupdt region ratio
-	float m_fLastNonFlatRegionRatio, m_fLastIllumUpdtRegionRatio;
+	//! last calculated non-flat region ratio
+	float m_fLastNonFlatRegionRatio;
 	//! current kernel size for median blur post-proc filtering
 	int m_nMedianBlurKernelSize;
 	//! specifies the downsampled frame size used for cam motion analysis & gword lookup maps
@@ -99,8 +99,6 @@ protected:
 	size_t m_nDownSampledROIPxCount;
 	//! current local word weight offset
 	size_t m_nLocalWordWeightOffset;
-	//! current learning rate ceiling
-	float m_fLearningRateCeiling;
 
 	//! word lists & dictionaries
 	LocalWordBase** m_apLocalWordDict;

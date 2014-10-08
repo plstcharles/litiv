@@ -30,8 +30,9 @@
 #define LBSPDESC_RATIO_MIN (0.100f)
 #define LBSPDESC_RATIO_MAX (0.500f)
 //! parameters used to trigger auto model resets in our frame-level component
-#define FRAMELEVEL_MIN_DIFF_THRESHOLD (45)
-#define FRAMELEVEL_DOWNSAMPLE_RATIO   (8)
+#define FRAMELEVEL_MIN_L1DIST_THRES (45)
+#define FRAMELEVEL_MIN_CDIST_THRES (FRAMELEVEL_MIN_L1DIST_THRES/10)
+#define FRAMELEVEL_DOWNSAMPLE_RATIO (8)
 //! parameters used to downscale gword maps & scale thresholds to make comparisons easier
 #define GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO (2)
 #define GWORD_DEFAULT_NB_INIT_SAMPL_PASSES (2)
@@ -63,8 +64,6 @@
 #define UNSTAB_DESC_DIST_OFFSET (m_nDescDistThresholdOffset)
 // local define used to specify the min descriptor bit count for flat regions
 #define FLAT_REGION_BIT_COUNT (s_nDescMaxDataRange_1ch/8)
-// local define used to specify the max color intensity value for dark regions
-#define DARK_REGION_MAX_COLOR (s_nColorMaxDataRange_1ch/8)
 
 #if USE_INTERNAL_HRCS
 #include "PlatformUtils.h"
@@ -92,11 +91,9 @@ BackgroundSubtractorPAWCS::BackgroundSubtractorPAWCS(	 float fRelLBSPThreshold
 		,m_nCurrGlobalWords(0)
 		,m_nSamplesForMovingAvgs(nSamplesForMovingAvgs)
 		,m_fLastNonFlatRegionRatio(0.0f)
-		,m_fLastIllumUpdtRegionRatio(0.0f)
 		,m_nMedianBlurKernelSize(m_nDefaultMedianBlurKernelSize)
 		,m_nDownSampledROIPxCount(0)
 		,m_nLocalWordWeightOffset(DEFAULT_LWORD_WEIGHT_OFFSET)
-		,m_fLearningRateCeiling(FEEDBACK_T_UPPER)
 		,m_apLocalWordDict(nullptr)
 		,m_aLocalWordList_1ch(nullptr)
 		,m_pLocalWordListIter_1ch(nullptr)
@@ -160,25 +157,7 @@ void BackgroundSubtractorPAWCS::initialize(const cv::Mat& oInitImg, const cv::Ma
 	m_oDownSampledFrameSize_MotionAnalysis = cv::Size(m_oImgSize.width/FRAMELEVEL_DOWNSAMPLE_RATIO,m_oImgSize.height/FRAMELEVEL_DOWNSAMPLE_RATIO);
 	m_oDownSampledFrameSize_GlobalWordLookup = cv::Size(m_oImgSize.width/GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO,m_oImgSize.height/GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO);
 	cv::resize(m_oROI,m_oDownSampledROI_MotionAnalysis,m_oDownSampledFrameSize_MotionAnalysis,0,0,cv::INTER_AREA);
-	/*cv::Mat test1; cv::resize(oInitImg,test1,m_oDownSampledFrameSize_MotionAnalysis,0,0,cv::INTER_AREA);
-	cv::Mat test2; cv::resize(oInitImg,test2,m_oDownSampledFrameSize_MotionAnalysis,0,0,cv::INTER_LINEAR);
-	cv::Mat test3; cv::resize(oInitImg,test3,m_oDownSampledFrameSize_MotionAnalysis,0,0,cv::INTER_NEAREST);
-	cv::Mat absdiff1,absdiff2,absdiff3;
-	cv::absdiff(test1,test2,absdiff1);
-	cv::absdiff(test2,test3,absdiff2);
-	cv::absdiff(test1,test3,absdiff3);
-	cv::imshow("absdiff1",absdiff1);
-	cv::imshow("absdiff2",absdiff2);
-	cv::imshow("absdiff3",absdiff3);
-	cv::Mat test1_r; cv::resize(test1,test1_r,m_oImgSize,0,0,cv::INTER_NEAREST);
-	cv::Mat test2_r; cv::resize(test2,test2_r,m_oImgSize,0,0,cv::INTER_NEAREST);
-	cv::Mat test3_r; cv::resize(test3,test3_r,m_oImgSize,0,0,cv::INTER_NEAREST);
-	cv::imshow("test1_r",test1_r);
-	cv::imshow("test2_r",test2_r);
-	cv::imshow("test3_r",test3_r);
-	cv::waitKey(0);*/
 	m_fLastNonFlatRegionRatio = 0.0f;
-	m_fLastIllumUpdtRegionRatio = 0.0f;
 	m_nCurrLocalWords = m_nMaxLocalWords;
 	if(nOrigROIPxCount>=m_nTotPxCount/2 && (int)m_nTotPxCount>=DEFAULT_FRAME_SIZE.area()) {
 		const float fRegionSizeScaleFactor = (float)m_nTotPxCount/DEFAULT_FRAME_SIZE.area();
@@ -317,8 +296,6 @@ void BackgroundSubtractorPAWCS::initialize(const cv::Mat& oInitImg, const cv::Ma
 			}
 		}
 	}
-	//for(size_t t=0; t<=UCHAR_MAX; ++t)
-	//	m_anLBSPThreshold_8bitLUT[t] = std::max(m_anLBSPThreshold_8bitLUT[t],(size_t)5);
 	m_bInitialized = true;
 	refreshModel(1,0);
 }
@@ -512,7 +489,6 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
 						for(nLocalWordIdx=0; nLocalWordIdx<m_nCurrLocalWords; ++nLocalWordIdx) {
 							LocalWord_3ch* pCurrLocalWord = (LocalWord_3ch*)m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx];
 							if(pCurrLocalWord
-									//&& L1dist<3>(anSampleColor,pCurrLocalWord->oFeature.anColor)<=nCurrTotColorDistThreshold
 									&& cmixdist<3>(anSampleColor,pCurrLocalWord->oFeature.anColor)<=nCurrTotColorDistThreshold
 									&& hdist<3>(anSampleIntraDesc,pCurrLocalWord->oFeature.anDesc)<=nCurrTotDescDistThreshold) {
 								pCurrLocalWord->nOccurrences += nCurrWordOccIncr;
@@ -668,9 +644,8 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 	const float fRollAvgFactor_ST = 1.0f/std::min(m_nFrameIndex,nCurrSamplesForMovingAvg_ST);
 	const size_t nCurrGlobalWordUpdateRate = bBootstrapping?DEFAULT_RESAMPLING_RATE/2:DEFAULT_RESAMPLING_RATE;
 	size_t nFlatRegionCount = 0;
-	size_t nDarkRegionCount = 0;
 #if DISPLAY_PAWCS_DEBUG_INFO
-	std::vector<std::string> vsWordModList(m_nTotLocalDictionaries*m_nCurrLocalWords);
+	std::vector<std::string> vsWordModList(m_nTotRelevantPxCount*m_nCurrLocalWords);
 	uchar anDBGColor[3] = {0,0,0};
 	ushort anDBGIntraDesc[3] = {0,0,0};
 	bool bDBGMaskResult = false;
@@ -679,7 +654,7 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 	float fDBGGlobalWordModifierLocalWeight = 0.0f;
 	float fDBGLocalWordsWeightSumThreshold = 0.0f;
 	size_t nLocalDictDBGIdx = UINT_MAX;
-	size_t nDBGWordOccIncr = nDefaultWordOccIncr;
+	size_t nDBGWordOccIncr = DEFAULT_LWORD_OCC_INCR;
 	cv::Mat oDBGWeightThresholds(m_oImgSize,CV_32FC1,0.0f);
 #endif //DISPLAY_PAWCS_DEBUG_INFO
 #if USE_INTERNAL_HRCS
@@ -733,24 +708,18 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 			uchar& nCurrRegionIllumUpdtVal = m_oIllumUpdtRegionMask.data[nPxIter];
 			uchar& nCurrRegionSegmVal = oCurrFGMask.data[nPxIter];
 			const bool bCurrRegionIsROIBorder = m_oROI.data[nPxIter]<UCHAR_MAX;
-			const bool bCurrRegionIsDark = false;//nCurrColor<DARK_REGION_MAX_COLOR;
 #if DISPLAY_PAWCS_DEBUG_INFO
 			oDBGWeightThresholds.at<float>(m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X) = fLocalWordsWeightSumThreshold;
 #endif //DISPLAY_PAWCS_DEBUG_INFO
 			const int nCurrImgCoord_X = m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X;
 			const int nCurrImgCoord_Y = m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y;
 			ushort nCurrInterDesc, nCurrIntraDesc;
-			LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColor,nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[nCurrColor]<<int(bCurrRegionIsUnstable&&bCurrRegionIsDark),nCurrIntraDesc);
+			LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColor,nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[nCurrColor],nCurrIntraDesc);
 			const uchar nCurrIntraDescBITS = (uchar)popcount(nCurrIntraDesc);
 			const bool bCurrRegionIsFlat = nCurrIntraDescBITS<FLAT_REGION_BIT_COUNT;
 			if(bCurrRegionIsFlat)
 				++nFlatRegionCount;
-			if(bCurrRegionIsDark)
-				++nDarkRegionCount;
-			//const size_t nCurrWordOccIncr = (bCurrRegionIsFlat||bBootstrapping)?DEFAULT_LWORD_OCC_INCR*2:DEFAULT_LWORD_OCC_INCR;
-			//const size_t nCurrWordOccIncr = (bCurrRegionIsFlat||bBootstrapping||m_nModelResetCooldown)?DEFAULT_LWORD_OCC_INCR*2:DEFAULT_LWORD_OCC_INCR;
-			//const size_t nCurrWordOccIncr = ((bCurrRegionIsFlat||bBootstrapping)?DEFAULT_LWORD_OCC_INCR*2:DEFAULT_LWORD_OCC_INCR)+m_nModelResetCooldown;
-			const size_t nCurrWordOccIncr = ((bCurrRegionIsFlat||bBootstrapping)?2:1)*(DEFAULT_LWORD_OCC_INCR+m_nModelResetCooldown);
+			const size_t nCurrWordOccIncr = (DEFAULT_LWORD_OCC_INCR+m_nModelResetCooldown)<<int(bCurrRegionIsFlat||bBootstrapping);
 #if USE_FEEDBACK_ADJUSTMENTS
 			const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):bCurrRegionIsFlat?(size_t)ceil(fCurrLearningRate+FEEDBACK_T_LOWER)/2:(size_t)ceil(fCurrLearningRate);
 #else //!USE_FEEDBACK_ADJUSTMENTS
@@ -771,21 +740,19 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 				{
 					const size_t nColorDist = L1dist(nCurrColor,pCurrLocalWord->oFeature.anColor[0]);
 					const size_t nIntraDescDist = hdist(nCurrIntraDesc,pCurrLocalWord->oFeature.anDesc[0]);
-					LBSP::computeGrayscaleDescriptor(oInputImg,pCurrLocalWord->oFeature.anColor[0],nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[pCurrLocalWord->oFeature.anColor[0]]<<int(bCurrRegionIsUnstable&&bCurrRegionIsDark),nCurrInterDesc);
+					LBSP::computeGrayscaleDescriptor(oInputImg,pCurrLocalWord->oFeature.anColor[0],nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[pCurrLocalWord->oFeature.anColor[0]],nCurrInterDesc);
 					const size_t nInterDescDist = hdist(nCurrInterDesc,pCurrLocalWord->oFeature.anDesc[0]);
 					const size_t nDescDist = (nIntraDescDist+nInterDescDist)/2;
-					if( (!bCurrRegionIsUnstable || bCurrRegionIsFlat || bCurrRegionIsDark || bCurrRegionIsROIBorder)
-							&& nColorDist>=nCurrColorDistThreshold/2
-							&& nIntraDescDist<=nCurrDescDistThreshold/(bCurrRegionIsDark?2:4)
+					if( (!bCurrRegionIsUnstable || bCurrRegionIsFlat || bCurrRegionIsROIBorder)
 							&& nColorDist<=nCurrColorDistThreshold
+							&& nColorDist>=nCurrColorDistThreshold/2
+							&& nIntraDescDist<=nCurrDescDistThreshold/2
 							&& (rand()%(nCurrRegionIllumUpdtVal?(nCurrLocalWordUpdateRate/2+1):nCurrLocalWordUpdateRate))==0) {
 						// == illum updt
 						pCurrLocalWord->oFeature.anColor[0] = nCurrColor;
 						pCurrLocalWord->oFeature.anDesc[0] = nCurrIntraDesc;
-						//m_oIllumUpdtRegionMask.data[nPxIter-2] = 1&m_oROI.data[nPxIter-2];
 						m_oIllumUpdtRegionMask.data[nPxIter-1] = 1&m_oROI.data[nPxIter-1];
 						m_oIllumUpdtRegionMask.data[nPxIter+1] = 1&m_oROI.data[nPxIter+1];
-						//m_oIllumUpdtRegionMask.data[nPxIter+2] = 1&m_oROI.data[nPxIter+2];
 						m_oIllumUpdtRegionMask.data[nPxIter] = 2;
 #if DISPLAY_PAWCS_DEBUG_INFO
 						vsWordModList[nLocalDictIdx+nLocalWordIdx] += "UPDATED ";
@@ -963,27 +930,6 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 								vsWordModList[nNeighborLocalDictIdx+nNeighborLocalWordIdx] += "UPDATED1(NEIGHBOR) ";
 #endif //DISPLAY_PAWCS_DEBUG_INFO
 							}
-							/*else {
-								uchar nNeighborLastColor = m_oLastColorFrame.data[nSamplePxIdx];
-								const bool bNeighborLastRegionIsDark = nNeighborLastColor<nCurrColorDistThreshold;
-								ushort nNeighborLastIntraDesc_MinThres;
-								LBSP::computeGrayscaleDescriptor(m_oLastColorFrame,m_oLastColorFrame.data[nSamplePxIdx],nSampleImgCoord_X,nSampleImgCoord_Y,m_anLBSPThreshold_8bitLUT[nCurrColorDistThreshold],nNeighborLastIntraDesc_MinThres);
-								const bool bNeighborLastRegionMinThresIsFlat = popcount_ushort_8bitsLUT(nNeighborLastIntraDesc_MinThres)<FLAT_REGION_BIT_COUNT;
-								if(bNeighborLastRegionIsDark && bNeighborLastRegionMinThresIsFlat &&
-									nNeighborColorDist<=nCurrColorDistThreshold/2 && nNeighborLastIntraDescDist<=nCurrDescDistThreshold) {
-									//nNeighborColorDist<=nCurrColorDistThreshold/2) {
-										const float fNeighborLocalWordWeight = GetLocalWordWeight(pNeighborLocalWord,m_nFrameIndex,m_nLocalWordWeightOffset);
-										fNeighborPotentialLocalWordsWeightSum += fNeighborLocalWordWeight;
-										pNeighborLocalWord->nLastOcc = m_nFrameIndex;
-										if(fNeighborLocalWordWeight<DEFAULT_LWORD_MAX_WEIGHT)
-											pNeighborLocalWord->nOccurrences += nNeighborWordOccIncr;
-										for(size_t c=0; c<3; ++c)
-											pNeighborLocalWord->oFeature.anColor[0] = nCurrColor;
-#if DISPLAY_PAWCS_DEBUG_INFO
-										vsWordModList[nNeighborLocalDictIdx+nNeighborLocalWordIdx] += "UPDATED2(NEIGHBOR) ";
-#endif //DISPLAY_PAWCS_DEBUG_INFO
-								}
-							}*/
 						}
 						++nNeighborLocalWordIdx;
 					}
@@ -1011,7 +957,7 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 			bCurrRegionIsUnstable = fCurrDistThresholdFactor>UNSTABLE_REG_RDIST_MIN || (fCurrMeanRawSegmRes_LT-fCurrMeanFinalSegmRes_LT)>UNSTABLE_REG_RATIO_MIN || (fCurrMeanRawSegmRes_ST-fCurrMeanFinalSegmRes_ST)>UNSTABLE_REG_RATIO_MIN;
 #if USE_FEEDBACK_ADJUSTMENTS
 			if(m_oLastFGMask.data[nPxIter] || (std::min(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)<UNSTABLE_REG_RATIO_MIN && nCurrRegionSegmVal))
-				fCurrLearningRate = std::min(fCurrLearningRate+FEEDBACK_T_INCR/(std::max(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)*fCurrDistThresholdVariationFactor),m_fLearningRateCeiling);
+				fCurrLearningRate = std::min(fCurrLearningRate+FEEDBACK_T_INCR/(std::max(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)*fCurrDistThresholdVariationFactor),FEEDBACK_T_UPPER);
 			else
 				fCurrLearningRate = std::max(fCurrLearningRate-FEEDBACK_T_DECR*fCurrDistThresholdVariationFactor/std::max(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST),FEEDBACK_T_LOWER);
 			if(std::max(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)>UNSTABLE_REG_RATIO_MIN && m_oBlinksFrame.data[nPxIter])
@@ -1089,25 +1035,19 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 			uchar& nCurrRegionIllumUpdtVal = m_oIllumUpdtRegionMask.data[nPxIter];
 			uchar& nCurrRegionSegmVal = oCurrFGMask.data[nPxIter];
 			const bool bCurrRegionIsROIBorder = m_oROI.data[nPxIter]<UCHAR_MAX;
-			const bool bCurrRegionIsDark = false;//(anCurrColor[0]+anCurrColor[1]+anCurrColor[2])<DARK_REGION_MAX_COLOR*2;
 #if DISPLAY_PAWCS_DEBUG_INFO
 			oDBGWeightThresholds.at<float>(m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X) = fLocalWordsWeightSumThreshold;
 #endif //DISPLAY_PAWCS_DEBUG_INFO
 			const int nCurrImgCoord_X = m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X;
 			const int nCurrImgCoord_Y = m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y;
 			ushort anCurrInterDesc[3], anCurrIntraDesc[3];
-			const size_t anCurrIntraLBSPThresholds[3] = {m_anLBSPThreshold_8bitLUT[anCurrColor[0]]<<int(bCurrRegionIsUnstable&&bCurrRegionIsDark),m_anLBSPThreshold_8bitLUT[anCurrColor[1]]<<int(bCurrRegionIsUnstable&&bCurrRegionIsDark),m_anLBSPThreshold_8bitLUT[anCurrColor[2]]<<int(bCurrRegionIsUnstable&&bCurrRegionIsDark)};
+			const size_t anCurrIntraLBSPThresholds[3] = {m_anLBSPThreshold_8bitLUT[anCurrColor[0]],m_anLBSPThreshold_8bitLUT[anCurrColor[1]],m_anLBSPThreshold_8bitLUT[anCurrColor[2]]};
 			LBSP::computeRGBDescriptor(oInputImg,anCurrColor,nCurrImgCoord_X,nCurrImgCoord_Y,anCurrIntraLBSPThresholds,anCurrIntraDesc);
 			const uchar nCurrIntraDescBITS = (uchar)popcount<3>(anCurrIntraDesc);
 			const bool bCurrRegionIsFlat = nCurrIntraDescBITS<FLAT_REGION_BIT_COUNT*2;
 			if(bCurrRegionIsFlat)
 				++nFlatRegionCount;
-			if(bCurrRegionIsDark)
-				++nDarkRegionCount;
-			//const size_t nCurrWordOccIncr = (bCurrRegionIsFlat||bBootstrapping)?DEFAULT_LWORD_OCC_INCR*2:DEFAULT_LWORD_OCC_INCR;
-			//const size_t nCurrWordOccIncr = (bCurrRegionIsFlat||bBootstrapping||m_nModelResetCooldown)?DEFAULT_LWORD_OCC_INCR*2:DEFAULT_LWORD_OCC_INCR;
-			//const size_t nCurrWordOccIncr = ((bCurrRegionIsFlat||bBootstrapping)?DEFAULT_LWORD_OCC_INCR*2:DEFAULT_LWORD_OCC_INCR)+m_nModelResetCooldown;
-			const size_t nCurrWordOccIncr = ((bCurrRegionIsFlat||bBootstrapping)?2:1)*(DEFAULT_LWORD_OCC_INCR+m_nModelResetCooldown);
+			const size_t nCurrWordOccIncr = (DEFAULT_LWORD_OCC_INCR+m_nModelResetCooldown)<<int(bCurrRegionIsFlat||bBootstrapping);
 #if USE_FEEDBACK_ADJUSTMENTS
 			const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):bCurrRegionIsFlat?(size_t)ceil(fCurrLearningRate+FEEDBACK_T_LOWER)/2:(size_t)ceil(fCurrLearningRate);
 #else //!USE_FEEDBACK_ADJUSTMENTS
@@ -1130,24 +1070,22 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 					const size_t nColorDistortion = cdist<3>(anCurrColor,pCurrLocalWord->oFeature.anColor);
 					const size_t nTotColorMixDist = cmixdist(nTotColorL1Dist,nColorDistortion);
 					const size_t nTotIntraDescDist = hdist<3>(anCurrIntraDesc,pCurrLocalWord->oFeature.anDesc);
-					const size_t anCurrInterLBSPThresholds[3] = {m_anLBSPThreshold_8bitLUT[pCurrLocalWord->oFeature.anColor[0]]<<int(bCurrRegionIsUnstable&&bCurrRegionIsDark),m_anLBSPThreshold_8bitLUT[pCurrLocalWord->oFeature.anColor[1]]<<int(bCurrRegionIsUnstable&&bCurrRegionIsDark),m_anLBSPThreshold_8bitLUT[pCurrLocalWord->oFeature.anColor[2]]<<int(bCurrRegionIsUnstable&&bCurrRegionIsDark)};
+					const size_t anCurrInterLBSPThresholds[3] = {m_anLBSPThreshold_8bitLUT[pCurrLocalWord->oFeature.anColor[0]],m_anLBSPThreshold_8bitLUT[pCurrLocalWord->oFeature.anColor[1]],m_anLBSPThreshold_8bitLUT[pCurrLocalWord->oFeature.anColor[2]]};
 					LBSP::computeRGBDescriptor(oInputImg,pCurrLocalWord->oFeature.anColor,nCurrImgCoord_X,nCurrImgCoord_Y,anCurrInterLBSPThresholds,anCurrInterDesc);
 					const size_t nTotInterDescDist = hdist<3>(anCurrInterDesc,pCurrLocalWord->oFeature.anDesc);
 					const size_t nTotDescDist = (nTotIntraDescDist+nTotInterDescDist)/2;
 					if( (!bCurrRegionIsUnstable || bCurrRegionIsFlat || bCurrRegionIsROIBorder)
+							&& nTotColorMixDist<=nCurrTotColorDistThreshold
 							&& nTotColorL1Dist>=nCurrTotColorDistThreshold/2
 							&& nTotIntraDescDist<=nCurrTotDescDistThreshold/2
-							&& nTotColorMixDist<=nCurrTotColorDistThreshold
 							&& (rand()%(nCurrRegionIllumUpdtVal?(nCurrLocalWordUpdateRate/2+1):nCurrLocalWordUpdateRate))==0) {
 						// == illum updt
 						for(size_t c=0; c<3; ++c) {
 							pCurrLocalWord->oFeature.anColor[c] = anCurrColor[c];
 							pCurrLocalWord->oFeature.anDesc[c] = anCurrIntraDesc[c];
 						}
-						//m_oIllumUpdtRegionMask.data[nPxIter-2] = 1&m_oROI.data[nPxIter-2];
 						m_oIllumUpdtRegionMask.data[nPxIter-1] = 1&m_oROI.data[nPxIter-1];
 						m_oIllumUpdtRegionMask.data[nPxIter+1] = 1&m_oROI.data[nPxIter+1];
-						//m_oIllumUpdtRegionMask.data[nPxIter+2] = 1&m_oROI.data[nPxIter+2];
 						m_oIllumUpdtRegionMask.data[nPxIter] = 2;
 #if DISPLAY_PAWCS_DEBUG_INFO
 						vsWordModList[nLocalDictIdx+nLocalWordIdx] += "UPDATED ";
@@ -1336,8 +1274,7 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 							else {
 								const bool bNeighborLastRegionIsFlat = popcount<3>(anNeighborLastIntraDesc)<FLAT_REGION_BIT_COUNT*2;
 								if(bNeighborLastRegionIsFlat && bCurrRegionIsFlat &&
-									nNeighborTotLastIntraDescDist<=nCurrTotDescDistThreshold/2 &&
-									nNeighborTotIntraDescDist<=nCurrTotDescDistThreshold/2 &&
+									nNeighborTotLastIntraDescDist+nNeighborTotIntraDescDist<=nCurrTotDescDistThreshold &&
 									nNeighborColorDistortion<=nCurrTotColorDistThreshold/4) {
 										const float fNeighborLocalWordWeight = GetLocalWordWeight(pNeighborLocalWord,m_nFrameIndex,m_nLocalWordWeightOffset);
 										fNeighborPotentialLocalWordsWeightSum += fNeighborLocalWordWeight;
@@ -1380,7 +1317,7 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 			bCurrRegionIsUnstable = fCurrDistThresholdFactor>UNSTABLE_REG_RDIST_MIN || (fCurrMeanRawSegmRes_LT-fCurrMeanFinalSegmRes_LT)>UNSTABLE_REG_RATIO_MIN || (fCurrMeanRawSegmRes_ST-fCurrMeanFinalSegmRes_ST)>UNSTABLE_REG_RATIO_MIN;
 #if USE_FEEDBACK_ADJUSTMENTS
 			if(m_oLastFGMask.data[nPxIter] || (std::min(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)<UNSTABLE_REG_RATIO_MIN && nCurrRegionSegmVal))
-				fCurrLearningRate = std::min(fCurrLearningRate+FEEDBACK_T_INCR/(std::max(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)*fCurrDistThresholdVariationFactor),m_fLearningRateCeiling);
+				fCurrLearningRate = std::min(fCurrLearningRate+FEEDBACK_T_INCR/(std::max(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)*fCurrDistThresholdVariationFactor),FEEDBACK_T_UPPER);
 			else
 				fCurrLearningRate = std::max(fCurrLearningRate-FEEDBACK_T_DECR*fCurrDistThresholdVariationFactor/std::max(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST),FEEDBACK_T_LOWER);
 			if(std::max(fCurrMeanMinDist_LT,fCurrMeanMinDist_ST)>UNSTABLE_REG_RATIO_MIN && m_oBlinksFrame.data[nPxIter])
@@ -1481,16 +1418,16 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 		cv::imshow("oGlobalWordsCoverageMap",oGlobalWordsCoverageMap);
 		printf("\nDBG[%2d,%2d] : \n",m_nDebugCoordX,m_nDebugCoordY);
 		printf("\t Color=[%03d,%03d,%03d]\n",(int)anDBGColor[0],(int)anDBGColor[1],(int)anDBGColor[2]);
-		printf("\t IntraDesc=[%05d,%05d,%05d], IntraDescBITS=[%02lu,%02lu,%02lu]\n",anDBGIntraDesc[0],anDBGIntraDesc[1],anDBGIntraDesc[2],popcount_ushort_8bitsLUT(anDBGIntraDesc[0]),popcount_ushort_8bitsLUT(anDBGIntraDesc[1]),popcount_ushort_8bitsLUT(anDBGIntraDesc[2]));
+		printf("\t IntraDesc=[%05d,%05d,%05d], IntraDescBITS=[%02lu,%02lu,%02lu]\n",anDBGIntraDesc[0],anDBGIntraDesc[1],anDBGIntraDesc[2],popcount(anDBGIntraDesc[0]),popcount(anDBGIntraDesc[1]),popcount(anDBGIntraDesc[2]));
 		char gword_dbg_str[1024] = "\0";
 		if(bDBGMaskModifiedByGDict) {
 			if(m_nImgChannels==1) {
 				GlobalWord_1ch* pDBGGlobalWordModifier_1ch = (GlobalWord_1ch*)pDBGGlobalWordModifier;
-				sprintf(gword_dbg_str,"* aided by gword weight=[%02.03f], nColor=[%03d], nDescBITS=[%02lu]",fDBGGlobalWordModifierLocalWeight,(int)pDBGGlobalWordModifier_1ch->oFeature.anColor[0],(size_t)pDBGGlobalWordModifier_1ch->oFeature.nDescBITS);
+				sprintf(gword_dbg_str,"* aided by gword weight=[%02.03f], nColor=[%03d], nDescBITS=[%02lu]",fDBGGlobalWordModifierLocalWeight,(int)pDBGGlobalWordModifier_1ch->oFeature.anColor[0],(size_t)pDBGGlobalWordModifier_1ch->nDescBITS);
 			}
 			else { //m_nImgChannels==3
 				GlobalWord_3ch* pDBGGlobalWordModifier_3ch = (GlobalWord_3ch*)pDBGGlobalWordModifier;
-				sprintf(gword_dbg_str,"* aided by gword weight=[%02.03f], anColor=[%03d,%03d,%03d], nDescBITS=[%02lu]",fDBGGlobalWordModifierLocalWeight,(int)pDBGGlobalWordModifier_3ch->oFeature.anColor[0],(int)pDBGGlobalWordModifier_3ch->oFeature.anColor[1],(int)pDBGGlobalWordModifier_3ch->oFeature.anColor[2],(size_t)pDBGGlobalWordModifier_3ch->oFeature.nDescBITS);
+				sprintf(gword_dbg_str,"* aided by gword weight=[%02.03f], anColor=[%03d,%03d,%03d], nDescBITS=[%02lu]",fDBGGlobalWordModifierLocalWeight,(int)pDBGGlobalWordModifier_3ch->oFeature.anColor[0],(int)pDBGGlobalWordModifier_3ch->oFeature.anColor[1],(int)pDBGGlobalWordModifier_3ch->oFeature.anColor[2],(size_t)pDBGGlobalWordModifier_3ch->nDescBITS);
 			}
 		}
 		printf("\t FG_Mask=[%s] %s\n",(bDBGMaskResult?"TRUE":"FALSE"),gword_dbg_str);
@@ -1499,11 +1436,11 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 		for(size_t nDBGWordIdx=0; nDBGWordIdx<m_nCurrLocalWords; ++nDBGWordIdx) {
 			if(m_nImgChannels==1) {
 				LocalWord_1ch* pDBGLocalWord = (LocalWord_1ch*)m_apLocalWordDict[nLocalDictDBGIdx+nDBGWordIdx];
-				printf("\t [%02lu] : weight=[%02.03f], nColor=[%03d], nDescBITS=[%02lu]  %s\n",nDBGWordIdx,GetLocalWordWeight(pDBGLocalWord,m_nFrameIndex),(int)pDBGLocalWord->oFeature.anColor[0],popcount_ushort_8bitsLUT(pDBGLocalWord->oFeature.anDesc[0]),vsWordModList[nLocalDictDBGIdx+nDBGWordIdx].c_str());
+				printf("\t [%02lu] : weight=[%02.03f], nColor=[%03d], nDescBITS=[%02lu]  %s\n",nDBGWordIdx,GetLocalWordWeight(pDBGLocalWord,m_nFrameIndex,m_nLocalWordWeightOffset),(int)pDBGLocalWord->oFeature.anColor[0],popcount(pDBGLocalWord->oFeature.anDesc[0]),vsWordModList[nLocalDictDBGIdx+nDBGWordIdx].c_str());
 			}
 			else { //m_nImgChannels==3
 				LocalWord_3ch* pDBGLocalWord = (LocalWord_3ch*)m_apLocalWordDict[nLocalDictDBGIdx+nDBGWordIdx];
-				printf("\t [%02lu] : weight=[%02.03f], anColor=[%03d,%03d,%03d], anDescBITS=[%02lu,%02lu,%02lu]  %s\n",nDBGWordIdx,GetLocalWordWeight(pDBGLocalWord,m_nFrameIndex),(int)pDBGLocalWord->oFeature.anColor[0],(int)pDBGLocalWord->oFeature.anColor[1],(int)pDBGLocalWord->oFeature.anColor[2],popcount_ushort_8bitsLUT(pDBGLocalWord->oFeature.anDesc[0]),popcount_ushort_8bitsLUT(pDBGLocalWord->oFeature.anDesc[1]),popcount_ushort_8bitsLUT(pDBGLocalWord->oFeature.anDesc[2]),vsWordModList[nLocalDictDBGIdx+nDBGWordIdx].c_str());
+				printf("\t [%02lu] : weight=[%02.03f], anColor=[%03d,%03d,%03d], anDescBITS=[%02lu,%02lu,%02lu]  %s\n",nDBGWordIdx,GetLocalWordWeight(pDBGLocalWord,m_nFrameIndex,m_nLocalWordWeightOffset),(int)pDBGLocalWord->oFeature.anColor[0],(int)pDBGLocalWord->oFeature.anColor[1],(int)pDBGLocalWord->oFeature.anColor[2],popcount(pDBGLocalWord->oFeature.anDesc[0]),popcount(pDBGLocalWord->oFeature.anDesc[1]),popcount(pDBGLocalWord->oFeature.anDesc[2]),vsWordModList[nLocalDictDBGIdx+nDBGWordIdx].c_str());
 			}
 		}
 		std::cout << std::fixed << std::setprecision(5) << " w_thrs(" << dbgpt << ") = " << fDBGLocalWordsWeightSumThreshold << std::endl;
@@ -1543,7 +1480,7 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 		cv::imshow("r2(x)",oDistThresholdVariationFrameNormalized);
 		//cv::imwrite("r2.png",oDistThresholdVariationFrameNormalized);
 		std::cout << std::fixed << std::setprecision(5) << "     r2(" << dbgpt << ") = " << m_oDistThresholdVariationFrame.at<float>(dbgpt) << std::endl;
-		cv::Mat oUpdateRateFrameNormalized; m_oUpdateRateFrame.convertTo(oUpdateRateFrameNormalized,CV_32FC1,1.0f/m_fLearningRateCeiling,-FEEDBACK_T_LOWER/m_fLearningRateCeiling);
+		cv::Mat oUpdateRateFrameNormalized; m_oUpdateRateFrame.convertTo(oUpdateRateFrameNormalized,CV_32FC1,1.0f/FEEDBACK_T_UPPER,-FEEDBACK_T_LOWER/FEEDBACK_T_UPPER);
 		cv::circle(oUpdateRateFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
 		cv::resize(oUpdateRateFrameNormalized,oUpdateRateFrameNormalized,DEFAULT_FRAME_SIZE);
 		cv::imshow("t(x)",oUpdateRateFrameNormalized);
@@ -1596,18 +1533,12 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 	            ++m_anLBSPThreshold_8bitLUT[t];
 	}
 	m_fLastNonFlatRegionRatio = fCurrNonFlatRegionRatio;
-	float fCurrIllumUpdtRegionRatio = (float)cv::countNonZero(m_oIllumUpdtRegionMask)/m_nTotRelevantPxCount;
-	if(fCurrIllumUpdtRegionRatio>0.5f && m_fLastIllumUpdtRegionRatio>0.5f)
-		m_fLearningRateCeiling = DEFAULT_RESAMPLING_RATE;
-	else if(!m_bUsingMovingCamera)
-		m_fLearningRateCeiling = FEEDBACK_T_UPPER;
-	m_fLastIllumUpdtRegionRatio = fCurrIllumUpdtRegionRatio;
 #if USE_AUTO_MODEL_RESET
 	cv::resize(oInputImg,m_oDownSampledFrame_MotionAnalysis,m_oDownSampledFrameSize_MotionAnalysis,0,0,cv::INTER_AREA);
 	cv::accumulateWeighted(m_oDownSampledFrame_MotionAnalysis,m_oMeanDownSampledLastDistFrame_LT,fRollAvgFactor_LT);
 	cv::accumulateWeighted(m_oDownSampledFrame_MotionAnalysis,m_oMeanDownSampledLastDistFrame_ST,fRollAvgFactor_ST);
-	const float fCurrSmoothL1DistRatio = L1dist((float*)m_oMeanDownSampledLastDistFrame_LT.data,(float*)m_oMeanDownSampledLastDistFrame_ST.data,m_oMeanDownSampledLastDistFrame_LT.total(),m_nImgChannels,m_oDownSampledROI_MotionAnalysis.data)/m_nDownSampledROIPxCount;
-	if(!m_bAutoModelResetEnabled && fCurrSmoothL1DistRatio>=FRAMELEVEL_MIN_DIFF_THRESHOLD*2)
+	const float fCurrMeanL1DistRatio = L1dist((float*)m_oMeanDownSampledLastDistFrame_LT.data,(float*)m_oMeanDownSampledLastDistFrame_ST.data,m_oMeanDownSampledLastDistFrame_LT.total(),m_nImgChannels,m_oDownSampledROI_MotionAnalysis.data)/m_nDownSampledROIPxCount;
+	if(!m_bAutoModelResetEnabled && fCurrMeanL1DistRatio>=FRAMELEVEL_MIN_L1DIST_THRES*2)
 		m_bAutoModelResetEnabled = true;
 	if(m_bAutoModelResetEnabled || m_bUsingMovingCamera) {
 		if((m_nFrameIndex%DEFAULT_BOOTSTRAP_WIN_SIZE)==0) {
@@ -1615,34 +1546,25 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 			getBackgroundImage(oCurrBackgroundImg);
 			cv::resize(oCurrBackgroundImg,oDownSampledBackgroundImg,m_oDownSampledFrameSize_MotionAnalysis,0,0,cv::INTER_AREA);
 			cv::Mat oDownSampledBackgroundImg_32F; oDownSampledBackgroundImg.convertTo(oDownSampledBackgroundImg_32F,CV_32F);
-			const float fCurrHardL1DistRatio = L1dist((float*)m_oMeanDownSampledLastDistFrame_LT.data,(float*)oDownSampledBackgroundImg_32F.data,m_oMeanDownSampledLastDistFrame_LT.total(),m_nImgChannels,cv::Mat(m_oDownSampledROI_MotionAnalysis==UCHAR_MAX).data)/m_nDownSampledROIPxCount;
-			if(!m_bUsingMovingCamera) {
-				if(m_nImgChannels==1)
-					m_bUsingMovingCamera = fCurrHardL1DistRatio>=FRAMELEVEL_MIN_DIFF_THRESHOLD;
-				else {
-					const float fCurrHardCDistRatio = cdist((float*)m_oMeanDownSampledLastDistFrame_LT.data,(float*)oDownSampledBackgroundImg_32F.data,m_oMeanDownSampledLastDistFrame_LT.total(),m_nImgChannels,cv::Mat(m_oDownSampledROI_MotionAnalysis==UCHAR_MAX).data)/m_nDownSampledROIPxCount;
-					m_bUsingMovingCamera = fCurrHardL1DistRatio>=FRAMELEVEL_MIN_DIFF_THRESHOLD || fCurrHardCDistRatio>=FRAMELEVEL_MIN_DIFF_THRESHOLD/10;
-				}
-				if(m_bUsingMovingCamera) {
-					s_oDebugFS << sDebugName << "{:" << "activated low offset mode at" << (int)m_nFrameIndex << "}";
-					m_nLocalWordWeightOffset = 5;
-					m_fLearningRateCeiling = DEFAULT_RESAMPLING_RATE;
-					m_bUsingMovingCamera = true;
-					refreshModel(1,1,true);
-				}
-			}
-			else if(fCurrHardL1DistRatio<FRAMELEVEL_MIN_DIFF_THRESHOLD/4) {
-				s_oDebugFS << sDebugName << "{:" << "deactivated low offset mode at" << (int)m_nFrameIndex << "}";
+			const float fCurrModelL1DistRatio = L1dist((float*)m_oMeanDownSampledLastDistFrame_LT.data,(float*)oDownSampledBackgroundImg_32F.data,m_oMeanDownSampledLastDistFrame_LT.total(),m_nImgChannels,cv::Mat(m_oDownSampledROI_MotionAnalysis==UCHAR_MAX).data)/m_nDownSampledROIPxCount;
+			const float fCurrModelCDistRatio = cdist((float*)m_oMeanDownSampledLastDistFrame_LT.data,(float*)oDownSampledBackgroundImg_32F.data,m_oMeanDownSampledLastDistFrame_LT.total(),m_nImgChannels,cv::Mat(m_oDownSampledROI_MotionAnalysis==UCHAR_MAX).data)/m_nDownSampledROIPxCount;
+			if(m_bUsingMovingCamera && fCurrModelL1DistRatio<FRAMELEVEL_MIN_L1DIST_THRES/4 && fCurrModelCDistRatio<FRAMELEVEL_MIN_CDIST_THRES/4) {
+				if(m_pDebugFS) (*m_pDebugFS) << m_sDebugName << "{:" << "deactivated low offset mode at" << (int)m_nFrameIndex << "}";
 				m_nLocalWordWeightOffset = DEFAULT_LWORD_WEIGHT_OFFSET;
-				m_fLearningRateCeiling = FEEDBACK_T_UPPER;
 				m_bUsingMovingCamera = false;
+				refreshModel(1,1,true);
+			}
+			else if(bBootstrapping && !m_bUsingMovingCamera && (fCurrModelL1DistRatio>=FRAMELEVEL_MIN_L1DIST_THRES || fCurrModelCDistRatio>=FRAMELEVEL_MIN_CDIST_THRES)) {
+				if(m_pDebugFS) (*m_pDebugFS) << m_sDebugName << "{:" << "activated low offset mode at" << (int)m_nFrameIndex << "}";
+				m_nLocalWordWeightOffset = 5;
+				m_bUsingMovingCamera = true;
 				refreshModel(1,1,true);
 			}
 		}
 		if(m_nFramesSinceLastReset>DEFAULT_BOOTSTRAP_WIN_SIZE*2)
 			m_bAutoModelResetEnabled = false;
-		else if(fCurrSmoothL1DistRatio>=FRAMELEVEL_MIN_DIFF_THRESHOLD && m_nModelResetCooldown==0) {
-			s_oDebugFS << sDebugName << "{:" << "triggered model reset at" << (int)m_nFrameIndex << "}";
+		else if(fCurrMeanL1DistRatio>=FRAMELEVEL_MIN_L1DIST_THRES && m_nModelResetCooldown==0) {
+			if(m_pDebugFS) (*m_pDebugFS) << m_sDebugName << "{:" << "triggered model reset at" << (int)m_nFrameIndex << "}";
 			m_nFramesSinceLastReset = 0;
 			refreshModel(m_nLocalWordWeightOffset/8,0,true);
 			m_nModelResetCooldown = nCurrSamplesForMovingAvg_ST;
