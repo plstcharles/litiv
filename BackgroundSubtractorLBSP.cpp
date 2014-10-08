@@ -26,7 +26,9 @@ BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(float fRelLBSPThreshold, size
 		,m_bInitialized(false)
 		,m_bAutoModelResetEnabled(true)
 		,m_bUsingMovingCamera(false)
-		,nDebugCoordX(0),nDebugCoordY(0) {
+		,m_nDebugCoordX(0)
+        ,m_nDebugCoordY(0)
+        ,m_pDebugFS(nullptr) {
 	CV_Assert(m_fRelLBSPThreshold>=0);
 }
 
