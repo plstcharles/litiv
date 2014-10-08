@@ -19,6 +19,10 @@ public:
 	BackgroundSubtractorLBSP(float fRelLBSPThreshold, size_t nLBSPThresholdOffset=0);
 	//! default destructor
 	virtual ~BackgroundSubtractorLBSP();
+    //! copy constructor -- disabled since this class (and its children) use lots of dynamic structs based on raw pointers
+    BackgroundSubtractorLBSP(const BackgroundSubtractorLBSP&) = delete;
+    //! assignment operator -- disabled since this class (and its children) use lots of dynamic structs based on raw pointers
+    BackgroundSubtractorLBSP& operator=(const BackgroundSubtractorLBSP&) = delete;
 	//! (re)initiaization method; needs to be called before starting background subtraction
 	virtual void initialize(const cv::Mat& oInitImg);
 	//! (re)initiaization method; needs to be called before starting background subtraction
