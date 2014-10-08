@@ -56,6 +56,15 @@ static inline bool compare_lowercase(const std::string& i, const std::string& j)
     return i_lower<j_lower;
 }
 
+template<typename T> int decimal_integer_digit_count(T number) {
+    int digits = number<0?1:0;
+    while(std::abs(number)>=1) {
+        number /= 10;
+        digits++;
+    }
+    return digits;
+}
+
 class CategoryInfo {
 public:
     CategoryInfo(const std::string& name, const std::string& dir, const std::string& dbname, bool forceGrayscale=false);
@@ -202,7 +211,8 @@ static inline cv::Mat ReadResult( const std::string& sResultsPath,
 static inline void WriteMetrics(const std::string sResultsFileName, const SequenceInfo* pSeq) {
     std::ofstream oMetricsOutput(sResultsFileName);
     AdvancedMetrics temp(pSeq);
-    std::cout << "\t\t" << std::setw(12) << pSeq->m_sName << ":  Rcl=" << std::fixed << std::setprecision(8) << temp.dRecall << ", Prc=" << temp.dPrecision << ", FM=" << temp.dFMeasure << ", MCC=" << temp.dMCC << std::endl;
+    const std::string sCurrSeqName = pSeq->m_sName.size()>12?pSeq->m_sName.substr(0,12):pSeq->m_sName;
+    std::cout << "\t\t" << std::setw(12) << sCurrSeqName << ": Rcl=" << std::fixed << std::setprecision(4) << temp.dRecall << " Prc=" << temp.dPrecision << " FM=" << temp.dFMeasure << " MCC=" << temp.dMCC << std::endl;
     oMetricsOutput << "Results for sequence '" << pSeq->m_sName << "' :" << std::endl;
     oMetricsOutput << std::endl;
     oMetricsOutput << "nTP nFP nFN nTN nSE" << std::endl; // order similar to the files saved by the CDNet analysis script
@@ -221,7 +231,8 @@ static inline void WriteMetrics(const std::string sResultsFileName, CategoryInfo
     std::ofstream oMetricsOutput(sResultsFileName);
     std::sort(pCat->m_vpSequences.begin(),pCat->m_vpSequences.end(),&SequenceInfo::compare);
     AdvancedMetrics met(pCat, USE_AVERAGE_METRICS);
-    std::cout << "\t" << std::setw(12) << pCat->m_sName << ":  Rcl=" << met.dRecall << ", Prc=" << met.dPrecision << ", FM=" << met.dFMeasure << ", MCC=" << met.dMCC << std::endl;
+    const std::string sCurrCatName = pCat->m_sName.size()>12?pCat->m_sName.substr(0,12):pCat->m_sName;
+    std::cout << "\t" << std::setw(12) << sCurrCatName << ": Rcl=" << std::fixed << std::setprecision(4) << met.dRecall << " Prc=" << met.dPrecision << " FM=" << met.dFMeasure << " MCC=" << met.dMCC << std::endl;
     oMetricsOutput << "Results for category '" << pCat->m_sName << "' :" << std::endl;
     oMetricsOutput << std::endl;
     oMetricsOutput << "nTP nFP nFN nTN nSE" << std::endl; // order similar to the files saved by the CDNet analysis script
