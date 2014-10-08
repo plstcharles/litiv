@@ -163,41 +163,64 @@ template<size_t nChannels, typename T> static inline float L2dist_(const cv::Vec
 //! computes the color distortion between two integer arrays
 template<size_t nChannels, typename T> static inline typename std::enable_if<std::is_integral<T>::value,size_t>::type cdist(const T* curr, const T* bg) {
 	static_assert(nChannels>1,"cdist: requires more than one channel");
-	size_t curr_sqr = 0;
-	bool bSkip = true;
-	for(size_t c=0; c<nChannels; ++c) {
-		curr_sqr += curr[c]*curr[c];
-		bSkip = bSkip&(bg[c]<=0);
+	bool bNonConstDist = false;
+	bool bNonNullDist = (curr[0]!=bg[0]);
+	bool bNonNullBG = (bg[0]>0);
+	for(size_t c=1; c<nChannels; ++c) {
+		bNonConstDist |= (curr[c]!=curr[c-1]) || (bg[c]!=bg[c-1]);
+		bNonNullDist |= (curr[c]!=bg[c]);
+		bNonNullBG |= (bg[c]>0);
 	}
-	if(bSkip)
-		return (size_t)sqrt((float)curr_sqr);
+	if(!bNonConstDist || !bNonNullDist)
+		return 0;
+	if(!bNonNullBG) {
+		size_t nulldist = 0;
+		for(size_t c=0; c<nChannels; ++c)
+			nulldist += curr[c];
+		return nulldist;
+	}
+	size_t curr_sqr = 0;
 	size_t bg_sqr = 0;
 	size_t mix = 0;
 	for(size_t c=0; c<nChannels; ++c) {
+		curr_sqr += curr[c]*curr[c];
 		bg_sqr += bg[c]*bg[c];
 		mix += curr[c]*bg[c];
 	}
-	return (size_t)sqrt(curr_sqr-((float)(mix*mix)/bg_sqr));
+	return (size_t)sqrt((float)(curr_sqr-(mix*mix)/bg_sqr));
 }
 
 //! computes the color distortion between two float arrays
 template<size_t nChannels, typename T> static inline typename std::enable_if<std::is_floating_point<T>::value,float>::type cdist(const T* curr, const T* bg) {
 	static_assert(nChannels>1,"cdist: requires more than one channel");
-	float curr_sqr = 0;
-	bool bSkip = true;
-	for(size_t c=0; c<nChannels; ++c) {
-		curr_sqr += (float)curr[c]*curr[c];
-		bSkip = bSkip&(bg[c]<=0);
+	bool bNonConstDist = false;
+	bool bNonNullDist = (curr[0]!=bg[0]);
+	bool bNonNullBG = (bg[0]>0);
+	for(size_t c=1; c<nChannels; ++c) {
+		bNonConstDist |= (curr[c]!=curr[c-1]) || (bg[c]!=bg[c-1]);
+		bNonNullDist |= (curr[c]!=bg[c]);
+		bNonNullBG |= (bg[c]>0);
 	}
-	if(bSkip)
-		return sqrt(curr_sqr);
+	if(!bNonConstDist || !bNonNullDist)
+		return 0;
+	if(!bNonNullBG) {
+		float nulldist = 0;
+		for(size_t c=0; c<nChannels; ++c)
+			nulldist += curr[c];
+		return nulldist;
+	}
+	float curr_sqr = 0;
 	float bg_sqr = 0;
 	float mix = 0;
 	for(size_t c=0; c<nChannels; ++c) {
+		curr_sqr += (float)curr[c]*curr[c];
 		bg_sqr += (float)bg[c]*bg[c];
 		mix += (float)curr[c]*bg[c];
 	}
-	return sqrt(curr_sqr-((mix*mix)/bg_sqr));
+	if(curr_sqr<(mix*mix)/bg_sqr)
+		return 0;
+	else
+		return (float)sqrt(curr_sqr-(mix*mix)/bg_sqr);
 }
 
 //! computes the color distortion between two generic arrays
@@ -218,7 +241,7 @@ template<size_t nChannels, typename T> static inline auto cdist(const T* a, cons
 
 //! computes the color distortion between two generic arrays
 template<typename T> static inline auto cdist(const T* a, const T* b, size_t nElements, size_t nChannels, const uchar* m=NULL) -> decltype(cdist<3>(a,b,nElements,m)) {
-	CV_Assert(nChannels>1 && nChannels<=4);
+	CV_Assert(nChannels>0 && nChannels<=4);
 	switch(nChannels) {
 		case 2: return cdist<2>(a,b,nElements,m);
 		case 3: return cdist<3>(a,b,nElements,m);
