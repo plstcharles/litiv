@@ -46,7 +46,7 @@ public:
 	//! batch version of LBSP::compute2(const cv::Mat& image, ...), also similar to DescriptorExtractor::compute(const std::vector<cv::Mat>& imageCollection, ...)
 	void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat>& voDescCollection) const;
 
-	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel version)
+	//! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel version)
 	inline static void computeGrayscaleDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _t, ushort& _res) {
 		CV_DbgAssert(!oInputImg.empty());
 		CV_DbgAssert(oInputImg.type()==CV_8UC1);
@@ -58,7 +58,7 @@ public:
 		#include "LBSP_16bits_dbcross_1ch.i"
 	}
 
-	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (3-channels version)
+	//! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (3-channels version)
 	inline static void computeRGBDescriptor(const cv::Mat& oInputImg, const uchar* const _ref,  const int _x, const int _y, const size_t* const _t, ushort* _res) {
 		CV_DbgAssert(!oInputImg.empty());
 		CV_DbgAssert(oInputImg.type()==CV_8UC3);
@@ -70,7 +70,7 @@ public:
 		#include "LBSP_16bits_dbcross_3ch3t.i"
 	}
 
-	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (3-channels version)
+	//! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (3-channels version)
 	inline static void computeRGBDescriptor(const cv::Mat& oInputImg, const uchar* const _ref,  const int _x, const int _y, const size_t _t, ushort* _res) {
 		CV_DbgAssert(!oInputImg.empty());
 		CV_DbgAssert(oInputImg.type()==CV_8UC3);
@@ -82,7 +82,7 @@ public:
 		#include "LBSP_16bits_dbcross_3ch1t.i"
 	}
 
-	// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel-RGB version)
+	//! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel-RGB version)
 	inline static void computeSingleRGBDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _c, const size_t _t, ushort& _res) {
 		CV_DbgAssert(!oInputImg.empty());
 		CV_DbgAssert(oInputImg.type()==CV_8UC3 && _c<3);
