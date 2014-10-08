@@ -29,13 +29,11 @@
 #define TIMER_INIT \
     LARGE_INTEGER frequency; \
     LARGE_INTEGER t1,t2; \
-    double elapsedTime; \
     QueryPerformanceFrequency(&frequency);
 #define TIMER_START QueryPerformanceCounter(&t1);
 #define TIMER_STOP \
     QueryPerformanceCounter(&t2); \
-    elapsedTime=(float)(t2.QuadPart-t1.QuadPart)/frequency.QuadPart; \
-    std::cout << elapsedTime << " sec" << std::endl;
+    std::cout << (float)(t2.QuadPart-t1.QuadPart)/frequency.QuadPart << " sec" << std::endl;
 void SetConsoleWindowSize(int x, int y, int buffer_lines=-1);
 #else //!PLATFORM_USES_WIN32API
 #include <dirent.h>
