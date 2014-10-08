@@ -182,7 +182,7 @@ void BackgroundSubtractorPBAS_1ch::operator()(cv::InputArray _image, cv::OutputA
     cv::circle(oMeanMinDistFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oMeanMinDistFrameNormalized,dbg2,5,cv::Scalar(1.0f));
     cv::imshow("m(x)",oMeanMinDistFrameNormalized);
     std::cout << std::fixed << std::setprecision(5) << " m(" << dbg1 << ") = " << m_oMeanMinDistFrame.at<float>(dbg1) << "  ,  m(" << dbg2 << ") = " << m_oMeanMinDistFrame.at<float>(dbg2) << std::endl;
-    cv::Mat oDistThresholdFrameNormalized = (m_oDistThresholdFrame-cv::Scalar(R_LOWER))/(R_UPPER-R_LOWER);
+    cv::Mat oDistThresholdFrameNormalized = (m_oDistThresholdFrame-cv::Scalar(BGSPBAS_R_LOWER))/(BGSPBAS_R_UPPER-BGSPBAS_R_LOWER);
     cv::circle(oDistThresholdFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oDistThresholdFrameNormalized,dbg2,5,cv::Scalar(1.0f));
     cv::imshow("r(x)",oDistThresholdFrameNormalized);
     std::cout << std::fixed << std::setprecision(5) << " r(" << dbg1 << ") = " << m_oDistThresholdFrame.at<float>(dbg1) << "  ,  r(" << dbg2 << ") = " << m_oDistThresholdFrame.at<float>(dbg2) << std::endl;
@@ -192,7 +192,7 @@ void BackgroundSubtractorPBAS_1ch::operator()(cv::InputArray _image, cv::OutputA
     cv::imshow("r2(x)",oDistThresholdVariationFrameNormalized);
     std::cout << std::fixed << std::setprecision(5) << "r2(" << dbg1 << ") = " << m_oDistThresholdVariationFrame.at<float>(dbg1) << "  , r2(" << dbg2 << ") = " << m_oDistThresholdVariationFrame.at<float>(dbg2) << std::endl;
 #endif //BGSPBAS_USE_R2_ACCELERATION
-    cv::Mat oUpdateRateFrameNormalized = (m_oUpdateRateFrame-cv::Scalar(T_LOWER))/(T_UPPER-T_LOWER);
+    cv::Mat oUpdateRateFrameNormalized = (m_oUpdateRateFrame-cv::Scalar(BGSPBAS_T_LOWER))/(BGSPBAS_T_UPPER-BGSPBAS_T_LOWER);
     cv::circle(oUpdateRateFrameNormalized,dbg1,5,cv::Scalar(1.0f));cv::circle(oUpdateRateFrameNormalized,dbg2,5,cv::Scalar(1.0f));
     cv::imshow("t(x)",oUpdateRateFrameNormalized);
     std::cout << std::fixed << std::setprecision(5) << " t(" << dbg1 << ") = " << m_oUpdateRateFrame.at<float>(dbg1) << "  ,  t(" << dbg2 << ") = " << m_oUpdateRateFrame.at<float>(dbg2) << std::endl;
