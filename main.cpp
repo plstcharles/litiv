@@ -383,7 +383,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
         for(size_t k=0; k<nNbInputFrames; k++) {
             if(!(k%100)) {
                 const std::string sCurrSeqName = pCurrSequence->m_sName.size()>12?pCurrSequence->m_sName.substr(0,12):pCurrSequence->m_sName;
-                std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ F:" << std::setfill('0') << std::setw(decimal_integer_digit_count(nNbInputFrames)) << k << "/" << nNbInputFrames << "   [T=" << nThreadIdx << "]" << std::endl;
+                std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ F:" << std::setfill('0') << std::setw(decimal_integer_digit_count((int)nNbInputFrames)) << k << "/" << nNbInputFrames << "   [T=" << nThreadIdx << "]" << std::endl;
             }
 #if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
             std::chrono::high_resolution_clock::time_point pre_query = std::chrono::high_resolution_clock::now();
