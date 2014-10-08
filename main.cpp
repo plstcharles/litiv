@@ -278,6 +278,7 @@ int main() {
                 }
             }
             WriteMetrics(sCurrResultsPath+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
+            g_oDebugFS.release();
 #endif //WRITE_BGSUB_METRICS_ANALYSIS
 #if TOTAL_NB_ITERS>1
         }
