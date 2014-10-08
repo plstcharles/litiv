@@ -107,6 +107,9 @@ void OnMouseEvent(int event, int x, int y, int, void*) {
     *pnLatestMouseY = y;
 }
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
+#if WRITE_BGSUB_METRICS_ANALYSIS
+cv::FileStorage g_oDebugFS;
+#endif //!WRITE_BGSUB_METRICS_ANALYSIS
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 cv::Size g_oDisplayOutputSize(960,240);
 bool g_bContinuousUpdates = false;
@@ -115,21 +118,20 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 #if DEFAULT_NB_THREADS<1
 #error "Bad default number of threads specified."
 #endif //DEFAULT_NB_THREADS<1
+int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence, const std::string& sCurrResultsPath);
 #if PLATFORM_SUPPORTS_CPP11
-int AnalyzeSequence(CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence);
-const size_t g_nMaxThreads = /*std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():*/DEFAULT_NB_THREADS;
+const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
 std::atomic_size_t g_nActiveThreads(0);
 #if WRITE_BGSUB_IMG_OUTPUT
 const std::vector<int> g_vnResultsComprParams = {CV_IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
-int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence);
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;
 HANDLE g_hThreadEvent[g_nMaxThreads] = {0};
 HANDLE g_hThreads[g_nMaxThreads] = {0};
-void* g_apThreadDataStruct[g_nMaxThreads][2] = {0};
+void* g_apThreadDataStruct[g_nMaxThreads][3] = {0};
 DWORD WINAPI AnalyzeSequenceEntryPoint(LPVOID lpParam) {
-    return AnalyzeSequence((int)(lpParam),(CategoryInfo*)g_apThreadDataStruct[(int)(lpParam)][0],(SequenceInfo*)g_apThreadDataStruct[(int)(lpParam)][1]);
+    return AnalyzeSequence((int)(lpParam),(CategoryInfo*)g_apThreadDataStruct[(int)(lpParam)][0],(SequenceInfo*)g_apThreadDataStruct[(int)(lpParam)][1],std::string((const char*)(g_apThreadDataStruct[(int)(lpParam)][2])));
 }
 #if WRITE_BGSUB_IMG_OUTPUT
 const int g_anResultsComprParams[2] = {CV_IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
@@ -177,11 +179,14 @@ int main() {
         std::cout << "Running background subtraction..." << std::endl;
 #endif //DEFAULT_NB_THREADS==1
         size_t nSeqProcessed = 1;
-#if TOTAL_NB_ITERS>1
+#if TOTAL_NB_ITERS==1
+        const std::string sCurrResultsPath = g_sResultsPath;
+#else //TOTAL_NB_ITERS>1
         for(g_nCurrIter=1; g_nCurrIter<=TOTAL_NB_ITERS; ++g_nCurrIter) {
             std::cout << std::endl << std::endl << "Processing iteration " << g_nCurrIter << "/" << TOTAL_NB_ITERS << "..." << std::endl << std::endl;
             std::stringstream ssCurrResultsPath;
-            ssCurrResultsPath << g_sResultsPath << "iter" << std::setfill('0') << std::setw(3) << g_nCurrIter << "/";
+            ssCurrResultsPath << g_sResultsPath << "_iter" << std::setfill('0') << std::setw(3) << g_nCurrIter << "/";
+            const std::string sCurrResultsPath = ssCurrResultsPath.str();
             for(size_t c=0; c<vpCategories.size(); ++c) {
                 vpCategories[c]->nTP = 0;
                 vpCategories[c]->nTN = 0;
@@ -197,18 +202,25 @@ int main() {
                 }
             }
 #endif //TOTAL_NB_ITERS>1
+#if WRITE_BGSUB_METRICS_ANALYSIS
+            g_oDebugFS = cv::FileStorage(sCurrResultsPath+"framelevel_debug.yml",cv::FileStorage::WRITE);
+#endif //WRITE_BGSUB_METRICS_ANALYSIS
 #if EVAL_RESULTS_ONLY
             std::cout << "Running background subtraction evaluation..." << std::endl;
             for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
                 std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific <<  oSeqIter->first << ")" << std::endl;
                 for(size_t k=0; k<oSeqIter->second->GetNbGTFrames(); ++k) {
                     cv::Mat oGTImg = oSeqIter->second->GetGTFrameFromIndex(k);
-                    cv::Mat oFGMask = ReadResult(g_sResultsPath,oSeqIter->second->m_pParent->m_sName,oSeqIter->second->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix);
+                    cv::Mat oFGMask = ReadResult(sCurrResultsPath,oSeqIter->second->m_pParent->m_sName,oSeqIter->second->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix);
                     CalcMetricsFromResult(oFGMask,oGTImg,oSeqIter->second->GetSequenceROI(),oSeqIter->second->nTP,oSeqIter->second->nTN,oSeqIter->second->nFP,oSeqIter->second->nFN,oSeqIter->second->nSE);
                 }
                 ++nSeqProcessed;
             }
+            const double dFinalFPS = 0.0;
 #else //!EVAL_RESULTS_ONLY
+            CreateDirIfNotExist(sCurrResultsPath);
+            for(size_t c=0; c<vpCategories.size(); ++c)
+                CreateDirIfNotExist(sCurrResultsPath+vpCategories[c]->m_sName+"/");
             time_t startup = time(nullptr);
             tm* startup_tm = localtime(&startup);
             std::cout << "[" << (startup_tm->tm_year + 1900) << '/' << (startup_tm->tm_mon + 1) << '/' <<  startup_tm->tm_mday << " -- ";
@@ -220,7 +232,7 @@ int main() {
                 std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific <<  oSeqIter->first << ")" << std::endl;
                 g_nActiveThreads++;
                 nSeqProcessed++;
-                std::thread(AnalyzeSequence,oSeqIter->second->m_pParent,oSeqIter->second).detach();
+                std::thread(AnalyzeSequence,nSeqProcessed,oSeqIter->second->m_pParent,oSeqIter->second,sCurrResultsPath).detach();
             }
             while(g_nActiveThreads>0)
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -233,6 +245,7 @@ int main() {
                 nSeqProcessed++;
                 g_apThreadDataStruct[ret][0] = oSeqIter->second->m_pParent;
                 g_apThreadDataStruct[ret][1] = oSeqIter->second;
+                g_apThreadDataStruct[ret][2] = (void*)sCurrResultsPath.c_str();
                 g_hThreads[ret] = CreateThread(NULL,NULL,AnalyzeSequenceEntryPoint,(LPVOID)ret,0,NULL);
             }
             WaitForMultipleObjects((DWORD)((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads),g_hThreads,TRUE,INFINITE);
@@ -247,16 +260,11 @@ int main() {
             tm* shutdown_tm = localtime(&shutdown);
             std::cout << "[" << (shutdown_tm->tm_year + 1900) << '/' << (shutdown_tm->tm_mon + 1) << '/' <<  shutdown_tm->tm_mday << " -- ";
             std::cout << shutdown_tm->tm_hour << ':' << shutdown_tm->tm_min << ':' << shutdown_tm->tm_sec << ']' << std::endl;
-            double dFinalFPS = ((double)nFramesTotal)/(shutdown-startup);
+            const double dFinalFPS = ((double)nFramesTotal)/(shutdown-startup);
             std::cout << "\t ... session completed at a total of " << dFinalFPS << " fps." << std::endl;
 #endif //!EVAL_RESULTS_ONLY
 #if WRITE_BGSUB_METRICS_ANALYSIS
             std::cout << "Summing and writing metrics results..." << std::endl;
-#if TOTAL_NB_ITERS>1
-            CreateDirIfNotExist(ssCurrResultsPath.str());
-#else //TOTAL_NB_ITERS==1
-            CreateDirIfNotExist(g_sResultsPath);
-#endif //TOTAL_NB_ITERS==1
             for(size_t c=0; c<vpCategories.size(); ++c) {
                 if(!vpCategories[c]->m_vpSequences.empty()) {
                     for(size_t s=0; s<vpCategories[c]->m_vpSequences.size(); ++s) {
@@ -266,25 +274,10 @@ int main() {
                         vpCategories[c]->nFN += vpCategories[c]->m_vpSequences[s]->nFN;
                         vpCategories[c]->nSE += vpCategories[c]->m_vpSequences[s]->nSE;
                     }
-#if TOTAL_NB_ITERS>1
-                    WriteMetrics(ssCurrResultsPath.str()+vpCategories[c]->m_sName+".txt",vpCategories[c]);
+                    WriteMetrics(sCurrResultsPath+vpCategories[c]->m_sName+".txt",vpCategories[c]);
                 }
             }
-#if EVAL_RESULTS_ONLY
-            WriteMetrics(ssCurrResultsPath.str()+"METRICS_TOTAL.txt",vpCategories,0.0);
-#else //!EVAL_RESULTS_ONLY
-            WriteMetrics(ssCurrResultsPath.str()+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
-#endif //!EVAL_RESULTS_ONLY
-#else //TOTAL_NB_ITERS==1
-                    WriteMetrics(g_sResultsPath+vpCategories[c]->m_sName+".txt",vpCategories[c]);
-                }
-            }
-#if EVAL_RESULTS_ONLY
-            WriteMetrics(g_sResultsPath+"METRICS_TOTAL.txt",vpCategories,0.0);
-#else //!EVAL_RESULTS_ONLY
-            WriteMetrics(g_sResultsPath+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
-#endif //!EVAL_RESULTS_ONLY
-#endif //TOTAL_NB_ITERS==1
+            WriteMetrics(sCurrResultsPath+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
 #endif //WRITE_BGSUB_METRICS_ANALYSIS
 #if TOTAL_NB_ITERS>1
         }
@@ -299,11 +292,7 @@ int main() {
     //vpCategories.clear();
 }
 
-#if PLATFORM_SUPPORTS_CPP11
-int AnalyzeSequence(CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence) {
-#elif PLATFORM_USES_WIN32API
-int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence) {
-#endif //PLATFORM_USES_WIN32API
+int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence, const std::string& sCurrResultsPath) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
@@ -363,10 +352,13 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #endif //USE_PBAS_BG_SUBTRACTOR
 #endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
-        pBGS->sDebugName = pCurrCategory->m_sName+"_"+pCurrSequence->m_sName;
+        pBGS->m_sDebugName = pCurrCategory->m_sName+"_"+pCurrSequence->m_sName;
+#if WRITE_BGSUB_METRICS_ANALYSIS
+        pBGS->m_pDebugFS = &g_oDebugFS;
+#endif //WRITE_BGSUB_METRICS_ANALYSIS
 #if ENABLE_DISPLAY_MOUSE_DEBUG
-        pnLatestMouseX = &pBGS->nDebugCoordX;
-        pnLatestMouseY = &pBGS->nDebugCoordY;
+        pnLatestMouseX = &pBGS->m_nDebugCoordX;
+        pnLatestMouseY = &pBGS->m_nDebugCoordY;
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
 #endif //USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
 #if DISPLAY_BGSUB_DEBUG_OUTPUT
@@ -379,10 +371,10 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
         cv::setMouseCallback(sMouseDebugDisplayName,OnMouseEvent,nullptr);
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
 #if WRITE_BGSUB_DEBUG_IMG_OUTPUT
-        cv::VideoWriter oDebugWriter(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,g_oDisplayOutputSize,true);
+        cv::VideoWriter oDebugWriter(sCurrResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,g_oDisplayOutputSize,true);
 #endif //WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if WRITE_BGSUB_SEGM_AVI_OUTPUT
-        cv::VideoWriter oSegmWriter(g_sResultsPath+"/"+pCurrSequence->m_sName+"segm.avi",CV_FOURCC('F','F','V','1'),30,pCurrSequence->GetSize(),false);
+        cv::VideoWriter oSegmWriter(sCurrResultsPath+pCurrSequence->m_sName+"_segm.avi",CV_FOURCC('F','F','V','1'),30,pCurrSequence->GetSize(),false);
 #endif //WRITE_BGSUB_SEGM_AVI_OUTPUT
 #if WRITE_BGSUB_METRICS_ANALYSIS
         time_t startup = time(nullptr);
@@ -390,7 +382,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
         const size_t nNbInputFrames = pCurrSequence->GetNbInputFrames();
         for(size_t k=0; k<nNbInputFrames; k++) {
             if(!(k%100))
-                std::cout << "\t\t" << std::setw(12) << pCurrSequence->m_sName << " @ F:" << k << "/" << nNbInputFrames << std::endl;
+                std::cout << "\t\t" << std::setw(12) << pCurrSequence->m_sName << " @ F:" << k << "/" << nNbInputFrames << "   [T=" << nThreadIdx << "]" << std::endl;
 #if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
             std::chrono::high_resolution_clock::time_point pre_query = std::chrono::high_resolution_clock::now();
 #endif //ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
@@ -446,14 +438,14 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
                 break;
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT
 #if WRITE_BGSUB_IMG_OUTPUT
-            WriteResult(g_sResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix,oFGMask,g_vnResultsComprParams);
+            WriteResult(sCurrResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix,oFGMask,g_vnResultsComprParams);
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #if WRITE_BGSUB_METRICS_ANALYSIS
             CalcMetricsFromResult(oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
         }
         time_t shutdown = time(nullptr);
         pCurrSequence->m_dAvgFPS = ((double)nNbInputFrames)/(shutdown-startup);
-        WriteMetrics(g_sResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".txt",pCurrSequence);
+        WriteMetrics(sCurrResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".txt",pCurrSequence);
 #else //!WRITE_BGSUB_METRICS_ANALYSIS
         }
 #endif //!WRITE_BGSUB_METRICS_ANALYSIS

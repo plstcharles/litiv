@@ -584,7 +584,7 @@ void BackgroundSubtractorSuBSENSE::operator()(cv::InputArray _image, cv::OutputA
 	}
 #if DISPLAY_SUBSENSE_DEBUG_INFO
 	std::cout << std::endl;
-	cv::Point dbgpt(nDebugCoordX,nDebugCoordY);
+	cv::Point dbgpt(m_nDebugCoordX,m_nDebugCoordY);
 	cv::Mat oMeanMinDistFrameNormalized; m_oMeanMinDistFrame_ST.copyTo(oMeanMinDistFrameNormalized);
 	cv::circle(oMeanMinDistFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
 	cv::resize(oMeanMinDistFrameNormalized,oMeanMinDistFrameNormalized,DEFAULT_FRAME_SIZE);

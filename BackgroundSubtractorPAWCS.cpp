@@ -6,8 +6,6 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <iomanip>
 
-static cv::FileStorage s_oDebugFS("C:/datasets/CDNet2014/results_pawcs_wacv2015/debug73.yml",cv::FileStorage::WRITE);
-
 /*
  *
  * Intrinsic parameters for our method are defined here; tuning these for better
@@ -892,7 +890,7 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 							nCurrRegionSegmVal = UCHAR_MAX;
 					}
 #if DISPLAY_PAWCS_DEBUG_INFO
-					if(!nCurrRegionSegmVal && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==nDebugCoordY && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==nDebugCoordX) {
+					if(!nCurrRegionSegmVal && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==m_nDebugCoordY && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==m_nDebugCoordX) {
 						bDBGMaskModifiedByGDict = true;
 						pDBGGlobalWordModifier = pCurrGlobalWord;
 						fDBGGlobalWordModifierLocalWeight = *(float*)(pCurrGlobalWord->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
@@ -1034,7 +1032,7 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 			fIntraKPsTimeSum_MS += (float)(std::chrono::duration_cast<std::chrono::nanoseconds>(post_lastKP-pre_currKP).count())/1000000;
 #endif //USE_INTERNAL_HRCS
 #if DISPLAY_PAWCS_DEBUG_INFO
-			if(m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==nDebugCoordY && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==nDebugCoordX) {
+			if(m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==m_nDebugCoordY && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==m_nDebugCoordX) {
 				for(size_t c=0; c<3; ++c) {
 					anDBGColor[c] = nCurrColor;
 					anDBGIntraDesc[c] = nCurrIntraDesc;
@@ -1256,7 +1254,7 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 							nCurrRegionSegmVal = UCHAR_MAX;
 					}
 #if DISPLAY_PAWCS_DEBUG_INFO
-					if(!nCurrRegionSegmVal && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==nDebugCoordY && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==nDebugCoordX) {
+					if(!nCurrRegionSegmVal && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==m_nDebugCoordY && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==m_nDebugCoordX) {
 						bDBGMaskModifiedByGDict = true;
 						pDBGGlobalWordModifier = pCurrGlobalWord;
 						fDBGGlobalWordModifierLocalWeight = *(float*)(pCurrGlobalWord->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
@@ -1405,7 +1403,7 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 			fIntraKPsTimeSum_MS += (float)(std::chrono::duration_cast<std::chrono::nanoseconds>(post_lastKP-pre_currKP).count())/1000000;
 #endif //USE_INTERNAL_HRCS
 #if DISPLAY_PAWCS_DEBUG_INFO
-			if(m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==nDebugCoordY && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==nDebugCoordX) {
+			if(m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==m_nDebugCoordY && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==m_nDebugCoordX) {
 				for(size_t c=0; c<3; ++c) {
 					anDBGColor[c] = anCurrColor[c];
 					anDBGIntraDesc[c] = anCurrIntraDesc[c];
@@ -1475,13 +1473,13 @@ void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArra
 #if DISPLAY_PAWCS_DEBUG_INFO
 	if(nLocalDictDBGIdx!=UINT_MAX) {
 		std::cout << std::endl;
-		cv::Point dbgpt(nDebugCoordX,nDebugCoordY);
+		cv::Point dbgpt(m_nDebugCoordX,m_nDebugCoordY);
 		cv::Mat oGlobalWordsCoverageMap(m_oDownSampledFrameSize_GlobalWordLookup,CV_32FC1,cv::Scalar(0.0f));
 		for(size_t nDBGWordIdx=0; nDBGWordIdx<m_nCurrGlobalWords; ++nDBGWordIdx)
 				cv::max(oGlobalWordsCoverageMap,m_apGlobalWordDict[nDBGWordIdx]->oSpatioOccMap,oGlobalWordsCoverageMap);
 		cv::resize(oGlobalWordsCoverageMap,oGlobalWordsCoverageMap,DEFAULT_FRAME_SIZE,0,0,cv::INTER_NEAREST);
 		cv::imshow("oGlobalWordsCoverageMap",oGlobalWordsCoverageMap);
-		printf("\nDBG[%2d,%2d] : \n",nDebugCoordX,nDebugCoordY);
+		printf("\nDBG[%2d,%2d] : \n",m_nDebugCoordX,m_nDebugCoordY);
 		printf("\t Color=[%03d,%03d,%03d]\n",(int)anDBGColor[0],(int)anDBGColor[1],(int)anDBGColor[2]);
 		printf("\t IntraDesc=[%05d,%05d,%05d], IntraDescBITS=[%02lu,%02lu,%02lu]\n",anDBGIntraDesc[0],anDBGIntraDesc[1],anDBGIntraDesc[2],popcount_ushort_8bitsLUT(anDBGIntraDesc[0]),popcount_ushort_8bitsLUT(anDBGIntraDesc[1]),popcount_ushort_8bitsLUT(anDBGIntraDesc[2]));
 		char gword_dbg_str[1024] = "\0";

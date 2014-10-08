@@ -79,7 +79,8 @@ protected:
 
 public:
 	// ######## DEBUG PURPOSES ONLY ##########
-	int nDebugCoordX, nDebugCoordY;
-	std::string sDebugName;
+	int m_nDebugCoordX, m_nDebugCoordY;
+	std::string m_sDebugName;
+	cv::FileStorage* m_pDebugFS;
 };
 
