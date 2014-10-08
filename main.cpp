@@ -183,7 +183,7 @@ int main() {
         const std::string sCurrResultsPath = g_sResultsPath;
 #else //TOTAL_NB_ITERS>1
         for(g_nCurrIter=1; g_nCurrIter<=TOTAL_NB_ITERS; ++g_nCurrIter) {
-            std::cout << std::endl << std::endl << "Processing iteration " << g_nCurrIter << "/" << TOTAL_NB_ITERS << "..." << std::endl << std::endl;
+            std::cout << std::endl << std::endl << "Iteration [" << g_nCurrIter << "/" << TOTAL_NB_ITERS << "]" << std::endl << std::endl;
             std::stringstream ssCurrResultsPath;
             ssCurrResultsPath << g_sResultsPath << "_iter" << std::setfill('0') << std::setw(3) << g_nCurrIter << "/";
             const std::string sCurrResultsPath = ssCurrResultsPath.str();
@@ -208,7 +208,7 @@ int main() {
 #if EVAL_RESULTS_ONLY
             std::cout << "Running background subtraction evaluation..." << std::endl;
             for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
-                std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific <<  oSeqIter->first << ")" << std::endl;
+                std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
                 for(size_t k=0; k<oSeqIter->second->GetNbGTFrames(); ++k) {
                     cv::Mat oGTImg = oSeqIter->second->GetGTFrameFromIndex(k);
                     cv::Mat oFGMask = ReadResult(sCurrResultsPath,oSeqIter->second->m_pParent->m_sName,oSeqIter->second->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix);
@@ -229,7 +229,7 @@ int main() {
             for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
                 while(g_nActiveThreads>=g_nMaxThreads)
                     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-                std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific <<  oSeqIter->first << ")" << std::endl;
+                std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
                 g_nActiveThreads++;
                 nSeqProcessed++;
                 std::thread(AnalyzeSequence,nSeqProcessed,oSeqIter->second->m_pParent,oSeqIter->second,sCurrResultsPath).detach();
@@ -241,7 +241,7 @@ int main() {
                 g_hThreadEvent[n] = CreateEvent(NULL,FALSE,TRUE,NULL);
             for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
                 DWORD ret = WaitForMultipleObjects(g_nMaxThreads,g_hThreadEvent,FALSE,INFINITE);
-                std::cout << "\tProcessing sequence " << nSeqProcessed << "/" << nSeqTotal << "... (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << oSeqIter->first << ")" << std::endl;
+                std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
                 nSeqProcessed++;
                 g_apThreadDataStruct[ret][0] = oSeqIter->second->m_pParent;
                 g_apThreadDataStruct[ret][1] = oSeqIter->second;
@@ -381,8 +381,10 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #endif //WRITE_BGSUB_METRICS_ANALYSIS
         const size_t nNbInputFrames = pCurrSequence->GetNbInputFrames();
         for(size_t k=0; k<nNbInputFrames; k++) {
-            if(!(k%100))
-                std::cout << "\t\t" << std::setw(12) << pCurrSequence->m_sName << " @ F:" << k << "/" << nNbInputFrames << "   [T=" << nThreadIdx << "]" << std::endl;
+            if(!(k%100)) {
+                const std::string sCurrSeqName = pCurrSequence->m_sName.size()>12?pCurrSequence->m_sName.substr(0,12):pCurrSequence->m_sName;
+                std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ F:" << std::setfill('0') << std::setw(decimal_integer_digit_count(nNbInputFrames)) << k << "/" << nNbInputFrames << "   [T=" << nThreadIdx << "]" << std::endl;
+            }
 #if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
             std::chrono::high_resolution_clock::time_point pre_query = std::chrono::high_resolution_clock::now();
 #endif //ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
