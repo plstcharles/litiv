@@ -355,6 +355,10 @@ static inline cv::Mat GetColoredSegmFrameFromResult(const cv::Mat& oSegmResFrame
                     }
                 }
             }
+            else if(roi_step_ptr[j]==VAL_NEGATIVE) {
+                for(size_t c=0; c<3; ++c)
+                    res_step_ptr[j*3+c] = UCHAR_MAX/2;
+            }
             else {
                 for(size_t c=0; c<3; ++c)
                     res_step_ptr[j*3+c] = input_step_ptr[j];
