@@ -375,8 +375,11 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
         cv::VideoWriter oDebugWriter(sCurrResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,g_oDisplayOutputSize,true);
 #endif //WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if WRITE_BGSUB_SEGM_AVI_OUTPUT
-        cv::VideoWriter oSegmWriter(sCurrResultsPath+pCurrSequence->m_sName+"_segm.avi",CV_FOURCC('F','F','V','1'),30,pCurrSequence->GetSize(),false);
+        cv::VideoWriter oSegmWriter(sCurrResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+"_segm.avi",CV_FOURCC('F','F','V','1'),30,pCurrSequence->GetSize(),false);
 #endif //WRITE_BGSUB_SEGM_AVI_OUTPUT
+#if WRITE_BGSUB_IMG_OUTPUT
+        CreateDirIfNotExist(sCurrResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+"/");
+#endif //WRITE_BGSUB_IMG_OUTPUT
 #if WRITE_BGSUB_METRICS_ANALYSIS
         time_t startup = time(nullptr);
 #endif //WRITE_BGSUB_METRICS_ANALYSIS
