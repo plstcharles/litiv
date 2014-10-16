@@ -439,8 +439,10 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
                 nKeyPressed = cv::waitKey(1);
             else
                 nKeyPressed = cv::waitKey(0);
-            if(nKeyPressed!=-1)
-                std::cout << "nKeyPressed = " << nKeyPressed << std::endl;
+            if(nKeyPressed!=-1) {
+                nKeyPressed %= (UCHAR_MAX+1); // fixes return val bug in some opencv versions
+                std::cout << "nKeyPressed = " << nKeyPressed%(UCHAR_MAX+1) << std::endl;
+            }
             if(nKeyPressed==32)
                 g_bContinuousUpdates = !g_bContinuousUpdates;
             else if(nKeyPressed==(int)'q')
