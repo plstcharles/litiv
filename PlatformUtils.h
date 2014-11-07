@@ -35,6 +35,7 @@
     QueryPerformanceCounter(&t2); \
     std::cout << (float)(t2.QuadPart-t1.QuadPart)/frequency.QuadPart << " sec" << std::endl;
 void SetConsoleWindowSize(int x, int y, int buffer_lines=-1);
+#define __func__ __FUNCTION__
 #else //!PLATFORM_USES_WIN32API
 #include <dirent.h>
 #include <sys/stat.h>

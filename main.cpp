@@ -8,6 +8,8 @@
 #include "BackgroundSubtractorPBAS_1ch.h"
 #include "BackgroundSubtractorPBAS_3ch.h"
 
+// @@@@ OPENCV: CHECK HARDWARE SUPPORT FOR SSEX USING BUILT-IN UTILITY FUNCTIONS
+
 //////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
 //////////////////////////////////////////
@@ -264,7 +266,7 @@ int main() {
             std::cout << "\t ... session completed at a total of " << dFinalFPS << " fps." << std::endl;
 #endif //!EVAL_RESULTS_ONLY
 #if WRITE_BGSUB_METRICS_ANALYSIS
-            std::cout << "Summing and writing metrics results..." << std::endl;
+            std::cout << "Summing and writing metrics results...\n" << std::endl;
             for(size_t c=0; c<vpCategories.size(); ++c) {
                 if(!vpCategories[c]->m_vpSequences.empty()) {
                     for(size_t s=0; s<vpCategories[c]->m_vpSequences.size(); ++s) {
@@ -273,8 +275,10 @@ int main() {
                         vpCategories[c]->nFP += vpCategories[c]->m_vpSequences[s]->nFP;
                         vpCategories[c]->nFN += vpCategories[c]->m_vpSequences[s]->nFN;
                         vpCategories[c]->nSE += vpCategories[c]->m_vpSequences[s]->nSE;
+                        WriteMetrics(sCurrResultsPath+vpCategories[c]->m_sName+"/"+vpCategories[c]->m_vpSequences[s]->m_sName+".txt",vpCategories[c]->m_vpSequences[s]);
                     }
                     WriteMetrics(sCurrResultsPath+vpCategories[c]->m_sName+".txt",vpCategories[c]);
+                    std::cout << std::endl;
                 }
             }
             WriteMetrics(sCurrResultsPath+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
@@ -283,7 +287,7 @@ int main() {
 #if TOTAL_NB_ITERS>1
         }
 #endif //TOTAL_NB_ITERS>1
-        std::cout << "All done." << std::endl;
+        std::cout << std::endl << "All done." << std::endl;
     }
     else
         std::cout << "No sequences found, all done." << std::endl;
