@@ -407,8 +407,10 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
             cv::Mat oLastBGImg;
             pBGS->getBackgroundImage(oLastBGImg);
+#if (USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR)
             if(!oSequenceROI.empty())
                 cv::bitwise_or(oLastBGImg,UCHAR_MAX/2,oLastBGImg,oSequenceROI==0);
+#endif //(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR)
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
             std::chrono::high_resolution_clock::time_point pre_process = std::chrono::high_resolution_clock::now();
@@ -418,10 +420,12 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
             std::chrono::high_resolution_clock::time_point post_process = std::chrono::high_resolution_clock::now();
             std::cout << "proc=" << std::fixed << std::setprecision(1) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_process-pre_process).count())/1000 << "." << std::endl;
 #endif //ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
-#if WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT
+#if (WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT)
+#if (USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR)
             if(!oSequenceROI.empty())
                 cv::bitwise_or(oFGMask,UCHAR_MAX/2,oFGMask,oSequenceROI==0);
-#endif //WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT
+#endif //(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR)
+#endif //(WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT)
 #if WRITE_BGSUB_SEGM_AVI_OUTPUT
             oSegmWriter.write(oFGMask);
 #endif //WRITE_BGSUB_SEGM_AVI_OUTPUT
