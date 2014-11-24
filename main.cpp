@@ -18,17 +18,17 @@
 #define EVAL_RESULTS_ONLY                0
 #define WRITE_BGSUB_IMG_OUTPUT           0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
-#define WRITE_BGSUB_METRICS_ANALYSIS     1
+#define WRITE_BGSUB_METRICS_ANALYSIS     0
 //////////////////////////////////////////
 #if DEFAULT_NB_THREADS==1
-#define DISPLAY_BGSUB_DEBUG_OUTPUT       0
+#define DISPLAY_BGSUB_DEBUG_OUTPUT       1
 #define ENABLE_DISPLAY_MOUSE_DEBUG       0
 #define ENABLE_FRAME_TIMERS              0
 #define WRITE_BGSUB_SEGM_AVI_OUTPUT      0
 #endif //DEFAULT_NB_THREADS==1
 //////////////////////////////////////////
-#define USE_CB_LBSP_BG_SUBTRACTOR        1
-#define USE_VIBE_LBSP_BG_SUBTRACTOR      0
+#define USE_CB_LBSP_BG_SUBTRACTOR        0
+#define USE_VIBE_LBSP_BG_SUBTRACTOR      1
 #define USE_PBAS_LBSP_BG_SUBTRACTOR      0
 #define USE_VIBE_BG_SUBTRACTOR           0
 #define USE_PBAS_BG_SUBTRACTOR           0
@@ -37,11 +37,12 @@
 #define LIMIT_MODEL_TO_SEQUENCE_ROI      1
 #endif
 //////////////////////////////////////////
-#define USE_CDNET2012_DATASET            1
+#define USE_CDNET2012_DATASET            0
 #define USE_CDNET2014_DATASET            0
 #define USE_WALLFLOWER_DATASET           0
 #define USE_PETS2001_D3TC1_DATASET       0
 #define USE_SINGLE_AVI_FILE              0
+#define USE_VIDEO_REGISTRATION           1
 /////////////////////////////////////////////////////////////////////
 #define DATASET_ROOT_DIR                 std::string("/shared/datasets/")
 #define RESULTS_ROOT_DIR                 std::string("/shared/datasets/")
@@ -57,49 +58,60 @@
 #endif //(TOTAL_NB_ITERS<=0 || TOTAL_NB_PASSES<=0)
 #if (USE_VIBE_LBSP_BG_SUBTRACTOR+USE_PBAS_LBSP_BG_SUBTRACTOR+USE_VIBE_BG_SUBTRACTOR+USE_PBAS_BG_SUBTRACTOR+USE_CB_LBSP_BG_SUBTRACTOR)!=1
 #error "Must specify a single algorithm."
-#elif (USE_CDNET2012_DATASET+USE_CDNET2014_DATASET+USE_WALLFLOWER_DATASET+USE_PETS2001_D3TC1_DATASET+USE_SINGLE_AVI_FILE)!=1
+#elif (USE_CDNET2012_DATASET+USE_CDNET2014_DATASET+USE_WALLFLOWER_DATASET+USE_PETS2001_D3TC1_DATASET+USE_SINGLE_AVI_FILE+USE_VIDEO_REGISTRATION)!=1
 #error "Must specify a single dataset."
 #elif USE_CDNET2012_DATASET
-const std::string g_sDatasetName(CDNET_DB_NAME);
+const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_CDnet;
 const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/CDNet/dataset/");
 const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet/"+RESULTS_OUTPUT_DIR_NAME+"/");
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
-const char* g_asDatasetCategories[] = {"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"};
+const char* g_asDatasetFolders[] = {"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"};
+const char* g_asDatasetGrayscaleDirNameTokens = {"thermal"};
 const size_t g_nResultIdxOffset = 1;
 #elif USE_CDNET2014_DATASET
-const std::string g_sDatasetName(CDNET_DB_NAME);
+const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_CDnet;
 const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/CDNet2014/dataset/");
 const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet2014/"+RESULTS_OUTPUT_DIR_NAME+"/");
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
-const char* g_asDatasetCategories[] = {"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"};
+const char* g_asDatasetFolders[] = {"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"};
+const char* g_asDatasetGrayscaleDirNameTokens[] = {"thermal","turbulence"};
 const size_t g_nResultIdxOffset = 1;
 #elif USE_WALLFLOWER_DATASET
-const std::string g_sDatasetName(WALLFLOWER_DB_NAME);
+const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_Wallflower;
 const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/Wallflower/dataset/");
 const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/Wallflower/"+RESULTS_OUTPUT_DIR_NAME+"/");
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
-const char* g_asDatasetCategories[] = {"global"};
+const char* g_asDatasetFolders[] = {"global"};
 const size_t g_nResultIdxOffset = 0;
 #elif USE_PETS2001_D3TC1_DATASET
-const std::string g_sDatasetName(PETS2001_D3TC1_DB_NAME);
+const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_PETS2001_D3TC1;
 const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/PETS2001/DATASET3/");
 const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/PETS2001/DATASET3/"+RESULTS_OUTPUT_DIR_NAME+"/");
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
-const char* g_asDatasetCategories[] = {"TESTING"};
+const char* g_asDatasetFolders[] = {"TESTING"};
 const size_t g_nResultIdxOffset = 0;
 #elif USE_SINGLE_AVI_FILE
-const std::string g_sDatasetName(SINGLE_AVI_TEST_NAME);
+const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_GenericSegmentationTest;
 const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/avitest/");
 const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/avitest/"+RESULTS_OUTPUT_DIR_NAME+"/");
 const std::string g_sResultPrefix("");
 const std::string g_sResultSuffix("");
-const char* g_asDatasetCategories[] = {"gait_analysis"};
+const char* g_asDatasetFolders[] = {"gait_analysis"};
 const size_t g_nResultIdxOffset = 0;
-#endif //USE_SINGLE_AVI_FILE
+#elif USE_VIDEO_REGISTRATION
+const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_LITIV_Registr01;
+const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/litiv/registration_set01/");
+const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/litiv/registration_set01/"+RESULTS_OUTPUT_DIR_NAME+"/");
+const std::string g_sResultPrefix("");
+const std::string g_sResultSuffix("");
+const char* g_asDatasetFolders[] = {"SEQUENCE1"};
+const char* g_asDatasetGrayscaleDirNameTokens[] = {"THERMAL"};
+const size_t g_nResultIdxOffset = 0;
+#endif //USE_VIDEO_REGISTRATION
 #if ENABLE_DISPLAY_MOUSE_DEBUG
 static int *pnLatestMouseX=nullptr, *pnLatestMouseY=nullptr;
 void OnMouseEvent(int event, int x, int y, int, void*) {
@@ -120,7 +132,7 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 #if DEFAULT_NB_THREADS<1
 #error "Bad default number of threads specified."
 #endif //DEFAULT_NB_THREADS<1
-int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence, const std::string& sCurrResultsPath);
+int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, DatasetUtils::SequenceInfo* pCurrSequence, const std::string& sCurrResultsPath);
 #if PLATFORM_SUPPORTS_CPP11
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
 std::atomic_size_t g_nActiveThreads(0);
@@ -151,24 +163,21 @@ int main() {
 #if PLATFORM_USES_WIN32API
     SetConsoleWindowSize(80,40,1000);
 #endif //PLATFORM_USES_WIN32API
-    std::vector<CategoryInfo*> vpCategories;
-    std::cout << "Parsing dataset '"<< g_sDatasetName << "'..." << std::endl;
+    std::vector<DatasetUtils::CategoryInfo*> vpCategories;
+    std::cout << "Parsing dataset..." << std::endl;
     try {
-        for(size_t p=0; p<TOTAL_NB_PASSES; ++p) {
-            for(size_t i=0; i<sizeof(g_asDatasetCategories)/sizeof(char*); ++i) {
-                bool bIsThermal = (std::string(g_asDatasetCategories[i]).find("thermal")!=std::string::npos) || (std::string(g_asDatasetCategories[i]).find("turbulence")!=std::string::npos);
-                vpCategories.push_back(new CategoryInfo(g_asDatasetCategories[i], g_sDatasetPath+g_asDatasetCategories[i], g_sDatasetName, bIsThermal));
-            }
-        }
+        for(size_t p=0; p<TOTAL_NB_PASSES; ++p)
+            for(size_t i=0; i<sizeof(g_asDatasetFolders)/sizeof(char*); ++i)
+                vpCategories.push_back(new DatasetUtils::CategoryInfo(g_asDatasetFolders[i],g_sDatasetPath+g_asDatasetFolders[i],g_eDatasetID,g_asDatasetGrayscaleDirNameTokens));
     } catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
     size_t nSeqTotal = 0;
     size_t nFramesTotal = 0;
-    std::multimap<double,SequenceInfo*> mSeqLoads;
+    std::multimap<double,DatasetUtils::SequenceInfo*> mSeqLoads;
     for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory) {
         nSeqTotal += (*pCurrCategory)->m_vpSequences.size();
         for(auto pCurrSequence=(*pCurrCategory)->m_vpSequences.begin(); pCurrSequence!=(*pCurrCategory)->m_vpSequences.end(); ++pCurrSequence) {
             nFramesTotal += (*pCurrSequence)->GetNbInputFrames();
-            mSeqLoads.insert(std::pair<double,SequenceInfo*>((*pCurrSequence)->m_dExpectedROILoad,(*pCurrSequence)));
+            mSeqLoads.insert(std::pair<double,DatasetUtils::SequenceInfo*>((*pCurrSequence)->m_dExpectedROILoad,(*pCurrSequence)));
         }
     }
     CV_Assert(mSeqLoads.size()==nSeqTotal);
@@ -220,9 +229,9 @@ int main() {
             }
             const double dFinalFPS = 0.0;
 #else //!EVAL_RESULTS_ONLY
-            CreateDirIfNotExist(sCurrResultsPath);
+            PlatformUtils::CreateDirIfNotExist(sCurrResultsPath);
             for(size_t c=0; c<vpCategories.size(); ++c)
-                CreateDirIfNotExist(sCurrResultsPath+vpCategories[c]->m_sName+"/");
+                PlatformUtils::CreateDirIfNotExist(sCurrResultsPath+vpCategories[c]->m_sName+"/");
             time_t startup = time(nullptr);
             tm* startup_tm = localtime(&startup);
             std::cout << "[" << (startup_tm->tm_year + 1900) << '/' << (startup_tm->tm_mon + 1) << '/' <<  startup_tm->tm_mday << " -- ";
@@ -297,7 +306,7 @@ int main() {
     //vpCategories.clear();
 }
 
-int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* pCurrSequence, const std::string& sCurrResultsPath) {
+int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, DatasetUtils::SequenceInfo* pCurrSequence, const std::string& sCurrResultsPath) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
 #if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
@@ -370,6 +379,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
         std::string sDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName;
         cv::namedWindow(sDebugDisplayName);
 #endif //DISPLAY_ANALYSIS_DEBUG_RESULTS
+        CV_Assert((!WRITE_BGSUB_DEBUG_IMG_OUTPUT && !WRITE_BGSUB_SEGM_AVI_OUTPUT && !WRITE_BGSUB_IMG_OUTPUT) || !sCurrResultsPath.empty());
 #if ENABLE_DISPLAY_MOUSE_DEBUG
         std::string sMouseDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName + " [MOUSE DEBUG]";
         cv::namedWindow(sMouseDebugDisplayName,0);
@@ -391,7 +401,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
         for(size_t k=0; k<nNbInputFrames; k++) {
             if(!(k%100)) {
                 const std::string sCurrSeqName = pCurrSequence->m_sName.size()>12?pCurrSequence->m_sName.substr(0,12):pCurrSequence->m_sName;
-                std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ F:" << std::setfill('0') << std::setw(decimal_integer_digit_count((int)nNbInputFrames)) << k << "/" << nNbInputFrames << "   [T=" << nThreadIdx << "]" << std::endl;
+                std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nNbInputFrames)) << k << "/" << nNbInputFrames << "   [T=" << nThreadIdx << "]" << std::endl;
             }
 #if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
             std::chrono::high_resolution_clock::time_point pre_query = std::chrono::high_resolution_clock::now();
@@ -454,7 +464,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
                 nKeyPressed %= (UCHAR_MAX+1); // fixes return val bug in some opencv versions
                 std::cout << "nKeyPressed = " << nKeyPressed%(UCHAR_MAX+1) << std::endl;
             }
-            if(nKeyPressed==32)
+            if(nKeyPressed==' ')
                 g_bContinuousUpdates = !g_bContinuousUpdates;
             else if(nKeyPressed==(int)'q')
                 break;
@@ -463,7 +473,7 @@ int AnalyzeSequence(int nThreadIdx, CategoryInfo* pCurrCategory, SequenceInfo* p
             WriteResult(sCurrResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix,oFGMask,g_vnResultsComprParams);
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #if WRITE_BGSUB_METRICS_ANALYSIS
-            CalcMetricsFromResult(oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
+            DatasetUtils::CalcMetricsFromResult(oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
         }
         time_t shutdown = time(nullptr);
         pCurrSequence->m_dAvgFPS = ((double)nNbInputFrames)/(shutdown-startup);
@@ -508,7 +518,7 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
         oInputImgBYTE3 = oInputImg;
         oBGImgBYTE3 = oBGImg;
     }
-    oFGMaskBYTE3 = GetColoredSegmFrameFromResult(oFGMask,oGTFGMask,oROI);
+    oFGMaskBYTE3 = DatasetUtils::GetColoredSegmFrameFromResult(oFGMask,oGTFGMask,oROI);
 #if ENABLE_DISPLAY_MOUSE_DEBUG
     if(pnLatestMouseX&&pnLatestMouseY) {
         cv::Point dbgpt(*pnLatestMouseX,*pnLatestMouseY);
@@ -523,9 +533,9 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
 
     std::stringstream sstr;
     sstr << "Input Image #" << nFrame;
-    WriteOnImage(oInputImgBYTE3,sstr.str());
-    WriteOnImage(oBGImgBYTE3,"Reference Image");
-    WriteOnImage(oFGMaskBYTE3,"Segmentation Result");
+    DatasetUtils::WriteOnImage(oInputImgBYTE3,sstr.str());
+    DatasetUtils::WriteOnImage(oBGImgBYTE3,"Reference Image");
+    DatasetUtils::WriteOnImage(oFGMaskBYTE3,"Segmentation Result");
 
     cv::hconcat(oInputImgBYTE3,oBGImgBYTE3,displayH);
     cv::hconcat(displayH,oFGMaskBYTE3,displayH);

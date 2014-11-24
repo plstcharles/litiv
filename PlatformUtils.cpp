@@ -1,38 +1,6 @@
 #include "PlatformUtils.h"
 
-#if PLATFORM_USES_WIN32API
-// SetConsoleWindowSize(...) : derived from http://www.cplusplus.com/forum/windows/121444/
-void SetConsoleWindowSize(int x, int y, int buffer_lines) {
-    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
-    if(h==INVALID_HANDLE_VALUE)
-        throw std::runtime_error("SetConsoleWindowSize(...): Unable to get stdout handle.");
-    COORD largestSize = GetLargestConsoleWindowSize(h);
-    if(x>largestSize.X)
-        x = largestSize.X;
-    if(y>largestSize.Y)
-        y = largestSize.Y;
-    if(buffer_lines<=0)
-        buffer_lines = y;
-    CONSOLE_SCREEN_BUFFER_INFO bufferInfo;
-    if(!GetConsoleScreenBufferInfo(h,&bufferInfo))
-        throw std::runtime_error("SetConsoleWindowSize(...): Unable to retrieve screen buffer info.");
-    SMALL_RECT& winInfo = bufferInfo.srWindow;
-    COORD windowSize = {winInfo.Right-winInfo.Left+1,winInfo.Bottom-winInfo.Top+1};
-    if(windowSize.X>x || windowSize.Y>y) {
-        SMALL_RECT info = {0,0,(x<windowSize.X)?(x-1):(windowSize.X-1),(y<windowSize.Y)?(y-1):(windowSize.Y-1)};
-        if(!SetConsoleWindowInfo(h,TRUE,&info))
-            throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize window before resizing buffer.");
-    }
-    COORD size = {x,y};
-    if(!SetConsoleScreenBufferSize(h,size))
-        throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize screen buffer.");
-    SMALL_RECT info = {0,0,x-1,y-1};
-    if(!SetConsoleWindowInfo(h, TRUE, &info))
-        throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize window after resizing buffer.");
-}
-#endif //PLATFORM_USES_WIN32API
-
-void GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths) {
+void PlatformUtils::GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths) {
     vsFilePaths.clear();
 #if PLATFORM_USES_WIN32API
     WIN32_FIND_DATA ffd;
@@ -85,7 +53,7 @@ void GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFi
 #endif //!PLATFORM_USES_WIN32API
 }
 
-void GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths) {
+void PlatformUtils::GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths) {
     vsSubDirPaths.clear();
 #if PLATFORM_USES_WIN32API
     WIN32_FIND_DATA ffd;
@@ -141,7 +109,7 @@ void GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vs
 #endif //!PLATFORM_USES_WIN32API
 }
 
-bool CreateDirIfNotExist(const std::string& sDirPath) {
+bool PlatformUtils::CreateDirIfNotExist(const std::string& sDirPath) {
 #if PLATFORM_USES_WIN32API
     std::wstring dir(sDirPath.begin(),sDirPath.end());
     return CreateDirectory(dir.c_str(),NULL)!=ERROR_PATH_NOT_FOUND;
@@ -153,3 +121,35 @@ bool CreateDirIfNotExist(const std::string& sDirPath) {
         return (stat(sDirPath.c_str(),&st)==0 && S_ISDIR(st.st_mode));
 #endif //!PLATFORM_USES_WIN32API
 }
+
+#if PLATFORM_USES_WIN32API
+// SetConsoleWindowSize(...) : derived from http://www.cplusplus.com/forum/windows/121444/
+void PlatformUtils::SetConsoleWindowSize(int x, int y, int buffer_lines) {
+    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+    if(h==INVALID_HANDLE_VALUE)
+        throw std::runtime_error("SetConsoleWindowSize(...): Unable to get stdout handle.");
+    COORD largestSize = GetLargestConsoleWindowSize(h);
+    if(x>largestSize.X)
+        x = largestSize.X;
+    if(y>largestSize.Y)
+        y = largestSize.Y;
+    if(buffer_lines<=0)
+        buffer_lines = y;
+    CONSOLE_SCREEN_BUFFER_INFO bufferInfo;
+    if(!GetConsoleScreenBufferInfo(h,&bufferInfo))
+        throw std::runtime_error("SetConsoleWindowSize(...): Unable to retrieve screen buffer info.");
+    SMALL_RECT& winInfo = bufferInfo.srWindow;
+    COORD windowSize = {winInfo.Right-winInfo.Left+1,winInfo.Bottom-winInfo.Top+1};
+    if(windowSize.X>x || windowSize.Y>y) {
+        SMALL_RECT info = {0,0,(x<windowSize.X)?(x-1):(windowSize.X-1),(y<windowSize.Y)?(y-1):(windowSize.Y-1)};
+        if(!SetConsoleWindowInfo(h,TRUE,&info))
+            throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize window before resizing buffer.");
+    }
+    COORD size = {x,y};
+    if(!SetConsoleScreenBufferSize(h,size))
+        throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize screen buffer.");
+    SMALL_RECT info = {0,0,x-1,y-1};
+    if(!SetConsoleWindowInfo(h, TRUE, &info))
+        throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize window after resizing buffer.");
+}
+#endif //PLATFORM_USES_WIN32API

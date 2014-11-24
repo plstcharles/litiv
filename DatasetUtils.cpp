@@ -1,57 +1,410 @@
 #include "DatasetUtils.h"
 
-CategoryInfo::CategoryInfo(const std::string& name, const std::string& dir, const std::string& dbname, bool forceGrayscale)
-    :    m_sName(name)
-        ,m_sDBName(dbname)
-        ,nTP(0)
-        ,nTN(0)
-        ,nFP(0)
-        ,nFN(0)
-        ,nSE(0)
-        ,m_dAvgFPS(-1) {
-    std::cout << "\tParsing dir '" << dir << "' for category '" << name << "'... ";
-    std::vector<std::string> vsSequencePaths;
-    if(m_sDBName==CDNET_DB_NAME || m_sDBName==WALLFLOWER_DB_NAME || m_sDBName==PETS2001_D3TC1_DB_NAME/*|| m_sDBName==...*/) {
-        // all subdirs are considered sequence directories
-        GetSubDirsFromDir(dir,vsSequencePaths);
-        std::cout << "(" << vsSequencePaths.size() << " subdir sequences)" << std::endl;
+double DatasetUtils::CalcMetric_FMeasure(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN) {
+    const double dRecall = DatasetUtils::CalcMetric_Recall(nTP,nTN,nFP,nFN);
+    const double dPrecision = DatasetUtils::CalcMetric_Precision(nTP,nTN,nFP,nFN);
+    return (2.0*(dRecall*dPrecision)/(dRecall+dPrecision));
+}
+double DatasetUtils::CalcMetric_Recall(uint64_t nTP, uint64_t /*nTN*/, uint64_t /*nFP*/, uint64_t nFN) {return ((double)nTP/(nTP+nFN));}
+double DatasetUtils::CalcMetric_Precision(uint64_t nTP, uint64_t /*nTN*/, uint64_t nFP, uint64_t /*nFN*/) {return ((double)nTP/(nTP+nFP));}
+double DatasetUtils::CalcMetric_Specificity(uint64_t /*nTP*/, uint64_t nTN, uint64_t nFP, uint64_t /*nFN*/) {return ((double)nTN/(nTN+nFP));}
+double DatasetUtils::CalcMetric_FalsePositiveRate(uint64_t /*nTP*/, uint64_t nTN, uint64_t nFP, uint64_t /*nFN*/) {return ((double)nFP/(nFP+nTN));}
+double DatasetUtils::CalcMetric_FalseNegativeRate(uint64_t nTP, uint64_t /*nTN*/, uint64_t /*nFP*/, uint64_t nFN) {return ((double)nFN/(nTP+nFN));}
+double DatasetUtils::CalcMetric_PercentBadClassifs(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN) {return (100.0*(nFN+nFP)/(nTP+nFP+nFN+nTN));}
+double DatasetUtils::CalcMetric_MatthewsCorrCoeff(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN) {return ((((double)nTP*nTN)-(nFP*nFN))/sqrt(((double)nTP+nFP)*(nTP+nFN)*(nTN+nFP)*(nTN+nFN)));}
+
+cv::Mat DatasetUtils::ReadResult( const std::string& sResultsPath,
+                                  const std::string& sCatName,
+                                  const std::string& sSeqName,
+                                  const std::string& sResultPrefix,
+                                  size_t framenum,
+                                  const std::string& sResultSuffix) {
+    char buffer[10];
+    sprintf(buffer,"%06lu",framenum);
+    std::stringstream sResultFilePath;
+    sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << buffer << sResultSuffix;
+    return cv::imread(sResultFilePath.str(),cv::IMREAD_GRAYSCALE);
+}
+
+void DatasetUtils::WriteResult( const std::string& sResultsPath,
+                                const std::string& sCatName,
+                                const std::string& sSeqName,
+                                const std::string& sResultPrefix,
+                                size_t framenum,
+                                const std::string& sResultSuffix,
+                                const cv::Mat& res,
+                                const std::vector<int>& vnComprParams) {
+    char buffer[10];
+    sprintf(buffer,"%06lu",framenum);
+    std::stringstream sResultFilePath;
+    sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << buffer << sResultSuffix;
+    cv::imwrite(sResultFilePath.str(), res, vnComprParams);
+}
+
+void DatasetUtils::WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bBottom) {
+    cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-15):15),cv::FONT_HERSHEY_PLAIN,1.0,cv::Scalar_<uchar>(0,0,255),1,CV_AA);
+}
+
+void DatasetUtils::WriteMetrics(const std::string sResultsFileName, const SequenceInfo* pSeq) {
+    std::ofstream oMetricsOutput(sResultsFileName);
+    MetricsCalculator tmp(pSeq);
+    const std::string sCurrSeqName = pSeq->m_sName.size()>12?pSeq->m_sName.substr(0,12):pSeq->m_sName;
+    std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " : Rcl=" << std::fixed << std::setprecision(4) << tmp.m_oMetrics.dRecall << " Prc=" << tmp.m_oMetrics.dPrecision << " FM=" << tmp.m_oMetrics.dFMeasure << " MCC=" << tmp.m_oMetrics.dMCC << std::endl;
+    oMetricsOutput << "Results for sequence '" << pSeq->m_sName << "' :" << std::endl;
+    oMetricsOutput << std::endl;
+    oMetricsOutput << "nTP nFP nFN nTN nSE" << std::endl; // order similar to the files saved by the CDNet analysis script
+    oMetricsOutput << pSeq->nTP << " " << pSeq->nFP << " " << pSeq->nFN << " " << pSeq->nTN << " " << pSeq->nSE << std::endl;
+    oMetricsOutput << std::endl << std::endl;
+    oMetricsOutput << std::fixed << std::setprecision(8);
+    oMetricsOutput << "Cumulative metrics :" << std::endl;
+    oMetricsOutput << "Rcl        Spc        FPR        FNR        PBC        Prc        FM         MCC        " << std::endl;
+    oMetricsOutput << tmp.m_oMetrics.dRecall << " " << tmp.m_oMetrics.dSpecficity << " " << tmp.m_oMetrics.dFPR << " " << tmp.m_oMetrics.dFNR << " " << tmp.m_oMetrics.dPBC << " " << tmp.m_oMetrics.dPrecision << " " << tmp.m_oMetrics.dFMeasure << " " << tmp.m_oMetrics.dMCC << std::endl;
+    oMetricsOutput << std::endl << std::endl;
+    oMetricsOutput << "Sequence FPS: " << pSeq->m_dAvgFPS << std::endl;
+    oMetricsOutput.close();
+}
+
+void DatasetUtils::WriteMetrics(const std::string sResultsFileName, CategoryInfo* pCat) {
+    std::ofstream oMetricsOutput(sResultsFileName);
+    std::sort(pCat->m_vpSequences.begin(),pCat->m_vpSequences.end(),&SequenceInfo::compare);
+    oMetricsOutput << "Results for category '" << pCat->m_sName << "' :" << std::endl;
+    oMetricsOutput << std::endl;
+    oMetricsOutput << "nTP nFP nFN nTN nSE" << std::endl; // order similar to the files saved by the CDNet analysis script
+    oMetricsOutput << pCat->nTP << " " << pCat->nFP << " " << pCat->nFN << " " << pCat->nTN << " " << pCat->nSE << std::endl;
+    oMetricsOutput << std::endl << std::endl;
+    oMetricsOutput << std::fixed << std::setprecision(8);
+    oMetricsOutput << "Sequence Metrics :" << std::endl;
+    oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FM         MCC        " << std::endl;
+    for(size_t i=0; i<pCat->m_vpSequences.size(); ++i) {
+        MetricsCalculator tmp(pCat->m_vpSequences[i]);
+        std::string sName = pCat->m_vpSequences[i]->m_sName;
+        if(sName.size()>10)
+            sName = sName.substr(0,10);
+        else if(sName.size()<10)
+            sName += std::string(10-sName.size(),' ');
+        oMetricsOutput << sName << " " << tmp.m_oMetrics.dRecall << " " << tmp.m_oMetrics.dSpecficity << " " << tmp.m_oMetrics.dFPR << " " << tmp.m_oMetrics.dFNR << " " << tmp.m_oMetrics.dPBC << " " << tmp.m_oMetrics.dPrecision << " " << tmp.m_oMetrics.dFMeasure << " " << tmp.m_oMetrics.dMCC << std::endl;
     }
-    else if(m_sDBName==SINGLE_AVI_TEST_NAME) {
-        // all files are considered sequences
-        GetFilesFromDir(dir,vsSequencePaths);
-        std::cout << "(" << vsSequencePaths.size() << " sequences)" << std::endl;
+    oMetricsOutput << "--------------------------------------------------------------------------------------------------" << std::endl;
+    MetricsCalculator all(pCat, USE_AVERAGE_METRICS);
+    const std::string sCurrCatName = pCat->m_sName.size()>12?pCat->m_sName.substr(0,12):pCat->m_sName;
+    std::cout << "\t" << std::setfill(' ') << std::setw(12) << sCurrCatName << " : Rcl=" << std::fixed << std::setprecision(4) << all.m_oMetrics.dRecall << " Prc=" << all.m_oMetrics.dPrecision << " FM=" << all.m_oMetrics.dFMeasure << " MCC=" << all.m_oMetrics.dMCC << std::endl;
+    oMetricsOutput << std::string(USE_AVERAGE_METRICS?"averaged   ":"cumulative ") << all.m_oMetrics.dRecall << " " << all.m_oMetrics.dSpecficity << " " << all.m_oMetrics.dFPR << " " << all.m_oMetrics.dFNR << " " << all.m_oMetrics.dPBC << " " << all.m_oMetrics.dPrecision << " " << all.m_oMetrics.dFMeasure << " " << all.m_oMetrics.dMCC << std::endl;
+    oMetricsOutput << std::endl << std::endl;
+    oMetricsOutput << "All Sequences Average FPS: " << all.m_oMetrics.dFPS << std::endl;
+    oMetricsOutput.close();
+}
+
+void DatasetUtils::WriteMetrics(const std::string sResultsFileName, std::vector<CategoryInfo*>& vpCat, double dTotalFPS) {
+    std::ofstream oMetricsOutput(sResultsFileName);
+    std::sort(vpCat.begin(),vpCat.end(),&CategoryInfo::compare);
+    oMetricsOutput << std::fixed << std::setprecision(8);
+    oMetricsOutput << "Overall results :" << std::endl;
+    oMetricsOutput << std::endl;
+    oMetricsOutput << std::string(USE_AVERAGE_METRICS?"Averaged":"Cumulative") << " metrics :" << std::endl;
+    oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FM         MCC        " << std::endl;
+    for(size_t i=0; i<vpCat.size(); ++i) {
+        if(!vpCat[i]->m_vpSequences.empty()) {
+            MetricsCalculator tmp(vpCat[i],USE_AVERAGE_METRICS);
+            std::string sName = vpCat[i]->m_sName;
+            if(sName.size()>10)
+                sName = sName.substr(0,10);
+            else if(sName.size()<10)
+                sName += std::string(10-sName.size(),' ');
+            oMetricsOutput << sName << " " << tmp.m_oMetrics.dRecall << " " << tmp.m_oMetrics.dSpecficity << " " << tmp.m_oMetrics.dFPR << " " << tmp.m_oMetrics.dFNR << " " << tmp.m_oMetrics.dPBC << " " << tmp.m_oMetrics.dPrecision << " " << tmp.m_oMetrics.dFMeasure << " " << tmp.m_oMetrics.dMCC << std::endl;
+        }
     }
-    /*else if(m_sDBName==...) {
-            // ...
-    }*/
-    else
-        throw std::runtime_error(std::string("Unknown database name, cannot use any known parsing strategy."));
-    for(auto iter=vsSequencePaths.begin(); iter!=vsSequencePaths.end(); ++iter) {
-        const size_t pos = iter->find_last_of("/\\");
-        if(pos==std::string::npos)
-            m_vpSequences.push_back(new SequenceInfo(*iter,*iter,dbname,this,forceGrayscale));
-        else
-            m_vpSequences.push_back(new SequenceInfo(iter->substr(pos+1),*iter,dbname,this,forceGrayscale));
+    oMetricsOutput << "--------------------------------------------------------------------------------------------------" << std::endl;
+    MetricsCalculator all(vpCat,USE_AVERAGE_METRICS);
+    oMetricsOutput << "overall    " << all.m_oMetrics.dRecall << " " << all.m_oMetrics.dSpecficity << " " << all.m_oMetrics.dFPR << " " << all.m_oMetrics.dFNR << " " << all.m_oMetrics.dPBC << " " << all.m_oMetrics.dPrecision << " " << all.m_oMetrics.dFMeasure << " " << all.m_oMetrics.dMCC << std::endl;
+    oMetricsOutput << std::endl << std::endl;
+    oMetricsOutput << "All Sequences Average FPS: " << all.m_oMetrics.dFPS << std::endl;
+    oMetricsOutput << "Total FPS: " << dTotalFPS << std::endl;
+    oMetricsOutput.close();
+}
+
+void DatasetUtils::CalcMetricsFromResult(const cv::Mat& oSegmResFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI, uint64_t& nTP, uint64_t& nTN, uint64_t& nFP, uint64_t& nFN, uint64_t& nSE) {
+    CV_DbgAssert(oSegmResFrame.type()==CV_8UC1 && oGTFrame.type()==CV_8UC1 && oROI.type()==CV_8UC1);
+    CV_DbgAssert(oSegmResFrame.size()==oGTFrame.size() && oSegmResFrame.size()==oROI.size());
+    const size_t step_row = oSegmResFrame.step.p[0];
+    for(size_t i=0; i<(size_t)oSegmResFrame.rows; ++i) {
+        const size_t idx_nstep = step_row*i;
+        const uchar* input_step_ptr = oSegmResFrame.data+idx_nstep;
+        const uchar* gt_step_ptr = oGTFrame.data+idx_nstep;
+        const uchar* roi_step_ptr = oROI.data+idx_nstep;
+        for(int j=0; j<oSegmResFrame.cols; ++j) {
+            if( gt_step_ptr[j]!=g_nCDnetOutOfScope &&
+                gt_step_ptr[j]!=g_nCDnetUnknown &&
+                roi_step_ptr[j]!=g_nCDnetNegative ) {
+                if(input_step_ptr[j]==g_nCDnetPositive) {
+                    if(gt_step_ptr[j]==g_nCDnetPositive)
+                        ++nTP;
+                    else // gt_step_ptr[j]==g_nCDnetNegative
+                        ++nFP;
+                }
+                else { // input_step_ptr[j]==g_nCDnetNegative
+                    if(gt_step_ptr[j]==g_nCDnetPositive)
+                        ++nFN;
+                    else // gt_step_ptr[j]==g_nCDnetNegative
+                        ++nTN;
+                }
+                if(gt_step_ptr[j]==g_nCDnetShadow) {
+                    if(input_step_ptr[j]==g_nCDnetPositive)
+                        ++nSE;
+                }
+            }
+        }
     }
 }
 
-CategoryInfo::~CategoryInfo() {
+inline DatasetUtils::CommonMetrics CalcMetricsFromCounts(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN, uint64_t /*nSE*/, double dFPS) {
+    DatasetUtils::CommonMetrics res;
+    res.dRecall = DatasetUtils::CalcMetric_Recall(nTP,nTN,nFP,nFN);
+    res.dSpecficity = DatasetUtils::CalcMetric_Specificity(nTP,nTN,nFP,nFN);
+    res.dFPR = DatasetUtils::CalcMetric_FalsePositiveRate(nTP,nTN,nFP,nFN);
+    res.dFNR = DatasetUtils::CalcMetric_FalseNegativeRate(nTP,nTN,nFP,nFN);
+    res.dPBC = DatasetUtils::CalcMetric_PercentBadClassifs(nTP,nTN,nFP,nFN);
+    res.dPrecision = DatasetUtils::CalcMetric_Precision(nTP,nTN,nFP,nFN);
+    res.dFMeasure = DatasetUtils::CalcMetric_FMeasure(nTP,nTN,nFP,nFN);
+    res.dMCC = DatasetUtils::CalcMetric_MatthewsCorrCoeff(nTP,nTN,nFP,nFN);
+    res.dFPS = dFPS;
+    return res;
+}
+
+inline DatasetUtils::CommonMetrics CalcMetricsFromCategory(const DatasetUtils::CategoryInfo* pCat, bool bAverage) {
+    DatasetUtils::CommonMetrics res;
+    if(!bAverage) {
+        res.dRecall = DatasetUtils::CalcMetric_Recall(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
+        res.dSpecficity = DatasetUtils::CalcMetric_Specificity(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
+        res.dFPR = DatasetUtils::CalcMetric_FalsePositiveRate(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
+        res.dFNR = DatasetUtils::CalcMetric_FalseNegativeRate(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
+        res.dPBC = DatasetUtils::CalcMetric_PercentBadClassifs(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
+        res.dPrecision = DatasetUtils::CalcMetric_Precision(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
+        res.dFMeasure = DatasetUtils::CalcMetric_FMeasure(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
+        res.dMCC = DatasetUtils::CalcMetric_MatthewsCorrCoeff(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
+        res.dFPS = pCat->m_dAvgFPS;
+    }
+    else {
+        res.dRecall = 0;
+        res.dSpecficity = 0;
+        res.dFPR = 0;
+        res.dFNR = 0;
+        res.dPBC = 0;
+        res.dPrecision = 0;
+        res.dFMeasure = 0;
+        res.dMCC = 0;
+        res.dFPS = 0;
+        const size_t nSeq = pCat->m_vpSequences.size();
+        for(size_t i=0; i<nSeq; ++i) {
+            const DatasetUtils::SequenceInfo* pCurrSeq = pCat->m_vpSequences[i];
+            res.dRecall += DatasetUtils::CalcMetric_Recall(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
+            res.dSpecficity += DatasetUtils::CalcMetric_Specificity(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
+            res.dFPR += DatasetUtils::CalcMetric_FalsePositiveRate(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
+            res.dFNR += DatasetUtils::CalcMetric_FalseNegativeRate(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
+            res.dPBC += DatasetUtils::CalcMetric_PercentBadClassifs(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
+            res.dPrecision += DatasetUtils::CalcMetric_Precision(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
+            res.dFMeasure += DatasetUtils::CalcMetric_FMeasure(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
+            res.dMCC += DatasetUtils::CalcMetric_MatthewsCorrCoeff(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
+            res.dFPS += pCurrSeq->m_dAvgFPS;
+        }
+        res.dRecall /= nSeq;
+        res.dSpecficity /= nSeq;
+        res.dFPR /= nSeq;
+        res.dFNR /= nSeq;
+        res.dPBC /= nSeq;
+        res.dPrecision /= nSeq;
+        res.dFMeasure /= nSeq;
+        res.dMCC /= nSeq;
+        res.dFPS /= nSeq;
+    }
+    return res;
+}
+
+inline DatasetUtils::CommonMetrics CalcMetricsFromCategories(const std::vector<DatasetUtils::CategoryInfo*>& vpCat, bool bAverage) {
+    DatasetUtils::CommonMetrics res;
+    const size_t nCat = vpCat.size();
+    size_t nBadCat = 0;
+    if(!bAverage) {
+        uint64_t nGlobalTP=0, nGlobalTN=0, nGlobalFP=0, nGlobalFN=0, nGlobalSE=0;
+        res.dFPS=0;
+        for(size_t i=0; i<nCat; ++i) {
+            if(vpCat[i]->m_vpSequences.empty()) {
+                ++nBadCat;
+            }
+            else {
+                nGlobalTP += vpCat[i]->nTP;
+                nGlobalTN += vpCat[i]->nTN;
+                nGlobalFP += vpCat[i]->nFP;
+                nGlobalFN += vpCat[i]->nFN;
+                nGlobalSE += vpCat[i]->nSE;
+                res.dFPS += vpCat[i]->m_dAvgFPS;
+            }
+        }
+        CV_Assert(nBadCat<nCat);
+        res.dRecall = DatasetUtils::CalcMetric_Recall(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+        res.dSpecficity = DatasetUtils::CalcMetric_Specificity(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+        res.dFPR = DatasetUtils::CalcMetric_FalsePositiveRate(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+        res.dFNR = DatasetUtils::CalcMetric_FalseNegativeRate(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+        res.dPBC = DatasetUtils::CalcMetric_PercentBadClassifs(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+        res.dPrecision = DatasetUtils::CalcMetric_Precision(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+        res.dFMeasure = DatasetUtils::CalcMetric_FMeasure(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+        res.dMCC = DatasetUtils::CalcMetric_MatthewsCorrCoeff(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
+        res.dFPS /= (nCat-nBadCat);
+    }
+    else {
+        res.dRecall = 0;
+        res.dSpecficity = 0;
+        res.dFPR = 0;
+        res.dFNR = 0;
+        res.dPBC = 0;
+        res.dPrecision = 0;
+        res.dFMeasure = 0;
+        res.dMCC = 0;
+        res.dFPS = 0;
+        for(size_t i=0; i<nCat; ++i) {
+            if(vpCat[i]->m_vpSequences.empty())
+                ++nBadCat;
+            else {
+                DatasetUtils::CommonMetrics curr = CalcMetricsFromCategory(vpCat[i],true);
+                res.dRecall += curr.dRecall;
+                res.dSpecficity += curr.dSpecficity;
+                res.dFPR += curr.dFPR;
+                res.dFNR += curr.dFNR;
+                res.dPBC += curr.dPBC;
+                res.dPrecision += curr.dPrecision;
+                res.dFMeasure += curr.dFMeasure;
+                res.dMCC += curr.dMCC;
+                res.dFPS += curr.dFPS;
+            }
+        }
+        CV_Assert(nBadCat<nCat);
+        res.dRecall /= (nCat-nBadCat);
+        res.dSpecficity /= (nCat-nBadCat);
+        res.dFPR /= (nCat-nBadCat);
+        res.dFNR /= (nCat-nBadCat);
+        res.dPBC /= (nCat-nBadCat);
+        res.dPrecision /= (nCat-nBadCat);
+        res.dFMeasure /= (nCat-nBadCat);
+        res.dMCC /= (nCat-nBadCat);
+        res.dFPS /= (nCat-nBadCat);
+    }
+    return res;
+}
+
+cv::Mat DatasetUtils::GetColoredSegmFrameFromResult(const cv::Mat& oSegmResFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI) {
+    CV_DbgAssert(oSegmResFrame.type()==CV_8UC1 && oGTFrame.type()==CV_8UC1 && oROI.type()==CV_8UC1);
+    CV_DbgAssert(oSegmResFrame.size()==oGTFrame.size() && oSegmResFrame.size()==oROI.size());
+    cv::Mat oResult(oSegmResFrame.size(),CV_8UC3,cv::Scalar_<uchar>(0));
+    const size_t step_row = oSegmResFrame.step.p[0];
+    for(size_t i=0; i<(size_t)oSegmResFrame.rows; ++i) {
+        const size_t idx_nstep = step_row*i;
+        const uchar* input_step_ptr = oSegmResFrame.data+idx_nstep;
+        const uchar* gt_step_ptr = oGTFrame.data+idx_nstep;
+        const uchar* roi_step_ptr = oROI.data+idx_nstep;
+        uchar* res_step_ptr = oResult.data+idx_nstep*3;
+        for(int j=0; j<oSegmResFrame.cols; ++j) {
+            if( gt_step_ptr[j]!=g_nCDnetOutOfScope &&
+                gt_step_ptr[j]!=g_nCDnetUnknown &&
+                roi_step_ptr[j]!=g_nCDnetNegative ) {
+                if(input_step_ptr[j]==g_nCDnetPositive) {
+                    if(gt_step_ptr[j]==g_nCDnetPositive)
+                        res_step_ptr[j*3+1] = UCHAR_MAX;
+                    else if(gt_step_ptr[j]==g_nCDnetNegative)
+                        res_step_ptr[j*3+2] = UCHAR_MAX;
+                    else if(gt_step_ptr[j]==g_nCDnetShadow) {
+                        res_step_ptr[j*3+1] = UCHAR_MAX/2;
+                        res_step_ptr[j*3+2] = UCHAR_MAX;
+                    }
+                    else {
+                        for(size_t c=0; c<3; ++c)
+                            res_step_ptr[j*3+c] = UCHAR_MAX/3;
+                    }
+                }
+                else { // input_step_ptr[j]==g_nCDnetNegative
+                    if(gt_step_ptr[j]==g_nCDnetPositive) {
+                        res_step_ptr[j*3] = UCHAR_MAX/2;
+                        res_step_ptr[j*3+2] = UCHAR_MAX;
+                    }
+                }
+            }
+            else if(roi_step_ptr[j]==g_nCDnetNegative) {
+                for(size_t c=0; c<3; ++c)
+                    res_step_ptr[j*3+c] = UCHAR_MAX/2;
+            }
+            else {
+                for(size_t c=0; c<3; ++c)
+                    res_step_ptr[j*3+c] = input_step_ptr[j];
+            }
+        }
+    }
+    return oResult;
+}
+
+DatasetUtils::MetricsCalculator::MetricsCalculator(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN, uint64_t nSE)
+    :    m_oMetrics(CalcMetricsFromCounts(nTP,nTN,nFP,nFN,nSE,0)),m_bAveraged(false) {}
+
+DatasetUtils::MetricsCalculator::MetricsCalculator(const SequenceInfo* pSeq)
+    :    m_oMetrics(CalcMetricsFromCounts(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN,pSeq->nSE,pSeq->m_dAvgFPS)),m_bAveraged(false) {}
+
+DatasetUtils::MetricsCalculator::MetricsCalculator(const CategoryInfo* pCat, bool bAverage)
+    :    m_oMetrics(CalcMetricsFromCategory(pCat,bAverage)),m_bAveraged(bAverage) {CV_Assert(!pCat->m_vpSequences.empty());}
+
+DatasetUtils::MetricsCalculator::MetricsCalculator(const std::vector<CategoryInfo*>& vpCat, bool bAverage)
+    :    m_oMetrics(CalcMetricsFromCategories(vpCat,bAverage)),m_bAveraged(bAverage) {CV_Assert(!vpCat.empty());}
+
+DatasetUtils::CategoryInfo::CategoryInfo(const std::string& sName, const std::string& sDirectoryPath,
+                                         DatasetUtils::eAvailableDatasetsID eDatasetID,
+                                         const char* asGrayscaleDirNameTokens[])
+    :    m_sName(sName)
+        ,m_eDatasetID(eDatasetID)
+        ,nTP(0),nTN(0),nFP(0),nFN(0),nSE(0)
+        ,m_dAvgFPS(-1) {
+    std::cout << "\tParsing dir '" << sDirectoryPath << "' for category '" << m_sName << "'... ";
+    std::vector<std::string> vsSequencePaths;
+    if(m_eDatasetID==eDataset_CDnet || m_eDatasetID==eDataset_Wallflower || m_eDatasetID==eDataset_PETS2001_D3TC1) {
+        // all subdirs are considered sequence directories
+        PlatformUtils::GetSubDirsFromDir(sDirectoryPath,vsSequencePaths);
+        std::cout << "(" << vsSequencePaths.size() << " sequences)" << std::endl;
+    }
+    else if(m_eDatasetID==eDataset_LITIV_Registr01) {
+        // all subdirs should contain individual video tracks in separate modalities
+        PlatformUtils::GetSubDirsFromDir(sDirectoryPath,vsSequencePaths);
+        std::cout << "(" << vsSequencePaths.size() << " tracks)" << std::endl;
+    }
+    else if(m_eDatasetID==eDataset_GenericSegmentationTest) {
+        // all files are considered sequences
+        PlatformUtils::GetFilesFromDir(sDirectoryPath,vsSequencePaths);
+        std::cout << "(" << vsSequencePaths.size() << " sequences)" << std::endl;
+    }
+    else
+        throw std::runtime_error(std::string("Unknown dataset type, cannot use any known parsing strategy."));
+    for(auto iter=vsSequencePaths.begin(); iter!=vsSequencePaths.end(); ++iter) {
+        bool bForceGrayscale = false;
+        if(asGrayscaleDirNameTokens) {
+            for(size_t i=0; i<sizeof(asGrayscaleDirNameTokens)/sizeof(char*) && !bForceGrayscale; ++i)
+                bForceGrayscale = iter->find(asGrayscaleDirNameTokens[i])!=std::string::npos;
+        }
+        const size_t pos = iter->find_last_of("/\\");
+        if(pos==std::string::npos)
+            m_vpSequences.push_back(new SequenceInfo(*iter,*iter,this,bForceGrayscale));
+        else
+            m_vpSequences.push_back(new SequenceInfo(iter->substr(pos+1),*iter,this,bForceGrayscale));
+    }
+}
+
+DatasetUtils::CategoryInfo::~CategoryInfo() {
     for(size_t i=0; i<m_vpSequences.size(); i++)
         delete m_vpSequences[i];
 }
 
-SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, const std::string& dbname, CategoryInfo* parent, bool forceGrayscale)
-    :    m_sName(name)
-        ,m_sDBName(dbname)
-        ,nTP(0)
-        ,nTN(0)
-        ,nFP(0)
-        ,nFN(0)
-        ,nSE(0)
+DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::string& sPath, CategoryInfo* pParent, bool bForceGrayscale)
+    :    m_sName(sName)
+        ,m_sPath(sPath)
+        ,m_eDatasetID(pParent?pParent->m_eDatasetID:eDataset_GenericSegmentationTest)
+        ,nTP(0),nTN(0),nFP(0),nFN(0),nSE(0)
         ,m_dAvgFPS(-1)
         ,m_dExpectedLoad(0)
         ,m_dExpectedROILoad(0)
-        ,m_pParent(parent)
+        ,m_pParent(pParent)
 #if USE_PRECACHED_IO
         ,m_bIsPrecaching(false)
         ,m_nRequestInputFrameIndex(SIZE_MAX)
@@ -66,21 +419,21 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 #endif //!USE_PRECACHED_IO
         ,m_nNextExpectedVideoReaderFrameIdx(0)
         ,m_nTotalNbFrames(0)
-        ,m_nIMReadInputFlags(forceGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR) {
-    if(m_sDBName==CDNET_DB_NAME) {
+        ,m_nIMReadInputFlags(bForceGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR) {
+    if(m_eDatasetID==eDataset_CDnet) {
         std::vector<std::string> vsSubDirs;
-        GetSubDirsFromDir(dir,vsSubDirs);
-        auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),dir+"/groundtruth");
-        auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),dir+"/input");
+        PlatformUtils::GetSubDirsFromDir(m_sPath,vsSubDirs);
+        auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),m_sPath+"/groundtruth");
+        auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),m_sPath+"/input");
         if(gtDir==vsSubDirs.end() || inputDir==vsSubDirs.end())
-            throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess the required groundtruth and input directories.");
-        GetFilesFromDir(*inputDir,m_vsInputFramePaths);
-        GetFilesFromDir(*gtDir,m_vsGTFramePaths);
+            throw std::runtime_error(std::string("Sequence at ") + m_sPath + " did not possess the required groundtruth and input directories.");
+        PlatformUtils::GetFilesFromDir(*inputDir,m_vsInputFramePaths);
+        PlatformUtils::GetFilesFromDir(*gtDir,m_vsGTFramePaths);
         if(m_vsGTFramePaths.size()!=m_vsInputFramePaths.size())
-            throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess same amount of GT & input frames.");
-        m_oROI = cv::imread(dir+"/ROI.bmp",cv::IMREAD_GRAYSCALE);
+            throw std::runtime_error(std::string("Sequence at ") + m_sPath + " did not possess same amount of GT & input frames.");
+        m_oROI = cv::imread(m_sPath+"/ROI.bmp",cv::IMREAD_GRAYSCALE);
         if(m_oROI.empty())
-            throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess a ROI.bmp file.");
+            throw std::runtime_error(std::string("Sequence at ") + m_sPath + " did not possess a ROI.bmp file.");
         m_oROI = m_oROI>0;
         m_oSize = m_oROI.size();
         m_nTotalNbFrames = m_vsInputFramePaths.size();
@@ -88,15 +441,15 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
         m_dExpectedROILoad = (double)cv::countNonZero(m_oROI)*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
         // note: in this case, no need to use m_vnTestGTIndexes since all # of gt frames == # of test frames (but we assume the frames returned by 'GetFilesFromDir' are ordered correctly...)
     }
-    else if(m_sDBName==WALLFLOWER_DB_NAME) {
+    else if(m_eDatasetID==eDataset_Wallflower) {
         std::vector<std::string> vsImgPaths;
-        GetFilesFromDir(dir,vsImgPaths);
+        PlatformUtils::GetFilesFromDir(m_sPath,vsImgPaths);
         bool bFoundScript=false, bFoundGTFile=false;
         const std::string sGTFilePrefix("hand_segmented_");
         const size_t nInputFileNbDecimals = 5;
         const std::string sInputFileSuffix(".bmp");
         for(auto iter=vsImgPaths.begin(); iter!=vsImgPaths.end(); ++iter) {
-            if(*iter==dir+"/script.txt")
+            if(*iter==m_sPath+"/script.txt")
                 bFoundScript = true;
             else if(iter->find(sGTFilePrefix)!=std::string::npos) {
                 m_mTestGTIndexes.insert(std::pair<size_t,size_t>(atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str()),m_vsGTFramePaths.size()));
@@ -105,69 +458,82 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
             }
             else {
                 if(iter->find(sInputFileSuffix)!=iter->size()-sInputFileSuffix.size())
-                    throw std::runtime_error(std::string("Sequence directory at ") + dir + " contained an unknown file ('" + *iter + "')");
+                    throw std::runtime_error(std::string("Sequence directory at ") + m_sPath + " contained an unknown file ('" + *iter + "')");
                 m_vsInputFramePaths.push_back(*iter);
             }
         }
         if(!bFoundGTFile || !bFoundScript || m_vsInputFramePaths.empty() || m_vsGTFramePaths.size()!=1)
-            throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess the required groundtruth and input files.");
+            throw std::runtime_error(std::string("Sequence at ") + m_sPath + " did not possess the required groundtruth and input files.");
         cv::Mat oTempImg = cv::imread(m_vsGTFramePaths[0]);
         if(oTempImg.empty())
-            throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess a valid GT file.");
-        m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(VAL_POSITIVE));
+            throw std::runtime_error(std::string("Sequence at ") + m_sPath + " did not possess a valid GT file.");
+        m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(g_nCDnetPositive));
         m_oSize = oTempImg.size();
         m_nTotalNbFrames = m_vsInputFramePaths.size();
         m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
     }
-    else if(m_sDBName==PETS2001_D3TC1_DB_NAME) {
+    else if(m_eDatasetID==eDataset_PETS2001_D3TC1) {
         std::vector<std::string> vsVideoSeqPaths;
-        GetFilesFromDir(dir,vsVideoSeqPaths);
+        PlatformUtils::GetFilesFromDir(m_sPath,vsVideoSeqPaths);
         if(vsVideoSeqPaths.size()!=1)
-            throw std::runtime_error(std::string("Bad subdirectory ('")+dir+std::string("') for PETS2001 parsing (should contain only one video sequence file)"));
+            throw std::runtime_error(std::string("Bad subdirectory ('")+m_sPath+std::string("') for PETS2001 parsing (should contain only one video sequence file)"));
         std::vector<std::string> vsGTSubdirPaths;
-        GetSubDirsFromDir(dir,vsGTSubdirPaths);
+        PlatformUtils::GetSubDirsFromDir(m_sPath,vsGTSubdirPaths);
         if(vsGTSubdirPaths.size()!=1)
-            throw std::runtime_error(std::string("Bad subdirectory ('")+dir+std::string("') for PETS2001 parsing (should contain only one GT subdir)"));
+            throw std::runtime_error(std::string("Bad subdirectory ('")+m_sPath+std::string("') for PETS2001 parsing (should contain only one GT subdir)"));
         m_voVideoReader.open(vsVideoSeqPaths[0]);
         if(!m_voVideoReader.isOpened())
             throw std::runtime_error(std::string("Bad video file ('")+vsVideoSeqPaths[0]+std::string("'), could not be opened."));
-        GetFilesFromDir(vsGTSubdirPaths[0],m_vsGTFramePaths);
+        PlatformUtils::GetFilesFromDir(vsGTSubdirPaths[0],m_vsGTFramePaths);
         if(m_vsGTFramePaths.empty())
-            throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess any valid GT frames.");
+            throw std::runtime_error(std::string("Sequence at ") + m_sPath + " did not possess any valid GT frames.");
         const std::string sGTFilePrefix("image_");
         const size_t nInputFileNbDecimals = 4;
         for(auto iter=m_vsGTFramePaths.begin(); iter!=m_vsGTFramePaths.end(); ++iter)
             m_mTestGTIndexes.insert(std::pair<size_t,size_t>(atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str()),iter-m_vsGTFramePaths.begin()));
         cv::Mat oTempImg = cv::imread(m_vsGTFramePaths[0]);
         if(oTempImg.empty())
-            throw std::runtime_error(std::string("Sequence at ") + dir + " did not possess valid GT file(s).");
-        m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(VAL_POSITIVE));
+            throw std::runtime_error(std::string("Sequence at ") + m_sPath + " did not possess valid GT file(s).");
+        m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(g_nCDnetPositive));
         m_oSize = oTempImg.size();
         m_nNextExpectedVideoReaderFrameIdx = 0;
         m_nTotalNbFrames = (size_t)m_voVideoReader.get(CV_CAP_PROP_FRAME_COUNT);
         m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
     }
-    else if(m_sDBName==SINGLE_AVI_TEST_NAME) {
-        m_voVideoReader.open(dir);
+    else if(m_eDatasetID==eDataset_LITIV_Registr01) {
+        m_voVideoReader.open(m_sPath+"/"+m_pParent->m_sName+"_"+m_sName+".avi");
         if(!m_voVideoReader.isOpened())
-            throw std::runtime_error(std::string("Bad video file ('")+dir+std::string("'), could not be opened."));
-        m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,0.0);
+            throw std::runtime_error(std::string("Bad video file ('")+m_sPath+std::string("'), could not be opened."));
+        m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,0);
         cv::Mat oTempImg;
         m_voVideoReader >> oTempImg;
-        m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,0.0);
+        m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,0);
         if(oTempImg.empty())
-            throw std::runtime_error(std::string("Bad video file ('")+dir+std::string("'), could not be read."));
-        m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(VAL_POSITIVE));
+            throw std::runtime_error(std::string("Bad video file ('")+m_sPath+std::string("'), could not be read."));
+        m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(g_nCDnetPositive));
+        m_oSize = oTempImg.size();
+        m_nNextExpectedVideoReaderFrameIdx = -1;
+        m_nTotalNbFrames = (size_t)m_voVideoReader.get(CV_CAP_PROP_FRAME_COUNT);
+        m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
+    }
+    else if(m_eDatasetID==eDataset_GenericSegmentationTest) {
+        m_voVideoReader.open(m_sPath);
+        if(!m_voVideoReader.isOpened())
+            throw std::runtime_error(std::string("Bad video file ('")+m_sPath+std::string("'), could not be opened."));
+        m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,0);
+        cv::Mat oTempImg;
+        m_voVideoReader >> oTempImg;
+        m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,0);
+        if(oTempImg.empty())
+            throw std::runtime_error(std::string("Bad video file ('")+m_sPath+std::string("'), could not be read."));
+        m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(g_nCDnetPositive));
         m_oSize = oTempImg.size();
         m_nNextExpectedVideoReaderFrameIdx = 0;
         m_nTotalNbFrames = (size_t)m_voVideoReader.get(CV_CAP_PROP_FRAME_COUNT);
         m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
     }
-    /*else if(m_sDBName==...) {
-        // ...
-    }*/
     else
-        throw std::runtime_error(std::string("Unknown database name, cannot use any known parsing strategy."));
+        throw std::runtime_error(std::string("Unknown dataset type, cannot use any known parsing strategy."));
 #if USE_PRECACHED_IO
     CV_Assert(MAX_NB_PRECACHED_FRAMES>1);
     CV_Assert(PRECACHE_REFILL_THRESHOLD>1 && PRECACHE_REFILL_THRESHOLD<MAX_NB_PRECACHED_FRAMES);
@@ -176,29 +542,29 @@ SequenceInfo::SequenceInfo(const std::string& name, const std::string& dir, cons
 #endif //USE_PRECACHED_IO
 }
 
-SequenceInfo::~SequenceInfo() {
+DatasetUtils::SequenceInfo::~SequenceInfo() {
 #if USE_PRECACHED_IO
     StopPrecaching();
 #endif //USE_PRECACHED_IO
 }
 
-size_t SequenceInfo::GetNbInputFrames() const {
+size_t DatasetUtils::SequenceInfo::GetNbInputFrames() const {
     return m_nTotalNbFrames;
 }
 
-size_t SequenceInfo::GetNbGTFrames() const {
+size_t DatasetUtils::SequenceInfo::GetNbGTFrames() const {
     return m_mTestGTIndexes.empty()?m_vsGTFramePaths.size():m_mTestGTIndexes.size();
 }
 
-cv::Size SequenceInfo::GetFrameSize() const {
+cv::Size DatasetUtils::SequenceInfo::GetFrameSize() const {
     return m_oSize;
 }
 
-const cv::Mat& SequenceInfo::GetSequenceROI() const {
+const cv::Mat& DatasetUtils::SequenceInfo::GetSequenceROI() const {
     return m_oROI;
 }
 
-std::vector<cv::KeyPoint> SequenceInfo::GetKeyPointsFromROI() const {
+std::vector<cv::KeyPoint> DatasetUtils::SequenceInfo::GetKeyPointsFromROI() const {
     std::vector<cv::KeyPoint> voNewKPs;
     cv::DenseFeatureDetector oKPDDetector(1.f, 1, 1.f, 1, 0, true, false);
     voNewKPs.reserve(m_oROI.rows*m_oROI.cols);
@@ -207,7 +573,7 @@ std::vector<cv::KeyPoint> SequenceInfo::GetKeyPointsFromROI() const {
     return voNewKPs;
 }
 
-void SequenceInfo::ValidateKeyPoints(std::vector<cv::KeyPoint>& voKPs) const {
+void DatasetUtils::SequenceInfo::ValidateKeyPoints(std::vector<cv::KeyPoint>& voKPs) const {
     std::vector<cv::KeyPoint> voNewKPs;
     for(size_t k=0; k<voKPs.size(); ++k) {
         if(m_oROI.at<uchar>(voKPs[k].pt)>0)
@@ -216,53 +582,55 @@ void SequenceInfo::ValidateKeyPoints(std::vector<cv::KeyPoint>& voKPs) const {
     voKPs = voNewKPs;
 }
 
-cv::Mat SequenceInfo::GetInputFrameFromIndex_Internal(size_t idx) {
-    CV_DbgAssert(idx<m_nTotalNbFrames);
+cv::Mat DatasetUtils::SequenceInfo::GetInputFrameFromIndex_Internal(size_t nFrameIdx) {
+    CV_DbgAssert(nFrameIdx<m_nTotalNbFrames);
     cv::Mat oFrame;
-    if(m_sDBName==CDNET_DB_NAME || m_sDBName==WALLFLOWER_DB_NAME)
-        oFrame = cv::imread(m_vsInputFramePaths[idx],m_nIMReadInputFlags);
-    else if(m_sDBName==PETS2001_D3TC1_DB_NAME || m_sDBName==SINGLE_AVI_TEST_NAME) {
-        if(m_nNextExpectedVideoReaderFrameIdx!=idx)
-            m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,(double)idx);
+    if(m_eDatasetID==eDataset_CDnet || m_eDatasetID==eDataset_Wallflower)
+        oFrame = cv::imread(m_vsInputFramePaths[nFrameIdx],m_nIMReadInputFlags);
+    else if(m_eDatasetID==eDataset_PETS2001_D3TC1 || m_eDatasetID==eDataset_LITIV_Registr01 || m_eDatasetID==eDataset_GenericSegmentationTest) {
+        if(m_nNextExpectedVideoReaderFrameIdx!=nFrameIdx) {
+            std::cout << "test" << std::endl;
+            m_voVideoReader >> oFrame;
+            cv::imshow("test1",oFrame);
+            m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,(double)nFrameIdx);
+            m_nNextExpectedVideoReaderFrameIdx = nFrameIdx+1;
+        }
+        else
+            ++m_nNextExpectedVideoReaderFrameIdx;
         m_voVideoReader >> oFrame;
-        ++m_nNextExpectedVideoReaderFrameIdx;
+        cv::imshow("test2",oFrame);//@@@@
+        cv::waitKey(0);
     }
-    /*else if(m_sDBName==...) {
-        // ...
-    }*/
     CV_DbgAssert(oFrame.size()==m_oSize);
     return oFrame;
 }
 
-cv::Mat SequenceInfo::GetGTFrameFromIndex_Internal(size_t idx) {
-    CV_DbgAssert(idx<m_nTotalNbFrames);
+cv::Mat DatasetUtils::SequenceInfo::GetGTFrameFromIndex_Internal(size_t nFrameIdx) {
+    CV_DbgAssert(nFrameIdx<m_nTotalNbFrames);
     cv::Mat oFrame;
-    if(m_sDBName==CDNET_DB_NAME)
-        oFrame = cv::imread(m_vsGTFramePaths[idx],cv::IMREAD_GRAYSCALE);
-    else if(m_sDBName==WALLFLOWER_DB_NAME || m_sDBName==PETS2001_D3TC1_DB_NAME) {
-        auto res = m_mTestGTIndexes.find(idx);
+    if(m_eDatasetID==eDataset_CDnet)
+        oFrame = cv::imread(m_vsGTFramePaths[nFrameIdx],cv::IMREAD_GRAYSCALE);
+    else if(m_eDatasetID==eDataset_Wallflower || m_eDatasetID==eDataset_PETS2001_D3TC1) {
+        auto res = m_mTestGTIndexes.find(nFrameIdx);
         if(res!=m_mTestGTIndexes.end())
             oFrame = cv::imread(m_vsGTFramePaths[res->second],cv::IMREAD_GRAYSCALE);
         else
-            oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar(VAL_OUTOFSCOPE));
+            oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar(g_nCDnetOutOfScope));
     }
-    else if(m_sDBName==SINGLE_AVI_TEST_NAME) {
-        oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar(VAL_OUTOFSCOPE));
+    else if(m_eDatasetID==eDataset_LITIV_Registr01 || m_eDatasetID==eDataset_GenericSegmentationTest) {
+        oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar(g_nCDnetOutOfScope));
     }
-    /*else if(m_sDBName==...) {
-        // ...
-    }*/
     CV_DbgAssert(oFrame.size()==m_oSize);
     return oFrame;
 }
 
-const cv::Mat& SequenceInfo::GetInputFrameFromIndex(size_t idx) {
+const cv::Mat& DatasetUtils::SequenceInfo::GetInputFrameFromIndex(size_t nFrameIdx) {
 #if USE_PRECACHED_IO
     if(!m_bIsPrecaching)
         throw std::runtime_error(m_sName + " [SequenceInfo] : Error, queried a frame before precaching was activated.");
 #if PLATFORM_SUPPORTS_CPP11
     std::unique_lock<std::mutex> sync_lock(m_oInputFrameSyncMutex);
-    m_nRequestInputFrameIndex = idx;
+    m_nRequestInputFrameIndex = nFrameIdx;
     std::cv_status res;
     do {
         m_oInputFrameReqCondVar.notify_one();
@@ -272,7 +640,7 @@ const cv::Mat& SequenceInfo::GetInputFrameFromIndex(size_t idx) {
     return m_oReqInputFrame;
 #elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
     EnterCriticalSection(&m_oInputFrameSyncMutex);
-    m_nRequestInputFrameIndex = idx;
+    m_nRequestInputFrameIndex = nFrameIdx;
     BOOL res;
     do {
         WakeConditionVariable(&m_oInputFrameReqCondVar);
@@ -285,21 +653,21 @@ const cv::Mat& SequenceInfo::GetInputFrameFromIndex(size_t idx) {
 #error "Missing implementation for precached io support on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #else //!USE_PRECACHED_IO
-    if(m_nLastReqInputFrameIndex!=idx) {
-        m_oLastReqInputFrame = GetInputFrameFromIndex_Internal(idx);
-        m_nLastReqInputFrameIndex = idx;
+    if(m_nLastReqInputFrameIndex!=nFrameIdx) {
+        m_oLastReqInputFrame = GetInputFrameFromIndex_Internal(nFrameIdx);
+        m_nLastReqInputFrameIndex = nFrameIdx;
     }
     return m_oLastReqInputFrame;
 #endif //!USE_PRECACHED_IO
 }
 
-const cv::Mat& SequenceInfo::GetGTFrameFromIndex(size_t idx) {
+const cv::Mat& DatasetUtils::SequenceInfo::GetGTFrameFromIndex(size_t nFrameIdx) {
 #if USE_PRECACHED_IO
     if(!m_bIsPrecaching)
         throw std::runtime_error(m_sName + " [SequenceInfo] : Error, queried a frame before precaching was activated.");
 #if PLATFORM_SUPPORTS_CPP11
     std::unique_lock<std::mutex> sync_lock(m_oGTFrameSyncMutex);
-    m_nRequestGTFrameIndex = idx;
+    m_nRequestGTFrameIndex = nFrameIdx;
     std::cv_status res;
     do {
         m_oGTFrameReqCondVar.notify_one();
@@ -309,7 +677,7 @@ const cv::Mat& SequenceInfo::GetGTFrameFromIndex(size_t idx) {
     return m_oReqGTFrame;
 #elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
     EnterCriticalSection(&m_oGTFrameSyncMutex);
-    m_nRequestGTFrameIndex = idx;
+    m_nRequestGTFrameIndex = nFrameIdx;
     BOOL res;
     do {
         WakeConditionVariable(&m_oGTFrameReqCondVar);
@@ -322,9 +690,9 @@ const cv::Mat& SequenceInfo::GetGTFrameFromIndex(size_t idx) {
 #error "Missing implementation for precached io support on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #else //!USE_PRECACHED_IO
-    if(m_nLastReqGTFrameIndex!=idx) {
-        m_oLastReqGTFrame = GetGTFrameFromIndex_Internal(idx);
-        m_nLastReqGTFrameIndex = idx;
+    if(m_nLastReqGTFrameIndex!=nFrameIdx) {
+        m_oLastReqGTFrame = GetGTFrameFromIndex_Internal(nFrameIdx);
+        m_nLastReqGTFrameIndex = nFrameIdx;
     }
     return m_oLastReqGTFrame;
 #endif //!USE_PRECACHED_IO
@@ -332,7 +700,7 @@ const cv::Mat& SequenceInfo::GetGTFrameFromIndex(size_t idx) {
 
 #if USE_PRECACHED_IO
 
-void SequenceInfo::PrecacheInputFrames() {
+void DatasetUtils::SequenceInfo::PrecacheInputFrames() {
     srand((unsigned int)(time(nullptr)*m_nTotalNbFrames*m_sName.size()));
 #if PLATFORM_SUPPORTS_CPP11
     std::unique_lock<std::mutex> sync_lock(m_oInputFrameSyncMutex);
@@ -410,7 +778,7 @@ void SequenceInfo::PrecacheInputFrames() {
 #endif //!PLATFORM_SUPPORTS_CPP11 && PLATFORM_USES_WIN32API
 }
 
-void SequenceInfo::PrecacheGTFrames() {
+void DatasetUtils::SequenceInfo::PrecacheGTFrames() {
     srand((unsigned int)(time(nullptr)*m_nTotalNbFrames*m_sName.size()));
 #if PLATFORM_SUPPORTS_CPP11
     std::unique_lock<std::mutex> sync_lock(m_oGTFrameSyncMutex);
@@ -488,12 +856,12 @@ void SequenceInfo::PrecacheGTFrames() {
 #endif //!PLATFORM_SUPPORTS_CPP11 && PLATFORM_USES_WIN32API
 }
 
-void SequenceInfo::StartPrecaching() {
+void DatasetUtils::SequenceInfo::StartPrecaching() {
     if(!m_bIsPrecaching) {
         m_bIsPrecaching = true;
 #if PLATFORM_SUPPORTS_CPP11
-        m_hInputFramePrecacher = std::thread(&SequenceInfo::PrecacheInputFrames,this);
-        m_hGTFramePrecacher = std::thread(&SequenceInfo::PrecacheGTFrames,this);
+        m_hInputFramePrecacher = std::thread(&DatasetUtils::SequenceInfo::PrecacheInputFrames,this);
+        m_hGTFramePrecacher = std::thread(&DatasetUtils::SequenceInfo::PrecacheGTFrames,this);
 #elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
         InitializeCriticalSection(&m_oInputFrameSyncMutex);
         InitializeCriticalSection(&m_oGTFrameSyncMutex);
@@ -501,15 +869,15 @@ void SequenceInfo::StartPrecaching() {
         InitializeConditionVariable(&m_oGTFrameReqCondVar);
         InitializeConditionVariable(&m_oInputFrameSyncCondVar);
         InitializeConditionVariable(&m_oGTFrameSyncCondVar);
-        m_hInputFramePrecacher = CreateThread(NULL,NULL,&SequenceInfo::PrecacheInputFramesEntryPoint,(LPVOID)this,0,NULL);
-        m_hGTFramePrecacher = CreateThread(NULL,NULL,&SequenceInfo::PrecacheGTFramesEntryPoint,(LPVOID)this,0,NULL);
+        m_hInputFramePrecacher = CreateThread(NULL,NULL,&DatasetUtils::SequenceInfo::PrecacheInputFramesEntryPoint,(LPVOID)this,0,NULL);
+        m_hGTFramePrecacher = CreateThread(NULL,NULL,&DatasetUtils::SequenceInfo::PrecacheGTFramesEntryPoint,(LPVOID)this,0,NULL);
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for precached io support on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
     }
 }
 
-void SequenceInfo::StopPrecaching() {
+void DatasetUtils::SequenceInfo::StopPrecaching() {
     if(m_bIsPrecaching) {
         m_bIsPrecaching = false;
 #if PLATFORM_SUPPORTS_CPP11
@@ -530,148 +898,3 @@ void SequenceInfo::StopPrecaching() {
 }
 
 #endif //USE_PRECACHED_IO
-
-AdvancedMetrics::AdvancedMetrics(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN, uint64_t /*nSE*/)
-    :    dRecall(METRIC_RECALL(nTP,nTN,nFP,nFN))
-        ,dSpecficity(METRIC_SPECIFICITY(nTP,nTN,nFP,nFN))
-        ,dFPR(METRIC_FALSEPOSRATE(nTP,nTN,nFP,nFN))
-        ,dFNR(METRIC_FALSENEGRATE(nTP,nTN,nFP,nFN))
-        ,dPBC(METRIC_PERCENTBADCL(nTP,nTN,nFP,nFN))
-        ,dPrecision(METRIC_PRECISION(nTP,nTN,nFP,nFN))
-        ,dFMeasure(METRIC_FMEASURE(nTP,nTN,nFP,nFN))
-        ,dMCC(METRIC_MATTCORRCOEF(nTP,nTN,nFP,nFN))
-        ,dFPS(0.0)
-        ,bAveraged(false) {}
-
-AdvancedMetrics::AdvancedMetrics(const SequenceInfo* pSeq)
-    :    dRecall(METRIC_RECALL(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
-        ,dSpecficity(METRIC_SPECIFICITY(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
-        ,dFPR(METRIC_FALSEPOSRATE(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
-        ,dFNR(METRIC_FALSENEGRATE(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
-        ,dPBC(METRIC_PERCENTBADCL(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
-        ,dPrecision(METRIC_PRECISION(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
-        ,dFMeasure(METRIC_FMEASURE(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
-        ,dMCC(METRIC_MATTCORRCOEF(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN))
-        ,dFPS(pSeq->m_dAvgFPS)
-        ,bAveraged(false) {}
-
-AdvancedMetrics::AdvancedMetrics(const CategoryInfo* pCat, bool bAverage)
-    :     bAveraged(bAverage) {
-    CV_Assert(!pCat->m_vpSequences.empty());
-    if(!bAverage) {
-        dRecall = METRIC_RECALL(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        dSpecficity = METRIC_SPECIFICITY(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        dFPR = METRIC_FALSEPOSRATE(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        dFNR = METRIC_FALSENEGRATE(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        dPBC = METRIC_PERCENTBADCL(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        dPrecision = METRIC_PRECISION(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        dFMeasure = METRIC_FMEASURE(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        dMCC = METRIC_MATTCORRCOEF(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        dFPS = pCat->m_dAvgFPS;
-    }
-    else {
-        dRecall = 0;
-        dSpecficity = 0;
-        dFPR = 0;
-        dFNR = 0;
-        dPBC = 0;
-        dPrecision = 0;
-        dFMeasure = 0;
-        dMCC = 0;
-        dFPS = 0;
-        const size_t nSeq = pCat->m_vpSequences.size();
-        for(size_t i=0; i<nSeq; ++i) {
-            AdvancedMetrics temp(pCat->m_vpSequences[i]);
-            dRecall += temp.dRecall;
-            dSpecficity += temp.dSpecficity;
-            dFPR += temp.dFPR;
-            dFNR += temp.dFNR;
-            dPBC += temp.dPBC;
-            dPrecision += temp.dPrecision;
-            dFMeasure += temp.dFMeasure;
-            dMCC += temp.dMCC;
-            dFPS += temp.dFPS;
-        }
-        dRecall /= nSeq;
-        dSpecficity /= nSeq;
-        dFPR /= nSeq;
-        dFNR /= nSeq;
-        dPBC /= nSeq;
-        dPrecision /= nSeq;
-        dFMeasure /= nSeq;
-        dMCC /= nSeq;
-        dFPS /= nSeq;
-    }
-}
-
-AdvancedMetrics::AdvancedMetrics(const std::vector<CategoryInfo*>& vpCat, bool bAverage)
-    :     bAveraged(bAverage) {
-    CV_Assert(!vpCat.empty());
-    const size_t nCat = vpCat.size();
-    size_t nBadCat = 0;
-    if(!bAverage) {
-        uint64_t nGlobalTP=0, nGlobalTN=0, nGlobalFP=0, nGlobalFN=0, nGlobalSE=0;
-        dFPS=0;
-        for(size_t i=0; i<nCat; ++i) {
-            if(vpCat[i]->m_vpSequences.empty()) {
-                ++nBadCat;
-            }
-            else {
-                nGlobalTP += vpCat[i]->nTP;
-                nGlobalTN += vpCat[i]->nTN;
-                nGlobalFP += vpCat[i]->nFP;
-                nGlobalFN += vpCat[i]->nFN;
-                nGlobalSE += vpCat[i]->nSE;
-                dFPS += vpCat[i]->m_dAvgFPS;
-            }
-        }
-        CV_Assert(nBadCat<nCat);
-        dRecall = METRIC_RECALL(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
-        dSpecficity = METRIC_SPECIFICITY(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
-        dFPR = METRIC_FALSEPOSRATE(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
-        dFNR = METRIC_FALSENEGRATE(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
-        dPBC = METRIC_PERCENTBADCL(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
-        dPrecision = METRIC_PRECISION(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
-        dFMeasure = METRIC_FMEASURE(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
-        dMCC = METRIC_MATTCORRCOEF(nGlobalTP,nGlobalTN,nGlobalFP,nGlobalFN);
-        dFPS /= (nCat-nBadCat);
-    }
-    else {
-        dRecall = 0;
-        dSpecficity = 0;
-        dFPR = 0;
-        dFNR = 0;
-        dPBC = 0;
-        dPrecision = 0;
-        dFMeasure = 0;
-        dMCC = 0;
-        dFPS = 0;
-        for(size_t i=0; i<nCat; ++i) {
-            if(vpCat[i]->m_vpSequences.empty()) {
-                ++nBadCat;
-            }
-            else {
-                AdvancedMetrics temp(vpCat[i],true);
-                dRecall += temp.dRecall;
-                dSpecficity += temp.dSpecficity;
-                dFPR += temp.dFPR;
-                dFNR += temp.dFNR;
-                dPBC += temp.dPBC;
-                dPrecision += temp.dPrecision;
-                dFMeasure += temp.dFMeasure;
-                dMCC += temp.dMCC;
-                dFPS += temp.dFPS;
-            }
-        }
-        CV_Assert(nBadCat<nCat);
-        dRecall /= (nCat-nBadCat);
-        dSpecficity /= (nCat-nBadCat);
-        dFPR /= (nCat-nBadCat);
-        dFNR /= (nCat-nBadCat);
-        dPBC /= (nCat-nBadCat);
-        dPrecision /= (nCat-nBadCat);
-        dFMeasure /= (nCat-nBadCat);
-        dMCC /= (nCat-nBadCat);
-        dFPS /= (nCat-nBadCat);
-    }
-}
