@@ -62,7 +62,7 @@ void BackgroundSubtractorPBAS_1ch::initialize(const cv::Mat& oInitImg) {
 	m_bInitialized = true;
 }
 
-void BackgroundSubtractorPBAS_1ch::operator()(cv::InputArray _image, cv::OutputArray _fgmask, double learningRateOverride) {
+void BackgroundSubtractorPBAS_1ch::apply(cv::InputArray _image, cv::OutputArray _fgmask, double learningRateOverride) {
 	CV_Assert(m_bInitialized);
 	cv::Mat oInputImg = _image.getMat();
 	CV_Assert(oInputImg.type()==CV_8UC1 && oInputImg.size()==m_oImgSize);

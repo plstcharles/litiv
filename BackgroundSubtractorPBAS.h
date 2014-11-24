@@ -18,7 +18,7 @@
 #define BGSPBAS_DEFAULT_REQUIRED_NB_BG_SAMPLES (2)
 //! defines the default value for BackgroundSubtractorPBAS::m_fDefaultUpdateRate
 #define BGSPBAS_DEFAULT_LEARNING_RATE (16.0f)
-//! defines the default value for the learning rate passed to BackgroundSubtractorPBAS::operator()
+//! defines the default value for the learning rate passed to BackgroundSubtractorPBAS::apply
 #define BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE (-1.0)
 //! parameters used for dynamic threshold adjustments
 #define BGSPBAS_R_OFFST (0.0000f)
@@ -70,7 +70,7 @@ public:
 	//! (re)initiaization method; needs to be called before starting background subtraction
 	virtual void initialize(const cv::Mat& oInitImg)=0;
 	//! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
-	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE)=0;
+	virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE)=0;
 	//! @@@@@@@@@@@@ ????
 	virtual cv::AlgorithmInfo* info() const;
 	//! returns a copy of the latest reconstructed background image

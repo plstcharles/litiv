@@ -169,10 +169,12 @@ void BackgroundSubtractorLOBSTER::refreshModel(float fSamplesRefreshFrac, bool b
 	}
 }
 
-void BackgroundSubtractorLOBSTER::operator()(cv::InputArray _image, cv::OutputArray _fgmask, double learningRate) {
+void BackgroundSubtractorLOBSTER::apply(cv::InputArray _image, cv::OutputArray _fgmask, double learningRate) {
 	CV_Assert(m_bInitialized);
 	CV_Assert(learningRate>0);
 	cv::Mat oInputImg = _image.getMat();
+	if(!(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize))
+	    std::cout << "in_type=" << oInputImg.type() << ", bg_type=" << m_nImgType << "   in_size=" << oInputImg.size() << ", bg_size=" << m_oImgSize << std::endl;
 	CV_Assert(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize);
 	CV_Assert(oInputImg.isContinuous());
 	_fgmask.create(m_oImgSize,CV_8UC1);

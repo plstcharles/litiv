@@ -9,7 +9,7 @@
 #define BGSVIBE_DEFAULT_NB_BG_SAMPLES (20)
 //! defines the default value for BackgroundSubtractorViBe::m_nRequiredBGSamples
 #define BGSVIBE_DEFAULT_REQUIRED_NB_BG_SAMPLES (2)
-//! defines the default value for the learning rate passed to BackgroundSubtractorViBe::operator() (the 'subsampling' factor in the original ViBe paper)
+//! defines the default value for the learning rate passed to BackgroundSubtractorViBe::apply (the 'subsampling' factor in the original ViBe paper)
 #define BGSVIBE_DEFAULT_LEARNING_RATE (16)
 //! defines the internal threshold adjustment factor to use when determining if the variation of a single channel is enough to declare the pixel as foreground
 #define BGSVIBE_SINGLECHANNEL_THRESHOLD_DIFF_FACTOR (1.60f)
@@ -36,7 +36,7 @@ public:
 	//! (re)initiaization method; needs to be called before starting background subtraction
 	virtual void initialize(const cv::Mat& oInitImg)=0;
 	//! primary model update function; the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
-	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSVIBE_DEFAULT_LEARNING_RATE)=0;
+	virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSVIBE_DEFAULT_LEARNING_RATE)=0;
 	//! @@@@@@@@@@@@ ????
 	virtual cv::AlgorithmInfo* info() const;
 	//! returns a copy of the latest reconstructed background image

@@ -39,7 +39,7 @@ public:
 	//! refreshes all local (+ global) dictionaries based on the last analyzed frame
 	virtual void refreshModel(size_t nBaseOccCount, float fOccDecrFrac, bool bForceFGUpdate=false);
 	//! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
-	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=0);
+	virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=0);
 	//! returns a copy of the latest reconstructed background image
 	virtual void getBackgroundImage(cv::OutputArray backgroundImage) const;
 	//! returns a copy of the latest reconstructed background descriptors image

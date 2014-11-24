@@ -21,5 +21,5 @@ public:
 	//! (re)initiaization method; needs to be called before starting background subtraction
 	virtual void initialize(const cv::Mat& oInitImg);
 	//! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
-	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE);
+	virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE);
 };

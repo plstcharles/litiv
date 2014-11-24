@@ -628,7 +628,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
 	}
 }
 
-void BackgroundSubtractorPAWCS::operator()(cv::InputArray _image, cv::OutputArray _fgmask, double learningRateOverride) {
+void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fgmask, double learningRateOverride) {
 	// == process
 	CV_Assert(m_bInitialized);
 	cv::Mat oInputImg = _image.getMat();

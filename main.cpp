@@ -425,7 +425,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
             std::chrono::high_resolution_clock::time_point pre_process = std::chrono::high_resolution_clock::now();
 #endif //ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
-            (*pBGS)(oInputImg, oFGMask, k<=100?1:dDefaultLearningRate);
+            pBGS->apply(oInputImg, oFGMask, k<=100?1:dDefaultLearningRate);
 #if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
             std::chrono::high_resolution_clock::time_point post_process = std::chrono::high_resolution_clock::now();
             std::cout << "proc=" << std::fixed << std::setprecision(1) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_process-pre_process).count())/1000 << "." << std::endl;
@@ -511,8 +511,8 @@ cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const 
     // note: this function is definitely NOT efficient in any way; it is only intended for debug purposes.
     cv::Mat oInputImgBYTE3, oBGImgBYTE3, oFGMaskBYTE3;
     if(oInputImg.channels()!=3) {
-        cv::cvtColor(oInputImg,oInputImgBYTE3,CV_GRAY2RGB);
-        cv::cvtColor(oBGImg,oBGImgBYTE3,CV_GRAY2RGB);
+        cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_GRAY2RGB);
+        cv::cvtColor(oBGImg,oBGImgBYTE3,cv::COLOR_GRAY2RGB);
     }
     else {
         oInputImgBYTE3 = oInputImg;

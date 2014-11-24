@@ -14,7 +14,7 @@
 #define BGSLOBSTER_DEFAULT_NB_BG_SAMPLES (35)
 //! defines the default value for BackgroundSubtractorLOBSTER::m_nRequiredBGSamples
 #define BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES (2)
-//! defines the default value for the learning rate passed to BackgroundSubtractorLOBSTER::operator()
+//! defines the default value for the learning rate passed to BackgroundSubtractorLOBSTER::apply
 #define BGSLOBSTER_DEFAULT_LEARNING_RATE (16)
 
 /*!
@@ -44,7 +44,7 @@ public:
 	//! refreshes all samples based on the last analyzed frame
 	virtual void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
 	//! primary model update function; the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
-	virtual void operator()(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
+	virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
 	//! returns a copy of the latest reconstructed background image
 	void getBackgroundImage(cv::OutputArray backgroundImage) const;
 	//! returns a copy of the latest reconstructed background descriptors image

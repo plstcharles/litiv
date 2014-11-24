@@ -172,6 +172,7 @@ namespace DatasetUtils {
         size_t m_nTotalNbFrames;
         cv::Mat m_oROI;
         cv::Size m_oSize;
+        const bool m_bForcingGrayscale;
         const int m_nIMReadInputFlags;
         std::unordered_map<size_t,size_t> m_mTestGTIndexes;
         cv::Mat GetInputFrameFromIndex_Internal(size_t nFrameIdx);

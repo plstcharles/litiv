@@ -42,7 +42,7 @@ void DatasetUtils::WriteResult( const std::string& sResultsPath,
 }
 
 void DatasetUtils::WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bBottom) {
-    cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-15):15),cv::FONT_HERSHEY_PLAIN,1.0,cv::Scalar_<uchar>(0,0,255),1,CV_AA);
+    cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-15):15),cv::FONT_HERSHEY_PLAIN,1.0,cv::Scalar_<uchar>(0,0,255),1,cv::LINE_AA);
 }
 
 void DatasetUtils::WriteMetrics(const std::string sResultsFileName, const SequenceInfo* pSeq) {
@@ -419,6 +419,7 @@ DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::st
 #endif //!USE_PRECACHED_IO
         ,m_nNextExpectedVideoReaderFrameIdx(0)
         ,m_nTotalNbFrames(0)
+        ,m_bForcingGrayscale(bForceGrayscale)
         ,m_nIMReadInputFlags(bForceGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR) {
     if(m_eDatasetID==eDataset_CDnet) {
         std::vector<std::string> vsSubDirs;
@@ -437,8 +438,8 @@ DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::st
         m_oROI = m_oROI>0;
         m_oSize = m_oROI.size();
         m_nTotalNbFrames = m_vsInputFramePaths.size();
-        m_dExpectedLoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
-        m_dExpectedROILoad = (double)cv::countNonZero(m_oROI)*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
+        m_dExpectedLoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(int(!m_bForcingGrayscale)+1);
+        m_dExpectedROILoad = (double)cv::countNonZero(m_oROI)*m_nTotalNbFrames*(int(!m_bForcingGrayscale)+1);
         // note: in this case, no need to use m_vnTestGTIndexes since all # of gt frames == # of test frames (but we assume the frames returned by 'GetFilesFromDir' are ordered correctly...)
     }
     else if(m_eDatasetID==eDataset_Wallflower) {
@@ -470,7 +471,7 @@ DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::st
         m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(g_nCDnetPositive));
         m_oSize = oTempImg.size();
         m_nTotalNbFrames = m_vsInputFramePaths.size();
-        m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
+        m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(int(!m_bForcingGrayscale)+1);
     }
     else if(m_eDatasetID==eDataset_PETS2001_D3TC1) {
         std::vector<std::string> vsVideoSeqPaths;
@@ -497,40 +498,49 @@ DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::st
         m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(g_nCDnetPositive));
         m_oSize = oTempImg.size();
         m_nNextExpectedVideoReaderFrameIdx = 0;
-        m_nTotalNbFrames = (size_t)m_voVideoReader.get(CV_CAP_PROP_FRAME_COUNT);
-        m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
+        m_nTotalNbFrames = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
+        m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(int(!m_bForcingGrayscale)+1);
     }
     else if(m_eDatasetID==eDataset_LITIV_Registr01) {
-        m_voVideoReader.open(m_sPath+"/"+m_pParent->m_sName+"_"+m_sName+".avi");
+        PlatformUtils::GetFilesFromDir(m_sPath+"/input/",m_vsInputFramePaths);
+        if(m_vsInputFramePaths.empty())
+            throw std::runtime_error(std::string("Sequence at ") + m_sPath + " did not possess any parsable input images.");
+        cv::Mat oTempImg = cv::imread(m_vsInputFramePaths[0]);
+        if(oTempImg.empty())
+            throw std::runtime_error(std::string("Bad image file ('")+m_vsInputFramePaths[0]+"'), could not be read.");
+        /*m_voVideoReader.open(m_sPath+"/input/in%06d.jpg");
+        if(!m_voVideoReader.isOpened())
+            m_voVideoReader.open(m_sPath+"/"+m_pParent->m_sName+"_"+m_sName+".avi");
         if(!m_voVideoReader.isOpened())
             throw std::runtime_error(std::string("Bad video file ('")+m_sPath+std::string("'), could not be opened."));
-        m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,0);
+        m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
         cv::Mat oTempImg;
         m_voVideoReader >> oTempImg;
-        m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,0);
+        m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
         if(oTempImg.empty())
-            throw std::runtime_error(std::string("Bad video file ('")+m_sPath+std::string("'), could not be read."));
+            throw std::runtime_error(std::string("Bad video file ('")+m_sPath+std::string("'), could not be read."));*/
         m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(g_nCDnetPositive));
         m_oSize = oTempImg.size();
         m_nNextExpectedVideoReaderFrameIdx = -1;
-        m_nTotalNbFrames = (size_t)m_voVideoReader.get(CV_CAP_PROP_FRAME_COUNT);
-        m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
+        //m_nTotalNbFrames = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
+        m_nTotalNbFrames = m_vsInputFramePaths.size();
+        m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(int(!m_bForcingGrayscale)+1);
     }
     else if(m_eDatasetID==eDataset_GenericSegmentationTest) {
         m_voVideoReader.open(m_sPath);
         if(!m_voVideoReader.isOpened())
             throw std::runtime_error(std::string("Bad video file ('")+m_sPath+std::string("'), could not be opened."));
-        m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,0);
+        m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
         cv::Mat oTempImg;
         m_voVideoReader >> oTempImg;
-        m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,0);
+        m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
         if(oTempImg.empty())
             throw std::runtime_error(std::string("Bad video file ('")+m_sPath+std::string("'), could not be read."));
         m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar(g_nCDnetPositive));
         m_oSize = oTempImg.size();
         m_nNextExpectedVideoReaderFrameIdx = 0;
-        m_nTotalNbFrames = (size_t)m_voVideoReader.get(CV_CAP_PROP_FRAME_COUNT);
-        m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(m_nIMReadInputFlags==cv::IMREAD_COLOR?2:1);
+        m_nTotalNbFrames = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
+        m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(int(!m_bForcingGrayscale)+1);
     }
     else
         throw std::runtime_error(std::string("Unknown dataset type, cannot use any known parsing strategy."));
@@ -564,15 +574,6 @@ const cv::Mat& DatasetUtils::SequenceInfo::GetSequenceROI() const {
     return m_oROI;
 }
 
-std::vector<cv::KeyPoint> DatasetUtils::SequenceInfo::GetKeyPointsFromROI() const {
-    std::vector<cv::KeyPoint> voNewKPs;
-    cv::DenseFeatureDetector oKPDDetector(1.f, 1, 1.f, 1, 0, true, false);
-    voNewKPs.reserve(m_oROI.rows*m_oROI.cols);
-    oKPDDetector.detect(cv::Mat(m_oROI.size(),m_oROI.type()),voNewKPs);
-    ValidateKeyPoints(voNewKPs);
-    return voNewKPs;
-}
-
 void DatasetUtils::SequenceInfo::ValidateKeyPoints(std::vector<cv::KeyPoint>& voKPs) const {
     std::vector<cv::KeyPoint> voNewKPs;
     for(size_t k=0; k<voKPs.size(); ++k) {
@@ -583,30 +584,27 @@ void DatasetUtils::SequenceInfo::ValidateKeyPoints(std::vector<cv::KeyPoint>& vo
 }
 
 cv::Mat DatasetUtils::SequenceInfo::GetInputFrameFromIndex_Internal(size_t nFrameIdx) {
-    CV_DbgAssert(nFrameIdx<m_nTotalNbFrames);
+    CV_Assert(nFrameIdx<m_nTotalNbFrames);
     cv::Mat oFrame;
-    if(m_eDatasetID==eDataset_CDnet || m_eDatasetID==eDataset_Wallflower)
+    if(m_eDatasetID==eDataset_CDnet || m_eDatasetID==eDataset_Wallflower || m_eDatasetID==eDataset_LITIV_Registr01)
         oFrame = cv::imread(m_vsInputFramePaths[nFrameIdx],m_nIMReadInputFlags);
-    else if(m_eDatasetID==eDataset_PETS2001_D3TC1 || m_eDatasetID==eDataset_LITIV_Registr01 || m_eDatasetID==eDataset_GenericSegmentationTest) {
+    else if(m_eDatasetID==eDataset_PETS2001_D3TC1 || /*m_eDatasetID==eDataset_LITIV_Registr01 || */m_eDatasetID==eDataset_GenericSegmentationTest) {
         if(m_nNextExpectedVideoReaderFrameIdx!=nFrameIdx) {
-            std::cout << "test" << std::endl;
-            m_voVideoReader >> oFrame;
-            cv::imshow("test1",oFrame);
-            m_voVideoReader.set(CV_CAP_PROP_POS_FRAMES,(double)nFrameIdx);
+            m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,(double)nFrameIdx);
             m_nNextExpectedVideoReaderFrameIdx = nFrameIdx+1;
         }
         else
             ++m_nNextExpectedVideoReaderFrameIdx;
         m_voVideoReader >> oFrame;
-        cv::imshow("test2",oFrame);//@@@@
-        cv::waitKey(0);
+        if(m_bForcingGrayscale && oFrame.channels()>1)
+            cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2GRAY);
     }
-    CV_DbgAssert(oFrame.size()==m_oSize);
+    CV_Assert(oFrame.size()==m_oSize);
     return oFrame;
 }
 
 cv::Mat DatasetUtils::SequenceInfo::GetGTFrameFromIndex_Internal(size_t nFrameIdx) {
-    CV_DbgAssert(nFrameIdx<m_nTotalNbFrames);
+    CV_Assert(nFrameIdx<m_nTotalNbFrames);
     cv::Mat oFrame;
     if(m_eDatasetID==eDataset_CDnet)
         oFrame = cv::imread(m_vsGTFramePaths[nFrameIdx],cv::IMREAD_GRAYSCALE);
@@ -620,7 +618,7 @@ cv::Mat DatasetUtils::SequenceInfo::GetGTFrameFromIndex_Internal(size_t nFrameId
     else if(m_eDatasetID==eDataset_LITIV_Registr01 || m_eDatasetID==eDataset_GenericSegmentationTest) {
         oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar(g_nCDnetOutOfScope));
     }
-    CV_DbgAssert(oFrame.size()==m_oSize);
+    CV_Assert(oFrame.size()==m_oSize);
     return oFrame;
 }
 

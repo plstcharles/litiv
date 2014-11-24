@@ -16,7 +16,7 @@
 
 	This algorithm is currently NOT thread-safe.
  */
-class LBSP : public cv::DescriptorExtractor {
+class LBSP : public cv::Feature2D {
 public:
 	//! constructor 1, threshold = absolute intensity 'similarity' threshold used when computing comparisons
 	LBSP(size_t nThreshold);
