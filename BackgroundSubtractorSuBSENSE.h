@@ -109,5 +109,6 @@ protected:
 	cv::Mat m_oLastFGMask_dilated_inverted;
 	cv::Mat m_oCurrRawFGBlinkMask;
 	cv::Mat m_oLastRawFGBlinkMask;
+	cv::Mat m_oMorphExStructElement;
 };
 

@@ -189,6 +189,7 @@ void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const cv:
 	m_oCurrRawFGBlinkMask = cv::Scalar_<uchar>(0);
 	m_oLastRawFGBlinkMask.create(m_oImgSize,CV_8UC1);
 	m_oLastRawFGBlinkMask = cv::Scalar_<uchar>(0);
+	m_oMorphExStructElement = cv::getStructuringElement(cv::MORPH_RECT,cv::Size(3,3));
 	m_voBGColorSamples.resize(m_nBGSamples);
 	m_voBGDescSamples.resize(m_nBGSamples);
 	for(size_t s=0; s<m_nBGSamples; ++s) {
@@ -625,7 +626,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
 	cv::bitwise_or(m_oCurrRawFGBlinkMask,m_oLastRawFGBlinkMask,m_oBlinksFrame);
 	m_oCurrRawFGBlinkMask.copyTo(m_oLastRawFGBlinkMask);
 	oCurrFGMask.copyTo(m_oLastRawFGMask);
-	cv::morphologyEx(oCurrFGMask,m_oFGMask_PreFlood,cv::MORPH_CLOSE,cv::Mat());
+	cv::morphologyEx(oCurrFGMask,m_oFGMask_PreFlood,cv::MORPH_CLOSE,m_oMorphExStructElement);
 	m_oFGMask_PreFlood.copyTo(m_oFGMask_FloodedHoles);
 	cv::floodFill(m_oFGMask_FloodedHoles,cv::Point(0,0),UCHAR_MAX);
 	cv::bitwise_not(m_oFGMask_FloodedHoles,m_oFGMask_FloodedHoles);
