@@ -16,12 +16,12 @@
 #define DEFAULT_NB_THREADS               1
 //////////////////////////////////////////
 #define EVAL_RESULTS_ONLY                0
-#define WRITE_BGSUB_IMG_OUTPUT           0
+#define WRITE_BGSUB_IMG_OUTPUT           1
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
 #define WRITE_BGSUB_METRICS_ANALYSIS     0
 //////////////////////////////////////////
 #if DEFAULT_NB_THREADS==1
-#define DISPLAY_BGSUB_DEBUG_OUTPUT       1
+#define DISPLAY_BGSUB_DEBUG_OUTPUT       0
 #define ENABLE_DISPLAY_MOUSE_DEBUG       0
 #define ENABLE_FRAME_TIMERS              0
 #define WRITE_BGSUB_SEGM_AVI_OUTPUT      0
@@ -42,11 +42,12 @@
 #define USE_WALLFLOWER_DATASET           0
 #define USE_PETS2001_D3TC1_DATASET       0
 #define USE_SINGLE_AVI_FILE              0
-#define USE_VIDEO_REGISTRATION           1
+#define USE_LITIV_REGISTRATION_SET01     0
+#define USE_LITIV_REGISTRATION_SET02     1
 /////////////////////////////////////////////////////////////////////
 #define DATASET_ROOT_DIR                 std::string("/shared/datasets/")
 #define RESULTS_ROOT_DIR                 std::string("/shared/datasets/")
-#define RESULTS_OUTPUT_DIR_NAME          std::string("results_test")
+#define RESULTS_OUTPUT_DIR_NAME          std::string("results_lobster")
 #define TOTAL_NB_ITERS                   1
 #define TOTAL_NB_PASSES                  1
 /////////////////////////////////////////////////////////////////////
@@ -58,7 +59,7 @@
 #endif //(TOTAL_NB_ITERS<=0 || TOTAL_NB_PASSES<=0)
 #if (USE_VIBE_LBSP_BG_SUBTRACTOR+USE_PBAS_LBSP_BG_SUBTRACTOR+USE_VIBE_BG_SUBTRACTOR+USE_PBAS_BG_SUBTRACTOR+USE_CB_LBSP_BG_SUBTRACTOR)!=1
 #error "Must specify a single algorithm."
-#elif (USE_CDNET2012_DATASET+USE_CDNET2014_DATASET+USE_WALLFLOWER_DATASET+USE_PETS2001_D3TC1_DATASET+USE_SINGLE_AVI_FILE+USE_VIDEO_REGISTRATION)!=1
+#elif (USE_CDNET2012_DATASET+USE_CDNET2014_DATASET+USE_WALLFLOWER_DATASET+USE_PETS2001_D3TC1_DATASET+USE_SINGLE_AVI_FILE+USE_LITIV_REGISTRATION_SET01+USE_LITIV_REGISTRATION_SET02)!=1
 #error "Must specify a single dataset."
 #elif USE_CDNET2012_DATASET
 const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_CDnet;
@@ -102,16 +103,22 @@ const std::string g_sResultPrefix("");
 const std::string g_sResultSuffix("");
 const char* g_asDatasetFolders[] = {"gait_analysis"};
 const size_t g_nResultIdxOffset = 0;
-#elif USE_VIDEO_REGISTRATION
-const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_LITIV_Registr01;
-const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/litiv/registration_set01/");
-const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/litiv/registration_set01/"+RESULTS_OUTPUT_DIR_NAME+"/");
-const std::string g_sResultPrefix("");
-const std::string g_sResultSuffix("");
-const char* g_asDatasetFolders[] = {"SEQUENCE1"};
+#elif (USE_LITIV_REGISTRATION_SET01 || USE_LITIV_REGISTRATION_SET02)
+const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_LITIV_Registr;
+const std::string g_sDatasetMidPath(std::string("/litiv/registration_set")+(USE_LITIV_REGISTRATION_SET01?"01/":"02/Dataset/"));
+const std::string g_sDatasetPath(DATASET_ROOT_DIR+g_sDatasetMidPath);
+const std::string g_sResultsPath(RESULTS_ROOT_DIR+g_sDatasetMidPath+RESULTS_OUTPUT_DIR_NAME+"/");
+const std::string g_sResultPrefix("bin");
+const std::string g_sResultSuffix(".png");
+#if USE_LITIV_REGISTRATION_SET01
+const char* g_asDatasetFolders[] = {"SEQUENCE1","SEQUENCE2","SEQUENCE3","SEQUENCE4","SEQUENCE5","SEQUENCE6","SEQUENCE7","SEQUENCE8","SEQUENCE9"};
+#else //USE_LITIV_REGISTRATION_SET02
+const char* g_asDatasetFolders[] = {"vid1","vid2/cut1","vid2/cut2","vid3"};
+#endif //USE_LITIV_REGISTRATION_SET02
 const char* g_asDatasetGrayscaleDirNameTokens[] = {"THERMAL"};
+const char* g_asDatasetSkippedDirNameTokens[] = {"1Person","2Person","3Person","4Person","5Person"};
 const size_t g_nResultIdxOffset = 0;
-#endif //USE_VIDEO_REGISTRATION
+#endif //(USE_LITIV_REGISTRATION_SET01 || USE_LITIV_REGISTRATION_SET02)
 #if ENABLE_DISPLAY_MOUSE_DEBUG
 static int *pnLatestMouseX=nullptr, *pnLatestMouseY=nullptr;
 void OnMouseEvent(int event, int x, int y, int, void*) {
@@ -137,7 +144,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
 std::atomic_size_t g_nActiveThreads(0);
 #if WRITE_BGSUB_IMG_OUTPUT
-const std::vector<int> g_vnResultsComprParams = {CV_IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
+const std::vector<int> g_vnResultsComprParams = {cv::IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;
@@ -163,12 +170,21 @@ int main() {
 #if PLATFORM_USES_WIN32API
     SetConsoleWindowSize(80,40,1000);
 #endif //PLATFORM_USES_WIN32API
+    std::vector<std::string> vsDatasetGrayscaleDirNameTokens, vsDatasetSkippedDirNameTokens;
+    if(g_asDatasetGrayscaleDirNameTokens!=nullptr) {
+        for(size_t i=0; i<sizeof(g_asDatasetGrayscaleDirNameTokens)/sizeof(char*); ++i)
+            vsDatasetGrayscaleDirNameTokens.push_back(g_asDatasetGrayscaleDirNameTokens[i]);
+    }
+    if(g_asDatasetSkippedDirNameTokens!=nullptr) {
+        for(size_t i=0; i<sizeof(g_asDatasetSkippedDirNameTokens)/sizeof(char*); ++i)
+            vsDatasetSkippedDirNameTokens.push_back(g_asDatasetSkippedDirNameTokens[i]);
+    }
     std::vector<DatasetUtils::CategoryInfo*> vpCategories;
     std::cout << "Parsing dataset..." << std::endl;
     try {
         for(size_t p=0; p<TOTAL_NB_PASSES; ++p)
             for(size_t i=0; i<sizeof(g_asDatasetFolders)/sizeof(char*); ++i)
-                vpCategories.push_back(new DatasetUtils::CategoryInfo(g_asDatasetFolders[i],g_sDatasetPath+g_asDatasetFolders[i],g_eDatasetID,g_asDatasetGrayscaleDirNameTokens));
+                vpCategories.push_back(new DatasetUtils::CategoryInfo(g_asDatasetFolders[i],g_sDatasetPath+g_asDatasetFolders[i],g_eDatasetID,vsDatasetGrayscaleDirNameTokens,vsDatasetSkippedDirNameTokens));
     } catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
     size_t nSeqTotal = 0;
     size_t nFramesTotal = 0;
@@ -223,7 +239,7 @@ int main() {
                 for(size_t k=0; k<oSeqIter->second->GetNbGTFrames(); ++k) {
                     cv::Mat oGTImg = oSeqIter->second->GetGTFrameFromIndex(k);
                     cv::Mat oFGMask = ReadResult(sCurrResultsPath,oSeqIter->second->m_pParent->m_sName,oSeqIter->second->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix);
-                    CalcMetricsFromResult(oFGMask,oGTImg,oSeqIter->second->GetSequenceROI(),oSeqIter->second->nTP,oSeqIter->second->nTN,oSeqIter->second->nFP,oSeqIter->second->nFN,oSeqIter->second->nSE);
+                    DatasetUtils::CalcMetricsFromResult(oFGMask,oGTImg,oSeqIter->second->GetSequenceROI(),oSeqIter->second->nTP,oSeqIter->second->nTN,oSeqIter->second->nFP,oSeqIter->second->nFN,oSeqIter->second->nSE);
                 }
                 ++nSeqProcessed;
             }
@@ -284,13 +300,13 @@ int main() {
                         vpCategories[c]->nFP += vpCategories[c]->m_vpSequences[s]->nFP;
                         vpCategories[c]->nFN += vpCategories[c]->m_vpSequences[s]->nFN;
                         vpCategories[c]->nSE += vpCategories[c]->m_vpSequences[s]->nSE;
-                        WriteMetrics(sCurrResultsPath+vpCategories[c]->m_sName+"/"+vpCategories[c]->m_vpSequences[s]->m_sName+".txt",vpCategories[c]->m_vpSequences[s]);
+                        DatasetUtils::WriteMetrics(sCurrResultsPath+vpCategories[c]->m_sName+"/"+vpCategories[c]->m_vpSequences[s]->m_sName+".txt",vpCategories[c]->m_vpSequences[s]);
                     }
-                    WriteMetrics(sCurrResultsPath+vpCategories[c]->m_sName+".txt",vpCategories[c]);
+                    DatasetUtils::WriteMetrics(sCurrResultsPath+vpCategories[c]->m_sName+".txt",vpCategories[c]);
                     std::cout << std::endl;
                 }
             }
-            WriteMetrics(sCurrResultsPath+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
+            DatasetUtils::WriteMetrics(sCurrResultsPath+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
             g_oDebugFS.release();
 #endif //WRITE_BGSUB_METRICS_ANALYSIS
 #if TOTAL_NB_ITERS>1
@@ -392,7 +408,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
         cv::VideoWriter oSegmWriter(sCurrResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+"_segm.avi",CV_FOURCC('F','F','V','1'),30,pCurrSequence->GetSize(),false);
 #endif //WRITE_BGSUB_SEGM_AVI_OUTPUT
 #if WRITE_BGSUB_IMG_OUTPUT
-        CreateDirIfNotExist(sCurrResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+"/");
+        PlatformUtils::CreateDirIfNotExist(sCurrResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+"/");
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #if WRITE_BGSUB_METRICS_ANALYSIS
         time_t startup = time(nullptr);
@@ -470,14 +486,14 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
                 break;
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT
 #if WRITE_BGSUB_IMG_OUTPUT
-            WriteResult(sCurrResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix,oFGMask,g_vnResultsComprParams);
+            DatasetUtils::WriteResult(sCurrResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix,oFGMask,g_vnResultsComprParams);
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #if WRITE_BGSUB_METRICS_ANALYSIS
             DatasetUtils::CalcMetricsFromResult(oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
         }
         time_t shutdown = time(nullptr);
         pCurrSequence->m_dAvgFPS = ((double)nNbInputFrames)/(shutdown-startup);
-        WriteMetrics(sCurrResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".txt",pCurrSequence);
+        DatasetUtils::WriteMetrics(sCurrResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".txt",pCurrSequence);
 #else //!WRITE_BGSUB_METRICS_ANALYSIS
         }
 #endif //!WRITE_BGSUB_METRICS_ANALYSIS

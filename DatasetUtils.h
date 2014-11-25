@@ -84,7 +84,7 @@ namespace DatasetUtils {
         eDataset_CDnet=0,
         eDataset_Wallflower,
         eDataset_PETS2001_D3TC1,
-        eDataset_LITIV_Registr01,
+        eDataset_LITIV_Registr,
         eDataset_GenericSegmentationTest,
         eDatasetsCount
     };
@@ -93,7 +93,8 @@ namespace DatasetUtils {
     public:
         CategoryInfo(const std::string& sName, const std::string& sDirectoryPath,
                      DatasetUtils::eAvailableDatasetsID eDatasetID,
-                     const char* asGrayscaleDirNameTokens[]=nullptr);
+                     std::vector<std::string> vsGrayscaleDirNameTokens=std::vector<std::string>(),
+                     std::vector<std::string> vsSkippedDirNameTokens=std::vector<std::string>());
         ~CategoryInfo();
         const std::string m_sName;
         const eAvailableDatasetsID m_eDatasetID;

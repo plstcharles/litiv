@@ -353,7 +353,8 @@ DatasetUtils::MetricsCalculator::MetricsCalculator(const std::vector<CategoryInf
 
 DatasetUtils::CategoryInfo::CategoryInfo(const std::string& sName, const std::string& sDirectoryPath,
                                          DatasetUtils::eAvailableDatasetsID eDatasetID,
-                                         const char* asGrayscaleDirNameTokens[])
+                                         std::vector<std::string> vsGrayscaleDirNameTokens,
+                                         std::vector<std::string> vsSkippedDirNameTokens)
     :    m_sName(sName)
         ,m_eDatasetID(eDatasetID)
         ,nTP(0),nTN(0),nFP(0),nFN(0),nSE(0)
@@ -363,31 +364,33 @@ DatasetUtils::CategoryInfo::CategoryInfo(const std::string& sName, const std::st
     if(m_eDatasetID==eDataset_CDnet || m_eDatasetID==eDataset_Wallflower || m_eDatasetID==eDataset_PETS2001_D3TC1) {
         // all subdirs are considered sequence directories
         PlatformUtils::GetSubDirsFromDir(sDirectoryPath,vsSequencePaths);
-        std::cout << "(" << vsSequencePaths.size() << " sequences)" << std::endl;
+        std::cout << "(" << vsSequencePaths.size() << " potential sequences)" << std::endl;
     }
-    else if(m_eDatasetID==eDataset_LITIV_Registr01) {
+    else if(m_eDatasetID==eDataset_LITIV_Registr) {
         // all subdirs should contain individual video tracks in separate modalities
         PlatformUtils::GetSubDirsFromDir(sDirectoryPath,vsSequencePaths);
-        std::cout << "(" << vsSequencePaths.size() << " tracks)" << std::endl;
+        std::cout << "(" << vsSequencePaths.size() << " potential tracks)" << std::endl;
     }
     else if(m_eDatasetID==eDataset_GenericSegmentationTest) {
         // all files are considered sequences
         PlatformUtils::GetFilesFromDir(sDirectoryPath,vsSequencePaths);
-        std::cout << "(" << vsSequencePaths.size() << " sequences)" << std::endl;
+        std::cout << "(" << vsSequencePaths.size() << " potential sequences)" << std::endl;
     }
     else
         throw std::runtime_error(std::string("Unknown dataset type, cannot use any known parsing strategy."));
     for(auto iter=vsSequencePaths.begin(); iter!=vsSequencePaths.end(); ++iter) {
-        bool bForceGrayscale = false;
-        if(asGrayscaleDirNameTokens) {
-            for(size_t i=0; i<sizeof(asGrayscaleDirNameTokens)/sizeof(char*) && !bForceGrayscale; ++i)
-                bForceGrayscale = iter->find(asGrayscaleDirNameTokens[i])!=std::string::npos;
+        bool bForceGrayscale = false, bSkip = false;
+        for(size_t i=0; i<vsGrayscaleDirNameTokens.size() && !bForceGrayscale; ++i)
+            bForceGrayscale = iter->find(vsGrayscaleDirNameTokens[i])!=std::string::npos;
+        for(size_t i=0; i<vsSkippedDirNameTokens.size() && !bSkip; ++i)
+            bSkip = iter->find(vsSkippedDirNameTokens[i])!=std::string::npos;
+        if(!bSkip) {
+            const size_t pos = iter->find_last_of("/\\");
+            if(pos==std::string::npos)
+                m_vpSequences.push_back(new SequenceInfo(*iter,*iter,this,bForceGrayscale));
+            else
+                m_vpSequences.push_back(new SequenceInfo(iter->substr(pos+1),*iter,this,bForceGrayscale));
         }
-        const size_t pos = iter->find_last_of("/\\");
-        if(pos==std::string::npos)
-            m_vpSequences.push_back(new SequenceInfo(*iter,*iter,this,bForceGrayscale));
-        else
-            m_vpSequences.push_back(new SequenceInfo(iter->substr(pos+1),*iter,this,bForceGrayscale));
     }
 }
 
@@ -501,7 +504,7 @@ DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::st
         m_nTotalNbFrames = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
         m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(int(!m_bForcingGrayscale)+1);
     }
-    else if(m_eDatasetID==eDataset_LITIV_Registr01) {
+    else if(m_eDatasetID==eDataset_LITIV_Registr) {
         PlatformUtils::GetFilesFromDir(m_sPath+"/input/",m_vsInputFramePaths);
         if(m_vsInputFramePaths.empty())
             throw std::runtime_error(std::string("Sequence at ") + m_sPath + " did not possess any parsable input images.");
@@ -510,7 +513,7 @@ DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::st
             throw std::runtime_error(std::string("Bad image file ('")+m_vsInputFramePaths[0]+"'), could not be read.");
         /*m_voVideoReader.open(m_sPath+"/input/in%06d.jpg");
         if(!m_voVideoReader.isOpened())
-            m_voVideoReader.open(m_sPath+"/"+m_pParent->m_sName+"_"+m_sName+".avi");
+            m_voVideoReader.open(m_sPath+"/"+m_sName+".avi");
         if(!m_voVideoReader.isOpened())
             throw std::runtime_error(std::string("Bad video file ('")+m_sPath+std::string("'), could not be opened."));
         m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
@@ -586,7 +589,7 @@ void DatasetUtils::SequenceInfo::ValidateKeyPoints(std::vector<cv::KeyPoint>& vo
 cv::Mat DatasetUtils::SequenceInfo::GetInputFrameFromIndex_Internal(size_t nFrameIdx) {
     CV_Assert(nFrameIdx<m_nTotalNbFrames);
     cv::Mat oFrame;
-    if(m_eDatasetID==eDataset_CDnet || m_eDatasetID==eDataset_Wallflower || m_eDatasetID==eDataset_LITIV_Registr01)
+    if(m_eDatasetID==eDataset_CDnet || m_eDatasetID==eDataset_Wallflower || m_eDatasetID==eDataset_LITIV_Registr)
         oFrame = cv::imread(m_vsInputFramePaths[nFrameIdx],m_nIMReadInputFlags);
     else if(m_eDatasetID==eDataset_PETS2001_D3TC1 || /*m_eDatasetID==eDataset_LITIV_Registr01 || */m_eDatasetID==eDataset_GenericSegmentationTest) {
         if(m_nNextExpectedVideoReaderFrameIdx!=nFrameIdx) {
@@ -615,7 +618,7 @@ cv::Mat DatasetUtils::SequenceInfo::GetGTFrameFromIndex_Internal(size_t nFrameId
         else
             oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar(g_nCDnetOutOfScope));
     }
-    else if(m_eDatasetID==eDataset_LITIV_Registr01 || m_eDatasetID==eDataset_GenericSegmentationTest) {
+    else if(m_eDatasetID==eDataset_LITIV_Registr || m_eDatasetID==eDataset_GenericSegmentationTest) {
         oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar(g_nCDnetOutOfScope));
     }
     CV_Assert(oFrame.size()==m_oSize);
