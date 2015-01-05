@@ -16,7 +16,7 @@
 #define DEFAULT_NB_THREADS               1
 //////////////////////////////////////////
 #define EVAL_RESULTS_ONLY                0
-#define WRITE_BGSUB_IMG_OUTPUT           1
+#define WRITE_BGSUB_IMG_OUTPUT           0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
 #define WRITE_BGSUB_METRICS_ANALYSIS     0
 //////////////////////////////////////////
@@ -35,19 +35,22 @@
 //////////////////////////////////////////
 #if (USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR)
 #define LIMIT_MODEL_TO_SEQUENCE_ROI      1
-#endif
+#define BOOTSTRAP_100_FIRST_FRAMES       1
+#else //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR)
+#define BOOTSTRAP_100_FIRST_FRAMES       0
+#endif //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR)
 //////////////////////////////////////////
-#define USE_CDNET2012_DATASET            0
+#define USE_CDNET2012_DATASET            1
 #define USE_CDNET2014_DATASET            0
 #define USE_WALLFLOWER_DATASET           0
 #define USE_PETS2001_D3TC1_DATASET       0
 #define USE_SINGLE_AVI_FILE              0
 #define USE_LITIV_REGISTRATION_SET01     0
-#define USE_LITIV_REGISTRATION_SET02     1
+#define USE_LITIV_REGISTRATION_SET02     0
 /////////////////////////////////////////////////////////////////////
 #define DATASET_ROOT_DIR                 std::string("/shared/datasets/")
 #define RESULTS_ROOT_DIR                 std::string("/shared/datasets/")
-#define RESULTS_OUTPUT_DIR_NAME          std::string("results_lobster")
+#define RESULTS_OUTPUT_DIR_NAME          std::string("results")
 #define TOTAL_NB_ITERS                   1
 #define TOTAL_NB_PASSES                  1
 /////////////////////////////////////////////////////////////////////
@@ -68,7 +71,8 @@ const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet/"+RESULTS_OUTPUT_DIR_N
 const std::string g_sResultPrefix("bin");
 const std::string g_sResultSuffix(".png");
 const char* g_asDatasetFolders[] = {"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"};
-const char* g_asDatasetGrayscaleDirNameTokens = {"thermal"};
+const char* g_asDatasetGrayscaleDirNameTokens[] = {"thermal"};
+const char** g_asDatasetSkippedDirNameTokens = nullptr;
 const size_t g_nResultIdxOffset = 1;
 #elif USE_CDNET2014_DATASET
 const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_CDnet;
@@ -441,7 +445,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
             std::chrono::high_resolution_clock::time_point pre_process = std::chrono::high_resolution_clock::now();
 #endif //ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
-            pBGS->apply(oInputImg, oFGMask, k<=100?1:dDefaultLearningRate);
+            pBGS->apply(oInputImg, oFGMask, (BOOTSTRAP_100_FIRST_FRAMES && k<=100)?1:dDefaultLearningRate);
 #if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
             std::chrono::high_resolution_clock::time_point post_process = std::chrono::high_resolution_clock::now();
             std::cout << "proc=" << std::fixed << std::setprecision(1) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_process-pre_process).count())/1000 << "." << std::endl;
