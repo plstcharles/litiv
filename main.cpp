@@ -104,8 +104,10 @@ const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_G
 const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/avitest/");
 const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/avitest/"+RESULTS_OUTPUT_DIR_NAME+"/");
 const std::string g_sResultPrefix("");
-const std::string g_sResultSuffix("");
-const char* g_asDatasetFolders[] = {"gait_analysis"};
+const std::string g_sResultSuffix(".png");
+const char* g_asDatasetFolders[] = {"inf6803_tp1"};
+const char** g_asDatasetGrayscaleDirNameTokens = nullptr;
+const char** g_asDatasetSkippedDirNameTokens = nullptr;
 const size_t g_nResultIdxOffset = 0;
 #elif (USE_LITIV_REGISTRATION_SET01 || USE_LITIV_REGISTRATION_SET02)
 const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_LITIV_Registr;
@@ -374,7 +376,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
             pBGS = new BackgroundSubtractorViBe_3ch();
         else
             pBGS = new BackgroundSubtractorViBe_1ch();
-        ((BackgroundSubtractorPBAS*)pBGS)->initialize(oInitImg);
+        ((BackgroundSubtractorViBe*)pBGS)->initialize(oInitImg);
         const double dDefaultLearningRate = BGSVIBE_DEFAULT_LEARNING_RATE;
 #else //USE_PBAS_BG_SUBTRACTOR
         if(m_nInputChannels==3)
