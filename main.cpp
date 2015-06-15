@@ -1,5 +1,38 @@
-#include "PlatformUtils.h"
+
+// @@@ imgproc gpu algo does not support mipmapping binding yet
+// @@@ test compute shader group size
+// @@@ ADD OPENGL HARDWARE LIMITS CHECKS EVERYWHERE (if using ssbo, check MAX_SHADER_STORAGE_BLOCK_SIZE)
+// @@@ always pack big gpu buffers with std430
+// @@@ add opencv hardware intrs check, and impl some stuff in MMX/SSE/SSE2/3/4.1/4.2? (also check popcount and AVX)
+// @@@ investigate glClearBufferData for large-scale opengl buffer memsets
+// ###@@@@@@ reimpl caching with solid malloc'd arrays
+
+//////////////////////////////////////////
+// USER/ENVIRONMENT-SPECIFIC VARIABLES :
+//////////////////////////////////////////
+#define GPU_EXEC                         0
+#define DEFAULT_NB_THREADS               1
+#define EVAL_RESULTS_ONLY                0
+#define WRITE_BGSUB_IMG_OUTPUT           0
+#define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
+#define WRITE_BGSUB_METRICS_ANALYSIS     0
+#define DISPLAY_BGSUB_DEBUG_OUTPUT       1
+#define ENABLE_FRAME_TIMERS              0
+#define ENABLE_DISPLAY_MOUSE_DEBUG       0
+#define WRITE_BGSUB_SEGM_AVI_OUTPUT      0
+//////////////////////////////////////////
+#define USE_CB_LBSP_BG_SUBTRACTOR        0
+#define USE_VIBE_LBSP_BG_SUBTRACTOR      1
+#define USE_PBAS_LBSP_BG_SUBTRACTOR      0
+#define USE_VIBE_BG_SUBTRACTOR           0
+#define USE_PBAS_BG_SUBTRACTOR           0
+//////////////////////////////////////////
+
 #include "DatasetUtils.h"
+#define DATASET_ID             DatasetUtils::eDataset_CDnet2014
+#define DATASET_ROOT_PATH      std::string("/shared2/datasets/")
+#define DATASET_RESULTS_PATH   std::string("results")
+
 #include "BackgroundSubtractorPAWCS.h"
 #include "BackgroundSubtractorSuBSENSE.h"
 #include "BackgroundSubtractorLOBSTER.h"
@@ -8,124 +41,18 @@
 #include "BackgroundSubtractorPBAS_1ch.h"
 #include "BackgroundSubtractorPBAS_3ch.h"
 
-// @@@@ OPENCV: CHECK HARDWARE SUPPORT FOR SSEX USING BUILT-IN UTILITY FUNCTIONS
-
-//////////////////////////////////////////
-// USER/ENVIRONMENT-SPECIFIC VARIABLES :
-//////////////////////////////////////////
-#define DEFAULT_NB_THREADS               1
-//////////////////////////////////////////
-#define EVAL_RESULTS_ONLY                0
-#define WRITE_BGSUB_IMG_OUTPUT           0
-#define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
-#define WRITE_BGSUB_METRICS_ANALYSIS     0
-//////////////////////////////////////////
-#if DEFAULT_NB_THREADS==1
-#define DISPLAY_BGSUB_DEBUG_OUTPUT       0
-#define ENABLE_DISPLAY_MOUSE_DEBUG       0
-#define ENABLE_FRAME_TIMERS              0
-#define WRITE_BGSUB_SEGM_AVI_OUTPUT      0
-#endif //DEFAULT_NB_THREADS==1
-//////////////////////////////////////////
-#define USE_CB_LBSP_BG_SUBTRACTOR        0
-#define USE_VIBE_LBSP_BG_SUBTRACTOR      1
-#define USE_PBAS_LBSP_BG_SUBTRACTOR      0
-#define USE_VIBE_BG_SUBTRACTOR           0
-#define USE_PBAS_BG_SUBTRACTOR           0
-//////////////////////////////////////////
-#if (USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR)
-#define LIMIT_MODEL_TO_SEQUENCE_ROI      1
-#define BOOTSTRAP_100_FIRST_FRAMES       1
-#else //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR)
-#define BOOTSTRAP_100_FIRST_FRAMES       0
-#endif //!(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR)
-//////////////////////////////////////////
-#define USE_CDNET2012_DATASET            1
-#define USE_CDNET2014_DATASET            0
-#define USE_WALLFLOWER_DATASET           0
-#define USE_PETS2001_D3TC1_DATASET       0
-#define USE_SINGLE_AVI_FILE              0
-#define USE_LITIV_REGISTRATION_SET01     0
-#define USE_LITIV_REGISTRATION_SET02     0
-/////////////////////////////////////////////////////////////////////
-#define DATASET_ROOT_DIR                 std::string("/shared/datasets/")
-#define RESULTS_ROOT_DIR                 std::string("/shared/datasets/")
-#define RESULTS_OUTPUT_DIR_NAME          std::string("results")
-#define TOTAL_NB_ITERS                   1
-#define TOTAL_NB_PASSES                  1
-/////////////////////////////////////////////////////////////////////
-
+#define LIMIT_MODEL_TO_SEQUENCE_ROI (USE_VIBE_LBSP_BG_SUBTRACTOR||USE_PBAS_LBSP_BG_SUBTRACTOR||USE_CB_LBSP_BG_SUBTRACTOR)
+#define BOOTSTRAP_100_FIRST_FRAMES  (USE_VIBE_LBSP_BG_SUBTRACTOR||USE_PBAS_LBSP_BG_SUBTRACTOR||USE_CB_LBSP_BG_SUBTRACTOR)
 #if EVAL_RESULTS_ONLY && (DEFAULT_NB_THREADS>1 || !WRITE_BGSUB_METRICS_ANALYSIS)
 #error "Eval-only mode must run with 1 thread & write results somewhere."
-#elif (TOTAL_NB_ITERS<=0 || TOTAL_NB_PASSES<=0)
-#error "Must run at least 1 iteration & 1 pass."
-#endif //(TOTAL_NB_ITERS<=0 || TOTAL_NB_PASSES<=0)
+#endif //EVAL_RESULTS_ONLY && (DEFAULT_NB_THREADS>1 || !WRITE_BGSUB_METRICS_ANALYSIS)
 #if (USE_VIBE_LBSP_BG_SUBTRACTOR+USE_PBAS_LBSP_BG_SUBTRACTOR+USE_VIBE_BG_SUBTRACTOR+USE_PBAS_BG_SUBTRACTOR+USE_CB_LBSP_BG_SUBTRACTOR)!=1
 #error "Must specify a single algorithm."
-#elif (USE_CDNET2012_DATASET+USE_CDNET2014_DATASET+USE_WALLFLOWER_DATASET+USE_PETS2001_D3TC1_DATASET+USE_SINGLE_AVI_FILE+USE_LITIV_REGISTRATION_SET01+USE_LITIV_REGISTRATION_SET02)!=1
-#error "Must specify a single dataset."
-#elif USE_CDNET2012_DATASET
-const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_CDnet;
-const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/CDNet/dataset/");
-const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet/"+RESULTS_OUTPUT_DIR_NAME+"/");
-const std::string g_sResultPrefix("bin");
-const std::string g_sResultSuffix(".png");
-const char* g_asDatasetFolders[] = {"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"};
-const char* g_asDatasetGrayscaleDirNameTokens[] = {"thermal"};
-const char** g_asDatasetSkippedDirNameTokens = nullptr;
-const size_t g_nResultIdxOffset = 1;
-#elif USE_CDNET2014_DATASET
-const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_CDnet;
-const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/CDNet2014/dataset/");
-const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/CDNet2014/"+RESULTS_OUTPUT_DIR_NAME+"/");
-const std::string g_sResultPrefix("bin");
-const std::string g_sResultSuffix(".png");
-const char* g_asDatasetFolders[] = {"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"};
-const char* g_asDatasetGrayscaleDirNameTokens[] = {"thermal","turbulence"};
-const size_t g_nResultIdxOffset = 1;
-#elif USE_WALLFLOWER_DATASET
-const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_Wallflower;
-const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/Wallflower/dataset/");
-const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/Wallflower/"+RESULTS_OUTPUT_DIR_NAME+"/");
-const std::string g_sResultPrefix("bin");
-const std::string g_sResultSuffix(".png");
-const char* g_asDatasetFolders[] = {"global"};
-const size_t g_nResultIdxOffset = 0;
-#elif USE_PETS2001_D3TC1_DATASET
-const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_PETS2001_D3TC1;
-const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/PETS2001/DATASET3/");
-const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/PETS2001/DATASET3/"+RESULTS_OUTPUT_DIR_NAME+"/");
-const std::string g_sResultPrefix("bin");
-const std::string g_sResultSuffix(".png");
-const char* g_asDatasetFolders[] = {"TESTING"};
-const size_t g_nResultIdxOffset = 0;
-#elif USE_SINGLE_AVI_FILE
-const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_GenericSegmentationTest;
-const std::string g_sDatasetPath(DATASET_ROOT_DIR+"/avitest/");
-const std::string g_sResultsPath(RESULTS_ROOT_DIR+"/avitest/"+RESULTS_OUTPUT_DIR_NAME+"/");
-const std::string g_sResultPrefix("");
-const std::string g_sResultSuffix(".png");
-const char* g_asDatasetFolders[] = {"inf6803_tp1"};
-const char** g_asDatasetGrayscaleDirNameTokens = nullptr;
-const char** g_asDatasetSkippedDirNameTokens = nullptr;
-const size_t g_nResultIdxOffset = 0;
-#elif (USE_LITIV_REGISTRATION_SET01 || USE_LITIV_REGISTRATION_SET02)
-const DatasetUtils::eAvailableDatasetsID g_eDatasetID = DatasetUtils::eDataset_LITIV_Registr;
-const std::string g_sDatasetMidPath(std::string("/litiv/registration_set")+(USE_LITIV_REGISTRATION_SET01?"01/":"02/Dataset/"));
-const std::string g_sDatasetPath(DATASET_ROOT_DIR+g_sDatasetMidPath);
-const std::string g_sResultsPath(RESULTS_ROOT_DIR+g_sDatasetMidPath+RESULTS_OUTPUT_DIR_NAME+"/");
-const std::string g_sResultPrefix("bin");
-const std::string g_sResultSuffix(".png");
-#if USE_LITIV_REGISTRATION_SET01
-const char* g_asDatasetFolders[] = {"SEQUENCE1","SEQUENCE2","SEQUENCE3","SEQUENCE4","SEQUENCE5","SEQUENCE6","SEQUENCE7","SEQUENCE8","SEQUENCE9"};
-#else //USE_LITIV_REGISTRATION_SET02
-const char* g_asDatasetFolders[] = {"vid1","vid2/cut1","vid2/cut2","vid3"};
-#endif //USE_LITIV_REGISTRATION_SET02
-const char* g_asDatasetGrayscaleDirNameTokens[] = {"THERMAL"};
-const char* g_asDatasetSkippedDirNameTokens[] = {"1Person","2Person","3Person","4Person","5Person"};
-const size_t g_nResultIdxOffset = 0;
-#endif //(USE_LITIV_REGISTRATION_SET01 || USE_LITIV_REGISTRATION_SET02)
+#endif //(USE_VIBE_LBSP_BG_SUBTRACTOR+USE_PBAS_LBSP_BG_SUBTRACTOR+USE_VIBE_BG_SUBTRACTOR+USE_PBAS_BG_SUBTRACTOR+USE_CB_LBSP_BG_SUBTRACTOR)!=1
 #if ENABLE_DISPLAY_MOUSE_DEBUG
+#if (GPU_EXEC || DEFAULT_NB_THREADS>1)
+#error "Cannot support mouse debug with GPU exec or with more than one thread."
+#endif //(GPU_EXEC || DEFAULT_NB_THREADS>1)
 static int *pnLatestMouseX=nullptr, *pnLatestMouseY=nullptr;
 void OnMouseEvent(int event, int x, int y, int, void*) {
     if(event!=cv::EVENT_MOUSEMOVE || !x || !y)
@@ -137,21 +64,25 @@ void OnMouseEvent(int event, int x, int y, int, void*) {
 #if WRITE_BGSUB_METRICS_ANALYSIS
 cv::FileStorage g_oDebugFS;
 #endif //!WRITE_BGSUB_METRICS_ANALYSIS
+#if WRITE_BGSUB_IMG_OUTPUT
+const std::vector<int> g_vnResultsComprParams = {cv::IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
+#endif //WRITE_BGSUB_IMG_OUTPUT
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 cv::Size g_oDisplayOutputSize(960,240);
 bool g_bContinuousUpdates = false;
 cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, const cv::Mat& oROI, size_t nFrame);
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
-#if DEFAULT_NB_THREADS<1
+const DatasetUtils::DatasetInfo& g_oDatasetInfo = DatasetUtils::GetDatasetInfo(DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH);
+#if (!GPU_EXEC && DEFAULT_NB_THREADS<1)
 #error "Bad default number of threads specified."
-#endif //DEFAULT_NB_THREADS<1
+#elif (GPU_EXEC && DEFAULT_NB_THREADS>1)
+#warning "Cannot support multithreading + gpu exec, will keep one main thread + gpu instead"
+#endif //(GPU_EXEC && DEFAULT_NB_THREADS>1)
 int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, DatasetUtils::SequenceInfo* pCurrSequence, const std::string& sCurrResultsPath);
+#if !GPU_EXEC
 #if PLATFORM_SUPPORTS_CPP11
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
 std::atomic_size_t g_nActiveThreads(0);
-#if WRITE_BGSUB_IMG_OUTPUT
-const std::vector<int> g_vnResultsComprParams = {cv::IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
-#endif //WRITE_BGSUB_IMG_OUTPUT
 #elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;
 HANDLE g_hThreadEvent[g_nMaxThreads] = {0};
@@ -160,38 +91,22 @@ void* g_apThreadDataStruct[g_nMaxThreads][3] = {0};
 DWORD WINAPI AnalyzeSequenceEntryPoint(LPVOID lpParam) {
     return AnalyzeSequence((int)(lpParam),(CategoryInfo*)g_apThreadDataStruct[(int)(lpParam)][0],(SequenceInfo*)g_apThreadDataStruct[(int)(lpParam)][1],std::string((const char*)(g_apThreadDataStruct[(int)(lpParam)][2])));
 }
-#if WRITE_BGSUB_IMG_OUTPUT
-const int g_anResultsComprParams[2] = {CV_IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
-const std::vector<int> g_vnResultsComprParams(g_anResultsComprParams,g_anResultsComprParams+2);
-#endif //WRITE_BGSUB_IMG_OUTPUT
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#error "Missing implementation for threads/mutexes/atomic variables on this platform."
+#error "Missing implementation for CPU-based exec using threads, mutexes & atomic variables on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#if TOTAL_NB_ITERS>1
-const int g_nBGSamplesIncrPerIter = 5;
-int g_nCurrIter;
-#endif //TOTAL_NB_ITERS>1
+#endif //!GPU_EXEC
 
 int main() {
 #if PLATFORM_USES_WIN32API
     SetConsoleWindowSize(80,40,1000);
 #endif //PLATFORM_USES_WIN32API
-    std::vector<std::string> vsDatasetGrayscaleDirNameTokens, vsDatasetSkippedDirNameTokens;
-    if(g_asDatasetGrayscaleDirNameTokens!=nullptr) {
-        for(size_t i=0; i<sizeof(g_asDatasetGrayscaleDirNameTokens)/sizeof(char*); ++i)
-            vsDatasetGrayscaleDirNameTokens.push_back(g_asDatasetGrayscaleDirNameTokens[i]);
-    }
-    if(g_asDatasetSkippedDirNameTokens!=nullptr) {
-        for(size_t i=0; i<sizeof(g_asDatasetSkippedDirNameTokens)/sizeof(char*); ++i)
-            vsDatasetSkippedDirNameTokens.push_back(g_asDatasetSkippedDirNameTokens[i]);
-    }
-    std::vector<DatasetUtils::CategoryInfo*> vpCategories;
     std::cout << "Parsing dataset..." << std::endl;
-    try {
-        for(size_t p=0; p<TOTAL_NB_PASSES; ++p)
-            for(size_t i=0; i<sizeof(g_asDatasetFolders)/sizeof(char*); ++i)
-                vpCategories.push_back(new DatasetUtils::CategoryInfo(g_asDatasetFolders[i],g_sDatasetPath+g_asDatasetFolders[i],g_eDatasetID,vsDatasetGrayscaleDirNameTokens,vsDatasetSkippedDirNameTokens));
-    } catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
+    std::vector<DatasetUtils::CategoryInfo*> vpCategories;
+    for(auto oDatasetFolderPathIter=g_oDatasetInfo.vsDatasetFolderPaths.begin(); oDatasetFolderPathIter!=g_oDatasetInfo.vsDatasetFolderPaths.end(); ++oDatasetFolderPathIter) {
+        try {
+            vpCategories.push_back(new DatasetUtils::CategoryInfo(*oDatasetFolderPathIter,g_oDatasetInfo.sDatasetPath+*oDatasetFolderPathIter,g_oDatasetInfo.eID,g_oDatasetInfo.vsDatasetGrayscaleDirPathTokens,g_oDatasetInfo.vsDatasetSkippedDirPathTokens));
+        } catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
+    }
     size_t nSeqTotal = 0;
     size_t nFramesTotal = 0;
     std::multimap<double,DatasetUtils::SequenceInfo*> mSeqLoads;
@@ -205,119 +120,102 @@ int main() {
     CV_Assert(mSeqLoads.size()==nSeqTotal);
     std::cout << "Parsing complete. [" << vpCategories.size() << " category(ies), "  << nSeqTotal  << " sequence(s)]" << std::endl << std::endl;
     if(nSeqTotal) {
-#if DEFAULT_NB_THREADS>1
+#if !GPU_EXEC && DEFAULT_NB_THREADS>1
         // since the algorithm isn't implemented to be parallelised yet, we parallelise the sequence treatment instead
         std::cout << "Running background subtraction with " << ((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads) << " thread(s)..." << std::endl;
 #else //DEFAULT_NB_THREADS==1
         std::cout << "Running background subtraction..." << std::endl;
 #endif //DEFAULT_NB_THREADS==1
         size_t nSeqProcessed = 1;
-#if TOTAL_NB_ITERS==1
-        const std::string sCurrResultsPath = g_sResultsPath;
-#else //TOTAL_NB_ITERS>1
-        for(g_nCurrIter=1; g_nCurrIter<=TOTAL_NB_ITERS; ++g_nCurrIter) {
-            std::cout << std::endl << std::endl << "Iteration [" << g_nCurrIter << "/" << TOTAL_NB_ITERS << "]" << std::endl << std::endl;
-            std::stringstream ssCurrResultsPath;
-            ssCurrResultsPath << g_sResultsPath << "_iter" << std::setfill('0') << std::setw(3) << g_nCurrIter << "/";
-            const std::string sCurrResultsPath = ssCurrResultsPath.str();
-            for(size_t c=0; c<vpCategories.size(); ++c) {
-                vpCategories[c]->nTP = 0;
-                vpCategories[c]->nTN = 0;
-                vpCategories[c]->nFP = 0;
-                vpCategories[c]->nFN = 0;
-                vpCategories[c]->nSE = 0;
-                for(size_t s=0; s<vpCategories[c]->m_vpSequences.size(); ++s) {
-                    vpCategories[c]->m_vpSequences[s]->nTP = 0;
-                    vpCategories[c]->m_vpSequences[s]->nTN = 0;
-                    vpCategories[c]->m_vpSequences[s]->nFP = 0;
-                    vpCategories[c]->m_vpSequences[s]->nFN = 0;
-                    vpCategories[c]->m_vpSequences[s]->nSE = 0;
-                }
-            }
-#endif //TOTAL_NB_ITERS>1
+        const std::string sCurrResultsPath = g_oDatasetInfo.sResultsPath;
 #if WRITE_BGSUB_METRICS_ANALYSIS
-            g_oDebugFS = cv::FileStorage(sCurrResultsPath+"framelevel_debug.yml",cv::FileStorage::WRITE);
+        g_oDebugFS = cv::FileStorage(sCurrResultsPath+"framelevel_debug.yml",cv::FileStorage::WRITE);
 #endif //WRITE_BGSUB_METRICS_ANALYSIS
 #if EVAL_RESULTS_ONLY
-            std::cout << "Running background subtraction evaluation..." << std::endl;
-            for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
-                std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
-                for(size_t k=0; k<oSeqIter->second->GetNbGTFrames(); ++k) {
-                    cv::Mat oGTImg = oSeqIter->second->GetGTFrameFromIndex(k);
-                    cv::Mat oFGMask = ReadResult(sCurrResultsPath,oSeqIter->second->m_pParent->m_sName,oSeqIter->second->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix);
-                    DatasetUtils::CalcMetricsFromResult(oFGMask,oGTImg,oSeqIter->second->GetSequenceROI(),oSeqIter->second->nTP,oSeqIter->second->nTN,oSeqIter->second->nFP,oSeqIter->second->nFN,oSeqIter->second->nSE);
-                }
-                ++nSeqProcessed;
+        std::cout << "Running background subtraction evaluation..." << std::endl;
+        for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
+            std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
+            for(size_t k=0; k<oSeqIter->second->GetNbGTFrames(); ++k) {
+                cv::Mat oGTImg = oSeqIter->second->GetGTFrameFromIndex(k);
+                cv::Mat oFGMask = DatasetUtils::ReadResult(sCurrResultsPath,oSeqIter->second->m_pParent->m_sName,oSeqIter->second->m_sName,g_oDatasetInfo.sResultPrefix,k+g_oDatasetInfo.nResultIdxOffset,g_oDatasetInfo.sResultSuffix);
+                DatasetUtils::CalcMetricsFromResult(oFGMask,oGTImg,oSeqIter->second->GetSequenceROI(),oSeqIter->second->nTP,oSeqIter->second->nTN,oSeqIter->second->nFP,oSeqIter->second->nFN,oSeqIter->second->nSE);
             }
-            const double dFinalFPS = 0.0;
+            ++nSeqProcessed;
+        }
+        const double dFinalFPS = 0.0;
 #else //!EVAL_RESULTS_ONLY
-            PlatformUtils::CreateDirIfNotExist(sCurrResultsPath);
-            for(size_t c=0; c<vpCategories.size(); ++c)
-                PlatformUtils::CreateDirIfNotExist(sCurrResultsPath+vpCategories[c]->m_sName+"/");
-            time_t startup = time(nullptr);
-            tm* startup_tm = localtime(&startup);
-            std::cout << "[" << (startup_tm->tm_year + 1900) << '/' << (startup_tm->tm_mon + 1) << '/' <<  startup_tm->tm_mday << " -- ";
-            std::cout << startup_tm->tm_hour << ':' << startup_tm->tm_min << ':' << startup_tm->tm_sec << ']' << std::endl;
+        PlatformUtils::CreateDirIfNotExist(sCurrResultsPath);
+        for(size_t c=0; c<vpCategories.size(); ++c)
+            PlatformUtils::CreateDirIfNotExist(sCurrResultsPath+vpCategories[c]->m_sName+"/");
+        time_t startup = time(nullptr);
+        tm* startup_tm = localtime(&startup);
+        std::cout << "[" << (startup_tm->tm_year + 1900) << '/' << (startup_tm->tm_mon + 1) << '/' <<  startup_tm->tm_mday << " -- ";
+        std::cout << startup_tm->tm_hour << ':' << startup_tm->tm_min << ':' << startup_tm->tm_sec << ']' << std::endl;
+#if GPU_EXEC
+        for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
+            std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
+            ++nSeqProcessed;
+            // @@@@@@@@@@@@@
+        }
+#else //!GPU_EXEC
 #if PLATFORM_SUPPORTS_CPP11
-            for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
-                while(g_nActiveThreads>=g_nMaxThreads)
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-                std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
-                g_nActiveThreads++;
-                nSeqProcessed++;
-                std::thread(AnalyzeSequence,nSeqProcessed,oSeqIter->second->m_pParent,oSeqIter->second,sCurrResultsPath).detach();
-            }
-            while(g_nActiveThreads>0)
+        for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
+            while(g_nActiveThreads>=g_nMaxThreads)
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+            std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
+            ++g_nActiveThreads;
+            ++nSeqProcessed;
+            std::thread(AnalyzeSequence,nSeqProcessed,oSeqIter->second->m_pParent,oSeqIter->second,sCurrResultsPath).detach();
+        }
+        while(g_nActiveThreads>0)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 #elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
-            for(size_t n=0; n<g_nMaxThreads; ++n)
-                g_hThreadEvent[n] = CreateEvent(NULL,FALSE,TRUE,NULL);
-            for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
-                DWORD ret = WaitForMultipleObjects(g_nMaxThreads,g_hThreadEvent,FALSE,INFINITE);
-                std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
-                nSeqProcessed++;
-                g_apThreadDataStruct[ret][0] = oSeqIter->second->m_pParent;
-                g_apThreadDataStruct[ret][1] = oSeqIter->second;
-                g_apThreadDataStruct[ret][2] = (void*)sCurrResultsPath.c_str();
-                g_hThreads[ret] = CreateThread(NULL,NULL,AnalyzeSequenceEntryPoint,(LPVOID)ret,0,NULL);
-            }
-            WaitForMultipleObjects((DWORD)((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads),g_hThreads,TRUE,INFINITE);
-            for(size_t n=0; n<g_nMaxThreads; ++n) {
-                CloseHandle(g_hThreadEvent[n]);
-                CloseHandle(g_hThreads[n]);
-            }
+        for(size_t n=0; n<g_nMaxThreads; ++n)
+            g_hThreadEvent[n] = CreateEvent(NULL,FALSE,TRUE,NULL);
+        for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
+            DWORD ret = WaitForMultipleObjects(g_nMaxThreads,g_hThreadEvent,FALSE,INFINITE);
+            std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
+            ++nSeqProcessed;
+            g_apThreadDataStruct[ret][0] = oSeqIter->second->m_pParent;
+            g_apThreadDataStruct[ret][1] = oSeqIter->second;
+            g_apThreadDataStruct[ret][2] = (void*)sCurrResultsPath.c_str();
+            g_hThreads[ret] = CreateThread(NULL,NULL,AnalyzeSequenceEntryPoint,(LPVOID)ret,0,NULL);
+        }
+        WaitForMultipleObjects((DWORD)((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads),g_hThreads,TRUE,INFINITE);
+        for(size_t n=0; n<g_nMaxThreads; ++n) {
+            CloseHandle(g_hThreadEvent[n]);
+            CloseHandle(g_hThreads[n]);
+        }
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for threads/mutexes/atomic variables on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-            time_t shutdown = time(nullptr);
-            tm* shutdown_tm = localtime(&shutdown);
-            std::cout << "[" << (shutdown_tm->tm_year + 1900) << '/' << (shutdown_tm->tm_mon + 1) << '/' <<  shutdown_tm->tm_mday << " -- ";
-            std::cout << shutdown_tm->tm_hour << ':' << shutdown_tm->tm_min << ':' << shutdown_tm->tm_sec << ']' << std::endl;
-            const double dFinalFPS = ((double)nFramesTotal)/(shutdown-startup);
-            std::cout << "\t ... session completed at a total of " << dFinalFPS << " fps." << std::endl;
+#endif //!GPU_EXEC
+        time_t shutdown = time(nullptr);
+        tm* shutdown_tm = localtime(&shutdown);
+        std::cout << "[" << (shutdown_tm->tm_year + 1900) << '/' << (shutdown_tm->tm_mon + 1) << '/' <<  shutdown_tm->tm_mday << " -- ";
+        std::cout << shutdown_tm->tm_hour << ':' << shutdown_tm->tm_min << ':' << shutdown_tm->tm_sec << ']' << std::endl;
+        const double dFinalFPS = ((double)nFramesTotal)/(shutdown-startup);
+        std::cout << "\t ... session completed at a total of " << dFinalFPS << " fps." << std::endl;
 #endif //!EVAL_RESULTS_ONLY
 #if WRITE_BGSUB_METRICS_ANALYSIS
-            std::cout << "Summing and writing metrics results...\n" << std::endl;
-            for(size_t c=0; c<vpCategories.size(); ++c) {
-                if(!vpCategories[c]->m_vpSequences.empty()) {
-                    for(size_t s=0; s<vpCategories[c]->m_vpSequences.size(); ++s) {
-                        vpCategories[c]->nTP += vpCategories[c]->m_vpSequences[s]->nTP;
-                        vpCategories[c]->nTN += vpCategories[c]->m_vpSequences[s]->nTN;
-                        vpCategories[c]->nFP += vpCategories[c]->m_vpSequences[s]->nFP;
-                        vpCategories[c]->nFN += vpCategories[c]->m_vpSequences[s]->nFN;
-                        vpCategories[c]->nSE += vpCategories[c]->m_vpSequences[s]->nSE;
-                        DatasetUtils::WriteMetrics(sCurrResultsPath+vpCategories[c]->m_sName+"/"+vpCategories[c]->m_vpSequences[s]->m_sName+".txt",vpCategories[c]->m_vpSequences[s]);
-                    }
-                    DatasetUtils::WriteMetrics(sCurrResultsPath+vpCategories[c]->m_sName+".txt",vpCategories[c]);
-                    std::cout << std::endl;
+        std::cout << "Summing and writing metrics results...\n" << std::endl;
+        for(size_t c=0; c<vpCategories.size(); ++c) {
+            if(!vpCategories[c]->m_vpSequences.empty()) {
+                for(size_t s=0; s<vpCategories[c]->m_vpSequences.size(); ++s) {
+                    vpCategories[c]->nTP += vpCategories[c]->m_vpSequences[s]->nTP;
+                    vpCategories[c]->nTN += vpCategories[c]->m_vpSequences[s]->nTN;
+                    vpCategories[c]->nFP += vpCategories[c]->m_vpSequences[s]->nFP;
+                    vpCategories[c]->nFN += vpCategories[c]->m_vpSequences[s]->nFN;
+                    vpCategories[c]->nSE += vpCategories[c]->m_vpSequences[s]->nSE;
+                    DatasetUtils::WriteMetrics(sCurrResultsPath+vpCategories[c]->m_sName+"/"+vpCategories[c]->m_vpSequences[s]->m_sName+".txt",vpCategories[c]->m_vpSequences[s]);
                 }
+                DatasetUtils::WriteMetrics(sCurrResultsPath+vpCategories[c]->m_sName+".txt",vpCategories[c]);
+                std::cout << std::endl;
             }
-            DatasetUtils::WriteMetrics(sCurrResultsPath+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
-            g_oDebugFS.release();
-#endif //WRITE_BGSUB_METRICS_ANALYSIS
-#if TOTAL_NB_ITERS>1
         }
-#endif //TOTAL_NB_ITERS>1
+        DatasetUtils::WriteMetrics(sCurrResultsPath+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
+        g_oDebugFS.release();
+#endif //WRITE_BGSUB_METRICS_ANALYSIS
         std::cout << std::endl << "All done." << std::endl;
     }
     else
@@ -328,6 +226,9 @@ int main() {
     //vpCategories.clear();
 }
 
+#if GPU_EXEC
+
+#else //!GPU_EXEC
 int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, DatasetUtils::SequenceInfo* pCurrSequence, const std::string& sCurrResultsPath) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
@@ -349,16 +250,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #endif //USE_PRECACHED_IO
         cv::Mat oFGMask, oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
 #if USE_VIBE_LBSP_BG_SUBTRACTOR
-#if TOTAL_NB_ITERS>1
-        pBGS = new BackgroundSubtractorLOBSTER( BGSLOBSTER_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
-                                                BGSLOBSTER_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
-                                                BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD,
-                                                BGSLOBSTER_DEFAULT_COLOR_DIST_THRESHOLD,
-                                                g_nBGSamplesIncrPerIter*g_nCurrIter,
-                                                BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES);
-#else //TOTAL_NB_ITERS==1
         pBGS = new BackgroundSubtractorLOBSTER();
-#endif //TOTAL_NB_ITERS==1
         const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
         pBGS->initialize(oInitImg,oSequenceROI);
 #elif USE_PBAS_LBSP_BG_SUBTRACTOR
@@ -492,7 +384,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
                 break;
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT
 #if WRITE_BGSUB_IMG_OUTPUT
-            DatasetUtils::WriteResult(sCurrResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_sResultPrefix,k+g_nResultIdxOffset,g_sResultSuffix,oFGMask,g_vnResultsComprParams);
+            DatasetUtils::WriteResult(sCurrResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_oDatasetInfo.sResultPrefix,k+g_oDatasetInfo.nResultIdxOffset,g_oDatasetInfo.sResultSuffix,oFGMask,g_vnResultsComprParams);
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #if WRITE_BGSUB_METRICS_ANALYSIS
             DatasetUtils::CalcMetricsFromResult(oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
@@ -526,6 +418,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
     return 0;
 }
+#endif //!GPU_EXEC
 
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 // NOTE : current impl is most likely broken for pure vibe/pbas subtractors.

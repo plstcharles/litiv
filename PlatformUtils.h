@@ -9,6 +9,14 @@
 #include <string.h>
 #include <stdlib.h>
 #include <map>
+#include <stdexcept>
+#include <iostream>
+#include <fstream>
+#include <iomanip>
+#include <ctime>
+#include <unordered_map>
+#include <deque>
+
 #define PLATFORM_SUPPORTS_CPP11 ((_MSC_VER > 1600) || (__GNUC__>=4 && __GNUC_MINOR__>=6))
 #if (defined WIN32 || defined _WIN32 || defined WIN64 || defined _WIN64)
 #define NOMINMAX

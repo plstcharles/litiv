@@ -1,22 +1,7 @@
 #pragma once
 
-#include <stdexcept>
-#include <algorithm>
-#include <iostream>
-#include <fstream>
-#include <iomanip>
-#include <ctime>
-#include <unordered_map>
-#include <deque>
-
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/features2d/features2d.hpp>
-#include "PlatformUtils.h"
-
-#define USE_AVERAGE_METRICS      1
-#define USE_PRECACHED_IO         0 // @@@@@@ reimpl caching with solid malloc'd arrays
+#define USE_AVERAGE_EVAL_METRICS  1
+#define USE_PRECACHED_IO          0
 #if USE_PRECACHED_IO
 #define MAX_NB_PRECACHED_FRAMES   100
 #define PRECACHE_REFILL_THRESHOLD (MAX_NB_PRECACHED_FRAMES/4)
@@ -24,10 +9,50 @@
 #define QUERY_TIMEOUT_MS          10
 #endif //USE_PRECACHED_IO
 
+#include "PlatformUtils.h"
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/features2d/features2d.hpp>
+
 namespace DatasetUtils {
     class MetricsCalculator;
     class SequenceInfo;
     class CategoryInfo;
+
+    enum eDatasetList {
+        eDataset_CDnet2012=0,
+        eDataset_CDnet2014,
+        eDataset_Wallflower,
+        eDataset_PETS2001_D3TC1,
+        eDataset_LITIV2012,
+        eDataset_GenericTest,
+        eDatasetsCount
+    };
+
+    struct DatasetInfo {
+        const eDatasetList eID;
+        const std::string sDatasetPath;
+        const std::string sResultsPath;
+        const std::string sResultPrefix;
+        const std::string sResultSuffix;
+        const std::vector<std::string> vsDatasetFolderPaths;
+        const std::vector<std::string> vsDatasetGrayscaleDirPathTokens;
+        const std::vector<std::string> vsDatasetSkippedDirPathTokens;
+        const size_t nResultIdxOffset;
+    };
+
+    struct CommonMetrics {
+        double dRecall;
+        double dSpecficity;
+        double dFPR;
+        double dFNR;
+        double dPBC;
+        double dPrecision;
+        double dFMeasure;
+        double dMCC;
+        double dFPS;
+    };
 
     // as defined in the 2012 CDNet scripts/dataset
     const uchar g_nCDnetPositive = 255;
@@ -35,6 +60,8 @@ namespace DatasetUtils {
     const uchar g_nCDnetOutOfScope = 85;
     const uchar g_nCDnetUnknown = 170;
     const uchar g_nCDnetShadow = 50;
+
+    DatasetInfo GetDatasetInfo(const eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirPath);
 
     double CalcMetric_FMeasure(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN);
     double CalcMetric_Recall(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN);
@@ -58,18 +85,6 @@ namespace DatasetUtils {
                                       uint64_t& nTP, uint64_t& nTN, uint64_t& nFP, uint64_t& nFN, uint64_t& nSE);
     cv::Mat GetColoredSegmFrameFromResult(const cv::Mat& oSegmResFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI);
 
-    struct CommonMetrics {
-        double dRecall;
-        double dSpecficity;
-        double dFPR;
-        double dFNR;
-        double dPBC;
-        double dPrecision;
-        double dFMeasure;
-        double dMCC;
-        double dFPS;
-    };
-
     class MetricsCalculator {
     public:
         MetricsCalculator(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN, uint64_t nSE);
@@ -80,24 +95,15 @@ namespace DatasetUtils {
         const bool m_bAveraged;
     };
 
-    enum eAvailableDatasetsID {
-        eDataset_CDnet=0,
-        eDataset_Wallflower,
-        eDataset_PETS2001_D3TC1,
-        eDataset_LITIV_Registr,
-        eDataset_GenericSegmentationTest,
-        eDatasetsCount
-    };
-
     class CategoryInfo {
     public:
         CategoryInfo(const std::string& sName, const std::string& sDirectoryPath,
-                     DatasetUtils::eAvailableDatasetsID eDatasetID,
+                     DatasetUtils::eDatasetList eDatasetID,
                      std::vector<std::string> vsGrayscaleDirNameTokens=std::vector<std::string>(),
                      std::vector<std::string> vsSkippedDirNameTokens=std::vector<std::string>());
         ~CategoryInfo();
         const std::string m_sName;
-        const eAvailableDatasetsID m_eDatasetID;
+        const eDatasetList m_eDatasetID;
         std::vector<SequenceInfo*> m_vpSequences;
         uint64_t nTP, nTN, nFP, nFN, nSE;
         double m_dAvgFPS;
@@ -126,7 +132,7 @@ namespace DatasetUtils {
         void ValidateKeyPoints(std::vector<cv::KeyPoint>& voKPs) const;
         const std::string m_sName;
         const std::string m_sPath;
-        const eAvailableDatasetsID m_eDatasetID;
+        const eDatasetList m_eDatasetID;
         uint64_t nTP, nTN, nFP, nFN, nSE;
         double m_dAvgFPS;
         double m_dExpectedLoad;

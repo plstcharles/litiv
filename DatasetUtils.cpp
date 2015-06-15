@@ -1,5 +1,94 @@
 #include "DatasetUtils.h"
 
+DatasetUtils::DatasetInfo DatasetUtils::GetDatasetInfo(const DatasetUtils::eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirPath) {
+    if(eDatasetID==DatasetUtils::eDataset_CDnet2012) {
+        const DatasetUtils::DatasetInfo oCDnet2012DatasetInfo = {
+            eDatasetID,
+            sDatasetRootDirPath+"/CDNet/dataset/",
+            sDatasetRootDirPath+"/CDNet/"+sResultsDirPath+"/",
+            "bin",
+            ".png",
+            {"baseline_highway"},//{"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"},
+            {"thermal"},
+            {},
+            1,
+        };
+        return oCDnet2012DatasetInfo;
+    }
+    else if(eDatasetID==DatasetUtils::eDataset_CDnet2014) {
+        const DatasetUtils::DatasetInfo oCDnet2014DatasetInfo = {
+            eDatasetID,
+            sDatasetRootDirPath+"/CDNet2014/dataset/",
+            sDatasetRootDirPath+"/CDNet2014/"+sResultsDirPath+"/",
+            "bin",
+            ".png",
+            {"baseline_highway"},//{"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"},
+            {"thermal","turbulence"},
+            {},
+            1,
+        };
+        return oCDnet2014DatasetInfo;
+    }
+    else if(eDatasetID==DatasetUtils::eDataset_Wallflower) {
+        const DatasetUtils::DatasetInfo oWallflowerDatasetInfo = {
+            eDatasetID,
+            sDatasetRootDirPath+"/Wallflower/dataset/",
+            sDatasetRootDirPath+"/Wallflower/"+sResultsDirPath+"/",
+            "bin",
+            ".png",
+            {"global"},
+            {},
+            {},
+            0,
+        };
+        return oWallflowerDatasetInfo;
+    }
+    else if(eDatasetID==DatasetUtils::eDataset_PETS2001_D3TC1) {
+        const DatasetUtils::DatasetInfo oPETS2001D3TC1DatasetInfo = {
+            eDatasetID,
+            sDatasetRootDirPath+"/PETS2001/DATASET3/",
+            sDatasetRootDirPath+"/PETS2001/DATASET3/"+sResultsDirPath+"/",
+            "bin",
+            ".png",
+            {"TESTING"},
+            {},
+            {},
+            0,
+        };
+        return oPETS2001D3TC1DatasetInfo;
+    }
+    else if(eDatasetID==DatasetUtils::eDataset_GenericTest) {
+        const DatasetUtils::DatasetInfo oGenericTestDatasetInfo = {
+            eDatasetID,
+            sDatasetRootDirPath+"/avitest/",
+            sDatasetRootDirPath+"/avitest/"+sResultsDirPath+"/",
+            "",
+            ".png",
+            {"inf6803_tp1"},
+            {},
+            {},
+            0,
+        };
+        return oGenericTestDatasetInfo;
+    }
+    else if(eDatasetID==DatasetUtils::eDataset_LITIV2012) {
+        const DatasetUtils::DatasetInfo oLITIV2012DatasetInfo = {
+            eDatasetID,
+            sDatasetRootDirPath+"/litiv/litiv2012_dataset/",
+            sDatasetRootDirPath+"/litiv/litiv2012_dataset/"+sResultsDirPath+"/",
+            "bin",
+            ".png",
+            {"SEQUENCE1","SEQUENCE2","SEQUENCE3","SEQUENCE4","SEQUENCE5","SEQUENCE6","SEQUENCE7","SEQUENCE8","SEQUENCE9"},//{"vid1","vid2/cut1","vid2/cut2","vid3"},
+            {"THERMAL"},
+            {},//{"1Person","2Person","3Person","4Person","5Person"},
+            0,
+        };
+        return oLITIV2012DatasetInfo;
+    }
+    else
+        throw std::runtime_error(std::string("Unknown dataset type, cannot use predefined info struct."));
+}
+
 double DatasetUtils::CalcMetric_FMeasure(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN) {
     const double dRecall = DatasetUtils::CalcMetric_Recall(nTP,nTN,nFP,nFN);
     const double dPrecision = DatasetUtils::CalcMetric_Precision(nTP,nTN,nFP,nFN);
@@ -85,10 +174,10 @@ void DatasetUtils::WriteMetrics(const std::string sResultsFileName, CategoryInfo
         oMetricsOutput << sName << " " << tmp.m_oMetrics.dRecall << " " << tmp.m_oMetrics.dSpecficity << " " << tmp.m_oMetrics.dFPR << " " << tmp.m_oMetrics.dFNR << " " << tmp.m_oMetrics.dPBC << " " << tmp.m_oMetrics.dPrecision << " " << tmp.m_oMetrics.dFMeasure << " " << tmp.m_oMetrics.dMCC << std::endl;
     }
     oMetricsOutput << "--------------------------------------------------------------------------------------------------" << std::endl;
-    MetricsCalculator all(pCat, USE_AVERAGE_METRICS);
+    MetricsCalculator all(pCat,USE_AVERAGE_EVAL_METRICS);
     const std::string sCurrCatName = pCat->m_sName.size()>12?pCat->m_sName.substr(0,12):pCat->m_sName;
     std::cout << "\t" << std::setfill(' ') << std::setw(12) << sCurrCatName << " : Rcl=" << std::fixed << std::setprecision(4) << all.m_oMetrics.dRecall << " Prc=" << all.m_oMetrics.dPrecision << " FM=" << all.m_oMetrics.dFMeasure << " MCC=" << all.m_oMetrics.dMCC << std::endl;
-    oMetricsOutput << std::string(USE_AVERAGE_METRICS?"averaged   ":"cumulative ") << all.m_oMetrics.dRecall << " " << all.m_oMetrics.dSpecficity << " " << all.m_oMetrics.dFPR << " " << all.m_oMetrics.dFNR << " " << all.m_oMetrics.dPBC << " " << all.m_oMetrics.dPrecision << " " << all.m_oMetrics.dFMeasure << " " << all.m_oMetrics.dMCC << std::endl;
+    oMetricsOutput << std::string(USE_AVERAGE_EVAL_METRICS?"averaged   ":"cumulative ") << all.m_oMetrics.dRecall << " " << all.m_oMetrics.dSpecficity << " " << all.m_oMetrics.dFPR << " " << all.m_oMetrics.dFNR << " " << all.m_oMetrics.dPBC << " " << all.m_oMetrics.dPrecision << " " << all.m_oMetrics.dFMeasure << " " << all.m_oMetrics.dMCC << std::endl;
     oMetricsOutput << std::endl << std::endl;
     oMetricsOutput << "All Sequences Average FPS: " << all.m_oMetrics.dFPS << std::endl;
     oMetricsOutput.close();
@@ -100,11 +189,11 @@ void DatasetUtils::WriteMetrics(const std::string sResultsFileName, std::vector<
     oMetricsOutput << std::fixed << std::setprecision(8);
     oMetricsOutput << "Overall results :" << std::endl;
     oMetricsOutput << std::endl;
-    oMetricsOutput << std::string(USE_AVERAGE_METRICS?"Averaged":"Cumulative") << " metrics :" << std::endl;
+    oMetricsOutput << std::string(USE_AVERAGE_EVAL_METRICS?"Averaged":"Cumulative") << " metrics :" << std::endl;
     oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FM         MCC        " << std::endl;
     for(size_t i=0; i<vpCat.size(); ++i) {
         if(!vpCat[i]->m_vpSequences.empty()) {
-            MetricsCalculator tmp(vpCat[i],USE_AVERAGE_METRICS);
+            MetricsCalculator tmp(vpCat[i],USE_AVERAGE_EVAL_METRICS);
             std::string sName = vpCat[i]->m_sName;
             if(sName.size()>10)
                 sName = sName.substr(0,10);
@@ -114,7 +203,7 @@ void DatasetUtils::WriteMetrics(const std::string sResultsFileName, std::vector<
         }
     }
     oMetricsOutput << "--------------------------------------------------------------------------------------------------" << std::endl;
-    MetricsCalculator all(vpCat,USE_AVERAGE_METRICS);
+    MetricsCalculator all(vpCat,USE_AVERAGE_EVAL_METRICS);
     oMetricsOutput << "overall    " << all.m_oMetrics.dRecall << " " << all.m_oMetrics.dSpecficity << " " << all.m_oMetrics.dFPR << " " << all.m_oMetrics.dFNR << " " << all.m_oMetrics.dPBC << " " << all.m_oMetrics.dPrecision << " " << all.m_oMetrics.dFMeasure << " " << all.m_oMetrics.dMCC << std::endl;
     oMetricsOutput << std::endl << std::endl;
     oMetricsOutput << "All Sequences Average FPS: " << all.m_oMetrics.dFPS << std::endl;
@@ -352,7 +441,7 @@ DatasetUtils::MetricsCalculator::MetricsCalculator(const std::vector<CategoryInf
     :    m_oMetrics(CalcMetricsFromCategories(vpCat,bAverage)),m_bAveraged(bAverage) {CV_Assert(!vpCat.empty());}
 
 DatasetUtils::CategoryInfo::CategoryInfo(const std::string& sName, const std::string& sDirectoryPath,
-                                         DatasetUtils::eAvailableDatasetsID eDatasetID,
+                                         DatasetUtils::eDatasetList eDatasetID,
                                          std::vector<std::string> vsGrayscaleDirNameTokens,
                                          std::vector<std::string> vsSkippedDirNameTokens)
     :    m_sName(sName)
@@ -361,17 +450,17 @@ DatasetUtils::CategoryInfo::CategoryInfo(const std::string& sName, const std::st
         ,m_dAvgFPS(-1) {
     std::cout << "\tParsing dir '" << sDirectoryPath << "' for category '" << m_sName << "'... ";
     std::vector<std::string> vsSequencePaths;
-    if(m_eDatasetID==eDataset_CDnet || m_eDatasetID==eDataset_Wallflower || m_eDatasetID==eDataset_PETS2001_D3TC1) {
+    if(m_eDatasetID==eDataset_CDnet2012 || m_eDatasetID==eDataset_CDnet2014 || m_eDatasetID==eDataset_Wallflower || m_eDatasetID==eDataset_PETS2001_D3TC1) {
         // all subdirs are considered sequence directories
         PlatformUtils::GetSubDirsFromDir(sDirectoryPath,vsSequencePaths);
         std::cout << "(" << vsSequencePaths.size() << " potential sequences)" << std::endl;
     }
-    else if(m_eDatasetID==eDataset_LITIV_Registr) {
+    else if(m_eDatasetID==eDataset_LITIV2012) {
         // all subdirs should contain individual video tracks in separate modalities
         PlatformUtils::GetSubDirsFromDir(sDirectoryPath,vsSequencePaths);
         std::cout << "(" << vsSequencePaths.size() << " potential tracks)" << std::endl;
     }
-    else if(m_eDatasetID==eDataset_GenericSegmentationTest) {
+    else if(m_eDatasetID==eDataset_GenericTest) {
         // all files are considered sequences
         PlatformUtils::GetFilesFromDir(sDirectoryPath,vsSequencePaths);
         std::cout << "(" << vsSequencePaths.size() << " potential sequences)" << std::endl;
@@ -402,7 +491,7 @@ DatasetUtils::CategoryInfo::~CategoryInfo() {
 DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::string& sPath, CategoryInfo* pParent, bool bForceGrayscale)
     :    m_sName(sName)
         ,m_sPath(sPath)
-        ,m_eDatasetID(pParent?pParent->m_eDatasetID:eDataset_GenericSegmentationTest)
+        ,m_eDatasetID(pParent?pParent->m_eDatasetID:eDataset_GenericTest)
         ,nTP(0),nTN(0),nFP(0),nFN(0),nSE(0)
         ,m_dAvgFPS(-1)
         ,m_dExpectedLoad(0)
@@ -424,7 +513,7 @@ DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::st
         ,m_nTotalNbFrames(0)
         ,m_bForcingGrayscale(bForceGrayscale)
         ,m_nIMReadInputFlags(bForceGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR) {
-    if(m_eDatasetID==eDataset_CDnet) {
+    if(m_eDatasetID==eDataset_CDnet2012 || m_eDatasetID==eDataset_CDnet2014) {
         std::vector<std::string> vsSubDirs;
         PlatformUtils::GetSubDirsFromDir(m_sPath,vsSubDirs);
         auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),m_sPath+"/groundtruth");
@@ -504,7 +593,7 @@ DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::st
         m_nTotalNbFrames = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
         m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(int(!m_bForcingGrayscale)+1);
     }
-    else if(m_eDatasetID==eDataset_LITIV_Registr) {
+    else if(m_eDatasetID==eDataset_LITIV2012) {
         PlatformUtils::GetFilesFromDir(m_sPath+"/input/",m_vsInputFramePaths);
         if(m_vsInputFramePaths.empty())
             throw std::runtime_error(std::string("Sequence at ") + m_sPath + " did not possess any parsable input images.");
@@ -529,7 +618,7 @@ DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::st
         m_nTotalNbFrames = m_vsInputFramePaths.size();
         m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(int(!m_bForcingGrayscale)+1);
     }
-    else if(m_eDatasetID==eDataset_GenericSegmentationTest) {
+    else if(m_eDatasetID==eDataset_GenericTest) {
         m_voVideoReader.open(m_sPath);
         if(!m_voVideoReader.isOpened())
             throw std::runtime_error(std::string("Bad video file ('")+m_sPath+std::string("'), could not be opened."));
@@ -589,9 +678,9 @@ void DatasetUtils::SequenceInfo::ValidateKeyPoints(std::vector<cv::KeyPoint>& vo
 cv::Mat DatasetUtils::SequenceInfo::GetInputFrameFromIndex_Internal(size_t nFrameIdx) {
     CV_Assert(nFrameIdx<m_nTotalNbFrames);
     cv::Mat oFrame;
-    if(m_eDatasetID==eDataset_CDnet || m_eDatasetID==eDataset_Wallflower || m_eDatasetID==eDataset_LITIV_Registr)
+    if(m_eDatasetID==eDataset_CDnet2012 || m_eDatasetID==eDataset_CDnet2014 || m_eDatasetID==eDataset_Wallflower || m_eDatasetID==eDataset_LITIV2012)
         oFrame = cv::imread(m_vsInputFramePaths[nFrameIdx],m_nIMReadInputFlags);
-    else if(m_eDatasetID==eDataset_PETS2001_D3TC1 || /*m_eDatasetID==eDataset_LITIV_Registr01 || */m_eDatasetID==eDataset_GenericSegmentationTest) {
+    else if(m_eDatasetID==eDataset_PETS2001_D3TC1 || /*m_eDatasetID==eDataset_LITIV2012 || */m_eDatasetID==eDataset_GenericTest) {
         if(m_nNextExpectedVideoReaderFrameIdx!=nFrameIdx) {
             m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,(double)nFrameIdx);
             m_nNextExpectedVideoReaderFrameIdx = nFrameIdx+1;
@@ -609,7 +698,7 @@ cv::Mat DatasetUtils::SequenceInfo::GetInputFrameFromIndex_Internal(size_t nFram
 cv::Mat DatasetUtils::SequenceInfo::GetGTFrameFromIndex_Internal(size_t nFrameIdx) {
     CV_Assert(nFrameIdx<m_nTotalNbFrames);
     cv::Mat oFrame;
-    if(m_eDatasetID==eDataset_CDnet)
+    if(m_eDatasetID==eDataset_CDnet2012 || m_eDatasetID==eDataset_CDnet2014)
         oFrame = cv::imread(m_vsGTFramePaths[nFrameIdx],cv::IMREAD_GRAYSCALE);
     else if(m_eDatasetID==eDataset_Wallflower || m_eDatasetID==eDataset_PETS2001_D3TC1) {
         auto res = m_mTestGTIndexes.find(nFrameIdx);
@@ -618,7 +707,7 @@ cv::Mat DatasetUtils::SequenceInfo::GetGTFrameFromIndex_Internal(size_t nFrameId
         else
             oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar(g_nCDnetOutOfScope));
     }
-    else if(m_eDatasetID==eDataset_LITIV_Registr || m_eDatasetID==eDataset_GenericSegmentationTest) {
+    else if(m_eDatasetID==eDataset_LITIV2012 || m_eDatasetID==eDataset_GenericTest) {
         oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar(g_nCDnetOutOfScope));
     }
     CV_Assert(oFrame.size()==m_oSize);
