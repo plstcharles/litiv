@@ -20,11 +20,11 @@
 #define ENABLE_DISPLAY_MOUSE_DEBUG       0
 #define WRITE_BGSUB_SEGM_AVI_OUTPUT      0
 //////////////////////////////////////////
-#define USE_CB_LBSP_BG_SUBTRACTOR        0
-#define USE_VIBE_LBSP_BG_SUBTRACTOR      1
-#define USE_PBAS_LBSP_BG_SUBTRACTOR      0
-#define USE_VIBE_BG_SUBTRACTOR           0
-#define USE_PBAS_BG_SUBTRACTOR           0
+#define USE_VIBE_BGSUB                   0
+#define USE_PBAS_BGSUB                   0
+#define USE_PAWCS_BGSUB                  0
+#define USE_LOBSTER_BGSUB                1
+#define USE_SUBSENSE_BGSUB               0
 //////////////////////////////////////////
 
 #include "DatasetUtils.h"
@@ -43,14 +43,14 @@
 #include "BackgroundSubtractorPBAS_1ch.h"
 #include "BackgroundSubtractorPBAS_3ch.h"
 
-#define LIMIT_MODEL_TO_SEQUENCE_ROI (USE_VIBE_LBSP_BG_SUBTRACTOR||USE_PBAS_LBSP_BG_SUBTRACTOR||USE_CB_LBSP_BG_SUBTRACTOR)
-#define BOOTSTRAP_100_FIRST_FRAMES  (USE_VIBE_LBSP_BG_SUBTRACTOR||USE_PBAS_LBSP_BG_SUBTRACTOR||USE_CB_LBSP_BG_SUBTRACTOR)
+#define LIMIT_MODEL_TO_SEQUENCE_ROI (USE_LOBSTER_BGSUB||USE_SUBSENSE_BGSUB||USE_PAWCS_BGSUB)
+#define BOOTSTRAP_100_FIRST_FRAMES  (USE_LOBSTER_BGSUB||USE_SUBSENSE_BGSUB||USE_PAWCS_BGSUB)
 #if EVAL_RESULTS_ONLY && (DEFAULT_NB_THREADS>1 || !WRITE_BGSUB_METRICS_ANALYSIS)
 #error "Eval-only mode must run with 1 thread & write results somewhere."
 #endif //EVAL_RESULTS_ONLY && (DEFAULT_NB_THREADS>1 || !WRITE_BGSUB_METRICS_ANALYSIS)
-#if (USE_VIBE_LBSP_BG_SUBTRACTOR+USE_PBAS_LBSP_BG_SUBTRACTOR+USE_VIBE_BG_SUBTRACTOR+USE_PBAS_BG_SUBTRACTOR+USE_CB_LBSP_BG_SUBTRACTOR)!=1
+#if (USE_LOBSTER_BGSUB+USE_SUBSENSE_BGSUB+USE_VIBE_BGSUB+USE_PBAS_BGSUB+USE_PAWCS_BGSUB)!=1
 #error "Must specify a single algorithm."
-#endif //(USE_VIBE_LBSP_BG_SUBTRACTOR+USE_PBAS_LBSP_BG_SUBTRACTOR+USE_VIBE_BG_SUBTRACTOR+USE_PBAS_BG_SUBTRACTOR+USE_CB_LBSP_BG_SUBTRACTOR)!=1
+#endif //(USE_LOBSTER_BGSUB+USE_SUBSENSE_BGSUB+USE_VIBE_BGSUB+USE_PBAS_BGSUB+USE_PAWCS_BGSUB)!=1
 #if ENABLE_DISPLAY_MOUSE_DEBUG
 #if (GPU_EXEC || DEFAULT_NB_THREADS>1)
 #error "Cannot support mouse debug with GPU exec or with more than one thread."
@@ -234,16 +234,16 @@ int main() {
 int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, DatasetUtils::SequenceInfo* pCurrSequence, const std::string& sCurrResultsPath) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
-#if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
+#if USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB
     BackgroundSubtractorLBSP* pBGS = nullptr;
 #if LIMIT_MODEL_TO_SEQUENCE_ROI
     cv::Mat oSequenceROI = pCurrSequence->GetSequenceROI();
 #else //!LIMIT_MODEL_TO_SEQUENCE_ROI
     cv::Mat oSequenceROI;
 #endif //!LIMIT_MODEL_TO_SEQUENCE_ROI
-#else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
+#else //USE_VIBE_BGSUB || USE_PBAS_BGSUB
     cv::BackgroundSubtractor* pBGS = nullptr;
-#endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
+#endif //USE_VIBE_BGSUB || USE_PBAS_BGSUB
     try {
         CV_Assert(pCurrCategory && pCurrSequence);
         CV_Assert(pCurrSequence->GetNbInputFrames()>1);
@@ -251,37 +251,37 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
         pCurrSequence->StartPrecaching();
 #endif //DATASETUTILS_USE_PRECACHED_IO
         cv::Mat oFGMask, oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
-#if USE_VIBE_LBSP_BG_SUBTRACTOR
+#if USE_LOBSTER_BGSUB
         pBGS = new BackgroundSubtractorLOBSTER();
         const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
         pBGS->initialize(oInitImg,oSequenceROI);
-#elif USE_PBAS_LBSP_BG_SUBTRACTOR
+#elif USE_SUBSENSE_BGSUB
         pBGS = new BackgroundSubtractorSuBSENSE();
         const double dDefaultLearningRate = 0;
         pBGS->initialize(oInitImg,oSequenceROI);
-#elif USE_CB_LBSP_BG_SUBTRACTOR
+#elif USE_PAWCS_BGSUB
         pBGS = new BackgroundSubtractorPAWCS();
         const double dDefaultLearningRate = 0;
         pBGS->initialize(oInitImg,oSequenceROI);
-#else //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
+#else //USE_VIBE_BGSUB || USE_PBAS_BGSUB
         const size_t m_nInputChannels = (size_t)oInitImg.channels();
-#if USE_VIBE_BG_SUBTRACTOR
+#if USE_VIBE_BGSUB
         if(m_nInputChannels==3)
             pBGS = new BackgroundSubtractorViBe_3ch();
         else
             pBGS = new BackgroundSubtractorViBe_1ch();
         ((BackgroundSubtractorViBe*)pBGS)->initialize(oInitImg);
         const double dDefaultLearningRate = BGSVIBE_DEFAULT_LEARNING_RATE;
-#else //USE_PBAS_BG_SUBTRACTOR
+#else //USE_PBAS_BGSUB
         if(m_nInputChannels==3)
             pBGS = new BackgroundSubtractorPBAS_3ch();
         else
             pBGS = new BackgroundSubtractorPBAS_1ch();
         ((BackgroundSubtractorPBAS*)pBGS)->initialize(oInitImg);
         const double dDefaultLearningRate = BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE;
-#endif //USE_PBAS_BG_SUBTRACTOR
-#endif //USE_VIBE_BG_SUBTRACTOR || USE_PBAS_BG_SUBTRACTOR
-#if USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
+#endif //USE_PBAS_BGSUB
+#endif //USE_VIBE_BGSUB || USE_PBAS_BGSUB
+#if USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB
         pBGS->m_sDebugName = pCurrCategory->m_sName+"_"+pCurrSequence->m_sName;
 #if WRITE_BGSUB_METRICS_ANALYSIS
         pBGS->m_pDebugFS = &g_oDebugFS;
@@ -290,7 +290,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
         pnLatestMouseX = &pBGS->m_nDebugCoordX;
         pnLatestMouseY = &pBGS->m_nDebugCoordY;
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
-#endif //USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR
+#endif //USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB
 #if DISPLAY_BGSUB_DEBUG_OUTPUT
         std::string sDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName;
         cv::namedWindow(sDebugDisplayName);
@@ -333,10 +333,10 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
             cv::Mat oLastBGImg;
             pBGS->getBackgroundImage(oLastBGImg);
-#if (USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR)
+#if (USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB)
             if(!oSequenceROI.empty())
                 cv::bitwise_or(oLastBGImg,UCHAR_MAX/2,oLastBGImg,oSequenceROI==0);
-#endif //(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR)
+#endif //(USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB)
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
             std::chrono::high_resolution_clock::time_point pre_process = std::chrono::high_resolution_clock::now();
@@ -347,10 +347,10 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
             std::cout << "proc=" << std::fixed << std::setprecision(1) << (float)(std::chrono::duration_cast<std::chrono::microseconds>(post_process-pre_process).count())/1000 << "." << std::endl;
 #endif //ENABLE_FRAME_TIMERS && PLATFORM_SUPPORTS_CPP11
 #if (WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT)
-#if (USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR)
+#if (USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB)
             if(!oSequenceROI.empty())
                 cv::bitwise_or(oFGMask,UCHAR_MAX/2,oFGMask,oSequenceROI==0);
-#endif //(USE_VIBE_LBSP_BG_SUBTRACTOR || USE_PBAS_LBSP_BG_SUBTRACTOR || USE_CB_LBSP_BG_SUBTRACTOR)
+#endif //(USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB)
 #endif //(WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT)
 #if WRITE_BGSUB_SEGM_AVI_OUTPUT
             oSegmWriter.write(oFGMask);
