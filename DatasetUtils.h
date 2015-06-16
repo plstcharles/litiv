@@ -77,6 +77,8 @@ namespace DatasetUtils {
     void WriteMetrics(const std::string sResultsFileName, std::vector<CategoryInfo*>& vpCat, double dTotalFPS);
     void CalcMetricsFromResult(const cv::Mat& oSegmResFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI,
                                       uint64_t& nTP, uint64_t& nTN, uint64_t& nFP, uint64_t& nFN, uint64_t& nSE);
+
+    cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, const cv::Mat& oROI, size_t nFrame, cv::Point oDbgPt=cv::Point(-1,-1));
     cv::Mat GetColoredSegmFrameFromResult(const cv::Mat& oSegmResFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI);
 
     class MetricsCalculator {

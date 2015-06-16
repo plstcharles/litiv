@@ -387,6 +387,37 @@ inline DatasetUtils::CommonMetrics CalcMetricsFromCategories(const std::vector<D
     return res;
 }
 
+cv::Mat DatasetUtils::GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, const cv::Mat& oROI, size_t nFrame, cv::Point oDbgPt) {
+    cv::Mat oInputImgBYTE3, oBGImgBYTE3, oFGMaskBYTE3;
+    if(oInputImg.channels()!=3) {
+        cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_GRAY2RGB);
+        cv::cvtColor(oBGImg,oBGImgBYTE3,cv::COLOR_GRAY2RGB);
+    }
+    else {
+        oInputImgBYTE3 = oInputImg;
+        oBGImgBYTE3 = oBGImg;
+    }
+    oFGMaskBYTE3 = DatasetUtils::GetColoredSegmFrameFromResult(oFGMask,oGTFGMask,oROI);
+    if(oDbgPt!=cv::Point(-1,-1)) {
+        cv::circle(oInputImgBYTE3,oDbgPt,5,cv::Scalar(255,255,255));
+        cv::circle(oFGMaskBYTE3,oDbgPt,5,cv::Scalar(255,255,255));
+    }
+    cv::Mat displayH,displayV1,displayV2;
+    cv::resize(oInputImgBYTE3,oInputImgBYTE3,cv::Size(320,240));
+    cv::resize(oBGImgBYTE3,oBGImgBYTE3,cv::Size(320,240));
+    cv::resize(oFGMaskBYTE3,oFGMaskBYTE3,cv::Size(320,240));
+
+    std::stringstream sstr;
+    sstr << "Input Image #" << nFrame;
+    DatasetUtils::WriteOnImage(oInputImgBYTE3,sstr.str());
+    DatasetUtils::WriteOnImage(oBGImgBYTE3,"Reference Image");
+    DatasetUtils::WriteOnImage(oFGMaskBYTE3,"Segmentation Result");
+
+    cv::hconcat(oInputImgBYTE3,oBGImgBYTE3,displayH);
+    cv::hconcat(displayH,oFGMaskBYTE3,displayH);
+    return displayH;
+}
+
 cv::Mat DatasetUtils::GetColoredSegmFrameFromResult(const cv::Mat& oSegmResFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI) {
     CV_DbgAssert(oSegmResFrame.type()==CV_8UC1 && oGTFrame.type()==CV_8UC1 && oROI.type()==CV_8UC1);
     CV_DbgAssert(oSegmResFrame.size()==oGTFrame.size() && oSegmResFrame.size()==oROI.size());
@@ -457,22 +488,22 @@ DatasetUtils::CategoryInfo::CategoryInfo(const std::string& sName, const std::st
         ,m_eDatasetID(eDatasetID)
         ,nTP(0),nTN(0),nFP(0),nFN(0),nSE(0)
         ,m_dAvgFPS(-1) {
-    std::cout << "\tParsing dir '" << sDirectoryPath << "' for category '" << m_sName << "'... ";
+    std::cout << "\tParsing dir '" << sDirectoryPath << "' for category '" << m_sName << "'; ";
     std::vector<std::string> vsSequencePaths;
     if(m_eDatasetID==eDataset_CDnet2012 || m_eDatasetID==eDataset_CDnet2014 || m_eDatasetID==eDataset_Wallflower || m_eDatasetID==eDataset_PETS2001_D3TC1) {
         // all subdirs are considered sequence directories
         PlatformUtils::GetSubDirsFromDir(sDirectoryPath,vsSequencePaths);
-        std::cout << "(" << vsSequencePaths.size() << " potential sequences)" << std::endl;
+        std::cout << vsSequencePaths.size() << " potential sequence(s)" << std::endl;
     }
     else if(m_eDatasetID==eDataset_LITIV2012) {
         // all subdirs should contain individual video tracks in separate modalities
         PlatformUtils::GetSubDirsFromDir(sDirectoryPath,vsSequencePaths);
-        std::cout << "(" << vsSequencePaths.size() << " potential tracks)" << std::endl;
+        std::cout << vsSequencePaths.size() << " potential track(s)" << std::endl;
     }
     else if(m_eDatasetID==eDataset_GenericTest) {
         // all files are considered sequences
         PlatformUtils::GetFilesFromDir(sDirectoryPath,vsSequencePaths);
-        std::cout << "(" << vsSequencePaths.size() << " potential sequences)" << std::endl;
+        std::cout << vsSequencePaths.size() << " potential sequence(s)" << std::endl;
     }
     else
         throw std::runtime_error(std::string("Unknown dataset type, cannot use any known parsing strategy."));
