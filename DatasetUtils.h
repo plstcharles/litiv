@@ -1,13 +1,7 @@
 #pragma once
 
-#define USE_AVERAGE_EVAL_METRICS  1
-#define USE_PRECACHED_IO          0
-#if USE_PRECACHED_IO
-#define MAX_NB_PRECACHED_FRAMES   100
-#define PRECACHE_REFILL_THRESHOLD (MAX_NB_PRECACHED_FRAMES/4)
-#define REQUEST_TIMEOUT_MS        1
-#define QUERY_TIMEOUT_MS          10
-#endif //USE_PRECACHED_IO
+#define DATASETUTILS_USE_AVERAGE_EVAL_METRICS  1
+#define DATASETUTILS_USE_PRECACHED_IO          1
 
 #include "PlatformUtils.h"
 #include <opencv2/core/core.hpp>
@@ -100,7 +94,8 @@ namespace DatasetUtils {
         CategoryInfo(const std::string& sName, const std::string& sDirectoryPath,
                      DatasetUtils::eDatasetList eDatasetID,
                      std::vector<std::string> vsGrayscaleDirNameTokens=std::vector<std::string>(),
-                     std::vector<std::string> vsSkippedDirNameTokens=std::vector<std::string>());
+                     std::vector<std::string> vsSkippedDirNameTokens=std::vector<std::string>(),
+                     bool bUse4chAlign=false);
         ~CategoryInfo();
         const std::string m_sName;
         const eDatasetList m_eDatasetID;
@@ -120,7 +115,7 @@ namespace DatasetUtils {
 
     class SequenceInfo {
     public:
-        SequenceInfo(const std::string& sName, const std::string& sPath, CategoryInfo* pParent, bool bForceGrayscale=false);
+        SequenceInfo(const std::string& sName, const std::string& sPath, CategoryInfo* pParent, bool bForceGrayscale=false, bool bUse4chAlign=false);
         ~SequenceInfo();
         const cv::Mat& GetInputFrameFromIndex(size_t nFrameIdx);
         const cv::Mat& GetGTFrameFromIndex(size_t nFrameIdx);
@@ -140,7 +135,7 @@ namespace DatasetUtils {
         CategoryInfo* m_pParent;
         inline cv::Size GetSize() {return m_oSize;}
         static inline bool compare(const SequenceInfo* i, const SequenceInfo* j) {return PlatformUtils::compare_lowercase(i->m_sName,j->m_sName);}
-#if USE_PRECACHED_IO
+#if DATASETUTILS_USE_PRECACHED_IO
         void StartPrecaching();
         void StopPrecaching();
     private:
@@ -162,16 +157,22 @@ namespace DatasetUtils {
 #error "Missing implementation for semaphores on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
         bool m_bIsPrecaching;
+        size_t m_nInputFrameSize,m_nGTFrameSize;
+        size_t m_nInputBufferSize,m_nGTBufferSize;
+        size_t m_nInputPrecacheSize,m_nGTPrecacheSize;
+        size_t m_nInputBufferFrameCount,m_nGTBufferFrameCount;
         size_t m_nRequestInputFrameIndex,m_nRequestGTFrameIndex;
         std::deque<cv::Mat> m_qoInputFrameCache,m_qoGTFrameCache;
+        uchar *m_acInputBuffer,*m_acGTBuffer;
+        size_t m_nNextInputBufferIdx,m_nNextGTBufferIdx;
         size_t m_nNextExpectedInputFrameIdx,m_nNextExpectedGTFrameIdx;
         size_t m_nNextPrecachedInputFrameIdx,m_nNextPrecachedGTFrameIdx;
         cv::Mat m_oReqInputFrame,m_oReqGTFrame;
-#else //!USE_PRECACHED_IO
+#else //!DATASETUTILS_USE_PRECACHED_IO
     private:
         size_t m_nLastReqInputFrameIndex,m_nLastReqGTFrameIndex;
         cv::Mat m_oLastReqInputFrame,m_oLastReqGTFrame;
-#endif //!USE_PRECACHED_IO
+#endif //!DATASETUTILS_USE_PRECACHED_IO
         std::vector<std::string> m_vsInputFramePaths;
         std::vector<std::string> m_vsGTFramePaths;
         cv::VideoCapture m_voVideoReader;
@@ -180,6 +181,7 @@ namespace DatasetUtils {
         cv::Mat m_oROI;
         cv::Size m_oSize;
         const bool m_bForcingGrayscale;
+        const bool m_bUsing4chAlignment;
         const int m_nIMReadInputFlags;
         std::unordered_map<size_t,size_t> m_mTestGTIndexes;
         cv::Mat GetInputFrameFromIndex_Internal(size_t nFrameIdx);

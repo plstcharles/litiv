@@ -1,5 +1,13 @@
 #include "DatasetUtils.h"
 
+#if DATASETUTILS_USE_PRECACHED_IO
+#define CONSOLE_DEBUG             0
+#define REQUEST_TIMEOUT_MS        1
+#define QUERY_TIMEOUT_MS          10
+#define MAX_CACHE_SIZE_GB         6L
+#define MAX_CACHE_SIZE            (((MAX_CACHE_SIZE_GB*1024)*1024)*1024)
+#endif //DATASETUTILS_USE_PRECACHED_IO
+
 DatasetUtils::DatasetInfo DatasetUtils::GetDatasetInfo(const DatasetUtils::eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirPath) {
     if(eDatasetID==DatasetUtils::eDataset_CDnet2012) {
         const DatasetUtils::DatasetInfo oCDnet2012DatasetInfo = {
@@ -174,10 +182,10 @@ void DatasetUtils::WriteMetrics(const std::string sResultsFileName, CategoryInfo
         oMetricsOutput << sName << " " << tmp.m_oMetrics.dRecall << " " << tmp.m_oMetrics.dSpecficity << " " << tmp.m_oMetrics.dFPR << " " << tmp.m_oMetrics.dFNR << " " << tmp.m_oMetrics.dPBC << " " << tmp.m_oMetrics.dPrecision << " " << tmp.m_oMetrics.dFMeasure << " " << tmp.m_oMetrics.dMCC << std::endl;
     }
     oMetricsOutput << "--------------------------------------------------------------------------------------------------" << std::endl;
-    MetricsCalculator all(pCat,USE_AVERAGE_EVAL_METRICS);
+    MetricsCalculator all(pCat,DATASETUTILS_USE_AVERAGE_EVAL_METRICS);
     const std::string sCurrCatName = pCat->m_sName.size()>12?pCat->m_sName.substr(0,12):pCat->m_sName;
     std::cout << "\t" << std::setfill(' ') << std::setw(12) << sCurrCatName << " : Rcl=" << std::fixed << std::setprecision(4) << all.m_oMetrics.dRecall << " Prc=" << all.m_oMetrics.dPrecision << " FM=" << all.m_oMetrics.dFMeasure << " MCC=" << all.m_oMetrics.dMCC << std::endl;
-    oMetricsOutput << std::string(USE_AVERAGE_EVAL_METRICS?"averaged   ":"cumulative ") << all.m_oMetrics.dRecall << " " << all.m_oMetrics.dSpecficity << " " << all.m_oMetrics.dFPR << " " << all.m_oMetrics.dFNR << " " << all.m_oMetrics.dPBC << " " << all.m_oMetrics.dPrecision << " " << all.m_oMetrics.dFMeasure << " " << all.m_oMetrics.dMCC << std::endl;
+    oMetricsOutput << std::string(DATASETUTILS_USE_AVERAGE_EVAL_METRICS?"averaged   ":"cumulative ") << all.m_oMetrics.dRecall << " " << all.m_oMetrics.dSpecficity << " " << all.m_oMetrics.dFPR << " " << all.m_oMetrics.dFNR << " " << all.m_oMetrics.dPBC << " " << all.m_oMetrics.dPrecision << " " << all.m_oMetrics.dFMeasure << " " << all.m_oMetrics.dMCC << std::endl;
     oMetricsOutput << std::endl << std::endl;
     oMetricsOutput << "All Sequences Average FPS: " << all.m_oMetrics.dFPS << std::endl;
     oMetricsOutput.close();
@@ -189,11 +197,11 @@ void DatasetUtils::WriteMetrics(const std::string sResultsFileName, std::vector<
     oMetricsOutput << std::fixed << std::setprecision(8);
     oMetricsOutput << "Overall results :" << std::endl;
     oMetricsOutput << std::endl;
-    oMetricsOutput << std::string(USE_AVERAGE_EVAL_METRICS?"Averaged":"Cumulative") << " metrics :" << std::endl;
+    oMetricsOutput << std::string(DATASETUTILS_USE_AVERAGE_EVAL_METRICS?"Averaged":"Cumulative") << " metrics :" << std::endl;
     oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FM         MCC        " << std::endl;
     for(size_t i=0; i<vpCat.size(); ++i) {
         if(!vpCat[i]->m_vpSequences.empty()) {
-            MetricsCalculator tmp(vpCat[i],USE_AVERAGE_EVAL_METRICS);
+            MetricsCalculator tmp(vpCat[i],DATASETUTILS_USE_AVERAGE_EVAL_METRICS);
             std::string sName = vpCat[i]->m_sName;
             if(sName.size()>10)
                 sName = sName.substr(0,10);
@@ -203,7 +211,7 @@ void DatasetUtils::WriteMetrics(const std::string sResultsFileName, std::vector<
         }
     }
     oMetricsOutput << "--------------------------------------------------------------------------------------------------" << std::endl;
-    MetricsCalculator all(vpCat,USE_AVERAGE_EVAL_METRICS);
+    MetricsCalculator all(vpCat,DATASETUTILS_USE_AVERAGE_EVAL_METRICS);
     oMetricsOutput << "overall    " << all.m_oMetrics.dRecall << " " << all.m_oMetrics.dSpecficity << " " << all.m_oMetrics.dFPR << " " << all.m_oMetrics.dFNR << " " << all.m_oMetrics.dPBC << " " << all.m_oMetrics.dPrecision << " " << all.m_oMetrics.dFMeasure << " " << all.m_oMetrics.dMCC << std::endl;
     oMetricsOutput << std::endl << std::endl;
     oMetricsOutput << "All Sequences Average FPS: " << all.m_oMetrics.dFPS << std::endl;
@@ -443,7 +451,8 @@ DatasetUtils::MetricsCalculator::MetricsCalculator(const std::vector<CategoryInf
 DatasetUtils::CategoryInfo::CategoryInfo(const std::string& sName, const std::string& sDirectoryPath,
                                          DatasetUtils::eDatasetList eDatasetID,
                                          std::vector<std::string> vsGrayscaleDirNameTokens,
-                                         std::vector<std::string> vsSkippedDirNameTokens)
+                                         std::vector<std::string> vsSkippedDirNameTokens,
+                                         bool bUse4chAlign)
     :    m_sName(sName)
         ,m_eDatasetID(eDatasetID)
         ,nTP(0),nTN(0),nFP(0),nFN(0),nSE(0)
@@ -476,9 +485,9 @@ DatasetUtils::CategoryInfo::CategoryInfo(const std::string& sName, const std::st
         if(!bSkip) {
             const size_t pos = iter->find_last_of("/\\");
             if(pos==std::string::npos)
-                m_vpSequences.push_back(new SequenceInfo(*iter,*iter,this,bForceGrayscale));
+                m_vpSequences.push_back(new SequenceInfo(*iter,*iter,this,bForceGrayscale,bUse4chAlign));
             else
-                m_vpSequences.push_back(new SequenceInfo(iter->substr(pos+1),*iter,this,bForceGrayscale));
+                m_vpSequences.push_back(new SequenceInfo(iter->substr(pos+1),*iter,this,bForceGrayscale,bUse4chAlign));
         }
     }
 }
@@ -488,7 +497,7 @@ DatasetUtils::CategoryInfo::~CategoryInfo() {
         delete m_vpSequences[i];
 }
 
-DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::string& sPath, CategoryInfo* pParent, bool bForceGrayscale)
+DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::string& sPath, CategoryInfo* pParent, bool bForceGrayscale, bool bUse4chAlign)
     :    m_sName(sName)
         ,m_sPath(sPath)
         ,m_eDatasetID(pParent?pParent->m_eDatasetID:eDataset_GenericTest)
@@ -497,22 +506,40 @@ DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::st
         ,m_dExpectedLoad(0)
         ,m_dExpectedROILoad(0)
         ,m_pParent(pParent)
-#if USE_PRECACHED_IO
+#if DATASETUTILS_USE_PRECACHED_IO
         ,m_bIsPrecaching(false)
+        ,m_nInputFrameSize(0)
+        ,m_nGTFrameSize(0)
+        ,m_nInputBufferSize(0)
+        ,m_nGTBufferSize(0)
+        ,m_nInputPrecacheSize(0)
+        ,m_nGTPrecacheSize(0)
+        ,m_nInputBufferFrameCount(0)
+        ,m_nGTBufferFrameCount(0)
         ,m_nRequestInputFrameIndex(SIZE_MAX)
         ,m_nRequestGTFrameIndex(SIZE_MAX)
+        ,m_acInputBuffer(nullptr)
+        ,m_acGTBuffer(nullptr)
+        ,m_nNextInputBufferIdx(0)
+        ,m_nNextGTBufferIdx(0)
         ,m_nNextExpectedInputFrameIdx(0)
         ,m_nNextExpectedGTFrameIdx(0)
         ,m_nNextPrecachedInputFrameIdx(0)
         ,m_nNextPrecachedGTFrameIdx(0)
-#else //!USE_PRECACHED_IO
+#else //!DATASETUTILS_USE_PRECACHED_IO
         ,m_nLastReqInputFrameIndex(UINT_MAX)
         ,m_nLastReqGTFrameIndex(UINT_MAX)
-#endif //!USE_PRECACHED_IO
+#endif //!DATASETUTILS_USE_PRECACHED_IO
         ,m_nNextExpectedVideoReaderFrameIdx(0)
         ,m_nTotalNbFrames(0)
         ,m_bForcingGrayscale(bForceGrayscale)
+        ,m_bUsing4chAlignment(bUse4chAlign)
         ,m_nIMReadInputFlags(bForceGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR) {
+#if DATASETUTILS_USE_PRECACHED_IO
+    CV_Assert(MAX_CACHE_SIZE>0);
+    CV_Assert(REQUEST_TIMEOUT_MS>0);
+    CV_Assert(QUERY_TIMEOUT_MS>0);
+#endif //DATASETUTILS_USE_PRECACHED_IO
     if(m_eDatasetID==eDataset_CDnet2012 || m_eDatasetID==eDataset_CDnet2014) {
         std::vector<std::string> vsSubDirs;
         PlatformUtils::GetSubDirsFromDir(m_sPath,vsSubDirs);
@@ -591,6 +618,7 @@ DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::st
         m_oSize = oTempImg.size();
         m_nNextExpectedVideoReaderFrameIdx = 0;
         m_nTotalNbFrames = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
+        CV_Assert(m_nTotalNbFrames>0);
         m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(int(!m_bForcingGrayscale)+1);
     }
     else if(m_eDatasetID==eDataset_LITIV2012) {
@@ -632,22 +660,17 @@ DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::st
         m_oSize = oTempImg.size();
         m_nNextExpectedVideoReaderFrameIdx = 0;
         m_nTotalNbFrames = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
+        CV_Assert(m_nTotalNbFrames>0);
         m_dExpectedLoad = m_dExpectedROILoad = (double)m_oSize.height*m_oSize.width*m_nTotalNbFrames*(int(!m_bForcingGrayscale)+1);
     }
     else
         throw std::runtime_error(std::string("Unknown dataset type, cannot use any known parsing strategy."));
-#if USE_PRECACHED_IO
-    CV_Assert(MAX_NB_PRECACHED_FRAMES>1);
-    CV_Assert(PRECACHE_REFILL_THRESHOLD>1 && PRECACHE_REFILL_THRESHOLD<MAX_NB_PRECACHED_FRAMES);
-    CV_Assert(REQUEST_TIMEOUT_MS>0);
-    CV_Assert(QUERY_TIMEOUT_MS>0);
-#endif //USE_PRECACHED_IO
 }
 
 DatasetUtils::SequenceInfo::~SequenceInfo() {
-#if USE_PRECACHED_IO
+#if DATASETUTILS_USE_PRECACHED_IO
     StopPrecaching();
-#endif //USE_PRECACHED_IO
+#endif //DATASETUTILS_USE_PRECACHED_IO
 }
 
 size_t DatasetUtils::SequenceInfo::GetNbInputFrames() const {
@@ -690,6 +713,8 @@ cv::Mat DatasetUtils::SequenceInfo::GetInputFrameFromIndex_Internal(size_t nFram
         m_voVideoReader >> oFrame;
         if(m_bForcingGrayscale && oFrame.channels()>1)
             cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2GRAY);
+        else if(m_bUsing4chAlignment && oFrame.channels()>1 && oFrame.channels()<4)
+            cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2BGRA);
     }
     CV_Assert(oFrame.size()==m_oSize);
     return oFrame;
@@ -715,7 +740,7 @@ cv::Mat DatasetUtils::SequenceInfo::GetGTFrameFromIndex_Internal(size_t nFrameId
 }
 
 const cv::Mat& DatasetUtils::SequenceInfo::GetInputFrameFromIndex(size_t nFrameIdx) {
-#if USE_PRECACHED_IO
+#if DATASETUTILS_USE_PRECACHED_IO
     if(!m_bIsPrecaching)
         throw std::runtime_error(m_sName + " [SequenceInfo] : Error, queried a frame before precaching was activated.");
 #if PLATFORM_SUPPORTS_CPP11
@@ -725,7 +750,10 @@ const cv::Mat& DatasetUtils::SequenceInfo::GetInputFrameFromIndex(size_t nFrameI
     do {
         m_oInputFrameReqCondVar.notify_one();
         res = m_oInputFrameSyncCondVar.wait_for(sync_lock,std::chrono::milliseconds(REQUEST_TIMEOUT_MS));
-        //if(res==std::cv_status::timeout) std::cout << " # retrying request..." << std::endl;
+#if CONSOLE_DEBUG
+        if(res==std::cv_status::timeout)
+            std::cout << " # retrying request..." << std::endl;
+#endif //CONSOLE_DEBUG
     } while(res==std::cv_status::timeout);
     return m_oReqInputFrame;
 #elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
@@ -735,24 +763,27 @@ const cv::Mat& DatasetUtils::SequenceInfo::GetInputFrameFromIndex(size_t nFrameI
     do {
         WakeConditionVariable(&m_oInputFrameReqCondVar);
         res = SleepConditionVariableCS(&m_oInputFrameSyncCondVar,&m_oInputFrameSyncMutex,REQUEST_TIMEOUT_MS);
-        //if(!res) std::cout << " # retrying request..." << std::endl;
+#if CONSOLE_DEBUG
+        if(!res)
+            std::cout << " # retrying request..." << std::endl;
+#endif //CONSOLE_DEBUG
     } while(!res);
     LeaveCriticalSection(&m_oInputFrameSyncMutex);
     return m_oReqInputFrame;
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for precached io support on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#else //!USE_PRECACHED_IO
+#else //!DATASETUTILS_USE_PRECACHED_IO
     if(m_nLastReqInputFrameIndex!=nFrameIdx) {
         m_oLastReqInputFrame = GetInputFrameFromIndex_Internal(nFrameIdx);
         m_nLastReqInputFrameIndex = nFrameIdx;
     }
     return m_oLastReqInputFrame;
-#endif //!USE_PRECACHED_IO
+#endif //!DATASETUTILS_USE_PRECACHED_IO
 }
 
 const cv::Mat& DatasetUtils::SequenceInfo::GetGTFrameFromIndex(size_t nFrameIdx) {
-#if USE_PRECACHED_IO
+#if DATASETUTILS_USE_PRECACHED_IO
     if(!m_bIsPrecaching)
         throw std::runtime_error(m_sName + " [SequenceInfo] : Error, queried a frame before precaching was activated.");
 #if PLATFORM_SUPPORTS_CPP11
@@ -762,7 +793,10 @@ const cv::Mat& DatasetUtils::SequenceInfo::GetGTFrameFromIndex(size_t nFrameIdx)
     do {
         m_oGTFrameReqCondVar.notify_one();
         res = m_oGTFrameSyncCondVar.wait_for(sync_lock,std::chrono::milliseconds(REQUEST_TIMEOUT_MS));
-        //if(res==std::cv_status::timeout) std::cout << " # retrying request..." << std::endl;
+#if CONSOLE_DEBUG
+        if(res==std::cv_status::timeout)
+            std::cout << " # retrying request..." << std::endl;
+#endif //CONSOLE_DEBUG
     } while(res==std::cv_status::timeout);
     return m_oReqGTFrame;
 #elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
@@ -772,26 +806,28 @@ const cv::Mat& DatasetUtils::SequenceInfo::GetGTFrameFromIndex(size_t nFrameIdx)
     do {
         WakeConditionVariable(&m_oGTFrameReqCondVar);
         res = SleepConditionVariableCS(&m_oGTFrameSyncCondVar,&m_oGTFrameSyncMutex,REQUEST_TIMEOUT_MS);
-        //if(!res) std::cout << " # retrying request..." << std::endl;
+#if CONSOLE_DEBUG
+        if(!res)
+            std::cout << " # retrying request..." << std::endl;
+#endif //CONSOLE_DEBUG
     } while(!res);
     LeaveCriticalSection(&m_oGTFrameSyncMutex);
     return m_oReqGTFrame;
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for precached io support on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#else //!USE_PRECACHED_IO
+#else //!DATASETUTILS_USE_PRECACHED_IO
     if(m_nLastReqGTFrameIndex!=nFrameIdx) {
         m_oLastReqGTFrame = GetGTFrameFromIndex_Internal(nFrameIdx);
         m_nLastReqGTFrameIndex = nFrameIdx;
     }
     return m_oLastReqGTFrame;
-#endif //!USE_PRECACHED_IO
+#endif //!DATASETUTILS_USE_PRECACHED_IO
 }
 
-#if USE_PRECACHED_IO
+#if DATASETUTILS_USE_PRECACHED_IO
 
 void DatasetUtils::SequenceInfo::PrecacheInputFrames() {
-    srand((unsigned int)(time(nullptr)*m_nTotalNbFrames*m_sName.size()));
 #if PLATFORM_SUPPORTS_CPP11
     std::unique_lock<std::mutex> sync_lock(m_oInputFrameSyncMutex);
 #elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
@@ -799,15 +835,23 @@ void DatasetUtils::SequenceInfo::PrecacheInputFrames() {
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for precached io support on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-    const size_t nInitFramesToPrecache = MAX_NB_PRECACHED_FRAMES/2 + rand()%(MAX_NB_PRECACHED_FRAMES/2);
-    //std::cout << " @ initializing precaching with " << nInitFramesToPrecache << " frames " << std::endl;
-    while(m_qoInputFrameCache.size()<nInitFramesToPrecache && m_nNextPrecachedInputFrameIdx<m_nTotalNbFrames)
-        m_qoInputFrameCache.push_back(GetInputFrameFromIndex_Internal(m_nNextPrecachedInputFrameIdx++));
+#if CONSOLE_DEBUG
+    std::cout << " @ initializing precaching with " << m_nInputBufferFrameCount << " frames " << std::endl;
+#endif //CONSOLE_DEBUG
+    while(m_qoInputFrameCache.size()<m_nInputBufferFrameCount && m_nNextPrecachedInputFrameIdx<m_nTotalNbFrames) {
+        cv::Mat oNextInputFrame = GetInputFrameFromIndex_Internal(m_nNextPrecachedInputFrameIdx++);
+        cv::Mat oNextInputFrame_precached(m_oSize,m_bUsing4chAlignment?CV_8UC4:m_bForcingGrayscale?CV_8UC1:CV_8UC3,m_acInputBuffer+m_nNextInputBufferIdx);
+        // @@@@@@@@ try to fetch without copy to?
+        oNextInputFrame.copyTo(oNextInputFrame_precached);
+        m_qoInputFrameCache.push_back(oNextInputFrame_precached);
+        m_nNextInputBufferIdx += m_nInputFrameSize;
+        m_nNextInputBufferIdx %= m_nInputBufferSize;
+    }
     while(m_bIsPrecaching) {
 #if PLATFORM_SUPPORTS_CPP11
-        if(m_oInputFrameReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(QUERY_TIMEOUT_MS))!=std::cv_status::timeout) {
+        if(m_oInputFrameReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(m_nNextPrecachedInputFrameIdx==m_nTotalNbFrames?QUERY_TIMEOUT_MS*32:QUERY_TIMEOUT_MS))!=std::cv_status::timeout) {
 #elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
-        if(SleepConditionVariableCS(&m_oInputFrameReqCondVar,&m_oInputFrameSyncMutex,QUERY_TIMEOUT_MS)) {
+        if(SleepConditionVariableCS(&m_oInputFrameReqCondVar,&m_oInputFrameSyncMutex,m_nNextPrecachedInputFrameIdx==m_nTotalNbFrames?QUERY_TIMEOUT_MS*32:QUERY_TIMEOUT_MS)) {
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for precached io support on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
@@ -819,10 +863,14 @@ void DatasetUtils::SequenceInfo::PrecacheInputFrames() {
                 }
                 else {
                     if(!m_qoInputFrameCache.empty()) {
-                        //std::cout << " @ answering request manually, out of order (req=" << m_nRequestInputFrameIndex << ", expected=" << m_nNextExpectedInputFrameIdx <<") ";
+#if CONSOLE_DEBUG
+                        std::cout << " @ answering request manually, out of order (req=" << m_nRequestInputFrameIndex << ", expected=" << m_nNextExpectedInputFrameIdx <<") ";
+#endif //CONSOLE_DEBUG
                         CV_DbgAssert((m_nNextPrecachedInputFrameIdx-m_qoInputFrameCache.size())==m_nNextExpectedInputFrameIdx);
                         if(m_nRequestInputFrameIndex<m_nNextPrecachedInputFrameIdx && m_nRequestInputFrameIndex>m_nNextExpectedInputFrameIdx) {
-                            //std::cout << " -- popping " << m_nRequestInputFrameIndex-m_nNextExpectedInputFrameIdx << " item(s) from cache" << std::endl;
+#if CONSOLE_DEBUG
+                            std::cout << " -- popping " << m_nRequestInputFrameIndex-m_nNextExpectedInputFrameIdx << " item(s) from cache" << std::endl;
+#endif //CONSOLE_DEBUG
                             while(m_nRequestInputFrameIndex-m_nNextExpectedInputFrameIdx>0) {
                                 m_qoInputFrameCache.pop_front();
                                 ++m_nNextExpectedInputFrameIdx;
@@ -831,20 +879,27 @@ void DatasetUtils::SequenceInfo::PrecacheInputFrames() {
                             m_qoInputFrameCache.pop_front();
                         }
                         else {
-                            //std::cout << " -- destroying cache" << std::endl;
+#if CONSOLE_DEBUG
+                            std::cout << " -- destroying cache" << std::endl;
+#endif //CONSOLE_DEBUG
                             m_qoInputFrameCache.clear();
                             m_oReqInputFrame = GetInputFrameFromIndex_Internal(m_nRequestInputFrameIndex);
                             m_nNextPrecachedInputFrameIdx = m_nRequestInputFrameIndex+1;
                         }
                     }
                     else {
-                        //std::cout << " @ answering request manually, precaching is falling behind" << std::endl;
+#if CONSOLE_DEBUG
+                        std::cout << " @ answering request manually, precaching is falling behind" << std::endl;
+#endif //CONSOLE_DEBUG
                         m_oReqInputFrame = GetInputFrameFromIndex_Internal(m_nRequestInputFrameIndex);
                         m_nNextPrecachedInputFrameIdx = m_nRequestInputFrameIndex+1;
                     }
                 }
             }
-            //else std::cout << " @ answering request using last frame" << std::endl;
+#if CONSOLE_DEBUG
+            else
+                std::cout << " @ answering request using last frame" << std::endl;
+#endif //CONSOLE_DEBUG
             m_nNextExpectedInputFrameIdx = m_nRequestInputFrameIndex+1;
 #if PLATFORM_SUPPORTS_CPP11
             m_oInputFrameSyncCondVar.notify_one();
@@ -856,10 +911,20 @@ void DatasetUtils::SequenceInfo::PrecacheInputFrames() {
         }
         else {
             CV_DbgAssert((m_nNextPrecachedInputFrameIdx-m_nNextExpectedInputFrameIdx)==m_qoInputFrameCache.size());
-            if(m_qoInputFrameCache.size()<PRECACHE_REFILL_THRESHOLD && m_nNextPrecachedInputFrameIdx<m_nTotalNbFrames) {
-                //std::cout << " @ filling precache buffer... (" << MAX_NB_PRECACHED_FRAMES-m_qoInputFrameCache.size() << " frames)" << std::endl;
-                while(m_qoInputFrameCache.size()<MAX_NB_PRECACHED_FRAMES && m_nNextPrecachedInputFrameIdx<m_nTotalNbFrames)
-                    m_qoInputFrameCache.push_back(GetInputFrameFromIndex_Internal(m_nNextPrecachedInputFrameIdx++));
+            if(m_qoInputFrameCache.size()<m_nInputBufferFrameCount/4 && m_nNextPrecachedInputFrameIdx<m_nTotalNbFrames) {
+#if CONSOLE_DEBUG
+                std::cout << " @ filling precache buffer... (" << m_nInputBufferFrameCount-m_qoInputFrameCache.size() << " frames)" << std::endl;
+#endif //CONSOLE_DEBUG
+                size_t nFillCount = 0;
+                while(m_qoInputFrameCache.size()<m_nInputBufferFrameCount && m_nNextPrecachedInputFrameIdx<m_nTotalNbFrames && nFillCount<10) {
+                   cv::Mat oNextInputFrame = GetInputFrameFromIndex_Internal(m_nNextPrecachedInputFrameIdx++);
+                   cv::Mat oNextInputFrame_precached(m_oSize,m_bUsing4chAlignment?CV_8UC4:m_bForcingGrayscale?CV_8UC1:CV_8UC3,m_acInputBuffer+m_nNextInputBufferIdx);
+                   // @@@@@@@@ try to fetch without copy to?
+                   oNextInputFrame.copyTo(oNextInputFrame_precached);
+                   m_qoInputFrameCache.push_back(oNextInputFrame_precached);
+                   m_nNextInputBufferIdx += m_nInputFrameSize;
+                   m_nNextInputBufferIdx %= m_nInputBufferSize;
+               }
             }
         }
     }
@@ -869,7 +934,6 @@ void DatasetUtils::SequenceInfo::PrecacheInputFrames() {
 }
 
 void DatasetUtils::SequenceInfo::PrecacheGTFrames() {
-    srand((unsigned int)(time(nullptr)*m_nTotalNbFrames*m_sName.size()));
 #if PLATFORM_SUPPORTS_CPP11
     std::unique_lock<std::mutex> sync_lock(m_oGTFrameSyncMutex);
 #elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
@@ -877,15 +941,23 @@ void DatasetUtils::SequenceInfo::PrecacheGTFrames() {
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for precached io support on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-    const size_t nInitFramesToPrecache = PRECACHE_REFILL_THRESHOLD/2 + rand()%(MAX_NB_PRECACHED_FRAMES/2);
-    //std::cout << " @ initializing precaching with " << nInitFramesToPrecache << " frames " << std::endl;
-    while(m_qoGTFrameCache.size()<nInitFramesToPrecache && m_nNextPrecachedGTFrameIdx<m_nTotalNbFrames)
-        m_qoGTFrameCache.push_back(GetGTFrameFromIndex_Internal(m_nNextPrecachedGTFrameIdx++));
+#if CONSOLE_DEBUG
+    std::cout << " @ initializing precaching with " << m_nGTBufferFrameCount << " frames " << std::endl;
+#endif //CONSOLE_DEBUG
+    while(m_qoGTFrameCache.size()<m_nGTBufferFrameCount && m_nNextPrecachedGTFrameIdx<m_nTotalNbFrames) {
+        cv::Mat oNextGTFrame = GetGTFrameFromIndex_Internal(m_nNextPrecachedGTFrameIdx++);
+        cv::Mat oNextGTFrame_precached(m_oSize,CV_8UC1,m_acGTBuffer+m_nNextGTBufferIdx);
+        // @@@@@@@@ try to fetch without copy to?
+        oNextGTFrame.copyTo(oNextGTFrame_precached);
+        m_qoGTFrameCache.push_back(oNextGTFrame_precached);
+        m_nNextGTBufferIdx += m_nGTFrameSize;
+        m_nNextGTBufferIdx %= m_nGTBufferSize;
+    }
     while(m_bIsPrecaching) {
 #if PLATFORM_SUPPORTS_CPP11
-        if(m_oGTFrameReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(QUERY_TIMEOUT_MS))!=std::cv_status::timeout) {
+        if(m_oGTFrameReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(m_nNextPrecachedGTFrameIdx==m_nTotalNbFrames?QUERY_TIMEOUT_MS*32:QUERY_TIMEOUT_MS))!=std::cv_status::timeout) {
 #elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
-        if(SleepConditionVariableCS(&m_oGTFrameReqCondVar,&m_oGTFrameSyncMutex,QUERY_TIMEOUT_MS)) {
+        if(SleepConditionVariableCS(&m_oGTFrameReqCondVar,&m_oGTFrameSyncMutex,m_nNextPrecachedGTFrameIdx==m_nTotalNbFrames?QUERY_TIMEOUT_MS*32:QUERY_TIMEOUT_MS)) {
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for precached io support on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
@@ -897,10 +969,14 @@ void DatasetUtils::SequenceInfo::PrecacheGTFrames() {
                 }
                 else {
                     if(!m_qoGTFrameCache.empty()) {
-                        //std::cout << " @ answering request manually, out of order (req=" << m_nRequestGTFrameIndex << ", expected=" << m_nNextExpectedGTFrameIdx <<") ";
+#if CONSOLE_DEBUG
+                        std::cout << " @ answering request manually, out of order (req=" << m_nRequestGTFrameIndex << ", expected=" << m_nNextExpectedGTFrameIdx <<") ";
+#endif //CONSOLE_DEBUG
                         CV_DbgAssert((m_nNextPrecachedGTFrameIdx-m_qoGTFrameCache.size())==m_nNextExpectedGTFrameIdx);
                         if(m_nRequestGTFrameIndex<m_nNextPrecachedGTFrameIdx && m_nRequestGTFrameIndex>m_nNextExpectedGTFrameIdx) {
-                            //std::cout << " -- popping " << m_nRequestGTFrameIndex-m_nNextExpectedGTFrameIdx << " item(s) from cache" << std::endl;
+#if CONSOLE_DEBUG
+                            std::cout << " -- popping " << m_nRequestGTFrameIndex-m_nNextExpectedGTFrameIdx << " item(s) from cache" << std::endl;
+#endif //CONSOLE_DEBUG
                             while(m_nRequestGTFrameIndex-m_nNextExpectedGTFrameIdx>0) {
                                 m_qoGTFrameCache.pop_front();
                                 ++m_nNextExpectedGTFrameIdx;
@@ -909,20 +985,27 @@ void DatasetUtils::SequenceInfo::PrecacheGTFrames() {
                             m_qoGTFrameCache.pop_front();
                         }
                         else {
-                            //std::cout << " -- destroying cache" << std::endl;
+#if CONSOLE_DEBUG
+                            std::cout << " -- destroying cache" << std::endl;
+#endif //CONSOLE_DEBUG
                             m_qoGTFrameCache.clear();
                             m_oReqGTFrame = GetGTFrameFromIndex_Internal(m_nRequestGTFrameIndex);
                             m_nNextPrecachedGTFrameIdx = m_nRequestGTFrameIndex+1;
                         }
                     }
                     else {
-                        //std::cout << " @ answering request manually, precaching is falling behind" << std::endl;
+#if CONSOLE_DEBUG
+                        std::cout << " @ answering request manually, precaching is falling behind" << std::endl;
+#endif //CONSOLE_DEBUG
                         m_oReqGTFrame = GetGTFrameFromIndex_Internal(m_nRequestGTFrameIndex);
                         m_nNextPrecachedGTFrameIdx = m_nRequestGTFrameIndex+1;
                     }
                 }
             }
-            //else std::cout << " @ answering request using last frame" << std::endl;
+#if CONSOLE_DEBUG
+            else
+                std::cout << " @ answering request using last frame" << std::endl;
+#endif //CONSOLE_DEBUG
             m_nNextExpectedGTFrameIdx = m_nRequestGTFrameIndex+1;
 #if PLATFORM_SUPPORTS_CPP11
             m_oGTFrameSyncCondVar.notify_one();
@@ -934,10 +1017,20 @@ void DatasetUtils::SequenceInfo::PrecacheGTFrames() {
         }
         else {
             CV_DbgAssert((m_nNextPrecachedGTFrameIdx-m_nNextExpectedGTFrameIdx)==m_qoGTFrameCache.size());
-            if(m_qoGTFrameCache.size()<PRECACHE_REFILL_THRESHOLD && m_nNextPrecachedGTFrameIdx<m_nTotalNbFrames) {
-                //std::cout << " @ filling precache buffer... (" << MAX_NB_PRECACHED_FRAMES-m_qoGTFrameCache.size() << " frames)" << std::endl;
-                while(m_qoGTFrameCache.size()<MAX_NB_PRECACHED_FRAMES && m_nNextPrecachedGTFrameIdx<m_nTotalNbFrames)
-                    m_qoGTFrameCache.push_back(GetGTFrameFromIndex_Internal(m_nNextPrecachedGTFrameIdx++));
+            if(m_qoGTFrameCache.size()<m_nGTBufferFrameCount/4 && m_nNextPrecachedGTFrameIdx<m_nTotalNbFrames) {
+#if CONSOLE_DEBUG
+                std::cout << " @ filling precache buffer... (" << m_nGTBufferFrameCount-m_qoGTFrameCache.size() << " frames)" << std::endl;
+#endif //CONSOLE_DEBUG
+                size_t nFillCount = 0;
+                while(m_qoGTFrameCache.size()<m_nGTBufferFrameCount && m_nNextPrecachedGTFrameIdx<m_nTotalNbFrames && nFillCount<10) {
+                    cv::Mat oNextGTFrame = GetGTFrameFromIndex_Internal(m_nNextPrecachedGTFrameIdx++);
+                    cv::Mat oNextGTFrame_precached(m_oSize,CV_8UC1,m_acGTBuffer+m_nNextGTBufferIdx);
+                    // @@@@@@@@ try to fetch without copy to?
+                    oNextGTFrame.copyTo(oNextGTFrame_precached);
+                    m_qoGTFrameCache.push_back(oNextGTFrame_precached);
+                    m_nNextGTBufferIdx += m_nGTFrameSize;
+                    m_nNextGTBufferIdx %= m_nGTBufferSize;
+                }
             }
         }
     }
@@ -949,6 +1042,18 @@ void DatasetUtils::SequenceInfo::PrecacheGTFrames() {
 void DatasetUtils::SequenceInfo::StartPrecaching() {
     if(!m_bIsPrecaching) {
         m_bIsPrecaching = true;
+        m_nGTFrameSize = (size_t)(m_oSize.height*m_oSize.width);
+        m_nGTPrecacheSize = m_nGTFrameSize*m_nTotalNbFrames;
+        m_nInputFrameSize = m_nGTFrameSize*(m_bForcingGrayscale?1:m_bUsing4chAlignment?4:3);
+        m_nInputPrecacheSize = m_nInputFrameSize*m_nTotalNbFrames;
+        CV_Assert(m_nInputFrameSize>0 && m_nInputPrecacheSize);
+        m_nInputBufferFrameCount = (m_nInputPrecacheSize>MAX_CACHE_SIZE)?(MAX_CACHE_SIZE/m_nInputFrameSize):m_nTotalNbFrames;
+        m_nGTBufferFrameCount = (m_nGTPrecacheSize>MAX_CACHE_SIZE)?(MAX_CACHE_SIZE/m_nGTFrameSize):m_nTotalNbFrames;
+        m_nInputBufferSize = m_nInputBufferFrameCount*m_nInputFrameSize;
+        m_nGTBufferSize = m_nGTBufferFrameCount*m_nGTFrameSize;
+        m_acInputBuffer = new uchar[m_nInputBufferSize];
+        m_acGTBuffer = new uchar[m_nGTBufferSize];
+        m_nNextInputBufferIdx = 0; m_nNextGTBufferIdx = 0;
 #if PLATFORM_SUPPORTS_CPP11
         m_hInputFramePrecacher = std::thread(&DatasetUtils::SequenceInfo::PrecacheInputFrames,this);
         m_hGTFramePrecacher = std::thread(&DatasetUtils::SequenceInfo::PrecacheGTFrames,this);
@@ -984,7 +1089,9 @@ void DatasetUtils::SequenceInfo::StopPrecaching() {
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for precached io support on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
+        delete [] m_acInputBuffer;
+        delete [] m_acGTBuffer;
     }
 }
 
-#endif //USE_PRECACHED_IO
+#endif //DATASETUTILS_USE_PRECACHED_IO

@@ -5,7 +5,6 @@
 // @@@ always pack big gpu buffers with std430
 // @@@ add opencv hardware intrs check, and impl some stuff in MMX/SSE/SSE2/3/4.1/4.2? (also check popcount and AVX)
 // @@@ investigate glClearBufferData for large-scale opengl buffer memsets
-// ###@@@@@@ reimpl caching with solid malloc'd arrays
 
 //////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
@@ -15,8 +14,8 @@
 #define EVAL_RESULTS_ONLY                0
 #define WRITE_BGSUB_IMG_OUTPUT           0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
-#define WRITE_BGSUB_METRICS_ANALYSIS     0
-#define DISPLAY_BGSUB_DEBUG_OUTPUT       1
+#define WRITE_BGSUB_METRICS_ANALYSIS     1
+#define DISPLAY_BGSUB_DEBUG_OUTPUT       0
 #define ENABLE_FRAME_TIMERS              0
 #define ENABLE_DISPLAY_MOUSE_DEBUG       0
 #define WRITE_BGSUB_SEGM_AVI_OUTPUT      0
@@ -33,6 +32,9 @@
 #define DATASET_ROOT_PATH      std::string("/shared2/datasets/")
 #define DATASET_RESULTS_PATH   std::string("results")
 
+#if GPU_EXEC
+//#include "GLUtils.h" #@@@@@@@@@@@#
+#endif //GPU_EXEC
 #include "BackgroundSubtractorPAWCS.h"
 #include "BackgroundSubtractorSuBSENSE.h"
 #include "BackgroundSubtractorLOBSTER.h"
@@ -104,7 +106,7 @@ int main() {
     std::vector<DatasetUtils::CategoryInfo*> vpCategories;
     for(auto oDatasetFolderPathIter=g_oDatasetInfo.vsDatasetFolderPaths.begin(); oDatasetFolderPathIter!=g_oDatasetInfo.vsDatasetFolderPaths.end(); ++oDatasetFolderPathIter) {
         try {
-            vpCategories.push_back(new DatasetUtils::CategoryInfo(*oDatasetFolderPathIter,g_oDatasetInfo.sDatasetPath+*oDatasetFolderPathIter,g_oDatasetInfo.eID,g_oDatasetInfo.vsDatasetGrayscaleDirPathTokens,g_oDatasetInfo.vsDatasetSkippedDirPathTokens));
+            vpCategories.push_back(new DatasetUtils::CategoryInfo(*oDatasetFolderPathIter,g_oDatasetInfo.sDatasetPath+*oDatasetFolderPathIter,g_oDatasetInfo.eID,g_oDatasetInfo.vsDatasetGrayscaleDirPathTokens,g_oDatasetInfo.vsDatasetSkippedDirPathTokens,GPU_EXEC));
         } catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
     }
     size_t nSeqTotal = 0;
@@ -245,9 +247,9 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
     try {
         CV_Assert(pCurrCategory && pCurrSequence);
         CV_Assert(pCurrSequence->GetNbInputFrames()>1);
-#if USE_PRECACHED_IO
+#if DATASETUTILS_USE_PRECACHED_IO
         pCurrSequence->StartPrecaching();
-#endif //USE_PRECACHED_IO
+#endif //DATASETUTILS_USE_PRECACHED_IO
         cv::Mat oFGMask, oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
 #if USE_VIBE_LBSP_BG_SUBTRACTOR
         pBGS = new BackgroundSubtractorLOBSTER();
