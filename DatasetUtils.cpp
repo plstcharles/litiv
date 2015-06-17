@@ -6,6 +6,9 @@
 #define QUERY_TIMEOUT_MS          10
 #define MAX_CACHE_SIZE_GB         6L
 #define MAX_CACHE_SIZE            (((MAX_CACHE_SIZE_GB*1024)*1024)*1024)
+#if (!(defined(_M_X64) || defined(__amd64__)) && MAX_CACHE_SIZE_GB>2)
+#error "Cache max size exceeds system limit (x86)."
+#endif //(!(defined(_M_X64) || defined(__amd64__)) && MAX_CACHE_SIZE_GB>2)
 #endif //DATASETUTILS_USE_PRECACHED_IO
 
 DatasetUtils::DatasetInfo DatasetUtils::GetDatasetInfo(const DatasetUtils::eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirPath) {
