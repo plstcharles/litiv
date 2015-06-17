@@ -3,6 +3,7 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/video/background_segm.hpp>
 #include "LBSP.h"
+#include "ParallelUtils.h"
 
 /*!
     Local Binary Similarity Pattern (LBSP)-based change detection algorithm (abstract version/base class).

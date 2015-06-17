@@ -9,8 +9,6 @@
 //////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
 //////////////////////////////////////////
-#define GPU_EXEC                         1
-#define DEFAULT_NB_THREADS               1
 #define EVAL_RESULTS_ONLY                0
 #define WRITE_BGSUB_IMG_OUTPUT           0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
@@ -27,14 +25,12 @@
 #define USE_SUBSENSE_BGSUB               0
 //////////////////////////////////////////
 
+#include "ParallelUtils.h"
 #include "DatasetUtils.h"
 #define DATASET_ID             DatasetUtils::eDataset_CDnet2014
 #define DATASET_ROOT_PATH      std::string("/shared2/datasets/")
 #define DATASET_RESULTS_PATH   std::string("results")
 
-#if GPU_EXEC
-#include "GLUtils.h"
-#endif //GPU_EXEC
 #include "BackgroundSubtractorPAWCS.h"
 #include "BackgroundSubtractorSuBSENSE.h"
 #include "BackgroundSubtractorLOBSTER.h"
@@ -52,9 +48,9 @@
 #error "Must specify a single algorithm."
 #endif //(USE_LOBSTER_BGSUB+USE_SUBSENSE_BGSUB+USE_VIBE_BGSUB+USE_PBAS_BGSUB+USE_PAWCS_BGSUB)!=1
 #if ENABLE_DISPLAY_MOUSE_DEBUG
-#if (GPU_EXEC || DEFAULT_NB_THREADS>1)
-#error "Cannot support mouse debug with GPU exec or with more than one thread."
-#endif //(GPU_EXEC || DEFAULT_NB_THREADS>1)
+#if (HAVE_GPU_SUPPORT || DEFAULT_NB_THREADS>1)
+#error "Cannot support mouse debug with GPU support or with more than one thread."
+#endif //(HAVE_GPU_SUPPORT || DEFAULT_NB_THREADS>1)
 static int *pnLatestMouseX=nullptr, *pnLatestMouseY=nullptr;
 void OnMouseEvent(int event, int x, int y, int, void*) {
     if(event!=cv::EVENT_MOUSEMOVE || !x || !y)
@@ -82,13 +78,11 @@ cv::Size g_oDisplayOutputSize(960,240);
 bool g_bContinuousUpdates = false;
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 const DatasetUtils::DatasetInfo& g_oDatasetInfo = DatasetUtils::GetDatasetInfo(DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH);
-#if (!GPU_EXEC && DEFAULT_NB_THREADS<1)
-#error "Bad default number of threads specified."
-#elif (GPU_EXEC && DEFAULT_NB_THREADS>1)
+#if (HAVE_GPU_SUPPORT && DEFAULT_NB_THREADS>1)
 #warning "Cannot support multithreading + gpu exec, will keep one main thread + gpu instead"
-#endif //(GPU_EXEC && DEFAULT_NB_THREADS>1)
+#endif //(HAVE_GPU_SUPPORT && DEFAULT_NB_THREADS>1)
 int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, DatasetUtils::SequenceInfo* pCurrSequence, const std::string& sCurrResultsPath);
-#if !GPU_EXEC
+#if !HAVE_GPU_SUPPORT
 #if PLATFORM_SUPPORTS_CPP11
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
 std::atomic_size_t g_nActiveThreads(0);
@@ -103,7 +97,7 @@ DWORD WINAPI AnalyzeSequenceEntryPoint(LPVOID lpParam) {
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for CPU-based exec using threads, mutexes & atomic variables on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#endif //!GPU_EXEC
+#endif //!HAVE_GPU_SUPPORT
 
 int main() {
 #if PLATFORM_USES_WIN32API
@@ -113,7 +107,7 @@ int main() {
     std::vector<DatasetUtils::CategoryInfo*> vpCategories;
     for(auto oDatasetFolderPathIter=g_oDatasetInfo.vsDatasetFolderPaths.begin(); oDatasetFolderPathIter!=g_oDatasetInfo.vsDatasetFolderPaths.end(); ++oDatasetFolderPathIter) {
         try {
-            vpCategories.push_back(new DatasetUtils::CategoryInfo(*oDatasetFolderPathIter,g_oDatasetInfo.sDatasetPath+*oDatasetFolderPathIter,g_oDatasetInfo.eID,g_oDatasetInfo.vsDatasetGrayscaleDirPathTokens,g_oDatasetInfo.vsDatasetSkippedDirPathTokens,GPU_EXEC));
+            vpCategories.push_back(new DatasetUtils::CategoryInfo(*oDatasetFolderPathIter,g_oDatasetInfo.sDatasetPath+*oDatasetFolderPathIter,g_oDatasetInfo.eID,g_oDatasetInfo.vsDatasetGrayscaleDirPathTokens,g_oDatasetInfo.vsDatasetSkippedDirPathTokens,HAVE_GPU_SUPPORT));
         } catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
     }
     size_t nSeqTotal = 0;
@@ -153,18 +147,18 @@ int main() {
         time_t nStartupTime = time(nullptr);
         const std::string sStartupTimeStr(asctime(localtime(&nStartupTime)));
         std::cout << "[" << sStartupTimeStr.substr(0,sStartupTimeStr.size()-1) << "]" << std::endl;
-#if !GPU_EXEC && DEFAULT_NB_THREADS>1
+#if !HAVE_GPU_SUPPORT && DEFAULT_NB_THREADS>1
         std::cout << "Executing background subtraction with " << ((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads) << " thread(s)..." << std::endl;
 #else //DEFAULT_NB_THREADS==1
         std::cout << "Executing background subtraction..." << std::endl;
 #endif //DEFAULT_NB_THREADS==1
-#if GPU_EXEC
+#if HAVE_GPU_SUPPORT
         for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
             std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
             ++nSeqProcessed;
             AnalyzeSequence(0,oSeqIter->second->m_pParent,oSeqIter->second,sCurrResultsPath);
         }
-#else //!GPU_EXEC
+#else //!HAVE_GPU_SUPPORT
 #if PLATFORM_SUPPORTS_CPP11
         for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
             while(g_nActiveThreads>=g_nMaxThreads)
@@ -196,7 +190,7 @@ int main() {
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for threads/mutexes/atomic variables on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#endif //!GPU_EXEC
+#endif //!HAVE_GPU_SUPPORT
         time_t nShutdownTime = time(nullptr);
         const double dFinalFPS = (nShutdownTime-nStartupTime)>0?(double)nFramesTotal/(nShutdownTime-nStartupTime):std::numeric_limits<double>::quiet_NaN();
         std::cout << "Execution completed; " << nFramesTotal << " frames over " << (nShutdownTime-nStartupTime) << " sec = " << std::fixed << std::setprecision(1) << dFinalFPS << " FPS overall" << std::endl;
@@ -245,10 +239,10 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #else //USE_VIBE_BGSUB || USE_PBAS_BGSUB
     cv::BackgroundSubtractor* pBGS = nullptr;
 #endif //USE_VIBE_BGSUB || USE_PBAS_BGSUB
-#if GPU_EXEC
+#if HAVE_GLSL
     bool bContextInitialized = false;
     GLFWwindow* pWindow = nullptr;
-#endif //GPU_EXEC
+#endif //HAVE_GLSL
     try {
         CV_Assert(pCurrCategory && pCurrSequence);
         CV_Assert(pCurrSequence->GetNbInputFrames()>1);
@@ -257,7 +251,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #endif //DATASETUTILS_USE_PRECACHED_IO
         cv::Mat oFGMask, oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
         CV_Assert(!oInitImg.empty() && oInitImg.isContinuous());
-#if GPU_EXEC
+#if HAVE_GLSL
         cv::Size oCurrInputSize,oCurrWindowSize;
         oCurrInputSize = oCurrWindowSize = oInitImg.size();
         // note: never construct GL classes before context initialization
@@ -285,7 +279,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
             glError("Bad GL core/ext version detected");
         if(!glGetTextureSubImage)
             std::cout << "\n\tWarning: glGetTextureSubImage not supported, performance might be affected\n" << std::endl;
-#endif //GPU_EXEC
+#endif //HAVE_GLSL
 #if USE_LOBSTER_BGSUB
         pBGS = new BackgroundSubtractorLOBSTER();
         const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
@@ -382,12 +376,12 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #if ENABLE_TIMERS
             nCPUTimerVals[eCPUTimer_PipelineUpdate] = cv::getTickCount()-nCPUTimerTick_PipelineUpdate;
 #endif //ENABLE_TIMERS
-#if GPU_EXEC
+#if HAVE_GLSL
             glErrorCheck;
 #if DISPLAY_BGSUB_DEBUG_OUTPUT
             glfwSwapBuffers(g_pWindow);
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT
-#endif //GPU_EXEC
+#endif //HAVE_GLSL
 #if (WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT)
 #if (USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB)
             if(!oSequenceROI.empty())
@@ -463,19 +457,21 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
         cv::destroyWindow(sMouseDebugDisplayName);
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
     }
-#if GPU_EXEC
+#if HAVE_GLSL
     catch(GLException& e) {std::cerr  << "\nTop level caught GLException:\n\t" << e.what() << std::endl << std::endl;}
-#endif //GPU_EXEC
+#endif //HAVE_GLSL
     catch(cv::Exception& e) {std::cerr  << "\nTop level caught cv::Exception:\n\t" << e.what() << std::endl << std::endl;}
     catch(std::runtime_error& e) {std::cerr  << "\nTop level caught std::runtime_error:\n\t" << e.what() << std::endl << std::endl;}
     catch(...) {std::cerr << "\nTop level caught unhandled exception" << std::endl << std::endl;}
     if(pBGS) delete pBGS;
-#if GPU_EXEC
+#if HAVE_GPU_SUPPORT
+#if HAVE_GLSL
     if(pWindow)
         glfwDestroyWindow(pWindow);
     if(bContextInitialized)
         glfwTerminate();
-#else //!GPU_EXEC
+#endif //HAVE_GLSL
+#else //!HAVE_GPU_SUPPORT
 #if PLATFORM_SUPPORTS_CPP11
     g_nActiveThreads--;
 #elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
@@ -483,6 +479,6 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #error "Missing implementation for threads/mutexes/atomic variables on this platform."
 #endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#endif //!GPU_EXEC
+#endif //!HAVE_GPU_SUPPORT
     return 0;
 }
