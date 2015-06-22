@@ -4,6 +4,9 @@
 #include <opencv2/video/background_segm.hpp>
 #include "LBSP.h"
 #include "ParallelUtils.h"
+#if HAVE_GLSL
+#include "GLImageProcUtils.h"
+#endif //HAVE_GLSL
 
 /*!
     Local Binary Similarity Pattern (LBSP)-based change detection algorithm (abstract version/base class).
@@ -23,7 +26,7 @@ public:
     //! (re)initiaization method; needs to be called before starting background subtraction
     virtual void initialize(const cv::Mat& oInitImg);
     //! (re)initiaization method; needs to be called before starting background subtraction
-    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI)=0;
+    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
     //! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
     virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRate=0)=0;
     //! unused, always returns nullptr
@@ -55,6 +58,8 @@ protected:
     const float m_fRelLBSPThreshold;
     //! total number of pixels (depends on the input frame size) & total number of relevant pixels
     size_t m_nTotPxCount, m_nTotRelevantPxCount;
+    //! total number of ROI pixels before & after border cleanup
+    size_t m_nOrigROIPxCount, m_nFinalROIPxCount;
     //! current frame index, frame count since last model reset & model reset cooldown counters
     size_t m_nFrameIndex, m_nFramesSinceLastReset, m_nModelResetCooldown;
     //! pre-allocated internal LBSP threshold values LUT for all possible 8-bit intensities
