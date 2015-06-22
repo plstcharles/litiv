@@ -99,6 +99,8 @@ protected:
     size_t m_nDownSampledROIPxCount;
     //! current local word weight offset
     size_t m_nLocalWordWeightOffset;
+    //! indicates whether the model has been fully initialized or not
+    bool m_bModelInitialized;
 
     //! word lists & dictionaries
     LocalWordBase** m_apLocalWordDict;

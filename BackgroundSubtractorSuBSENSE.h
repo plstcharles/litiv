@@ -69,6 +69,8 @@ protected:
 	int m_nMedianBlurKernelSize;
 	//! specifies the px update spread range
 	bool m_bUse3x3Spread;
+	//! indicates whether the model has been fully initialized or not
+    bool m_bModelInitialized;
 	//! specifies the downsampled frame size used for cam motion analysis
 	cv::Size m_oDownSampledFrameSize;
 

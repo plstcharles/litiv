@@ -94,6 +94,7 @@ BackgroundSubtractorPAWCS::BackgroundSubtractorPAWCS(    float fRelLBSPThreshold
         ,m_nMedianBlurKernelSize(m_nDefaultMedianBlurKernelSize)
         ,m_nDownSampledROIPxCount(0)
         ,m_nLocalWordWeightOffset(DEFAULT_LWORD_WEIGHT_OFFSET)
+        ,m_bModelInitialized(false)
         ,m_apLocalWordDict(nullptr)
         ,m_aLocalWordList_1ch(nullptr)
         ,m_pLocalWordListIter_1ch(nullptr)
@@ -114,52 +115,16 @@ BackgroundSubtractorPAWCS::~BackgroundSubtractorPAWCS() {
 
 void BackgroundSubtractorPAWCS::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
     // == init
-    CV_Assert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
-    CV_Assert(oInitImg.isContinuous());
-    CV_Assert(oInitImg.type()==CV_8UC3 || oInitImg.type()==CV_8UC1);
-    if(oInitImg.type()==CV_8UC3) {
-        std::vector<cv::Mat> voInitImgChannels;
-        cv::split(oInitImg,voInitImgChannels);
-        if(!cv::countNonZero((voInitImgChannels[0]!=voInitImgChannels[1])|(voInitImgChannels[2]!=voInitImgChannels[1])))
-            std::cout << std::endl << "\tBackgroundSubtractorPAWCS : Warning, grayscale images should always be passed in CV_8UC1 format for optimal performance." << std::endl;
-    }
-    cv::Mat oNewBGROI;
-    if(oROI.empty() && (m_oROI.empty() || oROI.size()!=oInitImg.size())) {
-        oNewBGROI.create(oInitImg.size(),CV_8UC1);
-        oNewBGROI = cv::Scalar_<uchar>(UCHAR_MAX);
-    }
-    else if(oROI.empty())
-        oNewBGROI = m_oROI;
-    else {
-        CV_Assert(oROI.size()==oInitImg.size() && oROI.type()==CV_8UC1);
-        CV_Assert(cv::countNonZero((oROI<UCHAR_MAX)&(oROI>0))==0);
-        oNewBGROI = oROI.clone();
-        cv::Mat oTempROI;
-        cv::dilate(oNewBGROI,oTempROI,cv::Mat(),cv::Point(-1,-1),LBSP::PATCH_SIZE/2);
-        cv::bitwise_or(oNewBGROI,oTempROI/2,oNewBGROI);
-    }
-    const size_t nOrigROIPxCount = (size_t)cv::countNonZero(oNewBGROI);
-    CV_Assert(nOrigROIPxCount>0);
-    LBSP::validateROI(oNewBGROI);
-    const size_t nFinalROIPxCount = (size_t)cv::countNonZero(oNewBGROI);
-    CV_Assert(nFinalROIPxCount>0);
+    BackgroundSubtractorLBSP::initialize(oInitImg,oROI);
+    m_bModelInitialized = false;
     CleanupDictionaries();
-    m_oROI = oNewBGROI;
-    m_oImgSize = oInitImg.size();
-    m_nImgType = oInitImg.type();
-    m_nImgChannels = oInitImg.channels();
-    m_nTotPxCount = m_oImgSize.area();
-    m_nTotRelevantPxCount = nFinalROIPxCount;
-    m_nFrameIndex = 0;
-    m_nFramesSinceLastReset = 0;
-    m_nModelResetCooldown = 0;
     m_bUsingMovingCamera = false;
     m_oDownSampledFrameSize_MotionAnalysis = cv::Size(m_oImgSize.width/FRAMELEVEL_DOWNSAMPLE_RATIO,m_oImgSize.height/FRAMELEVEL_DOWNSAMPLE_RATIO);
     m_oDownSampledFrameSize_GlobalWordLookup = cv::Size(m_oImgSize.width/GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO,m_oImgSize.height/GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO);
     cv::resize(m_oROI,m_oDownSampledROI_MotionAnalysis,m_oDownSampledFrameSize_MotionAnalysis,0,0,cv::INTER_AREA);
     m_fLastNonFlatRegionRatio = 0.0f;
     m_nCurrLocalWords = m_nMaxLocalWords;
-    if(nOrigROIPxCount>=m_nTotPxCount/2 && (int)m_nTotPxCount>=DEFAULT_FRAME_SIZE.area()) {
+    if(m_nOrigROIPxCount>=m_nTotPxCount/2 && (int)m_nTotPxCount>=DEFAULT_FRAME_SIZE.area()) {
         const float fRegionSizeScaleFactor = (float)m_nTotPxCount/DEFAULT_FRAME_SIZE.area();
         const int nRawMedianBlurKernelSize = std::min((int)floor(0.5f+fRegionSizeScaleFactor)+m_nDefaultMedianBlurKernelSize,m_nDefaultMedianBlurKernelSize+4);
         m_nMedianBlurKernelSize = (nRawMedianBlurKernelSize%2)?nRawMedianBlurKernelSize:nRawMedianBlurKernelSize-1;
@@ -167,7 +132,7 @@ void BackgroundSubtractorPAWCS::initialize(const cv::Mat& oInitImg, const cv::Ma
         m_oDownSampledROI_MotionAnalysis |= UCHAR_MAX/2;
     }
     else {
-        const float fRegionSizeScaleFactor = (float)nOrigROIPxCount/DEFAULT_FRAME_SIZE.area();
+        const float fRegionSizeScaleFactor = (float)m_nOrigROIPxCount/DEFAULT_FRAME_SIZE.area();
         const int nRawMedianBlurKernelSize = std::min((int)floor(0.5f+m_nDefaultMedianBlurKernelSize*fRegionSizeScaleFactor*2)+(m_nDefaultMedianBlurKernelSize-4),m_nDefaultMedianBlurKernelSize);
         m_nMedianBlurKernelSize = (nRawMedianBlurKernelSize%2)?nRawMedianBlurKernelSize:nRawMedianBlurKernelSize-1;
         m_nCurrGlobalWords = std::min((size_t)std::pow(m_nMaxGlobalWords*fRegionSizeScaleFactor,2)+1,m_nMaxGlobalWords);
@@ -208,14 +173,8 @@ void BackgroundSubtractorPAWCS::initialize(const cv::Mat& oInitImg, const cv::Ma
     m_oBlinksFrame = cv::Scalar_<uchar>(0);
     m_oDownSampledFrame_MotionAnalysis.create(m_oDownSampledFrameSize_MotionAnalysis,CV_8UC((int)m_nImgChannels));
     m_oDownSampledFrame_MotionAnalysis = cv::Scalar_<uchar>::all(0);
-    m_oLastColorFrame.create(m_oImgSize,CV_8UC((int)m_nImgChannels));
-    m_oLastColorFrame = cv::Scalar_<uchar>::all(0);
-    m_oLastDescFrame.create(m_oImgSize,CV_16UC((int)m_nImgChannels));
-    m_oLastDescFrame = cv::Scalar_<ushort>::all(0);
     m_oLastRawFGMask.create(m_oImgSize,CV_8UC1);
     m_oLastRawFGMask = cv::Scalar_<uchar>(0);
-    m_oLastFGMask.create(m_oImgSize,CV_8UC1);
-    m_oLastFGMask = cv::Scalar_<uchar>(0);
     m_oLastFGMask_dilated.create(m_oImgSize,CV_8UC1);
     m_oLastFGMask_dilated = cv::Scalar_<uchar>(0);
     m_oLastFGMask_dilated_inverted.create(m_oImgSize,CV_8UC1);
@@ -297,13 +256,13 @@ void BackgroundSubtractorPAWCS::initialize(const cv::Mat& oInitImg, const cv::Ma
             }
         }
     }
-    m_bInitialized = true;
+    m_bModelInitialized = true;
     refreshModel(1,0);
 }
 
 void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDecrFrac, bool bForceFGUpdate) {
     // == refresh
-    CV_Assert(m_bInitialized);
+    CV_Assert(m_bInitialized && m_bModelInitialized);
     CV_Assert(fOccDecrFrac>=0.0f && fOccDecrFrac<=1.0f);
     if(m_nImgChannels==1) {
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
@@ -631,7 +590,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
 
 void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fgmask, double learningRateOverride) {
     // == process
-    CV_Assert(m_bInitialized);
+    CV_Assert(m_bInitialized && m_bModelInitialized);
     cv::Mat oInputImg = _image.getMat();
     CV_Assert(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize);
     CV_Assert(oInputImg.isContinuous());
@@ -1641,6 +1600,7 @@ void BackgroundSubtractorPAWCS::getBackgroundDescriptorsImage(cv::OutputArray ba
 }
 
 void BackgroundSubtractorPAWCS::CleanupDictionaries() {
+    m_bModelInitialized = false;
     if(m_aLocalWordList_1ch) {
         delete[] m_aLocalWordList_1ch;
         m_aLocalWordList_1ch = nullptr;

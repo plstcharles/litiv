@@ -28,7 +28,12 @@
 
 	This algorithm is currently NOT thread-safe.
  */
-class BackgroundSubtractorLOBSTER : public BackgroundSubtractorLBSP {
+class BackgroundSubtractorLOBSTER :
+         public BackgroundSubtractorLBSP
+#if HAVE_GLSL
+        ,public GLImageProcAlgo
+#endif //HAVE_GLSL
+        {
 public:
 	//! full constructor
 	BackgroundSubtractorLOBSTER(float fRelLBSPThreshold=BGSLOBSTER_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
@@ -44,11 +49,11 @@ public:
 	//! refreshes all samples based on the last analyzed frame
 	virtual void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
 	//! primary model update function; the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
-	virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
+	virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
 	//! returns a copy of the latest reconstructed background image
-	void getBackgroundImage(cv::OutputArray backgroundImage) const;
+	void getBackgroundImage(cv::OutputArray oBGImg) const;
 	//! returns a copy of the latest reconstructed background descriptors image
-	virtual void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const;
+	virtual void getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const;
 
 protected:
 	//! absolute color distance threshold
@@ -59,9 +64,36 @@ protected:
 	const size_t m_nBGSamples;
 	//! number of similar samples needed to consider the current pixel/block as 'background'
 	const size_t m_nRequiredBGSamples;
+	//! default resampling rate (dictates model adaptation speed)
+	const size_t m_nResamplingRate;
 	//! background model pixel intensity samples
 	std::vector<cv::Mat> m_voBGColorSamples;
 	//! background model descriptors samples
 	std::vector<cv::Mat> m_voBGDescSamples;
+	//! indicates whether the model has been fully initialized or not
+	bool m_bModelInitialized;
+
+#if HAVE_GLSL
+public:
+	//! @@@@@
+	virtual std::string getComputeShaderSource(int nStage) const;
+	//! primary model update function; the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
+	virtual void apply_async(cv::InputArray oImage, cv::OutputArray oLastFGMask, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
+    virtual void apply_async(cv::InputArray oImage, cv::OutputArray oLastFGMask, bool bRebindAll, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
+    virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, bool bRebindAll, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
+protected:
+    size_t m_nTMT32ModelSize;
+    size_t m_nSampleStepSize;
+    size_t m_nPxModelSize;
+    size_t m_nPxModelPadding;
+    size_t m_nColStepSize;
+    size_t m_nRowStepSize;
+    size_t m_nBGModelSize;
+    uint* m_avBGModelData;
+    GLSLFunctionUtils::TMT32GenParams* m_avTMT32ModelData;
+    static const GLuint eBuffer_BGModelBinding;
+    static const GLuint eBuffer_TMT32ModelBinding;
+    virtual void dispatch(int nStage, GLShader* pShader);
+#endif //HAVE_GLSL
 };
 

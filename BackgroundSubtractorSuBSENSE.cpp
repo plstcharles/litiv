@@ -67,7 +67,8 @@ BackgroundSubtractorSuBSENSE::BackgroundSubtractorSuBSENSE(	 float fRelLBSPThres
 		,m_fCurrLearningRateLowerCap(FEEDBACK_T_LOWER)
 		,m_fCurrLearningRateUpperCap(FEEDBACK_T_UPPER)
 		,m_nMedianBlurKernelSize(m_nDefaultMedianBlurKernelSize)
-		,m_bUse3x3Spread(true) {
+		,m_bUse3x3Spread(true)
+        ,m_bModelInitialized(false) {
 	CV_Assert(m_nBGSamples>0 && m_nRequiredBGSamples<=m_nBGSamples);
 	CV_Assert(m_nMinColorDistThreshold>=STAB_COLOR_DIST_OFFSET);
 }
@@ -81,47 +82,11 @@ BackgroundSubtractorSuBSENSE::~BackgroundSubtractorSuBSENSE() {
 
 void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
 	// == init
-	CV_Assert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
-	CV_Assert(oInitImg.isContinuous());
-	CV_Assert(oInitImg.type()==CV_8UC3 || oInitImg.type()==CV_8UC1);
-	if(oInitImg.type()==CV_8UC3) {
-		std::vector<cv::Mat> voInitImgChannels;
-		cv::split(oInitImg,voInitImgChannels);
-		if(!cv::countNonZero((voInitImgChannels[0]!=voInitImgChannels[1])|(voInitImgChannels[2]!=voInitImgChannels[1])))
-			std::cout << std::endl << "\tBackgroundSubtractorSuBSENSE : Warning, grayscale images should always be passed in CV_8UC1 format for optimal performance." << std::endl;
-	}
-	cv::Mat oNewBGROI;
-	if(oROI.empty() && (m_oROI.empty() || oROI.size()!=oInitImg.size())) {
-		oNewBGROI.create(oInitImg.size(),CV_8UC1);
-		oNewBGROI = cv::Scalar_<uchar>(UCHAR_MAX);
-	}
-	else if(oROI.empty())
-		oNewBGROI = m_oROI;
-	else {
-		CV_Assert(oROI.size()==oInitImg.size() && oROI.type()==CV_8UC1);
-		CV_Assert(cv::countNonZero((oROI<UCHAR_MAX)&(oROI>0))==0);
-		oNewBGROI = oROI.clone();
-		cv::Mat oTempROI;
-		cv::dilate(oNewBGROI,oTempROI,cv::Mat(),cv::Point(-1,-1),LBSP::PATCH_SIZE/2);
-		cv::bitwise_or(oNewBGROI,oTempROI/2,oNewBGROI);
-	}
-	const size_t nOrigROIPxCount = (size_t)cv::countNonZero(oNewBGROI);
-	CV_Assert(nOrigROIPxCount>0);
-	LBSP::validateROI(oNewBGROI);
-	const size_t nFinalROIPxCount = (size_t)cv::countNonZero(oNewBGROI);
-	CV_Assert(nFinalROIPxCount>0);
-	m_oROI = oNewBGROI;
-	m_oImgSize = oInitImg.size();
-	m_nImgType = oInitImg.type();
-	m_nImgChannels = oInitImg.channels();
-	m_nTotPxCount = m_oImgSize.area();
-	m_nTotRelevantPxCount = nFinalROIPxCount;
-	m_nFrameIndex = 0;
-	m_nFramesSinceLastReset = 0;
-	m_nModelResetCooldown = 0;
+	BackgroundSubtractorLBSP::initialize(oInitImg,oROI);
+	m_bModelInitialized = false;
 	m_fLastNonZeroDescRatio = 0.0f;
 	const int nTotImgPixels = m_oImgSize.height*m_oImgSize.width;
-	if(nOrigROIPxCount>=m_nTotPxCount/2 && (int)m_nTotPxCount>=DEFAULT_FRAME_SIZE.area()) {
+	if(m_nOrigROIPxCount>=m_nTotPxCount/2 && (int)m_nTotPxCount>=DEFAULT_FRAME_SIZE.area()) {
 		m_bLearningRateScalingEnabled = true;
 		m_bAutoModelResetEnabled = true;
 		m_bUse3x3Spread = !(nTotImgPixels>DEFAULT_FRAME_SIZE.area()*2);
@@ -169,14 +134,8 @@ void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const cv:
 	m_oBlinksFrame = cv::Scalar_<uchar>(0);
 	m_oDownSampledFrame_MotionAnalysis.create(m_oDownSampledFrameSize,CV_8UC((int)m_nImgChannels));
 	m_oDownSampledFrame_MotionAnalysis = cv::Scalar_<uchar>::all(0);
-	m_oLastColorFrame.create(m_oImgSize,CV_8UC((int)m_nImgChannels));
-	m_oLastColorFrame = cv::Scalar_<uchar>::all(0);
-	m_oLastDescFrame.create(m_oImgSize,CV_16UC((int)m_nImgChannels));
-	m_oLastDescFrame = cv::Scalar_<ushort>::all(0);
 	m_oLastRawFGMask.create(m_oImgSize,CV_8UC1);
 	m_oLastRawFGMask = cv::Scalar_<uchar>(0);
-	m_oLastFGMask.create(m_oImgSize,CV_8UC1);
-	m_oLastFGMask = cv::Scalar_<uchar>(0);
 	m_oLastFGMask_dilated.create(m_oImgSize,CV_8UC1);
 	m_oLastFGMask_dilated = cv::Scalar_<uchar>(0);
 	m_oLastFGMask_dilated_inverted.create(m_oImgSize,CV_8UC1);
@@ -243,13 +202,13 @@ void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const cv:
 			}
 		}
 	}
-	m_bInitialized = true;
+	m_bModelInitialized = true;
 	refreshModel(1.0f);
 }
 
 void BackgroundSubtractorSuBSENSE::refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate) {
 	// == refresh
-	CV_Assert(m_bInitialized);
+	CV_Assert(m_bInitialized && m_bModelInitialized);
 	CV_Assert(fSamplesRefreshFrac>0.0f && fSamplesRefreshFrac<=1.0f);
 	const size_t nModelsToRefresh = fSamplesRefreshFrac<1.0f?(size_t)(fSamplesRefreshFrac*m_nBGSamples):m_nBGSamples;
 	const size_t nRefreshStartPos = fSamplesRefreshFrac<1.0f?rand()%m_nBGSamples:0;
@@ -293,7 +252,7 @@ void BackgroundSubtractorSuBSENSE::refreshModel(float fSamplesRefreshFrac, bool 
 
 void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray _fgmask, double learningRateOverride) {
 	// == process
-	CV_Assert(m_bInitialized);
+    CV_Assert(m_bInitialized && m_bModelInitialized);
 	cv::Mat oInputImg = _image.getMat();
 	CV_Assert(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize);
 	CV_Assert(oInputImg.isContinuous());
