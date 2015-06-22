@@ -19,40 +19,40 @@
 #define BGSVIBE_USE_L1_DISTANCE_CHECK 0
 
 /*!
-	ViBe foreground-background segmentation algorithm (abstract version).
+    ViBe foreground-background segmentation algorithm (abstract version).
 
-	For more details on the different parameters, go to @@@@@@@@@@@@@@.
+    For more details on the different parameters, go to @@@@@@@@@@@@@@.
 
-	This algorithm is currently NOT thread-safe.
+    This algorithm is currently NOT thread-safe.
  */
 class BackgroundSubtractorViBe : public cv::BackgroundSubtractor {
 public:
-	//! full constructor
-	BackgroundSubtractorViBe(	size_t nColorDistThreshold=BGSVIBE_DEFAULT_COLOR_DIST_THRESHOLD,
-								size_t nBGSamples=BGSVIBE_DEFAULT_NB_BG_SAMPLES,
-								size_t nRequiredBGSamples=BGSVIBE_DEFAULT_REQUIRED_NB_BG_SAMPLES);
-	//! default destructor
-	virtual ~BackgroundSubtractorViBe();
-	//! (re)initiaization method; needs to be called before starting background subtraction
-	virtual void initialize(const cv::Mat& oInitImg)=0;
-	//! primary model update function; the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
-	virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSVIBE_DEFAULT_LEARNING_RATE)=0;
-	//! @@@@@@@@@@@@ ????
-	virtual cv::AlgorithmInfo* info() const;
-	//! returns a copy of the latest reconstructed background image
-	void getBackgroundImage(cv::OutputArray backgroundImage) const;
+    //! full constructor
+    BackgroundSubtractorViBe(   size_t nColorDistThreshold=BGSVIBE_DEFAULT_COLOR_DIST_THRESHOLD,
+                                size_t nBGSamples=BGSVIBE_DEFAULT_NB_BG_SAMPLES,
+                                size_t nRequiredBGSamples=BGSVIBE_DEFAULT_REQUIRED_NB_BG_SAMPLES);
+    //! default destructor
+    virtual ~BackgroundSubtractorViBe();
+    //! (re)initiaization method; needs to be called before starting background subtraction
+    virtual void initialize(const cv::Mat& oInitImg)=0;
+    //! primary model update function; the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
+    virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSVIBE_DEFAULT_LEARNING_RATE)=0;
+    //! @@@@@@@@@@@@ ????
+    virtual cv::AlgorithmInfo* info() const;
+    //! returns a copy of the latest reconstructed background image
+    void getBackgroundImage(cv::OutputArray backgroundImage) const;
 
 protected:
-	//! number of different samples per pixel/block to be taken from input frames to build the background model ('N' in the original ViBe paper)
-	const size_t m_nBGSamples;
-	//! number of similar samples needed to consider the current pixel/block as 'background' ('#_min' in the original ViBe paper)
-	const size_t m_nRequiredBGSamples;
-	//! background model pixel intensity samples
-	std::vector<cv::Mat> m_voBGImg;
-	//! input image size
-	cv::Size m_oImgSize;
-	//! absolute color distance threshold ('R' or 'radius' in the original ViBe paper)
-	const size_t m_nColorDistThreshold;
-	//! defines whether or not the subtractor is fully initialized
-	bool m_bInitialized;
+    //! number of different samples per pixel/block to be taken from input frames to build the background model ('N' in the original ViBe paper)
+    const size_t m_nBGSamples;
+    //! number of similar samples needed to consider the current pixel/block as 'background' ('#_min' in the original ViBe paper)
+    const size_t m_nRequiredBGSamples;
+    //! background model pixel intensity samples
+    std::vector<cv::Mat> m_voBGImg;
+    //! input image size
+    cv::Size m_oImgSize;
+    //! absolute color distance threshold ('R' or 'radius' in the original ViBe paper)
+    const size_t m_nColorDistThreshold;
+    //! defines whether or not the subtractor is fully initialized
+    bool m_bInitialized;
 };

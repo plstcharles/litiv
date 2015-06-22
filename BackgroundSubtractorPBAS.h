@@ -52,59 +52,61 @@
 #define BGSPBAS_USE_SC_THRS_VALIDATION 0
 
 /*!
-	PBAS foreground-background segmentation algorithm (abstract version).
+    PBAS foreground-background segmentation algorithm (abstract version).
 
-	For more details on the different parameters, go to @@@@@@@@@@@@@@.
+    For more details on the different parameters, go to @@@@@@@@@@@@@@.
 
-	This algorithm is currently NOT thread-safe.
+    @@@@@@ IMPL MIGHT STILL BE BROKEN, CHECK Dmin UPDATES WHEN FG/BG @@@@@@
+
+    This algorithm is currently NOT thread-safe.
  */
 class BackgroundSubtractorPBAS : public cv::BackgroundSubtractor {
 public:
-	//! full constructor
-	BackgroundSubtractorPBAS(	size_t nInitColorDistThreshold=BGSPBAS_DEFAULT_COLOR_DIST_THRESHOLD,
-								float fInitUpdateRate=BGSPBAS_DEFAULT_LEARNING_RATE,
-								size_t nBGSamples=BGSPBAS_DEFAULT_NB_BG_SAMPLES,
-								size_t nRequiredBGSamples=BGSPBAS_DEFAULT_REQUIRED_NB_BG_SAMPLES);
-	//! default destructor
-	virtual ~BackgroundSubtractorPBAS();
-	//! (re)initiaization method; needs to be called before starting background subtraction
-	virtual void initialize(const cv::Mat& oInitImg)=0;
-	//! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
-	virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE)=0;
-	//! @@@@@@@@@@@@ ????
-	virtual cv::AlgorithmInfo* info() const;
-	//! returns a copy of the latest reconstructed background image
-	void getBackgroundImage(cv::OutputArray backgroundImage) const;
+    //! full constructor
+    BackgroundSubtractorPBAS(   size_t nInitColorDistThreshold=BGSPBAS_DEFAULT_COLOR_DIST_THRESHOLD,
+                                float fInitUpdateRate=BGSPBAS_DEFAULT_LEARNING_RATE,
+                                size_t nBGSamples=BGSPBAS_DEFAULT_NB_BG_SAMPLES,
+                                size_t nRequiredBGSamples=BGSPBAS_DEFAULT_REQUIRED_NB_BG_SAMPLES);
+    //! default destructor
+    virtual ~BackgroundSubtractorPBAS();
+    //! (re)initiaization method; needs to be called before starting background subtraction
+    virtual void initialize(const cv::Mat& oInitImg)=0;
+    //! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
+    virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE)=0;
+    //! @@@@@@@@@@@@ ????
+    virtual cv::AlgorithmInfo* info() const;
+    //! returns a copy of the latest reconstructed background image
+    void getBackgroundImage(cv::OutputArray backgroundImage) const;
 
 protected:
-	//! number of different samples per pixel/block to be taken from input frames to build the background model ('N' in the original ViBe/PBAS papers)
-	const size_t m_nBGSamples;
-	//! number of similar samples needed to consider the current pixel/block as 'background' ('#_min' in the original ViBe/PBAS papers)
-	const size_t m_nRequiredBGSamples;
-	//! background model pixel intensity samples
-	std::vector<cv::Mat> m_voBGImg;
-	//! background model pixel gradient samples
-	std::vector<cv::Mat> m_voBGGrad;
-	//! input image size
-	cv::Size m_oImgSize;
-	//! absolute color distance threshold ('R' or 'radius' in the original ViBe paper, and the default 'R(x)' value in the original PBAS paper)
-	const size_t m_nDefaultColorDistThreshold;
-	//! per-pixel distance thresholds ('R(x)' in the original PBAS paper)
-	cv::Mat m_oDistThresholdFrame;
-	//! per-pixel distance thresholds variation
-	cv::Mat m_oDistThresholdVariationFrame;
-	//! per-pixel mean minimal decision distances ('D(x)' in the original PBAS paper)
-	cv::Mat m_oMeanMinDistFrame;
-	//! the last foreground mask returned by the method (used for blinking pixel detection)
-	cv::Mat m_oLastFGMask;
-	//! the 'flooded' foreground mask, using for filling holes in blobs
-	cv::Mat m_oFloodedFGMask;
-	//! absolute default update rate threshold (the default 'T(x)' value in the original PBAS paper)
-	const float m_fDefaultUpdateRate;
-	//! mean gradient magnitude distance over the past frame
-	float m_fFormerMeanGradDist;
-	//! per-pixel update rate ('T(x)' in the original PBAS paper)
-	cv::Mat m_oUpdateRateFrame;
-	//! defines whether or not the subtractor is fully initialized
-	bool m_bInitialized;
+    //! number of different samples per pixel/block to be taken from input frames to build the background model ('N' in the original ViBe/PBAS papers)
+    const size_t m_nBGSamples;
+    //! number of similar samples needed to consider the current pixel/block as 'background' ('#_min' in the original ViBe/PBAS papers)
+    const size_t m_nRequiredBGSamples;
+    //! background model pixel intensity samples
+    std::vector<cv::Mat> m_voBGImg;
+    //! background model pixel gradient samples
+    std::vector<cv::Mat> m_voBGGrad;
+    //! input image size
+    cv::Size m_oImgSize;
+    //! absolute color distance threshold ('R' or 'radius' in the original ViBe paper, and the default 'R(x)' value in the original PBAS paper)
+    const size_t m_nDefaultColorDistThreshold;
+    //! per-pixel distance thresholds ('R(x)' in the original PBAS paper)
+    cv::Mat m_oDistThresholdFrame;
+    //! per-pixel distance thresholds variation
+    cv::Mat m_oDistThresholdVariationFrame;
+    //! per-pixel mean minimal decision distances ('D(x)' in the original PBAS paper)
+    cv::Mat m_oMeanMinDistFrame;
+    //! the last foreground mask returned by the method (used for blinking pixel detection)
+    cv::Mat m_oLastFGMask;
+    //! the 'flooded' foreground mask, using for filling holes in blobs
+    cv::Mat m_oFloodedFGMask;
+    //! absolute default update rate threshold (the default 'T(x)' value in the original PBAS paper)
+    const float m_fDefaultUpdateRate;
+    //! mean gradient magnitude distance over the past frame
+    float m_fFormerMeanGradDist;
+    //! per-pixel update rate ('T(x)' in the original PBAS paper)
+    cv::Mat m_oUpdateRateFrame;
+    //! defines whether or not the subtractor is fully initialized
+    bool m_bInitialized;
 };
