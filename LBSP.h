@@ -94,6 +94,18 @@ public:
         #include "LBSP_16bits_dbcross_s3ch.i"
     }
 
+    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel-RGBA version)
+    inline static void computeSingleRGBADescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _c, const size_t _t, ushort& _res) {
+        CV_DbgAssert(!oInputImg.empty());
+        CV_DbgAssert(oInputImg.type()==CV_8UC4 && _c<4);
+        CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
+        CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
+        CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
+        const size_t _step_row = oInputImg.step.p[0];
+        const uchar* const _data = oInputImg.data;
+        #include "LBSP_16bits_dbcross_s4ch.i"
+    }
+
     //! utility function, used to reshape a descriptors matrix to its input image size via their keypoint locations
     static void reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoints, const cv::Mat& oDescriptors, cv::Mat& oOutput);
     //! utility function, used to illustrate the difference between two descriptor images
