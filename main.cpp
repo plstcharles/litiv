@@ -12,8 +12,8 @@
 #define EVAL_RESULTS_ONLY                0
 #define WRITE_BGSUB_IMG_OUTPUT           0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
-#define WRITE_BGSUB_METRICS_ANALYSIS     1
-#define DISPLAY_BGSUB_DEBUG_OUTPUT       0
+#define WRITE_BGSUB_METRICS_ANALYSIS     0
+#define DISPLAY_BGSUB_DEBUG_OUTPUT       1
 #define ENABLE_TIMERS                    0
 #define ENABLE_DISPLAY_MOUSE_DEBUG       0
 #define WRITE_BGSUB_SEGM_AVI_OUTPUT      0
@@ -252,6 +252,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
         cv::Mat oFGMask, oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
         CV_Assert(!oInitImg.empty() && oInitImg.isContinuous());
 #if HAVE_GLSL
+        glAssert(oInitImg.channels()==1 || oInitImg.channels()==4);
         cv::Size oCurrInputSize,oCurrWindowSize;
         oCurrInputSize = oCurrWindowSize = oInitImg.size();
         // note: never construct GL classes before context initialization
@@ -339,6 +340,22 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #if WRITE_BGSUB_IMG_OUTPUT
         PlatformUtils::CreateDirIfNotExist(sCurrResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+"/");
 #endif //WRITE_BGSUB_IMG_OUTPUT
+#if HAVE_GLSL
+        GLImageProcAlgo* pImgProcAlgo = dynamic_cast<GLImageProcAlgo*>(pBGS);
+        if(pImgProcAlgo) {
+            oCurrWindowSize.width *= pImgProcAlgo->m_nSxSDisplayCount;
+            glfwSetWindowSize(pWindow,oCurrWindowSize.width,oCurrWindowSize.height);
+            glViewport(0,0,oCurrWindowSize.width,oCurrWindowSize.height);
+#if (WRITE_BGSUB_METRICS_ANALYSIS || DISPLAY_BGSUB_DEBUG_OUTPUT)
+            pImgProcAlgo->setOutputFetching(true);
+#if DISPLAY_BGSUB_DEBUG_OUTPUT
+            pImgProcAlgo->setDebugFetching(true);
+#endif //DISPLAY_BGSUB_DEBUG_OUTPUT
+#endif //(WRITE_BGSUB_METRICS_ANALYSIS || DISPLAY_BGSUB_DEBUG_OUTPUT)
+        }
+        else
+            glError("BGSub algorithm has no GLImageProcAlgo interface");
+#endif //HAVE_GLSL
         const double dCPUTickFreq_MS = cv::getTickFrequency()/1000;
         const int64 nCPUTimerInitVal = cv::getTickCount();
 #if ENABLE_TIMERS
@@ -347,13 +364,23 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #endif //ENABLE_TIMERS
         const std::string sCurrSeqName = pCurrSequence->m_sName.size()>12?pCurrSequence->m_sName.substr(0,12):pCurrSequence->m_sName;
         const size_t nNbInputFrames = pCurrSequence->GetNbInputFrames();
-        for(size_t k=0; k<nNbInputFrames; k++) {
-#if ENABLE_TIMERS
-            int64 nCPUTimerTick_OverallLoop = cv::getTickCount();
-#endif //ENABLE_TIMERS
+        for(size_t k=0; k<=nNbInputFrames; k++) {
             if(!(k%100))
                 std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nNbInputFrames)) << k << "/" << nNbInputFrames << "   [T=" << nThreadIdx << "]" << std::endl;
+            if(k==nNbInputFrames)
+                break;
+#if HAVE_GLSL
+            if(glfwWindowShouldClose(pWindow))
+                break;
+            glfwPollEvents();
+#if DISPLAY_BGSUB_DEBUG_OUTPUT
+            if(glfwGetKey(pWindow, GLFW_KEY_ESCAPE) || glfwGetKey(pWindow, GLFW_KEY_Q))
+                break;
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+#endif //DISPLAY_BGSUB_DEBUG_OUTPUT
+#endif //HAVE_GLSL
 #if ENABLE_TIMERS
+            int64 nCPUTimerTick_OverallLoop = cv::getTickCount();
             int64 nCPUTimerTick_VideoQuery = cv::getTickCount();
 #endif //ENABLE_TIMERS
             const cv::Mat& oInputImg = pCurrSequence->GetInputFrameFromIndex(k);
@@ -372,14 +399,14 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
             nCPUTimerVals[eCPUTimer_VideoQuery] = cv::getTickCount()-nCPUTimerTick_VideoQuery;
             int64 nCPUTimerTick_PipelineUpdate = cv::getTickCount();
 #endif //ENABLE_TIMERS
-            pBGS->apply(oInputImg, oFGMask, (BOOTSTRAP_100_FIRST_FRAMES && k<=100)?1:dDefaultLearningRate);
+            pBGS->apply(oInputImg,oFGMask,(BOOTSTRAP_100_FIRST_FRAMES&&k<=100)?1:dDefaultLearningRate);
 #if ENABLE_TIMERS
             nCPUTimerVals[eCPUTimer_PipelineUpdate] = cv::getTickCount()-nCPUTimerTick_PipelineUpdate;
 #endif //ENABLE_TIMERS
 #if HAVE_GLSL
             glErrorCheck;
 #if DISPLAY_BGSUB_DEBUG_OUTPUT
-            glfwSwapBuffers(g_pWindow);
+            glfwSwapBuffers(pWindow);
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT
 #endif //HAVE_GLSL
 #if (WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT)
@@ -396,9 +423,9 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS
 #if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if ENABLE_DISPLAY_MOUSE_DEBUG
-            cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),k,(pnLatestMouseX&&pnLatestMouseY)?cv::Point(*pnLatestMouseX,*pnLatestMouseY):cv::Point(-1,-1));
+            cv::Mat oDebugDisplayFrame = DatasetUtils::GetDisplayResult(oInputImg,oLastBGImg,oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),k,(pnLatestMouseX&&pnLatestMouseY)?cv::Point(*pnLatestMouseX,*pnLatestMouseY):cv::Point(-1,-1));
 #else //!ENABLE_DISPLAY_MOUSE_DEBUG
-            cv::Mat oDebugDisplayFrame = GetDisplayResult(oInputImg,oLastBGImg,oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),k);
+            cv::Mat oDebugDisplayFrame = DatasetUtils::GetDisplayResult(oInputImg,oLastBGImg,oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),k);
 #endif //!ENABLE_DISPLAY_MOUSE_DEBUG
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if WRITE_BGSUB_DEBUG_IMG_OUTPUT
@@ -410,7 +437,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
                 cv::resize(oDebugDisplayFrame,oDebugDisplayFrameResized,cv::Size(oDebugDisplayFrame.cols/2,oDebugDisplayFrame.rows/2));
             else
                 oDebugDisplayFrameResized = oDebugDisplayFrame;
-            cv::imshow(sDebugDisplayName, oDebugDisplayFrameResized);
+            cv::imshow(sDebugDisplayName,oDebugDisplayFrameResized);
             int nKeyPressed;
             if(g_bContinuousUpdates)
                 nKeyPressed = cv::waitKey(1);

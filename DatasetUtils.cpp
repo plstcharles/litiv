@@ -392,9 +392,18 @@ inline DatasetUtils::CommonMetrics CalcMetricsFromCategories(const std::vector<D
 
 cv::Mat DatasetUtils::GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, const cv::Mat& oROI, size_t nFrame, cv::Point oDbgPt) {
     cv::Mat oInputImgBYTE3, oBGImgBYTE3, oFGMaskBYTE3;
-    if(oInputImg.channels()!=3) {
+    CV_Assert(!oInputImg.empty() && (oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3 || oInputImg.type()==CV_8UC4));
+    CV_Assert(!oBGImg.empty() && (oBGImg.type()==CV_8UC1 || oBGImg.type()==CV_8UC3 || oBGImg.type()==CV_8UC4));
+    CV_Assert(!oFGMask.empty() && oFGMask.type()==CV_8UC1);
+    CV_Assert(!oGTFGMask.empty() && oGTFGMask.type()==CV_8UC1);
+    CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
+    if(oInputImg.channels()==1) {
         cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_GRAY2RGB);
         cv::cvtColor(oBGImg,oBGImgBYTE3,cv::COLOR_GRAY2RGB);
+    }
+    else if(oInputImg.channels()==4) {
+        cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_RGBA2RGB);
+        cv::cvtColor(oBGImg,oBGImgBYTE3,cv::COLOR_RGBA2RGB);
     }
     else {
         oInputImgBYTE3 = oInputImg;
@@ -747,9 +756,9 @@ cv::Mat DatasetUtils::SequenceInfo::GetInputFrameFromIndex_Internal(size_t nFram
         m_voVideoReader >> oFrame;
         if(m_bForcingGrayscale && oFrame.channels()>1)
             cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2GRAY);
-        else if(m_bUsing4chAlignment && oFrame.channels()>1 && oFrame.channels()<4)
-            cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2BGRA);
     }
+    if(m_bUsing4chAlignment && oFrame.channels()==3)
+        cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2BGRA);
     CV_Assert(oFrame.size()==m_oSize);
     return oFrame;
 }
