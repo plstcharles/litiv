@@ -3,11 +3,15 @@
 #define DATASETUTILS_USE_AVERAGE_EVAL_METRICS  1
 #define DATASETUTILS_USE_PRECACHED_IO          1
 
+#include "ParallelUtils.h"
 #include "PlatformUtils.h"
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
+#if HAVE_GLSL
+#include "GLImageProcUtils.h"
+#endif //HAVE_GLSL
 
 namespace DatasetUtils {
     class MetricsCalculator;
@@ -196,4 +200,30 @@ namespace DatasetUtils {
         SequenceInfo(const SequenceInfo&);
 #endif //!PLATFORM_SUPPORTS_CPP11
     };
+
+#if HAVE_GLSL
+    class CDNetEvaluator : public GLEvaluatorAlgo {
+    public:
+        CDNetEvaluator(GLImageProcAlgo* pParent, int nTotFrameCount);
+        virtual ~CDNetEvaluator();
+        virtual void initialize(const cv::Mat oInitInput, const cv::Mat& oROI, const cv::Mat& oInitGT);
+        virtual void apply(const cv::Mat oNextInput, const cv::Mat& oNextGT, bool bRebindAll=false);
+        virtual std::string getComputeShaderSource(int nStage) const;
+        enum eAtomicCountersList {
+            eAtomicCounter_TP=0,
+            eAtomicCounter_FP,
+            eAtomicCounter_FN,
+            eAtomicCounter_TN,
+            eAtomicCounter_SE,
+            eAtomicCountersCount,
+        };
+        cv::Mat getAtomicCounterBufferCopy();
+
+    protected:
+        size_t m_nTotFrameCount;
+        cv::Mat m_oAtomicCountersQueryBuffer;
+        virtual void dispatch(int nStage, GLShader* pShader);
+    };
+#endif //HAVE_GLSL
+
 }; //namespace DatasetUtils

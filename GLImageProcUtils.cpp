@@ -18,10 +18,10 @@ GLImageProcAlgo::GLImageProcAlgo( int nLevels, int nLayers, int nComputeStages,
         ,m_bUsingDebug(nDebugType>=0)
         ,m_bUsingInput(nInputType>=0)
         ,m_bUsingTexArrays(bUseTexArrays&&nLevels==1)
-        ,m_bUsingDisplay(bUseDisplay)
         ,m_bUsingTimers(bUseTimers)
         ,m_bUsingIntegralFormat(bUseIntegralFormat)
         ,m_vDefaultWorkGroupSize(GLUTILS_IMGPROC_DEFAULT_WORKGROUP)
+        ,m_bUsingDisplay(bUseDisplay)
         ,m_bGLInitialized(false)
         ,m_nInternalFrameIdx(-1)
         ,m_nLastOutputInternalIdx(-1)
@@ -511,6 +511,8 @@ GLEvaluatorAlgo::GLEvaluatorAlgo(GLImageProcAlgo* pParent, int nComputeStages, i
         ,m_pParent(pParent) {
     glAssert(m_bUsingInput);
     glAssert(!dynamic_cast<GLEvaluatorAlgo*>(m_pParent));
+    m_bUsingDisplay = m_pParent->m_bUsingDisplay;
+    m_pParent->m_bUsingDisplay = false;
 }
 
 GLEvaluatorAlgo::~GLEvaluatorAlgo() {}
@@ -727,3 +729,115 @@ void GLImagePassThroughAlgo::dispatch(int nStage, GLShader*) {
     glAssert(nStage>=0 && nStage<m_nComputeStages);
     glDispatchCompute((GLuint)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x), (GLuint)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y), 1);
 }
+/*
+const int BinaryMedianFilter::m_nPPSMaxRowSize = 512;
+const int BinaryMedianFilter::m_nTransposeBlockSize = 32;
+const GLenum BinaryMedianFilter::eImage_PPSAccumulator = GLImageProcAlgo::eImage_CustomBinding1;
+const GLenum BinaryMedianFilter::eImage_PPSAccumulator_T = GLImageProcAlgo::eImage_CustomBinding2;
+
+BinaryMedianFilter::BinaryMedianFilter( int nKernelSize, int nBorderSize, int nLayers, const cv::Mat& oROI,
+                                        bool bUseOutputPBOs, bool bUseInputPBOs, bool bUseTexArrays,
+                                        bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat)
+    :    GLImageProcAlgo(1,nLayers,4+bool(oROI.cols>m_nPPSMaxRowSize)+bool(oROI.rows>m_nPPSMaxRowSize),CV_8UC1,-1,CV_8UC1,bUseOutputPBOs,false,bUseInputPBOs,bUseTexArrays,bUseDisplay,bUseTimers,bUseIntegralFormat)
+        ,m_nKernelSize(nKernelSize)
+        ,m_nBorderSize(nBorderSize) {
+    glAssert((m_nKernelSize%2)==1 && m_nKernelSize>1 && m_nKernelSize<m_oFrameSize.width && m_nKernelSize<m_oFrameSize.height);
+    glAssert(m_nBorderSize>=0 && m_nBorderSize<(m_oFrameSize.width-m_nKernelSize) && m_nBorderSize<(m_oFrameSize.height-m_nKernelSize));
+    int nMaxComputeInvocs;
+    glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS,&nMaxComputeInvocs);
+    const int nCurrComputeStageInvocs = m_vDefaultWorkGroupSize.x*m_vDefaultWorkGroupSize.y;
+    glAssert(nCurrComputeStageInvocs>0 && nCurrComputeStageInvocs<nMaxComputeInvocs);
+    glAssert(m_nTransposeBlockSize*m_nTransposeBlockSize>0 && m_nTransposeBlockSize*m_nTransposeBlockSize<nMaxComputeInvocs);
+    int nMaxWorkGroupCount_X, nMaxWorkGroupCount_Y;
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT,0,&nMaxWorkGroupCount_X);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT,1,&nMaxWorkGroupCount_Y);
+    glAssert(m_oFrameSize.width<nMaxWorkGroupCount_X && m_oFrameSize.width<nMaxWorkGroupCount_Y);
+    glAssert(m_oFrameSize.height<nMaxWorkGroupCount_X && m_oFrameSize.height<nMaxWorkGroupCount_Y);
+    const GLenum eInputInternalFormat = getIntegralFormatFromInternalFormat(getInternalFormatFromMatType(m_nInputType,m_bUsingIntegralFormat));
+    const GLenum eAccumInternalFormat = getIntegralFormatFromInternalFormat(getInternalFormatFromMatType(CV_32SC1));
+    if(m_oFrameSize.width>m_nPPSMaxRowSize) {
+        m_vsComputeShaderSources.push_back(ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum(m_nPPSMaxRowSize,true,eInputInternalFormat,GLImageProcAlgo::eImage_InputBinding,BinaryMedianFilter::eImage_PPSAccumulator));
+        m_vvComputeShaderDispatchSizes.push_back(glm::uvec3((GLuint)ceil((float)m_oFrameSize.width/m_nPPSMaxRowSize),m_oFrameSize.height,1));
+        m_vsComputeShaderSources.push_back(ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum_BlockMerge(m_oFrameSize.width,m_nPPSMaxRowSize,m_oFrameSize.height,getInternalFormatFromMatType(CV_32SC1),BinaryMedianFilter::eImage_PPSAccumulator));
+        m_vvComputeShaderDispatchSizes.push_back(glm::uvec3(1,1,1));
+        m_vsComputeShaderSources.push_back(ComputeShaderUtils::getComputeShaderSource_Transpose(m_nTransposeBlockSize,eAccumInternalFormat,BinaryMedianFilter::eImage_PPSAccumulator,BinaryMedianFilter::eImage_PPSAccumulator_T));
+        m_vvComputeShaderDispatchSizes.push_back(glm::uvec3((GLuint)ceil((float)m_oFrameSize.width/m_nTransposeBlockSize), (GLuint)ceil((float)m_oFrameSize.height/m_nTransposeBlockSize), 1));
+        m_vsComputeShaderSources.push_back(ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum(m_nPPSMaxRowSize,false,getInternalFormatFromMatType(CV_32SC1),BinaryMedianFilter::eImage_PPSAccumulator_T,BinaryMedianFilter::eImage_PPSAccumulator_T));
+        m_vvComputeShaderDispatchSizes.push_back(glm::uvec3((GLuint)ceil((float)m_oFrameSize.height/m_nPPSMaxRowSize),m_oFrameSize.width,1));
+        if(m_oFrameSize.height>m_nPPSMaxRowSize) {
+            m_vsComputeShaderSources.push_back(ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum_BlockMerge(m_oFrameSize.height,m_nPPSMaxRowSize,m_oFrameSize.width,getInternalFormatFromMatType(CV_32SC1),BinaryMedianFilter::eImage_PPSAccumulator_T));
+            m_vvComputeShaderDispatchSizes.push_back(glm::uvec3(1,1,1));
+        }
+        //m_vsComputeShaderSources.push_back(ComputeShaderUtils::getComputeShaderSource_Transpose(m_nTransposeBlockSize,getInternalFormatFromMatType(CV_32SC1),BinaryMedianFilter::eImage_PPSAccumulator_T,ImageProcShaderAlgo::eImage_OutputBinding));
+        //m_vvComputeShaderDispatchSizes.push_back(glm::uvec3((GLuint)ceil((float)m_oFrameSize.height/m_nTransposeBlockSize),(GLuint)ceil((float)m_oFrameSize.width/m_nTransposeBlockSize),1));
+    }
+    else {
+        m_vsComputeShaderSources.push_back(ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum(m_nPPSMaxRowSize,true,eInputInternalFormat,GLImageProcAlgo::eImage_InputBinding,BinaryMedianFilter::eImage_PPSAccumulator));
+        m_vvComputeShaderDispatchSizes.push_back(glm::uvec3((GLuint)ceil((float)m_oFrameSize.width/m_nPPSMaxRowSize),m_oFrameSize.height,1));
+        m_vsComputeShaderSources.push_back(ComputeShaderUtils::getComputeShaderSource_Transpose(m_nTransposeBlockSize,getInternalFormatFromMatType(CV_32SC1),BinaryMedianFilter::eImage_PPSAccumulator,BinaryMedianFilter::eImage_PPSAccumulator_T));
+        m_vvComputeShaderDispatchSizes.push_back(glm::uvec3((GLuint)ceil((float)m_oFrameSize.width/m_nTransposeBlockSize),(GLuint)ceil((float)m_oFrameSize.height/m_nTransposeBlockSize),1));
+        m_vsComputeShaderSources.push_back(ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum(m_nPPSMaxRowSize,false,getInternalFormatFromMatType(CV_32SC1),BinaryMedianFilter::eImage_PPSAccumulator_T,BinaryMedianFilter::eImage_PPSAccumulator_T));
+        m_vvComputeShaderDispatchSizes.push_back(glm::uvec3((GLuint)ceil((float)m_oFrameSize.height/m_nPPSMaxRowSize),m_oFrameSize.width,1));
+        //m_vsComputeShaderSources.push_back(ComputeShaderUtils::getComputeShaderSource_Transpose(m_nTransposeBlockSize,getInternalFormatFromMatType(CV_32SC1),BinaryMedianFilter::eImage_PPSAccumulator_T,ImageProcShaderAlgo::eImage_OutputBinding));
+        //m_vvComputeShaderDispatchSizes.push_back(glm::uvec3((GLuint)ceil((float)m_oFrameSize.height/m_nTransposeBlockSize),(GLuint)ceil((float)m_oFrameSize.width/m_nTransposeBlockSize),1));
+    }
+    // area lookup with clamped coords & final output write
+    const char* acAccumInternalFormatName = getGLSLFormatNameFromInternalFormat(eAccumInternalFormat);
+    std::stringstream ssSrc;
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ssSrc << "#version 430\n"
+             "#define radius " << m_nKernelSize/2 << "\n"
+             "#define imgWidth " << m_oFrameSize.width << "\n"
+             "#define imgHeight " << m_oFrameSize.height << "\n"
+             "#define halfkernelarea " << (m_nKernelSize*m_nKernelSize)/2 << "\n";
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ssSrc << "layout(local_size_x=" << m_vDefaultWorkGroupSize.x << ",local_size_y=" << m_vDefaultWorkGroupSize.y << ") in;\n"
+             "layout(binding=" << BinaryMedianFilter::eImage_PPSAccumulator_T << ", " << acAccumInternalFormatName << ") readonly uniform uimage2D imgInput;\n"
+             "layout(binding=" << GLImageProcAlgo::eImage_OutputBinding << ") writeonly uniform uimage2D imgOutput;\n";
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    ssSrc << "void main() {\n"
+            // @@@@@@@@@@ could also benefit from shared mem, fetch area sums in and around local work group
+             "    ivec2 center = ivec2(gl_GlobalInvocationID.xy);\n"
+             "    // area sum = D - C - B + A\n"
+             "    ivec2 D = min(center+ivec2(radius),ivec2(imgWidth-1,imgHeight-1));\n"
+             "    ivec2 C = ivec2(max(center.x-radius,0),min(center.y+radius,imgHeight-1));\n"
+             "    ivec2 B = ivec2(min(center.x+radius,imgWidth-1),max(center.y-radius,0));\n"
+             "    ivec2 A = max(center-ivec2(radius),ivec2(0));\n"
+             "    uint areasum = imageLoad(imgInput,D.yx).r-imageLoad(imgInput,C.yx).r-imageLoad(imgInput,B.yx).r+imageLoad(imgInput,A.yx).r;\n"
+             "    imageStore(imgOutput,center,uvec4(255*uint(areasum>halfkernelarea)));\n"
+             "}\n";
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    m_vsComputeShaderSources.push_back(ssSrc.str());
+    m_vvComputeShaderDispatchSizes.push_back(glm::uvec3((GLuint)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x),(GLuint)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y),1));
+    glAssert((int)m_vsComputeShaderSources.size()==m_nComputeStages && (int)m_vvComputeShaderDispatchSizes.size()==m_nComputeStages);
+}
+
+std::string BinaryMedianFilter::getComputeShaderSource(int nStage) const {
+    // @@@@ go check how opencv handles borders (sets as 0...?)
+    glAssert(nStage>=0 && nStage<m_nComputeStages);
+    return m_vsComputeShaderSources[nStage];
+}
+
+void BinaryMedianFilter::dispatchCompute(int nStage, GLShader*) {
+    glAssert(nStage>=0 && nStage<m_nComputeStages);
+    if(nStage>0)
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+    glDispatchCompute(m_vvComputeShaderDispatchSizes[nStage].x,m_vvComputeShaderDispatchSizes[nStage].y,m_vvComputeShaderDispatchSizes[nStage].z);
+}
+
+void BinaryMedianFilter::postInitialize(const cv::Mat&) {
+    m_apCustomTextures[0] = std::unique_ptr<GLTexture2D>(new GLTexture2D(1,cv::Mat(m_oFrameSize,CV_32SC1),m_bUsingIntegralFormat));
+    m_apCustomTextures[0]->bindToImage(BinaryMedianFilter::eImage_PPSAccumulator,0,GL_READ_WRITE);
+    m_apCustomTextures[1] = std::unique_ptr<GLTexture2D>(new GLTexture2D(1,cv::Mat(cv::Size(m_oFrameSize.height,m_oFrameSize.width),CV_32SC1),m_bUsingIntegralFormat));
+    m_apCustomTextures[1]->bindToImage(BinaryMedianFilter::eImage_PPSAccumulator_T,0,GL_READ_WRITE);
+    glErrorCheck;
+}
+
+void BinaryMedianFilter::preProcess(bool bRebindAll) {
+    if(bRebindAll) {
+        m_apCustomTextures[0]->bindToImage(BinaryMedianFilter::eImage_PPSAccumulator,0,GL_READ_WRITE);
+        m_apCustomTextures[1]->bindToImage(BinaryMedianFilter::eImage_PPSAccumulator_T,0,GL_READ_WRITE);
+        glErrorCheck;
+    }
+}
+*/

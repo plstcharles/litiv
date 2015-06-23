@@ -24,6 +24,7 @@ public:
 
     inline bool setOutputFetching(bool b) {return (m_bFetchingOutput=(b&&m_bUsingOutput));}
     inline bool setDebugFetching(bool b) {return (m_bFetchingDebug=(b&&m_bUsingDebug));}
+    inline bool getIsUsingDisplay() const {return m_bUsingDisplay;}
     inline GLuint getAtomicBufferId() const {return m_nAtomicBuffer;}
     inline GLuint getSSBOId(int n) const {glAssert(n>=0 && n<eBufferBindingsCount); return m_anSSBO[n];}
     int fetchLastOutput(cv::Mat& oOutput) const;
@@ -43,7 +44,6 @@ public:
     const bool m_bUsingDebug;
     const bool m_bUsingInput;
     const bool m_bUsingTexArrays;
-    const bool m_bUsingDisplay;
     const bool m_bUsingTimers;
     const bool m_bUsingIntegralFormat;
     const glm::ivec2 m_vDefaultWorkGroupSize; // make dynamic? @@@@@
@@ -79,6 +79,7 @@ protected:
         eGLTimer_DisplayUpdate,
         eGLTimersCount
     };
+    bool m_bUsingDisplay;
     bool m_bGLInitialized;
     cv::Size m_oFrameSize;
     size_t m_nInternalFrameIdx;
@@ -143,5 +144,26 @@ public:
                             bool bUseTexArrays, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
     virtual std::string getComputeShaderSource(int nStage) const;
 protected:
+    virtual void dispatch(int nStage, GLShader* pShader);
+};
+
+class BinaryMedianFilter : public GLImageProcAlgo {
+public:
+    // @@@@@ add support for variable kernels? per-px kernel size could be provided via image load/store
+    // @@@ currently not using ROI
+    // via integral image: O(n) (where n is the total image size --- does not depend on r, the kernel size)
+    BinaryMedianFilter( int nKernelSize, int nBorderSize, int nLayers, const cv::Mat& oROI,
+                        bool bUseOutputPBOs, bool bUseInputPBOs, bool bUseTexArrays,
+                        bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
+    virtual std::string getComputeShaderSource(int nStage) const;
+    const int m_nKernelSize;
+    const int m_nBorderSize;
+    static const int m_nPPSMaxRowSize;
+    static const int m_nTransposeBlockSize;
+protected:
+    std::vector<std::string> m_vsComputeShaderSources;
+    std::vector<glm::uvec3> m_vvComputeShaderDispatchSizes;
+    static const GLuint eImage_PPSAccumulator;
+    static const GLuint eImage_PPSAccumulator_T;
     virtual void dispatch(int nStage, GLShader* pShader);
 };
