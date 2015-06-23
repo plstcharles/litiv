@@ -19,7 +19,7 @@ BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(float fRelLBSPThreshold, size
         ,m_nTotRelevantPxCount(0)
         ,m_nOrigROIPxCount(0)
         ,m_nFinalROIPxCount(0)
-        ,m_nFrameIndex(SIZE_MAX)
+        ,m_nFrameIdx(SIZE_MAX)
         ,m_nFramesSinceLastReset(0)
         ,m_nModelResetCooldown(0)
         ,m_aPxIdxLUT(nullptr)
@@ -90,7 +90,7 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg, const cv::Mat
     m_nImgChannels = oInitImg.channels();
     m_nTotPxCount = m_oImgSize.area();
     m_nTotRelevantPxCount = m_nFinalROIPxCount;
-    m_nFrameIndex = 0;
+    m_nFrameIdx = 0;
     m_nFramesSinceLastReset = 0;
     m_nModelResetCooldown = 0;
     m_oLastFGMask.create(m_oImgSize,CV_8UC1);

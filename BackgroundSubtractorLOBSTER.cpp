@@ -6,8 +6,13 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <iomanip>
 
-#define LOBSTER_DEBUG   0
-#define LOBSTER_TIMERS  0
+#define LOBSTER_GPU_DEBUG       1
+#define LOBSTER_GPU_TIMERS      0
+
+#if (!GPU_RENDERING && LOBSTER_GPU_DEBUG)
+#undef LOBSTER_GPU_DEBUG
+#define LOBSTER_GPU_DEBUG 0
+#endif //(!LOBSTER_GPU_DISPLAY && LOBSTER_GPU_DEBUG)
 
 BackgroundSubtractorLOBSTER::BackgroundSubtractorLOBSTER(  float fRelLBSPThreshold
                                                           ,size_t nLBSPThresholdOffset
@@ -17,7 +22,7 @@ BackgroundSubtractorLOBSTER::BackgroundSubtractorLOBSTER(  float fRelLBSPThresho
                                                           ,size_t nRequiredBGSamples)
     :     BackgroundSubtractorLBSP(fRelLBSPThreshold,nLBSPThresholdOffset)
 #if HAVE_GLSL
-        ,GLImageProcAlgo(1,2,1,CV_8UC1,LOBSTER_DEBUG?CV_8UC4:-1,CV_8UC4,GLUTILS_IMGPROC_USE_DOUBLE_PBO_OUTPUT,LOBSTER_DEBUG?GLUTILS_IMGPROC_USE_DOUBLE_PBO_DEBUG:0,GLUTILS_IMGPROC_USE_DOUBLE_PBO_INPUT,false,LOBSTER_DEBUG,LOBSTER_TIMERS,GLUTILS_IMGPROC_USE_INTEGER_TEX_FORMAT)
+        ,GLImageProcAlgo(1,2,1,CV_8UC1,LOBSTER_GPU_DEBUG?CV_8UC4:-1,CV_8UC4,GLUTILS_IMGPROC_USE_DOUBLE_PBO_OUTPUT,LOBSTER_GPU_DEBUG?GLUTILS_IMGPROC_USE_DOUBLE_PBO_OUTPUT:0,GLUTILS_IMGPROC_USE_DOUBLE_PBO_INPUT,GLUTILS_IMGPROC_USE_TEXTURE_ARRAYS,GPU_RENDERING,LOBSTER_GPU_TIMERS,GLUTILS_IMGPROC_USE_INTEGER_TEX_FORMAT)
 #endif //HAVE_GLSL
         ,m_nColorDistThreshold(nColorDistThreshold)
         ,m_nDescDistThreshold(nDescDistThreshold)
@@ -209,52 +214,53 @@ void BackgroundSubtractorLOBSTER::refreshModel(float fSamplesRefreshFrac, bool b
 #if HAVE_GLSL
 
 void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArray _oFGMask, double dLearningRate) {
-    this->apply(_oInputImg,_oFGMask,false,dLearningRate);
+    this->apply_glimpl(_oInputImg,_oFGMask,false,dLearningRate);
 }
 
-void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArray _oFGMask, bool bRebindAll, double dLearningRate) {
+void BackgroundSubtractorLOBSTER::apply_glimpl(cv::InputArray _oInputImg, cv::OutputArray _oFGMask, bool bRebindAll, double dLearningRate) {
     // == process_gpu_sync
     CV_Assert(m_bInitialized && m_bModelInitialized);
     CV_Assert(dLearningRate>0);
     cv::Mat oInputImg = _oInputImg.getMat();
-    if(!(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize))
-        std::cout << "in_type=" << oInputImg.type() << ", bg_type=" << m_nImgType << "   in_size=" << oInputImg.size() << ", bg_size=" << m_oImgSize << std::endl;
     CV_Assert(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize);
     CV_Assert(oInputImg.isContinuous());
     _oFGMask.create(m_oImgSize,CV_8UC1);
     cv::Mat oCurrFGMask = _oFGMask.getMat();
-    GLImageProcAlgo::apply(oInputImg,bRebindAll||true);
+    if(!m_bFetchingOutput)
+        glAssert(setOutputFetching(true));
+    ++m_nFrameIdx;
+    GLImageProcAlgo::apply(oInputImg,bRebindAll);
     fetchLastOutput(oCurrFGMask);
-    //cv::imshow("oCurrFGMask",oCurrFGMask);
-    //cv::waitKey(1);
-#if LOBSTER_DEBUG
-    cv::Mat oCurrDebug(m_oFrameSize,m_nDebugType);
-    fetchLastDebug(oCurrDebug);
-    cv::imshow("oCurrDebug",oCurrDebug);
-    cv::waitKey(1);
-#endif //LOBSTER_DEBUG
 }
 
 void BackgroundSubtractorLOBSTER::apply_async(cv::InputArray _oInputImg, cv::OutputArray _oLastFGMask, double dLearningRate) {
-    this->apply_async(_oInputImg,_oLastFGMask,false,dLearningRate);
+    this->apply_async_glimpl(_oInputImg,_oLastFGMask,false,dLearningRate);
 }
 
-void BackgroundSubtractorLOBSTER::apply_async(cv::InputArray _oInputImg, cv::OutputArray _oLastFGMask, bool bRebindAll, double dLearningRate) {
+void BackgroundSubtractorLOBSTER::apply_async(cv::InputArray _oInputImg, double dLearningRate) {
+    this->apply_async_glimpl(_oInputImg,false,dLearningRate);
+}
+
+void BackgroundSubtractorLOBSTER::apply_async_glimpl(cv::InputArray _oInputImg, bool bRebindAll, double dLearningRate) {
     // == process_gpu_async
     CV_Assert(m_bInitialized && m_bModelInitialized);
     CV_Assert(dLearningRate>0);
     cv::Mat oInputImg = _oInputImg.getMat();
-    if(!(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize))
-        std::cout << "in_type=" << oInputImg.type() << ", bg_type=" << m_nImgType << "   in_size=" << oInputImg.size() << ", bg_size=" << m_oImgSize << std::endl;
     CV_Assert(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize);
     CV_Assert(oInputImg.isContinuous());
+    GLImageProcAlgo::apply(oInputImg,bRebindAll);
+}
+
+void BackgroundSubtractorLOBSTER::apply_async_glimpl(cv::InputArray _oInputImg, cv::OutputArray _oLastFGMask, bool bRebindAll, double dLearningRate) {
+    CV_Assert(m_bInitialized && m_bModelInitialized);
+    CV_Assert(dLearningRate>0);
     _oLastFGMask.create(m_oImgSize,CV_8UC1);
     cv::Mat oLastFGMask = _oLastFGMask.getMat();
-
-    glAssert(false&&bRebindAll);
-    // @@@@@@@@ dispatch
-    // @@@@@@@@ fetch result if frame iter > 0
-
+    if(!m_bFetchingOutput)
+        glAssert(setOutputFetching(true))
+    else if(m_nFrameIdx++>0)
+        fetchLastOutput(oLastFGMask);
+    this->apply_async_glimpl(_oInputImg,bRebindAll,dLearningRate);
 }
 
 const GLuint BackgroundSubtractorLOBSTER::eBuffer_BGModelBinding = GLImageProcAlgo::eBuffer_CustomBinding1;
@@ -305,9 +311,10 @@ std::string BackgroundSubtractorLOBSTER::getComputeShaderSource(int nStage) cons
     ssSrc << "layout(local_size_x=" << m_vDefaultWorkGroupSize.x << ",local_size_y=" << m_vDefaultWorkGroupSize.y << ") in;\n"
              "layout(binding=" << GLImageProcAlgo::eImage_ROIBinding << ", r8ui) readonly uniform uimage2D mROI;\n"
              "layout(binding=" << GLImageProcAlgo::eImage_InputBinding << ", " << (m_nImgChannels==4?"rgba8ui":"r8ui") << ") readonly uniform uimage2D mInput;\n"
-#if LOBSTER_DEBUG
+#if LOBSTER_GPU_DEBUG
+             //"layout(binding=" << GLImageProcAlgo::eImage_DebugBinding << ", rgba8) writeonly uniform image2D mDebug;\n"
              "layout(binding=" << GLImageProcAlgo::eImage_DebugBinding << ", rgba8ui) writeonly uniform uimage2D mDebug;\n"
-#endif //LOBSTER_DEBUG
+#endif //LOBSTER_GPU_DEBUG
              "layout(binding=" << GLImageProcAlgo::eImage_OutputBinding << ", r8ui) writeonly uniform uimage2D mOutput;\n"
              "layout(binding=" << BackgroundSubtractorLOBSTER::eBuffer_BGModelBinding << ", std430) coherent buffer bBGModel {\n"
              "    PxModel aoPxModels[];\n"
@@ -360,14 +367,16 @@ std::string BackgroundSubtractorLOBSTER::getComputeShaderSource(int nStage) cons
              "        }\n"
              "    }\n"
              "    barrier();\n"
-#if LOBSTER_DEBUG
+#if LOBSTER_GPU_DEBUG
              //"    imageStore(mDebug,vImgCoords,uvec4(nResamplingRate*15));\n"
              "    imageStore(mDebug,vImgCoords,aoPxModels[nModelIdx].color_samples[0]);\n"
+             //"    imageStore(mDebug,vImgCoords,uvec4(128));\n"
+             //"    imageStore(mDebug,vImgCoords,vec4(0.5));\n"
              //"    imageStore(mDebug,vImgCoords,uvec4(nSampleIdx*(255/NB_SAMPLES)));\n"
              //"    imageStore(mDebug,vImgCoords,uvec4(hdist(uvec3(0),vInputDesc.bgr)*15));\n"
-#endif //LOBSTER_DEBUG
-             "    imageStore(mOutput,vImgCoords,nSegmResult);\n";
-    ssSrc << "}\n";
+#endif //LOBSTER_GPU_DEBUG
+             "    imageStore(mOutput,vImgCoords,nSegmResult);\n"
+             "}\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
@@ -379,6 +388,45 @@ void BackgroundSubtractorLOBSTER::dispatch(int nStage, GLShader* pShader) {
     glDispatchCompute((GLuint)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x),(GLuint)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y),1);
 }
 
+void BackgroundSubtractorLOBSTER::getBackgroundImage(cv::OutputArray oBGImg) const {
+    CV_Assert(m_bInitialized);
+    glAssert(m_bGLInitialized && m_avBGModelData);
+    oBGImg.create(m_oFrameSize,CV_8UC(m_nImgChannels));
+    cv::Mat oOutputImg = oBGImg.getMatRef();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER::eBuffer_BGModelBinding));
+    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER,0,m_nBGModelSize*sizeof(uint),m_avBGModelData);
+    glErrorCheck;
+    for(size_t nRowIdx=0; nRowIdx<(size_t)m_oFrameSize.height; ++nRowIdx) {
+        const size_t nModelRowOffset = nRowIdx*m_nRowStepSize;
+        const size_t nImgRowOffset = nRowIdx*oOutputImg.step.p[0];
+        for(size_t nColIdx=0; nColIdx<(size_t)m_oFrameSize.width; ++nColIdx) {
+            const size_t nModelColOffset = nColIdx*m_nColStepSize+nModelRowOffset;
+            const size_t nImgColOffset = nColIdx*oOutputImg.step.p[1]+nImgRowOffset;
+            float afCurrPxSum[4] = {0.0f,0.0f,0.0f,0.0f};
+            for(size_t nSampleIdx=0; nSampleIdx<m_nBGSamples; ++nSampleIdx) {
+                const size_t nModelPxOffset = nSampleIdx*m_nSampleStepSize+nModelColOffset;
+                for(size_t nChannelIdx=0; nChannelIdx<m_nImgChannels; ++nChannelIdx) {
+                    const size_t nModelTotOffset = nChannelIdx+nModelPxOffset;
+                    afCurrPxSum[nChannelIdx] += m_avBGModelData[nModelTotOffset];
+                }
+            }
+            for(size_t nChannelIdx=0; nChannelIdx<m_nImgChannels; ++nChannelIdx) {
+                const size_t nSampleChannelIdx = ((nChannelIdx==3||m_nImgChannels==1)?nChannelIdx:2-nChannelIdx);
+                const size_t nImgTotOffset = nSampleChannelIdx+nImgColOffset;
+                oOutputImg.data[nImgTotOffset] = (uchar)(afCurrPxSum[nChannelIdx]/m_nBGSamples);
+            }
+        }
+    }
+}
+
+void BackgroundSubtractorLOBSTER::getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const {
+    CV_Assert(LBSP::DESC_SIZE==2);
+    CV_Assert(m_bInitialized);
+    glAssert(m_bGLInitialized);
+    oBGDescImg.create(m_oFrameSize,CV_16UC(m_nImgChannels));
+    glAssert(false); // @@@@ missing impl
+}
+
 #else //!HAVE_GLSL
 
 void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArray _oFGMask, double dLearningRate) {
@@ -386,8 +434,6 @@ void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArr
     CV_Assert(m_bInitialized && m_bModelInitialized);
     CV_Assert(dLearningRate>0);
     cv::Mat oInputImg = _oInputImg.getMat();
-    if(!(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize))
-        std::cout << "in_type=" << oInputImg.type() << ", bg_type=" << m_nImgType << "   in_size=" << oInputImg.size() << ", bg_size=" << m_oImgSize << std::endl;
     CV_Assert(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize);
     CV_Assert(oInputImg.isContinuous());
     _oFGMask.create(m_oImgSize,CV_8UC1);
@@ -503,38 +549,8 @@ void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArr
     m_oLastFGMask.copyTo(oCurrFGMask);
 }
 
-#endif //!HAVE_GLSL
-
 void BackgroundSubtractorLOBSTER::getBackgroundImage(cv::OutputArray oBGImg) const {
     CV_Assert(m_bInitialized);
-#if HAVE_GLSL
-    glAssert(m_bGLInitialized && m_avBGModelData);
-    oBGImg.create(m_oFrameSize,CV_8UC(m_nImgChannels));
-    cv::Mat oOutputImg = oBGImg.getMatRef();
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER::eBuffer_BGModelBinding));
-    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER,0,m_nBGModelSize*sizeof(uint),m_avBGModelData);
-    glErrorCheck;
-    for(size_t nRowIdx=0; nRowIdx<(size_t)m_oFrameSize.height; ++nRowIdx) {
-        const size_t nModelRowOffset = nRowIdx*m_nRowStepSize;
-        const size_t nImgRowOffset = nRowIdx*oOutputImg.step.p[0];
-        for(size_t nColIdx=0; nColIdx<(size_t)m_oFrameSize.width; ++nColIdx) {
-            const size_t nModelColOffset = nColIdx*m_nColStepSize+nModelRowOffset;
-            const size_t nImgColOffset = nColIdx*oOutputImg.step.p[1]+nImgRowOffset;
-            float afCurrPxSum[4] = {0.0f,0.0f,0.0f,0.0f};
-            for(size_t nSampleIdx=0; nSampleIdx<m_nBGSamples; ++nSampleIdx) {
-                const size_t nModelPxOffset = nSampleIdx*m_nSampleStepSize+nModelColOffset;
-                for(size_t nChannelIdx=0; nChannelIdx<m_nImgChannels; ++nChannelIdx) {
-                    const size_t nModelTotOffset = nChannelIdx+nModelPxOffset;
-                    afCurrPxSum[nChannelIdx] += m_avBGModelData[nModelTotOffset];
-                }
-            }
-            for(size_t nChannelIdx=0; nChannelIdx<m_nImgChannels; ++nChannelIdx) {
-                const size_t nImgTotOffset = nChannelIdx+nImgColOffset;
-                oOutputImg.data[nImgTotOffset] = (uchar)(afCurrPxSum[nChannelIdx]/m_nBGSamples);
-            }
-        }
-    }
-#else //!HAVE_GLSL
     cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
     for(size_t s=0; s<m_nBGSamples; ++s) {
         for(int y=0; y<m_oImgSize.height; ++y) {
@@ -549,17 +565,11 @@ void BackgroundSubtractorLOBSTER::getBackgroundImage(cv::OutputArray oBGImg) con
         }
     }
     oAvgBGImg.convertTo(oBGImg,CV_8U);
-#endif //!HAVE_GLSL
 }
 
 void BackgroundSubtractorLOBSTER::getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const {
     CV_Assert(LBSP::DESC_SIZE==2);
     CV_Assert(m_bInitialized);
-#if HAVE_GLSL
-    glAssert(m_bGLInitialized);
-    oBGDescImg.create(m_oFrameSize,CV_16UC(m_nImgChannels));
-    glAssert(false); // @@@@ missing impl
-#else //!HAVE_GLSL
     cv::Mat oAvgBGDesc = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
     for(size_t n=0; n<m_voBGDescSamples.size(); ++n) {
         for(int y=0; y<m_oImgSize.height; ++y) {
@@ -574,5 +584,6 @@ void BackgroundSubtractorLOBSTER::getBackgroundDescriptorsImage(cv::OutputArray 
         }
     }
     oAvgBGDesc.convertTo(oBGDescImg,CV_16U);
-#endif //!HAVE_GLSL
 }
+
+#endif //!HAVE_GLSL

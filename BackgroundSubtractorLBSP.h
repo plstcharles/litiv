@@ -28,7 +28,13 @@ public:
     //! (re)initiaization method; needs to be called before starting background subtraction
     virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
     //! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
-    virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRate=0)=0;
+    virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, double learningRate=0)=0;
+#if HAVE_GPU_SUPPORT
+    //! primary model update function (asynchronous version); the learning param is used to override the internal learning speed (ignored when <= 0)
+    virtual void apply_async(cv::InputArray oImage, cv::OutputArray oLastFGMask, double dLearningRate=0)=0;
+    //! primary model update function (asynchronous version); the learning param is used to override the internal learning speed (ignored when <= 0)
+    virtual void apply_async(cv::InputArray oImage, double dLearningRate=0)=0;
+#endif //HAVE_GPU_SUPPORT
     //! unused, always returns nullptr
     virtual cv::AlgorithmInfo* info() const;
     //! returns a copy of the ROI used for descriptor extraction
@@ -61,7 +67,7 @@ protected:
     //! total number of ROI pixels before & after border cleanup
     size_t m_nOrigROIPxCount, m_nFinalROIPxCount;
     //! current frame index, frame count since last model reset & model reset cooldown counters
-    size_t m_nFrameIndex, m_nFramesSinceLastReset, m_nModelResetCooldown;
+    size_t m_nFrameIdx, m_nFramesSinceLastReset, m_nModelResetCooldown;
     //! pre-allocated internal LBSP threshold values LUT for all possible 8-bit intensities
     size_t m_anLBSPThreshold_8bitLUT[UCHAR_MAX+1];
     //! internal pixel index LUT for all relevant analysis regions (based on the provided ROI)

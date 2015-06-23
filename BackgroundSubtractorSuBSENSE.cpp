@@ -260,8 +260,8 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
     cv::Mat oCurrFGMask = _fgmask.getMat();
     memset(oCurrFGMask.data,0,oCurrFGMask.cols*oCurrFGMask.rows);
     size_t nNonZeroDescCount = 0;
-    const float fRollAvgFactor_LT = 1.0f/std::min(++m_nFrameIndex,m_nSamplesForMovingAvgs);
-    const float fRollAvgFactor_ST = 1.0f/std::min(m_nFrameIndex,m_nSamplesForMovingAvgs/4);
+    const float fRollAvgFactor_LT = 1.0f/std::min(++m_nFrameIdx,m_nSamplesForMovingAvgs);
+    const float fRollAvgFactor_ST = 1.0f/std::min(m_nFrameIdx,m_nSamplesForMovingAvgs/4);
     if(m_nImgChannels==1) {
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
             const size_t nPxIter = m_aPxIdxLUT[nModelIter];

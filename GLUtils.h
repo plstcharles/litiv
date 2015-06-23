@@ -15,7 +15,7 @@
 
 #define glError(msg) throw GLException(msg,__func__,__FILE__,__LINE__)
 #define glError2(errn,msg) throw GLException(errn,msg,__func__,__FILE__,__LINE__)
-#define glAssert(expr) if(!!(expr)); else throw GLException("assert failed; ("#expr")",__func__,__FILE__,__LINE__)
+#define glAssert(expr) {if(!!(expr)); else throw GLException("assert failed; ("#expr")",__func__,__FILE__,__LINE__);}
 #define glErrorCheck { \
     GLenum __errn = glGetError(); \
     if(__errn!=GL_NO_ERROR) \

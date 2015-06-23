@@ -5,6 +5,7 @@
 // @@@ always pack big gpu buffers with std430
 // @@@ add opencv hardware intrs check, and impl some stuff in MMX/SSE/SSE2/3/4.1/4.2? (also check popcount and AVX)
 // @@@ investigate glClearBufferData for large-scale opengl buffer memsets
+// @@@ support non-integer textures top level (alg)? need to replace all ui-stores by float-stores, rest is ok
 
 //////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
@@ -13,7 +14,7 @@
 #define WRITE_BGSUB_IMG_OUTPUT           0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
 #define WRITE_BGSUB_METRICS_ANALYSIS     0
-#define DISPLAY_BGSUB_DEBUG_OUTPUT       1
+#define DISPLAY_BGSUB_DEBUG_OUTPUT       0
 #define ENABLE_TIMERS                    0
 #define ENABLE_DISPLAY_MOUSE_DEBUG       0
 #define WRITE_BGSUB_SEGM_AVI_OUTPUT      0
@@ -41,8 +42,8 @@
 
 #define LIMIT_MODEL_TO_SEQUENCE_ROI (USE_LOBSTER_BGSUB||USE_SUBSENSE_BGSUB||USE_PAWCS_BGSUB)
 #define BOOTSTRAP_100_FIRST_FRAMES  (USE_LOBSTER_BGSUB||USE_SUBSENSE_BGSUB||USE_PAWCS_BGSUB)
-#if EVAL_RESULTS_ONLY && (DEFAULT_NB_THREADS>1 || !WRITE_BGSUB_METRICS_ANALYSIS)
-#error "Eval-only mode must run with 1 thread & write results somewhere."
+#if EVAL_RESULTS_ONLY && (DEFAULT_NB_THREADS>1 || HAVE_GPU_SUPPORT || !WRITE_BGSUB_METRICS_ANALYSIS)
+#error "Eval-only mode must run on CPU with 1 thread & write results somewhere."
 #endif //EVAL_RESULTS_ONLY && (DEFAULT_NB_THREADS>1 || !WRITE_BGSUB_METRICS_ANALYSIS)
 #if (USE_LOBSTER_BGSUB+USE_SUBSENSE_BGSUB+USE_VIBE_BGSUB+USE_PBAS_BGSUB+USE_PAWCS_BGSUB)!=1
 #error "Must specify a single algorithm."
@@ -73,10 +74,10 @@ enum eCPUTimersList {
 #if WRITE_BGSUB_IMG_OUTPUT
 const std::vector<int> g_vnResultsComprParams = {cv::IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
 #endif //WRITE_BGSUB_IMG_OUTPUT
-#if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
+#if (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT)
 cv::Size g_oDisplayOutputSize(960,240);
 bool g_bContinuousUpdates = false;
-#endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
+#endif //(DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT)
 const DatasetUtils::DatasetInfo& g_oDatasetInfo = DatasetUtils::GetDatasetInfo(DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH);
 #if (HAVE_GPU_SUPPORT && DEFAULT_NB_THREADS>1)
 #warning "Cannot support multithreading + gpu exec, will keep one main thread + gpu instead"
@@ -132,9 +133,9 @@ int main() {
         std::cout << "Executing background subtraction evaluation..." << std::endl;
         for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
             std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
-            for(size_t k=0; k<oSeqIter->second->GetNbGTFrames(); ++k) {
-                cv::Mat oGTImg = oSeqIter->second->GetGTFrameFromIndex(k);
-                cv::Mat oFGMask = DatasetUtils::ReadResult(sCurrResultsPath,oSeqIter->second->m_pParent->m_sName,oSeqIter->second->m_sName,g_oDatasetInfo.sResultPrefix,k+g_oDatasetInfo.nResultIdxOffset,g_oDatasetInfo.sResultSuffix);
+            for(size_t nCurrFrameIdx=0; nCurrFrameIdx<oSeqIter->second->GetNbGTFrames(); ++nCurrFrameIdx) {
+                cv::Mat oGTImg = oSeqIter->second->GetGTFrameFromIndex(nCurrFrameIdx);
+                cv::Mat oFGMask = DatasetUtils::ReadResult(sCurrResultsPath,oSeqIter->second->m_pParent->m_sName,oSeqIter->second->m_sName,g_oDatasetInfo.sResultPrefix,nCurrFrameIdx+g_oDatasetInfo.nResultIdxOffset,g_oDatasetInfo.sResultSuffix);
                 DatasetUtils::CalcMetricsFromResult(oFGMask,oGTImg,oSeqIter->second->GetSequenceROI(),oSeqIter->second->nTP,oSeqIter->second->nTN,oSeqIter->second->nFP,oSeqIter->second->nFN,oSeqIter->second->nSE);
             }
             ++nSeqProcessed;
@@ -249,7 +250,10 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #if DATASETUTILS_USE_PRECACHED_IO
         pCurrSequence->StartPrecaching();
 #endif //DATASETUTILS_USE_PRECACHED_IO
-        cv::Mat oFGMask, oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
+        cv::Mat oInitImg = pCurrSequence->GetInputFrameFromIndex(0);
+#if (WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT)
+        cv::Mat oFGMask;
+#endif //(WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT)
         CV_Assert(!oInitImg.empty() && oInitImg.isContinuous());
 #if HAVE_GLSL
         glAssert(oInitImg.channels()==1 || oInitImg.channels()==4);
@@ -259,13 +263,13 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
         if(glfwInit() == GL_FALSE)
             glError("Failed to init GLFW");
         bContextInitialized = true;
-        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
-        glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
-#if !DISPLAY_BGSUB_DEBUG_OUTPUT
-        glfwWindowHint(GLFW_VISIBLE, GL_FALSE);
-#endif //!DISPLAY_BGSUB_DEBUG_OUTPUT
+        glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,4);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,4);
+        glfwWindowHint(GLFW_RESIZABLE,GL_FALSE);
+#if !GPU_RENDERING
+        glfwWindowHint(GLFW_VISIBLE,GL_FALSE);
+#endif //!GPU_RENDERING
         if((pWindow=glfwCreateWindow(oCurrWindowSize.width,oCurrWindowSize.height,"changedet_gpu",nullptr,nullptr))==0)
             glError("Failed to create window via GLFW");
         glfwMakeContextCurrent(pWindow);
@@ -324,7 +328,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #if DISPLAY_BGSUB_DEBUG_OUTPUT
         std::string sDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName;
         cv::namedWindow(sDebugDisplayName);
-#endif //DISPLAY_ANALYSIS_DEBUG_RESULTS
+#endif //DISPLAY_BGSUB_DEBUG_OUTPUT
         CV_Assert((!WRITE_BGSUB_DEBUG_IMG_OUTPUT && !WRITE_BGSUB_SEGM_AVI_OUTPUT && !WRITE_BGSUB_IMG_OUTPUT) || !sCurrResultsPath.empty());
 #if ENABLE_DISPLAY_MOUSE_DEBUG
         std::string sMouseDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName + " [MOUSE DEBUG]";
@@ -363,101 +367,128 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
         double dCPUTimerTotValSum = 0;
 #endif //ENABLE_TIMERS
         const std::string sCurrSeqName = pCurrSequence->m_sName.size()>12?pCurrSequence->m_sName.substr(0,12):pCurrSequence->m_sName;
-        const size_t nNbInputFrames = pCurrSequence->GetNbInputFrames();
-        for(size_t k=0; k<=nNbInputFrames; k++) {
-            if(!(k%100))
-                std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nNbInputFrames)) << k << "/" << nNbInputFrames << "   [T=" << nThreadIdx << "]" << std::endl;
-            if(k==nNbInputFrames)
+        const size_t nInputFrameCount = pCurrSequence->GetNbInputFrames();
+        for(size_t nCurrFrameIdx=0;; nCurrFrameIdx++) {
+            if(!(nCurrFrameIdx%100))
+                std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nInputFrameCount)) << nCurrFrameIdx << "/" << nInputFrameCount << "   [T=" << nThreadIdx << "]" << std::endl;
+#if ASYNC_PROCESS
+            if(nCurrFrameIdx==nInputFrameCount+1)
                 break;
+            const size_t nInputFrameQueryIdx = (nCurrFrameIdx==nInputFrameCount)?nCurrFrameIdx-1:nCurrFrameIdx;
+#else //!ASYNC_PROCESS
+            if(nCurrFrameIdx==nInputFrameCount)
+                break;
+            const size_t nInputFrameQueryIdx = nCurrFrameIdx;
+#endif //ASYNC_PROCESS
 #if HAVE_GLSL
             if(glfwWindowShouldClose(pWindow))
                 break;
             glfwPollEvents();
-#if DISPLAY_BGSUB_DEBUG_OUTPUT
+#if GPU_RENDERING
             if(glfwGetKey(pWindow, GLFW_KEY_ESCAPE) || glfwGetKey(pWindow, GLFW_KEY_Q))
                 break;
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-#endif //DISPLAY_BGSUB_DEBUG_OUTPUT
+#endif //GPU_RENDERING
 #endif //HAVE_GLSL
 #if ENABLE_TIMERS
             int64 nCPUTimerTick_OverallLoop = cv::getTickCount();
             int64 nCPUTimerTick_VideoQuery = cv::getTickCount();
 #endif //ENABLE_TIMERS
-            const cv::Mat& oInputImg = pCurrSequence->GetInputFrameFromIndex(k);
+            const cv::Mat& oInputImg = pCurrSequence->GetInputFrameFromIndex(nInputFrameQueryIdx);
 #if ENABLE_DISPLAY_MOUSE_DEBUG
             cv::imshow(sMouseDebugDisplayName,oInputImg);
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
-#if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
+#if (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT)
             cv::Mat oLastBGImg;
             pBGS->getBackgroundImage(oLastBGImg);
 #if (USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB)
             if(!oSequenceROI.empty())
                 cv::bitwise_or(oLastBGImg,UCHAR_MAX/2,oLastBGImg,oSequenceROI==0);
 #endif //(USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB)
-#endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
+#endif //(DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT)
 #if ENABLE_TIMERS
             nCPUTimerVals[eCPUTimer_VideoQuery] = cv::getTickCount()-nCPUTimerTick_VideoQuery;
             int64 nCPUTimerTick_PipelineUpdate = cv::getTickCount();
 #endif //ENABLE_TIMERS
-            pBGS->apply(oInputImg,oFGMask,(BOOTSTRAP_100_FIRST_FRAMES&&k<=100)?1:dDefaultLearningRate);
+#if (HAVE_GLSL && ASYNC_PROCESS)
+#if (WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT)
+            pBGS->apply_async(oInputImg,oFGMask,(BOOTSTRAP_100_FIRST_FRAMES&&nCurrFrameIdx<=100)?1:dDefaultLearningRate);
+#else //!(WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT)
+            pBGS->apply_async(oInputImg,(BOOTSTRAP_100_FIRST_FRAMES&&nCurrFrameIdx<=100)?1:dDefaultLearningRate);
+#endif //!(WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT)
+#else //!(HAVE_GLSL && ASYNC_PROCESS)
+            pBGS->apply(oInputImg,oFGMask,(BOOTSTRAP_100_FIRST_FRAMES&&nCurrFrameIdx<=100)?1:dDefaultLearningRate);
+#endif //!(HAVE_GLSL && ASYNC_PROCESS)
 #if ENABLE_TIMERS
             nCPUTimerVals[eCPUTimer_PipelineUpdate] = cv::getTickCount()-nCPUTimerTick_PipelineUpdate;
 #endif //ENABLE_TIMERS
 #if HAVE_GLSL
             glErrorCheck;
-#if DISPLAY_BGSUB_DEBUG_OUTPUT
+#if GPU_RENDERING
             glfwSwapBuffers(pWindow);
-#endif //DISPLAY_BGSUB_DEBUG_OUTPUT
+#endif //GPU_RENDERING
 #endif //HAVE_GLSL
+#if ASYNC_PROCESS
+            if(nCurrFrameIdx>0) {
+#if (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS)
+                const size_t nGTFrameQueryIdx = nCurrFrameIdx-1;
+#endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS
+#else //!ASYNC_PROCESS
+            {
+#if (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS)
+                const size_t nGTFrameQueryIdx = nCurrFrameIdx;
+#endif //(DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS)
+#endif //!ASYNC_PROCESS
 #if (WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT)
 #if (USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB)
-            if(!oSequenceROI.empty())
-                cv::bitwise_or(oFGMask,UCHAR_MAX/2,oFGMask,oSequenceROI==0);
+                if(!oSequenceROI.empty())
+                    cv::bitwise_or(oFGMask,UCHAR_MAX/2,oFGMask,oSequenceROI==0);
 #endif //(USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB)
 #endif //(WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT)
 #if WRITE_BGSUB_SEGM_AVI_OUTPUT
-            oSegmWriter.write(oFGMask);
+                oSegmWriter.write(oFGMask);
 #endif //WRITE_BGSUB_SEGM_AVI_OUTPUT
-#if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS
-            cv::Mat oGTImg = pCurrSequence->GetGTFrameFromIndex(k);
-#endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS
-#if DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
+#if (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS)
+                cv::Mat oGTImg = pCurrSequence->GetGTFrameFromIndex(nGTFrameQueryIdx);
+#endif //(DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS)
+#if (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT)
 #if ENABLE_DISPLAY_MOUSE_DEBUG
-            cv::Mat oDebugDisplayFrame = DatasetUtils::GetDisplayResult(oInputImg,oLastBGImg,oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),k,(pnLatestMouseX&&pnLatestMouseY)?cv::Point(*pnLatestMouseX,*pnLatestMouseY):cv::Point(-1,-1));
+                cv::Mat oDebugDisplayFrame = DatasetUtils::GetDisplayResult(oInputImg,oLastBGImg,oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),nGTFrameQueryIdx,(pnLatestMouseX&&pnLatestMouseY)?cv::Point(*pnLatestMouseX,*pnLatestMouseY):cv::Point(-1,-1));
 #else //!ENABLE_DISPLAY_MOUSE_DEBUG
-            cv::Mat oDebugDisplayFrame = DatasetUtils::GetDisplayResult(oInputImg,oLastBGImg,oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),k);
+                cv::Mat oDebugDisplayFrame = DatasetUtils::GetDisplayResult(oInputImg,oLastBGImg,oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),nGTFrameQueryIdx);
 #endif //!ENABLE_DISPLAY_MOUSE_DEBUG
-#endif //DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if WRITE_BGSUB_DEBUG_IMG_OUTPUT
-            oDebugWriter.write(oDebugDisplayFrame);
+                oDebugWriter.write(oDebugDisplayFrame);
 #endif //WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if DISPLAY_BGSUB_DEBUG_OUTPUT
-            cv::Mat oDebugDisplayFrameResized;
-            if(oDebugDisplayFrame.cols>1280 || oDebugDisplayFrame.rows>960)
-                cv::resize(oDebugDisplayFrame,oDebugDisplayFrameResized,cv::Size(oDebugDisplayFrame.cols/2,oDebugDisplayFrame.rows/2));
-            else
-                oDebugDisplayFrameResized = oDebugDisplayFrame;
-            cv::imshow(sDebugDisplayName,oDebugDisplayFrameResized);
-            int nKeyPressed;
-            if(g_bContinuousUpdates)
-                nKeyPressed = cv::waitKey(1);
-            else
-                nKeyPressed = cv::waitKey(0);
-            if(nKeyPressed!=-1) {
-                nKeyPressed %= (UCHAR_MAX+1); // fixes return val bug in some opencv versions
-                std::cout << "nKeyPressed = " << nKeyPressed%(UCHAR_MAX+1) << std::endl;
-            }
-            if(nKeyPressed==' ')
-                g_bContinuousUpdates = !g_bContinuousUpdates;
-            else if(nKeyPressed==(int)'q')
-                break;
+                cv::Mat oDebugDisplayFrameResized;
+                if(oDebugDisplayFrame.cols>1280 || oDebugDisplayFrame.rows>960)
+                    cv::resize(oDebugDisplayFrame,oDebugDisplayFrameResized,cv::Size(oDebugDisplayFrame.cols/2,oDebugDisplayFrame.rows/2));
+                else
+                    oDebugDisplayFrameResized = oDebugDisplayFrame;
+                cv::imshow(sDebugDisplayName,oDebugDisplayFrameResized);
+                int nKeyPressed;
+                if(g_bContinuousUpdates)
+                    nKeyPressed = cv::waitKey(1);
+                else
+                    nKeyPressed = cv::waitKey(0);
+                if(nKeyPressed!=-1) {
+                    nKeyPressed %= (UCHAR_MAX+1); // fixes return val bug in some opencv versions
+                    std::cout << "nKeyPressed = " << nKeyPressed%(UCHAR_MAX+1) << std::endl;
+                }
+                if(nKeyPressed==' ')
+                    g_bContinuousUpdates = !g_bContinuousUpdates;
+                else if(nKeyPressed==(int)'q')
+                    break;
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT
+#endif //(DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT)
 #if WRITE_BGSUB_IMG_OUTPUT
-            DatasetUtils::WriteResult(sCurrResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_oDatasetInfo.sResultPrefix,k+g_oDatasetInfo.nResultIdxOffset,g_oDatasetInfo.sResultSuffix,oFGMask,g_vnResultsComprParams);
+                DatasetUtils::WriteResult(sCurrResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_oDatasetInfo.sResultPrefix,nGTFrameQueryIdx+g_oDatasetInfo.nResultIdxOffset,g_oDatasetInfo.sResultSuffix,oFGMask,g_vnResultsComprParams);
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #if WRITE_BGSUB_METRICS_ANALYSIS
-            DatasetUtils::CalcMetricsFromResult(oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
+                DatasetUtils::CalcMetricsFromResult(oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
 #endif //WRITE_BGS
+            }
 #if IMGPROC_MICRO_TIME
             nCPUTimerVals[eCPUTimer_OverallLoop] = cv::getTickCount()-nCPUTimerTick_OverallLoop;
             std::cout << "\t\tCPU: ";
@@ -468,7 +499,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #endif //IMGPROC_MICRO_TIME
         }
         const double dTimeElapsed_MS = double(cv::getTickCount()-nCPUTimerInitVal)/dCPUTickFreq_MS;
-        const double dAvgFPS = (double)nNbInputFrames/(dTimeElapsed_MS/1000);
+        const double dAvgFPS = (double)nInputFrameCount/(dTimeElapsed_MS/1000);
         std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ end, " << (int)(dTimeElapsed_MS/1000) << " sec (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
 #if WRITE_BGSUB_METRICS_ANALYSIS
         pCurrSequence->m_dAvgFPS = dAvgFPS;
