@@ -120,8 +120,8 @@ protected:
                                                          bool bUsingOutput, bool bUsingDebug, bool bUsingInput,
                                                          bool bUsingTexArrays, bool bUsingIntegralFormat);
 private:
-    GLImageProcAlgo(const GLImageProcAlgo&);
-    GLImageProcAlgo& operator=(const GLImageProcAlgo&);
+    GLImageProcAlgo& operator=(const GLImageProcAlgo&)=delete;
+    GLImageProcAlgo(const GLImageProcAlgo&)=delete;
     friend class GLEvaluatorAlgo;
     GLuint m_nAtomicBuffer;
     GLuint m_anSSBO[GLImageProcAlgo::eBufferBindingsCount];
@@ -129,11 +129,11 @@ private:
 
 class GLEvaluatorAlgo : public GLImageProcAlgo {
 public:
-    GLEvaluatorAlgo(GLImageProcAlgo* pParent, int nComputeStages, int nOutputType, int nGroundtruthType, bool bUseDisplay);
+    GLEvaluatorAlgo(std::unique_ptr<GLImageProcAlgo> pParent, int nComputeStages, int nOutputType, int nGroundtruthType, bool bUseDisplay);
     virtual ~GLEvaluatorAlgo();
     virtual std::string getFragmentShaderSource() const;
 protected:
-    GLImageProcAlgo* m_pParent;
+    std::unique_ptr<GLImageProcAlgo> m_pParent;
     virtual void initialize(const cv::Mat oInitInput, const cv::Mat& oROI, const cv::Mat& oInitGT);
     virtual void apply(const cv::Mat oNextInput, const cv::Mat& oNextGT, bool bRebindAll=false);
 };

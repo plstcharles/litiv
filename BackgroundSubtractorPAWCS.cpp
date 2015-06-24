@@ -67,9 +67,6 @@
 
 #if USE_INTERNAL_HRCS
 #include "PlatformUtils.h"
-#if !PLATFORM_SUPPORTS_CPP11
-#error "Cannnot activate HRCs, C++11 not supported."
-#endif //!PLATFORM_SUPPORTS_CPP11
 #endif //USE_INTERNAL_HRCS
 
 static const size_t s_nColorMaxDataRange_1ch = UCHAR_MAX;
@@ -95,17 +92,10 @@ BackgroundSubtractorPAWCS::BackgroundSubtractorPAWCS(    float fRelLBSPThreshold
         ,m_nDownSampledROIPxCount(0)
         ,m_nLocalWordWeightOffset(DEFAULT_LWORD_WEIGHT_OFFSET)
         ,m_bModelInitialized(false)
-        ,m_apLocalWordDict(nullptr)
-        ,m_aLocalWordList_1ch(nullptr)
-        ,m_pLocalWordListIter_1ch(nullptr)
-        ,m_aLocalWordList_3ch(nullptr)
-        ,m_pLocalWordListIter_3ch(nullptr)
-        ,m_apGlobalWordDict(nullptr)
-        ,m_aGlobalWordList_1ch(nullptr)
-        ,m_pGlobalWordListIter_1ch(nullptr)
-        ,m_aGlobalWordList_3ch(nullptr)
-        ,m_pGlobalWordListIter_3ch(nullptr)
-        ,m_aPxInfoLUT_PAWCS(nullptr) {
+        ,m_pLocalWordListIter_1ch(m_voLocalWordList_1ch.end())
+        ,m_pLocalWordListIter_3ch(m_voLocalWordList_3ch.end())
+        ,m_pGlobalWordListIter_1ch(m_voGlobalWordList_1ch.end())
+        ,m_pGlobalWordListIter_3ch(m_voGlobalWordList_3ch.end()) {
     CV_Assert(m_nMaxLocalWords>0 && m_nMaxGlobalWords>0);
 }
 
@@ -190,38 +180,32 @@ void BackgroundSubtractorPAWCS::initialize(const cv::Mat& oInitImg, const cv::Ma
     m_oTempGlobalWordWeightDiffFactor.create(m_oDownSampledFrameSize_GlobalWordLookup,CV_32FC1);
     m_oTempGlobalWordWeightDiffFactor = cv::Scalar(-0.1f);
     m_oMorphExStructElement = cv::getStructuringElement(cv::MORPH_RECT,cv::Size(3,3));
-    m_aPxIdxLUT = new size_t[m_nTotRelevantPxCount];
-    memset(m_aPxIdxLUT,0,sizeof(size_t)*m_nTotRelevantPxCount);
-    m_aPxInfoLUT_PAWCS = new PxInfo_PAWCS[m_nTotPxCount];
-    memset(m_aPxInfoLUT_PAWCS,0,sizeof(PxInfo_PAWCS)*m_nTotPxCount);
-    m_aPxInfoLUT = m_aPxInfoLUT_PAWCS;
-    m_apLocalWordDict = new LocalWordBase*[m_nTotRelevantPxCount*m_nCurrLocalWords];
-    memset(m_apLocalWordDict,0,sizeof(LocalWordBase*)*m_nTotRelevantPxCount*m_nCurrLocalWords);
-    m_apGlobalWordDict = new GlobalWordBase*[m_nCurrGlobalWords];
-    memset(m_apGlobalWordDict,0,sizeof(GlobalWordBase*)*m_nCurrGlobalWords);
+    m_vnPxIdxLUT.resize(m_nTotRelevantPxCount);
+    m_voPxInfoLUT_PAWCS.resize(m_nTotPxCount);
+    m_vpLocalWordDict.resize(m_nTotRelevantPxCount*m_nCurrLocalWords,nullptr);
+    m_vpGlobalWordDict.resize(m_nCurrGlobalWords,nullptr);
     if(m_nImgChannels==1) {
         CV_DbgAssert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width && m_oLastColorFrame.step.p[1]==1);
         CV_DbgAssert(m_oLastDescFrame.step.p[0]==m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==m_oLastColorFrame.step.p[1]*2);
-        m_aLocalWordList_1ch = new LocalWord_1ch[m_nTotRelevantPxCount*m_nCurrLocalWords];
-        memset(m_aLocalWordList_1ch,0,sizeof(LocalWord_1ch)*m_nTotRelevantPxCount*m_nCurrLocalWords);
-        m_pLocalWordListIter_1ch = m_aLocalWordList_1ch;
-        m_aGlobalWordList_1ch = new GlobalWord_1ch[m_nCurrGlobalWords];
-        m_pGlobalWordListIter_1ch = m_aGlobalWordList_1ch;
+        m_voLocalWordList_1ch.resize(m_nTotRelevantPxCount*m_nCurrLocalWords);
+        m_pLocalWordListIter_1ch = m_voLocalWordList_1ch.begin();
+        m_voGlobalWordList_1ch.resize(m_nCurrGlobalWords);
+        m_pGlobalWordListIter_1ch = m_voGlobalWordList_1ch.begin();
         for(size_t t=0; t<=UCHAR_MAX; ++t)
             m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>((m_nLBSPThresholdOffset+t*m_fRelLBSPThreshold)/3);
         for(size_t nPxIter=0, nModelIter=0; nPxIter<m_nTotPxCount; ++nPxIter) {
             if(m_oROI.data[nPxIter]) {
-                m_aPxIdxLUT[nModelIter] = nPxIter;
-                m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
-                m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
-                m_aPxInfoLUT_PAWCS[nPxIter].nModelIdx = nModelIter;
-                m_aPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx = (size_t)((m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y/GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO)*m_oDownSampledFrameSize_GlobalWordLookup.width+(m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X/GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO))*4;
-                m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT = new GlobalWordBase*[m_nCurrGlobalWords];
+                m_vnPxIdxLUT[nModelIter] = nPxIter;
+                m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
+                m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
+                m_voPxInfoLUT_PAWCS[nPxIter].nModelIdx = nModelIter;
+                m_voPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx = (size_t)((m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y/GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO)*m_oDownSampledFrameSize_GlobalWordLookup.width+(m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X/GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO))*4;
+                m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT.resize(m_nCurrGlobalWords);
                 for(size_t nGlobalWordIdxIter=0; nGlobalWordIdxIter<m_nCurrGlobalWords; ++nGlobalWordIdxIter)
-                    m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT[nGlobalWordIdxIter] = &(m_aGlobalWordList_1ch[nGlobalWordIdxIter]);
+                    m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordIdxIter] = &m_voGlobalWordList_1ch[nGlobalWordIdxIter];
                 m_oLastColorFrame.data[nPxIter] = oInitImg.data[nPxIter];
                 const size_t nDescIter = nPxIter*2;
-                LBSP::computeGrayscaleDescriptor(oInitImg,oInitImg.data[nPxIter],m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxIter]],*((ushort*)(m_oLastDescFrame.data+nDescIter)));
+                LBSP::computeGrayscaleDescriptor(oInitImg,oInitImg.data[nPxIter],m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxIter]],*((ushort*)(m_oLastDescFrame.data+nDescIter)));
                 ++nModelIter;
             }
         }
@@ -229,28 +213,27 @@ void BackgroundSubtractorPAWCS::initialize(const cv::Mat& oInitImg, const cv::Ma
     else { //m_nImgChannels==3
         CV_DbgAssert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width*3 && m_oLastColorFrame.step.p[1]==3);
         CV_DbgAssert(m_oLastDescFrame.step.p[0]==m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==m_oLastColorFrame.step.p[1]*2);
-        m_aLocalWordList_3ch = new LocalWord_3ch[m_nTotRelevantPxCount*m_nCurrLocalWords];
-        memset(m_aLocalWordList_3ch,0,sizeof(LocalWord_3ch)*m_nTotRelevantPxCount*m_nCurrLocalWords);
-        m_pLocalWordListIter_3ch = m_aLocalWordList_3ch;
-        m_aGlobalWordList_3ch = new GlobalWord_3ch[m_nCurrGlobalWords];
-        m_pGlobalWordListIter_3ch = m_aGlobalWordList_3ch;
+        m_voLocalWordList_3ch.resize(m_nTotRelevantPxCount*m_nCurrLocalWords);
+        m_pLocalWordListIter_3ch = m_voLocalWordList_3ch.begin();
+        m_voGlobalWordList_3ch.resize(m_nCurrGlobalWords);
+        m_pGlobalWordListIter_3ch = m_voGlobalWordList_3ch.begin();
         for(size_t t=0; t<=UCHAR_MAX; ++t)
             m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(m_nLBSPThresholdOffset+t*m_fRelLBSPThreshold);
         for(size_t nPxIter=0, nModelIter=0; nPxIter<m_nTotPxCount; ++nPxIter) {
             if(m_oROI.data[nPxIter]) {
-                m_aPxIdxLUT[nModelIter] = nPxIter;
-                m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
-                m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
-                m_aPxInfoLUT_PAWCS[nPxIter].nModelIdx = nModelIter;
-                m_aPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx = (size_t)((m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y/GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO)*m_oDownSampledFrameSize_GlobalWordLookup.width+(m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X/GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO))*4;
-                m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT = new GlobalWordBase*[m_nCurrGlobalWords];
+                m_vnPxIdxLUT[nModelIter] = nPxIter;
+                m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
+                m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
+                m_voPxInfoLUT_PAWCS[nPxIter].nModelIdx = nModelIter;
+                m_voPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx = (size_t)((m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y/GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO)*m_oDownSampledFrameSize_GlobalWordLookup.width+(m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X/GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO))*4;
+                m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT.resize(m_nCurrGlobalWords);
                 for(size_t nGlobalWordIdxIter=0; nGlobalWordIdxIter<m_nCurrGlobalWords; ++nGlobalWordIdxIter)
-                    m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT[nGlobalWordIdxIter] = &(m_aGlobalWordList_3ch[nGlobalWordIdxIter]);
+                    m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordIdxIter] = &m_voGlobalWordList_3ch[nGlobalWordIdxIter];
                 const size_t nPxRGBIter = nPxIter*3;
                 const size_t nDescRGBIter = nPxRGBIter*2;
                 for(size_t c=0; c<3; ++c) {
                     m_oLastColorFrame.data[nPxRGBIter+c] = oInitImg.data[nPxRGBIter+c];
-                    LBSP::computeSingleRGBDescriptor(oInitImg,oInitImg.data[nPxRGBIter+c],m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
+                    LBSP::computeSingleRGBDescriptor(oInitImg,oInitImg.data[nPxRGBIter+c],m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
                 }
                 ++nModelIter;
             }
@@ -266,7 +249,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
     CV_Assert(fOccDecrFrac>=0.0f && fOccDecrFrac<=1.0f);
     if(m_nImgChannels==1) {
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
-            const size_t nPxIter = m_aPxIdxLUT[nModelIter];
+            const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
             if(bForceFGUpdate || !m_oLastFGMask_dilated.data[nPxIter]) {
                 const size_t nLocalDictIdx = nModelIter*m_nCurrLocalWords;
                 const size_t nFloatIter = nPxIter*4;
@@ -277,7 +260,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                 // == refresh: local decr
                 if(fOccDecrFrac>0.0f) {
                     for(size_t nLocalWordIdx=0; nLocalWordIdx<m_nCurrLocalWords; ++nLocalWordIdx) {
-                        LocalWord_1ch* pCurrLocalWord = (LocalWord_1ch*)m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx];
+                        LocalWord_1ch* pCurrLocalWord = (LocalWord_1ch*)m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx];
                         if(pCurrLocalWord)
                             pCurrLocalWord->nOccurrences -= (size_t)(fOccDecrFrac*pCurrLocalWord->nOccurrences);
                     }
@@ -287,7 +270,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                 for(size_t nLocalSamplingIter=0; nLocalSamplingIter<nTotLocalSamplingIterCount; ++nLocalSamplingIter) {
                     // == refresh: local resampling
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                     if(bForceFGUpdate || !m_oLastFGMask_dilated.data[nSamplePxIdx]) {
                         const uchar nSampleColor = m_oLastColorFrame.data[nSamplePxIdx];
@@ -296,7 +279,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                         bool bFoundUninitd = false;
                         size_t nLocalWordIdx;
                         for(nLocalWordIdx=0; nLocalWordIdx<m_nCurrLocalWords; ++nLocalWordIdx) {
-                            LocalWord_1ch* pCurrLocalWord = (LocalWord_1ch*)m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx];
+                            LocalWord_1ch* pCurrLocalWord = (LocalWord_1ch*)m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx];
                             if(pCurrLocalWord
                                     && L1dist(nSampleColor,pCurrLocalWord->oFeature.anColor[0])<=nCurrColorDistThreshold
                                     && hdist(nSampleIntraDesc,pCurrLocalWord->oFeature.anDesc[0])<=nCurrDescDistThreshold) {
@@ -309,65 +292,64 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                         }
                         if(nLocalWordIdx==m_nCurrLocalWords) {
                             nLocalWordIdx = m_nCurrLocalWords-1;
-                            LocalWord_1ch* pCurrLocalWord = bFoundUninitd?m_pLocalWordListIter_1ch++:(LocalWord_1ch*)m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx];
-                            pCurrLocalWord->oFeature.anColor[0] = nSampleColor;
-                            pCurrLocalWord->oFeature.anDesc[0] = nSampleIntraDesc;
-                            pCurrLocalWord->nOccurrences = nBaseOccCount;
-                            pCurrLocalWord->nFirstOcc = m_nFrameIdx;
-                            pCurrLocalWord->nLastOcc = m_nFrameIdx;
-                            m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx] = pCurrLocalWord;
+                            LocalWord_1ch& oCurrLocalWord = bFoundUninitd?*m_pLocalWordListIter_1ch++:*(LocalWord_1ch*)m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx];
+                            oCurrLocalWord.oFeature.anColor[0] = nSampleColor;
+                            oCurrLocalWord.oFeature.anDesc[0] = nSampleIntraDesc;
+                            oCurrLocalWord.nOccurrences = nBaseOccCount;
+                            oCurrLocalWord.nFirstOcc = m_nFrameIdx;
+                            oCurrLocalWord.nLastOcc = m_nFrameIdx;
+                            m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx] = &oCurrLocalWord;
                         }
-                        while(nLocalWordIdx>0 && (!m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx-1] || GetLocalWordWeight(m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_nFrameIdx,m_nLocalWordWeightOffset)>GetLocalWordWeight(m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx-1],m_nFrameIdx,m_nLocalWordWeightOffset))) {
-                            std::swap(m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx-1]);
+                        while(nLocalWordIdx>0 && (!m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx-1] || GetLocalWordWeight(*m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_nFrameIdx,m_nLocalWordWeightOffset)>GetLocalWordWeight(*m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx-1],m_nFrameIdx,m_nLocalWordWeightOffset))) {
+                            std::swap(m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx-1]);
                             --nLocalWordIdx;
                         }
                     }
                 }
-                CV_Assert(m_apLocalWordDict[nLocalDictIdx]);
+                CV_Assert(m_vpLocalWordDict[nLocalDictIdx]);
                 for(size_t nLocalWordIdx=1; nLocalWordIdx<m_nCurrLocalWords; ++nLocalWordIdx) {
                     // == refresh: local random resampling
-                    LocalWord_1ch* pCurrLocalWord = (LocalWord_1ch*)m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx];
-                    if(!pCurrLocalWord) {
+                    if(!(LocalWord_1ch*)m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx]) {
                         const size_t nRandLocalWordIdx = (rand()%nLocalWordIdx);
-                        const LocalWord_1ch* pRefLocalWord = (LocalWord_1ch*)m_apLocalWordDict[nLocalDictIdx+nRandLocalWordIdx];
+                        const LocalWord_1ch& oRefLocalWord = *(LocalWord_1ch*)m_vpLocalWordDict[nLocalDictIdx+nRandLocalWordIdx];
                         const int nRandColorOffset = (rand()%(nCurrColorDistThreshold+1))-(int)nCurrColorDistThreshold/2;
-                        pCurrLocalWord = m_pLocalWordListIter_1ch++;
-                        pCurrLocalWord->oFeature.anColor[0] = cv::saturate_cast<uchar>((int)pRefLocalWord->oFeature.anColor[0]+nRandColorOffset);
-                        pCurrLocalWord->oFeature.anDesc[0] = pRefLocalWord->oFeature.anDesc[0];
-                        pCurrLocalWord->nOccurrences = std::max((size_t)(pRefLocalWord->nOccurrences*((float)(m_nCurrLocalWords-nLocalWordIdx)/m_nCurrLocalWords)),(size_t)1);
-                        pCurrLocalWord->nFirstOcc = m_nFrameIdx;
-                        pCurrLocalWord->nLastOcc = m_nFrameIdx;
-                        m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx] = pCurrLocalWord;
+                        LocalWord_1ch& oCurrNewLocalWord = *m_pLocalWordListIter_1ch++;
+                        oCurrNewLocalWord.oFeature.anColor[0] = cv::saturate_cast<uchar>((int)oRefLocalWord.oFeature.anColor[0]+nRandColorOffset);
+                        oCurrNewLocalWord.oFeature.anDesc[0] = oRefLocalWord.oFeature.anDesc[0];
+                        oCurrNewLocalWord.nOccurrences = std::max((size_t)(oRefLocalWord.nOccurrences*((float)(m_nCurrLocalWords-nLocalWordIdx)/m_nCurrLocalWords)),(size_t)1);
+                        oCurrNewLocalWord.nFirstOcc = m_nFrameIdx;
+                        oCurrNewLocalWord.nLastOcc = m_nFrameIdx;
+                        m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx] = &oCurrNewLocalWord;
                     }
                 }
             }
         }
-        CV_Assert(m_aLocalWordList_1ch==(m_pLocalWordListIter_1ch-m_nTotRelevantPxCount*m_nCurrLocalWords));
+        CV_Assert(m_voLocalWordList_1ch.end()==m_pLocalWordListIter_1ch);
         cv::Mat oGlobalDictPresenceLookupMap(m_oImgSize,CV_8UC1,cv::Scalar_<uchar>(0));
         size_t nPxIterIncr = std::max(m_nTotPxCount/m_nCurrGlobalWords,(size_t)1);
         for(size_t nSamplingPasses=0; nSamplingPasses<GWORD_DEFAULT_NB_INIT_SAMPL_PASSES; ++nSamplingPasses) {
             for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
                 // == refresh: global resampling
-                const size_t nPxIter = m_aPxIdxLUT[nModelIter];
+                const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
                 if((nPxIter%nPxIterIncr)==0) { // <=(m_nCurrGlobalWords) gwords from (m_nCurrGlobalWords) equally spaced pixels
                     if(bForceFGUpdate || !m_oLastFGMask_dilated.data[nPxIter]) {
                         const size_t nLocalDictIdx = nModelIter*m_nCurrLocalWords;
-                        const size_t nGlobalWordMapLookupIdx = m_aPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx;
+                        const size_t nGlobalWordMapLookupIdx = m_voPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx;
                         const size_t nFloatIter = nPxIter*4;
                         uchar& bCurrRegionIsUnstable = m_oUnstableRegionMask.data[nPxIter];
                         const float fCurrDistThresholdFactor = *(float*)(m_oDistThresholdFrame.data+nFloatIter);
                         const size_t nCurrColorDistThreshold = (size_t)(sqrt(fCurrDistThresholdFactor)*m_nMinColorDistThreshold)/2;
                         const size_t nCurrDescDistThreshold = ((size_t)1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThresholdOffset+(bCurrRegionIsUnstable*UNSTAB_DESC_DIST_OFFSET);
-                        CV_Assert(m_apLocalWordDict[nLocalDictIdx]);
-                        const LocalWord_1ch* pRefBestLocalWord = (LocalWord_1ch*)m_apLocalWordDict[nLocalDictIdx];
-                        const float fRefBestLocalWordWeight = GetLocalWordWeight(pRefBestLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
-                        const uchar nRefBestLocalWordDescBITS = (uchar)popcount(pRefBestLocalWord->oFeature.anDesc[0]);
+                        CV_Assert(m_vpLocalWordDict[nLocalDictIdx]);
+                        const LocalWord_1ch& oRefBestLocalWord = *(LocalWord_1ch*)m_vpLocalWordDict[nLocalDictIdx];
+                        const float fRefBestLocalWordWeight = GetLocalWordWeight(oRefBestLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
+                        const uchar nRefBestLocalWordDescBITS = (uchar)popcount(oRefBestLocalWord.oFeature.anDesc[0]);
                         bool bFoundUninitd = false;
                         size_t nGlobalWordIdx;
                         for(nGlobalWordIdx=0; nGlobalWordIdx<m_nCurrGlobalWords; ++nGlobalWordIdx) {
-                            GlobalWord_1ch* pCurrGlobalWord = (GlobalWord_1ch*)m_apGlobalWordDict[nGlobalWordIdx];
+                            GlobalWord_1ch* pCurrGlobalWord = (GlobalWord_1ch*)m_vpGlobalWordDict[nGlobalWordIdx];
                             if(pCurrGlobalWord
-                                    && L1dist(pCurrGlobalWord->oFeature.anColor[0],pRefBestLocalWord->oFeature.anColor[0])<=nCurrColorDistThreshold
+                                    && L1dist(pCurrGlobalWord->oFeature.anColor[0],oRefBestLocalWord.oFeature.anColor[0])<=nCurrColorDistThreshold
                                     && L1dist(nRefBestLocalWordDescBITS,pCurrGlobalWord->nDescBITS)<=nCurrDescDistThreshold/GWORD_DESC_THRES_BITS_MATCH_FACTOR)
                                 break;
                             else if(!pCurrGlobalWord)
@@ -375,23 +357,23 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                         }
                         if(nGlobalWordIdx==m_nCurrGlobalWords) {
                             nGlobalWordIdx = m_nCurrGlobalWords-1;
-                            GlobalWord_1ch* pCurrGlobalWord = bFoundUninitd?m_pGlobalWordListIter_1ch++:(GlobalWord_1ch*)m_apGlobalWordDict[nGlobalWordIdx];
-                            pCurrGlobalWord->oFeature.anColor[0] = pRefBestLocalWord->oFeature.anColor[0];
-                            pCurrGlobalWord->oFeature.anDesc[0] = pRefBestLocalWord->oFeature.anDesc[0];
-                            pCurrGlobalWord->nDescBITS = nRefBestLocalWordDescBITS;
-                            pCurrGlobalWord->oSpatioOccMap.create(m_oDownSampledFrameSize_GlobalWordLookup,CV_32FC1);
-                            pCurrGlobalWord->oSpatioOccMap = cv::Scalar(0.0f);
-                            pCurrGlobalWord->fLatestWeight = 0.0f;
-                            m_apGlobalWordDict[nGlobalWordIdx] = pCurrGlobalWord;
+                            GlobalWord_1ch& oCurrGlobalWord = bFoundUninitd?*m_pGlobalWordListIter_1ch++:*(GlobalWord_1ch*)m_vpGlobalWordDict[nGlobalWordIdx];
+                            oCurrGlobalWord.oFeature.anColor[0] = oRefBestLocalWord.oFeature.anColor[0];
+                            oCurrGlobalWord.oFeature.anDesc[0] = oRefBestLocalWord.oFeature.anDesc[0];
+                            oCurrGlobalWord.nDescBITS = nRefBestLocalWordDescBITS;
+                            oCurrGlobalWord.oSpatioOccMap.create(m_oDownSampledFrameSize_GlobalWordLookup,CV_32FC1);
+                            oCurrGlobalWord.oSpatioOccMap = cv::Scalar(0.0f);
+                            oCurrGlobalWord.fLatestWeight = 0.0f;
+                            m_vpGlobalWordDict[nGlobalWordIdx] = &oCurrGlobalWord;
                         }
-                        float& fCurrGlobalWordLocalWeight = *(float*)(m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
+                        float& fCurrGlobalWordLocalWeight = *(float*)(m_vpGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
                         if(fCurrGlobalWordLocalWeight<fRefBestLocalWordWeight) {
-                            m_apGlobalWordDict[nGlobalWordIdx]->fLatestWeight += fRefBestLocalWordWeight;
+                            m_vpGlobalWordDict[nGlobalWordIdx]->fLatestWeight += fRefBestLocalWordWeight;
                             fCurrGlobalWordLocalWeight += fRefBestLocalWordWeight;
                         }
                         oGlobalDictPresenceLookupMap.data[nPxIter] = UCHAR_MAX;
-                        while(nGlobalWordIdx>0 && (!m_apGlobalWordDict[nGlobalWordIdx-1] || m_apGlobalWordDict[nGlobalWordIdx]->fLatestWeight>m_apGlobalWordDict[nGlobalWordIdx-1]->fLatestWeight)) {
-                            std::swap(m_apGlobalWordDict[nGlobalWordIdx],m_apGlobalWordDict[nGlobalWordIdx-1]);
+                        while(nGlobalWordIdx>0 && (!m_vpGlobalWordDict[nGlobalWordIdx-1] || m_vpGlobalWordDict[nGlobalWordIdx]->fLatestWeight>m_vpGlobalWordDict[nGlobalWordIdx-1]->fLatestWeight)) {
+                            std::swap(m_vpGlobalWordDict[nGlobalWordIdx],m_vpGlobalWordDict[nGlobalWordIdx-1]);
                             --nGlobalWordIdx;
                         }
                     }
@@ -400,23 +382,22 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
             nPxIterIncr = std::max(nPxIterIncr/3,(size_t)1);
         }
         for(size_t nGlobalWordIdx=0;nGlobalWordIdx<m_nCurrGlobalWords;++nGlobalWordIdx) {
-            GlobalWord_1ch* pCurrGlobalWord = (GlobalWord_1ch*)m_apGlobalWordDict[nGlobalWordIdx];
-            if(!pCurrGlobalWord) {
-                pCurrGlobalWord = m_pGlobalWordListIter_1ch++;
-                pCurrGlobalWord->oFeature.anColor[0] = 0;
-                pCurrGlobalWord->oFeature.anDesc[0] = 0;
-                pCurrGlobalWord->nDescBITS = 0;
-                pCurrGlobalWord->oSpatioOccMap.create(m_oDownSampledFrameSize_GlobalWordLookup,CV_32FC1);
-                pCurrGlobalWord->oSpatioOccMap = cv::Scalar(0.0f);
-                pCurrGlobalWord->fLatestWeight = 0.0f;
-                m_apGlobalWordDict[nGlobalWordIdx] = pCurrGlobalWord;
+            if(!(GlobalWord_1ch*)m_vpGlobalWordDict[nGlobalWordIdx]) {
+                GlobalWord_1ch& oCurrNewGlobalWord = *m_pGlobalWordListIter_1ch++;
+                oCurrNewGlobalWord.oFeature.anColor[0] = 0;
+                oCurrNewGlobalWord.oFeature.anDesc[0] = 0;
+                oCurrNewGlobalWord.nDescBITS = 0;
+                oCurrNewGlobalWord.oSpatioOccMap.create(m_oDownSampledFrameSize_GlobalWordLookup,CV_32FC1);
+                oCurrNewGlobalWord.oSpatioOccMap = cv::Scalar(0.0f);
+                oCurrNewGlobalWord.fLatestWeight = 0.0f;
+                m_vpGlobalWordDict[nGlobalWordIdx] = &oCurrNewGlobalWord;
             }
         }
-        CV_Assert((size_t)(m_pGlobalWordListIter_1ch-m_aGlobalWordList_1ch)==m_nCurrGlobalWords && m_aGlobalWordList_1ch==(m_pGlobalWordListIter_1ch-m_nCurrGlobalWords));
+        CV_Assert(m_voGlobalWordList_1ch.end()==m_pGlobalWordListIter_1ch);
     }
     else { //m_nImgChannels==3
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
-            const size_t nPxIter = m_aPxIdxLUT[nModelIter];
+            const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
             if(bForceFGUpdate || !m_oLastFGMask_dilated.data[nPxIter]) {
                 const size_t nLocalDictIdx = nModelIter*m_nCurrLocalWords;
                 const size_t nFloatIter = nPxIter*4;
@@ -427,7 +408,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                 // == refresh: local decr
                 if(fOccDecrFrac>0.0f) {
                     for(size_t nLocalWordIdx=0; nLocalWordIdx<m_nCurrLocalWords; ++nLocalWordIdx) {
-                        LocalWord_3ch* pCurrLocalWord = (LocalWord_3ch*)m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx];
+                        LocalWord_3ch* pCurrLocalWord = (LocalWord_3ch*)m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx];
                         if(pCurrLocalWord)
                             pCurrLocalWord->nOccurrences -= (size_t)(fOccDecrFrac*pCurrLocalWord->nOccurrences);
                     }
@@ -437,7 +418,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                 for(size_t nLocalSamplingIter=0; nLocalSamplingIter<nTotLocalSamplingIterCount; ++nLocalSamplingIter) {
                     // == refresh: local resampling
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                     if(bForceFGUpdate || !m_oLastFGMask_dilated.data[nSamplePxIdx]) {
                         const size_t nSamplePxRGBIdx = nSamplePxIdx*3;
@@ -447,10 +428,10 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                         bool bFoundUninitd = false;
                         size_t nLocalWordIdx;
                         for(nLocalWordIdx=0; nLocalWordIdx<m_nCurrLocalWords; ++nLocalWordIdx) {
-                            LocalWord_3ch* pCurrLocalWord = (LocalWord_3ch*)m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx];
+                            LocalWord_3ch* pCurrLocalWord = (LocalWord_3ch*)m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx];
                             if(pCurrLocalWord
-                                    && cmixdist<3>(anSampleColor,pCurrLocalWord->oFeature.anColor)<=nCurrTotColorDistThreshold
-                                    && hdist<3>(anSampleIntraDesc,pCurrLocalWord->oFeature.anDesc)<=nCurrTotDescDistThreshold) {
+                                    && cmixdist<3>(anSampleColor,pCurrLocalWord->oFeature.anColor.data())<=nCurrTotColorDistThreshold
+                                    && hdist<3>(anSampleIntraDesc,pCurrLocalWord->oFeature.anDesc.data())<=nCurrTotDescDistThreshold) {
                                 pCurrLocalWord->nOccurrences += nCurrWordOccIncr;
                                 pCurrLocalWord->nLastOcc = m_nFrameIdx;
                                 break;
@@ -460,95 +441,94 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                         }
                         if(nLocalWordIdx==m_nCurrLocalWords) {
                             nLocalWordIdx = m_nCurrLocalWords-1;
-                            LocalWord_3ch* pCurrLocalWord = bFoundUninitd?m_pLocalWordListIter_3ch++:(LocalWord_3ch*)m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx];
+                            LocalWord_3ch& oCurrLocalWord = bFoundUninitd?*m_pLocalWordListIter_3ch++:*(LocalWord_3ch*)m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx];
                             for(size_t c=0; c<3; ++c) {
-                                pCurrLocalWord->oFeature.anColor[c] = anSampleColor[c];
-                                pCurrLocalWord->oFeature.anDesc[c] = anSampleIntraDesc[c];
+                                oCurrLocalWord.oFeature.anColor[c] = anSampleColor[c];
+                                oCurrLocalWord.oFeature.anDesc[c] = anSampleIntraDesc[c];
                             }
-                            pCurrLocalWord->nOccurrences = nBaseOccCount;
-                            pCurrLocalWord->nFirstOcc = m_nFrameIdx;
-                            pCurrLocalWord->nLastOcc = m_nFrameIdx;
-                            m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx] = pCurrLocalWord;
+                            oCurrLocalWord.nOccurrences = nBaseOccCount;
+                            oCurrLocalWord.nFirstOcc = m_nFrameIdx;
+                            oCurrLocalWord.nLastOcc = m_nFrameIdx;
+                            m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx] = &oCurrLocalWord;
                         }
-                        while(nLocalWordIdx>0 && (!m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx-1] || GetLocalWordWeight(m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_nFrameIdx,m_nLocalWordWeightOffset)>GetLocalWordWeight(m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx-1],m_nFrameIdx,m_nLocalWordWeightOffset))) {
-                            std::swap(m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx-1]);
+                        while(nLocalWordIdx>0 && (!m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx-1] || GetLocalWordWeight(*m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_nFrameIdx,m_nLocalWordWeightOffset)>GetLocalWordWeight(*m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx-1],m_nFrameIdx,m_nLocalWordWeightOffset))) {
+                            std::swap(m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx-1]);
                             --nLocalWordIdx;
                         }
                     }
                 }
-                CV_Assert(m_apLocalWordDict[nLocalDictIdx]);
+                CV_Assert(m_vpLocalWordDict[nLocalDictIdx]);
                 for(size_t nLocalWordIdx=1; nLocalWordIdx<m_nCurrLocalWords; ++nLocalWordIdx) {
                     // == refresh: local random resampling
-                    LocalWord_3ch* pCurrLocalWord = (LocalWord_3ch*)m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx];
-                    if(!pCurrLocalWord) {
+                    if(!(LocalWord_3ch*)m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx]) {
                         const size_t nRandLocalWordIdx = (rand()%nLocalWordIdx);
-                        const LocalWord_3ch* pRefLocalWord = (LocalWord_3ch*)m_apLocalWordDict[nLocalDictIdx+nRandLocalWordIdx];
+                        const LocalWord_3ch& oRefLocalWord = *(LocalWord_3ch*)m_vpLocalWordDict[nLocalDictIdx+nRandLocalWordIdx];
                         const int nRandColorOffset = (rand()%(nCurrTotColorDistThreshold/3+1))-(int)(nCurrTotColorDistThreshold/6);
-                        pCurrLocalWord = m_pLocalWordListIter_3ch++;
+                        LocalWord_3ch& oCurrNewLocalWord = *m_pLocalWordListIter_3ch++;
                         for(size_t c=0; c<3; ++c) {
-                            pCurrLocalWord->oFeature.anColor[c] = cv::saturate_cast<uchar>((int)pRefLocalWord->oFeature.anColor[c]+nRandColorOffset);
-                            pCurrLocalWord->oFeature.anDesc[c] = pRefLocalWord->oFeature.anDesc[c];
+                            oCurrNewLocalWord.oFeature.anColor[c] = cv::saturate_cast<uchar>((int)oRefLocalWord.oFeature.anColor[c]+nRandColorOffset);
+                            oCurrNewLocalWord.oFeature.anDesc[c] = oRefLocalWord.oFeature.anDesc[c];
                         }
-                        pCurrLocalWord->nOccurrences = std::max((size_t)(pRefLocalWord->nOccurrences*((float)(m_nCurrLocalWords-nLocalWordIdx)/m_nCurrLocalWords)),(size_t)1);
-                        pCurrLocalWord->nFirstOcc = m_nFrameIdx;
-                        pCurrLocalWord->nLastOcc = m_nFrameIdx;
-                        m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx] = pCurrLocalWord;
+                        oCurrNewLocalWord.nOccurrences = std::max((size_t)(oRefLocalWord.nOccurrences*((float)(m_nCurrLocalWords-nLocalWordIdx)/m_nCurrLocalWords)),(size_t)1);
+                        oCurrNewLocalWord.nFirstOcc = m_nFrameIdx;
+                        oCurrNewLocalWord.nLastOcc = m_nFrameIdx;
+                        m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx] = &oCurrNewLocalWord;
                     }
                 }
             }
         }
-        CV_Assert(m_aLocalWordList_3ch==(m_pLocalWordListIter_3ch-m_nTotRelevantPxCount*m_nCurrLocalWords));
+        CV_Assert(m_voLocalWordList_3ch.end()==m_pLocalWordListIter_3ch);
         cv::Mat oGlobalDictPresenceLookupMap(m_oImgSize,CV_8UC1,cv::Scalar_<uchar>(0));
         size_t nPxIterIncr = std::max(m_nTotPxCount/m_nCurrGlobalWords,(size_t)1);
         for(size_t nSamplingPasses=0; nSamplingPasses<GWORD_DEFAULT_NB_INIT_SAMPL_PASSES; ++nSamplingPasses) {
             for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
                 // == refresh: global resampling
-                const size_t nPxIter = m_aPxIdxLUT[nModelIter];
+                const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
                 if((nPxIter%nPxIterIncr)==0) { // <=(m_nCurrGlobalWords) gwords from (m_nCurrGlobalWords) equally spaced pixels
                     if(bForceFGUpdate || !m_oLastFGMask_dilated.data[nPxIter]) {
                         const size_t nLocalDictIdx = nModelIter*m_nCurrLocalWords;
-                        const size_t nGlobalWordMapLookupIdx = m_aPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx;
+                        const size_t nGlobalWordMapLookupIdx = m_voPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx;
                         const size_t nFloatIter = nPxIter*4;
                         uchar& bCurrRegionIsUnstable = m_oUnstableRegionMask.data[nPxIter];
                         const float fCurrDistThresholdFactor = *(float*)(m_oDistThresholdFrame.data+nFloatIter);
                         const size_t nCurrTotColorDistThreshold = (size_t)(sqrt(fCurrDistThresholdFactor)*m_nMinColorDistThreshold)*3;
                         const size_t nCurrTotDescDistThreshold = (((size_t)1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThresholdOffset+(bCurrRegionIsUnstable*UNSTAB_DESC_DIST_OFFSET))*3;
-                        CV_Assert(m_apLocalWordDict[nLocalDictIdx]);
-                        const LocalWord_3ch* pRefBestLocalWord = (LocalWord_3ch*)m_apLocalWordDict[nLocalDictIdx];
-                        const float fRefBestLocalWordWeight = GetLocalWordWeight(pRefBestLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
-                        const uchar nRefBestLocalWordDescBITS = (uchar)popcount<3>(pRefBestLocalWord->oFeature.anDesc);
+                        CV_Assert(m_vpLocalWordDict[nLocalDictIdx]);
+                        const LocalWord_3ch& oRefBestLocalWord = *(LocalWord_3ch*)m_vpLocalWordDict[nLocalDictIdx];
+                        const float fRefBestLocalWordWeight = GetLocalWordWeight(oRefBestLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
+                        const uchar nRefBestLocalWordDescBITS = (uchar)popcount<3>(oRefBestLocalWord.oFeature.anDesc.data());
                         bool bFoundUninitd = false;
                         size_t nGlobalWordIdx;
                         for(nGlobalWordIdx=0; nGlobalWordIdx<m_nCurrGlobalWords; ++nGlobalWordIdx) {
-                            GlobalWord_3ch* pCurrGlobalWord = (GlobalWord_3ch*)m_apGlobalWordDict[nGlobalWordIdx];
+                            GlobalWord_3ch* pCurrGlobalWord = (GlobalWord_3ch*)m_vpGlobalWordDict[nGlobalWordIdx];
                             if(pCurrGlobalWord
                                     && L1dist(nRefBestLocalWordDescBITS,pCurrGlobalWord->nDescBITS)<=nCurrTotDescDistThreshold/GWORD_DESC_THRES_BITS_MATCH_FACTOR
-                                    && cmixdist<3>(pRefBestLocalWord->oFeature.anColor,pCurrGlobalWord->oFeature.anColor)<=nCurrTotColorDistThreshold)
+                                    && cmixdist<3>(oRefBestLocalWord.oFeature.anColor.data(),pCurrGlobalWord->oFeature.anColor.data())<=nCurrTotColorDistThreshold)
                                 break;
                             else if(!pCurrGlobalWord)
                                 bFoundUninitd = true;
                         }
                         if(nGlobalWordIdx==m_nCurrGlobalWords) {
                             nGlobalWordIdx = m_nCurrGlobalWords-1;
-                            GlobalWord_3ch* pCurrGlobalWord = bFoundUninitd?m_pGlobalWordListIter_3ch++:(GlobalWord_3ch*)m_apGlobalWordDict[nGlobalWordIdx];
+                            GlobalWord_3ch& oCurrGlobalWord = bFoundUninitd?*m_pGlobalWordListIter_3ch++:*(GlobalWord_3ch*)m_vpGlobalWordDict[nGlobalWordIdx];
                             for(size_t c=0; c<3; ++c) {
-                                pCurrGlobalWord->oFeature.anColor[c] = pRefBestLocalWord->oFeature.anColor[c];
-                                pCurrGlobalWord->oFeature.anDesc[c] = pRefBestLocalWord->oFeature.anDesc[c];
+                                oCurrGlobalWord.oFeature.anColor[c] = oRefBestLocalWord.oFeature.anColor[c];
+                                oCurrGlobalWord.oFeature.anDesc[c] = oRefBestLocalWord.oFeature.anDesc[c];
                             }
-                            pCurrGlobalWord->nDescBITS = nRefBestLocalWordDescBITS;
-                            pCurrGlobalWord->oSpatioOccMap.create(m_oDownSampledFrameSize_GlobalWordLookup,CV_32FC1);
-                            pCurrGlobalWord->oSpatioOccMap = cv::Scalar(0.0f);
-                            pCurrGlobalWord->fLatestWeight = 0.0f;
-                            m_apGlobalWordDict[nGlobalWordIdx] = pCurrGlobalWord;
+                            oCurrGlobalWord.nDescBITS = nRefBestLocalWordDescBITS;
+                            oCurrGlobalWord.oSpatioOccMap.create(m_oDownSampledFrameSize_GlobalWordLookup,CV_32FC1);
+                            oCurrGlobalWord.oSpatioOccMap = cv::Scalar(0.0f);
+                            oCurrGlobalWord.fLatestWeight = 0.0f;
+                            m_vpGlobalWordDict[nGlobalWordIdx] = &oCurrGlobalWord;
                         }
-                        float& fCurrGlobalWordLocalWeight = *(float*)(m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
+                        float& fCurrGlobalWordLocalWeight = *(float*)(m_vpGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
                         if(fCurrGlobalWordLocalWeight<fRefBestLocalWordWeight) {
-                            m_apGlobalWordDict[nGlobalWordIdx]->fLatestWeight += fRefBestLocalWordWeight;
+                            m_vpGlobalWordDict[nGlobalWordIdx]->fLatestWeight += fRefBestLocalWordWeight;
                             fCurrGlobalWordLocalWeight += fRefBestLocalWordWeight;
                         }
                         oGlobalDictPresenceLookupMap.data[nPxIter] = UCHAR_MAX;
-                        while(nGlobalWordIdx>0 && (!m_apGlobalWordDict[nGlobalWordIdx-1] || m_apGlobalWordDict[nGlobalWordIdx]->fLatestWeight>m_apGlobalWordDict[nGlobalWordIdx-1]->fLatestWeight)) {
-                            std::swap(m_apGlobalWordDict[nGlobalWordIdx],m_apGlobalWordDict[nGlobalWordIdx-1]);
+                        while(nGlobalWordIdx>0 && (!m_vpGlobalWordDict[nGlobalWordIdx-1] || m_vpGlobalWordDict[nGlobalWordIdx]->fLatestWeight>m_vpGlobalWordDict[nGlobalWordIdx-1]->fLatestWeight)) {
+                            std::swap(m_vpGlobalWordDict[nGlobalWordIdx],m_vpGlobalWordDict[nGlobalWordIdx-1]);
                             --nGlobalWordIdx;
                         }
                     }
@@ -557,31 +537,30 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
             nPxIterIncr = std::max(nPxIterIncr/3,(size_t)1);
         }
         for(size_t nGlobalWordIdx=0;nGlobalWordIdx<m_nCurrGlobalWords;++nGlobalWordIdx) {
-            GlobalWord_3ch* pCurrGlobalWord = (GlobalWord_3ch*)m_apGlobalWordDict[nGlobalWordIdx];
-            if(!pCurrGlobalWord) {
-                pCurrGlobalWord = m_pGlobalWordListIter_3ch++;
+            if(!(GlobalWord_3ch*)m_vpGlobalWordDict[nGlobalWordIdx]) {
+                GlobalWord_3ch& oCurrNewGlobalWord = *m_pGlobalWordListIter_3ch++;
                 for(size_t c=0; c<3; ++c) {
-                    pCurrGlobalWord->oFeature.anColor[c] = 0;
-                    pCurrGlobalWord->oFeature.anDesc[c] = 0;
+                    oCurrNewGlobalWord.oFeature.anColor[c] = 0;
+                    oCurrNewGlobalWord.oFeature.anDesc[c] = 0;
                 }
-                pCurrGlobalWord->nDescBITS = 0;
-                pCurrGlobalWord->oSpatioOccMap.create(m_oDownSampledFrameSize_GlobalWordLookup,CV_32FC1);
-                pCurrGlobalWord->oSpatioOccMap = cv::Scalar(0.0f);
-                pCurrGlobalWord->fLatestWeight = 0.0f;
-                m_apGlobalWordDict[nGlobalWordIdx] = pCurrGlobalWord;
+                oCurrNewGlobalWord.nDescBITS = 0;
+                oCurrNewGlobalWord.oSpatioOccMap.create(m_oDownSampledFrameSize_GlobalWordLookup,CV_32FC1);
+                oCurrNewGlobalWord.oSpatioOccMap = cv::Scalar(0.0f);
+                oCurrNewGlobalWord.fLatestWeight = 0.0f;
+                m_vpGlobalWordDict[nGlobalWordIdx] = &oCurrNewGlobalWord;
             }
         }
-        CV_Assert((size_t)(m_pGlobalWordListIter_3ch-m_aGlobalWordList_3ch)==m_nCurrGlobalWords && m_aGlobalWordList_3ch==(m_pGlobalWordListIter_3ch-m_nCurrGlobalWords));
+        CV_Assert(m_voGlobalWordList_3ch.end()==m_pGlobalWordListIter_3ch);
     }
     for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
         // == refresh: per-px global word sort
-        const size_t nPxIter = m_aPxIdxLUT[nModelIter];
-        const size_t nGlobalWordMapLookupIdx = m_aPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx;
-        float fLastGlobalWordLocalWeight = *(float*)(m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT[0]->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
+        const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
+        const size_t nGlobalWordMapLookupIdx = m_voPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx;
+        float fLastGlobalWordLocalWeight = *(float*)(m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[0]->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
         for(size_t nGlobalWordLUTIdx=1; nGlobalWordLUTIdx<m_nCurrGlobalWords; ++nGlobalWordLUTIdx) {
-            const float fCurrGlobalWordLocalWeight = *(float*)(m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT[nGlobalWordLUTIdx]->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
+            const float fCurrGlobalWordLocalWeight = *(float*)(m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordLUTIdx]->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
             if(fCurrGlobalWordLocalWeight>fLastGlobalWordLocalWeight)
-                std::swap(m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT[nGlobalWordLUTIdx],m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT[nGlobalWordLUTIdx-1]);
+                std::swap(m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordLUTIdx],m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordLUTIdx-1]);
             else
                 fLastGlobalWordLocalWeight = fCurrGlobalWordLocalWeight;
         }
@@ -641,11 +620,11 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
             fInterKPsTimeSum_MS += (float)(std::chrono::duration_cast<std::chrono::nanoseconds>(pre_currKP-post_lastKP).count())/1000000;
             std::chrono::high_resolution_clock::time_point pre_prep = std::chrono::high_resolution_clock::now();
 #endif //USE_INTERNAL_HRCS
-            const size_t nPxIter = m_aPxIdxLUT[nModelIter];
+            const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
             const size_t nDescIter = nPxIter*2;
             const size_t nFloatIter = nPxIter*4;
             const size_t nLocalDictIdx = nModelIter*m_nCurrLocalWords;
-            const size_t nGlobalWordMapLookupIdx = m_aPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx;
+            const size_t nGlobalWordMapLookupIdx = m_voPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx;
             const uchar nCurrColor = oInputImg.data[nPxIter];
             uchar& nLastColor = m_oLastColorFrame.data[nPxIter];
             ushort& nLastIntraDesc = *((ushort*)(m_oLastDescFrame.data+nDescIter));
@@ -662,17 +641,17 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
             float& fCurrMeanMinDist_LT = *(float*)(m_oMeanMinDistFrame_LT.data+nFloatIter);
             float& fCurrMeanMinDist_ST = *(float*)(m_oMeanMinDistFrame_ST.data+nFloatIter);
 #endif //USE_FEEDBACK_ADJUSTMENTS
-            const float fBestLocalWordWeight = GetLocalWordWeight(m_apLocalWordDict[nLocalDictIdx],m_nFrameIdx,m_nLocalWordWeightOffset);
+            const float fBestLocalWordWeight = GetLocalWordWeight(*m_vpLocalWordDict[nLocalDictIdx],m_nFrameIdx,m_nLocalWordWeightOffset);
             const float fLocalWordsWeightSumThreshold = fBestLocalWordWeight/(fCurrDistThresholdFactor*2);
             uchar& bCurrRegionIsUnstable = m_oUnstableRegionMask.data[nPxIter];
             uchar& nCurrRegionIllumUpdtVal = m_oIllumUpdtRegionMask.data[nPxIter];
             uchar& nCurrRegionSegmVal = oCurrFGMask.data[nPxIter];
             const bool bCurrRegionIsROIBorder = m_oROI.data[nPxIter]<UCHAR_MAX;
 #if DISPLAY_PAWCS_DEBUG_INFO
-            oDBGWeightThresholds.at<float>(m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X) = fLocalWordsWeightSumThreshold;
+            oDBGWeightThresholds.at<float>(m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X) = fLocalWordsWeightSumThreshold;
 #endif //DISPLAY_PAWCS_DEBUG_INFO
-            const int nCurrImgCoord_X = m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X;
-            const int nCurrImgCoord_Y = m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y;
+            const int nCurrImgCoord_X = m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X;
+            const int nCurrImgCoord_Y = m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y;
             ushort nCurrInterDesc, nCurrIntraDesc;
             LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColor,nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[nCurrColor],nCurrIntraDesc);
             const uchar nCurrIntraDescBITS = (uchar)popcount(nCurrIntraDesc);
@@ -695,13 +674,13 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
             fPrepTimeSum_MS += (float)(std::chrono::duration_cast<std::chrono::nanoseconds>(post_prep-pre_prep).count())/1000000;
 #endif //USE_INTERNAL_HRCS
             while(nLocalWordIdx<m_nCurrLocalWords && fPotentialLocalWordsWeightSum<fLocalWordsWeightSumThreshold) {
-                LocalWord_1ch* pCurrLocalWord = (LocalWord_1ch*)m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx];
-                const float fCurrLocalWordWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
+                LocalWord_1ch& oCurrLocalWord = (LocalWord_1ch&)*m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx];
+                const float fCurrLocalWordWeight = GetLocalWordWeight(oCurrLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
                 {
-                    const size_t nColorDist = L1dist(nCurrColor,pCurrLocalWord->oFeature.anColor[0]);
-                    const size_t nIntraDescDist = hdist(nCurrIntraDesc,pCurrLocalWord->oFeature.anDesc[0]);
-                    LBSP::computeGrayscaleDescriptor(oInputImg,pCurrLocalWord->oFeature.anColor[0],nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[pCurrLocalWord->oFeature.anColor[0]],nCurrInterDesc);
-                    const size_t nInterDescDist = hdist(nCurrInterDesc,pCurrLocalWord->oFeature.anDesc[0]);
+                    const size_t nColorDist = L1dist(nCurrColor,oCurrLocalWord.oFeature.anColor[0]);
+                    const size_t nIntraDescDist = hdist(nCurrIntraDesc,oCurrLocalWord.oFeature.anDesc[0]);
+                    LBSP::computeGrayscaleDescriptor(oInputImg,oCurrLocalWord.oFeature.anColor[0],nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[oCurrLocalWord.oFeature.anColor[0]],nCurrInterDesc);
+                    const size_t nInterDescDist = hdist(nCurrInterDesc,oCurrLocalWord.oFeature.anDesc[0]);
                     const size_t nDescDist = (nIntraDescDist+nInterDescDist)/2;
                     if( (!bCurrRegionIsUnstable || bCurrRegionIsFlat || bCurrRegionIsROIBorder)
                             && nColorDist<=nCurrColorDistThreshold
@@ -709,8 +688,8 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                             && nIntraDescDist<=nCurrDescDistThreshold/2
                             && (rand()%(nCurrRegionIllumUpdtVal?(nCurrLocalWordUpdateRate/2+1):nCurrLocalWordUpdateRate))==0) {
                         // == illum updt
-                        pCurrLocalWord->oFeature.anColor[0] = nCurrColor;
-                        pCurrLocalWord->oFeature.anDesc[0] = nCurrIntraDesc;
+                        oCurrLocalWord.oFeature.anColor[0] = nCurrColor;
+                        oCurrLocalWord.oFeature.anDesc[0] = nCurrIntraDesc;
                         m_oIllumUpdtRegionMask.data[nPxIter-1] = 1&m_oROI.data[nPxIter-1];
                         m_oIllumUpdtRegionMask.data[nPxIter+1] = 1&m_oROI.data[nPxIter+1];
                         m_oIllumUpdtRegionMask.data[nPxIter] = 2;
@@ -720,9 +699,9 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                     }
                     if(nDescDist<=nCurrDescDistThreshold && nColorDist<=nCurrColorDistThreshold) {
                         fPotentialLocalWordsWeightSum += fCurrLocalWordWeight;
-                        pCurrLocalWord->nLastOcc = m_nFrameIdx;
+                        oCurrLocalWord.nLastOcc = m_nFrameIdx;
                         if((!m_oLastFGMask.data[nPxIter] || m_bUsingMovingCamera) && fCurrLocalWordWeight<DEFAULT_LWORD_MAX_WEIGHT)
-                            pCurrLocalWord->nOccurrences += nCurrWordOccIncr;
+                            oCurrLocalWord.nOccurrences += nCurrWordOccIncr;
                         nMinColorDist = std::min(nMinColorDist,nColorDist);
                         nMinDescDist = std::min(nMinDescDist,nDescDist);
 #if DISPLAY_PAWCS_DEBUG_INFO
@@ -731,7 +710,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                     }
                 }
                 if(fCurrLocalWordWeight>fLastLocalWordWeight) {
-                    std::swap(m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx-1]);
+                    std::swap(m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx-1]);
 #if DISPLAY_PAWCS_DEBUG_INFO
                     std::swap(vsWordModList[nLocalDictIdx+nLocalWordIdx],vsWordModList[nLocalDictIdx+nLocalWordIdx-1]);
 #endif //DISPLAY_PAWCS_DEBUG_INFO
@@ -741,9 +720,9 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                 ++nLocalWordIdx;
             }
             while(nLocalWordIdx<m_nCurrLocalWords) {
-                const float fCurrLocalWordWeight = GetLocalWordWeight(m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_nFrameIdx,m_nLocalWordWeightOffset);
+                const float fCurrLocalWordWeight = GetLocalWordWeight(*m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_nFrameIdx,m_nLocalWordWeightOffset);
                 if(fCurrLocalWordWeight>fLastLocalWordWeight) {
-                    std::swap(m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx-1]);
+                    std::swap(m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx-1]);
 #if DISPLAY_PAWCS_DEBUG_INFO
                     std::swap(vsWordModList[nLocalDictIdx+nLocalWordIdx],vsWordModList[nLocalDictIdx+nLocalWordIdx-1]);
 #endif //DISPLAY_PAWCS_DEBUG_INFO
@@ -769,14 +748,14 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                     size_t nGlobalWordLUTIdx;
                     GlobalWord_1ch* pCurrGlobalWord = nullptr;
                     for(nGlobalWordLUTIdx=0; nGlobalWordLUTIdx<m_nCurrGlobalWords; ++nGlobalWordLUTIdx) {
-                        pCurrGlobalWord = (GlobalWord_1ch*)m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT[nGlobalWordLUTIdx];
+                        pCurrGlobalWord = (GlobalWord_1ch*)m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordLUTIdx];
                         if(L1dist(pCurrGlobalWord->oFeature.anColor[0],nCurrColor)<=nCurrColorDistThreshold
                                 && L1dist(nCurrIntraDescBITS,pCurrGlobalWord->nDescBITS)<=nCurrDescDistThreshold/GWORD_DESC_THRES_BITS_MATCH_FACTOR)
                             break;
                     }
                     if(nGlobalWordLUTIdx!=m_nCurrGlobalWords || (rand()%(nCurrLocalWordUpdateRate*2))==0) {
                         if(nGlobalWordLUTIdx==m_nCurrGlobalWords) {
-                            pCurrGlobalWord = (GlobalWord_1ch*)m_apGlobalWordDict[m_nCurrGlobalWords-1];
+                            pCurrGlobalWord = (GlobalWord_1ch*)m_vpGlobalWordDict[m_nCurrGlobalWords-1];
                             pCurrGlobalWord->oFeature.anColor[0] = nCurrColor;
                             pCurrGlobalWord->oFeature.anDesc[0] = nCurrIntraDesc;
                             pCurrGlobalWord->nDescBITS = nCurrIntraDescBITS;
@@ -804,7 +783,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                     size_t nGlobalWordLUTIdx;
                     GlobalWord_1ch* pCurrGlobalWord;
                     for(nGlobalWordLUTIdx=0; nGlobalWordLUTIdx<m_nCurrGlobalWords; ++nGlobalWordLUTIdx) {
-                        pCurrGlobalWord = (GlobalWord_1ch*)m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT[nGlobalWordLUTIdx];
+                        pCurrGlobalWord = (GlobalWord_1ch*)m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordLUTIdx];
                         if(L1dist(pCurrGlobalWord->oFeature.anColor[0],nCurrColor)<=nCurrColorDistThreshold
                                 && L1dist(nCurrIntraDescBITS,pCurrGlobalWord->nDescBITS)<=nCurrDescDistThreshold/GWORD_DESC_THRES_BITS_MATCH_FACTOR)
                             break;
@@ -817,7 +796,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                             nCurrRegionSegmVal = UCHAR_MAX;
                     }
 #if DISPLAY_PAWCS_DEBUG_INFO
-                    if(!nCurrRegionSegmVal && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==m_nDebugCoordY && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==m_nDebugCoordX) {
+                    if(!nCurrRegionSegmVal && m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==m_nDebugCoordY && m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==m_nDebugCoordX) {
                         bDBGMaskModifiedByGDict = true;
                         pDBGGlobalWordModifier = pCurrGlobalWord;
                         fDBGGlobalWordModifierLocalWeight = *(float*)(pCurrGlobalWord->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
@@ -828,12 +807,12 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                     nCurrRegionSegmVal = UCHAR_MAX;
                 if(fPotentialLocalWordsWeightSum<DEFAULT_LWORD_INIT_WEIGHT) {
                     const size_t nNewLocalWordIdx = m_nCurrLocalWords-1;
-                    LocalWord_1ch* pNewLocalWord = (LocalWord_1ch*)m_apLocalWordDict[nLocalDictIdx+nNewLocalWordIdx];
-                    pNewLocalWord->oFeature.anColor[0] = nCurrColor;
-                    pNewLocalWord->oFeature.anDesc[0] = nCurrIntraDesc;
-                    pNewLocalWord->nOccurrences = nCurrWordOccIncr;
-                    pNewLocalWord->nFirstOcc = m_nFrameIdx;
-                    pNewLocalWord->nLastOcc = m_nFrameIdx;
+                    LocalWord_1ch& oNewLocalWord = (LocalWord_1ch&)*m_vpLocalWordDict[nLocalDictIdx+nNewLocalWordIdx];
+                    oNewLocalWord.oFeature.anColor[0] = nCurrColor;
+                    oNewLocalWord.oFeature.anDesc[0] = nCurrIntraDesc;
+                    oNewLocalWord.nOccurrences = nCurrWordOccIncr;
+                    oNewLocalWord.nFirstOcc = m_nFrameIdx;
+                    oNewLocalWord.nLastOcc = m_nFrameIdx;
 #if DISPLAY_PAWCS_DEBUG_INFO
                     vsWordModList[nLocalDictIdx+nNewLocalWordIdx] += "NEW ";
 #endif //DISPLAY_PAWCS_DEBUG_INFO
@@ -856,21 +835,21 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                     getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                 if(m_oROI.data[nSamplePxIdx]) {
-                    const size_t nNeighborLocalDictIdx = m_aPxInfoLUT_PAWCS[nSamplePxIdx].nModelIdx*m_nCurrLocalWords;
+                    const size_t nNeighborLocalDictIdx = m_voPxInfoLUT_PAWCS[nSamplePxIdx].nModelIdx*m_nCurrLocalWords;
                     size_t nNeighborLocalWordIdx = 0;
                     float fNeighborPotentialLocalWordsWeightSum = 0.0f;
                     while(nNeighborLocalWordIdx<m_nCurrLocalWords && fNeighborPotentialLocalWordsWeightSum<fLocalWordsWeightSumThreshold) {
-                        LocalWord_1ch* pNeighborLocalWord = (LocalWord_1ch*)m_apLocalWordDict[nNeighborLocalDictIdx+nNeighborLocalWordIdx];
-                        const size_t nNeighborColorDist = L1dist(nCurrColor,pNeighborLocalWord->oFeature.anColor[0]);
-                        const size_t nNeighborIntraDescDist = hdist(nCurrIntraDesc,pNeighborLocalWord->oFeature.anDesc[0]);
-                        const bool bNeighborRegionIsFlat = popcount(pNeighborLocalWord->oFeature.anDesc[0])<FLAT_REGION_BIT_COUNT;
+                        LocalWord_1ch oNeighborLocalWord = (LocalWord_1ch&)*m_vpLocalWordDict[nNeighborLocalDictIdx+nNeighborLocalWordIdx];
+                        const size_t nNeighborColorDist = L1dist(nCurrColor,oNeighborLocalWord.oFeature.anColor[0]);
+                        const size_t nNeighborIntraDescDist = hdist(nCurrIntraDesc,oNeighborLocalWord.oFeature.anDesc[0]);
+                        const bool bNeighborRegionIsFlat = popcount(oNeighborLocalWord.oFeature.anDesc[0])<FLAT_REGION_BIT_COUNT;
                         const size_t nNeighborWordOccIncr = bNeighborRegionIsFlat?nCurrWordOccIncr*2:nCurrWordOccIncr;
                         if(nNeighborColorDist<=nCurrColorDistThreshold && nNeighborIntraDescDist<=nCurrDescDistThreshold) {
-                            const float fNeighborLocalWordWeight = GetLocalWordWeight(pNeighborLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
+                            const float fNeighborLocalWordWeight = GetLocalWordWeight(oNeighborLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
                             fNeighborPotentialLocalWordsWeightSum += fNeighborLocalWordWeight;
-                            pNeighborLocalWord->nLastOcc = m_nFrameIdx;
+                            oNeighborLocalWord.nLastOcc = m_nFrameIdx;
                             if(fNeighborLocalWordWeight<DEFAULT_LWORD_MAX_WEIGHT)
-                                pNeighborLocalWord->nOccurrences += nNeighborWordOccIncr;
+                                oNeighborLocalWord.nOccurrences += nNeighborWordOccIncr;
 #if DISPLAY_PAWCS_DEBUG_INFO
                             vsWordModList[nNeighborLocalDictIdx+nNeighborLocalWordIdx] += "MATCHED(NEIGHBOR) ";
 #endif //DISPLAY_PAWCS_DEBUG_INFO
@@ -880,12 +859,12 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                             ushort& nNeighborLastIntraDesc = *((ushort*)(m_oLastDescFrame.data+nSampleDescIdx));
                             const size_t nNeighborLastIntraDescDist = hdist(nCurrIntraDesc,nNeighborLastIntraDesc);
                             if(nNeighborColorDist<=nCurrColorDistThreshold && nNeighborLastIntraDescDist<=nCurrDescDistThreshold/2) {
-                                const float fNeighborLocalWordWeight = GetLocalWordWeight(pNeighborLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
+                                const float fNeighborLocalWordWeight = GetLocalWordWeight(oNeighborLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
                                 fNeighborPotentialLocalWordsWeightSum += fNeighborLocalWordWeight;
-                                pNeighborLocalWord->nLastOcc = m_nFrameIdx;
+                                oNeighborLocalWord.nLastOcc = m_nFrameIdx;
                                 if(fNeighborLocalWordWeight<DEFAULT_LWORD_MAX_WEIGHT)
-                                    pNeighborLocalWord->nOccurrences += nNeighborWordOccIncr;
-                                pNeighborLocalWord->oFeature.anDesc[0] = nCurrIntraDesc;
+                                    oNeighborLocalWord.nOccurrences += nNeighborWordOccIncr;
+                                oNeighborLocalWord.oFeature.anDesc[0] = nCurrIntraDesc;
 #if DISPLAY_PAWCS_DEBUG_INFO
                                 vsWordModList[nNeighborLocalDictIdx+nNeighborLocalWordIdx] += "UPDATED1(NEIGHBOR) ";
 #endif //DISPLAY_PAWCS_DEBUG_INFO
@@ -895,12 +874,12 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                     }
                     if(fNeighborPotentialLocalWordsWeightSum<DEFAULT_LWORD_INIT_WEIGHT) {
                         nNeighborLocalWordIdx = m_nCurrLocalWords-1;
-                        LocalWord_1ch* pNeighborLocalWord = (LocalWord_1ch*)m_apLocalWordDict[nNeighborLocalDictIdx+nNeighborLocalWordIdx];
-                        pNeighborLocalWord->oFeature.anColor[0] = nCurrColor;
-                        pNeighborLocalWord->oFeature.anDesc[0] = nCurrIntraDesc;
-                        pNeighborLocalWord->nOccurrences = nCurrWordOccIncr;
-                        pNeighborLocalWord->nFirstOcc = m_nFrameIdx;
-                        pNeighborLocalWord->nLastOcc = m_nFrameIdx;
+                        LocalWord_1ch& oNeighborLocalWord = (LocalWord_1ch&)*m_vpLocalWordDict[nNeighborLocalDictIdx+nNeighborLocalWordIdx];
+                        oNeighborLocalWord.oFeature.anColor[0] = nCurrColor;
+                        oNeighborLocalWord.oFeature.anDesc[0] = nCurrIntraDesc;
+                        oNeighborLocalWord.nOccurrences = nCurrWordOccIncr;
+                        oNeighborLocalWord.nFirstOcc = m_nFrameIdx;
+                        oNeighborLocalWord.nLastOcc = m_nFrameIdx;
 #if DISPLAY_PAWCS_DEBUG_INFO
                         vsWordModList[nNeighborLocalDictIdx+nNeighborLocalWordIdx] += "NEW(NEIGHBOR) ";
 #endif //DISPLAY_PAWCS_DEBUG_INFO
@@ -938,7 +917,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
             fIntraKPsTimeSum_MS += (float)(std::chrono::duration_cast<std::chrono::nanoseconds>(post_lastKP-pre_currKP).count())/1000000;
 #endif //USE_INTERNAL_HRCS
 #if DISPLAY_PAWCS_DEBUG_INFO
-            if(m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==m_nDebugCoordY && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==m_nDebugCoordX) {
+            if(m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==m_nDebugCoordY && m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==m_nDebugCoordX) {
                 for(size_t c=0; c<3; ++c) {
                     anDBGColor[c] = nCurrColor;
                     anDBGIntraDesc[c] = nCurrIntraDesc;
@@ -967,12 +946,12 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
             fInterKPsTimeSum_MS += (float)(std::chrono::duration_cast<std::chrono::nanoseconds>(pre_currKP-post_lastKP).count())/1000000;
             std::chrono::high_resolution_clock::time_point pre_prep = std::chrono::high_resolution_clock::now();
 #endif //USE_INTERNAL_HRCS
-            const size_t nPxIter = m_aPxIdxLUT[nModelIter];
+            const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
             const size_t nPxRGBIter = nPxIter*3;
             const size_t nDescRGBIter = nPxRGBIter*2;
             const size_t nFloatIter = nPxIter*4;
             const size_t nLocalDictIdx = nModelIter*m_nCurrLocalWords;
-            const size_t nGlobalWordMapLookupIdx = m_aPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx;
+            const size_t nGlobalWordMapLookupIdx = m_voPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx;
             const uchar* const anCurrColor = oInputImg.data+nPxRGBIter;
             uchar* anLastColor = m_oLastColorFrame.data+nPxRGBIter;
             ushort* anLastIntraDesc = ((ushort*)(m_oLastDescFrame.data+nDescRGBIter));
@@ -989,17 +968,17 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
             float& fCurrMeanMinDist_LT = *(float*)(m_oMeanMinDistFrame_LT.data+nFloatIter);
             float& fCurrMeanMinDist_ST = *(float*)(m_oMeanMinDistFrame_ST.data+nFloatIter);
 #endif //USE_FEEDBACK_ADJUSTMENTS
-            const float fBestLocalWordWeight = GetLocalWordWeight(m_apLocalWordDict[nLocalDictIdx],m_nFrameIdx,m_nLocalWordWeightOffset);
+            const float fBestLocalWordWeight = GetLocalWordWeight(*m_vpLocalWordDict[nLocalDictIdx],m_nFrameIdx,m_nLocalWordWeightOffset);
             const float fLocalWordsWeightSumThreshold = fBestLocalWordWeight/(fCurrDistThresholdFactor*2);
             uchar& bCurrRegionIsUnstable = m_oUnstableRegionMask.data[nPxIter];
             uchar& nCurrRegionIllumUpdtVal = m_oIllumUpdtRegionMask.data[nPxIter];
             uchar& nCurrRegionSegmVal = oCurrFGMask.data[nPxIter];
             const bool bCurrRegionIsROIBorder = m_oROI.data[nPxIter]<UCHAR_MAX;
 #if DISPLAY_PAWCS_DEBUG_INFO
-            oDBGWeightThresholds.at<float>(m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X) = fLocalWordsWeightSumThreshold;
+            oDBGWeightThresholds.at<float>(m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X) = fLocalWordsWeightSumThreshold;
 #endif //DISPLAY_PAWCS_DEBUG_INFO
-            const int nCurrImgCoord_X = m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X;
-            const int nCurrImgCoord_Y = m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y;
+            const int nCurrImgCoord_X = m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X;
+            const int nCurrImgCoord_Y = m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y;
             ushort anCurrInterDesc[3], anCurrIntraDesc[3];
             const size_t anCurrIntraLBSPThresholds[3] = {m_anLBSPThreshold_8bitLUT[anCurrColor[0]],m_anLBSPThreshold_8bitLUT[anCurrColor[1]],m_anLBSPThreshold_8bitLUT[anCurrColor[2]]};
             LBSP::computeRGBDescriptor(oInputImg,anCurrColor,nCurrImgCoord_X,nCurrImgCoord_Y,anCurrIntraLBSPThresholds,anCurrIntraDesc);
@@ -1023,16 +1002,16 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
             fPrepTimeSum_MS += (float)(std::chrono::duration_cast<std::chrono::nanoseconds>(post_prep-pre_prep).count())/1000000;
 #endif //USE_INTERNAL_HRCS
             while(nLocalWordIdx<m_nCurrLocalWords && fPotentialLocalWordsWeightSum<fLocalWordsWeightSumThreshold) {
-                LocalWord_3ch* pCurrLocalWord = (LocalWord_3ch*)m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx];
-                const float fCurrLocalWordWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
+                LocalWord_3ch& oCurrLocalWord = (LocalWord_3ch&)*m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx];
+                const float fCurrLocalWordWeight = GetLocalWordWeight(oCurrLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
                 {
-                    const size_t nTotColorL1Dist = L1dist<3>(anCurrColor,pCurrLocalWord->oFeature.anColor);
-                    const size_t nColorDistortion = cdist<3>(anCurrColor,pCurrLocalWord->oFeature.anColor);
+                    const size_t nTotColorL1Dist = L1dist<3>(anCurrColor,oCurrLocalWord.oFeature.anColor.data());
+                    const size_t nColorDistortion = cdist<3>(anCurrColor,oCurrLocalWord.oFeature.anColor.data());
                     const size_t nTotColorMixDist = cmixdist(nTotColorL1Dist,nColorDistortion);
-                    const size_t nTotIntraDescDist = hdist<3>(anCurrIntraDesc,pCurrLocalWord->oFeature.anDesc);
-                    const size_t anCurrInterLBSPThresholds[3] = {m_anLBSPThreshold_8bitLUT[pCurrLocalWord->oFeature.anColor[0]],m_anLBSPThreshold_8bitLUT[pCurrLocalWord->oFeature.anColor[1]],m_anLBSPThreshold_8bitLUT[pCurrLocalWord->oFeature.anColor[2]]};
-                    LBSP::computeRGBDescriptor(oInputImg,pCurrLocalWord->oFeature.anColor,nCurrImgCoord_X,nCurrImgCoord_Y,anCurrInterLBSPThresholds,anCurrInterDesc);
-                    const size_t nTotInterDescDist = hdist<3>(anCurrInterDesc,pCurrLocalWord->oFeature.anDesc);
+                    const size_t nTotIntraDescDist = hdist<3>(anCurrIntraDesc,oCurrLocalWord.oFeature.anDesc.data());
+                    const size_t anCurrInterLBSPThresholds[3] = {m_anLBSPThreshold_8bitLUT[oCurrLocalWord.oFeature.anColor[0]],m_anLBSPThreshold_8bitLUT[oCurrLocalWord.oFeature.anColor[1]],m_anLBSPThreshold_8bitLUT[oCurrLocalWord.oFeature.anColor[2]]};
+                    LBSP::computeRGBDescriptor(oInputImg,oCurrLocalWord.oFeature.anColor.data(),nCurrImgCoord_X,nCurrImgCoord_Y,anCurrInterLBSPThresholds,anCurrInterDesc);
+                    const size_t nTotInterDescDist = hdist<3>(anCurrInterDesc,oCurrLocalWord.oFeature.anDesc.data());
                     const size_t nTotDescDist = (nTotIntraDescDist+nTotInterDescDist)/2;
                     if( (!bCurrRegionIsUnstable || bCurrRegionIsFlat || bCurrRegionIsROIBorder)
                             && nTotColorMixDist<=nCurrTotColorDistThreshold
@@ -1041,8 +1020,8 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                             && (rand()%(nCurrRegionIllumUpdtVal?(nCurrLocalWordUpdateRate/2+1):nCurrLocalWordUpdateRate))==0) {
                         // == illum updt
                         for(size_t c=0; c<3; ++c) {
-                            pCurrLocalWord->oFeature.anColor[c] = anCurrColor[c];
-                            pCurrLocalWord->oFeature.anDesc[c] = anCurrIntraDesc[c];
+                            oCurrLocalWord.oFeature.anColor[c] = anCurrColor[c];
+                            oCurrLocalWord.oFeature.anDesc[c] = anCurrIntraDesc[c];
                         }
                         m_oIllumUpdtRegionMask.data[nPxIter-1] = 1&m_oROI.data[nPxIter-1];
                         m_oIllumUpdtRegionMask.data[nPxIter+1] = 1&m_oROI.data[nPxIter+1];
@@ -1053,9 +1032,9 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                     }
                     if(nTotDescDist<=nCurrTotDescDistThreshold && nTotColorMixDist<=nCurrTotColorDistThreshold) {
                         fPotentialLocalWordsWeightSum += fCurrLocalWordWeight;
-                        pCurrLocalWord->nLastOcc = m_nFrameIdx;
+                        oCurrLocalWord.nLastOcc = m_nFrameIdx;
                         if((!m_oLastFGMask.data[nPxIter] || m_bUsingMovingCamera) && fCurrLocalWordWeight<DEFAULT_LWORD_MAX_WEIGHT)
-                            pCurrLocalWord->nOccurrences += nCurrWordOccIncr;
+                            oCurrLocalWord.nOccurrences += nCurrWordOccIncr;
                         nMinTotColorDist = std::min(nMinTotColorDist,nTotColorMixDist);
                         nMinTotDescDist = std::min(nMinTotDescDist,nTotDescDist);
 #if DISPLAY_PAWCS_DEBUG_INFO
@@ -1064,7 +1043,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                     }
                 }
                 if(fCurrLocalWordWeight>fLastLocalWordWeight) {
-                    std::swap(m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx-1]);
+                    std::swap(m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx-1]);
 #if DISPLAY_PAWCS_DEBUG_INFO
                     std::swap(vsWordModList[nLocalDictIdx+nLocalWordIdx],vsWordModList[nLocalDictIdx+nLocalWordIdx-1]);
 #endif //DISPLAY_PAWCS_DEBUG_INFO
@@ -1074,9 +1053,9 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                 ++nLocalWordIdx;
             }
             while(nLocalWordIdx<m_nCurrLocalWords) {
-                const float fCurrLocalWordWeight = GetLocalWordWeight(m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_nFrameIdx,m_nLocalWordWeightOffset);
+                const float fCurrLocalWordWeight = GetLocalWordWeight(*m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_nFrameIdx,m_nLocalWordWeightOffset);
                 if(fCurrLocalWordWeight>fLastLocalWordWeight) {
-                    std::swap(m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx-1]);
+                    std::swap(m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx],m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx-1]);
 #if DISPLAY_PAWCS_DEBUG_INFO
                     std::swap(vsWordModList[nLocalDictIdx+nLocalWordIdx],vsWordModList[nLocalDictIdx+nLocalWordIdx-1]);
 #endif //DISPLAY_PAWCS_DEBUG_INFO
@@ -1102,14 +1081,14 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                     size_t nGlobalWordLUTIdx;
                     GlobalWord_3ch* pCurrGlobalWord = nullptr;
                     for(nGlobalWordLUTIdx=0; nGlobalWordLUTIdx<m_nCurrGlobalWords; ++nGlobalWordLUTIdx) {
-                        pCurrGlobalWord = (GlobalWord_3ch*)m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT[nGlobalWordLUTIdx];
+                        pCurrGlobalWord = (GlobalWord_3ch*)m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordLUTIdx];
                         if(L1dist(nCurrIntraDescBITS,pCurrGlobalWord->nDescBITS)<=nCurrTotDescDistThreshold/GWORD_DESC_THRES_BITS_MATCH_FACTOR
-                                && cmixdist<3>(anCurrColor,pCurrGlobalWord->oFeature.anColor)<=nCurrTotColorDistThreshold)
+                                && cmixdist<3>(anCurrColor,pCurrGlobalWord->oFeature.anColor.data())<=nCurrTotColorDistThreshold)
                             break;
                     }
                     if(nGlobalWordLUTIdx!=m_nCurrGlobalWords || (rand()%(nCurrLocalWordUpdateRate*2))==0) {
                         if(nGlobalWordLUTIdx==m_nCurrGlobalWords) {
-                            pCurrGlobalWord = (GlobalWord_3ch*)m_apGlobalWordDict[m_nCurrGlobalWords-1];
+                            pCurrGlobalWord = (GlobalWord_3ch*)m_vpGlobalWordDict[m_nCurrGlobalWords-1];
                             for(size_t c=0; c<3; ++c) {
                                 pCurrGlobalWord->oFeature.anColor[c] = anCurrColor[c];
                                 pCurrGlobalWord->oFeature.anDesc[c] = anCurrIntraDesc[c];
@@ -1139,9 +1118,9 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                     size_t nGlobalWordLUTIdx;
                     GlobalWord_3ch* pCurrGlobalWord;
                     for(nGlobalWordLUTIdx=0; nGlobalWordLUTIdx<m_nCurrGlobalWords; ++nGlobalWordLUTIdx) {
-                        pCurrGlobalWord = (GlobalWord_3ch*)m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT[nGlobalWordLUTIdx];
+                        pCurrGlobalWord = (GlobalWord_3ch*)m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordLUTIdx];
                         if(L1dist(nCurrIntraDescBITS,pCurrGlobalWord->nDescBITS)<=nCurrTotDescDistThreshold/GWORD_DESC_THRES_BITS_MATCH_FACTOR
-                                && cmixdist<3>(anCurrColor,pCurrGlobalWord->oFeature.anColor)<=nCurrTotColorDistThreshold)
+                                && cmixdist<3>(anCurrColor,pCurrGlobalWord->oFeature.anColor.data())<=nCurrTotColorDistThreshold)
                             break;
                     }
                     if(nGlobalWordLUTIdx==m_nCurrGlobalWords)
@@ -1152,7 +1131,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                             nCurrRegionSegmVal = UCHAR_MAX;
                     }
 #if DISPLAY_PAWCS_DEBUG_INFO
-                    if(!nCurrRegionSegmVal && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==m_nDebugCoordY && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==m_nDebugCoordX) {
+                    if(!nCurrRegionSegmVal && m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==m_nDebugCoordY && m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==m_nDebugCoordX) {
                         bDBGMaskModifiedByGDict = true;
                         pDBGGlobalWordModifier = pCurrGlobalWord;
                         fDBGGlobalWordModifierLocalWeight = *(float*)(pCurrGlobalWord->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
@@ -1163,7 +1142,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                     nCurrRegionSegmVal = UCHAR_MAX;
                 if(fPotentialLocalWordsWeightSum<DEFAULT_LWORD_INIT_WEIGHT) {
                     const size_t nNewLocalWordIdx = m_nCurrLocalWords-1;
-                    LocalWord_3ch* pNewLocalWord = (LocalWord_3ch*)m_apLocalWordDict[nLocalDictIdx+nNewLocalWordIdx];
+                    LocalWord_3ch* pNewLocalWord = (LocalWord_3ch*)m_vpLocalWordDict[nLocalDictIdx+nNewLocalWordIdx];
                     for(size_t c=0; c<3; ++c) {
                         pNewLocalWord->oFeature.anColor[c] = anCurrColor[c];
                         pNewLocalWord->oFeature.anDesc[c] = anCurrIntraDesc[c];
@@ -1193,23 +1172,23 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                     getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                 if(m_oROI.data[nSamplePxIdx]) {
-                    const size_t nNeighborLocalDictIdx = m_aPxInfoLUT_PAWCS[nSamplePxIdx].nModelIdx*m_nCurrLocalWords;
+                    const size_t nNeighborLocalDictIdx = m_voPxInfoLUT_PAWCS[nSamplePxIdx].nModelIdx*m_nCurrLocalWords;
                     size_t nNeighborLocalWordIdx = 0;
                     float fNeighborPotentialLocalWordsWeightSum = 0.0f;
                     while(nNeighborLocalWordIdx<m_nCurrLocalWords && fNeighborPotentialLocalWordsWeightSum<fLocalWordsWeightSumThreshold) {
-                        LocalWord_3ch* pNeighborLocalWord = (LocalWord_3ch*)m_apLocalWordDict[nNeighborLocalDictIdx+nNeighborLocalWordIdx];
-                        const size_t nNeighborTotColorL1Dist = L1dist<3>(anCurrColor,pNeighborLocalWord->oFeature.anColor);
-                        const size_t nNeighborColorDistortion = cdist<3>(anCurrColor,pNeighborLocalWord->oFeature.anColor);
+                        LocalWord_3ch& oNeighborLocalWord = (LocalWord_3ch&)*m_vpLocalWordDict[nNeighborLocalDictIdx+nNeighborLocalWordIdx];
+                        const size_t nNeighborTotColorL1Dist = L1dist<3>(anCurrColor,oNeighborLocalWord.oFeature.anColor.data());
+                        const size_t nNeighborColorDistortion = cdist<3>(anCurrColor,oNeighborLocalWord.oFeature.anColor.data());
                         const size_t nNeighborTotColorMixDist = cmixdist(nNeighborTotColorL1Dist,nNeighborColorDistortion);
-                        const size_t nNeighborTotIntraDescDist = hdist<3>(anCurrIntraDesc,pNeighborLocalWord->oFeature.anDesc);
-                        const bool bNeighborRegionIsFlat = popcount<3>(pNeighborLocalWord->oFeature.anDesc)<FLAT_REGION_BIT_COUNT*2;
+                        const size_t nNeighborTotIntraDescDist = hdist<3>(anCurrIntraDesc,oNeighborLocalWord.oFeature.anDesc.data());
+                        const bool bNeighborRegionIsFlat = popcount<3>(oNeighborLocalWord.oFeature.anDesc.data())<FLAT_REGION_BIT_COUNT*2;
                         const size_t nNeighborWordOccIncr = bNeighborRegionIsFlat?nCurrWordOccIncr*2:nCurrWordOccIncr;
                         if(nNeighborTotColorMixDist<=nCurrTotColorDistThreshold && nNeighborTotIntraDescDist<=nCurrTotDescDistThreshold) {
-                            const float fNeighborLocalWordWeight = GetLocalWordWeight(pNeighborLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
+                            const float fNeighborLocalWordWeight = GetLocalWordWeight(oNeighborLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
                             fNeighborPotentialLocalWordsWeightSum += fNeighborLocalWordWeight;
-                            pNeighborLocalWord->nLastOcc = m_nFrameIdx;
+                            oNeighborLocalWord.nLastOcc = m_nFrameIdx;
                             if(fNeighborLocalWordWeight<DEFAULT_LWORD_MAX_WEIGHT)
-                                pNeighborLocalWord->nOccurrences += nNeighborWordOccIncr;
+                                oNeighborLocalWord.nOccurrences += nNeighborWordOccIncr;
 #if DISPLAY_PAWCS_DEBUG_INFO
                             vsWordModList[nNeighborLocalDictIdx+nNeighborLocalWordIdx] += "MATCHED(NEIGHBOR) ";
 #endif //DISPLAY_PAWCS_DEBUG_INFO
@@ -1220,13 +1199,13 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                             ushort* anNeighborLastIntraDesc = ((ushort*)(m_oLastDescFrame.data+nSampleDescRGBIdx));
                             const size_t nNeighborTotLastIntraDescDist = hdist<3>(anCurrIntraDesc,anNeighborLastIntraDesc);
                             if(nNeighborTotColorMixDist<=nCurrTotColorDistThreshold && nNeighborTotLastIntraDescDist<=nCurrTotDescDistThreshold/2) {
-                                const float fNeighborLocalWordWeight = GetLocalWordWeight(pNeighborLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
+                                const float fNeighborLocalWordWeight = GetLocalWordWeight(oNeighborLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
                                 fNeighborPotentialLocalWordsWeightSum += fNeighborLocalWordWeight;
-                                pNeighborLocalWord->nLastOcc = m_nFrameIdx;
+                                oNeighborLocalWord.nLastOcc = m_nFrameIdx;
                                 if(fNeighborLocalWordWeight<DEFAULT_LWORD_MAX_WEIGHT)
-                                    pNeighborLocalWord->nOccurrences += nNeighborWordOccIncr;
+                                    oNeighborLocalWord.nOccurrences += nNeighborWordOccIncr;
                                 for(size_t c=0; c<3; ++c)
-                                    pNeighborLocalWord->oFeature.anDesc[c] = anCurrIntraDesc[c];
+                                    oNeighborLocalWord.oFeature.anDesc[c] = anCurrIntraDesc[c];
 #if DISPLAY_PAWCS_DEBUG_INFO
                                 vsWordModList[nNeighborLocalDictIdx+nNeighborLocalWordIdx] += "UPDATED1(NEIGHBOR) ";
 #endif //DISPLAY_PAWCS_DEBUG_INFO
@@ -1236,13 +1215,13 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                                 if(bNeighborLastRegionIsFlat && bCurrRegionIsFlat &&
                                     nNeighborTotLastIntraDescDist+nNeighborTotIntraDescDist<=nCurrTotDescDistThreshold &&
                                     nNeighborColorDistortion<=nCurrTotColorDistThreshold/4) {
-                                        const float fNeighborLocalWordWeight = GetLocalWordWeight(pNeighborLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
+                                        const float fNeighborLocalWordWeight = GetLocalWordWeight(oNeighborLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
                                         fNeighborPotentialLocalWordsWeightSum += fNeighborLocalWordWeight;
-                                        pNeighborLocalWord->nLastOcc = m_nFrameIdx;
+                                        oNeighborLocalWord.nLastOcc = m_nFrameIdx;
                                         if(fNeighborLocalWordWeight<DEFAULT_LWORD_MAX_WEIGHT)
-                                            pNeighborLocalWord->nOccurrences += nNeighborWordOccIncr;
+                                            oNeighborLocalWord.nOccurrences += nNeighborWordOccIncr;
                                         for(size_t c=0; c<3; ++c)
-                                            pNeighborLocalWord->oFeature.anColor[c] = anCurrColor[c];
+                                            oNeighborLocalWord.oFeature.anColor[c] = anCurrColor[c];
 #if DISPLAY_PAWCS_DEBUG_INFO
                                         vsWordModList[nNeighborLocalDictIdx+nNeighborLocalWordIdx] += "UPDATED2(NEIGHBOR) ";
 #endif //DISPLAY_PAWCS_DEBUG_INFO
@@ -1253,14 +1232,14 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                     }
                     if(fNeighborPotentialLocalWordsWeightSum<DEFAULT_LWORD_INIT_WEIGHT) {
                         nNeighborLocalWordIdx = m_nCurrLocalWords-1;
-                        LocalWord_3ch* pNeighborLocalWord = (LocalWord_3ch*)m_apLocalWordDict[nNeighborLocalDictIdx+nNeighborLocalWordIdx];
+                        LocalWord_3ch& oNeighborLocalWord = (LocalWord_3ch&)*m_vpLocalWordDict[nNeighborLocalDictIdx+nNeighborLocalWordIdx];
                         for(size_t c=0; c<3; ++c) {
-                            pNeighborLocalWord->oFeature.anColor[c] = anCurrColor[c];
-                            pNeighborLocalWord->oFeature.anDesc[c] = anCurrIntraDesc[c];
+                            oNeighborLocalWord.oFeature.anColor[c] = anCurrColor[c];
+                            oNeighborLocalWord.oFeature.anDesc[c] = anCurrIntraDesc[c];
                         }
-                        pNeighborLocalWord->nOccurrences = nCurrWordOccIncr;
-                        pNeighborLocalWord->nFirstOcc = m_nFrameIdx;
-                        pNeighborLocalWord->nLastOcc = m_nFrameIdx;
+                        oNeighborLocalWord.nOccurrences = nCurrWordOccIncr;
+                        oNeighborLocalWord.nFirstOcc = m_nFrameIdx;
+                        oNeighborLocalWord.nLastOcc = m_nFrameIdx;
 #if DISPLAY_PAWCS_DEBUG_INFO
                         vsWordModList[nNeighborLocalDictIdx+nNeighborLocalWordIdx] += "NEW(NEIGHBOR) ";
 #endif //DISPLAY_PAWCS_DEBUG_INFO
@@ -1300,7 +1279,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
             fIntraKPsTimeSum_MS += (float)(std::chrono::duration_cast<std::chrono::nanoseconds>(post_lastKP-pre_currKP).count())/1000000;
 #endif //USE_INTERNAL_HRCS
 #if DISPLAY_PAWCS_DEBUG_INFO
-            if(m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==m_nDebugCoordY && m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==m_nDebugCoordX) {
+            if(m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y==m_nDebugCoordY && m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X==m_nDebugCoordX) {
                 for(size_t c=0; c<3; ++c) {
                     anDBGColor[c] = anCurrColor[c];
                     anDBGIntraDesc[c] = anCurrIntraDesc[c];
@@ -1325,30 +1304,30 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
     if(bUpdateGlobalWords)
         cv::resize(m_oLastFGMask_dilated_inverted,oLastFGMask_dilated_inverted_downscaled,m_oDownSampledFrameSize_GlobalWordLookup,0,0,cv::INTER_NEAREST);
     for(size_t nGlobalWordIdx=0; nGlobalWordIdx<m_nCurrGlobalWords; ++nGlobalWordIdx) {
-        if(bRecalcGlobalWords && m_apGlobalWordDict[nGlobalWordIdx]->fLatestWeight>0.0f) {
-            m_apGlobalWordDict[nGlobalWordIdx]->fLatestWeight = GetGlobalWordWeight(m_apGlobalWordDict[nGlobalWordIdx]);
-            if(m_apGlobalWordDict[nGlobalWordIdx]->fLatestWeight<1.0f) {
-                m_apGlobalWordDict[nGlobalWordIdx]->fLatestWeight = 0.0f;
-                m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap = cv::Scalar(0.0f);
+        if(bRecalcGlobalWords && m_vpGlobalWordDict[nGlobalWordIdx]->fLatestWeight>0.0f) {
+            m_vpGlobalWordDict[nGlobalWordIdx]->fLatestWeight = GetGlobalWordWeight(*m_vpGlobalWordDict[nGlobalWordIdx]);
+            if(m_vpGlobalWordDict[nGlobalWordIdx]->fLatestWeight<1.0f) {
+                m_vpGlobalWordDict[nGlobalWordIdx]->fLatestWeight = 0.0f;
+                m_vpGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap = cv::Scalar(0.0f);
             }
         }
-        if(bUpdateGlobalWords && m_apGlobalWordDict[nGlobalWordIdx]->fLatestWeight>0.0f) {
-            cv::accumulateProduct(m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,m_oTempGlobalWordWeightDiffFactor,m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,oLastFGMask_dilated_inverted_downscaled);
-            m_apGlobalWordDict[nGlobalWordIdx]->fLatestWeight *= 0.9f;
-            cv::blur(m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,m_apGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,cv::Size(3,3),cv::Point(-1,-1),cv::BORDER_REPLICATE);
+        if(bUpdateGlobalWords && m_vpGlobalWordDict[nGlobalWordIdx]->fLatestWeight>0.0f) {
+            cv::accumulateProduct(m_vpGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,m_oTempGlobalWordWeightDiffFactor,m_vpGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,oLastFGMask_dilated_inverted_downscaled);
+            m_vpGlobalWordDict[nGlobalWordIdx]->fLatestWeight *= 0.9f;
+            cv::blur(m_vpGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,m_vpGlobalWordDict[nGlobalWordIdx]->oSpatioOccMap,cv::Size(3,3),cv::Point(-1,-1),cv::BORDER_REPLICATE);
         }
-        if(nGlobalWordIdx>0 && m_apGlobalWordDict[nGlobalWordIdx]->fLatestWeight>m_apGlobalWordDict[nGlobalWordIdx-1]->fLatestWeight)
-            std::swap(m_apGlobalWordDict[nGlobalWordIdx],m_apGlobalWordDict[nGlobalWordIdx-1]);
+        if(nGlobalWordIdx>0 && m_vpGlobalWordDict[nGlobalWordIdx]->fLatestWeight>m_vpGlobalWordDict[nGlobalWordIdx-1]->fLatestWeight)
+            std::swap(m_vpGlobalWordDict[nGlobalWordIdx],m_vpGlobalWordDict[nGlobalWordIdx-1]);
     }
     if(bUpdateGlobalWords) {
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
-            const size_t nPxIter = m_aPxIdxLUT[nModelIter];
-            const size_t nGlobalWordMapLookupIdx = m_aPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx;
-            float fLastGlobalWordLocalWeight = *(float*)(m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT[0]->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
+            const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
+            const size_t nGlobalWordMapLookupIdx = m_voPxInfoLUT_PAWCS[nPxIter].nGlobalWordMapLookupIdx;
+            float fLastGlobalWordLocalWeight = *(float*)(m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[0]->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
             for(size_t nGlobalWordLUTIdx=1; nGlobalWordLUTIdx<m_nCurrGlobalWords; ++nGlobalWordLUTIdx) {
-                const float fCurrGlobalWordLocalWeight = *(float*)(m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT[nGlobalWordLUTIdx]->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
+                const float fCurrGlobalWordLocalWeight = *(float*)(m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordLUTIdx]->oSpatioOccMap.data+nGlobalWordMapLookupIdx);
                 if(fCurrGlobalWordLocalWeight>fLastGlobalWordLocalWeight)
-                    std::swap(m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT[nGlobalWordLUTIdx],m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT[nGlobalWordLUTIdx-1]);
+                    std::swap(m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordLUTIdx],m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordLUTIdx-1]);
                 else
                     fLastGlobalWordLocalWeight = fCurrGlobalWordLocalWeight;
             }
@@ -1373,7 +1352,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
         cv::Point dbgpt(m_nDebugCoordX,m_nDebugCoordY);
         cv::Mat oGlobalWordsCoverageMap(m_oDownSampledFrameSize_GlobalWordLookup,CV_32FC1,cv::Scalar(0.0f));
         for(size_t nDBGWordIdx=0; nDBGWordIdx<m_nCurrGlobalWords; ++nDBGWordIdx)
-                cv::max(oGlobalWordsCoverageMap,m_apGlobalWordDict[nDBGWordIdx]->oSpatioOccMap,oGlobalWordsCoverageMap);
+            cv::max(oGlobalWordsCoverageMap,m_vpGlobalWordDict[nDBGWordIdx]->oSpatioOccMap,oGlobalWordsCoverageMap);
         cv::resize(oGlobalWordsCoverageMap,oGlobalWordsCoverageMap,DEFAULT_FRAME_SIZE,0,0,cv::INTER_NEAREST);
         cv::imshow("oGlobalWordsCoverageMap",oGlobalWordsCoverageMap);
         printf("\nDBG[%2d,%2d] : \n",m_nDebugCoordX,m_nDebugCoordY);
@@ -1395,11 +1374,11 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
         printf("DBG_LDICT : (%lu occincr per match)\n",nDBGWordOccIncr);
         for(size_t nDBGWordIdx=0; nDBGWordIdx<m_nCurrLocalWords; ++nDBGWordIdx) {
             if(m_nImgChannels==1) {
-                LocalWord_1ch* pDBGLocalWord = (LocalWord_1ch*)m_apLocalWordDict[nLocalDictDBGIdx+nDBGWordIdx];
+                LocalWord_1ch* pDBGLocalWord = (LocalWord_1ch*)m_vpLocalWordDict[nLocalDictDBGIdx+nDBGWordIdx];
                 printf("\t [%02lu] : weight=[%02.03f], nColor=[%03d], nDescBITS=[%02lu]  %s\n",nDBGWordIdx,GetLocalWordWeight(pDBGLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset),(int)pDBGLocalWord->oFeature.anColor[0],popcount(pDBGLocalWord->oFeature.anDesc[0]),vsWordModList[nLocalDictDBGIdx+nDBGWordIdx].c_str());
             }
             else { //m_nImgChannels==3
-                LocalWord_3ch* pDBGLocalWord = (LocalWord_3ch*)m_apLocalWordDict[nLocalDictDBGIdx+nDBGWordIdx];
+                LocalWord_3ch* pDBGLocalWord = (LocalWord_3ch*)m_vpLocalWordDict[nLocalDictDBGIdx+nDBGWordIdx];
                 printf("\t [%02lu] : weight=[%02.03f], anColor=[%03d,%03d,%03d], anDescBITS=[%02lu,%02lu,%02lu]  %s\n",nDBGWordIdx,GetLocalWordWeight(pDBGLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset),(int)pDBGLocalWord->oFeature.anColor[0],(int)pDBGLocalWord->oFeature.anColor[1],(int)pDBGLocalWord->oFeature.anColor[2],popcount(pDBGLocalWord->oFeature.anDesc[0]),popcount(pDBGLocalWord->oFeature.anDesc[1]),popcount(pDBGLocalWord->oFeature.anDesc[2]),vsWordModList[nLocalDictDBGIdx+nDBGWordIdx].c_str());
             }
         }
@@ -1548,17 +1527,17 @@ void BackgroundSubtractorPAWCS::getBackgroundImage(cv::OutputArray backgroundIma
     CV_Assert(m_bInitialized);
     cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
     for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
-        const size_t nPxIter = m_aPxIdxLUT[nModelIter];
+        const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
         const size_t nLocalDictIdx = nModelIter*m_nCurrLocalWords;
-        const int nCurrImgCoord_X = m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_X;
-        const int nCurrImgCoord_Y = m_aPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y;
+        const int nCurrImgCoord_X = m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X;
+        const int nCurrImgCoord_Y = m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y;
         if(m_nImgChannels==1) {
             float fTotWeight = 0.0f;
             float fTotColor = 0.0f;
             for(size_t nLocalWordIdx=0; nLocalWordIdx<m_nCurrLocalWords; ++nLocalWordIdx) {
-                LocalWord_1ch* pCurrLocalWord = (LocalWord_1ch*)m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx];
-                float fCurrWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
-                fTotColor += (float)pCurrLocalWord->oFeature.anColor[0]*fCurrWeight;
+                const LocalWord_1ch& oCurrLocalWord = (LocalWord_1ch&)*m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx];
+                float fCurrWeight = GetLocalWordWeight(oCurrLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
+                fTotColor += (float)oCurrLocalWord.oFeature.anColor[0]*fCurrWeight;
                 fTotWeight += fCurrWeight;
             }
             oAvgBGImg.at<float>(nCurrImgCoord_Y,nCurrImgCoord_X) = fTotColor/fTotWeight;
@@ -1567,10 +1546,10 @@ void BackgroundSubtractorPAWCS::getBackgroundImage(cv::OutputArray backgroundIma
             float fTotWeight = 0.0f;
             float fTotColor[3] = {0.0f,0.0f,0.0f};
             for(size_t nLocalWordIdx=0; nLocalWordIdx<m_nCurrLocalWords; ++nLocalWordIdx) {
-                LocalWord_3ch* pCurrLocalWord = (LocalWord_3ch*)m_apLocalWordDict[nLocalDictIdx+nLocalWordIdx];
-                float fCurrWeight = GetLocalWordWeight(pCurrLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
+                const LocalWord_3ch& oCurrLocalWord = (LocalWord_3ch&)*m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx];
+                float fCurrWeight = GetLocalWordWeight(oCurrLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
                 for(size_t c=0; c<3; ++c)
-                    fTotColor[c] += (float)pCurrLocalWord->oFeature.anColor[c]*fCurrWeight;
+                    fTotColor[c] += (float)oCurrLocalWord.oFeature.anColor[c]*fCurrWeight;
                 fTotWeight += fCurrWeight;
             }
             oAvgBGImg.at<cv::Vec3f>(nCurrImgCoord_Y,nCurrImgCoord_X) = cv::Vec3f(fTotColor[0]/fTotWeight,fTotColor[1]/fTotWeight,fTotColor[2]/fTotWeight);
@@ -1601,51 +1580,20 @@ void BackgroundSubtractorPAWCS::getBackgroundDescriptorsImage(cv::OutputArray ba
 
 void BackgroundSubtractorPAWCS::CleanupDictionaries() {
     m_bModelInitialized = false;
-    if(m_aLocalWordList_1ch) {
-        delete[] m_aLocalWordList_1ch;
-        m_aLocalWordList_1ch = nullptr;
-        m_pLocalWordListIter_1ch = nullptr;
-    }
-    else if(m_aLocalWordList_3ch) {
-        delete[] m_aLocalWordList_3ch;
-        m_aLocalWordList_3ch = nullptr;
-        m_pLocalWordListIter_3ch = nullptr;
-    }
-    if(m_apLocalWordDict) {
-        delete[] m_apLocalWordDict;
-        m_apLocalWordDict = nullptr;
-    }
-    if(m_aGlobalWordList_1ch) {
-        delete[] m_aGlobalWordList_1ch;
-        m_aGlobalWordList_1ch = nullptr;
-        m_pGlobalWordListIter_1ch = nullptr;
-    }
-    else if(m_aGlobalWordList_3ch) {
-        delete[] m_aGlobalWordList_3ch;
-        m_aGlobalWordList_3ch = nullptr;
-        m_pGlobalWordListIter_3ch = nullptr;
-    }
-    if(m_apGlobalWordDict) {
-        delete[] m_apGlobalWordDict;
-        m_apGlobalWordDict = nullptr;
-    }
-    if(m_aPxInfoLUT_PAWCS) {
-        for(size_t nPxIter=0; nPxIter<m_nTotPxCount; ++nPxIter)
-            delete[] m_aPxInfoLUT_PAWCS[nPxIter].apGlobalDictSortLUT;
-        delete[] m_aPxInfoLUT_PAWCS;
-        m_aPxInfoLUT = nullptr;
-        m_aPxInfoLUT_PAWCS = nullptr;
-    }
-    if(m_aPxIdxLUT) {
-        delete[] m_aPxIdxLUT;
-        m_aPxIdxLUT = nullptr;
-    }
+    m_voLocalWordList_1ch.clear();
+    m_pLocalWordListIter_1ch = m_voLocalWordList_1ch.end();
+    m_voLocalWordList_3ch.clear();
+    m_pLocalWordListIter_3ch = m_voLocalWordList_3ch.end();
+    m_voGlobalWordList_1ch.clear();
+    m_pGlobalWordListIter_1ch = m_voGlobalWordList_1ch.end();
+    m_voGlobalWordList_3ch.clear();
+    m_pGlobalWordListIter_3ch = m_voGlobalWordList_3ch.end();
 }
 
-float BackgroundSubtractorPAWCS::GetLocalWordWeight(const LocalWordBase* w, size_t nCurrFrame, size_t nOffset) {
-    return (float)(w->nOccurrences)/((w->nLastOcc-w->nFirstOcc)+(nCurrFrame-w->nLastOcc)*2+nOffset);
+float BackgroundSubtractorPAWCS::GetLocalWordWeight(const LocalWordBase& w, size_t nCurrFrame, size_t nOffset) {
+    return (float)(w.nOccurrences)/((w.nLastOcc-w.nFirstOcc)+(nCurrFrame-w.nLastOcc)*2+nOffset);
 }
 
-float BackgroundSubtractorPAWCS::GetGlobalWordWeight(const GlobalWordBase* w) {
-    return (float)cv::sum(w->oSpatioOccMap).val[0];
+float BackgroundSubtractorPAWCS::GetGlobalWordWeight(const GlobalWordBase& w) {
+    return (float)cv::sum(w.oSpatioOccMap).val[0];
 }

@@ -56,8 +56,8 @@ public:
 
 private:
     static bool useShaderProgram(GLShader* pNewShader);
-    GLShader(const GLShader&);
-    GLShader& operator=(const GLShader&);
+    GLShader& operator=(const GLShader&)=delete;
+    GLShader(const GLShader&)=delete;
     std::map<GLuint,std::string> m_mShaderSources;
     std::map<std::string,GLint> m_mShaderUniformLocations;
     bool m_bIsCompiled;
@@ -99,6 +99,6 @@ namespace GLSLFunctionUtils {
         uint tmat;
         uint pad;
     };
-    void initTinyMT32Generators(glm::uvec3 vGeneratorLayout, TMT32GenParams** ppData);
+    void initTinyMT32Generators(glm::uvec3 vGeneratorLayout, std::vector<TMT32GenParams>& voData);
 }; // namespace DistanceFunctionUtils
 

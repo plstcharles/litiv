@@ -76,9 +76,9 @@ namespace DatasetUtils {
                              const std::string& sResultPrefix, size_t framenum, const std::string& sResultSuffix,
                              const cv::Mat& res, const std::vector<int>& vnComprParams);
     void WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bBottom=false);
-    void WriteMetrics(const std::string sResultsFileName, const SequenceInfo* pSeq);
-    void WriteMetrics(const std::string sResultsFileName, CategoryInfo* pCat);
-    void WriteMetrics(const std::string sResultsFileName, std::vector<CategoryInfo*>& vpCat, double dTotalFPS);
+    void WriteMetrics(const std::string sResultsFileName, const SequenceInfo& oSeq);
+    void WriteMetrics(const std::string sResultsFileName, CategoryInfo& oCat);
+    void WriteMetrics(const std::string sResultsFileName, std::vector<std::shared_ptr<CategoryInfo>>& vpCat, double dTotalFPS);
     void CalcMetricsFromResult(const cv::Mat& oSegmResFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI,
                                       uint64_t& nTP, uint64_t& nTN, uint64_t& nFP, uint64_t& nFN, uint64_t& nSE);
 
@@ -88,9 +88,9 @@ namespace DatasetUtils {
     class MetricsCalculator {
     public:
         MetricsCalculator(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN, uint64_t nSE);
-        MetricsCalculator(const SequenceInfo* pSeq);
-        MetricsCalculator(const CategoryInfo* pCat, bool bAverage=false);
-        MetricsCalculator(const std::vector<CategoryInfo*>& vpCat, bool bAverage=false);
+        MetricsCalculator(const SequenceInfo& oSeq);
+        MetricsCalculator(const CategoryInfo& oCat, bool bAverage=false);
+        MetricsCalculator(const std::vector<std::shared_ptr<CategoryInfo>>& vpCat, bool bAverage=false);
         const CommonMetrics m_oMetrics;
         const bool m_bAveraged;
     };
@@ -99,24 +99,18 @@ namespace DatasetUtils {
     public:
         CategoryInfo(const std::string& sName, const std::string& sDirectoryPath,
                      DatasetUtils::eDatasetList eDatasetID,
-                     std::vector<std::string> vsGrayscaleDirNameTokens=std::vector<std::string>(),
-                     std::vector<std::string> vsSkippedDirNameTokens=std::vector<std::string>(),
+                     const std::vector<std::string>& vsGrayscaleDirNameTokens=std::vector<std::string>(),
+                     const std::vector<std::string>& vsSkippedDirNameTokens=std::vector<std::string>(),
                      bool bUse4chAlign=false);
-        ~CategoryInfo();
         const std::string m_sName;
         const eDatasetList m_eDatasetID;
-        std::vector<SequenceInfo*> m_vpSequences;
+        std::vector<std::shared_ptr<SequenceInfo>> m_vpSequences;
         uint64_t nTP, nTN, nFP, nFN, nSE;
         double m_dAvgFPS;
-        static inline bool compare(const CategoryInfo* i, const CategoryInfo* j) {return PlatformUtils::compare_lowercase(i->m_sName,j->m_sName);}
+        static inline bool compare(const std::shared_ptr<CategoryInfo>& i, const std::shared_ptr<CategoryInfo>& j) {return PlatformUtils::compare_lowercase(i->m_sName,j->m_sName);}
     private:
-#if PLATFORM_SUPPORTS_CPP11
-        CategoryInfo& operator=(const CategoryInfo&) = delete;
-        CategoryInfo(const CategoryInfo&) = delete;
-#else //!PLATFORM_SUPPORTS_CPP11
-        CategoryInfo& operator=(const CategoryInfo&);
-        CategoryInfo(const CategoryInfo&);
-#endif //!PLATFORM_SUPPORTS_CPP11
+        CategoryInfo& operator=(const CategoryInfo&)=delete;
+        CategoryInfo(const CategoryInfo&)=delete;
     };
 
     class SequenceInfo {
@@ -140,28 +134,17 @@ namespace DatasetUtils {
         double m_dExpectedROILoad;
         CategoryInfo* m_pParent;
         inline cv::Size GetSize() {return m_oSize;}
-        static inline bool compare(const SequenceInfo* i, const SequenceInfo* j) {return PlatformUtils::compare_lowercase(i->m_sName,j->m_sName);}
+        static inline bool compare(const std::shared_ptr<SequenceInfo>& i, const std::shared_ptr<SequenceInfo>& j) {return PlatformUtils::compare_lowercase(i->m_sName,j->m_sName);}
 #if DATASETUTILS_USE_PRECACHED_IO
         void StartPrecaching();
         void StopPrecaching();
     private:
         void PrecacheInputFrames();
         void PrecacheGTFrames();
-#if PLATFORM_SUPPORTS_CPP11
         std::thread m_hInputFramePrecacher,m_hGTFramePrecacher;
         std::mutex m_oInputFrameSyncMutex,m_oGTFrameSyncMutex;
         std::condition_variable m_oInputFrameReqCondVar,m_oGTFrameReqCondVar;
         std::condition_variable m_oInputFrameSyncCondVar,m_oGTFrameSyncCondVar;
-#elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
-        HANDLE m_hInputFramePrecacher,m_hGTFramePrecacher;
-        static inline DWORD WINAPI PrecacheInputFramesEntryPoint(LPVOID lpParam) {try{((SequenceInfo*)lpParam)->PrecacheInputFrames();}catch(...){return-1;}return 0;}
-        static inline DWORD WINAPI PrecacheGTFramesEntryPoint(LPVOID lpParam) {try{((SequenceInfo*)lpParam)->PrecacheGTFrames();}catch(...){return-1;} return 0;}
-        CRITICAL_SECTION m_oInputFrameSyncMutex,m_oGTFrameSyncMutex;
-        CONDITION_VARIABLE m_oInputFrameReqCondVar,m_oGTFrameReqCondVar;
-        CONDITION_VARIABLE m_oInputFrameSyncCondVar,m_oGTFrameSyncCondVar;
-#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#error "Missing implementation for semaphores on this platform."
-#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
         bool m_bIsPrecaching;
         size_t m_nInputFrameSize,m_nGTFrameSize;
         size_t m_nInputBufferSize,m_nGTBufferSize;
@@ -169,7 +152,7 @@ namespace DatasetUtils {
         size_t m_nInputBufferFrameCount,m_nGTBufferFrameCount;
         size_t m_nRequestInputFrameIndex,m_nRequestGTFrameIndex;
         std::deque<cv::Mat> m_qoInputFrameCache,m_qoGTFrameCache;
-        uchar *m_acInputBuffer,*m_acGTBuffer;
+        std::vector<uchar> m_vcInputBuffer,m_vcGTBuffer;
         size_t m_nNextInputBufferIdx,m_nNextGTBufferIdx;
         size_t m_nNextExpectedInputFrameIdx,m_nNextExpectedGTFrameIdx;
         size_t m_nNextPrecachedInputFrameIdx,m_nNextPrecachedGTFrameIdx;
@@ -192,19 +175,14 @@ namespace DatasetUtils {
         std::unordered_map<size_t,size_t> m_mTestGTIndexes;
         cv::Mat GetInputFrameFromIndex_Internal(size_t nFrameIdx);
         cv::Mat GetGTFrameFromIndex_Internal(size_t nFrameIdx);
-#if PLATFORM_SUPPORTS_CPP11
-        SequenceInfo& operator=(const SequenceInfo&) = delete;
-        SequenceInfo(const CategoryInfo&) = delete;
-#else //!PLATFORM_SUPPORTS_CPP11
-        SequenceInfo& operator=(const SequenceInfo&);
-        SequenceInfo(const SequenceInfo&);
-#endif //!PLATFORM_SUPPORTS_CPP11
+        SequenceInfo& operator=(const SequenceInfo&)=delete;
+        SequenceInfo(const CategoryInfo&)=delete;
     };
 
 #if HAVE_GLSL
     class CDNetEvaluator : public GLEvaluatorAlgo {
     public:
-        CDNetEvaluator(GLImageProcAlgo* pParent, int nTotFrameCount);
+        CDNetEvaluator(std::unique_ptr<GLImageProcAlgo> pParent, int nTotFrameCount);
         virtual ~CDNetEvaluator();
         virtual void initialize(const cv::Mat oInitInput, const cv::Mat& oROI, const cv::Mat& oInitGT);
         virtual void apply(const cv::Mat oNextInput, const cv::Mat& oNextGT, bool bRebindAll=false);
@@ -222,7 +200,7 @@ namespace DatasetUtils {
     protected:
         size_t m_nTotFrameCount;
         cv::Mat m_oAtomicCountersQueryBuffer;
-        virtual void dispatch(int nStage, GLShader* pShader);
+        virtual void dispatch(int nStage, GLShader& pShader);
     };
 #endif //HAVE_GLSL
 

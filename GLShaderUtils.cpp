@@ -960,13 +960,10 @@ std::string GLSLFunctionUtils::getShaderFunctionSource_urand_tinymt32() {
     return ssSrc.str();
 }
 
-void GLSLFunctionUtils::initTinyMT32Generators(glm::uvec3 vGeneratorLayout, TMT32GenParams** ppData) {
-    glAssert(ppData!=NULL);
+void GLSLFunctionUtils::initTinyMT32Generators(glm::uvec3 vGeneratorLayout, std::vector<TMT32GenParams>& voData) {
     glAssert(vGeneratorLayout.x>0 && vGeneratorLayout.y>0 && vGeneratorLayout.z>0);
-    if(*ppData)
-        delete[] *ppData;
-    *ppData = new TMT32GenParams[vGeneratorLayout.x*vGeneratorLayout.y*vGeneratorLayout.z];
-    TMT32GenParams* pData = *ppData;
+    voData.resize(vGeneratorLayout.x*vGeneratorLayout.y*vGeneratorLayout.z);
+    TMT32GenParams* pData = voData.data();
     // tinymt32dc:cecf43a2417bd5c41e5d6f80cf2ce903,32,1337,f20d1b78,ff90ffe5,30fbdfff,65,0
     for(size_t z=0; z<vGeneratorLayout.z; ++z) {
         const size_t nStepSize_Z = z*vGeneratorLayout.y*vGeneratorLayout.x;

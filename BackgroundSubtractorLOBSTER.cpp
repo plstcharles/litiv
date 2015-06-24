@@ -38,8 +38,6 @@ BackgroundSubtractorLOBSTER::BackgroundSubtractorLOBSTER(  float fRelLBSPThresho
         ,m_nColStepSize(0)
         ,m_nRowStepSize(0)
         ,m_nBGModelSize(0)
-        ,m_avBGModelData(nullptr)
-        ,m_avTMT32ModelData(nullptr)
 #endif //HAVE_GLSL
 {
     CV_Assert(m_nRequiredBGSamples<=m_nBGSamples);
@@ -54,29 +52,14 @@ BackgroundSubtractorLOBSTER::BackgroundSubtractorLOBSTER(  float fRelLBSPThresho
 #endif //HAVE_GLSL
 }
 
-BackgroundSubtractorLOBSTER::~BackgroundSubtractorLOBSTER() {
-    if(m_aPxIdxLUT)
-        delete[] m_aPxIdxLUT;
-    if(m_aPxInfoLUT)
-        delete[] m_aPxInfoLUT;
-#if HAVE_GLSL
-    if(m_avBGModelData)
-        delete[] m_avBGModelData;
-    if(m_avTMT32ModelData)
-        delete[] m_avTMT32ModelData;
-#endif //HAVE_GLSL
-}
+BackgroundSubtractorLOBSTER::~BackgroundSubtractorLOBSTER() {}
 
 void BackgroundSubtractorLOBSTER::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
     // == init
     BackgroundSubtractorLBSP::initialize(oInitImg,oROI);
     m_bModelInitialized = false;
-    if(m_aPxIdxLUT)
-        delete[] m_aPxIdxLUT;
-    if(m_aPxInfoLUT)
-        delete[] m_aPxInfoLUT;
-    m_aPxIdxLUT = new size_t[m_nTotRelevantPxCount];
-    m_aPxInfoLUT = new PxInfoBase[m_nTotPxCount];
+    m_vnPxIdxLUT.resize(m_nTotRelevantPxCount);
+    m_voPxInfoLUT.resize(m_nTotPxCount);
     if(m_nImgChannels==1) {
         CV_Assert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width && m_oLastColorFrame.step.p[1]==1);
         CV_Assert(m_oLastDescFrame.step.p[0]==m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==m_oLastColorFrame.step.p[1]*2);
@@ -84,13 +67,13 @@ void BackgroundSubtractorLOBSTER::initialize(const cv::Mat& oInitImg, const cv::
             m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>((t*m_fRelLBSPThreshold+m_nLBSPThresholdOffset)/2);
         for(size_t nPxIter=0, nModelIter=0; nPxIter<m_nTotPxCount; ++nPxIter) {
             if(m_oROI.data[nPxIter]) {
-                m_aPxIdxLUT[nModelIter] = nPxIter;
-                m_aPxInfoLUT[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
-                m_aPxInfoLUT[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
-                m_aPxInfoLUT[nPxIter].nModelIdx = nModelIter;
+                m_vnPxIdxLUT[nModelIter] = nPxIter;
+                m_voPxInfoLUT[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
+                m_voPxInfoLUT[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
+                m_voPxInfoLUT[nPxIter].nModelIdx = nModelIter;
                 m_oLastColorFrame.data[nPxIter] = oInitImg.data[nPxIter];
                 const size_t nDescIter = nPxIter*2;
-                LBSP::computeGrayscaleDescriptor(oInitImg,oInitImg.data[nPxIter],m_aPxInfoLUT[nPxIter].nImgCoord_X,m_aPxInfoLUT[nPxIter].nImgCoord_Y,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxIter]],*((ushort*)(m_oLastDescFrame.data+nDescIter)));
+                LBSP::computeGrayscaleDescriptor(oInitImg,oInitImg.data[nPxIter],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxIter]],*((ushort*)(m_oLastDescFrame.data+nDescIter)));
                 ++nModelIter;
             }
         }
@@ -102,18 +85,18 @@ void BackgroundSubtractorLOBSTER::initialize(const cv::Mat& oInitImg, const cv::
             m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(t*m_fRelLBSPThreshold+m_nLBSPThresholdOffset);
         for(size_t nPxIter=0, nModelIter=0; nPxIter<m_nTotPxCount; ++nPxIter) {
             if(m_oROI.data[nPxIter]) {
-                m_aPxIdxLUT[nModelIter] = nPxIter;
-                m_aPxInfoLUT[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
-                m_aPxInfoLUT[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
-                m_aPxInfoLUT[nPxIter].nModelIdx = nModelIter;
+                m_vnPxIdxLUT[nModelIter] = nPxIter;
+                m_voPxInfoLUT[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
+                m_voPxInfoLUT[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
+                m_voPxInfoLUT[nPxIter].nModelIdx = nModelIter;
                 const size_t nPxRGBIter = nPxIter*m_nImgChannels;
                 const size_t nDescRGBIter = nPxRGBIter*2;
                 for(size_t c=0; c<m_nImgChannels; ++c) {
                     m_oLastColorFrame.data[nPxRGBIter+c] = oInitImg.data[nPxRGBIter+c];
                     if(m_nImgChannels==3)
-                        LBSP::computeSingleRGBDescriptor(oInitImg,oInitImg.data[nPxRGBIter+c],m_aPxInfoLUT[nPxIter].nImgCoord_X,m_aPxInfoLUT[nPxIter].nImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
+                        LBSP::computeSingleRGBDescriptor(oInitImg,oInitImg.data[nPxRGBIter+c],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
                     else //m_nImgChannels==4
-                        LBSP::computeSingleRGBADescriptor(oInitImg,oInitImg.data[nPxRGBIter+c],m_aPxInfoLUT[nPxIter].nImgCoord_X,m_aPxInfoLUT[nPxIter].nImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
+                        LBSP::computeSingleRGBADescriptor(oInitImg,oInitImg.data[nPxRGBIter+c],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
                 }
                 ++nModelIter;
             }
@@ -131,14 +114,11 @@ void BackgroundSubtractorLOBSTER::initialize(const cv::Mat& oInitImg, const cv::
     int nMaxSSBOBlockSize;
     glGetIntegerv(GL_MAX_SHADER_STORAGE_BLOCK_SIZE,&nMaxSSBOBlockSize);
     glAssert(nMaxSSBOBlockSize>(int)(m_nBGModelSize*sizeof(uint)) && nMaxSSBOBlockSize>(int)(m_nTMT32ModelSize*sizeof(GLSLFunctionUtils::TMT32GenParams)));
-    if(m_avBGModelData)
-        delete[] m_avBGModelData;
-    m_avBGModelData = new uint[m_nBGModelSize];
-    memset(m_avBGModelData,0,m_nBGModelSize*sizeof(uint));
-    GLSLFunctionUtils::initTinyMT32Generators(glm::uvec3(m_oROI.cols,m_oROI.rows,1),&m_avTMT32ModelData);
+    m_vnBGModelData.resize(m_nBGModelSize,0);
+    GLSLFunctionUtils::initTinyMT32Generators(glm::uvec3(m_oROI.cols,m_oROI.rows,1),m_voTMT32ModelData);
     GLImageProcAlgo::initialize(oInitImg,m_oROI);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER::eBuffer_TMT32ModelBinding));
-    glBufferData(GL_SHADER_STORAGE_BUFFER,m_nTMT32ModelSize*sizeof(GLSLFunctionUtils::TMT32GenParams),m_avTMT32ModelData,GL_STATIC_COPY);
+    glBufferData(GL_SHADER_STORAGE_BUFFER,m_nTMT32ModelSize*sizeof(GLSLFunctionUtils::TMT32GenParams),m_voTMT32ModelData.data(),GL_STATIC_COPY);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER,BackgroundSubtractorLOBSTER::eBuffer_TMT32ModelBinding,getSSBOId(BackgroundSubtractorLOBSTER::eBuffer_TMT32ModelBinding));
 #else //!HAVE_GLSL
     m_voBGColorSamples.resize(m_nBGSamples);
@@ -180,23 +160,23 @@ void BackgroundSubtractorLOBSTER::refreshModel(float fSamplesRefreshFrac, bool b
                     const size_t nModelTotOffset_lbsp = nChannelIdx+nModelPxOffset_lbsp;
                     const size_t nSampleChannelIdx = ((nChannelIdx==3||m_nImgChannels==1)?nChannelIdx:2-nChannelIdx);
                     const size_t nSampleTotOffset = nSampleChannelIdx+nSampleOffset;
-                    m_avBGModelData[nModelTotOffset_color] = (uint)m_oLastColorFrame.data[nSampleTotOffset];
+                    m_vnBGModelData[nModelTotOffset_color] = (uint)m_oLastColorFrame.data[nSampleTotOffset];
                     LBSP::computeSingleRGBADescriptor(m_oLastColorFrame,m_oLastColorFrame.data[nSampleTotOffset],nSampleColIdx,nSampleRowIdx,nSampleChannelIdx,m_anLBSPThreshold_8bitLUT[m_oLastColorFrame.data[nSampleTotOffset]],nLBSPDesc);
-                    m_avBGModelData[nModelTotOffset_lbsp] = (uint)nLBSPDesc;
+                    m_vnBGModelData[nModelTotOffset_lbsp] = (uint)nLBSPDesc;
                 }
             }
         }
     }
-    glBufferData(GL_SHADER_STORAGE_BUFFER,m_nBGModelSize*sizeof(uint),m_avBGModelData,GL_STATIC_COPY);
+    glBufferData(GL_SHADER_STORAGE_BUFFER,m_nBGModelSize*sizeof(uint),m_vnBGModelData.data(),GL_STATIC_COPY);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER,BackgroundSubtractorLOBSTER::eBuffer_BGModelBinding,getSSBOId(BackgroundSubtractorLOBSTER::eBuffer_BGModelBinding));
     glErrorCheck;
 #else //!HAVE_GLSL
     for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
-        const size_t nPxIter = m_aPxIdxLUT[nModelIter];
+        const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
         if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
             for(size_t nCurrModelIdx=nRefreshStartPos; nCurrModelIdx<nRefreshStartPos+nModelsToRefresh; ++nCurrModelIdx) {
                 int nSampleImgCoord_Y, nSampleImgCoord_X;
-                getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_aPxInfoLUT[nPxIter].nImgCoord_X,m_aPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                 if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
                     const size_t nCurrRealModelIdx = nCurrModelIdx%m_nBGSamples;
@@ -390,11 +370,11 @@ void BackgroundSubtractorLOBSTER::dispatch(int nStage, GLShader* pShader) {
 
 void BackgroundSubtractorLOBSTER::getBackgroundImage(cv::OutputArray oBGImg) const {
     CV_Assert(m_bInitialized);
-    glAssert(m_bGLInitialized && m_avBGModelData);
+    glAssert(m_bGLInitialized && !m_vnBGModelData.empty());
     oBGImg.create(m_oFrameSize,CV_8UC(m_nImgChannels));
     cv::Mat oOutputImg = oBGImg.getMatRef();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER::eBuffer_BGModelBinding));
-    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER,0,m_nBGModelSize*sizeof(uint),m_avBGModelData);
+    glGetBufferSubData(GL_SHADER_STORAGE_BUFFER,0,m_nBGModelSize*sizeof(uint),(void*)m_vnBGModelData.data());
     glErrorCheck;
     for(size_t nRowIdx=0; nRowIdx<(size_t)m_oFrameSize.height; ++nRowIdx) {
         const size_t nModelRowOffset = nRowIdx*m_nRowStepSize;
@@ -407,7 +387,7 @@ void BackgroundSubtractorLOBSTER::getBackgroundImage(cv::OutputArray oBGImg) con
                 const size_t nModelPxOffset = nSampleIdx*m_nSampleStepSize+nModelColOffset;
                 for(size_t nChannelIdx=0; nChannelIdx<m_nImgChannels; ++nChannelIdx) {
                     const size_t nModelTotOffset = nChannelIdx+nModelPxOffset;
-                    afCurrPxSum[nChannelIdx] += m_avBGModelData[nModelTotOffset];
+                    afCurrPxSum[nChannelIdx] += m_vnBGModelData[nModelTotOffset];
                 }
             }
             for(size_t nChannelIdx=0; nChannelIdx<m_nImgChannels; ++nChannelIdx) {
@@ -442,10 +422,10 @@ void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArr
     const size_t nLearningRate = (size_t)ceil(dLearningRate);
     if(m_nImgChannels==1) {
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
-            const size_t nPxIter = m_aPxIdxLUT[nModelIter];
+            const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
             const size_t nDescIter = nPxIter*2;
-            const int nCurrImgCoord_X = m_aPxInfoLUT[nPxIter].nImgCoord_X;
-            const int nCurrImgCoord_Y = m_aPxInfoLUT[nPxIter].nImgCoord_Y;
+            const int nCurrImgCoord_X = m_voPxInfoLUT[nPxIter].nImgCoord_X;
+            const int nCurrImgCoord_Y = m_voPxInfoLUT[nPxIter].nImgCoord_Y;
             const uchar nCurrColor = oInputImg.data[nPxIter];
             size_t nGoodSamplesCount=0, nModelIdx=0;
             ushort nCurrInputDesc;
@@ -492,9 +472,9 @@ void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArr
         const size_t desc_row_step = m_voBGDescSamples[0].step.p[0];
         const size_t img_row_step = m_voBGColorSamples[0].step.p[0];
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
-            const size_t nPxIter = m_aPxIdxLUT[nModelIter];
-            const int nCurrImgCoord_X = m_aPxInfoLUT[nPxIter].nImgCoord_X;
-            const int nCurrImgCoord_Y = m_aPxInfoLUT[nPxIter].nImgCoord_Y;
+            const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
+            const int nCurrImgCoord_X = m_voPxInfoLUT[nPxIter].nImgCoord_X;
+            const int nCurrImgCoord_Y = m_voPxInfoLUT[nPxIter].nImgCoord_Y;
             const size_t nPxIterRGB = nPxIter*3;
             const size_t nDescIterRGB = nPxIterRGB*2;
             const uchar* const anCurrColor = oInputImg.data+nPxIterRGB;

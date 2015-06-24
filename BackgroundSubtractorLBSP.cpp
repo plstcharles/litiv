@@ -22,8 +22,6 @@ BackgroundSubtractorLBSP::BackgroundSubtractorLBSP(float fRelLBSPThreshold, size
         ,m_nFrameIdx(SIZE_MAX)
         ,m_nFramesSinceLastReset(0)
         ,m_nModelResetCooldown(0)
-        ,m_aPxIdxLUT(nullptr)
-        ,m_aPxInfoLUT(nullptr)
         ,m_nDefaultMedianBlurKernelSize(DEFAULT_MEDIAN_BLUR_KERNEL_SIZE)
         ,m_bInitialized(false)
         ,m_bAutoModelResetEnabled(true)

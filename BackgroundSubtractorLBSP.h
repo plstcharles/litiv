@@ -69,11 +69,11 @@ protected:
     //! current frame index, frame count since last model reset & model reset cooldown counters
     size_t m_nFrameIdx, m_nFramesSinceLastReset, m_nModelResetCooldown;
     //! pre-allocated internal LBSP threshold values LUT for all possible 8-bit intensities
-    size_t m_anLBSPThreshold_8bitLUT[UCHAR_MAX+1];
+    std::array<size_t,UCHAR_MAX+1> m_anLBSPThreshold_8bitLUT;
     //! internal pixel index LUT for all relevant analysis regions (based on the provided ROI)
-    size_t* m_aPxIdxLUT;
+    std::vector<size_t> m_vnPxIdxLUT;
     //! internal pixel info LUT for all possible pixel indexes
-    PxInfoBase* m_aPxInfoLUT;
+    std::vector<PxInfoBase> m_voPxInfoLUT;
     //! default kernel size for median blur post-proc filtering
     const int m_nDefaultMedianBlurKernelSize;
     //! specifies whether the algorithm is fully initialized or not
@@ -90,10 +90,8 @@ protected:
     cv::Mat m_oLastFGMask;
 
 private:
-    //! copy constructor -- disabled since this class (and its children) use lots of dynamic structs based on raw pointers
-    BackgroundSubtractorLBSP(const BackgroundSubtractorLBSP&);
-    //! assignment operator -- disabled since this class (and its children) use lots of dynamic structs based on raw pointers
-    BackgroundSubtractorLBSP& operator=(const BackgroundSubtractorLBSP&);
+    BackgroundSubtractorLBSP& operator=(const BackgroundSubtractorLBSP&)=delete;
+    BackgroundSubtractorLBSP(const BackgroundSubtractorLBSP&)=delete;
 
 public:
     // ######## DEBUG PURPOSES ONLY ##########

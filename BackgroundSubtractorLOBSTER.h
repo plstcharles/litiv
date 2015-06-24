@@ -93,8 +93,8 @@ protected:
     size_t m_nColStepSize;
     size_t m_nRowStepSize;
     size_t m_nBGModelSize;
-    uint* m_avBGModelData;
-    GLSLFunctionUtils::TMT32GenParams* m_avTMT32ModelData;
+    std::vector<uint> m_vnBGModelData;
+    std::vector<GLSLFunctionUtils::TMT32GenParams> m_voTMT32ModelData;
     static const GLuint eBuffer_BGModelBinding;
     static const GLuint eBuffer_TMT32ModelBinding;
     virtual void dispatch(int nStage, GLShader* pShader);

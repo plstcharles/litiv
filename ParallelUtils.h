@@ -1,6 +1,6 @@
 #pragma once
 
-#define HAVE_GPU_SUPPORT    1
+#define HAVE_GPU_SUPPORT    0
 #define DEFAULT_NB_THREADS  1
 
 #if HAVE_GPU_SUPPORT

@@ -24,8 +24,8 @@ struct GLVertexArrayObject {
     virtual void render()=0;
     inline GLuint getVAOId() {return m_nVAO;}
 private:
-    GLVertexArrayObject(const GLVertexArrayObject&);
-    GLVertexArrayObject& operator=(const GLVertexArrayObject&);
+    GLVertexArrayObject& operator=(const GLVertexArrayObject&)=delete;
+    GLVertexArrayObject(const GLVertexArrayObject&)=delete;
     GLuint m_nVAO;
 };
 
@@ -40,8 +40,8 @@ struct GLPixelBufferObject {
     const GLenum m_eBufferTarget;
     const GLenum m_eBufferUsage;
 private:
-    GLPixelBufferObject(const GLPixelBufferObject&);
-    GLPixelBufferObject& operator=(const GLPixelBufferObject&);
+    GLPixelBufferObject& operator=(const GLPixelBufferObject&)=delete;
+    GLPixelBufferObject(const GLPixelBufferObject&)=delete;
     GLuint m_nPBO;
     const int m_nBufferSize;
     const int m_nFrameType;
@@ -65,8 +65,8 @@ struct GLTexture {
     virtual ~GLTexture();
     inline GLuint getTexId() {return m_nTex;}
 private:
-    GLTexture(const GLTexture&);
-    GLTexture& operator=(const GLTexture&);
+    GLTexture& operator=(const GLTexture&)=delete;
+    GLTexture(const GLTexture&)=delete;
     GLuint m_nTex;
 };
 

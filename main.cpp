@@ -14,7 +14,7 @@
 #define WRITE_BGSUB_IMG_OUTPUT           0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
 #define WRITE_BGSUB_METRICS_ANALYSIS     0
-#define DISPLAY_BGSUB_DEBUG_OUTPUT       0
+#define DISPLAY_BGSUB_DEBUG_OUTPUT       1
 #define ENABLE_TIMERS                    0
 #define ENABLE_DISPLAY_MOUSE_DEBUG       0
 #define WRITE_BGSUB_SEGM_AVI_OUTPUT      0
@@ -32,14 +32,6 @@
 #define DATASET_ROOT_PATH      std::string("/shared2/datasets/")
 #define DATASET_RESULTS_PATH   std::string("results")
 
-#include "BackgroundSubtractorPAWCS.h"
-#include "BackgroundSubtractorSuBSENSE.h"
-#include "BackgroundSubtractorLOBSTER.h"
-#include "BackgroundSubtractorViBe_1ch.h"
-#include "BackgroundSubtractorViBe_3ch.h"
-#include "BackgroundSubtractorPBAS_1ch.h"
-#include "BackgroundSubtractorPBAS_3ch.h"
-
 #define LIMIT_MODEL_TO_SEQUENCE_ROI (USE_LOBSTER_BGSUB||USE_SUBSENSE_BGSUB||USE_PAWCS_BGSUB)
 #define BOOTSTRAP_100_FIRST_FRAMES  (USE_LOBSTER_BGSUB||USE_SUBSENSE_BGSUB||USE_PAWCS_BGSUB)
 #if EVAL_RESULTS_ONLY && (DEFAULT_NB_THREADS>1 || HAVE_GPU_SUPPORT || !WRITE_BGSUB_METRICS_ANALYSIS)
@@ -47,7 +39,19 @@
 #endif //EVAL_RESULTS_ONLY && (DEFAULT_NB_THREADS>1 || !WRITE_BGSUB_METRICS_ANALYSIS)
 #if (USE_LOBSTER_BGSUB+USE_SUBSENSE_BGSUB+USE_VIBE_BGSUB+USE_PBAS_BGSUB+USE_PAWCS_BGSUB)!=1
 #error "Must specify a single algorithm."
-#endif //(USE_LOBSTER_BGSUB+USE_SUBSENSE_BGSUB+USE_VIBE_BGSUB+USE_PBAS_BGSUB+USE_PAWCS_BGSUB)!=1
+#elif USE_VIBE_BGSUB
+#include "BackgroundSubtractorViBe_1ch.h"
+#include "BackgroundSubtractorViBe_3ch.h"
+#elif USE_PBAS_BGSUB
+#include "BackgroundSubtractorPBAS_1ch.h"
+#include "BackgroundSubtractorPBAS_3ch.h"
+#elif USE_PAWCS_BGSUB
+#include "BackgroundSubtractorPAWCS.h"
+#elif USE_LOBSTER_BGSUB
+#include "BackgroundSubtractorLOBSTER.h"
+#elif USE_SUBSENSE_BGSUB
+#include "BackgroundSubtractorSuBSENSE.h"
+#endif //USE_..._BGSUB
 #if ENABLE_DISPLAY_MOUSE_DEBUG
 #if (HAVE_GPU_SUPPORT || DEFAULT_NB_THREADS>1)
 #error "Cannot support mouse debug with GPU support or with more than one thread."
@@ -82,22 +86,10 @@ const DatasetUtils::DatasetInfo& g_oDatasetInfo = DatasetUtils::GetDatasetInfo(D
 #if (HAVE_GPU_SUPPORT && DEFAULT_NB_THREADS>1)
 #warning "Cannot support multithreading + gpu exec, will keep one main thread + gpu instead"
 #endif //(HAVE_GPU_SUPPORT && DEFAULT_NB_THREADS>1)
-int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, DatasetUtils::SequenceInfo* pCurrSequence, const std::string& sCurrResultsPath);
+int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> pCurrSequence, const std::string& sCurrResultsPath);
 #if !HAVE_GPU_SUPPORT
-#if PLATFORM_SUPPORTS_CPP11
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
 std::atomic_size_t g_nActiveThreads(0);
-#elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
-const size_t g_nMaxThreads = DEFAULT_NB_THREADS;
-HANDLE g_hThreadEvent[g_nMaxThreads] = {0};
-HANDLE g_hThreads[g_nMaxThreads] = {0};
-void* g_apThreadDataStruct[g_nMaxThreads][3] = {0};
-DWORD WINAPI AnalyzeSequenceEntryPoint(LPVOID lpParam) {
-    return AnalyzeSequence((int)(lpParam),(CategoryInfo*)g_apThreadDataStruct[(int)(lpParam)][0],(SequenceInfo*)g_apThreadDataStruct[(int)(lpParam)][1],std::string((const char*)(g_apThreadDataStruct[(int)(lpParam)][2])));
-}
-#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#error "Missing implementation for CPU-based exec using threads, mutexes & atomic variables on this platform."
-#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #endif //!HAVE_GPU_SUPPORT
 
 int main() {
@@ -105,20 +97,20 @@ int main() {
     SetConsoleWindowSize(80,40,1000);
 #endif //PLATFORM_USES_WIN32API
     std::cout << "Parsing dataset..." << std::endl;
-    std::vector<DatasetUtils::CategoryInfo*> vpCategories;
+    std::vector<std::shared_ptr<DatasetUtils::CategoryInfo>> vpCategories;
     for(auto oDatasetFolderPathIter=g_oDatasetInfo.vsDatasetFolderPaths.begin(); oDatasetFolderPathIter!=g_oDatasetInfo.vsDatasetFolderPaths.end(); ++oDatasetFolderPathIter) {
         try {
-            vpCategories.push_back(new DatasetUtils::CategoryInfo(*oDatasetFolderPathIter,g_oDatasetInfo.sDatasetPath+*oDatasetFolderPathIter,g_oDatasetInfo.eID,g_oDatasetInfo.vsDatasetGrayscaleDirPathTokens,g_oDatasetInfo.vsDatasetSkippedDirPathTokens,HAVE_GPU_SUPPORT));
+            vpCategories.push_back(std::make_shared<DatasetUtils::CategoryInfo>(*oDatasetFolderPathIter,g_oDatasetInfo.sDatasetPath+*oDatasetFolderPathIter,g_oDatasetInfo.eID,g_oDatasetInfo.vsDatasetGrayscaleDirPathTokens,g_oDatasetInfo.vsDatasetSkippedDirPathTokens,HAVE_GPU_SUPPORT));
         } catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
     }
     size_t nSeqTotal = 0;
     size_t nFramesTotal = 0;
-    std::multimap<double,DatasetUtils::SequenceInfo*> mSeqLoads;
+    std::multimap<double,std::shared_ptr<DatasetUtils::SequenceInfo>> mSeqLoads;
     for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory) {
         nSeqTotal += (*pCurrCategory)->m_vpSequences.size();
         for(auto pCurrSequence=(*pCurrCategory)->m_vpSequences.begin(); pCurrSequence!=(*pCurrCategory)->m_vpSequences.end(); ++pCurrSequence) {
             nFramesTotal += (*pCurrSequence)->GetNbInputFrames();
-            mSeqLoads.insert(std::pair<double,DatasetUtils::SequenceInfo*>((*pCurrSequence)->m_dExpectedROILoad,(*pCurrSequence)));
+            mSeqLoads.insert(std::make_pair((*pCurrSequence)->m_dExpectedROILoad,(*pCurrSequence)));
         }
     }
     CV_Assert(mSeqLoads.size()==nSeqTotal);
@@ -157,40 +149,19 @@ int main() {
         for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
             std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
             ++nSeqProcessed;
-            AnalyzeSequence(0,oSeqIter->second->m_pParent,oSeqIter->second,sCurrResultsPath);
+            AnalyzeSequence(0,oSeqIter->second,sCurrResultsPath);
         }
 #else //!HAVE_GPU_SUPPORT
-#if PLATFORM_SUPPORTS_CPP11
         for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
             while(g_nActiveThreads>=g_nMaxThreads)
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
             ++g_nActiveThreads;
             ++nSeqProcessed;
-            std::thread(AnalyzeSequence,nSeqProcessed,oSeqIter->second->m_pParent,oSeqIter->second,sCurrResultsPath).detach();
+            std::thread(AnalyzeSequence,nSeqProcessed,oSeqIter->second,sCurrResultsPath).detach();
         }
         while(g_nActiveThreads>0)
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-#elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
-        for(size_t n=0; n<g_nMaxThreads; ++n)
-            g_hThreadEvent[n] = CreateEvent(NULL,FALSE,TRUE,NULL);
-        for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
-            DWORD ret = WaitForMultipleObjects(g_nMaxThreads,g_hThreadEvent,FALSE,INFINITE);
-            std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
-            ++nSeqProcessed;
-            g_apThreadDataStruct[ret][0] = oSeqIter->second->m_pParent;
-            g_apThreadDataStruct[ret][1] = oSeqIter->second;
-            g_apThreadDataStruct[ret][2] = (void*)sCurrResultsPath.c_str();
-            g_hThreads[ret] = CreateThread(NULL,NULL,AnalyzeSequenceEntryPoint,(LPVOID)ret,0,NULL);
-        }
-        WaitForMultipleObjects((DWORD)((g_nMaxThreads>nSeqTotal)?nSeqTotal:g_nMaxThreads),g_hThreads,TRUE,INFINITE);
-        for(size_t n=0; n<g_nMaxThreads; ++n) {
-            CloseHandle(g_hThreadEvent[n]);
-            CloseHandle(g_hThreads[n]);
-        }
-#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#error "Missing implementation for threads/mutexes/atomic variables on this platform."
-#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #endif //!HAVE_GPU_SUPPORT
         time_t nShutdownTime = time(nullptr);
         const double dFinalFPS = (nShutdownTime-nStartupTime)>0?(double)nFramesTotal/(nShutdownTime-nStartupTime):std::numeric_limits<double>::quiet_NaN();
@@ -221,32 +192,26 @@ int main() {
     }
     else
         std::cout << "No sequences found, all done." << std::endl;
-    // let memory 'leak' here, exits faster once job is done...
-    //for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory)
-    //    delete *pCurrCategory;
-    //vpCategories.clear();
 }
 
-int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, DatasetUtils::SequenceInfo* pCurrSequence, const std::string& sCurrResultsPath) {
+int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> pCurrSequence, const std::string& sCurrResultsPath) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
 #if USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB
-    BackgroundSubtractorLBSP* pBGS = nullptr;
+    std::unique_ptr<BackgroundSubtractorLBSP> pBGS;
 #if LIMIT_MODEL_TO_SEQUENCE_ROI
     cv::Mat oSequenceROI = pCurrSequence->GetSequenceROI();
 #else //!LIMIT_MODEL_TO_SEQUENCE_ROI
     cv::Mat oSequenceROI;
 #endif //!LIMIT_MODEL_TO_SEQUENCE_ROI
 #else //USE_VIBE_BGSUB || USE_PBAS_BGSUB
-    cv::BackgroundSubtractor* pBGS = nullptr;
+    std::unique_ptr<cv::BackgroundSubtractor> pBGS;
 #endif //USE_VIBE_BGSUB || USE_PBAS_BGSUB
 #if HAVE_GLSL
     bool bContextInitialized = false;
-    GLFWwindow* pWindow = nullptr;
 #endif //HAVE_GLSL
     try {
-        CV_Assert(pCurrCategory && pCurrSequence);
-        CV_Assert(pCurrSequence->GetNbInputFrames()>1);
+        CV_Assert(pCurrSequence && pCurrSequence->GetNbInputFrames()>1);
 #if DATASETUTILS_USE_PRECACHED_IO
         pCurrSequence->StartPrecaching();
 #endif //DATASETUTILS_USE_PRECACHED_IO
@@ -260,7 +225,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
         cv::Size oCurrInputSize,oCurrWindowSize;
         oCurrInputSize = oCurrWindowSize = oInitImg.size();
         // note: never construct GL classes before context initialization
-        if(glfwInit() == GL_FALSE)
+        if(glfwInit()==GL_FALSE)
             glError("Failed to init GLFW");
         bContextInitialized = true;
         glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
@@ -270,9 +235,10 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #if !GPU_RENDERING
         glfwWindowHint(GLFW_VISIBLE,GL_FALSE);
 #endif //!GPU_RENDERING
-        if((pWindow=glfwCreateWindow(oCurrWindowSize.width,oCurrWindowSize.height,"changedet_gpu",nullptr,nullptr))==0)
+        std::unique_ptr<GLFWwindow,void(*)(GLFWwindow*)> pWindow(glfwCreateWindow(oCurrWindowSize.width,oCurrWindowSize.height,"changedet_gpu",nullptr,nullptr),glfwDestroyWindow);
+        if(!pWindow)
             glError("Failed to create window via GLFW");
-        glfwMakeContextCurrent(pWindow);
+        glfwMakeContextCurrent(pWindow.get());
         GLenum eErrCode;
         glewExperimental = GL_TRUE;
         glErrorCheck;
@@ -286,37 +252,37 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
             std::cout << "\n\tWarning: glGetTextureSubImage not supported, performance might be affected\n" << std::endl;
 #endif //HAVE_GLSL
 #if USE_LOBSTER_BGSUB
-        pBGS = new BackgroundSubtractorLOBSTER();
+        pBGS = std::unique_ptr<BackgroundSubtractorLBSP>(new BackgroundSubtractorLOBSTER());
         const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
         pBGS->initialize(oInitImg,oSequenceROI);
 #elif USE_SUBSENSE_BGSUB
-        pBGS = new BackgroundSubtractorSuBSENSE();
+        pBGS = std::unique_ptr<BackgroundSubtractorLBSP>(new BackgroundSubtractorSuBSENSE());
         const double dDefaultLearningRate = 0;
         pBGS->initialize(oInitImg,oSequenceROI);
 #elif USE_PAWCS_BGSUB
-        pBGS = new BackgroundSubtractorPAWCS();
+        pBGS = std::unique_ptr<BackgroundSubtractorLBSP>(new BackgroundSubtractorPAWCS());
         const double dDefaultLearningRate = 0;
         pBGS->initialize(oInitImg,oSequenceROI);
 #else //USE_VIBE_BGSUB || USE_PBAS_BGSUB
         const size_t m_nInputChannels = (size_t)oInitImg.channels();
 #if USE_VIBE_BGSUB
         if(m_nInputChannels==3)
-            pBGS = new BackgroundSubtractorViBe_3ch();
+            pBGS = std::unique_ptr<cv::BackgroundSubtractor>(new BackgroundSubtractorViBe_3ch());
         else
-            pBGS = new BackgroundSubtractorViBe_1ch();
-        ((BackgroundSubtractorViBe*)pBGS)->initialize(oInitImg);
+            pBGS = std::unique_ptr<cv::BackgroundSubtractor>(new BackgroundSubtractorViBe_1ch());
+        ((BackgroundSubtractorViBe*)pBGS.get())->initialize(oInitImg);
         const double dDefaultLearningRate = BGSVIBE_DEFAULT_LEARNING_RATE;
 #else //USE_PBAS_BGSUB
         if(m_nInputChannels==3)
-            pBGS = new BackgroundSubtractorPBAS_3ch();
+            pBGS = std::unique_ptr<cv::BackgroundSubtractor>(new BackgroundSubtractorPBAS_3ch());
         else
-            pBGS = new BackgroundSubtractorPBAS_1ch();
-        ((BackgroundSubtractorPBAS*)pBGS)->initialize(oInitImg);
+            pBGS = std::unique_ptr<cv::BackgroundSubtractor>(new BackgroundSubtractorPBAS_1ch());
+        ((BackgroundSubtractorPBAS*)pBGS.get())->initialize(oInitImg);
         const double dDefaultLearningRate = BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE;
 #endif //USE_PBAS_BGSUB
 #endif //USE_VIBE_BGSUB || USE_PBAS_BGSUB
 #if USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB
-        pBGS->m_sDebugName = pCurrCategory->m_sName+"_"+pCurrSequence->m_sName;
+        pBGS->m_sDebugName = pCurrSequence->m_pParent->m_sName+"_"+pCurrSequence->m_sName;
 #if WRITE_BGSUB_METRICS_ANALYSIS
         pBGS->m_pDebugFS = &g_oDebugFS;
 #endif //WRITE_BGSUB_METRICS_ANALYSIS
@@ -326,29 +292,28 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
 #endif //USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB
 #if DISPLAY_BGSUB_DEBUG_OUTPUT
-        std::string sDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName;
+        std::string sDebugDisplayName = pCurrSequence->m_pParent->m_sName + std::string(" -- ") + pCurrSequence->m_sName;
         cv::namedWindow(sDebugDisplayName);
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT
         CV_Assert((!WRITE_BGSUB_DEBUG_IMG_OUTPUT && !WRITE_BGSUB_SEGM_AVI_OUTPUT && !WRITE_BGSUB_IMG_OUTPUT) || !sCurrResultsPath.empty());
 #if ENABLE_DISPLAY_MOUSE_DEBUG
-        std::string sMouseDebugDisplayName = pCurrCategory->m_sName + std::string(" -- ") + pCurrSequence->m_sName + " [MOUSE DEBUG]";
+        std::string sMouseDebugDisplayName = pCurrSequence->m_pParent->m_sName + std::string(" -- ") + pCurrSequence->m_sName + " [MOUSE DEBUG]";
         cv::namedWindow(sMouseDebugDisplayName,0);
         cv::setMouseCallback(sMouseDebugDisplayName,OnMouseEvent,nullptr);
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
 #if WRITE_BGSUB_DEBUG_IMG_OUTPUT
-        cv::VideoWriter oDebugWriter(sCurrResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,g_oDisplayOutputSize,true);
+        cv::VideoWriter oDebugWriter(sCurrResultsPath+pCurrSequence->m_pParent->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,g_oDisplayOutputSize,true);
 #endif //WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if WRITE_BGSUB_SEGM_AVI_OUTPUT
-        cv::VideoWriter oSegmWriter(sCurrResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+"_segm.avi",CV_FOURCC('F','F','V','1'),30,pCurrSequence->GetSize(),false);
+        cv::VideoWriter oSegmWriter(sCurrResultsPath+pCurrSequence->m_pParent->m_sName+"/"+pCurrSequence->m_sName+"_segm.avi",CV_FOURCC('F','F','V','1'),30,pCurrSequence->GetSize(),false);
 #endif //WRITE_BGSUB_SEGM_AVI_OUTPUT
 #if WRITE_BGSUB_IMG_OUTPUT
-        PlatformUtils::CreateDirIfNotExist(sCurrResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+"/");
+        PlatformUtils::CreateDirIfNotExist(sCurrResultsPath+pCurrSequence->m_pParent->m_sName+"/"+pCurrSequence->m_sName+"/");
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #if HAVE_GLSL
-        GLImageProcAlgo* pImgProcAlgo = dynamic_cast<GLImageProcAlgo*>(pBGS);
-        if(pImgProcAlgo) {
+        if(GLImageProcAlgo* pImgProcAlgo = dynamic_cast<GLImageProcAlgo*>(pBGS.get())) {
             oCurrWindowSize.width *= pImgProcAlgo->m_nSxSDisplayCount;
-            glfwSetWindowSize(pWindow,oCurrWindowSize.width,oCurrWindowSize.height);
+            glfwSetWindowSize(pWindow.get(),oCurrWindowSize.width,oCurrWindowSize.height);
             glViewport(0,0,oCurrWindowSize.width,oCurrWindowSize.height);
 #if (WRITE_BGSUB_METRICS_ANALYSIS || DISPLAY_BGSUB_DEBUG_OUTPUT)
             pImgProcAlgo->setOutputFetching(true);
@@ -381,7 +346,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
             const size_t nInputFrameQueryIdx = nCurrFrameIdx;
 #endif //ASYNC_PROCESS
 #if HAVE_GLSL
-            if(glfwWindowShouldClose(pWindow))
+            if(glfwWindowShouldClose(pWindow.get()))
                 break;
             glfwPollEvents();
 #if GPU_RENDERING
@@ -483,7 +448,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT
 #endif //(DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT)
 #if WRITE_BGSUB_IMG_OUTPUT
-                DatasetUtils::WriteResult(sCurrResultsPath,pCurrCategory->m_sName,pCurrSequence->m_sName,g_oDatasetInfo.sResultPrefix,nGTFrameQueryIdx+g_oDatasetInfo.nResultIdxOffset,g_oDatasetInfo.sResultSuffix,oFGMask,g_vnResultsComprParams);
+                DatasetUtils::WriteResult(sCurrResultsPath,pCurrSequence->m_pParent->m_sName,pCurrSequence->m_sName,g_oDatasetInfo.sResultPrefix,nGTFrameQueryIdx+g_oDatasetInfo.nResultIdxOffset,g_oDatasetInfo.sResultSuffix,oFGMask,g_vnResultsComprParams);
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #if WRITE_BGSUB_METRICS_ANALYSIS
                 DatasetUtils::CalcMetricsFromResult(oFGMask,oGTImg,pCurrSequence->GetSequenceROI(),pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
@@ -503,7 +468,7 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
         std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ end, " << (int)(dTimeElapsed_MS/1000) << " sec (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
 #if WRITE_BGSUB_METRICS_ANALYSIS
         pCurrSequence->m_dAvgFPS = dAvgFPS;
-        DatasetUtils::WriteMetrics(sCurrResultsPath+pCurrCategory->m_sName+"/"+pCurrSequence->m_sName+".txt",pCurrSequence);
+        DatasetUtils::WriteMetrics(sCurrResultsPath+pCurrSequence->m_pParent->m_sName+"/"+pCurrSequence->m_sName+".txt",*pCurrSequence);
 #endif //WRITE_BGSUB_METRICS_ANALYSIS
 #if DISPLAY_BGSUB_DEBUG_OUTPUT
         cv::destroyWindow(sDebugDisplayName);
@@ -521,22 +486,13 @@ int AnalyzeSequence(int nThreadIdx, DatasetUtils::CategoryInfo* pCurrCategory, D
     catch(cv::Exception& e) {std::cerr  << "\nTop level caught cv::Exception:\n\t" << e.what() << std::endl << std::endl;}
     catch(std::runtime_error& e) {std::cerr  << "\nTop level caught std::runtime_error:\n\t" << e.what() << std::endl << std::endl;}
     catch(...) {std::cerr << "\nTop level caught unhandled exception" << std::endl << std::endl;}
-    if(pBGS) delete pBGS;
 #if HAVE_GPU_SUPPORT
 #if HAVE_GLSL
-    if(pWindow)
-        glfwDestroyWindow(pWindow);
     if(bContextInitialized)
         glfwTerminate();
 #endif //HAVE_GLSL
 #else //!HAVE_GPU_SUPPORT
-#if PLATFORM_SUPPORTS_CPP11
     g_nActiveThreads--;
-#elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
-    SetEvent(g_hThreadEvent[nThreadIdx]);
-#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#error "Missing implementation for threads/mutexes/atomic variables on this platform."
-#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #endif //!HAVE_GPU_SUPPORT
     return 0;
 }

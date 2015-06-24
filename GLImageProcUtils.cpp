@@ -108,20 +108,20 @@ void GLImageProcAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oROI)
         }
     }
     else {
-        m_vpOutputArray.clear();
-        m_vpInputArray.clear();
-        m_vpDebugArray.clear();
+        m_vpOutputArray.resize(m_nLayers);
+        m_vpInputArray.resize(m_nLayers);
+        m_vpDebugArray.resize(m_nLayers);
         for(int nLayerIter=0; nLayerIter<m_nLayers; ++nLayerIter) {
             if(m_bUsingOutput) {
-                m_vpOutputArray.push_back(std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(1,cv::Mat(m_oFrameSize,m_nOutputType),m_bUsingIntegralFormat)));
+                m_vpOutputArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(1,cv::Mat(m_oFrameSize,m_nOutputType),m_bUsingIntegralFormat));
                 m_vpOutputArray[nLayerIter]->bindToSampler((nLayerIter*GLImageProcAlgo::eTextureBindingsCount)+GLImageProcAlgo::eTexture_OutputBinding);
             }
             if(m_bUsingDebug) {
-                m_vpDebugArray.push_back(std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(1,cv::Mat(m_oFrameSize,m_nDebugType),m_bUsingIntegralFormat)));
+                m_vpDebugArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(1,cv::Mat(m_oFrameSize,m_nDebugType),m_bUsingIntegralFormat));
                 m_vpDebugArray[nLayerIter]->bindToSampler((nLayerIter*GLImageProcAlgo::eTextureBindingsCount)+GLImageProcAlgo::eTexture_DebugBinding);
             }
             if(m_bUsingInput) {
-                m_vpInputArray.push_back(std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(m_nLevels,cv::Mat(m_oFrameSize,m_nInputType),m_bUsingIntegralFormat)));
+                m_vpInputArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(m_nLevels,cv::Mat(m_oFrameSize,m_nInputType),m_bUsingIntegralFormat));
                 m_vpInputArray[nLayerIter]->bindToSampler((nLayerIter*GLImageProcAlgo::eTextureBindingsCount)+GLImageProcAlgo::eTexture_InputBinding);
                 if(m_bUsingInputPBOs) {
                     if(nLayerIter==m_nCurrLayer)
@@ -144,11 +144,11 @@ void GLImageProcAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oROI)
         m_oLastOutput = cv::Mat(m_oFrameSize,m_nOutputType);
     if(!m_bUsingDebugPBOs && m_bUsingDebug)
         m_oLastDebug = cv::Mat(m_oFrameSize,m_nDebugType);
-    m_vpImgProcShaders.clear();
+    m_vpImgProcShaders.resize(m_nComputeStages);
     for(int nCurrStageIter=0; nCurrStageIter<m_nComputeStages; ++nCurrStageIter) {
-        m_vpImgProcShaders.push_back(std::unique_ptr<GLShader>(new GLShader()));
-        m_vpImgProcShaders.back()->addSource(getComputeShaderSource(nCurrStageIter),GL_COMPUTE_SHADER);
-        if(!m_vpImgProcShaders.back()->link())
+        m_vpImgProcShaders[nCurrStageIter] = std::unique_ptr<GLShader>(new GLShader());
+        m_vpImgProcShaders[nCurrStageIter]->addSource(getComputeShaderSource(nCurrStageIter),GL_COMPUTE_SHADER);
+        if(!m_vpImgProcShaders[nCurrStageIter]->link())
             glError("Could not link image processing shader");
     }
     m_oDisplayShader.clear();
@@ -506,11 +506,11 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal( int nLayers, int 
     return ssSrc.str();
 }
 
-GLEvaluatorAlgo::GLEvaluatorAlgo(GLImageProcAlgo* pParent, int nComputeStages, int nOutputType, int nGroundtruthType, bool bUseDisplay)
+GLEvaluatorAlgo::GLEvaluatorAlgo(std::unique_ptr<GLImageProcAlgo> pParent, int nComputeStages, int nOutputType, int nGroundtruthType, bool bUseDisplay)
     :    GLImageProcAlgo(1,pParent->m_nLayers,nComputeStages,nOutputType,-1,nGroundtruthType,pParent->m_bUsingOutputPBOs,false,pParent->m_bUsingInputPBOs,pParent->m_bUsingTexArrays,bUseDisplay,false,pParent->m_bUsingIntegralFormat)
-        ,m_pParent(pParent) {
+        ,m_pParent(std::move(pParent)) {
     glAssert(m_bUsingInput);
-    glAssert(!dynamic_cast<GLEvaluatorAlgo*>(m_pParent));
+    glAssert(!dynamic_cast<GLEvaluatorAlgo*>(m_pParent.get()));
     m_bUsingDisplay = m_pParent->m_bUsingDisplay;
     m_pParent->m_bUsingDisplay = false;
 }
@@ -550,15 +550,15 @@ void GLEvaluatorAlgo::initialize(const cv::Mat oInitInput, const cv::Mat& oROI, 
         }
     }
     else {
-        m_vpOutputArray.clear();
-        m_vpInputArray.clear();
+        m_vpOutputArray.resize(m_nLayers);
+        m_vpInputArray.resize(m_nLayers);
         for(int nLayerIter=0; nLayerIter<m_nLayers; ++nLayerIter) {
             if(m_bUsingOutput) {
-                m_vpOutputArray.push_back(std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(1,cv::Mat(m_oFrameSize,m_nOutputType),m_bUsingIntegralFormat)));
+                m_vpOutputArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(1,cv::Mat(m_oFrameSize,m_nOutputType),m_bUsingIntegralFormat));
                 m_vpOutputArray[nLayerIter]->bindToSampler((nLayerIter*GLImageProcAlgo::eTextureBindingsCount)+GLImageProcAlgo::eTexture_OutputBinding);
             }
             m_pParent->m_vpOutputArray[nLayerIter]->bindToSampler((nLayerIter*GLImageProcAlgo::eTextureBindingsCount)+GLImageProcAlgo::eTexture_EvalBinding);
-            m_vpInputArray.push_back(std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(m_nLevels,cv::Mat(m_oFrameSize,m_nInputType),m_bUsingIntegralFormat)));
+            m_vpInputArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(m_nLevels,cv::Mat(m_oFrameSize,m_nInputType),m_bUsingIntegralFormat));
             m_vpInputArray[nLayerIter]->bindToSampler((nLayerIter*GLImageProcAlgo::eTextureBindingsCount)+GLImageProcAlgo::eTexture_InputBinding);
             if(m_bUsingInputPBOs) {
                 if(nLayerIter==m_nCurrLayer)
@@ -578,11 +578,11 @@ void GLEvaluatorAlgo::initialize(const cv::Mat oInitInput, const cv::Mat& oROI, 
     m_pROITexture->bindToImage(GLImageProcAlgo::eImage_ROIBinding,0,GL_READ_ONLY);
     if(!m_bUsingOutputPBOs && m_bUsingOutput)
         m_oLastOutput = cv::Mat(m_oFrameSize,m_nOutputType);
-    m_vpImgProcShaders.clear();
+    m_vpImgProcShaders.resize(m_nComputeStages);
     for(int nCurrStageIter=0; nCurrStageIter<m_nComputeStages; ++nCurrStageIter) {
-        m_vpImgProcShaders.push_back(std::unique_ptr<GLShader>(new GLShader()));
-        m_vpImgProcShaders.back()->addSource(getComputeShaderSource(nCurrStageIter),GL_COMPUTE_SHADER);
-        if(!m_vpImgProcShaders.back()->link())
+        m_vpImgProcShaders[nCurrStageIter] = std::unique_ptr<GLShader>(new GLShader());
+        m_vpImgProcShaders[nCurrStageIter]->addSource(getComputeShaderSource(nCurrStageIter),GL_COMPUTE_SHADER);
+        if(!m_vpImgProcShaders[nCurrStageIter]->link())
             glError("Could not link image processing shader");
     }
     m_oDisplayShader.clear();

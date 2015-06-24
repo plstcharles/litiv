@@ -73,12 +73,7 @@ BackgroundSubtractorSuBSENSE::BackgroundSubtractorSuBSENSE(  float fRelLBSPThres
     CV_Assert(m_nMinColorDistThreshold>=STAB_COLOR_DIST_OFFSET);
 }
 
-BackgroundSubtractorSuBSENSE::~BackgroundSubtractorSuBSENSE() {
-    if(m_aPxIdxLUT)
-        delete[] m_aPxIdxLUT;
-    if(m_aPxInfoLUT)
-        delete[] m_aPxInfoLUT;
-}
+BackgroundSubtractorSuBSENSE::~BackgroundSubtractorSuBSENSE() {}
 
 void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
     // == init
@@ -157,12 +152,8 @@ void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const cv:
         m_voBGDescSamples[s].create(m_oImgSize,CV_16UC((int)m_nImgChannels));
         m_voBGDescSamples[s] = cv::Scalar_<ushort>::all(0);
     }
-    if(m_aPxIdxLUT)
-        delete[] m_aPxIdxLUT;
-    if(m_aPxInfoLUT)
-        delete[] m_aPxInfoLUT;
-    m_aPxIdxLUT = new size_t[m_nTotRelevantPxCount];
-    m_aPxInfoLUT = new PxInfoBase[m_nTotPxCount];
+    m_vnPxIdxLUT.resize(m_nTotRelevantPxCount);
+    m_voPxInfoLUT.resize(m_nTotPxCount);
     if(m_nImgChannels==1) {
         CV_Assert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width && m_oLastColorFrame.step.p[1]==1);
         CV_Assert(m_oLastDescFrame.step.p[0]==m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==m_oLastColorFrame.step.p[1]*2);
@@ -170,13 +161,13 @@ void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const cv:
             m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>((m_nLBSPThresholdOffset+t*m_fRelLBSPThreshold)/3);
         for(size_t nPxIter=0, nModelIter=0; nPxIter<m_nTotPxCount; ++nPxIter) {
             if(m_oROI.data[nPxIter]) {
-                m_aPxIdxLUT[nModelIter] = nPxIter;
-                m_aPxInfoLUT[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
-                m_aPxInfoLUT[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
-                m_aPxInfoLUT[nPxIter].nModelIdx = nModelIter;
+                m_vnPxIdxLUT[nModelIter] = nPxIter;
+                m_voPxInfoLUT[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
+                m_voPxInfoLUT[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
+                m_voPxInfoLUT[nPxIter].nModelIdx = nModelIter;
                 m_oLastColorFrame.data[nPxIter] = oInitImg.data[nPxIter];
                 const size_t nDescIter = nPxIter*2;
-                LBSP::computeGrayscaleDescriptor(oInitImg,oInitImg.data[nPxIter],m_aPxInfoLUT[nPxIter].nImgCoord_X,m_aPxInfoLUT[nPxIter].nImgCoord_Y,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxIter]],*((ushort*)(m_oLastDescFrame.data+nDescIter)));
+                LBSP::computeGrayscaleDescriptor(oInitImg,oInitImg.data[nPxIter],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxIter]],*((ushort*)(m_oLastDescFrame.data+nDescIter)));
                 ++nModelIter;
             }
         }
@@ -188,15 +179,15 @@ void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const cv:
             m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(m_nLBSPThresholdOffset+t*m_fRelLBSPThreshold);
         for(size_t nPxIter=0, nModelIter=0; nPxIter<m_nTotPxCount; ++nPxIter) {
             if(m_oROI.data[nPxIter]) {
-                m_aPxIdxLUT[nModelIter] = nPxIter;
-                m_aPxInfoLUT[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
-                m_aPxInfoLUT[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
-                m_aPxInfoLUT[nPxIter].nModelIdx = nModelIter;
+                m_vnPxIdxLUT[nModelIter] = nPxIter;
+                m_voPxInfoLUT[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
+                m_voPxInfoLUT[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
+                m_voPxInfoLUT[nPxIter].nModelIdx = nModelIter;
                 const size_t nPxRGBIter = nPxIter*3;
                 const size_t nDescRGBIter = nPxRGBIter*2;
                 for(size_t c=0; c<3; ++c) {
                     m_oLastColorFrame.data[nPxRGBIter+c] = oInitImg.data[nPxRGBIter+c];
-                    LBSP::computeSingleRGBDescriptor(oInitImg,oInitImg.data[nPxRGBIter+c],m_aPxInfoLUT[nPxIter].nImgCoord_X,m_aPxInfoLUT[nPxIter].nImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
+                    LBSP::computeSingleRGBDescriptor(oInitImg,oInitImg.data[nPxRGBIter+c],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
                 }
                 ++nModelIter;
             }
@@ -214,11 +205,11 @@ void BackgroundSubtractorSuBSENSE::refreshModel(float fSamplesRefreshFrac, bool 
     const size_t nRefreshStartPos = fSamplesRefreshFrac<1.0f?rand()%m_nBGSamples:0;
     if(m_nImgChannels==1) {
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
-            const size_t nPxIter = m_aPxIdxLUT[nModelIter];
+            const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
             if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
                 for(size_t nCurrModelIdx=nRefreshStartPos; nCurrModelIdx<nRefreshStartPos+nModelsToRefresh; ++nCurrModelIdx) {
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_aPxInfoLUT[nPxIter].nImgCoord_X,m_aPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                     if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
                         const size_t nCurrRealModelIdx = nCurrModelIdx%m_nBGSamples;
@@ -231,11 +222,11 @@ void BackgroundSubtractorSuBSENSE::refreshModel(float fSamplesRefreshFrac, bool 
     }
     else { //m_nImgChannels==3
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
-            const size_t nPxIter = m_aPxIdxLUT[nModelIter];
+            const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
             if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
                 for(size_t nCurrModelIdx=nRefreshStartPos; nCurrModelIdx<nRefreshStartPos+nModelsToRefresh; ++nCurrModelIdx) {
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_aPxInfoLUT[nPxIter].nImgCoord_X,m_aPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                     if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
                         const size_t nCurrRealModelIdx = nCurrModelIdx%m_nBGSamples;
@@ -264,11 +255,11 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
     const float fRollAvgFactor_ST = 1.0f/std::min(m_nFrameIdx,m_nSamplesForMovingAvgs/4);
     if(m_nImgChannels==1) {
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
-            const size_t nPxIter = m_aPxIdxLUT[nModelIter];
+            const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
             const size_t nDescIter = nPxIter*2;
             const size_t nFloatIter = nPxIter*4;
-            const int nCurrImgCoord_X = m_aPxInfoLUT[nPxIter].nImgCoord_X;
-            const int nCurrImgCoord_Y = m_aPxInfoLUT[nPxIter].nImgCoord_Y;
+            const int nCurrImgCoord_X = m_voPxInfoLUT[nPxIter].nImgCoord_X;
+            const int nCurrImgCoord_Y = m_voPxInfoLUT[nPxIter].nImgCoord_Y;
             const uchar nCurrColor = oInputImg.data[nPxIter];
             size_t nMinDescDist = s_nDescMaxDataRange_1ch;
             size_t nMinSumDist = s_nColorMaxDataRange_1ch;
@@ -395,9 +386,9 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
     }
     else { //m_nImgChannels==3
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
-            const size_t nPxIter = m_aPxIdxLUT[nModelIter];
-            const int nCurrImgCoord_X = m_aPxInfoLUT[nPxIter].nImgCoord_X;
-            const int nCurrImgCoord_Y = m_aPxInfoLUT[nPxIter].nImgCoord_Y;
+            const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
+            const int nCurrImgCoord_X = m_voPxInfoLUT[nPxIter].nImgCoord_X;
+            const int nCurrImgCoord_Y = m_voPxInfoLUT[nPxIter].nImgCoord_Y;
             const size_t nPxIterRGB = nPxIter*3;
             const size_t nDescIterRGB = nPxIterRGB*2;
             const size_t nFloatIter = nPxIter*4;

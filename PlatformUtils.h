@@ -17,7 +17,9 @@
 #include <unordered_map>
 #include <deque>
 
-#define PLATFORM_SUPPORTS_CPP11 ((_MSC_VER > 1600) || (__GNUC__>=4 && __GNUC_MINOR__>=6))
+#if __cplusplus<201103L
+#error "This project requires C++11 support."
+#endif //__cplusplus<=201103L
 #if (defined WIN32 || defined _WIN32 || defined WIN64 || defined _WIN64)
 #define NOMINMAX
 #include <windows.h>
@@ -49,13 +51,24 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #endif //!PLATFORM_USES_WIN32API
-#if PLATFORM_SUPPORTS_CPP11
 #include <thread>
 #include <mutex>
 #include <chrono>
 #include <atomic>
 #include <condition_variable>
-#endif //PLATFORM_USES_WIN32API
+
+template<typename Derived,typename Base,typename Del> std::unique_ptr<Derived,Del> static_unique_ptr_cast(std::unique_ptr<Base,Del>&& p) {
+    auto d = static_cast<Derived*>(p.release());
+    return std::unique_ptr<Derived,Del>(d,std::move(p.get_deleter()));
+}
+
+template<typename Derived,typename Base,typename Del> std::unique_ptr<Derived,Del> dynamic_unique_ptr_cast(std::unique_ptr<Base,Del>&& p) {
+    if(Derived* result = dynamic_cast<Derived*>(p.get())) {
+        p.release();
+        return std::unique_ptr<Derived,Del>(result,std::move(p.get_deleter()));
+    }
+    return std::unique_ptr<Derived,Del>(nullptr,p.get_deleter());
+}
 
 namespace PlatformUtils {
     void GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths);

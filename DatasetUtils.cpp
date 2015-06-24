@@ -145,39 +145,39 @@ void DatasetUtils::WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bB
     cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-15):15),cv::FONT_HERSHEY_PLAIN,1.0,cv::Scalar_<uchar>(0,0,255),1,cv::LINE_AA);
 }
 
-void DatasetUtils::WriteMetrics(const std::string sResultsFileName, const SequenceInfo* pSeq) {
+void DatasetUtils::WriteMetrics(const std::string sResultsFileName, const SequenceInfo& oSeq) {
     std::ofstream oMetricsOutput(sResultsFileName);
-    MetricsCalculator tmp(pSeq);
-    const std::string sCurrSeqName = pSeq->m_sName.size()>12?pSeq->m_sName.substr(0,12):pSeq->m_sName;
+    MetricsCalculator tmp(oSeq);
+    const std::string sCurrSeqName = oSeq.m_sName.size()>12?oSeq.m_sName.substr(0,12):oSeq.m_sName;
     std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " : Rcl=" << std::fixed << std::setprecision(4) << tmp.m_oMetrics.dRecall << " Prc=" << tmp.m_oMetrics.dPrecision << " FM=" << tmp.m_oMetrics.dFMeasure << " MCC=" << tmp.m_oMetrics.dMCC << std::endl;
-    oMetricsOutput << "Results for sequence '" << pSeq->m_sName << "' :" << std::endl;
+    oMetricsOutput << "Results for sequence '" << oSeq.m_sName << "' :" << std::endl;
     oMetricsOutput << std::endl;
     oMetricsOutput << "nTP nFP nFN nTN nSE" << std::endl; // order similar to the files saved by the CDNet analysis script
-    oMetricsOutput << pSeq->nTP << " " << pSeq->nFP << " " << pSeq->nFN << " " << pSeq->nTN << " " << pSeq->nSE << std::endl;
+    oMetricsOutput << oSeq.nTP << " " << oSeq.nFP << " " << oSeq.nFN << " " << oSeq.nTN << " " << oSeq.nSE << std::endl;
     oMetricsOutput << std::endl << std::endl;
     oMetricsOutput << std::fixed << std::setprecision(8);
     oMetricsOutput << "Cumulative metrics :" << std::endl;
     oMetricsOutput << "Rcl        Spc        FPR        FNR        PBC        Prc        FM         MCC        " << std::endl;
     oMetricsOutput << tmp.m_oMetrics.dRecall << " " << tmp.m_oMetrics.dSpecficity << " " << tmp.m_oMetrics.dFPR << " " << tmp.m_oMetrics.dFNR << " " << tmp.m_oMetrics.dPBC << " " << tmp.m_oMetrics.dPrecision << " " << tmp.m_oMetrics.dFMeasure << " " << tmp.m_oMetrics.dMCC << std::endl;
     oMetricsOutput << std::endl << std::endl;
-    oMetricsOutput << "Sequence FPS: " << pSeq->m_dAvgFPS << std::endl;
+    oMetricsOutput << "Sequence FPS: " << oSeq.m_dAvgFPS << std::endl;
     oMetricsOutput.close();
 }
 
-void DatasetUtils::WriteMetrics(const std::string sResultsFileName, CategoryInfo* pCat) {
+void DatasetUtils::WriteMetrics(const std::string sResultsFileName, CategoryInfo& oCat) {
     std::ofstream oMetricsOutput(sResultsFileName);
-    std::sort(pCat->m_vpSequences.begin(),pCat->m_vpSequences.end(),&SequenceInfo::compare);
-    oMetricsOutput << "Results for category '" << pCat->m_sName << "' :" << std::endl;
+    std::sort(oCat.m_vpSequences.begin(),oCat.m_vpSequences.end(),&SequenceInfo::compare);
+    oMetricsOutput << "Results for category '" << oCat.m_sName << "' :" << std::endl;
     oMetricsOutput << std::endl;
     oMetricsOutput << "nTP nFP nFN nTN nSE" << std::endl; // order similar to the files saved by the CDNet analysis script
-    oMetricsOutput << pCat->nTP << " " << pCat->nFP << " " << pCat->nFN << " " << pCat->nTN << " " << pCat->nSE << std::endl;
+    oMetricsOutput << oCat.nTP << " " << oCat.nFP << " " << oCat.nFN << " " << oCat.nTN << " " << oCat.nSE << std::endl;
     oMetricsOutput << std::endl << std::endl;
     oMetricsOutput << std::fixed << std::setprecision(8);
     oMetricsOutput << "Sequence Metrics :" << std::endl;
     oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FM         MCC        " << std::endl;
-    for(size_t i=0; i<pCat->m_vpSequences.size(); ++i) {
-        MetricsCalculator tmp(pCat->m_vpSequences[i]);
-        std::string sName = pCat->m_vpSequences[i]->m_sName;
+    for(size_t i=0; i<oCat.m_vpSequences.size(); ++i) {
+        MetricsCalculator tmp(*oCat.m_vpSequences[i]);
+        std::string sName = oCat.m_vpSequences[i]->m_sName;
         if(sName.size()>10)
             sName = sName.substr(0,10);
         else if(sName.size()<10)
@@ -185,8 +185,8 @@ void DatasetUtils::WriteMetrics(const std::string sResultsFileName, CategoryInfo
         oMetricsOutput << sName << " " << tmp.m_oMetrics.dRecall << " " << tmp.m_oMetrics.dSpecficity << " " << tmp.m_oMetrics.dFPR << " " << tmp.m_oMetrics.dFNR << " " << tmp.m_oMetrics.dPBC << " " << tmp.m_oMetrics.dPrecision << " " << tmp.m_oMetrics.dFMeasure << " " << tmp.m_oMetrics.dMCC << std::endl;
     }
     oMetricsOutput << "--------------------------------------------------------------------------------------------------" << std::endl;
-    MetricsCalculator all(pCat,DATASETUTILS_USE_AVERAGE_EVAL_METRICS);
-    const std::string sCurrCatName = pCat->m_sName.size()>12?pCat->m_sName.substr(0,12):pCat->m_sName;
+    MetricsCalculator all(oCat,DATASETUTILS_USE_AVERAGE_EVAL_METRICS);
+    const std::string sCurrCatName = oCat.m_sName.size()>12?oCat.m_sName.substr(0,12):oCat.m_sName;
     std::cout << "\t" << std::setfill(' ') << std::setw(12) << sCurrCatName << " : Rcl=" << std::fixed << std::setprecision(4) << all.m_oMetrics.dRecall << " Prc=" << all.m_oMetrics.dPrecision << " FM=" << all.m_oMetrics.dFMeasure << " MCC=" << all.m_oMetrics.dMCC << std::endl;
     oMetricsOutput << std::string(DATASETUTILS_USE_AVERAGE_EVAL_METRICS?"averaged   ":"cumulative ") << all.m_oMetrics.dRecall << " " << all.m_oMetrics.dSpecficity << " " << all.m_oMetrics.dFPR << " " << all.m_oMetrics.dFNR << " " << all.m_oMetrics.dPBC << " " << all.m_oMetrics.dPrecision << " " << all.m_oMetrics.dFMeasure << " " << all.m_oMetrics.dMCC << std::endl;
     oMetricsOutput << std::endl << std::endl;
@@ -194,7 +194,7 @@ void DatasetUtils::WriteMetrics(const std::string sResultsFileName, CategoryInfo
     oMetricsOutput.close();
 }
 
-void DatasetUtils::WriteMetrics(const std::string sResultsFileName, std::vector<CategoryInfo*>& vpCat, double dTotalFPS) {
+void DatasetUtils::WriteMetrics(const std::string sResultsFileName, std::vector<std::shared_ptr<CategoryInfo>>& vpCat, double dTotalFPS) {
     std::ofstream oMetricsOutput(sResultsFileName);
     std::sort(vpCat.begin(),vpCat.end(),&CategoryInfo::compare);
     oMetricsOutput << std::fixed << std::setprecision(8);
@@ -204,7 +204,7 @@ void DatasetUtils::WriteMetrics(const std::string sResultsFileName, std::vector<
     oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FM         MCC        " << std::endl;
     for(size_t i=0; i<vpCat.size(); ++i) {
         if(!vpCat[i]->m_vpSequences.empty()) {
-            MetricsCalculator tmp(vpCat[i],DATASETUTILS_USE_AVERAGE_EVAL_METRICS);
+            MetricsCalculator tmp(*vpCat[i],DATASETUTILS_USE_AVERAGE_EVAL_METRICS);
             std::string sName = vpCat[i]->m_sName;
             if(sName.size()>10)
                 sName = sName.substr(0,10);
@@ -270,18 +270,18 @@ inline DatasetUtils::CommonMetrics CalcMetricsFromCounts(uint64_t nTP, uint64_t 
     return res;
 }
 
-inline DatasetUtils::CommonMetrics CalcMetricsFromCategory(const DatasetUtils::CategoryInfo* pCat, bool bAverage) {
+inline DatasetUtils::CommonMetrics CalcMetricsFromCategory(const DatasetUtils::CategoryInfo& oCat, bool bAverage) {
     DatasetUtils::CommonMetrics res;
     if(!bAverage) {
-        res.dRecall = DatasetUtils::CalcMetric_Recall(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        res.dSpecficity = DatasetUtils::CalcMetric_Specificity(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        res.dFPR = DatasetUtils::CalcMetric_FalsePositiveRate(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        res.dFNR = DatasetUtils::CalcMetric_FalseNegativeRate(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        res.dPBC = DatasetUtils::CalcMetric_PercentBadClassifs(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        res.dPrecision = DatasetUtils::CalcMetric_Precision(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        res.dFMeasure = DatasetUtils::CalcMetric_FMeasure(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        res.dMCC = DatasetUtils::CalcMetric_MatthewsCorrCoeff(pCat->nTP,pCat->nTN,pCat->nFP,pCat->nFN);
-        res.dFPS = pCat->m_dAvgFPS;
+        res.dRecall = DatasetUtils::CalcMetric_Recall(oCat.nTP,oCat.nTN,oCat.nFP,oCat.nFN);
+        res.dSpecficity = DatasetUtils::CalcMetric_Specificity(oCat.nTP,oCat.nTN,oCat.nFP,oCat.nFN);
+        res.dFPR = DatasetUtils::CalcMetric_FalsePositiveRate(oCat.nTP,oCat.nTN,oCat.nFP,oCat.nFN);
+        res.dFNR = DatasetUtils::CalcMetric_FalseNegativeRate(oCat.nTP,oCat.nTN,oCat.nFP,oCat.nFN);
+        res.dPBC = DatasetUtils::CalcMetric_PercentBadClassifs(oCat.nTP,oCat.nTN,oCat.nFP,oCat.nFN);
+        res.dPrecision = DatasetUtils::CalcMetric_Precision(oCat.nTP,oCat.nTN,oCat.nFP,oCat.nFN);
+        res.dFMeasure = DatasetUtils::CalcMetric_FMeasure(oCat.nTP,oCat.nTN,oCat.nFP,oCat.nFN);
+        res.dMCC = DatasetUtils::CalcMetric_MatthewsCorrCoeff(oCat.nTP,oCat.nTN,oCat.nFP,oCat.nFN);
+        res.dFPS = oCat.m_dAvgFPS;
     }
     else {
         res.dRecall = 0;
@@ -293,18 +293,18 @@ inline DatasetUtils::CommonMetrics CalcMetricsFromCategory(const DatasetUtils::C
         res.dFMeasure = 0;
         res.dMCC = 0;
         res.dFPS = 0;
-        const size_t nSeq = pCat->m_vpSequences.size();
+        const size_t nSeq = oCat.m_vpSequences.size();
         for(size_t i=0; i<nSeq; ++i) {
-            const DatasetUtils::SequenceInfo* pCurrSeq = pCat->m_vpSequences[i];
-            res.dRecall += DatasetUtils::CalcMetric_Recall(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
-            res.dSpecficity += DatasetUtils::CalcMetric_Specificity(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
-            res.dFPR += DatasetUtils::CalcMetric_FalsePositiveRate(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
-            res.dFNR += DatasetUtils::CalcMetric_FalseNegativeRate(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
-            res.dPBC += DatasetUtils::CalcMetric_PercentBadClassifs(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
-            res.dPrecision += DatasetUtils::CalcMetric_Precision(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
-            res.dFMeasure += DatasetUtils::CalcMetric_FMeasure(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
-            res.dMCC += DatasetUtils::CalcMetric_MatthewsCorrCoeff(pCurrSeq->nTP,pCurrSeq->nTN,pCurrSeq->nFP,pCurrSeq->nFN);
-            res.dFPS += pCurrSeq->m_dAvgFPS;
+            const DatasetUtils::SequenceInfo& oCurrSeq = *oCat.m_vpSequences[i];
+            res.dRecall += DatasetUtils::CalcMetric_Recall(oCurrSeq.nTP,oCurrSeq.nTN,oCurrSeq.nFP,oCurrSeq.nFN);
+            res.dSpecficity += DatasetUtils::CalcMetric_Specificity(oCurrSeq.nTP,oCurrSeq.nTN,oCurrSeq.nFP,oCurrSeq.nFN);
+            res.dFPR += DatasetUtils::CalcMetric_FalsePositiveRate(oCurrSeq.nTP,oCurrSeq.nTN,oCurrSeq.nFP,oCurrSeq.nFN);
+            res.dFNR += DatasetUtils::CalcMetric_FalseNegativeRate(oCurrSeq.nTP,oCurrSeq.nTN,oCurrSeq.nFP,oCurrSeq.nFN);
+            res.dPBC += DatasetUtils::CalcMetric_PercentBadClassifs(oCurrSeq.nTP,oCurrSeq.nTN,oCurrSeq.nFP,oCurrSeq.nFN);
+            res.dPrecision += DatasetUtils::CalcMetric_Precision(oCurrSeq.nTP,oCurrSeq.nTN,oCurrSeq.nFP,oCurrSeq.nFN);
+            res.dFMeasure += DatasetUtils::CalcMetric_FMeasure(oCurrSeq.nTP,oCurrSeq.nTN,oCurrSeq.nFP,oCurrSeq.nFN);
+            res.dMCC += DatasetUtils::CalcMetric_MatthewsCorrCoeff(oCurrSeq.nTP,oCurrSeq.nTN,oCurrSeq.nFP,oCurrSeq.nFN);
+            res.dFPS += oCurrSeq.m_dAvgFPS;
         }
         res.dRecall /= nSeq;
         res.dSpecficity /= nSeq;
@@ -319,7 +319,7 @@ inline DatasetUtils::CommonMetrics CalcMetricsFromCategory(const DatasetUtils::C
     return res;
 }
 
-inline DatasetUtils::CommonMetrics CalcMetricsFromCategories(const std::vector<DatasetUtils::CategoryInfo*>& vpCat, bool bAverage) {
+inline DatasetUtils::CommonMetrics CalcMetricsFromCategories(const std::vector<std::shared_ptr<DatasetUtils::CategoryInfo>>& vpCat, bool bAverage) {
     DatasetUtils::CommonMetrics res;
     const size_t nCat = vpCat.size();
     size_t nBadCat = 0;
@@ -364,7 +364,7 @@ inline DatasetUtils::CommonMetrics CalcMetricsFromCategories(const std::vector<D
             if(vpCat[i]->m_vpSequences.empty())
                 ++nBadCat;
             else {
-                DatasetUtils::CommonMetrics curr = CalcMetricsFromCategory(vpCat[i],true);
+                DatasetUtils::CommonMetrics curr = CalcMetricsFromCategory(*vpCat[i],true);
                 res.dRecall += curr.dRecall;
                 res.dSpecficity += curr.dSpecficity;
                 res.dFPR += curr.dFPR;
@@ -482,19 +482,19 @@ cv::Mat DatasetUtils::GetColoredSegmFrameFromResult(const cv::Mat& oSegmResFrame
 DatasetUtils::MetricsCalculator::MetricsCalculator(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN, uint64_t nSE)
     :    m_oMetrics(CalcMetricsFromCounts(nTP,nTN,nFP,nFN,nSE,0)),m_bAveraged(false) {}
 
-DatasetUtils::MetricsCalculator::MetricsCalculator(const SequenceInfo* pSeq)
-    :    m_oMetrics(CalcMetricsFromCounts(pSeq->nTP,pSeq->nTN,pSeq->nFP,pSeq->nFN,pSeq->nSE,pSeq->m_dAvgFPS)),m_bAveraged(false) {}
+DatasetUtils::MetricsCalculator::MetricsCalculator(const SequenceInfo& oSeq)
+    :    m_oMetrics(CalcMetricsFromCounts(oSeq.nTP,oSeq.nTN,oSeq.nFP,oSeq.nFN,oSeq.nSE,oSeq.m_dAvgFPS)),m_bAveraged(false) {}
 
-DatasetUtils::MetricsCalculator::MetricsCalculator(const CategoryInfo* pCat, bool bAverage)
-    :    m_oMetrics(CalcMetricsFromCategory(pCat,bAverage)),m_bAveraged(bAverage) {CV_Assert(!pCat->m_vpSequences.empty());}
+DatasetUtils::MetricsCalculator::MetricsCalculator(const CategoryInfo& oCat, bool bAverage)
+    :    m_oMetrics(CalcMetricsFromCategory(oCat,bAverage)),m_bAveraged(bAverage) {CV_Assert(!oCat.m_vpSequences.empty());}
 
-DatasetUtils::MetricsCalculator::MetricsCalculator(const std::vector<CategoryInfo*>& vpCat, bool bAverage)
+DatasetUtils::MetricsCalculator::MetricsCalculator(const std::vector<std::shared_ptr<CategoryInfo>>& vpCat, bool bAverage)
     :    m_oMetrics(CalcMetricsFromCategories(vpCat,bAverage)),m_bAveraged(bAverage) {CV_Assert(!vpCat.empty());}
 
 DatasetUtils::CategoryInfo::CategoryInfo(const std::string& sName, const std::string& sDirectoryPath,
                                          DatasetUtils::eDatasetList eDatasetID,
-                                         std::vector<std::string> vsGrayscaleDirNameTokens,
-                                         std::vector<std::string> vsSkippedDirNameTokens,
+                                         const std::vector<std::string>& vsGrayscaleDirNameTokens,
+                                         const std::vector<std::string>& vsSkippedDirNameTokens,
                                          bool bUse4chAlign)
     :    m_sName(sName)
         ,m_eDatasetID(eDatasetID)
@@ -528,22 +528,17 @@ DatasetUtils::CategoryInfo::CategoryInfo(const std::string& sName, const std::st
         if(!bSkip) {
             const size_t pos = iter->find_last_of("/\\");
             if(pos==std::string::npos)
-                m_vpSequences.push_back(new SequenceInfo(*iter,*iter,this,bForceGrayscale,bUse4chAlign));
+                m_vpSequences.push_back(std::make_shared<SequenceInfo>(*iter,*iter,this,bForceGrayscale,bUse4chAlign));
             else
-                m_vpSequences.push_back(new SequenceInfo(iter->substr(pos+1),*iter,this,bForceGrayscale,bUse4chAlign));
+                m_vpSequences.push_back(std::make_shared<SequenceInfo>(iter->substr(pos+1),*iter,this,bForceGrayscale,bUse4chAlign));
         }
     }
-}
-
-DatasetUtils::CategoryInfo::~CategoryInfo() {
-    for(size_t i=0; i<m_vpSequences.size(); i++)
-        delete m_vpSequences[i];
 }
 
 DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::string& sPath, CategoryInfo* pParent, bool bForceGrayscale, bool bUse4chAlign)
     :    m_sName(sName)
         ,m_sPath(sPath)
-        ,m_eDatasetID(pParent?pParent->m_eDatasetID:eDataset_GenericTest)
+        ,m_eDatasetID(pParent?pParent->m_eDatasetID:DatasetUtils::eDataset_GenericTest)
         ,nTP(0),nTN(0),nFP(0),nFN(0),nSE(0)
         ,m_dAvgFPS(-1)
         ,m_dExpectedLoad(0)
@@ -561,8 +556,6 @@ DatasetUtils::SequenceInfo::SequenceInfo(const std::string& sName, const std::st
         ,m_nGTBufferFrameCount(0)
         ,m_nRequestInputFrameIndex(SIZE_MAX)
         ,m_nRequestGTFrameIndex(SIZE_MAX)
-        ,m_acInputBuffer(nullptr)
-        ,m_acGTBuffer(nullptr)
         ,m_nNextInputBufferIdx(0)
         ,m_nNextGTBufferIdx(0)
         ,m_nNextExpectedInputFrameIdx(0)
@@ -786,7 +779,6 @@ const cv::Mat& DatasetUtils::SequenceInfo::GetInputFrameFromIndex(size_t nFrameI
 #if DATASETUTILS_USE_PRECACHED_IO
     if(!m_bIsPrecaching)
         throw std::runtime_error(m_sName + " [SequenceInfo] : Error, queried a frame before precaching was activated.");
-#if PLATFORM_SUPPORTS_CPP11
     std::unique_lock<std::mutex> sync_lock(m_oInputFrameSyncMutex);
     m_nRequestInputFrameIndex = nFrameIdx;
     std::cv_status res;
@@ -799,23 +791,6 @@ const cv::Mat& DatasetUtils::SequenceInfo::GetInputFrameFromIndex(size_t nFrameI
 #endif //CONSOLE_DEBUG
     } while(res==std::cv_status::timeout);
     return m_oReqInputFrame;
-#elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
-    EnterCriticalSection(&m_oInputFrameSyncMutex);
-    m_nRequestInputFrameIndex = nFrameIdx;
-    BOOL res;
-    do {
-        WakeConditionVariable(&m_oInputFrameReqCondVar);
-        res = SleepConditionVariableCS(&m_oInputFrameSyncCondVar,&m_oInputFrameSyncMutex,REQUEST_TIMEOUT_MS);
-#if CONSOLE_DEBUG
-        if(!res)
-            std::cout << " # retrying request..." << std::endl;
-#endif //CONSOLE_DEBUG
-    } while(!res);
-    LeaveCriticalSection(&m_oInputFrameSyncMutex);
-    return m_oReqInputFrame;
-#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#error "Missing implementation for precached io support on this platform."
-#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #else //!DATASETUTILS_USE_PRECACHED_IO
     if(m_nLastReqInputFrameIndex!=nFrameIdx) {
         m_oLastReqInputFrame = GetInputFrameFromIndex_Internal(nFrameIdx);
@@ -829,7 +804,6 @@ const cv::Mat& DatasetUtils::SequenceInfo::GetGTFrameFromIndex(size_t nFrameIdx)
 #if DATASETUTILS_USE_PRECACHED_IO
     if(!m_bIsPrecaching)
         throw std::runtime_error(m_sName + " [SequenceInfo] : Error, queried a frame before precaching was activated.");
-#if PLATFORM_SUPPORTS_CPP11
     std::unique_lock<std::mutex> sync_lock(m_oGTFrameSyncMutex);
     m_nRequestGTFrameIndex = nFrameIdx;
     std::cv_status res;
@@ -842,23 +816,6 @@ const cv::Mat& DatasetUtils::SequenceInfo::GetGTFrameFromIndex(size_t nFrameIdx)
 #endif //CONSOLE_DEBUG
     } while(res==std::cv_status::timeout);
     return m_oReqGTFrame;
-#elif PLATFORM_USES_WIN32API //&& !PLATFORM_SUPPORTS_CPP11
-    EnterCriticalSection(&m_oGTFrameSyncMutex);
-    m_nRequestGTFrameIndex = nFrameIdx;
-    BOOL res;
-    do {
-        WakeConditionVariable(&m_oGTFrameReqCondVar);
-        res = SleepConditionVariableCS(&m_oGTFrameSyncCondVar,&m_oGTFrameSyncMutex,REQUEST_TIMEOUT_MS);
-#if CONSOLE_DEBUG
-        if(!res)
-            std::cout << " # retrying request..." << std::endl;
-#endif //CONSOLE_DEBUG
-    } while(!res);
-    LeaveCriticalSection(&m_oGTFrameSyncMutex);
-    return m_oReqGTFrame;
-#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#error "Missing implementation for precached io support on this platform."
-#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #else //!DATASETUTILS_USE_PRECACHED_IO
     if(m_nLastReqGTFrameIndex!=nFrameIdx) {
         m_oLastReqGTFrame = GetGTFrameFromIndex_Internal(nFrameIdx);
@@ -871,19 +828,13 @@ const cv::Mat& DatasetUtils::SequenceInfo::GetGTFrameFromIndex(size_t nFrameIdx)
 #if DATASETUTILS_USE_PRECACHED_IO
 
 void DatasetUtils::SequenceInfo::PrecacheInputFrames() {
-#if PLATFORM_SUPPORTS_CPP11
     std::unique_lock<std::mutex> sync_lock(m_oInputFrameSyncMutex);
-#elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
-    EnterCriticalSection(&m_oInputFrameSyncMutex);
-#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#error "Missing implementation for precached io support on this platform."
-#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #if CONSOLE_DEBUG
     std::cout << " @ initializing precaching with " << m_nInputBufferFrameCount << " frames " << std::endl;
 #endif //CONSOLE_DEBUG
     while(m_qoInputFrameCache.size()<m_nInputBufferFrameCount && m_nNextPrecachedInputFrameIdx<m_nTotalNbFrames) {
         cv::Mat oNextInputFrame = GetInputFrameFromIndex_Internal(m_nNextPrecachedInputFrameIdx++);
-        cv::Mat oNextInputFrame_precached(m_oSize,m_bUsing4chAlignment?CV_8UC4:m_bForcingGrayscale?CV_8UC1:CV_8UC3,m_acInputBuffer+m_nNextInputBufferIdx);
+        cv::Mat oNextInputFrame_precached(m_oSize,m_bUsing4chAlignment?CV_8UC4:m_bForcingGrayscale?CV_8UC1:CV_8UC3,m_vcInputBuffer.data()+m_nNextInputBufferIdx);
         // @@@@@@@@ try to fetch without copy to?
         oNextInputFrame.copyTo(oNextInputFrame_precached);
         m_qoInputFrameCache.push_back(oNextInputFrame_precached);
@@ -891,13 +842,7 @@ void DatasetUtils::SequenceInfo::PrecacheInputFrames() {
         m_nNextInputBufferIdx %= m_nInputBufferSize;
     }
     while(m_bIsPrecaching) {
-#if PLATFORM_SUPPORTS_CPP11
         if(m_oInputFrameReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(m_nNextPrecachedInputFrameIdx==m_nTotalNbFrames?QUERY_TIMEOUT_MS*32:QUERY_TIMEOUT_MS))!=std::cv_status::timeout) {
-#elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
-        if(SleepConditionVariableCS(&m_oInputFrameReqCondVar,&m_oInputFrameSyncMutex,m_nNextPrecachedInputFrameIdx==m_nTotalNbFrames?QUERY_TIMEOUT_MS*32:QUERY_TIMEOUT_MS)) {
-#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#error "Missing implementation for precached io support on this platform."
-#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
             CV_DbgAssert(m_nRequestInputFrameIndex<m_nTotalNbFrames);
             if(m_nRequestInputFrameIndex!=m_nNextExpectedInputFrameIdx-1) {
                 if(!m_qoInputFrameCache.empty() && m_nRequestInputFrameIndex==m_nNextExpectedInputFrameIdx) {
@@ -944,13 +889,7 @@ void DatasetUtils::SequenceInfo::PrecacheInputFrames() {
                 std::cout << " @ answering request using last frame" << std::endl;
 #endif //CONSOLE_DEBUG
             m_nNextExpectedInputFrameIdx = m_nRequestInputFrameIndex+1;
-#if PLATFORM_SUPPORTS_CPP11
             m_oInputFrameSyncCondVar.notify_one();
-#elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
-            WakeConditionVariable(&m_oInputFrameSyncCondVar);
-#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#error "Missing implementation for precached io support on this platform."
-#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
         }
         else {
             CV_DbgAssert((m_nNextPrecachedInputFrameIdx-m_nNextExpectedInputFrameIdx)==m_qoInputFrameCache.size());
@@ -961,7 +900,7 @@ void DatasetUtils::SequenceInfo::PrecacheInputFrames() {
                 size_t nFillCount = 0;
                 while(m_qoInputFrameCache.size()<m_nInputBufferFrameCount && m_nNextPrecachedInputFrameIdx<m_nTotalNbFrames && nFillCount<10) {
                    cv::Mat oNextInputFrame = GetInputFrameFromIndex_Internal(m_nNextPrecachedInputFrameIdx++);
-                   cv::Mat oNextInputFrame_precached(m_oSize,m_bUsing4chAlignment?CV_8UC4:m_bForcingGrayscale?CV_8UC1:CV_8UC3,m_acInputBuffer+m_nNextInputBufferIdx);
+                   cv::Mat oNextInputFrame_precached(m_oSize,m_bUsing4chAlignment?CV_8UC4:m_bForcingGrayscale?CV_8UC1:CV_8UC3,m_vcInputBuffer.data()+m_nNextInputBufferIdx);
                    // @@@@@@@@ try to fetch without copy to?
                    oNextInputFrame.copyTo(oNextInputFrame_precached);
                    m_qoInputFrameCache.push_back(oNextInputFrame_precached);
@@ -971,25 +910,16 @@ void DatasetUtils::SequenceInfo::PrecacheInputFrames() {
             }
         }
     }
-#if !PLATFORM_SUPPORTS_CPP11 && PLATFORM_USES_WIN32API
-    LeaveCriticalSection(&m_oInputFrameSyncMutex);
-#endif //!PLATFORM_SUPPORTS_CPP11 && PLATFORM_USES_WIN32API
 }
 
 void DatasetUtils::SequenceInfo::PrecacheGTFrames() {
-#if PLATFORM_SUPPORTS_CPP11
     std::unique_lock<std::mutex> sync_lock(m_oGTFrameSyncMutex);
-#elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
-    EnterCriticalSection(&m_oGTFrameSyncMutex);
-#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#error "Missing implementation for precached io support on this platform."
-#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
 #if CONSOLE_DEBUG
     std::cout << " @ initializing precaching with " << m_nGTBufferFrameCount << " frames " << std::endl;
 #endif //CONSOLE_DEBUG
     while(m_qoGTFrameCache.size()<m_nGTBufferFrameCount && m_nNextPrecachedGTFrameIdx<m_nTotalNbFrames) {
         cv::Mat oNextGTFrame = GetGTFrameFromIndex_Internal(m_nNextPrecachedGTFrameIdx++);
-        cv::Mat oNextGTFrame_precached(m_oSize,CV_8UC1,m_acGTBuffer+m_nNextGTBufferIdx);
+        cv::Mat oNextGTFrame_precached(m_oSize,CV_8UC1,m_vcGTBuffer.data()+m_nNextGTBufferIdx);
         // @@@@@@@@ try to fetch without copy to?
         oNextGTFrame.copyTo(oNextGTFrame_precached);
         m_qoGTFrameCache.push_back(oNextGTFrame_precached);
@@ -997,13 +927,7 @@ void DatasetUtils::SequenceInfo::PrecacheGTFrames() {
         m_nNextGTBufferIdx %= m_nGTBufferSize;
     }
     while(m_bIsPrecaching) {
-#if PLATFORM_SUPPORTS_CPP11
         if(m_oGTFrameReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(m_nNextPrecachedGTFrameIdx==m_nTotalNbFrames?QUERY_TIMEOUT_MS*32:QUERY_TIMEOUT_MS))!=std::cv_status::timeout) {
-#elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
-        if(SleepConditionVariableCS(&m_oGTFrameReqCondVar,&m_oGTFrameSyncMutex,m_nNextPrecachedGTFrameIdx==m_nTotalNbFrames?QUERY_TIMEOUT_MS*32:QUERY_TIMEOUT_MS)) {
-#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#error "Missing implementation for precached io support on this platform."
-#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
             CV_DbgAssert(m_nRequestGTFrameIndex<m_nTotalNbFrames);
             if(m_nRequestGTFrameIndex!=m_nNextExpectedGTFrameIdx-1) {
                 if(!m_qoGTFrameCache.empty() && m_nRequestGTFrameIndex==m_nNextExpectedGTFrameIdx) {
@@ -1050,13 +974,7 @@ void DatasetUtils::SequenceInfo::PrecacheGTFrames() {
                 std::cout << " @ answering request using last frame" << std::endl;
 #endif //CONSOLE_DEBUG
             m_nNextExpectedGTFrameIdx = m_nRequestGTFrameIndex+1;
-#if PLATFORM_SUPPORTS_CPP11
             m_oGTFrameSyncCondVar.notify_one();
-#elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
-            WakeConditionVariable(&m_oGTFrameSyncCondVar);
-#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#error "Missing implementation for precached io support on this platform."
-#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
         }
         else {
             CV_DbgAssert((m_nNextPrecachedGTFrameIdx-m_nNextExpectedGTFrameIdx)==m_qoGTFrameCache.size());
@@ -1067,7 +985,7 @@ void DatasetUtils::SequenceInfo::PrecacheGTFrames() {
                 size_t nFillCount = 0;
                 while(m_qoGTFrameCache.size()<m_nGTBufferFrameCount && m_nNextPrecachedGTFrameIdx<m_nTotalNbFrames && nFillCount<10) {
                     cv::Mat oNextGTFrame = GetGTFrameFromIndex_Internal(m_nNextPrecachedGTFrameIdx++);
-                    cv::Mat oNextGTFrame_precached(m_oSize,CV_8UC1,m_acGTBuffer+m_nNextGTBufferIdx);
+                    cv::Mat oNextGTFrame_precached(m_oSize,CV_8UC1,m_vcGTBuffer.data()+m_nNextGTBufferIdx);
                     // @@@@@@@@ try to fetch without copy to?
                     oNextGTFrame.copyTo(oNextGTFrame_precached);
                     m_qoGTFrameCache.push_back(oNextGTFrame_precached);
@@ -1077,9 +995,6 @@ void DatasetUtils::SequenceInfo::PrecacheGTFrames() {
             }
         }
     }
-#if !PLATFORM_SUPPORTS_CPP11 && PLATFORM_USES_WIN32API
-    LeaveCriticalSection(&m_oGTFrameSyncMutex);
-#endif //!PLATFORM_SUPPORTS_CPP11 && PLATFORM_USES_WIN32API
 }
 
 void DatasetUtils::SequenceInfo::StartPrecaching() {
@@ -1094,51 +1009,28 @@ void DatasetUtils::SequenceInfo::StartPrecaching() {
         m_nGTBufferFrameCount = (m_nGTPrecacheSize>MAX_CACHE_SIZE)?(MAX_CACHE_SIZE/m_nGTFrameSize):m_nTotalNbFrames;
         m_nInputBufferSize = m_nInputBufferFrameCount*m_nInputFrameSize;
         m_nGTBufferSize = m_nGTBufferFrameCount*m_nGTFrameSize;
-        m_acInputBuffer = new uchar[m_nInputBufferSize];
-        m_acGTBuffer = new uchar[m_nGTBufferSize];
+        m_vcInputBuffer.resize(m_nInputBufferSize);
+        m_vcGTBuffer.resize(m_nGTBufferSize);
         m_nNextInputBufferIdx = 0; m_nNextGTBufferIdx = 0;
-#if PLATFORM_SUPPORTS_CPP11
         m_hInputFramePrecacher = std::thread(&DatasetUtils::SequenceInfo::PrecacheInputFrames,this);
         m_hGTFramePrecacher = std::thread(&DatasetUtils::SequenceInfo::PrecacheGTFrames,this);
-#elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
-        InitializeCriticalSection(&m_oInputFrameSyncMutex);
-        InitializeCriticalSection(&m_oGTFrameSyncMutex);
-        InitializeConditionVariable(&m_oInputFrameReqCondVar);
-        InitializeConditionVariable(&m_oGTFrameReqCondVar);
-        InitializeConditionVariable(&m_oInputFrameSyncCondVar);
-        InitializeConditionVariable(&m_oGTFrameSyncCondVar);
-        m_hInputFramePrecacher = CreateThread(NULL,NULL,&DatasetUtils::SequenceInfo::PrecacheInputFramesEntryPoint,(LPVOID)this,0,NULL);
-        m_hGTFramePrecacher = CreateThread(NULL,NULL,&DatasetUtils::SequenceInfo::PrecacheGTFramesEntryPoint,(LPVOID)this,0,NULL);
-#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#error "Missing implementation for precached io support on this platform."
-#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
     }
 }
 
 void DatasetUtils::SequenceInfo::StopPrecaching() {
     if(m_bIsPrecaching) {
         m_bIsPrecaching = false;
-#if PLATFORM_SUPPORTS_CPP11
         m_hInputFramePrecacher.join();
         m_hGTFramePrecacher.join();
-#elif PLATFORM_USES_WIN32API //!PLATFORM_SUPPORTS_CPP11
-        //CloseHandle();
-        WaitForSingleObject(m_hInputFramePrecacher,INFINITE);
-        WaitForSingleObject(m_hGTFramePrecacher,INFINITE);
-        CloseHandle(m_hInputFramePrecacher);
-        CloseHandle(m_hGTFramePrecacher);
-        DeleteCriticalSection(&m_oInputFrameSyncMutex);
-        DeleteCriticalSection(&m_oGTFrameSyncMutex);
-#else //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-#error "Missing implementation for precached io support on this platform."
-#endif //!PLATFORM_USES_WIN32API && !PLATFORM_SUPPORTS_CPP11
-        delete [] m_acInputBuffer;
-        delete [] m_acGTBuffer;
     }
 }
 
-DatasetUtils::CDNetEvaluator::CDNetEvaluator(GLImageProcAlgo* pParent, int nTotFrameCount)
-    :    GLEvaluatorAlgo(pParent,1,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,pParent->getIsUsingDisplay())
+#endif //DATASETUTILS_USE_PRECACHED_IO
+
+#if HAVE_GLSL
+
+DatasetUtils::CDNetEvaluator::CDNetEvaluator(std::unique_ptr<GLImageProcAlgo> pParent, int nTotFrameCount)
+    :    GLEvaluatorAlgo(std::move(pParent),1,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,pParent->getIsUsingDisplay())
         ,m_nTotFrameCount(nTotFrameCount) {
     glAssert(m_pParent->m_nOutputType==CV_8UC1);
     glAssert(nTotFrameCount>0);
@@ -1276,10 +1168,10 @@ cv::Mat DatasetUtils::CDNetEvaluator::getAtomicCounterBufferCopy() {
     return oRes;
 }
 
-void DatasetUtils::CDNetEvaluator::dispatch(int nStage, GLShader*) {
+void DatasetUtils::CDNetEvaluator::dispatch(int nStage, GLShader&) {
     glAssert(nStage>=0 && nStage<m_nComputeStages);
     glMemoryBarrier(GL_ALL_BARRIER_BITS); // @@@@@@?
     glDispatchCompute((GLuint)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x), (GLuint)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y), 1);
 }
 
-#endif //DATASETUTILS_USE_PRECACHED_IO
+#endif //HAVE_GLSL
