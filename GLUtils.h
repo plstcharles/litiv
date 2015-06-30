@@ -13,12 +13,13 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/random.hpp>
 
-#ifndef STR
-#ifndef XSTR
-#define XSTR(s) STR(s)
-#endif //XSTR
-#define STR(s) #s
-#endif //STR
+#ifndef XSTR_BASE
+#define XSTR_CONCAT(s1,s2) XSTR_CONCAT_BASE(s1,s2)
+#define XSTR_CONCAT_BASE(s1,s2) s1##s2
+#define XSTR(s) XSTR_BASE(s)
+#define XSTR_BASE(s) #s
+#endif //XSTR_BASE
+
 #define TARGET_GL_VER_MAJOR  4
 #define TARGET_GL_VER_MINOR  4
 #define TARGET_GLEW_EXPERIM  1

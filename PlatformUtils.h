@@ -19,6 +19,15 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
+#ifndef XSTR_BASE
+#define XSTR_CONCAT(s1,s2) XSTR_CONCAT_BASE(s1,s2)
+#define XSTR_CONCAT_BASE(s1,s2) s1##s2
+#define XSTR(s) XSTR_BASE(s)
+#define XSTR_BASE(s) #s
+#endif //XSTR_BASE
+#define TIMER_TIC(x) int64 XSTR_CONCAT(__nCPUTimerTick_,x) = cv::getTickCount()
+#define TIMER_TOC(x) int64 XSTR_CONCAT(__nCPUTimerVal_,x) = cv::getTickCount()-XSTR_CONCAT(__nCPUTimerTick_,x)
+#define TIMER_ELAPSED_MS(x) (double(XSTR_CONCAT(__nCPUTimerVal_,x))/(cv::getTickFrequency()/1000))
 #if __cplusplus<201103L
 #error "This project requires C++11 support."
 #endif //__cplusplus<=201103L

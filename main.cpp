@@ -17,7 +17,7 @@
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
 #define WRITE_BGSUB_METRICS_ANALYSIS     0
 #define DISPLAY_BGSUB_DEBUG_OUTPUT       0
-#define ENABLE_TIMERS                    0
+#define ENABLE_INTERNAL_TIMERS           0
 #define ENABLE_DISPLAY_MOUSE_DEBUG       0
 #define WRITE_BGSUB_SEGM_AVI_OUTPUT      0
 //////////////////////////////////////////
@@ -78,14 +78,15 @@ void OnMouseEvent(int event, int x, int y, int, void*) {
 #if WRITE_BGSUB_METRICS_ANALYSIS
 cv::FileStorage g_oDebugFS;
 #endif //!WRITE_BGSUB_METRICS_ANALYSIS
-#if ENABLE_TIMERS
-enum eCPUTimersList {
-    eCPUTimer_VideoQuery=0,
-    eCPUTimer_PipelineUpdate,
-    eCPUTimer_OverallLoop,
-    eCPUTimersCount
-};
-#endif //ENABLE_TIMERS
+#if ENABLE_INTERNAL_TIMERS
+#define TIMER_INTERNAL_TIC(x) TIMER_TIC(x)
+#define TIMER_INTERNAL_TOC(x) TIMER_TOC(x)
+#define TIMER_INTERNAL_ELAPSED_MS(x) TIMER_ELAPSED_MS(x)
+#else //!ENABLE_INTERNAL_TIMERS
+#define TIMER_INTERNAL_TIC(x)
+#define TIMER_INTERNAL_TOC(x)
+#define TIMER_INTERNAL_ELAPSED_MS(x)
+#endif //!ENABLE_INTERNAL_TIMERS
 #if WRITE_BGSUB_IMG_OUTPUT
 const std::vector<int> g_vnResultsComprParams = {cv::IMWRITE_PNG_COMPRESSION,9}; // when writing output bin files, lower to increase processing speed
 #endif //WRITE_BGSUB_IMG_OUTPUT
@@ -352,12 +353,7 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
         glfwSetWindowSize(pWindow.get(),oWindowSize.width,oWindowSize.height);
         glViewport(0,0,oWindowSize.width,oWindowSize.height);
 #endif //HAVE_GLSL
-        const double dCPUTickFreq_MS = cv::getTickFrequency()/1000;
-        const int64 nCPUTimerInitVal = cv::getTickCount();
-#if ENABLE_TIMERS
-        int64 nCPUTimerVals[eCPUTimersCount];
-        double dCPUTimerTotValSum = 0;
-#endif //ENABLE_TIMERS
+        TIMER_TIC(MainLoop);
 #if HAVE_GPU_SUPPORT
         while(nNextFrameIdx<=nFrameCount) {
 #else //!HAVE_GPU_SUPPORT
@@ -366,17 +362,15 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
             if(!((nCurrFrameIdx+1)%100))
                 std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nCurrFrameIdx+1 << "/" << nFrameCount << "   [T=" << nThreadIdx << "]" << std::endl;
             const double dCurrLearningRate = (BOOTSTRAP_100_FIRST_FRAMES&&nCurrFrameIdx<=100)?1:dDefaultLearningRate;
-#if ENABLE_TIMERS
-            int64 nCPUTimerTick_OverallLoop = cv::getTickCount();
-#endif //ENABLE_TIMERS
+            TIMER_INTERNAL_TIC(OverallLoop);
 #if HAVE_GPU_SUPPORT
+            TIMER_INTERNAL_TIC(PipelineUpdate);
             pBGS->apply(oNextInputFrame,dCurrLearningRate);
+            TIMER_INTERNAL_TOC(PipelineUpdate);
 #if (GLSL_EVALUATION && WRITE_BGSUB_METRICS_ANALYSIS)
             pBGS_GPU_EVAL->apply(oNextGTMask);
 #endif //(GLSL_EVALUATION && WRITE_BGSUB_METRICS_ANALYSIS)
-#if ENABLE_TIMERS
-            int64 nCPUTimerTick_VideoQuery = cv::getTickCount();
-#endif //ENABLE_TIMERS
+            TIMER_INTERNAL_TIC(VideoQuery);
 #if NEED_BG_IMG
             oCurrInputFrame.copyTo(oLastInputFrame);
             const cv::Mat& oInputFrame = oLastInputFrame;
@@ -394,9 +388,7 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
             if(nNextFrameIdx<nFrameCount)
                 oNextGTMask = pCurrSequence->GetGTFrameFromIndex(nNextFrameIdx);
 #endif //NEED_GT_MASK
-#if ENABLE_TIMERS
-            nCPUTimerVals[eCPUTimer_VideoQuery] = cv::getTickCount()-nCPUTimerTick_VideoQuery;
-#endif //ENABLE_TIMERS
+            TIMER_INTERNAL_TOC(VideoQuery);
 #if HAVE_GLSL
             glErrorCheck;
             if(glfwWindowShouldClose(pWindow.get()))
@@ -422,9 +414,7 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
             const cv::Mat& oBGImg = oLastBGImg;
 #endif //NEED_BG_IMG
 #else //!HAVE_GPU_SUPPORT
-#if ENABLE_TIMERS
-            int64 nCPUTimerTick_VideoQuery = cv::getTickCount();
-#endif //ENABLE_TIMERS
+            TIMER_INTERNAL_TIC(VideoQuery);
             oCurrInputFrame = pCurrSequence->GetInputFrameFromIndex(nCurrFrameIdx);
 #if NEED_BG_IMG
             const cv::Mat& oInputFrame = oCurrInputFrame;
@@ -436,17 +426,10 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
             oCurrGTMask = pCurrSequence->GetGTFrameFromIndex(nCurrFrameIdx);
             const cv::Mat oGTMask = oCurrGTMask;
 #endif //NEED_GT_MASK
-#if ENABLE_TIMERS
-            nCPUTimerVals[eCPUTimer_VideoQuery] = cv::getTickCount()-nCPUTimerTick_VideoQuery;
-#endif //ENABLE_TIMERS
-#if ENABLE_TIMERS
-            int64 nCPUTimerTick_PipelineUpdate = cv::getTickCount();
-#endif //ENABLE_TIMERS
+            TIMER_INTERNAL_TOC(VideoQuery);
+            TIMER_INTERNAL_TIC(PipelineUpdate);
             pBGS->apply(oCurrInputFrame,oCurrFGMask,dCurrLearningRate);
-#if ENABLE_TIMERS
-            @@@@@ TIC(PipelineUpdate); TOC(PipelineUpdate);
-            nCPUTimerVals[eCPUTimer_PipelineUpdate] = cv::getTickCount()-nCPUTimerTick_PipelineUpdate;
-#endif //ENABLE_TIMERS
+            TIMER_INTERNAL_TOC(PipelineUpdate);
             if(!oROI.empty())
                 cv::bitwise_or(oCurrFGMask,UCHAR_MAX/2,oCurrFGMask,oROI==0);
             const cv::Mat& oFGMask = oCurrFGMask;
@@ -497,19 +480,18 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
 #if (WRITE_BGSUB_METRICS_ANALYSIS && (!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION))
             DatasetUtils::CalcMetricsFromResult(oFGMask,oGTMask,oROI,pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
 #endif //(WRITE_BGSUB_METRICS_ANALYSIS && (!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION))
-#if ENABLE_TIMERS
-            nCPUTimerVals[eCPUTimer_OverallLoop] = cv::getTickCount()-nCPUTimerTick_OverallLoop;
-            std::cout << "\t\tCPU: ";
-            std::cout << "VideoQuery=" << nCPUTimerVals[eCPUTimer_VideoQuery]/dCPUTickFreq_MS << "ms,  ";
-            std::cout << "PipelineUpdate=" << nCPUTimerVals[eCPUTimer_PipelineUpdate]/dCPUTickFreq_MS << "ms,  ";
-            double dCurrCPUTimerTotVal = nCPUTimerVals[eCPUTimer_OverallLoop]/dCPUTickFreq_MS;
-            std::cout << " tot=" << dCurrCPUTimerTotVal << "ms\n" << std::endl;
-#endif //ENABLE_TIMERS
+            TIMER_INTERNAL_TOC(OverallLoop);
+#if ENABLE_INTERNAL_TIMERS
+            std::cout << "VideoQuery=" << TIMER_INTERNAL_ELAPSED_MS(VideoQuery) << "ms,  "
+                      << "PipelineUpdate=" << TIMER_INTERNAL_ELAPSED_MS(PipelineUpdate) << "ms,  "
+                      << "OverallLoop=" << TIMER_INTERNAL_ELAPSED_MS(OverallLoop) << "ms" << std::endl;
+#endif //ENABLE_INTERNAL_TIMERS
             ++nCurrFrameIdx;
         }
-        const double dTimeElapsed_MS = double(cv::getTickCount()-nCPUTimerInitVal)/dCPUTickFreq_MS;
-        const double dAvgFPS = (double)nFrameCount/(dTimeElapsed_MS/1000);
-        std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ end, " << (int)(dTimeElapsed_MS/1000) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
+        TIMER_TOC(MainLoop);
+        const double dTimeElapsed = TIMER_ELAPSED_MS(MainLoop)/1000;
+        const double dAvgFPS = (double)nFrameCount/dTimeElapsed;
+        std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
 #if WRITE_BGSUB_METRICS_ANALYSIS
 #if GLSL_EVALUATION
 #if VALIDATE_GLSL_EVALUATION
