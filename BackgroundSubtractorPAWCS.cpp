@@ -66,7 +66,7 @@
 #define FLAT_REGION_BIT_COUNT (s_nDescMaxDataRange_1ch/8)
 
 #if USE_INTERNAL_HRCS
-#include "PlatformUtils.h"
+#include <chrono>
 #endif //USE_INTERNAL_HRCS
 
 static const size_t s_nColorMaxDataRange_1ch = UCHAR_MAX;

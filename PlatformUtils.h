@@ -16,6 +16,8 @@
 #include <ctime>
 #include <unordered_map>
 #include <deque>
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
 
 #if __cplusplus<201103L
 #error "This project requires C++11 support."
@@ -36,15 +38,6 @@
 #endif //WIN32
 #if PLATFORM_USES_WIN32API
 #include <stdint.h>
-#include <process.h>
-#define TIMER_INIT \
-    LARGE_INTEGER frequency; \
-    LARGE_INTEGER t1,t2; \
-    QueryPerformanceFrequency(&frequency);
-#define TIMER_START QueryPerformanceCounter(&t1);
-#define TIMER_STOP \
-    QueryPerformanceCounter(&t2); \
-    std::cout << (float)(t2.QuadPart-t1.QuadPart)/frequency.QuadPart << " sec" << std::endl;
 #define __func__ __FUNCTION__
 #else //!PLATFORM_USES_WIN32API
 #include <dirent.h>

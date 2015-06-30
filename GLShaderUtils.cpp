@@ -6,8 +6,8 @@ bool GLShader::useShaderProgram(GLShader* pNewShader) {
     if(pNewShader) {
         if(pNewShader->m_bIsActive && s_pCurrActiveShader==pNewShader)
             return true;
-        if(!pNewShader->m_bIsLinked)
-            pNewShader->link();
+        if(!pNewShader->m_bIsLinked && !pNewShader->link())
+            return false;
     }
     if(!pNewShader || (pNewShader->m_bIsEmpty && !pNewShader->m_nProgID) || pNewShader->m_bIsLinked) {
         if(pNewShader) {
@@ -58,7 +58,7 @@ GLuint GLShader::addSource(const std::string& sSource, GLenum eType) {
         const char* acSourcePtr = sSource.c_str();
         glShaderSource(shaderID,1,&acSourcePtr,nullptr);
         glErrorCheck;
-    } catch(GLException& e) {
+    } catch(const GLException&) {
         glDeleteShader(shaderID);
         throw;
     }
@@ -72,7 +72,7 @@ bool GLShader::removeSource(GLuint id) {
     auto oSrcIter = m_mShaderSources.find(id);
     if(oSrcIter!=m_mShaderSources.end()) {
         if(m_bIsActive)
-            useShaderProgram(nullptr);
+            glAssert(useShaderProgram(nullptr));
         glDetachShader(m_nProgID,oSrcIter->first);
         glDeleteShader(oSrcIter->first);
         m_mShaderSources.erase(oSrcIter);
@@ -102,8 +102,7 @@ bool GLShader::compile() {
             glGetShaderiv(oSrcIter->first, GL_INFO_LOG_LENGTH, &nLogSize);
             std::vector<char> vcLog(nLogSize);
             glGetShaderInfoLog(oSrcIter->first, nLogSize, &nLogSize, &vcLog[0]);
-            std::cerr << "GLShader::compile(); error in shaderID#" << oSrcIter->first << " :\n\n" << addLineNumbersToString(oSrcIter->second,true) << "\n\n" << &vcLog[0] << std::endl;
-            return false;
+            glErrorExt("shader compilation error in shader source #%d of program #%d:\n%s\n%s\n",oSrcIter->first,m_nProgID,addLineNumbersToString(oSrcIter->second,true).c_str(),&vcLog[0]);
         }
     }
     return (m_bIsCompiled=!m_mShaderSources.empty());
@@ -128,8 +127,7 @@ bool GLShader::link(bool bDiscardSources) {
         glGetProgramiv(m_nProgID, GL_INFO_LOG_LENGTH, &nLogSize);
         std::vector<char> vcLog(nLogSize);
         glGetProgramInfoLog(m_nProgID, nLogSize, &nLogSize, &vcLog[0]);
-        std::cerr << "GLShader::link(); error in program #" << m_nProgID << " :\n" << &vcLog[0] << std::endl;
-        return false;
+        glErrorExt("shader link error in program #%d:\n%s\n",m_nProgID,&vcLog[0]);
     }
     else if(bDiscardSources) {
         while(!m_mShaderSources.empty())

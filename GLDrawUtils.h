@@ -110,18 +110,18 @@ struct GLDynamicTexture2D : GLTexture2D {
     GLDynamicTexture2D(GLsizei nLevels, const cv::Mat& oInitTexture, bool bUseIntegralFormat);
     virtual ~GLDynamicTexture2D();
     virtual void updateTexture(const cv::Mat& oTexture, bool bRebindAll=false);
-    virtual void updateTexture(const GLPixelBufferObject* pPBO, bool bRebindAll=false);
+    virtual void updateTexture(const GLPixelBufferObject& oPBO, bool bRebindAll=false);
     virtual void fetchTexture(cv::Mat& oTexture);
-    virtual void fetchTexture(const GLPixelBufferObject* pPBO, bool bRebindAll=false);
+    virtual void fetchTexture(const GLPixelBufferObject& oPBO, bool bRebindAll=false);
 };
 
 struct GLDynamicTexture2DArray : GLTexture2DArray {
     GLDynamicTexture2DArray(GLsizei nLevels, const std::vector<cv::Mat>& voInitTextures, bool bUseIntegralFormat);
     virtual ~GLDynamicTexture2DArray();
     virtual void updateTexture(const cv::Mat& oTexture, int nLayer, bool bRebindAll=false, bool bRegenMipmaps=false);
-    virtual void updateTexture(const GLPixelBufferObject* pPBO, int nLayer, bool bRebindAll=false);
+    virtual void updateTexture(const GLPixelBufferObject& oPBO, int nLayer, bool bRebindAll=false);
     virtual void fetchTexture(cv::Mat& oTexture, int nLayer);
-    virtual void fetchTexture(const GLPixelBufferObject* pPBO, int nLayer, bool bRebindAll=false);
+    virtual void fetchTexture(const GLPixelBufferObject& oPBO, int nLayer, bool bRebindAll=false);
 private:
     cv::Mat m_oTextureArrayFetchBuffer;
 };

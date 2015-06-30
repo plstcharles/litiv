@@ -239,15 +239,15 @@ void GLDynamicTexture2D::updateTexture(const cv::Mat& oTexture, bool bRebindAll)
         glGenerateMipmap(GL_TEXTURE_2D);
 }
 
-void GLDynamicTexture2D::updateTexture(const GLPixelBufferObject* pPBO, bool bRebindAll) {
-    glDbgAssert(pPBO->m_eBufferTarget==GL_PIXEL_UNPACK_BUFFER);
-    glDbgAssert(pPBO->size()==m_oInitTexture.size() && pPBO->type()==m_oInitTexture.type());
+void GLDynamicTexture2D::updateTexture(const GLPixelBufferObject& oPBO, bool bRebindAll) {
+    glDbgAssert(oPBO.m_eBufferTarget==GL_PIXEL_UNPACK_BUFFER);
+    glDbgAssert(oPBO.size()==m_oInitTexture.size() && oPBO.type()==m_oInitTexture.type());
     if(bRebindAll)
         glBindTexture(GL_TEXTURE_2D,getTexId());
-    glBindBuffer(pPBO->m_eBufferTarget,pPBO->getPBOId());
+    glBindBuffer(oPBO.m_eBufferTarget,oPBO.getPBOId());
     glTexSubImage2D(GL_TEXTURE_2D,0,0,0,m_nWidth,m_nHeight,m_eDataFormat,m_eDataType,nullptr);
     if(bRebindAll)
-        glBindBuffer(pPBO->m_eBufferTarget,0);
+        glBindBuffer(oPBO.m_eBufferTarget,0);
 }
 
 void GLDynamicTexture2D::fetchTexture(cv::Mat& oTexture) {
@@ -258,14 +258,14 @@ void GLDynamicTexture2D::fetchTexture(cv::Mat& oTexture) {
     glGetTexImage(GL_TEXTURE_2D,0,m_eDataFormat,m_eDataType,oTexture.data);
 }
 
-void GLDynamicTexture2D::fetchTexture(const GLPixelBufferObject* pPBO, bool bRebindAll) {
-    glDbgAssert(pPBO->m_eBufferTarget==GL_PIXEL_PACK_BUFFER);
-    glDbgAssert(pPBO->size()==m_oInitTexture.size() && pPBO->type()==m_oInitTexture.type());
+void GLDynamicTexture2D::fetchTexture(const GLPixelBufferObject& oPBO, bool bRebindAll) {
+    glDbgAssert(oPBO.m_eBufferTarget==GL_PIXEL_PACK_BUFFER);
+    glDbgAssert(oPBO.size()==m_oInitTexture.size() && oPBO.type()==m_oInitTexture.type());
     glBindTexture(GL_TEXTURE_2D,getTexId());
-    glBindBuffer(pPBO->m_eBufferTarget,pPBO->getPBOId());
+    glBindBuffer(oPBO.m_eBufferTarget,oPBO.getPBOId());
     glGetTexImage(GL_TEXTURE_2D,0,m_eDataFormat,m_eDataType,nullptr);
     if(bRebindAll)
-        glBindBuffer(pPBO->m_eBufferTarget,0);
+        glBindBuffer(oPBO.m_eBufferTarget,0);
 }
 
 GLDynamicTexture2DArray::GLDynamicTexture2DArray(GLsizei nLevels, const std::vector<cv::Mat>& voInitTextures, bool bUseIntegralFormat)
@@ -286,16 +286,16 @@ void GLDynamicTexture2DArray::updateTexture(const cv::Mat& oTexture, int nLayer,
         glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
 }
 
-void GLDynamicTexture2DArray::updateTexture(const GLPixelBufferObject* pPBO, int nLayer, bool bRebindAll) {
-    glDbgAssert(pPBO->m_eBufferTarget==GL_PIXEL_UNPACK_BUFFER);
-    glDbgAssert(pPBO->size()==m_voInitTextures[0].size() && pPBO->type()==m_voInitTextures[0].type());
+void GLDynamicTexture2DArray::updateTexture(const GLPixelBufferObject& oPBO, int nLayer, bool bRebindAll) {
+    glDbgAssert(oPBO.m_eBufferTarget==GL_PIXEL_UNPACK_BUFFER);
+    glDbgAssert(oPBO.size()==m_voInitTextures[0].size() && oPBO.type()==m_voInitTextures[0].type());
     glDbgAssert(nLayer>=0 && nLayer<m_nTextureCount);
     if(bRebindAll)
         glBindTexture(GL_TEXTURE_2D_ARRAY,getTexId());
-    glBindBuffer(pPBO->m_eBufferTarget,pPBO->getPBOId());
+    glBindBuffer(oPBO.m_eBufferTarget,oPBO.getPBOId());
     glTexSubImage3D(GL_TEXTURE_2D_ARRAY,0,0,0,nLayer,m_nWidth,m_nHeight,1,m_eDataFormat,m_eDataType,nullptr);
     if(bRebindAll)
-        glBindBuffer(pPBO->m_eBufferTarget,0);
+        glBindBuffer(oPBO.m_eBufferTarget,0);
 }
 
 void GLDynamicTexture2DArray::fetchTexture(cv::Mat& oTexture, int nLayer) {
@@ -312,22 +312,22 @@ void GLDynamicTexture2DArray::fetchTexture(cv::Mat& oTexture, int nLayer) {
     }
 }
 
-void GLDynamicTexture2DArray::fetchTexture(const GLPixelBufferObject* pPBO, int nLayer, bool bRebindAll) {
-    glDbgAssert(pPBO->m_eBufferTarget==GL_PIXEL_PACK_BUFFER);
+void GLDynamicTexture2DArray::fetchTexture(const GLPixelBufferObject& oPBO, int nLayer, bool bRebindAll) {
+    glDbgAssert(oPBO.m_eBufferTarget==GL_PIXEL_PACK_BUFFER);
     glDbgAssert(nLayer>=0 && nLayer<m_nTextureCount);
     if(glGetTextureSubImage) {
-        glDbgAssert(pPBO->size()==m_voInitTextures[0].size() && pPBO->type()==m_voInitTextures[0].type());
-        glBindBuffer(pPBO->m_eBufferTarget,pPBO->getPBOId());
+        glDbgAssert(oPBO.size()==m_voInitTextures[0].size() && oPBO.type()==m_voInitTextures[0].type());
+        glBindBuffer(oPBO.m_eBufferTarget,oPBO.getPBOId());
         glGetTextureSubImage(getTexId(),0,0,0,nLayer,m_nWidth,m_nHeight,1,m_eDataFormat,m_eDataType,m_voInitTextures[0].step.p[0]*m_nHeight,nullptr);
     }
     else {
-        glDbgAssert(pPBO->size()==m_oTextureArrayFetchBuffer.size() && pPBO->type()==m_oTextureArrayFetchBuffer.type());
+        glDbgAssert(oPBO.size()==m_oTextureArrayFetchBuffer.size() && oPBO.type()==m_oTextureArrayFetchBuffer.type());
         glBindTexture(GL_TEXTURE_2D_ARRAY,getTexId());
-        glBindBuffer(pPBO->m_eBufferTarget,pPBO->getPBOId());
+        glBindBuffer(oPBO.m_eBufferTarget,oPBO.getPBOId());
         glGetTexImage(GL_TEXTURE_2D_ARRAY,0,m_eDataFormat,m_eDataType,nullptr);
     }
     if(bRebindAll)
-        glBindBuffer(pPBO->m_eBufferTarget,0);
+        glBindBuffer(oPBO.m_eBufferTarget,0);
 }
 
 GLScreenBillboard::GLScreenBillboard()

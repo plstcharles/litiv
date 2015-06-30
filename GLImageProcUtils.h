@@ -25,10 +25,12 @@ public:
     inline bool setOutputFetching(bool b) {return (m_bFetchingOutput=(b&&m_bUsingOutput));}
     inline bool setDebugFetching(bool b) {return (m_bFetchingDebug=(b&&m_bUsingDebug));}
     inline bool getIsUsingDisplay() const {return m_bUsingDisplay;}
-    inline GLuint getAtomicBufferId() const {return m_nAtomicBuffer;}
     inline GLuint getSSBOId(int n) const {glAssert(n>=0 && n<eBufferBindingsCount); return m_anSSBO[n];}
     int fetchLastOutput(cv::Mat& oOutput) const;
     int fetchLastDebug(cv::Mat& oDebug) const;
+
+    virtual void initialize(const cv::Mat& oInitInput, const cv::Mat& oROI);
+    virtual void apply(const cv::Mat& oNextInput, bool bRebindAll=false);
 
     const int m_nLevels;
     const int m_nLayers;
@@ -51,7 +53,7 @@ protected:
     enum eImageLayoutList {
         eImage_OutputBinding=0,
         eImage_DebugBinding,
-        eImage_EvalBinding, // @@@@ make custom4? set all customs at end? simplify custom tex array?
+        eImage_GTBinding, // @@@@ make custom4? set all customs at end? simplify custom tex array?
         eImage_ROIBinding,
         eImage_CustomBinding1,
         eImage_CustomBinding2,
@@ -62,7 +64,7 @@ protected:
     enum eTextureLayoutList {
         eTexture_OutputBinding=0,
         eTexture_DebugBinding,
-        eTexture_EvalBinding,
+        eTexture_GTBinding,
         eTexture_InputBinding,
         eTextureBindingsCount
     };
@@ -104,14 +106,8 @@ protected:
     std::unique_ptr<GLTexture2D> m_apCustomTextures[3];
     GLScreenBillboard m_oDisplayBillboard;
     GLShader m_oDisplayShader;
-    int m_nAtomicBufferSize;
-    int m_nAtomicBufferRangeSize;
-    int m_nAtomicBufferOffsetVar;
-    int m_nCurrAtomicBufferOffset;
 
-    virtual void initialize(const cv::Mat& oInitInput, const cv::Mat& oROI);
-    virtual void apply(const cv::Mat& oNextInput, bool bRebindAll=false);
-    virtual void dispatch(int nStage, GLShader* pShader) = 0;
+    virtual void dispatch(int nStage, GLShader& oShader) = 0;
 
     static const char* getCurrTextureLayerUniformName();
     static const char* getLastTextureLayerUniformName();
@@ -123,28 +119,40 @@ private:
     GLImageProcAlgo& operator=(const GLImageProcAlgo&)=delete;
     GLImageProcAlgo(const GLImageProcAlgo&)=delete;
     friend class GLEvaluatorAlgo;
-    GLuint m_nAtomicBuffer;
     GLuint m_anSSBO[GLImageProcAlgo::eBufferBindingsCount];
 };
 
 class GLEvaluatorAlgo : public GLImageProcAlgo {
 public:
-    GLEvaluatorAlgo(std::unique_ptr<GLImageProcAlgo> pParent, int nComputeStages, int nOutputType, int nGroundtruthType, bool bUseDisplay);
+    GLEvaluatorAlgo(const std::shared_ptr<GLImageProcAlgo>& pParent, int nTotFrameCount, int nCountersPerFrame, int nComputeStages, int nDebugType, int nGroundtruthType);
     virtual ~GLEvaluatorAlgo();
+    inline GLuint getAtomicBufferId() const {return m_nAtomicBuffer;}
+    const cv::Mat& getAtomicCounterBuffer();
     virtual std::string getFragmentShaderSource() const;
+
+    virtual void initialize(const cv::Mat& oInitInput, const cv::Mat& oInitGT, const cv::Mat& oROI);
+    virtual void initialize(const cv::Mat& oInitGT, const cv::Mat& oROI);
+    virtual void apply(const cv::Mat& oNextInput, const cv::Mat& oNextGT, bool bRebindAll=false);
+    virtual void apply(const cv::Mat& oNextGT, bool bRebindAll=false);
+
 protected:
-    std::unique_ptr<GLImageProcAlgo> m_pParent;
-    virtual void initialize(const cv::Mat oInitInput, const cv::Mat& oROI, const cv::Mat& oInitGT);
-    virtual void apply(const cv::Mat oNextInput, const cv::Mat& oNextGT, bool bRebindAll=false);
+    const size_t m_nTotFrameCount;
+    const size_t m_nAtomicBufferRangeSize;
+    const size_t m_nAtomicBufferSize;
+    size_t m_nCurrAtomicBufferOffset;
+    std::shared_ptr<GLImageProcAlgo> m_pParent;
+private:
+    cv::Mat m_oAtomicCountersQueryBuffer;
+    GLuint m_nAtomicBuffer;
 };
 
 class GLImagePassThroughAlgo : public GLImageProcAlgo {
 public:
-    GLImagePassThroughAlgo( int nLayers, const cv::Mat& oExampleFrame, bool bUseOutputPBOs, bool bUseInputPBOs,
+    GLImagePassThroughAlgo( int nLayers, int nFrameType, bool bUseOutputPBOs, bool bUseInputPBOs,
                             bool bUseTexArrays, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
     virtual std::string getComputeShaderSource(int nStage) const;
 protected:
-    virtual void dispatch(int nStage, GLShader* pShader);
+    virtual void dispatch(int nStage, GLShader& oShader);
 };
 
 class BinaryMedianFilter : public GLImageProcAlgo {
@@ -165,5 +173,5 @@ protected:
     std::vector<glm::uvec3> m_vvComputeShaderDispatchSizes;
     static const GLuint eImage_PPSAccumulator;
     static const GLuint eImage_PPSAccumulator_T;
-    virtual void dispatch(int nStage, GLShader* pShader);
+    virtual void dispatch(int nStage, GLShader& oShader);
 };

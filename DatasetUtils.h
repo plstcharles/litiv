@@ -2,6 +2,7 @@
 
 #define DATASETUTILS_USE_AVERAGE_EVAL_METRICS  1
 #define DATASETUTILS_USE_PRECACHED_IO          1
+#define DATASETUTILS_HARDCODE_FRAME_INDEX      0
 
 #include "ParallelUtils.h"
 #include "PlatformUtils.h"
@@ -75,10 +76,10 @@ namespace DatasetUtils {
     void WriteResult( const std::string& sResultsPath, const std::string& sCatName, const std::string& sSeqName,
                              const std::string& sResultPrefix, size_t framenum, const std::string& sResultSuffix,
                              const cv::Mat& res, const std::vector<int>& vnComprParams);
-    void WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bBottom=false);
+    void WriteOnImage(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom=false);
     void WriteMetrics(const std::string sResultsFileName, const SequenceInfo& oSeq);
-    void WriteMetrics(const std::string sResultsFileName, CategoryInfo& oCat);
-    void WriteMetrics(const std::string sResultsFileName, std::vector<std::shared_ptr<CategoryInfo>>& vpCat, double dTotalFPS);
+    void WriteMetrics(const std::string sResultsFileName, const CategoryInfo& oCat);
+    void WriteMetrics(const std::string sResultsFileName, const std::vector<std::shared_ptr<CategoryInfo>>& vpCat, double dTotalFPS);
     void CalcMetricsFromResult(const cv::Mat& oSegmResFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI,
                                       uint64_t& nTP, uint64_t& nTN, uint64_t& nFP, uint64_t& nFN, uint64_t& nSE);
 
@@ -182,25 +183,19 @@ namespace DatasetUtils {
 #if HAVE_GLSL
     class CDNetEvaluator : public GLEvaluatorAlgo {
     public:
-        CDNetEvaluator(std::unique_ptr<GLImageProcAlgo> pParent, int nTotFrameCount);
-        virtual ~CDNetEvaluator();
-        virtual void initialize(const cv::Mat oInitInput, const cv::Mat& oROI, const cv::Mat& oInitGT);
-        virtual void apply(const cv::Mat oNextInput, const cv::Mat& oNextGT, bool bRebindAll=false);
+        CDNetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, int nTotFrameCount);
         virtual std::string getComputeShaderSource(int nStage) const;
+        void getCumulativeCounts(uint64_t& nTotTP, uint64_t& nTotTN, uint64_t& nTotFP, uint64_t& nTotFN, uint64_t& nTotSE);
         enum eAtomicCountersList {
             eAtomicCounter_TP=0,
+            eAtomicCounter_TN,
             eAtomicCounter_FP,
             eAtomicCounter_FN,
-            eAtomicCounter_TN,
             eAtomicCounter_SE,
             eAtomicCountersCount,
         };
-        cv::Mat getAtomicCounterBufferCopy();
-
     protected:
-        size_t m_nTotFrameCount;
-        cv::Mat m_oAtomicCountersQueryBuffer;
-        virtual void dispatch(int nStage, GLShader& pShader);
+        virtual void dispatch(int nStage, GLShader& oShader);
     };
 #endif //HAVE_GLSL
 

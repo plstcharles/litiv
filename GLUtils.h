@@ -13,13 +13,38 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/random.hpp>
 
-#define glError(msg) throw GLException(msg,__func__,__FILE__,__LINE__)
-#define glError2(errn,msg) throw GLException(errn,msg,__func__,__FILE__,__LINE__)
-#define glAssert(expr) {if(!!(expr)); else throw GLException("assert failed; ("#expr")",__func__,__FILE__,__LINE__);}
+#ifndef STR
+#ifndef XSTR
+#define XSTR(s) STR(s)
+#endif //XSTR
+#define STR(s) #s
+#endif //STR
+#define TARGET_GL_VER_MAJOR  4
+#define TARGET_GL_VER_MINOR  4
+#define TARGET_GLEW_EXPERIM  1
+#define TARGET_GL_VER_STR "GL_VERSION_" XSTR(TARGET_GL_VER_MAJOR) "_" XSTR(TARGET_GL_VER_MINOR)
+#ifdef _MSC_VER
+    #define __PRETTY_FUNCTION__ __FUNCSIG__
+#endif
+
+#define glError(msg) throw GLException(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__)
+#define glErrorExt(msg,...) throw GLException(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
+#define glAssert(expr) {if(!!(expr)); else glError("assertion failed ("#expr")");}
 #define glErrorCheck { \
     GLenum __errn = glGetError(); \
     if(__errn!=GL_NO_ERROR) \
-        throw GLException(__errn,"glErrorCheck failed",__func__,__FILE__,__LINE__); \
+        glErrorExt("glErrorCheck failed (code=%d)",__errn); \
+}
+// see glew init GL_INVALID_ENUM bug discussion at https://www.opengl.org/wiki/OpenGL_Loading_Library
+#define glewInitErrorCheck { \
+    glErrorCheck; \
+    glewExperimental = TARGET_GLEW_EXPERIM?GL_TRUE:GL_FALSE; \
+    if(GLenum __errn=glewInit()!=GLEW_OK) \
+        glErrorExt("Failed to init GLEW (code=%d)",__errn); \
+    else if(GLenum __errn=glGetError()!=GL_INVALID_ENUM) \
+        glErrorExt("Unexpected GLEW init error (code=%d)",__errn); \
+    if(!glewIsSupported(TARGET_GL_VER_STR)) \
+        glErrorExt("Bad GL core/ext version detected (target is %s)",TARGET_GL_VER_STR); \
 }
 #ifdef _DEBUG
 #define glDbgAssert(expr) glAssert(expr)
@@ -29,19 +54,14 @@
 #define glDbgErrorCheck
 #endif
 
-class GLException : public std::exception {
+class GLException : public std::runtime_error {
 public:
-    GLException(const char* errs, const char* func, const char* file, int line) : m_eErrn(GL_NO_ERROR), m_acErrMsg(errs), m_acFuncName(func), m_acFileName(file), m_nLineNumber(line) {m_sFullErrMsg=getFullErrorMsg();};
-    GLException(GLenum errn, const char* errs, const char* func, const char* file, int line) : m_eErrn(errn), m_acErrMsg(errs), m_acFuncName(func), m_acFileName(file), m_nLineNumber(line) {m_sFullErrMsg=getFullErrorMsg();};
-    virtual const char* what() const throw() {return m_sFullErrMsg.c_str();};
-    GLenum m_eErrn;
-    const char* m_acErrMsg;
-    const char* m_acFuncName;
-    const char* m_acFileName;
-    std::string m_sFullErrMsg;
-    int m_nLineNumber;
-private:
-    std::string getFullErrorMsg() const {return cv::format("%s [%s] in %s from %s(%d)",m_acErrMsg,((m_eErrn!=GL_NO_ERROR)?(const char*)gluErrorString(m_eErrn):"unspecified_error"),m_acFuncName,m_acFileName,m_nLineNumber);};
+    template<typename... VALIST> GLException(const char* sErrMsg, const char* sFunc, const char* sFile, int nLine, VALIST... vArgs) : std::runtime_error(cv::format((std::string("GLException in function '%s' from %s(%d) : \n")+sErrMsg).c_str(),sFunc,sFile,nLine,vArgs...)), m_eErrn(GL_NO_ERROR), m_acErrMsg(sErrMsg), m_acFuncName(sFunc), m_acFileName(sFile), m_nLineNumber(nLine) {};
+    const GLenum m_eErrn;
+    const char* const m_acErrMsg;
+    const char* const m_acFuncName;
+    const char* const m_acFileName;
+    const int m_nLineNumber;
 };
 
 static inline bool isInternalFormatSupported(GLenum eInternalFormat) {

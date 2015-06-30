@@ -48,16 +48,17 @@ public:
     virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
     //! refreshes all samples based on the last analyzed frame
     virtual void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
-    //! primary model update function; the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
-    virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
 #if HAVE_GPU_SUPPORT
     //! primary model update function (asynchronous version); the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
-    virtual void apply_async(cv::InputArray oImage, cv::OutputArray oLastFGMask, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
-    //! primary model update function (asynchronous version); the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
-    virtual void apply_async(cv::InputArray oImage, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
-#endif //HAVE_GPU_SUPPORT
+    virtual void apply(cv::InputArray oNextImage, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
+    //! returns a copy of the latest foreground mask
+    virtual void getLatestForegroundMask(cv::OutputArray oLastFGMask);
+#else //!HAVE_GPU_SUPPORT
+    //! primary model update function; the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
+    virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
+#endif //!HAVE_GPU_SUPPORT
     //! returns a copy of the latest reconstructed background image
-    void getBackgroundImage(cv::OutputArray oBGImg) const;
+    virtual void getBackgroundImage(cv::OutputArray oBGImg) const;
     //! returns a copy of the latest reconstructed background descriptors image
     virtual void getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const;
 
@@ -82,9 +83,7 @@ protected:
 #if HAVE_GLSL
 public:
     virtual std::string getComputeShaderSource(int nStage) const;
-    virtual void apply_async_glimpl(cv::InputArray oImage, bool bRebindAll, double dLearningRate);
-    virtual void apply_async_glimpl(cv::InputArray oImage, cv::OutputArray oLastFGMask, bool bRebindAll, double dLearningRate);
-    virtual void apply_glimpl(cv::InputArray oImage, cv::OutputArray oFGMask, bool bRebindAll, double dLearningRate);
+    virtual void apply_glimpl(cv::InputArray oNextImage, bool bRebindAll, double dLearningRate);
 protected:
     size_t m_nTMT32ModelSize;
     size_t m_nSampleStepSize;
@@ -97,7 +96,7 @@ protected:
     std::vector<GLSLFunctionUtils::TMT32GenParams> m_voTMT32ModelData;
     static const GLuint eBuffer_BGModelBinding;
     static const GLuint eBuffer_TMT32ModelBinding;
-    virtual void dispatch(int nStage, GLShader* pShader);
+    virtual void dispatch(int nStage, GLShader& oShader);
 #endif //HAVE_GLSL
 };
 

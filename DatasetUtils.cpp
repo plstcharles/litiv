@@ -141,8 +141,8 @@ void DatasetUtils::WriteResult( const std::string& sResultsPath,
     cv::imwrite(sResultFilePath.str(), res, vnComprParams);
 }
 
-void DatasetUtils::WriteOnImage(cv::Mat& oImg, const std::string& sText, bool bBottom) {
-    cv::putText(oImg,sText,cv::Point(10,bBottom?(oImg.rows-15):15),cv::FONT_HERSHEY_PLAIN,1.0,cv::Scalar_<uchar>(0,0,255),1,cv::LINE_AA);
+void DatasetUtils::WriteOnImage(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom) {
+    cv::putText(oImg,sText,cv::Point(4,bBottom?(oImg.rows-15):15),cv::FONT_HERSHEY_PLAIN,1.2,vColor,2,cv::LINE_AA);
 }
 
 void DatasetUtils::WriteMetrics(const std::string sResultsFileName, const SequenceInfo& oSeq) {
@@ -164,9 +164,8 @@ void DatasetUtils::WriteMetrics(const std::string sResultsFileName, const Sequen
     oMetricsOutput.close();
 }
 
-void DatasetUtils::WriteMetrics(const std::string sResultsFileName, CategoryInfo& oCat) {
+void DatasetUtils::WriteMetrics(const std::string sResultsFileName, const CategoryInfo& oCat) {
     std::ofstream oMetricsOutput(sResultsFileName);
-    std::sort(oCat.m_vpSequences.begin(),oCat.m_vpSequences.end(),&SequenceInfo::compare);
     oMetricsOutput << "Results for category '" << oCat.m_sName << "' :" << std::endl;
     oMetricsOutput << std::endl;
     oMetricsOutput << "nTP nFP nFN nTN nSE" << std::endl; // order similar to the files saved by the CDNet analysis script
@@ -194,9 +193,8 @@ void DatasetUtils::WriteMetrics(const std::string sResultsFileName, CategoryInfo
     oMetricsOutput.close();
 }
 
-void DatasetUtils::WriteMetrics(const std::string sResultsFileName, std::vector<std::shared_ptr<CategoryInfo>>& vpCat, double dTotalFPS) {
+void DatasetUtils::WriteMetrics(const std::string sResultsFileName, const std::vector<std::shared_ptr<CategoryInfo>>& vpCat, double dTotalFPS) {
     std::ofstream oMetricsOutput(sResultsFileName);
-    std::sort(vpCat.begin(),vpCat.end(),&CategoryInfo::compare);
     oMetricsOutput << std::fixed << std::setprecision(8);
     oMetricsOutput << "Overall results :" << std::endl;
     oMetricsOutput << std::endl;
@@ -420,10 +418,10 @@ cv::Mat DatasetUtils::GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& 
     cv::resize(oFGMaskBYTE3,oFGMaskBYTE3,cv::Size(320,240));
 
     std::stringstream sstr;
-    sstr << "Input Image #" << nFrame;
-    DatasetUtils::WriteOnImage(oInputImgBYTE3,sstr.str());
-    DatasetUtils::WriteOnImage(oBGImgBYTE3,"Reference Image");
-    DatasetUtils::WriteOnImage(oFGMaskBYTE3,"Segmentation Result");
+    sstr << "Frame #" << nFrame;
+    DatasetUtils::WriteOnImage(oInputImgBYTE3,sstr.str(),cv::Scalar_<uchar>(0,0,255));
+    DatasetUtils::WriteOnImage(oBGImgBYTE3,"BG Reference",cv::Scalar_<uchar>(0,0,255));
+    DatasetUtils::WriteOnImage(oFGMaskBYTE3,"Segmentation Result",cv::Scalar_<uchar>(0,0,255));
 
     cv::hconcat(oInputImgBYTE3,oBGImgBYTE3,displayH);
     cv::hconcat(displayH,oFGMaskBYTE3,displayH);
@@ -753,6 +751,11 @@ cv::Mat DatasetUtils::SequenceInfo::GetInputFrameFromIndex_Internal(size_t nFram
     if(m_bUsing4chAlignment && oFrame.channels()==3)
         cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2BGRA);
     CV_Assert(oFrame.size()==m_oSize);
+#if DATASETUTILS_HARDCODE_FRAME_INDEX
+    std::stringstream sstr;
+    sstr << "Frame #" << nFrameIdx;
+    DatasetUtils::WriteOnImage(oFrame,sstr.str(),cv::Scalar::all(255));
+#endif //DATASETUTILS_HARDCODE_FRAME_INDEX
     return oFrame;
 }
 
@@ -772,6 +775,11 @@ cv::Mat DatasetUtils::SequenceInfo::GetGTFrameFromIndex_Internal(size_t nFrameId
         oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar(g_nCDnetOutOfScope));
     }
     CV_Assert(oFrame.size()==m_oSize);
+#if DATASETUTILS_HARDCODE_FRAME_INDEX
+    std::stringstream sstr;
+    sstr << "Frame #" << nFrameIdx;
+    DatasetUtils::WriteOnImage(oFrame,sstr.str(),cv::Scalar::all(255));
+#endif //DATASETUTILS_HARDCODE_FRAME_INDEX
     return oFrame;
 }
 
@@ -1029,44 +1037,9 @@ void DatasetUtils::SequenceInfo::StopPrecaching() {
 
 #if HAVE_GLSL
 
-DatasetUtils::CDNetEvaluator::CDNetEvaluator(std::unique_ptr<GLImageProcAlgo> pParent, int nTotFrameCount)
-    :    GLEvaluatorAlgo(std::move(pParent),1,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,pParent->getIsUsingDisplay())
-        ,m_nTotFrameCount(nTotFrameCount) {
+DatasetUtils::CDNetEvaluator::CDNetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, int nTotFrameCount)
+    :    GLEvaluatorAlgo(pParent,nTotFrameCount,eAtomicCountersCount,1,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1) {
     glAssert(m_pParent->m_nOutputType==CV_8UC1);
-    glAssert(nTotFrameCount>0);
-    GLint nMaxAtomicCounterBufferSize;
-    glGetIntegerv(GL_MAX_ATOMIC_COUNTER_BUFFER_SIZE,&nMaxAtomicCounterBufferSize);
-    if(nMaxAtomicCounterBufferSize<(int)m_nTotFrameCount*eAtomicCountersCount*4)
-        glError("atomic counter buffer size limit is too small for the current impl");
-    m_nAtomicBufferSize = m_nTotFrameCount*eAtomicCountersCount*4;
-    m_nAtomicBufferRangeSize = eAtomicCountersCount*4;
-    int nMaxComputeInvocs;
-    glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS,&nMaxComputeInvocs);
-    const int nCurrComputeStageInvocs = m_vDefaultWorkGroupSize.x*m_vDefaultWorkGroupSize.y;
-    glAssert(nCurrComputeStageInvocs>0 && nCurrComputeStageInvocs<nMaxComputeInvocs);
-}
-
-DatasetUtils::CDNetEvaluator::~CDNetEvaluator() {}
-
-void DatasetUtils::CDNetEvaluator::initialize(const cv::Mat oInitInput, const cv::Mat& oROI, const cv::Mat& oInitGT) {
-    this->GLEvaluatorAlgo::initialize(oInitInput,oROI,oInitGT);
-    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER,getAtomicBufferId());
-    glBufferData(GL_ATOMIC_COUNTER_BUFFER,m_nAtomicBufferSize,NULL,GL_DYNAMIC_DRAW);
-    GLuint* pAtomicCountersPtr = (GLuint*)glMapBufferRange(GL_ATOMIC_COUNTER_BUFFER,0,m_nAtomicBufferSize,GL_MAP_WRITE_BIT|GL_MAP_INVALIDATE_BUFFER_BIT|GL_MAP_UNSYNCHRONIZED_BIT);
-    if(!pAtomicCountersPtr)
-        glError("could not init atomic counters");
-    memset(pAtomicCountersPtr,0,m_nAtomicBufferSize);
-    glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);
-    m_nCurrAtomicBufferOffset = 0;
-    m_nAtomicBufferOffsetVar = m_nAtomicBufferRangeSize;
-    m_oAtomicCountersQueryBuffer = cv::Mat(m_nTotFrameCount,eAtomicCountersCount,CV_32SC1);
-    glBindBufferRange(GL_ATOMIC_COUNTER_BUFFER,0,getAtomicBufferId(),m_nCurrAtomicBufferOffset,m_nAtomicBufferRangeSize);
-    glErrorCheck;
-}
-
-void DatasetUtils::CDNetEvaluator::apply(const cv::Mat oNextInput, const cv::Mat& oNextGT, bool bRebindAll) {
-    CV_Assert(m_nInternalFrameIdx<m_nTotFrameCount);
-    this->GLEvaluatorAlgo::apply(oNextInput,oNextGT,bRebindAll);
 }
 
 std::string DatasetUtils::CDNetEvaluator::getComputeShaderSource(int nStage) const {
@@ -1074,22 +1047,22 @@ std::string DatasetUtils::CDNetEvaluator::getComputeShaderSource(int nStage) con
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "#version 430\n"
-             "#define VAL_POSITIVE     " << g_nCDnetPositive << "\n"
-             "#define VAL_NEGATIVE     " << g_nCDnetNegative << "\n"
-             "#define VAL_OUTOFSCOPE   " << g_nCDnetOutOfScope << "\n"
-             "#define VAL_UNKNOWN      " << g_nCDnetUnknown << "\n"
-             "#define VAL_SHADOW       " << g_nCDnetShadow << "\n";
+             "#define VAL_POSITIVE     " << (uint)g_nCDnetPositive << "\n"
+             "#define VAL_NEGATIVE     " << (uint)g_nCDnetNegative << "\n"
+             "#define VAL_OUTOFSCOPE   " << (uint)g_nCDnetOutOfScope << "\n"
+             "#define VAL_UNKNOWN      " << (uint)g_nCDnetUnknown << "\n"
+             "#define VAL_SHADOW       " << (uint)g_nCDnetShadow << "\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "layout(local_size_x=" << m_vDefaultWorkGroupSize.x << ",local_size_y=" << m_vDefaultWorkGroupSize.y << ") in;\n"
              "layout(binding=" << GLImageProcAlgo::eImage_ROIBinding << ", r8ui) readonly uniform uimage2D imgROI;\n"
-             "layout(binding=" << GLImageProcAlgo::eImage_EvalBinding << ", r8ui) readonly uniform uimage2D imgInput;\n"
-             "layout(binding=" << GLImageProcAlgo::eImage_InputBinding << ", r8ui) readonly uniform uimage2D imgGT;\n";
-    if(m_bUsingOutput) ssSrc <<
-             "layout(binding=" << GLImageProcAlgo::eImage_OutputBinding << ") writeonly uniform image2D imgOutput;\n";
+             "layout(binding=" << GLImageProcAlgo::eImage_OutputBinding << ", r8ui) readonly uniform uimage2D imgInput;\n"
+             "layout(binding=" << GLImageProcAlgo::eImage_GTBinding << ", r8ui) readonly uniform uimage2D imgGT;\n";
+    if(m_bUsingDebug) ssSrc <<
+             "layout(binding=" << GLImageProcAlgo::eImage_DebugBinding << ") writeonly uniform uimage2D imgDebug;\n";
     ssSrc << "layout(binding=0, offset=" << eAtomicCounter_TP*4 << ") uniform atomic_uint nTP;\n"
+             "layout(binding=0, offset=" << eAtomicCounter_TN*4 << ") uniform atomic_uint nTN;\n"
              "layout(binding=0, offset=" << eAtomicCounter_FP*4 << ") uniform atomic_uint nFP;\n"
              "layout(binding=0, offset=" << eAtomicCounter_FN*4 << ") uniform atomic_uint nFN;\n"
-             "layout(binding=0, offset=" << eAtomicCounter_TN*4 << ") uniform atomic_uint nTN;\n"
              "layout(binding=0, offset=" << eAtomicCounter_SE*4 << ") uniform atomic_uint nSE;\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "void main() {\n"
@@ -1120,58 +1093,61 @@ std::string DatasetUtils::CDNetEvaluator::getComputeShaderSource(int nStage) con
              "            }\n"
              "        }\n"
              "    }\n";
-    if(m_bUsingOutput) { ssSrc <<
-             "    vec4 out_color = vec4(0,0,0,1);\n"
-             "    if(nGTSegmVal!=VAL_OUTOFSCOPE && nGTSegmVal!=VAL_UNKNOWN && nROIVal!=VAL_NEGATIVE ) {\n"
+    if(m_bUsingDebug) { ssSrc <<
+             "    uvec4 out_color = uvec4(0,0,0,255);\n"
+             "    if(nGTSegmVal!=VAL_OUTOFSCOPE && nGTSegmVal!=VAL_UNKNOWN && nROIVal!=VAL_NEGATIVE) {\n"
              "        if(nInputSegmVal==VAL_POSITIVE) {\n"
              "            if(nGTSegmVal==VAL_POSITIVE) {\n"
-             "                out_color.g = 1;\n"
+             "                out_color.g = uint(255);\n"
              "            }\n"
              "            else if(nGTSegmVal==VAL_NEGATIVE) {\n"
-             "                out_color.r = 1;\n"
+             "                out_color.r = uint(255);\n"
              "            }\n"
              "            else if(nGTSegmVal==VAL_SHADOW) {\n"
-             "                out_color.rg = vec2(1,0.5);\n"
+             "                out_color.rg = uvec2(255,128);\n"
              "            }\n"
              "            else {\n"
-             "                out_color.rgb = vec3(0.333);\n"
+             "                out_color.rgb = uvec3(85);\n"
              "            }\n"
              "        }\n"
              "        else { // nInputSegmVal==VAL_NEGATIVE\n"
              "            if(nGTSegmVal==VAL_POSITIVE) {\n"
-             "                out_color.rb = vec2(1,0.5);\n"
+             "                out_color.rb = uvec2(255,128);\n"
              "            }\n"
              "        }\n"
              "    }\n"
              "    else if(nROIVal==VAL_NEGATIVE) {\n"
-             "        out_color.rgb = vec3(0.5);\n"
+             "        out_color.rgb = uvec3(128);\n"
              "    }\n"
              "    else if(nInputSegmVal==VAL_POSITIVE) {\n"
-             "        out_color.rgb = vec3(1);\n"
+             "        out_color.rgb = uvec3(255);\n"
              "    }\n"
              "    else if(nInputSegmVal==VAL_NEGATIVE) {\n"
-             "        out_color.rgb = vec3(0);\n"
+             "        out_color.rgb = uvec3(0);\n"
              "    }\n"
-             "    imageStore(imgOutput,imgCoord,out_color);\n";
+             "    imageStore(imgDebug,imgCoord,out_color);\n";
     }
     ssSrc << "}\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-cv::Mat DatasetUtils::CDNetEvaluator::getAtomicCounterBufferCopy() {
-    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER,getAtomicBufferId());
-    glGetBufferSubData(GL_ATOMIC_COUNTER_BUFFER,0,m_nAtomicBufferSize,m_oAtomicCountersQueryBuffer.data);
-    cv::Mat oRes = m_oAtomicCountersQueryBuffer.clone();
-    glBindBufferRange(GL_ATOMIC_COUNTER_BUFFER,0,getAtomicBufferId(),m_nCurrAtomicBufferOffset,m_nAtomicBufferRangeSize);
-    glErrorCheck;
-    return oRes;
+void DatasetUtils::CDNetEvaluator::getCumulativeCounts(uint64_t& nTotTP, uint64_t& nTotTN, uint64_t& nTotFP, uint64_t& nTotFN, uint64_t& nTotSE) {
+    const cv::Mat& oAtomicCountersQueryBuffer = this->getAtomicCounterBuffer();
+    nTotTP=0; nTotTN=0; nTotFP=0; nTotFN=0; nTotSE=0;
+    for(int nFrameIter=0; nFrameIter<oAtomicCountersQueryBuffer.rows; ++nFrameIter) {
+        nTotTP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eAtomicCounter_TP);
+        nTotTN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eAtomicCounter_TN);
+        nTotFP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eAtomicCounter_FP);
+        nTotFN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eAtomicCounter_FN);
+        nTotSE += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eAtomicCounter_SE);
+    }
 }
 
 void DatasetUtils::CDNetEvaluator::dispatch(int nStage, GLShader&) {
     glAssert(nStage>=0 && nStage<m_nComputeStages);
     glMemoryBarrier(GL_ALL_BARRIER_BITS); // @@@@@@?
-    glDispatchCompute((GLuint)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x), (GLuint)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y), 1);
+    glDispatchCompute((GLuint)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x),(GLuint)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y),1);
 }
 
 #endif //HAVE_GLSL

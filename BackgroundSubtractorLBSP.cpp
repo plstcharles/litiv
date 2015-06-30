@@ -59,7 +59,7 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg, const cv::Mat
             }
         }
         if(bAllChEqual)
-            std::cout << std::endl << "\tBackgroundSubtractorLOBSTER : Warning, grayscale images should always be passed in CV_8UC1 format for optimal performance." << std::endl;
+            std::cout << "\n\tBackgroundSubtractorLBSP : Warning, grayscale images should always be passed in CV_8UC1 format for optimal performance.\n" << std::endl;
     }
     cv::Mat oNewBGROI;
     if(oROI.empty() && (m_oROI.empty() || oROI.size()!=oInitImg.size())) {
@@ -99,6 +99,15 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg, const cv::Mat
     m_oLastDescFrame = cv::Scalar_<ushort>::all(0);
     m_bInitialized = true;
 }
+
+#if HAVE_GPU_SUPPORT
+
+void BackgroundSubtractorLBSP::apply(cv::InputArray _oNextImage, cv::OutputArray _oLastFGMask, double dLearningRate) {
+    this->apply(_oNextImage,dLearningRate);
+    this->getLatestForegroundMask(_oLastFGMask);
+}
+
+#endif //HAVE_GPU_SUPPORT
 
 cv::AlgorithmInfo* BackgroundSubtractorLBSP::info() const {
     return nullptr;

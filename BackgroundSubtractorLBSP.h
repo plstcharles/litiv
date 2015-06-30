@@ -27,20 +27,24 @@ public:
     virtual void initialize(const cv::Mat& oInitImg);
     //! (re)initiaization method; needs to be called before starting background subtraction
     virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
-    //! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
-    virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, double learningRate=0)=0;
 #if HAVE_GPU_SUPPORT
     //! primary model update function (asynchronous version); the learning param is used to override the internal learning speed (ignored when <= 0)
-    virtual void apply_async(cv::InputArray oImage, cv::OutputArray oLastFGMask, double dLearningRate=0)=0;
+    virtual void apply(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate=0);
     //! primary model update function (asynchronous version); the learning param is used to override the internal learning speed (ignored when <= 0)
-    virtual void apply_async(cv::InputArray oImage, double dLearningRate=0)=0;
-#endif //HAVE_GPU_SUPPORT
+    virtual void apply(cv::InputArray oNextImage, double dLearningRate=0)=0;
+    //! returns a copy of the latest foreground mask
+    virtual void getLatestForegroundMask(cv::OutputArray oLastFGMask)=0;
+#else //!HAVE_GPU_SUPPORT
+    //! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
+    virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, double learningRate=0)=0;
+#endif //!HAVE_GPU_SUPPORT
     //! unused, always returns nullptr
     virtual cv::AlgorithmInfo* info() const;
+
     //! returns a copy of the ROI used for descriptor extraction
-    virtual cv::Mat getROICopy() const;
+    cv::Mat getROICopy() const;
     //! sets the ROI to be used for descriptor extraction (note: this function will reinit the model and return the usable ROI)
-    virtual void setROI(cv::Mat& oROI);
+    void setROI(cv::Mat& oROI);
     //! turns automatic model reset on or off
     void setAutomaticModelReset(bool);
 
