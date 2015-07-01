@@ -1,6 +1,6 @@
 #pragma once
 
-#define GLUTILS_IMGPROC_DEFAULT_WORKGROUP           glm::ivec2(12,8)
+#define GLUTILS_IMGPROC_DEFAULT_WORKGROUP           glm::uvec2(12,8)
 #define GLUTILS_IMGPROC_TEXTURE_ARRAY_SIZE          4
 #define GLUTILS_IMGPROC_USE_TEXTURE_ARRAYS          0
 #define GLUTILS_IMGPROC_USE_INTEGER_TEX_FORMAT      1
@@ -12,7 +12,7 @@
 
 class GLImageProcAlgo {
 public:
-    GLImageProcAlgo( int nLevels, int nLayers, int nComputeStages,
+    GLImageProcAlgo( size_t nLevels, size_t nLayers, size_t nComputeStages,
                      int nOutputType, int nDebugType, int nInputType,
                      bool bUseOutputPBOs, bool bUseDebugPBOs, bool bUseInputPBOs,
                      bool bUseTexArrays, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
@@ -20,22 +20,22 @@ public:
 
     virtual std::string getVertexShaderSource() const;
     virtual std::string getFragmentShaderSource() const;
-    virtual std::string getComputeShaderSource(int nStage) const = 0;
+    virtual std::string getComputeShaderSource(size_t nStage) const = 0;
 
     inline bool setOutputFetching(bool b) {return (m_bFetchingOutput=(b&&m_bUsingOutput));}
     inline bool setDebugFetching(bool b) {return (m_bFetchingDebug=(b&&m_bUsingDebug));}
     inline bool getIsUsingDisplay() const {return m_bUsingDisplay;}
-    inline GLuint getSSBOId(int n) const {glAssert(n>=0 && n<eBufferBindingsCount); return m_anSSBO[n];}
-    int fetchLastOutput(cv::Mat& oOutput) const;
-    int fetchLastDebug(cv::Mat& oDebug) const;
+    inline GLuint getSSBOId(size_t n) const {glAssert(n<eBufferBindingsCount); return m_anSSBO[n];}
+    size_t fetchLastOutput(cv::Mat& oOutput) const;
+    size_t fetchLastDebug(cv::Mat& oDebug) const;
 
     virtual void initialize(const cv::Mat& oInitInput, const cv::Mat& oROI);
     virtual void apply(const cv::Mat& oNextInput, bool bRebindAll=false);
 
-    const int m_nLevels;
-    const int m_nLayers;
-    const int m_nSxSDisplayCount;
-    const int m_nComputeStages;
+    const size_t m_nLevels;
+    const size_t m_nLayers;
+    const size_t m_nSxSDisplayCount;
+    const size_t m_nComputeStages;
     const int m_nOutputType;
     const int m_nDebugType;
     const int m_nInputType;
@@ -48,7 +48,7 @@ public:
     const bool m_bUsingTexArrays;
     const bool m_bUsingTimers;
     const bool m_bUsingIntegralFormat;
-    const glm::ivec2 m_vDefaultWorkGroupSize; // make dynamic? @@@@@
+    const glm::uvec2 m_vDefaultWorkGroupSize; // make dynamic? @@@@@
 protected:
     enum eImageLayoutList {
         eImage_OutputBinding=0,
@@ -88,8 +88,8 @@ protected:
     size_t m_nLastOutputInternalIdx, m_nLastDebugInternalIdx;
     bool m_bFetchingOutput, m_bFetchingDebug;
     cv::Mat m_oLastOutput, m_oLastDebug;
-    int m_nNextLayer,m_nCurrLayer,m_nLastLayer;
-    int m_nCurrPBO, m_nNextPBO;
+    size_t m_nNextLayer,m_nCurrLayer,m_nLastLayer;
+    size_t m_nCurrPBO, m_nNextPBO;
     GLuint m_nGLTimers[eGLTimersCount];
     GLuint64 m_nGLTimerVals[eGLTimersCount];
     std::vector<std::unique_ptr<GLDynamicTexture2D>> m_vpInputArray;
@@ -107,12 +107,12 @@ protected:
     GLScreenBillboard m_oDisplayBillboard;
     GLShader m_oDisplayShader;
 
-    virtual void dispatch(int nStage, GLShader& oShader) = 0;
+    virtual void dispatch(size_t nStage, GLShader& oShader) = 0;
 
     static const char* getCurrTextureLayerUniformName();
     static const char* getLastTextureLayerUniformName();
     static const char* getFrameIndexUniformName();
-    static std::string getFragmentShaderSource_internal( int nLayers, int nOutputType, int nDebugType, int nInputType,
+    static std::string getFragmentShaderSource_internal( size_t nLayers, int nOutputType, int nDebugType, int nInputType,
                                                          bool bUsingOutput, bool bUsingDebug, bool bUsingInput,
                                                          bool bUsingTexArrays, bool bUsingIntegralFormat);
 private:
@@ -124,7 +124,7 @@ private:
 
 class GLEvaluatorAlgo : public GLImageProcAlgo {
 public:
-    GLEvaluatorAlgo(const std::shared_ptr<GLImageProcAlgo>& pParent, int nTotFrameCount, int nCountersPerFrame, int nComputeStages, int nDebugType, int nGroundtruthType);
+    GLEvaluatorAlgo(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount, size_t nCountersPerFrame, size_t nComputeStages, int nDebugType, int nGroundtruthType);
     virtual ~GLEvaluatorAlgo();
     inline GLuint getAtomicBufferId() const {return m_nAtomicBuffer;}
     const cv::Mat& getAtomicCounterBuffer();
@@ -139,7 +139,10 @@ protected:
     const size_t m_nTotFrameCount;
     const size_t m_nAtomicBufferRangeSize;
     const size_t m_nAtomicBufferSize;
-    size_t m_nCurrAtomicBufferOffset;
+    const size_t m_nAtomicBufferMaxSize;
+    size_t m_nCurrAtomicBufferSize;
+    size_t m_nCurrAtomicBufferOffsetPtr;
+    size_t m_nCurrAtomicBufferOffsetBlock;
     std::shared_ptr<GLImageProcAlgo> m_pParent;
 private:
     cv::Mat m_oAtomicCountersQueryBuffer;
@@ -148,11 +151,11 @@ private:
 
 class GLImagePassThroughAlgo : public GLImageProcAlgo {
 public:
-    GLImagePassThroughAlgo( int nLayers, int nFrameType, bool bUseOutputPBOs, bool bUseInputPBOs,
+    GLImagePassThroughAlgo( size_t nLayers, int nFrameType, bool bUseOutputPBOs, bool bUseInputPBOs,
                             bool bUseTexArrays, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
-    virtual std::string getComputeShaderSource(int nStage) const;
+    virtual std::string getComputeShaderSource(size_t nStage) const;
 protected:
-    virtual void dispatch(int nStage, GLShader& oShader);
+    virtual void dispatch(size_t nStage, GLShader& oShader);
 };
 
 class BinaryMedianFilter : public GLImageProcAlgo {
@@ -160,18 +163,18 @@ public:
     // @@@@@ add support for variable kernels? per-px kernel size could be provided via image load/store
     // @@@ currently not using ROI
     // via integral image: O(n) (where n is the total image size --- does not depend on r, the kernel size)
-    BinaryMedianFilter( int nKernelSize, int nBorderSize, int nLayers, const cv::Mat& oROI,
+    BinaryMedianFilter( size_t nKernelSize, size_t nBorderSize, size_t nLayers, const cv::Mat& oROI,
                         bool bUseOutputPBOs, bool bUseInputPBOs, bool bUseTexArrays,
                         bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
-    virtual std::string getComputeShaderSource(int nStage) const;
-    const int m_nKernelSize;
-    const int m_nBorderSize;
-    static const int m_nPPSMaxRowSize;
-    static const int m_nTransposeBlockSize;
+    virtual std::string getComputeShaderSource(size_t nStage) const;
+    const size_t m_nKernelSize;
+    const size_t m_nBorderSize;
+    static const size_t m_nPPSMaxRowSize;
+    static const size_t m_nTransposeBlockSize;
 protected:
     std::vector<std::string> m_vsComputeShaderSources;
     std::vector<glm::uvec3> m_vvComputeShaderDispatchSizes;
     static const GLuint eImage_PPSAccumulator;
     static const GLuint eImage_PPSAccumulator_T;
-    virtual void dispatch(int nStage, GLShader& oShader);
+    virtual void dispatch(size_t nStage, GLShader& oShader);
 };

@@ -82,7 +82,7 @@ protected:
 
 #if HAVE_GLSL
 public:
-    virtual std::string getComputeShaderSource(int nStage) const;
+    virtual std::string getComputeShaderSource(size_t nStage) const;
     virtual void apply_glimpl(cv::InputArray oNextImage, bool bRebindAll, double dLearningRate);
 protected:
     size_t m_nTMT32ModelSize;
@@ -96,7 +96,7 @@ protected:
     std::vector<GLSLFunctionUtils::TMT32GenParams> m_voTMT32ModelData;
     static const GLuint eBuffer_BGModelBinding;
     static const GLuint eBuffer_TMT32ModelBinding;
-    virtual void dispatch(int nStage, GLShader& oShader);
+    virtual void dispatch(size_t nStage, GLShader& oShader);
 #endif //HAVE_GLSL
 };
 

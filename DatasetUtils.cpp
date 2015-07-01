@@ -19,7 +19,7 @@ DatasetUtils::DatasetInfo DatasetUtils::GetDatasetInfo(const DatasetUtils::eData
             sDatasetRootDirPath+"/CDNet/"+sResultsDirPath+"/",
             "bin",
             ".png",
-            {"baseline_highway"},//{"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"},
+            {"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"},
             {"thermal"},
             {},
             1,
@@ -33,7 +33,7 @@ DatasetUtils::DatasetInfo DatasetUtils::GetDatasetInfo(const DatasetUtils::eData
             sDatasetRootDirPath+"/CDNet2014/"+sResultsDirPath+"/",
             "bin",
             ".png",
-            {"baseline_highway"},//{"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"},
+            {"baseline_highway"},//{"shadow_cubicle"},//{"dynamicBackground_fall"},//{"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"},
             {"thermal","turbulence"},
             {},
             1,
@@ -1037,13 +1037,13 @@ void DatasetUtils::SequenceInfo::StopPrecaching() {
 
 #if HAVE_GLSL
 
-DatasetUtils::CDNetEvaluator::CDNetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, int nTotFrameCount)
+DatasetUtils::CDNetEvaluator::CDNetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount)
     :    GLEvaluatorAlgo(pParent,nTotFrameCount,eAtomicCountersCount,1,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1) {
     glAssert(m_pParent->m_nOutputType==CV_8UC1);
 }
 
-std::string DatasetUtils::CDNetEvaluator::getComputeShaderSource(int nStage) const {
-    glAssert(nStage>=0 && nStage<m_nComputeStages);
+std::string DatasetUtils::CDNetEvaluator::getComputeShaderSource(size_t nStage) const {
+    glAssert(nStage<m_nComputeStages);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "#version 430\n"
@@ -1144,8 +1144,8 @@ void DatasetUtils::CDNetEvaluator::getCumulativeCounts(uint64_t& nTotTP, uint64_
     }
 }
 
-void DatasetUtils::CDNetEvaluator::dispatch(int nStage, GLShader&) {
-    glAssert(nStage>=0 && nStage<m_nComputeStages);
+void DatasetUtils::CDNetEvaluator::dispatch(size_t nStage, GLShader&) {
+    glAssert(nStage<m_nComputeStages);
     glMemoryBarrier(GL_ALL_BARRIER_BITS); // @@@@@@?
     glDispatchCompute((GLuint)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x),(GLuint)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y),1);
 }

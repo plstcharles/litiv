@@ -7,7 +7,6 @@
 // @@@ investigate glClearBufferData for large-scale opengl buffer memsets
 // @@@ support non-integer textures top level (alg)? need to replace all ui-stores by float-stores, rest is ok
 // @@@ imgproc: make all use*** defines only
-// @@@ timers: tic toc defines
 
 //////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
@@ -15,7 +14,7 @@
 #define EVAL_RESULTS_ONLY                0
 #define WRITE_BGSUB_IMG_OUTPUT           0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
-#define WRITE_BGSUB_METRICS_ANALYSIS     0
+#define WRITE_BGSUB_METRICS_ANALYSIS     1
 #define DISPLAY_BGSUB_DEBUG_OUTPUT       0
 #define ENABLE_INTERNAL_TIMERS           0
 #define ENABLE_DISPLAY_MOUSE_DEBUG       0
@@ -29,8 +28,8 @@
 //////////////////////////////////////////
 #include "ParallelUtils.h"
 #if HAVE_GLSL
-#define GLSL_EVALUATION                  0
-#define VALIDATE_GLSL_EVALUATION         0
+#define GLSL_EVALUATION                  1
+#define VALIDATE_GLSL_EVALUATION         1
 #endif //HAVE_GLSL
 #include "DatasetUtils.h"
 #define DATASET_ID             eDataset_CDnet2014
@@ -275,8 +274,6 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
             glError("Failed to create window via GLFW");
         glfwMakeContextCurrent(pWindow.get());
         glewInitErrorCheck;
-        if(!glGetTextureSubImage)
-            std::cout << "\n\tWarning: glGetTextureSubImage not supported, performance might be affected\n" << std::endl;
 #endif //HAVE_GLSL
 #if USE_LOBSTER_BGSUB
         std::shared_ptr<BackgroundSubtractorLOBSTER> pBGS(new BackgroundSubtractorLOBSTER());
@@ -493,13 +490,18 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
         const double dAvgFPS = (double)nFrameCount/dTimeElapsed;
         std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
 #if WRITE_BGSUB_METRICS_ANALYSIS
+        // cpu    baseline_highway: nTP=4752350, nTN=86239415, nFP=415054, nFN=705639,  nSE=352602, tot=92465060
+        // gpu    baseline_highway: nTP=3683389, nTN=86234574, nFP=419895, nFN=1774600, nSE=354805, tot=92467263 (@@@@ tot diff?!??)
+        // gpunew baseline_highway: nTP=3636273, nTN=86263300, nFP=391169, nFN=1821716, nSE=347734, tot=92460192 +/- 20
+        // @@@@@@ ... eval is ok, cpu+gpu same
+        printf("cpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN+pCurrSequence->nSE);
 #if GLSL_EVALUATION
 #if VALIDATE_GLSL_EVALUATION
-        printf("cpu eval:\nnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n@@@@@@@\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN+pCurrSequence->nSE);
+        printf("cpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN+pCurrSequence->nSE);
 #endif //VALIDATE_GLSL_EVALUATION
         pBGS_GPU_EVAL->getCumulativeCounts(pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
 #if VALIDATE_GLSL_EVALUATION
-        printf("gpu eval:\nnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n@@@@@@@\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN+pCurrSequence->nSE);
+        printf("gpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN+pCurrSequence->nSE);
 #endif //VALIDATE_GLSL_EVALUATION
 #endif //GLSL_EVALUATION
         pCurrSequence->m_dAvgFPS = dAvgFPS;
@@ -516,11 +518,11 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
     }
 #if HAVE_GLSL
-    catch(const GLException& e) {std::cout << "\nTop level caught GLException:\n\t" << e.what() << std::endl;}
+    catch(const GLUtils::GLException& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught GLException:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
 #endif //HAVE_GLSL
-    catch(const cv::Exception& e) {std::cout << "\nTop level caught cv::Exception:\n\t" << e.what() << std::endl;}
-    catch(const std::runtime_error& e) {std::cout << "\nTop level caught std::runtime_error:\n\t" << e.what() << std::endl;}
-    catch(...) {std::cout << "\nTop level caught unhandled exception\n" << std::endl;}
+    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
+    catch(const std::runtime_error& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::runtime_error:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
+    catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl;}
 #if HAVE_GPU_SUPPORT
     if(bGPUContextInitialized) {
 #if HAVE_GLSL

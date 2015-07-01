@@ -58,7 +58,7 @@ GLuint GLShader::addSource(const std::string& sSource, GLenum eType) {
         const char* acSourcePtr = sSource.c_str();
         glShaderSource(shaderID,1,&acSourcePtr,nullptr);
         glErrorCheck;
-    } catch(const GLException&) {
+    } catch(const GLUtils::GLException&) {
         glDeleteShader(shaderID);
         throw;
     }
@@ -102,7 +102,7 @@ bool GLShader::compile() {
             glGetShaderiv(oSrcIter->first, GL_INFO_LOG_LENGTH, &nLogSize);
             std::vector<char> vcLog(nLogSize);
             glGetShaderInfoLog(oSrcIter->first, nLogSize, &nLogSize, &vcLog[0]);
-            glErrorExt("shader compilation error in shader source #%d of program #%d:\n%s\n%s\n",oSrcIter->first,m_nProgID,addLineNumbersToString(oSrcIter->second,true).c_str(),&vcLog[0]);
+            glErrorExt("shader compilation error in shader source #%d of program #%d:\n%s\n%s\n",oSrcIter->first,m_nProgID,GLUtils::addLineNumbersToString(oSrcIter->second,true).c_str(),&vcLog[0]);
         }
     }
     return (m_bIsCompiled=!m_mShaderSources.empty());
@@ -452,13 +452,13 @@ std::string GLShader::getPassThroughFragmentShaderSource_ImgLoad(bool bUseTopLef
     ssSrc << "layout(location=0) out vec4 out_color;\n";
     if(bUseTopLeftFragCoordOrigin) ssSrc <<
              "layout(origin_upper_left) in vec4 gl_FragCoord;\n";
-    const bool bInternalFormatIsIntegral = isInternalFormatIntegral(eInternalFormat);
+    const bool bInternalFormatIsIntegral = GLUtils::isInternalFormatIntegral(eInternalFormat);
     if(!bUseIntegralFormat && bInternalFormatIsIntegral) ssSrc <<
-             "layout(binding=" << nImageBinding << ", " << getGLSLFormatNameFromInternalFormat(getNormalizedIntegralFormatFromInternalFormat(eInternalFormat)) << ") readonly uniform image2D img;\n";
+             "layout(binding=" << nImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(GLUtils::getNormalizedIntegralFormatFromInternalFormat(eInternalFormat)) << ") readonly uniform image2D img;\n";
     else if(bUseIntegralFormat && bInternalFormatIsIntegral) ssSrc <<
-             "layout(binding=" << nImageBinding << ", " << getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform uimage2D img;\n";
+             "layout(binding=" << nImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform uimage2D img;\n";
     else if(!bUseIntegralFormat && !bInternalFormatIsIntegral) ssSrc <<
-             "layout(binding=" << nImageBinding << ", " << getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform image2D img;\n";
+             "layout(binding=" << nImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform image2D img;\n";
     else
         glError("bad internal format & useintegral setup");
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -481,16 +481,16 @@ std::string GLShader::getPassThroughFragmentShaderSource_SxSImgLoad(bool bUseTop
     ssSrc << "layout(location=0) out vec4 out_color;\n";
     if(bUseTopLeftFragCoordOrigin) ssSrc <<
              "layout(origin_upper_left) in vec4 gl_FragCoord;\n";
-    const bool bInternalFormatIsIntegral = isInternalFormatIntegral(eInternalFormat);
+    const bool bInternalFormatIsIntegral = GLUtils::isInternalFormatIntegral(eInternalFormat);
     if(!bUseIntegralFormat && bInternalFormatIsIntegral)
         for(size_t nImageBindingIter=0; nImageBindingIter<vnImageBindings.size(); ++nImageBindingIter) ssSrc <<
-             "layout(binding=" << nImageBindingIter << ", " << getGLSLFormatNameFromInternalFormat(getNormalizedIntegralFormatFromInternalFormat(eInternalFormat)) << ") readonly uniform image2D" << (nImageLayer>0?"Array imgArray":" img") << nImageBindingIter << ";\n";
+             "layout(binding=" << nImageBindingIter << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(GLUtils::getNormalizedIntegralFormatFromInternalFormat(eInternalFormat)) << ") readonly uniform image2D" << (nImageLayer>0?"Array imgArray":" img") << nImageBindingIter << ";\n";
     else if(bUseIntegralFormat && bInternalFormatIsIntegral)
         for(size_t nImageBindingIter=0; nImageBindingIter<vnImageBindings.size(); ++nImageBindingIter) ssSrc <<
-             "layout(binding=" << nImageBindingIter << ", " << getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform uimage2D" << (nImageLayer>0?"Array imgArray":" img") << nImageBindingIter << ";\n";
+             "layout(binding=" << nImageBindingIter << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform uimage2D" << (nImageLayer>0?"Array imgArray":" img") << nImageBindingIter << ";\n";
     else if(!bUseIntegralFormat && !bInternalFormatIsIntegral)
         for(size_t nImageBindingIter=0; nImageBindingIter<vnImageBindings.size(); ++nImageBindingIter) ssSrc <<
-             "layout(binding=" << nImageBindingIter << ", " << getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform image2D" << (nImageLayer>0?"Array imgArray":" img") << nImageBindingIter << ";\n";
+             "layout(binding=" << nImageBindingIter << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform image2D" << (nImageLayer>0?"Array imgArray":" img") << nImageBindingIter << ";\n";
     else
         glError("bad internal format & useintegral setup");
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -532,13 +532,13 @@ std::string GLShader::getPassThroughFragmentShaderSource_SxSImgArrayLoad(bool bU
     ssSrc << "layout(location=0) out vec4 out_color;\n";
     if(bUseTopLeftFragCoordOrigin) ssSrc <<
              "layout(origin_upper_left) in vec4 gl_FragCoord;\n";
-    const bool bInternalFormatIsIntegral = isInternalFormatIntegral(eInternalFormat);
+    const bool bInternalFormatIsIntegral = GLUtils::isInternalFormatIntegral(eInternalFormat);
     if(!bUseIntegralFormat && bInternalFormatIsIntegral) ssSrc <<
-             "layout(binding=" << nImageBinding << ", " << getGLSLFormatNameFromInternalFormat(getNormalizedIntegralFormatFromInternalFormat(eInternalFormat)) << ") readonly uniform image2D" << (nImageCount>1?"Array imgArray":" img") << ";\n";
+             "layout(binding=" << nImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(GLUtils::getNormalizedIntegralFormatFromInternalFormat(eInternalFormat)) << ") readonly uniform image2D" << (nImageCount>1?"Array imgArray":" img") << ";\n";
     else if(bUseIntegralFormat && bInternalFormatIsIntegral) ssSrc <<
-             "layout(binding=" << nImageBinding << ", " << getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform uimage2D" << (nImageCount>1?"Array imgArray":" img") << ";\n";
+             "layout(binding=" << nImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform uimage2D" << (nImageCount>1?"Array imgArray":" img") << ";\n";
     else if(!bUseIntegralFormat && !bInternalFormatIsIntegral) ssSrc <<
-             "layout(binding=" << nImageBinding << ", " << getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform image2D" << (nImageCount>1?"Array imgArray":" img") << ";\n";
+             "layout(binding=" << nImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform image2D" << (nImageCount>1?"Array imgArray":" img") << ";\n";
     else
         glError("bad internal format & useintegral setup");
     ssSrc << "const int imgArrayLayers = " << nImageCount << ";\n";
@@ -557,22 +557,22 @@ std::string GLShader::getPassThroughFragmentShaderSource_SxSImgArrayLoad(bool bU
     return ssSrc.str();
 }
 
-std::string GLShader::getPassThroughComputeShaderSource_ImgLoadCopy(const glm::ivec2& vWorkGroupSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding, bool bUseIntegralFormat) {
+std::string GLShader::getPassThroughComputeShaderSource_ImgLoadCopy(const glm::uvec2& vWorkGroupSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding, bool bUseIntegralFormat) {
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "#version 430\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "layout(local_size_x=" << vWorkGroupSize.x << ",local_size_y=" << vWorkGroupSize.y << ") in;\n";
-    const bool bInternalFormatIsIntegral = isInternalFormatIntegral(eInternalFormat);
+    const bool bInternalFormatIsIntegral = GLUtils::isInternalFormatIntegral(eInternalFormat);
     if(!bUseIntegralFormat && bInternalFormatIsIntegral) ssSrc <<
-             "layout(binding=" << nInputImageBinding << ", " << getGLSLFormatNameFromInternalFormat(getNormalizedIntegralFormatFromInternalFormat(eInternalFormat)) << ") readonly uniform image2D imgInput;\n"
-             "layout(binding=" << nOutputImageBinding << ", " << getGLSLFormatNameFromInternalFormat(getNormalizedIntegralFormatFromInternalFormat(eInternalFormat)) << ") writeonly uniform image2D imgOutput;\n";
+             "layout(binding=" << nInputImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(GLUtils::getNormalizedIntegralFormatFromInternalFormat(eInternalFormat)) << ") readonly uniform image2D imgInput;\n"
+             "layout(binding=" << nOutputImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(GLUtils::getNormalizedIntegralFormatFromInternalFormat(eInternalFormat)) << ") writeonly uniform image2D imgOutput;\n";
     else if(bUseIntegralFormat && bInternalFormatIsIntegral) ssSrc <<
-             "layout(binding=" << nInputImageBinding << ", " << getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform uimage2D imgInput;\n"
-             "layout(binding=" << nOutputImageBinding << ", " << getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") writeonly uniform uimage2D imgOutput;\n";
+             "layout(binding=" << nInputImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform uimage2D imgInput;\n"
+             "layout(binding=" << nOutputImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") writeonly uniform uimage2D imgOutput;\n";
     else if(!bUseIntegralFormat && !bInternalFormatIsIntegral) ssSrc <<
-             "layout(binding=" << nInputImageBinding << ", " << getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform image2D imgInput;\n"
-             "layout(binding=" << nOutputImageBinding << ", " << getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") writeonly uniform image2D imgOutput;\n";
+             "layout(binding=" << nInputImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform image2D imgInput;\n"
+             "layout(binding=" << nOutputImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") writeonly uniform image2D imgOutput;\n";
     else
         glError("bad internal format & useintegral setup");
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -708,14 +708,12 @@ std::string NBodySimulationUtils::getIntegrateComputeShaderSource() {
 
 std::string ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum(int nMaxRowSize, bool bBinaryProc, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding) {
     // dispatch must use x=ceil(ceil(nColumns/2)/nMaxRowSize), y=nRows, z=1
-    glAssert(isInternalFormatIntegral(eInternalFormat));
+    glAssert(GLUtils::isInternalFormatIntegral(eInternalFormat));
     glAssert(nMaxRowSize>1);
     const int nInvocations = (int)ceil((float)nMaxRowSize/2);
     glAssert((!(nMaxRowSize%2) && nInvocations==nMaxRowSize/2) || ((nMaxRowSize%2) && nInvocations-1==nMaxRowSize/2));
-    int nMaxSharedMem;
-    glGetIntegerv(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE,&nMaxSharedMem);
-    glAssert(nMaxRowSize*4*4<nMaxSharedMem);
-    const char* acInternalFormatName = getGLSLFormatNameFromInternalFormat(eInternalFormat);
+    glAssert(nMaxRowSize*4*4<GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE));
+    const char* acInternalFormatName = GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "#version 430\n"
@@ -769,8 +767,8 @@ std::string ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum_BlockMe
     // dispatch must use x=1, y=1, z=1
     glAssert(nMaxRowSize>0);
     glAssert(nColumns>nMaxRowSize); // shader step is useless otherwise
-    glAssert(isInternalFormatIntegral(eInternalFormat));
-    const char* acInternalFormatName = getGLSLFormatNameFromInternalFormat(eInternalFormat);
+    glAssert(GLUtils::isInternalFormatIntegral(eInternalFormat));
+    const char* acInternalFormatName = GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat);
     const int nBlockCount = (int)ceil((float)nColumns/nMaxRowSize);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -796,12 +794,10 @@ std::string ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum_BlockMe
 
 std::string ComputeShaderUtils::getComputeShaderSource_Transpose(int nBlockSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding) {
     // dispatch must use x=ceil(nCols/nBlockSize), y=ceil(nRows/nBlockSize), z=1
-    int nMaxSharedMem;
-    glGetIntegerv(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE,&nMaxSharedMem);
-    glAssert(nBlockSize*nBlockSize*4*4<nMaxSharedMem);
+    glAssert(nBlockSize*nBlockSize*4*4<GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE));
     glAssert(nInputImageBinding!=nOutputImageBinding);
-    const bool bUsingIntegralFormat = isInternalFormatIntegral(eInternalFormat);
-    const char* acInternalFormatName = getGLSLFormatNameFromInternalFormat(eInternalFormat);
+    const bool bUsingIntegralFormat = GLUtils::isInternalFormatIntegral(eInternalFormat);
+    const char* acInternalFormatName = GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "#version 430\n"

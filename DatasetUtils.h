@@ -183,8 +183,8 @@ namespace DatasetUtils {
 #if HAVE_GLSL
     class CDNetEvaluator : public GLEvaluatorAlgo {
     public:
-        CDNetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, int nTotFrameCount);
-        virtual std::string getComputeShaderSource(int nStage) const;
+        CDNetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount);
+        virtual std::string getComputeShaderSource(size_t nStage) const;
         void getCumulativeCounts(uint64_t& nTotTP, uint64_t& nTotTN, uint64_t& nTotFP, uint64_t& nTotFN, uint64_t& nTotSE);
         enum eAtomicCountersList {
             eAtomicCounter_TP=0,
@@ -195,7 +195,7 @@ namespace DatasetUtils {
             eAtomicCountersCount,
         };
     protected:
-        virtual void dispatch(int nStage, GLShader& oShader);
+        virtual void dispatch(size_t nStage, GLShader& oShader);
     };
 #endif //HAVE_GLSL
 

@@ -52,7 +52,7 @@ public:
     static std::string getPassThroughFragmentShaderSource_ImgLoad(bool bUseTopLeftFragCoordOrigin, GLenum eInternalFormat, GLuint nImageBinding, bool bUseIntegralFormat);
     static std::string getPassThroughFragmentShaderSource_SxSImgLoad(bool bUseTopLeftFragCoordOrigin, GLenum eInternalFormat, const std::vector<GLuint> vnImageBindings, GLint nImageLayer, bool bUseIntegralFormat); // @@@ to be tested
     static std::string getPassThroughFragmentShaderSource_SxSImgArrayLoad(bool bUseTopLeftFragCoordOrigin, GLenum eInternalFormat, GLuint nImageBinding, GLint nImageCount, bool bUseIntegralFormat);
-    static std::string getPassThroughComputeShaderSource_ImgLoadCopy(const glm::ivec2& vWorkGroupSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding, bool bUseIntegralFormat);
+    static std::string getPassThroughComputeShaderSource_ImgLoadCopy(const glm::uvec2& vWorkGroupSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding, bool bUseIntegralFormat);
 
 private:
     static bool useShaderProgram(GLShader* pNewShader);
