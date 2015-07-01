@@ -1,9 +1,7 @@
 #pragma once
 
-#include <opencv2/features2d/features2d.hpp>
 #include <opencv2/video/background_segm.hpp>
 #include "LBSP.h"
-#include "ParallelUtils.h"
 #if HAVE_GLSL
 #include "GLImageProcUtils.h"
 #endif //HAVE_GLSL

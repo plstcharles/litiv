@@ -1,10 +1,9 @@
 #include "BackgroundSubtractorLOBSTER.h"
-#include "DistanceUtils.h"
 #include "RandUtils.h"
 #include <iostream>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
 #include <iomanip>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
 
 #if HAVE_GLSL
 #define LOBSTER_GLSL_DEBUG       0
@@ -344,7 +343,6 @@ std::string BackgroundSubtractorLOBSTER::getComputeShaderSource(size_t nStage) c
 void BackgroundSubtractorLOBSTER::dispatch(size_t nStage, GLShader& oShader) {
     glAssert(nStage<m_nComputeStages);
     oShader.setUniform1ui("nResamplingRate",m_nResamplingRate);
-    glMemoryBarrier(GL_ALL_BARRIER_BITS); // @@@@@@?
     glDispatchCompute((GLuint)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x),(GLuint)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y),1);
 }
 

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <opencv2/features2d/features2d.hpp>
 #include <opencv2/video/background_segm.hpp>
 
 //! defines the default value for BackgroundSubtractorViBe::m_nColorDistThreshold

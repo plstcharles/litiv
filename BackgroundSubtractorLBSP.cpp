@@ -1,11 +1,5 @@
 #include "BackgroundSubtractorLBSP.h"
-#include "DistanceUtils.h"
-#include "RandUtils.h"
-#include <iostream>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <iomanip>
-#include <exception>
+#include <opencv2/imgproc.hpp>
 
 // local define used to determine the default median blur kernel size
 #define DEFAULT_MEDIAN_BLUR_KERNEL_SIZE (9)

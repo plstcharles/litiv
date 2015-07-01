@@ -2,9 +2,9 @@
 #include "DistanceUtils.h"
 #include "RandUtils.h"
 #include <iostream>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
 #include <iomanip>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
 
 BackgroundSubtractorPBAS_1ch::BackgroundSubtractorPBAS_1ch(  size_t nInitColorDistThreshold
                                                             ,float fInitUpdateRate

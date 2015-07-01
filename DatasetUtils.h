@@ -6,10 +6,10 @@
 
 #include "ParallelUtils.h"
 #include "PlatformUtils.h"
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/features2d/features2d.hpp>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/features2d.hpp>
 #if HAVE_GLSL
 #include "GLImageProcUtils.h"
 #endif //HAVE_GLSL
@@ -194,8 +194,6 @@ namespace DatasetUtils {
             eAtomicCounter_SE,
             eAtomicCountersCount,
         };
-    protected:
-        virtual void dispatch(size_t nStage, GLShader& oShader);
     };
 #endif //HAVE_GLSL
 

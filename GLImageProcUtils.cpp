@@ -224,6 +224,8 @@ void GLImageProcAlgo::apply(const cv::Mat& oNextInput, bool bRebindAll) {
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getCurrTextureLayerUniformName(),m_nCurrLayer);
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getLastTextureLayerUniformName(),m_nLastLayer);
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getFrameIndexUniformName(),m_nInternalFrameIdx);
+        if(nCurrStageIter>0)
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         dispatch(nCurrStageIter,*m_vpImgProcShaders[nCurrStageIter]); // add timer for stage? can reuse the same @@@@@@@@@@@@@@@
     }
     if(m_bUsingTimers)
@@ -346,6 +348,11 @@ size_t GLImageProcAlgo::fetchLastDebug(cv::Mat& oDebug) const {
     else
         m_oLastDebug.copyTo(oDebug);
     return m_nLastDebugInternalIdx;
+}
+
+void GLImageProcAlgo::dispatch(size_t nStage, GLShader&) {
+    glAssert(nStage<m_nComputeStages);
+    glDispatchCompute((GLuint)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x),(GLuint)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y),1);
 }
 
 const char* GLImageProcAlgo::getCurrTextureLayerUniformName() {
@@ -522,6 +529,7 @@ GLEvaluatorAlgo::~GLEvaluatorAlgo() {
 
 const cv::Mat& GLEvaluatorAlgo::getAtomicCounterBuffer() {
     glAssert(m_bGLInitialized);
+    glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER,m_nAtomicBuffer);
     if(m_nCurrAtomicBufferOffsetPtr)
         glGetBufferSubData(GL_ATOMIC_COUNTER_BUFFER,0,m_nCurrAtomicBufferOffsetPtr,m_oAtomicCountersQueryBuffer.data+m_nCurrAtomicBufferOffsetBlock);
@@ -690,6 +698,8 @@ void GLEvaluatorAlgo::apply(const cv::Mat& oNextGT, bool bRebindAll) {
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getCurrTextureLayerUniformName(),m_nCurrLayer);
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getLastTextureLayerUniformName(),m_nLastLayer);
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getFrameIndexUniformName(),m_nInternalFrameIdx);
+        if(nCurrStageIter>0)
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
         dispatch(nCurrStageIter,*m_vpImgProcShaders[nCurrStageIter]);
     }
     if(m_bUsingInputPBOs) {
@@ -753,10 +763,6 @@ std::string GLImagePassThroughAlgo::getComputeShaderSource(size_t nStage) const 
     return GLShader::getPassThroughComputeShaderSource_ImgLoadCopy(m_vDefaultWorkGroupSize,GLUtils::getInternalFormatFromMatType(m_nInputType,m_bUsingIntegralFormat),GLImageProcAlgo::eImage_InputBinding,GLImageProcAlgo::eImage_OutputBinding,m_bUsingIntegralFormat);
 }
 
-void GLImagePassThroughAlgo::dispatch(size_t nStage, GLShader&) {
-    glAssert(nStage<m_nComputeStages);
-    glDispatchCompute((GLuint)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x), (GLuint)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y), 1);
-}
 /*
 const size_t BinaryMedianFilter::m_nPPSMaxRowSize = 512;
 const size_t BinaryMedianFilter::m_nTransposeBlockSize = 32;
@@ -848,8 +854,6 @@ std::string BinaryMedianFilter::getComputeShaderSource(size_t nStage) const {
 
 void BinaryMedianFilter::dispatchCompute(size_t nStage, GLShader*) {
     glAssert(nStage<m_nComputeStages);
-    if(nStage>0)
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
     glDispatchCompute(m_vvComputeShaderDispatchSizes[nStage].x,m_vvComputeShaderDispatchSizes[nStage].y,m_vvComputeShaderDispatchSizes[nStage].z);
 }
 

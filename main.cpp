@@ -342,7 +342,7 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
         pBGS_GPU->setOutputFetching(NEED_FG_MASK);
 #if (GLSL_EVALUATION && WRITE_BGSUB_METRICS_ANALYSIS)
         std::shared_ptr<DatasetUtils::CDNetEvaluator> pBGS_GPU_EVAL(new DatasetUtils::CDNetEvaluator(pBGS_GPU,nFrameCount));
-        pBGS_GPU_EVAL->initialize(oCurrGTMask,oROI.empty()?cv::Mat(oCurrInputFrame.size(),CV_8UC1,cv::Scalar_<uchar>(0)):oROI);
+        pBGS_GPU_EVAL->initialize(oCurrGTMask,oROI.empty()?cv::Mat(oCurrInputFrame.size(),CV_8UC1,cv::Scalar_<uchar>(255)):oROI);
         oWindowSize.width *= pBGS_GPU_EVAL->m_nSxSDisplayCount;
 #else //!(GLSL_EVALUATION && WRITE_BGSUB_METRICS_ANALYSIS)
         oWindowSize.width *= pBGS_GPU->m_nSxSDisplayCount;
@@ -490,18 +490,13 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
         const double dAvgFPS = (double)nFrameCount/dTimeElapsed;
         std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
 #if WRITE_BGSUB_METRICS_ANALYSIS
-        // cpu    baseline_highway: nTP=4752350, nTN=86239415, nFP=415054, nFN=705639,  nSE=352602, tot=92465060
-        // gpu    baseline_highway: nTP=3683389, nTN=86234574, nFP=419895, nFN=1774600, nSE=354805, tot=92467263 (@@@@ tot diff?!??)
-        // gpunew baseline_highway: nTP=3636273, nTN=86263300, nFP=391169, nFN=1821716, nSE=347734, tot=92460192 +/- 20
-        // @@@@@@ ... eval is ok, cpu+gpu same
-        printf("cpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN+pCurrSequence->nSE);
 #if GLSL_EVALUATION
 #if VALIDATE_GLSL_EVALUATION
-        printf("cpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN+pCurrSequence->nSE);
+        printf("cpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN);
 #endif //VALIDATE_GLSL_EVALUATION
         pBGS_GPU_EVAL->getCumulativeCounts(pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
 #if VALIDATE_GLSL_EVALUATION
-        printf("gpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN+pCurrSequence->nSE);
+        printf("gpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN);
 #endif //VALIDATE_GLSL_EVALUATION
 #endif //GLSL_EVALUATION
         pCurrSequence->m_dAvgFPS = dAvgFPS;

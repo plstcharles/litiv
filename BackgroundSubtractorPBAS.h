@@ -1,6 +1,5 @@
 #pragma once
 
-#include <opencv2/features2d/features2d.hpp>
 #include <opencv2/video/background_segm.hpp>
 
 //! defines the internal threshold adjustment factor to use when determining if the variation of a single channel is enough to declare the pixel as foreground

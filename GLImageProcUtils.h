@@ -107,8 +107,7 @@ protected:
     GLScreenBillboard m_oDisplayBillboard;
     GLShader m_oDisplayShader;
 
-    virtual void dispatch(size_t nStage, GLShader& oShader) = 0;
-
+    virtual void dispatch(size_t nStage, GLShader& oShader);
     static const char* getCurrTextureLayerUniformName();
     static const char* getLastTextureLayerUniformName();
     static const char* getFrameIndexUniformName();
@@ -154,8 +153,6 @@ public:
     GLImagePassThroughAlgo( size_t nLayers, int nFrameType, bool bUseOutputPBOs, bool bUseInputPBOs,
                             bool bUseTexArrays, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
     virtual std::string getComputeShaderSource(size_t nStage) const;
-protected:
-    virtual void dispatch(size_t nStage, GLShader& oShader);
 };
 
 class BinaryMedianFilter : public GLImageProcAlgo {

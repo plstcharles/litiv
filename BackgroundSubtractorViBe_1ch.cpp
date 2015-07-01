@@ -1,9 +1,6 @@
 #include "BackgroundSubtractorViBe_1ch.h"
 #include "DistanceUtils.h"
 #include "RandUtils.h"
-#include <iostream>
-#include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
 
 BackgroundSubtractorViBe_1ch::BackgroundSubtractorViBe_1ch(  size_t nColorDistThreshold
                                                             ,size_t nBGSamples

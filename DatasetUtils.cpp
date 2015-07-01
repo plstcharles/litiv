@@ -1070,26 +1070,28 @@ std::string DatasetUtils::CDNetEvaluator::getComputeShaderSource(size_t nStage) 
              "    uint nInputSegmVal = imageLoad(imgInput,imgCoord).r;\n"
              "    uint nGTSegmVal = imageLoad(imgGT,imgCoord).r;\n"
              "    uint nROIVal = imageLoad(imgROI,imgCoord).r;\n"
-             "    if(nGTSegmVal!=VAL_OUTOFSCOPE && nGTSegmVal!=VAL_UNKNOWN && nROIVal!=VAL_NEGATIVE) {\n"
-             "        if(nInputSegmVal==VAL_POSITIVE) {\n"
-             "            if(nGTSegmVal==VAL_POSITIVE) {\n"
-             "                atomicCounterIncrement(nTP);\n"
-             "            }\n"
-             "            else { // nGTSegmVal==VAL_NEGATIVE\n"
-             "                atomicCounterIncrement(nFP);\n"
-             "            }\n"
-             "        }\n"
-             "        else { // nInputSegmVal==VAL_NEGATIVE\n"
-             "            if(nGTSegmVal==VAL_POSITIVE) {\n"
-             "                atomicCounterIncrement(nFN);\n"
-             "            }\n"
-             "            else { // nGTSegmVal==VAL_NEGATIVE\n"
-             "                atomicCounterIncrement(nTN);\n"
-             "            }\n"
-             "        }\n"
-             "        if(nGTSegmVal==VAL_SHADOW) {\n"
+             "    if(nROIVal!=VAL_NEGATIVE) {\n"
+             "        if(nGTSegmVal!=VAL_OUTOFSCOPE && nGTSegmVal!=VAL_UNKNOWN) {\n"
              "            if(nInputSegmVal==VAL_POSITIVE) {\n"
-             "               atomicCounterIncrement(nSE);\n"
+             "                if(nGTSegmVal==VAL_POSITIVE) {\n"
+             "                    atomicCounterIncrement(nTP);\n"
+             "                }\n"
+             "                else { // nGTSegmVal==VAL_NEGATIVE\n"
+             "                    atomicCounterIncrement(nFP);\n"
+             "                }\n"
+             "            }\n"
+             "            else { // nInputSegmVal==VAL_NEGATIVE\n"
+             "                if(nGTSegmVal==VAL_POSITIVE) {\n"
+             "                    atomicCounterIncrement(nFN);\n"
+             "                }\n"
+             "                else { // nGTSegmVal==VAL_NEGATIVE\n"
+             "                    atomicCounterIncrement(nTN);\n"
+             "                }\n"
+             "            }\n"
+             "            if(nGTSegmVal==VAL_SHADOW) {\n"
+             "                if(nInputSegmVal==VAL_POSITIVE) {\n"
+             "                   atomicCounterIncrement(nSE);\n"
+             "                }\n"
              "            }\n"
              "        }\n"
              "    }\n";
@@ -1142,12 +1144,6 @@ void DatasetUtils::CDNetEvaluator::getCumulativeCounts(uint64_t& nTotTP, uint64_
         nTotFN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eAtomicCounter_FN);
         nTotSE += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eAtomicCounter_SE);
     }
-}
-
-void DatasetUtils::CDNetEvaluator::dispatch(size_t nStage, GLShader&) {
-    glAssert(nStage<m_nComputeStages);
-    glMemoryBarrier(GL_ALL_BARRIER_BITS); // @@@@@@?
-    glDispatchCompute((GLuint)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x),(GLuint)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y),1);
 }
 
 #endif //HAVE_GLSL
