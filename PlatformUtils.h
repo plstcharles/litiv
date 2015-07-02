@@ -73,6 +73,7 @@ template<typename Derived,typename Base,typename Del> std::unique_ptr<Derived,De
 }
 
 namespace PlatformUtils {
+
     void GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths);
     void GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths);
     bool CreateDirIfNotExist(const std::string& sDirPath);
@@ -96,4 +97,5 @@ namespace PlatformUtils {
 #if PLATFORM_USES_WIN32API
     void SetConsoleWindowSize(int x, int y, int buffer_lines=-1);
 #endif //PLATFORM_USES_WIN32API
+
 }; //namespace PlatformUtils

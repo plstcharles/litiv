@@ -15,6 +15,7 @@
 #endif //HAVE_GLSL
 
 namespace DatasetUtils {
+
     class MetricsCalculator;
     class SequenceInfo;
     class CategoryInfo;
@@ -181,6 +182,7 @@ namespace DatasetUtils {
     };
 
 #if HAVE_GLSL
+
     class CDNetEvaluator : public GLEvaluatorAlgo {
     public:
         CDNetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount);
@@ -195,6 +197,7 @@ namespace DatasetUtils {
             eAtomicCountersCount,
         };
     };
+
 #endif //HAVE_GLSL
 
 }; //namespace DatasetUtils

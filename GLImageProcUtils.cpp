@@ -831,6 +831,10 @@ BinaryMedianFilter::BinaryMedianFilter( size_t nKernelSize, size_t nBorderSize, 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "void main() {\n"
             // @@@@@@@@@@ could also benefit from shared mem, fetch area sums in and around local work group
+            @@@@@@@@@@@@
+            @@@ note @@@ see compute programming model, https://www.khronos.org/files/opengl44-quick-reference-card.pdf
+            @@@ note @@@  ----> global invoc id == pixel location (with inverted y axis?)
+            @@@@@@@@@@@@
              "    ivec2 center = ivec2(gl_GlobalInvocationID.xy);\n"
              "    // area sum = D - C - B + A\n"
              "    ivec2 D = min(center+ivec2(radius),ivec2(imgWidth-1,imgHeight-1));\n"

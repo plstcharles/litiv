@@ -119,11 +119,14 @@ public:
     static const size_t PATCH_SIZE = 5;
     //! utility, specifies the number of bytes per descriptor (should be the same as calling 'descriptorSize()')
     static const size_t DESC_SIZE = 2;
+#if HAVE_GLSL
+    //! utility function, returns the glsl source code required to describe an LBSP descriptor based on the image load store
+    static std::string getShaderFunctionSource(size_t nChannels);
+#endif //HAVE_GLSL
 
 protected:
     //! classic 'compute' implementation, based on the regular DescriptorExtractor::computeImpl arguments & expected output
     virtual void computeImpl(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const;
-
     const bool m_bOnlyUsingAbsThreshold;
     const float m_fRelThreshold;
     const size_t m_nThreshold;

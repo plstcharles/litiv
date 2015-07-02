@@ -318,3 +318,31 @@ void LBSP::validateROI(cv::Mat& oROI) {
     oROI = oROI_new;
 #endif //!HAVE_GPU_SUPPORT
 }
+
+#if HAVE_GLSL
+
+std::string LBSP::getShaderFunctionSource(size_t nChannels) {
+    glAssert(nChannels==4 || nChannels==1);
+    std::stringstream ssSrc;
+    ssSrc << "uvec4 lbsp(in uvec4 t, in uvec4 ref, in layout(" << (nChannels==4?"rgba8ui":"r8ui") << ") readonly uimage2D mData, in ivec2 vCoords) {\n"
+             "    return (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2(-1, 1)))-ivec4(ref)),t)) << 15)\n"
+             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 1,-1)))-ivec4(ref)),t)) << 14)\n"
+             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 1, 1)))-ivec4(ref)),t)) << 13)\n"
+             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2(-1,-1)))-ivec4(ref)),t)) << 12)\n"
+             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 1, 0)))-ivec4(ref)),t)) << 11)\n"
+             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 0,-1)))-ivec4(ref)),t)) << 10)\n"
+             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2(-1, 0)))-ivec4(ref)),t)) << 9)\n"
+             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 0, 1)))-ivec4(ref)),t)) << 8)\n"
+             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2(-2,-2)))-ivec4(ref)),t)) << 7)\n"
+             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 2, 2)))-ivec4(ref)),t)) << 6)\n"
+             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 2,-2)))-ivec4(ref)),t)) << 5)\n"
+             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2(-2, 2)))-ivec4(ref)),t)) << 4)\n"
+             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 0, 2)))-ivec4(ref)),t)) << 3)\n"
+             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 0,-2)))-ivec4(ref)),t)) << 2)\n"
+             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 2, 0)))-ivec4(ref)),t)) << 1)\n"
+             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2(-2, 0)))-ivec4(ref)),t)));\n"
+             "}\n";
+    return ssSrc.str();
+}
+
+#endif //HAVE_GLSL

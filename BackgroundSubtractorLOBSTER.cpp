@@ -8,6 +8,7 @@
 #if HAVE_GLSL
 #define LOBSTER_GLSL_DEBUG       0
 #define LOBSTER_GLSL_TIMERS      0
+#define LOBSTER_GLSL_BASIC       0
 #if (!GLSL_RENDERING && LOBSTER_GLSL_DEBUG)
 #undef LOBSTER_GLSL_DEBUG
 #define LOBSTER_GLSL_DEBUG 0
@@ -56,6 +57,8 @@ void BackgroundSubtractorLOBSTER::initialize(const cv::Mat& oInitImg, const cv::
     // == init
     BackgroundSubtractorLBSP::initialize(oInitImg,oROI);
     m_bModelInitialized = false;
+    //@@@@ ship off part below to BackgroundSubtractorLBSP (and lbsp rel thres for 1ch = /3, according to subsense/pawcs)
+    //@@@@ pass pxinfolut as function param, so pawcs can overload correctly
     m_vnPxIdxLUT.resize(m_nTotRelevantPxCount);
     m_voPxInfoLUT.resize(m_nTotPxCount);
     if(m_nImgChannels==1) {
@@ -223,12 +226,20 @@ std::string BackgroundSubtractorLOBSTER::getComputeShaderSource(size_t nStage) c
     glAssert(nStage<m_nComputeStages);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "#version 430\n"
-             "#define COLOR_DIST_THRESHOLD   " << (m_nImgChannels==4?m_nColorDistThreshold*3:m_nColorDistThreshold) << "\n"
-             "#define DESC_DIST_THRESHOLD    " << (m_nImgChannels==4?m_nDescDistThreshold*3:m_nDescDistThreshold) << "\n"
-             "#define NB_SAMPLES             " << m_nBGSamples << "\n"
-             "#define NB_REQ_SAMPLES         " << m_nRequiredBGSamples << "\n"
-             "#define MODEL_STEP_SIZE        " << m_oFrameSize.width << "\n"
+    ssSrc << "#version 430\n";
+    if(m_nImgChannels==4) { ssSrc <<
+             "#define COLOR_DIST_THRESHOLD    " << m_nColorDistThreshold*3 << "\n"
+             "#define DESC_DIST_THRESHOLD     " << m_nDescDistThreshold*3 << "\n"
+             "#define COLOR_DIST_SC_THRESHOLD (COLOR_DIST_THRESHOLD/2)\n"
+             "#define DESC_DIST_SC_THRESHOLD  (DESC_DIST_THRESHOLD/2)\n";
+    }
+    else { ssSrc <<
+             "#define COLOR_DIST_THRESHOLD    " << m_nColorDistThreshold << "\n"
+             "#define DESC_DIST_THRESHOLD     " << m_nDescDistThreshold << "\n";
+    }
+    ssSrc << "#define NB_SAMPLES              " << m_nBGSamples << "\n"
+             "#define NB_REQ_SAMPLES          " << m_nRequiredBGSamples << "\n"
+             "#define MODEL_STEP_SIZE         " << m_oFrameSize.width << "\n"
              "struct PxModel {\n"
              "    " << (m_nImgChannels==4?"uvec4":"uint") << " color_samples[" << m_nBGSamples << "];\n"
              "    " << (m_nImgChannels==4?"uvec4":"uint") << " lbsp_samples[" << m_nBGSamples << "];\n";
@@ -236,30 +247,12 @@ std::string BackgroundSubtractorLOBSTER::getComputeShaderSource(size_t nStage) c
              "    uint pad[" << m_nPxModelPadding << "];\n";
     ssSrc << "};\n";
     ssSrc << (m_nImgChannels==4?GLSLFunctionUtils::getShaderFunctionSource_L1dist():GLSLFunctionUtils::getShaderFunctionSource_absdiff(true));
-    ssSrc << GLSLFunctionUtils::getShaderFunctionSource_absdiff(true);
-    ssSrc << GLSLFunctionUtils::getShaderFunctionSource_hdist();
-    ssSrc << GLSLFunctionUtils::getShaderFunctionSource_urand_tinymt32();
-    ssSrc << GLSLFunctionUtils::getShaderFunctionSource_getRandNeighbor3x3(0,m_oFrameSize);
-    ssSrc << "uvec4 lbsp(in uvec4 t, in uvec4 ref, in layout(" << (m_nImgChannels==4?"rgba8ui":"r8ui") << ") readonly uimage2D mData, in ivec2 vCoords) {\n"
-             "    return (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2(-1, 1)))-ivec4(ref)),t)) << 15)\n"
-             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 1,-1)))-ivec4(ref)),t)) << 14)\n"
-             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 1, 1)))-ivec4(ref)),t)) << 13)\n"
-             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2(-1,-1)))-ivec4(ref)),t)) << 12)\n"
-             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 1, 0)))-ivec4(ref)),t)) << 11)\n"
-             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 0,-1)))-ivec4(ref)),t)) << 10)\n"
-             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2(-1, 0)))-ivec4(ref)),t)) << 9)\n"
-             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 0, 1)))-ivec4(ref)),t)) << 8)\n"
-             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2(-2,-2)))-ivec4(ref)),t)) << 7)\n"
-             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 2, 2)))-ivec4(ref)),t)) << 6)\n"
-             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 2,-2)))-ivec4(ref)),t)) << 5)\n"
-             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2(-2, 2)))-ivec4(ref)),t)) << 4)\n"
-             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 0, 2)))-ivec4(ref)),t)) << 3)\n"
-             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 0,-2)))-ivec4(ref)),t)) << 2)\n"
-             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2( 2, 0)))-ivec4(ref)),t)) << 1)\n"
-             "         + (uvec4(greaterThan(abs(ivec4(imageLoad(mData,vCoords+ivec2(-2, 0)))-ivec4(ref)),t)));\n"
-             "}\n";
-    ssSrc << "#define urand() urand(aoTMT32Models[nModelIdx])\n"
-             "#define dist(a,b) " << (m_nImgChannels==4?"L1dist(a,b)":"absdiff(a,b)") << "\n";
+    ssSrc << GLSLFunctionUtils::getShaderFunctionSource_absdiff(true); // @@@@ transfer to distanceutils
+    ssSrc << GLSLFunctionUtils::getShaderFunctionSource_hdist(); // @@@@ transfer to distanceutils
+    ssSrc << GLSLFunctionUtils::getShaderFunctionSource_urand_tinymt32(); // @@@@ transfer to randutils
+    ssSrc << GLSLFunctionUtils::getShaderFunctionSource_getRandNeighbor3x3(0,m_oFrameSize); // @@@@ transfer to randutils
+    ssSrc << LBSP::getShaderFunctionSource(m_nImgChannels);
+    ssSrc << "#define urand() urand(aoTMT32Models[nModelIdx])\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "layout(local_size_x=" << m_vDefaultWorkGroupSize.x << ",local_size_y=" << m_vDefaultWorkGroupSize.y << ") in;\n"
              "layout(binding=" << GLImageProcAlgo::eImage_ROIBinding << ", r8ui) readonly uniform uimage2D mROI;\n"
@@ -278,6 +271,7 @@ std::string BackgroundSubtractorLOBSTER::getComputeShaderSource(size_t nStage) c
              "uniform uint nFrameIdx;\n"
              "uniform uint nResamplingRate;\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    // @@@@@ try impl without conditions?
     ssSrc << "void main() {\n"
              "    ivec2 vImgCoords = ivec2(gl_GlobalInvocationID.xy);\n"
              "    uvec4 vSegmResult = uvec4(0);\n"
@@ -285,20 +279,32 @@ std::string BackgroundSubtractorLOBSTER::getComputeShaderSource(size_t nStage) c
              "    uint nModelIdx = gl_GlobalInvocationID.y*MODEL_STEP_SIZE + gl_GlobalInvocationID.x;\n"
              "    uint nGoodSamplesCount=0, nSampleIdx=0;\n"
              "    uvec4 vInputColor = imageLoad(mInput,vImgCoords);\n"
-             "    uvec4 vInputDesc = lbsp(uvec4(30),vInputColor,mInput,vImgCoords);\n" // preload & memshare input img?
+             "    uvec4 vInputIntraDesc = lbsp(uvec4(30),vInputColor,mInput,vImgCoords);\n" // @@@@ preload & memshare input img?
              "    if(bool(nROIVal)) {\n"
-             "        while(nSampleIdx<NB_SAMPLES) {\n";
+             "        while(nSampleIdx<NB_SAMPLES) {\n"; // @@@@ test speed with (nGoodSamplesCount<2)?
     if(m_nImgChannels==4) { ssSrc <<
              "            uvec4 vCurrColorSample = aoPxModels[nModelIdx].color_samples[nSampleIdx];\n"
-             "            uvec4 vCurrDescSample = aoPxModels[nModelIdx].lbsp_samples[nSampleIdx];\n"
-             "            if(dist(vInputColor.bgr,vCurrColorSample.bgr)<COLOR_DIST_THRESHOLD && hdist(vInputDesc.bgr,vCurrDescSample.bgr)<DESC_DIST_THRESHOLD)\n"
+             "            uvec4 vCurrIntraDescSample = aoPxModels[nModelIdx].lbsp_samples[nSampleIdx];\n"
+             "            uvec3 vCurrColorDist = absdiff(vInputColor.bgr,vCurrColorSample.bgr);\n"
+#if LOBSTER_GLSL_BASIC
+             "            uvec3 vCurrDescDist = hdist(vInputIntraDesc.bgr,vCurrIntraDescSample.bgr);\n"
+             "            if((vCurrColorDist.r+vCurrColorDist.g+vCurrColorDist.b)<COLOR_DIST_THRESHOLD && (vCurrDescDist.r+vCurrDescDist.g+vCurrDescDist.b)<DESC_DIST_THRESHOLD)\n"
+#else //!LOBSTER_GLSL_BASIC
+             "            uvec3 vCurrDescDist = hdist(lbsp(uvec4(30),vCurrColorSample,mInput,vImgCoords).bgr,vCurrIntraDescSample.bgr);\n"
+             "            if(all(lessThan(vCurrColorDist,uvec3(COLOR_DIST_SC_THRESHOLD))) && (vCurrColorDist.r+vCurrColorDist.g+vCurrColorDist.b)<COLOR_DIST_THRESHOLD &&\n"
+             "               all(lessThan(vCurrDescDist,uvec3(DESC_DIST_SC_THRESHOLD))) && (vCurrDescDist.r+vCurrDescDist.g+vCurrDescDist.b)<DESC_DIST_THRESHOLD)\n"
+#endif //LOBSTER_GLSL_BASIC
              "                ++nGoodSamplesCount;\n"
              "            ++nSampleIdx;\n";
     }
     else { ssSrc <<
              "            uint nCurrColorSample = aoPxModels[nModelIdx].color_samples[nSampleIdx];\n"
              "            uint nCurrDescSample = aoPxModels[nModelIdx].lbsp_samples[nSampleIdx];\n"
-             "            if(dist(vInputColor.r,nCurrColorSample)<COLOR_DIST_THRESHOLD && hdist(vInputDesc.r,nCurrDescSample)<DESC_DIST_THRESHOLD)\n"
+#if LOBSTER_GLSL_BASIC
+             "            if(absdiff(vInputColor.r,nCurrColorSample)<COLOR_DIST_THRESHOLD && hdist(vInputIntraDesc.r,nCurrDescSample)<DESC_DIST_THRESHOLD)\n"
+#else //!LOBSTER_GLSL_BASIC
+             "            if(absdiff(vInputColor.r,nCurrColorSample)<COLOR_DIST_THRESHOLD && hdist(lbsp(uvec4(30),uvec4(nCurrColorSample),mInput,vImgCoords).r,nCurrDescSample)<DESC_DIST_THRESHOLD)\n"
+#endif //!LOBSTER_GLSL_BASIC
              "                ++nGoodSamplesCount;\n"
              "            ++nSampleIdx;\n";
     }
@@ -313,27 +319,27 @@ std::string BackgroundSubtractorLOBSTER::getComputeShaderSource(size_t nStage) c
              "        else {\n"
              "            if((urand()%nResamplingRate)==0) {\n"
              "                aoPxModels[nModelIdx].color_samples[(urand()%NB_SAMPLES)] = vInputColor" << (m_nImgChannels==1?".r;":";") << "\n"
-             "                aoPxModels[nModelIdx].lbsp_samples[(urand()%NB_SAMPLES)] = vInputDesc" << (m_nImgChannels==1?".r;":";") << "\n"
+             "                aoPxModels[nModelIdx].lbsp_samples[(urand()%NB_SAMPLES)] = vInputIntraDesc" << (m_nImgChannels==1?".r;":";") << "\n"
              "            }\n"
              "            if((urand()%nResamplingRate)==0) {\n"
              "                ivec2 vNeighbCoords = getRandNeighbor3x3(vImgCoords,urand());\n"
              "                uint nNeighbPxModelIdx = uint(vNeighbCoords.y)*MODEL_STEP_SIZE + uint(vNeighbCoords.x);\n"
              "                aoPxModels[nNeighbPxModelIdx].color_samples[(urand()%NB_SAMPLES)] = vInputColor" << (m_nImgChannels==1?".r;":";") << "\n"
-             "                aoPxModels[nNeighbPxModelIdx].lbsp_samples[(urand()%NB_SAMPLES)] = vInputDesc" << (m_nImgChannels==1?".r;":";") << "\n"
+             "                aoPxModels[nNeighbPxModelIdx].lbsp_samples[(urand()%NB_SAMPLES)] = vInputIntraDesc" << (m_nImgChannels==1?".r;":";") << "\n"
              "            }\n"
              "        }\n"
              "    }\n"
+#if LOBSTER_GLSL_DEBUG
              "    barrier();\n"
              "    if(bool(nROIVal)) {\n"
-#if LOBSTER_GLSL_DEBUG
              //"        imageStore(mDebug,vImgCoords,uvec4(nResamplingRate*15));\n"
              "        imageStore(mDebug,vImgCoords,aoPxModels[nModelIdx].color_samples[0]);\n"
              //"        imageStore(mDebug,vImgCoords,uvec4(128));\n"
              //"        imageStore(mDebug,vImgCoords,vec4(0.5));\n"
              //"        imageStore(mDebug,vImgCoords,uvec4(nSampleIdx*(255/NB_SAMPLES)));\n"
-             //"        imageStore(mDebug,vImgCoords,uvec4(hdist(uvec3(0),vInputDesc.bgr)*15));\n"
-#endif //LOBSTER_GLSL_DEBUG
+             //"        imageStore(mDebug,vImgCoords,uvec4(hdist(uvec3(0),vInputIntraDesc.bgr)*15));\n"
              "    }\n"
+#endif //LOBSTER_GLSL_DEBUG
              "    imageStore(mOutput,vImgCoords,bool(nROIVal)?vSegmResult:uvec4(0));\n"
              "}\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////

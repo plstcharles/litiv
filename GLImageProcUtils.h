@@ -55,6 +55,7 @@ protected:
         eImage_DebugBinding,
         eImage_GTBinding, // @@@@ make custom4? set all customs at end? simplify custom tex array?
         eImage_ROIBinding,
+        // @@@@ find better alternative than extras = custom?
         eImage_CustomBinding1,
         eImage_CustomBinding2,
         eImage_CustomBinding3,
@@ -69,6 +70,7 @@ protected:
         eTextureBindingsCount
     };
     enum eBufferBindingList {
+        // @@@@ find better alternative than extras = custom?
         eBuffer_CustomBinding1=0,
         eBuffer_CustomBinding2,
         eBuffer_CustomBinding3,

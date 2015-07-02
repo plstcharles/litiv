@@ -69,6 +69,7 @@ private:
 };
 
 namespace NBodySimulationUtils {
+    // @@@@ not necessary?
     std::string getVertexShaderSource();
     std::string getGeometryShaderSource();
     std::string getFragmentShaderSource();
@@ -84,6 +85,7 @@ namespace ComputeShaderUtils {
 }; // namespace ComputeShaderUtils
 
 namespace GLSLFunctionUtils {
+    // @@@@@@ transfer all to their respective utils files
     std::string getShaderFunctionSource_absdiff(bool bUseBuiltinDistance); // @@@@ test with/without
     std::string getShaderFunctionSource_L1dist();
     std::string getShaderFunctionSource_L2dist(bool bUseBuiltinDistance);

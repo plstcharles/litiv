@@ -820,7 +820,10 @@ std::string ComputeShaderUtils::getComputeShaderSource_Transpose(int nBlockSize,
 
 std::string GLSLFunctionUtils::getShaderFunctionSource_absdiff(bool bUseBuiltinDistance) {
     std::stringstream ssSrc;
-    ssSrc << "uint absdiff(in uint a, in uint b) {\n"
+    ssSrc << "uvec3 absdiff(in uvec3 a, in uvec3 b) {\n"
+             "    return uvec3(abs(ivec3(a)-ivec3(b)));\n"
+             "}\n"
+             "uint absdiff(in uint a, in uint b) {\n"
              "    return uint(" << (bUseBuiltinDistance?"distance(a,b)":"abs((int)a-(int)b)") << ");\n"
              "}\n";
     return ssSrc.str();
@@ -845,8 +848,11 @@ std::string GLSLFunctionUtils::getShaderFunctionSource_L2dist(bool bUseBuiltinDi
 
 std::string GLSLFunctionUtils::getShaderFunctionSource_hdist() {
     std::stringstream ssSrc;
-    ssSrc << "uint hdist(in uvec3 a, in uvec3 b) {\n"
-             "    return uint(bitCount(a^b));\n"
+    ssSrc << "uvec3 hdist(in uvec3 a, in uvec3 b) {\n"
+             "    return bitCount(a^b);\n"
+             "}\n"
+             "uint hdist(in uint a, in uint b) {\n"
+             "    return bitCount(a^b);\n"
              "}\n";
     return ssSrc.str();
 }

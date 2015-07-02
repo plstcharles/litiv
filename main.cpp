@@ -29,21 +29,24 @@
 #include "ParallelUtils.h"
 #if HAVE_GLSL
 #define GLSL_EVALUATION                  1
-#define VALIDATE_GLSL_EVALUATION         1
+#define VALIDATE_GLSL_EVALUATION         0
 #endif //HAVE_GLSL
 #include "DatasetUtils.h"
 #define DATASET_ID             eDataset_CDnet2014
 #define DATASET_ROOT_PATH      std::string("/shared2/datasets/")
 #define DATASET_RESULTS_PATH   std::string("results")
 //////////////////////////////////////////
-#if (HAVE_GLSL && GLSL_EVALUATION && !(DATASET_ID==eDataset_CDnet2014 || DATASET_ID==eDataset_CDnet2012))
+#if (HAVE_GLSL && GLSL_EVALUATION)
+#if !(DATASET_ID==eDataset_CDnet2014 || DATASET_ID==eDataset_CDnet2012)
 #error "GLSL eval can only be used for cdnet dataset"
-#endif //(HAVE_GLSL && GLSL_EVALUATION && !(DATASET_ID==eDataset_CDnet2014 || DATASET_ID==eDataset_CDnet2012))
-#define LIMIT_MODEL_TO_SEQUENCE_ROI (USE_LOBSTER_BGSUB||USE_SUBSENSE_BGSUB||USE_PAWCS_BGSUB)
-#define BOOTSTRAP_100_FIRST_FRAMES  (USE_LOBSTER_BGSUB||USE_SUBSENSE_BGSUB||USE_PAWCS_BGSUB)
+#endif //!(DATASET_ID==eDataset_CDnet2014 || DATASET_ID==eDataset_CDnet2012)
+#define NEED_LAST_GT_MASK (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || (WRITE_BGSUB_METRICS_ANALYSIS && (!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION)))
+#endif //(HAVE_GLSL && GLSL_EVALUATION)
 #define NEED_GT_MASK (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS)
 #define NEED_FG_MASK (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT || WRITE_BGSUB_IMG_OUTPUT || (WRITE_BGSUB_METRICS_ANALYSIS && (!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION)))
 #define NEED_BG_IMG  (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT)
+#define LIMIT_MODEL_TO_SEQUENCE_ROI (USE_LOBSTER_BGSUB||USE_SUBSENSE_BGSUB||USE_PAWCS_BGSUB)
+#define BOOTSTRAP_100_FIRST_FRAMES  (USE_LOBSTER_BGSUB||USE_SUBSENSE_BGSUB||USE_PAWCS_BGSUB)
 #if EVAL_RESULTS_ONLY && (DEFAULT_NB_THREADS>1 || HAVE_GPU_SUPPORT || !WRITE_BGSUB_METRICS_ANALYSIS)
 #error "Eval-only mode must run on CPU with 1 thread & write results somewhere."
 #endif //EVAL_RESULTS_ONLY && (DEFAULT_NB_THREADS>1 || !WRITE_BGSUB_METRICS_ANALYSIS)
@@ -379,9 +382,11 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
             cv::imshow(sMouseDebugDisplayName,oNextInputFrame);
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
 #if NEED_GT_MASK
+#if NEED_LAST_GT_MASK
             oCurrGTMask.copyTo(oLastGTMask);
             const cv::Mat& oGTMask = oLastGTMask;
             oNextGTMask.copyTo(oCurrGTMask);
+#endif //NEED_LAST_GT_MASK
             if(nNextFrameIdx<nFrameCount)
                 oNextGTMask = pCurrSequence->GetGTFrameFromIndex(nNextFrameIdx);
 #endif //NEED_GT_MASK
