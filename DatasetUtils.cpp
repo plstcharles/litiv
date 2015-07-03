@@ -34,7 +34,7 @@ DatasetUtils::DatasetInfo DatasetUtils::GetDatasetInfo(const DatasetUtils::eData
             "bin",
             ".png",
             {"baseline_highway"},//{"shadow_cubicle"},//{"dynamicBackground_fall"},//{"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"},
-            {"thermal","turbulence"},
+            {"thermal","turbulence"},//{"baseline_highway"},//
             {},
             1,
         };
@@ -1038,9 +1038,7 @@ void DatasetUtils::SequenceInfo::StopPrecaching() {
 #if HAVE_GLSL
 
 DatasetUtils::CDNetEvaluator::CDNetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount)
-    :    GLEvaluatorAlgo(pParent,nTotFrameCount,eAtomicCountersCount,1,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1) {
-    glAssert(m_pParent->m_nOutputType==CV_8UC1);
-}
+    :    GLEvaluatorAlgo(pParent,nTotFrameCount,eAtomicCountersCount,1,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,true) {}
 
 std::string DatasetUtils::CDNetEvaluator::getComputeShaderSource(size_t nStage) const {
     glAssert(nStage<m_nComputeStages);

@@ -1,5 +1,6 @@
 #include "BackgroundSubtractorLBSP.h"
 #include <opencv2/imgproc.hpp>
+#include <iostream>
 
 // local define used to determine the default median blur kernel size
 #define DEFAULT_MEDIAN_BLUR_KERNEL_SIZE (9)
@@ -91,6 +92,50 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg, const cv::Mat
     m_oLastColorFrame = cv::Scalar_<uchar>::all(0);
     m_oLastDescFrame.create(m_oImgSize,CV_16UC((int)m_nImgChannels));
     m_oLastDescFrame = cv::Scalar_<ushort>::all(0);
+    m_vnPxIdxLUT.resize(m_nTotRelevantPxCount);
+    m_voPxInfoLUT.resize(m_nTotPxCount);
+    if(m_nImgChannels==1) {
+        CV_Assert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width && m_oLastColorFrame.step.p[1]==1);
+        CV_Assert(m_oLastDescFrame.step.p[0]==m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==m_oLastColorFrame.step.p[1]*2);
+        for(size_t t=0; t<=UCHAR_MAX; ++t)
+            m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>((t*m_fRelLBSPThreshold+m_nLBSPThresholdOffset)/3);
+        for(size_t nPxIter=0, nModelIter=0; nPxIter<m_nTotPxCount; ++nPxIter) {
+            if(m_oROI.data[nPxIter]) {
+                m_vnPxIdxLUT[nModelIter] = nPxIter;
+                m_voPxInfoLUT[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
+                m_voPxInfoLUT[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
+                m_voPxInfoLUT[nPxIter].nModelIdx = nModelIter;
+                m_oLastColorFrame.data[nPxIter] = oInitImg.data[nPxIter];
+                const size_t nDescIter = nPxIter*2;
+                LBSP::computeGrayscaleDescriptor(oInitImg,oInitImg.data[nPxIter],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxIter]],*((ushort*)(m_oLastDescFrame.data+nDescIter)));
+                ++nModelIter;
+            }
+        }
+    }
+    else { //(m_nImgChannels==3 || m_nImgChannels==4)
+        CV_Assert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width*m_nImgChannels && m_oLastColorFrame.step.p[1]==m_nImgChannels);
+        CV_Assert(m_oLastDescFrame.step.p[0]==m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==m_oLastColorFrame.step.p[1]*2);
+        for(size_t t=0; t<=UCHAR_MAX; ++t)
+            m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(t*m_fRelLBSPThreshold+m_nLBSPThresholdOffset);
+        for(size_t nPxIter=0, nModelIter=0; nPxIter<m_nTotPxCount; ++nPxIter) {
+            if(m_oROI.data[nPxIter]) {
+                m_vnPxIdxLUT[nModelIter] = nPxIter;
+                m_voPxInfoLUT[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
+                m_voPxInfoLUT[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
+                m_voPxInfoLUT[nPxIter].nModelIdx = nModelIter;
+                const size_t nPxRGBIter = nPxIter*m_nImgChannels;
+                const size_t nDescRGBIter = nPxRGBIter*2;
+                for(size_t c=0; c<m_nImgChannels; ++c) {
+                    m_oLastColorFrame.data[nPxRGBIter+c] = oInitImg.data[nPxRGBIter+c];
+                    if(m_nImgChannels==3)
+                        LBSP::computeSingleRGBDescriptor(oInitImg,oInitImg.data[nPxRGBIter+c],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
+                    else //m_nImgChannels==4
+                        LBSP::computeSingleRGBADescriptor(oInitImg,oInitImg.data[nPxRGBIter+c],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
+                }
+                ++nModelIter;
+            }
+        }
+    }
     m_bInitialized = true;
 }
 
@@ -99,6 +144,22 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg, const cv::Mat
 void BackgroundSubtractorLBSP::apply(cv::InputArray _oNextImage, cv::OutputArray _oLastFGMask, double dLearningRate) {
     this->apply(_oNextImage,dLearningRate);
     this->getLatestForegroundMask(_oLastFGMask);
+}
+
+std::string BackgroundSubtractorLBSP::getLBSPThresholdLUTShaderSource() const {
+    glAssert(m_bInitialized);
+    std::stringstream ssSrc;
+    ssSrc << "const uint anLBSPThresLUT[256] = uint[256](\n    ";
+    for(size_t t=0; t<=UCHAR_MAX; ++t) {
+        if(t>0 && (t%((UCHAR_MAX+1)/8))==(((UCHAR_MAX+1)/8)-1) && t<UCHAR_MAX)
+            ssSrc << m_anLBSPThreshold_8bitLUT[t] << ",\n    ";
+        else if(t<UCHAR_MAX)
+            ssSrc << m_anLBSPThreshold_8bitLUT[t] << ",";
+        else
+            ssSrc << m_anLBSPThreshold_8bitLUT[t] << "\n";
+    }
+    ssSrc << ");\n";
+    return ssSrc.str();
 }
 
 #endif //HAVE_GPU_SUPPORT

@@ -28,8 +28,8 @@
 //////////////////////////////////////////
 #include "ParallelUtils.h"
 #if HAVE_GLSL
-#define GLSL_EVALUATION                  1
-#define VALIDATE_GLSL_EVALUATION         0
+#define GLSL_EVALUATION                  0
+#define VALIDATE_GLSL_EVALUATION         1
 #endif //HAVE_GLSL
 #include "DatasetUtils.h"
 #define DATASET_ID             eDataset_CDnet2014
@@ -40,8 +40,8 @@
 #if !(DATASET_ID==eDataset_CDnet2014 || DATASET_ID==eDataset_CDnet2012)
 #error "GLSL eval can only be used for cdnet dataset"
 #endif //!(DATASET_ID==eDataset_CDnet2014 || DATASET_ID==eDataset_CDnet2012)
-#define NEED_LAST_GT_MASK (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || (WRITE_BGSUB_METRICS_ANALYSIS && (!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION)))
 #endif //(HAVE_GLSL && GLSL_EVALUATION)
+#define NEED_LAST_GT_MASK (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || (WRITE_BGSUB_METRICS_ANALYSIS && (!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION)))
 #define NEED_GT_MASK (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS)
 #define NEED_FG_MASK (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT || WRITE_BGSUB_IMG_OUTPUT || (WRITE_BGSUB_METRICS_ANALYSIS && (!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION)))
 #define NEED_BG_IMG  (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT)
@@ -405,8 +405,11 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
 #endif //HAVE_GLSL
 #if NEED_FG_MASK
             pBGS->getLatestForegroundMask(oLastFGMask);
+            //cv::medianBlur(oLastFGMask,oLastFGMask,9);
             if(!oROI.empty())
                 cv::bitwise_or(oLastFGMask,UCHAR_MAX/2,oLastFGMask,oROI==0);
+            //cv::imshow("oLastFGMask",oLastFGMask);
+            //cv::waitKey(1);
             const cv::Mat& oFGMask = oLastFGMask;
 #endif //NEED_FG_MASK
 #if NEED_BG_IMG

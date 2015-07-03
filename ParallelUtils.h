@@ -1,6 +1,8 @@
 #pragma once
 
 #define HAVE_GPU_SUPPORT    1
+// cpu:  highway : Rcl=0.8707 Prc=0.9197 FM=0.8945 MCC=0.8885
+// nopp: highway : Rcl=0.8279 Prc=0.8327 FM=0.8303 MCC=0.8197
 #define DEFAULT_NB_THREADS  1
 
 #if HAVE_GPU_SUPPORT
@@ -14,7 +16,7 @@
 #error "Bad default number of threads specified."
 #endif //DEFAULT_NB_THREADS<1
 #if HAVE_GLSL
-#define GLSL_RENDERING      0
+#define GLSL_RENDERING      1
 #include "GLUtils.h"
 #elif HAVE_CUDA
 #include @@@@@

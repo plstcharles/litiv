@@ -706,13 +706,13 @@ std::string NBodySimulationUtils::getIntegrateComputeShaderSource() {
     "}\n";
 }
 
-std::string ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum(int nMaxRowSize, bool bBinaryProc, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding) {
+std::string ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum(size_t nMaxRowSize, bool bBinaryProc, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding) {
     // dispatch must use x=ceil(ceil(nColumns/2)/nMaxRowSize), y=nRows, z=1
     glAssert(GLUtils::isInternalFormatIntegral(eInternalFormat));
     glAssert(nMaxRowSize>1);
-    const int nInvocations = (int)ceil((float)nMaxRowSize/2);
+    const size_t nInvocations = (size_t)ceil((float)nMaxRowSize/2);
     glAssert((!(nMaxRowSize%2) && nInvocations==nMaxRowSize/2) || ((nMaxRowSize%2) && nInvocations-1==nMaxRowSize/2));
-    glAssert(nMaxRowSize*4*4<GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE));
+    glAssert(nMaxRowSize*4*4<(size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE));
     const char* acInternalFormatName = GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -763,7 +763,7 @@ std::string ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum(int nMa
     return ssSrc.str();
 }
 
-std::string ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum_BlockMerge(int nColumns, int nMaxRowSize, int nRows, GLenum eInternalFormat, GLuint nImageBinding) {
+std::string ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum_BlockMerge(size_t nColumns, size_t nMaxRowSize, size_t nRows, GLenum eInternalFormat, GLuint nImageBinding) {
     // dispatch must use x=1, y=1, z=1
     glAssert(nMaxRowSize>0);
     glAssert(nColumns>nMaxRowSize); // shader step is useless otherwise
@@ -792,9 +792,9 @@ std::string ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum_BlockMe
     return ssSrc.str();
 }
 
-std::string ComputeShaderUtils::getComputeShaderSource_Transpose(int nBlockSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding) {
+std::string ComputeShaderUtils::getComputeShaderSource_Transpose(size_t nBlockSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding) {
     // dispatch must use x=ceil(nCols/nBlockSize), y=ceil(nRows/nBlockSize), z=1
-    glAssert(nBlockSize*nBlockSize*4*4<GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE));
+    glAssert(nBlockSize*nBlockSize*4*4<(size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE));
     glAssert(nInputImageBinding!=nOutputImageBinding);
     const bool bUsingIntegralFormat = GLUtils::isInternalFormatIntegral(eInternalFormat);
     const char* acInternalFormatName = GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat);
@@ -857,20 +857,24 @@ std::string GLSLFunctionUtils::getShaderFunctionSource_hdist() {
     return ssSrc.str();
 }
 
-std::string GLSLFunctionUtils::getShaderFunctionSource_getRandNeighbor3x3(const int nBorderSize, const cv::Size& oFrameSize) {
+std::string GLSLFunctionUtils::getShaderFunctionSource_getRandNeighbor3x3(size_t nBorderSize, const cv::Size& oFrameSize) {
     std::stringstream ssSrc;
     ssSrc << "const ivec2 _avNeighborPattern3x3[8] = ivec2[8](\n"
              "    ivec2(-1, 1),ivec2(0, 1),ivec2(1, 1),\n"
              "    ivec2(-1, 0),            ivec2(1, 0),\n"
              "    ivec2(-1,-1),ivec2(0,-1),ivec2(1,-1)\n"
              ");\n"
-             "ivec2 getRandNeighbor3x3(in ivec2 vCurrPos, in uint nRandVal) {\n"
-             "    const int nBorderSize = " << nBorderSize << ";\n"
-             "    const int nFrameWidth = " << oFrameSize.width << ";\n"
+             "ivec2 getRandNeighbor3x3(in ivec2 vCurrPos, in uint nRandVal) {\n";
+    if(nBorderSize>0) ssSrc <<
+             "    const int nBorderSize = " << nBorderSize << ";\n";
+    ssSrc << "    const int nFrameWidth = " << oFrameSize.width << ";\n"
              "    const int nFrameHeight = " << oFrameSize.height << ";\n"
-             "    ivec2 vNeighborPos = vCurrPos+_avNeighborPattern3x3[nRandVal%8];\n"
-             "    clamp(vNeighborPos,ivec2(nBorderSize),ivec2(nFrameWidth-nBorderSize-1,nFrameHeight-nBorderSize-1));\n"
-             "    return vNeighborPos;\n"
+             "    ivec2 vNeighborPos = vCurrPos+_avNeighborPattern3x3[nRandVal%8];\n";
+    if(nBorderSize>0) ssSrc <<
+             "    clamp(vNeighborPos,ivec2(nBorderSize),ivec2(nFrameWidth-nBorderSize-1,nFrameHeight-nBorderSize-1));\n";
+    else ssSrc <<
+             "    clamp(vNeighborPos,ivec2(0),ivec2(nFrameWidth-1,nFrameHeight-1));\n";
+    ssSrc << "    return vNeighborPos;\n"
              "}\n";
     return ssSrc.str();
 }

@@ -3,7 +3,6 @@
 #define GLUTILS_IMGPROC_DEFAULT_WORKGROUP           glm::uvec2(12,8)
 #define GLUTILS_IMGPROC_TEXTURE_ARRAY_SIZE          4
 #define GLUTILS_IMGPROC_USE_TEXTURE_ARRAYS          0
-#define GLUTILS_IMGPROC_USE_INTEGER_TEX_FORMAT      1
 #define GLUTILS_IMGPROC_USE_DOUBLE_PBO_INPUT        0
 #define GLUTILS_IMGPROC_USE_DOUBLE_PBO_OUTPUT       1
 #define GLUTILS_IMGPROC_USE_PBO_UPDATE_REALLOC      1 // @@@@@ unused?
@@ -13,9 +12,8 @@
 class GLImageProcAlgo {
 public:
     GLImageProcAlgo( size_t nLevels, size_t nLayers, size_t nComputeStages,
-                     int nOutputType, int nDebugType, int nInputType,
-                     bool bUseOutputPBOs, bool bUseDebugPBOs, bool bUseInputPBOs,
-                     bool bUseTexArrays, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
+                     int nOutputType, int nDebugType, bool bUseInput,
+                     bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
     virtual ~GLImageProcAlgo();
 
     virtual std::string getVertexShaderSource() const;
@@ -36,9 +34,6 @@ public:
     const size_t m_nLayers;
     const size_t m_nSxSDisplayCount;
     const size_t m_nComputeStages;
-    const int m_nOutputType;
-    const int m_nDebugType;
-    const int m_nInputType;
     const bool m_bUsingOutputPBOs;
     const bool m_bUsingDebugPBOs;
     const bool m_bUsingInputPBOs;
@@ -108,6 +103,8 @@ protected:
     std::unique_ptr<GLTexture2D> m_apCustomTextures[3];
     GLScreenBillboard m_oDisplayBillboard;
     GLShader m_oDisplayShader;
+    const int m_nOutputType;
+    const int m_nDebugType;
 
     virtual void dispatch(size_t nStage, GLShader& oShader);
     static const char* getCurrTextureLayerUniformName();
@@ -121,11 +118,14 @@ private:
     GLImageProcAlgo(const GLImageProcAlgo&)=delete;
     friend class GLEvaluatorAlgo;
     GLuint m_anSSBO[GLImageProcAlgo::eBufferBindingsCount];
+    int m_nInputType;
 };
 
 class GLEvaluatorAlgo : public GLImageProcAlgo {
 public:
-    GLEvaluatorAlgo(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount, size_t nCountersPerFrame, size_t nComputeStages, int nDebugType, int nGroundtruthType);
+    GLEvaluatorAlgo(const std::shared_ptr<GLImageProcAlgo>& pParent,
+                    size_t nTotFrameCount, size_t nCountersPerFrame, size_t nComputeStages,
+                    int nDebugType, int nGroundtruthType, bool bUseIntegralFormat);
     virtual ~GLEvaluatorAlgo();
     inline GLuint getAtomicBufferId() const {return m_nAtomicBuffer;}
     const cv::Mat& getAtomicCounterBuffer();
@@ -137,6 +137,7 @@ public:
     virtual void apply(const cv::Mat& oNextGT, bool bRebindAll=false);
 
 protected:
+    const int m_nGroundtruthType;
     const size_t m_nTotFrameCount;
     const size_t m_nAtomicBufferRangeSize;
     const size_t m_nAtomicBufferSize;
@@ -152,8 +153,7 @@ private:
 
 class GLImagePassThroughAlgo : public GLImageProcAlgo {
 public:
-    GLImagePassThroughAlgo( size_t nLayers, int nFrameType, bool bUseOutputPBOs, bool bUseInputPBOs,
-                            bool bUseTexArrays, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
+    GLImagePassThroughAlgo(size_t nLayers, int nFrameType, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
     virtual std::string getComputeShaderSource(size_t nStage) const;
 };
 

@@ -1,23 +1,19 @@
 #include "GLImageProcUtils.h"
 
 GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nLayers, size_t nComputeStages,
-                                  int nOutputType, int nDebugType, int nInputType,
-                                  bool bUseOutputPBOs, bool bUseDebugPBOs, bool bUseInputPBOs,
-                                  bool bUseTexArrays, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat)
+                                  int nOutputType, int nDebugType, bool bUseInput,
+                                  bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat)
     :    m_nLevels(nLevels)
         ,m_nLayers(nLayers)
-        ,m_nSxSDisplayCount(size_t(nOutputType>=0)+size_t(nDebugType>=0)+size_t(nInputType>=0))
+        ,m_nSxSDisplayCount(size_t(nOutputType>=0)+size_t(nDebugType>=0)+size_t(bUseInput))
         ,m_nComputeStages(nComputeStages)
-        ,m_nOutputType(nOutputType)
-        ,m_nDebugType(nDebugType)
-        ,m_nInputType(nInputType)
-        ,m_bUsingOutputPBOs(bUseOutputPBOs&&nOutputType>=0)
-        ,m_bUsingDebugPBOs(bUseDebugPBOs&&nDebugType>=0)
-        ,m_bUsingInputPBOs(bUseInputPBOs&&nInputType>=0)
+        ,m_bUsingOutputPBOs(nOutputType>=0&&GLUTILS_IMGPROC_USE_DOUBLE_PBO_OUTPUT)
+        ,m_bUsingDebugPBOs(nDebugType>=0&&GLUTILS_IMGPROC_USE_DOUBLE_PBO_OUTPUT)
+        ,m_bUsingInputPBOs(bUseInput&&GLUTILS_IMGPROC_USE_DOUBLE_PBO_INPUT)
         ,m_bUsingOutput(nOutputType>=0)
         ,m_bUsingDebug(nDebugType>=0)
-        ,m_bUsingInput(nInputType>=0)
-        ,m_bUsingTexArrays(bUseTexArrays&&nLevels==1)
+        ,m_bUsingInput(bUseInput)
+        ,m_bUsingTexArrays(GLUTILS_IMGPROC_USE_TEXTURE_ARRAYS&&nLevels==1) /// && levels==1??? @@@@
         ,m_bUsingTimers(bUseTimers)
         ,m_bUsingIntegralFormat(bUseIntegralFormat)
         ,m_vDefaultWorkGroupSize(GLUTILS_IMGPROC_DEFAULT_WORKGROUP)
@@ -32,7 +28,10 @@ GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nLayers, size_t nComput
         ,m_nCurrLayer(0)
         ,m_nLastLayer(nLayers-1)
         ,m_nCurrPBO(0)
-        ,m_nNextPBO(1) {
+        ,m_nNextPBO(1)
+        ,m_nOutputType(nOutputType)
+        ,m_nDebugType(nDebugType)
+        ,m_nInputType(-1) {
     glAssert(m_nLevels>0 && m_nLayers>1 && m_nComputeStages>0);
     if(m_bUsingTexArrays && !glGetTextureSubImage && (m_bUsingDebugPBOs || m_bUsingOutputPBOs))
         glError("missing impl for texture arrays pbo fetch when glGetTextureSubImage is not available");
@@ -62,9 +61,12 @@ std::string GLImageProcAlgo::getFragmentShaderSource() const {
 }
 
 void GLImageProcAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oROI) {
-    glAssert(!oROI.empty() && oROI.isContinuous() && oROI.type()==CV_8UC1);
-    glAssert(oInitInput.type()==m_nInputType && oInitInput.size()==oROI.size() && oInitInput.isContinuous());
     m_bGLInitialized = false;
+    glAssert(!oROI.empty() && oROI.isContinuous() && oROI.type()==CV_8UC1);
+    if(m_bUsingInput) {
+        glAssert(!oInitInput.empty() && oInitInput.size()==oROI.size() && oInitInput.isContinuous());
+        m_nInputType = oInitInput.type();
+    }
     m_oFrameSize = oROI.size();
     for(size_t nPBOIter=0; nPBOIter<2; ++nPBOIter) {
         if(m_bUsingOutputPBOs)
@@ -498,8 +500,11 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal( size_t nLayers, i
     return ssSrc.str();
 }
 
-GLEvaluatorAlgo::GLEvaluatorAlgo(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount, size_t nCountersPerFrame, size_t nComputeStages, int nDebugType, int nGroundtruthType)
-    :    GLImageProcAlgo(1,pParent->m_nLayers,nComputeStages,-1,nDebugType,nGroundtruthType,false,pParent->m_bUsingOutputPBOs,pParent->m_bUsingInputPBOs,pParent->m_bUsingTexArrays,pParent->m_bUsingDisplay,false,pParent->m_bUsingIntegralFormat)
+GLEvaluatorAlgo::GLEvaluatorAlgo(   const std::shared_ptr<GLImageProcAlgo>& pParent,
+                                    size_t nTotFrameCount, size_t nCountersPerFrame, size_t nComputeStages,
+                                    int nDebugType, int nGroundtruthType, bool bUseIntegralFormat)
+    :    GLImageProcAlgo(1,pParent->m_nLayers,nComputeStages,-1,nDebugType,true,pParent->m_bUsingDisplay,false,bUseIntegralFormat)
+        ,m_nGroundtruthType(nGroundtruthType)
         ,m_nTotFrameCount(nTotFrameCount)
         ,m_nAtomicBufferRangeSize(nCountersPerFrame*4)
         ,m_nAtomicBufferSize(nTotFrameCount*nCountersPerFrame*4)
@@ -509,7 +514,7 @@ GLEvaluatorAlgo::GLEvaluatorAlgo(const std::shared_ptr<GLImageProcAlgo>& pParent
         ,m_nCurrAtomicBufferOffsetBlock(0)
         ,m_pParent(pParent) {
     glAssert(m_bUsingInput && m_pParent->m_bUsingOutput);
-    glAssert(m_nInputType==m_pParent->m_nOutputType);
+    glAssert(m_nGroundtruthType>=0 && m_nGroundtruthType==m_pParent->m_nOutputType);
     glAssert(!dynamic_cast<GLEvaluatorAlgo*>(m_pParent.get()));
     glAssert(nTotFrameCount>0 && nCountersPerFrame>0);
     glAssert(m_nAtomicBufferMaxSize>nCountersPerFrame*4);
@@ -548,7 +553,7 @@ void GLEvaluatorAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oInit
 void GLEvaluatorAlgo::initialize(const cv::Mat& oInitGT, const cv::Mat& oROI) {
     glAssert(!oROI.empty() && oROI.isContinuous() && oROI.type()==CV_8UC1);
     glAssert(oROI.size()==m_pParent->m_oFrameSize);
-    glAssert(oInitGT.type()==m_nInputType && oInitGT.size()==oROI.size() && oInitGT.isContinuous());
+    glAssert(oInitGT.type()==m_nGroundtruthType && oInitGT.size()==oROI.size() && oInitGT.isContinuous());
     m_bGLInitialized = false;
     m_oFrameSize = oROI.size();
     for(size_t nPBOIter=0; nPBOIter<2; ++nPBOIter) {
@@ -562,7 +567,7 @@ void GLEvaluatorAlgo::initialize(const cv::Mat& oInitGT, const cv::Mat& oROI) {
             m_pDebugArray = std::unique_ptr<GLDynamicTexture2DArray>(new GLDynamicTexture2DArray(1,std::vector<cv::Mat>(m_nLayers,cv::Mat(m_oFrameSize,m_nDebugType)),m_bUsingIntegralFormat));
             m_pDebugArray->bindToSamplerArray(GLImageProcAlgo::eTexture_DebugBinding);
         }
-        m_pInputArray = std::unique_ptr<GLDynamicTexture2DArray>(new GLDynamicTexture2DArray(1,std::vector<cv::Mat>(m_nLayers,cv::Mat(m_oFrameSize,m_nInputType)),m_bUsingIntegralFormat));
+        m_pInputArray = std::unique_ptr<GLDynamicTexture2DArray>(new GLDynamicTexture2DArray(1,std::vector<cv::Mat>(m_nLayers,cv::Mat(m_oFrameSize,m_nGroundtruthType)),m_bUsingIntegralFormat));
         m_pInputArray->bindToSamplerArray(GLImageProcAlgo::eTexture_GTBinding);
         if(m_bUsingInputPBOs) {
             m_pInputArray->updateTexture(*m_apInputPBOs[m_nCurrPBO],m_nCurrLayer,true);
@@ -581,7 +586,7 @@ void GLEvaluatorAlgo::initialize(const cv::Mat& oInitGT, const cv::Mat& oROI) {
                 m_vpDebugArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(1,cv::Mat(m_oFrameSize,m_nDebugType),m_bUsingIntegralFormat));
                 m_vpDebugArray[nLayerIter]->bindToSampler((nLayerIter*GLImageProcAlgo::eTextureBindingsCount)+GLImageProcAlgo::eTexture_DebugBinding);
             }
-            m_vpInputArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(m_nLevels,cv::Mat(m_oFrameSize,m_nInputType),m_bUsingIntegralFormat));
+            m_vpInputArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(m_nLevels,cv::Mat(m_oFrameSize,m_nGroundtruthType),m_bUsingIntegralFormat));
             m_vpInputArray[nLayerIter]->bindToSampler((nLayerIter*GLImageProcAlgo::eTextureBindingsCount)+GLImageProcAlgo::eTexture_GTBinding);
             if(m_bUsingInputPBOs) {
                 if(nLayerIter==m_nCurrLayer)
@@ -636,7 +641,7 @@ void GLEvaluatorAlgo::apply(const cv::Mat& oNextInput, const cv::Mat& oNextGT, b
 }
 
 void GLEvaluatorAlgo::apply(const cv::Mat& oNextGT, bool bRebindAll) {
-    glAssert(m_bGLInitialized && (oNextGT.empty() || (oNextGT.type()==m_nInputType && oNextGT.size()==m_oFrameSize && oNextGT.isContinuous())));
+    glAssert(m_bGLInitialized && (oNextGT.empty() || (oNextGT.type()==m_nGroundtruthType && oNextGT.size()==m_oFrameSize && oNextGT.isContinuous())));
     CV_Assert(m_nInternalFrameIdx<m_nTotFrameCount);
     m_nLastLayer = m_nCurrLayer;
     m_nCurrLayer = m_nNextLayer;
@@ -752,15 +757,14 @@ void GLEvaluatorAlgo::apply(const cv::Mat& oNextGT, bool bRebindAll) {
     ++m_nInternalFrameIdx;
 }
 
-GLImagePassThroughAlgo::GLImagePassThroughAlgo( size_t nLayers, int nFrameType, bool bUseOutputPBOs, bool bUseInputPBOs,
-                                                bool bUseTexArrays, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat)
-    :    GLImageProcAlgo(1,nLayers,1,nFrameType,-1,nFrameType,bUseOutputPBOs,false,bUseInputPBOs,bUseTexArrays,bUseDisplay,bUseTimers,bUseIntegralFormat) {
+GLImagePassThroughAlgo::GLImagePassThroughAlgo(size_t nLayers, int nFrameType, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat)
+    :    GLImageProcAlgo(1,nLayers,1,nFrameType,-1,true,bUseDisplay,bUseTimers,bUseIntegralFormat) {
     glAssert(nFrameType>=0);
 }
 
 std::string GLImagePassThroughAlgo::getComputeShaderSource(size_t nStage) const {
     glAssert(nStage<m_nComputeStages);
-    return GLShader::getPassThroughComputeShaderSource_ImgLoadCopy(m_vDefaultWorkGroupSize,GLUtils::getInternalFormatFromMatType(m_nInputType,m_bUsingIntegralFormat),GLImageProcAlgo::eImage_InputBinding,GLImageProcAlgo::eImage_OutputBinding,m_bUsingIntegralFormat);
+    return GLShader::getPassThroughComputeShaderSource_ImgLoadCopy(m_vDefaultWorkGroupSize,GLUtils::getInternalFormatFromMatType(m_nOutputType,m_bUsingIntegralFormat),GLImageProcAlgo::eImage_InputBinding,GLImageProcAlgo::eImage_OutputBinding,m_bUsingIntegralFormat);
 }
 
 /*

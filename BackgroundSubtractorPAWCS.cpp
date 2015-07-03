@@ -179,22 +179,16 @@ void BackgroundSubtractorPAWCS::initialize(const cv::Mat& oInitImg, const cv::Ma
     m_oTempGlobalWordWeightDiffFactor.create(m_oDownSampledFrameSize_GlobalWordLookup,CV_32FC1);
     m_oTempGlobalWordWeightDiffFactor = cv::Scalar(-0.1f);
     m_oMorphExStructElement = cv::getStructuringElement(cv::MORPH_RECT,cv::Size(3,3));
-    m_vnPxIdxLUT.resize(m_nTotRelevantPxCount);
     m_voPxInfoLUT_PAWCS.resize(m_nTotPxCount);
     m_vpLocalWordDict.resize(m_nTotRelevantPxCount*m_nCurrLocalWords,nullptr);
     m_vpGlobalWordDict.resize(m_nCurrGlobalWords,nullptr);
     if(m_nImgChannels==1) {
-        CV_DbgAssert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width && m_oLastColorFrame.step.p[1]==1);
-        CV_DbgAssert(m_oLastDescFrame.step.p[0]==m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==m_oLastColorFrame.step.p[1]*2);
         m_voLocalWordList_1ch.resize(m_nTotRelevantPxCount*m_nCurrLocalWords);
         m_pLocalWordListIter_1ch = m_voLocalWordList_1ch.begin();
         m_voGlobalWordList_1ch.resize(m_nCurrGlobalWords);
         m_pGlobalWordListIter_1ch = m_voGlobalWordList_1ch.begin();
-        for(size_t t=0; t<=UCHAR_MAX; ++t)
-            m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>((m_nLBSPThresholdOffset+t*m_fRelLBSPThreshold)/3);
         for(size_t nPxIter=0, nModelIter=0; nPxIter<m_nTotPxCount; ++nPxIter) {
             if(m_oROI.data[nPxIter]) {
-                m_vnPxIdxLUT[nModelIter] = nPxIter;
                 m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
                 m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
                 m_voPxInfoLUT_PAWCS[nPxIter].nModelIdx = nModelIter;
@@ -202,25 +196,17 @@ void BackgroundSubtractorPAWCS::initialize(const cv::Mat& oInitImg, const cv::Ma
                 m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT.resize(m_nCurrGlobalWords);
                 for(size_t nGlobalWordIdxIter=0; nGlobalWordIdxIter<m_nCurrGlobalWords; ++nGlobalWordIdxIter)
                     m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordIdxIter] = &m_voGlobalWordList_1ch[nGlobalWordIdxIter];
-                m_oLastColorFrame.data[nPxIter] = oInitImg.data[nPxIter];
-                const size_t nDescIter = nPxIter*2;
-                LBSP::computeGrayscaleDescriptor(oInitImg,oInitImg.data[nPxIter],m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxIter]],*((ushort*)(m_oLastDescFrame.data+nDescIter)));
                 ++nModelIter;
             }
         }
     }
     else { //m_nImgChannels==3
-        CV_DbgAssert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width*3 && m_oLastColorFrame.step.p[1]==3);
-        CV_DbgAssert(m_oLastDescFrame.step.p[0]==m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==m_oLastColorFrame.step.p[1]*2);
         m_voLocalWordList_3ch.resize(m_nTotRelevantPxCount*m_nCurrLocalWords);
         m_pLocalWordListIter_3ch = m_voLocalWordList_3ch.begin();
         m_voGlobalWordList_3ch.resize(m_nCurrGlobalWords);
         m_pGlobalWordListIter_3ch = m_voGlobalWordList_3ch.begin();
-        for(size_t t=0; t<=UCHAR_MAX; ++t)
-            m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(m_nLBSPThresholdOffset+t*m_fRelLBSPThreshold);
         for(size_t nPxIter=0, nModelIter=0; nPxIter<m_nTotPxCount; ++nPxIter) {
             if(m_oROI.data[nPxIter]) {
-                m_vnPxIdxLUT[nModelIter] = nPxIter;
                 m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y = (int)nPxIter/m_oImgSize.width;
                 m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X = (int)nPxIter%m_oImgSize.width;
                 m_voPxInfoLUT_PAWCS[nPxIter].nModelIdx = nModelIter;
@@ -228,12 +214,6 @@ void BackgroundSubtractorPAWCS::initialize(const cv::Mat& oInitImg, const cv::Ma
                 m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT.resize(m_nCurrGlobalWords);
                 for(size_t nGlobalWordIdxIter=0; nGlobalWordIdxIter<m_nCurrGlobalWords; ++nGlobalWordIdxIter)
                     m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordIdxIter] = &m_voGlobalWordList_3ch[nGlobalWordIdxIter];
-                const size_t nPxRGBIter = nPxIter*3;
-                const size_t nDescRGBIter = nPxRGBIter*2;
-                for(size_t c=0; c<3; ++c) {
-                    m_oLastColorFrame.data[nPxRGBIter+c] = oInitImg.data[nPxRGBIter+c];
-                    LBSP::computeSingleRGBDescriptor(oInitImg,oInitImg.data[nPxRGBIter+c],m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
-                }
                 ++nModelIter;
             }
         }

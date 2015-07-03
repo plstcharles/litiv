@@ -71,8 +71,6 @@ protected:
     const size_t m_nBGSamples;
     //! number of similar samples needed to consider the current pixel/block as 'background'
     const size_t m_nRequiredBGSamples;
-    //! default resampling rate (dictates model adaptation speed)
-    const size_t m_nResamplingRate;
     //! background model pixel intensity samples
     std::vector<cv::Mat> m_voBGColorSamples;
     //! background model descriptors samples
@@ -85,6 +83,7 @@ public:
     virtual std::string getComputeShaderSource(size_t nStage) const;
     virtual void apply_glimpl(cv::InputArray oNextImage, bool bRebindAll, double dLearningRate);
 protected:
+    size_t m_nCurrResamplingRate;
     size_t m_nTMT32ModelSize;
     size_t m_nSampleStepSize;
     size_t m_nPxModelSize;

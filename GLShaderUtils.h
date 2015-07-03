@@ -79,9 +79,9 @@ namespace NBodySimulationUtils {
 }; // namespace NBodySimulationUtils
 
 namespace ComputeShaderUtils {
-    std::string getComputeShaderSource_ParallelPrefixSum(int nMaxRowSize, bool bBinaryProc, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding);
-    std::string getComputeShaderSource_ParallelPrefixSum_BlockMerge(int nColumns, int nMaxRowSize, int nRows, GLenum eInternalFormat, GLuint nImageBinding);
-    std::string getComputeShaderSource_Transpose(int nBlockSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding);
+    std::string getComputeShaderSource_ParallelPrefixSum(size_t nMaxRowSize, bool bBinaryProc, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding);
+    std::string getComputeShaderSource_ParallelPrefixSum_BlockMerge(size_t nColumns, size_t nMaxRowSize, size_t nRows, GLenum eInternalFormat, GLuint nImageBinding);
+    std::string getComputeShaderSource_Transpose(size_t nBlockSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding);
 }; // namespace ComputeShaderUtils
 
 namespace GLSLFunctionUtils {
@@ -90,7 +90,7 @@ namespace GLSLFunctionUtils {
     std::string getShaderFunctionSource_L1dist();
     std::string getShaderFunctionSource_L2dist(bool bUseBuiltinDistance);
     std::string getShaderFunctionSource_hdist();
-    std::string getShaderFunctionSource_getRandNeighbor3x3(const int nBorderSize, const cv::Size& oFrameSize);
+    std::string getShaderFunctionSource_getRandNeighbor3x3(size_t nBorderSize, const cv::Size& oFrameSize);
     std::string getShaderFunctionSource_frand();
     std::string getShaderFunctionSource_urand();
     std::string getShaderFunctionSource_urand_tinymt32();
