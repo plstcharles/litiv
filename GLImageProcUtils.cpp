@@ -38,13 +38,17 @@ GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t 
     if(m_bUsingTexArrays && !glGetTextureSubImage && (m_bUsingDebugPBOs || m_bUsingOutputPBOs))
         glError("missing impl for texture arrays pbo fetch when glGetTextureSubImage is not available");
     const size_t nCurrComputeStageInvocs = m_vDefaultWorkGroupSize.x*m_vDefaultWorkGroupSize.y;
-    glAssert(nCurrComputeStageInvocs>0 && nCurrComputeStageInvocs<(size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS));
+    glAssert(nCurrComputeStageInvocs>0);
+    if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS)<nCurrComputeStageInvocs)
+        glErrorExt("compute work group size is too small for the current impl (curr=%lu, req=%lu)",(size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS),nCurrComputeStageInvocs);
     if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_IMAGE_UNITS)<m_nImages || (size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_IMAGE_UNIFORMS)<m_nImages)
         glError("image units limit is too small for the current impl");
     if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_TEXTURE_UNITS)<m_nTextures)
         glError("texture units limit is too small for the current impl");
     if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS)<m_nSSBOs)
         glError("ssbo bindings limit is too small for the current impl");
+    if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS)<m_nSSBOs)
+        glError("ssbo blocks limit is too small for the current impl");
     if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_ATOMIC_COUNTER_BUFFER_BINDINGS)<m_nACBOs)
         glError("atomic bo bindings limit is too small for the current impl");
     if(m_bUsingTimers)
@@ -176,10 +180,11 @@ void GLImageProcAlgo::apply(const cv::Mat& oNextInput, bool bRebindAll) {
     m_nCurrPBO = m_nNextPBO;
     ++m_nNextPBO %= 2;
     if(bRebindAll) {
-        for(size_t nSSBOIter=0; nSSBOIter<m_nSSBOs; ++nSSBOIter)
+        for(size_t nSSBOIter=GLImageProcAlgo::eStorageBufferDefaultBindingsCount; nSSBOIter<m_nSSBOs; ++nSSBOIter)
             glBindBufferBase(GL_SHADER_STORAGE_BUFFER,nSSBOIter,m_vnSSBO[nSSBOIter]);
-        for(size_t nACBOIter=0; nACBOIter<m_nACBOs; ++nACBOIter)
+        for(size_t nACBOIter=GLImageProcAlgo::eAtomicCounterBufferDefaultBindingsCount; nACBOIter<m_nACBOs; ++nACBOIter)
             glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER,nACBOIter,m_vnACBO[nACBOIter]);
+        // rebind extra images, textures? @@@@@
     }
     if(m_bUsingTimers)
         glBeginQuery(GL_TIME_ELAPSED,m_nGLTimers[GLImageProcAlgo::eGLTimer_TextureUpdate]);

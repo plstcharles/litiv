@@ -4,17 +4,10 @@
 #include <iomanip>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
-
-#if HAVE_GLSL
-#define LOBSTER_GLSL_DEBUG       1
-#define LOBSTER_GLSL_TIMERS      0
-#define LOBSTER_GLSL_BASIC       0
-#define LOBSTER_GLSL_FEEDFORWARD 1@@@
-#if (!GLSL_RENDERING && LOBSTER_GLSL_DEBUG)
-#undef LOBSTER_GLSL_DEBUG
-#define LOBSTER_GLSL_DEBUG 0
-#endif //(!LOBSTER_GLSL_DISPLAY && LOBSTER_GLSL_DEBUG)
-#endif //HAVE_GLSL
+#if (HAVE_GLSL && !GLSL_RENDERING && BGSLOBSTER_GLSL_DEBUG)
+#undef BGSLOBSTER_GLSL_DEBUG
+#define BGSLOBSTER_GLSL_DEBUG 0
+#endif //(HAVE_GLSL && !GLSL_RENDERING && BGSLOBSTER_GLSL_DEBUG)
 
 BackgroundSubtractorLOBSTER::BackgroundSubtractorLOBSTER(  float fRelLBSPThreshold
                                                           ,size_t nLBSPThresholdOffset
@@ -24,7 +17,7 @@ BackgroundSubtractorLOBSTER::BackgroundSubtractorLOBSTER(  float fRelLBSPThresho
                                                           ,size_t nRequiredBGSamples)
     :    BackgroundSubtractorLBSP(fRelLBSPThreshold,nLBSPThresholdOffset)
 #if HAVE_GLSL
-        ,GLImageProcAlgo(1,1,2,0,0,0,CV_8UC1,LOBSTER_GLSL_DEBUG?CV_8UC4:-1,true,GLSL_RENDERING,LOBSTER_GLSL_TIMERS,true)
+        ,GLImageProcAlgo(1,1,2,0,0,0,CV_8UC1,BGSLOBSTER_GLSL_DEBUG?CV_8UC4:-1,true,GLSL_RENDERING,BGSLOBSTER_GLSL_TIMERS,true)
 #endif //HAVE_GLSL
         ,m_nColorDistThreshold(nColorDistThreshold)
         ,m_nDescDistThreshold(nDescDistThreshold)
@@ -47,7 +40,6 @@ BackgroundSubtractorLOBSTER::BackgroundSubtractorLOBSTER(  float fRelLBSPThresho
     m_bAutoModelResetEnabled = false; // @@@@@@ not supported here for now
 #if HAVE_GLSL
     glAssert(m_nCurrResamplingRate>0);
-    glAssert(GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS)>=2);
     glErrorCheck;
 #endif //HAVE_GLSL
 }
@@ -213,10 +205,10 @@ std::string BackgroundSubtractorLOBSTER::getComputeShaderSource(size_t nStage) c
     ssSrc << "layout(local_size_x=" << m_vDefaultWorkGroupSize.x << ",local_size_y=" << m_vDefaultWorkGroupSize.y << ") in;\n"
              "layout(binding=" << GLImageProcAlgo::eImage_ROIBinding << ", r8ui) readonly uniform uimage2D mROI;\n"
              "layout(binding=" << GLImageProcAlgo::eImage_InputBinding << ", " << (m_nImgChannels==4?"rgba8ui":"r8ui") << ") readonly uniform uimage2D mInput;\n"
-#if LOBSTER_GLSL_DEBUG
+#if BGSLOBSTER_GLSL_DEBUG
              //"layout(binding=" << GLImageProcAlgo::eImage_DebugBinding << ", rgba8) writeonly uniform image2D mDebug;\n"
              "layout(binding=" << GLImageProcAlgo::eImage_DebugBinding << ", rgba8ui) writeonly uniform uimage2D mDebug;\n"
-#endif //LOBSTER_GLSL_DEBUG
+#endif //BGSLOBSTER_GLSL_DEBUG
              "layout(binding=" << GLImageProcAlgo::eImage_OutputBinding << ", r8ui) writeonly uniform uimage2D mOutput;\n"
              "layout(binding=" << BackgroundSubtractorLOBSTER::eLOBSTERStorageBuffer_BGModelBinding << ", std430) coherent buffer bBGModel {\n"
              "    PxModel aoPxModels[];\n"
@@ -242,23 +234,23 @@ std::string BackgroundSubtractorLOBSTER::getComputeShaderSource(size_t nStage) c
              "            uvec3 vCurrBGColorSample = aoPxModels[nModelIdx].color_samples[nSampleIdx].rgb;\n"
              "            uvec3 vCurrBGIntraDescSample = aoPxModels[nModelIdx].lbsp_samples[nSampleIdx].rgb;\n"
              "            uvec3 vCurrColorDist = absdiff(vInputColor,vCurrBGColorSample);\n"
-#if LOBSTER_GLSL_BASIC
+#if BGSLOBSTER_GLSL_BASIC
              "            uvec3 vCurrDescDist = hdist(vInputIntraDesc,vCurrBGIntraDescSample);\n"
              "            if((vCurrColorDist.r+vCurrColorDist.g+vCurrColorDist.b)<=COLOR_DIST_THRESHOLD && (vCurrDescDist.r+vCurrDescDist.g+vCurrDescDist.b)<=DESC_DIST_THRESHOLD)\n"
-#else //!LOBSTER_GLSL_BASIC
+#else //!BGSLOBSTER_GLSL_BASIC
              "            uvec3 vCurrDescDist = hdist(lbsp(uvec3(anLBSPThresLUT[vCurrBGColorSample.r],anLBSPThresLUT[vCurrBGColorSample.g],anLBSPThresLUT[vCurrBGColorSample.b]),vCurrBGColorSample,mInput,vImgCoords),vCurrBGIntraDescSample);\n"
              "            if(all(lessThanEqual(vCurrColorDist,uvec3(COLOR_DIST_SC_THRESHOLD))) && (vCurrColorDist.r+vCurrColorDist.g+vCurrColorDist.b)<=COLOR_DIST_THRESHOLD &&\n"
              "               all(lessThanEqual(vCurrDescDist,uvec3(DESC_DIST_SC_THRESHOLD))) && (vCurrDescDist.r+vCurrDescDist.g+vCurrDescDist.b)<=DESC_DIST_THRESHOLD)\n";
-#endif //LOBSTER_GLSL_BASIC
+#endif //BGSLOBSTER_GLSL_BASIC
     }
     else { ssSrc <<
              "            uint nCurrBGColorSample = aoPxModels[nModelIdx].color_samples[nSampleIdx];\n"
              "            uint nCurrBGDescSample = aoPxModels[nModelIdx].lbsp_samples[nSampleIdx];\n"
-#if LOBSTER_GLSL_BASIC
+#if BGSLOBSTER_GLSL_BASIC
              "            if(absdiff(vInputColor.r,nCurrBGColorSample)<=COLOR_DIST_THRESHOLD/2 && hdist(vInputIntraDesc.r,nCurrBGDescSample)<=DESC_DIST_THRESHOLD)\n"
-#else //!LOBSTER_GLSL_BASIC
+#else //!BGSLOBSTER_GLSL_BASIC
              "            if(absdiff(vInputColor.r,nCurrBGColorSample)<=COLOR_DIST_THRESHOLD/2 && hdist(lbsp(uvec4(anLBSPThresLUT[nCurrBGColorSample]),uvec4(nCurrBGColorSample),mInput,vImgCoords).r,nCurrBGDescSample)<=DESC_DIST_THRESHOLD)\n";
-#endif //!LOBSTER_GLSL_BASIC
+#endif //!BGSLOBSTER_GLSL_BASIC
     }
     ssSrc << "                ++nGoodSamplesCount;\n"
              "            ++nSampleIdx;\n"
@@ -285,7 +277,7 @@ std::string BackgroundSubtractorLOBSTER::getComputeShaderSource(size_t nStage) c
              "            }\n"
              "        }\n"
              "    }\n"
-#if LOBSTER_GLSL_DEBUG
+#if BGSLOBSTER_GLSL_DEBUG
              //"    barrier();\n"
              "    if(bool(nROIVal)) {\n"
              "        vec4 vAvgBGColor = vec4(0);\n"
@@ -299,7 +291,7 @@ std::string BackgroundSubtractorLOBSTER::getComputeShaderSource(size_t nStage) c
              //"        imageStore(mDebug,vImgCoords,uvec4(nSampleIdx*(255/NB_SAMPLES)));\n"
              //"        imageStore(mDebug,vImgCoords,uvec4(hdist(uvec3(0),vInputIntraDesc)*15));\n"
              "    }\n"
-#endif //LOBSTER_GLSL_DEBUG
+#endif //BGSLOBSTER_GLSL_DEBUG
              "    imageStore(mOutput,vImgCoords,vSegmResult);\n"
              "}\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -115,7 +115,7 @@ protected:
     static const char* getCurrTextureLayerUniformName();
     static const char* getLastTextureLayerUniformName();
     static const char* getFrameIndexUniformName();
-    virtual std::string getFragmentShaderSource_internal(int nOutputType,int nDebugType,int nInputType) const;
+    std::string getFragmentShaderSource_internal(int nOutputType,int nDebugType,int nInputType) const;
 private:
     GLImageProcAlgo& operator=(const GLImageProcAlgo&)=delete;
     GLImageProcAlgo(const GLImageProcAlgo&)=delete;

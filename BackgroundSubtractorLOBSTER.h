@@ -17,6 +17,12 @@
 //! defines the default value for the learning rate passed to BackgroundSubtractorLOBSTER::apply
 #define BGSLOBSTER_DEFAULT_LEARNING_RATE (16)
 
+#if HAVE_GLSL
+#define BGSLOBSTER_GLSL_DEBUG       1
+#define BGSLOBSTER_GLSL_TIMERS      0
+#define BGSLOBSTER_GLSL_BASIC       0
+#endif //HAVE_GLSL
+
 /*!
     LOcal Binary Similarity segmenTER (LOBSTER) change detection algorithm.
 
