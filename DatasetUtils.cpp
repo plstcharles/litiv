@@ -1038,7 +1038,7 @@ void DatasetUtils::SequenceInfo::StopPrecaching() {
 #if HAVE_GLSL
 
 DatasetUtils::CDNetEvaluator::CDNetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount)
-    :    GLEvaluatorAlgo(pParent,nTotFrameCount,eAtomicCountersCount,1,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,true) {}
+    :    GLEvaluatorAlgo(pParent,nTotFrameCount,eCDNetEvalCountersCount,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,true) {}
 
 std::string DatasetUtils::CDNetEvaluator::getComputeShaderSource(size_t nStage) const {
     glAssert(nStage<m_nComputeStages);
@@ -1057,11 +1057,11 @@ std::string DatasetUtils::CDNetEvaluator::getComputeShaderSource(size_t nStage) 
              "layout(binding=" << GLImageProcAlgo::eImage_GTBinding << ", r8ui) readonly uniform uimage2D imgGT;\n";
     if(m_bUsingDebug) ssSrc <<
              "layout(binding=" << GLImageProcAlgo::eImage_DebugBinding << ") writeonly uniform uimage2D imgDebug;\n";
-    ssSrc << "layout(binding=0, offset=" << eAtomicCounter_TP*4 << ") uniform atomic_uint nTP;\n"
-             "layout(binding=0, offset=" << eAtomicCounter_TN*4 << ") uniform atomic_uint nTN;\n"
-             "layout(binding=0, offset=" << eAtomicCounter_FP*4 << ") uniform atomic_uint nFP;\n"
-             "layout(binding=0, offset=" << eAtomicCounter_FN*4 << ") uniform atomic_uint nFN;\n"
-             "layout(binding=0, offset=" << eAtomicCounter_SE*4 << ") uniform atomic_uint nSE;\n";
+    ssSrc << "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eCDNetEvalCounter_TP*4 << ") uniform atomic_uint nTP;\n"
+             "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eCDNetEvalCounter_TN*4 << ") uniform atomic_uint nTN;\n"
+             "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eCDNetEvalCounter_FP*4 << ") uniform atomic_uint nFP;\n"
+             "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eCDNetEvalCounter_FN*4 << ") uniform atomic_uint nFN;\n"
+             "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eCDNetEvalCounter_SE*4 << ") uniform atomic_uint nSE;\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "void main() {\n"
              "    ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);\n"
@@ -1133,14 +1133,14 @@ std::string DatasetUtils::CDNetEvaluator::getComputeShaderSource(size_t nStage) 
 }
 
 void DatasetUtils::CDNetEvaluator::getCumulativeCounts(uint64_t& nTotTP, uint64_t& nTotTN, uint64_t& nTotFP, uint64_t& nTotFN, uint64_t& nTotSE) {
-    const cv::Mat& oAtomicCountersQueryBuffer = this->getAtomicCounterBuffer();
+    const cv::Mat& oAtomicCountersQueryBuffer = this->getEvaluationAtomicCounterBuffer();
     nTotTP=0; nTotTN=0; nTotFP=0; nTotFN=0; nTotSE=0;
     for(int nFrameIter=0; nFrameIter<oAtomicCountersQueryBuffer.rows; ++nFrameIter) {
-        nTotTP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eAtomicCounter_TP);
-        nTotTN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eAtomicCounter_TN);
-        nTotFP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eAtomicCounter_FP);
-        nTotFN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eAtomicCounter_FN);
-        nTotSE += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eAtomicCounter_SE);
+        nTotTP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eCDNetEvalCounter_TP);
+        nTotTN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eCDNetEvalCounter_TN);
+        nTotFP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eCDNetEvalCounter_FP);
+        nTotFN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eCDNetEvalCounter_FN);
+        nTotSE += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,CDNetEvaluator::eCDNetEvalCounter_SE);
     }
 }
 

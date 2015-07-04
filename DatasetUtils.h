@@ -21,7 +21,7 @@ namespace DatasetUtils {
     class CategoryInfo;
 
     enum eDatasetList {
-        eDataset_CDnet2012=0,
+        eDataset_CDnet2012,
         eDataset_CDnet2014,
         eDataset_Wallflower,
         eDataset_PETS2001_D3TC1,
@@ -188,13 +188,13 @@ namespace DatasetUtils {
         CDNetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount);
         virtual std::string getComputeShaderSource(size_t nStage) const;
         void getCumulativeCounts(uint64_t& nTotTP, uint64_t& nTotTN, uint64_t& nTotFP, uint64_t& nTotFN, uint64_t& nTotSE);
-        enum eAtomicCountersList {
-            eAtomicCounter_TP=0,
-            eAtomicCounter_TN,
-            eAtomicCounter_FP,
-            eAtomicCounter_FN,
-            eAtomicCounter_SE,
-            eAtomicCountersCount,
+        enum eCDNetEvalCountersList {
+            eCDNetEvalCounter_TP,
+            eCDNetEvalCounter_TN,
+            eCDNetEvalCounter_FP,
+            eCDNetEvalCounter_FN,
+            eCDNetEvalCounter_SE,
+            eCDNetEvalCountersCount,
         };
     };
 

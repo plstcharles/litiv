@@ -1,6 +1,7 @@
 #pragma once
 
 #define GLUTILS_IMGPROC_DEFAULT_WORKGROUP           glm::uvec2(12,8)
+#define GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT         2
 #define GLUTILS_IMGPROC_TEXTURE_ARRAY_SIZE          4
 #define GLUTILS_IMGPROC_USE_TEXTURE_ARRAYS          0
 #define GLUTILS_IMGPROC_USE_DOUBLE_PBO_INPUT        0
@@ -11,9 +12,8 @@
 
 class GLImageProcAlgo {
 public:
-    GLImageProcAlgo( size_t nLevels, size_t nLayers, size_t nComputeStages,
-                     int nOutputType, int nDebugType, bool bUseInput,
-                     bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
+    GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs, size_t nExtraImages, size_t nExtraTextures,
+                     int nOutputType, int nDebugType, bool bUseInput, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
     virtual ~GLImageProcAlgo();
 
     virtual std::string getVertexShaderSource() const;
@@ -23,7 +23,10 @@ public:
     inline bool setOutputFetching(bool b) {return (m_bFetchingOutput=(b&&m_bUsingOutput));}
     inline bool setDebugFetching(bool b) {return (m_bFetchingDebug=(b&&m_bUsingDebug));}
     inline bool getIsUsingDisplay() const {return m_bUsingDisplay;}
-    inline GLuint getSSBOId(size_t n) const {glAssert(n<eBufferBindingsCount); return m_anSSBO[n];}
+    inline GLuint getACBOId(size_t n) const {glAssert(n<m_nACBOs); return m_vnACBO[n];}
+    inline GLuint getSSBOId(size_t n) const {glAssert(n<m_nSSBOs); return m_vnSSBO[n];}
+    inline size_t getTextureBinding(size_t nLayer, size_t eTexID) const {return (m_bUsingTexArrays?0:nLayer)*m_nTextures+eTexID;}
+
     size_t fetchLastOutput(cv::Mat& oOutput) const;
     size_t fetchLastDebug(cv::Mat& oDebug) const;
 
@@ -31,9 +34,12 @@ public:
     virtual void apply(const cv::Mat& oNextInput, bool bRebindAll=false);
 
     const size_t m_nLevels;
-    const size_t m_nLayers;
-    const size_t m_nSxSDisplayCount;
     const size_t m_nComputeStages;
+    const size_t m_nSSBOs;
+    const size_t m_nACBOs;
+    const size_t m_nImages;
+    const size_t m_nTextures;
+    const size_t m_nSxSDisplayCount;
     const bool m_bUsingOutputPBOs;
     const bool m_bUsingDebugPBOs;
     const bool m_bUsingInputPBOs;
@@ -45,35 +51,34 @@ public:
     const bool m_bUsingIntegralFormat;
     const glm::uvec2 m_vDefaultWorkGroupSize; // make dynamic? @@@@@
 protected:
-    enum eImageLayoutList {
-        eImage_OutputBinding=0,
+    enum eImageDefaultLayoutList {
+        eImage_OutputBinding,
         eImage_DebugBinding,
-        eImage_GTBinding, // @@@@ make custom4? set all customs at end? simplify custom tex array?
-        eImage_ROIBinding,
-        // @@@@ find better alternative than extras = custom?
-        eImage_CustomBinding1,
-        eImage_CustomBinding2,
-        eImage_CustomBinding3,
         eImage_InputBinding,
-        eImageBindingsCount
+        eImage_ROIBinding,
+        eImage_GTBinding,
+        // reserved here
+        eImageDefaultBindingsCount
     };
-    enum eTextureLayoutList {
-        eTexture_OutputBinding=0,
+    enum eTextureDefaultLayoutList {
+        eTexture_OutputBinding,
         eTexture_DebugBinding,
-        eTexture_GTBinding,
         eTexture_InputBinding,
-        eTextureBindingsCount
+        eTexture_GTBinding,
+        // reserved here
+        eTextureDefaultBindingsCount
     };
-    enum eBufferBindingList {
-        // @@@@ find better alternative than extras = custom?
-        eBuffer_CustomBinding1=0,
-        eBuffer_CustomBinding2,
-        eBuffer_CustomBinding3,
-        eBuffer_CustomBinding4,
-        eBufferBindingsCount
+    enum eStorageBufferDefaultBindingList {
+        // reserved here
+        eStorageBufferDefaultBindingsCount
+    };
+    enum eAtomicCounterBufferDefaultBindingList {
+        eAtomicCounterBuffer_EvalBinding,
+        // reserved here
+        eAtomicCounterBufferDefaultBindingsCount
     };
     enum eGLTimersList {
-        eGLTimer_TextureUpdate=0,
+        eGLTimer_TextureUpdate,
         eGLTimer_ComputeDispatch,
         eGLTimer_DisplayUpdate,
         eGLTimersCount
@@ -110,25 +115,22 @@ protected:
     static const char* getCurrTextureLayerUniformName();
     static const char* getLastTextureLayerUniformName();
     static const char* getFrameIndexUniformName();
-    static std::string getFragmentShaderSource_internal( size_t nLayers, int nOutputType, int nDebugType, int nInputType,
-                                                         bool bUsingOutput, bool bUsingDebug, bool bUsingInput,
-                                                         bool bUsingTexArrays, bool bUsingIntegralFormat);
+    virtual std::string getFragmentShaderSource_internal(int nOutputType,int nDebugType,int nInputType) const;
 private:
     GLImageProcAlgo& operator=(const GLImageProcAlgo&)=delete;
     GLImageProcAlgo(const GLImageProcAlgo&)=delete;
     friend class GLEvaluatorAlgo;
-    GLuint m_anSSBO[GLImageProcAlgo::eBufferBindingsCount];
+    std::vector<GLuint> m_vnSSBO;
+    std::vector<GLuint> m_vnACBO;
     int m_nInputType;
 };
 
 class GLEvaluatorAlgo : public GLImageProcAlgo {
 public:
-    GLEvaluatorAlgo(const std::shared_ptr<GLImageProcAlgo>& pParent,
-                    size_t nTotFrameCount, size_t nCountersPerFrame, size_t nComputeStages,
+    GLEvaluatorAlgo(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount, size_t nCountersPerFrame,
                     int nDebugType, int nGroundtruthType, bool bUseIntegralFormat);
     virtual ~GLEvaluatorAlgo();
-    inline GLuint getAtomicBufferId() const {return m_nAtomicBuffer;}
-    const cv::Mat& getAtomicCounterBuffer();
+    const cv::Mat& getEvaluationAtomicCounterBuffer();
     virtual std::string getFragmentShaderSource() const;
 
     virtual void initialize(const cv::Mat& oInitInput, const cv::Mat& oInitGT, const cv::Mat& oROI);
@@ -139,21 +141,20 @@ public:
 protected:
     const int m_nGroundtruthType;
     const size_t m_nTotFrameCount;
-    const size_t m_nAtomicBufferRangeSize;
-    const size_t m_nAtomicBufferSize;
-    const size_t m_nAtomicBufferMaxSize;
-    size_t m_nCurrAtomicBufferSize;
-    size_t m_nCurrAtomicBufferOffsetPtr;
-    size_t m_nCurrAtomicBufferOffsetBlock;
+    const size_t m_nEvalBufferFrameSize;
+    const size_t m_nEvalBufferTotSize;
+    const size_t m_nEvalBufferMaxSize;
+    size_t m_nCurrEvalBufferSize;
+    size_t m_nCurrEvalBufferOffsetPtr;
+    size_t m_nCurrEvalBufferOffsetBlock;
     std::shared_ptr<GLImageProcAlgo> m_pParent;
 private:
-    cv::Mat m_oAtomicCountersQueryBuffer;
-    GLuint m_nAtomicBuffer;
+    cv::Mat m_oEvalQueryBuffer;
 };
 
 class GLImagePassThroughAlgo : public GLImageProcAlgo {
 public:
-    GLImagePassThroughAlgo(size_t nLayers, int nFrameType, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
+    GLImagePassThroughAlgo(int nFrameType, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
     virtual std::string getComputeShaderSource(size_t nStage) const;
 };
 
@@ -162,7 +163,7 @@ public:
     // @@@@@ add support for variable kernels? per-px kernel size could be provided via image load/store
     // @@@ currently not using ROI
     // via integral image: O(n) (where n is the total image size --- does not depend on r, the kernel size)
-    BinaryMedianFilter( size_t nKernelSize, size_t nBorderSize, size_t nLayers, const cv::Mat& oROI,
+    BinaryMedianFilter( size_t nKernelSize, size_t nBorderSize, const cv::Mat& oROI,
                         bool bUseOutputPBOs, bool bUseInputPBOs, bool bUseTexArrays,
                         bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
     virtual std::string getComputeShaderSource(size_t nStage) const;

@@ -6,7 +6,7 @@
 
 struct GLVertex {
     enum eVertexAttribList {
-        eVertexAttrib_PositionIdx=0,
+        eVertexAttrib_PositionIdx,
         eVertexAttrib_NormalIdx,
         eVertexAttrib_ColorIdx,
         eVertexAttrib_TexCoordIdx,
@@ -51,12 +51,12 @@ private:
 struct GLTexture {
     // glPixelStore modifs might affect underlying behavior of this class
     enum eDefaultImageLayoutList {
-        eDefaultImage_InputBinding=0,
+        eDefaultImage_InputBinding,
         eDefaultImage_OutputBinding,
         eDefaultImageBindingsCount,
     };
     enum eDefaultTextureLayoutList {
-        eDefaultTexture_ColorBinding=0,
+        eDefaultTexture_ColorBinding,
         eDefaultTexture_NormalBinding,
         eDefaultTexture_ShadowBinding,
         eDefaultTextureBindingsCount,

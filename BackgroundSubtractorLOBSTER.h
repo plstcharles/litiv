@@ -93,8 +93,11 @@ protected:
     size_t m_nBGModelSize;
     std::vector<uint> m_vnBGModelData;
     std::vector<GLSLFunctionUtils::TMT32GenParams> m_voTMT32ModelData;
-    static const GLuint eBuffer_BGModelBinding;
-    static const GLuint eBuffer_TMT32ModelBinding;
+    enum eLOBSTERStorageBufferBindingList {
+        eLOBSTERStorageBuffer_BGModelBinding = GLImageProcAlgo::eStorageBufferDefaultBindingsCount,
+        eLOBSTERStorageBuffer_TMT32ModelBinding,
+        eLOBSTERStorageBufferBindingsCount
+    };
     virtual void dispatch(size_t nStage, GLShader& oShader);
 #endif //HAVE_GLSL
 };
