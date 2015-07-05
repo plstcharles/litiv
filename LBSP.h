@@ -51,7 +51,7 @@ public:
     inline static void computeGrayscaleDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _t, ushort& _res) {
         CV_DbgAssert(!oInputImg.empty());
         CV_DbgAssert(oInputImg.type()==CV_8UC1);
-        CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
+        CV_DbgAssert(LBSP::DESC_SIZE==2);
         CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
@@ -63,7 +63,7 @@ public:
     inline static void computeRGBDescriptor(const cv::Mat& oInputImg, const uchar* const _ref,  const int _x, const int _y, const size_t* const _t, ushort* _res) {
         CV_DbgAssert(!oInputImg.empty());
         CV_DbgAssert(oInputImg.type()==CV_8UC3);
-        CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
+        CV_DbgAssert(LBSP::DESC_SIZE==2);
         CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
@@ -75,7 +75,7 @@ public:
     inline static void computeRGBDescriptor(const cv::Mat& oInputImg, const uchar* const _ref,  const int _x, const int _y, const size_t _t, ushort* _res) {
         CV_DbgAssert(!oInputImg.empty());
         CV_DbgAssert(oInputImg.type()==CV_8UC3);
-        CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
+        CV_DbgAssert(LBSP::DESC_SIZE==2);
         CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
@@ -87,7 +87,7 @@ public:
     inline static void computeSingleRGBDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _c, const size_t _t, ushort& _res) {
         CV_DbgAssert(!oInputImg.empty());
         CV_DbgAssert(oInputImg.type()==CV_8UC3 && _c<3);
-        CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
+        CV_DbgAssert(LBSP::DESC_SIZE==2);
         CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
@@ -99,7 +99,7 @@ public:
     inline static void computeSingleRGBADescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _c, const size_t _t, ushort& _res) {
         CV_DbgAssert(!oInputImg.empty());
         CV_DbgAssert(oInputImg.type()==CV_8UC4 && _c<4);
-        CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
+        CV_DbgAssert(LBSP::DESC_SIZE==2);
         CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
@@ -122,6 +122,7 @@ public:
 #if HAVE_GLSL
     //! utility function, returns the glsl source code required to describe an LBSP descriptor based on the image load store
     static std::string getShaderFunctionSource(size_t nChannels);
+    static std::string getShaderFunctionSource_SharedDataPreload(size_t nChannels, const glm::uvec2& vWorkGroupSize);
 #endif //HAVE_GLSL
 
 protected:

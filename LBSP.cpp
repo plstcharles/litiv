@@ -30,7 +30,7 @@ void LBSP::setReference(const cv::Mat& img) {
 }
 
 int LBSP::descriptorSize() const {
-    return DESC_SIZE;
+    return LBSP::DESC_SIZE;
 }
 
 int LBSP::descriptorType() const {
@@ -56,7 +56,7 @@ static inline void lbsp_computeImpl(    const cv::Mat& oInputImg,
                                         size_t _t) {
     CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
     CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
-    CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
+    CV_DbgAssert(LBSP::DESC_SIZE==2);
     const size_t nChannels = (size_t)oInputImg.channels();
     const size_t _step_row = oInputImg.step.p[0];
     const uchar* _data = oInputImg.data;
@@ -92,7 +92,7 @@ static inline void lbsp_computeImpl(    const cv::Mat& oInputImg,
                                         size_t nThresholdOffset) {
     CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
     CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
-    CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
+    CV_DbgAssert(LBSP::DESC_SIZE==2);
     CV_DbgAssert(fThreshold>=0);
     const size_t nChannels = (size_t)oInputImg.channels();
     const size_t _step_row = oInputImg.step.p[0];
@@ -130,7 +130,7 @@ static inline void lbsp_computeImpl2(   const cv::Mat& oInputImg,
                                         size_t _t) {
     CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
     CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
-    CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
+    CV_DbgAssert(LBSP::DESC_SIZE==2);
     const size_t nChannels = (size_t)oInputImg.channels();
     const size_t _step_row = oInputImg.step.p[0];
     const uchar* _data = oInputImg.data;
@@ -166,7 +166,7 @@ static inline void lbsp_computeImpl2(   const cv::Mat& oInputImg,
                                         size_t nThresholdOffset) {
     CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
     CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
-    CV_DbgAssert(LBSP::DESC_SIZE==2); // @@@ also relies on a constant desc size
+    CV_DbgAssert(LBSP::DESC_SIZE==2);
     CV_DbgAssert(fThreshold>=0);
     const size_t nChannels = (size_t)oInputImg.channels();
     const size_t _step_row = oInputImg.step.p[0];
@@ -236,7 +236,7 @@ void LBSP::reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoi
     CV_DbgAssert(!voKeypoints.empty());
     CV_DbgAssert(!oDescriptors.empty() && oDescriptors.cols==1);
     CV_DbgAssert(oSize.width>0 && oSize.height>0);
-    CV_DbgAssert(DESC_SIZE==2); // @@@ also relies on a constant desc size
+    CV_DbgAssert(LBSP::DESC_SIZE==2);
     CV_DbgAssert(oDescriptors.type()==CV_16UC1 || oDescriptors.type()==CV_16UC3);
     const size_t nChannels = (size_t)oDescriptors.channels();
     const size_t nKeyPoints = voKeypoints.size();
@@ -261,12 +261,12 @@ void LBSP::reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoi
 
 void LBSP::calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat& oOutput, bool bForceMergeChannels) {
     CV_DbgAssert(oDesc1.size()==oDesc2.size() && oDesc1.type()==oDesc2.type());
-    CV_DbgAssert(DESC_SIZE==2); // @@@ also relies on a constant desc size
+    CV_DbgAssert(LBSP::DESC_SIZE==2);
     CV_DbgAssert(oDesc1.type()==CV_16UC1 || oDesc1.type()==CV_16UC3);
     CV_DbgAssert(CV_MAT_DEPTH(oDesc1.type())==CV_16U);
-    CV_DbgAssert(DESC_SIZE*8<=UCHAR_MAX);
+    CV_DbgAssert(LBSP::DESC_SIZE*8<=UCHAR_MAX);
     CV_DbgAssert(oDesc1.step.p[0]==oDesc2.step.p[0] && oDesc1.step.p[1]==oDesc2.step.p[1]);
-    const float fScaleFactor = (float)UCHAR_MAX/(DESC_SIZE*8);
+    const float fScaleFactor = (float)UCHAR_MAX/(LBSP::DESC_SIZE*8);
     const size_t nChannels = CV_MAT_CN(oDesc1.type());
     const size_t _step_row = oDesc1.step.p[0];
     if(nChannels==1) {
@@ -341,6 +341,82 @@ std::string LBSP::getShaderFunctionSource(size_t nChannels) {
              "         + (uvec3(greaterThan(uvec3(abs(ivec3(imageLoad(mData,vCoords+ivec2( 0,-2)).rgb)-ivec3(ref))),t)) << 2)\n"
              "         + (uvec3(greaterThan(uvec3(abs(ivec3(imageLoad(mData,vCoords+ivec2( 2, 0)).rgb)-ivec3(ref))),t)) << 1)\n"
              "         + (uvec3(greaterThan(uvec3(abs(ivec3(imageLoad(mData,vCoords+ivec2(-2, 0)).rgb)-ivec3(ref))),t)));\n"
+             "}\n";
+    return ssSrc.str();
+}
+
+std::string LBSP::getShaderFunctionSource_SharedDataPreload(size_t nChannels, const glm::uvec2& vWorkGroupSize) {
+    glAssert(nChannels==4 || nChannels==1);
+    glAssert(vWorkGroupSize.x>3 && vWorkGroupSize.y>3);
+    const size_t nLBSPRadius = LBSP::PATCH_SIZE/2;
+    std::stringstream ssSrc;
+    ssSrc << "shared uvec4 avLBSPData[" << vWorkGroupSize.y+nLBSPRadius*2 << "][" << vWorkGroupSize.x+nLBSPRadius*2 << "];\n"
+             "shared uint anLBSPQuadrantLockstep[4];\n"
+             "#define LBSP_RADIUS " << nLBSPRadius << "\n"
+             "uint lbsp_preload_data(in layout(" << (nChannels==4?"rgba8ui":"r8ui") << ") readonly uimage2D mData) {\n"
+             "    ivec2 vInvocCoord = ivec2(gl_GlobalInvocationID.xy);\n"
+             "    avLBSPData[LBSP_RADIUS+gl_LocalInvocationID.y][LBSP_RADIUS+gl_LocalInvocationID.x] = imageLoad(mData,vInvocCoord);\n"
+             "    uint nQuadID, nQuadExtRowLength;\n"
+             "    ivec2 vQuadExtStartCoord, vQuadExtVarRowLength, vQuadExtVarRow;\n"
+             "    ivec2 vWorkGroupStartCoord = ivec2(gl_GlobalInvocationID.xy)-ivec2(gl_LocalInvocationID.xy);\n"
+             "    float fVar = float(" << vWorkGroupSize.y << ")/" << vWorkGroupSize.x << ";\n"
+             "    if(int(gl_LocalInvocationID.x*fVar)>gl_LocalInvocationID.y && (" << vWorkGroupSize.y << "-int(fVar*gl_LocalInvocationID.x))<=gl_LocalInvocationID.y) {\n"
+             "        nQuadID = 1;\n"
+             "        nQuadExtRowLength = " << vWorkGroupSize.y+nLBSPRadius << ";\n"
+             "        vQuadExtStartCoord = vWorkGroupStartCoord+ivec2(" << vWorkGroupSize.x+nLBSPRadius-1 << ",-LBSP_RADIUS);\n"
+             "        vQuadExtVarRowLength = ivec2(0,1);\n"
+             "        vQuadExtVarRow = ivec2(-1,0);\n"
+             "    }\n"
+             "    else if(int(gl_LocalInvocationID.x*fVar)<gl_LocalInvocationID.y && (" << vWorkGroupSize.y << "-int(fVar*gl_LocalInvocationID.x))>=gl_LocalInvocationID.y) {\n"
+             "        nQuadID = 2;\n"
+             "        nQuadExtRowLength = " << vWorkGroupSize.y+nLBSPRadius << ";\n"
+             "        vQuadExtStartCoord = vWorkGroupStartCoord+ivec2(-LBSP_RADIUS," << vWorkGroupSize.y+nLBSPRadius-1 << ");\n"
+             "        vQuadExtVarRowLength = ivec2(0,-1);\n"
+             "        vQuadExtVarRow = ivec2(1,0);\n"
+             "    }\n"
+             "    else if(int(gl_LocalInvocationID.x*fVar)>=gl_LocalInvocationID.y && (" << vWorkGroupSize.y << "-int(fVar*gl_LocalInvocationID.x))>gl_LocalInvocationID.y) {\n"
+             "        nQuadID = 0;\n"
+             "        nQuadExtRowLength = " << vWorkGroupSize.x+nLBSPRadius << ";\n"
+             "        vQuadExtStartCoord = vWorkGroupStartCoord+ivec2(-LBSP_RADIUS);\n"
+             "        vQuadExtVarRowLength = ivec2(1,0);\n"
+             "        vQuadExtVarRow = ivec2(0,1);\n"
+             "    }\n"
+             "    else { //if(int(gl_LocalInvocationID.x*fVar)<=gl_LocalInvocationID.y && (" << vWorkGroupSize.y << "-int(fVar*gl_LocalInvocationID.x))<gl_LocalInvocationID.y) {\n"
+             "        nQuadID = 3;\n"
+             "        nQuadExtRowLength = " << vWorkGroupSize.x+nLBSPRadius << ";\n"
+             "        vQuadExtStartCoord = vWorkGroupStartCoord+ivec2(" << vWorkGroupSize.x+nLBSPRadius-1 << "," << vWorkGroupSize.y+nLBSPRadius-1 << ");\n"
+             "        vQuadExtVarRowLength = ivec2(-1,0);\n"
+             "        vQuadExtVarRow = ivec2(0,-1);\n"
+             "    }\n"
+             "    anLBSPQuadrantLockstep[nQuadID] = 0;\n"
+             "    barrier();\n"
+             "    uint nLockstep = atomicAdd(anLBSPQuadrantLockstep[nQuadID],1);\n"
+             "    while(nLockstep<nQuadExtRowLength*LBSP_RADIUS) {\n"
+             "        ivec2 vCurrQuadExtRowStartCoord = vQuadExtStartCoord + vQuadExtVarRow*int(nLockstep/nQuadExtRowLength);\n"
+             "        ivec2 vCurrQuadExtCoord = vCurrQuadExtRowStartCoord + vQuadExtVarRowLength*int(mod(nLockstep,nQuadExtRowLength));\n"
+             "        avLBSPData[vCurrQuadExtCoord.y-vWorkGroupStartCoord.y+LBSP_RADIUS][vCurrQuadExtCoord.x-vWorkGroupStartCoord.x+LBSP_RADIUS] = imageLoad(mData,vCurrQuadExtCoord);\n"
+             "        nLockstep = atomicAdd(anLBSPQuadrantLockstep[nQuadID],1);\n"
+             "    }\n"
+             "    return nQuadID;\n"
+             "}\n"
+             "uvec3 lbsp(in uvec3 t, in uvec3 ref, in ivec2 vCoords) {\n"
+             "    ivec2 vLocalCoords = vCoords-ivec2(gl_GlobalInvocationID.xy)+ivec2(gl_LocalInvocationID.xy)+ivec2(LBSP_RADIUS);\n"
+             "    return (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y+1][vLocalCoords.x-1].rgb)-ivec3(ref))),t)) << 15)\n"
+             "         + (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y-1][vLocalCoords.x+1].rgb)-ivec3(ref))),t)) << 14)\n"
+             "         + (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y+1][vLocalCoords.x+1].rgb)-ivec3(ref))),t)) << 13)\n"
+             "         + (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y-1][vLocalCoords.x-1].rgb)-ivec3(ref))),t)) << 12)\n"
+             "         + (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y  ][vLocalCoords.x+1].rgb)-ivec3(ref))),t)) << 11)\n"
+             "         + (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y-1][vLocalCoords.x  ].rgb)-ivec3(ref))),t)) << 10)\n"
+             "         + (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y  ][vLocalCoords.x-1].rgb)-ivec3(ref))),t)) << 9)\n"
+             "         + (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y+1][vLocalCoords.x  ].rgb)-ivec3(ref))),t)) << 8)\n"
+             "         + (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y-2][vLocalCoords.x-2].rgb)-ivec3(ref))),t)) << 7)\n"
+             "         + (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y+2][vLocalCoords.x+2].rgb)-ivec3(ref))),t)) << 6)\n"
+             "         + (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y-2][vLocalCoords.x+2].rgb)-ivec3(ref))),t)) << 5)\n"
+             "         + (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y+2][vLocalCoords.x-2].rgb)-ivec3(ref))),t)) << 4)\n"
+             "         + (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y+2][vLocalCoords.x  ].rgb)-ivec3(ref))),t)) << 3)\n"
+             "         + (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y-2][vLocalCoords.x  ].rgb)-ivec3(ref))),t)) << 2)\n"
+             "         + (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y  ][vLocalCoords.x+2].rgb)-ivec3(ref))),t)) << 1)\n"
+             "         + (uvec3(greaterThan(uvec3(abs(ivec3(avLBSPData[vLocalCoords.y  ][vLocalCoords.x-2].rgb)-ivec3(ref))),t)));\n"
              "}\n";
     return ssSrc.str();
 }

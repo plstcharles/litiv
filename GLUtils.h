@@ -360,13 +360,16 @@ namespace GLUtils {
     template<uint N> static inline typename std::enable_if<(N==1),int>::type getIntegerVal(GLenum eParamName) {
         int nVal;
         glGetIntegerv(eParamName,&nVal);
+        glErrorCheck;
         return nVal;
     }
 
     template<uint N> static inline typename std::enable_if<(N>1),std::array<int,N>>::type getIntegerVal(GLenum eParamName) {
-        std::array<int,N> vVal;
-        glGetIntegerv(eParamName,&vVal);
-        return vVal;
+        std::array<int,N> anVal;
+        for(uint n=0; n<N; ++n)
+            glGetIntegeri_v(eParamName,n,&anVal[n]);
+        glErrorCheck;
+        return anVal;
     }
 
     static inline cv::Mat deepCopyImage(GLsizei nWidth,

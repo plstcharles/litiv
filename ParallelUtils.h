@@ -16,7 +16,7 @@
 #error "Bad default number of threads specified."
 #endif //DEFAULT_NB_THREADS<1
 #if HAVE_GLSL
-#define GLSL_RENDERING      1
+#define GLSL_RENDERING      0
 #include "GLUtils.h"
 #elif HAVE_CUDA
 #include @@@@@

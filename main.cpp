@@ -1,12 +1,8 @@
 
 // @@@ imgproc gpu algo does not support mipmapping binding yet
-// @@@ test compute shader group size
-// @@@ ADD OPENGL HARDWARE LIMITS CHECKS EVERYWHERE (if using ssbo, check MAX_SHADER_STORAGE_BLOCK_SIZE)
-// @@@ always pack big gpu buffers with std430
-// @@@ add opencv hardware intrs check, and impl some stuff in MMX/SSE/SSE2/3/4.1/4.2? (also check popcount and AVX)
-// @@@ investigate glClearBufferData for large-scale opengl buffer memsets
+// @@@ test compute shader group size vs shared mem usage
+// @@@ add opencv hardware instr set check, and impl some stuff in MMX/SSE/SSE2/3/4.1/4.2? (also check popcount and AVX)
 // @@@ support non-integer textures top level (alg)? need to replace all ui-stores by float-stores, rest is ok
-// @@@ imgproc: make all use*** defines only
 
 //////////////////////////////////////////
 // USER/ENVIRONMENT-SPECIFIC VARIABLES :
@@ -28,8 +24,8 @@
 //////////////////////////////////////////
 #include "ParallelUtils.h"
 #if HAVE_GLSL
-#define GLSL_EVALUATION                  0
-#define VALIDATE_GLSL_EVALUATION         1
+#define GLSL_EVALUATION                  1
+#define VALIDATE_GLSL_EVALUATION         0
 #endif //HAVE_GLSL
 #include "DatasetUtils.h"
 #define DATASET_ID             eDataset_CDnet2014

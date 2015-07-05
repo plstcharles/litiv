@@ -37,10 +37,13 @@ GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t 
     glAssert(m_nLevels>0 && GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT>1 && m_nComputeStages>0);
     if(m_bUsingTexArrays && !glGetTextureSubImage && (m_bUsingDebugPBOs || m_bUsingOutputPBOs))
         glError("missing impl for texture arrays pbo fetch when glGetTextureSubImage is not available");
+    std::array<int,3> anMaxWorkGroupSize = GLUtils::getIntegerVal<3>(GL_MAX_COMPUTE_WORK_GROUP_SIZE);
+    if(anMaxWorkGroupSize[0]<(int)m_vDefaultWorkGroupSize.x || anMaxWorkGroupSize[1]<(int)m_vDefaultWorkGroupSize.y)
+        glErrorExt("workgroup size limit is too small for the current impl (curr=[%d,%d], req=[%d,%d])",anMaxWorkGroupSize[0],anMaxWorkGroupSize[1],(int)m_vDefaultWorkGroupSize.x,(int)m_vDefaultWorkGroupSize.y);
     const size_t nCurrComputeStageInvocs = m_vDefaultWorkGroupSize.x*m_vDefaultWorkGroupSize.y;
     glAssert(nCurrComputeStageInvocs>0);
     if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS)<nCurrComputeStageInvocs)
-        glErrorExt("compute work group size is too small for the current impl (curr=%lu, req=%lu)",(size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS),nCurrComputeStageInvocs);
+        glErrorExt("compute invoc limit is too small for the current impl (curr=%lu, req=%lu)",(size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS),nCurrComputeStageInvocs);
     if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_IMAGE_UNITS)<m_nImages || (size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_IMAGE_UNIFORMS)<m_nImages)
         glError("image units limit is too small for the current impl");
     if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_TEXTURE_UNITS)<m_nTextures)
@@ -88,6 +91,9 @@ void GLImageProcAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oROI)
         m_nInputType = oInitInput.type();
     }
     m_oFrameSize = oROI.size();
+    std::array<int,3> anMaxWorkGroupCount = GLUtils::getIntegerVal<3>(GL_MAX_COMPUTE_WORK_GROUP_COUNT);
+    if(anMaxWorkGroupCount[0]<(int)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x) || anMaxWorkGroupCount[1]<(int)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y))
+        glError("workgroup count dispatch limit is too small for the current impl");
     for(size_t nPBOIter=0; nPBOIter<2; ++nPBOIter) {
         if(m_bUsingOutputPBOs)
             m_apOutputPBOs[nPBOIter] = std::unique_ptr<GLPixelBufferObject>(new GLPixelBufferObject(cv::Mat(m_oFrameSize,m_nOutputType),GL_PIXEL_PACK_BUFFER,GL_STREAM_READ));
@@ -403,7 +409,7 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
              "layout(binding=" << GLImageProcAlgo::eTexture_OutputBinding << ") uniform" << (m_bUsingIntegralFormat?" u":" ") << "sampler2DArray texArrayOutput;\n";
         if(nDebugType>=0) ssSrc <<
              "layout(binding=" << GLImageProcAlgo::eTexture_DebugBinding << ") uniform" << (m_bUsingIntegralFormat?" u":" ") << "sampler2DArray texArrayDebug;\n";
-        if(nOutputType>=0) ssSrc <<
+        if(nInputType>=0) ssSrc <<
              "layout(binding=" << GLImageProcAlgo::eTexture_InputBinding << ") uniform" << (m_bUsingIntegralFormat?" u":" ") << "sampler2DArray texArrayInput;\n";
     }
     else
@@ -412,18 +418,18 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
              "layout(binding=" << getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_OutputBinding) << ") uniform" << (m_bUsingIntegralFormat?" u":" ") << "sampler2D texOutput" << nLayerIter << ";\n";
             if(nDebugType>=0) ssSrc <<
              "layout(binding=" << getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_DebugBinding) << ") uniform" << (m_bUsingIntegralFormat?" u":" ") << "sampler2D texDebug" << nLayerIter << ";\n";
-            if(nOutputType>=0) ssSrc <<
+            if(nInputType>=0) ssSrc <<
              "layout(binding=" << getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_InputBinding) << ") uniform" << (m_bUsingIntegralFormat?" u":" ") << "sampler2D texInput" << nLayerIter << ";\n";
         }
     ssSrc << "uniform uint nCurrLayerIdx;\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "void main() {\n"
              "    float texCoord2DArrayIdx = 1;\n"
-             "    vec3 texCoord3D = vec3(modf(texCoord2D.x*" << int(nOutputType>=0)+int(nDebugType>=0)+int(nOutputType>=0)<< ",texCoord2DArrayIdx),texCoord2D.y,texCoord2DArrayIdx);\n"
+             "    vec3 texCoord3D = vec3(modf(texCoord2D.x*" << int(nOutputType>=0)+int(nDebugType>=0)+int(nInputType>=0)<< ",texCoord2DArrayIdx),texCoord2D.y,texCoord2DArrayIdx);\n"
              "    vec2 texCoord2D_dPdx = dFdx(texCoord3D.xy);\n"
              "    vec2 texCoord2D_dPdy = dFdy(texCoord3D.xy);\n";
     if(m_bUsingTexArrays) {
-        if(nOutputType>=0) { ssSrc <<
+        if(nInputType>=0) { ssSrc <<
              "    if(texCoord2DArrayIdx==0) {\n";
             if(GLUtils::getChannelsFromMatType(nInputType)==1) ssSrc <<
              "        out_color = vec4(textureGrad(texArrayInput,vec3(texCoord3D.xy,nCurrLayerIdx),texCoord2D_dPdx,texCoord2D_dPdy).xxx," << (m_bUsingIntegralFormat?"255":"1") << ");\n";
@@ -433,7 +439,7 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
              "    }\n";
         }
         if(nDebugType>=0) { ssSrc <<
-             "    " << (nOutputType>=0?"else if":"if") << "(texCoord2DArrayIdx==" << int(nOutputType>=0) << ") {\n";
+             "    " << (nInputType>=0?"else if":"if") << "(texCoord2DArrayIdx==" << int(nInputType>=0) << ") {\n";
             if(GLUtils::getChannelsFromMatType(nDebugType)==1) ssSrc <<
              "        out_color = vec4(textureGrad(texArrayDebug,vec3(texCoord3D.xy,nCurrLayerIdx),texCoord2D_dPdx,texCoord2D_dPdy).xxx," << (m_bUsingIntegralFormat?"255":"1") << ");\n";
             else ssSrc <<
@@ -442,7 +448,7 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
              "    }\n";
         }
         if(nOutputType>=0) { ssSrc <<
-             "    " << ((nOutputType>=0||nDebugType>=0)?"else if":"if") << "(texCoord2DArrayIdx==" << int(nOutputType>=0)+int(nDebugType>=0) << ") {\n";
+             "    " << ((nInputType>=0||nDebugType>=0)?"else if":"if") << "(texCoord2DArrayIdx==" << int(nInputType>=0)+int(nDebugType>=0) << ") {\n";
             if(GLUtils::getChannelsFromMatType(nOutputType)==1) ssSrc <<
              "        out_color = vec4(textureGrad(texArrayOutput,vec3(texCoord3D.xy,nCurrLayerIdx),texCoord2D_dPdx,texCoord2D_dPdy).xxx," << (m_bUsingIntegralFormat?"255":"1") << ");\n";
             else ssSrc <<
@@ -451,12 +457,12 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
              "    }\n";
         }
         ssSrc <<
-             "    " << ((nOutputType>=0||nDebugType>=0||nOutputType>=0)?"else {":"{") << "\n"
+             "    " << ((nInputType>=0||nDebugType>=0||nOutputType>=0)?"else {":"{") << "\n"
              "        out_color = vec4(" << (m_bUsingIntegralFormat?"255":"1") << ");\n"
              "    }\n";
     }
     else {
-        if(nOutputType>=0) { ssSrc <<
+        if(nInputType>=0) { ssSrc <<
              "    if(texCoord2DArrayIdx==0) {\n";
             for(size_t nLayerIter=0; nLayerIter<GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT; ++nLayerIter) { ssSrc <<
              "        " << ((nLayerIter>0)?"else if":"if") << "(nCurrLayerIdx==" << nLayerIter << ") {\n";
@@ -474,7 +480,7 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
              "    }\n";
         }
         if(nDebugType>=0) { ssSrc <<
-             "    " << (nOutputType>=0?"else if":"if") << "(texCoord2DArrayIdx==" << int(nOutputType>=0) << ") {\n";
+             "    " << (nInputType>=0?"else if":"if") << "(texCoord2DArrayIdx==" << int(nInputType>=0) << ") {\n";
             for(size_t nLayerIter=0; nLayerIter<GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT; ++nLayerIter) { ssSrc <<
              "        " << ((nLayerIter>0)?"else if":"if") << "(nCurrLayerIdx==" << nLayerIter << ") {\n";
                 if(GLUtils::getChannelsFromMatType(nDebugType)==1) ssSrc <<
@@ -491,7 +497,7 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
              "    }\n";
         }
         if(nOutputType>=0) { ssSrc <<
-             "    " << ((nOutputType>=0||nDebugType>=0)?"else if":"if") << "(texCoord2DArrayIdx==" << int(nOutputType>=0)+int(nDebugType>=0) << ") {\n";
+             "    " << ((nInputType>=0||nDebugType>=0)?"else if":"if") << "(texCoord2DArrayIdx==" << int(nInputType>=0)+int(nDebugType>=0) << ") {\n";
             for(size_t nLayerIter=0; nLayerIter<GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT; ++nLayerIter) { ssSrc <<
              "        " << ((nLayerIter>0)?"else if":"if") << "(nCurrLayerIdx==" << nLayerIter << ") {\n";
                 if(GLUtils::getChannelsFromMatType(nOutputType)==1) ssSrc <<
@@ -508,7 +514,7 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
              "    }\n";
         }
         ssSrc <<
-             "    " << ((nOutputType>=0||nDebugType>=0||nOutputType>=0)?"else {":"{") << "\n"
+             "    " << ((nInputType>=0||nDebugType>=0||nOutputType>=0)?"else {":"{") << "\n"
              "        out_color = vec4(" << (m_bUsingIntegralFormat?"255":"1") << ");\n"
              "    }\n";
     }
@@ -790,7 +796,7 @@ BinaryMedianFilter::BinaryMedianFilter( size_t nKernelSize, size_t nBorderSize, 
         ,m_nBorderSize(nBorderSize) {
     glAssert((m_nKernelSize%2)==1 && m_nKernelSize>1 && m_nKernelSize<m_oFrameSize.width && m_nKernelSize<m_oFrameSize.height);
     glAssert(m_nBorderSize<(m_oFrameSize.width-m_nKernelSize) && m_nBorderSize<(m_oFrameSize.height-m_nKernelSize));
-    int nMaxComputeInvocs;@@@@
+    int nMaxComputeInvocs;@@@@ already checked?
     glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS,&nMaxComputeInvocs);
     const size_t nCurrComputeStageInvocs = m_vDefaultWorkGroupSize.x*m_vDefaultWorkGroupSize.y;
     glAssert(nCurrComputeStageInvocs>0 && nCurrComputeStageInvocs<nMaxComputeInvocs);
@@ -843,11 +849,7 @@ BinaryMedianFilter::BinaryMedianFilter( size_t nKernelSize, size_t nBorderSize, 
              "layout(binding=" << GLImageProcAlgo::eImage_OutputBinding << ") writeonly uniform uimage2D imgOutput;\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "void main() {\n"
-            // @@@@@@@@@@ could also benefit from shared mem, fetch area sums in and around local work group
-            @@@@@@@@@@@@
-            @@@ note @@@ see compute programming model, https://www.khronos.org/files/opengl44-quick-reference-card.pdf
-            @@@ note @@@  ----> global invoc id == pixel location (with inverted y axis?)
-            @@@@@@@@@@@@
+            // @@@@@@@@@@ could also benefit from shared mem, fetch area sums in and around local workgroup
              "    ivec2 center = ivec2(gl_GlobalInvocationID.xy);\n"
              "    // area sum = D - C - B + A\n"
              "    ivec2 D = min(center+ivec2(radius),ivec2(imgWidth-1,imgHeight-1));\n"
