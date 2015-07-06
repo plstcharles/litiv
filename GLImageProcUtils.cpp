@@ -253,8 +253,6 @@ void GLImageProcAlgo::apply(const cv::Mat& oNextInput, bool bRebindAll) {
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getCurrTextureLayerUniformName(),m_nCurrLayer);
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getLastTextureLayerUniformName(),m_nLastLayer);
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getFrameIndexUniformName(),m_nInternalFrameIdx);
-        if(nCurrStageIter>0)
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // add barrier for acbo? ssbo? @@@@@
         dispatch(nCurrStageIter,*m_vpImgProcShaders[nCurrStageIter]); // add timer for stage? can reuse the same @@@@@@@@@@@@@@@
     }
     if(m_bUsingTimers)
@@ -718,8 +716,6 @@ void GLEvaluatorAlgo::apply(const cv::Mat& oNextGT, bool bRebindAll) {
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getCurrTextureLayerUniformName(),m_nCurrLayer);
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getLastTextureLayerUniformName(),m_nLastLayer);
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getFrameIndexUniformName(),m_nInternalFrameIdx);
-        if(nCurrStageIter>0)
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // add barrier for acbo? ssbo? @@@@@
         dispatch(nCurrStageIter,*m_vpImgProcShaders[nCurrStageIter]);
     }
     if(m_bUsingInputPBOs) {
@@ -873,6 +869,8 @@ std::string BinaryMedianFilter::getComputeShaderSource(size_t nStage) const {
 
 void BinaryMedianFilter::dispatchCompute(size_t nStage, GLShader*) {
     glAssert(nStage<m_nComputeStages);
+    if(nCurrStageIter>0)
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // add barrier for acbo? ssbo? @@@@@
     glDispatchCompute(m_vvComputeShaderDispatchSizes[nStage].x,m_vvComputeShaderDispatchSizes[nStage].y,m_vvComputeShaderDispatchSizes[nStage].z);
 }
 

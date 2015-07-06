@@ -82,6 +82,8 @@ namespace ComputeShaderUtils {
     std::string getComputeShaderSource_ParallelPrefixSum(size_t nMaxRowSize, bool bBinaryProc, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding);
     std::string getComputeShaderSource_ParallelPrefixSum_BlockMerge(size_t nColumns, size_t nMaxRowSize, size_t nRows, GLenum eInternalFormat, GLuint nImageBinding);
     std::string getComputeShaderSource_Transpose(size_t nBlockSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding);
+    std::string getComputeShaderFunctionSource_SharedDataPreLoad(size_t nChannels, const glm::uvec2& vWorkGroupSize, size_t nExternalBorderSize);
+    std::string getComputeShaderFunctionSource_BinaryMedianBlur(size_t nKernelSize, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize);
 }; // namespace ComputeShaderUtils
 
 namespace GLSLFunctionUtils {

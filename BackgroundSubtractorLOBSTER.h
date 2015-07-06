@@ -18,10 +18,11 @@
 #define BGSLOBSTER_DEFAULT_LEARNING_RATE (16)
 
 #if HAVE_GLSL
-#define BGSLOBSTER_GLSL_DEBUG       0
-#define BGSLOBSTER_GLSL_TIMERS      0
-#define BGSLOBSTER_GLSL_BASIC       0
-#define BGSLOBSTER_GLSL_SHAREDLBSP  1
+#define BGSLOBSTER_GLSL_USE_DEBUG      0
+#define BGSLOBSTER_GLSL_USE_TIMERS     0
+#define BGSLOBSTER_GLSL_USE_BASIC_IMPL 0
+#define BGSLOBSTER_GLSL_USE_SHAREDMEM  1
+#define BGSLOBSTER_GLSL_USE_POSTPROC   1
 #endif //HAVE_GLSL
 
 /*!
@@ -106,6 +107,9 @@ protected:
         eLOBSTERStorageBufferBindingsCount
     };
     virtual void dispatch(size_t nStage, GLShader& oShader);
+private:
+    std::string getComputeShaderSource_LOBSTER() const;
+    std::string getComputeShaderSource_PostProc() const;
 #endif //HAVE_GLSL
 };
 

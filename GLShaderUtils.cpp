@@ -818,6 +818,96 @@ std::string ComputeShaderUtils::getComputeShaderSource_Transpose(size_t nBlockSi
     return ssSrc.str();
 }
 
+std::string ComputeShaderUtils::getComputeShaderFunctionSource_SharedDataPreLoad(size_t nChannels, const glm::uvec2& vWorkGroupSize, size_t nExternalBorderSize) {
+    glAssert(nChannels==4 || nChannels==1);
+    glAssert(vWorkGroupSize.x>3 && vWorkGroupSize.y>3);
+    std::stringstream ssSrc;
+    ssSrc << "shared uvec4 avPreloadData[" << vWorkGroupSize.y+nExternalBorderSize*2 << "][" << vWorkGroupSize.x+nExternalBorderSize*2 << "];\n"
+             "shared uint anQuadrantLockstep[4];\n"
+             "uint preload_data(in layout(" << (nChannels==4?"rgba8ui":"r8ui") << ") readonly uimage2D mData) {\n"
+             "    ivec2 vInvocCoord = ivec2(gl_GlobalInvocationID.xy);\n";
+    if(nExternalBorderSize>0) ssSrc <<
+             "    const uint nExternalBorderSize = " << nExternalBorderSize << ";\n"
+             "    const uvec2 vWorkGroupSize = uvec2(" << vWorkGroupSize.x << "," << vWorkGroupSize.y << ");\n"
+             "    const float fVar = float(vWorkGroupSize.y)/vWorkGroupSize.x;\n"
+             "    avPreloadData[nExternalBorderSize+gl_LocalInvocationID.y][nExternalBorderSize+gl_LocalInvocationID.x] = imageLoad(mData,vInvocCoord);\n"
+             "    uint nQuadID, nQuadExtRowLength;\n"
+             "    ivec2 vQuadExtStartCoord, vQuadExtVarRowLength, vQuadExtVarRow;\n"
+             "    ivec2 vWorkGroupStartCoord = ivec2(gl_GlobalInvocationID.xy)-ivec2(gl_LocalInvocationID.xy);\n"
+             "    if(int(gl_LocalInvocationID.x*fVar)>gl_LocalInvocationID.y && (vWorkGroupSize.y-int(fVar*gl_LocalInvocationID.x))<=gl_LocalInvocationID.y) {\n"
+             "        nQuadID = 1;\n"
+             "        nQuadExtRowLength = vWorkGroupSize.y+nExternalBorderSize;\n"
+             "        vQuadExtStartCoord = vWorkGroupStartCoord+ivec2(vWorkGroupSize.x+nExternalBorderSize-1,-nExternalBorderSize);\n"
+             "        vQuadExtVarRowLength = ivec2(0,1);\n"
+             "        vQuadExtVarRow = ivec2(-1,0);\n"
+             "    }\n"
+             "    else if(int(gl_LocalInvocationID.x*fVar)<gl_LocalInvocationID.y && (vWorkGroupSize.y-int(fVar*gl_LocalInvocationID.x))>=gl_LocalInvocationID.y) {\n"
+             "        nQuadID = 2;\n"
+             "        nQuadExtRowLength = vWorkGroupSize.y+nExternalBorderSize;\n"
+             "        vQuadExtStartCoord = vWorkGroupStartCoord+ivec2(-nExternalBorderSize,vWorkGroupSize.y+nExternalBorderSize-1);\n"
+             "        vQuadExtVarRowLength = ivec2(0,-1);\n"
+             "        vQuadExtVarRow = ivec2(1,0);\n"
+             "    }\n"
+             "    else if(int(gl_LocalInvocationID.x*fVar)>=gl_LocalInvocationID.y && (vWorkGroupSize.y-int(fVar*gl_LocalInvocationID.x))>gl_LocalInvocationID.y) {\n"
+             "        nQuadID = 0;\n"
+             "        nQuadExtRowLength = vWorkGroupSize.x+nExternalBorderSize;\n"
+             "        vQuadExtStartCoord = vWorkGroupStartCoord+ivec2(-nExternalBorderSize);\n"
+             "        vQuadExtVarRowLength = ivec2(1,0);\n"
+             "        vQuadExtVarRow = ivec2(0,1);\n"
+             "    }\n"
+             "    else { //if(int(gl_LocalInvocationID.x*fVar)<=gl_LocalInvocationID.y && (vWorkGroupSize.y-int(fVar*gl_LocalInvocationID.x))<gl_LocalInvocationID.y) {\n"
+             "        nQuadID = 3;\n"
+             "        nQuadExtRowLength = vWorkGroupSize.x+nExternalBorderSize;\n"
+             "        vQuadExtStartCoord = vWorkGroupStartCoord+ivec2(vWorkGroupSize.x+nExternalBorderSize-1,vWorkGroupSize.y+nExternalBorderSize-1);\n"
+             "        vQuadExtVarRowLength = ivec2(-1,0);\n"
+             "        vQuadExtVarRow = ivec2(0,-1);\n"
+             "    }\n"
+             "    anQuadrantLockstep[nQuadID] = 0;\n"
+             "    barrier();\n"
+             "    uint nLockstep = atomicAdd(anQuadrantLockstep[nQuadID],1);\n"
+             "    while(nLockstep<nQuadExtRowLength*nExternalBorderSize) {\n"
+             "        ivec2 vCurrQuadExtRowStartCoord = vQuadExtStartCoord + vQuadExtVarRow*int(nLockstep/nQuadExtRowLength);\n"
+             "        ivec2 vCurrQuadExtCoord = vCurrQuadExtRowStartCoord + vQuadExtVarRowLength*int(mod(nLockstep,nQuadExtRowLength));\n"
+             "        avPreloadData[vCurrQuadExtCoord.y-vWorkGroupStartCoord.y+nExternalBorderSize][vCurrQuadExtCoord.x-vWorkGroupStartCoord.x+nExternalBorderSize] = imageLoad(mData,vCurrQuadExtCoord);\n"
+             "        nLockstep = atomicAdd(anQuadrantLockstep[nQuadID],1);\n"
+             "    }\n"
+             "    return nQuadID;\n";
+    else ssSrc << //nExternalBorderSize==0
+             "    avPreloadData[gl_LocalInvocationID.y][gl_LocalInvocationID.x] = imageLoad(mData,vInvocCoord);\n"
+             "    return 0;\n";
+    ssSrc << "}\n";
+    return ssSrc.str();
+}
+
+std::string ComputeShaderUtils::getComputeShaderFunctionSource_BinaryMedianBlur(size_t nKernelSize, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize) {
+    std::stringstream ssSrc;
+    if(!bUseSharedDataPreload) ssSrc <<
+             "uint BinaryMedianBlur(in layout(r8ui) readonly uimage2D mData, in ivec2 vCoords) {\n"
+             "    const int nKernelSize = " << nKernelSize << ";\n"
+             "    const int nHalfKernelSize = nKernelSize/2;\n"
+             "    uint nPositiveCount = 0;\n"
+             "    for(int y=-nHalfKernelSize; y<=nHalfKernelSize; ++y)\n"
+             "        for(int x=-nHalfKernelSize; x<=nHalfKernelSize; ++x)\n"
+             "            nPositiveCount += uint(imageLoad(mData,vCoords+ivec2(x,y)).r>128);\n"
+             "    const uint nMajorityCount = uint(nKernelSize*nKernelSize)/2;\n"
+             "    return uint(nPositiveCount>nMajorityCount)*255;"
+             "}\n";
+    else ssSrc <<
+             ComputeShaderUtils::getComputeShaderFunctionSource_SharedDataPreLoad(1,vWorkGroupSize,nKernelSize/2) <<
+             "uint BinaryMedianBlur(in ivec2 vCoords) {\n"
+             "    const int nKernelSize = " << nKernelSize << ";\n"
+             "    const int nHalfKernelSize = nKernelSize/2;\n"
+             "    uint nPositiveCount = 0;\n"
+             "    ivec2 vLocalCoords = vCoords-ivec2(gl_GlobalInvocationID.xy)+ivec2(gl_LocalInvocationID.xy)+ivec2(nHalfKernelSize);\n"
+             "    for(int y=-nHalfKernelSize; y<=nHalfKernelSize; ++y)\n"
+             "        for(int x=-nHalfKernelSize; x<=nHalfKernelSize; ++x)\n"
+             "            nPositiveCount += uint(avPreloadData[vLocalCoords.y+y][vLocalCoords.x+x].r>128);\n"
+             "    const uint nMajorityCount = uint(nKernelSize*nKernelSize)/2;\n"
+             "    return uint(nPositiveCount>nMajorityCount)*255;"
+             "}\n";
+    return ssSrc.str();
+}
+
 std::string GLSLFunctionUtils::getShaderFunctionSource_absdiff(bool bUseBuiltinDistance) {
     std::stringstream ssSrc;
     ssSrc << "uvec3 absdiff(in uvec3 a, in uvec3 b) {\n"

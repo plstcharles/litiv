@@ -121,8 +121,7 @@ public:
     static const size_t DESC_SIZE = 2;
 #if HAVE_GLSL
     //! utility function, returns the glsl source code required to describe an LBSP descriptor based on the image load store
-    static std::string getShaderFunctionSource(size_t nChannels);
-    static std::string getShaderFunctionSource_SharedDataPreload(size_t nChannels, const glm::uvec2& vWorkGroupSize);
+    static std::string getShaderFunctionSource(size_t nChannels, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize);
 #endif //HAVE_GLSL
 
 protected:

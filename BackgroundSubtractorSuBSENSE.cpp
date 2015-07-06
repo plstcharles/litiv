@@ -200,20 +200,20 @@ void BackgroundSubtractorSuBSENSE::refreshModel(float fSamplesRefreshFrac, bool 
     // == refresh
     CV_Assert(m_bInitialized && m_bModelInitialized);
     CV_Assert(fSamplesRefreshFrac>0.0f && fSamplesRefreshFrac<=1.0f);
-    const size_t nModelsToRefresh = fSamplesRefreshFrac<1.0f?(size_t)(fSamplesRefreshFrac*m_nBGSamples):m_nBGSamples;
-    const size_t nRefreshStartPos = fSamplesRefreshFrac<1.0f?rand()%m_nBGSamples:0;
+    const size_t nModelSamplesToRefresh = fSamplesRefreshFrac<1.0f?(size_t)(fSamplesRefreshFrac*m_nBGSamples):m_nBGSamples;
+    const size_t nRefreshSampleStartPos = fSamplesRefreshFrac<1.0f?rand()%m_nBGSamples:0;
     if(m_nImgChannels==1) {
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
             const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
             if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
-                for(size_t nCurrModelIdx=nRefreshStartPos; nCurrModelIdx<nRefreshStartPos+nModelsToRefresh; ++nCurrModelIdx) {
+                for(size_t nCurrModelSampleIdx=nRefreshSampleStartPos; nCurrModelSampleIdx<nRefreshSampleStartPos+nModelSamplesToRefresh; ++nCurrModelSampleIdx) {
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
                     getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                     if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
-                        const size_t nCurrRealModelIdx = nCurrModelIdx%m_nBGSamples;
-                        m_voBGColorSamples[nCurrRealModelIdx].data[nPxIter] = m_oLastColorFrame.data[nSamplePxIdx];
-                        *((ushort*)(m_voBGDescSamples[nCurrRealModelIdx].data+nPxIter*2)) = *((ushort*)(m_oLastDescFrame.data+nSamplePxIdx*2));
+                        const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
+                        m_voBGColorSamples[nCurrRealModelSampleIdx].data[nPxIter] = m_oLastColorFrame.data[nSamplePxIdx];
+                        *((ushort*)(m_voBGDescSamples[nCurrRealModelSampleIdx].data+nPxIter*2)) = *((ushort*)(m_oLastDescFrame.data+nSamplePxIdx*2));
                     }
                 }
             }
@@ -223,15 +223,15 @@ void BackgroundSubtractorSuBSENSE::refreshModel(float fSamplesRefreshFrac, bool 
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
             const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
             if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
-                for(size_t nCurrModelIdx=nRefreshStartPos; nCurrModelIdx<nRefreshStartPos+nModelsToRefresh; ++nCurrModelIdx) {
+                for(size_t nCurrModelSampleIdx=nRefreshSampleStartPos; nCurrModelSampleIdx<nRefreshSampleStartPos+nModelSamplesToRefresh; ++nCurrModelSampleIdx) {
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
                     getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                     if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
-                        const size_t nCurrRealModelIdx = nCurrModelIdx%m_nBGSamples;
+                        const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
                         for(size_t c=0; c<3; ++c) {
-                            m_voBGColorSamples[nCurrRealModelIdx].data[nPxIter*3+c] = m_oLastColorFrame.data[nSamplePxIdx*3+c];
-                            *((ushort*)(m_voBGDescSamples[nCurrRealModelIdx].data+(nPxIter*3+c)*2)) = *((ushort*)(m_oLastDescFrame.data+(nSamplePxIdx*3+c)*2));
+                            m_voBGColorSamples[nCurrRealModelSampleIdx].data[nPxIter*3+c] = m_oLastColorFrame.data[nSamplePxIdx*3+c];
+                            *((ushort*)(m_voBGDescSamples[nCurrRealModelSampleIdx].data+(nPxIter*3+c)*2)) = *((ushort*)(m_oLastDescFrame.data+(nSamplePxIdx*3+c)*2));
                         }
                     }
                 }
