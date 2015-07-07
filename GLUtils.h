@@ -28,8 +28,8 @@
     #define __PRETTY_FUNCTION__ __FUNCSIG__
 #endif
 
-#define glError(msg) throw GLUtils::GLException(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__)
-#define glErrorExt(msg,...) throw GLUtils::GLException(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
+#define glError(msg) throw GLException(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__)
+#define glErrorExt(msg,...) throw GLException(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
 #define glAssert(expr) {if(!!(expr)); else glError("assertion failed ("#expr")");}
 #define glErrorCheck { \
     GLenum __errn = glGetError(); \
@@ -55,17 +55,17 @@
 #define glDbgErrorCheck
 #endif
 
-namespace GLUtils {
+class GLException : public std::runtime_error {
+public:
+    template<typename... VALIST> GLException(const char* sErrMsg, const char* sFunc, const char* sFile, int nLine, VALIST... vArgs) : std::runtime_error(cv::format((std::string("GLException in function '%s' from %s(%d) : \n")+sErrMsg).c_str(),sFunc,sFile,nLine,vArgs...)), m_eErrn(GL_NO_ERROR), m_acErrMsg(sErrMsg), m_acFuncName(sFunc), m_acFileName(sFile), m_nLineNumber(nLine) {};
+    const GLenum m_eErrn;
+    const char* const m_acErrMsg;
+    const char* const m_acFuncName;
+    const char* const m_acFileName;
+    const int m_nLineNumber;
+};
 
-    class GLException : public std::runtime_error {
-    public:
-        template<typename... VALIST> GLException(const char* sErrMsg, const char* sFunc, const char* sFile, int nLine, VALIST... vArgs) : std::runtime_error(cv::format((std::string("GLException in function '%s' from %s(%d) : \n")+sErrMsg).c_str(),sFunc,sFile,nLine,vArgs...)), m_eErrn(GL_NO_ERROR), m_acErrMsg(sErrMsg), m_acFuncName(sFunc), m_acFileName(sFile), m_nLineNumber(nLine) {};
-        const GLenum m_eErrn;
-        const char* const m_acErrMsg;
-        const char* const m_acFuncName;
-        const char* const m_acFileName;
-        const int m_nLineNumber;
-    };
+namespace GLUtils {
 
     static inline bool isInternalFormatSupported(GLenum eInternalFormat) {
         switch(eInternalFormat) {

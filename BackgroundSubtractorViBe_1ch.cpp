@@ -21,7 +21,7 @@ void BackgroundSubtractorViBe_1ch::initialize(const cv::Mat& oInitImg) {
         for(int y_orig=0; y_orig<m_oImgSize.height; y_orig++) {
             for(int x_orig=0; x_orig<m_oImgSize.width; x_orig++) {
                 int y_sample, x_sample;
-                getRandSamplePosition(x_sample,y_sample,x_orig,y_orig,0,m_oImgSize);
+                RandUtils::getRandSamplePosition(x_sample,y_sample,x_orig,y_orig,0,m_oImgSize);
                 m_voBGImg[s].at<uchar>(y_orig,x_orig) = oInitImg.at<uchar>(y_sample,x_sample);
             }
         }
@@ -43,7 +43,7 @@ void BackgroundSubtractorViBe_1ch::apply(cv::InputArray _image, cv::OutputArray 
         for(int x=0; x<m_oImgSize.width; x++) {
             size_t nGoodSamplesCount=0, nSampleIdx=0;
             while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
-                if(L1dist(oInputImg.at<uchar>(y,x),m_voBGImg[nSampleIdx].at<uchar>(y,x))<m_nColorDistThreshold)
+                if(DistanceUtils::L1dist(oInputImg.at<uchar>(y,x),m_voBGImg[nSampleIdx].at<uchar>(y,x))<m_nColorDistThreshold)
                     nGoodSamplesCount++;
                 nSampleIdx++;
             }
@@ -54,7 +54,7 @@ void BackgroundSubtractorViBe_1ch::apply(cv::InputArray _image, cv::OutputArray 
                     m_voBGImg[rand()%m_nBGSamples].at<uchar>(y,x)=oInputImg.at<uchar>(y,x);
                 if((rand()%nLearningRate)==0) {
                     int x_rand,y_rand;
-                    getRandNeighborPosition_3x3(x_rand,y_rand,x,y,0,m_oImgSize);
+                    RandUtils::getRandNeighborPosition_3x3(x_rand,y_rand,x,y,0,m_oImgSize);
                     m_voBGImg[rand()%m_nBGSamples].at<uchar>(y_rand,x_rand) = oInputImg.at<uchar>(y,x);
                 }
             }

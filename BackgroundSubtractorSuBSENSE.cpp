@@ -1,5 +1,4 @@
 #include "BackgroundSubtractorSuBSENSE.h"
-#include "RandUtils.h"
 #include <iostream>
 #include <iomanip>
 #include <opencv2/imgproc.hpp>
@@ -208,7 +207,7 @@ void BackgroundSubtractorSuBSENSE::refreshModel(float fSamplesRefreshFrac, bool 
             if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
                 for(size_t nCurrModelSampleIdx=nRefreshSampleStartPos; nCurrModelSampleIdx<nRefreshSampleStartPos+nModelSamplesToRefresh; ++nCurrModelSampleIdx) {
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    RandUtils::getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                     if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
                         const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
@@ -225,7 +224,7 @@ void BackgroundSubtractorSuBSENSE::refreshModel(float fSamplesRefreshFrac, bool 
             if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
                 for(size_t nCurrModelSampleIdx=nRefreshSampleStartPos; nCurrModelSampleIdx<nRefreshSampleStartPos+nModelSamplesToRefresh; ++nCurrModelSampleIdx) {
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    RandUtils::getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                     if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
                         const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
@@ -283,13 +282,13 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
             while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
                 const uchar& nBGColor = m_voBGColorSamples[nSampleIdx].data[nPxIter];
                 {
-                    const size_t nColorDist = L1dist(nCurrColor,nBGColor);
+                    const size_t nColorDist = DistanceUtils::L1dist(nCurrColor,nBGColor);
                     if(nColorDist>nCurrColorDistThreshold)
                         goto failedcheck1ch;
                     const ushort& nBGIntraDesc = *((ushort*)(m_voBGDescSamples[nSampleIdx].data+nDescIter));
-                    const size_t nIntraDescDist = hdist(nCurrIntraDesc,nBGIntraDesc);
+                    const size_t nIntraDescDist = DistanceUtils::hdist(nCurrIntraDesc,nBGIntraDesc);
                     LBSP::computeGrayscaleDescriptor(oInputImg,nBGColor,nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[nBGColor],nCurrInterDesc);
-                    const size_t nInterDescDist = hdist(nCurrInterDesc,nBGIntraDesc);
+                    const size_t nInterDescDist = DistanceUtils::hdist(nCurrInterDesc,nBGIntraDesc);
                     const size_t nDescDist = (nIntraDescDist+nInterDescDist)/2;
                     if(nDescDist>nCurrDescDistThreshold)
                         goto failedcheck1ch;
@@ -305,7 +304,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                 failedcheck1ch:
                 nSampleIdx++;
             }
-            const float fNormalizedLastDist = ((float)L1dist(nLastColor,nCurrColor)/s_nColorMaxDataRange_1ch+(float)hdist(nLastIntraDesc,nCurrIntraDesc)/s_nDescMaxDataRange_1ch)/2;
+            const float fNormalizedLastDist = ((float)DistanceUtils::L1dist(nLastColor,nCurrColor)/s_nColorMaxDataRange_1ch+(float)DistanceUtils::hdist(nLastIntraDesc,nCurrIntraDesc)/s_nDescMaxDataRange_1ch)/2;
             *pfCurrMeanLastDist = (*pfCurrMeanLastDist)*(1.0f-fRollAvgFactor_ST) + fNormalizedLastDist*fRollAvgFactor_ST;
             if(nGoodSamplesCount<m_nRequiredBGSamples) {
                 // == foreground
@@ -337,9 +336,9 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                 int nSampleImgCoord_Y, nSampleImgCoord_X;
                 const bool bCurrUsing3x3Spread = m_bUse3x3Spread && !m_oUnstableRegionMask.data[nPxIter];
                 if(bCurrUsing3x3Spread)
-                    getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    RandUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 else
-                    getRandNeighborPosition_5x5(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    RandUtils::getRandNeighborPosition_5x5(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 const size_t n_rand = rand();
                 const size_t idx_rand_uchar = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                 const size_t idx_rand_flt32 = idx_rand_uchar*4;
@@ -377,7 +376,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                 if((*pfCurrDistThresholdFactor)<1.0f)
                     (*pfCurrDistThresholdFactor) = 1.0f;
             }
-            if(popcount(nCurrIntraDesc)>=2)
+            if(DistanceUtils::popcount(nCurrIntraDesc)>=2)
                 ++nNonZeroDescCount;
             nLastIntraDesc = nCurrIntraDesc;
             nLastColor = nCurrColor;
@@ -422,12 +421,12 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                 size_t nTotDescDist = 0;
                 size_t nTotSumDist = 0;
                 for(size_t c=0;c<3; ++c) {
-                    const size_t nColorDist = L1dist(anCurrColor[c],anBGColor[c]);
+                    const size_t nColorDist = DistanceUtils::L1dist(anCurrColor[c],anBGColor[c]);
                     if(nColorDist>nCurrSCColorDistThreshold)
                         goto failedcheck3ch;
-                    const size_t nIntraDescDist = hdist(anCurrIntraDesc[c],anBGIntraDesc[c]);
+                    const size_t nIntraDescDist = DistanceUtils::hdist(anCurrIntraDesc[c],anBGIntraDesc[c]);
                     LBSP::computeSingleRGBDescriptor(oInputImg,anBGColor[c],nCurrImgCoord_X,nCurrImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[anBGColor[c]],anCurrInterDesc[c]);
-                    const size_t nInterDescDist = hdist(anCurrInterDesc[c],anBGIntraDesc[c]);
+                    const size_t nInterDescDist = DistanceUtils::hdist(anCurrInterDesc[c],anBGIntraDesc[c]);
                     const size_t nDescDist = (nIntraDescDist+nInterDescDist)/2;
                     const size_t nSumDist = std::min((nDescDist/2)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch);
                     if(nSumDist>nCurrSCColorDistThreshold)
@@ -445,7 +444,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                 failedcheck3ch:
                 nSampleIdx++;
             }
-            const float fNormalizedLastDist = ((float)L1dist<3>(anLastColor,anCurrColor)/s_nColorMaxDataRange_3ch+(float)hdist<3>(anLastIntraDesc,anCurrIntraDesc)/s_nDescMaxDataRange_3ch)/2;
+            const float fNormalizedLastDist = ((float)DistanceUtils::L1dist<3>(anLastColor,anCurrColor)/s_nColorMaxDataRange_3ch+(float)DistanceUtils::hdist<3>(anLastIntraDesc,anCurrIntraDesc)/s_nDescMaxDataRange_3ch)/2;
             *pfCurrMeanLastDist = (*pfCurrMeanLastDist)*(1.0f-fRollAvgFactor_ST) + fNormalizedLastDist*fRollAvgFactor_ST;
             if(nGoodSamplesCount<m_nRequiredBGSamples) {
                 // == foreground
@@ -481,9 +480,9 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                 int nSampleImgCoord_Y, nSampleImgCoord_X;
                 const bool bCurrUsing3x3Spread = m_bUse3x3Spread && !m_oUnstableRegionMask.data[nPxIter];
                 if(bCurrUsing3x3Spread)
-                    getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    RandUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 else
-                    getRandNeighborPosition_5x5(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    RandUtils::getRandNeighborPosition_5x5(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 const size_t n_rand = rand();
                 const size_t idx_rand_uchar = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                 const size_t idx_rand_flt32 = idx_rand_uchar*4;
@@ -524,7 +523,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                 if((*pfCurrDistThresholdFactor)<1.0f)
                     (*pfCurrDistThresholdFactor) = 1.0f;
             }
-            if(popcount<3>(anCurrIntraDesc)>=4)
+            if(DistanceUtils::popcount<3>(anCurrIntraDesc)>=4)
                 ++nNonZeroDescCount;
             for(size_t c=0; c<3; ++c) {
                 anLastIntraDesc[c] = anCurrIntraDesc[c];

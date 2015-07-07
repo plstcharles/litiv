@@ -58,7 +58,7 @@ GLuint GLShader::addSource(const std::string& sSource, GLenum eType) {
         const char* acSourcePtr = sSource.c_str();
         glShaderSource(shaderID,1,&acSourcePtr,nullptr);
         glErrorCheck;
-    } catch(const GLUtils::GLException&) {
+    } catch(const GLException&) {
         glDeleteShader(shaderID);
         throw;
     }
@@ -235,12 +235,10 @@ GLint GLShader::getUniformLocFromName(const std::string& sName) {
     return oFindRes->second;
 }
 
-std::string GLShader::getPassThroughVertexShaderSource(bool bPassNormals, bool bPassColors, bool bPassTexCoords) {
+std::string GLShader::getVertexShaderSource_PassThrough(bool bPassNormals, bool bPassColors, bool bPassTexCoords) {
     std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "#version 430\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(location=" << GLVertex::eVertexAttrib_PositionIdx << ") in vec4 in_position;\n";
+    ssSrc << "#version 430\n"
+             "layout(location=" << GLVertex::eVertexAttrib_PositionIdx << ") in vec4 in_position;\n";
     if(bPassNormals) ssSrc <<
              "layout(location=" << GLVertex::eVertexAttrib_NormalIdx << ") in vec4 in_normal;\n"
              "layout(location=" << GLVertex::eVertexAttrib_NormalIdx << ") out vec4 out_normal;\n";
@@ -250,7 +248,6 @@ std::string GLShader::getPassThroughVertexShaderSource(bool bPassNormals, bool b
     if(bPassTexCoords) ssSrc <<
              "layout(location=" << GLVertex::eVertexAttrib_TexCoordIdx << ") in vec4 in_texCoord;\n"
              "layout(location=" << GLVertex::eVertexAttrib_TexCoordIdx << ") out vec4 out_texCoord;\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "void main() {\n"
              "    gl_Position = in_position;\n";
     if(bPassNormals) ssSrc <<
@@ -260,17 +257,14 @@ std::string GLShader::getPassThroughVertexShaderSource(bool bPassNormals, bool b
     if(bPassTexCoords) ssSrc <<
              "    out_texCoord = in_texCoord;\n";
     ssSrc << "}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-std::string GLShader::getPassThroughVertexShaderSource_ConstArray(GLuint nVertexCount, const GLVertex* aVertices, bool bPassNormals, bool bPassColors, bool bPassTexCoords) {
+std::string GLShader::getVertexShaderSource_PassThrough_ConstArray(GLuint nVertexCount, const GLVertex* aVertices, bool bPassNormals, bool bPassColors, bool bPassTexCoords) {
     glAssert(nVertexCount>0 && aVertices);
     std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "#version 430\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "const vec4 positions[" << nVertexCount << "] = vec4[" << nVertexCount << "](\n";
+    ssSrc << "#version 430\n"
+             "const vec4 positions[" << nVertexCount << "] = vec4[" << nVertexCount << "](\n";
     for(size_t nVertexIter=0; nVertexIter<nVertexCount; ++nVertexIter) ssSrc <<
                  "\tvec4(" << aVertices[nVertexIter].vPosition[0] << "," <<
                               aVertices[nVertexIter].vPosition[1] << "," <<
@@ -310,7 +304,6 @@ std::string GLShader::getPassThroughVertexShaderSource_ConstArray(GLuint nVertex
              ");\n"
              "layout(location=" << GLVertex::eVertexAttrib_TexCoordIdx << ") out vec4 out_texCoord;\n";
     }
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "void main() {\n"
              "    gl_Position = positions[gl_VertexID];\n";
     if(bPassNormals) ssSrc <<
@@ -320,71 +313,55 @@ std::string GLShader::getPassThroughVertexShaderSource_ConstArray(GLuint nVertex
     if(bPassTexCoords) ssSrc <<
              "    out_texCoord = texCoords[gl_VertexID];\n";
     ssSrc << "}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-std::string GLShader::getPassThroughFragmentShaderSource_ConstColor(glm::vec4 vColor) {
+std::string GLShader::getFragmentShaderSource_PassThrough_ConstColor(glm::vec4 vColor) {
     std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "#version 430\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(location=0) out vec4 out_color;\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "void main() {\n"
+    ssSrc << "#version 430\n"
+             "layout(location=0) out vec4 out_color;\n"
+             "void main() {\n"
              "    out_color = vec4(" << vColor[0] << "," <<
                                         vColor[1] << "," <<
                                         vColor[2] << "," <<
                                         vColor[3] << ");\n"
              "}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-std::string GLShader::getPassThroughFragmentShaderSource_PassedColor() {
+std::string GLShader::getFragmentShaderSource_PassThrough_PassedColor() {
     std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "#version 430\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(location=0) out vec4 out_color;\n"
-             "layout(location=" << GLVertex::eVertexAttrib_ColorIdx << ") in vec4 in_color;\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "void main() {\n"
+    ssSrc << "#version 430\n"
+             "layout(location=0) out vec4 out_color;\n"
+             "layout(location=" << GLVertex::eVertexAttrib_ColorIdx << ") in vec4 in_color;\n"
+             "void main() {\n"
              "    out_color = in_color\n"
              "}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-std::string GLShader::getPassThroughFragmentShaderSource_TexSampler2D(GLuint nSamplerBinding, bool bUseIntegralFormat) {
+std::string GLShader::getFragmentShaderSource_PassThrough_TexSampler2D(GLuint nSamplerBinding, bool bUseIntegralFormat) {
     std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "#version 430\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(location=0) out vec4 out_color;\n"
+    ssSrc << "#version 430\n"
+             "layout(location=0) out vec4 out_color;\n"
              "layout(location=" << GLVertex::eVertexAttrib_TexCoordIdx << ") in vec4 texCoord2D;\n"
-             "layout(binding=" << nSamplerBinding << ") uniform" << (bUseIntegralFormat?" u":" ") << "sampler2D texSampler2D;\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "void main() {\n"
+             "layout(binding=" << nSamplerBinding << ") uniform" << (bUseIntegralFormat?" u":" ") << "sampler2D texSampler2D;\n"
+             "void main() {\n"
              "    out_color = texture(texSampler2D,texCoord2D.xy);\n";
     if(bUseIntegralFormat) ssSrc <<
              "    out_color = out_color/255;\n";
     ssSrc << "}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-std::string GLShader::getPassThroughFragmentShaderSource_SxSTexSampler2D(const std::vector<GLuint>& vnSamplerBindings, GLint nTextureLayer, bool bUseIntegralFormat) {
+std::string GLShader::getFragmentShaderSource_PassThrough_SxSTexSampler2D(const std::vector<GLuint>& vnSamplerBindings, GLint nTextureLayer, bool bUseIntegralFormat) {
     glAssert(vnSamplerBindings.size()>1 && nTextureLayer>=0);
     std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "#version 430\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(location=0) out vec4 out_color;\n"
+    ssSrc << "#version 430\n"
+             "layout(location=0) out vec4 out_color;\n"
              "layout(location=" << GLVertex::eVertexAttrib_TexCoordIdx << ") in vec4 texCoord2D;\n";
     for(size_t nSamplerBindingIter=0; nSamplerBindingIter<vnSamplerBindings.size(); ++nSamplerBindingIter) ssSrc <<
              "layout(binding=" << vnSamplerBindings[nSamplerBindingIter] << ") uniform" << (bUseIntegralFormat?" u":" ") << "sampler2DArray texSampler2DArray" << nSamplerBindingIter << ";\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "void main() {\n"
              "    float texCoord2DArrayIdx = 1;\n"
              "    vec3 texCoord3D = vec3(modf(texCoord2D.x*texSampler2DArrayLayers,texCoord2DArrayIdx),texCoord2D.y,texCoord2DArrayIdx);\n";
@@ -400,56 +377,45 @@ std::string GLShader::getPassThroughFragmentShaderSource_SxSTexSampler2D(const s
     if(bUseIntegralFormat) ssSrc <<
              "    out_color = out_color/255;\n";
     ssSrc << "}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-std::string GLShader::getPassThroughFragmentShaderSource_SxSTexSampler2DArray(GLuint nSamplerBinding, GLint nTextureCount, bool bUseIntegralFormat) {
+std::string GLShader::getFragmentShaderSource_PassThrough_SxSTexSampler2DArray(GLuint nSamplerBinding, GLint nTextureCount, bool bUseIntegralFormat) {
     std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "#version 430\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(location=0) out vec4 out_color;\n"
+    ssSrc << "#version 430\n"
+             "layout(location=0) out vec4 out_color;\n"
              "layout(location=" << GLVertex::eVertexAttrib_TexCoordIdx << ") in vec4 texCoord2D;\n"
              "layout(binding=" << nSamplerBinding << ") uniform" << (bUseIntegralFormat?" u":" ") << "sampler2DArray texSampler2DArray;\n"
-             "const int texSampler2DArrayLayers = " << nTextureCount << ";\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "void main() {\n"
+             "const int texSampler2DArrayLayers = " << nTextureCount << ";\n"
+             "void main() {\n"
              "    float texCoord2DArrayIdx = 1;\n"
              "    vec3 texCoord3D = vec3(modf(texCoord2D.x*texSampler2DArrayLayers,texCoord2DArrayIdx),texCoord2D.y,texCoord2DArrayIdx);\n"
              "    out_color = texture(texSampler2DArray,texCoord3D);\n";
     if(bUseIntegralFormat) ssSrc <<
              "    out_color = out_color/255;\n";
     ssSrc << "}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
-std::string GLShader::getPassThroughFragmentShaderSource_TexelFetchSampler2D(bool bUseTopLeftFragCoordOrigin, GLuint nSamplerBinding, float fTextureLevel, bool bUseIntegralFormat) {
+std::string GLShader::getFragmentShaderSource_PassThrough_TexelFetchSampler2D(bool bUseTopLeftFragCoordOrigin, GLuint nSamplerBinding, float fTextureLevel, bool bUseIntegralFormat) {
     std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "#version 430\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(location=0) out vec4 out_color;\n";
+    ssSrc << "#version 430\n"
+             "layout(location=0) out vec4 out_color;\n";
     if(bUseTopLeftFragCoordOrigin) ssSrc <<
              "layout(origin_upper_left) in vec4 gl_FragCoord;\n";
-    ssSrc << "layout(binding=" << nSamplerBinding << ") uniform" << (bUseIntegralFormat?" u":" ") << "sampler2D texSampler2D;\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "void main() {\n"
+    ssSrc << "layout(binding=" << nSamplerBinding << ") uniform" << (bUseIntegralFormat?" u":" ") << "sampler2D texSampler2D;\n"
+             "void main() {\n"
              "    ivec2 imgCoord = ivec2(gl_FragCoord.xy);\n"
              "    out_color = texelFetch(texSampler2D,imgCoord," << fTextureLevel << ");\n";
     if(bUseIntegralFormat) ssSrc <<
              "    out_color = out_color/255;\n";
     ssSrc << "}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-std::string GLShader::getPassThroughFragmentShaderSource_ImgLoad(bool bUseTopLeftFragCoordOrigin, GLenum eInternalFormat, GLuint nImageBinding, bool bUseIntegralFormat) {
+std::string GLShader::getFragmentShaderSource_PassThrough_ImgLoad(bool bUseTopLeftFragCoordOrigin, GLenum eInternalFormat, GLuint nImageBinding, bool bUseIntegralFormat) {
     std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "#version 430\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(location=0) out vec4 out_color;\n";
+    ssSrc << "#version 430\n"
+             "layout(location=0) out vec4 out_color;\n";
     if(bUseTopLeftFragCoordOrigin) ssSrc <<
              "layout(origin_upper_left) in vec4 gl_FragCoord;\n";
     const bool bInternalFormatIsIntegral = GLUtils::isInternalFormatIntegral(eInternalFormat);
@@ -461,24 +427,20 @@ std::string GLShader::getPassThroughFragmentShaderSource_ImgLoad(bool bUseTopLef
              "layout(binding=" << nImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform image2D img;\n";
     else
         glError("bad internal format & useintegral setup");
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "void main() {\n"
              "    ivec2 imgCoord = ivec2(gl_FragCoord.xy);\n"
              "    out_color = imageLoad(img,imgCoord);\n";
     if(bUseIntegralFormat) ssSrc <<
              "    out_color = out_color/255;\n";
     ssSrc << "}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-std::string GLShader::getPassThroughFragmentShaderSource_SxSImgLoad(bool bUseTopLeftFragCoordOrigin, GLenum eInternalFormat, const std::vector<GLuint> vnImageBindings, GLint nImageLayer, bool bUseIntegralFormat) {
+std::string GLShader::getFragmentShaderSource_PassThrough_SxSImgLoad(bool bUseTopLeftFragCoordOrigin, GLenum eInternalFormat, const std::vector<GLuint> vnImageBindings, GLint nImageLayer, bool bUseIntegralFormat) {
     glAssert(vnImageBindings.size()>1 && nImageLayer>=0);
     std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "#version 430\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(location=0) out vec4 out_color;\n";
+    ssSrc << "#version 430\n"
+             "layout(location=0) out vec4 out_color;\n";
     if(bUseTopLeftFragCoordOrigin) ssSrc <<
              "layout(origin_upper_left) in vec4 gl_FragCoord;\n";
     const bool bInternalFormatIsIntegral = GLUtils::isInternalFormatIntegral(eInternalFormat);
@@ -493,7 +455,6 @@ std::string GLShader::getPassThroughFragmentShaderSource_SxSImgLoad(bool bUseTop
              "layout(binding=" << nImageBindingIter << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform image2D" << (nImageLayer>0?"Array imgArray":" img") << nImageBindingIter << ";\n";
     else
         glError("bad internal format & useintegral setup");
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "void main() {\n";
     if(nImageLayer>0) { ssSrc <<
              "    ivec3 imgSize = imageSize(imgArray1);\n"
@@ -520,16 +481,13 @@ std::string GLShader::getPassThroughFragmentShaderSource_SxSImgLoad(bool bUseTop
     if(bUseIntegralFormat) ssSrc <<
              "    out_color = out_color/255;\n";
     ssSrc << "}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-std::string GLShader::getPassThroughFragmentShaderSource_SxSImgArrayLoad(bool bUseTopLeftFragCoordOrigin, GLenum eInternalFormat, GLuint nImageBinding, GLint nImageCount, bool bUseIntegralFormat) {
+std::string GLShader::getFragmentShaderSource_PassThrough_SxSImgArrayLoad(bool bUseTopLeftFragCoordOrigin, GLenum eInternalFormat, GLuint nImageBinding, GLint nImageCount, bool bUseIntegralFormat) {
     std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "#version 430\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(location=0) out vec4 out_color;\n";
+    ssSrc << "#version 430\n"
+             "layout(location=0) out vec4 out_color;\n";
     if(bUseTopLeftFragCoordOrigin) ssSrc <<
              "layout(origin_upper_left) in vec4 gl_FragCoord;\n";
     const bool bInternalFormatIsIntegral = GLUtils::isInternalFormatIntegral(eInternalFormat);
@@ -541,9 +499,8 @@ std::string GLShader::getPassThroughFragmentShaderSource_SxSImgArrayLoad(bool bU
              "layout(binding=" << nImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform image2D" << (nImageCount>1?"Array imgArray":" img") << ";\n";
     else
         glError("bad internal format & useintegral setup");
-    ssSrc << "const int imgArrayLayers = " << nImageCount << ";\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "void main() {\n";
+    ssSrc << "const int imgArrayLayers = " << nImageCount << ";\n"
+             "void main() {\n";
     if(nImageCount>1) ssSrc <<
              "    ivec3 imgSize = imageSize(imgArray);\n"
              "    ivec3 imgCoord = ivec3(mod(int(gl_FragCoord.x),imgSize.x),gl_FragCoord.y,int(gl_FragCoord.x)/imgSize.x);\n"
@@ -553,16 +510,13 @@ std::string GLShader::getPassThroughFragmentShaderSource_SxSImgArrayLoad(bool bU
     if(bUseIntegralFormat) ssSrc <<
              "    out_color = out_color/255;\n";
     ssSrc << "}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-std::string GLShader::getPassThroughComputeShaderSource_ImgLoadCopy(const glm::uvec2& vWorkGroupSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding, bool bUseIntegralFormat) {
+std::string GLShader::getComputeShaderSource_PassThrough_ImgLoadCopy(const glm::uvec2& vWorkGroupSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding, bool bUseIntegralFormat) {
     std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "#version 430\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(local_size_x=" << vWorkGroupSize.x << ",local_size_y=" << vWorkGroupSize.y << ") in;\n";
+    ssSrc << "#version 430\n"
+             "layout(local_size_x=" << vWorkGroupSize.x << ",local_size_y=" << vWorkGroupSize.y << ") in;\n";
     const bool bInternalFormatIsIntegral = GLUtils::isInternalFormatIntegral(eInternalFormat);
     if(!bUseIntegralFormat && bInternalFormatIsIntegral) ssSrc <<
              "layout(binding=" << nInputImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(GLUtils::getNormalizedIntegralFormatFromInternalFormat(eInternalFormat)) << ") readonly uniform image2D imgInput;\n"
@@ -575,138 +529,14 @@ std::string GLShader::getPassThroughComputeShaderSource_ImgLoadCopy(const glm::u
              "layout(binding=" << nOutputImageBinding << ", " << GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") writeonly uniform image2D imgOutput;\n";
     else
         glError("bad internal format & useintegral setup");
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "void main() {\n"
              "    ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);\n"
              "    imageStore(imgOutput,imgCoord,imageLoad(imgInput,imgCoord));\n"
              "}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-std::string NBodySimulationUtils::getVertexShaderSource() {
-    // the vertex shader simply passes through data
-    return
-    "#version 430\n"
-    "layout(location = 0) in vec4 vposition;\n"
-    "void main() {\n"
-    "   gl_Position = vposition;\n"
-    "}\n";
-}
-
-std::string NBodySimulationUtils::getGeometryShaderSource() {
-    // the geometry shader creates the billboard quads
-    return
-    "#version 430\n"
-    "layout(location = 0) uniform mat4 View;\n"
-    "layout(location = 1) uniform mat4 Projection;\n"
-    "layout (points) in;\n"
-    "layout (triangle_strip, max_vertices = 4) out;\n"
-    "out vec2 txcoord;\n"
-    "void main() {\n"
-    "   vec4 pos = View*gl_in[0].gl_Position;\n"
-    "   txcoord = vec2(-1,-1);\n"
-    "   gl_Position = Projection*(pos+0.2*vec4(txcoord,0,0));\n"
-    "   EmitVertex();\n"
-    "   txcoord = vec2( 1,-1);\n"
-    "   gl_Position = Projection*(pos+0.2*vec4(txcoord,0,0));\n"
-    "   EmitVertex();\n"
-    "   txcoord = vec2(-1, 1);\n"
-    "   gl_Position = Projection*(pos+0.2*vec4(txcoord,0,0));\n"
-    "   EmitVertex();\n"
-    "   txcoord = vec2( 1, 1);\n"
-    "   gl_Position = Projection*(pos+0.2*vec4(txcoord,0,0));\n"
-    "   EmitVertex();\n"
-    "}\n";
-}
-
-std::string NBodySimulationUtils::getFragmentShaderSource() {
-    // the fragment shader creates a bell like radial color distribution
-    return
-    "#version 330\n"
-    "in vec2 txcoord;\n"
-    "layout(location = 0) out vec4 FragColor;\n"
-    "void main() {\n"
-    "   float s = (1/(1+15.*dot(txcoord, txcoord))-1/16.);\n"
-    "   FragColor = s*vec4(0.3,0.3,1.0,1);\n"
-    "}\n";
-}
-
-std::string NBodySimulationUtils::getAccelerationComputeShaderSource() {
-    // straight forward implementation of the nbody kernel
-    return
-    "#version 430\n"
-    "layout(local_size_x=256) in;\n"
-    "layout(location = 0) uniform float dt;\n"
-    "layout(std430, binding=0) buffer pblock { vec4 positions[]; };\n"
-    "layout(std430, binding=1) buffer vblock { vec4 velocities[]; };\n"
-    "void main() {\n"
-    "   int N = int(gl_NumWorkGroups.x*gl_WorkGroupSize.x);\n"
-    "   int index = int(gl_GlobalInvocationID);\n"
-
-    "   vec3 position = positions[index].xyz;\n"
-    "   vec3 velocity = velocities[index].xyz;\n"
-    "   vec3 acceleration = vec3(0,0,0);\n"
-    "   for(int i = 0;i<N;++i) {\n"
-    "       vec3 other = positions[i].xyz;\n"
-    "       vec3 diff = position - other;\n"
-    "       float invdist = 1.0/(length(diff)+0.001);\n"
-    "       acceleration -= diff*0.1*invdist*invdist*invdist;\n"
-    "   }\n"
-    "   velocities[index] = vec4(velocity+dt*acceleration,0);\n"
-    "}\n";
-}
-
-std::string NBodySimulationUtils::getTiledAccelerationComputeShaderSource() {
-    // tiled version of the nbody shader that makes use of shared memory to reduce global memory transactions
-    return
-    "#version 430\n"
-    "layout(local_size_x=256) in;\n"
-    "layout(location = 0) uniform float dt;\n"
-    "layout(std430, binding=0) buffer pblock { vec4 positions[]; };\n"
-    "layout(std430, binding=1) buffer vblock { vec4 velocities[]; };\n"
-    "shared vec4 tmp[gl_WorkGroupSize.x];\n"
-    "void main() {\n"
-    "   int N = int(gl_NumWorkGroups.x*gl_WorkGroupSize.x);\n"
-    "   int index = int(gl_GlobalInvocationID);\n"
-    "   vec3 position = positions[index].xyz;\n"
-    "   vec3 velocity = velocities[index].xyz;\n"
-    "   vec3 acceleration = vec3(0,0,0);\n"
-    "   for(int tile = 0;tile<N;tile+=int(gl_WorkGroupSize.x)) {\n"
-    "       tmp[gl_LocalInvocationIndex] = positions[tile + int(gl_LocalInvocationIndex)];\n"
-    "       groupMemoryBarrier();\n"
-    "       barrier();\n"
-    "       for(int i = 0;i<gl_WorkGroupSize.x;++i) {\n"
-    "           vec3 other = tmp[i].xyz;\n"
-    "           vec3 diff = position - other;\n"
-    "           float invdist = 1.0/(length(diff)+0.001);\n"
-    "           acceleration -= diff*0.1*invdist*invdist*invdist;\n"
-    "       }\n"
-    "       groupMemoryBarrier();\n"
-    "       barrier();\n"
-    "   }\n"
-    "   velocities[index] = vec4(velocity+dt*acceleration,0);\n"
-    "}\n";
-}
-
-std::string NBodySimulationUtils::getIntegrateComputeShaderSource() {
-    // the integrate shader does the second part of the euler integration
-    return
-    "#version 430\n"
-    "layout(local_size_x=256) in;\n"
-    "layout(location = 0) uniform float dt;\n"
-    "layout(std430, binding=0) buffer pblock { vec4 positions[]; };\n"
-    "layout(std430, binding=1) buffer vblock { vec4 velocities[]; };\n"
-    "void main() {\n"
-    "   int index = int(gl_GlobalInvocationID);\n"
-    "   vec4 position = positions[index];\n"
-    "   vec4 velocity = velocities[index];\n"
-    "   position.xyz += dt*velocity.xyz;\n"
-    "   positions[index] = position;\n"
-    "}\n";
-}
-
-std::string ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum(size_t nMaxRowSize, bool bBinaryProc, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding) {
+std::string GLShader::getComputeShaderSource_ParallelPrefixSum(size_t nMaxRowSize, bool bBinaryProc, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding) {
     // dispatch must use x=ceil(ceil(nColumns/2)/nMaxRowSize), y=nRows, z=1
     glAssert(GLUtils::isInternalFormatIntegral(eInternalFormat));
     glAssert(nMaxRowSize>1);
@@ -715,21 +545,18 @@ std::string ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum(size_t 
     glAssert(nMaxRowSize*4*4<(size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE));
     const char* acInternalFormatName = GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat);
     std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "#version 430\n"
              "#define nRowSize " << nMaxRowSize << "\n"
-             "#define nInvocations " << nInvocations << "\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(local_size_x=nInvocations) in;\n";
+             "#define nInvocations " << nInvocations << "\n"
+             "layout(local_size_x=nInvocations) in;\n";
     if(nInputImageBinding!=nOutputImageBinding) ssSrc <<
              "layout(binding=" << nInputImageBinding << ", " << acInternalFormatName << ") readonly uniform uimage2D imgInput;\n"
              "layout(binding=" << nOutputImageBinding << ") writeonly uniform uimage2D imgOutput;\n";
     else ssSrc <<
              "layout(binding=" << nInputImageBinding << ", " << acInternalFormatName << ") uniform uimage2D imgInput;\n"
              "#define imgOutput imgInput\n";
-    ssSrc << "shared uvec4 tmp[nRowSize];\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "void main() {\n"
+    ssSrc << "shared uvec4 tmp[nRowSize];\n"
+             "void main() {\n"
              "    tmp[gl_LocalInvocationID.x*2] = imageLoad(imgInput,ivec2(gl_WorkGroupID.x*nRowSize+gl_LocalInvocationID.x*2,gl_WorkGroupID.y))" << (bBinaryProc?"&1;":";") << "\n"
              "    tmp[gl_LocalInvocationID.x*2+1] = imageLoad(imgInput,ivec2(gl_WorkGroupID.x*nRowSize+gl_LocalInvocationID.x*2+1,gl_WorkGroupID.y))" << (bBinaryProc?"&1;":";") << "\n"
              "    uint offset = 1;\n"
@@ -759,27 +586,24 @@ std::string ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum(size_t 
              "    imageStore(imgOutput,ivec2(gl_WorkGroupID.x*nRowSize+gl_LocalInvocationID.x*2,gl_WorkGroupID.y),tmp[gl_LocalInvocationID.x*2]);\n"
              "    imageStore(imgOutput,ivec2(gl_WorkGroupID.x*nRowSize+gl_LocalInvocationID.x*2+1,gl_WorkGroupID.y),tmp[gl_LocalInvocationID.x*2+1]);\n"
              "}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-std::string ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum_BlockMerge(size_t nColumns, size_t nMaxRowSize, size_t nRows, GLenum eInternalFormat, GLuint nImageBinding) {
+std::string GLShader::getComputeShaderSource_ParallelPrefixSum_BlockMerge(size_t nColumns, size_t nMaxRowSize, size_t nRows, GLenum eInternalFormat, GLuint nImageBinding) {
     // dispatch must use x=1, y=1, z=1
+    // @@@@ get rid of this step with atomic shared var?
     glAssert(nMaxRowSize>0);
     glAssert(nColumns>nMaxRowSize); // shader step is useless otherwise
     glAssert(GLUtils::isInternalFormatIntegral(eInternalFormat));
     const char* acInternalFormatName = GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat);
     const int nBlockCount = (int)ceil((float)nColumns/nMaxRowSize);
     std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "#version 430\n"
              "#define nRowSize " << nMaxRowSize << "\n"
-             "#define nBlockCount " << nBlockCount << "\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(local_size_x=1,local_size_y=" << nRows << ") in;\n"
-             "layout(binding=" << nImageBinding << ", " << acInternalFormatName << ") uniform uimage2D img;\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "void main() {\n"
+             "#define nBlockCount " << nBlockCount << "\n"
+             "layout(local_size_x=1,local_size_y=" << nRows << ") in;\n"
+             "layout(binding=" << nImageBinding << ", " << acInternalFormatName << ") uniform uimage2D img;\n"
+             "void main() {\n"
              "    for(int blockidx=1; blockidx<nBlockCount; ++blockidx) {\n"
              "        uvec4 last_block_sum = imageLoad(img,ivec2(blockidx*nRowSize-1,gl_LocalInvocationID.y));\n"
              "        for(int x=0; x<nRowSize; ++x) {\n"
@@ -788,37 +612,32 @@ std::string ComputeShaderUtils::getComputeShaderSource_ParallelPrefixSum_BlockMe
              "        }\n"
              "    }\n"
              "}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-std::string ComputeShaderUtils::getComputeShaderSource_Transpose(size_t nBlockSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding) {
+std::string GLShader::getComputeShaderSource_Transpose(size_t nBlockSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding) {
     // dispatch must use x=ceil(nCols/nBlockSize), y=ceil(nRows/nBlockSize), z=1
     glAssert(nBlockSize*nBlockSize*4*4<(size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE));
     glAssert(nInputImageBinding!=nOutputImageBinding);
     const bool bUsingIntegralFormat = GLUtils::isInternalFormatIntegral(eInternalFormat);
     const char* acInternalFormatName = GLUtils::getGLSLFormatNameFromInternalFormat(eInternalFormat);
     std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "#version 430\n"
              "#define gvec " << (bUsingIntegralFormat?"uvec4":"vec4") << "\n"
-             "#define blocksize " << nBlockSize << "\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(local_size_x=blocksize,local_size_y=blocksize) in;\n"
+             "#define blocksize " << nBlockSize << "\n"
+             "layout(local_size_x=blocksize,local_size_y=blocksize) in;\n"
              "layout(binding=" << nInputImageBinding << ", " << acInternalFormatName << ") readonly uniform " << (bUsingIntegralFormat?"uimage2D":"image2D") << " imgInput;\n"
              "layout(binding=" << nOutputImageBinding << ") writeonly uniform " << (bUsingIntegralFormat?"uimage2D":"image2D") << " imgOutput;\n"
-             "shared gvec tmp[blocksize][blocksize];\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "void main() {\n"
+             "shared gvec tmp[blocksize][blocksize];\n"
+             "void main() {\n"
              "    tmp[gl_LocalInvocationID.y][gl_LocalInvocationID.x] = imageLoad(imgInput,ivec2(gl_GlobalInvocationID.xy));\n"
              "    barrier();\n"
              "    imageStore(imgOutput,ivec2(gl_GlobalInvocationID.yx),tmp[gl_LocalInvocationID.y][gl_LocalInvocationID.x]);\n"
              "}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-std::string ComputeShaderUtils::getComputeShaderFunctionSource_SharedDataPreLoad(size_t nChannels, const glm::uvec2& vWorkGroupSize, size_t nExternalBorderSize) {
+std::string GLShader::getComputeShaderFunctionSource_SharedDataPreLoad(size_t nChannels, const glm::uvec2& vWorkGroupSize, size_t nExternalBorderSize) {
     glAssert(nChannels==4 || nChannels==1);
     glAssert(vWorkGroupSize.x>3 && vWorkGroupSize.y>3);
     std::stringstream ssSrc;
@@ -879,7 +698,7 @@ std::string ComputeShaderUtils::getComputeShaderFunctionSource_SharedDataPreLoad
     return ssSrc.str();
 }
 
-std::string ComputeShaderUtils::getComputeShaderFunctionSource_BinaryMedianBlur(size_t nKernelSize, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize) {
+std::string GLShader::getComputeShaderFunctionSource_BinaryMedianBlur(size_t nKernelSize, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize) {
     std::stringstream ssSrc;
     if(!bUseSharedDataPreload) ssSrc <<
              "uint BinaryMedianBlur(in layout(r8ui) readonly uimage2D mData, in ivec2 vCoords) {\n"
@@ -893,7 +712,7 @@ std::string ComputeShaderUtils::getComputeShaderFunctionSource_BinaryMedianBlur(
              "    return uint(nPositiveCount>nMajorityCount)*255;"
              "}\n";
     else ssSrc <<
-             ComputeShaderUtils::getComputeShaderFunctionSource_SharedDataPreLoad(1,vWorkGroupSize,nKernelSize/2) <<
+             GLShader::getComputeShaderFunctionSource_SharedDataPreLoad(1,vWorkGroupSize,nKernelSize/2) <<
              "uint BinaryMedianBlur(in ivec2 vCoords) {\n"
              "    const int nKernelSize = " << nKernelSize << ";\n"
              "    const int nHalfKernelSize = nKernelSize/2;\n"
@@ -906,186 +725,4 @@ std::string ComputeShaderUtils::getComputeShaderFunctionSource_BinaryMedianBlur(
              "    return uint(nPositiveCount>nMajorityCount)*255;"
              "}\n";
     return ssSrc.str();
-}
-
-std::string GLSLFunctionUtils::getShaderFunctionSource_absdiff(bool bUseBuiltinDistance) {
-    std::stringstream ssSrc;
-    ssSrc << "uvec3 absdiff(in uvec3 a, in uvec3 b) {\n"
-             "    return uvec3(abs(ivec3(a)-ivec3(b)));\n"
-             "}\n"
-             "uint absdiff(in uint a, in uint b) {\n"
-             "    return uint(" << (bUseBuiltinDistance?"distance(a,b)":"abs((int)a-(int)b)") << ");\n"
-             "}\n";
-    return ssSrc.str();
-}
-
-std::string GLSLFunctionUtils::getShaderFunctionSource_L1dist() {
-    std::stringstream ssSrc;
-    ssSrc << "uint L1dist(in uvec3 a, in uvec3 b) {\n"
-             "    ivec3 absdiffs = abs(ivec3(a)-ivec3(b));\n"
-             "    return uint(absdiffs.b+absdiffs.g+absdiffs.r);\n"
-             "}\n";
-    return ssSrc.str();
-}
-
-std::string GLSLFunctionUtils::getShaderFunctionSource_L2dist(bool bUseBuiltinDistance) {
-    std::stringstream ssSrc;
-    ssSrc << "uint L2dist(in uvec3 a, in uvec3 b) {\n"
-             "    return uint(" << (bUseBuiltinDistance?"distance(a,b)":"sqrt(dot(ivec3(a)-ivec3(b)))") << ");\n"
-             "}\n";
-    return ssSrc.str();
-}
-
-std::string GLSLFunctionUtils::getShaderFunctionSource_hdist() {
-    std::stringstream ssSrc;
-    ssSrc << "uvec3 hdist(in uvec3 a, in uvec3 b) {\n"
-             "    return bitCount(a^b);\n"
-             "}\n"
-             "uint hdist(in uint a, in uint b) {\n"
-             "    return bitCount(a^b);\n"
-             "}\n";
-    return ssSrc.str();
-}
-
-std::string GLSLFunctionUtils::getShaderFunctionSource_getRandNeighbor3x3(size_t nBorderSize, const cv::Size& oFrameSize) {
-    std::stringstream ssSrc;
-    ssSrc << "const ivec2 _avNeighborPattern3x3[8] = ivec2[8](\n"
-             "    ivec2(-1, 1),ivec2(0, 1),ivec2(1, 1),\n"
-             "    ivec2(-1, 0),            ivec2(1, 0),\n"
-             "    ivec2(-1,-1),ivec2(0,-1),ivec2(1,-1)\n"
-             ");\n"
-             "ivec2 getRandNeighbor3x3(in ivec2 vCurrPos, in uint nRandVal) {\n";
-    if(nBorderSize>0) ssSrc <<
-             "    const int nBorderSize = " << nBorderSize << ";\n";
-    ssSrc << "    const int nFrameWidth = " << oFrameSize.width << ";\n"
-             "    const int nFrameHeight = " << oFrameSize.height << ";\n"
-             "    ivec2 vNeighborPos = vCurrPos+_avNeighborPattern3x3[nRandVal%8];\n";
-    if(nBorderSize>0) ssSrc <<
-             "    clamp(vNeighborPos,ivec2(nBorderSize),ivec2(nFrameWidth-nBorderSize-1,nFrameHeight-nBorderSize-1));\n";
-    else ssSrc <<
-             "    clamp(vNeighborPos,ivec2(0),ivec2(nFrameWidth-1,nFrameHeight-1));\n";
-    ssSrc << "    return vNeighborPos;\n"
-             "}\n";
-    return ssSrc.str();
-}
-
-std::string GLSLFunctionUtils::getShaderFunctionSource_frand() {
-    std::stringstream ssSrc;
-    ssSrc << "float frand(inout vec2 vSeed) {\n"
-             "    float fRandVal = 0.5 + 0.5 * fract(sin(dot(vSeed.xy, vec2(12.9898, 78.233)))* 43758.5453);\n"
-             "    vSeed *= fRandVal;\n"
-             "    return fRandVal;\n"
-             "}\n";
-    return ssSrc.str();
-}
-
-std::string GLSLFunctionUtils::getShaderFunctionSource_urand() {
-    std::stringstream ssSrc;
-    // 1x iter of Bob Jenkins' "One-At-A-Time" hashing algorithm
-    ssSrc << "uint urand(inout uint nSeed) {\n"
-             "   nSeed += (nSeed<<10u);\n"
-             "   nSeed ^= (nSeed>>6u);\n"
-             "   nSeed += (nSeed<<3u);\n"
-             "   nSeed ^= (nSeed>>11u);\n"
-             "   nSeed += (nSeed<<15u);\n"
-             "   return nSeed;\n"
-             "}\n";
-    return ssSrc.str();
-}
-
-std::string GLSLFunctionUtils::getShaderFunctionSource_urand_tinymt32() {
-    std::stringstream ssSrc;
-    //
-    //                  32-bit Tiny Mersenne Twister
-    //
-    // Copyright (c) 2011 Mutsuo Saito, Makoto Matsumoto, Hiroshima
-    // University and The University of Tokyo. All rights reserved.
-    //
-    // Redistribution and use in source and binary forms, with or without
-    // modification, are permitted provided that the following conditions are
-    // met:
-    //
-    //     * Redistributions of source code must retain the above copyright
-    //       notice, this list of conditions and the following disclaimer.
-    //     * Redistributions in binary form must reproduce the above
-    //       copyright notice, this list of conditions and the following
-    //       disclaimer in the documentation and/or other materials provided
-    //       with the distribution.
-    //     * Neither the name of the Hiroshima University nor the names of
-    //       its contributors may be used to endorse or promote products
-    //       derived from this software without specific prior written
-    //       permission.
-    //
-    // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-    // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-    // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-    // A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-    // OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-    // SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-    // LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-    // DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-    // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-    // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-    // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-    ssSrc << "struct TMT32Model {\n"
-             "    uvec4 status;\n"
-             "    uint mat1;\n"
-             "    uint mat2;\n"
-             "    uint tmat;\n"
-             "    uint pad;\n"
-             "};\n"
-             "uint urand(inout TMT32Model p) {\n"
-             "    uint s0 = p.status[3];\n"
-             "    uint s1 = (p.status[0]&0x7fffffff)^p.status[1]^p.status[2];\n"
-             "    s1 ^= (s1<<1);\n"
-             "    s0 ^= (s0>>1)^s1;\n"
-             "    p.status[0] = p.status[1];\n"
-             "    p.status[1] = p.status[2];\n"
-             "    p.status[2] = s1^(s0<<10);\n"
-             "    p.status[3] = s0;\n"
-             "    p.status[1] ^= -int(s0&1)&p.mat1;\n"
-             "    p.status[2] ^= -int(s0&1)&p.mat2;\n"
-             "    uint t0 = p.status[3];\n"
-             "    uint t1 = p.status[0]+(p.status[2]>>8);\n"
-             "    t0 ^= t1;\n"
-             "    t0 ^= -int(t1&1)&p.tmat;\n"
-             "    return t0;\n"
-             "}\n";
-    return ssSrc.str();
-}
-
-void GLSLFunctionUtils::initTinyMT32Generators(glm::uvec3 vGeneratorLayout, std::vector<TMT32GenParams>& voData) {
-    glAssert(vGeneratorLayout.x>0 && vGeneratorLayout.y>0 && vGeneratorLayout.z>0);
-    voData.resize(vGeneratorLayout.x*vGeneratorLayout.y*vGeneratorLayout.z);
-    TMT32GenParams* pData = voData.data();
-    // tinymt32dc:cecf43a2417bd5c41e5d6f80cf2ce903,32,1337,f20d1b78,ff90ffe5,30fbdfff,65,0
-    for(size_t z=0; z<vGeneratorLayout.z; ++z) {
-        const size_t nStepSize_Z = z*vGeneratorLayout.y*vGeneratorLayout.x;
-        for(size_t y=0; y<vGeneratorLayout.y; ++y) {
-            const size_t nStepSize_Y = y*vGeneratorLayout.x + nStepSize_Z;
-            for(size_t x=0; x<vGeneratorLayout.x; ++x) {
-                const size_t nStepSize_X = x + nStepSize_Y;
-                TMT32GenParams* pCurrGenParams = pData+nStepSize_X;
-                pCurrGenParams->status[0] = (uint)rand();
-                pCurrGenParams->status[1] = pCurrGenParams->mat1 = 0xF20D1B78;
-                pCurrGenParams->status[2] = pCurrGenParams->mat2 = 0xFF90FFE5;
-                pCurrGenParams->status[3] = pCurrGenParams->tmat = 0x30FBDFFF;
-                pCurrGenParams->pad = 1337;
-                for(int nLoop=1; nLoop<8; ++nLoop)
-                    pCurrGenParams->status[nLoop&3] ^= nLoop+UINT32_C(1812433253)*((pCurrGenParams->status[(nLoop-1)&3])^(pCurrGenParams->status[(nLoop-1)&3]>>30));
-                for(int nLoop=0; nLoop<8; ++nLoop) {
-                    uint s0 = pCurrGenParams->status[3];
-                    uint s1 = (pCurrGenParams->status[0]&UINT32_C(0x7fffffff))^(pCurrGenParams->status[1])^(pCurrGenParams->status[2]);
-                    s1 ^= (s1<<1);
-                    s0 ^= (s0>>1)^s1;
-                    pCurrGenParams->status[0] = pCurrGenParams->status[1];
-                    pCurrGenParams->status[1] = pCurrGenParams->status[2];
-                    pCurrGenParams->status[2] = s1^(s0<<10);
-                    pCurrGenParams->status[3] = s0;
-                    pCurrGenParams->status[1] ^= -((int)(s0&1))&(pCurrGenParams->mat1);
-                    pCurrGenParams->status[2] ^= -((int)(s0&1))&(pCurrGenParams->mat2);
-                }
-            }
-        }
-    }
 }

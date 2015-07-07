@@ -27,7 +27,7 @@ void BackgroundSubtractorViBe_3ch::initialize(const cv::Mat& oInitImg) {
         m_voBGImg[s] = cv::Scalar(0,0,0);
         for(int y_orig=0; y_orig<m_oImgSize.height; y_orig++) {
             for(int x_orig=0; x_orig<m_oImgSize.width; x_orig++) {
-                getRandSamplePosition(x_sample,y_sample,x_orig,y_orig,0,m_oImgSize);
+                RandUtils::getRandSamplePosition(x_sample,y_sample,x_orig,y_orig,0,m_oImgSize);
                 m_voBGImg[s].at<cv::Vec3b>(y_orig,x_orig) = oInitImgRGB.at<cv::Vec3b>(y_sample,x_sample);
             }
         }
@@ -61,13 +61,13 @@ void BackgroundSubtractorViBe_3ch::apply(cv::InputArray _image, cv::OutputArray 
                 const cv::Vec3b& bg = m_voBGImg[nSampleIdx].at<cv::Vec3b>(y,x);
 #if BGSVIBE_USE_SC_THRS_VALIDATION
                 for(size_t c=0; c<3; c++)
-                    if(L1dist(in[c],bg[c])>nCurrSCColorDistThreshold)
+                    if(DistanceUtils::L1dist(in[c],bg[c])>nCurrSCColorDistThreshold)
                         goto skip;
 #endif //BGSVIBE_USE_SC_THRS_VALIDATION
 #if BGSVIBE_USE_L1_DISTANCE_CHECK
-                if(L1dist_<3>(in,bg)<m_nColorDistThreshold*3)
+                if(DistanceUtils::L1dist_<3>(in,bg)<m_nColorDistThreshold*3)
 #else //!BGSVIBE_USE_L1_DISTANCE_CHECK
-                if(L2dist_<3>(in,bg)<m_nColorDistThreshold*3)
+                if(DistanceUtils::L2dist_<3>(in,bg)<m_nColorDistThreshold*3)
 #endif //!BGSVIBE_USE_L1_DISTANCE_CHECK
                     nGoodSamplesCount++;
 #if BGSVIBE_USE_SC_THRS_VALIDATION
@@ -82,7 +82,7 @@ void BackgroundSubtractorViBe_3ch::apply(cv::InputArray _image, cv::OutputArray 
                     m_voBGImg[rand()%m_nBGSamples].at<cv::Vec3b>(y,x)=oInputImgRGB.at<cv::Vec3b>(y,x);
                 if((rand()%nLearningRate)==0) {
                     int x_rand,y_rand;
-                    getRandNeighborPosition_3x3(x_rand,y_rand,x,y,0,m_oImgSize);
+                    RandUtils::getRandNeighborPosition_3x3(x_rand,y_rand,x,y,0,m_oImgSize);
                     const size_t s_rand = rand()%m_nBGSamples;
                     m_voBGImg[s_rand].at<cv::Vec3b>(y_rand,x_rand) = oInputImgRGB.at<cv::Vec3b>(y,x);
                 }

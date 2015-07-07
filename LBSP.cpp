@@ -69,6 +69,7 @@ static inline void lbsp_computeImpl(    const cv::Mat& oInputImg,
             const int _y = (int)voKeyPoints[k].pt.y;
             const uchar _ref = _refdata[_step_row*(_y)+_x];
             ushort& _res = oDesc.at<ushort>((int)k);
+            using namespace DistanceUtils;
             #include "LBSP_16bits_dbcross_1ch.i"
         }
     }
@@ -79,6 +80,7 @@ static inline void lbsp_computeImpl(    const cv::Mat& oInputImg,
             const int _y = (int)voKeyPoints[k].pt.y;
             const uchar* _ref = _refdata+_step_row*(_y)+3*(_x);
             ushort* _res = ((ushort*)(oDesc.data + oDesc.step.p[0]*k));
+            using namespace DistanceUtils;
             #include "LBSP_16bits_dbcross_3ch1t.i"
         }
     }
@@ -107,6 +109,7 @@ static inline void lbsp_computeImpl(    const cv::Mat& oInputImg,
             const uchar _ref = _refdata[_step_row*(_y)+_x];
             ushort& _res = oDesc.at<ushort>((int)k);
             const size_t _t = (size_t)(_ref*fThreshold)+nThresholdOffset;
+            using namespace DistanceUtils;
             #include "LBSP_16bits_dbcross_1ch.i"
         }
     }
@@ -118,6 +121,7 @@ static inline void lbsp_computeImpl(    const cv::Mat& oInputImg,
             const uchar* _ref = _refdata+_step_row*(_y)+3*(_x);
             ushort* _res = ((ushort*)(oDesc.data + oDesc.step.p[0]*k));
             const size_t _t[3] = {(size_t)(_ref[0]*fThreshold)+nThresholdOffset,(size_t)(_ref[1]*fThreshold)+nThresholdOffset,(size_t)(_ref[2]*fThreshold)+nThresholdOffset};
+            using namespace DistanceUtils;
             #include "LBSP_16bits_dbcross_3ch3t.i"
         }
     }
@@ -143,6 +147,7 @@ static inline void lbsp_computeImpl2(   const cv::Mat& oInputImg,
             const int _y = (int)voKeyPoints[k].pt.y;
             const uchar _ref = _refdata[_step_row*(_y)+_x];
             ushort& _res = oDesc.at<ushort>(_y,_x);
+            using namespace DistanceUtils;
             #include "LBSP_16bits_dbcross_1ch.i"
         }
     }
@@ -153,6 +158,7 @@ static inline void lbsp_computeImpl2(   const cv::Mat& oInputImg,
             const int _y = (int)voKeyPoints[k].pt.y;
             const uchar* _ref = _refdata+_step_row*(_y)+3*(_x);
             ushort* _res = ((ushort*)(oDesc.data + oDesc.step.p[0]*_y + oDesc.step.p[1]*_x));
+            using namespace DistanceUtils;
             #include "LBSP_16bits_dbcross_3ch1t.i"
         }
     }
@@ -181,6 +187,7 @@ static inline void lbsp_computeImpl2(   const cv::Mat& oInputImg,
             const uchar _ref = _refdata[_step_row*(_y)+_x];
             ushort& _res = oDesc.at<ushort>(_y,_x);
             const size_t _t = (size_t)(_ref*fThreshold)+nThresholdOffset;
+            using namespace DistanceUtils;
             #include "LBSP_16bits_dbcross_1ch.i"
         }
     }
@@ -192,6 +199,7 @@ static inline void lbsp_computeImpl2(   const cv::Mat& oInputImg,
             const uchar* _ref = _refdata+_step_row*(_y)+3*(_x);
             ushort* _res = ((ushort*)(oDesc.data + oDesc.step.p[0]*_y + oDesc.step.p[1]*_x));
             const size_t _t[3] = {(size_t)(_ref[0]*fThreshold)+nThresholdOffset,(size_t)(_ref[1]*fThreshold)+nThresholdOffset,(size_t)(_ref[2]*fThreshold)+nThresholdOffset};
+            using namespace DistanceUtils;
             #include "LBSP_16bits_dbcross_3ch3t.i"
         }
     }
@@ -277,7 +285,7 @@ void LBSP::calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat
             const ushort* const desc1_ptr = (ushort*)(oDesc1.data+idx);
             const ushort* const desc2_ptr = (ushort*)(oDesc2.data+idx);
             for(int j=0; j<oDesc1.cols; ++j)
-                oOutput.at<uchar>(i,j) = (uchar)(fScaleFactor*hdist(desc1_ptr[j],desc2_ptr[j]));
+                oOutput.at<uchar>(i,j) = (uchar)(fScaleFactor*DistanceUtils::hdist(desc1_ptr[j],desc2_ptr[j]));
         }
     }
     else { //nChannels==3
@@ -295,9 +303,9 @@ void LBSP::calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat
                 for(size_t n=0;n<3; ++n) {
                     const size_t idx2 = 3*j+n;
                     if(bForceMergeChannels)
-                        output_ptr[j] += (uchar)((fScaleFactor*hdist(desc1_ptr[idx2],desc2_ptr[idx2]))/3);
+                        output_ptr[j] += (uchar)((fScaleFactor*DistanceUtils::hdist(desc1_ptr[idx2],desc2_ptr[idx2]))/3);
                     else
-                        output_ptr[idx2] = (uchar)(fScaleFactor*hdist(desc1_ptr[idx2],desc2_ptr[idx2]));
+                        output_ptr[idx2] = (uchar)(fScaleFactor*DistanceUtils::hdist(desc1_ptr[idx2],desc2_ptr[idx2]));
                 }
             }
         }
@@ -310,13 +318,13 @@ void LBSP::validateKeyPoints(std::vector<cv::KeyPoint>& voKeypoints, cv::Size oI
 
 void LBSP::validateROI(cv::Mat& oROI) {
     CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
-#if !HAVE_GPU_SUPPORT // glsl img load returns defined values even outside safe image bounds
+#if !HAVE_GLSL // glsl img load returns defined values even outside safe image bounds
     cv::Mat oROI_new(oROI.size(),CV_8UC1,cv::Scalar_<uchar>(0));
     const size_t nBorderSize = PATCH_SIZE/2;
     const cv::Rect nROI_inner(nBorderSize,nBorderSize,oROI.cols-nBorderSize*2,oROI.rows-nBorderSize*2);
     cv::Mat(oROI,nROI_inner).copyTo(cv::Mat(oROI_new,nROI_inner));
     oROI = oROI_new;
-#endif //!HAVE_GPU_SUPPORT
+#endif //!HAVE_GLSL
 }
 
 #if HAVE_GLSL
@@ -346,7 +354,7 @@ std::string LBSP::getShaderFunctionSource(size_t nChannels, bool bUseSharedDataP
              "         + (uvec3(greaterThan(uvec3(abs(ivec3(imageLoad(mData,vCoords+ivec2(-2, 0)).rgb)-ivec3(ref))),t)));\n"
              "}\n";
     else { ssSrc <<
-             ComputeShaderUtils::getComputeShaderFunctionSource_SharedDataPreLoad(nChannels,vWorkGroupSize,LBSP::PATCH_SIZE/2) <<
+             GLShader::getComputeShaderFunctionSource_SharedDataPreLoad(nChannels,vWorkGroupSize,LBSP::PATCH_SIZE/2) <<
              "uvec3 lbsp(in uvec3 t, in uvec3 ref, in ivec2 vCoords) {\n"
              "    ivec2 vLocalCoords = vCoords-ivec2(gl_GlobalInvocationID.xy)+ivec2(gl_LocalInvocationID.xy)+ivec2(" << LBSP::PATCH_SIZE/2 << ");\n"
              "    return (uvec3(greaterThan(uvec3(abs(ivec3(avPreloadData[vLocalCoords.y+1][vLocalCoords.x-1].rgb)-ivec3(ref))),t)) << 15)\n"

@@ -146,6 +146,8 @@ void BackgroundSubtractorLBSP::apply(cv::InputArray _oNextImage, cv::OutputArray
     this->getLatestForegroundMask(_oLastFGMask);
 }
 
+#if HAVE_GLSL
+
 std::string BackgroundSubtractorLBSP::getLBSPThresholdLUTShaderSource() const {
     glAssert(m_bInitialized);
     std::stringstream ssSrc;
@@ -162,6 +164,7 @@ std::string BackgroundSubtractorLBSP::getLBSPThresholdLUTShaderSource() const {
     return ssSrc.str();
 }
 
+#endif //HAVE_GLSL
 #endif //HAVE_GPU_SUPPORT
 
 cv::AlgorithmInfo* BackgroundSubtractorLBSP::info() const {

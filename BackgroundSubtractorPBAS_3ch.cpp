@@ -58,7 +58,7 @@ void BackgroundSubtractorPBAS_3ch::initialize(const cv::Mat& oInitImg) {
         for(int y=0; y<m_oImgSize.height; ++y) {
             for(int x=0; x<m_oImgSize.width; ++x) {
                 int x_sample,y_sample;
-                getRandSamplePosition(x_sample,y_sample,x,y,0,m_oImgSize);
+                RandUtils::getRandSamplePosition(x_sample,y_sample,x,y,0,m_oImgSize);
                 m_voBGImg[s].at<cv::Vec3b>(y,x) = oInitImgRGB.at<cv::Vec3b>(y_sample,x_sample);
                 m_voBGGrad[s].at<cv::Vec3b>(y,x) = oBlurredInitImg_AbsGrad.at<cv::Vec3b>(y_sample,x_sample);
             }
@@ -115,10 +115,10 @@ void BackgroundSubtractorPBAS_3ch::apply(cv::InputArray _image, cv::OutputArray 
             while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
                 const cv::Vec3b& in_color = oInputImgRGB.at<cv::Vec3b>(y,x);
                 const cv::Vec3b& bg_color = m_voBGImg[nSampleIdx].at<cv::Vec3b>(y,x);
-                const float fColorDist = L2dist_<3>(in_color,bg_color);
+                const float fColorDist = DistanceUtils::L2dist_<3>(in_color,bg_color);
                 const cv::Vec3b& in_grad = oBlurredInputImg_AbsGrad.at<cv::Vec3b>(y,x);
                 const cv::Vec3b& bg_grad = m_voBGGrad[nSampleIdx].at<cv::Vec3b>(y,x);
-                const float fGradDist = L2dist_<3>(in_grad,bg_grad);
+                const float fGradDist = DistanceUtils::L2dist_<3>(in_grad,bg_grad);
                 const float fSumDist = std::min(((BGSPBAS_GRAD_WEIGHT_ALPHA/m_fFormerMeanGradDist)*fGradDist)+fColorDist,(float)nChannelSize);
                 if(fSumDist<=fCurrDistThreshold) {
                     if(fMinDist>fSumDist)
@@ -149,7 +149,7 @@ void BackgroundSubtractorPBAS_3ch::apply(cv::InputArray _image, cv::OutputArray 
                 }
                 if((rand()%nLearningRate)==0) {
                     int x_rand,y_rand;
-                    getRandNeighborPosition_3x3(x_rand,y_rand,x,y,0,m_oImgSize);
+                    RandUtils::getRandNeighborPosition_3x3(x_rand,y_rand,x,y,0,m_oImgSize);
                     const size_t s_rand = rand()%m_nBGSamples;
 #if BGSPBAS_USE_SELF_DIFFUSION
                     m_voBGImg[s_rand].at<cv::Vec3b>(y_rand,x_rand) = oInputImgRGB.at<cv::Vec3b>(y_rand,x_rand);

@@ -517,7 +517,7 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
     }
 #if HAVE_GLSL
-    catch(const GLUtils::GLException& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught GLException:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
+    catch(const GLException& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught GLException:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
 #endif //HAVE_GLSL
     catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
     catch(const std::runtime_error& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::runtime_error:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}

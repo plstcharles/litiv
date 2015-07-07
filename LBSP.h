@@ -56,6 +56,7 @@ public:
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
         const uchar* const _data = oInputImg.data;
+        using namespace DistanceUtils;
         #include "LBSP_16bits_dbcross_1ch.i"
     }
 
@@ -68,6 +69,7 @@ public:
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
         const uchar* const _data = oInputImg.data;
+        using namespace DistanceUtils;
         #include "LBSP_16bits_dbcross_3ch3t.i"
     }
 
@@ -80,6 +82,7 @@ public:
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
         const uchar* const _data = oInputImg.data;
+        using namespace DistanceUtils;
         #include "LBSP_16bits_dbcross_3ch1t.i"
     }
 
@@ -92,6 +95,7 @@ public:
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
         const uchar* const _data = oInputImg.data;
+        using namespace DistanceUtils;
         #include "LBSP_16bits_dbcross_s3ch.i"
     }
 
@@ -104,6 +108,7 @@ public:
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
         const uchar* const _data = oInputImg.data;
+        using namespace DistanceUtils;
         #include "LBSP_16bits_dbcross_s4ch.i"
     }
 
