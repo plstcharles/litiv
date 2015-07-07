@@ -42,13 +42,13 @@ public:
     //! returns the current absolute threshold used for comparisons (-1 = invalid/not used)
     virtual size_t getAbsThreshold() const;
 
-    //! similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix (possibly slower, but the result can be displayed)
+    //! similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix
     void compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const;
-    //! batch version of LBSP::compute2(const cv::Mat& image, ...), also similar to DescriptorExtractor::compute(const std::vector<cv::Mat>& imageCollection, ...)
+    //! batch version of LBSP::compute2(const cv::Mat& image, ...)
     void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat>& voDescCollection) const;
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel version)
-    inline static void computeGrayscaleDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _t, ushort& _res) {
+    inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _t, ushort& _res) {
         CV_DbgAssert(!oInputImg.empty());
         CV_DbgAssert(oInputImg.type()==CV_8UC1);
         CV_DbgAssert(LBSP::DESC_SIZE==2);
@@ -60,56 +60,43 @@ public:
         #include "LBSP_16bits_dbcross_1ch.i"
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (3-channels version)
-    inline static void computeRGBDescriptor(const cv::Mat& oInputImg, const uchar* const _ref,  const int _x, const int _y, const size_t* const _t, ushort* _res) {
+    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel version)
+    template<size_t nChannels> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<size_t,nChannels>& _t, ushort _res[nChannels]) {
+        static_assert(nChannels>0,"need at least one image channel");
         CV_DbgAssert(!oInputImg.empty());
-        CV_DbgAssert(oInputImg.type()==CV_8UC3);
+        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels));
         CV_DbgAssert(LBSP::DESC_SIZE==2);
         CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
         const uchar* const _data = oInputImg.data;
         using namespace DistanceUtils;
-        #include "LBSP_16bits_dbcross_3ch3t.i"
+        const size_t _c = nChannels;
+        #include "LBSP_16bits_dbcross.i"
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (3-channels version)
-    inline static void computeRGBDescriptor(const cv::Mat& oInputImg, const uchar* const _ref,  const int _x, const int _y, const size_t _t, ushort* _res) {
-        CV_DbgAssert(!oInputImg.empty());
-        CV_DbgAssert(oInputImg.type()==CV_8UC3);
-        CV_DbgAssert(LBSP::DESC_SIZE==2);
-        CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
-        CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
-        const size_t _step_row = oInputImg.step.p[0];
-        const uchar* const _data = oInputImg.data;
-        using namespace DistanceUtils;
-        #include "LBSP_16bits_dbcross_3ch1t.i"
+    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel version)
+    template<size_t nChannels> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<size_t,nChannels>& _t, std::array<ushort,nChannels>& _res) {
+        LBSP::computeDescriptor(oInputImg,_ref,_x,_y,_t,_res.data());
+    }
+    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel version)
+    template<size_t nChannels> inline static void computeDescriptor(const cv::Mat& oInputImg, const std::array<uchar,nChannels>& _ref, const int _x, const int _y, const std::array<size_t,nChannels>& _t, std::array<ushort,nChannels>& _res) {
+        LBSP::computeDescriptor(oInputImg,_ref.data(),_x,_y,_t,_res.data());
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel-RGB version)
-    inline static void computeSingleRGBDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _c, const size_t _t, ushort& _res) {
+    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel, single result version)
+    template<size_t nChannels> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _resc, const size_t _t, ushort& _res) {
+        static_assert(nChannels>0,"need at least one image channel");
         CV_DbgAssert(!oInputImg.empty());
-        CV_DbgAssert(oInputImg.type()==CV_8UC3 && _c<3);
+        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _resc<nChannels);
         CV_DbgAssert(LBSP::DESC_SIZE==2);
         CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
         const uchar* const _data = oInputImg.data;
+        const size_t _c = nChannels;
         using namespace DistanceUtils;
-        #include "LBSP_16bits_dbcross_s3ch.i"
-    }
-
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel-RGBA version)
-    inline static void computeSingleRGBADescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _c, const size_t _t, ushort& _res) {
-        CV_DbgAssert(!oInputImg.empty());
-        CV_DbgAssert(oInputImg.type()==CV_8UC4 && _c<4);
-        CV_DbgAssert(LBSP::DESC_SIZE==2);
-        CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
-        CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
-        const size_t _step_row = oInputImg.step.p[0];
-        const uchar* const _data = oInputImg.data;
-        using namespace DistanceUtils;
-        #include "LBSP_16bits_dbcross_s4ch.i"
+        #include "LBSP_16bits_dbcross_1res.i"
     }
 
     //! utility function, used to reshape a descriptors matrix to its input image size via their keypoint locations

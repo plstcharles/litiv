@@ -7,7 +7,6 @@
 //    O O O           .. 12 10 14 ..
 //  O   O   O          7 ..  2 ..  5
 //
-//
 // must be defined externally:
 //      _t              (size_t, absolute threshold used for comparisons)
 //      _ref            (uchar, 'central' value used for comparisons)
