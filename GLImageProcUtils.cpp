@@ -253,7 +253,7 @@ void GLImageProcAlgo::apply(const cv::Mat& oNextInput, bool bRebindAll) {
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getCurrTextureLayerUniformName(),m_nCurrLayer);
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getLastTextureLayerUniformName(),m_nLastLayer);
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getFrameIndexUniformName(),m_nInternalFrameIdx);
-        dispatch(nCurrStageIter,*m_vpImgProcShaders[nCurrStageIter]); // add timer for stage? can reuse the same @@@@@@@@@@@@@@@
+        dispatch(nCurrStageIter,*m_vpImgProcShaders[nCurrStageIter]); // add timer for stage? can reuse the same @@@@
     }
     if(m_bUsingTimers)
         glEndQuery(GL_TIME_ELAPSED);
@@ -792,7 +792,7 @@ BinaryMedianFilter::BinaryMedianFilter( size_t nKernelSize, size_t nBorderSize, 
         ,m_nBorderSize(nBorderSize) {
     glAssert((m_nKernelSize%2)==1 && m_nKernelSize>1 && m_nKernelSize<m_oFrameSize.width && m_nKernelSize<m_oFrameSize.height);
     glAssert(m_nBorderSize<(m_oFrameSize.width-m_nKernelSize) && m_nBorderSize<(m_oFrameSize.height-m_nKernelSize));
-    int nMaxComputeInvocs;@@@@ already checked?
+    int nMaxComputeInvocs;@@@@ recheck for new workgroup sizes?
     glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS,&nMaxComputeInvocs);
     const size_t nCurrComputeStageInvocs = m_vDefaultWorkGroupSize.x*m_vDefaultWorkGroupSize.y;
     glAssert(nCurrComputeStageInvocs>0 && nCurrComputeStageInvocs<nMaxComputeInvocs);

@@ -20,8 +20,6 @@
 /*!
     ViBe foreground-background segmentation algorithm (abstract version).
 
-    For more details on the different parameters, go to @@@@@@@@@@@@@@.
-
     This algorithm is currently NOT thread-safe.
  */
 class BackgroundSubtractorViBe : public cv::BackgroundSubtractor {
@@ -36,8 +34,6 @@ public:
     virtual void initialize(const cv::Mat& oInitImg)=0;
     //! primary model update function; the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
     virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSVIBE_DEFAULT_LEARNING_RATE)=0;
-    //! @@@@@@@@@@@@ ????
-    virtual cv::AlgorithmInfo* info() const;
     //! returns a copy of the latest reconstructed background image
     void getBackgroundImage(cv::OutputArray backgroundImage) const;
 

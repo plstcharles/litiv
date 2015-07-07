@@ -2,99 +2,107 @@
 
 namespace RandUtils {
 
-    /*// gaussian 3x3 pattern, based on 'floor(fspecial('gaussian', 3, 1)*256)'
-    static const int s_nSamplesInitPatternWidth = 3;
-    static const int s_nSamplesInitPatternHeight = 3;
-    static const int s_nSamplesInitPatternTot = 256;
-    static const int s_anSamplesInitPattern[s_nSamplesInitPatternHeight][s_nSamplesInitPatternWidth] = {
-        {19,    32,    19,},
-        {32,    52,    32,},
-        {19,    32,    19,},
-    };*/
+    //! returns pixel coordinates clamped to the given image & border size
+    static inline void clampImageCoords(int& nSampleCoord_X, int& nSampleCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
+        if(nSampleCoord_X<nBorderSize)
+            nSampleCoord_X = nBorderSize;
+        else if(nSampleCoord_X>=oImageSize.width-nBorderSize)
+            nSampleCoord_X = oImageSize.width-nBorderSize-1;
+        if(nSampleCoord_Y<nBorderSize)
+            nSampleCoord_Y = nBorderSize;
+        else if(nSampleCoord_Y>=oImageSize.height-nBorderSize)
+            nSampleCoord_Y = oImageSize.height-nBorderSize-1;
+    }
 
-    // gaussian 7x7 pattern, based on 'floor(fspecial('gaussian',7,2)*512)'
-    static const int s_nSamplesInitPatternWidth = 7;
-    static const int s_nSamplesInitPatternHeight = 7;
-    static const int s_nSamplesInitPatternTot = 512;
-    static const int s_anSamplesInitPattern[s_nSamplesInitPatternHeight][s_nSamplesInitPatternWidth] = {
-        {2,     4,     6,     7,     6,     4,     2,},
-        {4,     8,    12,    14,    12,     8,     4,},
-        {6,    12,    21,    25,    21,    12,     6,},
-        {7,    14,    25,    28,    25,    14,     7,},
-        {6,    12,    21,    25,    21,    12,     6,},
-        {4,     8,    12,    14,    12,     8,     4,},
-        {2,     4,     6,     7,     6,     4,     2,},
-    };
-
-    //! returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-    static inline void getRandSamplePosition(int& x_sample, int& y_sample, const int x_orig, const int y_orig, const int border, const cv::Size& imgsize) {
-        int r = 1+rand()%s_nSamplesInitPatternTot;
-        for(x_sample=0; x_sample<s_nSamplesInitPatternWidth; ++x_sample) {
-            for(y_sample=0; y_sample<s_nSamplesInitPatternHeight; ++y_sample) {
-                r -= s_anSamplesInitPattern[y_sample][x_sample];
+    //! returns a random init/sampling position for the specified pixel position, given a predefined kernel; also guards against out-of-bounds values via image/border size check.
+    template<int nKernelHeight, int nKernelWidth> static inline void getRandSamplePosition( const std::array<std::array<int,nKernelWidth>,nKernelHeight>& anSamplesInitPattern,
+                                                                                            const int nSamplesInitPatternTot,
+                                                                                            int& nSampleCoord_X,
+                                                                                            int& nSampleCoord_Y,
+                                                                                            const int nOrigCoord_X,
+                                                                                            const int nOrigCoord_Y,
+                                                                                            const int nBorderSize,
+                                                                                            const cv::Size& oImageSize) {
+        int r = 1+rand()%nSamplesInitPatternTot;
+        for(nSampleCoord_X=0; nSampleCoord_X<nKernelWidth; ++nSampleCoord_X) {
+            for(nSampleCoord_Y=0; nSampleCoord_Y<nKernelHeight; ++nSampleCoord_Y) {
+                r -= anSamplesInitPattern[nSampleCoord_Y][nSampleCoord_X];
                 if(r<=0)
                     goto stop;
             }
         }
         stop:
-        x_sample += x_orig-s_nSamplesInitPatternWidth/2;
-        y_sample += y_orig-s_nSamplesInitPatternHeight/2;
-        if(x_sample<border)
-            x_sample = border;
-        else if(x_sample>=imgsize.width-border)
-            x_sample = imgsize.width-border-1;
-        if(y_sample<border)
-            y_sample = border;
-        else if(y_sample>=imgsize.height-border)
-            y_sample = imgsize.height-border-1;
+        nSampleCoord_X += nOrigCoord_X-nKernelWidth/2;
+        nSampleCoord_Y += nOrigCoord_Y-nKernelHeight/2;
+        clampImageCoords(nSampleCoord_X,nSampleCoord_Y,nBorderSize,oImageSize);
     }
 
-    // simple 8-connected (3x3) neighbors pattern
-    static const int s_anNeighborPatternSize_3x3 = 8;
-    static const int s_anNeighborPattern_3x3[8][2] = {
-        {-1, 1},  { 0, 1},  { 1, 1},
-        {-1, 0},            { 1, 0},
-        {-1,-1},  { 0,-1},  { 1,-1},
-    };
-
-    //! returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-    static inline void getRandNeighborPosition_3x3(int& x_neighbor, int& y_neighbor, const int x_orig, const int y_orig, const int border, const cv::Size& imgsize) {
-        int r = rand()%s_anNeighborPatternSize_3x3;
-        x_neighbor = x_orig+s_anNeighborPattern_3x3[r][0];
-        y_neighbor = y_orig+s_anNeighborPattern_3x3[r][1];
-        if(x_neighbor<border)
-            x_neighbor = border;
-        else if(x_neighbor>=imgsize.width-border)
-            x_neighbor = imgsize.width-border-1;
-        if(y_neighbor<border)
-            y_neighbor = border;
-        else if(y_neighbor>=imgsize.height-border)
-            y_neighbor = imgsize.height-border-1;
+    //! returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
+    static inline void getRandSamplePosition_3x3_std1(int& nSampleCoord_X, int& nSampleCoord_Y, const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
+        // based on 'floor(fspecial('gaussian',3,1)*256)'
+        static_assert(sizeof(std::array<int,3>)==sizeof(int)*3,"bad std::array stl impl");
+        static const int s_nSamplesInitPatternTot = 256;
+        static const std::array<std::array<int,3>,3> s_anSamplesInitPattern = {
+            std::array<int,3>{19,32,19,},
+            std::array<int,3>{32,52,32,},
+            std::array<int,3>{19,32,19,},
+        };
+        getRandSamplePosition<3,3>(s_anSamplesInitPattern,s_nSamplesInitPatternTot,nSampleCoord_X,nSampleCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
     }
 
-    // 5x5 neighbors pattern
-    static const int s_anNeighborPatternSize_5x5 = 24;
-    static const int s_anNeighborPattern_5x5[24][2] = {
-        {-2, 2},  {-1, 2},  { 0, 2},  { 1, 2},  { 2, 2},
-        {-2, 1},  {-1, 1},  { 0, 1},  { 1, 1},  { 2, 1},
-        {-2, 0},  {-1, 0},            { 1, 0},  { 2, 0},
-        {-2,-1},  {-1,-1},  { 0,-1},  { 1,-1},  { 2,-1},
-        {-2,-2},  {-1,-2},  { 0,-2},  { 1,-2},  { 2,-2},
-    };
+    //! returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
+    static inline void getRandSamplePosition_7x7_std2(int& nSampleCoord_X, int& nSampleCoord_Y, const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
+        // based on 'floor(fspecial('gaussian',7,2)*512)'
+        static_assert(sizeof(std::array<int,7>)==sizeof(int)*7,"bad std::array stl impl");
+        static const int s_nSamplesInitPatternTot = 512;
+        static const std::array<std::array<int,7>,7> s_anSamplesInitPattern = {
+            std::array<int,7>{ 2, 4, 6, 7, 6, 4, 2,},
+            std::array<int,7>{ 4, 8,12,14,12, 8, 4,},
+            std::array<int,7>{ 6,12,21,25,21,12, 6,},
+            std::array<int,7>{ 7,14,25,28,25,14, 7,},
+            std::array<int,7>{ 6,12,21,25,21,12, 6,},
+            std::array<int,7>{ 4, 8,12,14,12, 8, 4,},
+            std::array<int,7>{ 2, 4, 6, 7, 6, 4, 2,},
+        };
+        getRandSamplePosition<7,7>(s_anSamplesInitPattern,s_nSamplesInitPatternTot,nSampleCoord_X,nSampleCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
+    }
+
+    //! returns a random neighbor position for the specified pixel position, given a predefined neighborhood; also guards against out-of-bounds values via image/border size check.
+    template<int nNeighborCount> static inline void getRandNeighborPosition( const std::array<std::array<int,2>,nNeighborCount>& anNeighborPattern,
+                                                                             int& nNeighborCoord_X,
+                                                                             int& nNeighborCoord_Y,
+                                                                             const int nOrigCoord_X,
+                                                                             const int nOrigCoord_Y,
+                                                                             const int nBorderSize,
+                                                                             const cv::Size& oImageSize) {
+        int r = rand()%nNeighborCount;
+        nNeighborCoord_X = nOrigCoord_X+anNeighborPattern[r][0];
+        nNeighborCoord_Y = nOrigCoord_Y+anNeighborPattern[r][1];
+        clampImageCoords(nNeighborCoord_X,nNeighborCoord_Y,nBorderSize,oImageSize);
+    }
 
     //! returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-    static inline void getRandNeighborPosition_5x5(int& x_neighbor, int& y_neighbor, const int x_orig, const int y_orig, const int border, const cv::Size& imgsize) {
-        int r = rand()%s_anNeighborPatternSize_5x5;
-        x_neighbor = x_orig+s_anNeighborPattern_5x5[r][0];
-        y_neighbor = y_orig+s_anNeighborPattern_5x5[r][1];
-        if(x_neighbor<border)
-            x_neighbor = border;
-        else if(x_neighbor>=imgsize.width-border)
-            x_neighbor = imgsize.width-border-1;
-        if(y_neighbor<border)
-            y_neighbor = border;
-        else if(y_neighbor>=imgsize.height-border)
-            y_neighbor = imgsize.height-border-1;
+    static inline void getRandNeighborPosition_3x3(int& nNeighborCoord_X, int& nNeighborCoord_Y, const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
+        typedef std::array<int,2> Nb;
+        static const std::array<std::array<int,2>,8> s_anNeighborPattern = {
+            Nb{-1, 1},Nb{ 0, 1},Nb{ 1, 1},
+            Nb{-1, 0},          Nb{ 1, 0},
+            Nb{-1,-1},Nb{ 0,-1},Nb{ 1,-1},
+        };
+        getRandNeighborPosition<8>(s_anNeighborPattern,nNeighborCoord_X,nNeighborCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
+    }
+
+    //! returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
+    static inline void getRandNeighborPosition_5x5(int& nNeighborCoord_X, int& nNeighborCoord_Y, const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
+        typedef std::array<int,2> Nb;
+        static const std::array<std::array<int,2>,24> s_anNeighborPattern = {
+            Nb{-2, 2},Nb{-1, 2},Nb{ 0, 2},Nb{ 1, 2},Nb{ 2, 2},
+            Nb{-2, 1},Nb{-1, 1},Nb{ 0, 1},Nb{ 1, 1},Nb{ 2, 1},
+            Nb{-2, 0},Nb{-1, 0},          Nb{ 1, 0},Nb{ 2, 0},
+            Nb{-2,-1},Nb{-1,-1},Nb{ 0,-1},Nb{ 1,-1},Nb{ 2,-1},
+            Nb{-2,-2},Nb{-1,-2},Nb{ 0,-2},Nb{ 1,-2},Nb{ 2,-2},
+        };
+        getRandNeighborPosition<24>(s_anNeighborPattern,nNeighborCoord_X,nNeighborCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
     }
 
 #if HAVE_GLSL

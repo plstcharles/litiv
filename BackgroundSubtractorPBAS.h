@@ -53,8 +53,6 @@
 /*!
     PBAS foreground-background segmentation algorithm (abstract version).
 
-    For more details on the different parameters, go to @@@@@@@@@@@@@@.
-
     @@@@@@ IMPL MIGHT STILL BE BROKEN, CHECK Dmin UPDATES WHEN FG/BG @@@@@@
 
     This algorithm is currently NOT thread-safe.
@@ -72,8 +70,6 @@ public:
     virtual void initialize(const cv::Mat& oInitImg)=0;
     //! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
     virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE)=0;
-    //! @@@@@@@@@@@@ ????
-    virtual cv::AlgorithmInfo* info() const;
     //! returns a copy of the latest reconstructed background image
     void getBackgroundImage(cv::OutputArray backgroundImage) const;
 

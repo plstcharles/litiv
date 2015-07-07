@@ -160,7 +160,7 @@ public:
 
 class BinaryMedianFilter : public GLImageProcAlgo {
 public:
-    // @@@@@ add support for variable kernels? per-px kernel size could be provided via image load/store
+    // @@@ add support for variable kernels? per-px kernel size could be provided via image load/store
     // @@@ currently not using ROI
     // via integral image: O(n) (where n is the total image size --- does not depend on r, the kernel size)
     BinaryMedianFilter( size_t nKernelSize, size_t nBorderSize, const cv::Mat& oROI,

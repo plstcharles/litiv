@@ -21,7 +21,7 @@ void BackgroundSubtractorViBe_1ch::initialize(const cv::Mat& oInitImg) {
         for(int y_orig=0; y_orig<m_oImgSize.height; y_orig++) {
             for(int x_orig=0; x_orig<m_oImgSize.width; x_orig++) {
                 int y_sample, x_sample;
-                RandUtils::getRandSamplePosition(x_sample,y_sample,x_orig,y_orig,0,m_oImgSize);
+                RandUtils::getRandSamplePosition_7x7_std2(x_sample,y_sample,x_orig,y_orig,0,m_oImgSize);
                 m_voBGImg[s].at<uchar>(y_orig,x_orig) = oInitImg.at<uchar>(y_sample,x_sample);
             }
         }

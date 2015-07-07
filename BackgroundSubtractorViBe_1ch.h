@@ -5,8 +5,6 @@
 /*!
     ViBe foreground-background segmentation algorithm (1ch/grayscale version).
 
-    For more details on the different parameters, go to @@@@@@@@@@@@@@.
-
     This algorithm is currently NOT thread-safe.
  */
 class BackgroundSubtractorViBe_1ch : public BackgroundSubtractorViBe {

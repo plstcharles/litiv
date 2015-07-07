@@ -843,7 +843,7 @@ void DatasetUtils::SequenceInfo::PrecacheInputFrames() {
     while(m_qoInputFrameCache.size()<m_nInputBufferFrameCount && m_nNextPrecachedInputFrameIdx<m_nTotalNbFrames) {
         cv::Mat oNextInputFrame = GetInputFrameFromIndex_Internal(m_nNextPrecachedInputFrameIdx++);
         cv::Mat oNextInputFrame_precached(m_oSize,m_bUsing4chAlignment?CV_8UC4:m_bForcingGrayscale?CV_8UC1:CV_8UC3,m_vcInputBuffer.data()+m_nNextInputBufferIdx);
-        // @@@@@@@@ try to fetch without copy to?
+        // @@@ try to fetch without copyTo?
         oNextInputFrame.copyTo(oNextInputFrame_precached);
         m_qoInputFrameCache.push_back(oNextInputFrame_precached);
         m_nNextInputBufferIdx += m_nInputFrameSize;
@@ -909,7 +909,7 @@ void DatasetUtils::SequenceInfo::PrecacheInputFrames() {
                 while(m_qoInputFrameCache.size()<m_nInputBufferFrameCount && m_nNextPrecachedInputFrameIdx<m_nTotalNbFrames && nFillCount<10) {
                    cv::Mat oNextInputFrame = GetInputFrameFromIndex_Internal(m_nNextPrecachedInputFrameIdx++);
                    cv::Mat oNextInputFrame_precached(m_oSize,m_bUsing4chAlignment?CV_8UC4:m_bForcingGrayscale?CV_8UC1:CV_8UC3,m_vcInputBuffer.data()+m_nNextInputBufferIdx);
-                   // @@@@@@@@ try to fetch without copy to?
+                   // @@@ try to fetch without copyTo?
                    oNextInputFrame.copyTo(oNextInputFrame_precached);
                    m_qoInputFrameCache.push_back(oNextInputFrame_precached);
                    m_nNextInputBufferIdx += m_nInputFrameSize;
@@ -928,7 +928,7 @@ void DatasetUtils::SequenceInfo::PrecacheGTFrames() {
     while(m_qoGTFrameCache.size()<m_nGTBufferFrameCount && m_nNextPrecachedGTFrameIdx<m_nTotalNbFrames) {
         cv::Mat oNextGTFrame = GetGTFrameFromIndex_Internal(m_nNextPrecachedGTFrameIdx++);
         cv::Mat oNextGTFrame_precached(m_oSize,CV_8UC1,m_vcGTBuffer.data()+m_nNextGTBufferIdx);
-        // @@@@@@@@ try to fetch without copy to?
+        // @@@ try to fetch without copyTo?
         oNextGTFrame.copyTo(oNextGTFrame_precached);
         m_qoGTFrameCache.push_back(oNextGTFrame_precached);
         m_nNextGTBufferIdx += m_nGTFrameSize;
@@ -994,7 +994,7 @@ void DatasetUtils::SequenceInfo::PrecacheGTFrames() {
                 while(m_qoGTFrameCache.size()<m_nGTBufferFrameCount && m_nNextPrecachedGTFrameIdx<m_nTotalNbFrames && nFillCount<10) {
                     cv::Mat oNextGTFrame = GetGTFrameFromIndex_Internal(m_nNextPrecachedGTFrameIdx++);
                     cv::Mat oNextGTFrame_precached(m_oSize,CV_8UC1,m_vcGTBuffer.data()+m_nNextGTBufferIdx);
-                    // @@@@@@@@ try to fetch without copy to?
+                    // @@@ try to fetch without copyTo?
                     oNextGTFrame.copyTo(oNextGTFrame_precached);
                     m_qoGTFrameCache.push_back(oNextGTFrame_precached);
                     m_nNextGTBufferIdx += m_nGTFrameSize;

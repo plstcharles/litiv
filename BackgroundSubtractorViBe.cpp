@@ -13,11 +13,6 @@ BackgroundSubtractorViBe::BackgroundSubtractorViBe(  size_t nColorDistThreshold
 
 BackgroundSubtractorViBe::~BackgroundSubtractorViBe() {}
 
-cv::AlgorithmInfo* BackgroundSubtractorViBe::info() const {
-    CV_Assert(false); // NOT IMPL @@@@@
-    return nullptr;
-}
-
 void BackgroundSubtractorViBe::getBackgroundImage(cv::OutputArray backgroundImage) const {
     CV_DbgAssert(m_bInitialized);
     cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_32FC(m_voBGImg[0].channels()));

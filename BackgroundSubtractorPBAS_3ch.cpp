@@ -58,7 +58,7 @@ void BackgroundSubtractorPBAS_3ch::initialize(const cv::Mat& oInitImg) {
         for(int y=0; y<m_oImgSize.height; ++y) {
             for(int x=0; x<m_oImgSize.width; ++x) {
                 int x_sample,y_sample;
-                RandUtils::getRandSamplePosition(x_sample,y_sample,x,y,0,m_oImgSize);
+                RandUtils::getRandSamplePosition_7x7_std2(x_sample,y_sample,x,y,0,m_oImgSize);
                 m_voBGImg[s].at<cv::Vec3b>(y,x) = oInitImgRGB.at<cv::Vec3b>(y_sample,x_sample);
                 m_voBGGrad[s].at<cv::Vec3b>(y,x) = oBlurredInitImg_AbsGrad.at<cv::Vec3b>(y_sample,x_sample);
             }

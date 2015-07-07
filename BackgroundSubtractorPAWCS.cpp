@@ -244,11 +244,11 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                     }
                 }
                 const size_t nCurrWordOccIncr = DEFAULT_LWORD_OCC_INCR;
-                const size_t nTotLocalSamplingIterCount = (RandUtils::s_nSamplesInitPatternWidth*RandUtils::s_nSamplesInitPatternHeight)*2;
+                const size_t nTotLocalSamplingIterCount = 7*7*2;
                 for(size_t nLocalSamplingIter=0; nLocalSamplingIter<nTotLocalSamplingIterCount; ++nLocalSamplingIter) {
                     // == refresh: local resampling
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    RandUtils::getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    RandUtils::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                     if(bForceFGUpdate || !m_oLastFGMask_dilated.data[nSamplePxIdx]) {
                         const uchar nSampleColor = m_oLastColorFrame.data[nSamplePxIdx];
@@ -392,11 +392,11 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                     }
                 }
                 const size_t nCurrWordOccIncr = DEFAULT_LWORD_OCC_INCR;
-                const size_t nTotLocalSamplingIterCount = (RandUtils::s_nSamplesInitPatternWidth*RandUtils::s_nSamplesInitPatternHeight)*2;
+                const size_t nTotLocalSamplingIterCount = 7*7*2;
                 for(size_t nLocalSamplingIter=0; nLocalSamplingIter<nTotLocalSamplingIterCount; ++nLocalSamplingIter) {
                     // == refresh: local resampling
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    RandUtils::getRandSamplePosition(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    RandUtils::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                     if(bForceFGUpdate || !m_oLastFGMask_dilated.data[nSamplePxIdx]) {
                         const size_t nSamplePxRGBIdx = nSamplePxIdx*3;
@@ -1536,24 +1536,40 @@ void BackgroundSubtractorPAWCS::getBackgroundImage(cv::OutputArray backgroundIma
     oAvgBGImg.convertTo(backgroundImage,CV_8U);
 }
 
-void BackgroundSubtractorPAWCS::getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const {
+void BackgroundSubtractorPAWCS::getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const { // @@@ add option to reconstruct from gwords?
     CV_Assert(LBSP::DESC_SIZE==2);
     CV_Assert(m_bInitialized);
-    cv::Mat oAvgBGDesc = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
-    // @@@@@@ TO BE REWRITTEN FOR WORD-BASED RECONSTRUCTION
-    /*for(size_t n=0; n<m_voBGDescSamples.size(); ++n) {
-        for(int y=0; y<m_oImgSize.height; ++y) {
-            for(int x=0; x<m_oImgSize.width; ++x) {
-                const size_t nDescIter = m_voBGDescSamples[n].step.p[0]*y + m_voBGDescSamples[n].step.p[1]*x;
-                const size_t nFloatIter = nDescIter*2;
-                float* oAvgBgDescPtr = (float*)(oAvgBGDesc.data+nFloatIter);
-                const ushort* const oBGDescPtr = (ushort*)(m_voBGDescSamples[n].data+nDescIter);
-                for(size_t c=0; c<m_nImgChannels; ++c)
-                    oAvgBgDescPtr[c] += ((float)oBGDescPtr[c])/m_voBGDescSamples.size();
+    cv::Mat oAvgBGDescImg = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
+    for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
+        const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
+        const size_t nLocalDictIdx = nModelIter*m_nCurrLocalWords;
+        const int nCurrImgCoord_X = m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X;
+        const int nCurrImgCoord_Y = m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y;
+        if(m_nImgChannels==1) {
+            float fTotWeight = 0.0f;
+            float fTotDesc = 0.0f;
+            for(size_t nLocalWordIdx=0; nLocalWordIdx<m_nCurrLocalWords; ++nLocalWordIdx) {
+                const LocalWord_1ch& oCurrLocalWord = (LocalWord_1ch&)*m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx];
+                float fCurrWeight = GetLocalWordWeight(oCurrLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
+                fTotDesc += (float)oCurrLocalWord.oFeature.anDesc[0]*fCurrWeight;
+                fTotWeight += fCurrWeight;
             }
+            oAvgBGDescImg.at<float>(nCurrImgCoord_Y,nCurrImgCoord_X) = fTotDesc/fTotWeight;
         }
-    }*/
-    oAvgBGDesc.convertTo(backgroundDescImage,CV_16U);
+        else { //m_nImgChannels==3
+            float fTotWeight = 0.0f;
+            std::array<float,3> fTotDesc = {0.0f,0.0f,0.0f};
+            for(size_t nLocalWordIdx=0; nLocalWordIdx<m_nCurrLocalWords; ++nLocalWordIdx) {
+                const LocalWord_3ch& oCurrLocalWord = (LocalWord_3ch&)*m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx];
+                float fCurrWeight = GetLocalWordWeight(oCurrLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
+                for(size_t c=0; c<3; ++c)
+                    fTotDesc[c] += (float)oCurrLocalWord.oFeature.anDesc[c]*fCurrWeight;
+                fTotWeight += fCurrWeight;
+            }
+            oAvgBGDescImg.at<cv::Vec3f>(nCurrImgCoord_Y,nCurrImgCoord_X) = cv::Vec3f(fTotDesc[0]/fTotWeight,fTotDesc[1]/fTotWeight,fTotDesc[2]/fTotWeight);
+        }
+    }
+    oAvgBGDescImg.convertTo(backgroundDescImage,CV_16U);
 }
 
 void BackgroundSubtractorPAWCS::CleanupDictionaries() {
