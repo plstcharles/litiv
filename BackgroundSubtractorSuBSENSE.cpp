@@ -165,7 +165,7 @@ void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const cv:
                 m_voPxInfoLUT[nPxIter].nModelIdx = nModelIter;
                 m_oLastColorFrame.data[nPxIter] = oInitImg.data[nPxIter];
                 const size_t nDescIter = nPxIter*2;
-                LBSP::computeGrayscaleDescriptor(oInitImg,oInitImg.data[nPxIter],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxIter]],*((ushort*)(m_oLastDescFrame.data+nDescIter)));
+                LBSP::computeDescriptor(oInitImg,oInitImg.data[nPxIter],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxIter]],*((ushort*)(m_oLastDescFrame.data+nDescIter)));
                 ++nModelIter;
             }
         }
@@ -185,7 +185,7 @@ void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const cv:
                 const size_t nDescRGBIter = nPxRGBIter*2;
                 for(size_t c=0; c<3; ++c) {
                     m_oLastColorFrame.data[nPxRGBIter+c] = oInitImg.data[nPxRGBIter+c];
-                    LBSP::computeSingleRGBDescriptor(oInitImg,oInitImg.data[nPxRGBIter+c],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
+                    LBSP::computeDescriptor<3>(oInitImg,oInitImg.data[nPxRGBIter+c],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
                 }
                 ++nModelIter;
             }
@@ -276,7 +276,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
             const size_t nCurrColorDistThreshold = (size_t)(((*pfCurrDistThresholdFactor)*m_nMinColorDistThreshold)-((!m_oUnstableRegionMask.data[nPxIter])*STAB_COLOR_DIST_OFFSET))/2;
             const size_t nCurrDescDistThreshold = ((size_t)1<<((size_t)floor(*pfCurrDistThresholdFactor+0.5f)))+m_nDescDistThresholdOffset+(m_oUnstableRegionMask.data[nPxIter]*UNSTAB_DESC_DIST_OFFSET);
             ushort nCurrInterDesc, nCurrIntraDesc;
-            LBSP::computeGrayscaleDescriptor(oInputImg,nCurrColor,nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[nCurrColor],nCurrIntraDesc);
+            LBSP::computeDescriptor(oInputImg,nCurrColor,nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[nCurrColor],nCurrIntraDesc);
             m_oUnstableRegionMask.data[nPxIter] = ((*pfCurrDistThresholdFactor)>UNSTABLE_REG_RDIST_MIN || (*pfCurrMeanRawSegmRes_LT-*pfCurrMeanFinalSegmRes_LT)>UNSTABLE_REG_RATIO_MIN || (*pfCurrMeanRawSegmRes_ST-*pfCurrMeanFinalSegmRes_ST)>UNSTABLE_REG_RATIO_MIN)?1:0;
             size_t nGoodSamplesCount=0, nSampleIdx=0;
             while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
@@ -287,7 +287,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                         goto failedcheck1ch;
                     const ushort& nBGIntraDesc = *((ushort*)(m_voBGDescSamples[nSampleIdx].data+nDescIter));
                     const size_t nIntraDescDist = DistanceUtils::hdist(nCurrIntraDesc,nBGIntraDesc);
-                    LBSP::computeGrayscaleDescriptor(oInputImg,nBGColor,nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[nBGColor],nCurrInterDesc);
+                    LBSP::computeDescriptor(oInputImg,nBGColor,nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[nBGColor],nCurrInterDesc);
                     const size_t nInterDescDist = DistanceUtils::hdist(nCurrInterDesc,nBGIntraDesc);
                     const size_t nDescDist = (nIntraDescDist+nInterDescDist)/2;
                     if(nDescDist>nCurrDescDistThreshold)
@@ -410,9 +410,9 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
             const size_t nCurrTotColorDistThreshold = nCurrColorDistThreshold*3;
             const size_t nCurrTotDescDistThreshold = nCurrDescDistThreshold*3;
             const size_t nCurrSCColorDistThreshold = nCurrTotColorDistThreshold/2;
-            ushort anCurrInterDesc[3], anCurrIntraDesc[3];
-            const size_t anCurrIntraLBSPThresholds[3] = {m_anLBSPThreshold_8bitLUT[anCurrColor[0]],m_anLBSPThreshold_8bitLUT[anCurrColor[1]],m_anLBSPThreshold_8bitLUT[anCurrColor[2]]};
-            LBSP::computeRGBDescriptor(oInputImg,anCurrColor,nCurrImgCoord_X,nCurrImgCoord_Y,anCurrIntraLBSPThresholds,anCurrIntraDesc);
+            std::array<ushort,3> anCurrInterDesc, anCurrIntraDesc;
+            const std::array<size_t,3> anCurrIntraLBSPThresholds = {m_anLBSPThreshold_8bitLUT[anCurrColor[0]],m_anLBSPThreshold_8bitLUT[anCurrColor[1]],m_anLBSPThreshold_8bitLUT[anCurrColor[2]]};
+            LBSP::computeDescriptor(oInputImg,anCurrColor,nCurrImgCoord_X,nCurrImgCoord_Y,anCurrIntraLBSPThresholds,anCurrIntraDesc);
             m_oUnstableRegionMask.data[nPxIter] = ((*pfCurrDistThresholdFactor)>UNSTABLE_REG_RDIST_MIN || (*pfCurrMeanRawSegmRes_LT-*pfCurrMeanFinalSegmRes_LT)>UNSTABLE_REG_RATIO_MIN || (*pfCurrMeanRawSegmRes_ST-*pfCurrMeanFinalSegmRes_ST)>UNSTABLE_REG_RATIO_MIN)?1:0;
             size_t nGoodSamplesCount=0, nSampleIdx=0;
             while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
@@ -425,7 +425,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                     if(nColorDist>nCurrSCColorDistThreshold)
                         goto failedcheck3ch;
                     const size_t nIntraDescDist = DistanceUtils::hdist(anCurrIntraDesc[c],anBGIntraDesc[c]);
-                    LBSP::computeSingleRGBDescriptor(oInputImg,anBGColor[c],nCurrImgCoord_X,nCurrImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[anBGColor[c]],anCurrInterDesc[c]);
+                    LBSP::computeDescriptor<3>(oInputImg,anBGColor[c],nCurrImgCoord_X,nCurrImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[anBGColor[c]],anCurrInterDesc[c]);
                     const size_t nInterDescDist = DistanceUtils::hdist(anCurrInterDesc[c],anBGIntraDesc[c]);
                     const size_t nDescDist = (nIntraDescDist+nInterDescDist)/2;
                     const size_t nSumDist = std::min((nDescDist/2)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch);

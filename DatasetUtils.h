@@ -73,10 +73,10 @@ namespace DatasetUtils {
     double CalcMetric_MatthewsCorrCoeff(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN);
 
     cv::Mat ReadResult( const std::string& sResultsPath, const std::string& sCatName, const std::string& sSeqName,
-                               const std::string& sResultPrefix, size_t framenum, const std::string& sResultSuffix);
+                        const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix);
     void WriteResult( const std::string& sResultsPath, const std::string& sCatName, const std::string& sSeqName,
-                             const std::string& sResultPrefix, size_t framenum, const std::string& sResultSuffix,
-                             const cv::Mat& res, const std::vector<int>& vnComprParams);
+                      const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix,
+                      const cv::Mat& oResult, const std::vector<int>& vnComprParams);
     void WriteOnImage(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom=false);
     void WriteMetrics(const std::string sResultsFileName, const SequenceInfo& oSeq);
     void WriteMetrics(const std::string sResultsFileName, const CategoryInfo& oCat);

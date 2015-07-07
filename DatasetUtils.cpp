@@ -117,12 +117,12 @@ cv::Mat DatasetUtils::ReadResult( const std::string& sResultsPath,
                                   const std::string& sCatName,
                                   const std::string& sSeqName,
                                   const std::string& sResultPrefix,
-                                  size_t framenum,
+                                  size_t nFrameIdx,
                                   const std::string& sResultSuffix) {
-    char buffer[10];
-    sprintf(buffer,"%06lu",framenum);
+    std::array<char,10> acBuffer;
+    snprintf(acBuffer.data(),acBuffer.size(),"%06lu",nFrameIdx);
     std::stringstream sResultFilePath;
-    sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << buffer << sResultSuffix;
+    sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << acBuffer.data() << sResultSuffix;
     return cv::imread(sResultFilePath.str(),cv::IMREAD_GRAYSCALE);
 }
 
@@ -130,15 +130,15 @@ void DatasetUtils::WriteResult( const std::string& sResultsPath,
                                 const std::string& sCatName,
                                 const std::string& sSeqName,
                                 const std::string& sResultPrefix,
-                                size_t framenum,
+                                size_t nFrameIdx,
                                 const std::string& sResultSuffix,
-                                const cv::Mat& res,
+                                const cv::Mat& oResult,
                                 const std::vector<int>& vnComprParams) {
-    char buffer[10];
-    sprintf(buffer,"%06lu",framenum);
+    std::array<char,10> acBuffer;
+    snprintf(acBuffer.data(),acBuffer.size(),"%06lu",nFrameIdx);
     std::stringstream sResultFilePath;
-    sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << buffer << sResultSuffix;
-    cv::imwrite(sResultFilePath.str(), res, vnComprParams);
+    sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << acBuffer.data() << sResultSuffix;
+    cv::imwrite(sResultFilePath.str(),oResult,vnComprParams);
 }
 
 void DatasetUtils::WriteOnImage(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom) {

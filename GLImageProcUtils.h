@@ -92,8 +92,8 @@ protected:
     cv::Mat m_oLastOutput, m_oLastDebug;
     size_t m_nNextLayer,m_nCurrLayer,m_nLastLayer;
     size_t m_nCurrPBO, m_nNextPBO;
-    GLuint m_nGLTimers[eGLTimersCount];
-    GLuint64 m_nGLTimerVals[eGLTimersCount];
+    std::array<GLuint,eGLTimersCount> m_nGLTimers;
+    std::array<GLuint64,eGLTimersCount> m_nGLTimerVals;
     std::vector<std::unique_ptr<GLDynamicTexture2D>> m_vpInputArray;
     std::vector<std::unique_ptr<GLDynamicTexture2D>> m_vpDebugArray;
     std::vector<std::unique_ptr<GLDynamicTexture2D>> m_vpOutputArray;

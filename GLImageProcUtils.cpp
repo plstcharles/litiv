@@ -37,7 +37,7 @@ GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t 
     glAssert(m_nLevels>0 && GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT>1 && m_nComputeStages>0);
     if(m_bUsingTexArrays && !glGetTextureSubImage && (m_bUsingDebugPBOs || m_bUsingOutputPBOs))
         glError("missing impl for texture arrays pbo fetch when glGetTextureSubImage is not available");
-    std::array<int,3> anMaxWorkGroupSize = GLUtils::getIntegerVal<3>(GL_MAX_COMPUTE_WORK_GROUP_SIZE);
+    const std::array<int,3> anMaxWorkGroupSize = GLUtils::getIntegerVal<3>(GL_MAX_COMPUTE_WORK_GROUP_SIZE);
     if(anMaxWorkGroupSize[0]<(int)m_vDefaultWorkGroupSize.x || anMaxWorkGroupSize[1]<(int)m_vDefaultWorkGroupSize.y)
         glErrorExt("workgroup size limit is too small for the current impl (curr=[%d,%d], req=[%d,%d])",anMaxWorkGroupSize[0],anMaxWorkGroupSize[1],(int)m_vDefaultWorkGroupSize.x,(int)m_vDefaultWorkGroupSize.y);
     const size_t nCurrComputeStageInvocs = m_vDefaultWorkGroupSize.x*m_vDefaultWorkGroupSize.y;
@@ -55,7 +55,7 @@ GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t 
     if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_ATOMIC_COUNTER_BUFFER_BINDINGS)<m_nACBOs)
         glError("atomic bo bindings limit is too small for the current impl");
     if(m_bUsingTimers)
-        glGenQueries(GLImageProcAlgo::eGLTimersCount,m_nGLTimers);
+        glGenQueries(m_nGLTimers.size(),m_nGLTimers.data());
     if(m_nSSBOs) {
         m_vnSSBO.resize(m_nSSBOs);
         glGenBuffers(m_nSSBOs,m_vnSSBO.data());
@@ -68,7 +68,7 @@ GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t 
 
 GLImageProcAlgo::~GLImageProcAlgo() {
     if(m_bUsingTimers)
-        glDeleteQueries(GLImageProcAlgo::eGLTimersCount,m_nGLTimers);
+        glDeleteQueries(m_nGLTimers.size(),m_nGLTimers.data());
     if(m_nACBOs)
         glDeleteBuffers(m_nACBOs,m_vnACBO.data());
     if(m_nSSBOs)
@@ -91,7 +91,7 @@ void GLImageProcAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oROI)
         m_nInputType = oInitInput.type();
     }
     m_oFrameSize = oROI.size();
-    std::array<int,3> anMaxWorkGroupCount = GLUtils::getIntegerVal<3>(GL_MAX_COMPUTE_WORK_GROUP_COUNT);
+    const std::array<int,3> anMaxWorkGroupCount = GLUtils::getIntegerVal<3>(GL_MAX_COMPUTE_WORK_GROUP_COUNT);
     if(anMaxWorkGroupCount[0]<(int)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x) || anMaxWorkGroupCount[1]<(int)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y))
         glError("workgroup count dispatch limit is too small for the current impl");
     for(size_t nPBOIter=0; nPBOIter<2; ++nPBOIter) {

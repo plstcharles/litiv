@@ -215,12 +215,12 @@ bool GLShader::setUniform4fv(GLint nLoc, const glm::vec4& afVals) {
 
 std::string GLShader::getUniformNameFromLoc(GLint nLoc) {
     const GLsizei nNameMaxSize = 256;
-    GLchar acName[nNameMaxSize];
+    std::array<GLchar,nNameMaxSize> acName;
     GLsizei nNameSize, nSize;
     GLenum eType;
-    glGetActiveUniform(m_nProgID,(GLuint)nLoc,nNameMaxSize,&nNameSize,&nSize,&eType,acName);
+    glGetActiveUniform(m_nProgID,(GLuint)nLoc,nNameMaxSize,&nNameSize,&nSize,&eType,acName.data());
     glErrorCheck;
-    return std::string(acName);
+    return std::string(acName.data());
 }
 
 GLint GLShader::getUniformLocFromName(const std::string& sName) {
