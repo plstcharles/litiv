@@ -51,9 +51,9 @@ namespace DistanceUtils {
     }
 
     //! computes the L1 distance between two opencv vectors
-    template<size_t nChannels, typename T> static inline auto L1dist_(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) -> decltype(L1dist<nChannels,T>((T*)(0),(T*)(0))) {
+    template<int nChannels, typename T> static inline auto L1dist(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) -> decltype(L1dist<nChannels,T>((T*)(0),(T*)(0))) {
         T a_array[nChannels], b_array[nChannels];
-        for(size_t c=0; c<nChannels; ++c) {
+        for(int c=0; c<nChannels; ++c) {
             a_array[c] = a[(int)c];
             b_array[c] = b[(int)c];
         }
@@ -70,6 +70,7 @@ namespace DistanceUtils {
 
     //! computes the squared L2 distance between two generic arrays
     template<size_t nChannels, typename T> static inline auto L2sqrdist(const T* a, const T* b) -> decltype(L2sqrdist(*a,*b)) {
+        static_assert(nChannels>0,"vectors should have at least one channel");
         decltype(L2sqrdist(*a,*b)) oResult = 0;
         for(size_t c=0; c<nChannels; ++c)
             oResult += L2sqrdist(a[c],b[c]);
@@ -105,9 +106,9 @@ namespace DistanceUtils {
     }
 
     //! computes the squared L2 distance between two opencv vectors
-    template<size_t nChannels, typename T> static inline auto L2sqrdist_(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) -> decltype(L2sqrdist<nChannels,T>((T*)(0),(T*)(0))) {
+    template<int nChannels, typename T> static inline auto L2sqrdist(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) -> decltype(L2sqrdist<nChannels,T>((T*)(0),(T*)(0))) {
         T a_array[nChannels], b_array[nChannels];
-        for(size_t c=0; c<nChannels; ++c) {
+        for(int c=0; c<nChannels; ++c) {
             a_array[c] = a[(int)c];
             b_array[c] = b[(int)c];
         }
@@ -116,6 +117,7 @@ namespace DistanceUtils {
 
     //! computes the L2 distance between two generic arrays
     template<size_t nChannels, typename T> static inline float L2dist(const T* a, const T* b) {
+        static_assert(nChannels>0,"vectors should have at least one channel");
         decltype(L2sqrdist(*a,*b)) oResult = 0;
         for(size_t c=0; c<nChannels; ++c)
             oResult += L2sqrdist(a[c],b[c]);
@@ -151,9 +153,9 @@ namespace DistanceUtils {
     }
 
     //! computes the L2 distance between two opencv vectors
-    template<size_t nChannels, typename T> static inline float L2dist_(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) {
+    template<int nChannels, typename T> static inline float L2dist(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) {
         T a_array[nChannels], b_array[nChannels];
-        for(size_t c=0; c<nChannels; ++c) {
+        for(int c=0; c<nChannels; ++c) {
             a_array[c] = a[(int)c];
             b_array[c] = b[(int)c];
         }
@@ -164,7 +166,7 @@ namespace DistanceUtils {
 
     //! computes the color distortion between two integer arrays
     template<size_t nChannels, typename T> static inline typename std::enable_if<std::is_integral<T>::value,size_t>::type cdist(const T* curr, const T* bg) {
-        static_assert(nChannels>1,"cdist: requires more than one channel");
+        static_assert(nChannels>1,"vectors should have more than one channel");
         static_assert(sizeof(size_t)>=8,"cdist: cannot be used with 32 bit integers, might integer overflow");
         bool bNonConstDist = false;
         bool bNonNullDist = (curr[0]!=bg[0]);
@@ -195,7 +197,7 @@ namespace DistanceUtils {
 
     //! computes the color distortion between two float arrays
     template<size_t nChannels, typename T> static inline typename std::enable_if<std::is_floating_point<T>::value,float>::type cdist(const T* curr, const T* bg) {
-        static_assert(nChannels>1,"cdist: requires more than one channel");
+        static_assert(nChannels>1,"vectors should have more than one channel");
         bool bNonConstDist = false;
         bool bNonNullDist = (curr[0]!=bg[0]);
         bool bNonNullBG = (bg[0]>0);
@@ -254,9 +256,9 @@ namespace DistanceUtils {
     }
 
     //! computes the color distortion between two opencv vectors
-    template<size_t nChannels, typename T> static inline auto cdist_(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) -> decltype(cdist<nChannels,T>((T*)(0),(T*)(0))) {
+    template<int nChannels, typename T> static inline auto cdist(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) -> decltype(cdist<nChannels,T>((T*)(0),(T*)(0))) {
         T a_array[nChannels], b_array[nChannels];
-        for(size_t c=0; c<nChannels; ++c) {
+        for(int c=0; c<nChannels; ++c) {
             a_array[c] = a[(int)c];
             b_array[c] = b[(int)c];
         }
@@ -268,11 +270,12 @@ namespace DistanceUtils {
         return (oL1Distance/2+oCDistortion*4);
     }
 
-    //! computes a color distoirtion-distance mix using two generic arrays
+    //! computes a color distortion-distance mix using two generic arrays
     template<size_t nChannels, typename T> static inline typename std::enable_if<std::is_integral<T>::value,size_t>::type cmixdist(const T* curr, const T* bg) {
         return cmixdist(L1dist<nChannels>(curr,bg),cdist<nChannels>(curr,bg));
     }
 
+    //! computes a color distortion-distance mix using two generic arrays
     template<size_t nChannels, typename T> static inline typename std::enable_if<std::is_floating_point<T>::value,float>::type cmixdist(const T* curr, const T* bg) {
         return cmixdist(L1dist<nChannels>(curr,bg),cdist<nChannels>(curr,bg));
     }
@@ -301,9 +304,8 @@ namespace DistanceUtils {
 
     //! computes the population count of an N-byte vector using an 8-bit popcount LUT
     template<typename T> static inline size_t popcount(T x) {
-        size_t nBytes = sizeof(T);
         size_t nResult = 0;
-        for(size_t l=0; l<nBytes; ++l)
+        for(size_t l=0; l<sizeof(T); ++l)
             nResult += popcount_LUT8[(uchar)(x>>l*8)];
         return nResult;
     }
@@ -320,10 +322,10 @@ namespace DistanceUtils {
 
     //! computes the population count of a (nChannels*N)-byte vector using an 8-bit popcount LUT
     template<size_t nChannels, typename T> static inline size_t popcount(const T* x) {
-        size_t nBytes = sizeof(T);
+        static_assert(nChannels>0,"vector should have at least one channel");
         size_t nResult = 0;
         for(size_t c=0; c<nChannels; ++c)
-            for(size_t l=0; l<nBytes; ++l)
+            for(size_t l=0; l<sizeof(T); ++l)
                 nResult += popcount_LUT8[(uchar)(*(x+c)>>l*8)];
         return nResult;
     }

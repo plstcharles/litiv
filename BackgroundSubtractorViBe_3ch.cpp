@@ -65,9 +65,9 @@ void BackgroundSubtractorViBe_3ch::apply(cv::InputArray _image, cv::OutputArray 
                         goto skip;
 #endif //BGSVIBE_USE_SC_THRS_VALIDATION
 #if BGSVIBE_USE_L1_DISTANCE_CHECK
-                if(DistanceUtils::L1dist_<3>(in,bg)<m_nColorDistThreshold*3)
+                if(DistanceUtils::L1dist(in,bg)<m_nColorDistThreshold*3)
 #else //!BGSVIBE_USE_L1_DISTANCE_CHECK
-                if(DistanceUtils::L2dist_<3>(in,bg)<m_nColorDistThreshold*3)
+                if(DistanceUtils::L2dist(in,bg)<m_nColorDistThreshold*3)
 #endif //!BGSVIBE_USE_L1_DISTANCE_CHECK
                     nGoodSamplesCount++;
 #if BGSVIBE_USE_SC_THRS_VALIDATION
