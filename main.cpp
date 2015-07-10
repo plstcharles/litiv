@@ -10,7 +10,7 @@
 #define EVAL_RESULTS_ONLY                0
 #define WRITE_BGSUB_IMG_OUTPUT           0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
-#define WRITE_BGSUB_METRICS_ANALYSIS     1
+#define WRITE_BGSUB_METRICS_ANALYSIS     0
 #define DISPLAY_BGSUB_DEBUG_OUTPUT       0
 #define ENABLE_INTERNAL_TIMERS           0
 #define ENABLE_DISPLAY_MOUSE_DEBUG       0
@@ -39,7 +39,7 @@
 #endif //(HAVE_GLSL && GLSL_EVALUATION)
 #define NEED_LAST_GT_MASK (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || (WRITE_BGSUB_METRICS_ANALYSIS && (!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION)))
 #define NEED_GT_MASK (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_METRICS_ANALYSIS)
-#define NEED_FG_MASK (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT || WRITE_BGSUB_IMG_OUTPUT || (WRITE_BGSUB_METRICS_ANALYSIS && (!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION)))
+#define NEED_FG_MASK (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT || WRITE_BGSUB_IMG_OUTPUT || ((!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION) && WRITE_BGSUB_METRICS_ANALYSIS))
 #define NEED_BG_IMG  (DISPLAY_BGSUB_DEBUG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT)
 #define LIMIT_MODEL_TO_SEQUENCE_ROI (USE_LOBSTER_BGSUB||USE_SUBSENSE_BGSUB||USE_PAWCS_BGSUB)
 #define BOOTSTRAP_100_FIRST_FRAMES  (USE_LOBSTER_BGSUB||USE_SUBSENSE_BGSUB||USE_PAWCS_BGSUB)
@@ -235,9 +235,9 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
 #endif //NEED_BG_IMG
         cv::Mat oNextInputFrame = pCurrSequence->GetInputFrameFromIndex(nNextFrameIdx);
 #if NEED_GT_MASK
-#if (!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION)
+#if NEED_LAST_GT_MASK
         cv::Mat oLastGTMask = oCurrGTMask.clone();
-#endif //(!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION)
+#endif // NEED_LAST_GT_MASK
         cv::Mat oNextGTMask = pCurrSequence->GetGTFrameFromIndex(nNextFrameIdx);
 #endif //NEED_GT_MASK
 #if NEED_FG_MASK
@@ -247,9 +247,9 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
         cv::Mat oLastBGImg;
 #endif //NEED_BG_IMG
 #else //!HAVE_GPU_SUPPORT
-#if NEED_FG_MASK
+#if (NEED_FG_MASK || !HAVE_GPU_SUPPORT)
         cv::Mat oCurrFGMask(oCurrInputFrame.size(),CV_8UC1,cv::Scalar_<uchar>(0));
-#endif //NEED_FG_MASK
+#endif //(NEED_FG_MASK || !HAVE_GPU_SUPPORT)
 #if NEED_BG_IMG
         cv::Mat oCurrBGImg;
 #endif //NEED_BG_IMG
@@ -433,11 +433,13 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
             TIMER_INTERNAL_TOC(PipelineUpdate);
             if(!oROI.empty())
                 cv::bitwise_or(oCurrFGMask,UCHAR_MAX/2,oCurrFGMask,oROI==0);
+#if NEED_FG_MASK
             const cv::Mat& oFGMask = oCurrFGMask;
+#endif //NEED_FG_MASK
 #if NEED_BG_IMG
             pBGS->getBackgroundImage(oCurrBGImg);
             if(!oROI.empty())
-                cv::bitwise_or(oBGImg,UCHAR_MAX/2,oBGImg,oROI==0);
+                cv::bitwise_or(oCurrBGImg,UCHAR_MAX/2,oCurrBGImg,oROI==0);
             const cv::Mat& oBGImg = oCurrBGImg;
 #endif //NEED_BG_IMG
 #endif //!HAVE_GPU_SUPPORT

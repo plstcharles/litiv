@@ -268,7 +268,7 @@ std::string BackgroundSubtractorLOBSTER::getComputeShaderSource_LOBSTER() const 
              "            uvec3 vCurrColorDist = absdiff(vInputColor,vCurrBGColorSample);\n"
 #if BGSLOBSTER_GLSL_USE_BASIC_IMPL
              "            uvec3 vCurrDescDist = hdist(vInputIntraDesc,vCurrBGIntraDescSample);\n"
-             "            if((vCurrColorDist.r+vCurrColorDist.g+vCurrColorDist.b)<=COLOR_DIST_THRESHOLD && (vCurrDescDist.r+vCurrDescDist.g+vCurrDescDist.b)<=DESC_DIST_THRESHOLD)\n"
+             "            if((vCurrColorDist.r+vCurrColorDist.g+vCurrColorDist.b)<=COLOR_DIST_THRESHOLD && (vCurrDescDist.r+vCurrDescDist.g+vCurrDescDist.b)<=DESC_DIST_THRESHOLD)\n";
 #else //!BGSLOBSTER_GLSL_USE_BASIC_IMPL
              "            uvec3 vCurrDescThres = uvec3(anLBSPThresLUT[vCurrBGColorSample.r],anLBSPThresLUT[vCurrBGColorSample.g],anLBSPThresLUT[vCurrBGColorSample.b]);\n"
              "            uvec3 vCurrDescDist = hdist(lbsp(vCurrDescThres,vCurrBGColorSample,vImgCoords),vCurrBGIntraDescSample);\n"
@@ -280,7 +280,7 @@ std::string BackgroundSubtractorLOBSTER::getComputeShaderSource_LOBSTER() const 
              "            uint nCurrBGColorSample = aoPxModels[nModelIdx].color_samples[nSampleIdx];\n"
              "            uint nCurrBGDescSample = aoPxModels[nModelIdx].lbsp_samples[nSampleIdx];\n"
 #if BGSLOBSTER_GLSL_USE_BASIC_IMPL
-             "            if(absdiff(vInputColor.r,nCurrBGColorSample)<=COLOR_DIST_THRESHOLD/2 && hdist(vInputIntraDesc.r,nCurrBGDescSample)<=DESC_DIST_THRESHOLD)\n"
+             "            if(absdiff(vInputColor.r,nCurrBGColorSample)<=COLOR_DIST_THRESHOLD/2 && hdist(vInputIntraDesc.r,nCurrBGDescSample)<=DESC_DIST_THRESHOLD)\n";
 #else //!BGSLOBSTER_GLSL_USE_BASIC_IMPL
              "            if(absdiff(vInputColor.r,nCurrBGColorSample)<=COLOR_DIST_THRESHOLD/2 &&\n"
              "               hdist(lbsp(uvec3(anLBSPThresLUT[nCurrBGColorSample]),uvec3(nCurrBGColorSample),mInput,vImgCoords).r,nCurrBGDescSample)<=DESC_DIST_THRESHOLD)\n";
