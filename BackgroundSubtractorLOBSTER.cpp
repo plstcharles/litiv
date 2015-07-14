@@ -524,7 +524,6 @@ void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArr
             const size_t nDescIterRGB = nPxIterRGB*2;
             const uchar* const anCurrColor = oInputImg.data+nPxIterRGB;
             size_t nGoodSamplesCount=0, nModelIdx=0;
-            std::array<ushort,3> anCurrInputDesc;
             while(nGoodSamplesCount<m_nRequiredBGSamples && nModelIdx<m_nBGSamples) {
                 const ushort* const anBGDesc = (ushort*)(m_voBGDescSamples[nModelIdx].data+nDescIterRGB);
                 const uchar* const anBGColor = m_voBGColorSamples[nModelIdx].data+nPxIterRGB;
@@ -534,8 +533,9 @@ void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArr
                     const size_t nColorDist = DistanceUtils::L1dist(anCurrColor[c],anBGColor[c]);
                     if(nColorDist>nCurrSCColorDistThreshold)
                         goto failedcheck3ch;
-                    LBSP::computeDescriptor<3>(oInputImg,anBGColor[c],nCurrImgCoord_X,nCurrImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[anBGColor[c]],anCurrInputDesc[c]);
-                    const size_t nDescDist = DistanceUtils::hdist(anCurrInputDesc[c],anBGDesc[c]);
+                    ushort nCurrInputDesc;
+                    LBSP::computeDescriptor<3>(oInputImg,anBGColor[c],nCurrImgCoord_X,nCurrImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[anBGColor[c]],nCurrInputDesc);
+                    const size_t nDescDist = DistanceUtils::hdist(nCurrInputDesc,anBGDesc[c]);
                     if(nDescDist>nCurrSCDescDistThreshold)
                         goto failedcheck3ch;
                     nTotColorDist += nColorDist;

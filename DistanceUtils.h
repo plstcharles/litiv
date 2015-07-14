@@ -385,6 +385,7 @@ namespace DistanceUtils {
 
     //! computes the population count of an N-byte vector using an 8-bit popcount LUT
     template<typename T> static inline size_t popcount(T x) {
+        static_assert(std::is_integral<T>::value,"type must be integral");
         size_t nResult = 0;
         for(size_t l=0; l<sizeof(T); ++l)
             nResult += popcount_LUT8[(uchar)(x>>l*8)];
@@ -393,6 +394,7 @@ namespace DistanceUtils {
 
     //! computes the hamming distance between two N-byte vectors using an 8-bit popcount LUT
     template<typename T> static inline size_t hdist(T a, T b) {
+        static_assert(std::is_integral<T>::value,"type must be integral");
         return popcount(a^b);
     }
 

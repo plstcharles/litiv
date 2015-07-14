@@ -99,8 +99,8 @@ protected:
     size_t m_nColStepSize;
     size_t m_nRowStepSize;
     size_t m_nBGModelSize;
-    std::vector<uint> m_vnBGModelData;
-    std::vector<RandUtils::TMT32GenParams> m_voTMT32ModelData;
+    std::vector<uint,Cxx11Utils::AlignAllocator<uint,32>> m_vnBGModelData;
+    std::vector<RandUtils::TMT32GenParams,Cxx11Utils::AlignAllocator<RandUtils::TMT32GenParams,32>> m_voTMT32ModelData;
     enum eLOBSTERStorageBufferBindingList {
         eLOBSTERStorageBuffer_BGModelBinding = GLImageProcAlgo::eStorageBufferDefaultBindingsCount,
         eLOBSTERStorageBuffer_TMT32ModelBinding,

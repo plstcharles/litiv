@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Cxx11Utils.h"
+
 namespace RandUtils {
 
     //! returns pixel coordinates clamped to the given image & border size
@@ -107,7 +109,7 @@ namespace RandUtils {
 
 #if HAVE_GLSL
 
-    struct TMT32GenParams {
+    struct alignas(32) TMT32GenParams {
         uint status[4];
         uint mat1;
         uint mat2;
@@ -115,7 +117,7 @@ namespace RandUtils {
         uint pad;
     };
 
-    static inline void initTinyMT32Generators(glm::uvec3 vGeneratorLayout, std::vector<TMT32GenParams>& voData) {
+    template<typename Talloc> static inline void initTinyMT32Generators(glm::uvec3 vGeneratorLayout, std::vector<TMT32GenParams,Talloc>& voData) {
         glAssert(vGeneratorLayout.x>0 && vGeneratorLayout.y>0 && vGeneratorLayout.z>0);
         voData.resize(vGeneratorLayout.x*vGeneratorLayout.y*vGeneratorLayout.z);
         TMT32GenParams* pData = voData.data();

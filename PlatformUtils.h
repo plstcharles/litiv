@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Cxx11Utils.h"
 #include <queue>
 #include <string>
 #include <algorithm>
@@ -28,13 +29,10 @@
 #define TIMER_TIC(x) int64 XSTR_CONCAT(__nCPUTimerTick_,x) = cv::getTickCount()
 #define TIMER_TOC(x) int64 XSTR_CONCAT(__nCPUTimerVal_,x) = cv::getTickCount()-XSTR_CONCAT(__nCPUTimerTick_,x)
 #define TIMER_ELAPSED_MS(x) (double(XSTR_CONCAT(__nCPUTimerVal_,x))/(cv::getTickFrequency()/1000))
-#if __cplusplus<201103L
-#error "This project requires C++11 support."
-#endif //__cplusplus<=201103L
-#if (defined WIN32 || defined _WIN32 || defined WIN64 || defined _WIN64)
+#if defined(_MSC_VER)
+#define PLATFORM_USES_WIN32API defined(_MSC_VER)
 #define NOMINMAX
 #include <windows.h>
-#define PLATFORM_USES_WIN32API (WINVER>0x0599)
 #ifdef _DEBUG
 #define _CRTDBG_MAP_ALLOC
 #include <stdlib.h>
@@ -53,24 +51,6 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #endif //!PLATFORM_USES_WIN32API
-#include <thread>
-#include <mutex>
-#include <chrono>
-#include <atomic>
-#include <condition_variable>
-
-template<typename Derived,typename Base,typename Del> std::unique_ptr<Derived,Del> static_unique_ptr_cast(std::unique_ptr<Base,Del>&& p) {
-    auto d = static_cast<Derived*>(p.release());
-    return std::unique_ptr<Derived,Del>(d,std::move(p.get_deleter()));
-}
-
-template<typename Derived,typename Base,typename Del> std::unique_ptr<Derived,Del> dynamic_unique_ptr_cast(std::unique_ptr<Base,Del>&& p) {
-    if(Derived* result = dynamic_cast<Derived*>(p.get())) {
-        p.release();
-        return std::unique_ptr<Derived,Del>(result,std::move(p.get_deleter()));
-    }
-    return std::unique_ptr<Derived,Del>(nullptr,p.get_deleter());
-}
 
 namespace PlatformUtils {
 

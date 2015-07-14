@@ -5,6 +5,7 @@
 #include <opencv2/features2d.hpp>
 #include "ParallelUtils.h"
 #include "DistanceUtils.h"
+#include "Cxx11Utils.h"
 
 /*!
     Local Binary Similarity Pattern (LBSP) feature extractor
@@ -47,8 +48,13 @@ public:
     //! batch version of LBSP::compute2(const cv::Mat& image, ...)
     void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat>& voDescCollection) const;
 
+    // @@@@@@@@@@@@@@ add lbsp compute utils to get pre-threshold absdiff values (uchar[16] vector)
+    // @@@@@@@@@@@@@@ add sse support to lbsp comp (128bit reg = 16x uchar!)
+
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel version)
-    inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _t, ushort& _res) {
+    template<typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const Tt _t, Tr& _res) {
+        static_assert(std::is_integral<Tt>::value,"internal threshold type must be integral");
+        static_assert(sizeof(Tr)>=LBSP::DESC_SIZE,"result type size is too small");
         CV_DbgAssert(!oInputImg.empty());
         CV_DbgAssert(oInputImg.type()==CV_8UC1);
         CV_DbgAssert(LBSP::DESC_SIZE==2);
@@ -61,8 +67,10 @@ public:
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel version)
-    template<size_t nChannels> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<size_t,nChannels>& _t, ushort _res[nChannels]) {
+    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, Tr _res[nChannels]) {
         static_assert(nChannels>0,"need at least one image channel");
+        static_assert(std::is_integral<Tt>::value,"internal threshold type must be integral");
+        static_assert(sizeof(Tr)>=LBSP::DESC_SIZE,"result type size is too small");
         CV_DbgAssert(!oInputImg.empty());
         CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels));
         CV_DbgAssert(LBSP::DESC_SIZE==2);
@@ -76,17 +84,19 @@ public:
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel version)
-    template<size_t nChannels> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<size_t,nChannels>& _t, std::array<ushort,nChannels>& _res) {
+    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, std::array<Tr,nChannels>& _res) {
         LBSP::computeDescriptor(oInputImg,_ref,_x,_y,_t,_res.data());
     }
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel version)
-    template<size_t nChannels> inline static void computeDescriptor(const cv::Mat& oInputImg, const std::array<uchar,nChannels>& _ref, const int _x, const int _y, const std::array<size_t,nChannels>& _t, std::array<ushort,nChannels>& _res) {
+    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const std::array<uchar,nChannels>& _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, std::array<Tr,nChannels>& _res) {
         LBSP::computeDescriptor(oInputImg,_ref.data(),_x,_y,_t,_res.data());
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel, single result version)
-    template<size_t nChannels> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _resc, const size_t _t, ushort& _res) {
+    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _resc, const Tt _t, Tr& _res) {
         static_assert(nChannels>0,"need at least one image channel");
+        static_assert(std::is_integral<Tt>::value,"internal threshold type must be integral");
+        static_assert(sizeof(Tr)>=LBSP::DESC_SIZE,"result type size is too small");
         CV_DbgAssert(!oInputImg.empty());
         CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _resc<nChannels);
         CV_DbgAssert(LBSP::DESC_SIZE==2);

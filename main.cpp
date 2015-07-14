@@ -10,7 +10,7 @@
 #define EVAL_RESULTS_ONLY                0
 #define WRITE_BGSUB_IMG_OUTPUT           0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
-#define WRITE_BGSUB_METRICS_ANALYSIS     0
+#define WRITE_BGSUB_METRICS_ANALYSIS     1
 #define DISPLAY_BGSUB_DEBUG_OUTPUT       0
 #define ENABLE_INTERNAL_TIMERS           0
 #define ENABLE_DISPLAY_MOUSE_DEBUG       0
@@ -106,6 +106,9 @@ int main() {
 #if PLATFORM_USES_WIN32API
     SetConsoleWindowSize(80,40,1000);
 #endif //PLATFORM_USES_WIN32API
+#if HAVE_SIMD_SUPPORT
+    ParallelUtils::checkSIMDSupport();
+#endif //HAVE_SIMD_SUPPORT
     std::cout << "Parsing dataset..." << std::endl;
     std::vector<std::shared_ptr<DatasetUtils::CategoryInfo>> vpCategories;
     for(auto oDatasetFolderPathIter=g_oDatasetInfo.vsDatasetFolderPaths.begin(); oDatasetFolderPathIter!=g_oDatasetInfo.vsDatasetFolderPaths.end(); ++oDatasetFolderPathIter) {
