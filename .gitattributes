@@ -3,6 +3,7 @@
 *.c text
 *.cpp text
 *.i text
+*.ipp text
 *.h text
 *.hpp text
 

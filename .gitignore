@@ -54,6 +54,7 @@ $RECYCLE.BIN/
 *.suo
 *.user
 *.sln.docstates
+.idea/
 
 # Build results #
 #################
