@@ -106,9 +106,6 @@ int main() {
 #if PLATFORM_USES_WIN32API
     SetConsoleWindowSize(80,40,1000);
 #endif //PLATFORM_USES_WIN32API
-#if HAVE_SIMD_SUPPORT
-    ParallelUtils::checkSIMDSupport();
-#endif //HAVE_SIMD_SUPPORT
     std::cout << "Parsing dataset..." << std::endl;
     std::vector<std::shared_ptr<DatasetUtils::CategoryInfo>> vpCategories;
     for(auto oDatasetFolderPathIter=g_oDatasetInfo.vsDatasetFolderPaths.begin(); oDatasetFolderPathIter!=g_oDatasetInfo.vsDatasetFolderPaths.end(); ++oDatasetFolderPathIter) {
@@ -268,9 +265,9 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,TARGET_GL_VER_MAJOR);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,TARGET_GL_VER_MINOR);
         glfwWindowHint(GLFW_RESIZABLE,GL_FALSE);
-#if !GLSL_RENDERING
+#if !DISPLAY_BGSUB_DEBUG_OUTPUT
         glfwWindowHint(GLFW_VISIBLE,GL_FALSE);
-#endif //!GLSL_RENDERING
+#endif //!DISPLAY_BGSUB_DEBUG_OUTPUT
         std::unique_ptr<GLFWwindow,void(*)(GLFWwindow*)> pWindow(glfwCreateWindow(oWindowSize.width,oWindowSize.height,"changedet_gpu",nullptr,nullptr),glfwDestroyWindow);
         if(!pWindow)
             glError("Failed to create window via GLFW");
@@ -395,12 +392,12 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
             if(glfwWindowShouldClose(pWindow.get()))
                 break;
             glfwPollEvents();
-#if GLSL_RENDERING
+#if DISPLAY_BGSUB_DEBUG_OUTPUT
             if(glfwGetKey(pWindow.get(),GLFW_KEY_ESCAPE) || glfwGetKey(pWindow.get(),GLFW_KEY_Q))
                 break;
             glfwSwapBuffers(pWindow.get());
             glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-#endif //GLSL_RENDERING
+#endif //DISPLAY_BGSUB_DEBUG_OUTPUT
 #endif //HAVE_GLSL
 #if NEED_FG_MASK
             pBGS->getLatestForegroundMask(oLastFGMask);

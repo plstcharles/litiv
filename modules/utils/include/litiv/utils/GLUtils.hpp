@@ -1,5 +1,6 @@
 #pragma once
 
+#include "litiv/utils/DefineUtils.hpp"
 #include <GL/glew.h>
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
@@ -13,20 +14,10 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/random.hpp>
 
-#ifndef XSTR_BASE
-#define XSTR_CONCAT(s1,s2) XSTR_CONCAT_BASE(s1,s2)
-#define XSTR_CONCAT_BASE(s1,s2) s1##s2
-#define XSTR(s) XSTR_BASE(s)
-#define XSTR_BASE(s) #s
-#endif //XSTR_BASE
-
 #define TARGET_GL_VER_MAJOR  4
 #define TARGET_GL_VER_MINOR  4
 #define TARGET_GLEW_EXPERIM  1
 #define TARGET_GL_VER_STR "GL_VERSION_" XSTR(TARGET_GL_VER_MAJOR) "_" XSTR(TARGET_GL_VER_MINOR)
-#ifdef _MSC_VER
-    #define __PRETTY_FUNCTION__ __FUNCSIG__
-#endif
 
 #define glError(msg) throw GLException(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__)
 #define glErrorExt(msg,...) throw GLException(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)

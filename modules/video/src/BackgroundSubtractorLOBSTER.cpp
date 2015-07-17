@@ -3,10 +3,6 @@
 #include <iomanip>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
-#if (HAVE_GLSL && !GLSL_RENDERING && BGSLOBSTER_GLSL_USE_DEBUG)
-#undef BGSLOBSTER_GLSL_USE_DEBUG
-#define BGSLOBSTER_GLSL_USE_DEBUG 0
-#endif //(HAVE_GLSL && !GLSL_RENDERING && BGSLOBSTER_GLSL_USE_DEBUG)
 
 BackgroundSubtractorLOBSTER::BackgroundSubtractorLOBSTER(  float fRelLBSPThreshold
                                                           ,size_t nLBSPThresholdOffset
@@ -16,7 +12,7 @@ BackgroundSubtractorLOBSTER::BackgroundSubtractorLOBSTER(  float fRelLBSPThresho
                                                           ,size_t nRequiredBGSamples)
     :    BackgroundSubtractorLBSP(fRelLBSPThreshold,nLBSPThresholdOffset)
 #if HAVE_GLSL
-        ,GLImageProcAlgo(1,1+BGSLOBSTER_GLSL_USE_POSTPROC,2,0,0,0,CV_8UC1,BGSLOBSTER_GLSL_USE_DEBUG?CV_8UC4:-1,true,GLSL_RENDERING,BGSLOBSTER_GLSL_USE_TIMERS,true)
+        ,GLImageProcAlgo(1,1+BGSLOBSTER_GLSL_USE_POSTPROC,2,0,0,0,CV_8UC1,BGSLOBSTER_GLSL_USE_DEBUG?CV_8UC4:-1,true,BGSLOBSTER_GLSL_USE_DEBUG,BGSLOBSTER_GLSL_USE_TIMERS,true)
 #endif //HAVE_GLSL
         ,m_nColorDistThreshold(nColorDistThreshold)
         ,m_nDescDistThreshold(nDescDistThreshold)

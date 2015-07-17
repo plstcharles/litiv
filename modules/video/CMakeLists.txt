@@ -13,6 +13,7 @@ file(GLOB INCLUDE_FILES
 add_library(litiv_video ${SOURCE_FILES})
 
 target_link_libraries(litiv_video litiv_features2d)
+target_compil_litiv_dependencies(litiv_video)
 target_include_directories(litiv_video
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
