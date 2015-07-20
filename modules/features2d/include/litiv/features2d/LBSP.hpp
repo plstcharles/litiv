@@ -48,67 +48,6 @@ public:
     //! batch version of LBSP::compute2(const cv::Mat& image, ...)
     void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat>& voDescCollection) const;
 
-    // @@@@@@@@@@@@@@ add lbsp compute utils to get pre-threshold absdiff values (uchar[16] vector)
-    // @@@@@@@@@@@@@@ add sse support to lbsp comp (128bit reg = 16x uchar!)
-
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (1-channel version)
-    template<typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const Tt _t, Tr& _res) {
-        static_assert(std::is_integral<Tt>::value,"internal threshold type must be integral");
-        static_assert(sizeof(Tr)>=LBSP::DESC_SIZE,"result type size is too small");
-        CV_DbgAssert(!oInputImg.empty());
-        CV_DbgAssert(oInputImg.type()==CV_8UC1);
-        CV_DbgAssert(LBSP::DESC_SIZE==2);
-        CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
-        CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
-        const size_t _step_row = oInputImg.step.p[0];
-        const uchar* const _data = oInputImg.data;
-        using namespace DistanceUtils;
-        #include "litiv/features2d/LBSP_16bits_dbcross_1ch.ipp"
-    }
-
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel version)
-    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, Tr _res[nChannels]) {
-        static_assert(nChannels>0,"need at least one image channel");
-        static_assert(std::is_integral<Tt>::value,"internal threshold type must be integral");
-        static_assert(sizeof(Tr)>=LBSP::DESC_SIZE,"result type size is too small");
-        CV_DbgAssert(!oInputImg.empty());
-        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels));
-        CV_DbgAssert(LBSP::DESC_SIZE==2);
-        CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
-        CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
-        const size_t _step_row = oInputImg.step.p[0];
-        const uchar* const _data = oInputImg.data;
-        using namespace DistanceUtils;
-        const size_t _c = nChannels;
-        #include "litiv/features2d/LBSP_16bits_dbcross.ipp"
-    }
-
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel version)
-    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, std::array<Tr,nChannels>& _res) {
-        LBSP::computeDescriptor(oInputImg,_ref,_x,_y,_t,_res.data());
-    }
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel version)
-    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const std::array<uchar,nChannels>& _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, std::array<Tr,nChannels>& _res) {
-        LBSP::computeDescriptor(oInputImg,_ref.data(),_x,_y,_t,_res.data());
-    }
-
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel, single result version)
-    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _resc, const Tt _t, Tr& _res) {
-        static_assert(nChannels>0,"need at least one image channel");
-        static_assert(std::is_integral<Tt>::value,"internal threshold type must be integral");
-        static_assert(sizeof(Tr)>=LBSP::DESC_SIZE,"result type size is too small");
-        CV_DbgAssert(!oInputImg.empty());
-        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _resc<nChannels);
-        CV_DbgAssert(LBSP::DESC_SIZE==2);
-        CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
-        CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
-        const size_t _step_row = oInputImg.step.p[0];
-        const uchar* const _data = oInputImg.data;
-        const size_t _c = nChannels;
-        using namespace DistanceUtils;
-        #include "litiv/features2d/LBSP_16bits_dbcross_1res.ipp"
-    }
-
     //! utility function, used to reshape a descriptors matrix to its input image size via their keypoint locations
     static void reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoints, const cv::Mat& oDescriptors, cv::Mat& oOutput);
     //! utility function, used to illustrate the difference between two descriptor images
@@ -125,6 +64,69 @@ public:
     //! utility function, returns the glsl source code required to describe an LBSP descriptor based on the image load store
     static std::string getShaderFunctionSource(size_t nChannels, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize);
 #endif //HAVE_GLSL
+
+//! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
+    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, std::array<Tr,nChannels>& _res) {
+        LBSP::computeDescriptor(oInputImg,_ref,_x,_y,_t,_res.data());
+    }
+    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
+    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const std::array<uchar,nChannels>& _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, std::array<Tr,nChannels>& _res) {
+        LBSP::computeDescriptor(oInputImg,_ref.data(),_x,_y,_t,_res.data());
+    }
+
+    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (single-channel lookup, single-channel array thresholding)
+    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _resc, const Tt _t, Tr& _res) {
+        alignas(16) std::array<uchar,LBSP::DESC_SIZE*8> _anVals;
+        computeDescriptor_lookup<nChannels>(oInputImg,_x,_y,_resc,_anVals);
+        computeDescriptor_threshold(_anVals,_ref,_t,_res);
+    }
+
+    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
+    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, Tr _res[nChannels]) {
+        alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE*8>,nChannels> _aanVals;
+        computeDescriptor_lookup(oInputImg,_x,_y,_aanVals);
+        for(size_t _resc=0; _resc<nChannels; ++_resc)
+            computeDescriptor_threshold(_aanVals[_resc],_ref[_resc],_t[_resc],_res[_resc]);
+    }
+
+    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (single-channel lookup only)
+    template<size_t nChannels> inline static void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, const size_t _resc, std::array<uchar,DESC_SIZE*8>& _anVals) {
+        static_assert(nChannels>0,"need at least one image channel");
+        CV_DbgAssert(!oInputImg.empty());
+        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _resc<nChannels);
+        CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
+        CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
+        const size_t _step_row = oInputImg.step.p[0];
+        const uchar* const _data = oInputImg.data;
+        const size_t _c = nChannels;
+        using namespace DistanceUtils;
+#include "litiv/features2d/LBSP_16bits_dbcross_lookup.ipp"
+    }
+
+    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup only)
+    template<size_t nChannels> inline static void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, std::array<std::array<uchar,DESC_SIZE*8>,nChannels>& _aanVals) {
+        static_assert(nChannels>0,"need at least one image channel");
+        CV_DbgAssert(!oInputImg.empty());
+        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _resc<nChannels);
+        CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
+        CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
+        const size_t _step_row = oInputImg.step.p[0];
+        const uchar* const _data = oInputImg.data;
+        const size_t _c = nChannels;
+        using namespace DistanceUtils;
+        for(size_t _resc=0; _resc<nChannels; ++_resc) {
+            std::array<uchar,LBSP::DESC_SIZE*8>& _anVals = _aanVals[_resc];
+#include "litiv/features2d/LBSP_16bits_dbcross_lookup.ipp"
+        }
+    }
+
+    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (array thresholding only)
+    template<typename Tt, typename Tr> inline static void computeDescriptor_threshold(const std::array<uchar,DESC_SIZE*8>& _anVals, const uchar _ref, const Tt _t, Tr& _res) {
+        static_assert(std::is_integral<Tt>::value,"internal threshold type must be integral");
+        static_assert(sizeof(Tr)>=LBSP::DESC_SIZE,"result type size is too small");
+        using namespace DistanceUtils;
+#include "litiv/features2d/LBSP_16bits_dbcross_threshold.ipp"
+    }
 
 protected:
     //! classic 'compute' implementation, based on the regular DescriptorExtractor::computeImpl arguments & expected output

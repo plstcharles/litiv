@@ -112,7 +112,7 @@ void BackgroundSubtractorLOBSTER::refreshModel(float fSamplesRefreshFrac, bool b
                             const size_t nSampleTotOffset_desc = nSampleOffset_desc+(nSampleChannelIdx*2);
                             m_vnBGModelData[nModelTotOffset_color] = (uint)m_oLastColorFrame.data[nSampleTotOffset_color];
                             if(m_nImgChannels==1)
-                                LBSP::computeDescriptor(m_oLastColorFrame,m_oLastColorFrame.data[nSampleTotOffset_color],nSampleColIdx,nSampleRowIdx,m_anLBSPThreshold_8bitLUT[m_oLastColorFrame.data[nSampleTotOffset_color]],*((ushort*)(m_oLastDescFrame.data+nSampleTotOffset_desc)));
+                                LBSP::computeDescriptor(m_oLastColorFrame,m_oLastColorFrame.data[nSampleTotOffset_color],nSampleColIdx,nSampleRowIdx,0,m_anLBSPThreshold_8bitLUT[m_oLastColorFrame.data[nSampleTotOffset_color]],*((ushort*)(m_oLastDescFrame.data+nSampleTotOffset_desc)));
                             else if(m_nImgChannels==3)
                                 LBSP::computeDescriptor<3>(m_oLastColorFrame,m_oLastColorFrame.data[nSampleTotOffset_color],nSampleColIdx,nSampleRowIdx,nChannelIdx,m_anLBSPThreshold_8bitLUT[m_oLastColorFrame.data[nSampleTotOffset_color]],*((ushort*)(m_oLastDescFrame.data+nSampleTotOffset_desc)));
                             else //m_nImgChannels==4
@@ -140,7 +140,7 @@ void BackgroundSubtractorLOBSTER::refreshModel(float fSamplesRefreshFrac, bool b
                     for(size_t c=0; c<m_nImgChannels; ++c) {
                         m_voBGColorSamples[nCurrRealModelSampleIdx].data[nPxIter*m_nImgChannels+c] = m_oLastColorFrame.data[nSamplePxIdx*m_nImgChannels+c];
                         if(m_nImgChannels==1)
-                            LBSP::computeDescriptor(m_oLastColorFrame,m_oLastColorFrame.data[nSamplePxIdx*m_nImgChannels+c],nSampleImgCoord_X,nSampleImgCoord_Y,m_anLBSPThreshold_8bitLUT[m_oLastColorFrame.data[nSamplePxIdx*m_nImgChannels+c]],*((ushort*)(m_oLastDescFrame.data+(nSamplePxIdx*m_nImgChannels+c)*2)));
+                            LBSP::computeDescriptor<1>(m_oLastColorFrame,m_oLastColorFrame.data[nSamplePxIdx*m_nImgChannels+c],nSampleImgCoord_X,nSampleImgCoord_Y,0,m_anLBSPThreshold_8bitLUT[m_oLastColorFrame.data[nSamplePxIdx*m_nImgChannels+c]],*((ushort*)(m_oLastDescFrame.data+(nSamplePxIdx*m_nImgChannels+c)*2)));
                         else if(m_nImgChannels==3)
                             LBSP::computeDescriptor<3>(m_oLastColorFrame,m_oLastColorFrame.data[nSamplePxIdx*m_nImgChannels+c],nSampleImgCoord_X,nSampleImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[m_oLastColorFrame.data[nSamplePxIdx*m_nImgChannels+c]],*((ushort*)(m_oLastDescFrame.data+(nSamplePxIdx*m_nImgChannels+c)*2)));
                         else //m_nImgChannels==4
@@ -468,15 +468,17 @@ void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArr
             const int nCurrImgCoord_X = m_voPxInfoLUT[nPxIter].nImgCoord_X;
             const int nCurrImgCoord_Y = m_voPxInfoLUT[nPxIter].nImgCoord_Y;
             const uchar nCurrColor = oInputImg.data[nPxIter];
+            alignas(16) std::array<uchar,LBSP::DESC_SIZE*8> anLBSPLookupVals;
+            LBSP::computeDescriptor_lookup<1>(oInputImg,nCurrImgCoord_X,nCurrImgCoord_Y,0,anLBSPLookupVals);
             size_t nGoodSamplesCount=0, nModelIdx=0;
-            ushort nCurrInputDesc;
             while(nGoodSamplesCount<m_nRequiredBGSamples && nModelIdx<m_nBGSamples) {
                 const uchar nBGColor = m_voBGColorSamples[nModelIdx].data[nPxIter];
                 {
                     const size_t nColorDist = DistanceUtils::L1dist(nCurrColor,nBGColor);
                     if(nColorDist>m_nColorDistThreshold/2)
                         goto failedcheck1ch;
-                    LBSP::computeDescriptor(oInputImg,nBGColor,nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[nBGColor],nCurrInputDesc);
+                    ushort nCurrInputDesc;
+                    LBSP::computeDescriptor_threshold(anLBSPLookupVals,nBGColor,m_anLBSPThreshold_8bitLUT[nBGColor],nCurrInputDesc);
                     const size_t nDescDist = DistanceUtils::hdist(nCurrInputDesc,*((ushort*)(m_voBGDescSamples[nModelIdx].data+nDescIter)));
                     if(nDescDist>m_nDescDistThreshold)
                         goto failedcheck1ch;
@@ -491,7 +493,7 @@ void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArr
                 if((rand()%nLearningRate)==0) {
                     const size_t nSampleModelIdx = rand()%m_nBGSamples;
                     ushort& nRandInputDesc = *((ushort*)(m_voBGDescSamples[nSampleModelIdx].data+nDescIter));
-                    LBSP::computeDescriptor(oInputImg,nCurrColor,nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[nCurrColor],nRandInputDesc);
+                    LBSP::computeDescriptor_threshold(anLBSPLookupVals,nCurrColor,m_anLBSPThreshold_8bitLUT[nCurrColor],nRandInputDesc);
                     m_voBGColorSamples[nSampleModelIdx].data[nPxIter] = nCurrColor;
                 }
                 if((rand()%nLearningRate)==0) {
@@ -499,7 +501,7 @@ void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArr
                     RandUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSampleModelIdx = rand()%m_nBGSamples;
                     ushort& nRandInputDesc = m_voBGDescSamples[nSampleModelIdx].at<ushort>(nSampleImgCoord_Y,nSampleImgCoord_X);
-                    LBSP::computeDescriptor(oInputImg,nCurrColor,nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[nCurrColor],nRandInputDesc);
+                    LBSP::computeDescriptor_threshold(anLBSPLookupVals,nCurrColor,m_anLBSPThreshold_8bitLUT[nCurrColor],nRandInputDesc);
                     m_voBGColorSamples[nSampleModelIdx].at<uchar>(nSampleImgCoord_Y,nSampleImgCoord_X) = nCurrColor;
                 }
             }
@@ -519,6 +521,8 @@ void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArr
             const size_t nPxIterRGB = nPxIter*3;
             const size_t nDescIterRGB = nPxIterRGB*2;
             const uchar* const anCurrColor = oInputImg.data+nPxIterRGB;
+            alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE*8>,3> aanLBSPLookupVals;
+            LBSP::computeDescriptor_lookup(oInputImg,nCurrImgCoord_X,nCurrImgCoord_Y,aanLBSPLookupVals);
             size_t nGoodSamplesCount=0, nModelIdx=0;
             while(nGoodSamplesCount<m_nRequiredBGSamples && nModelIdx<m_nBGSamples) {
                 const ushort* const anBGDesc = (ushort*)(m_voBGDescSamples[nModelIdx].data+nDescIterRGB);
@@ -530,7 +534,7 @@ void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArr
                     if(nColorDist>nCurrSCColorDistThreshold)
                         goto failedcheck3ch;
                     ushort nCurrInputDesc;
-                    LBSP::computeDescriptor<3>(oInputImg,anBGColor[c],nCurrImgCoord_X,nCurrImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[anBGColor[c]],nCurrInputDesc);
+                    LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],anBGColor[c],m_anLBSPThreshold_8bitLUT[anBGColor[c]],nCurrInputDesc);
                     const size_t nDescDist = DistanceUtils::hdist(nCurrInputDesc,anBGDesc[c]);
                     if(nDescDist>nCurrSCDescDistThreshold)
                         goto failedcheck3ch;
@@ -548,20 +552,20 @@ void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArr
                 if((rand()%nLearningRate)==0) {
                     const size_t nSampleModelIdx = rand()%m_nBGSamples;
                     ushort* anRandInputDesc = ((ushort*)(m_voBGDescSamples[nSampleModelIdx].data+nDescIterRGB));
-                    const std::array<size_t,3> anCurrIntraLBSPThresholds = {m_anLBSPThreshold_8bitLUT[anCurrColor[0]],m_anLBSPThreshold_8bitLUT[anCurrColor[1]],m_anLBSPThreshold_8bitLUT[anCurrColor[2]]};
-                    LBSP::computeDescriptor(oInputImg,anCurrColor,nCurrImgCoord_X,nCurrImgCoord_Y,anCurrIntraLBSPThresholds,anRandInputDesc);
-                    for(size_t c=0; c<3; ++c)
+                    for(size_t c=0; c<3; ++c) {
                         *(m_voBGColorSamples[nSampleModelIdx].data+nPxIterRGB+c) = anCurrColor[c];
+                        LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],anCurrColor[c],m_anLBSPThreshold_8bitLUT[anCurrColor[c]],anRandInputDesc[c]);
+                    }
                 }
                 if((rand()%nLearningRate)==0) {
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
                     RandUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSampleModelIdx = rand()%m_nBGSamples;
                     ushort* anRandInputDesc = ((ushort*)(m_voBGDescSamples[nSampleModelIdx].data + desc_row_step*nSampleImgCoord_Y + 6*nSampleImgCoord_X));
-                    const std::array<size_t,3> anCurrIntraLBSPThresholds = {m_anLBSPThreshold_8bitLUT[anCurrColor[0]],m_anLBSPThreshold_8bitLUT[anCurrColor[1]],m_anLBSPThreshold_8bitLUT[anCurrColor[2]]};
-                    LBSP::computeDescriptor(oInputImg,anCurrColor,nCurrImgCoord_X,nCurrImgCoord_Y,anCurrIntraLBSPThresholds,anRandInputDesc);
-                    for(size_t c=0; c<3; ++c)
-                        *(m_voBGColorSamples[nSampleModelIdx].data + img_row_step*nSampleImgCoord_Y + 3*nSampleImgCoord_X + c) = anCurrColor[c];
+                    for(size_t c=0; c<3; ++c) {
+                        *(m_voBGColorSamples[nSampleModelIdx].data+img_row_step*nSampleImgCoord_Y+3*nSampleImgCoord_X+c) = anCurrColor[c];
+                        LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],anCurrColor[c],m_anLBSPThreshold_8bitLUT[anCurrColor[c]],anRandInputDesc[c]);
+                    }
                 }
             }
         }

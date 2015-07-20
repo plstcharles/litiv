@@ -107,7 +107,7 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg, const cv::Mat
                 m_voPxInfoLUT[nPxIter].nModelIdx = nModelIter;
                 m_oLastColorFrame.data[nPxIter] = oInitImg.data[nPxIter];
                 const size_t nDescIter = nPxIter*2;
-                LBSP::computeDescriptor(oInitImg,oInitImg.data[nPxIter],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxIter]],*((ushort*)(m_oLastDescFrame.data+nDescIter)));
+                LBSP::computeDescriptor<1>(oInitImg,oInitImg.data[nPxIter],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,0,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxIter]],*((ushort*)(m_oLastDescFrame.data+nDescIter)));
                 ++nModelIter;
             }
         }
@@ -125,12 +125,21 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg, const cv::Mat
                 m_voPxInfoLUT[nPxIter].nModelIdx = nModelIter;
                 const size_t nPxRGBIter = nPxIter*m_nImgChannels;
                 const size_t nDescRGBIter = nPxRGBIter*2;
-                for(size_t c=0; c<m_nImgChannels; ++c) {
-                    m_oLastColorFrame.data[nPxRGBIter+c] = oInitImg.data[nPxRGBIter+c];
-                    if(m_nImgChannels==3)
-                        LBSP::computeDescriptor<3>(oInitImg,oInitImg.data[nPxRGBIter+c],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
-                    else //m_nImgChannels==4
-                        LBSP::computeDescriptor<4>(oInitImg,oInitImg.data[nPxRGBIter+c],m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,c,m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
+                if(m_nImgChannels==3) {
+                    alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE*8>,3> aanLBSPLookupVals;
+                    LBSP::computeDescriptor_lookup(oInitImg,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,aanLBSPLookupVals);
+                    for(size_t c=0; c<3; ++c) {
+                        m_oLastColorFrame.data[nPxRGBIter+c] = oInitImg.data[nPxRGBIter+c];
+                        LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],oInitImg.data[nPxRGBIter+c],m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
+                    }
+                }
+                else { //m_nImgChannels==4
+                    alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE*8>,4> aanLBSPLookupVals;
+                    LBSP::computeDescriptor_lookup(oInitImg,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,aanLBSPLookupVals);
+                    for(size_t c=0; c<4; ++c) {
+                        m_oLastColorFrame.data[nPxRGBIter+c] = oInitImg.data[nPxRGBIter+c];
+                        LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],oInitImg.data[nPxRGBIter+c],m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
+                    }
                 }
                 ++nModelIter;
             }

@@ -630,8 +630,10 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
 #endif //DISPLAY_PAWCS_DEBUG_INFO
             const int nCurrImgCoord_X = m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X;
             const int nCurrImgCoord_Y = m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y;
-            ushort nCurrInterDesc, nCurrIntraDesc;
-            LBSP::computeDescriptor(oInputImg,nCurrColor,nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[nCurrColor],nCurrIntraDesc);
+            alignas(16) std::array<uchar,LBSP::DESC_SIZE*8> anLBSPLookupVals;
+            LBSP::computeDescriptor_lookup<1>(oInputImg,nCurrImgCoord_X,nCurrImgCoord_Y,0,anLBSPLookupVals);
+            ushort nCurrIntraDesc;
+            LBSP::computeDescriptor_threshold(anLBSPLookupVals,nCurrColor,m_anLBSPThreshold_8bitLUT[nCurrColor],nCurrIntraDesc);
             const uchar nCurrIntraDescBITS = (uchar)DistanceUtils::popcount(nCurrIntraDesc);
             const bool bCurrRegionIsFlat = nCurrIntraDescBITS<FLAT_REGION_BIT_COUNT;
             if(bCurrRegionIsFlat)
@@ -657,7 +659,8 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                 {
                     const size_t nColorDist = DistanceUtils::L1dist(nCurrColor,oCurrLocalWord.oFeature.anColor[0]);
                     const size_t nIntraDescDist = DistanceUtils::hdist(nCurrIntraDesc,oCurrLocalWord.oFeature.anDesc[0]);
-                    LBSP::computeDescriptor(oInputImg,oCurrLocalWord.oFeature.anColor[0],nCurrImgCoord_X,nCurrImgCoord_Y,m_anLBSPThreshold_8bitLUT[oCurrLocalWord.oFeature.anColor[0]],nCurrInterDesc);
+                    ushort nCurrInterDesc;
+                    LBSP::computeDescriptor_threshold(anLBSPLookupVals,oCurrLocalWord.oFeature.anColor[0],m_anLBSPThreshold_8bitLUT[oCurrLocalWord.oFeature.anColor[0]],nCurrInterDesc);
                     const size_t nInterDescDist = DistanceUtils::hdist(nCurrInterDesc,oCurrLocalWord.oFeature.anDesc[0]);
                     const size_t nDescDist = (nIntraDescDist+nInterDescDist)/2;
                     if( (!bCurrRegionIsUnstable || bCurrRegionIsFlat || bCurrRegionIsROIBorder)
@@ -957,9 +960,11 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
 #endif //DISPLAY_PAWCS_DEBUG_INFO
             const int nCurrImgCoord_X = m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X;
             const int nCurrImgCoord_Y = m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y;
-            std::array<ushort,3> anCurrInterDesc, anCurrIntraDesc;
-            const std::array<size_t,3> anCurrIntraLBSPThresholds = {m_anLBSPThreshold_8bitLUT[anCurrColor[0]],m_anLBSPThreshold_8bitLUT[anCurrColor[1]],m_anLBSPThreshold_8bitLUT[anCurrColor[2]]};
-            LBSP::computeDescriptor(oInputImg,anCurrColor,nCurrImgCoord_X,nCurrImgCoord_Y,anCurrIntraLBSPThresholds,anCurrIntraDesc);
+            alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE*8>,3> aanLBSPLookupVals;
+            LBSP::computeDescriptor_lookup(oInputImg,nCurrImgCoord_X,nCurrImgCoord_Y,aanLBSPLookupVals);
+            std::array<ushort,3> anCurrIntraDesc;
+            for(size_t c=0; c<3; ++c)
+                LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],anCurrColor[c],m_anLBSPThreshold_8bitLUT[anCurrColor[c]],anCurrIntraDesc[c]);
             const uchar nCurrIntraDescBITS = (uchar)DistanceUtils::popcount(anCurrIntraDesc);
             const bool bCurrRegionIsFlat = nCurrIntraDescBITS<FLAT_REGION_BIT_COUNT*2;
             if(bCurrRegionIsFlat)
@@ -987,8 +992,9 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                     const size_t nColorDistortion = DistanceUtils::cdist(anCurrColor,oCurrLocalWord.oFeature.anColor);
                     const size_t nTotColorMixDist = DistanceUtils::cmixdist(nTotColorL1Dist,nColorDistortion);
                     const size_t nTotIntraDescDist = DistanceUtils::hdist(anCurrIntraDesc,oCurrLocalWord.oFeature.anDesc);
-                    const std::array<size_t,3> anCurrInterLBSPThresholds = {m_anLBSPThreshold_8bitLUT[oCurrLocalWord.oFeature.anColor[0]],m_anLBSPThreshold_8bitLUT[oCurrLocalWord.oFeature.anColor[1]],m_anLBSPThreshold_8bitLUT[oCurrLocalWord.oFeature.anColor[2]]};
-                    LBSP::computeDescriptor(oInputImg,oCurrLocalWord.oFeature.anColor,nCurrImgCoord_X,nCurrImgCoord_Y,anCurrInterLBSPThresholds,anCurrInterDesc);
+                    std::array<ushort,3> anCurrInterDesc;
+                    for(size_t c=0; c<3; ++c)
+                        LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],oCurrLocalWord.oFeature.anColor[c],m_anLBSPThreshold_8bitLUT[oCurrLocalWord.oFeature.anColor[c]],anCurrInterDesc[c]);
                     const size_t nTotInterDescDist = DistanceUtils::hdist(anCurrInterDesc,oCurrLocalWord.oFeature.anDesc);
                     const size_t nTotDescDist = (nTotIntraDescDist+nTotInterDescDist)/2;
                     if( (!bCurrRegionIsUnstable || bCurrRegionIsFlat || bCurrRegionIsROIBorder)

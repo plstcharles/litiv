@@ -70,7 +70,7 @@ static inline void lbsp_computeImpl(    const cv::Mat& oInputImg,
         for(size_t k=0; k<nKeyPoints; ++k) {
             const int x = (int)voKeyPoints[k].pt.x;
             const int y = (int)voKeyPoints[k].pt.y;
-            LBSP::computeDescriptor(oInputImg,oRefMat.at<uchar>(y,x),x,y,nThreshold,oDesc.at<ushort>((int)k));
+            LBSP::computeDescriptor<1>(oInputImg,oRefMat.at<uchar>(y,x),x,y,0,nThreshold,oDesc.at<ushort>((int)k));
         }
         return;
     }
@@ -114,7 +114,7 @@ static inline void lbsp_computeImpl(    const cv::Mat& oInputImg,
             const int y = (int)voKeyPoints[k].pt.y;
             const size_t nThreshold = (size_t)(oRefMat.at<uchar>(y,x)*fThreshold)+nThresholdOffset;
             ushort& nResult = bSingleColumnDesc?oDesc.at<ushort>((int)k):oDesc.at<ushort>(y,x);
-            LBSP::computeDescriptor(oInputImg,oRefMat.at<uchar>(y,x),x,y,nThreshold,nResult);
+            LBSP::computeDescriptor<1>(oInputImg,oRefMat.at<uchar>(y,x),x,y,0,nThreshold,nResult);
         }
     }
     else { //nChannels==3
