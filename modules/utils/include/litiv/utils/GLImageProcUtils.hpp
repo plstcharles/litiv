@@ -128,7 +128,7 @@ private:
 class GLImageProcEvaluatorAlgo : public GLImageProcAlgo {
 public:
     GLImageProcEvaluatorAlgo(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount, size_t nCountersPerFrame,
-                    int nDebugType, int nGroundtruthType, bool bUseIntegralFormat);
+                             int nDebugType, int nGroundtruthType, bool bUseIntegralFormat);
     virtual ~GLImageProcEvaluatorAlgo();
     const cv::Mat& getEvaluationAtomicCounterBuffer();
     virtual std::string getFragmentShaderSource() const;

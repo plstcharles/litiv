@@ -54,7 +54,7 @@ namespace PlatformUtils {
         return digits;
     }
 
-    inline bool string_contains_token(const std::string& s, const std::vector<std::string> tokens) {
+    inline bool string_contains_token(const std::string& s, const std::vector<std::string>& tokens) {
         for(size_t i=0; i<tokens.size(); ++i)
             if(s.find(tokens[i])!=std::string::npos)
                 return true;
