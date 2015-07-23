@@ -1,7 +1,7 @@
 #pragma once
 
 // compile-time master switches for GPU/SIMD/threads usage
-#define HAVE_GPU_SUPPORT    0
+#define HAVE_GPU_SUPPORT    1
 #define HAVE_SIMD_SUPPORT   1
 #define DEFAULT_NB_THREADS  1
 

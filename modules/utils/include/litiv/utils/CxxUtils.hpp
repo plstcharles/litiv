@@ -8,6 +8,7 @@
 #include <mutex>
 #include <chrono>
 #include <atomic>
+#include <functional>
 #include <condition_variable>
 
 namespace CxxUtils {

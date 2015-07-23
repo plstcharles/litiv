@@ -523,8 +523,8 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
     return ssSrc.str();
 }
 
-GLEvaluatorAlgo::GLEvaluatorAlgo(   const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount, size_t nCountersPerFrame,
-                                    int nDebugType, int nGroundtruthType, bool bUseIntegralFormat)
+GLImageProcEvaluatorAlgo::GLImageProcEvaluatorAlgo( const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount, size_t nCountersPerFrame,
+                                                    int nDebugType, int nGroundtruthType, bool bUseIntegralFormat)
     // note: using extra buffers/images/textures would force rebinding for each iterations due to diamond dependency over enum lists
     :    GLImageProcAlgo(1,1,0,0,0,0,-1,nDebugType,true,pParent->m_bUsingDisplay,false,bUseIntegralFormat)
         ,m_nGroundtruthType(nGroundtruthType)
@@ -538,7 +538,7 @@ GLEvaluatorAlgo::GLEvaluatorAlgo(   const std::shared_ptr<GLImageProcAlgo>& pPar
         ,m_pParent(pParent) {
     glAssert(m_bUsingInput && m_pParent->m_bUsingOutput);
     glAssert(m_nGroundtruthType>=0 && m_nGroundtruthType==m_pParent->m_nOutputType);
-    glAssert(!dynamic_cast<GLEvaluatorAlgo*>(m_pParent.get()));
+    glAssert(!dynamic_cast<GLImageProcEvaluatorAlgo*>(m_pParent.get()));
     glAssert(nTotFrameCount>0 && nCountersPerFrame>0);
     glAssert(m_nEvalBufferMaxSize>nCountersPerFrame*4);
     if(m_nEvalBufferMaxSize<=m_nCurrEvalBufferSize) {
@@ -550,9 +550,9 @@ GLEvaluatorAlgo::GLEvaluatorAlgo(   const std::shared_ptr<GLImageProcAlgo>& pPar
     m_pParent->m_bUsingDisplay = false;
 }
 
-GLEvaluatorAlgo::~GLEvaluatorAlgo() {}
+GLImageProcEvaluatorAlgo::~GLImageProcEvaluatorAlgo() {}
 
-const cv::Mat& GLEvaluatorAlgo::getEvaluationAtomicCounterBuffer() {
+const cv::Mat& GLImageProcEvaluatorAlgo::getEvaluationAtomicCounterBuffer() {
     glAssert(m_bGLInitialized);
     glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER,getACBOId(GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding));
@@ -561,16 +561,16 @@ const cv::Mat& GLEvaluatorAlgo::getEvaluationAtomicCounterBuffer() {
     return m_oEvalQueryBuffer;
 }
 
-std::string GLEvaluatorAlgo::getFragmentShaderSource() const {
+std::string GLImageProcEvaluatorAlgo::getFragmentShaderSource() const {
     return GLImageProcAlgo::getFragmentShaderSource_internal(-1,m_nDebugType,m_pParent->m_nInputType);
 }
 
-void GLEvaluatorAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oInitGT, const cv::Mat& oROI) {
+void GLImageProcEvaluatorAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oInitGT, const cv::Mat& oROI) {
     m_pParent->initialize(oInitInput,oROI);
     this->initialize(oInitGT,oROI);
 }
 
-void GLEvaluatorAlgo::initialize(const cv::Mat& oInitGT, const cv::Mat& oROI) {
+void GLImageProcEvaluatorAlgo::initialize(const cv::Mat& oInitGT, const cv::Mat& oROI) {
     glAssert(!oROI.empty() && oROI.isContinuous() && oROI.type()==CV_8UC1);
     glAssert(oROI.size()==m_pParent->m_oFrameSize);
     glAssert(oInitGT.type()==m_nGroundtruthType && oInitGT.size()==oROI.size() && oInitGT.isContinuous());
@@ -655,12 +655,12 @@ void GLEvaluatorAlgo::initialize(const cv::Mat& oInitGT, const cv::Mat& oROI) {
     m_bGLInitialized = true;
 }
 
-void GLEvaluatorAlgo::apply(const cv::Mat& oNextInput, const cv::Mat& oNextGT, bool bRebindAll) {
+void GLImageProcEvaluatorAlgo::apply(const cv::Mat& oNextInput, const cv::Mat& oNextGT, bool bRebindAll) {
     m_pParent->apply(oNextInput,bRebindAll);
     this->apply(oNextGT,bRebindAll);
 }
 
-void GLEvaluatorAlgo::apply(const cv::Mat& oNextGT, bool bRebindAll) {
+void GLImageProcEvaluatorAlgo::apply(const cv::Mat& oNextGT, bool bRebindAll) {
     glAssert(m_bGLInitialized && (oNextGT.empty() || (oNextGT.type()==m_nGroundtruthType && oNextGT.size()==m_oFrameSize && oNextGT.isContinuous())));
     CV_Assert(m_nInternalFrameIdx<m_nTotFrameCount);
     m_nLastLayer = m_nCurrLayer;

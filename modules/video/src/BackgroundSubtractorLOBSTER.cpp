@@ -112,7 +112,7 @@ void BackgroundSubtractorLOBSTER::refreshModel(float fSamplesRefreshFrac, bool b
                             const size_t nSampleTotOffset_desc = nSampleOffset_desc+(nSampleChannelIdx*2);
                             m_vnBGModelData[nModelTotOffset_color] = (uint)m_oLastColorFrame.data[nSampleTotOffset_color];
                             if(m_nImgChannels==1)
-                                LBSP::computeDescriptor(m_oLastColorFrame,m_oLastColorFrame.data[nSampleTotOffset_color],nSampleColIdx,nSampleRowIdx,0,m_anLBSPThreshold_8bitLUT[m_oLastColorFrame.data[nSampleTotOffset_color]],*((ushort*)(m_oLastDescFrame.data+nSampleTotOffset_desc)));
+                                LBSP::computeDescriptor<1>(m_oLastColorFrame,m_oLastColorFrame.data[nSampleTotOffset_color],nSampleColIdx,nSampleRowIdx,0,m_anLBSPThreshold_8bitLUT[m_oLastColorFrame.data[nSampleTotOffset_color]],*((ushort*)(m_oLastDescFrame.data+nSampleTotOffset_desc)));
                             else if(m_nImgChannels==3)
                                 LBSP::computeDescriptor<3>(m_oLastColorFrame,m_oLastColorFrame.data[nSampleTotOffset_color],nSampleColIdx,nSampleRowIdx,nChannelIdx,m_anLBSPThreshold_8bitLUT[m_oLastColorFrame.data[nSampleTotOffset_color]],*((ushort*)(m_oLastDescFrame.data+nSampleTotOffset_desc)));
                             else //m_nImgChannels==4

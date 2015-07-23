@@ -10,7 +10,7 @@
 #define EVAL_RESULTS_ONLY                0
 #define WRITE_BGSUB_IMG_OUTPUT           0
 #define WRITE_BGSUB_DEBUG_IMG_OUTPUT     0
-#define WRITE_BGSUB_METRICS_ANALYSIS     1
+#define WRITE_BGSUB_METRICS_ANALYSIS     0
 #define DISPLAY_BGSUB_DEBUG_OUTPUT       0
 #define ENABLE_INTERNAL_TIMERS           0
 #define ENABLE_DISPLAY_MOUSE_DEBUG       0
@@ -31,6 +31,7 @@
 #define DATASET_ID             eDataset_CDnet2014
 #define DATASET_ROOT_PATH      std::string("/shared2/datasets/")
 #define DATASET_RESULTS_PATH   std::string("results")
+#define DATASET_PRECACHING     1
 //////////////////////////////////////////
 #if (HAVE_GLSL && GLSL_EVALUATION)
 #if !(DATASET_ID==eDataset_CDnet2014 || DATASET_ID==eDataset_CDnet2012)
@@ -92,11 +93,11 @@ const std::vector<int> g_vnResultsComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
 cv::Size g_oDisplayOutputSize(960,240);
 bool g_bContinuousUpdates = false;
 #endif //NEED_BG_IMG
-const DatasetUtils::DatasetInfo& g_oDatasetInfo = DatasetUtils::GetDatasetInfo(DatasetUtils::DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH);
+const DatasetUtils::VideoSegm::DatasetInfo& g_oDatasetInfo = DatasetUtils::VideoSegm::GetDatasetInfo(DatasetUtils::VideoSegm::DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH);
 #if (HAVE_GPU_SUPPORT && DEFAULT_NB_THREADS>1)
 #warning "Cannot support multithreading + gpu exec, will keep one main thread + gpu instead"
 #endif //(HAVE_GPU_SUPPORT && DEFAULT_NB_THREADS>1)
-int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> pCurrSequence, const std::string& sCurrResultsPath);
+int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::VideoSegm::SequenceInfo> pCurrSequence, const std::string& sCurrResultsPath);
 #if !HAVE_GPU_SUPPORT
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
 std::atomic_size_t g_nActiveThreads(0);
@@ -107,20 +108,20 @@ int main() {
     SetConsoleWindowSize(80,40,1000);
 #endif //PLATFORM_USES_WIN32API
     std::cout << "Parsing dataset..." << std::endl;
-    std::vector<std::shared_ptr<DatasetUtils::CategoryInfo>> vpCategories;
-    for(auto oDatasetFolderPathIter=g_oDatasetInfo.vsDatasetFolderPaths.begin(); oDatasetFolderPathIter!=g_oDatasetInfo.vsDatasetFolderPaths.end(); ++oDatasetFolderPathIter) {
+    std::vector<std::shared_ptr<DatasetUtils::VideoSegm::CategoryInfo>> vpCategories;
+    for(auto oDatasetFolderPathIter=g_oDatasetInfo.vsFolderPaths.begin(); oDatasetFolderPathIter!=g_oDatasetInfo.vsFolderPaths.end(); ++oDatasetFolderPathIter) {
         try {
-            vpCategories.push_back(std::make_shared<DatasetUtils::CategoryInfo>(*oDatasetFolderPathIter,g_oDatasetInfo.sDatasetPath+*oDatasetFolderPathIter,g_oDatasetInfo.eID,g_oDatasetInfo.vsDatasetGrayscaleDirPathTokens,g_oDatasetInfo.vsDatasetSkippedDirPathTokens,HAVE_GPU_SUPPORT));
+            vpCategories.push_back(std::make_shared<DatasetUtils::VideoSegm::CategoryInfo>(*oDatasetFolderPathIter,g_oDatasetInfo.sDatasetPath+*oDatasetFolderPathIter,g_oDatasetInfo.eID,g_oDatasetInfo.vsGrayscaleNameTokens,g_oDatasetInfo.vsSkippedNameTokens,HAVE_GPU_SUPPORT));
         } catch(std::runtime_error& e) { std::cout << e.what() << std::endl; }
     }
     size_t nSeqTotal = 0;
     size_t nFramesTotal = 0;
-    std::multimap<double,std::shared_ptr<DatasetUtils::SequenceInfo>> mSeqLoads;
+    std::multimap<double,std::shared_ptr<DatasetUtils::VideoSegm::SequenceInfo>> mSeqLoads;
     for(auto pCurrCategory=vpCategories.begin(); pCurrCategory!=vpCategories.end(); ++pCurrCategory) {
         nSeqTotal += (*pCurrCategory)->m_vpSequences.size();
         for(auto pCurrSequence=(*pCurrCategory)->m_vpSequences.begin(); pCurrSequence!=(*pCurrCategory)->m_vpSequences.end(); ++pCurrSequence) {
-            nFramesTotal += (*pCurrSequence)->GetNbInputFrames();
-            mSeqLoads.insert(std::make_pair((*pCurrSequence)->m_dExpectedROILoad,(*pCurrSequence)));
+            nFramesTotal += (*pCurrSequence)->GetTotalImageCount();
+            mSeqLoads.insert(std::make_pair((*pCurrSequence)->GetExpectedLoad(),(*pCurrSequence)));
         }
     }
     CV_Assert(mSeqLoads.size()==nSeqTotal);
@@ -134,20 +135,19 @@ int main() {
 #if EVAL_RESULTS_ONLY
         std::cout << "Executing background subtraction evaluation..." << std::endl;
         for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
-            std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
-            for(size_t nCurrFrameIdx=0; nCurrFrameIdx<oSeqIter->second->GetNbGTFrames(); ++nCurrFrameIdx) {
-                cv::Mat oCurrGTMask = oSeqIter->second->GetGTFrameFromIndex(nCurrFrameIdx);
-                cv::Mat oCurrFGMask = DatasetUtils::ReadResult(sCurrResultsPath,oSeqIter->second->m_pParent->m_sName,oSeqIter->second->m_sName,g_oDatasetInfo.sResultPrefix,nCurrFrameIdx+g_oDatasetInfo.nResultIdxOffset,g_oDatasetInfo.sResultSuffix);
-                DatasetUtils::CalcMetricsFromResult(oCurrFGMask,oCurrGTMask,oSeqIter->second->GetSequenceROI(),oSeqIter->second->nTP,oSeqIter->second->nTN,oSeqIter->second->nFP,oSeqIter->second->nFN,oSeqIter->second->nSE);
+            std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_sParentName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
+            for(size_t nCurrFrameIdx=0; nCurrFrameIdx<oSeqIter->second->GetTotalImageCount(); ++nCurrFrameIdx) {
+                cv::Mat oCurrGTMask = oSeqIter->second->GetGTFromIndex(nCurrFrameIdx);
+                cv::Mat oCurrFGMask = DatasetUtils::VideoSegm::ReadResult(sCurrResultsPath,oSeqIter->second->m_sParentName,oSeqIter->second->m_sName,g_oDatasetInfo.sResultPrefix,nCurrFrameIdx+g_oDatasetInfo.nResultIdxOffset,g_oDatasetInfo.sResultSuffix);
+                DatasetUtils::VideoSegm::CDnet::AccumulateMetricsFromResult(oCurrFGMask,oCurrGTMask,oSeqIter->second->GetROI(),oSeqIter->second->m_oMetrics);
             }
             ++nSeqProcessed;
         }
-        const double dFinalFPS = 0.0;
 #else //!EVAL_RESULTS_ONLY
         PlatformUtils::CreateDirIfNotExist(sCurrResultsPath);
         for(size_t c=0; c<vpCategories.size(); ++c)
             PlatformUtils::CreateDirIfNotExist(sCurrResultsPath+vpCategories[c]->m_sName+"/");
-        time_t nStartupTime = time(nullptr);
+        const time_t nStartupTime = time(nullptr);
         const std::string sStartupTimeStr(asctime(localtime(&nStartupTime)));
         std::cout << "[" << sStartupTimeStr.substr(0,sStartupTimeStr.size()-1) << "]" << std::endl;
 #if !HAVE_GPU_SUPPORT && DEFAULT_NB_THREADS>1
@@ -157,7 +157,7 @@ int main() {
 #endif //DEFAULT_NB_THREADS==1
 #if HAVE_GPU_SUPPORT
         for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
-            std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
+            std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_sParentName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
             ++nSeqProcessed;
             AnalyzeSequence(0,oSeqIter->second,sCurrResultsPath);
         }
@@ -165,7 +165,7 @@ int main() {
         for(auto oSeqIter=mSeqLoads.rbegin(); oSeqIter!=mSeqLoads.rend(); ++oSeqIter) {
             while(g_nActiveThreads>=g_nMaxThreads)
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-            std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_pParent->m_sName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
+            std::cout << "\tProcessing [" << nSeqProcessed << "/" << nSeqTotal << "] (" << oSeqIter->second->m_sParentName << ":" << oSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << oSeqIter->first << ")" << std::endl;
             ++g_nActiveThreads;
             ++nSeqProcessed;
             std::thread(AnalyzeSequence,nSeqProcessed,oSeqIter->second,sCurrResultsPath).detach();
@@ -173,9 +173,7 @@ int main() {
         while(g_nActiveThreads>0)
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 #endif //!HAVE_GPU_SUPPORT
-        time_t nShutdownTime = time(nullptr);
-        const double dFinalFPS = (nShutdownTime-nStartupTime)>0?(double)nFramesTotal/(nShutdownTime-nStartupTime):std::numeric_limits<double>::quiet_NaN();
-        std::cout << "Execution completed; " << nFramesTotal << " frames over " << (nShutdownTime-nStartupTime) << " sec = " << std::fixed << std::setprecision(1) << dFinalFPS << " FPS overall" << std::endl;
+        const time_t nShutdownTime = time(nullptr);
         const std::string sShutdownTimeStr(asctime(localtime(&nShutdownTime)));
         std::cout << "[" << sShutdownTimeStr.substr(0,sShutdownTimeStr.size()-1) << "]\n" << std::endl;
 #endif //!EVAL_RESULTS_ONLY
@@ -183,21 +181,15 @@ int main() {
         std::cout << "Summing and writing metrics results..." << std::endl;
         for(size_t c=0; c<vpCategories.size(); ++c) {
             if(!vpCategories[c]->m_vpSequences.empty()) {
-                for(size_t s=0; s<vpCategories[c]->m_vpSequences.size(); ++s) {
-                    vpCategories[c]->nTP += vpCategories[c]->m_vpSequences[s]->nTP;
-                    vpCategories[c]->nTN += vpCategories[c]->m_vpSequences[s]->nTN;
-                    vpCategories[c]->nFP += vpCategories[c]->m_vpSequences[s]->nFP;
-                    vpCategories[c]->nFN += vpCategories[c]->m_vpSequences[s]->nFN;
-                    vpCategories[c]->nSE += vpCategories[c]->m_vpSequences[s]->nSE;
-                    DatasetUtils::WriteMetrics(sCurrResultsPath+vpCategories[c]->m_sName+"/"+vpCategories[c]->m_vpSequences[s]->m_sName+".txt",*vpCategories[c]->m_vpSequences[s]);
-                }
-                std::sort(vpCategories[c]->m_vpSequences.begin(),vpCategories[c]->m_vpSequences.end(),&DatasetUtils::SequenceInfo::compare);
-                DatasetUtils::WriteMetrics(sCurrResultsPath+vpCategories[c]->m_sName+".txt",*vpCategories[c]);
+                for(size_t s=0; s<vpCategories[c]->m_vpSequences.size(); ++s)
+                    DatasetUtils::VideoSegm::SequenceInfo::WriteMetrics(sCurrResultsPath+vpCategories[c]->m_sName+"/"+vpCategories[c]->m_vpSequences[s]->m_sName+".txt",*vpCategories[c]->m_vpSequences[s]);
+                std::sort(vpCategories[c]->m_vpSequences.begin(),vpCategories[c]->m_vpSequences.end(),DatasetUtils::VideoSegm::SequenceInfo::compare<DatasetUtils::VideoSegm::SequenceInfo>);
+                DatasetUtils::VideoSegm::CategoryInfo::WriteMetrics(sCurrResultsPath+vpCategories[c]->m_sName+".txt",*vpCategories[c]);
                 std::cout << std::endl;
             }
         }
-        std::sort(vpCategories.begin(),vpCategories.end(),&DatasetUtils::CategoryInfo::compare);
-        DatasetUtils::WriteMetrics(sCurrResultsPath+"METRICS_TOTAL.txt",vpCategories,dFinalFPS);
+        std::sort(vpCategories.begin(),vpCategories.end(),&DatasetUtils::VideoSegm::CategoryInfo::compare<DatasetUtils::VideoSegm::CategoryInfo>);
+        DatasetUtils::VideoSegm::CategoryInfo::WriteMetrics(sCurrResultsPath+"METRICS_TOTAL.txt",vpCategories);
         g_oDebugFS.release();
 #endif //WRITE_BGSUB_METRICS_ANALYSIS
         std::cout << "All done." << std::endl;
@@ -206,39 +198,39 @@ int main() {
         std::cout << "No sequences found, all done." << std::endl;
 }
 
-int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> pCurrSequence, const std::string& sCurrResultsPath) {
+int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::VideoSegm::SequenceInfo> pCurrSequence, const std::string& sCurrResultsPath) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
-    CV_Assert(pCurrSequence.get() && !sCurrResultsPath.empty());
     size_t nCurrFrameIdx = 0;
 #if HAVE_GPU_SUPPORT
     size_t nNextFrameIdx = nCurrFrameIdx+1;
     bool bGPUContextInitialized = false;
 #endif //HAVE_GPU_SUPPORT
     try {
-        CV_Assert(pCurrSequence && pCurrSequence->GetNbInputFrames()>1);
-#if DATASETUTILS_USE_PRECACHED_IO
+        CV_Assert(pCurrSequence.get() && pCurrSequence->GetTotalImageCount()>1 && !sCurrResultsPath.empty());
+#if DATASET_PRECACHING
         pCurrSequence->StartPrecaching();
-#endif //DATASETUTILS_USE_PRECACHED_IO
+#endif //DATASET_PRECACHING
         const std::string sCurrSeqName = pCurrSequence->m_sName.size()>12?pCurrSequence->m_sName.substr(0,12):pCurrSequence->m_sName;
-        const size_t nFrameCount = pCurrSequence->GetNbInputFrames();
-        const cv::Mat oROI = LIMIT_MODEL_TO_SEQUENCE_ROI?pCurrSequence->GetSequenceROI():cv::Mat();
-        cv::Mat oCurrInputFrame = pCurrSequence->GetInputFrameFromIndex(nCurrFrameIdx).clone();
-        CV_Assert(!oCurrInputFrame.empty() && oCurrInputFrame.isContinuous());
+        const size_t nFrameCount = pCurrSequence->GetTotalImageCount();
+        const cv::Mat oROI = LIMIT_MODEL_TO_SEQUENCE_ROI?pCurrSequence->GetROI():cv::Mat();
+        cv::Mat oCurrInputFrame = pCurrSequence->GetInputFromIndex(nCurrFrameIdx).clone();
+        CV_Assert(!oCurrInputFrame.empty());
+        CV_Assert(oCurrInputFrame.isContinuous());
 #if NEED_GT_MASK
-        cv::Mat oCurrGTMask = pCurrSequence->GetGTFrameFromIndex(nCurrFrameIdx).clone();
+        cv::Mat oCurrGTMask = pCurrSequence->GetGTFromIndex(nCurrFrameIdx).clone();
         CV_Assert(!oCurrGTMask.empty() && oCurrGTMask.isContinuous());
 #endif //NEED_GT_MASK
 #if HAVE_GPU_SUPPORT
 #if NEED_BG_IMG
         cv::Mat oLastInputFrame = oCurrInputFrame.clone();
 #endif //NEED_BG_IMG
-        cv::Mat oNextInputFrame = pCurrSequence->GetInputFrameFromIndex(nNextFrameIdx);
+        cv::Mat oNextInputFrame = pCurrSequence->GetInputFromIndex(nNextFrameIdx);
 #if NEED_GT_MASK
 #if NEED_LAST_GT_MASK
         cv::Mat oLastGTMask = oCurrGTMask.clone();
 #endif // NEED_LAST_GT_MASK
-        cv::Mat oNextGTMask = pCurrSequence->GetGTFrameFromIndex(nNextFrameIdx);
+        cv::Mat oNextGTMask = pCurrSequence->GetGTFromIndex(nNextFrameIdx);
 #endif //NEED_GT_MASK
 #if NEED_FG_MASK
         cv::Mat oLastFGMask(oCurrInputFrame.size(),CV_8UC1,cv::Scalar_<uchar>(0));
@@ -306,7 +298,7 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
         pBGS->initialize(oCurrInputFrame);
 #endif //USE_VIBE_BGSUB || USE_PBAS_BGSUB
 #if USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB
-        pBGS->m_sDebugName = pCurrSequence->m_pParent->m_sName+"_"+pCurrSequence->m_sName;
+        pBGS->m_sDebugName = pCurrSequence->m_sParentName+"_"+pCurrSequence->m_sName;
 #if WRITE_BGSUB_METRICS_ANALYSIS
         pBGS->m_pDebugFS = &g_oDebugFS;
 #endif //WRITE_BGSUB_METRICS_ANALYSIS
@@ -316,22 +308,22 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
 #endif //USE_LOBSTER_BGSUB || USE_SUBSENSE_BGSUB || USE_PAWCS_BGSUB
 #if DISPLAY_BGSUB_DEBUG_OUTPUT
-        std::string sDebugDisplayName = pCurrSequence->m_pParent->m_sName + std::string(" -- ") + pCurrSequence->m_sName;
+        std::string sDebugDisplayName = pCurrSequence->m_sParentName + std::string(" -- ") + pCurrSequence->m_sName;
         cv::namedWindow(sDebugDisplayName);
 #endif //DISPLAY_BGSUB_DEBUG_OUTPUT
 #if ENABLE_DISPLAY_MOUSE_DEBUG
-        std::string sMouseDebugDisplayName = pCurrSequence->m_pParent->m_sName + std::string(" -- ") + pCurrSequence->m_sName + " [MOUSE DEBUG]";
+        std::string sMouseDebugDisplayName = pCurrSequence->m_sParentName + std::string(" -- ") + pCurrSequence->m_sName + " [MOUSE DEBUG]";
         cv::namedWindow(sMouseDebugDisplayName,0);
         cv::setMouseCallback(sMouseDebugDisplayName,OnMouseEvent,nullptr);
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
 #if (WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT)
         CV_Assert(!sCurrResultsPath.empty());
-        PlatformUtils::CreateDirIfNotExist(sCurrResultsPath+pCurrSequence->m_pParent->m_sName+"/"+pCurrSequence->m_sName+"/");
+        PlatformUtils::CreateDirIfNotExist(sCurrResultsPath+pCurrSequence->m_sParentName+"/"+pCurrSequence->m_sName+"/");
 #if WRITE_BGSUB_DEBUG_IMG_OUTPUT
-        cv::VideoWriter oDebugWriter(sCurrResultsPath+pCurrSequence->m_pParent->m_sName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,g_oDisplayOutputSize,true);
+        cv::VideoWriter oDebugWriter(sCurrResultsPath+pCurrSequence->m_sParentName+"/"+pCurrSequence->m_sName+".avi",CV_FOURCC('X','V','I','D'),30,g_oDisplayOutputSize,true);
 #endif //WRITE_BGSUB_DEBUG_IMG_OUTPUT
 #if WRITE_BGSUB_SEGM_AVI_OUTPUT
-        cv::VideoWriter oSegmWriter(sCurrResultsPath+pCurrSequence->m_pParent->m_sName+"/"+pCurrSequence->m_sName+"_segm.avi",CV_FOURCC('F','F','V','1'),30,pCurrSequence->GetSize(),false);
+        cv::VideoWriter oSegmWriter(sCurrResultsPath+pCurrSequence->m_sParentName+"/"+pCurrSequence->m_sName+"_segm.avi",CV_FOURCC('F','F','V','1'),30,pCurrSequence->GetImageSize(),false);
 #endif //WRITE_BGSUB_SEGM_AVI_OUTPUT
 #endif //(WRITE_BGSUB_IMG_OUTPUT || WRITE_BGSUB_DEBUG_IMG_OUTPUT || WRITE_BGSUB_SEGM_AVI_OUTPUT)
 #if HAVE_GLSL
@@ -340,7 +332,7 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
             glError("BGSub algorithm has no GLImageProcAlgo interface");
         pBGS_GPU->setOutputFetching(NEED_FG_MASK);
 #if (GLSL_EVALUATION && WRITE_BGSUB_METRICS_ANALYSIS)
-        std::shared_ptr<DatasetUtils::CDNetEvaluator> pBGS_GPU_EVAL(new DatasetUtils::CDNetEvaluator(pBGS_GPU,nFrameCount));
+        std::shared_ptr<DatasetUtils::VideoSegm::CDnet::Evaluator> pBGS_GPU_EVAL(new DatasetUtils::VideoSegm::CDnet::Evaluator(pBGS_GPU,nFrameCount));
         pBGS_GPU_EVAL->initialize(oCurrGTMask,oROI.empty()?cv::Mat(oCurrInputFrame.size(),CV_8UC1,cv::Scalar_<uchar>(255)):oROI);
         oWindowSize.width *= pBGS_GPU_EVAL->m_nSxSDisplayCount;
 #else //!(GLSL_EVALUATION && WRITE_BGSUB_METRICS_ANALYSIS)
@@ -373,7 +365,7 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
             oNextInputFrame.copyTo(oCurrInputFrame);
 #endif //NEED_BG_IMG
             if(++nNextFrameIdx<nFrameCount)
-                oNextInputFrame = pCurrSequence->GetInputFrameFromIndex(nNextFrameIdx);
+                oNextInputFrame = pCurrSequence->GetInputFromIndex(nNextFrameIdx);
 #if ENABLE_DISPLAY_MOUSE_DEBUG
             cv::imshow(sMouseDebugDisplayName,oNextInputFrame);
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
@@ -384,7 +376,7 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
             oNextGTMask.copyTo(oCurrGTMask);
 #endif //NEED_LAST_GT_MASK
             if(nNextFrameIdx<nFrameCount)
-                oNextGTMask = pCurrSequence->GetGTFrameFromIndex(nNextFrameIdx);
+                oNextGTMask = pCurrSequence->GetGTFromIndex(nNextFrameIdx);
 #endif //NEED_GT_MASK
             TIMER_INTERNAL_TOC(VideoQuery);
 #if HAVE_GLSL
@@ -416,7 +408,7 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
 #endif //NEED_BG_IMG
 #else //!HAVE_GPU_SUPPORT
             TIMER_INTERNAL_TIC(VideoQuery);
-            oCurrInputFrame = pCurrSequence->GetInputFrameFromIndex(nCurrFrameIdx);
+            oCurrInputFrame = pCurrSequence->GetInputFromIndex(nCurrFrameIdx);
 #if NEED_BG_IMG
             const cv::Mat& oInputFrame = oCurrInputFrame;
 #endif //NEED_BG_IMG
@@ -424,7 +416,7 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
             cv::imshow(sMouseDebugDisplayName,oCurrInputFrame);
 #endif //ENABLE_DISPLAY_MOUSE_DEBUG
 #if NEED_GT_MASK
-            oCurrGTMask = pCurrSequence->GetGTFrameFromIndex(nCurrFrameIdx);
+            oCurrGTMask = pCurrSequence->GetGTFromIndex(nCurrFrameIdx);
             const cv::Mat oGTMask = oCurrGTMask;
 #endif //NEED_GT_MASK
             TIMER_INTERNAL_TOC(VideoQuery);
@@ -445,9 +437,9 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
 #endif //!HAVE_GPU_SUPPORT
 #if NEED_BG_IMG
 #if ENABLE_DISPLAY_MOUSE_DEBUG
-            cv::Mat oDebugDisplayFrame = DatasetUtils::GetDisplayResult(oInputFrame,oBGImg,oFGMask,oGTMask,oROI,nCurrFrameIdx,(pnLatestMouseX&&pnLatestMouseY)?cv::Point(*pnLatestMouseX,*pnLatestMouseY):cv::Point(-1,-1));
+            cv::Mat oDebugDisplayFrame = DatasetUtils::VideoSegm::CDnet::GetDebugDisplayFrame(oInputFrame,oBGImg,oFGMask,oGTMask,oROI,nCurrFrameIdx,(pnLatestMouseX&&pnLatestMouseY)?cv::Point(*pnLatestMouseX,*pnLatestMouseY):cv::Point(-1,-1));
 #else //!ENABLE_DISPLAY_MOUSE_DEBUG
-            cv::Mat oDebugDisplayFrame = DatasetUtils::GetDisplayResult(oInputFrame,oBGImg,oFGMask,oGTMask,oROI,nCurrFrameIdx);
+            cv::Mat oDebugDisplayFrame = DatasetUtils::VideoSegm::CDnet::GetDebugDisplayFrame(oInputFrame,oBGImg,oFGMask,oGTMask,oROI,nCurrFrameIdx);
 #endif //!ENABLE_DISPLAY_MOUSE_DEBUG
 #if WRITE_BGSUB_DEBUG_IMG_OUTPUT
             oDebugWriter.write(oDebugDisplayFrame);
@@ -478,10 +470,10 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
             oSegmWriter.write(oFGMask);
 #endif //WRITE_BGSUB_SEGM_AVI_OUTPUT
 #if WRITE_BGSUB_IMG_OUTPUT
-            DatasetUtils::WriteResult(sCurrResultsPath,pCurrSequence->m_pParent->m_sName,pCurrSequence->m_sName,g_oDatasetInfo.sResultPrefix,nCurrFrameIdx+g_oDatasetInfo.nResultIdxOffset,g_oDatasetInfo.sResultSuffix,oFGMask,g_vnResultsComprParams);
+            DatasetUtils::VideoSegm::WriteResult(sCurrResultsPath,pCurrSequence->m_sParentName,pCurrSequence->m_sName,g_oDatasetInfo.sResultPrefix,nCurrFrameIdx+g_oDatasetInfo.nResultIdxOffset,g_oDatasetInfo.sResultSuffix,oFGMask,g_vnResultsComprParams);
 #endif //WRITE_BGSUB_IMG_OUTPUT
 #if (WRITE_BGSUB_METRICS_ANALYSIS && (!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION))
-            DatasetUtils::CalcMetricsFromResult(oFGMask,oGTMask,oROI,pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
+            DatasetUtils::VideoSegm::CDnet::AccumulateMetricsFromResult(oFGMask,oGTMask,oROI,pCurrSequence->m_oMetrics);
 #endif //(WRITE_BGSUB_METRICS_ANALYSIS && (!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION))
             TIMER_INTERNAL_TOC(OverallLoop);
 #if ENABLE_INTERNAL_TIMERS
@@ -500,13 +492,13 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::SequenceInfo> 
 #if VALIDATE_GLSL_EVALUATION
         printf("cpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN);
 #endif //VALIDATE_GLSL_EVALUATION
-        pBGS_GPU_EVAL->getCumulativeCounts(pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE);
+        pBGS_GPU_EVAL->getCumulativeCounts(pCurrSequence->m_oMetrics);
 #if VALIDATE_GLSL_EVALUATION
         printf("gpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN);
 #endif //VALIDATE_GLSL_EVALUATION
 #endif //GLSL_EVALUATION
-        pCurrSequence->m_dAvgFPS = dAvgFPS;
-        DatasetUtils::WriteMetrics(sCurrResultsPath+pCurrSequence->m_pParent->m_sName+"/"+pCurrSequence->m_sName+".txt",*pCurrSequence);
+        pCurrSequence->m_oMetrics.dTimeElapsed_sec = dTimeElapsed;
+        DatasetUtils::VideoSegm::SequenceInfo::WriteMetrics(sCurrResultsPath+pCurrSequence->m_sParentName+"/"+pCurrSequence->m_sName+".txt",*pCurrSequence);
 #endif //WRITE_BGSUB_METRICS_ANALYSIS
 #if DISPLAY_BGSUB_DEBUG_OUTPUT
         cv::destroyWindow(sDebugDisplayName);

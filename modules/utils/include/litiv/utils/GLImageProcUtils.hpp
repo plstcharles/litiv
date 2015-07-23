@@ -119,17 +119,17 @@ protected:
 private:
     GLImageProcAlgo& operator=(const GLImageProcAlgo&)=delete;
     GLImageProcAlgo(const GLImageProcAlgo&)=delete;
-    friend class GLEvaluatorAlgo;
+    friend class GLImageProcEvaluatorAlgo;
     std::vector<GLuint> m_vnSSBO;
     std::vector<GLuint> m_vnACBO;
     int m_nInputType;
 };
 
-class GLEvaluatorAlgo : public GLImageProcAlgo {
+class GLImageProcEvaluatorAlgo : public GLImageProcAlgo {
 public:
-    GLEvaluatorAlgo(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount, size_t nCountersPerFrame,
+    GLImageProcEvaluatorAlgo(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount, size_t nCountersPerFrame,
                     int nDebugType, int nGroundtruthType, bool bUseIntegralFormat);
-    virtual ~GLEvaluatorAlgo();
+    virtual ~GLImageProcEvaluatorAlgo();
     const cv::Mat& getEvaluationAtomicCounterBuffer();
     virtual std::string getFragmentShaderSource() const;
 

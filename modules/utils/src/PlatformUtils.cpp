@@ -127,7 +127,7 @@ bool PlatformUtils::CreateDirIfNotExist(const std::string& sDirPath) {
 void PlatformUtils::SetConsoleWindowSize(int x, int y, int buffer_lines) {
     HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
     if(h==INVALID_HANDLE_VALUE)
-        throw std::runtime_error("SetConsoleWindowSize(...): Unable to get stdout handle.");
+        throw std::runtime_error("SetConsoleWindowSize(...): Unable to get stdout handle");
     COORD largestSize = GetLargestConsoleWindowSize(h);
     if(x>largestSize.X)
         x = largestSize.X;
@@ -137,19 +137,19 @@ void PlatformUtils::SetConsoleWindowSize(int x, int y, int buffer_lines) {
         buffer_lines = y;
     CONSOLE_SCREEN_BUFFER_INFO bufferInfo;
     if(!GetConsoleScreenBufferInfo(h,&bufferInfo))
-        throw std::runtime_error("SetConsoleWindowSize(...): Unable to retrieve screen buffer info.");
+        throw std::runtime_error("SetConsoleWindowSize(...): Unable to retrieve screen buffer info");
     SMALL_RECT& winInfo = bufferInfo.srWindow;
     COORD windowSize = {winInfo.Right-winInfo.Left+1,winInfo.Bottom-winInfo.Top+1};
     if(windowSize.X>x || windowSize.Y>y) {
         SMALL_RECT info = {0,0,(x<windowSize.X)?(x-1):(windowSize.X-1),(y<windowSize.Y)?(y-1):(windowSize.Y-1)};
         if(!SetConsoleWindowInfo(h,TRUE,&info))
-            throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize window before resizing buffer.");
+            throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize window before resizing buffer");
     }
     COORD size = {x,y};
     if(!SetConsoleScreenBufferSize(h,size))
-        throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize screen buffer.");
+        throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize screen buffer");
     SMALL_RECT info = {0,0,x-1,y-1};
     if(!SetConsoleWindowInfo(h, TRUE, &info))
-        throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize window after resizing buffer.");
+        throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize window after resizing buffer");
 }
 #endif //PLATFORM_USES_WIN32API

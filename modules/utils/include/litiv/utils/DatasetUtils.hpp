@@ -1,7 +1,6 @@
 #pragma once
 
 #define DATASETUTILS_USE_AVERAGE_EVAL_METRICS  1
-#define DATASETUTILS_USE_PRECACHED_IO          1
 #define DATASETUTILS_HARDCODE_FRAME_INDEX      0
 
 #include "litiv/utils/ParallelUtils.hpp"
@@ -16,188 +15,251 @@
 
 namespace DatasetUtils {
 
-    class MetricsCalculator;
-    class SequenceInfo;
-    class CategoryInfo;
-
-    enum eDatasetList {
-        eDataset_CDnet2012,
-        eDataset_CDnet2014,
-        eDataset_Wallflower,
-        eDataset_PETS2001_D3TC1,
-        eDataset_LITIV2012,
-        eDataset_GenericTest,
-        eDatasetsCount
-    };
-
-    struct DatasetInfo {
-        const eDatasetList eID;
-        const std::string sDatasetPath;
-        const std::string sResultsPath;
-        const std::string sResultPrefix;
-        const std::string sResultSuffix;
-        const std::vector<std::string> vsDatasetFolderPaths;
-        const std::vector<std::string> vsDatasetGrayscaleDirPathTokens;
-        const std::vector<std::string> vsDatasetSkippedDirPathTokens;
-        const size_t nResultIdxOffset;
-    };
-
-    struct CommonMetrics {
-        double dRecall;
-        double dSpecficity;
-        double dFPR;
-        double dFNR;
-        double dPBC;
-        double dPrecision;
-        double dFMeasure;
-        double dMCC;
-        double dFPS;
-    };
-
-    // as defined in the 2012 CDNet scripts/dataset
-    const uchar g_nCDnetPositive = 255;
-    const uchar g_nCDnetNegative = 0;
-    const uchar g_nCDnetOutOfScope = 85;
-    const uchar g_nCDnetUnknown = 170;
-    const uchar g_nCDnetShadow = 50;
-
-    DatasetInfo GetDatasetInfo(const eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirPath);
-
-    double CalcMetric_FMeasure(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN);
-    double CalcMetric_Recall(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN);
-    double CalcMetric_Precision(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN);
-    double CalcMetric_Specificity(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN);
-    double CalcMetric_FalsePositiveRate(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN);
-    double CalcMetric_FalseNegativeRate(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN);
-    double CalcMetric_PercentBadClassifs(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN);
-    double CalcMetric_MatthewsCorrCoeff(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN);
-
-    cv::Mat ReadResult( const std::string& sResultsPath, const std::string& sCatName, const std::string& sSeqName,
-                        const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix);
-    void WriteResult( const std::string& sResultsPath, const std::string& sCatName, const std::string& sSeqName,
-                      const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix,
-                      const cv::Mat& oResult, const std::vector<int>& vnComprParams);
     void WriteOnImage(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom=false);
-    void WriteMetrics(const std::string sResultsFileName, const SequenceInfo& oSeq);
-    void WriteMetrics(const std::string sResultsFileName, const CategoryInfo& oCat);
-    void WriteMetrics(const std::string sResultsFileName, const std::vector<std::shared_ptr<CategoryInfo>>& vpCat, double dTotalFPS);
-    void CalcMetricsFromResult(const cv::Mat& oSegmResFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI,
-                                      uint64_t& nTP, uint64_t& nTN, uint64_t& nFP, uint64_t& nFN, uint64_t& nSE);
+    void ValidateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoint>& voKPs);
+    typedef std::function<const cv::Mat&(size_t)> ImageQueryByIndexFunc;
 
-    cv::Mat GetDisplayResult(const cv::Mat& oInputImg, const cv::Mat& oBGImg, const cv::Mat& oFGMask, const cv::Mat& oGTFGMask, const cv::Mat& oROI, size_t nFrame, cv::Point oDbgPt=cv::Point(-1,-1));
-    cv::Mat GetColoredSegmFrameFromResult(const cv::Mat& oSegmResFrame, const cv::Mat& oGTFrame, const cv::Mat& oROI);
+    namespace SegmEval {
 
-    class MetricsCalculator {
+        struct BasicMetrics {
+            BasicMetrics();
+            BasicMetrics operator+(const BasicMetrics& m) const;
+            BasicMetrics& operator+=(const BasicMetrics& m);
+            uint64_t total() const {return nTP+nTN+nFP+nFN;}
+            uint64_t nTP;
+            uint64_t nTN;
+            uint64_t nFP;
+            uint64_t nFN;
+            uint64_t nSE; // 'shadow error', not always used/required for eval
+            double dTimeElapsed_sec;
+        };
+
+        struct SegmMetrics {
+            SegmMetrics(const BasicMetrics& m);
+            SegmMetrics operator+(const BasicMetrics& m) const;
+            SegmMetrics& operator+=(const BasicMetrics& m);
+            SegmMetrics operator+(const SegmMetrics& m) const;
+            SegmMetrics& operator+=(const SegmMetrics& m);
+            double dRecall;
+            double dSpecificity;
+            double dFPR;
+            double dFNR;
+            double dPBC;
+            double dPrecision;
+            double dFMeasure;
+            double dMCC;
+            double dTimeElapsed_sec; // never averaged, always accumulated
+            size_t nWeight; // used to compute averages in overloads only
+        };
+
+        double CalcFMeasure(const BasicMetrics& m);
+        double CalcRecall(const BasicMetrics& m);
+        double CalcPrecision(const BasicMetrics& m);
+        double CalcSpecificity(const BasicMetrics& m);
+        double CalcFalsePositiveRate(const BasicMetrics& m);
+        double CalcFalseNegativeRate(const BasicMetrics& m);
+        double CalcPercentBadClassifs(const BasicMetrics& m);
+        double CalcMatthewsCorrCoeff(const BasicMetrics& m);
+
+    }; //namespace SegmEval
+
+    class ImagePrecacher {
     public:
-        MetricsCalculator(uint64_t nTP, uint64_t nTN, uint64_t nFP, uint64_t nFN, uint64_t nSE);
-        MetricsCalculator(const SequenceInfo& oSeq);
-        MetricsCalculator(const CategoryInfo& oCat, bool bAverage=false);
-        MetricsCalculator(const std::vector<std::shared_ptr<CategoryInfo>>& vpCat, bool bAverage=false);
-        const CommonMetrics m_oMetrics;
-        const bool m_bAveraged;
-    };
-
-    class CategoryInfo {
-    public:
-        CategoryInfo(const std::string& sName, const std::string& sDirectoryPath,
-                     DatasetUtils::eDatasetList eDatasetID,
-                     const std::vector<std::string>& vsGrayscaleDirNameTokens=std::vector<std::string>(),
-                     const std::vector<std::string>& vsSkippedDirNameTokens=std::vector<std::string>(),
-                     bool bUse4chAlign=false);
-        const std::string m_sName;
-        const eDatasetList m_eDatasetID;
-        std::vector<std::shared_ptr<SequenceInfo>> m_vpSequences;
-        uint64_t nTP, nTN, nFP, nFN, nSE;
-        double m_dAvgFPS;
-        static inline bool compare(const std::shared_ptr<CategoryInfo>& i, const std::shared_ptr<CategoryInfo>& j) {return PlatformUtils::compare_lowercase(i->m_sName,j->m_sName);}
-    private:
-        CategoryInfo& operator=(const CategoryInfo&)=delete;
-        CategoryInfo(const CategoryInfo&)=delete;
-    };
-
-    class SequenceInfo {
-    public:
-        SequenceInfo(const std::string& sName, const std::string& sPath, CategoryInfo* pParent, bool bForceGrayscale=false, bool bUse4chAlign=false);
-        ~SequenceInfo();
-        const cv::Mat& GetInputFrameFromIndex(size_t nFrameIdx);
-        const cv::Mat& GetGTFrameFromIndex(size_t nFrameIdx);
-        size_t GetNbInputFrames() const;
-        size_t GetNbGTFrames() const;
-        cv::Size GetFrameSize() const;
-        const cv::Mat& GetSequenceROI() const;
-        std::vector<cv::KeyPoint> GetKeyPointsFromROI() const;
-        void ValidateKeyPoints(std::vector<cv::KeyPoint>& voKPs) const;
-        const std::string m_sName;
-        const std::string m_sPath;
-        const eDatasetList m_eDatasetID;
-        uint64_t nTP, nTN, nFP, nFN, nSE;
-        double m_dAvgFPS;
-        double m_dExpectedLoad;
-        double m_dExpectedROILoad;
-        CategoryInfo* m_pParent;
-        inline cv::Size GetSize() {return m_oSize;}
-        static inline bool compare(const std::shared_ptr<SequenceInfo>& i, const std::shared_ptr<SequenceInfo>& j) {return PlatformUtils::compare_lowercase(i->m_sName,j->m_sName);}
-#if DATASETUTILS_USE_PRECACHED_IO
-        void StartPrecaching();
+        ImagePrecacher(ImageQueryByIndexFunc pCallback);
+        virtual ~ImagePrecacher();
+        const cv::Mat& GetImageFromIndex(size_t nIdx);
+        bool StartPrecaching(size_t nTotImageCount, size_t nSuggestedBufferSize);
         void StopPrecaching();
     private:
-        void PrecacheInputFrames();
-        void PrecacheGTFrames();
-        std::thread m_hInputFramePrecacher,m_hGTFramePrecacher;
-        std::mutex m_oInputFrameSyncMutex,m_oGTFrameSyncMutex;
-        std::condition_variable m_oInputFrameReqCondVar,m_oGTFrameReqCondVar;
-        std::condition_variable m_oInputFrameSyncCondVar,m_oGTFrameSyncCondVar;
+        void Precache();
+        const cv::Mat& GetImageFromIndex_internal(size_t nIdx);
+        ImageQueryByIndexFunc m_pCallback;
+        std::thread m_hPrecacher;
+        std::mutex m_oSyncMutex;
+        std::condition_variable m_oReqCondVar;
+        std::condition_variable m_oSyncCondVar;
         bool m_bIsPrecaching;
-        size_t m_nInputFrameSize,m_nGTFrameSize;
-        size_t m_nInputBufferSize,m_nGTBufferSize;
-        size_t m_nInputPrecacheSize,m_nGTPrecacheSize;
-        size_t m_nInputBufferFrameCount,m_nGTBufferFrameCount;
-        size_t m_nRequestInputFrameIndex,m_nRequestGTFrameIndex;
-        std::deque<cv::Mat> m_qoInputFrameCache,m_qoGTFrameCache;
-        std::vector<uchar> m_vcInputBuffer,m_vcGTBuffer;
-        size_t m_nNextInputBufferIdx,m_nNextGTBufferIdx;
-        size_t m_nNextExpectedInputFrameIdx,m_nNextExpectedGTFrameIdx;
-        size_t m_nNextPrecachedInputFrameIdx,m_nNextPrecachedGTFrameIdx;
-        cv::Mat m_oReqInputFrame,m_oReqGTFrame;
-#else //!DATASETUTILS_USE_PRECACHED_IO
-    private:
-        size_t m_nLastReqInputFrameIndex,m_nLastReqGTFrameIndex;
-        cv::Mat m_oLastReqInputFrame,m_oLastReqGTFrame;
-#endif //!DATASETUTILS_USE_PRECACHED_IO
-        std::vector<std::string> m_vsInputFramePaths;
-        std::vector<std::string> m_vsGTFramePaths;
-        cv::VideoCapture m_voVideoReader;
-        size_t m_nNextExpectedVideoReaderFrameIdx;
-        size_t m_nTotalNbFrames;
-        cv::Mat m_oROI;
-        cv::Size m_oSize;
+        size_t m_nBufferSize;
+        size_t m_nTotImageCount;
+        std::deque<cv::Mat> m_qoCache;
+        std::vector<uchar> m_vcBuffer;
+        size_t m_nFirstBufferIdx;
+        size_t m_nNextBufferIdx;
+        size_t m_nNextExpectedReqIdx;
+        size_t m_nNextPrecacheIdx;
+        size_t m_nReqIdx,m_nLastReqIdx;
+        cv::Mat m_oReqImage,m_oLastReqImage;
+    };
+
+    class WorkBatch {
+    public:
+        WorkBatch(const std::string& sName, const std::string& sPath, bool bForceGrayscale=false, bool bUse4chAlign=false);
+        static bool compare(const WorkBatch& i, const WorkBatch& j) {return PlatformUtils::compare_lowercase(i.m_sName,j.m_sName);}
+        static bool compare(const WorkBatch* i, const WorkBatch* j) {return PlatformUtils::compare_lowercase(i->m_sName,j->m_sName);}
+        template<typename Tp> static typename std::enable_if<std::is_base_of<WorkBatch,Tp>::value,bool>::type compare(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {return PlatformUtils::compare_lowercase(i->m_sName,j->m_sName);}
+        virtual size_t GetTotalImageCount() const = 0;
+        virtual double GetExpectedLoad() const = 0;
+        virtual bool StartPrecaching(size_t nSuggestedBufferSize=SIZE_MAX);
+        void StopPrecaching();
+        const std::string m_sName;
+        const std::string m_sPath;
+        const int m_nIMReadInputFlags;
         const bool m_bForcingGrayscale;
         const bool m_bUsing4chAlignment;
-        const int m_nIMReadInputFlags;
-        std::unordered_map<size_t,size_t> m_mTestGTIndexes;
-        cv::Mat GetInputFrameFromIndex_Internal(size_t nFrameIdx);
-        cv::Mat GetGTFrameFromIndex_Internal(size_t nFrameIdx);
-        SequenceInfo& operator=(const SequenceInfo&)=delete;
-        SequenceInfo(const CategoryInfo&)=delete;
+        const cv::Mat& GetInputFromIndex(size_t nIdx) {return m_oInputPrecacher.GetImageFromIndex(nIdx);}
+        const cv::Mat& GetGTFromIndex(size_t nIdx) {return m_oGTPrecacher.GetImageFromIndex(nIdx);}
+    protected:
+        ImagePrecacher m_oInputPrecacher;
+        ImagePrecacher m_oGTPrecacher;
+        virtual cv::Mat GetInputFromIndex_external(size_t nIdx) = 0;
+        virtual cv::Mat GetGTFromIndex_external(size_t nIdx) = 0;
+    private:
+        const cv::Mat& GetInputFromIndex_internal(size_t nIdx);
+        const cv::Mat& GetGTFromIndex_internal(size_t nIdx);
+        cv::Mat m_oLatestInputImage;
+        cv::Mat m_oLatestGTMask;
+        WorkBatch& operator=(const WorkBatch&) = delete;
+        WorkBatch(const WorkBatch&) = delete;
     };
 
-#if HAVE_GLSL
+    namespace VideoSegm {
 
-    class CDNetEvaluator : public GLEvaluatorAlgo {
-    public:
-        CDNetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount);
-        virtual std::string getComputeShaderSource(size_t nStage) const;
-        void getCumulativeCounts(uint64_t& nTotTP, uint64_t& nTotTN, uint64_t& nTotFP, uint64_t& nTotFN, uint64_t& nTotSE);
-        enum eCDNetEvalCountersList {
-            eCDNetEvalCounter_TP,
-            eCDNetEvalCounter_TN,
-            eCDNetEvalCounter_FP,
-            eCDNetEvalCounter_FN,
-            eCDNetEvalCounter_SE,
-            eCDNetEvalCountersCount,
+        class SequenceInfo;
+        class CategoryInfo;
+
+        enum eDatasetList {
+            eDataset_CDnet2012,
+            eDataset_CDnet2014,
+            eDataset_Wallflower,
+            eDataset_PETS2001_D3TC1,
+            eDataset_LITIV2012,
+            eDataset_GenericTest,
+            // ...
+            eDatasetCount
         };
-    };
 
+        struct DatasetInfo {
+            const eDatasetList eID;
+            const std::string sDatasetPath;
+            const std::string sResultsPath;
+            const std::string sResultPrefix;
+            const std::string sResultSuffix;
+            const std::vector<std::string> vsFolderPaths;
+            const std::vector<std::string> vsGrayscaleNameTokens;
+            const std::vector<std::string> vsSkippedNameTokens;
+            const size_t nResultIdxOffset;
+        };
+
+        DatasetInfo GetDatasetInfo(const eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirPath);
+        cv::Mat ReadResult( const std::string& sResultsPath, const std::string& sCatName, const std::string& sSeqName,
+                            const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix, int nFlags=cv::IMREAD_GRAYSCALE);
+        void WriteResult( const std::string& sResultsPath, const std::string& sCatName, const std::string& sSeqName,
+                          const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix,
+                          const cv::Mat& oResult, const std::vector<int>& vnComprParams);
+
+        class CategoryInfo : public WorkBatch {
+        public:
+            CategoryInfo(const std::string& sName, const std::string& sDirectoryPath, eDatasetList eDatasetID,
+                         const std::vector<std::string>& vsGrayscaleCategoryNameTokens=std::vector<std::string>(),
+                         const std::vector<std::string>& vsSkippedDirectoryNameTokens=std::vector<std::string>(),
+                         bool bUse4chAlign=false);
+            virtual size_t GetTotalImageCount() const {return m_nTotFrameCount;}
+            virtual double GetExpectedLoad() const {return m_dExpectedLoad;}
+            static SegmEval::SegmMetrics CalcMetricsFromCategory(const CategoryInfo& oCat, bool bAverage);
+            static SegmEval::SegmMetrics CalcMetricsFromCategories(const std::vector<std::shared_ptr<CategoryInfo>>& vpCat, bool bAverage);
+            static void WriteMetrics(const std::string& sResultsFilePath, const CategoryInfo& oCat);
+            static void WriteMetrics(const std::string& sResultsFilePath, const std::vector<std::shared_ptr<CategoryInfo>>& vpCat);
+            const eDatasetList m_eDatasetID;
+            std::vector<std::shared_ptr<SequenceInfo>> m_vpSequences;
+        protected:
+            virtual cv::Mat GetInputFromIndex_external(size_t nFrameIdx);
+            virtual cv::Mat GetGTFromIndex_external(size_t nFrameIdx);
+        private:
+            double m_dExpectedLoad;
+            size_t m_nTotFrameCount;
+            CategoryInfo& operator=(const CategoryInfo&)=delete;
+            CategoryInfo(const CategoryInfo&)=delete;
+        };
+
+        class SequenceInfo : public WorkBatch {
+        public:
+            SequenceInfo(const std::string& sName, const std::string& sParentName, const std::string& sPath,
+                         eDatasetList eDatasetID, bool bForceGrayscale=false, bool bUse4chAlign=false);
+            virtual size_t GetTotalImageCount() const {return m_nTotFrameCount;}
+            virtual double GetExpectedLoad() const {return m_dExpectedLoad;}
+            const std::string& GetParentName() const {return m_sParentName;}
+            cv::Size GetImageSize() const {return m_oSize;}
+            const cv::Mat& GetROI() const {return m_oROI;}
+            static void WriteMetrics(const std::string& sResultsFilePath, const SequenceInfo& oSeq);
+            const eDatasetList m_eDatasetID;
+            const std::string m_sParentName;
+            SegmEval::BasicMetrics m_oMetrics;
+        protected:
+            friend class CategoryInfo;
+            virtual cv::Mat GetInputFromIndex_external(size_t nFrameIdx);
+            virtual cv::Mat GetGTFromIndex_external(size_t nFrameIdx);
+        private:
+            double m_dExpectedLoad;
+            size_t m_nTotFrameCount;
+            std::vector<std::string> m_vsInputFramePaths;
+            std::vector<std::string> m_vsGTFramePaths;
+            cv::VideoCapture m_voVideoReader;
+            size_t m_nNextExpectedVideoReaderFrameIdx;
+            cv::Mat m_oROI;
+            cv::Size m_oSize;
+            std::unordered_map<size_t,size_t> m_mTestGTIndexes;
+            SequenceInfo& operator=(const SequenceInfo&)=delete;
+            SequenceInfo(const CategoryInfo&)=delete;
+        };
+
+        namespace CDnet {
+            // as defined in the 2012 CDNet scripts/dataset
+            const uchar g_nSegmPositive = 255;
+            const uchar g_nSegmNegative = 0;
+            const uchar g_nSegmOutOfScope = 85;
+            const uchar g_nSegmUnknown = 170;
+            const uchar g_nSegmShadow = 50;
+
+            void AccumulateMetricsFromResult(const cv::Mat& oSegm, const cv::Mat& oGTFrame, const cv::Mat& oROI, SegmEval::BasicMetrics& m);
+            cv::Mat GetDebugDisplayFrame( const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oSegmMask,
+                                          const cv::Mat& oGTSegmMask, const cv::Mat& oROI, size_t nFrame, cv::Point oDbgPt=cv::Point(-1,-1));
+            cv::Mat GetColoredSegmFrameFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI);
+#if HAVE_GLSL
+            class Evaluator : public GLImageProcEvaluatorAlgo {
+            public:
+                Evaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount);
+                virtual std::string getComputeShaderSource(size_t nStage) const;
+                void getCumulativeCounts(SegmEval::BasicMetrics& m);
+                enum eCDNetEvalCountersList {
+                    eCDNetEvalCounter_TP,
+                    eCDNetEvalCounter_TN,
+                    eCDNetEvalCounter_FP,
+                    eCDNetEvalCounter_FN,
+                    eCDNetEvalCounter_SE,
+                    eCDNetEvalCountersCount,
+                };
+            };
 #endif //HAVE_GLSL
+        } //namespace CDnet
+
+    } //namespace VideoSegm
+
+    namespace ImageSegm {
+
+        class BatchInfo;
+        enum eDatasetList {
+            eDataset_BSDS500,
+            // ...
+            eDatasetCount
+        };
+
+        class DatasetInfo {
+        public:
+
+        };
+
+        DatasetInfo GetDatasetInfo(const eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirPath);
+
+    } //namespace ImageSegm
 
 }; //namespace DatasetUtils

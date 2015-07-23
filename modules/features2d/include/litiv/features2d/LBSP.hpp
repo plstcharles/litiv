@@ -100,7 +100,7 @@ public:
         const uchar* const _data = oInputImg.data;
         const size_t _c = nChannels;
         using namespace DistanceUtils;
-#include "litiv/features2d/LBSP_16bits_dbcross_lookup.ipp"
+        #include "litiv/features2d/LBSP_16bits_dbcross_lookup.ipp"
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup only)
@@ -116,7 +116,7 @@ public:
         using namespace DistanceUtils;
         for(size_t _resc=0; _resc<nChannels; ++_resc) {
             std::array<uchar,LBSP::DESC_SIZE*8>& _anVals = _aanVals[_resc];
-#include "litiv/features2d/LBSP_16bits_dbcross_lookup.ipp"
+            #include "litiv/features2d/LBSP_16bits_dbcross_lookup.ipp"
         }
     }
 
@@ -125,7 +125,7 @@ public:
         static_assert(std::is_integral<Tt>::value,"internal threshold type must be integral");
         static_assert(sizeof(Tr)>=LBSP::DESC_SIZE,"result type size is too small");
         using namespace DistanceUtils;
-#include "litiv/features2d/LBSP_16bits_dbcross_threshold.ipp"
+        #include "litiv/features2d/LBSP_16bits_dbcross_threshold.ipp"
     }
 
 protected:

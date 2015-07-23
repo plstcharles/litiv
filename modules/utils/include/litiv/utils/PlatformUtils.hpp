@@ -54,6 +54,13 @@ namespace PlatformUtils {
         return digits;
     }
 
+    inline bool string_contains_token(const std::string& s, const std::vector<std::string> tokens) {
+        for(size_t i=0; i<tokens.size(); ++i)
+            if(s.find(tokens[i])!=std::string::npos)
+                return true;
+        return false;
+    }
+
 #if PLATFORM_USES_WIN32API
     void SetConsoleWindowSize(int x, int y, int buffer_lines=-1);
 #endif //PLATFORM_USES_WIN32API
