@@ -21,10 +21,10 @@ if(USE_GLSL)
     target_link_libraries(${name} ${GLM_LIBRARIES})
 endif(USE_GLSL)
 if(USE_CUDA)
-# @@@@
+# @@@@ add cuda package
 endif(USE_CUDA)
 if(USE_OPENCL)
-# @@@@
+# @@@@ add opencl package
 endif(USE_OPENCL)
 target_compil_litiv_dependencies(${name})
 endmacro(target_link_litiv_dependencies name)

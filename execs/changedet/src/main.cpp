@@ -369,7 +369,7 @@ int AnalyzeSequence_GPU(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCu
         }
         TIMER_TOC(MainLoop);
         const double dTimeElapsed = TIMER_ELAPSED_MS(MainLoop)/1000;
-        const double dAvgFPS = (double)nFrameCount/dTimeElapsed;
+        const double dAvgFPS = (double)nCurrFrameIdx/dTimeElapsed;
         std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
 #if WRITE_METRICS
 #if GLSL_EVALUATION
@@ -549,7 +549,7 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::S
         }
         TIMER_TOC(MainLoop);
         const double dTimeElapsed = TIMER_ELAPSED_MS(MainLoop)/1000;
-        const double dAvgFPS = (double)nFrameCount/dTimeElapsed;
+        const double dAvgFPS = (double)nCurrFrameIdx/dTimeElapsed;
         std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
 #if WRITE_METRICS
         pCurrSequence->m_oMetrics.dTimeElapsed_sec = dTimeElapsed;

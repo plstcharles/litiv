@@ -85,7 +85,6 @@ namespace DatasetUtils {
         const bool m_bHasGroundTruth;
         const bool m_bForcingGrayscale;
         const bool m_bForcing4ByteDataAlign;
-        const int m_nIMReadInputFlags;
         const cv::Mat& GetInputFromIndex(size_t nIdx) {return m_oInputPrecacher.GetImageFromIndex(nIdx);}
         const cv::Mat& GetGTFromIndex(size_t nIdx) {return m_oGTPrecacher.GetImageFromIndex(nIdx);}
     protected:

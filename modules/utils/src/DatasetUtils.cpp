@@ -206,7 +206,6 @@ DatasetUtils::WorkBatch::WorkBatch(const std::string& sBatchName, const std::str
         ,m_bHasGroundTruth(oDatasetInfo.m_pEvaluator!=nullptr)
         ,m_bForcingGrayscale(PlatformUtils::string_contains_token(sBatchName,oDatasetInfo.m_vsGrayscaleNameTokens))
         ,m_bForcing4ByteDataAlign(oDatasetInfo.m_bForce4ByteDataAlign)
-        ,m_nIMReadInputFlags((oDatasetInfo.m_pEvaluator!=nullptr)?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR)
         ,m_oInputPrecacher(std::bind(&DatasetUtils::WorkBatch::GetInputFromIndex_internal,this,std::placeholders::_1))
         ,m_oGTPrecacher(std::bind(&DatasetUtils::WorkBatch::GetGTFromIndex_internal,this,std::placeholders::_1)) {}
 
@@ -552,7 +551,7 @@ cv::Mat DatasetUtils::Segm::Video::Sequence::GetInputFromIndex_external(size_t n
     if( m_eDatasetID==eDataset_CDnet2012 ||
         m_eDatasetID==eDataset_CDnet2014 ||
         m_eDatasetID==eDataset_Wallflower)
-        oFrame = cv::imread(m_vsInputFramePaths[nFrameIdx],m_nIMReadInputFlags);
+        oFrame = cv::imread(m_vsInputFramePaths[nFrameIdx],m_bForcingGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
     else if( m_eDatasetID==eDataset_PETS2001_D3TC1 ||
              m_eDatasetID==eDataset_Custom) {
         if(m_nNextExpectedVideoReaderFrameIdx!=nFrameIdx) {
