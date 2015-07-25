@@ -67,9 +67,9 @@ public:
     //! default destructor
     virtual ~BackgroundSubtractorPBAS();
     //! (re)initiaization method; needs to be called before starting background subtraction
-    virtual void initialize(const cv::Mat& oInitImg)=0;
+    virtual void initialize(const cv::Mat& oInitImg) = 0;
     //! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
-    virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE)=0;
+    virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE) = 0;
     //! returns a copy of the latest reconstructed background image
     void getBackgroundImage(cv::OutputArray backgroundImage) const;
 

@@ -156,11 +156,11 @@ void BackgroundSubtractorLOBSTER::refreshModel(float fSamplesRefreshFrac, bool b
 
 #if HAVE_GLSL
 
-void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oNextInputImg, double dLearningRate) {
-    this->apply_glimpl(_oNextInputImg,false,dLearningRate);
+void BackgroundSubtractorLOBSTER::apply_async(cv::InputArray _oNextInputImg, double dLearningRate) {
+    this->apply_async_glimpl(_oNextInputImg,false,dLearningRate);
 }
 
-void BackgroundSubtractorLOBSTER::apply_glimpl(cv::InputArray _oNextInputImg, bool bRebindAll, double dLearningRate) {
+void BackgroundSubtractorLOBSTER::apply_async_glimpl(cv::InputArray _oNextInputImg, bool bRebindAll, double dLearningRate) {
     // == process_GLSL_async
     CV_Assert(m_bInitialized && m_bModelInitialized);
     CV_Assert(dLearningRate>0);
@@ -169,7 +169,7 @@ void BackgroundSubtractorLOBSTER::apply_glimpl(cv::InputArray _oNextInputImg, bo
     CV_Assert(oNextInputImg.type()==m_nImgType && oNextInputImg.size()==m_oImgSize);
     CV_Assert(oNextInputImg.isContinuous());
     ++m_nFrameIdx;
-    this->GLImageProcAlgo::apply(oNextInputImg,bRebindAll);
+    this->GLImageProcAlgo::apply_async(oNextInputImg,bRebindAll);
     oNextInputImg.copyTo(m_oLastColorFrame);
 }
 
@@ -279,7 +279,7 @@ std::string BackgroundSubtractorLOBSTER::getComputeShaderSource_LOBSTER() const 
              "            if(absdiff(vInputColor.r,nCurrBGColorSample)<=COLOR_DIST_THRESHOLD/2 && hdist(vInputIntraDesc.r,nCurrBGDescSample)<=DESC_DIST_THRESHOLD)\n";
 #else //!BGSLOBSTER_GLSL_USE_BASIC_IMPL
              "            if(absdiff(vInputColor.r,nCurrBGColorSample)<=COLOR_DIST_THRESHOLD/2 &&\n"
-             "               hdist(lbsp(uvec3(anLBSPThresLUT[nCurrBGColorSample]),uvec3(nCurrBGColorSample),mInput,vImgCoords).r,nCurrBGDescSample)<=DESC_DIST_THRESHOLD)\n";
+             "               hdist(lbsp(uvec3(anLBSPThresLUT[nCurrBGColorSample]),uvec3(nCurrBGColorSample),vImgCoords).r,nCurrBGDescSample)<=DESC_DIST_THRESHOLD)\n";
 #endif //!BGSLOBSTER_GLSL_USE_BASIC_IMPL
     }
     ssSrc << "                ++nGoodSamplesCount;\n"

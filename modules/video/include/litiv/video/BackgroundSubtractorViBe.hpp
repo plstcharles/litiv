@@ -31,9 +31,9 @@ public:
     //! default destructor
     virtual ~BackgroundSubtractorViBe();
     //! (re)initiaization method; needs to be called before starting background subtraction
-    virtual void initialize(const cv::Mat& oInitImg)=0;
+    virtual void initialize(const cv::Mat& oInitImg) = 0;
     //! primary model update function; the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
-    virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSVIBE_DEFAULT_LEARNING_RATE)=0;
+    virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSVIBE_DEFAULT_LEARNING_RATE) = 0;
     //! returns a copy of the latest reconstructed background image
     void getBackgroundImage(cv::OutputArray backgroundImage) const;
 

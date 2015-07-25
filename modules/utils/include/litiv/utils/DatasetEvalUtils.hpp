@@ -6,12 +6,28 @@
 
 namespace DatasetUtils {
 
+    struct EvaluatorBase {
+#if HAVE_GLSL
+        struct GLEvaluatorBase : public GLImageProcEvaluatorAlgo {
+            GLEvaluatorBase(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount, size_t nCountersPerImage);
+        };
+        virtual std::shared_ptr<GLEvaluatorBase> CreateGLEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount) const = 0;
+#endif //HAVE_GLSL
+        virtual void test() {}; // @@@@@@@@@ get rid of
+    };
+
     namespace Segm {
 
-        struct SegmEvaluator {
+        Metrics CalcMetricsFromWorkGroup(const WorkGroup& oGroup, bool bAverage);
+        Metrics CalcMetricsFromWorkGroups(const std::vector<std::shared_ptr<WorkGroup>>& vpGroups, bool bAverage);
+        void WriteMetrics(const std::string& sResultsFilePath, const SegmWorkBatch& oBatch);
+        void WriteMetrics(const std::string& sResultsFilePath, const WorkGroup& oGroup);
+        void WriteMetrics(const std::string& sResultsFilePath, const std::vector<std::shared_ptr<WorkGroup>>& vpGroups);
+        cv::Mat GetDisplayImage(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oSegmMask, const cv::Mat& oROI, size_t nIdx, cv::Point oDbgPt=cv::Point(-1,-1));
+
+        struct SegmEvaluator : public EvaluatorBase {
 #if HAVE_GLSL
-        protected:
-            struct GLSegmEvaluator : public GLImageProcEvaluatorAlgo {
+            struct GLSegmEvaluator : public GLEvaluatorBase {
                 GLSegmEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount);
                 BasicMetrics getCumulativeMetrics();
                 enum eSegmEvalCountersList {
@@ -23,53 +39,41 @@ namespace DatasetUtils {
                     eSegmEvalCountersCount,
                 };
             };
-        public:
-            virtual std::shared_ptr<GLSegmEvaluator> CreateGLEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount) const = 0;
-            virtual BasicMetrics FetchCumulativeMetrics(const std::shared_ptr<GLSegmEvaluator>& pEvaluator) const;
 #endif //HAVE_GLSL
             virtual void AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI, BasicMetrics& m) const = 0;
-            virtual cv::Mat GetDebugDisplayImage(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI, size_t nIdx, cv::Point oDbgPt=cv::Point(-1,-1)) const;
             virtual cv::Mat GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI) const = 0;
-        };
-
-        struct BinarySegmEvaluator : public SegmEvaluator {
-#if HAVE_GLSL
-        protected:
-            struct GLBinarySegmEvaluator : public SegmEvaluator::GLSegmEvaluator {
-                GLBinarySegmEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount);
-                virtual std::string getComputeShaderSource(size_t nStage) const;
-            };
-        public:
-            virtual std::shared_ptr<GLSegmEvaluator> CreateGLEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount) const;
-#endif //HAVE_GLSL
-            virtual void AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI, BasicMetrics& m) const;
-            virtual cv::Mat GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI) const;
-            static const uchar g_nSegmPositive;
-            static const uchar g_nSegmOutOfScope;
-            static const uchar g_nSegmNegative;
         };
 
         namespace Video {
 
-            Metrics CalcMetricsFromCategory(const CategoryInfo& oCat, bool bAverage);
-            Metrics CalcMetricsFromCategories(const std::vector<std::shared_ptr<CategoryInfo>>& vpCat, bool bAverage);
-            void WriteMetrics(const std::string& sResultsFilePath, const SequenceInfo& oSeq);
-            void WriteMetrics(const std::string& sResultsFilePath, const CategoryInfo& oCat);
-            void WriteMetrics(const std::string& sResultsFilePath, const std::vector<std::shared_ptr<CategoryInfo>>& vpCat);
-            cv::Mat ReadResult( const std::string& sResultsPath, const std::string& sCatName, const std::string& sSeqName,
+            cv::Mat ReadResult( const std::string& sResultsPath, const std::string& sGroupName, const std::string& sSeqName,
                                 const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix, int nFlags=cv::IMREAD_GRAYSCALE);
-            void WriteResult( const std::string& sResultsPath, const std::string& sCatName, const std::string& sSeqName,
+            void WriteResult( const std::string& sResultsPath, const std::string& sGroupName, const std::string& sSeqName,
                               const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix,
-                              const cv::Mat& oResult, const std::vector<int>& vnComprParams);
+                              const cv::Mat& oResult, const std::vector<int>& vnComprParams={cv::IMWRITE_PNG_COMPRESSION,9});
 
-            class CDnetEvaluator : public SegmEvaluator {
+            struct BinarySegmEvaluator : public SegmEvaluator {
 #if HAVE_GLSL
-                struct GLCDnetEvaluator : public SegmEvaluator::GLSegmEvaluator {
+                struct GLBinarySegmEvaluator : public GLSegmEvaluator {
+                    GLBinarySegmEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount);
+                    virtual std::string getComputeShaderSource(size_t nStage) const;
+                };
+                virtual std::shared_ptr<GLEvaluatorBase> CreateGLEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount) const;
+#endif //HAVE_GLSL
+                virtual void AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI, BasicMetrics& m) const;
+                virtual cv::Mat GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI) const;
+                static const uchar g_nSegmPositive;
+                static const uchar g_nSegmOutOfScope;
+                static const uchar g_nSegmNegative;
+            };
+
+            struct CDnetEvaluator : public SegmEvaluator {
+#if HAVE_GLSL
+                struct GLCDnetEvaluator : public GLSegmEvaluator {
                     GLCDnetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount);
                     virtual std::string getComputeShaderSource(size_t nStage) const;
                 };
-            public:
-                virtual std::shared_ptr<SegmEvaluator::GLSegmEvaluator> CreateGLEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount) const;
+                virtual std::shared_ptr<GLEvaluatorBase> CreateGLEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount) const;
 #endif //HAVE_GLSL
                 virtual void AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI, BasicMetrics& m) const;
                 virtual cv::Mat GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI) const;
@@ -83,6 +87,12 @@ namespace DatasetUtils {
         }; //namespace Video
 
         namespace Image {
+
+            cv::Mat ReadResult( const std::string& sResultsPath, const std::string& sGroupName, const std::string& sSeqName,
+                                const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix, int nFlags=cv::IMREAD_GRAYSCALE);
+            void WriteResult( const std::string& sResultsPath, const std::string& sGroupName, const std::string& sSeqName,
+                              const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix,
+                              const cv::Mat& oResult, const std::vector<int>& vnComprParams);
 
         }; //namespace Image
 

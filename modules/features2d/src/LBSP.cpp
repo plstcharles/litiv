@@ -262,6 +262,7 @@ void LBSP::validateROI(cv::Mat& oROI) {
 std::string LBSP::getShaderFunctionSource(size_t nChannels, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize) {
     glAssert(nChannels==4 || nChannels==1);
     std::stringstream ssSrc;
+    // @@@@@ split lookup/threshold?
     if(!bUseSharedDataPreload) ssSrc <<
              "uvec3 lbsp(in uvec3 t, in uvec3 ref, in layout(" << (nChannels==4?"rgba8ui":"r8ui") << ") readonly uimage2D mData, in ivec2 vCoords) {\n"
              "    return (uvec3(greaterThan(uvec3(abs(ivec3(imageLoad(mData,vCoords+ivec2(-1, 1)).rgb)-ivec3(ref))),t)) << 15)\n"

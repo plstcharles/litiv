@@ -404,13 +404,13 @@ namespace GLUtils {
         std::stringstream ssRes;
         int nCurrLine = 1;
         ssRes << (bPrefixTab?cv::format("\t%06d: ",nCurrLine):cv::format("%06d: ",nCurrLine));
-        for(auto oSrcCharIter = sSrc.begin(); oSrcCharIter!=sSrc.end(); ++oSrcCharIter) {
-            if(*oSrcCharIter=='\n') {
+        for(auto pcSrcCharIter=sSrc.begin(); pcSrcCharIter!=sSrc.end(); ++pcSrcCharIter) {
+            if(*pcSrcCharIter=='\n') {
                 ++nCurrLine;
                 ssRes << (bPrefixTab?"\n\t":"\n") << cv::format("%06d: ",nCurrLine);
             }
             else
-                ssRes << *oSrcCharIter;
+                ssRes << *pcSrcCharIter;
 
         }
         return ssRes.str();

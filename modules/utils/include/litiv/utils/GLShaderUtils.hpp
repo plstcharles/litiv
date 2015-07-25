@@ -61,8 +61,8 @@ public:
 
 private:
     static bool useShaderProgram(GLShader* pNewShader);
-    GLShader& operator=(const GLShader&)=delete;
-    GLShader(const GLShader&)=delete;
+    GLShader& operator=(const GLShader&) = delete;
+    GLShader(const GLShader&) = delete;
     std::map<GLuint,std::string> m_mShaderSources;
     std::map<std::string,GLint> m_mShaderUniformLocations;
     bool m_bIsCompiled;

@@ -150,8 +150,8 @@ void BackgroundSubtractorLBSP::initialize(const cv::Mat& oInitImg, const cv::Mat
 
 #if HAVE_GPU_SUPPORT
 
-void BackgroundSubtractorLBSP::apply(cv::InputArray _oNextImage, cv::OutputArray _oLastFGMask, double dLearningRate) {
-    this->apply(_oNextImage,dLearningRate);
+void BackgroundSubtractorLBSP::apply_async(cv::InputArray _oNextImage, cv::OutputArray _oLastFGMask, double dLearningRate) {
+    this->apply_async(_oNextImage,dLearningRate);
     this->getLatestForegroundMask(_oLastFGMask);
 }
 

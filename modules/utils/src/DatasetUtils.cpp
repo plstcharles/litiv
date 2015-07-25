@@ -25,7 +25,14 @@ void DatasetUtils::ValidateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoi
     voKPs = voNewKPs;
 }
 
-DatasetUtils::ImagePrecacher::ImagePrecacher(ImageQueryByIndexFunc pCallback) {
+std::vector<std::shared_ptr<DatasetUtils::WorkGroup>> DatasetUtils::DatasetInfoBase::ParseDataset(const DatasetUtils::DatasetInfoBase& oInfo) {
+    std::vector<std::shared_ptr<DatasetUtils::WorkGroup>> vpGroups;
+    for(auto psPathIter=oInfo.m_vsWorkBatchPaths.begin(); psPathIter!=oInfo.m_vsWorkBatchPaths.end(); ++psPathIter)
+        vpGroups.push_back(std::make_shared<DatasetUtils::WorkGroup>(*psPathIter,oInfo.m_sDatasetRootPath+*psPathIter,oInfo,oInfo.m_sDatasetName));
+    return vpGroups;
+}
+
+DatasetUtils::ImagePrecacher::ImagePrecacher(std::function<const cv::Mat&(size_t)> pCallback) {
     CV_Assert(pCallback);
     m_pCallback = pCallback;
     m_bIsPrecaching = false;
@@ -192,13 +199,14 @@ const cv::Mat& DatasetUtils::ImagePrecacher::GetImageFromIndex_internal(size_t n
     return m_oLastReqImage;
 }
 
-DatasetUtils::WorkBatch::WorkBatch(const std::string& sName, const std::string& sPath, bool bHasGT, bool bForceGrayscale, bool bUse4chAlign)
-    :    m_sName(sName)
-        ,m_sPath(sPath)
-        ,m_bHasGroundTruth(bHasGT)
-        ,m_bForcingGrayscale(bForceGrayscale)
-        ,m_bUsing4chAlignment(bUse4chAlign)
-        ,m_nIMReadInputFlags(bForceGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR)
+DatasetUtils::WorkBatch::WorkBatch(const std::string& sBatchName, const std::string& sBatchPath, const DatasetInfoBase& oDatasetInfo, const std::string& sGroupName)
+    :    m_sName(sBatchName)
+        ,m_sGroupName(sGroupName)
+        ,m_sPath(sBatchPath)
+        ,m_bHasGroundTruth(oDatasetInfo.m_pEvaluator!=nullptr)
+        ,m_bForcingGrayscale(PlatformUtils::string_contains_token(sBatchName,oDatasetInfo.m_vsGrayscaleNameTokens))
+        ,m_bForcing4ByteDataAlign(oDatasetInfo.m_bForce4ByteDataAlign)
+        ,m_nIMReadInputFlags((oDatasetInfo.m_pEvaluator!=nullptr)?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR)
         ,m_oInputPrecacher(std::bind(&DatasetUtils::WorkBatch::GetInputFromIndex_internal,this,std::placeholders::_1))
         ,m_oGTPrecacher(std::bind(&DatasetUtils::WorkBatch::GetGTFromIndex_internal,this,std::placeholders::_1)) {}
 
@@ -221,6 +229,50 @@ const cv::Mat& DatasetUtils::WorkBatch::GetGTFromIndex_internal(size_t nIdx) {
     CV_Assert(nIdx<GetTotalImageCount());
     m_oLatestGTMask = GetGTFromIndex_external(nIdx);
     return m_oLatestGTMask;
+}
+
+DatasetUtils::WorkGroup::WorkGroup(const std::string& sGroupName, const std::string& sGroupPath, const DatasetInfoBase& oDatasetInfo, const std::string& sSuperGroupName)
+    :    WorkBatch(sGroupName,sGroupPath,oDatasetInfo,sSuperGroupName)
+        ,m_dExpectedLoad(0)
+        ,m_nTotImageCount(0) {
+    if(!PlatformUtils::string_contains_token(m_sName,oDatasetInfo.m_vsSkippedNameTokens)) {
+        std::vector<std::string> vsWorkBatchPaths;
+        // all subdirs are considered work batch directories
+        PlatformUtils::GetSubDirsFromDir(m_sPath,vsWorkBatchPaths);
+        std::cout << "[" << oDatasetInfo.m_sDatasetName << "] -- Parsing directory '" << m_sPath << "' for work group '" << m_sName << "'; " << vsWorkBatchPaths.size() << " potential work batch directory(ies) found" << std::endl;
+        for(auto psPathIter=vsWorkBatchPaths.begin(); psPathIter!=vsWorkBatchPaths.end(); ++psPathIter) {
+            const size_t nLastSlashPos = psPathIter->find_last_of("/\\");
+            const std::string sBatchName = nLastSlashPos==std::string::npos?*psPathIter:psPathIter->substr(nLastSlashPos+1);
+            if(!PlatformUtils::string_contains_token(sBatchName,oDatasetInfo.m_vsSkippedNameTokens)) {
+                if(oDatasetInfo.GetType()==eDatasetType_Segm_Video)
+                    m_vpBatches.push_back(std::make_shared<Segm::Video::Sequence>(sBatchName,*psPathIter,dynamic_cast<const Segm::Video::DatasetInfo&>(oDatasetInfo),m_sName));
+                //else if(oDatasetInfo.GetType()==eDatasetType_Segm_Image) @@@@@@@@
+                //    m_vpBatches.push_back(std::make_shared<Segm::Image::Set>(sBatchName,*oPathIter,oDatasetInfo,m_sName));
+                else
+                    throw std::logic_error(m_sName+std::string(": bad dataset type bassed in dataset info struct"));
+                m_dExpectedLoad += m_vpBatches.back()->GetExpectedLoad();
+                m_nTotImageCount += m_vpBatches.back()->GetTotalImageCount();
+            }
+        }
+    }
+}
+
+cv::Mat DatasetUtils::WorkGroup::GetInputFromIndex_external(size_t nFrameIdx) {
+    size_t nCumulImageIdx = 0;
+    size_t nBatchIdx = 0;
+    do {
+        nCumulImageIdx += m_vpBatches[nBatchIdx++]->GetTotalImageCount();
+    } while(nCumulImageIdx<nFrameIdx);
+    return m_vpBatches[nBatchIdx-1]->GetInputFromIndex_external(nFrameIdx-(nCumulImageIdx-m_vpBatches[nBatchIdx-1]->GetTotalImageCount()));
+}
+
+cv::Mat DatasetUtils::WorkGroup::GetGTFromIndex_external(size_t nFrameIdx) {
+    size_t nCumulImageIdx = 0;
+    size_t nBatchIdx = 0;
+    do {
+        nCumulImageIdx += m_vpBatches[nBatchIdx++]->GetTotalImageCount();
+    } while(nCumulImageIdx<nFrameIdx);
+    return m_vpBatches[nBatchIdx-1]->GetGTFromIndex_external(nFrameIdx-(nCumulImageIdx-m_vpBatches[nBatchIdx-1]->GetTotalImageCount()));
 }
 
 DatasetUtils::Segm::BasicMetrics::BasicMetrics()
@@ -314,158 +366,81 @@ double DatasetUtils::Segm::Metrics::CalcFalseNegativeRate(const DatasetUtils::Se
 double DatasetUtils::Segm::Metrics::CalcPercentBadClassifs(const DatasetUtils::Segm::BasicMetrics& m) {return (100.0*(m.nFN+m.nFP)/(m.nTP+m.nFP+m.nFN+m.nTN));}
 double DatasetUtils::Segm::Metrics::CalcMatthewsCorrCoeff(const DatasetUtils::Segm::BasicMetrics& m) {return ((((double)m.nTP*m.nTN)-(m.nFP*m.nFN))/sqrt(((double)m.nTP+m.nFP)*(m.nTP+m.nFN)*(m.nTN+m.nFP)*(m.nTN+m.nFN)));}
 
-DatasetUtils::Segm::Video::DatasetInfo DatasetUtils::Segm::Video::GetDatasetInfo(const DatasetUtils::Segm::Video::eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirPath, bool bLoad4Channels) {
-    if(eDatasetID==eDataset_CDnet2012)
-        return DatasetInfo {
-            eDatasetID,
-            sDatasetRootDirPath+"/CDNet/dataset/",
-            sDatasetRootDirPath+"/CDNet/"+sResultsDirPath+"/",
-            "bin",
-            ".png",
-            {"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"},
-            {"thermal"},
-            {},
-            1,
-            std::shared_ptr<SegmEvaluator>(new CDnetEvaluator),
-            bLoad4Channels
-        };
-    else if(eDatasetID==eDataset_CDnet2014)
-        return DatasetInfo {
-            eDatasetID,
-            sDatasetRootDirPath+"/CDNet2014/dataset/",
-            sDatasetRootDirPath+"/CDNet2014/"+sResultsDirPath+"/",
-            "bin",
-            ".png",
-            {"baseline_highway"},//{"shadow_cubicle"},//{"dynamicBackground_fall"},//{"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"},
-            {"thermal","turbulence"},//{"baseline_highway"},//
-            {},
-            1,
-            nullptr,//std::shared_ptr<SegmEvaluator>(new CDnetEvaluator),
-            bLoad4Channels
-        };
-    else if(eDatasetID==eDataset_Wallflower)
-        return DatasetInfo {
-            eDatasetID,
-            sDatasetRootDirPath+"/Wallflower/dataset/",
-            sDatasetRootDirPath+"/Wallflower/"+sResultsDirPath+"/",
-            "bin",
-            ".png",
-            {"global"},
-            {},
-            {},
-            0,
-            nullptr,//std::shared_ptr<SegmEvaluator>(new BinarySegmEvaluator),
-            bLoad4Channels
-        };
-    else if(eDatasetID==eDataset_PETS2001_D3TC1)
-        return DatasetInfo {
-            eDatasetID,
-            sDatasetRootDirPath+"/PETS2001/DATASET3/",
-            sDatasetRootDirPath+"/PETS2001/DATASET3/"+sResultsDirPath+"/",
-            "bin",
-            ".png",
-            {"TESTING"},
-            {},
-            {},
-            0,
-            nullptr,//std::shared_ptr<SegmEvaluator>(new BinarySegmEvaluator),
-            bLoad4Channels
-        };
-    else if(eDatasetID==eDataset_LITIV2012)
-        return DatasetInfo {
-            eDatasetID,
-            sDatasetRootDirPath+"/litiv/litiv2012_dataset/",
-            sDatasetRootDirPath+"/litiv/litiv2012_dataset/"+sResultsDirPath+"/",
-            "bin",
-            ".png",
-            {"SEQUENCE1","SEQUENCE2","SEQUENCE3","SEQUENCE4","SEQUENCE5","SEQUENCE6","SEQUENCE7","SEQUENCE8","SEQUENCE9"},//{"vid1","vid2/cut1","vid2/cut2","vid3"},
-            {"THERMAL"},
-            {},//{"1Person","2Person","3Person","4Person","5Person"},
-            0,
-            nullptr,
-            bLoad4Channels
-        };
-    else if(eDatasetID==eDataset_GenericTest)
-        // @@@@@ remove from this func, set only in main where/when needed?
-        return DatasetInfo {
-            eDatasetID,
-            sDatasetRootDirPath+"/avitest/",                        // HARDCODED
-            sDatasetRootDirPath+"/avitest/"+sResultsDirPath+"/",    // HARDCODED
-            "",                                                     // HARDCODED
-            ".png",                                                 // HARDCODED
-            {"inf6803_tp1"},                                        // HARDCODED
-            {},                                                     // HARDCODED
-            {},                                                     // HARDCODED
-            0,                                                      // HARDCODED
-            nullptr,
-            bLoad4Channels
-        };
+DatasetUtils::Segm::SegmWorkBatch::SegmWorkBatch(const std::string& sBatchName, const std::string& sBatchPath, const DatasetInfoBase& oDatasetInfo, const std::string& sGroupName)
+    :    WorkBatch(sBatchName,sBatchPath,oDatasetInfo,sGroupName) {}
+
+std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> DatasetUtils::Segm::Video::GetDatasetInfo(const DatasetUtils::Segm::Video::eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirName, bool bForce4ByteDataAlign) {
+    std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> pInfo;
+    if(eDatasetID==eDataset_CDnet2012) {
+        pInfo = std::make_shared<DatasetInfo>();
+        pInfo->m_sDatasetName               = "CDnet 2012";
+        pInfo->m_sDatasetRootPath           = sDatasetRootDirPath+"/CDNet/dataset/";
+        pInfo->m_sResultsRootPath           = sDatasetRootDirPath+"/CDNet/"+sResultsDirName+"/";
+        pInfo->m_pEvaluator                 = std::shared_ptr<SegmEvaluator>(new CDnetEvaluator);
+        pInfo->m_vsWorkBatchPaths           = {"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"};
+        pInfo->m_vsSkippedNameTokens        = {};
+        pInfo->m_vsGrayscaleNameTokens      = {"thermal"};
+        pInfo->m_bForce4ByteDataAlign       = bForce4ByteDataAlign;
+        pInfo->m_eDatasetID                 = eDataset_CDnet2012;
+        pInfo->m_sResultFrameNamePrefix     = "bin";
+        pInfo->m_sResultFrameNameSuffix     = ".png";
+        pInfo->m_nResultIdxOffset           = 1;
+    }
+    else if(eDatasetID==eDataset_CDnet2014) {
+        pInfo = std::make_shared<DatasetInfo>();
+        pInfo->m_sDatasetName               = "CDnet 2014";
+        pInfo->m_sDatasetRootPath           = sDatasetRootDirPath+"/CDNet2014/dataset/";
+        pInfo->m_sResultsRootPath           = sDatasetRootDirPath+"/CDNet2014/"+sResultsDirName+"/";
+        pInfo->m_pEvaluator                 = std::shared_ptr<SegmEvaluator>(new CDnetEvaluator);
+        pInfo->m_vsWorkBatchPaths           = {"baseline_highway"};//{"shadow_cubicle"};//{"dynamicBackground_fall"},//{"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"};
+        pInfo->m_vsSkippedNameTokens        = {};
+        pInfo->m_vsGrayscaleNameTokens      = {"thermal","turbulence"};//{"baseline_highway"};
+        pInfo->m_bForce4ByteDataAlign       = bForce4ByteDataAlign;
+        pInfo->m_eDatasetID                 = eDataset_CDnet2014;
+        pInfo->m_sResultFrameNamePrefix     = "bin";
+        pInfo->m_sResultFrameNameSuffix     = ".png";
+        pInfo->m_nResultIdxOffset           = 1;
+    }
+    else if(eDatasetID==eDataset_Wallflower) {
+        pInfo = std::make_shared<DatasetInfo>();
+        pInfo->m_sDatasetName               = "Wallflower";
+        pInfo->m_sDatasetRootPath           = sDatasetRootDirPath+"/Wallflower/dataset/";
+        pInfo->m_sResultsRootPath           = sDatasetRootDirPath+"/Wallflower/"+sResultsDirName+"/";
+        pInfo->m_pEvaluator                 = std::shared_ptr<SegmEvaluator>(new BinarySegmEvaluator);
+        pInfo->m_vsWorkBatchPaths           = {"global"};
+        pInfo->m_vsSkippedNameTokens        = {};
+        pInfo->m_vsGrayscaleNameTokens      = {};
+        pInfo->m_bForce4ByteDataAlign       = bForce4ByteDataAlign;
+        pInfo->m_eDatasetID                 = eDataset_Wallflower;
+        pInfo->m_sResultFrameNamePrefix     = "bin";
+        pInfo->m_sResultFrameNameSuffix     = ".png";
+        pInfo->m_nResultIdxOffset           = 0;
+    }
+    else if(eDatasetID==eDataset_PETS2001_D3TC1) {
+        pInfo = std::make_shared<DatasetInfo>();
+        pInfo->m_sDatasetName               = "PETS2001 Dataset#3";
+        pInfo->m_sDatasetRootPath           = sDatasetRootDirPath+"/PETS2001/DATASET3/";
+        pInfo->m_sResultsRootPath           = sDatasetRootDirPath+"/PETS2001/DATASET3/"+sResultsDirName+"/";
+        pInfo->m_pEvaluator                 = std::shared_ptr<SegmEvaluator>(new BinarySegmEvaluator);
+        pInfo->m_vsWorkBatchPaths           = {"TESTING"};
+        pInfo->m_vsSkippedNameTokens        = {};
+        pInfo->m_vsGrayscaleNameTokens      = {};
+        pInfo->m_bForce4ByteDataAlign       = bForce4ByteDataAlign;
+        pInfo->m_eDatasetID                 = eDataset_PETS2001_D3TC1;
+        pInfo->m_sResultFrameNamePrefix     = "bin";
+        pInfo->m_sResultFrameNameSuffix     = ".png";
+        pInfo->m_nResultIdxOffset           = 0;
+    }
+    else if(eDatasetID==eDataset_Custom)
+        throw std::logic_error(std::string("Custom dataset info struct can only be filled manually"));
     else
-        throw std::runtime_error(std::string("Unknown dataset type, cannot use predefined info struct"));
+        throw std::logic_error(std::string("Unknown dataset type, cannot use predefined dataset info struct"));
+    return pInfo;
 }
 
-DatasetUtils::Segm::Video::CategoryInfo::CategoryInfo( const std::string& sName, const std::string& sDirectoryPath, const DatasetUtils::Segm::Video::DatasetInfo& oInfo)
-    :    WorkBatch(sName,sDirectoryPath,oInfo.pEvaluator!=nullptr,PlatformUtils::string_contains_token(sName,oInfo.vsGrayscaleNameTokens),oInfo.bLoad4Channels)
-        ,m_eDatasetID(oInfo.eID)
-        ,m_dExpectedLoad(0)
-        ,m_nTotFrameCount(0) {
-    std::cout<<"\tParsing dir '"<<sDirectoryPath<<"' for category '"<<m_sName<<"'; ";
-    std::vector<std::string> vsSequencePaths;
-    if(m_eDatasetID == eDataset_CDnet2012 ||
-       m_eDatasetID == eDataset_CDnet2014 ||
-       m_eDatasetID == eDataset_Wallflower ||
-       m_eDatasetID == eDataset_PETS2001_D3TC1) {
-        // all subdirs are considered sequence directories
-        PlatformUtils::GetSubDirsFromDir(sDirectoryPath,vsSequencePaths);
-        std::cout<<vsSequencePaths.size()<<" potential sequence(s)"<<std::endl;
-    }
-    else if(m_eDatasetID == eDataset_LITIV2012) {
-        // all subdirs should contain individual video tracks in separate modalities
-        PlatformUtils::GetSubDirsFromDir(sDirectoryPath,vsSequencePaths);
-        std::cout<<vsSequencePaths.size()<<" potential track(s)"<<std::endl;
-    }
-    else if(m_eDatasetID == eDataset_GenericTest) {
-        // all files are considered sequences
-        PlatformUtils::GetFilesFromDir(sDirectoryPath,vsSequencePaths);
-        std::cout<<vsSequencePaths.size()<<" potential sequence(s)"<<std::endl;
-    }
-    else
-        throw std::runtime_error(std::string("Unknown dataset type, cannot use any known parsing strategy"));
-    if(!PlatformUtils::string_contains_token(sName,oInfo.vsSkippedNameTokens)) {
-        for(auto oSeqPathIter=vsSequencePaths.begin(); oSeqPathIter!=vsSequencePaths.end(); ++oSeqPathIter) {
-            const size_t idx = oSeqPathIter->find_last_of("/\\");
-            const std::string sSeqName = idx==std::string::npos?*oSeqPathIter:oSeqPathIter->substr(idx+1);
-            if(!PlatformUtils::string_contains_token(sSeqName,oInfo.vsSkippedNameTokens)) {
-                m_vpSequences.push_back(std::make_shared<SequenceInfo>(sSeqName,m_sName,*oSeqPathIter,oInfo));
-                m_dExpectedLoad += m_vpSequences.back()->GetExpectedLoad();
-                m_nTotFrameCount += m_vpSequences.back()->GetTotalImageCount();
-            }
-        }
-    }
-}
-
-cv::Mat DatasetUtils::Segm::Video::CategoryInfo::GetInputFromIndex_external(size_t nFrameIdx) {
-    size_t nCumulFrameIdx = 0;
-    size_t nSeqIdx = 0;
-    do {
-        nCumulFrameIdx += m_vpSequences[nSeqIdx++]->GetTotalImageCount();
-    } while(nCumulFrameIdx<nFrameIdx);
-    return m_vpSequences[nSeqIdx-1]->GetInputFromIndex_external(nFrameIdx-(nCumulFrameIdx-m_vpSequences[nSeqIdx-1]->GetTotalImageCount()));
-}
-
-cv::Mat DatasetUtils::Segm::Video::CategoryInfo::GetGTFromIndex_external(size_t nFrameIdx) {
-    size_t nCumulFrameIdx = 0;
-    size_t nSeqIdx = 0;
-    do {
-        nCumulFrameIdx += m_vpSequences[nSeqIdx++]->GetTotalImageCount();
-    } while(nCumulFrameIdx<nFrameIdx);
-    return m_vpSequences[nSeqIdx-1]->GetGTFromIndex_external(nFrameIdx-(nCumulFrameIdx-m_vpSequences[nSeqIdx-1]->GetTotalImageCount()));
-}
-
-DatasetUtils::Segm::Video::SequenceInfo::SequenceInfo(const std::string& sName, const std::string& sParentName, const std::string& sPath, const DatasetUtils::Segm::Video::DatasetInfo& oInfo)
-    :    WorkBatch(sName,sPath,oInfo.pEvaluator!=nullptr,PlatformUtils::string_contains_token(sName,oInfo.vsGrayscaleNameTokens)||PlatformUtils::string_contains_token(sParentName,oInfo.vsGrayscaleNameTokens),oInfo.bLoad4Channels)
-        ,m_eDatasetID(oInfo.eID)
-        ,m_sParentName(sParentName)
+DatasetUtils::Segm::Video::Sequence::Sequence(const std::string& sSeqName, const std::string& sSeqPath, const DatasetInfo& oDatasetInfo, const std::string& sSeqGroupName)
+    :    SegmWorkBatch(sSeqName,sSeqPath,oDatasetInfo,sSeqGroupName)
+        ,m_eDatasetID(oDatasetInfo.m_eDatasetID)
         ,m_dExpectedLoad(0)
         ,m_nTotFrameCount(0)
         ,m_nNextExpectedVideoReaderFrameIdx(0) {
@@ -551,33 +526,7 @@ DatasetUtils::Segm::Video::SequenceInfo::SequenceInfo(const std::string& sName, 
         CV_Assert(m_nTotFrameCount>0);
         m_dExpectedLoad = (double)m_oSize.height*m_oSize.width*m_nTotFrameCount*(int(!m_bForcingGrayscale)+1);
     }
-    else if(m_eDatasetID==eDataset_LITIV2012) {
-        PlatformUtils::GetFilesFromDir(m_sPath+"/input/",m_vsInputFramePaths);
-        if(m_vsInputFramePaths.empty())
-            throw std::runtime_error(std::string("Sequence at ") + m_sPath + " did not possess any parsable input images");
-        cv::Mat oTempImg = cv::imread(m_vsInputFramePaths[0]);
-        if(oTempImg.empty())
-            throw std::runtime_error(std::string("Bad image file ('")+m_vsInputFramePaths[0]+"'), could not be read");
-        /*m_voVideoReader.open(m_sPath+"/input/in%06d.jpg");
-        if(!m_voVideoReader.isOpened())
-            m_voVideoReader.open(m_sPath+"/"+m_sName+".avi");
-        if(!m_voVideoReader.isOpened())
-            throw std::runtime_error(std::string("Bad video file ('")+m_sPath+std::string("'), could not be opened"));
-        m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
-        cv::Mat oTempImg;
-        m_voVideoReader >> oTempImg;
-        m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
-        if(oTempImg.empty())
-            throw std::runtime_error(std::string("Bad video file ('")+m_sPath+std::string("'), could not be read"));*/
-        m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
-        m_oSize = oTempImg.size();
-        m_nNextExpectedVideoReaderFrameIdx = (size_t)-1;
-        //m_nTotFrameCount = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
-        m_nTotFrameCount = m_vsInputFramePaths.size();
-        CV_Assert(m_nTotFrameCount>0);
-        m_dExpectedLoad = (double)m_oSize.height*m_oSize.width*m_nTotFrameCount*(int(!m_bForcingGrayscale)+1);
-    }
-    else if(m_eDatasetID==eDataset_GenericTest) {
+    else if(m_eDatasetID==eDataset_Custom) {
         m_voVideoReader.open(m_sPath);
         if(!m_voVideoReader.isOpened())
             throw std::runtime_error(std::string("Bad video file ('")+m_sPath+std::string("'), could not be opened"));
@@ -595,19 +544,17 @@ DatasetUtils::Segm::Video::SequenceInfo::SequenceInfo(const std::string& sName, 
         m_dExpectedLoad = (double)m_oSize.height*m_oSize.width*m_nTotFrameCount*(int(!m_bForcingGrayscale)+1);
     }
     else
-        throw std::runtime_error(std::string("Unknown dataset type, cannot use any known parsing strategy"));
+        throw std::logic_error(std::string("Unknown dataset type, cannot use any known parsing strategy"));
 }
 
-cv::Mat DatasetUtils::Segm::Video::SequenceInfo::GetInputFromIndex_external(size_t nFrameIdx) {
+cv::Mat DatasetUtils::Segm::Video::Sequence::GetInputFromIndex_external(size_t nFrameIdx) {
     cv::Mat oFrame;
     if( m_eDatasetID==eDataset_CDnet2012 ||
         m_eDatasetID==eDataset_CDnet2014 ||
-        m_eDatasetID==eDataset_Wallflower ||
-        m_eDatasetID==eDataset_LITIV2012)
+        m_eDatasetID==eDataset_Wallflower)
         oFrame = cv::imread(m_vsInputFramePaths[nFrameIdx],m_nIMReadInputFlags);
     else if( m_eDatasetID==eDataset_PETS2001_D3TC1 ||
-            /*m_eDatasetID==eDataset_LITIV2012 || */
-            m_eDatasetID==eDataset_GenericTest) {
+             m_eDatasetID==eDataset_Custom) {
         if(m_nNextExpectedVideoReaderFrameIdx!=nFrameIdx) {
             m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,(double)nFrameIdx);
             m_nNextExpectedVideoReaderFrameIdx = nFrameIdx+1;
@@ -618,7 +565,7 @@ cv::Mat DatasetUtils::Segm::Video::SequenceInfo::GetInputFromIndex_external(size
         if(m_bForcingGrayscale && oFrame.channels()>1)
             cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2GRAY);
     }
-    if(m_bUsing4chAlignment && oFrame.channels()==3)
+    if(m_bForcing4ByteDataAlign && oFrame.channels()==3)
         cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2BGRA);
     CV_Assert(oFrame.size()==m_oSize);
 #if DATASETUTILS_HARDCODE_FRAME_INDEX
@@ -629,7 +576,7 @@ cv::Mat DatasetUtils::Segm::Video::SequenceInfo::GetInputFromIndex_external(size
     return oFrame;
 }
 
-cv::Mat DatasetUtils::Segm::Video::SequenceInfo::GetGTFromIndex_external(size_t nFrameIdx) {
+cv::Mat DatasetUtils::Segm::Video::Sequence::GetGTFromIndex_external(size_t nFrameIdx) {
     cv::Mat oFrame;
     if(m_eDatasetID == eDataset_CDnet2012 ||
        m_eDatasetID == eDataset_CDnet2014)
@@ -649,4 +596,39 @@ cv::Mat DatasetUtils::Segm::Video::SequenceInfo::GetGTFromIndex_external(size_t 
     WriteOnImage(oFrame,sstr.str(),cv::Scalar_<uchar>::all(255);
 #endif //DATASETUTILS_HARDCODE_FRAME_INDEX
     return oFrame;
+}
+
+std::shared_ptr<DatasetUtils::Segm::Image::DatasetInfo> DatasetUtils::Segm::Image::GetDatasetInfo(const DatasetUtils::Segm::Image::eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirName, bool bForce4ByteDataAlign) {
+    std::shared_ptr<DatasetUtils::Segm::Image::DatasetInfo> pInfo;
+    if(eDatasetID==eDataset_BSDS500_train) {
+        pInfo = std::make_shared<DatasetInfo>();
+        pInfo->m_sDatasetName               = "BSDS500 Training set";
+        pInfo->m_sDatasetRootPath           = sDatasetRootDirPath+"/BSDS500/data/images/";
+        pInfo->m_sResultsRootPath           = sDatasetRootDirPath+"/BSDS500/BSR/"+sResultsDirName+"/";
+        pInfo->m_pEvaluator                 = nullptr; // external only, still not impl
+        pInfo->m_vsWorkBatchPaths           = {"train"};
+        pInfo->m_vsSkippedNameTokens        = {};
+        pInfo->m_vsGrayscaleNameTokens      = {};
+        pInfo->m_bForce4ByteDataAlign       = bForce4ByteDataAlign;
+        pInfo->m_eDatasetID                 = eDataset_BSDS500_train;
+        pInfo->m_sResultImageNameExtension  = ".png";
+    }
+    else if(eDatasetID==eDataset_BSDS500_train_valid) {
+        pInfo = std::make_shared<DatasetInfo>();
+        pInfo->m_sDatasetName               = "BSDS500 Training+Validation set";
+        pInfo->m_sDatasetRootPath           = sDatasetRootDirPath+"/BSDS500/data/images/";
+        pInfo->m_sResultsRootPath           = sDatasetRootDirPath+"/BSDS500/BSR/"+sResultsDirName+"/";
+        pInfo->m_pEvaluator                 = nullptr; // external only, still not impl
+        pInfo->m_vsWorkBatchPaths           = {"train","val"};
+        pInfo->m_vsSkippedNameTokens        = {};
+        pInfo->m_vsGrayscaleNameTokens      = {};
+        pInfo->m_bForce4ByteDataAlign       = bForce4ByteDataAlign;
+        pInfo->m_eDatasetID                 = eDataset_BSDS500_train;
+        pInfo->m_sResultImageNameExtension  = ".png";
+    }
+    else if(eDatasetID==eDataset_Custom)
+        throw std::logic_error(std::string("Custom dataset info struct can only be filled manually"));
+    else
+        throw std::logic_error(std::string("Unknown dataset type, cannot use predefined info struct"));
+    return pInfo;
 }

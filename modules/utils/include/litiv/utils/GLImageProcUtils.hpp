@@ -31,7 +31,7 @@ public:
     size_t fetchLastDebug(cv::Mat& oDebug) const;
 
     virtual void initialize(const cv::Mat& oInitInput, const cv::Mat& oROI);
-    virtual void apply(const cv::Mat& oNextInput, bool bRebindAll=false);
+    virtual void apply_async(const cv::Mat& oNextInput, bool bRebindAll=false);
 
     const size_t m_nLevels;
     const size_t m_nComputeStages;
@@ -117,8 +117,8 @@ protected:
     static const char* getFrameIndexUniformName();
     std::string getFragmentShaderSource_internal(int nOutputType,int nDebugType,int nInputType) const;
 private:
-    GLImageProcAlgo& operator=(const GLImageProcAlgo&)=delete;
-    GLImageProcAlgo(const GLImageProcAlgo&)=delete;
+    GLImageProcAlgo& operator=(const GLImageProcAlgo&) = delete;
+    GLImageProcAlgo(const GLImageProcAlgo&) = delete;
     friend class GLImageProcEvaluatorAlgo;
     std::vector<GLuint> m_vnSSBO;
     std::vector<GLuint> m_vnACBO;
@@ -135,8 +135,8 @@ public:
 
     virtual void initialize(const cv::Mat& oInitInput, const cv::Mat& oInitGT, const cv::Mat& oROI);
     virtual void initialize(const cv::Mat& oInitGT, const cv::Mat& oROI);
-    virtual void apply(const cv::Mat& oNextInput, const cv::Mat& oNextGT, bool bRebindAll=false);
-    virtual void apply(const cv::Mat& oNextGT, bool bRebindAll=false);
+    virtual void apply_async(const cv::Mat& oNextInput, const cv::Mat& oNextGT, bool bRebindAll=false);
+    virtual void apply_async(const cv::Mat& oNextGT, bool bRebindAll=false);
 
 protected:
     const int m_nGroundtruthType;

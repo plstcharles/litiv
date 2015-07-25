@@ -178,7 +178,7 @@ void GLImageProcAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oROI)
     m_bGLInitialized = true;
 }
 
-void GLImageProcAlgo::apply(const cv::Mat& oNextInput, bool bRebindAll) {
+void GLImageProcAlgo::apply_async(const cv::Mat& oNextInput, bool bRebindAll) {
     glAssert(m_bGLInitialized && (oNextInput.empty() || (oNextInput.type()==m_nInputType && oNextInput.size()==m_oFrameSize && oNextInput.isContinuous())));
     m_nLastLayer = m_nCurrLayer;
     m_nCurrLayer = m_nNextLayer;
@@ -655,12 +655,12 @@ void GLImageProcEvaluatorAlgo::initialize(const cv::Mat& oInitGT, const cv::Mat&
     m_bGLInitialized = true;
 }
 
-void GLImageProcEvaluatorAlgo::apply(const cv::Mat& oNextInput, const cv::Mat& oNextGT, bool bRebindAll) {
-    m_pParent->apply(oNextInput,bRebindAll);
-    this->apply(oNextGT,bRebindAll);
+void GLImageProcEvaluatorAlgo::apply_async(const cv::Mat& oNextInput, const cv::Mat& oNextGT, bool bRebindAll) {
+    m_pParent->apply_async(oNextInput,bRebindAll);
+    this->apply_async(oNextGT,bRebindAll);
 }
 
-void GLImageProcEvaluatorAlgo::apply(const cv::Mat& oNextGT, bool bRebindAll) {
+void GLImageProcEvaluatorAlgo::apply_async(const cv::Mat& oNextGT, bool bRebindAll) {
     glAssert(m_bGLInitialized && (oNextGT.empty() || (oNextGT.type()==m_nGroundtruthType && oNextGT.size()==m_oFrameSize && oNextGT.isContinuous())));
     CV_Assert(m_nInternalFrameIdx<m_nTotFrameCount);
     m_nLastLayer = m_nCurrLayer;

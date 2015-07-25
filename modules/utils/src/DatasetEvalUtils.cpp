@@ -2,8 +2,11 @@
 
 #if HAVE_GLSL
 
+DatasetUtils::EvaluatorBase::GLEvaluatorBase::GLEvaluatorBase(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount, size_t nCountersPerImage)
+    :    GLImageProcEvaluatorAlgo(pParent,nTotImageCount,nCountersPerImage,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,true) {}
+
 DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator::GLSegmEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount)
-        :    GLImageProcEvaluatorAlgo(pParent,nTotFrameCount,eSegmEvalCountersCount,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,true) {}
+    :    GLEvaluatorBase::GLEvaluatorBase(pParent,nTotFrameCount,eSegmEvalCountersCount) {}
 
 DatasetUtils::Segm::BasicMetrics DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator::getCumulativeMetrics() {
     const cv::Mat& oAtomicCountersQueryBuffer = this->getEvaluationAtomicCounterBuffer();
@@ -18,32 +21,161 @@ DatasetUtils::Segm::BasicMetrics DatasetUtils::Segm::SegmEvaluator::GLSegmEvalua
     return m;
 }
 
-DatasetUtils::Segm::BasicMetrics DatasetUtils::Segm::SegmEvaluator::FetchCumulativeMetrics(const std::shared_ptr<DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator>& pEvaluator) const {
-    return pEvaluator->getCumulativeMetrics();
-}
-
 #endif //HAVE_GLSL
 
-cv::Mat DatasetUtils::Segm::SegmEvaluator::GetDebugDisplayImage(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI, size_t nIdx, cv::Point oDbgPt) const {
+DatasetUtils::Segm::Metrics DatasetUtils::Segm::CalcMetricsFromWorkGroup(const DatasetUtils::WorkGroup& oGroup, bool bAverage) {
+    if(!bAverage) {
+        BasicMetrics oCumulBasicMetrics;
+        for(auto ppBatchIter =oGroup.m_vpBatches.begin(); ppBatchIter!=oGroup.m_vpBatches.end(); ++ppBatchIter) {
+            auto pSeq = std::dynamic_pointer_cast<SegmWorkBatch>(*ppBatchIter);
+            CV_Assert(pSeq!=nullptr);
+            oCumulBasicMetrics += pSeq->m_oMetrics;
+        }
+        return Metrics(oCumulBasicMetrics);
+    }
+    else {
+        CV_Assert(!oGroup.m_vpBatches.empty());
+        auto pFirstSeq = std::dynamic_pointer_cast<SegmWorkBatch>(oGroup.m_vpBatches.front());
+        CV_Assert(pFirstSeq!=nullptr);
+        Metrics tmp(pFirstSeq->m_oMetrics);
+        for(auto ppBatchIter =oGroup.m_vpBatches.begin()+1; ppBatchIter!=oGroup.m_vpBatches.end(); ++ppBatchIter) {
+            auto pSeq = std::dynamic_pointer_cast<SegmWorkBatch>(*ppBatchIter);
+            CV_Assert(pSeq!=nullptr);
+            tmp += pSeq->m_oMetrics;
+        }
+        return tmp;
+    }
+}
+
+DatasetUtils::Segm::Metrics DatasetUtils::Segm::CalcMetricsFromWorkGroups(const std::vector<std::shared_ptr<DatasetUtils::WorkGroup>>& vpGroups, bool bAverage) {
+    if(!bAverage) {
+        BasicMetrics oCumulBasicMetrics;
+        for(auto ppGroupIter =vpGroups.begin(); ppGroupIter!=vpGroups.end(); ++ppGroupIter) {
+            for(auto ppBatchIter =(*ppGroupIter)->m_vpBatches.begin(); ppBatchIter!=(*ppGroupIter)->m_vpBatches.end(); ++ppBatchIter) {
+                auto pSeq = std::dynamic_pointer_cast<SegmWorkBatch>(*ppBatchIter);
+                CV_Assert(pSeq!=nullptr);
+                oCumulBasicMetrics += pSeq->m_oMetrics;
+            }
+        }
+        return Metrics(oCumulBasicMetrics);
+    }
+    else {
+        CV_Assert(!vpGroups.empty() && vpGroups[0]!=nullptr);
+        Metrics res = CalcMetricsFromWorkGroup(*vpGroups[0],bAverage);
+        res.nWeight = 1;
+        for(auto ppGroupIter =vpGroups.begin()+1; ppGroupIter!=vpGroups.end(); ++ppGroupIter) {
+            CV_Assert((*ppGroupIter)!=nullptr);
+            if(!(*ppGroupIter)->m_vpBatches.empty()) {
+                Metrics tmp = CalcMetricsFromWorkGroup(**ppGroupIter,bAverage);
+                tmp.nWeight = 1;
+                res += tmp;
+            }
+        }
+        return res;
+    }
+}
+
+void DatasetUtils::Segm::WriteMetrics(const std::string& sResultsFilePath, const DatasetUtils::Segm::SegmWorkBatch& oBatch) {
+    std::ofstream oMetricsOutput(sResultsFilePath);
+    Metrics tmp(oBatch.m_oMetrics);
+    const std::string sCurrSeqName = oBatch.m_sName.size()>12?oBatch.m_sName.substr(0,12):oBatch.m_sName;
+    std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " : Rcl=" << std::fixed << std::setprecision(4) << tmp.dRecall << " Prc=" << tmp.dPrecision << " FM=" << tmp.dFMeasure << " MCC=" << tmp.dMCC << std::endl;
+    oMetricsOutput << "Results for segm batch '" << oBatch.m_sName << "' :" << std::endl;
+    oMetricsOutput << std::endl;
+    oMetricsOutput << "nTP nFP nFN nTN nSE nTot" << std::endl; // order similar to the files saved by the CDNet analysis script
+    oMetricsOutput << oBatch.m_oMetrics.nTP << " " << oBatch.m_oMetrics.nFP << " " << oBatch.m_oMetrics.nFN << " " << oBatch.m_oMetrics.nTN << " " << oBatch.m_oMetrics.nSE << " " << oBatch.m_oMetrics.total() << std::endl;
+    oMetricsOutput << std::endl << std::endl;
+    oMetricsOutput << std::fixed << std::setprecision(8);
+    oMetricsOutput << "Cumulative metrics :" << std::endl;
+    oMetricsOutput << "Rcl        Spc        FPR        FNR        PBC        Prc        FM         MCC        " << std::endl;
+    oMetricsOutput << tmp.dRecall << " " << tmp.dSpecificity << " " << tmp.dFPR << " " << tmp.dFNR << " " << tmp.dPBC << " " << tmp.dPrecision << " " << tmp.dFMeasure << " " << tmp.dMCC << std::endl;
+    oMetricsOutput << std::endl << std::endl;
+    oMetricsOutput << "Work batch FPS: " << oBatch.m_oMetrics.dTimeElapsed_sec/oBatch.GetTotalImageCount() << std::endl;
+    oMetricsOutput.close();
+}
+
+void DatasetUtils::Segm::WriteMetrics(const std::string& sResultsFilePath, const DatasetUtils::WorkGroup& oGroup) {
+    std::ofstream oMetricsOutput(sResultsFilePath);
+    oMetricsOutput << "Results for segm work group '" << oGroup.m_sName << "' :" << std::endl;
+    oMetricsOutput << std::endl;
+    oMetricsOutput << std::fixed << std::setprecision(8);
+    oMetricsOutput << "Batch Metrics :" << std::endl;
+    oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FM         MCC        " << std::endl;
+    for(auto ppBatchIter =oGroup.m_vpBatches.begin(); ppBatchIter!=oGroup.m_vpBatches.end(); ++ppBatchIter) {
+        auto pSeq = std::dynamic_pointer_cast<SegmWorkBatch>(*ppBatchIter);
+        CV_Assert(pSeq!=nullptr);
+        Metrics tmp(pSeq->m_oMetrics);
+        std::string sName = (*ppBatchIter)->m_sName;
+        if(sName.size()>10)
+            sName = sName.substr(0,10);
+        else if(sName.size()<10)
+            sName += std::string(10-sName.size(),' ');
+        oMetricsOutput << sName << " " << tmp.dRecall << " " << tmp.dSpecificity << " " << tmp.dFPR << " " << tmp.dFNR << " " << tmp.dPBC << " " << tmp.dPrecision << " " << tmp.dFMeasure << " " << tmp.dMCC << std::endl;
+    }
+    oMetricsOutput << "--------------------------------------------------------------------------------------------------" << std::endl;
+    Metrics all(CalcMetricsFromWorkGroup(oGroup,DATASETUTILS_USE_AVERAGE_EVAL_METRICS));
+    const std::string sCurrGroupName = oGroup.m_sName.size()>12?oGroup.m_sName.substr(0,12):oGroup.m_sName;
+    std::cout << "\t" << std::setfill(' ') << std::setw(12) << sCurrGroupName << " : Rcl=" << std::fixed << std::setprecision(4) << all.dRecall << " Prc=" << all.dPrecision << " FM=" << all.dFMeasure << " MCC=" << all.dMCC << std::endl;
+    oMetricsOutput << std::string(DATASETUTILS_USE_AVERAGE_EVAL_METRICS?"averaged   ":"cumulative ") << all.dRecall << " " << all.dSpecificity << " " << all.dFPR << " " << all.dFNR << " " << all.dPBC << " " << all.dPrecision << " " << all.dFMeasure << " " << all.dMCC << std::endl;
+    oMetricsOutput << std::endl << std::endl;
+    oMetricsOutput << "Work group FPS: " << all.dTimeElapsed_sec/oGroup.GetTotalImageCount() << std::endl;
+    oMetricsOutput.close();
+}
+
+void DatasetUtils::Segm::WriteMetrics(const std::string& sResultsFilePath, const std::vector<std::shared_ptr<DatasetUtils::WorkGroup>>& vpGroups) {
+    std::ofstream oMetricsOutput(sResultsFilePath);
+    oMetricsOutput << std::fixed << std::setprecision(8);
+    oMetricsOutput << "Overall results :" << std::endl;
+    oMetricsOutput << std::endl;
+    oMetricsOutput << std::fixed << std::setprecision(8);
+    oMetricsOutput << std::string(DATASETUTILS_USE_AVERAGE_EVAL_METRICS?"Averaged":"Cumulative") << " work group metrics :" << std::endl;
+    oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FM         MCC        " << std::endl;
+    size_t nOverallFrameCount = 0;
+    for(auto ppGroupIter =vpGroups.begin(); ppGroupIter!=vpGroups.end(); ++ppGroupIter) {
+        CV_Assert((*ppGroupIter)!=nullptr);
+        if(!(*ppGroupIter)->m_vpBatches.empty()) {
+            Metrics tmp(CalcMetricsFromWorkGroup(**ppGroupIter,DATASETUTILS_USE_AVERAGE_EVAL_METRICS));
+            std::string sName = (*ppGroupIter)->m_sName;
+            if(sName.size()>10)
+                sName = sName.substr(0,10);
+            else if(sName.size()<10)
+                sName += std::string(10-sName.size(),' ');
+            oMetricsOutput << sName << " " << tmp.dRecall << " " << tmp.dSpecificity << " " << tmp.dFPR << " " << tmp.dFNR << " " << tmp.dPBC << " " << tmp.dPrecision << " " << tmp.dFMeasure << " " << tmp.dMCC << std::endl;
+            nOverallFrameCount += (*ppGroupIter)->GetTotalImageCount();
+        }
+    }
+    oMetricsOutput << "--------------------------------------------------------------------------------------------------" << std::endl;
+    Metrics all(CalcMetricsFromWorkGroups(vpGroups,DATASETUTILS_USE_AVERAGE_EVAL_METRICS));
+    oMetricsOutput << "Overall    " << all.dRecall << " " << all.dSpecificity << " " << all.dFPR << " " << all.dFNR << " " << all.dPBC << " " << all.dPrecision << " " << all.dFMeasure << " " << all.dMCC << std::endl;
+    oMetricsOutput << std::endl << std::endl;
+    oMetricsOutput << "Overall FPS: " << all.dTimeElapsed_sec/nOverallFrameCount << std::endl;
+    oMetricsOutput.close();
+}
+
+cv::Mat DatasetUtils::Segm::GetDisplayImage(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oSegmMask, const cv::Mat& oROI, size_t nIdx, cv::Point oDbgPt) {
     cv::Mat oInputImgBYTE3, oDebugImgBYTE3, oSegmMaskBYTE3;
     CV_Assert(!oInputImg.empty() && (oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3 || oInputImg.type()==CV_8UC4));
     CV_Assert(!oDebugImg.empty() && (oDebugImg.type()==CV_8UC1 || oDebugImg.type()==CV_8UC3 || oDebugImg.type()==CV_8UC4));
-    CV_Assert(!oSegmMask.empty() && oSegmMask.type()==CV_8UC1);
-    CV_Assert(!oGTSegmMask.empty() && oGTSegmMask.type()==CV_8UC1);
+    CV_Assert(!oSegmMask.empty() && (oSegmMask.type()==CV_8UC1 || oSegmMask.type()==CV_8UC3 || oSegmMask.type()==CV_8UC4));
     CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
-    if(oInputImg.channels()==1) {
+    if(oInputImg.channels()==1)
         cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_GRAY2RGB);
-        cv::cvtColor(oDebugImg,oDebugImgBYTE3,cv::COLOR_GRAY2RGB);
-    }
-    else if(oInputImg.channels()==4) {
+    else if(oInputImg.channels()==4)
         cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_RGBA2RGB);
-        cv::cvtColor(oDebugImg,oDebugImgBYTE3,cv::COLOR_RGBA2RGB);
-    }
-    else {
+    else
         oInputImgBYTE3 = oInputImg;
+    if(oDebugImg.channels()==1)
+        cv::cvtColor(oDebugImg,oDebugImgBYTE3,cv::COLOR_GRAY2RGB);
+    else if(oDebugImg.channels()==4)
+        cv::cvtColor(oDebugImg,oDebugImgBYTE3,cv::COLOR_RGBA2RGB);
+    else
         oDebugImgBYTE3 = oDebugImg;
-    }
-    oSegmMaskBYTE3 = GetColoredSegmMaskFromResult(oSegmMask,oGTSegmMask,oROI);
+    if(oSegmMask.channels()==1)
+        cv::cvtColor(oSegmMask,oSegmMaskBYTE3,cv::COLOR_GRAY2RGB);
+    else if(oSegmMask.channels()==4)
+        cv::cvtColor(oSegmMask,oDebugImgBYTE3,cv::COLOR_RGBA2RGB);
+    else
+        oSegmMaskBYTE3 = oSegmMask;
     if(oDbgPt!=cv::Point(-1,-1)) {
         cv::circle(oInputImgBYTE3,oDbgPt,5,cv::Scalar(255,255,255));
         cv::circle(oSegmMaskBYTE3,oDbgPt,5,cv::Scalar(255,255,255));
@@ -64,37 +196,37 @@ cv::Mat DatasetUtils::Segm::SegmEvaluator::GetDebugDisplayImage(const cv::Mat& o
     return displayH;
 }
 
-const uchar DatasetUtils::Segm::BinarySegmEvaluator::g_nSegmPositive = 255;
-const uchar DatasetUtils::Segm::BinarySegmEvaluator::g_nSegmOutOfScope = DATASETUTILS_OUT_OF_SCOPE_DEFAULT_VAL;
-const uchar DatasetUtils::Segm::BinarySegmEvaluator::g_nSegmNegative = 0;
+const uchar DatasetUtils::Segm::Video::BinarySegmEvaluator::g_nSegmPositive = 255;
+const uchar DatasetUtils::Segm::Video::BinarySegmEvaluator::g_nSegmOutOfScope = DATASETUTILS_OUT_OF_SCOPE_DEFAULT_VAL;
+const uchar DatasetUtils::Segm::Video::BinarySegmEvaluator::g_nSegmNegative = 0;
 
 #if HAVE_GLSL
 
-DatasetUtils::Segm::BinarySegmEvaluator::GLBinarySegmEvaluator::GLBinarySegmEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount)
+DatasetUtils::Segm::Video::BinarySegmEvaluator::GLBinarySegmEvaluator::GLBinarySegmEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount)
     :    GLSegmEvaluator(pParent,nTotFrameCount) {}
 
-std::string DatasetUtils::Segm::BinarySegmEvaluator::GLBinarySegmEvaluator::getComputeShaderSource(size_t nStage) const {
+std::string DatasetUtils::Segm::Video::BinarySegmEvaluator::GLBinarySegmEvaluator::getComputeShaderSource(size_t nStage) const {
     glAssert(nStage<m_nComputeStages);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "#version 430\n"
+    ssSrc <<"#version 430\n"
             "#define VAL_POSITIVE     " << (uint)g_nSegmPositive << "\n"
             "#define VAL_NEGATIVE     " << (uint)g_nSegmNegative << "\n"
             "#define VAL_OUTOFSCOPE   " << (uint)g_nSegmOutOfScope << "\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(local_size_x=" << m_vDefaultWorkGroupSize.x << ",local_size_y=" << m_vDefaultWorkGroupSize.y << ") in;\n"
+    ssSrc <<"layout(local_size_x=" << m_vDefaultWorkGroupSize.x << ",local_size_y=" << m_vDefaultWorkGroupSize.y << ") in;\n"
             "layout(binding=" << GLImageProcAlgo::eImage_ROIBinding << ", r8ui) readonly uniform uimage2D imgROI;\n"
             "layout(binding=" << GLImageProcAlgo::eImage_OutputBinding << ", r8ui) readonly uniform uimage2D imgInput;\n"
             "layout(binding=" << GLImageProcAlgo::eImage_GTBinding << ", r8ui) readonly uniform uimage2D imgGT;\n";
     if(m_bUsingDebug) ssSrc <<
-                      "layout(binding=" << GLImageProcAlgo::eImage_DebugBinding << ") writeonly uniform uimage2D imgDebug;\n";
-    ssSrc << "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eSegmEvalCounter_TP*4 << ") uniform atomic_uint nTP;\n"
+            "layout(binding=" << GLImageProcAlgo::eImage_DebugBinding << ") writeonly uniform uimage2D imgDebug;\n";
+    ssSrc <<"layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eSegmEvalCounter_TP*4 << ") uniform atomic_uint nTP;\n"
             "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eSegmEvalCounter_TN*4 << ") uniform atomic_uint nTN;\n"
             "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eSegmEvalCounter_FP*4 << ") uniform atomic_uint nFP;\n"
             "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eSegmEvalCounter_FN*4 << ") uniform atomic_uint nFN;\n"
             "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eSegmEvalCounter_SE*4 << ") uniform atomic_uint nSE;\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "void main() {\n"
+    ssSrc <<"void main() {\n"
             "    ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);\n"
             "    uint nInputSegmVal = imageLoad(imgInput,imgCoord).r;\n"
             "    uint nGTSegmVal = imageLoad(imgGT,imgCoord).r;\n"
@@ -150,18 +282,18 @@ std::string DatasetUtils::Segm::BinarySegmEvaluator::GLBinarySegmEvaluator::getC
             "    }\n"
             "    imageStore(imgDebug,imgCoord,out_color);\n";
     }
-    ssSrc << "}\n";
+    ssSrc <<"}\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
 }
 
-std::shared_ptr<DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator> DatasetUtils::Segm::BinarySegmEvaluator::CreateGLEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount) const {
-    return std::shared_ptr<GLSegmEvaluator>(new GLBinarySegmEvaluator(pParent,nTotImageCount));
+std::shared_ptr<DatasetUtils::EvaluatorBase::GLEvaluatorBase> DatasetUtils::Segm::Video::BinarySegmEvaluator::CreateGLEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount) const {
+    return std::shared_ptr<GLEvaluatorBase>(new GLBinarySegmEvaluator(pParent,nTotImageCount));
 }
 
 #endif //HAVE_GLSL
 
-void DatasetUtils::Segm::BinarySegmEvaluator::AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI, DatasetUtils::Segm::BasicMetrics& m) const {
+void DatasetUtils::Segm::Video::BinarySegmEvaluator::AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI, DatasetUtils::Segm::BasicMetrics& m) const {
     CV_DbgAssert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1 && oROI.type()==CV_8UC1);
     CV_DbgAssert(oSegmMask.size()==oGTSegmMask.size() && oSegmMask.size()==oROI.size());
     const size_t step_row = oSegmMask.step.p[0];
@@ -189,7 +321,7 @@ void DatasetUtils::Segm::BinarySegmEvaluator::AccumulateMetricsFromResult(const 
     }
 }
 
-cv::Mat DatasetUtils::Segm::BinarySegmEvaluator::GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI) const {
+cv::Mat DatasetUtils::Segm::Video::BinarySegmEvaluator::GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI) const {
     CV_DbgAssert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1 && oROI.type()==CV_8UC1);
     CV_DbgAssert(oSegmMask.size()==oGTSegmMask.size() && oSegmMask.size()==oROI.size());
     cv::Mat oResult(oSegmMask.size(),CV_8UC3,cv::Scalar_<uchar>(0));
@@ -230,134 +362,21 @@ cv::Mat DatasetUtils::Segm::BinarySegmEvaluator::GetColoredSegmMaskFromResult(co
     return oResult;
 }
 
-DatasetUtils::Segm::Metrics DatasetUtils::Segm::Video::CalcMetricsFromCategory(const DatasetUtils::Segm::Video::CategoryInfo& oCat, bool bAverage) {
-    if(!bAverage) {
-        BasicMetrics oCumulBasicMetrics;
-        for(auto oSeqIter=oCat.m_vpSequences.begin(); oSeqIter!=oCat.m_vpSequences.end(); ++oSeqIter)
-            oCumulBasicMetrics += (*oSeqIter)->m_oMetrics;
-        return Metrics(oCumulBasicMetrics);
-    }
-    else {
-        CV_Assert(!oCat.m_vpSequences.empty());
-        Metrics tmp(oCat.m_vpSequences[0]->m_oMetrics);
-        for(auto oSeqIter=oCat.m_vpSequences.begin()+1; oSeqIter!=oCat.m_vpSequences.end(); ++oSeqIter)
-            tmp += (*oSeqIter)->m_oMetrics;
-        return tmp;
-    }
-}
-
-DatasetUtils::Segm::Metrics DatasetUtils::Segm::Video::CalcMetricsFromCategories(const std::vector<std::shared_ptr<DatasetUtils::Segm::Video::CategoryInfo>>& vpCat, bool bAverage) {
-    if(!bAverage) {
-        BasicMetrics oCumulBasicMetrics;
-        for(auto oCatIter=vpCat.begin(); oCatIter!=vpCat.end(); ++oCatIter)
-            for(auto oSeqIter=(*oCatIter)->m_vpSequences.begin(); oSeqIter!=(*oCatIter)->m_vpSequences.end(); ++oSeqIter)
-                oCumulBasicMetrics += (*oSeqIter)->m_oMetrics;
-        return Metrics(oCumulBasicMetrics);
-    }
-    else {
-        CV_Assert(!vpCat.empty());
-        Metrics res = CalcMetricsFromCategory(*(vpCat[0]),bAverage);
-        res.nWeight = 1;
-        for(auto oCatIter=vpCat.begin()+1; oCatIter!=vpCat.end(); ++oCatIter) {
-            if(!(*oCatIter)->m_vpSequences.empty()) {
-                Metrics tmp = CalcMetricsFromCategory(**oCatIter,bAverage);
-                tmp.nWeight = 1;
-                res += tmp;
-            }
-        }
-        return res;
-    }
-}
-
-void DatasetUtils::Segm::Video::WriteMetrics(const std::string& sResultsFilePath, const DatasetUtils::Segm::Video::SequenceInfo& oSeq) {
-    std::ofstream oMetricsOutput(sResultsFilePath);
-    Metrics tmp(oSeq.m_oMetrics);
-    const std::string sCurrSeqName = oSeq.m_sName.size()>12?oSeq.m_sName.substr(0,12):oSeq.m_sName;
-    std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " : Rcl=" << std::fixed << std::setprecision(4) << tmp.dRecall << " Prc=" << tmp.dPrecision << " FM=" << tmp.dFMeasure << " MCC=" << tmp.dMCC << std::endl;
-    oMetricsOutput << "Results for sequence '" << oSeq.m_sName << "' :" << std::endl;
-    oMetricsOutput << std::endl;
-    oMetricsOutput << "nTP nFP nFN nTN nSE nTot" << std::endl; // order similar to the files saved by the CDNet analysis script
-    oMetricsOutput << oSeq.m_oMetrics.nTP << " " << oSeq.m_oMetrics.nFP << " " << oSeq.m_oMetrics.nFN << " " << oSeq.m_oMetrics.nTN << " " << oSeq.m_oMetrics.nSE << " " << oSeq.m_oMetrics.total() << std::endl;
-    oMetricsOutput << std::endl << std::endl;
-    oMetricsOutput << std::fixed << std::setprecision(8);
-    oMetricsOutput << "Cumulative metrics :" << std::endl;
-    oMetricsOutput << "Rcl        Spc        FPR        FNR        PBC        Prc        FM         MCC        " << std::endl;
-    oMetricsOutput << tmp.dRecall << " " << tmp.dSpecificity << " " << tmp.dFPR << " " << tmp.dFNR << " " << tmp.dPBC << " " << tmp.dPrecision << " " << tmp.dFMeasure << " " << tmp.dMCC << std::endl;
-    oMetricsOutput << std::endl << std::endl;
-    oMetricsOutput << "Sequence FPS: " << oSeq.m_oMetrics.dTimeElapsed_sec/oSeq.GetTotalImageCount() << std::endl;
-    oMetricsOutput.close();
-}
-
-void DatasetUtils::Segm::Video::WriteMetrics(const std::string& sResultsFilePath, const DatasetUtils::Segm::Video::CategoryInfo& oCat) {
-    std::ofstream oMetricsOutput(sResultsFilePath);
-    oMetricsOutput << "Results for category '" << oCat.m_sName << "' :" << std::endl;
-    oMetricsOutput << std::endl;
-    oMetricsOutput << std::fixed << std::setprecision(8);
-    oMetricsOutput << "Sequence Metrics :" << std::endl;
-    oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FM         MCC        " << std::endl;
-    for(auto oSeqIter=oCat.m_vpSequences.begin(); oSeqIter!=oCat.m_vpSequences.end(); ++oSeqIter) {
-        Metrics tmp((*oSeqIter)->m_oMetrics);
-        std::string sName = (*oSeqIter)->m_sName;
-        if(sName.size()>10)
-            sName = sName.substr(0,10);
-        else if(sName.size()<10)
-            sName += std::string(10-sName.size(),' ');
-        oMetricsOutput << sName << " " << tmp.dRecall << " " << tmp.dSpecificity << " " << tmp.dFPR << " " << tmp.dFNR << " " << tmp.dPBC << " " << tmp.dPrecision << " " << tmp.dFMeasure << " " << tmp.dMCC << std::endl;
-    }
-    oMetricsOutput << "--------------------------------------------------------------------------------------------------" << std::endl;
-    Metrics all(CalcMetricsFromCategory(oCat,DATASETUTILS_USE_AVERAGE_EVAL_METRICS));
-    const std::string sCurrCatName = oCat.m_sName.size()>12?oCat.m_sName.substr(0,12):oCat.m_sName;
-    std::cout << "\t" << std::setfill(' ') << std::setw(12) << sCurrCatName << " : Rcl=" << std::fixed << std::setprecision(4) << all.dRecall << " Prc=" << all.dPrecision << " FM=" << all.dFMeasure << " MCC=" << all.dMCC << std::endl;
-    oMetricsOutput << std::string(DATASETUTILS_USE_AVERAGE_EVAL_METRICS?"averaged   ":"cumulative ") << all.dRecall << " " << all.dSpecificity << " " << all.dFPR << " " << all.dFNR << " " << all.dPBC << " " << all.dPrecision << " " << all.dFMeasure << " " << all.dMCC << std::endl;
-    oMetricsOutput << std::endl << std::endl;
-    oMetricsOutput << "Category FPS: " << all.dTimeElapsed_sec/oCat.GetTotalImageCount() << std::endl;
-    oMetricsOutput.close();
-}
-
-void DatasetUtils::Segm::Video::WriteMetrics(const std::string& sResultsFilePath, const std::vector<std::shared_ptr<DatasetUtils::Segm::Video::CategoryInfo>>& vpCat) {
-    std::ofstream oMetricsOutput(sResultsFilePath);
-    oMetricsOutput << std::fixed << std::setprecision(8);
-    oMetricsOutput << "Overall results :" << std::endl;
-    oMetricsOutput << std::endl;
-    oMetricsOutput << std::fixed << std::setprecision(8);
-    oMetricsOutput << std::string(DATASETUTILS_USE_AVERAGE_EVAL_METRICS?"Averaged":"Cumulative") << " category metrics :" << std::endl;
-    oMetricsOutput << "           Rcl        Spc        FPR        FNR        PBC        Prc        FM         MCC        " << std::endl;
-    size_t nOverallFrameCount = 0;
-    for(auto oCatIter=vpCat.begin(); oCatIter!=vpCat.end(); ++oCatIter) {
-        if(!(*oCatIter)->m_vpSequences.empty()) {
-            Metrics tmp(CalcMetricsFromCategory(**oCatIter,DATASETUTILS_USE_AVERAGE_EVAL_METRICS));
-            std::string sName = (*oCatIter)->m_sName;
-            if(sName.size()>10)
-                sName = sName.substr(0,10);
-            else if(sName.size()<10)
-                sName += std::string(10-sName.size(),' ');
-            oMetricsOutput << sName << " " << tmp.dRecall << " " << tmp.dSpecificity << " " << tmp.dFPR << " " << tmp.dFNR << " " << tmp.dPBC << " " << tmp.dPrecision << " " << tmp.dFMeasure << " " << tmp.dMCC << std::endl;
-            nOverallFrameCount += (*oCatIter)->GetTotalImageCount();
-        }
-    }
-    oMetricsOutput << "--------------------------------------------------------------------------------------------------" << std::endl;
-    Metrics all(CalcMetricsFromCategories(vpCat,DATASETUTILS_USE_AVERAGE_EVAL_METRICS));
-    oMetricsOutput << "overall    " << all.dRecall << " " << all.dSpecificity << " " << all.dFPR << " " << all.dFNR << " " << all.dPBC << " " << all.dPrecision << " " << all.dFMeasure << " " << all.dMCC << std::endl;
-    oMetricsOutput << std::endl << std::endl;
-    oMetricsOutput << "Overall FPS: " << all.dTimeElapsed_sec/nOverallFrameCount << std::endl;
-    oMetricsOutput.close();
-}
-
-cv::Mat DatasetUtils::Segm::Video::ReadResult( const std::string& sResultsPath, const std::string& sCatName, const std::string& sSeqName,
+cv::Mat DatasetUtils::Segm::Video::ReadResult( const std::string& sResultsPath, const std::string& sGroupName, const std::string& sSeqName,
                                                const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix, int nFlags) {
     std::array<char,10> acBuffer;
     snprintf(acBuffer.data(),acBuffer.size(),"%06lu",nFrameIdx);
     std::stringstream sResultFilePath;
-    sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << acBuffer.data() << sResultSuffix;
+    sResultFilePath << sResultsPath << sGroupName << "/" << sSeqName << "/" << sResultPrefix << acBuffer.data() << sResultSuffix;
     return cv::imread(sResultFilePath.str(),nFlags);
 }
 
-void DatasetUtils::Segm::Video::WriteResult( const std::string& sResultsPath, const std::string& sCatName, const std::string& sSeqName, const std::string& sResultPrefix,
+void DatasetUtils::Segm::Video::WriteResult( const std::string& sResultsPath, const std::string& sGroupName, const std::string& sSeqName, const std::string& sResultPrefix,
                                              size_t nFrameIdx, const std::string& sResultSuffix, const cv::Mat& oResult, const std::vector<int>& vnComprParams) {
     std::array<char,10> acBuffer;
     snprintf(acBuffer.data(),acBuffer.size(),"%06lu",nFrameIdx);
     std::stringstream sResultFilePath;
-    sResultFilePath << sResultsPath << sCatName << "/" << sSeqName << "/" << sResultPrefix << acBuffer.data() << sResultSuffix;
+    sResultFilePath << sResultsPath << sGroupName << "/" << sSeqName << "/" << sResultPrefix << acBuffer.data() << sResultSuffix;
     cv::imwrite(sResultFilePath.str(),oResult,vnComprParams);
 }
 
@@ -377,26 +396,26 @@ std::string DatasetUtils::Segm::Video::CDnetEvaluator::GLCDnetEvaluator::getComp
     glAssert(nStage<m_nComputeStages);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "#version 430\n"
+    ssSrc <<"#version 430\n"
             "#define VAL_POSITIVE     " << (uint)g_nSegmPositive << "\n"
             "#define VAL_NEGATIVE     " << (uint)g_nSegmNegative << "\n"
             "#define VAL_OUTOFSCOPE   " << (uint)g_nSegmOutOfScope << "\n"
             "#define VAL_UNKNOWN      " << (uint)g_nSegmUnknown << "\n"
             "#define VAL_SHADOW       " << (uint)g_nSegmShadow << "\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "layout(local_size_x=" << m_vDefaultWorkGroupSize.x << ",local_size_y=" << m_vDefaultWorkGroupSize.y << ") in;\n"
+    ssSrc <<"layout(local_size_x=" << m_vDefaultWorkGroupSize.x << ",local_size_y=" << m_vDefaultWorkGroupSize.y << ") in;\n"
             "layout(binding=" << GLImageProcAlgo::eImage_ROIBinding << ", r8ui) readonly uniform uimage2D imgROI;\n"
             "layout(binding=" << GLImageProcAlgo::eImage_OutputBinding << ", r8ui) readonly uniform uimage2D imgInput;\n"
             "layout(binding=" << GLImageProcAlgo::eImage_GTBinding << ", r8ui) readonly uniform uimage2D imgGT;\n";
     if(m_bUsingDebug) ssSrc <<
-                      "layout(binding=" << GLImageProcAlgo::eImage_DebugBinding << ") writeonly uniform uimage2D imgDebug;\n";
-    ssSrc << "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eSegmEvalCounter_TP*4 << ") uniform atomic_uint nTP;\n"
+            "layout(binding=" << GLImageProcAlgo::eImage_DebugBinding << ") writeonly uniform uimage2D imgDebug;\n";
+    ssSrc <<"layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eSegmEvalCounter_TP*4 << ") uniform atomic_uint nTP;\n"
             "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eSegmEvalCounter_TN*4 << ") uniform atomic_uint nTN;\n"
             "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eSegmEvalCounter_FP*4 << ") uniform atomic_uint nFP;\n"
             "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eSegmEvalCounter_FN*4 << ") uniform atomic_uint nFN;\n"
             "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eSegmEvalCounter_SE*4 << ") uniform atomic_uint nSE;\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc << "void main() {\n"
+    ssSrc <<"void main() {\n"
             "    ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);\n"
             "    uint nInputSegmVal = imageLoad(imgInput,imgCoord).r;\n"
             "    uint nGTSegmVal = imageLoad(imgGT,imgCoord).r;\n"
@@ -465,8 +484,8 @@ std::string DatasetUtils::Segm::Video::CDnetEvaluator::GLCDnetEvaluator::getComp
     return ssSrc.str();
 }
 
-std::shared_ptr<DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator> DatasetUtils::Segm::Video::CDnetEvaluator::CreateGLEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount) const {
-    return std::shared_ptr<GLSegmEvaluator>(new GLCDnetEvaluator(pParent,nTotImageCount));
+std::shared_ptr<DatasetUtils::EvaluatorBase::GLEvaluatorBase> DatasetUtils::Segm::Video::CDnetEvaluator::CreateGLEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount) const {
+    return std::shared_ptr<GLEvaluatorBase>(new GLCDnetEvaluator(pParent,nTotImageCount));
 }
 
 #endif //HAVE_GLSL

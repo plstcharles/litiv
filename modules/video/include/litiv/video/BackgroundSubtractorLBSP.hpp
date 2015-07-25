@@ -22,20 +22,20 @@ public:
     BackgroundSubtractorLBSP(float fRelLBSPThreshold, size_t nLBSPThresholdOffset=0);
     //! default destructor
     virtual ~BackgroundSubtractorLBSP();
-    //! (re)initiaization method; needs to be called before starting background subtraction
+    //! (re)initiaization method; needs to be called before starting background subtraction (assumes no specific ROI)
     virtual void initialize(const cv::Mat& oInitImg);
     //! (re)initiaization method; needs to be called before starting background subtraction
     virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
 #if HAVE_GPU_SUPPORT
     //! primary model update function (asynchronous version); the learning param is used to override the internal learning speed (ignored when <= 0)
-    virtual void apply(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate=0);
+    virtual void apply_async(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate=0);
     //! primary model update function (asynchronous version); the learning param is used to override the internal learning speed (ignored when <= 0)
-    virtual void apply(cv::InputArray oNextImage, double dLearningRate=0)=0;
+    virtual void apply_async(cv::InputArray oNextImage, double dLearningRate=0) = 0;
     //! returns a copy of the latest foreground mask
-    virtual void getLatestForegroundMask(cv::OutputArray oLastFGMask)=0;
+    virtual void getLatestForegroundMask(cv::OutputArray oLastFGMask) = 0;
 #else //!HAVE_GPU_SUPPORT
     //! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
-    virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, double learningRate=0)=0;
+    virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, double learningRate=0) = 0;
 #endif //!HAVE_GPU_SUPPORT
     //! unused, always returns nullptr
     virtual cv::AlgorithmInfo* info() const;
@@ -97,8 +97,12 @@ protected:
 #endif //HAVE_GLSL
 
 private:
-    BackgroundSubtractorLBSP& operator=(const BackgroundSubtractorLBSP&)=delete;
-    BackgroundSubtractorLBSP(const BackgroundSubtractorLBSP&)=delete;
+    BackgroundSubtractorLBSP& operator=(const BackgroundSubtractorLBSP&) = delete;
+    BackgroundSubtractorLBSP(const BackgroundSubtractorLBSP&) = delete;
+#if HAVE_GPU_SUPPORT
+    // ' = delete' later? @@@@@
+    virtual void apply(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate=0) {return apply_async(oNextImage,oLastFGMask,dLearningRate);}
+#endif //HAVE_GPU_SUPPORT
 
 public:
     // ######## DEBUG PURPOSES ONLY ##########
