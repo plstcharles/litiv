@@ -16,31 +16,27 @@
 #define BGSSUBSENSE_DEFAULT_N_SAMPLES_FOR_MV_AVGS (100)
 
 /*!
-    Self-Balanced Sensitivity segmenTER (SuBSENSE) change detection algorithm.
+    Self-Balanced Sensitivity segmenTER (SuBSENSE) algorithm for FG/BG video segmentation via change detection.
 
     Note: both grayscale and RGB/BGR images may be used with this extractor (parameters are adjusted automatically).
     For optimal grayscale results, use CV_8UC1 frames instead of CV_8UC3.
 
     For more details on the different parameters or on the algorithm itself, see P.-L. St-Charles et al.,
     "Flexible Background Subtraction With Self-Balanced Local Sensitivity", in CVPRW 2014.
-
-    This algorithm is currently NOT thread-safe.
  */
-class BackgroundSubtractorSuBSENSE : public BackgroundSubtractorLBSP {
+class BackgroundSubtractorSuBSENSE : public BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_None> {
 public:
     //! full constructor
-    BackgroundSubtractorSuBSENSE(   float fRelLBSPThreshold=BGSSUBSENSE_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
-                                    size_t nDescDistThresholdOffset=BGSSUBSENSE_DEFAULT_DESC_DIST_THRESHOLD_OFFSET,
-                                    size_t nMinColorDistThreshold=BGSSUBSENSE_DEFAULT_MIN_COLOR_DIST_THRESHOLD,
-                                    size_t nBGSamples=BGSSUBSENSE_DEFAULT_NB_BG_SAMPLES,
-                                    size_t nRequiredBGSamples=BGSSUBSENSE_DEFAULT_REQUIRED_NB_BG_SAMPLES,
-                                    size_t nSamplesForMovingAvgs=BGSSUBSENSE_DEFAULT_N_SAMPLES_FOR_MV_AVGS);
-    //! default destructor
-    virtual ~BackgroundSubtractorSuBSENSE();
-    //! (re)initiaization method; needs to be called before starting background subtraction
-    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
+    BackgroundSubtractorSuBSENSE(float fRelLBSPThreshold=BGSSUBSENSE_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
+                                 size_t nDescDistThresholdOffset=BGSSUBSENSE_DEFAULT_DESC_DIST_THRESHOLD_OFFSET,
+                                 size_t nMinColorDistThreshold=BGSSUBSENSE_DEFAULT_MIN_COLOR_DIST_THRESHOLD,
+                                 size_t nBGSamples=BGSSUBSENSE_DEFAULT_NB_BG_SAMPLES,
+                                 size_t nRequiredBGSamples=BGSSUBSENSE_DEFAULT_REQUIRED_NB_BG_SAMPLES,
+                                 size_t nSamplesForMovingAvgs=BGSSUBSENSE_DEFAULT_N_SAMPLES_FOR_MV_AVGS);
     //! refreshes all samples based on the last analyzed frame
     virtual void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
+    //! (re)initiaization method; needs to be called before starting background subtraction
+    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
     //! primary model update function; the learning param is used to override the internal learning thresholds (ignored when <= 0)
     virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=0);
     //! returns a copy of the latest reconstructed background image
@@ -69,8 +65,6 @@ protected:
     int m_nMedianBlurKernelSize;
     //! specifies the px update spread range
     bool m_bUse3x3Spread;
-    //! indicates whether the model has been fully initialized or not
-    bool m_bModelInitialized;
     //! specifies the downsampled frame size used for cam motion analysis
     cv::Size m_oDownSampledFrameSize;
 

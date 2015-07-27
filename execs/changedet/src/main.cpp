@@ -15,11 +15,11 @@
 ////////////////////////////////
 #define USE_VIBE                0
 #define USE_PBAS                0
-#define USE_PAWCS               0
-#define USE_LOBSTER             1
+#define USE_PAWCS               1
+#define USE_LOBSTER             0
 #define USE_SUBSENSE            0
 ////////////////////////////////
-#define USE_GLSL_IMPL           1
+#define USE_GLSL_IMPL           0
 #define USE_CUDA_IMPL           0
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
@@ -48,11 +48,9 @@
 #elif (USE_LOBSTER+USE_SUBSENSE+USE_VIBE+USE_PBAS+USE_PAWCS)!=1
 #error "Must specify a single algorithm."
 #elif USE_VIBE
-#include "litiv/video/BackgroundSubtractorViBe_1ch.hpp"
-#include "litiv/video/BackgroundSubtractorViBe_3ch.hpp"
+#include "litiv/video/BackgroundSubtractorViBe.hpp"
 #elif USE_PBAS
-#include "litiv/video/BackgroundSubtractorPBAS_1ch.hpp"
-#include "litiv/video/BackgroundSubtractorPBAS_3ch.hpp"
+#include "litiv/video/BackgroundSubtractorPBAS.hpp"
 #elif USE_PAWCS
 #include "litiv/video/BackgroundSubtractorPAWCS.hpp"
 #elif USE_LOBSTER
@@ -232,28 +230,31 @@ int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pC
         const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
         pBGS->initialize(oCurrInputFrame,oROI);
 #elif USE_SUBSENSE
-        std::shared_ptr<BackgroundSubtractorSuBSENSE> pBGS(new BackgroundSubtractorSuBSENSE());
+#error "Missing glsl impl." // ... @@@@@
+        std::shared_ptr<BackgroundSubtractorSuBSENSE_GLSL> pBGS(new BackgroundSubtractorSuBSENSE_GLSL());
         const double dDefaultLearningRate = 0;
         pBGS->initialize(oCurrInputFrame,oROI);
 #elif USE_PAWCS
-        std::shared_ptr<BackgroundSubtractorPAWCS> pBGS(new BackgroundSubtractorPAWCS());
+#error "Missing glsl impl." // ... @@@@@
+        std::shared_ptr<BackgroundSubtractorPAWCS_GLSL> pBGS(new BackgroundSubtractorPAWCS_GLSL());
         const double dDefaultLearningRate = 0;
         pBGS->initialize(oCurrInputFrame,oROI);
 #else //USE_VIBE || USE_PBAS
+#error "Missing glsl impl." // ... @@@@@
         const size_t m_nInputChannels = (size_t)oCurrInputFrame.channels();
 #if USE_VIBE
-        std::shared_ptr<cv::BackgroundSubtractorViBe> pBGS;
+        std::shared_ptr<cv::BackgroundSubtractorViBe_GLSL> pBGS;
         if(m_nInputChannels==3)
-            pBGS = std::shared_ptr<cv::BackgroundSubtractorViBe>(new BackgroundSubtractorViBe_3ch());
+            pBGS = std::shared_ptr<cv::BackgroundSubtractorViBe_GLSL>(new BackgroundSubtractorViBe_GLSL_3ch());
         else
-            pBGS = std::shared_ptr<cv::BackgroundSubtractorViBe>(new BackgroundSubtractorViBe_1ch());
+            pBGS = std::shared_ptr<cv::BackgroundSubtractorViBe_GLSL>(new BackgroundSubtractorViBe_GLSL_1ch());
         const double dDefaultLearningRate = BGSVIBE_DEFAULT_LEARNING_RATE;
 #else //USE_PBAS
-        std::shared_ptr<cv::BackgroundSubtractorPBAS> pBGS;
+        std::shared_ptr<cv::BackgroundSubtractorPBAS_GLSL> pBGS;
         if(m_nInputChannels==3)
-            pBGS = std::shared_ptr<cv::BackgroundSubtractorPBAS>(new BackgroundSubtractorPBAS_3ch());
+            pBGS = std::shared_ptr<cv::BackgroundSubtractorPBAS_GLSL>(new BackgroundSubtractorPBAS_GLSL_3ch());
         else
-            pBGS = std::shared_ptr<cv::BackgroundSubtractorPBAS>(new BackgroundSubtractorPBAS_1ch());
+            pBGS = std::shared_ptr<cv::BackgroundSubtractorPBAS_GLSL>(new BackgroundSubtractorPBAS_GLSL_1ch());
         const double dDefaultLearningRate = BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE;
 #endif //USE_PBAS
         pBGS->initialize(oCurrInputFrame);
@@ -340,7 +341,7 @@ int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pC
             if(!oROI.empty())
                 cv::bitwise_or(oLastBGImg,UCHAR_MAX/2,oLastBGImg,oROI==0);
             const cv::Mat& oBGImg = oLastBGImg;
-            cv::Mat oDisplayFrame = DatasetUtils::Segm::GetDisplayImage(oInputFrame,oBGImg,g_pEvaluator?g_pEvaluator->GetColoredSegmMaskFromResult(oFGMask,oGTMask,oROI):oFGMask,oROI,nCurrFrameIdx);
+            cv::Mat oDisplayFrame = DatasetUtils::Segm::GetDisplayImage(oInputFrame,oBGImg,g_pEvaluator?g_pEvaluator->GetColoredSegmMaskFromResult(oFGMask,oGTMask,oROI):oFGMask,nCurrFrameIdx);
             cv::Mat oDisplayFrameResized;
             if(oDisplayFrame.cols>1280 || oDisplayFrame.rows>960)
                 cv::resize(oDisplayFrame,oDisplayFrameResized,cv::Size(oDisplayFrame.cols/2,oDisplayFrame.rows/2));
@@ -449,18 +450,18 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::S
 #else //USE_VIBE || USE_PBAS
         const size_t m_nInputChannels = (size_t)oCurrInputFrame.channels();
 #if USE_VIBE
-        std::shared_ptr<cv::BackgroundSubtractorViBe> pBGS;
+        std::shared_ptr<BackgroundSubtractorViBe> pBGS;
         if(m_nInputChannels==3)
-            pBGS = std::shared_ptr<cv::BackgroundSubtractorViBe>(new BackgroundSubtractorViBe_3ch());
+            pBGS = std::shared_ptr<BackgroundSubtractorViBe>(new BackgroundSubtractorViBe_3ch());
         else
-            pBGS = std::shared_ptr<cv::BackgroundSubtractorViBe>(new BackgroundSubtractorViBe_1ch());
+            pBGS = std::shared_ptr<BackgroundSubtractorViBe>(new BackgroundSubtractorViBe_1ch());
         const double dDefaultLearningRate = BGSVIBE_DEFAULT_LEARNING_RATE;
 #else //USE_PBAS
-        std::shared_ptr<cv::BackgroundSubtractorPBAS> pBGS;
+        std::shared_ptr<BackgroundSubtractorPBAS> pBGS;
         if(m_nInputChannels==3)
-            pBGS = std::shared_ptr<cv::BackgroundSubtractorPBAS>(new BackgroundSubtractorPBAS_3ch());
+            pBGS = std::shared_ptr<BackgroundSubtractorPBAS>(new BackgroundSubtractorPBAS_3ch());
         else
-            pBGS = std::shared_ptr<cv::BackgroundSubtractorPBAS>(new BackgroundSubtractorPBAS_1ch());
+            pBGS = std::shared_ptr<BackgroundSubtractorPBAS>(new BackgroundSubtractorPBAS_1ch());
         const double dDefaultLearningRate = BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE;
 #endif //USE_PBAS
         pBGS->initialize(oCurrInputFrame);
@@ -494,15 +495,11 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::S
             TIMER_INTERNAL_TIC(OverallLoop);
             TIMER_INTERNAL_TIC(VideoQuery);
             oCurrInputFrame = pCurrSequence->GetInputFromIndex(nCurrFrameIdx);
-#if DISPLAY_OUTPUT
-            const cv::Mat& oInputFrame = oCurrInputFrame;
-#endif //DISPLAY_OUTPUT
 #if DEBUG_OUTPUT
             cv::imshow(sMouseDebugDisplayName,oCurrInputFrame);
 #endif //DEBUG_OUTPUT
 #if NEED_GT_MASK
             oCurrGTMask = pCurrSequence->GetGTFromIndex(nCurrFrameIdx);
-            const cv::Mat oGTMask = oCurrGTMask;
 #endif //NEED_GT_MASK
             TIMER_INTERNAL_TOC(VideoQuery);
             TIMER_INTERNAL_TIC(PipelineUpdate);
@@ -510,15 +507,11 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::S
             TIMER_INTERNAL_TOC(PipelineUpdate);
             if(!oROI.empty())
                 cv::bitwise_or(oCurrFGMask,UCHAR_MAX/2,oCurrFGMask,oROI==0);
-#if NEED_FG_MASK
-            const cv::Mat& oFGMask = oCurrFGMask;
-#endif //NEED_FG_MASK
 #if DISPLAY_OUTPUT
             pBGS->getBackgroundImage(oCurrBGImg);
             if(!oROI.empty())
                 cv::bitwise_or(oCurrBGImg,UCHAR_MAX/2,oCurrBGImg,oROI==0);
-            const cv::Mat& oBGImg = oCurrBGImg;
-            cv::Mat oDisplayFrame = DatasetUtils::Segm::GetDisplayImage(oInputFrame,oBGImg,g_pEvaluator?g_pEvaluator->GetColoredSegmMaskFromResult(oFGMask,oGTMask,oROI):oFGMask,oROI,nCurrFrameIdx,cv::Point(*g_pnLatestMouseX,*g_pnLatestMouseY));
+            cv::Mat oDisplayFrame = DatasetUtils::Segm::GetDisplayImage(oCurrInputFrame,oCurrBGImg,g_pEvaluator?g_pEvaluator->GetColoredSegmMaskFromResult(oCurrFGMask,oCurrGTMask,oROI):oCurrFGMask,nCurrFrameIdx,cv::Point(*g_pnLatestMouseX,*g_pnLatestMouseY));
             cv::Mat oDisplayFrameResized;
             if(oDisplayFrame.cols>1280 || oDisplayFrame.rows>960)
                 cv::resize(oDisplayFrame,oDisplayFrameResized,cv::Size(oDisplayFrame.cols/2,oDisplayFrame.rows/2));
@@ -540,14 +533,14 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::S
                 break;
 #endif //DISPLAY_OUTPUT
 #if WRITE_AVI_OUTPUT
-            oSegmWriter.write(oFGMask);
+            oSegmWriter.write(oCurrFGMask);
 #endif //WRITE_AVI_OUTPUT
 #if WRITE_IMG_OUTPUT
-            DatasetUtils::Segm::Video::WriteResult(sCurrResultsPath,pCurrSequence->m_sGroupName,pCurrSequence->m_sName,g_pDatasetInfo->m_sResultFrameNamePrefix,nCurrFrameIdx+g_pDatasetInfo->m_nResultIdxOffset,g_pDatasetInfo->m_sResultFrameNameSuffix,oFGMask);
+            DatasetUtils::Segm::Video::WriteResult(sCurrResultsPath,pCurrSequence->m_sGroupName,pCurrSequence->m_sName,g_pDatasetInfo->m_sResultFrameNamePrefix,nCurrFrameIdx+g_pDatasetInfo->m_nResultIdxOffset,g_pDatasetInfo->m_sResultFrameNameSuffix,oCurrFGMask);
 #endif //WRITE_IMG_OUTPUT
 #if WRITE_METRICS
             if(g_pEvaluator)
-                g_pEvaluator->AccumulateMetricsFromResult(oFGMask,oGTMask,oROI,pCurrSequence->m_oMetrics);
+                g_pEvaluator->AccumulateMetricsFromResult(oCurrFGMask,oCurrGTMask,oROI,pCurrSequence->m_oMetrics);
 #endif //WRITE_METRICS
             TIMER_INTERNAL_TOC(OverallLoop);
 #if DISPLAY_TIMERS

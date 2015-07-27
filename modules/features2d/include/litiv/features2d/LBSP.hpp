@@ -15,8 +15,6 @@
 
     For more details on the different parameters, see G.-A. Bilodeau et al, "Change Detection in Feature Space Using Local
     Binary Similarity Patterns", in CRV 2013.
-
-    This algorithm is currently NOT thread-safe.
  */
 class LBSP : public cv::Feature2D {
 public:

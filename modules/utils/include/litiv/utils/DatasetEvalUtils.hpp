@@ -23,7 +23,7 @@ namespace DatasetUtils {
         void WriteMetrics(const std::string& sResultsFilePath, const SegmWorkBatch& oBatch);
         void WriteMetrics(const std::string& sResultsFilePath, const WorkGroup& oGroup);
         void WriteMetrics(const std::string& sResultsFilePath, const std::vector<std::shared_ptr<WorkGroup>>& vpGroups);
-        cv::Mat GetDisplayImage(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oSegmMask, const cv::Mat& oROI, size_t nIdx, cv::Point oDbgPt=cv::Point(-1,-1));
+        cv::Mat GetDisplayImage(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oSegmMask, size_t nIdx, cv::Point oDbgPt=cv::Point(-1,-1));
 
         struct SegmEvaluator : public EvaluatorBase {
 #if HAVE_GLSL

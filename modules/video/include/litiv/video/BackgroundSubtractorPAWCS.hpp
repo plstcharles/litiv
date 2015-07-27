@@ -14,30 +14,28 @@
 #define BGSPAWCS_DEFAULT_N_SAMPLES_FOR_MV_AVGS (100)
 
 /*!
-    Pixel-based Adaptive Word Consensus Segmenter (PAWCS) change detection algorithm.
+    Pixel-based Adaptive Word Consensus Segmenter (PAWCS) algorithm for FG/BG video segmentation via change detection.
 
     Note: both grayscale and RGB/BGR images may be used with this extractor (parameters are adjusted automatically).
     For optimal grayscale results, use CV_8UC1 frames instead of CV_8UC3.
 
     For more details on the different parameters or on the algorithm itself, see P.-L. St-Charles et al.,
     "A Self-Adjusting Approach to Change Detection Based on Background Word Consensus", in WACV 2015.
-
-    This algorithm is currently NOT thread-safe.
  */
-class BackgroundSubtractorPAWCS : public BackgroundSubtractorLBSP {
+class BackgroundSubtractorPAWCS : public BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_None> {
 public:
     //! full constructor
-    BackgroundSubtractorPAWCS(  float fRelLBSPThreshold=BGSPAWCS_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
-                                size_t nDescDistThresholdOffset=BGSPAWCS_DEFAULT_DESC_DIST_THRESHOLD_OFFSET,
-                                size_t nMinColorDistThreshold=BGSPAWCS_DEFAULT_MIN_COLOR_DIST_THRESHOLD,
-                                size_t nMaxNbWords=BGSPAWCS_DEFAULT_MAX_NB_WORDS,
-                                size_t nSamplesForMovingAvgs=BGSPAWCS_DEFAULT_N_SAMPLES_FOR_MV_AVGS);
+    BackgroundSubtractorPAWCS(float fRelLBSPThreshold=BGSPAWCS_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
+                              size_t nDescDistThresholdOffset=BGSPAWCS_DEFAULT_DESC_DIST_THRESHOLD_OFFSET,
+                              size_t nMinColorDistThreshold=BGSPAWCS_DEFAULT_MIN_COLOR_DIST_THRESHOLD,
+                              size_t nMaxNbWords=BGSPAWCS_DEFAULT_MAX_NB_WORDS,
+                              size_t nSamplesForMovingAvgs=BGSPAWCS_DEFAULT_N_SAMPLES_FOR_MV_AVGS);
     //! default destructor
     virtual ~BackgroundSubtractorPAWCS();
-    //! (re)initiaization method; needs to be called before starting background subtraction
-    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
     //! refreshes all local (+ global) dictionaries based on the last analyzed frame
     virtual void refreshModel(size_t nBaseOccCount, float fOccDecrFrac, bool bForceFGUpdate=false);
+    //! (re)initiaization method; needs to be called before starting background subtraction
+    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
     //! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
     virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=0);
     //! returns a copy of the latest reconstructed background image
@@ -99,8 +97,6 @@ protected:
     size_t m_nDownSampledROIPxCount;
     //! current local word weight offset
     size_t m_nLocalWordWeightOffset;
-    //! indicates whether the model has been fully initialized or not
-    bool m_bModelInitialized;
 
     //! word lists & dictionaries
     std::vector<LocalWordBase*> m_vpLocalWordDict;

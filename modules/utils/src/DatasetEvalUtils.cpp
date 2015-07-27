@@ -152,12 +152,11 @@ void DatasetUtils::Segm::WriteMetrics(const std::string& sResultsFilePath, const
     oMetricsOutput.close();
 }
 
-cv::Mat DatasetUtils::Segm::GetDisplayImage(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oSegmMask, const cv::Mat& oROI, size_t nIdx, cv::Point oDbgPt) {
-    cv::Mat oInputImgBYTE3, oDebugImgBYTE3, oSegmMaskBYTE3;
+cv::Mat DatasetUtils::Segm::GetDisplayImage(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oSegmMask, size_t nIdx, cv::Point oDbgPt) {
     CV_Assert(!oInputImg.empty() && (oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3 || oInputImg.type()==CV_8UC4));
-    CV_Assert(!oDebugImg.empty() && (oDebugImg.type()==CV_8UC1 || oDebugImg.type()==CV_8UC3 || oDebugImg.type()==CV_8UC4));
-    CV_Assert(!oSegmMask.empty() && (oSegmMask.type()==CV_8UC1 || oSegmMask.type()==CV_8UC3 || oSegmMask.type()==CV_8UC4));
-    CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
+    CV_Assert(!oDebugImg.empty() && (oDebugImg.type()==CV_8UC1 || oDebugImg.type()==CV_8UC3 || oDebugImg.type()==CV_8UC4) && oDebugImg.size()==oInputImg.size());
+    CV_Assert(!oSegmMask.empty() && (oSegmMask.type()==CV_8UC1 || oSegmMask.type()==CV_8UC3 || oSegmMask.type()==CV_8UC4) && oSegmMask.size()==oInputImg.size());
+    cv::Mat oInputImgBYTE3, oDebugImgBYTE3, oSegmMaskBYTE3;
     if(oInputImg.channels()==1)
         cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_GRAY2RGB);
     else if(oInputImg.channels()==4)
@@ -294,8 +293,8 @@ std::shared_ptr<DatasetUtils::EvaluatorBase::GLEvaluatorBase> DatasetUtils::Segm
 #endif //HAVE_GLSL
 
 void DatasetUtils::Segm::Video::BinarySegmEvaluator::AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI, DatasetUtils::Segm::BasicMetrics& m) const {
-    CV_DbgAssert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1 && oROI.type()==CV_8UC1);
-    CV_DbgAssert(oSegmMask.size()==oGTSegmMask.size() && oSegmMask.size()==oROI.size());
+    CV_Assert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
+    CV_Assert(oSegmMask.size()==oGTSegmMask.size() && (oROI.empty() || oSegmMask.size()==oROI.size()));
     const size_t step_row = oSegmMask.step.p[0];
     for(size_t i=0; i<(size_t)oSegmMask.rows; ++i) {
         const size_t idx_nstep = step_row*i;
@@ -303,7 +302,7 @@ void DatasetUtils::Segm::Video::BinarySegmEvaluator::AccumulateMetricsFromResult
         const uchar* gt_step_ptr = oGTSegmMask.data+idx_nstep;
         const uchar* roi_step_ptr = oROI.data+idx_nstep;
         for(int j=0; j<oSegmMask.cols; ++j) {
-            if(gt_step_ptr[j]!=g_nSegmOutOfScope && roi_step_ptr[j]!=g_nSegmNegative) {
+            if(gt_step_ptr[j]!=g_nSegmOutOfScope && (oROI.empty() || roi_step_ptr[j]!=g_nSegmNegative) ) {
                 if(input_step_ptr[j]==g_nSegmPositive) {
                     if(gt_step_ptr[j]==g_nSegmPositive)
                         ++m.nTP;
@@ -322,8 +321,8 @@ void DatasetUtils::Segm::Video::BinarySegmEvaluator::AccumulateMetricsFromResult
 }
 
 cv::Mat DatasetUtils::Segm::Video::BinarySegmEvaluator::GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI) const {
-    CV_DbgAssert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1 && oROI.type()==CV_8UC1);
-    CV_DbgAssert(oSegmMask.size()==oGTSegmMask.size() && oSegmMask.size()==oROI.size());
+    CV_Assert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
+    CV_Assert(oSegmMask.size()==oGTSegmMask.size() && (oROI.empty() || oSegmMask.size()==oROI.size()));
     cv::Mat oResult(oSegmMask.size(),CV_8UC3,cv::Scalar_<uchar>(0));
     const size_t step_row = oSegmMask.step.p[0];
     for(size_t i=0; i<(size_t)oSegmMask.rows; ++i) {
@@ -333,7 +332,7 @@ cv::Mat DatasetUtils::Segm::Video::BinarySegmEvaluator::GetColoredSegmMaskFromRe
         const uchar* roi_step_ptr = oROI.data+idx_nstep;
         uchar* res_step_ptr = oResult.data+idx_nstep*3;
         for(int j=0; j<oSegmMask.cols; ++j) {
-            if(gt_step_ptr[j]!=g_nSegmOutOfScope && roi_step_ptr[j]!=g_nSegmNegative) {
+            if(gt_step_ptr[j]!=g_nSegmOutOfScope && (oROI.empty() || roi_step_ptr[j]!=g_nSegmNegative) ) {
                 if(input_step_ptr[j]==g_nSegmPositive) {
                     if(gt_step_ptr[j]==g_nSegmPositive)
                         res_step_ptr[j*3+1] = UCHAR_MAX;
@@ -349,7 +348,7 @@ cv::Mat DatasetUtils::Segm::Video::BinarySegmEvaluator::GetColoredSegmMaskFromRe
                     }
                 }
             }
-            else if(roi_step_ptr[j]==g_nSegmNegative) {
+            else if(!oROI.empty() && roi_step_ptr[j]==g_nSegmNegative) {
                 for(size_t c=0; c<3; ++c)
                     res_step_ptr[j*3+c] = UCHAR_MAX/2;
             }
@@ -491,8 +490,8 @@ std::shared_ptr<DatasetUtils::EvaluatorBase::GLEvaluatorBase> DatasetUtils::Segm
 #endif //HAVE_GLSL
 
 void DatasetUtils::Segm::Video::CDnetEvaluator::AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI, DatasetUtils::Segm::BasicMetrics& m) const {
-    CV_DbgAssert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1 && oROI.type()==CV_8UC1);
-    CV_DbgAssert(oSegmMask.size()==oGTSegmMask.size() && oSegmMask.size()==oROI.size());
+    CV_Assert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
+    CV_Assert(oSegmMask.size()==oGTSegmMask.size() && (oROI.empty() || oSegmMask.size()==oROI.size()));
     const size_t step_row = oSegmMask.step.p[0];
     for(size_t i=0; i<(size_t)oSegmMask.rows; ++i) {
         const size_t idx_nstep = step_row*i;
@@ -500,9 +499,7 @@ void DatasetUtils::Segm::Video::CDnetEvaluator::AccumulateMetricsFromResult(cons
         const uchar* gt_step_ptr = oGTSegmMask.data+idx_nstep;
         const uchar* roi_step_ptr = oROI.data+idx_nstep;
         for(int j=0; j<oSegmMask.cols; ++j) {
-            if( gt_step_ptr[j]!=g_nSegmOutOfScope &&
-                gt_step_ptr[j]!=g_nSegmUnknown &&
-                roi_step_ptr[j]!=g_nSegmNegative ) {
+            if(gt_step_ptr[j]!=g_nSegmOutOfScope && gt_step_ptr[j]!=g_nSegmUnknown && (oROI.empty() || roi_step_ptr[j]!=g_nSegmNegative) ) {
                 if(input_step_ptr[j]==g_nSegmPositive) {
                     if(gt_step_ptr[j]==g_nSegmPositive)
                         ++m.nTP;
@@ -525,8 +522,8 @@ void DatasetUtils::Segm::Video::CDnetEvaluator::AccumulateMetricsFromResult(cons
 }
 
 cv::Mat DatasetUtils::Segm::Video::CDnetEvaluator::GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI) const {
-    CV_DbgAssert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1 && oROI.type()==CV_8UC1);
-    CV_DbgAssert(oSegmMask.size()==oGTSegmMask.size() && oSegmMask.size()==oROI.size());
+    CV_Assert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
+    CV_Assert(oSegmMask.size()==oGTSegmMask.size() && (oROI.empty() || oSegmMask.size()==oROI.size()));
     cv::Mat oResult(oSegmMask.size(),CV_8UC3,cv::Scalar_<uchar>(0));
     const size_t step_row = oSegmMask.step.p[0];
     for(size_t i=0; i<(size_t)oSegmMask.rows; ++i) {
@@ -536,9 +533,7 @@ cv::Mat DatasetUtils::Segm::Video::CDnetEvaluator::GetColoredSegmMaskFromResult(
         const uchar* roi_step_ptr = oROI.data+idx_nstep;
         uchar* res_step_ptr = oResult.data+idx_nstep*3;
         for(int j=0; j<oSegmMask.cols; ++j) {
-            if( gt_step_ptr[j]!=g_nSegmOutOfScope &&
-                gt_step_ptr[j]!=g_nSegmUnknown &&
-                roi_step_ptr[j]!=g_nSegmNegative ) {
+            if(gt_step_ptr[j]!=g_nSegmOutOfScope && gt_step_ptr[j]!=g_nSegmUnknown && (oROI.empty() || roi_step_ptr[j]!=g_nSegmNegative) ) {
                 if(input_step_ptr[j]==g_nSegmPositive) {
                     if(gt_step_ptr[j]==g_nSegmPositive)
                         res_step_ptr[j*3+1] = UCHAR_MAX;
@@ -560,7 +555,7 @@ cv::Mat DatasetUtils::Segm::Video::CDnetEvaluator::GetColoredSegmMaskFromResult(
                     }
                 }
             }
-            else if(roi_step_ptr[j]==g_nSegmNegative) {
+            else if(!oROI.empty() && roi_step_ptr[j]==g_nSegmNegative) {
                 for(size_t c=0; c<3; ++c)
                     res_step_ptr[j*3+c] = UCHAR_MAX/2;
             }

@@ -11,26 +11,26 @@
  * very specific scenarios are always possible.
  *
  */
-//! defines the threshold value(s) used to detect long-term ghosting and trigger the fast edge-based absorption heuristic
+// defines the threshold value(s) used to detect long-term ghosting and trigger the fast edge-based absorption heuristic
 #define GHOSTDET_D_MAX (0.010f) // defines 'negligible' change here
 #define GHOSTDET_S_MIN (0.995f) // defines the required minimum local foreground saturation value
-//! parameter used to scale dynamic distance threshold adjustments ('R(x)')
+// parameter used to scale dynamic distance threshold adjustments ('R(x)')
 #define FEEDBACK_R_VAR (0.01f)
-//! parameters used to adjust the variation step size of 'v(x)'
+// parameters used to adjust the variation step size of 'v(x)'
 #define FEEDBACK_V_INCR  (1.000f)
 #define FEEDBACK_V_DECR  (0.100f)
-//! parameters used to scale dynamic learning rate adjustments  ('T(x)')
+// parameters used to scale dynamic learning rate adjustments  ('T(x)')
 #define FEEDBACK_T_DECR  (0.2500f)
 #define FEEDBACK_T_INCR  (0.5000f)
 #define FEEDBACK_T_LOWER (2.0000f)
 #define FEEDBACK_T_UPPER (256.00f)
-//! parameters used to define 'unstable' regions, based on segm noise/bg dynamics and local dist threshold values
+// parameters used to define 'unstable' regions, based on segm noise/bg dynamics and local dist threshold values
 #define UNSTABLE_REG_RATIO_MIN (0.100f)
 #define UNSTABLE_REG_RDIST_MIN (3.000f)
-//! parameters used to scale the relative LBSP intensity threshold used for internal comparisons
+// parameters used to scale the relative LBSP intensity threshold used for internal comparisons
 #define LBSPDESC_NONZERO_RATIO_MIN (0.100f)
 #define LBSPDESC_NONZERO_RATIO_MAX (0.500f)
-//! parameters used to define model reset/learning rate boosts in our frame-level component
+// parameters used to define model reset/learning rate boosts in our frame-level component
 #define FRAMELEVEL_MIN_COLOR_DIFF_THRESHOLD  (m_nMinColorDistThreshold/2)
 #define FRAMELEVEL_ANALYSIS_DOWNSAMPLE_RATIO (8)
 
@@ -48,35 +48,71 @@ static const size_t s_nDescMaxDataRange_1ch = LBSP::DESC_SIZE*8;
 static const size_t s_nColorMaxDataRange_3ch = s_nColorMaxDataRange_1ch*3;
 static const size_t s_nDescMaxDataRange_3ch = s_nDescMaxDataRange_1ch*3;
 
-BackgroundSubtractorSuBSENSE::BackgroundSubtractorSuBSENSE(  float fRelLBSPThreshold
-                                                            ,size_t nDescDistThresholdOffset
-                                                            ,size_t nMinColorDistThreshold
-                                                            ,size_t nBGSamples
-                                                            ,size_t nRequiredBGSamples
-                                                            ,size_t nSamplesForMovingAvgs)
-    :    BackgroundSubtractorLBSP(fRelLBSPThreshold)
-        ,m_nMinColorDistThreshold(nMinColorDistThreshold)
-        ,m_nDescDistThresholdOffset(nDescDistThresholdOffset)
-        ,m_nBGSamples(nBGSamples)
-        ,m_nRequiredBGSamples(nRequiredBGSamples)
-        ,m_nSamplesForMovingAvgs(nSamplesForMovingAvgs)
-        ,m_fLastNonZeroDescRatio(0.0f)
-        ,m_bLearningRateScalingEnabled(true)
-        ,m_fCurrLearningRateLowerCap(FEEDBACK_T_LOWER)
-        ,m_fCurrLearningRateUpperCap(FEEDBACK_T_UPPER)
-        ,m_nMedianBlurKernelSize(m_nDefaultMedianBlurKernelSize)
-        ,m_bUse3x3Spread(true)
-        ,m_bModelInitialized(false) {
+BackgroundSubtractorSuBSENSE::BackgroundSubtractorSuBSENSE(float fRelLBSPThreshold, size_t nDescDistThresholdOffset, size_t nMinColorDistThreshold,
+                                                           size_t nBGSamples, size_t nRequiredBGSamples, size_t nSamplesForMovingAvgs) :
+        BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_None>(fRelLBSPThreshold,0),
+        m_nMinColorDistThreshold(nMinColorDistThreshold),
+        m_nDescDistThresholdOffset(nDescDistThresholdOffset),
+        m_nBGSamples(nBGSamples),
+        m_nRequiredBGSamples(nRequiredBGSamples),
+        m_nSamplesForMovingAvgs(nSamplesForMovingAvgs),
+        m_fLastNonZeroDescRatio(0.0f),
+        m_bLearningRateScalingEnabled(true),
+        m_fCurrLearningRateLowerCap(FEEDBACK_T_LOWER),
+        m_fCurrLearningRateUpperCap(FEEDBACK_T_UPPER),
+        m_nMedianBlurKernelSize(m_nDefaultMedianBlurKernelSize),
+        m_bUse3x3Spread(true) {
     CV_Assert(m_nBGSamples>0 && m_nRequiredBGSamples<=m_nBGSamples);
     CV_Assert(m_nMinColorDistThreshold>=STAB_COLOR_DIST_OFFSET);
 }
 
-BackgroundSubtractorSuBSENSE::~BackgroundSubtractorSuBSENSE() {}
+void BackgroundSubtractorSuBSENSE::refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate) {
+    // == refresh
+    CV_Assert(m_bInitialized);
+    CV_Assert(fSamplesRefreshFrac>0.0f && fSamplesRefreshFrac<=1.0f);
+    const size_t nModelSamplesToRefresh = fSamplesRefreshFrac<1.0f?(size_t)(fSamplesRefreshFrac*m_nBGSamples):m_nBGSamples;
+    const size_t nRefreshSampleStartPos = fSamplesRefreshFrac<1.0f?rand()%m_nBGSamples:0;
+    if(m_nImgChannels==1) {
+        for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
+            const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
+            if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
+                for(size_t nCurrModelSampleIdx=nRefreshSampleStartPos; nCurrModelSampleIdx<nRefreshSampleStartPos+nModelSamplesToRefresh; ++nCurrModelSampleIdx) {
+                    int nSampleImgCoord_Y, nSampleImgCoord_X;
+                    RandUtils::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
+                    if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
+                        const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
+                        m_voBGColorSamples[nCurrRealModelSampleIdx].data[nPxIter] = m_oLastColorFrame.data[nSamplePxIdx];
+                        *((ushort*)(m_voBGDescSamples[nCurrRealModelSampleIdx].data+nPxIter*2)) = *((ushort*)(m_oLastDescFrame.data+nSamplePxIdx*2));
+                    }
+                }
+            }
+        }
+    }
+    else { //m_nImgChannels==3
+        for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
+            const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
+            if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
+                for(size_t nCurrModelSampleIdx=nRefreshSampleStartPos; nCurrModelSampleIdx<nRefreshSampleStartPos+nModelSamplesToRefresh; ++nCurrModelSampleIdx) {
+                    int nSampleImgCoord_Y, nSampleImgCoord_X;
+                    RandUtils::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
+                    if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
+                        const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
+                        for(size_t c=0; c<3; ++c) {
+                            m_voBGColorSamples[nCurrRealModelSampleIdx].data[nPxIter*3+c] = m_oLastColorFrame.data[nSamplePxIdx*3+c];
+                            *((ushort*)(m_voBGDescSamples[nCurrRealModelSampleIdx].data+(nPxIter*3+c)*2)) = *((ushort*)(m_oLastDescFrame.data+(nSamplePxIdx*3+c)*2));
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
     // == init
     BackgroundSubtractorLBSP::initialize(oInitImg,oROI);
-    m_bModelInitialized = false;
     m_fLastNonZeroDescRatio = 0.0f;
     const int nTotImgPixels = m_oImgSize.height*m_oImgSize.width;
     if(m_nOrigROIPxCount>=m_nTotPxCount/2 && (int)m_nTotPxCount>=DEFAULT_FRAME_SIZE.area()) {
@@ -150,52 +186,9 @@ void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const cv:
         m_voBGDescSamples[s].create(m_oImgSize,CV_16UC((int)m_nImgChannels));
         m_voBGDescSamples[s] = cv::Scalar_<ushort>::all(0);
     }
-    m_bModelInitialized = true;
+    m_bInitialized = true;
     refreshModel(1.0f);
-}
-
-void BackgroundSubtractorSuBSENSE::refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate) {
-    // == refresh
-    CV_Assert(m_bInitialized && m_bModelInitialized);
-    CV_Assert(fSamplesRefreshFrac>0.0f && fSamplesRefreshFrac<=1.0f);
-    const size_t nModelSamplesToRefresh = fSamplesRefreshFrac<1.0f?(size_t)(fSamplesRefreshFrac*m_nBGSamples):m_nBGSamples;
-    const size_t nRefreshSampleStartPos = fSamplesRefreshFrac<1.0f?rand()%m_nBGSamples:0;
-    if(m_nImgChannels==1) {
-        for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
-            const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
-            if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
-                for(size_t nCurrModelSampleIdx=nRefreshSampleStartPos; nCurrModelSampleIdx<nRefreshSampleStartPos+nModelSamplesToRefresh; ++nCurrModelSampleIdx) {
-                    int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    RandUtils::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
-                    const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
-                    if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
-                        const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
-                        m_voBGColorSamples[nCurrRealModelSampleIdx].data[nPxIter] = m_oLastColorFrame.data[nSamplePxIdx];
-                        *((ushort*)(m_voBGDescSamples[nCurrRealModelSampleIdx].data+nPxIter*2)) = *((ushort*)(m_oLastDescFrame.data+nSamplePxIdx*2));
-                    }
-                }
-            }
-        }
-    }
-    else { //m_nImgChannels==3
-        for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
-            const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
-            if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
-                for(size_t nCurrModelSampleIdx=nRefreshSampleStartPos; nCurrModelSampleIdx<nRefreshSampleStartPos+nModelSamplesToRefresh; ++nCurrModelSampleIdx) {
-                    int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    RandUtils::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
-                    const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
-                    if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
-                        const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
-                        for(size_t c=0; c<3; ++c) {
-                            m_voBGColorSamples[nCurrRealModelSampleIdx].data[nPxIter*3+c] = m_oLastColorFrame.data[nSamplePxIdx*3+c];
-                            *((ushort*)(m_voBGDescSamples[nCurrRealModelSampleIdx].data+(nPxIter*3+c)*2)) = *((ushort*)(m_oLastDescFrame.data+(nSamplePxIdx*3+c)*2));
-                        }
-                    }
-                }
-            }
-        }
-    }
+    m_bModelInitialized = true;
 }
 
 void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray _fgmask, double learningRateOverride) {
