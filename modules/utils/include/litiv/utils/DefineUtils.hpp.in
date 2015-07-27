@@ -19,4 +19,28 @@
 #define LITIV_FRAMEWORK_VERSION_MINOR @LITIV_FRAMEWORK_VERSION_MINOR@
 #define LITIV_FRAMEWORK_VERSION_PATCH @LITIV_FRAMEWORK_VERSION_PATCH@
 
+// compile-time master switches for GPU/SIMD/threads usage
+#define HAVE_GPU_SUPPORT    1
+#define HAVE_SIMD_SUPPORT   1
+#define DEFAULT_NB_THREADS  1
+
+#if HAVE_GPU_SUPPORT
+#define HAVE_GLSL           @USE_GLSL@
+#define HAVE_CUDA           @USE_CUDA@
+#define HAVE_OPENCL         @USE_OPENCL@
+#endif //HAVE_GPU_SUPPORT
+
+#if HAVE_SIMD_SUPPORT
+#define HAVE_MMX            @USE_MMX@
+#define HAVE_SSE            @USE_SSE@
+#define HAVE_SSE2           @USE_SSE2@
+#define HAVE_SSE3           @USE_SSE3@
+#define HAVE_SSSE3          @USE_SSSE3@
+#define HAVE_SSE4_1         @USE_SSE4_1@
+#define HAVE_SSE4_2         @USE_SSE4_2@
+#define HAVE_POPCNT         @USE_POPCNT@
+#define HAVE_AVX            @USE_AVX@
+#define HAVE_AVX2           @USE_AVX2@
+#endif //HAVE_SIMD_SUPPORT
+
 #cmakedefine USE_TEST
