@@ -9,9 +9,6 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/features2d.hpp>
-#if HAVE_GLSL
-#include "litiv/utils/GLImageProcUtils.hpp"
-#endif //HAVE_GLSL
 
 namespace DatasetUtils {
 

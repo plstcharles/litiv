@@ -66,23 +66,27 @@ public:
 #endif //HAVE_GLSL
 
 //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
-    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, std::array<Tr,nChannels>& _res) {
+    template<size_t nChannels, typename Tt, typename Tr>
+    inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, std::array<Tr,nChannels>& _res) {
         LBSP::computeDescriptor(oInputImg,_ref,_x,_y,_t,_res.data());
     }
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
-    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const std::array<uchar,nChannels>& _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, std::array<Tr,nChannels>& _res) {
+    template<size_t nChannels, typename Tt, typename Tr>
+    inline static void computeDescriptor(const cv::Mat& oInputImg, const std::array<uchar,nChannels>& _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, std::array<Tr,nChannels>& _res) {
         LBSP::computeDescriptor(oInputImg,_ref.data(),_x,_y,_t,_res.data());
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (single-channel lookup, single-channel array thresholding)
-    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _resc, const Tt _t, Tr& _res) {
+    template<size_t nChannels, typename Tt, typename Tr>
+    inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _resc, const Tt _t, Tr& _res) {
         alignas(16) std::array<uchar,LBSP::DESC_SIZE*8> _anVals;
         computeDescriptor_lookup<nChannels>(oInputImg,_x,_y,_resc,_anVals);
         computeDescriptor_threshold(_anVals,_ref,_t,_res);
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
-    template<size_t nChannels, typename Tt, typename Tr> inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, Tr _res[nChannels]) {
+    template<size_t nChannels, typename Tt, typename Tr>
+    inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, Tr _res[nChannels]) {
         alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE*8>,nChannels> _aanVals;
         computeDescriptor_lookup(oInputImg,_x,_y,_aanVals);
         for(size_t _resc=0; _resc<nChannels; ++_resc)
@@ -90,7 +94,8 @@ public:
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (single-channel lookup only)
-    template<size_t nChannels> inline static void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, const size_t _resc, std::array<uchar,DESC_SIZE*8>& _anVals) {
+    template<size_t nChannels>
+    inline static void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, const size_t _resc, std::array<uchar,DESC_SIZE*8>& _anVals) {
         static_assert(nChannels>0,"need at least one image channel");
         CV_DbgAssert(!oInputImg.empty());
         CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _resc<nChannels);
@@ -104,7 +109,8 @@ public:
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup only)
-    template<size_t nChannels> inline static void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, std::array<std::array<uchar,DESC_SIZE*8>,nChannels>& _aanVals) {
+    template<size_t nChannels>
+    inline static void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, std::array<std::array<uchar,DESC_SIZE*8>,nChannels>& _aanVals) {
         static_assert(nChannels>0,"need at least one image channel");
         CV_DbgAssert(!oInputImg.empty());
         CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _resc<nChannels);
@@ -121,7 +127,8 @@ public:
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (array thresholding only)
-    template<typename Tt, typename Tr> inline static void computeDescriptor_threshold(const std::array<uchar,DESC_SIZE*8>& _anVals, const uchar _ref, const Tt _t, Tr& _res) {
+    template<typename Tt, typename Tr>
+    inline static void computeDescriptor_threshold(const std::array<uchar,DESC_SIZE*8>& _anVals, const uchar _ref, const Tt _t, Tr& _res) {
         static_assert(std::is_integral<Tt>::value,"internal threshold type must be integral");
         static_assert(sizeof(Tr)>=LBSP::DESC_SIZE,"result type size is too small");
         using namespace DistanceUtils;

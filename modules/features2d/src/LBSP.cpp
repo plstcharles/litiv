@@ -1,16 +1,16 @@
 #include "litiv/features2d/LBSP.hpp"
 
-LBSP::LBSP(size_t nThreshold)
-    :    m_bOnlyUsingAbsThreshold(true)
-        ,m_fRelThreshold(0) // unused
-        ,m_nThreshold(nThreshold)
-        ,m_oRefImage() {}
+LBSP::LBSP(size_t nThreshold) :
+        m_bOnlyUsingAbsThreshold(true),
+        m_fRelThreshold(0), // unused
+        m_nThreshold(nThreshold),
+        m_oRefImage() {}
 
-LBSP::LBSP(float fRelThreshold, size_t nThresholdOffset)
-    :    m_bOnlyUsingAbsThreshold(false)
-        ,m_fRelThreshold(fRelThreshold)
-        ,m_nThreshold(nThresholdOffset)
-        ,m_oRefImage() {
+LBSP::LBSP(float fRelThreshold, size_t nThresholdOffset) :
+        m_bOnlyUsingAbsThreshold(false),
+        m_fRelThreshold(fRelThreshold),
+        m_nThreshold(nThresholdOffset),
+        m_oRefImage() {
     CV_Assert(m_fRelThreshold>=0);
 }
 
@@ -49,12 +49,8 @@ size_t LBSP::getAbsThreshold() const {
     return m_nThreshold;
 }
 
-static inline void lbsp_computeImpl(    const cv::Mat& oInputImg,
-                                        const cv::Mat& oRefImg,
-                                        const std::vector<cv::KeyPoint>& voKeyPoints,
-                                        cv::Mat& oDesc,
-                                        bool bSingleColumnDesc,
-                                        size_t nThreshold) {
+static inline void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const std::vector<cv::KeyPoint>& voKeyPoints,
+                                    cv::Mat& oDesc, bool bSingleColumnDesc, size_t nThreshold) {
     CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
     CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
     CV_DbgAssert(LBSP::DESC_SIZE==2);
@@ -89,13 +85,8 @@ static inline void lbsp_computeImpl(    const cv::Mat& oInputImg,
     }
 }
 
-static inline void lbsp_computeImpl(    const cv::Mat& oInputImg,
-                                        const cv::Mat& oRefImg,
-                                        const std::vector<cv::KeyPoint>& voKeyPoints,
-                                        cv::Mat& oDesc,
-                                        bool bSingleColumnDesc,
-                                        float fThreshold,
-                                        size_t nThresholdOffset) {
+static inline void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const std::vector<cv::KeyPoint>& voKeyPoints,
+                                    cv::Mat& oDesc, bool bSingleColumnDesc, float fThreshold, size_t nThresholdOffset) {
     CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
     CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
     CV_DbgAssert(LBSP::DESC_SIZE==2);
@@ -246,18 +237,14 @@ void LBSP::validateKeyPoints(std::vector<cv::KeyPoint>& voKeypoints, cv::Size oI
 
 void LBSP::validateROI(cv::Mat& oROI) {
     CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
-#if !HAVE_GLSL // glsl img load returns defined values even outside safe image bounds
     cv::Mat oROI_new(oROI.size(),CV_8UC1,cv::Scalar_<uchar>(0));
     const size_t nBorderSize = PATCH_SIZE/2;
     const cv::Rect nROI_inner(nBorderSize,nBorderSize,oROI.cols-nBorderSize*2,oROI.rows-nBorderSize*2);
     cv::Mat(oROI,nROI_inner).copyTo(cv::Mat(oROI_new,nROI_inner));
     oROI = oROI_new;
-#endif //!HAVE_GLSL
 }
 
 #if HAVE_GLSL
-
-#include "litiv/utils/GLShaderUtils.hpp"
 
 std::string LBSP::getShaderFunctionSource(size_t nChannels, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize) {
     glAssert(nChannels==4 || nChannels==1);

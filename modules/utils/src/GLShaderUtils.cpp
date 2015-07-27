@@ -30,12 +30,12 @@ bool GLShader::useShaderProgram(GLShader* pNewShader) {
     return false;
 }
 
-GLShader::GLShader(bool bFixedFunct)
-  :  m_bIsCompiled(false)
-    ,m_bIsLinked(false)
-    ,m_bIsActive(false)
-    ,m_bIsEmpty(true)
-    ,m_nProgID(bFixedFunct?0:glCreateProgram()) {
+GLShader::GLShader(bool bFixedFunct) :
+        m_bIsCompiled(false),
+        m_bIsLinked(false),
+        m_bIsActive(false),
+        m_bIsEmpty(true),
+        m_nProgID(bFixedFunct?0:glCreateProgram()) {
     if(bFixedFunct&&!m_nProgID)
         glError("glCreateProgram failed");
     glErrorCheck;

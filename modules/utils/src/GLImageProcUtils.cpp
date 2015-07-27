@@ -1,39 +1,39 @@
 #include "litiv/utils/GLImageProcUtils.hpp"
 
 GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs, size_t nExtraImages, size_t nExtraTextures,
-                                  int nOutputType, int nDebugType, bool bUseInput, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat)
-    :    m_nLevels(nLevels)
-        ,m_nComputeStages(nComputeStages)
-        ,m_nSSBOs(GLImageProcAlgo::eStorageBufferDefaultBindingsCount+nExtraSSBOs)
-        ,m_nACBOs(GLImageProcAlgo::eAtomicCounterBufferDefaultBindingsCount+nExtraACBOs)
-        ,m_nImages(GLImageProcAlgo::eImageDefaultBindingsCount+nExtraImages)
-        ,m_nTextures(GLImageProcAlgo::eTextureDefaultBindingsCount+nExtraTextures)
-        ,m_nSxSDisplayCount(size_t(nOutputType>=0)+size_t(nDebugType>=0)+size_t(bUseInput))
-        ,m_bUsingOutputPBOs(nOutputType>=0&&GLUTILS_IMGPROC_USE_DOUBLE_PBO_OUTPUT)
-        ,m_bUsingDebugPBOs(nDebugType>=0&&GLUTILS_IMGPROC_USE_DOUBLE_PBO_OUTPUT)
-        ,m_bUsingInputPBOs(bUseInput&&GLUTILS_IMGPROC_USE_DOUBLE_PBO_INPUT)
-        ,m_bUsingOutput(nOutputType>=0)
-        ,m_bUsingDebug(nDebugType>=0)
-        ,m_bUsingInput(bUseInput)
-        ,m_bUsingTexArrays(GLUTILS_IMGPROC_USE_TEXTURE_ARRAYS&&nLevels==1) /// && levels==1??? @@@@
-        ,m_bUsingTimers(bUseTimers)
-        ,m_bUsingIntegralFormat(bUseIntegralFormat)
-        ,m_vDefaultWorkGroupSize(GLUTILS_IMGPROC_DEFAULT_WORKGROUP)
-        ,m_bUsingDisplay(bUseDisplay)
-        ,m_bGLInitialized(false)
-        ,m_nInternalFrameIdx(-1)
-        ,m_nLastOutputInternalIdx(-1)
-        ,m_nLastDebugInternalIdx(-1)
-        ,m_bFetchingOutput(false)
-        ,m_bFetchingDebug(false)
-        ,m_nNextLayer(1)
-        ,m_nCurrLayer(0)
-        ,m_nLastLayer(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT-1)
-        ,m_nCurrPBO(0)
-        ,m_nNextPBO(1)
-        ,m_nOutputType(nOutputType)
-        ,m_nDebugType(nDebugType)
-        ,m_nInputType(-1) {
+                                  int nOutputType, int nDebugType, bool bUseInput, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat) :
+        m_nLevels(nLevels),
+        m_nComputeStages(nComputeStages),
+        m_nSSBOs(GLImageProcAlgo::eStorageBufferDefaultBindingsCount+nExtraSSBOs),
+        m_nACBOs(GLImageProcAlgo::eAtomicCounterBufferDefaultBindingsCount+nExtraACBOs),
+        m_nImages(GLImageProcAlgo::eImageDefaultBindingsCount+nExtraImages),
+        m_nTextures(GLImageProcAlgo::eTextureDefaultBindingsCount+nExtraTextures),
+        m_nSxSDisplayCount(size_t(nOutputType>=0)+size_t(nDebugType>=0)+size_t(bUseInput)),
+        m_bUsingOutputPBOs(nOutputType>=0&&GLUTILS_IMGPROC_USE_DOUBLE_PBO_OUTPUT),
+        m_bUsingDebugPBOs(nDebugType>=0&&GLUTILS_IMGPROC_USE_DOUBLE_PBO_OUTPUT),
+        m_bUsingInputPBOs(bUseInput&&GLUTILS_IMGPROC_USE_DOUBLE_PBO_INPUT),
+        m_bUsingOutput(nOutputType>=0),
+        m_bUsingDebug(nDebugType>=0),
+        m_bUsingInput(bUseInput),
+        m_bUsingTexArrays(GLUTILS_IMGPROC_USE_TEXTURE_ARRAYS&&nLevels==1), /// && levels==1??? @@@@
+        m_bUsingTimers(bUseTimers),
+        m_bUsingIntegralFormat(bUseIntegralFormat),
+        m_vDefaultWorkGroupSize(GLUTILS_IMGPROC_DEFAULT_WORKGROUP),
+        m_bUsingDisplay(bUseDisplay),
+        m_bGLInitialized(false),
+        m_nInternalFrameIdx(-1),
+        m_nLastOutputInternalIdx(-1),
+        m_nLastDebugInternalIdx(-1),
+        m_bFetchingOutput(false),
+        m_bFetchingDebug(false),
+        m_nNextLayer(1),
+        m_nCurrLayer(0),
+        m_nLastLayer(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT-1),
+        m_nCurrPBO(0),
+        m_nNextPBO(1),
+        m_nOutputType(nOutputType),
+        m_nDebugType(nDebugType),
+        m_nInputType(-1) {
     glAssert(m_nLevels>0 && GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT>1 && m_nComputeStages>0);
     if(m_bUsingTexArrays && !glGetTextureSubImage && (m_bUsingDebugPBOs || m_bUsingOutputPBOs))
         glError("missing impl for texture arrays pbo fetch when glGetTextureSubImage is not available");
@@ -524,18 +524,18 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
 }
 
 GLImageProcEvaluatorAlgo::GLImageProcEvaluatorAlgo( const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount, size_t nCountersPerFrame,
-                                                    int nDebugType, int nGroundtruthType, bool bUseIntegralFormat)
-    // note: using extra buffers/images/textures would force rebinding for each iterations due to diamond dependency over enum lists
-    :    GLImageProcAlgo(1,1,0,0,0,0,-1,nDebugType,true,pParent->m_bUsingDisplay,false,bUseIntegralFormat)
-        ,m_nGroundtruthType(nGroundtruthType)
-        ,m_nTotFrameCount(nTotFrameCount)
-        ,m_nEvalBufferFrameSize(nCountersPerFrame*4)
-        ,m_nEvalBufferTotSize(nTotFrameCount*nCountersPerFrame*4)
-        ,m_nEvalBufferMaxSize((size_t)GLUtils::getIntegerVal<1>(GL_MAX_ATOMIC_COUNTER_BUFFER_SIZE))
-        ,m_nCurrEvalBufferSize(m_nEvalBufferTotSize)
-        ,m_nCurrEvalBufferOffsetPtr(0)
-        ,m_nCurrEvalBufferOffsetBlock(0)
-        ,m_pParent(pParent) {
+                                                    int nDebugType, int nGroundtruthType, bool bUseIntegralFormat) :
+        // note: using extra buffers/images/textures would force rebinding for each iterations due to diamond dependency over enum lists
+        GLImageProcAlgo(1,1,0,0,0,0,-1,nDebugType,true,pParent->m_bUsingDisplay,false,bUseIntegralFormat),
+        m_nGroundtruthType(nGroundtruthType),
+        m_nTotFrameCount(nTotFrameCount),
+        m_nEvalBufferFrameSize(nCountersPerFrame*4),
+        m_nEvalBufferTotSize(nTotFrameCount*nCountersPerFrame*4),
+        m_nEvalBufferMaxSize((size_t)GLUtils::getIntegerVal<1>(GL_MAX_ATOMIC_COUNTER_BUFFER_SIZE)),
+        m_nCurrEvalBufferSize(m_nEvalBufferTotSize),
+        m_nCurrEvalBufferOffsetPtr(0),
+        m_nCurrEvalBufferOffsetBlock(0),
+        m_pParent(pParent) {
     glAssert(m_bUsingInput && m_pParent->m_bUsingOutput);
     glAssert(m_nGroundtruthType>=0 && m_nGroundtruthType==m_pParent->m_nOutputType);
     glAssert(!dynamic_cast<GLImageProcEvaluatorAlgo*>(m_pParent.get()));
@@ -768,8 +768,8 @@ void GLImageProcEvaluatorAlgo::apply_async(const cv::Mat& oNextGT, bool bRebindA
     ++m_nInternalFrameIdx;
 }
 
-GLImagePassThroughAlgo::GLImagePassThroughAlgo(int nFrameType, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat)
-    :    GLImageProcAlgo(1,1,0,0,0,0,nFrameType,-1,true,bUseDisplay,bUseTimers,bUseIntegralFormat) {
+GLImagePassThroughAlgo::GLImagePassThroughAlgo(int nFrameType, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat) :
+        GLImageProcAlgo(1,1,0,0,0,0,nFrameType,-1,true,bUseDisplay,bUseTimers,bUseIntegralFormat) {
     glAssert(nFrameType>=0);
 }
 
@@ -786,10 +786,10 @@ const GLenum BinaryMedianFilter::eImage_PPSAccumulator_T = GLImageProcAlgo::eIma
 
 BinaryMedianFilter::BinaryMedianFilter( size_t nKernelSize, size_t nBorderSize, const cv::Mat& oROI,
                                         bool bUseOutputPBOs, bool bUseInputPBOs, bool bUseTexArrays,
-                                        bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat)
-    :    GLImageProcAlgo(1,4+bool(oROI.cols>m_nPPSMaxRowSize)+bool(oROI.rows>m_nPPSMaxRowSize),CV_8UC1,-1,CV_8UC1,bUseOutputPBOs,false,bUseInputPBOs,bUseTexArrays,bUseDisplay,bUseTimers,bUseIntegralFormat)
-        ,m_nKernelSize(nKernelSize)
-        ,m_nBorderSize(nBorderSize) {
+                                        bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat) :
+        GLImageProcAlgo(1,4+bool(oROI.cols>m_nPPSMaxRowSize)+bool(oROI.rows>m_nPPSMaxRowSize),CV_8UC1,-1,CV_8UC1,bUseOutputPBOs,false,bUseInputPBOs,bUseTexArrays,bUseDisplay,bUseTimers,bUseIntegralFormat),
+        m_nKernelSize(nKernelSize),
+        m_nBorderSize(nBorderSize) {
     glAssert((m_nKernelSize%2)==1 && m_nKernelSize>1 && m_nKernelSize<m_oFrameSize.width && m_nKernelSize<m_oFrameSize.height);
     glAssert(m_nBorderSize<(m_oFrameSize.width-m_nKernelSize) && m_nBorderSize<(m_oFrameSize.height-m_nKernelSize));
     int nMaxComputeInvocs;@@@@ recheck for new workgroup sizes?

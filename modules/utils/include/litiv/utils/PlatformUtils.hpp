@@ -45,7 +45,8 @@ namespace PlatformUtils {
         return i_lower<j_lower;
     }
 
-    template<typename T> inline int decimal_integer_digit_count(T number) {
+    template<typename T>
+    inline int decimal_integer_digit_count(T number) {
         int digits = number<0?1:0;
         while(std::abs(number)>=1) {
             number /= 10;

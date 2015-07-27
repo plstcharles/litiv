@@ -199,15 +199,15 @@ const cv::Mat& DatasetUtils::ImagePrecacher::GetImageFromIndex_internal(size_t n
     return m_oLastReqImage;
 }
 
-DatasetUtils::WorkBatch::WorkBatch(const std::string& sBatchName, const std::string& sBatchPath, const DatasetInfoBase& oDatasetInfo, const std::string& sGroupName)
-    :    m_sName(sBatchName)
-        ,m_sGroupName(sGroupName)
-        ,m_sPath(sBatchPath)
-        ,m_bHasGroundTruth(oDatasetInfo.m_pEvaluator!=nullptr)
-        ,m_bForcingGrayscale(PlatformUtils::string_contains_token(sBatchName,oDatasetInfo.m_vsGrayscaleNameTokens))
-        ,m_bForcing4ByteDataAlign(oDatasetInfo.m_bForce4ByteDataAlign)
-        ,m_oInputPrecacher(std::bind(&DatasetUtils::WorkBatch::GetInputFromIndex_internal,this,std::placeholders::_1))
-        ,m_oGTPrecacher(std::bind(&DatasetUtils::WorkBatch::GetGTFromIndex_internal,this,std::placeholders::_1)) {}
+DatasetUtils::WorkBatch::WorkBatch(const std::string& sBatchName, const std::string& sBatchPath, const DatasetInfoBase& oDatasetInfo, const std::string& sGroupName) :
+        m_sName(sBatchName),
+        m_sGroupName(sGroupName),
+        m_sPath(sBatchPath),
+        m_bHasGroundTruth(oDatasetInfo.m_pEvaluator!=nullptr),
+        m_bForcingGrayscale(PlatformUtils::string_contains_token(sBatchName,oDatasetInfo.m_vsGrayscaleNameTokens)),
+        m_bForcing4ByteDataAlign(oDatasetInfo.m_bForce4ByteDataAlign),
+        m_oInputPrecacher(std::bind(&DatasetUtils::WorkBatch::GetInputFromIndex_internal,this,std::placeholders::_1)),
+        m_oGTPrecacher(std::bind(&DatasetUtils::WorkBatch::GetGTFromIndex_internal,this,std::placeholders::_1)) {}
 
 bool DatasetUtils::WorkBatch::StartPrecaching(size_t nSuggestedBufferSize) {
     return m_oInputPrecacher.StartPrecaching(GetTotalImageCount(),nSuggestedBufferSize) && (!m_bHasGroundTruth || m_oGTPrecacher.StartPrecaching(GetTotalImageCount(),nSuggestedBufferSize));
@@ -230,10 +230,10 @@ const cv::Mat& DatasetUtils::WorkBatch::GetGTFromIndex_internal(size_t nIdx) {
     return m_oLatestGTMask;
 }
 
-DatasetUtils::WorkGroup::WorkGroup(const std::string& sGroupName, const std::string& sGroupPath, const DatasetInfoBase& oDatasetInfo, const std::string& sSuperGroupName)
-    :    WorkBatch(sGroupName,sGroupPath,oDatasetInfo,sSuperGroupName)
-        ,m_dExpectedLoad(0)
-        ,m_nTotImageCount(0) {
+DatasetUtils::WorkGroup::WorkGroup(const std::string& sGroupName, const std::string& sGroupPath, const DatasetInfoBase& oDatasetInfo, const std::string& sSuperGroupName) :
+        WorkBatch(sGroupName,sGroupPath,oDatasetInfo,sSuperGroupName),
+        m_dExpectedLoad(0),
+        m_nTotImageCount(0) {
     if(!PlatformUtils::string_contains_token(m_sName,oDatasetInfo.m_vsSkippedNameTokens)) {
         std::vector<std::string> vsWorkBatchPaths;
         // all subdirs are considered work batch directories
@@ -274,8 +274,8 @@ cv::Mat DatasetUtils::WorkGroup::GetGTFromIndex_external(size_t nFrameIdx) {
     return m_vpBatches[nBatchIdx-1]->GetGTFromIndex_external(nFrameIdx-(nCumulImageIdx-m_vpBatches[nBatchIdx-1]->GetTotalImageCount()));
 }
 
-DatasetUtils::Segm::BasicMetrics::BasicMetrics()
-    :   nTP(0),nTN(0),nFP(0),nFN(0),nSE(0),dTimeElapsed_sec(0) {}
+DatasetUtils::Segm::BasicMetrics::BasicMetrics() :
+        nTP(0),nTN(0),nFP(0),nFN(0),nSE(0),dTimeElapsed_sec(0) {}
 
 DatasetUtils::Segm::BasicMetrics DatasetUtils::Segm::BasicMetrics::operator+(const BasicMetrics& m) const {
     BasicMetrics res(m);
@@ -298,17 +298,17 @@ DatasetUtils::Segm::BasicMetrics& DatasetUtils::Segm::BasicMetrics::operator+=(c
     return *this;
 }
 
-DatasetUtils::Segm::Metrics::Metrics(const DatasetUtils::Segm::BasicMetrics& m)
-    :    dRecall(CalcRecall(m))
-        ,dSpecificity(CalcSpecificity(m))
-        ,dFPR(CalcFalsePositiveRate(m))
-        ,dFNR(CalcFalseNegativeRate(m))
-        ,dPBC(CalcPercentBadClassifs(m))
-        ,dPrecision(CalcPrecision(m))
-        ,dFMeasure(CalcFMeasure(m))
-        ,dMCC(CalcMatthewsCorrCoeff(m))
-        ,dTimeElapsed_sec(m.dTimeElapsed_sec)
-        ,nWeight(1) {}
+DatasetUtils::Segm::Metrics::Metrics(const DatasetUtils::Segm::BasicMetrics& m) :
+        dRecall(CalcRecall(m)),
+        dSpecificity(CalcSpecificity(m)),
+        dFPR(CalcFalsePositiveRate(m)),
+        dFNR(CalcFalseNegativeRate(m)),
+        dPBC(CalcPercentBadClassifs(m)),
+        dPrecision(CalcPrecision(m)),
+        dFMeasure(CalcFMeasure(m)),
+        dMCC(CalcMatthewsCorrCoeff(m)),
+        dTimeElapsed_sec(m.dTimeElapsed_sec),
+        nWeight(1) {}
 
 DatasetUtils::Segm::Metrics DatasetUtils::Segm::Metrics::operator+(const DatasetUtils::Segm::BasicMetrics& m) const {
     Metrics tmp(m);
@@ -365,8 +365,8 @@ double DatasetUtils::Segm::Metrics::CalcFalseNegativeRate(const DatasetUtils::Se
 double DatasetUtils::Segm::Metrics::CalcPercentBadClassifs(const DatasetUtils::Segm::BasicMetrics& m) {return (100.0*(m.nFN+m.nFP)/(m.nTP+m.nFP+m.nFN+m.nTN));}
 double DatasetUtils::Segm::Metrics::CalcMatthewsCorrCoeff(const DatasetUtils::Segm::BasicMetrics& m) {return ((((double)m.nTP*m.nTN)-(m.nFP*m.nFN))/sqrt(((double)m.nTP+m.nFP)*(m.nTP+m.nFN)*(m.nTN+m.nFP)*(m.nTN+m.nFN)));}
 
-DatasetUtils::Segm::SegmWorkBatch::SegmWorkBatch(const std::string& sBatchName, const std::string& sBatchPath, const DatasetInfoBase& oDatasetInfo, const std::string& sGroupName)
-    :    WorkBatch(sBatchName,sBatchPath,oDatasetInfo,sGroupName) {}
+DatasetUtils::Segm::SegmWorkBatch::SegmWorkBatch(const std::string& sBatchName, const std::string& sBatchPath, const DatasetInfoBase& oDatasetInfo, const std::string& sGroupName) :
+        WorkBatch(sBatchName,sBatchPath,oDatasetInfo,sGroupName) {}
 
 std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> DatasetUtils::Segm::Video::GetDatasetInfo(const DatasetUtils::Segm::Video::eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirName, bool bForce4ByteDataAlign) {
     std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> pInfo;
@@ -437,12 +437,12 @@ std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> DatasetUtils::Segm::Vide
     return pInfo;
 }
 
-DatasetUtils::Segm::Video::Sequence::Sequence(const std::string& sSeqName, const std::string& sSeqPath, const DatasetInfo& oDatasetInfo, const std::string& sSeqGroupName)
-    :    SegmWorkBatch(sSeqName,sSeqPath,oDatasetInfo,sSeqGroupName)
-        ,m_eDatasetID(oDatasetInfo.m_eDatasetID)
-        ,m_dExpectedLoad(0)
-        ,m_nTotFrameCount(0)
-        ,m_nNextExpectedVideoReaderFrameIdx(0) {
+DatasetUtils::Segm::Video::Sequence::Sequence(const std::string& sSeqName, const std::string& sSeqPath, const DatasetInfo& oDatasetInfo, const std::string& sSeqGroupName) :
+        SegmWorkBatch(sSeqName,sSeqPath,oDatasetInfo,sSeqGroupName),
+        m_eDatasetID(oDatasetInfo.m_eDatasetID),
+        m_dExpectedLoad(0),
+        m_nTotFrameCount(0),
+        m_nNextExpectedVideoReaderFrameIdx(0) {
     if(m_eDatasetID==eDataset_CDnet2012 || m_eDatasetID==eDataset_CDnet2014) {
         std::vector<std::string> vsSubDirs;
         PlatformUtils::GetSubDirsFromDir(m_sPath,vsSubDirs);

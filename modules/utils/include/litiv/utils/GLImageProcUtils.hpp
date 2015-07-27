@@ -50,7 +50,7 @@ public:
     const bool m_bUsingTimers;
     const bool m_bUsingIntegralFormat;
     const glm::uvec2 m_vDefaultWorkGroupSize; // make dynamic? @@@@@
-protected:
+
     enum eImageDefaultLayoutList {
         eImage_OutputBinding,
         eImage_DebugBinding,
@@ -60,6 +60,7 @@ protected:
         // reserved here
         eImageDefaultBindingsCount
     };
+
     enum eTextureDefaultLayoutList {
         eTexture_OutputBinding,
         eTexture_DebugBinding,
@@ -68,21 +69,26 @@ protected:
         // reserved here
         eTextureDefaultBindingsCount
     };
+
     enum eStorageBufferDefaultBindingList {
         // reserved here
         eStorageBufferDefaultBindingsCount
     };
+
     enum eAtomicCounterBufferDefaultBindingList {
         eAtomicCounterBuffer_EvalBinding,
         // reserved here
         eAtomicCounterBufferDefaultBindingsCount
     };
+
     enum eGLTimersList {
         eGLTimer_TextureUpdate,
         eGLTimer_ComputeDispatch,
         eGLTimer_DisplayUpdate,
         eGLTimersCount
     };
+
+protected:
     bool m_bUsingDisplay;
     bool m_bGLInitialized;
     cv::Size m_oFrameSize;
@@ -162,6 +168,7 @@ class BinaryMedianFilter : public GLImageProcAlgo {
 public:
     // @@@ add support for variable kernels? per-px kernel size could be provided via image load/store
     // @@@ currently not using ROI
+    // @@@ validate multi-step logic... might simplify using atomic counters
     // via integral image: O(n) (where n is the total image size --- does not depend on r, the kernel size)
     BinaryMedianFilter( size_t nKernelSize, size_t nBorderSize, const cv::Mat& oROI,
                         bool bUseOutputPBOs, bool bUseInputPBOs, bool bUseTexArrays,

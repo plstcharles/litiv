@@ -17,59 +17,29 @@
 //! defines the default value for the learning rate passed to BackgroundSubtractorLOBSTER::apply
 #define BGSLOBSTER_DEFAULT_LEARNING_RATE (16)
 
-#if HAVE_GLSL
 #define BGSLOBSTER_GLSL_USE_DEBUG      0
 #define BGSLOBSTER_GLSL_USE_TIMERS     0
 #define BGSLOBSTER_GLSL_USE_BASIC_IMPL 0
 #define BGSLOBSTER_GLSL_USE_SHAREDMEM  1
 #define BGSLOBSTER_GLSL_USE_POSTPROC   1
-#endif //HAVE_GLSL
 
 /*!
-    LOcal Binary Similarity segmenTER (LOBSTER) change detection algorithm.
+    LOcal Binary Similarity segmenTER (LOBSTER) algorithm for FG/BG video segmentation via change detection.
 
     Note: both grayscale and RGB/BGR images may be used with this extractor (parameters are adjusted automatically).
     For optimal grayscale results, use CV_8UC1 frames instead of CV_8UC3.
 
     For more details on the different parameters or on the algorithm itself, see P.-L. St-Charles and
     G.-A. Bilodeau, "Improving Background Subtraction using Local Binary Similarity Patterns", in WACV 2014.
-
-    This algorithm is currently NOT thread-safe.
  */
-class BackgroundSubtractorLOBSTER :
-         public BackgroundSubtractorLBSP
-#if HAVE_GLSL
-        ,public GLImageProcAlgo
-#endif //HAVE_GLSL
-        {
-public:
-    //! full constructor
-    BackgroundSubtractorLOBSTER(float fRelLBSPThreshold=BGSLOBSTER_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
-                                size_t nLBSPThresholdOffset=BGSLOBSTER_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
-                                size_t nDescDistThreshold=BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD,
-                                size_t nColorDistThreshold=BGSLOBSTER_DEFAULT_COLOR_DIST_THRESHOLD,
-                                size_t nBGSamples=BGSLOBSTER_DEFAULT_NB_BG_SAMPLES,
-                                size_t nRequiredBGSamples=BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES);
-    //! default destructor
-    virtual ~BackgroundSubtractorLOBSTER();
-    //! (re)initiaization method; needs to be called before starting background subtraction
-    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
-    //! refreshes all samples based on the last analyzed frame
-    virtual void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
-#if HAVE_GPU_SUPPORT
-    //! primary model update function (asynchronous version); the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
-    virtual void apply_async(cv::InputArray oNextImage, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
-    //! returns a copy of the latest foreground mask
-    virtual void getLatestForegroundMask(cv::OutputArray oLastFGMask);
-#else //!HAVE_GPU_SUPPORT
-    //! primary model update function; the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
-    virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
-#endif //!HAVE_GPU_SUPPORT
-    //! returns a copy of the latest reconstructed background image
-    virtual void getBackgroundImage(cv::OutputArray oBGImg) const;
-    //! returns a copy of the latest reconstructed background descriptors image
-    virtual void getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const;
 
+class BackgroundSubtractorLOBSTER_base {
+public:
+    //! local param constructor
+    BackgroundSubtractorLOBSTER_base(size_t nDescDistThreshold=BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD,
+                                     size_t nColorDistThreshold=BGSLOBSTER_DEFAULT_COLOR_DIST_THRESHOLD,
+                                     size_t nBGSamples=BGSLOBSTER_DEFAULT_NB_BG_SAMPLES,
+                                     size_t nRequiredBGSamples=BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES);
 protected:
     //! absolute color distance threshold
     const size_t m_nColorDistThreshold;
@@ -79,19 +49,43 @@ protected:
     const size_t m_nBGSamples;
     //! number of similar samples needed to consider the current pixel/block as 'background'
     const size_t m_nRequiredBGSamples;
-    //! background model pixel intensity samples
-    std::vector<cv::Mat> m_voBGColorSamples;
-    //! background model descriptors samples
-    std::vector<cv::Mat> m_voBGDescSamples;
-    //! indicates whether the model has been fully initialized or not
-    bool m_bModelInitialized;
+};
+
+template<ParallelUtils::eParallelImplType eImpl, typename enable=void>
+class BackgroundSubtractorLOBSTER;
 
 #if HAVE_GLSL
+template<ParallelUtils::eParallelImplType eImpl>
+class BackgroundSubtractorLOBSTER<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_GLSL>::type> :
+        public BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_GLSL>,
+        public BackgroundSubtractorLOBSTER_base {
 public:
+    //! full constructor
+    BackgroundSubtractorLOBSTER(float fRelLBSPThreshold=BGSLOBSTER_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
+                                size_t nLBSPThresholdOffset=BGSLOBSTER_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
+                                size_t nDescDistThreshold=BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD,
+                                size_t nColorDistThreshold=BGSLOBSTER_DEFAULT_COLOR_DIST_THRESHOLD,
+                                size_t nBGSamples=BGSLOBSTER_DEFAULT_NB_BG_SAMPLES,
+                                size_t nRequiredBGSamples=BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES);
+    //! refreshes all samples based on the last analyzed frame
+    void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
+    //! (re)initiaization method; needs to be called before starting background subtraction
+    void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
+    //! returns the GLSL compute shader source code to run for a given algo stage
     virtual std::string getComputeShaderSource(size_t nStage) const;
-    virtual void apply_async_glimpl(cv::InputArray oNextImage, bool bRebindAll, double dLearningRate);
+    //! returns a copy of the latest reconstructed background image
+    virtual void getBackgroundImage(cv::OutputArray oBGImg) const;
+    //! returns a copy of the latest reconstructed background descriptors image
+    virtual void getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const;
+
 protected:
-    size_t m_nCurrResamplingRate;
+    //! returns the GLSL compute shader source code to run for the main processing stage
+    std::string getComputeShaderSource_LOBSTER() const;
+    //! returns the GLSL compute shader source code to run the post-processing stage (median blur)
+    std::string getComputeShaderSource_PostProc() const;
+    //! custom dispatch call function to adjust in-stage uniforms, batch workgroup size & other parameters
+    virtual void dispatch(size_t nStage, GLShader& oShader);
+
     size_t m_nTMT32ModelSize;
     size_t m_nSampleStepSize;
     size_t m_nPxModelSize;
@@ -106,10 +100,57 @@ protected:
         eLOBSTERStorageBuffer_TMT32ModelBinding,
         eLOBSTERStorageBufferBindingsCount
     };
-    virtual void dispatch(size_t nStage, GLShader& oShader);
-private:
-    std::string getComputeShaderSource_LOBSTER() const;
-    std::string getComputeShaderSource_PostProc() const;
-#endif //HAVE_GLSL
 };
+typedef BackgroundSubtractorLOBSTER<ParallelUtils::eParallelImpl_GLSL> BackgroundSubtractorLOBSTER_GLSL;
+#endif //HAVE_GLSL
 
+#if HAVE_CUDA
+template<ParallelUtils::eParallelImplType eImpl>
+class BackgroundSubtractorLOBSTER<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_CUDA>::type> :
+        public BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_CUDA>,
+        public BackgroundSubtractorLOBSTER_base {
+        static_assert(false,"Missing CUDA impl");
+};
+typedef BackgroundSubtractorLOBSTER<ParallelUtils::eParallelImpl_CUDA> BackgroundSubtractorLOBSTER_CUDA;
+#endif //HAVE_CUDA
+
+#if HAVE_OPENCL
+template<ParallelUtils::eParallelImplType eImpl>
+class BackgroundSubtractorLOBSTER<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_OpenCL>::type> :
+        public BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_OpenCL>,
+        public BackgroundSubtractorLOBSTER_base {
+        static_assert(false,"Missing OpenCL impl");
+};
+typedef BackgroundSubtractorLOBSTER<ParallelUtils::eParallelImpl_OpenCL> BackgroundSubtractorLOBSTER_OpenCL;
+#endif //HAVE_OPENCL
+
+template<ParallelUtils::eParallelImplType eImpl>
+class BackgroundSubtractorLOBSTER<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_None>::type> :
+        public BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_None>,
+        public BackgroundSubtractorLOBSTER_base {
+public:
+    //! full constructor
+    BackgroundSubtractorLOBSTER(float fRelLBSPThreshold=BGSLOBSTER_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
+                                size_t nLBSPThresholdOffset=BGSLOBSTER_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
+                                size_t nDescDistThreshold=BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD,
+                                size_t nColorDistThreshold=BGSLOBSTER_DEFAULT_COLOR_DIST_THRESHOLD,
+                                size_t nBGSamples=BGSLOBSTER_DEFAULT_NB_BG_SAMPLES,
+                                size_t nRequiredBGSamples=BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES);
+    //! refreshes all samples based on the last analyzed frame
+    void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
+    //! (re)initiaization method; needs to be called before starting background subtraction
+    void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
+    //! model update/segmentation function (synchronous version); the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
+    virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
+    //! returns a copy of the latest reconstructed background image
+    virtual void getBackgroundImage(cv::OutputArray oBGImg) const;
+    //! returns a copy of the latest reconstructed background descriptors image
+    virtual void getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const;
+
+protected:
+    //! background model pixel intensity samples
+    std::vector<cv::Mat> m_voBGColorSamples;
+    //! background model descriptors samples
+    std::vector<cv::Mat> m_voBGDescSamples;
+};
+typedef BackgroundSubtractorLOBSTER<ParallelUtils::eParallelImpl_None> BackgroundSubtractorLOBSTER_Basic;

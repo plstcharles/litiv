@@ -17,14 +17,10 @@ namespace RandUtils {
     }
 
     //! returns a random init/sampling position for the specified pixel position, given a predefined kernel; also guards against out-of-bounds values via image/border size check.
-    template<int nKernelHeight, int nKernelWidth> static inline void getRandSamplePosition( const std::array<std::array<int,nKernelWidth>,nKernelHeight>& anSamplesInitPattern,
-                                                                                            const int nSamplesInitPatternTot,
-                                                                                            int& nSampleCoord_X,
-                                                                                            int& nSampleCoord_Y,
-                                                                                            const int nOrigCoord_X,
-                                                                                            const int nOrigCoord_Y,
-                                                                                            const int nBorderSize,
-                                                                                            const cv::Size& oImageSize) {
+    template<int nKernelHeight, int nKernelWidth>
+    static inline void getRandSamplePosition( const std::array<std::array<int,nKernelWidth>,nKernelHeight>& anSamplesInitPattern,
+                                              const int nSamplesInitPatternTot, int& nSampleCoord_X, int& nSampleCoord_Y,
+                                              const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
         int r = 1+rand()%nSamplesInitPatternTot;
         for(nSampleCoord_X=0; nSampleCoord_X<nKernelWidth; ++nSampleCoord_X) {
             for(nSampleCoord_Y=0; nSampleCoord_Y<nKernelHeight; ++nSampleCoord_Y) {
@@ -70,13 +66,11 @@ namespace RandUtils {
     }
 
     //! returns a random neighbor position for the specified pixel position, given a predefined neighborhood; also guards against out-of-bounds values via image/border size check.
-    template<int nNeighborCount> static inline void getRandNeighborPosition( const std::array<std::array<int,2>,nNeighborCount>& anNeighborPattern,
-                                                                             int& nNeighborCoord_X,
-                                                                             int& nNeighborCoord_Y,
-                                                                             const int nOrigCoord_X,
-                                                                             const int nOrigCoord_Y,
-                                                                             const int nBorderSize,
-                                                                             const cv::Size& oImageSize) {
+    template<int nNeighborCount>
+    static inline void getRandNeighborPosition( const std::array<std::array<int,2>,nNeighborCount>& anNeighborPattern,
+                                                int& nNeighborCoord_X, int& nNeighborCoord_Y,
+                                                const int nOrigCoord_X, const int nOrigCoord_Y,
+                                                const int nBorderSize, const cv::Size& oImageSize) {
         int r = rand()%nNeighborCount;
         nNeighborCoord_X = nOrigCoord_X+anNeighborPattern[r][0];
         nNeighborCoord_Y = nOrigCoord_Y+anNeighborPattern[r][1];
@@ -117,7 +111,8 @@ namespace RandUtils {
         uint pad;
     };
 
-    template<typename Talloc> static inline void initTinyMT32Generators(glm::uvec3 vGeneratorLayout, std::vector<TMT32GenParams,Talloc>& voData) {
+    template<typename Talloc>
+    static inline void initTinyMT32Generators(glm::uvec3 vGeneratorLayout, std::vector<TMT32GenParams,Talloc>& voData) {
         glAssert(vGeneratorLayout.x>0 && vGeneratorLayout.y>0 && vGeneratorLayout.z>0);
         voData.resize(vGeneratorLayout.x*vGeneratorLayout.y*vGeneratorLayout.z);
         TMT32GenParams* pData = voData.data();

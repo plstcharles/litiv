@@ -48,7 +48,14 @@
 
 class GLException : public std::runtime_error {
 public:
-    template<typename... VALIST> GLException(const char* sErrMsg, const char* sFunc, const char* sFile, int nLine, VALIST... vArgs) : std::runtime_error(cv::format((std::string("GLException in function '%s' from %s(%d) : \n")+sErrMsg).c_str(),sFunc,sFile,nLine,vArgs...)), m_eErrn(GL_NO_ERROR), m_acErrMsg(sErrMsg), m_acFuncName(sFunc), m_acFileName(sFile), m_nLineNumber(nLine) {};
+    template<typename... VALIST>
+    GLException(const char* sErrMsg, const char* sFunc, const char* sFile, int nLine, VALIST... vArgs) :
+            std::runtime_error(cv::format((std::string("GLException in function '%s' from %s(%d) : \n")+sErrMsg).c_str(),sFunc,sFile,nLine,vArgs...)),
+            m_eErrn(GL_NO_ERROR),
+            m_acErrMsg(sErrMsg),
+            m_acFuncName(sFunc),
+            m_acFileName(sFile),
+            m_nLineNumber(nLine) {};
     const GLenum m_eErrn;
     const char* const m_acErrMsg;
     const char* const m_acFuncName;
@@ -348,14 +355,16 @@ namespace GLUtils {
         }
     }
 
-    template<uint N> static inline typename std::enable_if<(N==1),int>::type getIntegerVal(GLenum eParamName) {
+    template<uint N>
+    static inline typename std::enable_if<(N==1),int>::type getIntegerVal(GLenum eParamName) {
         int nVal;
         glGetIntegerv(eParamName,&nVal);
         glErrorCheck;
         return nVal;
     }
 
-    template<uint N> static inline typename std::enable_if<(N>1),std::array<int,N>>::type getIntegerVal(GLenum eParamName) {
+    template<uint N>
+    static inline typename std::enable_if<(N>1),std::array<int,N>>::type getIntegerVal(GLenum eParamName) {
         std::array<int,N> anVal;
         for(uint n=0; n<N; ++n)
             glGetIntegeri_v(eParamName,n,&anVal[n]);

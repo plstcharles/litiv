@@ -5,17 +5,20 @@
 namespace DistanceUtils {
 
     //! computes the L1 distance between two integer values
-    template<typename T> static inline typename std::enable_if<std::is_integral<T>::value,size_t>::type L1dist(T a, T b) {
+    template<typename T>
+    static inline typename std::enable_if<std::is_integral<T>::value,size_t>::type L1dist(T a, T b) {
         return (size_t)abs((int)a-b);
     }
 
     //! computes the L1 distance between two float values
-    template<typename T> static inline typename std::enable_if<std::is_floating_point<T>::value,float>::type L1dist(T a, T b) {
+    template<typename T>
+    static inline typename std::enable_if<std::is_floating_point<T>::value,float>::type L1dist(T a, T b) {
         return fabs((float)a-(float)b);
     }
 
     //! computes the L1 distance between two generic arrays
-    template<size_t nChannels, typename T> static inline auto L1dist(const T* const a, const T* const b) -> decltype(L1dist(*a,*b)) {
+    template<size_t nChannels, typename T>
+    static inline auto L1dist(const T* const a, const T* const b) -> decltype(L1dist(*a,*b)) {
         static_assert(nChannels>0,"vectors should have at least one channel");
         decltype(L1dist(*a,*b)) gResult = 0;
         for(size_t c=0; c<nChannels; ++c)
@@ -24,22 +27,26 @@ namespace DistanceUtils {
     }
 
     //! computes the L1 distance between two generic arrays
-    template<size_t nChannels, typename T> static inline auto L1dist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) -> decltype(L1dist<nChannels>(a.data(),b.data())) {
+    template<size_t nChannels, typename T>
+    static inline auto L1dist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) -> decltype(L1dist<nChannels>(a.data(),b.data())) {
         return L1dist<nChannels>(a.data(),b.data());
     }
 
     //! computes the L1 distance between two generic arrays
-    template<size_t nChannels, typename T> static inline auto L1dist(const std::array<T,nChannels>& a, const T* const b) -> decltype(L1dist<nChannels>(a.data(),b)) {
+    template<size_t nChannels, typename T>
+    static inline auto L1dist(const std::array<T,nChannels>& a, const T* const b) -> decltype(L1dist<nChannels>(a.data(),b)) {
         return L1dist<nChannels>(a.data(),b);
     }
 
     //! computes the L1 distance between two generic arrays
-    template<size_t nChannels, typename T> static inline auto L1dist(const T* const a, const std::array<T,nChannels>& b) -> decltype(L1dist<nChannels>(a,b.data())) {
+    template<size_t nChannels, typename T>
+    static inline auto L1dist(const T* const a, const std::array<T,nChannels>& b) -> decltype(L1dist<nChannels>(a,b.data())) {
         return L1dist<nChannels>(a,b.data());
     }
 
     //! computes the L1 distance between two generic arrays
-    template<size_t nChannels, typename T> static inline auto L1dist(const T* const a, const T* const b, size_t nElements, const uchar* m=NULL) -> decltype(L1dist<nChannels>(a,b)) {
+    template<size_t nChannels, typename T>
+    static inline auto L1dist(const T* const a, const T* const b, size_t nElements, const uchar* m=NULL) -> decltype(L1dist<nChannels>(a,b)) {
         decltype(L1dist<nChannels>(a,b)) gResult = 0;
         size_t nTotElements = nElements*nChannels;
         if(m) {
@@ -55,7 +62,8 @@ namespace DistanceUtils {
     }
 
     //! computes the L1 distance between two generic arrays
-    template<typename T> static inline auto L1dist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) -> decltype(L1dist<3>(a,b,nElements,m)) {
+    template<typename T>
+    static inline auto L1dist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) -> decltype(L1dist<3>(a,b,nElements,m)) {
         CV_Assert(nChannels>0 && nChannels<=4);
         switch(nChannels) {
             case 1: return L1dist<1>(a,b,nElements,m);
@@ -67,7 +75,8 @@ namespace DistanceUtils {
     }
 
     //! computes the L1 distance between two opencv vectors
-    template<int nChannels, typename T> static inline auto L1dist(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) -> decltype(L1dist<nChannels,T>(T(),T())) {
+    template<int nChannels, typename T>
+    static inline auto L1dist(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) -> decltype(L1dist<nChannels,T>(T(),T())) {
         T a_array[nChannels], b_array[nChannels];
         for(int c=0; c<nChannels; ++c) {
             a_array[c] = a[(int)c];
@@ -79,13 +88,15 @@ namespace DistanceUtils {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     //! computes the squared L2 distance between two generic variables
-    template<typename T> static inline auto L2sqrdist(T a, T b) -> decltype(L1dist(a,b)) {
+    template<typename T>
+    static inline auto L2sqrdist(T a, T b) -> decltype(L1dist(a,b)) {
         auto gResult = L1dist(a,b);
         return gResult*gResult;
     }
 
     //! computes the squared L2 distance between two generic arrays
-    template<size_t nChannels, typename T> static inline auto L2sqrdist(const T* const a, const T* const b) -> decltype(L2sqrdist(*a,*b)) {
+    template<size_t nChannels, typename T>
+    static inline auto L2sqrdist(const T* const a, const T* const b) -> decltype(L2sqrdist(*a,*b)) {
         static_assert(nChannels>0,"vectors should have at least one channel");
         decltype(L2sqrdist(*a,*b)) gResult = 0;
         for(size_t c=0; c<nChannels; ++c)
@@ -94,22 +105,26 @@ namespace DistanceUtils {
     }
 
     //! computes the squared L2 distance between two generic arrays
-    template<size_t nChannels, typename T> static inline auto L2sqrdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) -> decltype(L2sqrdist<nChannels>(a.data(),b.data())) {
+    template<size_t nChannels, typename T>
+    static inline auto L2sqrdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) -> decltype(L2sqrdist<nChannels>(a.data(),b.data())) {
         return L2sqrdist<nChannels>(a.data(),b.data());
     }
 
     //! computes the squared L2 distance between two generic arrays
-    template<size_t nChannels, typename T> static inline auto L2sqrdist(const std::array<T,nChannels>& a, const T* const b) -> decltype(L2sqrdist<nChannels>(a.data(),b)) {
+    template<size_t nChannels, typename T>
+    static inline auto L2sqrdist(const std::array<T,nChannels>& a, const T* const b) -> decltype(L2sqrdist<nChannels>(a.data(),b)) {
         return L2sqrdist<nChannels>(a.data(),b);
     }
 
     //! computes the squared L2 distance between two generic arrays
-    template<size_t nChannels, typename T> static inline auto L2sqrdist(const T* const a, const std::array<T,nChannels>& b) -> decltype(L2sqrdist<nChannels>(a,b.data())) {
+    template<size_t nChannels, typename T>
+    static inline auto L2sqrdist(const T* const a, const std::array<T,nChannels>& b) -> decltype(L2sqrdist<nChannels>(a,b.data())) {
         return L2sqrdist<nChannels>(a,b.data());
     }
 
     //! computes the squared L2 distance between two generic arrays
-    template<size_t nChannels, typename T> static inline auto L2sqrdist(const T* const a, const T* const b, size_t nElements, const uchar* m=NULL) -> decltype(L2sqrdist<nChannels>(a,b)) {
+    template<size_t nChannels, typename T>
+    static inline auto L2sqrdist(const T* const a, const T* const b, size_t nElements, const uchar* m=NULL) -> decltype(L2sqrdist<nChannels>(a,b)) {
         decltype(L2sqrdist<nChannels>(a,b)) gResult = 0;
         size_t nTotElements = nElements*nChannels;
         if(m) {
@@ -125,7 +140,8 @@ namespace DistanceUtils {
     }
 
     //! computes the squared L2 distance between two generic arrays
-    template<typename T> static inline auto L2sqrdist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) -> decltype(L2sqrdist<3>(a,b,nElements,m)) {
+    template<typename T>
+    static inline auto L2sqrdist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) -> decltype(L2sqrdist<3>(a,b,nElements,m)) {
         CV_Assert(nChannels>0 && nChannels<=4);
         switch(nChannels) {
             case 1: return L2sqrdist<1>(a,b,nElements,m);
@@ -137,7 +153,8 @@ namespace DistanceUtils {
     }
 
     //! computes the squared L2 distance between two opencv vectors
-    template<int nChannels, typename T> static inline auto L2sqrdist(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) -> decltype(L2sqrdist<nChannels,T>(T(),T())) {
+    template<int nChannels, typename T>
+    static inline auto L2sqrdist(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) -> decltype(L2sqrdist<nChannels,T>(T(),T())) {
         T a_array[nChannels], b_array[nChannels];
         for(int c=0; c<nChannels; ++c) {
             a_array[c] = a[(int)c];
@@ -147,7 +164,8 @@ namespace DistanceUtils {
     }
 
     //! computes the L2 distance between two generic arrays
-    template<size_t nChannels, typename T> static inline float L2dist(const T* const a, const T* const b) {
+    template<size_t nChannels, typename T>
+    static inline float L2dist(const T* const a, const T* const b) {
         static_assert(nChannels>0,"vectors should have at least one channel");
         decltype(L2sqrdist(*a,*b)) gResult = 0;
         for(size_t c=0; c<nChannels; ++c)
@@ -156,22 +174,26 @@ namespace DistanceUtils {
     }
 
     //! computes the L2 distance between two generic arrays
-    template<size_t nChannels, typename T> static inline auto L2dist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) -> decltype(L2dist<nChannels>(a.data(),b.data())) {
+    template<size_t nChannels, typename T>
+    static inline auto L2dist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) -> decltype(L2dist<nChannels>(a.data(),b.data())) {
         return L2dist<nChannels>(a.data(),b.data());
     }
 
     //! computes the L2 distance between two generic arrays
-    template<size_t nChannels, typename T> static inline auto L2dist(const std::array<T,nChannels>& a, const T* const b) -> decltype(L2dist<nChannels>(a.data(),b)) {
+    template<size_t nChannels, typename T>
+    static inline auto L2dist(const std::array<T,nChannels>& a, const T* const b) -> decltype(L2dist<nChannels>(a.data(),b)) {
         return L2dist<nChannels>(a.data(),b);
     }
 
     //! computes the L2 distance between two generic arrays
-    template<size_t nChannels, typename T> static inline auto L2dist(const T* const a, const std::array<T,nChannels>& b) -> decltype(L2dist<nChannels>(a,b.data())) {
+    template<size_t nChannels, typename T>
+    static inline auto L2dist(const T* const a, const std::array<T,nChannels>& b) -> decltype(L2dist<nChannels>(a,b.data())) {
         return L2dist<nChannels>(a,b.data());
     }
 
     //! computes the L2 distance between two generic arrays
-    template<size_t nChannels, typename T> static inline float L2dist(const T* const a, const T* const b, size_t nElements, const uchar* m=NULL) {
+    template<size_t nChannels, typename T>
+    static inline float L2dist(const T* const a, const T* const b, size_t nElements, const uchar* m=NULL) {
         decltype(L2sqrdist<nChannels>(a,b)) gResult = 0;
         size_t nTotElements = nElements*nChannels;
         if(m) {
@@ -187,7 +209,8 @@ namespace DistanceUtils {
     }
 
     //! computes the squared L2 distance between two generic arrays
-    template<typename T> static inline float L2dist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) {
+    template<typename T>
+    static inline float L2dist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) {
         CV_Assert(nChannels>0 && nChannels<=4);
         switch(nChannels) {
             case 1: return L2dist<1>(a,b,nElements,m);
@@ -199,7 +222,8 @@ namespace DistanceUtils {
     }
 
     //! computes the L2 distance between two opencv vectors
-    template<int nChannels, typename T> static inline float L2dist(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) {
+    template<int nChannels, typename T>
+    static inline float L2dist(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) {
         T a_array[nChannels], b_array[nChannels];
         for(int c=0; c<nChannels; ++c) {
             a_array[c] = a[(int)c];
@@ -211,7 +235,8 @@ namespace DistanceUtils {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     //! computes the color distortion between two integer arrays
-    template<size_t nChannels, typename T> static inline typename std::enable_if<std::is_integral<T>::value,size_t>::type cdist(const T* const curr, const T* const bg) {
+    template<size_t nChannels, typename T>
+    static inline typename std::enable_if<std::is_integral<T>::value,size_t>::type cdist(const T* const curr, const T* const bg) {
         static_assert(nChannels>1,"vectors should have more than one channel");
         static_assert(sizeof(size_t)>=8,"cdist: cannot be used with 32 bit integers, might integer overflow");
         bool bNonConstDist = false;
@@ -242,7 +267,8 @@ namespace DistanceUtils {
     }
 
     //! computes the color distortion between two float arrays
-    template<size_t nChannels, typename T> static inline typename std::enable_if<std::is_floating_point<T>::value,float>::type cdist(const T* const curr, const T* const bg) {
+    template<size_t nChannels, typename T>
+    static inline typename std::enable_if<std::is_floating_point<T>::value,float>::type cdist(const T* const curr, const T* const bg) {
         static_assert(nChannels>1,"vectors should have more than one channel");
         bool bNonConstDist = false;
         bool bNonNullDist = (curr[0]!=bg[0]);
@@ -275,22 +301,26 @@ namespace DistanceUtils {
     }
 
     //! computes the color distortion between two generic arrays
-    template<size_t nChannels, typename T> static inline auto cdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) -> decltype(cdist<nChannels>(a.data(),b.data())) {
+    template<size_t nChannels, typename T>
+    static inline auto cdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) -> decltype(cdist<nChannels>(a.data(),b.data())) {
         return cdist<nChannels>(a.data(),b.data());
     }
 
     //! computes the color distortion between two generic arrays
-    template<size_t nChannels, typename T> static inline auto cdist(const std::array<T,nChannels>& a, const T* const b) -> decltype(cdist<nChannels>(a.data(),b)) {
+    template<size_t nChannels, typename T>
+    static inline auto cdist(const std::array<T,nChannels>& a, const T* const b) -> decltype(cdist<nChannels>(a.data(),b)) {
         return cdist<nChannels>(a.data(),b);
     }
 
     //! computes the color distortion between two generic arrays
-    template<size_t nChannels, typename T> static inline auto cdist(const T* const a, const std::array<T,nChannels>& b) -> decltype(cdist<nChannels>(a,b.data())) {
+    template<size_t nChannels, typename T>
+    static inline auto cdist(const T* const a, const std::array<T,nChannels>& b) -> decltype(cdist<nChannels>(a,b.data())) {
         return cdist<nChannels>(a,b.data());
     }
 
     //! computes the color distortion between two generic arrays
-    template<size_t nChannels, typename T> static inline auto cdist(const T* const a, const T* const b, size_t nElements, const uchar* m=NULL) -> decltype(cdist<nChannels>(a,b)) {
+    template<size_t nChannels, typename T>
+    static inline auto cdist(const T* const a, const T* const b, size_t nElements, const uchar* m=NULL) -> decltype(cdist<nChannels>(a,b)) {
         decltype(cdist<nChannels>(a,b)) gResult = 0;
         size_t nTotElements = nElements*nChannels;
         if(m) {
@@ -306,7 +336,8 @@ namespace DistanceUtils {
     }
 
     //! computes the color distortion between two generic arrays
-    template<typename T> static inline auto cdist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) -> decltype(cdist<3>(a,b,nElements,m)) {
+    template<typename T>
+    static inline auto cdist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) -> decltype(cdist<3>(a,b,nElements,m)) {
         CV_Assert(nChannels>0 && nChannels<=4);
         switch(nChannels) {
             case 2: return cdist<2>(a,b,nElements,m);
@@ -317,7 +348,8 @@ namespace DistanceUtils {
     }
 
     //! computes the color distortion between two opencv vectors
-    template<int nChannels, typename T> static inline auto cdist(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) -> decltype(cdist<nChannels,T>(T(),T())) {
+    template<int nChannels, typename T>
+    static inline auto cdist(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) -> decltype(cdist<nChannels,T>(T(),T())) {
         T a_array[nChannels], b_array[nChannels];
         for(int c=0; c<nChannels; ++c) {
             a_array[c] = a[(int)c];
@@ -327,37 +359,32 @@ namespace DistanceUtils {
     }
 
     //! computes a color distortion-distance mix using two generic distances
-    template<typename T> static inline T cmixdist(T oL1Distance, T oCDistortion) {
+    template<typename T>
+    static inline T cmixdist(T oL1Distance, T oCDistortion) {
         return (oL1Distance/2+oCDistortion*4);
     }
 
     //! computes a color distortion-distance mix using two generic arrays
-    //template<size_t nChannels, typename T> static inline typename std::enable_if<std::is_integral<T>::value,size_t>::type cmixdist(const T* const curr, const T* const bg) {
-    //    return cmixdist(L1dist<nChannels>(curr,bg),cdist<nChannels>(curr,bg));
-    //}
-
-    //! computes a color distortion-distance mix using two generic arrays
-    //template<size_t nChannels, typename T> static inline typename std::enable_if<std::is_floating_point<T>::value,float>::type cmixdist(const T* const curr, const T* const bg) {
-    //    return cmixdist(L1dist<nChannels>(curr,bg),cdist<nChannels>(curr,bg));
-    //}
-
-    //! computes a color distortion-distance mix using two generic arrays
-    template<size_t nChannels, typename T> static inline auto cmixdist(const T* const curr, const T* const bg) -> decltype(L1dist<nChannels>(curr,bg)) {
+    template<size_t nChannels, typename T>
+    static inline auto cmixdist(const T* const curr, const T* const bg) -> decltype(L1dist<nChannels>(curr,bg)) {
         return cmixdist(L1dist<nChannels>(curr,bg),cdist<nChannels>(curr,bg));
     }
 
     //! computes a color distortion-distance mix using two generic arrays
-    template<size_t nChannels, typename T> static inline auto cmixdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) -> decltype(cmixdist<nChannels>(a.data(),b.data())) {
+    template<size_t nChannels, typename T>
+    static inline auto cmixdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) -> decltype(cmixdist<nChannels>(a.data(),b.data())) {
         return cmixdist<nChannels>(a.data(),b.data());
     }
 
     //! computes a color distortion-distance mix using two generic arrays
-    template<size_t nChannels, typename T> static inline auto cmixdist(const std::array<T,nChannels>& a, const T* const b) -> decltype(cmixdist<nChannels>(a.data(),b)) {
+    template<size_t nChannels, typename T>
+    static inline auto cmixdist(const std::array<T,nChannels>& a, const T* const b) -> decltype(cmixdist<nChannels>(a.data(),b)) {
         return cmixdist<nChannels>(a.data(),b);
     }
 
     //! computes a color distortion-distance mix using two generic arrays
-    template<size_t nChannels, typename T> static inline auto cmixdist(const T* const a, const std::array<T,nChannels>& b) -> decltype(cmixdist<nChannels>(a,b.data())) {
+    template<size_t nChannels, typename T>
+    static inline auto cmixdist(const T* const a, const std::array<T,nChannels>& b) -> decltype(cmixdist<nChannels>(a,b.data())) {
         return cmixdist<nChannels>(a,b.data());
     }
 
@@ -384,7 +411,8 @@ namespace DistanceUtils {
     };
 
     //! computes the population count of an N-byte vector using an 8-bit popcount LUT
-    template<typename T> static inline size_t popcount(T x) {
+    template<typename T>
+    static inline size_t popcount(T x) {
         static_assert(std::is_integral<T>::value,"type must be integral");
         size_t nResult = 0;
         for(size_t l=0; l<sizeof(T); ++l)
@@ -393,18 +421,21 @@ namespace DistanceUtils {
     }
 
     //! computes the hamming distance between two N-byte vectors using an 8-bit popcount LUT
-    template<typename T> static inline size_t hdist(T a, T b) {
+    template<typename T>
+    static inline size_t hdist(T a, T b) {
         static_assert(std::is_integral<T>::value,"type must be integral");
         return popcount(a^b);
     }
 
     //! computes the gradient magnitude distance between two N-byte vectors using an 8-bit popcount LUT
-    template<typename T> static inline size_t gdist(T a, T b) {
+    template<typename T>
+    static inline size_t gdist(T a, T b) {
         return L1dist(popcount(a),popcount(b));
     }
 
     //! computes the population count of a (nChannels*N)-byte vector using an 8-bit popcount LUT
-    template<size_t nChannels, typename T> static inline size_t popcount(const T* x) {
+    template<size_t nChannels, typename T>
+    static inline size_t popcount(const T* x) {
         static_assert(nChannels>0,"vector should have at least one channel");
         size_t nResult = 0;
         for(size_t c=0; c<nChannels; ++c)
@@ -414,12 +445,14 @@ namespace DistanceUtils {
     }
 
     //! computes the population count of a (nChannels*N)-byte vector using an 8-bit popcount LUT
-    template<size_t nChannels, typename T> static inline size_t popcount(const std::array<T,nChannels>& x) {
+    template<size_t nChannels, typename T>
+    static inline size_t popcount(const std::array<T,nChannels>& x) {
         return popcount<nChannels>(x.data());
     }
 
     //! computes the hamming distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
-    template<size_t nChannels, typename T> static inline size_t hdist(const T* const a, const T* const b) {
+    template<size_t nChannels, typename T>
+    static inline size_t hdist(const T* const a, const T* const b) {
         static_assert(nChannels>0,"vectors should have at least one channel");
         T xor_array[nChannels];
         for(size_t c=0; c<nChannels; ++c)
@@ -428,37 +461,44 @@ namespace DistanceUtils {
     }
 
     //! computes the hamming distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
-    template<size_t nChannels, typename T> static inline size_t hdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) {
+    template<size_t nChannels, typename T>
+    static inline size_t hdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) {
         return hdist<nChannels>(a.data(),b.data());
     }
 
     //! computes the hamming distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
-    template<size_t nChannels, typename T> static inline size_t hdist(const std::array<T,nChannels>& a, const T* const b) {
+    template<size_t nChannels, typename T>
+    static inline size_t hdist(const std::array<T,nChannels>& a, const T* const b) {
         return hdist<nChannels>(a.data(),b);
     }
 
     //! computes the hamming distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
-    template<size_t nChannels, typename T> static inline size_t hdist(const T* const a, const std::array<T,nChannels>& b) {
+    template<size_t nChannels, typename T>
+    static inline size_t hdist(const T* const a, const std::array<T,nChannels>& b) {
         return hdist<nChannels>(a,b.data());
     }
 
     //! computes the gradient magnitude distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
-    template<size_t nChannels, typename T> static inline size_t gdist(const T* const a, const T* const b) {
+    template<size_t nChannels, typename T>
+    static inline size_t gdist(const T* const a, const T* const b) {
         return L1dist(popcount<nChannels>(a),popcount<nChannels>(b));
     }
 
     //! computes the gradient magnitude distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
-    template<size_t nChannels, typename T> static inline size_t gdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) {
+    template<size_t nChannels, typename T>
+    static inline size_t gdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) {
         return gdist<nChannels>(a.data(),b.data());
     }
 
     //! computes the gradient magnitude distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
-    template<size_t nChannels, typename T> static inline size_t gdist(const std::array<T,nChannels>& a, const T* const b) {
+    template<size_t nChannels, typename T>
+    static inline size_t gdist(const std::array<T,nChannels>& a, const T* const b) {
         return gdist<nChannels>(a.data(),b);
     }
 
     //! computes the gradient magnitude distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
-    template<size_t nChannels, typename T> static inline size_t gdist(const T* const a, const std::array<T,nChannels>& b) {
+    template<size_t nChannels, typename T>
+    static inline size_t gdist(const T* const a, const std::array<T,nChannels>& b) {
         return gdist<nChannels>(a,b.data());
     }
 

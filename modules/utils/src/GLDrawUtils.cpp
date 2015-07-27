@@ -8,12 +8,12 @@ GLVertexArrayObject::~GLVertexArrayObject() {
     glDeleteVertexArrays(1,&m_nVAO);
 }
 
-GLPixelBufferObject::GLPixelBufferObject(const cv::Mat& oInitBufferData, GLenum eBufferTarget, GLenum eBufferUsage)
-    :    m_eBufferTarget(eBufferTarget)
-        ,m_eBufferUsage(eBufferUsage)
-        ,m_nBufferSize(oInitBufferData.rows*oInitBufferData.cols*oInitBufferData.channels()*GLUtils::getByteSizeFromMatDepth(oInitBufferData.depth()))
-        ,m_nFrameType(oInitBufferData.type())
-        ,m_oFrameSize(oInitBufferData.size()) {
+GLPixelBufferObject::GLPixelBufferObject(const cv::Mat& oInitBufferData, GLenum eBufferTarget, GLenum eBufferUsage) :
+        m_eBufferTarget(eBufferTarget),
+        m_eBufferUsage(eBufferUsage),
+        m_nBufferSize(oInitBufferData.rows*oInitBufferData.cols*oInitBufferData.channels()*GLUtils::getByteSizeFromMatDepth(oInitBufferData.depth())),
+        m_nFrameType(oInitBufferData.type()),
+        m_oFrameSize(oInitBufferData.size()) {
     glAssert(m_eBufferTarget==GL_PIXEL_PACK_BUFFER || (m_eBufferTarget==GL_PIXEL_UNPACK_BUFFER && oInitBufferData.isContinuous()));
     glAssert(m_nBufferSize>0);
     glGenBuffers(1,&m_nPBO);
@@ -64,22 +64,17 @@ GLTexture::~GLTexture() {
     glDeleteTextures(1,&m_nTex);
 }
 
-GLTexture2D::GLTexture2D( GLsizei nLevels,
-                          GLenum eInternalFormat,
-                          GLsizei nWidth,
-                          GLsizei nHeight,
-                          GLvoid* pData,
-                          GLenum eDataFormat,
-                          GLenum eDataType)
-    :    GLTexture()
-        ,m_bUseIntegralFormat(GLUtils::isInternalFormatIntegral(eInternalFormat))
-        ,m_nWidth(nWidth)
-        ,m_nHeight(nHeight)
-        ,m_nLevels(nLevels)
-        ,m_eInternalFormat(eInternalFormat)
-        ,m_eDataFormat(eDataFormat)
-        ,m_eDataType(eDataType)
-        ,m_oInitTexture(GLUtils::deepCopyImage(nWidth,nHeight,pData,eDataFormat,eDataType)) {
+GLTexture2D::GLTexture2D( GLsizei nLevels, GLenum eInternalFormat, GLsizei nWidth, GLsizei nHeight,
+                          GLvoid* pData, GLenum eDataFormat, GLenum eDataType) :
+        GLTexture(),
+        m_bUseIntegralFormat(GLUtils::isInternalFormatIntegral(eInternalFormat)),
+        m_nWidth(nWidth),
+        m_nHeight(nHeight),
+        m_nLevels(nLevels),
+        m_eInternalFormat(eInternalFormat),
+        m_eDataFormat(eDataFormat),
+        m_eDataType(eDataType),
+        m_oInitTexture(GLUtils::deepCopyImage(nWidth,nHeight,pData,eDataFormat,eDataType)) {
     glAssert(m_nLevels>=1 && m_nWidth>0 && m_nHeight>0);
     glBindTexture(GL_TEXTURE_2D,getTexId());
     glTexStorage2D(GL_TEXTURE_2D,m_nLevels,m_eInternalFormat,m_nWidth,m_nHeight);
@@ -98,16 +93,16 @@ GLTexture2D::GLTexture2D( GLsizei nLevels,
     glErrorCheck;
 }
 
-GLTexture2D::GLTexture2D(GLsizei nLevels, const cv::Mat& oTexture, bool bUseIntegralFormat)
-    :    GLTexture()
-        ,m_bUseIntegralFormat(bUseIntegralFormat)
-        ,m_nWidth(oTexture.cols)
-        ,m_nHeight(oTexture.rows)
-        ,m_nLevels(nLevels)
-        ,m_eInternalFormat(GLUtils::getInternalFormatFromMatType(oTexture.type(),bUseIntegralFormat))
-        ,m_eDataFormat(GLUtils::getDataFormatFromChannels(oTexture.channels(),bUseIntegralFormat))
-        ,m_eDataType(GLUtils::getDataTypeFromMatDepth(oTexture.depth(),oTexture.channels()))
-        ,m_oInitTexture(oTexture.clone()) {
+GLTexture2D::GLTexture2D(GLsizei nLevels, const cv::Mat& oTexture, bool bUseIntegralFormat) :
+        GLTexture(),
+        m_bUseIntegralFormat(bUseIntegralFormat),
+        m_nWidth(oTexture.cols),
+        m_nHeight(oTexture.rows),
+        m_nLevels(nLevels),
+        m_eInternalFormat(GLUtils::getInternalFormatFromMatType(oTexture.type(),bUseIntegralFormat)),
+        m_eDataFormat(GLUtils::getDataFormatFromChannels(oTexture.channels(),bUseIntegralFormat)),
+        m_eDataType(GLUtils::getDataTypeFromMatDepth(oTexture.depth(),oTexture.channels())),
+        m_oInitTexture(oTexture.clone()) {
     glAssert(m_nLevels>=1 && !m_oInitTexture.empty());
     glBindTexture(GL_TEXTURE_2D,getTexId());
     glTexStorage2D(GL_TEXTURE_2D,m_nLevels,m_eInternalFormat,m_nWidth,m_nHeight);
@@ -138,24 +133,18 @@ void GLTexture2D::bindToSampler(GLuint nUnit) {
     glBindTexture(GL_TEXTURE_2D,getTexId());
 }
 
-GLTexture2DArray::GLTexture2DArray( GLsizei nTextureCount,
-                                    GLsizei nLevels,
-                                    GLenum eInternalFormat,
-                                    GLsizei nWidth,
-                                    GLsizei nHeight,
-                                    GLvoid* pData,
-                                    GLenum eDataFormat,
-                                    GLenum eDataType)
-    :    GLTexture()
-        ,m_bUseIntegralFormat(GLUtils::isInternalFormatIntegral(eInternalFormat))
-        ,m_nTextureCount(nTextureCount)
-        ,m_nWidth(nWidth)
-        ,m_nHeight(nHeight)
-        ,m_nLevels(nLevels)
-        ,m_eInternalFormat(eInternalFormat)
-        ,m_eDataFormat(eDataFormat)
-        ,m_eDataType(eDataType)
-        ,m_voInitTextures(GLUtils::deepCopyImages(nTextureCount,nWidth,nHeight,pData,eDataFormat,eDataType)) {
+GLTexture2DArray::GLTexture2DArray( GLsizei nTextureCount, GLsizei nLevels, GLenum eInternalFormat, GLsizei nWidth,
+                                    GLsizei nHeight, GLvoid* pData, GLenum eDataFormat, GLenum eDataType) :
+        GLTexture(),
+        m_bUseIntegralFormat(GLUtils::isInternalFormatIntegral(eInternalFormat)),
+        m_nTextureCount(nTextureCount),
+        m_nWidth(nWidth),
+        m_nHeight(nHeight),
+        m_nLevels(nLevels),
+        m_eInternalFormat(eInternalFormat),
+        m_eDataFormat(eDataFormat),
+        m_eDataType(eDataType),
+        m_voInitTextures(GLUtils::deepCopyImages(nTextureCount,nWidth,nHeight,pData,eDataFormat,eDataType)) {
     glAssert(m_nTextureCount>0 && m_nLevels>=1 && m_nWidth>0 && m_nHeight>0);
     glBindTexture(GL_TEXTURE_2D_ARRAY,getTexId());
     glTexStorage3D(GL_TEXTURE_2D_ARRAY,m_nLevels,m_eInternalFormat,m_nWidth,m_nHeight,m_nTextureCount);
@@ -174,17 +163,17 @@ GLTexture2DArray::GLTexture2DArray( GLsizei nTextureCount,
     glErrorCheck;
 }
 
-GLTexture2DArray::GLTexture2DArray(GLsizei nLevels, const std::vector<cv::Mat>& voTextures, bool bUseIntegralFormat)
-:    GLTexture()
-    ,m_bUseIntegralFormat(bUseIntegralFormat)
-    ,m_nTextureCount((int)voTextures.size())
-    ,m_nWidth(voTextures[0].cols)
-    ,m_nHeight(voTextures[0].rows)
-    ,m_nLevels(nLevels)
-    ,m_eInternalFormat(GLUtils::getInternalFormatFromMatType(voTextures[0].type(),bUseIntegralFormat))
-    ,m_eDataFormat(GLUtils::getDataFormatFromChannels(voTextures[0].channels(),bUseIntegralFormat))
-    ,m_eDataType(GLUtils::getDataTypeFromMatDepth(voTextures[0].depth(),voTextures[0].channels()))
-    ,m_voInitTextures(GLUtils::deepCopyImages(voTextures)) {
+GLTexture2DArray::GLTexture2DArray(GLsizei nLevels, const std::vector<cv::Mat>& voTextures, bool bUseIntegralFormat) :
+        GLTexture(),
+        m_bUseIntegralFormat(bUseIntegralFormat),
+        m_nTextureCount((int)voTextures.size()),
+        m_nWidth(voTextures[0].cols),
+        m_nHeight(voTextures[0].rows),
+        m_nLevels(nLevels),
+        m_eInternalFormat(GLUtils::getInternalFormatFromMatType(voTextures[0].type(),bUseIntegralFormat)),
+        m_eDataFormat(GLUtils::getDataFormatFromChannels(voTextures[0].channels(),bUseIntegralFormat)),
+        m_eDataType(GLUtils::getDataTypeFromMatDepth(voTextures[0].depth(),voTextures[0].channels())),
+        m_voInitTextures(GLUtils::deepCopyImages(voTextures)) {
     glAssert(m_nLevels>=1);
     glBindTexture(GL_TEXTURE_2D_ARRAY,getTexId());
     glTexStorage3D(GL_TEXTURE_2D_ARRAY,m_nLevels,m_eInternalFormat,m_nWidth,m_nHeight,m_nTextureCount);
@@ -223,8 +212,8 @@ void GLTexture2DArray::bindToSamplerArray(GLuint nUnit) {
     glBindTexture(GL_TEXTURE_2D_ARRAY,getTexId());
 }
 
-GLDynamicTexture2D::GLDynamicTexture2D(GLsizei nLevels, const cv::Mat& oInitTexture, bool bUseIntegralFormat)
-    :    GLTexture2D(nLevels,oInitTexture,bUseIntegralFormat) {}
+GLDynamicTexture2D::GLDynamicTexture2D(GLsizei nLevels, const cv::Mat& oInitTexture, bool bUseIntegralFormat) :
+        GLTexture2D(nLevels,oInitTexture,bUseIntegralFormat) {}
 
 GLDynamicTexture2D::~GLDynamicTexture2D() {}
 
@@ -268,9 +257,9 @@ void GLDynamicTexture2D::fetchTexture(const GLPixelBufferObject& oPBO, bool bReb
         glBindBuffer(oPBO.m_eBufferTarget,0);
 }
 
-GLDynamicTexture2DArray::GLDynamicTexture2DArray(GLsizei nLevels, const std::vector<cv::Mat>& voInitTextures, bool bUseIntegralFormat)
-    :    GLTexture2DArray(nLevels,voInitTextures,bUseIntegralFormat)
-        ,m_oTextureArrayFetchBuffer(glGetTextureSubImage?cv::Mat():cv::Mat(m_nHeight*m_nTextureCount,m_nWidth,voInitTextures[0].type())) {
+GLDynamicTexture2DArray::GLDynamicTexture2DArray(GLsizei nLevels, const std::vector<cv::Mat>& voInitTextures, bool bUseIntegralFormat) :
+        GLTexture2DArray(nLevels,voInitTextures,bUseIntegralFormat),
+        m_oTextureArrayFetchBuffer(glGetTextureSubImage?cv::Mat():cv::Mat(m_nHeight*m_nTextureCount,m_nWidth,voInitTextures[0].type())) {
     static bool s_bAlreadyWarned = false;
     if(!glGetTextureSubImage && !s_bAlreadyWarned) {
         std::cout << "\tWarning: glGetTextureSubImage not supported, performance might be affected (full arrays will be transferred)" << std::endl;
@@ -336,8 +325,7 @@ void GLDynamicTexture2DArray::fetchTexture(const GLPixelBufferObject& oPBO, int 
         glBindBuffer(oPBO.m_eBufferTarget,0);
 }
 
-GLScreenBillboard::GLScreenBillboard()
-    :    GLVertexArrayObject() {
+GLScreenBillboard::GLScreenBillboard() : GLVertexArrayObject() {
     glBindVertexArray(getVAOId());
     glGenBuffers(1,&m_nVBO);
     glBindBuffer(GL_ARRAY_BUFFER,m_nVBO);

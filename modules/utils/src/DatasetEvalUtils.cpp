@@ -2,11 +2,11 @@
 
 #if HAVE_GLSL
 
-DatasetUtils::EvaluatorBase::GLEvaluatorBase::GLEvaluatorBase(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount, size_t nCountersPerImage)
-    :    GLImageProcEvaluatorAlgo(pParent,nTotImageCount,nCountersPerImage,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,true) {}
+DatasetUtils::EvaluatorBase::GLEvaluatorBase::GLEvaluatorBase(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotImageCount, size_t nCountersPerImage) :
+        GLImageProcEvaluatorAlgo(pParent,nTotImageCount,nCountersPerImage,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,true) {}
 
-DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator::GLSegmEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount)
-    :    GLEvaluatorBase::GLEvaluatorBase(pParent,nTotFrameCount,eSegmEvalCountersCount) {}
+DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator::GLSegmEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) :
+        GLEvaluatorBase::GLEvaluatorBase(pParent,nTotFrameCount,eSegmEvalCountersCount) {}
 
 DatasetUtils::Segm::BasicMetrics DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator::getCumulativeMetrics() {
     const cv::Mat& oAtomicCountersQueryBuffer = this->getEvaluationAtomicCounterBuffer();
@@ -202,8 +202,8 @@ const uchar DatasetUtils::Segm::Video::BinarySegmEvaluator::g_nSegmNegative = 0;
 
 #if HAVE_GLSL
 
-DatasetUtils::Segm::Video::BinarySegmEvaluator::GLBinarySegmEvaluator::GLBinarySegmEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount)
-    :    GLSegmEvaluator(pParent,nTotFrameCount) {}
+DatasetUtils::Segm::Video::BinarySegmEvaluator::GLBinarySegmEvaluator::GLBinarySegmEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) :
+        GLSegmEvaluator(pParent,nTotFrameCount) {}
 
 std::string DatasetUtils::Segm::Video::BinarySegmEvaluator::GLBinarySegmEvaluator::getComputeShaderSource(size_t nStage) const {
     glAssert(nStage<m_nComputeStages);
@@ -389,8 +389,8 @@ const uchar DatasetUtils::Segm::Video::CDnetEvaluator::g_nSegmShadow = 50;
 
 #if HAVE_GLSL
 
-DatasetUtils::Segm::Video::CDnetEvaluator::GLCDnetEvaluator::GLCDnetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount)
-    :    GLSegmEvaluator(pParent,nTotFrameCount) {}
+DatasetUtils::Segm::Video::CDnetEvaluator::GLCDnetEvaluator::GLCDnetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) :
+        GLSegmEvaluator(pParent,nTotFrameCount) {}
 
 std::string DatasetUtils::Segm::Video::CDnetEvaluator::GLCDnetEvaluator::getComputeShaderSource(size_t nStage) const {
     glAssert(nStage<m_nComputeStages);

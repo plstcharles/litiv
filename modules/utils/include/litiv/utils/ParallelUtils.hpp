@@ -40,10 +40,12 @@ namespace ParallelUtils {
         eParallelImpl_None
     };
 
-    template<eParallelImplType eImpl, typename enable=void> struct ParallelImpl;
+    template<eParallelImplType eImpl, typename enable=void>
+    struct ParallelImpl;
 
 #if HAVE_GLSL
-    template<eParallelImplType eImpl> struct ParallelImpl<eImpl, typename std::enable_if<eImpl==eParallelImpl_GLSL>::type> : public GLImageProcAlgo {
+    template<eParallelImplType eImpl>
+    struct ParallelImpl<eImpl, typename std::enable_if<eImpl==eParallelImpl_GLSL>::type> : public GLImageProcAlgo {
         ParallelImpl(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs, size_t nExtraImages, size_t nExtraTextures, int nOutputType, int nDebugType, bool bUseInput, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat) :
             GLImageProcAlgo(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nOutputType,nDebugType,bUseInput,bUseDisplay,bUseTimers,bUseIntegralFormat) {}
         static constexpr bool hasParallelImpl() {return true;}
@@ -53,7 +55,8 @@ namespace ParallelUtils {
 #endif //!HAVE_GLSL
 
 #if HAVE_CUDA
-    template<eParallelImplType eImpl> struct ParallelImpl<eImpl, typename std::enable_if<eImpl==eParallelImpl_CUDA>::type> {
+    template<eParallelImplType eImpl>
+    struct ParallelImpl<eImpl, typename std::enable_if<eImpl==eParallelImpl_CUDA>::type> {
         static_assert(false,"Missing CUDA impl");
         static constexpr bool hasParallelImpl() {return true;}
         static eParallelImplType getParallelImplType() {return eParallelImpl_CUDA;}
@@ -62,7 +65,8 @@ namespace ParallelUtils {
 #endif //HAVE_CUDA
 
 #if HAVE_CUDA
-    template<eParallelImplType eImpl> struct ParallelImpl<eImpl, typename std::enable_if<eImpl==eParallelImpl_OpenCL>::type> {
+    template<eParallelImplType eImpl>
+    struct ParallelImpl<eImpl, typename std::enable_if<eImpl==eParallelImpl_OpenCL>::type> {
         static_assert(false,"Missing OpenCL impl");
         static constexpr bool hasParallelImpl() {return true;}
         static eParallelImplType getParallelImplType() {return eParallelImpl_OpenCL;}
@@ -70,7 +74,8 @@ namespace ParallelUtils {
     typedef ParallelImpl<eParallelImpl_OpenCL> ParallelImpl_OpenCL;
 #endif //HAVE_CUDA
 
-    template<eParallelImplType eImpl> struct ParallelImpl<eImpl, typename std::enable_if<eImpl==eParallelImpl_None>::type> {
+    template<eParallelImplType eImpl>
+    struct ParallelImpl<eImpl, typename std::enable_if<eImpl==eParallelImpl_None>::type> {
         static constexpr bool hasParallelImpl() {return false;}
         static eParallelImplType getParallelImplType() {return eParallelImpl_None;}
     };
