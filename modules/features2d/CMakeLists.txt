@@ -10,7 +10,7 @@ file(GLOB INCLUDE_FILES
     "litiv/features2d/*.ipp"
 )
 
-add_library(litiv_features2d ${SOURCE_FILES})
+add_library(litiv_features2d SHARED ${SOURCE_FILES})
 
 target_link_libraries(litiv_features2d litiv_utils)
 target_compil_litiv_dependencies(litiv_features2d)

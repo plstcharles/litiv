@@ -10,7 +10,7 @@ file(GLOB INCLUDE_FILES
     "litiv/video/*.ipp"
 )
 
-add_library(litiv_video ${SOURCE_FILES})
+add_library(litiv_video SHARED ${SOURCE_FILES})
 
 target_link_libraries(litiv_video litiv_features2d)
 target_compil_litiv_dependencies(litiv_video)
