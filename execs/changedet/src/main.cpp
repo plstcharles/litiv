@@ -3,7 +3,7 @@
 // @@@ add opencv hardware instr set check, and impl some stuff in MMX/SSE/SSE2/3/4.1/4.2? (also check popcount and AVX)
 // @@@ support non-integer textures top level (alg)? need to replace all ui-stores by float-stores, rest is ok
 
-#include <litiv/utils/DatasetEvalUtils.hpp>
+#include "litiv/utils/DatasetEvalUtils.hpp"
 
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
@@ -18,6 +18,10 @@
 #define USE_PAWCS               0
 #define USE_LOBSTER             1
 #define USE_SUBSENSE            0
+////////////////////////////////
+#define USE_GLSL_IMPL           1
+#define USE_CUDA_IMPL           0
+#define USE_OPENCL_IMPL         0
 ////////////////////////////////
 #if EVALUATE_OUTPUT
 #define WRITE_METRICS           1
@@ -38,7 +42,10 @@
 #define NEED_FG_MASK (DISPLAY_OUTPUT || WRITE_AVI_OUTPUT || WRITE_IMG_OUTPUT || ((!GLSL_EVALUATION || VALIDATE_EVALUATION) && WRITE_METRICS))
 #define LIMIT_MODEL_TO_SEQUENCE_ROI (USE_LOBSTER||USE_SUBSENSE||USE_PAWCS)
 #define BOOTSTRAP_100_FIRST_FRAMES  (USE_LOBSTER||USE_SUBSENSE||USE_PAWCS)
-#if (USE_LOBSTER+USE_SUBSENSE+USE_VIBE+USE_PBAS+USE_PAWCS)!=1
+#define USE_GPU_IMPL (USE_GLSL_IMPL||USE_CUDA_IMPL||USE_OPENCL_IMPL)
+#if (USE_GLSL_IMPL+USE_CUDA_IMPL+USE_OPENCL_IMPL)>1
+#error "Must specify a single impl."
+#elif (USE_LOBSTER+USE_SUBSENSE+USE_VIBE+USE_PBAS+USE_PAWCS)!=1
 #error "Must specify a single algorithm."
 #elif USE_VIBE
 #include "litiv/video/BackgroundSubtractorViBe_1ch.hpp"
@@ -53,12 +60,9 @@
 #elif USE_SUBSENSE
 #include "litiv/video/BackgroundSubtractorSuBSENSE.hpp"
 #endif //USE_...
-#if (HAVE_GPU_SUPPORT && DEFAULT_NB_THREADS>1)
-#error "Cannot support multithreading + gpu exec"
-#endif //(HAVE_GPU_SUPPORT && DEFAULT_NB_THREADS>1)
-#if (DEBUG_OUTPUT && (HAVE_GPU_SUPPORT || DEFAULT_NB_THREADS>1))
+#if (DEBUG_OUTPUT && (USE_GPU_IMPL || DEFAULT_NB_THREADS>1))
 #error "Cannot debug output with GPU support or with more than one thread."
-#endif //(DEBUG_OUTPUT && (HAVE_GPU_SUPPORT || DEFAULT_NB_THREADS>1))
+#endif //(DEBUG_OUTPUT && (USE_GPU_IMPL || DEFAULT_NB_THREADS>1))
 #if DISPLAY_TIMERS
 #define TIMER_INTERNAL_TIC(x) TIMER_TIC(x)
 #define TIMER_INTERNAL_TOC(x) TIMER_TOC(x)
@@ -81,11 +85,20 @@ void OnMouseEvent(int event, int x, int y, int, void*) {
 
 std::atomic_size_t g_nActiveThreads(0);
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
-const std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> g_pDatasetInfo = DatasetUtils::Segm::Video::GetDatasetInfo(DatasetUtils::Segm::Video::DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH,HAVE_GPU_SUPPORT);
+const std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> g_pDatasetInfo = DatasetUtils::Segm::Video::GetDatasetInfo(DatasetUtils::Segm::Video::DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH,USE_GPU_IMPL);
 const std::shared_ptr<DatasetUtils::Segm::SegmEvaluator> g_pEvaluator = std::dynamic_pointer_cast<DatasetUtils::Segm::SegmEvaluator>(g_pDatasetInfo->m_pEvaluator);
 
-int AnalyzeSequence_GPU(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCurrSequence, const std::string& sCurrResultsPath);
+#if (HAVE_GLSL && USE_GLSL_IMPL)
+int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCurrSequence, const std::string& sCurrResultsPath);
+#elif (HAVE_CUDA && USE_CUDA_IMPL)
+static_assert(false,"missing impl");
+#elif (HAVE_OPENCL && USE_OPENCL_IMPL)
+static_assert(false,"missing impl");
+#elif !USE_GPU_IMPL
 int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCurrSequence, const std::string& sCurrResultsPath);
+#else // bad config
+#error "Bad config, trying to use an unavailable impl."
+#endif // bad config
 
 int main(int, char**) {
     try {
@@ -121,12 +134,16 @@ int main(int, char**) {
             while(g_nActiveThreads>=g_nMaxThreads)
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             std::cout << "\tProcessing [" << ++nSeqProcessed << "/" << nSeqTotal << "] (" << pSeqIter->second->m_sGroupName << ":" << pSeqIter->second->m_sName << ", L=" << std::scientific << std::setprecision(2) << pSeqIter->first << ")" << std::endl;
-#if HAVE_GPU_SUPPORT
-            AnalyzeSequence_GPU(pSeqIter->second,sCurrResultsPath);
-#else //!HAVE_GPU_SUPPORT
+#if (HAVE_GLSL && USE_GLSL_IMPL)
+            AnalyzeSequence_GLSL(pSeqIter->second,sCurrResultsPath);
+#elif (HAVE_CUDA && USE_CUDA_IMPL)
+            static_assert(false,"missing impl");
+#elif (HAVE_OPENCL && USE_OPENCL_IMPL)
+            static_assert(false,"missing impl");
+#elif !USE_GPU_IMPL
             ++g_nActiveThreads;
             std::thread(AnalyzeSequence,nSeqProcessed,pSeqIter->second,sCurrResultsPath).detach();
-#endif //!HAVE_GPU_SUPPORT
+#endif //!USE_GPU_IMPL
         }
         while(g_nActiveThreads>0)
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -155,8 +172,8 @@ int main(int, char**) {
     return 0;
 }
 
-#if HAVE_GPU_SUPPORT
-int AnalyzeSequence_GPU(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCurrSequence, const std::string& sCurrResultsPath) {
+#if (HAVE_GLSL && USE_GLSL_IMPL)
+int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCurrSequence, const std::string& sCurrResultsPath) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
     size_t nCurrFrameIdx = 0;
@@ -192,7 +209,6 @@ int AnalyzeSequence_GPU(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCu
 #if DISPLAY_OUTPUT
         cv::Mat oLastBGImg;
 #endif //DISPLAY_OUTPUT
-#if HAVE_GLSL
         glAssert(oCurrInputFrame.channels()==1 || oCurrInputFrame.channels()==4);
         cv::Size oWindowSize = oCurrInputFrame.size();
         // note: never construct GL classes before context initialization
@@ -211,9 +227,8 @@ int AnalyzeSequence_GPU(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCu
             glError("Failed to create window via GLFW");
         glfwMakeContextCurrent(pWindow.get());
         glewInitErrorCheck;
-#endif //HAVE_GLSL
 #if USE_LOBSTER
-        std::shared_ptr<BackgroundSubtractorLOBSTER> pBGS(new BackgroundSubtractorLOBSTER());
+        std::shared_ptr<BackgroundSubtractorLOBSTER_GLSL> pBGS(new BackgroundSubtractorLOBSTER_GLSL());
         const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
         pBGS->initialize(oCurrInputFrame,oROI);
 #elif USE_SUBSENSE
@@ -254,7 +269,6 @@ int AnalyzeSequence_GPU(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCu
         cv::VideoWriter oSegmWriter(sCurrResultsPath+pCurrSequence->m_sGroupName+"/"+pCurrSequence->m_sName+"_segm.avi",CV_FOURCC('F','F','V','1'),30,pCurrSequence->GetImageSize(),false);
 #endif //WRITE_AVI_OUTPUT
 #endif //(WRITE_IMG_OUTPUT || WRITE_AVI_OUTPUT)
-#if HAVE_GLSL
         std::shared_ptr<GLImageProcAlgo> pBGS_GPU = std::dynamic_pointer_cast<GLImageProcAlgo>(pBGS);
         if(pBGS_GPU==nullptr)
             glError("Video segmentation algorithm has no GLImageProcAlgo interface");
@@ -272,7 +286,6 @@ int AnalyzeSequence_GPU(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCu
 #endif //!(GLSL_EVALUATION && WRITE_METRICS)
         glfwSetWindowSize(pWindow.get(),oWindowSize.width,oWindowSize.height);
         glViewport(0,0,oWindowSize.width,oWindowSize.height);
-#endif //HAVE_GLSL
         TIMER_TIC(MainLoop);
         while(nNextFrameIdx<=nFrameCount) {
             if(!((nCurrFrameIdx+1)%100))
@@ -306,7 +319,6 @@ int AnalyzeSequence_GPU(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCu
                 oNextGTMask = pCurrSequence->GetGTFromIndex(nNextFrameIdx);
 #endif //NEED_GT_MASK
             TIMER_INTERNAL_TOC(VideoQuery);
-#if HAVE_GLSL
             glErrorCheck;
             if(glfwWindowShouldClose(pWindow.get()))
                 break;
@@ -317,7 +329,6 @@ int AnalyzeSequence_GPU(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCu
             glfwSwapBuffers(pWindow.get());
             glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 #endif //DISPLAY_OUTPUT
-#endif //HAVE_GLSL
 #if NEED_FG_MASK
             pBGS->getLatestForegroundMask(oLastFGMask);
             if(!oROI.empty())
@@ -388,20 +399,19 @@ int AnalyzeSequence_GPU(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCu
         cv::destroyWindow(sDisplayName);
 #endif //DISPLAY_OUTPUT
     }
-#if HAVE_GLSL
     catch(const GLException& e) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSequence caught GLException:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
-#endif //HAVE_GLSL
     catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSequence caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
     catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSequence caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
     catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSequence caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl;}
-    if(bGPUContextInitialized) {
-#if HAVE_GLSL
+    if(bGPUContextInitialized)
         glfwTerminate();
-#endif //HAVE_GLSL
-    }
     return 0;
 }
-#else //!HAVE_GPU_SUPPORT
+#elif (HAVE_CUDA && USE_CUDA_IMPL)
+static_assert(false,"missing impl");
+#elif (HAVE_OPENCL && USE_OPENCL_IMPL)
+static_assert(false,"missing impl");
+#elif !USE_GPU_IMPL
 int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCurrSequence, const std::string& sCurrResultsPath) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
@@ -425,7 +435,7 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::S
         cv::Mat oCurrBGImg;
 #endif //DISPLAY_OUTPUT
 #if USE_LOBSTER
-        std::shared_ptr<BackgroundSubtractorLOBSTER> pBGS(new BackgroundSubtractorLOBSTER());
+        std::shared_ptr<BackgroundSubtractorLOBSTER_Basic> pBGS(new BackgroundSubtractorLOBSTER_Basic());
         const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
         pBGS->initialize(oCurrInputFrame,oROI);
 #elif USE_SUBSENSE
@@ -571,4 +581,4 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::S
     g_nActiveThreads--;
     return 0;
 }
-#endif //!HAVE_GPU_SUPPORT
+#endif //!USE_GPU_IMPL
