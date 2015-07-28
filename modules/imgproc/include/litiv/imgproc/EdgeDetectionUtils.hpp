@@ -10,8 +10,10 @@ public:
     virtual cv::AlgorithmInfo* info() const {return nullptr;}
     //! returns the default threshold value used in 'apply'
     virtual double getDefaultThreshold() const = 0;
-    //! default edge detection function; the threshold should be between 0 and 1 (will use default otherwise)
-    virtual void apply(cv::InputArray oInputImage, cv::OutputArray oEdgeMask, double dThreshold=-1) = 0;
+    //! thresholded edge detection function; the threshold should be between 0 and 1 (will use default otherwise)
+    virtual void apply_threshold(cv::InputArray oInputImage, cv::OutputArray oEdgeMask, double dThreshold=-1) = 0;
+    //! edge detection function which returns a confidence edge mask (0-255) instead of a thresholded/binary edge mask
+    virtual void apply(cv::InputArray oInputImage, cv::OutputArray oEdgeMask) = 0;
 
     // #### for debug purposes only ####
     std::string m_sDebugName;

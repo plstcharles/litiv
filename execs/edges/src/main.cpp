@@ -8,8 +8,10 @@
 #define DISPLAY_OUTPUT          0
 #define DISPLAY_TIMERS          0
 ////////////////////////////////
-#define USE_CANNY               0
-#define USE_LBSP                1
+#define USE_CANNY               1
+#define USE_LBSP                0
+////////////////////////////////
+#define FULL_THRESH_ANALYSIS    1
 ////////////////////////////////
 #define USE_GLSL_IMPL           0
 #define USE_CUDA_IMPL           0
@@ -17,7 +19,7 @@
 ////////////////////////////////
 #define DATASET_ID              eDataset_BSDS500_train
 #define DATASET_ROOT_PATH       std::string("/shared2/datasets/")
-#define DATASET_RESULTS_PATH    std::string("results2")
+#define DATASET_RESULTS_PATH    std::string("results_test")
 #define DATASET_PRECACHING      1
 ////////////////////////////////
 #if EVALUATE_OUTPUT
@@ -51,6 +53,9 @@
 #undef DISPLAY_OUTPUT
 #define DISPLAY_OUTPUT 1
 #endif //(DEBUG_OUTPUT && !DISPLAY_OUTPUT)
+#if (DEBUG_OUTPUT && FULL_THRESH_ANALYSIS)
+#error "Cannot enable debug output while using all threshold values."
+#endif //(DEBUG_OUTPUT && FULL_THRESH_ANALYSIS)
 #define USE_GPU_IMPL (USE_GLSL_IMPL||USE_CUDA_IMPL||USE_OPENCL_IMPL)
 #define USE_GPU_EVALUATION (USE_GLSL_EVALUATION || USE_CUDA_EVALUATION || USE_OPENCL_EVALUATION)
 #define NEED_EDGES_MASK (DISPLAY_OUTPUT || WRITE_IMG_OUTPUT || (EVALUATE_OUTPUT && (!USE_GPU_EVALUATION || VALIDATE_GPU_EVALUATION)))
@@ -369,6 +374,9 @@ int AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> p
         CV_Assert(!oCurrGTMask.empty() && oCurrGTMask.isContinuous());
 #endif //NEED_GT_MASK
         cv::Mat oCurrEdgeMask(oCurrInputImage.size(),CV_8UC1,cv::Scalar_<uchar>(0));
+#if FULL_THRESH_ANALYSIS
+        cv::Mat oCumulEdgeMask(oCurrInputImage.size(),CV_8UC1,cv::Scalar_<uchar>(0));
+#endif //FULL_THRESH_ANALYSIS
 #if USE_CANNY
         std::shared_ptr<EdgeDetectorImpl> pAlgo(new EdgeDetectorCanny());
 #elif USE_LBSP
@@ -398,7 +406,11 @@ int AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> p
 #endif //NEED_GT_MASK
             TIMER_INTERNAL_TOC(ImageQuery);
             TIMER_INTERNAL_TIC(PipelineUpdate);
+#if FULL_THRESH_ANALYSIS
             pAlgo->apply(oCurrInputImage,oCurrEdgeMask);
+#else //!FULL_THRESH_ANALYSIS
+            pAlgo->apply_threshold(oCurrInputImage,oCurrEdgeMask);
+#endif //!FULL_THRESH_ANALYSIS
             TIMER_INTERNAL_TOC(PipelineUpdate);
 #if DISPLAY_OUTPUT
 #if DEBUG_OUTPUT
