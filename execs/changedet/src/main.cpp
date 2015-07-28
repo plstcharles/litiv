@@ -218,48 +218,48 @@ int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pC
 #if !DISPLAY_OUTPUT
         glfwWindowHint(GLFW_VISIBLE,GL_FALSE);
 #endif //!DISPLAY_OUTPUT
-        std::unique_ptr<GLFWwindow,void(*)(GLFWwindow*)> pWindow(glfwCreateWindow(oWindowSize.width,oWindowSize.height,"changedet_gpu",nullptr,nullptr),glfwDestroyWindow);
+        std::unique_ptr<GLFWwindow,void(*)(GLFWwindow*)> pWindow(glfwCreateWindow(oWindowSize.width,oWindowSize.height,sDisplayName+" [GPU]",nullptr,nullptr),glfwDestroyWindow);
         if(!pWindow)
             glError("Failed to create window via GLFW");
         glfwMakeContextCurrent(pWindow.get());
         glewInitErrorCheck;
 #if USE_LOBSTER
-        std::shared_ptr<BackgroundSubtractorLOBSTER_GLSL> pBGS(new BackgroundSubtractorLOBSTER_GLSL());
+        std::shared_ptr<BackgroundSubtractorLOBSTER_GLSL> pAlgo(new BackgroundSubtractorLOBSTER_GLSL());
         const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
-        pBGS->initialize(oCurrInputFrame,oROI);
+        pAlgo->initialize(oCurrInputFrame,oROI);
 #elif USE_SUBSENSE
 #error "Missing glsl impl." // ... @@@@@
-        std::shared_ptr<BackgroundSubtractorSuBSENSE_GLSL> pBGS(new BackgroundSubtractorSuBSENSE_GLSL());
+        std::shared_ptr<BackgroundSubtractorSuBSENSE_GLSL> pAlgo(new BackgroundSubtractorSuBSENSE_GLSL());
         const double dDefaultLearningRate = 0;
-        pBGS->initialize(oCurrInputFrame,oROI);
+        pAlgo->initialize(oCurrInputFrame,oROI);
 #elif USE_PAWCS
 #error "Missing glsl impl." // ... @@@@@
-        std::shared_ptr<BackgroundSubtractorPAWCS_GLSL> pBGS(new BackgroundSubtractorPAWCS_GLSL());
+        std::shared_ptr<BackgroundSubtractorPAWCS_GLSL> pAlgo(new BackgroundSubtractorPAWCS_GLSL());
         const double dDefaultLearningRate = 0;
-        pBGS->initialize(oCurrInputFrame,oROI);
+        pAlgo->initialize(oCurrInputFrame,oROI);
 #else //USE_VIBE || USE_PBAS
 #error "Missing glsl impl." // ... @@@@@
         const size_t m_nInputChannels = (size_t)oCurrInputFrame.channels();
 #if USE_VIBE
-        std::shared_ptr<cv::BackgroundSubtractorViBe_GLSL> pBGS;
+        std::shared_ptr<cv::BackgroundSubtractorViBe_GLSL> pAlgo;
         if(m_nInputChannels==3)
-            pBGS = std::shared_ptr<cv::BackgroundSubtractorViBe_GLSL>(new BackgroundSubtractorViBe_GLSL_3ch());
+            pAlgo = std::shared_ptr<cv::BackgroundSubtractorViBe_GLSL>(new BackgroundSubtractorViBe_GLSL_3ch());
         else
-            pBGS = std::shared_ptr<cv::BackgroundSubtractorViBe_GLSL>(new BackgroundSubtractorViBe_GLSL_1ch());
+            pAlgo = std::shared_ptr<cv::BackgroundSubtractorViBe_GLSL>(new BackgroundSubtractorViBe_GLSL_1ch());
         const double dDefaultLearningRate = BGSVIBE_DEFAULT_LEARNING_RATE;
 #else //USE_PBAS
-        std::shared_ptr<cv::BackgroundSubtractorPBAS_GLSL> pBGS;
+        std::shared_ptr<cv::BackgroundSubtractorPBAS_GLSL> pAlgo;
         if(m_nInputChannels==3)
-            pBGS = std::shared_ptr<cv::BackgroundSubtractorPBAS_GLSL>(new BackgroundSubtractorPBAS_GLSL_3ch());
+            pAlgo = std::shared_ptr<cv::BackgroundSubtractorPBAS_GLSL>(new BackgroundSubtractorPBAS_GLSL_3ch());
         else
-            pBGS = std::shared_ptr<cv::BackgroundSubtractorPBAS_GLSL>(new BackgroundSubtractorPBAS_GLSL_1ch());
+            pAlgo = std::shared_ptr<cv::BackgroundSubtractorPBAS_GLSL>(new BackgroundSubtractorPBAS_GLSL_1ch());
         const double dDefaultLearningRate = BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE;
 #endif //USE_PBAS
-        pBGS->initialize(oCurrInputFrame);
+        pAlgo->initialize(oCurrInputFrame);
 #endif //USE_VIBE || USE_PBAS
 #if DISPLAY_OUTPUT
         bool bContinuousUpdates = false;
-        std::string sDisplayName = pCurrSequence->m_sGroupName + std::string(" -- ") + pCurrSequence->m_sName;
+        std::string sDisplayName = pCurrSequence->m_sRelativePath;
         cv::namedWindow(sDisplayName);
 #endif //DISPLAY_OUTPUT
 #if (WRITE_IMG_OUTPUT || WRITE_AVI_OUTPUT)
@@ -267,20 +267,20 @@ int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pC
         cv::VideoWriter oSegmWriter(pCurrSequence->m_sResultsPath+"../"+pCurrSequence->m_sName+"_segm.avi",CV_FOURCC('F','F','V','1'),30,pCurrSequence->GetImageSize(),false);
 #endif //WRITE_AVI_OUTPUT
 #endif //(WRITE_IMG_OUTPUT || WRITE_AVI_OUTPUT)
-        std::shared_ptr<GLImageProcAlgo> pBGS_GPU = std::dynamic_pointer_cast<GLImageProcAlgo>(pBGS);
-        if(pBGS_GPU==nullptr)
-            glError("Video segmentation algorithm has no GLImageProcAlgo interface");
-        pBGS_GPU->setOutputFetching(NEED_FG_MASK);
-        if(!pBGS_GPU->getIsUsingDisplay() && DISPLAY_OUTPUT) // @@@@ determine in advance to hint window to hide? or just always hide, and show when needed?
+        std::shared_ptr<GLImageProcAlgo> pGLSLAlgo = std::dynamic_pointer_cast<GLImageProcAlgo>(pAlgo);
+        if(pGLSLAlgo==nullptr)
+            glError("Segmentation algorithm has no GLImageProcAlgo interface");
+        pGLSLAlgo->setOutputFetching(NEED_FG_MASK);
+        if(!pGLSLAlgo->getIsUsingDisplay() && DISPLAY_OUTPUT) // @@@@ determine in advance to hint window to hide? or just always hide, and show when needed?
             glfwHideWindow(pWindow.get());
 #if (GLSL_EVALUATION && WRITE_METRICS)
-        std::shared_ptr<DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator> pBGS_GPU_EVAL = std::dynamic_pointer_cast<DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator>(g_pEvaluator->CreateGLEvaluator(pBGS_GPU,nFrameCount));
-        if(pBGS_GPU_EVAL==nullptr)
-            glError("Video segmentation evaluation algorithm has no GLSegmEvaluator interface");
-        pBGS_GPU_EVAL->initialize(oCurrGTMask,oROI.empty()?cv::Mat(oCurrInputFrame.size(),CV_8UC1,cv::Scalar_<uchar>(255)):oROI);
-        oWindowSize.width *= pBGS_GPU_EVAL->m_nSxSDisplayCount;
+        std::shared_ptr<DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator> pGLSLAlgoEvaluator = std::dynamic_pointer_cast<DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator>(g_pEvaluator->CreateGLEvaluator(pGLSLAlgo,nFrameCount));
+        if(pGLSLAlgoEvaluator==nullptr)
+            glError("Segmentation evaluation algorithm has no GLSegmEvaluator interface");
+        pGLSLAlgoEvaluator->initialize(oCurrGTMask,oROI.empty()?cv::Mat(oCurrInputFrame.size(),CV_8UC1,cv::Scalar_<uchar>(255)):oROI);
+        oWindowSize.width *= pGLSLAlgoEvaluator->m_nSxSDisplayCount;
 #else //!(GLSL_EVALUATION && WRITE_METRICS)
-        oWindowSize.width *= pBGS_GPU->m_nSxSDisplayCount;
+        oWindowSize.width *= pGLSLAlgo->m_nSxSDisplayCount;
 #endif //!(GLSL_EVALUATION && WRITE_METRICS)
         glfwSetWindowSize(pWindow.get(),oWindowSize.width,oWindowSize.height);
         glViewport(0,0,oWindowSize.width,oWindowSize.height);
@@ -291,15 +291,14 @@ int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pC
             const double dCurrLearningRate = (BOOTSTRAP_100_FIRST_FRAMES&&nCurrFrameIdx<=100)?1:dDefaultLearningRate;
             TIMER_INTERNAL_TIC(OverallLoop);
             TIMER_INTERNAL_TIC(PipelineUpdate);
-            pBGS->apply_async(oNextInputFrame,dCurrLearningRate);
+            pAlgo->apply_async(oNextInputFrame,dCurrLearningRate);
             TIMER_INTERNAL_TOC(PipelineUpdate);
 #if (GLSL_EVALUATION && WRITE_METRICS)
-            pBGS_GPU_EVAL->apply_async(oNextGTMask);
+            pGLSLAlgoEvaluator->apply_async(oNextGTMask);
 #endif //(GLSL_EVALUATION && WRITE_METRICS)
             TIMER_INTERNAL_TIC(VideoQuery);
 #if DISPLAY_OUTPUT
             oCurrInputFrame.copyTo(oLastInputFrame);
-            const cv::Mat& oInputFrame = oLastInputFrame;
             oNextInputFrame.copyTo(oCurrInputFrame);
 #endif //DISPLAY_OUTPUT
             if(++nNextFrameIdx<nFrameCount)
@@ -310,7 +309,6 @@ int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pC
 #if NEED_GT_MASK
 #if NEED_LAST_GT_MASK
             oCurrGTMask.copyTo(oLastGTMask);
-            const cv::Mat& oGTMask = oLastGTMask;
             oNextGTMask.copyTo(oCurrGTMask);
 #endif //NEED_LAST_GT_MASK
             if(nNextFrameIdx<nFrameCount)
@@ -328,17 +326,15 @@ int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pC
             glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 #endif //DISPLAY_OUTPUT
 #if NEED_FG_MASK
-            pBGS->getLatestForegroundMask(oLastFGMask);
+            pAlgo->getLatestForegroundMask(oLastFGMask);
             if(!oROI.empty())
                 cv::bitwise_or(oLastFGMask,UCHAR_MAX/2,oLastFGMask,oROI==0);
-            const cv::Mat& oFGMask = oLastFGMask;
 #endif //NEED_FG_MASK
 #if DISPLAY_OUTPUT
-            pBGS->getBackgroundImage(oLastBGImg);
+            pAlgo->getBackgroundImage(oLastBGImg);
             if(!oROI.empty())
                 cv::bitwise_or(oLastBGImg,UCHAR_MAX/2,oLastBGImg,oROI==0);
-            const cv::Mat& oBGImg = oLastBGImg;
-            cv::Mat oDisplayFrame = DatasetUtils::Segm::GetDisplayImage(oInputFrame,oBGImg,g_pEvaluator?g_pEvaluator->GetColoredSegmMaskFromResult(oFGMask,oGTMask,oROI):oFGMask,nCurrFrameIdx);
+            cv::Mat oDisplayFrame = DatasetUtils::Segm::GetDisplayImage(oLastInputFrame,oLastBGImg,g_pEvaluator?g_pEvaluator->GetColoredSegmMaskFromResult(oLastFGMask,oLastGTMask,oROI):oLastFGMask,nCurrFrameIdx);
             cv::Mat oDisplayFrameResized;
             if(oDisplayFrame.cols>1280 || oDisplayFrame.rows>960)
                 cv::resize(oDisplayFrame,oDisplayFrameResized,cv::Size(oDisplayFrame.cols/2,oDisplayFrame.rows/2));
@@ -360,13 +356,14 @@ int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pC
                 break;
 #endif //DISPLAY_OUTPUT
 #if WRITE_AVI_OUTPUT
-            oSegmWriter.write(oFGMask);
+            oSegmWriter.write(oLastFGMask);
 #endif //WRITE_AVI_OUTPUT
 #if WRITE_IMG_OUTPUT
-            pCurrSequence->WriteResult(nCurrFrameIdx,oFGMask);
+            pCurrSequence->WriteResult(nCurrFrameIdx,oLastFGMask);
 #endif //WRITE_IMG_OUTPUT
 #if (WRITE_METRICS && (!GLSL_EVALUATION || VALIDATE_EVALUATION))
-            DatasetUtils::Segm::Video::CDnet::AccumulateMetricsFromResult(oFGMask,oGTMask,oROI,pCurrSequence->m_oMetrics);
+            if(g_pEvaluator)
+                g_pEvaluator->AccumulateMetricsFromResult(oCurrFGMask,oCurrGTMask,oROI,pCurrSequence->m_oMetrics);
 #endif //(WRITE_METRICS && (!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION))
             TIMER_INTERNAL_TOC(OverallLoop);
 #if DISPLAY_TIMERS
@@ -385,7 +382,7 @@ int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pC
 #if VALIDATE_EVALUATION
         printf("cpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN);
 #endif //VALIDATE_GLSL_EVALUATION
-        pCurrSequence->m_oMetrics = pBGS_GPU_EVAL->getCumulativeMetrics();
+        pCurrSequence->m_oMetrics = pGLSLAlgoEvaluator->getCumulativeMetrics();
 #if VALIDATE_EVALUATION
         printf("gpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN);
 #endif //VALIDATE_GLSL_EVALUATION
@@ -433,43 +430,43 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::S
         cv::Mat oCurrBGImg;
 #endif //DISPLAY_OUTPUT
 #if USE_LOBSTER
-        std::shared_ptr<BackgroundSubtractorLOBSTER_Basic> pBGS(new BackgroundSubtractorLOBSTER_Basic());
+        std::shared_ptr<BackgroundSubtractorLOBSTER_base> pAlgo(new BackgroundSubtractorLOBSTER_base());
         const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
-        pBGS->initialize(oCurrInputFrame,oROI);
+        pAlgo->initialize(oCurrInputFrame,oROI);
 #elif USE_SUBSENSE
-        std::shared_ptr<BackgroundSubtractorSuBSENSE> pBGS(new BackgroundSubtractorSuBSENSE());
+        std::shared_ptr<BackgroundSubtractorSuBSENSE> pAlgo(new BackgroundSubtractorSuBSENSE());
         const double dDefaultLearningRate = 0;
-        pBGS->initialize(oCurrInputFrame,oROI);
+        pAlgo->initialize(oCurrInputFrame,oROI);
 #elif USE_PAWCS
-        std::shared_ptr<BackgroundSubtractorPAWCS> pBGS(new BackgroundSubtractorPAWCS());
+        std::shared_ptr<BackgroundSubtractorPAWCS> pAlgo(new BackgroundSubtractorPAWCS());
         const double dDefaultLearningRate = 0;
-        pBGS->initialize(oCurrInputFrame,oROI);
+        pAlgo->initialize(oCurrInputFrame,oROI);
 #else //USE_VIBE || USE_PBAS
         const size_t m_nInputChannels = (size_t)oCurrInputFrame.channels();
 #if USE_VIBE
-        std::shared_ptr<BackgroundSubtractorViBe> pBGS;
+        std::shared_ptr<BackgroundSubtractorViBe> pAlgo;
         if(m_nInputChannels==3)
-            pBGS = std::shared_ptr<BackgroundSubtractorViBe>(new BackgroundSubtractorViBe_3ch());
+            pAlgo = std::shared_ptr<BackgroundSubtractorViBe>(new BackgroundSubtractorViBe_3ch());
         else
-            pBGS = std::shared_ptr<BackgroundSubtractorViBe>(new BackgroundSubtractorViBe_1ch());
+            pAlgo = std::shared_ptr<BackgroundSubtractorViBe>(new BackgroundSubtractorViBe_1ch());
         const double dDefaultLearningRate = BGSVIBE_DEFAULT_LEARNING_RATE;
 #else //USE_PBAS
-        std::shared_ptr<BackgroundSubtractorPBAS> pBGS;
+        std::shared_ptr<BackgroundSubtractorPBAS> pAlgo;
         if(m_nInputChannels==3)
-            pBGS = std::shared_ptr<BackgroundSubtractorPBAS>(new BackgroundSubtractorPBAS_3ch());
+            pAlgo = std::shared_ptr<BackgroundSubtractorPBAS>(new BackgroundSubtractorPBAS_3ch());
         else
-            pBGS = std::shared_ptr<BackgroundSubtractorPBAS>(new BackgroundSubtractorPBAS_1ch());
+            pAlgo = std::shared_ptr<BackgroundSubtractorPBAS>(new BackgroundSubtractorPBAS_1ch());
         const double dDefaultLearningRate = BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE;
 #endif //USE_PBAS
-        pBGS->initialize(oCurrInputFrame);
+        pAlgo->initialize(oCurrInputFrame);
 #endif //USE_VIBE || USE_PBAS
 #if (DEBUG_OUTPUT && (USE_LOBSTER || USE_SUBSENSE || USE_PAWCS))
         cv::FileStorage oDebugFS = cv::FileStorage(pCurrSequence->m_sResultsPath+"../"+pCurrSequence->m_sName+"_debug.yml",cv::FileStorage::WRITE);
-        pBGS->m_pDebugFS = &oDebugFS;
-        pBGS->m_sDebugName = pCurrSequence->m_sGroupName+"_"+pCurrSequence->m_sName;
-        g_pnLatestMouseX = &pBGS->m_nDebugCoordX;
-        g_pnLatestMouseY = &pBGS->m_nDebugCoordY;
-        std::string sMouseDebugDisplayName = pCurrSequence->m_sGroupName + std::string(" -- ") + pCurrSequence->m_sName + " [MOUSE DEBUG]";
+        pAlgo->m_pDebugFS = &oDebugFS;
+        pAlgo->m_sDebugName = pCurrSequence->m_sName;
+        g_pnLatestMouseX = &pAlgo->m_nDebugCoordX;
+        g_pnLatestMouseY = &pAlgo->m_nDebugCoordY;
+        std::string sMouseDebugDisplayName = pCurrSequence->m_sName + " [MOUSE DEBUG]";
         cv::namedWindow(sMouseDebugDisplayName,0);
         cv::setMouseCallback(sMouseDebugDisplayName,OnMouseEvent,nullptr);
 #endif //(DEBUG_OUTPUT && (USE_LOBSTER || USE_SUBSENSE || USE_PAWCS))
@@ -499,12 +496,12 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::S
 #endif //NEED_GT_MASK
             TIMER_INTERNAL_TOC(VideoQuery);
             TIMER_INTERNAL_TIC(PipelineUpdate);
-            pBGS->apply(oCurrInputFrame,oCurrFGMask,dCurrLearningRate);
+            pAlgo->apply(oCurrInputFrame,oCurrFGMask,dCurrLearningRate);
             TIMER_INTERNAL_TOC(PipelineUpdate);
             if(!oROI.empty())
                 cv::bitwise_or(oCurrFGMask,UCHAR_MAX/2,oCurrFGMask,oROI==0);
 #if DISPLAY_OUTPUT
-            pBGS->getBackgroundImage(oCurrBGImg);
+            pAlgo->getBackgroundImage(oCurrBGImg);
             if(!oROI.empty())
                 cv::bitwise_or(oCurrBGImg,UCHAR_MAX/2,oCurrBGImg,oROI==0);
             cv::Mat oDisplayFrame = DatasetUtils::Segm::GetDisplayImage(oCurrInputFrame,oCurrBGImg,g_pEvaluator?g_pEvaluator->GetColoredSegmMaskFromResult(oCurrFGMask,oCurrGTMask,oROI):oCurrFGMask,nCurrFrameIdx,cv::Point(*g_pnLatestMouseX,*g_pnLatestMouseY));

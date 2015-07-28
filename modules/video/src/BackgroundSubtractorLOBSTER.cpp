@@ -6,8 +6,8 @@
 //@@@@ change comma pos list & super constr everywhere
 //@@@@ change template formatting everywhere
 
-BackgroundSubtractorLOBSTER_base::BackgroundSubtractorLOBSTER_base(size_t nDescDistThreshold, size_t nColorDistThreshold,
-                                                                   size_t nBGSamples, size_t nRequiredBGSamples) :
+IBackgroundSubtractorLOBSTER::IBackgroundSubtractorLOBSTER(size_t nDescDistThreshold, size_t nColorDistThreshold,
+                                                           size_t nBGSamples, size_t nRequiredBGSamples) :
         m_nColorDistThreshold(nColorDistThreshold),
         m_nDescDistThreshold(nDescDistThreshold),
         m_nBGSamples(nBGSamples),
@@ -21,7 +21,7 @@ BackgroundSubtractorLOBSTER_base::BackgroundSubtractorLOBSTER_base(size_t nDescD
 template<>
 BackgroundSubtractorLOBSTER<ParallelUtils::eParallelImpl_GLSL>::BackgroundSubtractorLOBSTER(float fRelLBSPThreshold, size_t nLBSPThresholdOffset, size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples, size_t nRequiredBGSamples) :
         BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_GLSL>(fRelLBSPThreshold,nLBSPThresholdOffset,1,1+BGSLOBSTER_GLSL_USE_POSTPROC,2,0,0,0,BGSLOBSTER_GLSL_USE_DEBUG?CV_8UC4:-1,BGSLOBSTER_GLSL_USE_DEBUG,BGSLOBSTER_GLSL_USE_TIMERS,true),
-        BackgroundSubtractorLOBSTER_base(nDescDistThreshold,nColorDistThreshold,nBGSamples,nRequiredBGSamples) {
+        IBackgroundSubtractorLOBSTER(nDescDistThreshold,nColorDistThreshold,nBGSamples,nRequiredBGSamples) {
     glErrorCheck;
 }
 
@@ -392,7 +392,7 @@ template class BackgroundSubtractorLOBSTER<ParallelUtils::eParallelImpl_GLSL>;
 template<>
 BackgroundSubtractorLOBSTER<ParallelUtils::eParallelImpl_None>::BackgroundSubtractorLOBSTER(float fRelLBSPThreshold, size_t nLBSPThresholdOffset, size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples, size_t nRequiredBGSamples) :
         BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_None>(fRelLBSPThreshold,nLBSPThresholdOffset),
-        BackgroundSubtractorLOBSTER_base(nDescDistThreshold,nColorDistThreshold,nBGSamples,nRequiredBGSamples) {}
+        IBackgroundSubtractorLOBSTER(nDescDistThreshold,nColorDistThreshold,nBGSamples,nRequiredBGSamples) {}
 
 template<>
 void BackgroundSubtractorLOBSTER<ParallelUtils::eParallelImpl_None>::refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate) {

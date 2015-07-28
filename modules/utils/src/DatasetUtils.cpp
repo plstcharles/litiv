@@ -683,7 +683,6 @@ DatasetUtils::Segm::Image::Set::Set(const std::string& sSetName, const DatasetIn
         m_oMaxSize = cv::Size(481,321);
         m_nTotImageCount = m_vsInputImagePaths.size();
         m_dExpectedLoad = (double)m_oMaxSize.area()*m_nTotImageCount*(int(!m_bForcingGrayscale)+1);
-        m_voOrigImageSizes.resize(m_nTotImageCount);
     }
     else
         throw std::logic_error(cv::format("Image set '%s': unknown dataset type, cannot use any known parsing strategy",sSetName.c_str()));
@@ -694,6 +693,7 @@ cv::Mat DatasetUtils::Segm::Image::Set::GetInputFromIndex_external(size_t nImage
     cv::Mat oImage;
     oImage = cv::imread(m_vsInputImagePaths[nImageIdx],m_bForcingGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
     CV_Assert(!oImage.empty());
+    CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size() || m_voOrigImageSizes[nImageIdx]==oImage.size());
     m_voOrigImageSizes[nImageIdx] = oImage.size();
     if(m_eDatasetID==eDataset_BSDS500_train || m_eDatasetID==eDataset_BSDS500_train_valid) {
         CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
@@ -716,6 +716,8 @@ cv::Mat DatasetUtils::Segm::Image::Set::GetGTFromIndex_external(size_t nImageIdx
     if(m_vsGTImagePaths.size()>nImageIdx)
         oImage = cv::imread(m_vsGTImagePaths[nImageIdx],cv::IMREAD_GRAYSCALE);
     if(!oImage.empty()) {
+        CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size() || m_voOrigImageSizes[nImageIdx]==oImage.size());
+        m_voOrigImageSizes[nImageIdx] = oImage.size();
         if(m_eDatasetID==eDataset_BSDS500_train || m_eDatasetID==eDataset_BSDS500_train_valid) {
             CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
             if(oImage.size()==cv::Size(321,481))
@@ -735,24 +737,27 @@ cv::Mat DatasetUtils::Segm::Image::Set::GetGTFromIndex_external(size_t nImageIdx
     return oImage;
 }
 
-cv::Mat DatasetUtils::Segm::Image::Set::ReadResult(size_t nIdx) {
-    cv::Mat oTmp = WorkBatch::ReadResult(nIdx);
+cv::Mat DatasetUtils::Segm::Image::Set::ReadResult(size_t nImageIdx) {
+    cv::Mat oImage = WorkBatch::ReadResult(nImageIdx);
     if(m_eDatasetID==eDataset_BSDS500_train || m_eDatasetID==eDataset_BSDS500_train_valid) {
-        CV_Assert(oTmp.size()==cv::Size(481,321) || oTmp.size()==cv::Size(321,481));
-        if(oTmp.size()==cv::Size(321,481))
-            cv::transpose(oTmp,oTmp);
+        CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
+        CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size() || m_voOrigImageSizes[nImageIdx]==oImage.size());
+        m_voOrigImageSizes[nImageIdx] = oImage.size();
+        if(oImage.size()==cv::Size(321,481))
+            cv::transpose(oImage,oImage);
     }
-    return oTmp;
+    return oImage;
 }
 
-void DatasetUtils::Segm::Image::Set::WriteResult(size_t nIdx, const cv::Mat& oResult) {
-    cv::Mat oTmp = oResult;
+void DatasetUtils::Segm::Image::Set::WriteResult(size_t nImageIdx, const cv::Mat& oResult) {
+    cv::Mat oImage = oResult;
     if(m_eDatasetID==eDataset_BSDS500_train || m_eDatasetID==eDataset_BSDS500_train_valid) {
-        CV_Assert(oTmp.size()==cv::Size(481,321) || oTmp.size()==cv::Size(321,481));
-        if(oTmp.size()==cv::Size(321,481))
-            cv::transpose(oTmp,oTmp);
+        CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
+        CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size(481,321) || m_voOrigImageSizes[nImageIdx]==cv::Size(321,481));
+        if(m_voOrigImageSizes[nImageIdx]==cv::Size(321,481))
+            cv::transpose(oImage,oImage);
     }
-    WorkBatch::WriteResult(nIdx,oTmp);
+    WorkBatch::WriteResult(nImageIdx,oImage);
 }
 
 bool DatasetUtils::Segm::Image::Set::StartPrecaching(bool bUsingGT, size_t /*nUnused*/) {

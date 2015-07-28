@@ -1,6 +1,6 @@
 #pragma once
 
-#include "litiv/video/BackgroundSubtractorUtils.hpp"
+#include "litiv/video/BackgroundSubtractionUtils.hpp"
 #include "litiv/features2d/LBSP.hpp"
 #include "litiv/utils/RandUtils.hpp"
 

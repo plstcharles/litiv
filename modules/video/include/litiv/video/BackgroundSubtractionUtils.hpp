@@ -76,13 +76,13 @@ public:
     cv::FileStorage* m_pDebugFS;
 };
 
-template<ParallelUtils::eParallelImplType eImpl, typename enable=void>
+template<ParallelUtils::eParallelImplType eImpl=ParallelUtils::eParallelImpl_None, typename enable=void>
 class BackgroundSubtractorParallelImpl;
 
 #if HAVE_GLSL
 template<ParallelUtils::eParallelImplType eImpl>
 class BackgroundSubtractorParallelImpl<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_GLSL>::type> :
-        public ParallelUtils::ParallelImpl<ParallelUtils::eParallelImpl_GLSL>,
+        public ParallelUtils::ParallelImpl_GLSL,
         public BackgroundSubtractorImpl {
 public:
     //! glsl impl constructor
@@ -111,7 +111,7 @@ typedef BackgroundSubtractorParallelImpl<ParallelUtils::eParallelImpl_GLSL> Back
 #if HAVE_CUDA
 template<ParallelUtils::eParallelImplType eImpl>
 class BackgroundSubtractorParallelImpl<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_CUDA>::type> :
-        public ParallelUtils::ParallelImpl<ParallelUtils::eParallelImpl_CUDA>,
+        public ParallelUtils::ParallelImpl_CUDA,
         public BackgroundSubtractorImpl {
         static_assert(false,"Missing CUDA impl");
 };
@@ -121,7 +121,7 @@ typedef BackgroundSubtractorParallelImpl<ParallelUtils::eParallelImpl_CUDA> Back
 #if HAVE_OPENCL
 template<ParallelUtils::eParallelImplType eImpl>
 class BackgroundSubtractorParallelImpl<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_OpenCL>::type> :
-        public ParallelUtils::ParallelImpl<ParallelUtils::eParallelImpl_OpenCL>,
+        public ParallelUtils::ParallelImpl_OpenCL,
         public BackgroundSubtractorImpl {
         static_assert(false,"Missing OpenCL impl");
 };
@@ -130,10 +130,9 @@ typedef BackgroundSubtractorParallelImpl<ParallelUtils::eParallelImpl_OpenCL> Ba
 
 template<ParallelUtils::eParallelImplType eImpl>
 class BackgroundSubtractorParallelImpl<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_None>::type> :
-        public ParallelUtils::ParallelImpl<ParallelUtils::eParallelImpl_None>,
+        public ParallelUtils::NoParallelImpl,
         public BackgroundSubtractorImpl {
 public:
     //! default impl constructor
     BackgroundSubtractorParallelImpl(size_t nROIBorderSize);
 };
-typedef BackgroundSubtractorParallelImpl<ParallelUtils::eParallelImpl_None> BackgroundSubtractorImpl_Basic;

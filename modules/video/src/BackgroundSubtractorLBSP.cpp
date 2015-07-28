@@ -6,7 +6,7 @@
 template<>
 template<>
 BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_None>::BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_None>(float fRelLBSPThreshold, size_t nLBSPThresholdOffset, void* /*pUnused*/) :
-        BackgroundSubtractorParallelImpl<ParallelUtils::eParallelImpl_None>(LBSP::PATCH_SIZE/2),
+        BackgroundSubtractorParallelImpl(LBSP::PATCH_SIZE/2),
         m_nLBSPThresholdOffset(nLBSPThresholdOffset),
         m_fRelLBSPThreshold(fRelLBSPThreshold),
         m_nDefaultMedianBlurKernelSize(DEFAULT_MEDIAN_BLUR_KERNEL_SIZE) {

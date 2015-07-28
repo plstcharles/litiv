@@ -1,4 +1,4 @@
-#include "litiv/video/BackgroundSubtractorUtils.hpp"
+#include "litiv/video/BackgroundSubtractionUtils.hpp"
 #include <iostream>
 #include <opencv2/imgproc.hpp>
 

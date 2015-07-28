@@ -40,7 +40,7 @@ namespace ParallelUtils {
         eParallelImpl_None
     };
 
-    template<eParallelImplType eImpl, typename enable=void>
+    template<eParallelImplType eImpl=eParallelImpl_None, typename enable=void>
     struct ParallelImpl;
 
 #if HAVE_GLSL
@@ -79,6 +79,6 @@ namespace ParallelUtils {
         static constexpr bool hasParallelImpl() {return false;}
         static eParallelImplType getParallelImplType() {return eParallelImpl_None;}
     };
-    typedef ParallelImpl<eParallelImpl_None> ParallelImpl_Basic;
+    typedef ParallelImpl<eParallelImpl_None> NoParallelImpl;
 
 }; //namespace ParallelUtils

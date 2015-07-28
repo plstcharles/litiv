@@ -33,13 +33,13 @@
     G.-A. Bilodeau, "Improving Background Subtraction using Local Binary Similarity Patterns", in WACV 2014.
  */
 
-class BackgroundSubtractorLOBSTER_base {
+class IBackgroundSubtractorLOBSTER {
 public:
     //! local param constructor
-    BackgroundSubtractorLOBSTER_base(size_t nDescDistThreshold=BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD,
-                                     size_t nColorDistThreshold=BGSLOBSTER_DEFAULT_COLOR_DIST_THRESHOLD,
-                                     size_t nBGSamples=BGSLOBSTER_DEFAULT_NB_BG_SAMPLES,
-                                     size_t nRequiredBGSamples=BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES);
+    IBackgroundSubtractorLOBSTER(size_t nDescDistThreshold=BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD,
+                                 size_t nColorDistThreshold=BGSLOBSTER_DEFAULT_COLOR_DIST_THRESHOLD,
+                                 size_t nBGSamples=BGSLOBSTER_DEFAULT_NB_BG_SAMPLES,
+                                 size_t nRequiredBGSamples=BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES);
 protected:
     //! absolute color distance threshold
     const size_t m_nColorDistThreshold;
@@ -51,14 +51,14 @@ protected:
     const size_t m_nRequiredBGSamples;
 };
 
-template<ParallelUtils::eParallelImplType eImpl, typename enable=void>
+template<ParallelUtils::eParallelImplType eImpl=ParallelUtils::eParallelImpl_None, typename enable=void>
 class BackgroundSubtractorLOBSTER;
 
 #if HAVE_GLSL
 template<ParallelUtils::eParallelImplType eImpl>
 class BackgroundSubtractorLOBSTER<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_GLSL>::type> :
         public BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_GLSL>,
-        public BackgroundSubtractorLOBSTER_base {
+        public IBackgroundSubtractorLOBSTER {
 public:
     //! full constructor
     BackgroundSubtractorLOBSTER(float fRelLBSPThreshold=BGSLOBSTER_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
@@ -108,7 +108,7 @@ typedef BackgroundSubtractorLOBSTER<ParallelUtils::eParallelImpl_GLSL> Backgroun
 template<ParallelUtils::eParallelImplType eImpl>
 class BackgroundSubtractorLOBSTER<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_CUDA>::type> :
         public BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_CUDA>,
-        public BackgroundSubtractorLOBSTER_base {
+        public IBackgroundSubtractorLOBSTER {
         static_assert(false,"Missing CUDA impl");
 };
 typedef BackgroundSubtractorLOBSTER<ParallelUtils::eParallelImpl_CUDA> BackgroundSubtractorLOBSTER_CUDA;
@@ -118,7 +118,7 @@ typedef BackgroundSubtractorLOBSTER<ParallelUtils::eParallelImpl_CUDA> Backgroun
 template<ParallelUtils::eParallelImplType eImpl>
 class BackgroundSubtractorLOBSTER<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_OpenCL>::type> :
         public BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_OpenCL>,
-        public BackgroundSubtractorLOBSTER_base {
+        public IBackgroundSubtractorLOBSTER {
         static_assert(false,"Missing OpenCL impl");
 };
 typedef BackgroundSubtractorLOBSTER<ParallelUtils::eParallelImpl_OpenCL> BackgroundSubtractorLOBSTER_OpenCL;
@@ -127,7 +127,7 @@ typedef BackgroundSubtractorLOBSTER<ParallelUtils::eParallelImpl_OpenCL> Backgro
 template<ParallelUtils::eParallelImplType eImpl>
 class BackgroundSubtractorLOBSTER<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_None>::type> :
         public BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_None>,
-        public BackgroundSubtractorLOBSTER_base {
+        public IBackgroundSubtractorLOBSTER {
 public:
     //! full constructor
     BackgroundSubtractorLOBSTER(float fRelLBSPThreshold=BGSLOBSTER_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
@@ -153,4 +153,4 @@ protected:
     //! background model descriptors samples
     std::vector<cv::Mat> m_voBGDescSamples;
 };
-typedef BackgroundSubtractorLOBSTER<ParallelUtils::eParallelImpl_None> BackgroundSubtractorLOBSTER_Basic;
+typedef BackgroundSubtractorLOBSTER<> BackgroundSubtractorLOBSTER_base;

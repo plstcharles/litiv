@@ -10,6 +10,8 @@
 #define GLUTILS_IMGPROC_USE_DOUBLE_PBO_OUTPUT       1
 #define GLUTILS_IMGPROC_USE_PBO_UPDATE_REALLOC      1 // @@@@@ unused?
 
+// @@@@ switch all 'frames' for 'images'?
+
 class GLImageProcAlgo {
 public:
     GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs, size_t nExtraImages, size_t nExtraTextures,
