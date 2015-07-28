@@ -113,8 +113,8 @@ namespace DatasetUtils {
         virtual double GetExpectedLoad() const {return m_dExpectedLoad;}
         std::vector<std::shared_ptr<WorkBatch>> m_vpBatches;
     protected:
-        virtual cv::Mat GetInputFromIndex_external(size_t nFrameIdx);
-        virtual cv::Mat GetGTFromIndex_external(size_t nFrameIdx);
+        virtual cv::Mat GetInputFromIndex_external(size_t nIdx);
+        virtual cv::Mat GetGTFromIndex_external(size_t nIdx);
     private:
         double m_dExpectedLoad;
         size_t m_nTotImageCount;
@@ -253,6 +253,7 @@ namespace DatasetUtils {
                 size_t m_nTotImageCount;
                 std::vector<std::string> m_vsInputImagePaths;
                 std::vector<std::string> m_vsGTImagePaths;
+                std::vector<std::string> m_vsOrigImageNames;
                 std::vector<cv::Size> m_voOrigImageSizes;
                 cv::Size m_oMaxSize;
                 bool m_bIsConstantSize;

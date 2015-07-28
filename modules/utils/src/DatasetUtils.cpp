@@ -265,43 +265,59 @@ DatasetUtils::WorkGroup::WorkGroup(const std::string& sGroupName, const DatasetI
         m_nTotImageCount(0) {
     PlatformUtils::CreateDirIfNotExist(m_sResultsPath);
     if(!PlatformUtils::string_contains_token(m_sName,oDatasetInfo.m_vsSkippedNameTokens)) {
+        std::cout << "[" << oDatasetInfo.m_sDatasetName << "] -- Parsing directory '" << oDatasetInfo.m_sDatasetRootPath+sRelativePath << "' for work group '" << m_sName << "'..." << std::endl;
         std::vector<std::string> vsWorkBatchPaths;
-        // all subdirs are considered work batch directories
+        // all subdirs are considered work batch directories (if none, the category directory itself is a batch)
         PlatformUtils::GetSubDirsFromDir(m_sDatasetPath,vsWorkBatchPaths);
-        std::cout << "[" << oDatasetInfo.m_sDatasetName << "] -- Parsing directory '" << m_sDatasetPath << "' for work group '" << m_sName << "'; " << vsWorkBatchPaths.size() << " potential work batch directory(ies) found" << std::endl;
-        for(auto psPathIter=vsWorkBatchPaths.begin(); psPathIter!=vsWorkBatchPaths.end(); ++psPathIter) {
-            const size_t nLastSlashPos = psPathIter->find_last_of("/\\");
-            const std::string sBatchName = nLastSlashPos==std::string::npos?*psPathIter:psPathIter->substr(nLastSlashPos+1);
-            if(!PlatformUtils::string_contains_token(sBatchName,oDatasetInfo.m_vsSkippedNameTokens)) {
-                if(oDatasetInfo.GetType()==eDatasetType_Segm_Video)
-                    m_vpBatches.push_back(std::make_shared<Segm::Video::Sequence>(sBatchName,dynamic_cast<const Segm::Video::DatasetInfo&>(oDatasetInfo),m_sRelativePath+"/"+sBatchName+"/"));
-                else if(oDatasetInfo.GetType()==eDatasetType_Segm_Image)
-                    m_vpBatches.push_back(std::make_shared<Segm::Image::Set>(sBatchName,dynamic_cast<const Segm::Image::DatasetInfo&>(oDatasetInfo),m_sRelativePath+"/"+sBatchName+"/"));
-                else
-                    throw std::logic_error(cv::format("Workgroup '%s': bad dataset type bassed in dataset info struct",m_sName.c_str()));
-                m_dExpectedLoad += m_vpBatches.back()->GetExpectedLoad();
-                m_nTotImageCount += m_vpBatches.back()->GetTotalImageCount();
+        if(vsWorkBatchPaths.empty()) {
+            if(oDatasetInfo.GetType()==eDatasetType_Segm_Video)
+                m_vpBatches.push_back(std::make_shared<Segm::Video::Sequence>(m_sName,dynamic_cast<const Segm::Video::DatasetInfo&>(oDatasetInfo),m_sRelativePath));
+            else if(oDatasetInfo.GetType()==eDatasetType_Segm_Image)
+                m_vpBatches.push_back(std::make_shared<Segm::Image::Set>(m_sName,dynamic_cast<const Segm::Image::DatasetInfo&>(oDatasetInfo),m_sRelativePath));
+            else
+                throw std::logic_error(cv::format("Workgroup '%s': bad dataset type bassed in dataset info struct",m_sName.c_str()));
+            m_dExpectedLoad += m_vpBatches.back()->GetExpectedLoad();
+            m_nTotImageCount += m_vpBatches.back()->GetTotalImageCount();
+        }
+        else {
+            for(auto psPathIter = vsWorkBatchPaths.begin(); psPathIter!=vsWorkBatchPaths.end(); ++psPathIter) {
+                const size_t nLastSlashPos = psPathIter->find_last_of("/\\");
+                const std::string sBatchName = nLastSlashPos==std::string::npos?*psPathIter:psPathIter->substr(nLastSlashPos+1);
+                if(!PlatformUtils::string_contains_token(sBatchName,oDatasetInfo.m_vsSkippedNameTokens)) {
+                    if(oDatasetInfo.GetType()==eDatasetType_Segm_Video)
+                        m_vpBatches.push_back(std::make_shared<Segm::Video::Sequence>(sBatchName,dynamic_cast<const Segm::Video::DatasetInfo&>(oDatasetInfo),m_sRelativePath+"/"+sBatchName+"/"));
+                    else if(oDatasetInfo.GetType()==eDatasetType_Segm_Image)
+                        m_vpBatches.push_back(std::make_shared<Segm::Image::Set>(sBatchName,dynamic_cast<const Segm::Image::DatasetInfo&>(oDatasetInfo),m_sRelativePath+"/"+sBatchName+"/"));
+                    else
+                        throw std::logic_error(cv::format("Workgroup '%s': bad dataset type bassed in dataset info struct",m_sName.c_str()));
+                    m_dExpectedLoad += m_vpBatches.back()->GetExpectedLoad();
+                    m_nTotImageCount += m_vpBatches.back()->GetTotalImageCount();
+                }
             }
         }
     }
 }
 
-cv::Mat DatasetUtils::WorkGroup::GetInputFromIndex_external(size_t nFrameIdx) {
-    size_t nCumulImageIdx = 0;
+cv::Mat DatasetUtils::WorkGroup::GetInputFromIndex_external(size_t nIdx) {
+    if(m_vpBatches.size()==1)
+        return m_vpBatches.front()->GetInputFromIndex_external(nIdx);
+    size_t nCumulIdx = 0;
     size_t nBatchIdx = 0;
     do {
-        nCumulImageIdx += m_vpBatches[nBatchIdx++]->GetTotalImageCount();
-    } while(nCumulImageIdx<nFrameIdx);
-    return m_vpBatches[nBatchIdx-1]->GetInputFromIndex_external(nFrameIdx-(nCumulImageIdx-m_vpBatches[nBatchIdx-1]->GetTotalImageCount()));
+        nCumulIdx += m_vpBatches[nBatchIdx++]->GetTotalImageCount();
+    } while(nCumulIdx<nIdx);
+    return m_vpBatches[nBatchIdx-1]->GetInputFromIndex_external(nIdx-(nCumulIdx-m_vpBatches[nBatchIdx-1]->GetTotalImageCount()));
 }
 
-cv::Mat DatasetUtils::WorkGroup::GetGTFromIndex_external(size_t nFrameIdx) {
-    size_t nCumulImageIdx = 0;
+cv::Mat DatasetUtils::WorkGroup::GetGTFromIndex_external(size_t nIdx) {
+    if(m_vpBatches.size()==1)
+        return m_vpBatches.front()->GetGTFromIndex_external(nIdx);
+    size_t nCumulIdx = 0;
     size_t nBatchIdx = 0;
     do {
-        nCumulImageIdx += m_vpBatches[nBatchIdx++]->GetTotalImageCount();
-    } while(nCumulImageIdx<nFrameIdx);
-    return m_vpBatches[nBatchIdx-1]->GetGTFromIndex_external(nFrameIdx-(nCumulImageIdx-m_vpBatches[nBatchIdx-1]->GetTotalImageCount()));
+        nCumulIdx += m_vpBatches[nBatchIdx++]->GetTotalImageCount();
+    } while(nCumulIdx<nIdx);
+    return m_vpBatches[nBatchIdx-1]->GetGTFromIndex_external(nIdx-(nCumulIdx-m_vpBatches[nBatchIdx-1]->GetTotalImageCount()));
 }
 
 DatasetUtils::Segm::BasicMetrics::BasicMetrics() :
@@ -687,6 +703,14 @@ DatasetUtils::Segm::Image::Set::Set(const std::string& sSetName, const DatasetIn
     else
         throw std::logic_error(cv::format("Image set '%s': unknown dataset type, cannot use any known parsing strategy",sSetName.c_str()));
     m_voOrigImageSizes.resize(m_nTotImageCount);
+    m_vsOrigImageNames.resize(m_nTotImageCount);
+    for(size_t nImageIdx=0; nImageIdx<m_vsInputImagePaths.size(); ++nImageIdx) {
+        const size_t nLastSlashPos = m_vsInputImagePaths[nImageIdx].find_last_of("/\\");
+        const std::string sImageFullName = nLastSlashPos==std::string::npos?m_vsInputImagePaths[nImageIdx]:m_vsInputImagePaths[nImageIdx].substr(nLastSlashPos+1);
+        const size_t nLastDotPos = sImageFullName.find_last_of(".");
+        const std::string sImageName = nLastSlashPos==std::string::npos?sImageFullName:sImageFullName.substr(0,nLastDotPos);
+        m_vsOrigImageNames[nImageIdx] = sImageName;
+    }
 }
 
 cv::Mat DatasetUtils::Segm::Image::Set::GetInputFromIndex_external(size_t nImageIdx) {
@@ -738,7 +762,11 @@ cv::Mat DatasetUtils::Segm::Image::Set::GetGTFromIndex_external(size_t nImageIdx
 }
 
 cv::Mat DatasetUtils::Segm::Image::Set::ReadResult(size_t nImageIdx) {
-    cv::Mat oImage = WorkBatch::ReadResult(nImageIdx);
+    CV_Assert(m_vsOrigImageNames[nImageIdx]!=std::string());
+    CV_Assert(!m_sResultNameSuffix.empty());
+    std::stringstream sResultFilePath;
+    sResultFilePath << m_sResultsPath << m_sResultNamePrefix << m_vsOrigImageNames[nImageIdx] << m_sResultNameSuffix;
+    cv::Mat oImage = cv::imread(sResultFilePath.str(),m_bForcingGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
     if(m_eDatasetID==eDataset_BSDS500_train || m_eDatasetID==eDataset_BSDS500_train_valid) {
         CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
         CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size() || m_voOrigImageSizes[nImageIdx]==oImage.size());
@@ -750,6 +778,8 @@ cv::Mat DatasetUtils::Segm::Image::Set::ReadResult(size_t nImageIdx) {
 }
 
 void DatasetUtils::Segm::Image::Set::WriteResult(size_t nImageIdx, const cv::Mat& oResult) {
+    CV_Assert(m_vsOrigImageNames[nImageIdx]!=std::string());
+    CV_Assert(!m_sResultNameSuffix.empty());
     cv::Mat oImage = oResult;
     if(m_eDatasetID==eDataset_BSDS500_train || m_eDatasetID==eDataset_BSDS500_train_valid) {
         CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
@@ -757,7 +787,10 @@ void DatasetUtils::Segm::Image::Set::WriteResult(size_t nImageIdx, const cv::Mat
         if(m_voOrigImageSizes[nImageIdx]==cv::Size(321,481))
             cv::transpose(oImage,oImage);
     }
-    WorkBatch::WriteResult(nImageIdx,oImage);
+    std::stringstream sResultFilePath;
+    sResultFilePath << m_sResultsPath << m_sResultNamePrefix << m_vsOrigImageNames[nImageIdx] << m_sResultNameSuffix;
+    const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
+    cv::imwrite(sResultFilePath.str(),oImage,vnComprParams);
 }
 
 bool DatasetUtils::Segm::Image::Set::StartPrecaching(bool bUsingGT, size_t /*nUnused*/) {

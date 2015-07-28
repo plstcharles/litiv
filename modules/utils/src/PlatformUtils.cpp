@@ -99,7 +99,7 @@ void PlatformUtils::GetSubDirsFromDir(const std::string& sDirPath, std::vector<s
                 int ret = stat(sFullPath.c_str(),&sb);
                 if(!ret && S_ISDIR(sb.st_mode)
                         && strcmp(dirp->d_name,".")
-                        && strcmp(dirp->d_name,".."))
+                        && strcmp(dirp->d_name,"..")) // @@@ also ignore all hidden folders/files + system folders/files?
                     vsSubDirPaths.push_back(sFullPath);
             }
             std::sort(vsSubDirPaths.begin(),vsSubDirPaths.end());

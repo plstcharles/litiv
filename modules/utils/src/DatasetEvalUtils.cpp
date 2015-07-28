@@ -158,24 +158,24 @@ cv::Mat DatasetUtils::Segm::GetDisplayImage(const cv::Mat& oInputImg, const cv::
     CV_Assert(!oSegmMask.empty() && (oSegmMask.type()==CV_8UC1 || oSegmMask.type()==CV_8UC3 || oSegmMask.type()==CV_8UC4) && oSegmMask.size()==oInputImg.size());
     cv::Mat oInputImgBYTE3, oDebugImgBYTE3, oSegmMaskBYTE3;
     if(oInputImg.channels()==1)
-        cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_GRAY2RGB);
+        cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_GRAY2BGR);
     else if(oInputImg.channels()==4)
-        cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_RGBA2RGB);
+        cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_BGRA2BGR);
     else
         oInputImgBYTE3 = oInputImg;
     if(oDebugImg.channels()==1)
-        cv::cvtColor(oDebugImg,oDebugImgBYTE3,cv::COLOR_GRAY2RGB);
+        cv::cvtColor(oDebugImg,oDebugImgBYTE3,cv::COLOR_GRAY2BGR);
     else if(oDebugImg.channels()==4)
-        cv::cvtColor(oDebugImg,oDebugImgBYTE3,cv::COLOR_RGBA2RGB);
+        cv::cvtColor(oDebugImg,oDebugImgBYTE3,cv::COLOR_BGRA2BGR);
     else
         oDebugImgBYTE3 = oDebugImg;
     if(oSegmMask.channels()==1)
-        cv::cvtColor(oSegmMask,oSegmMaskBYTE3,cv::COLOR_GRAY2RGB);
+        cv::cvtColor(oSegmMask,oSegmMaskBYTE3,cv::COLOR_GRAY2BGR);
     else if(oSegmMask.channels()==4)
-        cv::cvtColor(oSegmMask,oDebugImgBYTE3,cv::COLOR_RGBA2RGB);
+        cv::cvtColor(oSegmMask,oDebugImgBYTE3,cv::COLOR_BGRA2BGR);
     else
         oSegmMaskBYTE3 = oSegmMask;
-    if(oDbgPt!=cv::Point(-1,-1)) {
+    if(oDbgPt.x>=0 && oDbgPt.y>=0 && oDbgPt.x<oInputImg.cols && oDbgPt.y<oInputImg.rows) {
         cv::circle(oInputImgBYTE3,oDbgPt,5,cv::Scalar(255,255,255));
         cv::circle(oSegmMaskBYTE3,oDbgPt,5,cv::Scalar(255,255,255));
     }

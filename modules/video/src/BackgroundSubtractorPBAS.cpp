@@ -267,7 +267,7 @@ void BackgroundSubtractorPBAS_3ch::initialize(const cv::Mat& oInitImg) {
     if(oInitImg.type()==CV_8UC3)
         oInitImgRGB = oInitImg;
     else
-        cv::cvtColor(oInitImg,oInitImgRGB,cv::COLOR_GRAY2RGB);
+        cv::cvtColor(oInitImg,oInitImgRGB,cv::COLOR_GRAY2BGR);
     m_oImgSize = oInitImgRGB.size();
     m_oDistThresholdFrame.create(m_oImgSize,CV_32FC1);
     m_oDistThresholdFrame = cv::Scalar(1.0f);
@@ -320,7 +320,7 @@ void BackgroundSubtractorPBAS_3ch::apply(cv::InputArray _image, cv::OutputArray 
     if(oInputImg.type()==CV_8UC3)
         oInputImgRGB = oInputImg;
     else
-        cv::cvtColor(oInputImg,oInputImgRGB,cv::COLOR_GRAY2RGB);
+        cv::cvtColor(oInputImg,oInputImgRGB,cv::COLOR_GRAY2BGR);
     _fgmask.create(m_oImgSize,CV_8UC1);
     cv::Mat oFGMask = _fgmask.getMat();
     oFGMask = cv::Scalar_<uchar>(0);
