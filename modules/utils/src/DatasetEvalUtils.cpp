@@ -90,7 +90,7 @@ void DatasetUtils::Segm::WriteMetrics(const std::string& sResultsFilePath, const
     oMetricsOutput << "Rcl        Spc        FPR        FNR        PBC        Prc        FM         MCC        " << std::endl;
     oMetricsOutput << tmp.dRecall << " " << tmp.dSpecificity << " " << tmp.dFPR << " " << tmp.dFNR << " " << tmp.dPBC << " " << tmp.dPrecision << " " << tmp.dFMeasure << " " << tmp.dMCC << std::endl;
     oMetricsOutput << std::endl << std::endl;
-    oMetricsOutput << "Work batch FPS: " << oBatch.m_oMetrics.dTimeElapsed_sec/oBatch.GetTotalImageCount() << std::endl;
+    oMetricsOutput << "Work batch FPS: " << oBatch.GetTotalImageCount()/oBatch.m_oMetrics.dTimeElapsed_sec << std::endl;
     oMetricsOutput.close();
 }
 
@@ -118,7 +118,7 @@ void DatasetUtils::Segm::WriteMetrics(const std::string& sResultsFilePath, const
     std::cout << "\t" << std::setfill(' ') << std::setw(12) << sCurrGroupName << " : Rcl=" << std::fixed << std::setprecision(4) << all.dRecall << " Prc=" << all.dPrecision << " FM=" << all.dFMeasure << " MCC=" << all.dMCC << std::endl;
     oMetricsOutput << std::string(DATASETUTILS_USE_AVERAGE_EVAL_METRICS?"averaged   ":"cumulative ") << all.dRecall << " " << all.dSpecificity << " " << all.dFPR << " " << all.dFNR << " " << all.dPBC << " " << all.dPrecision << " " << all.dFMeasure << " " << all.dMCC << std::endl;
     oMetricsOutput << std::endl << std::endl;
-    oMetricsOutput << "Work group FPS: " << all.dTimeElapsed_sec/oGroup.GetTotalImageCount() << std::endl;
+    oMetricsOutput << "Work group FPS: " << oGroup.GetTotalImageCount()/all.dTimeElapsed_sec << std::endl;
     oMetricsOutput.close();
 }
 
@@ -148,7 +148,7 @@ void DatasetUtils::Segm::WriteMetrics(const std::string& sResultsFilePath, const
     Metrics all(CalcMetricsFromWorkGroups(vpGroups,DATASETUTILS_USE_AVERAGE_EVAL_METRICS));
     oMetricsOutput << "Overall    " << all.dRecall << " " << all.dSpecificity << " " << all.dFPR << " " << all.dFNR << " " << all.dPBC << " " << all.dPrecision << " " << all.dFMeasure << " " << all.dMCC << std::endl;
     oMetricsOutput << std::endl << std::endl;
-    oMetricsOutput << "Overall FPS: " << all.dTimeElapsed_sec/nOverallFrameCount << std::endl;
+    oMetricsOutput << "Overall FPS: " << nOverallFrameCount/all.dTimeElapsed_sec << std::endl;
     oMetricsOutput.close();
 }
 
@@ -359,24 +359,6 @@ cv::Mat DatasetUtils::Segm::Video::BinarySegmEvaluator::GetColoredSegmMaskFromRe
         }
     }
     return oResult;
-}
-
-cv::Mat DatasetUtils::Segm::Video::ReadResult( const std::string& sResultsPath, const std::string& sGroupName, const std::string& sSeqName,
-                                               const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix, int nFlags) {
-    std::array<char,10> acBuffer;
-    snprintf(acBuffer.data(),acBuffer.size(),"%06lu",nFrameIdx);
-    std::stringstream sResultFilePath;
-    sResultFilePath << sResultsPath << sGroupName << "/" << sSeqName << "/" << sResultPrefix << acBuffer.data() << sResultSuffix;
-    return cv::imread(sResultFilePath.str(),nFlags);
-}
-
-void DatasetUtils::Segm::Video::WriteResult( const std::string& sResultsPath, const std::string& sGroupName, const std::string& sSeqName, const std::string& sResultPrefix,
-                                             size_t nFrameIdx, const std::string& sResultSuffix, const cv::Mat& oResult, const std::vector<int>& vnComprParams) {
-    std::array<char,10> acBuffer;
-    snprintf(acBuffer.data(),acBuffer.size(),"%06lu",nFrameIdx);
-    std::stringstream sResultFilePath;
-    sResultFilePath << sResultsPath << sGroupName << "/" << sSeqName << "/" << sResultPrefix << acBuffer.data() << sResultSuffix;
-    cv::imwrite(sResultFilePath.str(),oResult,vnComprParams);
 }
 
 // as defined in the 2012 CDNet scripts/dataset

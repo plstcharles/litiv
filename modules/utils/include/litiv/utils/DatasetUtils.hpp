@@ -59,6 +59,8 @@ namespace DatasetUtils {
         std::string m_sDatasetName;
         std::string m_sDatasetRootPath;
         std::string m_sResultsRootPath;
+        std::string m_sResultNamePrefix;
+        std::string m_sResultNameSuffix;
         std::shared_ptr<EvaluatorBase> m_pEvaluator;
         std::vector<std::string> m_vsWorkBatchPaths;
         std::vector<std::string> m_vsSkippedNameTokens;
@@ -68,17 +70,22 @@ namespace DatasetUtils {
 
     class WorkBatch {
     public:
-        WorkBatch(const std::string& sBatchName, const std::string& sBatchPath, const DatasetInfoBase& oDatasetInfo, const std::string& sGroupName=std::string());
+        WorkBatch(const std::string& sBatchName, const DatasetInfoBase& oDatasetInfo, const std::string& sRelativePath=std::string("./"));
         template<typename Tp> static typename std::enable_if<std::is_base_of<WorkBatch,Tp>::value,bool>::type compare(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {return PlatformUtils::compare_lowercase(i->m_sName,j->m_sName);}
         static bool compare(const WorkBatch* i, const WorkBatch* j) {return PlatformUtils::compare_lowercase(i->m_sName,j->m_sName);}
         static bool compare(const WorkBatch& i, const WorkBatch& j) {return PlatformUtils::compare_lowercase(i.m_sName,j.m_sName);}
         virtual size_t GetTotalImageCount() const = 0;
         virtual double GetExpectedLoad() const = 0;
-        virtual bool StartPrecaching(size_t nSuggestedBufferSize=SIZE_MAX);
+        virtual cv::Mat ReadResult(size_t nIdx);
+        virtual void WriteResult(size_t nIdx, const cv::Mat& oResult);
+        virtual bool StartPrecaching(bool bUsingGT, size_t nSuggestedBufferSize=SIZE_MAX);
         void StopPrecaching();
         const std::string m_sName;
-        const std::string m_sGroupName;
-        const std::string m_sPath;
+        const std::string m_sRelativePath;
+        const std::string m_sDatasetPath;
+        const std::string m_sResultsPath;
+        const std::string m_sResultNamePrefix;
+        const std::string m_sResultNameSuffix;
         const bool m_bHasGroundTruth;
         const bool m_bForcingGrayscale;
         const bool m_bForcing4ByteDataAlign;
@@ -101,7 +108,7 @@ namespace DatasetUtils {
 
     class WorkGroup : public WorkBatch {
     public:
-        WorkGroup(const std::string& sGroupName, const std::string& sGroupPath, const DatasetInfoBase& oDatasetInfo, const std::string& sSuperGroupName=std::string());
+        WorkGroup(const std::string& sGroupName, const DatasetInfoBase& oDatasetInfo, const std::string& sRelativePath=std::string("./"));
         virtual size_t GetTotalImageCount() const {return m_nTotImageCount;}
         virtual double GetExpectedLoad() const {return m_dExpectedLoad;}
         std::vector<std::shared_ptr<WorkBatch>> m_vpBatches;
@@ -114,8 +121,6 @@ namespace DatasetUtils {
         WorkGroup& operator=(const WorkGroup&) = delete;
         WorkGroup(const WorkGroup&) = delete;
     };
-
-
 
     namespace Segm {
 
@@ -160,7 +165,7 @@ namespace DatasetUtils {
 
         class SegmWorkBatch : public WorkBatch {
         public:
-            SegmWorkBatch(const std::string& sBatchName, const std::string& sBatchPath, const DatasetInfoBase& oDatasetInfo, const std::string& sGroupName=std::string());
+            SegmWorkBatch(const std::string& sBatchName, const DatasetInfoBase& oDatasetInfo, const std::string& sRelativePath=std::string("./"));
             BasicMetrics m_oMetrics;
         };
 
@@ -178,8 +183,6 @@ namespace DatasetUtils {
             struct DatasetInfo : public DatasetInfoBase {
                 virtual eDatasetTypeList GetType() const {return eDatasetType_Segm_Video;}
                 eDatasetList m_eDatasetID;
-                std::string m_sResultFrameNamePrefix;
-                std::string m_sResultFrameNameSuffix;
                 size_t m_nResultIdxOffset;
             };
 
@@ -187,12 +190,15 @@ namespace DatasetUtils {
 
             class Sequence : public SegmWorkBatch {
             public:
-                Sequence(const std::string& sSeqName, const std::string& sSeqPath, const DatasetInfo& oDatasetInfo, const std::string& sSeqGroupName=std::string());
+                Sequence(const std::string& sSeqName, const DatasetInfo& oDatasetInfo, const std::string& sRelativePath=std::string("./"));
                 virtual size_t GetTotalImageCount() const {return m_nTotFrameCount;}
                 virtual double GetExpectedLoad() const {return m_dExpectedLoad;}
+                virtual void WriteResult(size_t nIdx, const cv::Mat& oResult);
+                virtual bool StartPrecaching(bool bUsingGT, size_t nUnused=0);
                 cv::Size GetImageSize() const {return m_oSize;}
                 const cv::Mat& GetROI() const {return m_oROI;}
                 const eDatasetList m_eDatasetID;
+                const size_t m_nResultIdxOffset;
             protected:
                 virtual cv::Mat GetInputFromIndex_external(size_t nFrameIdx);
                 virtual cv::Mat GetGTFromIndex_external(size_t nFrameIdx);
@@ -214,8 +220,6 @@ namespace DatasetUtils {
 
         namespace Image {
 
-            class SetInfo;
-
             enum eDatasetList {
                 eDataset_BSDS500_train,
                 eDataset_BSDS500_train_valid,
@@ -226,10 +230,35 @@ namespace DatasetUtils {
             struct DatasetInfo : public DatasetInfoBase {
                 virtual eDatasetTypeList GetType() const {return eDatasetType_Segm_Image;}
                 eDatasetList m_eDatasetID;
-                std::string m_sResultImageNameExtension;
             };
 
             std::shared_ptr<DatasetInfo> GetDatasetInfo(eDatasetList eDatasetID, const std::string& sDatasetRootPath, const std::string& sResultsDirName, bool bForce4ByteDataAlign);
+
+            class Set : public SegmWorkBatch {
+            public:
+                Set(const std::string& sSetName, const DatasetInfo& oDatasetInfo, const std::string& sRelativePath=std::string("./"));
+                virtual size_t GetTotalImageCount() const {return m_nTotImageCount;}
+                virtual double GetExpectedLoad() const {return m_dExpectedLoad;}
+                virtual cv::Mat ReadResult(size_t nIdx);
+                virtual void WriteResult(size_t nIdx, const cv::Mat& oResult);
+                virtual bool StartPrecaching(bool bUsingGT, size_t nUnused=0);
+                bool IsConstantImageSize() const {return m_bIsConstantSize;}
+                cv::Size GetMaxImageSize() const {return m_oMaxSize;}
+                const eDatasetList m_eDatasetID;
+            protected:
+                virtual cv::Mat GetInputFromIndex_external(size_t nImageIdx);
+                virtual cv::Mat GetGTFromIndex_external(size_t nImageIdx);
+            private:
+                double m_dExpectedLoad;
+                size_t m_nTotImageCount;
+                std::vector<std::string> m_vsInputImagePaths;
+                std::vector<std::string> m_vsGTImagePaths;
+                std::vector<cv::Size> m_voOrigImageSizes;
+                cv::Size m_oMaxSize;
+                bool m_bIsConstantSize;
+                Set& operator=(const Set&) = delete;
+                Set(const Set&) = delete;
+            };
 
         }; //namespace Image
 

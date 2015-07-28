@@ -36,6 +36,7 @@ namespace PlatformUtils {
 
     void GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths);
     void GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths);
+    void FilterFilePaths(std::vector<std::string>& vsFilePaths, const std::vector<std::string>& vsRemoveTokens, const std::vector<std::string>& vsKeepTokens);
     bool CreateDirIfNotExist(const std::string& sDirPath);
 
     inline bool compare_lowercase(const std::string& i, const std::string& j) {

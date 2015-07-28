@@ -109,6 +109,19 @@ void PlatformUtils::GetSubDirsFromDir(const std::string& sDirPath, std::vector<s
 #endif //!PLATFORM_USES_WIN32API
 }
 
+void PlatformUtils::FilterFilePaths(std::vector<std::string>& vsFilePaths, const std::vector<std::string>& vsRemoveTokens, const std::vector<std::string>& vsKeepTokens) {
+    // note: remove tokens take precedence over keep tokens, and no keep tokens means all are kept by default
+    std::vector<std::string> vsResultFilePaths;
+    vsResultFilePaths.reserve(vsFilePaths.size());
+    for(auto pPathIter=vsFilePaths.begin(); pPathIter!=vsFilePaths.end(); ++pPathIter) {
+        if(!vsRemoveTokens.empty() && string_contains_token(*pPathIter,vsRemoveTokens))
+            continue;
+        else if(vsKeepTokens.empty() || string_contains_token(*pPathIter,vsKeepTokens))
+            vsResultFilePaths.push_back(*pPathIter);
+    }
+    vsFilePaths = vsResultFilePaths;
+}
+
 bool PlatformUtils::CreateDirIfNotExist(const std::string& sDirPath) {
 #if PLATFORM_USES_WIN32API
     std::wstring dir(sDirPath.begin(),sDirPath.end());

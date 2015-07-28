@@ -46,12 +46,6 @@ namespace DatasetUtils {
 
         namespace Video {
 
-            cv::Mat ReadResult( const std::string& sResultsPath, const std::string& sGroupName, const std::string& sSeqName,
-                                const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix, int nFlags=cv::IMREAD_GRAYSCALE);
-            void WriteResult( const std::string& sResultsPath, const std::string& sGroupName, const std::string& sSeqName,
-                              const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix,
-                              const cv::Mat& oResult, const std::vector<int>& vnComprParams={cv::IMWRITE_PNG_COMPRESSION,9});
-
             struct BinarySegmEvaluator : public SegmEvaluator {
 #if HAVE_GLSL
                 struct GLBinarySegmEvaluator : public GLSegmEvaluator {
@@ -88,11 +82,7 @@ namespace DatasetUtils {
 
         namespace Image {
 
-            cv::Mat ReadResult( const std::string& sResultsPath, const std::string& sGroupName, const std::string& sSeqName,
-                                const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix, int nFlags=cv::IMREAD_GRAYSCALE);
-            void WriteResult( const std::string& sResultsPath, const std::string& sGroupName, const std::string& sSeqName,
-                              const std::string& sResultPrefix, size_t nFrameIdx, const std::string& sResultSuffix,
-                              const cv::Mat& oResult, const std::vector<int>& vnComprParams);
+            // ...
 
         }; //namespace Image
 
