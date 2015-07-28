@@ -8,39 +8,62 @@
 #define DISPLAY_OUTPUT          0
 #define DISPLAY_TIMERS          0
 ////////////////////////////////
-#define USE_CANNY               1
-#define USE_LBSP                0
+#define USE_CANNY               0
+#define USE_LBSP                1
 ////////////////////////////////
 #define USE_GLSL_IMPL           0
 #define USE_CUDA_IMPL           0
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
-#if EVALUATE_OUTPUT
-#define WRITE_METRICS           1
-#if HAVE_GLSL
-#define GLSL_EVALUATION         1
-#define VALIDATE_EVALUATION     0
-#endif //HAVE_GLSL
-#endif //EVALUATE_OUTPUT
-////////////////////////////////
 #define DATASET_ID              eDataset_BSDS500_train
 #define DATASET_ROOT_PATH       std::string("/shared2/datasets/")
-#define DATASET_RESULTS_PATH    std::string("results")
+#define DATASET_RESULTS_PATH    std::string("results2")
 #define DATASET_PRECACHING      1
 ////////////////////////////////
-
-#define NEED_LAST_GT_MASK (DISPLAY_OUTPUT || (WRITE_METRICS && (!GLSL_EVALUATION || VALIDATE_EVALUATION)))
-#define NEED_GT_MASK (DISPLAY_OUTPUT || WRITE_METRICS)
-#define NEED_EDGES_MASK (DISPLAY_OUTPUT || WRITE_IMG_OUTPUT || ((!GLSL_EVALUATION || VALIDATE_EVALUATION) && WRITE_METRICS))
+#if EVALUATE_OUTPUT
+#if HAVE_GLSL
+#define USE_GLSL_EVALUATION     1
+#endif //HAVE_GLSL
+#if HAVE_CUDA
+#define USE_CUDA_EVALUATION     1
+#endif //HAVE_CUDA
+#if HAVE_OPENCL
+#define USE_OPENCL_EVALUATION   1
+#endif //HAVE_OPENCL
+#if HAVE_GPU_SUPPORT
+#define VALIDATE_GPU_EVALUATION 0
+#endif //HAVE_GPU_SUPPORT
+#endif //EVALUATE_OUTPUT
+////////////////////////////////
+#ifndef VALIDATE_GPU_EVALUATION
+#define VALIDATE_GPU_EVALUATION 0
+#endif //VALIDATE_GPU_EVALUATION
+#ifndef USE_GLSL_EVALUATION
+#define USE_GLSL_EVALUATION 0
+#endif //USE_GLSL_EVALUATION
+#ifndef USE_CUDA_EVALUATION
+#define USE_CUDA_EVALUATION 0
+#endif //USE_CUDA_EVALUATION
+#ifndef USE_OPENCL_EVALUATION
+#define USE_OPENCL_EVALUATION 0
+#endif //USE_OPENCL_EVALUATION
+#if (DEBUG_OUTPUT && !DISPLAY_OUTPUT)
+#undef DISPLAY_OUTPUT
+#define DISPLAY_OUTPUT 1
+#endif //(DEBUG_OUTPUT && !DISPLAY_OUTPUT)
 #define USE_GPU_IMPL (USE_GLSL_IMPL||USE_CUDA_IMPL||USE_OPENCL_IMPL)
+#define USE_GPU_EVALUATION (USE_GLSL_EVALUATION || USE_CUDA_EVALUATION || USE_OPENCL_EVALUATION)
+#define NEED_EDGES_MASK (DISPLAY_OUTPUT || WRITE_IMG_OUTPUT || (EVALUATE_OUTPUT && (!USE_GPU_EVALUATION || VALIDATE_GPU_EVALUATION)))
+#define NEED_LAST_GT_MASK (DISPLAY_OUTPUT || (EVALUATE_OUTPUT && (!USE_GPU_EVALUATION || VALIDATE_GPU_EVALUATION)))
+#define NEED_GT_MASK (DISPLAY_OUTPUT || EVALUATE_OUTPUT)
 #if (USE_GLSL_IMPL+USE_CUDA_IMPL+USE_OPENCL_IMPL)>1
 #error "Must specify a single impl."
 #elif (USE_CANNY+USE_LBSP)!=1
 #error "Must specify a single algorithm."
 #elif USE_CANNY
-// ... @@@@
+#include "litiv/imgproc/EdgeDetectorCanny.hpp"
 #elif USE_LBSP
-// ... @@@@
+#include "litiv/imgproc/EdgeDetectorLBSP.hpp"
 #endif //USE_...
 #if DISPLAY_TIMERS
 #define TIMER_INTERNAL_TIC(x) TIMER_TIC(x)
@@ -51,12 +74,6 @@
 #define TIMER_INTERNAL_TOC(x)
 #define TIMER_INTERNAL_ELAPSED_MS(x)
 #endif //!ENABLE_INTERNAL_TIMERS
-
-std::atomic_size_t g_nActiveThreads(0);
-const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
-const std::shared_ptr<DatasetUtils::Segm::Image::DatasetInfo> g_pDatasetInfo = DatasetUtils::Segm::Image::GetDatasetInfo(DatasetUtils::Segm::Image::DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH,USE_GPU_IMPL);
-const std::shared_ptr<DatasetUtils::Segm::SegmEvaluator> g_pEvaluator = std::dynamic_pointer_cast<DatasetUtils::Segm::SegmEvaluator>(g_pDatasetInfo->m_pEvaluator);
-
 #if (HAVE_GLSL && USE_GLSL_IMPL)
 int AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet);
 #elif (HAVE_CUDA && USE_CUDA_IMPL)
@@ -68,6 +85,11 @@ int AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> p
 #else // bad config
 #error "Bad config, trying to use an unavailable impl."
 #endif // bad config
+
+std::atomic_size_t g_nActiveThreads(0);
+const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
+const std::shared_ptr<DatasetUtils::Segm::Image::DatasetInfo> g_pDatasetInfo = DatasetUtils::Segm::Image::GetDatasetInfo(DatasetUtils::Segm::Image::DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH,USE_GPU_IMPL);
+const std::shared_ptr<DatasetUtils::Segm::SegmEvaluator> g_pEvaluator = std::dynamic_pointer_cast<DatasetUtils::Segm::SegmEvaluator>(g_pDatasetInfo->m_pEvaluator);
 
 int main(int, char**) {
     try {
@@ -117,12 +139,11 @@ int main(int, char**) {
         const time_t nShutdownTime = time(nullptr);
         const std::string sShutdownTimeStr(asctime(localtime(&nShutdownTime)));
         std::cout << "[" << sShutdownTimeStr.substr(0,sShutdownTimeStr.size()-1) << "]\n" << std::endl;
-#if EVALUATE_OUTPUT
-        if(WRITE_METRICS) {
+        if(EVALUATE_OUTPUT) {
             std::cout << "Summing and writing metrics results..." << std::endl;
-            for(size_t c=0; c<vpDatasetGroups.size(); ++c) {
+            for(size_t c = 0; c<vpDatasetGroups.size(); ++c) {
                 if(!vpDatasetGroups[c]->m_vpBatches.empty()) {
-                    for(size_t s=0; s<vpDatasetGroups[c]->m_vpBatches.size(); ++s)
+                    for(size_t s = 0; s<vpDatasetGroups[c]->m_vpBatches.size(); ++s)
                         DatasetUtils::Segm::WriteMetrics(vpDatasetGroups[c]->m_sResultsPath+vpDatasetGroups[c]->m_vpBatches[s]->m_sName+".txt",dynamic_cast<const DatasetUtils::Segm::SegmWorkBatch&>(*vpDatasetGroups[c]->m_vpBatches[s]));
                     std::sort(vpDatasetGroups[c]->m_vpBatches.begin(),vpDatasetGroups[c]->m_vpBatches.end(),DatasetUtils::WorkBatch::compare<DatasetUtils::WorkBatch>);
                     DatasetUtils::Segm::WriteMetrics(vpDatasetGroups[c]->m_sResultsPath+vpDatasetGroups[c]->m_sName+".txt",*vpDatasetGroups[c]);
@@ -132,7 +153,6 @@ int main(int, char**) {
             std::sort(vpDatasetGroups.begin(),vpDatasetGroups.end(),&DatasetUtils::WorkBatch::compare<DatasetUtils::WorkBatch>);
             DatasetUtils::Segm::WriteMetrics(g_pDatasetInfo->m_sResultsRootPath+"/overall.txt",vpDatasetGroups);
         }
-#endif //EVALUATE_OUTPUT
         std::cout << "All done." << std::endl;
     }
     catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
@@ -185,7 +205,7 @@ int AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
 #if !DISPLAY_OUTPUT
         glfwWindowHint(GLFW_VISIBLE,GL_FALSE);
 #endif //!DISPLAY_OUTPUT
-        std::unique_ptr<GLFWwindow,void(*)(GLFWwindow*)> pWindow(glfwCreateWindow(oWindowSize.width,oWindowSize.height,sDisplayName+" [GPU]",nullptr,nullptr),glfwDestroyWindow);
+        std::unique_ptr<GLFWwindow,void(*)(GLFWwindow*)> pWindow(glfwCreateWindow(oWindowSize.width,oWindowSize.height,(pCurrSequence->m_sRelativePath+" [GPU]").c_str(),nullptr,nullptr),glfwDestroyWindow);
         if(!pWindow)
             glError("Failed to create window via GLFW");
         glfwMakeContextCurrent(pWindow.get());
@@ -208,15 +228,15 @@ int AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
         pGLSLAlgo->setOutputFetching(NEED_EDGES_MASK);
         if(!pGLSLAlgo->getIsUsingDisplay() && DISPLAY_OUTPUT) // @@@@ determine in advance to hint window to hide? or just always hide, and show when needed?
             glfwHideWindow(pWindow.get());
-#if (GLSL_EVALUATION && WRITE_METRICS)
+#if USE_GLSL_EVALUATION
         std::shared_ptr<DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator> pGLSLAlgoEvaluator = std::dynamic_pointer_cast<DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator>(g_pEvaluator->CreateGLEvaluator(pGLSLAlgo,nImageCount));
         if(pGLSLAlgoEvaluator==nullptr)
             glError("Segmentation evaluation algorithm has no GLSegmEvaluator interface");
         pGLSLAlgoEvaluator->initialize(oCurrGTMask,cv::Mat(oCurrInputImage.size(),CV_8UC1,cv::Scalar_<uchar>(255)));
         oWindowSize.width *= pGLSLAlgoEvaluator->m_nSxSDisplayCount;
-#else //!(GLSL_EVALUATION && WRITE_METRICS)
+#else //!USE_GLSL_EVALUATION
         oWindowSize.width *= pGLSLAlgo->m_nSxSDisplayCount;
-#endif //!(GLSL_EVALUATION && WRITE_METRICS)
+#endif //!USE_GLSL_EVALUATION
         glfwSetWindowSize(pWindow.get(),oWindowSize.width,oWindowSize.height);
         glViewport(0,0,oWindowSize.width,oWindowSize.height);
         TIMER_TIC(MainLoop);
@@ -227,9 +247,9 @@ int AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
             TIMER_INTERNAL_TIC(PipelineUpdate);
             pAlgo->apply_async(oNextInputImage);
             TIMER_INTERNAL_TOC(PipelineUpdate);
-#if (GLSL_EVALUATION && WRITE_METRICS)
+#if USE_GLSL_EVALUATION
             pGLSLAlgoEvaluator->apply_async(oNextGTMask);
-#endif //(GLSL_EVALUATION && WRITE_METRICS)
+#endif //USE_GLSL_EVALUATION
             TIMER_INTERNAL_TIC(ImageQuery);
 #if DISPLAY_OUTPUT
             oCurrInputImage.copyTo(oLastInputImage);
@@ -260,6 +280,7 @@ int AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
             pAlgo->getLatestEdgeMask(oLastEdgeMask);
 #endif //NEED_EDGES_MASK
 #if DISPLAY_OUTPUT
+            @@@ update via copy of non-parallel impl
             cv::Mat oDisplayImage = DatasetUtils::Segm::GetDisplayImage(oLastInputImage,oLastInputImage,g_pEvaluator?g_pEvaluator->GetColoredSegmMaskFromResult(oLastEdgeMask,oLastGTMask,cv::Mat()):oLastEdgeMask,nCurrImageIdx);
             cv::Mat oDisplayImageResized;
             if(oDisplayImage.cols>1280 || oDisplayImage.rows>960)
@@ -284,10 +305,10 @@ int AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
 #if WRITE_IMG_OUTPUT
             pCurrSet->WriteResult(nCurrImageIdx,oLastEdgeMask);
 #endif //WRITE_IMG_OUTPUT
-#if (WRITE_METRICS && (!GLSL_EVALUATION || VALIDATE_EVALUATION))
+#if (EVALUATE_OUTPUT && (!USE_GLSL_EVALUATION || VALIDATE_GPU_EVALUATION))
             if(g_pEvaluator)
                 g_pEvaluator->AccumulateMetricsFromResult(oCurrEdgeMask,oCurrGTMask,cv::Mat(),pCurrSet->m_oMetrics);
-#endif //(WRITE_METRICS && (!GLSL_EVALUATION || VALIDATE_GLSL_EVALUATION))
+#endif //(EVALUATE_OUTPUT && (!USE_GLSL_EVALUATION || VALIDATE_GPU_EVALUATION))
             TIMER_INTERNAL_TOC(OverallLoop);
 #if DISPLAY_TIMERS
             std::cout << "ImageQuery=" << TIMER_INTERNAL_ELAPSED_MS(ImageQuery) << "ms,  "
@@ -300,19 +321,19 @@ int AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
         const double dTimeElapsed = TIMER_ELAPSED_MS(MainLoop)/1000;
         const double dAvgFPS = (double)nCurrImageIdx/dTimeElapsed;
         std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSetName << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
-#if WRITE_METRICS
-#if GLSL_EVALUATION
-#if VALIDATE_EVALUATION
+#if EVALUATE_OUTPUT
+#if USE_GLSL_EVALUATION
+#if VALIDATE_GPU_EVALUATION
         printf("cpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSet->nTP,pCurrSet->nTN,pCurrSet->nFP,pCurrSet->nFN,pCurrSet->nSE,pCurrSet->nTP+pCurrSet->nTN+pCurrSet->nFP+pCurrSet->nFN);
-#endif //VALIDATE_GLSL_EVALUATION
+#endif //VALIDATE_GPU_EVALUATION
         pCurrSet->m_oMetrics = pGLSLAlgoEvaluator->getCumulativeMetrics();
-#if VALIDATE_EVALUATION
+#if VALIDATE_GPU_EVALUATION
         printf("gpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSet->nTP,pCurrSet->nTN,pCurrSet->nFP,pCurrSet->nFN,pCurrSet->nSE,pCurrSet->nTP+pCurrSet->nTN+pCurrSet->nFP+pCurrSet->nFN);
-#endif //VALIDATE_GLSL_EVALUATION
-#endif //GLSL_EVALUATION
+#endif //VALIDATE_GPU_EVALUATION
+#endif //USE_GLSL_EVALUATION
         pCurrSet->m_oMetrics.dTimeElapsed_sec = dTimeElapsed;
         DatasetUtils::Segm::WriteMetrics(pCurrSet->m_sResultsPath+"../"+pCurrSet->m_sName+".txt",*pCurrSet);
-#endif //WRITE_METRICS
+#endif //EVALUATE_OUTPUT
 #if DISPLAY_OUTPUT
         cv::destroyWindow(sDisplayName);
 #endif //DISPLAY_OUTPUT
@@ -349,22 +370,24 @@ int AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> p
 #endif //NEED_GT_MASK
         cv::Mat oCurrEdgeMask(oCurrInputImage.size(),CV_8UC1,cv::Scalar_<uchar>(0));
 #if USE_CANNY
-        std::shared_ptr<BackgroundSubtractorLOBSTER> pAlgo(new BackgroundSubtractorLOBSTER());
+        std::shared_ptr<EdgeDetectorImpl> pAlgo(new EdgeDetectorCanny());
 #elif USE_LBSP
-        std::shared_ptr<BackgroundSubtractorSuBSENSE> pAlgo(new BackgroundSubtractorSuBSENSE());
+        std::shared_ptr<EdgeDetectorImpl> pAlgo(new EdgeDetectorLBSP());
 #endif //USE_...
-#if (DEBUG_OUTPUT && USE_LBSP)
-        cv::FileStorage oDebugFS = cv::FileStorage(pCurrSet->m_sResultsPath+"../"+pCurrSet->m_sName+"_debug.yml",cv::FileStorage::WRITE);
-        pAlgo->m_pDebugFS = &oDebugFS;
-        pAlgo->m_sDebugName = pCurrSet->m_sName;
-#endif //(DEBUG_OUTPUT && USE_LBSP)
 #if DISPLAY_OUTPUT
-        bool bContinuousUpdates = false;
         std::string sDisplayName = pCurrSet->m_sRelativePath;
         cv::namedWindow(sDisplayName);
 #endif //DISPLAY_OUTPUT
+#if DEBUG_OUTPUT
+        cv::FileStorage oDebugFS = cv::FileStorage(pCurrSet->m_sResultsPath+"../"+pCurrSet->m_sName+"_debug.yml",cv::FileStorage::WRITE);
+        pAlgo->m_pDebugFS = &oDebugFS;
+        pAlgo->m_sDebugName = pCurrSet->m_sName;
+        int nCurrThreshold = int((pAlgo->getDefaultThreshold())*UCHAR_MAX);
+        cv::createTrackbar("Threshold:",sDisplayName,&nCurrThreshold,UCHAR_MAX);
+#endif //DEBUG_OUTPUT
+        bool bExit = false;
         TIMER_TIC(MainLoop);
-        while(nCurrImageIdx<nImageCount) {
+        while(nCurrImageIdx<nImageCount && !bExit) {
             if(!((nCurrImageIdx+1)%100))
                 std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSetName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nImageCount)) << nCurrImageIdx+1 << "/" << nImageCount << "   [T=" << nThreadIdx << "]" << std::endl;
             TIMER_INTERNAL_TIC(OverallLoop);
@@ -378,34 +401,37 @@ int AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> p
             pAlgo->apply(oCurrInputImage,oCurrEdgeMask);
             TIMER_INTERNAL_TOC(PipelineUpdate);
 #if DISPLAY_OUTPUT
-            cv::Mat oDisplayImage = DatasetUtils::Segm::GetDisplayImage(oCurrInputImage,oCurrInputImage,g_pEvaluator?g_pEvaluator->GetColoredSegmMaskFromResult(oCurrEdgeMask,oCurrGTMask,cv::Mat()):oCurrEdgeMask,nCurrImageIdx,cv::Point(*g_pnLatestMouseX,*g_pnLatestMouseY));
-            cv::Mat oDisplayImageResized;
-            if(oDisplayImage.cols>1280 || oDisplayImage.rows>960)
-                cv::resize(oDisplayImage,oDisplayImageResized,cv::Size(oDisplayImage.cols/2,oDisplayImage.rows/2));
-            else
-                oDisplayImageResized = oDisplayImage;
-            cv::imshow(sDisplayName,oDisplayImageResized);
-            int nKeyPressed;
-            if(bContinuousUpdates)
-                nKeyPressed = cv::waitKey(1);
-            else
-                nKeyPressed = cv::waitKey(0);
-            if(nKeyPressed!=-1) {
-                nKeyPressed %= (UCHAR_MAX+1); // fixes return val bug in some opencv versions
-                std::cout << "nKeyPressed = " << nKeyPressed%(UCHAR_MAX+1) << std::endl;
+#if DEBUG_OUTPUT
+            while(!bExit) {
+                pAlgo->apply(oCurrInputImage,oCurrEdgeMask,double(nCurrThreshold)/UCHAR_MAX);
+#endif //DEBUG_OUTPUT
+                cv::Mat oDisplayImage = DatasetUtils::Segm::GetDisplayImage(oCurrInputImage,oCurrInputImage,g_pEvaluator?g_pEvaluator->GetColoredSegmMaskFromResult(oCurrEdgeMask,oCurrGTMask,cv::Mat()):oCurrEdgeMask,nCurrImageIdx);
+                cv::Mat oDisplayImageResized;
+                if(oDisplayImage.cols>1280 || oDisplayImage.rows>960)
+                    cv::resize(oDisplayImage,oDisplayImageResized,cv::Size(oDisplayImage.cols/2,oDisplayImage.rows/2));
+                else
+                    oDisplayImageResized = oDisplayImage;
+                cv::imshow(sDisplayName,oDisplayImageResized);
+                int nKeyPressed = cv::waitKey(DEBUG_OUTPUT*100);
+                if(nKeyPressed!=-1) {
+                    nKeyPressed %= (UCHAR_MAX+1); // fixes return val bug in some opencv versions
+                    std::cout << "nKeyPressed = " << nKeyPressed%(UCHAR_MAX+1) << std::endl;
+                }
+                if(nKeyPressed==(int)'q')
+                    bExit = true;
+#if DEBUG_OUTPUT
+                else if(nKeyPressed==' ')
+                    break;
             }
-            if(nKeyPressed==' ')
-                bContinuousUpdates = !bContinuousUpdates;
-            else if(nKeyPressed==(int)'q')
-                break;
+#endif //DEBUG_OUTPUT
 #endif //DISPLAY_OUTPUT
 #if WRITE_IMG_OUTPUT
             pCurrSet->WriteResult(nCurrImageIdx,oCurrEdgeMask);
 #endif //WRITE_IMG_OUTPUT
-#if WRITE_METRICS
+#if EVALUATE_OUTPUT
             if(g_pEvaluator)
                 g_pEvaluator->AccumulateMetricsFromResult(oCurrEdgeMask,oCurrGTMask,cv::Mat(),pCurrSet->m_oMetrics);
-#endif //WRITE_METRICS
+#endif //EVALUATE_OUTPUT
             TIMER_INTERNAL_TOC(OverallLoop);
 #if DISPLAY_TIMERS
             std::cout << "ImageQuery=" << TIMER_INTERNAL_ELAPSED_MS(ImageQuery) << "ms,  "
@@ -418,10 +444,10 @@ int AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> p
         const double dTimeElapsed = TIMER_ELAPSED_MS(MainLoop)/1000;
         const double dAvgFPS = (double)nCurrImageIdx/dTimeElapsed;
         std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSetName << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
-#if WRITE_METRICS
+#if EVALUATE_OUTPUT
         pCurrSet->m_oMetrics.dTimeElapsed_sec = dTimeElapsed;
         DatasetUtils::Segm::WriteMetrics(pCurrSet->m_sResultsPath+"../"+pCurrSet->m_sName+".txt",*pCurrSet);
-#endif //WRITE_METRICS
+#endif //EVALUATE_OUTPUT
 #if DISPLAY_OUTPUT
         cv::destroyWindow(sDisplayName);
 #endif //DISPLAY_OUTPUT
