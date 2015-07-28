@@ -115,10 +115,6 @@ void BackgroundSubtractorImpl::initialize(const cv::Mat& oInitImg, const cv::Mat
     }
 }
 
-cv::AlgorithmInfo* BackgroundSubtractorImpl::info() const {
-    return nullptr;
-}
-
 void BackgroundSubtractorImpl::validateROI(cv::Mat& oROI) {
     CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
     if(m_nROIBorderSize>0) {

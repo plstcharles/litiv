@@ -1,9 +1,5 @@
-#include "litiv/imgproc/EdgeDetectionUtils.hpp"
+#include "litiv/imgproc/EdgeDetectorCanny.hpp"
 #include <iostream>
-
-cv::AlgorithmInfo* EdgeDetectorImpl::info() const {
-    return nullptr;
-}
 
 #if HAVE_GLSL
 
@@ -60,8 +56,5 @@ template class EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>;
 // ... @@@ add impl later
 //template class EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_OpenCL>;
 #endif //HAVE_OPENCL
-
-template<>
-EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_None>::EdgeDetectorParallelImpl() {}
 
 template class EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_None>;

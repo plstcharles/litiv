@@ -14,7 +14,9 @@ public:
     //! (re)initiaization method; needs to be called before starting background subtraction
     virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
     //! unused, always returns nullptr
-    virtual cv::AlgorithmInfo* info() const;
+    virtual cv::AlgorithmInfo* info() const {return nullptr;}
+    //! returns the default learning rate value used in 'apply'
+    virtual double getDefaultLearningRate() const = 0;
     //! turns automatic model reset on or off
     virtual void setAutomaticModelReset(bool);
     //! modifies the given ROI so it will not cause lookup errors near borders when used in the processing step

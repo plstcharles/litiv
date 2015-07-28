@@ -7,7 +7,9 @@ class EdgeDetectorImpl :
         public cv::Algorithm {
 public:
     //! unused, always returns nullptr
-    virtual cv::AlgorithmInfo* info() const;
+    virtual cv::AlgorithmInfo* info() const {return nullptr;}
+    //! returns the default threshold value used in 'apply'
+    virtual double getDefaultThreshold() const = 0;
     //! default edge detection function; the threshold should be between 0 and 1 (will use default otherwise)
     virtual void apply(cv::InputArray oInputImage, cv::OutputArray oEdgeMask, double dThreshold=-1) = 0;
 
