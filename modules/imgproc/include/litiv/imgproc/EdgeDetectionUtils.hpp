@@ -10,9 +10,9 @@ public:
     virtual cv::AlgorithmInfo* info() const {return nullptr;}
     //! returns the default threshold value used in 'apply'
     virtual double getDefaultThreshold() const = 0;
-    //! thresholded edge detection function; the threshold should be between 0 and 1 (will use default otherwise)
-    virtual void apply_threshold(cv::InputArray oInputImage, cv::OutputArray oEdgeMask, double dThreshold=-1) = 0;
-    //! edge detection function which returns a confidence edge mask (0-255) instead of a thresholded/binary edge mask
+    //! thresholded edge detection function; the threshold should be between 0 and 1
+    virtual void apply_threshold(cv::InputArray oInputImage, cv::OutputArray oEdgeMask, double dThreshold) = 0;
+    //! edge detection function which returns a binned confidence edge mask instead of a thresholded/binary edge mask
     virtual void apply(cv::InputArray oInputImage, cv::OutputArray oEdgeMask) = 0;
 
     // #### for debug purposes only ####
@@ -36,14 +36,16 @@ public:
 
     //! returns a copy of the latest edge mask
     void getLatestEdgeMask(cv::OutputArray _oLastEdgeMask);
-    //! edge detection function (asynchronous version, glsl interface); the threshold should be between 0 and 1 (will use default otherwise)
-    void apply_async_glimpl(cv::InputArray _oNextImage, bool bRebindAll, double dThreshold=-1);
-    //! edge detection function (asynchronous version); the threshold should be between 0 and 1 (will use default otherwise)
-    void apply_async(cv::InputArray oNextImage, double dThreshold=-1);
-    //! edge detection function (asynchronous version); the threshold should be between 0 and 1 (will use default otherwise)
-    void apply_async(cv::InputArray oNextImage, cv::OutputArray oEdgeMask, double dThreshold=-1);
+    //! edge detection function (asynchronous version, glsl interface); the threshold should be between 0 and 1, or -1 for the confidence mask version
+    void apply_async_glimpl(cv::InputArray _oNextImage, bool bRebindAll, double dThreshold);
+    //! edge detection function (asynchronous version); the threshold should be between 0 and 1, or -1 for the confidence mask version
+    void apply_async(cv::InputArray oNextImage, double dThreshold);
+    //! edge detection function (asynchronous version); the threshold should be between 0 and 1, or -1 for the confidence mask version
+    void apply_async(cv::InputArray oNextImage, cv::OutputArray oEdgeMask, double dThreshold);
+    //! overloads 'apply_threshold' from EdgeDetectorImpl and redirects it to apply_async
+    virtual void apply_threshold(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold);
     //! overloads 'apply' from EdgeDetectorImpl and redirects it to apply_async
-    virtual void apply(cv::InputArray oNextImage, cv::OutputArray oEdgeMask, double dThreshold=-1);
+    virtual void apply(cv::InputArray oNextImage, cv::OutputArray oEdgeMask);
 
 protected:
     //! used to pass 'apply' threshold parameter to overloaded dispatch call, if needed

@@ -40,8 +40,14 @@ void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_async(cv
 };
 
 template<>
-void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) {
+void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_threshold(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) {
+    CV_Assert(dThreshold>=0 && dThreshold<=1);
     apply_async(oNextImage,oLastEdgeMask,dThreshold);
+}
+
+template<>
+void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask) {
+    apply_async(oNextImage,oLastEdgeMask,-1);
 }
 
 template class EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>;
