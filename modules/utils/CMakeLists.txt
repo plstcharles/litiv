@@ -18,6 +18,9 @@ file(GLOB INCLUDE_FILES
 
 add_library(litiv_utils SHARED ${SOURCE_FILES})
 
+if(USE_BSDS500_BENCHMARK_UTILS)
+    target_link_libraries(litiv_utils BSDS500_utils)
+endif(USE_BSDS500_BENCHMARK_UTILS)
 target_compil_litiv_dependencies(litiv_utils)
 target_include_directories(litiv_utils
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"

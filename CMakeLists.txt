@@ -17,6 +17,7 @@ set(LITIV_FRAMEWORK_VERSION ${LITIV_FRAMEWORK_VERSION_MAJOR}.${LITIV_FRAMEWORK_V
 set(CMAKE_CXX_FLAGS "-march=native -Wall -Wextra -Wfatal-errors")
 
 option(USE_TEST "Use some useless global test define" ON)
+option(USE_BSDS500_BENCHMARK_UTILS "Link BSDS500 dataset utilities to litiv_utils" OFF)
 
 ### OPENCV CHECK
 find_package(OpenCV 3.0 REQUIRED)
@@ -71,4 +72,5 @@ else(CMAKE_CROSSCOMPILING)
 endif(CMAKE_CROSSCOMPILING)
 
 add_subdirectory(modules)
+add_subdirectory(modules_external)
 add_subdirectory(execs)
