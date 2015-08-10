@@ -13,6 +13,7 @@
 namespace DatasetUtils {
 
     void WriteOnImage(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom=false);
+    cv::Mat GetDisplayImage(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oSegmMask, size_t nIdx, cv::Point oDbgPt=cv::Point(-1,-1));
     void ValidateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoint>& voKPs);
 
     class ImagePrecacher {
@@ -54,14 +55,14 @@ namespace DatasetUtils {
     struct WorkGroup;
 
     struct DatasetInfoBase {
-        static std::vector<std::shared_ptr<WorkGroup>> ParseDataset(const DatasetInfoBase& oInfo);
+        virtual std::vector<std::shared_ptr<WorkGroup>> ParseDataset();
+        virtual void WriteEvalResults(const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) const = 0;
         virtual eDatasetTypeList GetType() const = 0;
         std::string m_sDatasetName;
         std::string m_sDatasetRootPath;
         std::string m_sResultsRootPath;
         std::string m_sResultNamePrefix;
         std::string m_sResultNameSuffix;
-        std::shared_ptr<EvaluatorBase> m_pEvaluator;
         std::vector<std::string> m_vsWorkBatchPaths;
         std::vector<std::string> m_vsSkippedNameTokens;
         std::vector<std::string> m_vsGrayscaleNameTokens;
@@ -86,15 +87,15 @@ namespace DatasetUtils {
         const std::string m_sResultsPath;
         const std::string m_sResultNamePrefix;
         const std::string m_sResultNameSuffix;
-        const bool m_bHasGroundTruth;
         const bool m_bForcingGrayscale;
         const bool m_bForcing4ByteDataAlign;
         const cv::Mat& GetInputFromIndex(size_t nIdx) {return m_oInputPrecacher.GetImageFromIndex(nIdx);}
         const cv::Mat& GetGTFromIndex(size_t nIdx) {return m_oGTPrecacher.GetImageFromIndex(nIdx);}
+        std::shared_ptr<EvaluatorBase> m_pEvaluator;
+        std::promise<size_t> m_nImagesProcessed;
     protected:
         ImagePrecacher m_oInputPrecacher;
         ImagePrecacher m_oGTPrecacher;
-        friend class WorkGroup;
         virtual cv::Mat GetInputFromIndex_external(size_t nIdx) = 0;
         virtual cv::Mat GetGTFromIndex_external(size_t nIdx) = 0;
     private:
@@ -104,6 +105,7 @@ namespace DatasetUtils {
         cv::Mat m_oLatestGTMask;
         WorkBatch& operator=(const WorkBatch&) = delete;
         WorkBatch(const WorkBatch&) = delete;
+        friend class WorkGroup;
     };
 
     class WorkGroup : public WorkBatch {
@@ -111,11 +113,13 @@ namespace DatasetUtils {
         WorkGroup(const std::string& sGroupName, const DatasetInfoBase& oDatasetInfo, const std::string& sRelativePath=std::string("./"));
         virtual size_t GetTotalImageCount() const {return m_nTotImageCount;}
         virtual double GetExpectedLoad() const {return m_dExpectedLoad;}
+        virtual bool IsBare() const {return m_bIsBare;}
         std::vector<std::shared_ptr<WorkBatch>> m_vpBatches;
     protected:
         virtual cv::Mat GetInputFromIndex_external(size_t nIdx);
         virtual cv::Mat GetGTFromIndex_external(size_t nIdx);
     private:
+        bool m_bIsBare;
         double m_dExpectedLoad;
         size_t m_nTotImageCount;
         WorkGroup& operator=(const WorkGroup&) = delete;
@@ -123,51 +127,6 @@ namespace DatasetUtils {
     };
 
     namespace Segm {
-
-        struct BasicMetrics {
-            BasicMetrics();
-            BasicMetrics operator+(const BasicMetrics& m) const;
-            BasicMetrics& operator+=(const BasicMetrics& m);
-            uint64_t total() const {return nTP+nTN+nFP+nFN;}
-            uint64_t nTP;
-            uint64_t nTN;
-            uint64_t nFP;
-            uint64_t nFN;
-            uint64_t nSE; // 'shadow error', not always used/required for eval
-            double dTimeElapsed_sec;
-        };
-
-        struct Metrics {
-            Metrics(const BasicMetrics& m);
-            Metrics operator+(const BasicMetrics& m) const;
-            Metrics& operator+=(const BasicMetrics& m);
-            Metrics operator+(const Metrics& m) const;
-            Metrics& operator+=(const Metrics& m);
-            double dRecall;
-            double dSpecificity;
-            double dFPR;
-            double dFNR;
-            double dPBC;
-            double dPrecision;
-            double dFMeasure;
-            double dMCC;
-            double dTimeElapsed_sec; // never averaged, always accumulated
-            size_t nWeight; // used to compute averages in overloads only
-            static double CalcFMeasure(const BasicMetrics& m);
-            static double CalcRecall(const BasicMetrics& m);
-            static double CalcPrecision(const BasicMetrics& m);
-            static double CalcSpecificity(const BasicMetrics& m);
-            static double CalcFalsePositiveRate(const BasicMetrics& m);
-            static double CalcFalseNegativeRate(const BasicMetrics& m);
-            static double CalcPercentBadClassifs(const BasicMetrics& m);
-            static double CalcMatthewsCorrCoeff(const BasicMetrics& m);
-        };
-
-        class SegmWorkBatch : public WorkBatch {
-        public:
-            SegmWorkBatch(const std::string& sBatchName, const DatasetInfoBase& oDatasetInfo, const std::string& sRelativePath=std::string("./"));
-            BasicMetrics m_oMetrics;
-        };
 
         namespace Video {
 
@@ -181,6 +140,7 @@ namespace DatasetUtils {
             };
 
             struct DatasetInfo : public DatasetInfoBase {
+                virtual void WriteEvalResults(const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) const;
                 virtual eDatasetTypeList GetType() const {return eDatasetType_Segm_Video;}
                 eDatasetList m_eDatasetID;
                 size_t m_nResultIdxOffset;
@@ -188,7 +148,7 @@ namespace DatasetUtils {
 
             std::shared_ptr<DatasetInfo> GetDatasetInfo(eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirName, bool bForce4ByteDataAlign);
 
-            class Sequence : public SegmWorkBatch {
+            class Sequence : public WorkBatch {
             public:
                 Sequence(const std::string& sSeqName, const DatasetInfo& oDatasetInfo, const std::string& sRelativePath=std::string("./"));
                 virtual size_t GetTotalImageCount() const {return m_nTotFrameCount;}
@@ -221,20 +181,23 @@ namespace DatasetUtils {
         namespace Image {
 
             enum eDatasetList {
-                eDataset_BSDS500_train,
-                eDataset_BSDS500_train_valid,
+                eDataset_BSDS500_segm_train,
+                eDataset_BSDS500_segm_train_valid,
+                eDataset_BSDS500_edge_train,
+                eDataset_BSDS500_edge_train_valid,
                 // ...
                 eDataset_Custom
             };
 
             struct DatasetInfo : public DatasetInfoBase {
+                virtual void WriteEvalResults(const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) const;
                 virtual eDatasetTypeList GetType() const {return eDatasetType_Segm_Image;}
                 eDatasetList m_eDatasetID;
             };
 
             std::shared_ptr<DatasetInfo> GetDatasetInfo(eDatasetList eDatasetID, const std::string& sDatasetRootPath, const std::string& sResultsDirName, bool bForce4ByteDataAlign);
 
-            class Set : public SegmWorkBatch {
+            class Set : public WorkBatch {
             public:
                 Set(const std::string& sSetName, const DatasetInfo& oDatasetInfo, const std::string& sRelativePath=std::string("./"));
                 virtual size_t GetTotalImageCount() const {return m_nTotImageCount;}
