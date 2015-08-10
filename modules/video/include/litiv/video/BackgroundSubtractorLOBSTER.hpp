@@ -71,6 +71,8 @@ public:
     void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
     //! (re)initiaization method; needs to be called before starting background subtraction
     void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
+    //! returns the default learning rate value used in 'apply'
+    virtual double getDefaultLearningRate() const {return BGSLOBSTER_DEFAULT_LEARNING_RATE;};
     //! returns the GLSL compute shader source code to run for a given algo stage
     virtual std::string getComputeShaderSource(size_t nStage) const;
     //! returns a copy of the latest reconstructed background image
@@ -140,6 +142,8 @@ public:
     void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
     //! (re)initiaization method; needs to be called before starting background subtraction
     void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
+    //! returns the default learning rate value used in 'apply'
+    virtual double getDefaultLearningRate() const {return BGSLOBSTER_DEFAULT_LEARNING_RATE;};
     //! model update/segmentation function (synchronous version); the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
     virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
     //! returns a copy of the latest reconstructed background image
