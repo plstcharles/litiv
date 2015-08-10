@@ -8,7 +8,7 @@
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
 #define WRITE_AVI_OUTPUT        0
-#define EVALUATE_OUTPUT         0
+#define EVALUATE_OUTPUT         1
 #define DEBUG_OUTPUT            0
 #define DISPLAY_OUTPUT          0
 #define DISPLAY_TIMERS          0
@@ -94,13 +94,13 @@
 #define TIMER_INTERNAL_ELAPSED_MS(x)
 #endif //!ENABLE_INTERNAL_TIMERS
 #if (HAVE_GLSL && USE_GLSL_IMPL)
-int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCurrSequence);
+void AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCurrSequence);
 #elif (HAVE_CUDA && USE_CUDA_IMPL)
 static_assert(false,"missing impl");
 #elif (HAVE_OPENCL && USE_OPENCL_IMPL)
 static_assert(false,"missing impl");
 #elif !USE_GPU_IMPL
-int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCurrSequence);
+void AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCurrSequence);
 #else // bad config
 #error "Bad config, trying to use an unavailable impl."
 #endif // bad config
@@ -118,14 +118,11 @@ void OnMouseEvent(int event, int x, int y, int, void*) {
 std::atomic_size_t g_nActiveThreads(0);
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
 const std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> g_pDatasetInfo = DatasetUtils::Segm::Video::GetDatasetInfo(DatasetUtils::Segm::Video::DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH,USE_GPU_IMPL);
-const std::shared_ptr<DatasetUtils::Segm::SegmEvaluator> g_pEvaluator = std::dynamic_pointer_cast<DatasetUtils::Segm::SegmEvaluator>(g_pDatasetInfo->m_pEvaluator);
 
 int main(int, char**) {
     try {
-        if(g_pEvaluator==nullptr && EVALUATE_OUTPUT)
-            throw std::runtime_error(cv::format("Missing evaluation impl for video segmentation dataset '%s'",g_pDatasetInfo->m_sDatasetName.c_str()));
         std::cout << "Parsing dataset '" << g_pDatasetInfo->m_sDatasetName << "'..." << std::endl;
-        std::vector<std::shared_ptr<DatasetUtils::WorkGroup>> vpDatasetGroups = DatasetUtils::DatasetInfoBase::ParseDataset(*g_pDatasetInfo);
+        std::vector<std::shared_ptr<DatasetUtils::WorkGroup>> vpDatasetGroups = g_pDatasetInfo->ParseDataset();
         size_t nFramesTotal = 0;
         // @@@ check out priority_queue?
         std::multimap<double,std::shared_ptr<DatasetUtils::Segm::Video::Sequence>> mSeqLoads;
@@ -165,40 +162,46 @@ int main(int, char**) {
         }
         while(g_nActiveThreads>0)
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        size_t nTotFramesProcessed = 0;
+        for(auto pSeqIter = mSeqLoads.rbegin(); pSeqIter!=mSeqLoads.rend(); ++pSeqIter)
+            nTotFramesProcessed += pSeqIter->second->m_nImagesProcessed.get_future().get();
         const time_t nShutdownTime = time(nullptr);
         const std::string sShutdownTimeStr(asctime(localtime(&nShutdownTime)));
         std::cout << "[" << sShutdownTimeStr.substr(0,sShutdownTimeStr.size()-1) << "]\n" << std::endl;
-        if(EVALUATE_OUTPUT) {
-            std::cout << "Summing and writing metrics results..." << std::endl;
-            for(size_t c = 0; c<vpDatasetGroups.size(); ++c) {
-                if(!vpDatasetGroups[c]->m_vpBatches.empty()) {
-                    for(size_t s = 0; s<vpDatasetGroups[c]->m_vpBatches.size(); ++s)
-                        DatasetUtils::Segm::WriteMetrics(vpDatasetGroups[c]->m_sResultsPath+vpDatasetGroups[c]->m_vpBatches[s]->m_sName+".txt",dynamic_cast<const DatasetUtils::Segm::SegmWorkBatch&>(*vpDatasetGroups[c]->m_vpBatches[s]));
-                    std::sort(vpDatasetGroups[c]->m_vpBatches.begin(),vpDatasetGroups[c]->m_vpBatches.end(),DatasetUtils::WorkBatch::compare<DatasetUtils::WorkBatch>);
-                    DatasetUtils::Segm::WriteMetrics(vpDatasetGroups[c]->m_sResultsPath+vpDatasetGroups[c]->m_sName+".txt",*vpDatasetGroups[c]);
-                    std::cout << std::endl;
-                }
-            }
-            std::sort(vpDatasetGroups.begin(),vpDatasetGroups.end(),&DatasetUtils::WorkBatch::compare<DatasetUtils::WorkBatch>);
-            DatasetUtils::Segm::WriteMetrics(g_pDatasetInfo->m_sResultsRootPath+"/overall.txt",vpDatasetGroups);
+        if(EVALUATE_OUTPUT && nTotFramesProcessed==nFramesTotal) {
+            std::cout << "Writing evaluation results..." << std::endl;
+            g_pDatasetInfo->WriteEvalResults(vpDatasetGroups);
+
         }
-        std::cout << "All done." << std::endl;
+        else if(EVALUATE_OUTPUT && nTotFramesProcessed<nFramesTotal)
+            std::cout << "Skipping eval results output, as some sequences were skipped." << std::endl;
     }
-    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
-    catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
-    catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl;}
+    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
+    catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
+    catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
+    std::cout << "\nAll done." << std::endl;
     return 0;
 }
 
 #if (HAVE_GLSL && USE_GLSL_IMPL)
-int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCurrSequence) {
+std::string g_sLatestGLFWErrorMessage;
+void GLFWErrorCallback(int nCode, const char* acMessage) {
+    std::stringstream ssStr;
+    ssStr << "code: " << nCode << ", message: " << acMessage;
+    g_sLatestGLFWErrorMessage = ssStr.str();
+}
+
+void AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCurrSequence) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
     size_t nCurrFrameIdx = 0;
     size_t nNextFrameIdx = nCurrFrameIdx+1;
     bool bGPUContextInitialized = false;
     try {
+        glfwSetErrorCallback(GLFWErrorCallback);
         CV_Assert(pCurrSequence.get() && pCurrSequence->GetTotalImageCount()>1);
+        if(pCurrSequence->m_pEvaluator==nullptr && EVALUATE_OUTPUT)
+            throw std::runtime_error(cv::format("Missing evaluation impl for video segmentation dataset '%s'",g_pDatasetInfo->m_sDatasetName.c_str()));
         const std::string sCurrSeqName = pCurrSequence->m_sName.size()>12?pCurrSequence->m_sName.substr(0,12):pCurrSequence->m_sName;
         const size_t nFrameCount = pCurrSequence->GetTotalImageCount();
         const cv::Mat oROI = LIMIT_MODEL_TO_SEQUENCE_ROI?pCurrSequence->GetROI():cv::Mat();
@@ -294,7 +297,9 @@ int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pC
         if(!pGLSLAlgo->getIsUsingDisplay() && DISPLAY_OUTPUT) // @@@@ determine in advance to hint window to hide? or just always hide, and show when needed?
             glfwHideWindow(pWindow.get());
 #if USE_GLSL_EVALUATION
-        std::shared_ptr<DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator> pGLSLAlgoEvaluator = std::dynamic_pointer_cast<DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator>(g_pEvaluator->CreateGLEvaluator(pGLSLAlgo,nFrameCount));
+        std::shared_ptr<DatasetUtils::EvaluatorBase::GLEvaluatorBase> pGLSLAlgoEvaluator;
+        if(pCurrSequence->m_pEvaluator!=nullptr)
+            pGLSLAlgoEvaluator = std::dynamic_pointer_cast<DatasetUtils::EvaluatorBase::GLEvaluatorBase>(pCurrSequence->m_pEvaluator->CreateGLEvaluator(pGLSLAlgo,nFrameCount));
         if(pGLSLAlgoEvaluator==nullptr)
             glError("Segmentation evaluation algorithm has no GLSegmEvaluator interface");
         pGLSLAlgoEvaluator->initialize(oCurrGTMask,oROI.empty()?cv::Mat(oCurrInputFrame.size(),CV_8UC1,cv::Scalar_<uchar>(255)):oROI);
@@ -354,7 +359,7 @@ int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pC
             pAlgo->getBackgroundImage(oLastBGImg);
             if(!oROI.empty())
                 cv::bitwise_or(oLastBGImg,UCHAR_MAX/2,oLastBGImg,oROI==0);
-            cv::Mat oDisplayFrame = DatasetUtils::Segm::GetDisplayImage(oLastInputFrame,oLastBGImg,g_pEvaluator?g_pEvaluator->GetColoredSegmMaskFromResult(oLastFGMask,oLastGTMask,oROI):oLastFGMask,nCurrFrameIdx);
+            cv::Mat oDisplayFrame = DatasetUtils::GetDisplayImage(oLastInputFrame,oLastBGImg,pCurrSequence->m_pEvaluator?pCurrSequence->m_pEvaluator->GetColoredSegmMaskFromResult(oLastFGMask,oLastGTMask,oROI):oLastFGMask,nCurrFrameIdx);
             cv::Mat oDisplayFrameResized;
             if(oDisplayFrame.cols>1280 || oDisplayFrame.rows>960)
                 cv::resize(oDisplayFrame,oDisplayFrameResized,cv::Size(oDisplayFrame.cols/2,oDisplayFrame.rows/2));
@@ -382,8 +387,8 @@ int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pC
             pCurrSequence->WriteResult(nCurrFrameIdx,oLastFGMask);
 #endif //WRITE_IMG_OUTPUT
 #if (EVALUATE_OUTPUT && (!USE_GLSL_EVALUATION || VALIDATE_GPU_EVALUATION))
-            if(g_pEvaluator)
-                g_pEvaluator->AccumulateMetricsFromResult(oCurrFGMask,oCurrGTMask,oROI,pCurrSequence->m_oMetrics);
+            if(pCurrSequence->m_pEvaluator)
+                pCurrSequence->m_pEvaluator->AccumulateMetricsFromResult(oCurrFGMask,oCurrGTMask,oROI);
 #endif //(EVALUATE_OUTPUT && (!USE_GLSL_EVALUATION || VALIDATE_GPU_EVALUATION))
             TIMER_INTERNAL_TOC(OverallLoop);
 #if DISPLAY_TIMERS
@@ -398,43 +403,56 @@ int AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pC
         const double dAvgFPS = (double)nCurrFrameIdx/dTimeElapsed;
         std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
 #if EVALUATE_OUTPUT
+        if(pCurrSequence->m_pEvaluator) {
 #if USE_GLSL_EVALUATION
 #if VALIDATE_GPU_EVALUATION
-        printf("cpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN);
+            printf("cpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTP,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTN,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFP,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFN,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nSE,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTP+pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTN+pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFP+pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFN);
 #endif //VALIDATE_USE_GLSL_EVALUATION
-        pCurrSequence->m_oMetrics = pGLSLAlgoEvaluator->getCumulativeMetrics();
+            pCurrSequence->m_pEvaluator->FetchGLEvaluationResults(pGLSLAlgoEvaluator);
 #if VALIDATE_GPU_EVALUATION
-        printf("gpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->nTP,pCurrSequence->nTN,pCurrSequence->nFP,pCurrSequence->nFN,pCurrSequence->nSE,pCurrSequence->nTP+pCurrSequence->nTN+pCurrSequence->nFP+pCurrSequence->nFN);
+            printf("gpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTP,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTN,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFP,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFN,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nSE,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTP+pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTN+pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFP+pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFN);
 #endif //VALIDATE_USE_GLSL_EVALUATION
 #endif //USE_GLSL_EVALUATION
-        pCurrSequence->m_oMetrics.dTimeElapsed_sec = dTimeElapsed;
-        DatasetUtils::Segm::WriteMetrics(pCurrSequence->m_sResultsPath+"../"+pCurrSequence->m_sName+".txt",*pCurrSequence);
+            pCurrSequence->m_pEvaluator->dTimeElapsed_sec = dTimeElapsed;
+        }
 #endif //EVALUATE_OUTPUT
 #if DISPLAY_OUTPUT
         cv::destroyWindow(sDisplayName);
 #endif //DISPLAY_OUTPUT
     }
-    catch(const GLException& e) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSequence caught GLException:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
-    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSequence caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
-    catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSequence caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
-    catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSequence caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl;}
+    catch(const GLException& e) {
+        std::cout << "\nAnalyzeSequence caught GLException:\n" << e.what();
+        if(!g_sLatestGLFWErrorMessage.empty()) {
+            std::cout << " (" << g_sLatestGLFWErrorMessage << ")" << "\n" << std::endl;
+            g_sLatestGLFWErrorMessage = std::string();
+        }
+        else
+            std::cout << "\n" << std::endl;
+    }
+    catch(const cv::Exception& e) {std::cout << "\nAnalyzeSequence caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
+    catch(const std::exception& e) {std::cout << "\nAnalyzeSequence caught std::exception:\n" << e.what() << "\n" << std::endl;}
+    catch(...) {std::cout << "\nAnalyzeSequence caught unhandled exception\n" << std::endl;}
     if(bGPUContextInitialized)
         glfwTerminate();
-    if(pCurrSequence.get() && DATASET_PRECACHING)
-        pCurrSequence->StopPrecaching();
-    return 0;
+    if(pCurrSequence.get()) {
+        if(DATASET_PRECACHING)
+            pCurrSequence->StopPrecaching();
+        pCurrSequence->m_nImagesProcessed.set_value(nCurrFrameIdx);
+    }
 }
 #elif (HAVE_CUDA && USE_CUDA_IMPL)
 static_assert(false,"missing impl");
 #elif (HAVE_OPENCL && USE_OPENCL_IMPL)
 static_assert(false,"missing impl");
 #elif !USE_GPU_IMPL
-int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCurrSequence) {
+void AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCurrSequence) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
     size_t nCurrFrameIdx = 0;
     try {
         CV_Assert(pCurrSequence.get() && pCurrSequence->GetTotalImageCount()>1);
+        if(pCurrSequence->m_pEvaluator==nullptr && EVALUATE_OUTPUT)
+            throw std::runtime_error(cv::format("Missing evaluation impl for video segmentation dataset '%s'",g_pDatasetInfo->m_sDatasetName.c_str()));
         const std::string sCurrSeqName = pCurrSequence->m_sName.size()>12?pCurrSequence->m_sName.substr(0,12):pCurrSequence->m_sName;
         const size_t nFrameCount = pCurrSequence->GetTotalImageCount();
         const cv::Mat oROI = LIMIT_MODEL_TO_SEQUENCE_ROI?pCurrSequence->GetROI():cv::Mat();
@@ -524,7 +542,7 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::S
             pAlgo->getBackgroundImage(oCurrBGImg);
             if(!oROI.empty())
                 cv::bitwise_or(oCurrBGImg,UCHAR_MAX/2,oCurrBGImg,oROI==0);
-            cv::Mat oDisplayFrame = DatasetUtils::Segm::GetDisplayImage(oCurrInputFrame,oCurrBGImg,g_pEvaluator?g_pEvaluator->GetColoredSegmMaskFromResult(oCurrFGMask,oCurrGTMask,oROI):oCurrFGMask,nCurrFrameIdx,cv::Point(*g_pnLatestMouseX,*g_pnLatestMouseY));
+            cv::Mat oDisplayFrame = DatasetUtils::GetDisplayImage(oCurrInputFrame,oCurrBGImg,pCurrSequence->m_pEvaluator?pCurrSequence->m_pEvaluator->GetColoredSegmMaskFromResult(oCurrFGMask,oCurrGTMask,oROI):oCurrFGMask,nCurrFrameIdx,cv::Point(*g_pnLatestMouseX,*g_pnLatestMouseY));
             cv::Mat oDisplayFrameResized;
             if(oDisplayFrame.cols>1280 || oDisplayFrame.rows>960)
                 cv::resize(oDisplayFrame,oDisplayFrameResized,cv::Size(oDisplayFrame.cols/2,oDisplayFrame.rows/2));
@@ -552,8 +570,8 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::S
             pCurrSequence->WriteResult(nCurrFrameIdx,oCurrFGMask);
 #endif //WRITE_IMG_OUTPUT
 #if EVALUATE_OUTPUT
-            if(g_pEvaluator)
-                g_pEvaluator->AccumulateMetricsFromResult(oCurrFGMask,oCurrGTMask,oROI,pCurrSequence->m_oMetrics);
+            if(pCurrSequence->m_pEvaluator)
+                pCurrSequence->m_pEvaluator->AccumulateMetricsFromResult(oCurrFGMask,oCurrGTMask,oROI);
 #endif //EVALUATE_OUTPUT
             TIMER_INTERNAL_TOC(OverallLoop);
 #if DISPLAY_TIMERS
@@ -568,8 +586,10 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::S
         const double dAvgFPS = (double)nCurrFrameIdx/dTimeElapsed;
         std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
 #if EVALUATE_OUTPUT
-        pCurrSequence->m_oMetrics.dTimeElapsed_sec = dTimeElapsed;
-        DatasetUtils::Segm::WriteMetrics(pCurrSequence->m_sResultsPath+"../"+pCurrSequence->m_sName+".txt",*pCurrSequence);
+        if(pCurrSequence->m_pEvaluator) {
+            pCurrSequence->m_pEvaluator->dTimeElapsed_sec = dTimeElapsed;
+            //pCurrSequence->m_pEvaluator->WriteMetrics(pCurrSequence->m_sResultsPath+"../"+pCurrSequence->m_sName+".txt",*pCurrSequence);
+        }
 #endif //EVALUATE_OUTPUT
 #if DISPLAY_OUTPUT
         cv::destroyWindow(sDisplayName);
@@ -581,12 +601,14 @@ int AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::S
         g_pnLatestMouseY = &g_nLatestMouseY;
 #endif //DEBUG_OUTPUT
     }
-    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSequence caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
-    catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSequence caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
-    catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSequence caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl;}
+    catch(const cv::Exception& e) {std::cout << "\nAnalyzeSequence caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
+    catch(const std::exception& e) {std::cout << "\nAnalyzeSequence caught std::exception:\n" << e.what() << "\n" << std::endl;}
+    catch(...) {std::cout << "\nAnalyzeSequence caught unhandled exception\n" << std::endl;}
     g_nActiveThreads--;
-    if(pCurrSequence.get() && DATASET_PRECACHING)
-        pCurrSequence->StopPrecaching();
-    return 0;
+    if(pCurrSequence.get()) {
+        if(DATASET_PRECACHING)
+            pCurrSequence->StopPrecaching();
+        pCurrSequence->m_nImagesProcessed.set_value(nCurrFrameIdx);
+    }
 }
 #endif //!USE_GPU_IMPL

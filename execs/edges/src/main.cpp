@@ -2,8 +2,8 @@
 #include "litiv/utils/DatasetEvalUtils.hpp"
 
 ////////////////////////////////
-#define WRITE_IMG_OUTPUT        0
-#define EVALUATE_OUTPUT         0
+#define WRITE_IMG_OUTPUT        1
+#define EVALUATE_OUTPUT         1
 #define DEBUG_OUTPUT            0
 #define DISPLAY_OUTPUT          0
 #define DISPLAY_TIMERS          0
@@ -11,32 +11,39 @@
 #define USE_CANNY               1
 #define USE_LBSP                0
 ////////////////////////////////
-#define FULL_THRESH_ANALYSIS    1
+#define FULL_THRESH_ANALYSIS    0
 ////////////////////////////////
 #define USE_GLSL_IMPL           0
 #define USE_CUDA_IMPL           0
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
-#define DATASET_ID              eDataset_BSDS500_train
+#define DATASET_ID              eDataset_BSDS500_edge_train
 #define DATASET_ROOT_PATH       std::string("/shared2/datasets/")
 #define DATASET_RESULTS_PATH    std::string("results_test")
 #define DATASET_PRECACHING      1
 ////////////////////////////////
+#if (DEBUG_OUTPUT && !DISPLAY_OUTPUT)
+#undef DISPLAY_OUTPUT
+#define DISPLAY_OUTPUT 1
+#endif //(DEBUG_OUTPUT && !DISPLAY_OUTPUT)
+#if (DEBUG_OUTPUT && FULL_THRESH_ANALYSIS)
+#error "Cannot enable debug output while using all threshold values."
+#endif //(DEBUG_OUTPUT && FULL_THRESH_ANALYSIS)
+#define USE_GPU_IMPL (USE_GLSL_IMPL||USE_CUDA_IMPL||USE_OPENCL_IMPL)
 #if EVALUATE_OUTPUT
-#if HAVE_GLSL
-#define USE_GLSL_EVALUATION     1
-#endif //HAVE_GLSL
-#if HAVE_CUDA
-#define USE_CUDA_EVALUATION     1
-#endif //HAVE_CUDA
-#if HAVE_OPENCL
-#define USE_OPENCL_EVALUATION   1
-#endif //HAVE_OPENCL
+#if (HAVE_GLSL && USE_GLSL_IMPL)
+#define USE_GLSL_EVALUATION 1
+#endif //(HAVE_GLSL && USE_GLSL_IMPL)
+#if (HAVE_CUDA && USE_CUDA_IMPL)
+#define USE_CUDA_EVALUATION 1
+#endif //(HAVE_CUDA && USE_CUDA_IMPL)
+#if (HAVE_OPENCL && USE_OPENCL_IMPL)
+#define USE_OPENCL_EVALUATION 1
+#endif //(HAVE_OPENCL && USE_OPENCL_IMPL)
 #if HAVE_GPU_SUPPORT
 #define VALIDATE_GPU_EVALUATION 0
 #endif //HAVE_GPU_SUPPORT
 #endif //EVALUATE_OUTPUT
-////////////////////////////////
 #ifndef VALIDATE_GPU_EVALUATION
 #define VALIDATE_GPU_EVALUATION 0
 #endif //VALIDATE_GPU_EVALUATION
@@ -49,14 +56,6 @@
 #ifndef USE_OPENCL_EVALUATION
 #define USE_OPENCL_EVALUATION 0
 #endif //USE_OPENCL_EVALUATION
-#if (DEBUG_OUTPUT && !DISPLAY_OUTPUT)
-#undef DISPLAY_OUTPUT
-#define DISPLAY_OUTPUT 1
-#endif //(DEBUG_OUTPUT && !DISPLAY_OUTPUT)
-#if (DEBUG_OUTPUT && FULL_THRESH_ANALYSIS)
-#error "Cannot enable debug output while using all threshold values."
-#endif //(DEBUG_OUTPUT && FULL_THRESH_ANALYSIS)
-#define USE_GPU_IMPL (USE_GLSL_IMPL||USE_CUDA_IMPL||USE_OPENCL_IMPL)
 #define USE_GPU_EVALUATION (USE_GLSL_EVALUATION || USE_CUDA_EVALUATION || USE_OPENCL_EVALUATION)
 #define NEED_EDGES_MASK (DISPLAY_OUTPUT || WRITE_IMG_OUTPUT || (EVALUATE_OUTPUT && (!USE_GPU_EVALUATION || VALIDATE_GPU_EVALUATION)))
 #define NEED_LAST_GT_MASK (DISPLAY_OUTPUT || (EVALUATE_OUTPUT && (!USE_GPU_EVALUATION || VALIDATE_GPU_EVALUATION)))
@@ -80,13 +79,13 @@
 #define TIMER_INTERNAL_ELAPSED_MS(x)
 #endif //!ENABLE_INTERNAL_TIMERS
 #if (HAVE_GLSL && USE_GLSL_IMPL)
-int AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet);
+void AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet);
 #elif (HAVE_CUDA && USE_CUDA_IMPL)
 static_assert(false,"missing impl");
 #elif (HAVE_OPENCL && USE_OPENCL_IMPL)
 static_assert(false,"missing impl");
 #elif !USE_GPU_IMPL
-int AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet);
+void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet);
 #else // bad config
 #error "Bad config, trying to use an unavailable impl."
 #endif // bad config
@@ -94,14 +93,11 @@ int AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> p
 std::atomic_size_t g_nActiveThreads(0);
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
 const std::shared_ptr<DatasetUtils::Segm::Image::DatasetInfo> g_pDatasetInfo = DatasetUtils::Segm::Image::GetDatasetInfo(DatasetUtils::Segm::Image::DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH,USE_GPU_IMPL);
-const std::shared_ptr<DatasetUtils::Segm::SegmEvaluator> g_pEvaluator = std::dynamic_pointer_cast<DatasetUtils::Segm::SegmEvaluator>(g_pDatasetInfo->m_pEvaluator);
 
 int main(int, char**) {
     try {
-        if(g_pEvaluator==nullptr && EVALUATE_OUTPUT)
-            throw std::runtime_error(cv::format("Missing evaluation impl for image segmentation dataset '%s'",g_pDatasetInfo->m_sDatasetName.c_str()));
         std::cout << "Parsing dataset '" << g_pDatasetInfo->m_sDatasetName << "'..." << std::endl;
-        std::vector<std::shared_ptr<DatasetUtils::WorkGroup>> vpDatasetGroups = DatasetUtils::DatasetInfoBase::ParseDataset(*g_pDatasetInfo);
+        std::vector<std::shared_ptr<DatasetUtils::WorkGroup>> vpDatasetGroups = g_pDatasetInfo->ParseDataset();
         size_t nImagesTotal = 0;
         // @@@ check out priority_queue?
         std::multimap<double,std::shared_ptr<DatasetUtils::Segm::Image::Set>> mSetsLoads;
@@ -141,40 +137,46 @@ int main(int, char**) {
         }
         while(g_nActiveThreads>0)
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        size_t nTotImagesProcessed = 0;
+        for(auto pSetIter = mSetsLoads.rbegin(); pSetIter!=mSetsLoads.rend(); ++pSetIter)
+            nTotImagesProcessed += pSetIter->second->m_nImagesProcessed.get_future().get();
         const time_t nShutdownTime = time(nullptr);
         const std::string sShutdownTimeStr(asctime(localtime(&nShutdownTime)));
         std::cout << "[" << sShutdownTimeStr.substr(0,sShutdownTimeStr.size()-1) << "]\n" << std::endl;
-        if(EVALUATE_OUTPUT) {
-            std::cout << "Summing and writing metrics results..." << std::endl;
-            for(size_t c = 0; c<vpDatasetGroups.size(); ++c) {
-                if(!vpDatasetGroups[c]->m_vpBatches.empty()) {
-                    for(size_t s = 0; s<vpDatasetGroups[c]->m_vpBatches.size(); ++s)
-                        DatasetUtils::Segm::WriteMetrics(vpDatasetGroups[c]->m_sResultsPath+vpDatasetGroups[c]->m_vpBatches[s]->m_sName+".txt",dynamic_cast<const DatasetUtils::Segm::SegmWorkBatch&>(*vpDatasetGroups[c]->m_vpBatches[s]));
-                    std::sort(vpDatasetGroups[c]->m_vpBatches.begin(),vpDatasetGroups[c]->m_vpBatches.end(),DatasetUtils::WorkBatch::compare<DatasetUtils::WorkBatch>);
-                    DatasetUtils::Segm::WriteMetrics(vpDatasetGroups[c]->m_sResultsPath+vpDatasetGroups[c]->m_sName+".txt",*vpDatasetGroups[c]);
-                    std::cout << std::endl;
-                }
-            }
-            std::sort(vpDatasetGroups.begin(),vpDatasetGroups.end(),&DatasetUtils::WorkBatch::compare<DatasetUtils::WorkBatch>);
-            DatasetUtils::Segm::WriteMetrics(g_pDatasetInfo->m_sResultsRootPath+"/overall.txt",vpDatasetGroups);
+        if(EVALUATE_OUTPUT && nTotImagesProcessed==nImagesTotal) {
+            std::cout << "Writing evaluation results..." << std::endl;
+            g_pDatasetInfo->WriteEvalResults(vpDatasetGroups);
+
         }
-        std::cout << "All done." << std::endl;
+        else if(EVALUATE_OUTPUT && nTotImagesProcessed<nImagesTotal)
+            std::cout << "Skipping eval results output, as some image sets were skipped." << std::endl;
     }
-    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
-    catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
-    catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl;}
+    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
+    catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
+    catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
+    std::cout << "\nAll done." << std::endl;
     return 0;
 }
 
 #if (HAVE_GLSL && USE_GLSL_IMPL)
-int AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
+std::string g_sLatestGLFWErrorMessage;
+void GLFWErrorCallback(int nCode, const char* acMessage) {
+    std::stringstream ssStr;
+    ssStr << "code: " << nCode << ", message: " << acMessage;
+    g_sLatestGLFWErrorMessage = ssStr.str();
+}
+
+void AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
     size_t nCurrImageIdx = 0;
     size_t nNextImageIdx = nCurrImageIdx+1;
     bool bGPUContextInitialized = false;
     try {
+        glfwSetErrorCallback(GLFWErrorCallback);
         CV_Assert(pCurrSet.get() && pCurrSet->GetTotalImageCount()>0);
+        if(pCurrSet->m_pEvaluator==nullptr && EVALUATE_OUTPUT)
+            throw std::runtime_error(cv::format("Missing evaluation impl for image segmentation dataset '%s'",g_pDatasetInfo->m_sDatasetName.c_str()));
         const std::string sCurrSetName = pCurrSet->m_sName.size()>12?pCurrSet->m_sName.substr(0,12):pCurrSet->m_sName;
         const size_t nImageCount = pCurrSet->GetTotalImageCount();
         cv::Mat oCurrInputImage = pCurrSet->GetInputFromIndex(nCurrImageIdx).clone();
@@ -210,7 +212,7 @@ int AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
 #if !DISPLAY_OUTPUT
         glfwWindowHint(GLFW_VISIBLE,GL_FALSE);
 #endif //!DISPLAY_OUTPUT
-        std::unique_ptr<GLFWwindow,void(*)(GLFWwindow*)> pWindow(glfwCreateWindow(oWindowSize.width,oWindowSize.height,(pCurrSequence->m_sRelativePath+" [GPU]").c_str(),nullptr,nullptr),glfwDestroyWindow);
+        std::unique_ptr<GLFWwindow,void(*)(GLFWwindow*)> pWindow(glfwCreateWindow(oWindowSize.width,oWindowSize.height,(pCurrSet->m_sRelativePath+" [GPU]").c_str(),nullptr,nullptr),glfwDestroyWindow);
         if(!pWindow)
             glError("Failed to create window via GLFW");
         glfwMakeContextCurrent(pWindow.get());
@@ -234,7 +236,9 @@ int AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
         if(!pGLSLAlgo->getIsUsingDisplay() && DISPLAY_OUTPUT) // @@@@ determine in advance to hint window to hide? or just always hide, and show when needed?
             glfwHideWindow(pWindow.get());
 #if USE_GLSL_EVALUATION
-        std::shared_ptr<DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator> pGLSLAlgoEvaluator = std::dynamic_pointer_cast<DatasetUtils::Segm::SegmEvaluator::GLSegmEvaluator>(g_pEvaluator->CreateGLEvaluator(pGLSLAlgo,nImageCount));
+        std::shared_ptr<DatasetUtils::EvaluatorBase::GLEvaluatorBase> pGLSLAlgoEvaluator;
+        if(pCurrSet->m_pEvaluator!=nullptr)
+            pGLSLAlgoEvaluator = std::dynamic_pointer_cast<DatasetUtils::EvaluatorBase::GLEvaluatorBase>(pCurrSet->m_pEvaluator->CreateGLEvaluator(pGLSLAlgo,nImageCount));
         if(pGLSLAlgoEvaluator==nullptr)
             glError("Segmentation evaluation algorithm has no GLSegmEvaluator interface");
         pGLSLAlgoEvaluator->initialize(oCurrGTMask,cv::Mat(oCurrInputImage.size(),CV_8UC1,cv::Scalar_<uchar>(255)));
@@ -246,7 +250,7 @@ int AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
         glViewport(0,0,oWindowSize.width,oWindowSize.height);
         TIMER_TIC(MainLoop);
         while(nNextImageIdx<=nImageCount) {
-            if(!((nCurrImageIdx+1)%100))
+            //if(!((nCurrImageIdx+1)%100))
                 std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSetName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nImageCount)) << nCurrImageIdx+1 << "/" << nImageCount << "   [GPU]" << std::endl;
             TIMER_INTERNAL_TIC(OverallLoop);
             TIMER_INTERNAL_TIC(PipelineUpdate);
@@ -286,7 +290,7 @@ int AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
 #endif //NEED_EDGES_MASK
 #if DISPLAY_OUTPUT
             @@@ update via copy of non-parallel impl
-            cv::Mat oDisplayImage = DatasetUtils::Segm::GetDisplayImage(oLastInputImage,oLastInputImage,g_pEvaluator?g_pEvaluator->GetColoredSegmMaskFromResult(oLastEdgeMask,oLastGTMask,cv::Mat()):oLastEdgeMask,nCurrImageIdx);
+            cv::Mat oDisplayImage = DatasetUtils::GetDisplayImage(oLastInputImage,oLastEdgeMask,pCurrSet->m_pEvaluator?pCurrSet->m_pEvaluator->GetColoredSegmMaskFromResult(oLastEdgeMask,oLastGTMask,cv::Mat()):oLastEdgeMask,nCurrImageIdx);
             cv::Mat oDisplayImageResized;
             if(oDisplayImage.cols>1280 || oDisplayImage.rows>960)
                 cv::resize(oDisplayImage,oDisplayImageResized,cv::Size(oDisplayImage.cols/2,oDisplayImage.rows/2));
@@ -311,8 +315,8 @@ int AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
             pCurrSet->WriteResult(nCurrImageIdx,oLastEdgeMask);
 #endif //WRITE_IMG_OUTPUT
 #if (EVALUATE_OUTPUT && (!USE_GLSL_EVALUATION || VALIDATE_GPU_EVALUATION))
-            if(g_pEvaluator)
-                g_pEvaluator->AccumulateMetricsFromResult(oCurrEdgeMask,oCurrGTMask,cv::Mat(),pCurrSet->m_oMetrics);
+            if(pCurrSet->m_pEvaluator)
+                pCurrSet->m_pEvaluator->AccumulateMetricsFromResult(oCurrEdgeMask,oCurrGTMask,cv::Mat());
 #endif //(EVALUATE_OUTPUT && (!USE_GLSL_EVALUATION || VALIDATE_GPU_EVALUATION))
             TIMER_INTERNAL_TOC(OverallLoop);
 #if DISPLAY_TIMERS
@@ -327,43 +331,56 @@ int AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
         const double dAvgFPS = (double)nCurrImageIdx/dTimeElapsed;
         std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSetName << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
 #if EVALUATE_OUTPUT
+        if(pCurrSet->m_pEvaluator) {
 #if USE_GLSL_EVALUATION
 #if VALIDATE_GPU_EVALUATION
-        printf("cpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSet->nTP,pCurrSet->nTN,pCurrSet->nFP,pCurrSet->nFN,pCurrSet->nSE,pCurrSet->nTP+pCurrSet->nTN+pCurrSet->nFP+pCurrSet->nFN);
-#endif //VALIDATE_GPU_EVALUATION
-        pCurrSet->m_oMetrics = pGLSLAlgoEvaluator->getCumulativeMetrics();
+            printf("cpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSet->m_pEvaluator->m_oBasicMetrics.nTP,pCurrSet->m_pEvaluator->m_oBasicMetrics.nTN,pCurrSet->m_pEvaluator->m_oBasicMetrics.nFP,pCurrSet->m_pEvaluator->m_oBasicMetrics.nFN,pCurrSet->m_pEvaluator->m_oBasicMetrics.nSE,pCurrSet->m_pEvaluator->m_oBasicMetrics.nTP+pCurrSet->m_pEvaluator->m_oBasicMetrics.nTN+pCurrSet->m_pEvaluator->m_oBasicMetrics.nFP+pCurrSet->m_pEvaluator->m_oBasicMetrics.nFN);
+#endif //VALIDATE_USE_GLSL_EVALUATION
+            pCurrSet->m_pEvaluator->FetchGLEvaluationResults(pGLSLAlgoEvaluator);
 #if VALIDATE_GPU_EVALUATION
-        printf("gpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSet->nTP,pCurrSet->nTN,pCurrSet->nFP,pCurrSet->nFN,pCurrSet->nSE,pCurrSet->nTP+pCurrSet->nTN+pCurrSet->nFP+pCurrSet->nFN);
-#endif //VALIDATE_GPU_EVALUATION
+            printf("gpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSet->m_pEvaluator->m_oBasicMetrics.nTP,pCurrSet->m_pEvaluator->m_oBasicMetrics.nTN,pCurrSet->m_pEvaluator->m_oBasicMetrics.nFP,pCurrSet->m_pEvaluator->m_oBasicMetrics.nFN,pCurrSet->m_pEvaluator->m_oBasicMetrics.nSE,pCurrSet->m_pEvaluator->m_oBasicMetrics.nTP+pCurrSet->m_pEvaluator->m_oBasicMetrics.nTN+pCurrSet->m_pEvaluator->m_oBasicMetrics.nFP+pCurrSet->m_pEvaluator->m_oBasicMetrics.nFN);
+#endif //VALIDATE_USE_GLSL_EVALUATION
 #endif //USE_GLSL_EVALUATION
-        pCurrSet->m_oMetrics.dTimeElapsed_sec = dTimeElapsed;
-        DatasetUtils::Segm::WriteMetrics(pCurrSet->m_sResultsPath+"../"+pCurrSet->m_sName+".txt",*pCurrSet);
+            pCurrSet->m_pEvaluator->dTimeElapsed_sec = dTimeElapsed;
+        }
 #endif //EVALUATE_OUTPUT
 #if DISPLAY_OUTPUT
         cv::destroyWindow(sDisplayName);
 #endif //DISPLAY_OUTPUT
     }
-    catch(const GLException& e) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSet caught GLException:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
-    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSet caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
-    catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSet caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
-    catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSet caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl;}
+    catch(const GLException& e) {
+        std::cout << "\nAnalyzeSequence caught GLException:\n" << e.what();
+        if(!g_sLatestGLFWErrorMessage.empty()) {
+            std::cout << " (" << g_sLatestGLFWErrorMessage << ")" << "\n" << std::endl;
+            g_sLatestGLFWErrorMessage = std::string();
+        }
+        else
+            std::cout << "\n" << std::endl;
+    }
+    catch(const cv::Exception& e) {std::cout << "\nAnalyzeSequence caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
+    catch(const std::exception& e) {std::cout << "\nAnalyzeSequence caught std::exception:\n" << e.what() << "\n" << std::endl;}
+    catch(...) {std::cout << "\nAnalyzeSequence caught unhandled exception\n" << std::endl;}
     if(bGPUContextInitialized)
         glfwTerminate();
-    if(pCurrSet.get() && DATASET_PRECACHING)
-        pCurrSet->StopPrecaching();
-    return 0;
+    if(pCurrSet.get()) {
+        if(DATASET_PRECACHING)
+            pCurrSet->StopPrecaching();
+        pCurrSet->m_nImagesProcessed.set_value(nCurrImageIdx);
+    }
 }
 #elif (HAVE_CUDA && USE_CUDA_IMPL)
 static_assert(false,"missing impl");
 #elif (HAVE_OPENCL && USE_OPENCL_IMPL)
 static_assert(false,"missing impl");
 #elif !USE_GPU_IMPL
-int AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
+void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
     size_t nCurrImageIdx = 0;
     try {
         CV_Assert(pCurrSet.get() && pCurrSet->GetTotalImageCount()>0);
+        if(pCurrSet->m_pEvaluator==nullptr && EVALUATE_OUTPUT)
+            throw std::runtime_error(cv::format("Missing evaluation impl for image segmentation dataset '%s'",g_pDatasetInfo->m_sDatasetName.c_str()));
         const std::string sCurrSetName = pCurrSet->m_sName.size()>12?pCurrSet->m_sName.substr(0,12):pCurrSet->m_sName;
         const size_t nImageCount = pCurrSet->GetTotalImageCount();
         cv::Mat oCurrInputImage = pCurrSet->GetInputFromIndex(nCurrImageIdx).clone();
@@ -382,6 +399,9 @@ int AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> p
 #elif USE_LBSP
         std::shared_ptr<EdgeDetectorImpl> pAlgo(new EdgeDetectorLBSP());
 #endif //USE_...
+#if !FULL_THRESH_ANALYSIS
+        const double dThreshold = pAlgo->getDefaultThreshold();
+#endif //!FULL_THRESH_ANALYSIS
 #if DISPLAY_OUTPUT
         std::string sDisplayName = pCurrSet->m_sRelativePath;
         cv::namedWindow(sDisplayName);
@@ -396,7 +416,7 @@ int AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> p
         bool bExit = false;
         TIMER_TIC(MainLoop);
         while(nCurrImageIdx<nImageCount && !bExit) {
-            if(!((nCurrImageIdx+1)%100))
+            //if(!((nCurrImageIdx+1)%100))
                 std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSetName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nImageCount)) << nCurrImageIdx+1 << "/" << nImageCount << "   [T=" << nThreadIdx << "]" << std::endl;
             TIMER_INTERNAL_TIC(OverallLoop);
             TIMER_INTERNAL_TIC(ImageQuery);
@@ -409,7 +429,7 @@ int AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> p
 #if FULL_THRESH_ANALYSIS
             pAlgo->apply(oCurrInputImage,oCurrEdgeMask);
 #else //!FULL_THRESH_ANALYSIS
-            pAlgo->apply_threshold(oCurrInputImage,oCurrEdgeMask);
+            pAlgo->apply_threshold(oCurrInputImage,oCurrEdgeMask,dThreshold);
 #endif //!FULL_THRESH_ANALYSIS
             TIMER_INTERNAL_TOC(PipelineUpdate);
 #if DISPLAY_OUTPUT
@@ -417,7 +437,7 @@ int AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> p
             while(!bExit) {
                 pAlgo->apply(oCurrInputImage,oCurrEdgeMask,double(nCurrThreshold)/UCHAR_MAX);
 #endif //DEBUG_OUTPUT
-                cv::Mat oDisplayImage = DatasetUtils::Segm::GetDisplayImage(oCurrInputImage,oCurrInputImage,g_pEvaluator?g_pEvaluator->GetColoredSegmMaskFromResult(oCurrEdgeMask,oCurrGTMask,cv::Mat()):oCurrEdgeMask,nCurrImageIdx);
+                cv::Mat oDisplayImage = DatasetUtils::GetDisplayImage(oCurrInputImage,oCurrEdgeMask,pCurrSet->m_pEvaluator?pCurrSet->m_pEvaluator->GetColoredSegmMaskFromResult(oCurrEdgeMask,oCurrGTMask,cv::Mat()):oCurrEdgeMask,nCurrImageIdx);
                 cv::Mat oDisplayImageResized;
                 if(oDisplayImage.cols>1280 || oDisplayImage.rows>960)
                     cv::resize(oDisplayImage,oDisplayImageResized,cv::Size(oDisplayImage.cols/2,oDisplayImage.rows/2));
@@ -441,8 +461,9 @@ int AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> p
             pCurrSet->WriteResult(nCurrImageIdx,oCurrEdgeMask);
 #endif //WRITE_IMG_OUTPUT
 #if EVALUATE_OUTPUT
-            if(g_pEvaluator)
-                g_pEvaluator->AccumulateMetricsFromResult(oCurrEdgeMask,oCurrGTMask,cv::Mat(),pCurrSet->m_oMetrics);
+            //@@@ FULL_THRESH_ANALYSIS oCurrEdgeMask
+            if(pCurrSet->m_pEvaluator)
+                pCurrSet->m_pEvaluator->AccumulateMetricsFromResult(oCurrEdgeMask,oCurrGTMask,cv::Mat());
 #endif //EVALUATE_OUTPUT
             TIMER_INTERNAL_TOC(OverallLoop);
 #if DISPLAY_TIMERS
@@ -457,19 +478,23 @@ int AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> p
         const double dAvgFPS = (double)nCurrImageIdx/dTimeElapsed;
         std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSetName << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
 #if EVALUATE_OUTPUT
-        pCurrSet->m_oMetrics.dTimeElapsed_sec = dTimeElapsed;
-        DatasetUtils::Segm::WriteMetrics(pCurrSet->m_sResultsPath+"../"+pCurrSet->m_sName+".txt",*pCurrSet);
+        if(pCurrSet->m_pEvaluator) {
+            pCurrSet->m_pEvaluator->dTimeElapsed_sec = dTimeElapsed;
+            //pCurrSet->m_pEvaluator->WriteMetrics(pCurrSet->m_sResultsPath+"../"+pCurrSet->m_sName+".txt",*pCurrSet);
+        }
 #endif //EVALUATE_OUTPUT
 #if DISPLAY_OUTPUT
         cv::destroyWindow(sDisplayName);
 #endif //DISPLAY_OUTPUT
     }
-    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSet caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
-    catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSet caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl;}
-    catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nAnalyzeSet caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl;}
+    catch(const cv::Exception& e) {std::cout << "\nAnalyzeSequence caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
+    catch(const std::exception& e) {std::cout << "\nAnalyzeSequence caught std::exception:\n" << e.what() << "\n" << std::endl;}
+    catch(...) {std::cout << "\nAnalyzeSequence caught unhandled exception\n" << std::endl;}
     g_nActiveThreads--;
-    if(pCurrSet.get() && DATASET_PRECACHING)
-        pCurrSet->StopPrecaching();
-    return 0;
+    if(pCurrSet.get()) {
+        if(DATASET_PRECACHING)
+            pCurrSet->StopPrecaching();
+        pCurrSet->m_nImagesProcessed.set_value(nCurrImageIdx);
+    }
 }
 #endif //!USE_GPU_IMPL

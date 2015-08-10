@@ -8,6 +8,7 @@
 #include <mutex>
 #include <chrono>
 #include <atomic>
+#include <future>
 #include <functional>
 #include <condition_variable>
 
