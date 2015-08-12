@@ -33,7 +33,7 @@
 
 // If seed==0, then the seed is generated from the system clock.
 
-namespace BSDS500Utils {
+namespace BSDS500 {
 
     class Random {
     public:

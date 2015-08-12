@@ -1,8 +1,8 @@
 
-#include "external/BSDS500_utils/Random.hh"
-#include "external/BSDS500_utils/kofn.hh"
+#include "3rdparty/BSDS500/Random.hh"
+#include "3rdparty/BSDS500/kofn.hh"
 
-using namespace BSDS500Utils;
+using namespace BSDS500;
 
 // O(n) implementation.
 static void

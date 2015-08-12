@@ -23,10 +23,10 @@
 // I have good reason to expect it to work with other options, but
 // it has not been tested.
 
-namespace BSDS500Utils {
+namespace BSDS500 {
 
-    #include "external/BSDS500_utils/csa_types.h"
-    #include "external/BSDS500_utils/csa_defs.h"
+    #include "3rdparty/BSDS500/csa_types.h"
+    #include "3rdparty/BSDS500/csa_defs.h"
 
     class CSA
     {

@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "external/BSDS500_utils/Random.hh"
+#include "3rdparty/BSDS500/Random.hh"
 
 // Copyright (C) 2002 David R. Martin <dmartin@eecs.berkeley.edu>
 //
@@ -23,7 +23,7 @@
 // Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 // 02111-1307, USA, or see http://www.gnu.org/copyleft/gpl.html.
 
-using namespace BSDS500Utils;
+using namespace BSDS500;
 
 Random Random::rand;
 

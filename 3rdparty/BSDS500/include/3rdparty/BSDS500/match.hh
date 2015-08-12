@@ -2,7 +2,7 @@
 #ifndef __match_hh__
 #define __match_hh__
 
-namespace BSDS500Utils {
+namespace BSDS500 {
 
     class Matrix;
 

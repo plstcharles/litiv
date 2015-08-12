@@ -1,7 +1,7 @@
 
-#include "external/BSDS500_utils/csa.hh"
+#include "3rdparty/BSDS500/csa.hh"
 
-using namespace BSDS500Utils;
+using namespace BSDS500;
 
 char* CSA::err_messages[] =
 {
