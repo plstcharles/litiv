@@ -1,24 +1,24 @@
 
-project(litiv_features2d)
+litiv_module(features2d)
 
 file(GLOB SOURCE_FILES
     "src/*.cpp"
 )
 
 file(GLOB INCLUDE_FILES
-    "litiv/features2d/*.hpp"
-    "litiv/features2d/*.ipp"
+    "litiv/${LITIV_CURRENT_MODULE_NAME}/*.hpp"
+    "litiv/${LITIV_CURRENT_MODULE_NAME}/*.ipp"
 )
 
-add_library(litiv_features2d SHARED ${SOURCE_FILES})
+add_library(${LITIV_CURRENT_PROJECT_NAME} STATIC ${SOURCE_FILES})
 
-target_link_libraries(litiv_features2d litiv_utils)
-target_compil_litiv_dependencies(litiv_features2d)
-target_include_directories(litiv_features2d
+target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} litiv_utils)
+target_compil_litiv_dependencies(${LITIV_CURRENT_PROJECT_NAME})
+target_include_directories(${LITIV_CURRENT_PROJECT_NAME}
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
     INTERFACE "$<INSTALL_INTERFACE:include/>"
 )
 
-install(TARGETS litiv_features2d DESTINATION lib)
+#install(TARGETS ${LITIV_CURRENT_PROJECT_NAME} DESTINATION lib)
 install(FILES ${INCLUDE_FILES} DESTINATION include)
