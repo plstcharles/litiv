@@ -778,7 +778,8 @@ cv::Mat DatasetUtils::Segm::Image::Set::ReadResult(size_t nImageIdx) {
     std::stringstream sResultFilePath;
     sResultFilePath << m_sResultsPath << m_sResultNamePrefix << m_vsOrigImageNames[nImageIdx] << m_sResultNameSuffix;
     cv::Mat oImage = cv::imread(sResultFilePath.str(),m_bForcingGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
-    if(m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid) {
+    if(m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid ||
+       m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid) {
         CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
         CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size() || m_voOrigImageSizes[nImageIdx]==oImage.size());
         m_voOrigImageSizes[nImageIdx] = oImage.size();
@@ -792,7 +793,8 @@ void DatasetUtils::Segm::Image::Set::WriteResult(size_t nImageIdx, const cv::Mat
     CV_Assert(m_vsOrigImageNames[nImageIdx]!=std::string());
     CV_Assert(!m_sResultNameSuffix.empty());
     cv::Mat oImage = oResult;
-    if(m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid) {
+    if(m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid ||
+       m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid) {
         CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
         CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size(481,321) || m_voOrigImageSizes[nImageIdx]==cv::Size(321,481));
         if(m_voOrigImageSizes[nImageIdx]==cv::Size(321,481))
