@@ -661,7 +661,7 @@ void DatasetUtils::Segm::Video::CDnetEvaluator::AccumulateMetricsFromResult(cons
     }
 }
 
-#if USE_BSDS500_BENCHMARK_UTILS
+#if USE_BSDS500_BENCHMARK
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wwrite-strings"
@@ -683,9 +683,9 @@ void DatasetUtils::Segm::Video::CDnetEvaluator::AccumulateMetricsFromResult(cons
 #ifdef _MSC_VER
 #pragma warning(push,0)
 #endif //defined(_MSC_VER)
-#include "external/BSDS500_utils/csa.hh"
-#include "external/BSDS500_utils/kofn.hh"
-#include "external/BSDS500_utils/match.hh"
+#include "3rdparty/BSDS500/csa.hh"
+#include "3rdparty/BSDS500/kofn.hh"
+#include "3rdparty/BSDS500/match.hh"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif //defined(_MSC_VER)
@@ -695,7 +695,7 @@ void DatasetUtils::Segm::Video::CDnetEvaluator::AccumulateMetricsFromResult(cons
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif //__clang__
-#endif //USE_BSDS500_BENCHMARK_UTILS
+#endif //USE_BSDS500_BENCHMARK
 
 // as defined in the BSDS500 scripts/dataset
 const double DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::s_dMaxImageDiagRatioDist = 0.0075;
@@ -749,7 +749,8 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
         cv::compare(oSegmMask,oBasicMetrics.vnThresholds[nThresholdBinIdx],oCurrSegmMask,cv::CMP_GE);
         // perform thinning? @@@@@ bmap = double(bwmorph(bmap, 'thin', inf)); --- Lam, L., Seong-Whan Lee, and Ching Y. Suen, "Thinning Methodologies-A Comprehensive Survey," PAMI'92
 
-#if USE_BSDS500_BENCHMARK_UTILS
+
+#if USE_BSDS500_BENCHMARK
 
         ///////////////////////////////////////////////////////
         // code below is adapted from match.cc::matchEdgeMaps()
@@ -1032,7 +1033,7 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
             oGTAccumulator |= oCurrGTSegmMask;
         }
 
-#else //!USE_BSDS500_BENCHMARK_UTILS
+#else //!USE_BSDS500_BENCHMARK
 
         oSegmTPAccumulator = cv::Scalar_<uchar>(0); // accP |= ...
         uint64_t nIndivTP = 0; // cntR += ...
@@ -1065,7 +1066,7 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
             }
         }
 
-#endif //!USE_BSDS500_BENCHMARK_UTILS
+#endif //!USE_BSDS500_BENCHMARK
 
         //re = TP / (TP + FN)
         CV_Assert(nGTPosCount>=nIndivTP);
