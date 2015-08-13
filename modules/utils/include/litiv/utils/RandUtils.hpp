@@ -257,4 +257,4 @@ namespace RandUtils {
 
 #endif //HAVE_GLSL
 
-}; //namespace RandUtils
+} //namespace RandUtils

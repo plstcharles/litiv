@@ -7,4 +7,4 @@ namespace litiv {
     //! for now, always returns true
     bool initAll();
 
-}; //namespace litiv
+} //namespace litiv

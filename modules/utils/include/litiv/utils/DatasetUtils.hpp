@@ -176,7 +176,7 @@ namespace DatasetUtils {
                 Sequence(const Sequence&) = delete;
             };
 
-        }; //namespace Video
+        } //namespace Video
 
         namespace Image {
 
@@ -224,8 +224,8 @@ namespace DatasetUtils {
                 Set(const Set&) = delete;
             };
 
-        }; //namespace Image
+        } //namespace Image
 
-    }; //namespace Segm
+    } //namespace Segm
 
-}; //namespace DatasetUtils
+} //namespace DatasetUtils

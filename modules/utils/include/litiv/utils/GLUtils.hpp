@@ -55,7 +55,7 @@ public:
             m_acErrMsg(sErrMsg),
             m_acFuncName(sFunc),
             m_acFileName(sFile),
-            m_nLineNumber(nLine) {};
+            m_nLineNumber(nLine) {}
     const GLenum m_eErrn;
     const char* const m_acErrMsg;
     const char* const m_acFuncName;
@@ -425,4 +425,4 @@ namespace GLUtils {
         return ssRes.str();
     }
 
-}; //namespace GLUtils
+} //namespace GLUtils

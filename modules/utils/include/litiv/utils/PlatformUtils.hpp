@@ -204,4 +204,4 @@ namespace PlatformUtils {
     void SetConsoleWindowSize(int x, int y, int buffer_lines=-1);
 #endif //PLATFORM_USES_WIN32API
 
-}; //namespace PlatformUtils
+} //namespace PlatformUtils

@@ -546,4 +546,4 @@ namespace DistanceUtils {
 
 #endif //HAVE_GLSL
 
-}; //namespace DistanceUtils
+} //namespace DistanceUtils

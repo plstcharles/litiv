@@ -57,7 +57,7 @@ void thinning_internal_LamLeeSuen(cv::Mat& oInput, bool bIter) {
         for(int j=1; j<oInput.cols-1; ++j) {
             if(!oInput.at<uchar>(i,j))
                 continue;
-            std::array<uchar,8> anLUT = {
+            const std::array<uchar,8> anLUT{
                 oInput.at<uchar>(i+1,j  ),
                 oInput.at<uchar>(i+1,j-1),
                 oInput.at<uchar>(i  ,j-1),

@@ -17,7 +17,7 @@ void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::getLatestEdgeM
     if(!GLImageProcAlgo::m_bFetchingOutput)
     glAssert(GLImageProcAlgo::setOutputFetching(true))
     GLImageProcAlgo::fetchLastOutput(oLastEdgeMask);
-};
+}
 
 template<>
 void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_async_glimpl(cv::InputArray _oNextImage, bool bRebindAll, double dThreshold) {
@@ -26,18 +26,18 @@ void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_async_gl
     CV_Assert(oNextInputImg.size()==m_oFrameSize);
     CV_Assert(oNextInputImg.isContinuous());
     GLImageProcAlgo::apply_async(oNextInputImg,bRebindAll);
-};
+}
 
 template<>
 void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_async(cv::InputArray oNextImage, double dThreshold) {
     apply_async_glimpl(oNextImage,false,dThreshold);
-};
+}
 
 template<>
 void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_async(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) {
     apply_async(oNextImage,dThreshold);
     getLatestEdgeMask(oLastEdgeMask);
-};
+}
 
 template<>
 void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_threshold(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) {

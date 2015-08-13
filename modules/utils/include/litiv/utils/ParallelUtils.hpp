@@ -81,4 +81,4 @@ namespace ParallelUtils {
     };
     typedef ParallelImpl<eParallelImpl_None> NoParallelImpl;
 
-}; //namespace ParallelUtils
+} //namespace ParallelUtils

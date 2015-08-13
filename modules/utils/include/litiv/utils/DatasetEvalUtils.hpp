@@ -114,7 +114,7 @@ namespace DatasetUtils {
                 static const uchar s_nSegmShadow;
             };
 
-        }; //namespace Video
+        } //namespace Video
 
         namespace Image {
 
@@ -158,8 +158,8 @@ namespace DatasetUtils {
                 friend class DatasetInfo;
             };
 
-        }; //namespace Image
+        } //namespace Image
 
-    }; //namespace Segm
+    } //namespace Segm
 
-}; //namespace DatasetUtils
+} //namespace DatasetUtils

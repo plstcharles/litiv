@@ -32,19 +32,19 @@ _res = ((L1dist(_anVals[15],_ref) > _t) << 15) |
 #else //(HAVE_SSE4_1 || HAVE_SSE2)
 CV_DbgAssert(((uintptr_t)(&_anVals[0])&15)==0);
 __m128i _anMMXVals = _mm_load_si128((__m128i*)&_anVals[0]);
-__m128i _anRefVals = _mm_set1_epi8(_ref);
+__m128i _anRefVals = _mm_set1_epi8(char(_ref));
 #if HAVE_SSE4_1
 __m128i _anDistVals = _mm_sub_epi8(_mm_max_epu8(_anMMXVals,_anRefVals),_mm_min_epu8(_anMMXVals,_anRefVals));
-__m128i _abCmpRes = _mm_cmpgt_epi8(_mm_xor_si128(_anDistVals,_mm_set1_epi8(0x80)),_mm_set1_epi8(_t^0x80));
+__m128i _abCmpRes = _mm_cmpgt_epi8(_mm_xor_si128(_anDistVals,_mm_set1_epi8(char(0x80))),_mm_set1_epi8(char(_t^0x80)));
 #else //HAVE_SSE2
-__m128i _anBitFlipper = _mm_set1_epi8(0x80);
+__m128i _anBitFlipper = _mm_set1_epi8(char(0x80));
 __m128i _anDistVals = _mm_xor_si128(_anMMXVals,_anBitFlipper);
 _anRefVals = _mm_xor_si128(_anRefVals,_anBitFlipper);
 __m128i _abCmpRes = _mm_cmpgt_epi8(_anDistVals,_anRefVals);
 __m128i _anDistVals1 = _mm_sub_epi8(_anDistVals,_anRefVals);
 __m128i _anDistVals2 = _mm_sub_epi8(_anRefVals,_anDistVals);
 _anDistVals = _mm_or_si128(_mm_and_si128(_abCmpRes,_anDistVals1),_mm_andnot_si128(_abCmpRes,_anDistVals2));
-_abCmpRes = _mm_cmpgt_epi8(_mm_xor_si128(_anDistVals,_anBitFlipper),_mm_set1_epi8(_t^0x80));
-#endif //HAVE_SSE2
+_abCmpRes = _mm_cmpgt_epi8(_mm_xor_si128(_anDistVals,_anBitFlipper),_mm_set1_epi8(char(_t^0x80)));
+#endif //HAVE_SSE20x80u
 _res = _mm_movemask_epi8(_abCmpRes);
 #endif //(HAVE_SSE4_1 || HAVE_SSE2)

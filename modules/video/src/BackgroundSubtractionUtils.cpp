@@ -165,7 +165,7 @@ void BackgroundSubtractorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::getLat
         GLImageProcAlgo::fetchLastOutput(oLastFGMask);
     else
         oLastFGMask = cv::Scalar_<uchar>(0);
-};
+}
 
 template<>
 void BackgroundSubtractorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_async_glimpl(cv::InputArray _oNextImage, bool bRebindAll, double dLearningRate) {
@@ -177,18 +177,18 @@ void BackgroundSubtractorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_
     ++m_nFrameIdx;
     GLImageProcAlgo::apply_async(oNextInputImg,bRebindAll);
     oNextInputImg.copyTo(m_oLastColorFrame);
-};
+}
 
 template<>
 void BackgroundSubtractorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_async(cv::InputArray oNextImage, double dLearningRate) {
     apply_async_glimpl(oNextImage,false,dLearningRate);
-};
+}
 
 template<>
 void BackgroundSubtractorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_async(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate) {
     apply_async(oNextImage,dLearningRate);
     getLatestForegroundMask(oLastFGMask);
-};
+}
 
 template<>
 void BackgroundSubtractorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate) {

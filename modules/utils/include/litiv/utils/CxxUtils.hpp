@@ -74,4 +74,4 @@ namespace CxxUtils {
         bool operator==(const AlignAllocator<T,nByteAlign>& other) const {return true;}
     };
 
-}; //namespace CxxUtils
+} //namespace CxxUtils
