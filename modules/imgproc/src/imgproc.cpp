@@ -70,10 +70,10 @@ void thinning_internal_LamLeeSuen(cv::Mat& oInput, bool bIter) {
             size_t x_h = 0, n1 = 0, n2 = 0;
             for(size_t k=0; k<4; ++k) {
                 // G1:
-                x_h += bool(!anLUT[2*(k+1)-2] && (anLUT[2*(k+1)-1] || anLUT[2*(k+1)]));
+                x_h += bool(!anLUT[2*(k+1)-2] && (anLUT[2*(k+1)-1] || anLUT[(2*(k+1))%8]));
                 // G2:
                 n1 += bool(anLUT[2*(k+1)-2] || anLUT[2*(k+1)-1]);
-                n2 += bool(anLUT[2*(k+1)-1] || anLUT[2*(k+1)]);
+                n2 += bool(anLUT[2*(k+1)-1] || anLUT[(2*(k+1))%8]);
             }
             size_t n_min = std::min(n1,n2);
             if(x_h==1 && n_min>=2 && n_min<=3) {
