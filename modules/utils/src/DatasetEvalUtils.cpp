@@ -1,4 +1,5 @@
 #include "litiv/utils/DatasetEvalUtils.hpp"
+#include "litiv/imgproc.hpp"
 
 DatasetUtils::BasicMetrics::BasicMetrics(std::string sID) :
         nTP(0),nTN(0),nFP(0),nFN(0),nSE(0),dTimeElapsed_sec(0),sInternalID(sID) {}
@@ -706,7 +707,6 @@ cv::Mat DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::GetColoredSegmMaskF
     CV_Assert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1);
     CV_Assert(oSegmMask.cols==oGTSegmMask.cols && (oGTSegmMask.rows%oSegmMask.rows)==0 && (oGTSegmMask.rows/oSegmMask.rows)>=1);
     CV_Assert(oSegmMask.step.p[0]==oGTSegmMask.step.p[0]);
-    // perform thinning? @@@@@ bmap = double(bwmorph(bmap, 'thin', inf)); --- Lam, L., Seong-Whan Lee, and Ching Y. Suen, "Thinning Methodologies-A Comprehensive Survey," PAMI'92
     const double dMaxDist = s_dMaxImageDiagRatioDist*sqrt(double(oSegmMask.cols*oSegmMask.cols+oSegmMask.rows*oSegmMask.rows));
     const int nMaxDist = (int)ceil(dMaxDist);
     CV_Assert(dMaxDist>0 && nMaxDist>0);
@@ -741,14 +741,13 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
 
     const std::vector<uchar> vuEvalUniqueVals = PlatformUtils::unique_8uc1_values(oSegmMask);
     BSDS500BasicMetrics oBasicMetrics(m_nThresholdBins);
-    cv::Mat oCurrSegmMask(oSegmMask.size(),CV_8UC1);
+    cv::Mat oCurrSegmMask(oSegmMask.size(),CV_8UC1), oTmpSegmMask(oSegmMask.size(),CV_8UC1);
     cv::Mat oSegmTPAccumulator(oSegmMask.size(),CV_8UC1);
     size_t nNextEvalUniqueValIdx = 0;
     size_t nThresholdBinIdx = 0;
     while(nThresholdBinIdx<oBasicMetrics.vnThresholds.size()) {
-        cv::compare(oSegmMask,oBasicMetrics.vnThresholds[nThresholdBinIdx],oCurrSegmMask,cv::CMP_GE);
-        // perform thinning? @@@@@ bmap = double(bwmorph(bmap, 'thin', inf)); --- Lam, L., Seong-Whan Lee, and Ching Y. Suen, "Thinning Methodologies-A Comprehensive Survey," PAMI'92
-
+        cv::compare(oSegmMask,oBasicMetrics.vnThresholds[nThresholdBinIdx],oTmpSegmMask,cv::CMP_GE);
+        litiv::thinning(oTmpSegmMask,oCurrSegmMask);
 
 #if USE_BSDS500_BENCHMARK
 
@@ -901,7 +900,7 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
                 }
                 // outliers edges for map1, exclude diagonal
                 for(int nNodeIdx_SEGM=0; nNodeIdx_SEGM<nNodeCount_SEGM; ++nNodeIdx_SEGM) {
-                    BSDS500Utils::kOfN(degree_SEGM,nNodeCount_SEGM-1,vnOutliers.data());
+                    BSDS500::kOfN(degree_SEGM,nNodeCount_SEGM-1,vnOutliers.data());
                     for(int a=0; a<degree_SEGM; a++) {
                         int j = vnOutliers[a];
                         if(j>=nNodeIdx_SEGM) {j++;}
@@ -915,7 +914,7 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
                 }
                 // outliers edges for map2, exclude diagonal
                 for(int nNodeIdx_GT = 0; nNodeIdx_GT<nNodeCount_GT; nNodeIdx_GT++) {
-                    BSDS500Utils::kOfN(degree_GT,nNodeCount_GT-1,vnOutliers.data());
+                    BSDS500::kOfN(degree_GT,nNodeCount_GT-1,vnOutliers.data());
                     for(int a = 0; a<degree_GT; a++) {
                         int i = vnOutliers[a];
                         if(i>=nNodeIdx_GT) {i++;}
@@ -929,7 +928,7 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
                 }
                 // outlier-to-outlier edges
                 for(int i = 0; i<nmax; i++) {
-                    BSDS500Utils::kOfN(degree_mix,nmin,vnOutliers.data());
+                    BSDS500::kOfN(degree_mix,nmin,vnOutliers.data());
                     for(int a = 0; a<degree_mix; a++) {
                         const int j = vnOutliers[a];
                         CV_DbgAssert(j>=0 && j<nmin);
@@ -973,7 +972,7 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
                 }
 
                 // Solve the assignment problem.
-                BSDS500Utils::CSA oCSASolver(2*n,m,(int*)oGraph.data);
+                BSDS500::CSA oCSASolver(2*n,m,(int*)oGraph.data);
                 CV_Assert(oCSASolver.edges()==n);
 
                 cv::Mat oOutGraph(n,3,CV_32SC1);
