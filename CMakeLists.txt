@@ -18,7 +18,7 @@ set(CMAKE_CXX_FLAGS "-march=native -Wall -Wextra -Wfatal-errors")
 #set(CMAKE_SHARED_LINKER_FLAGS "-Wl,--export-all-symbols")
 
 option(USE_TEST "Use some useless global test define" ON)
-option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark impl in litiv_utils" OFF)
+option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark impl in litiv_utils" ON)
 
 ### OPENCV CHECK
 find_package(OpenCV 3.0 REQUIRED)

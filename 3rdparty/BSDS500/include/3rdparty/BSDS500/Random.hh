@@ -122,7 +122,7 @@ namespace BSDS500 {
         return erand48(_xsubi)*(b-a)+a;
     }
 
-}; //namespace BSDS500Utils
+}; //namespace BSDS500
 
 #endif // __Random_hh__
 

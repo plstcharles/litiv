@@ -2582,6 +2582,6 @@ namespace BSDS500 {
 
     };
 
-}; //namespace BSDS500Utils
+}; //namespace BSDS500
 
 #endif // __csa_hh__

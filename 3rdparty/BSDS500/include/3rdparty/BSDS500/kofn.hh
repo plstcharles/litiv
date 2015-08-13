@@ -6,6 +6,6 @@ namespace BSDS500 {
 
     void kOfN (int k, int n, int* values);
 
-}; //namespace BSDS500Utils
+}; //namespace BSDS500
 
 #endif // __kofn_hh__

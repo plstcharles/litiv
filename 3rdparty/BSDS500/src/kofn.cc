@@ -55,7 +55,7 @@ _kOfN_smallK (int k, int n, int* values)
 // Return k randomly selected integers from the interval [0,n), in
 // increasing sorted order.
 void
-BSDS500Utils::kOfN (int k, int n, int* values)
+BSDS500::kOfN (int k, int n, int* values)
 {
     assert (k >= 0);
     assert (n >= 0);
