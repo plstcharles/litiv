@@ -167,28 +167,36 @@ namespace PlatformUtils {
     }
 
     template<typename T>
-    inline typename std::enable_if<std::is_integral<T>::value,std::vector<T>>::type linspace(T a, T b, size_t steps) {
+    inline typename std::enable_if<std::is_integral<T>::value,std::vector<T>>::type linspace(T a, T b, size_t steps, bool bIncludeInitVal=true) {
         if(steps==0)
             return std::vector<T>();
         else if(steps==1)
             return std::vector<T>(1,b);
         std::vector<T> vnResult(steps);
-        const double dStep = double(b-a)/(steps-1);
-        for(size_t nStepIter=0; nStepIter<steps; ++nStepIter)
-            vnResult[nStepIter] = a + T(dStep*nStepIter);
+        const double dStep = double(b-a)/(steps-int(bIncludeInitVal));
+        if(bIncludeInitVal)
+            for(size_t nStepIter = 0; nStepIter<steps; ++nStepIter)
+                vnResult[nStepIter] = a+T(dStep*nStepIter);
+        else
+            for(size_t nStepIter = 1; nStepIter<=steps; ++nStepIter)
+                vnResult[nStepIter-1] = a+T(dStep*nStepIter);
         return vnResult;
     }
 
     template<typename T>
-    inline typename std::enable_if<std::is_floating_point<T>::value,std::vector<T>>::type L1dist(T a, T b, size_t steps) {
+    inline typename std::enable_if<std::is_floating_point<T>::value,std::vector<T>>::type L1dist(T a, T b, size_t steps, bool bIncludeInitVal=true) {
         if(steps==0)
             return std::vector<T>();
         else if(steps==1)
             return std::vector<T>(1,b);
         std::vector<T> vfResult(steps);
-        const T fStep = (b-a)/(steps-1);
-        for(size_t nStepIter=0; nStepIter<steps; ++nStepIter)
-            vfResult[nStepIter] = a + fStep*T(nStepIter);
+        const T fStep = (b-a)/(steps-int(bIncludeInitVal));
+        if(bIncludeInitVal)
+            for(size_t nStepIter = 0; nStepIter<steps; ++nStepIter)
+                vfResult[nStepIter] = a+fStep*T(nStepIter);
+        else
+            for(size_t nStepIter = 1; nStepIter<=steps; ++nStepIter)
+                vfResult[nStepIter] = a+fStep*T(nStepIter);
         return vfResult;
     }
 

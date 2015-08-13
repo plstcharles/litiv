@@ -701,7 +701,7 @@ void DatasetUtils::Segm::Video::CDnetEvaluator::AccumulateMetricsFromResult(cons
 // as defined in the BSDS500 scripts/dataset
 const double DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::s_dMaxImageDiagRatioDist = 0.0075;
 
-DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::BSDS500BoundaryEvaluator(size_t nThresholdBins) : m_nThresholdBins(nThresholdBins) {CV_Assert(m_nThresholdBins>0 && m_nThresholdBins<=UCHAR_MAX+1);}
+DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::BSDS500BoundaryEvaluator(size_t nThresholdBins) : m_nThresholdBins(nThresholdBins) {CV_Assert(m_nThresholdBins>0 && m_nThresholdBins<=UCHAR_MAX);}
 
 cv::Mat DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& /*oUnused*/) const {
     CV_Assert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1);
@@ -1078,21 +1078,20 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
         CV_Assert(nSegmPosCount>=nSegmTPAccCount);
         oBasicMetrics.vnTotalTP[nThresholdBinIdx] = nSegmTPAccCount;
         oBasicMetrics.vnTotalTPFP[nThresholdBinIdx] = nSegmPosCount;
-
+        while(nNextEvalUniqueValIdx+1<vuEvalUniqueVals.size() && vuEvalUniqueVals[nNextEvalUniqueValIdx]<=oBasicMetrics.vnThresholds[nThresholdBinIdx])
+            ++nNextEvalUniqueValIdx;
         while(++nThresholdBinIdx<oBasicMetrics.vnThresholds.size() && oBasicMetrics.vnThresholds[nThresholdBinIdx]<=vuEvalUniqueVals[nNextEvalUniqueValIdx]) {
             oBasicMetrics.vnIndivTP[nThresholdBinIdx] = oBasicMetrics.vnIndivTP[nThresholdBinIdx-1];
             oBasicMetrics.vnIndivTPFN[nThresholdBinIdx] = oBasicMetrics.vnIndivTPFN[nThresholdBinIdx-1];
             oBasicMetrics.vnTotalTP[nThresholdBinIdx] = oBasicMetrics.vnTotalTP[nThresholdBinIdx-1];
             oBasicMetrics.vnTotalTPFP[nThresholdBinIdx] = oBasicMetrics.vnTotalTPFP[nThresholdBinIdx-1];
         }
-        while(nNextEvalUniqueValIdx+1<vuEvalUniqueVals.size() && vuEvalUniqueVals[nNextEvalUniqueValIdx]<oBasicMetrics.vnThresholds[nThresholdBinIdx])
-            ++nNextEvalUniqueValIdx;
     }
     CV_DbgAssert(m_voBasicMetrics.empty() || m_voBasicMetrics[0].vnThresholds==oBasicMetrics.vnThresholds);
     m_voBasicMetrics.push_back(oBasicMetrics);
 }
 
-DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::BSDS500BasicMetrics::BSDS500BasicMetrics(size_t nThresholdsBins) : vnIndivTP(nThresholdsBins,0), vnIndivTPFN(nThresholdsBins,0), vnTotalTP(nThresholdsBins,0), vnTotalTPFP(nThresholdsBins,0), vnThresholds(PlatformUtils::linspace<uchar>(0,UCHAR_MAX,nThresholdsBins)) {}
+DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::BSDS500BasicMetrics::BSDS500BasicMetrics(size_t nThresholdsBins) : vnIndivTP(nThresholdsBins,0), vnIndivTPFN(nThresholdsBins,0), vnTotalTP(nThresholdsBins,0), vnTotalTPFP(nThresholdsBins,0), vnThresholds(PlatformUtils::linspace<uchar>(0,UCHAR_MAX,nThresholdsBins,false)) {}
 
 void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::CalcMetrics(const WorkBatch& oBatch, BSDS500Metrics& oRes) {
     auto pEval = std::dynamic_pointer_cast<BSDS500BoundaryEvaluator>(oBatch.m_pEvaluator);

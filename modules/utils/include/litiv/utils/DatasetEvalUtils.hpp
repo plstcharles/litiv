@@ -119,12 +119,12 @@ namespace DatasetUtils {
         namespace Image {
 
             struct BSDS500BoundaryEvaluator : public EvaluatorBase {
-                BSDS500BoundaryEvaluator(size_t nThresholdBins=UCHAR_MAX+1);
+                BSDS500BoundaryEvaluator(size_t nThresholdBins=UCHAR_MAX);
                 virtual cv::Mat GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& /*oUnused*/) const;
                 virtual void AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& /*oUnused*/);
                 static const double s_dMaxImageDiagRatioDist;
                 struct BSDS500BasicMetrics { // basic eval metrics for a single image
-                    BSDS500BasicMetrics(size_t nThresholdsBins);
+                    BSDS500BasicMetrics(size_t nThresholdsBins); // always skips zero threshold
                     std::vector<uint64_t> vnIndivTP; // one count per threshold
                     std::vector<uint64_t> vnIndivTPFN; // one count per threshold
                     std::vector<uint64_t> vnTotalTP; // one count per threshold
