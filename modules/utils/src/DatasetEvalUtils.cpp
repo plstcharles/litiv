@@ -745,6 +745,7 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
 
     const std::vector<uchar> vuEvalUniqueVals = PlatformUtils::unique_8uc1_values(oSegmMask);
     BSDS500BasicMetrics oBasicMetrics(m_nThresholdBins);
+    CV_DbgAssert(m_voBasicMetrics.empty() || m_voBasicMetrics[0].vnThresholds==oBasicMetrics.vnThresholds);
     cv::Mat oCurrSegmMask(oSegmMask.size(),CV_8UC1), oTmpSegmMask(oSegmMask.size(),CV_8UC1);
     cv::Mat oSegmTPAccumulator(oSegmMask.size(),CV_8UC1);
     size_t nNextEvalUniqueValIdx = 0;
@@ -1091,11 +1092,20 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
             oBasicMetrics.vnTotalTPFP[nThresholdBinIdx] = oBasicMetrics.vnTotalTPFP[nThresholdBinIdx-1];
         }
     }
-    CV_DbgAssert(m_voBasicMetrics.empty() || m_voBasicMetrics[0].vnThresholds==oBasicMetrics.vnThresholds);
     m_voBasicMetrics.push_back(oBasicMetrics);
 }
 
 DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::BSDS500BasicMetrics::BSDS500BasicMetrics(size_t nThresholdsBins) : vnIndivTP(nThresholdsBins,0), vnIndivTPFN(nThresholdsBins,0), vnTotalTP(nThresholdsBins,0), vnTotalTPFP(nThresholdsBins,0), vnThresholds(PlatformUtils::linspace<uchar>(0,UCHAR_MAX,nThresholdsBins,false)) {}
+
+void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::setThresholdBins(size_t nThresholdBins) {
+    CV_Assert(m_nThresholdBins>0 && m_nThresholdBins<=UCHAR_MAX);
+    CV_Assert(m_voBasicMetrics.empty() || m_voBasicMetrics[0].vnThresholds.size()==nThresholdBins); // can't change once we started the eval
+    m_nThresholdBins = nThresholdBins;
+}
+
+size_t DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::getThresholdBins() const {
+    return m_nThresholdBins;
+}
 
 void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::CalcMetrics(const WorkBatch& oBatch, BSDS500Metrics& oRes) {
     auto pEval = std::dynamic_pointer_cast<BSDS500BoundaryEvaluator>(oBatch.m_pEvaluator);

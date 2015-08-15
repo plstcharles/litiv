@@ -2,6 +2,8 @@
 
 #include "litiv/utils/DatasetUtils.hpp"
 
+#define DEFAULT_BSDS500_EDGE_EVAL_THRESHOLD_BINS 99
+
 namespace DatasetUtils {
 
     struct BasicMetrics {
@@ -119,7 +121,7 @@ namespace DatasetUtils {
         namespace Image {
 
             struct BSDS500BoundaryEvaluator : public EvaluatorBase {
-                BSDS500BoundaryEvaluator(size_t nThresholdBins=UCHAR_MAX);
+                BSDS500BoundaryEvaluator(size_t nThresholdBins=DEFAULT_BSDS500_EDGE_EVAL_THRESHOLD_BINS);
                 virtual cv::Mat GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& /*oUnused*/) const;
                 virtual void AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& /*oUnused*/);
                 static const double s_dMaxImageDiagRatioDist;
@@ -131,9 +133,11 @@ namespace DatasetUtils {
                     std::vector<uint64_t> vnTotalTPFP; // one count per threshold
                     const std::vector<uchar> vnThresholds; // list of thresholds
                 };
-                std::vector<BSDS500BasicMetrics> m_voBasicMetrics;
-                const size_t m_nThresholdBins;
+                void setThresholdBins(size_t nThresholdBins);
+                size_t getThresholdBins() const;
             protected:
+                size_t m_nThresholdBins;
+                std::vector<BSDS500BasicMetrics> m_voBasicMetrics;
                 struct BSDS500Score { // edge detection score for a single threshold
                     double dThreshold;
                     double dRecall;

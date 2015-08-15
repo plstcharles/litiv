@@ -5,13 +5,13 @@
 #define WRITE_IMG_OUTPUT        1
 #define EVALUATE_OUTPUT         1
 #define DEBUG_OUTPUT            0
-#define DISPLAY_OUTPUT          0
+#define DISPLAY_OUTPUT          1
 #define DISPLAY_TIMERS          0
 ////////////////////////////////
 #define USE_CANNY               1
 #define USE_LBSP                0
 ////////////////////////////////
-#define FULL_THRESH_ANALYSIS    0
+#define FULL_THRESH_ANALYSIS    1
 ////////////////////////////////
 #define USE_GLSL_IMPL           0
 #define USE_CUDA_IMPL           0
@@ -19,7 +19,7 @@
 ////////////////////////////////
 #define DATASET_ID              eDataset_BSDS500_edge_train
 #define DATASET_ROOT_PATH       std::string("/shared2/datasets/")
-#define DATASET_RESULTS_PATH    std::string("results_test")
+#define DATASET_RESULTS_PATH    std::string("results_ceval_bsds500utils_full")
 #define DATASET_PRECACHING      1
 ////////////////////////////////
 #if (DEBUG_OUTPUT && !DISPLAY_OUTPUT)
@@ -391,9 +391,6 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
         CV_Assert(!oCurrGTMask.empty() && oCurrGTMask.isContinuous());
 #endif //NEED_GT_MASK
         cv::Mat oCurrEdgeMask(oCurrInputImage.size(),CV_8UC1,cv::Scalar_<uchar>(0));
-#if FULL_THRESH_ANALYSIS
-        cv::Mat oCumulEdgeMask(oCurrInputImage.size(),CV_8UC1,cv::Scalar_<uchar>(0));
-#endif //FULL_THRESH_ANALYSIS
 #if USE_CANNY
         std::shared_ptr<EdgeDetectorImpl> pAlgo(new EdgeDetectorCanny());
 #elif USE_LBSP
@@ -403,6 +400,7 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
         const double dThreshold = pAlgo->getDefaultThreshold();
 #endif //!FULL_THRESH_ANALYSIS
 #if DISPLAY_OUTPUT
+        bool bContinuousUpdates = false;
         std::string sDisplayName = pCurrSet->m_sRelativePath;
         cv::namedWindow(sDisplayName);
 #endif //DISPLAY_OUTPUT
@@ -444,12 +442,18 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
                 else
                     oDisplayImageResized = oDisplayImage;
                 cv::imshow(sDisplayName,oDisplayImageResized);
-                int nKeyPressed = cv::waitKey(DEBUG_OUTPUT*100);
+                int nKeyPressed;
+                if(bContinuousUpdates)
+                    nKeyPressed = cv::waitKey(1);
+                else
+                    nKeyPressed = cv::waitKey(DEBUG_OUTPUT*100);
                 if(nKeyPressed!=-1) {
                     nKeyPressed %= (UCHAR_MAX+1); // fixes return val bug in some opencv versions
                     std::cout << "nKeyPressed = " << nKeyPressed%(UCHAR_MAX+1) << std::endl;
                 }
-                if(nKeyPressed==(int)'q')
+                if(nKeyPressed==' ')
+                    bContinuousUpdates = !bContinuousUpdates;
+                else if(nKeyPressed==(int)'q')
                     bExit = true;
 #if DEBUG_OUTPUT
                 else if(nKeyPressed==' ')
