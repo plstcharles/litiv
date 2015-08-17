@@ -1,5 +1,6 @@
 #include "litiv/utils/DatasetEvalUtils.hpp"
 #include "litiv/imgproc.hpp"
+#include "litiv/utils/ConsoleUtils.hpp"
 
 DatasetUtils::BasicMetrics::BasicMetrics(std::string sID) :
         nTP(0),nTN(0),nFP(0),nFN(0),nSE(0),dTimeElapsed_sec(0),sInternalID(sID) {}
@@ -1091,7 +1092,11 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
             oBasicMetrics.vnTotalTP[nThresholdBinIdx] = oBasicMetrics.vnTotalTP[nThresholdBinIdx-1];
             oBasicMetrics.vnTotalTPFP[nThresholdBinIdx] = oBasicMetrics.vnTotalTPFP[nThresholdBinIdx-1];
         }
+
+        const float fCompltRatio = float(nThresholdBinIdx)/oBasicMetrics.vnThresholds.size();
+        litiv::updateConsoleProgressBar("BSDS500 eval:",fCompltRatio);
     }
+    litiv::cleanConsoleRow();
     m_voBasicMetrics.push_back(oBasicMetrics);
 }
 
