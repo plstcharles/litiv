@@ -292,7 +292,7 @@ void AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
             @@@ update via copy of non-parallel impl
             cv::Mat oDisplayImage = DatasetUtils::GetDisplayImage(oLastInputImage,oLastEdgeMask,pCurrSet->m_pEvaluator?pCurrSet->m_pEvaluator->GetColoredSegmMaskFromResult(oLastEdgeMask,oLastGTMask,cv::Mat()):oLastEdgeMask,nCurrImageIdx);
             cv::Mat oDisplayImageResized;
-            if(oDisplayImage.cols>1280 || oDisplayImage.rows>960)
+            if(oDisplayImage.cols>1920 || oDisplayImage.rows>1080)
                 cv::resize(oDisplayImage,oDisplayImageResized,cv::Size(oDisplayImage.cols/2,oDisplayImage.rows/2));
             else
                 oDisplayImageResized = oDisplayImage;
@@ -435,7 +435,7 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
 #endif //DEBUG_OUTPUT
                 cv::Mat oDisplayImage = DatasetUtils::GetDisplayImage(oCurrInputImage,oCurrEdgeMask,pCurrSet->m_pEvaluator?pCurrSet->m_pEvaluator->GetColoredSegmMaskFromResult(oCurrEdgeMask,oCurrGTMask,cv::Mat()):oCurrEdgeMask,nCurrImageIdx);
                 cv::Mat oDisplayImageResized;
-                if(oDisplayImage.cols>1280 || oDisplayImage.rows>960)
+                if(oDisplayImage.cols>1920 || oDisplayImage.rows>1080)
                     cv::resize(oDisplayImage,oDisplayImageResized,cv::Size(oDisplayImage.cols/2,oDisplayImage.rows/2));
                 else
                     oDisplayImageResized = oDisplayImage;

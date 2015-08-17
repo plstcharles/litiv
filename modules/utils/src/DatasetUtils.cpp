@@ -16,7 +16,7 @@ void DatasetUtils::WriteOnImage(cv::Mat& oImg, const std::string& sText, const c
     cv::putText(oImg,sText,cv::Point(4,bBottom?(oImg.rows-15):15),cv::FONT_HERSHEY_PLAIN,1.2,vColor,2,cv::LINE_AA);
 }
 
-cv::Mat DatasetUtils::GetDisplayImage(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oOutputImg, size_t nIdx, cv::Point oDbgPt) {
+cv::Mat DatasetUtils::GetDisplayImage(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oOutputImg, size_t nIdx, cv::Point oDbgPt, cv::Size oRefSize) {
     CV_Assert(!oInputImg.empty() && (oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3 || oInputImg.type()==CV_8UC4));
     CV_Assert(!oDebugImg.empty() && (oDebugImg.type()==CV_8UC1 || oDebugImg.type()==CV_8UC3 || oDebugImg.type()==CV_8UC4) && oDebugImg.size()==oInputImg.size());
     CV_Assert(!oOutputImg.empty() && (oOutputImg.type()==CV_8UC1 || oOutputImg.type()==CV_8UC3 || oOutputImg.type()==CV_8UC4) && oOutputImg.size()==oInputImg.size());
@@ -43,10 +43,11 @@ cv::Mat DatasetUtils::GetDisplayImage(const cv::Mat& oInputImg, const cv::Mat& o
         cv::circle(oInputImgBYTE3,oDbgPt,5,cv::Scalar(255,255,255));
         cv::circle(oOutputImgBYTE3,oDbgPt,5,cv::Scalar(255,255,255));
     }
-    cv::Mat displayH;
-    cv::resize(oInputImgBYTE3,oInputImgBYTE3,cv::Size(320,240));
-    cv::resize(oDebugImgBYTE3,oDebugImgBYTE3,cv::Size(320,240));
-    cv::resize(oOutputImgBYTE3,oOutputImgBYTE3,cv::Size(320,240));
+    if(oRefSize.width>0 && oRefSize.height>0) {
+        cv::resize(oInputImgBYTE3,oInputImgBYTE3,oRefSize);
+        cv::resize(oDebugImgBYTE3,oDebugImgBYTE3,oRefSize);
+        cv::resize(oOutputImgBYTE3,oOutputImgBYTE3,oRefSize);
+    }
 
     std::stringstream sstr;
     sstr << "Input #" << nIdx;
@@ -54,6 +55,7 @@ cv::Mat DatasetUtils::GetDisplayImage(const cv::Mat& oInputImg, const cv::Mat& o
     WriteOnImage(oDebugImgBYTE3,"Debug",cv::Scalar_<uchar>(0,0,255));
     WriteOnImage(oOutputImgBYTE3,"Output",cv::Scalar_<uchar>(0,0,255));
 
+    cv::Mat displayH;
     cv::hconcat(oInputImgBYTE3,oDebugImgBYTE3,displayH);
     cv::hconcat(displayH,oOutputImgBYTE3,displayH);
     return displayH;

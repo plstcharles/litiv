@@ -361,7 +361,7 @@ void AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> p
                 cv::bitwise_or(oLastBGImg,UCHAR_MAX/2,oLastBGImg,oROI==0);
             cv::Mat oDisplayFrame = DatasetUtils::GetDisplayImage(oLastInputFrame,oLastBGImg,pCurrSequence->m_pEvaluator?pCurrSequence->m_pEvaluator->GetColoredSegmMaskFromResult(oLastFGMask,oLastGTMask,oROI):oLastFGMask,nCurrFrameIdx);
             cv::Mat oDisplayFrameResized;
-            if(oDisplayFrame.cols>1280 || oDisplayFrame.rows>960)
+            if(oDisplayImage.cols>1920 || oDisplayImage.rows>1080)
                 cv::resize(oDisplayFrame,oDisplayFrameResized,cv::Size(oDisplayFrame.cols/2,oDisplayFrame.rows/2));
             else
                 oDisplayFrameResized = oDisplayFrame;
@@ -542,7 +542,7 @@ void AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::
                 cv::bitwise_or(oCurrBGImg,UCHAR_MAX/2,oCurrBGImg,oROI==0);
             cv::Mat oDisplayFrame = DatasetUtils::GetDisplayImage(oCurrInputFrame,oCurrBGImg,pCurrSequence->m_pEvaluator?pCurrSequence->m_pEvaluator->GetColoredSegmMaskFromResult(oCurrFGMask,oCurrGTMask,oROI):oCurrFGMask,nCurrFrameIdx,cv::Point(*g_pnLatestMouseX,*g_pnLatestMouseY));
             cv::Mat oDisplayFrameResized;
-            if(oDisplayFrame.cols>1280 || oDisplayFrame.rows>960)
+            if(oDisplayImage.cols>1920 || oDisplayImage.rows>1080)
                 cv::resize(oDisplayFrame,oDisplayFrameResized,cv::Size(oDisplayFrame.cols/2,oDisplayFrame.rows/2));
             else
                 oDisplayFrameResized = oDisplayFrame;
