@@ -371,10 +371,8 @@ void AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> p
                 nKeyPressed = cv::waitKey(1);
             else
                 nKeyPressed = cv::waitKey(0);
-            if(nKeyPressed!=-1) {
+            if(nKeyPressed!=-1)
                 nKeyPressed %= (UCHAR_MAX+1); // fixes return val bug in some opencv versions
-                std::cout << "nKeyPressed = " << nKeyPressed%(UCHAR_MAX+1) << std::endl;
-            }
             if(nKeyPressed==' ')
                 bContinuousUpdates = !bContinuousUpdates;
             else if(nKeyPressed==(int)'q')
@@ -554,10 +552,8 @@ void AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::
                 nKeyPressed = cv::waitKey(1);
             else
                 nKeyPressed = cv::waitKey(0);
-            if(nKeyPressed!=-1) {
+            if(nKeyPressed!=-1)
                 nKeyPressed %= (UCHAR_MAX+1); // fixes return val bug in some opencv versions
-                std::cout << "nKeyPressed = " << nKeyPressed%(UCHAR_MAX+1) << std::endl;
-            }
             if(nKeyPressed==' ')
                 bContinuousUpdates = !bContinuousUpdates;
             else if(nKeyPressed==(int)'q')

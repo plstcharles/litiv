@@ -302,10 +302,8 @@ void AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
                 nKeyPressed = cv::waitKey(1);
             else
                 nKeyPressed = cv::waitKey(0);
-            if(nKeyPressed!=-1) {
+            if(nKeyPressed!=-1)
                 nKeyPressed %= (UCHAR_MAX+1); // fixes return val bug in some opencv versions
-                std::cout << "nKeyPressed = " << nKeyPressed%(UCHAR_MAX+1) << std::endl;
-            }
             if(nKeyPressed==' ')
                 bContinuousUpdates = !bContinuousUpdates;
             else if(nKeyPressed==(int)'q')
@@ -447,10 +445,8 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
                     nKeyPressed = cv::waitKey(1);
                 else
                     nKeyPressed = cv::waitKey(DEBUG_OUTPUT*100);
-                if(nKeyPressed!=-1) {
+                if(nKeyPressed!=-1)
                     nKeyPressed %= (UCHAR_MAX+1); // fixes return val bug in some opencv versions
-                    std::cout << "nKeyPressed = " << nKeyPressed%(UCHAR_MAX+1) << std::endl;
-                }
                 if(nKeyPressed==' ')
                     bContinuousUpdates = !bContinuousUpdates;
                 else if(nKeyPressed==(int)'q')
