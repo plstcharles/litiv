@@ -16,7 +16,6 @@ set(LITIV_FRAMEWORK_VERSION_PATCH 0)
 set(LITIV_FRAMEWORK_VERSION ${LITIV_FRAMEWORK_VERSION_MAJOR}.${LITIV_FRAMEWORK_VERSION_MINOR}.${LITIV_FRAMEWORK_VERSION_PATCH})
 
 option(USE_TEST "Use some useless global test define" ON)
-option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark impl in litiv_utils" ON)
 option(USE_FAST_MATH "Enable fast math optimizations" OFF)
 
 ### OPENCV CHECK

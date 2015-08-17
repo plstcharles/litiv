@@ -18,6 +18,7 @@ file(GLOB INCLUDE_FILES
 
 add_library(${LITIV_CURRENT_PROJECT_NAME} STATIC ${SOURCE_FILES})
 
+option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark impl in litiv_utils" ON)
 if(USE_BSDS500_BENCHMARK)
     target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} BSDS500)
 endif(USE_BSDS500_BENCHMARK)
