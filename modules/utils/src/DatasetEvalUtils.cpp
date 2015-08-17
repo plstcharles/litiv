@@ -1224,7 +1224,11 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::WriteEvalResults(const
             }
             std::cout << "\t" << std::setfill(' ') << std::setw(12) << "ALL-AVG" << " : MaxRcl=" << std::fixed << std::setprecision(4) << dMaxRecall << " MaxPrc=" << dMaxPrecision << " MaxFM=" << dMaxFMeasure << std::endl;
             std::cout << "\t" << std::setfill(' ') << std::setw(12) << " " <<       " : BestRcl=" << std::fixed << std::setprecision(4) << dBestRecall << " BestPrc=" << dBestPrecision << " BestFM=" << dBestFMeasure << std::endl;
-            std::ofstream oMetricsInfoOutput(oInfo.m_sResultsRootPath+"/overall.txt");
+#if USE_BSDS500_BENCHMARK
+            std::ofstream oMetricsInfoOutput(oInfo.m_sResultsRootPath+"/reimpl_eval.txt");
+#else //!USE_BSDS500_BENCHMARK
+            std::ofstream oMetricsInfoOutput(oInfo.m_sResultsRootPath+"/homemade_eval.txt");
+#endif //!USE_BSDS500_BENCHMARK
             if(oMetricsInfoOutput.is_open()) {
                 oMetricsInfoOutput << "BSDS500 edge detection evaluation for " << voBatchMetrics.size() << " image set(s):" << std::endl;
                 oMetricsInfoOutput << std::endl;
@@ -1245,15 +1249,21 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::WriteEvalResults(const
 
 void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::WriteEvalResults(const WorkBatch& oBatch, BSDS500Metrics& oRes) {
     CalcMetrics(oBatch,oRes);
-    std::ofstream oImageScoresOutput(oBatch.m_sResultsPath+"/eval_bdry_img.txt");
+#if USE_BSDS500_BENCHMARK
+    const std::string sResultPath = oBatch.m_sResultsPath+"/../"+oBatch.m_sName+"_reimpl_eval/";
+#else //!USE_BSDS500_BENCHMARK
+    const std::string sResultPath = oBatch.m_sResultsPath+"/../"+oBatch.m_sName+"_homemade_eval/";
+#endif //!USE_BSDS500_BENCHMARK
+    PlatformUtils::CreateDirIfNotExist(sResultPath);
+    std::ofstream oImageScoresOutput(sResultPath+"/eval_bdry_img.txt");
     if(oImageScoresOutput.is_open())
         for(size_t n=0; n<oRes.voBestImageScores.size(); ++n)
             oImageScoresOutput << cv::format("%10d %10g %10g %10g %10g\n",n+1,oRes.voBestImageScores[n].dThreshold,oRes.voBestImageScores[n].dRecall,oRes.voBestImageScores[n].dPrecision,oRes.voBestImageScores[n].dFMeasure);
-    std::ofstream oThresholdMetricsOutput(oBatch.m_sResultsPath+"/eval_bdry_thr.txt");
+    std::ofstream oThresholdMetricsOutput(sResultPath+"/eval_bdry_thr.txt");
     if(oThresholdMetricsOutput.is_open())
         for(size_t n=0; n<oRes.voThresholdScores.size(); ++n)
             oThresholdMetricsOutput << cv::format("%10g %10g %10g %10g\n",oRes.voThresholdScores[n].dThreshold,oRes.voThresholdScores[n].dRecall,oRes.voThresholdScores[n].dPrecision,oRes.voThresholdScores[n].dFMeasure);
-    std::ofstream oOverallMetricsOutput(oBatch.m_sResultsPath+"/eval_bdry.txt");
+    std::ofstream oOverallMetricsOutput(sResultPath+"/eval_bdry.txt");
     if(oOverallMetricsOutput.is_open())
         oOverallMetricsOutput << cv::format("%10g %10g %10g %10g %10g %10g %10g %10g\n",oRes.oBestScore.dThreshold,oRes.oBestScore.dRecall,oRes.oBestScore.dPrecision,oRes.oBestScore.dFMeasure,oRes.dMaxRecall,oRes.dMaxPrecision,oRes.dMaxFMeasure,oRes.dAreaPR);
     const std::string sCurrSeqName = oBatch.m_sName.size()>12?oBatch.m_sName.substr(0,12):oBatch.m_sName;
