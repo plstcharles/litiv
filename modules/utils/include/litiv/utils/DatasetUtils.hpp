@@ -183,8 +183,10 @@ namespace DatasetUtils {
             enum eDatasetList {
                 eDataset_BSDS500_segm_train,
                 eDataset_BSDS500_segm_train_valid,
+                eDataset_BSDS500_segm_train_valid_test,
                 eDataset_BSDS500_edge_train,
                 eDataset_BSDS500_edge_train_valid,
+                eDataset_BSDS500_edge_train_valid_test,
                 // ...
                 eDataset_Custom
             };

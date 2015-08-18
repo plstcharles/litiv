@@ -608,7 +608,7 @@ cv::Mat DatasetUtils::Segm::Video::Sequence::GetGTFromIndex_external(size_t nFra
 }
 
 void DatasetUtils::Segm::Image::DatasetInfo::WriteEvalResults(const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) const {
-    if(m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid)
+    if( m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test)
         BSDS500BoundaryEvaluator::WriteEvalResults(*this,vpGroups);
     else
         throw std::logic_error(cv::format("DatasetUtils::Segm::Image::DatasetInfo::WriteEvalResults: missing dataset evaluator impl, cannot write results"));
@@ -642,6 +642,19 @@ std::shared_ptr<DatasetUtils::Segm::Image::DatasetInfo> DatasetUtils::Segm::Imag
         pInfo->m_bForce4ByteDataAlign       = bForce4ByteDataAlign;
         pInfo->m_eDatasetID                 = eDatasetID;
     }
+    else if(eDatasetID==eDataset_BSDS500_segm_train_valid_test || eDatasetID==eDataset_BSDS500_edge_train_valid_test) {
+        pInfo = std::make_shared<DatasetInfo>();
+        pInfo->m_sDatasetName               = "BSDS500 Training+Validation+Test set";
+        pInfo->m_sDatasetRootPath           = sDatasetRootDirPath+"/BSDS500/data/images/";
+        pInfo->m_sResultsRootPath           = sDatasetRootDirPath+"/BSDS500/BSR/"+sResultsDirName+"/";
+        pInfo->m_sResultNamePrefix          = "";
+        pInfo->m_sResultNameSuffix          = ".png";
+        pInfo->m_vsWorkBatchPaths           = {"train","val","test"};
+        pInfo->m_vsSkippedNameTokens        = {};
+        pInfo->m_vsGrayscaleNameTokens      = {};
+        pInfo->m_bForce4ByteDataAlign       = bForce4ByteDataAlign;
+        pInfo->m_eDatasetID                 = eDatasetID;
+    }
     else if(eDatasetID==eDataset_Custom)
         throw std::logic_error(cv::format("DatasetUtils::Segm::Image::GetDatasetInfo: custom dataset info struct (eDataset_Custom) can only be filled manually"));
     else
@@ -655,8 +668,8 @@ DatasetUtils::Segm::Image::Set::Set(const std::string& sSetName, const DatasetIn
         m_dExpectedLoad(0),
         m_nTotImageCount(0),
         m_bIsConstantSize(false) {
-    if(m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid ||
-       m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid) {
+    if(m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid || m_eDatasetID==eDataset_BSDS500_segm_train_valid_test ||
+       m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test) {
         PlatformUtils::GetFilesFromDir(m_sDatasetPath,m_vsInputImagePaths);
         PlatformUtils::FilterFilePaths(m_vsInputImagePaths,{},{".jpg"});
         if(m_vsInputImagePaths.empty())
@@ -664,7 +677,7 @@ DatasetUtils::Segm::Image::Set::Set(const std::string& sSetName, const DatasetIn
         m_oMaxSize = cv::Size(481,321);
         m_nTotImageCount = m_vsInputImagePaths.size();
         m_dExpectedLoad = (double)m_oMaxSize.area()*m_nTotImageCount*(int(!m_bForcingGrayscale)+1);
-        if(m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid) {
+        if(m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test) {
             PlatformUtils::GetSubDirsFromDir(oDatasetInfo.m_sDatasetRootPath+"/../groundTruth_bdry_images/"+sRelativePath,m_vsGTImagePaths);
             if(m_vsGTImagePaths.empty())
                 throw std::runtime_error(cv::format("Image set '%s' did not possess any groundtruth image folders",sSetName.c_str()));
@@ -682,7 +695,7 @@ DatasetUtils::Segm::Image::Set::Set(const std::string& sSetName, const DatasetIn
             }
             m_pEvaluator = std::shared_ptr<EvaluatorBase>(new BSDS500BoundaryEvaluator());
         }
-        else { //m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid
+        else { //m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid || m_eDatasetID==eDataset_BSDS500_segm_train_valid_test
             // current impl cannot parse GT/evaluate (matlab files only)
             CV_Assert(false);
         }
@@ -721,8 +734,8 @@ cv::Mat DatasetUtils::Segm::Image::Set::GetInputFromIndex_external(size_t nImage
     CV_Assert(!oImage.empty());
     CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size() || m_voOrigImageSizes[nImageIdx]==oImage.size());
     m_voOrigImageSizes[nImageIdx] = oImage.size();
-    if(m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid ||
-       m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid) {
+    if(m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid || m_eDatasetID==eDataset_BSDS500_segm_train_valid_test ||
+       m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test) {
         CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
         if(oImage.size()==cv::Size(321,481))
             cv::transpose(oImage,oImage);
@@ -740,7 +753,7 @@ cv::Mat DatasetUtils::Segm::Image::Set::GetInputFromIndex_external(size_t nImage
 
 cv::Mat DatasetUtils::Segm::Image::Set::GetGTFromIndex_external(size_t nImageIdx) {
     cv::Mat oImage;
-    if(m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid) {
+    if(m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test) {
         if(m_vsGTImagePaths.size()>nImageIdx) {
             std::vector<std::string> vsTempPaths;
             PlatformUtils::GetFilesFromDir(m_vsGTImagePaths[nImageIdx],vsTempPaths);
@@ -780,8 +793,8 @@ cv::Mat DatasetUtils::Segm::Image::Set::ReadResult(size_t nImageIdx) {
     std::stringstream sResultFilePath;
     sResultFilePath << m_sResultsPath << m_sResultNamePrefix << m_vsOrigImageNames[nImageIdx] << m_sResultNameSuffix;
     cv::Mat oImage = cv::imread(sResultFilePath.str(),m_bForcingGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
-    if(m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid ||
-       m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid) {
+    if(m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid || m_eDatasetID==eDataset_BSDS500_segm_train_valid_test ||
+       m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test) {
         CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
         CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size() || m_voOrigImageSizes[nImageIdx]==oImage.size());
         m_voOrigImageSizes[nImageIdx] = oImage.size();
@@ -795,8 +808,8 @@ void DatasetUtils::Segm::Image::Set::WriteResult(size_t nImageIdx, const cv::Mat
     CV_Assert(m_vsOrigImageNames[nImageIdx]!=std::string());
     CV_Assert(!m_sResultNameSuffix.empty());
     cv::Mat oImage = oResult;
-    if(m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid ||
-       m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid) {
+    if(m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid || m_eDatasetID==eDataset_BSDS500_segm_train_valid_test ||
+       m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test) {
         CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
         CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size(481,321) || m_voOrigImageSizes[nImageIdx]==cv::Size(321,481));
         if(m_voOrigImageSizes[nImageIdx]==cv::Size(321,481))
