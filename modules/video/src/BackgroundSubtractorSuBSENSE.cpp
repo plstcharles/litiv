@@ -50,7 +50,7 @@ static const size_t s_nDescMaxDataRange_3ch = s_nDescMaxDataRange_1ch*3;
 
 BackgroundSubtractorSuBSENSE::BackgroundSubtractorSuBSENSE(float fRelLBSPThreshold, size_t nDescDistThresholdOffset, size_t nMinColorDistThreshold,
                                                            size_t nBGSamples, size_t nRequiredBGSamples, size_t nSamplesForMovingAvgs) :
-        BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_None>(fRelLBSPThreshold,0),
+        BackgroundSubtractorLBSP<ParallelUtils::eNonParallel>(fRelLBSPThreshold,0),
         m_nMinColorDistThreshold(nMinColorDistThreshold),
         m_nDescDistThresholdOffset(nDescDistThresholdOffset),
         m_nBGSamples(nBGSamples),

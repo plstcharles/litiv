@@ -2,6 +2,8 @@
 // @@@ test compute shader group size vs shared mem usage
 // @@@ add opencv hardware instr set check, and impl some stuff in MMX/SSE/SSE2/3/4.1/4.2? (also check popcount and AVX)
 // @@@ support non-integer textures top level (alg)? need to replace all ui-stores by float-stores, rest is ok
+// @@@ change comma pos list & super constr everywhere
+// @@@ change template formatting everywhere
 
 #include "litiv/utils/DatasetEvalUtils.hpp"
 
@@ -466,7 +468,7 @@ void AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::
         cv::Mat oCurrBGImg;
 #endif //DISPLAY_OUTPUT
 #if USE_LOBSTER
-        std::shared_ptr<BackgroundSubtractorLOBSTER_base> pAlgo(new BackgroundSubtractorLOBSTER_base());
+        std::shared_ptr<BackgroundSubtractorLOBSTER> pAlgo(new BackgroundSubtractorLOBSTER());
         const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
         pAlgo->initialize(oCurrInputFrame,oROI);
 #elif USE_SUBSENSE

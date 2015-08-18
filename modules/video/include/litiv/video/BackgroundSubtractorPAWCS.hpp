@@ -22,7 +22,7 @@
     For more details on the different parameters or on the algorithm itself, see P.-L. St-Charles et al.,
     "A Self-Adjusting Approach to Change Detection Based on Background Word Consensus", in WACV 2015.
  */
-class BackgroundSubtractorPAWCS : public BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_None> {
+class BackgroundSubtractorPAWCS : public BackgroundSubtractorLBSP<ParallelUtils::eNonParallel> {
 public:
     //! full constructor
     BackgroundSubtractorPAWCS(float fRelLBSPThreshold=BGSPAWCS_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,

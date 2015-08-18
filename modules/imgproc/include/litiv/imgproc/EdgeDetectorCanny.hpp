@@ -16,9 +16,11 @@
 /*!
     Canny edge detection algorithm (wraps the OpenCV implementation).
 
+    Only available in non-parallel version.
+
     Note: converts all RGB/RGBA images to grayscale internally.
  */
-class EdgeDetectorCanny : public EdgeDetectorImpl {
+class EdgeDetectorCanny : public EdgeDetector {
 public:
     //! full constructor
     EdgeDetectorCanny(double dHystLowThrshFactor=EDGCANNY_DEFAULT_HYST_LOW_THRSH_FACT,

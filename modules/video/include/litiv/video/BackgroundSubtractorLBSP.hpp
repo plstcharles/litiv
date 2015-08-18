@@ -11,34 +11,34 @@
     Subtraction using Local Binary Similarity Patterns", in WACV 2014, or G.-A. Bilodeau et al, "Change Detection
     in Feature Space Using Local Binary Similarity Patterns", in CRV 2013.
  */
-template<ParallelUtils::eParallelImplType eImpl>
+template<ParallelUtils::eParallelAlgoType eImpl>
 class BackgroundSubtractorLBSP :
-        public BackgroundSubtractorParallelImpl<eImpl> {
+        public BackgroundSubtractor_<eImpl> {
 public:
 
     //! default impl constructor
-    template<ParallelUtils::eParallelImplType eImplTemp = eImpl>
-    BackgroundSubtractorLBSP(float fRelLBSPThreshold, size_t nLBSPThresholdOffset, typename std::enable_if<eImplTemp==ParallelUtils::eParallelImpl_None>::type* pUnused=0);
+    template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
+    BackgroundSubtractorLBSP(float fRelLBSPThreshold, size_t nLBSPThresholdOffset, typename std::enable_if<eImplTemp==ParallelUtils::eNonParallel>::type* pUnused=0);
 
 #if HAVE_GLSL
     //! glsl impl constructor
-    template<ParallelUtils::eParallelImplType eImplTemp = eImpl>
+    template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
     BackgroundSubtractorLBSP(float fRelLBSPThreshold, size_t nLBSPThresholdOffset, size_t nLevels, size_t nComputeStages,
                              size_t nExtraSSBOs, size_t nExtraACBOs, size_t nExtraImages, size_t nExtraTextures,
                              int nDebugType, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat,
-                             typename std::enable_if<eImplTemp==ParallelUtils::eParallelImpl_GLSL>::type* pUnused=0);
+                             typename std::enable_if<eImplTemp==ParallelUtils::eGLSL>::type* pUnused=0);
 
     //! returns the GLSL compute shader source code for LBSP lookup/description functions
-    template<ParallelUtils::eParallelImplType eImplTemp = eImpl>
-    typename std::enable_if<eImplTemp==ParallelUtils::eParallelImpl_GLSL,std::string>::type getLBSPThresholdLUTShaderSource() const;
+    template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
+    typename std::enable_if<eImplTemp==ParallelUtils::eGLSL,std::string>::type getLBSPThresholdLUTShaderSource() const;
 #endif //HAVE_GLSL
 #if HAVE_CUDA
     // ... @@@ add impl later
-    static_assert(eImpl!=ParallelUtils::eParallelImpl_CUDA),"Missing impl");
+    static_assert(eImpl!=ParallelUtils::eCUDA),"Missing constr impl");
 #endif //HAVE_CUDA
 #if HAVE_OPENCL
     // ... @@@ add impl later
-    static_assert(eImpl!=ParallelUtils::eParallelImpl_OpenCL),"Missing impl");
+    static_assert(eImpl!=ParallelUtils::eOpenCL),"Missing constr impl");
 #endif //HAVE_OPENCL
 
     //! (re)initiaization method; needs to be called before starting background subtraction

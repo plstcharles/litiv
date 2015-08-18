@@ -31,8 +31,8 @@
 #define glewInitErrorCheck { \
     glErrorCheck; \
     glewExperimental = TARGET_GLEW_EXPERIM?GL_TRUE:GL_FALSE; \
-    if(GLenum __errn=glewInit()!=GLEW_OK) \
-        glErrorExt("Failed to init GLEW (code=%d)",__errn); \
+    if(GLenum __glewerrn=glewInit()!=GLEW_OK) \
+        glErrorExt("Failed to init GLEW (code=%d)",__glewerrn); \
     else if(GLenum __errn=glGetError()!=GL_INVALID_ENUM) \
         glErrorExt("Unexpected GLEW init error (code=%d)",__errn); \
     if(!glewIsSupported(TARGET_GL_VER_STR)) \

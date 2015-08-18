@@ -3,9 +3,32 @@
 #include "litiv/utils/ParallelUtils.hpp"
 #include <opencv2/imgproc.hpp>
 
-class EdgeDetectorImpl :
+template<ParallelUtils::eParallelAlgoType eImpl, typename enable=void>
+class EdgeDetector_;
+
+template<ParallelUtils::eParallelAlgoType eImpl>
+class IEdgeDetector :
+        public ParallelUtils::ParallelAlgo_<eImpl>,
         public cv::Algorithm {
 public:
+    //! default impl constructor
+    template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
+    IEdgeDetector(size_t nROIBorderSize, typename std::enable_if<eImplTemp==ParallelUtils::eNonParallel>::type* pUnused=0);
+#if HAVE_GLSL
+    //! glsl impl constructor
+    template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
+    IEdgeDetector(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
+                  size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
+                  bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize=0,
+                  typename std::enable_if<eImplTemp==ParallelUtils::eGLSL>::type* pUnused=0);
+#endif //HAVE_GLSL
+#if HAVE_CUDA
+    static_assert(eImpl!=ParallelUtils::eCUDA),"Missing constr impl");
+#endif //HAVE_CUDA
+#if HAVE_OPENCL
+    static_assert(eImpl!=ParallelUtils::eOpenCL),"Missing constr impl");
+#endif //HAVE_OPENCL
+
     //! unused, always returns nullptr
     virtual cv::AlgorithmInfo* info() const {return nullptr;}
     //! returns the default threshold value used in 'apply'
@@ -15,24 +38,30 @@ public:
     //! edge detection function which returns a binned confidence edge mask instead of a thresholded/binary edge mask
     virtual void apply(cv::InputArray oInputImage, cv::OutputArray oEdgeMask) = 0;
 
+protected:
+    //! ROI border size to be ignored, useful for descriptor-based methods
+    size_t m_nROIBorderSize;
+
+private:
+    IEdgeDetector& operator=(const IEdgeDetector&) = delete;
+    IEdgeDetector(const IEdgeDetector&) = delete;
+
+public:
     // #### for debug purposes only ####
+    int m_nDebugCoordX, m_nDebugCoordY;
     std::string m_sDebugName;
     cv::FileStorage* m_pDebugFS;
 };
 
-template<ParallelUtils::eParallelImplType eImpl=ParallelUtils::eParallelImpl_None, typename enable=void>
-class EdgeDetectorParallelImpl;
-
 #if HAVE_GLSL
-template<ParallelUtils::eParallelImplType eImpl>
-class EdgeDetectorParallelImpl<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_GLSL>::type> :
-        public ParallelUtils::ParallelImpl_GLSL,
-        public EdgeDetectorImpl {
+template<ParallelUtils::eParallelAlgoType eImpl>
+class EdgeDetector_<eImpl, typename std::enable_if<eImpl==ParallelUtils::eGLSL>::type> :
+        public IEdgeDetector<ParallelUtils::eGLSL> {
 public:
     //! glsl impl constructor
-    EdgeDetectorParallelImpl(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
-                             size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
-                             bool bUseTimers, bool bUseIntegralFormat);
+    EdgeDetector_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
+                  size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
+                  bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize=0);
 
     //! returns a copy of the latest edge mask
     void getLatestEdgeMask(cv::OutputArray _oLastEdgeMask);
@@ -42,39 +71,43 @@ public:
     void apply_async(cv::InputArray oNextImage, double dThreshold);
     //! edge detection function (asynchronous version); the threshold should be between 0 and 1, or -1 for the confidence mask version
     void apply_async(cv::InputArray oNextImage, cv::OutputArray oEdgeMask, double dThreshold);
-    //! overloads 'apply_threshold' from EdgeDetectorImpl and redirects it to apply_async
+    //! overloads 'apply_threshold' from EdgeDetector and redirects it to apply_async
     virtual void apply_threshold(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold);
-    //! overloads 'apply' from EdgeDetectorImpl and redirects it to apply_async
+    //! overloads 'apply' from EdgeDetector and redirects it to apply_async
     virtual void apply(cv::InputArray oNextImage, cv::OutputArray oEdgeMask);
 
 protected:
     //! used to pass 'apply' threshold parameter to overloaded dispatch call, if needed
     double m_dCurrThreshold;
 };
-typedef EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL> EdgeDetectorImpl_GLSL;
+typedef EdgeDetector_<ParallelUtils::eGLSL> EdgeDetector_GLSL;
 #endif //!HAVE_GLSL
 
 #if HAVE_CUDA
-template<ParallelUtils::eParallelImplType eImpl>
-class EdgeDetectorParallelImpl<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_CUDA>::type> :
-        public ParallelUtils::ParallelImpl_CUDA,
-        public EdgeDetectorImpl {
-        static_assert(false,"Missing CUDA impl");
+template<ParallelUtils::eParallelAlgoType eImpl>
+class EdgeDetector_<eImpl, typename std::enable_if<eImpl==ParallelUtils::eCUDA>::type> :
+        public IEdgeDetector<ParallelUtils::eCUDA> {
+public:
+    static_assert(false,"Missing CUDA impl");
 };
-typedef EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_CUDA> EdgeDetectorImpl_CUDA;
+typedef EdgeDetector_<ParallelUtils::eCUDA> EdgeDetector_CUDA;
 #endif //HAVE_CUDA
 
 #if HAVE_OPENCL
-template<ParallelUtils::eParallelImplType eImpl>
-class EdgeDetectorParallelImpl<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_OpenCL>::type> :
-        public ParallelUtils::ParallelImpl_OpenCL,
-        public EdgeDetectorImpl {
-        static_assert(false,"Missing OpenCL impl");
+template<ParallelUtils::eParallelAlgoType eImpl>
+class EdgeDetector_<eImpl, typename std::enable_if<eImpl==ParallelUtils::eOpenCL>::type> :
+        public IEdgeDetector<ParallelUtils::eOpenCL> {
+public:
+    static_assert(false,"Missing OpenCL impl");
 };
-typedef EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_OpenCL> EdgeDetectorImpl_OpenCL;
+typedef EdgeDetector_<ParallelUtils::eOpenCL> EdgeDetector_OpenCL;
 #endif //HAVE_OPENCL
 
-template<ParallelUtils::eParallelImplType eImpl>
-class EdgeDetectorParallelImpl<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_None>::type> :
-        public ParallelUtils::NoParallelImpl,
-        public EdgeDetectorImpl {};
+template<ParallelUtils::eParallelAlgoType eImpl>
+class EdgeDetector_<eImpl, typename std::enable_if<eImpl==ParallelUtils::eNonParallel>::type> :
+        public IEdgeDetector<ParallelUtils::eNonParallel> {
+public:
+    //! default impl constructor
+    EdgeDetector_(size_t nROIBorderSize);
+};
+typedef EdgeDetector_<ParallelUtils::eNonParallel> EdgeDetector;

@@ -5,11 +5,11 @@
 #define WRITE_IMG_OUTPUT        1
 #define EVALUATE_OUTPUT         1
 #define DEBUG_OUTPUT            0
-#define DISPLAY_OUTPUT          0
+#define DISPLAY_OUTPUT          1
 #define DISPLAY_TIMERS          0
 ////////////////////////////////
-#define USE_CANNY               1
-#define USE_LBSP                0
+#define USE_CANNY               0
+#define USE_LBSP                1
 ////////////////////////////////
 #define FULL_THRESH_ANALYSIS    1
 ////////////////////////////////
@@ -17,7 +17,7 @@
 #define USE_CUDA_IMPL           0
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
-#define DATASET_ID              eDataset_BSDS500_edge_train_valid_test
+#define DATASET_ID              eDataset_BSDS500_edge_train
 #define DATASET_ROOT_PATH       std::string("/shared2/datasets/")
 #define DATASET_RESULTS_PATH    std::string("results_test")
 #define DATASET_PRECACHING      1
@@ -390,9 +390,9 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
 #endif //NEED_GT_MASK
         cv::Mat oCurrEdgeMask(oCurrInputImage.size(),CV_8UC1,cv::Scalar_<uchar>(0));
 #if USE_CANNY
-        std::shared_ptr<EdgeDetectorImpl> pAlgo(new EdgeDetectorCanny());
+        std::shared_ptr<EdgeDetector> pAlgo(new EdgeDetectorCanny());
 #elif USE_LBSP
-        std::shared_ptr<EdgeDetectorImpl> pAlgo(new EdgeDetectorLBSP());
+        std::shared_ptr<EdgeDetector> pAlgo(new EdgeDetectorLBSP());
 #endif //USE_...
 #if !FULL_THRESH_ANALYSIS
         const double dDefaultThreshold = pAlgo->getDefaultThreshold();

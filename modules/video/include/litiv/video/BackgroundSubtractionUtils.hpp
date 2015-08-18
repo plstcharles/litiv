@@ -3,12 +3,34 @@
 #include "litiv/utils/ParallelUtils.hpp"
 #include <opencv2/video/background_segm.hpp>
 
-class BackgroundSubtractorImpl :
+//! enhanced background subtractor interface (inherits from cv::BackgroundSubtractor)
+template<ParallelUtils::eParallelAlgoType eImpl, typename enable=void>
+class BackgroundSubtractor_;
+
+template<ParallelUtils::eParallelAlgoType eImpl>
+class IBackgroundSubtractor :
+        public ParallelUtils::ParallelAlgo_<eImpl>,
         public cv::BackgroundSubtractor {
 public:
-    //! default constructor
-    BackgroundSubtractorImpl(size_t nROIBorderSize);
+    //! default impl constructor
+    template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
+    IBackgroundSubtractor(size_t nROIBorderSize, typename std::enable_if<eImplTemp==ParallelUtils::eNonParallel>::type* pUnused=0);
+#if HAVE_GLSL
+    //! glsl impl constructor
+    template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
+    IBackgroundSubtractor(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
+                          size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
+                          bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize=0,
+                          typename std::enable_if<eImplTemp==ParallelUtils::eGLSL>::type* pUnused=0);
+#endif //HAVE_GLSL
+#if HAVE_CUDA
+    static_assert(eImpl!=ParallelUtils::eCUDA),"Missing constr impl");
+#endif //HAVE_CUDA
+#if HAVE_OPENCL
+    static_assert(eImpl!=ParallelUtils::eOpenCL),"Missing constr impl");
+#endif //HAVE_OPENCL
 
+    // @@@ add refresh model as virtual pure func here?
     //! (re)initiaization method; needs to be called before starting background subtraction (assumes no specific ROI)
     virtual void initialize(const cv::Mat& oInitImg);
     //! (re)initiaization method; needs to be called before starting background subtraction
@@ -68,8 +90,8 @@ protected:
     cv::Mat m_oLastColorFrame;
 
 private:
-    BackgroundSubtractorImpl& operator=(const BackgroundSubtractorImpl&) = delete;
-    BackgroundSubtractorImpl(const BackgroundSubtractorImpl&) = delete;
+    IBackgroundSubtractor& operator=(const IBackgroundSubtractor&) = delete;
+    IBackgroundSubtractor(const IBackgroundSubtractor&) = delete;
 
 public:
     // #### for debug purposes only ####
@@ -78,19 +100,15 @@ public:
     cv::FileStorage* m_pDebugFS;
 };
 
-template<ParallelUtils::eParallelImplType eImpl=ParallelUtils::eParallelImpl_None, typename enable=void>
-class BackgroundSubtractorParallelImpl;
-
 #if HAVE_GLSL
-template<ParallelUtils::eParallelImplType eImpl>
-class BackgroundSubtractorParallelImpl<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_GLSL>::type> :
-        public ParallelUtils::ParallelImpl_GLSL,
-        public BackgroundSubtractorImpl {
+template<ParallelUtils::eParallelAlgoType eImpl>
+class BackgroundSubtractor_<eImpl, typename std::enable_if<eImpl==ParallelUtils::eGLSL>::type> :
+        public IBackgroundSubtractor<ParallelUtils::eGLSL> {
 public:
     //! glsl impl constructor
-    BackgroundSubtractorParallelImpl(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
-                                     size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
-                                     bool bUseTimers, bool bUseIntegralFormat);
+    BackgroundSubtractor_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
+                          size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
+                          bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize=0);
 
     //! returns a copy of the latest foreground mask
     void getLatestForegroundMask(cv::OutputArray _oLastFGMask);
@@ -107,34 +125,34 @@ protected:
     //! used to pass 'apply' learning rate parameter to overloaded dispatch call, if needed
     double m_dCurrLearningRate;
 };
-typedef BackgroundSubtractorParallelImpl<ParallelUtils::eParallelImpl_GLSL> BackgroundSubtractorImpl_GLSL;
+typedef BackgroundSubtractor_<ParallelUtils::eGLSL> BackgroundSubtractor_GLSL;
 #endif //!HAVE_GLSL
 
 #if HAVE_CUDA
-template<ParallelUtils::eParallelImplType eImpl>
-class BackgroundSubtractorParallelImpl<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_CUDA>::type> :
-        public ParallelUtils::ParallelImpl_CUDA,
-        public BackgroundSubtractorImpl {
-        static_assert(false,"Missing CUDA impl");
+template<ParallelUtils::eParallelAlgoType eImpl>
+class BackgroundSubtractor_<eImpl, typename std::enable_if<eImpl==ParallelUtils::eCUDA>::type> :
+        public IBackgroundSubtractor<ParallelUtils::eCUDA> {
+public:
+    static_assert(false,"Missing CUDA impl");
 };
-typedef BackgroundSubtractorParallelImpl<ParallelUtils::eParallelImpl_CUDA> BackgroundSubtractorImpl_CUDA;
+typedef BackgroundSubtractor_<ParallelUtils::eCUDA> BackgroundSubtractor_CUDA;
 #endif //HAVE_CUDA
 
 #if HAVE_OPENCL
-template<ParallelUtils::eParallelImplType eImpl>
-class BackgroundSubtractorParallelImpl<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_OpenCL>::type> :
-        public ParallelUtils::ParallelImpl_OpenCL,
-        public BackgroundSubtractorImpl {
-        static_assert(false,"Missing OpenCL impl");
+template<ParallelUtils::eParallelAlgoType eImpl>
+class BackgroundSubtractor_<eImpl, typename std::enable_if<eImpl==ParallelUtils::eOpenCL>::type> :
+        public IBackgroundSubtractor<ParallelUtils::eOpenCL> {
+public:
+    static_assert(false,"Missing OpenCL impl");
 };
-typedef BackgroundSubtractorParallelImpl<ParallelUtils::eParallelImpl_OpenCL> BackgroundSubtractorImpl_OpenCL;
+typedef BackgroundSubtractor_<ParallelUtils::eOpenCL> BackgroundSubtractor_OpenCL;
 #endif //HAVE_OPENCL
 
-template<ParallelUtils::eParallelImplType eImpl>
-class BackgroundSubtractorParallelImpl<eImpl, typename std::enable_if<eImpl==ParallelUtils::eParallelImpl_None>::type> :
-        public ParallelUtils::NoParallelImpl,
-        public BackgroundSubtractorImpl {
+template<ParallelUtils::eParallelAlgoType eImpl>
+class BackgroundSubtractor_<eImpl, typename std::enable_if<eImpl==ParallelUtils::eNonParallel>::type> :
+        public IBackgroundSubtractor<ParallelUtils::eNonParallel> {
 public:
     //! default impl constructor
-    BackgroundSubtractorParallelImpl(size_t nROIBorderSize);
+    BackgroundSubtractor_(size_t nROIBorderSize);
 };
+typedef BackgroundSubtractor_<ParallelUtils::eNonParallel> BackgroundSubtractor;

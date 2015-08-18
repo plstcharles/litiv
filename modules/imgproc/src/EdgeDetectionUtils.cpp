@@ -1,17 +1,32 @@
 #include "litiv/imgproc/EdgeDetectorCanny.hpp"
 #include <iostream>
 
+/* non-specialized IEdgeDetector functions go here */
+
 #if HAVE_GLSL
 
 template<>
-EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::EdgeDetectorParallelImpl( size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs,
-                                                                                       size_t nExtraACBOs, size_t nExtraImages, size_t nExtraTextures,
-                                                                                       int nDebugType, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat) :
-    ParallelUtils::ParallelImpl_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,CV_8UC1,nDebugType,true,bUseDisplay,bUseTimers,bUseIntegralFormat),
-    m_dCurrThreshold(-1) {}
+template<>
+IEdgeDetector<ParallelUtils::eGLSL>::IEdgeDetector<ParallelUtils::eGLSL>( size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
+                                                                          size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
+                                                                          bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize, void* /*pUnused*/) :
+        ParallelUtils::ParallelAlgo_<ParallelUtils::eGLSL>(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,CV_8UC1,nDebugType,true,bUseDisplay,bUseTimers,bUseIntegralFormat),
+        m_nROIBorderSize(nROIBorderSize),
+        m_nDebugCoordX(0),
+        m_nDebugCoordY(0),
+        m_pDebugFS(nullptr) {}
+
+template class IEdgeDetector<ParallelUtils::eGLSL>;
 
 template<>
-void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::getLatestEdgeMask(cv::OutputArray _oLastEdgeMask) {
+EdgeDetector_<ParallelUtils::eGLSL>::EdgeDetector_( size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
+                                                    size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
+                                                    bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize) :
+        IEdgeDetector<ParallelUtils::eGLSL>(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat,nROIBorderSize),
+        m_dCurrThreshold(-1) {}
+
+template<>
+void EdgeDetector_<ParallelUtils::eGLSL>::getLatestEdgeMask(cv::OutputArray _oLastEdgeMask) {
     _oLastEdgeMask.create(m_oFrameSize,CV_8UC1);
     cv::Mat oLastEdgeMask = _oLastEdgeMask.getMat();
     if(!GLImageProcAlgo::m_bFetchingOutput)
@@ -20,7 +35,7 @@ void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::getLatestEdgeM
 }
 
 template<>
-void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_async_glimpl(cv::InputArray _oNextImage, bool bRebindAll, double dThreshold) {
+void EdgeDetector_<ParallelUtils::eGLSL>::apply_async_glimpl(cv::InputArray _oNextImage, bool bRebindAll, double dThreshold) {
     m_dCurrThreshold = dThreshold;
     cv::Mat oNextInputImg = _oNextImage.getMat();
     CV_Assert(oNextInputImg.size()==m_oFrameSize);
@@ -29,38 +44,55 @@ void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_async_gl
 }
 
 template<>
-void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_async(cv::InputArray oNextImage, double dThreshold) {
+void EdgeDetector_<ParallelUtils::eGLSL>::apply_async(cv::InputArray oNextImage, double dThreshold) {
     apply_async_glimpl(oNextImage,false,dThreshold);
 }
 
 template<>
-void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_async(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) {
+void EdgeDetector_<ParallelUtils::eGLSL>::apply_async(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) {
     apply_async(oNextImage,dThreshold);
     getLatestEdgeMask(oLastEdgeMask);
 }
 
 template<>
-void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply_threshold(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) {
+void EdgeDetector_<ParallelUtils::eGLSL>::apply_threshold(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) {
     CV_Assert(dThreshold>=0 && dThreshold<=1);
     apply_async(oNextImage,oLastEdgeMask,dThreshold);
 }
 
 template<>
-void EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>::apply(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask) {
+void EdgeDetector_<ParallelUtils::eGLSL>::apply(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask) {
     apply_async(oNextImage,oLastEdgeMask,-1);
 }
 
-template class EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_GLSL>;
+template class EdgeDetector_<ParallelUtils::eGLSL>;
 #endif //HAVE_GLSL
 
 #if HAVE_CUDA
+template class IEdgeDetector<ParallelUtils::eCUDA>;
 // ... @@@ add impl later
-//template class EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_CUDA>;
+template class EdgeDetector_<ParallelUtils::eCUDA>;
 #endif //HAVE_CUDA
 
 #if HAVE_OPENCL
+template class IEdgeDetector<ParallelUtils::eOpenCL>;
 // ... @@@ add impl later
-//template class EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_OpenCL>;
+template class EdgeDetector_<ParallelUtils::eOpenCL>;
 #endif //HAVE_OPENCL
 
-template class EdgeDetectorParallelImpl<ParallelUtils::eParallelImpl_None>;
+template<>
+template<>
+IEdgeDetector<ParallelUtils::eNonParallel>::IEdgeDetector<ParallelUtils::eNonParallel>(size_t nROIBorderSize, void* /*pUnused*/) :
+        ParallelUtils::ParallelAlgo_<ParallelUtils::eNonParallel>(),
+        m_nROIBorderSize(nROIBorderSize),
+        m_nDebugCoordX(0),
+        m_nDebugCoordY(0),
+        m_pDebugFS(nullptr) {}
+
+template class IEdgeDetector<ParallelUtils::eNonParallel>;
+
+template<>
+EdgeDetector_<ParallelUtils::eNonParallel>::EdgeDetector_(size_t nROIBorderSize) :
+        IEdgeDetector<ParallelUtils::eNonParallel>(nROIBorderSize) {}
+
+template class EdgeDetector_<ParallelUtils::eNonParallel>;

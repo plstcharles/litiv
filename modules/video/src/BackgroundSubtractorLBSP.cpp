@@ -5,8 +5,8 @@
 
 template<>
 template<>
-BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_None>::BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_None>(float fRelLBSPThreshold, size_t nLBSPThresholdOffset, void* /*pUnused*/) :
-        BackgroundSubtractorParallelImpl(LBSP::PATCH_SIZE/2),
+BackgroundSubtractorLBSP<ParallelUtils::eNonParallel>::BackgroundSubtractorLBSP<ParallelUtils::eNonParallel>(float fRelLBSPThreshold, size_t nLBSPThresholdOffset, void* /*pUnused*/) :
+        ::BackgroundSubtractor(LBSP::PATCH_SIZE/2),
         m_nLBSPThresholdOffset(nLBSPThresholdOffset),
         m_fRelLBSPThreshold(fRelLBSPThreshold),
         m_nDefaultMedianBlurKernelSize(DEFAULT_MEDIAN_BLUR_KERNEL_SIZE) {
@@ -17,10 +17,10 @@ BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_None>::BackgroundSubtracto
 
 template<>
 template<>
-BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_GLSL>::BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_GLSL>( float fRelLBSPThreshold, size_t nLBSPThresholdOffset, size_t nLevels, size_t nComputeStages,
-                                                                                                                          size_t nExtraSSBOs, size_t nExtraACBOs, size_t nExtraImages, size_t nExtraTextures,
-                                                                                                                          int nDebugType, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat, void* /*pUnused*/) :
-    BackgroundSubtractorParallelImpl<ParallelUtils::eParallelImpl_GLSL>(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat),
+BackgroundSubtractorLBSP<ParallelUtils::eGLSL>::BackgroundSubtractorLBSP<ParallelUtils::eGLSL>( float fRelLBSPThreshold, size_t nLBSPThresholdOffset, size_t nLevels, size_t nComputeStages,
+                                                                                                size_t nExtraSSBOs, size_t nExtraACBOs, size_t nExtraImages, size_t nExtraTextures,
+                                                                                                int nDebugType, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat, void* /*pUnused*/) :
+    BackgroundSubtractor_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat),
     m_nLBSPThresholdOffset(nLBSPThresholdOffset),
     m_fRelLBSPThreshold(fRelLBSPThreshold),
     m_nDefaultMedianBlurKernelSize(DEFAULT_MEDIAN_BLUR_KERNEL_SIZE) {
@@ -29,7 +29,7 @@ BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_GLSL>::BackgroundSubtracto
 
 template<>
 template<>
-std::string BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_GLSL>::getLBSPThresholdLUTShaderSource<ParallelUtils::eParallelImpl_GLSL>() const {
+std::string BackgroundSubtractorLBSP<ParallelUtils::eGLSL>::getLBSPThresholdLUTShaderSource<ParallelUtils::eGLSL>() const {
     glAssert(m_bInitialized);
     std::stringstream ssSrc;
     ssSrc << "const uint anLBSPThresLUT[256] = uint[256](\n    ";
@@ -45,23 +45,23 @@ std::string BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_GLSL>::getLBSP
     return ssSrc.str();
 }
 
-template class BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_GLSL>;
+template class BackgroundSubtractorLBSP<ParallelUtils::eGLSL>;
 
 #endif //HAVE_GLSL
 
 #if HAVE_CUDA
 // ... @@@ add impl later
-//template class BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_CUDA>;
+//template class BackgroundSubtractorLBSP<ParallelUtils::eCUDA>;
 #endif //HAVE_CUDA
 
 #if HAVE_OPENCL
 // ... @@@ add impl later
-//template class BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_OpenCL>;
+//template class BackgroundSubtractorLBSP<ParallelUtils::eOpenCL>;
 #endif //HAVE_OPENCL
 
-template<ParallelUtils::eParallelImplType eImpl>
+template<ParallelUtils::eParallelAlgoType eImpl>
 void BackgroundSubtractorLBSP<eImpl>::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
-    BackgroundSubtractorImpl::initialize(oInitImg,oROI);
+    ::BackgroundSubtractor_<eImpl>::initialize(oInitImg,oROI);
     m_oLastDescFrame.create(this->m_oImgSize,CV_16UC((int)this->m_nImgChannels));
     m_oLastDescFrame = cv::Scalar_<ushort>::all(0);
     if(this->m_nImgChannels==1) {
@@ -100,4 +100,4 @@ void BackgroundSubtractorLBSP<eImpl>::initialize(const cv::Mat& oInitImg, const 
     }
 }
 
-template class BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_None>;
+template class BackgroundSubtractorLBSP<ParallelUtils::eNonParallel>;

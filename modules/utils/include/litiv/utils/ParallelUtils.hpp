@@ -27,58 +27,66 @@
 
 namespace ParallelUtils {
 
-    enum eParallelImplType {
+    enum eParallelAlgoType {
 #if HAVE_GLSL
-        eParallelImpl_GLSL,
+        eGLSL,
 #endif //HAVE_GLSL
 #if HAVE_CUDA
-        eParallelImpl_CUDA,
+        eCUDA,
 #endif //HAVE_CUDA
 #if HAVE_OPENCL
-        eParallelImpl_OpenCL,
+        eOpenCL,
 #endif //HAVE_OPENCL
-        eParallelImpl_None
+        eNonParallel
     };
 
-    template<eParallelImplType eImpl=eParallelImpl_None, typename enable=void>
-    struct ParallelImpl;
+    template<eParallelAlgoType eImpl=eNonParallel, typename enable=void>
+    struct ParallelAlgo_;
+
+    struct IParallelAlgo {
+        //! returns whether the algorithm is implemented for parallel processing or not
+        virtual bool isParallel() = 0;
+        //! returns which type of parallel implementation is used in this algo
+        virtual eParallelAlgoType getParallelAlgoType() = 0;
+    };
 
 #if HAVE_GLSL
-    template<eParallelImplType eImpl>
-    struct ParallelImpl<eImpl, typename std::enable_if<eImpl==eParallelImpl_GLSL>::type> : public GLImageProcAlgo {
-        ParallelImpl(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs, size_t nExtraImages, size_t nExtraTextures, int nOutputType, int nDebugType, bool bUseInput, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat) :
+    template<eParallelAlgoType eImpl>
+    struct ParallelAlgo_<eImpl, typename std::enable_if<eImpl==eGLSL>::type> : public GLImageProcAlgo, public IParallelAlgo {
+        ParallelAlgo_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs, size_t nExtraImages, size_t nExtraTextures, int nOutputType, int nDebugType, bool bUseInput, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat) :
             GLImageProcAlgo(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nOutputType,nDebugType,bUseInput,bUseDisplay,bUseTimers,bUseIntegralFormat) {}
-        static constexpr bool hasParallelImpl() {return true;}
-        static eParallelImplType getParallelImplType() {return eParallelImpl_GLSL;}
+        virtual bool isParallel() {return true;}
+        virtual eParallelAlgoType getParallelAlgoType() {return eGLSL;}
     };
-    typedef ParallelImpl<eParallelImpl_GLSL> ParallelImpl_GLSL;
+    typedef ParallelAlgo_<eGLSL> GLSLAlgo;
 #endif //!HAVE_GLSL
 
 #if HAVE_CUDA
-    template<eParallelImplType eImpl>
-    struct ParallelImpl<eImpl, typename std::enable_if<eImpl==eParallelImpl_CUDA>::type> {
+    template<eParallelAlgoType eImpl>
+    struct ParallelAlgo_<eImpl, typename std::enable_if<eImpl==eCUDA>::type> : public IParallelAlgo {
         static_assert(false,"Missing CUDA impl");
-        static constexpr bool hasParallelImpl() {return true;}
-        static eParallelImplType getParallelImplType() {return eParallelImpl_CUDA;}
+        virtual bool isParallel() {return true;}
+        virtual eParallelAlgoType getParallelAlgoType() {return eCUDA;}
     };
-    typedef ParallelImpl<eParallelImpl_CUDA> ParallelImpl_CUDA;
+    typedef ParallelAlgo_<eCUDA> CUDAAlgo;
 #endif //HAVE_CUDA
 
 #if HAVE_CUDA
-    template<eParallelImplType eImpl>
-    struct ParallelImpl<eImpl, typename std::enable_if<eImpl==eParallelImpl_OpenCL>::type> {
+    template<eParallelAlgoType eImpl>
+    struct ParallelAlgo_<eImpl, typename std::enable_if<eImpl==eOpenCL>::type> : public IParallelAlgo {
         static_assert(false,"Missing OpenCL impl");
-        static constexpr bool hasParallelImpl() {return true;}
-        static eParallelImplType getParallelImplType() {return eParallelImpl_OpenCL;}
+        virtual bool isParallel() {return true;}
+        virtual eParallelAlgoType getParallelAlgoType() {return eOpenCL;}
     };
-    typedef ParallelImpl<eParallelImpl_OpenCL> ParallelImpl_OpenCL;
+    typedef ParallelAlgo_<eOpenCL> OpenCLAlgo;
 #endif //HAVE_CUDA
 
-    template<eParallelImplType eImpl>
-    struct ParallelImpl<eImpl, typename std::enable_if<eImpl==eParallelImpl_None>::type> {
-        static constexpr bool hasParallelImpl() {return false;}
-        static eParallelImplType getParallelImplType() {return eParallelImpl_None;}
+    template<eParallelAlgoType eImpl>
+    struct ParallelAlgo_<eImpl, typename std::enable_if<eImpl==eNonParallel>::type> : public IParallelAlgo {
+        ParallelAlgo_() {}
+        virtual bool isParallel() {return false;}
+        virtual eParallelAlgoType getParallelAlgoType() {return eNonParallel;}
     };
-    typedef ParallelImpl<eParallelImpl_None> NoParallelImpl;
+    typedef ParallelAlgo_<eNonParallel> NonParallelAlgo;
 
 } //namespace ParallelUtils

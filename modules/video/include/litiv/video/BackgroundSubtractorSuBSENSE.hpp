@@ -24,7 +24,7 @@
     For more details on the different parameters or on the algorithm itself, see P.-L. St-Charles et al.,
     "Flexible Background Subtraction With Self-Balanced Local Sensitivity", in CVPRW 2014.
  */
-class BackgroundSubtractorSuBSENSE : public BackgroundSubtractorLBSP<ParallelUtils::eParallelImpl_None> {
+class BackgroundSubtractorSuBSENSE : public BackgroundSubtractorLBSP<ParallelUtils::eNonParallel> {
 public:
     //! full constructor
     BackgroundSubtractorSuBSENSE(float fRelLBSPThreshold=BGSSUBSENSE_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
