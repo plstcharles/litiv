@@ -5,7 +5,7 @@
 #define WRITE_IMG_OUTPUT        1
 #define EVALUATE_OUTPUT         1
 #define DEBUG_OUTPUT            0
-#define DISPLAY_OUTPUT          1
+#define DISPLAY_OUTPUT          0
 #define DISPLAY_TIMERS          0
 ////////////////////////////////
 #define USE_CANNY               1
@@ -17,9 +17,9 @@
 #define USE_CUDA_IMPL           0
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
-#define DATASET_ID              eDataset_BSDS500_edge_train
+#define DATASET_ID              eDataset_BSDS500_edge_train_valid_test
 #define DATASET_ROOT_PATH       std::string("/shared2/datasets/")
-#define DATASET_RESULTS_PATH    std::string("results_ceval_bsds500utils_full")
+#define DATASET_RESULTS_PATH    std::string("results_test")
 #define DATASET_PRECACHING      1
 ////////////////////////////////
 #if (DEBUG_OUTPUT && !DISPLAY_OUTPUT)
@@ -395,7 +395,7 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
         std::shared_ptr<EdgeDetectorImpl> pAlgo(new EdgeDetectorLBSP());
 #endif //USE_...
 #if !FULL_THRESH_ANALYSIS
-        const double dThreshold = pAlgo->getDefaultThreshold();
+        const double dDefaultThreshold = pAlgo->getDefaultThreshold();
 #endif //!FULL_THRESH_ANALYSIS
 #if DISPLAY_OUTPUT
         bool bContinuousUpdates = false;
@@ -406,8 +406,6 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
         cv::FileStorage oDebugFS = cv::FileStorage(pCurrSet->m_sResultsPath+"../"+pCurrSet->m_sName+"_debug.yml",cv::FileStorage::WRITE);
         pAlgo->m_pDebugFS = &oDebugFS;
         pAlgo->m_sDebugName = pCurrSet->m_sName;
-        int nCurrThreshold = int((pAlgo->getDefaultThreshold())*UCHAR_MAX);
-        cv::createTrackbar("Threshold:",sDisplayName,&nCurrThreshold,UCHAR_MAX);
 #endif //DEBUG_OUTPUT
         bool bExit = false;
         TIMER_TIC(MainLoop);
@@ -425,37 +423,28 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
 #if FULL_THRESH_ANALYSIS
             pAlgo->apply(oCurrInputImage,oCurrEdgeMask);
 #else //!FULL_THRESH_ANALYSIS
-            pAlgo->apply_threshold(oCurrInputImage,oCurrEdgeMask,dThreshold);
+            pAlgo->apply_threshold(oCurrInputImage,oCurrEdgeMask,dDefaultThreshold);
 #endif //!FULL_THRESH_ANALYSIS
             TIMER_INTERNAL_TOC(PipelineUpdate);
 #if DISPLAY_OUTPUT
-#if DEBUG_OUTPUT
-            while(!bExit) {
-                pAlgo->apply(oCurrInputImage,oCurrEdgeMask,double(nCurrThreshold)/UCHAR_MAX);
-#endif //DEBUG_OUTPUT
-                cv::Mat oDisplayImage = DatasetUtils::GetDisplayImage(oCurrInputImage,oCurrEdgeMask,pCurrSet->m_pEvaluator?pCurrSet->m_pEvaluator->GetColoredSegmMaskFromResult(oCurrEdgeMask,oCurrGTMask,cv::Mat()):oCurrEdgeMask,nCurrImageIdx);
-                cv::Mat oDisplayImageResized;
-                if(oDisplayImage.cols>1920 || oDisplayImage.rows>1080)
-                    cv::resize(oDisplayImage,oDisplayImageResized,cv::Size(oDisplayImage.cols/2,oDisplayImage.rows/2));
-                else
-                    oDisplayImageResized = oDisplayImage;
-                cv::imshow(sDisplayName,oDisplayImageResized);
-                int nKeyPressed;
-                if(bContinuousUpdates)
-                    nKeyPressed = cv::waitKey(1);
-                else
-                    nKeyPressed = cv::waitKey(DEBUG_OUTPUT*100);
-                if(nKeyPressed!=-1)
-                    nKeyPressed %= (UCHAR_MAX+1); // fixes return val bug in some opencv versions
-                if(nKeyPressed==' ')
-                    bContinuousUpdates = !bContinuousUpdates;
-                else if(nKeyPressed==(int)'q')
-                    bExit = true;
-#if DEBUG_OUTPUT
-                else if(nKeyPressed==' ')
-                    break;
-            }
-#endif //DEBUG_OUTPUT
+            cv::Mat oDisplayImage = DatasetUtils::GetDisplayImage(oCurrInputImage,oCurrEdgeMask,pCurrSet->m_pEvaluator?pCurrSet->m_pEvaluator->GetColoredSegmMaskFromResult(oCurrEdgeMask,oCurrGTMask,cv::Mat()):oCurrEdgeMask,nCurrImageIdx);
+            cv::Mat oDisplayImageResized;
+            if(oDisplayImage.cols>1920 || oDisplayImage.rows>1080)
+                cv::resize(oDisplayImage,oDisplayImageResized,cv::Size(oDisplayImage.cols/2,oDisplayImage.rows/2));
+            else
+                oDisplayImageResized = oDisplayImage;
+            cv::imshow(sDisplayName,oDisplayImageResized);
+            int nKeyPressed;
+            if(bContinuousUpdates)
+                nKeyPressed = cv::waitKey(1);
+            else
+                nKeyPressed = cv::waitKey(0);
+            if(nKeyPressed!=-1)
+                nKeyPressed %= (UCHAR_MAX+1); // fixes return val bug in some opencv versions
+            if(nKeyPressed==' ')
+                bContinuousUpdates = !bContinuousUpdates;
+            else if(nKeyPressed==(int)'q')
+                bExit = true;
 #endif //DISPLAY_OUTPUT
 #if WRITE_IMG_OUTPUT
             pCurrSet->WriteResult(nCurrImageIdx,oCurrEdgeMask);
