@@ -29,6 +29,17 @@ namespace CxxUtils {
         return std::unique_ptr<Derived,Del>(nullptr,p.get_deleter());
     }
 
+    template<size_t n, typename F>
+    inline typename std::enable_if<n==0>::type unroll(const F& f) {
+        f(0);
+    }
+
+    template<size_t n, typename F>
+    inline typename std::enable_if<(n>0)>::type unroll(const F& f) {
+        unroll<n-1>(f);
+        f(n);
+    }
+
     template<typename T,std::size_t nByteAlign>
     class AlignAllocator {
     public:

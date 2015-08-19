@@ -58,6 +58,8 @@ public:
     static const size_t PATCH_SIZE = 5;
     //! utility, specifies the number of bytes per descriptor (should be the same as calling 'descriptorSize()')
     static const size_t DESC_SIZE = 2;
+    //! utility, specifies the number of bits per descriptor
+    static const size_t DESC_SIZE_BITS = DESC_SIZE*8;
 #if HAVE_GLSL
     //! utility function, returns the glsl source code required to describe an LBSP descriptor based on the image load store
     static std::string getShaderFunctionSource(size_t nChannels, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize);
@@ -76,61 +78,88 @@ public:
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (single-channel lookup, single-channel array thresholding)
     template<size_t nChannels, typename Tt, typename Tr>
-    inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _resc, const Tt _t, Tr& _res) {
-        alignas(16) std::array<uchar,LBSP::DESC_SIZE*8> _anVals;
-        computeDescriptor_lookup<nChannels>(oInputImg,_x,_y,_resc,_anVals);
+    inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar _ref, const int _x, const int _y, const size_t _c, const Tt _t, Tr& _res) {
+        alignas(16) std::array<uchar,LBSP::DESC_SIZE_BITS> _anVals;
+        computeDescriptor_lookup<nChannels>(oInputImg,_x,_y,_c,_anVals);
         computeDescriptor_threshold(_anVals,_ref,_t,_res);
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
     template<size_t nChannels, typename Tt, typename Tr>
     inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, Tr _res[nChannels]) {
-        alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE*8>,nChannels> _aanVals;
+        alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE_BITS>,nChannels> _aanVals;
         computeDescriptor_lookup(oInputImg,_x,_y,_aanVals);
-        for(size_t _resc=0; _resc<nChannels; ++_resc)
-            computeDescriptor_threshold(_aanVals[_resc],_ref[_resc],_t[_resc],_res[_resc]);
+        for(size_t _c=0; _c<nChannels; ++_c)
+            computeDescriptor_threshold(_aanVals[_c],_ref[_c],_t[_c],_res[_c]);
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (single-channel lookup only)
     template<size_t nChannels>
-    inline static void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, const size_t _resc, std::array<uchar,DESC_SIZE*8>& _anVals) {
+    inline static void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, const size_t _c, uchar* _anVals) {
         static_assert(nChannels>0,"need at least one image channel");
+        CV_DbgAssert(_anVals);
         CV_DbgAssert(!oInputImg.empty());
-        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _resc<nChannels);
+        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _c<nChannels);
         CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
         const uchar* const _data = oInputImg.data;
-        const size_t _c = nChannels;
-        using namespace DistanceUtils;
-        #include "litiv/features2d/LBSP_16bits_dbcross_lookup.ipp"
+        LBSP::lookup_16bits_dbcross<nChannels>(_data,_x,_y,_c,_step_row,_anVals);
+    }
+
+    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (single-channel lookup only)
+    template<size_t nChannels>
+    inline static void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, const size_t _c, std::array<uchar,DESC_SIZE_BITS>& _anVals) {
+        static_assert(nChannels>0,"need at least one image channel");
+        CV_DbgAssert(!oInputImg.empty());
+        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _c<nChannels);
+        CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
+        CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
+        const size_t _step_row = oInputImg.step.p[0];
+        const uchar* const _data = oInputImg.data;
+        LBSP::lookup_16bits_dbcross<nChannels>(_data,_x,_y,_c,_step_row,_anVals);
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup only)
     template<size_t nChannels>
-    inline static void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, std::array<std::array<uchar,DESC_SIZE*8>,nChannels>& _aanVals) {
+    inline static void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, uchar* _aanVals) {
         static_assert(nChannels>0,"need at least one image channel");
+        CV_DbgAssert(_aanVals);
         CV_DbgAssert(!oInputImg.empty());
-        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _resc<nChannels);
+        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _c<nChannels);
         CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
         const uchar* const _data = oInputImg.data;
-        const size_t _c = nChannels;
-        using namespace DistanceUtils;
-        for(size_t _resc=0; _resc<nChannels; ++_resc) {
-            std::array<uchar,LBSP::DESC_SIZE*8>& _anVals = _aanVals[_resc];
-            #include "litiv/features2d/LBSP_16bits_dbcross_lookup.ipp"
+        for(size_t _c=0; _c<nChannels; ++_c) {
+            uchar* _anVals = _aanVals+_c*LBSP::DESC_SIZE_BITS;
+            LBSP::lookup_16bits_dbcross<nChannels>(_data,_x,_y,_c,_step_row,_anVals);
+        }
+    }
+
+    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup only)
+    template<size_t nChannels>
+    inline static void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, std::array<std::array<uchar,DESC_SIZE_BITS>,nChannels>& _aanVals) {
+        static_assert(nChannels>0,"need at least one image channel");
+        CV_DbgAssert(!oInputImg.empty());
+        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _c<nChannels);
+        CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
+        CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
+        const size_t _step_row = oInputImg.step.p[0];
+        const uchar* const _data = oInputImg.data;
+        for(size_t _c=0; _c<nChannels; ++_c) {
+            std::array<uchar,LBSP::DESC_SIZE_BITS>& _anVals = _aanVals[_c];
+            LBSP::lookup_16bits_dbcross<nChannels>(_data,_x,_y,_c,_step_row,_anVals);
         }
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (array thresholding only)
-    template<typename Tt, typename Tr>
-    inline static void computeDescriptor_threshold(const std::array<uchar,DESC_SIZE*8>& _anVals, const uchar _ref, const Tt _t, Tr& _res) {
+    template<typename Tv, typename Tt, typename Tr>
+    inline static void computeDescriptor_threshold(const Tv& _anVals, const uchar _ref, const Tt _t, Tr& _anResVals) {
         static_assert(std::is_integral<Tt>::value,"internal threshold type must be integral");
         static_assert(sizeof(Tr)>=LBSP::DESC_SIZE,"result type size is too small");
-        using namespace DistanceUtils;
-        #include "litiv/features2d/LBSP_16bits_dbcross_threshold.ipp"
+        CV_DbgAssert(_anVals);
+        LBSP::threshold_internal(_anVals,_t,_ref,_anResVals);
     }
 
 protected:
@@ -140,4 +169,62 @@ protected:
     const float m_fRelThreshold;
     const size_t m_nThreshold;
     cv::Mat m_oRefImage;
+
+    template<size_t nChannels, typename Tv, typename Tr>
+    inline static void lookup_16bits_dbcross(const Tv& _data, const int _x, const int _y, const int _c, const int _step_row, Tr& _anVals) {
+        // note: this is the LBSP 16 bit double-cross indiv RGB/RGBA pattern as used in the original article by G.-A. Bilodeau et al.
+        //
+        //  O   O   O          4 ..  3 ..  6
+        //    O O O           .. 15  8 13 ..
+        //  O O X O O    =>    0  9  X 11  1
+        //    O O O           .. 12 10 14 ..
+        //  O   O   O          7 ..  2 ..  5
+        //
+        const int _anIdxLUT[16][2] = {
+            {-2, 0},{ 2, 0},{ 0,-2},{ 0, 2},
+            {-2, 2},{ 2,-2},{ 2, 2},{-2,-2},
+            { 0, 1},{-1, 0},{ 0,-1},{ 1, 0},
+            {-1,-1},{ 1, 1},{ 1,-1},{-1, 1},
+        };
+        auto _idx = [&](int n) {
+            return _step_row*(_anIdxLUT[n][1]+_y)+nChannels*(_anIdxLUT[n][0]+_x)+_c;
+        };
+        auto _f = [&](int n) {
+            _anVals[n] = _data[_idx(n)];
+        };
+        CxxUtils::unroll<15>(_f);
+    }
+
+    template<typename Tv, typename Tt, typename Tr>
+    inline static void threshold_internal(const Tv& _anVals, const Tt _t, const uchar _ref, Tr& _anResVal) {
+        // note: this function is used to threshold an LBSP pattern based on a predefined lookup array (see LBSP_16bits_dbcross_lookup for more information).
+        // @@@ todo: use array template to unroll loops & allow any descriptor size here
+#if (!HAVE_SSE4_1 && !HAVE_SSE2)
+        _anResVal = 0;
+        auto _f = [&](int n) {
+            _anResVal |= (DistanceUtils::L1dist(_anVals[n],_ref) > _t) << n;
+        };
+        CxxUtils::unroll<LBSP::DESC_SIZE_BITS-1>(_f);
+#else //(HAVE_SSE4_1 || HAVE_SSE2)
+        static_assert(LBSP::DESC_SIZE_BITS==16,"Current sse impl can only manage 16-byte chunks");
+        // @@@@ send <16byte back to non-sse, and >16 to loop via template enableif?
+        CV_DbgAssert(((uintptr_t)(&_anVals[0])&15)==0);
+        __m128i _anMMXVals = _mm_load_si128((__m128i*)&_anVals[0]);
+        __m128i _anRefVals = _mm_set1_epi8(char(_ref));
+#if HAVE_SSE4_1
+        __m128i _anDistVals = _mm_sub_epi8(_mm_max_epu8(_anMMXVals,_anRefVals),_mm_min_epu8(_anMMXVals,_anRefVals));
+        __m128i _abCmpRes = _mm_cmpgt_epi8(_mm_xor_si128(_anDistVals,_mm_set1_epi8(char(0x80))),_mm_set1_epi8(char(_t^0x80)));
+#else //HAVE_SSE2
+        __m128i _anBitFlipper = _mm_set1_epi8(char(0x80));
+        __m128i _anDistVals = _mm_xor_si128(_anMMXVals,_anBitFlipper);
+        _anRefVals = _mm_xor_si128(_anRefVals,_anBitFlipper);
+        __m128i _abCmpRes = _mm_cmpgt_epi8(_anDistVals,_anRefVals);
+        __m128i _anDistVals1 = _mm_sub_epi8(_anDistVals,_anRefVals);
+        __m128i _anDistVals2 = _mm_sub_epi8(_anRefVals,_anDistVals);
+        _anDistVals = _mm_or_si128(_mm_and_si128(_abCmpRes,_anDistVals1),_mm_andnot_si128(_abCmpRes,_anDistVals2));
+        _abCmpRes = _mm_cmpgt_epi8(_mm_xor_si128(_anDistVals,_anBitFlipper),_mm_set1_epi8(char(_t^0x80)));
+#endif //HAVE_SSE20x80u
+        _anResVal = _mm_movemask_epi8(_abCmpRes);
+#endif //(HAVE_SSE4_1 || HAVE_SSE2)
+    }
 };

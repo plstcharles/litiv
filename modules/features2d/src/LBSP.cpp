@@ -191,9 +191,9 @@ void LBSP::calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat
     CV_DbgAssert(LBSP::DESC_SIZE==2);
     CV_DbgAssert(oDesc1.type()==CV_16UC1 || oDesc1.type()==CV_16UC3);
     CV_DbgAssert(CV_MAT_DEPTH(oDesc1.type())==CV_16U);
-    CV_DbgAssert(LBSP::DESC_SIZE*8<=UCHAR_MAX);
+    CV_DbgAssert(LBSP::DESC_SIZE_BITS<=UCHAR_MAX);
     CV_DbgAssert(oDesc1.step.p[0]==oDesc2.step.p[0] && oDesc1.step.p[1]==oDesc2.step.p[1]);
-    const float fScaleFactor = (float)UCHAR_MAX/(LBSP::DESC_SIZE*8);
+    const float fScaleFactor = (float)UCHAR_MAX/(LBSP::DESC_SIZE_BITS);
     const size_t nChannels = CV_MAT_CN(oDesc1.type());
     const size_t _step_row = oDesc1.step.p[0];
     if(nChannels==1) {

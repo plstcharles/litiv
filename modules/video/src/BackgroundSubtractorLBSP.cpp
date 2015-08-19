@@ -84,13 +84,13 @@ void BackgroundSubtractorLBSP<eImpl>::initialize(const cv::Mat& oInitImg, const 
                 const size_t nPxRGBIter = nPxIter*this->m_nImgChannels;
                 const size_t nDescRGBIter = nPxRGBIter*2;
                 if(this->m_nImgChannels==3) {
-                    alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE*8>,3> aanLBSPLookupVals;
+                    alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE_BITS>,3> aanLBSPLookupVals;
                     LBSP::computeDescriptor_lookup(oInitImg,this->m_voPxInfoLUT[nPxIter].nImgCoord_X,this->m_voPxInfoLUT[nPxIter].nImgCoord_Y,aanLBSPLookupVals);
                     for(size_t c=0; c<3; ++c)
                         LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],oInitImg.data[nPxRGBIter+c],m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
                 }
                 else { //m_nImgChannels==4
-                    alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE*8>,4> aanLBSPLookupVals;
+                    alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE_BITS>,4> aanLBSPLookupVals;
                     LBSP::computeDescriptor_lookup(oInitImg,this->m_voPxInfoLUT[nPxIter].nImgCoord_X,this->m_voPxInfoLUT[nPxIter].nImgCoord_Y,aanLBSPLookupVals);
                     for(size_t c=0; c<4; ++c)
                         LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],oInitImg.data[nPxRGBIter+c],m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);

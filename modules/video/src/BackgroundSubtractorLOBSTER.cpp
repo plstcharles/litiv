@@ -474,7 +474,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::apply(cv::InputA
             const int nCurrImgCoord_X = m_voPxInfoLUT[nPxIter].nImgCoord_X;
             const int nCurrImgCoord_Y = m_voPxInfoLUT[nPxIter].nImgCoord_Y;
             const uchar nCurrColor = oInputImg.data[nPxIter];
-            alignas(16) std::array<uchar,LBSP::DESC_SIZE*8> anLBSPLookupVals;
+            alignas(16) std::array<uchar,LBSP::DESC_SIZE_BITS> anLBSPLookupVals;
             LBSP::computeDescriptor_lookup<1>(oInputImg,nCurrImgCoord_X,nCurrImgCoord_Y,0,anLBSPLookupVals);
             size_t nGoodSamplesCount=0, nModelIdx=0;
             while(nGoodSamplesCount<m_nRequiredBGSamples && nModelIdx<m_nBGSamples) {
@@ -527,7 +527,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::apply(cv::InputA
             const size_t nPxIterRGB = nPxIter*3;
             const size_t nDescIterRGB = nPxIterRGB*2;
             const uchar* const anCurrColor = oInputImg.data+nPxIterRGB;
-            alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE*8>,3> aanLBSPLookupVals;
+            alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE_BITS>,3> aanLBSPLookupVals;
             LBSP::computeDescriptor_lookup(oInputImg,nCurrImgCoord_X,nCurrImgCoord_Y,aanLBSPLookupVals);
             size_t nGoodSamplesCount=0, nModelIdx=0;
             while(nGoodSamplesCount<m_nRequiredBGSamples && nModelIdx<m_nBGSamples) {

@@ -44,7 +44,7 @@
 #define UNSTAB_DESC_DIST_OFFSET (m_nDescDistThresholdOffset)
 
 static const size_t s_nColorMaxDataRange_1ch = UCHAR_MAX;
-static const size_t s_nDescMaxDataRange_1ch = LBSP::DESC_SIZE*8;
+static const size_t s_nDescMaxDataRange_1ch = LBSP::DESC_SIZE_BITS;
 static const size_t s_nColorMaxDataRange_3ch = s_nColorMaxDataRange_1ch*3;
 static const size_t s_nDescMaxDataRange_3ch = s_nDescMaxDataRange_1ch*3;
 
@@ -227,7 +227,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
             uchar& nLastColor = m_oLastColorFrame.data[nPxIter];
             const size_t nCurrColorDistThreshold = (size_t)(((*pfCurrDistThresholdFactor)*m_nMinColorDistThreshold)-((!m_oUnstableRegionMask.data[nPxIter])*STAB_COLOR_DIST_OFFSET))/2;
             const size_t nCurrDescDistThreshold = ((size_t)1<<((size_t)floor(*pfCurrDistThresholdFactor+0.5f)))+m_nDescDistThresholdOffset+(m_oUnstableRegionMask.data[nPxIter]*UNSTAB_DESC_DIST_OFFSET);
-            alignas(16) std::array<uchar,LBSP::DESC_SIZE*8> anLBSPLookupVals;
+            alignas(16) std::array<uchar,LBSP::DESC_SIZE_BITS> anLBSPLookupVals;
             LBSP::computeDescriptor_lookup<1>(oInputImg,nCurrImgCoord_X,nCurrImgCoord_Y,0,anLBSPLookupVals);
             ushort nCurrIntraDesc;
             LBSP::computeDescriptor_threshold(anLBSPLookupVals,nCurrColor,m_anLBSPThreshold_8bitLUT[nCurrColor],nCurrIntraDesc);
@@ -365,7 +365,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
             const size_t nCurrTotColorDistThreshold = nCurrColorDistThreshold*3;
             const size_t nCurrTotDescDistThreshold = nCurrDescDistThreshold*3;
             const size_t nCurrSCColorDistThreshold = nCurrTotColorDistThreshold/2;
-            alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE*8>,3> aanLBSPLookupVals;
+            alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE_BITS>,3> aanLBSPLookupVals;
             LBSP::computeDescriptor_lookup(oInputImg,nCurrImgCoord_X,nCurrImgCoord_Y,aanLBSPLookupVals);
             std::array<ushort,3> anCurrIntraDesc;
             for(size_t c=0; c<3; ++c)
