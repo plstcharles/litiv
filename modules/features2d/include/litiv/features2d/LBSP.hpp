@@ -126,7 +126,7 @@ public:
         static_assert(nChannels>0,"need at least one image channel");
         CV_DbgAssert(_aanVals);
         CV_DbgAssert(!oInputImg.empty());
-        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _c<nChannels);
+        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels));
         CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
@@ -142,7 +142,7 @@ public:
     inline static void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, std::array<std::array<uchar,DESC_SIZE_BITS>,nChannels>& _aanVals) {
         static_assert(nChannels>0,"need at least one image channel");
         CV_DbgAssert(!oInputImg.empty());
-        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _c<nChannels);
+        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels));
         CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
@@ -158,7 +158,6 @@ public:
     inline static void computeDescriptor_threshold(const Tv& _anVals, const uchar _ref, const Tt _t, Tr& _anResVals) {
         static_assert(std::is_integral<Tt>::value,"internal threshold type must be integral");
         static_assert(sizeof(Tr)>=LBSP::DESC_SIZE,"result type size is too small");
-        CV_DbgAssert(_anVals);
         LBSP::threshold_internal(_anVals,_t,_ref,_anResVals);
     }
 
