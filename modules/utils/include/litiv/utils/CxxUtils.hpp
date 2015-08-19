@@ -61,7 +61,13 @@ namespace CxxUtils {
 #if PLATFORM_USES_WIN32API
         inline pointer allocate(size_type n) {
             const size_type alignment = static_cast<size_type>(nByteAlign);
-            void* ptr = _aligned_malloc(n*sizeof(value_type),nByteAlign);
+            const size_type alignment = static_cast<size_type>(nByteAlign);
+            size_t alloc_size = n*sizeof(value_type);
+            if((alloc_size%alignment)!=0) {
+                alloc_size += alignment - alloc_size%alignment;
+                CV_DbgAssert((alloc_size%alignment)==0);
+            }
+            void* ptr = _aligned_malloc(alloc_size,nByteAlign);
             if(ptr==nullptr)
                 throw std::bad_alloc();
             return reinterpret_cast<pointer>(ptr);
@@ -70,7 +76,12 @@ namespace CxxUtils {
 #else //!PLATFORM_USES_WIN32API
         inline pointer allocate(size_type n) {
             const size_type alignment = static_cast<size_type>(nByteAlign);
-            void* ptr = aligned_alloc(alignment,n*sizeof(value_type));
+            size_t alloc_size = n*sizeof(value_type);
+            if((alloc_size%alignment)!=0) {
+                alloc_size += alignment - alloc_size%alignment;
+                CV_DbgAssert((alloc_size%alignment)==0);
+            }
+            void* ptr = aligned_alloc(alignment,alloc_size);
             if(ptr==nullptr)
                 throw std::bad_alloc();
             return reinterpret_cast<pointer>(ptr);
