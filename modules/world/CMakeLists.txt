@@ -25,7 +25,6 @@ file(GLOB INCLUDE_FILES
 add_library(litiv_world SHARED ${SOURCE_FILES})
 
 target_link_libraries(litiv_world ${litiv_projects})
-target_compil_litiv_dependencies(litiv_world)
 target_include_directories(litiv_world
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"

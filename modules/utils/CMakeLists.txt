@@ -24,7 +24,6 @@ if(USE_BSDS500_BENCHMARK)
 endif(USE_BSDS500_BENCHMARK)
 target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} litiv_imgproc) # needed for thinning in BSDS500 eval
 target_link_litiv_dependencies(${LITIV_CURRENT_PROJECT_NAME})
-target_compil_litiv_dependencies(${LITIV_CURRENT_PROJECT_NAME})
 target_include_directories(${LITIV_CURRENT_PROJECT_NAME}
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"

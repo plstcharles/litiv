@@ -15,7 +15,6 @@ file(GLOB INCLUDE_FILES
 
 add_library(BSDS500 STATIC ${SOURCE_FILES})
 
-target_compil_litiv_dependencies(BSDS500)
 target_include_directories(BSDS500
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"

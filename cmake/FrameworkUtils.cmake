@@ -36,11 +36,6 @@ macro(set_eval name)
     endif(${ARGN})
 endmacro(set_eval)
 
-macro(target_compil_litiv_dependencies name)
-    set_property(TARGET ${name} PROPERTY CXX_STANDARD 11)
-    set_property(TARGET ${name} PROPERTY CXX_STANDARD_REQUIRED ON)
-endmacro(target_compil_litiv_dependencies name)
-
 macro(target_link_litiv_dependencies name)
     target_link_libraries(${name} ${OpenCV_LIBRARIES})
     if(USE_GLSL)
@@ -57,7 +52,6 @@ macro(target_link_litiv_dependencies name)
         # @@@@ add opencl package
         message(FATAL_ERROR "Missing OpenCL target link libraries")
     endif(USE_OPENCL)
-    target_compil_litiv_dependencies(${name})
 endmacro(target_link_litiv_dependencies name)
 
 macro(try_runcheck_and_set_success name)

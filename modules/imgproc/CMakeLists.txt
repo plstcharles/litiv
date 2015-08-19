@@ -13,7 +13,6 @@ file(GLOB INCLUDE_FILES
 add_library(${LITIV_CURRENT_PROJECT_NAME} STATIC ${SOURCE_FILES})
 
 target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} litiv_features2d)
-target_compil_litiv_dependencies(${LITIV_CURRENT_PROJECT_NAME})
 target_include_directories(${LITIV_CURRENT_PROJECT_NAME}
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
