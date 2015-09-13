@@ -42,6 +42,8 @@ public:
     virtual void getBackgroundImage(cv::OutputArray backgroundImage) const;
     //! returns a copy of the latest reconstructed background descriptors image
     virtual void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const;
+    //! returns the default learning rate value used in 'apply'
+    virtual double getDefaultLearningRate() const {return 0;}
 
 protected:
     template<size_t nChannels>
