@@ -97,3 +97,8 @@ namespace CxxUtils {
     };
 
 } //namespace CxxUtils
+
+namespace std {
+    template<typename T, size_t N>
+    using aligned_vector = vector<T,CxxUtils::AlignAllocator<T,N>>;
+} //namespace std
