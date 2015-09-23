@@ -16,11 +16,13 @@
 // limitations under the License.
 
 #include "litiv/imgproc/EdgeDetectorCanny.hpp"
+#if DEBUG
+#include "litiv/imgproc.hpp"
+#endif //DEBUG
 
-EdgeDetectorCanny::EdgeDetectorCanny(double dHystLowThrshFactor, double dGaussianKernelSigma, bool bUseL2GradientNorm) :
+EdgeDetectorCanny::EdgeDetectorCanny(double dHystLowThrshFactor, double dGaussianKernelSigma) :
         m_dHystLowThrshFactor(dHystLowThrshFactor),
-        m_dGaussianKernelSigma(dGaussianKernelSigma),
-        m_bUsingL2GradientNorm(bUseL2GradientNorm) {
+        m_dGaussianKernelSigma(dGaussianKernelSigma) {
     CV_Assert(m_dHystLowThrshFactor>0 && m_dHystLowThrshFactor<1);
     CV_Assert(m_dGaussianKernelSigma>=0);
 }
@@ -46,7 +48,14 @@ void EdgeDetectorCanny::apply_threshold(cv::InputArray _oInputImage, cv::OutputA
     if(dThreshold<0||dThreshold>1)
         dThreshold = getDefaultThreshold();
     const size_t nCurrBaseHystThreshold = (size_t)(dThreshold*UCHAR_MAX);
-    cv::Canny(oInputImage_gray,oEdgeMask,nCurrBaseHystThreshold*m_dHystLowThrshFactor,(double)nCurrBaseHystThreshold,3,m_bUsingL2GradientNorm);
+    static const int nWindowSize = EDGCANNY_DEFAULT_NMS_WINDOW_SIZE;
+    static const bool bUseL2Gradient = EDGCANNY_DEFAULT_USE_L2_GRADIENT_NORM;
+    litiv::cv_canny<nWindowSize,bUseL2Gradient>(oInputImage_gray,oEdgeMask,nCurrBaseHystThreshold*m_dHystLowThrshFactor,(double)nCurrBaseHystThreshold);
+#if DEBUG
+    cv::Mat tmp(oEdgeMask.size(),oEdgeMask.type());
+    cv::Canny(oInputImage_gray,tmp,nCurrBaseHystThreshold*m_dHystLowThrshFactor,(double)nCurrBaseHystThreshold,nWindowSize,bUseL2Gradient);
+    CV_Assert(cv::countNonZero(tmp!=oEdgeMask)==0);
+#endif //DEBUG
 }
 
 void EdgeDetectorCanny::apply(cv::InputArray _oInputImage, cv::OutputArray _oEdgeMask) {

@@ -25,8 +25,10 @@
 #define EDGCANNY_DEFAULT_HYST_LOW_THRSH_FACT (0.4)
 //! defines the default value for EdgeDetectorCanny::m_dGaussianKernelSigma
 #define EDGCANNY_DEFAULT_GAUSSIAN_KERNEL_SIGMA (2)
-//! defines the default value for EdgeDetectorCanny::m_bUsingL2GradientNorm
+//! defines the default value for the norm type used to compute gradient magnitudes
 #define EDGCANNY_DEFAULT_USE_L2_GRADIENT_NORM (true)
+//! defines the default value for the aperture (or window) size used for non-max suppression
+#define EDGCANNY_DEFAULT_NMS_WINDOW_SIZE (3)
 //! defines the default value for the threshold passed to EdgeDetectorCanny::apply
 #define EDGCANNY_DEFAULT_THRESHOLD (75.0/UCHAR_MAX)
 
@@ -40,8 +42,7 @@
 struct EdgeDetectorCanny : public IEdgeDetector {
     //! full constructor
     EdgeDetectorCanny(double dHystLowThrshFactor=EDGCANNY_DEFAULT_HYST_LOW_THRSH_FACT,
-                      double dGaussianKernelSigma=EDGCANNY_DEFAULT_GAUSSIAN_KERNEL_SIGMA,
-                      bool bUseL2GradientNorm=EDGCANNY_DEFAULT_USE_L2_GRADIENT_NORM);
+                      double dGaussianKernelSigma=EDGCANNY_DEFAULT_GAUSSIAN_KERNEL_SIGMA);
     //! returns the default threshold value used in 'apply'
     virtual double getDefaultThreshold() const {return EDGCANNY_DEFAULT_THRESHOLD;}
     //! thresholded edge detection function; the threshold should be between 0 and 1 (will use default otherwise), and sets the base hysteresis threshold
@@ -54,6 +55,4 @@ protected:
     const double m_dHystLowThrshFactor;
     //! gaussian blur kernel sigma value
     const double m_dGaussianKernelSigma;
-    //! specifies whether to use the accurate L2 norm for gradient magnitude calculations or simply the L1 norm
-    const bool m_bUsingL2GradientNorm;
 };
