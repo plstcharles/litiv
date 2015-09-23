@@ -55,6 +55,11 @@ namespace DatasetUtils {
     struct WorkGroup;
 
     struct DatasetInfoBase {
+        DatasetInfoBase();
+        DatasetInfoBase(const std::string& sDatasetName, const std::string& sDatasetRootPath, const std::string& sResultsRootPath,
+                        const std::string& sResultNamePrefix, const std::string& sResultNameSuffix, const std::vector<std::string>& vsWorkBatchPaths,
+                        const std::vector<std::string>& vsSkippedNameTokens, const std::vector<std::string>& vsGrayscaleNameTokens,
+                        bool bForce4ByteDataAlign, double dScaleFactor);
         virtual std::vector<std::shared_ptr<WorkGroup>> ParseDataset();
         virtual void WriteEvalResults(const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) const = 0;
         virtual eDatasetTypeList GetType() const = 0;
@@ -67,6 +72,7 @@ namespace DatasetUtils {
         std::vector<std::string> m_vsSkippedNameTokens;
         std::vector<std::string> m_vsGrayscaleNameTokens;
         bool m_bForce4ByteDataAlign;
+        double m_dScaleFactor;
     };
 
     class WorkBatch {
@@ -140,6 +146,11 @@ namespace DatasetUtils {
             };
 
             struct DatasetInfo : public DatasetInfoBase {
+                DatasetInfo();
+                DatasetInfo(const std::string& sDatasetName, const std::string& sDatasetRootPath, const std::string& sResultsRootPath,
+                            const std::string& sResultNamePrefix, const std::string& sResultNameSuffix, const std::vector<std::string>& vsWorkBatchPaths,
+                            const std::vector<std::string>& vsSkippedNameTokens, const std::vector<std::string>& vsGrayscaleNameTokens,
+                            bool bForce4ByteDataAlign, double dScaleFactor, eDatasetList eDatasetID, size_t nResultIdxOffset);
                 virtual void WriteEvalResults(const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) const;
                 virtual eDatasetTypeList GetType() const {return eDatasetType_Segm_Video;}
                 eDatasetList m_eDatasetID;
@@ -170,7 +181,8 @@ namespace DatasetUtils {
                 cv::VideoCapture m_voVideoReader;
                 size_t m_nNextExpectedVideoReaderFrameIdx;
                 cv::Mat m_oROI;
-                cv::Size m_oSize;
+                cv::Size m_oOrigSize,m_oSize;
+                double m_dScaleFactor;
                 std::unordered_map<size_t,size_t> m_mTestGTIndexes;
                 Sequence& operator=(const Sequence&) = delete;
                 Sequence(const Sequence&) = delete;
@@ -192,6 +204,11 @@ namespace DatasetUtils {
             };
 
             struct DatasetInfo : public DatasetInfoBase {
+                DatasetInfo();
+                DatasetInfo(const std::string& sDatasetName, const std::string& sDatasetRootPath, const std::string& sResultsRootPath,
+                            const std::string& sResultNamePrefix, const std::string& sResultNameSuffix, const std::vector<std::string>& vsWorkBatchPaths,
+                            const std::vector<std::string>& vsSkippedNameTokens, const std::vector<std::string>& vsGrayscaleNameTokens,
+                            bool bForce4ByteDataAlign, double dScaleFactor, eDatasetList eDatasetID);
                 virtual void WriteEvalResults(const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) const;
                 virtual eDatasetTypeList GetType() const {return eDatasetType_Segm_Image;}
                 eDatasetList m_eDatasetID;

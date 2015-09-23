@@ -106,6 +106,24 @@ void AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::
 #else // bad config
 #error "Bad config, trying to use an unavailable impl."
 #endif // bad config
+#ifndef DATASET_ID
+const std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> g_pDatasetInfo(new DatasetUtils::Segm::Video::DatasetInfo(
+        "GeekSys2D measy02", // m_sDatasetName
+        DATASET_ROOT_PATH+"/geeksys/measy02/", // m_sDatasetRootPath
+        DATASET_ROOT_PATH+"/geeksys/measy02/"+DATASET_RESULTS_PATH+"/", // m_sResultsRootPath
+        "fg_", // m_sResultNamePrefix
+        ".png", // m_sResultNameSuffix
+        {"original"}, // m_vsWorkBatchPaths
+        {}, // m_vsSkippedNameTokens
+        {"original"}, // m_vsGrayscaleNameTokens
+        USE_GPU_IMPL, // m_bForce4ByteDataAlign
+        0.5, // m_dScaleFactor
+        DatasetUtils::Segm::Video::eDataset_Custom, // m_eDatasetID
+        -1 // m_nResultIdxOffset
+));
+#else //defined(DATASET_ID)
+const std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> g_pDatasetInfo = DatasetUtils::Segm::Video::GetDatasetInfo(DatasetUtils::Segm::Video::DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH,USE_GPU_IMPL);
+#endif //defined(DATASET_ID)
 
 // @@@@ package x/y/event/code into shared_ptr struct? check opencv 3.0 callback for mouse event?
 int g_nLatestMouseX = -1, g_nLatestMouseY = -1;
@@ -544,7 +562,7 @@ void AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::
                 cv::bitwise_or(oCurrBGImg,UCHAR_MAX/2,oCurrBGImg,oROI==0);
             cv::Mat oDisplayFrame = DatasetUtils::GetDisplayImage(oCurrInputFrame,oCurrBGImg,pCurrSequence->m_pEvaluator?pCurrSequence->m_pEvaluator->GetColoredSegmMaskFromResult(oCurrFGMask,oCurrGTMask,oROI):oCurrFGMask,nCurrFrameIdx,cv::Point(*g_pnLatestMouseX,*g_pnLatestMouseY));
             cv::Mat oDisplayFrameResized;
-            if(oDisplayImage.cols>1920 || oDisplayImage.rows>1080)
+            if(oDisplayFrame.cols>1920 || oDisplayFrame.rows>1080)
                 cv::resize(oDisplayFrame,oDisplayFrameResized,cv::Size(oDisplayFrame.cols/2,oDisplayFrame.rows/2));
             else
                 oDisplayFrameResized = oDisplayFrame;

@@ -239,6 +239,27 @@ const cv::Mat& DatasetUtils::ImagePrecacher::GetImageFromIndex_internal(size_t n
     return m_oLastReqImage;
 }
 
+DatasetUtils::DatasetInfoBase::DatasetInfoBase() :
+        m_sDatasetName("<unknown>"),
+        m_sResultNameSuffix(".png"),
+        m_bForce4ByteDataAlign(false),
+        m_dScaleFactor(1.0) {}
+
+DatasetUtils::DatasetInfoBase::DatasetInfoBase( const std::string& sDatasetName, const std::string& sDatasetRootPath, const std::string& sResultsRootPath,
+                                                const std::string& sResultNamePrefix, const std::string& sResultNameSuffix, const std::vector<std::string>& vsWorkBatchPaths,
+                                                const std::vector<std::string>& vsSkippedNameTokens, const std::vector<std::string>& vsGrayscaleNameTokens,
+                                                bool bForce4ByteDataAlign, double dScaleFactor) :
+        m_sDatasetName(sDatasetName),
+        m_sDatasetRootPath(sDatasetRootPath),
+        m_sResultsRootPath(sResultsRootPath),
+        m_sResultNamePrefix(sResultNamePrefix),
+        m_sResultNameSuffix(sResultNameSuffix),
+        m_vsWorkBatchPaths(vsWorkBatchPaths),
+        m_vsSkippedNameTokens(vsSkippedNameTokens),
+        m_vsGrayscaleNameTokens(vsGrayscaleNameTokens),
+        m_bForce4ByteDataAlign(bForce4ByteDataAlign),
+        m_dScaleFactor(dScaleFactor) {}
+
 std::vector<std::shared_ptr<DatasetUtils::WorkGroup>> DatasetUtils::DatasetInfoBase::ParseDataset() {
     if(!m_sResultsRootPath.empty())
         PlatformUtils::CreateDirIfNotExist(m_sResultsRootPath);
@@ -366,6 +387,16 @@ cv::Mat DatasetUtils::WorkGroup::GetGTFromIndex_external(size_t nIdx) {
     return m_vpBatches[nBatchIdx-1]->GetGTFromIndex_external(nIdx-(nCumulIdx-m_vpBatches[nBatchIdx-1]->GetTotalImageCount()));
 }
 
+DatasetUtils::Segm::Video::DatasetInfo::DatasetInfo() : DatasetInfoBase(), m_eDatasetID(eDataset_Custom), m_nResultIdxOffset(0) {}
+
+DatasetUtils::Segm::Video::DatasetInfo::DatasetInfo(const std::string& sDatasetName, const std::string& sDatasetRootPath, const std::string& sResultsRootPath,
+                                                    const std::string& sResultNamePrefix, const std::string& sResultNameSuffix, const std::vector<std::string>& vsWorkBatchPaths,
+                                                    const std::vector<std::string>& vsSkippedNameTokens, const std::vector<std::string>& vsGrayscaleNameTokens,
+                                                    bool bForce4ByteDataAlign, double dScaleFactor, eDatasetList eDatasetID, size_t nResultIdxOffset) :
+        DatasetInfoBase(sDatasetName,sDatasetRootPath,sResultsRootPath,sResultNamePrefix,sResultNameSuffix,vsWorkBatchPaths,vsSkippedNameTokens,vsGrayscaleNameTokens,bForce4ByteDataAlign,dScaleFactor),
+        m_eDatasetID(eDatasetID),
+        m_nResultIdxOffset(nResultIdxOffset) {}
+
 void DatasetUtils::Segm::Video::DatasetInfo::WriteEvalResults(const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) const {
     if(m_eDatasetID==eDataset_CDnet2012 || m_eDatasetID==eDataset_CDnet2014)
         CDnetEvaluator::WriteEvalResults(*this,vpGroups,true);
@@ -446,7 +477,8 @@ DatasetUtils::Segm::Video::Sequence::Sequence(const std::string& sSeqName, const
         m_nResultIdxOffset(oDatasetInfo.m_nResultIdxOffset),
         m_dExpectedLoad(0),
         m_nTotFrameCount(0),
-        m_nNextExpectedVideoReaderFrameIdx(0) {
+        m_nNextExpectedVideoReaderFrameIdx(0),
+        m_dScaleFactor(oDatasetInfo.m_dScaleFactor) {
     if(m_eDatasetID==eDataset_CDnet2012 || m_eDatasetID==eDataset_CDnet2014) {
         std::vector<std::string> vsSubDirs;
         PlatformUtils::GetSubDirsFromDir(m_sDatasetPath,vsSubDirs);
@@ -533,19 +565,30 @@ DatasetUtils::Segm::Video::Sequence::Sequence(const std::string& sSeqName, const
         m_pEvaluator = std::shared_ptr<EvaluatorBase>(new BinarySegmEvaluator("PETS2001_EVAL"));
     }
     else if(m_eDatasetID==eDataset_Custom) {
-        m_voVideoReader.open(m_sDatasetPath);
-        if(!m_voVideoReader.isOpened())
-            throw std::runtime_error(cv::format("Sequence '%s': video could not be opened",sSeqName.c_str()));
-        m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
         cv::Mat oTempImg;
-        m_voVideoReader >> oTempImg;
-        m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
+        if(m_nResultIdxOffset==size_t(-1)) {
+            PlatformUtils::GetFilesFromDir(m_sDatasetPath,m_vsInputFramePaths);
+            oTempImg = cv::imread(m_vsInputFramePaths[0]);
+            std::cout << "path = " << m_vsInputFramePaths[0] << std::endl;
+            m_nTotFrameCount = m_vsInputFramePaths.size();
+        }
+        else {
+            m_voVideoReader.open(m_sDatasetPath);
+            if(!m_voVideoReader.isOpened())
+                throw std::runtime_error(cv::format("Sequence '%s': video could not be opened",sSeqName.c_str()));
+            m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
+            m_voVideoReader >> oTempImg;
+            m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
+            m_nTotFrameCount = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
+        }
         if(oTempImg.empty())
             throw std::runtime_error(cv::format("Sequence '%s': video could not be read",sSeqName.c_str()));
+        m_oOrigSize = oTempImg.size();
+        if(m_dScaleFactor!=1.0)
+            cv::resize(oTempImg,oTempImg,cv::Size(),m_dScaleFactor,m_dScaleFactor,cv::INTER_NEAREST);
         m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
         m_oSize = oTempImg.size();
         m_nNextExpectedVideoReaderFrameIdx = 0;
-        m_nTotFrameCount = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
         CV_Assert(m_nTotFrameCount>0);
         m_dExpectedLoad = (double)m_oSize.height*m_oSize.width*m_nTotFrameCount*(int(!m_bForcingGrayscale)+1);
     }
@@ -554,7 +597,13 @@ DatasetUtils::Segm::Video::Sequence::Sequence(const std::string& sSeqName, const
 }
 
 void DatasetUtils::Segm::Video::Sequence::WriteResult(size_t nIdx, const cv::Mat& oResult) {
-    WorkBatch::WriteResult(nIdx+m_nResultIdxOffset,oResult);
+    if(m_oOrigSize==m_oSize)
+        WorkBatch::WriteResult(nIdx+m_nResultIdxOffset,oResult);
+    else {
+        cv::Mat oResizedResult;
+        cv::resize(oResult,oResizedResult,m_oOrigSize,0,0,cv::INTER_NEAREST);
+        WorkBatch::WriteResult(nIdx+m_nResultIdxOffset,oResult);
+    }
 }
 
 bool DatasetUtils::Segm::Video::Sequence::StartPrecaching(bool bUsingGT, size_t /*nUnused*/) {
@@ -563,7 +612,7 @@ bool DatasetUtils::Segm::Video::Sequence::StartPrecaching(bool bUsingGT, size_t 
 
 cv::Mat DatasetUtils::Segm::Video::Sequence::GetInputFromIndex_external(size_t nFrameIdx) {
     cv::Mat oFrame;
-    if(m_eDatasetID==eDataset_CDnet2012 || m_eDatasetID==eDataset_CDnet2014 || m_eDatasetID==eDataset_Wallflower)
+    if(m_eDatasetID==eDataset_CDnet2012 || m_eDatasetID==eDataset_CDnet2014 || m_eDatasetID==eDataset_Wallflower || (m_eDatasetID==eDataset_Custom && m_nResultIdxOffset==size_t(-1)))
         oFrame = cv::imread(m_vsInputFramePaths[nFrameIdx],m_bForcingGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
     else if(m_eDatasetID==eDataset_PETS2001_D3TC1 || m_eDatasetID==eDataset_Custom) {
         if(m_nNextExpectedVideoReaderFrameIdx!=nFrameIdx) {
@@ -578,6 +627,8 @@ cv::Mat DatasetUtils::Segm::Video::Sequence::GetInputFromIndex_external(size_t n
     }
     if(m_bForcing4ByteDataAlign && oFrame.channels()==3)
         cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2BGRA);
+    if(m_dScaleFactor!=1)
+        cv::resize(oFrame,oFrame,cv::Size(),m_dScaleFactor,m_dScaleFactor,cv::INTER_NEAREST);
     CV_Assert(oFrame.size()==m_oSize);
 #if DATASETUTILS_HARDCODE_FRAME_INDEX
     std::stringstream sstr;
@@ -598,6 +649,8 @@ cv::Mat DatasetUtils::Segm::Video::Sequence::GetGTFromIndex_external(size_t nFra
     }
     if(oFrame.empty())
         oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_OUT_OF_SCOPE_DEFAULT_VAL));
+    else if(m_dScaleFactor!=1)
+        cv::resize(oFrame,oFrame,cv::Size(),m_dScaleFactor,m_dScaleFactor,cv::INTER_NEAREST);
     CV_Assert(oFrame.size()==m_oSize);
 #if DATASETUTILS_HARDCODE_FRAME_INDEX
     std::stringstream sstr;
@@ -606,6 +659,15 @@ cv::Mat DatasetUtils::Segm::Video::Sequence::GetGTFromIndex_external(size_t nFra
 #endif //DATASETUTILS_HARDCODE_FRAME_INDEX
     return oFrame;
 }
+
+DatasetUtils::Segm::Image::DatasetInfo::DatasetInfo() : DatasetInfoBase(), m_eDatasetID(eDataset_Custom) {}
+
+DatasetUtils::Segm::Image::DatasetInfo::DatasetInfo(const std::string& sDatasetName, const std::string& sDatasetRootPath, const std::string& sResultsRootPath,
+                                                    const std::string& sResultNamePrefix, const std::string& sResultNameSuffix, const std::vector<std::string>& vsWorkBatchPaths,
+                                                    const std::vector<std::string>& vsSkippedNameTokens, const std::vector<std::string>& vsGrayscaleNameTokens,
+                                                    bool bForce4ByteDataAlign, double dScaleFactor, eDatasetList eDatasetID) :
+        DatasetInfoBase(sDatasetName,sDatasetRootPath,sResultsRootPath,sResultNamePrefix,sResultNameSuffix,vsWorkBatchPaths,vsSkippedNameTokens,vsGrayscaleNameTokens,bForce4ByteDataAlign,dScaleFactor),
+        m_eDatasetID(eDatasetID) {}
 
 void DatasetUtils::Segm::Image::DatasetInfo::WriteEvalResults(const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) const {
     if( m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test)
