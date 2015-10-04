@@ -73,7 +73,8 @@ public:
                 glError("Failed to init GLFW");
             std::atexit(glfwTerminate);
         });
-        glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
+        if(nGLVerMajor>3 || (nGLVerMajor==3 && nGLVerMinor>=2))
+            glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,nGLVerMajor);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,nGLVerMinor);
         glfwWindowHint(GLFW_RESIZABLE,GL_FALSE);
@@ -81,7 +82,7 @@ public:
             glfwWindowHint(GLFW_VISIBLE,GL_FALSE);
         m_pWindowHandle = std::unique_ptr<GLFWwindow,glfwWindowDeleter>(glfwCreateWindow(oWinSize.width,oWinSize.height,sWinName.c_str(),nullptr,nullptr),glfwWindowDeleter());
         if(!m_pWindowHandle.get())
-            glError("Failed to create window via GLFW");
+            glErrorExt("Failed to create [%d,%d] window via GLFW for core GL profile v%d.%d",oWinSize.width,oWinSize.height,nGLVerMajor,nGLVerMinor);
         glfwMakeContextCurrent(m_pWindowHandle.get());
 #elif HAVE_GLUT
         std::call_once(GetInitFlag(),[](){
