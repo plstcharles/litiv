@@ -1,0 +1,11 @@
+
+project(vptz_camshift)
+if(USE_VPTZ_STANDALONE)
+    include_directories(${litiv_vptz_INCLUDE_DIR})
+    add_executable(vptz_camshift src/main.cpp)
+    target_link_libraries(vptz_camshift litiv_vptz)
+else(NOT USE_VPTZ_STANDALONE)
+    include_directories(${litiv_vptz_INCLUDE_DIR} ${litiv_utils_INCLUDE_DIR})
+    add_executable(vptz_camshift src/main.cpp)
+    target_link_libraries(vptz_camshift litiv_world)
+endif(USE_VPTZ_STANDALONE)
