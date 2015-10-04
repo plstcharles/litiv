@@ -1,0 +1,11 @@
+
+project(vptz_gtviewer)
+if(USE_VPTZ_STANDALONE)
+    include_directories(${litiv_vptz_INCLUDE_DIR})
+    add_executable(vptz_gtviewer src/main.cpp)
+    target_link_libraries(vptz_gtviewer litiv_vptz)
+else(NOT USE_VPTZ_STANDALONE)
+    include_directories(${litiv_vptz_INCLUDE_DIR} ${litiv_utils_INCLUDE_DIR})
+    add_executable(vptz_gtviewer src/main.cpp)
+    target_link_libraries(vptz_gtviewer litiv_world)
+endif(USE_VPTZ_STANDALONE)
