@@ -4,13 +4,33 @@
 #error "This project requires C++11 support."
 #endif //__cplusplus<=201103L
 
-#include <thread>
+#include <cmath>
 #include <mutex>
+#include <vector>
+#include <thread>
 #include <chrono>
 #include <atomic>
 #include <future>
+#include <iostream>
 #include <functional>
+#include <type_traits>
 #include <condition_variable>
+#include <opencv2/core.hpp>
+
+#define D2R(d) ((d)*(M_PI/180.0))
+#define R2D(r) ((r)*(180.0/M_PI))
+#define isnan(f) std::isnan(f)
+
+#define lvError(msg) throw CxxUtils::Exception(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__)
+#define lvErrorExt(msg,...) throw CxxUtils::Exception(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
+#define lvAssert(expr) {if(!!(expr)); else lvError("assertion failed ("#expr")");}
+#ifdef _DEBUG
+#define lvDbgAssert(expr) lvAssert(expr)
+#define lvDbgExceptionWatch CxxUtils::UncaughtExceptionLogger __logger(__PRETTY_FUNCTION__,__FILE__,__LINE__)
+#else //!defined(_DEBUG)
+#define lvDbgAssert(expr)
+#define lvDbgExceptionWatch
+#endif //!defined(_DEBUG)
 
 namespace CxxUtils {
 
@@ -94,6 +114,61 @@ namespace CxxUtils {
         inline size_type max_size() const noexcept {return (size_type(~0)-size_type(nByteAlign))/sizeof(value_type);}
         bool operator!=(const AlignAllocator<T,nByteAlign>& other) const {return !(*this==other);}
         bool operator==(const AlignAllocator<T,nByteAlign>& other) const {return true;}
+    };
+
+    template<char... str> struct MetaStr {
+        static constexpr char value[] = {str...};
+    };
+    template<char... str>
+    constexpr char MetaStr<str...>::value[];
+
+    template<typename, typename>
+    struct MetaStrConcat;
+    template<char... str1, char... str2>
+    struct MetaStrConcat<MetaStr<str1...>, MetaStr<str2...>> {
+        using type = MetaStr<str1..., str2...>;
+    };
+
+    template<typename...>
+    struct MetaStrConcatenator;
+    template<>
+    struct MetaStrConcatenator<> {
+        using type = MetaStr<>;
+    };
+    template<typename str, typename... vstr>
+    struct MetaStrConcatenator<str, vstr...> {
+        using type = typename MetaStrConcat<str, typename MetaStrConcatenator<vstr...>::type>::type;
+    };
+
+    template<size_t N>
+    struct MetaITOA {
+        using type = typename MetaStrConcat<typename std::conditional<(N>=10),typename MetaITOA<(N/10)>::type,MetaStr<>>::type,MetaStr<'0'+(N%10)>>::type;
+    };
+    template<>
+    struct MetaITOA<0> {
+        using type = MetaStr<'0'>;
+    };
+
+    struct UncaughtExceptionLogger {
+        UncaughtExceptionLogger(const char* sFunc, const char* sFile, int nLine) :
+                m_sMsg(cv::format("Unwinding at function '%s' from %s(%d) due to uncaught exception\n",sFunc,sFile,nLine)) {}
+        const std::string m_sMsg;
+        ~UncaughtExceptionLogger() {
+            if(std::uncaught_exception())
+                std::cerr << m_sMsg;
+        }
+    };
+
+    struct Exception : public std::runtime_error {
+        template<typename... VALIST>
+        Exception(const std::string& sErrMsg, const char* sFunc, const char* sFile, int nLine, VALIST... vArgs) :
+                std::runtime_error(cv::format((std::string("Exception in function '%s' from %s(%d) : \n")+sErrMsg).c_str(),sFunc,sFile,nLine,vArgs...)),
+                m_acFuncName(sFunc),
+                m_acFileName(sFile),
+                m_nLineNumber(nLine) {}
+        const char* const m_acFuncName;
+        const char* const m_acFileName;
+        const int m_nLineNumber;
     };
 
 } //namespace CxxUtils

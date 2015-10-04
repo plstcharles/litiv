@@ -58,7 +58,7 @@ GLuint GLShader::addSource(const std::string& sSource, GLenum eType) {
         const char* acSourcePtr = sSource.c_str();
         glShaderSource(shaderID,1,&acSourcePtr,nullptr);
         glErrorCheck;
-    } catch(const GLException&) {
+    } catch(const CxxUtils::Exception&) {
         glDeleteShader(shaderID);
         throw;
     }

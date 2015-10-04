@@ -1,67 +1,142 @@
 #pragma once
 
+// @@@@@ TODO: move all exception/log/assert defines to defineutils & cxxutils
+
 #include "litiv/utils/DefineUtils.hpp"
+#include "litiv/utils/CxxUtils.hpp"
 #include <GL/glew.h>
+#include <GL/glu.h>
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <sstream>
 #include <exception>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <opencv2/opencv.hpp>
+#if HAVE_GLFW
 #include <GLFW/glfw3.h>
+struct glfwWindowDeleter {
+    void operator()(GLFWwindow* pWindow) {
+        glfwDestroyWindow(pWindow);
+    }
+};
+#endif //HAVE_GLFW
+#if HAVE_GLUT
+#include <GL/glut.h>
+struct glutHandle {
+    glutHandle() : m_nHandle(0) {}
+    glutHandle(std::nullptr_t) : m_nHandle(0) {}
+    explicit glutHandle(int v) : m_nHandle(v) {}
+    glutHandle& operator=(std::nullptr_t) {m_nHandle = 0; return *this;}
+    explicit operator bool() const {return m_nHandle!=0;}
+    int m_nHandle;
+};
+inline bool operator==(const glutHandle& lhs, const glutHandle& rhs) {return lhs.m_nHandle==rhs.m_nHandle;}
+inline bool operator!=(const glutHandle& lhs, const glutHandle& rhs) {return lhs.m_nHandle!=rhs.m_nHandle;}
+struct glutWindowDeleter {
+    void operator()(const glutHandle& oWindowHandle) {
+        glutDestroyWindow(oWindowHandle.m_nHandle);
+    }
+    typedef glutHandle pointer;
+};
+#endif //HAVE_GLUT
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/random.hpp>
 
-#define TARGET_GL_VER_MAJOR  4
-#define TARGET_GL_VER_MINOR  4
-#define TARGET_GLEW_EXPERIM  1
-#define TARGET_GL_VER_STR "GL_VERSION_" XSTR(TARGET_GL_VER_MAJOR) "_" XSTR(TARGET_GL_VER_MINOR)
-
-#define glError(msg) throw GLException(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__)
-#define glErrorExt(msg,...) throw GLException(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
+#define glError(msg) throw CxxUtils::Exception(std::string("[glError] ")+msg,__PRETTY_FUNCTION__,__FILE__,__LINE__)
+#define glErrorExt(msg,...) throw CxxUtils::Exception(std::string("[glError] ")+msg,__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
 #define glAssert(expr) {if(!!(expr)); else glError("assertion failed ("#expr")");}
 #define glErrorCheck { \
     GLenum __errn = glGetError(); \
     if(__errn!=GL_NO_ERROR) \
-        glErrorExt("glErrorCheck failed (code=%d)",__errn); \
-}
-// see glew init GL_INVALID_ENUM bug discussion at https://www.opengl.org/wiki/OpenGL_Loading_Library
-#define glewInitErrorCheck { \
-    glErrorCheck; \
-    glewExperimental = TARGET_GLEW_EXPERIM?GL_TRUE:GL_FALSE; \
-    if(GLenum __glewerrn=glewInit()!=GLEW_OK) \
-        glErrorExt("Failed to init GLEW (code=%d)",__glewerrn); \
-    else if(GLenum __errn=glGetError()!=GL_INVALID_ENUM) \
-        glErrorExt("Unexpected GLEW init error (code=%d)",__errn); \
-    if(!glewIsSupported(TARGET_GL_VER_STR)) \
-        glErrorExt("Bad GL core/ext version detected (target is %s)",TARGET_GL_VER_STR); \
+        glErrorExt("glErrorCheck failed [code=%d, msg=%s]",__errn,gluErrorString(__errn)); \
 }
 #ifdef _DEBUG
 #define glDbgAssert(expr) glAssert(expr)
 #define glDbgErrorCheck glErrorCheck
-#else
+#define glDbgExceptionWatch CxxUtils::UncaughtExceptionLogger __logger(__PRETTY_FUNCTION__,__FILE__,__LINE__)
+#else //!defined(_DEBUG)
 #define glDbgAssert(expr)
 #define glDbgErrorCheck
-#endif
+#define glDbgExceptionWatch
+#endif //!defined(_DEBUG)
 
-class GLException : public std::runtime_error {
+template<size_t nGLVerMajor=TARGET_GL_VER_MAJOR,size_t nGLVerMinor=TARGET_GL_VER_MINOR>
+class GLContext {
 public:
-    template<typename... VALIST>
-    GLException(const char* sErrMsg, const char* sFunc, const char* sFile, int nLine, VALIST... vArgs) :
-            std::runtime_error(cv::format((std::string("GLException in function '%s' from %s(%d) : \n")+sErrMsg).c_str(),sFunc,sFile,nLine,vArgs...)),
-            m_eErrn(GL_NO_ERROR),
-            m_acErrMsg(sErrMsg),
-            m_acFuncName(sFunc),
-            m_acFileName(sFile),
-            m_nLineNumber(nLine) {}
-    const GLenum m_eErrn;
-    const char* const m_acErrMsg;
-    const char* const m_acFuncName;
-    const char* const m_acFileName;
-    const int m_nLineNumber;
+    GLContext(const cv::Size& oWinSize, const std::string& sWinName, bool bHide=true) {
+#if HAVE_GLFW
+        std::call_once(GetInitFlag(),[](){
+            if(glfwInit()==GL_FALSE)
+                glError("Failed to init GLFW");
+            std::atexit(glfwTerminate);
+        });
+        glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,nGLVerMajor);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,nGLVerMinor);
+        glfwWindowHint(GLFW_RESIZABLE,GL_FALSE);
+        if(bHide)
+            glfwWindowHint(GLFW_VISIBLE,GL_FALSE);
+        m_pWindowHandle = std::unique_ptr<GLFWwindow,glfwWindowDeleter>(glfwCreateWindow(oWinSize.width,oWinSize.height,sWinName.c_str(),nullptr,nullptr),glfwWindowDeleter());
+        if(!m_pWindowHandle.get())
+            glError("Failed to create window via GLFW");
+        glfwMakeContextCurrent(m_pWindowHandle.get());
+#elif HAVE_GLUT
+        std::call_once(GetInitFlag(),[](){
+            int argc = 0;
+            glutInit(&argc,NULL);
+        });
+        glutInitDisplayMode(GLUT_SINGLE);
+        glutInitWindowSize(oWinSize.width,oWinSize.height);
+        glutInitWindowPosition(0,0);
+        m_oWindowHandle = std::unique_ptr<glutHandle,glutWindowDeleter>(glutHandle(glutCreateWindow(sWinName.c_str())),glutWindowDeleter());
+        if(!(m_oWindowHandle.get().m_nHandle))
+            glError("Failed to create window via glut");
+        glutSetWindow(m_oWindowHandle.get().m_nHandle);
+        if(bHide)
+            glutHideWindow();
+#endif //HAVE_GLUT
+        glErrorCheck;
+        glewInitErrorCheck();
+    }
+
+    void SetAsActive() {
+#if HAVE_GLFW
+        glfwMakeContextCurrent(m_pWindowHandle.get());
+#elif HAVE_GLUT
+        glutSetWindow(m_oWindowHandle.get().m_nHandle);
+#endif //HAVE_GLUT
+    }
+
+    constexpr static std::string GetGLEWVersionString() {return std::string("GL_VERSION_")+CxxUtils::MetaStrConcatenator<typename CxxUtils::MetaITOA<nGLVerMajor>::type,CxxUtils::MetaStr<'_'>,typename CxxUtils::MetaITOA<nGLVerMinor>::type,CxxUtils::MetaStr<'\0'>>::type::value;}
+
+private:
+
+    void glewInitErrorCheck() {
+        glErrorCheck;
+        glewExperimental = GLEW_EXPERIMENTAL?GL_TRUE:GL_FALSE;
+        if(GLenum glewerrn=glewInit()!=GLEW_OK)
+            glErrorExt("Failed to init GLEW [code=%d, msg=%s]",glewerrn,glewGetErrorString(glewerrn));
+        GLenum errn = glGetError();
+        // see glew init GL_INVALID_ENUM bug discussion at https://www.opengl.org/wiki/OpenGL_Loading_Library
+        if(errn!=GL_NO_ERROR && errn!=GL_INVALID_ENUM && errn!=1)
+            glErrorExt("Unexpected GLEW init error [code=%d, msg=%s]",errn,gluErrorString(errn));
+        if(!glewIsSupported(GetGLEWVersionString().c_str()))
+            glErrorExt("Bad GL core/ext version detected (target is %s)",GetGLEWVersionString().c_str());
+    }
+
+#if HAVE_GLFW
+    std::unique_ptr<GLFWwindow,glfwWindowDeleter> m_pWindowHandle;
+#elif HAVE_GLUT
+    std::unique_ptr<glutHandle,glutWindowDeleter> m_oWindowHandle;
+#endif //HAVE_GLUT
+    GLContext& operator=(const GLContext&) = delete;
+    GLContext(const GLContext&) = delete;
+    static std::once_flag& GetInitFlag() {static std::once_flag oInitFlag; return oInitFlag;}
 };
+using GLDefaultContext = GLContext<>;
 
 namespace GLUtils {
 

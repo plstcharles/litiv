@@ -96,6 +96,20 @@
 #define TIMER_INTERNAL_ELAPSED_MS(x)
 #endif //!ENABLE_INTERNAL_TIMERS
 #if (HAVE_GLSL && USE_GLSL_IMPL)
+#define TARGET_GL_VER_STR "GL_VERSION_" XSTR(TARGET_GL_VER_MAJOR) "_" XSTR(TARGET_GL_VER_MINOR)
+#define glewInitErrorCheck { \
+    glErrorCheck; \
+    glewExperimental = GLEW_EXPERIMENTAL?GL_TRUE:GL_FALSE; \
+    if(GLenum __glewerrn=glewInit()!=GLEW_OK) \
+        glErrorExt("Failed to init GLEW (code=%d)",__glewerrn); \
+    else if(GLenum __errn=glGetError()!=GL_INVALID_ENUM) \
+        glErrorExt("Unexpected GLEW init error (code=%d)",__errn); \
+    if(!glewIsSupported(TARGET_GL_VER_STR)) \
+        glErrorExt("Bad GL core/ext version detected (target is %s)",TARGET_GL_VER_STR); \
+}
+#if !HAVE_GLFW
+#error "missing glfw"
+#endif //!HAVE_GLFW
 void AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> pCurrSequence);
 #elif (HAVE_CUDA && USE_CUDA_IMPL)
 static_assert(false,"missing impl");
@@ -137,7 +151,6 @@ void OnMouseEvent(int event, int x, int y, int, void*) {
 
 std::atomic_size_t g_nActiveThreads(0);
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
-const std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> g_pDatasetInfo = DatasetUtils::Segm::Video::GetDatasetInfo(DatasetUtils::Segm::Video::DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH,USE_GPU_IMPL);
 
 int main(int, char**) {
     try {
@@ -438,8 +451,8 @@ void AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> p
         cv::destroyWindow(sDisplayName);
 #endif //DISPLAY_OUTPUT
     }
-    catch(const GLException& e) {
-        std::cout << "\nAnalyzeSequence caught GLException:\n" << e.what();
+    catch(const CxxUtils::Exception& e) {
+        std::cout << "\nAnalyzeSequence caught Exception:\n" << e.what();
         if(!g_sLatestGLFWErrorMessage.empty()) {
             std::cout << " (" << g_sLatestGLFWErrorMessage << ")" << "\n" << std::endl;
             g_sLatestGLFWErrorMessage = std::string();

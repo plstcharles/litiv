@@ -1,7 +1,13 @@
 #pragma once
 
-#define ON 1
-#define OFF 0
+#ifndef __CMAKE_VAR_DEF_DROP_IN__
+#define __CMAKE_VAR_DEF_DROP_IN__
+// required for cmake cached variable drop-in
+#define ON        1
+#define TRUE      1
+#define OFF       0
+#define FALSE     0
+#endif //__CMAKE_VAR_DEF_DROP_IN__
 
 #define XSTR_CONCAT(s1,s2) XSTR_CONCAT_BASE(s1,s2)
 #define XSTR_CONCAT_BASE(s1,s2) s1##s2
@@ -34,6 +40,14 @@
 #define HAVE_OPENCL         @USE_OPENCL@
 #endif //HAVE_GPU_SUPPORT
 
+#if HAVE_GLSL
+#define TARGET_GL_VER_MAJOR @TARGET_GL_VER_MAJOR@
+#define TARGET_GL_VER_MINOR @TARGET_GL_VER_MINOR@
+#define GLEW_EXPERIMENTAL   @GLEW_EXPERIMENTAL@
+#define HAVE_GLFW           @USE_GLFW@
+#define HAVE_GLUT           @USE_GLUT@
+#endif //HAVE_GLSL
+
 #if HAVE_SIMD_SUPPORT
 #define HAVE_MMX            @USE_MMX@
 #define HAVE_SSE            @USE_SSE@
@@ -47,5 +61,9 @@
 #define HAVE_AVX2           @USE_AVX2@
 #endif //HAVE_SIMD_SUPPORT
 
-#define USE_TEST @USE_TEST@
-#define USE_BSDS500_BENCHMARK @USE_BSDS500_BENCHMARK@
+#ifndef USE_VPTZ_STANDALONE
+#define USE_VPTZ_STANDALONE       @USE_VPTZ_STANDALONE@
+#endif //USE_VPTZ_STANDALONE
+#ifndef USE_BSDS500_BENCHMARK
+#define USE_BSDS500_BENCHMARK     @USE_BSDS500_BENCHMARK@
+#endif //USE_BSDS500_BENCHMARK

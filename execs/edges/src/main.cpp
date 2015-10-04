@@ -79,6 +79,20 @@
 #define TIMER_INTERNAL_ELAPSED_MS(x)
 #endif //!ENABLE_INTERNAL_TIMERS
 #if (HAVE_GLSL && USE_GLSL_IMPL)
+#define TARGET_GL_VER_STR "GL_VERSION_" XSTR(TARGET_GL_VER_MAJOR) "_" XSTR(TARGET_GL_VER_MINOR)
+#define glewInitErrorCheck { \
+    glErrorCheck; \
+    glewExperimental = GLEW_EXPERIMENTAL?GL_TRUE:GL_FALSE; \
+    if(GLenum __glewerrn=glewInit()!=GLEW_OK) \
+        glErrorExt("Failed to init GLEW (code=%d)",__glewerrn); \
+    else if(GLenum __errn=glGetError()!=GL_INVALID_ENUM) \
+        glErrorExt("Unexpected GLEW init error (code=%d)",__errn); \
+    if(!glewIsSupported(TARGET_GL_VER_STR)) \
+        glErrorExt("Bad GL core/ext version detected (target is %s)",TARGET_GL_VER_STR); \
+}
+#if !HAVE_GLFW
+#error "missing glfw"
+#endif //!HAVE_GLFW
 void AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet);
 #elif (HAVE_CUDA && USE_CUDA_IMPL)
 static_assert(false,"missing impl");
@@ -89,10 +103,25 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
 #else // bad config
 #error "Bad config, trying to use an unavailable impl."
 #endif // bad config
+#ifndef DATASET_ID
+const std::shared_ptr<DatasetUtils::Segm::Image::DatasetInfo> g_pDatasetInfo(new DatasetUtils::Segm::Image::DatasetInfo(
+        "@@@@", // m_sDatasetName
+        DATASET_ROOT_PATH+"/@@@/", // m_sDatasetRootPath
+        DATASET_ROOT_PATH+"/@@@/"+DATASET_RESULTS_PATH+"/", // m_sResultsRootPath
+        "@@@", // m_sResultNamePrefix
+        ".png", // m_sResultNameSuffix
+        {"@@@"}, // m_vsWorkBatchPaths
+        {}, // m_vsSkippedNameTokens
+        {"@@@"}, // m_vsGrayscaleNameTokens
+        USE_GPU_IMPL, // m_bForce4ByteDataAlign
+        DatasetUtils::Segm::Image::eDataset_Custom, // m_eDatasetID
+));
+#else //defined(DATASET_ID)
+const std::shared_ptr<DatasetUtils::Segm::Image::DatasetInfo> g_pDatasetInfo = DatasetUtils::Segm::Image::GetDatasetInfo(DatasetUtils::Segm::Image::DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH,USE_GPU_IMPL);
+#endif //defined(DATASET_ID)
 
 std::atomic_size_t g_nActiveThreads(0);
 const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
-const std::shared_ptr<DatasetUtils::Segm::Image::DatasetInfo> g_pDatasetInfo = DatasetUtils::Segm::Image::GetDatasetInfo(DatasetUtils::Segm::Image::DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH,USE_GPU_IMPL);
 
 int main(int, char**) {
     try {
@@ -346,8 +375,8 @@ void AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
         cv::destroyWindow(sDisplayName);
 #endif //DISPLAY_OUTPUT
     }
-    catch(const GLException& e) {
-        std::cout << "\nAnalyzeSequence caught GLException:\n" << e.what();
+    catch(const CxxUtils::Exception& e) {
+        std::cout << "\nAnalyzeSequence caught Exception:\n" << e.what();
         if(!g_sLatestGLFWErrorMessage.empty()) {
             std::cout << " (" << g_sLatestGLFWErrorMessage << ")" << "\n" << std::endl;
             g_sLatestGLFWErrorMessage = std::string();
