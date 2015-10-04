@@ -19,7 +19,6 @@ set(LITIV_FRAMEWORK_VERSION ${LITIV_FRAMEWORK_VERSION_MAJOR}.${LITIV_FRAMEWORK_V
 set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:DEBUG>)
 set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:_DEBUG>)
 
-option(USE_TEST "Use some useless global test define" ON)
 option(USE_FAST_MATH "Enable fast math optimizations" OFF)
 
 ### OPENCV CHECK
@@ -29,27 +28,44 @@ link_directories(${OpenCV_LIBRARY_DIRS})
 add_definitions(${OpenCV_DEFINITIONS})
 
 ### GLSL CHECK
-find_package(GLFW REQUIRED)
-find_package(OpenGL REQUIRED)
-find_package(GLEW REQUIRED)
-find_package(GLM REQUIRED)
-set_eval(USE_GLSL (${GLFW_FOUND} AND ${OPENGL_FOUND} AND ${GLEW_FOUND} AND ${GLM_FOUND}))
+find_package(GLFW REQUIRED) ## @@@@ switch to 'not required' later?
+find_package(GLUT REQUIRED) ## @@@@ switch to 'not required' later?
+find_package(OpenGL REQUIRED) ## @@@@ switch to 'not required' later?
+find_package(GLEW REQUIRED) ## @@@@ switch to 'not required' later?
+find_package(GLM REQUIRED) ## @@@@ switch to 'not required' later?
+set_eval(USE_GLSL ((${GLFW_FOUND} OR ${GLUT_FOUND}) AND ${OPENGL_FOUND} AND ${GLEW_FOUND} AND ${GLM_FOUND}))
 if(USE_GLSL)
-    include_directories(${GLFW_INCLUDE_DIRS})
+    if(${GLFW_FOUND})
+        set(USE_GLFW 1 CACHE BOOL "Use GLFW as the OpenGL window manager")
+        set(USE_GLUT 0 CACHE BOOL "Use GLUT as the OpenGL window manager")
+    elseif(${GLUT_FOUND})
+        set(USE_GLFW 0 CACHE BOOL "Use GLFW as the OpenGL window manager")
+        set(USE_GLUT 1 CACHE BOOL "Use GLUT as the OpenGL window manager")
+    endif(${GLFW_FOUND})
+    if(${USE_GLFW} EQUAL ${USE_GLUT})
+        message(FATAL_ERROR "Need to select one window manager.")
+    endif(${USE_GLFW} EQUAL ${USE_GLUT})
+    if(USE_GLFW)
+        include_directories(${GLFW_INCLUDE_DIRS})
+    elseif(USE_GLUT)
+        include_directories(${GLUT_INCLUDE_DIRS})
+    endif(USE_GLFW)
     include_directories(${OpenGL_INCLUDE_DIRS})
     include_directories(${GLEW_INCLUDE_DIRS})
     include_directories(${GLM_INCLUDE_DIRS})
-    set(GLSL_LIBRARIES ${GLFW_LIBRARIES}${OPENGL_LIBRARIES}${GLEW_LIBRARIES}${GLM_LIBRARIES})
+    set(TARGET_GL_VER_MAJOR 4 CACHE STRING "Target OpenGL profile major version")
+    set(TARGET_GL_VER_MINOR 4 CACHE STRING "Target OpenGL profile minor version")
+    option(GLEW_EXPERIMENTAL "Use experimental GLEW features" ON)
 endif(USE_GLSL)
 message(STATUS USE_GLSL=${USE_GLSL})
 
-### CUDA CHECK @@@@
+### CUDA CHECK @@@@ add later for parallel utils & impls
 set_eval(USE_CUDA 0)
 
-### OPENCL CHECK @@@@
+### OPENCL CHECK @@@@ add later for parallel utils & impls
 set_eval(USE_OPENCL 0)
 
-### HARDWARE SIMD CHECK @@@@
+### HARDWARE SIMD CHECK
 if(CMAKE_CROSSCOMPILING)
     option(USE_MMX "Use MMX instructions support" OFF)
     option(USE_SSE "Use SSE instructions support" OFF)
@@ -62,6 +78,7 @@ if(CMAKE_CROSSCOMPILING)
     option(USE_AVX "Use AVX instructions support" OFF)
     option(USE_AVX2 "Use AVX2 instructions support" OFF)
 else(CMAKE_CROSSCOMPILING)
+    ## @@@@ these might not work on msvc toolchain (to be tested)
     try_cvhardwaresupport_runcheck_and_set_success(MMX)
     try_cvhardwaresupport_runcheck_and_set_success(SSE)
     try_cvhardwaresupport_runcheck_and_set_success(SSE2)
