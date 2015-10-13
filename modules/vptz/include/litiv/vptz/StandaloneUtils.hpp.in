@@ -12,8 +12,7 @@
 #define USE_VPTZ_STANDALONE       @USE_VPTZ_STANDALONE@
 
 //
-//         -- Below are code snippets taken from the LITIV framework --
-//   These are provided under the Apache license available at the project root.
+//       -- Below are code snippets taken from the LITIV framework --
 //
 
 #if USE_VPTZ_STANDALONE
@@ -29,7 +28,20 @@
 
 #if defined(_MSC_VER)
 #define __PRETTY_FUNCTION__ __FUNCSIG__
-#endif //defined(_MSC_VER)
+#define _USE_MATH_DEFINES
+#if (defined(VPTZ_EXPORT) && defined(VPTZ_IMPORT))
+#error "API Lib import/export config error"
+#endif //(defined(VPTZ_EXPORT) && defined(VPTZ_IMPORT))
+#if defined(VPTZ_EXPORT)
+#define VPTZ_API __declspec(dllexport)
+#elif defined(VPTZ_IMPORT)
+#define VPTZ_API __declspec(dllimport)
+#else //ndef(VPTZ_...)
+#define VPTZ_API
+#endif //ndef(VPTZ_...)
+#else //ndef(_MSC_VER)
+#define VPTZ_API
+#endif //ndef(_MSC_VER)
 
 #define VPTZ_STANDALONE_VERSION       @LITIV_FRAMEWORK_VERSION@
 #define VPTZ_STANDALONE_VERSION_STR   XSTR(LITIV_FRAMEWORK_VERSION)
@@ -40,36 +52,7 @@
 
 #define HAVE_GLSL           @USE_GLSL@
 #define HAVE_GLFW           @USE_GLFW@
-#define HAVE_GLUT           @USE_GLUT@
-
-#include <GL/glew.h>
-#if HAVE_GLFW
-#include <GLFW/glfw3.h>
-struct glfwWindowDeleter {
-    void operator()(GLFWwindow* pWindow) {
-        glfwDestroyWindow(pWindow);
-    }
-};
-#endif //HAVE_GLFW
-#if HAVE_GLUT
-#include <GL/glut.h>
-struct glutHandle {
-    glutHandle() : m_nHandle(0) {}
-    glutHandle(std::nullptr_t) : m_nHandle(0) {}
-    explicit glutHandle(int v) : m_nHandle(v) {}
-    glutHandle& operator=(std::nullptr_t) {m_nHandle = 0; return *this;}
-    explicit operator bool() const {return m_nHandle!=0;}
-    int m_nHandle;
-};
-inline bool operator==(const glutHandle& lhs, const glutHandle& rhs) {return lhs.m_nHandle==rhs.m_nHandle;}
-inline bool operator!=(const glutHandle& lhs, const glutHandle& rhs) {return lhs.m_nHandle!=rhs.m_nHandle;}
-struct glutWindowDeleter {
-    void operator()(const glutHandle& oWindowHandle) {
-        glutDestroyWindow(oWindowHandle.m_nHandle);
-    }
-    typedef glutHandle pointer;
-};
-#endif //HAVE_GLUT
+#define HAVE_FREEGLUT       @USE_FREEGLUT@
 
 #include <cmath>
 #include <mutex>
@@ -87,6 +70,35 @@ struct glutWindowDeleter {
 #define D2R(d) ((d)*(M_PI/180.0))
 #define R2D(r) ((r)*(180.0/M_PI))
 #define isnan(f) std::isnan(f)
+
+#include <GL/glew.h>
+#if HAVE_GLFW
+#include <GLFW/glfw3.h>
+struct glfwWindowDeleter {
+    void operator()(GLFWwindow* pWindow) {
+        glfwDestroyWindow(pWindow);
+    }
+};
+#endif //HAVE_GLFW
+#if HAVE_FREEGLUT
+#include <GL/freeglut.h>
+struct glutHandle {
+    glutHandle() : m_nHandle(0) {}
+    glutHandle(std::nullptr_t) : m_nHandle(0) {}
+    explicit glutHandle(int v) : m_nHandle(v) {}
+    glutHandle& operator=(std::nullptr_t) {m_nHandle = 0; return *this;}
+    explicit operator bool() const {return m_nHandle!=0;}
+    int m_nHandle;
+};
+inline bool operator==(const glutHandle& lhs, const glutHandle& rhs) {return lhs.m_nHandle==rhs.m_nHandle;}
+inline bool operator!=(const glutHandle& lhs, const glutHandle& rhs) {return lhs.m_nHandle!=rhs.m_nHandle;}
+struct glutWindowDeleter {
+    void operator()(const glutHandle& oWindowHandle) {
+        glutDestroyWindow(oWindowHandle.m_nHandle);
+    }
+    typedef glutHandle pointer;
+};
+#endif //HAVE_FREEGLUT
 
 namespace CxxUtils {
 
@@ -192,7 +204,7 @@ public:
         if(!m_pWindowHandle.get())
             glErrorExt("Failed to create [%d,%d] window via GLFW for core GL profile v%d.%d",oWinSize.width,oWinSize.height,nGLVerMajor,nGLVerMinor);
         glfwMakeContextCurrent(m_pWindowHandle.get());
-#elif HAVE_GLUT
+#elif HAVE_FREEGLUT
         std::call_once(GetInitFlag(),[](){
             int argc = 0;
             glutInit(&argc,NULL);
@@ -206,7 +218,7 @@ public:
         glutSetWindow(m_oWindowHandle.get().m_nHandle);
         if(bHide)
             glutHideWindow();
-#endif //HAVE_GLUT
+#endif //HAVE_FREEGLUT
         glErrorCheck;
         glewInitErrorCheck();
     }
@@ -214,9 +226,9 @@ public:
     void SetAsActive() {
 #if HAVE_GLFW
         glfwMakeContextCurrent(m_pWindowHandle.get());
-#elif HAVE_GLUT
+#elif HAVE_FREEGLUT
         glutSetWindow(m_oWindowHandle.get().m_nHandle);
-#endif //HAVE_GLUT
+#endif //HAVE_FREEGLUT
     }
 
     constexpr static std::string GetGLEWVersionString() {return std::string("GL_VERSION_")+CxxUtils::MetaStrConcatenator<typename CxxUtils::MetaITOA<nGLVerMajor>::type,CxxUtils::MetaStr<'_'>,typename CxxUtils::MetaITOA<nGLVerMinor>::type,CxxUtils::MetaStr<'\0'>>::type::value;}
@@ -238,9 +250,9 @@ private:
 
 #if HAVE_GLFW
     std::unique_ptr<GLFWwindow,glfwWindowDeleter> m_pWindowHandle;
-#elif HAVE_GLUT
+#elif HAVE_FREEGLUT
     std::unique_ptr<glutHandle,glutWindowDeleter> m_oWindowHandle;
-#endif //HAVE_GLUT
+#endif //HAVE_FREEGLUT
     GLContext& operator=(const GLContext&) = delete;
     GLContext(const GLContext&) = delete;
     static std::once_flag& GetInitFlag() {static std::once_flag oInitFlag; return oInitFlag;}

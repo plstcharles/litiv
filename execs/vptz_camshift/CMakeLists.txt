@@ -1,6 +1,7 @@
 
 project(vptz_camshift)
 if(USE_VPTZ_STANDALONE)
+    add_definitions(-DVPTZ_IMPORT)
     include_directories(${litiv_vptz_INCLUDE_DIR})
     add_executable(vptz_camshift src/main.cpp)
     target_link_libraries(vptz_camshift litiv_vptz)

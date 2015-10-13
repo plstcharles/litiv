@@ -8,6 +8,9 @@
 #include <GL/glu.h>
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/random.hpp>
 #include <sstream>
 #include <exception>
 #include <iostream>
@@ -22,8 +25,8 @@ struct glfwWindowDeleter {
     }
 };
 #endif //HAVE_GLFW
-#if HAVE_GLUT
-#include <GL/glut.h>
+#if HAVE_FREEGLUT
+#include <GL/freeglut.h>
 struct glutHandle {
     glutHandle() : m_nHandle(0) {}
     glutHandle(std::nullptr_t) : m_nHandle(0) {}
@@ -40,10 +43,7 @@ struct glutWindowDeleter {
     }
     typedef glutHandle pointer;
 };
-#endif //HAVE_GLUT
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtc/random.hpp>
+#endif //HAVE_FREEGLUT
 
 #define glError(msg) throw CxxUtils::Exception(std::string("[glError] ")+msg,__PRETTY_FUNCTION__,__FILE__,__LINE__)
 #define glErrorExt(msg,...) throw CxxUtils::Exception(std::string("[glError] ")+msg,__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
@@ -84,7 +84,7 @@ public:
         if(!m_pWindowHandle.get())
             glErrorExt("Failed to create [%d,%d] window via GLFW for core GL profile v%d.%d",oWinSize.width,oWinSize.height,nGLVerMajor,nGLVerMinor);
         glfwMakeContextCurrent(m_pWindowHandle.get());
-#elif HAVE_GLUT
+#elif HAVE_FREEGLUT
         std::call_once(GetInitFlag(),[](){
             int argc = 0;
             glutInit(&argc,NULL);
@@ -98,7 +98,7 @@ public:
         glutSetWindow(m_oWindowHandle.get().m_nHandle);
         if(bHide)
             glutHideWindow();
-#endif //HAVE_GLUT
+#endif //HAVE_FREEGLUT
         glErrorCheck;
         glewInitErrorCheck();
     }
@@ -106,9 +106,9 @@ public:
     void SetAsActive() {
 #if HAVE_GLFW
         glfwMakeContextCurrent(m_pWindowHandle.get());
-#elif HAVE_GLUT
+#elif HAVE_FREEGLUT
         glutSetWindow(m_oWindowHandle.get().m_nHandle);
-#endif //HAVE_GLUT
+#endif //HAVE_FREEGLUT
     }
 
     constexpr static std::string GetGLEWVersionString() {return std::string("GL_VERSION_")+CxxUtils::MetaStrConcatenator<typename CxxUtils::MetaITOA<nGLVerMajor>::type,CxxUtils::MetaStr<'_'>,typename CxxUtils::MetaITOA<nGLVerMinor>::type,CxxUtils::MetaStr<'\0'>>::type::value;}
@@ -130,9 +130,9 @@ private:
 
 #if HAVE_GLFW
     std::unique_ptr<GLFWwindow,glfwWindowDeleter> m_pWindowHandle;
-#elif HAVE_GLUT
+#elif HAVE_FREEGLUT
     std::unique_ptr<glutHandle,glutWindowDeleter> m_oWindowHandle;
-#endif //HAVE_GLUT
+#endif //HAVE_FREEGLUT
     GLContext& operator=(const GLContext&) = delete;
     GLContext(const GLContext&) = delete;
     static std::once_flag& GetInitFlag() {static std::once_flag oInitFlag; return oInitFlag;}

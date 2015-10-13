@@ -14,31 +14,31 @@
 // zoom to determine the view of the PTZ camera. The Evaluator class cooperates with
 // Camera and evaluate the result of tracker
 //
-// The API is based on OpenGL (via freeglut & GLEW) and OpenCV 2.4.9, the inputs
+// The API is based on OpenGL (via freeglut & GLEW) and OpenCV >=2.4.9, the inputs
 // and outputs are all in OpenCV format, (e.g. cv::Mat, cv::Point and cv::VideoCapture).
 //
 // @@@@ TODO: (05/2015)
 //   - update manual with latest project architecture
-//   - create vptz namespace, put everything in (3 main classes + utilities)
 //   - impl filenode config read/write functions for Camera
 //   - completely wrap Camera inside evaluator class (link interfaces)
 //
 
 #pragma once
 
+#include "litiv/vptz/StandaloneUtils.hpp"
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/video/tracking.hpp>
-#include "litiv/vptz/StandaloneUtils.hpp"
 #if !USE_VPTZ_STANDALONE
+#if !HAVE_GLSL
+#error "vptz requires full OpenGL support"
+#endif //!HAVE_GLSL
 #include "litiv/utils/DefineUtils.hpp"
 #include "litiv/utils/ParallelUtils.hpp"
 #include "litiv/utils/DistanceUtils.hpp"
 #include "litiv/utils/CxxUtils.hpp"
-#ifndef HAVE_GLSL
-#error "vptz requires full OpenGL support"
-#endif //HAVE_GLSL
+#define VPTZ_API
 #endif //!USE_VPTZ_STANDALONE
 
 #define VPTZ_MINIMUM_BBOX_RADIUS 3
@@ -53,7 +53,7 @@
 
 namespace vptz {
 
-    class Exception : public std::runtime_error {
+    class VPTZ_API Exception : public std::runtime_error {
     public:
         template<typename... VALIST>
         Exception(const char* sErrMsg, const char* sFunc, const char* sFile, int nLine, VALIST... vArgs) :
@@ -94,7 +94,7 @@ namespace vptz {
         PTZ_CAM_COMMUNICATION_DELAY
     };
 
-    class Camera {
+    class VPTZ_API Camera {
     public:
         //! Default Constructor; the default values are taken from the datasheet of the SONY network camera SNC-RZ50N.
         Camera( const std::string& input_file_path, // input video or image file path
@@ -171,7 +171,7 @@ namespace vptz {
         Camera& operator=(const Camera&) = delete;
     };
 
-    class GTTranslator {
+    class VPTZ_API GTTranslator {
         friend class Evaluator;
     public:
         //! default Constructor based on existing vptz camera; throws if any input parameter is invalid
@@ -218,7 +218,7 @@ namespace vptz {
         double bgtVertiFOV;                     // horizontal FOV angle of the virtual camera in ground truth (degree, (0, 180))
     };
 
-    class Evaluator {
+    class VPTZ_API Evaluator {
     public:
         //! custom test constructor; throws if it cannot open the input file or its content is invalid
         Evaluator( const std::string& sInputScenarioPath,      // input video or image file path
@@ -335,44 +335,43 @@ namespace vptz {
     };
 
     //! utility function: maps a 2D point on the virtual camera image to its horizontal and vertical angles in the sphere (throws if invalid args)
-    void PTZPointXYtoHV( int target2dX,                 // in: x coordinate of target point on the output image (pixel, [0, camOutputWidth-1])
-                         int target2dY,                 // in: y coordinate of target point on the output image (pixel, [0, camOutputHeight-1])
-                         double& tarHoriAngle,          // out: horizontal (phi) direction angle of target (degree)
-                         double& tarVertiAngle,         // out: vertical (theta) direction angle of target (degree)
-                         int camOutputWidth = 640.0,    // in: width of camera output image (pixel, >=1)
-                         int camOutputHeight = 480.0,   // in: height of camera output image (pixel, >=1)
-                         double camVertiFOV = 90.0,     // in: vertical FOV angle of the virtual camera (degree, (0, 180))
-                         double camHoriAngle = 0.0,     // in: horizontal (phi) direction angle of camera (degree, (-180, 180])
-                         double camVertiAngle = 90.0);  // in: vertical (theta) direction angle of camera (degree, [0, 180])
+    void VPTZ_API PTZPointXYtoHV( int target2dX,                 // in: x coordinate of target point on the output image (pixel, [0, camOutputWidth-1])
+                                  int target2dY,                 // in: y coordinate of target point on the output image (pixel, [0, camOutputHeight-1])
+                                  double& tarHoriAngle,          // out: horizontal (phi) direction angle of target (degree)
+                                  double& tarVertiAngle,         // out: vertical (theta) direction angle of target (degree)
+                                  int camOutputWidth = 640.0,    // in: width of camera output image (pixel, >=1)
+                                  int camOutputHeight = 480.0,   // in: height of camera output image (pixel, >=1)
+                                  double camVertiFOV = 90.0,     // in: vertical FOV angle of the virtual camera (degree, (0, 180))
+                                  double camHoriAngle = 0.0,     // in: horizontal (phi) direction angle of camera (degree, (-180, 180])
+                                  double camVertiAngle = 90.0);  // in: vertical (theta) direction angle of camera (degree, [0, 180])
     //! utility function: maps a 2D point on the virtual camera image to its horizontal and vertical angles in the sphere (throws if invalid args)
-    void PTZPointXYtoHV( cv::Point2i targetXY,
-                         cv::Point2d& targetHV,
-                         int camOutputWidth = 640.0,
-                         int camOutputHeight = 480.0,
-                         double camVertiFOV = 90.0,
-                         double camHoriAngle = 0.0,
-                         double camVertiAngle = 90.0);
-
+    void VPTZ_API PTZPointXYtoHV( cv::Point2i targetXY,
+                                  cv::Point2d& targetHV,
+                                  int camOutputWidth = 640.0,
+                                  int camOutputHeight = 480.0,
+                                  double camVertiFOV = 90.0,
+                                  double camHoriAngle = 0.0,
+                                  double camVertiAngle = 90.0);
 
     //! utility function: maps a point from its horizontal and vertical angles to its 2D coordinate on the virtual camera image (throws if invalid args)
     //! note: returns false if the direct difference between the target direction and camera direction is larger than 90 degree
-    bool PTZPointHVtoXY( double tarHoriAngle,           // in: horizontal (phi) direction angle of target (degree, (-180, 180])
-                         double tarVertiAngle,          // in: vertical (theta) direction angle of target (degree, [0, 180])
-                         int& target2dX,                // out: x coordinate of target point on the output image (pixel, may exceed [0, camOutputWidth-1])
-                         int& target2dY,                // out: y coordinate of target point on the output image (pixel, may exceed [0, camOutputHeight-1])
-                         int camOutputWidth = 640.0,    // in: width of camera output image (pixel, >=1)
-                         int camOutputHeight = 480.0,   // in: height of camera output image (pixel, >=1)
-                         double camVertiFOV = 90.0,     // in: vertical FOV angle of the virtual camera (degree, (0, 180))
-                         double camHoriAngle = 0.0,     // in: horizontal (phi) direction angle of camera (degree, (-180, 180])
-                         double camVertiAngle = 90.0);  // in: vertical (theta) direction angle of camera (degree, [0, 180])
+    bool VPTZ_API PTZPointHVtoXY( double tarHoriAngle,           // in: horizontal (phi) direction angle of target (degree, (-180, 180])
+                                  double tarVertiAngle,          // in: vertical (theta) direction angle of target (degree, [0, 180])
+                                  int& target2dX,                // out: x coordinate of target point on the output image (pixel, may exceed [0, camOutputWidth-1])
+                                  int& target2dY,                // out: y coordinate of target point on the output image (pixel, may exceed [0, camOutputHeight-1])
+                                  int camOutputWidth = 640.0,    // in: width of camera output image (pixel, >=1)
+                                  int camOutputHeight = 480.0,   // in: height of camera output image (pixel, >=1)
+                                  double camVertiFOV = 90.0,     // in: vertical FOV angle of the virtual camera (degree, (0, 180))
+                                  double camHoriAngle = 0.0,     // in: horizontal (phi) direction angle of camera (degree, (-180, 180])
+                                  double camVertiAngle = 90.0);  // in: vertical (theta) direction angle of camera (degree, [0, 180])
     //! utility function: maps a point from its horizontal and vertical angles to its 2D coordinate on the virtual camera image (throws if invalid args)
     //! note: returns false if the direct difference between the target direction and camera direction is larger than 90 degree
-    bool PTZPointHVtoXY( cv::Point2d targetHV,
-                         cv::Point2i& targetXY,
-                         int camOutputWidth = 640.0,
-                         int camOutputHeight = 480.0,
-                         double camVertiFOV = 90.0,
-                         double camHoriAngle = 0.0,
-                         double camVertiAngle = 90.0);
+    bool VPTZ_API PTZPointHVtoXY( cv::Point2d targetHV,
+                                  cv::Point2i& targetXY,
+                                  int camOutputWidth = 640.0,
+                                  int camOutputHeight = 480.0,
+                                  double camVertiFOV = 90.0,
+                                  double camHoriAngle = 0.0,
+                                  double camVertiAngle = 90.0);
 
 } //namespace vptz
