@@ -29,8 +29,6 @@ public:
     static_assert(eImpl!=ParallelUtils::eOpenCL),"Missing constr impl");
 #endif //HAVE_OPENCL
 
-    //! unused, always returns nullptr
-    virtual cv::AlgorithmInfo* info() const {return nullptr;}
     //! returns the default threshold value used in 'apply'
     virtual double getDefaultThreshold() const = 0;
     //! thresholded edge detection function; the threshold should be between 0 and 1
