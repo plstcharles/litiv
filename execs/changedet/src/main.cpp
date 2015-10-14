@@ -26,7 +26,11 @@
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
 #define DATASET_ID              eDataset_CDnet2014
-#define DATASET_ROOT_PATH       std::string("/shared2/datasets/")
+#ifndef GLOBAL_DATASET_ROOT_PATH
+#define DATASET_ROOT_PATH       std::string("/some/dataset/root/path/")
+#else //def(GLOBAL_DATASET_ROOT_PATH)
+#define DATASET_ROOT_PATH       std::string(GLOBAL_DATASET_ROOT_PATH)
+#endif //def(GLOBAL_DATASET_ROOT_PATH)
 #define DATASET_RESULTS_PATH    std::string("results")
 #define DATASET_PRECACHING      1
 ////////////////////////////////

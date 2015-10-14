@@ -20,6 +20,7 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:DEB
 set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:_DEBUG>)
 
 option(USE_FAST_MATH "Enable fast math optimizations" OFF)
+set(GLOBAL_DATASET_ROOT_PATH "/shared2/datasets/" CACHE STRING "Global dataset root folder for exec projects")
 
 ### OPENCV CHECK
 find_package(OpenCV 3.0 REQUIRED)
