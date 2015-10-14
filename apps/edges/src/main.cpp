@@ -23,8 +23,8 @@
 #define EVALUATE_OUTPUT         1
 #define DISPLAY_OUTPUT          0
 ////////////////////////////////
-#define USE_CANNY               1
-#define USE_LBSP                0
+#define USE_CANNY               0
+#define USE_LBSP                1
 ////////////////////////////////
 #define FULL_THRESH_ANALYSIS    0
 ////////////////////////////////
