@@ -2,14 +2,14 @@
 #include "litiv/utils/DatasetEvalUtils.hpp"
 
 ////////////////////////////////
-#define WRITE_IMG_OUTPUT        1
-#define EVALUATE_OUTPUT         1
+#define WRITE_IMG_OUTPUT        0
+#define EVALUATE_OUTPUT         0
 #define DEBUG_OUTPUT            0
 #define DISPLAY_OUTPUT          1
 #define DISPLAY_TIMERS          0
 ////////////////////////////////
-#define USE_CANNY               0
-#define USE_LBSP                1
+#define USE_CANNY               1
+#define USE_LBSP                0
 ////////////////////////////////
 #define FULL_THRESH_ANALYSIS    1
 ////////////////////////////////
