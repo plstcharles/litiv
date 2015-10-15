@@ -1,4 +1,4 @@
-
+// (see header for licensing information)
 #include "litiv/vptz/virtualptz.hpp"
 
 inline std::string GetRootFolderPath(const std::string& sPath) {
