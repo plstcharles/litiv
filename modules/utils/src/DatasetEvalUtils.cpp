@@ -715,21 +715,27 @@ cv::Mat DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::GetColoredSegmMaskF
     const double dMaxDist = s_dMaxImageDiagRatioDist*sqrt(double(oSegmMask.cols*oSegmMask.cols+oSegmMask.rows*oSegmMask.rows));
     const int nMaxDist = (int)ceil(dMaxDist);
     CV_Assert(dMaxDist>0 && nMaxDist>0);
-    cv::Mat oGoodSegmMask(oSegmMask.size(),CV_8UC1,cv::Scalar_<uchar>(0));
-    cv::Mat oBadSegmMask(oSegmMask.size(),CV_8UC1,cv::Scalar_<uchar>(0));
-    for(size_t nGTMaskIdx=0; nGTMaskIdx<size_t(oGTSegmMask.rows/oSegmMask.rows); ++nGTMaskIdx) {
+    cv::Mat oSegmMask_TP(oSegmMask.size(),CV_16UC1,cv::Scalar_<ushort>(0));
+    cv::Mat oSegmMask_FN(oSegmMask.size(),CV_16UC1,cv::Scalar_<ushort>(0));
+    cv::Mat oSegmMask_FP(oSegmMask.size(),CV_16UC1,cv::Scalar_<ushort>(0));
+    const size_t nGTMaskCount = size_t(oGTSegmMask.rows/oSegmMask.rows);
+    for(size_t nGTMaskIdx=0; nGTMaskIdx<nGTMaskCount; ++nGTMaskIdx) {
         cv::Mat oCurrGTSegmMask = oGTSegmMask(cv::Rect(0,int(oSegmMask.rows*nGTMaskIdx),oSegmMask.cols,oSegmMask.rows));
         cv::Mat oCurrGTSegmMask_dilated,oSegmMask_dilated;
         cv::Mat oDilateKernel(2*nMaxDist+1,2*nMaxDist+1,CV_8UC1,cv::Scalar_<uchar>(255));
         cv::dilate(oCurrGTSegmMask,oCurrGTSegmMask_dilated,oDilateKernel);
         cv::dilate(oSegmMask,oSegmMask_dilated,oDilateKernel);
-        oGoodSegmMask += (oSegmMask&oCurrGTSegmMask_dilated);
-        oBadSegmMask += (oSegmMask&(oCurrGTSegmMask_dilated==0));
-        oBadSegmMask += ((oSegmMask_dilated==0)&oCurrGTSegmMask);
+        cv::add((oSegmMask&oCurrGTSegmMask_dilated),oSegmMask_TP,oSegmMask_TP,cv::noArray(),CV_16U);
+        cv::add((oSegmMask&(oCurrGTSegmMask_dilated==0)),oSegmMask_FP,oSegmMask_FP,cv::noArray(),CV_16U);
+        cv::add(((oSegmMask_dilated==0)&oCurrGTSegmMask),oSegmMask_FN,oSegmMask_FN,cv::noArray(),CV_16U);
     }
+    cv::Mat oSegmMask_TP_byte, oSegmMask_FN_byte, oSegmMask_FP_byte;
+    oSegmMask_TP.convertTo(oSegmMask_TP_byte,CV_8U,1.0/nGTMaskCount);
+    oSegmMask_FN.convertTo(oSegmMask_FN_byte,CV_8U,1.0/nGTMaskCount);
+    oSegmMask_FP.convertTo(oSegmMask_FP_byte,CV_8U,1.0/nGTMaskCount);
     cv::Mat oResult(oSegmMask.size(),CV_8UC3,cv::Scalar_<uchar>(0));
-    const int anMixPairs[] = {0,2, 1,1};
-    cv::mixChannels(std::vector<cv::Mat>{oBadSegmMask,oGoodSegmMask},std::vector<cv::Mat>{oResult},anMixPairs,2);
+    const std::vector<int> vnMixPairs = {0,2, 1,0, 2,1};
+    cv::mixChannels(std::vector<cv::Mat>{oSegmMask_FN_byte|oSegmMask_FP_byte,oSegmMask_FN_byte,oSegmMask_TP_byte},std::vector<cv::Mat>{oResult},vnMixPairs.data(),vnMixPairs.size()/2);
     return oResult;
 }
 
