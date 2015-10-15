@@ -1,0 +1,11 @@
+
+The full version of the BSDS500 dataset & utilities can be found at :
+
+http://www.eecs.berkeley.edu/Research/Projects/CS/vision/grouping/resources.html
+
+This dataset was introduced by Arbeláez et al. in "Contour detection and
+hierarchical image segmentation" (TPAMI 2011). It is provided without (!!)
+a license (as of October 2015); here, we reuse a thinned & cleaned version
+of its utilities to reproduce its evaluation method, since the GT comparison
+approach it follows is... somewhat complex.
+
