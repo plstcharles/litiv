@@ -20,12 +20,14 @@ litiv_module(imgproc)
 add_files(SOURCE_FILES
     "src/EdgeDetectionUtils.cpp"
     "src/EdgeDetectorCanny.cpp"
+    "src/EdgeDetectorLBSP.cpp"
     "src/imgproc.cpp"
 )
 
 add_files(INCLUDE_FILES
     "include/litiv/imgproc/EdgeDetectionUtils.hpp"
     "include/litiv/imgproc/EdgeDetectorCanny.hpp"
+    "include/litiv/imgproc/EdgeDetectorLBSP.hpp"
     "include/litiv/imgproc.hpp"
 )
 
