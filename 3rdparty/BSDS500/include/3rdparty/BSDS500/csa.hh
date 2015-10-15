@@ -936,10 +936,9 @@ namespace BSDS500 {
     lr_aptr		*check_arc;
     #endif
 
-    #ifdef	DEBUG
-    (void) printf("%lu p's, %lu dp's: dp on %ld ", pushes, double_pushes,
-              v - head_lhs_node + 1);
-    #endif
+    //#ifdef	DEBUG
+    //(void) printf("%lu p's, %lu dp's: dp on %ld ", pushes, double_pushes, v - head_lhs_node + 1);
+    //#endif
 
     /*
     Begin part I: Compute the following:
@@ -1050,9 +1049,9 @@ namespace BSDS500 {
       }
     #endif
 
-    #ifdef	DEBUG
-    (void) printf("to %lu. Gap = %lg\n", adm->head - head_rhs_node + 1, adm_gap);
-    #endif
+    //#ifdef	DEBUG
+    //(void) printf("to %lu. Gap = %lg\n", adm->head - head_rhs_node + 1, adm_gap);
+    //#endif
 
     /*
     Begin part II: Using the information computed in part I,

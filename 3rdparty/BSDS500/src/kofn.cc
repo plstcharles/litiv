@@ -1,8 +1,15 @@
 
-#include "3rdparty/BSDS500/Random.hh"
 #include "3rdparty/BSDS500/kofn.hh"
+#include <random>
+#include <chrono>
+#include <cassert>
+#include <functional>
 
 using namespace BSDS500;
+
+static std::mt19937 s_oMT(std::chrono::system_clock::now().time_since_epoch().count());
+static std::uniform_real_distribution<double> s_oURDistrib_0_1(0,std::nextafter(1,std::numeric_limits<double>::max()));
+static auto s_oRand_0_1_Funct = std::bind(s_oURDistrib_0_1,s_oMT);
 
 // O(n) implementation.
 static void
@@ -14,7 +21,7 @@ _kOfN_largeK (int k, int n, int* values)
     for (int i = 0; i < n; i++) {
         double prob = (double) (k - j) / (n - i);
         assert (prob <= 1);
-        double x = Random::rand.fp ();
+        double x = s_oRand_0_1_Funct();
         if (x < prob) {
             values[j++] = i;
         }
@@ -30,7 +37,8 @@ _kOfN_smallK (int k, int n, int* values)
     assert (k > 0);
     assert (k <= n);
     if (k == 1) {
-        values[0] = Random::rand.i32 (0, n - 1);
+        std::uniform_int_distribution<int32_t> oUIDistrib(0,n-1);
+        values[0] = oUIDistrib(s_oMT);
         return;
     }
     int leftN = n / 2;
@@ -38,7 +46,8 @@ _kOfN_smallK (int k, int n, int* values)
     int leftK = 0;
     int rightK = 0;
     for (int i = 0; i < k; i++) {
-        int x = Random::rand.i32 (0, n - i - 1);
+        std::uniform_int_distribution<int32_t> oUIDistrib(0,n-i-1);
+        int x = oUIDistrib(s_oMT);
         if (x < leftN - leftK) {
             leftK++;
         } else {
