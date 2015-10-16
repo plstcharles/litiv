@@ -17,6 +17,25 @@
 
 #pragma once
 
+// @@@@@@@@
+//
+// Pixel-Based Adaptive Segmenter (PBAS); originally proposed by Hofmann, Tiefenbacher, & Rigoll.
+//
+// CAUTION: this implementation of PBAS has never been fully tested; it was used as a code sandbox
+// for early versions of SuBSENSE/PAWCS. In its current form (as of october 2015), I believe it is
+// still 'broken', as it does not reflect the original PBAS method (i.e. it should adjust only when
+// segm = background). In other words, don't use this implementation if you want to evaluate PBAS.
+//
+// For commercial applications, note that PBAS piggybacks on ViBe, and ViBe is patented; licensing
+// information for ViBe can be found at http://vibeinmotion.com/
+//
+// For the original (true) implementation, see:  https://sites.google.com/site/pbassegmenter/home
+//
+// Original paper: M. Hofmann, P.Tiefenbacher, G. Rigoll "Background Segmentation with Feedback:
+// The Pixel-Based Adaptive Segmenter" (Proc. CVPRW/CDW 2012)
+//
+// @@@@@@@@
+
 #include <opencv2/video/background_segm.hpp>
 
 //! defines the internal threshold adjustment factor to use when determining if the variation of a single channel is enough to declare the pixel as foreground

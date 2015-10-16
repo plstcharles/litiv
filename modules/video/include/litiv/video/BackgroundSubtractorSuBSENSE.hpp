@@ -39,7 +39,8 @@
     For optimal grayscale results, use CV_8UC1 frames instead of CV_8UC3.
 
     For more details on the different parameters or on the algorithm itself, see P.-L. St-Charles et al.,
-    "Flexible Background Subtraction With Self-Balanced Local Sensitivity", in CVPRW 2014.
+    "Flexible Background Subtraction With Self-Balanced Local Sensitivity", in CVPRW 2014, or "SuBSENSE: A Universal
+    Change Detection Method With Local Adaptive Sensitivity", in IEEE Trans. Image Processing vol.24 no.1, 2015.
  */
 class BackgroundSubtractorSuBSENSE : public BackgroundSubtractorLBSP<ParallelUtils::eNonParallel> {
 public:

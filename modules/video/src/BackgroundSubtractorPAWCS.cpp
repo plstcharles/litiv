@@ -21,13 +21,11 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 
-/*
- *
- * Intrinsic configuration parameters are defined here; tuning these for better
- * performance should not be required in most cases -- although improvements in
- * very specific scenarios are always possible.
- *
- */
+//
+// NOTE: this version of PAWCS is still pretty messy (debug). The cleaner (but older) implementation made available on
+// bitbucket is a good alternative in case of serious eyebleed; see https://bitbucket.org/pierre_luc_st_charles/pawcs
+//
+
 // parameter used for dynamic distance threshold adjustments ('R(x)')
 #define FEEDBACK_R_VAR (0.01f)
 // parameters used to adjust the variation step size of 'v(x)'
@@ -38,13 +36,13 @@
 #define FEEDBACK_T_INCR  (0.5000f)
 #define FEEDBACK_T_LOWER (1.0000f)
 #define FEEDBACK_T_UPPER (256.00f)
-// parameters used to define 'unstable' regions, based on segm noise/bg dynamics and local dist threshold values
+// parameters used to define 'unstable' regions (heuristic), based on segm noise/bg dynamics and local dist thresholds
 #define UNSTABLE_REG_RATIO_MIN (0.100f)
 #define UNSTABLE_REG_RDIST_MIN (3.000f)
-// parameters used to scale the relative LBSP intensity threshold used for internal comparisons
+// parameters used to scale the relative LBSP intensity threshold used for internal comparisons (inherited from SuBSENSE)
 #define LBSPDESC_RATIO_MIN (0.100f)
 #define LBSPDESC_RATIO_MAX (0.500f)
-// parameters used to trigger auto model resets in our frame-level component
+// parameters used to trigger auto model resets in our frame-level component (inherited from SuBSENSE)
 #define FRAMELEVEL_DOWNSAMPLE_RATIO (8)
 #define FRAMELEVEL_MIN_L1DIST_THRES (45)
 #define FRAMELEVEL_MIN_CDIST_THRES (FRAMELEVEL_MIN_L1DIST_THRES/10)

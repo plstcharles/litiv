@@ -795,7 +795,7 @@ std::string GLImagePassThroughAlgo::getComputeShaderSource(size_t nStage) const 
     return GLShader::getComputeShaderSource_PassThrough_ImgLoadCopy(m_vDefaultWorkGroupSize,GLUtils::getInternalFormatFromMatType(m_nOutputType,m_bUsingIntegralFormat),GLImageProcAlgo::eImage_InputBinding,GLImageProcAlgo::eImage_OutputBinding,m_bUsingIntegralFormat);
 }
 
-/*
+/* @@@@ CLEANUP REQUIRED, NEED TO RE-VALIDATE WITH NEW PROJ STRUCTURE
 const size_t BinaryMedianFilter::m_nPPSMaxRowSize = 512;
 const size_t BinaryMedianFilter::m_nTransposeBlockSize = 32;
 const GLenum BinaryMedianFilter::eImage_PPSAccumulator = GLImageProcAlgo::eImage_CustomBinding1;

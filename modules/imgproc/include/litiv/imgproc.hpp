@@ -18,7 +18,7 @@
 #pragma once
 
 #include "litiv/imgproc/EdgeDetectorCanny.hpp"
-//#include "litiv/imgproc/EdgeDetectorLBSP.hpp" @@@@
+//#include "litiv/imgproc/EdgeDetectorLBSP.hpp" @@@@ to be added later
 
 namespace litiv {
 

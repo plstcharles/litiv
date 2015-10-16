@@ -18,8 +18,6 @@
 #include "litiv/imgproc/EdgeDetectorCanny.hpp"
 #include <iostream>
 
-/* non-specialized IEdgeDetector functions go here */
-
 #if HAVE_GLSL
 
 template<>

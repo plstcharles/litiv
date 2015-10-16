@@ -21,13 +21,11 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
 
-/*
- *
- * Intrinsic parameters for our method are defined here; tuning these for better
- * performance should not be required in most cases -- although improvements in
- * very specific scenarios are always possible.
- *
- */
+//
+// NOTE: this version of SuBSENSE is still pretty messy (debug). The cleaner (but older) implementation made available on
+// bitbucket is a good alternative in case of serious eyebleed; see https://bitbucket.org/pierre_luc_st_charles/subsense
+//
+
 // defines the threshold value(s) used to detect long-term ghosting and trigger the fast edge-based absorption heuristic
 #define GHOSTDET_D_MAX (0.010f) // defines 'negligible' change here
 #define GHOSTDET_S_MIN (0.995f) // defines the required minimum local foreground saturation value

@@ -17,6 +17,25 @@
 
 #pragma once
 
+// @@@@@@@@
+//
+// Video Background Extractor (ViBe); originally proposed by O. Barnich and M. Van Droogenbroeck.
+//
+// CAUTION: this implementation of ViBe is very naive, and not optimized at all. It was used as a
+// code sandbox for early versions of LOBSTER. If you want a well-implemented, fully vectorized
+// version for testing/evaluation, contact the original authors via http://www.vibeinmotion.com/
+//
+// Note that ViBe is patented in the US, Europe and Japan; this implementation is offered for
+// testing purposes only. For commercial use, refer to the original author's licensing guide on
+// their website: http://www.vibeinmotion.com/Licensing.aspx
+//
+// For information on the patent, see http://www.google.com/patents/WO2009007198A1
+//
+// Journal paper: O. Barnich and M. Van Droogenbroeck. "ViBe: A universal background subtraction
+// algorithm for video sequences" (IEEE Trans. Image Processing 2011)
+//
+// @@@@@@@@
+
 #include <opencv2/video/background_segm.hpp>
 
 //! defines the default value for BackgroundSubtractorViBe::m_nColorDistThreshold
