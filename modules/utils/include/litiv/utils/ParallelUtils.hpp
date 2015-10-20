@@ -110,4 +110,28 @@ namespace ParallelUtils {
     };
     using NonParallelAlgo = IParallelAlgo_<eNonParallel>;
 
+#if HAVE_SIMD_SUPPORT
+#if HAVE_MMX
+    static inline int hsum_8bytes(const __m64& anBuffer) {
+        __m64 _anRes = _mm_sad_pu8(anBuffer,_mm_set1_pi8(char(0)));
+        return _mm_cvtsi64_si32(_anRes);
+    }
+#endif //HAVE_MMX
+#if HAVE_SSE2
+    static inline int hsum_16bytes(const __m128i& anBuffer) {
+        __m128i _anRes = _mm_sad_epu8(anBuffer,_mm_set1_epi8(char(0)));
+        return _mm_cvtsi128_si32(_mm_add_epi64(_mm_srli_si128(_anRes,8),_anRes));
+    }
+#endif //HAVE_SSE2
+#if HAVE_SSE4_1
+    static inline uchar hmax_16bytes(const __m128i& anBuffer) {
+        __m128i _anTmp = _mm_sub_epi8(_mm_set1_epi8(char(127)),anBuffer);
+        return (int8_t)(127 - _mm_cvtsi128_si32(_mm_minpos_epu16(_mm_min_epu8(_anTmp,_mm_srli_epi16(_anTmp,8)))));
+    }
+    static inline uchar hmin_16bytes(const __m128i& anBuffer) {
+        return (int8_t)(127 - _mm_cvtsi128_si32(_mm_minpos_epu16(_mm_min_epu8(anBuffer,_mm_srli_epi16(anBuffer,8)))));
+    }
+#endif //HAVE_SSE4_1
+#endif //HAVE_SIMD_SUPPORT
+
 } //namespace ParallelUtils
