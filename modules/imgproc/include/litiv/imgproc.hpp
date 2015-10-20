@@ -39,93 +39,69 @@ namespace litiv {
 
 } //namespace litiv
 
-
-/*! @brief suppress non-maximal values
- *
- * Taken from http://code.opencv.org/attachments/994/nms.cpp
- * (see copyright notice and licensing information there)
- *
- * nonMaximaSuppression produces a oMask (oOutput) such that every non-zero
- * value of the oMask corresponds to a local maxima of oInput. The criteria
- * for local maxima is as follows:
- *
- * 	For every possible (nWinSize x nWinSize) region within oInput, an element is a
- * 	local maxima of oInput iff it is strictly greater than all other elements
- * 	of windows which intersect the given element
- *
- * Intuitively, this means that all maxima must be at least nWinSize+1 pixels
- * apart, though the spacing may be greater
- *
- * A gradient image or a constant image has no local maxima by the definition
- * given above
- *
- * The method is derived from the following paper:
- * A. Neubeck and L. Van Gool. "Efficient Non-Maximum Suppression," ICPR 2006
- *
- * Example:
- * \code
- * 	// create a random test image
- * 	Mat random(Size(2000,2000), DataType<float>::type);
- * 	randn(random, 1, 1);
- *
- * 	// only look for local maxima above the value of 1
- * 	Mat oMask = (random > 1);
- *
- * 	// find the local maxima with a window of 50
- * 	Mat maxima;
- * 	nonMaximaSuppression(random, 50, maxima, oMask);
- *
- * 	// optionally set all non-maxima to zero
- * 	random.setTo(0, maxima == 0);
- * \endcode
- *
- * @param oInput the input image/matrix, of any valid cv type
- * @param nWinSize the size of the window
- * @param oOutput the oMask of type CV_8U, where non-zero elements correspond to
- * local maxima of the oInput
- * @param oMask an input oMask to skip particular elements
- */
 template<int nWinSize>
 void litiv::nonMaxSuppression(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat& oMask) {
+    //  http://code.opencv.org/attachments/994/nms.cpp
+    //  Copyright (c) 2012, Willow Garage, Inc.
+    //  All rights reserved.
+    //
+    //  Redistribution and use in source and binary forms, with or without
+    //  modification, are permitted provided that the following conditions
+    //  are met:
+    //
+    //   * Redistributions of source code must retain the above copyright
+    //     notice, this list of conditions and the following disclaimer.
+    //   * Redistributions in binary form must reproduce the above
+    //     copyright notice, this list of conditions and the following
+    //     disclaimer in the documentation and/or other materials provided
+    //     with the distribution.
+    //   * Neither the name of Willow Garage, Inc. nor the names of its
+    //     contributors may be used to endorse or promote products derived
+    //     from this software without specific prior written permission.
+    //
+    //  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+    //  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+    //  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+    //  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+    //  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+    //  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+    //  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+    //  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+    //  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+    //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+    //  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+    //  POSSIBILITY OF SUCH DAMAGE.
     CV_Assert(oInput.channels()==1);
-
     // initialise the block oMask and destination
     const int M = oInput.rows;
     const int N = oInput.cols;
     const bool masked = !oMask.empty();
     cv::Mat block = 255*cv::Mat_<uint8_t>::ones(cv::Size(2*nWinSize+1,2*nWinSize+1));
     oOutput = cv::Mat_<uint8_t>::zeros(oInput.size());
-
     // iterate over image blocks
-    for (int m = 0; m < M; m+=nWinSize+1) {
-        for (int n = 0; n < N; n+=nWinSize+1) {
+    for(int m = 0; m < M; m+=nWinSize+1) {
+        for(int n = 0; n < N; n+=nWinSize+1) {
             cv::Point  ijmax;
             double vcmax, vnmax;
-
             // get the maximal candidate within the block
             cv::Range ic(m,std::min(m+nWinSize+1,M));
             cv::Range jc(n,std::min(n+nWinSize+1,N));
             cv::minMaxLoc(oInput(ic,jc), NULL, &vcmax, NULL, &ijmax, masked ? oMask(ic,jc) : cv::noArray());
             cv::Point cc = ijmax + cv::Point(jc.start,ic.start);
-
             // search the neighbours centered around the candidate for the true maxima
             cv::Range in(std::max(cc.y-nWinSize,0),std::min(cc.y+nWinSize+1,M));
             cv::Range jn(std::max(cc.x-nWinSize,0),std::min(cc.x+nWinSize+1,N));
-
-            // oMask out the block whose maxima we already know
+            // mask out the block whose maxima we already know
             cv::Mat_<uint8_t> blockmask;
             block(cv::Range(0,in.size()),cv::Range(0,jn.size())).copyTo(blockmask);
             cv::Range iis(ic.start-in.start,std::min(ic.start-in.start+nWinSize+1, in.size()));
             cv::Range jis(jc.start-jn.start,std::min(jc.start-jn.start+nWinSize+1, jn.size()));
             blockmask(iis, jis) = cv::Mat_<uint8_t>::zeros(cv::Size(jis.size(),iis.size()));
-
             cv::minMaxLoc(oInput(in,jn), NULL, &vnmax, NULL, &ijmax, masked ? oMask(in,jn).mul(blockmask) : blockmask);
             //cv::Point cn = ijmax + cv::Point(jn.start, in.start);
-
             // if the block centre is also the neighbour centre, then it's a local maxima
-            if(vcmax > vnmax) {
+            if(vcmax > vnmax)
                 oOutput.at<uint8_t>(cc.y, cc.x) = 255;
-            }
         }
     }
 }
@@ -133,6 +109,8 @@ void litiv::nonMaxSuppression(const cv::Mat& oInput, cv::Mat& oOutput, const cv:
 //
 // @@@@@@ code below is currently a copy of opencv's canny impl (need to extract good bits)
 // see https://github.com/Itseez/opencv for copyright notice & license info
+//
+// note: canny nms always winsize=3
 //
 template<int aperture_size, bool L2gradient>
 void litiv::cv_canny(cv::InputArray _src, cv::OutputArray _dst, double low_thresh, double high_thresh) {
@@ -165,16 +143,17 @@ void litiv::cv_canny(cv::InputArray _src, cv::OutputArray _dst, double low_thres
 
     ptrdiff_t mapstep = src.cols + 2;
     cv::AutoBuffer<uchar> buffer((src.cols+2)*(src.rows+2) + cn * mapstep * 3 * sizeof(int));
+    // buffer contains 3x lines of cn*(img width + 2) in int, and a full img map + 1px border in uchar
 
-    int* mag_buf[3];
+    int* mag_buf[3]; // the pointers to the 3 lines of cn*(img width + 2) in int (ring buffer)
     mag_buf[0] = (int*)(uchar*)buffer;
     mag_buf[1] = mag_buf[0] + mapstep*cn;
     mag_buf[2] = mag_buf[1] + mapstep*cn;
-    memset(mag_buf[0], 0, /* cn* */mapstep*sizeof(int));
+    memset(mag_buf[0], 0, /* cn* */mapstep*sizeof(int)); // initializes 1/cn-th of the first int line to zero
 
-    uchar* map = (uchar*)(mag_buf[2] + mapstep*cn);
-    memset(map, 1, mapstep);
-    memset(map + mapstep*(src.rows + 1), 1, mapstep);
+    uchar* map = (uchar*)(mag_buf[2] + mapstep*cn); // the pointer to the first uchar map element
+    memset(map, 1, mapstep); // initializes the first map row to 1 (i.e. pixels cannot belong to an edge)
+    memset(map + mapstep*(src.rows + 1), 1, mapstep); // initializes the last map row to 1 (i.e. pixels cannot belong to an edge)
 
     int maxsize = std::max(1 << 10, src.cols * src.rows / 10);
     std::vector<uchar*> stack(maxsize);
@@ -204,6 +183,7 @@ void litiv::cv_canny(cv::InputArray _src, cv::OutputArray _dst, double low_thres
     for (int i = 0; i <= src.rows; ++i) {
         int* _norm = mag_buf[(i > 0) + 1] + 1;
         if(i < src.rows) {
+            // fills the next magnitude row in mag_buf[2] (or fills mag_buf[1] if first iter)
             short* _dx = dx.ptr<short>(i);
             short* _dy = dy.ptr<short>(i);
             if(!L2gradient) {
@@ -267,81 +247,81 @@ void litiv::cv_canny(cv::InputArray _src, cv::OutputArray _dst, double low_thres
 
         // at the very beginning we do not have a complete ring
         // buffer of 3 magnitude rows for non-maxima suppression
-        if(i==0)
-            continue;
+        if(i>0) {
+            // if not first iter, then mag_buf[0] is before-last, mag_buf[1] is last, and mag_buf[2] was just filled
+            // orientation analysis is done for magnitude values contained in mag_buf[1] (= defined 3x3 neighborhood)
+            uchar* _map = map+mapstep*i+1;
+            _map[-1] = _map[src.cols] = 1; // border pixels cannot belong to an edge
 
-        uchar* _map = map + mapstep*i + 1;
-        _map[-1] = _map[src.cols] = 1;
+            const int* _mag = mag_buf[1]+1; // take the central row
+            ptrdiff_t magstep_down = mag_buf[2]-mag_buf[1];
+            ptrdiff_t magstep_up = mag_buf[0]-mag_buf[1];
 
-        int* _mag = mag_buf[1] + 1; // take the central row
-        ptrdiff_t magstep1 = mag_buf[2] - mag_buf[1];
-        ptrdiff_t magstep2 = mag_buf[0] - mag_buf[1];
+            const short* _x = dx.ptr<short>(i-1);
+            const short* _y = dy.ptr<short>(i-1);
 
-        const short* _x = dx.ptr<short>(i-1);
-        const short* _y = dy.ptr<short>(i-1);
+            if((stack_top-stack_bottom)+src.cols>maxsize) {
+                int sz = (int)(stack_top-stack_bottom);
+                maxsize = std::max(maxsize*3/2,sz+src.cols);
+                stack.resize(maxsize);
+                stack_bottom = &stack[0];
+                stack_top = stack_bottom+sz;
+            }
 
-        if((stack_top - stack_bottom) + src.cols > maxsize)
-        {
-            int sz = (int)(stack_top - stack_bottom);
-            maxsize = std::max(maxsize * 3/2, sz + src.cols);
-            stack.resize(maxsize);
-            stack_bottom = &stack[0];
-            stack_top = stack_bottom + sz;
-        }
-
-        int prev_flag = 0;
-        for (int j = 0; j < src.cols; j++)
-        {
+            int prev_flag = 0;
+            for(int j = 0; j<src.cols; j++) {
 #define CANNY_SHIFT 15
-            const int TG22 = (int)(0.4142135623730950488016887242097*(1<<CANNY_SHIFT) + 0.5);
+                const int TG22 = (int)(0.4142135623730950488016887242097*(1 << CANNY_SHIFT)+0.5); // TG22 = tan(pi/8)
 
-            int m = _mag[j];
+                const int m = _mag[j];
 
-            if(m > low)
-            {
-                int xs = _x[j];
-                int ys = _y[j];
-                int x = std::abs(xs);
-                int y = std::abs(ys) << CANNY_SHIFT;
+                if(m>low) {
+                    int xs = _x[j];
+                    int ys = _y[j];
+                    int x = std::abs(xs);
+                    int y = std::abs(ys) << CANNY_SHIFT;
 
-                int tg22x = x * TG22;
+                    int tg22x = x*TG22; // tg22x = 0.4142135623730950488016887242097*std::abs(xs)
 
-                if(y < tg22x)
-                {
-                    if(m > _mag[j-1] && m >= _mag[j+1]) goto __ocv_canny_push;
+                    if(y<tg22x) { // if(std::abs(ys) < 0.4142135623730950488016887242097*std::abs(xs))
+                        // flat gradient (sector 0)
+                        if(m>_mag[j-1] && m>=_mag[j+1]) // if current magnitude is a peak among neighbors
+                            goto __ocv_canny_push; // push as 'edge'
+                    }
+                    else { // else(std::abs(ys) >= 0.4142135623730950488016887242097*std::abs(xs))
+                        // not a flat gradient (sectors 1, 2 or 3)
+                        int tg67x = tg22x+(x << (CANNY_SHIFT+1)); // tg67x = 2.4142135623730950488016887242097*std::abs(xs) = tan(3*pi/8)*std::abs(xs)
+                        if(y>tg67x) { // if(std::abs(ys) > 2.4142135623730950488016887242097*std::abs(xs)
+                            // vertical gradient (sector 2)
+                            if(m>_mag[j+magstep_up] && m>=_mag[j+magstep_down])
+                                goto __ocv_canny_push;
+                        }
+                        else { // else(std::abs(ys) <= 2.4142135623730950488016887242097*std::abs(xs)
+                            // diagonal gradient (sector sign(xs!=ys)?3:1)
+                            int s = (xs^ys)<0?-1:1; //int s = (std::signbit(xs)!=std::signbit(ys))?-1:1;
+                            if(m>_mag[j+magstep_up-s] && m>_mag[j+magstep_down+s])
+                                goto __ocv_canny_push;
+                        }
+                    }
+                }
+                prev_flag = 0;
+                _map[j] = uchar(1); // cannot belong to an edge (gradmag is below min threshold)
+                continue;
+                __ocv_canny_push:
+                if(!prev_flag && m>high && _map[j-mapstep]!=2) { // if not neighbor to identified edge (top/left), and gradmag above max threshold
+                    CANNY_PUSH(_map+j); // then pixel belongs to an edge
+                    prev_flag = 1; // set for neighbor check
                 }
                 else
-                {
-                    int tg67x = tg22x + (x << (CANNY_SHIFT+1));
-                    if(y > tg67x)
-                    {
-                        if(m > _mag[j+magstep2] && m >= _mag[j+magstep1]) goto __ocv_canny_push;
-                    }
-                    else
-                    {
-                        int s = (xs ^ ys) < 0 ? -1 : 1;
-                        if(m > _mag[j+magstep2-s] && m > _mag[j+magstep1+s]) goto __ocv_canny_push;
-                    }
-                }
+                    _map[j] = 0; // might belong to an edge (gradmag is local maximum above min threshold)
             }
-            prev_flag = 0;
-            _map[j] = uchar(1);
-            continue;
-            __ocv_canny_push:
-            if(!prev_flag && m > high && _map[j-mapstep] != 2)
-            {
-                CANNY_PUSH(_map + j);
-                prev_flag = 1;
-            }
-            else
-                _map[j] = 0;
-        }
 
-        // scroll the ring buffer
-        _mag = mag_buf[0];
-        mag_buf[0] = mag_buf[1];
-        mag_buf[1] = mag_buf[2];
-        mag_buf[2] = _mag;
+            // scroll the ring buffer
+            int* const _mag_tmp = mag_buf[0];
+            mag_buf[0] = mag_buf[1];
+            mag_buf[1] = mag_buf[2];
+            mag_buf[2] = _mag_tmp;
+        }
     }
 
     // now track the edges (hysteresis thresholding)
