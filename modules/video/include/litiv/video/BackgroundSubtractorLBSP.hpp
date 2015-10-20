@@ -93,7 +93,7 @@ protected:
     //! LBSP relative internal threshold (kept here since we don't keep an LBSP object)
     const float m_fRelLBSPThreshold;
     //! pre-allocated internal LBSP threshold values LUT for all possible 8-bit intensities
-    std::array<size_t,UCHAR_MAX+1> m_anLBSPThreshold_8bitLUT;
+    std::array<uchar,UCHAR_MAX+1> m_anLBSPThreshold_8bitLUT;
     //! default kernel size for median blur post-proc filtering
     const int m_nDefaultMedianBlurKernelSize;
     //! copy of latest descriptors (used when refreshing model)
