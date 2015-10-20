@@ -31,17 +31,10 @@ void EdgeDetectorCanny::apply_threshold(cv::InputArray _oInputImage, cv::OutputA
     cv::Mat oInputImg = _oInputImage.getMat();
     CV_Assert(!oInputImg.empty());
     CV_Assert(oInputImg.channels()==1 || oInputImg.channels()==3 || oInputImg.channels()==4);
-    cv::Mat oInputImage_gray;
-    if(oInputImg.channels()==3)
-        cv::cvtColor(oInputImg,oInputImage_gray,cv::COLOR_BGR2GRAY);
-    else if(oInputImg.channels()==4)
-        cv::cvtColor(oInputImg,oInputImage_gray,cv::COLOR_BGRA2GRAY);
-    else
-        oInputImage_gray = oInputImg;
     if(m_dGaussianKernelSigma>0) {
         const int nDefaultKernelSize = int(8*ceil(m_dGaussianKernelSigma));
         const int nRealKernelSize = nDefaultKernelSize%2==0?nDefaultKernelSize+1:nDefaultKernelSize;
-        cv::GaussianBlur(oInputImage_gray,oInputImage_gray,cv::Size(nRealKernelSize,nRealKernelSize),m_dGaussianKernelSigma,m_dGaussianKernelSigma);
+        cv::GaussianBlur(oInputImg,oInputImg,cv::Size(nRealKernelSize,nRealKernelSize),m_dGaussianKernelSigma,m_dGaussianKernelSigma);
     }
     _oEdgeMask.create(oInputImg.size(),CV_8UC1);
     cv::Mat oEdgeMask = _oEdgeMask.getMat();
@@ -50,10 +43,10 @@ void EdgeDetectorCanny::apply_threshold(cv::InputArray _oInputImage, cv::OutputA
     const size_t nCurrBaseHystThreshold = (size_t)(dThreshold*UCHAR_MAX);
     static const int nWindowSize = EDGCANNY_DEFAULT_NMS_WINDOW_SIZE;
     static const bool bUseL2Gradient = EDGCANNY_DEFAULT_USE_L2_GRADIENT_NORM;
-    litiv::cv_canny<nWindowSize,bUseL2Gradient>(oInputImage_gray,oEdgeMask,nCurrBaseHystThreshold*m_dHystLowThrshFactor,(double)nCurrBaseHystThreshold);
+    litiv::cv_canny<nWindowSize,bUseL2Gradient>(oInputImg,oEdgeMask,nCurrBaseHystThreshold*m_dHystLowThrshFactor,(double)nCurrBaseHystThreshold);
 #if DEBUG
     cv::Mat tmp(oEdgeMask.size(),oEdgeMask.type());
-    cv::Canny(oInputImage_gray,tmp,nCurrBaseHystThreshold*m_dHystLowThrshFactor,(double)nCurrBaseHystThreshold,nWindowSize,bUseL2Gradient);
+    cv::Canny(oInputImg,tmp,nCurrBaseHystThreshold*m_dHystLowThrshFactor,(double)nCurrBaseHystThreshold,nWindowSize,bUseL2Gradient);
     CV_Assert(cv::countNonZero(tmp!=oEdgeMask)==0);
 #endif //DEBUG
 }
