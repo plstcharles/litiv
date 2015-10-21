@@ -22,21 +22,31 @@
 
 //! defines the default value for EdgeDetectorLBSP::m_nLevels
 #define EDGLBSP_DEFAULT_LEVEL_COUNT (4)
-//! defines the default integral [0,255] threshold value
-#define EDGLBSP_DEFAULT_INT_THRESHOLD (30)
+//! defines the default value for EdgeDetectorLBSP::m_dHystLowThrshFactor (if needed)
+#define EDGLBSP_DEFAULT_HYST_LOW_THRSH_FACT (0.4)
+//! defines the default integral [0,255] LBSP detection threshold value
+#define EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER (30)
+//! defines the default integral [0,255] edge detection threshold value
+#define EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER (75)
 //! defines the default value for the threshold passed to EdgeDetectorLBSP::apply
-#define EDGLBSP_DEFAULT_THRESHOLD ((double)EDGLBSP_DEFAULT_INT_THRESHOLD/UCHAR_MAX)
+#define EDGLBSP_DEFAULT_DET_THRESHOLD ((double)EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER/UCHAR_MAX)
 
 #define EDGLBSP_NORMALIZE_OUTPUT 1
 
 class EdgeDetectorLBSP : public EdgeDetector {
 public:
     //! full constructor
-    EdgeDetectorLBSP(size_t nLevels=EDGLBSP_DEFAULT_LEVEL_COUNT, bool bNormalizeOutput=EDGLBSP_NORMALIZE_OUTPUT);
-    //! returns the default threshold value used in 'apply'
-    virtual double getDefaultThreshold() const {return EDGLBSP_DEFAULT_THRESHOLD;}
-    //! thresholded edge detection function; the threshold should be between 0 and 1 (will use default otherwise), and sets the base hysteresis threshold
-    virtual void apply_threshold(cv::InputArray oInputImage, cv::OutputArray oEdgeMask, double dThreshold=EDGLBSP_DEFAULT_THRESHOLD);
+    EdgeDetectorLBSP( size_t nLevels=EDGLBSP_DEFAULT_LEVEL_COUNT,
+                      double dHystLowThrshFactor=EDGLBSP_DEFAULT_HYST_LOW_THRSH_FACT,
+                      bool bNormalizeOutput=EDGLBSP_NORMALIZE_OUTPUT);
+    //! returns the default edge detection threshold value used in 'apply'
+    virtual double getDefaultThreshold() const {return EDGLBSP_DEFAULT_DET_THRESHOLD;}
+    //! returns the default LBSP descriptor internal threshold used for comparions (also used in 'apply')
+    virtual uchar getDefaultLBSPThreshold() const {return EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER;}
+    //! thresholded edge detection function; the edge detection threshold should be between 0 and 1 (will use default otherwise)
+    virtual void apply_threshold(cv::InputArray oInputImage, cv::OutputArray oEdgeMask, double dDetThreshold=EDGLBSP_DEFAULT_DET_THRESHOLD);
+    //! thresholded edge detection function; the edge detection threshold should be between 0 and 1 (will use default otherwise), and the LBSP threshold should be between 0 and 255
+    virtual void apply_threshold(cv::InputArray oInputImage, cv::OutputArray oEdgeMask, double dDetThreshold=EDGLBSP_DEFAULT_DET_THRESHOLD, uchar nLBSPThreshold=EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER);
     //! edge detection function; returns a confidence edge mask (0-255) instead of a thresholded/binary edge mask
     virtual void apply(cv::InputArray oInputImage, cv::OutputArray oEdgeMask);
 
@@ -44,6 +54,10 @@ protected:
 
     //! number of pyramid levels to analyze
     const size_t m_nLevels;
+    //! base threshold multiplier used to compute the upper hysteresis threshold
+    const double m_dHystLowThrshFactor;
+    //! gaussian blur kernel sigma value
+    const double m_dGaussianKernelSigma;
     //! defines whether the output is normalized to the full 0-255 range or not
     const bool m_bNormalizeOutput;
     //! pre-allocated image pyramid maps for multi-scale LBSP lookup
@@ -52,14 +66,8 @@ protected:
     std::vector<std::aligned_vector<uchar,32>> m_vvuLBSPLookupMaps;
     //! multi-level image map size lookup list
     std::vector<cv::Size> m_voMapSizeList;
-    //! base threshold multiplier used to compute the upper hysteresis threshold
-    const double m_dHystLowThrshFactor;
-    //! gaussian blur kernel sigma value
-    const double m_dGaussianKernelSigma;
-    //! specifies whether to use the accurate L2 norm for gradient magnitude calculations or simply the L1 norm
-    const bool m_bUsingL2GradientNorm;
 
     //! internal single-threshold edge det function w/ explicit def for 1/2/3/4 channel(s)
     template<size_t nChannels>
-    void apply_threshold_internal(const cv::Mat& oInputImg, cv::Mat& oEdgeMask, uchar nThreshold, bool bNormalize);
+    void apply_threshold_internal(const cv::Mat& oInputImg, cv::Mat& oEdgeMask, uchar nDetThreshold, uchar nLBSPThreshold);
 };
