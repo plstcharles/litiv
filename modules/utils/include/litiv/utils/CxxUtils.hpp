@@ -64,7 +64,7 @@ namespace CxxUtils {
     }
 
     template<size_t nWordBitSize, typename Tr>
-    constexpr inline typename std::enable_if<nWordBitSize==1,Tr>::type expand_bits(const Tr& nBits, int n=((sizeof(Tr)*8)/nWordBitSize)-1) {
+    constexpr inline typename std::enable_if<nWordBitSize==1,Tr>::type expand_bits(const Tr& nBits, int=0) {
         return nBits;
     }
 
