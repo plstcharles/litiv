@@ -130,7 +130,7 @@ public:
     inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _anRefs, const int _x, const int _y, const uchar* const _anThresholds, Tr* _res) {
         alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE_BITS>,nChannels> _aanVals;
         LBSP::computeDescriptor_lookup<nChannels>(oInputImg,_x,_y,_aanVals);
-        CxxUtils::unroll<nChannels-1>([&](int _c) {
+        CxxUtils::unroll<nChannels>([&](int _c) {
             LBSP::computeDescriptor_threshold(_aanVals[_c].data(),_anRefs[_c],_anThresholds[_c],_res[_c]);
         });
     }
@@ -175,34 +175,39 @@ public:
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t _step_row = oInputImg.step.p[0];
         const uchar* const _data = oInputImg.data;
-        CxxUtils::unroll<nChannels-1>([&](int _c) {
+        CxxUtils::unroll<nChannels>([&](int _c) {
             LBSP::lookup_16bits_dbcross<nChannels>(_data,_x,_y,_c,_step_row,_aanVals+_c*LBSP::DESC_SIZE_BITS);
         });
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP orientation estimation function
-    template<typename Tr>
-    inline static LBSP::eGradientOrientation computeDescriptor_orientation(const Tr& _nDescriptor) {
+    //! utility function, shortcut/lightweight/direct single-point LBSP orientation estimation function (w/ optional bitmask gaps, useful for counting)
+    template<typename To=LBSP::eGradientOrientation, size_t nBitMaskWordSize=1, typename Tr>
+    inline static To computeDescriptor_orientation(const Tr& _nDescriptor) {
+        // simple example of counter init: To=ushort, nBitMaskWordSize=4 => 4x bit counters with [0,15] range
+        static_assert(nBitMaskWordSize>0,"bit mask word size needs to be larger or equal to one");
+        static_assert(nBitMaskWordSize*4<=sizeof(To)*8,"bit mask word size is too large for output type");
 //#if (!HAVE_SSE4_1 && !HAVE_SSE2)
         const uint nBitCount = DistanceUtils::popcount(_nDescriptor);
         if(nBitCount<=1)
-            return LBSP::eGradientOrientation_None;
-        else if(nBitCount>=LBSP::DESC_SIZE_BITS-1)
-            return LBSP::eGradientOrientation_Point;
+            return (To)LBSP::eGradientOrientation_None;
+        else if(nBitCount>=LBSP::DESC_SIZE_BITS-1) {
+            constexpr To nRet = CxxUtils::expand_bits<nBitMaskWordSize>((To)LBSP::eGradientOrientation_Point);
+            return nRet;
+        }
         std::array<uint,4> anOrientMag = {0,0,0,0};
-        CxxUtils::unroll<(LBSP::DESC_SIZE_BITS/4)-1>([&](int n) {
+        CxxUtils::unroll<LBSP::DESC_SIZE_BITS/4>([&](int n) {
             anOrientMag[0] += bool(_nDescriptor&s_anIdxLUT_16bitdbcross_HorizIdx[n]);
         });
-        CxxUtils::unroll<(LBSP::DESC_SIZE_BITS/4)-1>([&](int n) {
+        CxxUtils::unroll<LBSP::DESC_SIZE_BITS/4>([&](int n) {
             anOrientMag[1] += bool(_nDescriptor&s_anIdxLUT_16bitdbcross_DiagIdx[n]);
         });
-        CxxUtils::unroll<(LBSP::DESC_SIZE_BITS/4)-1>([&](int n) {
+        CxxUtils::unroll<LBSP::DESC_SIZE_BITS/4>([&](int n) {
             anOrientMag[2] += bool(_nDescriptor&s_anIdxLUT_16bitdbcross_VertIdx[n]);
         });
-        CxxUtils::unroll<(LBSP::DESC_SIZE_BITS/4)-1>([&](int n) {
+        CxxUtils::unroll<LBSP::DESC_SIZE_BITS/4>([&](int n) {
             anOrientMag[3] += bool(_nDescriptor&s_anIdxLUT_16bitdbcross_DiagInvIdx[n]);
         });
-        return (LBSP::eGradientOrientation)(1<<(std::max_element(anOrientMag.begin(),anOrientMag.end())-anOrientMag.begin()));
+        return (To)(1<<((std::max_element(anOrientMag.begin(),anOrientMag.end())-anOrientMag.begin())*nBitMaskWordSize));
 //#else //(HAVE_SSE4_1 || HAVE_SSE2)
 // @@@@ TODO
 //#endif //(HAVE_SSE4_1 || HAVE_SSE2)
@@ -269,8 +274,8 @@ public:
         CV_DbgAssert(_anRefs);
 //#if (!HAVE_SSE4_1 && !HAVE_SSE2)
         _anResVal = 0;
-        CxxUtils::unroll<nChannels-1>([&](int cn) {
-            CxxUtils::unroll<LBSP::DESC_SIZE_BITS-1>([&](int n) {
+        CxxUtils::unroll<nChannels>([&](int cn) {
+            CxxUtils::unroll<LBSP::DESC_SIZE_BITS>([&](int n) {
                 _anResVal |= ((uchar)DistanceUtils::L1dist(_aanVals[cn*LBSP::DESC_SIZE_BITS+n],_anRefs[cn]) > _t) << n;
             });
         });
@@ -298,8 +303,8 @@ public:
         CV_DbgAssert(_anRefs);
 //#if (!HAVE_SSE4_1 && !HAVE_SSE2)
         _anResVal = 0;
-        CxxUtils::unroll<nChannels-1>([&](int cn) {
-            CxxUtils::unroll<LBSP::DESC_SIZE_BITS-1>([&](int n) {
+        CxxUtils::unroll<nChannels>([&](int cn) {
+            CxxUtils::unroll<LBSP::DESC_SIZE_BITS>([&](int n) {
                 _anResVal |= ((uchar)DistanceUtils::L1dist(_aanVals[cn*LBSP::DESC_SIZE_BITS+n],_anRefs[cn]) > _anRefs[cn]>>nShift) << n;
             });
         });
@@ -333,7 +338,7 @@ protected:
         auto _idx = [&](int n) {
             return _step_row*(s_anIdxLUT_16bitdbcross[n][1]+_y)+nChannels*(s_anIdxLUT_16bitdbcross[n][0]+_x)+_c;
         };
-        CxxUtils::unroll<15>([&](int n) {
+        CxxUtils::unroll<16>([&](int n) {
             _anVals[n] = _data[_idx(n)];
         });
     }
