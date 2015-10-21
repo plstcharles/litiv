@@ -196,16 +196,16 @@ public:
         }
         std::array<uint,4> anOrientMag = {0,0,0,0};
         CxxUtils::unroll<LBSP::DESC_SIZE_BITS/4>([&](int n) {
-            anOrientMag[0] += bool(_nDescriptor&s_anIdxLUT_16bitdbcross_HorizIdx[n]);
+            anOrientMag[0] += bool(_nDescriptor&s_anIdxLUT_16bitdbcross_HorizBits[n]);
         });
         CxxUtils::unroll<LBSP::DESC_SIZE_BITS/4>([&](int n) {
-            anOrientMag[1] += bool(_nDescriptor&s_anIdxLUT_16bitdbcross_DiagIdx[n]);
+            anOrientMag[1] += bool(_nDescriptor&s_anIdxLUT_16bitdbcross_DiagBits[n]);
         });
         CxxUtils::unroll<LBSP::DESC_SIZE_BITS/4>([&](int n) {
-            anOrientMag[2] += bool(_nDescriptor&s_anIdxLUT_16bitdbcross_VertIdx[n]);
+            anOrientMag[2] += bool(_nDescriptor&s_anIdxLUT_16bitdbcross_VertBits[n]);
         });
         CxxUtils::unroll<LBSP::DESC_SIZE_BITS/4>([&](int n) {
-            anOrientMag[3] += bool(_nDescriptor&s_anIdxLUT_16bitdbcross_DiagInvIdx[n]);
+            anOrientMag[3] += bool(_nDescriptor&s_anIdxLUT_16bitdbcross_DiagInvBits[n]);
         });
         return (To)(1<<((std::max_element(anOrientMag.begin(),anOrientMag.end())-anOrientMag.begin())*nBitMaskWordSize));
 //#else //(HAVE_SSE4_1 || HAVE_SSE2)
@@ -328,10 +328,10 @@ protected:
     //    O O O           .. 12 10 14 ..
     //  O   O   O          7 ..  2 ..  5
     static const std::array<std::array<int,2>,LBSP::DESC_SIZE_BITS> s_anIdxLUT_16bitdbcross;
-    static const std::array<uint,LBSP::DESC_SIZE_BITS/4> s_anIdxLUT_16bitdbcross_HorizIdx;
-    static const std::array<uint,LBSP::DESC_SIZE_BITS/4> s_anIdxLUT_16bitdbcross_VertIdx;
-    static const std::array<uint,LBSP::DESC_SIZE_BITS/4> s_anIdxLUT_16bitdbcross_DiagIdx;
-    static const std::array<uint,LBSP::DESC_SIZE_BITS/4> s_anIdxLUT_16bitdbcross_DiagInvIdx;
+    static const std::array<uint,LBSP::DESC_SIZE_BITS/4> s_anIdxLUT_16bitdbcross_HorizBits;
+    static const std::array<uint,LBSP::DESC_SIZE_BITS/4> s_anIdxLUT_16bitdbcross_DiagBits;
+    static const std::array<uint,LBSP::DESC_SIZE_BITS/4> s_anIdxLUT_16bitdbcross_VertBits;
+    static const std::array<uint,LBSP::DESC_SIZE_BITS/4> s_anIdxLUT_16bitdbcross_DiagInvBits;
 
     template<size_t nChannels, typename Tv>
     static inline void lookup_16bits_dbcross(const Tv* const _data, const int _x, const int _y, const size_t _c, const size_t _step_row, Tv* const _anVals) {

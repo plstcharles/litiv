@@ -24,10 +24,10 @@ const std::array<std::array<int,2>,LBSP::DESC_SIZE_BITS> LBSP::s_anIdxLUT_16bitd
         -1,-1,   1, 1,   1,-1,  -1, 1,
 };
 
-const std::array<uint,LBSP::DESC_SIZE_BITS/4> LBSP::s_anIdxLUT_16bitdbcross_HorizIdx = {0,9,11,1};
-const std::array<uint,LBSP::DESC_SIZE_BITS/4> LBSP::s_anIdxLUT_16bitdbcross_VertIdx = {3,8,10,2};
-const std::array<uint,LBSP::DESC_SIZE_BITS/4> LBSP::s_anIdxLUT_16bitdbcross_DiagIdx = {4,15,14,5};
-const std::array<uint,LBSP::DESC_SIZE_BITS/4> LBSP::s_anIdxLUT_16bitdbcross_DiagInvIdx = {7,12,13,6};
+const std::array<uint,LBSP::DESC_SIZE_BITS/4> LBSP::s_anIdxLUT_16bitdbcross_HorizBits = {1<<0,1<<9,1<<11,1<<1};
+const std::array<uint,LBSP::DESC_SIZE_BITS/4> LBSP::s_anIdxLUT_16bitdbcross_DiagBits = {1<<4,1<<15,1<<14,1<<5};
+const std::array<uint,LBSP::DESC_SIZE_BITS/4> LBSP::s_anIdxLUT_16bitdbcross_VertBits = {1<<3,1<<8,1<<10,1<<2};
+const std::array<uint,LBSP::DESC_SIZE_BITS/4> LBSP::s_anIdxLUT_16bitdbcross_DiagInvBits = {1<<7,1<<12,1<<13,1<<6};
 
 LBSP::LBSP(size_t nThreshold) :
         m_bOnlyUsingAbsThreshold(true),
