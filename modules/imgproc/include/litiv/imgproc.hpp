@@ -132,6 +132,17 @@ void litiv::cv_canny(cv::InputArray _src, cv::OutputArray _dst, double low_thres
     cv::Sobel(src, dx, CV_16S, 1, 0, aperture_size, 1, 0, cv::BORDER_REPLICATE);
     cv::Sobel(src, dy, CV_16S, 0, 1, aperture_size, 1, 0, cv::BORDER_REPLICATE);
 
+    /*cv::Mat dxa,dya;
+    cv::convertScaleAbs(dx,dxa);
+    cv::convertScaleAbs(dy,dya);
+    cv::Mat test_grad = (cv::abs(dxa)/2+cv::abs(dya)/2);
+    std::vector<cv::Mat> votest;
+    cv::split(test_grad,votest);
+    cv::max(votest[0],votest[1],votest[0]);
+    cv::max(votest[0],votest[2],votest[0]);
+    cv::normalize(votest[0],votest[0],0,255,cv::NORM_MINMAX);
+    cv::imshow("votest[0]",votest[0]);*/
+
     if(L2gradient) {
         low_thresh = std::min(32767.0, low_thresh);
         high_thresh = std::min(32767.0, high_thresh);

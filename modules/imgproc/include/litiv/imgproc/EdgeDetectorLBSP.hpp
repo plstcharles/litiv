@@ -27,7 +27,7 @@
 //! defines the default integral [0,255] LBSP detection threshold value
 #define EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER (30)
 //! defines the default integral [0,255] edge detection threshold value
-#define EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER (75)
+#define EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER (255)
 //! defines the default value for the threshold passed to EdgeDetectorLBSP::apply
 #define EDGLBSP_DEFAULT_DET_THRESHOLD ((double)EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER/UCHAR_MAX)
 
