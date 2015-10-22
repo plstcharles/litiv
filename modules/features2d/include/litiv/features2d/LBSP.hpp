@@ -277,33 +277,37 @@ public:
         nGradY = 0;
         nGradMag = 0;
         CxxUtils::unroll<LBSP::DESC_SIZE_BITS>([&](int n) {
-            const Tr1 nCurrDiff = (Tr1)aanVals[(nChannels-1)*LBSP::DESC_SIZE_BITS+n]-(Tr1)anRefs[(nChannels-1)];
-            nGradX += (Tr1)(s_anIdxLUT_16bitdbcross_IsGradX[n]*nCurrDiff);
-            nGradY += (Tr1)(s_anIdxLUT_16bitdbcross_IsGradY[n]*nCurrDiff);
-            const size_t nCurrL1Dist = std::abs(nCurrDiff);
-            nGradMag += (Tr2)bool(nCurrL1Dist>anRefs[(nChannels-1)]>>nShift) + (Tr2)bool(nCurrL1Dist>nThreshold);
+            const Tr2 nCurrDist = DistanceUtils::L1dist(aanVals[(nChannels-1)*LBSP::DESC_SIZE_BITS+n],anRefs[(nChannels-1)]);
+            const Tr2 nCurrGradMag = (Tr2)bool(nCurrDist>anRefs[(nChannels-1)]>>nShift) + (Tr2)bool(nCurrDist>nThreshold);
+            nGradX += (s_anIdxLUT_16bitdbcross_GradX[n]*nCurrGradMag); // range: [-4,4]x16
+            nGradY += (s_anIdxLUT_16bitdbcross_GradY[n]*nCurrGradMag);
+            //nGradMag += nCurrGradMag*nCurrGradMag; // range: [0-4]x16
+            //nGradMag += nCurrGradMag*nCurrGradMag*(std::abs(s_anIdxLUT_16bitdbcross_GradX[n])+std::abs(s_anIdxLUT_16bitdbcross_GradY[n])); // range: [0-4]x16
+            nGradMag += nCurrGradMag; // range: [0-2]x16
         });
-        //nGradMag = (Tr2)std::abs(nGradX)+(Tr2)std::abs(nGradY);
+        //nGradMag = (Tr2)std::abs(nGradX)+(Tr2)std::abs(nGradY); // range: [0,8]x16
+        //nGradMag = (Tr2)(int(nGradX)*nGradX+int(nGradY)*nGradY); // range: [0,16]x16
         CxxUtils::unroll<nChannels-1>([&](int cn) {
             Tr1 nNewGradX = 0;
             Tr1 nNewGradY = 0;
             Tr2 nNewGradMag = 0;
             CxxUtils::unroll<LBSP::DESC_SIZE_BITS>([&](int n) {
-                const Tr1 nCurrDiff = (Tr1)aanVals[cn*LBSP::DESC_SIZE_BITS+n]-(Tr1)anRefs[cn];
-                nNewGradX += (Tr1)(s_anIdxLUT_16bitdbcross_IsGradX[n]*nCurrDiff);
-                nNewGradY += (Tr1)(s_anIdxLUT_16bitdbcross_IsGradY[n]*nCurrDiff);
-                const size_t nCurrL1Dist = std::abs(nCurrDiff);
-                nNewGradMag += (Tr2)bool(nCurrL1Dist>anRefs[cn]>>nShift) + (Tr2)bool(nCurrL1Dist>nThreshold);
+                const Tr2 nCurrDist = DistanceUtils::L1dist(aanVals[cn*LBSP::DESC_SIZE_BITS+n],anRefs[cn]);
+                const Tr2 nCurrGradMag = (Tr2)bool(nCurrDist>anRefs[cn]>>nShift) + (Tr2)bool(nCurrDist>nThreshold);
+                nNewGradX += (s_anIdxLUT_16bitdbcross_GradX[n]*nCurrGradMag);
+                nNewGradY += (s_anIdxLUT_16bitdbcross_GradY[n]*nCurrGradMag);
+                //nNewGradMag += nCurrGradMag*nCurrGradMag;
+                //nNewGradMag += nCurrGradMag*nCurrGradMag*(std::abs(s_anIdxLUT_16bitdbcross_GradX[n])+std::abs(s_anIdxLUT_16bitdbcross_GradY[n])); // range: [0-4]x16
+                nNewGradMag += nCurrGradMag;
             });
-            //const Tr2 nNewGradMag = (Tr2)std::abs(nGradX)+(Tr2)std::abs(nGradY);
+            //const Tr2 nNewGradMag = (Tr2)std::abs(nNewGradX)+(Tr2)std::abs(nNewGradY);
+            //const Tr2 nNewGradMag = (Tr2)(int(nNewGradX)*nNewGradX+int(nNewGradY)*nNewGradY); // range: [0,16]x16
             if(nGradMag<nNewGradMag) {
                 nGradX = nNewGradX;
                 nGradY = nNewGradY;
                 nGradMag = nNewGradMag;
             }
         });
-        nGradMag = (nGradMag*UCHAR_MAX)/(LBSP::DESC_SIZE_BITS*2);
-        //nGradMag = nGradMag/(LBSP::DESC_SIZE_BITS*2);
 //#else //(HAVE_SSE4_1 || HAVE_SSE2)
 // @@@@ TODO
 //#endif //(HAVE_SSE4_1 || HAVE_SSE2)*/
@@ -330,8 +334,8 @@ protected:
     static const std::array<uint,4> s_anIdxLUT_16bitdbcross_DiagInv_Bits;
     static const std::array<uint,12> s_anIdxLUT_16bitdbcross_GradX_Idxs;
     static const std::array<uint,12> s_anIdxLUT_16bitdbcross_GradY_Idxs;
-    static const std::array<int,16> s_anIdxLUT_16bitdbcross_IsGradX;
-    static const std::array<int,16> s_anIdxLUT_16bitdbcross_IsGradY;
+    static const std::array<int,16> s_anIdxLUT_16bitdbcross_GradX;
+    static const std::array<int,16> s_anIdxLUT_16bitdbcross_GradY;
 
     template<size_t nChannels, typename Tv>
     static inline void lookup_16bits_dbcross(const Tv* const _data, const int _x, const int _y, const size_t _c, const size_t _step_row, Tv* const anVals) {
