@@ -135,13 +135,21 @@ void litiv::cv_canny(cv::InputArray _src, cv::OutputArray _dst, double low_thres
     /*cv::Mat dxa,dya;
     cv::convertScaleAbs(dx,dxa);
     cv::convertScaleAbs(dy,dya);
-    cv::Mat test_grad = (cv::abs(dxa)/2+cv::abs(dya)/2);
     std::vector<cv::Mat> votest;
+    cv::split(dxa,votest);
+    cv::max(votest[0],votest[1],votest[0]);
+    cv::max(votest[0],votest[2],votest[0]);
+    cv::Mat concat = votest[0].clone();
+    cv::split(dya,votest);
+    cv::max(votest[0],votest[1],votest[0]);
+    cv::max(votest[0],votest[2],votest[0]);
+    cv::vconcat(concat,votest[0],concat);
+    cv::Mat test_grad = (cv::abs(dxa)/2+cv::abs(dya)/2);
     cv::split(test_grad,votest);
     cv::max(votest[0],votest[1],votest[0]);
     cv::max(votest[0],votest[2],votest[0]);
-    cv::normalize(votest[0],votest[0],0,255,cv::NORM_MINMAX);
-    cv::imshow("votest[0]",votest[0]);*/
+    cv::vconcat(concat,votest[0],concat);
+    cv::imshow("concat sobel grad 0-1-2",concat);*/
 
     if(L2gradient) {
         low_thresh = std::min(32767.0, low_thresh);

@@ -37,6 +37,8 @@
 
     Only available in non-parallel version.
 
+    // @@@ IMPL: THRESHOLD CAN EXCEED 255 (400-500 is ok)
+
     Note: converts all RGB/RGBA images to grayscale internally.
  */
 struct EdgeDetectorCanny : public IEdgeDetector {
