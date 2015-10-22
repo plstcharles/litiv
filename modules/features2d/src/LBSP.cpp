@@ -17,17 +17,21 @@
 
 #include "litiv/features2d/LBSP.hpp"
 
-const std::array<std::array<int,2>,LBSP::DESC_SIZE_BITS> LBSP::s_anIdxLUT_16bitdbcross = {
+const std::array<std::array<int,2>,16> LBSP::s_anIdxLUT_16bitdbcross = {
         -2, 0,   2, 0,   0,-2,   0, 2,
         -2, 2,   2,-2,   2, 2,  -2,-2,
          0, 1,  -1, 0,   0,-1,   1, 0,
         -1,-1,   1, 1,   1,-1,  -1, 1,
 };
 
-const std::array<uint,LBSP::DESC_SIZE_BITS/4> LBSP::s_anIdxLUT_16bitdbcross_HorizBits = {1<<0,1<<9,1<<11,1<<1};
-const std::array<uint,LBSP::DESC_SIZE_BITS/4> LBSP::s_anIdxLUT_16bitdbcross_DiagBits = {1<<4,1<<15,1<<14,1<<5};
-const std::array<uint,LBSP::DESC_SIZE_BITS/4> LBSP::s_anIdxLUT_16bitdbcross_VertBits = {1<<3,1<<8,1<<10,1<<2};
-const std::array<uint,LBSP::DESC_SIZE_BITS/4> LBSP::s_anIdxLUT_16bitdbcross_DiagInvBits = {1<<7,1<<12,1<<13,1<<6};
+const std::array<uint,4> LBSP::s_anIdxLUT_16bitdbcross_Horiz_Bits = {1<<0,1<<9,1<<11,1<<1};
+const std::array<uint,4> LBSP::s_anIdxLUT_16bitdbcross_Diag_Bits = {1<<4,1<<15,1<<14,1<<5};
+const std::array<uint,4> LBSP::s_anIdxLUT_16bitdbcross_Vert_Bits = {1<<3,1<<8,1<<10,1<<2};
+const std::array<uint,4> LBSP::s_anIdxLUT_16bitdbcross_DiagInv_Bits = {1<<7,1<<12,1<<13,1<<6};
+const std::array<uint,12> LBSP::s_anIdxLUT_16bitdbcross_GradX_Idxs = {4,0,7,15,9,12,13,11,14,6,1,5};
+const std::array<uint,12> LBSP::s_anIdxLUT_16bitdbcross_GradY_Idxs = {4,3,6,15,8,13,12,10,14,7,2,5};
+const std::array<int,16> LBSP::s_anIdxLUT_16bitdbcross_IsGradX = {1,-1,0,0,1,-1,-1,1,0,1,0,-1,1,-1,-1,1};
+const std::array<int,16> LBSP::s_anIdxLUT_16bitdbcross_IsGradY = {0,0,-1,1,1,-1,1,-1,1,0,-1,0,-1,1,-1,1};
 
 LBSP::LBSP(size_t nThreshold) :
         m_bOnlyUsingAbsThreshold(true),
