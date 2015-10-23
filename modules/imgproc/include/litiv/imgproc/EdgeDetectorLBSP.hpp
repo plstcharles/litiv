@@ -21,13 +21,13 @@
 #include "litiv/imgproc.hpp"
 
 //! defines the default value for EdgeDetectorLBSP::m_nLevels
-#define EDGLBSP_DEFAULT_LEVEL_COUNT (3)
+#define EDGLBSP_DEFAULT_LEVEL_COUNT (2)
 //! defines the default value for EdgeDetectorLBSP::m_dHystLowThrshFactor (if needed)
-#define EDGLBSP_DEFAULT_HYST_LOW_THRSH_FACT (0.5)
+#define EDGLBSP_DEFAULT_HYST_LOW_THRSH_FACT (0.25)
 //! defines the default integral [0,255] LBSP detection threshold value
 #define EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER (30)
 //! defines the default integral [0,255] edge detection threshold value
-#define EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER (11)
+#define EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER (12)
 //! defines the default value for the threshold passed to EdgeDetectorLBSP::apply
 #define EDGLBSP_DEFAULT_DET_THRESHOLD ((double)EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER/UCHAR_MAX)
 
