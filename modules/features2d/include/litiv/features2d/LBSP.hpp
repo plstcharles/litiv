@@ -72,11 +72,11 @@ public:
     //! utility function, used to filter out bad pixels in a ROI that would trigger out of bounds error because they're too close to the image border
     static void validateROI(cv::Mat& oROI);
     //! utility, specifies the pixel size of the pattern used (width and height)
-    static const size_t PATCH_SIZE = 5;
+    static constexpr size_t PATCH_SIZE = 5;
     //! utility, specifies the number of bytes per descriptor (should be the same as calling 'descriptorSize()')
-    static const size_t DESC_SIZE = 2;
+    static constexpr size_t DESC_SIZE = 2;
     //! utility, specifies the number of bits per descriptor
-    static const size_t DESC_SIZE_BITS = DESC_SIZE*8;
+    static constexpr size_t DESC_SIZE_BITS = DESC_SIZE*8;
 #if HAVE_GLSL
     //! utility function, returns the glsl source code required to describe an LBSP descriptor based on the image load store
     static std::string getShaderFunctionSource(size_t nChannels, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize);
@@ -268,7 +268,7 @@ public:
     inline static void computeDescriptor_gradient(const uchar* const aanVals, const uchar* const anRefs, const uchar nThreshold, Tr1& nGradX, Tr1& nGradY, Tr2& nGradMag) {
         // note: this function is used to threshold a multi-channel LBSP pattern based on a predefined lookup array (see LBSP_16bits_dbcross_lookup for more information)
         // @@@ todo: use array template to unroll loops & allow any descriptor size here
-        static_assert(std::numeric_limits<Tr1>::max()>=UCHAR_MAX*LBSP::DESC_SIZE_BITS*2,"output size is too small for descriptor config");
+        static_assert(std::numeric_limits<Tr1>::max()>=4*LBSP::DESC_SIZE_BITS,"output size is too small for descriptor config");
         static_assert(nChannels>0,"need at least one image channel");
         CV_DbgAssert(aanVals);
         CV_DbgAssert(anRefs);
