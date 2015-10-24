@@ -19,12 +19,18 @@
 #include "litiv/imgproc/EdgeDetectorLBSP.hpp"
 #include "litiv/features2d/LBSP.hpp"
 
+#define USE_CANNY_NMS_HYST_STEPS  1
+#define USE_DOLLAR_STR_RAND_FOR   0
+
+#if USE_CANNY_NMS_HYST_STEPS
+#define USE_5x5_NON_MAX_SUPP      1
+#define USE_MIN_GRAD_ORIENT       1
 #define USE_3_AXIS_ORIENT         1
-#define USE_PREPROC_PYR_DISPLAY   1
-#if USE_PREPROC_PYR_DISPLAY
-#endif //USE_PREPROC_PYR_DISPLAY
-#define USE_NMS_HYST_CANNY        0
-#if (USE_PREPROC_PYR_DISPLAY+USE_NMS_HYST_CANNY)!=1
+#endif //USE_CANNY_NMS_HYST_STEPS
+#if USE_DOLLAR_STR_RAND_FOR
+
+#endif //USE_DOLLAR_STR_RAND_FOR
+#if (USE_CANNY_NMS_HYST_STEPS+USE_DOLLAR_STR_RAND_FOR)!=1
 #error "edge detector lbsp internal cfg error"
 #endif //(USE_...+...)!=1
 
@@ -38,6 +44,48 @@ EdgeDetectorLBSP::EdgeDetectorLBSP(size_t nLevels, double dHystLowThrshFactor, b
         m_vvuLBSPLookupMaps(nLevels),
         m_voMapSizeList(nLevels) {
     CV_Assert(m_nLevels>0);
+}
+
+template<size_t nHalfWinSize, typename Tr>
+inline bool isLocalMaximum_Horizontal(const Tr* const anGradPos, const int nGradMapColStep, const int /*nGradMapRowStep*/) {
+    static_assert(nHalfWinSize>=1,"need win size >= 3x3");
+    const Tr nGradMag = *anGradPos;
+    bool bRes = true;
+    CxxUtils::unroll<nHalfWinSize>([&](int n){
+        bRes &= nGradMag>anGradPos[(-n-1)*nGradMapColStep];
+    });
+    CxxUtils::unroll<nHalfWinSize>([&](int n){
+        bRes &= nGradMag>=anGradPos[(n+1)*nGradMapColStep];
+    });
+    return bRes;
+}
+
+template<size_t nHalfWinSize, typename Tr>
+inline bool isLocalMaximum_Vertical(const Tr* const anGradPos, const int /*nGradMapColStep*/, const int nGradMapRowStep) {
+    static_assert(nHalfWinSize>=1,"need win size >= 3x3");
+    const Tr nGradMag = *anGradPos;
+    bool bRes = true;
+    CxxUtils::unroll<nHalfWinSize>([&](int n){
+        bRes &= nGradMag>anGradPos[(-n-1)*nGradMapRowStep];
+    });
+    CxxUtils::unroll<nHalfWinSize>([&](int n){
+        bRes &= nGradMag>=anGradPos[(n+1)*nGradMapRowStep];
+    });
+    return bRes;
+}
+
+template<size_t nHalfWinSize, typename Tr>
+inline bool isLocalMaximum_Diagonal(const Tr* const anGradPos, const int nGradMapColStep, const int nGradMapRowStep, bool bInv) {
+    static_assert(nHalfWinSize>=1,"need win size >= 3x3");
+    const Tr nGradMag = *anGradPos;
+    bool bRes = true;
+    CxxUtils::unroll<nHalfWinSize>([&](int n){
+        bRes &= nGradMag>anGradPos[(bInv?-1:1)*(-n-1)*nGradMapColStep+(-n-1)*nGradMapRowStep];
+    });
+    CxxUtils::unroll<nHalfWinSize>([&](int n){
+        bRes &= nGradMag>=anGradPos[(bInv?-1:1)*(n+1)*nGradMapColStep+(n+1)*nGradMapRowStep];
+    });
+    return bRes;
 }
 
 template<size_t nChannels>
@@ -78,7 +126,7 @@ void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Ma
             oNextPyrInputMap = cv::Mat(oNextScaleSize,nOrigType,m_vvuInputPyrMaps[nLevelIter].data());
             CV_DbgAssert(size_t(oNextScaleSize.area()*nChannels)==m_vvuInputPyrMaps[nLevelIter].size());
         }
-        //std::cout << "L=" << nLevelIter << "; [" << nCurrScaleCols << "," << nCurrScaleRows << "]" << std::endl;
+        //std::cout << "LUT L=" << nLevelIter << "; [" << nCurrScaleCols << "," << nCurrScaleRows << "]" << std::endl;
         for(size_t nRowIter = 0; nRowIter<nCurrScaleRows; ++nRowIter) {
             const size_t nCurrRowLUTIdx = nRowIter*nCurrRowLUTStep;
             if(nRowIter<m_nROIBorderSize || nRowIter>=nCurrScaleRows-m_nROIBorderSize) {
@@ -155,34 +203,37 @@ void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Ma
             }
         }
     }
-#if USE_PREPROC_PYR_DISPLAY
+#if USE_CANNY_NMS_HYST_STEPS
     const uchar nAbsLBSPThreshold = cv::saturate_cast<uchar>(nLBSPThreshold);
     const uchar nHystHighThreshold = nDetThreshold;
     const uchar nHystLowThreshold = (uchar)(nDetThreshold*m_dHystLowThrshFactor);
-    //const size_t nNMSWinSize = (1<<(m_nLevels-1))+1; // @@@ need?
-    //const size_t nNMSHalfWinSize = nNMSWinSize>>1;
-    const cv::Size oMapSize(oInputImg.cols+2,oInputImg.rows+2);
-    const size_t nGradMapStep = oMapSize.width*3;
-    const size_t nEdgeMapStep = oMapSize.width;
-    std::aligned_vector<ushort,32> vuLBSPDescGradSumData(oMapSize.height*nGradMapStep);
-    std::aligned_vector<uchar,32> vuEdgeTempMaskData(oMapSize.height*nEdgeMapStep);
-    cv::Mat oLBSPGradMap(oMapSize,CV_16UC3,vuLBSPDescGradSumData.data()); // 3ch, X-Y-MAG
+    constexpr size_t nNMSWinSize = USE_5x5_NON_MAX_SUPP?LBSP::PATCH_SIZE:3;
+    constexpr size_t nNMSHalfWinSize = nNMSWinSize>>1;
+    const cv::Size oMapSize(oInputImg.cols+nNMSHalfWinSize*2,oInputImg.rows+nNMSHalfWinSize*2);
+    const size_t nGradMapColStep = 3;
+    const size_t nGradMapRowStep = oMapSize.width*nGradMapColStep;
+    const size_t nEdgeMapColStep = 1;
+    const size_t nEdgeMapRowStep = oMapSize.width*nEdgeMapColStep;
+    std::aligned_vector<uchar,32> vuLBSPGradMapData(oMapSize.height*nGradMapRowStep);
+    std::aligned_vector<uchar,32> vuEdgeTempMaskData(oMapSize.height*nEdgeMapRowStep);
+    cv::Mat oLBSPGradMap(oMapSize,CV_8UC3,vuLBSPGradMapData.data()); // 3ch, X-Y-MAG
     cv::Mat oEdgeTempMask(oMapSize,CV_8UC1,vuEdgeTempMaskData.data());
-    std::fill(vuLBSPDescGradSumData.data(),vuLBSPDescGradSumData.data()+nGradMapStep,0);
-    std::fill(vuLBSPDescGradSumData.data()+(oMapSize.height-1)*nGradMapStep,vuLBSPDescGradSumData.data()+oMapSize.height*nGradMapStep,0);
-    std::fill(vuEdgeTempMaskData.data(),vuEdgeTempMaskData.data()+nEdgeMapStep,1);
-    std::fill(vuEdgeTempMaskData.data()+(oMapSize.height-1)*nEdgeMapStep,vuEdgeTempMaskData.data()+oMapSize.height*nEdgeMapStep,1);
-    oLBSPGradMap(cv::Rect(1,1,m_voMapSizeList.back().width,m_voMapSizeList.back().height)) = cv::Scalar_<ushort>(0,0,SHRT_MAX); // optm? @@@@ try full?
-    //oLBSPGradMap(cv::Rect(1,1,m_voMapSizeList.back().width,m_voMapSizeList.back().height)) = cv::Scalar_<ushort>(SHRT_MAX,SHRT_MAX,SHRT_MAX); // optm? @@@@ try full?
-    CV_DbgAssert(m_nLevels*2*16<USHRT_MAX); // rewrite @@@@@ make sure grad orientation maps will not overflow (adding 2x 16x uchar gradients 'nLevels' times into ushort)
-    CV_DbgAssert(m_nLevels*2<USHRT_MAX); // rewrite @@@@@ make sure grad sum map will not overflow (adding 2x uchar gradients 'nLevels' times into ushort)
-    size_t nCurrHystStackSize = std::max((size_t)1<<10,(size_t)oMapSize.area()/10);
+    std::fill(vuLBSPGradMapData.data(),vuLBSPGradMapData.data()+nGradMapRowStep*nNMSHalfWinSize,0);
+    std::fill(vuLBSPGradMapData.data()+(oMapSize.height-nNMSHalfWinSize)*nGradMapRowStep,vuLBSPGradMapData.data()+oMapSize.height*nGradMapRowStep,0);
+    std::fill(vuEdgeTempMaskData.data(),vuEdgeTempMaskData.data()+nEdgeMapRowStep*nNMSHalfWinSize,1);
+    std::fill(vuEdgeTempMaskData.data()+(oMapSize.height-nNMSHalfWinSize)*nEdgeMapRowStep,vuEdgeTempMaskData.data()+oMapSize.height*nEdgeMapRowStep,1);
+#if USE_MIN_GRAD_ORIENT
+    oLBSPGradMap(cv::Rect(nNMSHalfWinSize,nNMSHalfWinSize,m_voMapSizeList.back().width,m_voMapSizeList.back().height)) = cv::Scalar_<uchar>(CHAR_MAX,CHAR_MAX,UCHAR_MAX); // optm? @@@@ try full?
+#else //!USE_MIN_GRAD_ORIENT
+    oLBSPGradMap(cv::Rect(nNMSHalfWinSize,nNMSHalfWinSize,m_voMapSizeList.back().width,m_voMapSizeList.back().height)) = cv::Scalar_<uchar>(0,0,UCHAR_MAX); // optm? @@@@ try full?
+#endif //!USE_MIN_GRAD_ORIENT
+    size_t nCurrHystStackSize = std::max((size_t)1<<10,(size_t)oMapSize.area()/8);
     std::vector<uchar*> vuHystStack(nCurrHystStackSize);
     uchar** pauHystStack_top = &vuHystStack[0];
     uchar** pauHystStack_bottom = &vuHystStack[0];
     auto stack_push = [&](uchar* pAddr) {
-        CV_DbgAssert(pAddr>=oEdgeTempMask.datastart+nEdgeMapStep);
-        CV_DbgAssert(pAddr<oEdgeTempMask.dataend-nEdgeMapStep);
+        CV_DbgAssert(pAddr>=oEdgeTempMask.datastart+nEdgeMapRowStep*nNMSHalfWinSize);
+        CV_DbgAssert(pAddr<oEdgeTempMask.dataend-nEdgeMapRowStep*nNMSHalfWinSize);
         *pAddr = 2, *pauHystStack_top++ = pAddr;
     };
     auto stack_pop = [&]() -> uchar* {
@@ -198,96 +249,98 @@ void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Ma
             pauHystStack_top = pauHystStack_bottom+nUsedHystStackSize;
         }
     };
-    for(size_t nLevelIter = m_nLevels-1; nLevelIter!=size_t(-1); --nLevelIter) {
+    for(int nLevelIter = (int)m_nLevels-1; nLevelIter>=0; --nLevelIter) {
         const cv::Size& oCurrScaleSize = m_voMapSizeList[nLevelIter];
         cv::Mat oPyrMap = (!nLevelIter)?oInputImg:cv::Mat(oCurrScaleSize,nOrigType,m_vvuInputPyrMaps[nLevelIter-1].data());
         const size_t nRowLUTStep = nColLUTStep*(size_t)oCurrScaleSize.width;
-        for(size_t nRowIter = size_t(oCurrScaleSize.height-1); nRowIter!=size_t(-2); --nRowIter) {
-            CV_DbgAssert(oLBSPGradMap.step.p[0]==nGradMapStep*2 && oLBSPGradMap.step.p[1]==6);
-            ushort* anGradRow = ((ushort*)oLBSPGradMap.data)+(nRowIter+1)*nGradMapStep+3;
-            CV_DbgAssert(anGradRow>(ushort*)oLBSPGradMap.datastart && anGradRow<(ushort*)oLBSPGradMap.dataend);
-            if(nRowIter!=size_t(-1)) {
+        //std::cout << "GRAD L=" << nLevelIter << "; [" << oCurrScaleSize.width << "," << oCurrScaleSize.height << "]" << std::endl;
+        for(int nRowIter = oCurrScaleSize.height-1; nRowIter>=-(int)nNMSHalfWinSize; --nRowIter) {
+            uchar* anGradRow = oLBSPGradMap.data+(nRowIter+nNMSHalfWinSize)*nGradMapRowStep+nGradMapColStep*nNMSHalfWinSize;
+            CV_DbgAssert(anGradRow>oLBSPGradMap.datastart && anGradRow<oLBSPGradMap.dataend);
+            if(nRowIter>=0) {
                 const size_t nRowLUTIdx = nRowIter*nRowLUTStep;
                 for(size_t nColIter = (size_t)oCurrScaleSize.width-1; nColIter!=size_t(-1); --nColIter) {
                     const size_t nColLUTIdx = nRowLUTIdx+nColIter*nColLUTStep;
                     const uchar* const anCurrLUT = m_vvuLBSPLookupMaps[nLevelIter].data()+nColLUTIdx;
                     const uchar* const auRefColor = (oPyrMap.data+nColLUTIdx/LBSP::DESC_SIZE_BITS);
-                    short nGradX, nGradY;
-                    ushort nGradMag;
+                    char nGradX, nGradY;
+                    uchar nGradMag;
                     LBSP::computeDescriptor_gradient<nChannels>(anCurrLUT,auRefColor,nAbsLBSPThreshold,nGradX,nGradY,nGradMag);
-                    //const auto lAbsComp = [](short a, short b){return std::abs(a)<std::abs(b);};
-                    //(short&)(anGradRow[nColIter*3]) = std::min(nGradX,(short)(anGradRow[nColIter*3]),lAbsComp);
-                    //(short&)(anGradRow[nColIter*3+1]) = std::min(nGradY,(short)(anGradRow[nColIter*3+1]),lAbsComp);
-                    (short&)(anGradRow[nColIter*3]) = (nGradX+(short)(anGradRow[nColIter*3]*2))/2;
-                    (short&)(anGradRow[nColIter*3+1]) = (nGradY+(short)(anGradRow[nColIter*3+1]*2))/2;
-                    anGradRow[nColIter*3+2] = std::min(nGradMag,anGradRow[nColIter*3+2]);
+#if USE_MIN_GRAD_ORIENT
+                    const auto lAbsComp = [](char a, char b){return std::abs(a)<std::abs(b);}; // @@@ retest w/ fixed char sign (done)
+                    (char&)(anGradRow[nColIter*nGradMapColStep]) = std::min(nGradX,char(anGradRow[nColIter*nGradMapColStep]),lAbsComp);
+                    (char&)(anGradRow[nColIter*nGradMapColStep+1]) = std::min(nGradY,char(anGradRow[nColIter*nGradMapColStep+1]),lAbsComp);
+#else //!USE_MIN_GRAD_ORIENT
+                    CV_DbgAssert((nGradX+(char)(anGradRow[nColIter*nGradMapColStep]*2))/2<=UCHAR_MAX);
+                    CV_DbgAssert((nGradY+(char)(anGradRow[nColIter*nGradMapColStep+1]*2))/2<=UCHAR_MAX);
+                    (char&)(anGradRow[nColIter*nGradMapColStep]) = ((nGradX+(char)(anGradRow[nColIter*nGradMapColStep]*2))/2);
+                    (char&)(anGradRow[nColIter*nGradMapColStep+1]) = ((nGradY+(char)(anGradRow[nColIter*nGradMapColStep+1]*2))/2);
+#endif //!USE_MIN_GRAD_ORIENT
+                    anGradRow[nColIter*nGradMapColStep+2] = std::min(nGradMag,anGradRow[nColIter*nGradMapColStep+2]);
                     if(nLevelIter>0) {
                         const size_t nRowIter_base = nRowIter << 1;
                         const size_t nColIter_base = nColIter << 1;
                         CV_DbgAssert((nRowIter_base+1)<(oMapSize.height));
                         CV_DbgAssert((nColIter_base+1)<(oMapSize.width));
                         for(size_t nRowIterOffset = nRowIter_base; nRowIterOffset<nRowIter_base+2; ++nRowIterOffset) {
-                            CV_DbgAssert(oLBSPGradMap.step.p[0]==nGradMapStep*2 && oLBSPGradMap.step.p[1]==6);
-                            ushort* anNextScaleGradRow = ((ushort*)oLBSPGradMap.data)+(nRowIterOffset+1)*nGradMapStep+3;
-                            CV_DbgAssert(anNextScaleGradRow<(ushort*)oLBSPGradMap.dataend);
+                            uchar* anNextScaleGradRow = oLBSPGradMap.data+(nRowIterOffset+nNMSHalfWinSize)*nGradMapRowStep+nGradMapColStep*nNMSHalfWinSize;
+                            CV_DbgAssert(anNextScaleGradRow<oLBSPGradMap.dataend);
                             for(size_t nColIterOffset = nColIter_base; nColIterOffset<nColIter_base+2; ++nColIterOffset) {
-                                anNextScaleGradRow[nColIterOffset*3] = anGradRow[nColIter*3];
-                                anNextScaleGradRow[nColIterOffset*3+1] = anGradRow[nColIter*3+1];
-                                anNextScaleGradRow[nColIterOffset*3+2] = anGradRow[nColIter*3+2];
+                                anNextScaleGradRow[nColIterOffset*nGradMapColStep] = anGradRow[nColIter*nGradMapColStep];
+                                anNextScaleGradRow[nColIterOffset*nGradMapColStep+1] = anGradRow[nColIter*nGradMapColStep+1];
+                                anNextScaleGradRow[nColIterOffset*nGradMapColStep+2] = anGradRow[nColIter*nGradMapColStep+2];
                             }
                         }
                     }
                 }
             }
             if(nLevelIter==0) {
-                std::fill(anGradRow-3,anGradRow,0); // remove if init'd at top
-                std::fill(anGradRow+oInputImg.cols*3,anGradRow+(oInputImg.cols+1)*3,0);
-                if(nRowIter<size_t(oCurrScaleSize.height-1)) {
-                    anGradRow += nGradMapStep; // offset by one row (nms is post grad comp since 3x3 neighborhood)
-                    uchar* anEdgeMapRow = oEdgeTempMask.ptr<uchar>(nRowIter+1)+1;
-                    CV_DbgAssert(oEdgeTempMask.step.p[0]==nEdgeMapStep);
-                    CV_DbgAssert(anEdgeMapRow>=oEdgeTempMask.datastart+nEdgeMapStep && anEdgeMapRow<oEdgeTempMask.dataend-nEdgeMapStep);
-                    anEdgeMapRow[-1] = anEdgeMapRow[oInputImg.cols] = 1;
+                std::fill(anGradRow-nGradMapColStep*nNMSHalfWinSize,anGradRow,0); // remove if init'd at top
+                std::fill(anGradRow+oInputImg.cols*nGradMapColStep,anGradRow+(oInputImg.cols+nNMSHalfWinSize)*nGradMapColStep,0);
+                if(nRowIter<oCurrScaleSize.height-nNMSHalfWinSize) {
+                    anGradRow += nGradMapRowStep*nNMSHalfWinSize; // offset by nNMSHalfWinSize rows
+                    uchar* anEdgeMapRow = oEdgeTempMask.ptr<uchar>(nRowIter+nNMSHalfWinSize)+nNMSHalfWinSize*nEdgeMapColStep;
+                    CV_DbgAssert(anEdgeMapRow>=oEdgeTempMask.datastart+nEdgeMapRowStep*nNMSHalfWinSize && anEdgeMapRow<oEdgeTempMask.dataend-nEdgeMapRowStep*nNMSHalfWinSize);
+                    std::fill(anEdgeMapRow-nNMSHalfWinSize*nGradMapColStep,anEdgeMapRow,1);
+                    std::fill(anEdgeMapRow+oInputImg.cols*nGradMapColStep,anEdgeMapRow+(oInputImg.cols+nNMSHalfWinSize)*nGradMapColStep,1);
                     stack_check_size(oInputImg.cols);
                     bool nNeighbMax = false;
                     for(size_t nColIter = 0; nColIter<(size_t)oInputImg.cols; ++nColIter) {
                         // make sure all 'quick-idx' lookups are at the right positions...
-                        CV_DbgAssert(anGradRow[nColIter*3]==oLBSPGradMap.at<cv::Vec3w>(nRowIter+2,nColIter+1)[0]);
-                        CV_DbgAssert(anGradRow[nColIter*3+1]==oLBSPGradMap.at<cv::Vec3w>(nRowIter+2,nColIter+1)[1]);
-                        CV_DbgAssert(anGradRow[nColIter*3+2]==oLBSPGradMap.at<cv::Vec3w>(nRowIter+2,nColIter+1)[2]);
-                        CV_DbgAssert(anGradRow[nColIter*3-nGradMapStep+2]==oLBSPGradMap.at<cv::Vec3w>(nRowIter+1,nColIter+1)[2]);
-                        CV_DbgAssert(anGradRow[nColIter*3+nGradMapStep+2]==oLBSPGradMap.at<cv::Vec3w>(nRowIter+3,nColIter+1)[2]);
-                        const ushort nGradMag = anGradRow[nColIter*3+2];
+                        CV_DbgAssert(anGradRow[nColIter*nGradMapColStep]==oLBSPGradMap.at<cv::Vec3b>(nRowIter+(nNMSHalfWinSize*2),nColIter+nNMSHalfWinSize)[0]);
+                        CV_DbgAssert(anGradRow[nColIter*nGradMapColStep+1]==oLBSPGradMap.at<cv::Vec3b>(nRowIter+(nNMSHalfWinSize*2),nColIter+nNMSHalfWinSize)[1]);
+                        for(int nNMSWinIter=-(int)nNMSHalfWinSize; nNMSWinIter<=(int)nNMSHalfWinSize; ++nNMSWinIter)
+                            CV_DbgAssert(anGradRow[nColIter*nGradMapColStep+nGradMapRowStep*nNMSWinIter+2]==oLBSPGradMap.at<cv::Vec3b>(nRowIter+nNMSWinIter+(nNMSHalfWinSize*2),nColIter+nNMSHalfWinSize)[2]);
+                        const uchar nGradMag = anGradRow[nColIter*nGradMapColStep+2];
                         if(nGradMag>=nHystLowThreshold) {
 #if USE_3_AXIS_ORIENT
-                            const short nGradX = anGradRow[nColIter*3];
-                            const short nGradY = anGradRow[nColIter*3+1];
+                            const char nGradX = anGradRow[nColIter*nGradMapColStep];
+                            const char nGradY = anGradRow[nColIter*nGradMapColStep+1];
                             const uint nShift_FPA = 15;
                             constexpr uint nTG22deg_FPA = (int)(0.4142135623730950488016887242097*(1<<nShift_FPA)+0.5); // == tan(pi/8)
-                            const uint nGradX_abs = (ushort)std::abs(nGradX);
-                            const uint nGradY_abs = (ushort)std::abs(nGradY)<<nShift_FPA;
+                            const uint nGradX_abs = (uint)std::abs(nGradX);
+                            const uint nGradY_abs = (uint)std::abs(nGradY)<<nShift_FPA;
                             uint nTG22GradX_FPA = nGradX_abs*nTG22deg_FPA; // == 0.4142135623730950488016887242097*nGradX_abs
                             if(nGradY_abs<nTG22GradX_FPA) { // if(nGradX_abs<0.4142135623730950488016887242097*nGradX_abs) == flat gradient (sector 0)
-                                if(nGradMag>anGradRow[(nColIter-1)*3+2] && nGradMag>=anGradRow[(nColIter+1)*3+2]) // if current magnitude is a peak among neighbors
+                                if(isLocalMaximum_Horizontal<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep))
                                     goto _edge_good; // push as 'edge'
                             }
                             else { // else(nGradX_abs>=0.4142135623730950488016887242097*nGradX_abs) == not a flat gradient (sectors 1, 2 or 3)
                                 uint nTG67GradX_FPA = nTG22GradX_FPA+(nGradX_abs<<(nShift_FPA+1)); // == 2.4142135623730950488016887242097*nGradX_abs == tan(3*pi/8)*nGradX_abs
                                 if(nGradY_abs>nTG67GradX_FPA) { // if(nGradX_abs>2.4142135623730950488016887242097*nGradX_abs == vertical gradient (sector 2)
-                                    if(nGradMag>anGradRow[nColIter*3-nGradMapStep+2] && nGradMag>=anGradRow[nColIter*3+nGradMapStep+2])
+                                    if(isLocalMaximum_Vertical<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep))
                                         goto _edge_good;
                                 }
                                 else { // else(nGradX_abs<=2.4142135623730950488016887242097*nGradX_abs == diagonal gradient (sector 1 or 3, depending on grad sign diff)
-                                    const int nSignOffset = (std::signbit(nGradX)!=std::signbit(nGradY))?1:-1;
-                                    if(nGradMag>anGradRow[(nColIter-nSignOffset)*3-nGradMapStep+2] && nGradMag>anGradRow[(nColIter+nSignOffset)*3+nGradMapStep+2])
+                                    if(isLocalMaximum_Diagonal<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep,std::signbit(nGradX)==std::signbit(nGradY)))
                                         goto _edge_good;
                                 }
                             }
 #else //!USE_3_AXIS_ORIENT
-                            const uint nGradX_abs = (ushort)std::abs(anGradRow[nColIter*3]);
-                            const uint nGradY_abs = (ushort)std::abs(anGradRow[nColIter*3+1]);
-                            if((nGradY_abs<=nGradX_abs && nGradMag>anGradRow[(nColIter-1)*3+2] && nGradMag>=anGradRow[(nColIter+1)*3+2]) ||
-                               (nGradY_abs>nGradX_abs && nGradMag>anGradRow[nColIter*3-nGradMapStep+2] && nGradMag>=anGradRow[nColIter*3+nGradMapStep+2]))
+                            const uint nGradX_abs = (uint)std::abs(anGradRow[nColIter*nGradMapColStep]);
+                            const uint nGradY_abs = (uint)std::abs(anGradRow[nColIter*nGradMapColStep+1]);
+                            if((nGradY_abs<=nGradX_abs && isLocalMaximum_Horizontal<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep)) ||
+                               (nGradY_abs>nGradX_abs && isLocalMaximum_Vertical<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep)))
                                 goto _edge_good;
 #endif //!USE_3_AXIS_ORIENT
                         }
@@ -296,7 +349,7 @@ void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Ma
                         continue;
                         _edge_good:
                         // if not neighbor to previously identified edge, and gradmag above max threshold
-                        if(!nNeighbMax && nGradMag>=nHystHighThreshold && anEdgeMapRow[nColIter+nEdgeMapStep]!=2) {
+                        if(!nNeighbMax && nGradMag>=nHystHighThreshold && anEdgeMapRow[nColIter+nEdgeMapRowStep]!=2) {
                             stack_push(anEdgeMapRow+nColIter);
                             nNeighbMax = true;
                             continue;
@@ -308,57 +361,56 @@ void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Ma
             }
         }
     }
-    CV_DbgAssert(oEdgeTempMask.step.p[0]==nEdgeMapStep);
+    CV_DbgAssert(oEdgeTempMask.step.p[0]==nEdgeMapRowStep);
     while(pauHystStack_top>pauHystStack_bottom) {
         stack_check_size(8);
         uchar* pEdgeAddr = stack_pop();
-        if(!pEdgeAddr[-1])
-            stack_push(pEdgeAddr-1);
-        if(!pEdgeAddr[1])
-            stack_push(pEdgeAddr+1);
-        if(!pEdgeAddr[-nEdgeMapStep-1])
-            stack_push(pEdgeAddr-nEdgeMapStep-1);
-        if(!pEdgeAddr[-nEdgeMapStep])
-            stack_push(pEdgeAddr-nEdgeMapStep);
-        if(!pEdgeAddr[-nEdgeMapStep+1])
-            stack_push(pEdgeAddr-nEdgeMapStep+1);
-        if(!pEdgeAddr[nEdgeMapStep-1])
-            stack_push(pEdgeAddr+nEdgeMapStep-1);
-        if(!pEdgeAddr[nEdgeMapStep])
-            stack_push(pEdgeAddr+nEdgeMapStep);
-        if(!pEdgeAddr[nEdgeMapStep+1])
-            stack_push(pEdgeAddr+nEdgeMapStep+1);
+        if(!pEdgeAddr[-nEdgeMapColStep])
+            stack_push(pEdgeAddr-nEdgeMapColStep);
+        if(!pEdgeAddr[+nEdgeMapColStep])
+            stack_push(pEdgeAddr+nEdgeMapColStep);
+        if(!pEdgeAddr[-nEdgeMapRowStep-nEdgeMapColStep])
+            stack_push(pEdgeAddr-nEdgeMapRowStep-nEdgeMapColStep);
+        if(!pEdgeAddr[-nEdgeMapRowStep])
+            stack_push(pEdgeAddr-nEdgeMapRowStep);
+        if(!pEdgeAddr[-nEdgeMapRowStep+nEdgeMapColStep])
+            stack_push(pEdgeAddr-nEdgeMapRowStep+nEdgeMapColStep);
+        if(!pEdgeAddr[nEdgeMapRowStep-nEdgeMapColStep])
+            stack_push(pEdgeAddr+nEdgeMapRowStep-nEdgeMapColStep);
+        if(!pEdgeAddr[nEdgeMapRowStep])
+            stack_push(pEdgeAddr+nEdgeMapRowStep);
+        if(!pEdgeAddr[nEdgeMapRowStep+nEdgeMapColStep])
+            stack_push(pEdgeAddr+nEdgeMapRowStep+nEdgeMapColStep);
     }
-    const uchar* oEdgeTempMaskData = oEdgeTempMask.data+nEdgeMapStep+1;
+    const uchar* anEdgeTempMaskData = oEdgeTempMask.data+nEdgeMapRowStep*nNMSHalfWinSize+nEdgeMapColStep*nNMSHalfWinSize;
     uchar* oEdgeMaskData = oEdgeMask.data;
-    for(size_t nRowIter=0; nRowIter<oInputImg.rows; ++nRowIter, oEdgeTempMaskData+=nEdgeMapStep, oEdgeMaskData+=oEdgeMask.step)
+    for(size_t nRowIter=0; nRowIter<oInputImg.rows; ++nRowIter, anEdgeTempMaskData+=nEdgeMapRowStep, oEdgeMaskData+=oEdgeMask.step)
         for(size_t nColIter=0; nColIter<oInputImg.cols; ++nColIter)
-            oEdgeMaskData[nColIter] = (uchar)-(oEdgeTempMaskData[nColIter] >> 1);
+            oEdgeMaskData[nColIter] = (uchar)-(*(anEdgeTempMaskData+nColIter*nEdgeMapColStep)>>1);
 
-    std::vector<cv::Mat> voLBSPGradMap;
-    cv::split(oLBSPGradMap(cv::Rect(1,1,oInputImg.cols,oInputImg.rows)).clone(),voLBSPGradMap);
-    cv::Mat oGradX(voLBSPGradMap[0].size(),CV_16SC1,voLBSPGradMap[0].data);
+    /*std::vector<cv::Mat> voLBSPGradMap;
+    cv::split(oLBSPGradMap(cv::Rect(nNMSHalfWinSize,nNMSHalfWinSize,oInputImg.cols,oInputImg.rows)).clone(),voLBSPGradMap); // @@@@ clone?
+    cv::Mat oGradX(voLBSPGradMap[0].size(),CV_8SC1,voLBSPGradMap[0].data);
     cv::Mat oGradX_norm; cv::normalize(oGradX,oGradX_norm,0,255,cv::NORM_MINMAX,CV_8U);
-    cv::Mat oGradY(voLBSPGradMap[1].size(),CV_16SC1,voLBSPGradMap[1].data);
+    cv::Mat oGradY(voLBSPGradMap[1].size(),CV_8SC1,voLBSPGradMap[1].data);
     cv::Mat oGradY_norm; cv::normalize(oGradY,oGradY_norm,0,255,cv::NORM_MINMAX,CV_8U);
-    cv::Mat oGradMag(voLBSPGradMap[2].size(),CV_16UC1,voLBSPGradMap[2].data);
+    cv::Mat oGradMag(voLBSPGradMap[2].size(),CV_8UC1,voLBSPGradMap[2].data);
     cv::Mat oGradMag_norm; cv::normalize(oGradMag,oGradMag_norm,0,255,cv::NORM_MINMAX,CV_8U);
-
     cv::Mat concat = oGradX_norm.clone();
     cv::vconcat(concat,oGradY_norm,concat);
     cv::vconcat(concat,oGradMag_norm,concat);
-    cv::imshow("concat grad 0-1-2",concat);
+    cv::imshow("concat grad 0-1-2",concat);*/
     //cv::imshow("oEdgeMask",oEdgeMask);
     //cv::Mat test_canny_out;
     //litiv::cv_canny<3,true>(oInputImg,test_canny_out,double(nHystLowThreshold),double(nHystHighThreshold));
     //cv::imshow("test_canny_out",test_canny_out);
     //cv::waitKey(0);
 
-#elif USE_NMS_HYST_CANNY
+#elif USE_DOLLAR_STR_RAND_FOR
 
     //@@@@ WiP
 
-#endif //USE_NMS_HYST_CANNY
+#endif //USE_DOLLAR_STR_RAND_FOR
 }
 
 template void EdgeDetectorLBSP::apply_threshold_internal<1>(const cv::Mat&, cv::Mat&, uchar, uchar);
