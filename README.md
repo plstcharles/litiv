@@ -1,7 +1,7 @@
 LITIV Computer Vision Framework
 ===============================
 
-This framework contains various libraries, executables and scripts originating from R&D projects undertaken in the [LITIV lab (Laboratoire d'Interprétation et de Traitement d'Images et Vidéo)](http://www.polymtl.ca/litiv/en/), at Polytechnique Montreal. For now, it primarily consists of C++ implementations and utilities, most of which rely on [OpenCV](http://opencv.org/). Its build system is based on [CMake](https://cmake.org/), and its structure is inspired by OpenCV's. The framework should be compilable on most Unix/Windows systems given proper configuration (I personally use it on Ubuntu & Windows 7 w/ MSVC12).
+This framework contains various libraries, executables and scripts originating from R&D projects undertaken in the [LITIV lab (Laboratoire d'Interprétation et de Traitement d'Images et Vidéo)](http://www.polymtl.ca/litiv/en/), at Polytechnique Montreal. For now, it primarily consists of C++ implementations and utilities, most of which rely on [OpenCV](http://opencv.org/). Its build system is based on [CMake](https://cmake.org/), and its structure is inspired by OpenCV's. The framework should be compilable on most Unix/Windows systems given proper configuration (I personally use it on Ubuntu & Windows 10 w/ MSVC Community 2015).
 
 Most of the source code behind the LITIV framework is available under the [Apache 2.0 license](https://tldrlegal.com/license/apache-license-2.0-(apache-2.0)); see the LICENSE file for more information. Some third-party modules and utilities are provided under their own BSD ([2-clause](https://tldrlegal.com/license/bsd-2-clause-license-(freebsd)) or [3-clause](https://tldrlegal.com/license/bsd-3-clause-license-(revised))) licenses. Specific licensing details are available in each source file. While this means most of the LITIV framework source code may be used in distributed commercial applications, be aware that some algorithms therein (e.g. PBAS, VIBE) may be covered by patents in your country. More information is provided in the header files for these algorithms. Note that we will offer no legal advice on possible patent infrigements cases; the LITIV framework should be primarily used for testing, evaluation, research, and development purposes in an academic setting.
 
@@ -50,4 +50,3 @@ If you use a module from this framework in your own work, please cite its relate
 Contributing
 ------------
 If you have a something you'd like to contribute to the LITIV framework, send me a message first; I'll be happy to merge your code in if it fits with the rest of the framework.
-
