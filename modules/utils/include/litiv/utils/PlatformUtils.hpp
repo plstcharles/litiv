@@ -129,14 +129,14 @@ namespace PlatformUtils {
         vuVals.reserve(UCHAR_MAX+1);
         for(size_t n=0; n<UCHAR_MAX+1; ++n)
             if(anUniqueLUT[n])
-                vuVals.push_back(n);
+                vuVals.push_back((uchar)n);
         return vuVals;
     }
 
     template<typename T>
     size_t find_nn_index(T oReqVal, const std::vector<T>& voRefVals) {
-        decltype(DistanceUtils::L1dist(T(0),T(0))) oMinDist;
-        size_t nIdx = -1;
+        decltype(DistanceUtils::L1dist(T(0),T(0))) oMinDist = std::numeric_limits<decltype(DistanceUtils::L1dist(T(0),T(0)))>::max();
+        size_t nIdx = size_t(-1);
         for(size_t n=0; n<voRefVals.size(); ++n) {
             auto oCurrDist = DistanceUtils::L1dist(oReqVal,voRefVals[n]);
             if(nIdx==-1 || oCurrDist<oMinDist) {

@@ -19,8 +19,6 @@
 
 #include "litiv/video/BackgroundSubtractorLBSP.hpp"
 
-//! defines the default value for BackgroundSubtractorLBSP::m_fRelLBSPThreshold
-#define BGSSUBSENSE_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.333f)
 //! defines the default value for BackgroundSubtractorSuBSENSE::m_nDescDistThresholdOffset
 #define BGSSUBSENSE_DEFAULT_DESC_DIST_THRESHOLD_OFFSET (3)
 //! defines the default value for BackgroundSubtractorSuBSENSE::m_nMinColorDistThreshold
@@ -45,12 +43,12 @@
 class BackgroundSubtractorSuBSENSE : public BackgroundSubtractorLBSP<ParallelUtils::eNonParallel> {
 public:
     //! full constructor
-    BackgroundSubtractorSuBSENSE(float fRelLBSPThreshold=BGSSUBSENSE_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
-                                 size_t nDescDistThresholdOffset=BGSSUBSENSE_DEFAULT_DESC_DIST_THRESHOLD_OFFSET,
+    BackgroundSubtractorSuBSENSE(size_t nDescDistThresholdOffset=BGSSUBSENSE_DEFAULT_DESC_DIST_THRESHOLD_OFFSET,
                                  size_t nMinColorDistThreshold=BGSSUBSENSE_DEFAULT_MIN_COLOR_DIST_THRESHOLD,
                                  size_t nBGSamples=BGSSUBSENSE_DEFAULT_NB_BG_SAMPLES,
                                  size_t nRequiredBGSamples=BGSSUBSENSE_DEFAULT_REQUIRED_NB_BG_SAMPLES,
-                                 size_t nSamplesForMovingAvgs=BGSSUBSENSE_DEFAULT_N_SAMPLES_FOR_MV_AVGS);
+                                 size_t nSamplesForMovingAvgs=BGSSUBSENSE_DEFAULT_N_SAMPLES_FOR_MV_AVGS,
+                                 float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
     //! refreshes all samples based on the last analyzed frame
     virtual void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
     //! (re)initiaization method; needs to be called before starting background subtraction

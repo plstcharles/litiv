@@ -1,5 +1,5 @@
 
-#include "3rdparty/BSDS500/kofn.hh"
+#include "3rdparty/BSDS500/kofn.hpp"
 #include <random>
 #include <chrono>
 #include <cassert>
@@ -77,4 +77,3 @@ BSDS500::kOfN (int k, int n, int* values)
         _kOfN_largeK (k, n, values);
     }
 }
-

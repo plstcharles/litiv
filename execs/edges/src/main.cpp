@@ -171,8 +171,9 @@ int main(int, char**) {
             while(g_nActiveThreads>=g_nMaxThreads)
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             std::cout << "\tProcessing [" << ++nSetsProcessed << "/" << nSetsTotal << "] (" << pSetIter->second->m_sRelativePath << ", L=" << std::scientific << std::setprecision(2) << pSetIter->first << ")" << std::endl;
-            if(DATASET_PRECACHING)
-                pSetIter->second->StartPrecaching(EVALUATE_OUTPUT);
+#if DATASET_PRECACHING
+            pSetIter->second->StartPrecaching(EVALUATE_OUTPUT);
+#endif //DATASET_PRECACHING
 #if (HAVE_GLSL && USE_GLSL_IMPL)
             AnalyzeSet_GLSL(pSetIter->second);
 #elif (HAVE_CUDA && USE_CUDA_IMPL)
@@ -181,7 +182,7 @@ int main(int, char**) {
             static_assert(false,"missing impl");
 #elif !USE_GPU_IMPL
             ++g_nActiveThreads;
-            std::thread(AnalyzeSet,nSetsProcessed,pSetIter->second).detach();
+            std::thread(AnalyzeSet,(int)nSetsProcessed,pSetIter->second).detach();
 #endif //!USE_GPU_IMPL
         }
         while(g_nActiveThreads>0)
@@ -192,13 +193,15 @@ int main(int, char**) {
         const time_t nShutdownTime = time(nullptr);
         const std::string sShutdownTimeStr(asctime(localtime(&nShutdownTime)));
         std::cout << "[" << sShutdownTimeStr.substr(0,sShutdownTimeStr.size()-1) << "]\n" << std::endl;
-        if(EVALUATE_OUTPUT && nTotImagesProcessed==nImagesTotal) {
+#if EVALUATE_OUTPUT
+        if(nTotImagesProcessed==nImagesTotal) {
             std::cout << "Writing evaluation results..." << std::endl;
             g_pDatasetInfo->WriteEvalResults(vpDatasetGroups);
 
         }
-        else if(EVALUATE_OUTPUT && nTotImagesProcessed<nImagesTotal)
+        else //if(nTotImagesProcessed<nImagesTotal)
             std::cout << "Skipping eval results output, as some image sets were skipped." << std::endl;
+#endif //EVALUATE_OUTPUT
     }
     catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
     catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
@@ -410,8 +413,9 @@ void AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
     if(bGPUContextInitialized)
         glfwTerminate();
     if(pCurrSet.get()) {
-        if(DATASET_PRECACHING)
-            pCurrSet->StopPrecaching();
+#if DATASET_PRECACHING
+        pCurrSet->StopPrecaching();
+#endif //DATASET_PRECACHING
         pCurrSet->m_nImagesProcessed.set_value(nCurrImageIdx);
     }
 }
@@ -530,8 +534,9 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
     catch(...) {std::cout << "\nAnalyzeSequence caught unhandled exception\n" << std::endl;}
     g_nActiveThreads--;
     if(pCurrSet.get()) {
-        if(DATASET_PRECACHING)
-            pCurrSet->StopPrecaching();
+#if DATASET_PRECACHING
+        pCurrSet->StopPrecaching();
+#endif //DATASET_PRECACHING
         pCurrSet->m_nImagesProcessed.set_value(nCurrImageIdx);
     }
 }

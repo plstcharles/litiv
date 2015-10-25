@@ -31,14 +31,50 @@ class IBackgroundSubtractor :
 public:
     //! default impl constructor
     template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
-    IBackgroundSubtractor(size_t nROIBorderSize, typename std::enable_if<eImplTemp==ParallelUtils::eNonParallel>::type* pUnused=0);
+    IBackgroundSubtractor(size_t nROIBorderSize, typename std::enable_if<eImplTemp==ParallelUtils::eNonParallel>::type* /*pUnused*/=0) :
+        ParallelUtils::ParallelAlgo_<ParallelUtils::eNonParallel>(),
+        m_nROIBorderSize(nROIBorderSize),
+        m_nImgChannels(0),
+        m_nImgType(0),
+        m_nTotPxCount(0),
+        m_nTotRelevantPxCount(0),
+        m_nOrigROIPxCount(0),
+        m_nFinalROIPxCount(0),
+        m_nFrameIdx(SIZE_MAX),
+        m_nFramesSinceLastReset(0),
+        m_nModelResetCooldown(0),
+        m_bInitialized(false),
+        m_bModelInitialized(false),
+        m_bAutoModelResetEnabled(true),
+        m_bUsingMovingCamera(false),
+        m_nDebugCoordX(0),
+        m_nDebugCoordY(0),
+        m_pDebugFS(nullptr) {}
 #if HAVE_GLSL
     //! glsl impl constructor
     template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
     IBackgroundSubtractor(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
                           size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
                           bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize=0,
-                          typename std::enable_if<eImplTemp==ParallelUtils::eGLSL>::type* pUnused=0);
+                          typename std::enable_if<eImplTemp==ParallelUtils::eGLSL>::type* /*pUnused*/=0) :
+        ParallelUtils::ParallelAlgo_<ParallelUtils::eGLSL>(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,CV_8UC1,nDebugType,true,bUseDisplay,bUseTimers,bUseIntegralFormat),
+        m_nROIBorderSize(nROIBorderSize),
+        m_nImgChannels(0),
+        m_nImgType(0),
+        m_nTotPxCount(0),
+        m_nTotRelevantPxCount(0),
+        m_nOrigROIPxCount(0),
+        m_nFinalROIPxCount(0),
+        m_nFrameIdx(SIZE_MAX),
+        m_nFramesSinceLastReset(0),
+        m_nModelResetCooldown(0),
+        m_bInitialized(false),
+        m_bModelInitialized(false),
+        m_bAutoModelResetEnabled(true),
+        m_bUsingMovingCamera(false),
+        m_nDebugCoordX(0),
+        m_nDebugCoordY(0),
+        m_pDebugFS(nullptr) {}
 #endif //HAVE_GLSL
 #if HAVE_CUDA
     static_assert(eImpl!=ParallelUtils::eCUDA),"Missing constr impl");

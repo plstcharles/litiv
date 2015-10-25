@@ -17,16 +17,19 @@
 
 litiv_module(imgproc)
 
-file(GLOB SOURCE_FILES
-    "src/*.cpp"
+add_files(SOURCE_FILES
+    "src/EdgeDetectionUtils.cpp"
+    "src/EdgeDetectorCanny.cpp"
+    "src/imgproc.cpp"
 )
 
-file(GLOB INCLUDE_FILES
-    "litiv/${LITIV_CURRENT_MODULE_NAME}/*.hpp"
-    "litiv/${LITIV_CURRENT_MODULE_NAME}/*.ipp"
+add_files(INCLUDE_FILES
+    "include/litiv/imgproc/EdgeDetectionUtils.hpp"
+    "include/litiv/imgproc/EdgeDetectorCanny.hpp"
+    "include/litiv/imgproc.hpp"
 )
 
-add_library(${LITIV_CURRENT_PROJECT_NAME} STATIC ${SOURCE_FILES})
+add_library(${LITIV_CURRENT_PROJECT_NAME} STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
 
 target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} litiv_features2d)
 target_include_directories(${LITIV_CURRENT_PROJECT_NAME}
@@ -34,6 +37,6 @@ target_include_directories(${LITIV_CURRENT_PROJECT_NAME}
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
     INTERFACE "$<INSTALL_INTERFACE:include/>"
 )
-
+set_target_properties(${LITIV_CURRENT_PROJECT_NAME} PROPERTIES FOLDER "modules")
 #install(TARGETS ${LITIV_CURRENT_PROJECT_NAME} DESTINATION lib)
 install(FILES ${INCLUDE_FILES} DESTINATION include)

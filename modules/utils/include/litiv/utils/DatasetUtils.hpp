@@ -68,8 +68,8 @@ namespace DatasetUtils {
     };
 
     struct EvaluatorBase;
-    struct WorkBatch;
-    struct WorkGroup;
+    class WorkBatch;
+    class WorkGroup;
 
     struct DatasetInfoBase {
         DatasetInfoBase();

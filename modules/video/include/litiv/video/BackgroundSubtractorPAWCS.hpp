@@ -19,8 +19,6 @@
 
 #include "litiv/video/BackgroundSubtractorLBSP.hpp"
 
-//! defines the default value for BackgroundSubtractorLBSP::m_fRelLBSPThreshold
-#define BGSPAWCS_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.333f)
 //! defines the default value for BackgroundSubtractorPAWCS::m_nDescDistThresholdOffset
 #define BGSPAWCS_DEFAULT_DESC_DIST_THRESHOLD_OFFSET (2)
 //! defines the default value for BackgroundSubtractorPAWCS::m_nMinColorDistThreshold
@@ -42,11 +40,11 @@
 class BackgroundSubtractorPAWCS : public BackgroundSubtractorLBSP<ParallelUtils::eNonParallel> {
 public:
     //! full constructor
-    BackgroundSubtractorPAWCS(float fRelLBSPThreshold=BGSPAWCS_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
-                              size_t nDescDistThresholdOffset=BGSPAWCS_DEFAULT_DESC_DIST_THRESHOLD_OFFSET,
+    BackgroundSubtractorPAWCS(size_t nDescDistThresholdOffset=BGSPAWCS_DEFAULT_DESC_DIST_THRESHOLD_OFFSET,
                               size_t nMinColorDistThreshold=BGSPAWCS_DEFAULT_MIN_COLOR_DIST_THRESHOLD,
                               size_t nMaxNbWords=BGSPAWCS_DEFAULT_MAX_NB_WORDS,
-                              size_t nSamplesForMovingAvgs=BGSPAWCS_DEFAULT_N_SAMPLES_FOR_MV_AVGS);
+                              size_t nSamplesForMovingAvgs=BGSPAWCS_DEFAULT_N_SAMPLES_FOR_MV_AVGS,
+                              float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
     //! default destructor
     virtual ~BackgroundSubtractorPAWCS();
     //! refreshes all local (+ global) dictionaries based on the last analyzed frame

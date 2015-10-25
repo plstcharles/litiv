@@ -23,6 +23,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 include(FrameworkUtils)
 include(GetGitRevisionDescription)
 get_git_head_revision(GIT_REFSPEC GIT_SHA1)
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
 project(litiv_framework)
@@ -35,9 +36,6 @@ set(LITIV_FRAMEWORK_VERSION_PATCH 0)
 set(LITIV_FRAMEWORK_VERSION ${LITIV_FRAMEWORK_VERSION_MAJOR}.${LITIV_FRAMEWORK_VERSION_MINOR}.${LITIV_FRAMEWORK_VERSION_PATCH})
 set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:DEBUG>)
 set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:_DEBUG>)
-
-option(USE_FAST_MATH "Enable fast math optimizations" OFF)
-set(GLOBAL_DATASET_ROOT_PATH "/shared2/datasets/" CACHE STRING "Global dataset root folder for exec projects")
 
 ### OPENCV CHECK
 find_package(OpenCV 3.0 REQUIRED)
@@ -74,8 +72,9 @@ if(USE_GLSL)
     set(TARGET_GL_VER_MAJOR 4 CACHE STRING "Target OpenGL profile major version")
     set(TARGET_GL_VER_MINOR 4 CACHE STRING "Target OpenGL profile minor version")
     option(GLEW_EXPERIMENTAL "Use experimental GLEW features" ON)
+else(NOT USE_GLSL)
+    message(WARNING "Missing OpenGL library(ies), vptz & GLSL implementations will be disabled")
 endif(USE_GLSL)
-message(STATUS USE_GLSL=${USE_GLSL})
 
 ### CUDA CHECK @@@@ add later for parallel utils & impls
 set_eval(USE_CUDA 0)
@@ -108,6 +107,9 @@ else(CMAKE_CROSSCOMPILING)
     try_cvhardwaresupport_runcheck_and_set_success(AVX)
     try_cvhardwaresupport_runcheck_and_set_success(AVX2)
 endif(CMAKE_CROSSCOMPILING)
+
+option(USE_FAST_MATH "Enable fast math optimizations" OFF)
+set(GLOBAL_DATASET_ROOT_PATH "/shared2/datasets/" CACHE STRING "Global dataset root folder for exec projects")
 if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang"))
     if(NOT CMAKE_CROSSCOMPILING)
         add_definitions(-march=native)
@@ -120,6 +122,8 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
     add_definitions(-Wshadow)
     add_definitions(-Wfatal-errors)
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+    add_definitions(-DUNICODE -D_UNICODE)
+    add_definitions(-D_SCL_SECURE_NO_WARNINGS)
     if(USE_FAST_MATH)
         add_definitions(/fp:fast)
     else(NOT USE_FAST_MATH)
@@ -141,7 +145,7 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
     add_definitions(-Werror)
     add_definitions(-pedantic-errors)
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-    #add_definitions(/WX) # re-test later, lots of incompatibilities on older toolchains @@@@
+    add_definitions(/W4)
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
     # ... @@@
 endif()

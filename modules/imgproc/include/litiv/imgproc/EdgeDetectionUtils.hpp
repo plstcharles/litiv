@@ -30,14 +30,27 @@ class IEdgeDetector :
 public:
     //! default impl constructor
     template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
-    IEdgeDetector(size_t nROIBorderSize, typename std::enable_if<eImplTemp==ParallelUtils::eNonParallel>::type* pUnused=0);
+    IEdgeDetector(size_t nROIBorderSize, typename std::enable_if<eImplTemp==ParallelUtils::eNonParallel>::type* /*pUnused*/=0) :
+            ParallelUtils::ParallelAlgo_<ParallelUtils::eNonParallel>(),
+            m_nROIBorderSize(nROIBorderSize),
+            m_nDebugCoordX(0),
+            m_nDebugCoordY(0),
+            m_pDebugFS(nullptr) {}
 #if HAVE_GLSL
     //! glsl impl constructor
     template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
     IEdgeDetector(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
                   size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
                   bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize=0,
-                  typename std::enable_if<eImplTemp==ParallelUtils::eGLSL>::type* pUnused=0);
+                  typename std::enable_if<eImplTemp==ParallelUtils::eGLSL>::type* /*pUnused*/=0) :
+            ParallelUtils::ParallelAlgo_<ParallelUtils::eGLSL>(nLevels,nComputeStages,nExtraSSBOs,
+                                                               nExtraACBOs,nExtraImages,nExtraTextures,
+                                                               CV_8UC1,nDebugType,true,bUseDisplay,
+                                                               bUseTimers,bUseIntegralFormat),
+            m_nROIBorderSize(nROIBorderSize),
+            m_nDebugCoordX(0),
+            m_nDebugCoordY(0),
+            m_pDebugFS(nullptr) {}
 #endif //HAVE_GLSL
 #if HAVE_CUDA
     static_assert(eImpl!=ParallelUtils::eCUDA),"Missing constr impl");

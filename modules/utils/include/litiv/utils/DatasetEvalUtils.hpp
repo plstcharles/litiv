@@ -115,7 +115,7 @@ namespace DatasetUtils {
                 static Metrics WriteEvalResults(const WorkBatch& oBatch);
                 static Metrics CalcMetrics(const std::vector<std::shared_ptr<WorkGroup>>& vpGroups, bool bAverage);
                 static Metrics CalcMetrics(const WorkGroup& oGroup, bool bAverage);
-                friend class DatasetInfo;
+                friend struct DatasetInfo;
             };
 
             struct CDnetEvaluator : public BinarySegmEvaluator {
@@ -176,7 +176,7 @@ namespace DatasetUtils {
                 static void WriteEvalResults(const WorkBatch& oBatch, BSDS500Metrics& oRes);
                 static BSDS500Score FindMaxFMeasure(const std::vector<uchar>& vnThresholds, const std::vector<double>& vdRecall, const std::vector<double>& vdPrecision);
                 static BSDS500Score FindMaxFMeasure(const std::vector<BSDS500Score>& voScores);
-                friend class DatasetInfo;
+                friend struct DatasetInfo;
             };
 
         } //namespace Image

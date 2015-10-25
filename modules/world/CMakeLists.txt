@@ -29,16 +29,18 @@ configure_file(
 )
 unset(CMAKE_CONFIGURABLE_FILE_CONTENT)
 
-file(GLOB SOURCE_FILES
-    "src/*.cpp"
+add_files(SOURCE_FILES
+    "src/world.cpp"
 )
 
-file(GLOB INCLUDE_FILES
-    "litiv/*.hpp"
-    "litiv/*.ipp"
+add_files(INCLUDE_FILES
+    "include/litiv/world.hpp"
 )
-
-add_library(litiv_world SHARED ${SOURCE_FILES})
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+    add_library(litiv_world STATIC ${SOURCE_FILES} ${INCLUDE_FILES}) # need to add API export/import config later @@@@
+else(NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+    add_library(litiv_world SHARED ${SOURCE_FILES} ${INCLUDE_FILES})
+endif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
 
 target_link_libraries(litiv_world ${litiv_projects})
 target_include_directories(litiv_world
@@ -46,6 +48,6 @@ target_include_directories(litiv_world
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
     INTERFACE "$<INSTALL_INTERFACE:include/>"
 )
-
+set_target_properties(litiv_world PROPERTIES FOLDER "modules")
 install(TARGETS litiv_world DESTINATION lib)
 install(FILES ${INCLUDE_FILES} DESTINATION include)

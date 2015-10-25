@@ -103,7 +103,7 @@ public:
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
     template<size_t nChannels, typename Tt, typename Tr>
-    inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, Tr _res[nChannels]) {
+    inline static void computeDescriptor(const cv::Mat& oInputImg, const uchar* const _ref, const int _x, const int _y, const std::array<Tt,nChannels>& _t, Tr _res) {
         alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE_BITS>,nChannels> _aanVals;
         computeDescriptor_lookup(oInputImg,_x,_y,_aanVals);
         for(size_t _c=0; _c<nChannels; ++_c)
@@ -187,7 +187,7 @@ protected:
     cv::Mat m_oRefImage;
 
     template<size_t nChannels, typename Tv, typename Tr>
-    inline static void lookup_16bits_dbcross(const Tv& _data, const int _x, const int _y, const int _c, const int _step_row, Tr& _anVals) {
+    inline static void lookup_16bits_dbcross(const Tv& _data, const int _x, const int _y, const size_t _c, const size_t _step_row, Tr& _anVals) {
         // note: this is the LBSP 16 bit double-cross indiv RGB/RGBA pattern as used in the original article by G.-A. Bilodeau et al.
         //
         //  O   O   O          4 ..  3 ..  6
@@ -226,10 +226,10 @@ protected:
         // @@@@ send <16byte back to non-sse, and >16 to loop via template enableif?
         CV_DbgAssert(((uintptr_t)(&_anVals[0])&15)==0);
         __m128i _anMMXVals = _mm_load_si128((__m128i*)&_anVals[0]);
-        __m128i _anRefVals = _mm_set1_epi8(char(_ref));
+        __m128i _anRefVals = _mm_set1_epi8(_ref);
 #if HAVE_SSE4_1
         __m128i _anDistVals = _mm_sub_epi8(_mm_max_epu8(_anMMXVals,_anRefVals),_mm_min_epu8(_anMMXVals,_anRefVals));
-        __m128i _abCmpRes = _mm_cmpgt_epi8(_mm_xor_si128(_anDistVals,_mm_set1_epi8(char(0x80))),_mm_set1_epi8(char(_t^0x80)));
+        __m128i _abCmpRes = _mm_cmpgt_epi8(_mm_xor_si128(_anDistVals,_mm_set1_epi8(uchar(0x80))),_mm_set1_epi8(uchar(_t^0x80)));
 #else //HAVE_SSE2
         __m128i _anBitFlipper = _mm_set1_epi8(char(0x80));
         __m128i _anDistVals = _mm_xor_si128(_anMMXVals,_anBitFlipper);
@@ -238,9 +238,9 @@ protected:
         __m128i _anDistVals1 = _mm_sub_epi8(_anDistVals,_anRefVals);
         __m128i _anDistVals2 = _mm_sub_epi8(_anRefVals,_anDistVals);
         _anDistVals = _mm_or_si128(_mm_and_si128(_abCmpRes,_anDistVals1),_mm_andnot_si128(_abCmpRes,_anDistVals2));
-        _abCmpRes = _mm_cmpgt_epi8(_mm_xor_si128(_anDistVals,_anBitFlipper),_mm_set1_epi8(char(_t^0x80)));
+        _abCmpRes = _mm_cmpgt_epi8(_mm_xor_si128(_anDistVals,_anBitFlipper),_mm_set1_epi8(uchar(_t^0x80)));
 #endif //HAVE_SSE20x80u
-        _anResVal = _mm_movemask_epi8(_abCmpRes);
+        _anResVal = (Tr)_mm_movemask_epi8(_abCmpRes);
 #endif //(HAVE_SSE4_1 || HAVE_SSE2)
     }
 };

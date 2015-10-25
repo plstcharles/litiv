@@ -21,7 +21,7 @@
 #define PRECACHE_CONSOLE_DEBUG             0
 #define PRECACHE_REQUEST_TIMEOUT_MS        1
 #define PRECACHE_QUERY_TIMEOUT_MS          10
-#define PRECACHE_MAX_CACHE_SIZE_GB         6L
+#define PRECACHE_MAX_CACHE_SIZE_GB         6LLU
 #define PRECACHE_MAX_CACHE_SIZE            (((PRECACHE_MAX_CACHE_SIZE_GB*1024)*1024)*1024)
 #if (!(defined(_M_X64) || defined(__amd64__)) && PRECACHE_MAX_CACHE_SIZE_GB>2)
 #error "Cache max size exceeds system limit (x86)."
@@ -121,7 +121,7 @@ const cv::Mat& DatasetUtils::ImagePrecacher::GetImageFromIndex(size_t nIdx) {
 bool DatasetUtils::ImagePrecacher::StartPrecaching(size_t nTotImageCount, size_t nSuggestedBufferSize) {
     static_assert(PRECACHE_REQUEST_TIMEOUT_MS>0,"Precache request timeout must be a positive value");
     static_assert(PRECACHE_QUERY_TIMEOUT_MS>0,"Precache query timeout must be a positive value");
-    static_assert(PRECACHE_MAX_CACHE_SIZE>=0,"Precache size must be a non-negative value");
+    static_assert(PRECACHE_MAX_CACHE_SIZE>=(size_t)0,"Precache size must be a non-negative value");
     CV_Assert(nTotImageCount);
     m_nTotImageCount = nTotImageCount;
     if(m_bIsPrecaching)
@@ -303,7 +303,7 @@ DatasetUtils::WorkBatch::WorkBatch(const std::string& sBatchName, const DatasetI
 cv::Mat DatasetUtils::WorkBatch::ReadResult(size_t nIdx) {
     CV_Assert(!m_sResultNameSuffix.empty());
     std::array<char,10> acBuffer;
-    snprintf(acBuffer.data(),acBuffer.size(),"%06lu",nIdx);
+    snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
     std::stringstream sResultFilePath;
     sResultFilePath << m_sResultsPath << m_sResultNamePrefix << acBuffer.data() << m_sResultNameSuffix;
     return cv::imread(sResultFilePath.str(),m_bForcingGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
@@ -312,7 +312,7 @@ cv::Mat DatasetUtils::WorkBatch::ReadResult(size_t nIdx) {
 void DatasetUtils::WorkBatch::WriteResult(size_t nIdx, const cv::Mat& oResult) {
     CV_Assert(!m_sResultNameSuffix.empty());
     std::array<char,10> acBuffer;
-    snprintf(acBuffer.data(),acBuffer.size(),"%06lu",nIdx);
+    snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
     std::stringstream sResultFilePath;
     sResultFilePath << m_sResultsPath << m_sResultNamePrefix << acBuffer.data() << m_sResultNameSuffix;
     const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
@@ -776,7 +776,7 @@ DatasetUtils::Segm::Image::Set::Set(const std::string& sSetName, const DatasetIn
         }
         else { //m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid || m_eDatasetID==eDataset_BSDS500_segm_train_valid_test
             // current impl cannot parse GT/evaluate (matlab files only)
-            CV_Assert(false);
+            CV_Error(0,"missing impl");
         }
     }
     else if(m_eDatasetID==eDataset_Custom) {

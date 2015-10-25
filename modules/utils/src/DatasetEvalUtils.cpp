@@ -706,9 +706,9 @@ void DatasetUtils::Segm::Video::CDnetEvaluator::AccumulateMetricsFromResult(cons
 #ifdef _MSC_VER
 #pragma warning(push,0)
 #endif //defined(_MSC_VER)
-#include "3rdparty/BSDS500/csa.hh"
-#include "3rdparty/BSDS500/kofn.hh"
-#include "3rdparty/BSDS500/match.hh"
+#include "3rdparty/BSDS500/csa.hpp"
+#include "3rdparty/BSDS500/kofn.hpp"
+#include "3rdparty/BSDS500/match.hpp"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif //defined(_MSC_VER)
@@ -791,14 +791,10 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
         uint64_t nIndivTP = 0;
         uint64_t nGTPosCount = 0;
 
-        // CSA code needs integer weights.  Use this multiplier to convert
-        // floating-point weights to integers.
-        static const int multiplier = 100;
-        // The degree of outlier connections.
-        static const int degree = 6;
-        CV_Assert(degree > 0);
-        CV_Assert(multiplier > 0);
-
+        static constexpr int multiplier = 100;
+        static constexpr int degree = 6;
+        static_assert(degree>0,"csa config bad; degree of outlier connections should be > 0");
+        static_assert(multiplier>0,"csa config bad; floating-point weights to integers should be > 0");
 
         for(size_t nGTMaskIdx=0; nGTMaskIdx<size_t(oGTSegmMask.rows/oCurrSegmMask.rows); ++nGTMaskIdx) {
             cv::Mat oCurrGTSegmMask = oGTSegmMask(cv::Rect(0,int(oCurrSegmMask.rows*nGTMaskIdx),oCurrSegmMask.cols,oCurrSegmMask.rows));
@@ -901,7 +897,7 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
 
             // Count the number of edges.
             int m = 0;
-            m += voEdges.size();              // real connections
+            m += (int)voEdges.size();              // real connections
             m += degree_SEGM*nNodeCount_SEGM; // outlier connections
             m += degree_GT*nNodeCount_GT;     // outlier connections
             m += degree_mix*nmax;             // outlier-outlier connections

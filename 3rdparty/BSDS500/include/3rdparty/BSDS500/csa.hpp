@@ -15,7 +15,7 @@
 #include <malloc.h>
 #endif
 #include <sys/types.h>
-#include <sys/times.h>
+//#include <sys/times.h>
 
 // NOTE: This code has been tested with the following options only:
 #define QUICK_MIN
@@ -25,8 +25,8 @@
 
 namespace BSDS500 {
 
-    #include "3rdparty/BSDS500/csa_types.h"
-    #include "3rdparty/BSDS500/csa_defs.h"
+    #include "3rdparty/BSDS500/csa_types.hpp"
+    #include "3rdparty/BSDS500/csa_defs.hpp"
 
     class CSA
     {
@@ -83,22 +83,18 @@ namespace BSDS500 {
         double_pushes = 0,
                    pushes = 0,
               relabelings = 0,
-                  refines = 0,
-              refine_time = 0;
+                  refines = 0;
     #ifdef	USE_P_REFINE
         p_refines = 0,
-              r_scans = 0,
-        p_refine_time = 0;
+              r_scans = 0;
     #endif
     #ifdef	USE_P_UPDATE
         p_updates = 0,
-              u_scans = 0,
-        p_update_time = 0;
+              u_scans = 0;
     #endif
     #ifdef	USE_SP_AUG
             sp_augs = 0,
-            a_scans = 0,
-        sp_aug_time = 0;
+            a_scans = 0;
     #endif
     #ifdef	STRONG_PO
         fix_ins = 0;
@@ -175,22 +171,18 @@ namespace BSDS500 {
     unsigned	double_pushes,
             pushes,
             relabelings,
-            refines,
-            refine_time;
+            refines;
     #ifdef	USE_P_REFINE
     unsigned	p_refines,
-            r_scans,
-            p_refine_time;
+            r_scans;
     #endif
     #ifdef	USE_P_UPDATE
     unsigned	p_updates,
-            u_scans,
-            p_update_time;
+            u_scans;
     #endif
     #ifdef	USE_SP_AUG
     unsigned	sp_augs,
-            a_scans,
-            sp_aug_time;
+            a_scans;
     #endif
     #ifdef	STRONG_PO
     unsigned	fix_ins;
@@ -451,8 +443,6 @@ namespace BSDS500 {
     min_epsilon = 1.0 / (double) (n + 1);
     #endif
 
-    time = myclock();
-
     #ifdef	USE_P_REFINE
     (void) update_epsilon();
     refine();
@@ -460,12 +450,6 @@ namespace BSDS500 {
 
     while (epsilon > min_epsilon)
       {
-    #ifdef	VERBOSE_TIME
-    /*
-      (void) fprintf(stderr,"CSA: |>   Epsilon = %lg; time = %lg\n",
-            epsilon, ((double) (myclock() - time)) / 60.0);
-    */
-    #endif
     #ifdef	USE_P_REFINE
       if (!update_epsilon() || !p_refine())
         refine();
@@ -474,8 +458,6 @@ namespace BSDS500 {
       refine();
     #endif
       }
-
-    time = myclock() - time;
 
      store_results();
     return(0);
@@ -647,7 +629,7 @@ namespace BSDS500 {
     #define	NONCONTIG	1007	/* Node id numbers not contiguous */
     #define NOMEM		1008	/* Not enough memory */
 
-    static char* err_messages[];
+    static const char* err_messages[];
 
     void parse_error(int err_index)
 
@@ -1120,7 +1102,6 @@ namespace BSDS500 {
     WORK_TYPE	old_refine_work_po;
     #endif
 
-    refine_time -= myclock();
     refines++;
     /*
     Saturate all negative arcs: Negative arcs are exactly those
@@ -1188,14 +1169,13 @@ namespace BSDS500 {
       sp_aug();
     #endif
 
-    refine_time += myclock();
     }
 
     ///////////////////////////////////////////////////////////////////////////
     // stack.c ////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////
 
-    static char* nomem_msg;
+    static const char* nomem_msg;
 
     void	st_reset(stack s)
 
@@ -1237,19 +1217,6 @@ namespace BSDS500 {
     {
         free(s->bottom);
         free(s);
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-    // timer.c ////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////
-
-    unsigned	myclock()
-
-    {
-    struct tms hold;
-
-    (void) times(&hold);
-    return(hold.tms_utime);
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -1738,7 +1705,6 @@ namespace BSDS500 {
     long	balance, level;
     lr_aptr	a, a_stop;
 
-    p_update_time -= myclock();
     p_updates++;
 
     #ifdef	DEBUG
@@ -1848,8 +1814,6 @@ namespace BSDS500 {
       if (w->key >= 0)
         w->p -= delta_c;
       }
-
-    p_update_time += myclock();
     }
 
     #endif
@@ -2019,7 +1983,6 @@ namespace BSDS500 {
     lhs_ptr	*save_top = save_active,
         *active_node;
 
-    sp_aug_time -= myclock();
     sp_augs++;
 
     #ifdef	DEBUG
@@ -2132,8 +2095,6 @@ namespace BSDS500 {
          exit(1);
          }
     #endif
-
-    sp_aug_time += myclock();
     }
 
     #endif
@@ -2233,8 +2194,6 @@ namespace BSDS500 {
     unsigned	long	level;
     long	k;
     double	delta_c, this_cost;
-
-    sp_aug_time -= myclock();
     sp_augs++;
 
     #ifdef	DEBUG
@@ -2350,8 +2309,6 @@ namespace BSDS500 {
       check_e_o(epsilon);
     #endif
       }
-
-    sp_aug_time += myclock();
     }
 
     #endif
@@ -2529,8 +2486,6 @@ namespace BSDS500 {
     long	wk, xk, max_key = 0;
     int	eps_opt = FALSE;
     register	double	w_to_x_cost, p;
-
-    p_refine_time -= myclock();
     p_refines++;
 
     while (top_sort() && !eps_opt)
@@ -2573,7 +2528,6 @@ namespace BSDS500 {
         }
       }
 
-    p_refine_time += myclock();
     return(eps_opt);
     }
 

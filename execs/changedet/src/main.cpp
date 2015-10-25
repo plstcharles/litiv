@@ -38,7 +38,7 @@
 #define USE_LOBSTER             1
 #define USE_SUBSENSE            0
 ////////////////////////////////
-#define USE_GLSL_IMPL           1
+#define USE_GLSL_IMPL           0
 #define USE_CUDA_IMPL           0
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
@@ -201,8 +201,9 @@ int main(int, char**) {
             while(g_nActiveThreads>=g_nMaxThreads)
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             std::cout << "\tProcessing [" << ++nSeqProcessed << "/" << nSeqTotal << "] (" << pSeqIter->second->m_sRelativePath << ", L=" << std::scientific << std::setprecision(2) << pSeqIter->first << ")" << std::endl;
-            if(DATASET_PRECACHING)
-                pSeqIter->second->StartPrecaching(EVALUATE_OUTPUT);
+#if DATASET_PRECACHING
+            pSeqIter->second->StartPrecaching(EVALUATE_OUTPUT);
+#endif //DATASET_PRECACHING
 #if (HAVE_GLSL && USE_GLSL_IMPL)
             AnalyzeSequence_GLSL(pSeqIter->second);
 #elif (HAVE_CUDA && USE_CUDA_IMPL)
@@ -211,7 +212,7 @@ int main(int, char**) {
             static_assert(false,"missing impl");
 #elif !USE_GPU_IMPL
             ++g_nActiveThreads;
-            std::thread(AnalyzeSequence,nSeqProcessed,pSeqIter->second).detach();
+            std::thread(AnalyzeSequence,(int)nSeqProcessed,pSeqIter->second).detach();
 #endif //!USE_GPU_IMPL
         }
         while(g_nActiveThreads>0)
@@ -487,8 +488,9 @@ void AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> p
     if(bGPUContextInitialized)
         glfwTerminate();
     if(pCurrSequence.get()) {
-        if(DATASET_PRECACHING)
-            pCurrSequence->StopPrecaching();
+#if DATASET_PRECACHING
+        pCurrSequence->StopPrecaching();
+#endif //DATASET_PRECACHING
         pCurrSequence->m_nImagesProcessed.set_value(nCurrFrameIdx);
     }
 }
@@ -656,8 +658,9 @@ void AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::
     catch(...) {std::cout << "\nAnalyzeSequence caught unhandled exception\n" << std::endl;}
     g_nActiveThreads--;
     if(pCurrSequence.get()) {
-        if(DATASET_PRECACHING)
-            pCurrSequence->StopPrecaching();
+#if DATASET_PRECACHING
+        pCurrSequence->StopPrecaching();
+#endif //DATASET_PRECACHING
         pCurrSequence->m_nImagesProcessed.set_value(nCurrFrameIdx);
     }
 }

@@ -17,12 +17,17 @@
 
 #pragma once
 
-#if __cplusplus<201103L
+#ifdef _MSC_VER
+#if _MSC_VER<1900 // requires at least MSVC 2015 toolchain for constexpr support
+#error "This project requires C++11 support w/ constexpr -- MSVC 2015 minimum."
+#endif //_MSC_VER<...
+#elif __cplusplus<201103L
 #error "This project requires C++11 support."
 #endif //__cplusplus<=201103L
 
 #include <cmath>
 #include <mutex>
+#include <array>
 #include <vector>
 #include <thread>
 #include <chrono>
@@ -95,7 +100,7 @@ namespace CxxUtils {
         inline ~AlignAllocator() throw() {}
         inline pointer address(reference r) {return std::addressof(r);}
         inline const_pointer address(const_reference r) const noexcept {return std::addressof(r);}
-#if PLATFORM_USES_WIN32API
+#ifdef _MSC_VER
         inline pointer allocate(size_type n) {
             const size_type alignment = static_cast<size_type>(nByteAlign);
             const size_type alignment = static_cast<size_type>(nByteAlign);
@@ -110,7 +115,7 @@ namespace CxxUtils {
             return reinterpret_cast<pointer>(ptr);
         }
         inline void deallocate(pointer p, size_type) noexcept {_aligned_free(p);}
-#else //!PLATFORM_USES_WIN32API
+#else //!def(_MSC_VER)
         inline pointer allocate(size_type n) {
             const size_type alignment = static_cast<size_type>(nByteAlign);
             size_t alloc_size = n*sizeof(value_type);
@@ -124,7 +129,7 @@ namespace CxxUtils {
             return reinterpret_cast<pointer>(ptr);
         }
         inline void deallocate(pointer p, size_type) noexcept {free(p);}
-#endif //!PLATFORM_USES_WIN32API
+#endif //!def(_MSC_VER)
         template<class T2, class ...Args> inline void construct(T2* p, Args&&... args) {::new(reinterpret_cast<void*>(p)) T2(std::forward<Args>(args)...);}
         inline void construct(pointer p, const value_type& wert) {new(p) value_type(wert);}
         inline void destroy(pointer p) {p->~value_type();}
@@ -133,6 +138,7 @@ namespace CxxUtils {
         bool operator==(const AlignAllocator<T,nByteAlign>& other) const {return true;}
     };
 
+#ifndef _MSC_VER // meta-str-concat below does not seem to compile properly w/ MSVC toolchain... @@@@
     template<char... str> struct MetaStr {
         static constexpr char value[] = {str...};
     };
@@ -165,6 +171,7 @@ namespace CxxUtils {
     struct MetaITOA<0> {
         using type = MetaStr<'0'>;
     };
+#endif //!def(_MSC_VER)
 
     struct UncaughtExceptionLogger {
         UncaughtExceptionLogger(const char* sFunc, const char* sFile, int nLine) :

@@ -87,10 +87,9 @@ static const size_t s_nDescMaxDataRange_1ch = LBSP::DESC_SIZE_BITS;
 static const size_t s_nColorMaxDataRange_3ch = s_nColorMaxDataRange_1ch*3;
 static const size_t s_nDescMaxDataRange_3ch = s_nDescMaxDataRange_1ch*3;
 
-BackgroundSubtractorPAWCS::BackgroundSubtractorPAWCS(float fRelLBSPThreshold, size_t nDescDistThresholdOffset,
-                                                     size_t nMinColorDistThreshold, size_t nMaxNbWords,
-                                                     size_t nSamplesForMovingAvgs) :
-        BackgroundSubtractorLBSP<ParallelUtils::eNonParallel>(fRelLBSPThreshold,0),
+BackgroundSubtractorPAWCS::BackgroundSubtractorPAWCS(size_t nDescDistThresholdOffset, size_t nMinColorDistThreshold, size_t nMaxNbWords,
+                                                     size_t nSamplesForMovingAvgs, float fRelLBSPThreshold) :
+        BackgroundSubtractorLBSP<ParallelUtils::eNonParallel>(fRelLBSPThreshold),
         m_nMinColorDistThreshold(nMinColorDistThreshold),
         m_nDescDistThresholdOffset(nDescDistThresholdOffset),
         m_nMaxLocalWords(nMaxNbWords),
@@ -774,7 +773,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                 fCurrMeanRawSegmRes_ST = fCurrMeanRawSegmRes_ST*(1.0f-fRollAvgFactor_ST) + fRollAvgFactor_ST;
                 if(bCurrRegionIsFlat || (rand()%nCurrLocalWordUpdateRate)==0) {
                     size_t nGlobalWordLUTIdx;
-                    GlobalWord_1ch* pCurrGlobalWord;
+                    GlobalWord_1ch* pCurrGlobalWord = nullptr;
                     for(nGlobalWordLUTIdx=0; nGlobalWordLUTIdx<m_nCurrGlobalWords; ++nGlobalWordLUTIdx) {
                         pCurrGlobalWord = (GlobalWord_1ch*)m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordLUTIdx];
                         if(DistanceUtils::L1dist(pCurrGlobalWord->oFeature.anColor[0],nCurrColor)<=nCurrColorDistThreshold &&
@@ -1112,7 +1111,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                 fCurrMeanRawSegmRes_ST = fCurrMeanRawSegmRes_ST*(1.0f-fRollAvgFactor_ST) + fRollAvgFactor_ST;
                 if(bCurrRegionIsFlat || (rand()%nCurrLocalWordUpdateRate)==0) {
                     size_t nGlobalWordLUTIdx;
-                    GlobalWord_3ch* pCurrGlobalWord;
+                    GlobalWord_3ch* pCurrGlobalWord = nullptr;
                     for(nGlobalWordLUTIdx=0; nGlobalWordLUTIdx<m_nCurrGlobalWords; ++nGlobalWordLUTIdx) {
                         pCurrGlobalWord = (GlobalWord_3ch*)m_voPxInfoLUT_PAWCS[nPxIter].vpGlobalDictSortLUT[nGlobalWordLUTIdx];
                         if(DistanceUtils::L1dist(nCurrIntraDescBITS,pCurrGlobalWord->nDescBITS)<=nCurrTotDescDistThreshold/GWORD_DESC_THRES_BITS_MATCH_FACTOR &&
@@ -1555,7 +1554,7 @@ void BackgroundSubtractorPAWCS::getBackgroundImage(cv::OutputArray backgroundIma
 }
 
 void BackgroundSubtractorPAWCS::getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const { // @@@ add option to reconstruct from gwords?
-    CV_Assert(LBSP::DESC_SIZE==2);
+    static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
     CV_Assert(m_bInitialized);
     cv::Mat oAvgBGDescImg = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
     for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {

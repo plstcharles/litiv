@@ -16,6 +16,7 @@
 // limitations under the License.
 
 #include "litiv/imgproc.hpp"
+#include "litiv/utils/CxxUtils.hpp"
 
 void thinning_internal_ZhangSuen(cv::Mat& oInput, cv::Mat& oTempMarker, bool bIter) {
     oTempMarker.create(oInput.size(),CV_8UC1);

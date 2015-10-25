@@ -56,7 +56,7 @@ void IBackgroundSubtractor<eImpl>::initialize(const cv::Mat& oInitImg, const cv:
         CV_Assert(cv::countNonZero((oROI<UCHAR_MAX)&(oROI>0))==0);
         oNewBGROI = oROI.clone();
         cv::Mat oTempROI;
-        cv::dilate(oNewBGROI,oTempROI,cv::Mat(),cv::Point(-1,-1),m_nROIBorderSize);
+        cv::dilate(oNewBGROI,oTempROI,cv::Mat(),cv::Point(-1,-1),(int)m_nROIBorderSize);
         cv::bitwise_or(oNewBGROI,oTempROI/2,oNewBGROI);
     }
     m_nOrigROIPxCount = (size_t)cv::countNonZero(oNewBGROI);
@@ -120,7 +120,7 @@ void IBackgroundSubtractor<eImpl>::validateROI(cv::Mat& oROI) {
     CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
     if(m_nROIBorderSize>0) {
         cv::Mat oROI_new(oROI.size(),CV_8UC1,cv::Scalar_<uchar>(0));
-        const cv::Rect oROI_inner(m_nROIBorderSize,m_nROIBorderSize,oROI.cols-int(m_nROIBorderSize*2),oROI.rows-int(m_nROIBorderSize*2));
+        const cv::Rect oROI_inner((int)m_nROIBorderSize,(int)m_nROIBorderSize,oROI.cols-int(m_nROIBorderSize*2),oROI.rows-int(m_nROIBorderSize*2));
         cv::Mat(oROI,oROI_inner).copyTo(cv::Mat(oROI_new,oROI_inner));
         oROI = oROI_new;
     }
@@ -150,30 +150,6 @@ void IBackgroundSubtractor<eImpl>::setAutomaticModelReset(bool bVal) {
 }
 
 #if HAVE_GLSL
-
-template<>
-template<>
-IBackgroundSubtractor<ParallelUtils::eGLSL>::IBackgroundSubtractor<ParallelUtils::eGLSL>( size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
-                                                                                          size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
-                                                                                          bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize, void* /*pUnused*/) :
-        ParallelUtils::ParallelAlgo_<ParallelUtils::eGLSL>(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,CV_8UC1,nDebugType,true,bUseDisplay,bUseTimers,bUseIntegralFormat),
-        m_nROIBorderSize(nROIBorderSize),
-        m_nImgChannels(0),
-        m_nImgType(0),
-        m_nTotPxCount(0),
-        m_nTotRelevantPxCount(0),
-        m_nOrigROIPxCount(0),
-        m_nFinalROIPxCount(0),
-        m_nFrameIdx(SIZE_MAX),
-        m_nFramesSinceLastReset(0),
-        m_nModelResetCooldown(0),
-        m_bInitialized(false),
-        m_bModelInitialized(false),
-        m_bAutoModelResetEnabled(true),
-        m_bUsingMovingCamera(false),
-        m_nDebugCoordX(0),
-        m_nDebugCoordY(0),
-        m_pDebugFS(nullptr) {}
 
 template class IBackgroundSubtractor<ParallelUtils::eGLSL>;
 
@@ -238,28 +214,6 @@ template class IBackgroundSubtractor<ParallelUtils::eOpenCL>;
 // ... @@@ add impl later
 template class BackgroundSubtractor_<ParallelUtils::eOpenCL>;
 #endif //HAVE_OPENCL
-
-template<>
-template<>
-IBackgroundSubtractor<ParallelUtils::eNonParallel>::IBackgroundSubtractor<ParallelUtils::eNonParallel>(size_t nROIBorderSize, void* /*pUnused*/) :
-        ParallelUtils::ParallelAlgo_<ParallelUtils::eNonParallel>(),
-        m_nROIBorderSize(nROIBorderSize),
-        m_nImgChannels(0),
-        m_nImgType(0),
-        m_nTotPxCount(0),
-        m_nTotRelevantPxCount(0),
-        m_nOrigROIPxCount(0),
-        m_nFinalROIPxCount(0),
-        m_nFrameIdx(SIZE_MAX),
-        m_nFramesSinceLastReset(0),
-        m_nModelResetCooldown(0),
-        m_bInitialized(false),
-        m_bModelInitialized(false),
-        m_bAutoModelResetEnabled(true),
-        m_bUsingMovingCamera(false),
-        m_nDebugCoordX(0),
-        m_nDebugCoordY(0),
-        m_pDebugFS(nullptr) {}
 
 template class IBackgroundSubtractor<ParallelUtils::eNonParallel>;
 

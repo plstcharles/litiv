@@ -15,21 +15,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "litiv/imgproc/EdgeDetectorCanny.hpp"
+#include "litiv/imgproc/EdgeDetectionUtils.hpp"
 #include <iostream>
 
 #if HAVE_GLSL
-
-template<>
-template<>
-IEdgeDetector<ParallelUtils::eGLSL>::IEdgeDetector<ParallelUtils::eGLSL>( size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
-                                                                          size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
-                                                                          bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize, void* /*pUnused*/) :
-        ParallelUtils::ParallelAlgo_<ParallelUtils::eGLSL>(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,CV_8UC1,nDebugType,true,bUseDisplay,bUseTimers,bUseIntegralFormat),
-        m_nROIBorderSize(nROIBorderSize),
-        m_nDebugCoordX(0),
-        m_nDebugCoordY(0),
-        m_pDebugFS(nullptr) {}
 
 template class IEdgeDetector<ParallelUtils::eGLSL>;
 
@@ -94,15 +83,6 @@ template class IEdgeDetector<ParallelUtils::eOpenCL>;
 // ... @@@ add impl later
 template class EdgeDetector_<ParallelUtils::eOpenCL>;
 #endif //HAVE_OPENCL
-
-template<>
-template<>
-IEdgeDetector<ParallelUtils::eNonParallel>::IEdgeDetector<ParallelUtils::eNonParallel>(size_t nROIBorderSize, void* /*pUnused*/) :
-        ParallelUtils::ParallelAlgo_<ParallelUtils::eNonParallel>(),
-        m_nROIBorderSize(nROIBorderSize),
-        m_nDebugCoordX(0),
-        m_nDebugCoordY(0),
-        m_pDebugFS(nullptr) {}
 
 template class IEdgeDetector<ParallelUtils::eNonParallel>;
 

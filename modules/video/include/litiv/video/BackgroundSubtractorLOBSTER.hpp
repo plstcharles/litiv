@@ -19,10 +19,6 @@
 
 #include "litiv/video/BackgroundSubtractorLBSP.hpp"
 
-//! defines the default value for BackgroundSubtractorLBSP::m_fRelLBSPThreshold
-#define BGSLOBSTER_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.365f)
-//! defines the default value for BackgroundSubtractorLBSP::m_nLBSPThresholdOffset
-#define BGSLOBSTER_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (0)
 //! defines the default value for IBackgroundSubtractorLOBSTER::m_nDescDistThreshold
 #define BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD (4)
 //! defines the default value for IBackgroundSubtractorLOBSTER::m_nColorDistThreshold
@@ -56,12 +52,12 @@ template<ParallelUtils::eParallelAlgoType eImpl>
 class IBackgroundSubtractorLOBSTER : public BackgroundSubtractorLBSP<eImpl> {
 public:
     //! local common param constructor
-    IBackgroundSubtractorLOBSTER(float fRelLBSPThreshold,
-                                 size_t nLBSPThresholdOffset,
-                                 size_t nDescDistThreshold,
+    IBackgroundSubtractorLOBSTER(size_t nDescDistThreshold,
                                  size_t nColorDistThreshold,
                                  size_t nBGSamples,
-                                 size_t nRequiredBGSamples);
+                                 size_t nRequiredBGSamples,
+                                 size_t nLBSPThresholdOffset,
+                                 float fRelLBSPThreshold);
     //! returns the default learning rate value used in 'apply'
     virtual double getDefaultLearningRate() const {return BGSLOBSTER_DEFAULT_LEARNING_RATE;}
 protected:
@@ -81,12 +77,12 @@ class BackgroundSubtractorLOBSTER_<eImpl, typename std::enable_if<eImpl==Paralle
         public IBackgroundSubtractorLOBSTER<ParallelUtils::eGLSL> {
 public:
     //! full constructor
-    BackgroundSubtractorLOBSTER_(float fRelLBSPThreshold=BGSLOBSTER_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
-                                 size_t nLBSPThresholdOffset=BGSLOBSTER_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
-                                 size_t nDescDistThreshold=BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD,
+    BackgroundSubtractorLOBSTER_(size_t nDescDistThreshold=BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD,
                                  size_t nColorDistThreshold=BGSLOBSTER_DEFAULT_COLOR_DIST_THRESHOLD,
                                  size_t nBGSamples=BGSLOBSTER_DEFAULT_NB_BG_SAMPLES,
-                                 size_t nRequiredBGSamples=BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES);
+                                 size_t nRequiredBGSamples=BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES,
+                                 size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
+                                 float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
     //! refreshes all samples based on the last analyzed frame
     void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
     //! (re)initiaization method; needs to be called before starting background subtraction
@@ -147,12 +143,12 @@ class BackgroundSubtractorLOBSTER_<eImpl, typename std::enable_if<eImpl==Paralle
         public IBackgroundSubtractorLOBSTER<ParallelUtils::eNonParallel> {
 public:
     //! full constructor
-    BackgroundSubtractorLOBSTER_(float fRelLBSPThreshold=BGSLOBSTER_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
-                                 size_t nLBSPThresholdOffset=BGSLOBSTER_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
-                                 size_t nDescDistThreshold=BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD,
+    BackgroundSubtractorLOBSTER_(size_t nDescDistThreshold=BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD,
                                  size_t nColorDistThreshold=BGSLOBSTER_DEFAULT_COLOR_DIST_THRESHOLD,
                                  size_t nBGSamples=BGSLOBSTER_DEFAULT_NB_BG_SAMPLES,
-                                 size_t nRequiredBGSamples=BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES);
+                                 size_t nRequiredBGSamples=BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES,
+                                 size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
+                                 float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
     //! refreshes all samples based on the last analyzed frame
     void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
     //! (re)initiaization method; needs to be called before starting background subtraction

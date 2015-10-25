@@ -68,9 +68,9 @@ size_t LBSP::getAbsThreshold() const {
 
 static inline void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const std::vector<cv::KeyPoint>& voKeyPoints,
                                     cv::Mat& oDesc, bool bSingleColumnDesc, size_t nThreshold) {
+    static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
     CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
     CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
-    CV_DbgAssert(LBSP::DESC_SIZE==2);
     const size_t nChannels = (size_t)oInputImg.channels();
     const cv::Mat& oRefMat = oRefImg.empty()?oInputImg:oRefImg;
     CV_DbgAssert(oInputImg.isContinuous() && oRefMat.isContinuous());
@@ -104,9 +104,9 @@ static inline void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRe
 
 static inline void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const std::vector<cv::KeyPoint>& voKeyPoints,
                                     cv::Mat& oDesc, bool bSingleColumnDesc, float fThreshold, size_t nThresholdOffset) {
+    static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
     CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
     CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
-    CV_DbgAssert(LBSP::DESC_SIZE==2);
     CV_DbgAssert(fThreshold>=0);
     const size_t nChannels = (size_t)oInputImg.channels();
     const cv::Mat& oRefMat = oRefImg.empty()?oInputImg:oRefImg;
@@ -177,10 +177,10 @@ void LBSP::computeImpl(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypo
 }
 
 void LBSP::reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoints, const cv::Mat& oDescriptors, cv::Mat& oOutput) {
+    static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
     CV_DbgAssert(!voKeypoints.empty());
     CV_DbgAssert(!oDescriptors.empty() && oDescriptors.cols==1);
     CV_DbgAssert(oSize.width>0 && oSize.height>0);
-    CV_DbgAssert(LBSP::DESC_SIZE==2);
     CV_DbgAssert(oDescriptors.type()==CV_16UC1 || oDescriptors.type()==CV_16UC3);
     const size_t nChannels = (size_t)oDescriptors.channels();
     const size_t nKeyPoints = voKeypoints.size();
@@ -204,11 +204,11 @@ void LBSP::reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoi
 }
 
 void LBSP::calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat& oOutput, bool bForceMergeChannels) {
+    static_assert(LBSP::DESC_SIZE_BITS<=UCHAR_MAX,"bad assumptions in impl below");
+    static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
     CV_DbgAssert(oDesc1.size()==oDesc2.size() && oDesc1.type()==oDesc2.type());
-    CV_DbgAssert(LBSP::DESC_SIZE==2);
     CV_DbgAssert(oDesc1.type()==CV_16UC1 || oDesc1.type()==CV_16UC3);
     CV_DbgAssert(CV_MAT_DEPTH(oDesc1.type())==CV_16U);
-    CV_DbgAssert(LBSP::DESC_SIZE_BITS<=UCHAR_MAX);
     CV_DbgAssert(oDesc1.step.p[0]==oDesc2.step.p[0] && oDesc1.step.p[1]==oDesc2.step.p[1]);
     const float fScaleFactor = (float)UCHAR_MAX/(LBSP::DESC_SIZE_BITS);
     const size_t nChannels = CV_MAT_CN(oDesc1.type());

@@ -23,13 +23,9 @@
 #if HAVE_GLSL
 
 template<>
-IBackgroundSubtractorLOBSTER<ParallelUtils::eGLSL>::IBackgroundSubtractorLOBSTER(float fRelLBSPThreshold,
-                                                                                 size_t nLBSPThresholdOffset,
-                                                                                 size_t nDescDistThreshold,
-                                                                                 size_t nColorDistThreshold,
-                                                                                 size_t nBGSamples,
-                                                                                 size_t nRequiredBGSamples) :
-        BackgroundSubtractorLBSP<ParallelUtils::eGLSL>(fRelLBSPThreshold,nLBSPThresholdOffset,1,1+BGSLOBSTER_GLSL_USE_POSTPROC,2,0,0,0,BGSLOBSTER_GLSL_USE_DEBUG?CV_8UC4:-1,BGSLOBSTER_GLSL_USE_DEBUG,BGSLOBSTER_GLSL_USE_TIMERS,true),
+IBackgroundSubtractorLOBSTER<ParallelUtils::eGLSL>::IBackgroundSubtractorLOBSTER(size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples,
+                                                                                 size_t nRequiredBGSamples, size_t nLBSPThresholdOffset, float fRelLBSPThreshold) :
+        BackgroundSubtractorLBSP<ParallelUtils::eGLSL>(1,1+BGSLOBSTER_GLSL_USE_POSTPROC,2,0,0,0,BGSLOBSTER_GLSL_USE_DEBUG?CV_8UC4:-1,BGSLOBSTER_GLSL_USE_DEBUG,BGSLOBSTER_GLSL_USE_TIMERS,true,fRelLBSPThreshold,nLBSPThresholdOffset),
         m_nColorDistThreshold(nColorDistThreshold),
         m_nDescDistThreshold(nDescDistThreshold),
         m_nBGSamples(nBGSamples),
@@ -39,8 +35,8 @@ IBackgroundSubtractorLOBSTER<ParallelUtils::eGLSL>::IBackgroundSubtractorLOBSTER
 }
 
 template<>
-BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::BackgroundSubtractorLOBSTER_(float fRelLBSPThreshold, size_t nLBSPThresholdOffset, size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples, size_t nRequiredBGSamples) :
-        IBackgroundSubtractorLOBSTER<ParallelUtils::eGLSL>(fRelLBSPThreshold,nLBSPThresholdOffset,nDescDistThreshold,nColorDistThreshold,nBGSamples,nRequiredBGSamples) {
+BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::BackgroundSubtractorLOBSTER_(size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples, size_t nRequiredBGSamples, size_t nLBSPThresholdOffset, float fRelLBSPThreshold) :
+        IBackgroundSubtractorLOBSTER<ParallelUtils::eGLSL>(nDescDistThreshold,nColorDistThreshold,nBGSamples,nRequiredBGSamples,nLBSPThresholdOffset,fRelLBSPThreshold) {
     glErrorCheck;
 }
 
@@ -417,7 +413,7 @@ template class BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>;
 #endif //HAVE_OPENCL
 
 template<>
-IBackgroundSubtractorLOBSTER<ParallelUtils::eNonParallel>::IBackgroundSubtractorLOBSTER(float fRelLBSPThreshold, size_t nLBSPThresholdOffset, size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples, size_t nRequiredBGSamples) :
+IBackgroundSubtractorLOBSTER<ParallelUtils::eNonParallel>::IBackgroundSubtractorLOBSTER(size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples, size_t nRequiredBGSamples, size_t nLBSPThresholdOffset, float fRelLBSPThreshold) :
         BackgroundSubtractorLBSP<ParallelUtils::eNonParallel>(fRelLBSPThreshold,nLBSPThresholdOffset),
         m_nColorDistThreshold(nColorDistThreshold),
         m_nDescDistThreshold(nDescDistThreshold),
@@ -428,8 +424,8 @@ IBackgroundSubtractorLOBSTER<ParallelUtils::eNonParallel>::IBackgroundSubtractor
 }
 
 template<>
-BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::BackgroundSubtractorLOBSTER_(float fRelLBSPThreshold, size_t nLBSPThresholdOffset, size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples, size_t nRequiredBGSamples) :
-        IBackgroundSubtractorLOBSTER<ParallelUtils::eNonParallel>(fRelLBSPThreshold,nLBSPThresholdOffset,nDescDistThreshold,nColorDistThreshold,nBGSamples,nRequiredBGSamples) {}
+BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::BackgroundSubtractorLOBSTER_(size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples, size_t nRequiredBGSamples, size_t nLBSPThresholdOffset, float fRelLBSPThreshold) :
+        IBackgroundSubtractorLOBSTER<ParallelUtils::eNonParallel>(nDescDistThreshold,nColorDistThreshold,nBGSamples,nRequiredBGSamples,nLBSPThresholdOffset,fRelLBSPThreshold) {}
 
 template<>
 void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate) {
@@ -631,9 +627,9 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::getBackgroundIma
 
 template<>
 void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const {
+    static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
     lvDbgExceptionWatch;
     CV_Assert(m_bInitialized);
-    CV_Assert(LBSP::DESC_SIZE==2);
     cv::Mat oAvgBGDesc = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
     for(size_t n=0; n<m_voBGDescSamples.size(); ++n) {
         for(int y=0; y<m_oImgSize.height; ++y) {

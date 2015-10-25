@@ -171,14 +171,14 @@ void PlatformUtils::SetConsoleWindowSize(int x, int y, int buffer_lines) {
     SMALL_RECT& winInfo = bufferInfo.srWindow;
     COORD windowSize = {winInfo.Right-winInfo.Left+1,winInfo.Bottom-winInfo.Top+1};
     if(windowSize.X>x || windowSize.Y>y) {
-        SMALL_RECT info = {0,0,(x<windowSize.X)?(x-1):(windowSize.X-1),(y<windowSize.Y)?(y-1):(windowSize.Y-1)};
+        SMALL_RECT info = {0,0,SHORT((x<windowSize.X)?(x-1):(windowSize.X-1)),SHORT((y<windowSize.Y)?(y-1):(windowSize.Y-1))};
         if(!SetConsoleWindowInfo(h,TRUE,&info))
             throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize window before resizing buffer");
     }
-    COORD size = {x,y};
+    COORD size = {SHORT(x),SHORT(y)};
     if(!SetConsoleScreenBufferSize(h,size))
         throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize screen buffer");
-    SMALL_RECT info = {0,0,x-1,y-1};
+    SMALL_RECT info = {0,0,SHORT(x-1),SHORT(y-1)};
     if(!SetConsoleWindowInfo(h, TRUE, &info))
         throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize window after resizing buffer");
 }

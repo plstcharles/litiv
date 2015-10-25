@@ -17,32 +17,7 @@
 
 #include "litiv/video/BackgroundSubtractorLBSP.hpp"
 
-// local define used to determine the default median blur kernel size
-#define DEFAULT_MEDIAN_BLUR_KERNEL_SIZE (9)
-
-template<>
-template<>
-BackgroundSubtractorLBSP<ParallelUtils::eNonParallel>::BackgroundSubtractorLBSP<ParallelUtils::eNonParallel>(float fRelLBSPThreshold, size_t nLBSPThresholdOffset, void* /*pUnused*/) :
-        ::BackgroundSubtractor(LBSP::PATCH_SIZE/2),
-        m_nLBSPThresholdOffset(nLBSPThresholdOffset),
-        m_fRelLBSPThreshold(fRelLBSPThreshold),
-        m_nDefaultMedianBlurKernelSize(DEFAULT_MEDIAN_BLUR_KERNEL_SIZE) {
-    CV_Assert(m_fRelLBSPThreshold>=0);
-}
-
 #if HAVE_GLSL
-
-template<>
-template<>
-BackgroundSubtractorLBSP<ParallelUtils::eGLSL>::BackgroundSubtractorLBSP<ParallelUtils::eGLSL>( float fRelLBSPThreshold, size_t nLBSPThresholdOffset, size_t nLevels, size_t nComputeStages,
-                                                                                                size_t nExtraSSBOs, size_t nExtraACBOs, size_t nExtraImages, size_t nExtraTextures,
-                                                                                                int nDebugType, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat, void* /*pUnused*/) :
-    BackgroundSubtractor_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat),
-    m_nLBSPThresholdOffset(nLBSPThresholdOffset),
-    m_fRelLBSPThreshold(fRelLBSPThreshold),
-    m_nDefaultMedianBlurKernelSize(DEFAULT_MEDIAN_BLUR_KERNEL_SIZE) {
-    CV_Assert(m_fRelLBSPThreshold>=0);
-}
 
 template<>
 template<>

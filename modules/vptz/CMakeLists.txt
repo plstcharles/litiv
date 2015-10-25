@@ -15,12 +15,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-option(BUILD_VPTZ "Build VPTZ library; requires full OpenGL support" ON)
-
+if(USE_GLSL)
+    option(BUILD_VPTZ "Build VPTZ library; requires full OpenGL support" ON)
+endif(USE_GLSL)
 if(BUILD_VPTZ)
-
+    if(NOT ${USE_GLSL})
+        message(ERROR "VirtualPTZ library requires full OpenGL support")
+    endif(NOT ${USE_GLSL})
     option(USE_VPTZ_STANDALONE "Build VPTZ library as standalone lib from LITIV framework" ON)
-
     if(USE_VPTZ_STANDALONE)
         project(litiv_vptz)
         set(LITIV_CURRENT_MODULE_NAME vptz)
@@ -29,28 +31,26 @@ if(BUILD_VPTZ)
         litiv_module(vptz)
     endif(USE_VPTZ_STANDALONE)
 
-    if(NOT ${USE_GLSL})
-        message(ERROR "VirtualPTZ library requires full OpenGL support")
-    endif(NOT ${USE_GLSL})
+    file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/StandaloneUtils.hpp)
 
-    file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/include/litiv/${LITIV_CURRENT_MODULE_NAME}/StandaloneUtils.hpp)
     configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/litiv/${LITIV_CURRENT_MODULE_NAME}/StandaloneUtils.hpp.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/${LITIV_CURRENT_MODULE_NAME}/StandaloneUtils.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/litiv/vptz/StandaloneUtils.hpp.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/StandaloneUtils.hpp"
     )
 
-    file(GLOB SOURCE_FILES
-        "src/*.cpp"
+    add_files(SOURCE_FILES
+        "src/virtualptz.cpp"
     )
 
-    file(GLOB INCLUDE_FILES
-        "litiv/${LITIV_CURRENT_MODULE_NAME}/*.hpp"
-        "litiv/${LITIV_CURRENT_MODULE_NAME}/*.ipp"
+    add_files(INCLUDE_FILES
+        "include/litiv/vptz/StandaloneUtils.hpp"
+        "include/litiv/vptz/virtualptz.hpp"
+        "include/litiv/vptz.hpp"
     )
 
     if(USE_VPTZ_STANDALONE)
         add_definitions(-DVPTZ_EXPORT)
-        add_library(${LITIV_CURRENT_PROJECT_NAME} SHARED ${SOURCE_FILES})
+        add_library(${LITIV_CURRENT_PROJECT_NAME} SHARED ${SOURCE_FILES} ${INCLUDE_FILES})
         target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} ${OpenCV_LIBRARIES})
         if(USE_GLFW)
             target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} ${GLFW_LIBRARIES})
@@ -60,7 +60,7 @@ if(BUILD_VPTZ)
         target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} ${OPENGL_LIBRARIES})
         target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} ${GLEW_LIBRARIES})
     else(NOT USE_VPTZ_STANDALONE)
-        add_library(${LITIV_CURRENT_PROJECT_NAME} STATIC ${SOURCE_FILES})
+        add_library(${LITIV_CURRENT_PROJECT_NAME} STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
         target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} litiv_utils)
     endif(USE_VPTZ_STANDALONE)
     target_include_directories(${LITIV_CURRENT_PROJECT_NAME}
@@ -68,7 +68,7 @@ if(BUILD_VPTZ)
         PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
         INTERFACE "$<INSTALL_INTERFACE:include/>"
     )
-
+    set_target_properties(${LITIV_CURRENT_PROJECT_NAME} PROPERTIES FOLDER "modules")
     #install(TARGETS ${LITIV_CURRENT_PROJECT_NAME} DESTINATION lib)
     install(FILES ${INCLUDE_FILES} DESTINATION include)
 
