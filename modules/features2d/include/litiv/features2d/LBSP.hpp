@@ -277,10 +277,10 @@ public:
         nGradY = 0;
         nGradMag = 0;
         CxxUtils::unroll<LBSP::DESC_SIZE_BITS>([&](int n) {
-            const Tr2 nCurrDist = DistanceUtils::L1dist(aanVals[(nChannels-1)*LBSP::DESC_SIZE_BITS+n],anRefs[(nChannels-1)]);
+            const Tr2 nCurrDist = (Tr2)DistanceUtils::L1dist(aanVals[(nChannels-1)*LBSP::DESC_SIZE_BITS+n],anRefs[(nChannels-1)]);
             const Tr2 nCurrGradMag = (Tr2)bool(nCurrDist>anRefs[(nChannels-1)]>>nShift) + (Tr2)bool(nCurrDist>nThreshold);
-            nGradX += (s_anIdxLUT_16bitdbcross_GradX[n]*nCurrGradMag); // range: [-4,4]x16
-            nGradY += (s_anIdxLUT_16bitdbcross_GradY[n]*nCurrGradMag);
+            nGradX += (Tr1)(s_anIdxLUT_16bitdbcross_GradX[n]*nCurrGradMag); // range: [-4,4]x16
+            nGradY += (Tr1)(s_anIdxLUT_16bitdbcross_GradY[n]*nCurrGradMag);
             //nGradMag += nCurrGradMag*nCurrGradMag; // range: [0-4]x16
             //nGradMag += nCurrGradMag*nCurrGradMag*(std::abs(s_anIdxLUT_16bitdbcross_GradX[n])+std::abs(s_anIdxLUT_16bitdbcross_GradY[n])); // range: [0-4]x16
             nGradMag += nCurrGradMag; // range: [0-2]x16
@@ -292,10 +292,10 @@ public:
             Tr1 nNewGradY = 0;
             Tr2 nNewGradMag = 0;
             CxxUtils::unroll<LBSP::DESC_SIZE_BITS>([&](int n) {
-                const Tr2 nCurrDist = DistanceUtils::L1dist(aanVals[cn*LBSP::DESC_SIZE_BITS+n],anRefs[cn]);
+                const Tr2 nCurrDist = (Tr2)DistanceUtils::L1dist(aanVals[cn*LBSP::DESC_SIZE_BITS+n],anRefs[cn]);
                 const Tr2 nCurrGradMag = (Tr2)bool(nCurrDist>anRefs[cn]>>nShift) + (Tr2)bool(nCurrDist>nThreshold);
-                nNewGradX += (s_anIdxLUT_16bitdbcross_GradX[n]*nCurrGradMag);
-                nNewGradY += (s_anIdxLUT_16bitdbcross_GradY[n]*nCurrGradMag);
+                nNewGradX += (Tr1)(s_anIdxLUT_16bitdbcross_GradX[n]*nCurrGradMag);
+                nNewGradY += (Tr1)(s_anIdxLUT_16bitdbcross_GradY[n]*nCurrGradMag);
                 //nNewGradMag += nCurrGradMag*nCurrGradMag;
                 //nNewGradMag += nCurrGradMag*nCurrGradMag*(std::abs(s_anIdxLUT_16bitdbcross_GradX[n])+std::abs(s_anIdxLUT_16bitdbcross_GradY[n])); // range: [0-4]x16
                 nNewGradMag += nCurrGradMag;
