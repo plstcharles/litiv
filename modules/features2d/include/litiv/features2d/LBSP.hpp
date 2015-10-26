@@ -77,6 +77,8 @@ public:
     static constexpr size_t DESC_SIZE = 2;
     //! utility, specifies the number of bits per descriptor
     static constexpr size_t DESC_SIZE_BITS = DESC_SIZE*8;
+    //! utility, specifies the maximum gradient magnitude value that can be returned by computeDescriptor_orientation
+    static constexpr size_t MAX_GRAD_MAG = DESC_SIZE_BITS*2;
 #if HAVE_GLSL
     //! utility function, returns the glsl source code required to describe an LBSP descriptor based on the image load store
     static std::string getShaderFunctionSource(size_t nChannels, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize);
@@ -307,6 +309,7 @@ public:
                 nGradY = nNewGradY;
                 nGradMag = nNewGradMag;
             }
+            CV_DbgAssert(nGradMag<=MAX_GRAD_MAG);
         });
 //#else //(HAVE_SSE4_1 || HAVE_SSE2)
 // @@@@ TODO
