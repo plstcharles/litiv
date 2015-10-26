@@ -29,15 +29,15 @@
 #define EDGCANNY_DEFAULT_USE_L2_GRADIENT_NORM (true)
 //! defines the default value for the aperture (or window) size used for non-max suppression
 #define EDGCANNY_DEFAULT_NMS_WINDOW_SIZE (3)
-//! defines the default value for the threshold passed to EdgeDetectorCanny::apply
-#define EDGCANNY_DEFAULT_THRESHOLD (75.0/UCHAR_MAX)
+//! defines the default value for the maximum gradient magnitude integer threshold used internally for 'apply'
+#define EDGCANNY_DEFAULT_MAX_THRESHOLD (512) // required since gradient magnitudes are not normalized internally
+//! defines the default value for the threshold passed to EdgeDetectorCanny::apply_threshold
+#define EDGCANNY_DEFAULT_THRESHOLD (75.0/EDGCANNY_DEFAULT_MAX_THRESHOLD)
 
 /*!
     Canny edge detection algorithm (wraps the OpenCV implementation).
 
     Only available in non-parallel version.
-
-    // @@@ IMPL: THRESHOLD CAN EXCEED 255 (400-500 is ok)
 
     Note: converts all RGB/RGBA images to grayscale internally.
  */
