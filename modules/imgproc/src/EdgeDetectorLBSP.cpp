@@ -418,51 +418,21 @@ template void EdgeDetectorLBSP::apply_threshold_internal<2>(const cv::Mat&, cv::
 template void EdgeDetectorLBSP::apply_threshold_internal<3>(const cv::Mat&, cv::Mat&, uchar, uchar);
 template void EdgeDetectorLBSP::apply_threshold_internal<4>(const cv::Mat&, cv::Mat&, uchar, uchar);
 
-void EdgeDetectorLBSP::apply_threshold(cv::InputArray _oInputImage, cv::OutputArray _oEdgeMask, double dDetThreshold, uchar nLBSPThreshold) {
-    cv::Mat oInputImg = _oInputImage.getMat();
-    CV_Assert(!oInputImg.empty());
-    CV_Assert(oInputImg.isContinuous());
-    if(m_dGaussianKernelSigma>0) {
-        // @@@ clone if overwrite image?
-        const int nDefaultKernelSize = int(8*ceil(m_dGaussianKernelSigma));
-        const int nRealKernelSize = nDefaultKernelSize%2==0?nDefaultKernelSize+1:nDefaultKernelSize;
-        cv::GaussianBlur(oInputImg,oInputImg,cv::Size(nRealKernelSize,nRealKernelSize),m_dGaussianKernelSigma,m_dGaussianKernelSigma);
-    }
-    _oEdgeMask.create(oInputImg.size(),CV_8UC1);
-    cv::Mat oEdgeMask = _oEdgeMask.getMat();
-    //oEdgeMask = cv::Scalar_<uchar>(0);
-    if(dDetThreshold<0||dDetThreshold>1)
-        dDetThreshold = getDefaultThreshold();
-    const uchar nDetThreshold = (uchar)(dDetThreshold*UCHAR_MAX);
-    const int nChannels = oInputImg.channels();
-    if(nChannels==1)
-        apply_threshold_internal<1>(oInputImg,oEdgeMask,nDetThreshold,nLBSPThreshold);
-    else if(nChannels==2)
-        apply_threshold_internal<2>(oInputImg,oEdgeMask,nDetThreshold,nLBSPThreshold);
-    else if(nChannels==3)
-        apply_threshold_internal<3>(oInputImg,oEdgeMask,nDetThreshold,nLBSPThreshold);
-    else if(nChannels==4)
-        apply_threshold_internal<4>(oInputImg,oEdgeMask,nDetThreshold,nLBSPThreshold);
-    else
-        CV_Error(0,"Unexpected channel count");
-}
-
 void EdgeDetectorLBSP::apply_threshold(cv::InputArray _oInputImage, cv::OutputArray _oEdgeMask, double dDetThreshold) {
     cv::Mat oInputImg = _oInputImage.getMat();
     CV_Assert(!oInputImg.empty());
     CV_Assert(oInputImg.isContinuous());
     if(m_dGaussianKernelSigma>0) {
-        // @@@ clone if overwrite image?
         const int nDefaultKernelSize = int(8*ceil(m_dGaussianKernelSigma));
         const int nRealKernelSize = nDefaultKernelSize%2==0?nDefaultKernelSize+1:nDefaultKernelSize;
+        oInputImg = oInputImg.clone();
         cv::GaussianBlur(oInputImg,oInputImg,cv::Size(nRealKernelSize,nRealKernelSize),m_dGaussianKernelSigma,m_dGaussianKernelSigma);
     }
     _oEdgeMask.create(oInputImg.size(),CV_8UC1);
     cv::Mat oEdgeMask = _oEdgeMask.getMat();
-    //oEdgeMask = cv::Scalar_<uchar>(0);
     if(dDetThreshold<0||dDetThreshold>1)
         dDetThreshold = getDefaultThreshold();
-    const uchar nDetThreshold = (uchar)(dDetThreshold*UCHAR_MAX);
+    const uchar nDetThreshold = (uchar)(dDetThreshold*LBSP::MAX_GRAD_MAG);
     const int nChannels = oInputImg.channels();
     if(nChannels==1)
         apply_threshold_internal<1>(oInputImg,oEdgeMask,nDetThreshold,EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER);
@@ -479,27 +449,16 @@ void EdgeDetectorLBSP::apply_threshold(cv::InputArray _oInputImage, cv::OutputAr
 void EdgeDetectorLBSP::apply(cv::InputArray _oInputImage, cv::OutputArray _oEdgeMask) {
     cv::Mat oInputImg = _oInputImage.getMat();
     CV_Assert(!oInputImg.empty());
-    CV_Assert(oInputImg.isContinuous());
-    if(m_dGaussianKernelSigma>0) {
-        const int nDefaultKernelSize = int(8*ceil(m_dGaussianKernelSigma));
-        const int nRealKernelSize = nDefaultKernelSize%2==0?nDefaultKernelSize+1:nDefaultKernelSize;
-        cv::GaussianBlur(oInputImg,oInputImg,cv::Size(nRealKernelSize,nRealKernelSize),m_dGaussianKernelSigma,m_dGaussianKernelSigma);
-    }
+    CV_Assert(oInputImg.channels()>=1 && oInputImg.channels()<=4);
     _oEdgeMask.create(oInputImg.size(),CV_8UC1);
     cv::Mat oEdgeMask = _oEdgeMask.getMat();
-    //oEdgeMask = cv::Scalar_<uchar>(0);
-    // @@@@ add threshold loop like canny's
-    const int nChannels = oInputImg.channels();
-    if(nChannels==1)
-        apply_threshold_internal<1>(oInputImg,oEdgeMask,EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER,EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER);
-    else if(nChannels==2)
-        apply_threshold_internal<2>(oInputImg,oEdgeMask,EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER,EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER);
-    else if(nChannels==3)
-        apply_threshold_internal<3>(oInputImg,oEdgeMask,EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER,EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER);
-    else if(nChannels==4)
-        apply_threshold_internal<4>(oInputImg,oEdgeMask,EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER,EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER);
-    else
-        CV_Error(0,"Unexpected channel count");
+    oEdgeMask = cv::Scalar_<uchar>(0);
+    cv::Mat oTempEdgeMask = oEdgeMask.clone();
+    for(size_t nCurrThreshold=0; nCurrThreshold<LBSP::MAX_GRAD_MAG; ++nCurrThreshold) {
+        // @@@ reimpl so it shares LUT and only diverges for thresholding
+        apply_threshold(oInputImg,oTempEdgeMask,double(nCurrThreshold)/LBSP::MAX_GRAD_MAG);
+        oEdgeMask += oTempEdgeMask/LBSP::MAX_GRAD_MAG;
+    }
     if(m_bNormalizeOutput)
         cv::normalize(oEdgeMask,oEdgeMask,0,UCHAR_MAX,cv::NORM_MINMAX);
 }
