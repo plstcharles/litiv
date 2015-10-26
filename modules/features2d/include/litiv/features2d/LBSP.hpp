@@ -258,15 +258,15 @@ public:
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP gradient computation function (mixes rel+abs, returns max-channel only)
-    template<size_t nChannels, size_t nShift=2, typename Tr1=short, typename Tr2=ushort>
-    inline static void computeDescriptor_threshold_max_rel(const std::array<std::array<uchar,DESC_SIZE_BITS>,nChannels>& aanVals, const std::array<uchar,nChannels>& anRefs, const uchar nThreshold, Tr1& nGradX, Tr1& nGradY, Tr2& nGradMag) {
+    template<size_t nChannels, size_t nShift=1, typename Tr1=short, typename Tr2=ushort>
+    inline static void computeDescriptor_gradient(const std::array<std::array<uchar,DESC_SIZE_BITS>,nChannels>& aanVals, const std::array<uchar,nChannels>& anRefs, const uchar nThreshold, Tr1& nGradX, Tr1& nGradY, Tr2& nGradMag) {
         static_assert(sizeof(std::array<std::array<uchar,DESC_SIZE_BITS>,nChannels>)==sizeof(uchar)*DESC_SIZE_BITS*nChannels,"terrible impl of std::array right here");
         static_assert(sizeof(std::array<uchar,nChannels>)==sizeof(uchar)*nChannels,"terrible impl of std::array right here");
         LBSP::computeDescriptor_gradient<nChannels,nShift>(aanVals.data(),anRefs.data(),nThreshold,nGradX,nGradY,nGradMag);
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP gradient computation function (mixes rel+abs, returns max-channel only)
-    template<size_t nChannels, size_t nShift=2, typename Tr1=short, typename Tr2=ushort>
+    template<size_t nChannels, size_t nShift=1, typename Tr1=short, typename Tr2=ushort>
     inline static void computeDescriptor_gradient(const uchar* const aanVals, const uchar* const anRefs, const uchar nThreshold, Tr1& nGradX, Tr1& nGradY, Tr2& nGradMag) {
         // note: this function is used to threshold a multi-channel LBSP pattern based on a predefined lookup array (see LBSP_16bits_dbcross_lookup for more information)
         // @@@ todo: use array template to unroll loops & allow any descriptor size here
