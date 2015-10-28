@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include "litiv/utils/ParallelUtils.hpp"
 #include <opencv2/core/types_c.h>
 #include "litiv/utils/DefineUtils.hpp"
 
@@ -25,6 +26,7 @@ namespace DistanceUtils {
     //! computes the L1 distance between two integer values
     template<typename T>
     static inline typename std::enable_if<std::is_integral<T>::value,size_t>::type L1dist(T a, T b) {
+        static_assert(sizeof(T)<=sizeof(int),"l1dist for integer types casts as int internally");
         return (size_t)abs((int)a-b);
     }
 
@@ -356,7 +358,7 @@ namespace DistanceUtils {
     //! computes the color distortion between two generic arrays
     template<typename T>
     static inline auto cdist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) -> decltype(cdist<3>(a,b,nElements,m)) {
-        CV_Assert(nChannels>0 && nChannels<=4);
+        CV_Assert(nChannels>1 && nChannels<=4);
         switch(nChannels) {
             case 2: return cdist<2>(a,b,nElements,m);
             case 3: return cdist<3>(a,b,nElements,m);
@@ -409,7 +411,7 @@ namespace DistanceUtils {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     //! popcount LUT for 8-bit vectors
-    static const uchar popcount_LUT8[256] = {
+    static constexpr size_t popcount_LUT8[256] = {
         0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
         1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
         1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
@@ -428,9 +430,34 @@ namespace DistanceUtils {
         4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8,
     };
 
+    //! computes the population count of an 8-bit vector using an 8-bit popcount LUT
+    template<typename T>
+    static inline typename std::enable_if<(sizeof(T)==1),size_t>::type popcount(const T x) {
+        static_assert(std::is_integral<T>::value,"type must be integral");
+        return popcount_LUT8[x];
+    }
+
+#if HAVE_POPCNT
+
+    //! computes the population count of a 2- or 4-byte vector using 32-bit popcnt instruction
+    template<typename T>
+    static inline typename std::enable_if<(sizeof(T)==2 || sizeof(T)==4),size_t>::type popcount(const T x) {
+        static_assert(std::is_integral<T>::value,"type must be integral");
+        return _mm_popcnt_u32((uint)x);
+    }
+
+    //! computes the population count of an 8-byte vector using 64-bit popcnt instruction
+    template<typename T>
+    static inline typename std::enable_if<(sizeof(T)==8),size_t>::type popcount(const T x) {
+        static_assert(std::is_integral<T>::value,"type must be integral");
+        return _mm_popcnt_u64((uint64)x);
+    }
+
+#else //!HAVE_POPCNT
+
     //! computes the population count of an N-byte vector using an 8-bit popcount LUT
     template<typename T>
-    static inline size_t popcount(T x) {
+    static inline typename std::enable_if<(sizeof(T)>1),size_t>::type popcount(const T x) {
         static_assert(std::is_integral<T>::value,"type must be integral");
         size_t nResult = 0;
         for(size_t l=0; l<sizeof(T); ++l)
@@ -438,37 +465,38 @@ namespace DistanceUtils {
         return nResult;
     }
 
-    //! computes the hamming distance between two N-byte vectors using an 8-bit popcount LUT
-    template<typename T>
-    static inline size_t hdist(T a, T b) {
-        static_assert(std::is_integral<T>::value,"type must be integral");
-        return popcount(a^b);
-    }
+#endif //!HAVE_POPCNT
 
-    //! computes the gradient magnitude distance between two N-byte vectors using an 8-bit popcount LUT
-    template<typename T>
-    static inline size_t gdist(T a, T b) {
-        return L1dist(popcount(a),popcount(b));
-    }
-
-    //! computes the population count of a (nChannels*N)-byte vector using an 8-bit popcount LUT
+    //! computes the population count of a (nChannels*N)-byte vector
     template<size_t nChannels, typename T>
     static inline size_t popcount(const T* x) {
         static_assert(nChannels>0,"vector should have at least one channel");
         size_t nResult = 0;
         for(size_t c=0; c<nChannels; ++c)
-            for(size_t l=0; l<sizeof(T); ++l)
-                nResult += popcount_LUT8[(uchar)(*(x+c)>>l*8)];
+            nResult += popcount(x[c]);
         return nResult;
     }
 
-    //! computes the population count of a (nChannels*N)-byte vector using an 8-bit popcount LUT
+    //! computes the population count of a (nChannels*N)-byte vector
     template<size_t nChannels, typename T>
     static inline size_t popcount(const std::array<T,nChannels>& x) {
         return popcount<nChannels>(x.data());
     }
 
-    //! computes the hamming distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
+    //! computes the hamming distance between two N-byte vectors
+    template<typename T>
+    static inline size_t hdist(T a, T b) {
+        static_assert(std::is_integral<T>::value,"type must be integral");
+        return popcount<T>(a^b);
+    }
+
+    //! computes the gradient magnitude distance between two N-byte vectors
+    template<typename T>
+    static inline size_t gdist(T a, T b) {
+        return L1dist(popcount(a),popcount(b));
+    }
+
+    //! computes the hamming distance between two (nChannels*N)-byte vectors
     template<size_t nChannels, typename T>
     static inline size_t hdist(const T* const a, const T* const b) {
         static_assert(nChannels>0,"vectors should have at least one channel");
@@ -478,43 +506,43 @@ namespace DistanceUtils {
         return popcount<nChannels>(xor_array);
     }
 
-    //! computes the hamming distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
+    //! computes the hamming distance between two (nChannels*N)-byte vectors
     template<size_t nChannels, typename T>
     static inline size_t hdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) {
         return hdist<nChannels>(a.data(),b.data());
     }
 
-    //! computes the hamming distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
+    //! computes the hamming distance between two (nChannels*N)-byte vectors
     template<size_t nChannels, typename T>
     static inline size_t hdist(const std::array<T,nChannels>& a, const T* const b) {
         return hdist<nChannels>(a.data(),b);
     }
 
-    //! computes the hamming distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
+    //! computes the hamming distance between two (nChannels*N)-byte vectors
     template<size_t nChannels, typename T>
     static inline size_t hdist(const T* const a, const std::array<T,nChannels>& b) {
         return hdist<nChannels>(a,b.data());
     }
 
-    //! computes the gradient magnitude distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
+    //! computes the gradient magnitude distance between two (nChannels*N)-byte vectors
     template<size_t nChannels, typename T>
     static inline size_t gdist(const T* const a, const T* const b) {
         return L1dist(popcount<nChannels>(a),popcount<nChannels>(b));
     }
 
-    //! computes the gradient magnitude distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
+    //! computes the gradient magnitude distance between two (nChannels*N)-byte vectors
     template<size_t nChannels, typename T>
     static inline size_t gdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) {
         return gdist<nChannels>(a.data(),b.data());
     }
 
-    //! computes the gradient magnitude distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
+    //! computes the gradient magnitude distance between two (nChannels*N)-byte vectors
     template<size_t nChannels, typename T>
     static inline size_t gdist(const std::array<T,nChannels>& a, const T* const b) {
         return gdist<nChannels>(a.data(),b);
     }
 
-    //! computes the gradient magnitude distance between two (nChannels*N)-byte vectors using an 8-bit popcount LUT
+    //! computes the gradient magnitude distance between two (nChannels*N)-byte vectors
     template<size_t nChannels, typename T>
     static inline size_t gdist(const T* const a, const std::array<T,nChannels>& b) {
         return gdist<nChannels>(a,b.data());
