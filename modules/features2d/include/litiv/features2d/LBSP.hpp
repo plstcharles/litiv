@@ -324,21 +324,28 @@ protected:
     const size_t m_nThreshold;
     cv::Mat m_oRefImage;
 
+    // arrays below do not rely on std::array to avoid multi-dim init problems w/ static constexpr in header files
+
     //! note: this is the LBSP 16 bit double-cross indiv RGB/RGBA pattern as used in the original article by G.-A. Bilodeau et al.
     //  O   O   O          4 ..  3 ..  6
     //    O O O           .. 15  8 13 ..
     //  O O X O O    =>    0  9  X 11  1
     //    O O O           .. 12 10 14 ..
     //  O   O   O          7 ..  2 ..  5
-    static const std::array<std::array<int,2>,16> s_anIdxLUT_16bitdbcross;
-    static const std::array<uint,4> s_anIdxLUT_16bitdbcross_Horiz_Bits;
-    static const std::array<uint,4> s_anIdxLUT_16bitdbcross_Diag_Bits;
-    static const std::array<uint,4> s_anIdxLUT_16bitdbcross_Vert_Bits;
-    static const std::array<uint,4> s_anIdxLUT_16bitdbcross_DiagInv_Bits;
-    static const std::array<uint,12> s_anIdxLUT_16bitdbcross_GradX_Idxs;
-    static const std::array<uint,12> s_anIdxLUT_16bitdbcross_GradY_Idxs;
-    static const std::array<int,16> s_anIdxLUT_16bitdbcross_GradX;
-    static const std::array<int,16> s_anIdxLUT_16bitdbcross_GradY;
+    static constexpr int s_anIdxLUT_16bitdbcross[16][2] = {
+           {-2, 0}, { 2, 0}, { 0,-2}, { 0, 2},
+           {-2, 2}, { 2,-2}, { 2, 2}, {-2,-2},
+           { 0, 1}, {-1, 0}, { 0,-1}, { 1, 0},
+           {-1,-1}, { 1, 1}, { 1,-1}, {-1, 1},
+    };
+    static constexpr uint s_anIdxLUT_16bitdbcross_Horiz_Bits[4] = {1<<0,1<<9,1<<11,1<<1};
+    static constexpr uint s_anIdxLUT_16bitdbcross_Diag_Bits[4] = {1<<4,1<<15,1<<14,1<<5};
+    static constexpr uint s_anIdxLUT_16bitdbcross_Vert_Bits[4] = {1<<3,1<<8,1<<10,1<<2};
+    static constexpr uint s_anIdxLUT_16bitdbcross_DiagInv_Bits[4] = {1<<7,1<<12,1<<13,1<<6};
+    static constexpr int s_anIdxLUT_16bitdbcross_GradX[16] = {1,-1,0,0,1,-1,-1,1,0,1,0,-1,1,-1,-1,1};
+    //static constexpr int s_anIdxLUT_16bitdbcross_GradX[16] = {1,-1,0,0,0,0,0,0,0,2,0,-2,1,-1,-1,1};
+    static constexpr int s_anIdxLUT_16bitdbcross_GradY[16] = {0,0,-1,1,1,-1,1,-1,1,0,-1,0,-1,1,-1,1};
+    //static constexpr int s_anIdxLUT_16bitdbcross_GradY[16] = {0,0,-1,1,0,0,0,0,2,0,-2,0,-1,1,-1,1};
 
     template<size_t nChannels, typename Tv>
     static inline void lookup_16bits_dbcross(const Tv* const _data, const int _x, const int _y, const size_t _c, const size_t _step_row, Tv* const anVals) {
