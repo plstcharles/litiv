@@ -78,7 +78,7 @@ public:
     //! utility, specifies the number of bits per descriptor
     static constexpr size_t DESC_SIZE_BITS = DESC_SIZE*8;
     //! utility, specifies the maximum gradient magnitude value that can be returned by computeDescriptor_orientation
-    static constexpr size_t MAX_GRAD_MAG = DESC_SIZE_BITS*2;
+    static constexpr size_t MAX_GRAD_MAG = DESC_SIZE_BITS;
 #if HAVE_GLSL
     //! utility function, returns the glsl source code required to describe an LBSP descriptor based on the image load store
     static std::string getShaderFunctionSource(size_t nChannels, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize);
@@ -183,8 +183,8 @@ public:
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP orientation estimation function (w/ optional bitmask gaps, useful for counting)
-    template<typename To=LBSP::eGradientOrientation, size_t nBitMaskWordSize=1, typename Tr>
-    inline static To computeDescriptor_orientation(const Tr& nDesc) {
+    template<size_t nBitMaskWordSize=1, typename Tr>
+    inline static LBSP::eGradientOrientation computeDescriptor_orientation(const Tr nDesc) {
         // simple example of counter init: To=ushort, nBitMaskWordSize=4 => 4x bit counters with [0,15] range
         static_assert(nBitMaskWordSize>0,"bit mask word size needs to be larger or equal to one");
         static_assert(nBitMaskWordSize*4<=sizeof(To)*8,"bit mask word size is too large for output type");
@@ -266,7 +266,7 @@ public:
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP gradient computation function (mixes rel+abs, returns max-channel only)
-    template<size_t nChannels, size_t nShift=1, typename Tr1=short, typename Tr2=ushort>
+    template<size_t nChannels, size_t nShift=2, typename Tr1=short, typename Tr2=ushort>
     inline static void computeDescriptor_gradient(const uchar* const aanVals, const uchar* const anRefs, const uchar nThreshold, Tr1& nGradX, Tr1& nGradY, Tr2& nGradMag) {
         // note: this function is used to threshold a multi-channel LBSP pattern based on a predefined lookup array (see LBSP_16bits_dbcross_lookup for more information)
         // @@@ todo: use array template to unroll loops & allow any descriptor size here
@@ -280,7 +280,7 @@ public:
         nGradMag = 0;
         CxxUtils::unroll<LBSP::DESC_SIZE_BITS>([&](int n) {
             const Tr2 nCurrDist = (Tr2)DistanceUtils::L1dist(aanVals[(nChannels-1)*LBSP::DESC_SIZE_BITS+n],anRefs[(nChannels-1)]);
-            const Tr2 nCurrGradMag = (Tr2)bool(nCurrDist>anRefs[(nChannels-1)]>>nShift) + (Tr2)bool(nCurrDist>nThreshold);
+            const Tr2 nCurrGradMag = (Tr2)(bool(nCurrDist>((anRefs[(nChannels-1)]>>nShift)+nThreshold)/2));
             nGradX += (Tr1)(s_anIdxLUT_16bitdbcross_GradX[n]*nCurrGradMag); // range: [-4,4]x16
             nGradY += (Tr1)(s_anIdxLUT_16bitdbcross_GradY[n]*nCurrGradMag);
             //nGradMag += nCurrGradMag*nCurrGradMag; // range: [0-4]x16
@@ -295,7 +295,7 @@ public:
             Tr2 nNewGradMag = 0;
             CxxUtils::unroll<LBSP::DESC_SIZE_BITS>([&](int n) {
                 const Tr2 nCurrDist = (Tr2)DistanceUtils::L1dist(aanVals[cn*LBSP::DESC_SIZE_BITS+n],anRefs[cn]);
-                const Tr2 nCurrGradMag = (Tr2)bool(nCurrDist>anRefs[cn]>>nShift) + (Tr2)bool(nCurrDist>nThreshold);
+                const Tr2 nCurrGradMag = (Tr2)(bool(nCurrDist>((anRefs[cn]>>nShift)+nThreshold)/2));
                 nNewGradX += (Tr1)(s_anIdxLUT_16bitdbcross_GradX[n]*nCurrGradMag);
                 nNewGradY += (Tr1)(s_anIdxLUT_16bitdbcross_GradY[n]*nCurrGradMag);
                 //nNewGradMag += nCurrGradMag*nCurrGradMag;
