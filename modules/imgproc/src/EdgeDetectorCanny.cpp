@@ -39,9 +39,9 @@ void EdgeDetectorCanny::apply_threshold(cv::InputArray _oInputImage, cv::OutputA
     cv::Mat oEdgeMask = _oEdgeMask.getMat();
     if(dThreshold<0||dThreshold>1)
         dThreshold = getDefaultThreshold();
-    const size_t nCurrBaseHystThreshold = (size_t)(dThreshold*EDGCANNY_DEFAULT_MAX_THRESHOLD);
-    static const int nWindowSize = EDGCANNY_DEFAULT_NMS_WINDOW_SIZE;
-    static const bool bUseL2Gradient = EDGCANNY_DEFAULT_USE_L2_GRADIENT_NORM;
+    const size_t nCurrBaseHystThreshold = (size_t)(dThreshold*EDGCANNY_MAX_THRESHOLD);
+    static const int nWindowSize = EDGCANNY_SOBEL_KERNEL_SIZE;
+    static const bool bUseL2Gradient = EDGCANNY_USE_L2_GRADIENT_NORM;
     // threshold max for canny w/ 3x3 sobel & L1 gradient : 255*(1+2)*2 = 1530
     // threshold max for canny w/ 3x3 sobel & L2 gradient : (255*(1+2)^2) = 585225
     litiv::cv_canny<nWindowSize,bUseL2Gradient>(oInputImg,oEdgeMask,nCurrBaseHystThreshold*m_dHystLowThrshFactor,(double)nCurrBaseHystThreshold);

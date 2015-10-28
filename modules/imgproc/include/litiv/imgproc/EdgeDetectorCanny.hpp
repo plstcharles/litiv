@@ -21,18 +21,18 @@
 
 // note: all default parameters mimic matlab's implementation
 
+//! defines the default value for the norm type used to compute gradient magnitudes
+#define EDGCANNY_USE_L2_GRADIENT_NORM (true)
+//! defines the default value for the aperture (or window) size used for Sobel gradient estimation
+#define EDGCANNY_SOBEL_KERNEL_SIZE (5)
+//! defines the default value for the maximum gradient magnitude integer threshold used internally for 'apply'
+#define EDGCANNY_MAX_THRESHOLD (EDGCANNY_SOBEL_KERNEL_SIZE==3?0x200:0x4000) // required since gradient magnitudes are not normalized internally
+//! defines the default value for the threshold passed to EdgeDetectorCanny::apply_threshold
+#define EDGCANNY_DEFAULT_THRESHOLD (EDGCANNY_SOBEL_KERNEL_SIZE==3?75.0:450.0/EDGCANNY_MAX_THRESHOLD)
 //! defines the default value for EdgeDetectorCanny::m_dHystLowThrshFactor
 #define EDGCANNY_DEFAULT_HYST_LOW_THRSH_FACT (0.4)
 //! defines the default value for EdgeDetectorCanny::m_dGaussianKernelSigma
 #define EDGCANNY_DEFAULT_GAUSSIAN_KERNEL_SIGMA (2)
-//! defines the default value for the norm type used to compute gradient magnitudes
-#define EDGCANNY_DEFAULT_USE_L2_GRADIENT_NORM (true)
-//! defines the default value for the aperture (or window) size used for non-max suppression
-#define EDGCANNY_DEFAULT_NMS_WINDOW_SIZE (3)
-//! defines the default value for the maximum gradient magnitude integer threshold used internally for 'apply'
-#define EDGCANNY_DEFAULT_MAX_THRESHOLD (512) // required since gradient magnitudes are not normalized internally
-//! defines the default value for the threshold passed to EdgeDetectorCanny::apply_threshold
-#define EDGCANNY_DEFAULT_THRESHOLD (75.0/EDGCANNY_DEFAULT_MAX_THRESHOLD)
 
 /*!
     Canny edge detection algorithm (wraps the OpenCV implementation).
