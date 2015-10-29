@@ -89,7 +89,7 @@ inline bool isLocalMaximum_Diagonal(const Tr* const anGradPos, const size_t nGra
 }
 
 template<size_t nChannels>
-void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Mat& oEdgeMask, uchar nDetThreshold, uchar nLBSPThreshold) {
+void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Mat& oEdgeMask, uchar nDetThreshold) {
     //cv::Mat oNewInput = oInputImg;
     //oNewInput = cv::Scalar_<uchar>::all(0);
     //cv::circle(oNewInput,cv::Point(oInputImg.cols/2,oInputImg.rows/2),100,cv::Scalar_<uchar>::all(255),20);
@@ -204,7 +204,6 @@ void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Ma
         }
     }
 #if USE_CANNY_NMS_HYST_STEPS
-    const uchar nAbsLBSPThreshold = cv::saturate_cast<uchar>(nLBSPThreshold);
     const uchar nHystHighThreshold = nDetThreshold;
     const uchar nHystLowThreshold = (uchar)(nDetThreshold*m_dHystLowThrshFactor);
     constexpr size_t nNMSWinSize = USE_5x5_NON_MAX_SUPP?LBSP::PATCH_SIZE:3;
@@ -265,7 +264,7 @@ void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Ma
                     const uchar* const auRefColor = (oPyrMap.data+nColLUTIdx/LBSP::DESC_SIZE_BITS);
                     char nGradX, nGradY;
                     uchar nGradMag;
-                    LBSP::computeDescriptor_gradient<nChannels>(anCurrLUT,auRefColor,nAbsLBSPThreshold,nGradX,nGradY,nGradMag);
+                    LBSP::computeDescriptor_gradient<nChannels>(anCurrLUT,auRefColor,nGradX,nGradY,nGradMag);
 #if USE_MIN_GRAD_ORIENT
                     const auto lAbsComp = [](char a, char b){return std::abs(a)<std::abs(b);}; // @@@ retest w/ fixed char sign (done)
                     (char&)(anGradRow[nColIter*nGradMapColStep]) = std::min(nGradX,char(anGradRow[nColIter*nGradMapColStep]),lAbsComp);
@@ -413,10 +412,10 @@ void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Ma
 #endif //USE_DOLLAR_STR_RAND_FOR
 }
 
-template void EdgeDetectorLBSP::apply_threshold_internal<1>(const cv::Mat&, cv::Mat&, uchar, uchar);
-template void EdgeDetectorLBSP::apply_threshold_internal<2>(const cv::Mat&, cv::Mat&, uchar, uchar);
-template void EdgeDetectorLBSP::apply_threshold_internal<3>(const cv::Mat&, cv::Mat&, uchar, uchar);
-template void EdgeDetectorLBSP::apply_threshold_internal<4>(const cv::Mat&, cv::Mat&, uchar, uchar);
+template void EdgeDetectorLBSP::apply_threshold_internal<1>(const cv::Mat&, cv::Mat&, uchar);
+template void EdgeDetectorLBSP::apply_threshold_internal<2>(const cv::Mat&, cv::Mat&, uchar);
+template void EdgeDetectorLBSP::apply_threshold_internal<3>(const cv::Mat&, cv::Mat&, uchar);
+template void EdgeDetectorLBSP::apply_threshold_internal<4>(const cv::Mat&, cv::Mat&, uchar);
 
 void EdgeDetectorLBSP::apply_threshold(cv::InputArray _oInputImage, cv::OutputArray _oEdgeMask, double dDetThreshold) {
     cv::Mat oInputImg = _oInputImage.getMat();
@@ -435,13 +434,13 @@ void EdgeDetectorLBSP::apply_threshold(cv::InputArray _oInputImage, cv::OutputAr
     const uchar nDetThreshold = (uchar)(dDetThreshold*LBSP::MAX_GRAD_MAG);
     const int nChannels = oInputImg.channels();
     if(nChannels==1)
-        apply_threshold_internal<1>(oInputImg,oEdgeMask,nDetThreshold,EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER);
+        apply_threshold_internal<1>(oInputImg,oEdgeMask,nDetThreshold);
     else if(nChannels==2)
-        apply_threshold_internal<2>(oInputImg,oEdgeMask,nDetThreshold,EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER);
+        apply_threshold_internal<2>(oInputImg,oEdgeMask,nDetThreshold);
     else if(nChannels==3)
-        apply_threshold_internal<3>(oInputImg,oEdgeMask,nDetThreshold,EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER);
+        apply_threshold_internal<3>(oInputImg,oEdgeMask,nDetThreshold);
     else if(nChannels==4)
-        apply_threshold_internal<4>(oInputImg,oEdgeMask,nDetThreshold,EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER);
+        apply_threshold_internal<4>(oInputImg,oEdgeMask,nDetThreshold);
     else
         CV_Error(0,"Unexpected channel count");
 }

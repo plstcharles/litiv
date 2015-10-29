@@ -24,9 +24,7 @@
 //! defines the default value for EdgeDetectorLBSP::m_nLevels
 #define EDGLBSP_DEFAULT_LEVEL_COUNT (3)
 //! defines the default value for EdgeDetectorLBSP::m_dHystLowThrshFactor (if needed)
-#define EDGLBSP_DEFAULT_HYST_LOW_THRSH_FACT (0.25)
-//! defines the default integral [0,255] LBSP detection threshold value
-#define EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER (20)
+#define EDGLBSP_DEFAULT_HYST_LOW_THRSH_FACT (0.5)
 //! defines the default integral [0,255] edge detection threshold value
 #define EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER (12)
 //! defines the default value for the threshold passed to EdgeDetectorLBSP::apply_threshold
@@ -40,8 +38,6 @@ public:
                       bool bNormalizeOutput=false);
     //! returns the default edge detection threshold value used in 'apply'
     virtual double getDefaultThreshold() const {return EDGLBSP_DEFAULT_DET_THRESHOLD;}
-    //! returns the default LBSP descriptor internal threshold used for comparions (also used in 'apply')
-    virtual uchar getDefaultLBSPThreshold() const {return EDGLBSP_DEFAULT_LBSP_THRESHOLD_INTEGER;}
     //! thresholded edge detection function; the edge detection threshold should be between 0 and 1 (will use default otherwise)
     virtual void apply_threshold(cv::InputArray oInputImage, cv::OutputArray oEdgeMask, double dDetThreshold=EDGLBSP_DEFAULT_DET_THRESHOLD);
     //! edge detection function; returns a confidence edge mask (0-255) instead of a thresholded/binary edge mask
@@ -66,5 +62,5 @@ protected:
 
     //! internal single-threshold edge det function w/ explicit def for 1/2/3/4 channel(s)
     template<size_t nChannels>
-    void apply_threshold_internal(const cv::Mat& oInputImg, cv::Mat& oEdgeMask, uchar nDetThreshold, uchar nLBSPThreshold);
+    void apply_threshold_internal(const cv::Mat& oInputImg, cv::Mat& oEdgeMask, uchar nDetThreshold);
 };
