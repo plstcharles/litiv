@@ -17,12 +17,8 @@
 
 #include "litiv/features2d/LBSP.hpp"
 
-// make sure static constexpr var addresses exist
+// make sure static constexpr array addresses exist
 constexpr int LBSP::s_anIdxLUT_16bitdbcross[16][2];
-constexpr uint LBSP::s_anIdxLUT_16bitdbcross_Horiz_Bits[4];
-constexpr uint LBSP::s_anIdxLUT_16bitdbcross_Diag_Bits[4];
-constexpr uint LBSP::s_anIdxLUT_16bitdbcross_Vert_Bits[4];
-constexpr uint LBSP::s_anIdxLUT_16bitdbcross_DiagInv_Bits[4];
 constexpr int LBSP::s_anIdxLUT_16bitdbcross_GradX[16];
 constexpr int LBSP::s_anIdxLUT_16bitdbcross_GradY[16];
 

@@ -51,13 +51,13 @@ void IBackgroundSubtractorLBSP_<eImpl>::initialize_common(const cv::Mat& oInitIm
                     alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE_BITS>,3> aanLBSPLookupVals;
                     LBSP::computeDescriptor_lookup(oInitImg,nImgCoord_X,nImgCoord_Y,aanLBSPLookupVals);
                     for(size_t c=0; c<3; ++c)
-                        LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],oInitImg.data[nPxRGBIter+c],m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
+                        ((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c] = LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],oInitImg.data[nPxRGBIter+c],m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]]);
                 }
                 else { //m_nImgChannels==4
                     alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE_BITS>,4> aanLBSPLookupVals;
                     LBSP::computeDescriptor_lookup(oInitImg,nImgCoord_X,nImgCoord_Y,aanLBSPLookupVals);
                     for(size_t c=0; c<4; ++c)
-                        LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],oInitImg.data[nPxRGBIter+c],m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]],((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c]);
+                        ((ushort*)(m_oLastDescFrame.data+nDescRGBIter))[c] = LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],oInitImg.data[nPxRGBIter+c],m_anLBSPThreshold_8bitLUT[oInitImg.data[nPxRGBIter+c]]);
                 }
             }
         }
