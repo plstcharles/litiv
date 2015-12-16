@@ -40,13 +40,11 @@ private:
 
     //cpu buffer
     float *m_clusters;
-    float* m_distances;
-    float *m_labels, *m_labelsCPU;
-    float* m_isTaken;
+    float *m_labels;
 
     // gpu variable
-    uchar4* frameBGRA_g;
-    float4* frameLab_g;
+   // uchar4* frameBGRA_g;
+    //float4* frameLab_g;
     float* labels_g;
     float* clusters_g;
     float* accAtt_g;
@@ -55,12 +53,14 @@ private:
 
     cudaArray* frameBGRA_array;
     cudaArray* frameLab_array;
+    cudaArray* labels_array;
 
 
 
     //texture object
     cudaTextureObject_t frameBGRA_tex;
     cudaSurfaceObject_t frameLab_surf;
+    cudaSurfaceObject_t labels_surf;
 
 
 
@@ -94,6 +94,6 @@ public:
 
 };
 
-__global__ void k_initClusters(float4* frameLab,float* clusters,int width, int height, int nSpxPerRow, int nSpxPerCol);
-__global__ void k_assignement(int width, int height,int wSpx, int hSpx,cudaSurfaceObject_t frameLab, float* labels,float* clusters,float* accAtt,float wc2);
+__global__ void k_initClusters(cudaSurfaceObject_t frameLab,float* clusters,int width, int height, int nSpxPerRow, int nSpxPerCol);
+__global__ void k_assignement(int width, int height,int wSpx, int hSpx,cudaSurfaceObject_t frameLab, cudaSurfaceObject_t labels,float* clusters,float* accAtt,float wc2);
 __global__ void k_update(int nSpx,float* clusters, float* accAtt);

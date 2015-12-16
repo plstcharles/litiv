@@ -73,8 +73,6 @@ __global__ void kRgb2CIELab(cudaTextureObject_t inputImg, cudaSurfaceObject_t ou
         fPixel.z = b;
         fPixel.w = 0;
 
-        //outputImg[offset]=fPixel;
-
         surf2Dwrite(fPixel, outputImg, px*16 , py);
     }
 
@@ -100,16 +98,16 @@ __global__ void k_initClusters(cudaSurfaceObject_t frameLab,float* clusters,int 
         surf2Dread(&color,frameLab, x * 16, y);
 
 
-        clusters[idx_c5] = color.x;//frameLab[y*width+x].x;
-        clusters[idx_c5+1] = color.y;//frameLab[y*width+x].y;
-        clusters[idx_c5+2] = color.z;//frameLab[y*width+x].z;
+        clusters[idx_c5] = color.x;
+        clusters[idx_c5+1] = color.y;
+        clusters[idx_c5+2] = color.z;
         clusters[idx_c5+3] = x;
         clusters[idx_c5+4] = y;
     }
 }
 
 
-__global__ void k_assignement(int width, int height,int wSpx, int hSpx,cudaSurfaceObject_t frameLab, float* labels,float* clusters,float* accAtt_g,float wc2){
+__global__ void k_assignement(int width, int height,int wSpx, int hSpx,cudaSurfaceObject_t frameLab, cudaSurfaceObject_t labels,float* clusters,float* accAtt_g,float wc2){
 
     // gather NNEIGH surrounding clusters
 
@@ -190,7 +188,7 @@ __global__ void k_assignement(int width, int height,int wSpx, int hSpx,cudaSurfa
                 }
             }
         }
-        labels[pxpy] = labelMin;
+        surf2Dwrite(labelMin,labels,px*4,py);
 
         int labelMin6 = int(labelMin*6);
         atomicAdd(&accAtt_g[labelMin6],px_Lab.x);
@@ -250,9 +248,6 @@ __host__ void SLIC_cuda::InitClusters()
 }
 __host__ void SLIC_cuda::Assignement() {
 
-    //dim3 threadsPerBlock(m_wSpx, m_hSpx);
-    //dim3 numBlocks(m_width / threadsPerBlock.x, m_height / threadsPerBlock.y);
-
     int hMax = NMAX_THREAD/m_hSpx;
     int nBlockPerClust = iDivUp(m_hSpx,hMax);
 
@@ -262,7 +257,7 @@ __host__ void SLIC_cuda::Assignement() {
     CV_Assert(threadPerBlock.x>=3 && threadPerBlock.y>=3);
 
     float wc2 = m_wc * m_wc;
-    k_assignement <<< blockPerGrid, threadPerBlock >>>(m_width, m_height, m_wSpx, m_hSpx, frameLab_surf, labels_g, clusters_g, accAtt_g, wc2);
+    k_assignement <<< blockPerGrid, threadPerBlock >>>(m_width, m_height, m_wSpx, m_hSpx, frameLab_surf, labels_surf, clusters_g, accAtt_g, wc2);
 
 }
 __host__ void SLIC_cuda::Update()

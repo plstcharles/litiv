@@ -27,8 +27,6 @@ int main() {
     cv::imshow("out",out);
 
 
-
-
     cv::waitKey();
 
     return 0;
