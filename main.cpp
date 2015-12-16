@@ -17,7 +17,7 @@ int main() {
         auto start = cv::getTickCount();
         slic.Segment(im);
         auto end = cv::getTickCount();
-        cout<<"runtime gpu "<<(end-start)/cv::getTickFrequency()<<endl;
+        cout<<"runtime gpu "<<(end-start)/cv::getTickFrequency()<<" for "<<N_ITER<<" iteration"<<endl;
     }
 
 

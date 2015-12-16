@@ -2,6 +2,7 @@
 // Created by derue on 15/12/15.
 //
 
+#include <driver_types.h>
 #include "SLIC_cuda.h"
 
 using namespace std;
@@ -49,8 +50,8 @@ void SLIC_cuda::Segment(cv::Mat &frame) {
     InitClusters();//ok
     cudaDeviceSynchronize();
 
-    int nIt = 1;
-    for(int i=0; i<nIt; i++) {
+
+    for(int i=0; i<N_ITER; i++) {
         //auto start = cv::getTickCount();
 
         Assignement();
@@ -61,9 +62,9 @@ void SLIC_cuda::Segment(cv::Mat &frame) {
         cudaDeviceSynchronize();
     }
 
-    float* test = new float[m_nPx];
-    cv::Mat checkFrame(frame.size(),CV_32F,test);
-    gpuErrchk(cudaMemcpy((float*)checkFrame.data,labels_g,m_nPx* sizeof(float),cudaMemcpyDeviceToHost));
+    //float* test = new float[m_nPx];
+    //cv::Mat checkFrame(frame.size(),CV_32F,test);
+    //gpuErrchk(cudaMemcpy((float*)checkFrame.data,labels_g,m_nPx* sizeof(float),cudaMemcpyDeviceToHost));
 
     //cout<<checkFrame<<endl;
 
@@ -74,8 +75,20 @@ void SLIC_cuda::Segment(cv::Mat &frame) {
 void SLIC_cuda::InitBuffers() {
 
     //allocate buffers on gpu
-    gpuErrchk(cudaMalloc((void**)&frameBGRA_g, m_nPx*sizeof(uchar4))); //4 channels for padding
+    //gpuErrchk(cudaMalloc((void**)&frameBGRA_g, m_nPx*sizeof(uchar4))); //4 channels for padding
+
+    cudaChannelFormatDesc channelDescr = cudaCreateChannelDesc(8,8,8,8,cudaChannelFormatKindUnsigned);
+    gpuErrchk(cudaMallocArray(&frameBGRA_array,&channelDescr,m_width,m_height));
+
     gpuErrchk(cudaMalloc((void**)&frameLab_g, m_nPx*sizeof(float4))); //4 channels for padding
+
+    cudaChannelFormatDesc channelDescrLab = cudaCreateChannelDesc(32,32,32,32,cudaChannelFormatKindFloat);
+    gpuErrchk(cudaMallocArray(&frameLab_array,&channelDescrLab,m_width,m_height,cudaArraySurfaceLoadStore));
+
+
+
+
+
     gpuErrchk(cudaMalloc((void**)&labels_g, m_nPx*sizeof(float)));
     gpuErrchk(cudaMalloc((void**)&clusters_g, m_nSpx*sizeof(float)*5)); // 5-D centroid
     gpuErrchk(cudaMalloc((void**)&accAtt_g, m_nSpx*sizeof(float)*6)); // 5-D centroid acc + 1 counter
@@ -91,12 +104,56 @@ void SLIC_cuda::SendFrame(cv::Mat& frameBGR){
     cv::cvtColor(frameBGR,frameBGRA,CV_BGR2BGRA);
     CV_Assert(frameBGRA.type()==CV_8UC4);
     CV_Assert(frameBGRA.isContinuous());
-    gpuErrchk(cudaMemcpy(frameBGRA_g, (float*)frameBGRA.data, frameBGRA.rows*frameBGRA.cols*frameBGRA.channels()*sizeof(uchar), cudaMemcpyHostToDevice));
-    Rgb2CIELab(frameBGRA_g,frameLab_g,m_width,m_height);
+
+    cudaMemcpyToArray(frameBGRA_array,0,0,(uchar*)frameBGRA.data,m_nPx* sizeof(uchar4),cudaMemcpyHostToDevice); //ok
+    // Specify texture
+    cudaResourceDesc resDesc;
+    memset(&resDesc, 0, sizeof(resDesc));
+    resDesc.resType = cudaResourceTypeArray;
+    resDesc.res.array.array = frameBGRA_array;
+
+    // Specify texture object parameters
+    cudaTextureDesc texDesc;
+    memset(&texDesc, 0, sizeof(texDesc));
+    texDesc.addressMode[0]    = cudaAddressModeClamp;
+    texDesc.addressMode[1]    = cudaAddressModeClamp;
+    texDesc.filterMode       = cudaFilterModePoint;
+    texDesc.readMode         = cudaReadModeElementType;
+    texDesc.normalizedCoords = false;
+
+    gpuErrchk(cudaCreateTextureObject(&frameBGRA_tex, &resDesc,&texDesc,NULL));
+
+    // Specify surface
+    cudaResourceDesc resDescLab;
+    memset(&resDescLab, 0, sizeof(resDescLab));
+    resDescLab.resType = cudaResourceTypeArray;
+
+    // Create the surface objects
+    resDescLab.res.array.array = frameLab_array;
+    gpuErrchk(cudaCreateSurfaceObject(&frameLab_surf, &resDescLab));
+
+    Rgb2CIELab(frameBGRA_tex,frameLab_surf,m_width,m_height);
 
 
-    //cv::Mat checkFrame(frameBGR.size(),CV_32FC4,cv::Scalar(0,0,0,0));
-    //gpuErrchk(cudaMemcpy((float*)checkFrame.data,frameLab_g,m_nPx* sizeof(float4),cudaMemcpyDeviceToHost));
+
+
+
+
+
+
+
+
+
+
+
+    //gpuErrchk(cudaMemcpy(frameBGRA_g, frameBGRA.data, frameBGRA.rows*frameBGRA.cols*frameBGRA.channels()*sizeof(uchar), cudaMemcpyHostToDevice));
+    //Rgb2CIELab(frameBGRA_g,frameLab_g,m_width,m_height);
+
+
+
+   // cv::Mat checkFrame(frameBGR.size(),CV_32FC4,cv::Scalar(0,0,0,0));
+
+    //cudaMemcpyFromArray((float*)checkFrame.data,frameLab_array,0,0,m_nPx* sizeof(float4),cudaMemcpyDeviceToHost);
 
     //cout<<checkFrame<<endl;
 }
@@ -152,9 +209,6 @@ void SLIC_cuda::displayBound(cv::Mat &image, cv::Scalar colour)
     for (int i = 0; i < (int)contours.size(); i++) {
         image.at<cv::Vec3b>(contours[i].y, contours[i].x) = cv::Vec3b(colour[0], colour[1], colour[2]);
     }
-
-
-
 }
 
 

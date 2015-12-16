@@ -24,7 +24,7 @@
 #include "funUtils.h"
 
 
-#define N_ITER 5 // Kmean iteration
+#define N_ITER 1 // Kmean iteration
 #define NMAX_THREAD 1024 // depend on gpu
 
 
@@ -51,6 +51,18 @@ private:
     float* clusters_g;
     float* accAtt_g;
 
+    //cudaArray
+
+    cudaArray* frameBGRA_array;
+    cudaArray* frameLab_array;
+
+
+
+    //texture object
+    cudaTextureObject_t frameBGRA_tex;
+    cudaSurfaceObject_t frameLab_surf;
+
+
 
     //========= methods ===========
     // init centroids uniformly on a grid spaced by diamSpx
@@ -58,7 +70,7 @@ private:
     //=subroutine =
     void InitBuffers(); // allocate buffers on gpu
     void SendFrame(cv::Mat& frameLab); //transfer frame to gpu buffer
-    void Rgb2CIELab( uchar4* inputImg, float4* outputImg, int width, int height );
+    void Rgb2CIELab( cudaTextureObject_t inputImg, cudaSurfaceObject_t outputImg, int width, int height );
 
 
     //===== Kernel Invocation ======
@@ -83,5 +95,5 @@ public:
 };
 
 __global__ void k_initClusters(float4* frameLab,float* clusters,int width, int height, int nSpxPerRow, int nSpxPerCol);
-__global__ void k_assignement(int width, int height,int wSpx, int hSpx,float4* frameLab, float* labels,float* clusters,float* accAtt,float wc2);
+__global__ void k_assignement(int width, int height,int wSpx, int hSpx,cudaSurfaceObject_t frameLab, float* labels,float* clusters,float* accAtt,float wc2);
 __global__ void k_update(int nSpx,float* clusters, float* accAtt);

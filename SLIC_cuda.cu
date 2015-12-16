@@ -34,46 +34,54 @@ __device__ int convertIdx(int2 wg, int lc_idx,int nBloc_per_row){
 
 //============ Kernel ===============
 
-__global__ void kRgb2CIELab(uchar4* inputImg, float4* outputImg, int width, int height)
+__global__ void kRgb2CIELab(cudaTextureObject_t inputImg, cudaSurfaceObject_t outputImg, int width, int height)
 {
     int offsetBlock = blockIdx.x * blockDim.x + blockIdx.y * blockDim.y * width;
     int offset = offsetBlock + threadIdx.x + threadIdx.y * width;
 
-    uchar4 nPixel=inputImg[offset];
+    int px = blockIdx.x*blockDim.x+threadIdx.x;
+    int py = blockIdx.y*blockDim.y+threadIdx.y;
 
-    float _b=(float)nPixel.x/255.0;
-    float _g=(float)nPixel.y/255.0;
-    float _r=(float)nPixel.z/255.0;
+    if(px<width && py<height) {
+        uchar4 nPixel = tex2D<uchar4>(inputImg, px, py);//inputImg[offset];
 
-    float x=_r*0.412453	+_g*0.357580	+_b*0.180423;
-    float y=_r*0.212671	+_g*0.715160	+_b*0.072169;
-    float z=_r*0.019334	+_g*0.119193	+_b*0.950227;
+        float _b = (float) nPixel.x / 255.0;
+        float _g = (float) nPixel.y / 255.0;
+        float _r = (float) nPixel.z / 255.0;
 
-    x/=0.950456;
-    float y3=exp(log(y)/3.0);
-    z/=1.088754;
+        float x = _r * 0.412453 + _g * 0.357580 + _b * 0.180423;
+        float y = _r * 0.212671 + _g * 0.715160 + _b * 0.072169;
+        float z = _r * 0.019334 + _g * 0.119193 + _b * 0.950227;
 
-    float l,a,b;
+        x /= 0.950456;
+        float y3 = exp(log(y) / 3.0);
+        z /= 1.088754;
 
-    x = x>0.008856 ? exp(log(x)/3.0) : (7.787*x+0.13793);
-    y = y>0.008856 ? y3 : 7.787*y+0.13793;
-    z = z>0.008856 ? z/=exp(log(z)/3.0) : (7.787*z+0.13793);
+        float l, a, b;
 
-    l = y>0.008856 ? (116.0*y3-16.0) : 903.3*y;
-    a=(x-y)*500.0;
-    b=(y-z)*200.0;
+        x = x > 0.008856 ? exp(log(x) / 3.0) : (7.787 * x + 0.13793);
+        y = y > 0.008856 ? y3 : 7.787 * y + 0.13793;
+        z = z > 0.008856 ? z /= exp(log(z) / 3.0) : (7.787 * z + 0.13793);
 
-    float4 fPixel;
-    fPixel.x=l;
-    fPixel.y=a;
-    fPixel.z=b;
-    fPixel.w = 0;
+        l = y > 0.008856 ? (116.0 * y3 - 16.0) : 903.3 * y;
+        a = (x - y) * 500.0;
+        b = (y - z) * 200.0;
 
-    outputImg[offset]=fPixel;
+        float4 fPixel;
+        fPixel.x = l;
+        fPixel.y = a;
+        fPixel.z = b;
+        fPixel.w = 0;
+
+        //outputImg[offset]=fPixel;
+
+        surf2Dwrite(fPixel, outputImg, px*16 , py);
+    }
+
 }
 
 
-__global__ void k_initClusters(float4* frameLab,float* clusters,int width, int height, int nSpxPerRow, int nSpxPerCol){
+__global__ void k_initClusters(cudaSurfaceObject_t frameLab,float* clusters,int width, int height, int nSpxPerRow, int nSpxPerCol){
 
     int idx_c = blockIdx.x*blockDim.x+threadIdx.x,idx_c5=idx_c*5;
     int nSpx = nSpxPerCol*nSpxPerRow;
@@ -88,16 +96,20 @@ __global__ void k_initClusters(float4* frameLab,float* clusters,int width, int h
         int x = j*wSpx+wSpx/2;
         int y = i*hSpx+hSpx/2;
 
-        clusters[idx_c5] = frameLab[y*width+x].x;
-        clusters[idx_c5+1] = frameLab[y*width+x].y;
-        clusters[idx_c5+2] = frameLab[y*width+x].z;
+        float4 color;
+        surf2Dread(&color,frameLab, x * 16, y);
+
+
+        clusters[idx_c5] = color.x;//frameLab[y*width+x].x;
+        clusters[idx_c5+1] = color.y;//frameLab[y*width+x].y;
+        clusters[idx_c5+2] = color.z;//frameLab[y*width+x].z;
         clusters[idx_c5+3] = x;
         clusters[idx_c5+4] = y;
     }
 }
 
 
-__global__ void k_assignement(int width, int height,int wSpx, int hSpx,float4* frameLab, float* labels,float* clusters,float* accAtt_g,float wc2){
+__global__ void k_assignement(int width, int height,int wSpx, int hSpx,cudaSurfaceObject_t frameLab, float* labels,float* clusters,float* accAtt_g,float wc2){
 
     // gather NNEIGH surrounding clusters
 
@@ -148,7 +160,12 @@ __global__ void k_assignement(int width, int height,int wSpx, int hSpx,float4* f
         int py = py_in_grid+px_in_grid/width*hSpx;
         int pxpy = py*width+px;
 
-        float3 px_Lab = make_float3(frameLab[pxpy].x,frameLab[pxpy].y,frameLab[pxpy].z);
+        float4 color;
+        surf2Dread(&color,frameLab,px*16,py);
+
+        //float3 px_Lab = make_float3(frameLab[pxpy].x,frameLab[pxpy].y,frameLab[pxpy].z);
+        float3 px_Lab = make_float3(color.x,color.y,color.z);
+
         float2 px_xy  = make_float2(px,py);
 
         for(int i=0; i<NNEIGH; i++)
@@ -216,10 +233,11 @@ __global__ void k_update(int nSpx,float* clusters, float* accAtt_g)
 
 //============== wrapper =================
 
-__host__ void SLIC_cuda::Rgb2CIELab( uchar4* inputImg, float4* outputImg, int width, int height )
+__host__ void SLIC_cuda::Rgb2CIELab(cudaTextureObject_t inputImg, cudaSurfaceObject_t outputImg, int width, int height )
 {
-    dim3 threadsPerBlock(m_wSpx, m_hSpx);
-    dim3 numBlocks(m_width / threadsPerBlock.x, m_height / threadsPerBlock.y);
+    int side = 16;
+    dim3 threadsPerBlock(side,side);
+    dim3 numBlocks(iDivUp(m_width,side),iDivUp(m_height,side));
     kRgb2CIELab<<<numBlocks,threadsPerBlock>>>(inputImg,outputImg,width,height);
 
 }
@@ -228,7 +246,7 @@ __host__ void SLIC_cuda::InitClusters()
 {
     dim3 threadsPerBlock(NMAX_THREAD);
     dim3 numBlocks(iDivUp(m_nSpx,NMAX_THREAD));
-    k_initClusters<<<numBlocks,threadsPerBlock>>>(frameLab_g,clusters_g,m_width,m_height,m_width/m_wSpx,m_height/m_hSpx);
+    k_initClusters<<<numBlocks,threadsPerBlock>>>(frameLab_surf,clusters_g,m_width,m_height,m_width/m_wSpx,m_height/m_hSpx);
 }
 __host__ void SLIC_cuda::Assignement() {
 
@@ -244,7 +262,7 @@ __host__ void SLIC_cuda::Assignement() {
     CV_Assert(threadPerBlock.x>=3 && threadPerBlock.y>=3);
 
     float wc2 = m_wc * m_wc;
-    k_assignement <<< blockPerGrid, threadPerBlock >>>(m_width, m_height, m_wSpx, m_hSpx, frameLab_g, labels_g, clusters_g, accAtt_g, wc2);
+    k_assignement <<< blockPerGrid, threadPerBlock >>>(m_width, m_height, m_wSpx, m_hSpx, frameLab_surf, labels_g, clusters_g, accAtt_g, wc2);
 
 }
 __host__ void SLIC_cuda::Update()
