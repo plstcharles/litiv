@@ -52,11 +52,6 @@ private:
     float* accAtt_g;
 
 
-
-
-
-    int nBlock;
-
     //========= methods ===========
     // init centroids uniformly on a grid spaced by diamSpx
     void InitClusters();

@@ -3,6 +3,7 @@
 
 #include "SLIC_cuda.h"
 #define MAX_DIST 300000000
+#define NNEIGH 3
 
 
 
@@ -97,82 +98,89 @@ __global__ void k_initClusters(float4* frameLab,float* clusters,int width, int h
 
 
 __global__ void k_assignement(int width, int height,int wSpx, int hSpx,float4* frameLab, float* labels,float* clusters,float* accAtt_g,float wc2){
-    int i = blockDim.y*blockIdx.y+threadIdx.y; //px idx
-    int j = blockDim.x*blockIdx.x+threadIdx.x;
-    int2 wgIdx = make_int2(blockIdx.x,blockIdx.y);
 
-    __shared__ float shareClusters[125];
+    // gather NNEIGH surrounding clusters
+
+    __shared__ float4 sharedLab[NNEIGH][NNEIGH];
+    __shared__ float2 sharedXY[NNEIGH][NNEIGH];
+
+    int nClustPerRow = width/wSpx;
+    int nn2 = NNEIGH/2;
+
+
+    if(threadIdx.x<NNEIGH && threadIdx.y<NNEIGH)
+    {
+        int id_x = threadIdx.x-nn2;
+        int id_y = threadIdx.y-nn2;
+
+        int clustLinIdx = blockIdx.x+id_y*nClustPerRow + id_x;
+        if(clustLinIdx>=0 && clustLinIdx<gridDim.x)
+        {
+            int clustLinIdx5 = clustLinIdx*5;
+            sharedLab[threadIdx.y][threadIdx.x].x = clusters[clustLinIdx5];
+            sharedLab[threadIdx.y][threadIdx.x].y = clusters[clustLinIdx5+1];
+            sharedLab[threadIdx.y][threadIdx.x].z = clusters[clustLinIdx5+2];
+
+            sharedXY[threadIdx.y][threadIdx.x].x = clusters[clustLinIdx5+3];
+            sharedXY[threadIdx.y][threadIdx.x].y = clusters[clustLinIdx5+4];
+        }
+        else
+        {
+            sharedLab[threadIdx.y][threadIdx.x].x = -1;
+        }
+
+    }
+
+    __syncthreads();
+    // Find nearest neighbour
 
     float areaSpx = wSpx*hSpx;
     float distanceMin = MAX_DIST;
     float labelMin = -1;
 
-    if(threadIdx.x<5 && threadIdx.y<5){
-        int l=threadIdx.x-2;
-        int k=threadIdx.y-2;
-        int2 localBlockId = make_int2(blockIdx.x+l,blockIdx.y+k);
-        int idShareClust5 = (threadIdx.y*5+threadIdx.x)*5;
-        if(localBlockId.x>=0 && localBlockId.x< gridDim.x && localBlockId.y>=0 && localBlockId.y<gridDim.y){
-            int clusterId = localBlockId.y*gridDim.x+localBlockId.x;
-            int clusterId5 = clusterId*5;
+    int px_in_grid = blockIdx.x*blockDim.x+threadIdx.x;
+    int py_in_grid = blockIdx.y*blockDim.y+threadIdx.y;
 
-            shareClusters[idShareClust5] = clusters[clusterId5];
-            shareClusters[idShareClust5+1] = clusters[clusterId5+1];
-            shareClusters[idShareClust5+2] = clusters[clusterId5+2];
-            shareClusters[idShareClust5+3] = clusters[clusterId5+3];
-            shareClusters[idShareClust5+4] = clusters[clusterId5+4];
+    int px = px_in_grid%width;
 
-        }else{
-            //case when out ouf bound
-            shareClusters[idShareClust5] = -1;
-        }
-    }
-
-    __syncthreads();
-
-
-//gathering 25 clusters
-    if(j<width && i<height)
+    if(py_in_grid<hSpx && px<width)
     {
-        int ij = (i*width+j);
-        float3 px_Lab = make_float3(frameLab[ij].x,frameLab[ij].y,frameLab[ij].z);
-        float2 px_xy  = make_float2(j,i);
+        int py = py_in_grid+px_in_grid/width*hSpx;
+        int pxpy = py*width+px;
 
+        float3 px_Lab = make_float3(frameLab[pxpy].x,frameLab[pxpy].y,frameLab[pxpy].z);
+        float2 px_xy  = make_float2(px,py);
 
-        //compare 25 centroids
-        for(int cluster_idx=0; cluster_idx<25; cluster_idx++) // cluster locaux
+        for(int i=0; i<NNEIGH; i++)
         {
-            int cluster_idx5 = cluster_idx*5;
-            if(shareClusters[cluster_idx5]!=-1){
-                float2 cluster_xy = make_float2(shareClusters[cluster_idx5+3],shareClusters[cluster_idx5+4]);
-                float3 cluster_Lab = make_float3(shareClusters[cluster_idx5],shareClusters[cluster_idx5+1],shareClusters[cluster_idx5+2]);
+            for(int j=0; j<NNEIGH ; j++)
+            {
+                if(sharedLab[i][j].x!=-1)
+                {
+                    float2 cluster_xy = make_float2(sharedXY[i][j].x,sharedXY[i][j].y);
+                    float3 cluster_Lab = make_float3(sharedLab[i][j].x,sharedLab[i][j].y,sharedLab[i][j].z);
 
-                float2 px_c_xy = px_xy-cluster_xy;
-                float3 px_c_Lab = px_Lab-cluster_Lab;
-
-
-                if(abs(px_c_xy.x)<wSpx && abs(px_c_xy.y)<hSpx){
+                    float2 px_c_xy = px_xy-cluster_xy;
+                    float3 px_c_Lab = px_Lab-cluster_Lab;
 
                     float distTmp = fminf(computeDistance(px_c_xy, px_c_Lab,areaSpx,wc2),distanceMin);
 
                     if(distTmp!=distanceMin){
                         distanceMin = distTmp;
-                        labelMin = convertIdx(wgIdx,cluster_idx,gridDim.x);
+                        labelMin = blockIdx.x+(i-nn2)*nClustPerRow + (j-nn2);
                     }
+
                 }
             }
         }
-        labels[ij] = labelMin;
+        labels[pxpy] = labelMin;
 
-
-
-        // =============== Accumulator : simplify update step ===================
         int labelMin6 = int(labelMin*6);
         atomicAdd(&accAtt_g[labelMin6],px_Lab.x);
         atomicAdd(&accAtt_g[labelMin6+1],px_Lab.y);
         atomicAdd(&accAtt_g[labelMin6+2],px_Lab.z);
-        atomicAdd(&accAtt_g[labelMin6+3],j);
-        atomicAdd(&accAtt_g[labelMin6+4],i);
+        atomicAdd(&accAtt_g[labelMin6+3],px);
+        atomicAdd(&accAtt_g[labelMin6+4],py);
         atomicAdd(&accAtt_g[labelMin6+5],1); //counter
     }
 }
@@ -223,12 +231,20 @@ __host__ void SLIC_cuda::InitClusters()
     k_initClusters<<<numBlocks,threadsPerBlock>>>(frameLab_g,clusters_g,m_width,m_height,m_width/m_wSpx,m_height/m_hSpx);
 }
 __host__ void SLIC_cuda::Assignement() {
-    dim3 threadsPerBlock(m_wSpx, m_hSpx);
-    dim3 numBlocks(m_width / threadsPerBlock.x, m_height / threadsPerBlock.y);
 
+    //dim3 threadsPerBlock(m_wSpx, m_hSpx);
+    //dim3 numBlocks(m_width / threadsPerBlock.x, m_height / threadsPerBlock.y);
+
+    int hMax = NMAX_THREAD/m_hSpx;
+    int nBlockPerClust = iDivUp(m_hSpx,hMax);
+
+    dim3 blockPerGrid(m_nSpx, nBlockPerClust);
+    dim3 threadPerBlock(m_wSpx,std::min(m_hSpx,hMax));
+
+    CV_Assert(threadPerBlock.x>=3 && threadPerBlock.y>=3);
 
     float wc2 = m_wc * m_wc;
-    k_assignement <<< numBlocks, threadsPerBlock >>>(m_width, m_height, m_wSpx, m_hSpx, frameLab_g, labels_g, clusters_g, accAtt_g, wc2);
+    k_assignement <<< blockPerGrid, threadPerBlock >>>(m_width, m_height, m_wSpx, m_hSpx, frameLab_g, labels_g, clusters_g, accAtt_g, wc2);
 
 }
 __host__ void SLIC_cuda::Update()

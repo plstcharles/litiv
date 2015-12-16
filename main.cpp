@@ -13,7 +13,7 @@ int main() {
     SLIC_cuda slic(16,35);
     slic.Initialize(im);
 
-    for(int i = 0; i<10; i++){
+    for(int i = 0; i<5; i++){
         auto start = cv::getTickCount();
         slic.Segment(im);
         auto end = cv::getTickCount();

@@ -49,7 +49,7 @@ void SLIC_cuda::Segment(cv::Mat &frame) {
     InitClusters();//ok
     cudaDeviceSynchronize();
 
-    int nIt = 5;
+    int nIt = 1;
     for(int i=0; i<nIt; i++) {
         //auto start = cv::getTickCount();
 
@@ -57,10 +57,18 @@ void SLIC_cuda::Segment(cv::Mat &frame) {
         cudaDeviceSynchronize();
         //auto end = cv::getTickCount();
         //cout<<"runtime gpu "<<(end-start)/cv::getTickFrequency()<<endl;
-
-        //Update();
-        //cudaDeviceSynchronize();
+        Update();
+        cudaDeviceSynchronize();
     }
+
+    float* test = new float[m_nPx];
+    cv::Mat checkFrame(frame.size(),CV_32F,test);
+    gpuErrchk(cudaMemcpy((float*)checkFrame.data,labels_g,m_nPx* sizeof(float),cudaMemcpyDeviceToHost));
+
+    //cout<<checkFrame<<endl;
+
+
+
 }
 
 void SLIC_cuda::InitBuffers() {
