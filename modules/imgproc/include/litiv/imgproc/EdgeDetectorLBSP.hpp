@@ -25,8 +25,8 @@
 #define EDGLBSP_DEFAULT_LEVEL_COUNT (3)
 //! defines the default value for EdgeDetectorLBSP::m_dHystLowThrshFactor (if needed)
 #define EDGLBSP_DEFAULT_HYST_LOW_THRSH_FACT (0.5)
-//! defines the default integral [0,255] edge detection threshold value
-#define EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER (12)
+//! defines the default integral [0,LBSP::MAX_GRAD_MAG] edge detection threshold value
+#define EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER (LBSP::MAX_GRAD_MAG/2)
 //! defines the default value for the threshold passed to EdgeDetectorLBSP::apply_threshold
 #define EDGLBSP_DEFAULT_DET_THRESHOLD ((double)EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER/LBSP::MAX_GRAD_MAG)
 

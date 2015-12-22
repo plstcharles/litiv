@@ -17,22 +17,11 @@
 
 #include <bitset>
 #include "litiv/imgproc/EdgeDetectorLBSP.hpp"
-#include "litiv/features2d/LBSP.hpp"
 
-#define USE_CANNY_NMS_HYST_STEPS  1
-#define USE_DOLLAR_STR_RAND_FOR   0
-
-#if USE_CANNY_NMS_HYST_STEPS
 #define USE_5x5_NON_MAX_SUPP      1
 #define USE_MIN_GRAD_ORIENT       1
 #define USE_3_AXIS_ORIENT         1
-#endif //USE_CANNY_NMS_HYST_STEPS
-#if USE_DOLLAR_STR_RAND_FOR
 
-#endif //USE_DOLLAR_STR_RAND_FOR
-#if (USE_CANNY_NMS_HYST_STEPS+USE_DOLLAR_STR_RAND_FOR)!=1
-#error "edge detector lbsp internal cfg error"
-#endif //(USE_...+...)!=1
 
 EdgeDetectorLBSP::EdgeDetectorLBSP(size_t nLevels, double dHystLowThrshFactor, bool bNormalizeOutput) :
         EdgeDetector(LBSP::PATCH_SIZE/2),
@@ -203,15 +192,14 @@ void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Ma
             }
         }
     }
-#if USE_CANNY_NMS_HYST_STEPS
     const uchar nHystHighThreshold = nDetThreshold;
     const uchar nHystLowThreshold = (uchar)(nDetThreshold*m_dHystLowThrshFactor);
     constexpr size_t nNMSWinSize = USE_5x5_NON_MAX_SUPP?LBSP::PATCH_SIZE:3;
     constexpr size_t nNMSHalfWinSize = nNMSWinSize>>1;
     const cv::Size oMapSize(oInputImg.cols+nNMSHalfWinSize*2,oInputImg.rows+nNMSHalfWinSize*2);
-    const size_t nGradMapColStep = 3;
+    constexpr size_t nGradMapColStep = 3; // 3ch (gradx, grady, gradmag)
     const size_t nGradMapRowStep = oMapSize.width*nGradMapColStep;
-    const size_t nEdgeMapColStep = 1;
+    constexpr size_t nEdgeMapColStep = 1; // 1ch (label)
     const size_t nEdgeMapRowStep = oMapSize.width*nEdgeMapColStep;
     std::aligned_vector<uchar,32> vuLBSPGradMapData(oMapSize.height*nGradMapRowStep);
     std::aligned_vector<uchar,32> vuEdgeTempMaskData(oMapSize.height*nEdgeMapRowStep);
@@ -300,8 +288,8 @@ void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Ma
                     anGradRow += nGradMapRowStep*nNMSHalfWinSize; // offset by nNMSHalfWinSize rows
                     uchar* anEdgeMapRow = oEdgeTempMask.ptr<uchar>(nRowIter+nNMSHalfWinSize)+nNMSHalfWinSize*nEdgeMapColStep;
                     CV_DbgAssert(anEdgeMapRow>=oEdgeTempMask.datastart+nEdgeMapRowStep*nNMSHalfWinSize && anEdgeMapRow<oEdgeTempMask.dataend-nEdgeMapRowStep*nNMSHalfWinSize);
-                    std::fill(anEdgeMapRow-nNMSHalfWinSize*nGradMapColStep,anEdgeMapRow,1);
-                    std::fill(anEdgeMapRow+oInputImg.cols*nGradMapColStep,anEdgeMapRow+(oInputImg.cols+nNMSHalfWinSize)*nGradMapColStep,1);
+                    std::fill(anEdgeMapRow-nEdgeMapColStep*nNMSHalfWinSize,anEdgeMapRow,1);
+                    std::fill(anEdgeMapRow+oInputImg.cols*nEdgeMapColStep,anEdgeMapRow+(oInputImg.cols+nNMSHalfWinSize)*nEdgeMapColStep,1);
                     stack_check_size(oInputImg.cols);
                     bool nNeighbMax = false;
                     for(size_t nColIter = 0; nColIter<(size_t)oInputImg.cols; ++nColIter) {
@@ -313,8 +301,8 @@ void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Ma
                         const uchar nGradMag = anGradRow[nColIter*nGradMapColStep+2];
                         if(nGradMag>=nHystLowThreshold) {
 #if USE_3_AXIS_ORIENT
-                            const char nGradX = anGradRow[nColIter*nGradMapColStep];
-                            const char nGradY = anGradRow[nColIter*nGradMapColStep+1];
+                            const char nGradX = ((char*)anGradRow)[nColIter*nGradMapColStep];
+                            const char nGradY = ((char*)anGradRow)[nColIter*nGradMapColStep+1];
                             const uint nShift_FPA = 15;
                             constexpr uint nTG22deg_FPA = (int)(0.4142135623730950488016887242097*(1<<nShift_FPA)+0.5); // == tan(pi/8)
                             const uint nGradX_abs = (uint)std::abs(nGradX);
@@ -331,8 +319,15 @@ void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Ma
                                         goto _edge_good;
                                 }
                                 else { // else(nGradX_abs<=2.4142135623730950488016887242097*nGradX_abs == diagonal gradient (sector 1 or 3, depending on grad sign diff)
-                                    if(isLocalMaximum_Diagonal<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep,(nGradX^nGradY)<0))
-                                        goto _edge_good;
+                                    if(nGradX!=0 || nGradY!=0) {
+                                        if(isLocalMaximum_Diagonal<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep,(nGradX^nGradY)>=0))
+                                            goto _edge_good;
+                                    }
+                                    else {
+                                        if(isLocalMaximum_Diagonal<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep,true) ||
+                                           isLocalMaximum_Diagonal<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep,false))
+                                            goto _edge_good;
+                                    }
                                 }
                             }
 #else //!USE_3_AXIS_ORIENT
@@ -344,23 +339,24 @@ void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Ma
 #endif //!USE_3_AXIS_ORIENT
                         }
                         nNeighbMax = false;
-                        anEdgeMapRow[nColIter] = 1; // not an edge
+                        anEdgeMapRow[nColIter*nEdgeMapColStep] = 1; // not an edge
                         continue;
                         _edge_good:
                         // if not neighbor to previously identified edge, and gradmag above max threshold
-                        if(!nNeighbMax && nGradMag>=nHystHighThreshold && anEdgeMapRow[nColIter+nEdgeMapRowStep]!=2) {
+                        if(!nNeighbMax && nGradMag>=nHystHighThreshold && anEdgeMapRow[nColIter*nEdgeMapColStep+nEdgeMapRowStep]!=2) {
                             stack_push(anEdgeMapRow+nColIter);
                             nNeighbMax = true;
                             continue;
                         }
                         //_edge_maybe:
-                        anEdgeMapRow[nColIter] = 0; // might belong to an edge
+                        anEdgeMapRow[nColIter*nEdgeMapColStep] = 0; // might belong to an edge
                     }
                 }
             }
         }
     }
     CV_DbgAssert(oEdgeTempMask.step.p[0]==nEdgeMapRowStep);
+    CV_DbgAssert(oEdgeTempMask.step.p[1]==nEdgeMapColStep);
     while(pauHystStack_top>pauHystStack_bottom) {
         stack_check_size(8);
         uchar* pEdgeAddr = stack_pop();
@@ -404,12 +400,6 @@ void EdgeDetectorLBSP::apply_threshold_internal(const cv::Mat& oInputImg, cv::Ma
     //litiv::cv_canny<3,true>(oInputImg,test_canny_out,double(nHystLowThreshold),double(nHystHighThreshold));
     //cv::imshow("test_canny_out",test_canny_out);
     //cv::waitKey(0);
-
-#elif USE_DOLLAR_STR_RAND_FOR
-
-    //@@@@ WiP
-
-#endif //USE_DOLLAR_STR_RAND_FOR
 }
 
 template void EdgeDetectorLBSP::apply_threshold_internal<1>(const cv::Mat&, cv::Mat&, uchar);
