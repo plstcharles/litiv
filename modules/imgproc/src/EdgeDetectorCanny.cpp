@@ -30,10 +30,11 @@ void EdgeDetectorCanny::apply_threshold(cv::InputArray _oInputImage, cv::OutputA
     CV_Assert(!oInputImg.empty());
     CV_Assert(oInputImg.channels()==1 || oInputImg.channels()==3 || oInputImg.channels()==4);
     if(m_dGaussianKernelSigma>0) {
+        // follows the approach used in Matlab's edge.m implementation of Canny's method
         const int nDefaultKernelSize = int(8*ceil(m_dGaussianKernelSigma));
-        const int nRealKernelSize = nDefaultKernelSize%2==0?nDefaultKernelSize+1:nDefaultKernelSize;
+        const int nRealHalfKernelSize = (nDefaultKernelSize-1)/2;
         oInputImg = oInputImg.clone();
-        cv::GaussianBlur(oInputImg,oInputImg,cv::Size(nRealKernelSize,nRealKernelSize),m_dGaussianKernelSigma,m_dGaussianKernelSigma);
+        cv::GaussianBlur(oInputImg,oInputImg,cv::Size(nRealHalfKernelSize,nRealHalfKernelSize),m_dGaussianKernelSigma,m_dGaussianKernelSigma);
     }
     _oEdgeMask.create(oInputImg.size(),CV_8UC1);
     cv::Mat oEdgeMask = _oEdgeMask.getMat();

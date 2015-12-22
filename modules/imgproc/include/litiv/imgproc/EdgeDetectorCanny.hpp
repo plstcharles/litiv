@@ -32,7 +32,7 @@
 //! defines the default value for EdgeDetectorCanny::m_dHystLowThrshFactor
 #define EDGCANNY_DEFAULT_HYST_LOW_THRSH_FACT (0.4)
 //! defines the default value for EdgeDetectorCanny::m_dGaussianKernelSigma
-#define EDGCANNY_DEFAULT_GAUSSIAN_KERNEL_SIGMA (2)
+#define EDGCANNY_DEFAULT_GAUSSIAN_KERNEL_SIGMA (sqrt(2.0))
 
 /*!
     Canny edge detection algorithm (wraps the OpenCV implementation).
