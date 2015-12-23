@@ -16,7 +16,6 @@
 // limitations under the License.
 
 #include "litiv/imgproc/EdgeDetectorCanny.hpp"
-#include "litiv/imgproc.hpp"
 
 EdgeDetectorCanny::EdgeDetectorCanny(double dHystLowThrshFactor, double dGaussianKernelSigma) :
         m_dHystLowThrshFactor(dHystLowThrshFactor),
@@ -43,14 +42,7 @@ void EdgeDetectorCanny::apply_threshold(cv::InputArray _oInputImage, cv::OutputA
     const size_t nCurrBaseHystThreshold = (size_t)(dThreshold*EDGCANNY_MAX_THRESHOLD);
     static const int nWindowSize = EDGCANNY_SOBEL_KERNEL_SIZE;
     static const bool bUseL2Gradient = EDGCANNY_USE_L2_GRADIENT_NORM;
-    // threshold max for canny w/ 3x3 sobel & L1 gradient : 255*(1+2)*2 = 1530
-    // threshold max for canny w/ 3x3 sobel & L2 gradient : (255*(1+2)^2) = 585225
-    litiv::cv_canny<nWindowSize,bUseL2Gradient>(oInputImg,oEdgeMask,nCurrBaseHystThreshold*m_dHystLowThrshFactor,(double)nCurrBaseHystThreshold);
-#if DEBUG
-    cv::Mat tmp(oEdgeMask.size(),oEdgeMask.type());
-    cv::Canny(oInputImg,tmp,nCurrBaseHystThreshold*m_dHystLowThrshFactor,(double)nCurrBaseHystThreshold,nWindowSize,bUseL2Gradient);
-    CV_Assert(cv::countNonZero(tmp!=oEdgeMask)==0);
-#endif //DEBUG
+    cv::Canny(oInputImg,oEdgeMask,nCurrBaseHystThreshold*m_dHystLowThrshFactor,(double)nCurrBaseHystThreshold,nWindowSize,bUseL2Gradient);
 }
 
 void EdgeDetectorCanny::apply(cv::InputArray _oInputImage, cv::OutputArray _oEdgeMask) {
