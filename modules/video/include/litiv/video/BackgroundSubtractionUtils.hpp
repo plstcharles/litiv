@@ -59,7 +59,7 @@ protected:
     //! input image size
     cv::Size m_oImgSize;
     //! ROI border size to be ignored, useful for descriptor-based methods
-    size_t m_nROIBorderSize;
+    const size_t m_nROIBorderSize;
     //! input image channel size
     size_t m_nImgChannels;
     //! input image type

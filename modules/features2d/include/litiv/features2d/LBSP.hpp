@@ -84,7 +84,7 @@ public:
     static constexpr size_t DESC_SIZE = 2;
     //! utility, specifies the number of bits per descriptor
     static constexpr size_t DESC_SIZE_BITS = DESC_SIZE*8;
-    //! utility, specifies the maximum gradient magnitude value that can be returned by computeDescriptor_orientation
+    //! utility, specifies the maximum gradient magnitude value that can be returned by computeDescriptor_gradient
     static constexpr size_t MAX_GRAD_MAG = DESC_SIZE_BITS;
 
     //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (single-channel lookup, single-channel array thresholding)

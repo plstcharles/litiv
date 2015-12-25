@@ -60,7 +60,12 @@ protected:
     //! multi-level image map size lookup list
     std::vector<cv::Size> m_voMapSizeList;
 
-    //! internal single-threshold edge det function w/ explicit def for 1/2/3/4 channel(s)
+    //! internal lookup/pyramiding function w/ explicit definitions for 1 to 4 channels
     template<size_t nChannels>
-    void apply_threshold_internal(const cv::Mat& oInputImg, cv::Mat& oEdgeMask, uchar nDetThreshold);
+    void apply_internal_lookup(const cv::Mat& oInputImg);
+    void apply_internal_lookup(const cv::Mat& oInputImg, size_t nChannels);
+    //! internal thresholding function w/ explicit definitions for 1 to 4 channels
+    template<size_t nChannels>
+    void apply_internal_threshold(const cv::Mat& oInputImg, cv::Mat& oEdgeMask, uchar nDetThreshold);
+    void apply_internal_threshold(const cv::Mat& oInputImg, cv::Mat& oEdgeMask, uchar nDetThreshold, size_t nChannels);
 };
