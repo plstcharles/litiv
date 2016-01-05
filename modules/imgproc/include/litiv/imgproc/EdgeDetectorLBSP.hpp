@@ -57,8 +57,14 @@ protected:
     std::vector<std::aligned_vector<uchar,32>> m_vvuInputPyrMaps;
     //! pre-allocated image pyramid LUT maps for multi-scale LBSP computation
     std::vector<std::aligned_vector<uchar,32>> m_vvuLBSPLookupMaps;
+    //! pre-allocated image gradient reconstruction map
+    std::aligned_vector<uchar,32> m_vuLBSPGradMapData;
+    //! pre-allocated image edge reconstruction map
+    std::aligned_vector<uchar,32> m_vuEdgeTempMaskData;
     //! multi-level image map size lookup list
     std::vector<cv::Size> m_voMapSizeList;
+    //! hysteresis recursive search stack
+    std::vector<uchar*> m_vuHystStack;
 
     //! internal lookup/pyramiding function w/ explicit definitions for 1 to 4 channels
     template<size_t nChannels>

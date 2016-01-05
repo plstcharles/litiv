@@ -78,7 +78,7 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg) {
             // no slower than fill_n if fill_n is implemented with SSE
             CV_DbgAssert(LBSP::DESC_SIZE_BITS==16); // all channels should already be 16-byte-aligned
             CxxUtils::unroll<nChannels>([&](size_t nChIter){
-                _mm_store_si128((__m128i*)(aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS),_mm_set1_epi8((char)*(aanCurrImg+nChIter)));
+                ParallelUtils::copy_16ub((__m128i*)(aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS),*(aanCurrImg+nChIter));
             });
 #else //!HAVE_SSE2
             CxxUtils::unroll<nChannels>([&](size_t nChIter){
@@ -122,8 +122,9 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg) {
 #else //!HAVE_SSE2
                         uchar* anCurrChLUT = aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS;
                         size_t nLUTSum = 0;
-                        for(size_t nLUTIter = 0; nLUTIter<LBSP::DESC_SIZE_BITS; ++nLUTIter)
+                        CxxUtils::unroll<LBSP::DESC_SIZE_BITS>([&](size_t nLUTIter){
                             nLUTSum += anCurrChLUT[nLUTIter];
+                        });
 #endif //!HAVE_SSE2
                         const size_t nNextPyrImgIdx = nNextColLUTIdx/LBSP::DESC_SIZE_BITS + nChIter;
                         CV_DbgAssert(nNextPyrImgIdx<size_t(oNextPyrInputMap.dataend-oNextPyrInputMap.datastart));
@@ -154,7 +155,7 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg, size_t nC
     else if(nChannels==4)
         apply_internal_lookup<4>(oInputImg);
     else
-        CV_Error(0,"Unexpected channel count");
+        CV_Error(-1,"Unexpected channel count");
 }
 
 template<size_t nChannels>
@@ -174,24 +175,24 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
     const size_t nGradMapRowStep = oMapSize.width*nGradMapColStep;
     constexpr size_t nEdgeMapColStep = 1; // 1ch (label)
     const size_t nEdgeMapRowStep = oMapSize.width*nEdgeMapColStep;
-    std::aligned_vector<uchar,32> vuLBSPGradMapData(oMapSize.height*nGradMapRowStep);
-    std::aligned_vector<uchar,32> vuEdgeTempMaskData(oMapSize.height*nEdgeMapRowStep);
-    cv::Mat oLBSPGradMap(oMapSize,CV_8UC3,vuLBSPGradMapData.data()); // 3ch, X-Y-MAG
-    cv::Mat oEdgeTempMask(oMapSize,CV_8UC1,vuEdgeTempMaskData.data());
-    std::fill(vuLBSPGradMapData.data(),vuLBSPGradMapData.data()+nGradMapRowStep*nNMSHalfWinSize,0);
-    std::fill(vuLBSPGradMapData.data()+(oMapSize.height-nNMSHalfWinSize)*nGradMapRowStep,vuLBSPGradMapData.data()+oMapSize.height*nGradMapRowStep,0);
-    std::fill(vuEdgeTempMaskData.data(),vuEdgeTempMaskData.data()+nEdgeMapRowStep*nNMSHalfWinSize,1);
-    std::fill(vuEdgeTempMaskData.data()+(oMapSize.height-nNMSHalfWinSize)*nEdgeMapRowStep,vuEdgeTempMaskData.data()+oMapSize.height*nEdgeMapRowStep,1);
+    m_vuLBSPGradMapData.resize(oMapSize.height*nGradMapRowStep);
+    m_vuEdgeTempMaskData.resize(oMapSize.height*nEdgeMapRowStep);
+    cv::Mat oLBSPGradMap(oMapSize,CV_8UC3,m_vuLBSPGradMapData.data()); // 3ch, X-Y-MAG
+    cv::Mat oEdgeTempMask(oMapSize,CV_8UC1,m_vuEdgeTempMaskData.data());
+    std::fill(m_vuLBSPGradMapData.data(),m_vuLBSPGradMapData.data()+nGradMapRowStep*nNMSHalfWinSize,0);
+    std::fill(m_vuLBSPGradMapData.data()+(oMapSize.height-nNMSHalfWinSize)*nGradMapRowStep,m_vuLBSPGradMapData.data()+oMapSize.height*nGradMapRowStep,0);
+    std::fill(m_vuEdgeTempMaskData.data(),m_vuEdgeTempMaskData.data()+nEdgeMapRowStep*nNMSHalfWinSize,1);
+    std::fill(m_vuEdgeTempMaskData.data()+(oMapSize.height-nNMSHalfWinSize)*nEdgeMapRowStep,m_vuEdgeTempMaskData.data()+oMapSize.height*nEdgeMapRowStep,1);
 #if USE_MIN_GRAD_ORIENT
-    oLBSPGradMap(cv::Rect(nNMSHalfWinSize,nNMSHalfWinSize,m_voMapSizeList.back().width,m_voMapSizeList.back().height)) = cv::Scalar_<uchar>(CHAR_MAX,CHAR_MAX,UCHAR_MAX);
+    oLBSPGradMap(cv::Rect(nNMSHalfWinSize,nNMSHalfWinSize,m_voMapSizeList.back().width,m_voMapSizeList.back().height)) = cv::Scalar_<uchar>(CHAR_MAX,CHAR_MAX,UCHAR_MAX); // @@@ test 4ch optimization & assignment?
     const auto lAbsCharComp = [](char a, char b){return std::abs(a)<std::abs(b);};
 #else //!USE_MIN_GRAD_ORIENT
     oLBSPGradMap(cv::Rect(nNMSHalfWinSize,nNMSHalfWinSize,m_voMapSizeList.back().width,m_voMapSizeList.back().height)) = cv::Scalar_<uchar>(0,0,UCHAR_MAX);
 #endif //!USE_MIN_GRAD_ORIENT
-    size_t nCurrHystStackSize = std::max((size_t)1<<10,(size_t)oMapSize.area()/8);
-    std::vector<uchar*> vuHystStack(nCurrHystStackSize);
-    uchar** pauHystStack_top = &vuHystStack[0];
-    uchar** pauHystStack_bottom = &vuHystStack[0];
+    size_t nCurrHystStackSize = std::max(std::max((size_t)1<<10,(size_t)oMapSize.area()/8),m_vuHystStack.size());
+    m_vuHystStack.resize(nCurrHystStackSize);
+    uchar** pauHystStack_top = &m_vuHystStack[0];
+    uchar** pauHystStack_bottom = &m_vuHystStack[0];
     auto stack_push = [&](uchar* pAddr) {
         CV_DbgAssert(pAddr>=oEdgeTempMask.datastart+nEdgeMapRowStep*nNMSHalfWinSize);
         CV_DbgAssert(pAddr<oEdgeTempMask.dataend-nEdgeMapRowStep*nNMSHalfWinSize);
@@ -205,8 +206,8 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
         if(ptrdiff_t(pauHystStack_top-pauHystStack_bottom)+nPotentialSize>nCurrHystStackSize) {
             const ptrdiff_t nUsedHystStackSize = pauHystStack_top-pauHystStack_bottom;
             nCurrHystStackSize = std::max(nCurrHystStackSize*2,nUsedHystStackSize+nPotentialSize);
-            vuHystStack.resize(nCurrHystStackSize);
-            pauHystStack_bottom = &vuHystStack[0];
+            m_vuHystStack.resize(nCurrHystStackSize);
+            pauHystStack_bottom = &m_vuHystStack[0];
             pauHystStack_top = pauHystStack_bottom+nUsedHystStackSize;
         }
     };
@@ -371,7 +372,7 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
     else if(nChannels==4)
         apply_internal_threshold<4>(oInputImg,oEdgeMask,nDetThreshold);
     else
-        CV_Error(0,"Unexpected channel count");
+        CV_Error(-1,"Unexpected channel count");
 }
 
 void EdgeDetectorLBSP::apply_threshold(cv::InputArray _oInputImage, cv::OutputArray _oEdgeMask, double dDetThreshold) {

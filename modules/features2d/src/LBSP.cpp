@@ -21,6 +21,8 @@
 constexpr int LBSP::s_anIdxLUT_16bitdbcross[16][2];
 constexpr int LBSP::s_anIdxLUT_16bitdbcross_GradX[16];
 constexpr int LBSP::s_anIdxLUT_16bitdbcross_GradY[16];
+constexpr LBSP::IdxLUTOffsetArray LBSP::s_oIdxLUT_16bitdbcross_x;
+constexpr LBSP::IdxLUTOffsetArray LBSP::s_oIdxLUT_16bitdbcross_y;
 
 LBSP::LBSP(size_t nThreshold) :
         m_bOnlyUsingAbsThreshold(true),

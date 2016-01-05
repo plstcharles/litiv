@@ -270,11 +270,32 @@ protected:
     static constexpr desc_t s_nDesc_16bitdbcross_GradX_Neg = ((1<<1)+(1<<5)+(1<<6)+(1<<11)+(1<<13)+(1<<14));
     static constexpr desc_t s_nDesc_16bitdbcross_GradY_Pos = ((1<<3)+(1<<4)+(1<<6)+(1<<8)+(1<<13)+(1<<15));
     static constexpr desc_t s_nDesc_16bitdbcross_GradY_Neg = ((1<<2)+(1<<5)+(1<<7)+(1<<10)+(1<<12)+(1<<14));
+#if HAVE_SSE2
+    static constexpr union IdxLUTOffsetArray {int anOffsets[16]; __m128i vnOffsets[4];}
+#else //!HAVE_SSE2
+    static constexpr union IdxLUTOffsetArray {int anOffsets[16];}
+#endif //!HAVE_SSE2
+            s_oIdxLUT_16bitdbcross_x = {{-2, 2, 0, 0,  -2, 2, 2,-2,   0,-1, 0, 1,  -1, 1, 1,-1}},
+            s_oIdxLUT_16bitdbcross_y = {{ 0, 0,-2, 2,   2,-2, 2,-2,   1, 0,-1, 0,  -1, 1,-1, 1}};
 
     template<size_t nChannels, typename Tv>
     static inline void lookup_16bits_dbcross(const Tv* const anData, const size_t nRowStep, const size_t nColStep, Tv* const anVals) {
-        CxxUtils::unroll<16>([&](int n) {
-            anVals[n] = anData[nRowStep*s_anIdxLUT_16bitdbcross[n][1]+nColStep*s_anIdxLUT_16bitdbcross[n][0]];
+/*#if !HAVE_SSE2
+        // SSE2 version is not faster than fully optimized version
+        CV_DbgAssert(nRowStep*2+nColStep*2<INT32_MAX); // map index offsets will be stored in signed 32-bit integers
+        const __m128i vnColStep = _mm_set1_epi32((int)nColStep);
+        const __m128i vnRowStep = _mm_set1_epi32((int)nRowStep);
+        CxxUtils::unroll<4>([&](int n) {
+            __m128i vnMapOffsets = _mm_add_epi32(ParallelUtils::mult_32si(vnColStep,s_oIdxLUT_16bitdbcross_x.vnOffsets[n]),ParallelUtils::mult_32si(vnRowStep,s_oIdxLUT_16bitdbcross_y.vnOffsets[n]));
+            anVals[n*4+3] = anData[ParallelUtils::extract_32si<3>(vnMapOffsets)];
+            anVals[n*4+2] = anData[ParallelUtils::extract_32si<2>(vnMapOffsets)];
+            anVals[n*4+1] = anData[ParallelUtils::extract_32si<1>(vnMapOffsets)];
+            anVals[n*4+0] = anData[ParallelUtils::extract_32si<0>(vnMapOffsets)];
         });
+#else //!HAVE_SSE2*/
+        CxxUtils::unroll<16>([&](int n) {
+            anVals[n] = anData[nRowStep*s_oIdxLUT_16bitdbcross_y.anOffsets[n]+nColStep*s_oIdxLUT_16bitdbcross_x.anOffsets[n]];
+        });
+//#endif //!HAVE_SSE2
     }
 };
