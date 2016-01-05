@@ -219,7 +219,7 @@ public:
     }
 
     //! utility function, shortcut/lightweight/direct single-point LBSP gradient estimation function (mixes rel+abs, returns max-channel only)
-    template<size_t nChannels, size_t nAbsOffset=20, size_t nRelShift=2, typename Tr1=int, typename Tr2=uint>
+    template<size_t nChannels, size_t nAbsOffset=20, size_t nRelShift=2, typename Tr1=char, typename Tr2=uchar>
     inline static void computeDescriptor_gradient(const uchar* const aanVals, const uchar* const anRefs, Tr1& nGradX, Tr1& nGradY, Tr2& nGradMag) {
         // note: this function is used to threshold a multi-channel LBSP pattern based on a predefined lookup array (see LBSP_16bits_dbcross_lookup for more information)
         // @@@ todo: use array template to unroll loops & allow any descriptor size here
