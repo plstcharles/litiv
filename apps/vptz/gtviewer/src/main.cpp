@@ -45,36 +45,36 @@ int main(int /*argc*/, char** /*argv*/) {
         g_oLastMouseClickPos = cv::Point(oCurrView.cols/2, oCurrView.rows/2);
 
         cv::FileNode oGTNode = oInputGT["basicGroundTruth"];
-		bool bPaused = true;
+        bool bPaused = true;
         for(auto oGTFrame=oGTNode.begin(); oGTFrame!=oGTNode.end(); ++oGTFrame) {
             nFrameIdx = (*oGTFrame)["framePos"];
             nBBoxWidth = (*oGTFrame)["width"];
             nBBoxHeight = (*oGTFrame)["height"];
             oTargetPos_HX.x = (*oGTFrame)["horizontalAngle"];
             oTargetPos_HX.y = (*oGTFrame)["verticalAngle"];
-			std::cout << "\t#" << nFrameIdx << std::endl;
+            std::cout << "\t#" << nFrameIdx << std::endl;
             oCamera.Set(vptz::PTZ_CAM_FRAME_POS, nFrameIdx);
-			while(true) {
-				oCamera.GoToPosition(g_oLastMouseClickPos);
-				oCurrView = oCamera.GetFrame();
-				if(oCurrView.empty())
-					break;
-				g_oLastMouseClickPos = cv::Point(oCurrView.cols/2, oCurrView.rows/2);
-				cv::circle(oCurrView, cv::Point(oCurrView.cols/2,oCurrView.rows/2), 3, cv::Scalar(0,255,0), 5);
-				oGTTranslator.GetGTTargetPoint(oTargetPos_HX.x, oTargetPos_HX.y, oTargetPos_XY);
-				cv::circle(oCurrView, oTargetPos_XY, 3, cv::Scalar(0,255,255), 5);
-				cv::Rect bb;
-				oGTTranslator.GetGTBoundingBox(oTargetPos_HX.x, oTargetPos_HX.y, nBBoxWidth, nBBoxHeight, bb);
-				cv::rectangle(oCurrView, bb, cv::Scalar(0,255,255));
-				cv::imshow("Current View", oCurrView);
-				char cKey = (char)cv::waitKey(1);
-				if(cKey==' ')
-					bPaused = !bPaused;
-				else if(cKey!=-1)
-					break;
-				if(!bPaused)
-					break;
-			}
+            while(true) {
+                oCamera.GoToPosition(g_oLastMouseClickPos);
+                oCurrView = oCamera.GetFrame();
+                if(oCurrView.empty())
+                    break;
+                g_oLastMouseClickPos = cv::Point(oCurrView.cols/2, oCurrView.rows/2);
+                cv::circle(oCurrView, cv::Point(oCurrView.cols/2,oCurrView.rows/2), 3, cv::Scalar(0,255,0), 5);
+                oGTTranslator.GetGTTargetPoint(oTargetPos_HX.x, oTargetPos_HX.y, oTargetPos_XY);
+                cv::circle(oCurrView, oTargetPos_XY, 3, cv::Scalar(0,255,255), 5);
+                cv::Rect bb;
+                oGTTranslator.GetGTBoundingBox(oTargetPos_HX.x, oTargetPos_HX.y, nBBoxWidth, nBBoxHeight, bb);
+                cv::rectangle(oCurrView, bb, cv::Scalar(0,255,255));
+                cv::imshow("Current View", oCurrView);
+                char cKey = (char)cv::waitKey(1);
+                if(cKey==' ')
+                    bPaused = !bPaused;
+                else if(cKey!=-1)
+                    break;
+                if(!bPaused)
+                    break;
+            }
         }
         return 0;
     }

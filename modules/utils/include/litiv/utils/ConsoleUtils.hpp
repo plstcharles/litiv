@@ -282,7 +282,7 @@ namespace rlutil {
                 }}
             case 13: return KEY_ENTER;
 #ifdef _WIN32
-			case 27: return KEY_ESCAPE;
+            case 27: return KEY_ESCAPE;
 #else //ndef _WIN32
             case 155: // single-character CSI
             case 27: {
@@ -352,7 +352,7 @@ namespace rlutil {
     // clears screen and moves cursor home
     inline void cls() {
 #if defined(_WIN32) && !defined(RLUTIL_USE_ANSI)
-		system("cls");
+        system("cls");
 #else //!defined(_WIN32) || defined(RLUTIL_USE_ANSI)
         RLUTIL_PRINT("\033[2J\033[H");
 #endif
@@ -361,10 +361,10 @@ namespace rlutil {
     // sets the cursor position to 1-based x,y
     inline void locate(int x, int y) {
 #if defined(_WIN32) && !defined(RLUTIL_USE_ANSI)
-		COORD coord;
-		coord.X = (SHORT)x-1;
-		coord.Y = (SHORT)y-1; // Windows uses 0-based coordinates
-		SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE),coord);
+        COORD coord;
+        coord.X = (SHORT)x-1;
+        coord.Y = (SHORT)y-1; // Windows uses 0-based coordinates
+        SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE),coord);
 #else //!defined(_WIN32) || defined(RLUTIL_USE_ANSI)
         std::ostringstream oss;
         oss << "\033[" << y << ";" << x << "H";
@@ -375,12 +375,12 @@ namespace rlutil {
     // hides the cursor
     inline void hidecursor() {
 #if defined(_WIN32) && !defined(RLUTIL_USE_ANSI)
-		HANDLE hConsoleOutput;
-		CONSOLE_CURSOR_INFO structCursorInfo;
-		hConsoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-		GetConsoleCursorInfo(hConsoleOutput,&structCursorInfo); // Get current cursor size
-		structCursorInfo.bVisible = FALSE;
-		SetConsoleCursorInfo(hConsoleOutput,&structCursorInfo);
+        HANDLE hConsoleOutput;
+        CONSOLE_CURSOR_INFO structCursorInfo;
+        hConsoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+        GetConsoleCursorInfo(hConsoleOutput,&structCursorInfo); // Get current cursor size
+        structCursorInfo.bVisible = FALSE;
+        SetConsoleCursorInfo(hConsoleOutput,&structCursorInfo);
 #else //!defined(_WIN32) || defined(RLUTIL_USE_ANSI)
         RLUTIL_PRINT("\033[?25l");
 #endif //!defined(_WIN32) || defined(RLUTIL_USE_ANSI)
@@ -389,12 +389,12 @@ namespace rlutil {
     // shows the cursor
     inline void showcursor() {
 #if defined(_WIN32) && !defined(RLUTIL_USE_ANSI)
-		HANDLE hConsoleOutput;
-		CONSOLE_CURSOR_INFO structCursorInfo;
-		hConsoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
-		GetConsoleCursorInfo(hConsoleOutput,&structCursorInfo); // Get current cursor size
-		structCursorInfo.bVisible = TRUE;
-		SetConsoleCursorInfo(hConsoleOutput,&structCursorInfo);
+        HANDLE hConsoleOutput;
+        CONSOLE_CURSOR_INFO structCursorInfo;
+        hConsoleOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+        GetConsoleCursorInfo(hConsoleOutput,&structCursorInfo); // Get current cursor size
+        structCursorInfo.bVisible = TRUE;
+        SetConsoleCursorInfo(hConsoleOutput,&structCursorInfo);
 #else //!defined(_WIN32) || defined(RLUTIL_USE_ANSI)
         RLUTIL_PRINT("\033[?25h");
 #endif //!defined(_WIN32) || defined(RLUTIL_USE_ANSI)
@@ -403,7 +403,7 @@ namespace rlutil {
     // waits given number of milliseconds before continuing
     inline void msleep(unsigned int ms) {
 #ifdef _WIN32
-		Sleep(ms);
+        Sleep(ms);
 #else //ndef win32
         // usleep argument must be under 1 000 000
         if(ms > 1000) sleep(ms/1000000);
@@ -414,25 +414,25 @@ namespace rlutil {
     // get the number of rows in the terminal window, or -1 on error
     inline int trows() {
 #ifdef _WIN32
-		CONSOLE_SCREEN_BUFFER_INFO csbi;
-		if(!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE),&csbi))
-			return -1;
-		else
-			return csbi.srWindow.Bottom - csbi.srWindow.Top + 1; // Window height
-			// return csbi.dwSize.Y; // Buffer height
+        CONSOLE_SCREEN_BUFFER_INFO csbi;
+        if(!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE),&csbi))
+            return -1;
+        else
+            return csbi.srWindow.Bottom - csbi.srWindow.Top + 1; // Window height
+            // return csbi.dwSize.Y; // Buffer height
 #else //ndef win32
 #ifdef TIOCGSIZE
-		struct ttysize ts;
-		if(ioctl(STDIN_FILENO,TIOCGSIZE,&ts))
-		    return -1;
-		return ts.ts_lines;
+        struct ttysize ts;
+        if(ioctl(STDIN_FILENO,TIOCGSIZE,&ts))
+            return -1;
+        return ts.ts_lines;
 #elif defined(TIOCGWINSZ)
         struct winsize ts;
         if(ioctl(STDIN_FILENO,TIOCGWINSZ,&ts))
             return -1;
         return ts.ws_row;
 #else //ndef TIOCGSIZE
-		return -1;
+        return -1;
 #endif //ndef TIOCGSIZE
 #endif //ndef _WIN32
     }
@@ -440,25 +440,25 @@ namespace rlutil {
     // get the number of columns in the terminal window or -1 on error
     inline int tcols() {
 #ifdef _WIN32
-		CONSOLE_SCREEN_BUFFER_INFO csbi;
-		if(!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE),&csbi))
-			return -1;
-		else
-			return csbi.srWindow.Right - csbi.srWindow.Left + 1; // Window width
-			// return csbi.dwSize.X; // Buffer width
+        CONSOLE_SCREEN_BUFFER_INFO csbi;
+        if(!GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE),&csbi))
+            return -1;
+        else
+            return csbi.srWindow.Right - csbi.srWindow.Left + 1; // Window width
+            // return csbi.dwSize.X; // Buffer width
 #else //ndef _WIN32
 #ifdef TIOCGSIZE
-		struct ttysize ts;
-		if(ioctl(STDIN_FILENO,TIOCGSIZE,&ts))
-		    return -1;
-		return ts.ts_cols;
+        struct ttysize ts;
+        if(ioctl(STDIN_FILENO,TIOCGSIZE,&ts))
+            return -1;
+        return ts.ts_cols;
 #elif defined(TIOCGWINSZ)
         struct winsize ts;
         if(ioctl(STDIN_FILENO,TIOCGWINSZ,&ts))
             return -1;
         return ts.ws_col;
 #else //ndef TIOCGSIZE
-		return -1;
+        return -1;
 #endif //ndef TIOCGSIZE
 #endif //ndef _WIN32
     }
