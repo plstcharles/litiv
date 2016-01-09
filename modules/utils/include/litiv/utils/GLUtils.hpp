@@ -128,7 +128,8 @@ public:
 #endif //HAVE_FREEGLUT
     }
 
-    constexpr static std::string GetGLEWVersionString() {return std::string("GL_VERSION_")+CxxUtils::MetaStrConcatenator<typename CxxUtils::MetaITOA<nGLVerMajor>::type,CxxUtils::MetaStr<'_'>,typename CxxUtils::MetaITOA<nGLVerMinor>::type,CxxUtils::MetaStr<'\0'>>::type::value;}
+    //constexpr static std::string GetGLEWVersionString() {return std::string("GL_VERSION_")+CxxUtils::MetaStrConcatenator<typename CxxUtils::MetaITOA<nGLVerMajor>::type,CxxUtils::MetaStr<'_'>,typename CxxUtils::MetaITOA<nGLVerMinor>::type,CxxUtils::MetaStr<'\0'>>::type::value;}
+    constexpr static std::string GetGLEWVersionString() {return std::string("GL_VERSION_")+std::to_string(nGLVerMajor)+"_"+std::to_string(nGLVerMinor);}
 
 private:
 
@@ -214,7 +215,6 @@ namespace GLUtils {
                 return bUseIntegralFormat?GL_RGBA32UI:glError("opencv mat input format type cannot be matched to a predefined setup");
             default:
                 glError("opencv mat input format type did not match any predefined setup");
-                return 0;
         }
     }
 
@@ -235,7 +235,6 @@ namespace GLUtils {
             case GL_RGBA32UI:
             default:
                 glError("input internal format did not match any predefined normalized format");
-                return 0;
         }
     }
 
@@ -284,7 +283,6 @@ namespace GLUtils {
                 return "rgba32ui";
             default:
                 glError("input internal format did not match any predefined glsl layout");
-                return 0;
         }
     }
 
@@ -304,7 +302,6 @@ namespace GLUtils {
                 return false;
             default:
                 glError("input internal format did not match any predefined integer format setup");
-                return 0;
         }
     }
 
@@ -344,7 +341,6 @@ namespace GLUtils {
                 return bUseIntegralFormat?GL_BGRA_INTEGER:GL_BGRA;
             default:
                 glError("opencv mat input format type did not match any predefined setup");
-                return 0;
         }
     }
 
@@ -361,7 +357,6 @@ namespace GLUtils {
                 return 4;
             default:
                 glError("input data format did not match any predefined opencv mat setup");
-                return 0;
         }
     }
 
@@ -375,7 +370,6 @@ namespace GLUtils {
                 return GL_UNSIGNED_INT;
             default:
                 glError("opencv mat input format type did not match any predefined setup");
-                return 0;
         }
     }
 
@@ -390,7 +384,6 @@ namespace GLUtils {
                 return CV_32S;
             default:
                 glError("input data type did not match any predefined opencv mat setup");
-                return 0;
         }
     }
 
@@ -403,7 +396,6 @@ namespace GLUtils {
                 return 4;
             default:
                 glError("input depth did not match any predefined byte size");
-                return 0;
         }
     }
 
@@ -423,7 +415,6 @@ namespace GLUtils {
                 return 4;
             default:
                 glError("input type did not match any predefined channel size");
-                return 0;
         }
     }
 

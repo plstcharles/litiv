@@ -67,7 +67,7 @@ int main(int /*argc*/, char** /*argv*/) {
 				oGTTranslator.GetGTBoundingBox(oTargetPos_HX.x, oTargetPos_HX.y, nBBoxWidth, nBBoxHeight, bb);
 				cv::rectangle(oCurrView, bb, cv::Scalar(0,255,255));
 				cv::imshow("Current View", oCurrView);
-				char cKey = cv::waitKey(1);
+				char cKey = (char)cv::waitKey(1);
 				if(cKey==' ')
 					bPaused = !bPaused;
 				else if(cKey!=-1)

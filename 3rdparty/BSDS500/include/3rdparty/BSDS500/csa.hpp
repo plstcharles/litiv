@@ -499,7 +499,7 @@ namespace BSDS500 {
     else
       (void) printf("unmatched\n");
     (void) printf("\t%d arcs priced out, %d arcs priced in\n",
-              v->first - v->priced_out, (v+1)->priced_out - v->first);
+              int(v->first - v->priced_out),int((v+1)->priced_out - v->first));
     if ((v+1)->priced_out - v->first > 0)
       {
       (void) printf("\tPriced in arcs:\n");
@@ -594,10 +594,10 @@ namespace BSDS500 {
         if (a->c - a->head->p - match_rc < -epsilon * 1.01)
           {
           (void) printf("Violated epsilon optimality: c(%d, %d)=%lg; matched to %d; eps=%lg\n",
-                v - head_lhs_node + 1,
-                a->head - head_rhs_node + 1,
+                int(v - head_lhs_node + 1),
+                int(a->head - head_rhs_node + 1),
                 a->c - a->head->p - match_rc,
-                v->matched->head - head_rhs_node + 1,
+                int(v->matched->head - head_rhs_node + 1),
                 epsilon);
           ret = TRUE;
           }

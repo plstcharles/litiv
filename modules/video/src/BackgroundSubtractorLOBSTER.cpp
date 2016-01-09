@@ -60,7 +60,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::refreshModel(float fSam
             if(bForceFGUpdate || !m_oLastFGMask.data[nColOffset]) {
                 for(size_t nCurrModelSampleIdx=nRefreshSampleStartPos; nCurrModelSampleIdx<nRefreshSampleStartPos+nModelSamplesToRefresh; ++nCurrModelSampleIdx) {
                     int nSampleRowIdx, nSampleColIdx;
-                    RandUtils::getRandSamplePosition_7x7_std2(nSampleColIdx,nSampleRowIdx,nColIdx,nRowIdx,LBSP::PATCH_SIZE/2,m_oFrameSize);
+                    RandUtils::getRandSamplePosition_7x7_std2(nSampleColIdx,nSampleRowIdx,(int)nColIdx,(int)nRowIdx,(int)LBSP::PATCH_SIZE/2,m_oFrameSize);
                     const size_t nSamplePxIdx = nSampleColIdx + nSampleRowIdx*m_oFrameSize.width;
                     if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
                         const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
@@ -369,7 +369,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::getBackgroundDescriptor
     lvDbgExceptionWatch;
     CV_Assert(m_bInitialized);
     glAssert(m_bGLInitialized && !m_vnBGModelData.empty());
-    CV_Assert(LBSP::DESC_SIZE==2);
+    static_assert(LBSP::DESC_SIZE==2,"Some assumptions are breaking below");
     oBGDescImg.create(m_oFrameSize,CV_16UC(int(m_nImgChannels)));
     cv::Mat oOutputImg = oBGDescImg.getMatRef();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_BGModelBinding));

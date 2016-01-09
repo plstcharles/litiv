@@ -38,9 +38,9 @@ GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t 
         m_vDefaultWorkGroupSize(GLUTILS_IMGPROC_DEFAULT_WORKGROUP),
         m_bUsingDisplay(bUseDisplay),
         m_bGLInitialized(false),
-        m_nInternalFrameIdx(-1),
-        m_nLastOutputInternalIdx(-1),
-        m_nLastDebugInternalIdx(-1),
+        m_nInternalFrameIdx(size_t(-1)),
+        m_nLastOutputInternalIdx(size_t(-1)),
+        m_nLastDebugInternalIdx(size_t(-1)),
         m_bFetchingOutput(false),
         m_bFetchingDebug(false),
         m_nNextLayer(1),
@@ -72,24 +72,24 @@ GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t 
     if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_ATOMIC_COUNTER_BUFFER_BINDINGS)<m_nACBOs)
         glError("atomic bo bindings limit is too small for the current impl");
     if(m_bUsingTimers)
-        glGenQueries(m_nGLTimers.size(),m_nGLTimers.data());
+        glGenQueries((GLsizei)m_nGLTimers.size(),m_nGLTimers.data());
     if(m_nSSBOs) {
         m_vnSSBO.resize(m_nSSBOs);
-        glGenBuffers(m_nSSBOs,m_vnSSBO.data());
+        glGenBuffers((GLsizei)m_nSSBOs,m_vnSSBO.data());
     }
     if(m_nACBOs) {
         m_vnACBO.resize(m_nACBOs);
-        glGenBuffers(m_nACBOs,m_vnACBO.data());
+        glGenBuffers((GLsizei)m_nACBOs,m_vnACBO.data());
     }
 }
 
 GLImageProcAlgo::~GLImageProcAlgo() {
     if(m_bUsingTimers)
-        glDeleteQueries(m_nGLTimers.size(),m_nGLTimers.data());
+        glDeleteQueries((GLsizei)m_nGLTimers.size(),m_nGLTimers.data());
     if(m_nACBOs)
-        glDeleteBuffers(m_nACBOs,m_vnACBO.data());
+        glDeleteBuffers((GLsizei)m_nACBOs,m_vnACBO.data());
     if(m_nSSBOs)
-        glDeleteBuffers(m_nSSBOs,m_vnSSBO.data());
+        glDeleteBuffers((GLsizei)m_nSSBOs,m_vnSSBO.data());
 }
 
 std::string GLImageProcAlgo::getVertexShaderSource() const {
@@ -132,12 +132,12 @@ void GLImageProcAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oROI)
             m_pInputArray = std::unique_ptr<GLDynamicTexture2DArray>(new GLDynamicTexture2DArray(1,std::vector<cv::Mat>(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT,cv::Mat(m_oFrameSize,m_nInputType)),m_bUsingIntegralFormat));
             m_pInputArray->bindToSamplerArray(GLImageProcAlgo::eTexture_InputBinding);
             if(m_bUsingInputPBOs) {
-                m_pInputArray->updateTexture(*m_apInputPBOs[m_nCurrPBO],m_nCurrLayer,true);
-                m_pInputArray->updateTexture(*m_apInputPBOs[m_nCurrPBO],m_nNextLayer,true);
+                m_pInputArray->updateTexture(*m_apInputPBOs[m_nCurrPBO],(int)m_nCurrLayer,true);
+                m_pInputArray->updateTexture(*m_apInputPBOs[m_nCurrPBO],(int)m_nNextLayer,true);
             }
             else {
-                m_pInputArray->updateTexture(oInitInput,m_nCurrLayer,true);
-                m_pInputArray->updateTexture(oInitInput,m_nNextLayer,true);
+                m_pInputArray->updateTexture(oInitInput,(int)m_nCurrLayer,true);
+                m_pInputArray->updateTexture(oInitInput,(int)m_nNextLayer,true);
             }
         }
     }
@@ -148,15 +148,15 @@ void GLImageProcAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oROI)
         for(size_t nLayerIter=0; nLayerIter<GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT; ++nLayerIter) {
             if(m_bUsingOutput) {
                 m_vpOutputArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(1,cv::Mat(m_oFrameSize,m_nOutputType),m_bUsingIntegralFormat));
-                m_vpOutputArray[nLayerIter]->bindToSampler(getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_OutputBinding));
+                m_vpOutputArray[nLayerIter]->bindToSampler((GLuint)getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_OutputBinding));
             }
             if(m_bUsingDebug) {
                 m_vpDebugArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(1,cv::Mat(m_oFrameSize,m_nDebugType),m_bUsingIntegralFormat));
-                m_vpDebugArray[nLayerIter]->bindToSampler(getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_DebugBinding));
+                m_vpDebugArray[nLayerIter]->bindToSampler((GLuint)getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_DebugBinding));
             }
             if(m_bUsingInput) {
-                m_vpInputArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(m_nLevels,cv::Mat(m_oFrameSize,m_nInputType),m_bUsingIntegralFormat));
-                m_vpInputArray[nLayerIter]->bindToSampler(getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_InputBinding));
+                m_vpInputArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D((GLsizei)m_nLevels,cv::Mat(m_oFrameSize,m_nInputType),m_bUsingIntegralFormat));
+                m_vpInputArray[nLayerIter]->bindToSampler((GLuint)getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_InputBinding));
                 if(m_bUsingInputPBOs) {
                     if(nLayerIter==m_nCurrLayer)
                         m_vpInputArray[m_nCurrLayer]->updateTexture(*m_apInputPBOs[m_nCurrPBO],true);
@@ -204,9 +204,9 @@ void GLImageProcAlgo::apply_async(const cv::Mat& oNextInput, bool bRebindAll) {
     ++m_nNextPBO %= 2;
     if(bRebindAll) {
         for(size_t nSSBOIter=GLImageProcAlgo::eStorageBufferDefaultBindingsCount; nSSBOIter<m_nSSBOs; ++nSSBOIter)
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER,nSSBOIter,m_vnSSBO[nSSBOIter]);
+            glBindBufferBase(GL_SHADER_STORAGE_BUFFER,(GLuint)nSSBOIter,m_vnSSBO[nSSBOIter]);
         for(size_t nACBOIter=GLImageProcAlgo::eAtomicCounterBufferDefaultBindingsCount; nACBOIter<m_nACBOs; ++nACBOIter)
-            glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER,nACBOIter,m_vnACBO[nACBOIter]);
+            glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER,(GLuint)nACBOIter,m_vnACBO[nACBOIter]);
         // rebind extra images, textures? @@@@@
     }
     if(m_bUsingTimers)
@@ -217,35 +217,35 @@ void GLImageProcAlgo::apply_async(const cv::Mat& oNextInput, bool bRebindAll) {
         if(m_bUsingOutput) {
             if(bRebindAll)
                 m_pOutputArray->bindToSamplerArray(GLImageProcAlgo::eTexture_OutputBinding);
-            m_pOutputArray->bindToImage(GLImageProcAlgo::eImage_OutputBinding,0,m_nCurrLayer,GL_READ_WRITE);
+            m_pOutputArray->bindToImage(GLImageProcAlgo::eImage_OutputBinding,0,(int)m_nCurrLayer,GL_READ_WRITE);
         }
         if(m_bUsingDebug) {
             if(bRebindAll)
                 m_pDebugArray->bindToSamplerArray(GLImageProcAlgo::eTexture_DebugBinding);
-            m_pDebugArray->bindToImage(GLImageProcAlgo::eImage_DebugBinding,0,m_nCurrLayer,GL_WRITE_ONLY);
+            m_pDebugArray->bindToImage(GLImageProcAlgo::eImage_DebugBinding,0,(int)m_nCurrLayer,GL_WRITE_ONLY);
         }
         if(m_bUsingInput) {
             if(bRebindAll || !m_bUsingInputPBOs) {
                 m_pInputArray->bindToSamplerArray(GLImageProcAlgo::eTexture_InputBinding);
                 if(!m_bUsingInputPBOs && !oNextInput.empty())
-                    m_pInputArray->updateTexture(oNextInput,m_nNextLayer,bRebindAll);
+                    m_pInputArray->updateTexture(oNextInput,(int)m_nNextLayer,bRebindAll);
             }
-            m_pInputArray->bindToImage(GLImageProcAlgo::eImage_InputBinding,0,m_nCurrLayer,GL_READ_ONLY);
+            m_pInputArray->bindToImage(GLImageProcAlgo::eImage_InputBinding,0,(int)m_nCurrLayer,GL_READ_ONLY);
         }
     }
     else {
         for(size_t nLayerIter=0; nLayerIter<GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT; ++nLayerIter) {
             if(bRebindAll) {
                 if(m_bUsingOutput)
-                    m_vpOutputArray[nLayerIter]->bindToSampler(getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_OutputBinding));
+                    m_vpOutputArray[nLayerIter]->bindToSampler((GLuint)getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_OutputBinding));
                 if(m_bUsingDebug)
-                    m_vpDebugArray[nLayerIter]->bindToSampler(getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_DebugBinding));
+                    m_vpDebugArray[nLayerIter]->bindToSampler((GLuint)getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_DebugBinding));
                 if(m_bUsingInput)
-                    m_vpInputArray[nLayerIter]->bindToSampler(getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_InputBinding));
+                    m_vpInputArray[nLayerIter]->bindToSampler((GLuint)getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_InputBinding));
             }
             if(nLayerIter==m_nNextLayer && !m_bUsingInputPBOs) {
                 if(!bRebindAll)
-                    m_vpInputArray[m_nNextLayer]->bindToSampler(getTextureBinding(m_nNextLayer,GLImageProcAlgo::eTexture_InputBinding));
+                    m_vpInputArray[m_nNextLayer]->bindToSampler((GLuint)getTextureBinding(m_nNextLayer,GLImageProcAlgo::eTexture_InputBinding));
                 if(!oNextInput.empty())
                     m_vpInputArray[m_nNextLayer]->updateTexture(oNextInput,bRebindAll);
             }
@@ -267,9 +267,9 @@ void GLImageProcAlgo::apply_async(const cv::Mat& oNextInput, bool bRebindAll) {
     }
     for(size_t nCurrStageIter=0; nCurrStageIter<m_nComputeStages; ++nCurrStageIter) {
         glAssert(m_vpImgProcShaders[nCurrStageIter]->activate());
-        m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getCurrTextureLayerUniformName(),m_nCurrLayer);
-        m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getLastTextureLayerUniformName(),m_nLastLayer);
-        m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getFrameIndexUniformName(),m_nInternalFrameIdx);
+        m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getCurrTextureLayerUniformName(),(GLuint)m_nCurrLayer);
+        m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getLastTextureLayerUniformName(),(GLuint)m_nLastLayer);
+        m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getFrameIndexUniformName(),(GLuint)m_nInternalFrameIdx);
         dispatch(nCurrStageIter,*m_vpImgProcShaders[nCurrStageIter]); // add timer for stage? can reuse the same @@@@
     }
     if(m_bUsingTimers)
@@ -277,10 +277,10 @@ void GLImageProcAlgo::apply_async(const cv::Mat& oNextInput, bool bRebindAll) {
     if(m_bUsingInputPBOs) {
         if(m_bUsingTexArrays) {
             m_pInputArray->bindToSamplerArray(GLImageProcAlgo::eTexture_InputBinding);
-            m_pInputArray->updateTexture(*m_apInputPBOs[m_nNextPBO],m_nNextLayer,bRebindAll);
+            m_pInputArray->updateTexture(*m_apInputPBOs[m_nNextPBO],(int)m_nNextLayer,bRebindAll);
         }
         else {
-            m_vpInputArray[m_nNextLayer]->bindToSampler(getTextureBinding(m_nNextLayer,GLImageProcAlgo::eTexture_InputBinding));
+            m_vpInputArray[m_nNextLayer]->bindToSampler((GLuint)getTextureBinding(m_nNextLayer,GLImageProcAlgo::eTexture_InputBinding));
             m_vpInputArray[m_nNextLayer]->updateTexture(*m_apInputPBOs[m_nNextPBO],bRebindAll);
         }
     }
@@ -290,20 +290,20 @@ void GLImageProcAlgo::apply_async(const cv::Mat& oNextInput, bool bRebindAll) {
         if(m_bUsingDebugPBOs) {
             if(m_bUsingTexArrays) {
                 m_pDebugArray->bindToSamplerArray(GLImageProcAlgo::eTexture_DebugBinding);
-                m_pDebugArray->fetchTexture(*m_apDebugPBOs[m_nNextPBO],m_nCurrLayer,bRebindAll);
+                m_pDebugArray->fetchTexture(*m_apDebugPBOs[m_nNextPBO],(int)m_nCurrLayer,bRebindAll);
             }
             else {
-                m_vpDebugArray[m_nCurrLayer]->bindToSampler(getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_DebugBinding));
+                m_vpDebugArray[m_nCurrLayer]->bindToSampler((GLuint)getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_DebugBinding));
                 m_vpDebugArray[m_nCurrLayer]->fetchTexture(*m_apDebugPBOs[m_nNextPBO],bRebindAll);
             }
         }
         else {
             if(m_bUsingTexArrays) {
                 m_pDebugArray->bindToSamplerArray(GLImageProcAlgo::eTexture_DebugBinding);
-                m_pDebugArray->fetchTexture(m_oLastDebug,m_nCurrLayer);
+                m_pDebugArray->fetchTexture(m_oLastDebug,(int)m_nCurrLayer);
             }
             else {
-                m_vpDebugArray[m_nCurrLayer]->bindToSampler(getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_DebugBinding));
+                m_vpDebugArray[m_nCurrLayer]->bindToSampler((GLuint)getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_DebugBinding));
                 m_vpDebugArray[m_nCurrLayer]->fetchTexture(m_oLastDebug);
             }
         }
@@ -315,20 +315,20 @@ void GLImageProcAlgo::apply_async(const cv::Mat& oNextInput, bool bRebindAll) {
         if(m_bUsingOutputPBOs) {
             if(m_bUsingTexArrays) {
                 m_pOutputArray->bindToSamplerArray(GLImageProcAlgo::eTexture_OutputBinding);
-                m_pOutputArray->fetchTexture(*m_apOutputPBOs[m_nNextPBO],m_nCurrLayer,bRebindAll);
+                m_pOutputArray->fetchTexture(*m_apOutputPBOs[m_nNextPBO],(int)m_nCurrLayer,bRebindAll);
             }
             else {
-                m_vpOutputArray[m_nCurrLayer]->bindToSampler(getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_OutputBinding));
+                m_vpOutputArray[m_nCurrLayer]->bindToSampler((GLuint)getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_OutputBinding));
                 m_vpOutputArray[m_nCurrLayer]->fetchTexture(*m_apOutputPBOs[m_nNextPBO],bRebindAll);
             }
         }
         else {
             if(m_bUsingTexArrays) {
                 m_pOutputArray->bindToSamplerArray(GLImageProcAlgo::eTexture_OutputBinding);
-                m_pOutputArray->fetchTexture(m_oLastOutput,m_nCurrLayer);
+                m_pOutputArray->fetchTexture(m_oLastOutput,(int)m_nCurrLayer);
             }
             else {
-                m_vpOutputArray[m_nCurrLayer]->bindToSampler(getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_OutputBinding));
+                m_vpOutputArray[m_nCurrLayer]->bindToSampler((GLuint)getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_OutputBinding));
                 m_vpOutputArray[m_nCurrLayer]->fetchTexture(m_oLastOutput);
             }
         }
@@ -339,18 +339,18 @@ void GLImageProcAlgo::apply_async(const cv::Mat& oNextInput, bool bRebindAll) {
             if(m_bUsingTexArrays)
                 m_pDebugArray->bindToSamplerArray(GLImageProcAlgo::eTexture_DebugBinding);
             else
-                m_vpDebugArray[m_nCurrLayer]->bindToSampler(getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_DebugBinding));
+                m_vpDebugArray[m_nCurrLayer]->bindToSampler((GLuint)getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_DebugBinding));
         }
         if(m_bUsingOutput) {
             if(m_bUsingTexArrays)
                 m_pOutputArray->bindToSamplerArray(GLImageProcAlgo::eTexture_OutputBinding);
             else
-                m_vpOutputArray[m_nCurrLayer]->bindToSampler(getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_OutputBinding));
+                m_vpOutputArray[m_nCurrLayer]->bindToSampler((GLuint)getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_OutputBinding));
         }
         if(m_bUsingTimers)
             glBeginQuery(GL_TIME_ELAPSED,m_nGLTimers[GLImageProcAlgo::eGLTimer_DisplayUpdate]);
         glAssert(m_oDisplayShader.activate());
-        m_oDisplayShader.setUniform1ui(getCurrTextureLayerUniformName(),m_nCurrLayer);
+        m_oDisplayShader.setUniform1ui(getCurrTextureLayerUniformName(),(GLuint)m_nCurrLayer);
         m_oDisplayBillboard.render();
         if(m_bUsingTimers)
             glEndQuery(GL_TIME_ELAPSED);
@@ -607,12 +607,12 @@ void GLImageProcEvaluatorAlgo::initialize(const cv::Mat& oInitGT, const cv::Mat&
         m_pInputArray = std::unique_ptr<GLDynamicTexture2DArray>(new GLDynamicTexture2DArray(1,std::vector<cv::Mat>(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT,cv::Mat(m_oFrameSize,m_nGroundtruthType)),m_bUsingIntegralFormat));
         m_pInputArray->bindToSamplerArray(GLImageProcAlgo::eTexture_GTBinding);
         if(m_bUsingInputPBOs) {
-            m_pInputArray->updateTexture(*m_apInputPBOs[m_nCurrPBO],m_nCurrLayer,true);
-            m_pInputArray->updateTexture(*m_apInputPBOs[m_nCurrPBO],m_nNextLayer,true);
+            m_pInputArray->updateTexture(*m_apInputPBOs[m_nCurrPBO],(int)m_nCurrLayer,true);
+            m_pInputArray->updateTexture(*m_apInputPBOs[m_nCurrPBO],(int)m_nNextLayer,true);
         }
         else {
-            m_pInputArray->updateTexture(oInitGT,m_nCurrLayer,true);
-            m_pInputArray->updateTexture(oInitGT,m_nNextLayer,true);
+            m_pInputArray->updateTexture(oInitGT,(int)m_nCurrLayer,true);
+            m_pInputArray->updateTexture(oInitGT,(int)m_nNextLayer,true);
         }
     }
     else {
@@ -621,10 +621,10 @@ void GLImageProcEvaluatorAlgo::initialize(const cv::Mat& oInitGT, const cv::Mat&
         for(size_t nLayerIter=0; nLayerIter<GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT; ++nLayerIter) {
             if(m_bUsingDebug) {
                 m_vpDebugArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(1,cv::Mat(m_oFrameSize,m_nDebugType),m_bUsingIntegralFormat));
-                m_vpDebugArray[nLayerIter]->bindToSampler(getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_DebugBinding));
+                m_vpDebugArray[nLayerIter]->bindToSampler((GLuint)getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_DebugBinding));
             }
-            m_vpInputArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(m_nLevels,cv::Mat(m_oFrameSize,m_nGroundtruthType),m_bUsingIntegralFormat));
-            m_vpInputArray[nLayerIter]->bindToSampler(getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_GTBinding));
+            m_vpInputArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D((GLsizei)m_nLevels,cv::Mat(m_oFrameSize,m_nGroundtruthType),m_bUsingIntegralFormat));
+            m_vpInputArray[nLayerIter]->bindToSampler((GLuint)getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_GTBinding));
             if(m_bUsingInputPBOs) {
                 if(nLayerIter==m_nCurrLayer)
                     m_vpInputArray[m_nCurrLayer]->updateTexture(*m_apInputPBOs[m_nCurrPBO],true);
@@ -665,7 +665,7 @@ void GLImageProcEvaluatorAlgo::initialize(const cv::Mat& oInitGT, const cv::Mat&
     glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);*/
     m_nCurrEvalBufferOffsetPtr = 0;
     m_nCurrEvalBufferOffsetBlock = 0;
-    m_oEvalQueryBuffer.create(m_nTotFrameCount,m_nEvalBufferFrameSize/4,CV_32SC1);
+    m_oEvalQueryBuffer.create((int)m_nTotFrameCount,(int)m_nEvalBufferFrameSize/4,CV_32SC1);
     m_oEvalQueryBuffer = cv::Scalar_<int>(0);
     glErrorCheck;
     m_nInternalFrameIdx = 0;
@@ -700,23 +700,23 @@ void GLImageProcEvaluatorAlgo::apply_async(const cv::Mat& oNextGT, bool bRebindA
         if(m_bUsingDebug) {
             if(bRebindAll || (m_pParent->m_bFetchingDebug && (m_bUsingDisplay||m_bFetchingDebug)))
                 m_pDebugArray->bindToSamplerArray(GLImageProcAlgo::eTexture_DebugBinding);
-            m_pDebugArray->bindToImage(GLImageProcAlgo::eImage_DebugBinding,0,m_nCurrLayer,GL_READ_WRITE);
+            m_pDebugArray->bindToImage(GLImageProcAlgo::eImage_DebugBinding,0,(int)m_nCurrLayer,GL_READ_WRITE);
         }
         if(!m_bUsingInputPBOs && !oNextGT.empty()) {
             m_pInputArray->bindToSamplerArray(GLImageProcAlgo::eTexture_GTBinding);
-            m_pInputArray->updateTexture(oNextGT,m_nNextLayer,bRebindAll);
+            m_pInputArray->updateTexture(oNextGT,(int)m_nNextLayer,bRebindAll);
         }
-        m_pInputArray->bindToImage(GLImageProcAlgo::eImage_GTBinding,0,m_nCurrLayer,GL_READ_ONLY);
-        m_pParent->m_pOutputArray->bindToImage(GLImageProcAlgo::eImage_OutputBinding,0,m_pParent->m_nCurrLayer,GL_READ_ONLY);
+        m_pInputArray->bindToImage(GLImageProcAlgo::eImage_GTBinding,0,(int)m_nCurrLayer,GL_READ_ONLY);
+        m_pParent->m_pOutputArray->bindToImage(GLImageProcAlgo::eImage_OutputBinding,0,(int)m_pParent->m_nCurrLayer,GL_READ_ONLY);
     }
     else {
         for(size_t nLayerIter=0; nLayerIter<GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT; ++nLayerIter) {
             if(bRebindAll || (m_pParent->m_bFetchingDebug && (m_bUsingDisplay||m_bFetchingDebug))) {
                 if(m_bUsingDebug)
-                    m_vpDebugArray[nLayerIter]->bindToSampler(getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_DebugBinding));
+                    m_vpDebugArray[nLayerIter]->bindToSampler((GLuint)getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_DebugBinding));
             }
             if(nLayerIter==m_nNextLayer && !m_bUsingInputPBOs && !oNextGT.empty()) {
-                m_vpInputArray[m_nNextLayer]->bindToSampler(getTextureBinding(m_nNextLayer,GLImageProcAlgo::eTexture_GTBinding));
+                m_vpInputArray[m_nNextLayer]->bindToSampler((GLuint)getTextureBinding(m_nNextLayer,GLImageProcAlgo::eTexture_GTBinding));
                 m_vpInputArray[m_nNextLayer]->updateTexture(oNextGT,bRebindAll);
             }
             else if(nLayerIter==m_nCurrLayer) {
@@ -730,18 +730,18 @@ void GLImageProcEvaluatorAlgo::apply_async(const cv::Mat& oNextGT, bool bRebindA
     m_pROITexture->bindToImage(GLImageProcAlgo::eImage_ROIBinding,0,GL_READ_ONLY);
     for(size_t nCurrStageIter=0; nCurrStageIter<m_nComputeStages; ++nCurrStageIter) {
         glAssert(m_vpImgProcShaders[nCurrStageIter]->activate());
-        m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getCurrTextureLayerUniformName(),m_nCurrLayer);
-        m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getLastTextureLayerUniformName(),m_nLastLayer);
-        m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getFrameIndexUniformName(),m_nInternalFrameIdx);
+        m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getCurrTextureLayerUniformName(),(GLuint)m_nCurrLayer);
+        m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getLastTextureLayerUniformName(),(GLuint)m_nLastLayer);
+        m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getFrameIndexUniformName(),(GLuint)m_nInternalFrameIdx);
         dispatch(nCurrStageIter,*m_vpImgProcShaders[nCurrStageIter]);
     }
     if(m_bUsingInputPBOs) {
         if(m_bUsingTexArrays) {
             m_pInputArray->bindToSamplerArray(GLImageProcAlgo::eTexture_GTBinding);
-            m_pInputArray->updateTexture(*m_apInputPBOs[m_nNextPBO],m_nNextLayer,bRebindAll);
+            m_pInputArray->updateTexture(*m_apInputPBOs[m_nNextPBO],(int)m_nNextLayer,bRebindAll);
         }
         else {
-            m_vpInputArray[m_nNextLayer]->bindToSampler(getTextureBinding(m_nNextLayer,GLImageProcAlgo::eTexture_GTBinding));
+            m_vpInputArray[m_nNextLayer]->bindToSampler((GLuint)getTextureBinding(m_nNextLayer,GLImageProcAlgo::eTexture_GTBinding));
             m_vpInputArray[m_nNextLayer]->updateTexture(*m_apInputPBOs[m_nNextPBO],bRebindAll);
         }
     }
@@ -751,20 +751,20 @@ void GLImageProcEvaluatorAlgo::apply_async(const cv::Mat& oNextGT, bool bRebindA
         if(m_bUsingDebugPBOs) {
             if(m_bUsingTexArrays) {
                 m_pDebugArray->bindToSamplerArray(GLImageProcAlgo::eTexture_DebugBinding);
-                m_pDebugArray->fetchTexture(*m_apDebugPBOs[m_nNextPBO],m_nCurrLayer,bRebindAll);
+                m_pDebugArray->fetchTexture(*m_apDebugPBOs[m_nNextPBO],(int)m_nCurrLayer,bRebindAll);
             }
             else {
-                m_vpDebugArray[m_nCurrLayer]->bindToSampler(getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_DebugBinding));
+                m_vpDebugArray[m_nCurrLayer]->bindToSampler((GLuint)getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_DebugBinding));
                 m_vpDebugArray[m_nCurrLayer]->fetchTexture(*m_apDebugPBOs[m_nNextPBO],bRebindAll);
             }
         }
         else {
             if(m_bUsingTexArrays) {
                 m_pDebugArray->bindToSamplerArray(GLImageProcAlgo::eTexture_DebugBinding);
-                m_pDebugArray->fetchTexture(m_oLastDebug,m_nCurrLayer);
+                m_pDebugArray->fetchTexture(m_oLastDebug,(int)m_nCurrLayer);
             }
             else {
-                m_vpDebugArray[m_nCurrLayer]->bindToSampler(getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_DebugBinding));
+                m_vpDebugArray[m_nCurrLayer]->bindToSampler((GLuint)getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_DebugBinding));
                 m_vpDebugArray[m_nCurrLayer]->fetchTexture(m_oLastDebug);
             }
         }
@@ -775,10 +775,10 @@ void GLImageProcEvaluatorAlgo::apply_async(const cv::Mat& oNextGT, bool bRebindA
             if(m_bUsingTexArrays)
                 m_pDebugArray->bindToSamplerArray(GLImageProcAlgo::eTexture_DebugBinding);
             else
-                m_vpDebugArray[m_nCurrLayer]->bindToSampler(getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_DebugBinding));
+                m_vpDebugArray[m_nCurrLayer]->bindToSampler((GLuint)getTextureBinding(m_nCurrLayer,GLImageProcAlgo::eTexture_DebugBinding));
         }
         glAssert(m_oDisplayShader.activate());
-        m_oDisplayShader.setUniform1ui(getCurrTextureLayerUniformName(),m_nCurrLayer);
+        m_oDisplayShader.setUniform1ui(getCurrTextureLayerUniformName(),(GLuint)m_nCurrLayer);
         m_oDisplayBillboard.render();
     }
     m_pParent->m_pROITexture->bindToImage(GLImageProcAlgo::eImage_ROIBinding,0,GL_READ_ONLY);

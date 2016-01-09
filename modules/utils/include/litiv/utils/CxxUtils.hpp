@@ -103,7 +103,6 @@ namespace CxxUtils {
 #ifdef _MSC_VER
         inline pointer allocate(size_type n) {
             const size_type alignment = static_cast<size_type>(nByteAlign);
-            const size_type alignment = static_cast<size_type>(nByteAlign);
             size_t alloc_size = n*sizeof(value_type);
             if((alloc_size%alignment)!=0) {
                 alloc_size += alignment - alloc_size%alignment;
@@ -115,6 +114,7 @@ namespace CxxUtils {
             return reinterpret_cast<pointer>(ptr);
         }
         inline void deallocate(pointer p, size_type) noexcept {_aligned_free(p);}
+        inline void destroy(pointer p) {p->~value_type();p;}
 #else //!def(_MSC_VER)
         inline pointer allocate(size_type n) {
             const size_type alignment = static_cast<size_type>(nByteAlign);
@@ -129,16 +129,16 @@ namespace CxxUtils {
             return reinterpret_cast<pointer>(ptr);
         }
         inline void deallocate(pointer p, size_type) noexcept {free(p);}
+        inline void destroy(pointer p) {p->~value_type();}
 #endif //!def(_MSC_VER)
         template<class T2, class ...Args> inline void construct(T2* p, Args&&... args) {::new(reinterpret_cast<void*>(p)) T2(std::forward<Args>(args)...);}
         inline void construct(pointer p, const value_type& wert) {new(p) value_type(wert);}
-        inline void destroy(pointer p) {p->~value_type();}
         inline size_type max_size() const noexcept {return (size_type(~0)-size_type(nByteAlign))/sizeof(value_type);}
         bool operator!=(const AlignAllocator<T,nByteAlign>& other) const {return !(*this==other);}
         bool operator==(const AlignAllocator<T,nByteAlign>& other) const {return true;}
     };
 
-#ifndef _MSC_VER // meta-str-concat below does not seem to compile properly w/ MSVC toolchain... @@@@
+#ifndef _MSC_VER // meta-str-concat below does not compile properly w/ MSVC 2015 toolchain (last tested Jan. 2015)
     template<char... str> struct MetaStr {
         static constexpr char value[] = {str...};
     };

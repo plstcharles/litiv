@@ -119,6 +119,7 @@ struct glutWindowDeleter {
 
 namespace CxxUtils {
 
+#ifndef _MSC_VER // meta-str-concat below does not compile properly w/ MSVC 2015 toolchain (last tested Jan. 2015)
     template<char... str> struct MetaStr {
         static constexpr char value[] = {str...};
     };
@@ -151,6 +152,7 @@ namespace CxxUtils {
     struct MetaITOA<0> {
         using type = MetaStr<'0'>;
     };
+#endif //!def(_MSC_VER)
 
     struct UncaughtExceptionLogger {
         UncaughtExceptionLogger(const char* sFunc, const char* sFile, int nLine) :
@@ -248,7 +250,8 @@ public:
 #endif //HAVE_FREEGLUT
     }
 
-    constexpr static std::string GetGLEWVersionString() {return std::string("GL_VERSION_")+CxxUtils::MetaStrConcatenator<typename CxxUtils::MetaITOA<nGLVerMajor>::type,CxxUtils::MetaStr<'_'>,typename CxxUtils::MetaITOA<nGLVerMinor>::type,CxxUtils::MetaStr<'\0'>>::type::value;}
+    //constexpr static std::string GetGLEWVersionString() {return std::string("GL_VERSION_")+CxxUtils::MetaStrConcatenator<typename CxxUtils::MetaITOA<nGLVerMajor>::type,CxxUtils::MetaStr<'_'>,typename CxxUtils::MetaITOA<nGLVerMinor>::type,CxxUtils::MetaStr<'\0'>>::type::value;}
+    constexpr static std::string GetGLEWVersionString() {return std::string("GL_VERSION_")+std::to_string(nGLVerMajor)+"_"+std::to_string(nGLVerMinor);}
 
 private:
 

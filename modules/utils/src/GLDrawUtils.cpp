@@ -56,7 +56,7 @@ bool GLPixelBufferObject::updateBuffer(const cv::Mat& oBufferData, bool bRealloc
     }
     if(bRebindAll)
         glBindBuffer(m_eBufferTarget,0);
-    return bool(pBufferClientPtr);
+    return pBufferClientPtr!=nullptr;
 }
 
 bool GLPixelBufferObject::fetchBuffer(cv::Mat& oBufferData, bool bRebindAll) {
@@ -70,7 +70,7 @@ bool GLPixelBufferObject::fetchBuffer(cv::Mat& oBufferData, bool bRebindAll) {
     }
     if(bRebindAll)
         glBindBuffer(m_eBufferTarget,0);
-    return bool(pBufferClientPtr);
+    return pBufferClientPtr!=nullptr;
 }
 
 GLTexture::GLTexture() {
@@ -316,7 +316,7 @@ void GLDynamicTexture2DArray::fetchTexture(cv::Mat& oTexture, int nLayer) {
     glDbgAssert(oTexture.isContinuous());
     glDbgAssert(nLayer>=0 && nLayer<m_nTextureCount);
     if(glGetTextureSubImage)
-        glGetTextureSubImage(getTexId(),0,0,0,nLayer,m_nWidth,m_nHeight,1,m_eDataFormat,m_eDataType,m_voInitTextures[0].step.p[0]*m_nHeight,oTexture.data);
+        glGetTextureSubImage(getTexId(),0,0,0,nLayer,(GLsizei)m_nWidth,(GLsizei)m_nHeight,1,m_eDataFormat,m_eDataType,(GLsizei)(m_voInitTextures[0].step.p[0]*m_nHeight),oTexture.data);
     else {
         glBindTexture(GL_TEXTURE_2D_ARRAY,getTexId());
         glGetTexImage(GL_TEXTURE_2D_ARRAY,0,m_eDataFormat,m_eDataType,m_oTextureArrayFetchBuffer.data);
@@ -330,7 +330,7 @@ void GLDynamicTexture2DArray::fetchTexture(const GLPixelBufferObject& oPBO, int 
     if(glGetTextureSubImage) {
         glDbgAssert(oPBO.size()==m_voInitTextures[0].size() && oPBO.type()==m_voInitTextures[0].type());
         glBindBuffer(oPBO.m_eBufferTarget,oPBO.getPBOId());
-        glGetTextureSubImage(getTexId(),0,0,0,nLayer,m_nWidth,m_nHeight,1,m_eDataFormat,m_eDataType,m_voInitTextures[0].step.p[0]*m_nHeight,nullptr);
+        glGetTextureSubImage(getTexId(),0,0,0,nLayer,(GLsizei)m_nWidth,(GLsizei)m_nHeight,1,m_eDataFormat,m_eDataType,(GLsizei)(m_voInitTextures[0].step.p[0]*m_nHeight),nullptr);
     }
     else {
         glDbgAssert(oPBO.size()==m_oTextureArrayFetchBuffer.size() && oPBO.type()==m_oTextureArrayFetchBuffer.type());
