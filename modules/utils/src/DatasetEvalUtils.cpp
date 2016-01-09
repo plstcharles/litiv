@@ -418,7 +418,7 @@ void DatasetUtils::Segm::Video::BinarySegmEvaluator::WriteEvalResults(const Data
                 oMetricsOutput << std::string(bAverageMetrics?"averaged   ":"cumulative ") << oOverallMetrics.dRecall << " " << oOverallMetrics.dSpecificity << " " << oOverallMetrics.dFPR << " " << oOverallMetrics.dFNR << " " << oOverallMetrics.dPBC << " " << oOverallMetrics.dPrecision << " " << oOverallMetrics.dFMeasure << " " << oOverallMetrics.dMCC << std::endl;
                 oMetricsOutput << std::endl;
                 oMetricsOutput << "Overall FPS: " << nOverallFrameCount/oOverallMetrics.dTimeElapsed_sec << std::endl;
-                oMetricsOutput << std::endl << std::endl << LITIV_FRAMEWORK_VERSION_SHA1 << std::endl;
+                oMetricsOutput << std::endl << std::endl << LITIV_VERSION_SHA1 << std::endl;
             }
         }
     }
@@ -460,7 +460,7 @@ DatasetUtils::Metrics DatasetUtils::Segm::Video::BinarySegmEvaluator::WriteEvalR
         oMetricsOutput << std::string(bAverage?"averaged   ":"cumulative ") << oGroupMetrics.dRecall << " " << oGroupMetrics.dSpecificity << " " << oGroupMetrics.dFPR << " " << oGroupMetrics.dFNR << " " << oGroupMetrics.dPBC << " " << oGroupMetrics.dPrecision << " " << oGroupMetrics.dFMeasure << " " << oGroupMetrics.dMCC << std::endl;
         oMetricsOutput << std::endl;
         oMetricsOutput << "Work group FPS: " << oGroup.GetTotalImageCount()/oGroupMetrics.dTimeElapsed_sec << std::endl;
-        oMetricsOutput << std::endl << std::endl << LITIV_FRAMEWORK_VERSION_SHA1 << std::endl;
+        oMetricsOutput << std::endl << std::endl << LITIV_VERSION_SHA1 << std::endl;
     }
     return oGroupMetrics;
 }
@@ -487,7 +487,7 @@ DatasetUtils::Metrics DatasetUtils::Segm::Video::BinarySegmEvaluator::WriteEvalR
         oMetricsOutput << oBatchMetrics.dRecall << " " << oBatchMetrics.dSpecificity << " " << oBatchMetrics.dFPR << " " << oBatchMetrics.dFNR << " " << oBatchMetrics.dPBC << " " << oBatchMetrics.dPrecision << " " << oBatchMetrics.dFMeasure << " " << oBatchMetrics.dMCC << std::endl;
         oMetricsOutput << std::endl;
         oMetricsOutput << "Work batch FPS: " << oBatch.GetTotalImageCount()/oCurrBasicMetrics.dTimeElapsed_sec << std::endl;
-        oMetricsOutput << std::endl << std::endl << LITIV_FRAMEWORK_VERSION_SHA1 << std::endl;
+        oMetricsOutput << std::endl << std::endl << LITIV_VERSION_SHA1 << std::endl;
     }
     return oBatchMetrics;
 }
@@ -1260,7 +1260,7 @@ void DatasetUtils::Segm::Image::BSDS500BoundaryEvaluator::WriteEvalResults(const
                 oMetricsInfoOutput << "averaged   " << dMaxRecall << " " << dMaxPrecision << " " << dMaxFMeasure << "            " << dBestRecall << " " << dBestPrecision << " " << dBestFMeasure << std::endl;
                 oMetricsInfoOutput << std::endl;
                 oMetricsInfoOutput << "Overall FPS: " << nOverallImageCount/dTimeElapsed_sec << std::endl;
-                oMetricsInfoOutput << std::endl << std::endl << LITIV_FRAMEWORK_VERSION_SHA1 << std::endl;
+                oMetricsInfoOutput << std::endl << std::endl << LITIV_VERSION_SHA1 << std::endl;
             }
         }
     }

@@ -50,6 +50,12 @@ if(BUILD_VPTZ)
 
     if(USE_VPTZ_STANDALONE)
         add_definitions(-DVPTZ_EXPORT)
+        if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+            # disables C4251 + C4275 to allow STL/template classes to be used in exported classes/members
+            # need to eliminate these using pImpl idiom in exported classes to add abstraction layer @@@@
+            add_definitions(/wd4251) # disables C4251, "'identifier' : class 'type' needs to have dll-interface to be used by clients of class 'type2'"
+            add_definitions(/wd4275) # disables C4275, "non DLL-interface classkey 'identifier' used as base for DLL-interface classkey 'identifier'"
+        endif()
         add_library(${LITIV_CURRENT_PROJECT_NAME} SHARED ${SOURCE_FILES} ${INCLUDE_FILES})
         target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} ${OpenCV_LIBRARIES})
         if(USE_GLFW)

@@ -17,6 +17,8 @@
 
 litiv_module(utils)
 
+option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark implementation in litiv_utils (will use an approximative solution otherwise)" ON)
+
 file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/include/litiv/utils/DefineUtils.hpp)
 
 configure_file(
@@ -57,10 +59,9 @@ endif(USE_GLSL)
 
 add_library(${LITIV_CURRENT_PROJECT_NAME} STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
 
-option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark impl in litiv_utils" ON)
 if(USE_BSDS500_BENCHMARK)
     target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} BSDS500)
-endif(USE_BSDS500_BENCHMARK)
+endif()
 target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} litiv_imgproc) # needed for thinning in BSDS500 eval
 target_link_litiv_dependencies(${LITIV_CURRENT_PROJECT_NAME})
 target_include_directories(${LITIV_CURRENT_PROJECT_NAME}

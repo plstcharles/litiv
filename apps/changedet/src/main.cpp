@@ -43,11 +43,11 @@
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
 #define DATASET_ID              eDataset_CDnet2014
-#ifndef GLOBAL_DATASET_ROOT_PATH
-#define DATASET_ROOT_PATH       std::string("/some/dataset/root/path/")
-#else //def(GLOBAL_DATASET_ROOT_PATH)
-#define DATASET_ROOT_PATH       std::string(GLOBAL_DATASET_ROOT_PATH)
-#endif //def(GLOBAL_DATASET_ROOT_PATH)
+#ifndef DATASET_ROOT
+#define DATASET_PATH       std::string("/some/dataset/root/path/")
+#else //def(DATASET_ROOT)
+#define DATASET_PATH       std::string(DATASET_ROOT)
+#endif //def(DATASET_ROOT)
 #define DATASET_RESULTS_PATH    std::string("results")
 #define DATASET_PRECACHING      1
 ////////////////////////////////
@@ -143,21 +143,21 @@ void AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::
 #endif // bad config
 #ifndef DATASET_ID
 const std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> g_pDatasetInfo(new DatasetUtils::Segm::Video::DatasetInfo(
-        "GeekSys2D measy02", // m_sDatasetName
-        DATASET_ROOT_PATH+"/geeksys/measy02/", // m_sDatasetRootPath
-        DATASET_ROOT_PATH+"/geeksys/measy02/"+DATASET_RESULTS_PATH+"/", // m_sResultsRootPath
-        "fg_", // m_sResultNamePrefix
+        "@@@@", // m_sDatasetName
+        DATASET_PATH+"/@@@/", // m_sDatasetRootPath
+        DATASET_PATH+"/@@@/"+DATASET_RESULTS_PATH+"/", // m_sResultsRootPath
+        "@@@", // m_sResultNamePrefix
         ".png", // m_sResultNameSuffix
-        {"original"}, // m_vsWorkBatchPaths
+        {"@@@"}, // m_vsWorkBatchPaths
         {}, // m_vsSkippedNameTokens
-        {"original"}, // m_vsGrayscaleNameTokens
+        {"@@@"}, // m_vsGrayscaleNameTokens
         USE_GPU_IMPL, // m_bForce4ByteDataAlign
-        0.5, // m_dScaleFactor
+        1.0, // m_dScaleFactor
         DatasetUtils::Segm::Video::eDataset_Custom, // m_eDatasetID
         -1 // m_nResultIdxOffset
 ));
 #else //defined(DATASET_ID)
-const std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> g_pDatasetInfo = DatasetUtils::Segm::Video::GetDatasetInfo(DatasetUtils::Segm::Video::DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH,USE_GPU_IMPL);
+const std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> g_pDatasetInfo = DatasetUtils::Segm::Video::GetDatasetInfo(DatasetUtils::Segm::Video::DATASET_ID,DATASET_PATH,DATASET_RESULTS_PATH,USE_GPU_IMPL);
 #endif //defined(DATASET_ID)
 
 // @@@@ package x/y/event/code into shared_ptr struct? check opencv 3.0 callback for mouse event?

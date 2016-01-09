@@ -34,11 +34,11 @@
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
 #define DATASET_ID              eDataset_BSDS500_edge_train
-#ifndef GLOBAL_DATASET_ROOT_PATH
-#define DATASET_ROOT_PATH       std::string("/some/dataset/root/path/")
-#else //def(GLOBAL_DATASET_ROOT_PATH)
-#define DATASET_ROOT_PATH       std::string(GLOBAL_DATASET_ROOT_PATH)
-#endif //def(GLOBAL_DATASET_ROOT_PATH)
+#ifndef DATASET_ROOT
+#define DATASET_PATH            std::string("/some/dataset/root/path/")
+#else //def(DATASET_ROOT)
+#define DATASET_PATH       std::string(DATASET_ROOT)
+#endif //def(DATASET_ROOT)
 #define DATASET_RESULTS_PATH    std::string("results_test")
 #define DATASET_PRECACHING      1
 ////////////////////////////////
@@ -126,8 +126,8 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
 #ifndef DATASET_ID
 const std::shared_ptr<DatasetUtils::Segm::Image::DatasetInfo> g_pDatasetInfo(new DatasetUtils::Segm::Image::DatasetInfo(
         "@@@@", // m_sDatasetName
-        DATASET_ROOT_PATH+"/@@@/", // m_sDatasetRootPath
-        DATASET_ROOT_PATH+"/@@@/"+DATASET_RESULTS_PATH+"/", // m_sResultsRootPath
+        DATASET_PATH+"/@@@/", // m_sDatasetRootPath
+        DATASET_PATH+"/@@@/"+DATASET_RESULTS_PATH+"/", // m_sResultsRootPath
         "@@@", // m_sResultNamePrefix
         ".png", // m_sResultNameSuffix
         {"@@@"}, // m_vsWorkBatchPaths
@@ -137,7 +137,7 @@ const std::shared_ptr<DatasetUtils::Segm::Image::DatasetInfo> g_pDatasetInfo(new
         DatasetUtils::Segm::Image::eDataset_Custom, // m_eDatasetID
 ));
 #else //defined(DATASET_ID)
-const std::shared_ptr<DatasetUtils::Segm::Image::DatasetInfo> g_pDatasetInfo = DatasetUtils::Segm::Image::GetDatasetInfo(DatasetUtils::Segm::Image::DATASET_ID,DATASET_ROOT_PATH,DATASET_RESULTS_PATH,USE_GPU_IMPL);
+const std::shared_ptr<DatasetUtils::Segm::Image::DatasetInfo> g_pDatasetInfo = DatasetUtils::Segm::Image::GetDatasetInfo(DatasetUtils::Segm::Image::DATASET_ID,DATASET_PATH,DATASET_RESULTS_PATH,USE_GPU_IMPL);
 #endif //defined(DATASET_ID)
 
 std::atomic_size_t g_nActiveThreads(0);
