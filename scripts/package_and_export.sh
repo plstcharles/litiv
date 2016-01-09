@@ -1,13 +1,13 @@
 #!/bin/bash
 
 if [ $# -eq 0 ]
-	then
-	echo "No arguments supplied."
-	exit -1;
+    then
+    echo "No arguments supplied."
+    exit -1;
 elif [ -z "$1" ]
-	then
-	echo "Bad first arg (remote host name)."
-	exit -1;
+    then
+    echo "Bad first arg (remote host name)."
+    exit -1;
 fi
 
 REMOTE_HOST_NAME="$1.info.polymtl.ca"
@@ -28,11 +28,11 @@ cd $old_wd
 echo "Sending to $REMOTE_HOST_NAME..."
 scp /home/perf5/workspace/lbsp/Release/$REMOTE_PACKAGE_NAME.tar.gz pistc@$REMOTE_HOST_NAME:
 if [ $? -ne 0 ]
-	then
-	echo "SSH connection failed."
-	rm -r /home/perf5/workspace/lbsp/Release/$REMOTE_PACKAGE_NAME
-	rm -r /home/perf5/workspace/lbsp/Release/$REMOTE_PACKAGE_NAME.tar.gz
-	exit -1
+    then
+    echo "SSH connection failed."
+    rm -r /home/perf5/workspace/lbsp/Release/$REMOTE_PACKAGE_NAME
+    rm -r /home/perf5/workspace/lbsp/Release/$REMOTE_PACKAGE_NAME.tar.gz
+    exit -1
 fi
 
 echo "Writing local extraction/execution script..."
@@ -46,13 +46,13 @@ rm $REMOTE_PACKAGE_NAME.tar.gz
 echo "Sending extraction/execution script to $REMOTE_HOST_NAME..."
 scp /home/perf5/workspace/lbsp/$REMOTE_SCRIPT_NAME pistc@$REMOTE_HOST_NAME:
 if [ $? -ne 0 ]
-	then
-	echo "SSH connection failed."
-	echo "Removing local files..."
-	rm /home/perf5/workspace/lbsp/$REMOTE_SCRIPT_NAME
-	rm -r /home/perf5/workspace/lbsp/Release/$REMOTE_PACKAGE_NAME
-	rm -r /home/perf5/workspace/lbsp/Release/$REMOTE_PACKAGE_NAME.tar.gz
-	exit -1
+    then
+    echo "SSH connection failed."
+    echo "Removing local files..."
+    rm /home/perf5/workspace/lbsp/$REMOTE_SCRIPT_NAME
+    rm -r /home/perf5/workspace/lbsp/Release/$REMOTE_PACKAGE_NAME
+    rm -r /home/perf5/workspace/lbsp/Release/$REMOTE_PACKAGE_NAME.tar.gz
+    exit -1
 fi
 
 echo "Starting download/extract script on $REMOTE_HOST_NAME..."
