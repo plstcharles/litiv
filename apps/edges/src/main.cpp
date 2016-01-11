@@ -99,17 +99,6 @@
 #define TIMER_INTERNAL_ELAPSED_MS(x)
 #endif //!ENABLE_INTERNAL_TIMERS
 #if (HAVE_GLSL && USE_GLSL_IMPL)
-#define TARGET_GL_VER_STR "GL_VERSION_" XSTR(TARGET_GL_VER_MAJOR) "_" XSTR(TARGET_GL_VER_MINOR)
-#define glewInitErrorCheck { \
-    glErrorCheck; \
-    glewExperimental = GLEW_EXPERIMENTAL?GL_TRUE:GL_FALSE; \
-    if(GLenum __glewerrn=glewInit()!=GLEW_OK) \
-        glErrorExt("Failed to init GLEW (code=%d)",__glewerrn); \
-    else if(GLenum __errn=glGetError()!=GL_INVALID_ENUM) \
-        glErrorExt("Unexpected GLEW init error (code=%d)",__errn); \
-    if(!glewIsSupported(TARGET_GL_VER_STR)) \
-        glErrorExt("Bad GL core/ext version detected (target is %s)",TARGET_GL_VER_STR); \
-}
 #if !HAVE_GLFW
 #error "missing glfw"
 #endif //!HAVE_GLFW
@@ -268,7 +257,7 @@ void AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
         if(!pWindow)
             glError("Failed to create window via GLFW");
         glfwMakeContextCurrent(pWindow.get());
-        glewInitErrorCheck;
+        GLContext<TARGET_GL_VER_MAJOR,TARGET_GL_VER_MINOR>::initGLEW();
 #if USE_CANNY
 #error "Missing glsl impl." // ... @@@@@
         std::shared_ptr<BackgroundSubtractorLOBSTER_GLSL> pAlgo(new BackgroundSubtractorLOBSTER_GLSL());

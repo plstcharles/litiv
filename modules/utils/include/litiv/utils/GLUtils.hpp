@@ -116,8 +116,7 @@ public:
         if(bHide)
             glutHideWindow();
 #endif //HAVE_FREEGLUT
-        glErrorCheck;
-        glewInitErrorCheck();
+        initGLEW();
     }
 
     void SetAsActive() {
@@ -131,20 +130,21 @@ public:
     //constexpr static std::string GetGLEWVersionString() {return std::string("GL_VERSION_")+CxxUtils::MetaStrConcatenator<typename CxxUtils::MetaITOA<nGLVerMajor>::type,CxxUtils::MetaStr<'_'>,typename CxxUtils::MetaITOA<nGLVerMinor>::type,CxxUtils::MetaStr<'\0'>>::type::value;}
     constexpr static std::string GetGLEWVersionString() {return std::string("GL_VERSION_")+std::to_string(nGLVerMajor)+"_"+std::to_string(nGLVerMinor);}
 
-private:
-
-    void glewInitErrorCheck() {
+    static void initGLEW() {
         glErrorCheck;
         glewExperimental = GLEW_EXPERIMENTAL?GL_TRUE:GL_FALSE;
-        if(GLenum glewerrn=glewInit()!=GLEW_OK)
+        const GLenum glewerrn = glewInit();
+        if(glewerrn!=GLEW_OK)
             glErrorExt("Failed to init GLEW [code=%d, msg=%s]",glewerrn,glewGetErrorString(glewerrn));
-        GLenum errn = glGetError();
+        const GLenum errn = glGetError();
         // see glew init GL_INVALID_ENUM bug discussion at https://www.opengl.org/wiki/OpenGL_Loading_Library
-        if(errn!=GL_NO_ERROR && errn!=GL_INVALID_ENUM && errn!=1)
+        if(errn!=GL_NO_ERROR && errn!=GL_INVALID_ENUM)
             glErrorExt("Unexpected GLEW init error [code=%d, msg=%s]",errn,gluErrorString(errn));
         if(!glewIsSupported(GetGLEWVersionString().c_str()))
             glErrorExt("Bad GL core/ext version detected (target is %s)",GetGLEWVersionString().c_str());
     }
+
+private:
 
 #if HAVE_GLFW
     std::unique_ptr<GLFWwindow,glfwWindowDeleter> m_pWindowHandle;
