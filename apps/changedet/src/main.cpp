@@ -44,9 +44,9 @@
 ////////////////////////////////
 #define DATASET_ID              eDataset_CDnet2014
 #ifndef DATASET_ROOT
-#define DATASET_PATH       std::string("/some/dataset/root/path/")
+#define DATASET_PATH            std::string("/some/dataset/root/path/")
 #else //def(DATASET_ROOT)
-#define DATASET_PATH       std::string(DATASET_ROOT)
+#define DATASET_PATH            std::string(DATASET_ROOT)
 #endif //def(DATASET_ROOT)
 #define DATASET_RESULTS_PATH    std::string("results")
 #define DATASET_PRECACHING      1
@@ -405,7 +405,7 @@ void AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> p
                 cv::bitwise_or(oLastBGImg,UCHAR_MAX/2,oLastBGImg,oROI==0);
             cv::Mat oDisplayFrame = DatasetUtils::GetDisplayImage(oLastInputFrame,oLastBGImg,pCurrSequence->m_pEvaluator?pCurrSequence->m_pEvaluator->GetColoredSegmMaskFromResult(oLastFGMask,oLastGTMask,oROI):oLastFGMask,nCurrFrameIdx);
             cv::Mat oDisplayFrameResized;
-            if(oDisplayImage.cols>1920 || oDisplayImage.rows>1080)
+            if(oDisplayFrame.cols>1920 || oDisplayFrame.rows>1080)
                 cv::resize(oDisplayFrame,oDisplayFrameResized,cv::Size(oDisplayFrame.cols/2,oDisplayFrame.rows/2));
             else
                 oDisplayFrameResized = oDisplayFrame;

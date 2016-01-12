@@ -37,7 +37,7 @@
 #ifndef DATASET_ROOT
 #define DATASET_PATH            std::string("/some/dataset/root/path/")
 #else //def(DATASET_ROOT)
-#define DATASET_PATH       std::string(DATASET_ROOT)
+#define DATASET_PATH            std::string(DATASET_ROOT)
 #endif //def(DATASET_ROOT)
 #define DATASET_RESULTS_PATH    std::string("results_test")
 #define DATASET_PRECACHING      1
