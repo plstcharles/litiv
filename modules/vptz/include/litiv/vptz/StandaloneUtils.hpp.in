@@ -84,10 +84,22 @@
 #include <condition_variable>
 #include <opencv2/core.hpp>
 
+#ifndef D2R
 #define D2R(d) ((d)*(M_PI/180.0))
+#endif //ndefined(D2R)
+#ifndef R2D
 #define R2D(r) ((r)*(180.0/M_PI))
+#endif //ndefined(R2D)
+#ifndef isnan
 #define isnan(f) std::isnan(f)
+#endif //ndefined(isnan)
 
+#if defined(_MSC_VER)
+#ifndef NOMINMAX
+#define NOMINMAX // go ahead, try using std::numeric_limits<...>::max() with the 'max' macro enabled
+#endif //ndefined(NOMINMAX)
+#include <windows.h>
+#endif //defined(_MSC_VER)
 #include <GL/glew.h>
 #if HAVE_GLFW
 #include <GLFW/glfw3.h>

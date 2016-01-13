@@ -15,6 +15,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// NOTE: no includes in this file!
+
 #pragma once
 
 #ifndef __CMAKE_VAR_DEF_DROP_IN__
@@ -35,9 +37,48 @@
 #define TIMER_TOC(x) int64 XSTR_CONCAT(__nCPUTimerVal_,x) = cv::getTickCount()-XSTR_CONCAT(__nCPUTimerTick_,x)
 #define TIMER_ELAPSED_MS(x) (double(XSTR_CONCAT(__nCPUTimerVal_,x))/(cv::getTickFrequency()/1000))
 
+#define lvError(msg) throw CxxUtils::Exception(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__)
+#define lvErrorExt(msg,...) throw CxxUtils::Exception(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
+#define lvAssert(expr) {if(!!(expr)); else lvError("assertion failed ("#expr")");}
+#ifdef _DEBUG
+#define lvDbgAssert(expr) lvAssert(expr)
+#define lvDbgExceptionWatch CxxUtils::UncaughtExceptionLogger __logger(__PRETTY_FUNCTION__,__FILE__,__LINE__)
+#else //ndefined(_DEBUG)
+#define lvDbgAssert(expr)
+#define lvDbgExceptionWatch
+#endif //ndefined(_DEBUG)
+
+#ifndef D2R
+#define D2R(d) ((d)*(M_PI/180.0))
+#endif //ndefined(D2R)
+#ifndef R2D
+#define R2D(r) ((r)*(180.0/M_PI))
+#endif //ndefined(R2D)
+#ifndef isnan
+#define isnan(f) std::isnan(f)
+#endif //ndefined(isnan)
+#ifndef __STDC_FORMAT_MACROS
+#define __STDC_FORMAT_MACROS
+#endif //ndefined(__STDC_FORMAT_MACROS)
+
 #if defined(_MSC_VER)
+#ifndef __PRETTY_FUNCTION__
 #define __PRETTY_FUNCTION__ __FUNCSIG__
-#endif //defined(_MSC_VER)
+#endif //ndefined(__PRETTY_FUNCTION__)
+#ifndef NOMINMAX
+#define NOMINMAX // go ahead, try using std::numeric_limits<...>::max() with the 'max' macro enabled
+#endif //ndefined(NOMINMAX)
+#ifndef __func__
+#define __func__ __FUNCTION__
+#endif //ndefined(__func__)
+#if _MSC_VER<1900 // need >= MSVC 2015 (v140) toolchain
+#error "This project requires full C++11 support (including constexpr and SFINAE)."
+#endif //_MSC_VER<1900
+#else //ndefined(_MSC_VER)
+#if __cplusplus<201103L
+#error "This project requires full C++11 support (including constexpr and SFINAE)."
+#endif //__cplusplus<201103L
+#endif //ndefined(_MSC_VER)
 
 #define LITIV_VERSION       @LITIV_VERSION@
 #define LITIV_VERSION_STR   XSTR(LITIV_VERSION)

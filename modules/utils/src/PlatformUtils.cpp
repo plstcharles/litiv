@@ -19,7 +19,7 @@
 
 void PlatformUtils::GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths) {
     vsFilePaths.clear();
-#if PLATFORM_USES_WIN32API
+#if defined(_MSC_VER)
     WIN32_FIND_DATA ffd;
     std::wstring dir(sDirPath.begin(),sDirPath.end());
     dir += L"/*";
@@ -46,7 +46,7 @@ void PlatformUtils::GetFilesFromDir(const std::string& sDirPath, std::vector<std
             }
         }
     }
-#else //!PLATFORM_USES_WIN32API
+#else //!defined(_MSC_VER)
     DIR *dp;
     struct dirent *dirp;
     if((dp  = opendir(sDirPath.c_str()))!=nullptr) {
@@ -67,12 +67,12 @@ void PlatformUtils::GetFilesFromDir(const std::string& sDirPath, std::vector<std
         }
         closedir(dp);
     }
-#endif //!PLATFORM_USES_WIN32API
+#endif //!defined(_MSC_VER)
 }
 
 void PlatformUtils::GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths) {
     vsSubDirPaths.clear();
-#if PLATFORM_USES_WIN32API
+#if defined(_MSC_VER)
     WIN32_FIND_DATA ffd;
     std::wstring dir(sDirPath.begin(),sDirPath.end());
     dir += L"/*";
@@ -100,7 +100,7 @@ void PlatformUtils::GetSubDirsFromDir(const std::string& sDirPath, std::vector<s
             }
         }
     }
-#else //!PLATFORM_USES_WIN32API
+#else //!defined(_MSC_VER)
     DIR *dp;
     struct dirent *dirp;
     if((dp  = opendir(sDirPath.c_str()))!=nullptr) {
@@ -123,7 +123,7 @@ void PlatformUtils::GetSubDirsFromDir(const std::string& sDirPath, std::vector<s
         }
         closedir(dp);
     }
-#endif //!PLATFORM_USES_WIN32API
+#endif //!defined(_MSC_VER)
 }
 
 void PlatformUtils::FilterFilePaths(std::vector<std::string>& vsFilePaths, const std::vector<std::string>& vsRemoveTokens, const std::vector<std::string>& vsKeepTokens) {
@@ -140,19 +140,19 @@ void PlatformUtils::FilterFilePaths(std::vector<std::string>& vsFilePaths, const
 }
 
 bool PlatformUtils::CreateDirIfNotExist(const std::string& sDirPath) {
-#if PLATFORM_USES_WIN32API
+#if defined(_MSC_VER)
     std::wstring dir(sDirPath.begin(),sDirPath.end());
     return CreateDirectory(dir.c_str(),NULL)!=ERROR_PATH_NOT_FOUND;
-#else //!PLATFORM_USES_WIN32API
+#else //!defined(_MSC_VER)
     struct stat st;
     if(stat(sDirPath.c_str(),&st)==-1)
         return !mkdir(sDirPath.c_str(),0777);
     else
         return (stat(sDirPath.c_str(),&st)==0 && S_ISDIR(st.st_mode));
-#endif //!PLATFORM_USES_WIN32API
+#endif //!defined(_MSC_VER)
 }
 
-#if PLATFORM_USES_WIN32API
+#if defined(_MSC_VER)
 // SetConsoleWindowSize(...) : derived from http://www.cplusplus.com/forum/windows/121444/
 void PlatformUtils::SetConsoleWindowSize(int x, int y, int buffer_lines) {
     HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -182,4 +182,4 @@ void PlatformUtils::SetConsoleWindowSize(int x, int y, int buffer_lines) {
     if(!SetConsoleWindowInfo(h, TRUE, &info))
         throw std::runtime_error("SetConsoleWindowSize(...): Unable to resize window after resizing buffer");
 }
-#endif //PLATFORM_USES_WIN32API
+#endif //defined(_MSC_VER)

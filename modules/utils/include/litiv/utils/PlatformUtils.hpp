@@ -17,6 +17,8 @@
 
 #pragma once
 
+// includes here really need cleanup @@@@
+
 #include <opencv2/core.hpp>
 #include "litiv/utils/DefineUtils.hpp"
 #include "litiv/utils/DistanceUtils.hpp"
@@ -38,14 +40,10 @@
 #include <ctime>
 #include <unordered_map>
 #include <deque>
-#define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 #if defined(_MSC_VER)
-#define PLATFORM_USES_WIN32API 1
-#define NOMINMAX
 #include <windows.h>
 #include <stdint.h>
-#define __func__ __FUNCTION__
 #else //!defined(_MSC_VER)
 #include <dirent.h>
 #include <sys/stat.h>
@@ -217,8 +215,8 @@ namespace PlatformUtils {
         return vfResult;
     }
 
-#if PLATFORM_USES_WIN32API
+#if defined(_MSC_VER)
     void SetConsoleWindowSize(int x, int y, int buffer_lines=-1);
-#endif //PLATFORM_USES_WIN32API
+#endif //defined(_MSC_VER)
 
 } //namespace PlatformUtils

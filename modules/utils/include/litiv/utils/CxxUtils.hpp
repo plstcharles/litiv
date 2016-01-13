@@ -17,14 +17,6 @@
 
 #pragma once
 
-#ifdef _MSC_VER
-#if _MSC_VER<1900 // requires at least MSVC 2015 toolchain for constexpr support
-#error "This project requires C++11 support w/ constexpr -- MSVC 2015 minimum."
-#endif //_MSC_VER<...
-#elif __cplusplus<201103L
-#error "This project requires C++11 support."
-#endif //__cplusplus<=201103L
-
 #include <cmath>
 #include <mutex>
 #include <array>
@@ -38,21 +30,7 @@
 #include <type_traits>
 #include <condition_variable>
 #include <opencv2/core.hpp>
-
-#define D2R(d) ((d)*(M_PI/180.0))
-#define R2D(r) ((r)*(180.0/M_PI))
-#define isnan(f) std::isnan(f)
-
-#define lvError(msg) throw CxxUtils::Exception(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__)
-#define lvErrorExt(msg,...) throw CxxUtils::Exception(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
-#define lvAssert(expr) {if(!!(expr)); else lvError("assertion failed ("#expr")");}
-#ifdef _DEBUG
-#define lvDbgAssert(expr) lvAssert(expr)
-#define lvDbgExceptionWatch CxxUtils::UncaughtExceptionLogger __logger(__PRETTY_FUNCTION__,__FILE__,__LINE__)
-#else //!defined(_DEBUG)
-#define lvDbgAssert(expr)
-#define lvDbgExceptionWatch
-#endif //!defined(_DEBUG)
+#include "litiv/utils/DefineUtils.hpp"
 
 namespace CxxUtils {
 

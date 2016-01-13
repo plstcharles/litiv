@@ -18,6 +18,7 @@
 #pragma once
 
 #include <opencv2/core/types_c.h>
+#include "litiv/utils/DefineUtils.hpp"
 
 namespace DistanceUtils {
 
