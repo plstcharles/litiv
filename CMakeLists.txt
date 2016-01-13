@@ -27,23 +27,27 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
 if(WIN32)
-    # add hardcoded guesses for find_package here
+    # add hardcoded guesses for find_package here (caution: top level project is not defined yet!)
     list(APPEND CMAKE_PREFIX_PATH
-         C:/opencv_latest/ C:/opencv_latest/build/ C:/opencv/ C:/opencv/build/
-         C:/freeglut_latest/ C:/freeglut_latest/build/
-         C:/glfw_latest/ C:/glfw_latest/build/
-         C:/glew_latest/ C:/glew_latest/build/
-         C:/glm_latest/ C:/glm_latest/build/)
-     set(DATASET_ROOT "C:/datasets/" CACHE STRING "Global dataset root folder for exec projects")
-     set(CMAKE_INSTALL_PREFIX "C:/litiv" CACHE STRING "Install path prefix, prepended onto install directories")
+        C:/opencv_latest/ C:/opencv_latest/build/ C:/opencv/ C:/opencv/build/
+        C:/freeglut_latest/ C:/freeglut_latest/build/
+        C:/glfw_latest/ C:/glfw_latest/build/
+        C:/glew_latest/ C:/glew_latest/build/
+        C:/glm_latest/ C:/glm_latest/build/
+    )
+    set(DATASET_ROOT "C:/datasets/" CACHE STRING "Global dataset root folder for exec projects")
+    set(CMAKE_INSTALL_PREFIX "C:/litiv" CACHE STRING "Install path prefix, prepended onto install directories")
 else(NOT WIN32)
-     set(DATASET_ROOT "/shared2/datasets/" CACHE STRING "Global dataset root folder for exec projects")
-     set(CMAKE_INSTALL_PREFIX "/usr/local/" CACHE STRING "Install path prefix, prepended onto install directories")
+    set(DATASET_ROOT "/shared2/datasets/" CACHE STRING "Global dataset root folder for exec projects")
+    set(CMAKE_INSTALL_PREFIX "/usr/local/" CACHE STRING "Install path prefix, prepended onto install directories")
 endif()
 
 project(litiv)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if(MSVC AND (MSVC_VERSION LESS 1900))
+    message(FATAL_ERROR "MSVC toolchains older than 2015 (v140) are not supported!")
+endif()
 
 set(LITIV_VERSION_MAJOR 1)
 set(LITIV_VERSION_MINOR 0)
