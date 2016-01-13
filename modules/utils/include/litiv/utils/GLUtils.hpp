@@ -20,6 +20,7 @@
 // @@@@@ TODO: move all exception/log/assert defines to defineutils & cxxutils
 
 #include "litiv/utils/DefineUtils.hpp"
+#include "litiv/utils/PlatformUtils.hpp"
 #include "litiv/utils/CxxUtils.hpp"
 #include <GL/glew.h>
 #include <GL/glu.h>
