@@ -354,9 +354,9 @@ DatasetUtils::WorkGroup::WorkGroup(const std::string& sGroupName, const DatasetI
         PlatformUtils::GetSubDirsFromDir(m_sDatasetPath,vsWorkBatchPaths);
         if(vsWorkBatchPaths.empty()) {
             if(oDatasetInfo.GetType()==eDatasetType_Segm_Video)
-                m_vpBatches.push_back(std::make_shared<Segm::Video::Sequence>(m_sName,dynamic_cast<const Segm::Video::DatasetInfo&>(oDatasetInfo),m_sRelativePath));
+                m_vpBatches.push_back(std::make_shared<Video::Segm::Sequence>(m_sName,dynamic_cast<const Video::Segm::DatasetInfo&>(oDatasetInfo),m_sRelativePath));
             else if(oDatasetInfo.GetType()==eDatasetType_Segm_Image)
-                m_vpBatches.push_back(std::make_shared<Segm::Image::Set>(m_sName,dynamic_cast<const Segm::Image::DatasetInfo&>(oDatasetInfo),m_sRelativePath));
+                m_vpBatches.push_back(std::make_shared<Image::Segm::Set>(m_sName,dynamic_cast<const Image::Segm::DatasetInfo&>(oDatasetInfo),m_sRelativePath));
             else
                 throw std::logic_error(cv::format("Workgroup '%s': bad dataset type bassed in dataset info struct",m_sName.c_str()));
             m_dExpectedLoad += m_vpBatches.back()->GetExpectedLoad();
@@ -369,9 +369,9 @@ DatasetUtils::WorkGroup::WorkGroup(const std::string& sGroupName, const DatasetI
                 const std::string sBatchName = nLastSlashPos==std::string::npos?*psPathIter:psPathIter->substr(nLastSlashPos+1);
                 if(!PlatformUtils::string_contains_token(sBatchName,oDatasetInfo.m_vsSkippedNameTokens)) {
                     if(oDatasetInfo.GetType()==eDatasetType_Segm_Video)
-                        m_vpBatches.push_back(std::make_shared<Segm::Video::Sequence>(sBatchName,dynamic_cast<const Segm::Video::DatasetInfo&>(oDatasetInfo),m_sRelativePath+"/"+sBatchName+"/"));
+                        m_vpBatches.push_back(std::make_shared<Video::Segm::Sequence>(sBatchName,dynamic_cast<const Video::Segm::DatasetInfo&>(oDatasetInfo),m_sRelativePath+"/"+sBatchName+"/"));
                     else if(oDatasetInfo.GetType()==eDatasetType_Segm_Image)
-                        m_vpBatches.push_back(std::make_shared<Segm::Image::Set>(sBatchName,dynamic_cast<const Segm::Image::DatasetInfo&>(oDatasetInfo),m_sRelativePath+"/"+sBatchName+"/"));
+                        m_vpBatches.push_back(std::make_shared<Image::Segm::Set>(sBatchName,dynamic_cast<const Image::Segm::DatasetInfo&>(oDatasetInfo),m_sRelativePath+"/"+sBatchName+"/"));
                     else
                         throw std::logic_error(cv::format("Workgroup '%s': bad dataset type bassed in dataset info struct",m_sName.c_str()));
                     m_dExpectedLoad += m_vpBatches.back()->GetExpectedLoad();
@@ -404,9 +404,9 @@ cv::Mat DatasetUtils::WorkGroup::GetGTFromIndex_external(size_t nIdx) {
     return m_vpBatches[nBatchIdx-1]->GetGTFromIndex_external(nIdx-(nCumulIdx-m_vpBatches[nBatchIdx-1]->GetTotalImageCount()));
 }
 
-DatasetUtils::Segm::Video::DatasetInfo::DatasetInfo() : DatasetInfoBase(), m_eDatasetID(eDataset_Custom), m_nResultIdxOffset(0) {}
+DatasetUtils::Video::Segm::DatasetInfo::DatasetInfo() : DatasetInfoBase(), m_eDatasetID(eDataset_Custom), m_nResultIdxOffset(0) {}
 
-DatasetUtils::Segm::Video::DatasetInfo::DatasetInfo(const std::string& sDatasetName, const std::string& sDatasetRootPath, const std::string& sResultsRootPath,
+DatasetUtils::Video::Segm::DatasetInfo::DatasetInfo(const std::string& sDatasetName, const std::string& sDatasetRootPath, const std::string& sResultsRootPath,
                                                     const std::string& sResultNamePrefix, const std::string& sResultNameSuffix, const std::vector<std::string>& vsWorkBatchPaths,
                                                     const std::vector<std::string>& vsSkippedNameTokens, const std::vector<std::string>& vsGrayscaleNameTokens,
                                                     bool bForce4ByteDataAlign, double dScaleFactor, eDatasetList eDatasetID, size_t nResultIdxOffset) :
@@ -414,16 +414,16 @@ DatasetUtils::Segm::Video::DatasetInfo::DatasetInfo(const std::string& sDatasetN
         m_eDatasetID(eDatasetID),
         m_nResultIdxOffset(nResultIdxOffset) {}
 
-void DatasetUtils::Segm::Video::DatasetInfo::WriteEvalResults(const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) const {
+void DatasetUtils::Video::Segm::DatasetInfo::WriteEvalResults(const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) const {
     if(m_eDatasetID==eDataset_CDnet2012 || m_eDatasetID==eDataset_CDnet2014)
         CDnetEvaluator::WriteEvalResults(*this,vpGroups,true);
     else if(m_eDatasetID==eDataset_Wallflower || m_eDatasetID==eDataset_PETS2001_D3TC1)
         BinarySegmEvaluator::WriteEvalResults(*this,vpGroups,true);
     else
-        throw std::logic_error(cv::format("DatasetUtils::Segm::Video::DatasetInfo::WriteEvalResults: missing dataset evaluator impl, cannot write results"));
+        throw std::logic_error(cv::format("DatasetUtils::Video::Segm::DatasetInfo::WriteEvalResults: missing dataset evaluator impl, cannot write results"));
 }
 
-std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> DatasetUtils::Segm::Video::GetDatasetInfo(const eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirName, bool bForce4ByteDataAlign) {
+std::shared_ptr<DatasetUtils::Video::Segm::DatasetInfo> DatasetUtils::Video::Segm::GetDatasetInfo(const eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirName, bool bForce4ByteDataAlign) {
     std::shared_ptr<DatasetInfo> pInfo;
     if(eDatasetID==eDataset_CDnet2012) {
         pInfo = std::make_shared<DatasetInfo>();
@@ -482,13 +482,13 @@ std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> DatasetUtils::Segm::Vide
         pInfo->m_nResultIdxOffset           = 0;
     }
     else if(eDatasetID==eDataset_Custom)
-        throw std::logic_error(cv::format("DatasetUtils::Segm::Video::GetDatasetInfo: custom dataset info struct (eDataset_Custom) can only be filled manually"));
+        throw std::logic_error(cv::format("DatasetUtils::Video::Segm::GetDatasetInfo: custom dataset info struct (eDataset_Custom) can only be filled manually"));
     else
-        throw std::logic_error(cv::format("DatasetUtils::Segm::Video::GetDatasetInfo: unknown dataset type, cannot use predefined dataset info struct"));
+        throw std::logic_error(cv::format("DatasetUtils::Video::Segm::GetDatasetInfo: unknown dataset type, cannot use predefined dataset info struct"));
     return pInfo;
 }
 
-DatasetUtils::Segm::Video::Sequence::Sequence(const std::string& sSeqName, const DatasetInfo& oDatasetInfo, const std::string& sRelativePath) :
+DatasetUtils::Video::Segm::Sequence::Sequence(const std::string& sSeqName, const DatasetInfo& oDatasetInfo, const std::string& sRelativePath) :
         WorkBatch(sSeqName,oDatasetInfo,sRelativePath),
         m_eDatasetID(oDatasetInfo.m_eDatasetID),
         m_nResultIdxOffset(oDatasetInfo.m_nResultIdxOffset),
@@ -613,7 +613,7 @@ DatasetUtils::Segm::Video::Sequence::Sequence(const std::string& sSeqName, const
         throw std::logic_error(cv::format("Sequence '%s': unknown dataset type, cannot use any known parsing strategy",sSeqName.c_str()));
 }
 
-void DatasetUtils::Segm::Video::Sequence::WriteResult(size_t nIdx, const cv::Mat& oResult) {
+void DatasetUtils::Video::Segm::Sequence::WriteResult(size_t nIdx, const cv::Mat& oResult) {
     if(m_oOrigSize==m_oSize)
         WorkBatch::WriteResult(nIdx+m_nResultIdxOffset,oResult);
     else {
@@ -623,11 +623,11 @@ void DatasetUtils::Segm::Video::Sequence::WriteResult(size_t nIdx, const cv::Mat
     }
 }
 
-bool DatasetUtils::Segm::Video::Sequence::StartPrecaching(bool bUsingGT, size_t /*nUnused*/) {
+bool DatasetUtils::Video::Segm::Sequence::StartPrecaching(bool bUsingGT, size_t /*nUnused*/) {
     return WorkBatch::StartPrecaching(bUsingGT,m_oSize.height*m_oSize.width*(m_nTotFrameCount+1)*(m_bForcingGrayscale?1:m_bForcing4ByteDataAlign?4:3));
 }
 
-cv::Mat DatasetUtils::Segm::Video::Sequence::GetInputFromIndex_external(size_t nFrameIdx) {
+cv::Mat DatasetUtils::Video::Segm::Sequence::GetInputFromIndex_external(size_t nFrameIdx) {
     cv::Mat oFrame;
     if(m_eDatasetID==eDataset_CDnet2012 || m_eDatasetID==eDataset_CDnet2014 || m_eDatasetID==eDataset_Wallflower || (m_eDatasetID==eDataset_Custom && m_nResultIdxOffset==size_t(-1)))
         oFrame = cv::imread(m_vsInputFramePaths[nFrameIdx],m_bForcingGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
@@ -655,7 +655,7 @@ cv::Mat DatasetUtils::Segm::Video::Sequence::GetInputFromIndex_external(size_t n
     return oFrame;
 }
 
-cv::Mat DatasetUtils::Segm::Video::Sequence::GetGTFromIndex_external(size_t nFrameIdx) {
+cv::Mat DatasetUtils::Video::Segm::Sequence::GetGTFromIndex_external(size_t nFrameIdx) {
     cv::Mat oFrame;
     if(m_eDatasetID==eDataset_CDnet2012 || m_eDatasetID == eDataset_CDnet2014)
         oFrame = cv::imread(m_vsGTFramePaths[nFrameIdx],cv::IMREAD_GRAYSCALE);
@@ -677,23 +677,23 @@ cv::Mat DatasetUtils::Segm::Video::Sequence::GetGTFromIndex_external(size_t nFra
     return oFrame;
 }
 
-DatasetUtils::Segm::Image::DatasetInfo::DatasetInfo() : DatasetInfoBase(), m_eDatasetID(eDataset_Custom) {}
+DatasetUtils::Image::Segm::DatasetInfo::DatasetInfo() : DatasetInfoBase(), m_eDatasetID(eDataset_Custom) {}
 
-DatasetUtils::Segm::Image::DatasetInfo::DatasetInfo(const std::string& sDatasetName, const std::string& sDatasetRootPath, const std::string& sResultsRootPath,
+DatasetUtils::Image::Segm::DatasetInfo::DatasetInfo(const std::string& sDatasetName, const std::string& sDatasetRootPath, const std::string& sResultsRootPath,
                                                     const std::string& sResultNamePrefix, const std::string& sResultNameSuffix, const std::vector<std::string>& vsWorkBatchPaths,
                                                     const std::vector<std::string>& vsSkippedNameTokens, const std::vector<std::string>& vsGrayscaleNameTokens,
                                                     bool bForce4ByteDataAlign, double dScaleFactor, eDatasetList eDatasetID) :
         DatasetInfoBase(sDatasetName,sDatasetRootPath,sResultsRootPath,sResultNamePrefix,sResultNameSuffix,vsWorkBatchPaths,vsSkippedNameTokens,vsGrayscaleNameTokens,bForce4ByteDataAlign,dScaleFactor),
         m_eDatasetID(eDatasetID) {}
 
-void DatasetUtils::Segm::Image::DatasetInfo::WriteEvalResults(const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) const {
+void DatasetUtils::Image::Segm::DatasetInfo::WriteEvalResults(const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) const {
     if( m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test)
         BSDS500BoundaryEvaluator::WriteEvalResults(*this,vpGroups);
     else
-        throw std::logic_error(cv::format("DatasetUtils::Segm::Image::DatasetInfo::WriteEvalResults: missing dataset evaluator impl, cannot write results"));
+        throw std::logic_error(cv::format("DatasetUtils::Image::Segm::DatasetInfo::WriteEvalResults: missing dataset evaluator impl, cannot write results"));
 }
 
-std::shared_ptr<DatasetUtils::Segm::Image::DatasetInfo> DatasetUtils::Segm::Image::GetDatasetInfo(const eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirName, bool bForce4ByteDataAlign) {
+std::shared_ptr<DatasetUtils::Image::Segm::DatasetInfo> DatasetUtils::Image::Segm::GetDatasetInfo(const eDatasetList eDatasetID, const std::string& sDatasetRootDirPath, const std::string& sResultsDirName, bool bForce4ByteDataAlign) {
     std::shared_ptr<DatasetInfo> pInfo;
     if(eDatasetID==eDataset_BSDS500_segm_train || eDatasetID==eDataset_BSDS500_edge_train) {
         pInfo = std::make_shared<DatasetInfo>();
@@ -735,13 +735,13 @@ std::shared_ptr<DatasetUtils::Segm::Image::DatasetInfo> DatasetUtils::Segm::Imag
         pInfo->m_eDatasetID                 = eDatasetID;
     }
     else if(eDatasetID==eDataset_Custom)
-        throw std::logic_error(cv::format("DatasetUtils::Segm::Image::GetDatasetInfo: custom dataset info struct (eDataset_Custom) can only be filled manually"));
+        throw std::logic_error(cv::format("DatasetUtils::Image::Segm::GetDatasetInfo: custom dataset info struct (eDataset_Custom) can only be filled manually"));
     else
-        throw std::logic_error(cv::format("DatasetUtils::Segm::Image::GetDatasetInfo: unknown dataset type, cannot use predefined dataset info struct"));
+        throw std::logic_error(cv::format("DatasetUtils::Image::Segm::GetDatasetInfo: unknown dataset type, cannot use predefined dataset info struct"));
     return pInfo;
 }
 
-DatasetUtils::Segm::Image::Set::Set(const std::string& sSetName, const DatasetInfo& oDatasetInfo, const std::string& sRelativePath) :
+DatasetUtils::Image::Segm::Set::Set(const std::string& sSetName, const DatasetInfo& oDatasetInfo, const std::string& sRelativePath) :
         WorkBatch(sSetName,oDatasetInfo,sRelativePath),
         m_eDatasetID(oDatasetInfo.m_eDatasetID),
         m_dExpectedLoad(0),
@@ -807,7 +807,7 @@ DatasetUtils::Segm::Image::Set::Set(const std::string& sSetName, const DatasetIn
     }
 }
 
-cv::Mat DatasetUtils::Segm::Image::Set::GetInputFromIndex_external(size_t nImageIdx) {
+cv::Mat DatasetUtils::Image::Segm::Set::GetInputFromIndex_external(size_t nImageIdx) {
     cv::Mat oImage;
     oImage = cv::imread(m_vsInputImagePaths[nImageIdx],m_bForcingGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
     CV_Assert(!oImage.empty());
@@ -830,7 +830,7 @@ cv::Mat DatasetUtils::Segm::Image::Set::GetInputFromIndex_external(size_t nImage
     return oImage;
 }
 
-cv::Mat DatasetUtils::Segm::Image::Set::GetGTFromIndex_external(size_t nImageIdx) {
+cv::Mat DatasetUtils::Image::Segm::Set::GetGTFromIndex_external(size_t nImageIdx) {
     cv::Mat oImage;
     if(m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test) {
         if(m_vsGTImagePaths.size()>nImageIdx) {
@@ -866,7 +866,7 @@ cv::Mat DatasetUtils::Segm::Image::Set::GetGTFromIndex_external(size_t nImageIdx
     return oImage;
 }
 
-cv::Mat DatasetUtils::Segm::Image::Set::ReadResult(size_t nImageIdx) {
+cv::Mat DatasetUtils::Image::Segm::Set::ReadResult(size_t nImageIdx) {
     CV_Assert(m_vsOrigImageNames[nImageIdx]!=std::string());
     CV_Assert(!m_sResultNameSuffix.empty());
     std::stringstream sResultFilePath;
@@ -883,7 +883,7 @@ cv::Mat DatasetUtils::Segm::Image::Set::ReadResult(size_t nImageIdx) {
     return oImage;
 }
 
-void DatasetUtils::Segm::Image::Set::WriteResult(size_t nImageIdx, const cv::Mat& oResult) {
+void DatasetUtils::Image::Segm::Set::WriteResult(size_t nImageIdx, const cv::Mat& oResult) {
     CV_Assert(m_vsOrigImageNames[nImageIdx]!=std::string());
     CV_Assert(!m_sResultNameSuffix.empty());
     cv::Mat oImage = oResult;
@@ -900,6 +900,6 @@ void DatasetUtils::Segm::Image::Set::WriteResult(size_t nImageIdx, const cv::Mat
     cv::imwrite(sResultFilePath.str(),oImage,vnComprParams);
 }
 
-bool DatasetUtils::Segm::Image::Set::StartPrecaching(bool bUsingGT, size_t /*nUnused*/) {
+bool DatasetUtils::Image::Segm::Set::StartPrecaching(bool bUsingGT, size_t /*nUnused*/) {
     return WorkBatch::StartPrecaching(bUsingGT,m_oMaxSize.height*m_oMaxSize.width*(m_nTotImageCount+1)*(m_bForcingGrayscale?1:m_bForcing4ByteDataAlign?4:3));
 }

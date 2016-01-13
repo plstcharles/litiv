@@ -61,6 +61,7 @@ namespace DatasetUtils {
     enum eDatasetTypeList {
         eDatasetType_Segm_Video,
         eDatasetType_Segm_Image,
+        eDatasetType_Registr_Video,
         // ...
     };
 
@@ -146,9 +147,9 @@ namespace DatasetUtils {
         WorkGroup(const WorkGroup&) = delete;
     };
 
-    namespace Segm {
+    namespace Video {
 
-        namespace Video {
+        namespace Segm {
 
             enum eDatasetList {
                 eDataset_CDnet2012,
@@ -202,9 +203,17 @@ namespace DatasetUtils {
                 Sequence(const Sequence&) = delete;
             };
 
-        } //namespace Video
+        } //namespace Segm
 
-        namespace Image {
+        namespace Registr {
+
+        } //namespace Registr
+
+    } //namespace Video
+
+    namespace Image {
+
+        namespace Segm {
 
             enum eDatasetList {
                 eDataset_BSDS500_segm_train,
@@ -257,8 +266,8 @@ namespace DatasetUtils {
                 Set(const Set&) = delete;
             };
 
-        } //namespace Image
+        } //namespace Segm
 
-    } //namespace Segm
+    } //namespace Image
 
 } //namespace DatasetUtils

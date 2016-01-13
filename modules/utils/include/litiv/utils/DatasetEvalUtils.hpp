@@ -88,9 +88,9 @@ namespace DatasetUtils {
         double dTimeElapsed_sec;
     };
 
-    namespace Segm {
+    namespace Video {
 
-        namespace Video {
+        namespace Segm {
 
             struct BinarySegmEvaluator : public EvaluatorBase {
                 BinarySegmEvaluator(std::string sEvalID);
@@ -133,9 +133,13 @@ namespace DatasetUtils {
                 static const uchar s_nSegmShadow;
             };
 
-        } //namespace Video
+        } //namespace Segm
 
-        namespace Image {
+    } //namespace Video
+
+    namespace Image {
+
+        namespace Segm {
 
             struct BSDS500BoundaryEvaluator : public EvaluatorBase {
                 BSDS500BoundaryEvaluator(size_t nThresholdBins=DEFAULT_BSDS500_EDGE_EVAL_THRESHOLD_BINS);
@@ -179,8 +183,8 @@ namespace DatasetUtils {
                 friend struct DatasetInfo;
             };
 
-        } //namespace Image
+        } //namespace Segm
 
-    } //namespace Segm
+    } //namespace Image
 
 } //namespace DatasetUtils
