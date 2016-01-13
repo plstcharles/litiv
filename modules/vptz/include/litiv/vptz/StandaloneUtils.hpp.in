@@ -90,9 +90,6 @@
 #ifndef R2D
 #define R2D(r) ((r)*(180.0/M_PI))
 #endif //ndefined(R2D)
-#ifndef isnan
-#define isnan(f) std::isnan(f)
-#endif //ndefined(isnan)
 
 #if defined(_MSC_VER)
 #ifndef NOMINMAX
@@ -175,6 +172,16 @@ namespace CxxUtils {
                 std::cerr << m_sMsg;
         }
     };
+
+    template<typename T>
+    static inline bool isnan(T dVal) {
+        // needed for portability...
+#ifdef _MSC_VER
+        return _isnan((double)dVal)!=0;
+#else //!def(_MSC_VER)
+        return std::isnan(dVal);
+#endif //!def(_MSC_VER)
+    }
 
 } //namespace CxxUtils
 

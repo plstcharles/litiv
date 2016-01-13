@@ -54,9 +54,6 @@
 #ifndef R2D
 #define R2D(r) ((r)*(180.0/M_PI))
 #endif //ndefined(R2D)
-#ifndef isnan
-#define isnan(f) std::isnan(f)
-#endif //ndefined(isnan)
 #ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
 #endif //ndefined(__STDC_FORMAT_MACROS)

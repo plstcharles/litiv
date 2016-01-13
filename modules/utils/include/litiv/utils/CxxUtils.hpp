@@ -270,9 +270,21 @@ namespace CxxUtils {
         getRandNeighborPosition<24>(s_anNeighborPattern,nNeighborCoord_X,nNeighborCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
     }
 
+    template<typename T>
+    static inline bool isnan(T dVal) {
+        // needed for portability...
+#ifdef _MSC_VER
+        return _isnan((double)dVal)!=0;
+#else //!def(_MSC_VER)
+        return std::isnan(dVal);
+#endif //!def(_MSC_VER)
+    }
+
 } //namespace CxxUtils
 
 namespace std {
+
     template<typename T, size_t N>
     using aligned_vector = vector<T,CxxUtils::AlignAllocator<T,N>>;
+
 } //namespace std
