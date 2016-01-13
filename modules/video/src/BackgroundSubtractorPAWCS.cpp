@@ -139,7 +139,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                 for(size_t nLocalSamplingIter=0; nLocalSamplingIter<nTotLocalSamplingIterCount; ++nLocalSamplingIter) {
                     // == refresh: local resampling
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    RandUtils::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    CxxUtils::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                     if(bForceFGUpdate || !m_oLastFGMask_dilated.data[nSamplePxIdx]) {
                         const uchar nSampleColor = m_oLastColorFrame.data[nSamplePxIdx];
@@ -287,7 +287,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                 for(size_t nLocalSamplingIter=0; nLocalSamplingIter<nTotLocalSamplingIterCount; ++nLocalSamplingIter) {
                     // == refresh: local resampling
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    RandUtils::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    CxxUtils::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_X,m_voPxInfoLUT_PAWCS[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                     if(bForceFGUpdate || !m_oLastFGMask_dilated.data[nSamplePxIdx]) {
                         const size_t nSamplePxRGBIdx = nSamplePxIdx*3;
@@ -822,9 +822,9 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
             //if((!nCurrRegionSegmVal && (rand()%(nCurrRegionIllumUpdtVal?(nCurrLocalWordUpdateRate/2+1):nCurrLocalWordUpdateRate))==0) || bCurrRegionIsROIBorder) {
                 int nSampleImgCoord_Y, nSampleImgCoord_X;
                 if(bCurrRegionIsFlat || bCurrRegionIsROIBorder || m_bUsingMovingCamera)
-                    RandUtils::getRandNeighborPosition_5x5(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    CxxUtils::getRandNeighborPosition_5x5(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 else
-                    RandUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    CxxUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                 if(m_oROI.data[nSamplePxIdx]) {
                     const size_t nNeighborLocalDictIdx = m_voPxInfoLUT_PAWCS[nSamplePxIdx].nModelIdx*m_nCurrLocalWords;
@@ -1162,9 +1162,9 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
             //if((!nCurrRegionSegmVal && (rand()%(nCurrRegionIllumUpdtVal?(nCurrLocalWordUpdateRate/2+1):nCurrLocalWordUpdateRate))==0) || bCurrRegionIsROIBorder) {
                 int nSampleImgCoord_Y, nSampleImgCoord_X;
                 if(bCurrRegionIsFlat || bCurrRegionIsROIBorder || m_bUsingMovingCamera)
-                    RandUtils::getRandNeighborPosition_5x5(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    CxxUtils::getRandNeighborPosition_5x5(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 else
-                    RandUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    CxxUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                 if(m_oROI.data[nSamplePxIdx]) {
                     const size_t nNeighborLocalDictIdx = m_voPxInfoLUT_PAWCS[nSamplePxIdx].nModelIdx*m_nCurrLocalWords;

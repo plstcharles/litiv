@@ -40,7 +40,6 @@ add_files(INCLUDE_FILES
     "include/litiv/utils/DistanceUtils.hpp"
     "include/litiv/utils/ParallelUtils.hpp"
     "include/litiv/utils/PlatformUtils.hpp"
-    "include/litiv/utils/RandUtils.hpp"
     "include/litiv/utils.hpp"
 )
 if(USE_GLSL)

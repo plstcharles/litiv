@@ -19,7 +19,6 @@
 
 #include "litiv/video/BackgroundSubtractionUtils.hpp"
 #include "litiv/features2d/LBSP.hpp"
-#include "litiv/utils/RandUtils.hpp"
 
 //! defines the default value for BackgroundSubtractorLBSP::m_fRelLBSPThreshold
 #define BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.333f)

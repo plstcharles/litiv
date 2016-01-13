@@ -60,7 +60,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::refreshModel(float fSam
             if(bForceFGUpdate || !m_oLastFGMask.data[nColOffset]) {
                 for(size_t nCurrModelSampleIdx=nRefreshSampleStartPos; nCurrModelSampleIdx<nRefreshSampleStartPos+nModelSamplesToRefresh; ++nCurrModelSampleIdx) {
                     int nSampleRowIdx, nSampleColIdx;
-                    RandUtils::getRandSamplePosition_7x7_std2(nSampleColIdx,nSampleRowIdx,(int)nColIdx,(int)nRowIdx,(int)LBSP::PATCH_SIZE/2,m_oFrameSize);
+                    CxxUtils::getRandSamplePosition_7x7_std2(nSampleColIdx,nSampleRowIdx,(int)nColIdx,(int)nRowIdx,(int)LBSP::PATCH_SIZE/2,m_oFrameSize);
                     const size_t nSamplePxIdx = nSampleColIdx + nSampleRowIdx*m_oFrameSize.width;
                     if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
                         const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
@@ -107,13 +107,13 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::initialize(const cv::Ma
     m_nRowStepSize = m_nColStepSize*m_oROI.cols;
     m_nBGModelSize = m_nRowStepSize*m_oROI.rows;
     const int nMaxSSBOBlockSize = GLUtils::getIntegerVal<1>(GL_MAX_SHADER_STORAGE_BLOCK_SIZE);
-    glAssert(nMaxSSBOBlockSize>(int)(m_nBGModelSize*sizeof(uint)) && nMaxSSBOBlockSize>(int)(m_nTMT32ModelSize*sizeof(RandUtils::TMT32GenParams)));
+    glAssert(nMaxSSBOBlockSize>(int)(m_nBGModelSize*sizeof(uint)) && nMaxSSBOBlockSize>(int)(m_nTMT32ModelSize*sizeof(GLUtils::TMT32GenParams)));
     m_vnBGModelData.resize(m_nBGModelSize,0);
-    RandUtils::initTinyMT32Generators(glm::uvec3(uint(m_oROI.cols),uint(m_oROI.rows),1),m_voTMT32ModelData);
+    GLUtils::initTinyMT32Generators(glm::uvec3(uint(m_oROI.cols),uint(m_oROI.rows),1),m_voTMT32ModelData);
     m_bInitialized = true;
     GLImageProcAlgo::initialize(oInitImg,m_oROI);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_TMT32ModelBinding));
-    glBufferData(GL_SHADER_STORAGE_BUFFER,m_nTMT32ModelSize*sizeof(RandUtils::TMT32GenParams),m_voTMT32ModelData.data(),GL_STATIC_COPY);
+    glBufferData(GL_SHADER_STORAGE_BUFFER,m_nTMT32ModelSize*sizeof(GLUtils::TMT32GenParams),m_voTMT32ModelData.data(),GL_STATIC_COPY);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER,BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_TMT32ModelBinding,getSSBOId(BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_TMT32ModelBinding));
     refreshModel(1.0f,true);
     m_bModelInitialized = true;
@@ -148,8 +148,8 @@ std::string BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::getComputeShader
              "layout(binding=" << GLImageProcAlgo::eImage_OutputBinding << ", r8ui) writeonly uniform uimage2D mOutput;\n" <<
              (m_nImgChannels==4?DistanceUtils::getShaderFunctionSource_L1dist():std::string())+DistanceUtils::getShaderFunctionSource_absdiff(true) <<
              DistanceUtils::getShaderFunctionSource_hdist() <<
-             RandUtils::getShaderFunctionSource_urand_tinymt32() <<
-             RandUtils::getShaderFunctionSource_getRandNeighbor3x3(0,m_oFrameSize) <<
+             GLUtils::getShaderFunctionSource_urand_tinymt32() <<
+             GLUtils::getShaderFunctionSource_getRandNeighbor3x3(0,m_oFrameSize) <<
              BackgroundSubtractorLBSP::getLBSPThresholdLUTShaderSource() <<
              LBSP::getShaderFunctionSource(m_nImgChannels,BGSLOBSTER_GLSL_USE_SHAREDMEM,m_vDefaultWorkGroupSize) <<
 #if !BGSLOBSTER_GLSL_USE_SHAREDMEM
@@ -440,7 +440,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::refreshModel(flo
         if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
             for(size_t nCurrModelSampleIdx=nRefreshSampleStartPos; nCurrModelSampleIdx<nRefreshSampleStartPos+nModelSamplesToRefresh; ++nCurrModelSampleIdx) {
                 int nSampleImgCoord_Y, nSampleImgCoord_X;
-                RandUtils::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                CxxUtils::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                 if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
                     const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
@@ -528,7 +528,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::apply(cv::InputA
                 }
                 if((rand()%nLearningRate)==0) {
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    RandUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    CxxUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSampleModelIdx = rand()%m_nBGSamples;
                     ushort& nRandInputDesc = m_voBGDescSamples[nSampleModelIdx].at<ushort>(nSampleImgCoord_Y,nSampleImgCoord_X);
                     LBSP::computeDescriptor_threshold(anLBSPLookupVals,nCurrColor,m_anLBSPThreshold_8bitLUT[nCurrColor],nRandInputDesc);
@@ -589,7 +589,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::apply(cv::InputA
                 }
                 if((rand()%nLearningRate)==0) {
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    RandUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    CxxUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSampleModelIdx = rand()%m_nBGSamples;
                     ushort* anRandInputDesc = ((ushort*)(m_voBGDescSamples[nSampleModelIdx].data + desc_row_step*nSampleImgCoord_Y + 6*nSampleImgCoord_X));
                     for(size_t c=0; c<3; ++c) {

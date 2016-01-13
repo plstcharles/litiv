@@ -24,7 +24,6 @@
 #include "litiv/utils/DatasetEvalUtils.hpp"
 #include "litiv/utils/DistanceUtils.hpp"
 #include "litiv/utils/PlatformUtils.hpp"
-#include "litiv/utils/RandUtils.hpp"
 #if HAVE_GLSL
 #include "litiv/utils/GLUtils.hpp"
 #include "litiv/utils/GLDrawUtils.hpp"
