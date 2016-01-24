@@ -246,7 +246,7 @@ void AnalyzeSequence_GLSL(std::shared_ptr<DatasetUtils::Segm::Video::Sequence> p
         CV_Assert(pCurrSequence.get() && pCurrSequence->GetTotalImageCount()>1);
         if(pCurrSequence->m_pEvaluator==nullptr && EVALUATE_OUTPUT)
             throw std::runtime_error(cv::format("Missing evaluation impl for video segmentation dataset '%s'",g_pDatasetInfo->m_sDatasetName.c_str()));
-        const std::string sCurrSeqName = pCurrSequence->m_sName.size()>12?pCurrSequence->m_sName.substr(0,12):pCurrSequence->m_sName;
+        const std::string sCurrSeqName = CxxUtils::clampString(pCurrSequence->m_sName,12);
         const size_t nFrameCount = pCurrSequence->GetTotalImageCount();
         const cv::Mat oROI = LIMIT_MODEL_TO_SEQUENCE_ROI?pCurrSequence->GetROI():cv::Mat();
         cv::Mat oCurrInputFrame = pCurrSequence->GetInputFromIndex(nCurrFrameIdx).clone();
@@ -496,7 +496,7 @@ void AnalyzeSequence(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Video::
         CV_Assert(pCurrSequence.get() && pCurrSequence->GetTotalImageCount()>1);
         if(pCurrSequence->m_pEvaluator==nullptr && EVALUATE_OUTPUT)
             throw std::runtime_error(cv::format("Missing evaluation impl for video segmentation dataset '%s'",g_pDatasetInfo->m_sDatasetName.c_str()));
-        const std::string sCurrSeqName = pCurrSequence->m_sName.size()>12?pCurrSequence->m_sName.substr(0,12):pCurrSequence->m_sName;
+        const std::string sCurrSeqName = CxxUtils::clampString(pCurrSequence->m_sName,12);
         const size_t nFrameCount = pCurrSequence->GetTotalImageCount();
         const cv::Mat oROI = LIMIT_MODEL_TO_SEQUENCE_ROI?pCurrSequence->GetROI():cv::Mat();
         cv::Mat oCurrInputFrame = pCurrSequence->GetInputFromIndex(nCurrFrameIdx).clone();

@@ -218,7 +218,7 @@ void AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
         CV_Assert(pCurrSet.get() && pCurrSet->GetTotalImageCount()>0);
         if(pCurrSet->m_pEvaluator==nullptr && EVALUATE_OUTPUT)
             throw std::runtime_error(cv::format("Missing evaluation impl for image segmentation dataset '%s'",g_pDatasetInfo->m_sDatasetName.c_str()));
-        const std::string sCurrSetName = pCurrSet->m_sName.size()>12?pCurrSet->m_sName.substr(0,12):pCurrSet->m_sName;
+        const std::string sCurrSetName = CxxUtils::clampString(pCurrSet->m_sName,12);
         const size_t nImageCount = pCurrSet->GetTotalImageCount();
         cv::Mat oCurrInputImage = pCurrSet->GetInputFromIndex(nCurrImageIdx).clone();
         CV_Assert(!oCurrInputImage.empty());
@@ -421,7 +421,7 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
         CV_Assert(pCurrSet.get() && pCurrSet->GetTotalImageCount()>0);
         if(pCurrSet->m_pEvaluator==nullptr && EVALUATE_OUTPUT)
             throw std::runtime_error(cv::format("Missing evaluation impl for image segmentation dataset '%s'",g_pDatasetInfo->m_sDatasetName.c_str()));
-        const std::string sCurrSetName = pCurrSet->m_sName.size()>12?pCurrSet->m_sName.substr(0,12):pCurrSet->m_sName;
+        const std::string sCurrSetName = CxxUtils::clampString(pCurrSet->m_sName,12);
         const size_t nImageCount = pCurrSet->GetTotalImageCount();
         cv::Mat oCurrInputImage = pCurrSet->GetInputFromIndex(nCurrImageIdx).clone();
         CV_Assert(!oCurrInputImage.empty());
