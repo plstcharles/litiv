@@ -25,6 +25,7 @@
 #include <chrono>
 #include <atomic>
 #include <future>
+#include <iomanip>
 #include <iostream>
 #include <functional>
 #include <type_traits>
@@ -278,6 +279,31 @@ namespace CxxUtils {
 #else //!def(_MSC_VER)
         return std::isnan(dVal);
 #endif //!def(_MSC_VER)
+    }
+
+    struct StopWatch {
+        StopWatch() {tick();}
+        void tick() {m_nTick = std::chrono::high_resolution_clock::now();}
+        double tock(bool bReset=true) {
+            const std::chrono::high_resolution_clock::time_point nNow = std::chrono::high_resolution_clock::now();
+            const std::chrono::duration<double> dElapsed_sec = nNow-m_nTick;
+            if(bReset)
+                m_nTick = nNow;
+            return dElapsed_sec.count();
+        }
+    private:
+        std::chrono::high_resolution_clock::time_point m_nTick;
+    };
+
+    static inline std::string getTimeStamp() {
+        std::time_t tNow = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+        char acBuffer[128];
+        std::strftime(acBuffer,sizeof(acBuffer),"%F %T",std::localtime(&tNow)); // std::put_time missing w/ GCC<5.0
+        return std::string(acBuffer);
+    }
+
+    static inline std::string clampString(const std::string& sInput, size_t nSize, char cPadding=' ') {
+        return sInput.size()>nSize?sInput.substr(0,nSize):sInput+std::string(nSize-sInput.size(),cPadding);
     }
 
 } //namespace CxxUtils
