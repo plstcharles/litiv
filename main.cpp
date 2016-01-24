@@ -1,14 +1,12 @@
 #include <iostream>
-#include <opencv2/opencv.hpp>
+#include <opencv2\opencv.hpp>
 #include "SLIC_cuda.h"
 using namespace std;
+using namespace cv;
 
 int main() {
-    cout << "Hello, World!" << endl;
-
-
-    cv::Mat im = cv::imread("/media/derue/4A30A96F30A962A5/Videos/Tiger1/img/0001.jpg");
-    //cv::Mat im = cv::imread("/media/derue/4A30A96F30A962A5/Pictures/test_pic/land1.jpg");
+ 
+    cv::Mat im = cv::imread("D:/Pictures/test_pic/lena.jpg");
 
     SLIC_cuda slic(16,35);
     slic.Initialize(im);
@@ -28,6 +26,8 @@ int main() {
 
 
     cv::waitKey();
+
+
 
     return 0;
 }

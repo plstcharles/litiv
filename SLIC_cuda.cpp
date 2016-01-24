@@ -46,21 +46,15 @@ void SLIC_cuda::Initialize(cv::Mat &frame0) {
 void SLIC_cuda::Segment(cv::Mat &frame) {
 
     SendFrame(frame); //ok
-    cudaDeviceSynchronize();
     InitClusters();//ok
-    cudaDeviceSynchronize();
-
 
     for(int i=0; i<N_ITER; i++) {
-        //auto start = cv::getTickCount();
-
         Assignement();
         cudaDeviceSynchronize();
-        //auto end = cv::getTickCount();
-        //cout<<"runtime gpu "<<(end-start)/cv::getTickFrequency()<<endl;
         Update();
         cudaDeviceSynchronize();
     }
+	Assignement();
 }
 
 void SLIC_cuda::InitBuffers() {
