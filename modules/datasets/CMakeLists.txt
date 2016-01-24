@@ -15,43 +15,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-litiv_module(utils)
+litiv_module(datasets)
 
-file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/include/litiv/utils/DefineUtils.hpp)
-
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/litiv/utils/DefineUtils.hpp.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/utils/DefineUtils.hpp"
-)
+option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark implementation in litiv_datasets (will use an approximative solution otherwise)" ON)
 
 add_files(SOURCE_FILES
-    "src/PlatformUtils.cpp"
+    "src/DatasetEvalUtils.cpp"
+    "src/DatasetUtils.cpp"
 )
 add_files(INCLUDE_FILES
-    "include/litiv/utils/ConsoleUtils.hpp"
-    "include/litiv/utils/CxxUtils.hpp"
-    "include/litiv/utils/DefineUtils.hpp"
-    "include/litiv/utils/DistanceUtils.hpp"
-    "include/litiv/utils/ParallelUtils.hpp"
-    "include/litiv/utils/PlatformUtils.hpp"
-    "include/litiv/utils.hpp"
+    "include/litiv/datasets/DatasetEvalUtils.hpp"
+    "include/litiv/datasets/DatasetUtils.hpp"
+    "include/litiv/datasets.hpp"
 )
-if(USE_GLSL)
-    add_files(SOURCE_FILES
-        "src/GLDrawUtils.cpp"
-        "src/GLImageProcUtils.cpp"
-        "src/GLShaderUtils.cpp"
-    )
-    add_files(INCLUDE_FILES
-        "include/litiv/utils/GLDrawUtils.hpp"
-        "include/litiv/utils/GLImageProcUtils.hpp"
-        "include/litiv/utils/GLShaderUtils.hpp"
-        "include/litiv/utils/GLUtils.hpp"
-    )
-endif(USE_GLSL)
 
 add_library(${LITIV_CURRENT_PROJECT_NAME} STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
 
+target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} litiv_utils litiv_imgproc) # imgproc needed for thinning in BSDS500 eval
 target_link_litiv_dependencies(${LITIV_CURRENT_PROJECT_NAME})
 target_include_directories(${LITIV_CURRENT_PROJECT_NAME}
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
