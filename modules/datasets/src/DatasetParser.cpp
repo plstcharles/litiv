@@ -17,12 +17,12 @@
 
 #include "litiv/datasets/DatasetParser.hpp"
 
-litiv::DataHandler::DataHandler(const std::string& sBatchName, const IDataset& oDataset, const std::string& sRelativePath) :
+litiv::DataHandler::DataHandler(const std::string& sBatchName, IDatasetPtr pDataset, const std::string& sRelativePath) :
         m_sBatchName(sBatchName),
         m_sRelativePath(sRelativePath),
-        m_sDatasetPath(oDataset.getDatasetRootPath()+sRelativePath),
-        m_sResultsPath(oDataset.getResultsRootPath()+sRelativePath),
-        m_bForcingGrayscale(PlatformUtils::string_contains_token(sBatchName,oDataset.getGrayscaleNameTokens())),
-        m_oDataset(oDataset) {
+        m_sDatasetPath(pDataset->getDatasetRootPath()+sRelativePath),
+        m_sResultsPath(pDataset->getResultsRootPath()+sRelativePath),
+        m_bForcingGrayscale(PlatformUtils::string_contains_token(sBatchName,pDataset->getGrayscaleNameTokens())),
+        m_pDataset(pDataset) {
     PlatformUtils::CreateDirIfNotExist(m_sResultsPath);
 }

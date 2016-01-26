@@ -66,12 +66,16 @@ namespace litiv {
 
     };
 
+    struct IDataset;
     struct IDataHandler;
+    using IDatasetPtr = std::shared_ptr<IDataset>;
     using IDataHandlerPtr = std::shared_ptr<IDataHandler>;
     using IDataHandlerPtrArray = std::vector<IDataHandlerPtr>;
+    using IDataHandlerConstPtr = std::shared_ptr<const IDataHandler>;
+    using IDataHandlerConstPtrArray = std::vector<IDataHandlerConstPtr>;
     using IDataHandlerPtrQueue = std::priority_queue<IDataHandlerPtr,IDataHandlerPtrArray,std::function<bool(const IDataHandlerPtr&,const IDataHandlerPtr&)>>;
 
-    struct IDataset {
+    struct IDataset : std::enable_shared_from_this<IDataset> {
         virtual const std::string& getDatasetName() const = 0;
         virtual const std::string& getDatasetRootPath() const = 0;
         virtual const std::string& getResultsRootPath() const = 0;
@@ -98,7 +102,7 @@ namespace litiv {
         virtual IDataHandlerPtrQueue getSortedBatches() const = 0;
     };
 
-    struct IDataHandler {
+    struct IDataHandler : std::enable_shared_from_this<IDataHandler> {
         virtual const std::string& getName() const = 0;
         virtual const std::string& getPath() const = 0;
         virtual const std::string& getResultsPath() const = 0;
@@ -109,7 +113,7 @@ namespace litiv {
         virtual bool isBare() const = 0;
         virtual bool isGroup() const = 0;
         virtual IDataHandlerPtrArray getBatches() const = 0; // @@@@@ rename batches at dataset level to something else?
-        virtual const IDataset& getDatasetInfo() const = 0;
+        virtual IDatasetPtr getDatasetInfo() const = 0;
         virtual eDatasetTypeList getDatasetType() const = 0;
         virtual eDatasetList getDataset() const = 0;
         virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize=12) const = 0;
@@ -130,18 +134,21 @@ namespace litiv {
         static bool compare(const IDataHandler& i, const IDataHandler& j) {return PlatformUtils::compare_lowercase(i.getName(),j.getName());}
         static bool compare_load(const IDataHandler& i, const IDataHandler& j) {return i.getExpectedLoad()<j.getExpectedLoad();}
     protected:
-        virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) const = 0; // will throw if out of range or if handler is not a group, and readjust nPacketIdx for returned batch range otherwise
+        virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const = 0; // will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
+        virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) = 0; // will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
+        virtual void _startProcessing() {}
+        virtual void _stopProcessing() {}
     };
 
     void writeOnImage(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom=false);
     cv::Mat getDisplayImage(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oSegmMask, size_t nIdx, cv::Point oDbgPt=cv::Point(-1,-1), cv::Size oRefSize=cv::Size(-1,-1));
     void validateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoint>& voKPs);
 
-    struct DataPrecacher {
+    struct DataPrecacher final {
         // @@@@ rewrite to allow streaming with no limit? (might just need to modify init and set tot=inf)
         // @@@@ current impl expects all packets to be the same size
         DataPrecacher(std::function<const cv::Mat&(size_t)> lCallback);
-        virtual ~DataPrecacher();
+        ~DataPrecacher();
         const cv::Mat& getPacket(size_t nIdx);
         bool startPrecaching(size_t nTotPacketCount, size_t nSuggestedBufferSize);
         void stopPrecaching();
@@ -164,7 +171,6 @@ namespace litiv {
         size_t m_nNextPrecacheIdx;
         size_t m_nReqIdx,m_nLastReqIdx;
         cv::Mat m_oReqPacket,m_oLastReqPacket;
-    private:
         DataPrecacher& operator=(const DataPrecacher&) = delete;
         DataPrecacher(const DataPrecacher&) = delete;
     };
@@ -174,10 +180,10 @@ namespace litiv {
 
     template<>
     struct IDataLoader_<TNoGroup> : public virtual IDataHandler { // generalized producer (exposes common interface for all dataset types)
-        IDataLoader_();
         virtual void startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX) override;
         virtual void stopPrecaching() override;
     protected:
+        IDataLoader_();
         DataPrecacher m_oInputPrecacher;
         DataPrecacher m_oGTPrecacher;
         virtual cv::Mat _getInputPacket_impl(size_t nIdx) = 0;
@@ -192,27 +198,31 @@ namespace litiv {
     struct IDataReader_;
 
     template<>
-    struct IDataReader_<eDatasetType_VideoSegm> : public virtual IDataHandler { // contains group-impl only
-        virtual size_t getFrameCount() const {return getTotPackets();}
-        virtual const cv::Mat& getInputFrame(size_t nFrameIdx) {return dynamic_cast<IDataReader_<eDatasetType_VideoSegm>&>(*getBatch(nFrameIdx)).getInputFrame(nFrameIdx);}
-        virtual const cv::Mat& getGTFrame(size_t nFrameIdx) {return dynamic_cast<IDataReader_<eDatasetType_VideoSegm>&>(*getBatch(nFrameIdx)).getGTFrame(nFrameIdx);}
+    struct IDataReader_<eDatasetType_VideoSegm> : public virtual IDataHandler {
+        size_t getFrameCount() const {return getTotPackets();}
+        virtual const cv::Mat& getInputFrame(size_t nFrameIdx) = 0;
+        virtual const cv::Mat& getGTFrame(size_t nFrameIdx) = 0;
     };
 
     template<eDatasetTypeList eDatasetType, bool bGroup>
-    struct IDataProducer_ :
-            public IDataLoader_<bGroup>,
-            public IDataReader_<eDatasetType> {};
+    struct IDataProducer_;
+
+    template<>
+    struct IDataProducer_<eDatasetType_VideoSegm,TGroup> :
+            public IDataLoader_<TGroup>,
+            public IDataReader_<eDatasetType_VideoSegm> {
+        virtual const cv::Mat& getInputFrame(size_t nFrameIdx) override final {return dynamic_cast<IDataReader_<eDatasetType_VideoSegm>&>(*getBatch(nFrameIdx)).getInputFrame(nFrameIdx);}
+        virtual const cv::Mat& getGTFrame(size_t nFrameIdx) override final {return dynamic_cast<IDataReader_<eDatasetType_VideoSegm>&>(*getBatch(nFrameIdx)).getGTFrame(nFrameIdx);}
+    };
 
     template<> // all method impl can go in CPP as template possibilities are tightly defined
     struct IDataProducer_<eDatasetType_VideoSegm,TNoGroup> :
             public IDataLoader_<TNoGroup>,
             public IDataReader_<eDatasetType_VideoSegm> {
-        IDataProducer_() : m_nFrameCount(0),m_nNextExpectedVideoReaderFrameIdx(size_t(-1)) {}
-
         virtual double getExpectedLoad() const override {return m_oROI.empty()?0.0:(double)cv::countNonZero(m_oROI)*m_nFrameCount*(int(!isGrayscale())+1);}
         virtual size_t getTotPackets() const override {return m_nFrameCount;}
         virtual void startPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override {
-            return IDataLoader_<TNoGroup>::startPrecaching(bUsingGT,m_oSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:getDatasetInfo().is4ByteAligned()?4:3));
+            return IDataLoader_<TNoGroup>::startPrecaching(bUsingGT,m_oSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
         }
         virtual cv::Size getFrameSize() const {return m_oSize;}
         virtual const cv::Mat& getROI() const {return m_oROI;}
@@ -238,7 +248,7 @@ namespace litiv {
             if(oTempImg.empty())
                 lvErrorExt("Sequence '%s': video could not be opened via VideoReader or imread (you might need to implement your own DataProducer_ interface)",getName().c_str());
             m_oOrigSize = oTempImg.size();
-            const double dScale = getDatasetInfo().getScaleFactor();
+            const double dScale = getDatasetInfo()->getScaleFactor();
             if(dScale!=1.0)
                 cv::resize(oTempImg,oTempImg,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
             m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
@@ -248,6 +258,7 @@ namespace litiv {
         }
 
     protected:
+        IDataProducer_() : m_nFrameCount(0),m_nNextExpectedVideoReaderFrameIdx(size_t(-1)) {}
 
         virtual cv::Mat _getInputPacket_impl(size_t nIdx) override {
             cv::Mat oFrame;
@@ -264,7 +275,7 @@ namespace litiv {
                 if(isGrayscale() && oFrame.channels()>1)
                     cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2GRAY);
             }
-            if(getDatasetInfo().is4ByteAligned() && oFrame.channels()==3)
+            if(getDatasetInfo()->is4ByteAligned() && oFrame.channels()==3)
                 cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2BGRA);
             if(oFrame.size()!=m_oSize)
                 cv::resize(oFrame,oFrame,m_oSize,0,0,cv::INTER_NEAREST);
@@ -290,8 +301,8 @@ namespace litiv {
 
     template<>
     struct IDataCounter_<TNoGroup> : public virtual IDataHandler { // generalized consumer (exposes common interface for all dataset types)
-        IDataCounter_() : m_nProcessedPackets(0) {}
     protected:
+        IDataCounter_() : m_nProcessedPackets(0) {}
         void processPacket() {++m_nProcessedPackets;}
         void setProcessedPacketsPromise() {m_nProcessedPacketsPromise.set_value(m_nProcessedPackets);}
         virtual size_t getProcessedPacketsCountPromise() override {return m_nProcessedPacketsPromise.get_future().get();}
@@ -307,21 +318,27 @@ namespace litiv {
         virtual size_t getProcessedPacketsCount() const override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCount();});}
     };
 
-
     template<eDatasetTypeList eDatasetType>
     struct IDataRecorder_;
 
     template<>
     struct IDataRecorder_<eDatasetType_VideoSegm> : public virtual IDataHandler { // contains group-impl only
-        virtual cv::Mat readResult(size_t nIdx) const {return dynamic_cast<IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).readResult(nIdx);}
-        virtual void pushResult(const cv::Mat& oSegm, size_t nIdx) {dynamic_cast<IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).pushResult(oSegm,nIdx);}
-        virtual void writeResult(const cv::Mat& oSegm, size_t nIdx) const {dynamic_cast<IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).writeResult(oSegm,nIdx);}
+        virtual cv::Mat readResult(size_t nIdx) const = 0;
+        virtual void pushResult(const cv::Mat& oSegm, size_t nIdx) = 0;
+        virtual void writeResult(const cv::Mat& oSegm, size_t nIdx) const = 0;
     };
 
     template<eDatasetTypeList eDatasetType, bool bGroup>
-    struct IDataConsumer_ :
-            public IDataCounter_<bGroup>,
-            public IDataRecorder_<eDatasetType> {};
+    struct IDataConsumer_;
+
+    template<>
+    struct IDataConsumer_<eDatasetType_VideoSegm,TGroup> :
+            public IDataCounter_<TGroup>,
+            public IDataRecorder_<eDatasetType_VideoSegm> {
+        virtual cv::Mat readResult(size_t nIdx) const override final {return dynamic_cast<const IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).readResult(nIdx);}
+        virtual void pushResult(const cv::Mat& oSegm, size_t nIdx) override final {dynamic_cast<IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).pushResult(oSegm,nIdx);}
+        virtual void writeResult(const cv::Mat& oSegm, size_t nIdx) const override final {dynamic_cast<const IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).writeResult(oSegm,nIdx);}
+    };
 
     template<>
     struct IDataConsumer_<eDatasetType_VideoSegm,TNoGroup> :
@@ -329,27 +346,27 @@ namespace litiv {
             public IDataRecorder_<eDatasetType_VideoSegm> {
 
         virtual cv::Mat readResult(size_t nIdx) const override {
-            CV_Assert(!getDatasetInfo().getResultsNameSuffix().empty());
+            CV_Assert(!getDatasetInfo()->getResultsNameSuffix().empty());
             std::array<char,10> acBuffer;
             snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
             std::stringstream sResultFilePath;
-            sResultFilePath << getResultsPath() << getDatasetInfo().getResultsNamePrefix() << acBuffer.data() << getDatasetInfo().getResultsNameSuffix();
+            sResultFilePath << getResultsPath() << getDatasetInfo()->getResultsNamePrefix() << acBuffer.data() << getDatasetInfo()->getResultsNameSuffix();
             return cv::imread(sResultFilePath.str(),isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
         }
 
         void pushResult(const cv::Mat& oSegm, size_t nIdx) override {
             processPacket();
             _pushResult(oSegm,nIdx);
-            if(getDatasetInfo().isSavingResults())
+            if(getDatasetInfo()->isSavingResults())
                 writeResult(oSegm,nIdx);
         }
 
         virtual void writeResult(const cv::Mat& oSegm, size_t nIdx) const override {
-            CV_Assert(!getDatasetInfo().getResultsNameSuffix().empty());
+            CV_Assert(!getDatasetInfo()->getResultsNameSuffix().empty());
             std::array<char,10> acBuffer;
             snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
             std::stringstream sResultFilePath;
-            sResultFilePath << getResultsPath() << getDatasetInfo().getResultsNamePrefix() << acBuffer.data() << getDatasetInfo().getResultsNameSuffix();
+            sResultFilePath << getResultsPath() << getDatasetInfo()->getResultsNamePrefix() << acBuffer.data() << getDatasetInfo()->getResultsNameSuffix();
             const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
             cv::imwrite(sResultFilePath.str(),oSegm,vnComprParams);
         }

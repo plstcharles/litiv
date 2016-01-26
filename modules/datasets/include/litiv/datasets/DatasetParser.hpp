@@ -23,29 +23,55 @@
 namespace litiv {
 
     struct DataHandler : public virtual IDataHandler {
-        DataHandler(const std::string& sBatchName, const IDataset& oDataset, const std::string& sRelativePath);
         virtual const std::string& getName() const override final {return m_sBatchName;}
         virtual const std::string& getPath() const override final {return m_sDatasetPath;}
         virtual const std::string& getResultsPath() const override final {return m_sResultsPath;}
         virtual const std::string& getRelativePath() const override final {return m_sRelativePath;}
         virtual bool isGrayscale() const override final {return m_bForcingGrayscale;}
-        virtual const IDataset& getDatasetInfo() const override final {return m_oDataset;}
+        virtual IDatasetPtr getDatasetInfo() const override final {return m_pDataset;}
     protected:
-        virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) const override final {
-            CV_Assert(isGroup()); // throws for all non-group handlers
-            size_t nCurrPacketCount = 0;
-            auto vpBatches = getBatches();
-            auto ppBatchIter = vpBatches.begin();
-            while(ppBatchIter!=vpBatches.end()) {
-                const size_t nNextPacketIncr = (*ppBatchIter)->getTotPackets();
-                if(nPacketIdx<nCurrPacketCount+nNextPacketIncr)
-                    break;
-                nCurrPacketCount += nNextPacketIncr;
-                ++ppBatchIter;
+        DataHandler(const std::string& sBatchName, std::shared_ptr<IDataset> pDataset, const std::string& sRelativePath);
+        virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const override final {
+            if(isGroup()) {
+                size_t nCurrPacketCount = 0;
+                auto vpBatches = getBatches();
+                auto ppBatchIter = vpBatches.begin();
+                while(ppBatchIter!=vpBatches.end()) {
+                    const size_t nNextPacketIncr = (*ppBatchIter)->getTotPackets();
+                    if(nPacketIdx<nCurrPacketCount+nNextPacketIncr)
+                        break;
+                    nCurrPacketCount += nNextPacketIncr;
+                    ++ppBatchIter;
+                }
+                CV_Assert(ppBatchIter!=vpBatches.end());
+                nPacketIdx -= nCurrPacketCount;
+                return *ppBatchIter;
             }
-            CV_Assert(ppBatchIter!=vpBatches.end());
-            nPacketIdx -= nCurrPacketCount;
-            return *ppBatchIter;
+            else {
+                CV_Assert(nPacketIdx<getTotPackets());
+                return shared_from_this();
+            }
+        }
+        virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) override final {
+            if(isGroup()) {
+                size_t nCurrPacketCount = 0;
+                auto vpBatches = getBatches();
+                auto ppBatchIter = vpBatches.begin();
+                while(ppBatchIter!=vpBatches.end()) {
+                    const size_t nNextPacketIncr = (*ppBatchIter)->getTotPackets();
+                    if(nPacketIdx<nCurrPacketCount+nNextPacketIncr)
+                        break;
+                    nCurrPacketCount += nNextPacketIncr;
+                    ++ppBatchIter;
+                }
+                CV_Assert(ppBatchIter!=vpBatches.end());
+                nPacketIdx -= nCurrPacketCount;
+                return *ppBatchIter;
+            }
+            else {
+                CV_Assert(nPacketIdx<getTotPackets());
+                return shared_from_this();
+            }
         }
     private:
         const std::string m_sBatchName;
@@ -53,7 +79,7 @@ namespace litiv {
         const std::string m_sDatasetPath;
         const std::string m_sResultsPath;
         const bool m_bForcingGrayscale;
-        const IDataset& m_oDataset;
+        const IDatasetPtr m_pDataset;
     };
 
     template<eDatasetTypeList eDatasetType, eDatasetList eDataset, bool bGroup>
@@ -96,22 +122,11 @@ namespace litiv {
 
     template<eDatasetTypeList eDatasetType, eDatasetList eDataset>
     struct IDataset_ : public DatasetEvaluator_<eDatasetType,eDataset> { // dataset interface specialization for smaller impl sizes
-        IDataset_(const std::string& sDatasetName, const std::string& sDatasetRootPath, const std::string& sResultsRootPath,
-                  const std::string& sResultNamePrefix, const std::string& sResultNameSuffix, const std::vector<std::string>& vsWorkBatchPaths,
-                  const std::vector<std::string>& vsSkippedNameTokens, const std::vector<std::string>& vsGrayscaleNameTokens,
-                  size_t nOutputIdxOffset, bool bSaveResults, bool bForce4ByteDataAlign, double dScaleFactor) :
-                m_sDatasetName(sDatasetName),m_sDatasetRootPath(sDatasetRootPath),m_sResultsRootPath(sResultsRootPath),
-                m_sResultNamePrefix(sResultNamePrefix),m_sResultNameSuffix(sResultNameSuffix),m_vsWorkBatchPaths(vsWorkBatchPaths),
-                m_vsSkippedNameTokens(vsSkippedNameTokens),m_vsGrayscaleNameTokens(vsGrayscaleNameTokens),m_nOutputIdxOffset(nOutputIdxOffset),
-                m_bSavingResults(bSaveResults),m_bForce4ByteDataAlign(bForce4ByteDataAlign),m_dScaleFactor(dScaleFactor) {
-            parseDataset();
-        }
-        struct WorkBatch :
+
+        struct WorkBatch final :
                 public DataHandler,
                 public DataProducer_<eDatasetType,eDataset,TNoGroup>,
                 public DataEvaluator_<eDatasetType,eDataset,TNoGroup> {
-            WorkBatch(const std::string& sBatchName, const IDataset& oDataset, const std::string& sRelativePath=std::string("./")) :
-                    DataHandler(sBatchName,oDataset,sRelativePath),m_dElapsedTime_sec(0),m_bIsProcessing(false) {}
             virtual ~WorkBatch() = default;
             virtual eDatasetTypeList getDatasetType() const override final {return eDatasetType;}
             virtual eDatasetList getDataset() const override final {return eDataset;}
@@ -120,7 +135,6 @@ namespace litiv {
             virtual IDataHandlerPtrArray getBatches() const override final {return IDataHandlerPtrArray();}
             virtual double getProcessTime() const override final {return m_dElapsedTime_sec;}
             bool isProcessing() {return m_bIsProcessing;}
-
             void startProcessing() { // used to start batch timer & init other time-critical components via _startProcessing
                 if(!m_bIsProcessing) {
                     _startProcessing();
@@ -128,7 +142,6 @@ namespace litiv {
                     m_bIsProcessing = true;
                 }
             }
-
             void stopProcessing() { // used to stop batch timer & release other time-critical components via _stopProcessing (also implies stopPrecaching)
                 if(m_bIsProcessing) {
                     m_dElapsedTime_sec = m_oStopWatch.tock();
@@ -137,11 +150,13 @@ namespace litiv {
                     stopPrecaching();
                 }
             }
-
-        protected:
-            virtual void _startProcessing() {}
-            virtual void _stopProcessing() {}
+            template<typename ...Targs>
+            static std::shared_ptr<WorkBatch> create(const Targs& ... args) {
+                return std::shared_ptr<WorkBatch>(new WorkBatch(args...));
+            }
         private:
+            WorkBatch(const std::string& sBatchName, IDatasetPtr pDataset, const std::string& sRelativePath=std::string("./")) :
+                    DataHandler(sBatchName,pDataset,sRelativePath),m_dElapsedTime_sec(0),m_bIsProcessing(false) {parseDataset();}
             WorkBatch& operator=(const WorkBatch&) = delete;
             WorkBatch(const WorkBatch&) = delete;
             friend class WorkBatchGroup;
@@ -149,32 +164,11 @@ namespace litiv {
             double m_dElapsedTime_sec;
             bool m_bIsProcessing;
         };
-        struct WorkBatchGroup :
+
+        struct WorkBatchGroup final :
                 public DataHandler,
                 public DataProducer_<eDatasetType,eDataset,TGroup>,
                 public DataEvaluator_<eDatasetType,eDataset,TGroup> {
-            WorkBatchGroup(const std::string& sGroupName, const IDataset& oDataset, const std::string& sRelativePath=std::string("./")) :
-                    DataHandler(sGroupName,oDataset,sRelativePath+"/"+sGroupName+"/"), m_bIsBare(false) {
-                PlatformUtils::CreateDirIfNotExist(getResultsPath());
-                if(!PlatformUtils::string_contains_token(getName(),getDatasetInfo().getSkippedNameTokens())) {
-                    std::cout << "[" << getDatasetInfo().getDatasetName() << "] -- Parsing directory '" << getDatasetInfo().getDatasetRootPath()+sRelativePath << "' for work group '" << getName() << "'..." << std::endl;
-                    std::vector<std::string> vsWorkBatchPaths;
-                    // all subdirs are considered work batch directories (if none, the category directory itself is a batch)
-                    PlatformUtils::GetSubDirsFromDir(getPath(),vsWorkBatchPaths);
-                    if(vsWorkBatchPaths.empty()) {
-                        m_vpBatches.push_back(std::make_shared<WorkBatch>(getName(),getDatasetInfo(),getRelativePath()));
-                        m_bIsBare = true;
-                    }
-                    else {
-                        for(const auto& sPathIter : vsWorkBatchPaths) {
-                            const size_t nLastSlashPos = sPathIter.find_last_of("/\\");
-                            const std::string sNewBatchName = nLastSlashPos==std::string::npos?sPathIter:sPathIter.substr(nLastSlashPos+1);
-                            if(!PlatformUtils::string_contains_token(sNewBatchName,getDatasetInfo().getSkippedNameTokens()))
-                                m_vpBatches.push_back(std::make_shared<WorkBatch>(sNewBatchName,getDatasetInfo(),getRelativePath()+"/"+sNewBatchName+"/"));
-                        }
-                    }
-                }
-            }
             virtual ~WorkBatchGroup() = default;
             virtual eDatasetTypeList getDatasetType() const override final {return eDatasetType;}
             virtual eDatasetList getDataset() const override final {return eDataset;}
@@ -187,12 +181,37 @@ namespace litiv {
             virtual double getProcessTime() const override final {return CxxUtils::accumulateMembers<double,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessTime();});}
             virtual double getExpectedLoad() const override final {return CxxUtils::accumulateMembers<double,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getExpectedLoad();});}
             virtual size_t getTotPackets() const override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getTotPackets();});}
-
+            template<typename ...Targs>
+            static std::shared_ptr<WorkBatchGroup> create(const Targs& ... args) {
+                return std::shared_ptr<WorkBatchGroup>(new WorkBatchGroup(args...));
+            }
         private:
-            bool m_bIsBare;
-            IDataHandlerPtrArray m_vpBatches;
+            WorkBatchGroup(const std::string& sGroupName, std::shared_ptr<IDataset> pDataset, const std::string& sRelativePath=std::string("./")) :
+                    DataHandler(sGroupName,pDataset,sRelativePath+"/"+sGroupName+"/"),m_bIsBare(false) {
+                PlatformUtils::CreateDirIfNotExist(getResultsPath());
+                if(!PlatformUtils::string_contains_token(getName(),pDataset->getSkippedNameTokens())) {
+                    std::cout << "[" << pDataset->getDatasetName() << "] -- Parsing directory '" << pDataset->getDatasetRootPath()+sRelativePath << "' for work group '" << getName() << "'..." << std::endl;
+                    std::vector<std::string> vsWorkBatchPaths;
+                    // all subdirs are considered work batch directories (if none, the category directory itself is a batch)
+                    PlatformUtils::GetSubDirsFromDir(getPath(),vsWorkBatchPaths);
+                    if(vsWorkBatchPaths.empty()) {
+                        m_vpBatches.push_back(WorkBatch::create(getName(),pDataset,getRelativePath()));
+                        m_bIsBare = true;
+                    }
+                    else {
+                        for(const auto& sPathIter : vsWorkBatchPaths) {
+                            const size_t nLastSlashPos = sPathIter.find_last_of("/\\");
+                            const std::string sNewBatchName = nLastSlashPos==std::string::npos?sPathIter:sPathIter.substr(nLastSlashPos+1);
+                            if(!PlatformUtils::string_contains_token(sNewBatchName,pDataset->getSkippedNameTokens()))
+                                m_vpBatches.push_back(WorkBatch::create(sNewBatchName,pDataset,getRelativePath()+"/"+sNewBatchName+"/"));
+                        }
+                    }
+                }
+            }
             WorkBatchGroup& operator=(const WorkBatchGroup&) = delete;
             WorkBatchGroup(const WorkBatchGroup&) = delete;
+            IDataHandlerPtrArray m_vpBatches;
+            bool m_bIsBare;
         };
 
         virtual const std::string& getDatasetName() const override final {return m_sDatasetName;}
@@ -219,11 +238,8 @@ namespace litiv {
             m_vpBatches.clear();
             if(!getResultsRootPath().empty())
                 PlatformUtils::CreateDirIfNotExist(getResultsRootPath());
-            for(const auto& sPathIter : getWorkBatchPaths()) {
-                auto pGroup = std::make_shared<WorkBatchGroup>(sPathIter,*this);
-                pGroup->parseDataset();
-                m_vpBatches.push_back(pGroup);
-            }
+            for(const auto& sPathIter : getWorkBatchPaths())
+                m_vpBatches.push_back(WorkBatchGroup::create(sPathIter,this->shared_from_this()));
         }
 
         virtual IDataHandlerPtrArray getBatches() const override final {
@@ -245,6 +261,14 @@ namespace litiv {
         }
 
     protected:
+        IDataset_(const std::string& sDatasetName, const std::string& sDatasetRootPath, const std::string& sResultsRootPath,
+                  const std::string& sResultNamePrefix, const std::string& sResultNameSuffix, const std::vector<std::string>& vsWorkBatchPaths,
+                  const std::vector<std::string>& vsSkippedNameTokens, const std::vector<std::string>& vsGrayscaleNameTokens,
+                  size_t nOutputIdxOffset, bool bSaveResults, bool bForce4ByteDataAlign, double dScaleFactor) :
+                m_sDatasetName(sDatasetName),m_sDatasetRootPath(sDatasetRootPath),m_sResultsRootPath(sResultsRootPath),
+                m_sResultNamePrefix(sResultNamePrefix),m_sResultNameSuffix(sResultNameSuffix),m_vsWorkBatchPaths(vsWorkBatchPaths),
+                m_vsSkippedNameTokens(vsSkippedNameTokens),m_vsGrayscaleNameTokens(vsGrayscaleNameTokens),m_nOutputIdxOffset(nOutputIdxOffset),
+                m_bSavingResults(bSaveResults),m_bForce4ByteDataAlign(bForce4ByteDataAlign),m_dScaleFactor(dScaleFactor) {}
         const std::string m_sDatasetName;
         const std::string m_sDatasetRootPath;
         const std::string m_sResultsRootPath;
@@ -257,17 +281,18 @@ namespace litiv {
         const bool m_bSavingResults;
         const bool m_bForce4ByteDataAlign;
         const double m_dScaleFactor;
-
         IDataHandlerPtrArray m_vpBatches;
+    private:
+        IDataset_& operator=(const IDataset_&) = delete;
+        IDataset_(const IDataset_&) = delete;
     };
 
     template<eDatasetTypeList eDatasetType, eDatasetList eDataset>
-    struct Dataset_; // no impl and no IDataset interface prevents compilation when not specialized
-
-    template<> // fully specialized dataset for default VideoSegm dataset handling
-    struct Dataset_<eDatasetType_VideoSegm, eDataset_VideoSegm_Custom> :
-            public IDataset_<eDatasetType_VideoSegm, eDataset_VideoSegm_Custom> {
-        using IDataset_<eDatasetType_VideoSegm, eDataset_VideoSegm_Custom>::IDataset_;
+    struct Dataset_ : public IDataset_<eDatasetType,eDataset> {
+        // if the dataset type/id is not specialized, redirect to default IDataset_ constructor
+        private:
+        friend struct datasets;
+        using IDataset_<eDatasetType,eDataset>::IDataset_;
     };
 
     template<>
