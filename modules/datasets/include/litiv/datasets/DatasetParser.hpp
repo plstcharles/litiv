@@ -162,7 +162,7 @@ namespace litiv {
                     DataHandler(sBatchName,pDataset,sRelativePath),m_dElapsedTime_sec(0),m_bIsProcessing(false) {parseDataset();}
             WorkBatch& operator=(const WorkBatch&) = delete;
             WorkBatch(const WorkBatch&) = delete;
-            friend class WorkBatchGroup;
+            friend struct WorkBatchGroup;
             CxxUtils::StopWatch m_oStopWatch;
             double m_dElapsedTime_sec;
             bool m_bIsProcessing;

@@ -272,7 +272,7 @@ std::string litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::writ
     std::stringstream ssStr;
     ssStr << std::fixed;
     const ClassifMetrics& oMetrics = getMetrics(true);
-    ssStr << std::setw(nCellSize) << (std::string('>',nIndentSize)+getName()) << "|" <<
+    ssStr << std::setw(nCellSize) << (std::string(nIndentSize,'>')+getName()) << "|" <<
     std::setw(nCellSize) << oMetrics.dRecall << "|" <<
     std::setw(nCellSize) << oMetrics.dSpecificity << "|" <<
     std::setw(nCellSize) << oMetrics.dFPR << "|" <<
