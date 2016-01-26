@@ -17,11 +17,11 @@
 
 #pragma once
 
-#include "litiv/utils/DatasetUtils.hpp"
-
 #define DEFAULT_BSDS500_EDGE_EVAL_THRESHOLD_BINS 99
 
-namespace DatasetUtils {
+#include "litiv/datasets/DatasetUtils.hpp"
+
+namespace litiv {
 
     struct ClassifMetricsBase {
         ClassifMetricsBase();
@@ -61,14 +61,15 @@ namespace DatasetUtils {
         static double CalcMatthewsCorrCoeff(const ClassifMetricsBase& m);
     };
 
-    template<eDatasetTypeList eDatasetType, eDatasetList eDataset>
+    template<eDatasetTypeList eDatasetType>
     struct IDatasetEvaluator_ : public IDataset {
-        virtual void writeEvalReport() const {
+        virtual void writeEvalReport() const override {
+            std::cout << "Writing evaluation report for dataset '" << getDatasetName() << "'..." << std::endl;
             if(getBatches().empty()) {
-                std::cout << "No report to write for dataset '" << getDatasetName() << "', skipping." << std::endl;
+                std::cout << "\tNo report to write for dataset '" << getDatasetName() << "', skipping." << std::endl;
                 return;
             }
-            for(auto&& pGroupIter : getBatches())
+            for(const auto& pGroupIter : getBatches())
                 pGroupIter->writeEvalReport();
             std::ofstream oMetricsOutput(getResultsRootPath()+"/overall.txt");
             if(oMetricsOutput.is_open()) {
@@ -78,7 +79,7 @@ namespace DatasetUtils {
                 oMetricsOutput << "------------|------------|------------|------------\n";
                 size_t nOverallPacketCount = 0;
                 double dOverallTimeElapsed = 0.0;
-                for(auto&& pGroupIter : getBatches()) {
+                for(const auto& pGroupIter : getBatches()) {
                     oMetricsOutput << pGroupIter->writeInlineEvalReport(0);
                     nOverallPacketCount += pGroupIter->getTotPackets();
                     dOverallTimeElapsed += pGroupIter->getProcessTime();
@@ -93,72 +94,17 @@ namespace DatasetUtils {
         }
     };
 
-    template<eDatasetList eDataset>
+    template<>
     struct IDatasetEvaluator_<eDatasetType_VideoSegm> : public IDataset {
-
-        virtual bool hasEvaluator() const override final {return true;}
-
-        virtual ClassifMetricsBase getMetricsBase() const {
-            ClassifMetricsBase oMetricsBase;
-            for(auto&& pBatch : getBatches())
-                oMetricsBase += std::dynamic_cast<IDataEvaluator_<eDatasetType_VideoSegm>&>(*pBatch).getMetricsBase();
-            return oMetricsBase;
-        }
-
-        virtual ClassifMetrics getMetrics(bool bAverage) const {
-            if(bAverage) {
-                IDataHandlerPtrArray vpBatches = getBatches();
-                auto ppBatchIter = vpBatches.begin();
-                for(; ppBatchIter!=vpBatches.end() && !(*ppBatchIter)->getTotPackets(); ++ppBatchIter);
-                CV_Assert(ppBatchIter!=vpBatches.end());
-                ClassifMetrics oMetrics = std::dynamic_cast<IDataEvaluator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage);
-                for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
-                    if((*ppBatchIter)->getTotPackets())
-                        oMetrics += std::dynamic_cast<IDataEvaluator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage);
-                return oMetrics;
-            }
-            return ClassifMetrics(getMetricsBase());
-        }
-
-        virtual void writeEvalReport() const {
-            if(getBatches().empty()) {
-                std::cout << "No report to write for dataset '" << getDatasetName() << "', skipping." << std::endl;
-                return;
-            }
-            for(auto&& pGroupIter : getBatches())
-                pGroupIter->writeEvalReport();
-            const ClassifMetrics& oMetrics = getMetrics(true);
-            std::cout << "Overall : Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
-            std::ofstream oMetricsOutput(getResultsRootPath()+"/overall.txt");
-            if(oMetricsOutput.is_open()) {
-                oMetricsOutput << std::fixed;
-                oMetricsOutput << "Video segmentation evaluation report for dataset '" << getDatasetName() << "' :\n\n";
-                oMetricsOutput << "            |Rcl         |Spc         |FPR         |FNR         |PBC         |Prc         |FM          |MCC         \n";
-                oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
-                size_t nOverallPacketCount = 0;
-                double dOverallTimeElapsed = 0.0;
-                for(auto&& pGroupIter : getBatches()) {
-                    oMetricsOutput << pGroupIter->writeInlineEvalReport(0);
-                    nOverallPacketCount += pGroupIter->getTotPackets();
-                    dOverallTimeElapsed += pGroupIter->getProcessTime();
-                }
-                oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
-                oMetricsOutput << "overall     |" <<
-                        std::setw(12) << oMetrics.dRecall << "|" <<
-                        std::setw(12) << oMetrics.dSpecificity << "|" <<
-                        std::setw(12) << oMetrics.dFPR << "|" <<
-                        std::setw(12) << oMetrics.dFNR << "|" <<
-                        std::setw(12) << oMetrics.dPBC << "|" <<
-                        std::setw(12) << oMetrics.dPrecision << "|" <<
-                        std::setw(12) << oMetrics.dFMeasure << "|" <<
-                        std::setw(12) << oMetrics.dMCC << "\n";
-                oMetricsOutput << "\nHz: " << nOverallPacketCount/dOverallTimeElapsed << "\n";
-                oMetricsOutput << "\n" << LITIV_VERSION_SHA1 << "\n" << CxxUtils::getTimeStamp() << std::endl;
-            }
-        }
+        virtual ClassifMetricsBase getMetricsBase() const;
+        virtual ClassifMetrics getMetrics(bool bAverage) const;
+        virtual void writeEvalReport() const override;
     };
 
-#if HAVE_GLSL // put in DatasetGLEvalUtils.hpp/cpp? @@@@@
+    template<eDatasetTypeList eDatasetType, eDatasetList eDataset>
+    struct DatasetEvaluator_ : public IDatasetEvaluator_<eDatasetType> {}; // can be specialized for custom operations
+
+#if 0//HAVE_GLSL // put in IDataEvaluator_<eDatasetType_VideoSegm>? @@@@@
 
     enum eClassifMetricsBaseCountersList {
         eClassifMetricsBaseCounter_TP,
@@ -186,11 +132,11 @@ namespace DatasetUtils {
         virtual ClassifMetricsBase getCumulativeMetrics();
     };
 
-    template<eDatasetList eDataset, typename enable=void>
+    template<eDatasetList eDataset>
     struct GLEvaluator_;
 
-    template<eDatasetList eDataset>
-    struct GLEvaluator_<eDataset, typename std::enable_if<((eDataset==eDataset_VideoSegm_CDnet2012)||(eDataset==eDataset_VideoSegm_CDnet2014))>::type> :
+    template<>
+    struct GLEvaluator_<eDataset_VideoSegm_CDnet> :
             public IGLEvaluator_<eDatasetType_VideoSegm> {
         GLEvaluator_(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) :
                 IGLEvaluator_(pParent,nTotFrameCount) {}
@@ -200,76 +146,66 @@ namespace DatasetUtils {
 #endif //HAVE_GLSL
 
     template<eDatasetTypeList eDatasetType>
-    struct IDataEvaluator_  : public IDataHandler {
-
+    struct IMetricsCalculator_ : public virtual IDataHandler {
         virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize=12) const override {
-            if(!getTotPackets())
+            if(!this->getTotPackets())
                 return std::string();
             std::stringstream ssStr;
             ssStr << std::fixed;
-            if(isGroup() && !isBare())
-                for(auto&& pBatch : getBatches())
+            if(this->isGroup() && !this->isBare())
+                for(const auto& pBatch : this->getBatches())
                     ssStr << pBatch->writeInlineEvalReport(nIndentSize+1);
-            ssStr << std::setw(nCellSize) << (std::string('>',nIndentSize)+getName()) << "|" <<
-            std::setw(nCellSize) << getTotPackets() << "|" <<
-            std::setw(nCellSize) << getProcessTime() << "|" <<
-            std::setw(nCellSize) << getTotPackets()/getProcessTime() << "\n";
+            ssStr << std::setw(nCellSize) << (std::string('>',nIndentSize)+this->getName()) << "|" <<
+            std::setw(nCellSize) << this->getTotPackets() << "|" <<
+            std::setw(nCellSize) << this->getProcessTime() << "|" <<
+            std::setw(nCellSize) << this->getTotPackets()/this->getProcessTime() << "\n";
             return ssStr.str();
         }
 
         virtual void writeEvalReport() const override {
-            if(!getTotPackets()) {
-                std::cout << "No report to write for '" << getName() << "', skipping..." << std::endl;
+            if(!this->getTotPackets()) {
+                std::cout << "No report to write for '" << this->getName() << "', skipping..." << std::endl;
                 return;
             }
-            if(isGroup() && !isBare()) {
-                for(auto&& pBatch : getBatches())
+            if(this->isGroup() && !this->isBare()) {
+                for(const auto& pBatch : this->getBatches())
                     pBatch->writeEvalReport();
             }
-            std::ofstream oMetricsOutput(getResultsPath()+"/../"+getName()+".txt");
+            std::ofstream oMetricsOutput(this->getResultsPath()+"/../"+this->getName()+".txt");
             if(oMetricsOutput.is_open()) {
                 oMetricsOutput << std::fixed;
-                oMetricsOutput << "Default evaluation report for '" << getName() << "' :\n\n";
+                oMetricsOutput << "Default evaluation report for '" << this->getName() << "' :\n\n";
                 oMetricsOutput << "            |Packets     |Seconds     |Hz          \n";
                 oMetricsOutput << "------------|------------|------------|------------\n";
-                oMetricsOutput << writeInlineEvalReport(0);
+                oMetricsOutput << this->writeInlineEvalReport(0);
                 oMetricsOutput << "\n" << LITIV_VERSION_SHA1 << "\n" << CxxUtils::getTimeStamp() << std::endl;
             }
         }
     };
 
     template<>
-    struct IDataEvaluator_<eDatasetType_VideoSegm> : public IDataHandler {
-
-        virtual bool hasEvaluator() const override final {return true;}
-
+    struct IMetricsCalculator_<eDatasetType_VideoSegm> : public virtual IDataHandler { // contains group-impl only
         virtual ClassifMetricsBase getMetricsBase() const {
-            // @@@@ fetch gl eval result here, if needed
-            if(isGroup() && !isBare()) {
-                ClassifMetricsBase oMetricsBase;
-                for(auto&& pBatch : getBatches())
-                    oMetricsBase += std::dynamic_cast<IDataEvaluator_<eDatasetType_VideoSegm>&>(*pBatch).getMetricsBase();
-            }
-            else if(isBare())
-                return std::dynamic_cast<IDataEvaluator_<eDatasetType_VideoSegm>&>(*(getBatches()[0])).getMetricsBase();
-            return m_oMetricsBase;
+            ClassifMetricsBase oMetricsBase;
+            for(const auto& pBatch : getBatches())
+                oMetricsBase += dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(*pBatch).getMetricsBase();
+            return oMetricsBase;
         }
-
         virtual ClassifMetrics getMetrics(bool bAverage) const {
             if(bAverage && isGroup() && !isBare()) {
                 const IDataHandlerPtrArray& vpBatches = getBatches();
                 auto ppBatchIter = vpBatches.begin();
                 for(; ppBatchIter!=vpBatches.end() && !(*ppBatchIter)->getTotPackets(); ++ppBatchIter);
                 CV_Assert(ppBatchIter!=vpBatches.end());
-                ClassifMetrics oMetrics(std::dynamic_cast<IDataEvaluator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage));
+                ClassifMetrics oMetrics(dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage));
                 for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
                     if((*ppBatchIter)->getTotPackets())
-                        oMetrics += std::dynamic_cast<IDataEvaluator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage);
+                        oMetrics += dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage);
+                // @@@ check returning metrics weight?
                 return oMetrics;
             }
             return ClassifMetrics(getMetricsBase());
         }
-
 
         virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize=12) const override {
             if(!getTotPackets())
@@ -277,18 +213,18 @@ namespace DatasetUtils {
             std::stringstream ssStr;
             ssStr << std::fixed;
             if(isGroup() && !isBare())
-                for(auto&& pBatch : getBatches())
+                for(const auto& pBatch : getBatches())
                     ssStr << pBatch->writeInlineEvalReport(nIndentSize+1);
             const ClassifMetrics& oMetrics = getMetrics(true);
             ssStr << std::setw(nCellSize) << (std::string('>',nIndentSize)+getName()) << "|" <<
-                     std::setw(nCellSize) << oMetrics.dRecall << "|" <<
-                     std::setw(nCellSize) << oMetrics.dSpecificity << "|" <<
-                     std::setw(nCellSize) << oMetrics.dFPR << "|" <<
-                     std::setw(nCellSize) << oMetrics.dFNR << "|" <<
-                     std::setw(nCellSize) << oMetrics.dPBC << "|" <<
-                     std::setw(nCellSize) << oMetrics.dPrecision << "|" <<
-                     std::setw(nCellSize) << oMetrics.dFMeasure << "|" <<
-                     std::setw(nCellSize) << oMetrics.dMCC << "\n";
+            std::setw(nCellSize) << oMetrics.dRecall << "|" <<
+            std::setw(nCellSize) << oMetrics.dSpecificity << "|" <<
+            std::setw(nCellSize) << oMetrics.dFPR << "|" <<
+            std::setw(nCellSize) << oMetrics.dFNR << "|" <<
+            std::setw(nCellSize) << oMetrics.dPBC << "|" <<
+            std::setw(nCellSize) << oMetrics.dPrecision << "|" <<
+            std::setw(nCellSize) << oMetrics.dFMeasure << "|" <<
+            std::setw(nCellSize) << oMetrics.dMCC << "\n";
             return ssStr.str();
         }
 
@@ -298,7 +234,7 @@ namespace DatasetUtils {
                 return;
             }
             if(isGroup() && !isBare()) {
-                for(auto&& pBatch : getBatches())
+                for(const auto& pBatch : getBatches())
                     pBatch->writeEvalReport();
             }
             const ClassifMetrics& oMetrics = getMetrics(true);
@@ -315,36 +251,41 @@ namespace DatasetUtils {
             }
         }
 
+    };
+
+    template<eDatasetTypeList eDatasetType, bool bGroup>
+    struct IDataEvaluator_ :
+            public IMetricsCalculator_<eDatasetType>,
+            public IDataConsumer_<eDatasetType,bGroup> {};
+
+    template<>
+    struct IDataEvaluator_<eDatasetType_VideoSegm,TNoGroup> : public IDataConsumer_<eDatasetType_VideoSegm,TNoGroup> {
+        virtual ClassifMetricsBase getMetricsBase() const;
+        virtual ClassifMetrics getMetrics(bool bAverage) const;
+        virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize=12) const override;
+        virtual void writeEvalReport() const override;
+        virtual cv::Mat getColoredSegmMaskFromResult(const cv::Mat& oSegm, size_t nIdx);
+
 #if HAVE_GLSL
         //virtual std::shared_ptr<GLEvaluator> CreateGLEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) const {
         //    return std::shared_ptr<GLEvaluator>(new GLEvaluator(pParent,nTotFrameCount));
         //}
-        virtual void FetchGLEvaluationResults(std::shared_ptr<IGLEvaluator_<eDatasetType_VideoSegm>> pGLEvaluator);
+        //virtual void FetchGLEvaluationResults(std::shared_ptr<IGLEvaluator_<eDatasetType_VideoSegm>> pGLEvaluator);
 #endif //HAVE_GLSL
-        virtual cv::Mat GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI) const;
-        virtual void AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI);
+
         static const uchar s_nSegmPositive;
-        static const uchar s_nSegmOutOfScope;
         static const uchar s_nSegmNegative;
+        static const uchar s_nSegmOutOfScope;
+        static const uchar s_nSegmUnknown;
+        static const uchar s_nSegmShadow;
+
     protected:
+        virtual void _pushResult(const cv::Mat& oSegm, size_t nIdx) override;
         ClassifMetricsBase m_oMetricsBase;
     };
 
-    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, typename enable=void>
-    struct DataEvaluator_;
-
-    template<> // fully specialized dataset for default VideoSegm evaluation handling
-    struct DataEvaluator_<eDatasetType_VideoSegm, eDataset_VideoSegm_Custom> :
-            public IDataEvaluator_<eDatasetType_VideoSegm> {};
-
-    template<eDatasetList eDataset> // partially specialized dataset for default CDnet (2012+2014) handling
-    struct DataEvaluator_<eDatasetType_VideoSegm, eDataset, typename std::enable_if<((eDataset==eDataset_VideoSegm_CDnet2012)||(eDataset==eDataset_VideoSegm_CDnet2014))>::type> final :
-            public IDataEvaluator_<eDatasetType_VideoSegm> {
-        virtual cv::Mat GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI) const;
-        virtual void AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI);
-        static const uchar s_nSegmUnknown;
-        static const uchar s_nSegmShadow;
-    };
+    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, bool bGroup>
+    struct DataEvaluator_ : public IDataEvaluator_<eDatasetType,bGroup> {};
 
 #if 0
 
@@ -399,4 +340,4 @@ namespace DatasetUtils {
 
 #endif
 
-} //namespace DatasetUtils
+} //namespace litiv

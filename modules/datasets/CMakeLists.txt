@@ -20,11 +20,13 @@ litiv_module(datasets)
 option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark implementation in litiv_datasets (will use an approximative solution otherwise)" ON)
 
 add_files(SOURCE_FILES
-    "src/DatasetEvalUtils.cpp"
+    "src/DatasetEvaluator.cpp"
+    "src/DatasetParser.cpp"
     "src/DatasetUtils.cpp"
 )
 add_files(INCLUDE_FILES
-    "include/litiv/datasets/DatasetEvalUtils.hpp"
+    "include/litiv/datasets/DatasetEvaluator.hpp"
+    "include/litiv/datasets/DatasetParser.hpp"
     "include/litiv/datasets/DatasetUtils.hpp"
     "include/litiv/datasets.hpp"
 )

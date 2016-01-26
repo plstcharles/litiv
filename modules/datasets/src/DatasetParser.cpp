@@ -15,8 +15,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#pragma once
-
-#include "litiv/datasets/DatasetUtils.hpp"
-#include "litiv/datasets/DatasetEvaluator.hpp"
 #include "litiv/datasets/DatasetParser.hpp"
+
+litiv::DataHandler::DataHandler(const std::string& sBatchName, const IDataset& oDataset, const std::string& sRelativePath) :
+        m_sBatchName(sBatchName),
+        m_sRelativePath(sRelativePath),
+        m_sDatasetPath(oDataset.getDatasetRootPath()+sRelativePath),
+        m_sResultsPath(oDataset.getResultsRootPath()+sRelativePath),
+        m_bForcingGrayscale(PlatformUtils::string_contains_token(sBatchName,oDataset.getGrayscaleNameTokens())),
+        m_oDataset(oDataset) {
+    PlatformUtils::CreateDirIfNotExist(m_sResultsPath);
+}
