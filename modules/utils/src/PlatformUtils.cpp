@@ -60,7 +60,8 @@ void PlatformUtils::GetFilesFromDir(const std::string& sDirPath, std::vector<std
                 struct stat sb;
                 std::string sFullPath = sDirPath + "/" + dirp->d_name;
                 int ret = stat(sFullPath.c_str(),&sb);
-                if(!ret && S_ISREG(sb.st_mode))
+                if(!ret && S_ISREG(sb.st_mode)
+                        && strcmp(dirp->d_name,"Thumbs.db"))
                     vsFilePaths.push_back(sFullPath);
             }
             std::sort(vsFilePaths.begin(),vsFilePaths.end());
