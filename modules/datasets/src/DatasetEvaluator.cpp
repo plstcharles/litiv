@@ -15,13 +15,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "litiv/utils/DatasetEvalUtils.hpp"
+#include "litiv/datasets/DatasetEvaluator.hpp"
 #include "litiv/imgproc.hpp"
-#include "litiv/utils/ConsoleUtils.hpp"
+//#include "litiv/utils/ConsoleUtils.hpp" @@@@@ reuse later?
 
-DatasetUtils::ClassifMetricsBase::ClassifMetricsBase() : nTP(0),nTN(0),nFP(0),nFN(0),nSE(0) {}
+litiv::ClassifMetricsBase::ClassifMetricsBase() : nTP(0),nTN(0),nFP(0),nFN(0),nSE(0) {}
 
-DatasetUtils::ClassifMetricsBase DatasetUtils::ClassifMetricsBase::operator+(const ClassifMetricsBase& m) const {
+litiv::ClassifMetricsBase litiv::ClassifMetricsBase::operator+(const ClassifMetricsBase& m) const {
     ClassifMetricsBase res(m);
     res.nTP += this->nTP;
     res.nTN += this->nTN;
@@ -31,7 +31,7 @@ DatasetUtils::ClassifMetricsBase DatasetUtils::ClassifMetricsBase::operator+(con
     return res;
 }
 
-DatasetUtils::ClassifMetricsBase& DatasetUtils::ClassifMetricsBase::operator+=(const ClassifMetricsBase& m) {
+litiv::ClassifMetricsBase& litiv::ClassifMetricsBase::operator+=(const ClassifMetricsBase& m) {
     this->nTP += m.nTP;
     this->nTN += m.nTN;
     this->nFP += m.nFP;
@@ -40,7 +40,7 @@ DatasetUtils::ClassifMetricsBase& DatasetUtils::ClassifMetricsBase::operator+=(c
     return *this;
 }
 
-DatasetUtils::ClassifMetrics::ClassifMetrics(const ClassifMetricsBase& m) :
+litiv::ClassifMetrics::ClassifMetrics(const ClassifMetricsBase& m) :
         dRecall(CalcRecall(m)),
         dSpecificity(CalcSpecificity(m)),
         dFPR(CalcFalsePositiveRate(m)),
@@ -51,7 +51,7 @@ DatasetUtils::ClassifMetrics::ClassifMetrics(const ClassifMetricsBase& m) :
         dMCC(CalcMatthewsCorrCoeff(m)),
         nWeight(1) {}
 
-DatasetUtils::ClassifMetrics DatasetUtils::ClassifMetrics::operator+(const ClassifMetrics& m) const {
+litiv::ClassifMetrics litiv::ClassifMetrics::operator+(const ClassifMetrics& m) const {
     ClassifMetrics res(m);
     const size_t nTotWeight = this->nWeight+res.nWeight;
     res.dRecall = (res.dRecall*res.nWeight + this->dRecall*this->nWeight)/nTotWeight;
@@ -66,7 +66,7 @@ DatasetUtils::ClassifMetrics DatasetUtils::ClassifMetrics::operator+(const Class
     return res;
 }
 
-DatasetUtils::ClassifMetrics& DatasetUtils::ClassifMetrics::operator+=(const ClassifMetrics& m) {
+litiv::ClassifMetrics& litiv::ClassifMetrics::operator+=(const ClassifMetrics& m) {
     const size_t nTotWeight = this->nWeight+m.nWeight;
     this->dRecall = (m.dRecall*m.nWeight + this->dRecall*this->nWeight)/nTotWeight;
     this->dSpecificity = (m.dSpecificity*m.nWeight + this->dSpecificity*this->nWeight)/nTotWeight;
@@ -80,22 +80,81 @@ DatasetUtils::ClassifMetrics& DatasetUtils::ClassifMetrics::operator+=(const Cla
     return *this;
 }
 
-double DatasetUtils::ClassifMetrics::CalcFMeasure(double dRecall, double dPrecision) {return (dRecall+dPrecision)>0?(2.0*(dRecall*dPrecision)/(dRecall+dPrecision)):0;}
-double DatasetUtils::ClassifMetrics::CalcFMeasure(const ClassifMetricsBase& m) {return CalcFMeasure(CalcRecall(m),CalcPrecision(m));}
-double DatasetUtils::ClassifMetrics::CalcRecall(uint64_t nTP, uint64_t nTPFN) {return nTPFN>0?((double)nTP/nTPFN):0;}
-double DatasetUtils::ClassifMetrics::CalcRecall(const ClassifMetricsBase& m) {return (m.nTP+m.nFN)>0?((double)m.nTP/(m.nTP+m.nFN)):0;}
-double DatasetUtils::ClassifMetrics::CalcPrecision(uint64_t nTP, uint64_t nTPFP) {return nTPFP>0?((double)nTP/nTPFP):0;}
-double DatasetUtils::ClassifMetrics::CalcPrecision(const ClassifMetricsBase& m) {return (m.nTP+m.nFP)>0?((double)m.nTP/(m.nTP+m.nFP)):0;}
-double DatasetUtils::ClassifMetrics::CalcSpecificity(const ClassifMetricsBase& m) {return (m.nTN+m.nFP)>0?((double)m.nTN/(m.nTN+m.nFP)):0;}
-double DatasetUtils::ClassifMetrics::CalcFalsePositiveRate(const ClassifMetricsBase& m) {return (m.nFP+m.nTN)>0?((double)m.nFP/(m.nFP+m.nTN)):0;}
-double DatasetUtils::ClassifMetrics::CalcFalseNegativeRate(const ClassifMetricsBase& m) {return (m.nTP+m.nFN)>0?((double)m.nFN/(m.nTP+m.nFN)):0;}
-double DatasetUtils::ClassifMetrics::CalcPercentBadClassifs(const ClassifMetricsBase& m) {return m.total()>0?(100.0*(m.nFN+m.nFP)/m.total()):0;}
-double DatasetUtils::ClassifMetrics::CalcMatthewsCorrCoeff(const ClassifMetricsBase& m) {return ((m.nTP+m.nFP)>0)&&((m.nTP+m.nFN)>0)&&((m.nTN+m.nFP)>0)&&((m.nTN+m.nFN)>0)?((((double)m.nTP*m.nTN)-(m.nFP*m.nFN))/sqrt(((double)m.nTP+m.nFP)*(m.nTP+m.nFN)*(m.nTN+m.nFP)*(m.nTN+m.nFN))):0;}
+double litiv::ClassifMetrics::CalcFMeasure(double dRecall, double dPrecision) {return (dRecall+dPrecision)>0?(2.0*(dRecall*dPrecision)/(dRecall+dPrecision)):0;}
+double litiv::ClassifMetrics::CalcFMeasure(const ClassifMetricsBase& m) {return CalcFMeasure(CalcRecall(m),CalcPrecision(m));}
+double litiv::ClassifMetrics::CalcRecall(uint64_t nTP, uint64_t nTPFN) {return nTPFN>0?((double)nTP/nTPFN):0;}
+double litiv::ClassifMetrics::CalcRecall(const ClassifMetricsBase& m) {return (m.nTP+m.nFN)>0?((double)m.nTP/(m.nTP+m.nFN)):0;}
+double litiv::ClassifMetrics::CalcPrecision(uint64_t nTP, uint64_t nTPFP) {return nTPFP>0?((double)nTP/nTPFP):0;}
+double litiv::ClassifMetrics::CalcPrecision(const ClassifMetricsBase& m) {return (m.nTP+m.nFP)>0?((double)m.nTP/(m.nTP+m.nFP)):0;}
+double litiv::ClassifMetrics::CalcSpecificity(const ClassifMetricsBase& m) {return (m.nTN+m.nFP)>0?((double)m.nTN/(m.nTN+m.nFP)):0;}
+double litiv::ClassifMetrics::CalcFalsePositiveRate(const ClassifMetricsBase& m) {return (m.nFP+m.nTN)>0?((double)m.nFP/(m.nFP+m.nTN)):0;}
+double litiv::ClassifMetrics::CalcFalseNegativeRate(const ClassifMetricsBase& m) {return (m.nTP+m.nFN)>0?((double)m.nFN/(m.nTP+m.nFN)):0;}
+double litiv::ClassifMetrics::CalcPercentBadClassifs(const ClassifMetricsBase& m) {return m.total()>0?(100.0*(m.nFN+m.nFP)/m.total()):0;}
+double litiv::ClassifMetrics::CalcMatthewsCorrCoeff(const ClassifMetricsBase& m) {return ((m.nTP+m.nFP)>0)&&((m.nTP+m.nFN)>0)&&((m.nTN+m.nFP)>0)&&((m.nTN+m.nFN)>0)?((((double)m.nTP*m.nTN)-(m.nFP*m.nFN))/sqrt(((double)m.nTP+m.nFP)*(m.nTP+m.nFN)*(m.nTN+m.nFP)*(m.nTN+m.nFN))):0;}
 
-#if HAVE_GLSL
+litiv::ClassifMetricsBase litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::getMetricsBase() const {
+    ClassifMetricsBase oMetricsBase;
+    for(const auto& pBatch : getBatches())
+        oMetricsBase += dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(*pBatch).getMetricsBase();
+    return oMetricsBase;
+}
+
+litiv::ClassifMetrics litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::getMetrics(bool bAverage) const {
+    if(bAverage) {
+        IDataHandlerPtrArray vpBatches = getBatches();
+        auto ppBatchIter = vpBatches.begin();
+        for(; ppBatchIter!=vpBatches.end() && !(*ppBatchIter)->getTotPackets(); ++ppBatchIter);
+        CV_Assert(ppBatchIter!=vpBatches.end());
+        ClassifMetrics oMetrics = dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage);
+        for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
+            if((*ppBatchIter)->getTotPackets())
+                oMetrics += dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage);
+        return oMetrics;
+    }
+    return ClassifMetrics(getMetricsBase());
+}
+
+void litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::writeEvalReport() const {
+    if(getBatches().empty()) {
+        std::cout << "No report to write for dataset '" << getDatasetName() << "', skipping." << std::endl;
+        return;
+    }
+    for(const auto& pGroupIter : getBatches())
+        pGroupIter->writeEvalReport();
+    const ClassifMetrics& oMetrics = getMetrics(true);
+    std::cout << "Overall : Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
+    std::ofstream oMetricsOutput(getResultsRootPath()+"/overall.txt");
+    if(oMetricsOutput.is_open()) {
+        oMetricsOutput << std::fixed;
+        oMetricsOutput << "Video segmentation evaluation report for dataset '" << getDatasetName() << "' :\n\n";
+        oMetricsOutput << "            |Rcl         |Spc         |FPR         |FNR         |PBC         |Prc         |FM          |MCC         \n";
+        oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
+        size_t nOverallPacketCount = 0;
+        double dOverallTimeElapsed = 0.0;
+        for(const auto& pGroupIter : getBatches()) {
+            oMetricsOutput << pGroupIter->writeInlineEvalReport(0);
+            nOverallPacketCount += pGroupIter->getTotPackets();
+            dOverallTimeElapsed += pGroupIter->getProcessTime();
+        }
+        oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
+        oMetricsOutput << "overall     |" <<
+        std::setw(12) << oMetrics.dRecall << "|" <<
+        std::setw(12) << oMetrics.dSpecificity << "|" <<
+        std::setw(12) << oMetrics.dFPR << "|" <<
+        std::setw(12) << oMetrics.dFNR << "|" <<
+        std::setw(12) << oMetrics.dPBC << "|" <<
+        std::setw(12) << oMetrics.dPrecision << "|" <<
+        std::setw(12) << oMetrics.dFMeasure << "|" <<
+        std::setw(12) << oMetrics.dMCC << "\n";
+        oMetricsOutput << "\nHz: " << nOverallPacketCount/dOverallTimeElapsed << "\n";
+        oMetricsOutput << "\n" << LITIV_VERSION_SHA1 << "\n" << CxxUtils::getTimeStamp() << std::endl;
+    }
+}
+
+#if 0//HAVE_GLSL
 
 //template<>
-std::string DatasetUtils::IGLEvaluator_<DatasetUtils::eDatasetType_VideoSegm>::getComputeShaderSource(size_t nStage) const {
+std::string litiv::IGLEvaluator_<litiv::eDatasetType_VideoSegm>::getComputeShaderSource(size_t nStage) const {
     glAssert(nStage<m_nComputeStages);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -178,7 +237,7 @@ std::string DatasetUtils::IGLEvaluator_<DatasetUtils::eDatasetType_VideoSegm>::g
 }
 
 //template<>
-DatasetUtils::ClassifMetricsBase DatasetUtils::IGLEvaluator_<DatasetUtils::eDatasetType_VideoSegm>::getCumulativeMetrics() {
+ClassifMetricsBase litiv::IGLEvaluator_<eDatasetType_VideoSegm>::getCumulativeMetrics() {
     const cv::Mat& oAtomicCountersQueryBuffer = this->getEvaluationAtomicCounterBuffer();
     ClassifMetricsBase oMetricsBase;
     for(int nFrameIter=0; nFrameIter<oAtomicCountersQueryBuffer.rows; ++nFrameIter) {
@@ -192,41 +251,95 @@ DatasetUtils::ClassifMetricsBase DatasetUtils::IGLEvaluator_<DatasetUtils::eData
 }
 
 //template<>
-void DatasetUtils::IEvaluator_<DatasetUtils::eDatasetType_VideoSegm>::FetchGLEvaluationResults(std::shared_ptr<IGLEvaluator_<eDatasetType_VideoSegm>> pGLEvaluator) {
+void litiv::IEvaluator_<eDatasetType_VideoSegm>::FetchGLEvaluationResults(std::shared_ptr<IGLEvaluator_<eDatasetType_VideoSegm>> pGLEvaluator) {
     m_oMetricsBase = pGLEvaluator->getCumulativeMetrics();
 }
 
 #endif //HAVE_GLSL
 
-// as defined in the 2012 CDNet scripts/dataset
-//template<>
-const uchar DatasetUtils::IEvaluator_<DatasetUtils::eDatasetType_VideoSegm>::s_nSegmPositive = 255;
-//template<>
-const uchar DatasetUtils::IEvaluator_<DatasetUtils::eDatasetType_VideoSegm>::s_nSegmOutOfScope = DATASETUTILS_OUT_OF_SCOPE_DEFAULT_VAL;
-//template<>
-const uchar DatasetUtils::IEvaluator_<DatasetUtils::eDatasetType_VideoSegm>::s_nSegmNegative = 0;
+litiv::ClassifMetricsBase litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getMetricsBase() const {
+    // @@@@ fetch gl eval result here, if needed
+    return m_oMetricsBase;
+}
 
-//template<>
-cv::Mat DatasetUtils::IEvaluator_<DatasetUtils::eDatasetType_VideoSegm>::GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI) const {
-    CV_Assert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
-    CV_Assert(oSegmMask.size()==oGTSegmMask.size() && (oROI.empty() || oSegmMask.size()==oROI.size()));
-    cv::Mat oResult(oSegmMask.size(),CV_8UC3,cv::Scalar_<uchar>(0));
-    const size_t step_row = oSegmMask.step.p[0];
-    for(size_t i=0; i<(size_t)oSegmMask.rows; ++i) {
+litiv::ClassifMetrics litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getMetrics(bool) const {
+    return ClassifMetrics(getMetricsBase());
+}
+
+std::string litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const {
+    if(!getTotPackets())
+        return std::string();
+    std::stringstream ssStr;
+    ssStr << std::fixed;
+    const ClassifMetrics& oMetrics = getMetrics(true);
+    ssStr << std::setw(nCellSize) << (std::string('>',nIndentSize)+getName()) << "|" <<
+    std::setw(nCellSize) << oMetrics.dRecall << "|" <<
+    std::setw(nCellSize) << oMetrics.dSpecificity << "|" <<
+    std::setw(nCellSize) << oMetrics.dFPR << "|" <<
+    std::setw(nCellSize) << oMetrics.dFNR << "|" <<
+    std::setw(nCellSize) << oMetrics.dPBC << "|" <<
+    std::setw(nCellSize) << oMetrics.dPrecision << "|" <<
+    std::setw(nCellSize) << oMetrics.dFMeasure << "|" <<
+    std::setw(nCellSize) << oMetrics.dMCC << "\n";
+    return ssStr.str();
+}
+
+void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::writeEvalReport() const {
+    if(!getTotPackets()) {
+        std::cout << "No report to write for '" << getName() << "', skipping..." << std::endl;
+        return;
+    }
+    const ClassifMetrics& oMetrics = getMetrics(true);
+    std::cout << "\t" << std::setw(12) << (std::string('>',size_t(!isGroup()))+getName()) << " : Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
+    std::ofstream oMetricsOutput(getResultsPath()+"/../"+getName()+".txt");
+    if(oMetricsOutput.is_open()) {
+        oMetricsOutput << std::fixed;
+        oMetricsOutput << "Video segmentation evaluation report for '" << getName() << "' :\n\n";
+        oMetricsOutput << "            |Rcl         |Spc         |FPR         |FNR         |PBC         |Prc         |FM          |MCC         \n";
+        oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
+        oMetricsOutput << writeInlineEvalReport(0);
+        oMetricsOutput << "\nHz: " << getTotPackets()/getProcessTime() << "\n";
+        oMetricsOutput << "\n" << LITIV_VERSION_SHA1 << "\n" << CxxUtils::getTimeStamp() << std::endl;
+    }
+}
+
+// as defined in the 2012 CDNet scripts/dataset
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmPositive = 255;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmNegative = 0;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmOutOfScope = DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmUnknown = DATASETUTILS_VIDEOSEGM_UNKNOWN_VAL;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmShadow = DATASETUTILS_VIDEOSEGM_SHADOW_VAL;
+
+cv::Mat litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getColoredSegmMaskFromResult(const cv::Mat& oSegm, size_t nIdx) {
+    IDataProducer_<eDatasetType_VideoSegm,TNoGroup>* pProducer = dynamic_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>*>(this);
+    CV_Assert(pProducer);
+    const cv::Mat& oGTSegm = pProducer->getGTFrame(nIdx);
+    const cv::Mat& oROI = pProducer->getROI();
+    CV_Assert(oSegm.type()==CV_8UC1 && oGTSegm.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
+    CV_Assert(oSegm.size()==oGTSegm.size() && (oROI.empty() || oSegm.size()==oROI.size()));
+    cv::Mat oResult(oSegm.size(),CV_8UC3,cv::Scalar_<uchar>(0));
+    const size_t step_row = oSegm.step.p[0];
+    for(size_t i=0; i<(size_t)oSegm.rows; ++i) {
         const size_t idx_nstep = step_row*i;
-        const uchar* input_step_ptr = oSegmMask.data+idx_nstep;
-        const uchar* gt_step_ptr = oGTSegmMask.data+idx_nstep;
+        const uchar* input_step_ptr = oSegm.data+idx_nstep;
+        const uchar* gt_step_ptr = oGTSegm.data+idx_nstep;
         const uchar* roi_step_ptr = oROI.data+idx_nstep;
         uchar* res_step_ptr = oResult.data+idx_nstep*3;
-        for(int j=0; j<oSegmMask.cols; ++j) {
-            if(gt_step_ptr[j]!=s_nSegmOutOfScope && (oROI.empty() || roi_step_ptr[j]!=s_nSegmNegative) ) {
+        for(int j=0; j<oSegm.cols; ++j) {
+            if(gt_step_ptr[j]!=s_nSegmOutOfScope && gt_step_ptr[j]!=s_nSegmUnknown && (oROI.empty() || roi_step_ptr[j]!=s_nSegmNegative) ) {
                 if(input_step_ptr[j]==s_nSegmPositive) {
                     if(gt_step_ptr[j]==s_nSegmPositive)
                         res_step_ptr[j*3+1] = UCHAR_MAX;
                     else if(gt_step_ptr[j]==s_nSegmNegative)
                         res_step_ptr[j*3+2] = UCHAR_MAX;
-                    else for(size_t c=0; c<3; ++c)
-                        res_step_ptr[j*3+c] = UCHAR_MAX/3;
+                    else if(gt_step_ptr[j]==s_nSegmShadow) {
+                        res_step_ptr[j*3+1] = UCHAR_MAX/2;
+                        res_step_ptr[j*3+2] = UCHAR_MAX;
+                    }
+                    else {
+                        for(size_t c=0; c<3; ++c)
+                            res_step_ptr[j*3+c] = UCHAR_MAX/3;
+                    }
                 }
                 else { // input_step_ptr[j]==s_nSegmNegative
                     if(gt_step_ptr[j]==s_nSegmPositive) {
@@ -248,18 +361,21 @@ cv::Mat DatasetUtils::IEvaluator_<DatasetUtils::eDatasetType_VideoSegm>::GetColo
     return oResult;
 }
 
-//template<>
-void DatasetUtils::IEvaluator_<DatasetUtils::eDatasetType_VideoSegm>::AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI) {
-    CV_Assert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
-    CV_Assert(oSegmMask.size()==oGTSegmMask.size() && (oROI.empty() || oSegmMask.size()==oROI.size()));
-    const size_t step_row = oSegmMask.step.p[0];
-    for(size_t i=0; i<(size_t)oSegmMask.rows; ++i) {
+void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::_pushResult(const cv::Mat& oSegm, size_t nIdx) {
+    IDataProducer_<eDatasetType_VideoSegm,TNoGroup>* pProducer = dynamic_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>*>(this);
+    CV_Assert(pProducer);
+    const cv::Mat& oGTSegm = pProducer->getGTFrame(nIdx);
+    const cv::Mat& oROI = pProducer->getROI();
+    CV_Assert(oSegm.type()==CV_8UC1 && oGTSegm.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
+    CV_Assert(oSegm.size()==oGTSegm.size() && (oROI.empty() || oSegm.size()==oROI.size()));
+    const size_t step_row = oSegm.step.p[0];
+    for(size_t i=0; i<(size_t)oSegm.rows; ++i) {
         const size_t idx_nstep = step_row*i;
-        const uchar* input_step_ptr = oSegmMask.data+idx_nstep;
-        const uchar* gt_step_ptr = oGTSegmMask.data+idx_nstep;
+        const uchar* input_step_ptr = oSegm.data+idx_nstep;
+        const uchar* gt_step_ptr = oGTSegm.data+idx_nstep;
         const uchar* roi_step_ptr = oROI.data+idx_nstep;
-        for(int j=0; j<oSegmMask.cols; ++j) {
-            if(gt_step_ptr[j]!=s_nSegmOutOfScope && (oROI.empty() || roi_step_ptr[j]!=s_nSegmNegative) ) {
+        for(int j=0; j<oSegm.cols; ++j) {
+            if(gt_step_ptr[j]!=s_nSegmOutOfScope && gt_step_ptr[j]!=s_nSegmUnknown && (oROI.empty() || roi_step_ptr[j]!=s_nSegmNegative) ) {
                 if(input_step_ptr[j]==s_nSegmPositive) {
                     if(gt_step_ptr[j]==s_nSegmPositive)
                         ++m_oMetricsBase.nTP;
@@ -272,17 +388,26 @@ void DatasetUtils::IEvaluator_<DatasetUtils::eDatasetType_VideoSegm>::Accumulate
                     else // gt_step_ptr[j]==s_nSegmNegative
                         ++m_oMetricsBase.nTN;
                 }
+                if(gt_step_ptr[j]==s_nSegmShadow) {
+                    if(input_step_ptr[j]==s_nSegmPositive)
+                        ++m_oMetricsBase.nSE;
+                }
             }
         }
     }
 }
 
-#if HAVE_GLSL
 
-DatasetUtils::Video::Segm::CDnetEvaluator::GLCDnetEvaluator::GLCDnetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) :
+
+
+
+
+#if 0//HAVE_GLSL
+
+litiv::Video::Segm::CDnetEvaluator::GLCDnetEvaluator::GLCDnetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) :
         GLBinarySegmEvaluator(pParent,nTotFrameCount) {}
 
-std::string DatasetUtils::Video::Segm::CDnetEvaluator::GLCDnetEvaluator::getComputeShaderSource(size_t nStage) const {
+std::string litiv::Video::Segm::CDnetEvaluator::GLCDnetEvaluator::getComputeShaderSource(size_t nStage) const {
     glAssert(nStage<m_nComputeStages);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -376,94 +501,6 @@ std::string DatasetUtils::Video::Segm::CDnetEvaluator::GLCDnetEvaluator::getComp
 
 #endif //HAVE_GLSL
 
-template<>
-const uchar DatasetUtils::Evaluator_<DatasetUtils::eDatasetType_VideoSegm,DatasetUtils::eDataset_VideoSegm_CDnet2012>::s_nSegmUnknown = 170;
-template<>
-const uchar DatasetUtils::Evaluator_<DatasetUtils::eDatasetType_VideoSegm,DatasetUtils::eDataset_VideoSegm_CDnet2014>::s_nSegmUnknown = 170;
-template<>
-const uchar DatasetUtils::Evaluator_<DatasetUtils::eDatasetType_VideoSegm,DatasetUtils::eDataset_VideoSegm_CDnet2012>::s_nSegmShadow = 50;
-template<>
-const uchar DatasetUtils::Evaluator_<DatasetUtils::eDatasetType_VideoSegm,DatasetUtils::eDataset_VideoSegm_CDnet2014>::s_nSegmShadow = 50;
-
-cv::Mat DatasetUtils::Video::Segm::CDnetEvaluator::GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI) const {
-    CV_Assert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
-    CV_Assert(oSegmMask.size()==oGTSegmMask.size() && (oROI.empty() || oSegmMask.size()==oROI.size()));
-    cv::Mat oResult(oSegmMask.size(),CV_8UC3,cv::Scalar_<uchar>(0));
-    const size_t step_row = oSegmMask.step.p[0];
-    for(size_t i=0; i<(size_t)oSegmMask.rows; ++i) {
-        const size_t idx_nstep = step_row*i;
-        const uchar* input_step_ptr = oSegmMask.data+idx_nstep;
-        const uchar* gt_step_ptr = oGTSegmMask.data+idx_nstep;
-        const uchar* roi_step_ptr = oROI.data+idx_nstep;
-        uchar* res_step_ptr = oResult.data+idx_nstep*3;
-        for(int j=0; j<oSegmMask.cols; ++j) {
-            if(gt_step_ptr[j]!=s_nSegmOutOfScope && gt_step_ptr[j]!=s_nSegmUnknown && (oROI.empty() || roi_step_ptr[j]!=s_nSegmNegative) ) {
-                if(input_step_ptr[j]==s_nSegmPositive) {
-                    if(gt_step_ptr[j]==s_nSegmPositive)
-                        res_step_ptr[j*3+1] = UCHAR_MAX;
-                    else if(gt_step_ptr[j]==s_nSegmNegative)
-                        res_step_ptr[j*3+2] = UCHAR_MAX;
-                    else if(gt_step_ptr[j]==s_nSegmShadow) {
-                        res_step_ptr[j*3+1] = UCHAR_MAX/2;
-                        res_step_ptr[j*3+2] = UCHAR_MAX;
-                    }
-                    else {
-                        for(size_t c=0; c<3; ++c)
-                            res_step_ptr[j*3+c] = UCHAR_MAX/3;
-                    }
-                }
-                else { // input_step_ptr[j]==s_nSegmNegative
-                    if(gt_step_ptr[j]==s_nSegmPositive) {
-                        res_step_ptr[j*3] = UCHAR_MAX/2;
-                        res_step_ptr[j*3+2] = UCHAR_MAX;
-                    }
-                }
-            }
-            else if(!oROI.empty() && roi_step_ptr[j]==s_nSegmNegative) {
-                for(size_t c=0; c<3; ++c)
-                    res_step_ptr[j*3+c] = UCHAR_MAX/2;
-            }
-            else {
-                for(size_t c=0; c<3; ++c)
-                    res_step_ptr[j*3+c] = input_step_ptr[j];
-            }
-        }
-    }
-    return oResult;
-}
-
-void DatasetUtils::Video::Segm::CDnetEvaluator::AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& oROI) {
-    CV_Assert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
-    CV_Assert(oSegmMask.size()==oGTSegmMask.size() && (oROI.empty() || oSegmMask.size()==oROI.size()));
-    const size_t step_row = oSegmMask.step.p[0];
-    for(size_t i=0; i<(size_t)oSegmMask.rows; ++i) {
-        const size_t idx_nstep = step_row*i;
-        const uchar* input_step_ptr = oSegmMask.data+idx_nstep;
-        const uchar* gt_step_ptr = oGTSegmMask.data+idx_nstep;
-        const uchar* roi_step_ptr = oROI.data+idx_nstep;
-        for(int j=0; j<oSegmMask.cols; ++j) {
-            if(gt_step_ptr[j]!=s_nSegmOutOfScope && gt_step_ptr[j]!=s_nSegmUnknown && (oROI.empty() || roi_step_ptr[j]!=s_nSegmNegative) ) {
-                if(input_step_ptr[j]==s_nSegmPositive) {
-                    if(gt_step_ptr[j]==s_nSegmPositive)
-                        ++m_oMetricsBase.nTP;
-                    else // gt_step_ptr[j]==s_nSegmNegative
-                        ++m_oMetricsBase.nFP;
-                }
-                else { // input_step_ptr[j]==s_nSegmNegative
-                    if(gt_step_ptr[j]==s_nSegmPositive)
-                        ++m_oMetricsBase.nFN;
-                    else // gt_step_ptr[j]==s_nSegmNegative
-                        ++m_oMetricsBase.nTN;
-                }
-                if(gt_step_ptr[j]==s_nSegmShadow) {
-                    if(input_step_ptr[j]==s_nSegmPositive)
-                        ++m_oMetricsBase.nSE;
-                }
-            }
-        }
-    }
-}
-
 #if 0
 
 #if USE_BSDS500_BENCHMARK
@@ -507,61 +544,61 @@ void DatasetUtils::Video::Segm::CDnetEvaluator::AccumulateMetricsFromResult(cons
 #endif //USE_BSDS500_BENCHMARK
 
 // as defined in the BSDS500 scripts/dataset
-const double DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::s_dMaxImageDiagRatioDist = 0.0075;
+const double litiv::Image::Segm::BSDS500BoundaryEvaluator::s_dMaxImageDiagRatioDist = 0.0075;
 
-DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::BSDS500BoundaryEvaluator(size_t nThresholdBins) : m_nThresholdBins(nThresholdBins) {CV_Assert(m_nThresholdBins>0 && m_nThresholdBins<=UCHAR_MAX);}
+litiv::Image::Segm::BSDS500BoundaryEvaluator::BSDS500BoundaryEvaluator(size_t nThresholdBins) : m_nThresholdBins(nThresholdBins) {CV_Assert(m_nThresholdBins>0 && m_nThresholdBins<=UCHAR_MAX);}
 
-cv::Mat DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& /*oUnused*/) const {
-    CV_Assert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1);
-    CV_Assert(oSegmMask.cols==oGTSegmMask.cols && (oGTSegmMask.rows%oSegmMask.rows)==0 && (oGTSegmMask.rows/oSegmMask.rows)>=1);
-    CV_Assert(oSegmMask.step.p[0]==oGTSegmMask.step.p[0]);
-    const double dMaxDist = s_dMaxImageDiagRatioDist*sqrt(double(oSegmMask.cols*oSegmMask.cols+oSegmMask.rows*oSegmMask.rows));
+cv::Mat litiv::Image::Segm::BSDS500BoundaryEvaluator::GetColoredSegmMaskFromResult(const cv::Mat& oSegm, const cv::Mat& oGTSegm, const cv::Mat& /*oUnused*/) const {
+    CV_Assert(oSegm.type()==CV_8UC1 && oGTSegm.type()==CV_8UC1);
+    CV_Assert(oSegm.cols==oGTSegm.cols && (oGTSegm.rows%oSegm.rows)==0 && (oGTSegm.rows/oSegm.rows)>=1);
+    CV_Assert(oSegm.step.p[0]==oGTSegm.step.p[0]);
+    const double dMaxDist = s_dMaxImageDiagRatioDist*sqrt(double(oSegm.cols*oSegm.cols+oSegm.rows*oSegm.rows));
     const int nMaxDist = (int)ceil(dMaxDist);
     CV_Assert(dMaxDist>0 && nMaxDist>0);
-    cv::Mat oSegmMask_TP(oSegmMask.size(),CV_16UC1,cv::Scalar_<ushort>(0));
-    cv::Mat oSegmMask_FN(oSegmMask.size(),CV_16UC1,cv::Scalar_<ushort>(0));
-    cv::Mat oSegmMask_FP(oSegmMask.size(),CV_16UC1,cv::Scalar_<ushort>(0));
-    const size_t nGTMaskCount = size_t(oGTSegmMask.rows/oSegmMask.rows);
+    cv::Mat oSegm_TP(oSegm.size(),CV_16UC1,cv::Scalar_<ushort>(0));
+    cv::Mat oSegm_FN(oSegm.size(),CV_16UC1,cv::Scalar_<ushort>(0));
+    cv::Mat oSegm_FP(oSegm.size(),CV_16UC1,cv::Scalar_<ushort>(0));
+    const size_t nGTMaskCount = size_t(oGTSegm.rows/oSegm.rows);
     for(size_t nGTMaskIdx=0; nGTMaskIdx<nGTMaskCount; ++nGTMaskIdx) {
-        cv::Mat oCurrGTSegmMask = oGTSegmMask(cv::Rect(0,int(oSegmMask.rows*nGTMaskIdx),oSegmMask.cols,oSegmMask.rows));
-        cv::Mat oCurrGTSegmMask_dilated,oSegmMask_dilated;
+        cv::Mat oCurrGTSegmMask = oGTSegm(cv::Rect(0,int(oSegm.rows*nGTMaskIdx),oSegm.cols,oSegm.rows));
+        cv::Mat oCurrGTSegmMask_dilated,oSegm_dilated;
         cv::Mat oDilateKernel(2*nMaxDist+1,2*nMaxDist+1,CV_8UC1,cv::Scalar_<uchar>(255));
         cv::dilate(oCurrGTSegmMask,oCurrGTSegmMask_dilated,oDilateKernel);
-        cv::dilate(oSegmMask,oSegmMask_dilated,oDilateKernel);
-        cv::add((oSegmMask&oCurrGTSegmMask_dilated),oSegmMask_TP,oSegmMask_TP,cv::noArray(),CV_16U);
-        cv::add((oSegmMask&(oCurrGTSegmMask_dilated==0)),oSegmMask_FP,oSegmMask_FP,cv::noArray(),CV_16U);
-        cv::add(((oSegmMask_dilated==0)&oCurrGTSegmMask),oSegmMask_FN,oSegmMask_FN,cv::noArray(),CV_16U);
+        cv::dilate(oSegm,oSegm_dilated,oDilateKernel);
+        cv::add((oSegm&oCurrGTSegmMask_dilated),oSegm_TP,oSegm_TP,cv::noArray(),CV_16U);
+        cv::add((oSegm&(oCurrGTSegmMask_dilated==0)),oSegm_FP,oSegm_FP,cv::noArray(),CV_16U);
+        cv::add(((oSegm_dilated==0)&oCurrGTSegmMask),oSegm_FN,oSegm_FN,cv::noArray(),CV_16U);
     }
-    cv::Mat oSegmMask_TP_byte, oSegmMask_FN_byte, oSegmMask_FP_byte;
-    oSegmMask_TP.convertTo(oSegmMask_TP_byte,CV_8U,1.0/nGTMaskCount);
-    oSegmMask_FN.convertTo(oSegmMask_FN_byte,CV_8U,1.0/nGTMaskCount);
-    oSegmMask_FP.convertTo(oSegmMask_FP_byte,CV_8U,1.0/nGTMaskCount);
-    cv::Mat oResult(oSegmMask.size(),CV_8UC3,cv::Scalar_<uchar>(0));
+    cv::Mat oSegm_TP_byte, oSegm_FN_byte, oSegm_FP_byte;
+    oSegm_TP.convertTo(oSegm_TP_byte,CV_8U,1.0/nGTMaskCount);
+    oSegm_FN.convertTo(oSegm_FN_byte,CV_8U,1.0/nGTMaskCount);
+    oSegm_FP.convertTo(oSegm_FP_byte,CV_8U,1.0/nGTMaskCount);
+    cv::Mat oResult(oSegm.size(),CV_8UC3,cv::Scalar_<uchar>(0));
     const std::vector<int> vnMixPairs = {0,2, 1,0, 2,1};
-    cv::mixChannels(std::vector<cv::Mat>{oSegmMask_FN_byte|oSegmMask_FP_byte,oSegmMask_FN_byte,oSegmMask_TP_byte},std::vector<cv::Mat>{oResult},vnMixPairs.data(),vnMixPairs.size()/2);
+    cv::mixChannels(std::vector<cv::Mat>{oSegm_FN_byte|oSegm_FP_byte,oSegm_FN_byte,oSegm_TP_byte},std::vector<cv::Mat>{oResult},vnMixPairs.data(),vnMixPairs.size()/2);
     return oResult;
 }
 
-void DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& /*oUnused*/) {
-    CV_Assert(oSegmMask.type()==CV_8UC1 && oGTSegmMask.type()==CV_8UC1);
-    CV_Assert(oSegmMask.isContinuous() && oGTSegmMask.isContinuous());
-    CV_Assert(oSegmMask.cols==oGTSegmMask.cols && (oGTSegmMask.rows%oSegmMask.rows)==0 && (oGTSegmMask.rows/oSegmMask.rows)>=1);
-    CV_Assert(oSegmMask.step.p[0]==oGTSegmMask.step.p[0]);
+void litiv::Image::Segm::BSDS500BoundaryEvaluator::AccumulateMetricsFromResult(const cv::Mat& oSegm, const cv::Mat& oGTSegm, const cv::Mat& /*oUnused*/) {
+    CV_Assert(oSegm.type()==CV_8UC1 && oGTSegm.type()==CV_8UC1);
+    CV_Assert(oSegm.isContinuous() && oGTSegm.isContinuous());
+    CV_Assert(oSegm.cols==oGTSegm.cols && (oGTSegm.rows%oSegm.rows)==0 && (oGTSegm.rows/oSegm.rows)>=1);
+    CV_Assert(oSegm.step.p[0]==oGTSegm.step.p[0]);
 
-    const double dMaxDist = s_dMaxImageDiagRatioDist*sqrt(double(oSegmMask.cols*oSegmMask.cols+oSegmMask.rows*oSegmMask.rows));
+    const double dMaxDist = s_dMaxImageDiagRatioDist*sqrt(double(oSegm.cols*oSegm.cols+oSegm.rows*oSegm.rows));
     const double dMaxDistSqr = dMaxDist*dMaxDist;
     const int nMaxDist = (int)ceil(dMaxDist);
     CV_Assert(dMaxDist>0 && nMaxDist>0);
 
-    const std::vector<uchar> vuEvalUniqueVals = PlatformUtils::unique_8uc1_values(oSegmMask);
+    const std::vector<uchar> vuEvalUniqueVals = PlatformUtils::unique_8uc1_values(oSegm);
     BSDS500ClassifMetricsBase oMetricsBase(m_nThresholdBins);
     CV_DbgAssert(m_voMetricsBase.empty() || m_voMetricsBase[0].vnThresholds==oMetricsBase.vnThresholds);
-    cv::Mat oCurrSegmMask(oSegmMask.size(),CV_8UC1), oTmpSegmMask(oSegmMask.size(),CV_8UC1);
-    cv::Mat oSegmTPAccumulator(oSegmMask.size(),CV_8UC1);
+    cv::Mat oCurrSegmMask(oSegm.size(),CV_8UC1), oTmpSegmMask(oSegm.size(),CV_8UC1);
+    cv::Mat oSegmTPAccumulator(oSegm.size(),CV_8UC1);
     size_t nNextEvalUniqueValIdx = 0;
     size_t nThresholdBinIdx = 0;
     while(nThresholdBinIdx<oMetricsBase.vnThresholds.size()) {
-        cv::compare(oSegmMask,oMetricsBase.vnThresholds[nThresholdBinIdx],oTmpSegmMask,cv::CMP_GE);
+        cv::compare(oSegm,oMetricsBase.vnThresholds[nThresholdBinIdx],oTmpSegmMask,cv::CMP_GE);
         litiv::thinning(oTmpSegmMask,oCurrSegmMask);
 
 #if USE_BSDS500_BENCHMARK
@@ -582,8 +619,8 @@ void DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
         static_assert(degree>0,"csa config bad; degree of outlier connections should be > 0");
         static_assert(multiplier>0,"csa config bad; floating-point weights to integers should be > 0");
 
-        for(size_t nGTMaskIdx=0; nGTMaskIdx<size_t(oGTSegmMask.rows/oCurrSegmMask.rows); ++nGTMaskIdx) {
-            cv::Mat oCurrGTSegmMask = oGTSegmMask(cv::Rect(0,int(oCurrSegmMask.rows*nGTMaskIdx),oCurrSegmMask.cols,oCurrSegmMask.rows));
+        for(size_t nGTMaskIdx=0; nGTMaskIdx<size_t(oGTSegm.rows/oCurrSegmMask.rows); ++nGTMaskIdx) {
+            cv::Mat oCurrGTSegmMask = oGTSegm(cv::Rect(0,int(oCurrSegmMask.rows*nGTMaskIdx),oCurrSegmMask.cols,oCurrSegmMask.rows));
             cv::Mat oMatchable_SEGM(oCurrSegmMask.size(),CV_8UC1,cv::Scalar_<uchar>(0));
             cv::Mat oMatchable_GT(oCurrSegmMask.size(),CV_8UC1,cv::Scalar_<uchar>(0));
             // Figure out which nodes are matchable, i.e. within maxDist
@@ -848,8 +885,8 @@ void DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
         oSegmTPAccumulator = cv::Scalar_<uchar>(0); // accP |= ...
         uint64_t nIndivTP = 0; // cntR += ...
         uint64_t nGTPosCount = 0; // sumR += ...
-        for(size_t nGTMaskIdx = 0; nGTMaskIdx<size_t(oGTSegmMask.rows/oCurrSegmMask.rows); ++nGTMaskIdx) {
-            cv::Mat oCurrGTSegmMask = oGTSegmMask(cv::Rect(0,int(oCurrSegmMask.rows*nGTMaskIdx),oCurrSegmMask.cols,oCurrSegmMask.rows));
+        for(size_t nGTMaskIdx = 0; nGTMaskIdx<size_t(oGTSegm.rows/oCurrSegmMask.rows); ++nGTMaskIdx) {
+            cv::Mat oCurrGTSegmMask = oGTSegm(cv::Rect(0,int(oCurrSegmMask.rows*nGTMaskIdx),oCurrSegmMask.cols,oCurrSegmMask.rows));
             for(int i = 0; i<oCurrSegmMask.rows; ++i) {
                 for(int j = 0; j<oCurrSegmMask.cols; ++j) {
                     if(!oCurrGTSegmMask.at<uchar>(i,j)) continue;
@@ -905,19 +942,19 @@ void DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::AccumulateMetricsFromR
     m_voMetricsBase.push_back(oMetricsBase);
 }
 
-DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::BSDS500ClassifMetricsBase::BSDS500ClassifMetricsBase(size_t nThresholdsBins) : vnIndivTP(nThresholdsBins,0), vnIndivTPFN(nThresholdsBins,0), vnTotalTP(nThresholdsBins,0), vnTotalTPFP(nThresholdsBins,0), vnThresholds(PlatformUtils::linspace<uchar>(0,UCHAR_MAX,nThresholdsBins,false)) {}
+litiv::Image::Segm::BSDS500BoundaryEvaluator::BSDS500ClassifMetricsBase::BSDS500ClassifMetricsBase(size_t nThresholdsBins) : vnIndivTP(nThresholdsBins,0), vnIndivTPFN(nThresholdsBins,0), vnTotalTP(nThresholdsBins,0), vnTotalTPFP(nThresholdsBins,0), vnThresholds(PlatformUtils::linspace<uchar>(0,UCHAR_MAX,nThresholdsBins,false)) {}
 
-void DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::setThresholdBins(size_t nThresholdBins) {
+void litiv::Image::Segm::BSDS500BoundaryEvaluator::setThresholdBins(size_t nThresholdBins) {
     CV_Assert(m_nThresholdBins>0 && m_nThresholdBins<=UCHAR_MAX);
     CV_Assert(m_voMetricsBase.empty() || m_voMetricsBase[0].vnThresholds.size()==nThresholdBins); // can't change once we started the eval
     m_nThresholdBins = nThresholdBins;
 }
 
-size_t DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::getThresholdBins() const {
+size_t litiv::Image::Segm::BSDS500BoundaryEvaluator::getThresholdBins() const {
     return m_nThresholdBins;
 }
 
-void DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::CalcMetrics(const WorkBatch& oBatch, BSDS500Metrics& oRes) {
+void litiv::Image::Segm::BSDS500BoundaryEvaluator::CalcMetrics(const WorkBatch& oBatch, BSDS500Metrics& oRes) {
     auto pEval = std::dynamic_pointer_cast<BSDS500BoundaryEvaluator>(oBatch.m_pEvaluator);
     CV_Assert(pEval!=nullptr && !pEval->m_voMetricsBase.empty());
     oRes.dTimeElapsed_sec = pEval->dTimeElapsed_sec;
@@ -995,7 +1032,7 @@ void DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::CalcMetrics(const Work
     // ^^^ oCumulScore,dMaxRecall,dMaxPrecision,dMaxFMeasure,dAreaPR => eval_bdry.txt
 }
 
-void DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::WriteEvalResults(const std::string& sRootPath, const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) {
+void litiv::Image::Segm::BSDS500BoundaryEvaluator::WriteEvalResults(const std::string& sRootPath, const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) {
     if(!vpGroups.empty()) {
         size_t nOverallImageCount = 0;
         std::vector<BSDS500Metrics> voBatchMetrics;
@@ -1047,7 +1084,7 @@ void DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::WriteEvalResults(const
     }
 }
 
-void DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::WriteEvalResults(const WorkBatch& oBatch, BSDS500Metrics& oRes) {
+void litiv::Image::Segm::BSDS500BoundaryEvaluator::WriteEvalResults(const WorkBatch& oBatch, BSDS500Metrics& oRes) {
     CalcMetrics(oBatch,oRes);
 #if USE_BSDS500_BENCHMARK
     const std::string sResultPath = oBatch.m_sResultsPath+"/../"+oBatch.m_sName+"_reimpl_eval/";
@@ -1070,7 +1107,7 @@ void DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::WriteEvalResults(const
     std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << " " <<          " : BestRcl=" << std::fixed << std::setprecision(4) << oRes.oBestScore.dRecall << " BestPrc=" << oRes.oBestScore.dPrecision << " BestFM=" << oRes.oBestScore.dFMeasure << "  (@ T=" << std::fixed << std::setprecision(4) << oRes.oBestScore.dThreshold << ")" << std::endl;
 }
 
-DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::BSDS500Score DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::FindMaxFMeasure(const std::vector<uchar>& vnThresholds, const std::vector<double>& vdRecall, const std::vector<double>& vdPrecision) {
+litiv::Image::Segm::BSDS500BoundaryEvaluator::BSDS500Score litiv::Image::Segm::BSDS500BoundaryEvaluator::FindMaxFMeasure(const std::vector<uchar>& vnThresholds, const std::vector<double>& vdRecall, const std::vector<double>& vdPrecision) {
     CV_Assert(!vnThresholds.empty() && !vdRecall.empty() && !vdPrecision.empty());
     CV_Assert(vnThresholds.size()==vdRecall.size() && vdRecall.size()==vdPrecision.size());
     BSDS500Score oRes;
@@ -1097,7 +1134,7 @@ DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::BSDS500Score DatasetUtils::
     return oRes;
 }
 
-DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::BSDS500Score DatasetUtils::Image::Segm::BSDS500BoundaryEvaluator::FindMaxFMeasure(const std::vector<BSDS500Score>& voScores) {
+litiv::Image::Segm::BSDS500BoundaryEvaluator::BSDS500Score litiv::Image::Segm::BSDS500BoundaryEvaluator::FindMaxFMeasure(const std::vector<BSDS500Score>& voScores) {
     CV_Assert(!voScores.empty());
     BSDS500Score oRes = voScores[0];
     for(size_t nScoreIdx=1; nScoreIdx<voScores.size(); ++nScoreIdx) {

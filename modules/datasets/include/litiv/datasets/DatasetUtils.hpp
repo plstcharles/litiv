@@ -17,14 +17,20 @@
 
 #pragma once
 
-#define DATASETUTILS_HARDCODE_FRAME_INDEX      0
-#define DATASETUTILS_OUT_OF_SCOPE_DEFAULT_VAL  uchar(85)
+#define DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL  uchar(85)
+#define DATASETUTILS_VIDEOSEGM_UNKNOWN_VAL     uchar(170)
+#define DATASETUTILS_VIDEOSEGM_SHADOW_VAL      uchar(50)
+
+#define TNoGroup false
+#define TGroup true
 
 #include "litiv/utils/ParallelUtils.hpp"
 #include "litiv/utils/PlatformUtils.hpp"
-#include "litiv/utils/DatasetEvalUtils.hpp"
+#include <opencv2/videoio.hpp>
+#include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
 
-namespace DatasetUtils {
+namespace litiv {
 
     enum eDatasetTypeList {
         eDatasetType_VideoSegm,
@@ -37,8 +43,7 @@ namespace DatasetUtils {
     enum eDatasetList {
 
         //// VIDEO SEGMENTATION
-        eDataset_VideoSegm_CDnet2012,
-        eDataset_VideoSegm_CDnet2014,
+        eDataset_VideoSegm_CDnet,
         eDataset_VideoSegm_Wallflower,
         eDataset_VideoSegm_PETS2001D3TC1,
         //eDataset_VideoSegm_...
@@ -62,10 +67,6 @@ namespace DatasetUtils {
     };
 
     struct IDataHandler;
-    struct IDataEvaluator;
-    template<eDatasetTypeList eDatasetType>
-    struct IDataEvaluator_;
-
     using IDataHandlerPtr = std::shared_ptr<IDataHandler>;
     using IDataHandlerPtrArray = std::vector<IDataHandlerPtr>;
     using IDataHandlerPtrQueue = std::priority_queue<IDataHandlerPtr,IDataHandlerPtrArray,std::function<bool(const IDataHandlerPtr&,const IDataHandlerPtr&)>>;
@@ -81,9 +82,15 @@ namespace DatasetUtils {
         virtual const std::vector<std::string>& getGrayscaleNameTokens() const = 0;
         virtual size_t getOutputIdxOffset() const = 0;
         virtual double getScaleFactor() const = 0;
+        virtual bool isSavingResults() const = 0;
         virtual bool is4ByteAligned() const = 0;
-        virtual bool hasEvaluator() const {return false;}
         virtual ~IDataset() = default;
+
+        virtual size_t getTotPackets() const = 0;
+        virtual double getProcessTime() const = 0;
+        virtual double getExpectedLoad() const = 0;
+        virtual size_t getProcessedPacketsCountPromise() = 0;
+        virtual size_t getProcessedPacketsCount() const = 0;
 
         virtual void parseDataset() = 0;
         virtual void writeEvalReport() const = 0;
@@ -98,21 +105,23 @@ namespace DatasetUtils {
         virtual const std::string& getRelativePath() const = 0;
         virtual double getExpectedLoad() const = 0;
         virtual size_t getTotPackets() const = 0;
-        virtual bool hasEvaluator() const {return false;}
         virtual bool isGrayscale() const = 0;
         virtual bool isBare() const = 0;
         virtual bool isGroup() const = 0;
-        virtual IDataHandlerPtrArray getBatches() const = 0;
+        virtual IDataHandlerPtrArray getBatches() const = 0; // @@@@@ rename batches at dataset level to something else?
         virtual const IDataset& getDatasetInfo() const = 0;
         virtual eDatasetTypeList getDatasetType() const = 0;
         virtual eDatasetList getDataset() const = 0;
         virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize=12) const = 0;
         virtual void writeEvalReport() const = 0;
+        virtual void parseDataset() = 0;
         virtual ~IDataHandler() = default;
 
-        virtual void startProcessing() = 0; // used to start batch timer & init other time-critical components via _startProcessing
-        virtual void stopProcessing() = 0; // used to stop batch timer & release other time-critical components via _stopProcessing
+        virtual void startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX) = 0; // starts prefetching data packets
+        virtual void stopPrecaching() = 0; // stops prefetching data packets (for work batches, is also called in stopProcessing)
         virtual double getProcessTime() const = 0; // returns the current (or final) duration elapsed between start/stopProcessing calls
+        virtual size_t getProcessedPacketsCountPromise() = 0;
+        virtual size_t getProcessedPacketsCount() const = 0;
 
         template<typename Tp> static typename std::enable_if<std::is_base_of<IDataHandler,Tp>::value,bool>::type compare(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {return PlatformUtils::compare_lowercase(i->getName(),j->getName());}
         template<typename Tp> static typename std::enable_if<std::is_base_of<IDataHandler,Tp>::value,bool>::type compare_load(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {return i->getExpectedLoad()<j->getExpectedLoad();}
@@ -121,8 +130,7 @@ namespace DatasetUtils {
         static bool compare(const IDataHandler& i, const IDataHandler& j) {return PlatformUtils::compare_lowercase(i.getName(),j.getName());}
         static bool compare_load(const IDataHandler& i, const IDataHandler& j) {return i.getExpectedLoad()<j.getExpectedLoad();}
     protected:
-        virtual void _startProcessing() {}
-        virtual void _stopProcessing() {}
+        virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) const = 0; // will throw if out of range or if handler is not a group, and readjust nPacketIdx for returned batch range otherwise
     };
 
     void writeOnImage(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom=false);
@@ -161,27 +169,14 @@ namespace DatasetUtils {
         DataPrecacher(const DataPrecacher&) = delete;
     };
 
-    struct DataHandler : public IDataHandler {
-        DataHandler(const std::string& sBatchName, const IDataset& oDataset, const std::string& sRelativePath);
-    protected:
-        const std::string m_sBatchName;
-        const std::string m_sRelativePath;
-        const std::string m_sDatasetPath;
-        const std::string m_sResultsPath;
-        const bool m_bForcingGrayscale;
-        const IDataset& m_oDataset;
-        virtual const std::string& getName() const override {return m_sBatchName;}
-        virtual const std::string& getPath() const override {return m_sDatasetPath;}
-        virtual const std::string& getResultsPath() const override {return m_sResultsPath;}
-        virtual const std::string& getRelativePath() const override {return m_sRelativePath;}
-        virtual bool isGrayscale() const override {return m_bForcingGrayscale;}
-        virtual const IDataset& getDatasetInfo() const override {return m_oDataset;}
-    };
+    template<bool bGroup>
+    struct IDataLoader_ : public virtual IDataHandler {};
 
-    struct IDataProducer : public IDataHandler { // generalized producer (exposes common interface for all dataset types)
-        IDataProducer();
-        virtual bool startPrecaching(bool bUsingGT, size_t nTotPacketCount, size_t nSuggestedBufferSize=SIZE_MAX);
-        virtual void stopPrecaching();
+    template<>
+    struct IDataLoader_<TNoGroup> : public virtual IDataHandler { // generalized producer (exposes common interface for all dataset types)
+        IDataLoader_();
+        virtual void startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX) override;
+        virtual void stopPrecaching() override;
     protected:
         DataPrecacher m_oInputPrecacher;
         DataPrecacher m_oGTPrecacher;
@@ -194,23 +189,63 @@ namespace DatasetUtils {
     };
 
     template<eDatasetTypeList eDatasetType>
-    struct IDataProducer_; // specialized producer (exposes interface for single dataset types)
+    struct IDataReader_;
+
+    template<>
+    struct IDataReader_<eDatasetType_VideoSegm> : public virtual IDataHandler { // contains group-impl only
+        virtual size_t getFrameCount() const {return getTotPackets();}
+        virtual const cv::Mat& getInputFrame(size_t nFrameIdx) {return dynamic_cast<IDataReader_<eDatasetType_VideoSegm>&>(*getBatch(nFrameIdx)).getInputFrame(nFrameIdx);}
+        virtual const cv::Mat& getGTFrame(size_t nFrameIdx) {return dynamic_cast<IDataReader_<eDatasetType_VideoSegm>&>(*getBatch(nFrameIdx)).getGTFrame(nFrameIdx);}
+    };
+
+    template<eDatasetTypeList eDatasetType, bool bGroup>
+    struct IDataProducer_ :
+            public IDataLoader_<bGroup>,
+            public IDataReader_<eDatasetType> {};
 
     template<> // all method impl can go in CPP as template possibilities are tightly defined
-    struct IDataProducer_<eDatasetType_VideoSegm> : public IDataProducer {
+    struct IDataProducer_<eDatasetType_VideoSegm,TNoGroup> :
+            public IDataLoader_<TNoGroup>,
+            public IDataReader_<eDatasetType_VideoSegm> {
         IDataProducer_() : m_nFrameCount(0),m_nNextExpectedVideoReaderFrameIdx(size_t(-1)) {}
 
         virtual double getExpectedLoad() const override {return m_oROI.empty()?0.0:(double)cv::countNonZero(m_oROI)*m_nFrameCount*(int(!isGrayscale())+1);}
         virtual size_t getTotPackets() const override {return m_nFrameCount;}
-        virtual bool startPrecaching(bool bUsingGT, size_t /*nUnused=0*/, size_t /*nUnused=0*/) override {
-            return IDataProducer::startPrecaching(bUsingGT,m_nFrameCount,m_oSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:getDatasetInfo().is4ByteAligned()?4:3));
+        virtual void startPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override {
+            return IDataLoader_<TNoGroup>::startPrecaching(bUsingGT,m_oSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:getDatasetInfo().is4ByteAligned()?4:3));
         }
-
         virtual cv::Size getFrameSize() const {return m_oSize;}
         virtual const cv::Mat& getROI() const {return m_oROI;}
+        virtual const cv::Mat& getInputFrame(size_t nFrameIdx) override final {return m_oInputPrecacher.getPacket(nFrameIdx);}
+        virtual const cv::Mat& getGTFrame(size_t nFrameIdx) override final {return m_oGTPrecacher.getPacket(nFrameIdx);}
 
-        virtual const cv::Mat& getInputFrame(size_t nFrameIdx) {return m_oInputPrecacher.getPacket(nFrameIdx);}
-        virtual const cv::Mat& getGTFrame(size_t nFrameIdx) {return m_oGTPrecacher.getPacket(nFrameIdx);}
+        virtual void parseDataset() override {
+            cv::Mat oTempImg;
+            m_voVideoReader.open(getPath());
+            if(!m_voVideoReader.isOpened()) {
+                PlatformUtils::GetFilesFromDir(getPath(),m_vsInputFramePaths);
+                if(!m_vsInputFramePaths.empty()) {
+                    oTempImg = cv::imread(m_vsInputFramePaths[0]);
+                    m_nFrameCount = m_vsInputFramePaths.size();
+                }
+            }
+            else {
+                m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
+                m_voVideoReader >> oTempImg;
+                m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
+                m_nFrameCount = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
+            }
+            if(oTempImg.empty())
+                throw std::runtime_error(cv::format("Sequence '%s': video could not be opened via VideoReader or imread (you might need to implement your own DataProducer_ interface)",getName().c_str()));
+            m_oOrigSize = oTempImg.size();
+            const double dScale = getDatasetInfo().getScaleFactor();
+            if(dScale!=1.0)
+                cv::resize(oTempImg,oTempImg,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
+            m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
+            m_oSize = oTempImg.size();
+            m_nNextExpectedVideoReaderFrameIdx = 0;
+            CV_Assert(m_nFrameCount>0);
+        }
 
     protected:
 
@@ -237,7 +272,7 @@ namespace DatasetUtils {
         }
 
         virtual cv::Mat _getGTPacket_impl(size_t) override {
-            return cv::Mat(m_oSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_OUT_OF_SCOPE_DEFAULT_VAL));
+            return cv::Mat(m_oSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL));
         }
 
         size_t m_nFrameCount;
@@ -250,298 +285,78 @@ namespace DatasetUtils {
         std::unordered_map<size_t,size_t> m_mTestGTIndexes;
     };
 
-    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, typename enable=void>
-    struct DataProducer_; // no impl and no IDataProducer_ interface prevents compilation when not specialized
-
-    template<eDatasetList eDataset> // partially specialized dataset producer type for default VideoSegm handling
-    struct DataProducer_<eDatasetType_VideoSegm, eDataset> :
-            public IDataProducer_<eDatasetType_VideoSegm> {
-        static_assert(eDataset>=eDataset_VideoSegm_CDnet2012 && eDataset<=eDataset_VideoSegm_Custom,"dataset id is invalid for dataset type");
-        DataProducer_()  {
-            cv::Mat oTempImg;
-            m_voVideoReader.open(getPath());
-            if(!m_voVideoReader.isOpened()) {
-                PlatformUtils::GetFilesFromDir(getPath(),m_vsInputFramePaths);
-                if(!m_vsInputFramePaths.empty()) {
-                    oTempImg = cv::imread(m_vsInputFramePaths[0]);
-                    m_nFrameCount = m_vsInputFramePaths.size();
-                }
-            }
-            else {
-                m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
-                m_voVideoReader >> oTempImg;
-                m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
-                m_nFrameCount = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
-            }
-            if(oTempImg.empty())
-                throw std::runtime_error(cv::format("Sequence '%s': video could not be opened via VideoReader or imread (you might need to implement your own DataProducer_ interface)",getName().c_str()));
-            m_oOrigSize = oTempImg.size();
-            if(getDatasetInfo().m_dScaleFactor!=1.0)
-                cv::resize(oTempImg,oTempImg,cv::Size(),getDatasetInfo().m_dScaleFactor,getDatasetInfo().m_dScaleFactor,cv::INTER_NEAREST);
-            m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
-            m_oSize = oTempImg.size();
-            m_nNextExpectedVideoReaderFrameIdx = 0;
-            CV_Assert(m_nFrameCount>0);
-        }
-    };
-
-    template<eDatasetList eDataset> // partially specialized dataset producer type for default CDnet (2012+2014) handling
-    struct DataProducer_<eDatasetType_VideoSegm, eDataset, typename std::enable_if<((eDataset==eDataset_VideoSegm_CDnet2012)||(eDataset==eDataset_VideoSegm_CDnet2014))>::type> final :
-            public IDataProducer_<eDatasetType_VideoSegm> {
-        DataProducer_()  {
-            std::vector<std::string> vsSubDirs;
-            PlatformUtils::GetSubDirsFromDir(getPath(),vsSubDirs);
-            auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),getPath()+"/groundtruth");
-            auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),getPath()+"/input");
-            if(gtDir==vsSubDirs.end() || inputDir==vsSubDirs.end())
-                throw std::runtime_error(cv::format("CDnet Sequence '%s' did not possess the required groundtruth and input directories",getName().c_str()));
-            PlatformUtils::GetFilesFromDir(*inputDir,m_vsInputFramePaths);
-            PlatformUtils::GetFilesFromDir(*gtDir,m_vsGTFramePaths);
-            if(m_vsGTFramePaths.size()!=m_vsInputFramePaths.size())
-                throw std::runtime_error(cv::format("CDnet Sequence '%s' did not possess same amount of GT & input frames",getName().c_str()));
-            m_oROI = cv::imread(getPath()+"/ROI.bmp",cv::IMREAD_GRAYSCALE);
-            if(m_oROI.empty())
-                throw std::runtime_error(cv::format("CDnet Sequence '%s' did not possess a ROI.bmp file",getName().c_str()));
-            m_oROI = m_oROI>0;
-            m_oSize = m_oROI.size();
-            m_nFrameCount = m_vsInputFramePaths.size();
-            CV_Assert(m_nFrameCount>0);
-            // note: in this case, no need to use m_vnTestGTIndexes since all # of gt frames == # of test frames (but we assume the frames returned by 'GetFilesFromDir' are ordered correctly...)
-            //m_pEvaluator = std::shared_ptr<EvaluatorBase>(new CDnetEvaluator()); @@@@
-        }
-
-        virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final {
-            cv::Mat oFrame = cv::imread(m_vsGTFramePaths[nIdx],cv::IMREAD_GRAYSCALE);
-            if(oFrame.empty())
-                oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_OUT_OF_SCOPE_DEFAULT_VAL));
-            else if(oFrame.size()!=m_oSize)
-                cv::resize(oFrame,oFrame,m_oSize,0,0,cv::INTER_NEAREST);
-            return oFrame;
-        }
-    };
-
-    template<eDatasetTypeList eDatasetType>
-    struct IDataConsumer_; // specialized consumer (exposes interface for single dataset types -- no need for generalized interface)
+    template<bool bGroup>
+    struct IDataCounter_;
 
     template<>
-    struct IDataConsumer_<eDatasetType_VideoSegm> : public IDataEvaluator_<eDatasetType_VideoSegm> {
-        IDataConsumer_() : m_nProcessedFrames(0) {}
+    struct IDataCounter_<TNoGroup> : public virtual IDataHandler { // generalized consumer (exposes common interface for all dataset types)
+        IDataCounter_() : m_nProcessedPackets(0) {}
+    protected:
+        void processPacket() {++m_nProcessedPackets;}
+        void setProcessedPacketsPromise() {m_nProcessedPacketsPromise.set_value(m_nProcessedPackets);}
+        virtual size_t getProcessedPacketsCountPromise() override {return m_nProcessedPacketsPromise.get_future().get();}
+        virtual size_t getProcessedPacketsCount() const override {return m_nProcessedPackets;}
+    private:
+        size_t m_nProcessedPackets;
+        std::promise<size_t> m_nProcessedPacketsPromise;
+    };
 
-        virtual void pushSegmResult(const cv::Mat& /*oUnused*/, size_t /*nIdx*/) {++m_nProcessedFrames;}
-        virtual void _stopProcessing() override {m_nPacketsProcessed.set_value(m_nProcessedFrames);}
-        virtual size_t getProcessedFramesCountPromise() {return m_nPacketsProcessed.get_future().get();}
-        virtual size_t getProcessedFramesCount() {return m_nProcessedFrames;}
+    template<>
+    struct IDataCounter_<TGroup> : public virtual IDataHandler { // generalized consumer (exposes common interface for all dataset types)
+        virtual size_t getProcessedPacketsCountPromise() override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCountPromise();});}
+        virtual size_t getProcessedPacketsCount() const override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCount();});}
+    };
 
-        virtual cv::Mat readSegmResult(size_t nIdx) const {
-            CV_Assert(!getDatasetInfo().m_sResultNameSuffix.empty());
+
+    template<eDatasetTypeList eDatasetType>
+    struct IDataRecorder_;
+
+    template<>
+    struct IDataRecorder_<eDatasetType_VideoSegm> : public virtual IDataHandler { // contains group-impl only
+        virtual cv::Mat readResult(size_t nIdx) const {return dynamic_cast<IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).readResult(nIdx);}
+        virtual void pushResult(const cv::Mat& oSegm, size_t nIdx) {dynamic_cast<IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).pushResult(oSegm,nIdx);}
+        virtual void writeResult(const cv::Mat& oSegm, size_t nIdx) const {dynamic_cast<IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).writeResult(oSegm,nIdx);}
+    };
+
+    template<eDatasetTypeList eDatasetType, bool bGroup>
+    struct IDataConsumer_ :
+            public IDataCounter_<bGroup>,
+            public IDataRecorder_<eDatasetType> {};
+
+    template<>
+    struct IDataConsumer_<eDatasetType_VideoSegm,TNoGroup> :
+            public IDataCounter_<TNoGroup>,
+            public IDataRecorder_<eDatasetType_VideoSegm> {
+
+        virtual cv::Mat readResult(size_t nIdx) const override {
+            CV_Assert(!getDatasetInfo().getResultsNameSuffix().empty());
             std::array<char,10> acBuffer;
             snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
             std::stringstream sResultFilePath;
-            sResultFilePath << getResultsPath() << getDatasetInfo().m_sResultNamePrefix << acBuffer.data() << getDatasetInfo().m_sResultNameSuffix;
+            sResultFilePath << getResultsPath() << getDatasetInfo().getResultsNamePrefix() << acBuffer.data() << getDatasetInfo().getResultsNameSuffix();
             return cv::imread(sResultFilePath.str(),isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
         }
 
-        virtual void writeSegmResult(const cv::Mat& oSegm, size_t nIdx) const {
-            CV_Assert(!getDatasetInfo().m_sResultNameSuffix.empty());
+        void pushResult(const cv::Mat& oSegm, size_t nIdx) override {
+            processPacket();
+            _pushResult(oSegm,nIdx);
+            if(getDatasetInfo().isSavingResults())
+                writeResult(oSegm,nIdx);
+        }
+
+        virtual void writeResult(const cv::Mat& oSegm, size_t nIdx) const override {
+            CV_Assert(!getDatasetInfo().getResultsNameSuffix().empty());
             std::array<char,10> acBuffer;
             snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
             std::stringstream sResultFilePath;
-            sResultFilePath << getResultsPath() << getDatasetInfo().m_sResultNamePrefix << acBuffer.data() << getDatasetInfo().m_sResultNameSuffix;
+            sResultFilePath << getResultsPath() << getDatasetInfo().getResultsNamePrefix() << acBuffer.data() << getDatasetInfo().getResultsNameSuffix();
             const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
             cv::imwrite(sResultFilePath.str(),oSegm,vnComprParams);
         }
 
     protected:
-        size_t m_nProcessedFrames;
-        std::promise<size_t> m_nPacketsProcessed;
+        virtual void _pushResult(const cv::Mat& /*oSegm*/, size_t /*nIdx*/) {} // should be overriden in child classes for each dataset
     };
-
-
-    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, typename enable=void>
-    struct DataConsumer_; // no impl and no IDataConsumer_ interface prevents compilation when not specialized
-
-    template<eDatasetList eDataset> // partially specialized dataset consumer type for default VideoSegm handling
-    struct DataConsumer_<eDatasetType_VideoSegm, eDataset> : public IDataConsumer_<eDatasetType_VideoSegm,Evaluator_<eDatasetType_VideoSegm,eDataset>> {};
-
-    template<eDatasetList eDataset> // partially specialized dataset producer type for default CDnet (2012+2014) handling
-    struct DataConsumer_<eDatasetType_VideoSegm, eDataset, typename std::enable_if<((eDataset==eDataset_VideoSegm_CDnet2012)||(eDataset==eDataset_VideoSegm_CDnet2014))>::type> final :
-            public IDataConsumer_<eDatasetType_VideoSegm,Evaluator_<eDatasetType_VideoSegm,eDataset>> {
-
-        DataConsumer_() {
-            //m_pEvaluator = std::make_shared(); @@@@
-        }
-
-        virtual void pushSegmResult(const cv::Mat& oSegm, size_t nIdx) override {
-            //m_pEvaluator-> @@@@
-            IDataConsumer_<eDatasetType_VideoSegm>::pushSegmResult(oSegm,nIdx);
-        }
-    };
-
-    template<eDatasetTypeList eDatasetType, eDatasetList eDataset>
-    struct IDataset_ : public IDatasetEvaluator_<eDatasetType,eDataset> { // dataset interface specialization for smaller impl sizes
-        IDataset_(const std::string& sDatasetName, const std::string& sDatasetRootPath, const std::string& sResultsRootPath,
-                  const std::string& sResultNamePrefix, const std::string& sResultNameSuffix, const std::vector<std::string>& vsWorkBatchPaths,
-                  const std::vector<std::string>& vsSkippedNameTokens, const std::vector<std::string>& vsGrayscaleNameTokens,
-                  size_t nOutputIdxOffset, double dScaleFactor, bool bForce4ByteDataAlign) :
-                m_sDatasetName(sDatasetName),m_sDatasetRootPath(sDatasetRootPath),m_sResultsRootPath(sResultsRootPath),
-                m_sResultNamePrefix(sResultNamePrefix),m_sResultNameSuffix(sResultNameSuffix),m_vsWorkBatchPaths(vsWorkBatchPaths),
-                m_vsSkippedNameTokens(vsSkippedNameTokens),m_vsGrayscaleNameTokens(vsGrayscaleNameTokens),
-                m_nOutputIdxOffset(nOutputIdxOffset),m_dScaleFactor(dScaleFactor),m_bForce4ByteDataAlign(bForce4ByteDataAlign) {}
-        struct WorkBatch :
-                public DataHandler,
-                public DataProducer_<eDatasetType,eDataset>,
-                public DataConsumer_<eDatasetType,eDataset> {
-            WorkBatch(const std::string& sBatchName, const IDataset& oDataset, const std::string& sRelativePath=std::string("./")) :
-                    DataHandler(sBatchName,oDataset,sRelativePath) {}
-            virtual ~WorkBatch() = default;
-            virtual eDatasetTypeList getDatasetType() const override final {return eDatasetType;}
-            virtual eDatasetList getDataset() const override final {return eDataset;}
-            virtual bool isBare() const override final {return false;}
-            virtual bool isGroup() const override final {return false;}
-            virtual IDataHandlerPtrArray getBatches() const override final {return IDataHandlerPtrArray();}
-            virtual void startProcessing() override final {_startProcessing(); m_oStopWatch.tick();}
-            virtual void stopProcessing() override final {_stopProcessing(); m_dElapsedTime_sec = m_oStopWatch.tock();}
-            virtual double getProcessTime() const override final {return m_dElapsedTime_sec;}
-        private:
-            WorkBatch& operator=(const WorkBatch&) = delete;
-            WorkBatch(const WorkBatch&) = delete;
-            friend class WorkBatchGroup;
-            CxxUtils::StopWatch m_oStopWatch;
-            double m_dElapsedTime_sec;
-        };
-        struct WorkBatchGroup :
-                public DataHandler { // @@@@@@@ inherit DataEvaluator_<1,2>? or interface?
-            WorkBatchGroup(const std::string& sGroupName, const IDataset& oDataset, const std::string& sRelativePath=std::string("./")) :
-                    DataHandler(sGroupName,oDataset,sRelativePath+"/"+sGroupName+"/"), m_bIsBare(false) {
-                PlatformUtils::CreateDirIfNotExist(m_sResultsPath);
-                if(!PlatformUtils::string_contains_token(getName(),m_oDataset.m_vsSkippedNameTokens)) {
-                    std::cout << "[" << m_oDataset.m_sDatasetName << "] -- Parsing directory '" << m_oDataset.m_sDatasetRootPath+sRelativePath << "' for work group '" << getName() << "'..." << std::endl;
-                    std::vector<std::string> vsWorkBatchPaths;
-                    // all subdirs are considered work batch directories (if none, the category directory itself is a batch)
-                    PlatformUtils::GetSubDirsFromDir(m_sDatasetPath,vsWorkBatchPaths);
-                    if(vsWorkBatchPaths.empty()) {
-                        m_vpBatches.push_back(std::make_shared<WorkBatch>(getName(),m_oDataset,m_sRelativePath));
-                        m_bIsBare = true;
-                    }
-                    else {
-                        for(auto&& sPathIter : vsWorkBatchPaths) {
-                            const size_t nLastSlashPos = sPathIter.find_last_of("/\\");
-                            const std::string sNewBatchName = nLastSlashPos==std::string::npos?sPathIter:sPathIter.substr(nLastSlashPos+1);
-                            if(!PlatformUtils::string_contains_token(sNewBatchName,m_oDataset.m_vsSkippedNameTokens))
-                                m_vpBatches.push_back(std::make_shared<WorkBatch>(sNewBatchName,m_oDataset,m_sRelativePath+"/"+sNewBatchName+"/"));
-                        }
-                    }
-                }
-            }
-            virtual ~WorkBatchGroup() = default;
-            virtual double getExpectedLoad() const override {
-                return std::accumulate(m_vpBatches.begin(),m_vpBatches.end(),0.0,[&](double dSum, const IDataHandlerPtr& p) {
-                    return dSum + p->getExpectedLoad();
-                });
-            }
-            virtual size_t getTotPackets() const override {
-                return std::accumulate(m_vpBatches.begin(),m_vpBatches.end(),0.0,[&](size_t nSum, const IDataHandlerPtr& p) {
-                    return nSum + p->getTotPackets();
-                });
-            }
-            virtual bool isBare() const override final {return m_bIsBare;}
-            virtual bool isGroup() const override final {return true;}
-            virtual IDataHandlerPtrArray getBatches() const override final {return m_vpBatches;}
-            virtual void startProcessing() override final {_startProcessing();}
-            virtual void stopProcessing() override final {_stopProcessing();}
-            virtual double getProcessTime() const override final {
-                return std::accumulate(m_vpBatches.begin(),m_vpBatches.end(),0.0,[&](double dSum, const IDataHandlerPtr& p) {
-                    return dSum + p->getProcessTime();
-                });
-            }
-        private:
-            bool m_bIsBare;
-            IDataHandlerPtrArray m_vpBatches;
-            WorkBatchGroup& operator=(const WorkBatchGroup&) = delete;
-            WorkBatchGroup(const WorkBatchGroup&) = delete;
-        };
-
-        virtual const std::string& getDatasetName() const override final {return m_sDatasetName;}
-        virtual const std::string& getDatasetRootPath() const override final {return m_sDatasetRootPath;}
-        virtual const std::string& getResultsRootPath() const override final {return m_sResultsRootPath;}
-        virtual const std::string& getResultsNamePrefix() const override final {return m_sResultNamePrefix;}
-        virtual const std::string& getResultsNameSuffix() const override final {return m_sResultNameSuffix;}
-        virtual const std::vector<std::string>& getWorkBatchPaths() const override final {return m_vsWorkBatchPaths;}
-        virtual const std::vector<std::string>& getSkippedNameTokens() const override final {return m_vsSkippedNameTokens;}
-        virtual const std::vector<std::string>& getGrayscaleNameTokens() const override final {return m_vsGrayscaleNameTokens;}
-        virtual size_t getOutputIdxOffset() const override final {return m_nOutputIdxOffset;}
-        virtual double getScaleFactor() const override final {return m_dScaleFactor;}
-        virtual bool is4ByteAligned() const override final {return m_bForce4ByteDataAlign;}
-
-        virtual void parseDataset() override final {
-            m_vpBatches.clear();
-            if(!m_sResultsRootPath.empty())
-                PlatformUtils::CreateDirIfNotExist(m_sResultsRootPath);
-            for(auto&& sPathIter : m_vsWorkBatchPaths)
-                m_vpBatches.push_back(std::make_shared<WorkBatchGroup>(sPathIter,*this));
-        }
-
-        virtual IDataHandlerPtrArray getBatches() const override final {
-            return m_vpBatches;
-        }
-
-        virtual IDataHandlerPtrQueue getSortedBatches() const override final {
-            IDataHandlerPtrQueue vpBatches(&IDataHandler::compare_load);
-            std::function<void(const IDataHandlerPtr&)> lPushBatches = [&](const IDataHandlerPtr& pBatch) {
-                if(pBatch->isGroup())
-                    for(auto&& pSubBatch : pBatch->getBatches())
-                        lPushBatches(pSubBatch);
-                else
-                    vpBatches.push(pBatch);
-            };
-            for(auto&& pBatch : getBatches())
-                lPushBatches(pBatch);
-            return vpBatches;
-        }
-
-    protected:
-        const std::string m_sDatasetName;
-        const std::string m_sDatasetRootPath;
-        const std::string m_sResultsRootPath;
-        const std::string m_sResultNamePrefix;
-        const std::string m_sResultNameSuffix;
-        const std::vector<std::string> m_vsWorkBatchPaths;
-        const std::vector<std::string> m_vsSkippedNameTokens;
-        const std::vector<std::string> m_vsGrayscaleNameTokens;
-        const size_t m_nOutputIdxOffset;
-        const double m_dScaleFactor;
-        const bool m_bForce4ByteDataAlign;
-
-        IDataHandlerPtrArray m_vpBatches;
-    };
-
-    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, typename enable=void>
-    struct Dataset_; // no impl and no IDataset interface prevents compilation when not specialized
-
-    template<> // fully specialized dataset for default VideoSegm dataset handling
-    struct Dataset_<eDatasetType_VideoSegm, eDataset_VideoSegm_Custom> :
-            public IDataset_<eDatasetType_VideoSegm, eDataset_VideoSegm_Custom> {
-        using IDataset_<eDatasetType_VideoSegm, eDataset_VideoSegm_Custom>::IDataset_<eDatasetType_VideoSegm, eDataset_VideoSegm_Custom>;
-    };
-
-    template<eDatasetList eDataset> // partially specialized dataset for default CDnet (2012+2014) handling
-    struct Dataset_<eDatasetType_VideoSegm, eDataset, typename std::enable_if<((eDataset==eDataset_VideoSegm_CDnet2012)||(eDataset==eDataset_VideoSegm_CDnet2014))>::type> final :
-            public IDataset_<eDatasetType_VideoSegm, eDataset_VideoSegm_Custom> {
-        Dataset_(const std::string& sDatasetRootPath, const std::string& sResultsDirName, bool bForce4ByteDataAlign, double dScaleFactor) :
-                IDataset_( eDataset==eDataset_VideoSegm_CDnet2012?"CDnet 2012":"CDnet 2014",
-                           eDataset==eDataset_VideoSegm_CDnet2012?sDatasetRootPath+"/CDNet/dataset/":sDatasetRootPath+"/CDNet2014/dataset/",
-                           eDataset==eDataset_VideoSegm_CDnet2012?sDatasetRootPath+"/CDNet/"+sResultsDirName+"/":sDatasetRootPath+"/CDNet2014/"+sResultsDirName+"/",
-                           "bin",
-                           ".png",
-                           eDataset==eDataset_VideoSegm_CDnet2012?std::vector<std::string>{"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"}:std::vector<std::string>{"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"},
-                           std::vector<std::string>{},
-                           eDataset==eDataset_VideoSegm_CDnet2012?std::vector<std::string>{"thermal"}:std::vector<std::string>{"thermal","turbulence"},
-                           1,
-                           dScaleFactor,
-                           bForce4ByteDataAlign) {}
-    };
-    typedef Dataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet2012> CDnet2012;
-    typedef Dataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet2014> CDnet2014;
 
 #if 0
     namespace Video {
@@ -717,4 +532,4 @@ namespace DatasetUtils {
 
 #endif
 
-} //namespace DatasetUtils
+} //namespace litiv
