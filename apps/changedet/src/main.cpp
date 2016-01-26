@@ -171,8 +171,8 @@ int main(int, char**) {
         const size_t nTotPackets = oDataset.getTotPackets();
         const size_t nTotBatches = vpBatches.size();
         if(nTotBatches==0 || nTotPackets==0)
-            throw std::runtime_error(cv::format("Could not find any sequences/frames to process for dataset '%s'",oDataset.getDatasetName().c_str()));
-        std::cout << "Parsing complete. [" << oDataset.getBatches().size() << " batch group(s), " << nTotBatches << " sequence(s)]\n" << std::endl;
+            lvErrorExt("Could not find any sequences/frames to process for dataset '%s'",pDataset->getDatasetName().c_str());
+        std::cout << "Parsing complete. [" << pDataset->getBatches().size() << " batch group(s), " << nTotBatches << " sequence(s)]\n" << std::endl;
         std::cout << "[" << CxxUtils::getTimeStamp() << "]" << std::endl;
         std::cout << "Executing background subtraction with " << ((g_nMaxThreads>nTotBatches)?nTotBatches:g_nMaxThreads) << " thread(s)..." << std::endl;
         size_t nProcessedBatches = 0;
@@ -228,7 +228,7 @@ void AnalyzeSequence_GLSL(litiv::IDataHandlerPtr pBatch) {
         glfwSetErrorCallback(GLFWErrorCallback);
         CV_Assert(pCurrSequence.get() && pCurrSequence->GetTotalImageCount()>1);
         if(pCurrSequence->m_pEvaluator==nullptr && EVALUATE_OUTPUT)
-            throw std::runtime_error(cv::format("Missing evaluation impl for video segmentation dataset '%s'",g_pDatasetInfo->m_sDatasetName.c_str()));
+            lvErrorExt("Missing evaluation impl for video segmentation dataset '%s'",g_pDatasetInfo->m_sDatasetName.c_str());
         const std::string sCurrSeqName = CxxUtils::clampString(pCurrSequence->m_sName,12);
         const size_t nFrameCount = pCurrSequence->GetTotalImageCount();
         const cv::Mat oROI = LIMIT_MODEL_TO_SEQUENCE_ROI?pCurrSequence->GetROI():cv::Mat();

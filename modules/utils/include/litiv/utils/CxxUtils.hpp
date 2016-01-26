@@ -169,7 +169,9 @@ namespace CxxUtils {
                 std::runtime_error(cv::format((std::string("Exception in function '%s' from %s(%d) : \n")+sErrMsg).c_str(),sFunc,sFile,nLine,vArgs...)),
                 m_acFuncName(sFunc),
                 m_acFileName(sFile),
-                m_nLineNumber(nLine) {}
+                m_nLineNumber(nLine) {
+            std::cerr << this->what() << std::endl;
+        }
         const char* const m_acFuncName;
         const char* const m_acFileName;
         const int m_nLineNumber;

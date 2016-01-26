@@ -69,15 +69,15 @@ namespace litiv {
             auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),getPath()+"/groundtruth");
             auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),getPath()+"/input");
             if(gtDir==vsSubDirs.end() || inputDir==vsSubDirs.end())
-                throw std::runtime_error(cv::format("CDnet Sequence '%s' did not possess the required groundtruth and input directories",getName().c_str()));
+                lvErrorExt("CDnet Sequence '%s' did not possess the required groundtruth and input directories",getName().c_str());
             PlatformUtils::GetFilesFromDir(*inputDir,m_vsInputFramePaths);
             PlatformUtils::GetFilesFromDir(*gtDir,m_vsGTFramePaths);
             if(m_vsGTFramePaths.size()!=m_vsInputFramePaths.size())
-                throw std::runtime_error(cv::format("CDnet Sequence '%s' did not possess same amount of GT & input frames",getName().c_str()));
+                lvErrorExt("CDnet Sequence '%s' did not possess same amount of GT & input frames",getName().c_str());
             m_oROI = cv::imread(getPath()+"/ROI.bmp",cv::IMREAD_GRAYSCALE);
             if(m_oROI.empty())
-                throw std::runtime_error(cv::format("CDnet Sequence '%s' did not possess a ROI.bmp file",getName().c_str()));
-            m_oROI = m_oROI>0;
+                lvErrorExt("CDnet Sequence '%s' did not possess a ROI.bmp file",getName().c_str());
+            m_oROI = m_oROI>0; // @@@@@ check throw here???
             m_oSize = m_oROI.size();
             m_nFrameCount = m_vsInputFramePaths.size();
             CV_Assert(m_nFrameCount>0);
