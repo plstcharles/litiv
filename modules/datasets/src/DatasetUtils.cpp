@@ -254,10 +254,6 @@ const cv::Mat& litiv::DataPrecacher::getPacket_internal(size_t nIdx) {
     return m_oLastReqPacket;
 }
 
-litiv::IDataLoader_<TNoGroup>::IDataLoader_() :
-        m_oInputPrecacher(std::bind(&IDataLoader_<TNoGroup>::_getInputPacket_redirect,this,std::placeholders::_1)),
-        m_oGTPrecacher(std::bind(&IDataLoader_<TNoGroup>::_getGTPacket_redirect,this,std::placeholders::_1)) {}
-
 void litiv::IDataLoader_<TNoGroup>::startPrecaching(bool bUsingGT, size_t nSuggestedBufferSize) {
     CV_Assert(m_oInputPrecacher.startPrecaching(getTotPackets(),nSuggestedBufferSize));
     CV_Assert(!bUsingGT || m_oGTPrecacher.startPrecaching(getTotPackets(),nSuggestedBufferSize));
@@ -267,6 +263,10 @@ void litiv::IDataLoader_<TNoGroup>::stopPrecaching() {
     m_oInputPrecacher.stopPrecaching();
     m_oGTPrecacher.stopPrecaching();
 }
+
+litiv::IDataLoader_<TNoGroup>::IDataLoader_() :
+        m_oInputPrecacher(std::bind(&IDataLoader_<TNoGroup>::_getInputPacket_redirect,this,std::placeholders::_1)),
+        m_oGTPrecacher(std::bind(&IDataLoader_<TNoGroup>::_getGTPacket_redirect,this,std::placeholders::_1)) {}
 
 const cv::Mat& litiv::IDataLoader_<TNoGroup>::_getInputPacket_redirect(size_t nIdx) {
     CV_Assert(nIdx<getTotPackets());

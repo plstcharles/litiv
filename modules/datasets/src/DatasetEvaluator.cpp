@@ -311,7 +311,7 @@ const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nS
 const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmShadow = DATASETUTILS_VIDEOSEGM_SHADOW_VAL;
 
 cv::Mat litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getColoredSegmMaskFromResult(const cv::Mat& oSegm, size_t nIdx) {
-    IDataProducer_<eDatasetType_VideoSegm,TNoGroup>* pProducer = dynamic_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>*>(this);
+    auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
     CV_Assert(pProducer);
     const cv::Mat& oGTSegm = pProducer->getGTFrame(nIdx);
     const cv::Mat& oROI = pProducer->getROI();
@@ -362,7 +362,7 @@ cv::Mat litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getColor
 }
 
 void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::_pushResult(const cv::Mat& oSegm, size_t nIdx) {
-    IDataProducer_<eDatasetType_VideoSegm,TNoGroup>* pProducer = dynamic_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>*>(this);
+    auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
     CV_Assert(pProducer);
     const cv::Mat& oGTSegm = pProducer->getGTFrame(nIdx);
     const cv::Mat& oROI = pProducer->getROI();
