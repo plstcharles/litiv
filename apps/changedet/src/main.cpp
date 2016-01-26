@@ -166,9 +166,9 @@ const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurre
 
 int main(int, char**) {
     try {
-        litiv::datasets::DATASET_TYPE oDataset(DATASET_PATH,DATASET_RESULTS_PATH,WRITE_IMG_OUTPUT,USE_GPU_IMPL,DATASET_SCALE_FACTOR);
-        litiv::IDataHandlerPtrQueue vpBatches = oDataset.getSortedBatches();
-        const size_t nTotPackets = oDataset.getTotPackets();
+        litiv::IDatasetPtr pDataset = litiv::datasets::create<litiv::eDatasetType_VideoSegm,litiv::eDataset_VideoSegm_CDnet>(DATASET_PATH,DATASET_RESULTS_PATH,WRITE_IMG_OUTPUT,USE_GPU_IMPL,DATASET_SCALE_FACTOR);
+        litiv::IDataHandlerPtrQueue vpBatches = pDataset->getSortedBatches();
+        const size_t nTotPackets = pDataset->getTotPackets();
         const size_t nTotBatches = vpBatches.size();
         if(nTotBatches==0 || nTotPackets==0)
             lvErrorExt("Could not find any sequences/frames to process for dataset '%s'",pDataset->getDatasetName().c_str());
@@ -198,10 +198,10 @@ int main(int, char**) {
         }
         //while(g_nActiveThreads>0) // shouldnt need this if using packet count promise
         //    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        const size_t nTotProcessedPackets = oDataset.getProcessedPacketsCountPromise();
+        const size_t nTotProcessedPackets = pDataset->getProcessedPacketsCountPromise();
         std::cout << "[" << CxxUtils::getTimeStamp() << "]\n" << std::endl;
         if(nTotProcessedPackets==nTotPackets)
-            oDataset.writeEvalReport();
+            pDataset->writeEvalReport();
     }
     catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
     catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}

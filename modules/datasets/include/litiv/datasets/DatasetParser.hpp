@@ -20,6 +20,9 @@
 #include "litiv/datasets/DatasetUtils.hpp"
 #include "litiv/datasets/DatasetEvaluator.hpp"
 
+#define LITIV_DATASET_IMPL_BEGIN(eDatasetType,eDataset) template<>struct Dataset_<eDatasetType,eDataset>:public IDataset_<eDatasetType,eDataset>{private:friend struct datasets
+#define LITIV_DATASET_IMPL_END() }
+
 namespace litiv {
 
     struct DataHandler : public virtual IDataHandler {
@@ -295,9 +298,7 @@ namespace litiv {
         using IDataset_<eDatasetType,eDataset>::IDataset_;
     };
 
-    template<>
-    struct Dataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet> final :
-            public IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet> {
+    LITIV_DATASET_IMPL_BEGIN(eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet);
         Dataset_(const std::string& sDatasetRootPath, const std::string& sResultsDirName, bool bSaveResults=true, bool bForce4ByteDataAlign=false, double dScaleFactor=1.0, bool b2014=true) :
                 IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet>(
                     b2014?"CDnet 2014":"CDnet 2012",
@@ -305,18 +306,31 @@ namespace litiv {
                     b2014?sDatasetRootPath+"/CDNet2014/"+sResultsDirName+"/":sDatasetRootPath+"/CDNet/"+sResultsDirName+"/",
                     "bin",
                     ".png",
-                    b2014?std::vector<std::string>{"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"}:std::vector<std::string>{"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"},
+                    std::vector<std::string>{"baseline_highway_cut2"},//b2014?std::vector<std::string>{"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"}:std::vector<std::string>{"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"},
                     std::vector<std::string>{},
                     b2014?std::vector<std::string>{"thermal","turbulence"}:std::vector<std::string>{"thermal"},
                     1,
                     bSaveResults,
                     bForce4ByteDataAlign,
                     dScaleFactor) {}
-    };
+    LITIV_DATASET_IMPL_END();
 
-    namespace datasets {
+    struct datasets final {
+
+        template<eDatasetTypeList eDatasetType, eDatasetList eDataset, typename ...Targs>
+        static IDatasetPtr create(const Targs& ... args) {
+            auto pDataset = IDatasetPtr(new Dataset_<eDatasetType,eDataset>(args...));
+            pDataset->parseDataset();
+            return pDataset;
+        }
+
         using CustomVideoSegm = Dataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_Custom>;
         using CDnet = Dataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet>;
-    } //namespace datasets
+
+    private:
+        // used as a 'friendly' namespace only (i.e. it can access private Dataset_ members)
+        datasets() = delete;
+        ~datasets() = delete;
+    };
 
 } //namespace litiv
