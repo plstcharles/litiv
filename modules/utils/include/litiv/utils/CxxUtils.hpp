@@ -26,6 +26,7 @@
 #include <atomic>
 #include <future>
 #include <memory>
+#include <numeric>
 #include <iomanip>
 #include <iostream>
 #include <functional>

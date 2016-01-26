@@ -216,7 +216,7 @@ namespace litiv {
                 for(const auto& pBatch : getBatches())
                     ssStr << pBatch->writeInlineEvalReport(nIndentSize+1);
             const ClassifMetrics& oMetrics = getMetrics(true);
-            ssStr << std::setw(nCellSize) << (std::string('>',nIndentSize)+getName()) << "|" <<
+            ssStr << std::setw(nCellSize) << (std::string(nIndentSize,'>')+getName()) << "|" <<
             std::setw(nCellSize) << oMetrics.dRecall << "|" <<
             std::setw(nCellSize) << oMetrics.dSpecificity << "|" <<
             std::setw(nCellSize) << oMetrics.dFPR << "|" <<
