@@ -25,6 +25,7 @@
 #include <chrono>
 #include <atomic>
 #include <future>
+#include <memory>
 #include <iomanip>
 #include <iostream>
 #include <functional>
@@ -304,6 +305,13 @@ namespace CxxUtils {
 
     static inline std::string clampString(const std::string& sInput, size_t nSize, char cPadding=' ') {
         return sInput.size()>nSize?sInput.substr(0,nSize):sInput+std::string(nSize-sInput.size(),cPadding);
+    }
+
+    template<typename TSum, typename TObj>
+    static inline TSum accumulateMembers(const std::vector<TObj>& vObjArray, const std::function<TSum(const TObj&)>& lFunc) {
+        return std::accumulate(vObjArray.begin(),vObjArray.end(),TSum(0),[&](TSum tSum, const TObj& p) {
+            return tSum + lFunc(p);
+        });
     }
 
 } //namespace CxxUtils
