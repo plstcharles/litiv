@@ -140,7 +140,7 @@ namespace litiv {
     struct DataPrecacher {
         // @@@@ rewrite to allow streaming with no limit? (might just need to modify init and set tot=inf)
         // @@@@ current impl expects all packets to be the same size
-        DataPrecacher(const std::function<const cv::Mat&(size_t)>& lCallback);
+        DataPrecacher(std::function<const cv::Mat&(size_t)> lCallback);
         virtual ~DataPrecacher();
         const cv::Mat& getPacket(size_t nIdx);
         bool startPrecaching(size_t nTotPacketCount, size_t nSuggestedBufferSize);
@@ -148,7 +148,7 @@ namespace litiv {
     private:
         void precache();
         const cv::Mat& getPacket_internal(size_t nIdx);
-        const std::function<const cv::Mat&(size_t)>& m_lCallback;
+        const std::function<const cv::Mat&(size_t)> m_lCallback;
         std::thread m_hPrecacher;
         std::mutex m_oSyncMutex;
         std::condition_variable m_oReqCondVar;
@@ -236,7 +236,7 @@ namespace litiv {
                 m_nFrameCount = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
             }
             if(oTempImg.empty())
-                throw std::runtime_error(cv::format("Sequence '%s': video could not be opened via VideoReader or imread (you might need to implement your own DataProducer_ interface)",getName().c_str()));
+                lvErrorExt("Sequence '%s': video could not be opened via VideoReader or imread (you might need to implement your own DataProducer_ interface)",getName().c_str());
             m_oOrigSize = oTempImg.size();
             const double dScale = getDatasetInfo().getScaleFactor();
             if(dScale!=1.0)

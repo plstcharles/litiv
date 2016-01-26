@@ -87,7 +87,7 @@ void litiv::validateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoint>& vo
     voKPs = voNewKPs;
 }
 
-litiv::DataPrecacher::DataPrecacher(const std::function<const cv::Mat&(size_t)>& lCallback) :
+litiv::DataPrecacher::DataPrecacher(std::function<const cv::Mat&(size_t)> lCallback) :
         m_lCallback(lCallback) {
     CV_Assert(lCallback);
     m_bIsPrecaching = false;
@@ -255,8 +255,8 @@ const cv::Mat& litiv::DataPrecacher::getPacket_internal(size_t nIdx) {
 }
 
 litiv::IDataLoader_<TNoGroup>::IDataLoader_() :
-        m_oInputPrecacher(std::bind(&IDataLoader_::_getInputPacket_redirect,this,std::placeholders::_1)),
-        m_oGTPrecacher(std::bind(&IDataLoader_::_getGTPacket_redirect,this,std::placeholders::_1)) {}
+        m_oInputPrecacher(std::bind(&IDataLoader_<TNoGroup>::_getInputPacket_redirect,this,std::placeholders::_1)),
+        m_oGTPrecacher(std::bind(&IDataLoader_<TNoGroup>::_getGTPacket_redirect,this,std::placeholders::_1)) {}
 
 void litiv::IDataLoader_<TNoGroup>::startPrecaching(bool bUsingGT, size_t nSuggestedBufferSize) {
     CV_Assert(m_oInputPrecacher.startPrecaching(getTotPackets(),nSuggestedBufferSize));
