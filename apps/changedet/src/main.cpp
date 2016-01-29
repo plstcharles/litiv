@@ -603,7 +603,7 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         oCurrSequence.stopProcessing();
         const double dTimeElapsed = oCurrSequence.getProcessTime();
         const double dProcessSpeed = (double)nCurrFrameIdx/dTimeElapsed;
-        std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << nFrameCount << "/" << nFrameCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::defaultfloat << std::endl;
+        std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << nFrameCount << "/" << nFrameCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
         oCurrSequence.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
 #if DISPLAY_OUTPUT
         cv::destroyWindow(sDisplayName);
