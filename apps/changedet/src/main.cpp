@@ -166,14 +166,14 @@ const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurre
 
 int main(int, char**) {
     try {
-        litiv::IDatasetPtr pDataset = litiv::datasets::create<litiv::eDatasetType_VideoSegm,litiv::eDataset_VideoSegm_CDnet>(DATASET_PATH,DATASET_RESULTS_PATH,WRITE_IMG_OUTPUT,USE_GPU_IMPL,DATASET_SCALE_FACTOR);
+        litiv::IDatasetPtr pDataset = litiv::datasets::create<litiv::eDatasetType_VideoSegm,litiv::eDataset_VideoSegm_CDnet>(DATASET_PATH,DATASET_RESULTS_PATH,bool(WRITE_IMG_OUTPUT),bool(USE_GPU_IMPL),DATASET_SCALE_FACTOR);
         litiv::IDataHandlerPtrQueue vpBatches = pDataset->getSortedBatches();
         const size_t nTotPackets = pDataset->getTotPackets();
         const size_t nTotBatches = vpBatches.size();
         if(nTotBatches==0 || nTotPackets==0)
             lvErrorExt("Could not find any sequences/frames to process for dataset '%s'",pDataset->getDatasetName().c_str());
-        std::cout << "Parsing complete. [" << pDataset->getBatches().size() << " batch group(s), " << nTotBatches << " sequence(s)]\n" << std::endl;
-        std::cout << "[" << CxxUtils::getTimeStamp() << "]" << std::endl;
+        std::cout << "Parsing complete. [" << pDataset->getBatches().size() << " batch group(s), " << nTotBatches << " sequence(s)]" << std::endl;
+        std::cout << "\n[" << CxxUtils::getTimeStamp() << "]\n" << std::endl;
         std::cout << "Executing background subtraction with " << ((g_nMaxThreads>nTotBatches)?nTotBatches:g_nMaxThreads) << " thread(s)..." << std::endl;
         size_t nProcessedBatches = 0;
         while(!vpBatches.empty()) {
@@ -196,17 +196,16 @@ int main(int, char**) {
 #endif //!USE_GPU_IMPL
             vpBatches.pop();
         }
-        //while(g_nActiveThreads>0) // shouldnt need this if using packet count promise
-        //    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        const size_t nTotProcessedPackets = pDataset->getProcessedPacketsCountPromise();
-        std::cout << "[" << CxxUtils::getTimeStamp() << "]\n" << std::endl;
-        if(nTotProcessedPackets==nTotPackets)
+        while(g_nActiveThreads>0)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        if(pDataset->getProcessedPacketsCountPromise()==nTotPackets)
             pDataset->writeEvalReport();
     }
     catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
     catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
     catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
-    std::cout << "\nAll done." << std::endl;
+    std::cout << "\n[" << CxxUtils::getTimeStamp() << "]\n" << std::endl;
+    std::cout << "All done." << std::endl;
     return 0;
 }
 
@@ -338,7 +337,7 @@ void AnalyzeSequence_GLSL(litiv::IDataHandlerPtr pBatch) {
         glViewport(0,0,oWindowSize.width,oWindowSize.height);
         while(nNextFrameIdx<=nFrameCount) {
             if(!((nCurrFrameIdx+1)%100))
-                std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nCurrFrameIdx+1 << "/" << nFrameCount << "   [GPU]" << std::endl;
+                std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nCurrFrameIdx+1 << "/" << nFrameCount << "   [GPU]" << std::endl;
             const double dCurrLearningRate = (BOOTSTRAP_100_FIRST_FRAMES&&nCurrFrameIdx<=100)?1:dDefaultLearningRate;
             TIMER_INTERNAL_TIC(OverallLoop);
             TIMER_INTERNAL_TIC(PipelineUpdate);
@@ -424,7 +423,7 @@ void AnalyzeSequence_GLSL(litiv::IDataHandlerPtr pBatch) {
         }
         const double dTimeElapsed = TIMER_ELAPSED_MS(MainLoop)/1000;
         const double dAvgFPS = (double)nCurrFrameIdx/dTimeElapsed;
-        std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
+        std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
 #if EVALUATE_OUTPUT
         if(pCurrSequence->m_pEvaluator) {
 #if USE_GLSL_EVALUATION
@@ -543,8 +542,8 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
 #endif //(WRITE_IMG_OUTPUT || WRITE_AVI_OUTPUT)
         oCurrSequence.startProcessing();
         while(nCurrFrameIdx<nFrameCount) {
-            if(!((nCurrFrameIdx+1)%100))
-                std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nCurrFrameIdx+1 << "/" << nFrameCount << "   [T=" << nThreadIdx << "]" << std::endl;
+            if(!((nCurrFrameIdx+1)%100) && nCurrFrameIdx<nFrameCount)
+                std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nCurrFrameIdx+1 << "/" << nFrameCount << "   [T=" << nThreadIdx << "]" << std::endl;
             const double dCurrLearningRate = (BOOTSTRAP_100_FIRST_FRAMES&&nCurrFrameIdx<=100)?1:dDefaultLearningRate;
             TIMER_INTERNAL_TIC(OverallLoop);
             TIMER_INTERNAL_TIC(VideoQuery);
@@ -599,12 +598,12 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
                       << "PipelineUpdate=" << TIMER_INTERNAL_ELAPSED_MS(PipelineUpdate) << "ms,  "
                       << "OverallLoop=" << TIMER_INTERNAL_ELAPSED_MS(OverallLoop) << "ms" << std::endl;
 #endif //ENABLE_INTERNAL_TIMERS
-            ++nCurrFrameIdx;
+            oCurrSequence.pushResult(oCurrFGMask,nCurrFrameIdx++);
         }
         oCurrSequence.stopProcessing();
         const double dTimeElapsed = oCurrSequence.getProcessTime();
-        const double dAvgFPS = (double)nCurrFrameIdx/dTimeElapsed;
-        std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSeqName << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
+        const double dProcessSpeed = (double)nCurrFrameIdx/dTimeElapsed;
+        std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << nFrameCount << "/" << nFrameCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::defaultfloat << std::endl;
         oCurrSequence.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
 #if DISPLAY_OUTPUT
         cv::destroyWindow(sDisplayName);

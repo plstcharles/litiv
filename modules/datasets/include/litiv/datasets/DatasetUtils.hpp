@@ -322,7 +322,7 @@ namespace litiv {
     struct IDataRecorder_;
 
     template<>
-    struct IDataRecorder_<eDatasetType_VideoSegm> : public virtual IDataHandler { // contains group-impl only
+    struct IDataRecorder_<eDatasetType_VideoSegm> : public virtual IDataHandler {
         virtual cv::Mat readResult(size_t nIdx) const = 0;
         virtual void pushResult(const cv::Mat& oSegm, size_t nIdx) = 0;
         virtual void writeResult(const cv::Mat& oSegm, size_t nIdx) const = 0;
