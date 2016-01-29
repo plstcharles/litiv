@@ -307,7 +307,7 @@ namespace CxxUtils {
     }
 
     static inline std::string clampString(const std::string& sInput, size_t nSize, char cPadding=' ') {
-        return sInput.size()>nSize?sInput.substr(0,nSize):sInput+std::string(nSize-sInput.size(),cPadding);
+        return sInput.size()>nSize?sInput.substr(0,nSize):std::string(nSize-sInput.size(),cPadding)+sInput;
     }
 
     template<typename TSum, typename TObj>

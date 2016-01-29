@@ -122,12 +122,12 @@ void litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::writeEvalReport()
     for(const auto& pGroupIter : getBatches())
         pGroupIter->writeEvalReport();
     const ClassifMetrics& oMetrics = getMetrics(true);
-    std::cout << "Overall : Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
+    std::cout << CxxUtils::clampString(getDatasetName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
     std::ofstream oMetricsOutput(getResultsRootPath()+"/overall.txt");
     if(oMetricsOutput.is_open()) {
         oMetricsOutput << std::fixed;
         oMetricsOutput << "Video segmentation evaluation report for dataset '" << getDatasetName() << "' :\n\n";
-        oMetricsOutput << "            |Rcl         |Spc         |FPR         |FNR         |PBC         |Prc         |FM          |MCC         \n";
+        oMetricsOutput << "            |     Rcl    |     Spc    |     FPR    |     FNR    |     PBC    |     Prc    |     FM     |     MCC    \n";
         oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
         size_t nOverallPacketCount = 0;
         double dOverallTimeElapsed = 0.0;
@@ -137,17 +137,17 @@ void litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::writeEvalReport()
             dOverallTimeElapsed += pGroupIter->getProcessTime();
         }
         oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
-        oMetricsOutput << "overall     |" <<
-        std::setw(12) << oMetrics.dRecall << "|" <<
-        std::setw(12) << oMetrics.dSpecificity << "|" <<
-        std::setw(12) << oMetrics.dFPR << "|" <<
-        std::setw(12) << oMetrics.dFNR << "|" <<
-        std::setw(12) << oMetrics.dPBC << "|" <<
-        std::setw(12) << oMetrics.dPrecision << "|" <<
-        std::setw(12) << oMetrics.dFMeasure << "|" <<
-        std::setw(12) << oMetrics.dMCC << "\n";
+        oMetricsOutput << "     overall|" <<
+                          std::setw(12) << oMetrics.dRecall << "|" <<
+                          std::setw(12) << oMetrics.dSpecificity << "|" <<
+                          std::setw(12) << oMetrics.dFPR << "|" <<
+                          std::setw(12) << oMetrics.dFNR << "|" <<
+                          std::setw(12) << oMetrics.dPBC << "|" <<
+                          std::setw(12) << oMetrics.dPrecision << "|" <<
+                          std::setw(12) << oMetrics.dFMeasure << "|" <<
+                          std::setw(12) << oMetrics.dMCC << "\n";
         oMetricsOutput << "\nHz: " << nOverallPacketCount/dOverallTimeElapsed << "\n";
-        oMetricsOutput << "\n" << LITIV_VERSION_SHA1 << "\n" << CxxUtils::getTimeStamp() << std::endl;
+        oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
     }
 }
 
@@ -257,6 +257,13 @@ void litiv::IEvaluator_<eDatasetType_VideoSegm>::FetchGLEvaluationResults(std::s
 
 #endif //HAVE_GLSL
 
+// as defined in the 2012 CDNet scripts/dataset
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmPositive = 255;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmNegative = 0;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmOutOfScope = DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmUnknown = DATASETUTILS_VIDEOSEGM_UNKNOWN_VAL;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmShadow = DATASETUTILS_VIDEOSEGM_SHADOW_VAL;
+
 litiv::ClassifMetricsBase litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getMetricsBase() const {
     // @@@@ fetch gl eval result here, if needed
     return m_oMetricsBase;
@@ -272,15 +279,15 @@ std::string litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::writ
     std::stringstream ssStr;
     ssStr << std::fixed;
     const ClassifMetrics& oMetrics = getMetrics(true);
-    ssStr << std::setw(nCellSize) << (std::string(nIndentSize,'>')+getName()) << "|" <<
-    std::setw(nCellSize) << oMetrics.dRecall << "|" <<
-    std::setw(nCellSize) << oMetrics.dSpecificity << "|" <<
-    std::setw(nCellSize) << oMetrics.dFPR << "|" <<
-    std::setw(nCellSize) << oMetrics.dFNR << "|" <<
-    std::setw(nCellSize) << oMetrics.dPBC << "|" <<
-    std::setw(nCellSize) << oMetrics.dPrecision << "|" <<
-    std::setw(nCellSize) << oMetrics.dFMeasure << "|" <<
-    std::setw(nCellSize) << oMetrics.dMCC << "\n";
+    ssStr << CxxUtils::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
+             std::setw(nCellSize) << oMetrics.dRecall << "|" <<
+             std::setw(nCellSize) << oMetrics.dSpecificity << "|" <<
+             std::setw(nCellSize) << oMetrics.dFPR << "|" <<
+             std::setw(nCellSize) << oMetrics.dFNR << "|" <<
+             std::setw(nCellSize) << oMetrics.dPBC << "|" <<
+             std::setw(nCellSize) << oMetrics.dPrecision << "|" <<
+             std::setw(nCellSize) << oMetrics.dFMeasure << "|" <<
+             std::setw(nCellSize) << oMetrics.dMCC << "\n";
     return ssStr.str();
 }
 
@@ -1059,7 +1066,7 @@ void litiv::Image::Segm::BSDS500BoundaryEvaluator::WriteEvalResults(const std::s
                 dMaxFMeasure += voBatchMetrics[n].dMaxFMeasure/nBatchCount;
                 dTimeElapsed_sec += voBatchMetrics[n].dTimeElapsed_sec;
             }
-            std::cout << "\t" << std::setfill(' ') << std::setw(12) << "ALL-AVG" << " : MaxRcl=" << std::fixed << std::setprecision(4) << dMaxRecall << " MaxPrc=" << dMaxPrecision << " MaxFM=" << dMaxFMeasure << std::endl;
+            std::cout << "\t" << std::setfill(' ') << @@@@std::setw(12) << "ALL-AVG" << " : MaxRcl=" << std::fixed << std::setprecision(4) << dMaxRecall << " MaxPrc=" << dMaxPrecision << " MaxFM=" << dMaxFMeasure << std::endl;
             std::cout << "\t" << std::setfill(' ') << std::setw(12) << " " <<       " : BestRcl=" << std::fixed << std::setprecision(4) << dBestRecall << " BestPrc=" << dBestPrecision << " BestFM=" << dBestFMeasure << std::endl;
 #if USE_BSDS500_BENCHMARK
             std::ofstream oMetricsInfoOutput(sRootPath+"/reimpl_eval.txt");
@@ -1078,7 +1085,7 @@ void litiv::Image::Segm::BSDS500BoundaryEvaluator::WriteEvalResults(const std::s
                 oMetricsInfoOutput << "averaged   " << dMaxRecall << " " << dMaxPrecision << " " << dMaxFMeasure << "            " << dBestRecall << " " << dBestPrecision << " " << dBestFMeasure << std::endl;
                 oMetricsInfoOutput << std::endl;
                 oMetricsInfoOutput << "Overall FPS: " << nOverallImageCount/dTimeElapsed_sec << std::endl;
-                oMetricsInfoOutput << std::endl << std::endl << LITIV_VERSION_SHA1 << std::endl;
+                oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
             }
         }
     }
@@ -1103,8 +1110,8 @@ void litiv::Image::Segm::BSDS500BoundaryEvaluator::WriteEvalResults(const WorkBa
     std::ofstream oOverallMetricsOutput(sResultPath+"/eval_bdry.txt");
     if(oOverallMetricsOutput.is_open())
         oOverallMetricsOutput << cv::format("%10g %10g %10g %10g %10g %10g %10g %10g\n",oRes.oBestScore.dThreshold,oRes.oBestScore.dRecall,oRes.oBestScore.dPrecision,oRes.oBestScore.dFMeasure,oRes.dMaxRecall,oRes.dMaxPrecision,oRes.dMaxFMeasure,oRes.dAreaPR);
-    std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << CxxUtils::clampString(oBatch.m_sName,12) << " : MaxRcl=" << std::fixed << std::setprecision(4) << oRes.dMaxRecall << " MaxPrc=" << oRes.dMaxPrecision << " MaxFM=" << oRes.dMaxFMeasure << std::endl;
-    std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << " " <<          " : BestRcl=" << std::fixed << std::setprecision(4) << oRes.oBestScore.dRecall << " BestPrc=" << oRes.oBestScore.dPrecision << " BestFM=" << oRes.oBestScore.dFMeasure << "  (@ T=" << std::fixed << std::setprecision(4) << oRes.oBestScore.dThreshold << ")" << std::endl;
+    std::cout << "\t\t" << CxxUtils::clampString(oBatch.m_sName,12) << " : MaxRcl=" << std::fixed << std::setprecision(4) << oRes.dMaxRecall << " MaxPrc=" << oRes.dMaxPrecision << " MaxFM=" << oRes.dMaxFMeasure << std::endl;
+    std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << @@@@" " <<          " : BestRcl=" << std::fixed << std::setprecision(4) << oRes.oBestScore.dRecall << " BestPrc=" << oRes.oBestScore.dPrecision << " BestFM=" << oRes.oBestScore.dFMeasure << "  (@ T=" << std::fixed << std::setprecision(4) << oRes.oBestScore.dThreshold << ")" << std::endl;
 }
 
 litiv::Image::Segm::BSDS500BoundaryEvaluator::BSDS500Score litiv::Image::Segm::BSDS500BoundaryEvaluator::FindMaxFMeasure(const std::vector<uchar>& vnThresholds, const std::vector<double>& vdRecall, const std::vector<double>& vdPrecision) {

@@ -75,7 +75,7 @@ namespace litiv {
             if(oMetricsOutput.is_open()) {
                 oMetricsOutput << std::fixed;
                 oMetricsOutput << "Default evaluation report for dataset '" << getDatasetName() << "' :\n\n";
-                oMetricsOutput << "            |Packets     |Seconds     |Hz          \n";
+                oMetricsOutput << "            |   Packets  |   Seconds  |     Hz     \n";
                 oMetricsOutput << "------------|------------|------------|------------\n";
                 size_t nOverallPacketCount = 0;
                 double dOverallTimeElapsed = 0.0;
@@ -85,11 +85,11 @@ namespace litiv {
                     dOverallTimeElapsed += pGroupIter->getProcessTime();
                 }
                 oMetricsOutput << "------------|------------|------------|------------\n";
-                oMetricsOutput << "overall     |" <<
-                std::setw(12) << nOverallPacketCount << "|" <<
-                std::setw(12) << dOverallTimeElapsed << "|" <<
-                std::setw(12) << nOverallPacketCount/dOverallTimeElapsed << "\n";
-                oMetricsOutput << "\n" << LITIV_VERSION_SHA1 << "\n" << CxxUtils::getTimeStamp() << std::endl;
+                oMetricsOutput << "     overall|" <<
+                                  std::setw(12) << nOverallPacketCount << "|" <<
+                                  std::setw(12) << dOverallTimeElapsed << "|" <<
+                                  std::setw(12) << nOverallPacketCount/dOverallTimeElapsed << "\n";
+                oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
             }
         }
     };
@@ -155,10 +155,10 @@ namespace litiv {
             if(this->isGroup() && !this->isBare())
                 for(const auto& pBatch : this->getBatches())
                     ssStr << pBatch->writeInlineEvalReport(nIndentSize+1);
-            ssStr << std::setw(nCellSize) << (std::string('>',nIndentSize)+this->getName()) << "|" <<
-            std::setw(nCellSize) << this->getTotPackets() << "|" <<
-            std::setw(nCellSize) << this->getProcessTime() << "|" <<
-            std::setw(nCellSize) << this->getTotPackets()/this->getProcessTime() << "\n";
+            ssStr << CxxUtils::clampString((std::string(nIndentSize,'>')+' '+this->getName()),nCellSize) << "|" <<
+                     std::setw(nCellSize) << this->getTotPackets() << "|" <<
+                     std::setw(nCellSize) << this->getProcessTime() << "|" <<
+                     std::setw(nCellSize) << this->getTotPackets()/this->getProcessTime() << "\n";
             return ssStr.str();
         }
 
@@ -175,17 +175,17 @@ namespace litiv {
             if(oMetricsOutput.is_open()) {
                 oMetricsOutput << std::fixed;
                 oMetricsOutput << "Default evaluation report for '" << this->getName() << "' :\n\n";
-                oMetricsOutput << "            |Packets     |Seconds     |Hz          \n";
+                oMetricsOutput << "            |   Packets  |   Seconds  |     Hz     \n";
                 oMetricsOutput << "------------|------------|------------|------------\n";
                 oMetricsOutput << this->writeInlineEvalReport(0);
-                oMetricsOutput << "\n" << LITIV_VERSION_SHA1 << "\n" << CxxUtils::getTimeStamp() << std::endl;
+                oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
             }
         }
     };
 
     template<>
-    struct IMetricsCalculator_<eDatasetType_VideoSegm> : public virtual IDataHandler { // contains group-impl only
-        virtual ClassifMetricsBase getMetricsBase() const {
+    struct IMetricsCalculator_<eDatasetType_VideoSegm> : public virtual IDataHandler {
+        virtual ClassifMetricsBase getMetricsBase() const { // provides group-impl only
             ClassifMetricsBase oMetricsBase;
             for(const auto& pBatch : getBatches())
                 oMetricsBase += dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(*pBatch).getMetricsBase();
@@ -216,15 +216,15 @@ namespace litiv {
                 for(const auto& pBatch : getBatches())
                     ssStr << pBatch->writeInlineEvalReport(nIndentSize+1);
             const ClassifMetrics& oMetrics = getMetrics(true);
-            ssStr << std::setw(nCellSize) << (std::string(nIndentSize,'>')+getName()) << "|" <<
-            std::setw(nCellSize) << oMetrics.dRecall << "|" <<
-            std::setw(nCellSize) << oMetrics.dSpecificity << "|" <<
-            std::setw(nCellSize) << oMetrics.dFPR << "|" <<
-            std::setw(nCellSize) << oMetrics.dFNR << "|" <<
-            std::setw(nCellSize) << oMetrics.dPBC << "|" <<
-            std::setw(nCellSize) << oMetrics.dPrecision << "|" <<
-            std::setw(nCellSize) << oMetrics.dFMeasure << "|" <<
-            std::setw(nCellSize) << oMetrics.dMCC << "\n";
+            ssStr << CxxUtils::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
+                     std::setw(nCellSize) << oMetrics.dRecall << "|" <<
+                     std::setw(nCellSize) << oMetrics.dSpecificity << "|" <<
+                     std::setw(nCellSize) << oMetrics.dFPR << "|" <<
+                     std::setw(nCellSize) << oMetrics.dFNR << "|" <<
+                     std::setw(nCellSize) << oMetrics.dPBC << "|" <<
+                     std::setw(nCellSize) << oMetrics.dPrecision << "|" <<
+                     std::setw(nCellSize) << oMetrics.dFMeasure << "|" <<
+                     std::setw(nCellSize) << oMetrics.dMCC << "\n";
             return ssStr.str();
         }
 
@@ -238,16 +238,16 @@ namespace litiv {
                     pBatch->writeEvalReport();
             }
             const ClassifMetrics& oMetrics = getMetrics(true);
-            std::cout << "\t" << std::setw(12) << (std::string('>',size_t(!isGroup()))+getName()) << " : Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
+            std::cout << "\t" << CxxUtils::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
             std::ofstream oMetricsOutput(getResultsPath()+"/../"+getName()+".txt");
             if(oMetricsOutput.is_open()) {
                 oMetricsOutput << std::fixed;
                 oMetricsOutput << "Video segmentation evaluation report for '" << getName() << "' :\n\n";
-                oMetricsOutput << "            |Rcl         |Spc         |FPR         |FNR         |PBC         |Prc         |FM          |MCC         \n";
+                oMetricsOutput << "            |     Rcl    |     Spc    |     FPR    |     FNR    |     PBC    |     Prc    |     FM     |     MCC    \n";
                 oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
                 oMetricsOutput << writeInlineEvalReport(0);
                 oMetricsOutput << "\nHz: " << getTotPackets()/getProcessTime() << "\n";
-                oMetricsOutput << "\n" << LITIV_VERSION_SHA1 << "\n" << CxxUtils::getTimeStamp() << std::endl;
+                oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
             }
         }
 

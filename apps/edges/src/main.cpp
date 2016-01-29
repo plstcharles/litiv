@@ -292,7 +292,7 @@ void AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
         TIMER_TIC(MainLoop);
         while(nNextImageIdx<=nImageCount) {
             //if(!((nCurrImageIdx+1)%100))
-                std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSetName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nImageCount)) << nCurrImageIdx+1 << "/" << nImageCount << "   [GPU]" << std::endl;
+                std::cout << "\t\t" << CxxUtils::clampString(sCurrSetName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nImageCount)) << nCurrImageIdx+1 << "/" << nImageCount << "   [GPU]" << std::endl;
             TIMER_INTERNAL_TIC(OverallLoop);
             TIMER_INTERNAL_TIC(PipelineUpdate);
             pAlgo->apply_async(oNextInputImage);
@@ -368,7 +368,7 @@ void AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
         TIMER_TOC(MainLoop);
         const double dTimeElapsed = TIMER_ELAPSED_MS(MainLoop)/1000;
         const double dAvgFPS = (double)nCurrImageIdx/dTimeElapsed;
-        std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSetName << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
+        std::cout << "\t\t" << CxxUtils::clampString(sCurrSetName,12) << @@@@" @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
 #if EVALUATE_OUTPUT
         if(pCurrSet->m_pEvaluator) {
 #if USE_GLSL_EVALUATION
@@ -453,7 +453,7 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
         TIMER_TIC(MainLoop);
         while(nCurrImageIdx<nImageCount && !bExit) {
             //if(!((nCurrImageIdx+1)%100))
-                std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSetName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nImageCount)) << nCurrImageIdx+1 << "/" << nImageCount << "   [T=" << nThreadIdx << "]" << std::endl;
+                std::cout << "\t\t" << CxxUtils::clampString(sCurrSetName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nImageCount)) << nCurrImageIdx+1 << "/" << nImageCount << "   [T=" << nThreadIdx << "]" << std::endl;
             TIMER_INTERNAL_TIC(OverallLoop);
             TIMER_INTERNAL_TIC(ImageQuery);
             oCurrInputImage = pCurrSet->GetInputFromIndex(nCurrImageIdx);
@@ -507,7 +507,7 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
         TIMER_TOC(MainLoop);
         const double dTimeElapsed = TIMER_ELAPSED_MS(MainLoop)/1000;
         const double dAvgFPS = (double)nCurrImageIdx/dTimeElapsed;
-        std::cout << "\t\t" << std::setfill(' ') << std::setw(12) << sCurrSetName << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
+        std::cout << "\t\t" << CxxUtils::clampString(sCurrSetName,12) << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
 #if EVALUATE_OUTPUT
         if(pCurrSet->m_pEvaluator) {
             pCurrSet->m_pEvaluator->dTimeElapsed_sec = dTimeElapsed;
