@@ -42,14 +42,8 @@
 #define USE_CUDA_IMPL           0
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
-#define DATASET_ID              eDataset_VideoSegm_CDnet2012
-#define DATASET_TYPE            CDnet
-#ifndef DATASET_ROOT
-#define DATASET_PATH            std::string("/some/dataset/root/path/")
-#else //def(DATASET_ROOT)
-#define DATASET_PATH            std::string(DATASET_ROOT)
-#endif //def(DATASET_ROOT)
-#define DATASET_RESULTS_PATH    std::string("results_test")
+#define DATASET_ID              eDataset_VideoSegm_CDnet // comment this line to fall back to custom definition
+#define DATASET_OUTPUT_PATH     "results_test" // always relative to the dataset root path
 #define DATASET_PRECACHING      1
 #define DATASET_SCALE_FACTOR    1.0
 ////////////////////////////////
@@ -132,24 +126,32 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch);
 #else // bad config
 #error "Bad config, trying to use an unavailable impl."
 #endif // bad config
+#ifndef DATASET_ROOT
+#error "Dataset root path should have been specified in CMake."
+#endif //ndef(DATASET_ROOT)
 #ifndef DATASET_ID
-const std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> g_pDatasetInfo(new DatasetUtils::Segm::Video::DatasetInfo(
-        "@@@@", // m_sDatasetName
-        DATASET_PATH+"/@@@/", // m_sDatasetRootPath
-        DATASET_PATH+"/@@@/"+DATASET_RESULTS_PATH+"/", // m_sResultsRootPath
-        "@@@", // m_sResultNamePrefix
-        ".png", // m_sResultNameSuffix
-        {"@@@"}, // m_vsWorkBatchPaths
-        {}, // m_vsSkippedNameTokens
-        {"@@@"}, // m_vsGrayscaleNameTokens
-        USE_GPU_IMPL, // m_bForce4ByteDataAlign
-        DATASET_SCALE_FACTOR, // m_dScaleFactor
-        DatasetUtils::Segm::Video::eDataset_Custom, // m_eDatasetID
-        -1 // m_nResultIdxOffset
-));
+#define DATASET_ID eDataset_VideoSegm_Custom
+#define DATASET_PARAMS \
+    "@@@@",                                                      /* => const std::string& sDatasetName */ \
+    "@@@@",                                                      /* => const std::string& sDatasetDirName */ \
+    DATASET_OUTPUT_PATH,                                         /* => const std::string& sOutputDirName */ \
+    "segm_mask_",                                                /* => const std::string& sOutputNamePrefix */ \
+    ".png",                                                      /* => const std::string& sOutputNameSuffix */ \
+    std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsWorkBatchDirs */ \
+    std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsSkippedDirTokens */ \
+    std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsGrayscaleDirTokens */ \
+    0,                                                           /* => size_t nOutputIdxOffset */ \
+    bool(WRITE_IMG_OUTPUT),                                      /* => bool bSaveOutput */ \
+    bool(USE_GPU_IMPL),                                          /* => bool bForce4ByteDataAlign */ \
+    DATASET_SCALE_FACTOR                                         /* => double dScaleFactor */
 #else //defined(DATASET_ID)
-//const std::shared_ptr<DatasetUtils::Segm::Video::DatasetInfo> g_pDatasetInfo = DatasetUtils::Segm::Video::GetDatasetInfo(DatasetUtils::Segm::Video::DATASET_ID,DATASET_PATH,DATASET_RESULTS_PATH,USE_GPU_IMPL);
+#define DATASET_PARAMS \
+    DATASET_OUTPUT_PATH,                                         /* => const std::string& sOutputDirName */ \
+    bool(WRITE_IMG_OUTPUT),                                      /* => bool bSaveOutput */ \
+    bool(USE_GPU_IMPL),                                          /* => bool bForce4ByteDataAlign */ \
+    DATASET_SCALE_FACTOR                                         /* => double dScaleFactor */
 #endif //defined(DATASET_ID)
+using DatasetType = litiv::Dataset_<litiv::eDatasetType_VideoSegm,litiv::DATASET_ID>;
 
 // @@@@ package x/y/event/code into shared_ptr struct? check opencv 3.0 callback for mouse event?
 int g_nLatestMouseX = -1, g_nLatestMouseY = -1;
@@ -166,12 +168,12 @@ const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurre
 
 int main(int, char**) {
     try {
-        litiv::IDatasetPtr pDataset = litiv::datasets::create<litiv::eDatasetType_VideoSegm,litiv::eDataset_VideoSegm_CDnet>(DATASET_PATH,DATASET_RESULTS_PATH,bool(WRITE_IMG_OUTPUT),bool(USE_GPU_IMPL),DATASET_SCALE_FACTOR);
+        litiv::IDatasetPtr pDataset = litiv::datasets::create<litiv::eDatasetType_VideoSegm,litiv::DATASET_ID>(DATASET_PARAMS);
         litiv::IDataHandlerPtrQueue vpBatches = pDataset->getSortedBatches();
         const size_t nTotPackets = pDataset->getTotPackets();
         const size_t nTotBatches = vpBatches.size();
         if(nTotBatches==0 || nTotPackets==0)
-            lvErrorExt("Could not find any sequences/frames to process for dataset '%s'",pDataset->getDatasetName().c_str());
+            lvErrorExt("Could not find any sequences/frames to process for dataset '%s'",pDataset->getName().c_str());
         std::cout << "Parsing complete. [" << pDataset->getBatches().size() << " batch group(s), " << nTotBatches << " sequence(s)]" << std::endl;
         std::cout << "\n[" << CxxUtils::getTimeStamp() << "]\n" << std::endl;
         std::cout << "Executing background subtraction with " << ((g_nMaxThreads>nTotBatches)?nTotBatches:g_nMaxThreads) << " thread(s)..." << std::endl;
@@ -473,7 +475,7 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
     //srand((unsigned int)time(NULL));
     size_t nCurrFrameIdx = 0;
     try {
-        litiv::datasets::DATASET_TYPE::WorkBatch& oCurrSequence = dynamic_cast<litiv::datasets::DATASET_TYPE::WorkBatch&>(*pBatch);
+        DatasetType::WorkBatch& oCurrSequence = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
         CV_Assert(oCurrSequence.getFrameCount()>1);
         const std::string sCurrSeqName = CxxUtils::clampString(oCurrSequence.getName(),12);
         const size_t nFrameCount = oCurrSequence.getFrameCount();
@@ -586,11 +588,8 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
 #if WRITE_AVI_OUTPUT
             oSegmWriter.write(oCurrFGMask);
 #endif //WRITE_AVI_OUTPUT
-#if WRITE_IMG_OUTPUT
-                oCurrSequence.writeResult(oCurrFGMask,nCurrFrameIdx);
-#endif //WRITE_IMG_OUTPUT
 #if EVALUATE_OUTPUT
-            oCurrSequence.pushResult(oCurrFGMask,nCurrFrameIdx);
+            oCurrSequence.pushSegmMask(oCurrFGMask,nCurrFrameIdx);
 #endif //EVALUATE_OUTPUT
             TIMER_INTERNAL_TOC(OverallLoop);
 #if DISPLAY_TIMERS
@@ -598,7 +597,7 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
                       << "PipelineUpdate=" << TIMER_INTERNAL_ELAPSED_MS(PipelineUpdate) << "ms,  "
                       << "OverallLoop=" << TIMER_INTERNAL_ELAPSED_MS(OverallLoop) << "ms" << std::endl;
 #endif //ENABLE_INTERNAL_TIMERS
-            oCurrSequence.pushResult(oCurrFGMask,nCurrFrameIdx++);
+            ++nCurrFrameIdx;
         }
         oCurrSequence.stopProcessing();
         const double dTimeElapsed = oCurrSequence.getProcessTime();

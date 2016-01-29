@@ -50,9 +50,9 @@ namespace litiv {
         eDataset_VideoSegm_Custom,
 
         //// VIDEO REGISTRATION
-        eDataset_VideoReg_LITIV2012b,
-        //eDataset_VideoReg_...
-        eDataset_VideoReg_Custom,
+        eDataset_VideoRegistr_LITIV2012b,
+        //eDataset_VideoRegistr_...
+        eDataset_VideoRegistr_Custom,
 
         //// IMAGE SEGMENTATION
         eDataset_ImageSegm_BSDS500,
@@ -66,6 +66,14 @@ namespace litiv {
 
     };
 
+    constexpr eDatasetList getCustomDatasetEnum(eDatasetTypeList eDatasetType) {
+        return (eDatasetType==eDatasetType_VideoSegm)?eDataset_VideoSegm_Custom:
+               (eDatasetType==eDatasetType_VideoRegistr)?eDataset_VideoRegistr_Custom:
+               (eDatasetType==eDatasetType_ImageSegm)?eDataset_ImageSegm_Custom:
+               (eDatasetType==eDatasetType_ImageEdgDet)?eDataset_ImageEdgDet_Custom:
+               throw -1; // undefined behavior
+    }
+
     struct IDataset;
     struct IDataHandler;
     using IDatasetPtr = std::shared_ptr<IDataset>;
@@ -76,17 +84,17 @@ namespace litiv {
     using IDataHandlerPtrQueue = std::priority_queue<IDataHandlerPtr,IDataHandlerPtrArray,std::function<bool(const IDataHandlerPtr&,const IDataHandlerPtr&)>>;
 
     struct IDataset : std::enable_shared_from_this<IDataset> {
-        virtual const std::string& getDatasetName() const = 0;
-        virtual const std::string& getDatasetRootPath() const = 0;
-        virtual const std::string& getResultsRootPath() const = 0;
-        virtual const std::string& getResultsNamePrefix() const = 0;
-        virtual const std::string& getResultsNameSuffix() const = 0;
-        virtual const std::vector<std::string>& getWorkBatchPaths() const = 0;
-        virtual const std::vector<std::string>& getSkippedNameTokens() const = 0;
-        virtual const std::vector<std::string>& getGrayscaleNameTokens() const = 0;
+        virtual const std::string& getName() const = 0;
+        virtual const std::string& getDatasetPath() const = 0;
+        virtual const std::string& getOutputPath() const = 0;
+        virtual const std::string& getOutputNamePrefix() const = 0;
+        virtual const std::string& getOutputNameSuffix() const = 0;
+        virtual const std::vector<std::string>& getWorkBatchDirs() const = 0;
+        virtual const std::vector<std::string>& getSkippedDirTokens() const = 0;
+        virtual const std::vector<std::string>& getGrayscaleDirTokens() const = 0;
         virtual size_t getOutputIdxOffset() const = 0;
         virtual double getScaleFactor() const = 0;
-        virtual bool isSavingResults() const = 0;
+        virtual bool isSavingOutput() const = 0;
         virtual bool is4ByteAligned() const = 0;
         virtual ~IDataset() = default;
 
@@ -104,8 +112,8 @@ namespace litiv {
 
     struct IDataHandler : std::enable_shared_from_this<IDataHandler> {
         virtual const std::string& getName() const = 0;
-        virtual const std::string& getPath() const = 0;
-        virtual const std::string& getResultsPath() const = 0;
+        virtual const std::string& getDataPath() const = 0;
+        virtual const std::string& getOutputPath() const = 0;
         virtual const std::string& getRelativePath() const = 0;
         virtual double getExpectedLoad() const = 0;
         virtual size_t getTotPackets() const = 0;
@@ -118,7 +126,7 @@ namespace litiv {
         virtual eDatasetList getDataset() const = 0;
         virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize=12) const = 0;
         virtual void writeEvalReport() const = 0;
-        virtual void parseDataset() = 0;
+        virtual void parseData() = 0;
         virtual ~IDataHandler() = default;
 
         virtual void startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX) = 0; // starts prefetching data packets
@@ -229,11 +237,11 @@ namespace litiv {
         virtual const cv::Mat& getInputFrame(size_t nFrameIdx) override final {return m_oInputPrecacher.getPacket(nFrameIdx);}
         virtual const cv::Mat& getGTFrame(size_t nFrameIdx) override final {return m_oGTPrecacher.getPacket(nFrameIdx);}
 
-        virtual void parseDataset() override {
+        virtual void parseData() override {
             cv::Mat oTempImg;
-            m_voVideoReader.open(getPath());
+            m_voVideoReader.open(getDataPath());
             if(!m_voVideoReader.isOpened()) {
-                PlatformUtils::GetFilesFromDir(getPath(),m_vsInputFramePaths);
+                PlatformUtils::GetFilesFromDir(getDataPath(),m_vsInputFramePaths);
                 if(!m_vsInputFramePaths.empty()) {
                     oTempImg = cv::imread(m_vsInputFramePaths[0]);
                     m_nFrameCount = m_vsInputFramePaths.size();
@@ -321,23 +329,26 @@ namespace litiv {
     template<eDatasetTypeList eDatasetType>
     struct IDataRecorder_;
 
-    template<>
-    struct IDataRecorder_<eDatasetType_VideoSegm> : public virtual IDataHandler {
-        virtual cv::Mat readResult(size_t nIdx) const = 0;
-        virtual void pushResult(const cv::Mat& oSegm, size_t nIdx) = 0;
-        virtual void writeResult(const cv::Mat& oSegm, size_t nIdx) const = 0;
-    };
-
     template<eDatasetTypeList eDatasetType, bool bGroup>
     struct IDataConsumer_;
+
+    template<>
+    struct IDataRecorder_<eDatasetType_VideoSegm> : public virtual IDataHandler {
+        virtual void pushSegmMask(const cv::Mat& oSegm, size_t nIdx) = 0;
+    protected:
+        virtual cv::Mat readSegmMask(size_t nIdx) const = 0; // used for output reevaluation only
+        virtual void writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const = 0;
+        friend struct IDataConsumer_<eDatasetType_VideoSegm,TGroup>;
+    };
 
     template<>
     struct IDataConsumer_<eDatasetType_VideoSegm,TGroup> :
             public IDataCounter_<TGroup>,
             public IDataRecorder_<eDatasetType_VideoSegm> {
-        virtual cv::Mat readResult(size_t nIdx) const override final {return dynamic_cast<const IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).readResult(nIdx);}
-        virtual void pushResult(const cv::Mat& oSegm, size_t nIdx) override final {dynamic_cast<IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).pushResult(oSegm,nIdx);}
-        virtual void writeResult(const cv::Mat& oSegm, size_t nIdx) const override final {dynamic_cast<const IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).writeResult(oSegm,nIdx);}
+        virtual void pushSegmMask(const cv::Mat& oSegm, size_t nIdx) override final {dynamic_cast<IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).pushSegmMask(oSegm,nIdx);}
+    protected:
+        virtual cv::Mat readSegmMask(size_t nIdx) const override final {return dynamic_cast<const IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).readSegmMask(nIdx);}
+        virtual void writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const override final {dynamic_cast<const IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).writeSegmMask(oSegm,nIdx);}
     };
 
     template<>
@@ -345,29 +356,32 @@ namespace litiv {
             public IDataCounter_<TNoGroup>,
             public IDataRecorder_<eDatasetType_VideoSegm> {
 
-        virtual cv::Mat readResult(size_t nIdx) const override {
-            CV_Assert(!getDatasetInfo()->getResultsNameSuffix().empty());
-            std::array<char,10> acBuffer;
-            snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
-            std::stringstream sResultFilePath;
-            sResultFilePath << getResultsPath() << getDatasetInfo()->getResultsNamePrefix() << acBuffer.data() << getDatasetInfo()->getResultsNameSuffix();
-            return cv::imread(sResultFilePath.str(),isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
-        }
-
-        void pushResult(const cv::Mat& oSegm, size_t nIdx) override {
+        void pushSegmMask(const cv::Mat& oSegm, size_t nIdx) override {
             processPacket();
-            if(getDatasetInfo()->isSavingResults())
-                writeResult(oSegm,nIdx);
+            if(getDatasetInfo()->isSavingOutput())
+                writeSegmMask(oSegm,nIdx);
+            // @@@@@ allow isEvaluatingOutput to decide whether to stop processing here or do evaluation (but in Evaluator)
         }
 
-        virtual void writeResult(const cv::Mat& oSegm, size_t nIdx) const override {
-            CV_Assert(!getDatasetInfo()->getResultsNameSuffix().empty());
+    protected:
+
+        virtual cv::Mat readSegmMask(size_t nIdx) const override {
+            CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
             std::array<char,10> acBuffer;
             snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
-            std::stringstream sResultFilePath;
-            sResultFilePath << getResultsPath() << getDatasetInfo()->getResultsNamePrefix() << acBuffer.data() << getDatasetInfo()->getResultsNameSuffix();
+            std::stringstream sOutputFilePath;
+            sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << acBuffer.data() << getDatasetInfo()->getOutputNameSuffix();
+            return cv::imread(sOutputFilePath.str(),isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+        }
+
+        virtual void writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const override {
+            CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
+            std::array<char,10> acBuffer;
+            snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
+            std::stringstream sOutputFilePath;
+            sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << acBuffer.data() << getDatasetInfo()->getOutputNameSuffix();
             const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
-            cv::imwrite(sResultFilePath.str(),oSegm,vnComprParams);
+            cv::imwrite(sOutputFilePath.str(),oSegm,vnComprParams);
         }
     };
 
