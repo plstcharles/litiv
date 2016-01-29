@@ -259,11 +259,14 @@ namespace litiv {
             public IDataConsumer_<eDatasetType,bGroup> {};
 
     template<>
-    struct IDataEvaluator_<eDatasetType_VideoSegm,TNoGroup> : public IDataConsumer_<eDatasetType_VideoSegm,TNoGroup> {
-        virtual ClassifMetricsBase getMetricsBase() const;
-        virtual ClassifMetrics getMetrics(bool bAverage) const;
+    struct IDataEvaluator_<eDatasetType_VideoSegm,TNoGroup> :
+            public IMetricsCalculator_<eDatasetType_VideoSegm>,
+            public IDataConsumer_<eDatasetType_VideoSegm,TNoGroup> {
+        virtual ClassifMetricsBase getMetricsBase() const override;
+        virtual ClassifMetrics getMetrics(bool bAverage) const override;
         virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize=12) const override;
         virtual void writeEvalReport() const override;
+        virtual void pushResult(const cv::Mat& oSegm,size_t nIdx) override;
         virtual cv::Mat getColoredSegmMaskFromResult(const cv::Mat& oSegm, size_t nIdx);
 
 #if HAVE_GLSL
@@ -280,7 +283,6 @@ namespace litiv {
         static const uchar s_nSegmShadow;
 
     protected:
-        virtual void _pushResult(const cv::Mat& oSegm, size_t nIdx) override;
         ClassifMetricsBase m_oMetricsBase;
     };
 
