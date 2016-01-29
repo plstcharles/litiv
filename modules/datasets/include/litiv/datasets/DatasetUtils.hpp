@@ -356,7 +356,6 @@ namespace litiv {
 
         void pushResult(const cv::Mat& oSegm, size_t nIdx) override {
             processPacket();
-            _pushResult(oSegm,nIdx);
             if(getDatasetInfo()->isSavingResults())
                 writeResult(oSegm,nIdx);
         }
@@ -370,9 +369,6 @@ namespace litiv {
             const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
             cv::imwrite(sResultFilePath.str(),oSegm,vnComprParams);
         }
-
-    protected:
-        virtual void _pushResult(const cv::Mat& /*oSegm*/, size_t /*nIdx*/) {} // should be overriden in child classes for each dataset
     };
 
 #if 0

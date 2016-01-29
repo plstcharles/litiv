@@ -297,25 +297,55 @@ void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::writeEvalRe
         return;
     }
     const ClassifMetrics& oMetrics = getMetrics(true);
-    std::cout << "\t" << std::setw(12) << (std::string('>',size_t(!isGroup()))+getName()) << " : Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
+    std::cout << "\t\t" << CxxUtils::clampString(getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
     std::ofstream oMetricsOutput(getResultsPath()+"/../"+getName()+".txt");
     if(oMetricsOutput.is_open()) {
         oMetricsOutput << std::fixed;
         oMetricsOutput << "Video segmentation evaluation report for '" << getName() << "' :\n\n";
-        oMetricsOutput << "            |Rcl         |Spc         |FPR         |FNR         |PBC         |Prc         |FM          |MCC         \n";
+        oMetricsOutput << "            |     Rcl    |     Spc    |     FPR    |     FNR    |     PBC    |     Prc    |     FM     |     MCC    \n";
         oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
         oMetricsOutput << writeInlineEvalReport(0);
         oMetricsOutput << "\nHz: " << getTotPackets()/getProcessTime() << "\n";
-        oMetricsOutput << "\n" << LITIV_VERSION_SHA1 << "\n" << CxxUtils::getTimeStamp() << std::endl;
+        oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
     }
 }
 
-// as defined in the 2012 CDNet scripts/dataset
-const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmPositive = 255;
-const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmNegative = 0;
-const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmOutOfScope = DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL;
-const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmUnknown = DATASETUTILS_VIDEOSEGM_UNKNOWN_VAL;
-const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmShadow = DATASETUTILS_VIDEOSEGM_SHADOW_VAL;
+void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::pushResult(const cv::Mat& oSegm,size_t nIdx) {
+    IDataConsumer_<eDatasetType_VideoSegm,TNoGroup>::pushResult(oSegm,nIdx);
+    auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
+    CV_Assert(pProducer);
+    const cv::Mat& oGTSegm = pProducer->getGTFrame(nIdx);
+    const cv::Mat& oROI = pProducer->getROI();
+    CV_Assert(oSegm.type()==CV_8UC1 && oGTSegm.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
+    CV_Assert(oSegm.size()==oGTSegm.size() && (oROI.empty() || oSegm.size()==oROI.size()));
+    const size_t step_row = oSegm.step.p[0];
+    for(size_t i=0; i<(size_t)oSegm.rows; ++i) {
+        const size_t idx_nstep = step_row*i;
+        const uchar* input_step_ptr = oSegm.data+idx_nstep;
+        const uchar* gt_step_ptr = oGTSegm.data+idx_nstep;
+        const uchar* roi_step_ptr = oROI.data+idx_nstep;
+        for(int j=0; j<oSegm.cols; ++j) {
+            if(gt_step_ptr[j]!=s_nSegmOutOfScope && gt_step_ptr[j]!=s_nSegmUnknown && (oROI.empty() || roi_step_ptr[j]!=s_nSegmNegative)) {
+                if(input_step_ptr[j]==s_nSegmPositive) {
+                    if(gt_step_ptr[j]==s_nSegmPositive)
+                        ++m_oMetricsBase.nTP;
+                    else // gt_step_ptr[j]==s_nSegmNegative
+                        ++m_oMetricsBase.nFP;
+                }
+                else { // input_step_ptr[j]==s_nSegmNegative
+                    if(gt_step_ptr[j]==s_nSegmPositive)
+                        ++m_oMetricsBase.nFN;
+                    else // gt_step_ptr[j]==s_nSegmNegative
+                        ++m_oMetricsBase.nTN;
+                }
+                if(gt_step_ptr[j]==s_nSegmShadow) {
+                    if(input_step_ptr[j]==s_nSegmPositive)
+                        ++m_oMetricsBase.nSE;
+                }
+            }
+        }
+    }
+}
 
 cv::Mat litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getColoredSegmMaskFromResult(const cv::Mat& oSegm, size_t nIdx) {
     auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
@@ -368,41 +398,6 @@ cv::Mat litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getColor
     return oResult;
 }
 
-void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::_pushResult(const cv::Mat& oSegm, size_t nIdx) {
-    auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
-    CV_Assert(pProducer);
-    const cv::Mat& oGTSegm = pProducer->getGTFrame(nIdx);
-    const cv::Mat& oROI = pProducer->getROI();
-    CV_Assert(oSegm.type()==CV_8UC1 && oGTSegm.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
-    CV_Assert(oSegm.size()==oGTSegm.size() && (oROI.empty() || oSegm.size()==oROI.size()));
-    const size_t step_row = oSegm.step.p[0];
-    for(size_t i=0; i<(size_t)oSegm.rows; ++i) {
-        const size_t idx_nstep = step_row*i;
-        const uchar* input_step_ptr = oSegm.data+idx_nstep;
-        const uchar* gt_step_ptr = oGTSegm.data+idx_nstep;
-        const uchar* roi_step_ptr = oROI.data+idx_nstep;
-        for(int j=0; j<oSegm.cols; ++j) {
-            if(gt_step_ptr[j]!=s_nSegmOutOfScope && gt_step_ptr[j]!=s_nSegmUnknown && (oROI.empty() || roi_step_ptr[j]!=s_nSegmNegative) ) {
-                if(input_step_ptr[j]==s_nSegmPositive) {
-                    if(gt_step_ptr[j]==s_nSegmPositive)
-                        ++m_oMetricsBase.nTP;
-                    else // gt_step_ptr[j]==s_nSegmNegative
-                        ++m_oMetricsBase.nFP;
-                }
-                else { // input_step_ptr[j]==s_nSegmNegative
-                    if(gt_step_ptr[j]==s_nSegmPositive)
-                        ++m_oMetricsBase.nFN;
-                    else // gt_step_ptr[j]==s_nSegmNegative
-                        ++m_oMetricsBase.nTN;
-                }
-                if(gt_step_ptr[j]==s_nSegmShadow) {
-                    if(input_step_ptr[j]==s_nSegmPositive)
-                        ++m_oMetricsBase.nSE;
-                }
-            }
-        }
-    }
-}
 
 
 
