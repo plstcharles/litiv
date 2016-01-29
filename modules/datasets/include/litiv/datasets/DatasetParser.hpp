@@ -151,7 +151,7 @@ namespace litiv {
                     m_bIsProcessing = false;
                     _stopProcessing();
                     stopPrecaching();
-                    setProcessedPacketsPromise();
+                    this->setProcessedPacketsPromise();
                 }
             }
             template<typename ...Targs>
