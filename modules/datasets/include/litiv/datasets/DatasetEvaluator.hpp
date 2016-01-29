@@ -64,17 +64,17 @@ namespace litiv {
     template<eDatasetTypeList eDatasetType>
     struct IDatasetEvaluator_ : public IDataset {
         virtual void writeEvalReport() const override {
-            std::cout << "Writing evaluation report for dataset '" << getDatasetName() << "'..." << std::endl;
+            std::cout << "Writing evaluation report for dataset '" << getName() << "'..." << std::endl;
             if(getBatches().empty()) {
-                std::cout << "\tNo report to write for dataset '" << getDatasetName() << "', skipping." << std::endl;
+                std::cout << "\tNo report to write for dataset '" << getName() << "', skipping." << std::endl;
                 return;
             }
             for(const auto& pGroupIter : getBatches())
                 pGroupIter->writeEvalReport();
-            std::ofstream oMetricsOutput(getResultsRootPath()+"/overall.txt");
+            std::ofstream oMetricsOutput(getOutputPath()+"/overall.txt");
             if(oMetricsOutput.is_open()) {
                 oMetricsOutput << std::fixed;
-                oMetricsOutput << "Default evaluation report for dataset '" << getDatasetName() << "' :\n\n";
+                oMetricsOutput << "Default evaluation report for dataset '" << getName() << "' :\n\n";
                 oMetricsOutput << "            |   Packets  |   Seconds  |     Hz     \n";
                 oMetricsOutput << "------------|------------|------------|------------\n";
                 size_t nOverallPacketCount = 0;
@@ -171,7 +171,7 @@ namespace litiv {
                 for(const auto& pBatch : this->getBatches())
                     pBatch->writeEvalReport();
             }
-            std::ofstream oMetricsOutput(this->getResultsPath()+"/../"+this->getName()+".txt");
+            std::ofstream oMetricsOutput(this->getOutputPath()+"/../"+this->getName()+".txt");
             if(oMetricsOutput.is_open()) {
                 oMetricsOutput << std::fixed;
                 oMetricsOutput << "Default evaluation report for '" << this->getName() << "' :\n\n";
@@ -239,7 +239,7 @@ namespace litiv {
             }
             const ClassifMetrics& oMetrics = getMetrics(true);
             std::cout << "\t" << CxxUtils::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
-            std::ofstream oMetricsOutput(getResultsPath()+"/../"+getName()+".txt");
+            std::ofstream oMetricsOutput(getOutputPath()+"/../"+getName()+".txt");
             if(oMetricsOutput.is_open()) {
                 oMetricsOutput << std::fixed;
                 oMetricsOutput << "Video segmentation evaluation report for '" << getName() << "' :\n\n";
@@ -266,14 +266,14 @@ namespace litiv {
         virtual ClassifMetrics getMetrics(bool bAverage) const override;
         virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize=12) const override;
         virtual void writeEvalReport() const override;
-        virtual void pushResult(const cv::Mat& oSegm,size_t nIdx) override;
-        virtual cv::Mat getColoredSegmMaskFromResult(const cv::Mat& oSegm, size_t nIdx);
+        virtual void pushSegmMask(const cv::Mat& oSegm,size_t nIdx) override;
+        virtual cv::Mat getColoredSegmMask(const cv::Mat& oSegm, size_t nIdx);
 
 #if HAVE_GLSL
         //virtual std::shared_ptr<GLEvaluator> CreateGLEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) const {
         //    return std::shared_ptr<GLEvaluator>(new GLEvaluator(pParent,nTotFrameCount));
         //}
-        //virtual void FetchGLEvaluationResults(std::shared_ptr<IGLEvaluator_<eDatasetType_VideoSegm>> pGLEvaluator);
+        //virtual void FetchGLEvaluation(std::shared_ptr<IGLEvaluator_<eDatasetType_VideoSegm>> pGLEvaluator);
 #endif //HAVE_GLSL
 
         static const uchar s_nSegmPositive;
@@ -297,8 +297,8 @@ namespace litiv {
 
             struct BSDS500BoundaryEvaluator : public IEvaluator {
                 BSDS500BoundaryEvaluator(size_t nThresholdBins=DEFAULT_BSDS500_EDGE_EVAL_THRESHOLD_BINS);
-                virtual cv::Mat GetColoredSegmMaskFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& /*oUnused*/) const;
-                virtual void AccumulateMetricsFromResult(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& /*oUnused*/);
+                virtual cv::Mat getColoredSegmMask(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& /*oUnused*/) const;
+                virtual void accumulateMetrics(const cv::Mat& oSegmMask, const cv::Mat& oGTSegmMask, const cv::Mat& /*oUnused*/);
                 static const double s_dMaxImageDiagRatioDist;
                 struct BSDS500ClassifMetricsBase { // basic eval metrics for a single image
                     BSDS500ClassifMetricsBase(size_t nThresholdsBins); // always skips zero threshold
@@ -329,8 +329,8 @@ namespace litiv {
                     double dAreaPR;
                 };
                 static void CalcMetrics(const WorkBatch& oBatch, BSDS500Metrics& oRes);
-                static void WriteEvalResults(const DatasetInfoBase& oInfo, const std::vector<std::shared_ptr<WorkGroup>>& vpGroups);
-                static void WriteEvalResults(const WorkBatch& oBatch, BSDS500Metrics& oRes);
+                static void writeEvalReport(const DatasetInfoBase& oInfo, const std::vector<std::shared_ptr<WorkGroup>>& vpGroups);
+                static void writeEvalReport(const WorkBatch& oBatch, BSDS500Metrics& oRes);
                 static BSDS500Score FindMaxFMeasure(const std::vector<uchar>& vnThresholds, const std::vector<double>& vdRecall, const std::vector<double>& vdPrecision);
                 static BSDS500Score FindMaxFMeasure(const std::vector<BSDS500Score>& voScores);
                 friend struct DatasetInfo;

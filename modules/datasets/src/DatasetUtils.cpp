@@ -292,11 +292,11 @@ const cv::Mat& litiv::IDataLoader_<TNoGroup>::_getGTPacket_redirect(size_t nIdx)
 
 #if 0
 
-litiv::Video::Segm::DatasetInfo::DatasetInfo() : DatasetInfoBase(), m_eDatasetID(eDataset_Custom), m_nResultIdxOffset(0) {}
+litiv::Video::Segm::DatasetInfo::DatasetInfo() : DatasetInfoBase(), m_eDatasetID(eDataset_Custom), m_nOutputIdxOffset(0) {}
 
 litiv::Video::Segm::DatasetInfo::DatasetInfo(const std::string& sDatasetName, const std::string& sDatasetRootPath, const std::string& sResultsRootPath,
-                                                    const std::string& sResultNamePrefix, const std::string& sResultNameSuffix, const std::vector<std::string>& vsWorkBatchPaths,
-                                                    const std::vector<std::string>& vsSkippedNameTokens, const std::vector<std::string>& vsGrayscaleNameTokens,
+                                             const std::string& sResultNamePrefix, const std::string& sResultNameSuffix, const std::vector<std::string>& vsWorkBatchPaths,
+                                             const std::vector<std::string>& vsSkippedNameTokens, const std::vector<std::string>& vsGrayscaleNameTokens,
                                                     bool bForce4ByteDataAlign, double dScaleFactor, eDatasetList eDatasetID, size_t nResultIdxOffset) :
         DatasetInfoBase(sDatasetName,sDatasetRootPath,sResultsRootPath,sResultNamePrefix,sResultNameSuffix,vsWorkBatchPaths,vsSkippedNameTokens,vsGrayscaleNameTokens,bForce4ByteDataAlign,dScaleFactor),
         m_eDatasetID(eDatasetID),

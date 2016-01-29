@@ -116,17 +116,17 @@ litiv::ClassifMetrics litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::
 
 void litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::writeEvalReport() const {
     if(getBatches().empty()) {
-        std::cout << "No report to write for dataset '" << getDatasetName() << "', skipping." << std::endl;
+        std::cout << "No report to write for dataset '" << getName() << "', skipping." << std::endl;
         return;
     }
     for(const auto& pGroupIter : getBatches())
         pGroupIter->writeEvalReport();
     const ClassifMetrics& oMetrics = getMetrics(true);
-    std::cout << CxxUtils::clampString(getDatasetName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
-    std::ofstream oMetricsOutput(getResultsRootPath()+"/overall.txt");
+    std::cout << CxxUtils::clampString(getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
+    std::ofstream oMetricsOutput(getOutputPath()+"/overall.txt");
     if(oMetricsOutput.is_open()) {
         oMetricsOutput << std::fixed;
-        oMetricsOutput << "Video segmentation evaluation report for dataset '" << getDatasetName() << "' :\n\n";
+        oMetricsOutput << "Video segmentation evaluation report for dataset '" << getName() << "' :\n\n";
         oMetricsOutput << "            |     Rcl    |     Spc    |     FPR    |     FNR    |     PBC    |     Prc    |     FM     |     MCC    \n";
         oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
         size_t nOverallPacketCount = 0;
@@ -251,7 +251,7 @@ ClassifMetricsBase litiv::IGLEvaluator_<eDatasetType_VideoSegm>::getCumulativeMe
 }
 
 //template<>
-void litiv::IEvaluator_<eDatasetType_VideoSegm>::FetchGLEvaluationResults(std::shared_ptr<IGLEvaluator_<eDatasetType_VideoSegm>> pGLEvaluator) {
+void litiv::IEvaluator_<eDatasetType_VideoSegm>::FetchGLEvaluation(std::shared_ptr<IGLEvaluator_<eDatasetType_VideoSegm>> pGLEvaluator) {
     m_oMetricsBase = pGLEvaluator->getCumulativeMetrics();
 }
 
@@ -265,7 +265,7 @@ const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nS
 const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmShadow = DATASETUTILS_VIDEOSEGM_SHADOW_VAL;
 
 litiv::ClassifMetricsBase litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getMetricsBase() const {
-    // @@@@ fetch gl eval result here, if needed
+    // @@@@ fetch gl eval output here, if needed
     return m_oMetricsBase;
 }
 
@@ -298,7 +298,7 @@ void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::writeEvalRe
     }
     const ClassifMetrics& oMetrics = getMetrics(true);
     std::cout << "\t\t" << CxxUtils::clampString(getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
-    std::ofstream oMetricsOutput(getResultsPath()+"/../"+getName()+".txt");
+    std::ofstream oMetricsOutput(getOutputPath()+"/../"+getName()+".txt");
     if(oMetricsOutput.is_open()) {
         oMetricsOutput << std::fixed;
         oMetricsOutput << "Video segmentation evaluation report for '" << getName() << "' :\n\n";
@@ -310,8 +310,8 @@ void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::writeEvalRe
     }
 }
 
-void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::pushResult(const cv::Mat& oSegm,size_t nIdx) {
-    IDataConsumer_<eDatasetType_VideoSegm,TNoGroup>::pushResult(oSegm,nIdx);
+void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::pushSegmMask(const cv::Mat& oSegm,size_t nIdx) {
+    IDataConsumer_<eDatasetType_VideoSegm,TNoGroup>::pushSegmMask(oSegm,nIdx);
     auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
     CV_Assert(pProducer);
     const cv::Mat& oGTSegm = pProducer->getGTFrame(nIdx);
@@ -347,7 +347,7 @@ void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::pushResult(
     }
 }
 
-cv::Mat litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getColoredSegmMaskFromResult(const cv::Mat& oSegm, size_t nIdx) {
+cv::Mat litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getColoredSegmMask(const cv::Mat& oSegm, size_t nIdx) {
     auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
     CV_Assert(pProducer);
     const cv::Mat& oGTSegm = pProducer->getGTFrame(nIdx);
@@ -550,7 +550,7 @@ const double litiv::Image::Segm::BSDS500BoundaryEvaluator::s_dMaxImageDiagRatioD
 
 litiv::Image::Segm::BSDS500BoundaryEvaluator::BSDS500BoundaryEvaluator(size_t nThresholdBins) : m_nThresholdBins(nThresholdBins) {CV_Assert(m_nThresholdBins>0 && m_nThresholdBins<=UCHAR_MAX);}
 
-cv::Mat litiv::Image::Segm::BSDS500BoundaryEvaluator::GetColoredSegmMaskFromResult(const cv::Mat& oSegm, const cv::Mat& oGTSegm, const cv::Mat& /*oUnused*/) const {
+cv::Mat litiv::Image::Segm::BSDS500BoundaryEvaluator::getColoredSegmMask(const cv::Mat& oSegm, const cv::Mat& oGTSegm, const cv::Mat& /*oUnused*/) const {
     CV_Assert(oSegm.type()==CV_8UC1 && oGTSegm.type()==CV_8UC1);
     CV_Assert(oSegm.cols==oGTSegm.cols && (oGTSegm.rows%oSegm.rows)==0 && (oGTSegm.rows/oSegm.rows)>=1);
     CV_Assert(oSegm.step.p[0]==oGTSegm.step.p[0]);
@@ -581,7 +581,7 @@ cv::Mat litiv::Image::Segm::BSDS500BoundaryEvaluator::GetColoredSegmMaskFromResu
     return oResult;
 }
 
-void litiv::Image::Segm::BSDS500BoundaryEvaluator::AccumulateMetricsFromResult(const cv::Mat& oSegm, const cv::Mat& oGTSegm, const cv::Mat& /*oUnused*/) {
+void litiv::Image::Segm::BSDS500BoundaryEvaluator::accumulateMetrics(const cv::Mat& oSegm, const cv::Mat& oGTSegm, const cv::Mat& /*oUnused*/) {
     CV_Assert(oSegm.type()==CV_8UC1 && oGTSegm.type()==CV_8UC1);
     CV_Assert(oSegm.isContinuous() && oGTSegm.isContinuous());
     CV_Assert(oSegm.cols==oGTSegm.cols && (oGTSegm.rows%oSegm.rows)==0 && (oGTSegm.rows/oSegm.rows)>=1);
@@ -1034,7 +1034,7 @@ void litiv::Image::Segm::BSDS500BoundaryEvaluator::CalcMetrics(const WorkBatch& 
     // ^^^ oCumulScore,dMaxRecall,dMaxPrecision,dMaxFMeasure,dAreaPR => eval_bdry.txt
 }
 
-void litiv::Image::Segm::BSDS500BoundaryEvaluator::WriteEvalResults(const std::string& sRootPath, const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) {
+void litiv::Image::Segm::BSDS500BoundaryEvaluator::writeEvalReport(const std::string& sRootPath, const std::vector<std::shared_ptr<WorkGroup>>& vpGroups) {
     if(!vpGroups.empty()) {
         size_t nOverallImageCount = 0;
         std::vector<BSDS500Metrics> voBatchMetrics;
@@ -1042,7 +1042,7 @@ void litiv::Image::Segm::BSDS500BoundaryEvaluator::WriteEvalResults(const std::s
         for(auto ppGroupIter = vpGroups.begin(); ppGroupIter!=vpGroups.end(); ++ppGroupIter) {
             for(auto ppBatchIter = (*ppGroupIter)->m_vpBatches.begin(); ppBatchIter!=(*ppGroupIter)->m_vpBatches.end(); ++ppBatchIter) {
                 voBatchMetrics.push_back(BSDS500Metrics());
-                WriteEvalResults(**ppBatchIter,voBatchMetrics.back());
+                writeEvalReport(**ppBatchIter,voBatchMetrics.back());
                 vsBatchNames.push_back(CxxUtils::clampString((*ppBatchIter)->m_sName,10));
                 nOverallImageCount += (*ppBatchIter)->GetTotalImageCount();
             }
@@ -1086,23 +1086,23 @@ void litiv::Image::Segm::BSDS500BoundaryEvaluator::WriteEvalResults(const std::s
     }
 }
 
-void litiv::Image::Segm::BSDS500BoundaryEvaluator::WriteEvalResults(const WorkBatch& oBatch, BSDS500Metrics& oRes) {
+void litiv::Image::Segm::BSDS500BoundaryEvaluator::writeEvalReport(const WorkBatch& oBatch, BSDS500Metrics& oRes) {
     CalcMetrics(oBatch,oRes);
 #if USE_BSDS500_BENCHMARK
-    const std::string sResultPath = oBatch.m_sResultsPath+"/../"+oBatch.m_sName+"_reimpl_eval/";
+    const std::string sOutputPath = oBatch.m_sOutputPath+"/../"+oBatch.m_sName+"_reimpl_eval/";
 #else //!USE_BSDS500_BENCHMARK
-    const std::string sResultPath = oBatch.m_sResultsPath+"/../"+oBatch.m_sName+"_homemade_eval/";
+    const std::string sOutputPath = oBatch.m_sOutputPath+"/../"+oBatch.m_sName+"_homemade_eval/";
 #endif //!USE_BSDS500_BENCHMARK
-    PlatformUtils::CreateDirIfNotExist(sResultPath);
-    std::ofstream oImageScoresOutput(sResultPath+"/eval_bdry_img.txt");
+    PlatformUtils::CreateDirIfNotExist(sOutputPath);
+    std::ofstream oImageScoresOutput(sOutputPath+"/eval_bdry_img.txt");
     if(oImageScoresOutput.is_open())
         for(size_t n=0; n<oRes.voBestImageScores.size(); ++n)
             oImageScoresOutput << cv::format("%10d %10g %10g %10g %10g\n",n+1,oRes.voBestImageScores[n].dThreshold,oRes.voBestImageScores[n].dRecall,oRes.voBestImageScores[n].dPrecision,oRes.voBestImageScores[n].dFMeasure);
-    std::ofstream oThresholdMetricsOutput(sResultPath+"/eval_bdry_thr.txt");
+    std::ofstream oThresholdMetricsOutput(sOutputPath+"/eval_bdry_thr.txt");
     if(oThresholdMetricsOutput.is_open())
         for(size_t n=0; n<oRes.voThresholdScores.size(); ++n)
             oThresholdMetricsOutput << cv::format("%10g %10g %10g %10g\n",oRes.voThresholdScores[n].dThreshold,oRes.voThresholdScores[n].dRecall,oRes.voThresholdScores[n].dPrecision,oRes.voThresholdScores[n].dFMeasure);
-    std::ofstream oOverallMetricsOutput(sResultPath+"/eval_bdry.txt");
+    std::ofstream oOverallMetricsOutput(sOutputPath+"/eval_bdry.txt");
     if(oOverallMetricsOutput.is_open())
         oOverallMetricsOutput << cv::format("%10g %10g %10g %10g %10g %10g %10g %10g\n",oRes.oBestScore.dThreshold,oRes.oBestScore.dRecall,oRes.oBestScore.dPrecision,oRes.oBestScore.dFMeasure,oRes.dMaxRecall,oRes.dMaxPrecision,oRes.dMaxFMeasure,oRes.dAreaPR);
     std::cout << "\t\t" << CxxUtils::clampString(oBatch.m_sName,12) << " : MaxRcl=" << std::fixed << std::setprecision(4) << oRes.dMaxRecall << " MaxPrc=" << oRes.dMaxPrecision << " MaxFM=" << oRes.dMaxFMeasure << std::endl;
