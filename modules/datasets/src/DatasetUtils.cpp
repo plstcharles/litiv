@@ -27,66 +27,6 @@
 #error "Cache max size exceeds system limit (x86)."
 #endif //(!(defined(_M_X64) || defined(__amd64__)) && PRECACHE_MAX_CACHE_SIZE_GB>2)
 
-void litiv::writeOnImage(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom) {
-    cv::putText(oImg,sText,cv::Point(4,bBottom?(oImg.rows-15):15),cv::FONT_HERSHEY_PLAIN,1.2,vColor,2,cv::LINE_AA);
-}
-
-cv::Mat litiv::getDisplayImage(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oOutputImg, size_t nIdx, cv::Point oDbgPt, cv::Size oRefSize) {
-    CV_Assert(!oInputImg.empty() && (oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3 || oInputImg.type()==CV_8UC4));
-    CV_Assert(!oDebugImg.empty() && (oDebugImg.type()==CV_8UC1 || oDebugImg.type()==CV_8UC3 || oDebugImg.type()==CV_8UC4) && oDebugImg.size()==oInputImg.size());
-    CV_Assert(!oOutputImg.empty() && (oOutputImg.type()==CV_8UC1 || oOutputImg.type()==CV_8UC3 || oOutputImg.type()==CV_8UC4) && oOutputImg.size()==oInputImg.size());
-    cv::Mat oInputImgBYTE3, oDebugImgBYTE3, oOutputImgBYTE3;
-    if(oInputImg.channels()==1)
-        cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_GRAY2BGR);
-    else if(oInputImg.channels()==4)
-        cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_BGRA2BGR);
-    else
-        oInputImgBYTE3 = oInputImg;
-    if(oDebugImg.channels()==1)
-        cv::cvtColor(oDebugImg,oDebugImgBYTE3,cv::COLOR_GRAY2BGR);
-    else if(oDebugImg.channels()==4)
-        cv::cvtColor(oDebugImg,oDebugImgBYTE3,cv::COLOR_BGRA2BGR);
-    else
-        oDebugImgBYTE3 = oDebugImg;
-    if(oOutputImg.channels()==1)
-        cv::cvtColor(oOutputImg,oOutputImgBYTE3,cv::COLOR_GRAY2BGR);
-    else if(oOutputImg.channels()==4)
-        cv::cvtColor(oOutputImg,oDebugImgBYTE3,cv::COLOR_BGRA2BGR);
-    else
-        oOutputImgBYTE3 = oOutputImg;
-    if(oDbgPt.x>=0 && oDbgPt.y>=0 && oDbgPt.x<oInputImg.cols && oDbgPt.y<oInputImg.rows) {
-        cv::circle(oInputImgBYTE3,oDbgPt,5,cv::Scalar(255,255,255));
-        cv::circle(oOutputImgBYTE3,oDbgPt,5,cv::Scalar(255,255,255));
-    }
-    if(oRefSize.width>0 && oRefSize.height>0) {
-        cv::resize(oInputImgBYTE3,oInputImgBYTE3,oRefSize);
-        cv::resize(oDebugImgBYTE3,oDebugImgBYTE3,oRefSize);
-        cv::resize(oOutputImgBYTE3,oOutputImgBYTE3,oRefSize);
-    }
-
-    std::stringstream sstr;
-    sstr << "Input #" << nIdx;
-    writeOnImage(oInputImgBYTE3,sstr.str(),cv::Scalar_<uchar>(0,0,255));
-    writeOnImage(oDebugImgBYTE3,"Debug",cv::Scalar_<uchar>(0,0,255));
-    writeOnImage(oOutputImgBYTE3,"Output",cv::Scalar_<uchar>(0,0,255));
-
-    cv::Mat displayH;
-    cv::hconcat(oInputImgBYTE3,oDebugImgBYTE3,displayH);
-    cv::hconcat(displayH,oOutputImgBYTE3,displayH);
-    return displayH;
-}
-
-void litiv::validateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoint>& voKPs) {
-    std::vector<cv::KeyPoint> voNewKPs;
-    for(size_t k=0; k<voKPs.size(); ++k) {
-        if( voKPs[k].pt.x>=0 && voKPs[k].pt.x<oROI.cols &&
-            voKPs[k].pt.y>=0 && voKPs[k].pt.y<oROI.rows &&
-            oROI.at<uchar>(voKPs[k].pt)>0)
-            voNewKPs.push_back(voKPs[k]);
-    }
-    voKPs = voNewKPs;
-}
-
 litiv::DataPrecacher::DataPrecacher(std::function<const cv::Mat&(size_t)> lCallback) :
         m_lCallback(lCallback) {
     CV_Assert(lCallback);

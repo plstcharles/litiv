@@ -149,10 +149,6 @@ namespace litiv {
         virtual void _stopProcessing() {}
     };
 
-    void writeOnImage(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom=false);
-    cv::Mat getDisplayImage(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oOutputImg, size_t nIdx, cv::Point oDbgPt=cv::Point(-1,-1), cv::Size oRefSize=cv::Size(-1,-1));
-    void validateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoint>& voKPs);
-
     struct DataPrecacher final {
         // @@@@ rewrite to allow streaming with no limit? (might just need to modify init and set tot=inf)
         // @@@@ current impl expects all packets to be the same size

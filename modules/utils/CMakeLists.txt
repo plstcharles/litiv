@@ -26,6 +26,7 @@ configure_file(
 
 add_files(SOURCE_FILES
     "src/PlatformUtils.cpp"
+    "src/OpenCVUtils.cpp"
 )
 add_files(INCLUDE_FILES
     "include/litiv/utils/ConsoleUtils.hpp"
@@ -34,6 +35,7 @@ add_files(INCLUDE_FILES
     "include/litiv/utils/DistanceUtils.hpp"
     "include/litiv/utils/ParallelUtils.hpp"
     "include/litiv/utils/PlatformUtils.hpp"
+    "include/litiv/utils/OpenCVUtils.hpp"
     "include/litiv/utils.hpp"
 )
 if(USE_GLSL)
