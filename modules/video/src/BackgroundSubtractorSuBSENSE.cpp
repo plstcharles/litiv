@@ -16,7 +16,6 @@
 // limitations under the License.
 
 #include "litiv/video/BackgroundSubtractorSuBSENSE.hpp"
-#include "litiv/utils/OpenCVUtils.hpp"
 
 //
 // NOTE: this version of SuBSENSE is still pretty messy (debug). The cleaner (but older) implementation made available on
@@ -502,43 +501,57 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
         }
     }
 #if DISPLAY_SUBSENSE_DEBUG_INFO
-    std::cout << std::endl;
-    cv::Point dbgpt(m_nDebugCoordX,m_nDebugCoordY);
-    cv::Mat oMeanMinDistFrameNormalized; m_oMeanMinDistFrame_ST.copyTo(oMeanMinDistFrameNormalized);
-    cv::circle(oMeanMinDistFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
-    cv::resize(oMeanMinDistFrameNormalized,oMeanMinDistFrameNormalized,DEFAULT_FRAME_SIZE);
-    cv::imshow("d_min(x)",oMeanMinDistFrameNormalized);
-    std::cout << std::fixed << std::setprecision(5) << "  d_min(" << dbgpt << ") = " << m_oMeanMinDistFrame_ST.at<float>(dbgpt) << std::endl;
-    cv::Mat oMeanLastDistFrameNormalized; m_oMeanLastDistFrame.copyTo(oMeanLastDistFrameNormalized);
-    cv::circle(oMeanLastDistFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
-    cv::resize(oMeanLastDistFrameNormalized,oMeanLastDistFrameNormalized,DEFAULT_FRAME_SIZE);
-    cv::imshow("d_last(x)",oMeanLastDistFrameNormalized);
-    std::cout << std::fixed << std::setprecision(5) << " d_last(" << dbgpt << ") = " << m_oMeanLastDistFrame.at<float>(dbgpt) << std::endl;
-    cv::Mat oMeanRawSegmResFrameNormalized; m_oMeanRawSegmResFrame_ST.copyTo(oMeanRawSegmResFrameNormalized);
-    cv::circle(oMeanRawSegmResFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
-    cv::resize(oMeanRawSegmResFrameNormalized,oMeanRawSegmResFrameNormalized,DEFAULT_FRAME_SIZE);
-    cv::imshow("s_avg(x)",oMeanRawSegmResFrameNormalized);
-    std::cout << std::fixed << std::setprecision(5) << "  s_avg(" << dbgpt << ") = " << m_oMeanRawSegmResFrame_ST.at<float>(dbgpt) << std::endl;
-    cv::Mat oMeanFinalSegmResFrameNormalized; m_oMeanFinalSegmResFrame_ST.copyTo(oMeanFinalSegmResFrameNormalized);
-    cv::circle(oMeanFinalSegmResFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
-    cv::resize(oMeanFinalSegmResFrameNormalized,oMeanFinalSegmResFrameNormalized,DEFAULT_FRAME_SIZE);
-    cv::imshow("z_avg(x)",oMeanFinalSegmResFrameNormalized);
-    std::cout << std::fixed << std::setprecision(5) << "  z_avg(" << dbgpt << ") = " << m_oMeanFinalSegmResFrame_ST.at<float>(dbgpt) << std::endl;
-    cv::Mat oDistThresholdFrameNormalized; m_oDistThresholdFrame.convertTo(oDistThresholdFrameNormalized,CV_32FC1,0.25f,-0.25f);
-    cv::circle(oDistThresholdFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
-    cv::resize(oDistThresholdFrameNormalized,oDistThresholdFrameNormalized,DEFAULT_FRAME_SIZE);
-    cv::imshow("r(x)",oDistThresholdFrameNormalized);
-    std::cout << std::fixed << std::setprecision(5) << "      r(" << dbgpt << ") = " << m_oDistThresholdFrame.at<float>(dbgpt) << std::endl;
-    cv::Mat oVariationModulatorFrameNormalized; cv::normalize(m_oVariationModulatorFrame,oVariationModulatorFrameNormalized,0,255,cv::NORM_MINMAX,CV_8UC1);
-    cv::circle(oVariationModulatorFrameNormalized,dbgpt,5,cv::Scalar(255));
-    cv::resize(oVariationModulatorFrameNormalized,oVariationModulatorFrameNormalized,DEFAULT_FRAME_SIZE);
-    cv::imshow("v(x)",oVariationModulatorFrameNormalized);
-    std::cout << std::fixed << std::setprecision(5) << "      v(" << dbgpt << ") = " << m_oVariationModulatorFrame.at<float>(dbgpt) << std::endl;
-    cv::Mat oUpdateRateFrameNormalized; m_oUpdateRateFrame.convertTo(oUpdateRateFrameNormalized,CV_32FC1,1.0f/FEEDBACK_T_UPPER,-FEEDBACK_T_LOWER/FEEDBACK_T_UPPER);
-    cv::circle(oUpdateRateFrameNormalized,dbgpt,5,cv::Scalar(1.0f));
-    cv::resize(oUpdateRateFrameNormalized,oUpdateRateFrameNormalized,DEFAULT_FRAME_SIZE);
-    cv::imshow("t(x)",oUpdateRateFrameNormalized);
-    std::cout << std::fixed << std::setprecision(5) << "      t(" << dbgpt << ") = " << m_oUpdateRateFrame.at<float>(dbgpt) << std::endl;
+    cv::Point2i oDbgPt(-1,-1);
+    if(m_pDisplayHelper) {
+        std::lock_guard<std::mutex> oLock(m_pDisplayHelper->m_oEventMutex);
+        const cv::Point2f& oDbgPt_rel = cv::Point2f(float(m_pDisplayHelper->m_oLatestMouseEvent.oPosition.x)/m_pDisplayHelper->m_oLatestMouseEvent.oDisplaySize.width,float(m_pDisplayHelper->m_oLatestMouseEvent.oPosition.y)/m_pDisplayHelper->m_oLatestMouseEvent.oDisplaySize.height);
+        oDbgPt = cv::Point2i(int(oDbgPt_rel.x*m_oImgSize.width),int(oDbgPt_rel.y*m_oImgSize.height));
+    }
+    if(oDbgPt.x>=0 && oDbgPt.x<m_oImgSize.width && oDbgPt.y>=0 && oDbgPt.y<m_oImgSize.height) {
+        std::cout << std::endl;
+        cv::Mat oMeanMinDistFrameNormalized;
+        m_oMeanMinDistFrame_ST.copyTo(oMeanMinDistFrameNormalized);
+        cv::circle(oMeanMinDistFrameNormalized,oDbgPt,5,cv::Scalar(1.0f));
+        cv::resize(oMeanMinDistFrameNormalized,oMeanMinDistFrameNormalized,DEFAULT_FRAME_SIZE);
+        cv::imshow("d_min(x)",oMeanMinDistFrameNormalized);
+        std::cout << std::fixed << std::setprecision(5) << "  d_min(" << oDbgPt << ") = " << m_oMeanMinDistFrame_ST.at<float>(oDbgPt) << std::endl;
+        cv::Mat oMeanLastDistFrameNormalized;
+        m_oMeanLastDistFrame.copyTo(oMeanLastDistFrameNormalized);
+        cv::circle(oMeanLastDistFrameNormalized,oDbgPt,5,cv::Scalar(1.0f));
+        cv::resize(oMeanLastDistFrameNormalized,oMeanLastDistFrameNormalized,DEFAULT_FRAME_SIZE);
+        cv::imshow("d_last(x)",oMeanLastDistFrameNormalized);
+        std::cout << std::fixed << std::setprecision(5) << " d_last(" << oDbgPt << ") = " << m_oMeanLastDistFrame.at<float>(oDbgPt) << std::endl;
+        cv::Mat oMeanRawSegmResFrameNormalized;
+        m_oMeanRawSegmResFrame_ST.copyTo(oMeanRawSegmResFrameNormalized);
+        cv::circle(oMeanRawSegmResFrameNormalized,oDbgPt,5,cv::Scalar(1.0f));
+        cv::resize(oMeanRawSegmResFrameNormalized,oMeanRawSegmResFrameNormalized,DEFAULT_FRAME_SIZE);
+        cv::imshow("s_avg(x)",oMeanRawSegmResFrameNormalized);
+        std::cout << std::fixed << std::setprecision(5) << "  s_avg(" << oDbgPt << ") = " << m_oMeanRawSegmResFrame_ST.at<float>(oDbgPt) << std::endl;
+        cv::Mat oMeanFinalSegmResFrameNormalized;
+        m_oMeanFinalSegmResFrame_ST.copyTo(oMeanFinalSegmResFrameNormalized);
+        cv::circle(oMeanFinalSegmResFrameNormalized,oDbgPt,5,cv::Scalar(1.0f));
+        cv::resize(oMeanFinalSegmResFrameNormalized,oMeanFinalSegmResFrameNormalized,DEFAULT_FRAME_SIZE);
+        cv::imshow("z_avg(x)",oMeanFinalSegmResFrameNormalized);
+        std::cout << std::fixed << std::setprecision(5) << "  z_avg(" << oDbgPt << ") = " << m_oMeanFinalSegmResFrame_ST.at<float>(oDbgPt) << std::endl;
+        cv::Mat oDistThresholdFrameNormalized;
+        m_oDistThresholdFrame.convertTo(oDistThresholdFrameNormalized,CV_32FC1,0.25f,-0.25f);
+        cv::circle(oDistThresholdFrameNormalized,oDbgPt,5,cv::Scalar(1.0f));
+        cv::resize(oDistThresholdFrameNormalized,oDistThresholdFrameNormalized,DEFAULT_FRAME_SIZE);
+        cv::imshow("r(x)",oDistThresholdFrameNormalized);
+        std::cout << std::fixed << std::setprecision(5) << "      r(" << oDbgPt << ") = " << m_oDistThresholdFrame.at<float>(oDbgPt) << std::endl;
+        cv::Mat oVariationModulatorFrameNormalized;
+        cv::normalize(m_oVariationModulatorFrame,oVariationModulatorFrameNormalized,0,255,cv::NORM_MINMAX,CV_8UC1);
+        cv::circle(oVariationModulatorFrameNormalized,oDbgPt,5,cv::Scalar(255));
+        cv::resize(oVariationModulatorFrameNormalized,oVariationModulatorFrameNormalized,DEFAULT_FRAME_SIZE);
+        cv::imshow("v(x)",oVariationModulatorFrameNormalized);
+        std::cout << std::fixed << std::setprecision(5) << "      v(" << oDbgPt << ") = " << m_oVariationModulatorFrame.at<float>(oDbgPt) << std::endl;
+        cv::Mat oUpdateRateFrameNormalized;
+        m_oUpdateRateFrame.convertTo(oUpdateRateFrameNormalized,CV_32FC1,1.0f/FEEDBACK_T_UPPER,-FEEDBACK_T_LOWER/FEEDBACK_T_UPPER);
+        cv::circle(oUpdateRateFrameNormalized,oDbgPt,5,cv::Scalar(1.0f));
+        cv::resize(oUpdateRateFrameNormalized,oUpdateRateFrameNormalized,DEFAULT_FRAME_SIZE);
+        cv::imshow("t(x)",oUpdateRateFrameNormalized);
+        std::cout << std::fixed << std::setprecision(5) << "      t(" << oDbgPt << ") = " << m_oUpdateRateFrame.at<float>(oDbgPt) << std::endl;
+    }
 #endif //DISPLAY_SUBSENSE_DEBUG_INFO
     cv::bitwise_xor(oCurrFGMask,m_oLastRawFGMask,m_oCurrRawFGBlinkMask);
     cv::bitwise_or(m_oCurrRawFGBlinkMask,m_oLastRawFGBlinkMask,m_oBlinksFrame);

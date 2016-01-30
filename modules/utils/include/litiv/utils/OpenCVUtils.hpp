@@ -24,6 +24,9 @@
 
 namespace cv { // extending cv
 
+    struct DisplayHelper;
+    using DisplayHelperPtr = std::shared_ptr<DisplayHelper>;
+
     //! returns pixel coordinates clamped to the given image & border size
     static inline void clampImageCoords(int& nSampleCoord_X,int& nSampleCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
         if(nSampleCoord_X<nBorderSize)
@@ -139,16 +142,14 @@ namespace cv { // extending cv
         voKPs = voNewKPs;
     }
 
-    //! helper struct for image display & callback management
-    struct DisplayHelper {
-        //! by default, comes with a filestorage algorithms can use for debug
-        DisplayHelper(const std::string& sDisplayName,
-                      const std::string& sDebugFSDirPath="./",
-                      const cv::Size& oMaxSize=cv::Size(1920,1080),
-                      int nWindowFlags=cv::WINDOW_AUTOSIZE);
-        //! desctructor automatically closes its window
-        ~DisplayHelper();
+    //! helper struct for image display & callback management (must be created via DisplayHelper::create due to enable_shared_from_this interface)
+    struct DisplayHelper : public std::enable_shared_from_this<DisplayHelper> {
 
+        //! by default, comes with a filestorage algorithms can use for debug
+        static DisplayHelperPtr create(const std::string& sDisplayName,
+                                       const std::string& sDebugFSDirPath="./",
+                                       const cv::Size& oMaxSize=cv::Size(1920,1080),
+                                       int nWindowFlags=cv::WINDOW_AUTOSIZE);
         //! will reformat the given image, print the index and mouse cursor point on it, and show it
         void display(const cv::Mat& oImage, size_t nIdx);
         //! will reformat the given images, print the index and mouse cursor point on them, and show them horizontally concatenated
@@ -157,10 +158,12 @@ namespace cv { // extending cv
 
         //! will call cv::waitKey and block if m_bContinuousUpdates is false, and loop otherwise (also returns cv::waitKey's captured value)
         int waitKey(int nDefaultSleepDelay=1);
+        //! desctructor automatically closes its window
+        ~DisplayHelper();
 
         const std::string m_sDisplayName;
         const cv::Size m_oMaxDisplaySize;
-        cv::FileStorage m_sDebugFS; // will be closed & printed when released, i.e. on destruction
+        cv::FileStorage m_oDebugFS; // will be closed & printed when released, i.e. on destruction
         std::mutex m_oEventMutex; // should be always used if m_oLatestMouseEvent is accessed externally
         struct {
             cv::Point2i oPosition;
@@ -170,6 +173,10 @@ namespace cv { // extending cv
         } m_oLatestMouseEvent;
 
     private:
+        DisplayHelper(const std::string& sDisplayName,
+                      const std::string& sDebugFSDirPath,
+                      const cv::Size& oMaxSize,
+                      int nWindowFlags);
         cv::Size m_oLastDisplaySize;
         bool m_bContinuousUpdates;
         bool m_bFirstDisplay;

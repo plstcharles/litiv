@@ -18,6 +18,7 @@
 #pragma once
 
 #include "litiv/utils/ParallelUtils.hpp"
+#include "litiv/utils/OpenCVUtils.hpp"
 #include <opencv2/video/background_segm.hpp>
 
 //! enhanced background subtractor interface (inherits from cv::BackgroundSubtractor)
@@ -50,6 +51,9 @@ protected:
 private:
     IBackgroundSubtractor& operator=(const IBackgroundSubtractor&) = delete;
     IBackgroundSubtractor(const IBackgroundSubtractor&) = delete;
+public:
+    // #### for debug purposes only ####
+    cv::DisplayHelperPtr m_pDisplayHelper;
 };
 
 template<ParallelUtils::eParallelAlgoType eImpl>
@@ -74,10 +78,7 @@ public:
         m_bInitialized(false),
         m_bModelInitialized(false),
         m_bAutoModelResetEnabled(true),
-        m_bUsingMovingCamera(false),
-        m_nDebugCoordX(0),
-        m_nDebugCoordY(0),
-        m_pDebugFS(nullptr) {}
+        m_bUsingMovingCamera(false) {}
 #if HAVE_GLSL
     //! glsl impl constructor
     template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
@@ -99,10 +100,7 @@ public:
         m_bInitialized(false),
         m_bModelInitialized(false),
         m_bAutoModelResetEnabled(true),
-        m_bUsingMovingCamera(false),
-        m_nDebugCoordX(0),
-        m_nDebugCoordY(0),
-        m_pDebugFS(nullptr) {}
+        m_bUsingMovingCamera(false) {}
 #endif //HAVE_GLSL
 #if HAVE_CUDA
     static_assert(eImpl!=ParallelUtils::eCUDA),"Missing constr impl");
@@ -165,11 +163,6 @@ protected:
     //! copy of latest pixel intensities (used when refreshing model)
     cv::Mat m_oLastColorFrame;
 
-public:
-    // #### for debug purposes only ####
-    int m_nDebugCoordX, m_nDebugCoordY;
-    std::string m_sDebugName;
-    cv::FileStorage* m_pDebugFS;
 };
 
 #if HAVE_GLSL
