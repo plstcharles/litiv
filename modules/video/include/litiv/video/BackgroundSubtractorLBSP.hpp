@@ -83,7 +83,9 @@ public:
 #endif //HAVE_OPENCL
 
     //! (re)initiaization method; needs to be called before starting background subtraction
-    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
+    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) override;
+    //! returns a copy of the latest reconstructed background descriptors image
+    virtual void getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const = 0;
 
 protected:
     //! LBSP internal threshold offset value, used to reduce texture noise in dark regions

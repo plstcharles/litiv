@@ -23,6 +23,7 @@
 // @@@ change template formatting everywhere
 
 #include "litiv/datasets.hpp"
+#include "litiv/video.hpp"
 
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
@@ -83,12 +84,6 @@
 #error "Must specify a single impl."
 #elif (USE_LOBSTER+USE_SUBSENSE+USE_PAWCS)!=1
 #error "Must specify a single algorithm."
-#elif USE_PAWCS
-#include "litiv/video/BackgroundSubtractorPAWCS.hpp"
-#elif USE_LOBSTER
-#include "litiv/video/BackgroundSubtractorLOBSTER.hpp"
-#elif USE_SUBSENSE
-#include "litiv/video/BackgroundSubtractorSuBSENSE.hpp"
 #endif //USE_...
 #if (DEBUG_OUTPUT && (USE_GPU_IMPL || DEFAULT_NB_THREADS>1))
 #error "Cannot debug output with GPU support or with more than one thread."
@@ -409,16 +404,15 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         CV_Assert(!oCurrInputFrame.empty());
         CV_Assert(oCurrInputFrame.isContinuous());
         cv::Mat oCurrFGMask(oCurrSequence.getFrameSize(),CV_8UC1,cv::Scalar_<uchar>(0));
+        std::shared_ptr<IBackgroundSubtractor> pAlgo;
 #if USE_LOBSTER
-        std::shared_ptr<BackgroundSubtractorLOBSTER> pAlgo(new BackgroundSubtractorLOBSTER());
-        const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
+        pAlgo = std::make_shared<BackgroundSubtractorLOBSTER>();
 #elif USE_SUBSENSE
-        std::shared_ptr<BackgroundSubtractorSuBSENSE> pAlgo(new BackgroundSubtractorSuBSENSE());
-        const double dDefaultLearningRate = 0;
+        pAlgo = std::make_shared<BackgroundSubtractorSuBSENSE>();
 #elif USE_PAWCS
-        std::shared_ptr<BackgroundSubtractorPAWCS> pAlgo(new BackgroundSubtractorPAWCS());
-        const double dDefaultLearningRate = 0;
+        pAlgo = std::make_shared<BackgroundSubtractorPAWCS>();
 #endif //USE_...
+        const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
         pAlgo->initialize(oCurrInputFrame,oROI);
 #if DISPLAY_OUTPUT
         bool bContinuousUpdates = false;

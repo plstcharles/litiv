@@ -50,15 +50,15 @@ public:
     //! refreshes all local (+ global) dictionaries based on the last analyzed frame
     virtual void refreshModel(size_t nBaseOccCount, float fOccDecrFrac, bool bForceFGUpdate=false);
     //! (re)initiaization method; needs to be called before starting background subtraction
-    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
+    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) override;
     //! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
-    virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=0);
+    virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=0) override;
     //! returns a copy of the latest reconstructed background image
-    virtual void getBackgroundImage(cv::OutputArray backgroundImage) const;
+    virtual void getBackgroundImage(cv::OutputArray backgroundImage) const override;
     //! returns a copy of the latest reconstructed background descriptors image
-    virtual void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const;
+    virtual void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const override;
     //! returns the default learning rate value used in 'apply'
-    virtual double getDefaultLearningRate() const {return 0;}
+    virtual double getDefaultLearningRate() const override {return 0;}
 
 protected:
     template<size_t nChannels>

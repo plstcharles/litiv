@@ -52,13 +52,15 @@ public:
     //! refreshes all samples based on the last analyzed frame
     virtual void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
     //! (re)initiaization method; needs to be called before starting background subtraction
-    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
+    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) override;
     //! primary model update function; the learning param is used to override the internal learning thresholds (ignored when <= 0)
-    virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=0);
+    virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=0) override;
     //! returns a copy of the latest reconstructed background image
-    void getBackgroundImage(cv::OutputArray backgroundImage) const;
+    void getBackgroundImage(cv::OutputArray backgroundImage) const override;
     //! returns a copy of the latest reconstructed background descriptors image
-    void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const;
+    void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const override;
+    //! returns the default learning rate value used in 'apply'
+    virtual double getDefaultLearningRate() const override {return 0;}
 
 protected:
     //! absolute minimal color distance threshold ('R' or 'radius' in the original ViBe paper, used as the default/initial 'R(x)' value here)

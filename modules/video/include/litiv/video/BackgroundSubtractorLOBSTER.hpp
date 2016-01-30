@@ -59,7 +59,7 @@ public:
                                  size_t nLBSPThresholdOffset,
                                  float fRelLBSPThreshold);
     //! returns the default learning rate value used in 'apply'
-    virtual double getDefaultLearningRate() const {return BGSLOBSTER_DEFAULT_LEARNING_RATE;}
+    virtual double getDefaultLearningRate() const override {return BGSLOBSTER_DEFAULT_LEARNING_RATE;}
 protected:
     //! absolute color distance threshold
     const size_t m_nColorDistThreshold;
@@ -86,13 +86,13 @@ public:
     //! refreshes all samples based on the last analyzed frame
     void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
     //! (re)initiaization method; needs to be called before starting background subtraction
-    void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
+    void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) override;
     //! returns the GLSL compute shader source code to run for a given algo stage
-    virtual std::string getComputeShaderSource(size_t nStage) const;
+    virtual std::string getComputeShaderSource(size_t nStage) const override;
     //! returns a copy of the latest reconstructed background image
-    virtual void getBackgroundImage(cv::OutputArray oBGImg) const;
+    virtual void getBackgroundImage(cv::OutputArray oBGImg) const override;
     //! returns a copy of the latest reconstructed background descriptors image
-    virtual void getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const;
+    virtual void getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const override;
 
 protected:
     //! returns the GLSL compute shader source code to run for the main processing stage
@@ -100,7 +100,7 @@ protected:
     //! returns the GLSL compute shader source code to run the post-processing stage (median blur)
     std::string getComputeShaderSource_PostProc() const;
     //! custom dispatch call function to adjust in-stage uniforms, batch workgroup size & other parameters
-    virtual void dispatch(size_t nStage, GLShader& oShader);
+    virtual void dispatch(size_t nStage, GLShader& oShader) override;
 
     size_t m_nTMT32ModelSize;
     size_t m_nSampleStepSize;
@@ -152,13 +152,13 @@ public:
     //! refreshes all samples based on the last analyzed frame
     void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
     //! (re)initiaization method; needs to be called before starting background subtraction
-    void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI);
+    void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) override;
     //! model update/segmentation function (synchronous version); the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
-    virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE);
+    virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE) override;
     //! returns a copy of the latest reconstructed background image
-    virtual void getBackgroundImage(cv::OutputArray oBGImg) const;
+    virtual void getBackgroundImage(cv::OutputArray oBGImg) const override;
     //! returns a copy of the latest reconstructed background descriptors image
-    virtual void getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const;
+    virtual void getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const override;
 
 protected:
     //! background model pixel intensity samples
