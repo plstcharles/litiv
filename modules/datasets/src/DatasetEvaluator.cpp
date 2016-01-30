@@ -312,35 +312,37 @@ void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::writeEvalRe
 
 void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::pushSegmMask(const cv::Mat& oSegm,size_t nIdx) {
     IDataConsumer_<eDatasetType_VideoSegm,TNoGroup>::pushSegmMask(oSegm,nIdx);
-    auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
-    CV_Assert(pProducer);
-    const cv::Mat& oGTSegm = pProducer->getGTFrame(nIdx);
-    const cv::Mat& oROI = pProducer->getROI();
-    CV_Assert(oSegm.type()==CV_8UC1 && oGTSegm.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
-    CV_Assert(oSegm.size()==oGTSegm.size() && (oROI.empty() || oSegm.size()==oROI.size()));
-    const size_t step_row = oSegm.step.p[0];
-    for(size_t i=0; i<(size_t)oSegm.rows; ++i) {
-        const size_t idx_nstep = step_row*i;
-        const uchar* input_step_ptr = oSegm.data+idx_nstep;
-        const uchar* gt_step_ptr = oGTSegm.data+idx_nstep;
-        const uchar* roi_step_ptr = oROI.data+idx_nstep;
-        for(int j=0; j<oSegm.cols; ++j) {
-            if(gt_step_ptr[j]!=s_nSegmOutOfScope && gt_step_ptr[j]!=s_nSegmUnknown && (oROI.empty() || roi_step_ptr[j]!=s_nSegmNegative)) {
-                if(input_step_ptr[j]==s_nSegmPositive) {
-                    if(gt_step_ptr[j]==s_nSegmPositive)
-                        ++m_oMetricsBase.nTP;
-                    else // gt_step_ptr[j]==s_nSegmNegative
-                        ++m_oMetricsBase.nFP;
-                }
-                else { // input_step_ptr[j]==s_nSegmNegative
-                    if(gt_step_ptr[j]==s_nSegmPositive)
-                        ++m_oMetricsBase.nFN;
-                    else // gt_step_ptr[j]==s_nSegmNegative
-                        ++m_oMetricsBase.nTN;
-                }
-                if(gt_step_ptr[j]==s_nSegmShadow) {
-                    if(input_step_ptr[j]==s_nSegmPositive)
-                        ++m_oMetricsBase.nSE;
+    if(getDatasetInfo()->isUsingEvaluator()) {
+        auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
+        CV_Assert(pProducer);
+        const cv::Mat& oGTSegm = pProducer->getGTFrame(nIdx);
+        const cv::Mat& oROI = pProducer->getROI();
+        CV_Assert(oSegm.type()==CV_8UC1 && oGTSegm.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
+        CV_Assert(oSegm.size()==oGTSegm.size() && (oROI.empty() || oSegm.size()==oROI.size()));
+        const size_t step_row = oSegm.step.p[0];
+        for(size_t i = 0; i<(size_t)oSegm.rows; ++i) {
+            const size_t idx_nstep = step_row*i;
+            const uchar* input_step_ptr = oSegm.data+idx_nstep;
+            const uchar* gt_step_ptr = oGTSegm.data+idx_nstep;
+            const uchar* roi_step_ptr = oROI.data+idx_nstep;
+            for(int j = 0; j<oSegm.cols; ++j) {
+                if(gt_step_ptr[j]!=s_nSegmOutOfScope && gt_step_ptr[j]!=s_nSegmUnknown && (oROI.empty() || roi_step_ptr[j]!=s_nSegmNegative)) {
+                    if(input_step_ptr[j]==s_nSegmPositive) {
+                        if(gt_step_ptr[j]==s_nSegmPositive)
+                            ++m_oMetricsBase.nTP;
+                        else // gt_step_ptr[j]==s_nSegmNegative
+                            ++m_oMetricsBase.nFP;
+                    }
+                    else { // input_step_ptr[j]==s_nSegmNegative
+                        if(gt_step_ptr[j]==s_nSegmPositive)
+                            ++m_oMetricsBase.nFN;
+                        else // gt_step_ptr[j]==s_nSegmNegative
+                            ++m_oMetricsBase.nTN;
+                    }
+                    if(gt_step_ptr[j]==s_nSegmShadow) {
+                        if(input_step_ptr[j]==s_nSegmPositive)
+                            ++m_oMetricsBase.nSE;
+                    }
                 }
             }
         }

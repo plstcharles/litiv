@@ -95,6 +95,7 @@ namespace litiv {
         virtual size_t getOutputIdxOffset() const = 0;
         virtual double getScaleFactor() const = 0;
         virtual bool isSavingOutput() const = 0;
+        virtual bool isUsingEvaluator() const = 0;
         virtual bool is4ByteAligned() const = 0;
         virtual ~IDataset() = default;
 
@@ -360,7 +361,6 @@ namespace litiv {
             processPacket();
             if(getDatasetInfo()->isSavingOutput())
                 writeSegmMask(oSegm,nIdx);
-            // @@@@@ allow isEvaluatingOutput to decide whether to stop processing here or do evaluation (but in Evaluator)
         }
 
     protected:
@@ -381,7 +381,15 @@ namespace litiv {
             std::stringstream sOutputFilePath;
             sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << acBuffer.data() << getDatasetInfo()->getOutputNameSuffix();
             const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
-            cv::imwrite(sOutputFilePath.str(),oSegm,vnComprParams);
+            auto pProducer = std::dynamic_pointer_cast<const IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
+            CV_Assert(pProducer);
+            const cv::Mat& oROI = pProducer->getROI();
+            cv::Mat oOutputSegm;
+            if(!oROI.empty())
+                cv::bitwise_or(oSegm,UCHAR_MAX/2,oOutputSegm,oROI==0);
+            else
+                oOutputSegm = oSegm;
+            cv::imwrite(sOutputFilePath.str(),oOutputSegm,vnComprParams);
         }
     };
 
