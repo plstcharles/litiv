@@ -243,6 +243,7 @@ namespace litiv {
         virtual const std::vector<std::string>& getGrayscaleDirTokens() const override final {return m_vsGrayscaleDirTokens;}
         virtual size_t getOutputIdxOffset() const override final {return m_nOutputIdxOffset;}
         virtual bool isSavingOutput() const override final {return m_bSavingOutput;}
+        virtual bool isUsingEvaluator() const override final {return m_bUsingEvaluator;}
         virtual bool is4ByteAligned() const override final {return m_bForce4ByteDataAlign;}
         virtual double getScaleFactor() const override final {return m_dScaleFactor;}
 
@@ -291,6 +292,7 @@ namespace litiv {
                 const std::vector<std::string>& vsGrayscaleDirTokens,
                 size_t nOutputIdxOffset,
                 bool bSaveOutput,
+                bool bUseEvaluator,
                 bool bForce4ByteDataAlign,
                 double dScaleFactor
         ) :
@@ -304,6 +306,7 @@ namespace litiv {
                 m_vsGrayscaleDirTokens(vsGrayscaleDirTokens),
                 m_nOutputIdxOffset(nOutputIdxOffset),
                 m_bSavingOutput(bSaveOutput),
+                m_bUsingEvaluator(bUseEvaluator),
                 m_bForce4ByteDataAlign(bForce4ByteDataAlign),
                 m_dScaleFactor(dScaleFactor) {}
         const std::string m_sDatasetName;
@@ -316,6 +319,7 @@ namespace litiv {
         const std::vector<std::string> m_vsGrayscaleDirTokens;
         const size_t m_nOutputIdxOffset;
         const bool m_bSavingOutput;
+        const bool m_bUsingEvaluator;
         const bool m_bForce4ByteDataAlign;
         const double m_dScaleFactor;
         IDataHandlerPtrArray m_vpBatches;
@@ -334,7 +338,7 @@ namespace litiv {
     };
 
     LITIV_DATASET_IMPL_BEGIN(eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet);
-        Dataset_(const std::string& sOutputDirName, bool bSaveOutput=false, bool bForce4ByteDataAlign=false, double dScaleFactor=1.0, bool b2014=true) :
+        Dataset_(const std::string& sOutputDirName, bool bSaveOutput=false, bool bUseEvaluator=true, bool bForce4ByteDataAlign=false, double dScaleFactor=1.0, bool b2014=true) :
                 IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet>(
                         b2014?"CDnet 2014":"CDnet 2012",
                         b2014?"CDNet2014/dataset":"CDNet/dataset",
@@ -346,6 +350,7 @@ namespace litiv {
                         b2014?std::vector<std::string>{"thermal","turbulence"}:std::vector<std::string>{"thermal"},
                         1,
                         bSaveOutput,
+                        bUseEvaluator,
                         bForce4ByteDataAlign,
                         dScaleFactor
                 ) {}
