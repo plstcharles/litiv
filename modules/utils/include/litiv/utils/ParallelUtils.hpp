@@ -44,6 +44,8 @@
 
 namespace ParallelUtils {
 
+    // @@@@ most enable_if cases could be replaced by full template spec if code is never shared between impl types
+
     enum eParallelAlgoType {
 #if HAVE_GLSL
         eGLSL,

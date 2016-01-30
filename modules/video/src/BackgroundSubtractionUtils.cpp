@@ -16,16 +16,13 @@
 // limitations under the License.
 
 #include "litiv/video/BackgroundSubtractionUtils.hpp"
-#include <iostream>
-#include <opencv2/imgproc.hpp>
 
-template<ParallelUtils::eParallelAlgoType eImpl>
-void IBackgroundSubtractor<eImpl>::initialize(const cv::Mat& oInitImg) {
+void IBackgroundSubtractor::initialize(const cv::Mat& oInitImg) {
     initialize(oInitImg,cv::Mat());
 }
 
 template<ParallelUtils::eParallelAlgoType eImpl>
-void IBackgroundSubtractor<eImpl>::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
+void IBackgroundSubtractor_<eImpl>::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
     CV_Assert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
     CV_Assert(oInitImg.isContinuous());
     CV_Assert(oInitImg.type()==CV_8UC1 || oInitImg.type()==CV_8UC3 || oInitImg.type()==CV_8UC4);
@@ -116,7 +113,7 @@ void IBackgroundSubtractor<eImpl>::initialize(const cv::Mat& oInitImg, const cv:
 }
 
 template<ParallelUtils::eParallelAlgoType eImpl>
-void IBackgroundSubtractor<eImpl>::validateROI(cv::Mat& oROI) {
+void IBackgroundSubtractor_<eImpl>::validateROI(cv::Mat& oROI) const {
     CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
     if(m_nROIBorderSize>0) {
         cv::Mat oROI_new(oROI.size(),CV_8UC1,cv::Scalar_<uchar>(0));
@@ -127,7 +124,7 @@ void IBackgroundSubtractor<eImpl>::validateROI(cv::Mat& oROI) {
 }
 
 template<ParallelUtils::eParallelAlgoType eImpl>
-void IBackgroundSubtractor<eImpl>::setROI(cv::Mat& oROI) {
+void IBackgroundSubtractor_<eImpl>::setROI(cv::Mat& oROI) {
     validateROI(oROI);
     CV_Assert(cv::countNonZero(oROI)>0);
     if(m_bInitialized) {
@@ -140,24 +137,24 @@ void IBackgroundSubtractor<eImpl>::setROI(cv::Mat& oROI) {
 }
 
 template<ParallelUtils::eParallelAlgoType eImpl>
-cv::Mat IBackgroundSubtractor<eImpl>::getROICopy() const {
+cv::Mat IBackgroundSubtractor_<eImpl>::getROICopy() const {
     return m_oROI.clone();
 }
 
 template<ParallelUtils::eParallelAlgoType eImpl>
-void IBackgroundSubtractor<eImpl>::setAutomaticModelReset(bool bVal) {
+void IBackgroundSubtractor_<eImpl>::setAutomaticModelReset(bool bVal) {
     m_bAutoModelResetEnabled = bVal;
 }
 
 #if HAVE_GLSL
 
-template class IBackgroundSubtractor<ParallelUtils::eGLSL>;
+template class IBackgroundSubtractor_<ParallelUtils::eGLSL>;
 
 template<>
 BackgroundSubtractor_<ParallelUtils::eGLSL>::BackgroundSubtractor_( size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
                                                                     size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
                                                                     bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize) :
-        IBackgroundSubtractor<ParallelUtils::eGLSL>(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat,nROIBorderSize),
+        IBackgroundSubtractor_<ParallelUtils::eGLSL>(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat,nROIBorderSize),
         m_dCurrLearningRate(-1) {}
 
 template<>
@@ -204,21 +201,21 @@ template class BackgroundSubtractor_<ParallelUtils::eGLSL>;
 #endif //HAVE_GLSL
 
 #if HAVE_CUDA
-template class IBackgroundSubtractor<ParallelUtils::eCUDA>;
+template class IBackgroundSubtractor_<ParallelUtils::eCUDA>;
 // ... @@@ add impl later
 template class BackgroundSubtractor_<ParallelUtils::eCUDA>;
 #endif //HAVE_CUDA
 
 #if HAVE_OPENCL
-template class IBackgroundSubtractor<ParallelUtils::eOpenCL>;
+template class IBackgroundSubtractor_<ParallelUtils::eOpenCL>;
 // ... @@@ add impl later
 template class BackgroundSubtractor_<ParallelUtils::eOpenCL>;
 #endif //HAVE_OPENCL
 
-template class IBackgroundSubtractor<ParallelUtils::eNonParallel>;
+template class IBackgroundSubtractor_<ParallelUtils::eNonParallel>;
 
 template<>
 BackgroundSubtractor_<ParallelUtils::eNonParallel>::BackgroundSubtractor_(size_t nROIBorderSize) :
-        IBackgroundSubtractor<ParallelUtils::eNonParallel>(nROIBorderSize) {}
+        IBackgroundSubtractor_<ParallelUtils::eNonParallel>(nROIBorderSize) {}
 
 template class BackgroundSubtractor_<ParallelUtils::eNonParallel>;
