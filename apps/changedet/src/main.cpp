@@ -24,7 +24,6 @@
 
 #include "litiv/datasets.hpp"
 #include "litiv/video.hpp"
-#include "litiv/utils.hpp"
 
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
@@ -407,9 +406,8 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
         pAlgo->initialize(oCurrInputFrame,oROI);
 #if DISPLAY_OUTPUT
-        cv::DisplayHelper oDisplayHelper(oCurrSequence.getRelativePath(),oCurrSequence.getOutputPath()+"/../");
-        //pAlgo->m_pDebugFS = &oDebugFS; @@@@@ todo
-        //pAlgo->m_sDebugName = oCurrSequence.getName();
+        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oCurrSequence.getRelativePath(),oCurrSequence.getOutputPath()+"/../");
+        pAlgo->m_pDisplayHelper = pDisplayHelper;
 #endif //DISPLAY_OUTPUT
         oCurrSequence.startProcessing();
         while(nCurrFrameIdx<nFrameCount) {
@@ -425,8 +423,8 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
                 cv::bitwise_or(oCurrBGImg,UCHAR_MAX/2,oCurrBGImg,oROI==0);
                 cv::bitwise_or(oCurrFGMask,UCHAR_MAX/2,oCurrFGMask,oROI==0);
             }
-            oDisplayHelper.display(oCurrInputFrame,oCurrBGImg,oCurrSequence.getColoredSegmMask(oCurrFGMask,nCurrFrameIdx),nCurrFrameIdx);
-            const int nKeyPressed = oDisplayHelper.waitKey();
+            pDisplayHelper->display(oCurrInputFrame,oCurrBGImg,oCurrSequence.getColoredSegmMask(oCurrFGMask,nCurrFrameIdx),nCurrFrameIdx);
+            const int nKeyPressed = pDisplayHelper->waitKey();
             if(nKeyPressed==(int)'q')
                 break;
 #endif //DISPLAY_OUTPUT

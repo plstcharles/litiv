@@ -16,7 +16,6 @@
 // limitations under the License.
 
 #include "litiv/video/BackgroundSubtractorLOBSTER.hpp"
-#include "litiv/utils/OpenCVUtils.hpp"
 
 #if HAVE_GLSL
 

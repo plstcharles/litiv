@@ -18,7 +18,7 @@
 #pragma once
 
 #include "litiv/utils/ParallelUtils.hpp"
-#include <opencv2/imgproc.hpp>
+#include "litiv/utils/OpenCVUtils.hpp"
 
 template<ParallelUtils::eParallelAlgoType eImpl, typename enable=void>
 class EdgeDetector_;
@@ -50,10 +50,7 @@ public:
     template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
     IEdgeDetector_(size_t nROIBorderSize, typename std::enable_if<eImplTemp==ParallelUtils::eNonParallel>::type* /*pUnused*/=0) :
             ParallelUtils::ParallelAlgo_<ParallelUtils::eNonParallel>(),
-            m_nROIBorderSize(nROIBorderSize),
-            m_nDebugCoordX(0),
-            m_nDebugCoordY(0),
-            m_pDebugFS(nullptr) {}
+            m_nROIBorderSize(nROIBorderSize) {}
 #if HAVE_GLSL
     //! glsl impl constructor
     template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
@@ -65,10 +62,7 @@ public:
                                                                nExtraACBOs,nExtraImages,nExtraTextures,
                                                                CV_8UC1,nDebugType,true,bUseDisplay,
                                                                bUseTimers,bUseIntegralFormat),
-            m_nROIBorderSize(nROIBorderSize),
-            m_nDebugCoordX(0),
-            m_nDebugCoordY(0),
-            m_pDebugFS(nullptr) {}
+            m_nROIBorderSize(nROIBorderSize) {}
 #endif //HAVE_GLSL
 #if HAVE_CUDA
     static_assert(eImpl!=ParallelUtils::eCUDA),"Missing constr impl");
@@ -87,12 +81,9 @@ protected:
 private:
     IEdgeDetector_& operator=(const IEdgeDetector_&) = delete;
     IEdgeDetector_(const IEdgeDetector_&) = delete;
-
 public:
     // #### for debug purposes only ####
-    int m_nDebugCoordX, m_nDebugCoordY;
-    std::string m_sDebugName;
-    cv::FileStorage* m_pDebugFS;
+    cv::DisplayHelperPtr m_pDisplayHelper;
 };
 
 #if HAVE_GLSL
