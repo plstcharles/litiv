@@ -26,14 +26,10 @@
 
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
-#define WRITE_AVI_OUTPUT        0
-#define EVALUATE_OUTPUT         0
+#define EVALUATE_OUTPUT         1
 #define DEBUG_OUTPUT            0
 #define DISPLAY_OUTPUT          0
-#define DISPLAY_TIMERS          0
 ////////////////////////////////
-#define USE_VIBE                0
-#define USE_PBAS                0
 #define USE_PAWCS               0
 #define USE_LOBSTER             1
 #define USE_SUBSENSE            0
@@ -83,16 +79,10 @@
 #define NEED_FG_MASK (DISPLAY_OUTPUT || WRITE_IMG_OUTPUT || (EVALUATE_OUTPUT && (!USE_GPU_EVALUATION || VALIDATE_GPU_EVALUATION)))
 #define NEED_LAST_GT_MASK (DISPLAY_OUTPUT || (EVALUATE_OUTPUT && (!USE_GPU_EVALUATION || VALIDATE_GPU_EVALUATION)))
 #define NEED_GT_MASK (DISPLAY_OUTPUT || EVALUATE_OUTPUT)
-#define LIMIT_MODEL_TO_SEQUENCE_ROI (USE_LOBSTER||USE_SUBSENSE||USE_PAWCS)
-#define BOOTSTRAP_100_FIRST_FRAMES  (USE_LOBSTER||USE_SUBSENSE||USE_PAWCS)
 #if (USE_GLSL_IMPL+USE_CUDA_IMPL+USE_OPENCL_IMPL)>1
 #error "Must specify a single impl."
-#elif (USE_LOBSTER+USE_SUBSENSE+USE_VIBE+USE_PBAS+USE_PAWCS)!=1
+#elif (USE_LOBSTER+USE_SUBSENSE+USE_PAWCS)!=1
 #error "Must specify a single algorithm."
-#elif USE_VIBE
-#include "litiv/video/BackgroundSubtractorViBe.hpp"
-#elif USE_PBAS
-#include "litiv/video/BackgroundSubtractorPBAS.hpp"
 #elif USE_PAWCS
 #include "litiv/video/BackgroundSubtractorPAWCS.hpp"
 #elif USE_LOBSTER
@@ -103,29 +93,11 @@
 #if (DEBUG_OUTPUT && (USE_GPU_IMPL || DEFAULT_NB_THREADS>1))
 #error "Cannot debug output with GPU support or with more than one thread."
 #endif //(DEBUG_OUTPUT && (USE_GPU_IMPL || DEFAULT_NB_THREADS>1))
-#if DISPLAY_TIMERS
-#define TIMER_INTERNAL_TIC(x) TIMER_TIC(x)
-#define TIMER_INTERNAL_TOC(x) TIMER_TOC(x)
-#define TIMER_INTERNAL_ELAPSED_MS(x) TIMER_ELAPSED_MS(x)
-#else //!ENABLE_INTERNAL_TIMERS
-#define TIMER_INTERNAL_TIC(x)
-#define TIMER_INTERNAL_TOC(x)
-#define TIMER_INTERNAL_ELAPSED_MS(x)
-#endif //!ENABLE_INTERNAL_TIMERS
 #if (HAVE_GLSL && USE_GLSL_IMPL)
 #if !HAVE_GLFW
 #error "missing glfw"
 #endif //!HAVE_GLFW
-void AnalyzeSequence_GLSL(litiv::IDataHandlerPtr pBatch);
-#elif (HAVE_CUDA && USE_CUDA_IMPL)
-static_assert(false,"missing impl");
-#elif (HAVE_OPENCL && USE_OPENCL_IMPL)
-static_assert(false,"missing impl");
-#elif !USE_GPU_IMPL
-void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch);
-#else // bad config
-#error "Bad config, trying to use an unavailable impl."
-#endif // bad config
+#endif //(HAVE_GLSL && USE_GLSL_IMPL)
 #ifndef DATASET_ROOT
 #error "Dataset root path should have been specified in CMake."
 #endif //ndef(DATASET_ROOT)
@@ -142,19 +114,21 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch);
     std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsGrayscaleDirTokens */ \
     0,                                                           /* => size_t nOutputIdxOffset */ \
     bool(WRITE_IMG_OUTPUT),                                      /* => bool bSaveOutput */ \
+    bool(EVALUATE_OUTPUT),                                       /* => bool bUseEvaluator */ \
     bool(USE_GPU_IMPL),                                          /* => bool bForce4ByteDataAlign */ \
     DATASET_SCALE_FACTOR                                         /* => double dScaleFactor */
 #else //defined(DATASET_ID)
 #define DATASET_PARAMS \
     DATASET_OUTPUT_PATH,                                         /* => const std::string& sOutputDirName */ \
     bool(WRITE_IMG_OUTPUT),                                      /* => bool bSaveOutput */ \
+    bool(EVALUATE_OUTPUT),                                       /* => bool bUseEvaluator */ \
     bool(USE_GPU_IMPL),                                          /* => bool bForce4ByteDataAlign */ \
     DATASET_SCALE_FACTOR                                         /* => double dScaleFactor */
 #endif //defined(DATASET_ID)
-using DatasetType = litiv::Dataset_<litiv::eDatasetType_VideoSegm,litiv::DATASET_ID>;
 
-// @@@@ package x/y/event/code into shared_ptr struct? check opencv 3.0 callback for mouse event?
-int g_nLatestMouseX = -1, g_nLatestMouseY = -1;
+void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch);
+using DatasetType = litiv::Dataset_<litiv::eDatasetType_VideoSegm,litiv::DATASET_ID>;
+int g_nLatestMouseX = -1, g_nLatestMouseY = -1; // @@@@ package x/y/event/code into shared_ptr struct? check opencv 3.0 callback for mouse event?
 int *g_pnLatestMouseX = &g_nLatestMouseX, *g_pnLatestMouseY = &g_nLatestMouseY;
 void OnMouseEvent(int event, int x, int y, int, void*) {
     if(event!=cv::EVENT_MOUSEMOVE || !x || !y)
@@ -164,7 +138,8 @@ void OnMouseEvent(int event, int x, int y, int, void*) {
 }
 
 std::atomic_size_t g_nActiveThreads(0);
-const size_t g_nMaxThreads = DEFAULT_NB_THREADS;//std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
+const size_t g_nMaxThreads = USE_GPU_IMPL?1:std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
+constexpr bool g_bIsPrecaching = DATASET_PRECACHING;
 
 int main(int, char**) {
     try {
@@ -183,19 +158,10 @@ int main(int, char**) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             litiv::IDataHandlerPtr pBatch = vpBatches.top();
             std::cout << "\tProcessing [" << ++nProcessedBatches << "/" << nTotBatches << "] (" << pBatch->getRelativePath() << ", L=" << std::scientific << std::setprecision(2) << pBatch->getExpectedLoad() << ")" << std::endl;
-#if DATASET_PRECACHING
-            pBatch->startPrecaching(EVALUATE_OUTPUT);
-#endif //DATASET_PRECACHING
-#if (HAVE_GLSL && USE_GLSL_IMPL)
-            AnalyzeSequence_GLSL(pBatch);
-#elif (HAVE_CUDA && USE_CUDA_IMPL)
-            static_assert(false,"missing impl");
-#elif (HAVE_OPENCL && USE_OPENCL_IMPL)
-            static_assert(false,"missing impl");
-#elif !USE_GPU_IMPL
+            if(DATASET_PRECACHING)
+                pBatch->startPrecaching(EVALUATE_OUTPUT);
             ++g_nActiveThreads;
             std::thread(AnalyzeSequence,(int)nProcessedBatches,pBatch).detach();
-#endif //!USE_GPU_IMPL
             vpBatches.pop();
         }
         while(g_nActiveThreads>0)
@@ -219,7 +185,7 @@ void GLFWErrorCallback(int nCode, const char* acMessage) {
     g_sLatestGLFWErrorMessage = ssStr.str();
 }
 
-void AnalyzeSequence_GLSL(litiv::IDataHandlerPtr pBatch) {
+void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
     size_t nCurrFrameIdx = 0;
@@ -232,7 +198,7 @@ void AnalyzeSequence_GLSL(litiv::IDataHandlerPtr pBatch) {
             lvErrorExt("Missing evaluation impl for video segmentation dataset '%s'",g_pDatasetInfo->m_sDatasetName.c_str());
         const std::string sCurrSeqName = CxxUtils::clampString(pCurrSequence->m_sName,12);
         const size_t nFrameCount = pCurrSequence->GetTotalImageCount();
-        const cv::Mat oROI = LIMIT_MODEL_TO_SEQUENCE_ROI?pCurrSequence->GetROI():cv::Mat();
+        const cv::Mat oROI = pCurrSequence->GetROI();
         cv::Mat oCurrInputFrame = pCurrSequence->GetInputFromIndex(nCurrFrameIdx).clone();
         CV_Assert(!oCurrInputFrame.empty());
         CV_Assert(oCurrInputFrame.isContinuous());
@@ -288,36 +254,12 @@ void AnalyzeSequence_GLSL(litiv::IDataHandlerPtr pBatch) {
         std::shared_ptr<BackgroundSubtractorPAWCS_GLSL> pAlgo(new BackgroundSubtractorPAWCS_GLSL());
         const double dDefaultLearningRate = 0;
         pAlgo->initialize(oCurrInputFrame,oROI);
-#else //USE_VIBE || USE_PBAS
-#error "Missing glsl impl." // ... @@@@@
-        const size_t m_nInputChannels = (size_t)oCurrInputFrame.channels();
-#if USE_VIBE
-        std::shared_ptr<cv::BackgroundSubtractorViBe_GLSL> pAlgo;
-        if(m_nInputChannels==3)
-            pAlgo = std::shared_ptr<cv::BackgroundSubtractorViBe_GLSL>(new BackgroundSubtractorViBe_GLSL_3ch());
-        else
-            pAlgo = std::shared_ptr<cv::BackgroundSubtractorViBe_GLSL>(new BackgroundSubtractorViBe_GLSL_1ch());
-        const double dDefaultLearningRate = BGSVIBE_DEFAULT_LEARNING_RATE;
-#else //USE_PBAS
-        std::shared_ptr<cv::BackgroundSubtractorPBAS_GLSL> pAlgo;
-        if(m_nInputChannels==3)
-            pAlgo = std::shared_ptr<cv::BackgroundSubtractorPBAS_GLSL>(new BackgroundSubtractorPBAS_GLSL_3ch());
-        else
-            pAlgo = std::shared_ptr<cv::BackgroundSubtractorPBAS_GLSL>(new BackgroundSubtractorPBAS_GLSL_1ch());
-        const double dDefaultLearningRate = BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE;
-#endif //USE_PBAS
-        pAlgo->initialize(oCurrInputFrame);
-#endif //USE_VIBE || USE_PBAS
+#endif //USE...
 #if DISPLAY_OUTPUT
         bool bContinuousUpdates = false;
         std::string sDisplayName = pCurrSequence->m_sRelativePath;
         cv::namedWindow(sDisplayName);
 #endif //DISPLAY_OUTPUT
-#if (WRITE_IMG_OUTPUT || WRITE_AVI_OUTPUT)
-#if WRITE_AVI_OUTPUT
-        cv::VideoWriter oSegmWriter(pCurrSequence->m_sResultsPath+"../"+pCurrSequence->m_sName+"_segm.avi",CV_FOURCC('F','F','V','1'),30,pCurrSequence->GetImageSize(),false);
-#endif //WRITE_AVI_OUTPUT
-#endif //(WRITE_IMG_OUTPUT || WRITE_AVI_OUTPUT)
         std::shared_ptr<GLImageProcAlgo> pGLSLAlgo = std::dynamic_pointer_cast<GLImageProcAlgo>(pAlgo);
         if(pGLSLAlgo==nullptr)
             glError("Segmentation algorithm has no GLImageProcAlgo interface");
@@ -340,15 +282,11 @@ void AnalyzeSequence_GLSL(litiv::IDataHandlerPtr pBatch) {
         while(nNextFrameIdx<=nFrameCount) {
             if(!((nCurrFrameIdx+1)%100))
                 std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nCurrFrameIdx+1 << "/" << nFrameCount << "   [GPU]" << std::endl;
-            const double dCurrLearningRate = (BOOTSTRAP_100_FIRST_FRAMES&&nCurrFrameIdx<=100)?1:dDefaultLearningRate;
-            TIMER_INTERNAL_TIC(OverallLoop);
-            TIMER_INTERNAL_TIC(PipelineUpdate);
+            const double dCurrLearningRate = nCurrFrameIdx<=100?1:dDefaultLearningRate;
             pAlgo->apply_async(oNextInputFrame,dCurrLearningRate);
-            TIMER_INTERNAL_TOC(PipelineUpdate);
 #if USE_GLSL_EVALUATION
             pGLSLAlgoEvaluator->apply_async(oNextGTMask);
 #endif //USE_GLSL_EVALUATION
-            TIMER_INTERNAL_TIC(VideoQuery);
 #if DISPLAY_OUTPUT
             oCurrInputFrame.copyTo(oLastInputFrame);
             oNextInputFrame.copyTo(oCurrInputFrame);
@@ -366,7 +304,6 @@ void AnalyzeSequence_GLSL(litiv::IDataHandlerPtr pBatch) {
             if(nNextFrameIdx<nFrameCount)
                 oNextGTMask = pCurrSequence->GetGTFromIndex(nNextFrameIdx);
 #endif //NEED_GT_MASK
-            TIMER_INTERNAL_TOC(VideoQuery);
             glErrorCheck;
             if(glfwWindowShouldClose(pWindow.get()))
                 break;
@@ -405,22 +342,10 @@ void AnalyzeSequence_GLSL(litiv::IDataHandlerPtr pBatch) {
             else if(nKeyPressed==(int)'q')
                 break;
 #endif //DISPLAY_OUTPUT
-#if WRITE_AVI_OUTPUT
-            oSegmWriter.write(oLastFGMask);
-#endif //WRITE_AVI_OUTPUT
-#if WRITE_IMG_OUTPUT
-            pCurrSequence->WriteResult(nCurrFrameIdx,oLastFGMask);
-#endif //WRITE_IMG_OUTPUT
 #if (EVALUATE_OUTPUT && (!USE_GLSL_EVALUATION || VALIDATE_GPU_EVALUATION))
             if(pCurrSequence->m_pEvaluator)
                 pCurrSequence->m_pEvaluator->AccumulateMetricsFromResult(oCurrFGMask,oCurrGTMask,oROI);
 #endif //(EVALUATE_OUTPUT && (!USE_GLSL_EVALUATION || VALIDATE_GPU_EVALUATION))
-            TIMER_INTERNAL_TOC(OverallLoop);
-#if DISPLAY_TIMERS
-            std::cout << "VideoQuery=" << TIMER_INTERNAL_ELAPSED_MS(VideoQuery) << "ms,  "
-            << "PipelineUpdate=" << TIMER_INTERNAL_ELAPSED_MS(PipelineUpdate) << "ms,  "
-            << "OverallLoop=" << TIMER_INTERNAL_ELAPSED_MS(OverallLoop) << "ms" << std::endl;
-#endif //ENABLE_INTERNAL_TIMERS
             ++nCurrFrameIdx;
         }
         const double dTimeElapsed = TIMER_ELAPSED_MS(MainLoop)/1000;
@@ -479,51 +404,29 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         CV_Assert(oCurrSequence.getFrameCount()>1);
         const std::string sCurrSeqName = CxxUtils::clampString(oCurrSequence.getName(),12);
         const size_t nFrameCount = oCurrSequence.getFrameCount();
-        const cv::Mat oROI = LIMIT_MODEL_TO_SEQUENCE_ROI?oCurrSequence.getROI():cv::Mat();
+        const cv::Mat oROI = oCurrSequence.getROI();
         cv::Mat oCurrInputFrame = oCurrSequence.getInputFrame(nCurrFrameIdx).clone();
         CV_Assert(!oCurrInputFrame.empty());
         CV_Assert(oCurrInputFrame.isContinuous());
-#if NEED_GT_MASK
-        cv::Mat oCurrGTMask = oCurrSequence.getGTFrame(nCurrFrameIdx).clone();
-        CV_Assert(!oCurrGTMask.empty() && oCurrGTMask.isContinuous());
-#endif //NEED_GT_MASK
         cv::Mat oCurrFGMask(oCurrSequence.getFrameSize(),CV_8UC1,cv::Scalar_<uchar>(0));
-#if DISPLAY_OUTPUT
-        cv::Mat oCurrBGImg;
-#endif //DISPLAY_OUTPUT
 #if USE_LOBSTER
         std::shared_ptr<BackgroundSubtractorLOBSTER> pAlgo(new BackgroundSubtractorLOBSTER());
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
-        pAlgo->initialize(oCurrInputFrame,oROI);
 #elif USE_SUBSENSE
         std::shared_ptr<BackgroundSubtractorSuBSENSE> pAlgo(new BackgroundSubtractorSuBSENSE());
         const double dDefaultLearningRate = 0;
-        pAlgo->initialize(oCurrInputFrame,oROI);
 #elif USE_PAWCS
         std::shared_ptr<BackgroundSubtractorPAWCS> pAlgo(new BackgroundSubtractorPAWCS());
         const double dDefaultLearningRate = 0;
+#endif //USE_...
         pAlgo->initialize(oCurrInputFrame,oROI);
-#else //USE_VIBE || USE_PBAS
-        const size_t m_nInputChannels = (size_t)oCurrInputFrame.channels();
-#if USE_VIBE
-        std::shared_ptr<BackgroundSubtractorViBe> pAlgo;
-        if(m_nInputChannels==3)
-            pAlgo = std::shared_ptr<BackgroundSubtractorViBe>(new BackgroundSubtractorViBe_3ch());
-        else
-            pAlgo = std::shared_ptr<BackgroundSubtractorViBe>(new BackgroundSubtractorViBe_1ch());
-        const double dDefaultLearningRate = BGSVIBE_DEFAULT_LEARNING_RATE;
-#else //USE_PBAS
-        std::shared_ptr<BackgroundSubtractorPBAS> pAlgo;
-        if(m_nInputChannels==3)
-            pAlgo = std::shared_ptr<BackgroundSubtractorPBAS>(new BackgroundSubtractorPBAS_3ch());
-        else
-            pAlgo = std::shared_ptr<BackgroundSubtractorPBAS>(new BackgroundSubtractorPBAS_1ch());
-        const double dDefaultLearningRate = BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE;
-#endif //USE_PBAS
-        pAlgo->initialize(oCurrInputFrame);
-#endif //USE_VIBE || USE_PBAS
-#if (DEBUG_OUTPUT && (USE_LOBSTER || USE_SUBSENSE || USE_PAWCS))
-        cv::FileStorage oDebugFS = cv::FileStorage(oCurrSequence.getResultsPath()+"/../"+oCurrSequence.getName()+"_debug.yml",cv::FileStorage::WRITE);
+#if DISPLAY_OUTPUT
+        bool bContinuousUpdates = false;
+        std::string sDisplayName = oCurrSequence.getRelativePath();
+        cv::namedWindow(sDisplayName);
+#if DEBUG_OUTPUT
+        // @@@@@ fuse getDisplayImage output image (3 tiles) with debug in new utility struct in utils module?
+        cv::FileStorage oDebugFS = cv::FileStorage(oCurrSequence.getOutputPath()+"/../"+oCurrSequence.getName()+"_debug.yml",cv::FileStorage::WRITE);
         pAlgo->m_pDebugFS = &oDebugFS;
         pAlgo->m_sDebugName = oCurrSequence.getName();
         g_pnLatestMouseX = &pAlgo->m_nDebugCoordX;
@@ -531,48 +434,32 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         std::string sMouseDebugDisplayName = oCurrSequence.getName() + " [MOUSE DEBUG]";
         cv::namedWindow(sMouseDebugDisplayName,0);
         cv::setMouseCallback(sMouseDebugDisplayName,OnMouseEvent,nullptr);
-#endif //(DEBUG_OUTPUT && (USE_LOBSTER || USE_SUBSENSE || USE_PAWCS))
-#if DISPLAY_OUTPUT
-        bool bContinuousUpdates = false;
-        std::string sDisplayName = oCurrSequence.getRelativePath();
-        cv::namedWindow(sDisplayName);
+#endif //DEBUG_OUTPUT
 #endif //DISPLAY_OUTPUT
-#if (WRITE_IMG_OUTPUT || WRITE_AVI_OUTPUT)
-#if WRITE_AVI_OUTPUT
-        cv::VideoWriter oSegmWriter(oCurrSequence.getResultsPath()+"/../"+oCurrSequence.getName()+"_segm.avi",CV_FOURCC('F','F','V','1'),30,oCurrSequence.getFrameSize(),false);
-#endif //WRITE_AVI_OUTPUT
-#endif //(WRITE_IMG_OUTPUT || WRITE_AVI_OUTPUT)
         oCurrSequence.startProcessing();
         while(nCurrFrameIdx<nFrameCount) {
             if(!((nCurrFrameIdx+1)%100) && nCurrFrameIdx<nFrameCount)
                 std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nCurrFrameIdx+1 << "/" << nFrameCount << "   [T=" << nThreadIdx << "]" << std::endl;
-            const double dCurrLearningRate = (BOOTSTRAP_100_FIRST_FRAMES&&nCurrFrameIdx<=100)?1:dDefaultLearningRate;
-            TIMER_INTERNAL_TIC(OverallLoop);
-            TIMER_INTERNAL_TIC(VideoQuery);
+            const double dCurrLearningRate = nCurrFrameIdx<=100?1:dDefaultLearningRate;
             oCurrInputFrame = oCurrSequence.getInputFrame(nCurrFrameIdx);
-#if DEBUG_OUTPUT
-            cv::imshow(sMouseDebugDisplayName,oCurrInputFrame);
-#endif //DEBUG_OUTPUT
-#if NEED_GT_MASK
-            oCurrGTMask = oCurrSequence.getGTFrame(nCurrFrameIdx);
-#endif //NEED_GT_MASK
-            TIMER_INTERNAL_TOC(VideoQuery);
-            TIMER_INTERNAL_TIC(PipelineUpdate);
             pAlgo->apply(oCurrInputFrame,oCurrFGMask,dCurrLearningRate);
-            TIMER_INTERNAL_TOC(PipelineUpdate);
-            if(!oROI.empty())
-                cv::bitwise_or(oCurrFGMask,UCHAR_MAX/2,oCurrFGMask,oROI==0);
 #if DISPLAY_OUTPUT
+            cv::Mat oCurrBGImg;
             pAlgo->getBackgroundImage(oCurrBGImg);
-            if(!oROI.empty())
+            if(!oROI.empty()) {
                 cv::bitwise_or(oCurrBGImg,UCHAR_MAX/2,oCurrBGImg,oROI==0);
-            cv::Mat oDisplayFrame = DatasetUtils::GetDisplayImage(oCurrInputFrame,oCurrBGImg,oCurrSequence.getColoredSegmMaskFromResult(oCurrFGMask,oCurrGTMask,oROI),nCurrFrameIdx,cv::Point(*g_pnLatestMouseX,*g_pnLatestMouseY));
+                cv::bitwise_or(oCurrFGMask,UCHAR_MAX/2,oCurrFGMask,oROI==0);
+            }
+            cv::Mat oDisplayFrame = litiv::getDisplayImage(oCurrInputFrame,oCurrBGImg,oCurrSequence.getColoredSegmMask(oCurrFGMask,nCurrFrameIdx),nCurrFrameIdx,cv::Point(*g_pnLatestMouseX,*g_pnLatestMouseY));
             cv::Mat oDisplayFrameResized;
             if(oDisplayFrame.cols>1920 || oDisplayFrame.rows>1080)
                 cv::resize(oDisplayFrame,oDisplayFrameResized,cv::Size(oDisplayFrame.cols/2,oDisplayFrame.rows/2));
             else
                 oDisplayFrameResized = oDisplayFrame;
             cv::imshow(sDisplayName,oDisplayFrameResized);
+#if DEBUG_OUTPUT
+            cv::imshow(sMouseDebugDisplayName,oCurrInputFrame);
+#endif //DEBUG_OUTPUT
             int nKeyPressed;
             if(bContinuousUpdates)
                 nKeyPressed = cv::waitKey(1);
@@ -585,38 +472,34 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
             else if(nKeyPressed==(int)'q')
                 break;
 #endif //DISPLAY_OUTPUT
-#if WRITE_AVI_OUTPUT
-            oSegmWriter.write(oCurrFGMask);
-#endif //WRITE_AVI_OUTPUT
-#if EVALUATE_OUTPUT
-            oCurrSequence.pushSegmMask(oCurrFGMask,nCurrFrameIdx);
-#endif //EVALUATE_OUTPUT
-            TIMER_INTERNAL_TOC(OverallLoop);
-#if DISPLAY_TIMERS
-            std::cout << "VideoQuery=" << TIMER_INTERNAL_ELAPSED_MS(VideoQuery) << "ms,  "
-                      << "PipelineUpdate=" << TIMER_INTERNAL_ELAPSED_MS(PipelineUpdate) << "ms,  "
-                      << "OverallLoop=" << TIMER_INTERNAL_ELAPSED_MS(OverallLoop) << "ms" << std::endl;
-#endif //ENABLE_INTERNAL_TIMERS
-            ++nCurrFrameIdx;
+            oCurrSequence.pushSegmMask(oCurrFGMask,nCurrFrameIdx++);
         }
         oCurrSequence.stopProcessing();
         const double dTimeElapsed = oCurrSequence.getProcessTime();
         const double dProcessSpeed = (double)nCurrFrameIdx/dTimeElapsed;
-        std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << nFrameCount << "/" << nFrameCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
+        std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << nCurrFrameIdx << "/" << nFrameCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
         oCurrSequence.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
 #if DISPLAY_OUTPUT
-        cv::destroyWindow(sDisplayName);
-#endif //DISPLAY_OUTPUT
 #if DEBUG_OUTPUT
         cv::setMouseCallback(sMouseDebugDisplayName,OnMouseEvent,nullptr);
         cv::destroyWindow(sMouseDebugDisplayName);
         g_pnLatestMouseX = &g_nLatestMouseX;
         g_pnLatestMouseY = &g_nLatestMouseY;
 #endif //DEBUG_OUTPUT
+        cv::destroyWindow(sDisplayName);
+#endif //DISPLAY_OUTPUT
     }
     catch(const cv::Exception& e) {std::cout << "\nAnalyzeSequence caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
     catch(const std::exception& e) {std::cout << "\nAnalyzeSequence caught std::exception:\n" << e.what() << "\n" << std::endl;}
     catch(...) {std::cout << "\nAnalyzeSequence caught unhandled exception\n" << std::endl;}
-    g_nActiveThreads--;
+    --g_nActiveThreads;
+    try {
+        DatasetType::WorkBatch& oCurrSequence = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
+        if(oCurrSequence.isProcessing())
+            oCurrSequence.stopProcessing();
+    } catch(...) {
+        std::cout << "\nAnalyzeSequence caught unhandled exception while attempting to stop batch processing.\n" << std::endl;
+        throw;
+    }
 }
 #endif //!USE_GPU_IMPL

@@ -22,7 +22,6 @@
 #define EVALUATE_OUTPUT         0
 #define DEBUG_OUTPUT            0
 #define DISPLAY_OUTPUT          1
-#define DISPLAY_TIMERS          0
 ////////////////////////////////
 #define USE_CANNY               1
 #define USE_LBSP                0
@@ -89,15 +88,6 @@
 #elif USE_LBSP
 #include "litiv/imgproc/EdgeDetectorLBSP.hpp"
 #endif //USE_...
-#if DISPLAY_TIMERS
-#define TIMER_INTERNAL_TIC(x) TIMER_TIC(x)
-#define TIMER_INTERNAL_TOC(x) TIMER_TOC(x)
-#define TIMER_INTERNAL_ELAPSED_MS(x) TIMER_ELAPSED_MS(x)
-#else //!ENABLE_INTERNAL_TIMERS
-#define TIMER_INTERNAL_TIC(x)
-#define TIMER_INTERNAL_TOC(x)
-#define TIMER_INTERNAL_ELAPSED_MS(x)
-#endif //!ENABLE_INTERNAL_TIMERS
 #if (HAVE_GLSL && USE_GLSL_IMPL)
 #if !HAVE_GLFW
 #error "missing glfw"
@@ -358,11 +348,6 @@ void AnalyzeSet_GLSL(std::shared_ptr<DatasetUtils::Segm::Image::Set> pCurrSet) {
                 pCurrSet->m_pEvaluator->AccumulateMetricsFromResult(oCurrEdgeMask,oCurrGTMask,cv::Mat());
 #endif //(EVALUATE_OUTPUT && (!USE_GLSL_EVALUATION || VALIDATE_GPU_EVALUATION))
             TIMER_INTERNAL_TOC(OverallLoop);
-#if DISPLAY_TIMERS
-            std::cout << "ImageQuery=" << TIMER_INTERNAL_ELAPSED_MS(ImageQuery) << "ms,  "
-            << "PipelineUpdate=" << TIMER_INTERNAL_ELAPSED_MS(PipelineUpdate) << "ms,  "
-            << "OverallLoop=" << TIMER_INTERNAL_ELAPSED_MS(OverallLoop) << "ms" << std::endl;
-#endif //ENABLE_INTERNAL_TIMERS
             ++nCurrImageIdx;
         }
         TIMER_TOC(MainLoop);
@@ -497,11 +482,6 @@ void AnalyzeSet(int nThreadIdx, std::shared_ptr<DatasetUtils::Segm::Image::Set> 
                 pCurrSet->m_pEvaluator->AccumulateMetricsFromResult(oCurrEdgeMask,oCurrGTMask,cv::Mat());
 #endif //EVALUATE_OUTPUT
             TIMER_INTERNAL_TOC(OverallLoop);
-#if DISPLAY_TIMERS
-            std::cout << "ImageQuery=" << TIMER_INTERNAL_ELAPSED_MS(ImageQuery) << "ms,  "
-                      << "PipelineUpdate=" << TIMER_INTERNAL_ELAPSED_MS(PipelineUpdate) << "ms,  "
-                      << "OverallLoop=" << TIMER_INTERNAL_ELAPSED_MS(OverallLoop) << "ms" << std::endl;
-#endif //ENABLE_INTERNAL_TIMERS
             ++nCurrImageIdx;
         }
         TIMER_TOC(MainLoop);
