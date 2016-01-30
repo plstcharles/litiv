@@ -16,10 +16,7 @@
 // limitations under the License.
 
 #include "litiv/video/BackgroundSubtractorSuBSENSE.hpp"
-#include <iostream>
-#include <iomanip>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/highgui.hpp>
+#include "litiv/utils/OpenCVUtils.hpp"
 
 //
 // NOTE: this version of SuBSENSE is still pretty messy (debug). The cleaner (but older) implementation made available on
@@ -93,7 +90,7 @@ void BackgroundSubtractorSuBSENSE::refreshModel(float fSamplesRefreshFrac, bool 
             if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
                 for(size_t nCurrModelSampleIdx=nRefreshSampleStartPos; nCurrModelSampleIdx<nRefreshSampleStartPos+nModelSamplesToRefresh; ++nCurrModelSampleIdx) {
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    CxxUtils::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    cv::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                     if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
                         const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
@@ -110,7 +107,7 @@ void BackgroundSubtractorSuBSENSE::refreshModel(float fSamplesRefreshFrac, bool 
             if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
                 for(size_t nCurrModelSampleIdx=nRefreshSampleStartPos; nCurrModelSampleIdx<nRefreshSampleStartPos+nModelSamplesToRefresh; ++nCurrModelSampleIdx) {
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    CxxUtils::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    cv::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                     if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
                         const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
@@ -306,9 +303,9 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                 int nSampleImgCoord_Y, nSampleImgCoord_X;
                 const bool bCurrUsing3x3Spread = m_bUse3x3Spread && !m_oUnstableRegionMask.data[nPxIter];
                 if(bCurrUsing3x3Spread)
-                    CxxUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    cv::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 else
-                    CxxUtils::getRandNeighborPosition_5x5(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    cv::getRandNeighborPosition_5x5(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 const size_t n_rand = rand();
                 const size_t idx_rand_uchar = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                 const size_t idx_rand_flt32 = idx_rand_uchar*4;
@@ -453,9 +450,9 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                 int nSampleImgCoord_Y, nSampleImgCoord_X;
                 const bool bCurrUsing3x3Spread = m_bUse3x3Spread && !m_oUnstableRegionMask.data[nPxIter];
                 if(bCurrUsing3x3Spread)
-                    CxxUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    cv::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 else
-                    CxxUtils::getRandNeighborPosition_5x5(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    cv::getRandNeighborPosition_5x5(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 const size_t n_rand = rand();
                 const size_t idx_rand_uchar = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                 const size_t idx_rand_flt32 = idx_rand_uchar*4;

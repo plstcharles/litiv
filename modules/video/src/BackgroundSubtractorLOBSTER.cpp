@@ -16,9 +16,7 @@
 // limitations under the License.
 
 #include "litiv/video/BackgroundSubtractorLOBSTER.hpp"
-#include <iostream>
-#include <iomanip>
-#include <opencv2/highgui.hpp>
+#include "litiv/utils/OpenCVUtils.hpp"
 
 #if HAVE_GLSL
 
@@ -60,7 +58,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::refreshModel(float fSam
             if(bForceFGUpdate || !m_oLastFGMask.data[nColOffset]) {
                 for(size_t nCurrModelSampleIdx=nRefreshSampleStartPos; nCurrModelSampleIdx<nRefreshSampleStartPos+nModelSamplesToRefresh; ++nCurrModelSampleIdx) {
                     int nSampleRowIdx, nSampleColIdx;
-                    CxxUtils::getRandSamplePosition_7x7_std2(nSampleColIdx,nSampleRowIdx,(int)nColIdx,(int)nRowIdx,(int)LBSP::PATCH_SIZE/2,m_oFrameSize);
+                    cv::getRandSamplePosition_7x7_std2(nSampleColIdx,nSampleRowIdx,(int)nColIdx,(int)nRowIdx,(int)LBSP::PATCH_SIZE/2,m_oFrameSize);
                     const size_t nSamplePxIdx = nSampleColIdx + nSampleRowIdx*m_oFrameSize.width;
                     if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
                         const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
@@ -440,7 +438,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::refreshModel(flo
         if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
             for(size_t nCurrModelSampleIdx=nRefreshSampleStartPos; nCurrModelSampleIdx<nRefreshSampleStartPos+nModelSamplesToRefresh; ++nCurrModelSampleIdx) {
                 int nSampleImgCoord_Y, nSampleImgCoord_X;
-                CxxUtils::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                cv::getRandSamplePosition_7x7_std2(nSampleImgCoord_X,nSampleImgCoord_Y,m_voPxInfoLUT[nPxIter].nImgCoord_X,m_voPxInfoLUT[nPxIter].nImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                 const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                 if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
                     const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
@@ -528,7 +526,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::apply(cv::InputA
                 }
                 if((rand()%nLearningRate)==0) {
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    CxxUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    cv::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSampleModelIdx = rand()%m_nBGSamples;
                     ushort& nRandInputDesc = m_voBGDescSamples[nSampleModelIdx].at<ushort>(nSampleImgCoord_Y,nSampleImgCoord_X);
                     LBSP::computeDescriptor_threshold(anLBSPLookupVals,nCurrColor,m_anLBSPThreshold_8bitLUT[nCurrColor],nRandInputDesc);
@@ -589,7 +587,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::apply(cv::InputA
                 }
                 if((rand()%nLearningRate)==0) {
                     int nSampleImgCoord_Y, nSampleImgCoord_X;
-                    CxxUtils::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
+                    cv::getRandNeighborPosition_3x3(nSampleImgCoord_X,nSampleImgCoord_Y,nCurrImgCoord_X,nCurrImgCoord_Y,LBSP::PATCH_SIZE/2,m_oImgSize);
                     const size_t nSampleModelIdx = rand()%m_nBGSamples;
                     ushort* anRandInputDesc = ((ushort*)(m_voBGDescSamples[nSampleModelIdx].data + desc_row_step*nSampleImgCoord_Y + 6*nSampleImgCoord_X));
                     for(size_t c=0; c<3; ++c) {

@@ -24,12 +24,13 @@
 
 #include "litiv/datasets.hpp"
 #include "litiv/video.hpp"
+#include "litiv/utils.hpp"
 
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
 #define EVALUATE_OUTPUT         1
-#define DEBUG_OUTPUT            0
-#define DISPLAY_OUTPUT          0
+#define DEBUG_OUTPUT            1
+#define DISPLAY_OUTPUT          1
 ////////////////////////////////
 #define USE_PAWCS               0
 #define USE_LOBSTER             1
@@ -123,18 +124,9 @@
 
 void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch);
 using DatasetType = litiv::Dataset_<litiv::eDatasetType_VideoSegm,litiv::DATASET_ID>;
-int g_nLatestMouseX = -1, g_nLatestMouseY = -1; // @@@@ package x/y/event/code into shared_ptr struct? check opencv 3.0 callback for mouse event?
-int *g_pnLatestMouseX = &g_nLatestMouseX, *g_pnLatestMouseY = &g_nLatestMouseY;
-void OnMouseEvent(int event, int x, int y, int, void*) {
-    if(event!=cv::EVENT_MOUSEMOVE || !x || !y)
-        return;
-    *g_pnLatestMouseX = x;
-    *g_pnLatestMouseY = y;
-}
 
 std::atomic_size_t g_nActiveThreads(0);
 const size_t g_nMaxThreads = USE_GPU_IMPL?1:std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
-constexpr bool g_bIsPrecaching = DATASET_PRECACHING;
 
 int main(int, char**) {
     try {
@@ -415,25 +407,14 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
         pAlgo->initialize(oCurrInputFrame,oROI);
 #if DISPLAY_OUTPUT
-        bool bContinuousUpdates = false;
-        std::string sDisplayName = oCurrSequence.getRelativePath();
-        cv::namedWindow(sDisplayName);
-#if DEBUG_OUTPUT
-        // @@@@@ fuse getDisplayImage output image (3 tiles) with debug in new utility struct in utils module?
-        cv::FileStorage oDebugFS = cv::FileStorage(oCurrSequence.getOutputPath()+"/../"+oCurrSequence.getName()+"_debug.yml",cv::FileStorage::WRITE);
-        pAlgo->m_pDebugFS = &oDebugFS;
-        pAlgo->m_sDebugName = oCurrSequence.getName();
-        g_pnLatestMouseX = &pAlgo->m_nDebugCoordX;
-        g_pnLatestMouseY = &pAlgo->m_nDebugCoordY;
-        std::string sMouseDebugDisplayName = oCurrSequence.getName() + " [MOUSE DEBUG]";
-        cv::namedWindow(sMouseDebugDisplayName,0);
-        cv::setMouseCallback(sMouseDebugDisplayName,OnMouseEvent,nullptr);
-#endif //DEBUG_OUTPUT
+        cv::DisplayHelper oDisplayHelper(oCurrSequence.getRelativePath(),oCurrSequence.getOutputPath()+"/../");
+        //pAlgo->m_pDebugFS = &oDebugFS; @@@@@ todo
+        //pAlgo->m_sDebugName = oCurrSequence.getName();
 #endif //DISPLAY_OUTPUT
         oCurrSequence.startProcessing();
         while(nCurrFrameIdx<nFrameCount) {
             if(!((nCurrFrameIdx+1)%100) && nCurrFrameIdx<nFrameCount)
-                std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nCurrFrameIdx+1 << "/" << nFrameCount << "   [T=" << nThreadIdx << "]" << std::endl;
+                std::cout << "\t\t" << sCurrSeqName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nCurrFrameIdx+1 << "/" << nFrameCount << "   [T=" << nThreadIdx << "]" << std::endl;
             const double dCurrLearningRate = nCurrFrameIdx<=100?1:dDefaultLearningRate;
             oCurrInputFrame = oCurrSequence.getInputFrame(nCurrFrameIdx);
             pAlgo->apply(oCurrInputFrame,oCurrFGMask,dCurrLearningRate);
@@ -444,26 +425,9 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
                 cv::bitwise_or(oCurrBGImg,UCHAR_MAX/2,oCurrBGImg,oROI==0);
                 cv::bitwise_or(oCurrFGMask,UCHAR_MAX/2,oCurrFGMask,oROI==0);
             }
-            cv::Mat oDisplayFrame = litiv::getDisplayImage(oCurrInputFrame,oCurrBGImg,oCurrSequence.getColoredSegmMask(oCurrFGMask,nCurrFrameIdx),nCurrFrameIdx,cv::Point(*g_pnLatestMouseX,*g_pnLatestMouseY));
-            cv::Mat oDisplayFrameResized;
-            if(oDisplayFrame.cols>1920 || oDisplayFrame.rows>1080)
-                cv::resize(oDisplayFrame,oDisplayFrameResized,cv::Size(oDisplayFrame.cols/2,oDisplayFrame.rows/2));
-            else
-                oDisplayFrameResized = oDisplayFrame;
-            cv::imshow(sDisplayName,oDisplayFrameResized);
-#if DEBUG_OUTPUT
-            cv::imshow(sMouseDebugDisplayName,oCurrInputFrame);
-#endif //DEBUG_OUTPUT
-            int nKeyPressed;
-            if(bContinuousUpdates)
-                nKeyPressed = cv::waitKey(1);
-            else
-                nKeyPressed = cv::waitKey(0);
-            if(nKeyPressed!=-1)
-                nKeyPressed %= (UCHAR_MAX+1); // fixes return val bug in some opencv versions
-            if(nKeyPressed==' ')
-                bContinuousUpdates = !bContinuousUpdates;
-            else if(nKeyPressed==(int)'q')
+            oDisplayHelper.display(oCurrInputFrame,oCurrBGImg,oCurrSequence.getColoredSegmMask(oCurrFGMask,nCurrFrameIdx),nCurrFrameIdx);
+            const int nKeyPressed = oDisplayHelper.waitKey();
+            if(nKeyPressed==(int)'q')
                 break;
 #endif //DISPLAY_OUTPUT
             oCurrSequence.pushSegmMask(oCurrFGMask,nCurrFrameIdx++);
@@ -471,17 +435,8 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         oCurrSequence.stopProcessing();
         const double dTimeElapsed = oCurrSequence.getProcessTime();
         const double dProcessSpeed = (double)nCurrFrameIdx/dTimeElapsed;
-        std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << nCurrFrameIdx << "/" << nFrameCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
+        std::cout << "\t\t" << sCurrSeqName << " @ F:" << nCurrFrameIdx << "/" << nFrameCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
         oCurrSequence.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
-#if DISPLAY_OUTPUT
-#if DEBUG_OUTPUT
-        cv::setMouseCallback(sMouseDebugDisplayName,OnMouseEvent,nullptr);
-        cv::destroyWindow(sMouseDebugDisplayName);
-        g_pnLatestMouseX = &g_nLatestMouseX;
-        g_pnLatestMouseY = &g_nLatestMouseY;
-#endif //DEBUG_OUTPUT
-        cv::destroyWindow(sDisplayName);
-#endif //DISPLAY_OUTPUT
     }
     catch(const cv::Exception& e) {std::cout << "\nAnalyzeSequence caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
     catch(const std::exception& e) {std::cout << "\nAnalyzeSequence caught std::exception:\n" << e.what() << "\n" << std::endl;}
