@@ -16,17 +16,16 @@
 // limitations under the License.
 
 #include "litiv/imgproc/EdgeDetectionUtils.hpp"
-#include <iostream>
 
 #if HAVE_GLSL
 
-template class IEdgeDetector<ParallelUtils::eGLSL>;
+template class IEdgeDetector_<ParallelUtils::eGLSL>;
 
 template<>
 EdgeDetector_<ParallelUtils::eGLSL>::EdgeDetector_( size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
                                                     size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
                                                     bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize) :
-        IEdgeDetector<ParallelUtils::eGLSL>(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat,nROIBorderSize),
+        IEdgeDetector_<ParallelUtils::eGLSL>(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat,nROIBorderSize),
         m_dCurrThreshold(-1) {}
 
 template<>
@@ -73,21 +72,21 @@ template class EdgeDetector_<ParallelUtils::eGLSL>;
 #endif //HAVE_GLSL
 
 #if HAVE_CUDA
-template class IEdgeDetector<ParallelUtils::eCUDA>;
+template class IEdgeDetector_<ParallelUtils::eCUDA>;
 // ... @@@ add impl later
 template class EdgeDetector_<ParallelUtils::eCUDA>;
 #endif //HAVE_CUDA
 
 #if HAVE_OPENCL
-template class IEdgeDetector<ParallelUtils::eOpenCL>;
+template class IEdgeDetector_<ParallelUtils::eOpenCL>;
 // ... @@@ add impl later
 template class EdgeDetector_<ParallelUtils::eOpenCL>;
 #endif //HAVE_OPENCL
 
-template class IEdgeDetector<ParallelUtils::eNonParallel>;
+template class IEdgeDetector_<ParallelUtils::eNonParallel>;
 
 template<>
 EdgeDetector_<ParallelUtils::eNonParallel>::EdgeDetector_(size_t nROIBorderSize) :
-        IEdgeDetector<ParallelUtils::eNonParallel>(nROIBorderSize) {}
+        IEdgeDetector_<ParallelUtils::eNonParallel>(nROIBorderSize) {}
 
 template class EdgeDetector_<ParallelUtils::eNonParallel>;
