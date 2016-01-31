@@ -55,9 +55,9 @@ namespace vptz {
 
     class VPTZ_API Exception : public std::runtime_error {
     public:
-        template<typename... VALIST>
-        Exception(const char* sErrMsg, const char* sFunc, const char* sFile, int nLine, VALIST... vArgs) :
-                std::runtime_error(cv::format((std::string("vptz::Exception in function '%s' from %s(%d) : \n")+sErrMsg).c_str(),sFunc,sFile,nLine,vArgs...)),
+        template<typename... Targs>
+        Exception(const char* sErrMsg, const char* sFunc, const char* sFile, int nLine, Targs&&... args) :
+                std::runtime_error(cv::format((std::string("vptz::Exception in function '%s' from %s(%d) : \n")+sErrMsg).c_str(),sFunc,sFile,nLine,std::forward<Targs>(args)...)),
                 m_eErrn(GL_NO_ERROR),
                 m_acErrMsg(sErrMsg),
                 m_acFuncName(sFunc),

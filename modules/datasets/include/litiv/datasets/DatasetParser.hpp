@@ -20,23 +20,15 @@
 #include "litiv/datasets/DatasetUtils.hpp"
 #include "litiv/datasets/DatasetEvaluator.hpp"
 
-#define LITIV_DATASET_IMPL_BEGIN(eDatasetType,eDataset) \
-    template<> \
-    struct Dataset_<eDatasetType,eDataset> : public IDataset_<eDatasetType,eDataset> { \
-    private: \
-        template<eDatasetTypeList eDatasetType, eDatasetList eDataset, typename ...Targs> \
-        friend IDatasetPtr datasets::create(const Targs& ... args)
-#define LITIV_DATASET_IMPL_END() }
-
 namespace litiv {
 
     namespace datasets {
 
         template<eDatasetTypeList eDatasetType, eDatasetList eDataset, typename ...Targs>
-        IDatasetPtr create(const Targs& ... args);
+        IDatasetPtr create(Targs&& ... args);
 
         template<eDatasetTypeList eDatasetType, typename ...Targs>
-        IDatasetPtr create(const Targs& ... args);
+        IDatasetPtr create(Targs&& ... args);
 
     } //namespace datasets
 
@@ -142,7 +134,7 @@ namespace litiv {
     template<eDatasetTypeList eDatasetType, eDatasetList eDataset>
     struct IDataset_ : public DatasetEvaluator_<eDatasetType,eDataset> { // dataset interface specialization for smaller impl sizes
 
-        struct WorkBatch final :
+        struct WorkBatch :
                 public DataHandler,
                 public DataProducer_<eDatasetType,eDataset,TNoGroup>,
                 public DataEvaluator_<eDatasetType,eDataset,TNoGroup> {
@@ -171,21 +163,24 @@ namespace litiv {
                 }
             }
             template<typename ...Targs>
-            static std::shared_ptr<WorkBatch> create(const Targs& ... args) {
-                return std::shared_ptr<WorkBatch>(new WorkBatch(args...));
+            static std::shared_ptr<WorkBatch> create(Targs&& ... args) {
+                struct WorkBatchWrapper : public WorkBatch {
+                    WorkBatchWrapper(Targs&& ... args) : WorkBatch(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
+                };
+                return std::make_shared<WorkBatchWrapper>(std::forward<Targs>(args)...);
             }
         private:
             WorkBatch(const std::string& sBatchName, IDatasetPtr pDataset, const std::string& sRelativePath=std::string("./")) :
                     DataHandler(sBatchName,pDataset,sRelativePath),m_dElapsedTime_sec(0),m_bIsProcessing(false) {parseData();}
             WorkBatch& operator=(const WorkBatch&) = delete;
             WorkBatch(const WorkBatch&) = delete;
-            friend struct WorkBatchGroup;
+            friend struct WorkBatchGroup; // really needed? @@@@
             CxxUtils::StopWatch m_oStopWatch;
             double m_dElapsedTime_sec;
             bool m_bIsProcessing;
         };
 
-        struct WorkBatchGroup final :
+        struct WorkBatchGroup :
                 public DataHandler,
                 public DataProducer_<eDatasetType,eDataset,TGroup>,
                 public DataEvaluator_<eDatasetType,eDataset,TGroup> {
@@ -202,9 +197,13 @@ namespace litiv {
             virtual double getExpectedLoad() const override final {return CxxUtils::accumulateMembers<double,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getExpectedLoad();});}
             virtual size_t getTotPackets() const override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getTotPackets();});}
             template<typename ...Targs>
-            static std::shared_ptr<WorkBatchGroup> create(const Targs& ... args) {
-                return std::shared_ptr<WorkBatchGroup>(new WorkBatchGroup(args...));
+            static std::shared_ptr<WorkBatchGroup> create(Targs&& ... args) {
+                struct WorkBatchGroupWrapper : public WorkBatchGroup {
+                    WorkBatchGroupWrapper(Targs&& ... args) : WorkBatchGroup(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
+                };
+                return std::make_shared<WorkBatchGroupWrapper>(std::forward<Targs>(args)...);
             }
+
         private:
             WorkBatchGroup(const std::string& sGroupName, std::shared_ptr<IDataset> pDataset, const std::string& sRelativePath=std::string("./")) :
                     DataHandler(sGroupName,pDataset,sRelativePath+"/"+sGroupName+"/"),m_bIsBare(false) {
@@ -331,13 +330,14 @@ namespace litiv {
     template<eDatasetTypeList eDatasetType, eDatasetList eDataset>
     struct Dataset_ : public IDataset_<eDatasetType,eDataset> {
         // if the dataset type/id is not specialized, redirect to default IDataset_ constructor
-        private:
+        // should still be protected, as creation should always be done via datasets::create
+    protected:
         using IDataset_<eDatasetType,eDataset>::IDataset_;
-        template<eDatasetTypeList eDatasetType2, eDatasetList eDataset2, typename ...Targs>
-        friend IDatasetPtr datasets::create(const Targs& ... args);
     };
 
-    LITIV_DATASET_IMPL_BEGIN(eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet);
+    template<>
+    struct Dataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet> : public IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet> {
+    protected: // should still be protected, as creation should always be done via datasets::create
         Dataset_(const std::string& sOutputDirName, bool bSaveOutput=false, bool bUseEvaluator=true, bool bForce4ByteDataAlign=false, double dScaleFactor=1.0, bool b2014=true) :
                 IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet>(
                         b2014?"CDnet 2014":"CDnet 2012",
@@ -354,20 +354,23 @@ namespace litiv {
                         bForce4ByteDataAlign,
                         dScaleFactor
                 ) {}
-    LITIV_DATASET_IMPL_END();
+    };
 
     namespace datasets {
 
         template<eDatasetTypeList eDatasetType, eDatasetList eDataset, typename ...Targs>
-        IDatasetPtr create(const Targs& ... args) {
-            auto pDataset = IDatasetPtr(new Dataset_<eDatasetType,eDataset>(args...));
+        IDatasetPtr create(Targs&& ... args) {
+            struct DatasetWrapper : public Dataset_<eDatasetType,eDataset> {
+                DatasetWrapper(Targs&& ... args) : Dataset_<eDatasetType,eDataset>(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
+            };
+            IDatasetPtr pDataset = std::make_shared<DatasetWrapper>(std::forward<Targs>(args)...);
             pDataset->parseDataset();
             return pDataset;
         }
 
         template<eDatasetTypeList eDatasetType, typename ...Targs>
-        IDatasetPtr create(const Targs& ... args) {
-            return create<eDatasetType,getCustomDatasetEnum(eDatasetType)>(args...);
+        IDatasetPtr create(Targs&& ... args) {
+            return create<eDatasetType,getCustomDatasetEnum(eDatasetType)>(std::forward<Targs>(args)...);
         }
 
     } //namespace datasets
