@@ -227,4 +227,11 @@ namespace std { // extending std
     template<typename T, size_t N>
     using aligned_vector = vector<T,CxxUtils::AlignAllocator<T,N>>;
 
+#if __cplusplus<=201103L // make_unique is missing from C++11
+    template<typename T, typename ...Targs>
+    std::unique_ptr<T> make_unique(Targs&& ...args) {
+        return std::unique_ptr<T>(new T(std::forward<Targs>(args)...));
+    }
+#endif //__cplusplus<=201103L
+
 } //namespace std
