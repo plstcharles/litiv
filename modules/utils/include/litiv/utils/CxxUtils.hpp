@@ -112,7 +112,7 @@ namespace CxxUtils {
         inline void deallocate(pointer p, size_type) noexcept {free(p);}
         inline void destroy(pointer p) {p->~value_type();}
 #endif //!def(_MSC_VER)
-        template<class T2, class ...Args> inline void construct(T2* p, Args&&... args) {::new(reinterpret_cast<void*>(p)) T2(std::forward<Args>(args)...);}
+        template<class T2, class ...Targs> inline void construct(T2* p, Targs&&... args) {::new(reinterpret_cast<void*>(p)) T2(std::forward<Targs>(args)...);}
         inline void construct(pointer p, const value_type& wert) {new(p) value_type(wert);}
         inline size_type max_size() const noexcept {return (size_type(~0)-size_type(nByteAlign))/sizeof(value_type);}
         bool operator!=(const AlignAllocator<T,nByteAlign>& other) const {return !(*this==other);}
@@ -165,9 +165,9 @@ namespace CxxUtils {
     };
 
     struct Exception : public std::runtime_error {
-        template<typename... VALIST>
-        Exception(const std::string& sErrMsg, const char* sFunc, const char* sFile, int nLine, VALIST... vArgs) :
-                std::runtime_error(cv::format((std::string("Exception in function '%s' from %s(%d) : \n")+sErrMsg).c_str(),sFunc,sFile,nLine,vArgs...)),
+        template<typename... Targs>
+        Exception(const std::string& sErrMsg, const char* sFunc, const char* sFile, int nLine, Targs&&... args) :
+                std::runtime_error(cv::format((std::string("Exception in function '%s' from %s(%d) : \n")+sErrMsg).c_str(),sFunc,sFile,nLine,std::forward<Targs>(args)...)),
                 m_acFuncName(sFunc),
                 m_acFileName(sFile),
                 m_nLineNumber(nLine) {

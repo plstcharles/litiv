@@ -18,7 +18,7 @@
 // @@@ imgproc gpu algo does not support mipmapping binding yet
 // @@@ test compute shader group size vs shared mem usage
 // @@@ support non-integer textures top level (alg)? need to replace all ui-stores by float-stores, rest is ok
-// @@@ search for ">( new " everywhere and replace by make_shared/make_unique if possible (2x blocks vs 1x block!)
+// @@@ search for ">(new " everywhere and replace by make_shared/make_unique if possible (2x blocks vs 1x block!)
 
 #include "litiv/datasets.hpp"
 #include "litiv/video.hpp"
@@ -26,7 +26,7 @@
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
 #define EVALUATE_OUTPUT         0
-#define DISPLAY_OUTPUT          1
+#define DISPLAY_OUTPUT          0
 ////////////////////////////////
 #define USE_PAWCS               0
 #define USE_LOBSTER             1
