@@ -17,11 +17,21 @@
 
 #include "litiv/utils/OpenCVUtils.hpp"
 
-std::shared_ptr<cv::DisplayHelper> cv::DisplayHelper::create(const std::string& sDisplayName,
-                                                                    const std::string& sDebugFSDirPath,
-                                                                    const cv::Size& oMaxSize,
-                                                                    int nWindowFlags) {
-    return DisplayHelperPtr(new DisplayHelper(sDisplayName,sDebugFSDirPath,oMaxSize,nWindowFlags));
+cv::DisplayHelperPtr cv::DisplayHelper::create(const std::string& sDisplayName,
+                                               const std::string& sDebugFSDirPath,
+                                               const cv::Size& oMaxSize,
+                                               int nWindowFlags) {
+    struct DisplayHelperWrapper : public DisplayHelper {
+        DisplayHelperWrapper(const std::string& sDisplayName,
+                             const std::string& sDebugFSDirPath,
+                             const cv::Size& oMaxSize,
+                             int nWindowFlags) :
+                DisplayHelper(sDisplayName,
+                              sDebugFSDirPath,
+                              oMaxSize,
+                              nWindowFlags) {}
+    };
+    return std::make_shared<DisplayHelperWrapper>(sDisplayName,sDebugFSDirPath,oMaxSize,nWindowFlags);
 }
 
 cv::DisplayHelper::DisplayHelper(const std::string& sDisplayName,

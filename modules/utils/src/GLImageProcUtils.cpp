@@ -113,23 +113,23 @@ void GLImageProcAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oROI)
         glError("workgroup count dispatch limit is too small for the current impl");
     for(size_t nPBOIter=0; nPBOIter<2; ++nPBOIter) {
         if(m_bUsingOutputPBOs)
-            m_apOutputPBOs[nPBOIter] = std::unique_ptr<GLPixelBufferObject>(new GLPixelBufferObject(cv::Mat(m_oFrameSize,m_nOutputType),GL_PIXEL_PACK_BUFFER,GL_STREAM_READ));
+            m_apOutputPBOs[nPBOIter] = std::make_unique<GLPixelBufferObject>(cv::Mat(m_oFrameSize,m_nOutputType),GL_PIXEL_PACK_BUFFER,GL_STREAM_READ);
         if(m_bUsingDebugPBOs)
-            m_apDebugPBOs[nPBOIter] = std::unique_ptr<GLPixelBufferObject>(new GLPixelBufferObject(cv::Mat(m_oFrameSize,m_nDebugType),GL_PIXEL_PACK_BUFFER,GL_STREAM_READ));
+            m_apDebugPBOs[nPBOIter] = std::make_unique<GLPixelBufferObject>(cv::Mat(m_oFrameSize,m_nDebugType),GL_PIXEL_PACK_BUFFER,GL_STREAM_READ);
         if(m_bUsingInputPBOs)
-            m_apInputPBOs[nPBOIter] = std::unique_ptr<GLPixelBufferObject>(new GLPixelBufferObject(oInitInput,GL_PIXEL_UNPACK_BUFFER,GL_STREAM_DRAW));
+            m_apInputPBOs[nPBOIter] = std::make_unique<GLPixelBufferObject>(oInitInput,GL_PIXEL_UNPACK_BUFFER,GL_STREAM_DRAW);
     }
     if(m_bUsingTexArrays) {
         if(m_bUsingOutput) {
-            m_pOutputArray = std::unique_ptr<GLDynamicTexture2DArray>(new GLDynamicTexture2DArray(1,std::vector<cv::Mat>(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT,cv::Mat(m_oFrameSize,m_nOutputType)),m_bUsingIntegralFormat));
+            m_pOutputArray = std::make_unique<GLDynamicTexture2DArray>(1,std::vector<cv::Mat>(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT,cv::Mat(m_oFrameSize,m_nOutputType)),m_bUsingIntegralFormat);
             m_pOutputArray->bindToSamplerArray(GLImageProcAlgo::eTexture_OutputBinding);
         }
         if(m_bUsingDebug) {
-            m_pDebugArray = std::unique_ptr<GLDynamicTexture2DArray>(new GLDynamicTexture2DArray(1,std::vector<cv::Mat>(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT,cv::Mat(m_oFrameSize,m_nDebugType)),m_bUsingIntegralFormat));
+            m_pDebugArray = std::make_unique<GLDynamicTexture2DArray>(1,std::vector<cv::Mat>(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT,cv::Mat(m_oFrameSize,m_nDebugType)),m_bUsingIntegralFormat);
             m_pDebugArray->bindToSamplerArray(GLImageProcAlgo::eTexture_DebugBinding);
         }
         if(m_bUsingInput) {
-            m_pInputArray = std::unique_ptr<GLDynamicTexture2DArray>(new GLDynamicTexture2DArray(1,std::vector<cv::Mat>(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT,cv::Mat(m_oFrameSize,m_nInputType)),m_bUsingIntegralFormat));
+            m_pInputArray = std::make_unique<GLDynamicTexture2DArray>(1,std::vector<cv::Mat>(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT,cv::Mat(m_oFrameSize,m_nInputType)),m_bUsingIntegralFormat);
             m_pInputArray->bindToSamplerArray(GLImageProcAlgo::eTexture_InputBinding);
             if(m_bUsingInputPBOs) {
                 m_pInputArray->updateTexture(*m_apInputPBOs[m_nCurrPBO],(int)m_nCurrLayer,true);
@@ -147,15 +147,15 @@ void GLImageProcAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oROI)
         m_vpDebugArray.resize(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT);
         for(size_t nLayerIter=0; nLayerIter<GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT; ++nLayerIter) {
             if(m_bUsingOutput) {
-                m_vpOutputArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(1,cv::Mat(m_oFrameSize,m_nOutputType),m_bUsingIntegralFormat));
+                m_vpOutputArray[nLayerIter] = std::make_unique<GLDynamicTexture2D>(1,cv::Mat(m_oFrameSize,m_nOutputType),m_bUsingIntegralFormat);
                 m_vpOutputArray[nLayerIter]->bindToSampler((GLuint)getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_OutputBinding));
             }
             if(m_bUsingDebug) {
-                m_vpDebugArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(1,cv::Mat(m_oFrameSize,m_nDebugType),m_bUsingIntegralFormat));
+                m_vpDebugArray[nLayerIter] = std::make_unique<GLDynamicTexture2D>(1,cv::Mat(m_oFrameSize,m_nDebugType),m_bUsingIntegralFormat);
                 m_vpDebugArray[nLayerIter]->bindToSampler((GLuint)getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_DebugBinding));
             }
             if(m_bUsingInput) {
-                m_vpInputArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D((GLsizei)m_nLevels,cv::Mat(m_oFrameSize,m_nInputType),m_bUsingIntegralFormat));
+                m_vpInputArray[nLayerIter] = std::make_unique<GLDynamicTexture2D>((GLsizei)m_nLevels,cv::Mat(m_oFrameSize,m_nInputType),m_bUsingIntegralFormat);
                 m_vpInputArray[nLayerIter]->bindToSampler((GLuint)getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_InputBinding));
                 if(m_bUsingInputPBOs) {
                     if(nLayerIter==m_nCurrLayer)
@@ -172,7 +172,7 @@ void GLImageProcAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oROI)
             }
         }
     }
-    m_pROITexture = std::unique_ptr<GLTexture2D>(new GLTexture2D(1,oROI,m_bUsingIntegralFormat));
+    m_pROITexture = std::make_unique<GLTexture2D>(1,oROI,m_bUsingIntegralFormat);
     m_pROITexture->bindToImage(GLImageProcAlgo::eImage_ROIBinding,0,GL_READ_ONLY);
     if(!m_bUsingOutputPBOs && m_bUsingOutput)
         m_oLastOutput = cv::Mat(m_oFrameSize,m_nOutputType);
@@ -180,7 +180,7 @@ void GLImageProcAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oROI)
         m_oLastDebug = cv::Mat(m_oFrameSize,m_nDebugType);
     m_vpImgProcShaders.resize(m_nComputeStages);
     for(size_t nCurrStageIter=0; nCurrStageIter<m_nComputeStages; ++nCurrStageIter) {
-        m_vpImgProcShaders[nCurrStageIter] = std::unique_ptr<GLShader>(new GLShader());
+        m_vpImgProcShaders[nCurrStageIter] = std::make_unique<GLShader>();
         m_vpImgProcShaders[nCurrStageIter]->addSource(getComputeShaderSource(nCurrStageIter),GL_COMPUTE_SHADER);
         if(!m_vpImgProcShaders[nCurrStageIter]->link())
             glError("Could not link image processing shader");
@@ -595,16 +595,16 @@ void GLImageProcEvaluatorAlgo::initialize(const cv::Mat& oInitGT, const cv::Mat&
     m_oFrameSize = oROI.size();
     for(size_t nPBOIter=0; nPBOIter<2; ++nPBOIter) {
         if(m_bUsingDebugPBOs)
-            m_apDebugPBOs[nPBOIter] = std::unique_ptr<GLPixelBufferObject>(new GLPixelBufferObject(cv::Mat(m_oFrameSize,m_nDebugType),GL_PIXEL_PACK_BUFFER,GL_STREAM_READ));
+            m_apDebugPBOs[nPBOIter] = std::make_unique<GLPixelBufferObject>(cv::Mat(m_oFrameSize,m_nDebugType),GL_PIXEL_PACK_BUFFER,GL_STREAM_READ);
         if(m_bUsingInputPBOs)
-            m_apInputPBOs[nPBOIter] = std::unique_ptr<GLPixelBufferObject>(new GLPixelBufferObject(oInitGT,GL_PIXEL_UNPACK_BUFFER,GL_STREAM_DRAW));
+            m_apInputPBOs[nPBOIter] = std::make_unique<GLPixelBufferObject>(oInitGT,GL_PIXEL_UNPACK_BUFFER,GL_STREAM_DRAW);
     }
     if(m_bUsingTexArrays) {
         if(m_bUsingDebug) {
-            m_pDebugArray = std::unique_ptr<GLDynamicTexture2DArray>(new GLDynamicTexture2DArray(1,std::vector<cv::Mat>(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT,cv::Mat(m_oFrameSize,m_nDebugType)),m_bUsingIntegralFormat));
+            m_pDebugArray = std::make_unique<GLDynamicTexture2DArray>(1,std::vector<cv::Mat>(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT,cv::Mat(m_oFrameSize,m_nDebugType)),m_bUsingIntegralFormat);
             m_pDebugArray->bindToSamplerArray(GLImageProcAlgo::eTexture_DebugBinding);
         }
-        m_pInputArray = std::unique_ptr<GLDynamicTexture2DArray>(new GLDynamicTexture2DArray(1,std::vector<cv::Mat>(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT,cv::Mat(m_oFrameSize,m_nGroundtruthType)),m_bUsingIntegralFormat));
+        m_pInputArray = std::make_unique<GLDynamicTexture2DArray>(1,std::vector<cv::Mat>(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT,cv::Mat(m_oFrameSize,m_nGroundtruthType)),m_bUsingIntegralFormat);
         m_pInputArray->bindToSamplerArray(GLImageProcAlgo::eTexture_GTBinding);
         if(m_bUsingInputPBOs) {
             m_pInputArray->updateTexture(*m_apInputPBOs[m_nCurrPBO],(int)m_nCurrLayer,true);
@@ -620,10 +620,10 @@ void GLImageProcEvaluatorAlgo::initialize(const cv::Mat& oInitGT, const cv::Mat&
         m_vpInputArray.resize(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT);
         for(size_t nLayerIter=0; nLayerIter<GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT; ++nLayerIter) {
             if(m_bUsingDebug) {
-                m_vpDebugArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D(1,cv::Mat(m_oFrameSize,m_nDebugType),m_bUsingIntegralFormat));
+                m_vpDebugArray[nLayerIter] = std::make_unique<GLDynamicTexture2D>(1,cv::Mat(m_oFrameSize,m_nDebugType),m_bUsingIntegralFormat);
                 m_vpDebugArray[nLayerIter]->bindToSampler((GLuint)getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_DebugBinding));
             }
-            m_vpInputArray[nLayerIter] = std::unique_ptr<GLDynamicTexture2D>(new GLDynamicTexture2D((GLsizei)m_nLevels,cv::Mat(m_oFrameSize,m_nGroundtruthType),m_bUsingIntegralFormat));
+            m_vpInputArray[nLayerIter] = std::make_unique<GLDynamicTexture2D>((GLsizei)m_nLevels,cv::Mat(m_oFrameSize,m_nGroundtruthType),m_bUsingIntegralFormat);
             m_vpInputArray[nLayerIter]->bindToSampler((GLuint)getTextureBinding(nLayerIter,GLImageProcAlgo::eTexture_GTBinding));
             if(m_bUsingInputPBOs) {
                 if(nLayerIter==m_nCurrLayer)
@@ -639,13 +639,13 @@ void GLImageProcEvaluatorAlgo::initialize(const cv::Mat& oInitGT, const cv::Mat&
             }
         }
     }
-    m_pROITexture = std::unique_ptr<GLTexture2D>(new GLTexture2D(1,oROI,m_bUsingIntegralFormat));
+    m_pROITexture = std::make_unique<GLTexture2D>(1,oROI,m_bUsingIntegralFormat);
     m_pROITexture->bindToImage(GLImageProcAlgo::eImage_ROIBinding,0,GL_READ_ONLY);
     if(!m_bUsingDebugPBOs && m_bUsingDebug)
         m_oLastDebug = cv::Mat(m_oFrameSize,m_nDebugType);
     m_vpImgProcShaders.resize(m_nComputeStages);
     for(size_t nCurrStageIter=0; nCurrStageIter<m_nComputeStages; ++nCurrStageIter) {
-        m_vpImgProcShaders[nCurrStageIter] = std::unique_ptr<GLShader>(new GLShader());
+        m_vpImgProcShaders[nCurrStageIter] = std::make_unique<GLShader>();
         m_vpImgProcShaders[nCurrStageIter]->addSource(getComputeShaderSource(nCurrStageIter),GL_COMPUTE_SHADER);
         if(!m_vpImgProcShaders[nCurrStageIter]->link())
             glError("Could not link image processing shader");
