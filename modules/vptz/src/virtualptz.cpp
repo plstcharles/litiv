@@ -91,7 +91,7 @@ vptz::Camera::Camera( const std::string& sInputPath, double verti_FOV, double ou
     // constants
     sphereGridSize = 512;
 
-    m_pContext = std::unique_ptr<GLDefaultContext>(new GLDefaultContext(cv::Size((int)outputWidth,(int)outputHeight),"VPTZ Mapper"));
+    m_pContext = std::unique_ptr<GLContext>(new GLContext(cv::Size((int)outputWidth,(int)outputHeight),"VPTZ Mapper"));
 
     // set the projection transformation
     glMatrixMode(GL_PROJECTION);
@@ -175,7 +175,7 @@ bool vptz::Camera::WaitDelay(bool bSleep) {
 
 const cv::Mat& vptz::Camera::GetFrame() {
     glDbgExceptionWatch;
-    m_pContext->SetAsActive();
+    m_pContext->setAsActive();
     double duration = double(cv::getTickCount());
     if(isVideo) {
         if(!panoCapture.set(cv::CAP_PROP_POS_FRAMES,m_nCurrFrameIdx) || !panoCapture.read(panoImage))

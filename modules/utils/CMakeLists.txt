@@ -43,6 +43,7 @@ if(USE_GLSL)
         "src/GLDrawUtils.cpp"
         "src/GLImageProcUtils.cpp"
         "src/GLShaderUtils.cpp"
+        "src/GLUtils.cpp"
     )
     add_files(INCLUDE_FILES
         "include/litiv/utils/GLDrawUtils.hpp"

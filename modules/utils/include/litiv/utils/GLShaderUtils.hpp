@@ -75,6 +75,10 @@ public:
     static std::string getComputeShaderSource_Transpose(size_t nBlockSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding);
     static std::string getComputeShaderFunctionSource_SharedDataPreLoad(size_t nChannels, const glm::uvec2& vWorkGroupSize, size_t nExternalBorderSize);
     static std::string getComputeShaderFunctionSource_BinaryMedianBlur(size_t nKernelSize, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize);
+    static std::string getShaderFunctionSource_getRandNeighbor3x3(size_t nBorderSize,const cv::Size& oFrameSize);
+    static std::string getShaderFunctionSource_frand();
+    static std::string getShaderFunctionSource_urand();
+    static std::string getShaderFunctionSource_urand_tinymt32();
 
 private:
     static bool useShaderProgram(GLShader* pNewShader);

@@ -743,3 +743,110 @@ std::string GLShader::getComputeShaderFunctionSource_BinaryMedianBlur(size_t nKe
              "}\n";
     return ssSrc.str();
 }
+
+std::string GLShader::getShaderFunctionSource_getRandNeighbor3x3(size_t nBorderSize,const cv::Size& oFrameSize) {
+    std::stringstream ssSrc;
+    ssSrc << "const ivec2 _avNeighborPattern3x3[8] = ivec2[8](\n"
+            "    ivec2(-1, 1),ivec2(0, 1),ivec2(1, 1),\n"
+            "    ivec2(-1, 0),            ivec2(1, 0),\n"
+            "    ivec2(-1,-1),ivec2(0,-1),ivec2(1,-1)\n"
+            ");\n"
+            "ivec2 getRandNeighbor3x3(in ivec2 vCurrPos, in uint nRandVal) {\n";
+    if(nBorderSize>0) ssSrc <<
+                      "    const int nBorderSize = " << nBorderSize << ";\n";
+    ssSrc << "    const int nFrameWidth = " << oFrameSize.width << ";\n"
+            "    const int nFrameHeight = " << oFrameSize.height << ";\n"
+            "    ivec2 vNeighborPos = vCurrPos+_avNeighborPattern3x3[nRandVal%8];\n";
+    if(nBorderSize>0) ssSrc <<
+                      "    clamp(vNeighborPos,ivec2(nBorderSize),ivec2(nFrameWidth-nBorderSize-1,nFrameHeight-nBorderSize-1));\n";
+    else ssSrc <<
+         "    clamp(vNeighborPos,ivec2(0),ivec2(nFrameWidth-1,nFrameHeight-1));\n";
+    ssSrc << "    return vNeighborPos;\n"
+            "}\n";
+    return ssSrc.str();
+}
+
+std::string GLShader::getShaderFunctionSource_frand() {
+    std::stringstream ssSrc;
+    ssSrc << "float frand(inout vec2 vSeed) {\n"
+            "    float fRandVal = 0.5 + 0.5 * fract(sin(dot(vSeed.xy, vec2(12.9898, 78.233)))* 43758.5453);\n"
+            "    vSeed *= fRandVal;\n"
+            "    return fRandVal;\n"
+            "}\n";
+    return ssSrc.str();
+}
+
+std::string GLShader::getShaderFunctionSource_urand() {
+    std::stringstream ssSrc;
+    // 1x iter of Bob Jenkins' "One-At-A-Time" hashing algorithm
+    ssSrc << "uint urand(inout uint nSeed) {\n"
+            "   nSeed += (nSeed<<10u);\n"
+            "   nSeed ^= (nSeed>>6u);\n"
+            "   nSeed += (nSeed<<3u);\n"
+            "   nSeed ^= (nSeed>>11u);\n"
+            "   nSeed += (nSeed<<15u);\n"
+            "   return nSeed;\n"
+            "}\n";
+    return ssSrc.str();
+}
+
+std::string GLShader::getShaderFunctionSource_urand_tinymt32() {
+    std::stringstream ssSrc;
+    //
+    //                  32-bit Tiny Mersenne Twister
+    //
+    // Copyright (c) 2011 Mutsuo Saito, Makoto Matsumoto, Hiroshima
+    // University and The University of Tokyo. All rights reserved.
+    //
+    // Redistribution and use in source and binary forms, with or without
+    // modification, are permitted provided that the following conditions are
+    // met:
+    //
+    //     * Redistributions of source code must retain the above copyright
+    //       notice, this list of conditions and the following disclaimer.
+    //     * Redistributions in binary form must reproduce the above
+    //       copyright notice, this list of conditions and the following
+    //       disclaimer in the documentation and/or other materials provided
+    //       with the distribution.
+    //     * Neither the name of the Hiroshima University nor the names of
+    //       its contributors may be used to endorse or promote products
+    //       derived from this software without specific prior written
+    //       permission.
+    //
+    // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+    // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+    // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+    // A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+    // OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+    // SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+    // LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+    // DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+    // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+    // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+    // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+    ssSrc << "struct TMT32Model {\n"
+            "    uvec4 status;\n"
+            "    uint mat1;\n"
+            "    uint mat2;\n"
+            "    uint tmat;\n"
+            "    uint pad;\n"
+            "};\n"
+            "uint urand(inout TMT32Model p) {\n"
+            "    uint s0 = p.status[3];\n"
+            "    uint s1 = (p.status[0]&0x7fffffff)^p.status[1]^p.status[2];\n"
+            "    s1 ^= (s1<<1);\n"
+            "    s0 ^= (s0>>1)^s1;\n"
+            "    p.status[0] = p.status[1];\n"
+            "    p.status[1] = p.status[2];\n"
+            "    p.status[2] = s1^(s0<<10);\n"
+            "    p.status[3] = s0;\n"
+            "    p.status[1] ^= -int(s0&1)&p.mat1;\n"
+            "    p.status[2] ^= -int(s0&1)&p.mat2;\n"
+            "    uint t0 = p.status[3];\n"
+            "    uint t1 = p.status[0]+(p.status[2]>>8);\n"
+            "    t0 ^= t1;\n"
+            "    t0 ^= -int(t1&1)&p.tmat;\n"
+            "    return t0;\n"
+            "}\n";
+    return ssSrc.str();
+}
