@@ -17,18 +17,15 @@
 
 // @@@ imgproc gpu algo does not support mipmapping binding yet
 // @@@ test compute shader group size vs shared mem usage
-// @@@ add opencv hardware instr set check, and impl some stuff in MMX/SSE/SSE2/3/4.1/4.2? (also check popcount and AVX)
 // @@@ support non-integer textures top level (alg)? need to replace all ui-stores by float-stores, rest is ok
-// @@@ change comma pos list & super constr everywhere
-// @@@ change template formatting everywhere
+// @@@ search for ">( new " everywhere and replace by make_shared/make_unique if possible (2x blocks vs 1x block!)
 
 #include "litiv/datasets.hpp"
 #include "litiv/video.hpp"
 
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
-#define EVALUATE_OUTPUT         1
-#define DEBUG_OUTPUT            1
+#define EVALUATE_OUTPUT         0
 #define DISPLAY_OUTPUT          1
 ////////////////////////////////
 #define USE_PAWCS               0
@@ -44,7 +41,7 @@
 #define DATASET_PRECACHING      1
 #define DATASET_SCALE_FACTOR    1.0
 ////////////////////////////////
-#if EVALUATE_OUTPUT
+#if EVALUATE_OUTPUT // @@@@ dataset should auto detect what is available and what to use
 #if HAVE_GLSL
 #define USE_GLSL_EVALUATION     1
 #endif //HAVE_GLSL
@@ -54,14 +51,8 @@
 #if HAVE_OPENCL
 #define USE_OPENCL_EVALUATION   1
 #endif //HAVE_OPENCL
-#if HAVE_GPU_SUPPORT
-#define VALIDATE_GPU_EVALUATION 0
-#endif //HAVE_GPU_SUPPORT
 #endif //EVALUATE_OUTPUT
 ////////////////////////////////
-#ifndef VALIDATE_GPU_EVALUATION
-#define VALIDATE_GPU_EVALUATION 0
-#endif //VALIDATE_GPU_EVALUATION
 #ifndef USE_GLSL_EVALUATION
 #define USE_GLSL_EVALUATION 0
 #endif //USE_GLSL_EVALUATION
@@ -71,10 +62,6 @@
 #ifndef USE_OPENCL_EVALUATION
 #define USE_OPENCL_EVALUATION 0
 #endif //USE_OPENCL_EVALUATION
-#if (DEBUG_OUTPUT && !DISPLAY_OUTPUT)
-#undef DISPLAY_OUTPUT
-#define DISPLAY_OUTPUT 1
-#endif //(DEBUG_OUTPUT && !DISPLAY_OUTPUT)
 #define USE_GPU_IMPL (USE_GLSL_IMPL||USE_CUDA_IMPL||USE_OPENCL_IMPL)
 #define USE_GPU_EVALUATION (USE_GLSL_EVALUATION || USE_CUDA_EVALUATION || USE_OPENCL_EVALUATION)
 #define NEED_FG_MASK (DISPLAY_OUTPUT || WRITE_IMG_OUTPUT || (EVALUATE_OUTPUT && (!USE_GPU_EVALUATION || VALIDATE_GPU_EVALUATION)))
@@ -85,14 +72,6 @@
 #elif (USE_LOBSTER+USE_SUBSENSE+USE_PAWCS)!=1
 #error "Must specify a single algorithm."
 #endif //USE_...
-#if (DEBUG_OUTPUT && (USE_GPU_IMPL || DEFAULT_NB_THREADS>1))
-#error "Cannot debug output with GPU support or with more than one thread."
-#endif //(DEBUG_OUTPUT && (USE_GPU_IMPL || DEFAULT_NB_THREADS>1))
-#if (HAVE_GLSL && USE_GLSL_IMPL)
-#if !HAVE_GLFW
-#error "missing glfw"
-#endif //!HAVE_GLFW
-#endif //(HAVE_GLSL && USE_GLSL_IMPL)
 #ifndef DATASET_ROOT
 #error "Dataset root path should have been specified in CMake."
 #endif //ndef(DATASET_ROOT)
@@ -164,107 +143,55 @@ int main(int, char**) {
 }
 
 #if (HAVE_GLSL && USE_GLSL_IMPL)
-std::string g_sLatestGLFWErrorMessage;
-void GLFWErrorCallback(int nCode, const char* acMessage) {
-    std::stringstream ssStr;
-    ssStr << "code: " << nCode << ", message: " << acMessage;
-    g_sLatestGLFWErrorMessage = ssStr.str();
-}
-
 void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
     size_t nCurrFrameIdx = 0;
     size_t nNextFrameIdx = nCurrFrameIdx+1;
-    bool bGPUContextInitialized = false;
     try {
-        glfwSetErrorCallback(GLFWErrorCallback);
-        CV_Assert(pCurrSequence.get() && pCurrSequence->GetTotalImageCount()>1);
-        if(pCurrSequence->m_pEvaluator==nullptr && EVALUATE_OUTPUT)
-            lvErrorExt("Missing evaluation impl for video segmentation dataset '%s'",g_pDatasetInfo->m_sDatasetName.c_str());
-        const std::string sCurrSeqName = CxxUtils::clampString(pCurrSequence->m_sName,12);
-        const size_t nFrameCount = pCurrSequence->GetTotalImageCount();
-        const cv::Mat oROI = pCurrSequence->GetROI();
-        cv::Mat oCurrInputFrame = pCurrSequence->GetInputFromIndex(nCurrFrameIdx).clone();
+        DatasetType::WorkBatch& oCurrSequence = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
+        CV_Assert(oCurrSequence.getFrameCount()>1);
+        const std::string sCurrSeqName = CxxUtils::clampString(oCurrSequence.getName(),12);
+        const size_t nFrameCount = oCurrSequence.getFrameCount();
+        const cv::Mat oROI = oCurrSequence.getROI();
+        cv::Mat oCurrInputFrame = oCurrSequence.getInputFrame(nCurrFrameIdx).clone();
+        cv::Mat oNextInputFrame = oCurrSequence.getInputFrame(nNextFrameIdx);
         CV_Assert(!oCurrInputFrame.empty());
         CV_Assert(oCurrInputFrame.isContinuous());
-#if NEED_GT_MASK
-        cv::Mat oCurrGTMask = pCurrSequence->GetGTFromIndex(nCurrFrameIdx).clone();
-        CV_Assert(!oCurrGTMask.empty() && oCurrGTMask.isContinuous());
-#endif //NEED_GT_MASK
-#if DISPLAY_OUTPUT
-        cv::Mat oLastInputFrame = oCurrInputFrame.clone();
-#endif //DISPLAY_OUTPUT
-        cv::Mat oNextInputFrame = pCurrSequence->GetInputFromIndex(nNextFrameIdx);
-#if NEED_GT_MASK
-#if NEED_LAST_GT_MASK
-        cv::Mat oLastGTMask = oCurrGTMask.clone();
-#endif // NEED_LAST_GT_MASK
-        cv::Mat oNextGTMask = pCurrSequence->GetGTFromIndex(nNextFrameIdx);
-#endif //NEED_GT_MASK
-#if NEED_FG_MASK
-        cv::Mat oLastFGMask(oCurrInputFrame.size(),CV_8UC1,cv::Scalar_<uchar>(0));
-#endif //NEED_FG_MASK
-#if DISPLAY_OUTPUT
-        cv::Mat oLastBGImg;
-#endif //DISPLAY_OUTPUT
         glAssert(oCurrInputFrame.channels()==1 || oCurrInputFrame.channels()==4);
         cv::Size oWindowSize = oCurrInputFrame.size();
-        // note: never construct GL classes before context initialization
-        if(glfwInit()==GL_FALSE)
-            glError("Failed to init GLFW");
-        bGPUContextInitialized = true;
-        glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,TARGET_GL_VER_MAJOR);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,TARGET_GL_VER_MINOR);
-        glfwWindowHint(GLFW_RESIZABLE,GL_FALSE);
-#if !DISPLAY_OUTPUT
-        glfwWindowHint(GLFW_VISIBLE,GL_FALSE);
-#endif //!DISPLAY_OUTPUT
-        std::unique_ptr<GLFWwindow,void(*)(GLFWwindow*)> pWindow(glfwCreateWindow(oWindowSize.width,oWindowSize.height,(pCurrSequence->m_sRelativePath+" [GPU]").c_str(),nullptr,nullptr),glfwDestroyWindow);
-        if(!pWindow)
-            glError("Failed to create window via GLFW");
-        glfwMakeContextCurrent(pWindow.get());
-        GLContext<TARGET_GL_VER_MAJOR,TARGET_GL_VER_MINOR>::initGLEW();
+        GLContext oContext(oWindowSize,std::string("[GPU] ")+oCurrSequence.getRelativePath(),bool(!DISPLAY_OUTPUT));
 #if USE_LOBSTER
-        std::shared_ptr<BackgroundSubtractorLOBSTER_GLSL> pAlgo(new BackgroundSubtractorLOBSTER_GLSL());
-        const double dDefaultLearningRate = BGSLOBSTER_DEFAULT_LEARNING_RATE;
-        pAlgo->initialize(oCurrInputFrame,oROI);
+        std::shared_ptr<BackgroundSubtractorLOBSTER_GLSL> pAlgo = std::make_shared<BackgroundSubtractorLOBSTER_GLSL>();
 #elif USE_SUBSENSE
 #error "Missing glsl impl." // ... @@@@@
-        std::shared_ptr<BackgroundSubtractorSuBSENSE_GLSL> pAlgo(new BackgroundSubtractorSuBSENSE_GLSL());
-        const double dDefaultLearningRate = 0;
-        pAlgo->initialize(oCurrInputFrame,oROI);
+        std::shared_ptr<BackgroundSubtractorSuBSENSE_GLSL> pAlgo = std::make_shared<BackgroundSubtractorSuBSENSE_GLSL>();
 #elif USE_PAWCS
 #error "Missing glsl impl." // ... @@@@@
-        std::shared_ptr<BackgroundSubtractorPAWCS_GLSL> pAlgo(new BackgroundSubtractorPAWCS_GLSL());
-        const double dDefaultLearningRate = 0;
-        pAlgo->initialize(oCurrInputFrame,oROI);
+        std::shared_ptr<BackgroundSubtractorPAWCS_GLSL> pAlgo = std::make_shared<BackgroundSubtractorPAWCS_GLSL>();
 #endif //USE...
-#if DISPLAY_OUTPUT
-        bool bContinuousUpdates = false;
-        std::string sDisplayName = pCurrSequence->m_sRelativePath;
-        cv::namedWindow(sDisplayName);
-#endif //DISPLAY_OUTPUT
-        std::shared_ptr<GLImageProcAlgo> pGLSLAlgo = std::dynamic_pointer_cast<GLImageProcAlgo>(pAlgo);
-        if(pGLSLAlgo==nullptr)
-            glError("Segmentation algorithm has no GLImageProcAlgo interface");
-        pGLSLAlgo->setOutputFetching(NEED_FG_MASK);
-        if(!pGLSLAlgo->getIsUsingDisplay() && DISPLAY_OUTPUT) // @@@@ determine in advance to hint window to hide? or just always hide, and show when needed?
-            glfwHideWindow(pWindow.get());
+        std::shared_ptr<GLImageProcAlgo> pAlgo_glsl = pAlgo;
+        std::shared_ptr<IBackgroundSubtractor> pAlgo_base = pAlgo;
+        const double dDefaultLearningRate = pAlgo_base->getDefaultLearningRate();
+        pAlgo_base->initialize(oCurrInputFrame,oROI);
 #if USE_GLSL_EVALUATION
         std::shared_ptr<DatasetUtils::EvaluatorBase::GLEvaluatorBase> pGLSLAlgoEvaluator;
         if(pCurrSequence->m_pEvaluator!=nullptr)
-            pGLSLAlgoEvaluator = std::dynamic_pointer_cast<DatasetUtils::EvaluatorBase::GLEvaluatorBase>(pCurrSequence->m_pEvaluator->CreateGLEvaluator(pGLSLAlgo,nFrameCount));
+            pGLSLAlgoEvaluator = std::dynamic_pointer_cast<DatasetUtils::EvaluatorBase::GLEvaluatorBase>(pCurrSequence->m_pEvaluator->CreateGLEvaluator(pAlgo_glsl,nFrameCount));
         if(pGLSLAlgoEvaluator==nullptr)
             glError("Segmentation evaluation algorithm has no GLSegmEvaluator interface");
         pGLSLAlgoEvaluator->initialize(oCurrGTMask,oROI.empty()?cv::Mat(oCurrInputFrame.size(),CV_8UC1,cv::Scalar_<uchar>(255)):oROI);
         oWindowSize.width *= pGLSLAlgoEvaluator->m_nSxSDisplayCount;
 #else //!USE_GLSL_EVALUATION
-        oWindowSize.width *= pGLSLAlgo->m_nSxSDisplayCount;
+        oWindowSize.width *= pAlgo_glsl->m_nSxSDisplayCount; // @@@@ should pAlgo contain a real 'display size' param, and we should query it here?
 #endif //!USE_GLSL_EVALUATION
-        glfwSetWindowSize(pWindow.get(),oWindowSize.width,oWindowSize.height);
-        glViewport(0,0,oWindowSize.width,oWindowSize.height);
+        oContext.setWindowSize(oWindowSize.width,oWindowSize.height);
+#if DISPLAY_OUTPUT
+        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oCurrSequence.getRelativePath(),oCurrSequence.getOutputPath()+"/../");
+        pAlgo->m_pDisplayHelper = pDisplayHelper;
+        pAlgo_glsl->setOutputFetching(true); // @@@ should be toggled in evaluator
+#endif //DISPLAY_OUTPUT
+        oCurrSequence.startProcessing();
         while(nNextFrameIdx<=nFrameCount) {
             if(!((nCurrFrameIdx+1)%100))
                 std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nCurrFrameIdx+1 << "/" << nFrameCount << "   [GPU]" << std::endl;
@@ -272,108 +199,61 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
             pAlgo->apply_async(oNextInputFrame,dCurrLearningRate);
 #if USE_GLSL_EVALUATION
             pGLSLAlgoEvaluator->apply_async(oNextGTMask);
+            just call evaluator -> apply_next_async();
 #endif //USE_GLSL_EVALUATION
 #if DISPLAY_OUTPUT
+            cv::Mat oLastInputFrame;
             oCurrInputFrame.copyTo(oLastInputFrame);
             oNextInputFrame.copyTo(oCurrInputFrame);
 #endif //DISPLAY_OUTPUT
             if(++nNextFrameIdx<nFrameCount)
-                oNextInputFrame = pCurrSequence->GetInputFromIndex(nNextFrameIdx);
-#if DEBUG_OUTPUT
-            cv::imshow(sMouseDebugDisplayName,oNextInputFrame);
-#endif //DEBUG_OUTPUT
-#if NEED_GT_MASK
-#if NEED_LAST_GT_MASK
-            oCurrGTMask.copyTo(oLastGTMask);
-            oNextGTMask.copyTo(oCurrGTMask);
-#endif //NEED_LAST_GT_MASK
-            if(nNextFrameIdx<nFrameCount)
-                oNextGTMask = pCurrSequence->GetGTFromIndex(nNextFrameIdx);
-#endif //NEED_GT_MASK
+                oNextInputFrame = oCurrSequence.getInputFrame(nNextFrameIdx);
             glErrorCheck;
-            if(glfwWindowShouldClose(pWindow.get()))
+            if(oContext.pollEventsAndCheckIfShouldClose())
                 break;
-            glfwPollEvents();
 #if DISPLAY_OUTPUT
-            if(glfwGetKey(pWindow.get(),GLFW_KEY_ESCAPE) || glfwGetKey(pWindow.get(),GLFW_KEY_Q))
+            if(oContext.getKeyPressed('q'))
                 break;
-            glfwSwapBuffers(pWindow.get());
-            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-#endif //DISPLAY_OUTPUT
-#if NEED_FG_MASK
+            oContext.swapBuffers(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+#if DISPLAY_OUTPUT // @@@@@ add define for display_output_cpu?
+            cv::Mat oLastFGMask,oLastBGImg;
             pAlgo->getLatestForegroundMask(oLastFGMask);
-            if(!oROI.empty())
-                cv::bitwise_or(oLastFGMask,UCHAR_MAX/2,oLastFGMask,oROI==0);
-#endif //NEED_FG_MASK
-#if DISPLAY_OUTPUT
             pAlgo->getBackgroundImage(oLastBGImg);
-            if(!oROI.empty())
+            if(!oROI.empty()) {
                 cv::bitwise_or(oLastBGImg,UCHAR_MAX/2,oLastBGImg,oROI==0);
-            cv::Mat oDisplayFrame = DatasetUtils::GetDisplayImage(oLastInputFrame,oLastBGImg,pCurrSequence->m_pEvaluator?pCurrSequence->m_pEvaluator->GetColoredSegmMaskFromResult(oLastFGMask,oLastGTMask,oROI):oLastFGMask,nCurrFrameIdx);
-            cv::Mat oDisplayFrameResized;
-            if(oDisplayFrame.cols>1920 || oDisplayFrame.rows>1080)
-                cv::resize(oDisplayFrame,oDisplayFrameResized,cv::Size(oDisplayFrame.cols/2,oDisplayFrame.rows/2));
-            else
-                oDisplayFrameResized = oDisplayFrame;
-            cv::imshow(sDisplayName,oDisplayFrameResized);
-            int nKeyPressed;
-            if(bContinuousUpdates)
-                nKeyPressed = cv::waitKey(1);
-            else
-                nKeyPressed = cv::waitKey(0);
-            if(nKeyPressed!=-1)
-                nKeyPressed %= (UCHAR_MAX+1); // fixes return val bug in some opencv versions
-            if(nKeyPressed==' ')
-                bContinuousUpdates = !bContinuousUpdates;
-            else if(nKeyPressed==(int)'q')
+                cv::bitwise_or(oLastFGMask,UCHAR_MAX/2,oLastFGMask,oROI==0);
+            }
+            pDisplayHelper->display(oLastInputFrame,oLastBGImg,oCurrSequence.getColoredSegmMask(oLastFGMask,nCurrFrameIdx),nCurrFrameIdx);
+            const int nKeyPressed = pDisplayHelper->waitKey();
+            if(nKeyPressed==(int)'q')
                 break;
 #endif //DISPLAY_OUTPUT
-#if (EVALUATE_OUTPUT && (!USE_GLSL_EVALUATION || VALIDATE_GPU_EVALUATION))
-            if(pCurrSequence->m_pEvaluator)
-                pCurrSequence->m_pEvaluator->AccumulateMetricsFromResult(oCurrFGMask,oCurrGTMask,oROI);
-#endif //(EVALUATE_OUTPUT && (!USE_GLSL_EVALUATION || VALIDATE_GPU_EVALUATION))
-            ++nCurrFrameIdx;
-        }
-        const double dTimeElapsed = TIMER_ELAPSED_MS(MainLoop)/1000;
-        const double dAvgFPS = (double)nCurrFrameIdx/dTimeElapsed;
-        std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ end, " << int(dTimeElapsed) << " sec in-thread (" << (int)floor(dAvgFPS+0.5) << " FPS)" << std::endl;
-#if EVALUATE_OUTPUT
-        if(pCurrSequence->m_pEvaluator) {
-#if USE_GLSL_EVALUATION
-#if VALIDATE_GPU_EVALUATION
-            printf("cpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTP,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTN,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFP,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFN,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nSE,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTP+pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTN+pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFP+pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFN);
-#endif //VALIDATE_USE_GLSL_EVALUATION
-            pCurrSequence->m_pEvaluator->FetchGLEvaluationResults(pGLSLAlgoEvaluator);
-#if VALIDATE_GPU_EVALUATION
-            printf("gpu eval:\n\tnTP=%" PRIu64 ", nTN=%" PRIu64 ", nFP=%" PRIu64 ", nFN=%" PRIu64 ", nSE=%" PRIu64 ", tot=%" PRIu64 "\n",pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTP,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTN,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFP,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFN,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nSE,pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTP+pCurrSequence->m_pEvaluator->m_oBasicMetrics.nTN+pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFP+pCurrSequence->m_pEvaluator->m_oBasicMetrics.nFN);
-#endif //VALIDATE_USE_GLSL_EVALUATION
-#endif //USE_GLSL_EVALUATION
-            pCurrSequence->m_pEvaluator->dTimeElapsed_sec = dTimeElapsed;
-        }
-#endif //EVALUATE_OUTPUT
-#if DISPLAY_OUTPUT
-        cv::destroyWindow(sDisplayName);
 #endif //DISPLAY_OUTPUT
+            //oCurrSequence.pushSegmMask_async(nCurrFrameIdx++); @@@@@ SOMETHING
+        }
+        oCurrSequence.stopProcessing();
+        const double dTimeElapsed = oCurrSequence.getProcessTime();
+        const double dProcessSpeed = (double)nCurrFrameIdx/dTimeElapsed;
+        std::cout << "\t\t" << sCurrSeqName << " @ F:" << nCurrFrameIdx << "/" << nFrameCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
+        oCurrSequence.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
     }
     catch(const CxxUtils::Exception& e) {
         std::cout << "\nAnalyzeSequence caught Exception:\n" << e.what();
-        if(!g_sLatestGLFWErrorMessage.empty()) {
-            std::cout << " (" << g_sLatestGLFWErrorMessage << ")" << "\n" << std::endl;
-            g_sLatestGLFWErrorMessage = std::string();
-        }
-        else
-            std::cout << "\n" << std::endl;
+        const std::string sContextErrMsg = GLContext::getLatestErrorMessage();
+        if(!sContextErrMsg.empty())
+            std::cout << "\nContext error: " << sContextErrMsg << "\n" << std::endl;
     }
     catch(const cv::Exception& e) {std::cout << "\nAnalyzeSequence caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
     catch(const std::exception& e) {std::cout << "\nAnalyzeSequence caught std::exception:\n" << e.what() << "\n" << std::endl;}
     catch(...) {std::cout << "\nAnalyzeSequence caught unhandled exception\n" << std::endl;}
-    if(bGPUContextInitialized)
-        glfwTerminate();
-    if(pCurrSequence.get()) {
-#if DATASET_PRECACHING
-        pCurrSequence->StopPrecaching();
-#endif //DATASET_PRECACHING
-        pCurrSequence->m_nImagesProcessed.set_value(nCurrFrameIdx);
+    --g_nActiveThreads;
+    try {
+        DatasetType::WorkBatch& oCurrSequence = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
+        if(oCurrSequence.isProcessing())
+            oCurrSequence.stopProcessing();
+    } catch(...) {
+        std::cout << "\nAnalyzeSequence caught unhandled exception while attempting to stop batch processing.\n" << std::endl;
+        throw;
     }
 }
 #elif (HAVE_CUDA && USE_CUDA_IMPL)

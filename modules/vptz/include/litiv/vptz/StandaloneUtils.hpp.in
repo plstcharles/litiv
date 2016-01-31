@@ -221,12 +221,11 @@ struct GLException : public std::runtime_error {
     const int m_nLineNumber;
 };
 
-template<size_t nGLVerMajor=TARGET_GL_VER_MAJOR,size_t nGLVerMinor=TARGET_GL_VER_MINOR>
 class GLContext {
 public:
-    GLContext(const cv::Size& oWinSize, const std::string& sWinName, bool bHide=true) {
+    GLContext(const cv::Size& oWinSize, const std::string& sWinName, bool bHide=true, size_t nGLVerMajor=TARGET_GL_VER_MAJOR, size_t nGLVerMinor=TARGET_GL_VER_MINOR) {
 #if HAVE_GLFW
-        std::call_once(GetInitFlag(),[](){
+        std::call_once(getInitFlag(),[](){
             if(glfwInit()==GL_FALSE)
                 glError("Failed to init GLFW");
             std::atexit(glfwTerminate);
@@ -243,7 +242,7 @@ public:
             glErrorExt("Failed to create [%d,%d] window via GLFW for core GL profile v%d.%d",oWinSize.width,oWinSize.height,nGLVerMajor,nGLVerMinor);
         glfwMakeContextCurrent(m_pWindowHandle.get());
 #elif HAVE_FREEGLUT
-        std::call_once(GetInitFlag(),[](){
+        std::call_once(getInitFlag(),[](){
             int argc = 0;
             glutInit(&argc,NULL);
         });
@@ -257,10 +256,10 @@ public:
         if(bHide)
             glutHideWindow();
 #endif //HAVE_FREEGLUT
-        initGLEW();
+        initGLEW(nGLVerMajor,nGLVerMinor);
     }
 
-    void SetAsActive() {
+    void setAsActive() {
 #if HAVE_GLFW
         glfwMakeContextCurrent(m_pWindowHandle.get());
 #elif HAVE_FREEGLUT
@@ -268,12 +267,9 @@ public:
 #endif //HAVE_FREEGLUT
     }
 
-    //constexpr static std::string GetGLEWVersionString() {return std::string("GL_VERSION_")+CxxUtils::MetaStrConcatenator<typename CxxUtils::MetaITOA<nGLVerMajor>::type,CxxUtils::MetaStr<'_'>,typename CxxUtils::MetaITOA<nGLVerMinor>::type,CxxUtils::MetaStr<'\0'>>::type::value;}
-    constexpr static std::string GetGLEWVersionString() {return std::string("GL_VERSION_")+std::to_string(nGLVerMajor)+"_"+std::to_string(nGLVerMinor);}
-
 private:
 
-    static void initGLEW() {
+    static void initGLEW(size_t nGLVerMajor, size_t nGLVerMinor) {
         glErrorCheck;
         glewExperimental = GLEW_EXPERIMENTAL?GL_TRUE:GL_FALSE;
         const GLenum glewerrn = glewInit();
@@ -283,8 +279,9 @@ private:
         // see glew init GL_INVALID_ENUM bug discussion at https://www.opengl.org/wiki/OpenGL_Loading_Library
         if(errn!=GL_NO_ERROR && errn!=GL_INVALID_ENUM)
             glErrorExt("Unexpected GLEW init error [code=%d, msg=%s]",errn,gluErrorString(errn));
-        if(!glewIsSupported(GetGLEWVersionString().c_str()))
-            glErrorExt("Bad GL core/ext version detected (target is %s)",GetGLEWVersionString().c_str());
+        const std::string sGLEWVersionString = std::string("GL_VERSION_")+std::to_string(nGLVerMajor)+"_"+std::to_string(nGLVerMinor);
+        if(!glewIsSupported(sGLEWVersionString.c_str()))
+            glErrorExt("Bad GL core/ext version detected (target is %s)",sGLEWVersionString.c_str());
     }
 
 #if HAVE_GLFW
@@ -294,8 +291,7 @@ private:
 #endif //HAVE_FREEGLUT
     GLContext& operator=(const GLContext&) = delete;
     GLContext(const GLContext&) = delete;
-    static std::once_flag& GetInitFlag() {static std::once_flag oInitFlag; return oInitFlag;}
+    static std::once_flag& getInitFlag() {static std::once_flag oInitFlag; return oInitFlag;}
 };
-using GLDefaultContext = GLContext<>;
 
 #endif //USE_VPTZ_STANDALONE

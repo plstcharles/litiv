@@ -106,7 +106,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::initialize(const cv::Ma
     const int nMaxSSBOBlockSize = GLUtils::getIntegerVal<1>(GL_MAX_SHADER_STORAGE_BLOCK_SIZE);
     glAssert(nMaxSSBOBlockSize>(int)(m_nBGModelSize*sizeof(uint)) && nMaxSSBOBlockSize>(int)(m_nTMT32ModelSize*sizeof(GLUtils::TMT32GenParams)));
     m_vnBGModelData.resize(m_nBGModelSize,0);
-    GLUtils::initTinyMT32Generators(glm::uvec3(uint(m_oROI.cols),uint(m_oROI.rows),1),m_voTMT32ModelData);
+    GLUtils::TMT32GenParams::initTinyMT32Generators(glm::uvec3(uint(m_oROI.cols),uint(m_oROI.rows),1),m_voTMT32ModelData);
     m_bInitialized = true;
     GLImageProcAlgo::initialize(oInitImg,m_oROI);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_TMT32ModelBinding));
@@ -145,8 +145,8 @@ std::string BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::getComputeShader
              "layout(binding=" << GLImageProcAlgo::eImage_OutputBinding << ", r8ui) writeonly uniform uimage2D mOutput;\n" <<
              (m_nImgChannels==4?DistanceUtils::getShaderFunctionSource_L1dist():std::string())+DistanceUtils::getShaderFunctionSource_absdiff(true) <<
              DistanceUtils::getShaderFunctionSource_hdist() <<
-             GLUtils::getShaderFunctionSource_urand_tinymt32() <<
-             GLUtils::getShaderFunctionSource_getRandNeighbor3x3(0,m_oFrameSize) <<
+             GLShader::getShaderFunctionSource_urand_tinymt32() <<
+             GLShader::getShaderFunctionSource_getRandNeighbor3x3(0,m_oFrameSize) <<
              BackgroundSubtractorLBSP::getLBSPThresholdLUTShaderSource() <<
              LBSP::getShaderFunctionSource(m_nImgChannels,BGSLOBSTER_GLSL_USE_SHAREDMEM,m_vDefaultWorkGroupSize) <<
 #if !BGSLOBSTER_GLSL_USE_SHAREDMEM
