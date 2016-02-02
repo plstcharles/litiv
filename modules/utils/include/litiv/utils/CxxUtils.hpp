@@ -112,7 +112,7 @@ namespace CxxUtils {
         inline void deallocate(pointer p, size_type) noexcept {free(p);}
         inline void destroy(pointer p) {p->~value_type();}
 #endif //!def(_MSC_VER)
-        template<class T2, class ...Targs> inline void construct(T2* p, Targs&&... args) {::new(reinterpret_cast<void*>(p)) T2(std::forward<Targs>(args)...);}
+        template<typename T2, typename... Targs> inline void construct(T2* p, Targs&&... args) {::new(reinterpret_cast<void*>(p)) T2(std::forward<Targs>(args)...);}
         inline void construct(pointer p, const value_type& wert) {new(p) value_type(wert);}
         inline size_type max_size() const noexcept {return (size_type(~0)-size_type(nByteAlign))/sizeof(value_type);}
         bool operator!=(const AlignAllocator<T,nByteAlign>& other) const {return !(*this==other);}
@@ -228,8 +228,8 @@ namespace std { // extending std
     using aligned_vector = vector<T,CxxUtils::AlignAllocator<T,N>>;
 
 #if __cplusplus<=201103L // make_unique is missing from C++11
-    template<typename T, typename ...Targs>
-    std::unique_ptr<T> make_unique(Targs&& ...args) {
+    template<typename T, typename... Targs>
+    std::unique_ptr<T> make_unique(Targs&&... args) {
         return std::unique_ptr<T>(new T(std::forward<Targs>(args)...));
     }
 #endif //__cplusplus<=201103L

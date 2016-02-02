@@ -87,15 +87,15 @@ void GLContext::setWindowVisibility(bool bVal) {
 #endif //HAVE_FREEGLUT
 }
 
-void GLContext::setWindowSize(int nWidth, int nHeight, bool bUpdateViewport) {
+void GLContext::setWindowSize(const cv::Size& oSize, bool bUpdateViewport) {
 #if HAVE_GLFW
-    glfwSetWindowSize(m_pWindowHandle.get(),nWidth,nHeight);
+    glfwSetWindowSize(m_pWindowHandle.get(),oSize.width,oSize.height);
 #elif HAVE_FREEGLUT
     glutSetWindow(m_oWindowHandle.get().m_nHandle);
-        glutReshapeWindow(nWidth,nHeight);
+        glutReshapeWindow(oSize.width,oSize.height);
 #endif //HAVE_FREEGLUT
     if(bUpdateViewport)
-        glViewport(0,0,nWidth,nHeight);
+        glViewport(0,0,oSize.width,oSize.height);
 }
 
 std::string GLContext::getLatestErrorMessage() { // also clears the latest error message

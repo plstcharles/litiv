@@ -88,7 +88,7 @@ public:
               size_t nGLVerMinor=TARGET_GL_VER_MINOR);
     void setAsActive();
     void setWindowVisibility(bool bVal);
-    void setWindowSize(int nWidth, int nHeight, bool bUpdateViewport=true);
+    void setWindowSize(const cv::Size& oSize, bool bUpdateViewport=true);
     static std::string getLatestErrorMessage();
     bool pollEventsAndCheckIfShouldClose();
     bool getKeyPressed(char nKeyID);

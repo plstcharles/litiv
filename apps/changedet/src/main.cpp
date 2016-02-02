@@ -25,14 +25,14 @@
 
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
-#define EVALUATE_OUTPUT         0
+#define EVALUATE_OUTPUT         1
 #define DISPLAY_OUTPUT          0
 ////////////////////////////////
 #define USE_PAWCS               0
 #define USE_LOBSTER             1
 #define USE_SUBSENSE            0
 ////////////////////////////////
-#define USE_GLSL_IMPL           0
+#define USE_GLSL_IMPL           1
 #define USE_CUDA_IMPL           0
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
@@ -64,8 +64,6 @@
 #endif //USE_OPENCL_EVALUATION
 #define USE_GPU_IMPL (USE_GLSL_IMPL||USE_CUDA_IMPL||USE_OPENCL_IMPL)
 #define USE_GPU_EVALUATION (USE_GLSL_EVALUATION || USE_CUDA_EVALUATION || USE_OPENCL_EVALUATION)
-#define NEED_FG_MASK (DISPLAY_OUTPUT || WRITE_IMG_OUTPUT || (EVALUATE_OUTPUT && (!USE_GPU_EVALUATION || VALIDATE_GPU_EVALUATION)))
-#define NEED_LAST_GT_MASK (DISPLAY_OUTPUT || (EVALUATE_OUTPUT && (!USE_GPU_EVALUATION || VALIDATE_GPU_EVALUATION)))
 #define NEED_GT_MASK (DISPLAY_OUTPUT || EVALUATE_OUTPUT)
 #if (USE_GLSL_IMPL+USE_CUDA_IMPL+USE_OPENCL_IMPL)>1
 #error "Must specify a single impl."
@@ -146,68 +144,34 @@ int main(int, char**) {
 void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
-    size_t nCurrFrameIdx = 0;
-    size_t nNextFrameIdx = nCurrFrameIdx+1;
     try {
         DatasetType::WorkBatch& oCurrSequence = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
         CV_Assert(oCurrSequence.getFrameCount()>1);
         const std::string sCurrSeqName = CxxUtils::clampString(oCurrSequence.getName(),12);
         const size_t nFrameCount = oCurrSequence.getFrameCount();
-        const cv::Mat oROI = oCurrSequence.getROI();
-        cv::Mat oCurrInputFrame = oCurrSequence.getInputFrame(nCurrFrameIdx).clone();
-        cv::Mat oNextInputFrame = oCurrSequence.getInputFrame(nNextFrameIdx);
-        CV_Assert(!oCurrInputFrame.empty());
-        CV_Assert(oCurrInputFrame.isContinuous());
-        glAssert(oCurrInputFrame.channels()==1 || oCurrInputFrame.channels()==4);
-        cv::Size oWindowSize = oCurrInputFrame.size();
-        GLContext oContext(oWindowSize,std::string("[GPU] ")+oCurrSequence.getRelativePath(),bool(!DISPLAY_OUTPUT));
+        GLContext oContext(oCurrSequence.getFrameSize(),std::string("[GPU] ")+oCurrSequence.getRelativePath(),bool(!DISPLAY_OUTPUT));
+        std::shared_ptr<IBackgroundSubtractor_<ParallelUtils::eGLSL>> pAlgo;
 #if USE_LOBSTER
-        std::shared_ptr<BackgroundSubtractorLOBSTER_GLSL> pAlgo = std::make_shared<BackgroundSubtractorLOBSTER_GLSL>();
-#elif USE_SUBSENSE
+        pAlgo = std::make_shared<BackgroundSubtractorLOBSTER_GLSL>();
+#else
 #error "Missing glsl impl." // ... @@@@@
-        std::shared_ptr<BackgroundSubtractorSuBSENSE_GLSL> pAlgo = std::make_shared<BackgroundSubtractorSuBSENSE_GLSL>();
-#elif USE_PAWCS
-#error "Missing glsl impl." // ... @@@@@
-        std::shared_ptr<BackgroundSubtractorPAWCS_GLSL> pAlgo = std::make_shared<BackgroundSubtractorPAWCS_GLSL>();
 #endif //USE...
-        std::shared_ptr<GLImageProcAlgo> pAlgo_glsl = pAlgo;
-        std::shared_ptr<IBackgroundSubtractor> pAlgo_base = pAlgo;
-        const double dDefaultLearningRate = pAlgo_base->getDefaultLearningRate();
-        pAlgo_base->initialize(oCurrInputFrame,oROI);
-#if USE_GLSL_EVALUATION
-        std::shared_ptr<DatasetUtils::EvaluatorBase::GLEvaluatorBase> pGLSLAlgoEvaluator;
-        if(pCurrSequence->m_pEvaluator!=nullptr)
-            pGLSLAlgoEvaluator = std::dynamic_pointer_cast<DatasetUtils::EvaluatorBase::GLEvaluatorBase>(pCurrSequence->m_pEvaluator->CreateGLEvaluator(pAlgo_glsl,nFrameCount));
-        if(pGLSLAlgoEvaluator==nullptr)
-            glError("Segmentation evaluation algorithm has no GLSegmEvaluator interface");
-        pGLSLAlgoEvaluator->initialize(oCurrGTMask,oROI.empty()?cv::Mat(oCurrInputFrame.size(),CV_8UC1,cv::Scalar_<uchar>(255)):oROI);
-        oWindowSize.width *= pGLSLAlgoEvaluator->m_nSxSDisplayCount;
-#else //!USE_GLSL_EVALUATION
-        oWindowSize.width *= pAlgo_glsl->m_nSxSDisplayCount; // @@@@ should pAlgo contain a real 'display size' param, and we should query it here?
-#endif //!USE_GLSL_EVALUATION
-        oContext.setWindowSize(oWindowSize.width,oWindowSize.height);
-#if DISPLAY_OUTPUT
+#if DISPLAY_OUTPUT // @@@ CPU?
         cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oCurrSequence.getRelativePath(),oCurrSequence.getOutputPath()+"/../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
-        pAlgo_glsl->setOutputFetching(true); // @@@ should be toggled in evaluator
 #endif //DISPLAY_OUTPUT
+        const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
+        DatasetType::WorkBatch::IAsyncDataConsumer_<IBackgroundSubtractor_<ParallelUtils::eGLSL>> oAsyncConsumer(pAlgo,pBatch);
+        oContext.setWindowSize(oAsyncConsumer.getIdealWindowSize());
         oCurrSequence.startProcessing();
+        size_t nNextFrameIdx = 1;
         while(nNextFrameIdx<=nFrameCount) {
-            if(!((nCurrFrameIdx+1)%100))
-                std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nCurrFrameIdx+1 << "/" << nFrameCount << "   [GPU]" << std::endl;
-            const double dCurrLearningRate = nCurrFrameIdx<=100?1:dDefaultLearningRate;
-            pAlgo->apply_async(oNextInputFrame,dCurrLearningRate);
-#if USE_GLSL_EVALUATION
-            pGLSLAlgoEvaluator->apply_async(oNextGTMask);
-            just call evaluator -> apply_next_async();
-#endif //USE_GLSL_EVALUATION
-#if DISPLAY_OUTPUT
-            cv::Mat oLastInputFrame;
-            oCurrInputFrame.copyTo(oLastInputFrame);
-            oNextInputFrame.copyTo(oCurrInputFrame);
-#endif //DISPLAY_OUTPUT
-            if(++nNextFrameIdx<nFrameCount)
-                oNextInputFrame = oCurrSequence.getInputFrame(nNextFrameIdx);
+            std::cout << "nNextFrameIdx=" << nNextFrameIdx << std::endl;
+            if(!(nNextFrameIdx%100))
+                std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nNextFrameIdx << "/" << nFrameCount << "   [GPU]" << std::endl;
+            const double dCurrLearningRate = nNextFrameIdx<=100?1:dDefaultLearningRate;
+            oAsyncConsumer.apply_async(nNextFrameIdx++,dCurrLearningRate);
+            //pGLSLAlgoEvaluator->apply_async(oNextGTMask);
             glErrorCheck;
             if(oContext.pollEventsAndCheckIfShouldClose())
                 break;
@@ -216,25 +180,16 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
                 break;
             oContext.swapBuffers(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 #if DISPLAY_OUTPUT // @@@@@ add define for display_output_cpu?
-            cv::Mat oLastFGMask,oLastBGImg;
-            pAlgo->getLatestForegroundMask(oLastFGMask);
-            pAlgo->getBackgroundImage(oLastBGImg);
-            if(!oROI.empty()) {
-                cv::bitwise_or(oLastBGImg,UCHAR_MAX/2,oLastBGImg,oROI==0);
-                cv::bitwise_or(oLastFGMask,UCHAR_MAX/2,oLastFGMask,oROI==0);
-            }
-            pDisplayHelper->display(oLastInputFrame,oLastBGImg,oCurrSequence.getColoredSegmMask(oLastFGMask,nCurrFrameIdx),nCurrFrameIdx);
             const int nKeyPressed = pDisplayHelper->waitKey();
             if(nKeyPressed==(int)'q')
                 break;
 #endif //DISPLAY_OUTPUT
 #endif //DISPLAY_OUTPUT
-            //oCurrSequence.pushSegmMask_async(nCurrFrameIdx++); @@@@@ SOMETHING
         }
         oCurrSequence.stopProcessing();
         const double dTimeElapsed = oCurrSequence.getProcessTime();
-        const double dProcessSpeed = (double)nCurrFrameIdx/dTimeElapsed;
-        std::cout << "\t\t" << sCurrSeqName << " @ F:" << nCurrFrameIdx << "/" << nFrameCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
+        const double dProcessSpeed = (double)(nNextFrameIdx-1)/dTimeElapsed;
+        std::cout << "\t\t" << sCurrSeqName << " @ F:" << (nNextFrameIdx-1) << "/" << nFrameCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
         oCurrSequence.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
     }
     catch(const CxxUtils::Exception& e) {

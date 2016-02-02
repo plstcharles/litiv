@@ -33,6 +33,14 @@ namespace litiv {
         uint64_t nFP;
         uint64_t nFN;
         uint64_t nSE; // 'shadow error', not always used/required for eval
+        enum eCountersList { // used for packed array indexing
+            eCounter_TP,
+            eCounter_TN,
+            eCounter_FP,
+            eCounter_FN,
+            eCounter_SE,
+            eCount,
+        };
     };
 
     struct ClassifMetrics {
@@ -103,47 +111,6 @@ namespace litiv {
 
     template<eDatasetTypeList eDatasetType, eDatasetList eDataset>
     struct DatasetEvaluator_ : public IDatasetEvaluator_<eDatasetType> {}; // can be specialized for custom operations
-
-#if 0//HAVE_GLSL // put in IDataEvaluator_<eDatasetType_VideoSegm>? @@@@@
-
-    enum eClassifMetricsBaseCountersList {
-        eClassifMetricsBaseCounter_TP,
-        eClassifMetricsBaseCounter_TN,
-        eClassifMetricsBaseCounter_FP,
-        eClassifMetricsBaseCounter_FN,
-        eClassifMetricsBaseCounter_SE, // 'shadow error', not always used/required for eval
-        eClassifMetricsBaseCountersCount,
-    };
-
-    struct IGLEvaluator {
-        virtual std::string getComputeShaderSource(size_t nStage) const = 0;
-        virtual ~IGLEvaluator() = default;
-    };
-
-    template<eDatasetTypeList eDatasetType>
-    struct IGLEvaluator_;
-
-    template<>
-    struct IGLEvaluator_<eDatasetType_VideoSegm> :
-            public GLImageProcEvaluatorAlgo {
-        IGLEvaluator_(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) :
-                GLImageProcEvaluatorAlgo(pParent,nTotFrameCount,(size_t)eClassifMetricsBaseCountersCount,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,true) {}
-        virtual std::string getComputeShaderSource(size_t nStage) const;
-        virtual ClassifMetricsBase getCumulativeMetrics();
-    };
-
-    template<eDatasetList eDataset>
-    struct GLEvaluator_;
-
-    template<>
-    struct GLEvaluator_<eDataset_VideoSegm_CDnet> :
-            public IGLEvaluator_<eDatasetType_VideoSegm> {
-        GLEvaluator_(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) :
-                IGLEvaluator_(pParent,nTotFrameCount) {}
-        virtual std::string getComputeShaderSource(size_t nStage) const;
-    };
-
-#endif //HAVE_GLSL
 
     template<eDatasetTypeList eDatasetType>
     struct IMetricsCalculator_ : public virtual IDataHandler {
@@ -269,11 +236,39 @@ namespace litiv {
         virtual void pushSegmMask(const cv::Mat& oSegm,size_t nIdx) override;
         virtual cv::Mat getColoredSegmMask(const cv::Mat& oSegm, size_t nIdx);
 
-#if HAVE_GLSL
+#if 0//HAVE_GLSL
+    protected:
+        struct GLVideoSegmDataEvaluator :
+                public IAsyncDataEvaluator<eDatasetType_VideoSegm,ParallelUtils::eGLSL>,
+                public GLImageProcEvaluatorAlgo {
+            GLVideoSegmDataEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount);
+            virtual std::string getComputeShaderSource(size_t nStage) const override;
+            virtual ClassifMetricsBase getCumulativeMetrics();
+        };
+        using GLVideoSegmDataEvaluatorPtr = std::unique_ptr<GLVideoSegmDataEvaluator>;
+        GLVideoSegmDataEvaluatorPtr m_pGLEvaluator;
+
+    public:
+        //! inits a glsl algo evaluator for the datset, and returns the expected gl context window size for display (if needed)
+        virtual cv::Size init_GLSL(const std::shared_ptr<GLImageProcAlgo>& pAlgo) override {
+            m_pGLEvaluator = std::make_unique<GLVideoSegmDataEvaluator>(pAlgo,getTotPackets());
+            auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
+            CV_Assert(pProducer);
+            m_pGLEvaluator->initialize(pProducer->getGTFrame(0),pProducer->getROI());
+            cv::Size oExpectedDisplaySize = pProducer->getFrameSize();
+            oExpectedDisplaySize.width *= m_pGLEvaluator->m_nSxSDisplayCount;
+            return oExpectedDisplaySize;
+        }
+        //! feeds the 'nIdx+1' frame to the gl algo (passed via initwhile fetching the 'nIdx-1' frame for evaluation
+        virtual void apply_GLSL(size_t nIdx) {
+            CV_Assert(m_pGLEvaluator);
+            m_pGLEvaluator->apply_async();
+        }
         //virtual std::shared_ptr<GLEvaluator> CreateGLEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) const {
         //    return std::shared_ptr<GLEvaluator>(new GLEvaluator(pParent,nTotFrameCount));
         //}
         //virtual void FetchGLEvaluation(std::shared_ptr<IGLEvaluator_<eDatasetType_VideoSegm>> pGLEvaluator);
+
 #endif //HAVE_GLSL
 
         static const uchar s_nSegmPositive;

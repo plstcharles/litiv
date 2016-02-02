@@ -115,7 +115,7 @@ litiv::ClassifMetrics litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::
 }
 
 void litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::writeEvalReport() const {
-    if(getBatches().empty()) {
+    if(getBatches().empty() || !isUsingEvaluator()) {
         std::cout << "No report to write for dataset '" << getName() << "', skipping." << std::endl;
         return;
     }
@@ -153,101 +153,10 @@ void litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::writeEvalReport()
 
 #if 0//HAVE_GLSL
 
-//template<>
-std::string litiv::IGLEvaluator_<litiv::eDatasetType_VideoSegm>::getComputeShaderSource(size_t nStage) const {
-    glAssert(nStage<m_nComputeStages);
-    std::stringstream ssSrc;
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc <<"#version 430\n"
-            "#define VAL_POSITIVE     " << (uint)IEvaluator_<eDatasetType_VideoSegm>::s_nSegmPositive << "\n"
-            "#define VAL_NEGATIVE     " << (uint)IEvaluator_<eDatasetType_VideoSegm>::s_nSegmNegative << "\n"
-            "#define VAL_OUTOFSCOPE   " << (uint)IEvaluator_<eDatasetType_VideoSegm>::s_nSegmOutOfScope << "\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc <<"layout(local_size_x=" << m_vDefaultWorkGroupSize.x << ",local_size_y=" << m_vDefaultWorkGroupSize.y << ") in;\n"
-            "layout(binding=" << GLImageProcAlgo::eImage_ROIBinding << ", r8ui) readonly uniform uimage2D imgROI;\n"
-            "layout(binding=" << GLImageProcAlgo::eImage_OutputBinding << ", r8ui) readonly uniform uimage2D imgInput;\n"
-            "layout(binding=" << GLImageProcAlgo::eImage_GTBinding << ", r8ui) readonly uniform uimage2D imgGT;\n";
-    if(m_bUsingDebug) ssSrc <<
-            "layout(binding=" << GLImageProcAlgo::eImage_DebugBinding << ") writeonly uniform uimage2D imgDebug;\n";
-    ssSrc <<"layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eClassifMetricsBaseCounter_TP*4 << ") uniform atomic_uint nTP;\n"
-            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eClassifMetricsBaseCounter_TN*4 << ") uniform atomic_uint nTN;\n"
-            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eClassifMetricsBaseCounter_FP*4 << ") uniform atomic_uint nFP;\n"
-            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eClassifMetricsBaseCounter_FN*4 << ") uniform atomic_uint nFN;\n"
-            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eClassifMetricsBaseCounter_SE*4 << ") uniform atomic_uint nSE;\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    ssSrc <<"void main() {\n"
-            "    ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);\n"
-            "    uint nInputSegmVal = imageLoad(imgInput,imgCoord).r;\n"
-            "    uint nGTSegmVal = imageLoad(imgGT,imgCoord).r;\n"
-            "    uint nROIVal = imageLoad(imgROI,imgCoord).r;\n"
-            "    if(nROIVal!=VAL_NEGATIVE) {\n"
-            "        if(nGTSegmVal!=VAL_OUTOFSCOPE) {\n"
-            "            if(nInputSegmVal==VAL_POSITIVE) {\n"
-            "                if(nGTSegmVal==VAL_POSITIVE) {\n"
-            "                    atomicCounterIncrement(nTP);\n"
-            "                }\n"
-            "                else { // nGTSegmVal==VAL_NEGATIVE\n"
-            "                    atomicCounterIncrement(nFP);\n"
-            "                }\n"
-            "            }\n"
-            "            else { // nInputSegmVal==VAL_NEGATIVE\n"
-            "                if(nGTSegmVal==VAL_POSITIVE) {\n"
-            "                    atomicCounterIncrement(nFN);\n"
-            "                }\n"
-            "                else { // nGTSegmVal==VAL_NEGATIVE\n"
-            "                    atomicCounterIncrement(nTN);\n"
-            "                }\n"
-            "            }\n"
-            "        }\n"
-            "    }\n";
-    if(m_bUsingDebug) { ssSrc <<
-            "    uvec4 out_color = uvec4(0,0,0,255);\n"
-            "    if(nGTSegmVal!=VAL_OUTOFSCOPE && nROIVal!=VAL_NEGATIVE) {\n"
-            "        if(nInputSegmVal==VAL_POSITIVE) {\n"
-            "            if(nGTSegmVal==VAL_POSITIVE) {\n"
-            "                out_color.g = uint(255);\n"
-            "            }\n"
-            "            else if(nGTSegmVal==VAL_NEGATIVE) {\n"
-            "                out_color.r = uint(255);\n"
-            "            }\n"
-            "            else {\n"
-            "                out_color.rgb = uvec3(85);\n"
-            "            }\n"
-            "        }\n"
-            "        else { // nInputSegmVal==VAL_NEGATIVE\n"
-            "            if(nGTSegmVal==VAL_POSITIVE) {\n"
-            "                out_color.rb = uvec2(255,128);\n"
-            "            }\n"
-            "        }\n"
-            "    }\n"
-            "    else if(nROIVal==VAL_NEGATIVE) {\n"
-            "        out_color.rgb = uvec3(128);\n"
-            "    }\n"
-            "    else if(nInputSegmVal==VAL_POSITIVE) {\n"
-            "        out_color.rgb = uvec3(255);\n"
-            "    }\n"
-            "    else if(nInputSegmVal==VAL_NEGATIVE) {\n"
-            "        out_color.rgb = uvec3(0);\n"
-            "    }\n"
-            "    imageStore(imgDebug,imgCoord,out_color);\n";
-    }
-    ssSrc <<"}\n";
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    return ssSrc.str();
-}
 
 //template<>
 ClassifMetricsBase litiv::IGLEvaluator_<eDatasetType_VideoSegm>::getCumulativeMetrics() {
-    const cv::Mat& oAtomicCountersQueryBuffer = this->getEvaluationAtomicCounterBuffer();
-    ClassifMetricsBase oMetricsBase;
-    for(int nFrameIter=0; nFrameIter<oAtomicCountersQueryBuffer.rows; ++nFrameIter) {
-        oMetricsBase.nTP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,eClassifMetricsBaseCounter_TP);
-        oMetricsBase.nTN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,eClassifMetricsBaseCounter_TN);
-        oMetricsBase.nFP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,eClassifMetricsBaseCounter_FP);
-        oMetricsBase.nFN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,eClassifMetricsBaseCounter_FN);
-        oMetricsBase.nSE += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,eClassifMetricsBaseCounter_SE);
-    }
-    return oMetricsBase;
+
 }
 
 //template<>
@@ -400,18 +309,12 @@ cv::Mat litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getColor
     return oResult;
 }
 
-
-
-
-
-
-
 #if 0//HAVE_GLSL
 
-litiv::Video::Segm::CDnetEvaluator::GLCDnetEvaluator::GLCDnetEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) :
-        GLBinarySegmEvaluator(pParent,nTotFrameCount) {}
+litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::GLVideoSegmDataEvaluator::GLVideoSegmDataEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) :
+        GLImageProcEvaluatorAlgo(pParent,nTotFrameCount,(size_t)ClassifMetricsBase::eCount,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,true) {}
 
-std::string litiv::Video::Segm::CDnetEvaluator::GLCDnetEvaluator::getComputeShaderSource(size_t nStage) const {
+std::string litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::GLVideoSegmDataEvaluator::getComputeShaderSource(size_t nStage) const {
     glAssert(nStage<m_nComputeStages);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -428,11 +331,11 @@ std::string litiv::Video::Segm::CDnetEvaluator::GLCDnetEvaluator::getComputeShad
             "layout(binding=" << GLImageProcAlgo::eImage_GTBinding << ", r8ui) readonly uniform uimage2D imgGT;\n";
     if(m_bUsingDebug) ssSrc <<
             "layout(binding=" << GLImageProcAlgo::eImage_DebugBinding << ") writeonly uniform uimage2D imgDebug;\n";
-    ssSrc <<"layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eClassifMetricsBaseCounter_TP*4 << ") uniform atomic_uint nTP;\n"
-            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eClassifMetricsBaseCounter_TN*4 << ") uniform atomic_uint nTN;\n"
-            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eClassifMetricsBaseCounter_FP*4 << ") uniform atomic_uint nFP;\n"
-            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eClassifMetricsBaseCounter_FN*4 << ") uniform atomic_uint nFN;\n"
-            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << eClassifMetricsBaseCounter_SE*4 << ") uniform atomic_uint nSE;\n";
+    ssSrc <<"layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << ClassifMetricsBase::eCounter_TP*4 << ") uniform atomic_uint nTP;\n"
+            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << ClassifMetricsBase::eCounter_TN*4 << ") uniform atomic_uint nTN;\n"
+            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << ClassifMetricsBase::eCounter_FP*4 << ") uniform atomic_uint nFP;\n"
+            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << ClassifMetricsBase::eCounter_FN*4 << ") uniform atomic_uint nFN;\n"
+            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << ClassifMetricsBase::eCounter_SE*4 << ") uniform atomic_uint nSE;\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc <<"void main() {\n"
             "    ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);\n"
@@ -501,6 +404,19 @@ std::string litiv::Video::Segm::CDnetEvaluator::GLCDnetEvaluator::getComputeShad
     ssSrc << "}\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     return ssSrc.str();
+}
+
+litiv::ClassifMetricsBase litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::GLVideoSegmDataEvaluator::getCumulativeMetrics() {
+    const cv::Mat& oAtomicCountersQueryBuffer = this->getEvaluationAtomicCounterBuffer();
+    ClassifMetricsBase oMetricsBase;
+    for(int nFrameIter=0; nFrameIter<oAtomicCountersQueryBuffer.rows; ++nFrameIter) {
+        oMetricsBase.nTP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,ClassifMetricsBase::eCounter_TP);
+        oMetricsBase.nTN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,ClassifMetricsBase::eCounter_TN);
+        oMetricsBase.nFP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,ClassifMetricsBase::eCounter_FP);
+        oMetricsBase.nFN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,ClassifMetricsBase::eCounter_FN);
+        oMetricsBase.nSE += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,ClassifMetricsBase::eCounter_SE);
+    }
+    return oMetricsBase;
 }
 
 #endif //HAVE_GLSL
