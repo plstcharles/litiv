@@ -227,11 +227,18 @@ namespace std { // extending std
     template<typename T, size_t N>
     using aligned_vector = vector<T,CxxUtils::AlignAllocator<T,N>>;
 
-#if __cplusplus<=201103L // make_unique is missing from C++11
+#if !defined(_MSC_VER) && __cplusplus<=201103L // make_unique is missing from C++11 (at least on GCC)
     template<typename T, typename... Targs>
-    std::unique_ptr<T> make_unique(Targs&&... args) {
+    inline typename std::enable_if<!std::is_array<T>::value,std::unique_ptr<T>>::type make_unique(Targs&&... args) {
         return std::unique_ptr<T>(new T(std::forward<Targs>(args)...));
     }
-#endif //__cplusplus<=201103L
+    template<typename T>
+    inline typename std::enable_if<(std::is_array<T>::value && !std::extent<T>::value),std::unique_ptr<T>>::type make_unique(size_t nSize) {
+        using ElemType = typename std::remove_extent<T>::type;
+        return std::unique_ptr<T>(new ElemType[nSize]());
+    }
+    template<typename T, typename... Targs>
+    typename std::enable_if<(std::extent<T>::value!=0)>::type make_unique(Targs&&...) = delete;
+#endif //!defined(_MSC_VER) && __cplusplus<=201103L
 
 } //namespace std
