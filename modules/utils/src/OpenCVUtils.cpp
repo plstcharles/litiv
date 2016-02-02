@@ -83,7 +83,7 @@ void cv::DisplayHelper::display(const cv::Mat& oImage, size_t nIdx) {
     const cv::Point2i& oDbgPt = m_oLatestMouseEvent.oPosition;
     const cv::Size& oLastDbgSize = m_oLatestMouseEvent.oDisplaySize;
     if(oDbgPt.x>=0 && oDbgPt.y>=0 && oDbgPt.x<oLastDbgSize.width && oDbgPt.y<oLastDbgSize.height) {
-        const cv::Point2i oDbgPt_rescaled(oCurrDisplaySize.width*(float(oDbgPt.x)/oLastDbgSize.width),oCurrDisplaySize.height*(float(oDbgPt.y)/oLastDbgSize.height));
+        const cv::Point2i oDbgPt_rescaled(int(oCurrDisplaySize.width*(float(oDbgPt.x)/oLastDbgSize.width)),int(oCurrDisplaySize.height*(float(oDbgPt.y)/oLastDbgSize.height)));
         cv::circle(oImageBYTE3,oDbgPt_rescaled,5,cv::Scalar(255,255,255));
     }
     cv::imshow(m_sDisplayName,oImageBYTE3);
@@ -137,7 +137,7 @@ void cv::DisplayHelper::display(const cv::Mat& oInputImg, const cv::Mat& oDebugI
     const cv::Point2i& oDbgPt = m_oLatestMouseEvent.oPosition;
     const cv::Size& oLastDbgSize = m_oLatestMouseEvent.oDisplaySize;
     if(oDbgPt.x>=0 && oDbgPt.y>=0 && oDbgPt.x<oLastDbgSize.width*3 && oDbgPt.y<oLastDbgSize.height) {
-        const cv::Point2i oDbgPt_rescaled(oCurrDisplaySize.width*(float(oDbgPt.x%oLastDbgSize.width)/oLastDbgSize.width),oCurrDisplaySize.height*(float(oDbgPt.y)/oLastDbgSize.height));
+        const cv::Point2i oDbgPt_rescaled(int(oCurrDisplaySize.width*(float(oDbgPt.x%oLastDbgSize.width)/oLastDbgSize.width)),int(oCurrDisplaySize.height*(float(oDbgPt.y)/oLastDbgSize.height)));
         cv::circle(oInputImgBYTE3,oDbgPt_rescaled,5,cv::Scalar(255,255,255));
         cv::circle(oDebugImgBYTE3,oDbgPt_rescaled,5,cv::Scalar(255,255,255));
         cv::circle(oOutputImgBYTE3,oDbgPt_rescaled,5,cv::Scalar(255,255,255));

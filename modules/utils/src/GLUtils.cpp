@@ -37,8 +37,8 @@ GLContext::GLContext(const cv::Size& oWinSize,
     });
     if(nGLVerMajor>3 || (nGLVerMajor==3 && nGLVerMinor>=2))
         glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,nGLVerMajor);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,nGLVerMinor);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,int(nGLVerMajor));
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,int(nGLVerMinor));
     glfwWindowHint(GLFW_RESIZABLE,GL_FALSE);
     if(bHide)
         glfwWindowHint(GLFW_VISIBLE,GL_FALSE);
