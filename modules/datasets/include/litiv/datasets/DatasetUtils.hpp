@@ -330,9 +330,6 @@ namespace litiv {
     template<eDatasetTypeList eDatasetType, bool bGroup>
     struct IDataConsumer_;
 
-    template<eDatasetTypeList eDatasetType, typename Talgo, typename enable=void>
-    struct IAsyncDataConsumer_;
-
     template<>
     struct IDataRecorder_<eDatasetType_VideoSegm> : public virtual IDataHandler {
         virtual void pushSegmMask(const cv::Mat& oSegm, size_t nIdx) = 0;
@@ -363,6 +360,93 @@ namespace litiv {
                 writeSegmMask(oSegm,nIdx);
         }
 
+        template<typename Talgo, typename enable=void>
+        struct IAsyncDataConsumer_;
+
+        template<typename Talgo>
+        struct IAsyncDataConsumer_<Talgo,typename std::enable_if<std::is_base_of<GLImageProcAlgo,Talgo>::value>::type> {
+            // add toggle for double-eval in here somewhere, or in actual evaluator interface?
+            std::shared_ptr<Talgo> m_pAlgo;
+            std::shared_ptr<cv::DisplayHelper> m_pDisplayHelper;
+            std::shared_ptr<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>> m_pProducer;
+            std::shared_ptr<IDataConsumer_<eDatasetType_VideoSegm,TNoGroup>> m_pConsumer;
+            const bool m_bPreserveInputs;
+            cv::Mat m_oLastInput,m_oCurrInput,m_oNextInput;
+            size_t m_nLastIdx,m_nCurrIdx,m_nNextIdx;
+            size_t m_nFrameCount;
+            //! also (re)initializes pAlgo
+            IAsyncDataConsumer_(const std::shared_ptr<Talgo>& pAlgo, const IDataHandlerPtr& pSequence) :
+                    m_pAlgo(pAlgo),
+                    m_pDisplayHelper(pAlgo->m_pDisplayHelper),
+                    m_pProducer(std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(pSequence)),
+                    m_pConsumer(std::dynamic_pointer_cast<IDataConsumer_<eDatasetType_VideoSegm,TNoGroup>>(pSequence)),
+                    m_bPreserveInputs(pAlgo->m_pDisplayHelper),
+                    m_nLastIdx(0),
+                    m_nCurrIdx(0),
+                    m_nNextIdx(1),
+                    m_nFrameCount(0)
+            {
+                CV_Assert(pAlgo && m_pProducer && m_pConsumer);
+                CV_Assert(m_pProducer->getFrameCount()>1);
+                m_oNextInput = m_pProducer->getInputFrame(m_nNextIdx).clone();
+                m_oCurrInput = m_pProducer->getInputFrame(m_nCurrIdx).clone();
+                m_oLastInput = m_oCurrInput.clone();
+                CV_Assert(!m_oCurrInput.empty());
+                CV_Assert(m_oCurrInput.isContinuous());
+                glAssert(m_oCurrInput.channels()==1 || m_oCurrInput.channels()==4);
+                m_nFrameCount= m_pProducer->getFrameCount();
+                pAlgo->initialize(m_oCurrInput,m_pProducer->getROI());
+                if(pSequence->getDatasetInfo()->isSavingOutput() || m_pDisplayHelper)
+                    pAlgo->setOutputFetching(true);
+                if(m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
+                    pAlgo->setDebugFetching(true);
+            }
+            virtual cv::Size getIdealWindowSize() {
+                cv::Size oFrameSize = m_pProducer->getFrameSize();
+                oFrameSize.width *= m_pAlgo->m_nSxSDisplayCount;
+                return oFrameSize;
+
+            }
+            // override this if implementing async evaluator
+            virtual void post_apply_async(size_t nNextIdx) {
+                m_nLastIdx = m_nCurrIdx;
+                m_nCurrIdx = nNextIdx;
+                m_nNextIdx = nNextIdx+1;
+                if(m_bPreserveInputs) {
+                    m_oCurrInput.copyTo(m_oLastInput);
+                    m_oNextInput.copyTo(m_oCurrInput);
+                }
+                if(m_nNextIdx<m_nFrameCount)
+                    m_oNextInput = m_pProducer->getInputFrame(m_nNextIdx);
+                m_pConsumer->processPacket();
+                if(m_pConsumer->getDatasetInfo()->isSavingOutput() || m_pDisplayHelper) {
+                    cv::Mat oLastOutput,oLastDebug;
+                    m_pAlgo->fetchLastOutput(oLastOutput);
+                    if(m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
+                        m_pAlgo->fetchLastDebug(oLastDebug);
+                    else
+                        oLastDebug = oLastOutput;
+                    if(m_pConsumer->getDatasetInfo()->isSavingOutput())
+                        m_pConsumer->writeSegmMask(oLastOutput,m_nLastIdx);
+                    if(m_pDisplayHelper) {
+                        const cv::Mat& oROI = m_pProducer->getROI();
+                        if(!oROI.empty()) {
+                            cv::bitwise_or(oLastOutput,UCHAR_MAX/2,oLastOutput,oROI==0);
+                            cv::bitwise_or(oLastDebug,UCHAR_MAX/2,oLastDebug,oROI==0);
+                        }
+                        m_pDisplayHelper->display(m_oLastInput,oLastDebug,oLastOutput,m_nLastIdx);
+                    }
+                }
+            }
+            template<typename... Targs>
+            void apply_async(size_t nNextIdx, Targs&&... args) {
+                if(nNextIdx!=m_nNextIdx)
+                    m_oNextInput = m_pProducer->getInputFrame(nNextIdx);
+                m_pAlgo->apply_async(m_oNextInput,std::forward<Targs>(args)...);
+                post_apply_async(nNextIdx);
+            }
+        };
+
     protected:
         virtual cv::Mat readSegmMask(size_t nIdx) const override {
             CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
@@ -389,90 +473,6 @@ namespace litiv {
             else
                 oOutputSegm = oSegm;
             cv::imwrite(sOutputFilePath.str(),oOutputSegm,vnComprParams);
-        }
-    };
-
-    template<typename Talgo>
-    struct IAsyncDataConsumer_<Talgo,typename std::enable_if<std::is_base_of<GLImageProcAlgo,Talgo>::value>::type> {
-        // add toggle for double-eval in here somewhere, or in actual evaluator interface?
-        std::shared_ptr<Talgo> m_pAlgo;
-        std::shared_ptr<cv::DisplayHelper> m_pDisplayHelper;
-        std::shared_ptr<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>> m_pProducer;
-        std::shared_ptr<IDataConsumer_<eDatasetType_VideoSegm,TNoGroup>> m_pConsumer;
-        const bool m_bPreserveInputs;
-        cv::Mat m_oLastInput,m_oCurrInput,m_oNextInput;
-        size_t m_nLastIdx,m_nCurrIdx,m_nNextIdx;
-        size_t m_nFrameCount;
-        //! also (re)initializes pAlgo
-        IAsyncDataConsumer_(const std::shared_ptr<Talgo>& pAlgo, const IDataHandlerPtr& pSequence) :
-                m_pAlgo(pAlgo),
-                m_pDisplayHelper(pAlgo->m_pDisplayHelper),
-                m_pProducer(std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(pSequence)),
-                m_pConsumer(std::dynamic_pointer_cast<IDataConsumer_<eDatasetType_VideoSegm,TNoGroup>>(pSequence)),
-                m_bPreserveInputs(pAlgo->m_pDisplayHelper),
-                m_nLastIdx(0),
-                m_nCurrIdx(0),
-                m_nNextIdx(1),
-                m_nFrameCount(0)
-        {
-            CV_Assert(pAlgo && m_pProducer && m_pConsumer);
-            CV_Assert(m_pProducer->getFrameCount()>1);
-            m_oNextInput = m_pProducer->getInputFrame(m_nNextIdx).clone();
-            m_oCurrInput = m_pProducer->getInputFrame(m_nCurrIdx).clone();
-            m_oLastInput = m_oCurrInput.clone();
-            CV_Assert(!m_oCurrInput.empty());
-            CV_Assert(m_oCurrInput.isContinuous());
-            glAssert(m_oCurrInput.channels()==1 || m_oCurrInput.channels()==4);
-            m_nFrameCount= m_pProducer->getFrameCount();
-            pAlgo->initialize(m_oCurrInput,m_pProducer->getROI());
-            if(pSequence->getDatasetInfo()->isSavingOutput() || m_pDisplayHelper)
-                pAlgo->setOutputFetching(true);
-            if(m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
-                pAlgo->setDebugFetching(true);
-        }
-        virtual cv::Size getIdealWindowSize() {
-            cv::Size oFrameSize = m_pProducer->getFrameSize();
-            oFrameSize.width *= m_pAlgo->m_nSxSDisplayCount;
-            return oFrameSize;
-
-        }
-        // override this if implementing async evaluator
-        virtual void post_apply_async(size_t nNextIdx) {
-            m_nLastIdx = m_nCurrIdx;
-            m_nCurrIdx = nNextIdx;
-            m_nNextIdx = nNextIdx+1;
-            if(m_bPreserveInputs) {
-                m_oCurrInput.copyTo(m_oLastInput);
-                m_oNextInput.copyTo(m_oCurrInput);
-            }
-            if(m_nNextIdx<m_nFrameCount)
-                m_oNextInput = m_pProducer->getInputFrame(m_nNextIdx);
-            m_pConsumer->processPacket();
-            if(m_pConsumer->getDatasetInfo()->isSavingOutput() || m_pDisplayHelper) {
-                cv::Mat oLastOutput,oLastDebug;
-                m_pAlgo->fetchLastOutput(oLastOutput);
-                if(m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
-                    m_pAlgo->fetchLastDebug(oLastDebug);
-                else
-                    oLastDebug = oLastOutput;
-                if(m_pConsumer->getDatasetInfo()->isSavingOutput())
-                    m_pConsumer->writeSegmMask(oLastOutput,m_nLastIdx);
-                if(m_pDisplayHelper) {
-                    const cv::Mat& oROI = m_pProducer->getROI();
-                    if(!oROI.empty()) {
-                        cv::bitwise_or(oLastOutput,UCHAR_MAX/2,oLastOutput,oROI==0);
-                        cv::bitwise_or(oLastDebug,UCHAR_MAX/2,oLastDebug,oROI==0);
-                    }
-                    m_pDisplayHelper->display(m_oLastInput,oLastDebug,oLastOutput,m_nLastIdx);
-                }
-            }
-        }
-        template<typename... Targs>
-        void apply_async(size_t nNextIdx, Targs&&... args) {
-            if(nNextIdx!=m_nNextIdx)
-                m_oNextInput = m_pProducer->getInputFrame(nNextIdx);
-            m_pAlgo->apply_async(m_oNextInput,std::forward<Targs>(args)...);
-            post_apply_async(nNextIdx);
         }
     };
 
