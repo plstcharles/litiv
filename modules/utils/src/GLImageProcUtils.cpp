@@ -375,8 +375,8 @@ void GLImageProcAlgo::apply_async(const cv::Mat& oNextInput, bool bRebindAll) {
 }
 
 size_t GLImageProcAlgo::fetchLastOutput(cv::Mat& oOutput) const {
-    glAssert(oOutput.size()==m_oFrameSize && oOutput.type()==m_nOutputType && oOutput.isContinuous());
     glAssert(m_bFetchingOutput);
+    oOutput.create(m_oFrameSize,m_nOutputType);
     if(m_bUsingOutputPBOs)
         m_apOutputPBOs[m_nNextPBO]->fetchBuffer(oOutput,true);
     else
@@ -385,8 +385,8 @@ size_t GLImageProcAlgo::fetchLastOutput(cv::Mat& oOutput) const {
 }
 
 size_t GLImageProcAlgo::fetchLastDebug(cv::Mat& oDebug) const {
-    glAssert(oDebug.size()==m_oFrameSize && oDebug.type()==m_nDebugType && oDebug.isContinuous());
     glAssert(m_bFetchingDebug);
+    oDebug.create(m_oFrameSize,m_nDebugType);
     if(m_bUsingDebugPBOs)
         m_apDebugPBOs[m_nNextPBO]->fetchBuffer(oDebug,true);
     else

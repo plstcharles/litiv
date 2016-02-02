@@ -24,11 +24,11 @@ namespace litiv {
 
     namespace datasets {
 
-        template<eDatasetTypeList eDatasetType, eDatasetList eDataset, typename ...Targs>
-        IDatasetPtr create(Targs&& ... args);
+        template<eDatasetTypeList eDatasetType, eDatasetList eDataset, typename... Targs>
+        IDatasetPtr create(Targs&&... args);
 
-        template<eDatasetTypeList eDatasetType, typename ...Targs>
-        IDatasetPtr create(Targs&& ... args);
+        template<eDatasetTypeList eDatasetType, typename... Targs>
+        IDatasetPtr create(Targs&&... args);
 
     } //namespace datasets
 
@@ -41,48 +41,8 @@ namespace litiv {
         virtual IDatasetPtr getDatasetInfo() const override final {return m_pDataset;}
     protected:
         DataHandler(const std::string& sBatchName, std::shared_ptr<IDataset> pDataset, const std::string& sRelativePath);
-        virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const override final {
-            if(isGroup()) {
-                size_t nCurrPacketCount = 0;
-                auto vpBatches = getBatches();
-                auto ppBatchIter = vpBatches.begin();
-                while(ppBatchIter!=vpBatches.end()) {
-                    const size_t nNextPacketIncr = (*ppBatchIter)->getTotPackets();
-                    if(nPacketIdx<nCurrPacketCount+nNextPacketIncr)
-                        break;
-                    nCurrPacketCount += nNextPacketIncr;
-                    ++ppBatchIter;
-                }
-                CV_Assert(ppBatchIter!=vpBatches.end());
-                nPacketIdx -= nCurrPacketCount;
-                return *ppBatchIter;
-            }
-            else {
-                CV_Assert(nPacketIdx<getTotPackets());
-                return shared_from_this();
-            }
-        }
-        virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) override final {
-            if(isGroup()) {
-                size_t nCurrPacketCount = 0;
-                auto vpBatches = getBatches();
-                auto ppBatchIter = vpBatches.begin();
-                while(ppBatchIter!=vpBatches.end()) {
-                    const size_t nNextPacketIncr = (*ppBatchIter)->getTotPackets();
-                    if(nPacketIdx<nCurrPacketCount+nNextPacketIncr)
-                        break;
-                    nCurrPacketCount += nNextPacketIncr;
-                    ++ppBatchIter;
-                }
-                CV_Assert(ppBatchIter!=vpBatches.end());
-                nPacketIdx -= nCurrPacketCount;
-                return *ppBatchIter;
-            }
-            else {
-                CV_Assert(nPacketIdx<getTotPackets());
-                return shared_from_this();
-            }
-        }
+        virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const override final;
+        virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) override final;
     private:
         const std::string m_sBatchName;
         const std::string m_sRelativePath;
@@ -98,42 +58,12 @@ namespace litiv {
     template<> // fully specialized dataset producer type for default CDnet (2012+2014) handling
     struct DataProducer_<eDatasetType_VideoSegm, eDataset_VideoSegm_CDnet, TNoGroup> :
             public IDataProducer_<eDatasetType_VideoSegm,TNoGroup> {
-
-        virtual void parseData() override final {
-            std::vector<std::string> vsSubDirs;
-            std::cout << getName() << "->getDataPath() = " << getDataPath() << std::endl;
-            PlatformUtils::GetSubDirsFromDir(getDataPath(),vsSubDirs);
-            auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),getDataPath()+"/groundtruth");
-            auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),getDataPath()+"/input");
-            if(gtDir==vsSubDirs.end() || inputDir==vsSubDirs.end())
-                lvErrorExt("CDnet Sequence '%s' did not possess the required groundtruth and input directories",getName().c_str());
-            PlatformUtils::GetFilesFromDir(*inputDir,m_vsInputFramePaths);
-            PlatformUtils::GetFilesFromDir(*gtDir,m_vsGTFramePaths);
-            if(m_vsGTFramePaths.size()!=m_vsInputFramePaths.size())
-                lvErrorExt("CDnet Sequence '%s' did not possess same amount of GT & input frames",getName().c_str());
-            m_oROI = cv::imread(getDataPath()+"/ROI.bmp",cv::IMREAD_GRAYSCALE);
-            if(m_oROI.empty())
-                lvErrorExt("CDnet Sequence '%s' did not possess a ROI.bmp file",getName().c_str());
-            m_oROI = m_oROI>0; // @@@@@ check throw here???
-            m_oSize = m_oROI.size();
-            m_nFrameCount = m_vsInputFramePaths.size();
-            CV_Assert(m_nFrameCount>0);
-            // note: in this case, no need to use m_vnTestGTIndexes since all # of gt frames == # of test frames (but we assume the frames returned by 'GetFilesFromDir' are ordered correctly...)
-        }
-
-        virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final {
-            cv::Mat oFrame = cv::imread(m_vsGTFramePaths[nIdx],cv::IMREAD_GRAYSCALE);
-            if(oFrame.empty())
-                oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL));
-            else if(oFrame.size()!=m_oSize)
-                cv::resize(oFrame,oFrame,m_oSize,0,0,cv::INTER_NEAREST);
-            return oFrame;
-        }
+        virtual void parseData() override final;
+        virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final;
     };
 
     template<eDatasetTypeList eDatasetType, eDatasetList eDataset>
     struct IDataset_ : public DatasetEvaluator_<eDatasetType,eDataset> { // dataset interface specialization for smaller impl sizes
-
         struct WorkBatch :
                 public DataHandler,
                 public DataProducer_<eDatasetType,eDataset,TNoGroup>,
@@ -162,10 +92,10 @@ namespace litiv {
                     this->setProcessedPacketsPromise();
                 }
             }
-            template<typename ...Targs>
-            static std::shared_ptr<WorkBatch> create(Targs&& ... args) {
+            template<typename... Targs>
+            static std::shared_ptr<WorkBatch> create(Targs&&... args) {
                 struct WorkBatchWrapper : public WorkBatch {
-                    WorkBatchWrapper(Targs&& ... args) : WorkBatch(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
+                    WorkBatchWrapper(Targs&&... args) : WorkBatch(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
                 };
                 return std::make_shared<WorkBatchWrapper>(std::forward<Targs>(args)...);
             }
@@ -196,10 +126,10 @@ namespace litiv {
             virtual double getProcessTime() const override final {return CxxUtils::accumulateMembers<double,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessTime();});}
             virtual double getExpectedLoad() const override final {return CxxUtils::accumulateMembers<double,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getExpectedLoad();});}
             virtual size_t getTotPackets() const override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getTotPackets();});}
-            template<typename ...Targs>
-            static std::shared_ptr<WorkBatchGroup> create(Targs&& ... args) {
+            template<typename... Targs>
+            static std::shared_ptr<WorkBatchGroup> create(Targs&&... args) {
                 struct WorkBatchGroupWrapper : public WorkBatchGroup {
-                    WorkBatchGroupWrapper(Targs&& ... args) : WorkBatchGroup(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
+                    WorkBatchGroupWrapper(Targs&&... args) : WorkBatchGroup(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
                 };
                 return std::make_shared<WorkBatchGroupWrapper>(std::forward<Targs>(args)...);
             }
@@ -210,7 +140,7 @@ namespace litiv {
                 if(!PlatformUtils::string_contains_token(getName(),pDataset->getSkippedDirTokens())) {
                     std::cout << "[" << pDataset->getName() << "] -- Parsing directory '" << pDataset->getDatasetPath()+sRelativePath << "' for work group '" << getName() << "'..." << std::endl;
                     std::vector<std::string> vsWorkBatchPaths;
-                    // all subdirs are considered work batch directories (if none, the category directory itself is a batch)
+                    // all subdirs are considered work batch directories (if none, the category directory itself is a batch, and 'bare')
                     PlatformUtils::GetSubDirsFromDir(getDataPath(),vsWorkBatchPaths);
                     if(vsWorkBatchPaths.empty()) {
                         m_vpBatches.push_back(WorkBatch::create(getName(),pDataset,getRelativePath()));
@@ -329,47 +259,30 @@ namespace litiv {
 
     template<eDatasetTypeList eDatasetType, eDatasetList eDataset>
     struct Dataset_ : public IDataset_<eDatasetType,eDataset> {
-        // if the dataset type/id is not specialized, redirect to default IDataset_ constructor
-        // should still be protected, as creation should always be done via datasets::create
-    protected:
+        // if the dataset type/id is not specialized, this redirects creation to default IDataset_ constructor
         using IDataset_<eDatasetType,eDataset>::IDataset_;
     };
 
     template<>
     struct Dataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet> : public IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet> {
     protected: // should still be protected, as creation should always be done via datasets::create
-        Dataset_(const std::string& sOutputDirName, bool bSaveOutput=false, bool bUseEvaluator=true, bool bForce4ByteDataAlign=false, double dScaleFactor=1.0, bool b2014=true) :
-                IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet>(
-                        b2014?"CDnet 2014":"CDnet 2012",
-                        b2014?"CDNet2014/dataset":"CDNet/dataset",
-                        sOutputDirName,
-                        "bin",
-                        ".png",
-                        std::vector<std::string>{"baseline_highway_cut2"},//b2014?std::vector<std::string>{"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"}:std::vector<std::string>{"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"},
-                        std::vector<std::string>{},
-                        b2014?std::vector<std::string>{"thermal","turbulence"}:std::vector<std::string>{"thermal"},
-                        1,
-                        bSaveOutput,
-                        bUseEvaluator,
-                        bForce4ByteDataAlign,
-                        dScaleFactor
-                ) {}
+        Dataset_(const std::string& sOutputDirName, bool bSaveOutput=false, bool bUseEvaluator=true, bool bForce4ByteDataAlign=false, double dScaleFactor=1.0, bool b2014=true);
     };
 
     namespace datasets {
 
-        template<eDatasetTypeList eDatasetType, eDatasetList eDataset, typename ...Targs>
-        IDatasetPtr create(Targs&& ... args) {
+        template<eDatasetTypeList eDatasetType, eDatasetList eDataset, typename... Targs>
+        IDatasetPtr create(Targs&&... args) {
             struct DatasetWrapper : public Dataset_<eDatasetType,eDataset> {
-                DatasetWrapper(Targs&& ... args) : Dataset_<eDatasetType,eDataset>(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
+                DatasetWrapper(Targs&&... args) : Dataset_<eDatasetType,eDataset>(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
             };
             IDatasetPtr pDataset = std::make_shared<DatasetWrapper>(std::forward<Targs>(args)...);
             pDataset->parseDataset();
             return pDataset;
         }
 
-        template<eDatasetTypeList eDatasetType, typename ...Targs>
-        IDatasetPtr create(Targs&& ... args) {
+        template<eDatasetTypeList eDatasetType, typename... Targs>
+        IDatasetPtr create(Targs&&... args) {
             return create<eDatasetType,getCustomDatasetEnum(eDatasetType)>(std::forward<Targs>(args)...);
         }
 
