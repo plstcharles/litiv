@@ -48,7 +48,7 @@ struct IEdgeDetector_;
 template<>
 struct IEdgeDetector_<ParallelUtils::eGLSL> :
         public ParallelUtils::IParallelAlgo_GLSL,
-        public virtual IIEdgeDetector {
+        public IIEdgeDetector {
 
     //! required for derived class destruction from this interface
     virtual ~IEdgeDetector_() {}
@@ -89,7 +89,7 @@ using IEdgeDetector_GLSL = IEdgeDetector_<ParallelUtils::eGLSL>;
 template<>
 struct IEdgeDetector_<ParallelUtils::eNonParallel> :
         public ParallelUtils::NonParallelAlgo,
-        public virtual IIEdgeDetector {
+        public IIEdgeDetector {
     //! required for derived class destruction from this interface
     virtual ~IEdgeDetector_() {}
 };

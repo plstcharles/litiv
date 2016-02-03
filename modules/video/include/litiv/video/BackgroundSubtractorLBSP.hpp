@@ -52,7 +52,7 @@ protected:
             m_fRelLBSPThreshold(fRelLBSPThreshold),
             m_nDefaultMedianBlurKernelSize(nDefaultMedianBlurKernelSize) {
         CV_Assert(m_fRelLBSPThreshold>=0);
-        m_nROIBorderSize = LBSP::PATCH_SIZE/2;
+        IIBackgroundSubtractor::m_nROIBorderSize = LBSP::PATCH_SIZE/2;
     }
 #if HAVE_GLSL
     //! glsl impl constructor (defined here as MSVC is very prude with template-class-template-cstor-definitions)
@@ -69,7 +69,7 @@ protected:
             m_fRelLBSPThreshold(fRelLBSPThreshold),
             m_nDefaultMedianBlurKernelSize(nDefaultMedianBlurKernelSize) {
         CV_Assert(m_fRelLBSPThreshold>=0);
-        m_nROIBorderSize = LBSP::PATCH_SIZE/2;
+        IIBackgroundSubtractor::m_nROIBorderSize = LBSP::PATCH_SIZE/2;
     }
     //! returns the GLSL compute shader source code for LBSP lookup/description functions
     template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl> // dont pass arguments here!
