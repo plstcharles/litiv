@@ -99,7 +99,7 @@ struct IBackgroundSubtractor_;
 template<>
 struct IBackgroundSubtractor_<ParallelUtils::eGLSL> :
         public ParallelUtils::IParallelAlgo_GLSL,
-        public virtual IIBackgroundSubtractor {
+        public IIBackgroundSubtractor {
     //! required for derived class destruction from this interface
     virtual ~IBackgroundSubtractor_() {}
     //! returns a copy of the latest foreground mask
@@ -138,7 +138,7 @@ using IBackgroundSubtractor_GLSL = IBackgroundSubtractor_<ParallelUtils::eGLSL>;
 template<>
 struct IBackgroundSubtractor_<ParallelUtils::eNonParallel> :
         public ParallelUtils::NonParallelAlgo,
-        public virtual IIBackgroundSubtractor {
+        public IIBackgroundSubtractor {
     //! required for derived class destruction from this interface
     virtual ~IBackgroundSubtractor_() {}
 };
