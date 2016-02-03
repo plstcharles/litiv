@@ -17,6 +17,13 @@
 
 #include "litiv/datasets/DatasetParser.hpp"
 
+const std::string& litiv::DataHandler::getName() const {return m_sBatchName;}
+const std::string& litiv::DataHandler::getDataPath() const {return m_sDataPath;}
+const std::string& litiv::DataHandler::getOutputPath() const {return m_sOutputPath;}
+const std::string& litiv::DataHandler::getRelativePath() const {return m_sRelativePath;}
+bool litiv::DataHandler::isGrayscale() const {return m_bForcingGrayscale;}
+litiv::IDatasetPtr litiv::DataHandler::getDatasetInfo() const {return m_pDataset;}
+
 litiv::DataHandler::DataHandler(const std::string& sBatchName, IDatasetPtr pDataset, const std::string& sRelativePath) :
         m_sBatchName(sBatchName),
         m_sRelativePath(sRelativePath),

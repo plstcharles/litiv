@@ -39,9 +39,6 @@ protected:
 private:
     IIEdgeDetector& operator=(const IIEdgeDetector&) = delete;
     IIEdgeDetector(const IIEdgeDetector&) = delete;
-public:
-    // #### for debug purposes only ####
-    cv::DisplayHelperPtr m_pDisplayHelper;
 };
 
 template<ParallelUtils::eParallelAlgoType eImpl>

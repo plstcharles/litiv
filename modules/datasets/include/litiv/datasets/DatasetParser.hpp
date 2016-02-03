@@ -33,12 +33,12 @@ namespace litiv {
     } //namespace datasets
 
     struct DataHandler : public virtual IDataHandler {
-        virtual const std::string& getName() const override final {return m_sBatchName;}
-        virtual const std::string& getDataPath() const override final {return m_sDataPath;}
-        virtual const std::string& getOutputPath() const override final {return m_sOutputPath;}
-        virtual const std::string& getRelativePath() const override final {return m_sRelativePath;}
-        virtual bool isGrayscale() const override final {return m_bForcingGrayscale;}
-        virtual IDatasetPtr getDatasetInfo() const override final {return m_pDataset;}
+        virtual const std::string& getName() const override final;
+        virtual const std::string& getDataPath() const override final;
+        virtual const std::string& getOutputPath() const override final;
+        virtual const std::string& getRelativePath() const override final;
+        virtual bool isGrayscale() const override final;
+        virtual IDatasetPtr getDatasetInfo() const override final;
     protected:
         DataHandler(const std::string& sBatchName, std::shared_ptr<IDataset> pDataset, const std::string& sRelativePath);
         virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const override final;
@@ -211,19 +211,19 @@ namespace litiv {
 
     protected:
         IDataset_(
-                const std::string& sDatasetName,
-                const std::string& sDatasetDirName,
-                const std::string& sOutputDirName,
-                const std::string& sOutputNamePrefix,
-                const std::string& sOutputNameSuffix,
-                const std::vector<std::string>& vsWorkBatchDirs,
-                const std::vector<std::string>& vsSkippedDirTokens,
-                const std::vector<std::string>& vsGrayscaleDirTokens,
-                size_t nOutputIdxOffset,
-                bool bSaveOutput,
-                bool bUseEvaluator,
-                bool bForce4ByteDataAlign,
-                double dScaleFactor
+                const std::string& sDatasetName, // user-friendly dataset name (used for identification only)
+                const std::string& sDatasetDirName, // dataset directory name in the dataset root path (the latter is set in CMake)
+                const std::string& sOutputDirName, // output directory name for debug logs, evaluation reports and results archiving
+                const std::string& sOutputNamePrefix, // output name prefix for results archiving (if null, only packet idx will be used as file name)
+                const std::string& sOutputNameSuffix, // output name suffix for results archiving (if null, no file extension will be used)
+                const std::vector<std::string>& vsWorkBatchDirs, // array of directory names for top-level work batch groups
+                const std::vector<std::string>& vsSkippedDirTokens, // array of tokens which allow directories to be skipped if one is found in their name
+                const std::vector<std::string>& vsGrayscaleDirTokens, // array of tokens which allow directories to be treated as grayscale input only if one is found in their name
+                size_t nOutputIdxOffset, // output packet idx offset value used when archiving results
+                bool bSaveOutput, // defines whether results should be archived or not
+                bool bUseEvaluator, // defines whether results should be fully evaluated, or simply acknowledged
+                bool bForce4ByteDataAlign, // defines whether data packets should be 4-byte aligned (useful for GPU upload)
+                double dScaleFactor // defines the scale factor to use to resize/rescale read packets
         ) :
                 m_sDatasetName(sDatasetName),
                 m_sDatasetPath(std::string(DATASET_ROOT)+"/"+sDatasetDirName+"/"),
