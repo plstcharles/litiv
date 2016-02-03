@@ -60,7 +60,7 @@ struct IEdgeDetector_<ParallelUtils::eGLSL> :
     //! edge detection function (asynchronous version w/ gl interface); the threshold should be between 0 and 1, or -1 for sweep
     void apply_gl(cv::InputArray oNextImage, bool bRebindAll, double dThreshold);
     //! edge detection function (asynchronous version w/ gl interface); the threshold should be between 0 and 1, or -1 for sweep
-    void apply_gl(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold);
+    void apply_gl(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, bool bRebindAll, double dThreshold);
     //! overloads 'apply_threshold' from IIEdgeDetector and redirects it to apply_gl
     virtual void apply_threshold(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) override final;
     //! overloads 'apply' from IIEdgeDetector and redirects it to apply_gl (with threshold = -1)

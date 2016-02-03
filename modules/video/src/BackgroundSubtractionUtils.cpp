@@ -193,13 +193,13 @@ void IBackgroundSubtractor_GLSL::apply_gl(cv::InputArray _oNextImage, bool bRebi
     oNextInputImg.copyTo(m_oLastColorFrame);
 }
 
-void IBackgroundSubtractor_GLSL::apply_gl(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate) {
-    apply_gl(oNextImage,dLearningRate);
+void IBackgroundSubtractor_GLSL::apply_gl(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, bool bRebindAll, double dLearningRate) {
+    apply_gl(oNextImage,bRebindAll,dLearningRate);
     getLatestForegroundMask(oLastFGMask);
 }
 
 void IBackgroundSubtractor_GLSL::apply(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate) {
-    apply_gl(oNextImage,oLastFGMask,dLearningRate);
+    apply_gl(oNextImage,oLastFGMask,false,dLearningRate);
 }
 
 #endif //HAVE_GLSL
