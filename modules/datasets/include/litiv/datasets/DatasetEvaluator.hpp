@@ -254,7 +254,7 @@ namespace litiv {
             m_pGLEvaluator = std::make_unique<GLVideoSegmDataEvaluator>(pAlgo,getTotPackets());
             auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
             CV_Assert(pProducer);
-            m_pGLEvaluator->initialize(pProducer->getGTFrame(0),pProducer->getROI());
+            m_pGLEvaluator->initialize_gl(pProducer->getGTFrame(0),pProducer->getROI());
             cv::Size oExpectedDisplaySize = pProducer->getFrameSize();
             oExpectedDisplaySize.width *= m_pGLEvaluator->m_nSxSDisplayCount;
             return oExpectedDisplaySize;
@@ -262,7 +262,7 @@ namespace litiv {
         //! feeds the 'nIdx+1' frame to the gl algo (passed via initwhile fetching the 'nIdx-1' frame for evaluation
         virtual void apply_GLSL(size_t nIdx) {
             CV_Assert(m_pGLEvaluator);
-            m_pGLEvaluator->apply_async();
+            m_pGLEvaluator->apply_gl();
         }
         //virtual std::shared_ptr<GLEvaluator> CreateGLEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) const {
         //    return std::shared_ptr<GLEvaluator>(new GLEvaluator(pParent,nTotFrameCount));

@@ -100,7 +100,7 @@ std::string GLImageProcAlgo::getFragmentShaderSource() const {
     return getFragmentShaderSource_internal(m_nOutputType,m_nDebugType,m_nInputType);
 }
 
-void GLImageProcAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oROI) {
+void GLImageProcAlgo::initialize_gl(const cv::Mat& oInitInput, const cv::Mat& oROI) {
     m_bGLInitialized = false;
     glAssert(!oROI.empty() && oROI.isContinuous() && oROI.type()==CV_8UC1);
     if(m_bUsingInput) {
@@ -195,7 +195,7 @@ void GLImageProcAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oROI)
     m_bGLInitialized = true;
 }
 
-void GLImageProcAlgo::apply_async(const cv::Mat& oNextInput, bool bRebindAll) {
+void GLImageProcAlgo::apply_gl(const cv::Mat& oNextInput, bool bRebindAll) {
     glAssert(m_bGLInitialized && (oNextInput.empty() || (oNextInput.type()==m_nInputType && oNextInput.size()==m_oFrameSize && oNextInput.isContinuous())));
     m_nLastLayer = m_nCurrLayer;
     m_nCurrLayer = m_nNextLayer;
@@ -582,12 +582,12 @@ std::string GLImageProcEvaluatorAlgo::getFragmentShaderSource() const {
     return GLImageProcAlgo::getFragmentShaderSource_internal(-1,m_nDebugType,m_pParent->m_nInputType);
 }
 
-void GLImageProcEvaluatorAlgo::initialize(const cv::Mat& oInitInput, const cv::Mat& oInitGT, const cv::Mat& oROI) {
-    m_pParent->initialize(oInitInput,oROI);
-    this->initialize(oInitGT,oROI);
+void GLImageProcEvaluatorAlgo::initialize_gl(const cv::Mat& oInitInput, const cv::Mat& oInitGT, const cv::Mat& oROI) {
+    m_pParent->initialize_gl(oInitInput,oROI);
+    this->initialize_gl(oInitGT,oROI);
 }
 
-void GLImageProcEvaluatorAlgo::initialize(const cv::Mat& oInitGT, const cv::Mat& oROI) {
+void GLImageProcEvaluatorAlgo::initialize_gl(const cv::Mat& oInitGT, const cv::Mat& oROI) {
     glAssert(!oROI.empty() && oROI.isContinuous() && oROI.type()==CV_8UC1);
     glAssert(oROI.size()==m_pParent->m_oFrameSize);
     glAssert(oInitGT.type()==m_nGroundtruthType && oInitGT.size()==oROI.size() && oInitGT.isContinuous());
@@ -672,12 +672,12 @@ void GLImageProcEvaluatorAlgo::initialize(const cv::Mat& oInitGT, const cv::Mat&
     m_bGLInitialized = true;
 }
 
-void GLImageProcEvaluatorAlgo::apply_async(const cv::Mat& oNextInput, const cv::Mat& oNextGT, bool bRebindAll) {
-    m_pParent->apply_async(oNextInput,bRebindAll);
-    this->apply_async(oNextGT,bRebindAll);
+void GLImageProcEvaluatorAlgo::apply_gl(const cv::Mat& oNextInput, const cv::Mat& oNextGT, bool bRebindAll) {
+    m_pParent->apply_gl(oNextInput,bRebindAll);
+    this->apply_gl(oNextGT,bRebindAll);
 }
 
-void GLImageProcEvaluatorAlgo::apply_async(const cv::Mat& oNextGT, bool bRebindAll) {
+void GLImageProcEvaluatorAlgo::apply_gl(const cv::Mat& oNextGT, bool bRebindAll) {
     glAssert(m_bGLInitialized && (oNextGT.empty() || (oNextGT.type()==m_nGroundtruthType && oNextGT.size()==m_oFrameSize && oNextGT.isContinuous())));
     CV_Assert(m_nInternalFrameIdx<m_nTotFrameCount);
     m_nLastLayer = m_nCurrLayer;

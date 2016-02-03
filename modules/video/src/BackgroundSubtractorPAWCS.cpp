@@ -86,7 +86,7 @@ static const size_t s_nDescMaxDataRange_3ch = s_nDescMaxDataRange_1ch*3;
 
 BackgroundSubtractorPAWCS::BackgroundSubtractorPAWCS(size_t nDescDistThresholdOffset, size_t nMinColorDistThreshold, size_t nMaxNbWords,
                                                      size_t nSamplesForMovingAvgs, float fRelLBSPThreshold) :
-        BackgroundSubtractorLBSP<ParallelUtils::eNonParallel>(fRelLBSPThreshold),
+        IBackgroundSubtractorLBSP(fRelLBSPThreshold),
         m_nMinColorDistThreshold(nMinColorDistThreshold),
         m_nDescDistThresholdOffset(nDescDistThresholdOffset),
         m_nMaxLocalWords(nMaxNbWords),
@@ -435,7 +435,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
 
 void BackgroundSubtractorPAWCS::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
     // == init
-    BackgroundSubtractorLBSP::initialize(oInitImg,oROI);
+    IBackgroundSubtractorLBSP::initialize_common(oInitImg,oROI);
     CleanupDictionaries();
     m_bUsingMovingCamera = false;
     m_oDownSampledFrameSize_MotionAnalysis = cv::Size(m_oImgSize.width/FRAMELEVEL_DOWNSAMPLE_RATIO,m_oImgSize.height/FRAMELEVEL_DOWNSAMPLE_RATIO);

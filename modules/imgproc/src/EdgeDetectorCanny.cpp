@@ -18,7 +18,6 @@
 #include "litiv/imgproc/EdgeDetectorCanny.hpp"
 
 EdgeDetectorCanny::EdgeDetectorCanny(double dHystLowThrshFactor, double dGaussianKernelSigma, bool bUseL2GradientNorm) :
-        EdgeDetector(0),
         m_dHystLowThrshFactor(dHystLowThrshFactor),
         m_dGaussianKernelSigma(dGaussianKernelSigma),
         m_bUsingL2GradientNorm(bUseL2GradientNorm) {

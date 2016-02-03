@@ -384,10 +384,19 @@ namespace litiv {
                     m_nLastIdx(0),
                     m_nCurrIdx(0),
                     m_nNextIdx(1),
-                    m_nFrameCount(0)
-            {
+                    m_nFrameCount(0) {
                 CV_Assert(pAlgo && m_pProducer && m_pConsumer);
                 CV_Assert(m_pProducer->getFrameCount()>1);
+            }
+            virtual cv::Size getIdealWindowSize() {
+                cv::Size oFrameSize = m_pProducer->getFrameSize();
+                oFrameSize.width *= int(m_pAlgo->m_nSxSDisplayCount);
+                return oFrameSize;
+
+            }
+
+            // override this if implementing async evaluator
+            virtual void pre_initialize_gl() {
                 m_oNextInput = m_pProducer->getInputFrame(m_nNextIdx).clone();
                 m_oCurrInput = m_pProducer->getInputFrame(m_nCurrIdx).clone();
                 m_oLastInput = m_oCurrInput.clone();
@@ -395,23 +404,20 @@ namespace litiv {
                 CV_Assert(m_oCurrInput.isContinuous());
                 glAssert(m_oCurrInput.channels()==1 || m_oCurrInput.channels()==4);
                 m_nFrameCount= m_pProducer->getFrameCount();
-                pAlgo->initialize(m_oCurrInput,m_pProducer->getROI());
-                if(pSequence->getDatasetInfo()->isSavingOutput() || m_pDisplayHelper)
-                    pAlgo->setOutputFetching(true);
+                if(m_pProducer->getDatasetInfo()->isSavingOutput() || m_pDisplayHelper)
+                    m_pAlgo->setOutputFetching(true);
                 if(m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
-                    pAlgo->setDebugFetching(true);
+                    m_pAlgo->setDebugFetching(true);
             }
-            virtual cv::Size getIdealWindowSize() {
-                cv::Size oFrameSize = m_pProducer->getFrameSize();
-                oFrameSize.width *= m_pAlgo->m_nSxSDisplayCount;
-                return oFrameSize;
 
+            template<typename... Targs>
+            void initialize_gl(Targs&&... args) {
+                pre_initialize_gl();
+                m_pAlgo->initialize_gl(m_oCurrInput,m_pProducer->getROI(),std::forward<Targs>(args)...);
             }
+
             // override this if implementing async evaluator
-            virtual void post_apply_async(size_t nNextIdx) {
-                m_nLastIdx = m_nCurrIdx;
-                m_nCurrIdx = nNextIdx;
-                m_nNextIdx = nNextIdx+1;
+            virtual void post_apply_gl() {
                 if(m_bPreserveInputs) {
                     m_oCurrInput.copyTo(m_oLastInput);
                     m_oNextInput.copyTo(m_oCurrInput);
@@ -438,12 +444,16 @@ namespace litiv {
                     }
                 }
             }
+
             template<typename... Targs>
-            void apply_async(size_t nNextIdx, Targs&&... args) {
+            void apply_gl(size_t nNextIdx, Targs&&... args) {
                 if(nNextIdx!=m_nNextIdx)
                     m_oNextInput = m_pProducer->getInputFrame(nNextIdx);
-                m_pAlgo->apply_async(m_oNextInput,std::forward<Targs>(args)...);
-                post_apply_async(nNextIdx);
+                m_pAlgo->apply_gl(m_oNextInput,std::forward<Targs>(args)...);
+                m_nLastIdx = m_nCurrIdx;
+                m_nCurrIdx = nNextIdx;
+                m_nNextIdx = nNextIdx+1;
+                post_apply_gl();
             }
         };
 

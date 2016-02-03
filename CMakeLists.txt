@@ -126,6 +126,7 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
     endif()
     add_definitions(-Wall)
     add_definitions(-Wfatal-errors)
+    add_definitions(-fPIC) # @@@@ for shared libs only?
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     add_definitions(-DUNICODE -D_UNICODE)
     if(USE_FAST_MATH)
