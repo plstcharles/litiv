@@ -42,14 +42,20 @@ struct IBackgroundSubtractorLBSP_ : public IBackgroundSubtractor_<eImpl> {
     virtual void getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const = 0;
 
 protected:
-    //! default impl constructor
+    //! default impl constructor (defined here as MSVC is very prude with template-class-template-cstor-definitions)
     template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
     IBackgroundSubtractorLBSP_(float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
                                size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
                                int nDefaultMedianBlurKernelSize=BGSLBSP_DEFAULT_MEDIAN_BLUR_KERNEL_SIZE,
-                               typename std::enable_if<eImplTemp==ParallelUtils::eNonParallel>::type* /*pUnused*/=0);
+                               typename std::enable_if<eImplTemp==ParallelUtils::eNonParallel>::type* /*pUnused*/=0) :
+            m_nLBSPThresholdOffset(nLBSPThresholdOffset),
+            m_fRelLBSPThreshold(fRelLBSPThreshold),
+            m_nDefaultMedianBlurKernelSize(nDefaultMedianBlurKernelSize) {
+        CV_Assert(m_fRelLBSPThreshold>=0);
+        m_nROIBorderSize = LBSP::PATCH_SIZE/2;
+    }
 #if HAVE_GLSL
-    //! glsl impl constructor
+    //! glsl impl constructor (defined here as MSVC is very prude with template-class-template-cstor-definitions)
     template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
     IBackgroundSubtractorLBSP_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
                                size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
@@ -57,7 +63,14 @@ protected:
                                float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
                                size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
                                int nDefaultMedianBlurKernelSize=BGSLBSP_DEFAULT_MEDIAN_BLUR_KERNEL_SIZE,
-                               typename std::enable_if<eImplTemp==ParallelUtils::eGLSL>::type* /*pUnused*/=0);
+                               typename std::enable_if<eImplTemp==ParallelUtils::eGLSL>::type* /*pUnused*/=0) :
+            IBackgroundSubtractor_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat),
+            m_nLBSPThresholdOffset(nLBSPThresholdOffset),
+            m_fRelLBSPThreshold(fRelLBSPThreshold),
+            m_nDefaultMedianBlurKernelSize(nDefaultMedianBlurKernelSize) {
+        CV_Assert(m_fRelLBSPThreshold>=0);
+        m_nROIBorderSize = LBSP::PATCH_SIZE/2;
+    }
     //! returns the GLSL compute shader source code for LBSP lookup/description functions
     template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl> // dont pass arguments here!
     typename std::enable_if<eImplTemp==ParallelUtils::eGLSL,std::string>::type getLBSPThresholdLUTShaderSource() const;
