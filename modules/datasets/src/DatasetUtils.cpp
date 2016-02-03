@@ -404,6 +404,7 @@ CV_Assert(m_pProducer->getFrameCount()>1);
 }
 
 cv::Size litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::getIdealGLWindowSize() {
+    glAssert(m_pAlgo->getIsGLInitialized());
     cv::Size oFrameSize = m_pProducer->getFrameSize();
     oFrameSize.width *= int(m_pAlgo->m_nSxSDisplayCount);
     return oFrameSize;
