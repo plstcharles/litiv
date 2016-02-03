@@ -389,28 +389,28 @@ void litiv::IDataConsumer_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::writ
     cv::imwrite(sOutputFilePath.str(),oOutputSegm,vnComprParams);
 }
 
-litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::IAsyncDataConsumer_(const std::shared_ptr<ParallelUtils::IParallelAlgo_GLSL>& pAlgo, const IDataHandlerPtr& pSequence) :
+litiv::AsyncEvaluationWrapper_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::AsyncEvaluationWrapper_(const std::shared_ptr<ParallelUtils::IParallelAlgo_GLSL>& pAlgo, const IDataHandlerPtr& pSequence) :
         m_pAlgo(pAlgo),
         m_pDisplayHelper(pAlgo->m_pDisplayHelper),
         m_pProducer(std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(pSequence)),
-m_pConsumer(std::dynamic_pointer_cast<IDataConsumer_<eDatasetType_VideoSegm,eNotGroup>>(pSequence)),
-m_bPreserveInputs(pAlgo->m_pDisplayHelper),
-m_nLastIdx(0),
-m_nCurrIdx(0),
-m_nNextIdx(1),
-m_nFrameCount(0) {
-CV_Assert(pAlgo && m_pProducer && m_pConsumer);
-CV_Assert(m_pProducer->getFrameCount()>1);
+        m_pConsumer(std::dynamic_pointer_cast<IDataConsumer_<eDatasetType_VideoSegm,eNotGroup>>(pSequence)),
+        m_bPreserveInputs(pAlgo->m_pDisplayHelper),
+        m_nLastIdx(0),
+        m_nCurrIdx(0),
+        m_nNextIdx(1),
+        m_nFrameCount(0) {
+    CV_Assert(pAlgo && m_pProducer && m_pConsumer);
+    CV_Assert(m_pProducer->getFrameCount()>1);
 }
 
-cv::Size litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::getIdealGLWindowSize() {
+cv::Size litiv::AsyncEvaluationWrapper_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::getIdealGLWindowSize() {
     glAssert(m_pAlgo->getIsGLInitialized());
     cv::Size oFrameSize = m_pProducer->getFrameSize();
     oFrameSize.width *= int(m_pAlgo->m_nSxSDisplayCount);
     return oFrameSize;
 }
 
-void litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::pre_initialize_gl() {
+void litiv::AsyncEvaluationWrapper_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::pre_initialize_gl() {
     m_oNextInput = m_pProducer->getInputFrame(m_nNextIdx).clone();
     m_oCurrInput = m_pProducer->getInputFrame(m_nCurrIdx).clone();
     m_oLastInput = m_oCurrInput.clone();
@@ -424,7 +424,7 @@ void litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGL
         m_pAlgo->setDebugFetching(true);
 }
 
-void litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::post_apply_gl() {
+void litiv::AsyncEvaluationWrapper_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::post_apply_gl() {
     if(m_bPreserveInputs) {
         m_oCurrInput.copyTo(m_oLastInput);
         m_oNextInput.copyTo(m_oCurrInput);
@@ -451,7 +451,6 @@ void litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGL
         }
     }
 }
-
 
 #if 0
 

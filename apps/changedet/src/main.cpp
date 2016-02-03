@@ -32,7 +32,7 @@
 #define USE_LOBSTER             1
 #define USE_SUBSENSE            0
 ////////////////////////////////
-#define USE_GLSL_IMPL           0
+#define USE_GLSL_IMPL           1
 #define USE_CUDA_IMPL           0
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
@@ -167,7 +167,7 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         pAlgo->m_pDisplayHelper = pDisplayHelper;
 #endif //DISPLAY_OUTPUT_CPU
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
-        litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL> oAsyncConsumer(pAlgo,pBatch);
+        litiv::AsyncEvaluationWrapper_VideoSegm_GLSL oAsyncConsumer(pAlgo,pBatch);
         oAsyncConsumer.initialize_gl<BackgroundSubtractorType>();
         oContext.setWindowSize(oAsyncConsumer.getIdealGLWindowSize());
         oCurrSequence.startProcessing();

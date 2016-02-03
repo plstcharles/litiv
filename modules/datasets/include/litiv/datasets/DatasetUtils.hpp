@@ -96,8 +96,9 @@ namespace litiv {
     struct IDataRecorder_;
     template<eDatasetTypeList eDatasetType, eGroupPolicy ePolicy>
     struct IDataConsumer_;
+
     template<eDatasetTypeList eDatasetType, ParallelUtils::eParallelAlgoType eImpl>
-    struct IAsyncDataConsumer_; // can be created as standalone
+    struct AsyncEvaluationWrapper_; // standalone algo evaluation wrapper
 
     struct IDataset : std::enable_shared_from_this<IDataset> {
         virtual const std::string& getName() const = 0;
@@ -309,16 +310,17 @@ namespace litiv {
         virtual cv::Mat readSegmMask(size_t nIdx) const override;
         virtual void writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const override;
         // cannot use partial template specialization here... for some reason.
-        friend struct IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eGLSL>;
-        //friend struct IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eCUDA>;
-        //friend struct IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eOpenCL>;
-        friend struct IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eNonParallel>;
+        friend struct AsyncEvaluationWrapper_<eDatasetType_VideoSegm,ParallelUtils::eGLSL>;
+        //friend struct AsyncEvaluationWrapper_<eDatasetType_VideoSegm,ParallelUtils::eCUDA>;
+        //friend struct AsyncEvaluationWrapper_<eDatasetType_VideoSegm,ParallelUtils::eOpenCL>;
     };
 
+#if HAVE_GLSL
+
     template<>
-    struct IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eGLSL> {
+    struct AsyncEvaluationWrapper_<eDatasetType_VideoSegm,ParallelUtils::eGLSL> {
         //! default constructor (grabs a copy of pAlgo and readies internal fetching; you still need to call 'initialize_gl' however)
-        IAsyncDataConsumer_(const std::shared_ptr<ParallelUtils::IParallelAlgo_GLSL>& pAlgo, const IDataHandlerPtr& pSequence);
+        AsyncEvaluationWrapper_(const std::shared_ptr<ParallelUtils::IParallelAlgo_GLSL>& pAlgo, const IDataHandlerPtr& pSequence);
         //! returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs)
         virtual cv::Size getIdealGLWindowSize();
         //! always called by 'initialize_gl' before initializing algo; override this if implementing async evaluator
@@ -355,6 +357,9 @@ namespace litiv {
         size_t m_nLastIdx,m_nCurrIdx,m_nNextIdx;
         size_t m_nFrameCount;
     };
+
+    using AsyncEvaluationWrapper_VideoSegm_GLSL = AsyncEvaluationWrapper_<eDatasetType_VideoSegm,ParallelUtils::eGLSL>;
+#endif //HAVE_GLSL
 
 #if 0
     namespace Video {
