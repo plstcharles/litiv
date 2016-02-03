@@ -34,60 +34,47 @@
     Subtraction using Local Binary Similarity Patterns", in WACV 2014, or G.-A. Bilodeau et al, "Change Detection
     in Feature Space Using Local Binary Similarity Patterns", in CRV 2013.
  */
+
 template<ParallelUtils::eParallelAlgoType eImpl>
-class BackgroundSubtractorLBSP :
-        public BackgroundSubtractor_<eImpl> {
-public:
+struct IBackgroundSubtractorLBSP_ : public IBackgroundSubtractor_<eImpl> {
 
-    //! default impl constructor
-    template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
-    BackgroundSubtractorLBSP(float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
-                             size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
-                             int nDefaultMedianBlurKernelSize=BGSLBSP_DEFAULT_MEDIAN_BLUR_KERNEL_SIZE,
-                             typename std::enable_if<eImplTemp==ParallelUtils::eNonParallel>::type* /*pUnused*/=0) :
-            ::BackgroundSubtractor(LBSP::PATCH_SIZE/2),
-            m_nLBSPThresholdOffset(nLBSPThresholdOffset),
-            m_fRelLBSPThreshold(fRelLBSPThreshold),
-            m_nDefaultMedianBlurKernelSize(nDefaultMedianBlurKernelSize) {
-        CV_Assert(m_fRelLBSPThreshold>=0);
-    }
-
-#if HAVE_GLSL
-    //! glsl impl constructor
-    template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
-    BackgroundSubtractorLBSP(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
-                             size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
-                             bool bUseTimers, bool bUseIntegralFormat,
-                             float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
-                             size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
-                             int nDefaultMedianBlurKernelSize=BGSLBSP_DEFAULT_MEDIAN_BLUR_KERNEL_SIZE,
-                             typename std::enable_if<eImplTemp==ParallelUtils::eGLSL>::type* /*pUnused*/=0) :
-            BackgroundSubtractor_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat),
-            m_nLBSPThresholdOffset(nLBSPThresholdOffset),
-            m_fRelLBSPThreshold(fRelLBSPThreshold),
-            m_nDefaultMedianBlurKernelSize(nDefaultMedianBlurKernelSize) {
-        CV_Assert(m_fRelLBSPThreshold>=0);
-    }
-
-    //! returns the GLSL compute shader source code for LBSP lookup/description functions
-    template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
-    typename std::enable_if<eImplTemp==ParallelUtils::eGLSL,std::string>::type getLBSPThresholdLUTShaderSource() const;
-#endif //HAVE_GLSL
-#if HAVE_CUDA
-    // ... @@@ add impl later
-    static_assert(eImpl!=ParallelUtils::eCUDA),"Missing constr impl");
-#endif //HAVE_CUDA
-#if HAVE_OPENCL
-    // ... @@@ add impl later
-    static_assert(eImpl!=ParallelUtils::eOpenCL),"Missing constr impl");
-#endif //HAVE_OPENCL
-
-    //! (re)initiaization method; needs to be called before starting background subtraction
-    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) override;
     //! returns a copy of the latest reconstructed background descriptors image
     virtual void getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const = 0;
 
 protected:
+    //! default impl constructor
+    template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
+    IBackgroundSubtractorLBSP_(float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
+                               size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
+                               int nDefaultMedianBlurKernelSize=BGSLBSP_DEFAULT_MEDIAN_BLUR_KERNEL_SIZE,
+                               typename std::enable_if<eImplTemp==ParallelUtils::eNonParallel>::type* /*pUnused*/=0);
+#if HAVE_GLSL
+    //! glsl impl constructor
+    template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
+    IBackgroundSubtractorLBSP_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
+                               size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
+                               bool bUseTimers, bool bUseIntegralFormat,
+                               float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
+                               size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
+                               int nDefaultMedianBlurKernelSize=BGSLBSP_DEFAULT_MEDIAN_BLUR_KERNEL_SIZE,
+                               typename std::enable_if<eImplTemp==ParallelUtils::eGLSL>::type* /*pUnused*/=0);
+    //! returns the GLSL compute shader source code for LBSP lookup/description functions
+    template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl> // dont pass arguments here!
+    typename std::enable_if<eImplTemp==ParallelUtils::eGLSL,std::string>::type getLBSPThresholdLUTShaderSource() const;
+#endif //HAVE_GLSL
+#if HAVE_CUDA
+    // ... @@@ add impl later
+    static_assert(eImpl!=ParallelUtils::eCUDA),"Missing impl");
+#endif //HAVE_CUDA
+#if HAVE_OPENCL
+    // ... @@@ add impl later
+    static_assert(eImpl!=ParallelUtils::eOpenCL),"Missing impl");
+#endif //HAVE_OPENCL
+
+    //! required for derived class destruction from this interface
+    virtual ~IBackgroundSubtractorLBSP_() {}
+    //! common (re)initiaization method for all impl types (should be called in impl-specific initialize func)
+    virtual void initialize_common(const cv::Mat& oInitImg, const cv::Mat& oROI) override;
     //! LBSP internal threshold offset value, used to reduce texture noise in dark regions
     const size_t m_nLBSPThresholdOffset;
     //! LBSP relative internal threshold (kept here since we don't keep an LBSP object)
@@ -99,3 +86,14 @@ protected:
     //! copy of latest descriptors (used when refreshing model)
     cv::Mat m_oLastDescFrame;
 };
+
+#if HAVE_GLSL
+using IBackgroundSubtractorLBSP_GLSL = IBackgroundSubtractorLBSP_<ParallelUtils::eGLSL>;
+#endif //HAVE_GLSL
+#if HAVE_CUDA
+//using IBackgroundSubtractorLBSP_CUDA = IBackgroundSubtractorLBSP_<ParallelUtils::eCUDA>;
+#endif //HAVE_CUDA
+#if HAVE_OPENCL
+//using IBackgroundSubtractorLBSP_OpenCL = IBackgroundSubtractorLBSP_<ParallelUtils::eOpenCL>;
+#endif //HAVE_OPENCL
+using IBackgroundSubtractorLBSP = IBackgroundSubtractorLBSP_<ParallelUtils::eNonParallel>;

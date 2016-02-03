@@ -49,9 +49,6 @@ public:
     size_t fetchLastOutput(cv::Mat& oOutput) const;
     size_t fetchLastDebug(cv::Mat& oDebug) const;
 
-    virtual void initialize(const cv::Mat& oInitInput, const cv::Mat& oROI);
-    virtual void apply_async(const cv::Mat& oNextInput, bool bRebindAll=false);
-
     const size_t m_nLevels;
     const size_t m_nComputeStages;
     const size_t m_nSSBOs;
@@ -108,6 +105,11 @@ public:
     };
 
 protected:
+    //! initialize internal texture arrays and shader programs; should be called in top-level algo init function
+    virtual void initialize_gl(const cv::Mat& oInitInput, const cv::Mat& oROI);
+    //! uploads the next input texture to GPU, processes the input texture currently on GPU, and fetches (if required) the last output texture
+    virtual void apply_gl(const cv::Mat& oNextInput, bool bRebindAll=false);
+
     bool m_bUsingDisplay;
     bool m_bGLInitialized;
     cv::Size m_oFrameSize;
@@ -158,12 +160,16 @@ public:
     const cv::Mat& getEvaluationAtomicCounterBuffer();
     virtual std::string getFragmentShaderSource() const;
 
-    virtual void initialize(const cv::Mat& oInitInput, const cv::Mat& oInitGT, const cv::Mat& oROI);
-    virtual void initialize(const cv::Mat& oInitGT, const cv::Mat& oROI);
-    virtual void apply_async(const cv::Mat& oNextInput, const cv::Mat& oNextGT, bool bRebindAll=false);
-    virtual void apply_async(const cv::Mat& oNextGT, bool bRebindAll=false);
-
 protected:
+    //! initialize internal texture arrays and shader programs for evaluator+algo; should be called in top-level evaluator init function
+    virtual void initialize_gl(const cv::Mat& oInitInput, const cv::Mat& oInitGT, const cv::Mat& oROI);
+    //! initialize internal texture arrays and shader programs for evaluator only; should be called in top-level evaluator init function
+    virtual void initialize_gl(const cv::Mat& oInitGT, const cv::Mat& oROI);
+    //! uploads the next input/gt texture to GPU, processes the input/gt/output textures currently on GPU, and fetches (if required) the last output texture
+    virtual void apply_gl(const cv::Mat& oNextInput, const cv::Mat& oNextGT, bool bRebindAll=false);
+    //! uploads the next gt texture to GPU, processes the output/gt textures currently on GPU, and fetches (if required) the last output texture
+    virtual void apply_gl(const cv::Mat& oNextGT, bool bRebindAll=false);
+
     const int m_nGroundtruthType;
     const size_t m_nTotFrameCount;
     const size_t m_nEvalBufferFrameSize;

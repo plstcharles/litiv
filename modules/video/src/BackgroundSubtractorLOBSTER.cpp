@@ -17,12 +17,10 @@
 
 #include "litiv/video/BackgroundSubtractorLOBSTER.hpp"
 
-#if HAVE_GLSL
-
 template<>
-IBackgroundSubtractorLOBSTER<ParallelUtils::eGLSL>::IBackgroundSubtractorLOBSTER(size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples,
-                                                                                 size_t nRequiredBGSamples, size_t nLBSPThresholdOffset, float fRelLBSPThreshold) :
-        BackgroundSubtractorLBSP<ParallelUtils::eGLSL>(1,1+BGSLOBSTER_GLSL_USE_POSTPROC,2,0,0,0,BGSLOBSTER_GLSL_USE_DEBUG?CV_8UC4:-1,BGSLOBSTER_GLSL_USE_DEBUG,BGSLOBSTER_GLSL_USE_TIMERS,true,fRelLBSPThreshold,nLBSPThresholdOffset),
+IBackgroundSubtractorLOBSTER::IBackgroundSubtractorLOBSTER_(size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples,
+                                                                                          size_t nRequiredBGSamples, size_t nLBSPThresholdOffset, float fRelLBSPThreshold) :
+        IBackgroundSubtractorLBSP(fRelLBSPThreshold,nLBSPThresholdOffset),
         m_nColorDistThreshold(nColorDistThreshold),
         m_nDescDistThreshold(nDescDistThreshold),
         m_nBGSamples(nBGSamples),
@@ -31,14 +29,21 @@ IBackgroundSubtractorLOBSTER<ParallelUtils::eGLSL>::IBackgroundSubtractorLOBSTER
     CV_Assert(m_nColorDistThreshold>0 || m_nDescDistThreshold>0);
 }
 
+#if HAVE_GLSL
 template<>
-BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::BackgroundSubtractorLOBSTER_(size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples, size_t nRequiredBGSamples, size_t nLBSPThresholdOffset, float fRelLBSPThreshold) :
-        IBackgroundSubtractorLOBSTER<ParallelUtils::eGLSL>(nDescDistThreshold,nColorDistThreshold,nBGSamples,nRequiredBGSamples,nLBSPThresholdOffset,fRelLBSPThreshold) {
+IBackgroundSubtractorLOBSTER_GLSL::IBackgroundSubtractorLOBSTER_(size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples,
+                                                                                   size_t nRequiredBGSamples, size_t nLBSPThresholdOffset, float fRelLBSPThreshold) :
+        IBackgroundSubtractorLBSP_GLSL(1,1+BGSLOBSTER_GLSL_USE_POSTPROC,2,0,0,0,BGSLOBSTER_GLSL_USE_DEBUG?CV_8UC4:-1,BGSLOBSTER_GLSL_USE_DEBUG,BGSLOBSTER_GLSL_USE_TIMERS,true,fRelLBSPThreshold,nLBSPThresholdOffset),
+        m_nColorDistThreshold(nColorDistThreshold),
+        m_nDescDistThreshold(nDescDistThreshold),
+        m_nBGSamples(nBGSamples),
+        m_nRequiredBGSamples(nRequiredBGSamples) {
+    CV_Assert(m_nRequiredBGSamples<=m_nBGSamples);
+    CV_Assert(m_nColorDistThreshold>0 || m_nDescDistThreshold>0);
     glErrorCheck;
 }
 
-template<>
-void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate) {
+void BackgroundSubtractorLOBSTER_GLSL::refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate) {
     lvDbgExceptionWatch;
     // == refresh
     CV_Assert(m_bInitialized);
@@ -90,11 +95,10 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::refreshModel(float fSam
     glErrorCheck;
 }
 
-template<>
-void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
+void BackgroundSubtractorLOBSTER_GLSL::initialize_gl(const cv::Mat& oInitImg, const cv::Mat& oROI) {
     lvDbgExceptionWatch;
     // == init
-    BackgroundSubtractorLBSP::initialize(oInitImg,oROI);
+    initialize_common(oInitImg,oROI);
     // not considering relevant pixels via LUT: it would ruin shared mem usage
     m_nTMT32ModelSize = size_t(m_oROI.cols*m_oROI.rows);
     m_nSampleStepSize = m_nImgChannels;
@@ -108,7 +112,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::initialize(const cv::Ma
     m_vnBGModelData.resize(m_nBGModelSize,0);
     GLUtils::TMT32GenParams::initTinyMT32Generators(glm::uvec3(uint(m_oROI.cols),uint(m_oROI.rows),1),m_voTMT32ModelData);
     m_bInitialized = true;
-    GLImageProcAlgo::initialize(oInitImg,m_oROI);
+    GLImageProcAlgo::initialize_gl(oInitImg,m_oROI);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_TMT32ModelBinding));
     glBufferData(GL_SHADER_STORAGE_BUFFER,m_nTMT32ModelSize*sizeof(GLUtils::TMT32GenParams),m_voTMT32ModelData.data(),GL_STATIC_COPY);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER,BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_TMT32ModelBinding,getSSBOId(BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_TMT32ModelBinding));
@@ -116,8 +120,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::initialize(const cv::Ma
     m_bModelInitialized = true;
 }
 
-template<>
-std::string BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::getComputeShaderSource_LOBSTER() const {
+std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource_LOBSTER() const {
     lvDbgExceptionWatch;
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -147,7 +150,7 @@ std::string BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::getComputeShader
              DistanceUtils::getShaderFunctionSource_hdist() <<
              GLShader::getShaderFunctionSource_urand_tinymt32() <<
              GLShader::getShaderFunctionSource_getRandNeighbor3x3(0,m_oFrameSize) <<
-             BackgroundSubtractorLBSP::getLBSPThresholdLUTShaderSource() <<
+             IBackgroundSubtractorLBSP_GLSL::getLBSPThresholdLUTShaderSource() <<
              LBSP::getShaderFunctionSource(m_nImgChannels,BGSLOBSTER_GLSL_USE_SHAREDMEM,m_vDefaultWorkGroupSize) <<
 #if !BGSLOBSTER_GLSL_USE_SHAREDMEM
              "#define lbsp(t,ref,vCoords) lbsp(t,ref,mInput,vCoords)\n"
@@ -273,8 +276,7 @@ std::string BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::getComputeShader
     return ssSrc.str();
 }
 
-template<>
-std::string BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::getComputeShaderSource_PostProc() const {
+std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource_PostProc() const {
     lvDbgExceptionWatch;
     glAssert(m_nDefaultMedianBlurKernelSize>0);
     std::stringstream ssSrc;
@@ -302,8 +304,7 @@ std::string BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::getComputeShader
     return ssSrc.str();
 }
 
-template<>
-std::string BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::getComputeShaderSource(size_t nStage) const {
+std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource(size_t nStage) const {
     lvDbgExceptionWatch;
     glAssert(m_bInitialized);
     glAssert(nStage<m_nComputeStages);
@@ -313,8 +314,7 @@ std::string BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::getComputeShader
         return getComputeShaderSource_PostProc();
 }
 
-template<>
-void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::dispatch(size_t nStage, GLShader& oShader) {
+void BackgroundSubtractorLOBSTER_GLSL::dispatch(size_t nStage, GLShader& oShader) {
     lvDbgExceptionWatch;
     glAssert(nStage<m_nComputeStages);
     if(nStage==0) {
@@ -328,8 +328,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::dispatch(size_t nStage,
     glDispatchCompute((GLuint)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x),(GLuint)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y),1);
 }
 
-template<>
-void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::getBackgroundImage(cv::OutputArray oBGImg) const {
+void BackgroundSubtractorLOBSTER_GLSL::getBackgroundImage(cv::OutputArray oBGImg) const {
     lvDbgExceptionWatch;
     CV_Assert(m_bInitialized);
     glAssert(m_bGLInitialized && !m_vnBGModelData.empty());
@@ -361,8 +360,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::getBackgroundImage(cv::
     }
 }
 
-template<>
-void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const {
+void BackgroundSubtractorLOBSTER_GLSL::getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const {
     lvDbgExceptionWatch;
     CV_Assert(m_bInitialized);
     glAssert(m_bGLInitialized && !m_vnBGModelData.empty());
@@ -396,36 +394,20 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>::getBackgroundDescriptor
     }
 }
 
-template class BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>;
+template struct BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>;
 #endif //HAVE_GLSL
 
 #if HAVE_CUDA
 // ... @@@ add impl later
-//template class BackgroundSubtractorLOBSTER_<ParallelUtils::eCUDA>;
+//template struct BackgroundSubtractorLOBSTER_<ParallelUtils::eCUDA>;
 #endif //HAVE_CUDA
 
 #if HAVE_OPENCL
 // ... @@@ add impl later
-//template class BackgroundSubtractorLOBSTER_<ParallelUtils::eOpenCL>;
+//template struct BackgroundSubtractorLOBSTER_<ParallelUtils::eOpenCL>;
 #endif //HAVE_OPENCL
 
-template<>
-IBackgroundSubtractorLOBSTER<ParallelUtils::eNonParallel>::IBackgroundSubtractorLOBSTER(size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples, size_t nRequiredBGSamples, size_t nLBSPThresholdOffset, float fRelLBSPThreshold) :
-        BackgroundSubtractorLBSP<ParallelUtils::eNonParallel>(fRelLBSPThreshold,nLBSPThresholdOffset),
-        m_nColorDistThreshold(nColorDistThreshold),
-        m_nDescDistThreshold(nDescDistThreshold),
-        m_nBGSamples(nBGSamples),
-        m_nRequiredBGSamples(nRequiredBGSamples) {
-    CV_Assert(m_nRequiredBGSamples<=m_nBGSamples);
-    CV_Assert(m_nColorDistThreshold>0 || m_nDescDistThreshold>0);
-}
-
-template<>
-BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::BackgroundSubtractorLOBSTER_(size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples, size_t nRequiredBGSamples, size_t nLBSPThresholdOffset, float fRelLBSPThreshold) :
-        IBackgroundSubtractorLOBSTER<ParallelUtils::eNonParallel>(nDescDistThreshold,nColorDistThreshold,nBGSamples,nRequiredBGSamples,nLBSPThresholdOffset,fRelLBSPThreshold) {}
-
-template<>
-void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate) {
+void BackgroundSubtractorLOBSTER::refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate) {
     lvDbgExceptionWatch;
     // == refresh
     CV_Assert(m_bInitialized);
@@ -457,11 +439,10 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::refreshModel(flo
     }
 }
 
-template<>
-void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
+void BackgroundSubtractorLOBSTER::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
     lvDbgExceptionWatch;
     // == init
-    BackgroundSubtractorLBSP::initialize(oInitImg,oROI);
+    IBackgroundSubtractorLBSP::initialize_common(oInitImg,oROI);
     m_voBGColorSamples.resize(m_nBGSamples);
     m_voBGDescSamples.resize(m_nBGSamples);
     for(size_t s=0; s<m_nBGSamples; ++s) {
@@ -475,8 +456,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::initialize(const
     m_bModelInitialized = true;
 }
 
-template<>
-void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::apply(cv::InputArray _oInputImg, cv::OutputArray _oFGMask, double dLearningRate) {
+void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArray _oFGMask, double dLearningRate) {
     lvDbgExceptionWatch;
     // == process_sync
     CV_Assert(m_bInitialized && m_bModelInitialized);
@@ -602,8 +582,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::apply(cv::InputA
     oInputImg.copyTo(m_oLastColorFrame);
 }
 
-template<>
-void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::getBackgroundImage(cv::OutputArray oBGImg) const {
+void BackgroundSubtractorLOBSTER::getBackgroundImage(cv::OutputArray oBGImg) const {
     lvDbgExceptionWatch;
     CV_Assert(m_bInitialized);
     cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
@@ -622,8 +601,7 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::getBackgroundIma
     oAvgBGImg.convertTo(oBGImg,CV_8U);
 }
 
-template<>
-void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const {
+void BackgroundSubtractorLOBSTER::getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const {
     static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
     lvDbgExceptionWatch;
     CV_Assert(m_bInitialized);
@@ -643,4 +621,4 @@ void BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>::getBackgroundDes
     oAvgBGDesc.convertTo(oBGDescImg,CV_16U);
 }
 
-template class BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>;
+template struct BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>;

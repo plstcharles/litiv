@@ -17,45 +17,23 @@
 
 #include "litiv/video/BackgroundSubtractorLBSP.hpp"
 
-#if HAVE_GLSL
-
 template<>
 template<>
-std::string BackgroundSubtractorLBSP<ParallelUtils::eGLSL>::getLBSPThresholdLUTShaderSource<ParallelUtils::eGLSL>() const {
-    lvDbgExceptionWatch;
-    glAssert(m_bInitialized);
-    std::stringstream ssSrc;
-    ssSrc << "const uint anLBSPThresLUT[256] = uint[256](\n    ";
-    for(size_t t=0; t<=UCHAR_MAX; ++t) {
-        if(t>0 && (t%((UCHAR_MAX+1)/8))==(((UCHAR_MAX+1)/8)-1) && t<UCHAR_MAX)
-            ssSrc << m_anLBSPThreshold_8bitLUT[t] << ",\n    ";
-        else if(t<UCHAR_MAX)
-            ssSrc << m_anLBSPThreshold_8bitLUT[t] << ",";
-        else
-            ssSrc << m_anLBSPThreshold_8bitLUT[t] << "\n";
-    }
-    ssSrc << ");\n";
-    return ssSrc.str();
+IBackgroundSubtractorLBSP::IBackgroundSubtractorLBSP_<ParallelUtils::eNonParallel>(float fRelLBSPThreshold,
+                                                                                   size_t nLBSPThresholdOffset,
+                                                                                   int nDefaultMedianBlurKernelSize,
+                                                                                   void* /*pUnused*/) :
+        m_nLBSPThresholdOffset(nLBSPThresholdOffset),
+        m_fRelLBSPThreshold(fRelLBSPThreshold),
+        m_nDefaultMedianBlurKernelSize(nDefaultMedianBlurKernelSize) {
+    CV_Assert(m_fRelLBSPThreshold>=0);
+    m_nROIBorderSize = LBSP::PATCH_SIZE/2;
 }
 
-template class BackgroundSubtractorLBSP<ParallelUtils::eGLSL>;
-
-#endif //HAVE_GLSL
-
-#if HAVE_CUDA
-// ... @@@ add impl later
-//template class BackgroundSubtractorLBSP<ParallelUtils::eCUDA>;
-#endif //HAVE_CUDA
-
-#if HAVE_OPENCL
-// ... @@@ add impl later
-//template class BackgroundSubtractorLBSP<ParallelUtils::eOpenCL>;
-#endif //HAVE_OPENCL
-
 template<ParallelUtils::eParallelAlgoType eImpl>
-void BackgroundSubtractorLBSP<eImpl>::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
+void IBackgroundSubtractorLBSP_<eImpl>::initialize_common(const cv::Mat& oInitImg, const cv::Mat& oROI) {
     lvDbgExceptionWatch;
-    ::BackgroundSubtractor_<eImpl>::initialize(oInitImg,oROI);
+    IIBackgroundSubtractor::initialize_common(oInitImg,oROI);
     m_oLastDescFrame.create(this->m_oImgSize,CV_16UC((int)this->m_nImgChannels));
     m_oLastDescFrame = cv::Scalar_<ushort>::all(0);
     const int nLBSPBorderSize = (int)LBSP::PATCH_SIZE/2;
@@ -99,4 +77,54 @@ void BackgroundSubtractorLBSP<eImpl>::initialize(const cv::Mat& oInitImg, const 
     }
 }
 
-template class BackgroundSubtractorLBSP<ParallelUtils::eNonParallel>;
+#if HAVE_GLSL
+
+template<>
+template<>
+IBackgroundSubtractorLBSP_GLSL::IBackgroundSubtractorLBSP_<ParallelUtils::eGLSL>(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
+                                                                                 size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
+                                                                                 bool bUseTimers, bool bUseIntegralFormat,
+                                                                                 float fRelLBSPThreshold, size_t nLBSPThresholdOffset, int nDefaultMedianBlurKernelSize,
+                                                                                 void* /*pUnused*/) :
+        IBackgroundSubtractor_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat),
+        m_nLBSPThresholdOffset(nLBSPThresholdOffset),
+        m_fRelLBSPThreshold(fRelLBSPThreshold),
+        m_nDefaultMedianBlurKernelSize(nDefaultMedianBlurKernelSize) {
+    CV_Assert(m_fRelLBSPThreshold>=0);
+    m_nROIBorderSize = LBSP::PATCH_SIZE/2;
+}
+
+template<>
+template<>
+std::string IBackgroundSubtractorLBSP_GLSL::getLBSPThresholdLUTShaderSource<ParallelUtils::eGLSL>() const {
+    lvDbgExceptionWatch;
+    glAssert(m_bInitialized);
+    std::stringstream ssSrc;
+    ssSrc << "const uint anLBSPThresLUT[256] = uint[256](\n    ";
+    for(size_t t=0; t<=UCHAR_MAX; ++t) {
+        if(t>0 && (t%((UCHAR_MAX+1)/8))==(((UCHAR_MAX+1)/8)-1) && t<UCHAR_MAX)
+            ssSrc << m_anLBSPThreshold_8bitLUT[t] << ",\n    ";
+        else if(t<UCHAR_MAX)
+            ssSrc << m_anLBSPThreshold_8bitLUT[t] << ",";
+        else
+            ssSrc << m_anLBSPThreshold_8bitLUT[t] << "\n";
+    }
+    ssSrc << ");\n";
+    return ssSrc.str();
+}
+
+template struct IBackgroundSubtractorLBSP_<ParallelUtils::eGLSL>;
+
+#endif //HAVE_GLSL
+
+#if HAVE_CUDA
+// ... @@@ add impl later
+//template struct IBackgroundSubtractorLBSP_<ParallelUtils::eCUDA>;
+#endif //HAVE_CUDA
+
+#if HAVE_OPENCL
+// ... @@@ add impl later
+//template struct IBackgroundSubtractorLBSP_<ParallelUtils::eOpenCL>;
+#endif //HAVE_OPENCL
+
+template struct IBackgroundSubtractorLBSP_<ParallelUtils::eNonParallel>;

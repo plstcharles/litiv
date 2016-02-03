@@ -37,8 +37,7 @@
 
     Note: converts all RGB/RGBA images to grayscale internally.
  */
-class EdgeDetectorCanny : public EdgeDetector {
-public:
+struct EdgeDetectorCanny : public IEdgeDetector {
     //! full constructor
     EdgeDetectorCanny(double dHystLowThrshFactor=EDGCANNY_DEFAULT_HYST_LOW_THRSH_FACT,
                       double dGaussianKernelSigma=EDGCANNY_DEFAULT_GAUSSIAN_KERNEL_SIGMA,

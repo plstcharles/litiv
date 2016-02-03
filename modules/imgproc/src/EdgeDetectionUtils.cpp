@@ -17,76 +17,48 @@
 
 #include "litiv/imgproc/EdgeDetectionUtils.hpp"
 
+IIEdgeDetector::IIEdgeDetector() :
+        m_nROIBorderSize(0) {}
+
 #if HAVE_GLSL
 
-template class IEdgeDetector_<ParallelUtils::eGLSL>;
-
-template<>
-EdgeDetector_<ParallelUtils::eGLSL>::EdgeDetector_( size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
-                                                    size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
-                                                    bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize) :
-        IEdgeDetector_<ParallelUtils::eGLSL>(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat,nROIBorderSize),
-        m_dCurrThreshold(-1) {}
-
-template<>
-void EdgeDetector_<ParallelUtils::eGLSL>::getLatestEdgeMask(cv::OutputArray _oLastEdgeMask) {
-    _oLastEdgeMask.create(m_oFrameSize,CV_8UC1);
+void IEdgeDetector_GLSL::getLatestEdgeMask(cv::OutputArray _oLastEdgeMask) {
+    glAssert(GLImageProcAlgo::m_bGLInitialized);
+    _oLastEdgeMask.create(GLImageProcAlgo::m_oFrameSize,CV_8UC1);
     cv::Mat oLastEdgeMask = _oLastEdgeMask.getMat();
-    if(!GLImageProcAlgo::m_bFetchingOutput)
-    glAssert(GLImageProcAlgo::setOutputFetching(true))
-    GLImageProcAlgo::fetchLastOutput(oLastEdgeMask);
+    glAssert(GLImageProcAlgo::m_bFetchingOutput || GLImageProcAlgo::setOutputFetching(true))
+    if(GLImageProcAlgo::m_nInternalFrameIdx>0)
+        GLImageProcAlgo::fetchLastOutput(oLastEdgeMask);
+    else
+        oLastEdgeMask = cv::Scalar_<uchar>(0);
 }
 
-template<>
-void EdgeDetector_<ParallelUtils::eGLSL>::apply_async_glimpl(cv::InputArray _oNextImage, bool bRebindAll, double dThreshold) {
+void IEdgeDetector_GLSL::apply_gl(cv::InputArray _oNextImage, bool bRebindAll, double dThreshold) {
+    glAssert(GLImageProcAlgo::m_bGLInitialized);
     m_dCurrThreshold = dThreshold;
     cv::Mat oNextInputImg = _oNextImage.getMat();
-    CV_Assert(oNextInputImg.size()==m_oFrameSize);
-    CV_Assert(oNextInputImg.isContinuous());
-    GLImageProcAlgo::apply_async(oNextInputImg,bRebindAll);
+    glAssert(oNextInputImg.size()==GLImageProcAlgo::m_oFrameSize);
+    glAssert(oNextInputImg.isContinuous());
+    GLImageProcAlgo::apply_gl(oNextInputImg,bRebindAll);
 }
 
-template<>
-void EdgeDetector_<ParallelUtils::eGLSL>::apply_async(cv::InputArray oNextImage, double dThreshold) {
-    apply_async_glimpl(oNextImage,false,dThreshold);
-}
-
-template<>
-void EdgeDetector_<ParallelUtils::eGLSL>::apply_async(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) {
-    apply_async(oNextImage,dThreshold);
+void IEdgeDetector_GLSL::apply_gl(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) {
+    apply_gl(oNextImage,false,dThreshold);
     getLatestEdgeMask(oLastEdgeMask);
 }
 
-template<>
-void EdgeDetector_<ParallelUtils::eGLSL>::apply_threshold(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) {
-    CV_Assert(dThreshold>=0 && dThreshold<=1);
-    apply_async(oNextImage,oLastEdgeMask,dThreshold);
+void IEdgeDetector_GLSL::apply_threshold(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) {
+    apply_gl(oNextImage,oLastEdgeMask,dThreshold);
 }
 
-template<>
-void EdgeDetector_<ParallelUtils::eGLSL>::apply(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask) {
-    apply_async(oNextImage,oLastEdgeMask,-1);
+void IEdgeDetector_GLSL::apply(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask) {
+    apply_gl(oNextImage,oLastEdgeMask,-1);
 }
 
-template class EdgeDetector_<ParallelUtils::eGLSL>;
+IEdgeDetector_GLSL::IEdgeDetector_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
+                                   size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
+                                   bool bUseTimers, bool bUseIntegralFormat) :
+        ParallelUtils::IParallelAlgo_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,CV_8UC1,nDebugType,true,bUseDisplay,bUseTimers,bUseIntegralFormat),
+        m_dCurrThreshold(-1) {}
+
 #endif //HAVE_GLSL
-
-#if HAVE_CUDA
-template class IEdgeDetector_<ParallelUtils::eCUDA>;
-// ... @@@ add impl later
-template class EdgeDetector_<ParallelUtils::eCUDA>;
-#endif //HAVE_CUDA
-
-#if HAVE_OPENCL
-template class IEdgeDetector_<ParallelUtils::eOpenCL>;
-// ... @@@ add impl later
-template class EdgeDetector_<ParallelUtils::eOpenCL>;
-#endif //HAVE_OPENCL
-
-template class IEdgeDetector_<ParallelUtils::eNonParallel>;
-
-template<>
-EdgeDetector_<ParallelUtils::eNonParallel>::EdgeDetector_(size_t nROIBorderSize) :
-        IEdgeDetector_<ParallelUtils::eNonParallel>(nROIBorderSize) {}
-
-template class EdgeDetector_<ParallelUtils::eNonParallel>;

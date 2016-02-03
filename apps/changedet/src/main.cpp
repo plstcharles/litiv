@@ -170,8 +170,8 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
             if(!(nNextFrameIdx%100))
                 std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nNextFrameIdx << "/" << nFrameCount << "   [GPU]" << std::endl;
             const double dCurrLearningRate = nNextFrameIdx<=100?1:dDefaultLearningRate;
-            oAsyncConsumer.apply_async(nNextFrameIdx++,dCurrLearningRate);
-            //pGLSLAlgoEvaluator->apply_async(oNextGTMask);
+            oAsyncConsumer.apply_gl(nNextFrameIdx++,dCurrLearningRate);
+            //pGLSLAlgoEvaluator->apply_gl(oNextGTMask);
             glErrorCheck;
             if(oContext.pollEventsAndCheckIfShouldClose())
                 break;

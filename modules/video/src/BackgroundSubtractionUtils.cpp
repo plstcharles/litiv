@@ -17,29 +17,69 @@
 
 #include "litiv/video/BackgroundSubtractionUtils.hpp"
 
-void IBackgroundSubtractor::initialize(const cv::Mat& oInitImg) {
+void IIBackgroundSubtractor::initialize(const cv::Mat& oInitImg) {
     initialize(oInitImg,cv::Mat());
 }
 
-template<ParallelUtils::eParallelAlgoType eImpl>
-void IBackgroundSubtractor_<eImpl>::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
+void IIBackgroundSubtractor::setAutomaticModelReset(bool bVal) {
+    m_bAutoModelResetEnabled = bVal;
+}
+
+void IIBackgroundSubtractor::validateROI(cv::Mat& oROI) const {
+    CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
+    if(m_nROIBorderSize>0) {
+        cv::Mat oROI_new(oROI.size(),CV_8UC1,cv::Scalar_<uchar>(0));
+        const cv::Rect oROI_inner((int)m_nROIBorderSize,(int)m_nROIBorderSize,oROI.cols-int(m_nROIBorderSize*2),oROI.rows-int(m_nROIBorderSize*2));
+        cv::Mat(oROI,oROI_inner).copyTo(cv::Mat(oROI_new,oROI_inner));
+        oROI = oROI_new;
+    }
+}
+
+void IIBackgroundSubtractor::setROI(cv::Mat& oROI) {
+    validateROI(oROI);
+    CV_Assert(cv::countNonZero(oROI)>0);
+    if(m_bInitialized) {
+        cv::Mat oLatestBackgroundImage;
+        getBackgroundImage(oLatestBackgroundImage);
+        initialize(oLatestBackgroundImage,oROI);
+    }
+    else
+        m_oROI = oROI.clone();
+}
+
+cv::Mat IIBackgroundSubtractor::getROICopy() const {
+    return m_oROI.clone();
+}
+
+IIBackgroundSubtractor::IIBackgroundSubtractor() :
+        m_nROIBorderSize(0),
+        m_nImgChannels(0),
+        m_nImgType(0),
+        m_nTotPxCount(0),
+        m_nTotRelevantPxCount(0),
+        m_nOrigROIPxCount(0),
+        m_nFinalROIPxCount(0),
+        m_nFrameIdx(SIZE_MAX),
+        m_nFramesSinceLastReset(0),
+        m_nModelResetCooldown(0),
+        m_bInitialized(false),
+        m_bModelInitialized(false),
+        m_bAutoModelResetEnabled(true),
+        m_bUsingMovingCamera(false) {}
+
+void IIBackgroundSubtractor::initialize_common(const cv::Mat& oInitImg, const cv::Mat& oROI) {
     CV_Assert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
     CV_Assert(oInitImg.isContinuous());
     CV_Assert(oInitImg.type()==CV_8UC1 || oInitImg.type()==CV_8UC3 || oInitImg.type()==CV_8UC4);
-    if(oInitImg.type()!=CV_8UC1) {
-        std::vector<cv::Mat> voInitImgChannels;
-        cv::split(oInitImg,voInitImgChannels);
-        bool bAllChEqual = true;
-        for(int c1=0; c1<oInitImg.channels(); ++c1) {
-            for(int c2=c1+1; c2<oInitImg.channels(); ++c2) {
-                if(cv::countNonZero((voInitImgChannels[c1]!=voInitImgChannels[c2]))) {
-                    bAllChEqual = false;
-                    break;
-                }
-            }
-        }
-        if(bAllChEqual)
-            std::cout << "\n\tBackgroundSubtractorLBSP_base : Warning, grayscale images should always be passed in CV_8UC1 format for optimal performance.\n" << std::endl;
+    if(oInitImg.channels()>1) {
+        std::vector<cv::Mat> voInitImgs;
+        cv::split(oInitImg,voInitImgs);
+        bool bFoundChDiff = false;
+        for(size_t c=1; c<voInitImgs.size(); ++c)
+            if((bFoundChDiff=(cv::countNonZero(voInitImgs[0]!=voInitImgs[c])!=0)))
+                break;
+        if(!bFoundChDiff)
+            std::cerr << "\n\tIIBackgroundSubtractor : Warning, grayscale images should always be passed in CV_8UC1 format for optimal performance.\n" << std::endl;
     }
     cv::Mat oNewBGROI;
     if(oROI.empty() && (m_oROI.empty() || oROI.size()!=oInitImg.size())) {
@@ -112,110 +152,54 @@ void IBackgroundSubtractor_<eImpl>::initialize(const cv::Mat& oInitImg, const cv
     }
 }
 
-template<ParallelUtils::eParallelAlgoType eImpl>
-void IBackgroundSubtractor_<eImpl>::validateROI(cv::Mat& oROI) const {
-    CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
-    if(m_nROIBorderSize>0) {
-        cv::Mat oROI_new(oROI.size(),CV_8UC1,cv::Scalar_<uchar>(0));
-        const cv::Rect oROI_inner((int)m_nROIBorderSize,(int)m_nROIBorderSize,oROI.cols-int(m_nROIBorderSize*2),oROI.rows-int(m_nROIBorderSize*2));
-        cv::Mat(oROI,oROI_inner).copyTo(cv::Mat(oROI_new,oROI_inner));
-        oROI = oROI_new;
-    }
-}
-
-template<ParallelUtils::eParallelAlgoType eImpl>
-void IBackgroundSubtractor_<eImpl>::setROI(cv::Mat& oROI) {
-    validateROI(oROI);
-    CV_Assert(cv::countNonZero(oROI)>0);
-    if(m_bInitialized) {
-        cv::Mat oLatestBackgroundImage;
-        getBackgroundImage(oLatestBackgroundImage);
-        initialize(oLatestBackgroundImage,oROI);
-    }
-    else
-        m_oROI = oROI.clone();
-}
-
-template<ParallelUtils::eParallelAlgoType eImpl>
-cv::Mat IBackgroundSubtractor_<eImpl>::getROICopy() const {
-    return m_oROI.clone();
-}
-
-template<ParallelUtils::eParallelAlgoType eImpl>
-void IBackgroundSubtractor_<eImpl>::setAutomaticModelReset(bool bVal) {
-    m_bAutoModelResetEnabled = bVal;
-}
-
 #if HAVE_GLSL
 
-template class IBackgroundSubtractor_<ParallelUtils::eGLSL>;
-
-template<>
-BackgroundSubtractor_<ParallelUtils::eGLSL>::BackgroundSubtractor_( size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
-                                                                    size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
-                                                                    bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize) :
-        IBackgroundSubtractor_<ParallelUtils::eGLSL>(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat,nROIBorderSize),
+IBackgroundSubtractor_GLSL::IBackgroundSubtractor_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
+                                                                     size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
+                                                                     bool bUseTimers, bool bUseIntegralFormat) :
+        ParallelUtils::IParallelAlgo_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,CV_8UC1,nDebugType,true,bUseDisplay,bUseTimers,bUseIntegralFormat),
         m_dCurrLearningRate(-1) {}
 
-template<>
-void BackgroundSubtractor_<ParallelUtils::eGLSL>::getLatestForegroundMask(cv::OutputArray _oLastFGMask) {
+void IBackgroundSubtractor_GLSL::getLatestForegroundMask(cv::OutputArray _oLastFGMask) {
     _oLastFGMask.create(m_oImgSize,CV_8UC1);
     cv::Mat oLastFGMask = _oLastFGMask.getMat();
-    if(!GLImageProcAlgo::m_bFetchingOutput)
-    glAssert(GLImageProcAlgo::setOutputFetching(true))
-    else if(m_nFrameIdx>0)
+    glAssert(GLImageProcAlgo::m_bFetchingOutput || GLImageProcAlgo::setOutputFetching(true))
+    if(GLImageProcAlgo::m_nInternalFrameIdx>0)
         GLImageProcAlgo::fetchLastOutput(oLastFGMask);
     else
         oLastFGMask = cv::Scalar_<uchar>(0);
 }
 
-template<>
-void BackgroundSubtractor_<ParallelUtils::eGLSL>::apply_async_glimpl(cv::InputArray _oNextImage, bool bRebindAll, double dLearningRate) {
+void IBackgroundSubtractor_GLSL::initialize_gl(const cv::Mat& oInitImg, const cv::Mat& oROI) {
+    glAssert(!oInitImg.empty());
+    cv::Mat oCurrROI = oROI;
+    if(oCurrROI.empty())
+        oCurrROI = cv::Mat(oInitImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
+    ParallelUtils::IParallelAlgo_GLSL::initialize_gl(oInitImg,oROI);
+}
+
+void IBackgroundSubtractor_GLSL::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
+    initialize_gl(oInitImg,oROI);
+}
+
+void IBackgroundSubtractor_GLSL::apply_gl(cv::InputArray _oNextImage, bool bRebindAll, double dLearningRate) {
     glAssert(m_bInitialized && m_bModelInitialized);
     m_dCurrLearningRate = dLearningRate;
     cv::Mat oNextInputImg = _oNextImage.getMat();
     CV_Assert(oNextInputImg.type()==m_nImgType && oNextInputImg.size()==m_oImgSize);
     CV_Assert(oNextInputImg.isContinuous());
     ++m_nFrameIdx;
-    GLImageProcAlgo::apply_async(oNextInputImg,bRebindAll);
+    GLImageProcAlgo::apply_gl(oNextInputImg,bRebindAll);
     oNextInputImg.copyTo(m_oLastColorFrame);
 }
 
-template<>
-void BackgroundSubtractor_<ParallelUtils::eGLSL>::apply_async(cv::InputArray oNextImage, double dLearningRate) {
-    apply_async_glimpl(oNextImage,false,dLearningRate);
-}
-
-template<>
-void BackgroundSubtractor_<ParallelUtils::eGLSL>::apply_async(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate) {
-    apply_async(oNextImage,dLearningRate);
+void IBackgroundSubtractor_GLSL::apply_gl(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate) {
+    apply_gl(oNextImage,dLearningRate);
     getLatestForegroundMask(oLastFGMask);
 }
 
-template<>
-void BackgroundSubtractor_<ParallelUtils::eGLSL>::apply(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate) {
-    apply_async(oNextImage,oLastFGMask,dLearningRate);
+void IBackgroundSubtractor_GLSL::apply(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate) {
+    apply_gl(oNextImage,oLastFGMask,dLearningRate);
 }
 
-template class BackgroundSubtractor_<ParallelUtils::eGLSL>;
 #endif //HAVE_GLSL
-
-#if HAVE_CUDA
-template class IBackgroundSubtractor_<ParallelUtils::eCUDA>;
-// ... @@@ add impl later
-template class BackgroundSubtractor_<ParallelUtils::eCUDA>;
-#endif //HAVE_CUDA
-
-#if HAVE_OPENCL
-template class IBackgroundSubtractor_<ParallelUtils::eOpenCL>;
-// ... @@@ add impl later
-template class BackgroundSubtractor_<ParallelUtils::eOpenCL>;
-#endif //HAVE_OPENCL
-
-template class IBackgroundSubtractor_<ParallelUtils::eNonParallel>;
-
-template<>
-BackgroundSubtractor_<ParallelUtils::eNonParallel>::BackgroundSubtractor_(size_t nROIBorderSize) :
-        IBackgroundSubtractor_<ParallelUtils::eNonParallel>(nROIBorderSize) {}
-
-template class BackgroundSubtractor_<ParallelUtils::eNonParallel>;

@@ -21,11 +21,7 @@
 #include "litiv/utils/OpenCVUtils.hpp"
 #include <opencv2/video/background_segm.hpp>
 
-//! enhanced background subtractor interface (inherits from cv::BackgroundSubtractor)
-template<ParallelUtils::eParallelAlgoType eImpl, typename enable=void>
-class BackgroundSubtractor_;
-
-struct IBackgroundSubtractor : public cv::BackgroundSubtractor {
+struct IIBackgroundSubtractor : public cv::BackgroundSubtractor {
 
     // @@@ add refresh model as virtual pure func here?
 
@@ -36,100 +32,28 @@ struct IBackgroundSubtractor : public cv::BackgroundSubtractor {
     //! returns the default learning rate value used in 'apply'
     virtual double getDefaultLearningRate() const = 0;
     //! turns automatic model reset on or off
-    virtual void setAutomaticModelReset(bool) = 0;
+    virtual void setAutomaticModelReset(bool);
     //! modifies the given ROI so it will not cause lookup errors near borders when used in the processing step
-    virtual void validateROI(cv::Mat& oROI) const = 0;
+    virtual void validateROI(cv::Mat& oROI) const;
     //! sets the ROI to be used for input analysis (note: this function will reinit the model and return the validated ROI)
-    virtual void setROI(cv::Mat& oROI) = 0;
+    virtual void setROI(cv::Mat& oROI);
     //! returns a copy of the ROI used for input analysis
-    virtual cv::Mat getROICopy() const = 0;
+    virtual cv::Mat getROICopy() const;
     //! required for derived class destruction from this interface
-    virtual ~IBackgroundSubtractor() {}
+    virtual ~IIBackgroundSubtractor() {}
 
 protected:
-    IBackgroundSubtractor() {}
-private:
-    IBackgroundSubtractor& operator=(const IBackgroundSubtractor&) = delete;
-    IBackgroundSubtractor(const IBackgroundSubtractor&) = delete;
-public:
-    // #### for debug purposes only ####
-    cv::DisplayHelperPtr m_pDisplayHelper;
-};
+    //! default impl constructor (for common parameters only -- none must be const to avoid constructor hell when deriving)
+    IIBackgroundSubtractor();
+    //! common (re)initiaization method for all impl types (should be called in impl-specific initialize func)
+    virtual void initialize_common(const cv::Mat& oInitImg, const cv::Mat& oROI);
 
-template<ParallelUtils::eParallelAlgoType eImpl>
-class IBackgroundSubtractor_ :
-        public ParallelUtils::ParallelAlgo_<eImpl>,
-        public IBackgroundSubtractor {
-public:
-    //! default impl constructor
-    template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
-    IBackgroundSubtractor_(size_t nROIBorderSize, typename std::enable_if<eImplTemp==ParallelUtils::eNonParallel>::type* /*pUnused*/=0) :
-        ParallelUtils::ParallelAlgo_<ParallelUtils::eNonParallel>(),
-        m_nROIBorderSize(nROIBorderSize),
-        m_nImgChannels(0),
-        m_nImgType(0),
-        m_nTotPxCount(0),
-        m_nTotRelevantPxCount(0),
-        m_nOrigROIPxCount(0),
-        m_nFinalROIPxCount(0),
-        m_nFrameIdx(SIZE_MAX),
-        m_nFramesSinceLastReset(0),
-        m_nModelResetCooldown(0),
-        m_bInitialized(false),
-        m_bModelInitialized(false),
-        m_bAutoModelResetEnabled(true),
-        m_bUsingMovingCamera(false) {}
-#if HAVE_GLSL
-    //! glsl impl constructor
-    template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl>
-    IBackgroundSubtractor_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
-                           size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
-                           bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize=0,
-                           typename std::enable_if<eImplTemp==ParallelUtils::eGLSL>::type* /*pUnused*/=0) :
-        ParallelUtils::ParallelAlgo_<ParallelUtils::eGLSL>(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,CV_8UC1,nDebugType,true,bUseDisplay,bUseTimers,bUseIntegralFormat),
-        m_nROIBorderSize(nROIBorderSize),
-        m_nImgChannels(0),
-        m_nImgType(0),
-        m_nTotPxCount(0),
-        m_nTotRelevantPxCount(0),
-        m_nOrigROIPxCount(0),
-        m_nFinalROIPxCount(0),
-        m_nFrameIdx(SIZE_MAX),
-        m_nFramesSinceLastReset(0),
-        m_nModelResetCooldown(0),
-        m_bInitialized(false),
-        m_bModelInitialized(false),
-        m_bAutoModelResetEnabled(true),
-        m_bUsingMovingCamera(false) {}
-#endif //HAVE_GLSL
-#if HAVE_CUDA
-    static_assert(eImpl!=ParallelUtils::eCUDA),"Missing constr impl");
-#endif //HAVE_CUDA
-#if HAVE_OPENCL
-    static_assert(eImpl!=ParallelUtils::eOpenCL),"Missing constr impl");
-#endif //HAVE_OPENCL
-
-    //! (re)initiaization method; needs to be called before starting background subtraction
-    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) override;
-    //! turns automatic model reset on or off
-    virtual void setAutomaticModelReset(bool) override;
-    //! modifies the given ROI so it will not cause lookup errors near borders when used in the processing step
-    virtual void validateROI(cv::Mat& oROI) const override;
-    //! sets the ROI to be used for input analysis (note: this function will reinit the model and return the validated ROI)
-    virtual void setROI(cv::Mat& oROI) override;
-    //! returns a copy of the ROI used for input analysis
-    virtual cv::Mat getROICopy() const override;
-    //! required for derived class destruction from this interface
-    virtual ~IBackgroundSubtractor_() {}
-
-protected:
-
+    //! basic info struct used in px model LUTs
     struct PxInfoBase {
         int nImgCoord_Y;
         int nImgCoord_X;
         size_t nModelIdx;
     };
-
     //! background model ROI used for input analysis (specific to the input image size)
     cv::Mat m_oROI;
     //! input image size
@@ -163,61 +87,63 @@ protected:
     //! copy of latest pixel intensities (used when refreshing model)
     cv::Mat m_oLastColorFrame;
 
+private:
+    IIBackgroundSubtractor& operator=(const IIBackgroundSubtractor&) = delete;
+    IIBackgroundSubtractor(const IIBackgroundSubtractor&) = delete;
+public:
+    // #### for debug purposes only ####
+    cv::DisplayHelperPtr m_pDisplayHelper;
 };
+
+template<ParallelUtils::eParallelAlgoType eImpl>
+struct IBackgroundSubtractor_;
 
 #if HAVE_GLSL
-template<ParallelUtils::eParallelAlgoType eImpl>
-class BackgroundSubtractor_<eImpl, typename std::enable_if<eImpl==ParallelUtils::eGLSL>::type> :
-        public IBackgroundSubtractor_<ParallelUtils::eGLSL> {
-public:
-    //! glsl impl constructor
-    BackgroundSubtractor_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
-                          size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
-                          bool bUseTimers, bool bUseIntegralFormat, size_t nROIBorderSize=0);
-
+template<>
+struct IBackgroundSubtractor_<ParallelUtils::eGLSL> :
+        public ParallelUtils::IParallelAlgo_GLSL,
+        public virtual IIBackgroundSubtractor {
+    //! required for derived class destruction from this interface
+    virtual ~IBackgroundSubtractor_() {}
     //! returns a copy of the latest foreground mask
-    void getLatestForegroundMask(cv::OutputArray _oLastFGMask);
-    //! model update/segmentation function (asynchronous version, glsl interface); the learning param is used to override the internal learning speed
-    void apply_async_glimpl(cv::InputArray _oNextImage, bool bRebindAll, double dLearningRate=-1);
-    //! model update/segmentation function (asynchronous version); the learning param is used to override the internal learning speed
-    void apply_async(cv::InputArray oNextImage, double dLearningRate=-1);
-    //! model update/segmentation function (asynchronous version); the learning param is used to override the internal learning speed
-    void apply_async(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate=-1);
-    //! overloads 'apply' from cv::BackgroundSubtractor and redirects it to apply_async
-    virtual void apply(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate=-1);
+    void getLatestForegroundMask(cv::OutputArray oLastFGMask);
+    //! (re)initiaization method (asynchronous version w/ gl interface); needs to be called before starting background subtraction
+    virtual void initialize_gl(const cv::Mat& oInitImg, const cv::Mat& oROI) override;
+    //! overloads 'initialize' from IIBackgroundSubtractor and redirects it to 'initialize_gl'
+    virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) override final;
+    //! model update/segmentation function (asynchronous version w/ gl interface); the learning param is used to override the internal learning speed
+    void apply_gl(cv::InputArray oNextImage, bool bRebindAll=false, double dLearningRate=-1);
+    //! model update/segmentation function (asynchronous version w/ gl interface); the learning param is used to override the internal learning speed
+    void apply_gl(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate=-1);
+    //! overloads 'apply' from IIBackgroundSubtractor and redirects it to 'apply_gl'
+    virtual void apply(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate=-1) override final;
 
 protected:
-    //! used to pass 'apply' learning rate parameter to overloaded dispatch call, if needed
+    //! glsl impl constructor
+    IBackgroundSubtractor_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
+                           size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
+                           bool bUseTimers, bool bUseIntegralFormat);
+    //! used to pass learning rate parameter to overriden dispatch call, if needed
     double m_dCurrLearningRate;
 };
-typedef BackgroundSubtractor_<ParallelUtils::eGLSL> BackgroundSubtractor_GLSL;
-#endif //!HAVE_GLSL
+
+using IBackgroundSubtractor_GLSL = IBackgroundSubtractor_<ParallelUtils::eGLSL>;
+#endif //HAVE_GLSL
 
 #if HAVE_CUDA
-template<ParallelUtils::eParallelAlgoType eImpl>
-class BackgroundSubtractor_<eImpl, typename std::enable_if<eImpl==ParallelUtils::eCUDA>::type> :
-        public IBackgroundSubtractor_<ParallelUtils::eCUDA> {
-public:
-    static_assert(false,"Missing CUDA impl");
-};
-typedef BackgroundSubtractor_<ParallelUtils::eCUDA> BackgroundSubtractor_CUDA;
+// IBackgroundSubtractor_<ParallelUtils::eCUDA> will not compile here, missing impl
 #endif //HAVE_CUDA
 
 #if HAVE_OPENCL
-template<ParallelUtils::eParallelAlgoType eImpl>
-class BackgroundSubtractor_<eImpl, typename std::enable_if<eImpl==ParallelUtils::eOpenCL>::type> :
-        public IBackgroundSubtractor_<ParallelUtils::eOpenCL> {
-public:
-    static_assert(false,"Missing OpenCL impl");
-};
-typedef BackgroundSubtractor_<ParallelUtils::eOpenCL> BackgroundSubtractor_OpenCL;
+// IBackgroundSubtractor_<ParallelUtils::eOpenCL> will not compile here, missing impl
 #endif //HAVE_OPENCL
 
-template<ParallelUtils::eParallelAlgoType eImpl>
-class BackgroundSubtractor_<eImpl, typename std::enable_if<eImpl==ParallelUtils::eNonParallel>::type> :
-        public IBackgroundSubtractor_<ParallelUtils::eNonParallel> {
-public:
-    //! default impl constructor
-    BackgroundSubtractor_(size_t nROIBorderSize);
+template<>
+struct IBackgroundSubtractor_<ParallelUtils::eNonParallel> :
+        public ParallelUtils::NonParallelAlgo,
+        public virtual IIBackgroundSubtractor {
+    //! required for derived class destruction from this interface
+    virtual ~IBackgroundSubtractor_() {}
 };
-typedef BackgroundSubtractor_<ParallelUtils::eNonParallel> BackgroundSubtractor;
+
+using IBackgroundSubtractor = IBackgroundSubtractor_<ParallelUtils::eNonParallel>;
