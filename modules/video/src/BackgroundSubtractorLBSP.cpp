@@ -17,19 +17,6 @@
 
 #include "litiv/video/BackgroundSubtractorLBSP.hpp"
 
-template<>
-template<>
-IBackgroundSubtractorLBSP::IBackgroundSubtractorLBSP_<ParallelUtils::eNonParallel>(float fRelLBSPThreshold,
-                                                                                   size_t nLBSPThresholdOffset,
-                                                                                   int nDefaultMedianBlurKernelSize,
-                                                                                   void* /*pUnused*/) :
-        m_nLBSPThresholdOffset(nLBSPThresholdOffset),
-        m_fRelLBSPThreshold(fRelLBSPThreshold),
-        m_nDefaultMedianBlurKernelSize(nDefaultMedianBlurKernelSize) {
-    CV_Assert(m_fRelLBSPThreshold>=0);
-    m_nROIBorderSize = LBSP::PATCH_SIZE/2;
-}
-
 template<ParallelUtils::eParallelAlgoType eImpl>
 void IBackgroundSubtractorLBSP_<eImpl>::initialize_common(const cv::Mat& oInitImg, const cv::Mat& oROI) {
     lvDbgExceptionWatch;
@@ -78,21 +65,6 @@ void IBackgroundSubtractorLBSP_<eImpl>::initialize_common(const cv::Mat& oInitIm
 }
 
 #if HAVE_GLSL
-
-template<>
-template<>
-IBackgroundSubtractorLBSP_GLSL::IBackgroundSubtractorLBSP_<ParallelUtils::eGLSL>(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
-                                                                                 size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
-                                                                                 bool bUseTimers, bool bUseIntegralFormat,
-                                                                                 float fRelLBSPThreshold, size_t nLBSPThresholdOffset, int nDefaultMedianBlurKernelSize,
-                                                                                 void* /*pUnused*/) :
-        IBackgroundSubtractor_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat),
-        m_nLBSPThresholdOffset(nLBSPThresholdOffset),
-        m_fRelLBSPThreshold(fRelLBSPThreshold),
-        m_nDefaultMedianBlurKernelSize(nDefaultMedianBlurKernelSize) {
-    CV_Assert(m_fRelLBSPThreshold>=0);
-    m_nROIBorderSize = LBSP::PATCH_SIZE/2;
-}
 
 template<>
 template<>
