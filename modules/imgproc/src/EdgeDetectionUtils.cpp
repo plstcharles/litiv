@@ -42,17 +42,17 @@ void IEdgeDetector_GLSL::apply_gl(cv::InputArray _oNextImage, bool bRebindAll, d
     GLImageProcAlgo::apply_gl(oNextInputImg,bRebindAll);
 }
 
-void IEdgeDetector_GLSL::apply_gl(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) {
-    apply_gl(oNextImage,false,dThreshold);
+void IEdgeDetector_GLSL::apply_gl(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, bool bRebindAll, double dThreshold) {
+    apply_gl(oNextImage,bRebindAll,dThreshold);
     getLatestEdgeMask(oLastEdgeMask);
 }
 
 void IEdgeDetector_GLSL::apply_threshold(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) {
-    apply_gl(oNextImage,oLastEdgeMask,dThreshold);
+    apply_gl(oNextImage,oLastEdgeMask,false,dThreshold);
 }
 
 void IEdgeDetector_GLSL::apply(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask) {
-    apply_gl(oNextImage,oLastEdgeMask,-1);
+    apply_gl(oNextImage,oLastEdgeMask,false,-1);
 }
 
 IEdgeDetector_GLSL::IEdgeDetector_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,

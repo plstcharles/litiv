@@ -111,7 +111,7 @@ struct IBackgroundSubtractor_<ParallelUtils::eGLSL> :
     //! model update/segmentation function (asynchronous version w/ gl interface); the learning param is used to override the internal learning speed
     void apply_gl(cv::InputArray oNextImage, bool bRebindAll=false, double dLearningRate=-1);
     //! model update/segmentation function (asynchronous version w/ gl interface); the learning param is used to override the internal learning speed
-    void apply_gl(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate=-1);
+    void apply_gl(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, bool bRebindAll=false, double dLearningRate=-1);
     //! overloads 'apply' from IIBackgroundSubtractor and redirects it to 'apply_gl'
     virtual void apply(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate=-1) override final;
 
