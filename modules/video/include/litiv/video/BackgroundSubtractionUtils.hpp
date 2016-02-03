@@ -90,9 +90,6 @@ protected:
 private:
     IIBackgroundSubtractor& operator=(const IIBackgroundSubtractor&) = delete;
     IIBackgroundSubtractor(const IIBackgroundSubtractor&) = delete;
-public:
-    // #### for debug purposes only ####
-    cv::DisplayHelperPtr m_pDisplayHelper;
 };
 
 template<ParallelUtils::eParallelAlgoType eImpl>

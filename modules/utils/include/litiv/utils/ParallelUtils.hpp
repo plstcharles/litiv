@@ -18,6 +18,7 @@
 #pragma once
 
 #include "litiv/utils/DefineUtils.hpp"
+#include "litiv/utils/OpenCVUtils.hpp"
 #include <type_traits>
 
 #if HAVE_GLSL
@@ -62,6 +63,9 @@ namespace ParallelUtils {
         virtual bool isParallel() = 0;
         //! returns which type of parallel implementation is used in this algo
         virtual eParallelAlgoType getParallelAlgoType() = 0;
+    public:
+        // #### for debug purposes only ####
+        cv::DisplayHelperPtr m_pDisplayHelper;
     };
 
     template<eParallelAlgoType eImpl>

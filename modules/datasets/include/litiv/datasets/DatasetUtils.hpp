@@ -86,6 +86,19 @@ namespace litiv {
     using IDataHandlerConstPtrArray = std::vector<IDataHandlerConstPtr>;
     using IDataHandlerPtrQueue = std::priority_queue<IDataHandlerPtr,IDataHandlerPtrArray,std::function<bool(const IDataHandlerPtr&,const IDataHandlerPtr&)>>;
 
+    template<eDatasetTypeList eDatasetType>
+    struct IDataReader_;
+    template<eDatasetTypeList eDatasetType, eGroupPolicy ePolicy>
+    struct IDataProducer_;
+    template<eGroupPolicy ePolicy>
+    struct IDataCounter_;
+    template<eDatasetTypeList eDatasetType>
+    struct IDataRecorder_;
+    template<eDatasetTypeList eDatasetType, eGroupPolicy ePolicy>
+    struct IDataConsumer_;
+    template<eDatasetTypeList eDatasetType, ParallelUtils::eParallelAlgoType eImpl>
+    struct IAsyncDataConsumer_; // can be created as standalone
+
     struct IDataset : std::enable_shared_from_this<IDataset> {
         virtual const std::string& getName() const = 0;
         virtual const std::string& getDatasetPath() const = 0;
@@ -139,12 +152,18 @@ namespace litiv {
         virtual size_t getProcessedPacketsCountPromise() = 0;
         virtual size_t getProcessedPacketsCount() const = 0;
 
-        template<typename Tp> static typename std::enable_if<std::is_base_of<IDataHandler,Tp>::value,bool>::type compare(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {return PlatformUtils::compare_lowercase(i->getName(),j->getName());}
-        template<typename Tp> static typename std::enable_if<std::is_base_of<IDataHandler,Tp>::value,bool>::type compare_load(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {return i->getExpectedLoad()<j->getExpectedLoad();}
-        static bool compare(const IDataHandler* i, const IDataHandler* j) {return PlatformUtils::compare_lowercase(i->getName(),j->getName());}
-        static bool compare_load(const IDataHandler* i, const IDataHandler* j) {return i->getExpectedLoad()<j->getExpectedLoad();}
-        static bool compare(const IDataHandler& i, const IDataHandler& j) {return PlatformUtils::compare_lowercase(i.getName(),j.getName());}
-        static bool compare_load(const IDataHandler& i, const IDataHandler& j) {return i.getExpectedLoad()<j.getExpectedLoad();}
+        template<typename Tp>
+        static typename std::enable_if<std::is_base_of<IDataHandler,Tp>::value,bool>::type compare(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {
+            return PlatformUtils::compare_lowercase(i->getName(),j->getName());
+        }
+        template<typename Tp>
+        static typename std::enable_if<std::is_base_of<IDataHandler,Tp>::value,bool>::type compare_load(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {
+            return i->getExpectedLoad()<j->getExpectedLoad();
+        }
+        static bool compare(const IDataHandler* i, const IDataHandler* j);
+        static bool compare_load(const IDataHandler* i, const IDataHandler* j);
+        static bool compare(const IDataHandler& i, const IDataHandler& j);
+        static bool compare_load(const IDataHandler& i, const IDataHandler& j);
     protected:
         virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const = 0; // will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
         virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) = 0; // will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
@@ -152,15 +171,15 @@ namespace litiv {
         virtual void _stopProcessing() {}
     };
 
-    struct DataPrecacher final {
+    struct DataPrecacher {
         // @@@@ rewrite to allow streaming with no limit? (might just need to modify init and set tot=inf)
         // @@@@ current impl expects all packets to be the same size
-        DataPrecacher(std::function<const cv::Mat&(size_t)> lCallback);
+        DataPrecacher(std::function<const cv::Mat&(size_t)> lDataLoaderCallback);
         ~DataPrecacher();
         const cv::Mat& getPacket(size_t nIdx);
         bool startPrecaching(size_t nTotPacketCount, size_t nSuggestedBufferSize);
         void stopPrecaching();
-    private:
+    protected:
         void precache();
         const cv::Mat& getPacket_internal(size_t nIdx);
         const std::function<const cv::Mat&(size_t)> m_lCallback;
@@ -179,6 +198,7 @@ namespace litiv {
         size_t m_nNextPrecacheIdx;
         size_t m_nReqIdx,m_nLastReqIdx;
         cv::Mat m_oReqPacket,m_oLastReqPacket;
+    private:
         DataPrecacher& operator=(const DataPrecacher&) = delete;
         DataPrecacher(const DataPrecacher&) = delete;
     };
@@ -187,13 +207,12 @@ namespace litiv {
     struct IDataLoader_ : public virtual IDataHandler {};
 
     template<>
-    struct IDataLoader_<eNotGroup> : public virtual IDataHandler { // generalized producer (exposes common interface for all dataset types)
+    struct IDataLoader_<eNotGroup> : public virtual IDataHandler {
         virtual void startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX) override;
         virtual void stopPrecaching() override;
     protected:
         IDataLoader_();
-        DataPrecacher m_oInputPrecacher;
-        DataPrecacher m_oGTPrecacher;
+        DataPrecacher m_oInputPrecacher,m_oGTPrecacher;
         virtual cv::Mat _getInputPacket_impl(size_t nIdx) = 0;
         virtual cv::Mat _getGTPacket_impl(size_t nIdx) = 0;
     private:
@@ -202,98 +221,37 @@ namespace litiv {
         const cv::Mat& _getGTPacket_redirect(size_t nIdx);
     };
 
-    template<eDatasetTypeList eDatasetType>
-    struct IDataReader_;
-
     template<>
     struct IDataReader_<eDatasetType_VideoSegm> : public virtual IDataHandler {
-        size_t getFrameCount() const {return getTotPackets();}
+        inline size_t getFrameCount() const {return getTotPackets();}
         virtual const cv::Mat& getInputFrame(size_t nFrameIdx) = 0;
         virtual const cv::Mat& getGTFrame(size_t nFrameIdx) = 0;
     };
-
-    template<eDatasetTypeList eDatasetType, eGroupPolicy ePolicy>
-    struct IDataProducer_;
 
     template<>
     struct IDataProducer_<eDatasetType_VideoSegm,eGroup> :
             public IDataLoader_<eGroup>,
             public IDataReader_<eDatasetType_VideoSegm> {
-        virtual const cv::Mat& getInputFrame(size_t nFrameIdx) override final {return dynamic_cast<IDataReader_<eDatasetType_VideoSegm>&>(*getBatch(nFrameIdx)).getInputFrame(nFrameIdx);}
-        virtual const cv::Mat& getGTFrame(size_t nFrameIdx) override final {return dynamic_cast<IDataReader_<eDatasetType_VideoSegm>&>(*getBatch(nFrameIdx)).getGTFrame(nFrameIdx);}
+        virtual const cv::Mat& getInputFrame(size_t nFrameIdx) override final;
+        virtual const cv::Mat& getGTFrame(size_t nFrameIdx) override final;
     };
 
-    template<> // all method impl can go in CPP as template possibilities are tightly defined
+    template<>
     struct IDataProducer_<eDatasetType_VideoSegm,eNotGroup> :
             public IDataLoader_<eNotGroup>,
             public IDataReader_<eDatasetType_VideoSegm> {
-        virtual double getExpectedLoad() const override {return m_oROI.empty()?0.0:(double)cv::countNonZero(m_oROI)*m_nFrameCount*(int(!isGrayscale())+1);}
-        virtual size_t getTotPackets() const override {return m_nFrameCount;}
-        virtual void startPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override {
-            return IDataLoader_<eNotGroup>::startPrecaching(bUsingGT,m_oSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
-        }
-        virtual cv::Size getFrameSize() const {return m_oSize;}
-        virtual const cv::Mat& getROI() const {return m_oROI;}
-        virtual const cv::Mat& getInputFrame(size_t nFrameIdx) override final {return m_oInputPrecacher.getPacket(nFrameIdx);}
-        virtual const cv::Mat& getGTFrame(size_t nFrameIdx) override final {return m_oGTPrecacher.getPacket(nFrameIdx);}
-
-        virtual void parseData() override {
-            cv::Mat oTempImg;
-            m_voVideoReader.open(getDataPath());
-            if(!m_voVideoReader.isOpened()) {
-                PlatformUtils::GetFilesFromDir(getDataPath(),m_vsInputFramePaths);
-                if(!m_vsInputFramePaths.empty()) {
-                    oTempImg = cv::imread(m_vsInputFramePaths[0]);
-                    m_nFrameCount = m_vsInputFramePaths.size();
-                }
-            }
-            else {
-                m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
-                m_voVideoReader >> oTempImg;
-                m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
-                m_nFrameCount = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
-            }
-            if(oTempImg.empty())
-                lvErrorExt("Sequence '%s': video could not be opened via VideoReader or imread (you might need to implement your own DataProducer_ interface)",getName().c_str());
-            m_oOrigSize = oTempImg.size();
-            const double dScale = getDatasetInfo()->getScaleFactor();
-            if(dScale!=1.0)
-                cv::resize(oTempImg,oTempImg,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
-            m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
-            m_oSize = oTempImg.size();
-            m_nNextExpectedVideoReaderFrameIdx = 0;
-            CV_Assert(m_nFrameCount>0);
-        }
-
+        virtual double getExpectedLoad() const override;
+        virtual size_t getTotPackets() const override;
+        virtual void startPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
+        inline const cv::Size& getFrameSize() const {return m_oSize;}
+        inline const cv::Mat& getROI() const {return m_oROI;}
+        virtual const cv::Mat& getInputFrame(size_t nFrameIdx) override final;
+        virtual const cv::Mat& getGTFrame(size_t nFrameIdx) override final;
+        virtual void parseData() override;
     protected:
         IDataProducer_() : m_nFrameCount(0),m_nNextExpectedVideoReaderFrameIdx(size_t(-1)) {}
-
-        virtual cv::Mat _getInputPacket_impl(size_t nIdx) override {
-            cv::Mat oFrame;
-            if(!m_voVideoReader.isOpened())
-                oFrame = cv::imread(m_vsInputFramePaths[nIdx],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
-            else {
-                if(m_nNextExpectedVideoReaderFrameIdx!=nIdx) {
-                    m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,(double)nIdx);
-                    m_nNextExpectedVideoReaderFrameIdx = nIdx+1;
-                }
-                else
-                    ++m_nNextExpectedVideoReaderFrameIdx;
-                m_voVideoReader >> oFrame;
-                if(isGrayscale() && oFrame.channels()>1)
-                    cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2GRAY);
-            }
-            if(getDatasetInfo()->is4ByteAligned() && oFrame.channels()==3)
-                cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2BGRA);
-            if(oFrame.size()!=m_oSize)
-                cv::resize(oFrame,oFrame,m_oSize,0,0,cv::INTER_NEAREST);
-            return oFrame;
-        }
-
-        virtual cv::Mat _getGTPacket_impl(size_t) override {
-            return cv::Mat(m_oSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL));
-        }
-
+        virtual cv::Mat _getInputPacket_impl(size_t nIdx) override;
+        virtual cv::Mat _getGTPacket_impl(size_t) override;
         size_t m_nFrameCount;
         std::vector<std::string> m_vsInputFramePaths;
         std::vector<std::string> m_vsGTFramePaths;
@@ -304,33 +262,24 @@ namespace litiv {
         std::unordered_map<size_t,size_t> m_mTestGTIndexes;
     };
 
-    template<eGroupPolicy ePolicy>
-    struct IDataCounter_;
-
-    template<> // put function defs in cpp?
-    struct IDataCounter_<eNotGroup> : public virtual IDataHandler { // generalized consumer (exposes common interface for all dataset types)
+    template<>
+    struct IDataCounter_<eNotGroup> : public virtual IDataHandler {
     protected:
         IDataCounter_() : m_nProcessedPackets(0) {}
-        void processPacket() {++m_nProcessedPackets;}
-        void setProcessedPacketsPromise() {m_nProcessedPacketsPromise.set_value(m_nProcessedPackets);}
-        virtual size_t getProcessedPacketsCountPromise() override {return m_nProcessedPacketsPromise.get_future().get();}
-        virtual size_t getProcessedPacketsCount() const override {return m_nProcessedPackets;}
+        inline void processPacket() {++m_nProcessedPackets;}
+        inline void setProcessedPacketsPromise() {m_nProcessedPacketsPromise.set_value(m_nProcessedPackets);}
+        virtual size_t getProcessedPacketsCountPromise() override;
+        virtual size_t getProcessedPacketsCount() const override;
     private:
         size_t m_nProcessedPackets;
         std::promise<size_t> m_nProcessedPacketsPromise;
     };
 
-    template<> // put function defs in cpp?
-    struct IDataCounter_<eGroup> : public virtual IDataHandler { // generalized consumer (exposes common interface for all dataset types)
-        virtual size_t getProcessedPacketsCountPromise() override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCountPromise();});}
-        virtual size_t getProcessedPacketsCount() const override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCount();});}
+    template<>
+    struct IDataCounter_<eGroup> : public virtual IDataHandler {
+        virtual size_t getProcessedPacketsCountPromise() override final;
+        virtual size_t getProcessedPacketsCount() const override final;
     };
-
-    template<eDatasetTypeList eDatasetType>
-    struct IDataRecorder_;
-
-    template<eDatasetTypeList eDatasetType, eGroupPolicy ePolicy>
-    struct IDataConsumer_;
 
     template<>
     struct IDataRecorder_<eDatasetType_VideoSegm> : public virtual IDataHandler {
@@ -341,151 +290,70 @@ namespace litiv {
         friend struct IDataConsumer_<eDatasetType_VideoSegm,eGroup>;
     };
 
-    template<> // put function defs in cpp?
+    template<>
     struct IDataConsumer_<eDatasetType_VideoSegm,eGroup> :
             public IDataCounter_<eGroup>,
             public IDataRecorder_<eDatasetType_VideoSegm> {
-        virtual void pushSegmMask(const cv::Mat& oSegm, size_t nIdx) override final {dynamic_cast<IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).pushSegmMask(oSegm,nIdx);}
+        virtual void pushSegmMask(const cv::Mat& oSegm, size_t nIdx) override final;
     protected:
-        virtual cv::Mat readSegmMask(size_t nIdx) const override final {return dynamic_cast<const IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).readSegmMask(nIdx);}
-        virtual void writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const override final {dynamic_cast<const IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).writeSegmMask(oSegm,nIdx);}
+        virtual cv::Mat readSegmMask(size_t nIdx) const override final;
+        virtual void writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const override final;
     };
 
-    template<> // put function defs in cpp?
+    template<>
     struct IDataConsumer_<eDatasetType_VideoSegm,eNotGroup> :
             public IDataCounter_<eNotGroup>,
             public IDataRecorder_<eDatasetType_VideoSegm> {
-
-        void pushSegmMask(const cv::Mat& oSegm, size_t nIdx) override {
-            processPacket();
-            if(getDatasetInfo()->isSavingOutput())
-                writeSegmMask(oSegm,nIdx);
-        }
-
-        template<typename Talgo, typename enable=void>
-        struct IAsyncDataConsumer_;
-
-        template<typename Talgo>
-        struct IAsyncDataConsumer_<Talgo,typename std::enable_if<std::is_base_of<GLImageProcAlgo,Talgo>::value>::type> {
-            // add toggle for double-eval in here somewhere, or in actual evaluator interface?
-            std::shared_ptr<Talgo> m_pAlgo;
-            std::shared_ptr<cv::DisplayHelper> m_pDisplayHelper;
-            std::shared_ptr<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>> m_pProducer;
-            std::shared_ptr<IDataConsumer_<eDatasetType_VideoSegm,eNotGroup>> m_pConsumer;
-            const bool m_bPreserveInputs;
-            cv::Mat m_oLastInput,m_oCurrInput,m_oNextInput;
-            size_t m_nLastIdx,m_nCurrIdx,m_nNextIdx;
-            size_t m_nFrameCount;
-            //! also (re)initializes pAlgo
-            IAsyncDataConsumer_(const std::shared_ptr<Talgo>& pAlgo, const IDataHandlerPtr& pSequence) :
-                    m_pAlgo(pAlgo),
-                    m_pDisplayHelper(pAlgo->m_pDisplayHelper),
-                    m_pProducer(std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(pSequence)),
-                    m_pConsumer(std::dynamic_pointer_cast<IDataConsumer_<eDatasetType_VideoSegm,eNotGroup>>(pSequence)),
-                    m_bPreserveInputs(pAlgo->m_pDisplayHelper),
-                    m_nLastIdx(0),
-                    m_nCurrIdx(0),
-                    m_nNextIdx(1),
-                    m_nFrameCount(0) {
-                CV_Assert(pAlgo && m_pProducer && m_pConsumer);
-                CV_Assert(m_pProducer->getFrameCount()>1);
-            }
-            virtual cv::Size getIdealWindowSize() {
-                cv::Size oFrameSize = m_pProducer->getFrameSize();
-                oFrameSize.width *= int(m_pAlgo->m_nSxSDisplayCount);
-                return oFrameSize;
-
-            }
-
-            // override this if implementing async evaluator
-            virtual void pre_initialize_gl() {
-                m_oNextInput = m_pProducer->getInputFrame(m_nNextIdx).clone();
-                m_oCurrInput = m_pProducer->getInputFrame(m_nCurrIdx).clone();
-                m_oLastInput = m_oCurrInput.clone();
-                CV_Assert(!m_oCurrInput.empty());
-                CV_Assert(m_oCurrInput.isContinuous());
-                glAssert(m_oCurrInput.channels()==1 || m_oCurrInput.channels()==4);
-                m_nFrameCount= m_pProducer->getFrameCount();
-                if(m_pProducer->getDatasetInfo()->isSavingOutput() || m_pDisplayHelper)
-                    m_pAlgo->setOutputFetching(true);
-                if(m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
-                    m_pAlgo->setDebugFetching(true);
-            }
-
-            template<typename... Targs>
-            void initialize_gl(Targs&&... args) {
-                pre_initialize_gl();
-                m_pAlgo->initialize_gl(m_oCurrInput,m_pProducer->getROI(),std::forward<Targs>(args)...);
-            }
-
-            // override this if implementing async evaluator
-            virtual void post_apply_gl() {
-                if(m_bPreserveInputs) {
-                    m_oCurrInput.copyTo(m_oLastInput);
-                    m_oNextInput.copyTo(m_oCurrInput);
-                }
-                if(m_nNextIdx<m_nFrameCount)
-                    m_oNextInput = m_pProducer->getInputFrame(m_nNextIdx);
-                m_pConsumer->processPacket();
-                if(m_pConsumer->getDatasetInfo()->isSavingOutput() || m_pDisplayHelper) {
-                    cv::Mat oLastOutput,oLastDebug;
-                    m_pAlgo->fetchLastOutput(oLastOutput);
-                    if(m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
-                        m_pAlgo->fetchLastDebug(oLastDebug);
-                    else
-                        oLastDebug = oLastOutput;
-                    if(m_pConsumer->getDatasetInfo()->isSavingOutput())
-                        m_pConsumer->writeSegmMask(oLastOutput,m_nLastIdx);
-                    if(m_pDisplayHelper) {
-                        const cv::Mat& oROI = m_pProducer->getROI();
-                        if(!oROI.empty()) {
-                            cv::bitwise_or(oLastOutput,UCHAR_MAX/2,oLastOutput,oROI==0);
-                            cv::bitwise_or(oLastDebug,UCHAR_MAX/2,oLastDebug,oROI==0);
-                        }
-                        m_pDisplayHelper->display(m_oLastInput,oLastDebug,oLastOutput,m_nLastIdx);
-                    }
-                }
-            }
-
-            template<typename... Targs>
-            void apply_gl(size_t nNextIdx, Targs&&... args) {
-                if(nNextIdx!=m_nNextIdx)
-                    m_oNextInput = m_pProducer->getInputFrame(nNextIdx);
-                m_pAlgo->apply_gl(m_oNextInput,std::forward<Targs>(args)...);
-                m_nLastIdx = m_nCurrIdx;
-                m_nCurrIdx = nNextIdx;
-                m_nNextIdx = nNextIdx+1;
-                post_apply_gl();
-            }
-        };
-
+        virtual void pushSegmMask(const cv::Mat& oSegm, size_t nIdx) override;
     protected:
-        virtual cv::Mat readSegmMask(size_t nIdx) const override {
-            CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
-            std::array<char,10> acBuffer;
-            snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
-            std::stringstream sOutputFilePath;
-            sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << acBuffer.data() << getDatasetInfo()->getOutputNameSuffix();
-            return cv::imread(sOutputFilePath.str(),isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
-        }
+        virtual cv::Mat readSegmMask(size_t nIdx) const override;
+        virtual void writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const override;
+        // cannot use partial template specialization here... for some reason.
+        friend struct IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eGLSL>;
+        //friend struct IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eCUDA>;
+        //friend struct IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eOpenCL>;
+        friend struct IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eNonParallel>;
+    };
 
-        virtual void writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const override {
-            CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
-            std::array<char,10> acBuffer;
-            snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
-            std::stringstream sOutputFilePath;
-            sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << acBuffer.data() << getDatasetInfo()->getOutputNameSuffix();
-            const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
-            auto pProducer = std::dynamic_pointer_cast<const IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(shared_from_this());
-            CV_Assert(pProducer);
-            const cv::Mat& oROI = pProducer->getROI();
-            cv::Mat oOutputSegm;
-            if(!oROI.empty())
-                cv::bitwise_or(oSegm,UCHAR_MAX/2,oOutputSegm,oROI==0);
-            else
-                oOutputSegm = oSegm;
-            cv::imwrite(sOutputFilePath.str(),oOutputSegm,vnComprParams);
+    template<>
+    struct IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eGLSL> {
+        //! default constructor, also (re)initializes pAlgo based on dataset specs
+        IAsyncDataConsumer_(const std::shared_ptr<ParallelUtils::IParallelAlgo_GLSL>& pAlgo, const IDataHandlerPtr& pSequence);
+        //! returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs)
+        virtual cv::Size getIdealGLWindowSize();
+        //! always called by 'initialize_gl' before initializing algo; override this if implementing async evaluator
+        virtual void pre_initialize_gl();
+        //! casts the algo to 'Talgo' type, and calls 'initialize_gl' with expanded args list
+        template<typename Talgo, typename... Targs>
+        void initialize_gl(Targs&&... args) {
+            Talgo& oAlgo = dynamic_cast<Talgo&>(*m_pAlgo);
+            pre_initialize_gl();
+            oAlgo.initialize_gl(m_oCurrInput,m_pProducer->getROI(),std::forward<Targs>(args)...);
         }
+        //! always called by 'apply_gl' after processing via algo; override this if implementing async evaluator
+        virtual void post_apply_gl();
+        //! casts the algo to 'Talgo' type, and calls 'apply_gl' with expanded args list
+        template<typename Talgo, typename... Targs>
+        void apply_gl(size_t nNextIdx, Targs&&... args) {
+            Talgo& oAlgo = dynamic_cast<Talgo&>(*m_pAlgo);
+            if(nNextIdx!=m_nNextIdx)
+                m_oNextInput = m_pProducer->getInputFrame(nNextIdx);
+            oAlgo.apply_gl(m_oNextInput,std::forward<Targs>(args)...);
+            m_nLastIdx = m_nCurrIdx;
+            m_nCurrIdx = nNextIdx;
+            m_nNextIdx = nNextIdx+1;
+            post_apply_gl();
+        }
+    protected:
+        // add toggle for double-eval in here somewhere, or in actual evaluator interface?
+        std::shared_ptr<ParallelUtils::IParallelAlgo_GLSL> m_pAlgo;
+        std::shared_ptr<cv::DisplayHelper> m_pDisplayHelper;
+        std::shared_ptr<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>> m_pProducer;
+        std::shared_ptr<IDataConsumer_<eDatasetType_VideoSegm,eNotGroup>> m_pConsumer;
+        const bool m_bPreserveInputs;
+        cv::Mat m_oLastInput,m_oCurrInput,m_oNextInput;
+        size_t m_nLastIdx,m_nCurrIdx,m_nNextIdx;
+        size_t m_nFrameCount;
     };
 
 #if 0
