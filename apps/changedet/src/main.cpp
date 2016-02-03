@@ -32,7 +32,7 @@
 #define USE_LOBSTER             1
 #define USE_SUBSENSE            0
 ////////////////////////////////
-#define USE_GLSL_IMPL           1
+#define USE_GLSL_IMPL           0
 #define USE_CUDA_IMPL           0
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////

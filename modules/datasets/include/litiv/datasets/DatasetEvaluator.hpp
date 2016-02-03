@@ -220,15 +220,15 @@ namespace litiv {
 
     };
 
-    template<eDatasetTypeList eDatasetType, bool bGroup>
+    template<eDatasetTypeList eDatasetType, eGroupPolicy ePolicy>
     struct IDataEvaluator_ :
             public IMetricsCalculator_<eDatasetType>,
-            public IDataConsumer_<eDatasetType,bGroup> {};
+            public IDataConsumer_<eDatasetType,ePolicy> {};
 
     template<>
-    struct IDataEvaluator_<eDatasetType_VideoSegm,TNoGroup> :
+    struct IDataEvaluator_<eDatasetType_VideoSegm,eNotGroup> :
             public IMetricsCalculator_<eDatasetType_VideoSegm>,
-            public IDataConsumer_<eDatasetType_VideoSegm,TNoGroup> {
+            public IDataConsumer_<eDatasetType_VideoSegm,eNotGroup> {
         virtual ClassifMetricsBase getMetricsBase() const override;
         virtual ClassifMetrics getMetrics(bool bAverage) const override;
         virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize=12) const override;
@@ -252,7 +252,7 @@ namespace litiv {
         //! inits a glsl algo evaluator for the datset, and returns the expected gl context window size for display (if needed)
         virtual cv::Size init_GLSL(const std::shared_ptr<GLImageProcAlgo>& pAlgo) override {
             m_pGLEvaluator = std::make_unique<GLVideoSegmDataEvaluator>(pAlgo,getTotPackets());
-            auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
+            auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(shared_from_this());
             CV_Assert(pProducer);
             m_pGLEvaluator->initialize_gl(pProducer->getGTFrame(0),pProducer->getROI());
             cv::Size oExpectedDisplaySize = pProducer->getFrameSize();
@@ -281,8 +281,8 @@ namespace litiv {
         ClassifMetricsBase m_oMetricsBase;
     };
 
-    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, bool bGroup>
-    struct DataEvaluator_ : public IDataEvaluator_<eDatasetType,bGroup> {};
+    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, eGroupPolicy ePolicy>
+    struct DataEvaluator_ : public IDataEvaluator_<eDatasetType,ePolicy> {};
 
 #if 0
 

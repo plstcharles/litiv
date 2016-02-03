@@ -52,12 +52,12 @@ namespace litiv {
         const IDatasetPtr m_pDataset;
     };
 
-    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, bool bGroup>
-    struct DataProducer_ : public IDataProducer_<eDatasetType,bGroup> {};
+    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, eGroupPolicy ePolicy>
+    struct DataProducer_ : public IDataProducer_<eDatasetType,ePolicy> {};
 
     template<> // fully specialized dataset producer type for default CDnet (2012+2014) handling
-    struct DataProducer_<eDatasetType_VideoSegm, eDataset_VideoSegm_CDnet, TNoGroup> :
-            public IDataProducer_<eDatasetType_VideoSegm,TNoGroup> {
+    struct DataProducer_<eDatasetType_VideoSegm, eDataset_VideoSegm_CDnet, eNotGroup> :
+            public IDataProducer_<eDatasetType_VideoSegm,eNotGroup> {
         virtual void parseData() override final;
         virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final;
     };
@@ -66,8 +66,8 @@ namespace litiv {
     struct IDataset_ : public DatasetEvaluator_<eDatasetType,eDataset> { // dataset interface specialization for smaller impl sizes
         struct WorkBatch :
                 public DataHandler,
-                public DataProducer_<eDatasetType,eDataset,TNoGroup>,
-                public DataEvaluator_<eDatasetType,eDataset,TNoGroup> {
+                public DataProducer_<eDatasetType,eDataset,eNotGroup>,
+                public DataEvaluator_<eDatasetType,eDataset,eNotGroup> {
             virtual ~WorkBatch() = default;
             virtual eDatasetTypeList getDatasetType() const override final {return eDatasetType;}
             virtual eDatasetList getDataset() const override final {return eDataset;}
@@ -112,8 +112,8 @@ namespace litiv {
 
         struct WorkBatchGroup :
                 public DataHandler,
-                public DataProducer_<eDatasetType,eDataset,TGroup>,
-                public DataEvaluator_<eDatasetType,eDataset,TGroup> {
+                public DataProducer_<eDatasetType,eDataset,eGroup>,
+                public DataEvaluator_<eDatasetType,eDataset,eGroup> {
             virtual ~WorkBatchGroup() = default;
             virtual eDatasetTypeList getDatasetType() const override final {return eDatasetType;}
             virtual eDatasetList getDataset() const override final {return eDataset;}
