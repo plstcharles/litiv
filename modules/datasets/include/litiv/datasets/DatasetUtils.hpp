@@ -317,7 +317,7 @@ namespace litiv {
 
     template<>
     struct IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eGLSL> {
-        //! default constructor, also (re)initializes pAlgo based on dataset specs
+        //! default constructor (grabs a copy of pAlgo and readies internal fetching; you still need to call 'initialize_gl' however)
         IAsyncDataConsumer_(const std::shared_ptr<ParallelUtils::IParallelAlgo_GLSL>& pAlgo, const IDataHandlerPtr& pSequence);
         //! returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs)
         virtual cv::Size getIdealGLWindowSize();

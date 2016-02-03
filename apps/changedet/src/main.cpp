@@ -63,8 +63,10 @@
 #define USE_OPENCL_EVALUATION 0
 #endif //USE_OPENCL_EVALUATION
 #define USE_GPU_IMPL (USE_GLSL_IMPL||USE_CUDA_IMPL||USE_OPENCL_IMPL)
+#if (USE_GPU_IMPL && DISPLAY_OUTPUT)
+#define DISPLAY_OUTPUT_CPU 0
+#endif //(USE_GPU_IMPL && DISPLAY_OUTPUT)
 #define USE_GPU_EVALUATION (USE_GLSL_EVALUATION || USE_CUDA_EVALUATION || USE_OPENCL_EVALUATION)
-#define NEED_GT_MASK (DISPLAY_OUTPUT || EVALUATE_OUTPUT)
 #if (USE_GLSL_IMPL+USE_CUDA_IMPL+USE_OPENCL_IMPL)>1
 #error "Must specify a single impl."
 #elif (USE_LOBSTER+USE_SUBSENSE+USE_PAWCS)!=1
@@ -97,10 +99,19 @@
     bool(USE_GPU_IMPL),                                          /* => bool bForce4ByteDataAlign */ \
     DATASET_SCALE_FACTOR                                         /* => double dScaleFactor */
 #endif //defined(DATASET_ID)
-
 void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch);
 using DatasetType = litiv::Dataset_<litiv::eDatasetType_VideoSegm,litiv::DATASET_ID>;
-
+#if USE_LOBSTER
+#if USE_GLSL_IMPL
+using BackgroundSubtractorType = BackgroundSubtractorLOBSTER_GLSL;
+#else // USE_..._IMPL
+using BackgroundSubtractorType = BackgroundSubtractorLOBSTER;
+#endif // USE_..._IMPL
+#elif USE_SUBSENSE
+using BackgroundSubtractorType = BackgroundSubtractorSuBSENSE;
+#elif USE_PAWCS
+using BackgroundSubtractorType = BackgroundSubtractorPAWCS;
+#endif //USE_...
 std::atomic_size_t g_nActiveThreads(0);
 const size_t g_nMaxThreads = USE_GPU_IMPL?1:std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
 
@@ -150,27 +161,22 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         const std::string sCurrSeqName = CxxUtils::clampString(oCurrSequence.getName(),12);
         const size_t nFrameCount = oCurrSequence.getFrameCount();
         GLContext oContext(oCurrSequence.getFrameSize(),std::string("[GPU] ")+oCurrSequence.getRelativePath(),bool(!DISPLAY_OUTPUT));
-        std::shared_ptr<IBackgroundSubtractor_<ParallelUtils::eGLSL>> pAlgo;
-#if USE_LOBSTER
-        pAlgo = std::make_shared<BackgroundSubtractorLOBSTER_GLSL>();
-#else
-#error "Missing glsl impl." // ... @@@@@
-#endif //USE...
-#if DISPLAY_OUTPUT // @@@ CPU?
+        std::shared_ptr<IBackgroundSubtractor_<ParallelUtils::eGLSL>> pAlgo = std::make_shared<BackgroundSubtractorType>();
+#if DISPLAY_OUTPUT_CPU
         cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oCurrSequence.getRelativePath(),oCurrSequence.getOutputPath()+"/../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
-#endif //DISPLAY_OUTPUT
+#endif //DISPLAY_OUTPUT_CPU
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
-        DatasetType::WorkBatch::IAsyncDataConsumer_<IBackgroundSubtractor_<ParallelUtils::eGLSL>> oAsyncConsumer(pAlgo,pBatch);
-        oContext.setWindowSize(oAsyncConsumer.getIdealWindowSize());
+        litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL> oAsyncConsumer(pAlgo,pBatch);
+        oAsyncConsumer.initialize_gl<BackgroundSubtractorType>();
+        oContext.setWindowSize(oAsyncConsumer.getIdealGLWindowSize());
         oCurrSequence.startProcessing();
         size_t nNextFrameIdx = 1;
         while(nNextFrameIdx<=nFrameCount) {
-            std::cout << "nNextFrameIdx=" << nNextFrameIdx << std::endl;
             if(!(nNextFrameIdx%100))
                 std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nNextFrameIdx << "/" << nFrameCount << "   [GPU]" << std::endl;
             const double dCurrLearningRate = nNextFrameIdx<=100?1:dDefaultLearningRate;
-            oAsyncConsumer.apply_gl(nNextFrameIdx++,dCurrLearningRate);
+            oAsyncConsumer.apply_gl<BackgroundSubtractorType>(nNextFrameIdx++,false,dCurrLearningRate);
             //pGLSLAlgoEvaluator->apply_gl(oNextGTMask);
             glErrorCheck;
             if(oContext.pollEventsAndCheckIfShouldClose())
@@ -179,11 +185,11 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
             if(oContext.getKeyPressed('q'))
                 break;
             oContext.swapBuffers(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-#if DISPLAY_OUTPUT // @@@@@ add define for display_output_cpu?
+#if DISPLAY_OUTPUT_CPU
             const int nKeyPressed = pDisplayHelper->waitKey();
             if(nKeyPressed==(int)'q')
                 break;
-#endif //DISPLAY_OUTPUT
+#endif //DISPLAY_OUTPUT_CPU
 #endif //DISPLAY_OUTPUT
         }
         oCurrSequence.stopProcessing();
@@ -230,14 +236,7 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         CV_Assert(!oCurrInputFrame.empty());
         CV_Assert(oCurrInputFrame.isContinuous());
         cv::Mat oCurrFGMask(oCurrSequence.getFrameSize(),CV_8UC1,cv::Scalar_<uchar>(0));
-        std::shared_ptr<IBackgroundSubtractor> pAlgo;
-#if USE_LOBSTER
-        pAlgo = std::make_shared<BackgroundSubtractorLOBSTER>();
-#elif USE_SUBSENSE
-        pAlgo = std::make_shared<BackgroundSubtractorSuBSENSE>();
-#elif USE_PAWCS
-        pAlgo = std::make_shared<BackgroundSubtractorPAWCS>();
-#endif //USE_...
+        std::shared_ptr<IBackgroundSubtractor> pAlgo = std::make_shared<BackgroundSubtractorType>();
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
         pAlgo->initialize(oCurrInputFrame,oROI);
 #if DISPLAY_OUTPUT
