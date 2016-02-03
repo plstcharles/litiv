@@ -138,7 +138,7 @@ namespace litiv {
             WorkBatchGroup(const std::string& sGroupName, std::shared_ptr<IDataset> pDataset, const std::string& sRelativePath=std::string("./")) :
                     DataHandler(sGroupName,pDataset,sRelativePath+"/"+sGroupName+"/"),m_bIsBare(false) {
                 if(!PlatformUtils::string_contains_token(getName(),pDataset->getSkippedDirTokens())) {
-                    std::cout << "[" << pDataset->getName() << "] -- Parsing directory '" << pDataset->getDatasetPath()+sRelativePath << "' for work group '" << getName() << "'..." << std::endl;
+                    std::cout << "\tParsing directory '" << pDataset->getDatasetPath()+sRelativePath << "' for work group '" << getName() << "'..." << std::endl;
                     std::vector<std::string> vsWorkBatchPaths;
                     // all subdirs are considered work batch directories (if none, the category directory itself is a batch, and 'bare')
                     PlatformUtils::GetSubDirsFromDir(getDataPath(),vsWorkBatchPaths);
@@ -213,7 +213,7 @@ namespace litiv {
         IDataset_(
                 const std::string& sDatasetName, // user-friendly dataset name (used for identification only)
                 const std::string& sDatasetDirName, // dataset directory name in the dataset root path (the latter is set in CMake)
-                const std::string& sOutputDirName, // output directory name for debug logs, evaluation reports and results archiving
+                const std::string& sOutputDirPath, // output directory (full) path for debug logs, evaluation reports and results archiving
                 const std::string& sOutputNamePrefix, // output name prefix for results archiving (if null, only packet idx will be used as file name)
                 const std::string& sOutputNameSuffix, // output name suffix for results archiving (if null, no file extension will be used)
                 const std::vector<std::string>& vsWorkBatchDirs, // array of directory names for top-level work batch groups
@@ -227,7 +227,7 @@ namespace litiv {
         ) :
                 m_sDatasetName(sDatasetName),
                 m_sDatasetPath(std::string(DATASET_ROOT)+"/"+sDatasetDirName+"/"),
-                m_sOutputPath(std::string(DATASET_ROOT)+"/"+sDatasetDirName+"/"+sOutputDirName+"/"),
+                m_sOutputPath(sOutputDirPath),
                 m_sOutputNamePrefix(sOutputNamePrefix),
                 m_sOutputNameSuffix(sOutputNameSuffix),
                 m_vsWorkBatchDirs(vsWorkBatchDirs),
@@ -266,7 +266,14 @@ namespace litiv {
     template<>
     struct Dataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet> : public IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet> {
     protected: // should still be protected, as creation should always be done via datasets::create
-        Dataset_(const std::string& sOutputDirName, bool bSaveOutput=false, bool bUseEvaluator=true, bool bForce4ByteDataAlign=false, double dScaleFactor=1.0, bool b2014=true);
+        Dataset_(
+                const std::string& sOutputDirName, // output directory (full) path for debug logs, evaluation reports and results archiving (will be created in CDnet dataset folder)
+                bool bSaveOutput=false, // defines whether results should be archived or not
+                bool bUseEvaluator=true, // defines whether results should be fully evaluated, or simply acknowledged
+                bool bForce4ByteDataAlign=false, // defines whether data packets should be 4-byte aligned (useful for GPU upload)
+                double dScaleFactor=1.0, // defines the scale factor to use to resize/rescale read packets
+                bool b2014=true // defines whether to use the 2012 or 2014 version of the dataset (each should have its own folder in dataset root)
+        );
     };
 
     namespace datasets {
