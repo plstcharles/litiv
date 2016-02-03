@@ -7,18 +7,6 @@
 
 using namespace std;
 
-
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
-{
-    if (code != cudaSuccess)
-    {
-        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-        if (abort) exit(code);
-    }
-}
-
-
 SLIC_cuda::SLIC_cuda(int diamSpx, float wc){
     m_diamSpx = diamSpx;
     m_wc = wc;
@@ -40,11 +28,9 @@ void SLIC_cuda::Initialize(cv::Mat &frame0) {
     m_labels = new float[m_nPx];
 
     InitBuffers();
-
-
 }
 void SLIC_cuda::Segment(cv::Mat &frame) {
-
+	m_nSpx = m_nPx / m_areaSpx;//reinit m_nSpx because of enforceConnectivity
     SendFrame(frame); //ok
     InitClusters();//ok
 
@@ -55,67 +41,9 @@ void SLIC_cuda::Segment(cv::Mat &frame) {
         cudaDeviceSynchronize();
     }
 	Assignement();
+	getLabelsFromGpu();
+	enforceConnectivity();
 }
-
-void SLIC_cuda::InitBuffers() {
-
-    //allocate buffers on gpu
-    //gpuErrchk(cudaMalloc((void**)&frameBGRA_g, m_nPx*sizeof(uchar4))); //4 channels for padding
-
-    cudaChannelFormatDesc channelDescr = cudaCreateChannelDesc(8,8,8,8,cudaChannelFormatKindUnsigned);
-    gpuErrchk(cudaMallocArray(&frameBGRA_array,&channelDescr,m_width,m_height));
-
-    cudaChannelFormatDesc channelDescrLab = cudaCreateChannelDesc(32,32,32,32,cudaChannelFormatKindFloat);
-    gpuErrchk(cudaMallocArray(&frameLab_array,&channelDescrLab,m_width,m_height,cudaArraySurfaceLoadStore));
-
-    cudaChannelFormatDesc channelDescrLabels = cudaCreateChannelDesc(32,0,0,0,cudaChannelFormatKindFloat);
-    gpuErrchk(cudaMallocArray(&labels_array,&channelDescrLabels,m_width,m_height,cudaArraySurfaceLoadStore));
-
-
-    //texture FrameBGR (read-only)
-    cudaResourceDesc resDesc;
-    memset(&resDesc, 0, sizeof(resDesc));
-    resDesc.resType = cudaResourceTypeArray;
-    resDesc.res.array.array = frameBGRA_array;
-
-    // Specify texture object parameters
-    cudaTextureDesc texDesc;
-    memset(&texDesc, 0, sizeof(texDesc));
-    texDesc.addressMode[0]    = cudaAddressModeClamp;
-    texDesc.addressMode[1]    = cudaAddressModeClamp;
-    texDesc.filterMode       = cudaFilterModePoint;
-    texDesc.readMode         = cudaReadModeElementType;
-    texDesc.normalizedCoords = false;
-
-    gpuErrchk(cudaCreateTextureObject(&frameBGRA_tex, &resDesc,&texDesc,NULL));
-
-
-    // surface frameLab
-    cudaResourceDesc resDescLab;
-    memset(&resDescLab, 0, sizeof(resDescLab));
-    resDescLab.resType = cudaResourceTypeArray;
-
-    resDescLab.res.array.array = frameLab_array;
-    gpuErrchk(cudaCreateSurfaceObject(&frameLab_surf, &resDescLab));
-
-    // surface labels
-    cudaResourceDesc resDescLabels;
-    memset(&resDescLabels, 0, sizeof(resDescLabels));
-    resDescLabels.resType = cudaResourceTypeArray;
-
-    resDescLabels.res.array.array = labels_array;
-    gpuErrchk(cudaCreateSurfaceObject(&labels_surf, &resDescLabels));
-
-
-
-    // buffers clusters , accAtt
-    gpuErrchk(cudaMalloc((void**)&clusters_g, m_nSpx*sizeof(float)*5)); // 5-D centroid
-    gpuErrchk(cudaMalloc((void**)&accAtt_g, m_nSpx*sizeof(float)*6)); // 5-D centroid acc + 1 counter
-    cudaMemset(accAtt_g, 0, m_nSpx*sizeof(float)*6);//initialize accAtt to 0
-
-}
-
-
 
 void SLIC_cuda::SendFrame(cv::Mat& frameBGR){
 
@@ -125,18 +53,90 @@ void SLIC_cuda::SendFrame(cv::Mat& frameBGR){
     CV_Assert(frameBGRA.isContinuous());
 
     cudaMemcpyToArray(frameBGRA_array,0,0,(uchar*)frameBGRA.data,m_nPx* sizeof(uchar4),cudaMemcpyHostToDevice); //ok
-
+#if __CUDA_ARCH__>=300
     Rgb2CIELab(frameBGRA_tex,frameLab_surf,m_width,m_height); //BGR->Lab gpu
-
+#else
+	Rgb2CIELab(m_width, m_height); //BGR->Lab gpu
+#endif
 }
 
+void SLIC_cuda::getLabelsFromGpu()
+{
+	cudaMemcpyFromArray(m_labels, labels_array, 0, 0, m_nPx* sizeof(float), cudaMemcpyDeviceToHost);
+}
+
+void SLIC_cuda::enforceConnectivity()
+{
+	int label = 0, adjlabel = 0;
+	int lims = (m_width * m_height) / (m_nSpx);
+	lims = lims >> 2;
+
+
+	const int dx4[4] = { -1, 0, 1, 0 };
+	const int dy4[4] = { 0, -1, 0, 1 };
+
+	vector<vector<int> >newLabels;
+	for (int i = 0; i < m_height; i++)
+	{
+		vector<int> nv(m_width, -1);
+		newLabels.push_back(nv);
+	}
+
+	for (int i = 0; i < m_height; i++)
+	{
+		for (int j = 0; j < m_width; j++)
+		{
+			if (newLabels[i][j] == -1)
+			{
+				vector<cv::Point> elements;
+				elements.push_back(cv::Point(j, i));
+				for (int k = 0; k < 4; k++)
+				{
+					int x = elements[0].x + dx4[k], y = elements[0].y + dy4[k];
+					if (x >= 0 && x < m_width && y >= 0 && y < m_height)
+					{
+						if (newLabels[y][x] >= 0)
+						{
+							adjlabel = newLabels[y][x];
+						}
+					}
+				}
+				int count = 1;
+				for (int c = 0; c < count; c++)
+				{
+					for (int k = 0; k < 4; k++)
+					{
+						int x = elements[c].x + dx4[k], y = elements[c].y + dy4[k];
+						if (x >= 0 && x < m_width && y >= 0 && y < m_height)
+						{
+							if (newLabels[y][x] == -1 && m_labels[i*m_width + j] == m_labels[y*m_width + x])
+							{
+								elements.push_back(cv::Point(x, y));
+								newLabels[y][x] = label;//m_labels[i][j];
+								count += 1;
+							}
+						}
+					}
+				}
+				if (count <= lims) {
+					for (int c = 0; c < count; c++) {
+						newLabels[elements[c].y][elements[c].x] = adjlabel;
+					}
+					label -= 1;
+				}
+				label += 1;
+			}
+		}
+	}
+	m_nSpx = label;
+	for (int i = 0; i < newLabels.size(); i++)
+	for (int j = 0; j < newLabels[i].size(); j++)
+	m_labels[i*m_width+j] = newLabels[i][j];
+}
 
 void SLIC_cuda::displayBound(cv::Mat &image, cv::Scalar colour)
 {
     //load label from gpu
-
-    cudaMemcpyFromArray(m_labels,labels_array,0,0,m_nPx* sizeof(float),cudaMemcpyDeviceToHost);
-
 
     const int dx8[8] = { -1, -1,  0,  1, 1, 1, 0, -1 };
     const int dy8[8] = { 0, -1, -1, -1, 0, 1, 1,  1 };
