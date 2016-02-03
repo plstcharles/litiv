@@ -21,9 +21,6 @@
 #define DATASETUTILS_VIDEOSEGM_UNKNOWN_VAL     uchar(170)
 #define DATASETUTILS_VIDEOSEGM_SHADOW_VAL      uchar(50)
 
-#define TNoGroup false
-#define TGroup true
-
 #include "litiv/utils/ParallelUtils.hpp"
 #include "litiv/utils/OpenCVUtils.hpp"
 #include "litiv/utils/PlatformUtils.hpp"
@@ -65,6 +62,11 @@ namespace litiv {
         //eDataset_ImageEdgDet_...
         eDataset_ImageEdgDet_Custom
 
+    };
+
+    enum eGroupPolicy {
+        eGroup,
+        eNotGroup,
     };
 
     constexpr eDatasetList getCustomDatasetEnum(eDatasetTypeList eDatasetType) {
@@ -181,11 +183,11 @@ namespace litiv {
         DataPrecacher(const DataPrecacher&) = delete;
     };
 
-    template<bool bGroup>
+    template<eGroupPolicy ePolicy>
     struct IDataLoader_ : public virtual IDataHandler {};
 
     template<>
-    struct IDataLoader_<TNoGroup> : public virtual IDataHandler { // generalized producer (exposes common interface for all dataset types)
+    struct IDataLoader_<eNotGroup> : public virtual IDataHandler { // generalized producer (exposes common interface for all dataset types)
         virtual void startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX) override;
         virtual void stopPrecaching() override;
     protected:
@@ -210,25 +212,25 @@ namespace litiv {
         virtual const cv::Mat& getGTFrame(size_t nFrameIdx) = 0;
     };
 
-    template<eDatasetTypeList eDatasetType, bool bGroup>
+    template<eDatasetTypeList eDatasetType, eGroupPolicy ePolicy>
     struct IDataProducer_;
 
     template<>
-    struct IDataProducer_<eDatasetType_VideoSegm,TGroup> :
-            public IDataLoader_<TGroup>,
+    struct IDataProducer_<eDatasetType_VideoSegm,eGroup> :
+            public IDataLoader_<eGroup>,
             public IDataReader_<eDatasetType_VideoSegm> {
         virtual const cv::Mat& getInputFrame(size_t nFrameIdx) override final {return dynamic_cast<IDataReader_<eDatasetType_VideoSegm>&>(*getBatch(nFrameIdx)).getInputFrame(nFrameIdx);}
         virtual const cv::Mat& getGTFrame(size_t nFrameIdx) override final {return dynamic_cast<IDataReader_<eDatasetType_VideoSegm>&>(*getBatch(nFrameIdx)).getGTFrame(nFrameIdx);}
     };
 
     template<> // all method impl can go in CPP as template possibilities are tightly defined
-    struct IDataProducer_<eDatasetType_VideoSegm,TNoGroup> :
-            public IDataLoader_<TNoGroup>,
+    struct IDataProducer_<eDatasetType_VideoSegm,eNotGroup> :
+            public IDataLoader_<eNotGroup>,
             public IDataReader_<eDatasetType_VideoSegm> {
         virtual double getExpectedLoad() const override {return m_oROI.empty()?0.0:(double)cv::countNonZero(m_oROI)*m_nFrameCount*(int(!isGrayscale())+1);}
         virtual size_t getTotPackets() const override {return m_nFrameCount;}
         virtual void startPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override {
-            return IDataLoader_<TNoGroup>::startPrecaching(bUsingGT,m_oSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
+            return IDataLoader_<eNotGroup>::startPrecaching(bUsingGT,m_oSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
         }
         virtual cv::Size getFrameSize() const {return m_oSize;}
         virtual const cv::Mat& getROI() const {return m_oROI;}
@@ -302,11 +304,11 @@ namespace litiv {
         std::unordered_map<size_t,size_t> m_mTestGTIndexes;
     };
 
-    template<bool bGroup>
+    template<eGroupPolicy ePolicy>
     struct IDataCounter_;
 
     template<> // put function defs in cpp?
-    struct IDataCounter_<TNoGroup> : public virtual IDataHandler { // generalized consumer (exposes common interface for all dataset types)
+    struct IDataCounter_<eNotGroup> : public virtual IDataHandler { // generalized consumer (exposes common interface for all dataset types)
     protected:
         IDataCounter_() : m_nProcessedPackets(0) {}
         void processPacket() {++m_nProcessedPackets;}
@@ -319,7 +321,7 @@ namespace litiv {
     };
 
     template<> // put function defs in cpp?
-    struct IDataCounter_<TGroup> : public virtual IDataHandler { // generalized consumer (exposes common interface for all dataset types)
+    struct IDataCounter_<eGroup> : public virtual IDataHandler { // generalized consumer (exposes common interface for all dataset types)
         virtual size_t getProcessedPacketsCountPromise() override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCountPromise();});}
         virtual size_t getProcessedPacketsCount() const override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCount();});}
     };
@@ -327,7 +329,7 @@ namespace litiv {
     template<eDatasetTypeList eDatasetType>
     struct IDataRecorder_;
 
-    template<eDatasetTypeList eDatasetType, bool bGroup>
+    template<eDatasetTypeList eDatasetType, eGroupPolicy ePolicy>
     struct IDataConsumer_;
 
     template<>
@@ -336,12 +338,12 @@ namespace litiv {
     protected:
         virtual cv::Mat readSegmMask(size_t nIdx) const = 0; // used for output reevaluation only
         virtual void writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const = 0;
-        friend struct IDataConsumer_<eDatasetType_VideoSegm,TGroup>;
+        friend struct IDataConsumer_<eDatasetType_VideoSegm,eGroup>;
     };
 
     template<> // put function defs in cpp?
-    struct IDataConsumer_<eDatasetType_VideoSegm,TGroup> :
-            public IDataCounter_<TGroup>,
+    struct IDataConsumer_<eDatasetType_VideoSegm,eGroup> :
+            public IDataCounter_<eGroup>,
             public IDataRecorder_<eDatasetType_VideoSegm> {
         virtual void pushSegmMask(const cv::Mat& oSegm, size_t nIdx) override final {dynamic_cast<IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).pushSegmMask(oSegm,nIdx);}
     protected:
@@ -350,8 +352,8 @@ namespace litiv {
     };
 
     template<> // put function defs in cpp?
-    struct IDataConsumer_<eDatasetType_VideoSegm,TNoGroup> :
-            public IDataCounter_<TNoGroup>,
+    struct IDataConsumer_<eDatasetType_VideoSegm,eNotGroup> :
+            public IDataCounter_<eNotGroup>,
             public IDataRecorder_<eDatasetType_VideoSegm> {
 
         void pushSegmMask(const cv::Mat& oSegm, size_t nIdx) override {
@@ -368,8 +370,8 @@ namespace litiv {
             // add toggle for double-eval in here somewhere, or in actual evaluator interface?
             std::shared_ptr<Talgo> m_pAlgo;
             std::shared_ptr<cv::DisplayHelper> m_pDisplayHelper;
-            std::shared_ptr<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>> m_pProducer;
-            std::shared_ptr<IDataConsumer_<eDatasetType_VideoSegm,TNoGroup>> m_pConsumer;
+            std::shared_ptr<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>> m_pProducer;
+            std::shared_ptr<IDataConsumer_<eDatasetType_VideoSegm,eNotGroup>> m_pConsumer;
             const bool m_bPreserveInputs;
             cv::Mat m_oLastInput,m_oCurrInput,m_oNextInput;
             size_t m_nLastIdx,m_nCurrIdx,m_nNextIdx;
@@ -378,8 +380,8 @@ namespace litiv {
             IAsyncDataConsumer_(const std::shared_ptr<Talgo>& pAlgo, const IDataHandlerPtr& pSequence) :
                     m_pAlgo(pAlgo),
                     m_pDisplayHelper(pAlgo->m_pDisplayHelper),
-                    m_pProducer(std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(pSequence)),
-                    m_pConsumer(std::dynamic_pointer_cast<IDataConsumer_<eDatasetType_VideoSegm,TNoGroup>>(pSequence)),
+                    m_pProducer(std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(pSequence)),
+                    m_pConsumer(std::dynamic_pointer_cast<IDataConsumer_<eDatasetType_VideoSegm,eNotGroup>>(pSequence)),
                     m_bPreserveInputs(pAlgo->m_pDisplayHelper),
                     m_nLastIdx(0),
                     m_nCurrIdx(0),
@@ -474,7 +476,7 @@ namespace litiv {
             std::stringstream sOutputFilePath;
             sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << acBuffer.data() << getDatasetInfo()->getOutputNameSuffix();
             const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
-            auto pProducer = std::dynamic_pointer_cast<const IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
+            auto pProducer = std::dynamic_pointer_cast<const IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(shared_from_this());
             CV_Assert(pProducer);
             const cv::Mat& oROI = pProducer->getROI();
             cv::Mat oOutputSegm;

@@ -53,7 +53,7 @@ litiv::IDataHandlerPtr litiv::DataHandler::getBatch(size_t& nPacketIdx) {
     return std::const_pointer_cast<IDataHandler>(static_cast<const DataHandler*>(this)->getBatch(nPacketIdx));
 }
 
-void litiv::DataProducer_<litiv::eDatasetType_VideoSegm,litiv::eDataset_VideoSegm_CDnet,TNoGroup>::parseData() {
+void litiv::DataProducer_<litiv::eDatasetType_VideoSegm,litiv::eDataset_VideoSegm_CDnet,litiv::eNotGroup>::parseData() {
     std::vector<std::string> vsSubDirs;
     std::cout << getName() << "->getDataPath() = " << getDataPath() << std::endl;
     PlatformUtils::GetSubDirsFromDir(getDataPath(),vsSubDirs);
@@ -75,7 +75,7 @@ void litiv::DataProducer_<litiv::eDatasetType_VideoSegm,litiv::eDataset_VideoSeg
     // note: in this case, no need to use m_vnTestGTIndexes since all # of gt frames == # of test frames (but we assume the frames returned by 'GetFilesFromDir' are ordered correctly...)
 }
 
-cv::Mat litiv::DataProducer_<litiv::eDatasetType_VideoSegm,litiv::eDataset_VideoSegm_CDnet,TNoGroup>::_getGTPacket_impl(size_t nIdx) {
+cv::Mat litiv::DataProducer_<litiv::eDatasetType_VideoSegm,litiv::eDataset_VideoSegm_CDnet,litiv::eNotGroup>::_getGTPacket_impl(size_t nIdx) {
     cv::Mat oFrame = cv::imread(m_vsGTFramePaths[nIdx],cv::IMREAD_GRAYSCALE);
     if(oFrame.empty())
         oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL));

@@ -167,22 +167,22 @@ void litiv::IEvaluator_<eDatasetType_VideoSegm>::FetchGLEvaluation(std::shared_p
 #endif //HAVE_GLSL
 
 // as defined in the 2012 CDNet scripts/dataset
-const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmPositive = 255;
-const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmNegative = 0;
-const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmOutOfScope = DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL;
-const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmUnknown = DATASETUTILS_VIDEOSEGM_UNKNOWN_VAL;
-const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::s_nSegmShadow = DATASETUTILS_VIDEOSEGM_SHADOW_VAL;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::s_nSegmPositive = 255;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::s_nSegmNegative = 0;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::s_nSegmOutOfScope = DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::s_nSegmUnknown = DATASETUTILS_VIDEOSEGM_UNKNOWN_VAL;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::s_nSegmShadow = DATASETUTILS_VIDEOSEGM_SHADOW_VAL;
 
-litiv::ClassifMetricsBase litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getMetricsBase() const {
+litiv::ClassifMetricsBase litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::getMetricsBase() const {
     // @@@@ fetch gl eval output here, if needed
     return m_oMetricsBase;
 }
 
-litiv::ClassifMetrics litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getMetrics(bool) const {
+litiv::ClassifMetrics litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::getMetrics(bool) const {
     return ClassifMetrics(getMetricsBase());
 }
 
-std::string litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const {
+std::string litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const {
     if(!getTotPackets())
         return std::string();
     std::stringstream ssStr;
@@ -200,7 +200,7 @@ std::string litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::writ
     return ssStr.str();
 }
 
-void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::writeEvalReport() const {
+void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::writeEvalReport() const {
     if(!getTotPackets()) {
         std::cout << "No report to write for '" << getName() << "', skipping..." << std::endl;
         return;
@@ -219,10 +219,10 @@ void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::writeEvalRe
     }
 }
 
-void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::pushSegmMask(const cv::Mat& oSegm,size_t nIdx) {
-    IDataConsumer_<eDatasetType_VideoSegm,TNoGroup>::pushSegmMask(oSegm,nIdx);
+void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::pushSegmMask(const cv::Mat& oSegm,size_t nIdx) {
+    IDataConsumer_<eDatasetType_VideoSegm,eNotGroup>::pushSegmMask(oSegm,nIdx);
     if(getDatasetInfo()->isUsingEvaluator()) {
-        auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
+        auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(shared_from_this());
         CV_Assert(pProducer);
         const cv::Mat& oGTSegm = pProducer->getGTFrame(nIdx);
         const cv::Mat& oROI = pProducer->getROI();
@@ -258,8 +258,8 @@ void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::pushSegmMas
     }
 }
 
-cv::Mat litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getColoredSegmMask(const cv::Mat& oSegm, size_t nIdx) {
-    auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,TNoGroup>>(shared_from_this());
+cv::Mat litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::getColoredSegmMask(const cv::Mat& oSegm, size_t nIdx) {
+    auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(shared_from_this());
     CV_Assert(pProducer);
     const cv::Mat& oGTSegm = pProducer->getGTFrame(nIdx);
     const cv::Mat& oROI = pProducer->getROI();
@@ -311,10 +311,10 @@ cv::Mat litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::getColor
 
 #if 0//HAVE_GLSL
 
-litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::GLVideoSegmDataEvaluator::GLVideoSegmDataEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) :
+litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,eNotGroup>::GLVideoSegmDataEvaluator::GLVideoSegmDataEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) :
         GLImageProcEvaluatorAlgo(pParent,nTotFrameCount,(size_t)ClassifMetricsBase::eCount,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,true) {}
 
-std::string litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::GLVideoSegmDataEvaluator::getComputeShaderSource(size_t nStage) const {
+std::string litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,eNotGroup>::GLVideoSegmDataEvaluator::getComputeShaderSource(size_t nStage) const {
     glAssert(nStage<m_nComputeStages);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -406,7 +406,7 @@ std::string litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::GLVi
     return ssSrc.str();
 }
 
-litiv::ClassifMetricsBase litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,TNoGroup>::GLVideoSegmDataEvaluator::getCumulativeMetrics() {
+litiv::ClassifMetricsBase litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,eNotGroup>::GLVideoSegmDataEvaluator::getCumulativeMetrics() {
     const cv::Mat& oAtomicCountersQueryBuffer = this->getEvaluationAtomicCounterBuffer();
     ClassifMetricsBase oMetricsBase;
     for(int nFrameIter=0; nFrameIter<oAtomicCountersQueryBuffer.rows; ++nFrameIter) {
