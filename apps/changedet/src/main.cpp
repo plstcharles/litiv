@@ -78,7 +78,7 @@
 #define DATASET_PARAMS \
     "@@@@",                                                      /* => const std::string& sDatasetName */ \
     "@@@@",                                                      /* => const std::string& sDatasetDirName */ \
-    DATASET_OUTPUT_PATH,                                         /* => const std::string& sOutputDirName */ \
+    DATASET_OUTPUT_PATH,                                         /* => const std::string& sOutputDirPath */ \
     "segm_mask_",                                                /* => const std::string& sOutputNamePrefix */ \
     ".png",                                                      /* => const std::string& sOutputNameSuffix */ \
     std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsWorkBatchDirs */ \

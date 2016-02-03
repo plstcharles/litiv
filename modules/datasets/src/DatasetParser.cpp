@@ -62,7 +62,6 @@ litiv::IDataHandlerPtr litiv::DataHandler::getBatch(size_t& nPacketIdx) {
 
 void litiv::DataProducer_<litiv::eDatasetType_VideoSegm,litiv::eDataset_VideoSegm_CDnet,litiv::eNotGroup>::parseData() {
     std::vector<std::string> vsSubDirs;
-    std::cout << getName() << "->getDataPath() = " << getDataPath() << std::endl;
     PlatformUtils::GetSubDirsFromDir(getDataPath(),vsSubDirs);
     auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),getDataPath()+"/groundtruth");
     auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),getDataPath()+"/input");
@@ -95,7 +94,7 @@ litiv::Dataset_<litiv::eDatasetType_VideoSegm,litiv::eDataset_VideoSegm_CDnet>::
             IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet>(
                     b2014?"CDnet 2014":"CDnet 2012",
                     b2014?"CDNet2014/dataset":"CDNet/dataset",
-                    sOutputDirName,
+                    std::string(DATASET_ROOT)+"/"+std::string(b2014?"CDNet2014/":"CDNet/")+sOutputDirName+"/",
                     "bin",
                     ".png",
                     std::vector<std::string>{"baseline_highway_cut2"},//b2014?std::vector<std::string>{"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"}:std::vector<std::string>{"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"},

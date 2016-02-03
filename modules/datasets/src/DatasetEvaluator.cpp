@@ -92,28 +92,6 @@ double litiv::ClassifMetrics::CalcFalseNegativeRate(const ClassifMetricsBase& m)
 double litiv::ClassifMetrics::CalcPercentBadClassifs(const ClassifMetricsBase& m) {return m.total()>0?(100.0*(m.nFN+m.nFP)/m.total()):0;}
 double litiv::ClassifMetrics::CalcMatthewsCorrCoeff(const ClassifMetricsBase& m) {return ((m.nTP+m.nFP)>0)&&((m.nTP+m.nFN)>0)&&((m.nTN+m.nFP)>0)&&((m.nTN+m.nFN)>0)?((((double)m.nTP*m.nTN)-(m.nFP*m.nFN))/sqrt(((double)m.nTP+m.nFP)*(m.nTP+m.nFN)*(m.nTN+m.nFP)*(m.nTN+m.nFN))):0;}
 
-litiv::ClassifMetricsBase litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::getMetricsBase() const {
-    ClassifMetricsBase oMetricsBase;
-    for(const auto& pBatch : getBatches())
-        oMetricsBase += dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(*pBatch).getMetricsBase();
-    return oMetricsBase;
-}
-
-litiv::ClassifMetrics litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::getMetrics(bool bAverage) const {
-    if(bAverage) {
-        IDataHandlerPtrArray vpBatches = getBatches();
-        auto ppBatchIter = vpBatches.begin();
-        for(; ppBatchIter!=vpBatches.end() && !(*ppBatchIter)->getTotPackets(); ++ppBatchIter);
-        CV_Assert(ppBatchIter!=vpBatches.end());
-        ClassifMetrics oMetrics = dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage);
-        for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
-            if((*ppBatchIter)->getTotPackets())
-                oMetrics += dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage);
-        return oMetrics;
-    }
-    return ClassifMetrics(getMetricsBase());
-}
-
 void litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::writeEvalReport() const {
     if(getBatches().empty() || !isUsingEvaluator()) {
         std::cout << "No report to write for dataset '" << getName() << "', skipping." << std::endl;
@@ -151,6 +129,30 @@ void litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::writeEvalReport()
     }
 }
 
+litiv::ClassifMetricsBase litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::getMetricsBase() const {
+    ClassifMetricsBase oMetricsBase;
+    for(const auto& pBatch : getBatches())
+        oMetricsBase += dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(*pBatch).getMetricsBase();
+    return oMetricsBase;
+}
+
+litiv::ClassifMetrics litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::getMetrics(bool bAverage) const {
+    if(bAverage) {
+        IDataHandlerPtrArray vpBatches = getBatches();
+        auto ppBatchIter = vpBatches.begin();
+        for(; ppBatchIter!=vpBatches.end() && !(*ppBatchIter)->getTotPackets(); ++ppBatchIter);
+        CV_Assert(ppBatchIter!=vpBatches.end());
+        ClassifMetrics oMetrics = dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage);
+        for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
+            if((*ppBatchIter)->getTotPackets())
+                oMetrics += dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage);
+        return oMetrics;
+    }
+    return ClassifMetrics(getMetricsBase());
+}
+
+
+
 #if 0//HAVE_GLSL
 
 
@@ -166,27 +168,38 @@ void litiv::IEvaluator_<eDatasetType_VideoSegm>::FetchGLEvaluation(std::shared_p
 
 #endif //HAVE_GLSL
 
-// as defined in the 2012 CDNet scripts/dataset
-const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::s_nSegmPositive = 255;
-const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::s_nSegmNegative = 0;
-const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::s_nSegmOutOfScope = DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL;
-const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::s_nSegmUnknown = DATASETUTILS_VIDEOSEGM_UNKNOWN_VAL;
-const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::s_nSegmShadow = DATASETUTILS_VIDEOSEGM_SHADOW_VAL;
-
-litiv::ClassifMetricsBase litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::getMetricsBase() const {
-    // @@@@ fetch gl eval output here, if needed
-    return m_oMetricsBase;
+litiv::ClassifMetricsBase litiv::IMetricsCalculator_<litiv::eDatasetType_VideoSegm>::getMetricsBase() const {
+    lvAssert(isGroup()); // non-group specialization should override this method
+    ClassifMetricsBase oMetricsBase;
+    for(const auto& pBatch : getBatches())
+        oMetricsBase += dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(*pBatch).getMetricsBase();
+    return oMetricsBase;
 }
 
-litiv::ClassifMetrics litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::getMetrics(bool) const {
+litiv::ClassifMetrics litiv::IMetricsCalculator_<litiv::eDatasetType_VideoSegm>::getMetrics(bool bAverage) const {
+    if(bAverage && isGroup() && !isBare()) {
+        const IDataHandlerPtrArray& vpBatches = getBatches();
+        auto ppBatchIter = vpBatches.begin();
+        for(; ppBatchIter!=vpBatches.end() && !(*ppBatchIter)->getTotPackets(); ++ppBatchIter);
+        CV_Assert(ppBatchIter!=vpBatches.end());
+        ClassifMetrics oMetrics(dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage));
+        for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
+            if((*ppBatchIter)->getTotPackets())
+                oMetrics += dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage);
+        // @@@ check returning metrics weight?
+        return oMetrics;
+    }
     return ClassifMetrics(getMetricsBase());
 }
 
-std::string litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const {
+std::string litiv::IMetricsCalculator_<litiv::eDatasetType_VideoSegm>::writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const {
     if(!getTotPackets())
         return std::string();
     std::stringstream ssStr;
     ssStr << std::fixed;
+    if(isGroup() && !isBare())
+        for(const auto& pBatch : getBatches())
+            ssStr << pBatch->writeInlineEvalReport(nIndentSize+1);
     const ClassifMetrics& oMetrics = getMetrics(true);
     ssStr << CxxUtils::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
              std::setw(nCellSize) << oMetrics.dRecall << "|" <<
@@ -200,13 +213,17 @@ std::string litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGrou
     return ssStr.str();
 }
 
-void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::writeEvalReport() const {
+void litiv::IMetricsCalculator_<litiv::eDatasetType_VideoSegm>::writeEvalReport() const {
     if(!getTotPackets()) {
         std::cout << "No report to write for '" << getName() << "', skipping..." << std::endl;
         return;
     }
+    if(isGroup() && !isBare()) {
+        for(const auto& pBatch : getBatches())
+        pBatch->writeEvalReport();
+    }
     const ClassifMetrics& oMetrics = getMetrics(true);
-    std::cout << "\t\t" << CxxUtils::clampString(getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
+    std::cout << "\t" << CxxUtils::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
     std::ofstream oMetricsOutput(getOutputPath()+"/../"+getName()+".txt");
     if(oMetricsOutput.is_open()) {
         oMetricsOutput << std::fixed;
@@ -217,6 +234,18 @@ void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::wri
         oMetricsOutput << "\nHz: " << getTotPackets()/getProcessTime() << "\n";
         oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
     }
+}
+
+// as defined in the 2012 CDNet scripts/dataset
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::s_nSegmPositive = 255;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::s_nSegmNegative = 0;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::s_nSegmOutOfScope = DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::s_nSegmUnknown = DATASETUTILS_VIDEOSEGM_UNKNOWN_VAL;
+const uchar litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::s_nSegmShadow = DATASETUTILS_VIDEOSEGM_SHADOW_VAL;
+
+litiv::ClassifMetricsBase litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::getMetricsBase() const {
+    // @@@@ fetch gl eval output here, if needed
+    return m_oMetricsBase;
 }
 
 void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::pushSegmMask(const cv::Mat& oSegm,size_t nIdx) {
