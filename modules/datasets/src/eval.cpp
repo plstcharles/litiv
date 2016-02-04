@@ -15,7 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "litiv/datasets/DatasetEvaluator.hpp"
+#include "litiv/datasets/eval.hpp"
 #include "litiv/imgproc.hpp"
 //#include "litiv/utils/ConsoleUtils.hpp" @@@@@ reuse later?
 

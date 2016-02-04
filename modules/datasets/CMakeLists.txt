@@ -20,20 +20,24 @@ litiv_module(datasets)
 option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark implementation in litiv_datasets (will use an approximative solution otherwise)" ON)
 
 add_files(SOURCE_FILES
-    "src/DatasetEvaluator.cpp"
-    "src/DatasetParser.cpp"
-    "src/DatasetUtils.cpp"
+    "src/datasets.cpp"
+    "src/eval.cpp"
+    "src/utils.cpp"
 )
 add_files(INCLUDE_FILES
-    "include/litiv/datasets/DatasetEvaluator.hpp"
-    "include/litiv/datasets/DatasetParser.hpp"
-    "include/litiv/datasets/DatasetUtils.hpp"
     "include/litiv/datasets.hpp"
+    "include/litiv/datasets/eval.hpp"
+    "include/litiv/datasets/utils.hpp"
+    "include/litiv/datasets/impl/BSDS500.hpp"
+    "include/litiv/datasets/impl/CDnet.hpp"
+    "include/litiv/datasets/impl/LITIV2012b.hpp"
+    "include/litiv/datasets/impl/PETS2001.hpp"
+    "include/litiv/datasets/impl/Wallflower.hpp"
 )
 
 add_library(${LITIV_CURRENT_PROJECT_NAME} STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
 
-target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} litiv_utils litiv_imgproc) # imgproc needed for thinning in BSDS500 eval
+target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} litiv_utils litiv_imgproc)
 target_link_litiv_dependencies(${LITIV_CURRENT_PROJECT_NAME})
 target_include_directories(${LITIV_CURRENT_PROJECT_NAME}
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"

@@ -19,7 +19,7 @@
 
 #define DEFAULT_BSDS500_EDGE_EVAL_THRESHOLD_BINS 99
 
-#include "litiv/datasets/DatasetUtils.hpp"
+#include "litiv/datasets/utils.hpp"
 
 namespace litiv {
 
