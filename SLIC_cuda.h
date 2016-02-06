@@ -21,7 +21,7 @@
 #include <opencv2/opencv.hpp>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#include "funUtils.h"
+#include "funUtilsSC.h"
 
 
 #define N_ITER 5 // Kmean iteration

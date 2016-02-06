@@ -2,7 +2,7 @@
 // Created by derue on 15/12/15.
 //
 
-#include "funUtils.h"
+#include "funUtilsSC.h"
 
 
 
