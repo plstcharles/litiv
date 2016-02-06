@@ -39,7 +39,11 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort =
 
 
 class SLIC_cuda {
-
+public:
+	static enum InitType{
+		SLIC_SIZE,
+		SLIC_NSPX
+	};
 private:
     int m_nPx;
     int m_nSpx;
@@ -47,6 +51,7 @@ private:
     int m_wSpx, m_hSpx, m_areaSpx;
     int m_width, m_height;
     float m_wc;
+	InitType m_initType;
 
     //cpu buffer
     float *m_clusters;
@@ -88,7 +93,7 @@ private:
     void Update(); // Update
 
 public:
-    SLIC_cuda(int diamSpx, float wc);
+	SLIC_cuda(int diamSpx_or_Nspx=16, float wc=35, SLIC_cuda::InitType initType=SLIC_SIZE);
     ~SLIC_cuda();
 
     void Initialize(cv::Mat& frame0);
@@ -100,6 +105,8 @@ public:
     // enforce connectivity between superpixel, discard orphan (optional)
     // implementation from Pascal Mettes : https://github.com/PSMM/SLIC-Superpixels
     void enforceConnectivity();
+	cv::Mat getLabels(){ return cv::Mat(m_height, m_width, CV_32F, m_labels); }
+
 };
 #if __CUDA_ARCH__>=300
 __global__ void k_initClusters(cudaSurfaceObject_t frameLab,float* clusters,int width, int height, int nSpxPerRow, int nSpxPerCol);

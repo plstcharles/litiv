@@ -7,39 +7,42 @@
 
 using namespace std;
 
-SLIC_cuda::SLIC_cuda(int diamSpx, float wc){
-    m_diamSpx = diamSpx;
-    m_wc = wc;
+SLIC_cuda::SLIC_cuda(int diamSpx_or_nspx, float wc, InitType initType){
+	m_initType = initType;
+	if (initType == SLIC_SIZE)m_diamSpx = diamSpx_or_nspx;
+	else m_nSpx = diamSpx_or_nspx;
+	m_wc = wc;
 }
 SLIC_cuda::~SLIC_cuda(){
-    delete[] m_clusters;
-    delete[] m_labels;
+	delete[] m_clusters;
+	delete[] m_labels;
 }
 void SLIC_cuda::Initialize(cv::Mat &frame0) {
-    m_width = frame0.cols;
-    m_height = frame0.rows;
-    m_nPx = m_width*m_height;
-    getWlHl(m_width, m_height, m_diamSpx, m_wSpx, m_hSpx); // determine w and h of Spx based on diamSpx
-    m_areaSpx = m_wSpx*m_hSpx;
-    CV_Assert(m_nPx%m_areaSpx==0);
-    m_nSpx = m_nPx/m_areaSpx; // should be an integer!!
+	m_width = frame0.cols;
+	m_height = frame0.rows;
+	m_nPx = m_width*m_height;
+	if (m_initType == SLIC_NSPX) m_diamSpx = sqrt(m_nPx / (float)m_nSpx);
+	getWlHl(m_width, m_height, m_diamSpx, m_wSpx, m_hSpx); // determine w and h of Spx based on diamSpx
+	m_areaSpx = m_wSpx*m_hSpx;
+	CV_Assert(m_nPx%m_areaSpx == 0);
+	m_nSpx = m_nPx / m_areaSpx; // should be an integer!!
 
-    m_clusters = new float[m_nSpx * 5];
-    m_labels = new float[m_nPx];
+	m_clusters = new float[m_nSpx * 5];
+	m_labels = new float[m_nPx];
 
-    InitBuffers();
+	InitBuffers();
 }
 void SLIC_cuda::Segment(cv::Mat &frame) {
 	m_nSpx = m_nPx / m_areaSpx;//reinit m_nSpx because of enforceConnectivity
-    SendFrame(frame); //ok
-    InitClusters();//ok
+	SendFrame(frame); //ok
+	InitClusters();//ok
 
-    for(int i=0; i<N_ITER; i++) {
-        Assignement();
-        cudaDeviceSynchronize();
-        Update();
-        cudaDeviceSynchronize();
-    }
+	for (int i = 0; i<N_ITER; i++) {
+		Assignement();
+		cudaDeviceSynchronize();
+		Update();
+		cudaDeviceSynchronize();
+	}
 	Assignement();
 	getLabelsFromGpu();
 	enforceConnectivity();
@@ -47,14 +50,14 @@ void SLIC_cuda::Segment(cv::Mat &frame) {
 
 void SLIC_cuda::SendFrame(cv::Mat& frameBGR){
 
-    cv::Mat frameBGRA;
-    cv::cvtColor(frameBGR,frameBGRA,CV_BGR2BGRA);
-    CV_Assert(frameBGRA.type()==CV_8UC4);
-    CV_Assert(frameBGRA.isContinuous());
+	cv::Mat frameBGRA;
+	cv::cvtColor(frameBGR, frameBGRA, CV_BGR2BGRA);
+	CV_Assert(frameBGRA.type() == CV_8UC4);
+	CV_Assert(frameBGRA.isContinuous());
 
-    cudaMemcpyToArray(frameBGRA_array,0,0,(uchar*)frameBGRA.data,m_nPx* sizeof(uchar4),cudaMemcpyHostToDevice); //ok
+	cudaMemcpyToArray(frameBGRA_array, 0, 0, (uchar*)frameBGRA.data, m_nPx* sizeof(uchar4), cudaMemcpyHostToDevice); //ok
 #if __CUDA_ARCH__>=300
-    Rgb2CIELab(frameBGRA_tex,frameLab_surf,m_width,m_height); //BGR->Lab gpu
+	Rgb2CIELab(frameBGRA_tex, frameLab_surf, m_width, m_height); //BGR->Lab gpu
 #else
 	Rgb2CIELab(m_width, m_height); //BGR->Lab gpu
 #endif
@@ -131,58 +134,58 @@ void SLIC_cuda::enforceConnectivity()
 	m_nSpx = label;
 	for (int i = 0; i < newLabels.size(); i++)
 	for (int j = 0; j < newLabels[i].size(); j++)
-	m_labels[i*m_width+j] = newLabels[i][j];
+		m_labels[i*m_width + j] = newLabels[i][j];
 }
 
 void SLIC_cuda::displayBound(cv::Mat &image, cv::Scalar colour)
 {
-    //load label from gpu
+	//load label from gpu
 
-    const int dx8[8] = { -1, -1,  0,  1, 1, 1, 0, -1 };
-    const int dy8[8] = { 0, -1, -1, -1, 0, 1, 1,  1 };
+	const int dx8[8] = { -1, -1, 0, 1, 1, 1, 0, -1 };
+	const int dy8[8] = { 0, -1, -1, -1, 0, 1, 1, 1 };
 
-    /* Initialize the contour vector and the matrix detailing whether a pixel
-    * is already taken to be a contour. */
-    vector<cv::Point> contours;
-    vector<vector<bool> > istaken;
-    for (int i = 0; i < image.rows; i++) {
-        vector<bool> nb;
-        for (int j = 0; j < image.cols; j++) {
-            nb.push_back(false);
-        }
-        istaken.push_back(nb);
-    }
+	/* Initialize the contour vector and the matrix detailing whether a pixel
+	* is already taken to be a contour. */
+	vector<cv::Point> contours;
+	vector<vector<bool> > istaken;
+	for (int i = 0; i < image.rows; i++) {
+		vector<bool> nb;
+		for (int j = 0; j < image.cols; j++) {
+			nb.push_back(false);
+		}
+		istaken.push_back(nb);
+	}
 
-    /* Go through all the pixels. */
+	/* Go through all the pixels. */
 
-    for (int i = 0; i<image.rows; i++) {
-        for (int j = 0; j < image.cols; j++) {
+	for (int i = 0; i<image.rows; i++) {
+		for (int j = 0; j < image.cols; j++) {
 
-            int nr_p = 0;
+			int nr_p = 0;
 
-            /* Compare the pixel to its 8 neighbours. */
-            for (int k = 0; k < 8; k++) {
-                int x = j + dx8[k], y = i + dy8[k];
+			/* Compare the pixel to its 8 neighbours. */
+			for (int k = 0; k < 8; k++) {
+				int x = j + dx8[k], y = i + dy8[k];
 
-                if (x >= 0 && x < image.cols && y >= 0 && y < image.rows) {
-                    if (istaken[y][x] == false && m_labels[i*m_width+j] != m_labels[y*m_width+x]) {
-                        nr_p += 1;
-                    }
-                }
-            }
-            /* Add the pixel to the contour list if desired. */
-            if (nr_p >= 2) {
-                contours.push_back(cv::Point(j, i));
-                istaken[i][j] = true;
-            }
+				if (x >= 0 && x < image.cols && y >= 0 && y < image.rows) {
+					if (istaken[y][x] == false && m_labels[i*m_width + j] != m_labels[y*m_width + x]) {
+						nr_p += 1;
+					}
+				}
+			}
+			/* Add the pixel to the contour list if desired. */
+			if (nr_p >= 2) {
+				contours.push_back(cv::Point(j, i));
+				istaken[i][j] = true;
+			}
 
-        }
-    }
+		}
+	}
 
-    /* Draw the contour pixels. */
-    for (int i = 0; i < (int)contours.size(); i++) {
-        image.at<cv::Vec3b>(contours[i].y, contours[i].x) = cv::Vec3b(colour[0], colour[1], colour[2]);
-    }
+	/* Draw the contour pixels. */
+	for (int i = 0; i < (int)contours.size(); i++) {
+		image.at<cv::Vec3b>(contours[i].y, contours[i].x) = cv::Vec3b(colour[0], colour[1], colour[2]);
+	}
 }
 
 

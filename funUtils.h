@@ -1,7 +1,7 @@
 //
 // Created by derue on 15/12/15.
 //
-
+#pragma once
 #ifndef SLIC_CUDA_FUNUTILS_H
 #define SLIC_CUDA_FUNUTILS_H
 
