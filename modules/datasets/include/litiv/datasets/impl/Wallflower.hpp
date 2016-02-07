@@ -22,8 +22,9 @@
 #error "This file should never be included directly; use litiv/datasets.hpp instead"
 #endif //__LITIV_DATASETS_IMPL_H
 
-template<>
-struct Dataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_Wallflower> : public IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_Wallflower> {
+template<ParallelUtils::eParallelAlgoType eEvalImpl>
+struct Dataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_Wallflower,eEvalImpl> :
+        public IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_Wallflower,eEvalImpl> {
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
             const std::string& sOutputDirName, // output directory (full) path for debug logs, evaluation reports and results archiving (will be created in Wallflower dataset folder)
@@ -32,7 +33,7 @@ protected: // should still be protected, as creation should always be done via d
             bool bForce4ByteDataAlign=false, // defines whether data packets should be 4-byte aligned (useful for GPU upload)
             double dScaleFactor=1.0 // defines the scale factor to use to resize/rescale read packets
     ) :
-            IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_Wallflower>(
+            IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_Wallflower,eEvalImpl>(
                     "Wallflower",
                     "Wallflower/dataset",
                     std::string(DATASET_ROOT)+"/Wallflower/"+sOutputDirName+"/",
@@ -50,19 +51,19 @@ protected: // should still be protected, as creation should always be done via d
 };
 
 template<>
-struct DataProducer_<eDatasetType_VideoSegm, eDataset_VideoSegm_Wallflower, eNotGroup> :
+struct DataProducer_<eDatasetType_VideoSegm,eDataset_VideoSegm_Wallflower,eNotGroup> :
         public IDataProducer_<eDatasetType_VideoSegm,eNotGroup> {
-        
+protected:
     virtual void parseData() override final {
-        /*
+        // @@@@ untested since 2016/01 refactoring
         std::vector<std::string> vsImgPaths;
-        PlatformUtils::GetFilesFromDir(m_sDatasetPath,vsImgPaths);
+        PlatformUtils::GetFilesFromDir(getDataPath(),vsImgPaths);
         bool bFoundScript=false, bFoundGTFile=false;
         const std::string sGTFilePrefix("hand_segmented_");
         const size_t nInputFileNbDecimals = 5;
         const std::string sInputFileSuffix(".bmp");
         for(auto iter=vsImgPaths.begin(); iter!=vsImgPaths.end(); ++iter) {
-            if(*iter==m_sDatasetPath+"/script.txt")
+            if(*iter==getDataPath()+"/script.txt")
                 bFoundScript = true;
             else if(iter->find(sGTFilePrefix)!=std::string::npos) {
                 m_mTestGTIndexes.insert(std::pair<size_t,size_t>(atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str()),m_vsGTFramePaths.size()));
@@ -71,25 +72,20 @@ struct DataProducer_<eDatasetType_VideoSegm, eDataset_VideoSegm_Wallflower, eNot
             }
             else {
                 if(iter->find(sInputFileSuffix)!=iter->size()-sInputFileSuffix.size())
-                    throw std::runtime_error(cv::format("Sequence '%s' contained an unknown file ('%s')",sSeqName.c_str(),iter->c_str()));
+                    lvErrorExt("Wallflower sequence '%s' contained an unknown file ('%s')",getName().c_str(),iter->c_str());
                 m_vsInputFramePaths.push_back(*iter);
             }
         }
         if(!bFoundGTFile || !bFoundScript || m_vsInputFramePaths.empty() || m_vsGTFramePaths.size()!=1)
-            throw std::runtime_error(cv::format("Sequence '%s' did not possess the required groundtruth and input files",sSeqName.c_str()));
+            lvErrorExt("Wallflower sequence '%s' did not possess the required groundtruth and input files",getName().c_str());
         cv::Mat oTempImg = cv::imread(m_vsGTFramePaths[0]);
         if(oTempImg.empty())
-            throw std::runtime_error(cv::format("Sequence '%s' did not possess a valid GT file",sSeqName.c_str()));
+            lvErrorExt("Wallflower sequence '%s' did not possess a valid GT file",getName().c_str());
         m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
         m_oSize = oTempImg.size();
-        m_nTotFrameCount = m_vsInputFramePaths.size();
-        CV_Assert(m_nTotFrameCount>0);
-        m_dExpectedLoad = (double)m_oSize.height*m_oSize.width*m_nTotFrameCount*(int(!m_bForcingGrayscale)+1);
-        m_pEvaluator = std::shared_ptr<EvaluatorBase>(new BinarySegmEvaluator("WALLFLOWER_EVAL"));
-        */
-        lvError("Missing impl");
+        m_nFrameCount = m_vsInputFramePaths.size();
+        CV_Assert(m_nFrameCount>0);
     }
-    
     virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final {
         cv::Mat oFrame;
         auto res = m_mTestGTIndexes.find(nIdx);

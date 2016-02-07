@@ -28,8 +28,9 @@ enum eBSDS500DatasetGroup {
     eBSDS500Dataset_Training_Validation_Test,
 };
 
-template<>
-struct Dataset_<eDatasetType_ImageEdgDet,eDataset_ImageEdgDet_BSDS500> : public IDataset_<eDatasetType_ImageEdgDet,eDataset_ImageEdgDet_BSDS500> {
+template<ParallelUtils::eParallelAlgoType eEvalImpl>
+struct Dataset_<eDatasetType_ImageEdgDet,eDataset_ImageEdgDet_BSDS500,eEvalImpl> :
+        public IDataset_<eDatasetType_ImageEdgDet,eDataset_ImageEdgDet_BSDS500,eEvalImpl> {
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
             const std::string& sOutputDirName, // output directory (full) path for debug logs, evaluation reports and results archiving (will be created in BSR dataset folder)
@@ -39,7 +40,7 @@ protected: // should still be protected, as creation should always be done via d
             double dScaleFactor=1.0, // defines the scale factor to use to resize/rescale read packets
             eBSDS500DatasetGroup eType=eBSDS500Dataset_Training // defines which dataset groups to use
     ) :
-            IDataset_<eDatasetType_ImageEdgDet,eDataset_ImageEdgDet_BSDS500>(
+            IDataset_<eDatasetType_ImageEdgDet,eDataset_ImageEdgDet_BSDS500,eEvalImpl>(
                     "BSDS500",
                     "BSDS500/data/images",
                     std::string(DATASET_ROOT)+"/BSDS500/BSR/"+sOutputDirName+"/",
@@ -57,9 +58,9 @@ protected: // should still be protected, as creation should always be done via d
 };
 
 template<>
-struct DataProducer_<eDatasetType_ImageEdgDet, eDataset_ImageEdgDet_BSDS500, eNotGroup> :
+struct DataProducer_<eDatasetType_ImageEdgDet,eDataset_ImageEdgDet_BSDS500,eNotGroup> :
         public IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup> {
-       
+protected:
     /*
     class Set : public WorkBatch {
     public:
@@ -88,7 +89,6 @@ struct DataProducer_<eDatasetType_ImageEdgDet, eDataset_ImageEdgDet_BSDS500, eNo
         Set(const Set&) = delete;
     };
     */
-        
     virtual void parseData() override final {
         /*
         PlatformUtils::GetFilesFromDir(m_sDatasetPath,m_vsInputImagePaths);
@@ -123,7 +123,6 @@ struct DataProducer_<eDatasetType_ImageEdgDet, eDataset_ImageEdgDet_BSDS500, eNo
         */
         lvError("Missing impl");
     }
-    
     virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final {
         cv::Mat oFrame;
         auto res = m_mTestGTIndexes.find(nFrameIdx);
