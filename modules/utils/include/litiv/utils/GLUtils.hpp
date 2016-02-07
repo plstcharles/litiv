@@ -17,9 +17,6 @@
 
 #pragma once
 
-#include "litiv/utils/DefineUtils.hpp"
-#include "litiv/utils/PlatformUtils.hpp"
-#include "litiv/utils/CxxUtils.hpp"
 #include <GL/glew.h>
 #include <GL/glu.h>
 #define GLM_FORCE_RADIANS
@@ -33,6 +30,8 @@
 #include <memory>
 #include <mutex>
 #include <opencv2/opencv.hpp>
+#include "litiv/utils/CxxUtils.hpp"
+
 #if HAVE_GLFW
 #include <GLFW/glfw3.h>
 struct glfwWindowDeleter {

@@ -118,7 +118,7 @@ protected:
         }
         else { //m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid || m_eDatasetID==eDataset_BSDS500_segm_train_valid_test
             // current impl cannot parse GT/evaluate (matlab files only)
-            CV_Error(0,"missing impl");
+            lvError("Missing impl");
         }
         */
         lvError("Missing impl");

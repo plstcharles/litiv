@@ -17,13 +17,13 @@
 
 #pragma once
 
-#include "litiv/utils/GLDrawUtils.hpp"
 #include <stdio.h>
 #include <string>
 #include <map>
 #include <vector>
 #include <cstdlib>
 #include <cassert>
+#include "litiv/utils/GLDrawUtils.hpp"
 
 class GLShader {
 public:
