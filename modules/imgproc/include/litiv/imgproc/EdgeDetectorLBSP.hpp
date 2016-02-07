@@ -17,9 +17,8 @@
 
 #pragma once
 
-#include "litiv/utils/CxxUtils.hpp"
-#include "litiv/features2d.hpp"
-#include "litiv/imgproc.hpp"
+#include "litiv/imgproc/EdgeDetectionUtils.hpp"
+#include "litiv/features2d/LBSP.hpp"
 
 //! defines the default value for EdgeDetectorLBSP::m_nLevels
 #define EDGLBSP_DEFAULT_LEVEL_COUNT (3)
@@ -30,12 +29,12 @@
 //! defines the default value for the threshold passed to EdgeDetectorLBSP::apply_threshold
 #define EDGLBSP_DEFAULT_DET_THRESHOLD ((double)EDGLBSP_DEFAULT_DET_THRESHOLD_INTEGER/LBSP::MAX_GRAD_MAG)
 
-class EdgeDetectorLBSP : public EdgeDetector {
+class EdgeDetectorLBSP : public IEdgeDetector {
 public:
     //! full constructor
-    EdgeDetectorLBSP( size_t nLevels=EDGLBSP_DEFAULT_LEVEL_COUNT,
-                      double dHystLowThrshFactor=EDGLBSP_DEFAULT_HYST_LOW_THRSH_FACT,
-                      bool bNormalizeOutput=false);
+    EdgeDetectorLBSP(size_t nLevels=EDGLBSP_DEFAULT_LEVEL_COUNT,
+                     double dHystLowThrshFactor=EDGLBSP_DEFAULT_HYST_LOW_THRSH_FACT,
+                     bool bNormalizeOutput=false);
     //! returns the default edge detection threshold value used in 'apply'
     virtual double getDefaultThreshold() const {return EDGLBSP_DEFAULT_DET_THRESHOLD;}
     //! thresholded edge detection function; the edge detection threshold should be between 0 and 1 (will use default otherwise)

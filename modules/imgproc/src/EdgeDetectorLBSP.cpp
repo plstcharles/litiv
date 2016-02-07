@@ -15,15 +15,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <bitset>
 #include "litiv/imgproc/EdgeDetectorLBSP.hpp"
+#include "litiv/imgproc.hpp"
+#include <bitset>
 
 #define USE_5x5_NON_MAX_SUPP      1
 #define USE_MIN_GRAD_ORIENT       1
 #define USE_3_AXIS_ORIENT         1
 
 EdgeDetectorLBSP::EdgeDetectorLBSP(size_t nLevels, double dHystLowThrshFactor, bool bNormalizeOutput) :
-        EdgeDetector(LBSP::PATCH_SIZE/2),
         m_nLevels(nLevels),
         m_dHystLowThrshFactor(dHystLowThrshFactor),
         m_dGaussianKernelSigma(0),
@@ -31,6 +31,7 @@ EdgeDetectorLBSP::EdgeDetectorLBSP(size_t nLevels, double dHystLowThrshFactor, b
         m_vvuInputPyrMaps(std::max(nLevels,size_t(1))-1),
         m_vvuLBSPLookupMaps(nLevels),
         m_voMapSizeList(nLevels) {
+    m_nROIBorderSize = LBSP::PATCH_SIZE/2;
     CV_Assert(m_nLevels>0);
 }
 
