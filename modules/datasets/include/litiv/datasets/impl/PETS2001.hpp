@@ -22,8 +22,9 @@
 #error "This file should never be included directly; use litiv/datasets.hpp instead"
 #endif //__LITIV_DATASETS_IMPL_H
 
-template<>
-struct Dataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_PETS2001D3TC1> : public IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_PETS2001D3TC1> {
+template<ParallelUtils::eParallelAlgoType eEvalImpl>
+struct Dataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_PETS2001D3TC1,eEvalImpl> :
+        public IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_PETS2001D3TC1,eEvalImpl> {
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
             const std::string& sOutputDirName, // output directory (full) path for debug logs, evaluation reports and results archiving (will be created in PETS dataset folder)
@@ -32,7 +33,7 @@ protected: // should still be protected, as creation should always be done via d
             bool bForce4ByteDataAlign=false, // defines whether data packets should be 4-byte aligned (useful for GPU upload)
             double dScaleFactor=1.0 // defines the scale factor to use to resize/rescale read packets
     ) :
-            IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_PETS2001D3TC1>(
+            IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_PETS2001D3TC1,eEvalImpl>(
                     "PETS2001 Dataset#3",
                     "PETS2001/DATASET3",
                     std::string(DATASET_ROOT)+"/PETS2001/DATASET3/"+sOutputDirName+"/",
@@ -50,43 +51,38 @@ protected: // should still be protected, as creation should always be done via d
 };
 
 template<>
-struct DataProducer_<eDatasetType_VideoSegm, eDataset_VideoSegm_PETS2001D3TC1, eNotGroup> :
+struct DataProducer_<eDatasetType_VideoSegm,eDataset_VideoSegm_PETS2001D3TC1,eNotGroup> :
         public IDataProducer_<eDatasetType_VideoSegm,eNotGroup> {
-        
+protected:
     virtual void parseData() override final {
-        /*
+        // @@@@ untested since 2016/01 refactoring
         std::vector<std::string> vsVideoSeqPaths;
-        PlatformUtils::GetFilesFromDir(m_sDatasetPath,vsVideoSeqPaths);
+        PlatformUtils::GetFilesFromDir(getDataPath(),vsVideoSeqPaths);
         if(vsVideoSeqPaths.size()!=1)
-            throw std::runtime_error(cv::format("Sequence '%s': bad subdirectory for PETS2001 parsing (should contain only one video sequence file)",sSeqName.c_str()));
+            lvErrorExt("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one video sequence file)",getName().c_str());
         std::vector<std::string> vsGTSubdirPaths;
-        PlatformUtils::GetSubDirsFromDir(m_sDatasetPath,vsGTSubdirPaths);
+        PlatformUtils::GetSubDirsFromDir(getDataPath(),vsGTSubdirPaths);
         if(vsGTSubdirPaths.size()!=1)
-            throw std::runtime_error(cv::format("Sequence '%s': bad subdirectory for PETS2001 parsing (should contain only one GT subdir)",sSeqName.c_str()));
+            lvErrorExt("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one GT subdir)",getName().c_str());
         m_voVideoReader.open(vsVideoSeqPaths[0]);
         if(!m_voVideoReader.isOpened())
-            throw std::runtime_error(cv::format("Sequence '%s': video file could not be opened",sSeqName.c_str()));
+            lvErrorExt("PETS2006D3TC1 sequence '%s': video file could not be opened",getName().c_str());
         PlatformUtils::GetFilesFromDir(vsGTSubdirPaths[0],m_vsGTFramePaths);
         if(m_vsGTFramePaths.empty())
-            throw std::runtime_error(cv::format("Sequence '%s': did not possess any valid GT frames",m_sDatasetPath.c_str()));
+            lvErrorExt("PETS2006D3TC1 sequence '%s': did not possess any valid GT frames",getName().c_str());
         const std::string sGTFilePrefix("image_");
         const size_t nInputFileNbDecimals = 4;
         for(auto iter=m_vsGTFramePaths.begin(); iter!=m_vsGTFramePaths.end(); ++iter)
             m_mTestGTIndexes.insert(std::pair<size_t,size_t>((size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str()),iter-m_vsGTFramePaths.begin()));
         cv::Mat oTempImg = cv::imread(m_vsGTFramePaths[0]);
         if(oTempImg.empty())
-            throw std::runtime_error(cv::format("Sequence '%s': did not possess valid GT file(s)",sSeqName.c_str()));
+            lvErrorExt("PETS2006D3TC1 sequence '%s': did not possess valid GT file(s)",getName().c_str());
         m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
         m_oSize = oTempImg.size();
         m_nNextExpectedVideoReaderFrameIdx = 0;
-        m_nTotFrameCount = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
-        CV_Assert(m_nTotFrameCount>0);
-        m_dExpectedLoad = (double)m_oSize.height*m_oSize.width*m_nTotFrameCount*(int(!m_bForcingGrayscale)+1);
-        m_pEvaluator = std::shared_ptr<EvaluatorBase>(new BinarySegmEvaluator("PETS2001_EVAL"));
-        */
-        lvError("Missing impl");
+        m_nFrameCount = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
+        CV_Assert(m_nFrameCount>0);
     }
-    
     virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final {
         cv::Mat oFrame;
         auto res = m_mTestGTIndexes.find(nIdx);

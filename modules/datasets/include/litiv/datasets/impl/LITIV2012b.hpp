@@ -22,8 +22,9 @@
 #error "This file should never be included directly; use litiv/datasets.hpp instead"
 #endif //__LITIV_DATASETS_IMPL_H
 
-template<>
-struct Dataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b> : public IDataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b> {
+template<ParallelUtils::eParallelAlgoType eEvalImpl>
+struct Dataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b,eEvalImpl> :
+        public IDataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b,eEvalImpl> {
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
             const std::string& sOutputDirName, // output directory (full) path for debug logs, evaluation reports and results archiving (will be created in LITIV dataset folder)
@@ -32,7 +33,7 @@ protected: // should still be protected, as creation should always be done via d
             bool bForce4ByteDataAlign=false, // defines whether data packets should be 4-byte aligned (useful for GPU upload)
             double dScaleFactor=1.0 // defines the scale factor to use to resize/rescale read packets
     ) :
-            IDataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b>(
+            IDataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b,eEvalImpl>(
                     "LITIV 2012b (CVPRW2015 update)",
                     "litiv/litiv2012b",
                     std::string(DATASET_ROOT)+"/litiv/litiv2012b/"+sOutputDirName+"/",
@@ -50,9 +51,9 @@ protected: // should still be protected, as creation should always be done via d
 };
 
 template<>
-struct DataProducer_<eDatasetType_VideoRegistr, eDataset_VideoRegistr_LITIV2012b, eNotGroup> :
+struct DataProducer_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b,eNotGroup> :
         public IDataProducer_<eDatasetType_VideoRegistr,eNotGroup> {
-        
+protected:
     virtual void parseData() override final {
         /* @@@@ old bsds500 below
         std::vector<std::string> vsImgPaths;
@@ -114,7 +115,6 @@ struct DataProducer_<eDatasetType_VideoRegistr, eDataset_VideoRegistr_LITIV2012b
         */
         lvError("Missing impl");
     }
-    
     virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final {
         /*
         cv::Mat litiv::Image::Segm::Set::GetInputFromIndex_external(size_t nImageIdx) {
