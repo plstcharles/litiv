@@ -274,6 +274,32 @@ const cv::Mat& litiv::IDataProducer_<litiv::eDatasetType_VideoSegm,litiv::eNotGr
     return m_oGTPrecacher.getPacket(nFrameIdx);
 }
 
+cv::Mat litiv::IDataProducer_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::_getInputPacket_impl(size_t nIdx) {
+    cv::Mat oFrame;
+    if(!m_voVideoReader.isOpened())
+        oFrame = cv::imread(m_vsInputFramePaths[nIdx],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+    else {
+        if(m_nNextExpectedVideoReaderFrameIdx!=nIdx) {
+            m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,(double)nIdx);
+            m_nNextExpectedVideoReaderFrameIdx = nIdx+1;
+        }
+        else
+            ++m_nNextExpectedVideoReaderFrameIdx;
+        m_voVideoReader >> oFrame;
+        if(isGrayscale() && oFrame.channels()>1)
+            cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2GRAY);
+    }
+    if(getDatasetInfo()->is4ByteAligned() && oFrame.channels()==3)
+        cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2BGRA);
+    if(oFrame.size()!=m_oSize)
+        cv::resize(oFrame,oFrame,m_oSize,0,0,cv::INTER_NEAREST);
+    return oFrame;
+}
+
+cv::Mat litiv::IDataProducer_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::_getGTPacket_impl(size_t) {
+    return cv::Mat(m_oSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL));
+}
+
 void litiv::IDataProducer_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::parseData() {
     cv::Mat oTempImg;
     m_voVideoReader.open(getDataPath());
@@ -302,32 +328,6 @@ void litiv::IDataProducer_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::pars
     CV_Assert(m_nFrameCount>0);
 }
 
-cv::Mat litiv::IDataProducer_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::_getInputPacket_impl(size_t nIdx) {
-    cv::Mat oFrame;
-    if(!m_voVideoReader.isOpened())
-        oFrame = cv::imread(m_vsInputFramePaths[nIdx],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
-    else {
-        if(m_nNextExpectedVideoReaderFrameIdx!=nIdx) {
-            m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,(double)nIdx);
-            m_nNextExpectedVideoReaderFrameIdx = nIdx+1;
-        }
-        else
-            ++m_nNextExpectedVideoReaderFrameIdx;
-        m_voVideoReader >> oFrame;
-        if(isGrayscale() && oFrame.channels()>1)
-            cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2GRAY);
-    }
-    if(getDatasetInfo()->is4ByteAligned() && oFrame.channels()==3)
-        cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2BGRA);
-    if(oFrame.size()!=m_oSize)
-        cv::resize(oFrame,oFrame,m_oSize,0,0,cv::INTER_NEAREST);
-    return oFrame;
-}
-
-cv::Mat litiv::IDataProducer_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::_getGTPacket_impl(size_t) {
-    return cv::Mat(m_oSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL));
-}
-
 size_t litiv::IDataCounter_<litiv::eNotGroup>::getProcessedPacketsCountPromise() {
     return m_nProcessedPacketsPromise.get_future().get();
 }
@@ -344,42 +344,20 @@ size_t litiv::IDataCounter_<litiv::eGroup>::getProcessedPacketsCount() const {
     return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCount();});
 }
 
-void litiv::IDataConsumer_<litiv::eDatasetType_VideoSegm,litiv::eGroup>::pushSegmMask(const cv::Mat& oSegm, size_t nIdx) {
-    dynamic_cast<IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).pushSegmMask(oSegm,nIdx);
-}
-
-cv::Mat litiv::IDataConsumer_<litiv::eDatasetType_VideoSegm,litiv::eGroup>::readSegmMask(size_t nIdx) const {
-    return dynamic_cast<const IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).readSegmMask(nIdx);
-}
-
-void litiv::IDataConsumer_<litiv::eDatasetType_VideoSegm,litiv::eGroup>::writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const {
-    dynamic_cast<const IDataRecorder_<eDatasetType_VideoSegm>&>(*getBatch(nIdx)).writeSegmMask(oSegm,nIdx);
-}
-
-void litiv::IDataConsumer_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::pushSegmMask(const cv::Mat& oSegm, size_t nIdx) {
+void litiv::IDataConsumer_<litiv::eDatasetType_VideoSegm>::pushSegmMask(const cv::Mat& oSegm, size_t nIdx) {
     processPacket();
     if(getDatasetInfo()->isSavingOutput())
         writeSegmMask(oSegm,nIdx);
 }
 
-cv::Mat litiv::IDataConsumer_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::readSegmMask(size_t nIdx) const {
-    CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
-    std::array<char,10> acBuffer;
-    snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
-    std::stringstream sOutputFilePath;
-    sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << acBuffer.data() << getDatasetInfo()->getOutputNameSuffix();
-    return cv::imread(sOutputFilePath.str(),isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
-}
-
-void litiv::IDataConsumer_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const {
+void litiv::IDataConsumer_<litiv::eDatasetType_VideoSegm>::writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const {
     CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
     std::array<char,10> acBuffer;
     snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
     std::stringstream sOutputFilePath;
     sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << acBuffer.data() << getDatasetInfo()->getOutputNameSuffix();
     const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
-    auto pProducer = std::dynamic_pointer_cast<const IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(shared_from_this());
-    CV_Assert(pProducer);
+    auto pProducer = shared_from_this_cast<const IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(true);
     const cv::Mat& oROI = pProducer->getROI();
     cv::Mat oOutputSegm;
     if(!oROI.empty())
@@ -389,30 +367,36 @@ void litiv::IDataConsumer_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::writ
     cv::imwrite(sOutputFilePath.str(),oOutputSegm,vnComprParams);
 }
 
-#if HAVE_GLSL
-
-litiv::AsyncEvaluationWrapper_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::AsyncEvaluationWrapper_(const std::shared_ptr<ParallelUtils::IParallelAlgo_GLSL>& pAlgo, const IDataHandlerPtr& pSequence) :
-        m_pAlgo(pAlgo),
-        m_pDisplayHelper(pAlgo->m_pDisplayHelper),
-        m_pProducer(std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(pSequence)),
-        m_pConsumer(std::dynamic_pointer_cast<IDataConsumer_<eDatasetType_VideoSegm,eNotGroup>>(pSequence)),
-        m_bPreserveInputs(pAlgo->m_pDisplayHelper),
-        m_nLastIdx(0),
-        m_nCurrIdx(0),
-        m_nNextIdx(1),
-        m_nFrameCount(0) {
-    CV_Assert(pAlgo && m_pProducer && m_pConsumer);
-    CV_Assert(m_pProducer->getFrameCount()>1);
+cv::Mat litiv::IDataConsumer_<litiv::eDatasetType_VideoSegm>::readSegmMask(size_t nIdx) const {
+    CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
+    std::array<char,10> acBuffer;
+    snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
+    std::stringstream sOutputFilePath;
+    sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << acBuffer.data() << getDatasetInfo()->getOutputNameSuffix();
+    return cv::imread(sOutputFilePath.str(),isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
 }
 
-cv::Size litiv::AsyncEvaluationWrapper_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::getIdealGLWindowSize() {
-    glAssert(m_pAlgo->getIsGLInitialized());
-    cv::Size oFrameSize = m_pProducer->getFrameSize();
+#if HAVE_GLSL
+
+cv::Size litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::getIdealGLWindowSize() const {
+    glAssert(m_pAlgo && m_pAlgo->getIsGLInitialized());
+    auto pProducer = shared_from_this_cast<const IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(true);
+    glAssert(pProducer->getFrameCount()>1);
+    cv::Size oFrameSize = pProducer->getFrameSize();
     oFrameSize.width *= int(m_pAlgo->m_nSxSDisplayCount);
     return oFrameSize;
 }
 
-void litiv::AsyncEvaluationWrapper_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::pre_initialize_gl() {
+litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::IAsyncDataConsumer_() :
+        m_nLastIdx(0),
+        m_nCurrIdx(0),
+        m_nNextIdx(1),
+        m_nFrameCount(0) {}
+
+void litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::pre_initialize_gl() {
+    m_pProducer = shared_from_this_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(true);
+    glAssert(m_pProducer->getFrameCount()>1);
+    glDbgAssert(m_pAlgo);
     m_oNextInput = m_pProducer->getInputFrame(m_nNextIdx).clone();
     m_oCurrInput = m_pProducer->getInputFrame(m_nCurrIdx).clone();
     m_oLastInput = m_oCurrInput.clone();
@@ -420,38 +404,82 @@ void litiv::AsyncEvaluationWrapper_<litiv::eDatasetType_VideoSegm,ParallelUtils:
     CV_Assert(m_oCurrInput.isContinuous());
     glAssert(m_oCurrInput.channels()==1 || m_oCurrInput.channels()==4);
     m_nFrameCount= m_pProducer->getFrameCount();
-    if(m_pProducer->getDatasetInfo()->isSavingOutput() || m_pDisplayHelper)
+    if(getDatasetInfo()->isSavingOutput() || m_pAlgo->m_pDisplayHelper)
         m_pAlgo->setOutputFetching(true);
-    if(m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
+    if(m_pAlgo->m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
         m_pAlgo->setDebugFetching(true);
 }
 
-void litiv::AsyncEvaluationWrapper_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::post_apply_gl() {
-    if(m_bPreserveInputs) {
+void litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::post_initialize_gl() {
+    glDbgAssert(m_pAlgo);
+}
+
+void litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::pre_apply_gl(size_t nNextIdx, bool bRebindAll) {
+    UNUSED(bRebindAll);
+    glDbgAssert(m_pProducer);
+    glDbgAssert(m_pAlgo);
+    if(nNextIdx!=m_nNextIdx)
+        m_oNextInput = m_pProducer->getInputFrame(nNextIdx);
+}
+
+void litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::post_apply_gl(size_t nNextIdx, bool bRebindAll) {
+    UNUSED(bRebindAll);
+    glDbgAssert(m_pProducer);
+    glDbgAssert(m_pAlgo);
+    m_nLastIdx = m_nCurrIdx;
+    m_nCurrIdx = nNextIdx;
+    m_nNextIdx = nNextIdx+1;
+    if(m_pAlgo->m_pDisplayHelper) {
         m_oCurrInput.copyTo(m_oLastInput);
         m_oNextInput.copyTo(m_oCurrInput);
     }
     if(m_nNextIdx<m_nFrameCount)
         m_oNextInput = m_pProducer->getInputFrame(m_nNextIdx);
-    m_pConsumer->processPacket();
-    if(m_pConsumer->getDatasetInfo()->isSavingOutput() || m_pDisplayHelper) {
+    processPacket();
+    if(getDatasetInfo()->isSavingOutput() || m_pAlgo->m_pDisplayHelper) {
         cv::Mat oLastOutput,oLastDebug;
         m_pAlgo->fetchLastOutput(oLastOutput);
-        if(m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
+        if(m_pAlgo->m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
             m_pAlgo->fetchLastDebug(oLastDebug);
         else
             oLastDebug = oLastOutput;
-        if(m_pConsumer->getDatasetInfo()->isSavingOutput())
-            m_pConsumer->writeSegmMask(oLastOutput,m_nLastIdx);
-        if(m_pDisplayHelper) {
+        if(getDatasetInfo()->isSavingOutput())
+            writeSegmMask(oLastOutput,m_nLastIdx);
+        if(m_pAlgo->m_pDisplayHelper) {
             const cv::Mat& oROI = m_pProducer->getROI();
             if(!oROI.empty()) {
                 cv::bitwise_or(oLastOutput,UCHAR_MAX/2,oLastOutput,oROI==0);
                 cv::bitwise_or(oLastDebug,UCHAR_MAX/2,oLastDebug,oROI==0);
             }
-            m_pDisplayHelper->display(m_oLastInput,oLastDebug,oLastOutput,m_nLastIdx);
+            m_pAlgo->m_pDisplayHelper->display(m_oLastInput,oLastDebug,oLastOutput,m_nLastIdx);
         }
     }
+}
+
+void litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::writeSegmMask(const cv::Mat& oSegm,size_t nIdx) const {
+    CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
+    std::array<char,10> acBuffer;
+    snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
+    std::stringstream sOutputFilePath;
+    sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << acBuffer.data() << getDatasetInfo()->getOutputNameSuffix();
+    const std::vector<int> vnComprParams ={cv::IMWRITE_PNG_COMPRESSION,9};
+    auto pProducer = shared_from_this_cast<const IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(true);
+    const cv::Mat& oROI = pProducer->getROI();
+    cv::Mat oOutputSegm;
+    if(!oROI.empty())
+        cv::bitwise_or(oSegm,UCHAR_MAX/2,oOutputSegm,oROI==0);
+    else
+        oOutputSegm = oSegm;
+    cv::imwrite(sOutputFilePath.str(),oOutputSegm,vnComprParams);
+}
+
+cv::Mat litiv::IAsyncDataConsumer_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::readSegmMask(size_t nIdx) const {
+    CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
+    std::array<char,10> acBuffer;
+    snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
+    std::stringstream sOutputFilePath;
+    sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << acBuffer.data() << getDatasetInfo()->getOutputNameSuffix();
+    return cv::imread(sOutputFilePath.str(),isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
 }
 
 #endif //HAVE_GLSL

@@ -161,7 +161,6 @@ public:
     const cv::Mat& getEvaluationAtomicCounterBuffer();
     virtual std::string getFragmentShaderSource() const;
 
-protected:
     //! initialize internal texture arrays and shader programs for evaluator+algo; should be called in top-level evaluator init function
     virtual void initialize_gl(const cv::Mat& oInitInput, const cv::Mat& oInitGT, const cv::Mat& oROI);
     //! initialize internal texture arrays and shader programs for evaluator only; should be called in top-level evaluator init function
@@ -171,6 +170,7 @@ protected:
     //! uploads the next gt texture to GPU, processes the output/gt textures currently on GPU, and fetches (if required) the last output texture
     virtual void apply_gl(const cv::Mat& oNextGT, bool bRebindAll=false);
 
+protected:
     const int m_nGroundtruthType;
     const size_t m_nTotFrameCount;
     const size_t m_nEvalBufferFrameSize;
