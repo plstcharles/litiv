@@ -35,25 +35,25 @@ litiv::DataHandler::DataHandler(const std::string& sBatchName, IDatasetPtr pData
 }
 
 litiv::IDataHandlerConstPtr litiv::DataHandler::getBatch(size_t& nPacketIdx) const {
-        if(isGroup()) {
-            size_t nCurrPacketCount = 0;
-            auto vpBatches = getBatches();
-            auto ppBatchIter = vpBatches.begin();
-            while(ppBatchIter!=vpBatches.end()) {
-                const size_t nNextPacketIncr = (*ppBatchIter)->getTotPackets();
-                if(nPacketIdx<nCurrPacketCount+nNextPacketIncr)
-                    break;
-                nCurrPacketCount += nNextPacketIncr;
-                ++ppBatchIter;
-            }
-            CV_Assert(ppBatchIter!=vpBatches.end());
-            nPacketIdx -= nCurrPacketCount;
-            return *ppBatchIter;
+    if(isGroup()) {
+        size_t nCurrPacketCount = 0;
+        auto vpBatches = getBatches();
+        auto ppBatchIter = vpBatches.begin();
+        while(ppBatchIter!=vpBatches.end()) {
+            const size_t nNextPacketIncr = (*ppBatchIter)->getTotPackets();
+            if(nPacketIdx<nCurrPacketCount+nNextPacketIncr)
+                break;
+            nCurrPacketCount += nNextPacketIncr;
+            ++ppBatchIter;
         }
-        else {
-            CV_Assert(nPacketIdx<getTotPackets());
-            return shared_from_this();
-        }
+        CV_Assert(ppBatchIter!=vpBatches.end());
+        nPacketIdx -= nCurrPacketCount;
+        return *ppBatchIter;
+    }
+    else {
+        CV_Assert(nPacketIdx<getTotPackets());
+        return shared_from_this();
+    }
 }
 
 litiv::IDataHandlerPtr litiv::DataHandler::getBatch(size_t& nPacketIdx) {

@@ -24,10 +24,10 @@ namespace litiv {
 
     namespace datasets {
 
-        template<eDatasetTypeList eDatasetType, eDatasetList eDataset, typename... Targs>
+        template<eDatasetTypeList eDatasetType, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl, typename... Targs>
         IDatasetPtr create(Targs&&... args);
 
-        template<eDatasetTypeList eDatasetType, typename... Targs>
+        template<eDatasetTypeList eDatasetType, ParallelUtils::eParallelAlgoType eEvalImpl, typename... Targs>
         IDatasetPtr create(Targs&&... args);
 
     } //namespace datasets
@@ -52,15 +52,12 @@ namespace litiv {
         const IDatasetPtr m_pDataset;
     };
 
-    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, eGroupPolicy ePolicy>
-    struct DataProducer_ : public IDataProducer_<eDatasetType,ePolicy> {};
-
-    template<eDatasetTypeList eDatasetType, eDatasetList eDataset>
+    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl>
     struct IDataset_ : public DatasetEvaluator_<eDatasetType,eDataset> {
         struct WorkBatch :
                 public DataHandler,
                 public DataProducer_<eDatasetType,eDataset,eNotGroup>,
-                public DataEvaluator_<eDatasetType,eDataset,eNotGroup> {
+                public std::conditional<(eEvalImpl==ParallelUtils::eNonParallel),DataEvaluator_<eDatasetType,eDataset>,AsyncDataEvaluator_<eDatasetType,eDataset,eEvalImpl>>::type {
             virtual ~WorkBatch() = default;
             virtual eDatasetTypeList getDatasetType() const override final {return eDatasetType;}
             virtual eDatasetList getDataset() const override final {return eDataset;}
@@ -92,12 +89,11 @@ namespace litiv {
                 };
                 return std::make_shared<WorkBatchWrapper>(std::forward<Targs>(args)...);
             }
-        private:
+        protected:
             WorkBatch(const std::string& sBatchName, IDatasetPtr pDataset, const std::string& sRelativePath=std::string("./")) :
                     DataHandler(sBatchName,pDataset,sRelativePath),m_dElapsedTime_sec(0),m_bIsProcessing(false) {parseData();}
             WorkBatch& operator=(const WorkBatch&) = delete;
             WorkBatch(const WorkBatch&) = delete;
-            friend struct WorkBatchGroup; // really needed? @@@@
             CxxUtils::StopWatch m_oStopWatch;
             double m_dElapsedTime_sec;
             bool m_bIsProcessing;
@@ -106,7 +102,8 @@ namespace litiv {
         struct WorkBatchGroup :
                 public DataHandler,
                 public DataProducer_<eDatasetType,eDataset,eGroup>,
-                public DataEvaluator_<eDatasetType,eDataset,eGroup> {
+                public IMetricsCalculator_<eDatasetType>,
+                public IDataCounter_<eGroup> {
             virtual ~WorkBatchGroup() = default;
             virtual eDatasetTypeList getDatasetType() const override final {return eDatasetType;}
             virtual eDatasetList getDataset() const override final {return eDataset;}
@@ -115,7 +112,6 @@ namespace litiv {
             virtual IDataHandlerPtrArray getBatches() const override final {return m_vpBatches;}
             virtual void startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX) override final {for(const auto& pBatch : getBatches()) pBatch->startPrecaching(bPrecacheGT,nSuggestedBufferSize);}
             virtual void stopPrecaching() override final {for(const auto& pBatch : getBatches()) pBatch->stopPrecaching();}
-            virtual void parseData() override final {for(const auto& pBatch : getBatches()) pBatch->parseData();}
             virtual double getProcessTime() const override final {return CxxUtils::accumulateMembers<double,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessTime();});}
             virtual double getExpectedLoad() const override final {return CxxUtils::accumulateMembers<double,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getExpectedLoad();});}
             virtual size_t getTotPackets() const override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getTotPackets();});}
@@ -126,8 +122,8 @@ namespace litiv {
                 };
                 return std::make_shared<WorkBatchGroupWrapper>(std::forward<Targs>(args)...);
             }
-
-        private:
+        protected:
+            virtual void parseData() override final { for(const auto& pBatch : getBatches()) pBatch->parseData(); }
             WorkBatchGroup(const std::string& sGroupName, std::shared_ptr<IDataset> pDataset, const std::string& sRelativePath=std::string("./")) :
                     DataHandler(sGroupName,pDataset,sRelativePath+"/"+sGroupName+"/"),m_bIsBare(false) {
                 if(!PlatformUtils::string_contains_token(getName(),pDataset->getSkippedDirTokens())) {
@@ -249,11 +245,11 @@ namespace litiv {
         IDataset_& operator=(const IDataset_&) = delete;
         IDataset_(const IDataset_&) = delete;
     };
-    
-    template<eDatasetTypeList eDatasetType, eDatasetList eDataset>
-    struct Dataset_ : public IDataset_<eDatasetType,eDataset> {
+
+    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl>
+    struct Dataset_ : public IDataset_<eDatasetType,eDataset,eEvalImpl> {
         // if the dataset type/id is not specialized, this redirects creation to default IDataset_ constructor
-        using IDataset_<eDatasetType,eDataset>::IDataset_;
+        using IDataset_<eDatasetType,eDataset,eEvalImpl>::IDataset_;
     };
 
 #define __LITIV_DATASETS_IMPL_H
@@ -266,19 +262,19 @@ namespace litiv {
 
     namespace datasets {
 
-        template<eDatasetTypeList eDatasetType, eDatasetList eDataset, typename... Targs>
+        template<eDatasetTypeList eDatasetType, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl, typename... Targs>
         IDatasetPtr create(Targs&&... args) {
-            struct DatasetWrapper : public Dataset_<eDatasetType,eDataset> {
-                DatasetWrapper(Targs&&... args) : Dataset_<eDatasetType,eDataset>(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
+            struct DatasetWrapper : public Dataset_<eDatasetType,eDataset,eEvalImpl> {
+                DatasetWrapper(Targs&&... args) : Dataset_<eDatasetType,eDataset,eEvalImpl>(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
             };
             IDatasetPtr pDataset = std::make_shared<DatasetWrapper>(std::forward<Targs>(args)...);
             pDataset->parseDataset();
             return pDataset;
         }
 
-        template<eDatasetTypeList eDatasetType, typename... Targs>
+        template<eDatasetTypeList eDatasetType, ParallelUtils::eParallelAlgoType eEvalImpl, typename... Targs>
         IDatasetPtr create(Targs&&... args) {
-            return create<eDatasetType,getCustomDatasetEnum(eDatasetType)>(std::forward<Targs>(args)...);
+            return create<eDatasetType,getCustomDatasetEnum(eDatasetType),eEvalImpl>(std::forward<Targs>(args)...);
         }
 
     } //namespace datasets
