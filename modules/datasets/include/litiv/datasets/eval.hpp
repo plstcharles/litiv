@@ -18,6 +18,7 @@
 #pragma once
 
 #define DEFAULT_BSDS500_EDGE_EVAL_THRESHOLD_BINS 99
+#define VALIDATE_GPU_EVALUATORS 1
 
 #include "litiv/datasets/utils.hpp"
 
@@ -29,6 +30,8 @@ namespace litiv {
         ClassifMetricsBase();
         ClassifMetricsBase operator+(const ClassifMetricsBase& m) const;
         ClassifMetricsBase& operator+=(const ClassifMetricsBase& m);
+        bool operator==(const ClassifMetricsBase& m) const;
+        bool operator!=(const ClassifMetricsBase& m) const;
         inline uint64_t total() const {return nTP+nTN+nFP+nFN;}
         uint64_t nTP;
         uint64_t nTN;
@@ -44,6 +47,9 @@ namespace litiv {
             eCount,
         };
     };
+
+    void accumulateMetricsBase_VideoSegm(const cv::Mat& oSegm, const cv::Mat& oGTSegm, const cv::Mat& oROI, ClassifMetricsBase& oMetrics);
+    cv::Mat getColoredMask_VideoSegm(const cv::Mat& oSegm,const cv::Mat& oGTSegm,const cv::Mat& oROI);
 
     //! high-level metrics counter used to evaluate binary classifiers (relies on ClassifMetricsBase internally)
     struct ClassifMetrics {
@@ -122,21 +128,6 @@ namespace litiv {
 
     template<eDatasetTypeList eDatasetType>
     struct IMetricsCalculator_ : public virtual IDataHandler {
-        //! returns a one-line string listing packet counts, seconds elapsed and algo speed for current batch(es)
-        virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize=12) const override {
-            if(!this->getTotPackets())
-                return std::string();
-            std::stringstream ssStr;
-            ssStr << std::fixed;
-            if(this->isGroup() && !this->isBare())
-                for(const auto& pBatch : this->getBatches())
-                    ssStr << pBatch->writeInlineEvalReport(nIndentSize+1);
-            ssStr << CxxUtils::clampString((std::string(nIndentSize,'>')+' '+this->getName()),nCellSize) << "|" <<
-                     std::setw(nCellSize) << this->getTotPackets() << "|" <<
-                     std::setw(nCellSize) << this->getProcessTime() << "|" <<
-                     std::setw(nCellSize) << this->getTotPackets()/this->getProcessTime() << "\n";
-            return ssStr.str();
-        }
         //! writes an evaluation report listing packet counts, seconds elapsed and algo speed for current batch(es)
         virtual void writeEvalReport() const override {
             if(!this->getTotPackets()) {
@@ -157,6 +148,22 @@ namespace litiv {
                 oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
             }
         }
+    protected:
+        //! returns a one-line string listing packet counts, seconds elapsed and algo speed for current batch(es)
+        virtual std::string writeInlineEvalReport(size_t nIndentSize,size_t nCellSize=12) const override {
+            if(!this->getTotPackets())
+                return std::string();
+            std::stringstream ssStr;
+            ssStr << std::fixed;
+            if(this->isGroup() && !this->isBare())
+                for(const auto& pBatch : this->getBatches())
+                    ssStr << pBatch->writeInlineEvalReport(nIndentSize+1);
+            ssStr << CxxUtils::clampString((std::string(nIndentSize,'>')+' '+this->getName()),nCellSize) << "|" <<
+                std::setw(nCellSize) << this->getTotPackets() << "|" <<
+                std::setw(nCellSize) << this->getProcessTime() << "|" <<
+                std::setw(nCellSize) << this->getTotPackets()/this->getProcessTime() << "\n";
+            return ssStr.str();
+        }
     };
 
     template<>
@@ -165,75 +172,79 @@ namespace litiv {
         virtual ClassifMetricsBase getMetricsBase() const;
         //! accumulates high-level metrics from current batch(es)
         virtual ClassifMetrics getMetrics(bool bAverage) const;
-        //! returns a one-line string listing high-level metrics for current batch(es)
-        virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize=12) const override;
         //! writes an evaluation report listing high-level metrics for current batch(es)
         virtual void writeEvalReport() const override;
+    protected:
+        //! returns a one-line string listing high-level metrics for current batch(es)
+        virtual std::string writeInlineEvalReport(size_t nIndentSize,size_t nCellSize=12) const override;
     };
 
-    template<eDatasetTypeList eDatasetType, eGroupPolicy ePolicy>
-    struct IDataEvaluator_ :
+    template<eDatasetTypeList eDatasetType>
+    struct IDataEvaluator_ : // no evaluation specialization by default
             public IMetricsCalculator_<eDatasetType>,
-            public IDataConsumer_<eDatasetType,ePolicy> {}; // no evaluation specialization by default
+            public IDataConsumer_<eDatasetType> {};
 
     template<>
-    struct IDataEvaluator_<eDatasetType_VideoSegm,eNotGroup> :
+    struct IDataEvaluator_<eDatasetType_VideoSegm> :
             public IMetricsCalculator_<eDatasetType_VideoSegm>,
-            public IDataConsumer_<eDatasetType_VideoSegm,eNotGroup> {
+            public IDataConsumer_<eDatasetType_VideoSegm> {
         //! overrides 'getMetricsBase' from IMetricsCalculator_ for non-group-impl (as always required)
-        virtual ClassifMetricsBase getMetricsBase() const override;
+        virtual ClassifMetricsBase getMetricsBase() const override {return m_oMetricsBase;}
         //! overrides 'pushSegmMask' from IDataConsumer_ to simultaneously evaluate the pushed results
-        virtual void pushSegmMask(const cv::Mat& oSegm,size_t nIdx) override;
+        virtual void pushSegmMask(const cv::Mat& oSegm,size_t nIdx) override {
+            IDataConsumer_<eDatasetType_VideoSegm>::pushSegmMask(oSegm,nIdx);
+            if(getDatasetInfo()->isUsingEvaluator()) {
+                auto pProducer = shared_from_this_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(true);
+                accumulateMetricsBase_VideoSegm(oSegm,pProducer->getGTFrame(nIdx),pProducer->getROI(),m_oMetricsBase);
+            }
+        }
         //! provides a visual feedback on result quality based on evaluation guidelines
-        virtual cv::Mat getColoredSegmMask(const cv::Mat& oSegm, size_t nIdx);
-
-#if 0//HAVE_GLSL
-    protected:
-        struct GLVideoSegmDataEvaluator :
-                public IAsyncDataEvaluator<eDatasetType_VideoSegm,ParallelUtils::eGLSL>,
-                public GLImageProcEvaluatorAlgo {
-            GLVideoSegmDataEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount);
-            virtual std::string getComputeShaderSource(size_t nStage) const override;
-            virtual ClassifMetricsBase getCumulativeMetrics();
-        };
-        using GLVideoSegmDataEvaluatorPtr = std::unique_ptr<GLVideoSegmDataEvaluator>;
-        GLVideoSegmDataEvaluatorPtr m_pGLEvaluator;
-
-    public:
-        //! inits a glsl algo evaluator for the datset, and returns the expected gl context window size for display (if needed)
-        virtual cv::Size init_GLSL(const std::shared_ptr<GLImageProcAlgo>& pAlgo) override {
-            m_pGLEvaluator = std::make_unique<GLVideoSegmDataEvaluator>(pAlgo,getTotPackets());
-            auto pProducer = std::dynamic_pointer_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(shared_from_this());
-            CV_Assert(pProducer);
-            m_pGLEvaluator->initialize_gl(pProducer->getGTFrame(0),pProducer->getROI());
-            cv::Size oExpectedDisplaySize = pProducer->getFrameSize();
-            oExpectedDisplaySize.width *= m_pGLEvaluator->m_nSxSDisplayCount;
-            return oExpectedDisplaySize;
+        virtual cv::Mat getColoredMask(const cv::Mat& oSegm,size_t nIdx) {
+            auto pProducer = shared_from_this_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(true);
+            return getColoredMask_VideoSegm(oSegm,pProducer->getGTFrame(nIdx),pProducer->getROI());
         }
-        //! feeds the 'nIdx+1' frame to the gl algo (passed via initwhile fetching the 'nIdx-1' frame for evaluation
-        virtual void apply_GLSL(size_t nIdx) {
-            CV_Assert(m_pGLEvaluator);
-            m_pGLEvaluator->apply_gl();
-        }
-        //virtual std::shared_ptr<GLEvaluator> CreateGLEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount) const {
-        //    return std::shared_ptr<GLEvaluator>(new GLEvaluator(pParent,nTotFrameCount));
-        //}
-        //virtual void FetchGLEvaluation(std::shared_ptr<IGLEvaluator_<eDatasetType_VideoSegm>> pGLEvaluator);
-
-#endif //HAVE_GLSL
-
-        static const uchar s_nSegmPositive;
-        static const uchar s_nSegmNegative;
-        static const uchar s_nSegmOutOfScope;
-        static const uchar s_nSegmUnknown;
-        static const uchar s_nSegmShadow;
-
+        //! resets internal metrics counters to zero
+        void resetMetrics() {m_oMetricsBase = ClassifMetricsBase();}
     protected:
         ClassifMetricsBase m_oMetricsBase;
     };
 
-    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, eGroupPolicy ePolicy>
-    struct DataEvaluator_ : public IDataEvaluator_<eDatasetType,ePolicy> {};
+    template<eDatasetTypeList eDatasetType, ParallelUtils::eParallelAlgoType eImpl>
+    struct IAsyncDataEvaluator_ : // no evaluation specialization by default
+            public IMetricsCalculator_<eDatasetType>,
+            public IAsyncDataConsumer_<eDatasetType,eImpl> {};
+
+#if HAVE_GLSL
+    template<>
+    struct IAsyncDataEvaluator_<eDatasetType_VideoSegm,ParallelUtils::eGLSL> :
+            public IMetricsCalculator_<eDatasetType_VideoSegm>,
+            public IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eGLSL> {
+        //! overrides 'getMetricsBase' from IMetricsCalculator_ for non-group-impl (as always required)
+        virtual ClassifMetricsBase getMetricsBase() const override;
+        //! returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs, if available)
+        virtual cv::Size getIdealGLWindowSize() const override;
+    protected:
+        virtual void pre_initialize_gl() override;
+        virtual void post_initialize_gl() override;
+        virtual void pre_apply_gl(size_t nNextIdx, bool bRebindAll) override;
+        virtual void post_apply_gl(size_t nNextIdx, bool bRebindAll) override;
+        struct GLVideoSegmDataEvaluator : public GLImageProcEvaluatorAlgo {
+            GLVideoSegmDataEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount);
+            virtual std::string getComputeShaderSource(size_t nStage) const override;
+            virtual ClassifMetricsBase getMetricsBase();
+        };
+        std::unique_ptr<GLVideoSegmDataEvaluator> m_pEvalAlgo;
+        cv::Mat m_oLastGT,m_oCurrGT,m_oNextGT;
+        ClassifMetricsBase m_oMetricsBase;
+    };
+
+#endif //HAVE_GLSL
+
+    template<eDatasetTypeList eDatasetType, eDatasetList eDataset>
+    struct DataEvaluator_ : public IDataEvaluator_<eDatasetType> {};
+
+    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eImpl>
+    struct AsyncDataEvaluator_ : public IAsyncDataEvaluator_<eDatasetType,eImpl> {};
 
 #if 0
 
