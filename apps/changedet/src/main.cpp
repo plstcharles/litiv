@@ -41,32 +41,7 @@
 #define DATASET_PRECACHING      1
 #define DATASET_SCALE_FACTOR    1.0
 ////////////////////////////////
-#if EVALUATE_OUTPUT // @@@@ dataset should auto detect what is available and what to use
-#if HAVE_GLSL
-#define USE_GLSL_EVALUATION     1
-#endif //HAVE_GLSL
-#if HAVE_CUDA
-#define USE_CUDA_EVALUATION     1
-#endif //HAVE_CUDA
-#if HAVE_OPENCL
-#define USE_OPENCL_EVALUATION   1
-#endif //HAVE_OPENCL
-#endif //EVALUATE_OUTPUT
-////////////////////////////////
-#ifndef USE_GLSL_EVALUATION
-#define USE_GLSL_EVALUATION 0
-#endif //USE_GLSL_EVALUATION
-#ifndef USE_CUDA_EVALUATION
-#define USE_CUDA_EVALUATION 0
-#endif //USE_CUDA_EVALUATION
-#ifndef USE_OPENCL_EVALUATION
-#define USE_OPENCL_EVALUATION 0
-#endif //USE_OPENCL_EVALUATION
 #define USE_GPU_IMPL (USE_GLSL_IMPL||USE_CUDA_IMPL||USE_OPENCL_IMPL)
-#if (USE_GPU_IMPL && DISPLAY_OUTPUT)
-#define DISPLAY_OUTPUT_CPU 0
-#endif //(USE_GPU_IMPL && DISPLAY_OUTPUT)
-#define USE_GPU_EVALUATION (USE_GLSL_EVALUATION || USE_CUDA_EVALUATION || USE_OPENCL_EVALUATION)
 #if (USE_GLSL_IMPL+USE_CUDA_IMPL+USE_OPENCL_IMPL)>1
 #error "Must specify a single impl."
 #elif (USE_LOBSTER+USE_SUBSENSE+USE_PAWCS)!=1
@@ -100,24 +75,25 @@
     DATASET_SCALE_FACTOR                                         /* => double dScaleFactor */
 #endif //defined(DATASET_ID)
 void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch);
-using DatasetType = litiv::Dataset_<litiv::eDatasetType_VideoSegm,litiv::DATASET_ID>;
-#if USE_LOBSTER
 #if USE_GLSL_IMPL
-using BackgroundSubtractorType = BackgroundSubtractorLOBSTER_GLSL;
+constexpr ParallelUtils::eParallelAlgoType eImplTypeEnum = ParallelUtils::eGLSL;
 #else // USE_..._IMPL
-using BackgroundSubtractorType = BackgroundSubtractorLOBSTER;
+constexpr ParallelUtils::eParallelAlgoType eImplTypeEnum = ParallelUtils::eNonParallel;
 #endif // USE_..._IMPL
+using DatasetType = litiv::Dataset_<litiv::eDatasetType_VideoSegm,litiv::DATASET_ID,eImplTypeEnum>;
+#if USE_LOBSTER
+using BackgroundSubtractorType = BackgroundSubtractorLOBSTER_<eImplTypeEnum>;
 #elif USE_SUBSENSE
-using BackgroundSubtractorType = BackgroundSubtractorSuBSENSE;
+using BackgroundSubtractorType = BackgroundSubtractorSuBSENSE_<eImplTypeEnum>;
 #elif USE_PAWCS
-using BackgroundSubtractorType = BackgroundSubtractorPAWCS;
+using BackgroundSubtractorType = BackgroundSubtractorPAWCS_<eImplTypeEnum>;
 #endif //USE_...
 std::atomic_size_t g_nActiveThreads(0);
 const size_t g_nMaxThreads = USE_GPU_IMPL?1:std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
 
 int main(int, char**) {
     try {
-        litiv::IDatasetPtr pDataset = litiv::datasets::create<litiv::eDatasetType_VideoSegm,litiv::DATASET_ID>(DATASET_PARAMS);
+        litiv::IDatasetPtr pDataset = litiv::datasets::create<litiv::eDatasetType_VideoSegm,litiv::DATASET_ID,eImplTypeEnum>(DATASET_PARAMS);
         litiv::IDataHandlerPtrQueue vpBatches = pDataset->getSortedBatches();
         const size_t nTotPackets = pDataset->getTotPackets();
         const size_t nTotBatches = vpBatches.size();
@@ -160,37 +136,36 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         CV_Assert(oCurrSequence.getFrameCount()>1);
         const std::string sCurrSeqName = CxxUtils::clampString(oCurrSequence.getName(),12);
         const size_t nFrameCount = oCurrSequence.getFrameCount();
-        GLContext oContext(oCurrSequence.getFrameSize(),std::string("[GPU] ")+oCurrSequence.getRelativePath(),bool(!DISPLAY_OUTPUT));
+        GLContext oContext(oCurrSequence.getFrameSize(),std::string("[GPU] ")+oCurrSequence.getRelativePath(),DISPLAY_OUTPUT==0);
         std::shared_ptr<IBackgroundSubtractor_<ParallelUtils::eGLSL>> pAlgo = std::make_shared<BackgroundSubtractorType>();
-#if DISPLAY_OUTPUT_CPU
+#if DISPLAY_OUTPUT>1
         cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oCurrSequence.getRelativePath(),oCurrSequence.getOutputPath()+"/../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
-#endif //DISPLAY_OUTPUT_CPU
+#endif //DISPLAY_OUTPUT>1
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
-        litiv::AsyncEvaluationWrapper_VideoSegm_GLSL oAsyncConsumer(pAlgo,pBatch);
-        oAsyncConsumer.initialize_gl<BackgroundSubtractorType>();
-        oContext.setWindowSize(oAsyncConsumer.getIdealGLWindowSize());
+        oCurrSequence.initialize_gl(pAlgo);
+        oContext.setWindowSize(oCurrSequence.getIdealGLWindowSize());
         oCurrSequence.startProcessing();
         size_t nNextFrameIdx = 1;
         while(nNextFrameIdx<=nFrameCount) {
             if(!(nNextFrameIdx%100))
                 std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nNextFrameIdx << "/" << nFrameCount << "   [GPU]" << std::endl;
             const double dCurrLearningRate = nNextFrameIdx<=100?1:dDefaultLearningRate;
-            oAsyncConsumer.apply_gl<BackgroundSubtractorType>(nNextFrameIdx++,false,dCurrLearningRate);
+            oCurrSequence.apply_gl(pAlgo,nNextFrameIdx++,false,dCurrLearningRate);
             //pGLSLAlgoEvaluator->apply_gl(oNextGTMask);
             glErrorCheck;
             if(oContext.pollEventsAndCheckIfShouldClose())
                 break;
-#if DISPLAY_OUTPUT
+#if DISPLAY_OUTPUT>0
             if(oContext.getKeyPressed('q'))
                 break;
             oContext.swapBuffers(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-#if DISPLAY_OUTPUT_CPU
+#if DISPLAY_OUTPUT>1
             const int nKeyPressed = pDisplayHelper->waitKey();
             if(nKeyPressed==(int)'q')
                 break;
-#endif //DISPLAY_OUTPUT_CPU
-#endif //DISPLAY_OUTPUT
+#endif //DISPLAY_OUTPUT>1
+#endif //DISPLAY_OUTPUT>0
         }
         oCurrSequence.stopProcessing();
         const double dTimeElapsed = oCurrSequence.getProcessTime();
@@ -239,10 +214,10 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         std::shared_ptr<IBackgroundSubtractor> pAlgo = std::make_shared<BackgroundSubtractorType>();
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
         pAlgo->initialize(oCurrInputFrame,oROI);
-#if DISPLAY_OUTPUT
+#if DISPLAY_OUTPUT>0
         cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oCurrSequence.getRelativePath(),oCurrSequence.getOutputPath()+"/../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
-#endif //DISPLAY_OUTPUT
+#endif //DISPLAY_OUTPUT>0
         oCurrSequence.startProcessing();
         while(nCurrFrameIdx<nFrameCount) {
             if(!((nCurrFrameIdx+1)%100) && nCurrFrameIdx<nFrameCount)
@@ -250,7 +225,7 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
             const double dCurrLearningRate = nCurrFrameIdx<=100?1:dDefaultLearningRate;
             oCurrInputFrame = oCurrSequence.getInputFrame(nCurrFrameIdx);
             pAlgo->apply(oCurrInputFrame,oCurrFGMask,dCurrLearningRate);
-#if DISPLAY_OUTPUT
+#if DISPLAY_OUTPUT>0
             cv::Mat oCurrBGImg;
             pAlgo->getBackgroundImage(oCurrBGImg);
             if(!oROI.empty()) {
@@ -261,7 +236,7 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
             const int nKeyPressed = pDisplayHelper->waitKey();
             if(nKeyPressed==(int)'q')
                 break;
-#endif //DISPLAY_OUTPUT
+#endif //DISPLAY_OUTPUT>0
             oCurrSequence.pushSegmMask(oCurrFGMask,nCurrFrameIdx++);
         }
         oCurrSequence.stopProcessing();
