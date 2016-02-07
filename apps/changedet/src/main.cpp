@@ -74,7 +74,7 @@
     bool(USE_GPU_IMPL),                                          /* => bool bForce4ByteDataAlign */ \
     DATASET_SCALE_FACTOR                                         /* => double dScaleFactor */
 #endif //defined(DATASET_ID)
-void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch);
+void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch);
 #if USE_GLSL_IMPL
 constexpr ParallelUtils::eParallelAlgoType eImplTypeEnum = ParallelUtils::eGLSL;
 #else // USE_..._IMPL
@@ -98,8 +98,8 @@ int main(int, char**) {
         const size_t nTotPackets = pDataset->getTotPackets();
         const size_t nTotBatches = vpBatches.size();
         if(nTotBatches==0 || nTotPackets==0)
-            lvErrorExt("Could not find any sequences/frames to process for dataset '%s'",pDataset->getName().c_str());
-        std::cout << "Parsing complete. [" << pDataset->getBatches().size() << " batch group(s), " << nTotBatches << " sequence(s)]" << std::endl;
+            lvErrorExt("Could not parse any data for dataset '%s'",pDataset->getName().c_str());
+        std::cout << "Parsing complete. [" << pDataset->getBatches().size() << " batch group(s), " << nTotBatches << " batch(es)]" << std::endl;
         std::cout << "\n[" << CxxUtils::getTimeStamp() << "]\n" << std::endl;
         std::cout << "Executing background subtraction with " << ((g_nMaxThreads>nTotBatches)?nTotBatches:g_nMaxThreads) << " thread(s)..." << std::endl;
         size_t nProcessedBatches = 0;
@@ -111,7 +111,7 @@ int main(int, char**) {
             if(DATASET_PRECACHING)
                 pBatch->startPrecaching(EVALUATE_OUTPUT);
             ++g_nActiveThreads;
-            std::thread(AnalyzeSequence,(int)nProcessedBatches,pBatch).detach();
+            std::thread(Analyze,(int)nProcessedBatches,pBatch).detach();
             vpBatches.pop();
         }
         while(g_nActiveThreads>0)
@@ -128,30 +128,30 @@ int main(int, char**) {
 }
 
 #if (HAVE_GLSL && USE_GLSL_IMPL)
-void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
+void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
     try {
-        DatasetType::WorkBatch& oCurrSequence = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
-        CV_Assert(oCurrSequence.getFrameCount()>1);
-        const std::string sCurrSeqName = CxxUtils::clampString(oCurrSequence.getName(),12);
-        const size_t nFrameCount = oCurrSequence.getFrameCount();
-        GLContext oContext(oCurrSequence.getFrameSize(),std::string("[GPU] ")+oCurrSequence.getRelativePath(),DISPLAY_OUTPUT==0);
+        DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
+        CV_Assert(oBatch.getFrameCount()>1);
+        const std::string sCurrBatchName = CxxUtils::clampString(oBatch.getName(),12);
+        const size_t nTotPacketCount = oBatch.getFrameCount();
+        GLContext oContext(oBatch.getFrameSize(),std::string("[GPU] ")+oBatch.getRelativePath(),DISPLAY_OUTPUT==0);
         std::shared_ptr<IBackgroundSubtractor_<ParallelUtils::eGLSL>> pAlgo = std::make_shared<BackgroundSubtractorType>();
 #if DISPLAY_OUTPUT>1
-        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oCurrSequence.getRelativePath(),oCurrSequence.getOutputPath()+"/../");
+        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getRelativePath(),oBatch.getOutputPath()+"/../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
 #endif //DISPLAY_OUTPUT>1
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
-        oCurrSequence.initialize_gl(pAlgo);
-        oContext.setWindowSize(oCurrSequence.getIdealGLWindowSize());
-        oCurrSequence.startProcessing();
-        size_t nNextFrameIdx = 1;
-        while(nNextFrameIdx<=nFrameCount) {
-            if(!(nNextFrameIdx%100))
-                std::cout << "\t\t" << CxxUtils::clampString(sCurrSeqName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nNextFrameIdx << "/" << nFrameCount << "   [GPU]" << std::endl;
-            const double dCurrLearningRate = nNextFrameIdx<=100?1:dDefaultLearningRate;
-            oCurrSequence.apply_gl(pAlgo,nNextFrameIdx++,false,dCurrLearningRate);
+        oBatch.initialize_gl(pAlgo);
+        oContext.setWindowSize(oBatch.getIdealGLWindowSize());
+        oBatch.startProcessing();
+        size_t nNextIdx = 1;
+        while(nNextIdx<=nTotPacketCount) {
+            if(!(nNextIdx%100))
+                std::cout << "\t\t" << CxxUtils::clampString(sCurrBatchName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nTotPacketCount)) << nNextIdx << "/" << nTotPacketCount << "   [GPU]" << std::endl;
+            const double dCurrLearningRate = nNextIdx<=100?1:dDefaultLearningRate;
+            oBatch.apply_gl(pAlgo,nNextIdx++,false,dCurrLearningRate);
             //pGLSLAlgoEvaluator->apply_gl(oNextGTMask);
             glErrorCheck;
             if(oContext.pollEventsAndCheckIfShouldClose())
@@ -167,28 +167,28 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
 #endif //DISPLAY_OUTPUT>1
 #endif //DISPLAY_OUTPUT>0
         }
-        oCurrSequence.stopProcessing();
-        const double dTimeElapsed = oCurrSequence.getProcessTime();
-        const double dProcessSpeed = (double)(nNextFrameIdx-1)/dTimeElapsed;
-        std::cout << "\t\t" << sCurrSeqName << " @ F:" << (nNextFrameIdx-1) << "/" << nFrameCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
-        oCurrSequence.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
+        oBatch.stopProcessing();
+        const double dTimeElapsed = oBatch.getProcessTime();
+        const double dProcessSpeed = (double)(nNextIdx-1)/dTimeElapsed;
+        std::cout << "\t\t" << sCurrBatchName << " @ F:" << (nNextIdx-1) << "/" << nTotPacketCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
+        oBatch.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
     }
     catch(const CxxUtils::Exception& e) {
-        std::cout << "\nAnalyzeSequence caught Exception:\n" << e.what();
+        std::cout << "\nAnalyze caught Exception:\n" << e.what();
         const std::string sContextErrMsg = GLContext::getLatestErrorMessage();
         if(!sContextErrMsg.empty())
             std::cout << "\nContext error: " << sContextErrMsg << "\n" << std::endl;
     }
-    catch(const cv::Exception& e) {std::cout << "\nAnalyzeSequence caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
-    catch(const std::exception& e) {std::cout << "\nAnalyzeSequence caught std::exception:\n" << e.what() << "\n" << std::endl;}
-    catch(...) {std::cout << "\nAnalyzeSequence caught unhandled exception\n" << std::endl;}
+    catch(const cv::Exception& e) {std::cout << "\nAnalyze caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
+    catch(const std::exception& e) {std::cout << "\nAnalyze caught std::exception:\n" << e.what() << "\n" << std::endl;}
+    catch(...) {std::cout << "\nAnalyze caught unhandled exception\n" << std::endl;}
     --g_nActiveThreads;
     try {
-        DatasetType::WorkBatch& oCurrSequence = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
-        if(oCurrSequence.isProcessing())
-            oCurrSequence.stopProcessing();
+        DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
+        if(oBatch.isProcessing())
+            oBatch.stopProcessing();
     } catch(...) {
-        std::cout << "\nAnalyzeSequence caught unhandled exception while attempting to stop batch processing.\n" << std::endl;
+        std::cout << "\nAnalyze caught unhandled exception while attempting to stop batch processing.\n" << std::endl;
         throw;
     }
 }
@@ -197,34 +197,34 @@ static_assert(false,"missing impl");
 #elif (HAVE_OPENCL && USE_OPENCL_IMPL)
 static_assert(false,"missing impl");
 #elif !USE_GPU_IMPL
-void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
+void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
-    size_t nCurrFrameIdx = 0;
+    size_t nCurrIdx = 0;
     try {
-        DatasetType::WorkBatch& oCurrSequence = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
-        CV_Assert(oCurrSequence.getFrameCount()>1);
-        const std::string sCurrSeqName = CxxUtils::clampString(oCurrSequence.getName(),12);
-        const size_t nFrameCount = oCurrSequence.getFrameCount();
-        const cv::Mat oROI = oCurrSequence.getROI();
-        cv::Mat oCurrInputFrame = oCurrSequence.getInputFrame(nCurrFrameIdx).clone();
-        CV_Assert(!oCurrInputFrame.empty());
-        CV_Assert(oCurrInputFrame.isContinuous());
-        cv::Mat oCurrFGMask(oCurrSequence.getFrameSize(),CV_8UC1,cv::Scalar_<uchar>(0));
+        DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
+        CV_Assert(oBatch.getFrameCount()>1);
+        const std::string sCurrBatchName = CxxUtils::clampString(oBatch.getName(),12);
+        const size_t nTotPacketCount = oBatch.getFrameCount();
+        const cv::Mat oROI = oBatch.getROI();
+        cv::Mat oCurrInput = oBatch.getInputFrame(nCurrIdx).clone();
+        CV_Assert(!oCurrInput.empty());
+        CV_Assert(oCurrInput.isContinuous());
+        cv::Mat oCurrFGMask(oBatch.getFrameSize(),CV_8UC1,cv::Scalar_<uchar>(0));
         std::shared_ptr<IBackgroundSubtractor> pAlgo = std::make_shared<BackgroundSubtractorType>();
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
-        pAlgo->initialize(oCurrInputFrame,oROI);
+        pAlgo->initialize(oCurrInput,oROI);
 #if DISPLAY_OUTPUT>0
-        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oCurrSequence.getRelativePath(),oCurrSequence.getOutputPath()+"/../");
+        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getRelativePath(),oBatch.getOutputPath()+"/../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
 #endif //DISPLAY_OUTPUT>0
-        oCurrSequence.startProcessing();
-        while(nCurrFrameIdx<nFrameCount) {
-            if(!((nCurrFrameIdx+1)%100) && nCurrFrameIdx<nFrameCount)
-                std::cout << "\t\t" << sCurrSeqName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nFrameCount)) << nCurrFrameIdx+1 << "/" << nFrameCount << "   [T=" << nThreadIdx << "]" << std::endl;
-            const double dCurrLearningRate = nCurrFrameIdx<=100?1:dDefaultLearningRate;
-            oCurrInputFrame = oCurrSequence.getInputFrame(nCurrFrameIdx);
-            pAlgo->apply(oCurrInputFrame,oCurrFGMask,dCurrLearningRate);
+        oBatch.startProcessing();
+        while(nCurrIdx<nTotPacketCount) {
+            if(!((nCurrIdx+1)%100) && nCurrIdx<nTotPacketCount)
+                std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << "   [T=" << nThreadIdx << "]" << std::endl;
+            const double dCurrLearningRate = nCurrIdx<=100?1:dDefaultLearningRate;
+            oCurrInput = oBatch.getInputFrame(nCurrIdx);
+            pAlgo->apply(oCurrInput,oCurrFGMask,dCurrLearningRate);
 #if DISPLAY_OUTPUT>0
             cv::Mat oCurrBGImg;
             pAlgo->getBackgroundImage(oCurrBGImg);
@@ -232,29 +232,29 @@ void AnalyzeSequence(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
                 cv::bitwise_or(oCurrBGImg,UCHAR_MAX/2,oCurrBGImg,oROI==0);
                 cv::bitwise_or(oCurrFGMask,UCHAR_MAX/2,oCurrFGMask,oROI==0);
             }
-            pDisplayHelper->display(oCurrInputFrame,oCurrBGImg,oCurrSequence.getColoredSegmMask(oCurrFGMask,nCurrFrameIdx),nCurrFrameIdx);
+            pDisplayHelper->display(oCurrInput,oCurrBGImg,oBatch.getColoredSegmMask(oCurrFGMask,nCurrIdx),nCurrIdx);
             const int nKeyPressed = pDisplayHelper->waitKey();
             if(nKeyPressed==(int)'q')
                 break;
 #endif //DISPLAY_OUTPUT>0
-            oCurrSequence.pushSegmMask(oCurrFGMask,nCurrFrameIdx++);
+            oBatch.pushSegmMask(oCurrFGMask,nCurrIdx++);
         }
-        oCurrSequence.stopProcessing();
-        const double dTimeElapsed = oCurrSequence.getProcessTime();
-        const double dProcessSpeed = (double)nCurrFrameIdx/dTimeElapsed;
-        std::cout << "\t\t" << sCurrSeqName << " @ F:" << nCurrFrameIdx << "/" << nFrameCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
-        oCurrSequence.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
+        oBatch.stopProcessing();
+        const double dTimeElapsed = oBatch.getProcessTime();
+        const double dProcessSpeed = (double)nCurrIdx/dTimeElapsed;
+        std::cout << "\t\t" << sCurrBatchName << " @ F:" << nCurrIdx << "/" << nTotPacketCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
+        oBatch.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
     }
-    catch(const cv::Exception& e) {std::cout << "\nAnalyzeSequence caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
-    catch(const std::exception& e) {std::cout << "\nAnalyzeSequence caught std::exception:\n" << e.what() << "\n" << std::endl;}
-    catch(...) {std::cout << "\nAnalyzeSequence caught unhandled exception\n" << std::endl;}
+    catch(const cv::Exception& e) {std::cout << "\nAnalyze caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
+    catch(const std::exception& e) {std::cout << "\nAnalyze caught std::exception:\n" << e.what() << "\n" << std::endl;}
+    catch(...) {std::cout << "\nAnalyze caught unhandled exception\n" << std::endl;}
     --g_nActiveThreads;
     try {
-        DatasetType::WorkBatch& oCurrSequence = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
-        if(oCurrSequence.isProcessing())
-            oCurrSequence.stopProcessing();
+        DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
+        if(oBatch.isProcessing())
+            oBatch.stopProcessing();
     } catch(...) {
-        std::cout << "\nAnalyzeSequence caught unhandled exception while attempting to stop batch processing.\n" << std::endl;
+        std::cout << "\nAnalyze caught unhandled exception while attempting to stop batch processing.\n" << std::endl;
         throw;
     }
 }
