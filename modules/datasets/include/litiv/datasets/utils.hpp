@@ -17,6 +17,9 @@
 
 #pragma once
 
+// as defined in the 2012/2014 CDNet evaluation scripts
+#define DATASETUTILS_VIDEOSEGM_POSITIVE_VAL    uchar(255)
+#define dATASETUTILS_VIDEOSEGM_NEGATIVE_VAL    uchar(0)
 #define DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL  uchar(85)
 #define DATASETUTILS_VIDEOSEGM_UNKNOWN_VAL     uchar(170)
 #define DATASETUTILS_VIDEOSEGM_SHADOW_VAL      uchar(50)
@@ -93,14 +96,11 @@ namespace litiv {
     template<eGroupPolicy ePolicy>
     struct IDataCounter_;
     template<eDatasetTypeList eDatasetType>
-    struct IDataRecorder_;
-    template<eDatasetTypeList eDatasetType, eGroupPolicy ePolicy>
     struct IDataConsumer_;
-
     template<eDatasetTypeList eDatasetType, ParallelUtils::eParallelAlgoType eImpl>
-    struct AsyncEvaluationWrapper_; // standalone algo evaluation wrapper
+    struct IAsyncDataConsumer_;
 
-    struct IDataset : std::enable_shared_from_this<IDataset> {
+    struct IDataset : CxxUtils::enable_shared_from_this<IDataset> {
         virtual const std::string& getName() const = 0;
         virtual const std::string& getDatasetPath() const = 0;
         virtual const std::string& getOutputPath() const = 0;
@@ -128,7 +128,7 @@ namespace litiv {
         virtual IDataHandlerPtrQueue getSortedBatches() const = 0;
     };
 
-    struct IDataHandler : std::enable_shared_from_this<IDataHandler> {
+    struct IDataHandler : CxxUtils::enable_shared_from_this<IDataHandler> {
         virtual const std::string& getName() const = 0;
         virtual const std::string& getDataPath() const = 0;
         virtual const std::string& getOutputPath() const = 0;
@@ -142,17 +142,15 @@ namespace litiv {
         virtual IDatasetPtr getDatasetInfo() const = 0;
         virtual eDatasetTypeList getDatasetType() const = 0;
         virtual eDatasetList getDataset() const = 0;
-        virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize=12) const = 0;
         virtual void writeEvalReport() const = 0;
-        virtual void parseData() = 0;
         virtual ~IDataHandler() = default;
-
         virtual void startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX) = 0; // starts prefetching data packets
         virtual void stopPrecaching() = 0; // stops prefetching data packets (for work batches, is also called in stopProcessing)
         virtual double getProcessTime() const = 0; // returns the current (or final) duration elapsed between start/stopProcessing calls
         virtual size_t getProcessedPacketsCountPromise() = 0;
         virtual size_t getProcessedPacketsCount() const = 0;
 
+    protected:
         template<typename Tp>
         static typename std::enable_if<std::is_base_of<IDataHandler,Tp>::value,bool>::type compare(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {
             return PlatformUtils::compare_lowercase(i->getName(),j->getName());
@@ -165,11 +163,16 @@ namespace litiv {
         static bool compare_load(const IDataHandler* i, const IDataHandler* j);
         static bool compare(const IDataHandler& i, const IDataHandler& j);
         static bool compare_load(const IDataHandler& i, const IDataHandler& j);
-    protected:
+        virtual std::string writeInlineEvalReport(size_t nIndentSize,size_t nCellSize=12) const = 0;
         virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const = 0; // will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
         virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) = 0; // will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
+        template<eDatasetTypeList eDatasetType>
+        friend struct IDatasetEvaluator_;
+        template<eDatasetTypeList eDatasetType, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl>
+        friend struct IDataset_;
         virtual void _startProcessing() {}
         virtual void _stopProcessing() {}
+        virtual void parseData() = 0;
     };
 
     struct DataPrecacher {
@@ -248,11 +251,11 @@ namespace litiv {
         inline const cv::Mat& getROI() const {return m_oROI;}
         virtual const cv::Mat& getInputFrame(size_t nFrameIdx) override final;
         virtual const cv::Mat& getGTFrame(size_t nFrameIdx) override final;
-        virtual void parseData() override;
     protected:
         IDataProducer_() : m_nFrameCount(0),m_nNextExpectedVideoReaderFrameIdx(size_t(-1)) {}
         virtual cv::Mat _getInputPacket_impl(size_t nIdx) override;
         virtual cv::Mat _getGTPacket_impl(size_t) override;
+        virtual void parseData() override;
         size_t m_nFrameCount;
         std::vector<std::string> m_vsInputFramePaths;
         std::vector<std::string> m_vsGTFramePaths;
@@ -262,6 +265,9 @@ namespace litiv {
         cv::Size m_oOrigSize,m_oSize;
         std::unordered_map<size_t,size_t> m_mTestGTIndexes;
     };
+
+    template<eDatasetTypeList eDatasetType,eDatasetList eDataset,eGroupPolicy ePolicy>
+    struct DataProducer_ : public IDataProducer_<eDatasetType,ePolicy> {};
 
     template<>
     struct IDataCounter_<eNotGroup> : public virtual IDataHandler {
@@ -283,83 +289,52 @@ namespace litiv {
     };
 
     template<>
-    struct IDataRecorder_<eDatasetType_VideoSegm> : public virtual IDataHandler {
-        virtual void pushSegmMask(const cv::Mat& oSegm, size_t nIdx) = 0;
+    struct IDataConsumer_<eDatasetType_VideoSegm> :
+            public IDataCounter_<eNotGroup> {
+        virtual void pushSegmMask(const cv::Mat& oSegm, size_t nIdx);
     protected:
-        virtual cv::Mat readSegmMask(size_t nIdx) const = 0; // used for output reevaluation only
-        virtual void writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const = 0;
-        friend struct IDataConsumer_<eDatasetType_VideoSegm,eGroup>;
-    };
-
-    template<>
-    struct IDataConsumer_<eDatasetType_VideoSegm,eGroup> :
-            public IDataCounter_<eGroup>,
-            public IDataRecorder_<eDatasetType_VideoSegm> {
-        virtual void pushSegmMask(const cv::Mat& oSegm, size_t nIdx) override final;
-    protected:
-        virtual cv::Mat readSegmMask(size_t nIdx) const override final;
-        virtual void writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const override final;
-    };
-
-    template<>
-    struct IDataConsumer_<eDatasetType_VideoSegm,eNotGroup> :
-            public IDataCounter_<eNotGroup>,
-            public IDataRecorder_<eDatasetType_VideoSegm> {
-        virtual void pushSegmMask(const cv::Mat& oSegm, size_t nIdx) override;
-    protected:
-        virtual cv::Mat readSegmMask(size_t nIdx) const override;
-        virtual void writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const override;
-        // cannot use partial template specialization here... for some reason.
-        friend struct AsyncEvaluationWrapper_<eDatasetType_VideoSegm,ParallelUtils::eGLSL>;
-        //friend struct AsyncEvaluationWrapper_<eDatasetType_VideoSegm,ParallelUtils::eCUDA>;
-        //friend struct AsyncEvaluationWrapper_<eDatasetType_VideoSegm,ParallelUtils::eOpenCL>;
+        virtual void writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const;
+        virtual cv::Mat readSegmMask(size_t nIdx) const;
     };
 
 #if HAVE_GLSL
 
     template<>
-    struct AsyncEvaluationWrapper_<eDatasetType_VideoSegm,ParallelUtils::eGLSL> {
-        //! default constructor (grabs a copy of pAlgo and readies internal fetching; you still need to call 'initialize_gl' however)
-        AsyncEvaluationWrapper_(const std::shared_ptr<ParallelUtils::IParallelAlgo_GLSL>& pAlgo, const IDataHandlerPtr& pSequence);
-        //! returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs)
-        virtual cv::Size getIdealGLWindowSize();
-        //! always called by 'initialize_gl' before initializing algo; override this if implementing async evaluator
-        virtual void pre_initialize_gl();
-        //! casts the algo to 'Talgo' type, and calls 'initialize_gl' with expanded args list
+    struct IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eGLSL> :
+            public IDataCounter_<eNotGroup> {
+        //! returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs, if available)
+        virtual cv::Size getIdealGLWindowSize() const;
+        //! initializes internal params & calls 'initialize_gl' on algo with expanded args list
         template<typename Talgo, typename... Targs>
-        void initialize_gl(Targs&&... args) {
-            Talgo& oAlgo = dynamic_cast<Talgo&>(*m_pAlgo);
+        void initialize_gl(const std::shared_ptr<Talgo>& pAlgo, Targs&&... args) {
+            m_pAlgo = pAlgo;
             pre_initialize_gl();
-            oAlgo.initialize_gl(m_oCurrInput,m_pProducer->getROI(),std::forward<Targs>(args)...);
+            pAlgo->initialize_gl(m_oCurrInput,((IDataProducer_<eDatasetType_VideoSegm,eNotGroup>*)this)->getROI(),std::forward<Targs>(args)...);
+            post_initialize_gl();
         }
-        //! always called by 'apply_gl' after processing via algo; override this if implementing async evaluator
-        virtual void post_apply_gl();
         //! casts the algo to 'Talgo' type, and calls 'apply_gl' with expanded args list
         template<typename Talgo, typename... Targs>
-        void apply_gl(size_t nNextIdx, Targs&&... args) {
-            Talgo& oAlgo = dynamic_cast<Talgo&>(*m_pAlgo);
-            if(nNextIdx!=m_nNextIdx)
-                m_oNextInput = m_pProducer->getInputFrame(nNextIdx);
-            oAlgo.apply_gl(m_oNextInput,std::forward<Targs>(args)...);
-            m_nLastIdx = m_nCurrIdx;
-            m_nCurrIdx = nNextIdx;
-            m_nNextIdx = nNextIdx+1;
-            post_apply_gl();
+        void apply_gl(const std::shared_ptr<Talgo>& pAlgo, size_t nNextIdx, bool bRebindAll, Targs&&... args) {
+            m_pAlgo = pAlgo;
+            pre_apply_gl(nNextIdx,bRebindAll);
+            pAlgo->apply_gl(m_oNextInput,bRebindAll,std::forward<Targs>(args)...);
+            post_apply_gl(nNextIdx,bRebindAll);
         }
     protected:
-        // add toggle for double-eval in here somewhere, or in actual evaluator interface?
+        IAsyncDataConsumer_();
+        virtual void pre_initialize_gl();
+        virtual void post_initialize_gl();
+        virtual void pre_apply_gl(size_t nNextIdx, bool bRebindAll);
+        virtual void post_apply_gl(size_t nNextIdx, bool bRebindAll);
+        virtual void writeSegmMask(const cv::Mat& oSegm,size_t nIdx) const;
+        virtual cv::Mat readSegmMask(size_t nIdx) const;
         std::shared_ptr<ParallelUtils::IParallelAlgo_GLSL> m_pAlgo;
-        std::shared_ptr<cv::DisplayHelper> m_pDisplayHelper;
         std::shared_ptr<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>> m_pProducer;
-        std::shared_ptr<IDataConsumer_<eDatasetType_VideoSegm,eNotGroup>> m_pConsumer;
-        const bool m_bPreserveInputs;
         cv::Mat m_oLastInput,m_oCurrInput,m_oNextInput;
         size_t m_nLastIdx,m_nCurrIdx,m_nNextIdx;
         size_t m_nFrameCount;
     };
 
-    using AsyncEvaluationWrapper_VideoSegm_GLSL = AsyncEvaluationWrapper_<eDatasetType_VideoSegm,ParallelUtils::eGLSL>;
-    
 #endif //HAVE_GLSL
 
 } //namespace litiv
