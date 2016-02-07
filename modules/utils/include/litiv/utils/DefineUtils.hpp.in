@@ -47,6 +47,8 @@
 #define lvDbgAssert(expr)
 #define lvDbgExceptionWatch
 #endif //ndefined(_DEBUG)
+#define lvIgnore(x) (void)(x)
+#define UNUSED(x) lvIgnore(x)
 
 #ifndef D2R
 #define D2R(d) ((d)*(M_PI/180.0))

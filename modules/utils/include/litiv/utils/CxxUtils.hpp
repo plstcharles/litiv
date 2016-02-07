@@ -220,6 +220,24 @@ namespace CxxUtils {
         });
     }
 
+    template<typename T>
+    struct enable_shared_from_this : public std::enable_shared_from_this<T> {
+        template<typename Tcast>
+        inline std::shared_ptr<const Tcast> shared_from_this_cast(bool bCheck=false) const {
+            auto pCast = std::dynamic_pointer_cast<const Tcast>(this->shared_from_this());
+            if(bCheck && !pCast)
+                lvErrorExt("Failed shared_from_this_cast from type '%s' to type '%s'",typeid(T).name(),typeid(Tcast).name());
+            return pCast;
+        }
+        template<typename Tcast>
+        inline std::shared_ptr<Tcast> shared_from_this_cast(bool bCheck=false) {
+            auto pCast = std::dynamic_pointer_cast<Tcast>(this->shared_from_this());
+            if(bCheck && !pCast)
+                lvErrorExt("Failed shared_from_this_cast from type '%s' to type '%s'",typeid(T).name(),typeid(Tcast).name());
+            return pCast;
+        }
+    };
+
 } //namespace CxxUtils
 
 namespace std { // extending std

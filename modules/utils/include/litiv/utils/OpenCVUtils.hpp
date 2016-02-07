@@ -143,7 +143,7 @@ namespace cv { // extending cv
     }
 
     //! helper struct for image display & callback management (must be created via DisplayHelper::create due to enable_shared_from_this interface)
-    struct DisplayHelper : public std::enable_shared_from_this<DisplayHelper> {
+    struct DisplayHelper : public CxxUtils::enable_shared_from_this<DisplayHelper> {
 
         //! by default, comes with a filestorage algorithms can use for debug
         static DisplayHelperPtr create(const std::string& sDisplayName,
