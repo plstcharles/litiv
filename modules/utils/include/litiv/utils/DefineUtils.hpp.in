@@ -37,6 +37,8 @@
 #define TIMER_TOC(x) int64 XSTR_CONCAT(__nCPUTimerVal_,x) = cv::getTickCount()-XSTR_CONCAT(__nCPUTimerTick_,x)
 #define TIMER_ELAPSED_MS(x) (double(XSTR_CONCAT(__nCPUTimerVal_,x))/(cv::getTickFrequency()/1000))
 
+// @@@@ replace lvAssert/lvDbgAssert with version with obligatory msg param? (also replace all cv asserts by those)
+
 #define lvError(msg) throw CxxUtils::Exception(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__)
 #define lvErrorExt(msg,...) throw CxxUtils::Exception(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
 #define lvAssert(expr) {if(!!(expr)); else lvError("assertion failed ("#expr")");}

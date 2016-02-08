@@ -61,78 +61,94 @@ template<>
 struct DataProducer_<eDatasetType_ImageEdgDet,eDataset_ImageEdgDet_BSDS500,eNotGroup> :
         public IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup> {
 protected:
-    /*
-    class Set : public WorkBatch {
-    public:
-        Set(const std::string& sSetName, const DatasetInfo& oDataset, const std::string& sRelativePath=std::string("./"));
-        virtual size_t GetTotalImageCount() const {return m_nTotImageCount;}
-        virtual double GetExpectedLoad() const {return m_dExpectedLoad;}
-        virtual cv::Mat ReadResult(size_t nIdx);
-        virtual void WriteResult(size_t nIdx, const cv::Mat& oResult);
-        virtual bool StartPrecaching(bool bUsingGT, size_t nUnused=0);
-        bool IsConstantImageSize() const {return m_bIsConstantSize;}
-        cv::Size GetMaxImageSize() const {return m_oMaxSize;}
-        const eDatasetList m_eDatasetID;
-    protected:
-        virtual cv::Mat GetInputFromIndex_external(size_t nImageIdx);
-        virtual cv::Mat GetGTFromIndex_external(size_t nImageIdx);
-    private:
-        double m_dExpectedLoad;
-        size_t m_nTotImageCount;
-        std::vector<std::string> m_vsInputImagePaths;
-        std::vector<std::string> m_vsGTImagePaths;
-        std::vector<std::string> m_vsOrigImageNames;
-        std::vector<cv::Size> m_voOrigImageSizes;
-        cv::Size m_oMaxSize;
-        bool m_bIsConstantSize;
-        Set& operator=(const Set&) = delete;
-        Set(const Set&) = delete;
-    };
-    */
     virtual void parseData() override final {
-        /*
-        PlatformUtils::GetFilesFromDir(m_sDatasetPath,m_vsInputImagePaths);
-        PlatformUtils::FilterFilePaths(m_vsInputImagePaths,{},{".jpg"});
+        PlatformUtils::GetFilesFromDir(getDataPath(),m_vsInputImagePaths);
+        PlatformUtils::FilterFilePaths(m_vsInputImagePaths,{},{".jpg",".png",".bmp"});
         if(m_vsInputImagePaths.empty())
-            throw std::runtime_error(cv::format("Image set '%s' did not possess any image file",sSetName.c_str()));
+            lvErrorExt("BSDS500 set '%s' did not possess any jpg/png/bmp image file",getName().c_str());
+        PlatformUtils::GetSubDirsFromDir(getDatasetInfo()->getDatasetPath()+"/../groundTruth_bdry_images/"+getRelativePath(),m_vsGTMaskPaths);
+        if(m_vsGTMaskPaths.empty())
+            lvErrorExt("BSDS500 set '%s' did not possess any groundtruth image folders",getName().c_str());
+        else if(m_vsGTMaskPaths.size()!=m_vsInputImagePaths.size())
+            lvErrorExt("BSDS500 set '%s' input/groundtruth count mismatch",getName().c_str());
+        // make sure folders are non-empty, and folders & images are similarliy ordered
+        std::vector<std::string> vsTempPaths;
+        for(size_t nImageIdx=0; nImageIdx<m_vsGTMaskPaths.size(); ++nImageIdx) {
+            PlatformUtils::GetFilesFromDir(m_vsGTMaskPaths[nImageIdx],vsTempPaths);
+            CV_Assert(!vsTempPaths.empty());
+            const size_t nLastInputSlashPos = m_vsInputImagePaths[nImageIdx].find_last_of("/\\");
+            const std::string sInputImageFullName = nLastInputSlashPos==std::string::npos?m_vsInputImagePaths[nImageIdx]:m_vsInputImagePaths[nImageIdx].substr(nLastInputSlashPos+1);
+            const size_t nLastGTSlashPos = m_vsGTMaskPaths[nImageIdx].find_last_of("/\\");
+            CV_Assert(sInputImageFullName.find(nLastGTSlashPos==std::string::npos?m_vsGTMaskPaths[nImageIdx]:m_vsGTMaskPaths[nImageIdx].substr(nLastGTSlashPos+1))!=std::string::npos);
+        }
+        m_bIsConstantSize = true;
         m_oMaxSize = cv::Size(481,321);
-        m_nTotImageCount = m_vsInputImagePaths.size();
-        m_dExpectedLoad = (double)m_oMaxSize.area()*m_nTotImageCount*(int(!m_bForcingGrayscale)+1);
-        if(m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test) {
-            PlatformUtils::GetSubDirsFromDir(oDatasetInfo.m_sDatasetRootPath+"/../groundTruth_bdry_images/"+sRelativePath,m_vsGTImagePaths);
-            if(m_vsGTImagePaths.empty())
-                throw std::runtime_error(cv::format("Image set '%s' did not possess any groundtruth image folders",sSetName.c_str()));
-            else if(m_vsGTImagePaths.size()!=m_vsInputImagePaths.size())
-                throw std::runtime_error(cv::format("Image set '%s' input/groundtruth count mismatch",sSetName.c_str()));
-            // make sure folders are non-empty, and folders & images are similarliy ordered
-            std::vector<std::string> vsTempPaths;
-            for(size_t nImageIdx=0; nImageIdx<m_vsGTImagePaths.size(); ++nImageIdx) {
-                PlatformUtils::GetFilesFromDir(m_vsGTImagePaths[nImageIdx],vsTempPaths);
-                CV_Assert(!vsTempPaths.empty());
-                const size_t nLastInputSlashPos = m_vsInputImagePaths[nImageIdx].find_last_of("/\\");
-                const std::string sInputImageFullName = nLastInputSlashPos==std::string::npos?m_vsInputImagePaths[nImageIdx]:m_vsInputImagePaths[nImageIdx].substr(nLastInputSlashPos+1);
-                const size_t nLastGTSlashPos = m_vsGTImagePaths[nImageIdx].find_last_of("/\\");
-                CV_Assert(sInputImageFullName.find(nLastGTSlashPos==std::string::npos?m_vsGTImagePaths[nImageIdx]:m_vsGTImagePaths[nImageIdx].substr(nLastGTSlashPos+1))!=std::string::npos);
-            }
-            m_pEvaluator = std::shared_ptr<EvaluatorBase>(new BSDS500BoundaryEvaluator());
+        m_voOrigImageSizes.clear();
+        m_voOrigImageSizes.reserve(m_vsInputImagePaths.size());
+        for(size_t n=0; n<m_vsInputImagePaths.size(); ++n) {
+            cv::Mat oCurrInput = cv::imread(m_vsInputImagePaths[n],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+            lvAssert(!oCurrInput.empty());
+            m_voOrigImageSizes.push_back(oCurrInput.size());
         }
-        else { //m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid || m_eDatasetID==eDataset_BSDS500_segm_train_valid_test
-            // current impl cannot parse GT/evaluate (matlab files only)
-            lvError("Missing impl");
-        }
-        */
-        lvError("Missing impl");
+        m_nImageCount = m_vsInputImagePaths.size();
+        const double dScale = getDatasetInfo()->getScaleFactor();
+        if(dScale!=1.0)
+            m_oMaxSize = cv::Size(m_oMaxSize.width*dScale,m_oMaxSize.height*dScale);
+        CV_Assert(m_nImageCount>0);
+    }
+    virtual cv::Mat _getInputPacket_impl(size_t nIdx) override final {
+        cv::Mat oImage = IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup>::_getInputPacket_impl(nIdx);
+        if(m_voOrigImageSizes[nIdx]==cv::Size(321,481))
+            cv::transpose(oImage,oImage);
+        return oImage;
     }
     virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final {
-        cv::Mat oFrame;
-        auto res = m_mTestGTIndexes.find(nFrameIdx);
-        if(res!=m_mTestGTIndexes.end()) {
-            oFrame = cv::imread(m_vsGTFramePaths[res->second],cv::IMREAD_GRAYSCALE);
-            if(oFrame.size()!=m_oSize)
-                cv::resize(oFrame,oFrame,m_oSize,0,0,cv::INTER_NEAREST);
+        if(m_vsGTMaskPaths.size()>nIdx) {
+            std::vector<std::string> vsTempPaths;
+            PlatformUtils::GetFilesFromDir(m_vsGTMaskPaths[nIdx],vsTempPaths);
+            CV_Assert(!vsTempPaths.empty());
+            cv::Mat oTempRefGTImage = cv::imread(vsTempPaths[0],cv::IMREAD_GRAYSCALE);
+            CV_Assert(!oTempRefGTImage.empty());
+            CV_Assert(m_voOrigImageSizes[nIdx]==cv::Size() || m_voOrigImageSizes[nIdx]==oTempRefGTImage.size());
+            CV_Assert(oTempRefGTImage.size()==cv::Size(481,321) || oTempRefGTImage.size()==cv::Size(321,481));
+            m_voOrigImageSizes[nIdx] = oTempRefGTImage.size();
+            if(oTempRefGTImage.size()==cv::Size(321,481))
+                cv::transpose(oTempRefGTImage,oTempRefGTImage);
+            cv::Mat oGTMask(int(oTempRefGTImage.rows*vsTempPaths.size()),oTempRefGTImage.cols,CV_8UC1);
+            for(size_t nGTImageIdx=0; nGTImageIdx<vsTempPaths.size(); ++nGTImageIdx) {
+                cv::Mat oTempGTImage = cv::imread(vsTempPaths[nGTImageIdx],cv::IMREAD_GRAYSCALE);
+                CV_Assert(!oTempGTImage.empty() && (oTempGTImage.size()==cv::Size(481,321) || oTempGTImage.size()==cv::Size(321,481)));
+                if(oTempGTImage.size()==cv::Size(321,481))
+                    cv::transpose(oTempGTImage,oTempGTImage);
+                oTempGTImage.copyTo(cv::Mat(oGTMask,cv::Rect(0,int(oTempGTImage.rows*nGTImageIdx),oTempGTImage.cols,oTempGTImage.rows)));
+            }
+            const double dScale = getDatasetInfo()->getScaleFactor();
+            if(dScale!=1.0)
+                cv::resize(oGTMask,oGTMask,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
+            return oGTMask;
         }
-        else
-            oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL));
-        return oFrame;
+        return IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup>::_getGTPacket_impl(nIdx);
+    }
+};
+
+template<>
+struct DataEvaluator_<eDatasetType_ImageEdgDet,eDataset_ImageEdgDet_BSDS500> :
+        public IDataEvaluator_<eDatasetType_ImageEdgDet> {
+protected:
+    virtual void writeEdgeMask(const cv::Mat& oEdges, size_t nIdx) const override final {
+        CV_Assert(!oEdges.empty());
+        cv::Mat oEdgesOutput = oEdges;
+        auto pProducer = shared_from_this_cast<const IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup>>(true);
+        if(pProducer->getInputImageSize(nIdx)==cv::Size(321,481))
+            cv::transpose(oEdgesOutput,oEdgesOutput);
+        IDataConsumer_<eDatasetType_ImageEdgDet>::writeEdgeMask(oEdgesOutput,nIdx);
+    }
+    virtual cv::Mat readEdgeMask(size_t nIdx) const override final {
+        cv::Mat oEdgesOutput = IDataConsumer_<eDatasetType_ImageEdgDet>::readEdgeMask(nIdx);
+        CV_Assert(!oEdgesOutput.empty());
+        auto pProducer = shared_from_this_cast<const IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup>>(true);
+        if(pProducer->getInputImageSize(nIdx)==cv::Size(321,481))
+            cv::transpose(oEdgesOutput,oEdgesOutput);
+        return oEdgesOutput;
     }
 };

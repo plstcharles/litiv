@@ -232,6 +232,11 @@ const cv::Mat& litiv::IDataLoader_<litiv::eNotGroup>::_getInputPacket_redirect(s
     sstr << "Frame #" << nFrameIdx;
     writeOnImage(m_oLatestInputPacket,sstr.str(),cv::Scalar_<uchar>::all(255);
 #endif //HARDCODE_FRAME_INDEX
+    if(getDatasetInfo()->is4ByteAligned() && m_oLatestInputPacket.channels()==3)
+        cv::cvtColor(m_oLatestInputPacket,m_oLatestInputPacket,cv::COLOR_BGR2BGRA);
+    const double dScale = getDatasetInfo()->getScaleFactor();
+    if(dScale!=1.0)
+        cv::resize(m_oLatestInputPacket,m_oLatestInputPacket,cv::Size(),dScale,dScale,cv::INTER_CUBIC);
     return m_oLatestInputPacket;
 }
 
@@ -243,6 +248,11 @@ const cv::Mat& litiv::IDataLoader_<litiv::eNotGroup>::_getGTPacket_redirect(size
     sstr << "Frame #" << nFrameIdx;
     writeOnImage(m_oLatestGTPacket,sstr.str(),cv::Scalar_<uchar>::all(255);
 #endif //HARDCODE_FRAME_INDEX
+    if(getDatasetInfo()->is4ByteAligned() && m_oLatestInputPacket.channels()==3)
+        cv::cvtColor(m_oLatestGTPacket,m_oLatestGTPacket,cv::COLOR_BGR2BGRA);
+    const double dScale = getDatasetInfo()->getScaleFactor();
+    if(dScale!=1.0)
+        cv::resize(m_oLatestGTPacket,m_oLatestGTPacket,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
     return m_oLatestGTPacket;
 }
 
@@ -286,13 +296,7 @@ cv::Mat litiv::IDataProducer_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::_
         else
             ++m_nNextExpectedVideoReaderFrameIdx;
         m_voVideoReader >> oFrame;
-        if(isGrayscale() && oFrame.channels()>1)
-            cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2GRAY);
     }
-    if(getDatasetInfo()->is4ByteAligned() && oFrame.channels()==3)
-        cv::cvtColor(oFrame,oFrame,cv::COLOR_BGR2BGRA);
-    if(oFrame.size()!=m_oSize)
-        cv::resize(oFrame,oFrame,m_oSize,0,0,cv::INTER_NEAREST);
     return oFrame;
 }
 
@@ -326,6 +330,125 @@ void litiv::IDataProducer_<litiv::eDatasetType_VideoSegm,litiv::eNotGroup>::pars
     m_oSize = oTempImg.size();
     m_nNextExpectedVideoReaderFrameIdx = 0;
     CV_Assert(m_nFrameCount>0);
+}
+
+bool litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eGroup>::isConstantSize() const {
+    for(const auto& pBatch : getBatches())
+        if(!dynamic_cast<const IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup>&>(*pBatch).isConstantSize())
+            return false;
+    return true;
+}
+
+cv::Size litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eGroup>::getMaxImageSize() const {
+    cv::Size oMaxSize(0,0);
+    for(const auto& pBatch : getBatches()) {
+        const cv::Size oCurrSize = dynamic_cast<const IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup>&>(*pBatch).getMaxImageSize();
+        if(oCurrSize.width>oMaxSize.width)
+            oMaxSize.width = oCurrSize.width;
+        if(oCurrSize.height>oMaxSize.height)
+            oMaxSize.height = oCurrSize.height;
+    }
+    return oMaxSize;
+}
+
+const cv::Mat& litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eGroup>::getInputImage(size_t nImageIdx) {
+    return dynamic_cast<IDataReader_<eDatasetType_ImageEdgDet>&>(*getBatch(nImageIdx)).getInputImage(nImageIdx);
+}
+
+const cv::Mat& litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eGroup>::getGTMask(size_t nImageIdx) {
+    return dynamic_cast<IDataReader_<eDatasetType_ImageEdgDet>&>(*getBatch(nImageIdx)).getGTMask(nImageIdx);
+}
+
+double litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eNotGroup>::getExpectedLoad() const {
+    return getMaxImageSize().area()*m_nImageCount*(int(!isGrayscale())+1);
+}
+
+size_t litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eNotGroup>::getTotPackets() const {
+    return m_nImageCount;
+}
+
+void litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eNotGroup>::startPrecaching(bool bUsingGT, size_t /*nUnused*/) {
+    return IDataLoader_<eNotGroup>::startPrecaching(bUsingGT,getMaxImageSize().area()*(m_nImageCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
+}
+
+bool litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eNotGroup>::isConstantSize() const {
+    return m_bIsConstantSize;
+}
+
+cv::Size litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eNotGroup>::getMaxImageSize() const {
+    return m_oMaxSize;
+}
+
+const cv::Mat& litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eNotGroup>::getInputImage(size_t nImageIdx) {
+    return m_oInputPrecacher.getPacket(nImageIdx);
+}
+
+const cv::Mat& litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eNotGroup>::getGTMask(size_t nImageIdx) {
+    return m_oGTPrecacher.getPacket(nImageIdx);
+}
+
+std::string litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eNotGroup>::getInputImageName(size_t nImageIdx, bool bStripExt) const {
+    lvAssert(nImageIdx<m_nImageCount);
+    const size_t nLastSlashPos = m_vsInputImagePaths[nImageIdx].find_last_of("/\\");
+    std::string sFileName = (nLastSlashPos==std::string::npos)?m_vsInputImagePaths[nImageIdx]:m_vsInputImagePaths[nImageIdx].substr(nLastSlashPos+1);
+    if(bStripExt)
+        sFileName = sFileName.substr(0,sFileName.find_last_of("."));
+    return sFileName;
+}
+
+cv::Size litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eNotGroup>::getInputImageSize(size_t nImageIdx) const {
+    lvAssert(nImageIdx<m_nImageCount);
+    return m_voOrigImageSizes[nImageIdx];
+}
+
+cv::Mat litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eNotGroup>::_getInputPacket_impl(size_t nImageIdx) {
+    cv::Mat oImage = cv::imread(m_vsInputImagePaths[nImageIdx],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+    CV_Assert(!oImage.empty());
+    CV_Assert(m_voOrigImageSizes[nImageIdx]==oImage.size());
+    return oImage;
+}
+
+cv::Mat litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eNotGroup>::_getGTPacket_impl(size_t nImageIdx) {
+    return cv::Mat(m_voOrigImageSizes[nImageIdx],CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL));
+}
+
+void litiv::IDataProducer_<litiv::eDatasetType_ImageEdgDet,litiv::eNotGroup>::parseData() {
+    PlatformUtils::GetFilesFromDir(getDataPath(),m_vsInputImagePaths);
+    PlatformUtils::FilterFilePaths(m_vsInputImagePaths,{},{".jpg",".png",".bmp"});
+    if(m_vsInputImagePaths.empty())
+        lvErrorExt("Set '%s' did not possess any jpg/png/bmp image file",getName().c_str());
+    m_bIsConstantSize = true;
+    m_oMaxSize = cv::Size(0,0);
+    cv::Mat oLastInput;
+    m_voOrigImageSizes.clear();
+    m_voOrigImageSizes.reserve(m_vsInputImagePaths.size());
+    for(size_t n = 0; n<m_vsInputImagePaths.size(); ++n) {
+        cv::Mat oCurrInput = cv::imread(m_vsInputImagePaths[n],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+        while(oCurrInput.empty()) {
+            m_vsInputImagePaths.erase(m_vsInputImagePaths.begin()+n);
+            if(n>=m_vsInputImagePaths.size())
+                break;
+            oCurrInput = cv::imread(m_vsInputImagePaths[n],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+        }
+        if(oCurrInput.empty())
+            break;
+        if(m_oMaxSize.width<oCurrInput.cols)
+            m_oMaxSize.width = oCurrInput.cols;
+        if(m_oMaxSize.height<oCurrInput.rows)
+            m_oMaxSize.height = oCurrInput.rows;
+        if(!oLastInput.empty() && oCurrInput.size()!=oLastInput.size())
+            m_bIsConstantSize = false;
+        m_voOrigImageSizes.push_back(oCurrInput.size());
+        oLastInput = oCurrInput;
+    }
+    m_nImageCount = m_vsInputImagePaths.size();
+    const double dScale = getDatasetInfo()->getScaleFactor();
+    if(dScale!=1.0) {
+        oLastInput.create(m_oMaxSize,CV_8UC1);
+        cv::resize(oLastInput,oLastInput,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
+        m_oMaxSize = oLastInput.size(); // helps make sure we have the same scale rounding
+    }
+    CV_Assert(m_nImageCount>0);
 }
 
 size_t litiv::IDataCounter_<litiv::eNotGroup>::getProcessedPacketsCountPromise() {
@@ -364,6 +487,8 @@ void litiv::IDataConsumer_<litiv::eDatasetType_VideoSegm>::writeSegmMask(const c
         cv::bitwise_or(oSegm,UCHAR_MAX/2,oOutputSegm,oROI==0);
     else
         oOutputSegm = oSegm;
+    if(oOutputSegm.size()!=pProducer->getOrigFrameSize())
+        cv::resize(oOutputSegm,oOutputSegm,pProducer->getOrigFrameSize(),0,0,cv::INTER_NEAREST);
     cv::imwrite(sOutputFilePath.str(),oOutputSegm,vnComprParams);
 }
 
@@ -373,7 +498,45 @@ cv::Mat litiv::IDataConsumer_<litiv::eDatasetType_VideoSegm>::readSegmMask(size_
     snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nIdx);
     std::stringstream sOutputFilePath;
     sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << acBuffer.data() << getDatasetInfo()->getOutputNameSuffix();
-    return cv::imread(sOutputFilePath.str(),isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+    cv::Mat oSegm = cv::imread(sOutputFilePath.str(),isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+    if(getDatasetInfo()->is4ByteAligned() && oSegm.channels()==3)
+        cv::cvtColor(oSegm,oSegm,cv::COLOR_BGR2BGRA);
+    const double dScale = getDatasetInfo()->getScaleFactor();
+    if(dScale!=1.0)
+        cv::resize(oSegm,oSegm,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
+    return oSegm;
+}
+
+void litiv::IDataConsumer_<litiv::eDatasetType_ImageEdgDet>::pushEdgeMask(const cv::Mat& oEdges, size_t nIdx) {
+    processPacket();
+    if(getDatasetInfo()->isSavingOutput())
+        writeEdgeMask(oEdges,nIdx);
+}
+
+void litiv::IDataConsumer_<litiv::eDatasetType_ImageEdgDet>::writeEdgeMask(const cv::Mat& oEdges, size_t nIdx) const {
+    CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
+    auto pProducer = shared_from_this_cast<const IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup>>(true);
+    std::stringstream sOutputFilePath;
+    sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << pProducer->getInputImageName(nIdx) << getDatasetInfo()->getOutputNameSuffix();
+    const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
+    cv::Mat oResizedEdges = oEdges;
+    if(oEdges.size()!=pProducer->getInputImageSize(nIdx))
+        cv::resize(oResizedEdges,oResizedEdges,pProducer->getInputImageSize(nIdx),0,0,cv::INTER_NEAREST);
+    cv::imwrite(sOutputFilePath.str(),oResizedEdges,vnComprParams);
+}
+
+cv::Mat litiv::IDataConsumer_<litiv::eDatasetType_ImageEdgDet>::readEdgeMask(size_t nIdx) const {
+    CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
+    auto pProducer = shared_from_this_cast<const IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup>>(true);
+    std::stringstream sOutputFilePath;
+    sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << pProducer->getInputImageName(nIdx) << getDatasetInfo()->getOutputNameSuffix();
+    cv::Mat oEdges = cv::imread(sOutputFilePath.str(),isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+    if(getDatasetInfo()->is4ByteAligned() && oEdges.channels()==3)
+        cv::cvtColor(oEdges,oEdges,cv::COLOR_BGR2BGRA);
+    const double dScale = getDatasetInfo()->getScaleFactor();
+    if(dScale!=1.0)
+        cv::resize(oEdges,oEdges,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
+    return oEdges;
 }
 
 #if HAVE_GLSL

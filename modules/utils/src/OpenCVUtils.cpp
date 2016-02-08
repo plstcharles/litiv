@@ -17,27 +17,15 @@
 
 #include "litiv/utils/OpenCVUtils.hpp"
 
-cv::DisplayHelperPtr cv::DisplayHelper::create(const std::string& sDisplayName,
-                                               const std::string& sDebugFSDirPath,
-                                               const cv::Size& oMaxSize,
-                                               int nWindowFlags) {
+cv::DisplayHelperPtr cv::DisplayHelper::create(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) {
     struct DisplayHelperWrapper : public DisplayHelper {
-        DisplayHelperWrapper(const std::string& sDisplayName,
-                             const std::string& sDebugFSDirPath,
-                             const cv::Size& oMaxSize,
-                             int nWindowFlags) :
-                DisplayHelper(sDisplayName,
-                              sDebugFSDirPath,
-                              oMaxSize,
-                              nWindowFlags) {}
+        DisplayHelperWrapper(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) :
+                DisplayHelper(sDisplayName,sDebugFSDirPath,oMaxSize,nWindowFlags) {}
     };
     return std::make_shared<DisplayHelperWrapper>(sDisplayName,sDebugFSDirPath,oMaxSize,nWindowFlags);
 }
 
-cv::DisplayHelper::DisplayHelper(const std::string& sDisplayName,
-                                 const std::string& sDebugFSDirPath,
-                                 const cv::Size& oMaxSize,
-                                 int nWindowFlags) :
+cv::DisplayHelper::DisplayHelper(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) :
         m_sDisplayName(sDisplayName),
         m_oMaxDisplaySize(oMaxSize),
         m_oDebugFS(sDebugFSDirPath+"/"+sDisplayName+"_debug.yml",cv::FileStorage::WRITE),

@@ -139,7 +139,7 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         GLContext oContext(oBatch.getFrameSize(),std::string("[GPU] ")+oBatch.getRelativePath(),DISPLAY_OUTPUT==0);
         std::shared_ptr<IBackgroundSubtractor_<ParallelUtils::eGLSL>> pAlgo = std::make_shared<BackgroundSubtractorType>();
 #if DISPLAY_OUTPUT>1
-        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getRelativePath(),oBatch.getOutputPath()+"/../");
+        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
 #endif //DISPLAY_OUTPUT>1
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
@@ -215,7 +215,7 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
         pAlgo->initialize(oCurrInput,oROI);
 #if DISPLAY_OUTPUT>0
-        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getRelativePath(),oBatch.getOutputPath()+"/../");
+        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
 #endif //DISPLAY_OUTPUT>0
         oBatch.startProcessing();
