@@ -129,13 +129,13 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
     //srand((unsigned int)time(NULL));
     try {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
-        CV_Assert(oBatch.getFrameCount()>1);
+        CV_Assert(oBatch.getImageCount()>1);
         const std::string sCurrBatchName = CxxUtils::clampString(oBatch.getName(),12);
-        const size_t nTotPacketCount = oBatch.getFrameCount();
-        GLContext oContext(oBatch.getFrameSize(),std::string("[GPU] ")+oBatch.getRelativePath(),DISPLAY_OUTPUT==0);
+        const size_t nTotPacketCount = oBatch.getImageCount();
+        GLContext oContext(oBatch.getMaxImageSize(),std::string("[GPU] ")+oBatch.getRelativePath(),DISPLAY_OUTPUT==0);
         std::shared_ptr<IEdgeDetector_<ParallelUtils::eGLSL>> pAlgo = std::make_shared<EdgeDetectorType>();
 #if DISPLAY_OUTPUT>1
-        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getRelativePath(),oBatch.getOutputPath()+"/../");
+        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
 #endif //DISPLAY_OUTPUT>1
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
@@ -199,41 +199,38 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
     size_t nCurrIdx = 0;
     try {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
-        CV_Assert(oBatch.getFrameCount()>1);
+        CV_Assert(oBatch.getImageCount()>1);
         const std::string sCurrBatchName = CxxUtils::clampString(oBatch.getName(),12);
-        const size_t nTotPacketCount = oBatch.getFrameCount();
-        const cv::Mat oROI = oBatch.getROI();
-        cv::Mat oCurrInput = oBatch.getInputFrame(nCurrIdx).clone();
+        const size_t nTotPacketCount = oBatch.getImageCount();
+        cv::Mat oCurrInput = oBatch.getInputImage(nCurrIdx).clone();
         CV_Assert(!oCurrInput.empty());
         CV_Assert(oCurrInput.isContinuous());
-        cv::Mat oCurrEdgeMask(oBatch.getFrameSize(),CV_8UC1,cv::Scalar_<uchar>(0));
+        cv::Mat oCurrEdgeMask(oBatch.getMaxImageSize(),CV_8UC1,cv::Scalar_<uchar>(0));
         std::shared_ptr<IEdgeDetector> pAlgo = std::make_shared<EdgeDetectorType>();
 #if !FULL_THRESH_ANALYSIS
         const double dDefaultThreshold = pAlgo->getDefaultThreshold();
 #endif //!FULL_THRESH_ANALYSIS
 #if DISPLAY_OUTPUT>0
-        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getRelativePath(),oBatch.getOutputPath()+"/../");
+        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
 #endif //DISPLAY_OUTPUT>0
         oBatch.startProcessing();
         while(nCurrIdx<nTotPacketCount) {
             //if(!((nCurrIdx+1)%100) && nCurrIdx<nTotPacketCount)
                 std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << "   [T=" << nThreadIdx << "]" << std::endl;
-            oCurrInput = oBatch.getInputFrame(nCurrIdx);
+            oCurrInput = oBatch.getInputImage(nCurrIdx);
 #if FULL_THRESH_ANALYSIS
             pAlgo->apply(oCurrInput,oCurrEdgeMask);
 #else //!FULL_THRESH_ANALYSIS
             pAlgo->apply_threshold(oCurrInput,oCurrEdgeMask,dDefaultThreshold);
 #endif //!FULL_THRESH_ANALYSIS
 #if DISPLAY_OUTPUT>0
-            if(!oROI.empty())
-                cv::bitwise_or(oCurrEdgeMask,UCHAR_MAX/2,oCurrEdgeMask,oROI==0);
-            pDisplayHelper->display(oCurrInput,oCurrEdgeMask,oBatch.getColoredSegmMask(oCurrEdgeMask,nCurrIdx),nCurrIdx);
+            pDisplayHelper->display(oCurrInput,oCurrEdgeMask,/*oBatch.getColoredEdgeMask(oCurrEdgeMask,nCurrIdx)*/oCurrEdgeMask,nCurrIdx);
             const int nKeyPressed = pDisplayHelper->waitKey();
             if(nKeyPressed==(int)'q')
                 break;
 #endif //DISPLAY_OUTPUT>0
-            oBatch.pushSegmMask(oCurrEdgeMask,nCurrIdx++);
+            oBatch.pushEdgeMask(oCurrEdgeMask,nCurrIdx++);
         }
         oBatch.stopProcessing();
         const double dTimeElapsed = oBatch.getProcessTime();

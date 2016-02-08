@@ -206,7 +206,7 @@ void litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::writeEvalReport()
         size_t nOverallPacketCount = 0;
         double dOverallTimeElapsed = 0.0;
         for(const auto& pGroupIter : getBatches()) {
-            oMetricsOutput << pGroupIter->writeInlineEvalReport(0);
+            oMetricsOutput << pGroupIter->writeInlineEvalReport(0,12);
             nOverallPacketCount += pGroupIter->getTotPackets();
             dOverallTimeElapsed += pGroupIter->getProcessTime();
         }
@@ -288,7 +288,7 @@ void litiv::IMetricsCalculator_<litiv::eDatasetType_VideoSegm>::writeEvalReport(
         oMetricsOutput << "Video segmentation evaluation report for '" << getName() << "' :\n\n";
         oMetricsOutput << "            |     Rcl    |     Spc    |     FPR    |     FNR    |     PBC    |     Prc    |     FM     |     MCC    \n";
         oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
-        oMetricsOutput << writeInlineEvalReport(0);
+        oMetricsOutput << writeInlineEvalReport(0,12);
         oMetricsOutput << "\nHz: " << getTotPackets()/getProcessTime() << "\n";
         oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
     }
@@ -301,7 +301,7 @@ std::string litiv::IMetricsCalculator_<litiv::eDatasetType_VideoSegm>::writeInli
     ssStr << std::fixed;
     if(isGroup() && !isBare())
         for(const auto& pBatch : getBatches())
-            ssStr << dynamic_cast<IMetricsCalculator_<eDatasetType_VideoSegm>&>(*pBatch).writeInlineEvalReport(nIndentSize+1);
+            ssStr << dynamic_cast<IMetricsCalculator_<eDatasetType_VideoSegm>&>(*pBatch).writeInlineEvalReport(nIndentSize+1,nCellSize);
     const ClassifMetrics& oMetrics = getMetrics(true);
     ssStr << CxxUtils::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
              std::setw(nCellSize) << oMetrics.dRecall << "|" <<
@@ -313,6 +313,23 @@ std::string litiv::IMetricsCalculator_<litiv::eDatasetType_VideoSegm>::writeInli
              std::setw(nCellSize) << oMetrics.dFMeasure << "|" <<
              std::setw(nCellSize) << oMetrics.dMCC << "\n";
     return ssStr.str();
+}
+
+litiv::ClassifMetricsBase litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm>::getMetricsBase() const {
+    return m_oMetricsBase;
+}
+
+void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm>::pushSegmMask(const cv::Mat& oSegm,size_t nIdx) {
+    IDataConsumer_<eDatasetType_VideoSegm>::pushSegmMask(oSegm,nIdx);
+    if(getDatasetInfo()->isUsingEvaluator()) {
+        auto pProducer = shared_from_this_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(true);
+        accumulateMetricsBase_VideoSegm(oSegm,pProducer->getGTFrame(nIdx),pProducer->getROI(),m_oMetricsBase);
+    }
+}
+
+cv::Mat litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm>::getColoredMask(const cv::Mat& oSegm,size_t nIdx) {
+    auto pProducer = shared_from_this_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(true);
+    return getColoredMask_VideoSegm(oSegm,pProducer->getGTFrame(nIdx),pProducer->getROI());
 }
 
 #if HAVE_GLSL

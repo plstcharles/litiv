@@ -24,6 +24,8 @@
 
 namespace litiv {
 
+    // @@@@ make 'metrics base' the interface, add enum-based templ spec for binaryclassif, ...
+
     //! basic metrics counter used to evaluate binary classifiers
     struct ClassifMetricsBase {
         //! default constructor sets all counters to zero
@@ -99,7 +101,7 @@ namespace litiv {
                 size_t nOverallPacketCount = 0;
                 double dOverallTimeElapsed = 0.0;
                 for(const auto& pGroupIter : getBatches()) {
-                    oMetricsOutput << pGroupIter->writeInlineEvalReport(0);
+                    oMetricsOutput << pGroupIter->writeInlineEvalReport(0,12);
                     nOverallPacketCount += pGroupIter->getTotPackets();
                     dOverallTimeElapsed += pGroupIter->getProcessTime();
                 }
@@ -144,24 +146,27 @@ namespace litiv {
                 oMetricsOutput << "Default evaluation report for '" << this->getName() << "' :\n\n";
                 oMetricsOutput << "            |   Packets  |   Seconds  |     Hz     \n";
                 oMetricsOutput << "------------|------------|------------|------------\n";
-                oMetricsOutput << this->writeInlineEvalReport(0);
+                oMetricsOutput << this->writeInlineEvalReport(0,12);
                 oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
             }
         }
     protected:
         //! returns a one-line string listing packet counts, seconds elapsed and algo speed for current batch(es)
-        virtual std::string writeInlineEvalReport(size_t nIndentSize,size_t nCellSize=12) const override {
+        virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const override {
             if(!this->getTotPackets())
                 return std::string();
             std::stringstream ssStr;
             ssStr << std::fixed;
-            if(this->isGroup() && !this->isBare())
-                for(const auto& pBatch : this->getBatches())
-                    ssStr << pBatch->writeInlineEvalReport(nIndentSize+1);
+            if(this->isGroup() && !this->isBare()) {
+                for(const auto& pBatch : this->getBatches()) {
+                    const auto pCalculator = pBatch->shared_from_this_cast<const IMetricsCalculator_<eDatasetType>>(true);
+                    ssStr << pCalculator->writeInlineEvalReport(nIndentSize+1,nCellSize);
+                }
+            }
             ssStr << CxxUtils::clampString((std::string(nIndentSize,'>')+' '+this->getName()),nCellSize) << "|" <<
-                std::setw(nCellSize) << this->getTotPackets() << "|" <<
-                std::setw(nCellSize) << this->getProcessTime() << "|" <<
-                std::setw(nCellSize) << this->getTotPackets()/this->getProcessTime() << "\n";
+                     std::setw(nCellSize) << this->getTotPackets() << "|" <<
+                     std::setw(nCellSize) << this->getProcessTime() << "|" <<
+                     std::setw(nCellSize) << this->getTotPackets()/this->getProcessTime() << "\n";
             return ssStr.str();
         }
     };
@@ -176,7 +181,7 @@ namespace litiv {
         virtual void writeEvalReport() const override;
     protected:
         //! returns a one-line string listing high-level metrics for current batch(es)
-        virtual std::string writeInlineEvalReport(size_t nIndentSize,size_t nCellSize=12) const override;
+        virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const override;
     };
 
     template<eDatasetTypeList eDatasetType>
@@ -189,22 +194,13 @@ namespace litiv {
             public IMetricsCalculator_<eDatasetType_VideoSegm>,
             public IDataConsumer_<eDatasetType_VideoSegm> {
         //! overrides 'getMetricsBase' from IMetricsCalculator_ for non-group-impl (as always required)
-        virtual ClassifMetricsBase getMetricsBase() const override {return m_oMetricsBase;}
+        virtual ClassifMetricsBase getMetricsBase() const override;
         //! overrides 'pushSegmMask' from IDataConsumer_ to simultaneously evaluate the pushed results
-        virtual void pushSegmMask(const cv::Mat& oSegm,size_t nIdx) override {
-            IDataConsumer_<eDatasetType_VideoSegm>::pushSegmMask(oSegm,nIdx);
-            if(getDatasetInfo()->isUsingEvaluator()) {
-                auto pProducer = shared_from_this_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(true);
-                accumulateMetricsBase_VideoSegm(oSegm,pProducer->getGTFrame(nIdx),pProducer->getROI(),m_oMetricsBase);
-            }
-        }
+        virtual void pushSegmMask(const cv::Mat& oSegm,size_t nIdx) override;
         //! provides a visual feedback on result quality based on evaluation guidelines
-        virtual cv::Mat getColoredMask(const cv::Mat& oSegm,size_t nIdx) {
-            auto pProducer = shared_from_this_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(true);
-            return getColoredMask_VideoSegm(oSegm,pProducer->getGTFrame(nIdx),pProducer->getROI());
-        }
+        virtual cv::Mat getColoredMask(const cv::Mat& oSegm,size_t nIdx);
         //! resets internal metrics counters to zero
-        void resetMetrics() {m_oMetricsBase = ClassifMetricsBase();}
+        inline void resetMetrics() {m_oMetricsBase = ClassifMetricsBase();}
     protected:
         ClassifMetricsBase m_oMetricsBase;
     };

@@ -163,7 +163,7 @@ namespace litiv {
         static bool compare_load(const IDataHandler* i, const IDataHandler* j);
         static bool compare(const IDataHandler& i, const IDataHandler& j);
         static bool compare_load(const IDataHandler& i, const IDataHandler& j);
-        virtual std::string writeInlineEvalReport(size_t nIndentSize,size_t nCellSize=12) const = 0;
+        virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const = 0;
         virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const = 0; // will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
         virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) = 0; // will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
         template<eDatasetTypeList eDatasetType>
@@ -233,6 +233,15 @@ namespace litiv {
     };
 
     template<>
+    struct IDataReader_<eDatasetType_ImageEdgDet> : public virtual IDataHandler {
+        inline size_t getImageCount() const {return getTotPackets();}
+        virtual bool isConstantSize() const = 0;
+        virtual cv::Size getMaxImageSize() const = 0;
+        virtual const cv::Mat& getInputImage(size_t nImageIdx) = 0;
+        virtual const cv::Mat& getGTMask(size_t nImageIdx) = 0;
+    };
+
+    template<>
     struct IDataProducer_<eDatasetType_VideoSegm,eGroup> :
             public IDataLoader_<eGroup>,
             public IDataReader_<eDatasetType_VideoSegm> {
@@ -248,13 +257,14 @@ namespace litiv {
         virtual size_t getTotPackets() const override;
         virtual void startPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
         inline const cv::Size& getFrameSize() const {return m_oSize;}
+        inline const cv::Size& getOrigFrameSize() const {return m_oOrigSize;}
         inline const cv::Mat& getROI() const {return m_oROI;}
         virtual const cv::Mat& getInputFrame(size_t nFrameIdx) override final;
         virtual const cv::Mat& getGTFrame(size_t nFrameIdx) override final;
     protected:
         IDataProducer_() : m_nFrameCount(0),m_nNextExpectedVideoReaderFrameIdx(size_t(-1)) {}
         virtual cv::Mat _getInputPacket_impl(size_t nIdx) override;
-        virtual cv::Mat _getGTPacket_impl(size_t) override;
+        virtual cv::Mat _getGTPacket_impl(size_t nIdx) override;
         virtual void parseData() override;
         size_t m_nFrameCount;
         std::vector<std::string> m_vsInputFramePaths;
@@ -263,6 +273,43 @@ namespace litiv {
         size_t m_nNextExpectedVideoReaderFrameIdx;
         cv::Mat m_oROI;
         cv::Size m_oOrigSize,m_oSize;
+        std::unordered_map<size_t,size_t> m_mTestGTIndexes;
+    };
+
+    template<>
+    struct IDataProducer_<eDatasetType_ImageEdgDet,eGroup> :
+            public IDataLoader_<eGroup>,
+            public IDataReader_<eDatasetType_ImageEdgDet> {
+        virtual bool isConstantSize() const override final;
+        virtual cv::Size getMaxImageSize() const override final;
+        virtual const cv::Mat& getInputImage(size_t nImageIdx) override final;
+        virtual const cv::Mat& getGTMask(size_t nImageIdx) override final;
+    };
+
+    template<>
+    struct IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup> :
+            public IDataLoader_<eNotGroup>,
+            public IDataReader_<eDatasetType_ImageEdgDet> {
+        virtual double getExpectedLoad() const override;
+        virtual size_t getTotPackets() const override;
+        virtual void startPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
+        virtual bool isConstantSize() const override; // @@@ todo
+        virtual cv::Size getMaxImageSize() const override; // @@@ todo
+        virtual const cv::Mat& getInputImage(size_t nImageIdx) override final;
+        virtual const cv::Mat& getGTMask(size_t nImageIdx) override final;
+        std::string getInputImageName(size_t nImageIdx, bool bStipExt=true) const;
+        cv::Size getInputImageSize(size_t nImageIdx) const;
+    protected:
+        IDataProducer_() : m_nImageCount(0) {}
+        virtual cv::Mat _getInputPacket_impl(size_t nIdx) override;
+        virtual cv::Mat _getGTPacket_impl(size_t nIdx) override;
+        virtual void parseData() override;
+        size_t m_nImageCount;
+        std::vector<std::string> m_vsInputImagePaths;
+        std::vector<std::string> m_vsGTMaskPaths;
+        std::vector<cv::Size> m_voOrigImageSizes;
+        bool m_bIsConstantSize;
+        cv::Size m_oMaxSize;
         std::unordered_map<size_t,size_t> m_mTestGTIndexes;
     };
 
@@ -295,6 +342,15 @@ namespace litiv {
     protected:
         virtual void writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const;
         virtual cv::Mat readSegmMask(size_t nIdx) const;
+    };
+
+    template<>
+    struct IDataConsumer_<eDatasetType_ImageEdgDet> :
+            public IDataCounter_<eNotGroup> {
+        virtual void pushEdgeMask(const cv::Mat& oEdges, size_t nIdx);
+    protected:
+        virtual void writeEdgeMask(const cv::Mat& oEdges, size_t nIdx) const;
+        virtual cv::Mat readEdgeMask(size_t nIdx) const;
     };
 
 #if HAVE_GLSL
