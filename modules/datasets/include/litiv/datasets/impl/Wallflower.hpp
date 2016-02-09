@@ -22,9 +22,10 @@
 #error "This file should never be included directly; use litiv/datasets.hpp instead"
 #endif //__LITIV_DATASETS_IMPL_H
 
-template<ParallelUtils::eParallelAlgoType eEvalImpl>
-struct Dataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_Wallflower,eEvalImpl> :
-        public IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_Wallflower,eEvalImpl> {
+template<eDatasetTaskList eDatasetTask, ParallelUtils::eParallelAlgoType eEvalImpl>
+struct Dataset_<eDatasetTask,eDataset_Wallflower,eEvalImpl> :
+        public IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_Wallflower,getDatasetEval<eDatasetTask,eDataset_Wallflower>(),eEvalImpl> {
+    static_assert(eDatasetTask!=eDatasetTask_Registr,"Wallflower dataset does not support image registration (no image arrays)");
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
             const std::string& sOutputDirName, // output directory (full) path for debug logs, evaluation reports and results archiving (will be created in Wallflower dataset folder)
@@ -33,7 +34,7 @@ protected: // should still be protected, as creation should always be done via d
             bool bForce4ByteDataAlign=false, // defines whether data packets should be 4-byte aligned (useful for GPU upload)
             double dScaleFactor=1.0 // defines the scale factor to use to resize/rescale read packets
     ) :
-            IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_Wallflower,eEvalImpl>(
+            IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_Wallflower,getDatasetEval<eDatasetTask,eDataset_Wallflower>(),eEvalImpl>(
                     "Wallflower",
                     "Wallflower/dataset",
                     std::string(DATASET_ROOT)+"/Wallflower/"+sOutputDirName+"/",
@@ -51,8 +52,8 @@ protected: // should still be protected, as creation should always be done via d
 };
 
 template<>
-struct DataProducer_<eDatasetType_VideoSegm,eDataset_VideoSegm_Wallflower,eNotGroup> :
-        public IDataProducer_<eDatasetType_VideoSegm,eNotGroup> {
+struct DataProducer_<eDatasetSource_Video,eDataset_Wallflower> :
+        public IDataProducer_<eDatasetSource_Video> {
 protected:
     virtual void parseData() override final {
         // @@@@ untested since 2016/01 refactoring
@@ -62,11 +63,12 @@ protected:
         const std::string sGTFilePrefix("hand_segmented_");
         const size_t nInputFileNbDecimals = 5;
         const std::string sInputFileSuffix(".bmp");
+        m_mGTIndexLUT.clear();
         for(auto iter=vsImgPaths.begin(); iter!=vsImgPaths.end(); ++iter) {
             if(*iter==getDataPath()+"/script.txt")
                 bFoundScript = true;
             else if(iter->find(sGTFilePrefix)!=std::string::npos) {
-                m_mTestGTIndexes.insert(std::pair<size_t,size_t>(atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str()),m_vsGTFramePaths.size()));
+                m_mGTIndexLUT[(size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str())] = m_vsGTFramePaths.size();
                 m_vsGTFramePaths.push_back(*iter);
                 bFoundGTFile = true;
             }
@@ -82,20 +84,12 @@ protected:
         if(oTempImg.empty())
             lvErrorExt("Wallflower sequence '%s' did not possess a valid GT file",getName().c_str());
         m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
-        m_oSize = oTempImg.size();
+        m_oOrigSize = m_oROI.size();
+        const double dScale = getDatasetInfo()->getScaleFactor();
+        if(dScale!=1.0)
+            cv::resize(m_oROI,m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
+        m_oSize = m_oROI.size();
         m_nFrameCount = m_vsInputFramePaths.size();
         CV_Assert(m_nFrameCount>0);
-    }
-    virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final {
-        cv::Mat oFrame;
-        auto res = m_mTestGTIndexes.find(nIdx);
-        if(res!=m_mTestGTIndexes.end()) {
-            oFrame = cv::imread(m_vsGTFramePaths[res->second],cv::IMREAD_GRAYSCALE);
-            if(oFrame.size()!=m_oSize)
-                cv::resize(oFrame,oFrame,m_oSize,0,0,cv::INTER_NEAREST);
-        }
-        else
-            oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL));
-        return oFrame;
     }
 };

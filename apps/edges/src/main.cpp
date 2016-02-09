@@ -20,19 +20,19 @@
 
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
-#define EVALUATE_OUTPUT         0
-#define DISPLAY_OUTPUT          1
+#define EVALUATE_OUTPUT         1
+#define DISPLAY_OUTPUT          0
 ////////////////////////////////
 #define USE_CANNY               1
 #define USE_LBSP                0
 ////////////////////////////////
-#define FULL_THRESH_ANALYSIS    1
+#define FULL_THRESH_ANALYSIS    0
 ////////////////////////////////
 #define USE_GLSL_IMPL           0
 #define USE_CUDA_IMPL           0
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
-#define DATASET_ID              eDataset_ImageEdgDet_BSDS500 // comment this line to fall back to custom definition
+#define DATASET_ID              eDataset_BSDS500 // comment this line to fall back to custom definition
 #define DATASET_OUTPUT_PATH     "results_test" // always relative to the dataset root path
 #define DATASET_PRECACHING      1
 #define DATASET_SCALE_FACTOR    1.0
@@ -77,7 +77,7 @@ constexpr ParallelUtils::eParallelAlgoType eImplTypeEnum = ParallelUtils::eGLSL;
 #else // USE_..._IMPL
 constexpr ParallelUtils::eParallelAlgoType eImplTypeEnum = ParallelUtils::eNonParallel;
 #endif // USE_..._IMPL
-using DatasetType = litiv::Dataset_<litiv::eDatasetType_ImageEdgDet,litiv::DATASET_ID,eImplTypeEnum>;
+using DatasetType = litiv::Dataset_<litiv::eDatasetTask_EdgDet,litiv::DATASET_ID,eImplTypeEnum>;
 #if USE_CANNY
 using EdgeDetectorType = EdgeDetectorCanny;
 #elif USE_LBSP
@@ -88,7 +88,7 @@ const size_t g_nMaxThreads = USE_GPU_IMPL?1:std::thread::hardware_concurrency()>
 
 int main(int, char**) {
     try {
-        litiv::IDatasetPtr pDataset = litiv::datasets::create<litiv::eDatasetType_ImageEdgDet,litiv::DATASET_ID,eImplTypeEnum>(DATASET_PARAMS);
+        litiv::IDatasetPtr pDataset = litiv::datasets::create<litiv::eDatasetTask_EdgDet,litiv::DATASET_ID,eImplTypeEnum>(DATASET_PARAMS);
         litiv::IDataHandlerPtrQueue vpBatches = pDataset->getSortedBatches();
         const size_t nTotPackets = pDataset->getTotPackets();
         const size_t nTotBatches = vpBatches.size();
@@ -202,10 +202,11 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         CV_Assert(oBatch.getImageCount()>1);
         const std::string sCurrBatchName = CxxUtils::clampString(oBatch.getName(),12);
         const size_t nTotPacketCount = oBatch.getImageCount();
-        cv::Mat oCurrInput = oBatch.getInputImage(nCurrIdx).clone();
+        cv::Mat oCurrInput = oBatch.getInput(nCurrIdx).clone();
         CV_Assert(!oCurrInput.empty());
         CV_Assert(oCurrInput.isContinuous());
-        cv::Mat oCurrEdgeMask(oBatch.getMaxImageSize(),CV_8UC1,cv::Scalar_<uchar>(0));
+        CV_Assert(oBatch.isConstantSize());
+        cv::Mat oCurrEdgeMask(oBatch.getPacketMaxSize(),CV_8UC1,cv::Scalar_<uchar>(0));
         std::shared_ptr<IEdgeDetector> pAlgo = std::make_shared<EdgeDetectorType>();
 #if !FULL_THRESH_ANALYSIS
         const double dDefaultThreshold = pAlgo->getDefaultThreshold();
@@ -218,7 +219,7 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         while(nCurrIdx<nTotPacketCount) {
             //if(!((nCurrIdx+1)%100) && nCurrIdx<nTotPacketCount)
                 std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << "   [T=" << nThreadIdx << "]" << std::endl;
-            oCurrInput = oBatch.getInputImage(nCurrIdx);
+            oCurrInput = oBatch.getInput(nCurrIdx);
 #if FULL_THRESH_ANALYSIS
             pAlgo->apply(oCurrInput,oCurrEdgeMask);
 #else //!FULL_THRESH_ANALYSIS
@@ -230,7 +231,7 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
             if(nKeyPressed==(int)'q')
                 break;
 #endif //DISPLAY_OUTPUT>0
-            oBatch.pushEdgeMask(oCurrEdgeMask,nCurrIdx++);
+            oBatch.push(oCurrEdgeMask,nCurrIdx++);
         }
         oBatch.stopProcessing();
         const double dTimeElapsed = oBatch.getProcessTime();

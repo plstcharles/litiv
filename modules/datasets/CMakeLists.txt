@@ -23,11 +23,13 @@ add_files(SOURCE_FILES
     "src/datasets.cpp"
     "src/eval.cpp"
     "src/utils.cpp"
+    "src/metrics.cpp"
 )
 add_files(INCLUDE_FILES
     "include/litiv/datasets.hpp"
     "include/litiv/datasets/eval.hpp"
     "include/litiv/datasets/utils.hpp"
+    "include/litiv/datasets/metrics.hpp"
     "include/litiv/datasets/impl/BSDS500.hpp"
     "include/litiv/datasets/impl/CDnet.hpp"
     "include/litiv/datasets/impl/LITIV2012b.hpp"

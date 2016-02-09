@@ -22,15 +22,19 @@
 #error "This file should never be included directly; use litiv/datasets.hpp instead"
 #endif //__LITIV_DATASETS_IMPL_H
 
+#define DEFAULT_BSDS500_EDGE_EVAL_THRESHOLD_BINS 99
+
 enum eBSDS500DatasetGroup {
     eBSDS500Dataset_Training,
     eBSDS500Dataset_Training_Validation,
     eBSDS500Dataset_Training_Validation_Test,
 };
 
-template<ParallelUtils::eParallelAlgoType eEvalImpl>
-struct Dataset_<eDatasetType_ImageEdgDet,eDataset_ImageEdgDet_BSDS500,eEvalImpl> :
-        public IDataset_<eDatasetType_ImageEdgDet,eDataset_ImageEdgDet_BSDS500,eEvalImpl> {
+template<eDatasetTaskList eDatasetTask, ParallelUtils::eParallelAlgoType eEvalImpl>
+struct Dataset_<eDatasetTask,eDataset_BSDS500,eEvalImpl> :
+        public IDataset_<eDatasetTask,eDatasetSource_Image,eDataset_BSDS500,getDatasetEval<eDatasetTask,eDataset_BSDS500>(),eEvalImpl> {
+    static_assert(eDatasetTask!=eDatasetTask_Registr,"BSDS500 dataset does not support image registration (no image arrays)");
+    static_assert(eDatasetTask!=eDatasetTask_ChgDet,"BSDS500 dataset does not support change detection (no data streaming)");
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
             const std::string& sOutputDirName, // output directory (full) path for debug logs, evaluation reports and results archiving (will be created in BSR dataset folder)
@@ -40,7 +44,7 @@ protected: // should still be protected, as creation should always be done via d
             double dScaleFactor=1.0, // defines the scale factor to use to resize/rescale read packets
             eBSDS500DatasetGroup eType=eBSDS500Dataset_Training // defines which dataset groups to use
     ) :
-            IDataset_<eDatasetType_ImageEdgDet,eDataset_ImageEdgDet_BSDS500,eEvalImpl>(
+            IDataset_<eDatasetTask,eDatasetSource_Image,eDataset_BSDS500,getDatasetEval<eDatasetTask,eDataset_BSDS500>(),eEvalImpl>(
                     "BSDS500",
                     "BSDS500/data/images",
                     std::string(DATASET_ROOT)+"/BSDS500/BSR/"+sOutputDirName+"/",
@@ -58,60 +62,58 @@ protected: // should still be protected, as creation should always be done via d
 };
 
 template<>
-struct DataProducer_<eDatasetType_ImageEdgDet,eDataset_ImageEdgDet_BSDS500,eNotGroup> :
-        public IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup> {
+struct DataProducer_<eDatasetSource_Image,eDataset_BSDS500> :
+        public IDataProducer_<eDatasetSource_Image> {
 protected:
     virtual void parseData() override final {
         PlatformUtils::GetFilesFromDir(getDataPath(),m_vsInputImagePaths);
         PlatformUtils::FilterFilePaths(m_vsInputImagePaths,{},{".jpg",".png",".bmp"});
         if(m_vsInputImagePaths.empty())
             lvErrorExt("BSDS500 set '%s' did not possess any jpg/png/bmp image file",getName().c_str());
-        PlatformUtils::GetSubDirsFromDir(getDatasetInfo()->getDatasetPath()+"/../groundTruth_bdry_images/"+getRelativePath(),m_vsGTMaskPaths);
-        if(m_vsGTMaskPaths.empty())
+        PlatformUtils::GetSubDirsFromDir(getDatasetInfo()->getDatasetPath()+"/../groundTruth_bdry_images/"+getRelativePath(),m_vsGTImagePaths);
+        if(m_vsGTImagePaths.empty())
             lvErrorExt("BSDS500 set '%s' did not possess any groundtruth image folders",getName().c_str());
-        else if(m_vsGTMaskPaths.size()!=m_vsInputImagePaths.size())
+        else if(m_vsGTImagePaths.size()!=m_vsInputImagePaths.size())
             lvErrorExt("BSDS500 set '%s' input/groundtruth count mismatch",getName().c_str());
         // make sure folders are non-empty, and folders & images are similarliy ordered
         std::vector<std::string> vsTempPaths;
-        for(size_t nImageIdx=0; nImageIdx<m_vsGTMaskPaths.size(); ++nImageIdx) {
-            PlatformUtils::GetFilesFromDir(m_vsGTMaskPaths[nImageIdx],vsTempPaths);
+        for(size_t nImageIdx=0; nImageIdx<m_vsGTImagePaths.size(); ++nImageIdx) {
+            PlatformUtils::GetFilesFromDir(m_vsGTImagePaths[nImageIdx],vsTempPaths);
             CV_Assert(!vsTempPaths.empty());
             const size_t nLastInputSlashPos = m_vsInputImagePaths[nImageIdx].find_last_of("/\\");
             const std::string sInputImageFullName = nLastInputSlashPos==std::string::npos?m_vsInputImagePaths[nImageIdx]:m_vsInputImagePaths[nImageIdx].substr(nLastInputSlashPos+1);
-            const size_t nLastGTSlashPos = m_vsGTMaskPaths[nImageIdx].find_last_of("/\\");
-            CV_Assert(sInputImageFullName.find(nLastGTSlashPos==std::string::npos?m_vsGTMaskPaths[nImageIdx]:m_vsGTMaskPaths[nImageIdx].substr(nLastGTSlashPos+1))!=std::string::npos);
+            const size_t nLastGTSlashPos = m_vsGTImagePaths[nImageIdx].find_last_of("/\\");
+            CV_Assert(sInputImageFullName.find(nLastGTSlashPos==std::string::npos?m_vsGTImagePaths[nImageIdx]:m_vsGTImagePaths[nImageIdx].substr(nLastGTSlashPos+1))!=std::string::npos);
         }
         m_bIsConstantSize = true;
         m_oMaxSize = cv::Size(481,321);
-        m_voOrigImageSizes.clear();
-        m_voOrigImageSizes.reserve(m_vsInputImagePaths.size());
+        m_voImageOrigSizes.clear();
+        m_vbImageTransposed.clear();
+        m_voImageOrigSizes.reserve(m_vsInputImagePaths.size());
+        m_vbImageTransposed.reserve(m_vsInputImagePaths.size());
         for(size_t n=0; n<m_vsInputImagePaths.size(); ++n) {
             cv::Mat oCurrInput = cv::imread(m_vsInputImagePaths[n],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
             lvAssert(!oCurrInput.empty());
-            m_voOrigImageSizes.push_back(oCurrInput.size());
+            m_voImageOrigSizes.push_back(oCurrInput.size());
+            m_vbImageTransposed.push_back(oCurrInput.size()==cv::Size(321,481));
         }
         m_nImageCount = m_vsInputImagePaths.size();
         const double dScale = getDatasetInfo()->getScaleFactor();
         if(dScale!=1.0)
             m_oMaxSize = cv::Size(m_oMaxSize.width*dScale,m_oMaxSize.height*dScale);
+        m_voImageSizes = std::vector<cv::Size>(m_nImageCount,m_oMaxSize);
         CV_Assert(m_nImageCount>0);
     }
-    virtual cv::Mat _getInputPacket_impl(size_t nIdx) override final {
-        cv::Mat oImage = IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup>::_getInputPacket_impl(nIdx);
-        if(m_voOrigImageSizes[nIdx]==cv::Size(321,481))
-            cv::transpose(oImage,oImage);
-        return oImage;
-    }
     virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final {
-        if(m_vsGTMaskPaths.size()>nIdx) {
+        if(m_vsGTImagePaths.size()>nIdx) {
             std::vector<std::string> vsTempPaths;
-            PlatformUtils::GetFilesFromDir(m_vsGTMaskPaths[nIdx],vsTempPaths);
+            PlatformUtils::GetFilesFromDir(m_vsGTImagePaths[nIdx],vsTempPaths);
             CV_Assert(!vsTempPaths.empty());
             cv::Mat oTempRefGTImage = cv::imread(vsTempPaths[0],cv::IMREAD_GRAYSCALE);
             CV_Assert(!oTempRefGTImage.empty());
-            CV_Assert(m_voOrigImageSizes[nIdx]==cv::Size() || m_voOrigImageSizes[nIdx]==oTempRefGTImage.size());
+            CV_Assert(m_voImageOrigSizes[nIdx]==cv::Size() || m_voImageOrigSizes[nIdx]==oTempRefGTImage.size());
             CV_Assert(oTempRefGTImage.size()==cv::Size(481,321) || oTempRefGTImage.size()==cv::Size(321,481));
-            m_voOrigImageSizes[nIdx] = oTempRefGTImage.size();
+            m_voImageOrigSizes[nIdx] = oTempRefGTImage.size();
             if(oTempRefGTImage.size()==cv::Size(321,481))
                 cv::transpose(oTempRefGTImage,oTempRefGTImage);
             cv::Mat oGTMask(int(oTempRefGTImage.rows*vsTempPaths.size()),oTempRefGTImage.cols,CV_8UC1);
@@ -122,20 +124,19 @@ protected:
                     cv::transpose(oTempGTImage,oTempGTImage);
                 oTempGTImage.copyTo(cv::Mat(oGTMask,cv::Rect(0,int(oTempGTImage.rows*nGTImageIdx),oTempGTImage.cols,oTempGTImage.rows)));
             }
-            const double dScale = getDatasetInfo()->getScaleFactor();
-            if(dScale!=1.0)
-                cv::resize(oGTMask,oGTMask,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
+            if(getPacketSize(nIdx).area()>0 && oGTMask.size()!=getPacketSize(nIdx))
+                cv::resize(oGTMask,oGTMask,getPacketSize(nIdx),0,0,cv::INTER_NEAREST);
             return oGTMask;
         }
-        return IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup>::_getGTPacket_impl(nIdx);
+        return cv::Mat(getPacketSize(nIdx),CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_OUTOFSCOPE_VAL));
     }
 };
 
 template<>
-struct DataEvaluator_<eDatasetType_ImageEdgDet,eDataset_ImageEdgDet_BSDS500> :
-        public IDataEvaluator_<eDatasetType_ImageEdgDet> {
+struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> :
+        public IDataEvaluator_<eDatasetEval_BinaryClassifier> {
 protected:
-    virtual void writeEdgeMask(const cv::Mat& oEdges, size_t nIdx) const override final {
+/*    virtual void writeEdgeMask(const cv::Mat& oEdges, size_t nIdx) const override final {
         CV_Assert(!oEdges.empty());
         cv::Mat oEdgesOutput = oEdges;
         auto pProducer = shared_from_this_cast<const IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup>>(true);
@@ -150,5 +151,5 @@ protected:
         if(pProducer->getInputImageSize(nIdx)==cv::Size(321,481))
             cv::transpose(oEdgesOutput,oEdgesOutput);
         return oEdgesOutput;
-    }
+    }*/
 };

@@ -19,183 +19,44 @@
 #include "litiv/imgproc.hpp"
 //#include "litiv/utils/ConsoleUtils.hpp" @@@@@ reuse later?
 
-litiv::ClassifMetricsBase::ClassifMetricsBase() : nTP(0),nTN(0),nFP(0),nFN(0),nSE(0) {}
-
-litiv::ClassifMetricsBase litiv::ClassifMetricsBase::operator+(const ClassifMetricsBase& m) const {
-    ClassifMetricsBase res(m);
-    res.nTP += this->nTP;
-    res.nTN += this->nTN;
-    res.nFP += this->nFP;
-    res.nFN += this->nFN;
-    res.nSE += this->nSE;
-    return res;
-}
-
-litiv::ClassifMetricsBase& litiv::ClassifMetricsBase::operator+=(const ClassifMetricsBase& m) {
-    this->nTP += m.nTP;
-    this->nTN += m.nTN;
-    this->nFP += m.nFP;
-    this->nFN += m.nFN;
-    this->nSE += m.nSE;
-    return *this;
-}
-
-bool litiv::ClassifMetricsBase::operator==(const ClassifMetricsBase& m) const {
-    return
-        (this->nTP==m.nTP) &&
-        (this->nTN==m.nTN) &&
-        (this->nFP==m.nFP) &&
-        (this->nFN==m.nFN) &&
-        (this->nSE==m.nSE);
-}
-
-bool litiv::ClassifMetricsBase::operator!=(const ClassifMetricsBase& m) const {
-    return !((*this)==m);
-}
-
-void litiv::accumulateMetricsBase_VideoSegm(const cv::Mat& oSegm, const cv::Mat& oGTSegm, const cv::Mat& oROI, ClassifMetricsBase& oMetrics) {
-    CV_Assert(oSegm.type()==CV_8UC1 && oGTSegm.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
-    CV_Assert(oSegm.size()==oGTSegm.size() && (oROI.empty() || oSegm.size()==oROI.size()));
-    const size_t step_row = oSegm.step.p[0];
-    for(size_t i = 0; i<(size_t)oSegm.rows; ++i) {
-        const size_t idx_nstep = step_row*i;
-        const uchar* input_step_ptr = oSegm.data+idx_nstep;
-        const uchar* gt_step_ptr = oGTSegm.data+idx_nstep;
-        const uchar* roi_step_ptr = oROI.data+idx_nstep;
-        for(int j = 0; j<oSegm.cols; ++j) {
-            if(gt_step_ptr[j]!=DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL &&
-               gt_step_ptr[j]!=DATASETUTILS_VIDEOSEGM_UNKNOWN_VAL &&
-               (oROI.empty() || roi_step_ptr[j]!=dATASETUTILS_VIDEOSEGM_NEGATIVE_VAL)) {
-                if(input_step_ptr[j]==DATASETUTILS_VIDEOSEGM_POSITIVE_VAL) {
-                    if(gt_step_ptr[j]==DATASETUTILS_VIDEOSEGM_POSITIVE_VAL)
-                        ++oMetrics.nTP;
-                    else // gt_step_ptr[j]==s_nSegmNegative
-                        ++oMetrics.nFP;
-                }
-                else { // input_step_ptr[j]==s_nSegmNegative
-                    if(gt_step_ptr[j]==DATASETUTILS_VIDEOSEGM_POSITIVE_VAL)
-                        ++oMetrics.nFN;
-                    else // gt_step_ptr[j]==s_nSegmNegative
-                        ++oMetrics.nTN;
-                }
-                if(gt_step_ptr[j]==DATASETUTILS_VIDEOSEGM_SHADOW_VAL) {
-                    if(input_step_ptr[j]==DATASETUTILS_VIDEOSEGM_POSITIVE_VAL)
-                        ++oMetrics.nSE;
-                }
-            }
+void litiv::IDatasetEvaluator_<litiv::eDatasetEval_None>::writeEvalReport() const {
+    std::cout << "Writing evaluation report for dataset '" << getName() << "'..." << std::endl;
+    if(getBatches().empty()) {
+        std::cout << "\tNo report to write for dataset '" << getName() << "', skipping." << std::endl;
+        return;
+    }
+    for(const auto& pGroupIter : getBatches())
+        pGroupIter->writeEvalReport();
+    std::ofstream oMetricsOutput(getOutputPath()+"/overall.txt");
+    if(oMetricsOutput.is_open()) {
+        oMetricsOutput << std::fixed;
+        oMetricsOutput << "Default evaluation report for dataset '" << getName() << "' :\n\n";
+        oMetricsOutput << "            |   Packets  |   Seconds  |     Hz     \n";
+        oMetricsOutput << "------------|------------|------------|------------\n";
+        size_t nOverallPacketCount = 0;
+        double dOverallTimeElapsed = 0.0;
+        for(const auto& pGroupIter : getBatches()) {
+            oMetricsOutput << pGroupIter->writeInlineEvalReport(0,12);
+            nOverallPacketCount += pGroupIter->getTotPackets();
+            dOverallTimeElapsed += pGroupIter->getProcessTime();
         }
+        oMetricsOutput << "------------|------------|------------|------------\n";
+        oMetricsOutput << "     overall|" <<
+        std::setw(12) << nOverallPacketCount << "|" <<
+        std::setw(12) << dOverallTimeElapsed << "|" <<
+        std::setw(12) << nOverallPacketCount/dOverallTimeElapsed << "\n";
+        oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
     }
 }
 
-cv::Mat litiv::getColoredMask_VideoSegm(const cv::Mat& oSegm, const cv::Mat& oGTSegm, const cv::Mat& oROI) {
-    CV_Assert(oSegm.type()==CV_8UC1 && oGTSegm.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
-    CV_Assert(oSegm.size()==oGTSegm.size() && (oROI.empty() || oSegm.size()==oROI.size()));
-    cv::Mat oResult(oSegm.size(),CV_8UC3,cv::Scalar_<uchar>(0));
-    const size_t step_row = oSegm.step.p[0];
-    for(size_t i=0; i<(size_t)oSegm.rows; ++i) {
-        const size_t idx_nstep = step_row*i;
-        const uchar* input_step_ptr = oSegm.data+idx_nstep;
-        const uchar* gt_step_ptr = oGTSegm.data+idx_nstep;
-        const uchar* roi_step_ptr = oROI.data+idx_nstep;
-        uchar* res_step_ptr = oResult.data+idx_nstep*3;
-        for(int j=0; j<oSegm.cols; ++j) {
-            if(gt_step_ptr[j]!=DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL &&
-               gt_step_ptr[j]!=DATASETUTILS_VIDEOSEGM_UNKNOWN_VAL &&
-               (oROI.empty() || roi_step_ptr[j]!=dATASETUTILS_VIDEOSEGM_NEGATIVE_VAL)) {
-                if(input_step_ptr[j]==DATASETUTILS_VIDEOSEGM_POSITIVE_VAL) {
-                    if(gt_step_ptr[j]==DATASETUTILS_VIDEOSEGM_POSITIVE_VAL)
-                        res_step_ptr[j*3+1] = UCHAR_MAX;
-                    else if(gt_step_ptr[j]==dATASETUTILS_VIDEOSEGM_NEGATIVE_VAL)
-                        res_step_ptr[j*3+2] = UCHAR_MAX;
-                    else if(gt_step_ptr[j]==DATASETUTILS_VIDEOSEGM_SHADOW_VAL) {
-                        res_step_ptr[j*3+1] = UCHAR_MAX/2;
-                        res_step_ptr[j*3+2] = UCHAR_MAX;
-                    }
-                    else {
-                        for(size_t c=0; c<3; ++c)
-                            res_step_ptr[j*3+c] = UCHAR_MAX/3;
-                    }
-                }
-                else { // input_step_ptr[j]==s_nSegmNegative
-                    if(gt_step_ptr[j]==DATASETUTILS_VIDEOSEGM_POSITIVE_VAL) {
-                        res_step_ptr[j*3] = UCHAR_MAX/2;
-                        res_step_ptr[j*3+2] = UCHAR_MAX;
-                    }
-                }
-            }
-            else if(!oROI.empty() && roi_step_ptr[j]==dATASETUTILS_VIDEOSEGM_NEGATIVE_VAL) {
-                for(size_t c=0; c<3; ++c)
-                    res_step_ptr[j*3+c] = UCHAR_MAX/2;
-            }
-            else {
-                for(size_t c=0; c<3; ++c)
-                    res_step_ptr[j*3+c] = input_step_ptr[j];
-            }
-        }
-    }
-    return oResult;
-}
-
-litiv::ClassifMetrics::ClassifMetrics(const ClassifMetricsBase& m) :
-        dRecall(CalcRecall(m)),
-        dSpecificity(CalcSpecificity(m)),
-        dFPR(CalcFalsePositiveRate(m)),
-        dFNR(CalcFalseNegativeRate(m)),
-        dPBC(CalcPercentBadClassifs(m)),
-        dPrecision(CalcPrecision(m)),
-        dFMeasure(CalcFMeasure(m)),
-        dMCC(CalcMatthewsCorrCoeff(m)),
-        nWeight(1) {}
-
-litiv::ClassifMetrics litiv::ClassifMetrics::operator+(const ClassifMetrics& m) const {
-    ClassifMetrics res(m);
-    const size_t nTotWeight = this->nWeight+res.nWeight;
-    res.dRecall = (res.dRecall*res.nWeight + this->dRecall*this->nWeight)/nTotWeight;
-    res.dSpecificity = (res.dSpecificity*res.nWeight + this->dSpecificity*this->nWeight)/nTotWeight;
-    res.dFPR = (res.dFPR*res.nWeight + this->dFPR*this->nWeight)/nTotWeight;
-    res.dFNR = (res.dFNR*res.nWeight + this->dFNR*this->nWeight)/nTotWeight;
-    res.dPBC = (res.dPBC*res.nWeight + this->dPBC*this->nWeight)/nTotWeight;
-    res.dPrecision = (res.dPrecision*res.nWeight + this->dPrecision*this->nWeight)/nTotWeight;
-    res.dFMeasure = (res.dFMeasure*res.nWeight + this->dFMeasure*this->nWeight)/nTotWeight;
-    res.dMCC = (res.dMCC*res.nWeight + this->dMCC*this->nWeight)/nTotWeight;
-    res.nWeight = nTotWeight;
-    return res;
-}
-
-litiv::ClassifMetrics& litiv::ClassifMetrics::operator+=(const ClassifMetrics& m) {
-    const size_t nTotWeight = this->nWeight+m.nWeight;
-    this->dRecall = (m.dRecall*m.nWeight + this->dRecall*this->nWeight)/nTotWeight;
-    this->dSpecificity = (m.dSpecificity*m.nWeight + this->dSpecificity*this->nWeight)/nTotWeight;
-    this->dFPR = (m.dFPR*m.nWeight + this->dFPR*this->nWeight)/nTotWeight;
-    this->dFNR = (m.dFNR*m.nWeight + this->dFNR*this->nWeight)/nTotWeight;
-    this->dPBC = (m.dPBC*m.nWeight + this->dPBC*this->nWeight)/nTotWeight;
-    this->dPrecision = (m.dPrecision*m.nWeight + this->dPrecision*this->nWeight)/nTotWeight;
-    this->dFMeasure = (m.dFMeasure*m.nWeight + this->dFMeasure*this->nWeight)/nTotWeight;
-    this->dMCC = (m.dMCC*m.nWeight + this->dMCC*this->nWeight)/nTotWeight;
-    this->nWeight = nTotWeight;
-    return *this;
-}
-
-double litiv::ClassifMetrics::CalcFMeasure(double dRecall, double dPrecision) {return (dRecall+dPrecision)>0?(2.0*(dRecall*dPrecision)/(dRecall+dPrecision)):0;}
-double litiv::ClassifMetrics::CalcFMeasure(const ClassifMetricsBase& m) {return CalcFMeasure(CalcRecall(m),CalcPrecision(m));}
-double litiv::ClassifMetrics::CalcRecall(uint64_t nTP, uint64_t nTPFN) {return nTPFN>0?((double)nTP/nTPFN):0;}
-double litiv::ClassifMetrics::CalcRecall(const ClassifMetricsBase& m) {return (m.nTP+m.nFN)>0?((double)m.nTP/(m.nTP+m.nFN)):0;}
-double litiv::ClassifMetrics::CalcPrecision(uint64_t nTP, uint64_t nTPFP) {return nTPFP>0?((double)nTP/nTPFP):0;}
-double litiv::ClassifMetrics::CalcPrecision(const ClassifMetricsBase& m) {return (m.nTP+m.nFP)>0?((double)m.nTP/(m.nTP+m.nFP)):0;}
-double litiv::ClassifMetrics::CalcSpecificity(const ClassifMetricsBase& m) {return (m.nTN+m.nFP)>0?((double)m.nTN/(m.nTN+m.nFP)):0;}
-double litiv::ClassifMetrics::CalcFalsePositiveRate(const ClassifMetricsBase& m) {return (m.nFP+m.nTN)>0?((double)m.nFP/(m.nFP+m.nTN)):0;}
-double litiv::ClassifMetrics::CalcFalseNegativeRate(const ClassifMetricsBase& m) {return (m.nTP+m.nFN)>0?((double)m.nFN/(m.nTP+m.nFN)):0;}
-double litiv::ClassifMetrics::CalcPercentBadClassifs(const ClassifMetricsBase& m) {return m.total()>0?(100.0*(m.nFN+m.nFP)/m.total()):0;}
-double litiv::ClassifMetrics::CalcMatthewsCorrCoeff(const ClassifMetricsBase& m) {return ((m.nTP+m.nFP)>0)&&((m.nTP+m.nFN)>0)&&((m.nTN+m.nFP)>0)&&((m.nTN+m.nFN)>0)?((((double)m.nTP*m.nTN)-(m.nFP*m.nFN))/sqrt(((double)m.nTP+m.nFP)*(m.nTP+m.nFN)*(m.nTN+m.nFP)*(m.nTN+m.nFN))):0;}
-
-void litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::writeEvalReport() const {
+void litiv::IDatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier>::writeEvalReport() const {
     if(getBatches().empty() || !isUsingEvaluator()) {
         std::cout << "No report to write for dataset '" << getName() << "', skipping." << std::endl;
         return;
     }
     for(const auto& pGroupIter : getBatches())
         pGroupIter->writeEvalReport();
-    const ClassifMetrics& oMetrics = getMetrics(true);
+    const BinClassifMetricsCalculator& oMetrics = getMetrics(true);
     std::cout << CxxUtils::clampString(getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
     std::ofstream oMetricsOutput(getOutputPath()+"/overall.txt");
     if(oMetricsOutput.is_open()) {
@@ -225,53 +86,33 @@ void litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::writeEvalReport()
     }
 }
 
-litiv::ClassifMetricsBase litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::getMetricsBase() const {
-    ClassifMetricsBase oMetricsBase;
+litiv::BinClassifMetricsAccumulator litiv::IDatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier>::getMetricsBase() const {
+    BinClassifMetricsAccumulator oMetricsBase;
     for(const auto& pBatch : getBatches())
-        oMetricsBase += dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(*pBatch).getMetricsBase();
+        oMetricsBase += dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(*pBatch).getMetricsBase();
     return oMetricsBase;
 }
 
-litiv::ClassifMetrics litiv::IDatasetEvaluator_<litiv::eDatasetType_VideoSegm>::getMetrics(bool bAverage) const {
+litiv::BinClassifMetricsCalculator litiv::IDatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier>::getMetrics(bool bAverage) const {
     if(bAverage) {
         IDataHandlerPtrArray vpBatches = getBatches();
         auto ppBatchIter = vpBatches.begin();
         for(; ppBatchIter!=vpBatches.end() && !(*ppBatchIter)->getTotPackets(); ++ppBatchIter);
         CV_Assert(ppBatchIter!=vpBatches.end());
-        ClassifMetrics oMetrics = dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage);
+        BinClassifMetricsCalculator oMetrics = dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(**ppBatchIter).getMetrics(bAverage);
         for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
             if((*ppBatchIter)->getTotPackets())
-                oMetrics += dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage);
+                oMetrics += dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(**ppBatchIter).getMetrics(bAverage);
         return oMetrics;
     }
-    return ClassifMetrics(getMetricsBase());
+    return BinClassifMetricsCalculator(getMetricsBase());
 }
 
-litiv::ClassifMetricsBase litiv::IMetricsCalculator_<litiv::eDatasetType_VideoSegm>::getMetricsBase() const {
-    lvAssert(isGroup()); // non-group specialization should override this method
-    ClassifMetricsBase oMetricsBase;
-    for(const auto& pBatch : getBatches())
-        oMetricsBase += dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(*pBatch).getMetricsBase();
-    return oMetricsBase;
-}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
-litiv::ClassifMetrics litiv::IMetricsCalculator_<litiv::eDatasetType_VideoSegm>::getMetrics(bool bAverage) const {
-    if(bAverage && isGroup() && !isBare()) {
-        const IDataHandlerPtrArray& vpBatches = getBatches();
-        auto ppBatchIter = vpBatches.begin();
-        for(; ppBatchIter!=vpBatches.end() && !(*ppBatchIter)->getTotPackets(); ++ppBatchIter);
-        CV_Assert(ppBatchIter!=vpBatches.end());
-        ClassifMetrics oMetrics(dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage));
-        for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
-            if((*ppBatchIter)->getTotPackets())
-                oMetrics += dynamic_cast<const IMetricsCalculator_<eDatasetType_VideoSegm>&>(**ppBatchIter).getMetrics(bAverage);
-        // @@@ check returning metrics weight?
-        return oMetrics;
-    }
-    return ClassifMetrics(getMetricsBase());
-}
-
-void litiv::IMetricsCalculator_<litiv::eDatasetType_VideoSegm>::writeEvalReport() const {
+void litiv::IDataReporter_<litiv::eDatasetEval_None>::writeEvalReport() const {
     if(!getTotPackets()) {
         std::cout << "No report to write for '" << getName() << "', skipping..." << std::endl;
         return;
@@ -280,7 +121,69 @@ void litiv::IMetricsCalculator_<litiv::eDatasetType_VideoSegm>::writeEvalReport(
         for(const auto& pBatch : getBatches())
             pBatch->writeEvalReport();
     }
-    const ClassifMetrics& oMetrics = getMetrics(true);
+    std::ofstream oMetricsOutput(getOutputPath()+"/../"+getName()+".txt");
+    if(oMetricsOutput.is_open()) {
+        oMetricsOutput << std::fixed;
+        oMetricsOutput << "Default evaluation report for '" << getName() << "' :\n\n";
+        oMetricsOutput << "            |   Packets  |   Seconds  |     Hz     \n";
+        oMetricsOutput << "------------|------------|------------|------------\n";
+        oMetricsOutput << writeInlineEvalReport(0,12);
+        oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
+    }
+}
+
+std::string litiv::IDataReporter_<litiv::eDatasetEval_None>::writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const {
+    if(!getTotPackets())
+        return std::string();
+    std::stringstream ssStr;
+    ssStr << std::fixed;
+    if(isGroup() && !isBare()) {
+        for(const auto& pBatch : getBatches()) {
+            // @@@@@@@@@@@
+            ssStr << pBatch->shared_from_this_cast<const IDataReporter_<litiv::eDatasetEval_None>>(true)->writeInlineEvalReport(nIndentSize+1,nCellSize);
+        }
+    }
+    ssStr << CxxUtils::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
+             std::setw(nCellSize) << getTotPackets() << "|" <<
+             std::setw(nCellSize) << getProcessTime() << "|" <<
+             std::setw(nCellSize) << getTotPackets()/getProcessTime() << "\n";
+    return ssStr.str();
+}
+
+litiv::BinClassifMetricsAccumulator litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::getMetricsBase() const {
+    lvAssert(isGroup()); // non-group specialization should override this method
+    BinClassifMetricsAccumulator oMetricsBase;
+    for(const auto& pBatch : getBatches())
+        oMetricsBase += dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(*pBatch).getMetricsBase();
+    return oMetricsBase;
+}
+
+litiv::BinClassifMetricsCalculator litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::getMetrics(bool bAverage) const {
+    if(bAverage && isGroup() && !isBare()) {
+        const IDataHandlerPtrArray& vpBatches = getBatches();
+        auto ppBatchIter = vpBatches.begin();
+        for(; ppBatchIter!=vpBatches.end() && !(*ppBatchIter)->getTotPackets(); ++ppBatchIter);
+        CV_Assert(ppBatchIter!=vpBatches.end());
+        BinClassifMetricsCalculator oMetrics(dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(**ppBatchIter).getMetrics(bAverage));
+        for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
+            if((*ppBatchIter)->getTotPackets())
+                oMetrics += dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(**ppBatchIter).getMetrics(bAverage);
+        // @@@ check returning metrics weight?
+        return oMetrics;
+    }
+    return BinClassifMetricsCalculator(getMetricsBase());
+}
+
+void litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::writeEvalReport() const {
+    if(!getTotPackets()) {
+        std::cout << "No report to write for '" << getName() << "', skipping..." << std::endl;
+        return;
+    }
+    if(isGroup() && !isBare()) {
+        for(const auto& pBatch : getBatches())
+            pBatch->writeEvalReport();
+    }
+    const BinClassifMetricsCalculator& oMetrics = getMetrics(true);
     std::cout << "\t" << CxxUtils::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
     std::ofstream oMetricsOutput(getOutputPath()+"/../"+getName()+".txt");
     if(oMetricsOutput.is_open()) {
@@ -294,15 +197,15 @@ void litiv::IMetricsCalculator_<litiv::eDatasetType_VideoSegm>::writeEvalReport(
     }
 }
 
-std::string litiv::IMetricsCalculator_<litiv::eDatasetType_VideoSegm>::writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const {
+std::string litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const {
     if(!getTotPackets())
         return std::string();
     std::stringstream ssStr;
     ssStr << std::fixed;
     if(isGroup() && !isBare())
         for(const auto& pBatch : getBatches())
-            ssStr << dynamic_cast<IMetricsCalculator_<eDatasetType_VideoSegm>&>(*pBatch).writeInlineEvalReport(nIndentSize+1,nCellSize);
-    const ClassifMetrics& oMetrics = getMetrics(true);
+            ssStr << dynamic_cast<IDataReporter_<eDatasetEval_BinaryClassifier>&>(*pBatch).writeInlineEvalReport(nIndentSize+1,nCellSize);
+    const BinClassifMetricsCalculator& oMetrics = getMetrics(true);
     ssStr << CxxUtils::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
              std::setw(nCellSize) << oMetrics.dRecall << "|" <<
              std::setw(nCellSize) << oMetrics.dSpecificity << "|" <<
@@ -315,75 +218,77 @@ std::string litiv::IMetricsCalculator_<litiv::eDatasetType_VideoSegm>::writeInli
     return ssStr.str();
 }
 
-litiv::ClassifMetricsBase litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm>::getMetricsBase() const {
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+litiv::BinClassifMetricsAccumulator litiv::IDataEvaluator_<litiv::eDatasetEval_BinaryClassifier>::getMetricsBase() const {
     return m_oMetricsBase;
 }
 
-void litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm>::pushSegmMask(const cv::Mat& oSegm,size_t nIdx) {
-    IDataConsumer_<eDatasetType_VideoSegm>::pushSegmMask(oSegm,nIdx);
+void litiv::IDataEvaluator_<litiv::eDatasetEval_BinaryClassifier>::push(const cv::Mat& oClassif, size_t nIdx) {
+    IDataConsumer_<eDatasetEval_BinaryClassifier>::push(oClassif,nIdx);
     if(getDatasetInfo()->isUsingEvaluator()) {
-        auto pProducer = shared_from_this_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(true);
-        accumulateMetricsBase_VideoSegm(oSegm,pProducer->getGTFrame(nIdx),pProducer->getROI(),m_oMetricsBase);
+        auto pLoader = shared_from_this_cast<IDataLoader_<eImagePacket>>(true);
+        m_oMetricsBase.accumulate(oClassif,pLoader->getGT(nIdx),pLoader->getPacketROI(nIdx));
     }
 }
 
-cv::Mat litiv::IDataEvaluator_<litiv::eDatasetType_VideoSegm>::getColoredMask(const cv::Mat& oSegm,size_t nIdx) {
-    auto pProducer = shared_from_this_cast<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(true);
-    return getColoredMask_VideoSegm(oSegm,pProducer->getGTFrame(nIdx),pProducer->getROI());
+cv::Mat litiv::IDataEvaluator_<litiv::eDatasetEval_BinaryClassifier>::getColoredMask(const cv::Mat& oClassif, size_t nIdx) {
+    auto pLoader = shared_from_this_cast<IDataLoader_<eImagePacket>>(true);
+    return BinClassifMetricsAccumulator::getColoredMask(oClassif,pLoader->getGT(nIdx),pLoader->getPacketROI(nIdx));
 }
 
 #if HAVE_GLSL
 
-cv::Size litiv::IAsyncDataEvaluator_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::getIdealGLWindowSize() const {
+cv::Size litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::getIdealGLWindowSize() const {
     glAssert(m_pEvalAlgo && m_pEvalAlgo->getIsGLInitialized());
-    auto pProducer = shared_from_this_cast<const IDataProducer_<eDatasetType_VideoSegm,eNotGroup>>(true);
-    glAssert(pProducer->getFrameCount()>1);
-    cv::Size oFrameSize = pProducer->getFrameSize();
-    oFrameSize.width *= int(m_pEvalAlgo->m_nSxSDisplayCount);
-    return oFrameSize;
+    glAssert(getTotPackets()>1);
+    cv::Size oWindowSize = shared_from_this_cast<const IDataLoader_<eImagePacket>>(true)->getPacketMaxSize();
+    oWindowSize.width *= int(m_pEvalAlgo->m_nSxSDisplayCount);
+    return oWindowSize;
 }
 
-litiv::ClassifMetricsBase litiv::IAsyncDataEvaluator_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::getMetricsBase() const {
+litiv::BinClassifMetricsAccumulator litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::getMetricsBase() const {
     glAssert(m_pEvalAlgo && m_pEvalAlgo->getIsGLInitialized());
-    ClassifMetricsBase oMetricsBase = m_pEvalAlgo->getMetricsBase();
-#if VALIDATE_GPU_EVALUATORS
+    BinClassifMetricsAccumulator oMetricsBase = m_pEvalAlgo->getMetricsBase();
+#if DATASETUTILS_VALIDATE_ASYNC_EVALUATORS
     glAssert(m_oMetricsBase==oMetricsBase);
-#endif //VALIDATE_GPU_EVALUATORS
+#endif //DATASETUTILS_VALIDATE_ASYNC_EVALUATORS
     return oMetricsBase;
 }
 
-void litiv::IAsyncDataEvaluator_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::pre_initialize_gl() {
-    IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eGLSL>::pre_initialize_gl();
-    m_oNextGT = m_pProducer->getGTFrame(m_nNextIdx).clone();
-    m_oCurrGT = m_pProducer->getGTFrame(m_nCurrIdx).clone();
+void litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::pre_initialize_gl() {
+    IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::pre_initialize_gl();
+    m_oNextGT = m_pLoader->getGT(m_nNextIdx).clone();
+    m_oCurrGT = m_pLoader->getGT(m_nCurrIdx).clone();
     m_oLastGT = m_oCurrGT.clone();
     CV_Assert(!m_oCurrGT.empty());
     CV_Assert(m_oCurrGT.isContinuous());
     glAssert(m_oCurrGT.channels()==1 || m_oCurrGT.channels()==4);
 }
 
-void litiv::IAsyncDataEvaluator_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::post_initialize_gl() {
-    IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eGLSL>::post_initialize_gl();
-    glAssert(m_nFrameCount);
-    m_pEvalAlgo = std::make_unique<GLVideoSegmDataEvaluator>(m_pAlgo,m_nFrameCount);
-    m_pEvalAlgo->initialize_gl(m_oCurrGT,m_pProducer->getROI());
-    m_oMetricsBase = ClassifMetricsBase();
+void litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::post_initialize_gl() {
+    IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::post_initialize_gl();
+    m_pEvalAlgo = std::make_unique<GLVideoSegmDataEvaluator>(m_pAlgo,getTotPackets());
+    m_pEvalAlgo->initialize_gl(m_oCurrGT,m_pLoader->getPacketROI(m_nCurrIdx));
+    m_oMetricsBase = BinClassifMetricsAccumulator();
     if(m_pAlgo->m_pDisplayHelper)
         m_pEvalAlgo->setOutputFetching(true);
     if(m_pAlgo->m_pDisplayHelper && m_pEvalAlgo->m_bUsingDebug)
         m_pEvalAlgo->setDebugFetching(true);
-    if(VALIDATE_GPU_EVALUATORS)
+    if(DATASETUTILS_VALIDATE_ASYNC_EVALUATORS)
         m_pAlgo->setOutputFetching(true);
 }
 
-void litiv::IAsyncDataEvaluator_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::pre_apply_gl(size_t nNextIdx, bool bRebindAll) {
-    IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eGLSL>::pre_apply_gl(nNextIdx,bRebindAll);
+void litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::pre_apply_gl(size_t nNextIdx, bool bRebindAll) {
+    IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::pre_apply_gl(nNextIdx,bRebindAll);
     if(nNextIdx!=m_nNextIdx)
-        m_oNextGT = m_pProducer->getGTFrame(nNextIdx);
+        m_oNextGT = m_pLoader->getGT(nNextIdx);
 }
 
-void litiv::IAsyncDataEvaluator_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::post_apply_gl(size_t nNextIdx, bool bRebindAll) {
-    glDbgAssert(m_pProducer);
+void litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::post_apply_gl(size_t nNextIdx, bool bRebindAll) {
+    glDbgAssert(m_pLoader);
     glDbgAssert(m_pEvalAlgo);
     glDbgAssert(m_pAlgo);
     m_pEvalAlgo->apply_gl(m_oNextGT,bRebindAll);
@@ -396,12 +301,12 @@ void litiv::IAsyncDataEvaluator_<litiv::eDatasetType_VideoSegm,ParallelUtils::eG
         m_oCurrGT.copyTo(m_oLastGT);
         m_oNextGT.copyTo(m_oCurrGT);
     }
-    if(m_nNextIdx<m_nFrameCount) {
-        m_oNextInput = m_pProducer->getInputFrame(m_nNextIdx);
-        m_oNextGT = m_pProducer->getGTFrame(m_nNextIdx);
+    if(m_nNextIdx<getTotPackets()) {
+        m_oNextInput = m_pLoader->getInput(m_nNextIdx);
+        m_oNextGT = m_pLoader->getGT(m_nNextIdx);
     }
     processPacket();
-    if(getDatasetInfo()->isSavingOutput() || m_pAlgo->m_pDisplayHelper || VALIDATE_GPU_EVALUATORS) {
+    if(getDatasetInfo()->isSavingOutput() || m_pAlgo->m_pDisplayHelper || DATASETUTILS_VALIDATE_ASYNC_EVALUATORS) {
         cv::Mat oLastOutput,oLastDebug;
         m_pAlgo->fetchLastOutput(oLastOutput);
         if(m_pAlgo->m_pDisplayHelper && m_pEvalAlgo->m_bUsingDebug)
@@ -409,27 +314,27 @@ void litiv::IAsyncDataEvaluator_<litiv::eDatasetType_VideoSegm,ParallelUtils::eG
         else
             oLastDebug = oLastOutput;
         if(getDatasetInfo()->isSavingOutput())
-            writeSegmMask(oLastOutput,m_nLastIdx);
+            save(oLastOutput,m_nLastIdx);
         if(m_pAlgo->m_pDisplayHelper)
-            m_pAlgo->m_pDisplayHelper->display(m_oLastInput,oLastDebug,getColoredMask_VideoSegm(oLastOutput,m_oLastGT,m_pProducer->getROI()),m_nLastIdx);
-        if(VALIDATE_GPU_EVALUATORS)
-            accumulateMetricsBase_VideoSegm(oLastOutput,m_pProducer->getGTFrame(m_nLastIdx),m_pProducer->getROI(),m_oMetricsBase);
+            m_pAlgo->m_pDisplayHelper->display(m_oLastInput,oLastDebug,BinClassifMetricsAccumulator::getColoredMask(oLastOutput,m_oLastGT,m_pLoader->getPacketROI(m_nLastIdx)),m_nLastIdx);
+        if(DATASETUTILS_VALIDATE_ASYNC_EVALUATORS)
+            m_oMetricsBase.accumulate(oLastOutput,m_pLoader->getGT(m_nLastIdx),m_pLoader->getPacketROI(m_nLastIdx));
     }
 }
 
-litiv::IAsyncDataEvaluator_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::GLVideoSegmDataEvaluator::GLVideoSegmDataEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent,size_t nTotFrameCount) :
-        GLImageProcEvaluatorAlgo(pParent,nTotFrameCount,(size_t)ClassifMetricsBase::eCount,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,true) {}
+litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::GLVideoSegmDataEvaluator::GLVideoSegmDataEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent,size_t nTotFrameCount) :
+        GLImageProcEvaluatorAlgo(pParent,nTotFrameCount,(size_t)BinClassifMetricsAccumulator::eCountersCount,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,true) {}
 
-std::string litiv::IAsyncDataEvaluator_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::GLVideoSegmDataEvaluator::getComputeShaderSource(size_t nStage) const {
+std::string litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::GLVideoSegmDataEvaluator::getComputeShaderSource(size_t nStage) const {
     glAssert(nStage<m_nComputeStages);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc <<"#version 430\n"
-            "#define VAL_POSITIVE     " << (uint)DATASETUTILS_VIDEOSEGM_POSITIVE_VAL << "\n"
-            "#define VAL_NEGATIVE     " << (uint)dATASETUTILS_VIDEOSEGM_NEGATIVE_VAL << "\n"
-            "#define VAL_OUTOFSCOPE   " << (uint)DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL << "\n"
-            "#define VAL_UNKNOWN      " << (uint)DATASETUTILS_VIDEOSEGM_UNKNOWN_VAL << "\n"
-            "#define VAL_SHADOW       " << (uint)DATASETUTILS_VIDEOSEGM_SHADOW_VAL << "\n";
+            "#define VAL_POSITIVE     " << (uint)DATASETUTILS_POSITIVE_VAL << "\n"
+            "#define VAL_NEGATIVE     " << (uint)dATASETUTILS_NEGATIVE_VAL << "\n"
+            "#define VAL_OUTOFSCOPE   " << (uint)DATASETUTILS_OUTOFSCOPE_VAL << "\n"
+            "#define VAL_UNKNOWN      " << (uint)DATASETUTILS_UNKNOWN_VAL << "\n"
+            "#define VAL_SHADOW       " << (uint)DATASETUTILS_SHADOW_VAL << "\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc <<"layout(local_size_x=" << m_vDefaultWorkGroupSize.x << ",local_size_y=" << m_vDefaultWorkGroupSize.y << ") in;\n"
             "layout(binding=" << GLImageProcAlgo::eImage_ROIBinding << ", r8ui) readonly uniform uimage2D imgROI;\n"
@@ -437,41 +342,43 @@ std::string litiv::IAsyncDataEvaluator_<litiv::eDatasetType_VideoSegm,ParallelUt
             "layout(binding=" << GLImageProcAlgo::eImage_GTBinding << ", r8ui) readonly uniform uimage2D imgGT;\n";
     if(m_bUsingDebug) ssSrc <<
             "layout(binding=" << GLImageProcAlgo::eImage_DebugBinding << ") writeonly uniform uimage2D imgDebug;\n";
-    ssSrc <<"layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << ClassifMetricsBase::eCounter_TP*4 << ") uniform atomic_uint nTP;\n"
-            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << ClassifMetricsBase::eCounter_TN*4 << ") uniform atomic_uint nTN;\n"
-            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << ClassifMetricsBase::eCounter_FP*4 << ") uniform atomic_uint nFP;\n"
-            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << ClassifMetricsBase::eCounter_FN*4 << ") uniform atomic_uint nFN;\n"
-            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << ClassifMetricsBase::eCounter_SE*4 << ") uniform atomic_uint nSE;\n";
+    ssSrc <<"layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << BinClassifMetricsAccumulator::eCounter_TP*4 << ") uniform atomic_uint nTP;\n"
+            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << BinClassifMetricsAccumulator::eCounter_TN*4 << ") uniform atomic_uint nTN;\n"
+            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << BinClassifMetricsAccumulator::eCounter_FP*4 << ") uniform atomic_uint nFP;\n"
+            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << BinClassifMetricsAccumulator::eCounter_FN*4 << ") uniform atomic_uint nFN;\n"
+            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << BinClassifMetricsAccumulator::eCounter_SE*4 << ") uniform atomic_uint nSE;\n"
+            "layout(binding=" << GLImageProcAlgo::eAtomicCounterBuffer_EvalBinding << ", offset=" << BinClassifMetricsAccumulator::eCounter_DC*4 << ") uniform atomic_uint nDC;\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc <<"void main() {\n"
             "    ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);\n"
             "    uint nInputSegmVal = imageLoad(imgInput,imgCoord).r;\n"
             "    uint nGTSegmVal = imageLoad(imgGT,imgCoord).r;\n"
             "    uint nROIVal = imageLoad(imgROI,imgCoord).r;\n"
-            "    if(nROIVal!=VAL_NEGATIVE) {\n"
-            "        if(nGTSegmVal!=VAL_OUTOFSCOPE && nGTSegmVal!=VAL_UNKNOWN) {\n"
-            "            if(nInputSegmVal==VAL_POSITIVE) {\n"
-            "                if(nGTSegmVal==VAL_POSITIVE) {\n"
-            "                    atomicCounterIncrement(nTP);\n"
-            "                }\n"
-            "                else { // nGTSegmVal==VAL_NEGATIVE\n"
-            "                    atomicCounterIncrement(nFP);\n"
-            "                }\n"
+            "    if(nROIVal!=VAL_NEGATIVE && nGTSegmVal!=VAL_OUTOFSCOPE && nGTSegmVal!=VAL_UNKNOWN) {\n"
+            "        if(nInputSegmVal==VAL_POSITIVE) {\n"
+            "            if(nGTSegmVal==VAL_POSITIVE) {\n"
+            "                atomicCounterIncrement(nTP);\n"
             "            }\n"
-            "            else { // nInputSegmVal==VAL_NEGATIVE\n"
-            "                if(nGTSegmVal==VAL_POSITIVE) {\n"
-            "                    atomicCounterIncrement(nFN);\n"
-            "                }\n"
-            "                else { // nGTSegmVal==VAL_NEGATIVE\n"
-            "                    atomicCounterIncrement(nTN);\n"
-            "                }\n"
-            "            }\n"
-            "            if(nGTSegmVal==VAL_SHADOW) {\n"
-            "                if(nInputSegmVal==VAL_POSITIVE) {\n"
-            "                   atomicCounterIncrement(nSE);\n"
-            "                }\n"
+            "            else { // nGTSegmVal==VAL_NEGATIVE\n"
+            "                atomicCounterIncrement(nFP);\n"
             "            }\n"
             "        }\n"
+            "        else { // nInputSegmVal==VAL_NEGATIVE\n"
+            "            if(nGTSegmVal==VAL_POSITIVE) {\n"
+            "                atomicCounterIncrement(nFN);\n"
+            "            }\n"
+            "            else { // nGTSegmVal==VAL_NEGATIVE\n"
+            "                atomicCounterIncrement(nTN);\n"
+            "            }\n"
+            "        }\n"
+            "        if(nGTSegmVal==VAL_SHADOW) {\n"
+            "            if(nInputSegmVal==VAL_POSITIVE) {\n"
+            "               atomicCounterIncrement(nSE);\n"
+            "            }\n"
+            "        }\n"
+            "    }\n"
+            "    else {\n"
+            "        atomicCounterIncrement(nDC);\n"
             "    }\n";
     if(m_bUsingDebug) { ssSrc <<
             "    uvec4 out_color = uvec4(0,0,0,255);\n"
@@ -512,15 +419,16 @@ std::string litiv::IAsyncDataEvaluator_<litiv::eDatasetType_VideoSegm,ParallelUt
     return ssSrc.str();
 }
 
-litiv::ClassifMetricsBase litiv::IAsyncDataEvaluator_<litiv::eDatasetType_VideoSegm,ParallelUtils::eGLSL>::GLVideoSegmDataEvaluator::getMetricsBase() {
+litiv::BinClassifMetricsAccumulator litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::GLVideoSegmDataEvaluator::getMetricsBase() {
     const cv::Mat& oAtomicCountersQueryBuffer = this->getEvaluationAtomicCounterBuffer();
-    ClassifMetricsBase oMetricsBase;
+    BinClassifMetricsAccumulator oMetricsBase;
     for(int nFrameIter=0; nFrameIter<oAtomicCountersQueryBuffer.rows; ++nFrameIter) {
-        oMetricsBase.nTP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,ClassifMetricsBase::eCounter_TP);
-        oMetricsBase.nTN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,ClassifMetricsBase::eCounter_TN);
-        oMetricsBase.nFP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,ClassifMetricsBase::eCounter_FP);
-        oMetricsBase.nFN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,ClassifMetricsBase::eCounter_FN);
-        oMetricsBase.nSE += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,ClassifMetricsBase::eCounter_SE);
+        oMetricsBase.nTP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_TP);
+        oMetricsBase.nTN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_TN);
+        oMetricsBase.nFP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_FP);
+        oMetricsBase.nFN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_FN);
+        oMetricsBase.nSE += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_SE);
+        oMetricsBase.nDC += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_DC);
     }
     return oMetricsBase;
 }
@@ -617,7 +525,7 @@ void litiv::Image::Segm::BSDS500BoundaryEvaluator::accumulateMetrics(const cv::M
     CV_Assert(dMaxDist>0 && nMaxDist>0);
 
     const std::vector<uchar> vuEvalUniqueVals = PlatformUtils::unique_8uc1_values(oSegm);
-    BSDS500ClassifMetricsBase oMetricsBase(m_nThresholdBins);
+    BSDS500BinClassifMetricsAccumulator oMetricsBase(m_nThresholdBins);
     CV_DbgAssert(m_voMetricsBase.empty() || m_voMetricsBase[0].vnThresholds==oMetricsBase.vnThresholds);
     cv::Mat oCurrSegmMask(oSegm.size(),CV_8UC1), oTmpSegmMask(oSegm.size(),CV_8UC1);
     cv::Mat oSegmTPAccumulator(oSegm.size(),CV_8UC1);
@@ -968,7 +876,7 @@ void litiv::Image::Segm::BSDS500BoundaryEvaluator::accumulateMetrics(const cv::M
     m_voMetricsBase.push_back(oMetricsBase);
 }
 
-litiv::Image::Segm::BSDS500BoundaryEvaluator::BSDS500ClassifMetricsBase::BSDS500ClassifMetricsBase(size_t nThresholdsBins) : vnIndivTP(nThresholdsBins,0), vnIndivTPFN(nThresholdsBins,0), vnTotalTP(nThresholdsBins,0), vnTotalTPFP(nThresholdsBins,0), vnThresholds(PlatformUtils::linspace<uchar>(0,UCHAR_MAX,nThresholdsBins,false)) {}
+litiv::Image::Segm::BSDS500BoundaryEvaluator::BSDS500BinClassifMetricsAccumulator::BSDS500BinClassifMetricsAccumulator(size_t nThresholdsBins) : vnIndivTP(nThresholdsBins,0), vnIndivTPFN(nThresholdsBins,0), vnTotalTP(nThresholdsBins,0), vnTotalTPFP(nThresholdsBins,0), vnThresholds(PlatformUtils::linspace<uchar>(0,UCHAR_MAX,nThresholdsBins,false)) {}
 
 void litiv::Image::Segm::BSDS500BoundaryEvaluator::setThresholdBins(size_t nThresholdBins) {
     CV_Assert(m_nThresholdBins>0 && m_nThresholdBins<=UCHAR_MAX);
@@ -984,8 +892,8 @@ void litiv::Image::Segm::BSDS500BoundaryEvaluator::CalcMetrics(const WorkBatch& 
     auto pEval = std::dynamic_pointer_cast<BSDS500BoundaryEvaluator>(oBatch.m_pEvaluator);
     CV_Assert(pEval!=nullptr && !pEval->m_voMetricsBase.empty());
     oRes.dTimeElapsed_sec = pEval->dTimeElapsed_sec;
-    BSDS500ClassifMetricsBase oCumulMetricsBase(pEval->m_nThresholdBins);
-    BSDS500ClassifMetricsBase oMaxClassifMetricsBase(1);
+    BSDS500BinClassifMetricsAccumulator oCumulMetricsBase(pEval->m_nThresholdBins);
+    BSDS500BinClassifMetricsAccumulator oMaxBinClassifMetricsAccumulator(1);
     const size_t nImageCount = pEval->m_voMetricsBase.size();
     oRes.voBestImageScores.resize(nImageCount);
     for(size_t nImageIdx = 0; nImageIdx<nImageCount; ++nImageIdx) {
@@ -999,9 +907,9 @@ void litiv::Image::Segm::BSDS500BoundaryEvaluator::CalcMetrics(const WorkBatch& 
         CV_DbgAssert(nImageIdx==0 || pEval->m_voMetricsBase[nImageIdx].vnThresholds==pEval->m_voMetricsBase[nImageIdx-1].vnThresholds);
         std::vector<BSDS500Score> voImageScore_PerThreshold(pEval->m_nThresholdBins);
         for(size_t nThresholdIdx = 0; nThresholdIdx<pEval->m_nThresholdBins; ++nThresholdIdx) {
-            voImageScore_PerThreshold[nThresholdIdx].dRecall = ClassifMetrics::CalcRecall(pEval->m_voMetricsBase[nImageIdx].vnIndivTP[nThresholdIdx],pEval->m_voMetricsBase[nImageIdx].vnIndivTPFN[nThresholdIdx]);
-            voImageScore_PerThreshold[nThresholdIdx].dPrecision = ClassifMetrics::CalcPrecision(pEval->m_voMetricsBase[nImageIdx].vnTotalTP[nThresholdIdx],pEval->m_voMetricsBase[nImageIdx].vnTotalTPFP[nThresholdIdx]);
-            voImageScore_PerThreshold[nThresholdIdx].dFMeasure = ClassifMetrics::CalcFMeasure(voImageScore_PerThreshold[nThresholdIdx].dRecall,voImageScore_PerThreshold[nThresholdIdx].dPrecision);
+            voImageScore_PerThreshold[nThresholdIdx].dRecall = BinClassifMetricsCalculator::CalcRecall(pEval->m_voMetricsBase[nImageIdx].vnIndivTP[nThresholdIdx],pEval->m_voMetricsBase[nImageIdx].vnIndivTPFN[nThresholdIdx]);
+            voImageScore_PerThreshold[nThresholdIdx].dPrecision = BinClassifMetricsCalculator::CalcPrecision(pEval->m_voMetricsBase[nImageIdx].vnTotalTP[nThresholdIdx],pEval->m_voMetricsBase[nImageIdx].vnTotalTPFP[nThresholdIdx]);
+            voImageScore_PerThreshold[nThresholdIdx].dFMeasure = BinClassifMetricsCalculator::CalcFMeasure(voImageScore_PerThreshold[nThresholdIdx].dRecall,voImageScore_PerThreshold[nThresholdIdx].dPrecision);
             voImageScore_PerThreshold[nThresholdIdx].dThreshold = double(pEval->m_voMetricsBase[nImageIdx].vnThresholds[nThresholdIdx])/UCHAR_MAX;
             oCumulMetricsBase.vnIndivTP[nThresholdIdx] += pEval->m_voMetricsBase[nImageIdx].vnIndivTP[nThresholdIdx];
             oCumulMetricsBase.vnIndivTPFN[nThresholdIdx] += pEval->m_voMetricsBase[nImageIdx].vnIndivTPFN[nThresholdIdx];
@@ -1012,24 +920,24 @@ void litiv::Image::Segm::BSDS500BoundaryEvaluator::CalcMetrics(const WorkBatch& 
         size_t nMaxFMeasureIdx = (size_t)std::distance(voImageScore_PerThreshold.begin(),std::max_element(voImageScore_PerThreshold.begin(),voImageScore_PerThreshold.end(),[](const BSDS500Score& n1, const BSDS500Score& n2){
             return n1.dFMeasure<n2.dFMeasure;
         }));
-        oMaxClassifMetricsBase.vnIndivTP[0] += pEval->m_voMetricsBase[nImageIdx].vnIndivTP[nMaxFMeasureIdx];
-        oMaxClassifMetricsBase.vnIndivTPFN[0] += pEval->m_voMetricsBase[nImageIdx].vnIndivTPFN[nMaxFMeasureIdx];
-        oMaxClassifMetricsBase.vnTotalTP[0] += pEval->m_voMetricsBase[nImageIdx].vnTotalTP[nMaxFMeasureIdx];
-        oMaxClassifMetricsBase.vnTotalTPFP[0] += pEval->m_voMetricsBase[nImageIdx].vnTotalTPFP[nMaxFMeasureIdx];
+        oMaxBinClassifMetricsAccumulator.vnIndivTP[0] += pEval->m_voMetricsBase[nImageIdx].vnIndivTP[nMaxFMeasureIdx];
+        oMaxBinClassifMetricsAccumulator.vnIndivTPFN[0] += pEval->m_voMetricsBase[nImageIdx].vnIndivTPFN[nMaxFMeasureIdx];
+        oMaxBinClassifMetricsAccumulator.vnTotalTP[0] += pEval->m_voMetricsBase[nImageIdx].vnTotalTP[nMaxFMeasureIdx];
+        oMaxBinClassifMetricsAccumulator.vnTotalTPFP[0] += pEval->m_voMetricsBase[nImageIdx].vnTotalTPFP[nMaxFMeasureIdx];
     }
     // ^^^ voBestImageScores => eval_bdry_img.txt
     oRes.voThresholdScores.resize(pEval->m_nThresholdBins);
     for(size_t nThresholdIdx = 0; nThresholdIdx<oCumulMetricsBase.vnThresholds.size(); ++nThresholdIdx) {
-        oRes.voThresholdScores[nThresholdIdx].dRecall = ClassifMetrics::CalcRecall(oCumulMetricsBase.vnIndivTP[nThresholdIdx],oCumulMetricsBase.vnIndivTPFN[nThresholdIdx]);
-        oRes.voThresholdScores[nThresholdIdx].dPrecision = ClassifMetrics::CalcPrecision(oCumulMetricsBase.vnTotalTP[nThresholdIdx],oCumulMetricsBase.vnTotalTPFP[nThresholdIdx]);
-        oRes.voThresholdScores[nThresholdIdx].dFMeasure = ClassifMetrics::CalcFMeasure(oRes.voThresholdScores[nThresholdIdx].dRecall,oRes.voThresholdScores[nThresholdIdx].dPrecision);
+        oRes.voThresholdScores[nThresholdIdx].dRecall = BinClassifMetricsCalculator::CalcRecall(oCumulMetricsBase.vnIndivTP[nThresholdIdx],oCumulMetricsBase.vnIndivTPFN[nThresholdIdx]);
+        oRes.voThresholdScores[nThresholdIdx].dPrecision = BinClassifMetricsCalculator::CalcPrecision(oCumulMetricsBase.vnTotalTP[nThresholdIdx],oCumulMetricsBase.vnTotalTPFP[nThresholdIdx]);
+        oRes.voThresholdScores[nThresholdIdx].dFMeasure = BinClassifMetricsCalculator::CalcFMeasure(oRes.voThresholdScores[nThresholdIdx].dRecall,oRes.voThresholdScores[nThresholdIdx].dPrecision);
         oRes.voThresholdScores[nThresholdIdx].dThreshold = double(oCumulMetricsBase.vnThresholds[nThresholdIdx])/UCHAR_MAX;
     }
     // ^^^ voThresholdScores => eval_bdry_thr.txt
     oRes.oBestScore = FindMaxFMeasure(oRes.voThresholdScores);
-    oRes.dMaxRecall = ClassifMetrics::CalcRecall(oMaxClassifMetricsBase.vnIndivTP[0],oMaxClassifMetricsBase.vnIndivTPFN[0]);
-    oRes.dMaxPrecision = ClassifMetrics::CalcPrecision(oMaxClassifMetricsBase.vnTotalTP[0],oMaxClassifMetricsBase.vnTotalTPFP[0]);
-    oRes.dMaxFMeasure = ClassifMetrics::CalcFMeasure(oRes.dMaxRecall,oRes.dMaxPrecision);
+    oRes.dMaxRecall = BinClassifMetricsCalculator::CalcRecall(oMaxBinClassifMetricsAccumulator.vnIndivTP[0],oMaxBinClassifMetricsAccumulator.vnIndivTPFN[0]);
+    oRes.dMaxPrecision = BinClassifMetricsCalculator::CalcPrecision(oMaxBinClassifMetricsAccumulator.vnTotalTP[0],oMaxBinClassifMetricsAccumulator.vnTotalTPFP[0]);
+    oRes.dMaxFMeasure = BinClassifMetricsCalculator::CalcFMeasure(oRes.dMaxRecall,oRes.dMaxPrecision);
     oRes.dAreaPR = 0;
     std::vector<size_t> vnCumulRecallIdx_uniques = PlatformUtils::unique_indexes(oRes.voThresholdScores,
         [&oRes](size_t n1, size_t n2) {
@@ -1137,7 +1045,7 @@ litiv::Image::Segm::BSDS500BoundaryEvaluator::BSDS500Score litiv::Image::Segm::B
     CV_Assert(!vnThresholds.empty() && !vdRecall.empty() && !vdPrecision.empty());
     CV_Assert(vnThresholds.size()==vdRecall.size() && vdRecall.size()==vdPrecision.size());
     BSDS500Score oRes;
-    oRes.dFMeasure = ClassifMetrics::CalcFMeasure(vdRecall[0],vdPrecision[0]);
+    oRes.dFMeasure = BinClassifMetricsCalculator::CalcFMeasure(vdRecall[0],vdPrecision[0]);
     oRes.dPrecision = vdPrecision[0];
     oRes.dRecall = vdRecall[0];
     oRes.dThreshold = double(vnThresholds[0])/UCHAR_MAX;
@@ -1148,7 +1056,7 @@ litiv::Image::Segm::BSDS500BoundaryEvaluator::BSDS500Score litiv::Image::Segm::B
             const double dCurrInterp = double(nInterpIdx)/nInterpCount;
             const double dInterpRecall = dLastInterp*vdRecall[nThresholdIdx-1] + dCurrInterp*vdRecall[nThresholdIdx];
             const double dInterpPrecision = dLastInterp*vdPrecision[nThresholdIdx-1] + dCurrInterp*vdPrecision[nThresholdIdx];
-            const double dInterpFMeasure = ClassifMetrics::CalcFMeasure(dInterpRecall,dInterpPrecision);
+            const double dInterpFMeasure = BinClassifMetricsCalculator::CalcFMeasure(dInterpRecall,dInterpPrecision);
             if(dInterpFMeasure>oRes.dFMeasure) {
                 oRes.dThreshold = (dLastInterp*vnThresholds[nThresholdIdx-1] + dCurrInterp*vnThresholds[nThresholdIdx])/UCHAR_MAX;
                 oRes.dFMeasure = dInterpFMeasure;
@@ -1170,7 +1078,7 @@ litiv::Image::Segm::BSDS500BoundaryEvaluator::BSDS500Score litiv::Image::Segm::B
             const double dCurrInterp = double(nInterpIdx)/nInterpCount;
             const double dInterpRecall = dLastInterp*voScores[nScoreIdx-1].dRecall + dCurrInterp*voScores[nScoreIdx].dRecall;
             const double dInterpPrecision = dLastInterp*voScores[nScoreIdx-1].dPrecision + dCurrInterp*voScores[nScoreIdx].dPrecision;
-            const double dInterpFMeasure = ClassifMetrics::CalcFMeasure(dInterpRecall,dInterpPrecision);
+            const double dInterpFMeasure = BinClassifMetricsCalculator::CalcFMeasure(dInterpRecall,dInterpPrecision);
             if(dInterpFMeasure>oRes.dFMeasure) {
                 oRes.dThreshold = dLastInterp*voScores[nScoreIdx-1].dThreshold + dCurrInterp*voScores[nScoreIdx].dThreshold;
                 oRes.dFMeasure = dInterpFMeasure;
