@@ -32,11 +32,11 @@
 #define USE_LOBSTER             1
 #define USE_SUBSENSE            0
 ////////////////////////////////
-#define USE_GLSL_IMPL           1
+#define USE_GLSL_IMPL           0
 #define USE_CUDA_IMPL           0
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
-#define DATASET_ID              eDataset_VideoSegm_CDnet // comment this line to fall back to custom definition
+#define DATASET_ID              eDataset_CDnet // comment this line to fall back to custom definition
 #define DATASET_OUTPUT_PATH     "results_test" // always relative to the dataset root path
 #define DATASET_PRECACHING      1
 #define DATASET_SCALE_FACTOR    1.0
@@ -80,7 +80,7 @@ constexpr ParallelUtils::eParallelAlgoType eImplTypeEnum = ParallelUtils::eGLSL;
 #else // USE_..._IMPL
 constexpr ParallelUtils::eParallelAlgoType eImplTypeEnum = ParallelUtils::eNonParallel;
 #endif // USE_..._IMPL
-using DatasetType = litiv::Dataset_<litiv::eDatasetType_VideoSegm,litiv::DATASET_ID,eImplTypeEnum>;
+using DatasetType = litiv::Dataset_<litiv::eDatasetTask_ChgDet,litiv::DATASET_ID,eImplTypeEnum>;
 #if USE_LOBSTER
 using BackgroundSubtractorType = BackgroundSubtractorLOBSTER_<eImplTypeEnum>;
 #elif USE_SUBSENSE
@@ -93,7 +93,7 @@ const size_t g_nMaxThreads = USE_GPU_IMPL?1:std::thread::hardware_concurrency()>
 
 int main(int, char**) {
     try {
-        litiv::IDatasetPtr pDataset = litiv::datasets::create<litiv::eDatasetType_VideoSegm,litiv::DATASET_ID,eImplTypeEnum>(DATASET_PARAMS);
+        litiv::IDatasetPtr pDataset = litiv::datasets::create<litiv::eDatasetTask_ChgDet,litiv::DATASET_ID,eImplTypeEnum>(DATASET_PARAMS);
         litiv::IDataHandlerPtrQueue vpBatches = pDataset->getSortedBatches();
         const size_t nTotPackets = pDataset->getTotPackets();
         const size_t nTotBatches = vpBatches.size();
@@ -207,7 +207,7 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         const std::string sCurrBatchName = CxxUtils::clampString(oBatch.getName(),12);
         const size_t nTotPacketCount = oBatch.getFrameCount();
         const cv::Mat oROI = oBatch.getROI();
-        cv::Mat oCurrInput = oBatch.getInputFrame(nCurrIdx).clone();
+        cv::Mat oCurrInput = oBatch.getInput(nCurrIdx).clone();
         CV_Assert(!oCurrInput.empty());
         CV_Assert(oCurrInput.isContinuous());
         cv::Mat oCurrFGMask(oBatch.getFrameSize(),CV_8UC1,cv::Scalar_<uchar>(0));
@@ -223,7 +223,7 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
             if(!((nCurrIdx+1)%100) && nCurrIdx<nTotPacketCount)
                 std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << "   [T=" << nThreadIdx << "]" << std::endl;
             const double dCurrLearningRate = nCurrIdx<=100?1:dDefaultLearningRate;
-            oCurrInput = oBatch.getInputFrame(nCurrIdx);
+            oCurrInput = oBatch.getInput(nCurrIdx);
             pAlgo->apply(oCurrInput,oCurrFGMask,dCurrLearningRate);
 #if DISPLAY_OUTPUT>0
             cv::Mat oCurrBGImg;
@@ -237,7 +237,7 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
             if(nKeyPressed==(int)'q')
                 break;
 #endif //DISPLAY_OUTPUT>0
-            oBatch.pushSegmMask(oCurrFGMask,nCurrIdx++);
+            oBatch.push(oCurrFGMask,nCurrIdx++);
         }
         oBatch.stopProcessing();
         const double dTimeElapsed = oBatch.getProcessTime();

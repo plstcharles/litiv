@@ -48,7 +48,7 @@ litiv::IDataHandlerConstPtr litiv::DataHandler::getBatch(size_t& nPacketIdx) con
         }
         CV_Assert(ppBatchIter!=vpBatches.end());
         nPacketIdx -= nCurrPacketCount;
-        return *ppBatchIter;
+        return (*ppBatchIter)->shared_from_this_cast<DataHandler>(true)->getBatch(nPacketIdx);
     }
     else {
         CV_Assert(nPacketIdx<getTotPackets());

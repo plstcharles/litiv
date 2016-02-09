@@ -22,9 +22,10 @@
 #error "This file should never be included directly; use litiv/datasets.hpp instead"
 #endif //__LITIV_DATASETS_IMPL_H
 
-template<ParallelUtils::eParallelAlgoType eEvalImpl>
-struct Dataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet,eEvalImpl> :
-        public IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet,eEvalImpl> {
+template<eDatasetTaskList eDatasetTask, ParallelUtils::eParallelAlgoType eEvalImpl>
+struct Dataset_<eDatasetTask,eDataset_CDnet,eEvalImpl> :
+        public IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_CDnet,getDatasetEval<eDatasetTask,eDataset_CDnet>(),eEvalImpl> {
+    static_assert(eDatasetTask!=eDatasetTask_Registr,"CDnet dataset does not support image registration (no image arrays)");
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
             const std::string& sOutputDirName, // output directory (full) path for debug logs, evaluation reports and results archiving (will be created in CDnet dataset folder)
@@ -34,7 +35,7 @@ protected: // should still be protected, as creation should always be done via d
             double dScaleFactor=1.0, // defines the scale factor to use to resize/rescale read packets
             bool b2014=true // defines whether to use the 2012 or 2014 version of the dataset (each should have its own folder in dataset root)
     ) :
-            IDataset_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet,eEvalImpl>(
+            IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_CDnet,getDatasetEval<eDatasetTask,eDataset_CDnet>(),eEvalImpl>(
                     b2014?"CDnet 2014":"CDnet 2012",
                     b2014?"CDNet2014/dataset":"CDNet/dataset",
                     std::string(DATASET_ROOT)+"/"+std::string(b2014?"CDNet2014/":"CDNet/")+sOutputDirName+"/",
@@ -52,8 +53,8 @@ protected: // should still be protected, as creation should always be done via d
 };
 
 template<>
-struct DataProducer_<eDatasetType_VideoSegm,eDataset_VideoSegm_CDnet,eNotGroup> :
-        public IDataProducer_<eDatasetType_VideoSegm,eNotGroup> {
+struct DataProducer_<eDatasetSource_Video,eDataset_CDnet> :
+        public IDataProducer_<eDatasetSource_Video> {
 protected:
     virtual void parseData() override final {
         std::vector<std::string> vsSubDirs;
@@ -69,18 +70,16 @@ protected:
         m_oROI = cv::imread(getDataPath()+"/ROI.bmp",cv::IMREAD_GRAYSCALE);
         if(m_oROI.empty())
             lvErrorExt("CDnet sequence '%s' did not possess a ROI.bmp file",getName().c_str());
-        m_oROI = m_oROI>0; // @@@@@ check throw here???
+        m_oROI = m_oROI>0;
+        m_oOrigSize = m_oROI.size();
+        const double dScale = getDatasetInfo()->getScaleFactor();
+        if(dScale!=1.0)
+            cv::resize(m_oROI,m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
         m_oSize = m_oROI.size();
         m_nFrameCount = m_vsInputFramePaths.size();
         CV_Assert(m_nFrameCount>0);
-        // note: in this case, no need to use m_vnTestGTIndexes since all # of gt frames == # of test frames (but we assume the frames returned by 'GetFilesFromDir' are ordered correctly...)
-    }
-    virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final {
-        cv::Mat oFrame = cv::imread(m_vsGTFramePaths[nIdx],cv::IMREAD_GRAYSCALE);
-        if(oFrame.empty())
-            oFrame = cv::Mat(m_oSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL));
-        else if(oFrame.size()!=m_oSize)
-            cv::resize(oFrame,oFrame,m_oSize,0,0,cv::INTER_NEAREST);
-        return oFrame;
+        m_mGTIndexLUT.clear();
+        for(size_t i=0; i<m_nFrameCount; ++i)
+            m_mGTIndexLUT[i] = i; // direct gt path index to frame index mapping
     }
 };

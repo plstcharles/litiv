@@ -223,18 +223,15 @@ namespace CxxUtils {
     template<typename T>
     struct enable_shared_from_this : public std::enable_shared_from_this<T> {
         template<typename Tcast>
-        inline std::shared_ptr<const Tcast> shared_from_this_cast(bool bCheck=false) const {
+        inline std::shared_ptr<const Tcast> shared_from_this_cast(bool bThrowIfFail=false) const {
             auto pCast = std::dynamic_pointer_cast<const Tcast>(this->shared_from_this());
-            if(bCheck && !pCast)
+            if(bThrowIfFail && !pCast)
                 lvErrorExt("Failed shared_from_this_cast from type '%s' to type '%s'",typeid(T).name(),typeid(Tcast).name());
             return pCast;
         }
         template<typename Tcast>
-        inline std::shared_ptr<Tcast> shared_from_this_cast(bool bCheck=false) {
-            auto pCast = std::dynamic_pointer_cast<Tcast>(this->shared_from_this());
-            if(bCheck && !pCast)
-                lvErrorExt("Failed shared_from_this_cast from type '%s' to type '%s'",typeid(T).name(),typeid(Tcast).name());
-            return pCast;
+        inline std::shared_ptr<Tcast> shared_from_this_cast(bool bThrowIfFail=false) {
+            return std::const_pointer_cast<Tcast>(static_cast<const T*>(this)->shared_from_this_cast<Tcast>(bThrowIfFail));
         }
     };
 

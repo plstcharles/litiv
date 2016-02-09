@@ -18,16 +18,17 @@
 #pragma once
 
 #include "litiv/datasets/utils.hpp"
+#include "litiv/datasets/metrics.hpp"
 #include "litiv/datasets/eval.hpp"
 
 namespace litiv {
 
     namespace datasets {
 
-        template<eDatasetTypeList eDatasetType, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl, typename... Targs>
+        template<eDatasetTaskList eDatasetTask, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl, typename... Targs>
         IDatasetPtr create(Targs&&... args);
 
-        template<eDatasetTypeList eDatasetType, ParallelUtils::eParallelAlgoType eEvalImpl, typename... Targs>
+        template<eDatasetTaskList eDatasetTask, ParallelUtils::eParallelAlgoType eEvalImpl, typename... Targs>
         IDatasetPtr create(Targs&&... args);
 
     } //namespace datasets
@@ -52,15 +53,17 @@ namespace litiv {
         const IDatasetPtr m_pDataset;
     };
 
-    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl>
-    struct IDataset_ : public DatasetEvaluator_<eDatasetType,eDataset> {
+    template<eDatasetTaskList eDatasetTask, eDatasetSourceList eDatasetSource, eDatasetList eDataset, eDatasetEvalList eDatasetEval, ParallelUtils::eParallelAlgoType eEvalImpl>
+    struct IDataset_ : public DatasetEvaluator_<eDatasetEval,eDataset> {
         struct WorkBatch :
                 public DataHandler,
-                public DataProducer_<eDatasetType,eDataset,eNotGroup>,
-                public std::conditional<(eEvalImpl==ParallelUtils::eNonParallel),DataEvaluator_<eDatasetType,eDataset>,AsyncDataEvaluator_<eDatasetType,eDataset,eEvalImpl>>::type {
+                public DataProducer_<eDatasetSource,eDataset>,
+                public std::conditional<(eEvalImpl==ParallelUtils::eNonParallel),DataEvaluator_<eDatasetEval,eDataset>,AsyncDataEvaluator_<eDatasetEval,eDataset,eEvalImpl>>::type {
             virtual ~WorkBatch() = default;
-            virtual eDatasetTypeList getDatasetType() const override final {return eDatasetType;}
+            virtual eDatasetTaskList getDatasetTask() const override final {return eDatasetTask;}
+            virtual eDatasetSourceList getDatasetSource() const override final {return eDatasetSource;}
             virtual eDatasetList getDataset() const override final {return eDataset;}
+            virtual eDatasetEvalList getDatasetEval() const override final {return eDatasetEval;}
             virtual bool isBare() const override final {return false;}
             virtual bool isGroup() const override final {return false;}
             virtual IDataHandlerPtrArray getBatches() const override final {return IDataHandlerPtrArray();}
@@ -101,12 +104,13 @@ namespace litiv {
 
         struct WorkBatchGroup :
                 public DataHandler,
-                public DataProducer_<eDatasetType,eDataset,eGroup>,
-                public IMetricsCalculator_<eDatasetType>,
+                public IDataReporter_<eDatasetEval>,
                 public IDataCounter_<eGroup> {
             virtual ~WorkBatchGroup() = default;
-            virtual eDatasetTypeList getDatasetType() const override final {return eDatasetType;}
+            virtual eDatasetTaskList getDatasetTask() const override final {return eDatasetTask;}
+            virtual eDatasetSourceList getDatasetSource() const override final {return eDatasetSource;}
             virtual eDatasetList getDataset() const override final {return eDataset;}
+            virtual eDatasetEvalList getDatasetEval() const override final {return eDatasetEval;}
             virtual bool isBare() const override final {return m_bIsBare;}
             virtual bool isGroup() const override final {return true;}
             virtual IDataHandlerPtrArray getBatches() const override final {return m_vpBatches;}
@@ -246,11 +250,30 @@ namespace litiv {
         IDataset_(const IDataset_&) = delete;
     };
 
-    template<eDatasetTypeList eDatasetType, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl>
-    struct Dataset_ : public IDataset_<eDatasetType,eDataset,eEvalImpl> {
-        // if the dataset type/id is not specialized, this redirects creation to default IDataset_ constructor
-        using IDataset_<eDatasetType,eDataset,eEvalImpl>::IDataset_;
-    };
+    template<eDatasetTaskList eDatasetTask, eDatasetList eDataset>
+    constexpr eDatasetEvalList getDatasetEval() {
+        // note: these are only defaults, they can be overriden via full specialization in their impl header
+        return (eDatasetTask==eDatasetTask_ChgDet)?eDatasetEval_BinaryClassifier:
+               (eDatasetTask==eDatasetTask_Segm)?eDatasetEval_Segm:
+               (eDatasetTask==eDatasetTask_Registr)?eDatasetEval_Registr:
+               (eDatasetTask==eDatasetTask_EdgDet)?eDatasetEval_BinaryClassifier:
+               // ...
+               throw -1; // undefined behavior
+    }
+
+    template<eDatasetTaskList eDatasetTask, eDatasetList eDataset>
+    constexpr eDatasetSourceList getDatasetSource() {
+        // note: these are only defaults, they can be overriden via full specialization in their impl header
+        return (eDatasetTask==eDatasetTask_ChgDet)?eDatasetSource_Video:
+               (eDatasetTask==eDatasetTask_Segm)?eDatasetSource_Video:
+               (eDatasetTask==eDatasetTask_Registr)?eDatasetSource_VideoArray:
+               (eDatasetTask==eDatasetTask_EdgDet)?eDatasetSource_Image:
+               // ...
+               throw -1; // undefined behavior
+    }
+
+    template<eDatasetTaskList eDatasetTask, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl>
+    struct Dataset_; // to be specialized (if required) in dataset impl headers
 
 #define __LITIV_DATASETS_IMPL_H
 #include "litiv/datasets/impl/BSDS500.hpp"
@@ -260,21 +283,27 @@ namespace litiv {
 #include "litiv/datasets/impl/Wallflower.hpp"
 #undef __LITIV_DATASETS_IMPL_H
 
+    template<eDatasetTaskList eDatasetTask, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl>
+    struct Dataset_ : public IDataset_<eDatasetTask,getDatasetSource<eDatasetTask,eDataset>(),eDataset,getDatasetEval<eDatasetTask,eDataset>(),eEvalImpl> {
+        // if the task/dataset is not specialized, this redirects creation to the default IDataset_ constructor
+        using IDataset_<eDatasetTask,getDatasetSource<eDatasetTask,eDataset>(),eDataset,getDatasetEval<eDatasetTask,eDataset>(),eEvalImpl>::IDataset_;
+    };
+
     namespace datasets {
 
-        template<eDatasetTypeList eDatasetType, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl, typename... Targs>
+        template<eDatasetTaskList eDatasetTask, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl, typename... Targs>
         IDatasetPtr create(Targs&&... args) {
-            struct DatasetWrapper : public Dataset_<eDatasetType,eDataset,eEvalImpl> {
-                DatasetWrapper(Targs&&... args) : Dataset_<eDatasetType,eDataset,eEvalImpl>(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
+            struct DatasetWrapper : public Dataset_<eDatasetTask,eDataset,eEvalImpl> {
+                DatasetWrapper(Targs&&... args) : Dataset_<eDatasetTask,eDataset,eEvalImpl>(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
             };
             IDatasetPtr pDataset = std::make_shared<DatasetWrapper>(std::forward<Targs>(args)...);
             pDataset->parseDataset();
             return pDataset;
         }
 
-        template<eDatasetTypeList eDatasetType, ParallelUtils::eParallelAlgoType eEvalImpl, typename... Targs>
+        template<eDatasetTaskList eDatasetTask, ParallelUtils::eParallelAlgoType eEvalImpl, typename... Targs>
         IDatasetPtr create(Targs&&... args) {
-            return create<eDatasetType,getCustomDatasetEnum(eDatasetType),eEvalImpl>(std::forward<Targs>(args)...);
+            return create<eDatasetTask,eDataset_Custom,eEvalImpl>(std::forward<Targs>(args)...);
         }
 
     } //namespace datasets

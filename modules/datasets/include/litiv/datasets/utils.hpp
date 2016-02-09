@@ -17,13 +17,6 @@
 
 #pragma once
 
-// as defined in the 2012/2014 CDNet evaluation scripts
-#define DATASETUTILS_VIDEOSEGM_POSITIVE_VAL    uchar(255)
-#define dATASETUTILS_VIDEOSEGM_NEGATIVE_VAL    uchar(0)
-#define DATASETUTILS_VIDEOSEGM_OUTOFSCOPE_VAL  uchar(85)
-#define DATASETUTILS_VIDEOSEGM_UNKNOWN_VAL     uchar(170)
-#define DATASETUTILS_VIDEOSEGM_SHADOW_VAL      uchar(50)
-
 #include "litiv/utils/ParallelUtils.hpp"
 #include "litiv/utils/OpenCVUtils.hpp"
 #include "litiv/utils/PlatformUtils.hpp"
@@ -31,54 +24,64 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 
+//@@@@@ rename defines below (no more videosegm / imageedgdet)
+
+// as defined in the 2012/2014 CDNet evaluation scripts
+#define DATASETUTILS_POSITIVE_VAL    uchar(255)
+#define dATASETUTILS_NEGATIVE_VAL    uchar(0)
+#define DATASETUTILS_OUTOFSCOPE_VAL  uchar(85)
+#define DATASETUTILS_UNKNOWN_VAL     uchar(170)
+#define DATASETUTILS_SHADOW_VAL      uchar(50)
+
+// as defined in the bsds500 evaluation script
+#define DATASETUTILS_IMAGEEDGDET_EVAL_THRESHOLD_BINS 99
+
 namespace litiv {
 
-    enum eDatasetTypeList {
-        eDatasetType_VideoSegm,
-        eDatasetType_VideoRegistr,
-        eDatasetType_ImageSegm,
-        eDatasetType_ImageEdgDet,
+    enum eDatasetTaskList {
+        eDatasetTask_ChgDet,
+        eDatasetTask_Segm,
+        eDatasetTask_Registr,
+        eDatasetTask_EdgDet,
+        // ...
+    };
+
+    enum eDatasetSourceList {
+        eDatasetSource_Video,
+        eDatasetSource_VideoArray,
+        eDatasetSource_Image,
+        eDatasetSource_ImageArray,
         // ...
     };
 
     enum eDatasetList {
-
-        //// VIDEO SEGMENTATION
-        eDataset_VideoSegm_CDnet,
-        eDataset_VideoSegm_Wallflower,
-        eDataset_VideoSegm_PETS2001D3TC1,
-        //eDataset_VideoSegm_...
-        eDataset_VideoSegm_Custom,
-
-        //// VIDEO REGISTRATION
-        eDataset_VideoRegistr_LITIV2012b,
-        //eDataset_VideoRegistr_...
-        eDataset_VideoRegistr_Custom,
-
-        //// IMAGE SEGMENTATION
-        eDataset_ImageSegm_BSDS500,
-        //eDataset_ImageSegm_...
-        eDataset_ImageSegm_Custom,
-
-        //// IMAGE EDGE DETECTION
-        eDataset_ImageEdgDet_BSDS500,
-        //eDataset_ImageEdgDet_...
-        eDataset_ImageEdgDet_Custom
-
+        eDataset_CDnet,
+        eDataset_Wallflower,
+        eDataset_PETS2001D3TC1,
+        eDataset_LITIV2012b,
+        eDataset_BSDS500,
+        // ...
+        eDataset_Custom // 'datasets::create' will forward all parameters from Dataset constr
     };
 
-    enum eGroupPolicy {
+    enum eDatasetEvalList {
+        eDatasetEval_BinaryClassifier,
+        eDatasetEval_Registr,
+        eDatasetEval_Segm,
+        eDatasetEval_BoundingBox,
+        // ...
+        eDatasetEval_None // will only count packets & monitor processing time
+    };
+
+    enum eGroupPolicy { // used to toggle group policy template in data handler interfaces
         eGroup,
         eNotGroup,
     };
 
-    constexpr eDatasetList getCustomDatasetEnum(eDatasetTypeList eDatasetType) {
-        return (eDatasetType==eDatasetType_VideoSegm)?eDataset_VideoSegm_Custom:
-               (eDatasetType==eDatasetType_VideoRegistr)?eDataset_VideoRegistr_Custom:
-               (eDatasetType==eDatasetType_ImageSegm)?eDataset_ImageSegm_Custom:
-               (eDatasetType==eDatasetType_ImageEdgDet)?eDataset_ImageEdgDet_Custom:
-               throw -1; // undefined behavior
-    }
+    enum ePacketPolicy { // used to toggle packet policy template in data handler interfaces
+        eImagePacket,
+        eNotImagePacket
+    };
 
     struct IDataset;
     struct IDataHandler;
@@ -88,17 +91,6 @@ namespace litiv {
     using IDataHandlerConstPtr = std::shared_ptr<const IDataHandler>;
     using IDataHandlerConstPtrArray = std::vector<IDataHandlerConstPtr>;
     using IDataHandlerPtrQueue = std::priority_queue<IDataHandlerPtr,IDataHandlerPtrArray,std::function<bool(const IDataHandlerPtr&,const IDataHandlerPtr&)>>;
-
-    template<eDatasetTypeList eDatasetType>
-    struct IDataReader_;
-    template<eDatasetTypeList eDatasetType, eGroupPolicy ePolicy>
-    struct IDataProducer_;
-    template<eGroupPolicy ePolicy>
-    struct IDataCounter_;
-    template<eDatasetTypeList eDatasetType>
-    struct IDataConsumer_;
-    template<eDatasetTypeList eDatasetType, ParallelUtils::eParallelAlgoType eImpl>
-    struct IAsyncDataConsumer_;
 
     struct IDataset : CxxUtils::enable_shared_from_this<IDataset> {
         virtual const std::string& getName() const = 0;
@@ -140,8 +132,10 @@ namespace litiv {
         virtual bool isGroup() const = 0;
         virtual IDataHandlerPtrArray getBatches() const = 0; // @@@@@ rename batches at dataset level to something else?
         virtual IDatasetPtr getDatasetInfo() const = 0;
-        virtual eDatasetTypeList getDatasetType() const = 0;
+        virtual eDatasetTaskList getDatasetTask() const = 0;
+        virtual eDatasetSourceList getDatasetSource() const = 0;
         virtual eDatasetList getDataset() const = 0;
+        virtual eDatasetEvalList getDatasetEval() const = 0;
         virtual void writeEvalReport() const = 0;
         virtual ~IDataHandler() = default;
         virtual void startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX) = 0; // starts prefetching data packets
@@ -164,11 +158,12 @@ namespace litiv {
         static bool compare(const IDataHandler& i, const IDataHandler& j);
         static bool compare_load(const IDataHandler& i, const IDataHandler& j);
         virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const = 0;
+        virtual std::string getPacketName(size_t nPacketIdx) const;
         virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const = 0; // will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
         virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) = 0; // will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
-        template<eDatasetTypeList eDatasetType>
+        template<eDatasetEvalList eDatasetEval>
         friend struct IDatasetEvaluator_;
-        template<eDatasetTypeList eDatasetType, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl>
+        template<eDatasetTaskList eDatasetTask, eDatasetSourceList eDatasetSource, eDatasetList eDataset, eDatasetEvalList eDatasetEval, ParallelUtils::eParallelAlgoType eEvalImpl>
         friend struct IDataset_;
         virtual void _startProcessing() {}
         virtual void _stopProcessing() {}
@@ -207,15 +202,12 @@ namespace litiv {
         DataPrecacher(const DataPrecacher&) = delete;
     };
 
-    template<eGroupPolicy ePolicy>
-    struct IDataLoader_ : public virtual IDataHandler {};
-
-    template<>
-    struct IDataLoader_<eNotGroup> : public virtual IDataHandler {
+    struct IIDataLoader : public virtual IDataHandler {
+        inline ePacketPolicy getPacketType() const {return m_ePacketType;}
         virtual void startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX) override;
         virtual void stopPrecaching() override;
     protected:
-        IDataLoader_();
+        IIDataLoader(ePacketPolicy ePacket); // will automatically apply byte-alignment/scale in redirect if using image packets
         DataPrecacher m_oInputPrecacher,m_oGTPrecacher;
         virtual cv::Mat _getInputPacket_impl(size_t nIdx) = 0;
         virtual cv::Mat _getGTPacket_impl(size_t nIdx) = 0;
@@ -223,98 +215,102 @@ namespace litiv {
         cv::Mat m_oLatestInputPacket, m_oLatestGTPacket;
         const cv::Mat& _getInputPacket_redirect(size_t nIdx);
         const cv::Mat& _getGTPacket_redirect(size_t nIdx);
+        const ePacketPolicy m_ePacketType;
     };
 
-    template<>
-    struct IDataReader_<eDatasetType_VideoSegm> : public virtual IDataHandler {
-        inline size_t getFrameCount() const {return getTotPackets();}
-        virtual const cv::Mat& getInputFrame(size_t nFrameIdx) = 0;
-        virtual const cv::Mat& getGTFrame(size_t nFrameIdx) = 0;
-    };
-
-    template<>
-    struct IDataReader_<eDatasetType_ImageEdgDet> : public virtual IDataHandler {
-        inline size_t getImageCount() const {return getTotPackets();}
-        virtual bool isConstantSize() const = 0;
-        virtual cv::Size getMaxImageSize() const = 0;
-        virtual const cv::Mat& getInputImage(size_t nImageIdx) = 0;
-        virtual const cv::Mat& getGTMask(size_t nImageIdx) = 0;
-    };
-
-    template<>
-    struct IDataProducer_<eDatasetType_VideoSegm,eGroup> :
-            public IDataLoader_<eGroup>,
-            public IDataReader_<eDatasetType_VideoSegm> {
-        virtual const cv::Mat& getInputFrame(size_t nFrameIdx) override final;
-        virtual const cv::Mat& getGTFrame(size_t nFrameIdx) override final;
-    };
-
-    template<>
-    struct IDataProducer_<eDatasetType_VideoSegm,eNotGroup> :
-            public IDataLoader_<eNotGroup>,
-            public IDataReader_<eDatasetType_VideoSegm> {
-        virtual double getExpectedLoad() const override;
-        virtual size_t getTotPackets() const override;
-        virtual void startPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
-        inline const cv::Size& getFrameSize() const {return m_oSize;}
-        inline const cv::Size& getOrigFrameSize() const {return m_oOrigSize;}
-        inline const cv::Mat& getROI() const {return m_oROI;}
-        virtual const cv::Mat& getInputFrame(size_t nFrameIdx) override final;
-        virtual const cv::Mat& getGTFrame(size_t nFrameIdx) override final;
+    template<ePacketPolicy ePacket>
+    struct IDataLoader_ : public IIDataLoader {
     protected:
-        IDataProducer_() : m_nFrameCount(0),m_nNextExpectedVideoReaderFrameIdx(size_t(-1)) {}
+        IDataLoader_() : IIDataLoader(ePacket) {}
+    };
+
+    template<>
+    struct IDataLoader_<eImagePacket> : public IIDataLoader {
+        virtual bool isPacketTransposed(size_t nPacketIdx) const = 0;
+        virtual const cv::Mat& getPacketROI(size_t nPacketIdx) const = 0;
+        virtual const cv::Size& getPacketSize(size_t nPacketIdx) const = 0;
+        virtual const cv::Size& getPacketOrigSize(size_t nPacketIdx) const = 0;
+        virtual const cv::Size& getPacketMaxSize() const = 0;
+        const cv::Mat& getInput(size_t nPacketIdx) {return m_oInputPrecacher.getPacket(nPacketIdx);}
+        const cv::Mat& getGT(size_t nPacketIdx) {return m_oGTPrecacher.getPacket(nPacketIdx);}
+    protected:
+        IDataLoader_() : IIDataLoader(eImagePacket) {}
+    };
+
+    template<eDatasetSourceList eDatasetSource>
+    struct IDataProducer_;
+
+    template<>
+    struct IDataProducer_<eDatasetSource_Video> :
+            public IDataLoader_<eImagePacket> {
+        //! redirects to getTotPackets()
+        inline size_t getFrameCount() const {return getTotPackets();}
+        virtual double getExpectedLoad() const override;
+        virtual void startPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
+        virtual const cv::Mat& getROI() const {return m_oROI;}
+        virtual const cv::Size& getFrameSize() const {return m_oSize;}
+        virtual const cv::Size& getFrameOrigSize() const {return m_oOrigSize;}
+
+    protected:
+        IDataProducer_();
+        virtual size_t getTotPackets() const override;
+        virtual bool isPacketTransposed(size_t /*nPacketIdx*/) const override final {return m_bTransposeFrames;}
+        virtual const cv::Mat& getPacketROI(size_t /*nPacketIdx*/) const override final {return getROI();}
+        virtual const cv::Size& getPacketSize(size_t /*nPacketIdx*/) const override final {return getFrameSize();}
+        virtual const cv::Size& getPacketOrigSize(size_t /*nPacketIdx*/) const override final {return getFrameOrigSize();}
+        virtual const cv::Size& getPacketMaxSize() const override final {return getFrameSize();}
         virtual cv::Mat _getInputPacket_impl(size_t nIdx) override;
         virtual cv::Mat _getGTPacket_impl(size_t nIdx) override;
         virtual void parseData() override;
         size_t m_nFrameCount;
+        std::unordered_map<size_t,size_t> m_mGTIndexLUT;
         std::vector<std::string> m_vsInputFramePaths;
         std::vector<std::string> m_vsGTFramePaths;
         cv::VideoCapture m_voVideoReader;
         size_t m_nNextExpectedVideoReaderFrameIdx;
+        bool m_bTransposeFrames;
         cv::Mat m_oROI;
         cv::Size m_oOrigSize,m_oSize;
-        std::unordered_map<size_t,size_t> m_mTestGTIndexes;
     };
 
     template<>
-    struct IDataProducer_<eDatasetType_ImageEdgDet,eGroup> :
-            public IDataLoader_<eGroup>,
-            public IDataReader_<eDatasetType_ImageEdgDet> {
-        virtual bool isConstantSize() const override final;
-        virtual cv::Size getMaxImageSize() const override final;
-        virtual const cv::Mat& getInputImage(size_t nImageIdx) override final;
-        virtual const cv::Mat& getGTMask(size_t nImageIdx) override final;
-    };
-
-    template<>
-    struct IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup> :
-            public IDataLoader_<eNotGroup>,
-            public IDataReader_<eDatasetType_ImageEdgDet> {
+    struct IDataProducer_<eDatasetSource_Image> :
+            public IDataLoader_<eImagePacket> {
+        //! redirects to getTotPackets()
+        inline size_t getImageCount() const {return getTotPackets();}
         virtual double getExpectedLoad() const override;
-        virtual size_t getTotPackets() const override;
         virtual void startPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
-        virtual bool isConstantSize() const override; // @@@ todo
-        virtual cv::Size getMaxImageSize() const override; // @@@ todo
-        virtual const cv::Mat& getInputImage(size_t nImageIdx) override final;
-        virtual const cv::Mat& getGTMask(size_t nImageIdx) override final;
-        std::string getInputImageName(size_t nImageIdx, bool bStipExt=true) const;
-        cv::Size getInputImageSize(size_t nImageIdx) const;
+        virtual bool isConstantSize() const {return m_bIsConstantSize;}
+        virtual bool isPacketTransposed(size_t nPacketIdx) const override;
+        virtual const cv::Mat& getPacketROI(size_t nPacketIdx) const override;
+        virtual const cv::Size& getPacketSize(size_t nPacketIdx) const override;
+        virtual const cv::Size& getPacketOrigSize(size_t nPacketIdx) const override;
+        virtual const cv::Size& getPacketMaxSize() const override;
+        virtual std::string getPacketName(size_t nPacketIdx) const override;
+
     protected:
-        IDataProducer_() : m_nImageCount(0) {}
+        IDataProducer_();
+        virtual size_t getTotPackets() const override;
         virtual cv::Mat _getInputPacket_impl(size_t nIdx) override;
         virtual cv::Mat _getGTPacket_impl(size_t nIdx) override;
         virtual void parseData() override;
         size_t m_nImageCount;
+        std::unordered_map<size_t,size_t> m_mGTIndexLUT;
         std::vector<std::string> m_vsInputImagePaths;
-        std::vector<std::string> m_vsGTMaskPaths;
-        std::vector<cv::Size> m_voOrigImageSizes;
+        std::vector<std::string> m_vsGTImagePaths;
+        std::vector<cv::Size> m_voImageSizes;
+        std::vector<cv::Size> m_voImageOrigSizes;
+        std::vector<bool> m_vbImageTransposed;
         bool m_bIsConstantSize;
         cv::Size m_oMaxSize;
-        std::unordered_map<size_t,size_t> m_mTestGTIndexes;
+        const cv::Mat m_oDefaultEmptyROI;
     };
 
-    template<eDatasetTypeList eDatasetType,eDatasetList eDataset,eGroupPolicy ePolicy>
-    struct DataProducer_ : public IDataProducer_<eDatasetType,ePolicy> {};
+    template<eDatasetSourceList eDatasetSource, eDatasetList eDataset>
+    struct DataProducer_ : public IDataProducer_<eDatasetSource> {};
+
+    template<eGroupPolicy ePolicy>
+    struct IDataCounter_;
 
     template<>
     struct IDataCounter_<eNotGroup> : public virtual IDataHandler {
@@ -335,28 +331,31 @@ namespace litiv {
         virtual size_t getProcessedPacketsCount() const override final;
     };
 
-    template<>
-    struct IDataConsumer_<eDatasetType_VideoSegm> :
-            public IDataCounter_<eNotGroup> {
-        virtual void pushSegmMask(const cv::Mat& oSegm, size_t nIdx);
+    struct IDataArchiver : public virtual IDataHandler {
     protected:
-        virtual void writeSegmMask(const cv::Mat& oSegm, size_t nIdx) const;
-        virtual cv::Mat readSegmMask(size_t nIdx) const;
+        virtual void save(const cv::Mat& oClassif, size_t nIdx) const;
+        virtual cv::Mat load(size_t nIdx) const;
     };
 
-    template<>
-    struct IDataConsumer_<eDatasetType_ImageEdgDet> :
+    template<eDatasetEvalList eDatasetEval>
+    struct IDataConsumer_ :
+            public IDataArchiver,
             public IDataCounter_<eNotGroup> {
-        virtual void pushEdgeMask(const cv::Mat& oEdges, size_t nIdx);
-    protected:
-        virtual void writeEdgeMask(const cv::Mat& oEdges, size_t nIdx) const;
-        virtual cv::Mat readEdgeMask(size_t nIdx) const;
+        virtual void push(const cv::Mat& oClassif, size_t nIdx) {
+            processPacket();
+            if(getDatasetInfo()->isSavingOutput())
+                save(oClassif,nIdx);
+        }
     };
+
+    template<eDatasetEvalList eDatasetEval, ParallelUtils::eParallelAlgoType eImpl>
+    struct IAsyncDataConsumer_;
 
 #if HAVE_GLSL
 
     template<>
-    struct IAsyncDataConsumer_<eDatasetType_VideoSegm,ParallelUtils::eGLSL> :
+    struct IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL> :
+            public IDataArchiver,
             public IDataCounter_<eNotGroup> {
         //! returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs, if available)
         virtual cv::Size getIdealGLWindowSize() const;
@@ -365,7 +364,7 @@ namespace litiv {
         void initialize_gl(const std::shared_ptr<Talgo>& pAlgo, Targs&&... args) {
             m_pAlgo = pAlgo;
             pre_initialize_gl();
-            pAlgo->initialize_gl(m_oCurrInput,((IDataProducer_<eDatasetType_VideoSegm,eNotGroup>*)this)->getROI(),std::forward<Targs>(args)...);
+            pAlgo->initialize_gl(m_oCurrInput,((IDataLoader_<eImagePacket>*)this)->getPacketROI(m_nCurrIdx),std::forward<Targs>(args)...);
             post_initialize_gl();
         }
         //! casts the algo to 'Talgo' type, and calls 'apply_gl' with expanded args list
@@ -373,6 +372,7 @@ namespace litiv {
         void apply_gl(const std::shared_ptr<Talgo>& pAlgo, size_t nNextIdx, bool bRebindAll, Targs&&... args) {
             m_pAlgo = pAlgo;
             pre_apply_gl(nNextIdx,bRebindAll);
+            // @@@@@ allow apply with new roi for each packet? (like init?)
             pAlgo->apply_gl(m_oNextInput,bRebindAll,std::forward<Targs>(args)...);
             post_apply_gl(nNextIdx,bRebindAll);
         }
@@ -382,13 +382,10 @@ namespace litiv {
         virtual void post_initialize_gl();
         virtual void pre_apply_gl(size_t nNextIdx, bool bRebindAll);
         virtual void post_apply_gl(size_t nNextIdx, bool bRebindAll);
-        virtual void writeSegmMask(const cv::Mat& oSegm,size_t nIdx) const;
-        virtual cv::Mat readSegmMask(size_t nIdx) const;
         std::shared_ptr<ParallelUtils::IParallelAlgo_GLSL> m_pAlgo;
-        std::shared_ptr<IDataProducer_<eDatasetType_VideoSegm,eNotGroup>> m_pProducer;
+        std::shared_ptr<IDataLoader_<eImagePacket>> m_pLoader;
         cv::Mat m_oLastInput,m_oCurrInput,m_oNextInput;
         size_t m_nLastIdx,m_nCurrIdx,m_nNextIdx;
-        size_t m_nFrameCount;
     };
 
 #endif //HAVE_GLSL
