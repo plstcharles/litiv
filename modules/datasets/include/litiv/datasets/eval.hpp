@@ -108,6 +108,7 @@ namespace litiv {
         //! returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs, if available)
         virtual cv::Size getIdealGLWindowSize() const override;
     protected:
+        virtual void _stopProcessing() override;
         virtual void pre_initialize_gl() override;
         virtual void post_initialize_gl() override;
         virtual void pre_apply_gl(size_t nNextIdx, bool bRebindAll) override;

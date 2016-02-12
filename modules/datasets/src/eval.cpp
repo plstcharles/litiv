@@ -250,12 +250,19 @@ cv::Size litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,Parall
 }
 
 litiv::BinClassifMetricsAccumulator litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::getMetricsBase() const {
-    glAssert(m_pEvalAlgo && m_pEvalAlgo->getIsGLInitialized());
-    BinClassifMetricsAccumulator oMetricsBase = m_pEvalAlgo->getMetricsBase();
+    if(isProcessing())
+        lvError("Must stop processing batch before querying metrics under async data evaluator interface");
+    return m_oMetricsBase;
+}
+
+void litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::_stopProcessing() {
+    if(m_pEvalAlgo && m_pEvalAlgo->getIsGLInitialized()) {
+        BinClassifMetricsAccumulator oMetricsBase = m_pEvalAlgo->getMetricsBase();
 #if DATASETUTILS_VALIDATE_ASYNC_EVALUATORS
-    glAssert(m_oMetricsBase==oMetricsBase);
+        glAssert(m_oMetricsBase==oMetricsBase);
 #endif //DATASETUTILS_VALIDATE_ASYNC_EVALUATORS
-    return oMetricsBase;
+        m_oMetricsBase = oMetricsBase;
+    }
 }
 
 void litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::pre_initialize_gl() {

@@ -550,7 +550,6 @@ cv::Mat litiv::IDataArchiver::load(size_t nIdx) const {
     else {
         // @@@@ read from YML
         lvError("Missing impl");
-        return cv::Mat();
     }
 }
 

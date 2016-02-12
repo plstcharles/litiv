@@ -68,7 +68,7 @@ namespace litiv {
             virtual bool isGroup() const override final {return false;}
             virtual IDataHandlerPtrArray getBatches() const override final {return IDataHandlerPtrArray();}
             virtual double getProcessTime() const override final {return m_dElapsedTime_sec;}
-            bool isProcessing() {return m_bIsProcessing;}
+            virtual bool isProcessing() const override final {return m_bIsProcessing;}
             void startProcessing() { // used to start batch timer & init other time-critical components via _startProcessing
                 if(!m_bIsProcessing) {
                     _startProcessing();
@@ -116,6 +116,7 @@ namespace litiv {
             virtual IDataHandlerPtrArray getBatches() const override final {return m_vpBatches;}
             virtual void startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX) override final {for(const auto& pBatch : getBatches()) pBatch->startPrecaching(bPrecacheGT,nSuggestedBufferSize);}
             virtual void stopPrecaching() override final {for(const auto& pBatch : getBatches()) pBatch->stopPrecaching();}
+            virtual bool isProcessing() const override final {for(const auto& pBatch : getBatches()) if(pBatch->isProcessing()) return true; return false;}
             virtual double getProcessTime() const override final {return CxxUtils::accumulateMembers<double,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessTime();});}
             virtual double getExpectedLoad() const override final {return CxxUtils::accumulateMembers<double,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getExpectedLoad();});}
             virtual size_t getTotPackets() const override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getTotPackets();});}

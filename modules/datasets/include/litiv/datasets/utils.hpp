@@ -140,6 +140,7 @@ namespace litiv {
         virtual ~IDataHandler() = default;
         virtual void startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX) = 0; // starts prefetching data packets
         virtual void stopPrecaching() = 0; // stops prefetching data packets (for work batches, is also called in stopProcessing)
+        virtual bool isProcessing() const = 0;
         virtual double getProcessTime() const = 0; // returns the current (or final) duration elapsed between start/stopProcessing calls
         virtual size_t getProcessedPacketsCountPromise() = 0;
         virtual size_t getProcessedPacketsCount() const = 0;
@@ -364,7 +365,7 @@ namespace litiv {
         void initialize_gl(const std::shared_ptr<Talgo>& pAlgo, Targs&&... args) {
             m_pAlgo = pAlgo;
             pre_initialize_gl();
-            pAlgo->initialize_gl(m_oCurrInput,((IDataLoader_<eImagePacket>*)this)->getPacketROI(m_nCurrIdx),std::forward<Targs>(args)...);
+            pAlgo->initialize_gl(m_oCurrInput,m_pLoader->getPacketROI(m_nCurrIdx),std::forward<Targs>(args)...);
             post_initialize_gl();
         }
         //! casts the algo to 'Talgo' type, and calls 'apply_gl' with expanded args list
