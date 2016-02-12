@@ -368,7 +368,7 @@ void litiv::IDataProducer_<litiv::eDatasetSource_Video>::parseData() {
 }
 
 double litiv::IDataProducer_<litiv::eDatasetSource_Image>::getExpectedLoad() const {
-    return getPacketMaxSize().area()*m_nImageCount*(int(!isGrayscale())+1);
+    return (double)getPacketMaxSize().area()*m_nImageCount*(int(!isGrayscale())+1);
 }
 
 void litiv::IDataProducer_<litiv::eDatasetSource_Image>::startPrecaching(bool bUsingGT, size_t /*nUnused*/) {

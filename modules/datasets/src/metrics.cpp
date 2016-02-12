@@ -17,9 +17,9 @@
 
 #include "litiv/datasets/metrics.hpp"
 
-litiv::BinClassifMetricsAccumulator::MetricsAccumulator_() : nTP(0),nTN(0),nFP(0),nFN(0),nSE(0),nDC(0) {}
+litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::MetricsAccumulator_() : nTP(0),nTN(0),nFP(0),nFN(0),nSE(0),nDC(0) {}
 
-litiv::BinClassifMetricsAccumulator litiv::BinClassifMetricsAccumulator::operator+(const BinClassifMetricsAccumulator& m) const {
+litiv::BinClassifMetricsAccumulator litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::operator+(const BinClassifMetricsAccumulator& m) const {
     BinClassifMetricsAccumulator res(m);
     res.nTP += this->nTP;
     res.nTN += this->nTN;
@@ -29,7 +29,7 @@ litiv::BinClassifMetricsAccumulator litiv::BinClassifMetricsAccumulator::operato
     return res;
 }
 
-litiv::BinClassifMetricsAccumulator& litiv::BinClassifMetricsAccumulator::operator+=(const BinClassifMetricsAccumulator& m) {
+litiv::BinClassifMetricsAccumulator& litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::operator+=(const BinClassifMetricsAccumulator& m) {
     this->nTP += m.nTP;
     this->nTN += m.nTN;
     this->nFP += m.nFP;
@@ -38,7 +38,7 @@ litiv::BinClassifMetricsAccumulator& litiv::BinClassifMetricsAccumulator::operat
     return *this;
 }
 
-bool litiv::BinClassifMetricsAccumulator::operator==(const BinClassifMetricsAccumulator& m) const {
+bool litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::operator==(const BinClassifMetricsAccumulator& m) const {
     return
         (this->nTP==m.nTP) &&
         (this->nTN==m.nTN) &&
@@ -47,11 +47,11 @@ bool litiv::BinClassifMetricsAccumulator::operator==(const BinClassifMetricsAccu
         (this->nSE==m.nSE);
 }
 
-bool litiv::BinClassifMetricsAccumulator::operator!=(const BinClassifMetricsAccumulator& m) const {
+bool litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::operator!=(const BinClassifMetricsAccumulator& m) const {
     return !((*this)==m);
 }
 
-void litiv::BinClassifMetricsAccumulator::accumulate(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
+void litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::accumulate(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
     CV_Assert(oClassif.type()==CV_8UC1 && oGT.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
     CV_Assert(oClassif.size()==oGT.size() && (oROI.empty() || oClassif.size()==oROI.size()));
     const size_t step_row = oClassif.step.p[0];
@@ -87,7 +87,7 @@ void litiv::BinClassifMetricsAccumulator::accumulate(const cv::Mat& oClassif, co
     }
 }
 
-cv::Mat litiv::BinClassifMetricsAccumulator::getColoredMask(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
+cv::Mat litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::getColoredMask(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
     CV_Assert(oClassif.type()==CV_8UC1 && oGT.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
     CV_Assert(oClassif.size()==oGT.size() && (oROI.empty() || oClassif.size()==oROI.size()));
     cv::Mat oResult(oClassif.size(),CV_8UC3,cv::Scalar_<uchar>(0));
@@ -136,7 +136,7 @@ cv::Mat litiv::BinClassifMetricsAccumulator::getColoredMask(const cv::Mat& oClas
     return oResult;
 }
 
-litiv::BinClassifMetricsCalculator::MetricsCalculator_(const BinClassifMetricsAccumulator& m) :
+litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::MetricsCalculator_(const BinClassifMetricsAccumulator& m) :
         dRecall(CalcRecall(m)),
         dSpecificity(CalcSpecificity(m)),
         dFPR(CalcFalsePositiveRate(m)),
@@ -146,7 +146,7 @@ litiv::BinClassifMetricsCalculator::MetricsCalculator_(const BinClassifMetricsAc
         dFMeasure(CalcFMeasure(m)),
         dMCC(CalcMatthewsCorrCoeff(m)) {}
 
-litiv::BinClassifMetricsCalculator litiv::BinClassifMetricsCalculator::operator+(const BinClassifMetricsCalculator& m) const {
+litiv::BinClassifMetricsCalculator litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::operator+(const BinClassifMetricsCalculator& m) const {
     BinClassifMetricsCalculator res(m);
     const size_t nTotWeight = this->nWeight+res.nWeight;
     res.dRecall = (res.dRecall*res.nWeight + this->dRecall*this->nWeight)/nTotWeight;
@@ -161,7 +161,7 @@ litiv::BinClassifMetricsCalculator litiv::BinClassifMetricsCalculator::operator+
     return res;
 }
 
-litiv::BinClassifMetricsCalculator& litiv::BinClassifMetricsCalculator::operator+=(const BinClassifMetricsCalculator& m) {
+litiv::BinClassifMetricsCalculator& litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::operator+=(const BinClassifMetricsCalculator& m) {
     const size_t nTotWeight = this->nWeight+m.nWeight;
     this->dRecall = (m.dRecall*m.nWeight + this->dRecall*this->nWeight)/nTotWeight;
     this->dSpecificity = (m.dSpecificity*m.nWeight + this->dSpecificity*this->nWeight)/nTotWeight;
@@ -175,14 +175,14 @@ litiv::BinClassifMetricsCalculator& litiv::BinClassifMetricsCalculator::operator
     return *this;
 }
 
-double litiv::BinClassifMetricsCalculator::CalcFMeasure(double dRecall, double dPrecision) {return (dRecall+dPrecision)>0?(2.0*(dRecall*dPrecision)/(dRecall+dPrecision)):0;}
-double litiv::BinClassifMetricsCalculator::CalcFMeasure(const BinClassifMetricsAccumulator& m) {return CalcFMeasure(CalcRecall(m),CalcPrecision(m));}
-double litiv::BinClassifMetricsCalculator::CalcRecall(uint64_t nTP, uint64_t nTPFN) {return nTPFN>0?((double)nTP/nTPFN):0;}
-double litiv::BinClassifMetricsCalculator::CalcRecall(const BinClassifMetricsAccumulator& m) {return (m.nTP+m.nFN)>0?((double)m.nTP/(m.nTP+m.nFN)):0;}
-double litiv::BinClassifMetricsCalculator::CalcPrecision(uint64_t nTP, uint64_t nTPFP) {return nTPFP>0?((double)nTP/nTPFP):0;}
-double litiv::BinClassifMetricsCalculator::CalcPrecision(const BinClassifMetricsAccumulator& m) {return (m.nTP+m.nFP)>0?((double)m.nTP/(m.nTP+m.nFP)):0;}
-double litiv::BinClassifMetricsCalculator::CalcSpecificity(const BinClassifMetricsAccumulator& m) {return (m.nTN+m.nFP)>0?((double)m.nTN/(m.nTN+m.nFP)):0;}
-double litiv::BinClassifMetricsCalculator::CalcFalsePositiveRate(const BinClassifMetricsAccumulator& m) {return (m.nFP+m.nTN)>0?((double)m.nFP/(m.nFP+m.nTN)):0;}
-double litiv::BinClassifMetricsCalculator::CalcFalseNegativeRate(const BinClassifMetricsAccumulator& m) {return (m.nTP+m.nFN)>0?((double)m.nFN/(m.nTP+m.nFN)):0;}
-double litiv::BinClassifMetricsCalculator::CalcPercentBadClassifs(const BinClassifMetricsAccumulator& m) {return m.total()>0?(100.0*(m.nFN+m.nFP)/m.total()):0;}
-double litiv::BinClassifMetricsCalculator::CalcMatthewsCorrCoeff(const BinClassifMetricsAccumulator& m) {return ((m.nTP+m.nFP)>0)&&((m.nTP+m.nFN)>0)&&((m.nTN+m.nFP)>0)&&((m.nTN+m.nFN)>0)?((((double)m.nTP*m.nTN)-(m.nFP*m.nFN))/sqrt(((double)m.nTP+m.nFP)*(m.nTP+m.nFN)*(m.nTN+m.nFP)*(m.nTN+m.nFN))):0;}
+double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcFMeasure(double dRecall, double dPrecision) {return (dRecall+dPrecision)>0?(2.0*(dRecall*dPrecision)/(dRecall+dPrecision)):0;}
+double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcFMeasure(const BinClassifMetricsAccumulator& m) {return CalcFMeasure(CalcRecall(m),CalcPrecision(m));}
+double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcRecall(uint64_t nTP, uint64_t nTPFN) {return nTPFN>0?((double)nTP/nTPFN):0;}
+double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcRecall(const BinClassifMetricsAccumulator& m) {return (m.nTP+m.nFN)>0?((double)m.nTP/(m.nTP+m.nFN)):0;}
+double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcPrecision(uint64_t nTP, uint64_t nTPFP) {return nTPFP>0?((double)nTP/nTPFP):0;}
+double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcPrecision(const BinClassifMetricsAccumulator& m) {return (m.nTP+m.nFP)>0?((double)m.nTP/(m.nTP+m.nFP)):0;}
+double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcSpecificity(const BinClassifMetricsAccumulator& m) {return (m.nTN+m.nFP)>0?((double)m.nTN/(m.nTN+m.nFP)):0;}
+double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcFalsePositiveRate(const BinClassifMetricsAccumulator& m) {return (m.nFP+m.nTN)>0?((double)m.nFP/(m.nFP+m.nTN)):0;}
+double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcFalseNegativeRate(const BinClassifMetricsAccumulator& m) {return (m.nTP+m.nFN)>0?((double)m.nFN/(m.nTP+m.nFN)):0;}
+double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcPercentBadClassifs(const BinClassifMetricsAccumulator& m) {return m.total()>0?(100.0*(m.nFN+m.nFP)/m.total()):0;}
+double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcMatthewsCorrCoeff(const BinClassifMetricsAccumulator& m) {return ((m.nTP+m.nFP)>0)&&((m.nTP+m.nFN)>0)&&((m.nTN+m.nFP)>0)&&((m.nTN+m.nFN)>0)?((((double)m.nTP*m.nTN)-(m.nFP*m.nFN))/sqrt(((double)m.nTP+m.nFP)*(m.nTP+m.nFN)*(m.nTN+m.nFP)*(m.nTN+m.nFN))):0;}

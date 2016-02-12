@@ -100,7 +100,7 @@ protected:
         m_nImageCount = m_vsInputImagePaths.size();
         const double dScale = getDatasetInfo()->getScaleFactor();
         if(dScale!=1.0)
-            m_oMaxSize = cv::Size(m_oMaxSize.width*dScale,m_oMaxSize.height*dScale);
+            m_oMaxSize = cv::Size(int(m_oMaxSize.width*dScale),int(m_oMaxSize.height*dScale));
         m_voImageSizes = std::vector<cv::Size>(m_nImageCount,m_oMaxSize);
         CV_Assert(m_nImageCount>0);
     }
