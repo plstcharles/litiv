@@ -21,7 +21,7 @@
 void litiv::IDatasetEvaluator_<litiv::eDatasetEval_None>::writeEvalReport() const {
     std::cout << "Writing evaluation report for dataset '" << getName() << "'..." << std::endl;
     if(getBatches().empty()) {
-        std::cout << "\tNo report to write for dataset '" << getName() << "', skipping." << std::endl;
+        std::cout << "No report to write for dataset '" << getName() << "', skipping." << std::endl;
         return;
     }
     for(const auto& pGroupIter : getBatches())
@@ -44,7 +44,7 @@ void litiv::IDatasetEvaluator_<litiv::eDatasetEval_None>::writeEvalReport() cons
                           std::setw(12) << nOverallPacketCount << "|" <<
                           std::setw(12) << dOverallTimeElapsed << "|" <<
                           std::setw(12) << nOverallPacketCount/dOverallTimeElapsed << "\n";
-        oMetricsOutput << "\nSHA1: " << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
+        oMetricsOutput << CxxUtils::getLogStamp();
     }
 }
 
@@ -83,7 +83,7 @@ void litiv::IDatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier>::writeEvalR
                           std::setw(12) << oMetrics.dFMeasure << "|" <<
                           std::setw(12) << oMetrics.dMCC << "\n";
         oMetricsOutput << "\nHz: " << nOverallPacketCount/dOverallTimeElapsed << "\n";
-        oMetricsOutput << "\nSHA1: " << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
+        oMetricsOutput << CxxUtils::getLogStamp();
     }
 }
 
@@ -128,7 +128,7 @@ void litiv::IDataReporter_<litiv::eDatasetEval_None>::writeEvalReport() const {
         oMetricsOutput << "            |   Packets  |   Seconds  |     Hz     \n";
         oMetricsOutput << "------------|------------|------------|------------\n";
         oMetricsOutput << IDataReporter_<eDatasetEval_None>::writeInlineEvalReport(0);
-        oMetricsOutput << "\nSHA1: " << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
+        oMetricsOutput << CxxUtils::getLogStamp();
     }
 }
 
@@ -191,7 +191,7 @@ void litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::writeEvalRepor
         oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
         oMetricsOutput << IDataReporter_<eDatasetEval_BinaryClassifier>::writeInlineEvalReport(0);
         oMetricsOutput << "\nHz: " << getTotPackets()/getProcessTime() << "\n";
-        oMetricsOutput << "\nSHA1: " << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
+        oMetricsOutput << CxxUtils::getLogStamp();
     }
 }
 

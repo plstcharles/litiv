@@ -209,6 +209,14 @@ namespace CxxUtils {
         return std::string(acBuffer);
     }
 
+    static inline std::string getVersionStamp() {
+        return "LITIV Framework v" LITIV_VERSION_STR " (SHA1=" LITIV_VERSION_SHA1 ")";
+    }
+
+    static inline std::string getLogStamp() {
+        return std::string("\n")+CxxUtils::getVersionStamp()+"\n["+CxxUtils::getTimeStamp()+"]\n";
+    }
+
     static inline std::string clampString(const std::string& sInput, size_t nSize, char cPadding=' ') {
         return sInput.size()>nSize?sInput.substr(0,nSize):std::string(nSize-sInput.size(),cPadding)+sInput;
     }
