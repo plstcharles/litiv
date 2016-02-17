@@ -779,16 +779,18 @@ cv::Mat litiv::DataProducer_<litiv::eDatasetSource_Image,litiv::eDataset_BSDS500
         m_voImageOrigSizes[nIdx] = oTempRefGTImage.size();
         if(oTempRefGTImage.size()==cv::Size(321,481))
             cv::transpose(oTempRefGTImage,oTempRefGTImage);
+        if(getPacketSize(nIdx).area()>0 && oTempRefGTImage.size()!=getPacketSize(nIdx))
+            cv::resize(oTempRefGTImage,oTempRefGTImage,getPacketSize(nIdx),0,0,cv::INTER_NEAREST);
         cv::Mat oGTMask(int(oTempRefGTImage.rows*vsTempPaths.size()),oTempRefGTImage.cols,CV_8UC1);
         for(size_t nGTImageIdx=0; nGTImageIdx<vsTempPaths.size(); ++nGTImageIdx) {
             cv::Mat oTempGTImage = cv::imread(vsTempPaths[nGTImageIdx],cv::IMREAD_GRAYSCALE);
             CV_Assert(!oTempGTImage.empty() && (oTempGTImage.size()==cv::Size(481,321) || oTempGTImage.size()==cv::Size(321,481)));
             if(oTempGTImage.size()==cv::Size(321,481))
                 cv::transpose(oTempGTImage,oTempGTImage);
+            if(getPacketSize(nIdx).area()>0 && oTempGTImage.size()!=getPacketSize(nIdx))
+                cv::resize(oTempGTImage,oTempGTImage,getPacketSize(nIdx),0,0,cv::INTER_NEAREST);
             oTempGTImage.copyTo(cv::Mat(oGTMask,cv::Rect(0,int(oTempGTImage.rows*nGTImageIdx),oTempGTImage.cols,oTempGTImage.rows)));
         }
-        if(getPacketSize(nIdx).area()>0 && oGTMask.size()!=getPacketSize(nIdx))
-            cv::resize(oGTMask,oGTMask,getPacketSize(nIdx),0,0,cv::INTER_NEAREST);
         return oGTMask;
     }
     return cv::Mat(getPacketSize(nIdx),CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_OUTOFSCOPE_VAL));

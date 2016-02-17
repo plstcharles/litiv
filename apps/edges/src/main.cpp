@@ -226,7 +226,7 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
             pAlgo->apply_threshold(oCurrInput,oCurrEdgeMask,dDefaultThreshold);
 #endif //!FULL_THRESH_ANALYSIS
 #if DISPLAY_OUTPUT>0
-            pDisplayHelper->display(oCurrInput,oCurrEdgeMask,/*oBatch.getColoredEdgeMask(oCurrEdgeMask,nCurrIdx)*/oCurrEdgeMask,nCurrIdx);
+            pDisplayHelper->display(oCurrInput,oCurrEdgeMask,oBatch.getColoredMask(oCurrEdgeMask,nCurrIdx),nCurrIdx);
             const int nKeyPressed = pDisplayHelper->waitKey();
             if(nKeyPressed==(int)'q')
                 break;
