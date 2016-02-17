@@ -22,17 +22,34 @@
 namespace litiv {
 
     //! basic metrics accumulator interface
-    struct IMetricsAccumulator {
+    struct IMetricsAccumulator : CxxUtils::enable_shared_from_this<IMetricsAccumulator> {
         virtual ~IMetricsAccumulator() = default;
+        bool operator!=(const IMetricsAccumulator& m) const;
+        bool operator==(const IMetricsAccumulator& m) const;
+        virtual bool isEqual(const std::shared_ptr<const IMetricsAccumulator>& m) const = 0;
+        IMetricsAccumulator& operator+=(const IMetricsAccumulator& m);
+        virtual std::shared_ptr<IMetricsAccumulator> accumulate(const std::shared_ptr<const IMetricsAccumulator>& m) = 0;
+    protected:
+        IMetricsAccumulator() = default;
+        IMetricsAccumulator& operator=(const IMetricsAccumulator&) = delete;
+        IMetricsAccumulator(const IMetricsAccumulator&) = delete;
     };
+    using IMetricsAccumulatorPtr = std::shared_ptr<IMetricsAccumulator>;
+    using IMetricsAccumulatorConstPtr = std::shared_ptr<const IMetricsAccumulator>;
 
     //! high-level metrics calculator interface (relies on IMetricsAccumulator internally)
-    struct IMetricsCalculator {
-        IMetricsCalculator() : nWeight(1) {}
+    struct IMetricsCalculator : CxxUtils::enable_shared_from_this<IMetricsCalculator> {
         virtual ~IMetricsCalculator() = default;
+        IMetricsCalculator& operator+=(const IMetricsCalculator& m);
+        virtual std::shared_ptr<IMetricsCalculator> accumulate(const std::shared_ptr<const IMetricsCalculator>& m) = 0;
     protected:
+        IMetricsCalculator() : nWeight(1) {}
+        IMetricsCalculator& operator=(const IMetricsCalculator&) = delete;
+        IMetricsCalculator(const IMetricsCalculator&) = delete;
         size_t nWeight; // used to compute iterative averages in overloads
     };
+    using IMetricsCalculatorPtr = std::shared_ptr<IMetricsCalculator>;
+    using IMetricsCalculatorConstPtr = std::shared_ptr<const IMetricsCalculator>;
 
     template<eDatasetEvalList eDatasetEval>
     struct MetricsAccumulator_;
@@ -40,16 +57,12 @@ namespace litiv {
     template<> //! basic metrics counter used to evaluate 2d binary classifiers
     struct MetricsAccumulator_<eDatasetEval_BinaryClassifier> :
             public IMetricsAccumulator {
-        using ThisType = MetricsAccumulator_<eDatasetEval_BinaryClassifier>;
-        //! default constructor sets all counters to zero
-        MetricsAccumulator_();
-        ThisType operator+(const ThisType& m) const;
-        ThisType& operator+=(const ThisType& m);
-        bool operator==(const ThisType& m) const;
-        bool operator!=(const ThisType& m) const;
+        virtual bool isEqual(const IMetricsAccumulatorConstPtr& m) const override;
+        virtual IMetricsAccumulatorPtr accumulate(const IMetricsAccumulatorConstPtr& m) override;
         virtual void accumulate(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI=cv::Mat());
         static cv::Mat getColoredMask(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI=cv::Mat());
         inline uint64_t total(bool bWithDontCare=false) const {return nTP+nTN+nFP+nFN+(bWithDontCare?nDC:uint64_t(0));}
+        static std::shared_ptr<MetricsAccumulator_<eDatasetEval_BinaryClassifier>> create();
         uint64_t nTP;
         uint64_t nTN;
         uint64_t nFP;
@@ -65,8 +78,13 @@ namespace litiv {
             eCounter_DC,
             eCountersCount,
         };
+    protected:
+        //! default constructor sets all counters to zero
+        MetricsAccumulator_();
     };
     using BinClassifMetricsAccumulator = MetricsAccumulator_<eDatasetEval_BinaryClassifier>;
+    using BinClassifMetricsAccumulatorPtr = std::shared_ptr<BinClassifMetricsAccumulator>;
+    using BinClassifMetricsAccumulatorConstPtr = std::shared_ptr<const BinClassifMetricsAccumulator>;
 
     template<eDatasetEvalList eDatasetEval>
     struct MetricsCalculator_;
@@ -74,12 +92,19 @@ namespace litiv {
     template<> //! high-level metrics used to evaluate 2d binary classifiers
     struct MetricsCalculator_<eDatasetEval_BinaryClassifier> :
             public IMetricsCalculator {
-        using ThisType = MetricsCalculator_<eDatasetEval_BinaryClassifier>;
-        using ThisBaseType = MetricsAccumulator_<eDatasetEval_BinaryClassifier>;
-        //! default contructor requires a base metrics counters, as otherwise, we may obtain NaN's
-        MetricsCalculator_(const ThisBaseType& m);
-        ThisType operator+(const ThisType& m) const;
-        ThisType& operator+=(const ThisType& m);
+        virtual IMetricsCalculatorPtr accumulate(const IMetricsCalculatorConstPtr& m) override;
+        static std::shared_ptr<MetricsCalculator_<eDatasetEval_BinaryClassifier>> create(const IMetricsAccumulatorConstPtr& m);
+        static double CalcFMeasure(double dRecall, double dPrecision);
+        static double CalcFMeasure(const BinClassifMetricsAccumulator& m);
+        static double CalcRecall(uint64_t nTP, uint64_t nTPFN);
+        static double CalcRecall(const BinClassifMetricsAccumulator& m);
+        static double CalcPrecision(uint64_t nTP, uint64_t nTPFP);
+        static double CalcPrecision(const BinClassifMetricsAccumulator& m);
+        static double CalcSpecificity(const BinClassifMetricsAccumulator& m);
+        static double CalcFalsePositiveRate(const BinClassifMetricsAccumulator& m);
+        static double CalcFalseNegativeRate(const BinClassifMetricsAccumulator& m);
+        static double CalcPercentBadClassifs(const BinClassifMetricsAccumulator& m);
+        static double CalcMatthewsCorrCoeff(const BinClassifMetricsAccumulator& m);
         double dRecall;
         double dSpecificity;
         double dFPR;
@@ -88,18 +113,12 @@ namespace litiv {
         double dPrecision;
         double dFMeasure;
         double dMCC;
-        static double CalcFMeasure(double dRecall, double dPrecision);
-        static double CalcFMeasure(const ThisBaseType& m);
-        static double CalcRecall(uint64_t nTP, uint64_t nTPFN);
-        static double CalcRecall(const ThisBaseType& m);
-        static double CalcPrecision(uint64_t nTP, uint64_t nTPFP);
-        static double CalcPrecision(const ThisBaseType& m);
-        static double CalcSpecificity(const ThisBaseType& m);
-        static double CalcFalsePositiveRate(const ThisBaseType& m);
-        static double CalcFalseNegativeRate(const ThisBaseType& m);
-        static double CalcPercentBadClassifs(const ThisBaseType& m);
-        static double CalcMatthewsCorrCoeff(const ThisBaseType& m);
+    protected:
+        //! default contructor requires a base metrics counters, as otherwise, we may obtain NaN's
+        MetricsCalculator_(const IMetricsAccumulatorConstPtr& m);
     };
     using BinClassifMetricsCalculator = MetricsCalculator_<eDatasetEval_BinaryClassifier>;
+    using BinClassifMetricsCalculatorPtr = std::shared_ptr<BinClassifMetricsCalculator>;
+    using BinClassifMetricsCalculatorConstPtr = std::shared_ptr<const BinClassifMetricsCalculator>;
 
 } //namespace litiv

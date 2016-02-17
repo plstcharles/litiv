@@ -37,9 +37,9 @@ namespace litiv {
         //! writes an overall evaluation report listing high-level binary classification metrics
         virtual void writeEvalReport() const override;
         //! accumulates overall metrics from all batch(es)
-        virtual BinClassifMetricsAccumulator getMetricsBase() const;
+        virtual IMetricsAccumulatorConstPtr getMetricsBase() const;
         //! calculates overall metrics from all batch(es)
-        virtual BinClassifMetricsCalculator getMetrics(bool bAverage) const;
+        virtual IMetricsCalculatorPtr getMetrics(bool bAverage) const;
     };
 
     template<eDatasetEvalList eDatasetEval, eDatasetList eDataset>
@@ -54,20 +54,22 @@ namespace litiv {
         virtual void writeEvalReport() const override ;
     protected:
         //! returns a one-line string listing packet counts, seconds elapsed and algo speed for current batch(es)
-        virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const override;
+        std::string writeInlineEvalReport(size_t nIndentSize) const;
+        friend struct IDatasetEvaluator_<eDatasetEval_None>;
     };
 
     template<>
-    struct IDataReporter_<eDatasetEval_BinaryClassifier> : public virtual IDataHandler {
+    struct IDataReporter_<eDatasetEval_BinaryClassifier> : IDataReporter_<eDatasetEval_None> {
         //! accumulates basic metrics from current batch(es) --- provides group-impl only
-        virtual BinClassifMetricsAccumulator getMetricsBase() const;
+        virtual IMetricsAccumulatorConstPtr getMetricsBase() const;
         //! accumulates high-level metrics from current batch(es)
-        virtual BinClassifMetricsCalculator getMetrics(bool bAverage) const;
+        virtual IMetricsCalculatorPtr getMetrics(bool bAverage) const;
         //! writes an evaluation report listing high-level metrics for current batch(es)
         virtual void writeEvalReport() const override;
     protected:
         //! returns a one-line string listing high-level metrics for current batch(es)
-        virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const override;
+        std::string writeInlineEvalReport(size_t nIndentSize) const;
+        friend struct IDatasetEvaluator_<eDatasetEval_BinaryClassifier>;
     };
 
     template<eDatasetEvalList eDatasetEval>
@@ -80,15 +82,15 @@ namespace litiv {
             public IDataReporter_<eDatasetEval_BinaryClassifier>,
             public IDataConsumer_<eDatasetEval_BinaryClassifier> {
         //! overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
-        virtual BinClassifMetricsAccumulator getMetricsBase() const override;
+        virtual IMetricsAccumulatorConstPtr getMetricsBase() const override;
         //! overrides 'push' from IDataConsumer_ to simultaneously evaluate the pushed results
         virtual void push(const cv::Mat& oClassif, size_t nIdx) override;
         //! provides a visual feedback on result quality based on evaluation guidelines
         virtual cv::Mat getColoredMask(const cv::Mat& oClassif, size_t nIdx);
         //! resets internal metrics counters to zero
-        inline void resetMetrics() {m_oMetricsBase = BinClassifMetricsAccumulator();}
+        virtual void resetMetrics();
     protected:
-        BinClassifMetricsAccumulator m_oMetricsBase;
+        BinClassifMetricsAccumulatorPtr m_pMetricsBase;
     };
 
     template<eDatasetEvalList eDatasetEval, ParallelUtils::eParallelAlgoType eImpl>
@@ -104,7 +106,7 @@ namespace litiv {
             public IDataReporter_<eDatasetEval_BinaryClassifier>,
             public IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL> {
         //! overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
-        virtual BinClassifMetricsAccumulator getMetricsBase() const override;
+        virtual IMetricsAccumulatorConstPtr getMetricsBase() const override;
         //! returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs, if available)
         virtual cv::Size getIdealGLWindowSize() const override;
     protected:
@@ -116,11 +118,11 @@ namespace litiv {
         struct GLVideoSegmDataEvaluator : public GLImageProcEvaluatorAlgo {
             GLVideoSegmDataEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount);
             virtual std::string getComputeShaderSource(size_t nStage) const override;
-            virtual BinClassifMetricsAccumulator getMetricsBase();
+            BinClassifMetricsAccumulatorPtr getMetricsBase();
         };
         std::unique_ptr<GLVideoSegmDataEvaluator> m_pEvalAlgo;
         cv::Mat m_oLastGT,m_oCurrGT,m_oNextGT;
-        BinClassifMetricsAccumulator m_oMetricsBase;
+        BinClassifMetricsAccumulatorPtr m_pMetricsBase;
     };
 
 #endif //HAVE_GLSL

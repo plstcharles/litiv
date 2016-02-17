@@ -158,7 +158,6 @@ namespace litiv {
         static bool compare_load(const IDataHandler* i, const IDataHandler* j);
         static bool compare(const IDataHandler& i, const IDataHandler& j);
         static bool compare_load(const IDataHandler& i, const IDataHandler& j);
-        virtual std::string writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const = 0;
         virtual std::string getPacketName(size_t nPacketIdx) const;
         virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const = 0; // will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
         virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) = 0; // will throw if out of range, and readjust nPacketIdx for returned batch range otherwise

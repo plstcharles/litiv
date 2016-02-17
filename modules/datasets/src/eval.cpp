@@ -16,7 +16,6 @@
 // limitations under the License.
 
 #include "litiv/datasets/eval.hpp"
-#include "litiv/imgproc.hpp"
 //#include "litiv/utils/ConsoleUtils.hpp" @@@@@ reuse later?
 
 void litiv::IDatasetEvaluator_<litiv::eDatasetEval_None>::writeEvalReport() const {
@@ -36,16 +35,16 @@ void litiv::IDatasetEvaluator_<litiv::eDatasetEval_None>::writeEvalReport() cons
         size_t nOverallPacketCount = 0;
         double dOverallTimeElapsed = 0.0;
         for(const auto& pGroupIter : getBatches()) {
-            oMetricsOutput << pGroupIter->writeInlineEvalReport(0,12);
+            oMetricsOutput << pGroupIter->shared_from_this_cast<const IDataReporter_<eDatasetEval_None>>(true)->IDataReporter_<eDatasetEval_None>::writeInlineEvalReport(0);
             nOverallPacketCount += pGroupIter->getTotPackets();
             dOverallTimeElapsed += pGroupIter->getProcessTime();
         }
         oMetricsOutput << "------------|------------|------------|------------\n";
         oMetricsOutput << "     overall|" <<
-        std::setw(12) << nOverallPacketCount << "|" <<
-        std::setw(12) << dOverallTimeElapsed << "|" <<
-        std::setw(12) << nOverallPacketCount/dOverallTimeElapsed << "\n";
-        oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
+                          std::setw(12) << nOverallPacketCount << "|" <<
+                          std::setw(12) << dOverallTimeElapsed << "|" <<
+                          std::setw(12) << nOverallPacketCount/dOverallTimeElapsed << "\n";
+        oMetricsOutput << "\nSHA1: " << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
     }
 }
 
@@ -56,7 +55,9 @@ void litiv::IDatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier>::writeEvalR
     }
     for(const auto& pGroupIter : getBatches())
         pGroupIter->writeEvalReport();
-    const BinClassifMetricsCalculator& oMetrics = getMetrics(true);
+    IMetricsCalculatorConstPtr pMetrics = getMetrics(true);
+    lvAssert(pMetrics.get());
+    const BinClassifMetricsCalculator& oMetrics = dynamic_cast<const BinClassifMetricsCalculator&>(*pMetrics.get());
     std::cout << CxxUtils::clampString(getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
     std::ofstream oMetricsOutput(getOutputPath()+"/overall.txt");
     if(oMetricsOutput.is_open()) {
@@ -67,7 +68,7 @@ void litiv::IDatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier>::writeEvalR
         size_t nOverallPacketCount = 0;
         double dOverallTimeElapsed = 0.0;
         for(const auto& pGroupIter : getBatches()) {
-            oMetricsOutput << pGroupIter->writeInlineEvalReport(0,12);
+            oMetricsOutput << pGroupIter->shared_from_this_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>>(true)->IDataReporter_<eDatasetEval_BinaryClassifier>::writeInlineEvalReport(0);
             nOverallPacketCount += pGroupIter->getTotPackets();
             dOverallTimeElapsed += pGroupIter->getProcessTime();
         }
@@ -82,30 +83,30 @@ void litiv::IDatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier>::writeEvalR
                           std::setw(12) << oMetrics.dFMeasure << "|" <<
                           std::setw(12) << oMetrics.dMCC << "\n";
         oMetricsOutput << "\nHz: " << nOverallPacketCount/dOverallTimeElapsed << "\n";
-        oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
+        oMetricsOutput << "\nSHA1: " << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
     }
 }
 
-litiv::BinClassifMetricsAccumulator litiv::IDatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier>::getMetricsBase() const {
-    BinClassifMetricsAccumulator oMetricsBase;
+litiv::IMetricsAccumulatorConstPtr litiv::IDatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier>::getMetricsBase() const {
+    BinClassifMetricsAccumulatorPtr pMetricsBase = BinClassifMetricsAccumulator::create();
     for(const auto& pBatch : getBatches())
-        oMetricsBase += dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(*pBatch).getMetricsBase();
-    return oMetricsBase;
+        pMetricsBase->accumulate(dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(*pBatch).getMetricsBase());
+    return pMetricsBase;
 }
 
-litiv::BinClassifMetricsCalculator litiv::IDatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier>::getMetrics(bool bAverage) const {
+litiv::IMetricsCalculatorPtr litiv::IDatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier>::getMetrics(bool bAverage) const {
     if(bAverage) {
         IDataHandlerPtrArray vpBatches = getBatches();
         auto ppBatchIter = vpBatches.begin();
         for(; ppBatchIter!=vpBatches.end() && !(*ppBatchIter)->getTotPackets(); ++ppBatchIter);
         CV_Assert(ppBatchIter!=vpBatches.end());
-        BinClassifMetricsCalculator oMetrics = dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(**ppBatchIter).getMetrics(bAverage);
+        IMetricsCalculatorPtr pMetrics = dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(**ppBatchIter).getMetrics(bAverage);
         for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
             if((*ppBatchIter)->getTotPackets())
-                oMetrics += dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(**ppBatchIter).getMetrics(bAverage);
-        return oMetrics;
+                pMetrics->accumulate(dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(**ppBatchIter).getMetrics(bAverage));
+        return pMetrics;
     }
-    return BinClassifMetricsCalculator(getMetricsBase());
+    return BinClassifMetricsCalculator::create(getMetricsBase());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -117,32 +118,29 @@ void litiv::IDataReporter_<litiv::eDatasetEval_None>::writeEvalReport() const {
         std::cout << "No report to write for '" << getName() << "', skipping..." << std::endl;
         return;
     }
-    if(isGroup() && !isBare()) {
+    else if(isGroup() && !isBare())
         for(const auto& pBatch : getBatches())
             pBatch->writeEvalReport();
-    }
     std::ofstream oMetricsOutput(getOutputPath()+"/../"+getName()+".txt");
     if(oMetricsOutput.is_open()) {
         oMetricsOutput << std::fixed;
         oMetricsOutput << "Default evaluation report for '" << getName() << "' :\n\n";
         oMetricsOutput << "            |   Packets  |   Seconds  |     Hz     \n";
         oMetricsOutput << "------------|------------|------------|------------\n";
-        oMetricsOutput << writeInlineEvalReport(0,12);
-        oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
+        oMetricsOutput << IDataReporter_<eDatasetEval_None>::writeInlineEvalReport(0);
+        oMetricsOutput << "\nSHA1: " << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
     }
 }
 
-std::string litiv::IDataReporter_<litiv::eDatasetEval_None>::writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const {
+std::string litiv::IDataReporter_<litiv::eDatasetEval_None>::writeInlineEvalReport(size_t nIndentSize) const {
     if(!getTotPackets())
         return std::string();
+    const size_t nCellSize = 12;
     std::stringstream ssStr;
     ssStr << std::fixed;
-    if(isGroup() && !isBare()) {
-        for(const auto& pBatch : getBatches()) {
-            // @@@@@@@@@@@
-            ssStr << pBatch->shared_from_this_cast<const IDataReporter_<litiv::eDatasetEval_None>>(true)->writeInlineEvalReport(nIndentSize+1,nCellSize);
-        }
-    }
+    if(isGroup() && !isBare())
+        for(const auto& pBatch : getBatches())
+            ssStr << pBatch->shared_from_this_cast<const IDataReporter_<litiv::eDatasetEval_None>>(true)->IDataReporter_<eDatasetEval_None>::writeInlineEvalReport(nIndentSize+1);
     ssStr << CxxUtils::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
              std::setw(nCellSize) << getTotPackets() << "|" <<
              std::setw(nCellSize) << getProcessTime() << "|" <<
@@ -150,28 +148,27 @@ std::string litiv::IDataReporter_<litiv::eDatasetEval_None>::writeInlineEvalRepo
     return ssStr.str();
 }
 
-litiv::BinClassifMetricsAccumulator litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::getMetricsBase() const {
+litiv::IMetricsAccumulatorConstPtr litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::getMetricsBase() const {
     lvAssert(isGroup()); // non-group specialization should override this method
-    BinClassifMetricsAccumulator oMetricsBase;
+    BinClassifMetricsAccumulatorPtr pMetricsBase = BinClassifMetricsAccumulator::create();
     for(const auto& pBatch : getBatches())
-        oMetricsBase += dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(*pBatch).getMetricsBase();
-    return oMetricsBase;
+        pMetricsBase->accumulate(dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(*pBatch).getMetricsBase());
+    return pMetricsBase;
 }
 
-litiv::BinClassifMetricsCalculator litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::getMetrics(bool bAverage) const {
+litiv::IMetricsCalculatorPtr litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::getMetrics(bool bAverage) const {
     if(bAverage && isGroup() && !isBare()) {
         const IDataHandlerPtrArray& vpBatches = getBatches();
         auto ppBatchIter = vpBatches.begin();
         for(; ppBatchIter!=vpBatches.end() && !(*ppBatchIter)->getTotPackets(); ++ppBatchIter);
         CV_Assert(ppBatchIter!=vpBatches.end());
-        BinClassifMetricsCalculator oMetrics(dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(**ppBatchIter).getMetrics(bAverage));
+        IMetricsCalculatorPtr pMetrics = dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(**ppBatchIter).getMetrics(bAverage);
         for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
             if((*ppBatchIter)->getTotPackets())
-                oMetrics += dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(**ppBatchIter).getMetrics(bAverage);
-        // @@@ check returning metrics weight?
-        return oMetrics;
+                pMetrics->accumulate(dynamic_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>&>(**ppBatchIter).getMetrics(bAverage));
+        return pMetrics; // @@@ check returning metrics weight?
     }
-    return BinClassifMetricsCalculator(getMetricsBase());
+    return BinClassifMetricsCalculator::create(getMetricsBase());
 }
 
 void litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::writeEvalReport() const {
@@ -179,11 +176,12 @@ void litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::writeEvalRepor
         std::cout << "No report to write for '" << getName() << "', skipping..." << std::endl;
         return;
     }
-    if(isGroup() && !isBare()) {
+    else if(isGroup() && !isBare())
         for(const auto& pBatch : getBatches())
             pBatch->writeEvalReport();
-    }
-    const BinClassifMetricsCalculator& oMetrics = getMetrics(true);
+    IMetricsCalculatorConstPtr pMetrics = getMetrics(true);
+    lvAssert(pMetrics.get());
+    const BinClassifMetricsCalculator& oMetrics = dynamic_cast<const BinClassifMetricsCalculator&>(*pMetrics.get());;
     std::cout << "\t" << CxxUtils::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
     std::ofstream oMetricsOutput(getOutputPath()+"/../"+getName()+".txt");
     if(oMetricsOutput.is_open()) {
@@ -191,21 +189,24 @@ void litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::writeEvalRepor
         oMetricsOutput << "Video segmentation evaluation report for '" << getName() << "' :\n\n";
         oMetricsOutput << "            |     Rcl    |     Spc    |     FPR    |     FNR    |     PBC    |     Prc    |     FM     |     MCC    \n";
         oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
-        oMetricsOutput << writeInlineEvalReport(0,12);
+        oMetricsOutput << IDataReporter_<eDatasetEval_BinaryClassifier>::writeInlineEvalReport(0);
         oMetricsOutput << "\nHz: " << getTotPackets()/getProcessTime() << "\n";
-        oMetricsOutput << "\nSHA1:" << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
+        oMetricsOutput << "\nSHA1: " << LITIV_VERSION_SHA1 << "\n[" << CxxUtils::getTimeStamp() << "]" << std::endl;
     }
 }
 
-std::string litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::writeInlineEvalReport(size_t nIndentSize, size_t nCellSize) const {
+std::string litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::writeInlineEvalReport(size_t nIndentSize) const {
     if(!getTotPackets())
         return std::string();
+    const size_t nCellSize = 12;
     std::stringstream ssStr;
     ssStr << std::fixed;
     if(isGroup() && !isBare())
         for(const auto& pBatch : getBatches())
-            ssStr << dynamic_cast<IDataReporter_<eDatasetEval_BinaryClassifier>&>(*pBatch).writeInlineEvalReport(nIndentSize+1,nCellSize);
-    const BinClassifMetricsCalculator& oMetrics = getMetrics(true);
+            ssStr << pBatch->shared_from_this_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>>(true)->IDataReporter_<eDatasetEval_BinaryClassifier>::writeInlineEvalReport(nIndentSize+1);
+    IMetricsCalculatorConstPtr pMetrics = getMetrics(true);
+    lvAssert(pMetrics.get());
+    const BinClassifMetricsCalculator& oMetrics = dynamic_cast<const BinClassifMetricsCalculator&>(*pMetrics.get());
     ssStr << CxxUtils::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
              std::setw(nCellSize) << oMetrics.dRecall << "|" <<
              std::setw(nCellSize) << oMetrics.dSpecificity << "|" <<
@@ -222,21 +223,29 @@ std::string litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::writeIn
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-litiv::BinClassifMetricsAccumulator litiv::IDataEvaluator_<litiv::eDatasetEval_BinaryClassifier>::getMetricsBase() const {
-    return m_oMetricsBase;
+litiv::IMetricsAccumulatorConstPtr litiv::IDataEvaluator_<litiv::eDatasetEval_BinaryClassifier>::getMetricsBase() const {
+    if(!m_pMetricsBase)
+        return BinClassifMetricsAccumulator::create();
+    return m_pMetricsBase;
 }
 
 void litiv::IDataEvaluator_<litiv::eDatasetEval_BinaryClassifier>::push(const cv::Mat& oClassif, size_t nIdx) {
     IDataConsumer_<eDatasetEval_BinaryClassifier>::push(oClassif,nIdx);
     if(getDatasetInfo()->isUsingEvaluator()) {
         auto pLoader = shared_from_this_cast<IDataLoader_<eImagePacket>>(true);
-        m_oMetricsBase.accumulate(oClassif,pLoader->getGT(nIdx),pLoader->getPacketROI(nIdx));
+        if(!m_pMetricsBase)
+            m_pMetricsBase = BinClassifMetricsAccumulator::create();
+        m_pMetricsBase->accumulate(oClassif,pLoader->getGT(nIdx),pLoader->getPacketROI(nIdx));
     }
 }
 
 cv::Mat litiv::IDataEvaluator_<litiv::eDatasetEval_BinaryClassifier>::getColoredMask(const cv::Mat& oClassif, size_t nIdx) {
     auto pLoader = shared_from_this_cast<IDataLoader_<eImagePacket>>(true);
     return BinClassifMetricsAccumulator::getColoredMask(oClassif,pLoader->getGT(nIdx),pLoader->getPacketROI(nIdx));
+}
+
+void litiv::IDataEvaluator_<litiv::eDatasetEval_BinaryClassifier>::resetMetrics() {
+    m_pMetricsBase = BinClassifMetricsAccumulator::create();
 }
 
 #if HAVE_GLSL
@@ -249,19 +258,21 @@ cv::Size litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,Parall
     return oWindowSize;
 }
 
-litiv::BinClassifMetricsAccumulator litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::getMetricsBase() const {
+litiv::IMetricsAccumulatorConstPtr litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::getMetricsBase() const {
     if(isProcessing())
         lvError("Must stop processing batch before querying metrics under async data evaluator interface");
-    return m_oMetricsBase;
+    else if(!m_pMetricsBase)
+        return BinClassifMetricsAccumulator::create();
+    return m_pMetricsBase;
 }
 
 void litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::_stopProcessing() {
     if(m_pEvalAlgo && m_pEvalAlgo->getIsGLInitialized()) {
-        BinClassifMetricsAccumulator oMetricsBase = m_pEvalAlgo->getMetricsBase();
+        BinClassifMetricsAccumulatorPtr pMetricsBase = m_pEvalAlgo->getMetricsBase();
 #if DATASETUTILS_VALIDATE_ASYNC_EVALUATORS
-        glAssert(m_oMetricsBase==oMetricsBase);
+        glAssert(!m_pMetricsBase || m_pMetricsBase->isEqual(pMetricsBase));
 #endif //DATASETUTILS_VALIDATE_ASYNC_EVALUATORS
-        m_oMetricsBase = oMetricsBase;
+        m_pMetricsBase = pMetricsBase;
     }
 }
 
@@ -279,7 +290,7 @@ void litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUt
     IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::post_initialize_gl();
     m_pEvalAlgo = std::make_unique<GLVideoSegmDataEvaluator>(m_pAlgo,getTotPackets());
     m_pEvalAlgo->initialize_gl(m_oCurrGT,m_pLoader->getPacketROI(m_nCurrIdx));
-    m_oMetricsBase = BinClassifMetricsAccumulator();
+    m_pMetricsBase = BinClassifMetricsAccumulator::create();
     if(m_pAlgo->m_pDisplayHelper)
         m_pEvalAlgo->setOutputFetching(true);
     if(m_pAlgo->m_pDisplayHelper && m_pEvalAlgo->m_bUsingDebug)
@@ -325,7 +336,7 @@ void litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUt
         if(m_pAlgo->m_pDisplayHelper)
             m_pAlgo->m_pDisplayHelper->display(m_oLastInput,oLastDebug,BinClassifMetricsAccumulator::getColoredMask(oLastOutput,m_oLastGT,m_pLoader->getPacketROI(m_nLastIdx)),m_nLastIdx);
         if(DATASETUTILS_VALIDATE_ASYNC_EVALUATORS)
-            m_oMetricsBase.accumulate(oLastOutput,m_pLoader->getGT(m_nLastIdx),m_pLoader->getPacketROI(m_nLastIdx));
+            m_pMetricsBase->accumulate(oLastOutput,m_pLoader->getGT(m_nLastIdx),m_pLoader->getPacketROI(m_nLastIdx));
     }
 }
 
@@ -426,18 +437,18 @@ std::string litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,Par
     return ssSrc.str();
 }
 
-litiv::BinClassifMetricsAccumulator litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::GLVideoSegmDataEvaluator::getMetricsBase() {
+litiv::BinClassifMetricsAccumulatorPtr litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::GLVideoSegmDataEvaluator::getMetricsBase() {
     const cv::Mat& oAtomicCountersQueryBuffer = this->getEvaluationAtomicCounterBuffer();
-    BinClassifMetricsAccumulator oMetricsBase;
+    BinClassifMetricsAccumulatorPtr pMetricsBase = BinClassifMetricsAccumulator::create();
     for(int nFrameIter=0; nFrameIter<oAtomicCountersQueryBuffer.rows; ++nFrameIter) {
-        oMetricsBase.nTP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_TP);
-        oMetricsBase.nTN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_TN);
-        oMetricsBase.nFP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_FP);
-        oMetricsBase.nFN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_FN);
-        oMetricsBase.nSE += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_SE);
-        oMetricsBase.nDC += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_DC);
+        pMetricsBase->nTP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_TP);
+        pMetricsBase->nTN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_TN);
+        pMetricsBase->nFP += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_FP);
+        pMetricsBase->nFN += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_FN);
+        pMetricsBase->nSE += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_SE);
+        pMetricsBase->nDC += (uint32_t)oAtomicCountersQueryBuffer.at<int32_t>(nFrameIter,BinClassifMetricsAccumulator::eCounter_DC);
     }
-    return oMetricsBase;
+    return pMetricsBase;
 }
 
 #endif //HAVE_GLSL

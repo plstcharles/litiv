@@ -17,38 +17,40 @@
 
 #include "litiv/datasets/metrics.hpp"
 
-litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::MetricsAccumulator_() : nTP(0),nTN(0),nFP(0),nFN(0),nSE(0),nDC(0) {}
-
-litiv::BinClassifMetricsAccumulator litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::operator+(const BinClassifMetricsAccumulator& m) const {
-    BinClassifMetricsAccumulator res(m);
-    res.nTP += this->nTP;
-    res.nTN += this->nTN;
-    res.nFP += this->nFP;
-    res.nFN += this->nFN;
-    res.nSE += this->nSE;
-    return res;
+bool litiv::IMetricsAccumulator::operator!=(const IMetricsAccumulator& m) const {
+    return !isEqual(m.shared_from_this());
 }
 
-litiv::BinClassifMetricsAccumulator& litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::operator+=(const BinClassifMetricsAccumulator& m) {
-    this->nTP += m.nTP;
-    this->nTN += m.nTN;
-    this->nFP += m.nFP;
-    this->nFN += m.nFN;
-    this->nSE += m.nSE;
-    return *this;
+bool litiv::IMetricsAccumulator::operator==(const IMetricsAccumulator& m) const {
+    return isEqual(m.shared_from_this());
 }
 
-bool litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::operator==(const BinClassifMetricsAccumulator& m) const {
+litiv::IMetricsAccumulator& litiv::IMetricsAccumulator::operator+=(const IMetricsAccumulator& m) {
+    return *accumulate(m.shared_from_this());
+}
+
+litiv::IMetricsCalculator& litiv::IMetricsCalculator::operator+=(const IMetricsCalculator& m) {
+    return *accumulate(m.shared_from_this());
+}
+
+bool litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::isEqual(const IMetricsAccumulatorConstPtr& m) const {
+    const auto& m2 = dynamic_cast<const MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>&>(*m.get());
     return
-        (this->nTP==m.nTP) &&
-        (this->nTN==m.nTN) &&
-        (this->nFP==m.nFP) &&
-        (this->nFN==m.nFN) &&
-        (this->nSE==m.nSE);
+        (this->nTP==m2.nTP) &&
+        (this->nTN==m2.nTN) &&
+        (this->nFP==m2.nFP) &&
+        (this->nFN==m2.nFN) &&
+        (this->nSE==m2.nSE);
 }
 
-bool litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::operator!=(const BinClassifMetricsAccumulator& m) const {
-    return !((*this)==m);
+litiv::IMetricsAccumulatorPtr litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::accumulate(const IMetricsAccumulatorConstPtr& m) {
+    const auto& m2 = dynamic_cast<const MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>&>(*m.get());
+    this->nTP += m2.nTP;
+    this->nTN += m2.nTN;
+    this->nFP += m2.nFP;
+    this->nFN += m2.nFN;
+    this->nSE += m2.nSE;
+    return shared_from_this();
 }
 
 void litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::accumulate(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
@@ -136,43 +138,35 @@ cv::Mat litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::getCol
     return oResult;
 }
 
-litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::MetricsCalculator_(const BinClassifMetricsAccumulator& m) :
-        dRecall(CalcRecall(m)),
-        dSpecificity(CalcSpecificity(m)),
-        dFPR(CalcFalsePositiveRate(m)),
-        dFNR(CalcFalseNegativeRate(m)),
-        dPBC(CalcPercentBadClassifs(m)),
-        dPrecision(CalcPrecision(m)),
-        dFMeasure(CalcFMeasure(m)),
-        dMCC(CalcMatthewsCorrCoeff(m)) {}
-
-litiv::BinClassifMetricsCalculator litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::operator+(const BinClassifMetricsCalculator& m) const {
-    BinClassifMetricsCalculator res(m);
-    const size_t nTotWeight = this->nWeight+res.nWeight;
-    res.dRecall = (res.dRecall*res.nWeight + this->dRecall*this->nWeight)/nTotWeight;
-    res.dSpecificity = (res.dSpecificity*res.nWeight + this->dSpecificity*this->nWeight)/nTotWeight;
-    res.dFPR = (res.dFPR*res.nWeight + this->dFPR*this->nWeight)/nTotWeight;
-    res.dFNR = (res.dFNR*res.nWeight + this->dFNR*this->nWeight)/nTotWeight;
-    res.dPBC = (res.dPBC*res.nWeight + this->dPBC*this->nWeight)/nTotWeight;
-    res.dPrecision = (res.dPrecision*res.nWeight + this->dPrecision*this->nWeight)/nTotWeight;
-    res.dFMeasure = (res.dFMeasure*res.nWeight + this->dFMeasure*this->nWeight)/nTotWeight;
-    res.dMCC = (res.dMCC*res.nWeight + this->dMCC*this->nWeight)/nTotWeight;
-    res.nWeight = nTotWeight;
-    return res;
+std::shared_ptr<litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>> litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::create() {
+    struct MetricsAccumulatorWrapper : public MetricsAccumulator_<eDatasetEval_BinaryClassifier> {
+        MetricsAccumulatorWrapper() : MetricsAccumulator_<eDatasetEval_BinaryClassifier>() {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
+    };
+    return std::make_shared<MetricsAccumulatorWrapper>();
 }
 
-litiv::BinClassifMetricsCalculator& litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::operator+=(const BinClassifMetricsCalculator& m) {
-    const size_t nTotWeight = this->nWeight+m.nWeight;
-    this->dRecall = (m.dRecall*m.nWeight + this->dRecall*this->nWeight)/nTotWeight;
-    this->dSpecificity = (m.dSpecificity*m.nWeight + this->dSpecificity*this->nWeight)/nTotWeight;
-    this->dFPR = (m.dFPR*m.nWeight + this->dFPR*this->nWeight)/nTotWeight;
-    this->dFNR = (m.dFNR*m.nWeight + this->dFNR*this->nWeight)/nTotWeight;
-    this->dPBC = (m.dPBC*m.nWeight + this->dPBC*this->nWeight)/nTotWeight;
-    this->dPrecision = (m.dPrecision*m.nWeight + this->dPrecision*this->nWeight)/nTotWeight;
-    this->dFMeasure = (m.dFMeasure*m.nWeight + this->dFMeasure*this->nWeight)/nTotWeight;
-    this->dMCC = (m.dMCC*m.nWeight + this->dMCC*this->nWeight)/nTotWeight;
+litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::MetricsAccumulator_() : nTP(0),nTN(0),nFP(0),nFN(0),nSE(0),nDC(0) {}
+
+litiv::IMetricsCalculatorPtr litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::accumulate(const IMetricsCalculatorConstPtr& m) {
+    const auto& m2 = dynamic_cast<const MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>&>(*m.get());
+    const size_t nTotWeight = this->nWeight+m2.nWeight;
+    this->dRecall = (m2.dRecall*m2.nWeight + this->dRecall*this->nWeight)/nTotWeight;
+    this->dSpecificity = (m2.dSpecificity*m2.nWeight + this->dSpecificity*this->nWeight)/nTotWeight;
+    this->dFPR = (m2.dFPR*m2.nWeight + this->dFPR*this->nWeight)/nTotWeight;
+    this->dFNR = (m2.dFNR*m2.nWeight + this->dFNR*this->nWeight)/nTotWeight;
+    this->dPBC = (m2.dPBC*m2.nWeight + this->dPBC*this->nWeight)/nTotWeight;
+    this->dPrecision = (m2.dPrecision*m2.nWeight + this->dPrecision*this->nWeight)/nTotWeight;
+    this->dFMeasure = (m2.dFMeasure*m2.nWeight + this->dFMeasure*this->nWeight)/nTotWeight;
+    this->dMCC = (m2.dMCC*m2.nWeight + this->dMCC*this->nWeight)/nTotWeight;
     this->nWeight = nTotWeight;
-    return *this;
+    return shared_from_this();
+}
+
+litiv::BinClassifMetricsCalculatorPtr litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::create(const IMetricsAccumulatorConstPtr& m) {
+    struct MetricsCalculatorWrapper : public MetricsCalculator_<eDatasetEval_BinaryClassifier> {
+        MetricsCalculatorWrapper(const IMetricsAccumulatorConstPtr& m2) : MetricsCalculator_<eDatasetEval_BinaryClassifier>(m2) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
+    };
+    return std::make_shared<MetricsCalculatorWrapper>(m);
 }
 
 double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcFMeasure(double dRecall, double dPrecision) {return (dRecall+dPrecision)>0?(2.0*(dRecall*dPrecision)/(dRecall+dPrecision)):0;}
@@ -186,3 +180,18 @@ double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcFals
 double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcFalseNegativeRate(const BinClassifMetricsAccumulator& m) {return (m.nTP+m.nFN)>0?((double)m.nFN/(m.nTP+m.nFN)):0;}
 double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcPercentBadClassifs(const BinClassifMetricsAccumulator& m) {return m.total()>0?(100.0*(m.nFN+m.nFP)/m.total()):0;}
 double litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::CalcMatthewsCorrCoeff(const BinClassifMetricsAccumulator& m) {return ((m.nTP+m.nFP)>0)&&((m.nTP+m.nFN)>0)&&((m.nTN+m.nFP)>0)&&((m.nTN+m.nFN)>0)?((((double)m.nTP*m.nTN)-(m.nFP*m.nFN))/sqrt(((double)m.nTP+m.nFP)*(m.nTP+m.nFN)*(m.nTN+m.nFP)*(m.nTN+m.nFN))):0;}
+
+litiv::MetricsCalculator_<litiv::eDatasetEval_BinaryClassifier>::MetricsCalculator_(const IMetricsAccumulatorConstPtr& m) {
+    lvAssert(m.get());
+    const auto& m2 = std::dynamic_pointer_cast<const BinClassifMetricsAccumulator>(m);
+    lvAssert(m2.get());
+    const BinClassifMetricsAccumulator& m3 = *m2.get();
+    dRecall = CalcRecall(m3);
+    dSpecificity = CalcSpecificity(m3);
+    dFPR = CalcFalsePositiveRate(m3);
+    dFNR = CalcFalseNegativeRate(m3);
+    dPBC = CalcPercentBadClassifs(m3);
+    dPrecision = CalcPrecision(m3);
+    dFMeasure = CalcFMeasure(m3);
+    dMCC = CalcMatthewsCorrCoeff(m3);
+}
