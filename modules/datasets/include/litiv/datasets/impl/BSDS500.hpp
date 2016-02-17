@@ -22,12 +22,25 @@
 #error "This file should never be included directly; use litiv/datasets.hpp instead"
 #endif //__LITIV_DATASETS_IMPL_H
 
-#define DEFAULT_BSDS500_EDGE_EVAL_THRESHOLD_BINS 99
+// as defined in the BSDS500 scripts/dataset
+#define DATASETS_BSDS500_EVAL_DEFAULT_THRESH_BINS   99
+#define DATASETS_BSDS500_EVAL_IMAGE_DIAG_RATIO_DIST 0.0075
 
 enum eBSDS500DatasetGroup {
     eBSDS500Dataset_Training,
     eBSDS500Dataset_Training_Validation,
     eBSDS500Dataset_Training_Validation_Test,
+};
+
+template<>
+struct DatasetEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> :
+        public IDatasetEvaluator_<eDatasetEval_BinaryClassifier> {
+    //! writes an overall evaluation report listing high-level binary classification metrics
+    virtual void writeEvalReport() const override;
+    //! accumulates overall metrics from all batch(es)
+    virtual IMetricsAccumulatorConstPtr getMetricsBase() const override;
+    //! calculates overall metrics from all batch(es)
+    virtual IMetricsCalculatorPtr getMetrics(bool /*bUnused*/) const override;
 };
 
 template<eDatasetTaskList eDatasetTask, ParallelUtils::eParallelAlgoType eEvalImpl>
@@ -132,24 +145,29 @@ protected:
     }
 };
 
+struct BSDS500MetricsAccumulator;
+struct BSDS500MetricsCalculator;
+
 template<>
 struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> :
         public IDataEvaluator_<eDatasetEval_BinaryClassifier> {
+public:
+    //! overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
+    virtual IMetricsAccumulatorConstPtr getMetricsBase() const override;
+    //! accumulates high-level metrics from current batch(es)
+    virtual IMetricsCalculatorPtr getMetrics(bool /*bUnused*/) const override;
+    //! writes an evaluation report listing high-level metrics for current batch(es)
+    virtual void writeEvalReport() const override;
+    //! overrides 'push' from IDataConsumer_ to simultaneously evaluate the pushed results
+    virtual void push(const cv::Mat& oClassif, size_t nIdx) override;
+    //! provides a visual feedback on result quality based on evaluation guidelines
+    virtual cv::Mat getColoredMask(const cv::Mat& oClassif, size_t nIdx) override;
+    //! resets internal metrics counters to zero
+    virtual void resetMetrics() override;
 protected:
-/*    virtual void writeEdgeMask(const cv::Mat& oEdges, size_t nIdx) const override final {
-        CV_Assert(!oEdges.empty());
-        cv::Mat oEdgesOutput = oEdges;
-        auto pProducer = shared_from_this_cast<const IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup>>(true);
-        if(pProducer->getInputImageSize(nIdx)==cv::Size(321,481))
-            cv::transpose(oEdgesOutput,oEdgesOutput);
-        IDataConsumer_<eDatasetType_ImageEdgDet>::writeEdgeMask(oEdgesOutput,nIdx);
-    }
-    virtual cv::Mat readEdgeMask(size_t nIdx) const override final {
-        cv::Mat oEdgesOutput = IDataConsumer_<eDatasetType_ImageEdgDet>::readEdgeMask(nIdx);
-        CV_Assert(!oEdgesOutput.empty());
-        auto pProducer = shared_from_this_cast<const IDataProducer_<eDatasetType_ImageEdgDet,eNotGroup>>(true);
-        if(pProducer->getInputImageSize(nIdx)==cv::Size(321,481))
-            cv::transpose(oEdgesOutput,oEdgesOutput);
-        return oEdgesOutput;
-    }*/
+    //! returns a one-line string listing high-level metrics for current batch(es)
+    std::string writeInlineEvalReport(size_t nIndentSize) const;
+
+    friend struct DatasetEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500>;
+    std::shared_ptr<BSDS500MetricsAccumulator> m_pMetricsBase;
 };

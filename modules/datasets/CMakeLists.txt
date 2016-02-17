@@ -24,6 +24,7 @@ add_files(SOURCE_FILES
     "src/eval.cpp"
     "src/utils.cpp"
     "src/metrics.cpp"
+    "src/impl/BSDS500.cpp"
 )
 add_files(INCLUDE_FILES
     "include/litiv/datasets.hpp"
