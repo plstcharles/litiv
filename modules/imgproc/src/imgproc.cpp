@@ -87,13 +87,13 @@ void thinning_internal_LamLeeSuen(cv::Mat& oInput, bool bIter) {
             };
             size_t x_h = 0, n1 = 0, n2 = 0;
             for(size_t k=0; k<4; ++k) {
-#if USE_IMGPROC_THINNING_MATLAB_IMPL_FIX
+#if defined(_MSC_VER) || USE_IMGPROC_THINNING_MATLAB_IMPL_FIX
                 // G1:
                 x_h += bool(!anLUT[2*(k+1)-2] && (anLUT[2*(k+1)-1] || anLUT[(2*(k+1))%8]));
                 // G2:
                 n1 += bool(anLUT[2*(k+1)-2] || anLUT[2*(k+1)-1]);
                 n2 += bool(anLUT[2*(k+1)-1] || anLUT[(2*(k+1))%8]);
-#else //!USE_IMGPROC_THINNING_MATLAB_IMPL_FIX
+#else //!defined(_MSC_VER) && !USE_IMGPROC_THINNING_MATLAB_IMPL_FIX
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmaybe-uninitialized"
@@ -102,24 +102,18 @@ void thinning_internal_LamLeeSuen(cv::Mat& oInput, bool bIter) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #endif //(defined(__GNUC__) || defined(__GNUG__))
-#ifdef _MSC_VER
-#pragma warning(push,0)
-#endif //defined(_MSC_VER)
                 // G1:
                 x_h += bool(!anLUT[2*(k+1)-2] && (anLUT[2*(k+1)-1] || anLUT[2*(k+1)]));
                 // G2:
                 n1 += bool(anLUT[2*(k+1)-2] || anLUT[2*(k+1)-1]);
                 n2 += bool(anLUT[2*(k+1)-1] || anLUT[2*(k+1)]);
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif //defined(_MSC_VER)
 #if (defined(__GNUC__) || defined(__GNUG__))
 #pragma GCC diagnostic pop
 #endif //(defined(__GNUC__) || defined(__GNUG__))
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif //__clang__
-#endif //!USE_IMGPROC_THINNING_MATLAB_IMPL_FIX
+#endif //!defined(_MSC_VER) && !USE_IMGPROC_THINNING_MATLAB_IMPL_FIX
             }
             size_t n_min = std::min(n1,n2);
             if(x_h==1 && n_min>=2 && n_min<=3) {

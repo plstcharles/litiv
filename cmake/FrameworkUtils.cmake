@@ -80,10 +80,12 @@ macro(target_link_litiv_dependencies name)
     endif()
 endmacro(target_link_litiv_dependencies name)
 
-macro(try_runcheck_and_set_success name description)
+macro(try_runcheck_and_set_success name description defaultval)
     if(NOT (DEFINED USE_${name}))
-        if(CMAKE_CROSSCOMPILING OR WIN32) # try_run often fails on windows due to linking/dll issues
+        if(CMAKE_CROSSCOMPILING) # all code intrinsics should be user-defined
             option(USE_${name} ${description} OFF)
+        elseif(WIN32) # try_run often fails on windows due to linking/dll issues
+            option(USE_${name} ${description} ${defaultval})
         else()
             message(STATUS "Testing local support for ${name} instructions via OpenCV...")
             try_run(${name}_RUN_RESULT ${name}_COMPILE_RESULT ${CMAKE_CURRENT_BINARY_DIR}/cmake/checks/ ${CMAKE_CURRENT_BINARY_DIR}/cmake/checks/${name}.cpp LINK_LIBRARIES ${OpenCV_LIBS} COMPILE_OUTPUT_VARIABLE ${name}_COMPILE_OUTPUT)
@@ -94,13 +96,13 @@ macro(try_runcheck_and_set_success name description)
     endif()
 endmacro(try_runcheck_and_set_success)
 
-macro(try_cvhardwaresupport_runcheck_and_set_success name)
+macro(try_cvhardwaresupport_runcheck_and_set_success name defaultval)
     set(CV_HARDWARE_SUPPORT_CHECK_FLAG_NAME ${name})
     configure_file(
         "${CMAKE_SOURCE_DIR}/cmake/checks/cvhardwaresupport_check.cpp.in"
         "${CMAKE_BINARY_DIR}/cmake/checks/${name}.cpp"
     )
-    try_runcheck_and_set_success(${name} "Allow implementations to use ${name} instructions")
+    try_runcheck_and_set_success(${name} "Allow implementations to use ${name} instructions" ${defaultval})
 endmacro(try_cvhardwaresupport_runcheck_and_set_success)
 
 macro(get_subdirectory_list result dir)
