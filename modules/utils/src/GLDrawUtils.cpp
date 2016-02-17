@@ -367,7 +367,7 @@ GLScreenBillboard::~GLScreenBillboard() {
     glDeleteBuffers(1,&m_nIBO);
 }
 
-void GLScreenBillboard::render() {
+void GLScreenBillboard::render(GLMatrices /*oMats*/) {
     glBindVertexArray(getVAOId());
     glDrawElements(GL_TRIANGLES,GLScreenBillboard::s_nIndexCount,GL_UNSIGNED_BYTE,0);
     glDbgErrorCheck;

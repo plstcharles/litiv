@@ -21,6 +21,13 @@
 
 #define GLScreenBillboard_FLIP_TEX_Y_COORDS 1
 
+struct GLMatrices {
+    glm::mat4 mProj;
+    glm::mat4 mView;
+    glm::mat4 mModel;
+    glm::mat4 mNormal;
+};
+
 struct GLVertex {
     enum eVertexAttribList {
         eVertexAttrib_PositionIdx,
@@ -38,7 +45,7 @@ struct GLVertex {
 struct GLVertexArrayObject {
     GLVertexArrayObject();
     virtual ~GLVertexArrayObject();
-    virtual void render() = 0;
+    virtual void render(GLMatrices oMats) = 0;
     inline GLuint getVAOId() {return m_nVAO;}
 private:
     GLVertexArrayObject& operator=(const GLVertexArrayObject&) = delete;
@@ -146,7 +153,7 @@ private:
 struct GLScreenBillboard : GLVertexArrayObject {
     GLScreenBillboard();
     virtual ~GLScreenBillboard();
-    virtual void render();
+    virtual void render(GLMatrices /*oMats*/=GLMatrices());
     inline GLuint getVBOId() {return m_nVBO;}
     inline GLuint getIBOId() {return m_nIBO;}
     static const GLuint s_nVertexCount;

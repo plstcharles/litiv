@@ -42,10 +42,12 @@ public:
     bool setUniform1i(const std::string& sName, GLint nVal);
     bool setUniform1ui(const std::string& sName, GLuint nVal);
     bool setUniform4fv(const std::string& sName, const glm::vec4& afVals);
+    bool setUniform4fm(const std::string& sName, const glm::mat4& mfVals);
     bool setUniform1f(GLint nLoc, GLfloat fVal);
     bool setUniform1i(GLint nLoc, GLint nVal);
     bool setUniform1ui(GLint nLoc, GLuint nVal);
     bool setUniform4fv(GLint nLoc, const glm::vec4& afVals);
+    bool setUniform4fm(GLint nLoc, const glm::mat4& mfVals);
 
     std::string getUniformNameFromLoc(GLint nLoc);
     GLint getUniformLocFromName(const std::string& sName);
@@ -56,7 +58,7 @@ public:
     bool isEmpty()     {return m_bIsEmpty;}
     GLuint getProgID() {return m_nProgID;}
 
-    static const char* getDefaultVertexAttribVarName(GLVertex::eVertexAttribList eVar);
+    //static const char* getDefaultVertexAttribVarName(GLVertex::eVertexAttribList eVar); @@@@ todo?
 
     static std::string getVertexShaderSource_PassThrough(bool bPassNormals, bool bPassColors, bool bPassTexCoords);
     static std::string getVertexShaderSource_PassThrough_ConstArray(GLuint nVertexCount, const GLVertex* aVertices, bool bPassNormals, bool bPassColors, bool bPassTexCoords);
@@ -87,5 +89,5 @@ private:
     bool m_bIsActive;
     bool m_bIsEmpty;
     const GLuint m_nProgID;
-    static GLShader* s_pCurrActiveShader; // add mutex?
+    static GLShader* s_pCurrActiveShader; // add mutex? manage via shared_ptr w/ enable_... interf?
 };

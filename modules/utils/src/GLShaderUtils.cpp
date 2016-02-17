@@ -101,6 +101,8 @@ bool GLShader::removeSource(GLuint id) {
 }
 
 bool GLShader::compile() {
+    if(!m_nProgID)
+        return true;
     GLboolean bCompilerSupport;
     glGetBooleanv(GL_SHADER_COMPILER,&bCompilerSupport);
     if(bCompilerSupport==GL_FALSE)
@@ -126,6 +128,8 @@ bool GLShader::compile() {
 }
 
 bool GLShader::link(bool bDiscardSources) {
+    if(!m_nProgID)
+        return true;
     if(!compile() && !m_bIsEmpty)
         return false;
     if(m_bIsLinked && m_bIsEmpty)
@@ -167,7 +171,7 @@ bool GLShader::setUniform1f(const std::string& sName, GLfloat fVal) {
     if(nLoc==-1)
         return false;
     glProgramUniform1f(m_nProgID,nLoc,fVal);
-    glErrorCheck;
+    glDbgErrorCheck;
     return true;
 }
 
@@ -176,7 +180,7 @@ bool GLShader::setUniform1i(const std::string& sName, GLint nVal) {
     if(nLoc==-1)
         return false;
     glProgramUniform1i(m_nProgID,nLoc,nVal);
-    glErrorCheck;
+    glDbgErrorCheck;
     return true;
 }
 
@@ -185,7 +189,7 @@ bool GLShader::setUniform1ui(const std::string& sName, GLuint nVal) {
     if(nLoc==-1)
         return false;
     glProgramUniform1ui(m_nProgID,nLoc,nVal);
-    glErrorCheck;
+    glDbgErrorCheck;
     return true;
 }
 
@@ -194,7 +198,16 @@ bool GLShader::setUniform4fv(const std::string& sName, const glm::vec4& afVals) 
     if(nLoc==-1)
         return false;
     glProgramUniform4fv(m_nProgID,nLoc,1,&afVals[0]);
-    glErrorCheck;
+    glDbgErrorCheck;
+    return true;
+}
+
+bool GLShader::setUniform4fm(const std::string& sName, const glm::mat4& mfVals) {
+    GLint nLoc = getUniformLocFromName(sName);
+    if(nLoc==-1)
+        return false;
+    glProgramUniformMatrix4fv(m_nProgID,nLoc,1,false,(GLfloat*)&mfVals);
+    glDbgErrorCheck;
     return true;
 }
 
@@ -202,7 +215,7 @@ bool GLShader::setUniform1f(GLint nLoc, GLfloat fVal) {
     if(nLoc<0)
         return false;
     glProgramUniform1f(m_nProgID,nLoc,fVal);
-    glErrorCheck;
+    glDbgErrorCheck;
     return true;
 }
 
@@ -210,7 +223,7 @@ bool GLShader::setUniform1i(GLint nLoc, GLint nVal) {
     if(nLoc<0)
         return false;
     glProgramUniform1i(m_nProgID,nLoc,nVal);
-    glErrorCheck;
+    glDbgErrorCheck;
     return true;
 }
 
@@ -218,7 +231,7 @@ bool GLShader::setUniform1ui(GLint nLoc, GLuint nVal) {
     if(nLoc<0)
         return false;
     glProgramUniform1ui(m_nProgID,nLoc,nVal);
-    glErrorCheck;
+    glDbgErrorCheck;
     return true;
 }
 
@@ -226,7 +239,15 @@ bool GLShader::setUniform4fv(GLint nLoc, const glm::vec4& afVals) {
     if(nLoc<0)
         return false;
     glProgramUniform4fv(m_nProgID,nLoc,1,&afVals[0]);
-    glErrorCheck;
+    glDbgErrorCheck;
+    return true;
+}
+
+bool GLShader::setUniform4fm(GLint nLoc, const glm::mat4& mfVals) {
+    if(nLoc<0)
+        return false;
+    glProgramUniformMatrix4fv(m_nProgID,nLoc,1,false,(GLfloat*)&mfVals);
+    glDbgErrorCheck;
     return true;
 }
 
@@ -236,7 +257,7 @@ std::string GLShader::getUniformNameFromLoc(GLint nLoc) {
     GLsizei nNameSize, nSize;
     GLenum eType;
     glGetActiveUniform(m_nProgID,(GLuint)nLoc,nNameMaxSize,&nNameSize,&nSize,&eType,acName.data());
-    glErrorCheck;
+    glDbgErrorCheck;
     return std::string(acName.data());
 }
 
@@ -249,6 +270,7 @@ GLint GLShader::getUniformLocFromName(const std::string& sName) {
         m_mShaderUniformLocations.insert(std::make_pair(sName,nLoc));
         return nLoc;
     }
+    glDbgErrorCheck;
     return oFindRes->second;
 }
 
