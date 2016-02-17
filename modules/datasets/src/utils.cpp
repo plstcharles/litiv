@@ -488,19 +488,19 @@ void litiv::IDataProducer_<litiv::eDatasetSource_Image>::parseData() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-size_t litiv::IDataCounter_<litiv::eNotGroup>::getProcessedPacketsCountPromise() {
+size_t litiv::DataCounter_<litiv::eNotGroup>::getProcessedPacketsCountPromise() {
     return m_nProcessedPacketsPromise.get_future().get();
 }
 
-size_t litiv::IDataCounter_<litiv::eNotGroup>::getProcessedPacketsCount() const {
+size_t litiv::DataCounter_<litiv::eNotGroup>::getProcessedPacketsCount() const {
     return m_nProcessedPackets;
 }
 
-size_t litiv::IDataCounter_<litiv::eGroup>::getProcessedPacketsCountPromise() {
+size_t litiv::DataCounter_<litiv::eGroup>::getProcessedPacketsCountPromise() {
     return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCountPromise();});
 }
 
-size_t litiv::IDataCounter_<litiv::eGroup>::getProcessedPacketsCount() const {
+size_t litiv::DataCounter_<litiv::eGroup>::getProcessedPacketsCount() const {
     return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCount();});
 }
 
@@ -560,10 +560,16 @@ cv::Mat litiv::IDataArchiver::load(size_t nIdx) const {
 #if HAVE_GLSL
 
 cv::Size litiv::IAsyncDataConsumer_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::getIdealGLWindowSize() const {
-    glAssert(m_pAlgo && m_pAlgo->getIsGLInitialized());
     glAssert(getTotPackets()>1);
     cv::Size oWindowSize = shared_from_this_cast<const IDataLoader_<eImagePacket>>(true)->getPacketMaxSize();
-    oWindowSize.width *= int(m_pAlgo->m_nSxSDisplayCount);
+    if(m_pEvalAlgo) {
+        glAssert(m_pEvalAlgo->getIsGLInitialized());
+        oWindowSize.width *= int(m_pEvalAlgo->m_nSxSDisplayCount);
+    }
+    else if(m_pAlgo) {
+        glAssert(m_pAlgo->getIsGLInitialized());
+        oWindowSize.width *= int(m_pAlgo->m_nSxSDisplayCount);
+    }
     return oWindowSize;
 }
 
@@ -586,6 +592,14 @@ void litiv::IAsyncDataConsumer_<litiv::eDatasetEval_BinaryClassifier,ParallelUti
         m_pAlgo->setOutputFetching(true);
     if(m_pAlgo->m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
         m_pAlgo->setDebugFetching(true);
+    if(getDatasetInfo()->isUsingEvaluator()) {
+        m_oNextGT = m_pLoader->getGT(m_nNextIdx).clone();
+        m_oCurrGT = m_pLoader->getGT(m_nCurrIdx).clone();
+        m_oLastGT = m_oCurrGT.clone();
+        CV_Assert(!m_oCurrGT.empty());
+        CV_Assert(m_oCurrGT.isContinuous());
+        glAssert(m_oCurrGT.channels()==1 || m_oCurrGT.channels()==4);
+    }
 }
 
 void litiv::IAsyncDataConsumer_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::post_initialize_gl() {
@@ -598,39 +612,58 @@ void litiv::IAsyncDataConsumer_<litiv::eDatasetEval_BinaryClassifier,ParallelUti
     glDbgAssert(m_pAlgo);
     if(nNextIdx!=m_nNextIdx)
         m_oNextInput = m_pLoader->getInput(nNextIdx);
+    if(getDatasetInfo()->isUsingEvaluator() && nNextIdx!=m_nNextIdx)
+        m_oNextGT = m_pLoader->getGT(nNextIdx);
 }
 
 void litiv::IAsyncDataConsumer_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::post_apply_gl(size_t nNextIdx, bool bRebindAll) {
-    UNUSED(bRebindAll);
     glDbgAssert(m_pLoader);
     glDbgAssert(m_pAlgo);
+    if(m_pEvalAlgo && getDatasetInfo()->isUsingEvaluator())
+        m_pEvalAlgo->apply_gl(m_oNextGT,bRebindAll);
     m_nLastIdx = m_nCurrIdx;
     m_nCurrIdx = nNextIdx;
     m_nNextIdx = nNextIdx+1;
-    if(m_pAlgo->m_pDisplayHelper) {
+    if(m_pAlgo->m_pDisplayHelper || m_lDataCallback) {
         m_oCurrInput.copyTo(m_oLastInput);
         m_oNextInput.copyTo(m_oCurrInput);
+        if(getDatasetInfo()->isUsingEvaluator()) {
+            m_oCurrGT.copyTo(m_oLastGT);
+            m_oNextGT.copyTo(m_oCurrGT);
+        }
     }
-    if(m_nNextIdx<m_pLoader->getTotPackets())
+    if(m_nNextIdx<getTotPackets()) {
         m_oNextInput = m_pLoader->getInput(m_nNextIdx);
+        if(getDatasetInfo()->isUsingEvaluator())
+            m_oNextGT = m_pLoader->getGT(m_nNextIdx);
+    }
     processPacket();
-    if(getDatasetInfo()->isSavingOutput() || m_pAlgo->m_pDisplayHelper) {
+    if(getDatasetInfo()->isSavingOutput() || m_pAlgo->m_pDisplayHelper || m_lDataCallback) {
         cv::Mat oLastOutput,oLastDebug;
         m_pAlgo->fetchLastOutput(oLastOutput);
-        if(m_pAlgo->m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
+        if(m_pAlgo->m_pDisplayHelper && m_pEvalAlgo && m_pEvalAlgo->m_bUsingDebug)
+            m_pEvalAlgo->fetchLastDebug(oLastDebug);
+        else if(m_pAlgo->m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
             m_pAlgo->fetchLastDebug(oLastDebug);
         else
-            oLastDebug = oLastOutput;
+            oLastDebug = oLastOutput.clone();
         if(getDatasetInfo()->isSavingOutput())
             save(oLastOutput,m_nLastIdx);
+        if(m_lDataCallback)
+            m_lDataCallback(m_oLastInput,oLastDebug,oLastOutput,m_oLastGT,m_pLoader->getPacketROI(m_nLastIdx),m_nLastIdx);
         if(m_pAlgo->m_pDisplayHelper) {
-            const cv::Mat& oROI = m_pLoader->getPacketROI(m_nLastIdx);
-            if(!oROI.empty()) {
-                cv::bitwise_or(oLastOutput,UCHAR_MAX/2,oLastOutput,oROI==0);
-                cv::bitwise_or(oLastDebug,UCHAR_MAX/2,oLastDebug,oROI==0);
-            }
+            getColoredMasks(oLastOutput,oLastDebug,m_oLastGT,m_pLoader->getPacketROI(m_nLastIdx));
             m_pAlgo->m_pDisplayHelper->display(m_oLastInput,oLastDebug,oLastOutput,m_nLastIdx);
         }
+    }
+}
+
+void litiv::IAsyncDataConsumer_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::getColoredMasks(cv::Mat& oOutput, cv::Mat& oDebug, const cv::Mat& /*oGT*/, const cv::Mat& oROI) {
+    if(!oROI.empty()) {
+        lvAssert(oOutput.size()==oROI.size());
+        lvAssert(oDebug.size()==oROI.size());
+        cv::bitwise_or(oOutput,UCHAR_MAX/2,oOutput,oROI==0);
+        cv::bitwise_or(oDebug,UCHAR_MAX/2,oDebug,oROI==0);
     }
 }
 

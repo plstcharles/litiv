@@ -17,7 +17,7 @@
 
 #pragma once
 
-#define DATASETUTILS_VALIDATE_ASYNC_EVALUATORS 1
+#define DATASETUTILS_VALIDATE_ASYNC_EVALUATORS 0
 
 #include "litiv/datasets/metrics.hpp"
 
@@ -33,7 +33,7 @@ namespace litiv {
     };
 
     template<>
-    struct IDatasetEvaluator_<eDatasetEval_BinaryClassifier> : public IDataset {
+    struct IDatasetEvaluator_<eDatasetEval_BinaryClassifier> : IDatasetEvaluator_<eDatasetEval_None> {
         //! writes an overall evaluation report listing high-level binary classification metrics
         virtual void writeEvalReport() const override;
         //! accumulates overall metrics from all batch(es)
@@ -51,7 +51,7 @@ namespace litiv {
     template<>
     struct IDataReporter_<eDatasetEval_None> : public virtual IDataHandler {
         //! writes an evaluation report listing packet counts, seconds elapsed and algo speed for current batch(es)
-        virtual void writeEvalReport() const override ;
+        virtual void writeEvalReport() const override;
     protected:
         //! returns a one-line string listing packet counts, seconds elapsed and algo speed for current batch(es)
         std::string writeInlineEvalReport(size_t nIndentSize) const;
@@ -72,65 +72,101 @@ namespace litiv {
         friend struct IDatasetEvaluator_<eDatasetEval_BinaryClassifier>;
     };
 
-    template<eDatasetEvalList eDatasetEval>
-    struct IDataEvaluator_ : // no evaluation specialization by default
-            public IDataReporter_<eDatasetEval>,
-            public IDataConsumer_<eDatasetEval> {};
+    template<eDatasetEvalList eDatasetEval, eDatasetList eDataset>
+    struct DataReporter_ : public IDataReporter_<eDatasetEval> {};
 
-    template<>
-    struct IDataEvaluator_<eDatasetEval_BinaryClassifier> :
-            public IDataReporter_<eDatasetEval_BinaryClassifier>,
-            public IDataConsumer_<eDatasetEval_BinaryClassifier> {
+    template<eDatasetEvalList eDatasetEval, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl>
+    struct DataEvaluator_ : // no evaluation specialization by default
+            public std::conditional<(eEvalImpl==ParallelUtils::eNonParallel),IDataConsumer_<eDatasetEval>,IAsyncDataConsumer_<eDatasetEval,eEvalImpl>>::type,
+            public DataReporter_<eDatasetEval,eDataset> {};
+
+    template<eDatasetList eDataset>
+    struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset,ParallelUtils::eNonParallel> :
+            public IDataConsumer_<eDatasetEval_BinaryClassifier>,
+            public DataReporter_<eDatasetEval_BinaryClassifier,eDataset> {
         //! overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
-        virtual IMetricsAccumulatorConstPtr getMetricsBase() const override;
+        virtual IMetricsAccumulatorConstPtr getMetricsBase() const override {
+            if(!m_pMetricsBase)
+                return BinClassifMetricsAccumulator::create();
+            return m_pMetricsBase;
+        }
         //! overrides 'push' from IDataConsumer_ to simultaneously evaluate the pushed results
-        virtual void push(const cv::Mat& oClassif, size_t nIdx) override;
+        virtual void push(const cv::Mat& oClassif, size_t nIdx) override {
+            IDataConsumer_<eDatasetEval_BinaryClassifier>::push(oClassif,nIdx);
+            if(getDatasetInfo()->isUsingEvaluator()) {
+                auto pLoader = shared_from_this_cast<IDataLoader_<eImagePacket>>(true);
+                if(!m_pMetricsBase)
+                    m_pMetricsBase = BinClassifMetricsAccumulator::create();
+                m_pMetricsBase->accumulate(oClassif,pLoader->getGT(nIdx),pLoader->getPacketROI(nIdx));
+            }
+        }
         //! provides a visual feedback on result quality based on evaluation guidelines
-        virtual cv::Mat getColoredMask(const cv::Mat& oClassif, size_t nIdx);
+        virtual cv::Mat getColoredMask(const cv::Mat& oClassif, size_t nIdx) {
+            auto pLoader = shared_from_this_cast<IDataLoader_<eImagePacket>>(true);
+            return BinClassifMetricsAccumulator::getColoredMask(oClassif,pLoader->getGT(nIdx),pLoader->getPacketROI(nIdx));
+        }
         //! resets internal metrics counters to zero
-        virtual void resetMetrics();
+        virtual void resetMetrics() {
+            m_pMetricsBase = BinClassifMetricsAccumulator::create();
+        }
     protected:
         BinClassifMetricsAccumulatorPtr m_pMetricsBase;
     };
 
-    template<eDatasetEvalList eDatasetEval, ParallelUtils::eParallelAlgoType eImpl>
-    struct IAsyncDataEvaluator_ : // no evaluation specialization by default
-            public IDataReporter_<eDatasetEval>,
-            public IAsyncDataConsumer_<eDatasetEval,eImpl> {
-        static_assert(eImpl!=ParallelUtils::eNonParallel,"Cannot use Async eval interface with non-parallel impl");
+#if HAVE_GLSL
+
+    struct GLBinaryClassifierEvaluator : public GLImageProcEvaluatorAlgo {
+        GLBinaryClassifierEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount);
+        virtual std::string getComputeShaderSource(size_t nStage) const override;
+        BinClassifMetricsAccumulatorPtr getMetricsBase();
     };
 
-#if HAVE_GLSL
-    template<>
-    struct IAsyncDataEvaluator_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL> :
-            public IDataReporter_<eDatasetEval_BinaryClassifier>,
-            public IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL> {
+    template<eDatasetList eDataset>
+    struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset,ParallelUtils::eGLSL> :
+            public IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>,
+            public DataReporter_<eDatasetEval_BinaryClassifier,eDataset> {
         //! overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
-        virtual IMetricsAccumulatorConstPtr getMetricsBase() const override;
-        //! returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs, if available)
-        virtual cv::Size getIdealGLWindowSize() const override;
+        virtual IMetricsAccumulatorConstPtr getMetricsBase() const override {
+            if(isProcessing())
+                lvError("Must stop processing batch before querying metrics under async data evaluator interface");
+            else if(!m_pMetricsBase)
+                return BinClassifMetricsAccumulator::create();
+            return m_pMetricsBase;
+        }
     protected:
-        virtual void _stopProcessing() override;
-        virtual void pre_initialize_gl() override;
-        virtual void post_initialize_gl() override;
-        virtual void pre_apply_gl(size_t nNextIdx, bool bRebindAll) override;
-        virtual void post_apply_gl(size_t nNextIdx, bool bRebindAll) override;
-        struct GLVideoSegmDataEvaluator : public GLImageProcEvaluatorAlgo {
-            GLVideoSegmDataEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount);
-            virtual std::string getComputeShaderSource(size_t nStage) const override;
-            BinClassifMetricsAccumulatorPtr getMetricsBase();
-        };
-        std::unique_ptr<GLVideoSegmDataEvaluator> m_pEvalAlgo;
-        cv::Mat m_oLastGT,m_oCurrGT,m_oNextGT;
+        virtual void _stopProcessing() override {
+            if(m_pEvalAlgo && m_pEvalAlgo->getIsGLInitialized()) {
+                auto pEvalAlgo = std::dynamic_pointer_cast<GLBinaryClassifierEvaluator>(m_pEvalAlgo);
+                glAssert(pEvalAlgo);
+                BinClassifMetricsAccumulatorPtr pMetricsBase = pEvalAlgo->getMetricsBase();
+                glAssert(!DATASETUTILS_VALIDATE_ASYNC_EVALUATORS || !m_pMetricsBase || m_pMetricsBase->isEqual(pMetricsBase));
+                m_pMetricsBase = pMetricsBase;
+            }
+        }
+        virtual void post_initialize_gl() override {
+            IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::post_initialize_gl();
+            if(getDatasetInfo()->isUsingEvaluator()) {
+                m_pEvalAlgo = std::make_shared<GLBinaryClassifierEvaluator>(m_pAlgo,getTotPackets());
+                m_pEvalAlgo->initialize_gl(m_oCurrGT,m_pLoader->getPacketROI(m_nCurrIdx));
+                m_pMetricsBase = BinClassifMetricsAccumulator::create();
+                if(DATASETUTILS_VALIDATE_ASYNC_EVALUATORS) {
+                    using namespace std::placeholders;
+                    m_lDataCallback = std::bind(&DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset,ParallelUtils::eGLSL>::validationCallback,this,_1,_2,_3,_4,_5,_6);
+                    m_pAlgo->setOutputFetching(true);
+                }
+                if(m_pAlgo->m_pDisplayHelper)
+                    m_pEvalAlgo->setOutputFetching(true);
+                if(m_pAlgo->m_pDisplayHelper && m_pEvalAlgo->m_bUsingDebug)
+                    m_pEvalAlgo->setDebugFetching(true);
+            }
+        }
+        void validationCallback(const cv::Mat& /*oInput*/, const cv::Mat& /*oDebug*/, const cv::Mat& oOutput, const cv::Mat& oGT, const cv::Mat& oROI, size_t /*nIdx*/) {
+            lvAssert(m_pMetricsBase && !oOutput.empty() && !oGT.empty());
+            m_pMetricsBase->accumulate(oOutput,oGT,oROI);
+        }
         BinClassifMetricsAccumulatorPtr m_pMetricsBase;
     };
 
 #endif //HAVE_GLSL
-
-    template<eDatasetEvalList eDatasetEval, eDatasetList eDataset>
-    struct DataEvaluator_ : public IDataEvaluator_<eDatasetEval> {};
-
-    template<eDatasetEvalList eDatasetEval, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eImpl>
-    struct AsyncDataEvaluator_ : public IAsyncDataEvaluator_<eDatasetEval,eImpl> {};
 
 } //namespace litiv

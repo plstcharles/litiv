@@ -24,8 +24,6 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 
-//@@@@@ rename defines below (no more videosegm / imageedgdet)
-
 // as defined in the 2012/2014 CDNet evaluation scripts
 #define DATASETUTILS_POSITIVE_VAL    uchar(255)
 #define dATASETUTILS_NEGATIVE_VAL    uchar(0)
@@ -167,6 +165,7 @@ namespace litiv {
         friend struct IDataset_;
         virtual void _startProcessing() {}
         virtual void _stopProcessing() {}
+        //! data parsing function, dataset-specific
         virtual void parseData() = 0;
     };
 
@@ -209,7 +208,9 @@ namespace litiv {
     protected:
         IIDataLoader(ePacketPolicy ePacket); // will automatically apply byte-alignment/scale in redirect if using image packets
         DataPrecacher m_oInputPrecacher,m_oGTPrecacher;
+        //! input packet load function, dataset-specific
         virtual cv::Mat _getInputPacket_impl(size_t nIdx) = 0;
+        //! gt packet load function, dataset-specific
         virtual cv::Mat _getGTPacket_impl(size_t nIdx) = 0;
     private:
         cv::Mat m_oLatestInputPacket, m_oLatestGTPacket;
@@ -310,23 +311,23 @@ namespace litiv {
     struct DataProducer_ : public IDataProducer_<eDatasetSource> {};
 
     template<eGroupPolicy ePolicy>
-    struct IDataCounter_;
+    struct DataCounter_;
 
     template<>
-    struct IDataCounter_<eNotGroup> : public virtual IDataHandler {
+    struct DataCounter_<eNotGroup> : public virtual IDataHandler {
     protected:
-        IDataCounter_() : m_nProcessedPackets(0) {}
+        DataCounter_() : m_nProcessedPackets(0) {}
         inline void processPacket() {++m_nProcessedPackets;}
         inline void setProcessedPacketsPromise() {m_nProcessedPacketsPromise.set_value(m_nProcessedPackets);}
-        virtual size_t getProcessedPacketsCountPromise() override;
-        virtual size_t getProcessedPacketsCount() const override;
+        virtual size_t getProcessedPacketsCountPromise() override final;
+        virtual size_t getProcessedPacketsCount() const override final;
     private:
         size_t m_nProcessedPackets;
         std::promise<size_t> m_nProcessedPacketsPromise;
     };
 
     template<>
-    struct IDataCounter_<eGroup> : public virtual IDataHandler {
+    struct DataCounter_<eGroup> : public virtual IDataHandler {
         virtual size_t getProcessedPacketsCountPromise() override final;
         virtual size_t getProcessedPacketsCount() const override final;
     };
@@ -340,7 +341,7 @@ namespace litiv {
     template<eDatasetEvalList eDatasetEval>
     struct IDataConsumer_ :
             public IDataArchiver,
-            public IDataCounter_<eNotGroup> {
+            public DataCounter_<eNotGroup> {
         virtual void push(const cv::Mat& oClassif, size_t nIdx) {
             processPacket();
             if(getDatasetInfo()->isSavingOutput())
@@ -348,6 +349,7 @@ namespace litiv {
         }
     };
 
+    using DataCallbackFunc = std::function<void(const cv::Mat& /*oInput*/,const cv::Mat& /*oDebug*/,const cv::Mat& /*oOutput*/,const cv::Mat& /*oGT*/,const cv::Mat& /*oROI*/,size_t /*nIdx*/)>;
     template<eDatasetEvalList eDatasetEval, ParallelUtils::eParallelAlgoType eImpl>
     struct IAsyncDataConsumer_;
 
@@ -356,7 +358,7 @@ namespace litiv {
     template<>
     struct IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL> :
             public IDataArchiver,
-            public IDataCounter_<eNotGroup> {
+            public DataCounter_<eNotGroup> {
         //! returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs, if available)
         virtual cv::Size getIdealGLWindowSize() const;
         //! initializes internal params & calls 'initialize_gl' on algo with expanded args list
@@ -382,10 +384,14 @@ namespace litiv {
         virtual void post_initialize_gl();
         virtual void pre_apply_gl(size_t nNextIdx, bool bRebindAll);
         virtual void post_apply_gl(size_t nNextIdx, bool bRebindAll);
+        virtual void getColoredMasks(cv::Mat& oOutput, cv::Mat& oDebug, const cv::Mat& oGT=cv::Mat(), const cv::Mat& oROI=cv::Mat());
         std::shared_ptr<ParallelUtils::IParallelAlgo_GLSL> m_pAlgo;
+        std::shared_ptr<GLImageProcEvaluatorAlgo> m_pEvalAlgo;
         std::shared_ptr<IDataLoader_<eImagePacket>> m_pLoader;
         cv::Mat m_oLastInput,m_oCurrInput,m_oNextInput;
+        cv::Mat m_oLastGT,m_oCurrGT,m_oNextGT;
         size_t m_nLastIdx,m_nCurrIdx,m_nNextIdx;
+        DataCallbackFunc m_lDataCallback;
     };
 
 #endif //HAVE_GLSL

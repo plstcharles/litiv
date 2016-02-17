@@ -19,13 +19,12 @@
 //#include "litiv/utils/ConsoleUtils.hpp" @@@@@ reuse later?
 
 void litiv::IDatasetEvaluator_<litiv::eDatasetEval_None>::writeEvalReport() const {
-    std::cout << "Writing evaluation report for dataset '" << getName() << "'..." << std::endl;
     if(getBatches().empty()) {
         std::cout << "No report to write for dataset '" << getName() << "', skipping." << std::endl;
         return;
     }
     for(const auto& pGroupIter : getBatches())
-        pGroupIter->writeEvalReport();
+        pGroupIter->shared_from_this_cast<const IDataReporter_<eDatasetEval_None>>(true)->IDataReporter_<eDatasetEval_None>::writeEvalReport();
     std::ofstream oMetricsOutput(getOutputPath()+"/overall.txt");
     if(oMetricsOutput.is_open()) {
         oMetricsOutput << std::fixed;
@@ -50,11 +49,11 @@ void litiv::IDatasetEvaluator_<litiv::eDatasetEval_None>::writeEvalReport() cons
 
 void litiv::IDatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier>::writeEvalReport() const {
     if(getBatches().empty() || !isUsingEvaluator()) {
-        std::cout << "No report to write for dataset '" << getName() << "', skipping." << std::endl;
+        IDatasetEvaluator_<litiv::eDatasetEval_None>::writeEvalReport();
         return;
     }
     for(const auto& pGroupIter : getBatches())
-        pGroupIter->writeEvalReport();
+        pGroupIter->shared_from_this_cast<const IDataReporter_<eDatasetEval_BinaryClassifier>>(true)->IDataReporter_<eDatasetEval_BinaryClassifier>::writeEvalReport();
     IMetricsCalculatorConstPtr pMetrics = getMetrics(true);
     lvAssert(pMetrics.get());
     const BinClassifMetricsCalculator& oMetrics = dynamic_cast<const BinClassifMetricsCalculator&>(*pMetrics.get());
@@ -172,8 +171,8 @@ litiv::IMetricsCalculatorPtr litiv::IDataReporter_<litiv::eDatasetEval_BinaryCla
 }
 
 void litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::writeEvalReport() const {
-    if(!getTotPackets()) {
-        std::cout << "No report to write for '" << getName() << "', skipping..." << std::endl;
+    if(!getTotPackets() || !getDatasetInfo()->isUsingEvaluator()) {
+        IDataReporter_<litiv::eDatasetEval_None>::writeEvalReport();
         return;
     }
     else if(isGroup() && !isBare())
@@ -223,127 +222,12 @@ std::string litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::writeIn
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-litiv::IMetricsAccumulatorConstPtr litiv::IDataEvaluator_<litiv::eDatasetEval_BinaryClassifier>::getMetricsBase() const {
-    if(!m_pMetricsBase)
-        return BinClassifMetricsAccumulator::create();
-    return m_pMetricsBase;
-}
-
-void litiv::IDataEvaluator_<litiv::eDatasetEval_BinaryClassifier>::push(const cv::Mat& oClassif, size_t nIdx) {
-    IDataConsumer_<eDatasetEval_BinaryClassifier>::push(oClassif,nIdx);
-    if(getDatasetInfo()->isUsingEvaluator()) {
-        auto pLoader = shared_from_this_cast<IDataLoader_<eImagePacket>>(true);
-        if(!m_pMetricsBase)
-            m_pMetricsBase = BinClassifMetricsAccumulator::create();
-        m_pMetricsBase->accumulate(oClassif,pLoader->getGT(nIdx),pLoader->getPacketROI(nIdx));
-    }
-}
-
-cv::Mat litiv::IDataEvaluator_<litiv::eDatasetEval_BinaryClassifier>::getColoredMask(const cv::Mat& oClassif, size_t nIdx) {
-    auto pLoader = shared_from_this_cast<IDataLoader_<eImagePacket>>(true);
-    return BinClassifMetricsAccumulator::getColoredMask(oClassif,pLoader->getGT(nIdx),pLoader->getPacketROI(nIdx));
-}
-
-void litiv::IDataEvaluator_<litiv::eDatasetEval_BinaryClassifier>::resetMetrics() {
-    m_pMetricsBase = BinClassifMetricsAccumulator::create();
-}
-
 #if HAVE_GLSL
 
-cv::Size litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::getIdealGLWindowSize() const {
-    glAssert(m_pEvalAlgo && m_pEvalAlgo->getIsGLInitialized());
-    glAssert(getTotPackets()>1);
-    cv::Size oWindowSize = shared_from_this_cast<const IDataLoader_<eImagePacket>>(true)->getPacketMaxSize();
-    oWindowSize.width *= int(m_pEvalAlgo->m_nSxSDisplayCount);
-    return oWindowSize;
-}
-
-litiv::IMetricsAccumulatorConstPtr litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::getMetricsBase() const {
-    if(isProcessing())
-        lvError("Must stop processing batch before querying metrics under async data evaluator interface");
-    else if(!m_pMetricsBase)
-        return BinClassifMetricsAccumulator::create();
-    return m_pMetricsBase;
-}
-
-void litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::_stopProcessing() {
-    if(m_pEvalAlgo && m_pEvalAlgo->getIsGLInitialized()) {
-        BinClassifMetricsAccumulatorPtr pMetricsBase = m_pEvalAlgo->getMetricsBase();
-#if DATASETUTILS_VALIDATE_ASYNC_EVALUATORS
-        glAssert(!m_pMetricsBase || m_pMetricsBase->isEqual(pMetricsBase));
-#endif //DATASETUTILS_VALIDATE_ASYNC_EVALUATORS
-        m_pMetricsBase = pMetricsBase;
-    }
-}
-
-void litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::pre_initialize_gl() {
-    IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::pre_initialize_gl();
-    m_oNextGT = m_pLoader->getGT(m_nNextIdx).clone();
-    m_oCurrGT = m_pLoader->getGT(m_nCurrIdx).clone();
-    m_oLastGT = m_oCurrGT.clone();
-    CV_Assert(!m_oCurrGT.empty());
-    CV_Assert(m_oCurrGT.isContinuous());
-    glAssert(m_oCurrGT.channels()==1 || m_oCurrGT.channels()==4);
-}
-
-void litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::post_initialize_gl() {
-    IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::post_initialize_gl();
-    m_pEvalAlgo = std::make_unique<GLVideoSegmDataEvaluator>(m_pAlgo,getTotPackets());
-    m_pEvalAlgo->initialize_gl(m_oCurrGT,m_pLoader->getPacketROI(m_nCurrIdx));
-    m_pMetricsBase = BinClassifMetricsAccumulator::create();
-    if(m_pAlgo->m_pDisplayHelper)
-        m_pEvalAlgo->setOutputFetching(true);
-    if(m_pAlgo->m_pDisplayHelper && m_pEvalAlgo->m_bUsingDebug)
-        m_pEvalAlgo->setDebugFetching(true);
-    if(DATASETUTILS_VALIDATE_ASYNC_EVALUATORS)
-        m_pAlgo->setOutputFetching(true);
-}
-
-void litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::pre_apply_gl(size_t nNextIdx, bool bRebindAll) {
-    IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::pre_apply_gl(nNextIdx,bRebindAll);
-    if(nNextIdx!=m_nNextIdx)
-        m_oNextGT = m_pLoader->getGT(nNextIdx);
-}
-
-void litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::post_apply_gl(size_t nNextIdx, bool bRebindAll) {
-    glDbgAssert(m_pLoader);
-    glDbgAssert(m_pEvalAlgo);
-    glDbgAssert(m_pAlgo);
-    m_pEvalAlgo->apply_gl(m_oNextGT,bRebindAll);
-    m_nLastIdx = m_nCurrIdx;
-    m_nCurrIdx = nNextIdx;
-    m_nNextIdx = nNextIdx+1;
-    if(m_pAlgo->m_pDisplayHelper) {
-        m_oCurrInput.copyTo(m_oLastInput);
-        m_oNextInput.copyTo(m_oCurrInput);
-        m_oCurrGT.copyTo(m_oLastGT);
-        m_oNextGT.copyTo(m_oCurrGT);
-    }
-    if(m_nNextIdx<getTotPackets()) {
-        m_oNextInput = m_pLoader->getInput(m_nNextIdx);
-        m_oNextGT = m_pLoader->getGT(m_nNextIdx);
-    }
-    processPacket();
-    if(getDatasetInfo()->isSavingOutput() || m_pAlgo->m_pDisplayHelper || DATASETUTILS_VALIDATE_ASYNC_EVALUATORS) {
-        cv::Mat oLastOutput,oLastDebug;
-        m_pAlgo->fetchLastOutput(oLastOutput);
-        if(m_pAlgo->m_pDisplayHelper && m_pEvalAlgo->m_bUsingDebug)
-            m_pEvalAlgo->fetchLastDebug(oLastDebug);
-        else
-            oLastDebug = oLastOutput;
-        if(getDatasetInfo()->isSavingOutput())
-            save(oLastOutput,m_nLastIdx);
-        if(m_pAlgo->m_pDisplayHelper)
-            m_pAlgo->m_pDisplayHelper->display(m_oLastInput,oLastDebug,BinClassifMetricsAccumulator::getColoredMask(oLastOutput,m_oLastGT,m_pLoader->getPacketROI(m_nLastIdx)),m_nLastIdx);
-        if(DATASETUTILS_VALIDATE_ASYNC_EVALUATORS)
-            m_pMetricsBase->accumulate(oLastOutput,m_pLoader->getGT(m_nLastIdx),m_pLoader->getPacketROI(m_nLastIdx));
-    }
-}
-
-litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::GLVideoSegmDataEvaluator::GLVideoSegmDataEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent,size_t nTotFrameCount) :
+litiv::GLBinaryClassifierEvaluator::GLBinaryClassifierEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent,size_t nTotFrameCount) :
         GLImageProcEvaluatorAlgo(pParent,nTotFrameCount,(size_t)BinClassifMetricsAccumulator::eCountersCount,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,true) {}
 
-std::string litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::GLVideoSegmDataEvaluator::getComputeShaderSource(size_t nStage) const {
+std::string litiv::GLBinaryClassifierEvaluator::getComputeShaderSource(size_t nStage) const {
     glAssert(nStage<m_nComputeStages);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -437,7 +321,7 @@ std::string litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,Par
     return ssSrc.str();
 }
 
-litiv::BinClassifMetricsAccumulatorPtr litiv::IAsyncDataEvaluator_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::GLVideoSegmDataEvaluator::getMetricsBase() {
+litiv::BinClassifMetricsAccumulatorPtr litiv::GLBinaryClassifierEvaluator::getMetricsBase() {
     const cv::Mat& oAtomicCountersQueryBuffer = this->getEvaluationAtomicCounterBuffer();
     BinClassifMetricsAccumulatorPtr pMetricsBase = BinClassifMetricsAccumulator::create();
     for(int nFrameIter=0; nFrameIter<oAtomicCountersQueryBuffer.rows; ++nFrameIter) {

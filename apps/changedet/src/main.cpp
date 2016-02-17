@@ -114,7 +114,7 @@ int main(int, char**) {
             std::thread(Analyze,(int)nProcessedBatches,pBatch).detach();
             vpBatches.pop();
         }
-        while(g_nActiveThreads>0)
+        while(g_nActiveThreads>0) // @@@ check if thread crashed?
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         if(pDataset->getProcessedPacketsCountPromise()==nTotPackets)
             pDataset->writeEvalReport();

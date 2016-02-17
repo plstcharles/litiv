@@ -26,6 +26,8 @@
 #define DATASETS_BSDS500_EVAL_DEFAULT_THRESH_BINS   99
 #define DATASETS_BSDS500_EVAL_IMAGE_DIAG_RATIO_DIST 0.0075
 
+struct BSDS500MetricsAccumulator;
+
 enum eBSDS500DatasetGroup {
     eBSDS500Dataset_Training,
     eBSDS500Dataset_Training_Validation,
@@ -34,13 +36,13 @@ enum eBSDS500DatasetGroup {
 
 template<>
 struct DatasetEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> :
-        public IDatasetEvaluator_<eDatasetEval_BinaryClassifier> {
+        public IDatasetEvaluator_<eDatasetEval_None> {
     //! writes an overall evaluation report listing high-level binary classification metrics
     virtual void writeEvalReport() const override;
     //! accumulates overall metrics from all batch(es)
-    virtual IMetricsAccumulatorConstPtr getMetricsBase() const override;
+    virtual IMetricsAccumulatorConstPtr getMetricsBase() const;
     //! calculates overall metrics from all batch(es)
-    virtual IMetricsCalculatorPtr getMetrics(bool /*bUnused*/) const override;
+    virtual IMetricsCalculatorPtr getMetrics() const;
 };
 
 template<eDatasetTaskList eDatasetTask, ParallelUtils::eParallelAlgoType eEvalImpl>
@@ -78,96 +80,41 @@ template<>
 struct DataProducer_<eDatasetSource_Image,eDataset_BSDS500> :
         public IDataProducer_<eDatasetSource_Image> {
 protected:
-    virtual void parseData() override final {
-        PlatformUtils::GetFilesFromDir(getDataPath(),m_vsInputImagePaths);
-        PlatformUtils::FilterFilePaths(m_vsInputImagePaths,{},{".jpg",".png",".bmp"});
-        if(m_vsInputImagePaths.empty())
-            lvErrorExt("BSDS500 set '%s' did not possess any jpg/png/bmp image file",getName().c_str());
-        PlatformUtils::GetSubDirsFromDir(getDatasetInfo()->getDatasetPath()+"/../groundTruth_bdry_images/"+getRelativePath(),m_vsGTImagePaths);
-        if(m_vsGTImagePaths.empty())
-            lvErrorExt("BSDS500 set '%s' did not possess any groundtruth image folders",getName().c_str());
-        else if(m_vsGTImagePaths.size()!=m_vsInputImagePaths.size())
-            lvErrorExt("BSDS500 set '%s' input/groundtruth count mismatch",getName().c_str());
-        // make sure folders are non-empty, and folders & images are similarliy ordered
-        std::vector<std::string> vsTempPaths;
-        for(size_t nImageIdx=0; nImageIdx<m_vsGTImagePaths.size(); ++nImageIdx) {
-            PlatformUtils::GetFilesFromDir(m_vsGTImagePaths[nImageIdx],vsTempPaths);
-            CV_Assert(!vsTempPaths.empty());
-            const size_t nLastInputSlashPos = m_vsInputImagePaths[nImageIdx].find_last_of("/\\");
-            const std::string sInputImageFullName = nLastInputSlashPos==std::string::npos?m_vsInputImagePaths[nImageIdx]:m_vsInputImagePaths[nImageIdx].substr(nLastInputSlashPos+1);
-            const size_t nLastGTSlashPos = m_vsGTImagePaths[nImageIdx].find_last_of("/\\");
-            CV_Assert(sInputImageFullName.find(nLastGTSlashPos==std::string::npos?m_vsGTImagePaths[nImageIdx]:m_vsGTImagePaths[nImageIdx].substr(nLastGTSlashPos+1))!=std::string::npos);
-        }
-        m_bIsConstantSize = true;
-        m_oMaxSize = cv::Size(481,321);
-        m_voImageOrigSizes.clear();
-        m_vbImageTransposed.clear();
-        m_voImageOrigSizes.reserve(m_vsInputImagePaths.size());
-        m_vbImageTransposed.reserve(m_vsInputImagePaths.size());
-        for(size_t n=0; n<m_vsInputImagePaths.size(); ++n) {
-            cv::Mat oCurrInput = cv::imread(m_vsInputImagePaths[n],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
-            lvAssert(!oCurrInput.empty());
-            m_voImageOrigSizes.push_back(oCurrInput.size());
-            m_vbImageTransposed.push_back(oCurrInput.size()==cv::Size(321,481));
-        }
-        m_nImageCount = m_vsInputImagePaths.size();
-        const double dScale = getDatasetInfo()->getScaleFactor();
-        if(dScale!=1.0)
-            m_oMaxSize = cv::Size(int(m_oMaxSize.width*dScale),int(m_oMaxSize.height*dScale));
-        m_voImageSizes = std::vector<cv::Size>(m_nImageCount,m_oMaxSize);
-        CV_Assert(m_nImageCount>0);
-    }
-    virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final {
-        if(m_vsGTImagePaths.size()>nIdx) {
-            std::vector<std::string> vsTempPaths;
-            PlatformUtils::GetFilesFromDir(m_vsGTImagePaths[nIdx],vsTempPaths);
-            CV_Assert(!vsTempPaths.empty());
-            cv::Mat oTempRefGTImage = cv::imread(vsTempPaths[0],cv::IMREAD_GRAYSCALE);
-            CV_Assert(!oTempRefGTImage.empty());
-            CV_Assert(m_voImageOrigSizes[nIdx]==cv::Size() || m_voImageOrigSizes[nIdx]==oTempRefGTImage.size());
-            CV_Assert(oTempRefGTImage.size()==cv::Size(481,321) || oTempRefGTImage.size()==cv::Size(321,481));
-            m_voImageOrigSizes[nIdx] = oTempRefGTImage.size();
-            if(oTempRefGTImage.size()==cv::Size(321,481))
-                cv::transpose(oTempRefGTImage,oTempRefGTImage);
-            cv::Mat oGTMask(int(oTempRefGTImage.rows*vsTempPaths.size()),oTempRefGTImage.cols,CV_8UC1);
-            for(size_t nGTImageIdx=0; nGTImageIdx<vsTempPaths.size(); ++nGTImageIdx) {
-                cv::Mat oTempGTImage = cv::imread(vsTempPaths[nGTImageIdx],cv::IMREAD_GRAYSCALE);
-                CV_Assert(!oTempGTImage.empty() && (oTempGTImage.size()==cv::Size(481,321) || oTempGTImage.size()==cv::Size(321,481)));
-                if(oTempGTImage.size()==cv::Size(321,481))
-                    cv::transpose(oTempGTImage,oTempGTImage);
-                oTempGTImage.copyTo(cv::Mat(oGTMask,cv::Rect(0,int(oTempGTImage.rows*nGTImageIdx),oTempGTImage.cols,oTempGTImage.rows)));
-            }
-            if(getPacketSize(nIdx).area()>0 && oGTMask.size()!=getPacketSize(nIdx))
-                cv::resize(oGTMask,oGTMask,getPacketSize(nIdx),0,0,cv::INTER_NEAREST);
-            return oGTMask;
-        }
-        return cv::Mat(getPacketSize(nIdx),CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_OUTOFSCOPE_VAL));
-    }
+    //! data parsing function, dataset-specific (default parser is not satisfactory)
+    virtual void parseData() override final;
+    //! gt packet load function, dataset-specific (default gt loader is not satisfactory)
+    virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final;
 };
 
-struct BSDS500MetricsAccumulator;
-struct BSDS500MetricsCalculator;
-
 template<>
-struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> :
-        public IDataEvaluator_<eDatasetEval_BinaryClassifier> {
-public:
-    //! overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
-    virtual IMetricsAccumulatorConstPtr getMetricsBase() const override;
+struct DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> :
+        public IDataReporter_<eDatasetEval_None> {
+    //! accumulates basic metrics from current batch(es) --- provides group-impl only
+    virtual IMetricsAccumulatorConstPtr getMetricsBase() const;
     //! accumulates high-level metrics from current batch(es)
-    virtual IMetricsCalculatorPtr getMetrics(bool /*bUnused*/) const override;
+    virtual IMetricsCalculatorPtr getMetrics() const;
     //! writes an evaluation report listing high-level metrics for current batch(es)
     virtual void writeEvalReport() const override;
-    //! overrides 'push' from IDataConsumer_ to simultaneously evaluate the pushed results
-    virtual void push(const cv::Mat& oClassif, size_t nIdx) override;
-    //! provides a visual feedback on result quality based on evaluation guidelines
-    virtual cv::Mat getColoredMask(const cv::Mat& oClassif, size_t nIdx) override;
-    //! resets internal metrics counters to zero
-    virtual void resetMetrics() override;
 protected:
     //! returns a one-line string listing high-level metrics for current batch(es)
     std::string writeInlineEvalReport(size_t nIndentSize) const;
-
+    //! required so that dataset-level evaluation report can write dataset-specific reports
     friend struct DatasetEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500>;
+};
+
+template<>
+struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500,ParallelUtils::eNonParallel> :
+        public IDataConsumer_<eDatasetEval_BinaryClassifier>,
+        public DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> {
+public:
+    //! overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
+    virtual IMetricsAccumulatorConstPtr getMetricsBase() const;
+    //! overrides 'push' from IDataConsumer_ to simultaneously evaluate the pushed results
+    virtual void push(const cv::Mat& oClassif, size_t nIdx) override;
+    //! provides a visual feedback on result quality based on evaluation guidelines
+    virtual cv::Mat getColoredMask(const cv::Mat& oClassif, size_t nIdx);
+    //! resets internal metrics counters to zero
+    virtual void resetMetrics();
+protected:
     std::shared_ptr<BSDS500MetricsAccumulator> m_pMetricsBase;
 };

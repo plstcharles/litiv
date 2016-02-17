@@ -58,7 +58,7 @@ namespace litiv {
         struct WorkBatch :
                 public DataHandler,
                 public DataProducer_<eDatasetSource,eDataset>,
-                public std::conditional<(eEvalImpl==ParallelUtils::eNonParallel),DataEvaluator_<eDatasetEval,eDataset>,AsyncDataEvaluator_<eDatasetEval,eDataset,eEvalImpl>>::type {
+                public DataEvaluator_<eDatasetEval,eDataset,eEvalImpl> {
             virtual ~WorkBatch() = default;
             virtual eDatasetTaskList getDatasetTask() const override final {return eDatasetTask;}
             virtual eDatasetSourceList getDatasetSource() const override final {return eDatasetSource;}
@@ -104,8 +104,8 @@ namespace litiv {
 
         struct WorkBatchGroup :
                 public DataHandler,
-                public IDataReporter_<eDatasetEval>,
-                public IDataCounter_<eGroup> {
+                public DataCounter_<eGroup>,
+                public DataReporter_<eDatasetEval,eDataset> {
             virtual ~WorkBatchGroup() = default;
             virtual eDatasetTaskList getDatasetTask() const override final {return eDatasetTask;}
             virtual eDatasetSourceList getDatasetSource() const override final {return eDatasetSource;}
