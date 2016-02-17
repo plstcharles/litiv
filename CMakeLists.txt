@@ -29,11 +29,11 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 if(WIN32)
     # add hardcoded guesses for find_package here (caution: top level project is not defined yet!)
     list(APPEND CMAKE_PREFIX_PATH
-        E:/opencv_latest/ E:/opencv_latest/build/ E:/opencv/ E:/opencv/build/
-        E:/freeglut_latest/ E:/freeglut_latest/build/
-        E:/glfw_latest/ E:/glfw_latest/build/
-        E:/glew_latest/ E:/glew_latest/build/
-        E:/glm_latest/ E:/glm_latest/build/
+        $ENV{USER_DEVELOP}/opencv/ $ENV{USER_DEVELOP}/opencv/build/
+        $ENV{USER_DEVELOP}/freeglut/ $ENV{USER_DEVELOP}/freeglut/build/
+        $ENV{USER_DEVELOP}/glfw/ $ENV{USER_DEVELOP}/glfw/build/
+        $ENV{USER_DEVELOP}/glew/ $ENV{USER_DEVELOP}/glew/build/
+        $ENV{USER_DEVELOP}/glm/ $ENV{USER_DEVELOP}/glm/build/
     )
     set(DATASET_ROOT "E:/datasets/" CACHE STRING "Global dataset root folder for exec projects")
     set(CMAKE_INSTALL_PREFIX "E:/litiv" CACHE STRING "Install path prefix, prepended onto install directories")

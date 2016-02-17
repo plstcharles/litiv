@@ -36,6 +36,8 @@ find_path( GLFW_INCLUDE_DIR
     HINTS
         "${GLFW_LOCATION}/include"
         "$ENV{GLFW_LOCATION}/include"
+        "$ENV{USER_DEVELOP}/glfw/include"
+        "$ENV{USER_DEVELOP}/vendor/glfw/include"
     PATHS
         "$ENV{PROGRAMFILES}/GLFW/include"
         "${OPENGL_INCLUDE_DIR}"
@@ -61,6 +63,8 @@ find_path( GLFW_INCLUDE_DIR
     HINTS
         "${GLFW_LOCATION}/include"
         "$ENV{GLFW_LOCATION}/include"
+        "$ENV{USER_DEVELOP}/glfw/include"
+        "$ENV{USER_DEVELOP}/vendor/glfw/include"
     PATHS
         "$ENV{PROGRAMFILES}/GLFW/include"
         "${OPENGL_INCLUDE_DIR}"
@@ -86,6 +90,8 @@ if (WIN32)
                 "${GLFW_LOCATION}/lib"
                 "${GLFW_LOCATION}/lib/x64"
                 "$ENV{GLFW_LOCATION}/lib"
+                "$ENV{USER_DEVELOP}/glfw/build/src/Release/"
+                "$ENV{USER_DEVELOP}/vendor/glfw/build/src/Release/"
             PATHS
                 "${OPENGL_LIBRARY_DIR}"
                 /usr/lib
@@ -102,6 +108,7 @@ if (WIN32)
                 glfw32s
                 glfw
                 glfw3
+                glfw3dll
             HINTS
                 "${GLFW_LOCATION}/lib"
                 "${GLFW_LOCATION}/lib/x64"
@@ -111,6 +118,8 @@ if (WIN32)
                 "$ENV{GLFW_LOCATION}/lib/x64"
                 "$ENV{GLFW_LOCATION}/lib-msvc110"
                 "$ENV{GLFW_LOCATION}/lib-vc2012"
+                "$ENV{USER_DEVELOP}/glfw/build/src/Release/"
+                "$ENV{USER_DEVELOP}/vendor/glfw/build/src/Release/"
             PATHS
                 "$ENV{PROGRAMFILES}/GLFW/lib"
                 "${OPENGL_LIBRARY_DIR}"

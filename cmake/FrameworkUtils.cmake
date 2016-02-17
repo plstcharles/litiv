@@ -82,9 +82,9 @@ endmacro(target_link_litiv_dependencies name)
 
 macro(try_runcheck_and_set_success name description)
     if(NOT (DEFINED USE_${name}))
-        if(CMAKE_CROSSCOMPILING)
+        if(CMAKE_CROSSCOMPILING OR WIN32) # try_run often fails on windows due to linking/dll issues
             option(USE_${name} ${description} OFF)
-        else(NOT CMAKE_CROSSCOMPILING)
+        else()
             message(STATUS "Testing local support for ${name} instructions via OpenCV...")
             try_run(${name}_RUN_RESULT ${name}_COMPILE_RESULT ${CMAKE_CURRENT_BINARY_DIR}/cmake/checks/ ${CMAKE_CURRENT_BINARY_DIR}/cmake/checks/${name}.cpp LINK_LIBRARIES ${OpenCV_LIBS} COMPILE_OUTPUT_VARIABLE ${name}_COMPILE_OUTPUT)
             set_eval(USE_${name} (${name}_RUN_RESULT AND ${name}_COMPILE_RESULT))
