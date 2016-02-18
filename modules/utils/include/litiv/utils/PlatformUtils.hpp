@@ -199,7 +199,7 @@ namespace PlatformUtils {
     }
 
     template<typename T>
-    inline typename std::enable_if<std::is_floating_point<T>::value,std::vector<T>>::type L1dist(T a, T b, size_t steps, bool bIncludeInitVal=true) {
+    inline typename std::enable_if<std::is_floating_point<T>::value,std::vector<T>>::type linspace(T a, T b, size_t steps, bool bIncludeInitVal=true) {
         if(steps==0)
             return std::vector<T>();
         else if(steps==1)
@@ -214,9 +214,5 @@ namespace PlatformUtils {
                 vfResult[nStepIter] = a+fStep*T(nStepIter);
         return vfResult;
     }
-
-#if defined(_MSC_VER)
-    void SetConsoleWindowSize(int x, int y, int buffer_lines=-1);
-#endif //defined(_MSC_VER)
 
 } //namespace PlatformUtils

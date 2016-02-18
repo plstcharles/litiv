@@ -16,6 +16,10 @@
 // limitations under the License.
 
 #pragma once
+
+#include "litiv/utils/DefineUtils.hpp"
+#include "litiv/utils/CxxUtils.hpp"
+
 /**
  * ConsoleUtils.h (litiv version inspired from rlutil.h)
  *
@@ -472,7 +476,41 @@ namespace rlutil {
 } //namespace rlutil
 
 namespace litiv {
-    // shows a progression bar in the console
+
+#if defined(_MSC_VER)
+    //! sets the console window to a certain size (with optional buffer resizing)
+    void SetConsoleWindowSize(int x, int y, int buffer_lines=-1) {
+        // derived from http://www.cplusplus.com/forum/windows/121444/
+        HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
+        if(h==INVALID_HANDLE_VALUE)
+            lvError("SetConsoleWindowSize: Unable to get stdout handle");
+        COORD largestSize = GetLargestConsoleWindowSize(h);
+        if(x>largestSize.X)
+            x = largestSize.X;
+        if(y>largestSize.Y)
+            y = largestSize.Y;
+        if(buffer_lines<=0)
+            buffer_lines = y;
+        CONSOLE_SCREEN_BUFFER_INFO bufferInfo;
+        if(!GetConsoleScreenBufferInfo(h,&bufferInfo))
+            lvError("SetConsoleWindowSize: Unable to retrieve screen buffer info");
+        SMALL_RECT& winInfo = bufferInfo.srWindow;
+        COORD windowSize = {winInfo.Right-winInfo.Left+1,winInfo.Bottom-winInfo.Top+1};
+        if(windowSize.X>x || windowSize.Y>y) {
+            SMALL_RECT info = {0,0,SHORT((x<windowSize.X)?(x-1):(windowSize.X-1)),SHORT((y<windowSize.Y)?(y-1):(windowSize.Y-1))};
+            if(!SetConsoleWindowInfo(h,TRUE,&info))
+                lvError("SetConsoleWindowSize: Unable to resize window before resizing buffer");
+        }
+        COORD size = {SHORT(x),SHORT(y)};
+        if(!SetConsoleScreenBufferSize(h,size))
+            lvError("SetConsoleWindowSize: Unable to resize screen buffer");
+        SMALL_RECT info = {0,0,SHORT(x-1),SHORT(y-1)};
+        if(!SetConsoleWindowInfo(h, TRUE, &info))
+            lvError("SetConsoleWindowSize: Unable to resize window after resizing buffer");
+    }
+#endif //defined(_MSC_VER)
+
+    //! shows a progression bar in the console
     void updateConsoleProgressBar(const std::string& sMsg, float fCompletion, size_t nBarCols=20) {
         if(nBarCols==0)
             return;
@@ -506,6 +544,7 @@ namespace litiv {
         fflush(stdout);
     }
 
+    //! cleans a specific row from the console (default=last)
     void cleanConsoleRow(int nRowIdx=INT_MAX) {
         if(nRowIdx<0)
             return;

@@ -152,35 +152,3 @@ bool PlatformUtils::CreateDirIfNotExist(const std::string& sDirPath) {
         return (stat(sDirPath.c_str(),&st)==0 && S_ISDIR(st.st_mode));
 #endif //!defined(_MSC_VER)
 }
-
-#if defined(_MSC_VER)
-// SetConsoleWindowSize(...) : derived from http://www.cplusplus.com/forum/windows/121444/
-void PlatformUtils::SetConsoleWindowSize(int x, int y, int buffer_lines) {
-    HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
-    if(h==INVALID_HANDLE_VALUE)
-        lvError("SetConsoleWindowSize: Unable to get stdout handle");
-    COORD largestSize = GetLargestConsoleWindowSize(h);
-    if(x>largestSize.X)
-        x = largestSize.X;
-    if(y>largestSize.Y)
-        y = largestSize.Y;
-    if(buffer_lines<=0)
-        buffer_lines = y;
-    CONSOLE_SCREEN_BUFFER_INFO bufferInfo;
-    if(!GetConsoleScreenBufferInfo(h,&bufferInfo))
-        lvError("SetConsoleWindowSize: Unable to retrieve screen buffer info");
-    SMALL_RECT& winInfo = bufferInfo.srWindow;
-    COORD windowSize = {winInfo.Right-winInfo.Left+1,winInfo.Bottom-winInfo.Top+1};
-    if(windowSize.X>x || windowSize.Y>y) {
-        SMALL_RECT info = {0,0,SHORT((x<windowSize.X)?(x-1):(windowSize.X-1)),SHORT((y<windowSize.Y)?(y-1):(windowSize.Y-1))};
-        if(!SetConsoleWindowInfo(h,TRUE,&info))
-            lvError("SetConsoleWindowSize: Unable to resize window before resizing buffer");
-    }
-    COORD size = {SHORT(x),SHORT(y)};
-    if(!SetConsoleScreenBufferSize(h,size))
-        lvError("SetConsoleWindowSize: Unable to resize screen buffer");
-    SMALL_RECT info = {0,0,SHORT(x-1),SHORT(y-1)};
-    if(!SetConsoleWindowInfo(h, TRUE, &info))
-        lvError("SetConsoleWindowSize: Unable to resize window after resizing buffer");
-}
-#endif //defined(_MSC_VER)
