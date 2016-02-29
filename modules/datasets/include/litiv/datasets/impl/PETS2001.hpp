@@ -28,11 +28,11 @@ struct Dataset_<eDatasetTask,eDataset_PETS2001D3TC1,eEvalImpl> :
     static_assert(eDatasetTask!=eDatasetTask_Registr,"PETS2001 dataset does not support image registration (no image arrays)");
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
-            const std::string& sOutputDirName, // output directory (full) path for debug logs, evaluation reports and results archiving (will be created in PETS dataset folder)
-            bool bSaveOutput=false, // defines whether results should be archived or not
-            bool bUseEvaluator=true, // defines whether results should be fully evaluated, or simply acknowledged
-            bool bForce4ByteDataAlign=false, // defines whether data packets should be 4-byte aligned (useful for GPU upload)
-            double dScaleFactor=1.0 // defines the scale factor to use to resize/rescale read packets
+            const std::string& sOutputDirName, //!< output directory (full) path for debug logs, evaluation reports and results archiving (will be created in PETS dataset folder)
+            bool bSaveOutput=false, //!< defines whether results should be archived or not
+            bool bUseEvaluator=true, //!< defines whether results should be fully evaluated, or simply acknowledged
+            bool bForce4ByteDataAlign=false, //!< defines whether data packets should be 4-byte aligned (useful for GPU upload)
+            double dScaleFactor=1.0 //!< defines the scale factor to use to resize/rescale read packets
     ) :
             IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_PETS2001D3TC1,getDatasetEval<eDatasetTask,eDataset_PETS2001D3TC1>(),eEvalImpl>(
                     "PETS2001 Dataset#3",
@@ -51,42 +51,43 @@ protected: // should still be protected, as creation should always be done via d
             ) {}
 };
 
-template<>
-struct DataProducer_<eDatasetSource_Video,eDataset_PETS2001D3TC1> :
-        public IDataProducer_<eDatasetSource_Video> {
+template<eDatasetTaskList eDatasetTask>
+struct DataProducer_<eDatasetTask,eDatasetSource_Video,eDataset_PETS2001D3TC1> :
+        public DataProducer_c<eDatasetTask,eDatasetSource_Video> {
 protected:
     virtual void parseData() override final {
+        // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
         // @@@@ untested since 2016/01 refactoring
         std::vector<std::string> vsVideoSeqPaths;
-        PlatformUtils::GetFilesFromDir(getDataPath(),vsVideoSeqPaths);
+        PlatformUtils::GetFilesFromDir(this->getDataPath(),vsVideoSeqPaths);
         if(vsVideoSeqPaths.size()!=1)
-            lvErrorExt("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one video sequence file)",getName().c_str());
+            lvErrorExt("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one video sequence file)",this->getName().c_str());
         std::vector<std::string> vsGTSubdirPaths;
-        PlatformUtils::GetSubDirsFromDir(getDataPath(),vsGTSubdirPaths);
+        PlatformUtils::GetSubDirsFromDir(this->getDataPath(),vsGTSubdirPaths);
         if(vsGTSubdirPaths.size()!=1)
-            lvErrorExt("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one GT subdir)",getName().c_str());
-        m_voVideoReader.open(vsVideoSeqPaths[0]);
-        if(!m_voVideoReader.isOpened())
-            lvErrorExt("PETS2006D3TC1 sequence '%s': video file could not be opened",getName().c_str());
-        PlatformUtils::GetFilesFromDir(vsGTSubdirPaths[0],m_vsGTFramePaths);
-        if(m_vsGTFramePaths.empty())
-            lvErrorExt("PETS2006D3TC1 sequence '%s': did not possess any valid GT frames",getName().c_str());
+            lvErrorExt("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one GT subdir)",this->getName().c_str());
+        this->m_voVideoReader.open(vsVideoSeqPaths[0]);
+        if(!this->m_voVideoReader.isOpened())
+            lvErrorExt("PETS2006D3TC1 sequence '%s': video file could not be opened",this->getName().c_str());
+        PlatformUtils::GetFilesFromDir(vsGTSubdirPaths[0],this->m_vsGTFramePaths);
+        if(this->m_vsGTFramePaths.empty())
+            lvErrorExt("PETS2006D3TC1 sequence '%s': did not possess any valid GT frames",this->getName().c_str());
         const std::string sGTFilePrefix("image_");
         const size_t nInputFileNbDecimals = 4;
-        m_mGTIndexLUT.clear();
-        for(auto iter=m_vsGTFramePaths.begin(); iter!=m_vsGTFramePaths.end(); ++iter)
-            m_mGTIndexLUT[(size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str())] = iter-m_vsGTFramePaths.begin();
-        cv::Mat oTempImg = cv::imread(m_vsGTFramePaths[0]);
+        this->m_mGTIndexLUT.clear();
+        for(auto iter=this->m_vsGTFramePaths.begin(); iter!=this->m_vsGTFramePaths.end(); ++iter)
+            this->m_mGTIndexLUT[(size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str())] = iter-this->m_vsGTFramePaths.begin();
+        cv::Mat oTempImg = cv::imread(this->m_vsGTFramePaths[0]);
         if(oTempImg.empty())
-            lvErrorExt("PETS2006D3TC1 sequence '%s': did not possess valid GT file(s)",getName().c_str());
-        m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
-        m_oOrigSize = m_oROI.size();
-        const double dScale = getDatasetInfo()->getScaleFactor();
+            lvErrorExt("PETS2006D3TC1 sequence '%s': did not possess valid GT file(s)",this->getName().c_str());
+        this->m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
+        this->m_oOrigSize = this->m_oROI.size();
+        const double dScale = this->getDatasetInfo()->getScaleFactor();
         if(dScale!=1.0)
-            cv::resize(m_oROI,m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
-        m_oSize = m_oROI.size();
-        m_nNextExpectedVideoReaderFrameIdx = 0;
-        m_nFrameCount = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
-        CV_Assert(m_nFrameCount>0);
+            cv::resize(this->m_oROI,this->m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
+        this->m_oSize = this->m_oROI.size();
+        this->m_nNextExpectedVideoReaderFrameIdx = 0;
+        this->m_nFrameCount = (size_t)this->m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
+        CV_Assert(this->m_nFrameCount>0);
     }
 };

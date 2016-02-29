@@ -28,12 +28,12 @@ struct Dataset_<eDatasetTask,eDataset_CDnet,eEvalImpl> :
     static_assert(eDatasetTask!=eDatasetTask_Registr,"CDnet dataset does not support image registration (no image arrays)");
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
-            const std::string& sOutputDirName, // output directory (full) path for debug logs, evaluation reports and results archiving (will be created in CDnet dataset folder)
-            bool bSaveOutput=false, // defines whether results should be archived or not
-            bool bUseEvaluator=true, // defines whether results should be fully evaluated, or simply acknowledged
-            bool bForce4ByteDataAlign=false, // defines whether data packets should be 4-byte aligned (useful for GPU upload)
-            double dScaleFactor=1.0, // defines the scale factor to use to resize/rescale read packets
-            bool b2014=true // defines whether to use the 2012 or 2014 version of the dataset (each should have its own folder in dataset root)
+            const std::string& sOutputDirName, //!< output directory (full) path for debug logs, evaluation reports and results archiving (will be created in CDnet dataset folder)
+            bool bSaveOutput=false, //!< defines whether results should be archived or not
+            bool bUseEvaluator=true, //!< defines whether results should be fully evaluated, or simply acknowledged
+            bool bForce4ByteDataAlign=false, //!< defines whether data packets should be 4-byte aligned (useful for GPU upload)
+            double dScaleFactor=1.0, //!< defines the scale factor to use to resize/rescale read packets
+            bool b2014=true //!< defines whether to use the 2012 or 2014 version of the dataset (each should have its own folder in dataset root)
     ) :
             IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_CDnet,getDatasetEval<eDatasetTask,eDataset_CDnet>(),eEvalImpl>(
                     b2014?"CDnet 2014":"CDnet 2012",
@@ -52,34 +52,35 @@ protected: // should still be protected, as creation should always be done via d
             ) {}
 };
 
-template<>
-struct DataProducer_<eDatasetSource_Video,eDataset_CDnet> :
-        public IDataProducer_<eDatasetSource_Video> {
+template<eDatasetTaskList eDatasetTask>
+struct DataProducer_<eDatasetTask,eDatasetSource_Video,eDataset_CDnet> :
+        public DataProducer_c<eDatasetTask,eDatasetSource_Video> {
 protected:
     virtual void parseData() override final {
+        // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
         std::vector<std::string> vsSubDirs;
-        PlatformUtils::GetSubDirsFromDir(getDataPath(),vsSubDirs);
-        auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),getDataPath()+"/groundtruth");
-        auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),getDataPath()+"/input");
+        PlatformUtils::GetSubDirsFromDir(this->getDataPath(),vsSubDirs);
+        auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"/groundtruth");
+        auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"/input");
         if(gtDir==vsSubDirs.end() || inputDir==vsSubDirs.end())
-            lvErrorExt("CDnet sequence '%s' did not possess the required groundtruth and input directories",getName().c_str());
-        PlatformUtils::GetFilesFromDir(*inputDir,m_vsInputFramePaths);
-        PlatformUtils::GetFilesFromDir(*gtDir,m_vsGTFramePaths);
-        if(m_vsGTFramePaths.size()!=m_vsInputFramePaths.size())
-            lvErrorExt("CDnet sequence '%s' did not possess same amount of GT & input frames",getName().c_str());
-        m_oROI = cv::imread(getDataPath()+"/ROI.bmp",cv::IMREAD_GRAYSCALE);
-        if(m_oROI.empty())
-            lvErrorExt("CDnet sequence '%s' did not possess a ROI.bmp file",getName().c_str());
-        m_oROI = m_oROI>0;
-        m_oOrigSize = m_oROI.size();
-        const double dScale = getDatasetInfo()->getScaleFactor();
+            lvErrorExt("CDnet sequence '%s' did not possess the required groundtruth and input directories",this->getName().c_str());
+        PlatformUtils::GetFilesFromDir(*inputDir,this->m_vsInputFramePaths);
+        PlatformUtils::GetFilesFromDir(*gtDir,this->m_vsGTFramePaths);
+        if(this->m_vsGTFramePaths.size()!=this->m_vsInputFramePaths.size())
+            lvErrorExt("CDnet sequence '%s' did not possess same amount of GT & input frames",this->getName().c_str());
+        this->m_oROI = cv::imread(this->getDataPath()+"/ROI.bmp",cv::IMREAD_GRAYSCALE);
+        if(this->m_oROI.empty())
+            lvErrorExt("CDnet sequence '%s' did not possess a ROI.bmp file",this->getName().c_str());
+        this->m_oROI = this->m_oROI>0;
+        this->m_oOrigSize = this->m_oROI.size();
+        const double dScale = this->getDatasetInfo()->getScaleFactor();
         if(dScale!=1.0)
-            cv::resize(m_oROI,m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
-        m_oSize = m_oROI.size();
-        m_nFrameCount = m_vsInputFramePaths.size();
-        CV_Assert(m_nFrameCount>0);
-        m_mGTIndexLUT.clear();
-        for(size_t i=0; i<m_nFrameCount; ++i)
-            m_mGTIndexLUT[i] = i; // direct gt path index to frame index mapping
+            cv::resize(this->m_oROI,this->m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
+        this->m_oSize = this->m_oROI.size();
+        this->m_nFrameCount = this->m_vsInputFramePaths.size();
+        CV_Assert(this->m_nFrameCount>0);
+        this->m_mGTIndexLUT.clear();
+        for(size_t i=0; i<this->m_nFrameCount; ++i)
+            this->m_mGTIndexLUT[i] = i; // direct gt path index to frame index mapping
     }
 };

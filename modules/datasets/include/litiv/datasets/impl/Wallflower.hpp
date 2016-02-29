@@ -28,11 +28,11 @@ struct Dataset_<eDatasetTask,eDataset_Wallflower,eEvalImpl> :
     static_assert(eDatasetTask!=eDatasetTask_Registr,"Wallflower dataset does not support image registration (no image arrays)");
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
-            const std::string& sOutputDirName, // output directory (full) path for debug logs, evaluation reports and results archiving (will be created in Wallflower dataset folder)
-            bool bSaveOutput=false, // defines whether results should be archived or not
-            bool bUseEvaluator=true, // defines whether results should be fully evaluated, or simply acknowledged
-            bool bForce4ByteDataAlign=false, // defines whether data packets should be 4-byte aligned (useful for GPU upload)
-            double dScaleFactor=1.0 // defines the scale factor to use to resize/rescale read packets
+            const std::string& sOutputDirName, //!< output directory (full) path for debug logs, evaluation reports and results archiving (will be created in Wallflower dataset folder)
+            bool bSaveOutput=false, //!< defines whether results should be archived or not
+            bool bUseEvaluator=true, //!< defines whether results should be fully evaluated, or simply acknowledged
+            bool bForce4ByteDataAlign=false, //!< defines whether data packets should be 4-byte aligned (useful for GPU upload)
+            double dScaleFactor=1.0 //!< defines the scale factor to use to resize/rescale read packets
     ) :
             IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_Wallflower,getDatasetEval<eDatasetTask,eDataset_Wallflower>(),eEvalImpl>(
                     "Wallflower",
@@ -51,45 +51,46 @@ protected: // should still be protected, as creation should always be done via d
             ) {}
 };
 
-template<>
-struct DataProducer_<eDatasetSource_Video,eDataset_Wallflower> :
-        public IDataProducer_<eDatasetSource_Video> {
+template<eDatasetTaskList eDatasetTask>
+struct DataProducer_<eDatasetTask,eDatasetSource_Video,eDataset_Wallflower> :
+        public DataProducer_c<eDatasetTask,eDatasetSource_Video> {
 protected:
     virtual void parseData() override final {
+        // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
         // @@@@ untested since 2016/01 refactoring
         std::vector<std::string> vsImgPaths;
-        PlatformUtils::GetFilesFromDir(getDataPath(),vsImgPaths);
+        PlatformUtils::GetFilesFromDir(this->getDataPath(),vsImgPaths);
         bool bFoundScript=false, bFoundGTFile=false;
         const std::string sGTFilePrefix("hand_segmented_");
         const size_t nInputFileNbDecimals = 5;
         const std::string sInputFileSuffix(".bmp");
-        m_mGTIndexLUT.clear();
+        this->m_mGTIndexLUT.clear();
         for(auto iter=vsImgPaths.begin(); iter!=vsImgPaths.end(); ++iter) {
-            if(*iter==getDataPath()+"/script.txt")
+            if(*iter==this->getDataPath()+"/script.txt")
                 bFoundScript = true;
             else if(iter->find(sGTFilePrefix)!=std::string::npos) {
-                m_mGTIndexLUT[(size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str())] = m_vsGTFramePaths.size();
-                m_vsGTFramePaths.push_back(*iter);
+                this->m_mGTIndexLUT[(size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str())] = this->m_vsGTFramePaths.size();
+                this->m_vsGTFramePaths.push_back(*iter);
                 bFoundGTFile = true;
             }
             else {
                 if(iter->find(sInputFileSuffix)!=iter->size()-sInputFileSuffix.size())
-                    lvErrorExt("Wallflower sequence '%s' contained an unknown file ('%s')",getName().c_str(),iter->c_str());
-                m_vsInputFramePaths.push_back(*iter);
+                    lvErrorExt("Wallflower sequence '%s' contained an unknown file ('%s')",this->getName().c_str(),iter->c_str());
+                this->m_vsInputFramePaths.push_back(*iter);
             }
         }
-        if(!bFoundGTFile || !bFoundScript || m_vsInputFramePaths.empty() || m_vsGTFramePaths.size()!=1)
-            lvErrorExt("Wallflower sequence '%s' did not possess the required groundtruth and input files",getName().c_str());
-        cv::Mat oTempImg = cv::imread(m_vsGTFramePaths[0]);
+        if(!bFoundGTFile || !bFoundScript || this->m_vsInputFramePaths.empty() || this->m_vsGTFramePaths.size()!=1)
+            lvErrorExt("Wallflower sequence '%s' did not possess the required groundtruth and input files",this->getName().c_str());
+        cv::Mat oTempImg = cv::imread(this->m_vsGTFramePaths[0]);
         if(oTempImg.empty())
-            lvErrorExt("Wallflower sequence '%s' did not possess a valid GT file",getName().c_str());
-        m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
-        m_oOrigSize = m_oROI.size();
-        const double dScale = getDatasetInfo()->getScaleFactor();
+            lvErrorExt("Wallflower sequence '%s' did not possess a valid GT file",this->getName().c_str());
+        this->m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
+        this->m_oOrigSize = this->m_oROI.size();
+        const double dScale = this->getDatasetInfo()->getScaleFactor();
         if(dScale!=1.0)
-            cv::resize(m_oROI,m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
-        m_oSize = m_oROI.size();
-        m_nFrameCount = m_vsInputFramePaths.size();
-        CV_Assert(m_nFrameCount>0);
+            cv::resize(this->m_oROI,this->m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
+        this->m_oSize = this->m_oROI.size();
+        this->m_nFrameCount = this->m_vsInputFramePaths.size();
+        CV_Assert(this->m_nFrameCount>0);
     }
 };

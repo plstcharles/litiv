@@ -54,8 +54,12 @@ litiv::IMetricsAccumulatorPtr litiv::MetricsAccumulator_<litiv::eDatasetEval_Bin
 }
 
 void litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::accumulate(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
-    CV_Assert(oClassif.type()==CV_8UC1 && oGT.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
-    CV_Assert(oClassif.size()==oGT.size() && (oROI.empty() || oClassif.size()==oROI.size()));
+    CV_Assert(!oClassif.empty() && oClassif.type()==CV_8UC1 && (oGT.empty() || oGT.type()==CV_8UC1) && (oROI.empty() || oROI.type()==CV_8UC1));
+    CV_Assert((oGT.empty() || oClassif.size()==oGT.size()) && (oROI.empty() || oClassif.size()==oROI.size()));
+    if(oGT.empty()) {
+        nDC += oClassif.size().area();
+        return;
+    }
     const size_t step_row = oClassif.step.p[0];
     for(size_t i = 0; i<(size_t)oClassif.rows; ++i) {
         const size_t idx_nstep = step_row*i;
@@ -90,8 +94,13 @@ void litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::accumulat
 }
 
 cv::Mat litiv::MetricsAccumulator_<litiv::eDatasetEval_BinaryClassifier>::getColoredMask(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
-    CV_Assert(oClassif.type()==CV_8UC1 && oGT.type()==CV_8UC1 && (oROI.empty() || oROI.type()==CV_8UC1));
-    CV_Assert(oClassif.size()==oGT.size() && (oROI.empty() || oClassif.size()==oROI.size()));
+    CV_Assert(!oClassif.empty() && oClassif.type()==CV_8UC1 && (oGT.empty() || oGT.type()==CV_8UC1) && (oROI.empty() || oROI.type()==CV_8UC1));
+    CV_Assert((oGT.empty() || oClassif.size()==oGT.size()) && (oROI.empty() || oClassif.size()==oROI.size()));
+    if(oGT.empty()) {
+        cv::Mat oResult;
+        cv::cvtColor(oClassif,oResult,cv::COLOR_GRAY2BGR);
+        return oResult;
+    }
     cv::Mat oResult(oClassif.size(),CV_8UC3,cv::Scalar_<uchar>(0));
     const size_t step_row = oClassif.step.p[0];
     for(size_t i=0; i<(size_t)oClassif.rows; ++i) {

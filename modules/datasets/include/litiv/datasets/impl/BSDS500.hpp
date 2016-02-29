@@ -52,12 +52,12 @@ struct Dataset_<eDatasetTask,eDataset_BSDS500,eEvalImpl> :
     static_assert(eDatasetTask!=eDatasetTask_ChgDet,"BSDS500 dataset does not support change detection (no data streaming)");
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
-            const std::string& sOutputDirName, // output directory (full) path for debug logs, evaluation reports and results archiving (will be created in BSR dataset folder)
-            bool bSaveOutput=false, // defines whether results should be archived or not
-            bool bUseEvaluator=true, // defines whether results should be fully evaluated, or simply acknowledged
-            bool bForce4ByteDataAlign=false, // defines whether data packets should be 4-byte aligned (useful for GPU upload)
-            double dScaleFactor=1.0, // defines the scale factor to use to resize/rescale read packets
-            eBSDS500DatasetGroup eType=eBSDS500Dataset_Training // defines which dataset groups to use
+            const std::string& sOutputDirName, //!< output directory (full) path for debug logs, evaluation reports and results archiving (will be created in BSR dataset folder)
+            bool bSaveOutput=false, //!< defines whether results should be archived or not
+            bool bUseEvaluator=true, //!< defines whether results should be fully evaluated, or simply acknowledged
+            bool bForce4ByteDataAlign=false, //!< defines whether data packets should be 4-byte aligned (useful for GPU upload)
+            double dScaleFactor=1.0, //!< defines the scale factor to use to resize/rescale read packets
+            eBSDS500DatasetGroup eType=eBSDS500Dataset_Training //!< defines which dataset groups to use
     ) :
             IDataset_<eDatasetTask,eDatasetSource_Image,eDataset_BSDS500,getDatasetEval<eDatasetTask,eDataset_BSDS500>(),eEvalImpl>(
                     "BSDS500",
@@ -76,14 +76,83 @@ protected: // should still be protected, as creation should always be done via d
             ) {}
 };
 
-template<>
-struct DataProducer_<eDatasetSource_Image,eDataset_BSDS500> :
-        public IDataProducer_<eDatasetSource_Image> {
+template<eDatasetTaskList eDatasetTask>
+struct DataProducer_<eDatasetTask,eDatasetSource_Image,eDataset_BSDS500> :
+        public DataProducer_c<eDatasetTask,eDatasetSource_Image> {
 protected:
     //! data parsing function, dataset-specific (default parser is not satisfactory)
-    virtual void parseData() override final;
+    virtual void parseData() override final {
+        // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
+        PlatformUtils::GetFilesFromDir(this->getDataPath(),this->m_vsInputImagePaths);
+        PlatformUtils::FilterFilePaths(this->m_vsInputImagePaths,{},{".jpg",".png",".bmp"});
+        if(this->m_vsInputImagePaths.empty())
+            lvErrorExt("BSDS500 set '%s' did not possess any jpg/png/bmp image file",this->getName().c_str());
+        PlatformUtils::GetSubDirsFromDir(this->getDatasetInfo()->getDatasetPath()+"/../groundTruth_bdry_images/"+this->getRelativePath(),this->m_vsGTImagePaths);
+        if(this->m_vsGTImagePaths.empty())
+            lvErrorExt("BSDS500 set '%s' did not possess any groundtruth image folders",this->getName().c_str());
+        else if(this->m_vsGTImagePaths.size()!=this->m_vsInputImagePaths.size())
+            lvErrorExt("BSDS500 set '%s' input/groundtruth count mismatch",this->getName().c_str());
+        // make sure folders are non-empty, and folders & images are similarliy ordered
+        this->m_vsGTImagePaths.resize(10);
+        this->m_vsInputImagePaths.resize(10);
+        std::vector<std::string> vsTempPaths;
+        for(size_t nImageIdx=0; nImageIdx<this->m_vsGTImagePaths.size(); ++nImageIdx) {
+            PlatformUtils::GetFilesFromDir(this->m_vsGTImagePaths[nImageIdx],vsTempPaths);
+            CV_Assert(!vsTempPaths.empty());
+            const size_t nLastInputSlashPos = this->m_vsInputImagePaths[nImageIdx].find_last_of("/\\");
+            const std::string sInputImageFullName = nLastInputSlashPos==std::string::npos?this->m_vsInputImagePaths[nImageIdx]:this->m_vsInputImagePaths[nImageIdx].substr(nLastInputSlashPos+1);
+            const size_t nLastGTSlashPos = this->m_vsGTImagePaths[nImageIdx].find_last_of("/\\");
+            CV_Assert(sInputImageFullName.find(nLastGTSlashPos==std::string::npos?this->m_vsGTImagePaths[nImageIdx]:this->m_vsGTImagePaths[nImageIdx].substr(nLastGTSlashPos+1))!=std::string::npos);
+        }
+        this->m_bIsConstantSize = true;
+        this->m_oMaxSize = cv::Size(481,321);
+        this->m_voImageOrigSizes.clear();
+        this->m_vbImageTransposed.clear();
+        this->m_voImageOrigSizes.reserve(this->m_vsInputImagePaths.size());
+        this->m_vbImageTransposed.reserve(this->m_vsInputImagePaths.size());
+        for(size_t n=0; n<this->m_vsInputImagePaths.size(); ++n) {
+            cv::Mat oCurrInput = cv::imread(this->m_vsInputImagePaths[n],this->isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+            lvAssert(!oCurrInput.empty());
+            this->m_voImageOrigSizes.push_back(oCurrInput.size());
+            this->m_vbImageTransposed.push_back(oCurrInput.size()==cv::Size(321,481));
+        }
+        this->m_nImageCount = this->m_vsInputImagePaths.size();
+        const double dScale = this->getDatasetInfo()->getScaleFactor();
+        if(dScale!=1.0)
+            this->m_oMaxSize = cv::Size(int(this->m_oMaxSize.width*dScale),int(this->m_oMaxSize.height*dScale));
+        this->m_voImageSizes = std::vector<cv::Size>(this->m_nImageCount,this->m_oMaxSize);
+        CV_Assert(this->m_nImageCount>0);
+    }
     //! gt packet load function, dataset-specific (default gt loader is not satisfactory)
-    virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final;
+    virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final {
+        // 'this' is always required here since function name lookup is done during instantiation because of not-fully-specialized class template
+        if(this->m_vsGTImagePaths.size()>nIdx) {
+            std::vector<std::string> vsTempPaths;
+            PlatformUtils::GetFilesFromDir(this->m_vsGTImagePaths[nIdx],vsTempPaths);
+            CV_Assert(!vsTempPaths.empty());
+            cv::Mat oTempRefGTImage = cv::imread(vsTempPaths[0],cv::IMREAD_GRAYSCALE);
+            CV_Assert(!oTempRefGTImage.empty());
+            CV_Assert(this->m_voImageOrigSizes[nIdx]==cv::Size() || this->m_voImageOrigSizes[nIdx]==oTempRefGTImage.size());
+            CV_Assert(oTempRefGTImage.size()==cv::Size(481,321) || oTempRefGTImage.size()==cv::Size(321,481));
+            this->m_voImageOrigSizes[nIdx] = oTempRefGTImage.size();
+            if(oTempRefGTImage.size()==cv::Size(321,481))
+                cv::transpose(oTempRefGTImage,oTempRefGTImage);
+            if(this->getPacketSize(nIdx).area()>0 && oTempRefGTImage.size()!=this->getPacketSize(nIdx))
+                cv::resize(oTempRefGTImage,oTempRefGTImage,this->getPacketSize(nIdx),0,0,cv::INTER_NEAREST);
+            cv::Mat oGTMask(int(oTempRefGTImage.rows*vsTempPaths.size()),oTempRefGTImage.cols,CV_8UC1);
+            for(size_t nGTImageIdx=0; nGTImageIdx<vsTempPaths.size(); ++nGTImageIdx) {
+                cv::Mat oTempGTImage = cv::imread(vsTempPaths[nGTImageIdx],cv::IMREAD_GRAYSCALE);
+                CV_Assert(!oTempGTImage.empty() && (oTempGTImage.size()==cv::Size(481,321) || oTempGTImage.size()==cv::Size(321,481)));
+                if(oTempGTImage.size()==cv::Size(321,481))
+                    cv::transpose(oTempGTImage,oTempGTImage);
+                if(this->getPacketSize(nIdx).area()>0 && oTempGTImage.size()!=this->getPacketSize(nIdx))
+                    cv::resize(oTempGTImage,oTempGTImage,this->getPacketSize(nIdx),0,0,cv::INTER_NEAREST);
+                oTempGTImage.copyTo(cv::Mat(oGTMask,cv::Rect(0,int(oTempGTImage.rows*nGTImageIdx),oTempGTImage.cols,oTempGTImage.rows)));
+            }
+            return oGTMask;
+        }
+        return cv::Mat();
+    }
 };
 
 template<>
