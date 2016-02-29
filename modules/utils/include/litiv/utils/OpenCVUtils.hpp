@@ -185,4 +185,13 @@ namespace cv { // extending cv
         static void onMouseEvent(int nEvent, int x, int y, int nFlags, void* pData);
     };
 
+    //! always-empty-mat, which allows functions to return const-references to an empty mat without dangling ref issues
+    static const cv::Mat g_oEmptyMat = cv::Mat();
+    //! always-empty-size, which allows functions to return const-references to an empty size without dangling ref issues
+    static const cv::Size g_oEmptySize = cv::Size();
+    //! returns an always-empty-mat by reference
+    static inline const cv::Mat& emptyMat() {return g_oEmptyMat;}
+    //! returns an always-empty-size by reference
+    static inline const cv::Size& emptySize() {return g_oEmptySize;}
+
 } //namespace cv
