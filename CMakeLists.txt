@@ -111,7 +111,7 @@ set_eval(USE_CUDA 0)
 set_eval(USE_OPENCL 0)
 
 ### SIMD CHECK
-try_cvhardwaresupport_runcheck_and_set_success(MMX ON)
+try_cvhardwaresupport_runcheck_and_set_success(MMX OFF)
 try_cvhardwaresupport_runcheck_and_set_success(SSE ON)
 try_cvhardwaresupport_runcheck_and_set_success(SSE2 ON)
 try_cvhardwaresupport_runcheck_and_set_success(SSE3 ON)

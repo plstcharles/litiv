@@ -4,32 +4,34 @@
 # FREEGLUT_LIBRARY
 # FREEGLUT_FOUND
 
-FIND_PATH(
-  FREEGLUT_INCLUDE_DIR GL/freeglut.h
-  ${CMAKE_INCLUDE_PATH}
-  $ENV{include}
-  ${OPENGL_INCLUDE_DIR}
-  /usr/include
-  /usr/local/include
+FIND_PATH(FREEGLUT_INCLUDE_DIR
+    GL/freeglut.h
+    ${CMAKE_INCLUDE_PATH}
+    $ENV{include}
+    ${OPENGL_INCLUDE_DIR}
+    /usr/include
+    /usr/local/include
 )
 
 SET(STORE_CMAKE_FIND_FRAMEWORK ${CMAKE_FIND_FRAMEWORK})
 SET(CMAKE_FIND_FRAMEWORK NEVER)
 
-FIND_LIBRARY(
-  FREEGLUT_LIBRARY
-  NAMES freeglut_static freeglut glut
-  PATH
-    /opt/local/lib
-    ${CMAKE_LIBRARY_PATH}
-    $ENV{lib}
-    /usr/lib
-    /usr/local/lib
+FIND_LIBRARY(FREEGLUT_LIBRARY
+    NAMES
+        freeglut_static
+        freeglut
+        glut
+    PATH
+        /opt/local/lib
+        ${CMAKE_LIBRARY_PATH}
+        $ENV{lib}
+        /usr/lib
+        /usr/local/lib
 )
 
 SET(CMAKE_FIND_FRAMEWORK ${STORE_CMAKE_FIND_FRAMEWORK})
-
 SET(FREEGLUT_FOUND FALSE)
-IF (FREEGLUT_INCLUDE_DIR AND FREEGLUT_LIBRARY)
-   SET(FREEGLUT_FOUND TRUE)
-ENDIF (FREEGLUT_INCLUDE_DIR AND FREEGLUT_LIBRARY)
+if(FREEGLUT_INCLUDE_DIR AND FREEGLUT_LIBRARY)
+    SET(FREEGLUT_FOUND TRUE)
+    mark_as_advanced(FREEGLUT_INCLUDE_DIR FREEGLUT_LIBRARY)
+endif()

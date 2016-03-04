@@ -255,11 +255,11 @@ find_package_handle_standard_args(GLFW
         GLFW_VERSION
 )
 
-mark_as_advanced(
-  GLFW_INCLUDE_DIR
-  GLFW_LIBRARIES
-  GLFW_glfw_LIBRARY
-  GLFW_cocoa_LIBRARY
-)
-
-
+if(GLFW_FOUND)
+    mark_as_advanced(
+        GLFW_INCLUDE_DIR
+        GLFW_LIBRARIES
+        GLFW_glfw_LIBRARY
+        GLFW_cocoa_LIBRARY
+    )
+endif()
