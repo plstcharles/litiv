@@ -171,3 +171,4 @@ endif()
 
 add_subdirectory(modules)
 add_subdirectory(apps)
+add_subdirectory(doc)
