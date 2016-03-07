@@ -384,7 +384,7 @@ const GLVertex GLScreenBillboard::s_aVertices[GLScreenBillboard::s_nVertexCount]
     {{ 1.0f,-1.0f, 0.0f, 1.0f}, {0.0f,0.0f,-1.0f,0.0f}, {1.0f,1.0f,1.0f,1.0f}, {1.0f,1.0f,0.0f,0.0f}}, // 1
     {{ 1.0f, 1.0f, 0.0f, 1.0f}, {0.0f,0.0f,-1.0f,0.0f}, {1.0f,1.0f,1.0f,1.0f}, {1.0f,0.0f,0.0f,0.0f}}, // 2
     {{-1.0f, 1.0f, 0.0f, 1.0f}, {0.0f,0.0f,-1.0f,0.0f}, {1.0f,1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f,0.0f}}, // 3
-#else //!GLScreenBillboard_FLIP_TEX_Y_COORDS
+#else //(!GLScreenBillboard_FLIP_TEX_Y_COORDS)
     {{-1.0f,-1.0f, 0.0f, 1.0f}, {0.0f,0.0f,-1.0f,0.0f}, {1.0f,1.0f,1.0f,1.0f}, {0.0f,0.0f,0.0f,0.0f}}, // 0
     {{ 1.0f,-1.0f, 0.0f, 1.0f}, {0.0f,0.0f,-1.0f,0.0f}, {1.0f,1.0f,1.0f,1.0f}, {1.0f,0.0f,0.0f,0.0f}}, // 1
     {{ 1.0f, 1.0f, 0.0f, 1.0f}, {0.0f,0.0f,-1.0f,0.0f}, {1.0f,1.0f,1.0f,1.0f}, {1.0f,1.0f,0.0f,0.0f}}, // 2

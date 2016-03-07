@@ -348,16 +348,16 @@ namespace rlutil {
             HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
             SetConsoleTextAttribute(hConsole,(WORD)c);
         }
-#else //!defined(_WIN32) || defined(RLUTIL_USE_ANSI)
+#else //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
         RLUTIL_PRINT(getANSIColor(c));
-#endif //!defined(_WIN32) || defined(RLUTIL_USE_ANSI)
+#endif //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
     }
 
     // clears screen and moves cursor home
     inline void cls() {
 #if defined(_WIN32) && !defined(RLUTIL_USE_ANSI)
         system("cls");
-#else //!defined(_WIN32) || defined(RLUTIL_USE_ANSI)
+#else //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
         RLUTIL_PRINT("\033[2J\033[H");
 #endif
     }
@@ -369,11 +369,11 @@ namespace rlutil {
         coord.X = (SHORT)x-1;
         coord.Y = (SHORT)y-1; // Windows uses 0-based coordinates
         SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE),coord);
-#else //!defined(_WIN32) || defined(RLUTIL_USE_ANSI)
+#else //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
         std::ostringstream oss;
         oss << "\033[" << y << ";" << x << "H";
         RLUTIL_PRINT(oss.str());
-#endif //!defined(_WIN32) || defined(RLUTIL_USE_ANSI)
+#endif //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
     }
 
     // hides the cursor
@@ -385,9 +385,9 @@ namespace rlutil {
         GetConsoleCursorInfo(hConsoleOutput,&structCursorInfo); // Get current cursor size
         structCursorInfo.bVisible = FALSE;
         SetConsoleCursorInfo(hConsoleOutput,&structCursorInfo);
-#else //!defined(_WIN32) || defined(RLUTIL_USE_ANSI)
+#else //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
         RLUTIL_PRINT("\033[?25l");
-#endif //!defined(_WIN32) || defined(RLUTIL_USE_ANSI)
+#endif //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
     }
 
     // shows the cursor
@@ -399,9 +399,9 @@ namespace rlutil {
         GetConsoleCursorInfo(hConsoleOutput,&structCursorInfo); // Get current cursor size
         structCursorInfo.bVisible = TRUE;
         SetConsoleCursorInfo(hConsoleOutput,&structCursorInfo);
-#else //!defined(_WIN32) || defined(RLUTIL_USE_ANSI)
+#else //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
         RLUTIL_PRINT("\033[?25h");
-#endif //!defined(_WIN32) || defined(RLUTIL_USE_ANSI)
+#endif //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
     }
 
     // waits given number of milliseconds before continuing

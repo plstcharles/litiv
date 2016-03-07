@@ -34,9 +34,9 @@
 #if HAVE_SIMD_SUPPORT
 #if defined(_MSC_VER)
 #include <intrin.h>
-#else //!defined(_MSC_VER)
+#else //(!defined(_MSC_VER))
 #include <x86intrin.h>
-#endif //!defined(_MSC_VER)
+#endif //(!defined(_MSC_VER))
 #endif //HAVE_SIMD_SUPPORT
 
 #if DEFAULT_NB_THREADS<1
@@ -80,7 +80,7 @@ namespace ParallelUtils {
         virtual eParallelAlgoType getParallelAlgoType() {return eGLSL;}
     };
     using IParallelAlgo_GLSL = IParallelAlgo_<eGLSL>;
-#endif //!HAVE_GLSL
+#endif //(!HAVE_GLSL)
 
 #if HAVE_CUDA
     template<>

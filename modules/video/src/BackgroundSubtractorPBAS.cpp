@@ -184,10 +184,10 @@ void BackgroundSubtractorPBAS_1ch::apply(cv::InputArray _image, cv::OutputArray 
 #if BGSPBAS_USE_SELF_DIFFUSION
                     m_voBGImg[s_rand].at<uchar>(y_rand,x_rand) = oInputImg.at<uchar>(y_rand,x_rand);
                     m_voBGGrad[s_rand].at<uchar>(y_rand,x_rand) = oBlurredInputImg_AbsGrad.at<uchar>(y_rand,x_rand);
-#else //!BGSPBAS_USE_SELF_DIFFUSION
+#else //(!BGSPBAS_USE_SELF_DIFFUSION)
                     m_voBGImg[s_rand].at<uchar>(y_rand,x_rand) = oInputImg.data[idx_uchar];
                     m_voBGGrad[s_rand].at<uchar>(y_rand,x_rand) = oBlurredInputImg_AbsGrad.data[idx_uchar];
-#endif //!BGSPBAS_USE_SELF_DIFFUSION
+#endif //(!BGSPBAS_USE_SELF_DIFFUSION)
                 }
                 *pfCurrLearningRate -= BGSPBAS_T_DECR/((*pfCurrMeanMinDist)*BGSPBAS_T_SCALE+BGSPBAS_T_OFFST);
                 if((*pfCurrLearningRate)<BGSPBAS_T_LOWER)
@@ -209,14 +209,14 @@ void BackgroundSubtractorPBAS_1ch::apply(cv::InputArray _image, cv::OutputArray 
             }
             else if((*pfCurrDistThresholdFactor)>BGSPBAS_R_LOWER)
                 (*pfCurrDistThresholdFactor) *= BGSPBAS_R_DECR*(*pfCurrDistThresholdVariationFactor);
-#else //!BGSPBAS_USE_R2_ACCELERATION
+#else //(!BGSPBAS_USE_R2_ACCELERATION)
             if((*pfCurrDistThresholdFactor)<BGSPBAS_R_LOWER+(*pfCurrMeanMinDist)*BGSPBAS_R_SCALE+BGSPBAS_R_OFFST) {
                 if((*pfCurrDistThresholdFactor)<BGSPBAS_R_UPPER)
                     (*pfCurrDistThresholdFactor) *= BGSPBAS_R_INCR;
             }
             else if((*pfCurrDistThresholdFactor)>BGSPBAS_R_LOWER)
                 (*pfCurrDistThresholdFactor) *= BGSPBAS_R_DECR;
-#endif //!BGSPBAS_USE_R2_ACCELERATION
+#endif //(!BGSPBAS_USE_R2_ACCELERATION)
         }
     }
     m_fFormerMeanGradDist = std::max(((float)nFrameTotGradDist)/nFrameTotBadSamplesCount,20.0f);
@@ -262,9 +262,9 @@ void BackgroundSubtractorPBAS_1ch::apply(cv::InputArray _image, cv::OutputArray 
     cv::medianBlur(oFGMask,oFGMask,9);
     //cv::imshow("median3 post-fill, +median9 ",oFGMask);
     //cv::waitKey(0);
-#else //!BGSPBAS_USE_ADVANCED_MORPH_OPS
+#else //(!BGSPBAS_USE_ADVANCED_MORPH_OPS)
     cv::medianBlur(oFGMask,oFGMask,9);
-#endif //!BGSPBAS_USE_ADVANCED_MORPH_OPS
+#endif //(!BGSPBAS_USE_ADVANCED_MORPH_OPS)
 }
 
 BackgroundSubtractorPBAS_3ch::BackgroundSubtractorPBAS_3ch(size_t nInitColorDistThreshold, float fInitUpdateRate, size_t nBGSamples, size_t nRequiredBGSamples) :
@@ -412,10 +412,10 @@ void BackgroundSubtractorPBAS_3ch::apply(cv::InputArray _image, cv::OutputArray 
 #if BGSPBAS_USE_SELF_DIFFUSION
                     m_voBGImg[s_rand].at<cv::Vec3b>(y_rand,x_rand) = oInputImgRGB.at<cv::Vec3b>(y_rand,x_rand);
                     m_voBGGrad[s_rand].at<cv::Vec3b>(y_rand,x_rand) = oBlurredInputImg_AbsGrad.at<cv::Vec3b>(y_rand,x_rand);
-#else //!BGSPBAS_USE_SELF_DIFFUSION
+#else //(!BGSPBAS_USE_SELF_DIFFUSION)
                     m_voBGImg[s_rand].at<cv::Vec3b>(y_rand,x_rand) = oInputImg.at<cv::Vec3b>(y,x);
                     m_voBGGrad[s_rand].at<cv::Vec3b>(y_rand,x_rand) = oBlurredInputImg_AbsGrad.at<cv::Vec3b>(y,x);
-#endif //!BGSPBAS_USE_SELF_DIFFUSION
+#endif //(!BGSPBAS_USE_SELF_DIFFUSION)
                 }
                 *pfCurrLearningRate -= BGSPBAS_T_DECR/((*pfCurrMeanMinDist)*BGSPBAS_T_SCALE+BGSPBAS_T_OFFST);
                 if((*pfCurrLearningRate)<BGSPBAS_T_LOWER)
@@ -437,14 +437,14 @@ void BackgroundSubtractorPBAS_3ch::apply(cv::InputArray _image, cv::OutputArray 
             }
             else if((*pfCurrDistThresholdFactor)>BGSPBAS_R_LOWER)
                 (*pfCurrDistThresholdFactor) *= BGSPBAS_R_DECR*(*pfCurrDistThresholdVariationFactor);
-#else //!BGSPBAS_USE_R2_ACCELERATION
+#else //(!BGSPBAS_USE_R2_ACCELERATION)
             if((*pfCurrDistThresholdFactor)<BGSPBAS_R_LOWER+(*pfCurrMeanMinDist)*BGSPBAS_R_SCALE+BGSPBAS_R_OFFST) {
                 if((*pfCurrDistThresholdFactor)<BGSPBAS_R_UPPER)
                     (*pfCurrDistThresholdFactor) *= BGSPBAS_R_INCR;
             }
             else if((*pfCurrDistThresholdFactor)>BGSPBAS_R_LOWER)
                 (*pfCurrDistThresholdFactor) *= BGSPBAS_R_DECR;
-#endif //!BGSPBAS_USE_R2_ACCELERATION
+#endif //(!BGSPBAS_USE_R2_ACCELERATION)
         }
     }
     m_fFormerMeanGradDist = std::max(fFrameTotGradDist/nFrameTotBadSamplesCount,20.0f);
@@ -490,7 +490,7 @@ void BackgroundSubtractorPBAS_3ch::apply(cv::InputArray _image, cv::OutputArray 
     cv::medianBlur(oFGMask,oFGMask,9);
     //cv::imshow("median3 post-fill, +median9 ",oFGMask);
     //cv::waitKey(0);
-#else //!BGSPBAS_USE_ADVANCED_MORPH_OPS
+#else //(!BGSPBAS_USE_ADVANCED_MORPH_OPS)
     cv::medianBlur(oFGMask,oFGMask,9);
-#endif //!BGSPBAS_USE_ADVANCED_MORPH_OPS
+#endif //(!BGSPBAS_USE_ADVANCED_MORPH_OPS)
 }

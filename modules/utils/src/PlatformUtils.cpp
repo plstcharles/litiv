@@ -46,7 +46,7 @@ void PlatformUtils::GetFilesFromDir(const std::string& sDirPath, std::vector<std
             }
         }
     }
-#else //!defined(_MSC_VER)
+#else //(!defined(_MSC_VER))
     DIR *dp;
     struct dirent *dirp;
     if((dp  = opendir(sDirPath.c_str()))!=nullptr) {
@@ -68,7 +68,7 @@ void PlatformUtils::GetFilesFromDir(const std::string& sDirPath, std::vector<std
         }
         closedir(dp);
     }
-#endif //!defined(_MSC_VER)
+#endif //(!defined(_MSC_VER))
 }
 
 void PlatformUtils::GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths) {
@@ -101,7 +101,7 @@ void PlatformUtils::GetSubDirsFromDir(const std::string& sDirPath, std::vector<s
             }
         }
     }
-#else //!defined(_MSC_VER)
+#else //(!defined(_MSC_VER))
     DIR *dp;
     struct dirent *dirp;
     if((dp  = opendir(sDirPath.c_str()))!=nullptr) {
@@ -124,7 +124,7 @@ void PlatformUtils::GetSubDirsFromDir(const std::string& sDirPath, std::vector<s
         }
         closedir(dp);
     }
-#endif //!defined(_MSC_VER)
+#endif //(!defined(_MSC_VER))
 }
 
 void PlatformUtils::FilterFilePaths(std::vector<std::string>& vsFilePaths, const std::vector<std::string>& vsRemoveTokens, const std::vector<std::string>& vsKeepTokens) {
@@ -144,11 +144,11 @@ bool PlatformUtils::CreateDirIfNotExist(const std::string& sDirPath) {
 #if defined(_MSC_VER)
     std::wstring dir(sDirPath.begin(),sDirPath.end());
     return CreateDirectory(dir.c_str(),NULL)!=ERROR_PATH_NOT_FOUND;
-#else //!defined(_MSC_VER)
+#else //(!defined(_MSC_VER))
     struct stat st;
     if(stat(sDirPath.c_str(),&st)==-1)
         return !mkdir(sDirPath.c_str(),0777);
     else
         return (stat(sDirPath.c_str(),&st)==0 && S_ISDIR(st.st_mode));
-#endif //!defined(_MSC_VER)
+#endif //(!defined(_MSC_VER))
 }

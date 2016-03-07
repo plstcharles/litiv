@@ -33,13 +33,13 @@
 #if !USE_VPTZ_STANDALONE
 #if !HAVE_GLSL
 #error "vptz requires full OpenGL support"
-#endif //!HAVE_GLSL
+#endif //(!HAVE_GLSL)
 #include "litiv/utils/DefineUtils.hpp"
 #include "litiv/utils/ParallelUtils.hpp"
 #include "litiv/utils/DistanceUtils.hpp"
 #include "litiv/utils/CxxUtils.hpp"
 #define VPTZ_API
-#endif //!USE_VPTZ_STANDALONE
+#endif //(!USE_VPTZ_STANDALONE)
 
 #define VPTZ_MINIMUM_BBOX_RADIUS 3
 #define vptzError(msg) throw vptz::Exception(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__)
@@ -47,9 +47,9 @@
 #define vptzAssert(expr) {if(!!(expr)); else vptzError("assertion failed ("#expr")");}
 #ifdef _DEBUG
 #define vptzDbgAssert(expr) vptzAssert(expr)
-#else //!defined(_DEBUG)
+#else //(!defined(_DEBUG))
 #define vptzDbgAssert(expr)
-#endif //!defined(_DEBUG)
+#endif //(!defined(_DEBUG))
 
 namespace vptz {
 

@@ -73,11 +73,11 @@ struct glutWindowDeleter {
 #define glDbgAssert(expr) glAssert(expr)
 #define glDbgErrorCheck glErrorCheck
 #define glDbgExceptionWatch CxxUtils::UncaughtExceptionLogger __logger(__PRETTY_FUNCTION__,__FILE__,__LINE__)
-#else //!defined(_DEBUG)
+#else //(!defined(_DEBUG))
 #define glDbgAssert(expr)
 #define glDbgErrorCheck
 #define glDbgExceptionWatch
-#endif //!defined(_DEBUG)
+#endif //(!defined(_DEBUG))
 
 class GLContext {
 public:

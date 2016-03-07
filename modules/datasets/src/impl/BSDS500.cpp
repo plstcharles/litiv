@@ -399,7 +399,7 @@ namespace litiv {
                     oGTAccumulator |= oCurrGTSegmMask;
                 }
 
-    #else //!USE_BSDS500_BENCHMARK
+    #else //(!USE_BSDS500_BENCHMARK)
 
                 oSegmTPAccumulator = cv::Scalar_<uchar>(0); // accP |= ...
                 uint64_t nIndivTP = 0; // cntR += ...
@@ -432,7 +432,7 @@ namespace litiv {
                     }
                 }
 
-    #endif //!USE_BSDS500_BENCHMARK
+    #endif //(!USE_BSDS500_BENCHMARK)
 
                 //re = TP / (TP + FN)
                 CV_Assert(nGTPosCount>=nIndivTP);
@@ -693,9 +693,9 @@ void litiv::DatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier,litiv::eDatas
     std::cout << "                BestRcl=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dRecall << " BestPrc=" << oMetrics.oBestScore.dPrecision << " BestFM=" << oMetrics.oBestScore.dFMeasure << "  (@ T=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dThreshold << ")" << std::endl;
 #if USE_BSDS500_BENCHMARK
     std::ofstream oMetricsOutput(getOutputPath()+"/overall_reimpl_eval.txt");
-#else //!USE_BSDS500_BENCHMARK
+#else //(!USE_BSDS500_BENCHMARK)
     std::ofstream oMetricsOutput(getOutputPath()+"/overall_homemade_eval.txt");
-#endif //!USE_BSDS500_BENCHMARK
+#endif //(!USE_BSDS500_BENCHMARK)
     if(oMetricsOutput.is_open()) {
         oMetricsOutput << std::fixed;
         oMetricsOutput << "BSDS500 edge detection evaluation report :\n\n";
@@ -759,9 +759,9 @@ void litiv::DataReporter_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_B
     std::cout << "\t" << "                BestRcl=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dRecall << " BestPrc=" << oMetrics.oBestScore.dPrecision << " BestFM=" << oMetrics.oBestScore.dFMeasure << "  (@ T=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dThreshold << ")" << std::endl;
 #if USE_BSDS500_BENCHMARK
     const std::string sOutputPath = getOutputPath()+"/../"+getName()+"_reimpl_eval/";
-#else //!USE_BSDS500_BENCHMARK
+#else //(!USE_BSDS500_BENCHMARK)
     const std::string sOutputPath = getOutputPath()+"/../"+getName()+"_homemade_eval/";
-#endif //!USE_BSDS500_BENCHMARK
+#endif //(!USE_BSDS500_BENCHMARK)
     PlatformUtils::CreateDirIfNotExist(sOutputPath);
     std::ofstream oImageScoresOutput(sOutputPath+"/eval_bdry_img.txt");
     if(oImageScoresOutput.is_open())

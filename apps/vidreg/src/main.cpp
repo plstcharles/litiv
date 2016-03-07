@@ -81,7 +81,7 @@ int main(int /*argc*/, char **/*argv*/) {
         const cv::Mat& oPolyPts = oPolyPts_VISIBLE;
         const cv::Mat& oGTTransMat = oGTTransMat_THERMAL;
         const cv::Mat& oGTTransMat_inv = oGTTransMat_VISIBLE;
-#else //!USE_THERMAL_TO_VISIBLE_PROJ
+#else //(!USE_THERMAL_TO_VISIBLE_PROJ)
 #if USE_FULL_DEBUG_DISPLAY
         const cv::Mat& oSource_ToTransform = oSource_VISIBLE;
         //const cv::Mat& oSource = oSource_THERMAL;
@@ -95,7 +95,7 @@ int main(int /*argc*/, char **/*argv*/) {
         const cv::Mat& oPolyPts = oPolyPts_THERMAL;
         const cv::Mat& oGTTransMat = oGTTransMat_VISIBLE;
         const cv::Mat& oGTTransMat_inv = oGTTransMat_THERMAL;
-#endif //!USE_THERMAL_TO_VISIBLE_PROJ
+#endif //(!USE_THERMAL_TO_VISIBLE_PROJ)
 
         cv::Mat oTransformedSource(oTransformedImageSize,CV_8UC3,cv::Scalar_<uchar>::all(0)); // debug
         cv::Mat oGTTransformedSource(oTransformedImageSize,CV_8UC3,cv::Scalar_<uchar>::all(0)); // debug

@@ -258,4 +258,4 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         throw;
     }
 }
-#endif //!USE_GPU_IMPL
+#endif //(!USE_GPU_IMPL)

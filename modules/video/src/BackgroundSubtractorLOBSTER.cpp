@@ -154,7 +154,7 @@ std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource_LOBSTER() c
              LBSP::getShaderFunctionSource(m_nImgChannels,BGSLOBSTER_GLSL_USE_SHAREDMEM,m_vDefaultWorkGroupSize) <<
 #if !BGSLOBSTER_GLSL_USE_SHAREDMEM
              "#define lbsp(t,ref,vCoords) lbsp(t,ref,mInput,vCoords)\n"
-#endif //!BGSLOBSTER_GLSL_USE_SHAREDMEM
+#endif //(!BGSLOBSTER_GLSL_USE_SHAREDMEM)
              "struct PxModel {\n"
              "    " << (m_nImgChannels==4?"uvec4":"uint") << " color_samples[" << m_nBGSamples << "];\n"
              "    " << (m_nImgChannels==4?"uvec4":"uint") << " lbsp_samples[" << m_nBGSamples << "];\n";
@@ -202,7 +202,7 @@ std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource_LOBSTER() c
 #if BGSLOBSTER_GLSL_USE_BASIC_IMPL
              "            uvec3 vCurrDescDist = hdist(vInputIntraDesc,vCurrBGIntraDescSample);\n"
              "            if((vCurrColorDist.r+vCurrColorDist.g+vCurrColorDist.b)<=COLOR_DIST_THRESHOLD && (vCurrDescDist.r+vCurrDescDist.g+vCurrDescDist.b)<=DESC_DIST_THRESHOLD)\n";
-#else //!BGSLOBSTER_GLSL_USE_BASIC_IMPL
+#else //(!BGSLOBSTER_GLSL_USE_BASIC_IMPL)
              "            uvec3 vCurrDescThres = uvec3(anLBSPThresLUT[vCurrBGColorSample.r],anLBSPThresLUT[vCurrBGColorSample.g],anLBSPThresLUT[vCurrBGColorSample.b]);\n"
              "            uvec3 vCurrDescDist = hdist(lbsp(vCurrDescThres,vCurrBGColorSample,vImgCoords),vCurrBGIntraDescSample);\n"
              "            if(all(lessThanEqual(vCurrColorDist,uvec3(COLOR_DIST_SC_THRESHOLD))) && (vCurrColorDist.r+vCurrColorDist.g+vCurrColorDist.b)<=COLOR_DIST_THRESHOLD &&\n"
@@ -214,10 +214,10 @@ std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource_LOBSTER() c
              "            uint nCurrBGDescSample = aoPxModels[nModelIdx].lbsp_samples[nSampleIdx];\n"
 #if BGSLOBSTER_GLSL_USE_BASIC_IMPL
              "            if(absdiff(vInputColor.r,nCurrBGColorSample)<=COLOR_DIST_THRESHOLD/2 && hdist(vInputIntraDesc.r,nCurrBGDescSample)<=DESC_DIST_THRESHOLD)\n";
-#else //!BGSLOBSTER_GLSL_USE_BASIC_IMPL
+#else //(!BGSLOBSTER_GLSL_USE_BASIC_IMPL)
              "            if(absdiff(vInputColor.r,nCurrBGColorSample)<=COLOR_DIST_THRESHOLD/2 &&\n"
              "               hdist(lbsp(uvec3(anLBSPThresLUT[nCurrBGColorSample]),uvec3(nCurrBGColorSample),vImgCoords).r,nCurrBGDescSample)<=DESC_DIST_THRESHOLD)\n";
-#endif //!BGSLOBSTER_GLSL_USE_BASIC_IMPL
+#endif //(!BGSLOBSTER_GLSL_USE_BASIC_IMPL)
     }
     ssSrc << "                ++nGoodSamplesCount;\n"
              "            ++nSampleIdx;\n"
@@ -294,10 +294,10 @@ std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource_PostProc() 
              "    preload_data(mOutput);\n"
              "    barrier();\n"
              "    uint nFinalSegmRes = BinaryMedianBlur(vImgCoords);\n"
-#else //!BGSLOBSTER_GLSL_USE_SHAREDMEM
+#else //(!BGSLOBSTER_GLSL_USE_SHAREDMEM)
              "    uint nFinalSegmRes = BinaryMedianBlur(mOutput,vImgCoords);\n"
              "    barrier();\n"
-#endif //!BGSLOBSTER_GLSL_USE_SHAREDMEM
+#endif //(!BGSLOBSTER_GLSL_USE_SHAREDMEM)
              "    imageStore(mOutput,vImgCoords,uvec4(nFinalSegmRes));\n"
              "}\n";
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -210,7 +210,7 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         std::shared_ptr<IEdgeDetector> pAlgo = std::make_shared<EdgeDetectorType>();
 #if !FULL_THRESH_ANALYSIS
         const double dDefaultThreshold = pAlgo->getDefaultThreshold();
-#endif //!FULL_THRESH_ANALYSIS
+#endif //(!FULL_THRESH_ANALYSIS)
 #if DISPLAY_OUTPUT>0
         cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
@@ -222,9 +222,9 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
             oCurrInput = oBatch.getInput(nCurrIdx);
 #if FULL_THRESH_ANALYSIS
             pAlgo->apply(oCurrInput,oCurrEdgeMask);
-#else //!FULL_THRESH_ANALYSIS
+#else //(!FULL_THRESH_ANALYSIS)
             pAlgo->apply_threshold(oCurrInput,oCurrEdgeMask,dDefaultThreshold);
-#endif //!FULL_THRESH_ANALYSIS
+#endif //(!FULL_THRESH_ANALYSIS)
 #if DISPLAY_OUTPUT>0
             pDisplayHelper->display(oCurrInput,oCurrEdgeMask,oBatch.getColoredMask(oCurrEdgeMask,nCurrIdx),nCurrIdx);
             const int nKeyPressed = pDisplayHelper->waitKey();
@@ -252,4 +252,4 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         throw;
     }
 }
-#endif //!USE_GPU_IMPL
+#endif //(!USE_GPU_IMPL)

@@ -39,17 +39,17 @@
 #elif VPTZ_USE_SINGLE_TEST_SET /////////////////////////////////////////////////////////////////////////
 #define INPUT_TEST_SET_PATH              std::string("testsets/articulated_objects.yml")
 #define OUTPUT_EVAL_FILE_PATH            std::string("results_camshift/articulated_objects.yml")
-#else //!VPTZ_USE_SINGLE_TEST_SET //////////////////////////////////////////////////////////////////////
+#else //(!VPTZ_USE_SINGLE_TEST_SET) ////////////////////////////////////////////////////////////////////
 #define INPUT_SCENARIO_PATH              std::string("scenario5/frames/scenario5_%06d.jpg")
 #define INPUT_GT_SEQUENCE_PATH           std::string("scenario5/gt/scenario5_torso_green01.yml")
 #define INPUT_TARGET_MASK_PATH           std::string("target_masks/scenario5_torso_green01.png")
 #define OUTPUT_EVAL_FILE_PATH            std::string("results_camshift/scenario5_torso_green01.yml")
 #endif //VPTZ_USE_SINGLE_TEST_SET //////////////////////////////////////////////////////////////////////
-#else //!USE_VPTZ_TRACKING /////////////////////////////////////////////////////////////////////////////
+#else //(!USE_VPTZ_TRACKING) ///////////////////////////////////////////////////////////////////////////
 #define INPUT_VIDEO_PATH                 std::string("/some/root/directory/tracking/book/book.avi")
 #define INPUT_TARGET_IMG_PATH            std::string("/some/root/directory/tracking/book/target.png")
 #define INPUT_METADATA_FILE_PATH         std::string("/some/root/directory/tracking/book/targetLoc.yml")
-#endif //!USE_VPTZ_TRACKING ////////////////////////////////////////////////////////////////////////////
+#endif //(!USE_VPTZ_TRACKING) //////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////// CAMSHIFT PARAMETERS ///////////////////////////////////////////////
@@ -66,7 +66,7 @@ const int vmin = 10;
 const int vmax = 255;
 const int smin = 30;
 const int pmin = 0;
-#else //!CAMSHIFT_USE_MIXED_HSV
+#else //(!CAMSHIFT_USE_MIXED_HSV)
 const int nHistDims = 2;
 const int anHistChannels[] = {0,1};
 const int anHistBins[] = {16,16};
@@ -77,8 +77,8 @@ const int vmin = 0;
 const int vmax = 255;
 const int smin = 25;
 const int pmin = 35;
-#endif //!CAMSHIFT_USE_MIXED_HSV
-#else //!CAMSHIFT_USE_PURE_HSV
+#endif //(!CAMSHIFT_USE_MIXED_HSV)
+#else //(!CAMSHIFT_USE_PURE_HSV)
 const int nHistDims = 3;
 const int anHistChannels[] = {0,1,2};
 const int anHistBins[] = {256,256,256};
@@ -110,7 +110,7 @@ cv::Mat g_oTargetPickingMat;
 TargetBox g_oTargetBox;
 void displayRect(cv::Mat img);
 void onMouse( int event, int x, int y, int, void* );
-#endif //!USE_VPTZ_TRACKING
+#endif //(!USE_VPTZ_TRACKING)
 #if (VPTZ_USE_ALL_TEST_SETS+VPTZ_USE_SINGLE_TEST_SET)>1
 #error "config error, must specify all test sets or a single test set"
 #endif //(VPTZ_USE_ALL_TEST_SETS+VPTZ_USE_SINGLE_TEST_SET)>0
@@ -121,9 +121,9 @@ int main(int /*argc*/, char** /*argv*/) {
         const std::string sCurrTestSetPath = VPTZ_DATASET_ROOT_DIR_PATH+INPUT_TEST_SETS_PATH_PREFIX+asTestSets[nTestSetIdx]+".yml";
         const std::string sCurrResultFilePath = VPTZ_DATASET_ROOT_DIR_PATH+OUTPUT_EVAL_FILES_PATH_PREFIX+asTestSets[nTestSetIdx]+".yml";
         std::cout << "\n\n===============================\n\n  Setting up testset#" << nTestSetIdx+1 << " [" << asTestSets[nTestSetIdx] << "]\n\n===============================\n" << std::endl;
-#else //!VPTZ_USE_ALL_TEST_SETS
+#else //(!VPTZ_USE_ALL_TEST_SETS)
     {
-#endif //!VPTZ_USE_ALL_TEST_SETS
+#endif //(!VPTZ_USE_ALL_TEST_SETS)
         try {
             cv::Mat oCurrImg;
             cv::Mat oTargetImg,oTargetMask,oTargetImg_HIST;
@@ -137,13 +137,13 @@ int main(int /*argc*/, char** /*argv*/) {
             vptz::Evaluator oTestEval( VPTZ_DATASET_ROOT_DIR_PATH+INPUT_TEST_SET_PATH,
                                        VPTZ_DATASET_ROOT_DIR_PATH+OUTPUT_EVAL_FILE_PATH,
                                        VPTZ_COMMUNICATION_DELAY,VPTZ_EXEC_DELAY_RATIO);
-#else //!VPTZ_USE_SINGLE_TEST_SET
+#else //(!VPTZ_USE_SINGLE_TEST_SET)
             vptz::Evaluator oTestEval( VPTZ_DATASET_ROOT_DIR_PATH+INPUT_SCENARIO_PATH,
                                        VPTZ_DATASET_ROOT_DIR_PATH+INPUT_GT_SEQUENCE_PATH,
                                        VPTZ_DATASET_ROOT_DIR_PATH+INPUT_TARGET_MASK_PATH,
                                        VPTZ_DATASET_ROOT_DIR_PATH+OUTPUT_EVAL_FILE_PATH,
                                        VPTZ_COMMUNICATION_DELAY,VPTZ_EXEC_DELAY_RATIO);
-#endif //!VPTZ_USE_SINGLE_TEST_SET
+#endif //(!VPTZ_USE_SINGLE_TEST_SET)
             for(int nTestIdx=0; nTestIdx<oTestEval.GetTestSetSize(); ++nTestIdx) {
                 if(nTestIdx>0)
                     cv::destroyAllWindows();
@@ -154,7 +154,7 @@ int main(int /*argc*/, char** /*argv*/) {
                 oTargetImg = oTestEval.GetInitTarget();
                 oTargetMask = oTestEval.GetInitTargetMask();
                 nTotPotentialFrameCount += oTestEval.GetPotentialTestFrameCount();
-#else //!USE_VPTZ_TRACKING
+#else //(!USE_VPTZ_TRACKING)
             {
                 cv::VideoCapture oCap(INPUT_VIDEO_PATH);
                 if(!oCap.isOpened()) {
@@ -194,7 +194,7 @@ int main(int /*argc*/, char** /*argv*/) {
                 if(oCurrImg.empty())
                     return -1;
                 nTotPotentialFrameCount += (int)oCap.get(CV_CAP_PROP_FRAME_COUNT);
-#endif //!USE_VPTZ_TRACKING
+#endif //(!USE_VPTZ_TRACKING)
                 CV_Assert(oTargetImg.type()==CV_8UC4);
                 const int nImageWidth = oCurrImg.cols;
                 const int nImageHeight = oCurrImg.rows;
@@ -233,12 +233,12 @@ int main(int /*argc*/, char** /*argv*/) {
                 oTargetImg_HUE.create(oTargetImg_HSV.size(),oTargetImg_HSV.depth());
                 cv::mixChannels(&oTargetImg_HSV,1,&oTargetImg_HUE,1,anChannelPairMix,1);
                 cv::calcHist(&oTargetImg_HUE,1,anHistChannels,oTargetMask,oTargetImg_HIST,nHistDims,anHistBins,aafHistRanges);
-#else //!CAMSHIFT_USE_MIXED_HSV
+#else //(!CAMSHIFT_USE_MIXED_HSV)
                 calcHist(&oTargetImg_HSV,1,anHistChannels,oTargetMask,oTargetImg_HIST,nHistDims,anHistBins,aafHistRanges);
-#endif //!CAMSHIFT_USE_MIXED_HSV
-#else //!CAMSHIFT_USE_PURE_HSV
+#endif //(!CAMSHIFT_USE_MIXED_HSV)
+#else //(!CAMSHIFT_USE_PURE_HSV)
                 calcHist(&oTargetImg,1,anHistChannels,cv::Mat(),oTargetImg_HIST,nHistDims,anHistBins,aafHistRanges);
-#endif //!CAMSHIFT_USE_PURE_HSV
+#endif //(!CAMSHIFT_USE_PURE_HSV)
                 cv::normalize(oTargetImg_HIST,oTargetImg_HIST,0,UCHAR_MAX,cv::NORM_MINMAX);
 #if CAMSHIFT_DISPLAY_TARGET||CAMSHIFT_DISPLAY_FG_MASK
                 cv::imshow("oTargetImg",oTargetImg);
@@ -264,13 +264,13 @@ int main(int /*argc*/, char** /*argv*/) {
                     cv::Point oNewCenterPos = oTargetCenterPos+oExpectedDisplacement;
                     oNewCenterPos.x = std::min(std::max(oNewCenterPos.x,0),nImageWidth-1);
                     oNewCenterPos.y = std::min(std::max(oNewCenterPos.y,0),nImageHeight-1);
-#else //!CAMSHIFT_USE_POSE_PREDICT
+#else //(!CAMSHIFT_USE_POSE_PREDICT)
                     cv::Point oNewCenterPos((oTargetBBox.tl()+oTargetBBox.br())*0.5);
-#endif //!CAMSHIFT_USE_POSE_PREDICT
+#endif //(!CAMSHIFT_USE_POSE_PREDICT)
                 oCurrImg = oTestEval.GetNextFrame(oNewCenterPos,VPTZ_USE_WAITSLEEP);
-#else //!USE_VPTZ_TRACKING
+#else //(!USE_VPTZ_TRACKING)
                     oCap >> oCurrImg;
-#endif //!USE_VPTZ_TRACKING
+#endif //(!USE_VPTZ_TRACKING)
                     if(oCurrImg.empty())
                         break;
                     CV_Assert(oCurrImg.type()==CV_8UC4);
@@ -287,14 +287,14 @@ int main(int /*argc*/, char** /*argv*/) {
                     oCurrImg_HUE.create(oCurrImg_HSV.size(), oCurrImg_HSV.depth());
                     cv::mixChannels(&oCurrImg_HSV,1,&oCurrImg_HUE,1,anChannelPairMix,1);
                     cv::calcBackProject(&oCurrImg_HUE,1,0,oTargetImg_HIST,oCurrImg_BP,aafHistRanges);
-#else //!CAMSHIFT_USE_MIXED_HSV
+#else //(!CAMSHIFT_USE_MIXED_HSV)
                     cv::calcBackProject(&oCurrImg_HSV,1,anHistChannels,oTargetImg_HIST,oCurrImg_BP,aafHistRanges);
-#endif //!CAMSHIFT_USE_MIXED_HSV
+#endif //(!CAMSHIFT_USE_MIXED_HSV)
                     oCurrImg_BP &= oCurrImg_MASK;
                     cv::threshold(oCurrImg_BP,oCurrImg_BP,pmin,255,cv::THRESH_TOZERO);
-#else //!CAMSHIFT_USE_PURE_HSV
+#else //(!CAMSHIFT_USE_PURE_HSV)
                     cv::calcBackProject(&oCurrImg,1,anHistChannels,oTargetImg_HIST,oCurrImg_BP,aafHistRanges);
-#endif //!CAMSHIFT_USE_PURE_HSV
+#endif //(!CAMSHIFT_USE_PURE_HSV)
                     oTargetBBox.width = std::max(oTargetBBox.width,1);
                     oTargetBBox.height = std::max(oTargetBBox.height,1);
                     cv::CamShift(oCurrImg_BP,oTargetBBox,cv::TermCriteria(cv::TermCriteria::EPS|cv::TermCriteria::MAX_ITER,nMeanShiftMaxIterCount,fMeanShiftMinEpsilon));
@@ -401,4 +401,4 @@ void onMouse( int event, int x, int y, int, void* ) {
     else if( event == cv::EVENT_LBUTTONDBLCLK ) g_oTargetBox.changeCenter(cv::Point(x,y));
     displayRect(g_oTargetPickingMat);
 }
-#endif //!USE_VPTZ_TRACKING
+#endif //(!USE_VPTZ_TRACKING)

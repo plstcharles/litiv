@@ -161,7 +161,7 @@ namespace CxxUtils {
     struct MetaITOA<0> {
         using type = MetaStr<'0'>;
     };
-#endif //!def(_MSC_VER)
+#endif //(!def(_MSC_VER))
 
     struct UncaughtExceptionLogger {
         UncaughtExceptionLogger(const char* sFunc, const char* sFile, int nLine) :
@@ -178,9 +178,9 @@ namespace CxxUtils {
         // needed for portability...
 #ifdef _MSC_VER
         return _isnan((double)dVal)!=0;
-#else //!def(_MSC_VER)
+#else //(!def(_MSC_VER))
         return std::isnan(dVal);
-#endif //!def(_MSC_VER)
+#endif //(!def(_MSC_VER))
     }
 
 } //namespace CxxUtils
@@ -201,11 +201,11 @@ namespace CxxUtils {
 #define glDbgAssert(expr) glAssert(expr)
 #define glDbgErrorCheck glErrorCheck
 #define glDbgExceptionWatch CxxUtils::UncaughtExceptionLogger __logger(__PRETTY_FUNCTION__,__FILE__,__LINE__)
-#else //!defined(_DEBUG)
+#else //(!defined(_DEBUG))
 #define glDbgAssert(expr)
 #define glDbgErrorCheck
 #define glDbgExceptionWatch
-#endif //!defined(_DEBUG)
+#endif //(!defined(_DEBUG))
 
 struct GLException : public std::runtime_error {
     template<typename... VALIST>

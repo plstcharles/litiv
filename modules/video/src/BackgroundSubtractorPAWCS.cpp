@@ -655,9 +655,9 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
             const size_t nCurrWordOccIncr = (DEFAULT_LWORD_OCC_INCR+m_nModelResetCooldown)<<int(bCurrRegionIsFlat||bBootstrapping);
 #if USE_FEEDBACK_ADJUSTMENTS
             const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):bCurrRegionIsFlat?(size_t)ceil(fCurrLearningRate+FEEDBACK_T_LOWER)/2:(size_t)ceil(fCurrLearningRate);
-#else //!USE_FEEDBACK_ADJUSTMENTS
+#else //(!USE_FEEDBACK_ADJUSTMENTS)
             const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)DEFAULT_RESAMPLING_RATE;
-#endif //!USE_FEEDBACK_ADJUSTMENTS
+#endif //(!USE_FEEDBACK_ADJUSTMENTS)
             const size_t nCurrColorDistThreshold = (size_t)(sqrt(fCurrDistThresholdFactor)*m_nMinColorDistThreshold)/2;
             const size_t nCurrDescDistThreshold = ((size_t)1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThresholdOffset+(bCurrRegionIsUnstable*UNSTAB_DESC_DIST_OFFSET);
             size_t nLocalWordIdx = 0;
@@ -986,9 +986,9 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
             const size_t nCurrWordOccIncr = (DEFAULT_LWORD_OCC_INCR+m_nModelResetCooldown)<<int(bCurrRegionIsFlat||bBootstrapping);
 #if USE_FEEDBACK_ADJUSTMENTS
             const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):bCurrRegionIsFlat?(size_t)ceil(fCurrLearningRate+FEEDBACK_T_LOWER)/2:(size_t)ceil(fCurrLearningRate);
-#else //!USE_FEEDBACK_ADJUSTMENTS
+#else //(!USE_FEEDBACK_ADJUSTMENTS)
             const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)DEFAULT_RESAMPLING_RATE;
-#endif //!USE_FEEDBACK_ADJUSTMENTS
+#endif //(!USE_FEEDBACK_ADJUSTMENTS)
             const size_t nCurrTotColorDistThreshold = (size_t)(sqrt(fCurrDistThresholdFactor)*m_nMinColorDistThreshold)*3;
             const size_t nCurrTotDescDistThreshold = (((size_t)1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThresholdOffset+(bCurrRegionIsUnstable*UNSTAB_DESC_DIST_OFFSET))*3;
             size_t nLocalWordIdx = 0;

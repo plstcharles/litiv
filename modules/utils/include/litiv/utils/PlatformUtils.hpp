@@ -44,11 +44,11 @@
 #if defined(_MSC_VER)
 #include <windows.h>
 #include <stdint.h>
-#else //!defined(_MSC_VER)
+#else //(!defined(_MSC_VER))
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#endif //!defined(_MSC_VER)
+#endif //(!defined(_MSC_VER))
 
 namespace PlatformUtils {
 

@@ -96,7 +96,7 @@ namespace CxxUtils {
         }
         inline void deallocate(pointer p, size_type) noexcept {_aligned_free(p);}
         inline void destroy(pointer p) {p->~value_type();p;}
-#else //!def(_MSC_VER)
+#else //(!def(_MSC_VER))
         inline pointer allocate(size_type n) {
             const size_type alignment = static_cast<size_type>(nByteAlign);
             size_t alloc_size = n*sizeof(value_type);
@@ -111,7 +111,7 @@ namespace CxxUtils {
         }
         inline void deallocate(pointer p, size_type) noexcept {free(p);}
         inline void destroy(pointer p) {p->~value_type();}
-#endif //!def(_MSC_VER)
+#endif //(!def(_MSC_VER))
         template<typename T2, typename... Targs> inline void construct(T2* p, Targs&&... args) {::new(reinterpret_cast<void*>(p)) T2(std::forward<Targs>(args)...);}
         inline void construct(pointer p, const value_type& wert) {new(p) value_type(wert);}
         inline size_type max_size() const noexcept {return (size_type(~0)-size_type(nByteAlign))/sizeof(value_type);}
@@ -152,7 +152,7 @@ namespace CxxUtils {
     struct MetaITOA<0> {
         using type = MetaStr<'0'>;
     };
-#endif //!def(_MSC_VER)
+#endif //(!def(_MSC_VER))
 
     struct UncaughtExceptionLogger {
         UncaughtExceptionLogger(const char* sFunc, const char* sFile, int nLine) :
@@ -183,9 +183,9 @@ namespace CxxUtils {
         // needed for portability...
 #ifdef _MSC_VER
         return _isnan((double)dVal)!=0;
-#else //!def(_MSC_VER)
+#else //(!def(_MSC_VER))
         return std::isnan(dVal);
-#endif //!def(_MSC_VER)
+#endif //(!def(_MSC_VER))
     }
 
     struct StopWatch {
@@ -262,6 +262,6 @@ namespace std { // extending std
     }
     template<typename T, typename... Targs>
     typename std::enable_if<(std::extent<T>::value!=0)>::type make_unique(Targs&&...) = delete;
-#endif //!defined(_MSC_VER) && __cplusplus<=201103L
+#endif //(!defined(_MSC_VER) && __cplusplus<=201103L)
 
 } //namespace std
