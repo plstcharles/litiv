@@ -392,7 +392,7 @@ namespace litiv {
     //! data producer interface specialization default constructor override for cleaner implementations
     template<eDatasetTaskList eDatasetTask, eDatasetSourceList eDatasetSource>
     struct DataProducer_c : public IDataProducer_<eDatasetSource> {
-        DataProducer_c() : IDataProducer_<eDatasetSource>(getGTMappingType<eDatasetTask>()) {}
+        DataProducer_c() : IDataProducer_<eDatasetSource>(litiv::getGTMappingType<eDatasetTask>()) {}
     };
 
     //! default data producer interface specialization (will attempt to load data using predefined functions)
