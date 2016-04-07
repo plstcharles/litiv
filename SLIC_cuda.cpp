@@ -7,21 +7,26 @@
 
 using namespace std;
 
-SLIC_cuda::SLIC_cuda(int diamSpx_or_nspx, float wc, InitType initType){
-	m_initType = initType;
-	if (initType == SLIC_SIZE)m_diamSpx = diamSpx_or_nspx;
-	else m_nSpx = diamSpx_or_nspx;
-	m_wc = wc;
-}
 SLIC_cuda::~SLIC_cuda(){
 	delete[] m_clusters;
 	delete[] m_labels;
+	gpuErrchk(cudaFree(clusters_g));
+	gpuErrchk(cudaFree(accAtt_g));
+	gpuErrchk(cudaFreeArray(frameBGRA_array));
+	gpuErrchk(cudaFreeArray(frameLab_array));
+	gpuErrchk(cudaFreeArray(labels_array));
 }
-void SLIC_cuda::Initialize(cv::Mat &frame0) {
+void SLIC_cuda::Initialize(cv::Mat &frame0, int diamSpx_or_Nspx, float wc, int nIteration, SLIC_cuda::InitType initType) {
+	m_nIteration = nIteration;
 	m_width = frame0.cols;
 	m_height = frame0.rows;
 	m_nPx = m_width*m_height;
-	if (m_initType == SLIC_NSPX) m_diamSpx = sqrt(m_nPx / (float)m_nSpx);
+	m_initType = initType;
+	m_wc = wc;
+	if (m_initType == SLIC_NSPX){
+		m_diamSpx = diamSpx_or_Nspx; m_diamSpx = sqrt(m_nPx / (float)diamSpx_or_Nspx);
+	}
+	else m_diamSpx = diamSpx_or_Nspx;
 	getWlHl(m_width, m_height, m_diamSpx, m_wSpx, m_hSpx); // determine w and h of Spx based on diamSpx
 	m_areaSpx = m_wSpx*m_hSpx;
 	CV_Assert(m_nPx%m_areaSpx == 0);
@@ -37,13 +42,12 @@ void SLIC_cuda::Segment(cv::Mat &frame) {
 	SendFrame(frame); //ok
 	InitClusters();//ok
 
-	for (int i = 0; i<N_ITER; i++) {
+	for (int i = 0; i<m_nIteration; i++) {
 		Assignement();
 		cudaDeviceSynchronize();
 		Update();
 		cudaDeviceSynchronize();
 	}
-	Assignement();
 	getLabelsFromGpu();
 	enforceConnectivity();
 }

@@ -6,28 +6,30 @@ using namespace cv;
 
 int main() {
  
-    cv::Mat im = cv::imread("D:/Pictures/test_pic/lena.jpg");
+	VideoCapture cap("C:/Recherche_FX/video/TB_CVPR2013/tiger2/img/%04d.jpg"); //change with your videopath
+	Mat frame;
+	cap >> frame;
 
-    SLIC_cuda slic(16,35);
-    slic.Initialize(im);
+	//parameters
+	int diamSpx = 8;
+	int wc = 35;
+	int nIteration = 5;
+	SLIC_cuda::InitType initType = SLIC_cuda::SLIC_SIZE;
 
-    for(int i = 0; i<5; i++){
+	//start segmentation
+	SLIC_cuda slic_cuda;
+	slic_cuda.Initialize(frame,diamSpx,wc,nIteration,initType);
+    for(int i = 0; i<10; i++){
         auto start = cv::getTickCount();
-        slic.Segment(im);
+		slic_cuda.Segment(frame);
         auto end = cv::getTickCount();
-        cout<<"runtime gpu "<<(end-start)/cv::getTickFrequency()<<" for "<<N_ITER<<" iteration"<<endl;
+		cout << "runtime segmentation gpu " << (end - start) / cv::getTickFrequency() <<" s"<<endl;
+		cv::Mat out = frame.clone();
+		slic_cuda.displayBound(out, cv::Scalar(0, 0, 255));
+		cv::imshow("out", out);
+		waitKey(30);
+		cap >> frame;
     }
-
-
-    cv::Mat out = im.clone();
-    slic.displayBound(out,cv::Scalar(0,0,255));
-
-    cv::imshow("out",out);
-
-
-    cv::waitKey();
-
-
-
+	waitKey();
     return 0;
 }
