@@ -24,7 +24,7 @@
 #include "funUtilsSC.h"
 
 
-
+#define __CUDA_ARCH__ 300 // to comment if __CUDA_ARCH__ < 300
 #define NMAX_THREAD 256 // depend on gpu
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
