@@ -278,3 +278,10 @@ void cv::read(const std::string& sFilePath, cv::Mat& oData, cv::MatArchiveList e
     else
         lvError("unrecognized mat archive type flag");
 }
+
+// these are really empty shells, but we need actual allocation due to ocv's virtual interface
+cv::AlignedMatAllocator<16> g_oMatAlloc16a = cv::AlignedMatAllocator<16>();
+cv::AlignedMatAllocator<32> g_oMatAlloc32a = cv::AlignedMatAllocator<32>();
+
+cv::MatAllocator* cv::getMatAllocator16a() {return (cv::MatAllocator*)&g_oMatAlloc16a;}
+cv::MatAllocator* cv::getMatAllocator32a() {return (cv::MatAllocator*)&g_oMatAlloc32a;}

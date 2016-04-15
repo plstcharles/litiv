@@ -230,4 +230,52 @@ namespace cv { // extending cv
         return s_vEmptySizeArray;
     }
 
+    /// defines an aligned memory allocator to be used in matrices
+    template<size_t nByteAlign, bool bAlignSingleElem=false>
+    class AlignedMatAllocator : public cv::MatAllocator {
+        static_assert(nByteAlign>0,"byte alignment must be a non-null value");
+    public:
+        typedef AlignedMatAllocator<nByteAlign,bAlignSingleElem> this_type;
+        inline AlignedMatAllocator() noexcept {}
+        inline AlignedMatAllocator(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept {}
+        template<typename T2>
+        inline this_type& operator=(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept {}
+        virtual ~AlignedMatAllocator() noexcept {}
+        virtual cv::UMatData* allocate(int dims, const int* sizes, int type, void* data, size_t* step, int /*flags*/, cv::UMatUsageFlags /*usageFlags*/) const override {
+            step[dims-1] = bAlignSingleElem?cv::alignSize(CV_ELEM_SIZE(type),nByteAlign):CV_ELEM_SIZE(type);
+            for(int d=dims-2; d>=0; --d)
+                step[d] = cv::alignSize(step[d+1]*sizes[d+1],nByteAlign);
+            const size_t nTotBytes = (size_t)cv::alignSize(step[0]*size_t(sizes[0]),(int)nByteAlign);
+            cv::UMatData* u = new cv::UMatData(this);
+            u->size = nTotBytes;
+            if(data) {
+                u->data = u->origdata = static_cast<uchar*>(data);
+                u->flags |= cv::UMatData::USER_ALLOCATED;
+            }
+            else
+                u->data = u->origdata = lv::AlignedMemAllocator<uchar,nByteAlign>::allocate(nTotBytes);
+            return u;
+        }
+        virtual bool allocate(cv::UMatData* data, int /*accessFlags*/, cv::UMatUsageFlags /*usageFlags*/) const override {
+            return (data!=nullptr);
+        }
+        virtual void deallocate(cv::UMatData* data) const override {
+            if(data==nullptr)
+                return;
+            lvDbgAssert(data->urefcount>=0 && data->refcount>=0);
+            if(data->refcount==0) {
+                if(!(data->flags & cv::UMatData::USER_ALLOCATED)) {
+                    lv::AlignedMemAllocator<uchar,nByteAlign>::deallocate(data->origdata,data->size);
+                    data->origdata = nullptr;
+                }
+                delete data;
+            }
+        }
+    };
+
+    /// returns a 16-byte aligned matrix allocator for SSE(1/2/3/4.1/4.2) support (should never be modified, despite non-const!)
+    cv::MatAllocator* getMatAllocator16a();
+    /// returns a 16-byte aligned matrix allocator for AVX(1/2) support (should never be modified, despite non-const!)
+    cv::MatAllocator* getMatAllocator32a();
+
 } // namespace cv
