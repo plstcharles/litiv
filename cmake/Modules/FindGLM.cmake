@@ -1,4 +1,4 @@
-# FindGLM - attempts to locate the glm matrix/vector library.
+# FindGLM.cmake - attempts to locate the glm matrix/vector library.
 #
 # This module defines the following variables (on success):
 #   GLM_INCLUDE_DIRS  - where to find glm/glm.hpp
@@ -19,15 +19,12 @@
 #=============================================================================
 # Copyright 2012 Carsten Neumann
 #
-# Distributed under the OSI-approved BSD License (the "License");
-# see accompanying file Copyright.txt for details.
+# Distributed under the OSI-approved BSD License (the "License").
 #
 # This software is distributed WITHOUT ANY WARRANTY; without even the
 # implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 # See the License for more information.
 #=============================================================================
-# (To distribute this file outside of CMake, substitute the full
-#  License text for the above reference.)
 
 # default search dirs
 SET(_glm_HEADER_SEARCH_DIRS
