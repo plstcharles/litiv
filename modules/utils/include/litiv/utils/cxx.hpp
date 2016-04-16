@@ -498,6 +498,72 @@ namespace lv {
         return _static_reduce_impl<nArraySize-1>(a,lOp);
     }
 
+    /// helper structure to create lookup tables with generic functors (also exposes multiple lookup interfaces)
+    template<typename Tx, typename Ty, size_t nBins, size_t nSafety=0>
+    struct LUT {
+        static_assert(nBins>1 && (nBins%2)==1,"LUT bin count must be at least two and odd");
+        /// default constructor; will automatically fill the LUT array for lFunc([tMinLookup,tMaxLookup])
+        template<typename TFunc>
+        LUT(Tx tMinLookup, Tx tMaxLookup, TFunc lFunc) :
+                m_tMin(std::min(tMinLookup,tMaxLookup)),m_tMax(std::max(tMinLookup,tMaxLookup)),
+                m_tMidOffset((m_tMax+m_tMin)/2),m_tLowOffset(m_tMin),
+                m_fScale(float(nBins-1)/(m_tMax-m_tMin)),m_vLUT(init(m_tMin,m_tMax,lFunc)),
+                m_pMid(m_vLUT.data()+nBins/2+nSafety),m_pLow(m_vLUT.data()+nSafety) {}
+        /// returns the evaluation result of lFunc(x) using the LUT mid pointer after offsetting x (i.e. assuming tOffset!=0)
+        inline Ty eval_mid(Tx x) const {
+            lvDbgAssert(ptrdiff_t((x-m_tMidOffset)*m_fScale)>=-ptrdiff_t(nBins/2+nSafety) && ptrdiff_t((x-m_tMidOffset)*m_fScale)<=ptrdiff_t(nBins/2+nSafety));
+            return m_pMid[ptrdiff_t((x-m_tMidOffset)*m_fScale)];
+        }
+        /// returns the evaluation result of lFunc(x) using the LUT mid pointer without offsetting x (i.e. assuming tOffset==0)
+        inline Ty eval_mid_noffset(Tx x) const {
+            lvDbgAssert(ptrdiff_t(x*m_fScale)>=-ptrdiff_t(nBins/2+nSafety) && ptrdiff_t(x*m_fScale)<=ptrdiff_t(nBins/2+nSafety));
+            return m_pMid[ptrdiff_t(x*m_fScale)];
+        }
+        /// returns the evaluation result of lFunc(x) using the LUT mid pointer with x as a direct index value
+        inline Ty eval_mid_raw(ptrdiff_t x) const {
+            lvDbgAssert(x>=-ptrdiff_t(nBins/2+nSafety) && x<=ptrdiff_t(nBins/2+nSafety));
+            return m_pMid[x];
+        }
+        /// returns the evaluation result of lFunc(x) using the LUT low pointer after offsetting x (i.e. assuming tOffset!=0)
+        inline Ty eval(Tx x) const {
+            lvDbgAssert(ptrdiff_t((x-m_tLowOffset)*m_fScale)>=-ptrdiff_t(nSafety) && ptrdiff_t((x-m_tLowOffset)*m_fScale)<ptrdiff_t(nBins+nSafety));
+            return m_pLow[ptrdiff_t((x-m_tLowOffset)*m_fScale)];
+        }
+        /// returns the evaluation result of lFunc(x) using the LUT low pointer without offsetting x (i.e. assuming tOffset==0)
+        inline Ty eval_noffset(Tx x) const {
+            lvDbgAssert(ptrdiff_t(x*m_fScale)>=-ptrdiff_t(nSafety) && ptrdiff_t(x*m_fScale)<ptrdiff_t(nBins+nSafety));
+            return m_pLow[ptrdiff_t(x*m_fScale)];
+        }
+        /// returns the evaluation result of lFunc(x) using the LUT low pointer with x as a direct index value
+        inline Ty eval_raw(ptrdiff_t x) const {
+            lvDbgAssert(x>=-ptrdiff_t(nSafety) && x<ptrdiff_t(nBins+nSafety));
+            return m_pLow[x];
+        }
+        /// min/max lookup values passed to the constructor (LUT bounds)
+        const Tx m_tMin,m_tMax;
+        /// input value offsets for lookup
+        const Tx m_tMidOffset,m_tLowOffset;
+        /// scale coefficient for lookup
+        const float m_fScale;
+        /// functor lookup table
+        const std::vector<Ty> m_vLUT;
+        /// base LUT pointers for lookup
+        const Ty* m_pMid,*m_pLow;
+    private:
+        template<typename TFunc>
+        static std::vector<Ty> init(Tx tMin, Tx tMax, TFunc lFunc) {
+            std::vector<Ty> vLUT(nBins+nSafety*2);
+            for(size_t n=0; n<=nSafety; ++n)
+                vLUT[n] = lFunc(tMin);
+            const Tx tStep = (tMax-tMin)/(nBins-1);
+            for(size_t n=nSafety+1; n<nBins+nSafety-1; ++n)
+                vLUT[n] = lFunc(tMin+(Tx)(n*tStep));
+            for(size_t n=nBins+nSafety-1; n<nBins+nSafety*2; ++n)
+                vLUT[n] = lFunc(tMax);
+            return vLUT;
+        }
+    };
+
     /// helper class used to unlock several mutexes in the current scope (logical inverse of lock_guard)
     template<typename... TMutexes>
     struct unlock_guard {
