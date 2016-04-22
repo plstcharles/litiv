@@ -17,5 +17,7 @@
 
 get_subdirectory_list(subdirs ${CMAKE_CURRENT_SOURCE_DIR})
 foreach(subdir ${subdirs})
-    add_subdirectory(${subdir})
+    if(NOT(${subdir} STREQUAL "vidreg")) # unfinished as of march 2016, to be fixed later
+        add_subdirectory(${subdir})
+    endif()
 endforeach()
