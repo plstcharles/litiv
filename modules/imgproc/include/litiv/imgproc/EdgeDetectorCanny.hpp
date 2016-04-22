@@ -24,11 +24,9 @@
 //! defines the default value for the norm type used to compute gradient magnitudes
 #define EDGCANNY_USE_L2_GRADIENT_NORM (true)
 //! defines the default value for the aperture (or window) size used for Sobel gradient estimation
-#define EDGCANNY_SOBEL_KERNEL_SIZE (5)
-//! defines the default value for the maximum gradient magnitude integer threshold used internally for 'apply'
-#define EDGCANNY_MAX_THRESHOLD (EDGCANNY_SOBEL_KERNEL_SIZE==3?0x200:0x4000) // required since gradient magnitudes are not normalized internally
+#define EDGCANNY_SOBEL_KERNEL_SIZE (3)
 //! defines the default value for the threshold passed to EdgeDetectorCanny::apply_threshold
-#define EDGCANNY_DEFAULT_THRESHOLD (EDGCANNY_SOBEL_KERNEL_SIZE==3?75.0:450.0/EDGCANNY_MAX_THRESHOLD)
+#define EDGCANNY_DEFAULT_THRESHOLD (100<<std::max(EDGCANNY_SOBEL_KERNEL_SIZE-3,0)*2)
 //! defines the default value for EdgeDetectorCanny::m_dHystLowThrshFactor
 #define EDGCANNY_DEFAULT_HYST_LOW_THRSH_FACT (0.4)
 //! defines the default value for EdgeDetectorCanny::m_dGaussianKernelSigma
