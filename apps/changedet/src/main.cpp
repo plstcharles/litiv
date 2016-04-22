@@ -18,19 +18,18 @@
 // @@@ imgproc gpu algo does not support mipmapping binding yet
 // @@@ test compute shader group size vs shared mem usage
 // @@@ support non-integer textures top level (alg)? need to replace all ui-stores by float-stores, rest is ok
-// @@@ search for ">(new " everywhere and replace by make_shared/make_unique if possible (2x blocks vs 1x block!)
 
 #include "litiv/datasets.hpp"
 #include "litiv/video.hpp"
 
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
-#define EVALUATE_OUTPUT         1
-#define DISPLAY_OUTPUT          0
+#define EVALUATE_OUTPUT         0
+#define DISPLAY_OUTPUT          1
 ////////////////////////////////
 #define USE_PAWCS               0
-#define USE_LOBSTER             1
-#define USE_SUBSENSE            0
+#define USE_LOBSTER             0
+#define USE_SUBSENSE            1
 ////////////////////////////////
 #define USE_GLSL_IMPL           0
 #define USE_CUDA_IMPL           0
@@ -232,7 +231,7 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
                 cv::bitwise_or(oCurrBGImg,UCHAR_MAX/2,oCurrBGImg,oROI==0);
                 cv::bitwise_or(oCurrFGMask,UCHAR_MAX/2,oCurrFGMask,oROI==0);
             }
-            pDisplayHelper->display(oCurrInput,oCurrBGImg,oBatch.getColoredSegmMask(oCurrFGMask,nCurrIdx),nCurrIdx);
+            pDisplayHelper->display(oCurrInput,oCurrBGImg,oBatch.getColoredMask(oCurrFGMask,nCurrIdx),nCurrIdx);
             const int nKeyPressed = pDisplayHelper->waitKey();
             if(nKeyPressed==(int)'q')
                 break;

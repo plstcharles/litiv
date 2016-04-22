@@ -34,19 +34,23 @@
     Note: both grayscale and RGB/BGR images may be used with this extractor (parameters are adjusted automatically).
     For optimal grayscale results, use CV_8UC1 frames instead of CV_8UC3.
 
+    For now, only the algorithm's default CPU implementation is offered here.
+
     For more details on the different parameters or on the algorithm itself, see P.-L. St-Charles et al.,
     "A Self-Adjusting Approach to Change Detection Based on Background Word Consensus", in WACV 2015.
  */
-class BackgroundSubtractorPAWCS : public IBackgroundSubtractorLBSP {
+template<ParallelUtils::eParallelAlgoType eImpl>
+struct BackgroundSubtractorPAWCS_;
+
+template<>
+struct BackgroundSubtractorPAWCS_<ParallelUtils::eNonParallel> : public IBackgroundSubtractorLBSP {
 public:
     //! full constructor
-    BackgroundSubtractorPAWCS(size_t nDescDistThresholdOffset=BGSPAWCS_DEFAULT_DESC_DIST_THRESHOLD_OFFSET,
-                              size_t nMinColorDistThreshold=BGSPAWCS_DEFAULT_MIN_COLOR_DIST_THRESHOLD,
-                              size_t nMaxNbWords=BGSPAWCS_DEFAULT_MAX_NB_WORDS,
-                              size_t nSamplesForMovingAvgs=BGSPAWCS_DEFAULT_N_SAMPLES_FOR_MV_AVGS,
-                              float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
-    //! default destructor
-    virtual ~BackgroundSubtractorPAWCS();
+    BackgroundSubtractorPAWCS_(size_t nDescDistThresholdOffset=BGSPAWCS_DEFAULT_DESC_DIST_THRESHOLD_OFFSET,
+                               size_t nMinColorDistThreshold=BGSPAWCS_DEFAULT_MIN_COLOR_DIST_THRESHOLD,
+                               size_t nMaxNbWords=BGSPAWCS_DEFAULT_MAX_NB_WORDS,
+                               size_t nSamplesForMovingAvgs=BGSPAWCS_DEFAULT_N_SAMPLES_FOR_MV_AVGS,
+                               float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
     //! refreshes all local (+ global) dictionaries based on the last analyzed frame
     virtual void refreshModel(size_t nBaseOccCount, float fOccDecrFrac, bool bForceFGUpdate=false);
     //! (re)initiaization method; needs to be called before starting background subtraction
@@ -163,10 +167,10 @@ protected:
     cv::Mat m_oTempGlobalWordWeightDiffFactor;
     cv::Mat m_oMorphExStructElement;
 
-    //! internal cleanup function for the dictionary structures
-    void CleanupDictionaries();
     //! internal weight lookup function for local words
     static float GetLocalWordWeight(const LocalWordBase& w, size_t nCurrFrame, size_t nOffset);
     //! internal weight lookup function for global words
     static float GetGlobalWordWeight(const GlobalWordBase& w);
 };
+
+using BackgroundSubtractorPAWCS = BackgroundSubtractorPAWCS_<ParallelUtils::eNonParallel>;

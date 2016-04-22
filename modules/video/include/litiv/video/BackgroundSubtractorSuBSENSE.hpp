@@ -36,19 +36,25 @@
     Note: both grayscale and RGB/BGR images may be used with this extractor (parameters are adjusted automatically).
     For optimal grayscale results, use CV_8UC1 frames instead of CV_8UC3.
 
+    For now, only the algorithm's default CPU implementation is offered here.
+
     For more details on the different parameters or on the algorithm itself, see P.-L. St-Charles et al.,
     "Flexible Background Subtraction With Self-Balanced Local Sensitivity", in CVPRW 2014, or "SuBSENSE: A Universal
     Change Detection Method With Local Adaptive Sensitivity", in IEEE Trans. Image Processing vol.24 no.1, 2015.
  */
-class BackgroundSubtractorSuBSENSE : public IBackgroundSubtractorLBSP {
+template<ParallelUtils::eParallelAlgoType eImpl>
+struct BackgroundSubtractorSuBSENSE_;
+
+template<>
+struct BackgroundSubtractorSuBSENSE_<ParallelUtils::eNonParallel> : public IBackgroundSubtractorLBSP {
 public:
     //! full constructor
-    BackgroundSubtractorSuBSENSE(size_t nDescDistThresholdOffset=BGSSUBSENSE_DEFAULT_DESC_DIST_THRESHOLD_OFFSET,
-                                 size_t nMinColorDistThreshold=BGSSUBSENSE_DEFAULT_MIN_COLOR_DIST_THRESHOLD,
-                                 size_t nBGSamples=BGSSUBSENSE_DEFAULT_NB_BG_SAMPLES,
-                                 size_t nRequiredBGSamples=BGSSUBSENSE_DEFAULT_REQUIRED_NB_BG_SAMPLES,
-                                 size_t nSamplesForMovingAvgs=BGSSUBSENSE_DEFAULT_N_SAMPLES_FOR_MV_AVGS,
-                                 float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
+    BackgroundSubtractorSuBSENSE_(size_t nDescDistThresholdOffset=BGSSUBSENSE_DEFAULT_DESC_DIST_THRESHOLD_OFFSET,
+                                  size_t nMinColorDistThreshold=BGSSUBSENSE_DEFAULT_MIN_COLOR_DIST_THRESHOLD,
+                                  size_t nBGSamples=BGSSUBSENSE_DEFAULT_NB_BG_SAMPLES,
+                                  size_t nRequiredBGSamples=BGSSUBSENSE_DEFAULT_REQUIRED_NB_BG_SAMPLES,
+                                  size_t nSamplesForMovingAvgs=BGSSUBSENSE_DEFAULT_N_SAMPLES_FOR_MV_AVGS,
+                                  float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
     //! refreshes all samples based on the last analyzed frame
     virtual void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
     //! (re)initiaization method; needs to be called before starting background subtraction
@@ -126,3 +132,4 @@ protected:
     cv::Mat m_oMorphExStructElement;
 };
 
+using BackgroundSubtractorSuBSENSE = BackgroundSubtractorSuBSENSE_<ParallelUtils::eNonParallel>;

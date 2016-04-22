@@ -84,8 +84,8 @@ static const size_t s_nDescMaxDataRange_1ch = LBSP::DESC_SIZE_BITS;
 static const size_t s_nColorMaxDataRange_3ch = s_nColorMaxDataRange_1ch*3;
 static const size_t s_nDescMaxDataRange_3ch = s_nDescMaxDataRange_1ch*3;
 
-BackgroundSubtractorPAWCS::BackgroundSubtractorPAWCS(size_t nDescDistThresholdOffset, size_t nMinColorDistThreshold, size_t nMaxNbWords,
-                                                     size_t nSamplesForMovingAvgs, float fRelLBSPThreshold) :
+BackgroundSubtractorPAWCS::BackgroundSubtractorPAWCS_(size_t nDescDistThresholdOffset, size_t nMinColorDistThreshold,
+                                                      size_t nMaxNbWords, size_t nSamplesForMovingAvgs, float fRelLBSPThreshold) :
         IBackgroundSubtractorLBSP(fRelLBSPThreshold),
         m_nMinColorDistThreshold(nMinColorDistThreshold),
         m_nDescDistThresholdOffset(nDescDistThresholdOffset),
@@ -103,10 +103,6 @@ BackgroundSubtractorPAWCS::BackgroundSubtractorPAWCS(size_t nDescDistThresholdOf
         m_pGlobalWordListIter_1ch(m_voGlobalWordList_1ch.end()),
         m_pGlobalWordListIter_3ch(m_voGlobalWordList_3ch.end()) {
     CV_Assert(m_nMaxLocalWords>0 && m_nMaxGlobalWords>0);
-}
-
-BackgroundSubtractorPAWCS::~BackgroundSubtractorPAWCS() {
-    CleanupDictionaries();
 }
 
 void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDecrFrac, bool bForceFGUpdate) {
@@ -436,7 +432,15 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
 void BackgroundSubtractorPAWCS::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
     // == init
     IBackgroundSubtractorLBSP::initialize_common(oInitImg,oROI);
-    CleanupDictionaries();
+    m_bModelInitialized = false;
+    m_voLocalWordList_1ch.clear();
+    m_pLocalWordListIter_1ch = m_voLocalWordList_1ch.end();
+    m_voLocalWordList_3ch.clear();
+    m_pLocalWordListIter_3ch = m_voLocalWordList_3ch.end();
+    m_voGlobalWordList_1ch.clear();
+    m_pGlobalWordListIter_1ch = m_voGlobalWordList_1ch.end();
+    m_voGlobalWordList_3ch.clear();
+    m_pGlobalWordListIter_3ch = m_voGlobalWordList_3ch.end();
     m_bUsingMovingCamera = false;
     m_oDownSampledFrameSize_MotionAnalysis = cv::Size(m_oImgSize.width/FRAMELEVEL_DOWNSAMPLE_RATIO,m_oImgSize.height/FRAMELEVEL_DOWNSAMPLE_RATIO);
     m_oDownSampledFrameSize_GlobalWordLookup = cv::Size(m_oImgSize.width/GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO,m_oImgSize.height/GWORD_LOOKUP_MAPS_DOWNSAMPLE_RATIO);
@@ -1588,18 +1592,6 @@ void BackgroundSubtractorPAWCS::getBackgroundDescriptorsImage(cv::OutputArray ba
         }
     }
     oAvgBGDescImg.convertTo(backgroundDescImage,CV_16U);
-}
-
-void BackgroundSubtractorPAWCS::CleanupDictionaries() {
-    m_bModelInitialized = false;
-    m_voLocalWordList_1ch.clear();
-    m_pLocalWordListIter_1ch = m_voLocalWordList_1ch.end();
-    m_voLocalWordList_3ch.clear();
-    m_pLocalWordListIter_3ch = m_voLocalWordList_3ch.end();
-    m_voGlobalWordList_1ch.clear();
-    m_pGlobalWordListIter_1ch = m_voGlobalWordList_1ch.end();
-    m_voGlobalWordList_3ch.clear();
-    m_pGlobalWordListIter_3ch = m_voGlobalWordList_3ch.end();
 }
 
 float BackgroundSubtractorPAWCS::GetLocalWordWeight(const LocalWordBase& w, size_t nCurrFrame, size_t nOffset) {

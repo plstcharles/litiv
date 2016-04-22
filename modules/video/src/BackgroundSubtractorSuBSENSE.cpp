@@ -59,8 +59,8 @@ static const size_t s_nDescMaxDataRange_1ch = LBSP::DESC_SIZE_BITS;
 static const size_t s_nColorMaxDataRange_3ch = s_nColorMaxDataRange_1ch*3;
 static const size_t s_nDescMaxDataRange_3ch = s_nDescMaxDataRange_1ch*3;
 
-BackgroundSubtractorSuBSENSE::BackgroundSubtractorSuBSENSE(size_t nDescDistThresholdOffset, size_t nMinColorDistThreshold, size_t nBGSamples,
-                                                           size_t nRequiredBGSamples, size_t nSamplesForMovingAvgs, float fRelLBSPThreshold) :
+BackgroundSubtractorSuBSENSE::BackgroundSubtractorSuBSENSE_(size_t nDescDistThresholdOffset, size_t nMinColorDistThreshold, size_t nBGSamples,
+                                                            size_t nRequiredBGSamples, size_t nSamplesForMovingAvgs, float fRelLBSPThreshold) :
         IBackgroundSubtractorLBSP(fRelLBSPThreshold),
         m_nMinColorDistThreshold(nMinColorDistThreshold),
         m_nDescDistThresholdOffset(nDescDistThresholdOffset),
