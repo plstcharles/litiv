@@ -249,9 +249,9 @@ const cv::Mat& litiv::IDataLoader::_getInputPacket_redirect(size_t nIdx) {
         return cv::emptyMat();
     m_oLatestInputPacket = _getInputPacket_impl(nIdx);
     if(!m_oLatestInputPacket.empty()) {
-        CV_Assert(getPacketOrigSize(nIdx)==m_oLatestInputPacket.size());
+        CV_Assert(getInputOrigSize(nIdx)==m_oLatestInputPacket.size());
         if(m_eInputType==eImagePacket) {
-            if(isPacketTransposed(nIdx))
+            if(isInputTransposed(nIdx))
                 cv::transpose(m_oLatestInputPacket,m_oLatestInputPacket);
 #if HARDCODE_IMAGE_PACKET_INDEX
             std::stringstream sstr;
@@ -260,7 +260,7 @@ const cv::Mat& litiv::IDataLoader::_getInputPacket_redirect(size_t nIdx) {
 #endif //HARDCODE_IMAGE_PACKET_INDEX
             if(getDatasetInfo()->is4ByteAligned() && m_oLatestInputPacket.channels()==3)
                 cv::cvtColor(m_oLatestInputPacket,m_oLatestInputPacket,cv::COLOR_BGR2BGRA);
-            const cv::Size& oPacketSize = getPacketSize(nIdx);
+            const cv::Size& oPacketSize = getInputSize(nIdx);
             if(oPacketSize.area()>0 && m_oLatestInputPacket.size()!=oPacketSize)
                 cv::resize(m_oLatestInputPacket,m_oLatestInputPacket,oPacketSize,0,0,cv::INTER_NEAREST);
         }
@@ -273,9 +273,9 @@ const cv::Mat& litiv::IDataLoader::_getGTPacket_redirect(size_t nIdx) {
         return cv::emptyMat();
     m_oLatestGTPacket = _getGTPacket_impl(nIdx);
     if(!m_oLatestGTPacket.empty()) {
-        CV_Assert(getPacketOrigSize(nIdx)==m_oLatestGTPacket.size());
+        CV_Assert(getGTOrigSize(nIdx)==m_oLatestGTPacket.size());
         if(m_eGTMappingType==eDirectPixelMapping && m_eInputType==eImagePacket) {
-            if(isPacketTransposed(nIdx))
+            if(isGTTransposed(nIdx))
                 cv::transpose(m_oLatestGTPacket,m_oLatestGTPacket);
 #if HARDCODE_IMAGE_PACKET_INDEX
             std::stringstream sstr;
@@ -284,7 +284,7 @@ const cv::Mat& litiv::IDataLoader::_getGTPacket_redirect(size_t nIdx) {
 #endif //HARDCODE_IMAGE_PACKET_INDEX
             if(getDatasetInfo()->is4ByteAligned() && m_oLatestGTPacket.channels()==3)
                 cv::cvtColor(m_oLatestGTPacket,m_oLatestGTPacket,cv::COLOR_BGR2BGRA);
-            const cv::Size& oPacketSize = getPacketSize(nIdx);
+            const cv::Size& oPacketSize = getGTSize(nIdx);
             if(oPacketSize.area()>0 && m_oLatestGTPacket.size()!=oPacketSize)
                 cv::resize(m_oLatestGTPacket,m_oLatestGTPacket,oPacketSize,0,0,cv::INTER_NEAREST);
         }
@@ -311,11 +311,52 @@ size_t litiv::IDataProducer_<litiv::eDatasetSource_Video>::getTotPackets() const
     return m_nFrameCount;
 }
 
+bool litiv::IDataProducer_<litiv::eDatasetSource_Video>::isInputTransposed(size_t /*nPacketIdx*/) const {
+    return m_bTransposeFrames;
+}
+
+bool litiv::IDataProducer_<litiv::eDatasetSource_Video>::isGTTransposed(size_t nPacketIdx) const {
+    return getGTMappingType()==eDirectPixelMapping?isInputTransposed(nPacketIdx):false;
+}
+
+const cv::Mat& litiv::IDataProducer_<litiv::eDatasetSource_Video>::getInputROI(size_t /*nPacketIdx*/) const {
+    return getROI();
+}
+
+const cv::Mat& litiv::IDataProducer_<litiv::eDatasetSource_Video>::getGTROI(size_t nPacketIdx) const {
+    return getGTMappingType()==eDirectPixelMapping?getInputROI(nPacketIdx):cv::emptyMat();
+}
+
+const cv::Size& litiv::IDataProducer_<litiv::eDatasetSource_Video>::getInputSize(size_t /*nPacketIdx*/) const {
+    return getFrameSize();
+}
+
+const cv::Size& litiv::IDataProducer_<litiv::eDatasetSource_Video>::getGTSize(size_t nPacketIdx) const {
+    return getGTMappingType()==eDirectPixelMapping?getInputSize(nPacketIdx):cv::emptySize();
+}
+
+const cv::Size& litiv::IDataProducer_<litiv::eDatasetSource_Video>::getInputOrigSize(size_t /*nPacketIdx*/) const {
+    return getFrameOrigSize();
+}
+
+const cv::Size& litiv::IDataProducer_<litiv::eDatasetSource_Video>::getGTOrigSize(size_t nPacketIdx) const {
+    return getGTMappingType()==eDirectPixelMapping?getInputOrigSize(nPacketIdx):cv::emptySize();
+}
+
+const cv::Size& litiv::IDataProducer_<litiv::eDatasetSource_Video>::getInputMaxSize() const {
+    return getFrameSize();
+}
+
+const cv::Size& litiv::IDataProducer_<litiv::eDatasetSource_Video>::getGTMaxSize() const {
+    return getGTMappingType()==eDirectPixelMapping?getFrameSize():cv::emptySize();
+}
+
 cv::Mat litiv::IDataProducer_<litiv::eDatasetSource_Video>::_getInputPacket_impl(size_t nFrameIdx) {
+    lvDbgAssert(getInputPacketType()==eImagePacket);
     lvDbgAssert(nFrameIdx<getTotPackets());
     cv::Mat oFrame;
     if(!m_voVideoReader.isOpened())
-        oFrame = cv::imread(m_vsInputFramePaths[nFrameIdx],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+        oFrame = cv::imread(m_vsInputPaths[nFrameIdx],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
     else {
         if(m_nNextExpectedVideoReaderFrameIdx!=nFrameIdx) {
             m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,(double)nFrameIdx);
@@ -329,32 +370,26 @@ cv::Mat litiv::IDataProducer_<litiv::eDatasetSource_Video>::_getInputPacket_impl
 }
 
 cv::Mat litiv::IDataProducer_<litiv::eDatasetSource_Video>::_getGTPacket_impl(size_t nFrameIdx) {
-    glDbgAssert(nFrameIdx<getTotPackets());
+    lvDbgAssert(nFrameIdx<getTotPackets());
     if(m_mGTIndexLUT.count(nFrameIdx)) {
         const size_t nGTIdx = m_mGTIndexLUT[nFrameIdx];
-        if(m_vsGTFramePaths.size()>nGTIdx) {
-            cv::Mat oFrame = cv::imread(m_vsGTFramePaths[nGTIdx],cv::IMREAD_GRAYSCALE);
-            if(!oFrame.empty()) {
-                lvAssert(oFrame.size()==getPacketOrigSize(nFrameIdx));
-                if(isPacketTransposed(nFrameIdx))
-                    cv::transpose(oFrame,oFrame);
-                if(getPacketSize(nFrameIdx).area()>0 && oFrame.size()!=getPacketSize(nFrameIdx))
-                    cv::resize(oFrame,oFrame,getPacketSize(nFrameIdx),0,0,cv::INTER_NEAREST);
-                return oFrame;
-            }
+        if(m_vsGTPaths.size()>nGTIdx) {
+            lvAssert(getGTMappingType()==eDirectPixelMapping); // loading as an image wouldnt make sense otherwise
+            return cv::imread(m_vsGTPaths[nGTIdx],cv::IMREAD_GRAYSCALE); // @@@@ expose grayscale flag in class member?
         }
     }
     return cv::Mat();
 }
 
 void litiv::IDataProducer_<litiv::eDatasetSource_Video>::parseData() {
+    lvAssert(getInputPacketType()==eImagePacket);
     cv::Mat oTempImg;
     m_voVideoReader.open(getDataPath());
     if(!m_voVideoReader.isOpened()) {
-        PlatformUtils::GetFilesFromDir(getDataPath(),m_vsInputFramePaths);
-        if(!m_vsInputFramePaths.empty()) {
-            oTempImg = cv::imread(m_vsInputFramePaths[0]);
-            m_nFrameCount = m_vsInputFramePaths.size();
+        PlatformUtils::GetFilesFromDir(getDataPath(),m_vsInputPaths);
+        if(!m_vsInputPaths.empty()) {
+            oTempImg = cv::imread(m_vsInputPaths[0]);
+            m_nFrameCount = m_vsInputPaths.size();
         }
     }
     else {
@@ -376,42 +411,78 @@ void litiv::IDataProducer_<litiv::eDatasetSource_Video>::parseData() {
 }
 
 double litiv::IDataProducer_<litiv::eDatasetSource_Image>::getExpectedLoad() const {
-    return (double)getPacketMaxSize().area()*m_nImageCount*(int(!isGrayscale())+1);
+    return (double)getInputMaxSize().area()*m_nImageCount*(int(!isGrayscale())+1);
 }
 
 void litiv::IDataProducer_<litiv::eDatasetSource_Image>::startPrecaching(bool bUsingGT, size_t /*nUnused*/) {
-    return IDataLoader::startPrecaching(bUsingGT,getPacketMaxSize().area()*(m_nImageCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
+    return IDataLoader::startPrecaching(bUsingGT,getInputMaxSize().area()*(m_nImageCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
 }
 
-bool litiv::IDataProducer_<litiv::eDatasetSource_Image>::isPacketTransposed(size_t nPacketIdx) const {
+bool litiv::IDataProducer_<litiv::eDatasetSource_Image>::isInputConstantSize() const {
+    return m_bIsInputConstantSize;
+}
+
+bool litiv::IDataProducer_<litiv::eDatasetSource_Image>::isGTConstantSize() const {
+    return m_bIsGTConstantSize;
+}
+
+bool litiv::IDataProducer_<litiv::eDatasetSource_Image>::isInputTransposed(size_t nPacketIdx) const {
     lvAssert(nPacketIdx<m_nImageCount);
-    return m_vbImageTransposed[nPacketIdx];
+    return m_vbInputTransposed[nPacketIdx];
 }
 
-const cv::Mat& litiv::IDataProducer_<litiv::eDatasetSource_Image>::getPacketROI(size_t /*nPacketIdx*/) const {
+bool litiv::IDataProducer_<litiv::eDatasetSource_Image>::isGTTransposed(size_t nPacketIdx) const {
+    lvAssert(getGTMappingType()<=ePacketIdxMapping);
+    lvAssert(nPacketIdx<m_nImageCount);
+    return m_vbGTTransposed[nPacketIdx];
+}
+
+const cv::Mat& litiv::IDataProducer_<litiv::eDatasetSource_Image>::getInputROI(size_t /*nPacketIdx*/) const {
     return cv::emptyMat();
 }
 
-const cv::Size& litiv::IDataProducer_<litiv::eDatasetSource_Image>::getPacketSize(size_t nPacketIdx) const {
-    if(nPacketIdx>=m_nImageCount)
-        return cv::emptySize();
-    return m_voImageSizes[nPacketIdx];
+const cv::Mat& litiv::IDataProducer_<litiv::eDatasetSource_Image>::getGTROI(size_t /*nPacketIdx*/) const {
+    return cv::emptyMat();
 }
 
-const cv::Size& litiv::IDataProducer_<litiv::eDatasetSource_Image>::getPacketOrigSize(size_t nPacketIdx) const {
+const cv::Size& litiv::IDataProducer_<litiv::eDatasetSource_Image>::getInputSize(size_t nPacketIdx) const {
     if(nPacketIdx>=m_nImageCount)
         return cv::emptySize();
-    return m_voImageOrigSizes[nPacketIdx];
+    return m_voInputSizes[nPacketIdx];
 }
 
-const cv::Size& litiv::IDataProducer_<litiv::eDatasetSource_Image>::getPacketMaxSize() const {
-    return m_oMaxSize;
+const cv::Size& litiv::IDataProducer_<litiv::eDatasetSource_Image>::getGTSize(size_t nPacketIdx) const {
+    lvAssert(getGTMappingType()<=ePacketIdxMapping);
+    if(nPacketIdx>=m_nImageCount)
+        return cv::emptySize();
+    return m_voGTSizes[nPacketIdx];
+}
+
+const cv::Size& litiv::IDataProducer_<litiv::eDatasetSource_Image>::getInputOrigSize(size_t nPacketIdx) const {
+    if(nPacketIdx>=m_nImageCount)
+        return cv::emptySize();
+    return m_voInputOrigSizes[nPacketIdx];
+}
+
+const cv::Size& litiv::IDataProducer_<litiv::eDatasetSource_Image>::getGTOrigSize(size_t nPacketIdx) const {
+    lvAssert(getGTMappingType()<=ePacketIdxMapping);
+    if(nPacketIdx>=m_nImageCount)
+        return cv::emptySize();
+    return m_voGTOrigSizes[nPacketIdx];
+}
+
+const cv::Size& litiv::IDataProducer_<litiv::eDatasetSource_Image>::getInputMaxSize() const {
+    return m_oInputMaxSize;
+}
+
+const cv::Size& litiv::IDataProducer_<litiv::eDatasetSource_Image>::getGTMaxSize() const {
+    return m_oGTMaxSize;
 }
 
 std::string litiv::IDataProducer_<litiv::eDatasetSource_Image>::getPacketName(size_t nPacketIdx) const {
     lvAssert(nPacketIdx<m_nImageCount);
-    const size_t nLastSlashPos = m_vsInputImagePaths[nPacketIdx].find_last_of("/\\");
-    std::string sFileName = (nLastSlashPos==std::string::npos)?m_vsInputImagePaths[nPacketIdx]:m_vsInputImagePaths[nPacketIdx].substr(nLastSlashPos+1);
+    const size_t nLastSlashPos = m_vsInputPaths[nPacketIdx].find_last_of("/\\");
+    std::string sFileName = (nLastSlashPos==std::string::npos)?m_vsInputPaths[nPacketIdx]:m_vsInputPaths[nPacketIdx].substr(nLastSlashPos+1);
     return sFileName.substr(0,sFileName.find_last_of("."));
 }
 
@@ -423,58 +494,69 @@ size_t litiv::IDataProducer_<litiv::eDatasetSource_Image>::getTotPackets() const
 }
 
 cv::Mat litiv::IDataProducer_<litiv::eDatasetSource_Image>::_getInputPacket_impl(size_t nImageIdx) {
+    lvDbgAssert(getInputPacketType()==eImagePacket);
     lvDbgAssert(nImageIdx<getTotPackets());
-    return cv::imread(m_vsInputImagePaths[nImageIdx],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+    return cv::imread(m_vsInputPaths[nImageIdx],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
 }
 
 cv::Mat litiv::IDataProducer_<litiv::eDatasetSource_Image>::_getGTPacket_impl(size_t nImageIdx) {
-    glDbgAssert(nImageIdx<getTotPackets());
+    lvDbgAssert(nImageIdx<getTotPackets());
     if(m_mGTIndexLUT.count(nImageIdx)) {
-        glDbgAssert(m_mGTIndexLUT[nImageIdx]<m_vsGTImagePaths.size());
-        return cv::imread(m_vsGTImagePaths[m_mGTIndexLUT[nImageIdx]],cv::IMREAD_GRAYSCALE);
+        const size_t nGTIdx = m_mGTIndexLUT[nImageIdx];
+        if(m_vsGTPaths.size()>nGTIdx) {
+            lvAssert(getGTMappingType()==eDirectPixelMapping); // loading as an image wouldnt make sense otherwise
+            return cv::imread(m_vsGTPaths[m_mGTIndexLUT[nGTIdx]],cv::IMREAD_GRAYSCALE); // @@@@ expose grayscale flag in class member?
+        }
     }
     return cv::Mat();
 }
 
 void litiv::IDataProducer_<litiv::eDatasetSource_Image>::parseData() {
-    PlatformUtils::GetFilesFromDir(getDataPath(),m_vsInputImagePaths);
-    PlatformUtils::FilterFilePaths(m_vsInputImagePaths,{},{".jpg",".png",".bmp"});
-    if(m_vsInputImagePaths.empty())
+    lvAssert(getInputPacketType()==eImagePacket);
+    PlatformUtils::GetFilesFromDir(getDataPath(),m_vsInputPaths);
+    PlatformUtils::FilterFilePaths(m_vsInputPaths,{},{".jpg",".png",".bmp"});
+    if(m_vsInputPaths.empty())
         lvErrorExt("Set '%s' did not possess any jpg/png/bmp image file",getName().c_str());
-    m_bIsConstantSize = true;
-    m_oMaxSize = cv::Size(0,0);
+    m_bIsInputConstantSize = m_bIsGTConstantSize = true;
+    m_oInputMaxSize = m_oGTMaxSize = cv::Size(0,0);
+    m_voInputSizes.clear();
+    m_voInputSizes.reserve(m_vsInputPaths.size());
+    m_voGTSizes.clear();
+    m_voGTSizes.reserve(m_vsInputPaths.size());
+    m_voInputOrigSizes.clear();
+    m_voInputOrigSizes.reserve(m_vsInputPaths.size());
+    m_voGTOrigSizes.clear();
+    m_voGTOrigSizes.reserve(m_vsInputPaths.size());
+    m_vbInputTransposed.clear();
+    m_vbInputTransposed.reserve(m_vsInputPaths.size());
+    m_vbGTTransposed.clear();
+    m_vbGTTransposed.reserve(m_vsInputPaths.size());
     cv::Mat oLastInput;
-    m_voImageSizes.clear();
-    m_voImageOrigSizes.clear();
-    m_vbImageTransposed.clear();
-    m_voImageSizes.reserve(m_vsInputImagePaths.size());
-    m_voImageOrigSizes.reserve(m_vsInputImagePaths.size());
-    m_vbImageTransposed.reserve(m_vsInputImagePaths.size());
     const double dScale = getDatasetInfo()->getScaleFactor();
-    for(size_t n = 0; n<m_vsInputImagePaths.size(); ++n) {
-        cv::Mat oCurrInput = cv::imread(m_vsInputImagePaths[n],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+    for(size_t n = 0; n<m_vsInputPaths.size(); ++n) {
+        cv::Mat oCurrInput = cv::imread(m_vsInputPaths[n],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
         while(oCurrInput.empty()) {
-            m_vsInputImagePaths.erase(m_vsInputImagePaths.begin()+n);
-            if(n>=m_vsInputImagePaths.size())
+            m_vsInputPaths.erase(m_vsInputPaths.begin()+n);
+            if(n>=m_vsInputPaths.size())
                 break;
-            oCurrInput = cv::imread(m_vsInputImagePaths[n],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+            oCurrInput = cv::imread(m_vsInputPaths[n],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
         }
         if(oCurrInput.empty())
             break;
-        m_voImageOrigSizes.push_back(oCurrInput.size());
+        m_voInputOrigSizes.push_back(oCurrInput.size());
         if(dScale!=1.0)
             cv::resize(oCurrInput,oCurrInput,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
-        m_voImageSizes.push_back(oCurrInput.size());
-        if(m_oMaxSize.width<oCurrInput.cols)
-            m_oMaxSize.width = oCurrInput.cols;
-        if(m_oMaxSize.height<oCurrInput.rows)
-            m_oMaxSize.height = oCurrInput.rows;
+        m_voInputSizes.push_back(oCurrInput.size());
+        if(m_oInputMaxSize.width<oCurrInput.cols)
+            m_oInputMaxSize.width = oCurrInput.cols;
+        if(m_oInputMaxSize.height<oCurrInput.rows)
+            m_oInputMaxSize.height = oCurrInput.rows;
         if(!oLastInput.empty() && oCurrInput.size()!=oLastInput.size())
-            m_bIsConstantSize = false;
+            m_bIsInputConstantSize = false;
         oLastInput = oCurrInput;
-        m_vbImageTransposed.push_back(false);
+        m_vbInputTransposed.push_back(false);
     }
-    m_nImageCount = m_vsInputImagePaths.size();
+    m_nImageCount = m_vsInputPaths.size();
     CV_Assert(m_nImageCount>0);
 }
 
@@ -502,21 +584,20 @@ size_t litiv::DataCounter_<litiv::eGroup>::getProcessedPacketsCount() const {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-
 void litiv::IDataArchiver::save(const cv::Mat& oOutput, size_t nIdx) const {
     CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
     std::stringstream sOutputFilePath;
     sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << getPacketName(nIdx) << getDatasetInfo()->getOutputNameSuffix();
     const auto pLoader = shared_from_this_cast<const IDataLoader>(true);
     if(pLoader->getGTMappingType()==eDirectPixelMapping && pLoader->getInputPacketType()==eImagePacket) {
-        const cv::Mat& oROI = pLoader->getPacketROI(nIdx);
+        const cv::Mat& oROI = pLoader->getInputROI(nIdx);
         cv::Mat oOutputClone = oOutput.clone();
         if(!oROI.empty() && oROI.size()==oOutputClone.size())
             cv::bitwise_or(oOutputClone,DATASETUTILS_UNKNOWN_VAL,oOutputClone,oROI==0);
-        if(pLoader->isPacketTransposed(nIdx))
+        if(pLoader->isInputTransposed(nIdx))
             cv::transpose(oOutputClone,oOutputClone);
-        if(pLoader->getPacketOrigSize(nIdx).area()>0 && oOutputClone.size()!=pLoader->getPacketOrigSize(nIdx))
-            cv::resize(oOutputClone,oOutputClone,pLoader->getPacketOrigSize(nIdx),0,0,cv::INTER_NEAREST);
+        if(pLoader->getInputOrigSize(nIdx).area()>0 && oOutputClone.size()!=pLoader->getInputOrigSize(nIdx))
+            cv::resize(oOutputClone,oOutputClone,pLoader->getInputOrigSize(nIdx),0,0,cv::INTER_NEAREST);
         const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
         cv::imwrite(sOutputFilePath.str(),oOutputClone,vnComprParams);
     }
@@ -533,12 +614,12 @@ cv::Mat litiv::IDataArchiver::load(size_t nIdx) const {
     const auto pLoader = shared_from_this_cast<const IDataLoader>(true);
     if(pLoader->getGTMappingType()==eDirectPixelMapping && pLoader->getInputPacketType()==eImagePacket) {
         cv::Mat oOutput = cv::imread(sOutputFilePath.str(),isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
-        if(pLoader->isPacketTransposed(nIdx))
+        if(pLoader->isInputTransposed(nIdx))
             cv::transpose(oOutput,oOutput);
         if(getDatasetInfo()->is4ByteAligned() && oOutput.channels()==3)
             cv::cvtColor(oOutput,oOutput,cv::COLOR_BGR2BGRA);
-        if(pLoader->getPacketSize(nIdx).area()>0 && oOutput.size()!=pLoader->getPacketSize(nIdx))
-            cv::resize(oOutput,oOutput,pLoader->getPacketSize(nIdx),0,0,cv::INTER_NEAREST);
+        if(pLoader->getInputSize(nIdx).area()>0 && oOutput.size()!=pLoader->getInputSize(nIdx))
+            cv::resize(oOutput,oOutput,pLoader->getInputSize(nIdx),0,0,cv::INTER_NEAREST);
         return oOutput;
     }
     else {
@@ -555,7 +636,7 @@ cv::Mat litiv::IDataArchiver::load(size_t nIdx) const {
 
 cv::Size litiv::IAsyncDataConsumer_<litiv::eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::getIdealGLWindowSize() const {
     glAssert(getTotPackets()>1);
-    cv::Size oWindowSize = shared_from_this_cast<const IDataLoader>(true)->getPacketMaxSize();
+    cv::Size oWindowSize = shared_from_this_cast<const IDataLoader>(true)->getInputMaxSize();
     if(m_pEvalAlgo) {
         glAssert(m_pEvalAlgo->getIsGLInitialized());
         oWindowSize.width *= int(m_pEvalAlgo->m_nSxSDisplayCount);
@@ -644,9 +725,9 @@ void litiv::IAsyncDataConsumer_<litiv::eDatasetEval_BinaryClassifier,ParallelUti
         if(getDatasetInfo()->isSavingOutput())
             save(oLastOutput,m_nLastIdx);
         if(m_lDataCallback)
-            m_lDataCallback(m_oLastInput,oLastDebug,oLastOutput,m_oLastGT,m_pLoader->getPacketROI(m_nLastIdx),m_nLastIdx);
+            m_lDataCallback(m_oLastInput,oLastDebug,oLastOutput,m_oLastGT,m_pLoader->getInputROI(m_nLastIdx),m_nLastIdx);
         if(m_pAlgo->m_pDisplayHelper) {
-            getColoredMasks(oLastOutput,oLastDebug,m_oLastGT,m_pLoader->getPacketROI(m_nLastIdx));
+            getColoredMasks(oLastOutput,oLastDebug,m_oLastGT,m_pLoader->getInputROI(m_nLastIdx));
             m_pAlgo->m_pDisplayHelper->display(m_oLastInput,oLastDebug,oLastOutput,m_nLastIdx);
         }
     }

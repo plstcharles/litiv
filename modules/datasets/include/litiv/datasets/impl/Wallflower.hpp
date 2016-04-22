@@ -76,10 +76,10 @@ protected:
             else {
                 if(iter->find(sInputFileSuffix)!=iter->size()-sInputFileSuffix.size())
                     lvErrorExt("Wallflower sequence '%s' contained an unknown file ('%s')",this->getName().c_str(),iter->c_str());
-                this->m_vsInputFramePaths.push_back(*iter);
+                this->m_vsInputPaths.push_back(*iter);
             }
         }
-        if(!bFoundGTFile || !bFoundScript || this->m_vsInputFramePaths.empty() || this->m_vsGTFramePaths.size()!=1)
+        if(!bFoundGTFile || !bFoundScript || this->m_vsInputPaths.empty() || this->m_vsGTFramePaths.size()!=1)
             lvErrorExt("Wallflower sequence '%s' did not possess the required groundtruth and input files",this->getName().c_str());
         cv::Mat oTempImg = cv::imread(this->m_vsGTFramePaths[0]);
         if(oTempImg.empty())
@@ -90,7 +90,7 @@ protected:
         if(dScale!=1.0)
             cv::resize(this->m_oROI,this->m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
         this->m_oSize = this->m_oROI.size();
-        this->m_nFrameCount = this->m_vsInputFramePaths.size();
+        this->m_nFrameCount = this->m_vsInputPaths.size();
         CV_Assert(this->m_nFrameCount>0);
     }
 };

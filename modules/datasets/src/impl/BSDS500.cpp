@@ -811,13 +811,13 @@ void litiv::DataEvaluator_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_
         auto pLoader = shared_from_this_cast<IDataLoader>(true);
         if(!m_pMetricsBase)
             m_pMetricsBase = BSDS500MetricsAccumulator::create(DATASETS_BSDS500_EVAL_DEFAULT_THRESH_BINS);
-        m_pMetricsBase->accumulate(oClassif,pLoader->getGT(nIdx),pLoader->getPacketROI(nIdx));
+        m_pMetricsBase->accumulate(oClassif,pLoader->getGT(nIdx),pLoader->getInputROI(nIdx));
     }
 }
 
 cv::Mat litiv::DataEvaluator_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_BSDS500,ParallelUtils::eNonParallel>::getColoredMask(const cv::Mat& oClassif, size_t nIdx) {
     auto pLoader = shared_from_this_cast<IDataLoader>(true);
-    return BSDS500MetricsAccumulator::getColoredMask(oClassif,pLoader->getGT(nIdx),pLoader->getPacketROI(nIdx));
+    return BSDS500MetricsAccumulator::getColoredMask(oClassif,pLoader->getGT(nIdx),pLoader->getInputROI(nIdx));
 }
 
 void litiv::DataEvaluator_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_BSDS500,ParallelUtils::eNonParallel>::resetMetrics() {

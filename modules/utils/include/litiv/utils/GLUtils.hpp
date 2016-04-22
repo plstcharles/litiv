@@ -31,7 +31,6 @@
 #include <mutex>
 #include <opencv2/opencv.hpp>
 #include "litiv/utils/CxxUtils.hpp"
-#include "litiv/utils/PlatformUtils.hpp"
 
 #if HAVE_GLFW
 #include <GLFW/glfw3.h>

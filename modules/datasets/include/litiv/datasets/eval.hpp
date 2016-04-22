@@ -102,13 +102,13 @@ namespace litiv {
                 auto pLoader = shared_from_this_cast<IDataLoader>(true);
                 if(!m_pMetricsBase)
                     m_pMetricsBase = BinClassifMetricsAccumulator::create();
-                m_pMetricsBase->accumulate(oClassif,pLoader->getGT(nIdx),pLoader->getPacketROI(nIdx));
+                m_pMetricsBase->accumulate(oClassif,pLoader->getGT(nIdx),pLoader->getInputROI(nIdx));
             }
         }
         //! provides a visual feedback on result quality based on evaluation guidelines
         virtual cv::Mat getColoredMask(const cv::Mat& oClassif, size_t nIdx) {
             auto pLoader = shared_from_this_cast<IDataLoader>(true);
-            return BinClassifMetricsAccumulator::getColoredMask(oClassif,pLoader->getGT(nIdx),pLoader->getPacketROI(nIdx));
+            return BinClassifMetricsAccumulator::getColoredMask(oClassif,pLoader->getGT(nIdx),pLoader->getInputROI(nIdx));
         }
         //! resets internal metrics counters to zero
         virtual void resetMetrics() {
@@ -155,7 +155,7 @@ namespace litiv {
             IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::post_initialize_gl();
             if(getDatasetInfo()->isUsingEvaluator()) {
                 m_pEvalAlgo = std::make_shared<GLBinaryClassifierEvaluator>(m_pAlgo,getTotPackets());
-                m_pEvalAlgo->initialize_gl(m_oCurrGT,m_pLoader->getPacketROI(m_nCurrIdx));
+                m_pEvalAlgo->initialize_gl(m_oCurrGT,m_pLoader->getInputROI(m_nCurrIdx));
                 m_pMetricsBase = BinClassifMetricsAccumulator::create();
                 if(DATASETUTILS_VALIDATE_ASYNC_EVALUATORS) {
                     using namespace std::placeholders;

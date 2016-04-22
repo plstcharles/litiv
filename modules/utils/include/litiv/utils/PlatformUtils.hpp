@@ -20,7 +20,6 @@
 // includes here really need cleanup @@@@
 
 #include <opencv2/core.hpp>
-#include "litiv/utils/DefineUtils.hpp"
 #include "litiv/utils/DistanceUtils.hpp"
 #include "litiv/utils/CxxUtils.hpp"
 #include <queue>
@@ -137,7 +136,7 @@ namespace PlatformUtils {
         size_t nIdx = size_t(-1);
         for(size_t n=0; n<voRefVals.size(); ++n) {
             auto oCurrDist = DistanceUtils::L1dist(oReqVal,voRefVals[n]);
-            if(nIdx==-1 || oCurrDist<oMinDist) {
+            if(nIdx==size_t(-1) || oCurrDist<oMinDist) {
                 oMinDist = oCurrDist;
                 nIdx = n;
             }

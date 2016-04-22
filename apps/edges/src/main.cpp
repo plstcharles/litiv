@@ -249,8 +249,8 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         cv::Mat oCurrInput = oBatch.getInput(nCurrIdx).clone();
         CV_Assert(!oCurrInput.empty());
         CV_Assert(oCurrInput.isContinuous());
-        CV_Assert(oBatch.isConstantSize());
-        cv::Mat oCurrEdgeMask(oBatch.getPacketMaxSize(),CV_8UC1,cv::Scalar_<uchar>(0));
+        CV_Assert(oBatch.isInputConstantSize() && oBatch.getInputPacketType()==litiv::eImagePacket);
+        cv::Mat oCurrEdgeMask(oBatch.getInputMaxSize(),CV_8UC1,cv::Scalar_<uchar>(0));
         std::shared_ptr<IEdgeDetector> pAlgo = std::make_shared<EdgeDetectorType>();
 #if !FULL_THRESH_ANALYSIS
         const double dDefaultThreshold = pAlgo->getDefaultThreshold();

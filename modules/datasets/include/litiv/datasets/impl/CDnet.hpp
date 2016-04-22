@@ -64,9 +64,9 @@ protected:
         auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"/input");
         if(gtDir==vsSubDirs.end() || inputDir==vsSubDirs.end())
             lvErrorExt("CDnet sequence '%s' did not possess the required groundtruth and input directories",this->getName().c_str());
-        PlatformUtils::GetFilesFromDir(*inputDir,this->m_vsInputFramePaths);
-        PlatformUtils::GetFilesFromDir(*gtDir,this->m_vsGTFramePaths);
-        if(this->m_vsGTFramePaths.size()!=this->m_vsInputFramePaths.size())
+        PlatformUtils::GetFilesFromDir(*inputDir,this->m_vsInputPaths);
+        PlatformUtils::GetFilesFromDir(*gtDir,this->m_vsGTPaths);
+        if(this->m_vsGTPaths.size()!=this->m_vsInputPaths.size())
             lvErrorExt("CDnet sequence '%s' did not possess same amount of GT & input frames",this->getName().c_str());
         this->m_oROI = cv::imread(this->getDataPath()+"/ROI.bmp",cv::IMREAD_GRAYSCALE);
         if(this->m_oROI.empty())
@@ -77,7 +77,7 @@ protected:
         if(dScale!=1.0)
             cv::resize(this->m_oROI,this->m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
         this->m_oSize = this->m_oROI.size();
-        this->m_nFrameCount = this->m_vsInputFramePaths.size();
+        this->m_nFrameCount = this->m_vsInputPaths.size();
         CV_Assert(this->m_nFrameCount>0);
         this->m_mGTIndexLUT.clear();
         for(size_t i=0; i<this->m_nFrameCount; ++i)

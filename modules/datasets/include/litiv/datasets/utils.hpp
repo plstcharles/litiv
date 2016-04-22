@@ -280,15 +280,25 @@ namespace litiv {
         //! returns a gt packet by index (with both with and without precaching enabled)
         const cv::Mat& getGT(size_t nPacketIdx) {return m_oGTPrecacher.getPacket(nPacketIdx);}
         //! returns whether an input packet should be transposed or not (only applicable to image packets)
-        virtual bool isPacketTransposed(size_t /*nPacketIdx*/) const {return false;}
+        virtual bool isInputTransposed(size_t /*nPacketIdx*/) const {return false;}
+        //! returns whether a gt packet should be transposed or not (only applicable to image packets)
+        virtual bool isGTTransposed(size_t /*nPacketIdx*/) const {return false;}
         //! returns the roi associated with an input packet (only applicable to image packets, or dataset-specific)
-        virtual const cv::Mat& getPacketROI(size_t /*nPacketIdx*/) const {return cv::emptyMat();}
+        virtual const cv::Mat& getInputROI(size_t /*nPacketIdx*/) const {return cv::emptyMat();}
+        //! returns the roi associated with an input packet (only applicable to image packets, or dataset-specific)
+        virtual const cv::Mat& getGTROI(size_t /*nPacketIdx*/) const {return cv::emptyMat();}
         //! returns the size of a pre-transformed input packet @@@@@ override later to make size N-Dim?
-        virtual const cv::Size& getPacketSize(size_t nPacketIdx) const = 0;
+        virtual const cv::Size& getInputSize(size_t nPacketIdx) const = 0;
+        //! returns the size of a pre-transformed gt packet @@@@@ override later to make size N-Dim?
+        virtual const cv::Size& getGTSize(size_t nPacketIdx) const = 0;
         //! returns the original size of an input packet @@@@@ override later to make size N-Dim?
-        virtual const cv::Size& getPacketOrigSize(size_t nPacketIdx) const = 0;
+        virtual const cv::Size& getInputOrigSize(size_t nPacketIdx) const = 0;
+        //! returns the original size of a GT packet @@@@@ override later to make size N-Dim?
+        virtual const cv::Size& getGTOrigSize(size_t nPacketIdx) const = 0;
         //! returns the maximum size of all input packets for this data batch @@@@@ override later to make size N-Dim?
-        virtual const cv::Size& getPacketMaxSize() const = 0;
+        virtual const cv::Size& getInputMaxSize() const = 0;
+        //! returns the maximum size of all gt packets for this data batch @@@@@ override later to make size N-Dim?
+        virtual const cv::Size& getGTMaxSize() const = 0;
     protected:
         //! will automatically apply byte-alignment/scale in packet redirection if using image packets
         IDataLoader(ePacketPolicy eInputType, eGTMappingPolicy eGTMappingType);
@@ -328,18 +338,22 @@ namespace litiv {
     protected:
         IDataProducer_(eGTMappingPolicy eGTMappingType);
         virtual size_t getTotPackets() const override;
-        virtual bool isPacketTransposed(size_t /*nPacketIdx*/) const override final {return m_bTransposeFrames;}
-        virtual const cv::Mat& getPacketROI(size_t /*nPacketIdx*/) const override final {return getROI();}
-        virtual const cv::Size& getPacketSize(size_t /*nPacketIdx*/) const override final {return getFrameSize();}
-        virtual const cv::Size& getPacketOrigSize(size_t /*nPacketIdx*/) const override final {return getFrameOrigSize();}
-        virtual const cv::Size& getPacketMaxSize() const override final {return getFrameSize();}
+        virtual bool isInputTransposed(size_t nPacketIdx) const override final;
+        virtual bool isGTTransposed(size_t nPacketIdx) const override;
+        virtual const cv::Mat& getInputROI(size_t nPacketIdx) const override final;
+        virtual const cv::Mat& getGTROI(size_t nPacketIdx) const override;
+        virtual const cv::Size& getInputSize(size_t nPacketIdx) const override final;
+        virtual const cv::Size& getGTSize(size_t nPacketIdx) const override;
+        virtual const cv::Size& getInputOrigSize(size_t nPacketIdx) const override final;
+        virtual const cv::Size& getGTOrigSize(size_t nPacketIdx) const override;
+        virtual const cv::Size& getInputMaxSize() const override final;
+        virtual const cv::Size& getGTMaxSize() const override;
         virtual cv::Mat _getInputPacket_impl(size_t nIdx) override;
         virtual cv::Mat _getGTPacket_impl(size_t nIdx) override;
         virtual void parseData() override;
         size_t m_nFrameCount;
         std::unordered_map<size_t,size_t> m_mGTIndexLUT;
-        std::vector<std::string> m_vsInputFramePaths;
-        std::vector<std::string> m_vsGTFramePaths;
+        std::vector<std::string> m_vsInputPaths,m_vsGTPaths;
         cv::VideoCapture m_voVideoReader;
         size_t m_nNextExpectedVideoReaderFrameIdx;
         bool m_bTransposeFrames;
@@ -356,18 +370,30 @@ namespace litiv {
         virtual double getExpectedLoad() const override;
         //! initializes image precaching for this work batch (will try to allocate enough memory for the entire set)
         virtual void startPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
-        //! returns whether all images in this batch have the same size
-        virtual bool isConstantSize() const {return m_bIsConstantSize;}
+        //! returns whether all input images in this batch have the same size
+        virtual bool isInputConstantSize() const;
+        //! returns whether all input images in this batch have the same size
+        virtual bool isGTConstantSize() const;
         //! returns whether an input packet should be transposed or not (only applicable to image packets)
-        virtual bool isPacketTransposed(size_t nPacketIdx) const override;
-        //! returns the roi associated with an image packet
-        virtual const cv::Mat& getPacketROI(size_t nPacketIdx) const override;
-        //! returns the size of a pre-transformed image packet
-        virtual const cv::Size& getPacketSize(size_t nPacketIdx) const override;
-        //! returns the original size of an image packet
-        virtual const cv::Size& getPacketOrigSize(size_t nPacketIdx) const override;
+        virtual bool isInputTransposed(size_t nPacketIdx) const override;
+        //! returns whether a gt packet should be transposed or not (only applicable to image packets)
+        virtual bool isGTTransposed(size_t nPacketIdx) const override;
+        //! returns the roi associated with an input image packet
+        virtual const cv::Mat& getInputROI(size_t nPacketIdx) const override;
+        //! returns the roi associated with a gt image packet
+        virtual const cv::Mat& getGTROI(size_t nPacketIdx) const override;
+        //! returns the size of a pre-transformed input image packet
+        virtual const cv::Size& getInputSize(size_t nPacketIdx) const override;
+        //! returns the size of a pre-transformed gt image packet
+        virtual const cv::Size& getGTSize(size_t nPacketIdx) const override;
+        //! returns the original size of an input image packet
+        virtual const cv::Size& getInputOrigSize(size_t nPacketIdx) const override;
+        //! returns the original size of a gt image packet
+        virtual const cv::Size& getGTOrigSize(size_t nPacketIdx) const override;
+        //! returns the maximum size of all input image packets for this data batch
+        virtual const cv::Size& getInputMaxSize() const override;
         //! returns the maximum size of all image packets for this data batch
-        virtual const cv::Size& getPacketMaxSize() const override;
+        virtual const cv::Size& getGTMaxSize() const override;
         //! returns the (file) name associated with an image packet (useful for archiving/evaluation)
         virtual std::string getPacketName(size_t nPacketIdx) const override;
 
@@ -379,14 +405,12 @@ namespace litiv {
         virtual void parseData() override;
         size_t m_nImageCount;
         std::unordered_map<size_t,size_t> m_mGTIndexLUT;
-        std::vector<std::string> m_vsInputImagePaths;
-        std::vector<std::string> m_vsGTImagePaths;
-        std::vector<cv::Size> m_voImageSizes;
-        std::vector<cv::Size> m_voImageOrigSizes;
-        std::vector<bool> m_vbImageTransposed;
-        bool m_bIsConstantSize;
-        cv::Size m_oMaxSize;
-        const cv::Mat m_oDefaultEmptyROI;
+        std::vector<std::string> m_vsInputPaths,m_vsGTPaths;
+        std::vector<cv::Size> m_voInputSizes,m_voGTSizes;
+        std::vector<cv::Size> m_voInputOrigSizes,m_voGTOrigSizes;
+        std::vector<bool> m_vbInputTransposed,m_vbGTTransposed;
+        bool m_bIsInputConstantSize,m_bIsGTConstantSize;
+        cv::Size m_oInputMaxSize,m_oGTMaxSize;
     };
 
     //! data producer interface specialization default constructor override for cleaner implementations
@@ -469,7 +493,7 @@ namespace litiv {
         void initialize_gl(const std::shared_ptr<Talgo>& pAlgo, Targs&&... args) {
             m_pAlgo = pAlgo;
             pre_initialize_gl();
-            pAlgo->initialize_gl(m_oCurrInput,m_pLoader->getPacketROI(m_nCurrIdx),std::forward<Targs>(args)...);
+            pAlgo->initialize_gl(m_oCurrInput,m_pLoader->getInputROI(m_nCurrIdx),std::forward<Targs>(args)...);
             post_initialize_gl();
         }
         //! calls 'apply_gl' from 'Talgo' interface with expanded args list
