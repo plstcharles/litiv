@@ -20,13 +20,13 @@
 
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
-#define EVALUATE_OUTPUT         1
-#define DISPLAY_OUTPUT          0
+#define EVALUATE_OUTPUT         0
+#define DISPLAY_OUTPUT          1
 ////////////////////////////////
-#define USE_CANNY               1
-#define USE_LBSP                0
+#define USE_CANNY               0
+#define USE_LBSP                1
 ////////////////////////////////
-#define FULL_THRESH_ANALYSIS    0
+#define FULL_THRESH_ANALYSIS    1
 ////////////////////////////////
 #define USE_GLSL_IMPL           0
 #define USE_CUDA_IMPL           0

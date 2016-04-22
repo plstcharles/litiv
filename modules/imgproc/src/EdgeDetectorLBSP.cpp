@@ -261,7 +261,6 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
                 if(nRowIter<oCurrScaleSize.height-int(nNMSHalfWinSize)) {
                     anGradRow += nGradMapRowStep*nNMSHalfWinSize; // offset by nNMSHalfWinSize rows
                     uchar* anEdgeMapRow = oEdgeTempMask.ptr<uchar>(nRowIter+nNMSHalfWinSize)+nNMSHalfWinSize*nEdgeMapColStep;
-                    CV_DbgAssert(anEdgeMapRow>=oEdgeTempMask.datastart+nEdgeMapRowStep*nNMSHalfWinSize && anEdgeMapRow<oEdgeTempMask.dataend-nEdgeMapRowStep*nNMSHalfWinSize);
                     std::fill(anEdgeMapRow-nEdgeMapColStep*nNMSHalfWinSize,anEdgeMapRow,1);
                     std::fill(anEdgeMapRow+oInputImg.cols*nEdgeMapColStep,anEdgeMapRow+(oInputImg.cols+nNMSHalfWinSize)*nEdgeMapColStep,1);
                     stack_check_size(oInputImg.cols);
