@@ -93,8 +93,6 @@ protected:
         else if(this->m_vsGTImagePaths.size()!=this->m_vsInputImagePaths.size())
             lvErrorExt("BSDS500 set '%s' input/groundtruth count mismatch",this->getName().c_str());
         // make sure folders are non-empty, and folders & images are similarliy ordered
-        this->m_vsGTImagePaths.resize(10);
-        this->m_vsInputImagePaths.resize(10);
         std::vector<std::string> vsTempPaths;
         for(size_t nImageIdx=0; nImageIdx<this->m_vsGTImagePaths.size(); ++nImageIdx) {
             PlatformUtils::GetFilesFromDir(this->m_vsGTImagePaths[nImageIdx],vsTempPaths);

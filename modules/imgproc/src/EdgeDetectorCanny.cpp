@@ -17,10 +17,9 @@
 
 #include "litiv/imgproc/EdgeDetectorCanny.hpp"
 
-EdgeDetectorCanny::EdgeDetectorCanny(double dHystLowThrshFactor, double dGaussianKernelSigma, bool bUseL2GradientNorm) :
+EdgeDetectorCanny::EdgeDetectorCanny(double dHystLowThrshFactor, double dGaussianKernelSigma) :
         m_dHystLowThrshFactor(dHystLowThrshFactor),
-        m_dGaussianKernelSigma(dGaussianKernelSigma),
-        m_bUsingL2GradientNorm(bUseL2GradientNorm) {
+        m_dGaussianKernelSigma(dGaussianKernelSigma) {
     CV_Assert(m_dHystLowThrshFactor>0 && m_dHystLowThrshFactor<1);
     CV_Assert(m_dGaussianKernelSigma>=0);
 }
@@ -29,24 +28,21 @@ void EdgeDetectorCanny::apply_threshold(cv::InputArray _oInputImage, cv::OutputA
     cv::Mat oInputImg = _oInputImage.getMat();
     CV_Assert(!oInputImg.empty());
     CV_Assert(oInputImg.channels()==1 || oInputImg.channels()==3 || oInputImg.channels()==4);
-    cv::Mat oInputImage_gray;
-    if(oInputImg.channels()==3)
-        cv::cvtColor(oInputImg,oInputImage_gray,cv::COLOR_BGR2GRAY);
-    else if(oInputImg.channels()==4)
-        cv::cvtColor(oInputImg,oInputImage_gray,cv::COLOR_BGRA2GRAY);
-    else
-        oInputImage_gray = oInputImg;
     if(m_dGaussianKernelSigma>0) {
+        // follows the approach used in Matlab's edge.m implementation of Canny's method
         const int nDefaultKernelSize = int(8*ceil(m_dGaussianKernelSigma));
-        const int nRealKernelSize = nDefaultKernelSize%2==0?nDefaultKernelSize+1:nDefaultKernelSize;
-        cv::GaussianBlur(oInputImage_gray,oInputImage_gray,cv::Size(nRealKernelSize,nRealKernelSize),m_dGaussianKernelSigma,m_dGaussianKernelSigma);
+        const int nRealHalfKernelSize = (nDefaultKernelSize-1)/2;
+        oInputImg = oInputImg.clone();
+        cv::GaussianBlur(oInputImg,oInputImg,cv::Size(nRealHalfKernelSize,nRealHalfKernelSize),m_dGaussianKernelSigma,m_dGaussianKernelSigma);
     }
     _oEdgeMask.create(oInputImg.size(),CV_8UC1);
     cv::Mat oEdgeMask = _oEdgeMask.getMat();
     if(dThreshold<0||dThreshold>1)
         dThreshold = getDefaultThreshold();
-    const size_t nCurrBaseHystThreshold = (size_t)(dThreshold*UCHAR_MAX);
-    cv::Canny(oInputImage_gray,oEdgeMask,nCurrBaseHystThreshold*m_dHystLowThrshFactor,(double)nCurrBaseHystThreshold,3,m_bUsingL2GradientNorm);
+    const size_t nCurrBaseHystThreshold = (size_t)(dThreshold*EDGCANNY_MAX_THRESHOLD);
+    static const int nWindowSize = EDGCANNY_SOBEL_KERNEL_SIZE;
+    static const bool bUseL2Gradient = EDGCANNY_USE_L2_GRADIENT_NORM;
+    cv::Canny(oInputImg,oEdgeMask,nCurrBaseHystThreshold*m_dHystLowThrshFactor,(double)nCurrBaseHystThreshold,nWindowSize,bUseL2Gradient);
 }
 
 void EdgeDetectorCanny::apply(cv::InputArray _oInputImage, cv::OutputArray _oEdgeMask) {

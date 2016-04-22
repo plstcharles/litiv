@@ -37,11 +37,52 @@
 #define DATASET_PRECACHING      1
 #define DATASET_SCALE_FACTOR    1.0
 ////////////////////////////////
+#if (DEBUG_OUTPUT && !DISPLAY_OUTPUT)
+#undef DISPLAY_OUTPUT
+#define DISPLAY_OUTPUT 1
+#endif //(DEBUG_OUTPUT && !DISPLAY_OUTPUT)
+#if (DEBUG_OUTPUT && FULL_THRESH_ANALYSIS)
+#error "Cannot enable debug output while using all threshold values."
+#endif //(DEBUG_OUTPUT && FULL_THRESH_ANALYSIS)
 #define USE_GPU_IMPL (USE_GLSL_IMPL||USE_CUDA_IMPL||USE_OPENCL_IMPL)
+#if EVALUATE_OUTPUT
+#if (HAVE_GLSL && USE_GLSL_IMPL)
+#define USE_GLSL_EVALUATION 1
+#endif //(HAVE_GLSL && USE_GLSL_IMPL)
+#if (HAVE_CUDA && USE_CUDA_IMPL)
+#define USE_CUDA_EVALUATION 1
+#endif //(HAVE_CUDA && USE_CUDA_IMPL)
+#if (HAVE_OPENCL && USE_OPENCL_IMPL)
+#define USE_OPENCL_EVALUATION 1
+#endif //(HAVE_OPENCL && USE_OPENCL_IMPL)
+#if HAVE_GPU_SUPPORT
+#define VALIDATE_GPU_EVALUATION 0
+#endif //HAVE_GPU_SUPPORT
+#endif //EVALUATE_OUTPUT
+#ifndef VALIDATE_GPU_EVALUATION
+#define VALIDATE_GPU_EVALUATION 0
+#endif //VALIDATE_GPU_EVALUATION
+#ifndef USE_GLSL_EVALUATION
+#define USE_GLSL_EVALUATION 0
+#endif //USE_GLSL_EVALUATION
+#ifndef USE_CUDA_EVALUATION
+#define USE_CUDA_EVALUATION 0
+#endif //USE_CUDA_EVALUATION
+#ifndef USE_OPENCL_EVALUATION
+#define USE_OPENCL_EVALUATION 0
+#endif //USE_OPENCL_EVALUATION
+#define USE_GPU_EVALUATION (USE_GLSL_EVALUATION || USE_CUDA_EVALUATION || USE_OPENCL_EVALUATION)
+#define NEED_EDGES_MASK (DISPLAY_OUTPUT || WRITE_IMG_OUTPUT || (EVALUATE_OUTPUT && (!USE_GPU_EVALUATION || VALIDATE_GPU_EVALUATION)))
+#define NEED_LAST_GT_MASK (DISPLAY_OUTPUT || (EVALUATE_OUTPUT && (!USE_GPU_EVALUATION || VALIDATE_GPU_EVALUATION)))
+#define NEED_GT_MASK (DISPLAY_OUTPUT || EVALUATE_OUTPUT)
 #if (USE_GLSL_IMPL+USE_CUDA_IMPL+USE_OPENCL_IMPL)>1
 #error "Must specify a single impl."
 #elif (USE_CANNY+USE_LBSP)!=1
 #error "Must specify a single algorithm."
+#elif USE_CANNY
+#include "litiv/imgproc/EdgeDetectorCanny.hpp"
+#elif USE_LBSP
+#include "litiv/imgproc/EdgeDetectorLBSP.hpp"
 #endif //USE_...
 #ifndef DATASET_ROOT
 #error "Dataset root path should have been specified in CMake."
@@ -127,6 +168,9 @@ static_assert(false,"Missing impl");
 void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
+    size_t nCurrImageIdx = 0;
+    size_t nNextImageIdx = nCurrImageIdx+1;
+    bool bGPUContextInitialized = false;
     try {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
         CV_Assert(oBatch.getImageCount()>1);

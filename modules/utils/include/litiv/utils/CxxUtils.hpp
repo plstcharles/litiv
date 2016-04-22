@@ -37,6 +37,8 @@
 
 namespace CxxUtils {
 
+    template<int> struct _; // used for compile-time integer expr printing via error; just write "_<expr> __;"
+
     template<typename Derived,typename Base,typename Del>
     std::unique_ptr<Derived,Del> static_unique_ptr_cast(std::unique_ptr<Base,Del>&& p) {
         auto d = static_cast<Derived*>(p.release());
@@ -53,14 +55,24 @@ namespace CxxUtils {
     }
 
     template<size_t n, typename F>
-    inline typename std::enable_if<n==0>::type unroll(const F& f) {
-        f(0);
-    }
+    constexpr inline typename std::enable_if<n==0>::type unroll(const F&) {}
 
     template<size_t n, typename F>
-    inline typename std::enable_if<(n>0)>::type unroll(const F& f) {
+    constexpr inline typename std::enable_if<(n>0)>::type unroll(const F& f) {
         unroll<n-1>(f);
-        f(n);
+        f(n-1);
+    }
+
+    template<size_t nWordBitSize, typename Tr>
+    constexpr inline typename std::enable_if<nWordBitSize==1,Tr>::type expand_bits(const Tr& nBits, int=0) {
+        return nBits;
+    }
+
+    template<size_t nWordBitSize, typename Tr>
+    constexpr inline typename std::enable_if<(nWordBitSize>1),Tr>::type expand_bits(const Tr& nBits, int n=((sizeof(Tr)*8)/nWordBitSize)-1) {
+        static_assert(std::is_integral<Tr>::value,"nBits type must be integral");
+        // only the first [(sizeof(Tr)*8)/nWordBitSize] bits are kept (otherwise overflow/ignored)
+        return (Tr)(bool(nBits&(1<<n))<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,Tr>(nBits,n-1):(Tr)0);
     }
 
     template<typename T,std::size_t nByteAlign>
@@ -96,7 +108,7 @@ namespace CxxUtils {
         }
         inline void deallocate(pointer p, size_type) noexcept {_aligned_free(p);}
         inline void destroy(pointer p) {p->~value_type();p;}
-#else //(!def(_MSC_VER))
+#else //!def(_MSC_VER)
         inline pointer allocate(size_type n) {
             const size_type alignment = static_cast<size_type>(nByteAlign);
             size_t alloc_size = n*sizeof(value_type);

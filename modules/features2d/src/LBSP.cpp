@@ -17,6 +17,13 @@
 
 #include "litiv/features2d/LBSP.hpp"
 
+// make sure static constexpr array addresses exist
+constexpr int LBSP::s_anIdxLUT_16bitdbcross[16][2];
+constexpr int LBSP::s_anIdxLUT_16bitdbcross_GradX[16];
+constexpr int LBSP::s_anIdxLUT_16bitdbcross_GradY[16];
+constexpr LBSP::IdxLUTOffsetArray LBSP::s_oIdxLUT_16bitdbcross_x;
+constexpr LBSP::IdxLUTOffsetArray LBSP::s_oIdxLUT_16bitdbcross_y;
+
 LBSP::LBSP(size_t nThreshold) :
         m_bOnlyUsingAbsThreshold(true),
         m_fRelThreshold(0), // unused
@@ -75,6 +82,7 @@ static inline void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRe
     const cv::Mat& oRefMat = oRefImg.empty()?oInputImg:oRefImg;
     CV_DbgAssert(oInputImg.isContinuous() && oRefMat.isContinuous());
     const size_t nKeyPoints = voKeyPoints.size();
+    const uchar t = cv::saturate_cast<uchar>(nThreshold);
     if(nChannels==1) {
         if(bSingleColumnDesc)
             oDesc.create((int)nKeyPoints,1,CV_16UC1);
@@ -83,7 +91,7 @@ static inline void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRe
         for(size_t k=0; k<nKeyPoints; ++k) {
             const int x = (int)voKeyPoints[k].pt.x;
             const int y = (int)voKeyPoints[k].pt.y;
-            LBSP::computeDescriptor<1>(oInputImg,oRefMat.at<uchar>(y,x),x,y,0,nThreshold,oDesc.at<ushort>((int)k));
+            LBSP::computeDescriptor<1>(oInputImg,oRefMat.at<uchar>(y,x),x,y,0,t,oDesc.at<ushort>((int)k));
         }
         return;
     }
@@ -92,7 +100,7 @@ static inline void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRe
             oDesc.create((int)nKeyPoints,1,CV_16UC3);
         else
             oDesc.create(oInputImg.size(),CV_16UC3);
-        const std::array<size_t,3> anThreshold = {nThreshold,nThreshold,nThreshold};
+        alignas(16) const std::array<uchar,3> anThreshold = {t,t,t};
         for(size_t k=0; k<nKeyPoints; ++k) {
             const int x = (int)voKeyPoints[k].pt.x;
             const int y = (int)voKeyPoints[k].pt.y;
@@ -120,7 +128,7 @@ static inline void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRe
         for(size_t k=0; k<nKeyPoints; ++k) {
             const int x = (int)voKeyPoints[k].pt.x;
             const int y = (int)voKeyPoints[k].pt.y;
-            const size_t nThreshold = (size_t)(oRefMat.at<uchar>(y,x)*fThreshold)+nThresholdOffset;
+            const uchar nThreshold = cv::saturate_cast<uchar>(oRefMat.at<uchar>(y,x)*fThreshold+nThresholdOffset);
             ushort& nResult = bSingleColumnDesc?oDesc.at<ushort>((int)k):oDesc.at<ushort>(y,x);
             LBSP::computeDescriptor<1>(oInputImg,oRefMat.at<uchar>(y,x),x,y,0,nThreshold,nResult);
         }
@@ -134,7 +142,9 @@ static inline void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRe
             const int x = (int)voKeyPoints[k].pt.x;
             const int y = (int)voKeyPoints[k].pt.y;
             const uchar* acRef = oRefMat.data+oInputImg.step.p[0]*y+oInputImg.step.p[1]*x;
-            const std::array<size_t,3> anThreshold = {(size_t)(acRef[0]*fThreshold)+nThresholdOffset,(size_t)(acRef[1]*fThreshold)+nThresholdOffset,(size_t)(acRef[2]*fThreshold)+nThresholdOffset};
+            alignas(16) const std::array<uchar,3> anThreshold = {cv::saturate_cast<uchar>(acRef[0]*fThreshold+nThresholdOffset),
+                                                                 cv::saturate_cast<uchar>(acRef[1]*fThreshold+nThresholdOffset),
+                                                                 cv::saturate_cast<uchar>(acRef[2]*fThreshold+nThresholdOffset)};
             ushort* anResult = (ushort*)(bSingleColumnDesc?(oDesc.data+oDesc.step.p[0]*k):(oDesc.data+oDesc.step.p[0]*y+oDesc.step.p[1]*x));
             LBSP::computeDescriptor(oInputImg,acRef,x,y,anThreshold,anResult);
         }
