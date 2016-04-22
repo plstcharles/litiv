@@ -44,7 +44,7 @@
 #define lvAssert(expr) {if(!!(expr)); else lvError("assertion failed ("#expr")");}
 #ifdef _DEBUG
 #define lvDbgAssert(expr) lvAssert(expr)
-#define lvDbgExceptionWatch CxxUtils::UncaughtExceptionLogger __logger(__PRETTY_FUNCTION__,__FILE__,__LINE__)
+#define lvDbgExceptionWatch CxxUtils::UncaughtExceptionLogger XSTR_CONCAT(__logger,__LINE__)(__PRETTY_FUNCTION__,__FILE__,__LINE__)
 #else //ndefined(_DEBUG)
 #define lvDbgAssert(expr)
 #define lvDbgExceptionWatch

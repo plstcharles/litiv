@@ -243,8 +243,8 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
                     if(nLevelIter>0) {
                         const size_t nRowIter_base = nRowIter << 1;
                         const size_t nColIter_base = nColIter << 1;
-                        CV_DbgAssert((nRowIter_base+1)<(oMapSize.height));
-                        CV_DbgAssert((nColIter_base+1)<(oMapSize.width));
+                        CV_DbgAssert((nRowIter_base+1)<size_t(oMapSize.height));
+                        CV_DbgAssert((nColIter_base+1)<size_t(oMapSize.width));
                         CxxUtils::unroll<2>([&](int nRowIterOffset){
                             uchar* anNextScaleGradRow = oGradMap.data+(nRowIter_base+nRowIterOffset+nNMSHalfWinSize)*nGradMapRowStep+nGradMapColStep*nNMSHalfWinSize;
                             CV_DbgAssert(anNextScaleGradRow<oGradMap.dataend);
@@ -258,7 +258,7 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
             if(nLevelIter==0) {
                 std::fill(anGradRow-nGradMapColStep*nNMSHalfWinSize,anGradRow,0); // remove if init'd at top
                 std::fill(anGradRow+oInputImg.cols*nGradMapColStep,anGradRow+(oInputImg.cols+nNMSHalfWinSize)*nGradMapColStep,0);
-                if(nRowIter<oCurrScaleSize.height-nNMSHalfWinSize) {
+                if(nRowIter<oCurrScaleSize.height-int(nNMSHalfWinSize)) {
                     anGradRow += nGradMapRowStep*nNMSHalfWinSize; // offset by nNMSHalfWinSize rows
                     uchar* anEdgeMapRow = oEdgeTempMask.ptr<uchar>(nRowIter+nNMSHalfWinSize)+nNMSHalfWinSize*nEdgeMapColStep;
                     CV_DbgAssert(anEdgeMapRow>=oEdgeTempMask.datastart+nEdgeMapRowStep*nNMSHalfWinSize && anEdgeMapRow<oEdgeTempMask.dataend-nEdgeMapRowStep*nNMSHalfWinSize);
@@ -353,8 +353,8 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
     }
     const uchar* anEdgeTempMaskData = oEdgeTempMask.data+nEdgeMapRowStep*nNMSHalfWinSize+nEdgeMapColStep*nNMSHalfWinSize;
     uchar* oEdgeMaskData = oEdgeMask.data;
-    for(size_t nRowIter=0; nRowIter<oInputImg.rows; ++nRowIter, anEdgeTempMaskData+=nEdgeMapRowStep, oEdgeMaskData+=oEdgeMask.step)
-        for(size_t nColIter=0; nColIter<oInputImg.cols; ++nColIter)
+    for(int nRowIter=0; nRowIter<oInputImg.rows; ++nRowIter, anEdgeTempMaskData+=nEdgeMapRowStep, oEdgeMaskData+=oEdgeMask.step)
+        for(int nColIter=0; nColIter<oInputImg.cols; ++nColIter)
             oEdgeMaskData[nColIter] = (uchar)-(*(anEdgeTempMaskData+nColIter*nEdgeMapColStep)>>1);
 }
 
