@@ -262,53 +262,62 @@ namespace BSDS500 {
         void describe_self()
 
         {
-            static char* desc[20];
+            static const char* desc[20];
             int i = 0;
-#ifdef QUICK_MIN
-            char minstr[40];
-#endif
-
 #ifdef ROUND_COSTS
-            desc[i++] = "Rounded costs";
+            static const char* sROUND_COSTS = "Rounded costs";
+            desc[i++] = sROUND_COSTS;
 #endif
 #ifdef PREC_COSTS
-            desc[i++] = "Precise costs";
-    #ifdef USE_PRICE_OUT
-    desc[i++] = "Price-outs";
-    #endif
+            static const char* sPREC_COSTS = "Precise costs";
+            desc[i++] = sPREC_COSTS;
+#ifdef USE_PRICE_OUT
+            static const char* sUSE_PRICE_OUT = "Price-outs";
+            desc[i++] = sUSE_PRICE_OUT;
+#endif
 #endif
 #ifdef STRONG_PO
-            desc[i++] = "Strong price-outs";
+            static const char* sSTRONG_PO = "Strong price-outs";
+            desc[i++] = sSTRONG_PO;
 #endif
 #ifdef BACK_PRICE_OUT
-            desc[i++] = "Back price-outs";
+            static const char* sBACK_PRICE_OUT = "Back price-outs";
+            desc[i++] = sBACK_PRICE_OUT;
 #endif
 #ifdef USE_P_UPDATE
-            desc[i++] = "Global updates";
+            static const char* sUSE_P_UPDATE = "Global updates";
+            desc[i++] = sUSE_P_UPDATE;
 #endif
 #ifdef USE_SP_AUG_FORWARD
-            desc[i++] = "Forward SAP cleanup";
+            static const char* sUSE_SP_AUG_FORWARD = "Forward SAP cleanup";
+            desc[i++] = sUSE_SP_AUG_FORWARD;
 #endif
 #ifdef USE_SP_AUG_BACKWARD
-            desc[i++] = "Backward SAP cleanup";
+            static const char* sUSE_SP_AUG_BACKWARD = "Backward SAP cleanup";
+            desc[i++] = sUSE_SP_AUG_BACKWARD;
 #endif
 #ifdef STORE_REV_ARCS
-            desc[i++] = "Reverse arcs";
+            static const char* sSTORE_REV_ARCS = "Reverse arcs";
+            desc[i++] = sSTORE_REV_ARCS;
 #endif
 #ifdef USE_P_REFINE
-            desc[i++] = "Price refinement";
+            static const char* sUSE_P_REFINE = "Price refinement";
+            desc[i++] = sUSE_P_REFINE;
 #endif
 #ifdef QUEUE_ORDER
-            desc[i++] = "Queue ordering";
+            static const char* sQUEUE_ORDER = "Queue ordering";
+            desc[i++] = sQUEUE_ORDER;
 #else
-            desc[i++] = "Stack ordering";
+            static const char* sSTACK_ORDER = "Stack ordering";
+            desc[i++] = sSTACK_ORDER;
 #endif
 #ifdef QUICK_MIN
+            char minstr[40];
             (void) sprintf(minstr, "Quick minima; NUM_BEST = %d", NUM_BEST);
             desc[i++] = minstr;
 #endif
-
             desc[i] = NULL;
+            (void)desc;
 #if 0
             (void) fprintf(stderr,"CSA: ");
     for (i = 5; i > 0; i--)
@@ -420,10 +429,7 @@ namespace BSDS500 {
             }
         }
 
-        int main(const int* graph)
-        {
-            unsigned time;
-
+        int main(const int* graph) {
             init(graph);
             /*
             (void) fprintf(stderr,"CSA: |>  n = %u,  m = %u,  sc_f = %lg", n, m, scale_factor);
@@ -648,8 +654,7 @@ namespace BSDS500 {
         unsigned long parse(const int* graph)
 
         {
-            unsigned arc_count, tail, head, lhs_n,
-                    swap, id_offset, temp;
+            unsigned tail, head, lhs_n, swap, id_offset, temp;
             long cost, *lhs_degree;
 #ifdef STORE_REV_ARCS
             long *rhs_degree;
@@ -660,8 +665,6 @@ namespace BSDS500 {
             ta_ptr temp_a, temp_arcs;
             lhs_ptr l_v;
             rhs_ptr r_v;
-
-            arc_count = m;
             lhs_n = n/2;
 
             head_lr_arc = (lr_aptr) malloc((m + 1) * sizeof(struct lr_arc));
@@ -883,23 +886,19 @@ namespace BSDS500 {
             a_stop = (v+1)->priced_out;
             for (; a != a_stop; a++)
             {
-                if ((red_cost = a->c - a->head->p) < v->next_best)
+                if ((red_cost = a->c - a->head->p) < v->next_best) {
 #ifdef LOOSE_BOUND
-                    {
-        sort_insert(v->best, NUM_BEST, a, red_cost, NUM_BEST);
-        v->next_best = v->best[NUM_BEST - 1]->c -
-               v->best[NUM_BEST - 1]->head->p;
-        }
-#else
-                if (red_cost < (save_max = v->best[NUM_BEST - 1]->c -
-                                           v->best[NUM_BEST - 1]->head->p))
-                {
                     sort_insert(v->best, NUM_BEST, a, red_cost, NUM_BEST);
-                    v->next_best = save_max;
-                }
-                else
-                    v->next_best = red_cost;
+                    v->next_best = v->best[NUM_BEST - 1]->c - v->best[NUM_BEST - 1]->head->p;
+#else
+                    if(red_cost<(save_max = v->best[NUM_BEST-1]->c-v->best[NUM_BEST-1]->head->p)) {
+                        sort_insert(v->best,NUM_BEST,a,red_cost,NUM_BEST);
+                        v->next_best = save_max;
+                    }
+                    else
+                        v->next_best = red_cost;
 #endif
+                }
             }
         }
 #endif
@@ -1199,13 +1198,13 @@ namespace BSDS500 {
 
             if (s == NULL)
             {
-                (void) fprintf(stderr,nomem_msg);
+                //(void) fprintf(stderr,nomem_msg);
                 exit(9);
             }
             s->bottom = (char **) malloc(size * sizeof(char *));
             if (s->bottom == NULL)
             {
-                (void) fprintf(stderr,nomem_msg);
+                //(void) fprintf(stderr,nomem_msg);
                 exit(9);
             }
             s->top = s->bottom;
