@@ -135,9 +135,9 @@ namespace ParallelUtils {
     static inline __m128i mult_32si(const __m128i& a, const __m128i& b) {
 #if HAVE_SSE4_1
         return _mm_mullo_epi32(a, b);
-#else //!HAVE_SSE4_1
+#else //(!HAVE_SSE4_1)
         return _mm_unpacklo_epi32(_mm_shuffle_epi32(_mm_mul_epu32(a,b),_MM_SHUFFLE(0,0,2,0)),_mm_shuffle_epi32(_mm_mul_epu32(_mm_srli_si128(a,4),_mm_srli_si128(b,4)),_MM_SHUFFLE(0,0,2,0)));
-#endif //!HAVE_SSE4_1
+#endif //(!HAVE_SSE4_1)
     }
 
     template<int nPos>
@@ -145,9 +145,9 @@ namespace ParallelUtils {
         static_assert(nPos>=0 && nPos<4,"Integer position out of bounds");
 #if HAVE_SSE4_1
         return _mm_extract_epi32(anBuffer,nPos);
-#else //!HAVE_SSE4_1
+#else //(!HAVE_SSE4_1)
         return _mm_extract_epi16(anBuffer,nPos*2)+_mm_extract_epi16(anBuffer,nPos*2+1)<<16;
-#endif //!HAVE_SSE4_1
+#endif //(!HAVE_SSE4_1)
     }
 #endif //HAVE_SSE2
 

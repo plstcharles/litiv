@@ -453,7 +453,7 @@ namespace DistanceUtils {
         return _mm_popcnt_u64((uint64)x);
     }
 
-#else //!HAVE_POPCNT
+#else //(!HAVE_POPCNT)
 
     //! computes the population count of an N-byte vector using an 8-bit popcount LUT
     template<typename T>
@@ -465,7 +465,7 @@ namespace DistanceUtils {
         return nResult;
     }
 
-#endif //!HAVE_POPCNT
+#endif //(!HAVE_POPCNT)
 
     //! computes the population count of a (nChannels*N)-byte vector
     template<size_t nChannels, typename T>

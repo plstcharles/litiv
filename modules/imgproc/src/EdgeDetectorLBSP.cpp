@@ -81,11 +81,11 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg) {
             CxxUtils::unroll<nChannels>([&](size_t nChIter){
                 ParallelUtils::copy_16ub((__m128i*)(aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS),*(aanCurrImg+nChIter));
             });
-#else //!HAVE_SSE2
+#else //(!HAVE_SSE2)
             CxxUtils::unroll<nChannels>([&](size_t nChIter){
                 std::fill_n(aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS,LBSP::DESC_SIZE_BITS,*(aanCurrImg+nChIter));
             });
-#endif //!HAVE_SSE2
+#endif //(!HAVE_SSE2)
             if(nNextScaleMapSize && !(nRowIter%2) && !(nColIter%2)) {
                 const size_t nNextColLUTIdx = (nRowIter/2)*nNextRowLUTStep + (nColIter/2)*nColLUTStep;
                 for(size_t nChIter = 0; nChIter<nChannels; ++nChIter) {
@@ -120,13 +120,13 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg) {
                         CV_DbgAssert(LBSP::DESC_SIZE_BITS==16); // all channels should already be 16-byte-aligned
                         __m128i _anInputVals = _mm_load_si128((__m128i*)(aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS));
                         size_t nLUTSum = (size_t)ParallelUtils::hsum_16ub(_anInputVals);
-#else //!HAVE_SSE2
+#else //(!HAVE_SSE2)
                         uchar* anCurrChLUT = aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS;
                         size_t nLUTSum = 0;
                         CxxUtils::unroll<LBSP::DESC_SIZE_BITS>([&](size_t nLUTIter){
                             nLUTSum += anCurrChLUT[nLUTIter];
                         });
-#endif //!HAVE_SSE2
+#endif //(!HAVE_SSE2)
                         const size_t nNextPyrImgIdx = nNextColLUTIdx/LBSP::DESC_SIZE_BITS + nChIter;
                         CV_DbgAssert(nNextPyrImgIdx<size_t(oNextPyrInputMap.dataend-oNextPyrInputMap.datastart));
                         *(oNextPyrInputMap.data+nNextPyrImgIdx) = uchar(nLUTSum/LBSP::DESC_SIZE_BITS);
@@ -189,9 +189,9 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
     constexpr uint32_t nDefaultGradMapVal4Ch = (CHAR_MAX<<24)|(CHAR_MAX<<16)|(UCHAR_MAX)<<8;
     std::fill((uint32_t*)(m_vuLBSPGradMapData.data()+nGradMapRowStep*nNMSHalfWinSize+nGradMapColStep*nNMSHalfWinSize),(uint32_t*)(m_vuLBSPGradMapData.data()+(oMapSize.height-nNMSHalfWinSize)*nGradMapRowStep-nNMSHalfWinSize*nGradMapColStep),nDefaultGradMapVal4Ch);
     const auto lAbsCharComp = [](char a, char b){return std::abs(a)<std::abs(b);};
-#else //!USE_MIN_GRAD_ORIENT
+#else //(!USE_MIN_GRAD_ORIENT)
     oGradMap(cv::Rect(nNMSHalfWinSize,nNMSHalfWinSize,m_voMapSizeList.back().width,m_voMapSizeList.back().height)) = cv::Scalar_<uchar>(0,0,UCHAR_MAX,0);
-#endif //!USE_MIN_GRAD_ORIENT
+#endif //(!USE_MIN_GRAD_ORIENT)
     size_t nCurrHystStackSize = std::max(std::max((size_t)1<<10,(size_t)oMapSize.area()/8),m_vuHystStack.size());
     m_vuHystStack.resize(nCurrHystStackSize);
     uchar** pauHystStack_top = &m_vuHystStack[0];
@@ -233,12 +233,12 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
 #if USE_MIN_GRAD_ORIENT
                     (char&)(anGradRow[nColIter*nGradMapColStep]) = std::min(nGradX,char(anGradRow[nColIter*nGradMapColStep]),lAbsCharComp);
                     (char&)(anGradRow[nColIter*nGradMapColStep+1]) = std::min(nGradY,char(anGradRow[nColIter*nGradMapColStep+1]),lAbsCharComp);
-#else //!USE_MIN_GRAD_ORIENT
+#else //(!USE_MIN_GRAD_ORIENT)
                     CV_DbgAssert((nGradX+(char)(anGradRow[nColIter*nGradMapColStep]*2))/2<=UCHAR_MAX);
                     CV_DbgAssert((nGradY+(char)(anGradRow[nColIter*nGradMapColStep+1]*2))/2<=UCHAR_MAX);
                     (char&)(anGradRow[nColIter*nGradMapColStep]) = ((nGradX+(char)(anGradRow[nColIter*nGradMapColStep]*2))/2);
                     (char&)(anGradRow[nColIter*nGradMapColStep+1]) = ((nGradY+(char)(anGradRow[nColIter*nGradMapColStep+1]*2))/2);
-#endif //!USE_MIN_GRAD_ORIENT
+#endif //(!USE_MIN_GRAD_ORIENT)
                     anGradRow[nColIter*nGradMapColStep+2] = std::min(nGradMag,anGradRow[nColIter*nGradMapColStep+2]);
                     if(nLevelIter>0) {
                         const size_t nRowIter_base = nRowIter << 1;
@@ -303,13 +303,13 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
                                     }
                                 }
                             }
-#else //!USE_3_AXIS_ORIENT
+#else //(!USE_3_AXIS_ORIENT)
                             const uint nGradX_abs = (uint)std::abs(anGradRow[nColIter*nGradMapColStep]);
                             const uint nGradY_abs = (uint)std::abs(anGradRow[nColIter*nGradMapColStep+1]);
                             if((nGradY_abs<=nGradX_abs && isLocalMaximum_Horizontal<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep)) ||
                                (nGradY_abs>nGradX_abs && isLocalMaximum_Vertical<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep)))
                                 goto _edge_good;
-#endif //!USE_3_AXIS_ORIENT
+#endif //(!USE_3_AXIS_ORIENT)
                         }
                         nNeighbMax = false;
                         anEdgeMapRow[nColIter*nEdgeMapColStep] = 1; // not an edge

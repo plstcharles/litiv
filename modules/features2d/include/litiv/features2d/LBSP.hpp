@@ -272,9 +272,9 @@ protected:
     static constexpr desc_t s_nDesc_16bitdbcross_GradY_Neg = ((1<<2)+(1<<5)+(1<<7)+(1<<10)+(1<<12)+(1<<14));
 #if HAVE_SSE2
     static constexpr union IdxLUTOffsetArray {int anOffsets[16]; __m128i vnOffsets[4];}
-#else //!HAVE_SSE2
+#else //(!HAVE_SSE2)
     static constexpr union IdxLUTOffsetArray {int anOffsets[16];}
-#endif //!HAVE_SSE2
+#endif //(!HAVE_SSE2)
             s_oIdxLUT_16bitdbcross_x = {{-2, 2, 0, 0,  -2, 2, 2,-2,   0,-1, 0, 1,  -1, 1, 1,-1}},
             s_oIdxLUT_16bitdbcross_y = {{ 0, 0,-2, 2,   2,-2, 2,-2,   1, 0,-1, 0,  -1, 1,-1, 1}};
 
@@ -292,10 +292,10 @@ protected:
             anVals[n*4+1] = anData[ParallelUtils::extract_32si<1>(vnMapOffsets)];
             anVals[n*4+0] = anData[ParallelUtils::extract_32si<0>(vnMapOffsets)];
         });
-#else //!HAVE_SSE2*/
+#else //(!HAVE_SSE2)*/
         CxxUtils::unroll<16>([&](int n) {
             anVals[n] = anData[nRowStep*s_oIdxLUT_16bitdbcross_y.anOffsets[n]+nColStep*s_oIdxLUT_16bitdbcross_x.anOffsets[n]];
         });
-//#endif //!HAVE_SSE2
+//#endif //(!HAVE_SSE2)
     }
 };

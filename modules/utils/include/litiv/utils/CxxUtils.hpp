@@ -108,7 +108,7 @@ namespace CxxUtils {
         }
         inline void deallocate(pointer p, size_type) noexcept {_aligned_free(p);}
         inline void destroy(pointer p) {p->~value_type();p;}
-#else //!def(_MSC_VER)
+#else //(!def(_MSC_VER))
         inline pointer allocate(size_type n) {
             const size_type alignment = static_cast<size_type>(nByteAlign);
             size_t alloc_size = n*sizeof(value_type);
