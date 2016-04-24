@@ -25,7 +25,7 @@ include(GetGitRevisionDescription)
 get_git_head_revision(GIT_REFSPEC GIT_SHA1)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
-
+set(DATASET_ROOT "${CMAKE_SOURCE_DIR}/data/" CACHE STRING "Dataset root folder (this is where test data should be located for apps benchmarks to be used out-of-the-box)")
 if(WIN32)
     # add hardcoded guesses for find_package here (caution: top level project is not defined yet!)
     list(APPEND CMAKE_PREFIX_PATH
@@ -35,11 +35,9 @@ if(WIN32)
         $ENV{USER_DEVELOP}/glew/ $ENV{USER_DEVELOP}/glew/build/
         $ENV{USER_DEVELOP}/glm/ $ENV{USER_DEVELOP}/glm/build/
     )
-    set(DATASET_ROOT "E:/datasets/" CACHE STRING "Global dataset root folder for exec projects")
-    set(CMAKE_INSTALL_PREFIX "E:/litiv" CACHE STRING "Install path prefix, prepended onto install directories")
+    set(CMAKE_INSTALL_PREFIX "C:/litiv" CACHE STRING "Install path prefix, prepended onto install directories (optional)")
 else(NOT WIN32)
-    set(DATASET_ROOT "/shared2/datasets/" CACHE STRING "Global dataset root folder for exec projects")
-    set(CMAKE_INSTALL_PREFIX "/usr/local/" CACHE STRING "Install path prefix, prepended onto install directories")
+    set(CMAKE_INSTALL_PREFIX "/usr/local/" CACHE STRING "Install path prefix, prepended onto install directories (optional)")
 endif()
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "Configs" FORCE)
 if(DEFINED CMAKE_BUILD_TYPE)

@@ -26,6 +26,11 @@
 *.tar
 *.zip
 
+# Test data #
+#############
+data
+data/
+
 # Logs and databases #
 ######################
 *.log
