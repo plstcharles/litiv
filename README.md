@@ -33,7 +33,7 @@ Standalone dataset parsing and result evaluation framework with support for data
 
 As of version 1.1, the interfaces support image-based and video-based data parsing and saving, and evaluation for binary classification problems (including BSDS500 via a custom evaluator). Upcoming versions should add support for image-array-based data parsing/saving, and evaluation for image/video registration and cosegmentation problems.
 
-List of datasets with out-of-the-box specialization (more should be added over time):
+List of (non-LITIV) datasets with out-of-the-box specialization (more should be added over time):
   - Foreground-background video segmentation & background subtraction:
     - [ChangeDetection.net 2012](http://wordpress-jodoin.dmi.usherb.ca/cdw2012)
     - [ChangeDetection.net 2014](http://wordpress-jodoin.dmi.usherb.ca/cdw2014)
@@ -47,7 +47,7 @@ For now, only contains a feature descriptor class for Local Binary Similarity Pa
 
 Besides, an implementation of Felzenszwalb’s HOG features with proper optimization might be added later...
 ##### _imgproc_
-Contains various image processing utilities and classes for edge detection (more to be added later). The main header file contains two implementations of image thinning algorithms, and the module offers an algorithm-interface-wrapped version of Canny's edge detection method (based on OpenCV's implementation).
+Contains various image processing utilities and classes for edge detection. The main header file contains two implementations of image thinning algorithms along with non-max suppression utilities. The module itself contains a wrapper interface for edge detection, and two versions of Canny's method: one based on OpenCV's implementation, and one using binary feature convolutions via LBSPs (CVPRW2016).
 ##### _utils_
 Equivalent of OpenCV’s “core” module; contains miscellaneous utilities required in other modules (e.g. OpenGL wrappers, platform wrappers, distance functions, C++11 utilities, etc.). Here is a non-exhaustive list of features:
   - OpenGL:
