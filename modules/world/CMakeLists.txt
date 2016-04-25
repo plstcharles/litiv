@@ -24,7 +24,7 @@ foreach(l ${litiv_modules})
 endforeach(l ${${litiv_modules}})
 set(CMAKE_CONFIGURABLE_FILE_CONTENT "${CMAKE_CONFIGURABLE_FILE_CONTENT}")
 configure_file(
-    "${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in"
+    "${CMAKE_SOURCE_DIR}/cmake/CMakeConfigurableFile.in"
     "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/litiv_modules.hpp"
 )
 unset(CMAKE_CONFIGURABLE_FILE_CONTENT)
