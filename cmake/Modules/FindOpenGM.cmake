@@ -45,28 +45,34 @@ if(OpenGM_FOUND)
 
     # @@@ might be able to deduce USE_OPENGM_WITH... vals using header presence
 
-    find_package(CPLEX)
+    find_package(CPLEX QUIET)
     option(USE_OPENGM_WITH_CPLEX "Specifies whether OpenGM was built with IBM CPLEX support or not" ${CPLEX_FOUND})
     if(USE_OPENGM_WITH_CPLEX)
         find_package(CPLEX REQUIRED)
         list(APPEND OpenGM_INCLUDE_DIRS ${CPLEX_INCLUDE_DIRS})
         list(APPEND OpenGM_LIBRARIES ${CPLEX_LIBRARIES})
+    else()
+        message(WARNING "Will use OpenGM without IBM CPLEX support, some inference algos might be disabled.")
     endif()
 
-    find_package(GUROBI)
+    find_package(GUROBI QUIET)
     option(USE_OPENGM_WITH_GUROBI "Specifies whether OpenGM was built with GUROBI support or not" ${GUROBI_FOUND})
     if(USE_OPENGM_WITH_GUROBI)
         find_package(GUROBI REQUIRED)
         list(APPEND OpenGM_INCLUDE_DIRS ${GUROBI_INCLUDE_DIRS})
         list(APPEND OpenGM_LIBRARIES ${GUROBI_LIBRARIES})
+    else()
+        message(WARNING "Will use OpenGM without GUROBI support, some inference algos might be disabled.")
     endif()
 
-    find_package(HDF5)
+    find_package(HDF5 QUIET)
     option(USE_OPENGM_WITH_HDF5 "Specifies whether OpenGM was built with HDF5 support or not" ${HDF5_FOUND})
     if(USE_OPENGM_WITH_GUROBI)
         find_package(GUROBI REQUIRED)
         list(APPEND OpenGM_INCLUDE_DIRS ${HDF5_INCLUDE_DIR})
         list(APPEND OpenGM_LIBRARIES ${HDF5_LIBRARIES})
+    else()
+        message(WARNING "Will use OpenGM without HDF5 support, some I/O methods might be disabled.")
     endif()
 
     mark_as_advanced(

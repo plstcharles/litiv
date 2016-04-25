@@ -109,8 +109,19 @@ if(USE_GLSL)
     set(TARGET_GL_VER_MAJOR 4 CACHE STRING "Target OpenGL profile major version")
     set(TARGET_GL_VER_MINOR 4 CACHE STRING "Target OpenGL profile minor version")
     option(GLEW_EXPERIMENTAL "Use experimental GLEW features" ON)
-else(NOT USE_GLSL)
-    message(WARNING "Missing OpenGL library(ies), vptz & GLSL implementations will be disabled")
+else()
+    message(WARNING "Missing OpenGL library(ies), vptz module & GLSL implementations will be disabled")
+endif()
+
+### OPENGM CHECK
+find_package(OpenGM)
+option(USE_OPENGM "Specifies whether OpenGM should be included/linked or not; if false, projects that depend on it will be disabled" ${OpenGM_FOUND})
+if(USE_OPENGM)
+    find_package(OpenGM REQUIRED)
+    include_directories(${OpenGM_INCLUDE_DIRS})
+    link_directories(${OpenGM_LIBRARY_DIRS})
+else()
+    message(WARNING "Missing OpenGM library, cosegm project & utilities will be disabled")
 endif()
 
 ### CUDA CHECK @@@@ add later for parallel utils & impls
