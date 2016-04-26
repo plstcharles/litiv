@@ -127,7 +127,7 @@ protected:
             this->m_voInputOrigSizes.push_back(oCurrInput.size());
             PlatformUtils::GetFilesFromDir(this->m_vsGTPaths[nImageIdx],vsTempPaths);
             CV_Assert(!vsTempPaths.empty());
-            this->m_voGTOrigSizes.push_back(cv::Size(481,321*vsTempPaths.size()));
+            this->m_voGTOrigSizes.push_back(cv::Size(481,321*int(vsTempPaths.size())));
             this->m_voInputSizes.push_back(cv::Size(int(481*dScale),int(321*dScale)));
             this->m_voGTSizes.push_back(cv::Size(int(481*dScale),int(321*vsTempPaths.size()*dScale)));
             this->m_oInputMaxSize.width = std::max(this->m_oInputMaxSize.width,this->m_voInputSizes[nImageIdx].width);
@@ -148,13 +148,13 @@ protected:
             cv::Mat oTempRefGTImage = cv::imread(vsTempPaths[0],cv::IMREAD_GRAYSCALE);
             CV_Assert(!oTempRefGTImage.empty());
             CV_Assert(oTempRefGTImage.size()==cv::Size(481,321) || oTempRefGTImage.size()==cv::Size(321,481));
-            cv::Mat oGTMask(321*vsTempPaths.size(),481,CV_8UC1);
+            cv::Mat oGTMask(321*int(vsTempPaths.size()),481,CV_8UC1);
             for(size_t nGTImageIdx=0; nGTImageIdx<vsTempPaths.size(); ++nGTImageIdx) {
                 cv::Mat oTempGTImage = cv::imread(vsTempPaths[nGTImageIdx],cv::IMREAD_GRAYSCALE);
                 CV_Assert(!oTempGTImage.empty() && (oTempGTImage.size()==cv::Size(481,321) || oTempGTImage.size()==cv::Size(321,481)));
                 if(oTempGTImage.size()==cv::Size(321,481))
                     cv::transpose(oTempGTImage,oTempGTImage);
-                oTempGTImage.copyTo(cv::Mat(oGTMask,cv::Rect(0,321*nGTImageIdx,481,321)));
+                oTempGTImage.copyTo(cv::Mat(oGTMask,cv::Rect(0,321*int(nGTImageIdx),481,321)));
             }
             CV_Assert(this->m_voGTOrigSizes[nIdx]==oGTMask.size());
             return oGTMask;

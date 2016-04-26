@@ -77,7 +77,7 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg) {
             CV_DbgAssert(nCurrColLUTIdx<m_vvuLBSPLookupMaps[nLevelIter].size() && (nCurrColLUTIdx%LBSP::DESC_SIZE_BITS)==0);
 #if HAVE_SSE2
             // no slower than fill_n if fill_n is implemented with SSE
-            CV_DbgAssert(LBSP::DESC_SIZE_BITS==16); // all channels should already be 16-byte-aligned
+            static_assert(LBSP::DESC_SIZE_BITS==16,"all channels should already be 16-byte-aligned");
             CxxUtils::unroll<nChannels>([&](size_t nChIter){
                 ParallelUtils::copy_16ub((__m128i*)(aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS),*(aanCurrImg+nChIter));
             });
@@ -117,7 +117,7 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg) {
                     const size_t nNextColLUTIdx = (nRowIter/2)*nNextRowLUTStep + (nColIter/2)*nColLUTStep;
                     for(size_t nChIter = 0; nChIter<nChannels; ++nChIter) {
 #if HAVE_SSE2
-                        CV_DbgAssert(LBSP::DESC_SIZE_BITS==16); // all channels should already be 16-byte-aligned
+                        static_assert(LBSP::DESC_SIZE_BITS==16,"all channels should already be 16-byte-aligned");
                         __m128i _anInputVals = _mm_load_si128((__m128i*)(aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS));
                         size_t nLUTSum = (size_t)ParallelUtils::hsum_16ub(_anInputVals);
 #else //(!HAVE_SSE2)
@@ -410,8 +410,8 @@ void EdgeDetectorLBSP::apply(cv::InputArray _oInputImage, cv::OutputArray _oEdge
     oEdgeMask = cv::Scalar_<uchar>(0);
     cv::Mat oTempEdgeMask = oEdgeMask.clone();
     for(size_t nCurrThreshold=0; nCurrThreshold<LBSP::MAX_GRAD_MAG; ++nCurrThreshold) {
-        apply_internal_threshold(oInputImg,oTempEdgeMask,nCurrThreshold,oInputImg.channels());
-        oEdgeMask += oTempEdgeMask/LBSP::MAX_GRAD_MAG;
+        apply_internal_threshold(oInputImg,oTempEdgeMask,uchar(nCurrThreshold),oInputImg.channels());
+        oEdgeMask += oTempEdgeMask/double(LBSP::MAX_GRAD_MAG);
     }
     if(m_bNormalizeOutput)
         cv::normalize(oEdgeMask,oEdgeMask,0,UCHAR_MAX,cv::NORM_MINMAX);

@@ -163,6 +163,7 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     add_definitions(/wd4505) # disables C4505, "unreferenced local function has been removed"
     add_definitions(/wd4514) # disables C4514, "unreferenced inline function has been removed"
     add_definitions(/wd4250) # disables C4250, "'class1' : inherits 'class2::member' via dominance" (such behavior is expected in datasets module due to diamond struct patterns)
+    add_definitions(/wd4268) # disables C4268, "'variable': 'const' static/global data initialized with compiler generated default constructor fills the object with zeros
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
     # ... @@@
 endif()
