@@ -151,10 +151,10 @@ namespace litiv {
         virtual void parseDataset() = 0;
         //! writes the dataset-level evaluation report
         virtual void writeEvalReport() const = 0;
-        //! returns the array of work batches (or groups) contained in this dataset
-        virtual IDataHandlerPtrArray getBatches() const = 0;
-        //! returns the array of work batches (or groups) contained in this dataset, sorted by expected CPU load
-        virtual IDataHandlerPtrQueue getSortedBatches() const = 0;
+        //! returns the array of work batches (or groups, if requested with hierarchy) contained in this dataset
+        virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const = 0;
+        //! returns the array of work batches (or groups, if requested with hierarchy) contained in this dataset, sorted by expected CPU load
+        virtual IDataHandlerPtrQueue getSortedBatches(bool bWithHierarchy) const = 0;
     };
 
     //! fully abstract data handler interface (work batch and work group implementations will derive from this)
@@ -178,7 +178,7 @@ namespace litiv {
         //! returns whether this data handler interface points to a work batch or a work group
         virtual bool isGroup() const = 0;
         //! returns this work group's children (work batch array)
-        virtual IDataHandlerPtrArray getBatches() const = 0; // @@@@@ rename batches at dataset level to something else?
+        virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const = 0;
         //! returns a pointer to this work batch/group's parent dataset interface
         virtual IDatasetPtr getDatasetInfo() const = 0;
         //! returns which processing task this work batch/group was built for

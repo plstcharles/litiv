@@ -130,12 +130,12 @@ const size_t g_nMaxThreads = USE_GPU_IMPL?1:std::thread::hardware_concurrency()>
 int main(int, char**) {
     try {
         litiv::IDatasetPtr pDataset = litiv::datasets::create<litiv::eDatasetTask_EdgDet,litiv::DATASET_ID,eImplTypeEnum>(DATASET_PARAMS);
-        litiv::IDataHandlerPtrQueue vpBatches = pDataset->getSortedBatches();
+        litiv::IDataHandlerPtrQueue vpBatches = pDataset->getSortedBatches(false);
         const size_t nTotPackets = pDataset->getTotPackets();
         const size_t nTotBatches = vpBatches.size();
         if(nTotBatches==0 || nTotPackets==0)
             lvErrorExt("Could not parse any data for dataset '%s'",pDataset->getName().c_str());
-        std::cout << "Parsing complete. [" << pDataset->getBatches().size() << " batch group(s), " << nTotBatches << " batch(es)]" << std::endl;
+        std::cout << "Parsing complete. [" << nTotBatches << " batch(es)]" << std::endl;
         std::cout << "\n[" << CxxUtils::getTimeStamp() << "]\n" << std::endl;
         std::cout << "Executing edge detection with " << ((g_nMaxThreads>nTotBatches)?nTotBatches:g_nMaxThreads) << " thread(s)..." << std::endl;
         size_t nProcessedBatches = 0;

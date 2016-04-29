@@ -573,11 +573,11 @@ size_t litiv::DataCounter_<litiv::eNotGroup>::getProcessedPacketsCount() const {
 }
 
 size_t litiv::DataCounter_<litiv::eGroup>::getProcessedPacketsCountPromise() {
-    return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCountPromise();});
+    return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCountPromise();});
 }
 
 size_t litiv::DataCounter_<litiv::eGroup>::getProcessedPacketsCount() const {
-    return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCount();});
+    return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCount();});
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -37,7 +37,7 @@ litiv::DataHandler::DataHandler(const std::string& sBatchName, IDatasetPtr pData
 litiv::IDataHandlerConstPtr litiv::DataHandler::getBatch(size_t& nPacketIdx) const {
     if(isGroup()) {
         size_t nCurrPacketCount = 0;
-        auto vpBatches = getBatches();
+        auto vpBatches = getBatches(true);
         auto ppBatchIter = vpBatches.begin();
         while(ppBatchIter!=vpBatches.end()) {
             const size_t nNextPacketIncr = (*ppBatchIter)->getTotPackets();

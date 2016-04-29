@@ -82,12 +82,12 @@ namespace litiv {
             virtual eDatasetList getDataset() const override final {return eDataset;}
             //! returns the currently implemented evaluation type for this work batch
             virtual eDatasetEvalList getDatasetEval() const override final {return eDatasetEval;}
-            //! always returns false for work batches
+            //! always returns false for non-group work batches
             virtual bool isBare() const override final {return false;}
-            //! always returns false for work batches
+            //! always returns false for non-group work batches
             virtual bool isGroup() const override final {return false;}
-            //! always returns an empty data handler array for work batches
-            virtual IDataHandlerPtrArray getBatches() const override final {return IDataHandlerPtrArray();}
+            //! always returns an empty data handler array for non-group work batches
+            virtual IDataHandlerPtrArray getBatches(bool /*bWithHierarchy*/) const override final {return IDataHandlerPtrArray();}
             //! returns the current (or final) duration elapsed between start/stopProcessing calls
             virtual double getProcessTime() const override final {return m_dElapsedTime_sec;}
             //! returns whether the work batch is still being processed or not (i.e. between start/stopProcessing calls)
@@ -148,15 +148,29 @@ namespace litiv {
             //! always returns true for work groups
             virtual bool isGroup() const override final {return true;}
             //! returns this work group's children (work batch array)
-            virtual IDataHandlerPtrArray getBatches() const override final {return m_vpBatches;}
+            virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const override final {
+                if(bWithHierarchy)
+                    return m_vpBatches;
+                IDataHandlerPtrArray vpBatches;
+                std::function<void(const IDataHandlerPtr&)> lPushBatches = [&](const IDataHandlerPtr& pBatch) {
+                    if(pBatch->isGroup())
+                        for(const auto& pSubBatch : pBatch->getBatches(true))
+                            lPushBatches(pSubBatch);
+                    else
+                        vpBatches.push_back(pBatch);
+                };
+                for(const auto& pBatch : getBatches(true))
+                    lPushBatches(pBatch);
+                return vpBatches;
+            }
             //! returns whether any of this work group's children batches is currently processing data
-            virtual bool isProcessing() const override final {for(const auto& pBatch : getBatches()) if(pBatch->isProcessing()) return true; return false;}
+            virtual bool isProcessing() const override final {for(const auto& pBatch : getBatches(true)) if(pBatch->isProcessing()) return true; return false;}
             //! returns the current (or final) duration elapsed between start/stopProcessing calls, recursively queried for all children work batches
-            virtual double getProcessTime() const override final {return CxxUtils::accumulateMembers<double,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessTime();});}
+            virtual double getProcessTime() const override final {return CxxUtils::accumulateMembers<double,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessTime();});}
             //! accumulates the expected CPU load for this data batch based on all children work batches load
-            virtual double getExpectedLoad() const override final {return CxxUtils::accumulateMembers<double,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getExpectedLoad();});}
+            virtual double getExpectedLoad() const override final {return CxxUtils::accumulateMembers<double,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getExpectedLoad();});}
             //! accumulate total packet count from all children work batches
-            virtual size_t getTotPackets() const override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getTotPackets();});}
+            virtual size_t getTotPackets() const override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getTotPackets();});}
             //! work group object creation method with dataset impl specialization (forwards extra args to work group constructor)
             template<typename... Targs>
             static std::shared_ptr<WorkBatchGroup> create(Targs&&... args) {
@@ -167,7 +181,7 @@ namespace litiv {
             }
         protected:
             //! recursively calls parse data on all childrens
-            virtual void parseData() override final { for(const auto& pBatch : getBatches()) pBatch->parseData(); }
+            virtual void parseData() override final { for(const auto& pBatch : getBatches(true)) pBatch->parseData(); }
             //! work group default constructor (protected, objects should always be instantiated via 'create' member function)
             WorkBatchGroup(const std::string& sGroupName, std::shared_ptr<IDataset> pDataset, const std::string& sRelativePath=std::string("./")) :
                     DataHandler(sGroupName,pDataset,PlatformUtils::AddDirSlashIfMissing(sRelativePath)+sGroupName+"/"),m_bIsBare(false) {
@@ -222,13 +236,13 @@ namespace litiv {
         //! returns whether loaded data should be 4-byte aligned or not (4-byte alignment is ideal for GPU upload)
         virtual bool is4ByteAligned() const override final {return m_bForce4ByteDataAlign;}
         //! returns the total number of packets in the dataset (recursively queried from work batches)
-        virtual size_t getTotPackets() const override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getTotPackets();});}
+        virtual size_t getTotPackets() const override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getTotPackets();});}
         //! returns the total time it took to process the dataset (recursively queried from work batches)
-        virtual double getProcessTime() const override final {return CxxUtils::accumulateMembers<double,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessTime();});}
+        virtual double getProcessTime() const override final {return CxxUtils::accumulateMembers<double,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessTime();});}
         //! returns the total processed packet count, blocking if processing is not finished yet (recursively queried from work batches)
-        virtual size_t getProcessedPacketsCountPromise() override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCountPromise();});}
+        virtual size_t getProcessedPacketsCountPromise() override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCountPromise();});}
         //! returns the total processed packet count (recursively queried from work batches)
-        virtual size_t getProcessedPacketsCount() const override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCount();});}
+        virtual size_t getProcessedPacketsCount() const override final {return CxxUtils::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCount();});}
         //! clears all batches and reparses them from the dataset metadata
         virtual void parseDataset() override final {
             std::cout << "Parsing dataset '" << getName() << "'..." << std::endl;
@@ -239,21 +253,23 @@ namespace litiv {
                 m_vpBatches.push_back(WorkBatchGroup::create(sPathIter,this->shared_from_this()));
         }
         //! returns the array of work batches (or groups) contained in this dataset
-        virtual IDataHandlerPtrArray getBatches() const override final {
-            return m_vpBatches;
+        virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const override final {
+            if(bWithHierarchy)
+                return m_vpBatches;
+            IDataHandlerPtrArray vpBatches;
+            for(const auto& pBatch : getBatches(true))
+                if(pBatch->isGroup())
+                    for(const auto& pSubBatch : pBatch->getBatches(false))
+                        vpBatches.push_back(pSubBatch);
+                else
+                    vpBatches.push_back(pBatch);
+            return vpBatches;
         }
         //! returns the array of work batches (or groups) contained in this dataset, sorted by expected CPU load
-        virtual IDataHandlerPtrQueue getSortedBatches() const override final {
+        virtual IDataHandlerPtrQueue getSortedBatches(bool bWithHierarchy) const override final {
             IDataHandlerPtrQueue vpBatches(&IDataHandler::compare_load<IDataHandler>);
-            std::function<void(const IDataHandlerPtr&)> lPushBatches = [&](const IDataHandlerPtr& pBatch) {
-                if(pBatch->isGroup())
-                    for(const auto& pSubBatch : pBatch->getBatches())
-                        lPushBatches(pSubBatch);
-                else
-                    vpBatches.push(pBatch);
-            };
-            for(const auto& pBatch : getBatches())
-                lPushBatches(pBatch);
+            for(const auto& pBatch : getBatches(bWithHierarchy))
+                vpBatches.push(pBatch);
             return vpBatches;
         }
     protected:
