@@ -1,0 +1,1 @@
+The images in this subdirectory were taken from the BSDS500 dataset; see https://www.eecs.berkeley.edu/Research/Projects/CS/vision/bsds/ for more information.
