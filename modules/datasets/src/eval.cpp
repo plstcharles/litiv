@@ -120,7 +120,7 @@ void litiv::IDataReporter_<litiv::eDatasetEval_None>::writeEvalReport() const {
     else if(isGroup() && !isBare())
         for(const auto& pBatch : getBatches())
             pBatch->writeEvalReport();
-    std::ofstream oMetricsOutput(getOutputPath()+"/../"+getName()+".txt");
+    std::ofstream oMetricsOutput(PlatformUtils::AddDirSlashIfMissing(getOutputPath())+"../"+getName()+".txt");
     if(oMetricsOutput.is_open()) {
         oMetricsOutput << std::fixed;
         oMetricsOutput << "Default evaluation report for '" << getName() << "' :\n\n";
@@ -182,7 +182,7 @@ void litiv::IDataReporter_<litiv::eDatasetEval_BinaryClassifier>::writeEvalRepor
     lvAssert(pMetrics.get());
     const BinClassifMetricsCalculator& oMetrics = dynamic_cast<const BinClassifMetricsCalculator&>(*pMetrics.get());;
     std::cout << "\t" << CxxUtils::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
-    std::ofstream oMetricsOutput(getOutputPath()+"/../"+getName()+".txt");
+    std::ofstream oMetricsOutput(PlatformUtils::AddDirSlashIfMissing(getOutputPath())+"../"+getName()+".txt");
     if(oMetricsOutput.is_open()) {
         oMetricsOutput << std::fixed;
         oMetricsOutput << "Video segmentation evaluation report for '" << getName() << "' :\n\n";

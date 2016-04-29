@@ -37,8 +37,8 @@ protected: // should still be protected, as creation should always be done via d
     ) :
             IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_CDnet,getDatasetEval<eDatasetTask,eDataset_CDnet>(),eEvalImpl>(
                     b2014?"CDnet 2014":"CDnet 2012",
-                    b2014?"CDNet2014/dataset":"CDNet/dataset",
-                    std::string(DATASET_ROOT)+"/"+std::string(b2014?"CDNet2014/":"CDNet/")+sOutputDirName+"/",
+                    PlatformUtils::AddDirSlashIfMissing(DATASET_ROOT)+std::string(b2014?"CDNet2014/dataset/":"CDNet/dataset/"),
+                    PlatformUtils::AddDirSlashIfMissing(DATASET_ROOT)+std::string(b2014?"CDNet2014/":"CDNet/")+PlatformUtils::AddDirSlashIfMissing(sOutputDirName),
                     "bin",
                     ".png",
                     /*std::vector<std::string>{"baseline_highway_cut2"},*/b2014?std::vector<std::string>{"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"}:std::vector<std::string>{"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"},

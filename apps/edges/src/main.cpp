@@ -32,8 +32,8 @@
 #define USE_CUDA_IMPL           0
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
-#define DATASET_ID              eDataset_BSDS500 // comment this line to fall back to custom definition
-#define DATASET_OUTPUT_PATH     "results_test" // always relative to the dataset root path
+#define DATASET_ID              eDataset_BSDS500 // comment this line to fall back to custom dataset definition
+#define DATASET_OUTPUT_PATH     "results_test" // will be created in the app's working directory if using a custom dataset
 #define DATASET_PRECACHING      1
 #define DATASET_SCALE_FACTOR    1.0
 ////////////////////////////////
@@ -91,7 +91,7 @@
 #define DATASET_ID eDataset_Custom
 #define DATASET_PARAMS \
     "@@@@",                                                      /* => const std::string& sDatasetName */ \
-    "@@@@",                                                      /* => const std::string& sDatasetDirName */ \
+    "@@@@",                                                      /* => const std::string& sDatasetDirPath */ \
     DATASET_OUTPUT_PATH,                                         /* => const std::string& sOutputDirPath */ \
     "edge_mask_",                                                /* => const std::string& sOutputNamePrefix */ \
     ".png",                                                      /* => const std::string& sOutputNameSuffix */ \

@@ -170,7 +170,7 @@ namespace litiv {
             virtual void parseData() override final { for(const auto& pBatch : getBatches()) pBatch->parseData(); }
             //! work group default constructor (protected, objects should always be instantiated via 'create' member function)
             WorkBatchGroup(const std::string& sGroupName, std::shared_ptr<IDataset> pDataset, const std::string& sRelativePath=std::string("./")) :
-                    DataHandler(sGroupName,pDataset,sRelativePath+"/"+sGroupName+"/"),m_bIsBare(false) {
+                    DataHandler(sGroupName,pDataset,PlatformUtils::AddDirSlashIfMissing(sRelativePath)+sGroupName+"/"),m_bIsBare(false) {
                 if(!PlatformUtils::string_contains_token(getName(),pDataset->getSkippedDirTokens())) {
                     std::cout << "\tParsing directory '" << pDataset->getDatasetPath()+sRelativePath << "' for work group '" << getName() << "'..." << std::endl;
                     std::vector<std::string> vsWorkBatchPaths;
@@ -185,7 +185,7 @@ namespace litiv {
                             const size_t nLastSlashPos = sPathIter.find_last_of("/\\");
                             const std::string sNewBatchName = nLastSlashPos==std::string::npos?sPathIter:sPathIter.substr(nLastSlashPos+1);
                             if(!PlatformUtils::string_contains_token(sNewBatchName,pDataset->getSkippedDirTokens()))
-                                m_vpBatches.push_back(WorkBatch::create(sNewBatchName,pDataset,getRelativePath()+"/"+sNewBatchName+"/"));
+                                m_vpBatches.push_back(WorkBatch::create(sNewBatchName,pDataset,PlatformUtils::AddDirSlashIfMissing(getRelativePath())+sNewBatchName+"/"));
                         }
                     }
                 }
@@ -260,11 +260,11 @@ namespace litiv {
         //! full dataset constructor; see individual parameter comments for descriptions
         IDataset_(
                 const std::string& sDatasetName, //!< user-friendly dataset name (used for identification only)
-                const std::string& sDatasetDirName, //!< dataset directory name in the dataset root path (the latter is set in CMake)
+                const std::string& sDatasetDirPath, //!< dataset directory (full) path where work batches can be found
                 const std::string& sOutputDirPath, //!< output directory (full) path for debug logs, evaluation reports and results archiving
                 const std::string& sOutputNamePrefix, //!< output name prefix for results archiving (if null, only packet idx will be used as file name)
                 const std::string& sOutputNameSuffix, //!< output name suffix for results archiving (if null, no file extension will be used)
-                const std::vector<std::string>& vsWorkBatchDirs, //!< array of directory names for top-level work batch groups
+                const std::vector<std::string>& vsWorkBatchDirs, //!< array of directory names for top-level work batch groups (one group typically contains multiple work batches)
                 const std::vector<std::string>& vsSkippedDirTokens, //!< array of tokens which allow directories to be skipped if one is found in their name
                 const std::vector<std::string>& vsGrayscaleDirTokens, //!< array of tokens which allow directories to be treated as grayscale input only if one is found in their name
                 size_t nOutputIdxOffset, //!< output packet idx offset value used when archiving results
@@ -274,8 +274,8 @@ namespace litiv {
                 double dScaleFactor //!< defines the scale factor to use to resize/rescale read packets
         ) :
                 m_sDatasetName(sDatasetName),
-                m_sDatasetPath(std::string(DATASET_ROOT)+"/"+sDatasetDirName+"/"),
-                m_sOutputPath(sOutputDirPath),
+                m_sDatasetPath(PlatformUtils::AddDirSlashIfMissing(sDatasetDirPath)),
+                m_sOutputPath(PlatformUtils::AddDirSlashIfMissing(sOutputDirPath)),
                 m_sOutputNamePrefix(sOutputNamePrefix),
                 m_sOutputNameSuffix(sOutputNameSuffix),
                 m_vsWorkBatchDirs(vsWorkBatchDirs),

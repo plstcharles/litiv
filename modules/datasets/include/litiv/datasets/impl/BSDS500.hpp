@@ -61,8 +61,8 @@ protected: // should still be protected, as creation should always be done via d
     ) :
             IDataset_<eDatasetTask,eDatasetSource_Image,eDataset_BSDS500,getDatasetEval<eDatasetTask,eDataset_BSDS500>(),eEvalImpl>(
                     "BSDS500",
-                    "BSDS500/data/images",
-                    std::string(DATASET_ROOT)+"/BSDS500/BSR/"+sOutputDirName+"/",
+                    PlatformUtils::AddDirSlashIfMissing(DATASET_ROOT)+"BSDS500/data/images/",
+                    PlatformUtils::AddDirSlashIfMissing(DATASET_ROOT)+"BSDS500/BSR/"+PlatformUtils::AddDirSlashIfMissing(sOutputDirName),
                     "",
                     ".png",
                     (eType==eBSDS500Dataset_Training)?std::vector<std::string>{"train"}:((eType==eBSDS500Dataset_Training_Validation)?std::vector<std::string>{"train","val"}:std::vector<std::string>{"train","val","test"}),
@@ -88,7 +88,7 @@ protected:
         PlatformUtils::FilterFilePaths(this->m_vsInputPaths,{},{".jpg",".png",".bmp"});
         if(this->m_vsInputPaths.empty())
             lvErrorExt("BSDS500 set '%s' did not possess any jpg/png/bmp image file",this->getName().c_str());
-        PlatformUtils::GetSubDirsFromDir(this->getDatasetInfo()->getDatasetPath()+"/../groundTruth_bdry_images/"+this->getRelativePath(),this->m_vsGTPaths);
+        PlatformUtils::GetSubDirsFromDir(PlatformUtils::AddDirSlashIfMissing(this->getDatasetInfo()->getDatasetPath())+"../groundTruth_bdry_images/"+this->getRelativePath(),this->m_vsGTPaths);
         if(this->m_vsGTPaths.empty())
             lvErrorExt("BSDS500 set '%s' did not possess any groundtruth image folders",this->getName().c_str());
         else if(this->m_vsGTPaths.size()!=this->m_vsInputPaths.size())

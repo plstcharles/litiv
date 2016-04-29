@@ -758,9 +758,9 @@ void litiv::DataReporter_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_B
     std::cout << "\t" << CxxUtils::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => MaxRcl=" << std::fixed << std::setprecision(4) << oMetrics.dMaxRecall << " MaxPrc=" << oMetrics.dMaxPrecision << " MaxFM=" << oMetrics.dMaxFMeasure << std::endl;
     std::cout << "\t" << "                BestRcl=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dRecall << " BestPrc=" << oMetrics.oBestScore.dPrecision << " BestFM=" << oMetrics.oBestScore.dFMeasure << "  (@ T=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dThreshold << ")" << std::endl;
 #if USE_BSDS500_BENCHMARK
-    const std::string sOutputPath = getOutputPath()+"/../"+getName()+"_reimpl_eval/";
+    const std::string sOutputPath = PlatformUtils::AddDirSlashIfMissing(getOutputPath())+"../"+getName()+"_reimpl_eval/";
 #else //(!USE_BSDS500_BENCHMARK)
-    const std::string sOutputPath = getOutputPath()+"/../"+getName()+"_homemade_eval/";
+    const std::string sOutputPath = PlatformUtils::AddDirSlashIfMissing(getOutputPath())+"../"+getName()+"_homemade_eval/";
 #endif //(!USE_BSDS500_BENCHMARK)
     PlatformUtils::CreateDirIfNotExist(sOutputPath);
     std::ofstream oImageScoresOutput(sOutputPath+"/eval_bdry_img.txt");

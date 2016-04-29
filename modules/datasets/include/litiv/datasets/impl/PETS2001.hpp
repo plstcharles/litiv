@@ -36,8 +36,8 @@ protected: // should still be protected, as creation should always be done via d
     ) :
             IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_PETS2001D3TC1,getDatasetEval<eDatasetTask,eDataset_PETS2001D3TC1>(),eEvalImpl>(
                     "PETS2001 Dataset#3",
-                    "PETS2001/DATASET3",
-                    std::string(DATASET_ROOT)+"/PETS2001/DATASET3/"+sOutputDirName+"/",
+                    PlatformUtils::AddDirSlashIfMissing(DATASET_ROOT)+"PETS2001/DATASET3/",
+                    PlatformUtils::AddDirSlashIfMissing(DATASET_ROOT)+"PETS2001/DATASET3/"+PlatformUtils::AddDirSlashIfMissing(sOutputDirName),
                     "bin",
                     ".png",
                     std::vector<std::string>{"TESTING"},
