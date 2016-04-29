@@ -43,14 +43,18 @@
 #if defined(_MSC_VER)
 #include <windows.h>
 #include <stdint.h>
+#include <direct.h>
 #else //(!defined(_MSC_VER))
 #include <dirent.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #endif //(!defined(_MSC_VER))
 
 namespace PlatformUtils {
 
+    std::string GetCurrentWorkDirPath();
+    std::string AddDirSlashIfMissing(const std::string& sDirPath);
     void GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths);
     void GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths);
     void FilterFilePaths(std::vector<std::string>& vsFilePaths, const std::vector<std::string>& vsRemoveTokens, const std::vector<std::string>& vsKeepTokens);

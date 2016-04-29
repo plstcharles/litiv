@@ -17,6 +17,28 @@
 
 #include "litiv/utils/PlatformUtils.hpp"
 
+std::string PlatformUtils::GetCurrentWorkDirPath() {
+    static std::array<char,FILENAME_MAX> s_acCurrentPath = {};
+#if defined(_MSC_VER)
+    if(!_getcwd(s_acCurrentPath.data(),s_acCurrentPath.size()-1))
+#else //(!defined(_MSC_VER))
+    if(!getcwd(s_acCurrentPath.data(),s_acCurrentPath.size()-1))
+#endif //(!defined(_MSC_VER))
+        return std::string();
+    return std::string(s_acCurrentPath.data());
+}
+
+std::string PlatformUtils::AddDirSlashIfMissing(const std::string& sDirPath) {
+    if(sDirPath.empty())
+        return std::string();
+    if(sDirPath=="." || sDirPath=="..")
+        return sDirPath+"/";
+    const char cLastCharacter = sDirPath[sDirPath.size()-1];
+    if(cLastCharacter!='/' && cLastCharacter!='\\')
+        return sDirPath+"/";
+    return sDirPath;
+}
+
 void PlatformUtils::GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths) {
     vsFilePaths.clear();
 #if defined(_MSC_VER)
@@ -40,7 +62,7 @@ void PlatformUtils::GetFilesFromDir(const std::string& sDirPath, std::vector<std
             while(ret) {
                 if(!(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
                     std::wstring file(ffd.cFileName);
-                    vsFilePaths.push_back(sDirPath + "/" + std::string(file.begin(),file.end()));
+                    vsFilePaths.push_back(AddDirSlashIfMissing(sDirPath)+std::string(file.begin(),file.end()));
                 }
                 ret = FindNextFile(h, &ffd);
             }
@@ -58,7 +80,7 @@ void PlatformUtils::GetFilesFromDir(const std::string& sDirPath, std::vector<std
             rewinddir(dp);
             while((dirp = readdir(dp))!=nullptr) {
                 struct stat sb;
-                std::string sFullPath = sDirPath + "/" + dirp->d_name;
+                std::string sFullPath = AddDirSlashIfMissing(sDirPath)+dirp->d_name;
                 int ret = stat(sFullPath.c_str(),&sb);
                 if(!ret && S_ISREG(sb.st_mode)
                         && strcmp(dirp->d_name,"Thumbs.db"))
@@ -95,7 +117,7 @@ void PlatformUtils::GetSubDirsFromDir(const std::string& sDirPath, std::vector<s
                 if(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
                     std::wstring subdir(ffd.cFileName);
                     if(subdir!=L"." && subdir!=L"..")
-                        vsSubDirPaths.push_back(sDirPath + "/" + std::string(subdir.begin(),subdir.end()));
+                        vsSubDirPaths.push_back(AddDirSlashIfMissing(sDirPath)+std::string(subdir.begin(),subdir.end()));
                 }
                 ret = FindNextFile(h, &ffd);
             }
@@ -113,7 +135,7 @@ void PlatformUtils::GetSubDirsFromDir(const std::string& sDirPath, std::vector<s
             rewinddir(dp);
             while((dirp = readdir(dp))!=nullptr) {
                 struct stat sb;
-                std::string sFullPath = sDirPath + "/" + dirp->d_name;
+                std::string sFullPath = AddDirSlashIfMissing(sDirPath)+dirp->d_name;
                 int ret = stat(sFullPath.c_str(),&sb);
                 if(!ret && S_ISDIR(sb.st_mode)
                         && strcmp(dirp->d_name,".")
