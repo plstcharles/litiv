@@ -5,22 +5,23 @@ This framework contains various libraries, executables and scripts originating f
 
 Most of the source code behind the LITIV framework is available under the [Apache 2.0 license](https://tldrlegal.com/license/apache-license-2.0-(apache-2.0)); see the LICENSE file for more information. Some third-party libraries and utilities are provided under their own BSD ([2-clause](https://tldrlegal.com/license/bsd-2-clause-license-(freebsd)) or [3-clause](https://tldrlegal.com/license/bsd-3-clause-license-(revised))) licenses. Specific licensing details are available in each source file (see the 3rdparty folder for more info). While this means most of the LITIV framework source code may be used in distributed commercial applications, be aware that some algorithms therein (e.g. PBAS, VIBE) may be covered by patents in your country. More information is provided in the header files for these algorithms. Note that we will offer no legal advice on possible patent infringements cases; the LITIV framework should be primarily used for testing, evaluation, research, and development purposes in an academic setting.
 
-Since the LITIV framework is still in its infancy, it has very little documentation outside header files. If you want to learn more about the algorithms, your best bet is to read the papers that introduced them. Minimalist code samples, automated testing & unit testing are also on the 'big TODO list'; for now, module behavior validation solely relies on assertions, and most of these are only enabled for debug builds. If you are looking for a place to start digging, I would recommend the apps folder; it contains executable projects with a rather high-level look at features of the framework.
+Since the LITIV framework is still in its infancy, it has very little documentation outside header files. If you want to learn more about the algorithms, your best bet is to read the papers that introduced them. More minimalist code samples, automated testing & unit testing are also on the 'big TODO list'; for now, module behavior validation solely relies on assertions, and most of these are only enabled for debug builds. If you are looking for a place to start digging, I would recommend the *samples* and *apps* folders; they contain executable projects providing a high-level look at some features of the framework. The *apps* folder contains mostly development sandboxes and testbenches (mostly uncommented), while the *samples* folder contains cleaner use-case examples with more adequate description.
 
 Structure Overview
 ------------------
-As stated before, the LITIV framework structure is inspired by OpenCV's structure. This means libraries are split into *modules*, and they are all assembled under a global library ("*world*") for easier linking. Third-party modules are kept in their own folder (*3rdparty*) at the root level. The *apps* folder contains various executables which rely on LITIV algorithms and utilities for testing and evaluation. The *scripts* folder contains evaluation/test scripts that once had some purpose in the lab (it needs cleaning).
+As stated before, the LITIV framework structure is inspired by OpenCV's structure. This means libraries are split into *modules*, and they are all assembled under a global library (*world*) for easier linking. Third-party modules are kept in their own folder (*3rdparty*) at the root level. The *apps* and *samples* folders contain various executables which rely on LITIV algorithms and utilities for testing and evaluation. The *scripts* folder contains evaluation/test scripts that once had some purpose in the lab (it needs cleaning).
 
 All internal modules can be dynamically or statically linked on Unix systems, and only statically linked on Windows (symbol exports are still missing).
 
 Requirements
-----------------------
+------------
 * [CMake](https://cmake.org/) >= 3.1.0 (required)
 * [OpenCV](http://opencv.org/) >= 3.0.0 (required)
 * OpenGL >= 4.3 (optional, for GLSL impl)
 * [GLFW](http://www.glfw.org/) >= 3.0.0 or [FreeGLUT](http://freeglut.sourceforge.net/) >= 2.8.0 (optional, for GLSL impl)
 * [GLEW](http://glew.sourceforge.net/) >= 1.9.0 (optional, for GLSL impl)
 * (CUDA/OpenCL will eventually be added as optional)
+* (OpenGM + Gurobi/CPLEX/HDF5 will eventually be added as optional)
 
 Module List
 -----------
@@ -104,7 +105,7 @@ Notes
 -----
 For a more user-friendly, stable and documented background subtraction/video segmentation framework with various other utilities, see [Andrews Sobral's BGSLibrary](https://github.com/andrewssobral/bgslibrary).
 
-Release notes and versions for the framework are maintained through [Github Releases](https://github.com/plstcharles/litiv/releases). For now, no binaries (executables or libraries) are provided; you are expected to configure and compile the framework yourself based on your own needs & your hardware's capabilities.
+Release notes and versions for the framework are maintained through [Github Releases](https://github.com/plstcharles/litiv/releases). **Expect both major and minor version changes to break backwards compatibility for some time, as the API is not yet stable**. For now, no binaries (executables or libraries) are provided; you are expected to configure and compile the framework yourself based on your own needs & your hardware's capabilities.
 
 Citation
 --------
