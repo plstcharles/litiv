@@ -81,20 +81,42 @@ namespace litiv {
         eNotImagePacket
     };
 
-    enum eGTMappingPolicy { // used to determine if input packet transformations should also be applied to GT (e.g. scaling)
-        eDirectPixelMapping,
-        ePacketIdxMapping,
+    enum eMappingPolicy { // used to determine how data packets (input/output, or gt/output) can be mapped
+        ePixelMapping,
+        eIdxMapping,
         eBatchMapping,
         eNoMapping
     };
 
+    //! returns the output packet type policy to use based on the dataset task type
+    template<eDatasetTaskList eDatasetTask>
+    constexpr ePacketPolicy getOutputPacketType() {
+        return (eDatasetTask==eDatasetTask_ChgDet)?eImagePacket:
+               (eDatasetTask==eDatasetTask_Segm)?eImagePacket:
+               (eDatasetTask==eDatasetTask_Registr)?eNotImagePacket:
+               (eDatasetTask==eDatasetTask_EdgDet)?eImagePacket:
+               // ...
+               throw -1; // undefined behavior
+    }
+
     //! returns the GT packet mapping style policy to use based on the dataset task type
     template<eDatasetTaskList eDatasetTask>
-    constexpr eGTMappingPolicy getGTMappingType() {
-        return (eDatasetTask==eDatasetTask_ChgDet)?eDirectPixelMapping:
-               (eDatasetTask==eDatasetTask_Segm)?eDirectPixelMapping:
+    constexpr eMappingPolicy getGTMappingType() {
+        return (eDatasetTask==eDatasetTask_ChgDet)?ePixelMapping:
+               (eDatasetTask==eDatasetTask_Segm)?ePixelMapping:
                (eDatasetTask==eDatasetTask_Registr)?eBatchMapping:
-               (eDatasetTask==eDatasetTask_EdgDet)?ePacketIdxMapping:
+               (eDatasetTask==eDatasetTask_EdgDet)?eIdxMapping:
+               // ...
+               throw -1; // undefined behavior
+    }
+
+    //! returns the I/O packet mapping style policy to use based on the dataset task type
+    template<eDatasetTaskList eDatasetTask>
+    constexpr eMappingPolicy getIOMappingType() {
+        return (eDatasetTask==eDatasetTask_ChgDet)?ePixelMapping:
+               (eDatasetTask==eDatasetTask_Segm)?ePixelMapping:
+               (eDatasetTask==eDatasetTask_Registr)?eBatchMapping:
+               (eDatasetTask==eDatasetTask_EdgDet)?ePixelMapping:
                // ...
                throw -1; // undefined behavior
     }
@@ -269,8 +291,12 @@ namespace litiv {
     struct IDataLoader : public virtual IDataHandler {
         //! returns the input data packet type policy (used for internal packet auto-transformations)
         inline ePacketPolicy getInputPacketType() const {return m_eInputType;}
-        //! returns the gt data packet mapping type policy (used for internal packet auto-transformations)
-        inline eGTMappingPolicy getGTMappingType() const {return m_eGTMappingType;}
+        //! returns the output data packet type policy (used for internal packet auto-transformations)
+        inline ePacketPolicy getOutputPacketType() const {return m_eOutputType;}
+        //! returns the gt/output data packet mapping type policy (used for internal packet auto-transformations)
+        inline eMappingPolicy getGTMappingType() const {return m_eGTMappingType;}
+        //! returns the input/output data packet mapping type policy (used for internal packet auto-transformations)
+        inline eMappingPolicy getIOMappingType() const {return m_eIOMappingType;}
         //! initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
         virtual void startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX);
         //! kills the asynchronyzed precacher, and clears internal buffers
@@ -301,7 +327,7 @@ namespace litiv {
         virtual const cv::Size& getGTMaxSize() const = 0;
     protected:
         //! will automatically apply byte-alignment/scale in packet redirection if using image packets
-        IDataLoader(ePacketPolicy eInputType, eGTMappingPolicy eGTMappingType);
+        IDataLoader(ePacketPolicy eInputType, ePacketPolicy eOutputType, eMappingPolicy eGTMappingType, eMappingPolicy eIOMappingType);
         //! input packet load function, dataset-specific (can return empty mats)
         virtual cv::Mat _getInputPacket_impl(size_t nIdx) = 0;
         //! gt packet load function, dataset-specific (can return empty mats)
@@ -311,8 +337,8 @@ namespace litiv {
         DataPrecacher m_oInputPrecacher,m_oGTPrecacher;
         const cv::Mat& _getInputPacket_redirect(size_t nIdx);
         const cv::Mat& _getGTPacket_redirect(size_t nIdx);
-        const ePacketPolicy m_eInputType;
-        const eGTMappingPolicy m_eGTMappingType;
+        const ePacketPolicy m_eInputType,m_eOutputType;
+        const eMappingPolicy m_eGTMappingType,m_eIOMappingType;
     };
 
     //! data producer interface for work batch that must be specialized based on source type (wraps data loader interface)
@@ -336,7 +362,7 @@ namespace litiv {
         virtual const cv::Size& getFrameOrigSize() const {return m_oOrigSize;}
 
     protected:
-        IDataProducer_(eGTMappingPolicy eGTMappingType);
+        IDataProducer_(ePacketPolicy eOutputType, eMappingPolicy eGTMappingType, eMappingPolicy eIOMappingType);
         virtual size_t getTotPackets() const override;
         virtual bool isInputTransposed(size_t nPacketIdx) const override final;
         virtual bool isGTTransposed(size_t nPacketIdx) const override;
@@ -398,7 +424,7 @@ namespace litiv {
         virtual std::string getPacketName(size_t nPacketIdx) const override;
 
     protected:
-        IDataProducer_(eGTMappingPolicy eGTMappingType);
+        IDataProducer_(ePacketPolicy eOutputType, eMappingPolicy eGTMappingType, eMappingPolicy eIOMappingType);
         virtual size_t getTotPackets() const override;
         virtual cv::Mat _getInputPacket_impl(size_t nIdx) override;
         virtual cv::Mat _getGTPacket_impl(size_t nIdx) override;
@@ -416,7 +442,7 @@ namespace litiv {
     //! data producer interface specialization default constructor override for cleaner implementations
     template<eDatasetTaskList eDatasetTask, eDatasetSourceList eDatasetSource>
     struct DataProducer_c : public IDataProducer_<eDatasetSource> {
-        DataProducer_c() : IDataProducer_<eDatasetSource>(litiv::getGTMappingType<eDatasetTask>()) {}
+        DataProducer_c() : IDataProducer_<eDatasetSource>(litiv::getOutputPacketType<eDatasetTask>(),litiv::getGTMappingType<eDatasetTask>(),litiv::getIOMappingType<eDatasetTask>()) {}
     };
 
     //! default data producer interface specialization (will attempt to load data using predefined functions)
