@@ -37,7 +37,7 @@ void EdgeDetectorCanny::apply_threshold(cv::InputArray _oInputImage, cv::OutputA
     }
     _oEdgeMask.create(oInputImg.size(),CV_8UC1);
     cv::Mat oEdgeMask = _oEdgeMask.getMat();
-    if(dThreshold<0||dThreshold>1)
+    if(dThreshold<0)
         dThreshold = getDefaultThreshold();
     static const int nWindowSize = EDGCANNY_SOBEL_KERNEL_SIZE;
     static const bool bUseL2Gradient = EDGCANNY_USE_L2_GRADIENT_NORM;
@@ -53,7 +53,7 @@ void EdgeDetectorCanny::apply(cv::InputArray _oInputImage, cv::OutputArray _oEdg
     oEdgeMask = cv::Scalar_<uchar>(0);
     cv::Mat oTempEdgeMask = oEdgeMask.clone();
     for(size_t nCurrThreshold=0; nCurrThreshold<UCHAR_MAX; ++nCurrThreshold) {
-        apply_threshold(oInputImg,oTempEdgeMask,double(nCurrThreshold)/UCHAR_MAX);
+        apply_threshold(oInputImg,oTempEdgeMask,double(nCurrThreshold));
         oEdgeMask += oTempEdgeMask/UCHAR_MAX;
     }
     cv::normalize(oEdgeMask,oEdgeMask,0,UCHAR_MAX,cv::NORM_MINMAX);
