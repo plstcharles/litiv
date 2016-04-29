@@ -20,7 +20,7 @@
 std::string PlatformUtils::GetCurrentWorkDirPath() {
     static std::array<char,FILENAME_MAX> s_acCurrentPath = {};
 #if defined(_MSC_VER)
-    if(!_getcwd(s_acCurrentPath.data(),s_acCurrentPath.size()-1))
+    if(!_getcwd(s_acCurrentPath.data(),int(s_acCurrentPath.size()-1)))
 #else //(!defined(_MSC_VER))
     if(!getcwd(s_acCurrentPath.data(),s_acCurrentPath.size()-1))
 #endif //(!defined(_MSC_VER))
