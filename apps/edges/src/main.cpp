@@ -88,7 +88,7 @@
 #error "Dataset root path should have been specified in CMake."
 #endif //ndef(DATASET_ROOT)
 #ifndef DATASET_ID
-#define DATASET_ID eDataset_ImageEdgDet_Custom
+#define DATASET_ID eDataset_Custom
 #define DATASET_PARAMS \
     "@@@@",                                                      /* => const std::string& sDatasetName */ \
     "@@@@",                                                      /* => const std::string& sDatasetDirName */ \
