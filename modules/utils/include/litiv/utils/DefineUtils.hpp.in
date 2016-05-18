@@ -15,7 +15,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// NOTE: no includes in this file!
+// NOTE:
+// CMake parses this file and automatically fills in the missing values;
+// you should never modify it directly via "DefineUtils.hpp", but rather
+// via "DefineUtils.hpp.in". Besides, keep includes out of here!
 
 #pragma once
 
@@ -129,3 +132,5 @@
 #ifndef USE_BSDS500_BENCHMARK
 #define USE_BSDS500_BENCHMARK     @USE_BSDS500_BENCHMARK@
 #endif //USE_BSDS500_BENCHMARK
+
+#define PRECACHE_MAX_SIZE_GB      @DATASETS_CACHE_SIZE@LLU

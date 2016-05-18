@@ -122,6 +122,12 @@ try_cvhardwaresupport_runcheck_and_set_success(AVX ON)
 try_cvhardwaresupport_runcheck_and_set_success(AVX2 OFF)
 
 option(USE_FAST_MATH "Enable fast math optimizations" OFF)
+if(CMAKE_SIZEOF_VOID_P EQUAL 8) # 64-bit toolchain/platform
+    set(DATASETS_CACHE_SIZE 6 CACHE STRING "Cache size to be used for dataset preloading, if needed (in GB)")
+else() # (likely) 32-bit toolchain/platform
+    set(DATASETS_CACHE_SIZE 1 CACHE STRING "Cache size to be used for dataset preloading, if needed (in GB)")
+endif()
+mark_as_advanced(DATASETS_CACHE_SIZE)
 if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang"))
     if(NOT CMAKE_CROSSCOMPILING)
         add_definitions(-march=native)

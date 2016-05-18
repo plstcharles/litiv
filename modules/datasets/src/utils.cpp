@@ -22,11 +22,10 @@
 #define PRECACHE_REQUEST_TIMEOUT_MS        1
 #define PRECACHE_QUERY_TIMEOUT_MS          10
 #define PRECACHE_PREFILL_TIMEOUT_MS        5000
-#define PRECACHE_MAX_CACHE_SIZE_GB         6LLU
-#define PRECACHE_MAX_CACHE_SIZE            (((PRECACHE_MAX_CACHE_SIZE_GB*1024)*1024)*1024)
-#if (!(defined(_M_X64) || defined(__amd64__)) && PRECACHE_MAX_CACHE_SIZE_GB>2)
+#if (!(defined(_M_X64) || defined(__amd64__)) && PRECACHE_MAX_SIZE_GB>2)
 #error "Cache max size exceeds system limit (x86)."
-#endif //(!(defined(_M_X64) || defined(__amd64__)) && PRECACHE_MAX_CACHE_SIZE_GB>2)
+#endif //(!(defined(_M_X64) || defined(__amd64__)) && PRECACHE_MAX_SIZE_GB>2)
+#define PRECACHE_MAX_CACHE_SIZE size_t(((PRECACHE_MAX_SIZE_GB*1024)*1024)*1024)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
