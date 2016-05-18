@@ -16,10 +16,7 @@
 # limitations under the License.
 
 project(vidreg)
-
-include_directories(${litiv_video_INCLUDE_DIR} ${litiv_features2d_INCLUDE_DIR} ${litiv_utils_INCLUDE_DIR})
-
 add_executable(vidreg src/main.cpp)
-
 target_link_libraries(vidreg litiv_world)
 set_target_properties(vidreg PROPERTIES FOLDER "apps")
+install(TARGETS vidreg RUNTIME DESTINATION bin COMPONENT apps)

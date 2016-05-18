@@ -16,9 +16,7 @@
 # limitations under the License.
 
 project(camshift)
-
 add_executable(camshift src/main.cpp)
-
 target_link_libraries(camshift ${VPTZ_LINK_LIBS})
-
 set_target_properties(camshift PROPERTIES FOLDER "apps/vptz")
+install(TARGETS camshift RUNTIME DESTINATION bin COMPONENT apps)

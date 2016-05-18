@@ -36,7 +36,7 @@ if(WIN32)
         $ENV{USER_DEVELOP}/glew/ $ENV{USER_DEVELOP}/glew/build/
         $ENV{USER_DEVELOP}/glm/ $ENV{USER_DEVELOP}/glm/build/
     )
-    set(CMAKE_INSTALL_PREFIX "C:/litiv" CACHE STRING "Install path prefix, prepended onto install directories (optional)")
+    set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/install CACHE STRING "Install path prefix, prepended onto install directories (optional)")
 else(NOT WIN32)
     set(CMAKE_INSTALL_PREFIX "/usr/local/" CACHE STRING "Install path prefix, prepended onto install directories (optional)")
 endif()

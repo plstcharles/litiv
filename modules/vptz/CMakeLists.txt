@@ -75,7 +75,21 @@ if(BUILD_VPTZ)
         INTERFACE "$<INSTALL_INTERFACE:include/>"
     )
     set_target_properties(${LITIV_CURRENT_PROJECT_NAME} PROPERTIES FOLDER "modules")
-    #install(TARGETS ${LITIV_CURRENT_PROJECT_NAME} DESTINATION lib)
-    install(FILES ${INCLUDE_FILES} DESTINATION include)
+
+    install(TARGETS ${LITIV_CURRENT_PROJECT_NAME}
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        COMPONENT modules
+    )
+    install(DIRECTORY "include/"
+        DESTINATION "include/"
+        COMPONENT modules
+        FILES_MATCHING PATTERN "*.hpp"
+    )
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/StandaloneUtils.hpp"
+        DESTINATION "include/litiv/vptz/"
+        COMPONENT modules
+    )
 
 endif(BUILD_VPTZ)

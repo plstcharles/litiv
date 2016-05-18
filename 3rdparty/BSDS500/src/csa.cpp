@@ -1,5 +1,5 @@
 
-#include "3rdparty/BSDS500/csa.hpp"
+#include "litiv/3rdparty/BSDS500/csa.hpp"
 
 using namespace BSDS500;
 

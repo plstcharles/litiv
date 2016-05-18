@@ -44,9 +44,9 @@
 #ifdef _MSC_VER
 #pragma warning(push,0)
 #endif //defined(_MSC_VER)
-#include "3rdparty/BSDS500/csa.hpp"
-#include "3rdparty/BSDS500/kofn.hpp"
-#include "3rdparty/BSDS500/match.hpp"
+#include "litiv/3rdparty/BSDS500/csa.hpp"
+#include "litiv/3rdparty/BSDS500/kofn.hpp"
+#include "litiv/3rdparty/BSDS500/match.hpp"
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif //defined(_MSC_VER)

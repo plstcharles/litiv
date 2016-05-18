@@ -22,7 +22,7 @@ set(CMAKE_CONFIGURABLE_FILE_CONTENT "#pragma once\n")
 foreach(l ${litiv_modules})
     set(CMAKE_CONFIGURABLE_FILE_CONTENT "${CMAKE_CONFIGURABLE_FILE_CONTENT}\n#include \"litiv/${l}.hpp\"")
 endforeach(l ${${litiv_modules}})
-set(CMAKE_CONFIGURABLE_FILE_CONTENT "${CMAKE_CONFIGURABLE_FILE_CONTENT}\n")
+set(CMAKE_CONFIGURABLE_FILE_CONTENT "${CMAKE_CONFIGURABLE_FILE_CONTENT}")
 configure_file(
     "${CMAKE_ROOT}/Modules/CMakeConfigurableFile.in"
     "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/litiv_modules.hpp"
@@ -49,5 +49,19 @@ target_include_directories(litiv_world
     INTERFACE "$<INSTALL_INTERFACE:include/>"
 )
 set_target_properties(litiv_world PROPERTIES FOLDER "modules")
-install(TARGETS litiv_world DESTINATION lib)
-install(FILES ${INCLUDE_FILES} DESTINATION include)
+
+install(TARGETS litiv_world
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    COMPONENT modules
+)
+install(DIRECTORY "include/"
+    DESTINATION "include/"
+    COMPONENT modules
+    FILES_MATCHING PATTERN "*.hpp"
+)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/litiv_modules.hpp"
+    DESTINATION "include/litiv/"
+    COMPONENT modules
+)

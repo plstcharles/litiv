@@ -95,9 +95,9 @@ if(DOXYGEN_FOUND)
                 ${CMAKE_CURRENT_BINARY_DIR}/doxygen/html
                 ${CMAKE_CURRENT_BINARY_DIR}/doxygen/latex
             DESTINATION
-                share
+                share/doc/litiv/
             COMPONENT
-                "docs"
+                docs
             OPTIONAL
         )
     endif()

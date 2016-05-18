@@ -23,11 +23,11 @@ add_files(SOURCE_FILES
 )
 
 add_files(INCLUDE_FILES
-    "include/3rdparty/BSDS500/csa.hpp"
-    "include/3rdparty/BSDS500/csa_defs.hpp"
-    "include/3rdparty/BSDS500/csa_types.hpp"
-    "include/3rdparty/BSDS500/kofn.hpp"
-    "include/3rdparty/BSDS500/match.hpp"
+    "include/litiv/3rdparty/BSDS500/csa.hpp"
+    "include/litiv/3rdparty/BSDS500/csa_defs.hpp"
+    "include/litiv/3rdparty/BSDS500/csa_types.hpp"
+    "include/litiv/3rdparty/BSDS500/kofn.hpp"
+    "include/litiv/3rdparty/BSDS500/match.hpp"
 )
 
 add_library(BSDS500 STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
@@ -38,5 +38,15 @@ target_include_directories(BSDS500
     INTERFACE "$<INSTALL_INTERFACE:include/>"
 )
 set_target_properties(BSDS500 PROPERTIES FOLDER "3rdparty")
-#install(TARGETS BSDS500 DESTINATION lib)
-install(FILES ${INCLUDE_FILES} DESTINATION include)
+
+install(TARGETS BSDS500
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    COMPONENT 3rdparty
+)
+install(DIRECTORY "include/"
+    DESTINATION "include/"
+    COMPONENT 3rdparty
+    FILES_MATCHING PATTERN "*.hpp"
+)

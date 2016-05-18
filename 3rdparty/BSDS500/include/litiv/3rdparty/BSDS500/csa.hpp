@@ -25,8 +25,8 @@
 
 namespace BSDS500 {
 
-#include "3rdparty/BSDS500/csa_types.hpp"
-#include "3rdparty/BSDS500/csa_defs.hpp"
+#include "litiv/3rdparty/BSDS500/csa_types.hpp"
+#include "litiv/3rdparty/BSDS500/csa_defs.hpp"
 
     class CSA
     {

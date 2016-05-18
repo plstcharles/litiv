@@ -1,5 +1,5 @@
 
-#include "3rdparty/BSDS500/kofn.hpp"
+#include "litiv/3rdparty/BSDS500/kofn.hpp"
 #include <random>
 #include <chrono>
 #include <cassert>

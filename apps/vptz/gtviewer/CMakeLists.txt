@@ -16,9 +16,7 @@
 # limitations under the License.
 
 project(gtviewer)
-
 add_executable(gtviewer src/main.cpp)
-
 target_link_libraries(gtviewer ${VPTZ_LINK_LIBS})
-
 set_target_properties(gtviewer PROPERTIES FOLDER "apps/vptz")
+install(TARGETS gtviewer RUNTIME DESTINATION bin COMPONENT apps)
