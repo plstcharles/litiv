@@ -333,15 +333,15 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
     while(pauHystStack_top>pauHystStack_bottom) {
         stack_check_size(8);
         uchar* pEdgeAddr = stack_pop();
-        if(!pEdgeAddr[-1*nEdgeMapColStep])
+        if(!pEdgeAddr[-intptr_t(nEdgeMapColStep)])
             stack_push(pEdgeAddr-nEdgeMapColStep);
         if(!pEdgeAddr[nEdgeMapColStep])
             stack_push(pEdgeAddr+nEdgeMapColStep);
-        if(!pEdgeAddr[-1*nEdgeMapRowStep-nEdgeMapColStep])
+        if(!pEdgeAddr[-intptr_t(nEdgeMapRowStep)-nEdgeMapColStep])
             stack_push(pEdgeAddr-nEdgeMapRowStep-nEdgeMapColStep);
-        if(!pEdgeAddr[-1*nEdgeMapRowStep])
+        if(!pEdgeAddr[-intptr_t(nEdgeMapRowStep)])
             stack_push(pEdgeAddr-nEdgeMapRowStep);
-        if(!pEdgeAddr[-1*nEdgeMapRowStep+nEdgeMapColStep])
+        if(!pEdgeAddr[-intptr_t(nEdgeMapRowStep)+nEdgeMapColStep])
             stack_push(pEdgeAddr-nEdgeMapRowStep+nEdgeMapColStep);
         if(!pEdgeAddr[nEdgeMapRowStep-nEdgeMapColStep])
             stack_push(pEdgeAddr+nEdgeMapRowStep-nEdgeMapColStep);
