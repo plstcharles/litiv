@@ -258,7 +258,6 @@ namespace DistanceUtils {
     template<size_t nChannels, typename T>
     static inline typename std::enable_if<std::is_integral<T>::value,size_t>::type cdist(const T* const curr, const T* const bg) {
         static_assert(nChannels>1,"vectors should have more than one channel");
-        static_assert(sizeof(size_t)>=8,"cdist: cannot be used with 32 bit integers, might integer overflow");
         bool bNonConstDist = false;
         bool bNonNullDist = (curr[0]!=bg[0]);
         bool bNonNullBG = (bg[0]>0);
@@ -275,13 +274,13 @@ namespace DistanceUtils {
                 nulldist += curr[c];
             return nulldist;
         }
-        size_t curr_sqr = 0;
-        size_t bg_sqr = 0;
-        size_t mix = 0;
+        uint64_t curr_sqr = 0;
+        uint64_t bg_sqr = 0;
+        uint64_t mix = 0;
         for(size_t c=0; c<nChannels; ++c) {
-            curr_sqr += curr[c]*curr[c];
-            bg_sqr += bg[c]*bg[c];
-            mix += curr[c]*bg[c];
+            curr_sqr += uint64_t(curr[c]*curr[c]);
+            bg_sqr += uint64_t(bg[c]*bg[c]);
+            mix += uint64_t(curr[c]*bg[c]);
         }
         return (size_t)sqrt((float)(curr_sqr-(mix*mix)/bg_sqr));
     }
