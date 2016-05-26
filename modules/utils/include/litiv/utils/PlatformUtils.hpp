@@ -42,8 +42,12 @@
 #include <inttypes.h>
 #if defined(_MSC_VER)
 #include <windows.h>
+#include <winerror.h>
+#include <comdef.h>
 #include <stdint.h>
 #include <direct.h>
+template<class T>
+void SafeRelease(T **ppT) {if(*ppT) {(*ppT)->Release();*ppT = nullptr;}}
 #else //(!defined(_MSC_VER))
 #include <dirent.h>
 #include <unistd.h>

@@ -75,6 +75,12 @@
 #ifndef __func__
 #define __func__ __FUNCTION__
 #endif //ndefined(__func__)
+#define lvAssertHR(expr) [](HRESULT hr){if(FAILED(hr)) lvErrorExt("HR assertion failed ("#expr" = 0x%x), %ws",hr,_com_error(hr).ErrorMessage());}(expr)
+#ifdef _DEBUG
+#define lvDbgAssertHR(expr) lvAssertHR(expr)
+#else //ndefined(_DEBUG)
+#define lvDbgAssertHR(expr)
+#endif //ndefined(_DEBUG)
 #if _MSC_VER<1900 // need >= MSVC 2015 (v140) toolchain
 #error "This project requires full C++11 support (including constexpr and SFINAE)."
 #endif //_MSC_VER<1900
