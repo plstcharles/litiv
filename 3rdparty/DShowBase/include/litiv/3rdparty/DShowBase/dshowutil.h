@@ -59,6 +59,7 @@
     Graph Building Functions 
     -----------------------
     AddFilterByCLSID
+    AddFilterByName
 	AddFilterFromMoniker
     AddSourceFilter
     AddVMR9Filter
@@ -70,6 +71,7 @@
     FindGraphInterface
     GetNextFilter
     GetConnectedFilter
+    ListFilterNamesByDeviceCategory
     RemoveFilter
     RemoveFiltersDownstream
     RemoveUnconnectedFilters
@@ -1200,6 +1202,60 @@ done:
     return hr;
 }
 
+// @@@ custom function
+inline HRESULT AddFilterByName(
+    IGraphBuilder* pGraph,            // pointer to the filter graph manager
+    const std::string& sFilterName,   // friendly name of the filter to create
+    IBaseFilter** ppF,                // receives a pointer to the filter
+    GUID DEVICE_CLSID,                // the device category in which the filter should be
+    LPCWSTR wszName = NULL            // a name for the filter (can be NULL)
+) {
+    HRESULT hr;
+    ICreateDevEnum* pSysDevEnum;
+    hr = CoCreateInstance(CLSID_SystemDeviceEnum,NULL,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&pSysDevEnum));
+    if(FAILED(hr))
+        return hr;
+    IEnumMoniker* pEnumCat;
+    hr = pSysDevEnum->CreateClassEnumerator(DEVICE_CLSID,&pEnumCat,0);
+    SafeRelease(&pSysDevEnum);
+    if(hr!=S_OK)
+        return hr;
+    IBaseFilter* pFilter = NULL;
+    IMoniker* pMoniker = NULL;
+    ULONG cFetched;
+    bool bFound = false;
+    while(pEnumCat->Next(1,&pMoniker,&cFetched)==S_OK && !bFound) {
+        IPropertyBag *pPropBag;
+        hr = pMoniker->BindToStorage(0,0,IID_PPV_ARGS(&pPropBag));
+        if(SUCCEEDED(hr)) {
+            VARIANT var;
+            var.vt = VT_BSTR;
+            hr = pPropBag->Read(L"FriendlyName",&var,0);
+            SafeRelease(&pPropBag);
+            if(SUCCEEDED(hr)) {
+                const char* acFriendlyNameStr = _com_util::ConvertBSTRToString(var.bstrVal);
+                const std::string sFriendlyNameCopy(acFriendlyNameStr);
+                VariantClear(&var);
+                delete [] acFriendlyNameStr;
+                if(sFilterName==sFriendlyNameCopy) {
+                    hr = pMoniker->BindToObject(0,0,IID_PPV_ARGS(&pFilter));
+                    if(SUCCEEDED(hr))
+                        bFound = true;
+                }
+            }
+        }
+        SafeRelease(&pMoniker);
+    }
+    SafeRelease(&pEnumCat);
+    CHECK_HR(hr);
+    CHECK_HR(hr = pGraph->AddFilter(pFilter, wszName));
+    *ppF = pFilter;
+    (*ppF)->AddRef();
+done:
+    SAFE_RELEASE(pFilter);
+    return hr;
+}
+
 
 ///////////////////////////////////////////////////////////////////////
 // Name: AddFilterFromMoniker
@@ -1721,6 +1777,42 @@ done:
     SAFE_RELEASE(pPeer);
     SAFE_RELEASE(info.pFilter);
     return hr;
+}
+
+// @@@ custom function
+inline std::vector<std::string> ListFilterNamesByDeviceCategory(GUID DEVICE_CLSID) {
+    std::vector<std::string> vsFilterNames;
+    HRESULT hr;
+    ICreateDevEnum *pSysDevEnum;
+    hr = CoCreateInstance(CLSID_SystemDeviceEnum,NULL,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&pSysDevEnum));
+    if(FAILED(hr))
+        return vsFilterNames;
+    IEnumMoniker *pEnumCat;
+    hr = pSysDevEnum->CreateClassEnumerator(DEVICE_CLSID,&pEnumCat,0);
+    SafeRelease(&pSysDevEnum);
+    if(hr==S_OK) {
+        IMoniker *pMoniker;
+        ULONG cFetched;
+        while(pEnumCat->Next(1,&pMoniker,&cFetched)==S_OK) {
+            IPropertyBag *pPropBag;
+            hr = pMoniker->BindToStorage(0,0,IID_PPV_ARGS(&pPropBag));
+            if (SUCCEEDED(hr)) {
+                VARIANT var;
+                var.vt = VT_BSTR;
+                hr = pPropBag->Read(L"FriendlyName",&var,0);
+                SafeRelease(&pPropBag);
+                if(SUCCEEDED(hr)) {
+                    const char* acFriendlyNameStr = _com_util::ConvertBSTRToString(var.bstrVal);
+                    vsFilterNames.push_back(std::string(acFriendlyNameStr));
+                    VariantClear(&var);
+                    delete [] acFriendlyNameStr;
+                }
+            }
+            SafeRelease(&pMoniker);
+        }
+        SafeRelease(&pEnumCat);
+    }
+    return vsFilterNames;
 }
 
 ///////////////////////////////////////////////////////////////////////
