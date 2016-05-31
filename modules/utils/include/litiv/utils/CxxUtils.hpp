@@ -166,6 +166,15 @@ namespace CxxUtils {
     };
 #endif //(!def(_MSC_VER))
 
+    template<int... anIndices>
+    struct MetaIdxConcat {};
+
+    template<int N, int... anIndices>
+    struct MetaIdxConcatenator : MetaIdxConcatenator<N - 1, N - 1, anIndices...> {};
+
+    template<int... anIndices>
+    struct MetaIdxConcatenator<0, anIndices...> : MetaIdxConcat<anIndices...> {};
+
     struct UncaughtExceptionLogger {
         UncaughtExceptionLogger(const char* sFunc, const char* sFile, int nLine) :
                 m_sMsg(cv::format("Unwinding at function '%s' from %s(%d) due to uncaught exception\n",sFunc,sFile,nLine)) {}
@@ -253,6 +262,46 @@ namespace CxxUtils {
         inline std::shared_ptr<Tcast> shared_from_this_cast(bool bThrowIfFail=false) {
             return std::const_pointer_cast<Tcast>(static_cast<const T*>(this)->shared_from_this_cast<Tcast>(bThrowIfFail));
         }
+    };
+
+    template<typename Ttuple, typename Tfunc, int... anIndices>
+    void for_each(Ttuple&& t, Tfunc f, MetaIdxConcat<anIndices...>) {
+        auto l = { (f(std::get<anIndices>(t)),0)... };
+    }
+
+    template<typename... Ttupletypes, typename Tfunc>
+    void for_each_in_tuple(const std::tuple<Ttupletypes...>& t, Tfunc f) {
+        for_each(t, f, MetaIdxConcatenator<sizeof...(Ttupletypes)>());
+    }
+
+    template<typename... Tmutexes>
+    struct unlock_guard {
+        explicit unlock_guard(Tmutexes&... aMutexes) noexcept :
+                m_aMutexes(aMutexes...) {
+            for_each_in_tuple(m_aMutexes,[](auto& oMutex) noexcept {oMutex.unlock();});
+        }
+        ~unlock_guard() {
+            std::lock(m_aMutexes...);
+        }
+        unlock_guard(const unlock_guard&) = delete;
+        unlock_guard& operator=(const unlock_guard&) = delete;
+    private:
+        std::tuple<Tmutexes&...> m_aMutexes;
+    };
+
+    template<typename Tmutex>
+    struct unlock_guard<Tmutex> {
+        explicit unlock_guard(Tmutex& oMutex) noexcept :
+                m_oMutex(oMutex) {
+            m_oMutex.unlock();
+        }
+        ~unlock_guard() {
+            m_oMutex.lock();
+        }
+        unlock_guard(const unlock_guard&) = delete;
+        unlock_guard& operator=(const unlock_guard&) = delete;
+    private:
+        Tmutex& m_oMutex;
     };
 
 } //namespace CxxUtils
