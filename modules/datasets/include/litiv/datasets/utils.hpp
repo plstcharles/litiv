@@ -478,11 +478,41 @@ namespace litiv {
         virtual size_t getProcessedPacketsCount() const override final;
     };
 
+    //! general-purpose data packet writer, fully implemented (i.e. can be used stand-alone)
+    struct DataWriter {
+        //! attaches to data archiver (the callback is the actual 'writing' action, with a signature similar to 'queue')
+        DataWriter(std::function<size_t(const cv::Mat&,size_t)> lDataArchiverCallback);
+        //! default destructor (joins the writing thread, if still running)
+        ~DataWriter();
+        //! queues a packet, with or without async writing enabled, and returns its position in queue
+        size_t queue(const cv::Mat& oPacket, size_t nIdx);
+        //! returns the current queue size, in packets
+        inline size_t getCurrentQueueCount() const {return m_nQueueCount;}
+        //! returns the current queue size, in bytes
+        inline size_t getCurrentQueueSize() const {return m_nQueueSize;}
+        //! initializes async writing with a given queue size (in bytes) and a number of threads
+        bool startAsyncWriting(size_t nSuggestedQueueSize, size_t nWorkers=1);
+        //! joins writing thread and clears all internal buffers
+        void stopAsyncWriting();
+    private:
+        void entry(const size_t nMaxQueueSize);
+        const std::function<size_t(const cv::Mat&,size_t)> m_lCallback;
+        std::vector<std::thread> m_vhWorkers;
+        std::mutex m_oSyncMutex;
+        std::condition_variable m_oQueueCondVar;
+        std::map<size_t,cv::Mat> m_mQueue;
+        std::atomic_bool m_bIsActive;
+        std::atomic_size_t m_nQueueSize;
+        std::atomic_size_t m_nQueueCount;
+        DataWriter& operator=(const DataWriter&) = delete;
+        DataWriter(const DataWriter&) = delete;
+    };
+
     //! data archiver interface for work batches for processed packet saving/loading from disk
     struct IDataArchiver : public virtual IDataHandler {
     protected:
         //! saves a processed data packet locally based on idx and packet name (if available)
-        virtual void save(const cv::Mat& oOutput, size_t nIdx) const;
+        virtual size_t save(const cv::Mat& oOutput, size_t nIdx) const;
         //! loads a processed data packet based on idx and packet name (if available)
         virtual cv::Mat load(size_t nIdx) const;
     };

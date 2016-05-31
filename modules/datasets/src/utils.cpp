@@ -582,7 +582,91 @@ size_t litiv::DataCounter_<litiv::eGroup>::getProcessedPacketsCount() const {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void litiv::IDataArchiver::save(const cv::Mat& oOutput, size_t nIdx) const {
+litiv::DataWriter::DataWriter(std::function<size_t(const cv::Mat&,size_t)> lDataArchiverCallback) :
+        m_lCallback(lDataArchiverCallback) {
+    CV_Assert(m_lCallback);
+    m_bIsActive = false;
+    m_nQueueSize = 0;
+    m_nQueueCount = 0;
+}
+
+litiv::DataWriter::~DataWriter() {
+    stopAsyncWriting();
+}
+
+size_t litiv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
+    if(!m_bIsActive)
+        return m_lCallback(oPacket,nIdx);
+    cv::Mat oPacketCopy = oPacket.clone();
+    const size_t nPacketSize = oPacket.total()*oPacket.elemSize();
+    size_t nPacketPosition;
+    {
+        std::unique_lock<std::mutex> sync_lock(m_oSyncMutex);
+        // @@@ could cut a find operation here using C++17's map::insert_or_assign
+        m_mQueue[nIdx] = std::move(oPacketCopy);
+        m_nQueueSize += nPacketSize;
+        nPacketPosition = std::distance(m_mQueue.begin(),m_mQueue.find(nIdx));
+        ++m_nQueueCount;
+    }
+    m_oQueueCondVar.notify_one();
+    return nPacketPosition;
+}
+
+bool litiv::DataWriter::startAsyncWriting(size_t nSuggestedQueueSize, size_t nWorkers) {
+    if(m_bIsActive)
+        stopAsyncWriting();
+    if(nSuggestedQueueSize>0) {
+        m_bIsActive = true;
+        m_nQueueSize = 0;
+        m_nQueueCount = 0;
+        m_mQueue.clear();
+        for(size_t n=0; n<nWorkers; ++n)
+            m_vhWorkers.emplace_back(std::bind(&DataWriter::entry,this,(nSuggestedQueueSize>CACHE_MAX_SIZE)?(CACHE_MAX_SIZE):nSuggestedQueueSize));
+    }
+    return m_bIsActive;
+}
+
+void litiv::DataWriter::stopAsyncWriting() {
+    if(m_bIsActive) {
+        m_bIsActive = false;
+        m_oQueueCondVar.notify_all();
+        for(std::thread& oWorker : m_vhWorkers)
+            oWorker.join();
+    }
+}
+
+void litiv::DataWriter::entry(const size_t nMaxQueueSize) {
+    std::unique_lock<std::mutex> sync_lock(m_oSyncMutex);
+#if CONSOLE_DEBUG
+    std::cout << " @ initializing writing with max buffer size = " << (nMaxQueueSize/1024)/1024 << " mb" << std::endl;
+#endif //CONSOLE_DEBUG
+    while(m_bIsActive || m_nQueueCount>0) {
+        if(m_nQueueCount==0)
+            m_oQueueCondVar.wait(sync_lock);
+        if(m_nQueueCount>0) {
+            cv::Mat oPacketData;
+            size_t nPacketIdx;
+            do {
+                auto pCurrPacket = m_mQueue.begin();
+                oPacketData = std::move(pCurrPacket->second);
+                nPacketIdx = pCurrPacket->first;
+                const size_t nPacketSize = oPacketData.total()*oPacketData.elemSize();
+                lvDbgAssert(nPacketSize<m_nQueueSize);
+                m_nQueueSize -= nPacketSize;
+                m_mQueue.erase(pCurrPacket);
+                --m_nQueueCount;
+            } while(m_nQueueSize>=nMaxQueueSize);
+            CxxUtils::unlock_guard<std::unique_lock<std::mutex>> oUnlock(sync_lock);
+            m_lCallback(oPacketData,nPacketIdx);
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+size_t litiv::IDataArchiver::save(const cv::Mat& oOutput, size_t nIdx) const {
     CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
     std::stringstream sOutputFilePath;
     sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << getPacketName(nIdx) << getDatasetInfo()->getOutputNameSuffix();
@@ -603,6 +687,7 @@ void litiv::IDataArchiver::save(const cv::Mat& oOutput, size_t nIdx) const {
         // @@@@ save to YML
         lvError("Missing impl");
     }
+    return 0;
 }
 
 cv::Mat litiv::IDataArchiver::load(size_t nIdx) const {
