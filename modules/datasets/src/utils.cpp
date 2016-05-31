@@ -18,14 +18,14 @@
 #include "litiv/datasets/utils.hpp"
 
 #define HARDCODE_IMAGE_PACKET_INDEX        0 // for sync debug only! will corrupt data for non-image packets
-#define PRECACHE_CONSOLE_DEBUG             0
+#define CONSOLE_DEBUG                      0
 #define PRECACHE_REQUEST_TIMEOUT_MS        1
 #define PRECACHE_QUERY_TIMEOUT_MS          10
 #define PRECACHE_PREFILL_TIMEOUT_MS        5000
-#if (!(defined(_M_X64) || defined(__amd64__)) && PRECACHE_MAX_SIZE_GB>2)
+#if (!(defined(_M_X64) || defined(__amd64__)) && CACHE_MAX_SIZE_GB>2)
 #error "Cache max size exceeds system limit (x86)."
-#endif //(!(defined(_M_X64) || defined(__amd64__)) && PRECACHE_MAX_SIZE_GB>2)
-#define PRECACHE_MAX_CACHE_SIZE size_t(((PRECACHE_MAX_SIZE_GB*1024)*1024)*1024)
+#endif //(!(defined(_M_X64) || defined(__amd64__)) && CACHE_MAX_SIZE_GB>2)
+#define CACHE_MAX_SIZE size_t(((CACHE_MAX_SIZE_GB*1024)*1024)*1024)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,18 +60,18 @@ std::string litiv::IDataHandler::getPacketName(size_t nPacketIdx) const {
 litiv::DataPrecacher::DataPrecacher(std::function<const cv::Mat&(size_t)> lDataLoaderCallback) :
         m_lCallback(lDataLoaderCallback) {
     CV_Assert(m_lCallback);
-    m_bIsPrecaching = false;
+    m_bIsActive = false;
     m_nReqIdx = m_nLastReqIdx = size_t(-1);
 }
 
 litiv::DataPrecacher::~DataPrecacher() {
-    stopPrecaching();
+    stopAsyncPrecaching();
 }
 
 const cv::Mat& litiv::DataPrecacher::getPacket(size_t nIdx) {
     if(nIdx==m_nLastReqIdx)
         return m_oLastReqPacket;
-    else if(!m_bIsPrecaching) {
+    else if(!m_bIsActive) {
         m_oLastReqPacket = m_lCallback(nIdx);
         m_nLastReqIdx = nIdx;
         return m_oLastReqPacket;
@@ -82,39 +82,38 @@ const cv::Mat& litiv::DataPrecacher::getPacket(size_t nIdx) {
     do {
         m_oReqCondVar.notify_one();
         res = m_oSyncCondVar.wait_for(sync_lock,std::chrono::milliseconds(PRECACHE_REQUEST_TIMEOUT_MS));
-#if PRECACHE_CONSOLE_DEBUG
+#if CONSOLE_DEBUG
         if(res==std::cv_status::timeout)
             std::cout << " # retrying request..." << std::endl;
-#endif //PRECACHE_CONSOLE_DEBUG
+#endif //CONSOLE_DEBUG
     } while(res==std::cv_status::timeout);
     m_oLastReqPacket = m_oReqPacket;
     m_nLastReqIdx = nIdx;
     return m_oLastReqPacket;
 }
 
-bool litiv::DataPrecacher::startPrecaching(size_t nSuggestedBufferSize) {
+bool litiv::DataPrecacher::startAsyncPrecaching(size_t nSuggestedBufferSize) {
     static_assert(PRECACHE_REQUEST_TIMEOUT_MS>0,"Precache request timeout must be a positive value");
     static_assert(PRECACHE_QUERY_TIMEOUT_MS>0,"Precache query timeout must be a positive value");
     static_assert(PRECACHE_PREFILL_TIMEOUT_MS>0,"Precache prefill timeout must be a positive value");
-    static_assert(PRECACHE_MAX_CACHE_SIZE>=(size_t)0,"Precache size must be a non-negative value");
-    if(m_bIsPrecaching)
-        stopPrecaching();
+    if(m_bIsActive)
+        stopAsyncPrecaching();
     if(nSuggestedBufferSize>0) {
-        m_bIsPrecaching = true;
+        m_bIsActive = true;
         m_nReqIdx = size_t(-1);
-        m_hPrecacher = std::thread(&DataPrecacher::precache,this,(nSuggestedBufferSize>PRECACHE_MAX_CACHE_SIZE)?(PRECACHE_MAX_CACHE_SIZE):nSuggestedBufferSize);
+        m_hWorker = std::thread(&DataPrecacher::entry,this,(nSuggestedBufferSize>CACHE_MAX_SIZE)?(CACHE_MAX_SIZE):nSuggestedBufferSize);
     }
-    return m_bIsPrecaching;
+    return m_bIsActive;
 }
 
-void litiv::DataPrecacher::stopPrecaching() {
-    if(m_bIsPrecaching) {
-        m_bIsPrecaching = false;
-        m_hPrecacher.join();
+void litiv::DataPrecacher::stopAsyncPrecaching() {
+    if(m_bIsActive) {
+        m_bIsActive = false;
+        m_hWorker.join();
     }
 }
 
-void litiv::DataPrecacher::precache(size_t nBufferSize) {
+void litiv::DataPrecacher::entry(const size_t nBufferSize) {
     std::unique_lock<std::mutex> sync_lock(m_oSyncMutex);
     std::queue<cv::Mat> qoCache;
     std::vector<uchar> vcBuffer(nBufferSize);
@@ -122,9 +121,9 @@ void litiv::DataPrecacher::precache(size_t nBufferSize) {
     size_t nNextPrecacheIdx = 0;
     size_t nFirstBufferIdx = 0;
     size_t nNextBufferIdx = 0;
-#if PRECACHE_CONSOLE_DEBUG
+#if CONSOLE_DEBUG
     std::cout << " @ initializing precaching with buffer size = " << (nBufferSize/1024)/1024 << " mb" << std::endl;
-#endif //PRECACHE_CONSOLE_DEBUG
+#endif //CONSOLE_DEBUG
     const std::chrono::time_point<std::chrono::high_resolution_clock> nPrefillTick = std::chrono::high_resolution_clock::now();
     while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nPrefillTick).count()<PRECACHE_PREFILL_TIMEOUT_MS) {
         const cv::Mat& oNextPacket = m_lCallback(nNextPrecacheIdx);
@@ -138,14 +137,14 @@ void litiv::DataPrecacher::precache(size_t nBufferSize) {
         }
         else break;
     }
-    while(m_bIsPrecaching) {
+    while(m_bIsActive) {
         if(m_oReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(PRECACHE_QUERY_TIMEOUT_MS))!=std::cv_status::timeout) {
             if(m_nReqIdx!=nNextExpectedReqIdx-1) {
                 if(!qoCache.empty()) {
                     if(m_nReqIdx<nNextPrecacheIdx && m_nReqIdx>=nNextExpectedReqIdx) {
-//#if PRECACHE_CONSOLE_DEBUG
+//#if CONSOLE_DEBUG
 //                        std::cout << " -- popping " << m_nReqIdx-nNextExpectedReqIdx+1 << " Packet(s) from cache" << std::endl;
-//#endif //PRECACHE_CONSOLE_DEBUG
+//#endif //CONSOLE_DEBUG
                         while(m_nReqIdx-nNextExpectedReqIdx+1>0) {
                             m_oReqPacket = qoCache.front();
                             nFirstBufferIdx = (size_t)(m_oReqPacket.data-vcBuffer.data());
@@ -154,9 +153,9 @@ void litiv::DataPrecacher::precache(size_t nBufferSize) {
                         }
                     }
                     else {
-#if PRECACHE_CONSOLE_DEBUG
+#if CONSOLE_DEBUG
                         std::cout << " -- out-of-order request, destroying cache" << std::endl;
-#endif //PRECACHE_CONSOLE_DEBUG
+#endif //CONSOLE_DEBUG
                         qoCache = std::queue<cv::Mat>();
                         m_oReqPacket = m_lCallback(m_nReqIdx);
                         nFirstBufferIdx = nNextBufferIdx = size_t(-1);
@@ -164,26 +163,26 @@ void litiv::DataPrecacher::precache(size_t nBufferSize) {
                     }
                 }
                 else {
-#if PRECACHE_CONSOLE_DEBUG
+#if CONSOLE_DEBUG
                     std::cout << " @ answering request manually, precaching is falling behind" << std::endl;
-#endif //PRECACHE_CONSOLE_DEBUG
+#endif //CONSOLE_DEBUG
                     m_oReqPacket = m_lCallback(m_nReqIdx);
                     nFirstBufferIdx = nNextBufferIdx = size_t(-1);
                     nNextExpectedReqIdx = nNextPrecacheIdx = m_nReqIdx+1;
                 }
             }
-#if PRECACHE_CONSOLE_DEBUG
+#if CONSOLE_DEBUG
             else
                 std::cout << " @ answering request using last Packet" << std::endl;
-#endif //PRECACHE_CONSOLE_DEBUG
+#endif //CONSOLE_DEBUG
             m_oSyncCondVar.notify_one();
         }
         else {
             size_t nUsedBufferSize = nFirstBufferIdx==size_t(-1)?0:(nFirstBufferIdx<nNextBufferIdx?nNextBufferIdx-nFirstBufferIdx:nBufferSize-nFirstBufferIdx+nNextBufferIdx);
             if(nUsedBufferSize<nBufferSize/4) {
-#if PRECACHE_CONSOLE_DEBUG
+#if CONSOLE_DEBUG
                 std::cout << " @ filling precache buffer... (current size = " << (nUsedBufferSize/1024)/1024 << " mb)" << std::endl;
-#endif //PRECACHE_CONSOLE_DEBUG
+#endif //CONSOLE_DEBUG
                 size_t nFillCount = 0;
                 while(nUsedBufferSize<nBufferSize && nFillCount<10) {
                     const cv::Mat& oNextPacket = m_lCallback(nNextPrecacheIdx);
@@ -228,14 +227,14 @@ void litiv::DataPrecacher::precache(size_t nBufferSize) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void litiv::IDataLoader::startPrecaching(bool bUsingGT, size_t nSuggestedBufferSize) {
-    CV_Assert(m_oInputPrecacher.startPrecaching(nSuggestedBufferSize));
-    CV_Assert(!bUsingGT || m_oGTPrecacher.startPrecaching(nSuggestedBufferSize));
+void litiv::IDataLoader::startAsyncPrecaching(bool bUsingGT, size_t nSuggestedBufferSize) {
+    CV_Assert(m_oInputPrecacher.startAsyncPrecaching(nSuggestedBufferSize));
+    CV_Assert(!bUsingGT || m_oGTPrecacher.startAsyncPrecaching(nSuggestedBufferSize));
 }
 
-void litiv::IDataLoader::stopPrecaching() {
-    m_oInputPrecacher.stopPrecaching();
-    m_oGTPrecacher.stopPrecaching();
+void litiv::IDataLoader::stopAsyncPrecaching() {
+    m_oInputPrecacher.stopAsyncPrecaching();
+    m_oGTPrecacher.stopAsyncPrecaching();
 }
 
 litiv::IDataLoader::IDataLoader(ePacketPolicy eInputType, ePacketPolicy eOutputType, eMappingPolicy eGTMappingType, eMappingPolicy eIOMappingType) :
@@ -299,8 +298,8 @@ double litiv::IDataProducer_<litiv::eDatasetSource_Video>::getExpectedLoad() con
     return m_oROI.empty()?0.0:(double)cv::countNonZero(m_oROI)*m_nFrameCount*(int(!isGrayscale())+1);
 }
 
-void litiv::IDataProducer_<litiv::eDatasetSource_Video>::startPrecaching(bool bUsingGT, size_t /*nUnused*/) {
-    return IDataLoader::startPrecaching(bUsingGT,m_oSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
+void litiv::IDataProducer_<litiv::eDatasetSource_Video>::startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/) {
+    return IDataLoader::startAsyncPrecaching(bUsingGT,m_oSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
 }
 
 litiv::IDataProducer_<litiv::eDatasetSource_Video>::IDataProducer_(ePacketPolicy eOutputType, eMappingPolicy eGTMappingType, eMappingPolicy eIOMappingType) :
@@ -413,8 +412,8 @@ double litiv::IDataProducer_<litiv::eDatasetSource_Image>::getExpectedLoad() con
     return (double)getInputMaxSize().area()*m_nImageCount*(int(!isGrayscale())+1);
 }
 
-void litiv::IDataProducer_<litiv::eDatasetSource_Image>::startPrecaching(bool bUsingGT, size_t /*nUnused*/) {
-    return IDataLoader::startPrecaching(bUsingGT,getInputMaxSize().area()*(m_nImageCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
+void litiv::IDataProducer_<litiv::eDatasetSource_Image>::startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/) {
+    return IDataLoader::startAsyncPrecaching(bUsingGT,getInputMaxSize().area()*(m_nImageCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
 }
 
 bool litiv::IDataProducer_<litiv::eDatasetSource_Image>::isInputConstantSize() const {

@@ -266,21 +266,20 @@ namespace litiv {
         DataPrecacher(std::function<const cv::Mat&(size_t)> lDataLoaderCallback);
         //! default destructor (joins the precaching thread, if still running)
         ~DataPrecacher();
-        //! fetches a packet, with or without precaching enabled -- should never be called concurrently, and packets should never be altered directly
+        //! fetches a packet, with or without precaching enabled (should never be called concurrently, returned packets should never be altered directly, and a single packet loaded twice is assumed identical)
         const cv::Mat& getPacket(size_t nIdx);
         //! initializes precaching with a given buffer size (starts up thread)
-        bool startPrecaching(size_t nSuggestedBufferSize);
+        bool startAsyncPrecaching(size_t nSuggestedBufferSize);
         //! joins precaching thread and clears all internal buffers
-        void stopPrecaching();
+        void stopAsyncPrecaching();
     private:
-        //! precacher entry point
-        void precache(size_t nBufferSize);
+        void entry(const size_t nBufferSize);
         const std::function<const cv::Mat&(size_t)> m_lCallback;
-        std::thread m_hPrecacher;
+        std::thread m_hWorker;
         std::mutex m_oSyncMutex;
         std::condition_variable m_oReqCondVar;
         std::condition_variable m_oSyncCondVar;
-        bool m_bIsPrecaching;
+        std::atomic_bool m_bIsActive;
         size_t m_nReqIdx,m_nLastReqIdx;
         cv::Mat m_oReqPacket,m_oLastReqPacket;
         DataPrecacher& operator=(const DataPrecacher&) = delete;
@@ -298,9 +297,9 @@ namespace litiv {
         //! returns the input/output data packet mapping type policy (used for internal packet auto-transformations)
         inline eMappingPolicy getIOMappingType() const {return m_eIOMappingType;}
         //! initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
-        virtual void startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX);
+        virtual void startAsyncPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX);
         //! kills the asynchronyzed precacher, and clears internal buffers
-        virtual void stopPrecaching();
+        virtual void stopAsyncPrecaching();
         //! returns an input packet by index (with both with and without precaching enabled)
         const cv::Mat& getInput(size_t nPacketIdx) {return m_oInputPrecacher.getPacket(nPacketIdx);}
         //! returns a gt packet by index (with both with and without precaching enabled)
@@ -353,7 +352,7 @@ namespace litiv {
         //! compute the expected CPU load for this data batch based on frame size, frame count, and channel count
         virtual double getExpectedLoad() const override;
         //! initializes frame precaching for this work batch (will try to allocate enough memory for the entire sequence)
-        virtual void startPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
+        virtual void startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
         //! returns the ROI associated with the video sequence (if any)
         virtual const cv::Mat& getROI() const {return m_oROI;}
         //! return the (constant) frame size used in this video sequence, post-transformations
@@ -395,7 +394,7 @@ namespace litiv {
         //! compute the expected CPU load for this data batch based on max image size, image count, and channel count
         virtual double getExpectedLoad() const override;
         //! initializes image precaching for this work batch (will try to allocate enough memory for the entire set)
-        virtual void startPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
+        virtual void startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
         //! returns whether all input images in this batch have the same size
         virtual bool isInputConstantSize() const;
         //! returns whether all input images in this batch have the same size

@@ -106,7 +106,7 @@ namespace litiv {
                     m_dElapsedTime_sec = m_oStopWatch.tock();
                     m_bIsProcessing = false;
                     _stopProcessing();
-                    this->stopPrecaching();
+                    this->stopAsyncPrecaching();
                     this->setProcessedPacketsPromise();
                 }
             }
