@@ -272,6 +272,8 @@ namespace litiv {
         bool startAsyncPrecaching(size_t nSuggestedBufferSize);
         //! joins precaching thread and clears all internal buffers
         void stopAsyncPrecaching();
+        //! returns whether the precaching thread has already been started or not
+        inline bool isActive() const {return m_bIsActive;}
     private:
         void entry(const size_t nBufferSize);
         const std::function<const cv::Mat&(size_t)> m_lCallback;
@@ -491,17 +493,22 @@ namespace litiv {
         //! returns the current queue size, in bytes
         inline size_t getCurrentQueueSize() const {return m_nQueueSize;}
         //! initializes async writing with a given queue size (in bytes) and a number of threads
-        bool startAsyncWriting(size_t nSuggestedQueueSize, size_t nWorkers=1);
+        bool startAsyncWriting(size_t nSuggestedQueueSize, bool bDropPacketsIfFull=false, size_t nWorkers=1);
         //! joins writing thread and clears all internal buffers
         void stopAsyncWriting();
+        //! returns whether the wariting thread has already been started or not
+        inline bool isActive() const {return m_bIsActive;}
     private:
-        void entry(const size_t nMaxQueueSize);
+        void entry();
         const std::function<size_t(const cv::Mat&,size_t)> m_lCallback;
         std::vector<std::thread> m_vhWorkers;
         std::mutex m_oSyncMutex;
         std::condition_variable m_oQueueCondVar;
+        std::condition_variable m_oClearCondVar;
         std::map<size_t,cv::Mat> m_mQueue;
         std::atomic_bool m_bIsActive;
+        bool m_bAllowPacketDrop;
+        size_t m_nQueueMaxSize;
         std::atomic_size_t m_nQueueSize;
         std::atomic_size_t m_nQueueCount;
         DataWriter& operator=(const DataWriter&) = delete;

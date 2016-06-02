@@ -76,7 +76,7 @@ const cv::Mat& litiv::DataPrecacher::getPacket(size_t nIdx) {
         m_nLastReqIdx = nIdx;
         return m_oLastReqPacket;
     }
-    std::unique_lock<std::mutex> sync_lock(m_oSyncMutex);
+    std::mutex_unique_lock sync_lock(m_oSyncMutex);
     m_nReqIdx = nIdx;
     std::cv_status res;
     do {
@@ -114,7 +114,7 @@ void litiv::DataPrecacher::stopAsyncPrecaching() {
 }
 
 void litiv::DataPrecacher::entry(const size_t nBufferSize) {
-    std::unique_lock<std::mutex> sync_lock(m_oSyncMutex);
+    std::mutex_unique_lock sync_lock(m_oSyncMutex);
     std::queue<cv::Mat> qoCache;
     std::vector<uchar> vcBuffer(nBufferSize);
     size_t nNextExpectedReqIdx = 0;
@@ -586,6 +586,7 @@ litiv::DataWriter::DataWriter(std::function<size_t(const cv::Mat&,size_t)> lData
         m_lCallback(lDataArchiverCallback) {
     CV_Assert(m_lCallback);
     m_bIsActive = false;
+    m_bAllowPacketDrop = false;
     m_nQueueSize = 0;
     m_nQueueCount = 0;
 }
@@ -601,27 +602,35 @@ size_t litiv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
     const size_t nPacketSize = oPacket.total()*oPacket.elemSize();
     size_t nPacketPosition;
     {
-        std::unique_lock<std::mutex> sync_lock(m_oSyncMutex);
-        // @@@ could cut a find operation here using C++17's map::insert_or_assign
+        std::mutex_unique_lock sync_lock(m_oSyncMutex);
+        if(!m_bAllowPacketDrop && m_nQueueSize+nPacketSize>m_nQueueMaxSize)
+            m_oClearCondVar.wait(sync_lock,[&]{return m_nQueueSize+nPacketSize<=m_nQueueMaxSize;});
         m_mQueue[nIdx] = std::move(oPacketCopy);
         m_nQueueSize += nPacketSize;
+        // @@@ could cut a find operation here using C++17's map::insert_or_assign above
         nPacketPosition = std::distance(m_mQueue.begin(),m_mQueue.find(nIdx));
         ++m_nQueueCount;
     }
     m_oQueueCondVar.notify_one();
+#if CONSOLE_DEBUG
+    if((nIdx%50)==0)
+        std::cout << "data writer queue @ " << std::min((int)(((float)m_nQueueSize*100)/m_nQueueMaxSize),100) << "% capacity" << std::endl;
+#endif //CONSOLE_DEBUG
     return nPacketPosition;
 }
 
-bool litiv::DataWriter::startAsyncWriting(size_t nSuggestedQueueSize, size_t nWorkers) {
+bool litiv::DataWriter::startAsyncWriting(size_t nSuggestedQueueSize, bool bDropPacketsIfFull, size_t nWorkers) {
     if(m_bIsActive)
         stopAsyncWriting();
     if(nSuggestedQueueSize>0) {
         m_bIsActive = true;
+        m_bAllowPacketDrop = bDropPacketsIfFull;
+        m_nQueueMaxSize = (nSuggestedQueueSize>CACHE_MAX_SIZE)?(CACHE_MAX_SIZE):nSuggestedQueueSize;
         m_nQueueSize = 0;
         m_nQueueCount = 0;
         m_mQueue.clear();
         for(size_t n=0; n<nWorkers; ++n)
-            m_vhWorkers.emplace_back(std::bind(&DataWriter::entry,this,(nSuggestedQueueSize>CACHE_MAX_SIZE)?(CACHE_MAX_SIZE):nSuggestedQueueSize));
+            m_vhWorkers.emplace_back(std::bind(&DataWriter::entry,this));
     }
     return m_bIsActive;
 }
@@ -635,10 +644,10 @@ void litiv::DataWriter::stopAsyncWriting() {
     }
 }
 
-void litiv::DataWriter::entry(const size_t nMaxQueueSize) {
-    std::unique_lock<std::mutex> sync_lock(m_oSyncMutex);
+void litiv::DataWriter::entry() {
+    std::mutex_unique_lock sync_lock(m_oSyncMutex);
 #if CONSOLE_DEBUG
-    std::cout << " @ initializing writing with max buffer size = " << (nMaxQueueSize/1024)/1024 << " mb" << std::endl;
+    std::cout << "data writer queue @ init w/ max size = " << (m_nQueueMaxSize/1024)/1024 << " mb" << std::endl;
 #endif //CONSOLE_DEBUG
     while(m_bIsActive || m_nQueueCount>0) {
         if(m_nQueueCount==0)
@@ -651,13 +660,14 @@ void litiv::DataWriter::entry(const size_t nMaxQueueSize) {
                 oPacketData = std::move(pCurrPacket->second);
                 nPacketIdx = pCurrPacket->first;
                 const size_t nPacketSize = oPacketData.total()*oPacketData.elemSize();
-                lvDbgAssert(nPacketSize<m_nQueueSize);
+                lvDbgAssert(nPacketSize<=m_nQueueSize);
                 m_nQueueSize -= nPacketSize;
                 m_mQueue.erase(pCurrPacket);
                 --m_nQueueCount;
-            } while(m_nQueueSize>=nMaxQueueSize);
-            CxxUtils::unlock_guard<std::unique_lock<std::mutex>> oUnlock(sync_lock);
+            } while(m_nQueueSize>=m_nQueueMaxSize && m_bAllowPacketDrop);
+            std::unlock_guard<std::mutex_unique_lock> oUnlock(sync_lock);
             m_lCallback(oPacketData,nPacketIdx);
+            m_oClearCondVar.notify_all();
         }
     }
 }

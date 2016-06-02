@@ -587,7 +587,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
     cv::Mat oDBGWeightThresholds(m_oImgSize,CV_32FC1,0.0f);
     cv::Point2i oDbgPt(-1,-1);
     if(m_pDisplayHelper) {
-        std::lock_guard<std::mutex> oLock(m_pDisplayHelper->m_oEventMutex);
+        std::mutex_lock_guard oLock(m_pDisplayHelper->m_oEventMutex);
         const cv::Point2f& oDbgPt_rel = cv::Point2f(float(m_pDisplayHelper->m_oLatestMouseEvent.oPosition.x)/m_pDisplayHelper->m_oLatestMouseEvent.oDisplaySize.width,float(m_pDisplayHelper->m_oLatestMouseEvent.oPosition.y)/m_pDisplayHelper->m_oLatestMouseEvent.oDisplaySize.height);
         oDbgPt = cv::Point2i(int(oDbgPt_rel.x*m_oImgSize.width),int(oDbgPt_rel.y*m_oImgSize.height));
     }

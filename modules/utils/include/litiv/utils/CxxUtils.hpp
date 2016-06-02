@@ -304,12 +304,66 @@ namespace CxxUtils {
         Tmutex& m_oMutex;
     };
 
+    struct Semaphore {
+        using native_handle_type = std::condition_variable::native_handle_type;
+        inline explicit Semaphore(size_t nInitCount) :
+                m_nCount(nInitCount) {}
+        inline void notify() {
+            std::unique_lock<std::mutex> oLock(m_oMutex);
+            ++m_nCount;
+            m_oCondVar.notify_one();
+        }
+        inline void wait() {
+            std::unique_lock<std::mutex> oLock(m_oMutex);
+            m_oCondVar.wait(oLock,[&]{return m_nCount>0;});
+            --m_nCount;
+        }
+        inline bool try_wait() {
+            std::unique_lock<std::mutex> oLock(m_oMutex);
+            if(m_nCount>0) {
+                --m_nCount;
+                return true;
+            }
+            return false;
+        }
+        template<typename TRep, typename TPeriod=std::ratio<1>>
+        inline bool wait_for(const std::chrono::duration<TRep,TPeriod>& nDuration) {
+            std::unique_lock<std::mutex> oLock(m_oMutex);
+            bool b = m_oCondVar.wait_for(oLock,nDuration,[&]{return m_nCount>0;});
+            if(finished)
+                --m_nCount;
+            return finished;
+        }
+        template<typename TClock, typename TDuration=typename TClock::duration>
+        inline bool wait_until(const std::chrono::time_point<TClock,TDuration>& nTimePoint) {
+            std::unique_lock<std::mutex> oLock(m_oMutex);
+            auto finished = m_oCondVar.wait_until(oLock,nTimePoint,[&]{return m_nCount>0;});
+            if(finished)
+                --m_nCount;
+            return finished;
+        }
+        inline native_handle_type native_handle() {
+            return m_oCondVar.native_handle();
+        }
+        Semaphore(const Semaphore&) = delete;
+        Semaphore& operator=(const Semaphore&) = delete;
+    private:
+        std::condition_variable m_oCondVar;
+        std::mutex m_oMutex;
+        size_t m_nCount;
+    };
+
 } //namespace CxxUtils
 
 namespace std { // extending std
 
     template<typename T, size_t N>
     using aligned_vector = vector<T,CxxUtils::AlignAllocator<T,N>>;
+    template<typename T>
+    using unlock_guard = CxxUtils::unlock_guard<T>;
+    using semaphore = CxxUtils::Semaphore;
+    using mutex_lock_guard = lock_guard<mutex>;
+    using mutex_unique_lock = unique_lock<mutex>;
 
 #if !defined(_MSC_VER) && __cplusplus<=201103L // make_unique is missing from C++11 (at least on GCC)
     template<typename T, typename... Targs>

@@ -68,7 +68,7 @@ void cv::DisplayHelper::display(const cv::Mat& oImage, size_t nIdx) {
         putText(oImageBYTE3,"[Press space to continue]",cv::Scalar_<uchar>(0,0,255),true,cv::Point2i(oImageBYTE3.cols/2-40,15));
         m_bFirstDisplay = false;
     }
-    std::lock_guard<std::mutex> oLock(m_oEventMutex);
+    std::mutex_lock_guard oLock(m_oEventMutex);
     const cv::Point2i& oDbgPt = m_oLatestMouseEvent.oPosition;
     const cv::Size& oLastDbgSize = m_oLatestMouseEvent.oDisplaySize;
     if(oDbgPt.x>=0 && oDbgPt.y>=0 && oDbgPt.x<oLastDbgSize.width && oDbgPt.y<oLastDbgSize.height) {
@@ -122,7 +122,7 @@ void cv::DisplayHelper::display(const cv::Mat& oInputImg, const cv::Mat& oDebugI
         putText(oDebugImgBYTE3,"[Press space to continue]",cv::Scalar_<uchar>(0,0,255),true,cv::Point2i(oDebugImgBYTE3.cols/2-100,15),1,1.0);
         m_bFirstDisplay = false;
     }
-    std::lock_guard<std::mutex> oLock(m_oEventMutex);
+    std::mutex_lock_guard oLock(m_oEventMutex);
     const cv::Point2i& oDbgPt = m_oLatestMouseEvent.oPosition;
     const cv::Size& oLastDbgSize = m_oLatestMouseEvent.oDisplaySize;
     if(oDbgPt.x>=0 && oDbgPt.y>=0 && oDbgPt.x<oLastDbgSize.width*3 && oDbgPt.y<oLastDbgSize.height) {
@@ -152,7 +152,7 @@ int cv::DisplayHelper::waitKey(int nDefaultSleepDelay) {
 }
 
 void cv::DisplayHelper::onMouseEventCallback(int nEvent, int x, int y, int nFlags) {
-    std::lock_guard<std::mutex> oLock(m_oEventMutex);
+    std::mutex_lock_guard oLock(m_oEventMutex);
     m_oLatestMouseEvent.oPosition = cv::Point2i(x,y);
     m_oLatestMouseEvent.oDisplaySize = m_oLastDisplaySize;
     m_oLatestMouseEvent.nEvent = nEvent;

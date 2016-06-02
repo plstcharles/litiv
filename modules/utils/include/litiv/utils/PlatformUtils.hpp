@@ -242,7 +242,7 @@ namespace PlatformUtils {
             std::shared_ptr<task_t> pSharableTask = std::make_shared<task_t>(std::bind(std::forward<Tfunc>(lTaskEntryPoint),std::forward<Targs>(args)...));
             std::future<task_return_t> oTaskRes = pSharableTask->get_future();
             {
-                std::lock_guard<std::mutex> sync_lock(m_oSyncMutex);
+                std::mutex_lock_guard sync_lock(m_oSyncMutex);
                 m_qTasks.emplace([pSharableTask](){(*pSharableTask)();}); // lambda keeps a copy of the task in the queue
             }
             m_oSyncVar.notify_one();
@@ -256,14 +256,14 @@ namespace PlatformUtils {
         std::atomic_bool m_bIsActive;
     private:
         void entry() {
-            std::unique_lock<std::mutex> sync_lock(m_oSyncMutex);
+            std::mutex_unique_lock sync_lock(m_oSyncMutex);
             while(m_bIsActive || !m_qTasks.empty()) {
                 if(m_qTasks.empty())
                     m_oSyncVar.wait(sync_lock);
                 if(!m_qTasks.empty()) {
                     std::function<void()> task = std::move(m_qTasks.front());
                     m_qTasks.pop();
-                    CxxUtils::unlock_guard<std::unique_lock<std::mutex>> oUnlock(sync_lock);
+                    std::unlock_guard<std::mutex_unique_lock> oUnlock(sync_lock);
                     task();
                 }
             }
