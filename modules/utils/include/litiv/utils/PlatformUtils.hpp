@@ -222,4 +222,54 @@ namespace PlatformUtils {
         return vfResult;
     }
 
+    template<size_t nWorkers>
+    struct WorkerPool {
+        static_assert(nWorkers>0,"Worker pool must have at least one work thread");
+        WorkerPool() : m_bIsActive(true) {
+            CxxUtils::unroll<nWorkers>([this](size_t){m_vhWorkers.emplace_back(std::bind(&WorkerPool::entry,this));});
+        }
+        ~WorkerPool() {
+            m_bIsActive = false;
+            m_oSyncVar.notify_all();
+            for(std::thread& oWorker : m_vhWorkers)
+                oWorker.join();
+        }
+        template<typename Tfunc, typename... Targs>
+        std::future<typename std::result_of<Tfunc(Targs...)>::type> queueTask(Tfunc&& lTaskEntryPoint, Targs&&... args) {
+            using task_return_t = typename std::result_of<Tfunc(Targs...)>::type;
+            using task_t = std::packaged_task<task_return_t()>;
+            // http://stackoverflow.com/questions/28179817/how-can-i-store-generic-packaged-tasks-in-a-container
+            std::shared_ptr<task_t> pSharableTask = std::make_shared<task_t>(std::bind(std::forward<Tfunc>(lTaskEntryPoint),std::forward<Targs>(args)...));
+            std::future<task_return_t> oTaskRes = pSharableTask->get_future();
+            {
+                std::lock_guard<std::mutex> sync_lock(m_oSyncMutex);
+                m_qTasks.emplace([pSharableTask](){(*pSharableTask)();}); // lambda keeps a copy of the task in the queue
+            }
+            m_oSyncVar.notify_one();
+            return oTaskRes;
+        }
+    protected:
+        std::queue<std::function<void()>> m_qTasks;
+        std::vector<std::thread> m_vhWorkers;
+        std::mutex m_oSyncMutex;
+        std::condition_variable m_oSyncVar;
+        std::atomic_bool m_bIsActive;
+    private:
+        void entry() {
+            std::unique_lock<std::mutex> sync_lock(m_oSyncMutex);
+            while(m_bIsActive || !m_qTasks.empty()) {
+                if(m_qTasks.empty())
+                    m_oSyncVar.wait(sync_lock);
+                if(!m_qTasks.empty()) {
+                    std::function<void()> task = std::move(m_qTasks.front());
+                    m_qTasks.pop();
+                    CxxUtils::unlock_guard<std::unique_lock<std::mutex>> oUnlock(sync_lock);
+                    task();
+                }
+            }
+        }
+        WorkerPool(const WorkerPool&) = delete;
+        WorkerPool& operator=(const WorkerPool&) = delete;
+    };
+
 } //namespace PlatformUtils
