@@ -63,6 +63,7 @@ namespace PlatformUtils {
     void GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths);
     void FilterFilePaths(std::vector<std::string>& vsFilePaths, const std::vector<std::string>& vsRemoveTokens, const std::vector<std::string>& vsKeepTokens);
     bool CreateDirIfNotExist(const std::string& sDirPath);
+    std::fstream CreateBinFileWithPrealloc(const std::string& sFilePath, size_t nPreallocBytes);
 
     inline bool compare_lowercase(const std::string& i, const std::string& j) {
         std::string i_lower(i), j_lower(j);

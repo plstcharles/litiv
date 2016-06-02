@@ -174,3 +174,18 @@ bool PlatformUtils::CreateDirIfNotExist(const std::string& sDirPath) {
         return (stat(sDirPath.c_str(),&st)==0 && S_ISDIR(st.st_mode));
 #endif //(!defined(_MSC_VER))
 }
+
+std::fstream PlatformUtils::CreateBinFileWithPrealloc(const std::string & sFilePath, size_t nPreallocBytes) {
+    std::fstream ssFile(sFilePath,std::ios::out|std::ios::in|std::ios::ate|std::ios::binary);
+    if(!ssFile.is_open())
+        ssFile.open(sFilePath,std::ios::out|std::ios::binary);
+    lvAssert(ssFile.is_open());
+    const std::streampos nInitFileSize = ssFile.tellp();
+    if(nInitFileSize<(std::streampos)nPreallocBytes) {
+        const size_t nBytesToWrite = nPreallocBytes-size_t(nInitFileSize);
+        std::vector<char> aPreallocBuff(nBytesToWrite);
+        ssFile.write(aPreallocBuff.data(),nBytesToWrite);
+    }
+    lvAssert(ssFile.seekp(0));
+    return ssFile;
+}
