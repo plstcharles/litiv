@@ -84,7 +84,7 @@ const cv::Mat& litiv::DataPrecacher::getPacket(size_t nIdx) {
         res = m_oSyncCondVar.wait_for(sync_lock,std::chrono::milliseconds(PRECACHE_REQUEST_TIMEOUT_MS));
 #if CONSOLE_DEBUG
         if(res==std::cv_status::timeout)
-            std::cout << " # retrying request..." << std::endl;
+            std::cout << "data precacher [" << uintptr_t(this) << "] retrying request for packet #" << nIdx << "..." << std::endl;
 #endif //CONSOLE_DEBUG
     } while(res==std::cv_status::timeout);
     m_oLastReqPacket = m_oReqPacket;
@@ -122,7 +122,7 @@ void litiv::DataPrecacher::entry(const size_t nBufferSize) {
     size_t nFirstBufferIdx = 0;
     size_t nNextBufferIdx = 0;
 #if CONSOLE_DEBUG
-    std::cout << " @ initializing precaching with buffer size = " << (nBufferSize/1024)/1024 << " mb" << std::endl;
+    std::cout << "data precacher [" << uintptr_t(this) << "] init w/ buffer size = " << (nBufferSize/1024)/1024 << " mb" << std::endl;
 #endif //CONSOLE_DEBUG
     const std::chrono::time_point<std::chrono::high_resolution_clock> nPrefillTick = std::chrono::high_resolution_clock::now();
     while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nPrefillTick).count()<PRECACHE_PREFILL_TIMEOUT_MS) {
@@ -143,7 +143,7 @@ void litiv::DataPrecacher::entry(const size_t nBufferSize) {
                 if(!qoCache.empty()) {
                     if(m_nReqIdx<nNextPrecacheIdx && m_nReqIdx>=nNextExpectedReqIdx) {
 //#if CONSOLE_DEBUG
-//                        std::cout << " -- popping " << m_nReqIdx-nNextExpectedReqIdx+1 << " Packet(s) from cache" << std::endl;
+//                        std::cout << "data precacher [" << uintptr_t(this) << "] popping " << m_nReqIdx-nNextExpectedReqIdx+1 << " packet(s) from cache" << std::endl;
 //#endif //CONSOLE_DEBUG
                         while(m_nReqIdx-nNextExpectedReqIdx+1>0) {
                             m_oReqPacket = qoCache.front();
@@ -154,7 +154,7 @@ void litiv::DataPrecacher::entry(const size_t nBufferSize) {
                     }
                     else {
 #if CONSOLE_DEBUG
-                        std::cout << " -- out-of-order request, destroying cache" << std::endl;
+                        std::cout << "data precacher [" << uintptr_t(this) << "] out-of-order request, destroying cache" << std::endl;
 #endif //CONSOLE_DEBUG
                         qoCache = std::queue<cv::Mat>();
                         m_oReqPacket = m_lCallback(m_nReqIdx);
@@ -164,7 +164,7 @@ void litiv::DataPrecacher::entry(const size_t nBufferSize) {
                 }
                 else {
 #if CONSOLE_DEBUG
-                    std::cout << " @ answering request manually, precaching is falling behind" << std::endl;
+                    std::cout << "data precacher [" << uintptr_t(this) << "] answering request manually, precaching is falling behind" << std::endl;
 #endif //CONSOLE_DEBUG
                     m_oReqPacket = m_lCallback(m_nReqIdx);
                     nFirstBufferIdx = nNextBufferIdx = size_t(-1);
@@ -173,7 +173,7 @@ void litiv::DataPrecacher::entry(const size_t nBufferSize) {
             }
 #if CONSOLE_DEBUG
             else
-                std::cout << " @ answering request using last Packet" << std::endl;
+                std::cout << "data precacher [" << uintptr_t(this) << "] answering request using last packet" << std::endl;
 #endif //CONSOLE_DEBUG
             m_oSyncCondVar.notify_one();
         }
@@ -181,7 +181,7 @@ void litiv::DataPrecacher::entry(const size_t nBufferSize) {
             size_t nUsedBufferSize = nFirstBufferIdx==size_t(-1)?0:(nFirstBufferIdx<nNextBufferIdx?nNextBufferIdx-nFirstBufferIdx:nBufferSize-nFirstBufferIdx+nNextBufferIdx);
             if(nUsedBufferSize<nBufferSize/4) {
 #if CONSOLE_DEBUG
-                std::cout << " @ filling precache buffer... (current size = " << (nUsedBufferSize/1024)/1024 << " mb)" << std::endl;
+                std::cout << "data precacher [" << uintptr_t(this) << "] filling precache buffer... (current size = " << (nUsedBufferSize/1024)/1024 << " mb)" << std::endl;
 #endif //CONSOLE_DEBUG
                 size_t nFillCount = 0;
                 while(nUsedBufferSize<nBufferSize && nFillCount<10) {
@@ -605,16 +605,24 @@ size_t litiv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
         std::mutex_unique_lock sync_lock(m_oSyncMutex);
         if(!m_bAllowPacketDrop && m_nQueueSize+nPacketSize>m_nQueueMaxSize)
             m_oClearCondVar.wait(sync_lock,[&]{return m_nQueueSize+nPacketSize<=m_nQueueMaxSize;});
-        m_mQueue[nIdx] = std::move(oPacketCopy);
-        m_nQueueSize += nPacketSize;
-        // @@@ could cut a find operation here using C++17's map::insert_or_assign above
-        nPacketPosition = std::distance(m_mQueue.begin(),m_mQueue.find(nIdx));
-        ++m_nQueueCount;
+        if(m_nQueueSize+nPacketSize<=m_nQueueMaxSize) {
+            m_mQueue[nIdx] = std::move(oPacketCopy);
+            m_nQueueSize += nPacketSize;
+            // @@@ could cut a find operation here using C++17's map::insert_or_assign above
+            nPacketPosition = std::distance(m_mQueue.begin(),m_mQueue.find(nIdx));
+            ++m_nQueueCount;
+        }
+        else {
+#if CONSOLE_DEBUG
+            std::cout << "data writer [" << uintptr_t(this) << "] dropping packet #" << nIdx << std::endl;
+#endif //CONSOLE_DEBUG
+            nPacketPosition = SIZE_MAX; // packet dropped
+        }
     }
     m_oQueueCondVar.notify_one();
 #if CONSOLE_DEBUG
     if((nIdx%50)==0)
-        std::cout << "data writer queue @ " << std::min((int)(((float)m_nQueueSize*100)/m_nQueueMaxSize),100) << "% capacity" << std::endl;
+        std::cout << "data writer [" << uintptr_t(this) << "] queue @ " << (int)(((float)m_nQueueSize*100)/m_nQueueMaxSize) << "% capacity" << std::endl;
 #endif //CONSOLE_DEBUG
     return nPacketPosition;
 }
@@ -647,24 +655,21 @@ void litiv::DataWriter::stopAsyncWriting() {
 void litiv::DataWriter::entry() {
     std::mutex_unique_lock sync_lock(m_oSyncMutex);
 #if CONSOLE_DEBUG
-    std::cout << "data writer queue @ init w/ max size = " << (m_nQueueMaxSize/1024)/1024 << " mb" << std::endl;
+    std::cout << "data writer [" << uintptr_t(this) << "] init w/ max buffer size = " << (m_nQueueMaxSize/1024)/1024 << " mb" << std::endl;
 #endif //CONSOLE_DEBUG
     while(m_bIsActive || m_nQueueCount>0) {
         if(m_nQueueCount==0)
             m_oQueueCondVar.wait(sync_lock);
         if(m_nQueueCount>0) {
-            cv::Mat oPacketData;
-            size_t nPacketIdx;
-            do {
-                auto pCurrPacket = m_mQueue.begin();
-                oPacketData = std::move(pCurrPacket->second);
-                nPacketIdx = pCurrPacket->first;
-                const size_t nPacketSize = oPacketData.total()*oPacketData.elemSize();
-                lvDbgAssert(nPacketSize<=m_nQueueSize);
-                m_nQueueSize -= nPacketSize;
-                m_mQueue.erase(pCurrPacket);
-                --m_nQueueCount;
-            } while(m_nQueueSize>=m_nQueueMaxSize && m_bAllowPacketDrop);
+            auto pCurrPacket = m_mQueue.begin();
+            lvDbgAssert(pCurrPacket!=m_mQueue.end());
+            const cv::Mat oPacketData(std::move(pCurrPacket->second));
+            const size_t nPacketIdx = pCurrPacket->first;
+            const size_t nPacketSize = oPacketData.total()*oPacketData.elemSize();
+            lvDbgAssert(nPacketSize<=m_nQueueSize);
+            m_nQueueSize -= nPacketSize;
+            m_mQueue.erase(pCurrPacket);
+            --m_nQueueCount;
             std::unlock_guard<std::mutex_unique_lock> oUnlock(sync_lock);
             m_lCallback(oPacketData,nPacketIdx);
             m_oClearCondVar.notify_all();
