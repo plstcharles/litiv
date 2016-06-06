@@ -182,10 +182,34 @@ std::fstream PlatformUtils::CreateBinFileWithPrealloc(const std::string & sFileP
     lvAssert(ssFile.is_open());
     const std::streampos nInitFileSize = ssFile.tellp();
     if(nInitFileSize<(std::streampos)nPreallocBytes) {
-        const size_t nBytesToWrite = nPreallocBytes-size_t(nInitFileSize);
-        std::vector<char> aPreallocBuff(nBytesToWrite);
-        ssFile.write(aPreallocBuff.data(),nBytesToWrite);
+        size_t nBytesToWrite = nPreallocBytes-size_t(nInitFileSize);
+        std::vector<char> aPreallocBuff;
+        while(nBytesToWrite>0) {
+            const size_t nBufferSize = TARGET_PLATFORM_IS_x64?nBytesToWrite:std::min(size_t(250*1024*1024)/*250MB*/,nBytesToWrite);
+            aPreallocBuff.resize(nBufferSize);
+            ssFile.write(aPreallocBuff.data(),nBufferSize);
+            nBytesToWrite -= nBufferSize;
+        }
     }
     lvAssert(ssFile.seekp(0));
     return ssFile;
+}
+
+size_t PlatformUtils::GetCurrentPhysMemBytesUsed() {
+#if defined(_MSC_VER)
+    PROCESS_MEMORY_COUNTERS info;
+    GetProcessMemoryInfo(GetCurrentProcess(),&info,sizeof(info));
+    return (size_t)info.WorkingSetSize;
+#else //ndef(_MSC_VER)
+    FILE* fp = nullptr;
+    if(!(fp=fopen("/proc/self/statm","r")))
+        return size_t(0);
+    long nMemUsed = 0L;
+    if(fscanf(fp,"%*s%ld",&nMemUsed)!=1) {
+        fclose(fp);
+        return size_t(0);
+    }
+    fclose(fp);
+    return size_t(nMemUsed*sysconf(_SC_PAGESIZE));
+#endif //ndef(_MSC_VER)
 }

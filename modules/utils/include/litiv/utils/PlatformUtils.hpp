@@ -46,6 +46,7 @@
 #include <comdef.h>
 #include <stdint.h>
 #include <direct.h>
+#include <psapi.h>
 template<class T>
 void SafeRelease(T **ppT) {if(*ppT) {(*ppT)->Release();*ppT = nullptr;}}
 #else //(!defined(_MSC_VER))
@@ -53,6 +54,8 @@ void SafeRelease(T **ppT) {if(*ppT) {(*ppT)->Release();*ppT = nullptr;}}
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/resource.h>
+#include <stdio.h>
 #endif //(!defined(_MSC_VER))
 
 namespace PlatformUtils {
@@ -64,6 +67,7 @@ namespace PlatformUtils {
     void FilterFilePaths(std::vector<std::string>& vsFilePaths, const std::vector<std::string>& vsRemoveTokens, const std::vector<std::string>& vsKeepTokens);
     bool CreateDirIfNotExist(const std::string& sDirPath);
     std::fstream CreateBinFileWithPrealloc(const std::string& sFilePath, size_t nPreallocBytes);
+    size_t GetCurrentPhysMemBytesUsed();
 
     inline bool compare_lowercase(const std::string& i, const std::string& j) {
         std::string i_lower(i), j_lower(j);

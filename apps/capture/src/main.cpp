@@ -31,6 +31,7 @@
 /////////////////////////////////
 #define DEFAULT_QUEUE_BUFFER_SIZE   1024*1024*50  // max = 50MB per queue (default)
 #define HIGHDEF_QUEUE_BUFFER_SIZE   1024*1024*1024 // max = 1GB per queue (high-defition stream)
+#define VIDEO_FILE_PREALLOC_SIZE    1024*1024*1024 // tot = 1GB per video file
 /////////////////////////////////
 
 std::atomic_bool g_bIsActive = true;
@@ -54,26 +55,28 @@ int main() {
 #if USE_FLIR_SENSOR
         std::cout << "Setting up FLIR video writer..." << std::endl;
         size_t nLastSavedFLIRFrameIdx = SIZE_MAX;
-        cv::VideoWriter oFLIRVideoWriter("e:/temp/test_flir.avi",-1,30.0,cv::Size(320,240),false);
+        cv::VideoWriter oFLIRVideoWriter("c:/temp/test_flir.avi",-1,30.0,cv::Size(320,240),false);
         lvAssert(oFLIRVideoWriter.isOpened());
         litiv::DataWriter oFLIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oFLIRVideoWriter,nLastSavedFLIRFrameIdx));
         lvAssert(oFLIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
 #endif //USE_FLIR_SENSOR
         std::cout << "Setting up NIR video writer..." << std::endl;
         size_t nLastSavedNIRFrameIdx = SIZE_MAX;
-        cv::VideoWriter oNIRVideoWriter("e:/temp/test_nir.avi",-1,30.0,cv::Size(512,424),false);
+        cv::VideoWriter oNIRVideoWriter("c:/temp/test_nir.avi",-1,30.0,cv::Size(512,424),false);
         lvAssert(oNIRVideoWriter.isOpened());
         litiv::DataWriter oNIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oNIRVideoWriter,nLastSavedNIRFrameIdx));
         lvAssert(oNIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
         std::cout << "Setting up DEPTH video writer..." << std::endl;
         size_t nLastSavedDepthFrameIdx = SIZE_MAX;
-        cv::VideoWriter oDepthVideoWriter("e:/temp/test_depth.avi",-1,30.0,cv::Size(512,424),false);
+        cv::VideoWriter oDepthVideoWriter("c:/temp/test_depth.avi",-1,30.0,cv::Size(512,424),false);
         lvAssert(oDepthVideoWriter.isOpened());
         litiv::DataWriter oDepthVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oDepthVideoWriter,nLastSavedDepthFrameIdx));
         lvAssert(oDepthVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
         std::cout << "Setting up COLOR video writer..." << std::endl;
         size_t nLastSavedColorFrameIdx = SIZE_MAX;
-        cv::VideoWriter oColorVideoWriter("c:/temp/test_color.avi",-1,30.0,cv::Size(1920,1080),true);
+        const std::string sColorVideoFilePath = "e:/temp/test_color.avi";
+        PlatformUtils::CreateBinFileWithPrealloc(sColorVideoFilePath,VIDEO_FILE_PREALLOC_SIZE);
+        cv::VideoWriter oColorVideoWriter(sColorVideoFilePath,-1,30.0,cv::Size(1920,1080),true);
         lvAssert(oColorVideoWriter.isOpened());
         litiv::DataWriter oColorVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oColorVideoWriter,nLastSavedColorFrameIdx));
         lvAssert(oColorVideoAsyncWriter.startAsyncWriting(HIGHDEF_QUEUE_BUFFER_SIZE,true));
