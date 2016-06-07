@@ -28,6 +28,11 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set(DATASET_ROOT "${CMAKE_SOURCE_DIR}/data/" CACHE STRING "Dataset root folder (this is where test data should be located for apps benchmarks to be used out-of-the-box)")
 set(SAMPLES_ROOT "${CMAKE_SOURCE_DIR}/samples/" CACHE STRING "Samples root folder (should contain a data subdirectory so that samples can be used out-of-the-box)")
 if(WIN32)
+    if(MSVC AND (MSVC_VERSION LESS 1900))
+        message(FATAL_ERROR "MSVC toolchains older than 2015 (v140) are not supported!")
+    elseif(MSVC)
+        set(CMAKE_USE_RELATIVE_PATHS ON CACHE INTERNAL "" FORCE)
+    endif()
     # add hardcoded guesses for find_package here (caution: top level project is not defined yet!)
     list(APPEND CMAKE_PREFIX_PATH
         $ENV{USER_DEVELOP}/opencv/ $ENV{USER_DEVELOP}/opencv/build/
@@ -40,26 +45,31 @@ if(WIN32)
 else(NOT WIN32)
     set(CMAKE_INSTALL_PREFIX "/usr/local/" CACHE STRING "Install path prefix, prepended onto install directories (optional)")
 endif()
-set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "Configs" FORCE)
-if(DEFINED CMAKE_BUILD_TYPE)
-  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES})
-endif()
 
 project(litiv)
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-if(MSVC AND (MSVC_VERSION LESS 1900))
-    message(FATAL_ERROR "MSVC toolchains older than 2015 (v140) are not supported!")
-elseif(MSVC)
-    set(CMAKE_USE_RELATIVE_PATHS ON CACHE INTERNAL "" FORCE)
-endif()
-
 set(LITIV_VERSION_MAJOR 1) # last change: 2015/10
 set(LITIV_VERSION_MINOR 2) # last change: 2016/04
 set(LITIV_VERSION_PATCH 0) # last change: 2016/04
 set(LITIV_VERSION ${LITIV_VERSION_MAJOR}.${LITIV_VERSION_MINOR}.${LITIV_VERSION_PATCH})
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "Configs" FORCE)
 set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:DEBUG>)
 set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:_DEBUG>)
+if(DEFINED CMAKE_BUILD_TYPE)
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES})
+endif()
+if(CMAKE_SIZEOF_VOID_P EQUAL 8) # 64-bit toolchain/platform
+    set(DATASETS_CACHE_SIZE 6 CACHE STRING "Cache size to be used for dataset preloading, if needed (in GB)")
+    set(TARGET_PLATFORM_IS_x64 TRUE CACHE INTERNAL "" FORCE)
+elseif(CMAKE_SIZEOF_VOID_P EQUAL 4) # 32-bit toolchain/platform
+    set(DATASETS_CACHE_SIZE 1 CACHE STRING "Cache size to be used for dataset preloading, if needed (in GB)")
+    set(TARGET_PLATFORM_IS_x64 FALSE CACHE INTERNAL "" FORCE)
+else()
+    message(FATAL_ERROR "Could not detect x64/x86 platform identity using void pointer size (s=${CMAKE_SIZEOF_VOID_P}).")
+endif()
+option(USE_FAST_MATH "Enable fast math optimizations" OFF)
+mark_as_advanced(USE_FAST_MATH DATASETS_CACHE_SIZE)
 
 ### OPENCV CHECK
 find_package(OpenCV 3.0 REQUIRED)
@@ -135,17 +145,6 @@ try_cvhardwaresupport_runcheck_and_set_success(POPCNT ON)
 try_cvhardwaresupport_runcheck_and_set_success(AVX ON)
 try_cvhardwaresupport_runcheck_and_set_success(AVX2 OFF)
 
-option(USE_FAST_MATH "Enable fast math optimizations" OFF)
-if(CMAKE_SIZEOF_VOID_P EQUAL 8) # 64-bit toolchain/platform
-    set(DATASETS_CACHE_SIZE 6 CACHE STRING "Cache size to be used for dataset preloading, if needed (in GB)")
-    set(TARGET_PLATFORM_IS_x64 TRUE CACHE INTERNAL "" FORCE)
-elseif(CMAKE_SIZEOF_VOID_P EQUAL 4) # 32-bit toolchain/platform
-    set(DATASETS_CACHE_SIZE 1 CACHE STRING "Cache size to be used for dataset preloading, if needed (in GB)")
-    set(TARGET_PLATFORM_IS_x64 FALSE CACHE INTERNAL "" FORCE)
-else()
-    message(FATAL_ERROR "Could not detect x64/x86 platform identity using void pointer size.")
-endif()
-mark_as_advanced(DATASETS_CACHE_SIZE)
 if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang"))
     if(NOT CMAKE_CROSSCOMPILING)
         add_definitions(-march=native)
@@ -169,8 +168,10 @@ elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
     add_definitions(/openmp)
     add_definitions(/arch:AVX) # check performance difference? vs 387? @@@
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
-    message(SEND_ERROR "Intel compiler still unsupported; please edit the main CMakeList.txt file to add proper configuration")
+    message(FATAL_ERROR "Intel compiler still unsupported; please edit the main CMakeList.txt file to add proper configuration")
     # ... @@@
+else()
+    message(FATAL_ERROR "Unknown compiler; please edit the main CMakeList.txt file to add proper configuration")
 endif()
 
 add_subdirectory(3rdparty)
