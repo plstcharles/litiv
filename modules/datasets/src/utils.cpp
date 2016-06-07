@@ -385,12 +385,14 @@ void litiv::IDataProducer_<litiv::eDatasetSource_Video>::parseData() {
     m_voVideoReader.open(getDataPath());
     if(!m_voVideoReader.isOpened()) {
         PlatformUtils::GetFilesFromDir(getDataPath(),m_vsInputPaths);
-        if(!m_vsInputPaths.empty()) {
+        if(m_vsInputPaths.size()>1) {
             oTempImg = cv::imread(m_vsInputPaths[0]);
             m_nFrameCount = m_vsInputPaths.size();
         }
+        else if(m_vsInputPaths.size()==1)
+            m_voVideoReader.open(m_vsInputPaths[0]);
     }
-    else {
+    if(m_voVideoReader.isOpened()) {
         m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
         m_voVideoReader >> oTempImg;
         m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
