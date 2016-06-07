@@ -40,6 +40,7 @@
 #include <unordered_map>
 #include <deque>
 #include <inttypes.h>
+#include <csignal>
 #if defined(_MSC_VER)
 #include <windows.h>
 #include <winerror.h>
@@ -66,7 +67,8 @@ namespace PlatformUtils {
     void GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths);
     void FilterFilePaths(std::vector<std::string>& vsFilePaths, const std::vector<std::string>& vsRemoveTokens, const std::vector<std::string>& vsKeepTokens);
     bool CreateDirIfNotExist(const std::string& sDirPath);
-    std::fstream CreateBinFileWithPrealloc(const std::string& sFilePath, size_t nPreallocBytes);
+    std::fstream CreateBinFileWithPrealloc(const std::string& sFilePath, size_t nPreallocBytes, bool bZeroInit=false);
+    void RegisterAllConsoleSignals(void(*lHandler)(int));
     size_t GetCurrentPhysMemBytesUsed();
 
     inline bool compare_lowercase(const std::string& i, const std::string& j) {

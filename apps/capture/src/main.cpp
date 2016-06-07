@@ -21,7 +21,6 @@
 #include "litiv/3rdparty/DShowBase/streams.h"
 #include "litiv/3rdparty/DShowBase/ocvcompat.h"
 #include <Kinect.h>
-#include <csignal>
 
 /////////////////////////////////
 #define USE_FLIR_SENSOR         0
@@ -38,12 +37,7 @@ std::atomic_bool g_bIsActive = true;
 
 int main() {
     try {
-        const auto lSignalHandler = [](int nSignal){g_bIsActive = false;};
-        signal(SIGINT,lSignalHandler);
-        signal(SIGTERM,lSignalHandler);
-#ifdef SIGBREAK
-        signal(SIGBREAK,lSignalHandler);
-#endif //def(SIGBREAK)
+        PlatformUtils::RegisterAllConsoleSignals([](int nSignal){g_bIsActive = false;});
 #if WRITE_OUTPUT
         const auto lEncodeAndSaveFrame = [](const cv::Mat& oImage, size_t nIndex, cv::VideoWriter& oWriter, size_t& nLastSavedIndex) {
             lvAssert(!oImage.empty() && oWriter.isOpened());

@@ -175,7 +175,7 @@ bool PlatformUtils::CreateDirIfNotExist(const std::string& sDirPath) {
 #endif //(!defined(_MSC_VER))
 }
 
-std::fstream PlatformUtils::CreateBinFileWithPrealloc(const std::string & sFilePath, size_t nPreallocBytes) {
+std::fstream PlatformUtils::CreateBinFileWithPrealloc(const std::string & sFilePath, size_t nPreallocBytes, bool bZeroInit) {
     std::fstream ssFile(sFilePath,std::ios::out|std::ios::in|std::ios::ate|std::ios::binary);
     if(!ssFile.is_open())
         ssFile.open(sFilePath,std::ios::out|std::ios::binary);
@@ -186,13 +186,24 @@ std::fstream PlatformUtils::CreateBinFileWithPrealloc(const std::string & sFileP
         std::vector<char> aPreallocBuff;
         while(nBytesToWrite>0) {
             const size_t nBufferSize = TARGET_PLATFORM_IS_x64?nBytesToWrite:std::min(size_t(250*1024*1024)/*250MB*/,nBytesToWrite);
-            aPreallocBuff.resize(nBufferSize);
+            if(bZeroInit)
+                aPreallocBuff.resize(nBufferSize,0);
+            else
+                aPreallocBuff.resize(nBufferSize);
             ssFile.write(aPreallocBuff.data(),nBufferSize);
             nBytesToWrite -= nBufferSize;
         }
     }
     lvAssert(ssFile.seekp(0));
     return ssFile;
+}
+
+void PlatformUtils::RegisterAllConsoleSignals(void(*lHandler)(int)) {
+    signal(SIGINT,lHandler);
+    signal(SIGTERM,lHandler);
+#ifdef SIGBREAK
+    signal(SIGBREAK,lHandler);
+#endif //def(SIGBREAK)
 }
 
 size_t PlatformUtils::GetCurrentPhysMemBytesUsed() {
