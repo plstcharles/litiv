@@ -17,8 +17,6 @@
 
 #include "litiv/datasets.hpp"
 #include "litiv/video.hpp"
-
-#include "litiv/3rdparty/DShowBase/streams.h"
 #include "litiv/3rdparty/DShowBase/ocvcompat.h"
 #include <Kinect.h>
 
@@ -38,7 +36,7 @@ std::atomic_bool g_bIsActive = true;
 
 int main() {
     try {
-        PlatformUtils::RegisterAllConsoleSignals([](int nSignal){g_bIsActive = false;});
+        PlatformUtils::RegisterAllConsoleSignals([](int){g_bIsActive = false;});
         const auto lEncodeAndSaveFrame = [](const cv::Mat& oImage, size_t nIndex, cv::VideoWriter& oWriter, size_t& nLastSavedIndex) {
             lvAssert(!oImage.empty() && oWriter.isOpened());
             lvAssert(nLastSavedIndex==SIZE_MAX || nLastSavedIndex<nIndex);
@@ -247,7 +245,7 @@ int main() {
             for(size_t n=0; n<alGrabTasks.size(); ++n)
                 abGrabResults[n] = oPool.queueTask(alGrabTasks[n]);
 #if USE_FLIR_SENSOR
-            pFLIRSensor->GetLatestFrame(oFIRFrame,true);
+            pFLIRSensor->GetLatestFrame(oFLIRFrame,true);
 #endif //USE_FLIR_SENSOR
             bool bFinalGrabResult = true;
             for(size_t n=0; n<abGrabResults.size(); ++n)

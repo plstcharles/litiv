@@ -31,6 +31,7 @@ if(WIN32)
         "src/dllentry.cpp"
         "src/dllsetup.cpp"
         "src/mtype.cpp"
+        "src/ocvcompat.cpp"
         "src/outputq.cpp"
         "src/perflog.cpp"
         "src/pstream.cpp"
