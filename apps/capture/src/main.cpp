@@ -31,6 +31,7 @@
 #define DEFAULT_QUEUE_BUFFER_SIZE   1024*1024*50  // max = 50MB per queue (default)
 #define HIGHDEF_QUEUE_BUFFER_SIZE   1024*1024*1024 // max = 1GB per queue (high-defition stream)
 #define VIDEO_FILE_PREALLOC_SIZE    1024*1024*1024 // tot = 1GB per video file
+#define STRUCT_FILE_PREALLOC_SIZE   1024*1024*20 // tot = 200MB per struct file
 /////////////////////////////////
 
 std::atomic_bool g_bIsActive = true;
@@ -54,27 +55,78 @@ int main() {
         litiv::DataWriter oFLIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oFLIRVideoWriter,nLastSavedFLIRFrameIdx));
         lvAssert(oFLIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
 #endif //USE_FLIR_SENSOR
+        std::cout << "Setting up BODY struct writer..." << std::endl;
+        struct BodyFrame {
+            bool bIsValid;
+            TIMESPAN nTimeStamp;
+            Vector4 vFloorClipPlane;
+            size_t nFrameIdx;
+            struct BodyData {
+                BOOLEAN bIsTracked;
+                BOOLEAN bIsRestricted;
+                DWORD nClippedEdges;
+                UINT64 nTrackingID;
+                PointF vLean;
+                TrackingState eLeanTrackState;
+                HandState eLeftHandState;
+                HandState eRightHandState;
+                TrackingConfidence eLeftHandStateConfidence;
+                TrackingConfidence eRightHandStateConfidence;
+                Joint aJointData[JointType::JointType_Count];
+                JointOrientation aJointOrientationData[JointType::JointType_Count];
+            } aBodyData[BODY_COUNT];
+        } oBodyFrame;
+        const cv::Mat oBodyFrameWrapper(1,(int)sizeof(BodyFrame),CV_8UC1,&oBodyFrame);
+        const auto lEncodeAndSaveBodyFrame = [](const cv::Mat& oBodyFrame, size_t nIndex, std::fstream* pWriter, size_t& nLastSavedIndex){
+            lvAssert(!oBodyFrame.empty() && oBodyFrame.total()*oBodyFrame.elemSize()==sizeof(BodyFrame));
+            lvAssert(pWriter && pWriter->is_open());
+            lvAssert(nLastSavedIndex==SIZE_MAX || nLastSavedIndex<nIndex);
+            ((BodyFrame*)oBodyFrame.data)->nFrameIdx = nIndex;
+            pWriter->write((char*)oBodyFrame.data,sizeof(BodyFrame));
+            nLastSavedIndex = nIndex;
+            return (size_t)0;
+        };
+        size_t nLastSavedBodyFrameIdx = SIZE_MAX;
+        std::fstream oBodyStructWriter = PlatformUtils::CreateBinFileWithPrealloc("c:/temp/test_body.bin",STRUCT_FILE_PREALLOC_SIZE,true);
+        lvAssert(oBodyStructWriter);
+        litiv::DataWriter oBodyStructAsyncWriter(std::bind(lEncodeAndSaveBodyFrame,std::placeholders::_1,std::placeholders::_2,&oBodyStructWriter,nLastSavedBodyFrameIdx));
+        lvAssert(oBodyStructAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
+
+        std::cout << "Setting up BODYINDEX video writer..." << std::endl;
+        cv::Mat oBodyIdxFrame;
+        size_t nLastSavedBodyIdxFrameIdx = SIZE_MAX;
+        cv::VideoWriter oBodyIdxVideoWriter("c:/temp/test_bodyidx.avi",-1,30.0,cv::Size(512,424),false);
+        lvAssert(oBodyIdxVideoWriter.isOpened());
+        litiv::DataWriter oBodyIdxVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oBodyIdxVideoWriter,nLastSavedBodyIdxFrameIdx));
+        lvAssert(oBodyIdxVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
+
         std::cout << "Setting up NIR video writer..." << std::endl;
+        cv::Mat oNIRFrame;
         size_t nLastSavedNIRFrameIdx = SIZE_MAX;
         cv::VideoWriter oNIRVideoWriter("c:/temp/test_nir.avi",-1,30.0,cv::Size(512,424),false);
         lvAssert(oNIRVideoWriter.isOpened());
         litiv::DataWriter oNIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oNIRVideoWriter,nLastSavedNIRFrameIdx));
         lvAssert(oNIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
+
         std::cout << "Setting up DEPTH video writer..." << std::endl;
+        cv::Mat oDepthFrame;
         size_t nLastSavedDepthFrameIdx = SIZE_MAX;
         cv::VideoWriter oDepthVideoWriter("c:/temp/test_depth.avi",-1,30.0,cv::Size(512,424),false);
         lvAssert(oDepthVideoWriter.isOpened());
         litiv::DataWriter oDepthVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oDepthVideoWriter,nLastSavedDepthFrameIdx));
         lvAssert(oDepthVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
+
         std::cout << "Setting up COLOR video writer..." << std::endl;
+        cv::Mat oColorFrame;
         size_t nLastSavedColorFrameIdx = SIZE_MAX;
         const std::string sColorVideoFilePath = "e:/temp/test_color.avi";
-        PlatformUtils::CreateBinFileWithPrealloc(sColorVideoFilePath,VIDEO_FILE_PREALLOC_SIZE);
+        lvAssert(PlatformUtils::CreateBinFileWithPrealloc(sColorVideoFilePath,VIDEO_FILE_PREALLOC_SIZE));
         cv::VideoWriter oColorVideoWriter(sColorVideoFilePath,-1,30.0,cv::Size(1920,1080),true);
         lvAssert(oColorVideoWriter.isOpened());
         litiv::DataWriter oColorVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oColorVideoWriter,nLastSavedColorFrameIdx));
         lvAssert(oColorVideoAsyncWriter.startAsyncWriting(HIGHDEF_QUEUE_BUFFER_SIZE,true));
 #endif //WRITE_OUTPUT
+
 #if USE_FLIR_SENSOR
         lvAssertHR(CoInitializeEx(0,COINIT_MULTITHREADED|COINIT_DISABLE_OLE1DDE));
         std::unique_ptr<litiv::DShowCameraGrabber> pFLIRSensor = std::make_unique<litiv::DShowCameraGrabber>("FLIR ThermaCAM",(bool)DISPLAY_OUTPUT);
@@ -86,12 +138,62 @@ int main() {
         lvAssert(pKinectSensor);
         lvAssertHR(pKinectSensor->Open());
         CComPtr<IMultiSourceFrameReader> pMultiFrameReader;
-        lvAssertHR(pKinectSensor->OpenMultiSourceFrameReader(FrameSourceTypes_Color|FrameSourceTypes_Depth|FrameSourceTypes_Infrared/*|FrameSourceTypes_Body|FrameSourceTypes_BodyIndex*/,&pMultiFrameReader));
+        lvAssertHR(pKinectSensor->OpenMultiSourceFrameReader(FrameSourceTypes_Color|FrameSourceTypes_Depth|FrameSourceTypes_Infrared|FrameSourceTypes_Body|FrameSourceTypes_BodyIndex,&pMultiFrameReader));
+        constexpr size_t nStreamCount = 5;
         CComPtr<IMultiSourceFrame> pMultiFrame;
-        cv::Mat oNIRFrame,oDepthFrame,oColorFrame;
-        PlatformUtils::WorkerPool<3> oPool;
-        std::array<std::future<bool>,3> abGrabResults;
-        const std::array<std::function<bool()>,3> alGrabTasks = {
+        PlatformUtils::WorkerPool<nStreamCount> oPool;
+        std::array<std::future<bool>,nStreamCount> abGrabResults;
+        const std::array<std::function<bool()>,nStreamCount> alGrabTasks = {
+            [&]{
+                CComPtr<IBodyFrameReference> pFrameRef;
+                lvAssertHR(pMultiFrame->get_BodyFrameReference(&pFrameRef));
+                CComPtr<IBodyFrame> pFrame;
+                IBody* apBodies[BODY_COUNT] = {0};
+                const bool bGotFrame = SUCCEEDED(pFrameRef->AcquireFrame(&pFrame)) && SUCCEEDED(pFrame->GetAndRefreshBodyData(BODY_COUNT,apBodies));
+                if(bGotFrame) {
+                    oBodyFrame.bIsValid = true;
+                    pFrameRef.Release();
+                    for(size_t nBodyIdx=0; nBodyIdx<BODY_COUNT; ++nBodyIdx) {
+                        lvAssertHR(apBodies[nBodyIdx]->get_IsRestricted(&oBodyFrame.aBodyData[nBodyIdx].bIsRestricted));
+                        lvAssertHR(apBodies[nBodyIdx]->get_IsTracked(&oBodyFrame.aBodyData[nBodyIdx].bIsTracked));
+                        if(oBodyFrame.aBodyData[nBodyIdx].bIsTracked) {
+                            lvAssertHR(apBodies[nBodyIdx]->GetJoints(JointType::JointType_Count,oBodyFrame.aBodyData[nBodyIdx].aJointData));
+                            lvAssertHR(apBodies[nBodyIdx]->GetJointOrientations(JointType::JointType_Count,oBodyFrame.aBodyData[nBodyIdx].aJointOrientationData));
+                            lvAssertHR(apBodies[nBodyIdx]->get_HandLeftConfidence(&oBodyFrame.aBodyData[nBodyIdx].eLeftHandStateConfidence));
+                            lvAssertHR(apBodies[nBodyIdx]->get_HandRightConfidence(&oBodyFrame.aBodyData[nBodyIdx].eRightHandStateConfidence));
+                            lvAssertHR(apBodies[nBodyIdx]->get_HandLeftState(&oBodyFrame.aBodyData[nBodyIdx].eLeftHandState));
+                            lvAssertHR(apBodies[nBodyIdx]->get_HandRightState(&oBodyFrame.aBodyData[nBodyIdx].eRightHandState));
+                            lvAssertHR(apBodies[nBodyIdx]->get_ClippedEdges(&oBodyFrame.aBodyData[nBodyIdx].nClippedEdges));
+                            lvAssertHR(apBodies[nBodyIdx]->get_TrackingId(&oBodyFrame.aBodyData[nBodyIdx].nTrackingID));
+                            lvAssertHR(apBodies[nBodyIdx]->get_LeanTrackingState(&oBodyFrame.aBodyData[nBodyIdx].eLeanTrackState));
+                            lvAssertHR(apBodies[nBodyIdx]->get_Lean(&oBodyFrame.aBodyData[nBodyIdx].vLean));
+                        }
+                        SafeRelease(&apBodies[nBodyIdx]);
+                    }
+                    lvAssertHR(pFrame->get_FloorClipPlane(&oBodyFrame.vFloorClipPlane));
+                    lvAssertHR(pFrame->get_RelativeTime(&oBodyFrame.nTimeStamp));
+                }
+                return bGotFrame;
+            },
+            [&]{
+                CComPtr<IBodyIndexFrameReference> pFrameRef;
+                lvAssertHR(pMultiFrame->get_BodyIndexFrameReference(&pFrameRef));
+                CComPtr<IBodyIndexFrame> pFrame;
+                const bool bGotFrame = SUCCEEDED(pFrameRef->AcquireFrame(&pFrame));
+                if(bGotFrame) {
+                    pFrameRef.Release();
+                    if(oBodyIdxFrame.empty()) {
+                        CComPtr<IFrameDescription> pFrameDesc;
+                        lvAssertHR(pFrame->get_FrameDescription(&pFrameDesc));
+                        int nFrameHeight,nFrameWidth;
+                        lvAssertHR(pFrameDesc->get_Height(&nFrameHeight));
+                        lvAssertHR(pFrameDesc->get_Width(&nFrameWidth));
+                        oBodyIdxFrame.create(nFrameHeight,nFrameWidth,CV_8UC1);
+                    }
+                    lvAssertHR(pFrame->CopyFrameDataToArray(oBodyIdxFrame.total(),oBodyIdxFrame.data));
+                }
+                return bGotFrame;
+            },
             [&]{
                 CComPtr<IInfraredFrameReference> pFrameRef;
                 lvAssertHR(pMultiFrame->get_InfraredFrameReference(&pFrameRef));
@@ -155,7 +257,6 @@ int main() {
                     const cv::Mat oRawColorFrame(oColorFrame.size(),CV_8UC2,pBuffer);
                     lvAssert(nBufferSize<=oRawColorFrame.total()*oRawColorFrame.elemSize());
                     cv::cvtColor(oRawColorFrame,oColorFrame,cv::COLOR_YUV2BGR_YUY2);
-                    //lvAssertHR(pFrame->CopyConvertedFrameDataToArray(oColorFrame.total()*oColorFrame.channels(),oColorFrame.data,ColorImageFormat_Bgra));
                 }
                 return bGotFrame;
             },
@@ -181,6 +282,8 @@ int main() {
                 if(!oFIRFrame.empty())
                     cv::imshow("oFIRFrame",oFIRFrame);
 #endif //USE_FLIR_SENSOR
+                if(!oBodyIdxFrame.empty())
+                    cv::imshow("oBodyIdxFrame",oBodyIdxFrame);
                 if(!oNIRFrame.empty())
                     cv::imshow("oNIRFrame",oNIRFrame);
                 if(!oDepthFrame.empty())
@@ -197,6 +300,8 @@ int main() {
 #if USE_FLIR_SENSOR
                     lvAssert(oFLIRVideoAsyncWriter.queue(oFLIRFrame,nRealFrameIdx)!=SIZE_MAX);
 #endif //USE_FLIR_SENSOR
+                    lvAssert(oBodyStructAsyncWriter.queue(oBodyFrameWrapper,nRealFrameIdx)!=SIZE_MAX);
+                    lvAssert(oBodyIdxVideoAsyncWriter.queue(oBodyIdxFrame,nRealFrameIdx)!=SIZE_MAX);
                     lvAssert(oNIRVideoAsyncWriter.queue(oNIRFrame,nRealFrameIdx)!=SIZE_MAX);
                     lvAssert(oDepthVideoAsyncWriter.queue(oDepthFrame,nRealFrameIdx)!=SIZE_MAX);
                     ++nGoodFrameIdx;
