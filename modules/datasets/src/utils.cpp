@@ -18,14 +18,14 @@
 #include "litiv/datasets/utils.hpp"
 
 #define HARDCODE_IMAGE_PACKET_INDEX        0 // for sync debug only! will corrupt data for non-image packets
-#define PRECACHE_CONSOLE_DEBUG             0
+#define CONSOLE_DEBUG                      0
 #define PRECACHE_REQUEST_TIMEOUT_MS        1
 #define PRECACHE_QUERY_TIMEOUT_MS          10
 #define PRECACHE_PREFILL_TIMEOUT_MS        5000
-#if (!(defined(_M_X64) || defined(__amd64__)) && PRECACHE_MAX_SIZE_GB>2)
+#if (!(defined(_M_X64) || defined(__amd64__)) && CACHE_MAX_SIZE_GB>2)
 #error "Cache max size exceeds system limit (x86)."
-#endif //(!(defined(_M_X64) || defined(__amd64__)) && PRECACHE_MAX_SIZE_GB>2)
-#define PRECACHE_MAX_CACHE_SIZE size_t(((PRECACHE_MAX_SIZE_GB*1024)*1024)*1024)
+#endif //(!(defined(_M_X64) || defined(__amd64__)) && CACHE_MAX_SIZE_GB>2)
+#define CACHE_MAX_SIZE size_t(((CACHE_MAX_SIZE_GB*1024)*1024)*1024)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,71 +60,70 @@ std::string litiv::IDataHandler::getPacketName(size_t nPacketIdx) const {
 litiv::DataPrecacher::DataPrecacher(std::function<const cv::Mat&(size_t)> lDataLoaderCallback) :
         m_lCallback(lDataLoaderCallback) {
     CV_Assert(m_lCallback);
-    m_bIsPrecaching = false;
+    m_bIsActive = false;
     m_nReqIdx = m_nLastReqIdx = size_t(-1);
 }
 
 litiv::DataPrecacher::~DataPrecacher() {
-    stopPrecaching();
+    stopAsyncPrecaching();
 }
 
 const cv::Mat& litiv::DataPrecacher::getPacket(size_t nIdx) {
     if(nIdx==m_nLastReqIdx)
         return m_oLastReqPacket;
-    else if(!m_bIsPrecaching) {
+    else if(!m_bIsActive) {
         m_oLastReqPacket = m_lCallback(nIdx);
         m_nLastReqIdx = nIdx;
         return m_oLastReqPacket;
     }
-    std::unique_lock<std::mutex> sync_lock(m_oSyncMutex);
+    std::mutex_unique_lock sync_lock(m_oSyncMutex);
     m_nReqIdx = nIdx;
     std::cv_status res;
     do {
         m_oReqCondVar.notify_one();
         res = m_oSyncCondVar.wait_for(sync_lock,std::chrono::milliseconds(PRECACHE_REQUEST_TIMEOUT_MS));
-#if PRECACHE_CONSOLE_DEBUG
+#if CONSOLE_DEBUG
         if(res==std::cv_status::timeout)
-            std::cout << " # retrying request..." << std::endl;
-#endif //PRECACHE_CONSOLE_DEBUG
+            std::cout << "data precacher [" << uintptr_t(this) << "] retrying request for packet #" << nIdx << "..." << std::endl;
+#endif //CONSOLE_DEBUG
     } while(res==std::cv_status::timeout);
     m_oLastReqPacket = m_oReqPacket;
     m_nLastReqIdx = nIdx;
     return m_oLastReqPacket;
 }
 
-bool litiv::DataPrecacher::startPrecaching(size_t nSuggestedBufferSize) {
+bool litiv::DataPrecacher::startAsyncPrecaching(size_t nSuggestedBufferSize) {
     static_assert(PRECACHE_REQUEST_TIMEOUT_MS>0,"Precache request timeout must be a positive value");
     static_assert(PRECACHE_QUERY_TIMEOUT_MS>0,"Precache query timeout must be a positive value");
     static_assert(PRECACHE_PREFILL_TIMEOUT_MS>0,"Precache prefill timeout must be a positive value");
-    static_assert(PRECACHE_MAX_CACHE_SIZE>=(size_t)0,"Precache size must be a non-negative value");
-    if(m_bIsPrecaching)
-        stopPrecaching();
+    if(m_bIsActive)
+        stopAsyncPrecaching();
     if(nSuggestedBufferSize>0) {
-        m_bIsPrecaching = true;
+        m_bIsActive = true;
         m_nReqIdx = size_t(-1);
-        m_hPrecacher = std::thread(&DataPrecacher::precache,this,(nSuggestedBufferSize>PRECACHE_MAX_CACHE_SIZE)?(PRECACHE_MAX_CACHE_SIZE):nSuggestedBufferSize);
+        m_hWorker = std::thread(&DataPrecacher::entry,this,(nSuggestedBufferSize>CACHE_MAX_SIZE)?(CACHE_MAX_SIZE):nSuggestedBufferSize);
     }
-    return m_bIsPrecaching;
+    return m_bIsActive;
 }
 
-void litiv::DataPrecacher::stopPrecaching() {
-    if(m_bIsPrecaching) {
-        m_bIsPrecaching = false;
-        m_hPrecacher.join();
+void litiv::DataPrecacher::stopAsyncPrecaching() {
+    if(m_bIsActive) {
+        m_bIsActive = false;
+        m_hWorker.join();
     }
 }
 
-void litiv::DataPrecacher::precache(size_t nBufferSize) {
-    std::unique_lock<std::mutex> sync_lock(m_oSyncMutex);
+void litiv::DataPrecacher::entry(const size_t nBufferSize) {
+    std::mutex_unique_lock sync_lock(m_oSyncMutex);
     std::queue<cv::Mat> qoCache;
     std::vector<uchar> vcBuffer(nBufferSize);
     size_t nNextExpectedReqIdx = 0;
     size_t nNextPrecacheIdx = 0;
     size_t nFirstBufferIdx = 0;
     size_t nNextBufferIdx = 0;
-#if PRECACHE_CONSOLE_DEBUG
-    std::cout << " @ initializing precaching with buffer size = " << (nBufferSize/1024)/1024 << " mb" << std::endl;
-#endif //PRECACHE_CONSOLE_DEBUG
+#if CONSOLE_DEBUG
+    std::cout << "data precacher [" << uintptr_t(this) << "] init w/ buffer size = " << (nBufferSize/1024)/1024 << " mb" << std::endl;
+#endif //CONSOLE_DEBUG
     const std::chrono::time_point<std::chrono::high_resolution_clock> nPrefillTick = std::chrono::high_resolution_clock::now();
     while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nPrefillTick).count()<PRECACHE_PREFILL_TIMEOUT_MS) {
         const cv::Mat& oNextPacket = m_lCallback(nNextPrecacheIdx);
@@ -138,14 +137,14 @@ void litiv::DataPrecacher::precache(size_t nBufferSize) {
         }
         else break;
     }
-    while(m_bIsPrecaching) {
+    while(m_bIsActive) {
         if(m_oReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(PRECACHE_QUERY_TIMEOUT_MS))!=std::cv_status::timeout) {
             if(m_nReqIdx!=nNextExpectedReqIdx-1) {
                 if(!qoCache.empty()) {
                     if(m_nReqIdx<nNextPrecacheIdx && m_nReqIdx>=nNextExpectedReqIdx) {
-//#if PRECACHE_CONSOLE_DEBUG
-//                        std::cout << " -- popping " << m_nReqIdx-nNextExpectedReqIdx+1 << " Packet(s) from cache" << std::endl;
-//#endif //PRECACHE_CONSOLE_DEBUG
+//#if CONSOLE_DEBUG
+//                        std::cout << "data precacher [" << uintptr_t(this) << "] popping " << m_nReqIdx-nNextExpectedReqIdx+1 << " packet(s) from cache" << std::endl;
+//#endif //CONSOLE_DEBUG
                         while(m_nReqIdx-nNextExpectedReqIdx+1>0) {
                             m_oReqPacket = qoCache.front();
                             nFirstBufferIdx = (size_t)(m_oReqPacket.data-vcBuffer.data());
@@ -154,9 +153,9 @@ void litiv::DataPrecacher::precache(size_t nBufferSize) {
                         }
                     }
                     else {
-#if PRECACHE_CONSOLE_DEBUG
-                        std::cout << " -- out-of-order request, destroying cache" << std::endl;
-#endif //PRECACHE_CONSOLE_DEBUG
+#if CONSOLE_DEBUG
+                        std::cout << "data precacher [" << uintptr_t(this) << "] out-of-order request, destroying cache" << std::endl;
+#endif //CONSOLE_DEBUG
                         qoCache = std::queue<cv::Mat>();
                         m_oReqPacket = m_lCallback(m_nReqIdx);
                         nFirstBufferIdx = nNextBufferIdx = size_t(-1);
@@ -164,26 +163,26 @@ void litiv::DataPrecacher::precache(size_t nBufferSize) {
                     }
                 }
                 else {
-#if PRECACHE_CONSOLE_DEBUG
-                    std::cout << " @ answering request manually, precaching is falling behind" << std::endl;
-#endif //PRECACHE_CONSOLE_DEBUG
+#if CONSOLE_DEBUG
+                    std::cout << "data precacher [" << uintptr_t(this) << "] answering request manually, precaching is falling behind" << std::endl;
+#endif //CONSOLE_DEBUG
                     m_oReqPacket = m_lCallback(m_nReqIdx);
                     nFirstBufferIdx = nNextBufferIdx = size_t(-1);
                     nNextExpectedReqIdx = nNextPrecacheIdx = m_nReqIdx+1;
                 }
             }
-#if PRECACHE_CONSOLE_DEBUG
+#if CONSOLE_DEBUG
             else
-                std::cout << " @ answering request using last Packet" << std::endl;
-#endif //PRECACHE_CONSOLE_DEBUG
+                std::cout << "data precacher [" << uintptr_t(this) << "] answering request using last packet" << std::endl;
+#endif //CONSOLE_DEBUG
             m_oSyncCondVar.notify_one();
         }
         else {
             size_t nUsedBufferSize = nFirstBufferIdx==size_t(-1)?0:(nFirstBufferIdx<nNextBufferIdx?nNextBufferIdx-nFirstBufferIdx:nBufferSize-nFirstBufferIdx+nNextBufferIdx);
             if(nUsedBufferSize<nBufferSize/4) {
-#if PRECACHE_CONSOLE_DEBUG
-                std::cout << " @ filling precache buffer... (current size = " << (nUsedBufferSize/1024)/1024 << " mb)" << std::endl;
-#endif //PRECACHE_CONSOLE_DEBUG
+#if CONSOLE_DEBUG
+                std::cout << "data precacher [" << uintptr_t(this) << "] filling precache buffer... (current size = " << (nUsedBufferSize/1024)/1024 << " mb)" << std::endl;
+#endif //CONSOLE_DEBUG
                 size_t nFillCount = 0;
                 while(nUsedBufferSize<nBufferSize && nFillCount<10) {
                     const cv::Mat& oNextPacket = m_lCallback(nNextPrecacheIdx);
@@ -228,14 +227,14 @@ void litiv::DataPrecacher::precache(size_t nBufferSize) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void litiv::IDataLoader::startPrecaching(bool bUsingGT, size_t nSuggestedBufferSize) {
-    CV_Assert(m_oInputPrecacher.startPrecaching(nSuggestedBufferSize));
-    CV_Assert(!bUsingGT || m_oGTPrecacher.startPrecaching(nSuggestedBufferSize));
+void litiv::IDataLoader::startAsyncPrecaching(bool bUsingGT, size_t nSuggestedBufferSize) {
+    CV_Assert(m_oInputPrecacher.startAsyncPrecaching(nSuggestedBufferSize));
+    CV_Assert(!bUsingGT || m_oGTPrecacher.startAsyncPrecaching(nSuggestedBufferSize));
 }
 
-void litiv::IDataLoader::stopPrecaching() {
-    m_oInputPrecacher.stopPrecaching();
-    m_oGTPrecacher.stopPrecaching();
+void litiv::IDataLoader::stopAsyncPrecaching() {
+    m_oInputPrecacher.stopAsyncPrecaching();
+    m_oGTPrecacher.stopAsyncPrecaching();
 }
 
 litiv::IDataLoader::IDataLoader(ePacketPolicy eInputType, ePacketPolicy eOutputType, eMappingPolicy eGTMappingType, eMappingPolicy eIOMappingType) :
@@ -299,8 +298,8 @@ double litiv::IDataProducer_<litiv::eDatasetSource_Video>::getExpectedLoad() con
     return m_oROI.empty()?0.0:(double)cv::countNonZero(m_oROI)*m_nFrameCount*(int(!isGrayscale())+1);
 }
 
-void litiv::IDataProducer_<litiv::eDatasetSource_Video>::startPrecaching(bool bUsingGT, size_t /*nUnused*/) {
-    return IDataLoader::startPrecaching(bUsingGT,m_oSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
+void litiv::IDataProducer_<litiv::eDatasetSource_Video>::startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/) {
+    return IDataLoader::startAsyncPrecaching(bUsingGT,m_oSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
 }
 
 litiv::IDataProducer_<litiv::eDatasetSource_Video>::IDataProducer_(ePacketPolicy eOutputType, eMappingPolicy eGTMappingType, eMappingPolicy eIOMappingType) :
@@ -386,12 +385,14 @@ void litiv::IDataProducer_<litiv::eDatasetSource_Video>::parseData() {
     m_voVideoReader.open(getDataPath());
     if(!m_voVideoReader.isOpened()) {
         PlatformUtils::GetFilesFromDir(getDataPath(),m_vsInputPaths);
-        if(!m_vsInputPaths.empty()) {
+        if(m_vsInputPaths.size()>1) {
             oTempImg = cv::imread(m_vsInputPaths[0]);
             m_nFrameCount = m_vsInputPaths.size();
         }
+        else if(m_vsInputPaths.size()==1)
+            m_voVideoReader.open(m_vsInputPaths[0]);
     }
-    else {
+    if(m_voVideoReader.isOpened()) {
         m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
         m_voVideoReader >> oTempImg;
         m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
@@ -413,8 +414,8 @@ double litiv::IDataProducer_<litiv::eDatasetSource_Image>::getExpectedLoad() con
     return (double)getInputMaxSize().area()*m_nImageCount*(int(!isGrayscale())+1);
 }
 
-void litiv::IDataProducer_<litiv::eDatasetSource_Image>::startPrecaching(bool bUsingGT, size_t /*nUnused*/) {
-    return IDataLoader::startPrecaching(bUsingGT,getInputMaxSize().area()*(m_nImageCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
+void litiv::IDataProducer_<litiv::eDatasetSource_Image>::startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/) {
+    return IDataLoader::startAsyncPrecaching(bUsingGT,getInputMaxSize().area()*(m_nImageCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
 }
 
 bool litiv::IDataProducer_<litiv::eDatasetSource_Image>::isInputConstantSize() const {
@@ -583,7 +584,106 @@ size_t litiv::DataCounter_<litiv::eGroup>::getProcessedPacketsCount() const {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void litiv::IDataArchiver::save(const cv::Mat& oOutput, size_t nIdx) const {
+litiv::DataWriter::DataWriter(std::function<size_t(const cv::Mat&,size_t)> lDataArchiverCallback) :
+        m_lCallback(lDataArchiverCallback) {
+    CV_Assert(m_lCallback);
+    m_bIsActive = false;
+    m_bAllowPacketDrop = false;
+    m_nQueueSize = 0;
+    m_nQueueCount = 0;
+}
+
+litiv::DataWriter::~DataWriter() {
+    stopAsyncWriting();
+}
+
+size_t litiv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
+    if(!m_bIsActive)
+        return m_lCallback(oPacket,nIdx);
+    cv::Mat oPacketCopy = oPacket.clone();
+    const size_t nPacketSize = oPacket.total()*oPacket.elemSize();
+    size_t nPacketPosition;
+    {
+        std::mutex_unique_lock sync_lock(m_oSyncMutex);
+        if(!m_bAllowPacketDrop && m_nQueueSize+nPacketSize>m_nQueueMaxSize)
+            m_oClearCondVar.wait(sync_lock,[&]{return m_nQueueSize+nPacketSize<=m_nQueueMaxSize;});
+        if(m_nQueueSize+nPacketSize<=m_nQueueMaxSize) {
+            m_mQueue[nIdx] = std::move(oPacketCopy);
+            m_nQueueSize += nPacketSize;
+            // @@@ could cut a find operation here using C++17's map::insert_or_assign above
+            nPacketPosition = std::distance(m_mQueue.begin(),m_mQueue.find(nIdx));
+            ++m_nQueueCount;
+        }
+        else {
+#if CONSOLE_DEBUG
+            std::cout << "data writer [" << uintptr_t(this) << "] dropping packet #" << nIdx << std::endl;
+#endif //CONSOLE_DEBUG
+            nPacketPosition = SIZE_MAX; // packet dropped
+        }
+    }
+    m_oQueueCondVar.notify_one();
+#if CONSOLE_DEBUG
+    if((nIdx%50)==0)
+        std::cout << "data writer [" << uintptr_t(this) << "] queue @ " << (int)(((float)m_nQueueSize*100)/m_nQueueMaxSize) << "% capacity" << std::endl;
+#endif //CONSOLE_DEBUG
+    return nPacketPosition;
+}
+
+bool litiv::DataWriter::startAsyncWriting(size_t nSuggestedQueueSize, bool bDropPacketsIfFull, size_t nWorkers) {
+    if(m_bIsActive)
+        stopAsyncWriting();
+    if(nSuggestedQueueSize>0) {
+        m_bIsActive = true;
+        m_bAllowPacketDrop = bDropPacketsIfFull;
+        m_nQueueMaxSize = (nSuggestedQueueSize>CACHE_MAX_SIZE)?(CACHE_MAX_SIZE):nSuggestedQueueSize;
+        m_nQueueSize = 0;
+        m_nQueueCount = 0;
+        m_mQueue.clear();
+        for(size_t n=0; n<nWorkers; ++n)
+            m_vhWorkers.emplace_back(std::bind(&DataWriter::entry,this));
+    }
+    return m_bIsActive;
+}
+
+void litiv::DataWriter::stopAsyncWriting() {
+    if(m_bIsActive) {
+        m_bIsActive = false;
+        m_oQueueCondVar.notify_all();
+        for(std::thread& oWorker : m_vhWorkers)
+            oWorker.join();
+    }
+}
+
+void litiv::DataWriter::entry() {
+    std::mutex_unique_lock sync_lock(m_oSyncMutex);
+#if CONSOLE_DEBUG
+    std::cout << "data writer [" << uintptr_t(this) << "] init w/ max buffer size = " << (m_nQueueMaxSize/1024)/1024 << " mb" << std::endl;
+#endif //CONSOLE_DEBUG
+    while(m_bIsActive || m_nQueueCount>0) {
+        if(m_nQueueCount==0)
+            m_oQueueCondVar.wait(sync_lock);
+        if(m_nQueueCount>0) {
+            auto pCurrPacket = m_mQueue.begin();
+            lvDbgAssert(pCurrPacket!=m_mQueue.end());
+            const cv::Mat oPacketData(std::move(pCurrPacket->second));
+            const size_t nPacketIdx = pCurrPacket->first;
+            const size_t nPacketSize = oPacketData.total()*oPacketData.elemSize();
+            lvDbgAssert(nPacketSize<=m_nQueueSize);
+            m_nQueueSize -= nPacketSize;
+            m_mQueue.erase(pCurrPacket);
+            --m_nQueueCount;
+            std::unlock_guard<std::mutex_unique_lock> oUnlock(sync_lock);
+            m_lCallback(oPacketData,nPacketIdx);
+            m_oClearCondVar.notify_all();
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+size_t litiv::IDataArchiver::save(const cv::Mat& oOutput, size_t nIdx) const {
     CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
     std::stringstream sOutputFilePath;
     sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << getPacketName(nIdx) << getDatasetInfo()->getOutputNameSuffix();
@@ -604,6 +704,7 @@ void litiv::IDataArchiver::save(const cv::Mat& oOutput, size_t nIdx) const {
         // @@@@ save to YML
         lvError("Missing impl");
     }
+    return 0;
 }
 
 cv::Mat litiv::IDataArchiver::load(size_t nIdx) const {

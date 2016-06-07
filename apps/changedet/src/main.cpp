@@ -108,7 +108,7 @@ int main(int, char**) {
             litiv::IDataHandlerPtr pBatch = vpBatches.top();
             std::cout << "\tProcessing [" << ++nProcessedBatches << "/" << nTotBatches << "] (" << pBatch->getRelativePath() << ", L=" << std::scientific << std::setprecision(2) << pBatch->getExpectedLoad() << ")" << std::endl;
             if(DATASET_PRECACHING)
-                dynamic_cast<DatasetType::WorkBatch&>(*pBatch).startPrecaching(EVALUATE_OUTPUT);
+                dynamic_cast<DatasetType::WorkBatch&>(*pBatch).startAsyncPrecaching(EVALUATE_OUTPUT);
             ++g_nActiveThreads;
             std::thread(Analyze,(int)nProcessedBatches,pBatch).detach();
             vpBatches.pop();
