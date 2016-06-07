@@ -281,7 +281,7 @@ namespace CxxUtils {
             for_each_in_tuple(m_aMutexes,[](auto& oMutex) noexcept {oMutex.unlock();});
         }
         ~unlock_guard() {
-            std::lock(m_aMutexes...);
+            std::lock(m_aMutexes);
         }
         unlock_guard(const unlock_guard&) = delete;
         unlock_guard& operator=(const unlock_guard&) = delete;
@@ -329,18 +329,18 @@ namespace CxxUtils {
         template<typename TRep, typename TPeriod=std::ratio<1>>
         inline bool wait_for(const std::chrono::duration<TRep,TPeriod>& nDuration) {
             std::unique_lock<std::mutex> oLock(m_oMutex);
-            bool b = m_oCondVar.wait_for(oLock,nDuration,[&]{return m_nCount>0;});
-            if(finished)
+            bool bFinished = m_oCondVar.wait_for(oLock,nDuration,[&]{return m_nCount>0;});
+            if(bFinished)
                 --m_nCount;
-            return finished;
+            return bFinished;
         }
         template<typename TClock, typename TDuration=typename TClock::duration>
         inline bool wait_until(const std::chrono::time_point<TClock,TDuration>& nTimePoint) {
             std::unique_lock<std::mutex> oLock(m_oMutex);
-            auto finished = m_oCondVar.wait_until(oLock,nTimePoint,[&]{return m_nCount>0;});
-            if(finished)
+            bool bFinished = m_oCondVar.wait_until(oLock,nTimePoint,[&]{return m_nCount>0;});
+            if(bFinished)
                 --m_nCount;
-            return finished;
+            return bFinished;
         }
         inline native_handle_type native_handle() {
             return m_oCondVar.native_handle();

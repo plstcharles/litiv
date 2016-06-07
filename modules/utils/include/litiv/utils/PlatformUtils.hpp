@@ -341,7 +341,7 @@ namespace PlatformUtils {
 #endif //ndef(_TrackingConfidence_)
 #ifndef _CameraSpacePoint_
 #define _CameraSpacePoint_
-    using CameraSpacePoint = struct {
+    using CameraSpacePoint = struct _CameraSpacePoint {
         float X,Y,Z;
     };
 #endif //ndef(_CameraSpacePoint_)
@@ -379,16 +379,16 @@ namespace PlatformUtils {
 #ifndef _Joint_
 #define _Joint_
     using Joint = struct _Joint {
-        JointType JointType;
-        CameraSpacePoint Position;
-        TrackingState TrackingState;
+        _JointType JointType;
+        _CameraSpacePoint Position;
+        _TrackingState TrackingState;
     };
 #endif //ndef(_Joint_)
 #ifndef _JointOrientation_
 #define _JointOrientation_
     using JointOrientation = struct _JointOrientation {
-        JointType JointType;
-        Vector4 Orientation;
+        _JointType JointType;
+        _Vector4 Orientation;
     };
 #endif //ndef(_JointOrientation_)
 #endif //USE_KINECTSDK_STANDALONE
