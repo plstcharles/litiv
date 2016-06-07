@@ -54,9 +54,9 @@ void cv::DisplayHelper::display(const cv::Mat& oImage, size_t nIdx) {
     cv::Size oCurrDisplaySize;
     if(m_oMaxDisplaySize.area()>0 && (oImageBYTE3.cols>m_oMaxDisplaySize.width || oImageBYTE3.rows>m_oMaxDisplaySize.height)) {
         if(oImageBYTE3.cols>m_oMaxDisplaySize.width && oImageBYTE3.cols>oImageBYTE3.rows)
-            oCurrDisplaySize = cv::Size(m_oMaxDisplaySize.width,m_oMaxDisplaySize.width*(oImageBYTE3.rows/oImageBYTE3.cols));
+            oCurrDisplaySize = cv::Size(m_oMaxDisplaySize.width,int(m_oMaxDisplaySize.width*(float(oImageBYTE3.rows)/oImageBYTE3.cols)));
         else
-            oCurrDisplaySize = cv::Size(m_oMaxDisplaySize.height*(oImageBYTE3.cols/oImageBYTE3.rows),m_oMaxDisplaySize.height);
+            oCurrDisplaySize = cv::Size(int(m_oMaxDisplaySize.height*(float(oImageBYTE3.cols)/oImageBYTE3.rows)),m_oMaxDisplaySize.height);
         cv::resize(oImageBYTE3,oImageBYTE3,oCurrDisplaySize);
     }
     else
@@ -102,11 +102,11 @@ void cv::DisplayHelper::display(const cv::Mat& oInputImg, const cv::Mat& oDebugI
     else
         oOutputImgBYTE3 = oOutputImg;
     cv::Size oCurrDisplaySize;
-    if(m_oMaxDisplaySize.area()>0 && (oOutputImgBYTE3.cols>m_oMaxDisplaySize.width || oOutputImgBYTE3.rows>m_oMaxDisplaySize.height)) {
-        if(oOutputImgBYTE3.cols>m_oMaxDisplaySize.width && oOutputImgBYTE3.cols>oOutputImgBYTE3.rows)
-            oCurrDisplaySize = cv::Size(m_oMaxDisplaySize.width,m_oMaxDisplaySize.width*(oOutputImgBYTE3.rows/oOutputImgBYTE3.cols));
+    if(m_oMaxDisplaySize.area()>0 && (oOutputImgBYTE3.cols*3>m_oMaxDisplaySize.width || oOutputImgBYTE3.rows>m_oMaxDisplaySize.height)) {
+        if(oOutputImgBYTE3.cols*3>m_oMaxDisplaySize.width && oOutputImgBYTE3.cols>oOutputImgBYTE3.rows)
+            oCurrDisplaySize = cv::Size((m_oMaxDisplaySize.width/3),int((m_oMaxDisplaySize.width/3)*(float(oOutputImgBYTE3.rows)/oOutputImgBYTE3.cols)));
         else
-            oCurrDisplaySize = cv::Size(m_oMaxDisplaySize.height*(oOutputImgBYTE3.cols/oOutputImgBYTE3.rows),m_oMaxDisplaySize.height);
+            oCurrDisplaySize = cv::Size(int(m_oMaxDisplaySize.height*(float(oOutputImgBYTE3.cols)/oOutputImgBYTE3.rows)),m_oMaxDisplaySize.height);
         cv::resize(oInputImgBYTE3,oInputImgBYTE3,oCurrDisplaySize);
         cv::resize(oDebugImgBYTE3,oDebugImgBYTE3,oCurrDisplaySize);
         cv::resize(oOutputImgBYTE3,oOutputImgBYTE3,oCurrDisplaySize);
