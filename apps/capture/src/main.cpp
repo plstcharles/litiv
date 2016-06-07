@@ -39,7 +39,6 @@ std::atomic_bool g_bIsActive = true;
 int main() {
     try {
         PlatformUtils::RegisterAllConsoleSignals([](int nSignal){g_bIsActive = false;});
-#if WRITE_OUTPUT
         const auto lEncodeAndSaveFrame = [](const cv::Mat& oImage, size_t nIndex, cv::VideoWriter& oWriter, size_t& nLastSavedIndex) {
             lvAssert(!oImage.empty() && oWriter.isOpened());
             lvAssert(nLastSavedIndex==SIZE_MAX || nLastSavedIndex<nIndex);
@@ -47,77 +46,67 @@ int main() {
             nLastSavedIndex = nIndex;
             return (size_t)0;
         };
+        const auto lEncodeAndSaveBodyFrame = [](const cv::Mat& oBodyFrame, size_t nIndex, std::ofstream* pWriter, size_t& nLastSavedIndex){
+            lvAssert(!oBodyFrame.empty() && oBodyFrame.total()*oBodyFrame.elemSize()==sizeof(PlatformUtils::KinectBodyFrame));
+            lvAssert(pWriter && pWriter->is_open());
+            lvAssert(nLastSavedIndex==SIZE_MAX || nLastSavedIndex<nIndex);
+            ((PlatformUtils::KinectBodyFrame*)oBodyFrame.data)->nFrameIdx = nIndex;
+            pWriter->write((char*)oBodyFrame.data,sizeof(PlatformUtils::KinectBodyFrame));
+            nLastSavedIndex = nIndex;
+            return (size_t)0;
+        };
 #if USE_FLIR_SENSOR
+        std::cout << "Setting up FLIR device..." << std::endl;
+        lvAssertHR(CoInitializeEx(0,COINIT_MULTITHREADED|COINIT_DISABLE_OLE1DDE));
+        std::unique_ptr<litiv::DShowCameraGrabber> pFLIRSensor = std::make_unique<litiv::DShowCameraGrabber>("FLIR ThermaCAM",(bool)DISPLAY_OUTPUT);
+        lvAssertHR(pFLIRSensor->Connect());
+        cv::Mat oFLIRFrame;
+#if WRITE_OUTPUT
         std::cout << "Setting up FLIR video writer..." << std::endl;
         size_t nLastSavedFLIRFrameIdx = SIZE_MAX;
         cv::VideoWriter oFLIRVideoWriter("c:/temp/test_flir.avi",-1,30.0,cv::Size(320,240),false);
         lvAssert(oFLIRVideoWriter.isOpened());
         litiv::DataWriter oFLIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oFLIRVideoWriter,nLastSavedFLIRFrameIdx));
         lvAssert(oFLIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
+#endif //WRITE_OUTPUT
 #endif //USE_FLIR_SENSOR
-        std::cout << "Setting up BODY struct writer..." << std::endl;
-        struct BodyFrame {
-            bool bIsValid;
-            TIMESPAN nTimeStamp;
-            Vector4 vFloorClipPlane;
-            size_t nFrameIdx;
-            struct BodyData {
-                BOOLEAN bIsTracked;
-                BOOLEAN bIsRestricted;
-                DWORD nClippedEdges;
-                UINT64 nTrackingID;
-                PointF vLean;
-                TrackingState eLeanTrackState;
-                HandState eLeftHandState;
-                HandState eRightHandState;
-                TrackingConfidence eLeftHandStateConfidence;
-                TrackingConfidence eRightHandStateConfidence;
-                Joint aJointData[JointType::JointType_Count];
-                JointOrientation aJointOrientationData[JointType::JointType_Count];
-            } aBodyData[BODY_COUNT];
-        } oBodyFrame;
-        const cv::Mat oBodyFrameWrapper(1,(int)sizeof(BodyFrame),CV_8UC1,&oBodyFrame);
-        const auto lEncodeAndSaveBodyFrame = [](const cv::Mat& oBodyFrame, size_t nIndex, std::fstream* pWriter, size_t& nLastSavedIndex){
-            lvAssert(!oBodyFrame.empty() && oBodyFrame.total()*oBodyFrame.elemSize()==sizeof(BodyFrame));
-            lvAssert(pWriter && pWriter->is_open());
-            lvAssert(nLastSavedIndex==SIZE_MAX || nLastSavedIndex<nIndex);
-            ((BodyFrame*)oBodyFrame.data)->nFrameIdx = nIndex;
-            pWriter->write((char*)oBodyFrame.data,sizeof(BodyFrame));
-            nLastSavedIndex = nIndex;
-            return (size_t)0;
-        };
+        std::cout << "Setting up Kinect device..." << std::endl;
+        CComPtr<IKinectSensor> pKinectSensor;
+        lvAssertHR(GetDefaultKinectSensor(&pKinectSensor));
+        lvAssert(pKinectSensor);
+        lvAssertHR(pKinectSensor->Open());
+        CComPtr<IMultiSourceFrameReader> pMultiFrameReader;
+        lvAssertHR(pKinectSensor->OpenMultiSourceFrameReader(FrameSourceTypes_Color|FrameSourceTypes_Depth|FrameSourceTypes_Infrared|FrameSourceTypes_Body|FrameSourceTypes_BodyIndex,&pMultiFrameReader));
+        constexpr size_t nStreamCount = 5;
+        PlatformUtils::KinectBodyFrame oBodyFrame;
+        const cv::Mat oBodyFrameWrapper(1,(int)sizeof(PlatformUtils::KinectBodyFrame),CV_8UC1,&oBodyFrame);
+        cv::Mat oBodyIdxFrame,oNIRFrame,oDepthFrame,oColorFrame;
+#if WRITE_OUTPUT
+        std::cout << "Setting up Kinect body data writer..." << std::endl;
         size_t nLastSavedBodyFrameIdx = SIZE_MAX;
-        std::fstream oBodyStructWriter = PlatformUtils::CreateBinFileWithPrealloc("c:/temp/test_body.bin",STRUCT_FILE_PREALLOC_SIZE,true);
-        lvAssert(oBodyStructWriter);
+        std::ofstream oBodyStructWriter("c:/temp/test_body.bin",std::ios::out|std::ios::binary);
+        lvAssert(oBodyStructWriter && oBodyStructWriter.is_open());
         litiv::DataWriter oBodyStructAsyncWriter(std::bind(lEncodeAndSaveBodyFrame,std::placeholders::_1,std::placeholders::_2,&oBodyStructWriter,nLastSavedBodyFrameIdx));
         lvAssert(oBodyStructAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
-
         std::cout << "Setting up BODYINDEX video writer..." << std::endl;
-        cv::Mat oBodyIdxFrame;
         size_t nLastSavedBodyIdxFrameIdx = SIZE_MAX;
         cv::VideoWriter oBodyIdxVideoWriter("c:/temp/test_bodyidx.avi",-1,30.0,cv::Size(512,424),false);
         lvAssert(oBodyIdxVideoWriter.isOpened());
         litiv::DataWriter oBodyIdxVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oBodyIdxVideoWriter,nLastSavedBodyIdxFrameIdx));
         lvAssert(oBodyIdxVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
-
         std::cout << "Setting up NIR video writer..." << std::endl;
-        cv::Mat oNIRFrame;
         size_t nLastSavedNIRFrameIdx = SIZE_MAX;
         cv::VideoWriter oNIRVideoWriter("c:/temp/test_nir.avi",-1,30.0,cv::Size(512,424),false);
         lvAssert(oNIRVideoWriter.isOpened());
         litiv::DataWriter oNIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oNIRVideoWriter,nLastSavedNIRFrameIdx));
         lvAssert(oNIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
-
         std::cout << "Setting up DEPTH video writer..." << std::endl;
-        cv::Mat oDepthFrame;
         size_t nLastSavedDepthFrameIdx = SIZE_MAX;
         cv::VideoWriter oDepthVideoWriter("c:/temp/test_depth.avi",-1,30.0,cv::Size(512,424),false);
         lvAssert(oDepthVideoWriter.isOpened());
         litiv::DataWriter oDepthVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oDepthVideoWriter,nLastSavedDepthFrameIdx));
         lvAssert(oDepthVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
-
         std::cout << "Setting up COLOR video writer..." << std::endl;
-        cv::Mat oColorFrame;
         size_t nLastSavedColorFrameIdx = SIZE_MAX;
         const std::string sColorVideoFilePath = "e:/temp/test_color.avi";
         lvAssert(PlatformUtils::CreateBinFileWithPrealloc(sColorVideoFilePath,VIDEO_FILE_PREALLOC_SIZE));
@@ -127,19 +116,6 @@ int main() {
         lvAssert(oColorVideoAsyncWriter.startAsyncWriting(HIGHDEF_QUEUE_BUFFER_SIZE,true));
 #endif //WRITE_OUTPUT
 
-#if USE_FLIR_SENSOR
-        lvAssertHR(CoInitializeEx(0,COINIT_MULTITHREADED|COINIT_DISABLE_OLE1DDE));
-        std::unique_ptr<litiv::DShowCameraGrabber> pFLIRSensor = std::make_unique<litiv::DShowCameraGrabber>("FLIR ThermaCAM",(bool)DISPLAY_OUTPUT);
-        lvAssertHR(pFLIRSensor->Connect());
-        cv::Mat oFLIRFrame;
-#endif //USE_FLIR_SENSOR
-        CComPtr<IKinectSensor> pKinectSensor;
-        lvAssertHR(GetDefaultKinectSensor(&pKinectSensor));
-        lvAssert(pKinectSensor);
-        lvAssertHR(pKinectSensor->Open());
-        CComPtr<IMultiSourceFrameReader> pMultiFrameReader;
-        lvAssertHR(pKinectSensor->OpenMultiSourceFrameReader(FrameSourceTypes_Color|FrameSourceTypes_Depth|FrameSourceTypes_Infrared|FrameSourceTypes_Body|FrameSourceTypes_BodyIndex,&pMultiFrameReader));
-        constexpr size_t nStreamCount = 5;
         CComPtr<IMultiSourceFrame> pMultiFrame;
         PlatformUtils::WorkerPool<nStreamCount> oPool;
         std::array<std::future<bool>,nStreamCount> abGrabResults;
@@ -157,8 +133,8 @@ int main() {
                         lvAssertHR(apBodies[nBodyIdx]->get_IsRestricted(&oBodyFrame.aBodyData[nBodyIdx].bIsRestricted));
                         lvAssertHR(apBodies[nBodyIdx]->get_IsTracked(&oBodyFrame.aBodyData[nBodyIdx].bIsTracked));
                         if(oBodyFrame.aBodyData[nBodyIdx].bIsTracked) {
-                            lvAssertHR(apBodies[nBodyIdx]->GetJoints(JointType::JointType_Count,oBodyFrame.aBodyData[nBodyIdx].aJointData));
-                            lvAssertHR(apBodies[nBodyIdx]->GetJointOrientations(JointType::JointType_Count,oBodyFrame.aBodyData[nBodyIdx].aJointOrientationData));
+                            lvAssertHR(apBodies[nBodyIdx]->GetJoints(oBodyFrame.aBodyData[nBodyIdx].aJointData.size(),oBodyFrame.aBodyData[nBodyIdx].aJointData.data()));
+                            lvAssertHR(apBodies[nBodyIdx]->GetJointOrientations(oBodyFrame.aBodyData[nBodyIdx].aJointOrientationData.size(),oBodyFrame.aBodyData[nBodyIdx].aJointOrientationData.data()));
                             lvAssertHR(apBodies[nBodyIdx]->get_HandLeftConfidence(&oBodyFrame.aBodyData[nBodyIdx].eLeftHandStateConfidence));
                             lvAssertHR(apBodies[nBodyIdx]->get_HandRightConfidence(&oBodyFrame.aBodyData[nBodyIdx].eRightHandStateConfidence));
                             lvAssertHR(apBodies[nBodyIdx]->get_HandLeftState(&oBodyFrame.aBodyData[nBodyIdx].eLeftHandState));
@@ -279,7 +255,7 @@ int main() {
             if(bFinalGrabResult) {
 #if DISPLAY_OUTPUT
 #if USE_FLIR_SENSOR
-                if(!oFIRFrame.empty())
+                if(!oFLIRFrame.empty())
                     cv::imshow("oFIRFrame",oFIRFrame);
 #endif //USE_FLIR_SENSOR
                 if(!oBodyIdxFrame.empty())

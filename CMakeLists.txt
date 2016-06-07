@@ -109,6 +109,20 @@ set_eval(USE_CUDA 0)
 ### OPENCL CHECK @@@@ add later for parallel utils & impls
 set_eval(USE_OPENCL 0)
 
+### EXTRA LIBS CHECK
+if(WIN32)
+    find_package(KinectSDK2)
+endif()
+if(KinectSDK2_FOUND)
+    message(STATUS "Kinectv2 SDK found, will disable internal SDK standalone utilities.")
+    set(USE_KINECTSDK_STANDALONE FALSE CACHE INTERNAL "" FORCE)
+    include_directories(${KinectSDK2_INCLUDE_DIRS})
+    link_directories(${KinectSDK2_LIBRARY_DIRS})
+else()
+    message(STATUS "Kinectv2 SDK not found, will enable internal SDK standalone utilities.")
+    set(USE_KINECTSDK_STANDALONE TRUE CACHE INTERNAL "" FORCE)
+endif()
+
 ### SIMD CHECK
 try_cvhardwaresupport_runcheck_and_set_success(MMX OFF)
 try_cvhardwaresupport_runcheck_and_set_success(SSE ON)
