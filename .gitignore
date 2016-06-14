@@ -28,8 +28,7 @@
 
 # Test data #
 #############
-data
-data/
+/data/
 
 # Logs and databases #
 ######################
