@@ -1,0 +1,3 @@
+LITIV *imgproc* Module
+----------------------
+This module contains various image processing utilities and classes currently used only for edge detection. The main header file, [imgproc.hpp](./include/litiv/imgproc.hpp), contains two implementations of image thinning algorithms along with non-max suppression utilities. The module itself contains a wrapper interface for edge detection algorithms, and two versions of Canny's method: one based on OpenCV's implementation, and one using binary feature convolutions via LBSPs (see our [CVPRW2016 paper](http://www.polymtl.ca/litiv/doc/StCharlesCVPRW2016.pdf) for more information).
