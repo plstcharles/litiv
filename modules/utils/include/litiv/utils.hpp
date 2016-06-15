@@ -22,6 +22,7 @@
 #include "litiv/utils/ParallelUtils.hpp"
 #include "litiv/utils/DistanceUtils.hpp"
 #include "litiv/utils/PlatformUtils.hpp"
+#include "litiv/utils/ConsoleUtils.hpp"
 #include "litiv/utils/OpenCVUtils.hpp"
 #if HAVE_GLSL
 #include "litiv/utils/GLUtils.hpp"
