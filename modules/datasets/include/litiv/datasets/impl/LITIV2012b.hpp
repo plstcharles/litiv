@@ -35,8 +35,8 @@ protected: // should still be protected, as creation should always be done via d
     ) :
             IDataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b,eEvalImpl>(
                     "LITIV 2012b (CVPRW2015 update)",
-                    PlatformUtils::AddDirSlashIfMissing(DATASET_ROOT)+"litiv/litiv2012b/",
-                    PlatformUtils::AddDirSlashIfMissing(DATASET_ROOT)+"litiv/litiv2012b/"+PlatformUtils::AddDirSlashIfMissing(sOutputDirName),
+                    PlatformUtils::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"litiv/litiv2012b/",
+                    PlatformUtils::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"litiv/litiv2012b/"+PlatformUtils::AddDirSlashIfMissing(sOutputDirName),
                     "homography",
                     ".cvmat",
                     std::vector<std::string>{""},

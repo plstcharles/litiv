@@ -50,9 +50,9 @@
 #elif (USE_CANNY+USE_LBSP)!=1
 #error "Must specify a single algorithm."
 #endif //USE_...
-#ifndef DATASET_ROOT
+#ifndef EXTERNAL_DATA_ROOT
 #error "Dataset root path should have been specified in CMake."
-#endif //ndef(DATASET_ROOT)
+#endif //ndef(EXTERNAL_DATA_ROOT)
 #ifndef DATASET_ID
 #define DATASET_ID eDataset_Custom
 #define DATASET_PARAMS \

@@ -36,8 +36,8 @@ protected: // should still be protected, as creation should always be done via d
     ) :
             IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_Wallflower,getDatasetEval<eDatasetTask,eDataset_Wallflower>(),eEvalImpl>(
                     "Wallflower",
-                    PlatformUtils::AddDirSlashIfMissing(DATASET_ROOT)+"Wallflower/dataset/",
-                    PlatformUtils::AddDirSlashIfMissing(DATASET_ROOT)+"Wallflower/"+PlatformUtils::AddDirSlashIfMissing(sOutputDirName),
+                    PlatformUtils::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"Wallflower/dataset/",
+                    PlatformUtils::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"Wallflower/"+PlatformUtils::AddDirSlashIfMissing(sOutputDirName),
                     "bin",
                     ".png",
                     std::vector<std::string>{""},

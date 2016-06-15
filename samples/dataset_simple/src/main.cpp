@@ -99,7 +99,7 @@ int main(int, char**) { // this sample uses no command line argument
         //
         litiv::IDatasetPtr pDataset = litiv::datasets::create<litiv::eDatasetTask_EdgDet,litiv::eDataset_Custom,ParallelUtils::eNonParallel>(
             "Custom Dataset Example",
-            PlatformUtils::AddDirSlashIfMissing(SAMPLES_ROOT)+"samples_data/custom_dataset_ex/",
+            PlatformUtils::AddDirSlashIfMissing(SAMPLES_DATA_ROOT)+"custom_dataset_ex/",
             "results_test",
             "edge_mask_",
             ".png",

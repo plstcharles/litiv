@@ -61,8 +61,8 @@ protected: // should still be protected, as creation should always be done via d
     ) :
             IDataset_<eDatasetTask,eDatasetSource_Image,eDataset_BSDS500,getDatasetEval<eDatasetTask,eDataset_BSDS500>(),eEvalImpl>(
                     "BSDS500",
-                    PlatformUtils::AddDirSlashIfMissing(DATASET_ROOT)+"BSDS500/data/images/",
-                    PlatformUtils::AddDirSlashIfMissing(DATASET_ROOT)+"BSDS500/BSR/"+PlatformUtils::AddDirSlashIfMissing(sOutputDirName),
+                    PlatformUtils::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"BSDS500/data/images/",
+                    PlatformUtils::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"BSDS500/BSR/"+PlatformUtils::AddDirSlashIfMissing(sOutputDirName),
                     "",
                     ".png",
                     (eType==eBSDS500Dataset_Training)?std::vector<std::string>{"train"}:((eType==eBSDS500Dataset_Training_Validation)?std::vector<std::string>{"train","val"}:std::vector<std::string>{"train","val","test"}),

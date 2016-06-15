@@ -97,8 +97,8 @@
 #define LITIV_VERSION_PATCH @LITIV_VERSION_PATCH@
 #define LITIV_VERSION_SHA1  "@GIT_SHA1@"
 
-#define DATASET_ROOT        XSTR(@DATASET_ROOT@)
-#define SAMPLES_ROOT        XSTR(@SAMPLES_ROOT@)
+#define EXTERNAL_DATA_ROOT  XSTR(@EXTERNAL_DATA_ROOT@)
+#define SAMPLES_DATA_ROOT   XSTR(@SAMPLES_DATA_ROOT@)
 
 // compile-time master switches for GPU/SIMD/threads usage
 #define HAVE_GPU_SUPPORT    1

@@ -30,7 +30,7 @@
 
 int main(int, char**) { // this sample uses no command line argument
     try { // its always a good idea to scope your app's top level in some try/catch blocks!
-        const cv::Mat oInput = cv::imread(SAMPLES_ROOT "/samples_data/108073.jpg"); // load a training image taken from the BSDS500 dataset
+        const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg"); // load a training image taken from the BSDS500 dataset
         if(oInput.empty()) // check if the mat is empty (i.e. if the image failed to load)
             CV_Error(-1,"Could not load test image from internal sample data folder");
         cv::Mat oEdgeMask; // no need to preallocate the output matrix (the algo will make sure it is allocated at some point)
