@@ -80,11 +80,11 @@ BackgroundSubtractorSuBSENSE::BackgroundSubtractorSuBSENSE_(size_t nDescDistThre
 void BackgroundSubtractorSuBSENSE::refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate) {
     // == refresh
     CV_Assert(m_bInitialized);
+    CV_Assert(!m_voBGColorSamples.empty() && !m_voBGColorSamples[0].empty());
     CV_Assert(fSamplesRefreshFrac>0.0f && fSamplesRefreshFrac<=1.0f);
     const size_t nModelSamplesToRefresh = fSamplesRefreshFrac<1.0f?(size_t)(fSamplesRefreshFrac*m_nBGSamples):m_nBGSamples;
     const size_t nRefreshSampleStartPos = fSamplesRefreshFrac<1.0f?rand()%m_nBGSamples:0;
-    const size_t channels = m_voBGColorSamples[nCurrRealModelSampleIdx].channels();
-
+    const size_t nChannels = m_voBGColorSamples[0].channels();
     for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
         const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
         if(bForceFGUpdate || !m_oLastFGMask.data[nPxIter]) {
@@ -94,9 +94,9 @@ void BackgroundSubtractorSuBSENSE::refreshModel(float fSamplesRefreshFrac, bool 
                 const size_t nSamplePxIdx = m_oImgSize.width*nSampleImgCoord_Y + nSampleImgCoord_X;
                 if(bForceFGUpdate || !m_oLastFGMask.data[nSamplePxIdx]) {
                     const size_t nCurrRealModelSampleIdx = nCurrModelSampleIdx%m_nBGSamples;
-                    for(size_t c=0; c<channels; ++c) {
-                        m_voBGColorSamples[nCurrRealModelSampleIdx].data[nPxIter*channels+c] = m_oLastColorFrame.data[nSamplePxIdx*channels+c];
-                        *((ushort*)(m_voBGDescSamples[nCurrRealModelSampleIdx].data+(nPxIter*channels+c)*2)) = *((ushort*)(m_oLastDescFrame.data+(nSamplePxIdx*channels+c)*2));
+                    for(size_t c=0; c<nChannels; ++c) {
+                        m_voBGColorSamples[nCurrRealModelSampleIdx].data[nPxIter*nChannels+c] = m_oLastColorFrame.data[nSamplePxIdx*nChannels+c];
+                        *((ushort*)(m_voBGDescSamples[nCurrRealModelSampleIdx].data+(nPxIter*nChannels+c)*2)) = *((ushort*)(m_oLastDescFrame.data+(nSamplePxIdx*nChannels+c)*2));
                     }
                 }
             }
