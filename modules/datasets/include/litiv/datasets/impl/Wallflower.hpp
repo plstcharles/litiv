@@ -66,7 +66,7 @@ protected:
         const std::string sInputFileSuffix(".bmp");
         this->m_mGTIndexLUT.clear();
         for(auto iter=vsImgPaths.begin(); iter!=vsImgPaths.end(); ++iter) {
-            if(*iter==this->getDataPath()+"/script.txt")
+            if(*iter==PlatformUtils::AddDirSlashIfMissing(this->getDataPath())+"script.txt")
                 bFoundScript = true;
             else if(iter->find(sGTFilePrefix)!=std::string::npos) {
                 this->m_mGTIndexLUT[(size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str())] = this->m_vsGTFramePaths.size();

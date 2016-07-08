@@ -29,7 +29,7 @@ litiv::DataHandler::DataHandler(const std::string& sBatchName, IDatasetPtr pData
         m_sRelativePath(sRelativePath),
         m_sDataPath(pDataset->getDatasetPath()+sRelativePath),
         m_sOutputPath(pDataset->getOutputPath()+sRelativePath),
-        m_bForcingGrayscale(PlatformUtils::string_contains_token(sBatchName,pDataset->getGrayscaleDirTokens())),
+        m_bForcingGrayscale(PlatformUtils::string_contains_token(sRelativePath,pDataset->getGrayscaleDirTokens())),
         m_pDataset(pDataset) {
     PlatformUtils::CreateDirIfNotExist(m_sOutputPath);
 }

@@ -131,8 +131,8 @@ int main() {
                         lvAssertHR(apBodies[nBodyIdx]->get_IsRestricted(&oBodyFrame.aBodyData[nBodyIdx].bIsRestricted));
                         lvAssertHR(apBodies[nBodyIdx]->get_IsTracked(&oBodyFrame.aBodyData[nBodyIdx].bIsTracked));
                         if(oBodyFrame.aBodyData[nBodyIdx].bIsTracked) {
-                            lvAssertHR(apBodies[nBodyIdx]->GetJoints(oBodyFrame.aBodyData[nBodyIdx].aJointData.size(),oBodyFrame.aBodyData[nBodyIdx].aJointData.data()));
-                            lvAssertHR(apBodies[nBodyIdx]->GetJointOrientations(oBodyFrame.aBodyData[nBodyIdx].aJointOrientationData.size(),oBodyFrame.aBodyData[nBodyIdx].aJointOrientationData.data()));
+                            lvAssertHR(apBodies[nBodyIdx]->GetJoints((UINT)oBodyFrame.aBodyData[nBodyIdx].aJointData.size(),oBodyFrame.aBodyData[nBodyIdx].aJointData.data()));
+                            lvAssertHR(apBodies[nBodyIdx]->GetJointOrientations((UINT)oBodyFrame.aBodyData[nBodyIdx].aJointOrientationData.size(),oBodyFrame.aBodyData[nBodyIdx].aJointOrientationData.data()));
                             lvAssertHR(apBodies[nBodyIdx]->get_HandLeftConfidence(&oBodyFrame.aBodyData[nBodyIdx].eLeftHandStateConfidence));
                             lvAssertHR(apBodies[nBodyIdx]->get_HandRightConfidence(&oBodyFrame.aBodyData[nBodyIdx].eRightHandStateConfidence));
                             lvAssertHR(apBodies[nBodyIdx]->get_HandLeftState(&oBodyFrame.aBodyData[nBodyIdx].eLeftHandState));
@@ -164,7 +164,7 @@ int main() {
                         lvAssertHR(pFrameDesc->get_Width(&nFrameWidth));
                         oBodyIdxFrame.create(nFrameHeight,nFrameWidth,CV_8UC1);
                     }
-                    lvAssertHR(pFrame->CopyFrameDataToArray(oBodyIdxFrame.total(),oBodyIdxFrame.data));
+                    lvAssertHR(pFrame->CopyFrameDataToArray((UINT)oBodyIdxFrame.total(),oBodyIdxFrame.data));
                 }
                 return bGotFrame;
             },
@@ -183,7 +183,7 @@ int main() {
                         lvAssertHR(pFrameDesc->get_Width(&nFrameWidth));
                         oNIRFrame.create(nFrameHeight,nFrameWidth,CV_16UC1);
                     }
-                    lvAssertHR(pFrame->CopyFrameDataToArray(oNIRFrame.total(),(uint16_t*)oNIRFrame.data));
+                    lvAssertHR(pFrame->CopyFrameDataToArray((UINT)oNIRFrame.total(),(uint16_t*)oNIRFrame.data));
                 }
                 return bGotFrame;
             },
@@ -202,7 +202,7 @@ int main() {
                         lvAssertHR(pFrameDesc->get_Width(&nFrameWidth));
                         oDepthFrame.create(nFrameHeight,nFrameWidth,CV_16UC1);
                     }
-                    lvAssertHR(pFrame->CopyFrameDataToArray(oDepthFrame.total(),(uint16_t*)oDepthFrame.data));
+                    lvAssertHR(pFrame->CopyFrameDataToArray((UINT)oDepthFrame.total(),(uint16_t*)oDepthFrame.data));
                 }
                 return bGotFrame;
             },

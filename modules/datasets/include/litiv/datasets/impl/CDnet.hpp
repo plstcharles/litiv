@@ -60,15 +60,15 @@ protected:
         // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
         std::vector<std::string> vsSubDirs;
         PlatformUtils::GetSubDirsFromDir(this->getDataPath(),vsSubDirs);
-        auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"/groundtruth");
-        auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"/input");
+        auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),PlatformUtils::AddDirSlashIfMissing(this->getDataPath())+"groundtruth");
+        auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),PlatformUtils::AddDirSlashIfMissing(this->getDataPath())+"input");
         if(gtDir==vsSubDirs.end() || inputDir==vsSubDirs.end())
             lvErrorExt("CDnet sequence '%s' did not possess the required groundtruth and input directories",this->getName().c_str());
         PlatformUtils::GetFilesFromDir(*inputDir,this->m_vsInputPaths);
         PlatformUtils::GetFilesFromDir(*gtDir,this->m_vsGTPaths);
         if(this->m_vsGTPaths.size()!=this->m_vsInputPaths.size())
             lvErrorExt("CDnet sequence '%s' did not possess same amount of GT & input frames",this->getName().c_str());
-        this->m_oROI = cv::imread(this->getDataPath()+"/ROI.bmp",cv::IMREAD_GRAYSCALE);
+        this->m_oROI = cv::imread(PlatformUtils::AddDirSlashIfMissing(this->getDataPath())+"ROI.bmp",cv::IMREAD_GRAYSCALE);
         if(this->m_oROI.empty())
             lvErrorExt("CDnet sequence '%s' did not possess a ROI.bmp file",this->getName().c_str());
         this->m_oROI = this->m_oROI>0;
