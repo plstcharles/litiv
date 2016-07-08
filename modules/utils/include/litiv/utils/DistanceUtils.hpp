@@ -357,7 +357,7 @@ namespace DistanceUtils {
     //! computes the color distortion between two generic arrays
     template<typename T>
     static inline auto cdist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) -> decltype(cdist<3>(a,b,nElements,m)) {
-        CV_Assert(nChannels>1 && nChannels<=4);
+        CV_Assert(nChannels<=4);
         switch(nChannels) {
             case 2: return cdist<2>(a,b,nElements,m);
             case 3: return cdist<3>(a,b,nElements,m);
