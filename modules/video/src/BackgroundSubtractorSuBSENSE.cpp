@@ -197,7 +197,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
     size_t nNonZeroDescCount = 0;
     const float fRollAvgFactor_LT = 1.0f/std::min(++m_nFrameIdx,m_nSamplesForMovingAvgs);
     const float fRollAvgFactor_ST = 1.0f/std::min(m_nFrameIdx,m_nSamplesForMovingAvgs/4);
-    if(m_nImgChannels==1) {
+    if(m_nImgChannels==0) {
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
             const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
             const size_t nDescIter = nPxIter*2;
@@ -334,12 +334,12 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
             const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
             const int nCurrImgCoord_X = m_voPxInfoLUT[nPxIter].nImgCoord_X;
             const int nCurrImgCoord_Y = m_voPxInfoLUT[nPxIter].nImgCoord_Y;
-            const size_t nPxIterRGB = nPxIter*3;
+            const size_t nPxIterRGB = nPxIter*m_nImgChannels;
             const size_t nDescIterRGB = nPxIterRGB*2;
             const size_t nFloatIter = nPxIter*4;
             const uchar* const anCurrColor = oInputImg.data+nPxIterRGB;
-            size_t nMinTotDescDist=s_nDescMaxDataRange_3ch;
-            size_t nMinTotSumDist=s_nColorMaxDataRange_3ch;
+            size_t nMinTotDescDist=s_nDescMaxDataRange_3ch;     // Change to n channel
+            size_t nMinTotSumDist=s_nColorMaxDataRange_3ch;     // Change to n channel
             float* pfCurrDistThresholdFactor = (float*)(m_oDistThresholdFrame.data+nFloatIter);
             float* pfCurrVariationFactor = (float*)(m_oVariationModulatorFrame.data+nFloatIter);
             float* pfCurrLearningRate = ((float*)(m_oUpdateRateFrame.data+nFloatIter));
@@ -354,13 +354,13 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
             uchar* anLastColor = m_oLastColorFrame.data+nPxIterRGB;
             const size_t nCurrColorDistThreshold = (size_t)(((*pfCurrDistThresholdFactor)*m_nMinColorDistThreshold)-((!m_oUnstableRegionMask.data[nPxIter])*STAB_COLOR_DIST_OFFSET));
             const size_t nCurrDescDistThreshold = ((size_t)1<<((size_t)floor(*pfCurrDistThresholdFactor+0.5f)))+m_nDescDistThresholdOffset+(m_oUnstableRegionMask.data[nPxIter]*UNSTAB_DESC_DIST_OFFSET);
-            const size_t nCurrTotColorDistThreshold = nCurrColorDistThreshold*3;
-            const size_t nCurrTotDescDistThreshold = nCurrDescDistThreshold*3;
+            const size_t nCurrTotColorDistThreshold = nCurrColorDistThreshold*m_nImgChannels;
+            const size_t nCurrTotDescDistThreshold = nCurrDescDistThreshold*m_nImgChannels;
             const size_t nCurrSCColorDistThreshold = nCurrTotColorDistThreshold/2;
-            alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE_BITS>,3> aanLBSPLookupVals;
+            alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE_BITS>,3> aanLBSPLookupVals;     // need to change to channels count
             LBSP::computeDescriptor_lookup(oInputImg,nCurrImgCoord_X,nCurrImgCoord_Y,aanLBSPLookupVals);
-            std::array<ushort,3> anCurrIntraDesc;
-            for(size_t c=0; c<3; ++c)
+            std::array<ushort,3> anCurrIntraDesc;       // need to change to channels count
+            for(size_t c=0; c<m_nImgChannels; ++c)
                 anCurrIntraDesc[c] = LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],anCurrColor[c],m_anLBSPThreshold_8bitLUT[anCurrColor[c]]);
             m_oUnstableRegionMask.data[nPxIter] = ((*pfCurrDistThresholdFactor)>UNSTABLE_REG_RDIST_MIN || (*pfCurrMeanRawSegmRes_LT-*pfCurrMeanFinalSegmRes_LT)>UNSTABLE_REG_RATIO_MIN || (*pfCurrMeanRawSegmRes_ST-*pfCurrMeanFinalSegmRes_ST)>UNSTABLE_REG_RATIO_MIN)?1:0;
             size_t nGoodSamplesCount=0, nSampleIdx=0;
@@ -369,35 +369,35 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                 const uchar* const anBGColor = m_voBGColorSamples[nSampleIdx].data+nPxIterRGB;
                 size_t nTotDescDist = 0;
                 size_t nTotSumDist = 0;
-                for(size_t c=0;c<3; ++c) {
+                for(size_t c=0;c<m_nImgChannels; ++c) {
                     const size_t nColorDist = DistanceUtils::L1dist(anCurrColor[c],anBGColor[c]);
                     if(nColorDist>nCurrSCColorDistThreshold)
-                        goto failedcheck3ch;
+                        goto failedcheck;
                     const size_t nIntraDescDist = DistanceUtils::hdist(anCurrIntraDesc[c],anBGIntraDesc[c]);
                     const ushort nCurrInterDesc = LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],anBGColor[c],m_anLBSPThreshold_8bitLUT[anBGColor[c]]);
                     const size_t nInterDescDist = DistanceUtils::hdist(nCurrInterDesc,anBGIntraDesc[c]);
                     const size_t nDescDist = (nIntraDescDist+nInterDescDist)/2;
                     const size_t nSumDist = std::min((nDescDist/2)*(s_nColorMaxDataRange_1ch/s_nDescMaxDataRange_1ch)+nColorDist,s_nColorMaxDataRange_1ch);
                     if(nSumDist>nCurrSCColorDistThreshold)
-                        goto failedcheck3ch;
+                        goto failedcheck;
                     nTotDescDist += nDescDist;
                     nTotSumDist += nSumDist;
                 }
                 if(nTotDescDist>nCurrTotDescDistThreshold || nTotSumDist>nCurrTotColorDistThreshold)
-                    goto failedcheck3ch;
+                    goto failedcheck;
                 if(nMinTotDescDist>nTotDescDist)
                     nMinTotDescDist = nTotDescDist;
                 if(nMinTotSumDist>nTotSumDist)
                     nMinTotSumDist = nTotSumDist;
                 nGoodSamplesCount++;
-                failedcheck3ch:
+                failedcheck:
                 nSampleIdx++;
             }
-            const float fNormalizedLastDist = ((float)DistanceUtils::L1dist<3>(anLastColor,anCurrColor)/s_nColorMaxDataRange_3ch+(float)DistanceUtils::hdist<3>(anLastIntraDesc,anCurrIntraDesc)/s_nDescMaxDataRange_3ch)/2;
+            const float fNormalizedLastDist = ((float)DistanceUtils::L1dist<3>(anLastColor,anCurrColor)/s_nColorMaxDataRange_3ch+(float)DistanceUtils::hdist<3>(anLastIntraDesc,anCurrIntraDesc)/s_nDescMaxDataRange_3ch)/2;      // change to n channel ranges
             *pfCurrMeanLastDist = (*pfCurrMeanLastDist)*(1.0f-fRollAvgFactor_ST) + fNormalizedLastDist*fRollAvgFactor_ST;
             if(nGoodSamplesCount<m_nRequiredBGSamples) {
                 // == foreground
-                const float fNormalizedMinDist = std::min(1.0f,((float)nMinTotSumDist/s_nColorMaxDataRange_3ch+(float)nMinTotDescDist/s_nDescMaxDataRange_3ch)/2 + (float)(m_nRequiredBGSamples-nGoodSamplesCount)/m_nRequiredBGSamples);
+                const float fNormalizedMinDist = std::min(1.0f,((float)nMinTotSumDist/s_nColorMaxDataRange_3ch+(float)nMinTotDescDist/s_nDescMaxDataRange_3ch)/2 + (float)(m_nRequiredBGSamples-nGoodSamplesCount)/m_nRequiredBGSamples);       // change to n channel ranges
                 *pfCurrMeanMinDist_LT = (*pfCurrMeanMinDist_LT)*(1.0f-fRollAvgFactor_LT) + fNormalizedMinDist*fRollAvgFactor_LT;
                 *pfCurrMeanMinDist_ST = (*pfCurrMeanMinDist_ST)*(1.0f-fRollAvgFactor_ST) + fNormalizedMinDist*fRollAvgFactor_ST;
                 *pfCurrMeanRawSegmRes_LT = (*pfCurrMeanRawSegmRes_LT)*(1.0f-fRollAvgFactor_LT) + fRollAvgFactor_LT;
@@ -405,7 +405,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                 oCurrFGMask.data[nPxIter] = UCHAR_MAX;
                 if(m_nModelResetCooldown && (rand()%(size_t)FEEDBACK_T_LOWER)==0) {
                     const size_t s_rand = rand()%m_nBGSamples;
-                    for(size_t c=0; c<3; ++c) {
+                    for(size_t c=0; c<m_nImgChannels; ++c) {
                         *((ushort*)(m_voBGDescSamples[s_rand].data+nDescIterRGB+2*c)) = anCurrIntraDesc[c];
                         *(m_voBGColorSamples[s_rand].data+nPxIterRGB+c) = anCurrColor[c];
                     }
@@ -413,7 +413,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
             }
             else {
                 // == background
-                const float fNormalizedMinDist = ((float)nMinTotSumDist/s_nColorMaxDataRange_3ch+(float)nMinTotDescDist/s_nDescMaxDataRange_3ch)/2;
+                const float fNormalizedMinDist = ((float)nMinTotSumDist/s_nColorMaxDataRange_3ch+(float)nMinTotDescDist/s_nDescMaxDataRange_3ch)/2;     // change to n channel ranges
                 *pfCurrMeanMinDist_LT = (*pfCurrMeanMinDist_LT)*(1.0f-fRollAvgFactor_LT) + fNormalizedMinDist*fRollAvgFactor_LT;
                 *pfCurrMeanMinDist_ST = (*pfCurrMeanMinDist_ST)*(1.0f-fRollAvgFactor_ST) + fNormalizedMinDist*fRollAvgFactor_ST;
                 *pfCurrMeanRawSegmRes_LT = (*pfCurrMeanRawSegmRes_LT)*(1.0f-fRollAvgFactor_LT);
@@ -421,7 +421,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                 const size_t nLearningRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil(*pfCurrLearningRate);
                 if((rand()%nLearningRate)==0) {
                     const size_t s_rand = rand()%m_nBGSamples;
-                    for(size_t c=0; c<3; ++c) {
+                    for(size_t c=0; c<m_nImgChannels; ++c) {
                         *((ushort*)(m_voBGDescSamples[s_rand].data+nDescIterRGB+2*c)) = anCurrIntraDesc[c];
                         *(m_voBGColorSamples[s_rand].data+nPxIterRGB+c) = anCurrColor[c];
                     }
@@ -439,10 +439,10 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                 const float fRandMeanRawSegmRes = *((float*)(m_oMeanRawSegmResFrame_ST.data+idx_rand_flt32));
                 if((n_rand%(bCurrUsing3x3Spread?nLearningRate:(nLearningRate/2+1)))==0
                     || (fRandMeanRawSegmRes>GHOSTDET_S_MIN && fRandMeanLastDist<GHOSTDET_D_MAX && (n_rand%((size_t)m_fCurrLearningRateLowerCap))==0)) {
-                    const size_t idx_rand_uchar_rgb = idx_rand_uchar*3;
+                    const size_t idx_rand_uchar_rgb = idx_rand_uchar*m_nImgChannels;
                     const size_t idx_rand_ushrt_rgb = idx_rand_uchar_rgb*2;
                     const size_t s_rand = rand()%m_nBGSamples;
-                    for(size_t c=0; c<3; ++c) {
+                    for(size_t c=0; c<m_nImgChannels; ++c) {
                         *((ushort*)(m_voBGDescSamples[s_rand].data+idx_rand_ushrt_rgb+2*c)) = anCurrIntraDesc[c];
                         *(m_voBGColorSamples[s_rand].data+idx_rand_uchar_rgb+c) = anCurrColor[c];
                     }
@@ -474,7 +474,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
             }
             if(DistanceUtils::popcount<3>(anCurrIntraDesc)>=4)
                 ++nNonZeroDescCount;
-            for(size_t c=0; c<3; ++c) {
+            for(size_t c=0; c<m_nImgChannels; ++c) {
                 anLastIntraDesc[c] = anCurrIntraDesc[c];
                 anLastColor[c] = anCurrColor[c];
             }
