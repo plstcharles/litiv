@@ -69,8 +69,13 @@ protected:
         if(this->m_vsGTPaths.size()!=this->m_vsInputPaths.size())
             lvErrorExt("CDnet sequence '%s' did not possess same amount of GT & input frames",this->getName().c_str());
         this->m_oROI = cv::imread(PlatformUtils::AddDirSlashIfMissing(this->getDataPath())+"ROI.bmp",cv::IMREAD_GRAYSCALE);
-        if(this->m_oROI.empty())
-            lvErrorExt("CDnet sequence '%s' did not possess a ROI.bmp file",this->getName().c_str());
+        cv::Mat oTempROI = cv::imread(PlatformUtils::AddDirSlashIfMissing(this->getDataPath())+"ROI.jpg");
+        if(this->m_oROI.empty() || oTempROI.empty())
+            lvErrorExt("CDnet sequence '%s' did not possess ROI.bmp/ROI.jpg files",this->getName().c_str());
+        if(this->m_oROI.size()!=oTempROI.size()) {
+            std::cerr << "CDnet sequence '" << this->getName().c_str() << "' ROI images size mismatch; will keep smallest overlap." << std::endl;
+            this->m_oROI = this->m_oROI(cv::Rect(0,0,std::min(this->m_oROI.cols,oTempROI.cols),std::min(this->m_oROI.rows,oTempROI.rows))).clone();
+        }
         this->m_oROI = this->m_oROI>0;
         this->m_oOrigSize = this->m_oROI.size();
         const double dScale = this->getDatasetInfo()->getScaleFactor();
