@@ -240,15 +240,15 @@ HRESULT  DbgUniqueProcessName(LPCTSTR inName, LPTSTR outName)
 
     DWORD dwProcessId = GetCurrentProcessId();
 
-    if (dotPos < 0) 
+    if (dotPos < 0)
     {
         //no extension in the input, appending process id to the input
         hr = StringCchPrintf(outName, MAX_PATH, TEXT("%s_%d"), inName, dwProcessId);
     }
     else
     {
-        TCHAR pathAndBasename[MAX_PATH] = {0};
-        
+        TCHAR pathAndBasename[MAX_PATH] = {};
+
         //there's an extension  - zero-terminate the path and basename first by copying
         hr = StringCchCopyN(pathAndBasename, MAX_PATH, inName, (size_t)dotPos);
 
@@ -270,7 +270,7 @@ void WINAPI DbgInitLogTo (
     LONG  lReturn;
     DWORD dwKeyType;
     DWORD dwKeySize;
-    TCHAR szFile[MAX_PATH] = {0};
+    TCHAR szFile[MAX_PATH] = {};
     static const TCHAR cszKey[] = TEXT("LogToFile");
 
     dwKeySize = MAX_PATH;
@@ -325,7 +325,7 @@ void WINAPI DbgInitLogTo (
             if (INVALID_HANDLE_VALUE == m_hOutput &&
                 GetLastError() == ERROR_SHARING_VIOLATION)
             {
-               TCHAR uniqueName[MAX_PATH] = {0};
+               TCHAR uniqueName[MAX_PATH] = {};
                if (SUCCEEDED(DbgUniqueProcessName(szFile, uniqueName)))
                {
                     m_hOutput = CreateFile(uniqueName, GENERIC_WRITE,
@@ -335,7 +335,7 @@ void WINAPI DbgInitLogTo (
                                          NULL);
                }
             }
-               
+
             if (INVALID_HANDLE_VALUE != m_hOutput)
             {
               static const TCHAR cszBar[] = TEXT("\r\n\r\n=====DbgInitialize()=====\r\n\r\n");
@@ -667,7 +667,7 @@ BOOL WINAPI DbgCheckModuleLevel(DWORD Type,DWORD Level)
 	// speed up unconditional output.
 	if (0==Level)
 	    return(TRUE);
-	
+
         for (LONG lKeyPos = 0;lKeyPos < iMAXLEVELS;lKeyPos++) {
             if (Type & Mask) {
                 if (Level <= (m_Levels[lKeyPos] & ~LOG_FORCIBLY_SET)) {
@@ -1087,7 +1087,7 @@ void WINAPI DbgSetWaitTimeout(DWORD dwTimeout)
         }
 
 	// !!! add something to print FOURCC guids?
-	
+
 	// shouldn't this print the hex CLSID?
         return "Unknown GUID Name";
     }
@@ -1128,7 +1128,7 @@ CDisp::CDisp(LONGLONG ll, int Format)
 
 CDisp::CDisp(REFCLSID clsid)
 {
-#ifdef UNICODE 
+#ifdef UNICODE
     (void)StringFromGUID2(clsid, m_String, NUMELMS(m_String));
 #else
     WCHAR wszTemp[50];
@@ -1400,7 +1400,7 @@ void WINAPI DumpGraph(IFilterGraph *pGraph, DWORD dwLevel)
 	    QueryFilterInfoReleaseGraph(info);
 
 	    // !!! should QueryVendorInfo here!
-	
+
 	    DbgLog((LOG_TRACE,dwLevel,TEXT("    Filter [%p]  '%ls'"), pFilter, info.achName));
 
 	    IEnumPins *pins;
@@ -1461,7 +1461,7 @@ void WINAPI DumpGraph(IFilterGraph *pGraph, DWORD dwLevel)
 	    }
 
 	}
-	
+
 	pFilter->Release();
     }
 

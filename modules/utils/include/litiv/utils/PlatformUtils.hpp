@@ -136,7 +136,7 @@ namespace PlatformUtils {
 
     inline std::vector<uchar> unique_8uc1_values(const cv::Mat& oMat) {
         CV_Assert(!oMat.empty() && oMat.type()==CV_8UC1);
-        std::array<bool,UCHAR_MAX+1> anUniqueLUT{0};
+        std::array<bool,UCHAR_MAX+1> anUniqueLUT = {};
         for(int i=0; i<oMat.rows; ++i)
             for(int j=0; j<oMat.cols; ++j)
                 anUniqueLUT[oMat.at<uchar>(i,j)] = true;

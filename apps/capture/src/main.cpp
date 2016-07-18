@@ -122,7 +122,7 @@ int main() {
                 CComPtr<IBodyFrameReference> pFrameRef;
                 lvAssertHR(pMultiFrame->get_BodyFrameReference(&pFrameRef));
                 CComPtr<IBodyFrame> pFrame;
-                IBody* apBodies[BODY_COUNT] = {0};
+                IBody* apBodies[BODY_COUNT] = {};
                 const bool bGotFrame = SUCCEEDED(pFrameRef->AcquireFrame(&pFrame)) && SUCCEEDED(pFrame->GetAndRefreshBodyData(BODY_COUNT,apBodies));
                 if(bGotFrame) {
                     oBodyFrame.bIsValid = true;

@@ -212,7 +212,7 @@ STDMETHODIMP litiv::DShowCameraGrabber::Connect() {
     CComPtr<ISampleGrabber> pGrabberInterf;
     if(FAILED(hr=m_pGrabber->QueryInterface(IID_ISampleGrabber,(void**)&pGrabberInterf)))
         return hr;
-    AM_MEDIA_TYPE mt = {0};
+    AM_MEDIA_TYPE mt = {};
     mt.majortype = MEDIATYPE_Video;
     mt.subtype = MEDIASUBTYPE_ARGB32; // @@@ rgb24?
     mt.formattype = FORMAT_VideoInfo;
