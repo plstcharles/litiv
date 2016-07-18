@@ -22,9 +22,11 @@ add_files(SOURCE_FILES
     "src/imgproc.cpp"
 )
 add_files(INCLUDE_FILES
+    "include/litiv/imgproc/CosegmentationUtils.hpp"
     "include/litiv/imgproc/EdgeDetectionUtils.hpp"
     "include/litiv/imgproc/EdgeDetectorCanny.hpp"
     "include/litiv/imgproc/EdgeDetectorLBSP.hpp"
+    "include/litiv/imgproc/StereoGraphMatcher.hpp"
     "include/litiv/imgproc.hpp"
 )
 

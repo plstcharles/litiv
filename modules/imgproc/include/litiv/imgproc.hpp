@@ -20,6 +20,10 @@
 #include "litiv/features2d.hpp"
 #include "litiv/imgproc/EdgeDetectorCanny.hpp"
 #include "litiv/imgproc/EdgeDetectorLBSP.hpp"
+#include "litiv/imgproc/CosegmentationUtils.hpp"
+#if HAVE_OPENGM
+#include "litiv/imgproc/StereoGraphMatcher.hpp"
+#endif //HAVE_OPENGM
 #if HAVE_CUDA
 #include "litiv/imgproc/SLIC.hpp"
 #endif //HAVE_CUDA
