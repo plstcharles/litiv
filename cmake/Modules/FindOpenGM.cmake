@@ -33,15 +33,41 @@ find_path(OpenGM_INCLUDE_DIR
 )
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(OpenGM
-    REQUIRED_VARS
-        OpenGM_INCLUDE_DIR
-)
+option(USE_OPENGM_WITH_EXTLIB "Specifies whether OpenGM should be linked with its external/3rd-party library." OFF)
+if(USE_OPENGM_WITH_EXTLIB)
+    find_library(OpenGM_EXT_LIBRARY
+        NAMES
+            "opengm-external"
+        HINTS
+            "${OpenGM_INCLUDE_DIR}/../lib/"
+            "${OpenGM_INCLUDE_DIR}/../lib64/"
+            "${OpenGM_LIBRARY_DIR}"
+            "${OpenGM_ROOT_DIR}/lib/"
+            "${OpenGM_ROOT_DIR}/build/lib/"
+            "${OpenGM_ROOT_DIR}/build/lib/Release/"
+            "$ENV{OPENGM_ROOT}/lib/"
+            "$ENV{OPENGM_ROOT}/build/lib/"
+            "$ENV{OPENGM_ROOT}/build/lib/Release/"
+            "$ENV{USER_DEVELOP}/opengm/build/Release/"
+            "$ENV{USER_DEVELOP}/vendor/opengm/build/Release/"
+    )
+    find_package_handle_standard_args(OpenGM
+        REQUIRED_VARS
+            OpenGM_INCLUDE_DIR
+            OpenGM_EXT_LIBRARY
+    )
+    list(APPEND OpenGM_LIBRARIES OpenGM_EXT_LIBRARY)
+else()
+    set(OpenGM_EXT_LIBRARY "")
+    find_package_handle_standard_args(OpenGM
+        REQUIRED_VARS
+            OpenGM_INCLUDE_DIR
+    )
+endif()
 
 if(OpenGM_FOUND)
-
     set(OpenGM_INCLUDE_DIRS ${OpenGM_INCLUDE_DIR})
-    set(OpenGM_LIBRARIES "")
+    set(OpenGM_LIBRARIES ${OpenGM_EXT_LIBRARY})
 
     # @@@ might be able to deduce USE_OPENGM_WITH... vals using header presence
 
@@ -78,7 +104,7 @@ if(OpenGM_FOUND)
     mark_as_advanced(
         OpenGM_INCLUDE_DIR
         OpenGM_INCLUDE_DIRS
+        OpenGM_EXT_LIBRARY
         OpenGM_LIBRARIES
     )
-
 endif()
