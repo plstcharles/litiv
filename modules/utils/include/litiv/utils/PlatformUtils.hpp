@@ -38,6 +38,7 @@
 #include <iomanip>
 #include <ctime>
 #include <unordered_map>
+#include <unordered_set>
 #include <deque>
 #include <inttypes.h>
 #include <csignal>
@@ -134,18 +135,13 @@ namespace PlatformUtils {
         return std::vector<size_t>(vnIndexes.begin(),pLastIdxIter);
     }
 
-    inline std::vector<uchar> unique_8uc1_values(const cv::Mat& oMat) {
-        CV_Assert(!oMat.empty() && oMat.type()==CV_8UC1);
-        std::array<bool,UCHAR_MAX+1> anUniqueLUT = {};
-        for(int i=0; i<oMat.rows; ++i)
-            for(int j=0; j<oMat.cols; ++j)
-                anUniqueLUT[oMat.at<uchar>(i,j)] = true;
-        std::vector<uchar> vuVals;
-        vuVals.reserve(UCHAR_MAX+1);
-        for(size_t n=0; n<UCHAR_MAX+1; ++n)
-            if(anUniqueLUT[n])
-                vuVals.push_back((uchar)n);
-        return vuVals;
+    template<typename T>
+    inline std::vector<T> unique(const cv::Mat_<T>& oMat, bool bSort=true) {
+        const std::unordered_set<T> mMap(oMat.begin(),oMat.end());
+        std::vector<T> vals(mMap.begin(),mMap.end());
+        if(bSort)
+            std::sort(vals.begin(),vals.end());
+        return vals;
     }
 
     template<typename T>

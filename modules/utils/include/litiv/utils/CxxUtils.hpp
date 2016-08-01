@@ -249,6 +249,15 @@ namespace CxxUtils {
         });
     }
 
+    template<typename Tout, typename Ta, typename Tb>
+    static inline std::vector<Tout> concat(const std::vector<Ta>& a, const std::vector<Tb>& b) {
+        std::vector<Tout> v;
+        v.reserve(v.size()+b.size());
+        v.insert(v.end(),a.begin(),a.end());
+        v.insert(v.end(),b.begin(),b.end());
+        return v;
+    }
+
     template<typename T>
     struct enable_shared_from_this : public std::enable_shared_from_this<T> {
         template<typename Tcast>

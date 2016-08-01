@@ -112,7 +112,7 @@ namespace litiv {
             CV_Assert(dMaxDist>0 && nMaxDist>0);
 
             BSDS500Counters oMetricsBase(m_nThresholdBins);
-            const std::vector<uchar> vuEvalUniqueVals = PlatformUtils::unique_8uc1_values(oClassif);
+            const std::vector<uchar> vuEvalUniqueVals = PlatformUtils::unique<uchar>(oClassif);
             cv::Mat oCurrSegmMask(oClassif.size(),CV_8UC1), oTmpSegmMask(oClassif.size(),CV_8UC1);
             cv::Mat oSegmTPAccumulator(oClassif.size(),CV_8UC1);
             size_t nNextEvalUniqueValIdx = 0;
