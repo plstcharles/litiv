@@ -226,12 +226,12 @@ namespace litiv {
     protected:
         //! work batch/group comparison function based on names
         template<typename Tp>
-        static typename std::enable_if<std::is_base_of<IDataHandler,Tp>::value,bool>::type compare(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {
+        static std::enable_if_t<std::is_base_of<IDataHandler,Tp>::value,bool> compare(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {
             return PlatformUtils::compare_lowercase(i->getName(),j->getName());
         }
         //! work batch/group comparison function based on expected CPU load
         template<typename Tp>
-        static typename std::enable_if<std::is_base_of<IDataHandler,Tp>::value,bool>::type compare_load(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {
+        static std::enable_if_t<std::is_base_of<IDataHandler,Tp>::value,bool> compare_load(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {
             return i->getExpectedLoad()<j->getExpectedLoad();
         }
         //! work batch/group comparison function based on names

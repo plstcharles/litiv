@@ -56,21 +56,21 @@ namespace CxxUtils {
     }
 
     template<size_t n, typename F>
-    constexpr inline typename std::enable_if<n==0>::type unroll(const F&) {}
+    constexpr inline std::enable_if_t<n==0> unroll(const F&) {}
 
     template<size_t n, typename F>
-    constexpr inline typename std::enable_if<(n>0)>::type unroll(const F& f) {
+    constexpr inline std::enable_if_t<(n>0)> unroll(const F& f) {
         unroll<n-1>(f);
         f(n-1);
     }
 
     template<size_t nWordBitSize, typename Tr>
-    constexpr inline typename std::enable_if<nWordBitSize==1,Tr>::type expand_bits(const Tr& nBits, int=0) {
+    constexpr inline std::enable_if_t<nWordBitSize==1,Tr> expand_bits(const Tr& nBits, int=0) {
         return nBits;
     }
 
     template<size_t nWordBitSize, typename Tr>
-    constexpr inline typename std::enable_if<(nWordBitSize>1),Tr>::type expand_bits(const Tr& nBits, int n=((sizeof(Tr)*8)/nWordBitSize)-1) {
+    constexpr inline std::enable_if_t<(nWordBitSize>1),Tr> expand_bits(const Tr& nBits, int n=((sizeof(Tr)*8)/nWordBitSize)-1) {
         static_assert(std::is_integral<Tr>::value,"nBits type must be integral");
         // only the first [(sizeof(Tr)*8)/nWordBitSize] bits are kept (otherwise overflow/ignored)
         return (Tr)(bool(nBits&(1<<n))<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,Tr>(nBits,n-1):(Tr)0);
@@ -355,16 +355,16 @@ namespace std { // extending std
 
 #if !defined(_MSC_VER) && __cplusplus<=201103L // make_unique is missing from C++11 (at least on GCC)
     template<typename T, typename... Targs>
-    inline typename std::enable_if<!std::is_array<T>::value,std::unique_ptr<T>>::type make_unique(Targs&&... args) {
+    inline std::enable_if_t<!std::is_array<T>::value,std::unique_ptr<T>> make_unique(Targs&&... args) {
         return std::unique_ptr<T>(new T(std::forward<Targs>(args)...));
     }
     template<typename T>
-    inline typename std::enable_if<(std::is_array<T>::value && !std::extent<T>::value),std::unique_ptr<T>>::type make_unique(size_t nSize) {
-        using ElemType = typename std::remove_extent<T>::type;
+    inline std::enable_if_t<(std::is_array<T>::value && !std::extent<T>::value),std::unique_ptr<T>> make_unique(size_t nSize) {
+        using ElemType = std::remove_extent_t<T>;
         return std::unique_ptr<T>(new ElemType[nSize]());
     }
     template<typename T, typename... Targs>
-    typename std::enable_if<(std::extent<T>::value!=0)>::type make_unique(Targs&&...) = delete;
+    std::enable_if_t<(std::extent<T>::value!=0)> make_unique(Targs&&...) = delete;
 #endif //(!defined(_MSC_VER) && __cplusplus<=201103L)
 
 } //namespace std

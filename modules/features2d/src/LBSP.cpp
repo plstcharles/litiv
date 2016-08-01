@@ -73,8 +73,9 @@ size_t LBSP::getAbsThreshold() const {
     return m_nThreshold;
 }
 
-static inline void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const std::vector<cv::KeyPoint>& voKeyPoints,
-                                    cv::Mat& oDesc, bool bSingleColumnDesc, size_t nThreshold) {
+namespace {
+
+void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const std::vector<cv::KeyPoint>& voKeyPoints, cv::Mat& oDesc, bool bSingleColumnDesc, size_t nThreshold) {
     static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
     CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
     CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
@@ -110,8 +111,7 @@ static inline void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRe
     }
 }
 
-static inline void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const std::vector<cv::KeyPoint>& voKeyPoints,
-                                    cv::Mat& oDesc, bool bSingleColumnDesc, float fThreshold, size_t nThresholdOffset) {
+void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const std::vector<cv::KeyPoint>& voKeyPoints, cv::Mat& oDesc, bool bSingleColumnDesc, float fThreshold, size_t nThresholdOffset) {
     static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
     CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
     CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
@@ -150,6 +150,8 @@ static inline void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRe
         }
     }
 }
+
+} //namespace
 
 void LBSP::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const {
     CV_Assert(!oImage.empty());

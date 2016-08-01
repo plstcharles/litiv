@@ -117,7 +117,7 @@ private:
 
 namespace GLUtils {
 
-    static inline bool isInternalFormatSupported(GLenum eInternalFormat) {
+    inline bool isInternalFormatSupported(GLenum eInternalFormat) {
         switch(eInternalFormat) {
             case GL_R8:
             case GL_R8UI:
@@ -135,7 +135,7 @@ namespace GLUtils {
         }
     }
 
-    static inline bool isMatTypeSupported(int nType) {
+    inline bool isMatTypeSupported(int nType) {
         switch(nType) {
             case CV_8UC1:
             case CV_8UC3:
@@ -152,7 +152,7 @@ namespace GLUtils {
         }
     }
 
-    static inline GLenum getInternalFormatFromMatType(int nTextureType, bool bUseIntegralFormat=true) {
+    inline GLenum getInternalFormatFromMatType(int nTextureType, bool bUseIntegralFormat=true) {
         switch(nTextureType) {
             case CV_8UC1:
                 return bUseIntegralFormat?GL_R8UI:GL_R8;
@@ -176,7 +176,7 @@ namespace GLUtils {
         }
     }
 
-    static inline GLenum getNormalizedIntegralFormatFromInternalFormat(GLenum eInternalFormat) {
+    inline GLenum getNormalizedIntegralFormatFromInternalFormat(GLenum eInternalFormat) {
         switch(eInternalFormat) {
             case GL_R8UI:
                 return GL_R8;
@@ -196,7 +196,7 @@ namespace GLUtils {
         }
     }
 
-    static inline GLenum getIntegralFormatFromInternalFormat(GLenum eInternalFormat) {
+    inline GLenum getIntegralFormatFromInternalFormat(GLenum eInternalFormat) {
         switch(eInternalFormat) {
             case GL_R8:
                 return GL_R8UI;
@@ -217,7 +217,7 @@ namespace GLUtils {
         }
     }
 
-    static inline const char* getGLSLFormatNameFromInternalFormat(GLenum eInternalFormat) {
+    inline const char* getGLSLFormatNameFromInternalFormat(GLenum eInternalFormat) {
         switch(eInternalFormat) {
             case GL_R8UI:
                 return "r8ui";
@@ -244,7 +244,7 @@ namespace GLUtils {
         }
     }
 
-    static inline bool isInternalFormatIntegral(GLenum eInternalFormat) {
+    inline bool isInternalFormatIntegral(GLenum eInternalFormat) {
         switch(eInternalFormat) {
             case GL_R8UI:
             case GL_R32UI:
@@ -263,7 +263,7 @@ namespace GLUtils {
         }
     }
 
-    static inline int getMatTypeFromInternalFormat(GLenum eInternalFormat) {
+    inline int getMatTypeFromInternalFormat(GLenum eInternalFormat) {
         switch(eInternalFormat) {
             case GL_R8UI:
             case GL_R8:
@@ -289,7 +289,7 @@ namespace GLUtils {
         }
     }
 
-    static inline GLenum getDataFormatFromChannels(int nTextureChannels, bool bUseIntegralFormat=true) {
+    inline GLenum getDataFormatFromChannels(int nTextureChannels, bool bUseIntegralFormat=true) {
         switch(nTextureChannels) {
             case 1:
                 return bUseIntegralFormat?GL_RED_INTEGER:GL_RED;
@@ -302,7 +302,7 @@ namespace GLUtils {
         }
     }
 
-    static inline int getChannelsFromDataFormat(GLenum eDataFormat) {
+    inline int getChannelsFromDataFormat(GLenum eDataFormat) {
         switch(eDataFormat) {
             case GL_RED:
             case GL_RED_INTEGER:
@@ -318,7 +318,7 @@ namespace GLUtils {
         }
     }
 
-    static inline GLenum getDataTypeFromMatDepth(int nTextureDepth, int nTextureChannels) {
+    inline GLenum getDataTypeFromMatDepth(int nTextureDepth, int nTextureChannels) {
         switch(nTextureDepth) {
             case CV_8U:
                 return nTextureChannels==4?GL_UNSIGNED_INT_8_8_8_8_REV:GL_UNSIGNED_BYTE;
@@ -331,7 +331,7 @@ namespace GLUtils {
         }
     }
 
-    static inline int getMatDepthFromDataType(GLenum eDataType) {
+    inline int getMatDepthFromDataType(GLenum eDataType) {
         switch(eDataType) {
             case GL_UNSIGNED_BYTE:
             case GL_UNSIGNED_INT_8_8_8_8_REV:
@@ -345,7 +345,7 @@ namespace GLUtils {
         }
     }
 
-    static inline int getByteSizeFromMatDepth(int nDepth) {
+    inline int getByteSizeFromMatDepth(int nDepth) {
         switch(nDepth) {
             case CV_8U:
                 return 1;
@@ -357,7 +357,7 @@ namespace GLUtils {
         }
     }
 
-    static inline int getChannelsFromMatType(int nType) {
+    inline int getChannelsFromMatType(int nType) {
         switch(nType) {
             case CV_8UC1:
             case CV_32FC1:
@@ -376,7 +376,7 @@ namespace GLUtils {
         }
     }
 
-    static inline int getChannelsFromInternalFormat(GLenum eInternalFormat) {
+    inline int getChannelsFromInternalFormat(GLenum eInternalFormat) {
         switch(eInternalFormat) {
             case GL_R8:
             case GL_R8UI:
@@ -398,7 +398,7 @@ namespace GLUtils {
     }
 
     template<uint N>
-    static inline typename std::enable_if<(N==1),int>::type getIntegerVal(GLenum eParamName) {
+    inline std::enable_if_t<(N==1),int> getIntegerVal(GLenum eParamName) {
         int nVal;
         glGetIntegerv(eParamName,&nVal);
         glErrorCheck;
@@ -406,7 +406,7 @@ namespace GLUtils {
     }
 
     template<uint N>
-    static inline typename std::enable_if<(N>1),std::array<int,N>>::type getIntegerVal(GLenum eParamName) {
+    inline std::enable_if_t<(N>1),std::array<int,N>> getIntegerVal(GLenum eParamName) {
         std::array<int,N> anVal;
         for(uint n=0; n<N; ++n)
             glGetIntegeri_v(eParamName,n,&anVal[n]);

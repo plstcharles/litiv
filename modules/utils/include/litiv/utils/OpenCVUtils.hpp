@@ -28,7 +28,7 @@ namespace cv { // extending cv
     using DisplayHelperPtr = std::shared_ptr<DisplayHelper>;
 
     //! returns pixel coordinates clamped to the given image & border size
-    static inline void clampImageCoords(int& nSampleCoord_X,int& nSampleCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
+    inline void clampImageCoords(int& nSampleCoord_X,int& nSampleCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
         if(nSampleCoord_X<nBorderSize)
             nSampleCoord_X = nBorderSize;
         else if(nSampleCoord_X>=oImageSize.width-nBorderSize)
@@ -41,7 +41,7 @@ namespace cv { // extending cv
 
     //! returns a random init/sampling position for the specified pixel position, given a predefined kernel; also guards against out-of-bounds values via image/border size check.
     template<int nKernelHeight,int nKernelWidth>
-    static inline void getRandSamplePosition(const std::array<std::array<int,nKernelWidth>,nKernelHeight>& anSamplesInitPattern,
+    inline void getRandSamplePosition(const std::array<std::array<int,nKernelWidth>,nKernelHeight>& anSamplesInitPattern,
                                              const int nSamplesInitPatternTot,int& nSampleCoord_X,int& nSampleCoord_Y,
                                              const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
         int r = 1+rand()%nSamplesInitPatternTot;
@@ -59,7 +59,7 @@ namespace cv { // extending cv
     }
 
     //! returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-    static inline void getRandSamplePosition_3x3_std1(int& nSampleCoord_X,int& nSampleCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
+    inline void getRandSamplePosition_3x3_std1(int& nSampleCoord_X,int& nSampleCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
         // based on 'floor(fspecial('gaussian',3,1)*256)'
         static_assert(sizeof(std::array<int,3>)==sizeof(int)*3,"bad std::array stl impl");
         static const int s_nSamplesInitPatternTot = 256;
@@ -72,7 +72,7 @@ namespace cv { // extending cv
     }
 
     //! returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-    static inline void getRandSamplePosition_7x7_std2(int& nSampleCoord_X,int& nSampleCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
+    inline void getRandSamplePosition_7x7_std2(int& nSampleCoord_X,int& nSampleCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
         // based on 'floor(fspecial('gaussian',7,2)*512)'
         static_assert(sizeof(std::array<int,7>)==sizeof(int)*7,"bad std::array stl impl");
         static const int s_nSamplesInitPatternTot = 512;
@@ -90,7 +90,7 @@ namespace cv { // extending cv
 
     //! returns a random neighbor position for the specified pixel position, given a predefined neighborhood; also guards against out-of-bounds values via image/border size check.
     template<int nNeighborCount>
-    static inline void getRandNeighborPosition(const std::array<std::array<int,2>,nNeighborCount>& anNeighborPattern,
+    inline void getRandNeighborPosition(const std::array<std::array<int,2>,nNeighborCount>& anNeighborPattern,
                                                int& nNeighborCoord_X,int& nNeighborCoord_Y,
                                                const int nOrigCoord_X,const int nOrigCoord_Y,
                                                const int nBorderSize,const cv::Size& oImageSize) {
@@ -101,7 +101,7 @@ namespace cv { // extending cv
     }
 
     //! returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-    static inline void getRandNeighborPosition_3x3(int& nNeighborCoord_X,int& nNeighborCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
+    inline void getRandNeighborPosition_3x3(int& nNeighborCoord_X,int& nNeighborCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
         typedef std::array<int,2> Nb;
         static const std::array<std::array<int,2>,8> s_anNeighborPattern ={
                 Nb{-1, 1},Nb{0, 1},Nb{1, 1},
@@ -112,7 +112,7 @@ namespace cv { // extending cv
     }
 
     //! returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-    static inline void getRandNeighborPosition_5x5(int& nNeighborCoord_X,int& nNeighborCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
+    inline void getRandNeighborPosition_5x5(int& nNeighborCoord_X,int& nNeighborCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
         typedef std::array<int,2> Nb;
         static const std::array<std::array<int,2>,24> s_anNeighborPattern ={
                 Nb{-2, 2},Nb{-1, 2},Nb{0, 2},Nb{1, 2},Nb{2, 2},
@@ -125,12 +125,12 @@ namespace cv { // extending cv
     }
 
     //! writes a given text string on an image using the original cv::putText (this function only acts as a simplification wrapper)
-    static inline void putText(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom=false, const cv::Point2i& oOffset=cv::Point2i(4,15), int nThickness=2, double dScale=1.2) {
+    inline void putText(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom=false, const cv::Point2i& oOffset=cv::Point2i(4,15), int nThickness=2, double dScale=1.2) {
         cv::putText(oImg,sText,cv::Point(oOffset.x,bBottom?(oImg.rows-oOffset.y):oOffset.y),cv::FONT_HERSHEY_PLAIN,dScale,vColor,nThickness,cv::LINE_AA);
     }
 
     //! removes all keypoints from voKPs which fall on null values (or outside the bounds) of oROI
-    static inline void validateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoint>& voKPs) {
+    inline void validateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoint>& voKPs) {
         CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
         std::vector<cv::KeyPoint> voNewKPs;
         for(size_t k=0; k<voKPs.size(); ++k) {
@@ -190,8 +190,8 @@ namespace cv { // extending cv
     //! always-empty-size, which allows functions to return const-references to an empty size without dangling ref issues
     static const cv::Size g_oEmptySize = cv::Size();
     //! returns an always-empty-mat by reference
-    static inline const cv::Mat& emptyMat() {return g_oEmptyMat;}
+    inline const cv::Mat& emptyMat() {return g_oEmptyMat;}
     //! returns an always-empty-size by reference
-    static inline const cv::Size& emptySize() {return g_oEmptySize;}
+    inline const cv::Size& emptySize() {return g_oEmptySize;}
 
 } //namespace cv

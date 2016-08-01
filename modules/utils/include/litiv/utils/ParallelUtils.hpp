@@ -114,7 +114,7 @@ namespace ParallelUtils {
 
 #if HAVE_MMX
     //! returns the (horizontal) sum of the provided 8-unsigned-byte array
-    static inline uint hsum_8ub(const __m64& anBuffer) {
+    inline uint hsum_8ub(const __m64& anBuffer) {
         __m64 _anRes = _mm_sad_pu8(anBuffer,_mm_set1_pi8(char(0)));
         return uint(_mm_cvtsi64_si32(_anRes));
     }
@@ -122,17 +122,17 @@ namespace ParallelUtils {
 
 #if HAVE_SSE2
     //! returns the (horizontal) sum of the provided 16-unsigned-byte array
-    static inline uint hsum_16ub(const __m128i& anBuffer) {
+    inline uint hsum_16ub(const __m128i& anBuffer) {
         __m128i _anRes = _mm_sad_epu8(anBuffer,_mm_set1_epi8(char(0)));
         return uint(_mm_cvtsi128_si32(_mm_add_epi64(_mm_srli_si128(_anRes,8),_anRes)));
     }
 
     //! fills the provided 16-byte array with a constant
-    static inline void copy_16ub(__m128i* anBuffer, uchar nVal) {
+    inline void copy_16ub(__m128i* anBuffer, uchar nVal) {
         _mm_store_si128(anBuffer,_mm_set1_epi8((char)nVal));
     }
 
-    static inline __m128i mult_32si(const __m128i& a, const __m128i& b) {
+    inline __m128i mult_32si(const __m128i& a, const __m128i& b) {
 #if HAVE_SSE4_1
         return _mm_mullo_epi32(a, b);
 #else //(!HAVE_SSE4_1)
@@ -141,7 +141,7 @@ namespace ParallelUtils {
     }
 
     template<int nPos>
-    static inline int extract_32si(const __m128i& anBuffer) {
+    inline int extract_32si(const __m128i& anBuffer) {
         static_assert(nPos>=0 && nPos<4,"Integer position out of bounds");
 #if HAVE_SSE4_1
         return _mm_extract_epi32(anBuffer,nPos);
@@ -153,13 +153,13 @@ namespace ParallelUtils {
 
 #if HAVE_SSE4_1
     //! returns the maximum value of the provided 16-unsigned-byte array
-    static inline uchar hmax_16ub(const __m128i& anBuffer) {
+    inline uchar hmax_16ub(const __m128i& anBuffer) {
         __m128i _anTmp = _mm_sub_epi8(_mm_set1_epi8(char(CHAR_MAX)),anBuffer);
         return uchar(char(CHAR_MAX)-_mm_cvtsi128_si32(_mm_minpos_epu16(_mm_min_epu8(_anTmp,_mm_srli_epi16(_anTmp,8)))));
     }
 
     //! returns the minimum value of the provided 16-unsigned-byte array
-    static inline uchar hmin_16ub(const __m128i& anBuffer) {
+    inline uchar hmin_16ub(const __m128i& anBuffer) {
         return uchar(_mm_cvtsi128_si32(_mm_minpos_epu16(_mm_min_epu8(anBuffer,_mm_srli_epi16(anBuffer,8)))));
     }
 #endif //HAVE_SSE4_1

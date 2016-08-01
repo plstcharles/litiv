@@ -155,7 +155,7 @@ namespace CxxUtils {
 
     template<size_t N>
     struct MetaITOA {
-        using type = typename MetaStrConcat<typename std::conditional<(N>=10),typename MetaITOA<(N/10)>::type,MetaStr<>>::type,MetaStr<'0'+(N%10)>>::type;
+        using type = typename MetaStrConcat<std::conditional_t<(N>=10),typename MetaITOA<(N/10)>::type,MetaStr<>>,MetaStr<'0'+(N%10)>>::type;
     };
     template<>
     struct MetaITOA<0> {
@@ -174,9 +174,8 @@ namespace CxxUtils {
     };
 
     template<typename T>
-    static inline bool isnan(T dVal) {
-        // needed for portability...
-#ifdef _MSC_VER
+    inline bool isnan(T dVal) {
+#ifdef _MSC_VER // needed for portability...
         return _isnan((double)dVal)!=0;
 #else //(!def(_MSC_VER))
         return std::isnan(dVal);

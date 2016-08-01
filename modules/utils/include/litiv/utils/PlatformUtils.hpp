@@ -194,7 +194,7 @@ namespace PlatformUtils {
     }
 
     template<typename T>
-    inline typename std::enable_if<std::is_integral<T>::value,std::vector<T>>::type linspace(T a, T b, size_t steps, bool bIncludeInitVal=true) {
+    inline std::enable_if_t<std::is_integral<T>::value,std::vector<T>> linspace(T a, T b, size_t steps, bool bIncludeInitVal=true) {
         if(steps==0)
             return std::vector<T>();
         else if(steps==1)
@@ -211,7 +211,7 @@ namespace PlatformUtils {
     }
 
     template<typename T>
-    inline typename std::enable_if<std::is_floating_point<T>::value,std::vector<T>>::type linspace(T a, T b, size_t steps, bool bIncludeInitVal=true) {
+    inline std::enable_if_t<std::is_floating_point<T>::value,std::vector<T>> linspace(T a, T b, size_t steps, bool bIncludeInitVal=true) {
         if(steps==0)
             return std::vector<T>();
         else if(steps==1)
@@ -240,8 +240,8 @@ namespace PlatformUtils {
                 oWorker.join();
         }
         template<typename Tfunc, typename... Targs>
-        std::future<typename std::result_of<Tfunc(Targs...)>::type> queueTask(Tfunc&& lTaskEntryPoint, Targs&&... args) {
-            using task_return_t = typename std::result_of<Tfunc(Targs...)>::type;
+        std::future<std::result_of_t<Tfunc(Targs...)>> queueTask(Tfunc&& lTaskEntryPoint, Targs&&... args) {
+            using task_return_t = std::result_of_t<Tfunc(Targs...)>;
             using task_t = std::packaged_task<task_return_t()>;
             // http://stackoverflow.com/questions/28179817/how-can-i-store-generic-packaged-tasks-in-a-container
             std::shared_ptr<task_t> pSharableTask = std::make_shared<task_t>(std::bind(std::forward<Tfunc>(lTaskEntryPoint),std::forward<Targs>(args)...));

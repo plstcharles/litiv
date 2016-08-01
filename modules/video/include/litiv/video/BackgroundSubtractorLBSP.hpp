@@ -47,7 +47,7 @@ protected:
     IBackgroundSubtractorLBSP_(float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
                                size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
                                int nDefaultMedianBlurKernelSize=BGSLBSP_DEFAULT_MEDIAN_BLUR_KERNEL_SIZE,
-                               typename std::enable_if<eImplTemp==ParallelUtils::eNonParallel>::type* /*pUnused*/=0) :
+                               std::enable_if_t<eImplTemp==ParallelUtils::eNonParallel>* /*pUnused*/=0) :
             m_nLBSPThresholdOffset(nLBSPThresholdOffset),
             m_fRelLBSPThreshold(fRelLBSPThreshold),
             m_nDefaultMedianBlurKernelSize(nDefaultMedianBlurKernelSize) {
@@ -63,7 +63,7 @@ protected:
                                float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
                                size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
                                int nDefaultMedianBlurKernelSize=BGSLBSP_DEFAULT_MEDIAN_BLUR_KERNEL_SIZE,
-                               typename std::enable_if<eImplTemp==ParallelUtils::eGLSL>::type* /*pUnused*/=0) :
+                               std::enable_if_t<eImplTemp==ParallelUtils::eGLSL>* /*pUnused*/=0) :
             IBackgroundSubtractor_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat),
             m_nLBSPThresholdOffset(nLBSPThresholdOffset),
             m_fRelLBSPThreshold(fRelLBSPThreshold),
@@ -73,7 +73,7 @@ protected:
     }
     //! returns the GLSL compute shader source code for LBSP lookup/description functions
     template<ParallelUtils::eParallelAlgoType eImplTemp = eImpl> // dont pass arguments here!
-    typename std::enable_if<eImplTemp==ParallelUtils::eGLSL,std::string>::type getLBSPThresholdLUTShaderSource() const;
+    std::enable_if_t<eImplTemp==ParallelUtils::eGLSL,std::string> getLBSPThresholdLUTShaderSource() const;
 #endif //HAVE_GLSL
 #if HAVE_CUDA
     // ... @@@ add impl later
