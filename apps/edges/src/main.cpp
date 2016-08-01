@@ -155,7 +155,7 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         size_t nNextIdx = 1;
         while(nNextIdx<=nTotPacketCount) {
             if(!(nNextIdx%100))
-                std::cout << "\t\t" << CxxUtils::clampString(sCurrBatchName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nTotPacketCount)) << nNextIdx << "/" << nTotPacketCount << "   [GPU]" << std::endl;
+                std::cout << "\t\t" << CxxUtils::clampString(sCurrBatchName,12) << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::digit_count((int)nTotPacketCount)) << nNextIdx << "/" << nTotPacketCount << "   [GPU]" << std::endl;
             const double dCurrLearningRate = nNextIdx<=100?1:dDefaultLearningRate;
             oBatch.apply_gl(pAlgo,nNextIdx++,false,dCurrLearningRate);
             //pGLSLAlgoEvaluator->apply_gl(oNextGTMask);
@@ -228,7 +228,7 @@ void Analyze(int nThreadIdx, litiv::IDataHandlerPtr pBatch) {
         oBatch.startProcessing();
         while(nCurrIdx<nTotPacketCount) {
             //if(!((nCurrIdx+1)%100) && nCurrIdx<nTotPacketCount)
-                std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::decimal_integer_digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << "   [T=" << nThreadIdx << "]" << std::endl;
+                std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(PlatformUtils::digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << "   [T=" << nThreadIdx << "]" << std::endl;
             oCurrInput = oBatch.getInput(nCurrIdx);
 #if FULL_THRESH_ANALYSIS
             pAlgo->apply(oCurrInput,oCurrEdgeMask);

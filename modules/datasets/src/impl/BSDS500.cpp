@@ -645,7 +645,7 @@ namespace litiv {
             dMaxPrecision = litiv::BinClassifMetricsCalculator::CalcPrecision(oMaxBinClassifMetricsAccumulator.vnTotalTP[0],oMaxBinClassifMetricsAccumulator.vnTotalTPFP[0]);
             dMaxFMeasure = litiv::BinClassifMetricsCalculator::CalcFMeasure(dMaxRecall,dMaxPrecision);
             dAreaPR = 0;
-            std::vector<size_t> vnCumulRecallIdx_uniques = PlatformUtils::unique_indexes(voThresholdScores,[&](size_t n1, size_t n2) {
+            std::vector<size_t> vnCumulRecallIdx_uniques = PlatformUtils::unique_indices(voThresholdScores,[&](size_t n1, size_t n2) {
                     return voThresholdScores[n1].dRecall<voThresholdScores[n2].dRecall;
                 },[&](size_t n1, size_t n2) {
                     return voThresholdScores[n1].dRecall==voThresholdScores[n2].dRecall;

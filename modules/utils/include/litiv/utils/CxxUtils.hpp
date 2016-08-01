@@ -39,19 +39,20 @@ namespace CxxUtils {
 
     template<int> struct _; // used for compile-time integer expr printing via error; just write "_<expr> __;"
 
-    template<typename Derived,typename Base,typename Del>
-    std::unique_ptr<Derived,Del> static_unique_ptr_cast(std::unique_ptr<Base,Del>&& p) {
-        auto d = static_cast<Derived*>(p.release());
-        return std::unique_ptr<Derived,Del>(d,std::move(p.get_deleter()));
+    template<typename TDerived, typename TBase, typename TDeleter>
+    inline std::unique_ptr<TDerived,TDeleter> static_unique_ptr_cast(std::unique_ptr<TBase,TDeleter>&& p) {
+        auto d = static_cast<TDerived*>(p.release());
+        return std::unique_ptr<TDerived,TDeleter>(d,std::move(p.get_deleter()));
     }
 
-    template<typename Derived,typename Base,typename Del>
-    std::unique_ptr<Derived,Del>dynamic_unique_ptr_cast(std::unique_ptr<Base,Del>&& p) {
-        if(Derived* result = dynamic_cast<Derived*>(p.get())) {
+    template<typename TDerived, typename TBase, typename TDeleter>
+    inline std::unique_ptr<TDerived,TDeleter> dynamic_unique_ptr_cast(std::unique_ptr<TBase,TDeleter>&& p) {
+        // note: returned ptr deleter will be the original ptr's
+        if(TDerived* result = dynamic_cast<TDerived*>(p.get())) {
             p.release();
-            return std::unique_ptr<Derived,Del>(result,std::move(p.get_deleter()));
+            return std::unique_ptr<TDerived,TDeleter>(result,std::move(p.get_deleter()));
         }
-        return std::unique_ptr<Derived,Del>(nullptr,p.get_deleter());
+        return std::unique_ptr<TDerived,TDeleter>(nullptr,p.get_deleter());
     }
 
     template<size_t n, typename F>
@@ -75,7 +76,7 @@ namespace CxxUtils {
         return (Tr)(bool(nBits&(1<<n))<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,Tr>(nBits,n-1):(Tr)0);
     }
 
-    template<typename T,std::size_t nByteAlign>
+    template<typename T, std::size_t nByteAlign>
     class AlignAllocator {
     public:
         typedef T value_type;
@@ -131,41 +132,6 @@ namespace CxxUtils {
         bool operator==(const AlignAllocator<T,nByteAlign>& other) const {return true;}
     };
 
-#ifndef _MSC_VER // meta-str-concat below does not compile properly w/ MSVC 2015 toolchain (last tested Jan. 2015)
-    template<char... str> struct MetaStr {
-        static constexpr char value[] = {str...};
-    };
-    template<char... str>
-    constexpr char MetaStr<str...>::value[];
-
-    template<typename, typename>
-    struct MetaStrConcat;
-    template<char... str1, char... str2>
-    struct MetaStrConcat<MetaStr<str1...>, MetaStr<str2...>> {
-        using type = MetaStr<str1..., str2...>;
-    };
-
-    template<typename...>
-    struct MetaStrConcatenator;
-    template<>
-    struct MetaStrConcatenator<> {
-        using type = MetaStr<>;
-    };
-    template<typename str, typename... vstr>
-    struct MetaStrConcatenator<str, vstr...> {
-        using type = typename MetaStrConcat<str, typename MetaStrConcatenator<vstr...>::type>::type;
-    };
-
-    template<size_t N>
-    struct MetaITOA {
-        using type = typename MetaStrConcat<typename std::conditional<(N>=10),typename MetaITOA<(N/10)>::type,MetaStr<>>::type,MetaStr<'0'+(N%10)>>::type;
-    };
-    template<>
-    struct MetaITOA<0> {
-        using type = MetaStr<'0'>;
-    };
-#endif //(!def(_MSC_VER))
-
     template<int... anIndices>
     struct MetaIdxConcat {};
 
@@ -200,9 +166,8 @@ namespace CxxUtils {
     };
 
     template<typename T>
-    static inline bool isnan(T dVal) {
-        // needed for portability...
-#ifdef _MSC_VER
+    inline bool isnan(T dVal) {
+#ifdef _MSC_VER // needed for portability...
         return _isnan((double)dVal)!=0;
 #else //(!def(_MSC_VER))
         return std::isnan(dVal);
@@ -211,8 +176,8 @@ namespace CxxUtils {
 
     struct StopWatch {
         StopWatch() {tick();}
-        void tick() {m_nTick = std::chrono::high_resolution_clock::now();}
-        double tock(bool bReset=true) {
+        inline void tick() {m_nTick = std::chrono::high_resolution_clock::now();}
+        inline double tock(bool bReset=true) {
             const std::chrono::high_resolution_clock::time_point nNow = std::chrono::high_resolution_clock::now();
             const std::chrono::duration<double> dElapsed_sec = nNow-m_nTick;
             if(bReset)
@@ -223,35 +188,35 @@ namespace CxxUtils {
         std::chrono::high_resolution_clock::time_point m_nTick;
     };
 
-    static inline std::string getTimeStamp() {
+    inline std::string getTimeStamp() {
         std::time_t tNow = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
         char acBuffer[128];
         std::strftime(acBuffer,sizeof(acBuffer),"%F %T",std::localtime(&tNow)); // std::put_time missing w/ GCC<5.0
         return std::string(acBuffer);
     }
 
-    static inline std::string getVersionStamp() {
+    inline std::string getVersionStamp() {
         return "LITIV Framework v" LITIV_VERSION_STR " (SHA1=" LITIV_VERSION_SHA1 ")";
     }
 
-    static inline std::string getLogStamp() {
+    inline std::string getLogStamp() {
         return std::string("\n")+CxxUtils::getVersionStamp()+"\n["+CxxUtils::getTimeStamp()+"]\n";
     }
 
-    static inline std::string clampString(const std::string& sInput, size_t nSize, char cPadding=' ') {
+    inline std::string clampString(const std::string& sInput, size_t nSize, char cPadding=' ') {
         return sInput.size()>nSize?sInput.substr(0,nSize):std::string(nSize-sInput.size(),cPadding)+sInput;
     }
 
     template<typename TSum, typename TObj>
-    static inline TSum accumulateMembers(const std::vector<TObj>& vObjArray, const std::function<TSum(const TObj&)>& lFunc) {
+    inline TSum accumulateMembers(const std::vector<TObj>& vObjArray, const std::function<TSum(const TObj&)>& lFunc) {
         return std::accumulate(vObjArray.begin(),vObjArray.end(),TSum(0),[&](TSum tSum, const TObj& p) {
             return tSum + lFunc(p);
         });
     }
 
-    template<typename Tout, typename Ta, typename Tb>
-    static inline std::vector<Tout> concat(const std::vector<Ta>& a, const std::vector<Tb>& b) {
-        std::vector<Tout> v;
+    template<typename To, typename Ta, typename Tb>
+    inline std::vector<To> concat(const std::vector<Ta>& a, const std::vector<Tb>& b) {
+        std::vector<To> v;
         v.reserve(v.size()+b.size());
         v.insert(v.end(),a.begin(),a.end());
         v.insert(v.end(),b.begin(),b.end());
@@ -287,19 +252,19 @@ namespace CxxUtils {
         }
     };
 
-    template<typename Ttuple, typename Tfunc, int... anIndices>
-    void for_each(Ttuple&& t, Tfunc f, MetaIdxConcat<anIndices...>) {
+    template<typename TTuple, typename TFunc, int... anIndices>
+    inline void for_each(TTuple&& t, TFunc f, MetaIdxConcat<anIndices...>) {
         auto l = { (f(std::get<anIndices>(t)),0)... };
     }
 
-    template<typename... Ttupletypes, typename Tfunc>
-    void for_each_in_tuple(const std::tuple<Ttupletypes...>& t, Tfunc f) {
-        for_each(t, f, MetaIdxConcatenator<sizeof...(Ttupletypes)>());
+    template<typename... TTupleTypes, typename TFunc>
+    inline void for_each_in_tuple(const std::tuple<TTupleTypes...>& t, TFunc f) {
+        for_each(t, f, MetaIdxConcatenator<sizeof...(TTupleTypes)>());
     }
 
-    template<typename... Tmutexes>
+    template<typename... TMutexes>
     struct unlock_guard {
-        explicit unlock_guard(Tmutexes&... aMutexes) noexcept :
+        explicit unlock_guard(TMutexes&... aMutexes) noexcept :
                 m_aMutexes(aMutexes...) {
             for_each_in_tuple(m_aMutexes,[](auto& oMutex) noexcept {oMutex.unlock();});
         }
@@ -309,12 +274,12 @@ namespace CxxUtils {
         unlock_guard(const unlock_guard&) = delete;
         unlock_guard& operator=(const unlock_guard&) = delete;
     private:
-        std::tuple<Tmutexes&...> m_aMutexes;
+        std::tuple<TMutexes&...> m_aMutexes;
     };
 
-    template<typename Tmutex>
-    struct unlock_guard<Tmutex> {
-        explicit unlock_guard(Tmutex& oMutex) noexcept :
+    template<typename TMutex>
+    struct unlock_guard<TMutex> {
+        explicit unlock_guard(TMutex& oMutex) noexcept :
                 m_oMutex(oMutex) {
             m_oMutex.unlock();
         }
@@ -324,7 +289,7 @@ namespace CxxUtils {
         unlock_guard(const unlock_guard&) = delete;
         unlock_guard& operator=(const unlock_guard&) = delete;
     private:
-        Tmutex& m_oMutex;
+        TMutex& m_oMutex;
     };
 
     struct Semaphore {

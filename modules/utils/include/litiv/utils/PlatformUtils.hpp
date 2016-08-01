@@ -83,7 +83,8 @@ namespace PlatformUtils {
     }
 
     template<typename T>
-    inline int decimal_integer_digit_count(T number) {
+    inline int digit_count(T number) {
+        // counts sign as extra digit if negative
         int digits = number<0?1:0;
         while(std::abs(number)>=1) {
             number /= 10;
@@ -100,39 +101,37 @@ namespace PlatformUtils {
     }
 
     template<typename T>
-    inline std::vector<size_t> sort_indexes(const std::vector<T>& voVals) {
-        std::vector<size_t> vnIndexes(voVals.size());
-        for(size_t n=0; n<voVals.size(); ++n)
-            vnIndexes[n] = n;
-        std::sort(vnIndexes.begin(),vnIndexes.end(),[&voVals](size_t n1, size_t n2) {
+    inline std::vector<size_t> sort_indices(const std::vector<T>& voVals) {
+        std::vector<size_t> vnIndices(voVals.size());
+        std::iota(vnIndices.begin(),vnIndices.end(),0);
+        std::sort(vnIndices.begin(),vnIndices.end(),[&voVals](size_t n1, size_t n2) {
             return voVals[n1]<voVals[n2];
         });
-        return vnIndexes;
+        return vnIndices;
     }
 
     template<typename T, typename P>
-    inline std::vector<size_t> sort_indexes(const std::vector<T>& voVals, P oSortFunctor) {
-        std::vector<size_t> vnIndexes(voVals.size());
-        for(size_t n=0; n<voVals.size(); ++n)
-            vnIndexes[n] = n;
-        std::sort(vnIndexes.begin(),vnIndexes.end(),oSortFunctor);
-        return vnIndexes;
+    inline std::vector<size_t> sort_indices(const std::vector<T>& voVals, P oSortFunctor) {
+        std::vector<size_t> vnIndices(voVals.size());
+        std::iota(vnIndices.begin(),vnIndices.end(),0);
+        std::sort(vnIndices.begin(),vnIndices.end(),oSortFunctor);
+        return vnIndices;
     }
 
     template<typename T>
-    inline std::vector<size_t> unique_indexes(const std::vector<T>& voVals) {
-        std::vector<size_t> vnIndexes = sort_indexes(voVals);
-        auto pLastIdxIter = std::unique(vnIndexes.begin(),vnIndexes.end(),[&voVals](size_t n1, size_t n2) {
+    inline std::vector<size_t> unique_indices(const std::vector<T>& voVals) {
+        std::vector<size_t> vnIndices = sort_indices(voVals);
+        auto pLastIdxIter = std::unique(vnIndices.begin(),vnIndices.end(),[&voVals](size_t n1, size_t n2) {
             return voVals[n1]==voVals[n2];
         });
-        return std::vector<size_t>(vnIndexes.begin(),pLastIdxIter);
+        return std::vector<size_t>(vnIndices.begin(),pLastIdxIter);
     }
 
     template<typename T, typename P1, typename P2>
-    inline std::vector<size_t> unique_indexes(const std::vector<T>& voVals, P1 oSortFunctor, P2 oCompareFunctor) {
-        std::vector<size_t> vnIndexes = sort_indexes(voVals,oSortFunctor);
-        auto pLastIdxIter = std::unique(vnIndexes.begin(),vnIndexes.end(),oCompareFunctor);
-        return std::vector<size_t>(vnIndexes.begin(),pLastIdxIter);
+    inline std::vector<size_t> unique_indices(const std::vector<T>& voVals, P1 oSortFunctor, P2 oCompareFunctor) {
+        std::vector<size_t> vnIndices = sort_indices(voVals,oSortFunctor);
+        auto pLastIdxIter = std::unique(vnIndices.begin(),vnIndices.end(),oCompareFunctor);
+        return std::vector<size_t>(vnIndices.begin(),pLastIdxIter);
     }
 
     template<typename T>
