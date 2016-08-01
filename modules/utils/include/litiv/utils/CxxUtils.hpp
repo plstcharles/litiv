@@ -259,6 +259,20 @@ namespace CxxUtils {
     }
 
     template<typename T>
+    inline std::vector<T> filter_out(const std::vector<T>& vVals, const std::vector<T>& vTokens) {
+        std::vector<T> vRet = vVals; // will return all values not found in token list
+        vRet.erase(std::remove_if(vRet.begin(),vRet.end(),[&](const T& o){return std::find(vTokens.begin(),vTokens.end(),o)!=vTokens.end();}),vRet.end());
+        return vRet;
+    }
+
+    template<typename T>
+    inline std::vector<T> filter_in(const std::vector<T>& vVals, const std::vector<T>& vTokens) {
+        std::vector<T> vRet = vVals; // will returns all values found in token list
+        vRet.erase(std::remove_if(vRet.begin(),vRet.end(),[&](const T& o){return std::find(vTokens.begin(),vTokens.end(),o)==vTokens.end();}),vRet.end());
+        return vRet;
+    }
+
+    template<typename T>
     struct enable_shared_from_this : public std::enable_shared_from_this<T> {
         template<typename Tcast>
         inline std::shared_ptr<const Tcast> shared_from_this_cast(bool bThrowIfFail=false) const {
