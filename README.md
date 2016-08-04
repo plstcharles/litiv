@@ -3,8 +3,12 @@ Superpixel Segmentation SLIC of Achanta et al. [PAMI 2012, vol. 34, num. 11, pp.
 
 GPU version with CUDA
 
+  Cuda : 30 fps
 <p align="center">
-  <img src="https://cloud.githubusercontent.com/assets/10605043/14361548/5776d25c-fcc9-11e5-9b06-9083b274730f.jpg" width="600"/>
-  <img src="https://cloud.githubusercontent.com/assets/10605043/14361530/4802f45e-fcc9-11e5-9d41-b2cfb1cf6450.jpg" width="600"/>
-  <img src="https://cloud.githubusercontent.com/assets/10605043/14361529/459f147c-fcc9-11e5-8cdc-4f272bc36809.jpg" width="600"/>
+  <img src="https://cloud.githubusercontent.com/assets/10605043/17391166/fceb718c-59e1-11e6-8251-7ca9b90287e5.gif" width="700"/>
 </p>
+
+  OpenCv : 4 fps
+  <p align="center">
+  <img src="https://cloud.githubusercontent.com/assets/10605043/17391176/247636ec-59e2-11e6-9d3d-df4e16c75218.gif" width="700"/>
+  </p>
