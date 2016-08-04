@@ -1,31 +1,25 @@
-//
-// Created by derue on 15/12/15.
-//
-#pragma once
-#ifndef SLIC_CUDA_SLIC_CUDA_H
-#define SLIC_CUDA_SLIC_CUDA_H
-#endif //SLIC_CUDA_SLIC_CUDA_H
-
 /*
 * Written by Derue Francois-Xavier
-* francois-xavier.derue@polymtl.ca
+* francois.xavier.derue<at>gmail.com
 *
 * Superpixel oversegmentation
 * GPU implementation of the algorithm SLIC of
 * Achanta et al. [PAMI 2012, vol. 34, num. 11, pp. 2274-2282]
 *
 * Library required :
+* Opencv 3.0 min
 * CUDA
 */
-
+#pragma once
 #include <opencv2/opencv.hpp>
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#include "funUtilsSC.h"
 
 
 #define __CUDA_ARCH__ 300 // to comment if __CUDA_ARCH__ < 300
 #define NMAX_THREAD 256 // depend on gpu
+#define MAX_DIST FLT_MAX
+#define NNEIGH 3
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
@@ -59,8 +53,6 @@ private:
 	float *m_labels;
 
 	// gpu variable
-	// uchar4* frameBGRA_g;
-	//float4* frameLab_g;
 	float* labels_g;
 	float* clusters_g;
 	float* accAtt_g;
@@ -118,3 +110,8 @@ __global__ void k_initClusters(float* clusters, int width, int height, int nSpxP
 __global__ void k_assignement(int width, int height, int wSpx, int hSpx, float* clusters, float* accAtt, float wc2);
 #endif
 __global__ void k_update(int nSpx, float* clusters, float* accAtt);
+
+
+/* determine width and height (integer value) of an initial spx from its expected size d. */
+void getWlHl(int w, int h, int d, int & wl, int & hl);
+inline int iDivUp(int a, int b){ return (a%b == 0) ? a / b : a / b + 1; }

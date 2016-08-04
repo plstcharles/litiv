@@ -1,9 +1,4 @@
-//SLIC cuda kernel 
-
-
 #include "SLIC_cuda.h"
-#define MAX_DIST FLT_MAX
-#define NNEIGH 3
 
 
 #if __CUDA_ARCH__<300
