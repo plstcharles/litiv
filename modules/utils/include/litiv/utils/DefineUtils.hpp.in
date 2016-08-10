@@ -89,6 +89,10 @@
 #error "This project requires full C++11 support (including constexpr and SFINAE)."
 #endif //__cplusplus<201103L
 #endif //ndefined(_MSC_VER)
+#define DEFAULT_NB_THREADS  1
+#if DEFAULT_NB_THREADS<1
+#error "Bad default number of threads specified."
+#endif //DEFAULT_NB_THREADS<1
 
 #define LITIV_VERSION       @LITIV_VERSION@
 #define LITIV_VERSION_STR   XSTR(LITIV_VERSION)
@@ -99,18 +103,10 @@
 
 #define EXTERNAL_DATA_ROOT  XSTR(@EXTERNAL_DATA_ROOT@)
 #define SAMPLES_DATA_ROOT   XSTR(@SAMPLES_DATA_ROOT@)
+#define TARGET_PLATFORM_x64 @TARGET_PLATFORM_IS_x64@
+#define CACHE_MAX_SIZE_GB   @DATASETS_CACHE_SIZE@LLU
 
-// compile-time master switches for GPU/SIMD/threads usage
-#define HAVE_GPU_SUPPORT    1
-#define HAVE_SIMD_SUPPORT   1
-#define DEFAULT_NB_THREADS  1
-
-#if HAVE_GPU_SUPPORT
 #define HAVE_GLSL           @USE_GLSL@
-#define HAVE_CUDA           @USE_CUDA@
-#define HAVE_OPENCL         @USE_OPENCL@
-#endif //HAVE_GPU_SUPPORT
-
 #if HAVE_GLSL
 #define TARGET_GL_VER_MAJOR @TARGET_GL_VER_MAJOR@
 #define TARGET_GL_VER_MINOR @TARGET_GL_VER_MINOR@
@@ -119,7 +115,24 @@
 #define HAVE_FREEGLUT       @USE_FREEGLUT@
 #endif //HAVE_GLSL
 
-#if HAVE_SIMD_SUPPORT
+#define HAVE_CUDA           @USE_CUDA@
+#if HAVE_CUDA
+// ...
+#endif //HAVE_CUDA
+
+#define HAVE_OPENCL         @USE_OPENCL@
+#if HAVE_OPENCL
+// ...
+#endif //HAVE_OPENCL
+
+#define HAVE_OPENGM         @USE_OPENGM@
+#if HAVE_OPENGM
+#define HAVE_OPENGM_EXTLIB  @USE_OPENGM_WITH_EXTLIB@
+#define HAVE_OPENGM_CPLEX   @USE_OPENGM_WITH_CPLEX@
+#define HAVE_OPENGM_GUROBI  @USE_OPENGM_WITH_GUROBI@
+#define HAVE_OPENGM_HDF5    @USE_OPENGM_WITH_HDF5@
+#endif //HAVE_OPENGM
+
 #define HAVE_MMX            @USE_MMX@
 #define HAVE_SSE            @USE_SSE@
 #define HAVE_SSE2           @USE_SSE2@
@@ -130,7 +143,6 @@
 #define HAVE_POPCNT         @USE_POPCNT@
 #define HAVE_AVX            @USE_AVX@
 #define HAVE_AVX2           @USE_AVX2@
-#endif //HAVE_SIMD_SUPPORT
 
 #ifndef USE_VPTZ_STANDALONE
 #define USE_VPTZ_STANDALONE       @USE_VPTZ_STANDALONE@
@@ -139,6 +151,3 @@
 #define USE_BSDS500_BENCHMARK     @USE_BSDS500_BENCHMARK@
 #endif //USE_BSDS500_BENCHMARK
 #define USE_KINECTSDK_STANDALONE  @USE_KINECTSDK_STANDALONE@
-
-#define TARGET_PLATFORM_IS_x64    @TARGET_PLATFORM_IS_x64@
-#define CACHE_MAX_SIZE_GB         @DATASETS_CACHE_SIZE@LLU

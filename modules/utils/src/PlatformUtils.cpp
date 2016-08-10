@@ -185,7 +185,7 @@ std::fstream PlatformUtils::CreateBinFileWithPrealloc(const std::string & sFileP
         size_t nBytesToWrite = nPreallocBytes-size_t(nInitFileSize);
         std::vector<char> aPreallocBuff;
         while(nBytesToWrite>0) {
-            const size_t nBufferSize = TARGET_PLATFORM_IS_x64?nBytesToWrite:std::min(size_t(250*1024*1024)/*250MB*/,nBytesToWrite);
+            const size_t nBufferSize = TARGET_PLATFORM_x64?nBytesToWrite:std::min(size_t(250*1024*1024)/*250MB*/,nBytesToWrite);
             if(bZeroInit)
                 aPreallocBuff.resize(nBufferSize,0);
             else

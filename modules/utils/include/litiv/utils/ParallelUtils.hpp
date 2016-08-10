@@ -30,18 +30,11 @@
 #if HAVE_OPENCL
 #include @@@@@
 #endif //HAVE_OPENCL
-
-#if HAVE_SIMD_SUPPORT
 #if defined(_MSC_VER)
 #include <intrin.h>
 #else //(!defined(_MSC_VER))
 #include <x86intrin.h>
 #endif //(!defined(_MSC_VER))
-#endif //HAVE_SIMD_SUPPORT
-
-#if DEFAULT_NB_THREADS<1
-#error "Bad default number of threads specified."
-#endif //DEFAULT_NB_THREADS<1
 
 namespace ParallelUtils {
 
@@ -110,8 +103,6 @@ namespace ParallelUtils {
     };
     using NonParallelAlgo = IParallelAlgo_<eNonParallel>;
 
-#if HAVE_SIMD_SUPPORT
-
 #if HAVE_MMX
     //! returns the (horizontal) sum of the provided 8-unsigned-byte array
     inline uint hsum_8ub(const __m64& anBuffer) {
@@ -163,7 +154,5 @@ namespace ParallelUtils {
         return uchar(_mm_cvtsi128_si32(_mm_minpos_epu16(_mm_min_epu8(anBuffer,_mm_srli_epi16(anBuffer,8)))));
     }
 #endif //HAVE_SSE4_1
-
-#endif //HAVE_SIMD_SUPPORT
 
 } //namespace ParallelUtils

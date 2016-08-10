@@ -61,10 +61,10 @@ if(DEFINED CMAKE_BUILD_TYPE)
 endif()
 if(CMAKE_SIZEOF_VOID_P EQUAL 8) # 64-bit toolchain/platform
     set(DATASETS_CACHE_SIZE 6 CACHE STRING "Cache size to be used for dataset preloading, if needed (in GB)")
-    set(TARGET_PLATFORM_IS_x64 TRUE CACHE INTERNAL "" FORCE)
+    set(TARGET_PLATFORM_x64 TRUE CACHE INTERNAL "" FORCE)
 elseif(CMAKE_SIZEOF_VOID_P EQUAL 4) # 32-bit toolchain/platform
     set(DATASETS_CACHE_SIZE 1 CACHE STRING "Cache size to be used for dataset preloading, if needed (in GB)")
-    set(TARGET_PLATFORM_IS_x64 FALSE CACHE INTERNAL "" FORCE)
+    set(TARGET_PLATFORM_x64 FALSE CACHE INTERNAL "" FORCE)
 else()
     message(FATAL_ERROR "Could not detect x64/x86 platform identity using void pointer size (s=${CMAKE_SIZEOF_VOID_P}).")
 endif()
@@ -114,14 +114,14 @@ else()
 endif()
 
 ### OPENGM CHECK
-find_package(OpenGM)
+find_package(OpenGM COMPONENTS ext)
 option(USE_OPENGM "Specifies whether OpenGM should be included/linked or not; if false, projects that depend on it will be disabled" ${OpenGM_FOUND})
 if(USE_OPENGM)
-    find_package(OpenGM REQUIRED)
+    find_package(OpenGM REQUIRED COMPONENTS ext)
     include_directories(${OpenGM_INCLUDE_DIRS})
     link_directories(${OpenGM_LIBRARY_DIRS})
 else()
-    message(WARNING "Missing OpenGM library, cosegm project & utilities will be disabled")
+    message(WARNING "Missing OpenGM library w/ external dependencies, cosegm project & utilities will be disabled")
 endif()
 
 ### CUDA CHECK @@@@ add later for parallel utils & impls
