@@ -22,6 +22,14 @@
 #   OpenGM_LIBRARIES      (may be empty)
 #   OpenGM_FOUND
 
+macro(_set_eval name)
+    if(${ARGN})
+        set(${name} 1)
+    else(NOT ${ARGN})
+        set(${name} 0)
+    endif()
+endmacro(_set_eval)
+
 find_path(OpenGM_INCLUDE_DIR
     NAMES
         opengm/opengm.hxx
@@ -33,7 +41,27 @@ find_path(OpenGM_INCLUDE_DIR
 )
 
 include(FindPackageHandleStandardArgs)
-option(USE_OPENGM_WITH_EXTLIB "Specifies whether OpenGM should be linked with its external/3rd-party library." OFF)
+
+set(_supported_components gurobi cplex hdf5 ext)
+set(_opengm_gurobi_default OFF)
+set(_opengm_cplex_default OFF)
+set(_opengm_hdf5_default OFF)
+set(_opengm_ext_default OFF)
+foreach(_comp ${OpenGM_FIND_COMPONENTS})
+    if(NOT ";${_supported_components};" MATCHES ";${_comp};")
+        message(WARNING "Specified unsupported OpenGM component: ${_comp}")
+    elseif("${_comp}" STREQUAL gurobi)
+        set(_opengm_gurobi_default ON)
+    elseif("${_comp}" STREQUAL cplex)
+        set(_opengm_cplex_default ON)
+    elseif("${_comp}" STREQUAL hdf5)
+        set(_opengm_hdf5_default ON)
+    elseif("${_comp}" STREQUAL ext)
+        set(_opengm_ext_default ON)
+    endif()
+endforeach()
+
+option(USE_OPENGM_WITH_EXTLIB "Specifies whether OpenGM should be linked with its external/3rd-party library." ${_opengm_ext_default})
 if(USE_OPENGM_WITH_EXTLIB)
     find_library(OpenGM_EXT_LIBRARY
         NAMES
@@ -63,6 +91,7 @@ else()
         REQUIRED_VARS
             OpenGM_INCLUDE_DIR
     )
+    message("Will use OpenGM without its external dependencies, some inference algos might be disabled.")
 endif()
 
 if(OpenGM_FOUND)
@@ -72,33 +101,36 @@ if(OpenGM_FOUND)
     # @@@ might be able to deduce USE_OPENGM_WITH... vals using header presence
 
     find_package(CPLEX QUIET)
-    option(USE_OPENGM_WITH_CPLEX "Specifies whether OpenGM was built with IBM CPLEX support or not" ${CPLEX_FOUND})
+    _set_eval(_opengm_cplex_current (${_opengm_cplex_default} OR ${CPLEX_FOUND}))
+    option(USE_OPENGM_WITH_CPLEX "Specifies whether OpenGM was built with IBM CPLEX support or not" ${_opengm_cplex_current})
     if(USE_OPENGM_WITH_CPLEX)
         find_package(CPLEX REQUIRED)
         list(APPEND OpenGM_INCLUDE_DIRS ${CPLEX_INCLUDE_DIRS})
         list(APPEND OpenGM_LIBRARIES ${CPLEX_LIBRARIES})
     else()
-        message(WARNING "Will use OpenGM without IBM CPLEX support, some inference algos might be disabled.")
+        message("Will use OpenGM without IBM CPLEX support, some inference algos might be disabled.")
     endif()
 
     find_package(GUROBI QUIET)
-    option(USE_OPENGM_WITH_GUROBI "Specifies whether OpenGM was built with GUROBI support or not" ${GUROBI_FOUND})
+    _set_eval(_opengm_gurobi_current (${_opengm_gurobi_default} OR ${GUROBI_FOUND}))
+    option(USE_OPENGM_WITH_GUROBI "Specifies whether OpenGM was built with GUROBI support or not" ${_opengm_gurobi_current})
     if(USE_OPENGM_WITH_GUROBI)
         find_package(GUROBI REQUIRED)
         list(APPEND OpenGM_INCLUDE_DIRS ${GUROBI_INCLUDE_DIRS})
         list(APPEND OpenGM_LIBRARIES ${GUROBI_LIBRARIES})
     else()
-        message(WARNING "Will use OpenGM without GUROBI support, some inference algos might be disabled.")
+        message("Will use OpenGM without GUROBI support, some inference algos might be disabled.")
     endif()
 
     find_package(HDF5 QUIET)
-    option(USE_OPENGM_WITH_HDF5 "Specifies whether OpenGM was built with HDF5 support or not" ${HDF5_FOUND})
-    if(USE_OPENGM_WITH_GUROBI)
-        find_package(GUROBI REQUIRED)
+    _set_eval(_opengm_hdf5_current (${_opengm_hdf5_default} OR ${HDF5_FOUND}))
+    option(USE_OPENGM_WITH_HDF5 "Specifies whether OpenGM was built with HDF5 support or not" ${_opengm_hdf5_current})
+    if(USE_OPENGM_WITH_HDF5)
+        find_package(HDF5 REQUIRED)
         list(APPEND OpenGM_INCLUDE_DIRS ${HDF5_INCLUDE_DIR})
         list(APPEND OpenGM_LIBRARIES ${HDF5_LIBRARIES})
     else()
-        message(WARNING "Will use OpenGM without HDF5 support, some I/O methods might be disabled.")
+        message("Will use OpenGM without HDF5 support, some I/O methods might be disabled.")
     endif()
 
     mark_as_advanced(
