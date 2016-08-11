@@ -410,7 +410,7 @@ namespace DistanceUtils {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     //! popcount LUT for 8-bit vectors
-    static constexpr size_t popcount_LUT8[256] = {
+    static constexpr size_t s_anPopcntLUT8[256] = {
         0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
         1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
         1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5,
@@ -433,7 +433,7 @@ namespace DistanceUtils {
     template<typename T>
     inline std::enable_if_t<(sizeof(T)==1),size_t> popcount(const T x) {
         static_assert(std::is_integral<T>::value,"type must be integral");
-        return popcount_LUT8[x];
+        return s_anPopcntLUT8[x];
     }
 
 #if HAVE_POPCNT
@@ -460,7 +460,7 @@ namespace DistanceUtils {
         static_assert(std::is_integral<T>::value,"type must be integral");
         size_t nResult = 0;
         for(size_t l=0; l<sizeof(T); ++l)
-            nResult += popcount_LUT8[(uchar)(x>>l*8)];
+            nResult += s_anPopcntLUT8[(uchar)(x>>l*8)];
         return nResult;
     }
 
