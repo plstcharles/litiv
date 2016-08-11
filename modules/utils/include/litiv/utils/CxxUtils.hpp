@@ -252,6 +252,17 @@ namespace CxxUtils {
         }
     };
 
+    template<template<typename,typename...> class TContainer>
+    struct has_const_iterator {
+    private:
+        template<typename T>
+        static char test(typename T::const_iterator*) {return char(0);}
+        template<typename T>
+        static int test(...) {return int(0);}
+    public:
+        enum {value=(sizeof(test<TContainer>(0))==sizeof(char))};
+    };
+
     template<typename TTuple, typename TFunc, int... anIndices>
     inline void for_each(TTuple&& t, TFunc f, MetaIdxConcat<anIndices...>) {
         auto l = { (f(std::get<anIndices>(t)),0)... };
