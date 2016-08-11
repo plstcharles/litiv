@@ -134,13 +134,16 @@ namespace PlatformUtils {
         return std::vector<size_t>(vnIndices.begin(),pLastIdxIter);
     }
 
+    template<typename Titer>
+    inline std::vector<typename std::iterator_traits<Titer>::value_type> unique(Titer begin, Titer end) {
+        const std::set<typename std::iterator_traits<Titer>::value_type> mMap(begin,end);
+        return std::vector<typename std::iterator_traits<Titer>::value_type>(mMap.begin(),mMap.end());
+    }
+
     template<typename T>
-    inline std::vector<T> unique(const cv::Mat_<T>& oMat, bool bSort=true) {
-        const std::unordered_set<T> mMap(oMat.begin(),oMat.end());
-        std::vector<T> vals(mMap.begin(),mMap.end());
-        if(bSort)
-            std::sort(vals.begin(),vals.end());
-        return vals;
+    inline std::vector<T> unique(const cv::Mat_<T>& oMat) {
+        const std::set<T> mMap(oMat.begin(),oMat.end());
+        return std::vector<T>(mMap.begin(),mMap.end());
     }
 
     template<typename T>
