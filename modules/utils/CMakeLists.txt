@@ -17,39 +17,39 @@
 
 litiv_module(utils)
 
-file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/include/litiv/utils/DefineUtils.hpp)
+file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/include/litiv/utils/defines.hpp)
 
 configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/include/litiv/utils/DefineUtils.hpp.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/utils/DefineUtils.hpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/litiv/utils/defines.hpp.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/utils/defines.hpp"
 )
 
 add_files(SOURCE_FILES
-    "src/PlatformUtils.cpp"
-    "src/OpenCVUtils.cpp"
+    "src/platform.cpp"
+    "src/opencv.cpp"
 )
 add_files(INCLUDE_FILES
-    "include/litiv/utils/ConsoleUtils.hpp"
-    "include/litiv/utils/CxxUtils.hpp"
-    "include/litiv/utils/DefineUtils.hpp"
-    "include/litiv/utils/DistanceUtils.hpp"
-    "include/litiv/utils/ParallelUtils.hpp"
-    "include/litiv/utils/PlatformUtils.hpp"
-    "include/litiv/utils/OpenCVUtils.hpp"
+    "include/litiv/utils/console.hpp"
+    "include/litiv/utils/cxx.hpp"
+    "include/litiv/utils/defines.hpp"
+    "include/litiv/utils/distances.hpp"
+    "include/litiv/utils/parallel.hpp"
+    "include/litiv/utils/platform.hpp"
+    "include/litiv/utils/opencv.hpp"
     "include/litiv/utils.hpp"
 )
 if(USE_GLSL)
     add_files(SOURCE_FILES
-        "src/GLDrawUtils.cpp"
-        "src/GLImageProcUtils.cpp"
-        "src/GLShaderUtils.cpp"
-        "src/GLUtils.cpp"
+        "src/opengl-imgproc.cpp"
+        "src/opengl-shaders.cpp"
+        "src/opengl-draw.cpp"
+        "src/opengl.cpp"
     )
     add_files(INCLUDE_FILES
-        "include/litiv/utils/GLDrawUtils.hpp"
-        "include/litiv/utils/GLImageProcUtils.hpp"
-        "include/litiv/utils/GLShaderUtils.hpp"
-        "include/litiv/utils/GLUtils.hpp"
+        "include/litiv/utils/opengl-imgproc.hpp"
+        "include/litiv/utils/opengl-draw.hpp"
+        "include/litiv/utils/opengl-shaders.hpp"
+        "include/litiv/utils/opengl.hpp"
     )
 endif(USE_GLSL)
 
@@ -74,7 +74,7 @@ install(DIRECTORY "include/"
     COMPONENT modules
     FILES_MATCHING PATTERN "*.hpp"
 )
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/utils/DefineUtils.hpp"
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/utils/defines.hpp"
     DESTINATION "include/litiv/utils/"
     COMPONENT modules
 )

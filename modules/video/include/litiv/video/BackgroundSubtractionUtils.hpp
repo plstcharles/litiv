@@ -17,8 +17,8 @@
 
 #pragma once
 
-#include "litiv/utils/ParallelUtils.hpp"
-#include "litiv/utils/OpenCVUtils.hpp"
+#include "litiv/utils/parallel.hpp"
+#include "litiv/utils/opencv.hpp"
 #include <opencv2/video/background_segm.hpp>
 
 struct IIBackgroundSubtractor : public cv::BackgroundSubtractor {

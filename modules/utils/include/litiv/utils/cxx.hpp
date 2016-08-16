@@ -33,7 +33,7 @@
 #include <type_traits>
 #include <condition_variable>
 #include <opencv2/core.hpp>
-#include "litiv/utils/DefineUtils.hpp"
+#include "litiv/utils/defines.hpp"
 
 namespace CxxUtils {
 

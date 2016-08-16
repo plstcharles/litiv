@@ -15,7 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "litiv/utils/PlatformUtils.hpp"
+#include "litiv/utils/platform.hpp"
 
 std::string PlatformUtils::GetCurrentWorkDirPath() {
     static std::array<char,FILENAME_MAX> s_acCurrentPath = {};

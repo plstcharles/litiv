@@ -15,7 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "litiv/utils/GLShaderUtils.hpp"
+#include "litiv/utils/opengl-shaders.hpp"
 
 GLShader* GLShader::s_pCurrActiveShader = nullptr;
 

@@ -15,7 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <litiv/utils/OpenCVUtils.hpp>
+#include "litiv/utils/opencv.hpp"
 #include "litiv/video/BackgroundSubtractorPAWCS.hpp"
 
 //

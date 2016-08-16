@@ -17,9 +17,9 @@
 
 #pragma once
 
-#include "litiv/utils/ParallelUtils.hpp"
-#include "litiv/utils/OpenCVUtils.hpp"
-#include "litiv/utils/PlatformUtils.hpp"
+#include "litiv/utils/parallel.hpp"
+#include "litiv/utils/opencv.hpp"
+#include "litiv/utils/platform.hpp"
 #include <opencv2/videoio.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>

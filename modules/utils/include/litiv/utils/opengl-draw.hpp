@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "litiv/utils/GLUtils.hpp"
+#include "litiv/utils/opengl.hpp"
 
 #define GLScreenBillboard_FLIP_TEX_Y_COORDS 1
 

@@ -23,7 +23,7 @@
 #include <vector>
 #include <cstdlib>
 #include <cassert>
-#include "litiv/utils/GLDrawUtils.hpp"
+#include "litiv/utils/opengl-draw.hpp"
 
 class GLShader {
 public:

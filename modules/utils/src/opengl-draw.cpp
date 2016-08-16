@@ -15,7 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "litiv/utils/GLDrawUtils.hpp"
+#include "litiv/utils/opengl-draw.hpp"
 
 GLVertexArrayObject::GLVertexArrayObject() {
     glGenVertexArrays(1,&m_nVAO);
@@ -393,4 +393,3 @@ const GLVertex GLScreenBillboard::s_aVertices[GLScreenBillboard::s_nVertexCount]
 };
 
 const GLubyte GLScreenBillboard::s_anIndices[GLScreenBillboard::s_nIndexCount] = {0,1,3,3,1,2};
-

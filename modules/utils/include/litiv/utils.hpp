@@ -17,18 +17,18 @@
 
 #pragma once
 
-#include "litiv/utils/DefineUtils.hpp"
-#include "litiv/utils/CxxUtils.hpp"
-#include "litiv/utils/ParallelUtils.hpp"
-#include "litiv/utils/DistanceUtils.hpp"
-#include "litiv/utils/PlatformUtils.hpp"
-#include "litiv/utils/ConsoleUtils.hpp"
-#include "litiv/utils/OpenCVUtils.hpp"
+#include "litiv/utils/defines.hpp"
+#include "litiv/utils/cxx.hpp"
+#include "litiv/utils/parallel.hpp"
+#include "litiv/utils/distances.hpp"
+#include "litiv/utils/platform.hpp"
+#include "litiv/utils/console.hpp"
+#include "litiv/utils/opencv.hpp"
 #if HAVE_GLSL
-#include "litiv/utils/GLUtils.hpp"
-#include "litiv/utils/GLDrawUtils.hpp"
-#include "litiv/utils/GLShaderUtils.hpp"
-#include "litiv/utils/GLImageProcUtils.hpp"
+#include "litiv/utils/opengl.hpp"
+#include "litiv/utils/opengl-draw.hpp"
+#include "litiv/utils/opengl-shaders.hpp"
+#include "litiv/utils/opengl-imgproc.hpp"
 #endif //HAVE_GLSL
 #if HAVE_CUDA
 // ... @@@

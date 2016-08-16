@@ -15,7 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "litiv/utils/GLImageProcUtils.hpp"
+#include "litiv/utils/opengl-imgproc.hpp"
 
 GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs, size_t nExtraImages, size_t nExtraTextures,
                                   int nOutputType, int nDebugType, bool bUseInput, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat) :

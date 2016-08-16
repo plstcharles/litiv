@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "litiv/utils/GLShaderUtils.hpp"
+#include "litiv/utils/opengl-shaders.hpp"
 
 #define GLUTILS_IMGPROC_DEFAULT_WORKGROUP           glm::uvec2(12,8)
 #define GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT         2

@@ -17,9 +17,9 @@
 
 #pragma once
 
-#include "litiv/utils/ParallelUtils.hpp"
+#include "litiv/utils/parallel.hpp"
 #include <opencv2/core/types_c.h>
-#include "litiv/utils/DefineUtils.hpp"
+#include "litiv/utils/defines.hpp"
 
 namespace DistanceUtils {
 

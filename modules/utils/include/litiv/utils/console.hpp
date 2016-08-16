@@ -17,8 +17,8 @@
 
 #pragma once
 
-#include "litiv/utils/DefineUtils.hpp"
-#include "litiv/utils/CxxUtils.hpp"
+#include "litiv/utils/defines.hpp"
+#include "litiv/utils/cxx.hpp"
 
 /**
  * ConsoleUtils.h (litiv version inspired from rlutil.h)

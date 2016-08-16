@@ -31,11 +31,11 @@ if(BUILD_VPTZ)
         litiv_module(vptz)
     endif(USE_VPTZ_STANDALONE)
 
-    file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/StandaloneUtils.hpp)
+    file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/utils.hpp)
 
     configure_file(
-        "${CMAKE_CURRENT_SOURCE_DIR}/include/litiv/vptz/StandaloneUtils.hpp.in"
-        "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/StandaloneUtils.hpp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/include/litiv/vptz/utils.hpp.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/utils.hpp"
     )
 
     add_files(SOURCE_FILES
@@ -43,7 +43,7 @@ if(BUILD_VPTZ)
     )
 
     add_files(INCLUDE_FILES
-        "include/litiv/vptz/StandaloneUtils.hpp"
+        "include/litiv/vptz/utils.hpp"
         "include/litiv/vptz/virtualptz.hpp"
         "include/litiv/vptz.hpp"
     )
@@ -87,7 +87,7 @@ if(BUILD_VPTZ)
         COMPONENT modules
         FILES_MATCHING PATTERN "*.hpp"
     )
-    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/StandaloneUtils.hpp"
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/utils.hpp"
         DESTINATION "include/litiv/vptz/"
         COMPONENT modules
     )

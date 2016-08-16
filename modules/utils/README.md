@@ -52,4 +52,4 @@ Here is a non-exhaustive (and probably not fully up-to-date) list of features:
     - LUT-based Hamming weight functions for processors that do not support Intel's POPCNT
     - GLSL implementations of various distance functions
 
-This module also links all external dependencies for the framework, meaning that executables only have to link to this target (along with other LITIV targets, as needed) to fully link to, e.g., OpenCV. Also, note that most important CMake variables have symbol entrypoints in the [DefineUtils.hpp.in](./include/litiv/utils/DefineUtils.hpp.in) file, which is converted by CMake into an actual header file.
+This module also links all external dependencies for the framework, meaning that executables only have to link to this target (along with other LITIV targets, as needed) to fully link to, e.g., OpenCV. Also, note that most important CMake variables have symbol entrypoints in the [defines.hpp.in](./include/litiv/utils/defines.hpp.in) file, which is converted by CMake into an actual header file.

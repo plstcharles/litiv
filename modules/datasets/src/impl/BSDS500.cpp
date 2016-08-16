@@ -17,7 +17,7 @@
 
 #include "litiv/datasets.hpp"
 #include "litiv/imgproc.hpp"
-#include "litiv/utils/ConsoleUtils.hpp"
+#include "litiv/utils/console.hpp"
 #if USE_BSDS500_BENCHMARK
 #ifdef __clang__
 #pragma clang diagnostic push

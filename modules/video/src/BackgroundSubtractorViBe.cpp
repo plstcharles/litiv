@@ -16,8 +16,8 @@
 // limitations under the License.
 
 #include "litiv/video/BackgroundSubtractorViBe.hpp"
-#include "litiv/utils/DistanceUtils.hpp"
-#include "litiv/utils/OpenCVUtils.hpp"
+#include "litiv/utils/distances.hpp"
+#include "litiv/utils/opencv.hpp"
 
 BackgroundSubtractorViBe::BackgroundSubtractorViBe(size_t nColorDistThreshold, size_t nBGSamples, size_t nRequiredBGSamples) :
         m_nBGSamples(nBGSamples),

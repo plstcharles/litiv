@@ -20,8 +20,8 @@
 // includes here really need cleanup @@@@
 
 #include <opencv2/core.hpp>
-#include "litiv/utils/DistanceUtils.hpp"
-#include "litiv/utils/CxxUtils.hpp"
+#include "litiv/utils/distances.hpp"
+#include "litiv/utils/cxx.hpp"
 #include <queue>
 #include <string>
 #include <algorithm>

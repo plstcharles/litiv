@@ -16,7 +16,7 @@
 // limitations under the License.
 
 #include "litiv/datasets/eval.hpp"
-//#include "litiv/utils/ConsoleUtils.hpp" @@@@@ reuse later?
+//#include "litiv/utils/console.hpp" @@@@@ reuse later?
 
 void litiv::IDatasetEvaluator_<litiv::eDatasetEval_None>::writeEvalReport() const {
     if(getBatches(false).empty()) {

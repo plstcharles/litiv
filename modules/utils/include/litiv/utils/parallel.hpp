@@ -17,12 +17,12 @@
 
 #pragma once
 
-#include "litiv/utils/DefineUtils.hpp"
-#include "litiv/utils/OpenCVUtils.hpp"
+#include "litiv/utils/defines.hpp"
+#include "litiv/utils/opencv.hpp"
 #include <type_traits>
 
 #if HAVE_GLSL
-#include "litiv/utils/GLImageProcUtils.hpp"
+#include "litiv/utils/opengl-imgproc.hpp"
 #endif //HAVE_GLSL
 #if HAVE_CUDA
 #include @@@@@

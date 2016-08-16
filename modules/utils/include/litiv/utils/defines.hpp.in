@@ -17,8 +17,8 @@
 
 // NOTE:
 // CMake parses this file and automatically fills in the missing values;
-// you should never modify it directly via "DefineUtils.hpp", but rather
-// via "DefineUtils.hpp.in". Besides, keep includes out of here!
+// you should never modify it directly via "defines.hpp", but rather
+// via "defines.hpp.in". Besides, keep includes out of here!
 
 #pragma once
 

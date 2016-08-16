@@ -25,7 +25,7 @@
 
 #pragma once
 
-#include "litiv/vptz/StandaloneUtils.hpp"
+#include "litiv/vptz/utils.hpp"
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/highgui.hpp>
@@ -34,10 +34,10 @@
 #if !HAVE_GLSL
 #error "vptz requires full OpenGL support"
 #endif //(!HAVE_GLSL)
-#include "litiv/utils/DefineUtils.hpp"
-#include "litiv/utils/ParallelUtils.hpp"
-#include "litiv/utils/DistanceUtils.hpp"
-#include "litiv/utils/CxxUtils.hpp"
+#include "litiv/utils/defines.hpp"
+#include "litiv/utils/parallel.hpp"
+#include "litiv/utils/distances.hpp"
+#include "litiv/utils/cxx.hpp"
 #define VPTZ_API
 #endif //(!USE_VPTZ_STANDALONE)
 
