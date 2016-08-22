@@ -28,11 +28,11 @@ struct Dataset_<eDatasetTask,eDataset_Wallflower,eEvalImpl> :
     static_assert(eDatasetTask!=eDatasetTask_Registr,"Wallflower dataset does not support image registration (no image arrays)");
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
-            const std::string& sOutputDirName, //!< output directory (full) path for debug logs, evaluation reports and results archiving (will be created in Wallflower dataset folder)
-            bool bSaveOutput=false, //!< defines whether results should be archived or not
-            bool bUseEvaluator=true, //!< defines whether results should be fully evaluated, or simply acknowledged
-            bool bForce4ByteDataAlign=false, //!< defines whether data packets should be 4-byte aligned (useful for GPU upload)
-            double dScaleFactor=1.0 //!< defines the scale factor to use to resize/rescale read packets
+            const std::string& sOutputDirName, ///< output directory (full) path for debug logs, evaluation reports and results archiving (will be created in Wallflower dataset folder)
+            bool bSaveOutput=false, ///< defines whether results should be archived or not
+            bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
+            bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
+            double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
     ) :
             IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_Wallflower,getDatasetEval<eDatasetTask,eDataset_Wallflower>(),eEvalImpl>(
                     "Wallflower",

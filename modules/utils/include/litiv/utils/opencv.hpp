@@ -27,7 +27,7 @@ namespace cv { // extending cv
     struct DisplayHelper;
     using DisplayHelperPtr = std::shared_ptr<DisplayHelper>;
 
-    //! returns pixel coordinates clamped to the given image & border size
+    /// returns pixel coordinates clamped to the given image & border size
     inline void clampImageCoords(int& nSampleCoord_X,int& nSampleCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
         if(nSampleCoord_X<nBorderSize)
             nSampleCoord_X = nBorderSize;
@@ -39,7 +39,7 @@ namespace cv { // extending cv
             nSampleCoord_Y = oImageSize.height-nBorderSize-1;
     }
 
-    //! returns a random init/sampling position for the specified pixel position, given a predefined kernel; also guards against out-of-bounds values via image/border size check.
+    /// returns a random init/sampling position for the specified pixel position, given a predefined kernel; also guards against out-of-bounds values via image/border size check.
     template<int nKernelHeight,int nKernelWidth>
     inline void getRandSamplePosition(const std::array<std::array<int,nKernelWidth>,nKernelHeight>& anSamplesInitPattern,
                                              const int nSamplesInitPatternTot,int& nSampleCoord_X,int& nSampleCoord_Y,
@@ -58,7 +58,7 @@ namespace cv { // extending cv
         clampImageCoords(nSampleCoord_X,nSampleCoord_Y,nBorderSize,oImageSize);
     }
 
-    //! returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
+    /// returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
     inline void getRandSamplePosition_3x3_std1(int& nSampleCoord_X,int& nSampleCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
         // based on 'floor(fspecial('gaussian',3,1)*256)'
         static_assert(sizeof(std::array<int,3>)==sizeof(int)*3,"bad std::array stl impl");
@@ -71,7 +71,7 @@ namespace cv { // extending cv
         getRandSamplePosition<3,3>(s_anSamplesInitPattern,s_nSamplesInitPatternTot,nSampleCoord_X,nSampleCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
     }
 
-    //! returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
+    /// returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
     inline void getRandSamplePosition_7x7_std2(int& nSampleCoord_X,int& nSampleCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
         // based on 'floor(fspecial('gaussian',7,2)*512)'
         static_assert(sizeof(std::array<int,7>)==sizeof(int)*7,"bad std::array stl impl");
@@ -88,7 +88,7 @@ namespace cv { // extending cv
         getRandSamplePosition<7,7>(s_anSamplesInitPattern,s_nSamplesInitPatternTot,nSampleCoord_X,nSampleCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
     }
 
-    //! returns a random neighbor position for the specified pixel position, given a predefined neighborhood; also guards against out-of-bounds values via image/border size check.
+    /// returns a random neighbor position for the specified pixel position, given a predefined neighborhood; also guards against out-of-bounds values via image/border size check.
     template<int nNeighborCount>
     inline void getRandNeighborPosition(const std::array<std::array<int,2>,nNeighborCount>& anNeighborPattern,
                                                int& nNeighborCoord_X,int& nNeighborCoord_Y,
@@ -100,7 +100,7 @@ namespace cv { // extending cv
         clampImageCoords(nNeighborCoord_X,nNeighborCoord_Y,nBorderSize,oImageSize);
     }
 
-    //! returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
+    /// returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
     inline void getRandNeighborPosition_3x3(int& nNeighborCoord_X,int& nNeighborCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
         typedef std::array<int,2> Nb;
         static const std::array<std::array<int,2>,8> s_anNeighborPattern ={
@@ -111,7 +111,7 @@ namespace cv { // extending cv
         getRandNeighborPosition<8>(s_anNeighborPattern,nNeighborCoord_X,nNeighborCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
     }
 
-    //! returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
+    /// returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
     inline void getRandNeighborPosition_5x5(int& nNeighborCoord_X,int& nNeighborCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
         typedef std::array<int,2> Nb;
         static const std::array<std::array<int,2>,24> s_anNeighborPattern ={
@@ -124,12 +124,12 @@ namespace cv { // extending cv
         getRandNeighborPosition<24>(s_anNeighborPattern,nNeighborCoord_X,nNeighborCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
     }
 
-    //! writes a given text string on an image using the original cv::putText (this function only acts as a simplification wrapper)
+    /// writes a given text string on an image using the original cv::putText (this function only acts as a simplification wrapper)
     inline void putText(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom=false, const cv::Point2i& oOffset=cv::Point2i(4,15), int nThickness=2, double dScale=1.2) {
         cv::putText(oImg,sText,cv::Point(oOffset.x,bBottom?(oImg.rows-oOffset.y):oOffset.y),cv::FONT_HERSHEY_PLAIN,dScale,vColor,nThickness,cv::LINE_AA);
     }
 
-    //! removes all keypoints from voKPs which fall on null values (or outside the bounds) of oROI
+    /// removes all keypoints from voKPs which fall on null values (or outside the bounds) of oROI
     inline void validateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoint>& voKPs) {
         CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
         std::vector<cv::KeyPoint> voNewKPs;
@@ -142,23 +142,23 @@ namespace cv { // extending cv
         voKPs = voNewKPs;
     }
 
-    //! helper struct for image display & callback management (must be created via DisplayHelper::create due to enable_shared_from_this interface)
+    /// helper struct for image display & callback management (must be created via DisplayHelper::create due to enable_shared_from_this interface)
     struct DisplayHelper : public lv::enable_shared_from_this<DisplayHelper> {
 
-        //! by default, comes with a filestorage algorithms can use for debug
+        /// by default, comes with a filestorage algorithms can use for debug
         static DisplayHelperPtr create(const std::string& sDisplayName,
                                        const std::string& sDebugFSDirPath="./",
                                        const cv::Size& oMaxSize=cv::Size(1920,1080),
                                        int nWindowFlags=cv::WINDOW_AUTOSIZE);
-        //! will reformat the given image, print the index and mouse cursor point on it, and show it
+        /// will reformat the given image, print the index and mouse cursor point on it, and show it
         void display(const cv::Mat& oImage, size_t nIdx);
-        //! will reformat the given images, print the index and mouse cursor point on them, and show them horizontally concatenated
+        /// will reformat the given images, print the index and mouse cursor point on them, and show them horizontally concatenated
         void display(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oOutputImg, size_t nIdx);
         // @@@ add matvector-based display function for extra flexibility?
 
-        //! will call cv::waitKey and block if m_bContinuousUpdates is false, and loop otherwise (also returns cv::waitKey's captured value)
+        /// will call cv::waitKey and block if m_bContinuousUpdates is false, and loop otherwise (also returns cv::waitKey's captured value)
         int waitKey(int nDefaultSleepDelay=1);
-        //! desctructor automatically closes its window
+        /// desctructor automatically closes its window
         ~DisplayHelper();
 
         const std::string m_sDisplayName;
@@ -185,13 +185,13 @@ namespace cv { // extending cv
         static void onMouseEvent(int nEvent, int x, int y, int nFlags, void* pData);
     };
 
-    //! always-empty-mat, which allows functions to return const-references to an empty mat without dangling ref issues
+    /// always-empty-mat, which allows functions to return const-references to an empty mat without dangling ref issues
     static const cv::Mat g_oEmptyMat = cv::Mat();
-    //! always-empty-size, which allows functions to return const-references to an empty size without dangling ref issues
+    /// always-empty-size, which allows functions to return const-references to an empty size without dangling ref issues
     static const cv::Size g_oEmptySize = cv::Size();
-    //! returns an always-empty-mat by reference
+    /// returns an always-empty-mat by reference
     inline const cv::Mat& emptyMat() {return g_oEmptyMat;}
-    //! returns an always-empty-size by reference
+    /// returns an always-empty-size by reference
     inline const cv::Size& emptySize() {return g_oEmptySize;}
 
 } // namespace cv

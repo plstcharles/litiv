@@ -27,11 +27,11 @@ struct Dataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b,eEval
         public IDataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b,eEvalImpl> {
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
-            const std::string& sOutputDirName, //!< output directory (full) path for debug logs, evaluation reports and results archiving (will be created in LITIV dataset folder)
-            bool bSaveOutput=false, //!< defines whether results should be archived or not
-            bool bUseEvaluator=true, //!< defines whether results should be fully evaluated, or simply acknowledged
-            bool bForce4ByteDataAlign=false, //!< defines whether data packets should be 4-byte aligned (useful for GPU upload)
-            double dScaleFactor=1.0 //!< defines the scale factor to use to resize/rescale read packets
+            const std::string& sOutputDirName, ///< output directory (full) path for debug logs, evaluation reports and results archiving (will be created in LITIV dataset folder)
+            bool bSaveOutput=false, ///< defines whether results should be archived or not
+            bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
+            bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
+            double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
     ) :
             IDataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b,eEvalImpl>(
                     "LITIV 2012b (CVPRW2015 update)",

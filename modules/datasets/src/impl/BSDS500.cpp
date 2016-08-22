@@ -668,7 +668,7 @@ namespace lv {
             }
             // ^^^ oCumulScore,dMaxRecall,dMaxPrecision,dMaxFMeasure,dAreaPR => eval_bdry.txt
         }
-        //! default contructor requires a base metrics counters, as otherwise, we may obtain NaN's
+        /// default contructor requires a base metrics counters, as otherwise, we may obtain NaN's
         BSDS500MetricsCalculator(const BSDS500MetricsAccumulator& m) :
                 m_voMetricsBase(m.m_voMetricsBase), m_nThresholdBins(m.m_nThresholdBins) {
             updateScores();

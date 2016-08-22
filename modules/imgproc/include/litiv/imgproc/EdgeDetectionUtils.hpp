@@ -22,19 +22,19 @@
 
 struct IIEdgeDetector : public cv::Algorithm {
 
-    //! returns the default threshold value used in 'apply'
+    /// returns the default threshold value used in 'apply'
     virtual double getDefaultThreshold() const = 0;
-    //! edge detection function; the threshold should be between 0 and 1 (returns a binary edge map)
+    /// edge detection function; the threshold should be between 0 and 1 (returns a binary edge map)
     virtual void apply_threshold(cv::InputArray oInputImage, cv::OutputArray oEdgeMask, double dThreshold) = 0;
-    //! edge detection function; performs a full sensitivty sweep and returns a non-binary (grayscale confidence) edge map
+    /// edge detection function; performs a full sensitivty sweep and returns a non-binary (grayscale confidence) edge map
     virtual void apply(cv::InputArray oInputImage, cv::OutputArray oEdgeMask) = 0;
-    //! required for derived class destruction from this interface
+    /// required for derived class destruction from this interface
     virtual ~IIEdgeDetector() {}
 
 protected:
-    //! default impl constructor (for common parameters only -- none must be const to avoid constructor hell when deriving)
+    /// default impl constructor (for common parameters only -- none must be const to avoid constructor hell when deriving)
     IIEdgeDetector();
-    //! ROI border size to be ignored, useful for descriptor-based methods
+    /// ROI border size to be ignored, useful for descriptor-based methods
     size_t m_nROIBorderSize;
 private:
     IIEdgeDetector& operator=(const IIEdgeDetector&) = delete;
@@ -50,28 +50,28 @@ struct IEdgeDetector_<lv::eGLSL> :
         public lv::IParallelAlgo_GLSL,
         public IIEdgeDetector {
 
-    //! required for derived class destruction from this interface
+    /// required for derived class destruction from this interface
     virtual ~IEdgeDetector_() {}
-    //! returns a copy of the latest edge mask
+    /// returns a copy of the latest edge mask
     void getLatestEdgeMask(cv::OutputArray oLastEdgeMask);
 
     // @@@@ also add init funcs here?
 
-    //! edge detection function (asynchronous version w/ gl interface); the threshold should be between 0 and 1, or -1 for sweep
+    /// edge detection function (asynchronous version w/ gl interface); the threshold should be between 0 and 1, or -1 for sweep
     void apply_gl(cv::InputArray oNextImage, bool bRebindAll, double dThreshold);
-    //! edge detection function (asynchronous version w/ gl interface); the threshold should be between 0 and 1, or -1 for sweep
+    /// edge detection function (asynchronous version w/ gl interface); the threshold should be between 0 and 1, or -1 for sweep
     void apply_gl(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, bool bRebindAll, double dThreshold);
-    //! overloads 'apply_threshold' from IIEdgeDetector and redirects it to apply_gl
+    /// overloads 'apply_threshold' from IIEdgeDetector and redirects it to apply_gl
     virtual void apply_threshold(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask, double dThreshold) override final;
-    //! overloads 'apply' from IIEdgeDetector and redirects it to apply_gl (with threshold = -1)
+    /// overloads 'apply' from IIEdgeDetector and redirects it to apply_gl (with threshold = -1)
     virtual void apply(cv::InputArray oNextImage, cv::OutputArray oLastEdgeMask) override final;
 
 protected:
-    //! glsl impl constructor
+    /// glsl impl constructor
     IEdgeDetector_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
                    size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
                    bool bUseTimers, bool bUseIntegralFormat);
-    //! used to pass threshold parameter to overriden dispatch call, if needed
+    /// used to pass threshold parameter to overriden dispatch call, if needed
     double m_dCurrThreshold;
 };
 
@@ -90,7 +90,7 @@ template<>
 struct IEdgeDetector_<lv::eNonParallel> :
         public lv::NonParallelAlgo,
         public IIEdgeDetector {
-    //! required for derived class destruction from this interface
+    /// required for derived class destruction from this interface
     virtual ~IEdgeDetector_() {}
 };
 

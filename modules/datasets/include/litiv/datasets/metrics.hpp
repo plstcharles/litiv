@@ -21,7 +21,7 @@
 
 namespace lv {
 
-    //! basic metrics accumulator interface
+    /// basic metrics accumulator interface
     struct IMetricsAccumulator : lv::enable_shared_from_this<IMetricsAccumulator> {
         virtual ~IMetricsAccumulator() = default;
         bool operator!=(const IMetricsAccumulator& m) const;
@@ -37,7 +37,7 @@ namespace lv {
     using IMetricsAccumulatorPtr = std::shared_ptr<IMetricsAccumulator>;
     using IMetricsAccumulatorConstPtr = std::shared_ptr<const IMetricsAccumulator>;
 
-    //! high-level metrics calculator interface (relies on IMetricsAccumulator internally)
+    /// high-level metrics calculator interface (relies on IMetricsAccumulator internally)
     struct IMetricsCalculator : lv::enable_shared_from_this<IMetricsCalculator> {
         virtual ~IMetricsCalculator() = default;
         IMetricsCalculator& operator+=(const IMetricsCalculator& m);
@@ -54,7 +54,7 @@ namespace lv {
     template<eDatasetEvalList eDatasetEval>
     struct MetricsAccumulator_;
 
-    template<> //! basic metrics counter used to evaluate 2d binary classifiers
+    template<> /// basic metrics counter used to evaluate 2d binary classifiers
     struct MetricsAccumulator_<eDatasetEval_BinaryClassifier> :
             public IMetricsAccumulator {
         virtual bool isEqual(const IMetricsAccumulatorConstPtr& m) const override;
@@ -79,7 +79,7 @@ namespace lv {
             eCountersCount,
         };
     protected:
-        //! default constructor sets all counters to zero
+        /// default constructor sets all counters to zero
         MetricsAccumulator_();
     };
     using BinClassifMetricsAccumulator = MetricsAccumulator_<eDatasetEval_BinaryClassifier>;
@@ -89,7 +89,7 @@ namespace lv {
     template<eDatasetEvalList eDatasetEval>
     struct MetricsCalculator_;
 
-    template<> //! high-level metrics used to evaluate 2d binary classifiers
+    template<> /// high-level metrics used to evaluate 2d binary classifiers
     struct MetricsCalculator_<eDatasetEval_BinaryClassifier> :
             public IMetricsCalculator {
         virtual IMetricsCalculatorPtr accumulate(const IMetricsCalculatorConstPtr& m) override;
@@ -114,7 +114,7 @@ namespace lv {
         double dFMeasure;
         double dMCC;
     protected:
-        //! default contructor requires a base metrics counters, as otherwise, we may obtain NaN's
+        /// default contructor requires a base metrics counters, as otherwise, we may obtain NaN's
         MetricsCalculator_(const IMetricsAccumulatorConstPtr& m);
     };
     using BinClassifMetricsCalculator = MetricsCalculator_<eDatasetEval_BinaryClassifier>;

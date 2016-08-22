@@ -19,15 +19,15 @@
 
 #include "litiv/video/BackgroundSubtractorLBSP.hpp"
 
-//! defines the default value for IBackgroundSubtractorLOBSTER_::m_nDescDistThreshold
+/// defines the default value for IBackgroundSubtractorLOBSTER_::m_nDescDistThreshold
 #define BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD (4)
-//! defines the default value for IBackgroundSubtractorLOBSTER_::m_nColorDistThreshold
+/// defines the default value for IBackgroundSubtractorLOBSTER_::m_nColorDistThreshold
 #define BGSLOBSTER_DEFAULT_COLOR_DIST_THRESHOLD (30)
-//! defines the default value for IBackgroundSubtractorLOBSTER_::m_nBGSamples
+/// defines the default value for IBackgroundSubtractorLOBSTER_::m_nBGSamples
 #define BGSLOBSTER_DEFAULT_NB_BG_SAMPLES (35)
-//! defines the default value for IBackgroundSubtractorLOBSTER_::m_nRequiredBGSamples
+/// defines the default value for IBackgroundSubtractorLOBSTER_::m_nRequiredBGSamples
 #define BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES (2)
-//! defines the default value for the learning rate passed to cv::BackgroundSubtractor::apply
+/// defines the default value for the learning rate passed to cv::BackgroundSubtractor::apply
 #define BGSLOBSTER_DEFAULT_LEARNING_RATE (16)
 
 #define BGSLOBSTER_GLSL_USE_DEBUG      0
@@ -54,16 +54,16 @@ struct IBackgroundSubtractorLOBSTER_ : public IBackgroundSubtractorLBSP_<eImpl> 
                                   size_t nRequiredBGSamples=BGSLOBSTER_DEFAULT_REQUIRED_NB_BG_SAMPLES,
                                   size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
                                   float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
-    //! returns the default learning rate value used in 'apply'
+    /// returns the default learning rate value used in 'apply'
     virtual double getDefaultLearningRate() const override {return BGSLOBSTER_DEFAULT_LEARNING_RATE;}
 protected:
-    //! absolute color distance threshold
+    /// absolute color distance threshold
     const size_t m_nColorDistThreshold;
-    //! absolute descriptor distance threshold
+    /// absolute descriptor distance threshold
     const size_t m_nDescDistThreshold;
-    //! number of different samples per pixel/block to be taken from input frames to build the background model
+    /// number of different samples per pixel/block to be taken from input frames to build the background model
     const size_t m_nBGSamples;
-    //! number of similar samples needed to consider the current pixel/block as 'background'
+    /// number of similar samples needed to consider the current pixel/block as 'background'
     const size_t m_nRequiredBGSamples;
 };
 
@@ -82,25 +82,25 @@ struct BackgroundSubtractorLOBSTER_;
 #if HAVE_GLSL
 template<>
 struct BackgroundSubtractorLOBSTER_<lv::eGLSL> : public IBackgroundSubtractorLOBSTER_GLSL {
-    //! full constructor
+    /// full constructor
     using IBackgroundSubtractorLOBSTER_GLSL::IBackgroundSubtractorLOBSTER_GLSL;
-    //! refreshes all samples based on the last analyzed frame
+    /// refreshes all samples based on the last analyzed frame
     void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
-    //! (re)initiaization method; needs to be called before starting background subtraction
+    /// (re)initiaization method; needs to be called before starting background subtraction
     void initialize_gl(const cv::Mat& oInitImg, const cv::Mat& oROI) override;
-    //! returns the GLSL compute shader source code to run for a given algo stage
+    /// returns the GLSL compute shader source code to run for a given algo stage
     virtual std::string getComputeShaderSource(size_t nStage) const override;
-    //! returns a copy of the latest reconstructed background image
+    /// returns a copy of the latest reconstructed background image
     virtual void getBackgroundImage(cv::OutputArray oBGImg) const override;
-    //! returns a copy of the latest reconstructed background descriptors image
+    /// returns a copy of the latest reconstructed background descriptors image
     virtual void getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const override;
 
 protected:
-    //! returns the GLSL compute shader source code to run for the main processing stage
+    /// returns the GLSL compute shader source code to run for the main processing stage
     std::string getComputeShaderSource_LOBSTER() const;
-    //! returns the GLSL compute shader source code to run the post-processing stage (median blur)
+    /// returns the GLSL compute shader source code to run the post-processing stage (median blur)
     std::string getComputeShaderSource_PostProc() const;
-    //! custom dispatch call function to adjust in-stage uniforms, batch workgroup size & other parameters
+    /// custom dispatch call function to adjust in-stage uniforms, batch workgroup size & other parameters
     virtual void dispatch(size_t nStage, GLShader& oShader) override;
 
     size_t m_nTMT32ModelSize;
@@ -133,23 +133,23 @@ using BackgroundSubtractorLOBSTER_GLSL = BackgroundSubtractorLOBSTER_<lv::eGLSL>
 template<>
 struct BackgroundSubtractorLOBSTER_<lv::eNonParallel> : public IBackgroundSubtractorLOBSTER {
 public:
-    //! full constructor
+    /// full constructor
     using IBackgroundSubtractorLOBSTER::IBackgroundSubtractorLOBSTER;
-    //! refreshes all samples based on the last analyzed frame
+    /// refreshes all samples based on the last analyzed frame
     void refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate=false);
-    //! (re)initiaization method; needs to be called before starting background subtraction
+    /// (re)initiaization method; needs to be called before starting background subtraction
     virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) override;
-    //! model update/segmentation function (synchronous version); the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
+    /// model update/segmentation function (synchronous version); the learning param is reinterpreted as an integer and should be > 0 (smaller values == faster adaptation)
     virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, double dLearningRate=BGSLOBSTER_DEFAULT_LEARNING_RATE) override;
-    //! returns a copy of the latest reconstructed background image
+    /// returns a copy of the latest reconstructed background image
     virtual void getBackgroundImage(cv::OutputArray oBGImg) const override;
-    //! returns a copy of the latest reconstructed background descriptors image
+    /// returns a copy of the latest reconstructed background descriptors image
     virtual void getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const override;
 
 protected:
-    //! background model pixel intensity samples
+    /// background model pixel intensity samples
     std::vector<cv::Mat> m_voBGColorSamples;
-    //! background model descriptors samples
+    /// background model descriptors samples
     std::vector<cv::Mat> m_voBGDescSamples;
 };
 

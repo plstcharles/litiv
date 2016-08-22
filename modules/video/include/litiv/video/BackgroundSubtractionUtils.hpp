@@ -25,66 +25,66 @@ struct IIBackgroundSubtractor : public cv::BackgroundSubtractor {
 
     // @@@ add refresh model as virtual pure func here?
 
-    //! (re)initiaization method; needs to be called before starting background subtraction (assumes no specific ROI)
+    /// (re)initiaization method; needs to be called before starting background subtraction (assumes no specific ROI)
     void initialize(const cv::Mat& oInitImg);
-    //! (re)initiaization method; needs to be called before starting background subtraction
+    /// (re)initiaization method; needs to be called before starting background subtraction
     virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) = 0;
-    //! returns the default learning rate value used in 'apply'
+    /// returns the default learning rate value used in 'apply'
     virtual double getDefaultLearningRate() const = 0;
-    //! turns automatic model reset on or off
+    /// turns automatic model reset on or off
     virtual void setAutomaticModelReset(bool);
-    //! modifies the given ROI so it will not cause lookup errors near borders when used in the processing step
+    /// modifies the given ROI so it will not cause lookup errors near borders when used in the processing step
     virtual void validateROI(cv::Mat& oROI) const;
-    //! sets the ROI to be used for input analysis (note: this function will reinit the model and return the validated ROI)
+    /// sets the ROI to be used for input analysis (note: this function will reinit the model and return the validated ROI)
     virtual void setROI(cv::Mat& oROI);
-    //! returns a copy of the ROI used for input analysis
+    /// returns a copy of the ROI used for input analysis
     virtual cv::Mat getROICopy() const;
-    //! required for derived class destruction from this interface
+    /// required for derived class destruction from this interface
     virtual ~IIBackgroundSubtractor() {}
 
 protected:
-    //! default impl constructor (for common parameters only -- none must be const to avoid constructor hell when deriving)
+    /// default impl constructor (for common parameters only -- none must be const to avoid constructor hell when deriving)
     IIBackgroundSubtractor();
-    //! common (re)initiaization method for all impl types (should be called in impl-specific initialize func)
+    /// common (re)initiaization method for all impl types (should be called in impl-specific initialize func)
     virtual void initialize_common(const cv::Mat& oInitImg, const cv::Mat& oROI);
 
-    //! basic info struct used in px model LUTs
+    /// basic info struct used in px model LUTs
     struct PxInfoBase {
         int nImgCoord_Y;
         int nImgCoord_X;
         size_t nModelIdx;
     };
-    //! background model ROI used for input analysis (specific to the input image size)
+    /// background model ROI used for input analysis (specific to the input image size)
     cv::Mat m_oROI;
-    //! input image size
+    /// input image size
     cv::Size m_oImgSize;
-    //! ROI border size to be ignored, useful for descriptor-based methods
+    /// ROI border size to be ignored, useful for descriptor-based methods
     size_t m_nROIBorderSize;
-    //! input image channel size
+    /// input image channel size
     size_t m_nImgChannels;
-    //! input image type
+    /// input image type
     int m_nImgType;
-    //! total number of pixels (depends on the input frame size) & total number of relevant pixels
+    /// total number of pixels (depends on the input frame size) & total number of relevant pixels
     size_t m_nTotPxCount, m_nTotRelevantPxCount;
-    //! total number of ROI pixels before & after border cleanup
+    /// total number of ROI pixels before & after border cleanup
     size_t m_nOrigROIPxCount, m_nFinalROIPxCount;
-    //! current frame index, frame count since last model reset & model reset cooldown counters
+    /// current frame index, frame count since last model reset & model reset cooldown counters
     size_t m_nFrameIdx, m_nFramesSinceLastReset, m_nModelResetCooldown;
-    //! internal pixel index LUT for all relevant analysis regions (based on the provided ROI)
+    /// internal pixel index LUT for all relevant analysis regions (based on the provided ROI)
     std::vector<size_t> m_vnPxIdxLUT;
-    //! internal pixel info LUT for all possible pixel indexes
+    /// internal pixel info LUT for all possible pixel indexes
     std::vector<PxInfoBase> m_voPxInfoLUT;
-    //! specifies whether the algorithm parameters are fully initialized or not (must be handled by derived class)
+    /// specifies whether the algorithm parameters are fully initialized or not (must be handled by derived class)
     bool m_bInitialized;
-    //! specifies whether the model has been fully initialized or not (must be handled by derived class)
+    /// specifies whether the model has been fully initialized or not (must be handled by derived class)
     bool m_bModelInitialized;
-    //! specifies whether automatic model resets are enabled or not
+    /// specifies whether automatic model resets are enabled or not
     bool m_bAutoModelResetEnabled;
-    //! specifies whether the camera is considered moving or not
+    /// specifies whether the camera is considered moving or not
     bool m_bUsingMovingCamera;
-    //! the foreground mask generated by the method at [t-1]
+    /// the foreground mask generated by the method at [t-1]
     cv::Mat m_oLastFGMask;
-    //! copy of latest pixel intensities (used when refreshing model)
+    /// copy of latest pixel intensities (used when refreshing model)
     cv::Mat m_oLastColorFrame;
 
 private:
@@ -100,27 +100,27 @@ template<>
 struct IBackgroundSubtractor_<lv::eGLSL> :
         public lv::IParallelAlgo_GLSL,
         public IIBackgroundSubtractor {
-    //! required for derived class destruction from this interface
+    /// required for derived class destruction from this interface
     virtual ~IBackgroundSubtractor_() {}
-    //! returns a copy of the latest foreground mask
+    /// returns a copy of the latest foreground mask
     void getLatestForegroundMask(cv::OutputArray oLastFGMask);
-    //! (re)initiaization method (asynchronous version w/ gl interface); needs to be called before starting background subtraction
+    /// (re)initiaization method (asynchronous version w/ gl interface); needs to be called before starting background subtraction
     virtual void initialize_gl(const cv::Mat& oInitImg, const cv::Mat& oROI) override;
-    //! overloads 'initialize' from IIBackgroundSubtractor and redirects it to 'initialize_gl'
+    /// overloads 'initialize' from IIBackgroundSubtractor and redirects it to 'initialize_gl'
     virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) override final;
-    //! model update/segmentation function (asynchronous version w/ gl interface); the learning param is used to override the internal learning speed
+    /// model update/segmentation function (asynchronous version w/ gl interface); the learning param is used to override the internal learning speed
     void apply_gl(cv::InputArray oNextImage, bool bRebindAll=false, double dLearningRate=-1);
-    //! model update/segmentation function (asynchronous version w/ gl interface); the learning param is used to override the internal learning speed
+    /// model update/segmentation function (asynchronous version w/ gl interface); the learning param is used to override the internal learning speed
     void apply_gl(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, bool bRebindAll=false, double dLearningRate=-1);
-    //! overloads 'apply' from IIBackgroundSubtractor and redirects it to 'apply_gl'
+    /// overloads 'apply' from IIBackgroundSubtractor and redirects it to 'apply_gl'
     virtual void apply(cv::InputArray oNextImage, cv::OutputArray oLastFGMask, double dLearningRate=-1) override final;
 
 protected:
-    //! glsl impl constructor
+    /// glsl impl constructor
     IBackgroundSubtractor_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
                            size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
                            bool bUseTimers, bool bUseIntegralFormat);
-    //! used to pass learning rate parameter to overriden dispatch call, if needed
+    /// used to pass learning rate parameter to overriden dispatch call, if needed
     double m_dCurrLearningRate;
 };
 
@@ -139,7 +139,7 @@ template<>
 struct IBackgroundSubtractor_<lv::eNonParallel> :
         public lv::NonParallelAlgo,
         public IIBackgroundSubtractor {
-    //! required for derived class destruction from this interface
+    /// required for derived class destruction from this interface
     virtual ~IBackgroundSubtractor_() {}
 };
 

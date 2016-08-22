@@ -20,11 +20,11 @@
 #include "litiv/video/BackgroundSubtractionUtils.hpp"
 #include "litiv/features2d/LBSP.hpp"
 
-//! defines the default value for BackgroundSubtractorLBSP::m_fRelLBSPThreshold
+/// defines the default value for BackgroundSubtractorLBSP::m_fRelLBSPThreshold
 #define BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD (0.333f)
-//! defines the default value for BackgroundSubtractorLBSP::m_nLBSPThresholdOffset
+/// defines the default value for BackgroundSubtractorLBSP::m_nLBSPThresholdOffset
 #define BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD (0)
-//! defines the default value for BackgroundSubtractorLBSP::m_nDefaultMedianBlurKernelSize
+/// defines the default value for BackgroundSubtractorLBSP::m_nDefaultMedianBlurKernelSize
 #define BGSLBSP_DEFAULT_MEDIAN_BLUR_KERNEL_SIZE (9)
 
 /*!
@@ -38,11 +38,11 @@
 template<lv::eParallelAlgoType eImpl>
 struct IBackgroundSubtractorLBSP_ : public IBackgroundSubtractor_<eImpl> {
 
-    //! returns a copy of the latest reconstructed background descriptors image
+    /// returns a copy of the latest reconstructed background descriptors image
     virtual void getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const = 0;
 
 protected:
-    //! default impl constructor (defined here as MSVC is very prude with template-class-template-cstor-definitions)
+    /// default impl constructor (defined here as MSVC is very prude with template-class-template-cstor-definitions)
     template<lv::eParallelAlgoType eImplTemp = eImpl>
     IBackgroundSubtractorLBSP_(float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
                                size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
@@ -55,7 +55,7 @@ protected:
         IIBackgroundSubtractor::m_nROIBorderSize = LBSP::PATCH_SIZE/2;
     }
 #if HAVE_GLSL
-    //! glsl impl constructor (defined here as MSVC is very prude with template-class-template-cstor-definitions)
+    /// glsl impl constructor (defined here as MSVC is very prude with template-class-template-cstor-definitions)
     template<lv::eParallelAlgoType eImplTemp = eImpl>
     IBackgroundSubtractorLBSP_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
                                size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
@@ -71,7 +71,7 @@ protected:
         CV_Assert(m_fRelLBSPThreshold>=0);
         IIBackgroundSubtractor::m_nROIBorderSize = LBSP::PATCH_SIZE/2;
     }
-    //! returns the GLSL compute shader source code for LBSP lookup/description functions
+    /// returns the GLSL compute shader source code for LBSP lookup/description functions
     template<lv::eParallelAlgoType eImplTemp = eImpl> // dont pass arguments here!
     std::enable_if_t<eImplTemp==lv::eGLSL,std::string> getLBSPThresholdLUTShaderSource() const;
 #endif //HAVE_GLSL
@@ -84,19 +84,19 @@ protected:
     static_assert(eImpl!=lv::eOpenCL),"Missing impl");
 #endif //HAVE_OPENCL
 
-    //! required for derived class destruction from this interface
+    /// required for derived class destruction from this interface
     virtual ~IBackgroundSubtractorLBSP_() {}
-    //! common (re)initiaization method for all impl types (should be called in impl-specific initialize func)
+    /// common (re)initiaization method for all impl types (should be called in impl-specific initialize func)
     virtual void initialize_common(const cv::Mat& oInitImg, const cv::Mat& oROI) override;
-    //! LBSP internal threshold offset value, used to reduce texture noise in dark regions
+    /// LBSP internal threshold offset value, used to reduce texture noise in dark regions
     const size_t m_nLBSPThresholdOffset;
-    //! LBSP relative internal threshold (kept here since we don't keep an LBSP object)
+    /// LBSP relative internal threshold (kept here since we don't keep an LBSP object)
     const float m_fRelLBSPThreshold;
-    //! pre-allocated internal LBSP threshold values LUT for all possible 8-bit intensities
+    /// pre-allocated internal LBSP threshold values LUT for all possible 8-bit intensities
     std::array<uchar,UCHAR_MAX+1> m_anLBSPThreshold_8bitLUT;
-    //! default kernel size for median blur post-proc filtering
+    /// default kernel size for median blur post-proc filtering
     const int m_nDefaultMedianBlurKernelSize;
-    //! copy of latest descriptors (used when refreshing model)
+    /// copy of latest descriptors (used when refreshing model)
     cv::Mat m_oLastDescFrame;
 };
 

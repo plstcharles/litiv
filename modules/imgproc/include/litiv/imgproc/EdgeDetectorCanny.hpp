@@ -21,15 +21,15 @@
 
 // note: all default parameters mimic matlab's implementation
 
-//! defines the default value for the norm type used to compute gradient magnitudes
+/// defines the default value for the norm type used to compute gradient magnitudes
 #define EDGCANNY_USE_L2_GRADIENT_NORM (true)
-//! defines the default value for the aperture (or window) size used for Sobel gradient estimation
+/// defines the default value for the aperture (or window) size used for Sobel gradient estimation
 #define EDGCANNY_SOBEL_KERNEL_SIZE (3)
-//! defines the default value for the threshold passed to EdgeDetectorCanny::apply_threshold
+/// defines the default value for the threshold passed to EdgeDetectorCanny::apply_threshold
 #define EDGCANNY_DEFAULT_THRESHOLD (100<<std::max(EDGCANNY_SOBEL_KERNEL_SIZE-3,0)*2)
-//! defines the default value for EdgeDetectorCanny::m_dHystLowThrshFactor
+/// defines the default value for EdgeDetectorCanny::m_dHystLowThrshFactor
 #define EDGCANNY_DEFAULT_HYST_LOW_THRSH_FACT (0.4)
-//! defines the default value for EdgeDetectorCanny::m_dGaussianKernelSigma
+/// defines the default value for EdgeDetectorCanny::m_dGaussianKernelSigma
 #define EDGCANNY_DEFAULT_GAUSSIAN_KERNEL_SIGMA (sqrt(2.0))
 
 /*!
@@ -40,19 +40,19 @@
     Note: converts all RGB/RGBA images to grayscale internally.
  */
 struct EdgeDetectorCanny : public IEdgeDetector {
-    //! full constructor
+    /// full constructor
     EdgeDetectorCanny(double dHystLowThrshFactor=EDGCANNY_DEFAULT_HYST_LOW_THRSH_FACT,
                       double dGaussianKernelSigma=EDGCANNY_DEFAULT_GAUSSIAN_KERNEL_SIGMA);
-    //! returns the default threshold value used in 'apply'
+    /// returns the default threshold value used in 'apply'
     virtual double getDefaultThreshold() const {return EDGCANNY_DEFAULT_THRESHOLD;}
-    //! thresholded edge detection function; the threshold should be between 0 and 1 (will use default otherwise), and sets the base hysteresis threshold
+    /// thresholded edge detection function; the threshold should be between 0 and 1 (will use default otherwise), and sets the base hysteresis threshold
     virtual void apply_threshold(cv::InputArray oInputImage, cv::OutputArray oEdgeMask, double dThreshold=EDGCANNY_DEFAULT_THRESHOLD);
-    //! edge detection function; returns a confidence edge mask (0-255) instead of a thresholded/binary edge mask
+    /// edge detection function; returns a confidence edge mask (0-255) instead of a thresholded/binary edge mask
     virtual void apply(cv::InputArray oInputImage, cv::OutputArray oEdgeMask);
 
 protected:
-    //! base threshold multiplier used to compute the upper hysteresis threshold
+    /// base threshold multiplier used to compute the upper hysteresis threshold
     const double m_dHystLowThrshFactor;
-    //! gaussian blur kernel sigma value
+    /// gaussian blur kernel sigma value
     const double m_dGaussianKernelSigma;
 };

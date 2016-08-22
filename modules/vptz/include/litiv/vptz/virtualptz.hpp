@@ -96,7 +96,7 @@ namespace vptz {
 
     class VPTZ_API Camera {
     public:
-        //! Default Constructor; the default values are taken from the datasheet of the SONY network camera SNC-RZ50N.
+        /// Default Constructor; the default values are taken from the datasheet of the SONY network camera SNC-RZ50N.
         Camera( const std::string& input_file_path, // input video or image file path
                 double verti_FOV = 90.0,
                 double output_width = 640.0,
@@ -108,21 +108,21 @@ namespace vptz {
                 double communication_delay = 0.2);
         ~Camera();
 
-        //! moves the view to center the target point; throws if the point is out of image bounds. The User can also set the horizontal and vertical (pan and tilt) angles via the Set(...) function.
+        /// moves the view to center the target point; throws if the point is out of image bounds. The User can also set the horizontal and vertical (pan and tilt) angles via the Set(...) function.
         void GoToPosition(int x, int y);
-        //! moves the view to center the target point; throws if the point is out of image bounds. The User can also set the horizontal and vertical (pan and tilt) angles via the Set(...) function.
+        /// moves the view to center the target point; throws if the point is out of image bounds. The User can also set the horizontal and vertical (pan and tilt) angles via the Set(...) function.
         void GoToPosition(cv::Point target);
-        //! begins playing the video sequence; throws if the frame index is invalid.
+        /// begins playing the video sequence; throws if the frame index is invalid.
         void BeginPlaying(int nFrameIdx=0);
-        //! simulate the response delay of a PTZ camera; returns false if the video ends before the end of the waiting period.
+        /// simulate the response delay of a PTZ camera; returns false if the video ends before the end of the waiting period.
         bool WaitDelay(bool bSleep=false);
-        //! returns the current frame from the video sequence given the current FoV; specific frames can be obtained by using Set(...) prior to calling
+        /// returns the current frame from the video sequence given the current FoV; specific frames can be obtained by using Set(...) prior to calling
         const cv::Mat& GetFrame();
-        //! manual update function to replace the panoramic image (for image mode only)
+        /// manual update function to replace the panoramic image (for image mode only)
         void UpdatePanoImage(cv::Mat& image);
-        //! global property Getter, see 'CameraPropertyFlag' enum for options; throws if flag is invalid.
+        /// global property Getter, see 'CameraPropertyFlag' enum for options; throws if flag is invalid.
         double Get(CameraPropertyFlag flag);
-        //! global property Setter, see 'CameraPropertyFlag' enum for options; throws if flag or value is invalid.
+        /// global property Setter, see 'CameraPropertyFlag' enum for options; throws if flag or value is invalid.
         void Set(CameraPropertyFlag flag, double value);
 
         const std::string m_sInputPath;
@@ -174,12 +174,12 @@ namespace vptz {
     class VPTZ_API GTTranslator {
         friend class Evaluator;
     public:
-        //! default Constructor based on existing vptz camera; throws if any input parameter is invalid
+        /// default Constructor based on existing vptz camera; throws if any input parameter is invalid
         GTTranslator( Camera* pCam,
                       int bgt_output_width = 640,
                       int bgt_output_height = 480,
                       double bgt_verti_FOV = 90.0);
-        //! default Constructor; throws if any input parameter is invalid
+        /// default Constructor; throws if any input parameter is invalid
         GTTranslator( int cur_output_width = 640,
                       int cur_output_height = 480,
                       double cur_verti_FOV = 90.0,
@@ -189,16 +189,16 @@ namespace vptz {
                       int bgt_output_height = 480,
                       double bgt_verti_FOV = 90.0);
 
-        //! updates viewing direction, only needed when there is no bound camera; throws if any input parameter is invalid
+        /// updates viewing direction, only needed when there is no bound camera; throws if any input parameter is invalid
         void UpdateViewAngle( double cur_hori_angle,      // current horizontal (phi) direction angle of virtual (degree, (-180, 180])
                               double cur_verti_angle);    // current vertical (theta) direction angle of virtual (degree, [0, 180])
-        //! tranlates gt target 2d point for particular outputWidth, outputHeight, vertiFOV, horiAngle, vertiAngle; throws if any input parameter is invalid
-        //! note: returns false if the direct difference between the target direction and camera direction is larger than 90 degree
+        /// tranlates gt target 2d point for particular outputWidth, outputHeight, vertiFOV, horiAngle, vertiAngle; throws if any input parameter is invalid
+        /// note: returns false if the direct difference between the target direction and camera direction is larger than 90 degree
         bool GetGTTargetPoint( double bgtHoriAngle,        // horizontal (phi) direction angle of virtual camera in basic ground truth (degree, (-180, 180])
                                double bgtVertiAngle,       // vertical (theta) direction angle of virtual camera in basic ground truth (degree, [0, 180])
                                cv::Point& tgtTargetPoint); // translated ground-truth target point, reference (0,0) is bottom-left point
-        //! tranlates ground-truth target bounding box for perticular outputWidth, outputHeight, vertiFOV, horiAngle, vertiAngle; throws if any input parameter is invalid
-        //! note: returns false if the direct difference between the target direction and camera direction is larger than 90 degree
+        /// tranlates ground-truth target bounding box for perticular outputWidth, outputHeight, vertiFOV, horiAngle, vertiAngle; throws if any input parameter is invalid
+        /// note: returns false if the direct difference between the target direction and camera direction is larger than 90 degree
         bool GetGTBoundingBox( double bgtHoriAngle,        // horizontal (phi) direction angle of virtual camera in basic ground truth (degree, (-180, 180])
                                double bgtVertiAngle,       // vertical (theta) direction angle of virtual camera in basic ground truth (degree, [0, 180])
                                int bgtBBoxWidth,           // width of the bounding box in basic ground truth (pixel, [0,bgtOutputWidth])
@@ -220,7 +220,7 @@ namespace vptz {
 
     class VPTZ_API Evaluator {
     public:
-        //! custom test constructor; throws if it cannot open the input file or its content is invalid
+        /// custom test constructor; throws if it cannot open the input file or its content is invalid
         Evaluator( const std::string& sInputScenarioPath,      // input video or image file path
                    const std::string& sInputGTSequencePath,    // input basic ground truth file path (.yml)
                    const std::string& sInputTargetMaskPath,    // input target mask image file path (can be empty)
@@ -229,44 +229,44 @@ namespace vptz {
                    double dExecDelayRatio=0.0,
                    int nFirstTestFrameIdx=-1,
                    int nLastTestFrameIdx=INT_MAX);
-        //! testset-based constructor; throws if it cannot open the input file or its content is invalid
+        /// testset-based constructor; throws if it cannot open the input file or its content is invalid
         Evaluator( const std::string& sInputTestSetPath,
                    const std::string& sOutputEvalFilePath,
                    double dCommDelay=0.5,
                    double dExecDelayRatio=0.0);
         ~Evaluator();
 
-        //! returns the frame count in the current test set
+        /// returns the frame count in the current test set
         int GetTestSetSize();
-        //! returns the frame index in the current test set
+        /// returns the frame index in the current test set
         int GetCurrTestIdx();
-        //! sets up test set for a given frame index (camera setup, output file setup)
+        /// sets up test set for a given frame index (camera setup, output file setup)
         void SetupTesting(int nTestIdx=0);
-        //! sets up last internal test components and triggers 'BeginPlaying(...)' on the vptz camera
+        /// sets up last internal test components and triggers 'BeginPlaying(...)' on the vptz camera
         void BeginTesting();
-        //! cleans internal state, computes overall metrics and prints them to console
+        /// cleans internal state, computes overall metrics and prints them to console
         void EndTesting();
-        //! redirects Get(...) calls to the camera
+        /// redirects Get(...) calls to the camera
         double GetCurrCameraProperty(CameraPropertyFlag flag);
-        //! returns the current test sequence name (for display purposes)
+        /// returns the current test sequence name (for display purposes)
         std::string GetCurrTestSequenceName();
-        //! returns the maximum number of frames that could be used in the current test sequence
+        /// returns the maximum number of frames that could be used in the current test sequence
         int GetPotentialTestFrameCount();
-        //! returns the target image used to initialize tracking models
+        /// returns the target image used to initialize tracking models
         cv::Mat GetInitTarget();
-        //! returns the target image mask used to remove the background from the target image (should not be required by regular trackers)
+        /// returns the target image mask used to remove the background from the target image (should not be required by regular trackers)
         cv::Mat GetInitTargetMask();
-        //! returns the full frame where the initialization target can be located
+        /// returns the full frame where the initialization target can be located
         cv::Mat GetInitTargetFrame();
-        //! returns the bounding box where the initialization target is for the full frame
+        /// returns the bounding box where the initialization target is for the full frame
         cv::Rect GetInitTargetBBox();
-        //! moves the camera to the expected target position (if needed), and returns the next image from the tracking sequence (or an empty frame when it is over)
+        /// moves the camera to the expected target position (if needed), and returns the next image from the tracking sequence (or an empty frame when it is over)
         cv::Mat GetNextFrame(const cv::Point& oExpectedTargetPosition, bool bUseWaitDelaySleep=false);
-        //! moves the camera to the expected target position (if needed), and returns the next image from the tracking sequence (or an empty frame when it is over)
+        /// moves the camera to the expected target position (if needed), and returns the next image from the tracking sequence (or an empty frame when it is over)
         cv::Mat GetNextFrame(double dExpectedTargetAngle_H, double dExpectedTargetAngle_V, bool bUseWaitDelaySleep=false);
-        //! returns the last ground truth bounding box, for display purposes only
+        /// returns the last ground truth bounding box, for display purposes only
         cv::Rect GetLastGTBoundingBox();
-        //! feeds current tracking results to the evaluator which compares them to the groundtruth and saves them for later
+        /// feeds current tracking results to the evaluator which compares them to the groundtruth and saves them for later
         void UpdateCurrentResult(cv::Rect& rCurrTargetBBox, bool bPrintResult=false);
 
     private:
@@ -334,7 +334,7 @@ namespace vptz {
         int m_nTotTestFrameCount;
     };
 
-    //! utility function: maps a 2D point on the virtual camera image to its horizontal and vertical angles in the sphere (throws if invalid args)
+    /// utility function: maps a 2D point on the virtual camera image to its horizontal and vertical angles in the sphere (throws if invalid args)
     void VPTZ_API PTZPointXYtoHV( int target2dX,                 // in: x coordinate of target point on the output image (pixel, [0, camOutputWidth-1])
                                   int target2dY,                 // in: y coordinate of target point on the output image (pixel, [0, camOutputHeight-1])
                                   double& tarHoriAngle,          // out: horizontal (phi) direction angle of target (degree)
@@ -344,7 +344,7 @@ namespace vptz {
                                   double camVertiFOV = 90.0,     // in: vertical FOV angle of the virtual camera (degree, (0, 180))
                                   double camHoriAngle = 0.0,     // in: horizontal (phi) direction angle of camera (degree, (-180, 180])
                                   double camVertiAngle = 90.0);  // in: vertical (theta) direction angle of camera (degree, [0, 180])
-    //! utility function: maps a 2D point on the virtual camera image to its horizontal and vertical angles in the sphere (throws if invalid args)
+    /// utility function: maps a 2D point on the virtual camera image to its horizontal and vertical angles in the sphere (throws if invalid args)
     void VPTZ_API PTZPointXYtoHV( cv::Point2i targetXY,
                                   cv::Point2d& targetHV,
                                   int camOutputWidth = 640.0,
@@ -353,8 +353,8 @@ namespace vptz {
                                   double camHoriAngle = 0.0,
                                   double camVertiAngle = 90.0);
 
-    //! utility function: maps a point from its horizontal and vertical angles to its 2D coordinate on the virtual camera image (throws if invalid args)
-    //! note: returns false if the direct difference between the target direction and camera direction is larger than 90 degree
+    /// utility function: maps a point from its horizontal and vertical angles to its 2D coordinate on the virtual camera image (throws if invalid args)
+    /// note: returns false if the direct difference between the target direction and camera direction is larger than 90 degree
     bool VPTZ_API PTZPointHVtoXY( double tarHoriAngle,           // in: horizontal (phi) direction angle of target (degree, (-180, 180])
                                   double tarVertiAngle,          // in: vertical (theta) direction angle of target (degree, [0, 180])
                                   int& target2dX,                // out: x coordinate of target point on the output image (pixel, may exceed [0, camOutputWidth-1])
@@ -364,8 +364,8 @@ namespace vptz {
                                   double camVertiFOV = 90.0,     // in: vertical FOV angle of the virtual camera (degree, (0, 180))
                                   double camHoriAngle = 0.0,     // in: horizontal (phi) direction angle of camera (degree, (-180, 180])
                                   double camVertiAngle = 90.0);  // in: vertical (theta) direction angle of camera (degree, [0, 180])
-    //! utility function: maps a point from its horizontal and vertical angles to its 2D coordinate on the virtual camera image (throws if invalid args)
-    //! note: returns false if the direct difference between the target direction and camera direction is larger than 90 degree
+    /// utility function: maps a point from its horizontal and vertical angles to its 2D coordinate on the virtual camera image (throws if invalid args)
+    /// note: returns false if the direct difference between the target direction and camera direction is larger than 90 degree
     bool VPTZ_API PTZPointHVtoXY( cv::Point2d targetHV,
                                   cv::Point2i& targetXY,
                                   int camOutputWidth = 640.0,

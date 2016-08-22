@@ -107,9 +107,9 @@ public:
     };
 
 protected:
-    //! initialize internal texture arrays and shader programs; should be called in top-level algo init function
+    /// initialize internal texture arrays and shader programs; should be called in top-level algo init function
     virtual void initialize_gl(const cv::Mat& oInitInput, const cv::Mat& oROI);
-    //! uploads the next input texture to GPU, processes the input texture currently on GPU, and fetches (if required) the last output texture
+    /// uploads the next input texture to GPU, processes the input texture currently on GPU, and fetches (if required) the last output texture
     virtual void apply_gl(const cv::Mat& oNextInput, bool bRebindAll=false);
 
     bool m_bUsingDisplay;
@@ -162,13 +162,13 @@ public:
     const cv::Mat& getEvaluationAtomicCounterBuffer();
     virtual std::string getFragmentShaderSource() const;
 
-    //! initialize internal texture arrays and shader programs for evaluator+algo; should be called in top-level evaluator init function
+    /// initialize internal texture arrays and shader programs for evaluator+algo; should be called in top-level evaluator init function
     virtual void initialize_gl(const cv::Mat& oInitInput, const cv::Mat& oInitGT, const cv::Mat& oROI);
-    //! initialize internal texture arrays and shader programs for evaluator only; should be called in top-level evaluator init function
+    /// initialize internal texture arrays and shader programs for evaluator only; should be called in top-level evaluator init function
     virtual void initialize_gl(const cv::Mat& oInitGT, const cv::Mat& oROI);
-    //! uploads the next input/gt texture to GPU, processes the input/gt/output textures currently on GPU, and fetches (if required) the last output texture
+    /// uploads the next input/gt texture to GPU, processes the input/gt/output textures currently on GPU, and fetches (if required) the last output texture
     virtual void apply_gl(const cv::Mat& oNextInput, const cv::Mat& oNextGT, bool bRebindAll=false);
-    //! uploads the next gt texture to GPU, processes the output/gt textures currently on GPU, and fetches (if required) the last output texture
+    /// uploads the next gt texture to GPU, processes the output/gt textures currently on GPU, and fetches (if required) the last output texture
     virtual void apply_gl(const cv::Mat& oNextGT, bool bRebindAll=false);
 
 protected:

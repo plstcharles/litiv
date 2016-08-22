@@ -52,9 +52,9 @@ namespace lv {
     };
 
     struct IIParallelAlgo {
-        //! returns whether the algorithm is implemented for parallel processing or not
+        /// returns whether the algorithm is implemented for parallel processing or not
         virtual bool isParallel() = 0;
-        //! returns which type of parallel implementation is used in this algo
+        /// returns which type of parallel implementation is used in this algo
         virtual eParallelAlgoType getParallelAlgoType() = 0;
     public:
         // #### for debug purposes only ####
@@ -104,7 +104,7 @@ namespace lv {
     using NonParallelAlgo = IParallelAlgo_<eNonParallel>;
 
 #if HAVE_MMX
-    //! returns the (horizontal) sum of the provided 8-unsigned-byte array
+    /// returns the (horizontal) sum of the provided 8-unsigned-byte array
     inline uint hsum_8ub(const __m64& anBuffer) {
         __m64 _anRes = _mm_sad_pu8(anBuffer,_mm_set1_pi8(char(0)));
         return uint(_mm_cvtsi64_si32(_anRes));
@@ -112,13 +112,13 @@ namespace lv {
 #endif //HAVE_MMX
 
 #if HAVE_SSE2
-    //! returns the (horizontal) sum of the provided 16-unsigned-byte array
+    /// returns the (horizontal) sum of the provided 16-unsigned-byte array
     inline uint hsum_16ub(const __m128i& anBuffer) {
         __m128i _anRes = _mm_sad_epu8(anBuffer,_mm_set1_epi8(char(0)));
         return uint(_mm_cvtsi128_si32(_mm_add_epi64(_mm_srli_si128(_anRes,8),_anRes)));
     }
 
-    //! fills the provided 16-byte array with a constant
+    /// fills the provided 16-byte array with a constant
     inline void copy_16ub(__m128i* anBuffer, uchar nVal) {
         _mm_store_si128(anBuffer,_mm_set1_epi8((char)nVal));
     }
@@ -143,13 +143,13 @@ namespace lv {
 #endif //HAVE_SSE2
 
 #if HAVE_SSE4_1
-    //! returns the maximum value of the provided 16-unsigned-byte array
+    /// returns the maximum value of the provided 16-unsigned-byte array
     inline uchar hmax_16ub(const __m128i& anBuffer) {
         __m128i _anTmp = _mm_sub_epi8(_mm_set1_epi8(char(CHAR_MAX)),anBuffer);
         return uchar(char(CHAR_MAX)-_mm_cvtsi128_si32(_mm_minpos_epu16(_mm_min_epu8(_anTmp,_mm_srli_epi16(_anTmp,8)))));
     }
 
-    //! returns the minimum value of the provided 16-unsigned-byte array
+    /// returns the minimum value of the provided 16-unsigned-byte array
     inline uchar hmin_16ub(const __m128i& anBuffer) {
         return uchar(_mm_cvtsi128_si32(_mm_minpos_epu16(_mm_min_epu8(anBuffer,_mm_srli_epi16(anBuffer,8)))));
     }

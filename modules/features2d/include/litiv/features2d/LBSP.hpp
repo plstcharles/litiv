@@ -35,59 +35,59 @@
  */
 class LBSP : public cv::Feature2D {
 public:
-    //! constructor 1, threshold = absolute intensity 'similarity' threshold used when computing comparisons
+    /// constructor 1, threshold = absolute intensity 'similarity' threshold used when computing comparisons
     LBSP(size_t nThreshold);
-    //! constructor 2, threshold = relative intensity 'similarity' threshold used when computing comparisons
+    /// constructor 2, threshold = relative intensity 'similarity' threshold used when computing comparisons
     LBSP(float fRelThreshold, size_t nThresholdOffset=0);
-    //! default destructor
+    /// default destructor
     virtual ~LBSP();
-    //! loads extractor params from the specified file node @@@@ not impl
+    /// loads extractor params from the specified file node @@@@ not impl
     virtual void read(const cv::FileNode&);
-    //! writes extractor params to the specified file storage @@@@ not impl
+    /// writes extractor params to the specified file storage @@@@ not impl
     virtual void write(cv::FileStorage&) const;
-    //! sets the 'reference' image to be used for inter-frame comparisons (note: if no image is set or if the image is empty, the algorithm will default back to intra-frame comparisons)
+    /// sets the 'reference' image to be used for inter-frame comparisons (note: if no image is set or if the image is empty, the algorithm will default back to intra-frame comparisons)
     virtual void setReference(const cv::Mat&);
-    //! returns the current descriptor size, in bytes
+    /// returns the current descriptor size, in bytes
     virtual int descriptorSize() const;
-    //! returns the current descriptor data type
+    /// returns the current descriptor data type
     virtual int descriptorType() const;
-    //! returns whether this extractor is using a relative threshold or not
+    /// returns whether this extractor is using a relative threshold or not
     virtual bool isUsingRelThreshold() const;
-    //! returns the current relative threshold used for comparisons (-1 = invalid/not used)
+    /// returns the current relative threshold used for comparisons (-1 = invalid/not used)
     virtual float getRelThreshold() const;
-    //! returns the current absolute threshold used for comparisons (-1 = invalid/not used)
+    /// returns the current absolute threshold used for comparisons (-1 = invalid/not used)
     virtual size_t getAbsThreshold() const;
 
-    //! similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix
+    /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix
     void compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const;
-    //! batch version of LBSP::compute2(const cv::Mat& image, ...)
+    /// batch version of LBSP::compute2(const cv::Mat& image, ...)
     void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat>& voDescCollection) const;
 
-    //! utility function, used to reshape a descriptors matrix to its input image size via their keypoint locations
+    /// utility function, used to reshape a descriptors matrix to its input image size via their keypoint locations
     static void reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoints, const cv::Mat& oDescriptors, cv::Mat& oOutput);
-    //! utility function, used to illustrate the difference between two descriptor images
+    /// utility function, used to illustrate the difference between two descriptor images
     static void calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat& oOutput, bool bForceMergeChannels=false);
-    //! utility function, used to filter out bad keypoints that would trigger out of bounds error because they're too close to the image border
+    /// utility function, used to filter out bad keypoints that would trigger out of bounds error because they're too close to the image border
     static void validateKeyPoints(std::vector<cv::KeyPoint>& voKeypoints, cv::Size oImgSize);
-    //! utility function, used to filter out bad pixels in a ROI that would trigger out of bounds error because they're too close to the image border
+    /// utility function, used to filter out bad pixels in a ROI that would trigger out of bounds error because they're too close to the image border
     static void validateROI(cv::Mat& oROI);
 #if HAVE_GLSL
-    //! utility function, returns the glsl source code required to describe an LBSP descriptor based on the image load store
+    /// utility function, returns the glsl source code required to describe an LBSP descriptor based on the image load store
     static std::string getShaderFunctionSource(size_t nChannels, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize);
 #endif //HAVE_GLSL
 
-    //! utility, specifies the integer type used to store descriptors
+    /// utility, specifies the integer type used to store descriptors
     typedef ushort desc_t;
-    //! utility, specifies the pixel size of the pattern used (width and height)
+    /// utility, specifies the pixel size of the pattern used (width and height)
     static constexpr size_t PATCH_SIZE = 5;
-    //! utility, specifies the number of bytes per descriptor (should be the same as calling 'descriptorSize()')
+    /// utility, specifies the number of bytes per descriptor (should be the same as calling 'descriptorSize()')
     static constexpr size_t DESC_SIZE = 2;
-    //! utility, specifies the number of bits per descriptor
+    /// utility, specifies the number of bits per descriptor
     static constexpr size_t DESC_SIZE_BITS = DESC_SIZE*8;
-    //! utility, specifies the maximum gradient magnitude value that can be returned by computeDescriptor_gradient
+    /// utility, specifies the maximum gradient magnitude value that can be returned by computeDescriptor_gradient
     static constexpr size_t MAX_GRAD_MAG = DESC_SIZE_BITS;
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (single-channel lookup, single-channel array thresholding)
+    /// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (single-channel lookup, single-channel array thresholding)
     template<size_t nChannels>
     static inline void computeDescriptor(const cv::Mat& oInputImg, const uchar nRef, const int _x, const int _y, const size_t _c, const uchar nThreshold, desc_t& nDesc) {
         alignas(16) std::array<uchar,LBSP::DESC_SIZE_BITS> anVals;
@@ -95,25 +95,25 @@ public:
         nDesc = LBSP::computeDescriptor_threshold(anVals.data(),nRef,nThreshold);
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
+    /// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
     template<size_t nChannels>
     static inline void computeDescriptor(const cv::Mat& oInputImg, const std::array<uchar,nChannels>& anRefs, const int _x, const int _y, const std::array<uchar,nChannels>& anThresholds, std::array<desc_t,nChannels>& anDesc) {
         LBSP::computeDescriptor<nChannels>(oInputImg,anRefs.data(),_x,_y,anThresholds.data(),anDesc.data());
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
+    /// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
     template<size_t nChannels>
     static inline void computeDescriptor(const cv::Mat& oInputImg, const uchar* const anRefs, const int _x, const int _y, const std::array<uchar,nChannels>& anThresholds, std::array<desc_t,nChannels>& anDesc) {
         LBSP::computeDescriptor<nChannels>(oInputImg,anRefs,_x,_y,anThresholds.data(),anDesc.data());
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
+    /// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
     template<size_t nChannels>
     static inline void computeDescriptor(const cv::Mat& oInputImg, const uchar* const anRefs, const int _x, const int _y, const std::array<uchar,nChannels>& anThresholds, desc_t* anDesc) {
         LBSP::computeDescriptor<nChannels>(oInputImg,anRefs,_x,_y,anThresholds.data(),anDesc);
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
+    /// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup, multi-channel array thresholding)
     template<size_t nChannels>
     static inline void computeDescriptor(const cv::Mat& oInputImg, const uchar* const anRefs, const int _x, const int _y, const uchar* const anThresholds, desc_t* anDesc) {
         alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE_BITS>,nChannels> aanVals;
@@ -123,14 +123,14 @@ public:
         });
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (single-channel lookup only)
+    /// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (single-channel lookup only)
     template<size_t nChannels>
     static inline void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, const size_t _c, std::array<uchar,DESC_SIZE_BITS>& anVals) {
         static_assert(sizeof(std::array<uchar,DESC_SIZE_BITS>)==sizeof(uchar)*DESC_SIZE_BITS,"terrible impl of std::array right here");
         LBSP::computeDescriptor_lookup<nChannels>(oInputImg,_x,_y,_c,anVals.data());
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup only)
+    /// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup only)
     template<size_t nChannels>
     static inline void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, std::array<std::array<uchar,DESC_SIZE_BITS>,nChannels>& aanVals) {
         static_assert(sizeof(std::array<std::array<uchar,DESC_SIZE_BITS>,nChannels>)==sizeof(uchar)*DESC_SIZE_BITS*nChannels,"terrible impl of std::array right here");
@@ -138,7 +138,7 @@ public:
         LBSP::computeDescriptor_lookup<nChannels>(oInputImg,_x,_y,aanVals[0].data());
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (single-channel lookup only)
+    /// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (single-channel lookup only)
     template<size_t nChannels>
     static inline void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, const size_t _c, uchar* anVals) {
         static_assert(nChannels>0,"need at least one image channel");
@@ -153,7 +153,7 @@ public:
         LBSP::lookup_16bits_dbcross<nChannels>(anData,nRowStep,nColStep,anVals);
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup only)
+    /// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (multi-channel lookup only)
     template<size_t nChannels>
     static inline void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, uchar* aanVals) {
         static_assert(nChannels>0,"need at least one image channel");
@@ -170,13 +170,13 @@ public:
         });
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (array thresholding only)
+    /// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (array thresholding only)
     static inline desc_t computeDescriptor_threshold(const std::array<uchar,LBSP::DESC_SIZE_BITS>& anVals, const uchar nRef, const uchar nThreshold) {
         static_assert(sizeof(std::array<uchar,LBSP::DESC_SIZE_BITS>)==sizeof(uchar)*LBSP::DESC_SIZE_BITS,"terrible impl of std::array right here");
         return LBSP::computeDescriptor_threshold(anVals.data(),nRef,nThreshold);
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (array thresholding only)
+    /// utility function, shortcut/lightweight/direct single-point LBSP computation function for extra flexibility (array thresholding only)
     static inline desc_t computeDescriptor_threshold(const uchar* const anVals, const uchar nRef, const uchar nThreshold) {
         // note: this function is used to threshold an LBSP pattern based on a predefined lookup array (see LBSP_16bits_dbcross_lookup for more information)
         // @@@ todo: use array template to unroll loops & allow any descriptor size here
@@ -210,7 +210,7 @@ public:
 #endif //(HAVE_SSE4_1 || HAVE_SSE2)
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP gradient computation function (mixes rel+abs, returns max-channel only)
+    /// utility function, shortcut/lightweight/direct single-point LBSP gradient computation function (mixes rel+abs, returns max-channel only)
     template<size_t nChannels, size_t nAbsOffset=20, size_t nRelShift=2, typename Tr1=int, typename Tr2=uint>
     static inline void computeDescriptor_gradient(const std::array<std::array<uchar,DESC_SIZE_BITS>,nChannels>& aanVals, const std::array<uchar,nChannels>& anRefs, Tr1& nGradX, Tr1& nGradY, Tr2& nGradMag) {
         static_assert(sizeof(std::array<std::array<uchar,DESC_SIZE_BITS>,nChannels>)==sizeof(uchar)*DESC_SIZE_BITS*nChannels,"terrible impl of std::array right here");
@@ -218,7 +218,7 @@ public:
         LBSP::computeDescriptor_gradient<nChannels,nAbsOffset,nRelShift>(aanVals.data(),anRefs.data(),nGradX,nGradY,nGradMag);
     }
 
-    //! utility function, shortcut/lightweight/direct single-point LBSP gradient estimation function (mixes rel+abs, returns max-channel only)
+    /// utility function, shortcut/lightweight/direct single-point LBSP gradient estimation function (mixes rel+abs, returns max-channel only)
     template<size_t nChannels, size_t nAbsOffset=20, size_t nRelShift=2, typename Tr1=char, typename Tr2=uchar>
     static inline void computeDescriptor_gradient(const uchar* const aanVals, const uchar* const anRefs, Tr1& nGradX, Tr1& nGradY, Tr2& nGradMag) {
         // note: this function is used to threshold a multi-channel LBSP pattern based on a predefined lookup array (see LBSP_16bits_dbcross_lookup for more information)
@@ -243,7 +243,7 @@ public:
     }
 
 protected:
-    //! classic 'compute' implementation, based on the regular DescriptorExtractor::computeImpl arguments & expected output
+    /// classic 'compute' implementation, based on the regular DescriptorExtractor::computeImpl arguments & expected output
     virtual void computeImpl(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const;
     const bool m_bOnlyUsingAbsThreshold;
     const float m_fRelThreshold;
@@ -252,7 +252,7 @@ protected:
 
     // arrays below do not rely on std::array to avoid multi-dim init problems w/ static constexpr in header files
 
-    //! LBSP 16 bit double-cross indiv RGB/RGBA pattern as used in the original article by G.-A. Bilodeau et al.
+    /// LBSP 16 bit double-cross indiv RGB/RGBA pattern as used in the original article by G.-A. Bilodeau et al.
     static constexpr int s_anIdxLUT_16bitdbcross[16][2] = {
             //  O   O   O        4 ..  3 ..  6
             //    O O O         .. 15  8 13 ..

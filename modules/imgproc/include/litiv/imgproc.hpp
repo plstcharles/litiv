@@ -22,20 +22,20 @@
 
 namespace lv {
 
-    //! possible implementation modes for lv::thinning
+    /// possible implementation modes for lv::thinning
     enum eThinningMode {
         eThinningMode_ZhangSuen=0,
         eThinningMode_LamLeeSuen
     };
 
-    //! 'thins' the provided image (currently only works on 1ch 8UC1 images, treated as binary)
+    /// 'thins' the provided image (currently only works on 1ch 8UC1 images, treated as binary)
     void thinning(const cv::Mat& oInput, cv::Mat& oOutput, eThinningMode eMode=eThinningMode_LamLeeSuen);
 
-    //! performs non-maximum suppression on the input image, with a (nWinSize)x(nWinSize) window
+    /// performs non-maximum suppression on the input image, with a (nWinSize)x(nWinSize) window
     template<int nWinSize>
     void nonMaxSuppression(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat& oMask=cv::Mat());
 
-    //! determines if '*anMap' is a local maximum on the horizontal axis, given 'nMapColStep' spacing between horizontal elements in 'anMap'
+    /// determines if '*anMap' is a local maximum on the horizontal axis, given 'nMapColStep' spacing between horizontal elements in 'anMap'
     template<size_t nHalfWinSize, typename Tr>
     inline bool isLocalMaximum_Horizontal(const Tr* const anMap, const size_t nMapColStep, const size_t /*nMapRowStep*/) {
         static_assert(nHalfWinSize>=1,"Window size needs to be at least 3x3");
@@ -50,7 +50,7 @@ namespace lv {
         return bRes;
     }
 
-    //! determines if '*anMap' is a local maximum on the vertical axis, given 'nMapRowStep' spacing between vertical elements in 'anMap'
+    /// determines if '*anMap' is a local maximum on the vertical axis, given 'nMapRowStep' spacing between vertical elements in 'anMap'
     template<size_t nHalfWinSize, typename Tr>
     inline bool isLocalMaximum_Vertical(const Tr* const anMap, const size_t /*nMapColStep*/, const size_t nMapRowStep) {
         static_assert(nHalfWinSize>=1,"Window size needs to be at least 3x3");
@@ -65,7 +65,7 @@ namespace lv {
         return bRes;
     }
 
-    //! determines if '*anMap' is a local maximum on the diagonal, given 'nMapColStep'/'nMapColStep' spacing between horizontal/vertical elements in 'anMap'
+    /// determines if '*anMap' is a local maximum on the diagonal, given 'nMapColStep'/'nMapColStep' spacing between horizontal/vertical elements in 'anMap'
     template<size_t nHalfWinSize, bool bInvDiag, typename Tr>
     inline bool isLocalMaximum_Diagonal(const Tr* const anMap, const size_t nMapColStep, const size_t nMapRowStep) {
         static_assert(nHalfWinSize>=1,"Window size needs to be at least 3x3");
@@ -80,7 +80,7 @@ namespace lv {
         return bRes;
     }
 
-    //! determines if '*anMap' is a local maximum on the diagonal, given 'nMapColStep'/'nMapColStep' spacing between horizontal/vertical elements in 'anMap'
+    /// determines if '*anMap' is a local maximum on the diagonal, given 'nMapColStep'/'nMapColStep' spacing between horizontal/vertical elements in 'anMap'
     template<size_t nHalfWinSize, typename Tr>
     inline bool isLocalMaximum_Diagonal(const Tr* const anMap, const size_t nMapColStep, const size_t nMapRowStep, bool bInvDiag) {
         if(bInvDiag)

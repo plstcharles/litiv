@@ -37,11 +37,11 @@ enum eBSDS500DatasetGroup {
 template<>
 struct DatasetEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> :
         public IDatasetEvaluator_<eDatasetEval_None> {
-    //! writes an overall evaluation report listing high-level binary classification metrics
+    /// writes an overall evaluation report listing high-level binary classification metrics
     virtual void writeEvalReport() const override;
-    //! accumulates overall metrics from all batch(es)
+    /// accumulates overall metrics from all batch(es)
     virtual IMetricsAccumulatorConstPtr getMetricsBase() const;
-    //! calculates overall metrics from all batch(es)
+    /// calculates overall metrics from all batch(es)
     virtual IMetricsCalculatorPtr getMetrics() const;
 };
 
@@ -52,12 +52,12 @@ struct Dataset_<eDatasetTask,eDataset_BSDS500,eEvalImpl> :
     static_assert(eDatasetTask!=eDatasetTask_ChgDet,"BSDS500 dataset does not support change detection (no data streaming)");
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
-            const std::string& sOutputDirName, //!< output directory (full) path for debug logs, evaluation reports and results archiving (will be created in BSR dataset folder)
-            bool bSaveOutput=false, //!< defines whether results should be archived or not
-            bool bUseEvaluator=true, //!< defines whether results should be fully evaluated, or simply acknowledged
-            bool bForce4ByteDataAlign=false, //!< defines whether data packets should be 4-byte aligned (useful for GPU upload)
-            double dScaleFactor=1.0, //!< defines the scale factor to use to resize/rescale read packets
-            eBSDS500DatasetGroup eType=eBSDS500Dataset_Training //!< defines which dataset groups to use
+            const std::string& sOutputDirName, ///< output directory (full) path for debug logs, evaluation reports and results archiving (will be created in BSR dataset folder)
+            bool bSaveOutput=false, ///< defines whether results should be archived or not
+            bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
+            bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
+            double dScaleFactor=1.0, ///< defines the scale factor to use to resize/rescale read packets
+            eBSDS500DatasetGroup eType=eBSDS500Dataset_Training ///< defines which dataset groups to use
     ) :
             IDataset_<eDatasetTask,eDatasetSource_Image,eDataset_BSDS500,getDatasetEval<eDatasetTask,eDataset_BSDS500>(),eEvalImpl>(
                     "BSDS500",
@@ -80,7 +80,7 @@ template<eDatasetTaskList eDatasetTask>
 struct DataProducer_<eDatasetTask,eDatasetSource_Image,eDataset_BSDS500> :
         public DataProducer_c<eDatasetTask,eDatasetSource_Image> {
 protected:
-    //! data parsing function, dataset-specific (default parser is not satisfactory)
+    /// data parsing function, dataset-specific (default parser is not satisfactory)
     virtual void parseData() override final {
         lvDbgExceptionWatch;
         // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
@@ -137,7 +137,7 @@ protected:
         }
         CV_Assert(this->m_nImageCount>0);
     }
-    //! gt packet load function, dataset-specific (default gt loader is not satisfactory)
+    /// gt packet load function, dataset-specific (default gt loader is not satisfactory)
     virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final {
         lvDbgExceptionWatch;
         // 'this' is always required here since function name lookup is done during instantiation because of not-fully-specialized class template
@@ -166,16 +166,16 @@ protected:
 template<>
 struct DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> :
         public IDataReporter_<eDatasetEval_None> {
-    //! accumulates basic metrics from current batch(es) --- provides group-impl only
+    /// accumulates basic metrics from current batch(es) --- provides group-impl only
     virtual IMetricsAccumulatorConstPtr getMetricsBase() const;
-    //! accumulates high-level metrics from current batch(es)
+    /// accumulates high-level metrics from current batch(es)
     virtual IMetricsCalculatorPtr getMetrics() const;
-    //! writes an evaluation report listing high-level metrics for current batch(es)
+    /// writes an evaluation report listing high-level metrics for current batch(es)
     virtual void writeEvalReport() const override;
 protected:
-    //! returns a one-line string listing high-level metrics for current batch(es)
+    /// returns a one-line string listing high-level metrics for current batch(es)
     std::string writeInlineEvalReport(size_t nIndentSize) const;
-    //! required so that dataset-level evaluation report can write dataset-specific reports
+    /// required so that dataset-level evaluation report can write dataset-specific reports
     friend struct DatasetEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500>;
 };
 
@@ -184,13 +184,13 @@ struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500,lv::eNonPar
         public IDataConsumer_<eDatasetEval_BinaryClassifier>,
         public DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> {
 public:
-    //! overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
+    /// overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
     virtual IMetricsAccumulatorConstPtr getMetricsBase() const;
-    //! overrides 'push' from IDataConsumer_ to simultaneously evaluate the pushed results
+    /// overrides 'push' from IDataConsumer_ to simultaneously evaluate the pushed results
     virtual void push(const cv::Mat& oClassif, size_t nIdx) override;
-    //! provides a visual feedback on result quality based on evaluation guidelines
+    /// provides a visual feedback on result quality based on evaluation guidelines
     virtual cv::Mat getColoredMask(const cv::Mat& oClassif, size_t nIdx);
-    //! resets internal metrics counters to zero
+    /// resets internal metrics counters to zero
     virtual void resetMetrics();
 protected:
     std::shared_ptr<BSDS500MetricsAccumulator> m_pMetricsBase;

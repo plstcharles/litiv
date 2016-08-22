@@ -21,7 +21,7 @@
 
 namespace lv {
 
-    //! for now, always returns true
+    /// for now, always returns true
     bool initAll();
 
 } // namespace lv

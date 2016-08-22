@@ -23,63 +23,63 @@
 
 namespace lv {
 
-    //! dataset evaluator interface for top-level metrics computation & report writing
+    /// dataset evaluator interface for top-level metrics computation & report writing
     template<eDatasetEvalList eDatasetEval>
     struct IDatasetEvaluator_;
 
     template<>
     struct IDatasetEvaluator_<eDatasetEval_None> : public IDataset {
-        //! writes an overall evaluation report listing packet counts, seconds elapsed and algo speed (default eval)
+        /// writes an overall evaluation report listing packet counts, seconds elapsed and algo speed (default eval)
         virtual void writeEvalReport() const override;
     };
 
     template<>
     struct IDatasetEvaluator_<eDatasetEval_BinaryClassifier> : IDatasetEvaluator_<eDatasetEval_None> {
-        //! writes an overall evaluation report listing high-level binary classification metrics
+        /// writes an overall evaluation report listing high-level binary classification metrics
         virtual void writeEvalReport() const override;
-        //! accumulates overall metrics from all batch(es)
+        /// accumulates overall metrics from all batch(es)
         virtual IMetricsAccumulatorConstPtr getMetricsBase() const;
-        //! calculates overall metrics from all batch(es)
+        /// calculates overall metrics from all batch(es)
         virtual IMetricsCalculatorPtr getMetrics(bool bAverage) const;
     };
 
-    //! default dataset evaluator interface specialization (will use 'non eval' report, by default)
+    /// default dataset evaluator interface specialization (will use 'non eval' report, by default)
     template<eDatasetEvalList eDatasetEval, eDatasetList eDataset>
     struct DatasetEvaluator_ : public IDatasetEvaluator_<eDatasetEval> {};
 
-    //! data reporter interface for work batch that must be specialized based on eval type
+    /// data reporter interface for work batch that must be specialized based on eval type
     template<eDatasetEvalList eDatasetEval>
     struct IDataReporter_;
 
     template<>
     struct IDataReporter_<eDatasetEval_None> : public virtual IDataHandler {
-        //! writes an evaluation report listing packet counts, seconds elapsed and algo speed for current batch(es)
+        /// writes an evaluation report listing packet counts, seconds elapsed and algo speed for current batch(es)
         virtual void writeEvalReport() const override;
     protected:
-        //! returns a one-line string listing packet counts, seconds elapsed and algo speed for current batch(es)
+        /// returns a one-line string listing packet counts, seconds elapsed and algo speed for current batch(es)
         virtual std::string writeInlineEvalReport(size_t nIndentSize) const;
         friend struct IDatasetEvaluator_<eDatasetEval_None>;
     };
 
     template<>
     struct IDataReporter_<eDatasetEval_BinaryClassifier> : IDataReporter_<eDatasetEval_None> {
-        //! accumulates basic metrics from current batch(es) --- provides group-impl only
+        /// accumulates basic metrics from current batch(es) --- provides group-impl only
         virtual IMetricsAccumulatorConstPtr getMetricsBase() const;
-        //! accumulates high-level metrics from current batch(es)
+        /// accumulates high-level metrics from current batch(es)
         virtual IMetricsCalculatorPtr getMetrics(bool bAverage) const;
-        //! writes an evaluation report listing high-level metrics for current batch(es)
+        /// writes an evaluation report listing high-level metrics for current batch(es)
         virtual void writeEvalReport() const override;
     protected:
-        //! returns a one-line string listing high-level metrics for current batch(es)
+        /// returns a one-line string listing high-level metrics for current batch(es)
         virtual std::string writeInlineEvalReport(size_t nIndentSize) const override;
         friend struct IDatasetEvaluator_<eDatasetEval_BinaryClassifier>;
     };
 
-    //! default data reporter interface specialization
+    /// default data reporter interface specialization
     template<eDatasetEvalList eDatasetEval, eDatasetList eDataset>
     struct DataReporter_ : public IDataReporter_<eDatasetEval> {};
 
-    //! default data evaluator interface specialization (will also determine which consumer interf to use based on eval impl)
+    /// default data evaluator interface specialization (will also determine which consumer interf to use based on eval impl)
     template<eDatasetEvalList eDatasetEval, eDatasetList eDataset, lv::eParallelAlgoType eEvalImpl>
     struct DataEvaluator_ : // no evaluation specialization by default
             public std::conditional<(eEvalImpl==lv::eNonParallel),IDataConsumer_<eDatasetEval>,IAsyncDataConsumer_<eDatasetEval,eEvalImpl>>::type,
@@ -89,13 +89,13 @@ namespace lv {
     struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset,lv::eNonParallel> :
             public IDataConsumer_<eDatasetEval_BinaryClassifier>,
             public DataReporter_<eDatasetEval_BinaryClassifier,eDataset> {
-        //! overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
+        /// overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
         virtual IMetricsAccumulatorConstPtr getMetricsBase() const override {
             if(!m_pMetricsBase)
                 return BinClassifMetricsAccumulator::create();
             return m_pMetricsBase;
         }
-        //! overrides 'push' from IDataConsumer_ to simultaneously evaluate the pushed results
+        /// overrides 'push' from IDataConsumer_ to simultaneously evaluate the pushed results
         virtual void push(const cv::Mat& oClassif, size_t nIdx) override {
             IDataConsumer_<eDatasetEval_BinaryClassifier>::push(oClassif,nIdx);
             if(getDatasetInfo()->isUsingEvaluator()) {
@@ -105,12 +105,12 @@ namespace lv {
                 m_pMetricsBase->accumulate(oClassif,pLoader->getGT(nIdx),pLoader->getInputROI(nIdx));
             }
         }
-        //! provides a visual feedback on result quality based on evaluation guidelines
+        /// provides a visual feedback on result quality based on evaluation guidelines
         virtual cv::Mat getColoredMask(const cv::Mat& oClassif, size_t nIdx) {
             auto pLoader = shared_from_this_cast<IDataLoader>(true);
             return BinClassifMetricsAccumulator::getColoredMask(oClassif,pLoader->getGT(nIdx),pLoader->getInputROI(nIdx));
         }
-        //! resets internal metrics counters to zero
+        /// resets internal metrics counters to zero
         virtual void resetMetrics() {
             m_pMetricsBase = BinClassifMetricsAccumulator::create();
         }
@@ -120,7 +120,7 @@ namespace lv {
 
 #if HAVE_GLSL
 
-    //! basic 2D binary classifier evaluator algo interface
+    /// basic 2D binary classifier evaluator algo interface
     struct GLBinaryClassifierEvaluator : public GLImageProcEvaluatorAlgo {
         GLBinaryClassifierEvaluator(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount);
         virtual std::string getComputeShaderSource(size_t nStage) const override;
@@ -131,7 +131,7 @@ namespace lv {
     struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset,lv::eGLSL> :
             public IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,lv::eGLSL>,
             public DataReporter_<eDatasetEval_BinaryClassifier,eDataset> {
-        //! overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
+        /// overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
         virtual IMetricsAccumulatorConstPtr getMetricsBase() const override {
             if(isProcessing())
                 lvError("Must stop processing batch before querying metrics under async data evaluator interface");
@@ -140,7 +140,7 @@ namespace lv {
             return m_pMetricsBase;
         }
     protected:
-        //! overrides '_stopProcessing' from IDataHandler to make sure accumulated metrics are fetched from gpu once processing is done
+        /// overrides '_stopProcessing' from IDataHandler to make sure accumulated metrics are fetched from gpu once processing is done
         virtual void _stopProcessing() override {
             if(m_pEvalAlgo && m_pEvalAlgo->getIsGLInitialized()) {
                 auto pEvalAlgo = std::dynamic_pointer_cast<GLBinaryClassifierEvaluator>(m_pEvalAlgo);
@@ -150,7 +150,7 @@ namespace lv {
                 m_pMetricsBase = pMetricsBase;
             }
         }
-        //! overrides 'post_initialize_gl' from IAsyncDataConsumer_ to initialize an evaluation algo interface
+        /// overrides 'post_initialize_gl' from IAsyncDataConsumer_ to initialize an evaluation algo interface
         virtual void post_initialize_gl() override {
             IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,lv::eGLSL>::post_initialize_gl();
             if(getDatasetInfo()->isUsingEvaluator()) {
@@ -168,7 +168,7 @@ namespace lv {
                     m_pEvalAlgo->setDebugFetching(true);
             }
         }
-        //! callback entrypoint for gpu-cpu evaluation validation
+        /// callback entrypoint for gpu-cpu evaluation validation
         void validationCallback(const cv::Mat& /*oInput*/, const cv::Mat& /*oDebug*/, const cv::Mat& oOutput, const cv::Mat& oGT, const cv::Mat& oROI, size_t /*nIdx*/) {
             lvAssert(m_pMetricsBase && !oOutput.empty() && !oGT.empty());
             m_pMetricsBase->accumulate(oOutput,oGT,oROI);

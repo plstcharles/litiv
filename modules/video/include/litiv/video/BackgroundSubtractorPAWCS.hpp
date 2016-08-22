@@ -19,13 +19,13 @@
 
 #include "litiv/video/BackgroundSubtractorLBSP.hpp"
 
-//! defines the default value for BackgroundSubtractorPAWCS::m_nDescDistThresholdOffset
+/// defines the default value for BackgroundSubtractorPAWCS::m_nDescDistThresholdOffset
 #define BGSPAWCS_DEFAULT_DESC_DIST_THRESHOLD_OFFSET (2)
-//! defines the default value for BackgroundSubtractorPAWCS::m_nMinColorDistThreshold
+/// defines the default value for BackgroundSubtractorPAWCS::m_nMinColorDistThreshold
 #define BGSPAWCS_DEFAULT_MIN_COLOR_DIST_THRESHOLD (20)
-//! defines the default value for BackgroundSubtractorPAWCS::m_nMaxLocalWords and m_nMaxGlobalWords
+/// defines the default value for BackgroundSubtractorPAWCS::m_nMaxLocalWords and m_nMaxGlobalWords
 #define BGSPAWCS_DEFAULT_MAX_NB_WORDS (50)
-//! defines the default value for BackgroundSubtractorPAWCS::m_nSamplesForMovingAvgs
+/// defines the default value for BackgroundSubtractorPAWCS::m_nSamplesForMovingAvgs
 #define BGSPAWCS_DEFAULT_N_SAMPLES_FOR_MV_AVGS (100)
 
 /*!
@@ -45,23 +45,23 @@ struct BackgroundSubtractorPAWCS_;
 template<>
 struct BackgroundSubtractorPAWCS_<lv::eNonParallel> : public IBackgroundSubtractorLBSP {
 public:
-    //! full constructor
+    /// full constructor
     BackgroundSubtractorPAWCS_(size_t nDescDistThresholdOffset=BGSPAWCS_DEFAULT_DESC_DIST_THRESHOLD_OFFSET,
                                size_t nMinColorDistThreshold=BGSPAWCS_DEFAULT_MIN_COLOR_DIST_THRESHOLD,
                                size_t nMaxNbWords=BGSPAWCS_DEFAULT_MAX_NB_WORDS,
                                size_t nSamplesForMovingAvgs=BGSPAWCS_DEFAULT_N_SAMPLES_FOR_MV_AVGS,
                                float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD);
-    //! refreshes all local (+ global) dictionaries based on the last analyzed frame
+    /// refreshes all local (+ global) dictionaries based on the last analyzed frame
     virtual void refreshModel(size_t nBaseOccCount, float fOccDecrFrac, bool bForceFGUpdate=false);
-    //! (re)initiaization method; needs to be called before starting background subtraction
+    /// (re)initiaization method; needs to be called before starting background subtraction
     virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) override;
-    //! primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
+    /// primary model update function; the learning param is used to override the internal learning speed (ignored when <= 0)
     virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=0) override;
-    //! returns a copy of the latest reconstructed background image
+    /// returns a copy of the latest reconstructed background image
     virtual void getBackgroundImage(cv::OutputArray backgroundImage) const override;
-    //! returns a copy of the latest reconstructed background descriptors image
+    /// returns a copy of the latest reconstructed background descriptors image
     virtual void getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const override;
-    //! returns the default learning rate value used in 'apply'
+    /// returns the default learning rate value used in 'apply'
     virtual double getDefaultLearningRate() const override {return 0;}
 
 protected:
@@ -96,30 +96,30 @@ protected:
         size_t nGlobalWordMapLookupIdx;
         std::vector<GlobalWordBase*> vpGlobalDictSortLUT;
     };
-    //! absolute minimal color distance threshold ('R' or 'radius' in the original ViBe paper, used as the default/initial 'R(x)' value here)
+    /// absolute minimal color distance threshold ('R' or 'radius' in the original ViBe paper, used as the default/initial 'R(x)' value here)
     const size_t m_nMinColorDistThreshold;
-    //! absolute descriptor distance threshold offset
+    /// absolute descriptor distance threshold offset
     const size_t m_nDescDistThresholdOffset;
-    //! max/curr number of local words used to build background submodels (for a single pixel, similar to 'N' in ViBe/PBAS, may vary based on img/channel size)
+    /// max/curr number of local words used to build background submodels (for a single pixel, similar to 'N' in ViBe/PBAS, may vary based on img/channel size)
     size_t m_nMaxLocalWords, m_nCurrLocalWords;
-    //! max/curr number of global words used to build the global background model (may vary based on img/channel size)
+    /// max/curr number of global words used to build the global background model (may vary based on img/channel size)
     size_t m_nMaxGlobalWords, m_nCurrGlobalWords;
-    //! number of samples to use to compute the learning rate of moving averages
+    /// number of samples to use to compute the learning rate of moving averages
     const size_t m_nSamplesForMovingAvgs;
-    //! last calculated non-flat region ratio
+    /// last calculated non-flat region ratio
     float m_fLastNonFlatRegionRatio;
-    //! current kernel size for median blur post-proc filtering
+    /// current kernel size for median blur post-proc filtering
     int m_nMedianBlurKernelSize;
-    //! specifies the downsampled frame size used for cam motion analysis & gword lookup maps
+    /// specifies the downsampled frame size used for cam motion analysis & gword lookup maps
     cv::Size m_oDownSampledFrameSize_MotionAnalysis, m_oDownSampledFrameSize_GlobalWordLookup;
-    //! downsampled version of the ROI used for cam motion analysis
+    /// downsampled version of the ROI used for cam motion analysis
     cv::Mat m_oDownSampledROI_MotionAnalysis;
-    //! total pixel count for the downsampled ROIs
+    /// total pixel count for the downsampled ROIs
     size_t m_nDownSampledROIPxCount;
-    //! current local word weight offset
+    /// current local word weight offset
     size_t m_nLocalWordWeightOffset;
 
-    //! word lists & dictionaries
+    /// word lists & dictionaries
     std::vector<LocalWordBase*> m_vpLocalWordDict;
     std::vector<LocalWord_1ch> m_voLocalWordList_1ch;
     std::vector<LocalWord_3ch> m_voLocalWordList_3ch;
@@ -132,32 +132,32 @@ protected:
     std::vector<GlobalWord_3ch>::iterator m_pGlobalWordListIter_3ch;
     std::vector<PxInfo_PAWCS> m_voPxInfoLUT_PAWCS;
 
-    //! a lookup map used to keep track of regions where illumination recently changed
+    /// a lookup map used to keep track of regions where illumination recently changed
     cv::Mat m_oIllumUpdtRegionMask;
-    //! per-pixel update rates ('T(x)' in PBAS, which contains pixel-level 'sigmas', as referred to in ViBe)
+    /// per-pixel update rates ('T(x)' in PBAS, which contains pixel-level 'sigmas', as referred to in ViBe)
     cv::Mat m_oUpdateRateFrame;
-    //! per-pixel distance thresholds (equivalent to 'R(x)' in PBAS, but used as a relative value to determine both intensity and descriptor variation thresholds)
+    /// per-pixel distance thresholds (equivalent to 'R(x)' in PBAS, but used as a relative value to determine both intensity and descriptor variation thresholds)
     cv::Mat m_oDistThresholdFrame;
-    //! per-pixel distance threshold variation modulators ('v(x)', relative value used to modulate 'R(x)' and 'T(x)' variations)
+    /// per-pixel distance threshold variation modulators ('v(x)', relative value used to modulate 'R(x)' and 'T(x)' variations)
     cv::Mat m_oDistThresholdVariationFrame;
-    //! per-pixel mean minimal distances from the model ('D_min(x)' in PBAS, used to control variation magnitude and direction of 'T(x)' and 'R(x)')
+    /// per-pixel mean minimal distances from the model ('D_min(x)' in PBAS, used to control variation magnitude and direction of 'T(x)' and 'R(x)')
     cv::Mat m_oMeanMinDistFrame_LT, m_oMeanMinDistFrame_ST;
-    //! per-pixel mean downsampled distances between consecutive frames (used to analyze camera movement and force global model resets automatically)
+    /// per-pixel mean downsampled distances between consecutive frames (used to analyze camera movement and force global model resets automatically)
     cv::Mat m_oMeanDownSampledLastDistFrame_LT, m_oMeanDownSampledLastDistFrame_ST;
-    //! per-pixel mean raw segmentation results (used to detect unstable segmentation regions)
+    /// per-pixel mean raw segmentation results (used to detect unstable segmentation regions)
     cv::Mat m_oMeanRawSegmResFrame_LT, m_oMeanRawSegmResFrame_ST;
-    //! per-pixel mean raw segmentation results (used to detect unstable segmentation regions)
+    /// per-pixel mean raw segmentation results (used to detect unstable segmentation regions)
     cv::Mat m_oMeanFinalSegmResFrame_LT, m_oMeanFinalSegmResFrame_ST;
-    //! a lookup map used to keep track of unstable regions (based on segm. noise & local dist. thresholds)
+    /// a lookup map used to keep track of unstable regions (based on segm. noise & local dist. thresholds)
     cv::Mat m_oUnstableRegionMask;
-    //! per-pixel blink detection map ('Z(x)')
+    /// per-pixel blink detection map ('Z(x)')
     cv::Mat m_oBlinksFrame;
-    //! pre-allocated matrix used to downsample the input frame when needed
+    /// pre-allocated matrix used to downsample the input frame when needed
     cv::Mat m_oDownSampledFrame_MotionAnalysis;
-    //! the foreground mask generated by the method at t-1 (without post-proc, used for blinking px detection)
+    /// the foreground mask generated by the method at t-1 (without post-proc, used for blinking px detection)
     cv::Mat m_oLastRawFGMask;
 
-    //! pre-allocated CV_8UC1 matrices used to speed up morph ops
+    /// pre-allocated CV_8UC1 matrices used to speed up morph ops
     cv::Mat m_oFGMask_PreFlood;
     cv::Mat m_oFGMask_FloodedHoles;
     cv::Mat m_oLastFGMask_dilated;
@@ -167,9 +167,9 @@ protected:
     cv::Mat m_oTempGlobalWordWeightDiffFactor;
     cv::Mat m_oMorphExStructElement;
 
-    //! internal weight lookup function for local words
+    /// internal weight lookup function for local words
     static float GetLocalWordWeight(const LocalWordBase& w, size_t nCurrFrame, size_t nOffset);
-    //! internal weight lookup function for global words
+    /// internal weight lookup function for global words
     static float GetGlobalWordWeight(const GlobalWordBase& w);
 };
 

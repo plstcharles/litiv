@@ -15,7 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! dataset/application parameters
+// dataset/application parameters below
 #define LITIV2012_DATASET_PATH          "/shared2/datasets/litiv/litiv2012_dataset/"
 #define LITIV2012_TEST_SEQUENCE_ID      9 // [1..9]
 #include "LITIV2012Utils.h"             // automatically adds all other required LITIV dataset defines
