@@ -1,6 +1,6 @@
 
-// This file is part of the LITIV framework; visit the original repository at
-// https://github.com/plstcharles/litiv for more information.
+// This file is part of the lv framework; visit the original repository at
+// https://github.com/plstcharles/lv for more information.
 //
 // Copyright 2016 Pierre-Luc St-Charles; pierre-luc.st-charles<at>polymtl.ca
 //
@@ -36,7 +36,7 @@ std::atomic_bool g_bIsActive = true;
 
 int main() {
     try {
-        PlatformUtils::RegisterAllConsoleSignals([](int){g_bIsActive = false;});
+        lv::RegisterAllConsoleSignals([](int){g_bIsActive = false;});
         const auto lEncodeAndSaveFrame = [](const cv::Mat& oImage, size_t nIndex, cv::VideoWriter& oWriter, size_t& nLastSavedIndex) {
             lvAssert(!oImage.empty() && oWriter.isOpened());
             lvAssert(nLastSavedIndex==SIZE_MAX || nLastSavedIndex<nIndex);
@@ -45,18 +45,18 @@ int main() {
             return (size_t)0;
         };
         const auto lEncodeAndSaveBodyFrame = [](const cv::Mat& oBodyFrame, size_t nIndex, std::ofstream* pWriter, size_t& nLastSavedIndex){
-            lvAssert(!oBodyFrame.empty() && oBodyFrame.total()*oBodyFrame.elemSize()==sizeof(PlatformUtils::KinectBodyFrame));
+            lvAssert(!oBodyFrame.empty() && oBodyFrame.total()*oBodyFrame.elemSize()==sizeof(lv::KinectBodyFrame));
             lvAssert(pWriter && pWriter->is_open());
             lvAssert(nLastSavedIndex==SIZE_MAX || nLastSavedIndex<nIndex);
-            ((PlatformUtils::KinectBodyFrame*)oBodyFrame.data)->nFrameIdx = nIndex;
-            pWriter->write((char*)oBodyFrame.data,sizeof(PlatformUtils::KinectBodyFrame));
+            ((lv::KinectBodyFrame*)oBodyFrame.data)->nFrameIdx = nIndex;
+            pWriter->write((char*)oBodyFrame.data,sizeof(lv::KinectBodyFrame));
             nLastSavedIndex = nIndex;
             return (size_t)0;
         };
 #if USE_FLIR_SENSOR
         std::cout << "Setting up FLIR device..." << std::endl;
         lvAssertHR(CoInitializeEx(0,COINIT_MULTITHREADED|COINIT_DISABLE_OLE1DDE));
-        std::unique_ptr<litiv::DShowCameraGrabber> pFLIRSensor = std::make_unique<litiv::DShowCameraGrabber>("FLIR ThermaCAM",(bool)DISPLAY_OUTPUT);
+        std::unique_ptr<lv::DShowCameraGrabber> pFLIRSensor = std::make_unique<lv::DShowCameraGrabber>("FLIR ThermaCAM",(bool)DISPLAY_OUTPUT);
         lvAssertHR(pFLIRSensor->Connect());
         cv::Mat oFLIRFrame;
 #if WRITE_OUTPUT
@@ -64,7 +64,7 @@ int main() {
         size_t nLastSavedFLIRFrameIdx = SIZE_MAX;
         cv::VideoWriter oFLIRVideoWriter("c:/temp/test_flir.avi",-1,30.0,cv::Size(320,240),false);
         lvAssert(oFLIRVideoWriter.isOpened());
-        litiv::DataWriter oFLIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oFLIRVideoWriter,nLastSavedFLIRFrameIdx));
+        lv::DataWriter oFLIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oFLIRVideoWriter,nLastSavedFLIRFrameIdx));
         lvAssert(oFLIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
 #endif //WRITE_OUTPUT
 #endif //USE_FLIR_SENSOR
@@ -76,46 +76,46 @@ int main() {
         CComPtr<IMultiSourceFrameReader> pMultiFrameReader;
         lvAssertHR(pKinectSensor->OpenMultiSourceFrameReader(FrameSourceTypes_Color|FrameSourceTypes_Depth|FrameSourceTypes_Infrared|FrameSourceTypes_Body|FrameSourceTypes_BodyIndex,&pMultiFrameReader));
         constexpr size_t nStreamCount = 5;
-        PlatformUtils::KinectBodyFrame oBodyFrame;
-        const cv::Mat oBodyFrameWrapper(1,(int)sizeof(PlatformUtils::KinectBodyFrame),CV_8UC1,&oBodyFrame);
+        lv::KinectBodyFrame oBodyFrame;
+        const cv::Mat oBodyFrameWrapper(1,(int)sizeof(lv::KinectBodyFrame),CV_8UC1,&oBodyFrame);
         cv::Mat oBodyIdxFrame,oNIRFrame,oDepthFrame,oColorFrame;
 #if WRITE_OUTPUT
         std::cout << "Setting up Kinect body data writer..." << std::endl;
         size_t nLastSavedBodyFrameIdx = SIZE_MAX;
         std::ofstream oBodyStructWriter("c:/temp/test_body.bin",std::ios::out|std::ios::binary);
         lvAssert(oBodyStructWriter && oBodyStructWriter.is_open());
-        litiv::DataWriter oBodyStructAsyncWriter(std::bind(lEncodeAndSaveBodyFrame,std::placeholders::_1,std::placeholders::_2,&oBodyStructWriter,nLastSavedBodyFrameIdx));
+        lv::DataWriter oBodyStructAsyncWriter(std::bind(lEncodeAndSaveBodyFrame,std::placeholders::_1,std::placeholders::_2,&oBodyStructWriter,nLastSavedBodyFrameIdx));
         lvAssert(oBodyStructAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
         std::cout << "Setting up BODYINDEX video writer..." << std::endl;
         size_t nLastSavedBodyIdxFrameIdx = SIZE_MAX;
         cv::VideoWriter oBodyIdxVideoWriter("c:/temp/test_bodyidx.avi",-1,30.0,cv::Size(512,424),false);
         lvAssert(oBodyIdxVideoWriter.isOpened());
-        litiv::DataWriter oBodyIdxVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oBodyIdxVideoWriter,nLastSavedBodyIdxFrameIdx));
+        lv::DataWriter oBodyIdxVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oBodyIdxVideoWriter,nLastSavedBodyIdxFrameIdx));
         lvAssert(oBodyIdxVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
         std::cout << "Setting up NIR video writer..." << std::endl;
         size_t nLastSavedNIRFrameIdx = SIZE_MAX;
         cv::VideoWriter oNIRVideoWriter("c:/temp/test_nir.avi",-1,30.0,cv::Size(512,424),false);
         lvAssert(oNIRVideoWriter.isOpened());
-        litiv::DataWriter oNIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oNIRVideoWriter,nLastSavedNIRFrameIdx));
+        lv::DataWriter oNIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oNIRVideoWriter,nLastSavedNIRFrameIdx));
         lvAssert(oNIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
         std::cout << "Setting up DEPTH video writer..." << std::endl;
         size_t nLastSavedDepthFrameIdx = SIZE_MAX;
         cv::VideoWriter oDepthVideoWriter("c:/temp/test_depth.avi",-1,30.0,cv::Size(512,424),false);
         lvAssert(oDepthVideoWriter.isOpened());
-        litiv::DataWriter oDepthVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oDepthVideoWriter,nLastSavedDepthFrameIdx));
+        lv::DataWriter oDepthVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oDepthVideoWriter,nLastSavedDepthFrameIdx));
         lvAssert(oDepthVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
         std::cout << "Setting up COLOR video writer..." << std::endl;
         size_t nLastSavedColorFrameIdx = SIZE_MAX;
         const std::string sColorVideoFilePath = "e:/temp/test_color.avi";
-        lvAssert(PlatformUtils::CreateBinFileWithPrealloc(sColorVideoFilePath,VIDEO_FILE_PREALLOC_SIZE));
+        lvAssert(lv::CreateBinFileWithPrealloc(sColorVideoFilePath,VIDEO_FILE_PREALLOC_SIZE));
         cv::VideoWriter oColorVideoWriter(sColorVideoFilePath,-1,30.0,cv::Size(1920,1080),true);
         lvAssert(oColorVideoWriter.isOpened());
-        litiv::DataWriter oColorVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oColorVideoWriter,nLastSavedColorFrameIdx));
+        lv::DataWriter oColorVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oColorVideoWriter,nLastSavedColorFrameIdx));
         lvAssert(oColorVideoAsyncWriter.startAsyncWriting(HIGHDEF_QUEUE_BUFFER_SIZE,true));
 #endif //WRITE_OUTPUT
 
         CComPtr<IMultiSourceFrame> pMultiFrame;
-        PlatformUtils::WorkerPool<nStreamCount> oPool;
+        lv::WorkerPool<nStreamCount> oPool;
         std::array<std::future<bool>,nStreamCount> abGrabResults;
         const std::array<std::function<bool()>,nStreamCount> alGrabTasks = {
             [&]{
@@ -305,7 +305,7 @@ int main() {
     catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
     catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
     CoUninitialize();
-    std::cout << "\n[" << CxxUtils::getTimeStamp() << "]\n" << std::endl;
+    std::cout << "\n[" << lv::getTimeStamp() << "]\n" << std::endl;
     std::cout << "All done." << std::endl;
     return 0;
 }

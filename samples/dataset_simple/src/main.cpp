@@ -38,7 +38,7 @@
 int main(int, char**) { // this sample uses no command line argument
     try { // its always a good idea to scope your app's top level in some try/catch blocks!
 
-        std::cout << "\nNote: a directory will be created at '" << PlatformUtils::GetCurrentWorkDirPath() << "'\n" << std::endl;
+        std::cout << "\nNote: a directory will be created at '" << lv::GetCurrentWorkDirPath() << "'\n" << std::endl;
 
         // The 'DatasetType' alias below is only used to simplify templating; the 'Dataset_' interface
         // has three enum template parameters, namely the dataset task type ('eDatasetTask'), the datset
@@ -46,7 +46,7 @@ int main(int, char**) { // this sample uses no command line argument
         // an edge detection algo, so we set the task type as 'eDatasetTask_EdgDet'; we are also defining
         // a custom run-time dataset, so we set the dataset identifier as 'eDataset_Custom'; finally, we
         // only require a traditional evaluation approach (i.e. not asynchronous), so we use 'eNonParallel'.
-        using DatasetType = litiv::Dataset_<litiv::eDatasetTask_EdgDet,litiv::eDataset_Custom,ParallelUtils::eNonParallel>;
+        using DatasetType = lv::Dataset_<lv::eDatasetTask_EdgDet,lv::eDataset_Custom,lv::eNonParallel>;
 
         // The line below creates an instance of the dataset for parsing/evaluation, using the same template
         // parameters we used above. Since rely on the built-in custom dataset parser, we have to respect
@@ -95,11 +95,11 @@ int main(int, char**) { // this sample uses no command line argument
         // output is an edge detection mask.
         //
         // ** NOTE: I'll pay a beer to whoever finds how to make the template argument deduction work via:
-        //            litiv::IDatasetPtr pDataset = litiv::datasets::create<DatasetType>(...);
+        //            lv::IDatasetPtr pDataset = lv::datasets::create<DatasetType>(...);
         //
-        litiv::IDatasetPtr pDataset = litiv::datasets::create<litiv::eDatasetTask_EdgDet,litiv::eDataset_Custom,ParallelUtils::eNonParallel>(
+        lv::IDatasetPtr pDataset = lv::datasets::create<lv::eDatasetTask_EdgDet,lv::eDataset_Custom,lv::eNonParallel>(
             "Custom Dataset Example",
-            PlatformUtils::AddDirSlashIfMissing(SAMPLES_DATA_ROOT)+"custom_dataset_ex/",
+            lv::AddDirSlashIfMissing(SAMPLES_DATA_ROOT)+"custom_dataset_ex/",
             "results_test",
             "edge_mask_",
             ".png",
@@ -119,7 +119,7 @@ int main(int, char**) { // this sample uses no command line argument
         // a high-level report to still be generated and written to disk with the processing time and other
         // useful metadata on the session duration and framework version.
 
-        litiv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false); // returns a list of all work batches in the dataset without considering hierarchy (or images sets, in this case)
+        lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false); // returns a list of all work batches in the dataset without considering hierarchy (or images sets, in this case)
         if(vpBatches.size()==0 || pDataset->getTotPackets()==0) // check that data was indeed properly parsed automatically from the dataset directory
             lvErrorExt("Could not parse any data for dataset '%s'",pDataset->getName().c_str());
         std::cout << "Parsing complete. [" << vpBatches.size() << " batch(es)]" << std::endl;

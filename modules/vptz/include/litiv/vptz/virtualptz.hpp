@@ -165,7 +165,7 @@ namespace vptz {
 
         // OpenGL internals
         int sphereGridSize;                      // grid size of the sphere
-        std::unique_ptr<GLContext> m_pContext;
+        std::unique_ptr<lv::gl::Context> m_pContext;
 
         Camera(const Camera&) = delete;
         Camera& operator=(const Camera&) = delete;
@@ -374,4 +374,4 @@ namespace vptz {
                                   double camHoriAngle = 0.0,
                                   double camVertiAngle = 90.0);
 
-} //namespace vptz
+} // namespace vptz

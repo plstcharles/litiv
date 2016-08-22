@@ -36,7 +36,7 @@
 #include <x86intrin.h>
 #endif //(!defined(_MSC_VER))
 
-namespace ParallelUtils {
+namespace lv {
 
     enum eParallelAlgoType {
 #if HAVE_GLSL
@@ -155,4 +155,4 @@ namespace ParallelUtils {
     }
 #endif //HAVE_SSE4_1
 
-} //namespace ParallelUtils
+} // namespace lv

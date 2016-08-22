@@ -51,7 +51,7 @@ int main(int, char**) { // this sample uses no command line argument
         cv::Mat oROI; // specifies the segmentation region of interest (when the matrix is left unallocated, the full frame is used by default)
         pAlgo->initialize(oInput,oROI); // initialize the background model using the video's first frame (it may already contain foreground; the algo should adapt to any case)
         size_t nCurrInputIdx = 0; // use a frame counter to report average processing speed
-        CxxUtils::StopWatch oStopWatch;
+        lv::StopWatch oStopWatch;
         while(true) { // loop, as long as we can still fetch frames
             const double dCurrLearningRate = nCurrInputIdx<=50?1:dDefaultLearningRate; // boost the learning rate in the first ~50 frames for initialization, and switch to default after
             pAlgo->apply(oInput,oForegroundMask,dCurrLearningRate); // apply background subtraction on a new frame (oInput), and fetch the result simultaneously (oForegroundMask)

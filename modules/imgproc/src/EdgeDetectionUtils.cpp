@@ -58,7 +58,7 @@ void IEdgeDetector_GLSL::apply(cv::InputArray oNextImage, cv::OutputArray oLastE
 IEdgeDetector_GLSL::IEdgeDetector_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
                                    size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
                                    bool bUseTimers, bool bUseIntegralFormat) :
-        ParallelUtils::IParallelAlgo_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,CV_8UC1,nDebugType,true,bUseDisplay,bUseTimers,bUseIntegralFormat),
+        lv::IParallelAlgo_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,CV_8UC1,nDebugType,true,bUseDisplay,bUseTimers,bUseIntegralFormat),
         m_dCurrThreshold(-1) {}
 
 #endif //HAVE_GLSL

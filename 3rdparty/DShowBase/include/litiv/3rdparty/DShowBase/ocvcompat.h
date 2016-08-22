@@ -23,7 +23,7 @@
 #include <atlbase.h>
 #include <mutex>
 
-namespace litiv {
+namespace lv {
 
     using GraphEventFN = void(CALLBACK*)(HWND hwnd, long eventCode, LONG_PTR param1, LONG_PTR param2);
     static STDMETHODIMP initMatFromMediaType(const AM_MEDIA_TYPE* pmt, cv::Mat& oOutput, bool* pbVFlip=nullptr);
@@ -65,7 +65,7 @@ namespace litiv {
         const UINT m_nMsgID;
         const bool m_bDisplayOutput;
         const std::string m_sVideoDeviceName;
-        std::unique_ptr<litiv::DShowFrameGrabber> m_pFrameGrabber;
+        std::unique_ptr<lv::DShowFrameGrabber> m_pFrameGrabber;
         CComPtr<IMediaControl> m_pControl;
         CComPtr<IMediaEventEx> m_pEvent;
         CComPtr<IBaseFilter> m_pCam;
@@ -77,5 +77,4 @@ namespace litiv {
         bool m_bIsConnected;
     };
 
-
-} //namespace litiv
+} // namespace lv

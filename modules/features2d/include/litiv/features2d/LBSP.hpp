@@ -118,7 +118,7 @@ public:
     static inline void computeDescriptor(const cv::Mat& oInputImg, const uchar* const anRefs, const int _x, const int _y, const uchar* const anThresholds, desc_t* anDesc) {
         alignas(16) std::array<std::array<uchar,LBSP::DESC_SIZE_BITS>,nChannels> aanVals;
         LBSP::computeDescriptor_lookup<nChannels>(oInputImg,_x,_y,aanVals);
-        CxxUtils::unroll<nChannels>([&](int _c) {
+        lv::unroll<nChannels>([&](int _c) {
             anDesc[_c] = LBSP::computeDescriptor_threshold(aanVals[_c].data(),anRefs[_c],anThresholds[_c]);
         });
     }
@@ -164,7 +164,7 @@ public:
         CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
         const size_t nRowStep = oInputImg.step.p[0];
         const size_t nColStep = oInputImg.step.p[1];
-        CxxUtils::unroll<nChannels>([&](int _c) {
+        lv::unroll<nChannels>([&](int _c) {
             const uchar* const anData = oInputImg.data+_y*nRowStep+_x*nColStep+_c;
             LBSP::lookup_16bits_dbcross<nChannels>(anData,nRowStep,nColStep,aanVals+_c*LBSP::DESC_SIZE_BITS);
         });
@@ -183,8 +183,8 @@ public:
         CV_DbgAssert(anVals);
 #if (!HAVE_SSE4_1 && !HAVE_SSE2)
         desc_t nDesc = 0;
-        CxxUtils::unroll<LBSP::DESC_SIZE_BITS>([&](int n) {
-            nDesc |= (DistanceUtils::L1dist(anVals[n],nRef) > nThreshold) << n;
+        lv::unroll<LBSP::DESC_SIZE_BITS>([&](int n) {
+            nDesc |= (lv::L1dist(anVals[n],nRef) > nThreshold) << n;
         });
         return nDesc;
 #else //(HAVE_SSE4_1 || HAVE_SSE2)
@@ -228,17 +228,17 @@ public:
         CV_DbgAssert(aanVals);
         CV_DbgAssert(anRefs);
         desc_t nTempDesc = computeDescriptor_threshold(aanVals+(nChannels-1)*LBSP::DESC_SIZE_BITS,anRefs[nChannels-1],((anRefs[nChannels-1]>>nRelShift)+nAbsOffset)/2);
-        nGradMag = (Tr2)DistanceUtils::popcount(nTempDesc);
-        CxxUtils::unroll<nChannels-1>([&](int cn) {
+        nGradMag = (Tr2)lv::popcount(nTempDesc);
+        lv::unroll<nChannels-1>([&](int cn) {
             desc_t nNewTempDesc = computeDescriptor_threshold(aanVals+cn*LBSP::DESC_SIZE_BITS,anRefs[cn],((anRefs[cn]>>nRelShift)+nAbsOffset)/2);
-            const Tr2 nNewGradMag = (Tr2)DistanceUtils::popcount(nNewTempDesc);
+            const Tr2 nNewGradMag = (Tr2)lv::popcount(nNewTempDesc);
             if(nGradMag<nNewGradMag) {
                 nGradMag = nNewGradMag;
                 nTempDesc = nNewTempDesc;
             }
         });
-        nGradX = (Tr1)DistanceUtils::popcount(nTempDesc&s_nDesc_16bitdbcross_GradX_Pos)-(Tr1)DistanceUtils::popcount(nTempDesc&s_nDesc_16bitdbcross_GradX_Neg);
-        nGradY = (Tr1)DistanceUtils::popcount(nTempDesc&s_nDesc_16bitdbcross_GradY_Pos)-(Tr1)DistanceUtils::popcount(nTempDesc&s_nDesc_16bitdbcross_GradY_Neg);
+        nGradX = (Tr1)lv::popcount(nTempDesc&s_nDesc_16bitdbcross_GradX_Pos)-(Tr1)lv::popcount(nTempDesc&s_nDesc_16bitdbcross_GradX_Neg);
+        nGradY = (Tr1)lv::popcount(nTempDesc&s_nDesc_16bitdbcross_GradY_Pos)-(Tr1)lv::popcount(nTempDesc&s_nDesc_16bitdbcross_GradY_Neg);
         CV_DbgAssert(nGradMag<=MAX_GRAD_MAG);
     }
 
@@ -285,15 +285,15 @@ protected:
         CV_DbgAssert(nRowStep*2+nColStep*2<INT32_MAX); // map index offsets will be stored in signed 32-bit integers
         const __m128i vnColStep = _mm_set1_epi32((int)nColStep);
         const __m128i vnRowStep = _mm_set1_epi32((int)nRowStep);
-        CxxUtils::unroll<4>([&](int n) {
-            __m128i vnMapOffsets = _mm_add_epi32(ParallelUtils::mult_32si(vnColStep,s_oIdxLUT_16bitdbcross_x.vnOffsets[n]),ParallelUtils::mult_32si(vnRowStep,s_oIdxLUT_16bitdbcross_y.vnOffsets[n]));
-            anVals[n*4+3] = anData[ParallelUtils::extract_32si<3>(vnMapOffsets)];
-            anVals[n*4+2] = anData[ParallelUtils::extract_32si<2>(vnMapOffsets)];
-            anVals[n*4+1] = anData[ParallelUtils::extract_32si<1>(vnMapOffsets)];
-            anVals[n*4+0] = anData[ParallelUtils::extract_32si<0>(vnMapOffsets)];
+        lv::unroll<4>([&](int n) {
+            __m128i vnMapOffsets = _mm_add_epi32(lv::mult_32si(vnColStep,s_oIdxLUT_16bitdbcross_x.vnOffsets[n]),lv::mult_32si(vnRowStep,s_oIdxLUT_16bitdbcross_y.vnOffsets[n]));
+            anVals[n*4+3] = anData[lv::extract_32si<3>(vnMapOffsets)];
+            anVals[n*4+2] = anData[lv::extract_32si<2>(vnMapOffsets)];
+            anVals[n*4+1] = anData[lv::extract_32si<1>(vnMapOffsets)];
+            anVals[n*4+0] = anData[lv::extract_32si<0>(vnMapOffsets)];
         });
 #else //(!HAVE_SSE2)*/
-        CxxUtils::unroll<16>([&](int n) {
+        lv::unroll<16>([&](int n) {
             anVals[n] = anData[nRowStep*s_oIdxLUT_16bitdbcross_y.anOffsets[n]+nColStep*s_oIdxLUT_16bitdbcross_x.anOffsets[n]];
         });
 //#endif //(!HAVE_SSE2)

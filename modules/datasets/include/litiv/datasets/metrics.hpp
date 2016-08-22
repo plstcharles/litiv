@@ -19,10 +19,10 @@
 
 #include "litiv/datasets/utils.hpp"
 
-namespace litiv {
+namespace lv {
 
     //! basic metrics accumulator interface
-    struct IMetricsAccumulator : CxxUtils::enable_shared_from_this<IMetricsAccumulator> {
+    struct IMetricsAccumulator : lv::enable_shared_from_this<IMetricsAccumulator> {
         virtual ~IMetricsAccumulator() = default;
         bool operator!=(const IMetricsAccumulator& m) const;
         bool operator==(const IMetricsAccumulator& m) const;
@@ -38,7 +38,7 @@ namespace litiv {
     using IMetricsAccumulatorConstPtr = std::shared_ptr<const IMetricsAccumulator>;
 
     //! high-level metrics calculator interface (relies on IMetricsAccumulator internally)
-    struct IMetricsCalculator : CxxUtils::enable_shared_from_this<IMetricsCalculator> {
+    struct IMetricsCalculator : lv::enable_shared_from_this<IMetricsCalculator> {
         virtual ~IMetricsCalculator() = default;
         IMetricsCalculator& operator+=(const IMetricsCalculator& m);
         virtual std::shared_ptr<IMetricsCalculator> accumulate(const std::shared_ptr<const IMetricsCalculator>& m) = 0;
@@ -121,4 +121,4 @@ namespace litiv {
     using BinClassifMetricsCalculatorPtr = std::shared_ptr<BinClassifMetricsCalculator>;
     using BinClassifMetricsCalculatorConstPtr = std::shared_ptr<const BinClassifMetricsCalculator>;
 
-} //namespace litiv
+} // namespace lv

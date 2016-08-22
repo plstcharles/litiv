@@ -21,6 +21,8 @@
 
 #define GLScreenBillboard_FLIP_TEX_Y_COORDS 1
 
+// @@@@ rewrite all classes as part of lv::gl namespace?
+
 struct GLMatrices {
     glm::mat4 mProj;
     glm::mat4 mView;

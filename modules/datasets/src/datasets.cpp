@@ -17,24 +17,24 @@
 
 #include "litiv/datasets.hpp"
 
-const std::string& litiv::DataHandler::getName() const {return m_sBatchName;}
-const std::string& litiv::DataHandler::getDataPath() const {return m_sDataPath;}
-const std::string& litiv::DataHandler::getOutputPath() const {return m_sOutputPath;}
-const std::string& litiv::DataHandler::getRelativePath() const {return m_sRelativePath;}
-bool litiv::DataHandler::isGrayscale() const {return m_bForcingGrayscale;}
-litiv::IDatasetPtr litiv::DataHandler::getDatasetInfo() const {return m_pDataset;}
+const std::string& lv::DataHandler::getName() const {return m_sBatchName;}
+const std::string& lv::DataHandler::getDataPath() const {return m_sDataPath;}
+const std::string& lv::DataHandler::getOutputPath() const {return m_sOutputPath;}
+const std::string& lv::DataHandler::getRelativePath() const {return m_sRelativePath;}
+bool lv::DataHandler::isGrayscale() const {return m_bForcingGrayscale;}
+lv::IDatasetPtr lv::DataHandler::getDatasetInfo() const {return m_pDataset;}
 
-litiv::DataHandler::DataHandler(const std::string& sBatchName, IDatasetPtr pDataset, const std::string& sRelativePath) :
+lv::DataHandler::DataHandler(const std::string& sBatchName, IDatasetPtr pDataset, const std::string& sRelativePath) :
         m_sBatchName(sBatchName),
         m_sRelativePath(sRelativePath),
         m_sDataPath(pDataset->getDatasetPath()+sRelativePath),
         m_sOutputPath(pDataset->getOutputPath()+sRelativePath),
-        m_bForcingGrayscale(PlatformUtils::string_contains_token(sRelativePath,pDataset->getGrayscaleDirTokens())),
+        m_bForcingGrayscale(lv::string_contains_token(sRelativePath,pDataset->getGrayscaleDirTokens())),
         m_pDataset(pDataset) {
-    PlatformUtils::CreateDirIfNotExist(m_sOutputPath);
+    lv::CreateDirIfNotExist(m_sOutputPath);
 }
 
-litiv::IDataHandlerConstPtr litiv::DataHandler::getBatch(size_t& nPacketIdx) const {
+lv::IDataHandlerConstPtr lv::DataHandler::getBatch(size_t& nPacketIdx) const {
     if(isGroup()) {
         size_t nCurrPacketCount = 0;
         auto vpBatches = getBatches(true);
@@ -56,6 +56,6 @@ litiv::IDataHandlerConstPtr litiv::DataHandler::getBatch(size_t& nPacketIdx) con
     }
 }
 
-litiv::IDataHandlerPtr litiv::DataHandler::getBatch(size_t& nPacketIdx) {
+lv::IDataHandlerPtr lv::DataHandler::getBatch(size_t& nPacketIdx) {
     return std::const_pointer_cast<IDataHandler>(static_cast<const DataHandler*>(this)->getBatch(nPacketIdx));
 }

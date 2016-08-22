@@ -22,7 +22,7 @@
 #error "This file should never be included directly; use litiv/datasets.hpp instead"
 #endif //__LITIV_DATASETS_IMPL_H
 
-template<ParallelUtils::eParallelAlgoType eEvalImpl>
+template<lv::eParallelAlgoType eEvalImpl>
 struct Dataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b,eEvalImpl> :
         public IDataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b,eEvalImpl> {
 protected: // should still be protected, as creation should always be done via datasets::create
@@ -35,8 +35,8 @@ protected: // should still be protected, as creation should always be done via d
     ) :
             IDataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b,eEvalImpl>(
                     "LITIV 2012b (CVPRW2015 update)",
-                    PlatformUtils::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"litiv/litiv2012b/",
-                    PlatformUtils::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"litiv/litiv2012b/"+PlatformUtils::AddDirSlashIfMissing(sOutputDirName),
+                    lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"litiv/litiv2012b/",
+                    lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"litiv/litiv2012b/"+lv::AddDirSlashIfMissing(sOutputDirName),
                     "homography",
                     ".cvmat",
                     std::vector<std::string>{""},
@@ -57,7 +57,7 @@ protected:
     virtual void parseData() override final {
         /* @@@@ old bsds500 below
         std::vector<std::string> vsImgPaths;
-        PlatformUtils::GetFilesFromDir(m_sDatasetPath,vsImgPaths);
+        lv::GetFilesFromDir(m_sDatasetPath,vsImgPaths);
         bool bFoundScript=false, bFoundGTFile=false;
         const std::string sGTFilePrefix("hand_segmented_");
         const size_t nInputFileNbDecimals = 5;
@@ -89,8 +89,8 @@ protected:
         m_pEvaluator = std::shared_ptr<EvaluatorBase>(new BinarySegmEvaluator("WALLFLOWER_EVAL"));
         */
         /* @@@@ old default below
-        PlatformUtils::GetFilesFromDir(m_sDatasetPath,m_vsInputImagePaths);
-        PlatformUtils::FilterFilePaths(m_vsInputImagePaths,{},{".jpg"});
+        lv::GetFilesFromDir(m_sDatasetPath,m_vsInputImagePaths);
+        lv::FilterFilePaths(m_vsInputImagePaths,{},{".jpg"});
         if(m_vsInputImagePaths.empty())
             throw std::runtime_error(cv::format("Image set '%s' did not possess any jpg image file",sSetName.c_str()));
         for(size_t n=0; n<m_vsInputImagePaths.size(); ++n) {
@@ -117,7 +117,7 @@ protected:
     }
     virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final {
         /*
-        cv::Mat litiv::Image::Segm::Set::GetInputFromIndex_external(size_t nImageIdx) {
+        cv::Mat lv::Image::Segm::Set::GetInputFromIndex_external(size_t nImageIdx) {
             cv::Mat oImage;
             oImage = cv::imread(m_vsInputImagePaths[nImageIdx],m_bForcingGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
             CV_Assert(!oImage.empty());
@@ -141,12 +141,12 @@ protected:
         }
         */
         /*
-        cv::Mat litiv::Image::Segm::Set::GetGTFromIndex_external(size_t nImageIdx) {
+        cv::Mat lv::Image::Segm::Set::GetGTFromIndex_external(size_t nImageIdx) {
             cv::Mat oImage;
             if(m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test) {
                 if(m_vsGTImagePaths.size()>nImageIdx) {
                     std::vector<std::string> vsTempPaths;
-                    PlatformUtils::GetFilesFromDir(m_vsGTImagePaths[nImageIdx],vsTempPaths);
+                    lv::GetFilesFromDir(m_vsGTImagePaths[nImageIdx],vsTempPaths);
                     CV_Assert(!vsTempPaths.empty());
                     cv::Mat oTempRefGTImage = cv::imread(vsTempPaths[0],cv::IMREAD_GRAYSCALE);
                     CV_Assert(!oTempRefGTImage.empty());
@@ -178,7 +178,7 @@ protected:
         }
         */
         /*
-        cv::Mat litiv::Image::Segm::Set::ReadResult(size_t nImageIdx) {
+        cv::Mat lv::Image::Segm::Set::ReadResult(size_t nImageIdx) {
             CV_Assert(m_vsOrigImageNames[nImageIdx]!=std::string());
             CV_Assert(!m_sResultNameSuffix.empty());
             std::stringstream sResultFilePath;
@@ -196,7 +196,7 @@ protected:
         }
         */
         /*
-        void litiv::Image::Segm::Set::WriteResult(size_t nImageIdx, const cv::Mat& oResult) {
+        void lv::Image::Segm::Set::WriteResult(size_t nImageIdx, const cv::Mat& oResult) {
             CV_Assert(m_vsOrigImageNames[nImageIdx]!=std::string());
             CV_Assert(!m_sResultNameSuffix.empty());
             cv::Mat oImage = oResult;
@@ -214,7 +214,7 @@ protected:
         }
         */
         /*
-        bool litiv::Image::Segm::Set::StartPrecaching(bool bUsingGT, size_t nUnused) {
+        bool lv::Image::Segm::Set::StartPrecaching(bool bUsingGT, size_t nUnused) {
             return WorkBatch::StartPrecaching(bUsingGT,m_oMaxSize.height*m_oMaxSize.width*(m_nTotImageCount+1)*(m_bForcingGrayscale?1:m_bForcing4ByteDataAlign?4:3));
         }
         */

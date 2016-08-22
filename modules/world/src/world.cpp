@@ -17,6 +17,6 @@
 
 #include "litiv/world.hpp"
 
-bool litiv::initAll() {
+bool lv::initAll() {
     return true;
 }

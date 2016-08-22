@@ -147,8 +147,8 @@ void BackgroundSubtractorPBAS_1ch::apply(cv::InputArray _image, cv::OutputArray 
             const float fCurrDistThreshold = ((*pfCurrDistThresholdFactor)*m_nDefaultColorDistThreshold);
             size_t nGoodSamplesCount=0, nSampleIdx=0;
             while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
-                const size_t nColorDist = DistanceUtils::L1dist(oInputImg.data[idx_uchar],m_voBGImg[nSampleIdx].data[idx_uchar]);
-                const size_t nGradDist = DistanceUtils::L1dist(oBlurredInputImg_AbsGrad.data[idx_uchar],m_voBGGrad[nSampleIdx].data[idx_uchar]);
+                const size_t nColorDist = lv::L1dist(oInputImg.data[idx_uchar],m_voBGImg[nSampleIdx].data[idx_uchar]);
+                const size_t nGradDist = lv::L1dist(oBlurredInputImg_AbsGrad.data[idx_uchar],m_voBGGrad[nSampleIdx].data[idx_uchar]);
                 const float fSumDist = std::min(((BGSPBAS_GRAD_WEIGHT_ALPHA/m_fFormerMeanGradDist)*nGradDist)+nColorDist,(float)nChannelSize);
                 if(fSumDist<=fCurrDistThreshold) {
                     if(fMinDist>fSumDist)
@@ -373,10 +373,10 @@ void BackgroundSubtractorPBAS_3ch::apply(cv::InputArray _image, cv::OutputArray 
             while(nGoodSamplesCount<m_nRequiredBGSamples && nSampleIdx<m_nBGSamples) {
                 const cv::Vec3b& in_color = oInputImgRGB.at<cv::Vec3b>(y,x);
                 const cv::Vec3b& bg_color = m_voBGImg[nSampleIdx].at<cv::Vec3b>(y,x);
-                const float fColorDist = DistanceUtils::L2dist(in_color,bg_color);
+                const float fColorDist = lv::L2dist(in_color,bg_color);
                 const cv::Vec3b& in_grad = oBlurredInputImg_AbsGrad.at<cv::Vec3b>(y,x);
                 const cv::Vec3b& bg_grad = m_voBGGrad[nSampleIdx].at<cv::Vec3b>(y,x);
-                const float fGradDist = DistanceUtils::L2dist(in_grad,bg_grad);
+                const float fGradDist = lv::L2dist(in_grad,bg_grad);
                 const float fSumDist = std::min(((BGSPBAS_GRAD_WEIGHT_ALPHA/m_fFormerMeanGradDist)*fGradDist)+fColorDist,(float)nChannelSize);
                 if(fSumDist<=fCurrDistThreshold) {
                     if(fMinDist>fSumDist)

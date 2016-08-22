@@ -58,7 +58,7 @@
 #endif //__clang__
 #endif //USE_BSDS500_BENCHMARK
 
-namespace litiv {
+namespace lv {
 
     struct BSDS500Counters { // edge detection counters for a single image
         BSDS500Counters(size_t nThresholdsBins) : // always skips zero threshold
@@ -66,7 +66,7 @@ namespace litiv {
             vnIndivTPFN(nThresholdsBins,0),
             vnTotalTP(nThresholdsBins,0),
             vnTotalTPFP(nThresholdsBins,0),
-            vnThresholds(PlatformUtils::linspace<uchar>(0,UCHAR_MAX,nThresholdsBins,false)) {
+            vnThresholds(lv::linspace<uchar>(0,UCHAR_MAX,nThresholdsBins,false)) {
             CV_Assert(nThresholdsBins>0 && nThresholdsBins<=UCHAR_MAX);
         }
         std::vector<uint64_t> vnIndivTP; // one count per threshold
@@ -112,14 +112,14 @@ namespace litiv {
             CV_Assert(dMaxDist>0 && nMaxDist>0);
 
             BSDS500Counters oMetricsBase(m_nThresholdBins);
-            const std::vector<uchar> vuEvalUniqueVals = PlatformUtils::unique<uchar>(oClassif);
+            const std::vector<uchar> vuEvalUniqueVals = lv::unique<uchar>(oClassif);
             cv::Mat oCurrSegmMask(oClassif.size(),CV_8UC1), oTmpSegmMask(oClassif.size(),CV_8UC1);
             cv::Mat oSegmTPAccumulator(oClassif.size(),CV_8UC1);
             size_t nNextEvalUniqueValIdx = 0;
             size_t nThresholdBinIdx = 0;
             while(nThresholdBinIdx<oMetricsBase.vnThresholds.size()) {
                 cv::compare(oClassif,oMetricsBase.vnThresholds[nThresholdBinIdx],oTmpSegmMask,cv::CMP_GE);
-                litiv::thinning(oTmpSegmMask,oCurrSegmMask);
+                lv::thinning(oTmpSegmMask,oCurrSegmMask);
 
     #if USE_BSDS500_BENCHMARK
 
@@ -455,9 +455,9 @@ namespace litiv {
                 }
 
                 const float fCompltRatio = float(nThresholdBinIdx)/oMetricsBase.vnThresholds.size();
-                litiv::updateConsoleProgressBar("BSDS500 eval:",fCompltRatio);
+                lv::updateConsoleProgressBar("BSDS500 eval:",fCompltRatio);
             }
-            litiv::cleanConsoleRow();
+            lv::cleanConsoleRow();
             m_voMetricsBase.push_back(oMetricsBase);
         }
         static cv::Mat getColoredMask(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& /*oROI*/) {
@@ -521,7 +521,7 @@ namespace litiv {
         CV_Assert(!vnThresholds.empty() && !vdRecall.empty() && !vdPrecision.empty());
         CV_Assert(vnThresholds.size()==vdRecall.size() && vdRecall.size()==vdPrecision.size());
         BSDS500Score oRes;
-        oRes.dFMeasure = litiv::BinClassifMetricsCalculator::CalcFMeasure(vdRecall[0],vdPrecision[0]);
+        oRes.dFMeasure = lv::BinClassifMetricsCalculator::CalcFMeasure(vdRecall[0],vdPrecision[0]);
         oRes.dPrecision = vdPrecision[0];
         oRes.dRecall = vdRecall[0];
         oRes.dThreshold = double(vnThresholds[0])/UCHAR_MAX;
@@ -532,7 +532,7 @@ namespace litiv {
                 const double dCurrInterp = double(nInterpIdx)/nInterpCount;
                 const double dInterpRecall = dLastInterp*vdRecall[nThresholdIdx-1] + dCurrInterp*vdRecall[nThresholdIdx];
                 const double dInterpPrecision = dLastInterp*vdPrecision[nThresholdIdx-1] + dCurrInterp*vdPrecision[nThresholdIdx];
-                const double dInterpFMeasure = litiv::BinClassifMetricsCalculator::CalcFMeasure(dInterpRecall,dInterpPrecision);
+                const double dInterpFMeasure = lv::BinClassifMetricsCalculator::CalcFMeasure(dInterpRecall,dInterpPrecision);
                 if(dInterpFMeasure>oRes.dFMeasure) {
                     oRes.dThreshold = (dLastInterp*vnThresholds[nThresholdIdx-1] + dCurrInterp*vnThresholds[nThresholdIdx])/UCHAR_MAX;
                     oRes.dFMeasure = dInterpFMeasure;
@@ -554,7 +554,7 @@ namespace litiv {
                 const double dCurrInterp = double(nInterpIdx)/nInterpCount;
                 const double dInterpRecall = dLastInterp*voScores[nScoreIdx-1].dRecall + dCurrInterp*voScores[nScoreIdx].dRecall;
                 const double dInterpPrecision = dLastInterp*voScores[nScoreIdx-1].dPrecision + dCurrInterp*voScores[nScoreIdx].dPrecision;
-                const double dInterpFMeasure = litiv::BinClassifMetricsCalculator::CalcFMeasure(dInterpRecall,dInterpPrecision);
+                const double dInterpFMeasure = lv::BinClassifMetricsCalculator::CalcFMeasure(dInterpRecall,dInterpPrecision);
                 if(dInterpFMeasure>oRes.dFMeasure) {
                     oRes.dThreshold = dLastInterp*voScores[nScoreIdx-1].dThreshold + dCurrInterp*voScores[nScoreIdx].dThreshold;
                     oRes.dFMeasure = dInterpFMeasure;
@@ -613,9 +613,9 @@ namespace litiv {
                 CV_DbgAssert(nImageIdx==0 || m_voMetricsBase[nImageIdx].vnThresholds==m_voMetricsBase[nImageIdx-1].vnThresholds);
                 std::vector<BSDS500Score> voImageScore_PerThreshold(m_nThresholdBins);
                 for(size_t nThresholdIdx = 0; nThresholdIdx<m_nThresholdBins; ++nThresholdIdx) {
-                    voImageScore_PerThreshold[nThresholdIdx].dRecall = litiv::BinClassifMetricsCalculator::CalcRecall(m_voMetricsBase[nImageIdx].vnIndivTP[nThresholdIdx],m_voMetricsBase[nImageIdx].vnIndivTPFN[nThresholdIdx]);
-                    voImageScore_PerThreshold[nThresholdIdx].dPrecision = litiv::BinClassifMetricsCalculator::CalcPrecision(m_voMetricsBase[nImageIdx].vnTotalTP[nThresholdIdx],m_voMetricsBase[nImageIdx].vnTotalTPFP[nThresholdIdx]);
-                    voImageScore_PerThreshold[nThresholdIdx].dFMeasure = litiv::BinClassifMetricsCalculator::CalcFMeasure(voImageScore_PerThreshold[nThresholdIdx].dRecall,voImageScore_PerThreshold[nThresholdIdx].dPrecision);
+                    voImageScore_PerThreshold[nThresholdIdx].dRecall = lv::BinClassifMetricsCalculator::CalcRecall(m_voMetricsBase[nImageIdx].vnIndivTP[nThresholdIdx],m_voMetricsBase[nImageIdx].vnIndivTPFN[nThresholdIdx]);
+                    voImageScore_PerThreshold[nThresholdIdx].dPrecision = lv::BinClassifMetricsCalculator::CalcPrecision(m_voMetricsBase[nImageIdx].vnTotalTP[nThresholdIdx],m_voMetricsBase[nImageIdx].vnTotalTPFP[nThresholdIdx]);
+                    voImageScore_PerThreshold[nThresholdIdx].dFMeasure = lv::BinClassifMetricsCalculator::CalcFMeasure(voImageScore_PerThreshold[nThresholdIdx].dRecall,voImageScore_PerThreshold[nThresholdIdx].dPrecision);
                     voImageScore_PerThreshold[nThresholdIdx].dThreshold = double(m_voMetricsBase[nImageIdx].vnThresholds[nThresholdIdx])/UCHAR_MAX;
                     oCumulMetricsBase.vnIndivTP[nThresholdIdx] += m_voMetricsBase[nImageIdx].vnIndivTP[nThresholdIdx];
                     oCumulMetricsBase.vnIndivTPFN[nThresholdIdx] += m_voMetricsBase[nImageIdx].vnIndivTPFN[nThresholdIdx];
@@ -634,18 +634,18 @@ namespace litiv {
             // ^^^ voBestImageScores => eval_bdry_img.txt
             voThresholdScores.resize(m_nThresholdBins);
             for(size_t nThresholdIdx = 0; nThresholdIdx<oCumulMetricsBase.vnThresholds.size(); ++nThresholdIdx) {
-                voThresholdScores[nThresholdIdx].dRecall = litiv::BinClassifMetricsCalculator::CalcRecall(oCumulMetricsBase.vnIndivTP[nThresholdIdx],oCumulMetricsBase.vnIndivTPFN[nThresholdIdx]);
-                voThresholdScores[nThresholdIdx].dPrecision = litiv::BinClassifMetricsCalculator::CalcPrecision(oCumulMetricsBase.vnTotalTP[nThresholdIdx],oCumulMetricsBase.vnTotalTPFP[nThresholdIdx]);
-                voThresholdScores[nThresholdIdx].dFMeasure = litiv::BinClassifMetricsCalculator::CalcFMeasure(voThresholdScores[nThresholdIdx].dRecall,voThresholdScores[nThresholdIdx].dPrecision);
+                voThresholdScores[nThresholdIdx].dRecall = lv::BinClassifMetricsCalculator::CalcRecall(oCumulMetricsBase.vnIndivTP[nThresholdIdx],oCumulMetricsBase.vnIndivTPFN[nThresholdIdx]);
+                voThresholdScores[nThresholdIdx].dPrecision = lv::BinClassifMetricsCalculator::CalcPrecision(oCumulMetricsBase.vnTotalTP[nThresholdIdx],oCumulMetricsBase.vnTotalTPFP[nThresholdIdx]);
+                voThresholdScores[nThresholdIdx].dFMeasure = lv::BinClassifMetricsCalculator::CalcFMeasure(voThresholdScores[nThresholdIdx].dRecall,voThresholdScores[nThresholdIdx].dPrecision);
                 voThresholdScores[nThresholdIdx].dThreshold = double(oCumulMetricsBase.vnThresholds[nThresholdIdx])/UCHAR_MAX;
             }
             // ^^^ voThresholdScores => eval_bdry_thr.txt
             oBestScore = FindMaxFMeasure(voThresholdScores);
-            dMaxRecall = litiv::BinClassifMetricsCalculator::CalcRecall(oMaxBinClassifMetricsAccumulator.vnIndivTP[0],oMaxBinClassifMetricsAccumulator.vnIndivTPFN[0]);
-            dMaxPrecision = litiv::BinClassifMetricsCalculator::CalcPrecision(oMaxBinClassifMetricsAccumulator.vnTotalTP[0],oMaxBinClassifMetricsAccumulator.vnTotalTPFP[0]);
-            dMaxFMeasure = litiv::BinClassifMetricsCalculator::CalcFMeasure(dMaxRecall,dMaxPrecision);
+            dMaxRecall = lv::BinClassifMetricsCalculator::CalcRecall(oMaxBinClassifMetricsAccumulator.vnIndivTP[0],oMaxBinClassifMetricsAccumulator.vnIndivTPFN[0]);
+            dMaxPrecision = lv::BinClassifMetricsCalculator::CalcPrecision(oMaxBinClassifMetricsAccumulator.vnTotalTP[0],oMaxBinClassifMetricsAccumulator.vnTotalTPFP[0]);
+            dMaxFMeasure = lv::BinClassifMetricsCalculator::CalcFMeasure(dMaxRecall,dMaxPrecision);
             dAreaPR = 0;
-            std::vector<size_t> vnCumulRecallIdx_uniques = PlatformUtils::unique_indices(voThresholdScores,[&](size_t n1, size_t n2) {
+            std::vector<size_t> vnCumulRecallIdx_uniques = lv::unique_indices(voThresholdScores,[&](size_t n1, size_t n2) {
                     return voThresholdScores[n1].dRecall<voThresholdScores[n2].dRecall;
                 },[&](size_t n1, size_t n2) {
                     return voThresholdScores[n1].dRecall==voThresholdScores[n2].dRecall;
@@ -661,7 +661,7 @@ namespace litiv {
                 std::vector<double> vdInterpReqIdx(nInterpReqIdxCount+1);
                 for(size_t n = 0; n<=nInterpReqIdxCount; ++n)
                     vdInterpReqIdx[n] = double(n)/nInterpReqIdxCount;
-                std::vector<double> vdInterpVals = PlatformUtils::interp1(vdCumulRecall_uniques,vdCumulPrecision_uniques,vdInterpReqIdx);
+                std::vector<double> vdInterpVals = lv::interp1(vdCumulRecall_uniques,vdCumulPrecision_uniques,vdInterpReqIdx);
                 if(!vdInterpVals.empty())
                     for(size_t n = 0; n<=vdInterpVals.size(); ++n)
                         dAreaPR += vdInterpVals[n]*0.01;
@@ -677,11 +677,11 @@ namespace litiv {
     using BSDS500MetricsCalculatorPtr = std::shared_ptr<BSDS500MetricsCalculator>;
     using BSDS500MetricsCalculatorConstPtr = std::shared_ptr<const BSDS500MetricsCalculator>;
 
-} //namespace litiv
+} // namespace lv
 
-void litiv::DatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_BSDS500>::writeEvalReport() const {
+void lv::DatasetEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500>::writeEvalReport() const {
     if(getBatches(false).empty() || !isUsingEvaluator()) {
-        IDatasetEvaluator_<litiv::eDatasetEval_None>::writeEvalReport();
+        IDatasetEvaluator_<lv::eDatasetEval_None>::writeEvalReport();
         return;
     }
     for(const auto& pGroupIter : getBatches(true))
@@ -689,7 +689,7 @@ void litiv::DatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier,litiv::eDatas
     IMetricsCalculatorConstPtr pMetrics = getMetrics();
     lvAssert(pMetrics.get());
     const BSDS500MetricsCalculator& oMetrics = dynamic_cast<const BSDS500MetricsCalculator&>(*pMetrics.get());
-    std::cout << CxxUtils::clampString(getName(),12) << " => MaxRcl=" << std::fixed << std::setprecision(4) << oMetrics.dMaxRecall << " MaxPrc=" << oMetrics.dMaxPrecision << " MaxFM=" << oMetrics.dMaxFMeasure << std::endl;
+    std::cout << lv::clampString(getName(),12) << " => MaxRcl=" << std::fixed << std::setprecision(4) << oMetrics.dMaxRecall << " MaxPrc=" << oMetrics.dMaxPrecision << " MaxFM=" << oMetrics.dMaxFMeasure << std::endl;
     std::cout << "                BestRcl=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dRecall << " BestPrc=" << oMetrics.oBestScore.dPrecision << " BestFM=" << oMetrics.oBestScore.dFMeasure << "  (@ T=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dThreshold << ")" << std::endl;
 #if USE_BSDS500_BENCHMARK
     std::ofstream oMetricsOutput(getOutputPath()+"/overall_reimpl_eval.txt");
@@ -718,22 +718,22 @@ void litiv::DatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier,litiv::eDatas
             std::setw(12) << oMetrics.oBestScore.dFMeasure << "|" <<
             std::setw(12) << oMetrics.oBestScore.dThreshold << "\n";
         oMetricsOutput << "\nHz: " << nOverallPacketCount/dOverallTimeElapsed << "\n";
-        oMetricsOutput << CxxUtils::getLogStamp();
+        oMetricsOutput << lv::getLogStamp();
     }
 }
 
-litiv::IMetricsAccumulatorConstPtr litiv::DatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_BSDS500>::getMetricsBase() const {
+lv::IMetricsAccumulatorConstPtr lv::DatasetEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500>::getMetricsBase() const {
     BSDS500MetricsAccumulatorPtr pMetricsBase = BSDS500MetricsAccumulator::create(DATASETS_BSDS500_EVAL_DEFAULT_THRESH_BINS);
     for(const auto& pBatch : getBatches(true))
         pMetricsBase->accumulate(dynamic_cast<const DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500>&>(*pBatch).getMetricsBase());
     return pMetricsBase;
 }
 
-litiv::IMetricsCalculatorPtr litiv::DatasetEvaluator_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_BSDS500>::getMetrics() const {
+lv::IMetricsCalculatorPtr lv::DatasetEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500>::getMetrics() const {
     return BSDS500MetricsCalculator::create(getMetricsBase());
 }
 
-litiv::IMetricsAccumulatorConstPtr litiv::DataReporter_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_BSDS500>::getMetricsBase() const {
+lv::IMetricsAccumulatorConstPtr lv::DataReporter_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500>::getMetricsBase() const {
     lvAssert(isGroup()); // non-group specialization should override this method
     BSDS500MetricsAccumulatorPtr pMetricsBase = BSDS500MetricsAccumulator::create(DATASETS_BSDS500_EVAL_DEFAULT_THRESH_BINS);
     for(const auto& pBatch : getBatches(true))
@@ -741,11 +741,11 @@ litiv::IMetricsAccumulatorConstPtr litiv::DataReporter_<litiv::eDatasetEval_Bina
     return pMetricsBase;
 }
 
-litiv::IMetricsCalculatorPtr litiv::DataReporter_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_BSDS500>::getMetrics() const {
+lv::IMetricsCalculatorPtr lv::DataReporter_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500>::getMetrics() const {
     return BSDS500MetricsCalculator::create(getMetricsBase());
 }
 
-void litiv::DataReporter_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_BSDS500>::writeEvalReport() const {
+void lv::DataReporter_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500>::writeEvalReport() const {
     IDataReporter_<eDatasetEval_None>::writeEvalReport();
     if(!getTotPackets() || !getDatasetInfo()->isUsingEvaluator())
         return;
@@ -755,14 +755,14 @@ void litiv::DataReporter_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_B
     IMetricsCalculatorConstPtr pMetrics = getMetrics();
     lvAssert(pMetrics.get());
     const BSDS500MetricsCalculator& oMetrics = dynamic_cast<const BSDS500MetricsCalculator&>(*pMetrics.get());
-    std::cout << "\t" << CxxUtils::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => MaxRcl=" << std::fixed << std::setprecision(4) << oMetrics.dMaxRecall << " MaxPrc=" << oMetrics.dMaxPrecision << " MaxFM=" << oMetrics.dMaxFMeasure << std::endl;
+    std::cout << "\t" << lv::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => MaxRcl=" << std::fixed << std::setprecision(4) << oMetrics.dMaxRecall << " MaxPrc=" << oMetrics.dMaxPrecision << " MaxFM=" << oMetrics.dMaxFMeasure << std::endl;
     std::cout << "\t" << "                BestRcl=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dRecall << " BestPrc=" << oMetrics.oBestScore.dPrecision << " BestFM=" << oMetrics.oBestScore.dFMeasure << "  (@ T=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dThreshold << ")" << std::endl;
 #if USE_BSDS500_BENCHMARK
-    const std::string sOutputPath = PlatformUtils::AddDirSlashIfMissing(getOutputPath())+"../"+getName()+"_reimpl_eval/";
+    const std::string sOutputPath = lv::AddDirSlashIfMissing(getOutputPath())+"../"+getName()+"_reimpl_eval/";
 #else //(!USE_BSDS500_BENCHMARK)
-    const std::string sOutputPath = PlatformUtils::AddDirSlashIfMissing(getOutputPath())+"../"+getName()+"_homemade_eval/";
+    const std::string sOutputPath = lv::AddDirSlashIfMissing(getOutputPath())+"../"+getName()+"_homemade_eval/";
 #endif //(!USE_BSDS500_BENCHMARK)
-    PlatformUtils::CreateDirIfNotExist(sOutputPath);
+    lv::CreateDirIfNotExist(sOutputPath);
     std::ofstream oImageScoresOutput(sOutputPath+"/eval_bdry_img.txt");
     if(oImageScoresOutput.is_open())
         for(size_t n=0; n<oMetrics.voBestImageScores.size(); ++n)
@@ -776,7 +776,7 @@ void litiv::DataReporter_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_B
         oOverallMetricsOutput << cv::format("%10g %10g %10g %10g %10g %10g %10g %10g\n",oMetrics.oBestScore.dThreshold,oMetrics.oBestScore.dRecall,oMetrics.oBestScore.dPrecision,oMetrics.oBestScore.dFMeasure,oMetrics.dMaxRecall,oMetrics.dMaxPrecision,oMetrics.dMaxFMeasure,oMetrics.dAreaPR);
 }
 
-std::string litiv::DataReporter_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_BSDS500>::writeInlineEvalReport(size_t nIndentSize) const {
+std::string lv::DataReporter_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500>::writeInlineEvalReport(size_t nIndentSize) const {
     if(!getTotPackets())
         return std::string();
     const size_t nCellSize = 12;
@@ -788,7 +788,7 @@ std::string litiv::DataReporter_<litiv::eDatasetEval_BinaryClassifier,litiv::eDa
     IMetricsCalculatorConstPtr pMetrics = getMetrics();
     lvAssert(pMetrics.get());
     const BSDS500MetricsCalculator& oMetrics = dynamic_cast<const BSDS500MetricsCalculator&>(*pMetrics.get());
-    ssStr << CxxUtils::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "||" <<
+    ssStr << lv::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "||" <<
         std::setw(nCellSize) << oMetrics.dMaxRecall << "|" <<
         std::setw(nCellSize) << oMetrics.dMaxPrecision << "|" <<
         std::setw(nCellSize) << oMetrics.dMaxFMeasure << "||" <<
@@ -799,13 +799,13 @@ std::string litiv::DataReporter_<litiv::eDatasetEval_BinaryClassifier,litiv::eDa
     return ssStr.str();
 }
 
-litiv::IMetricsAccumulatorConstPtr litiv::DataEvaluator_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_BSDS500,ParallelUtils::eNonParallel>::getMetricsBase() const {
+lv::IMetricsAccumulatorConstPtr lv::DataEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500,lv::eNonParallel>::getMetricsBase() const {
     if(!m_pMetricsBase)
         return BSDS500MetricsAccumulator::create(DATASETS_BSDS500_EVAL_DEFAULT_THRESH_BINS);
     return m_pMetricsBase;
 }
 
-void litiv::DataEvaluator_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_BSDS500,ParallelUtils::eNonParallel>::push(const cv::Mat& oClassif, size_t nIdx) {
+void lv::DataEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500,lv::eNonParallel>::push(const cv::Mat& oClassif, size_t nIdx) {
     IDataConsumer_<eDatasetEval_BinaryClassifier>::push(oClassif,nIdx);
     if(getDatasetInfo()->isUsingEvaluator()) {
         auto pLoader = shared_from_this_cast<IDataLoader>(true);
@@ -815,11 +815,11 @@ void litiv::DataEvaluator_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_
     }
 }
 
-cv::Mat litiv::DataEvaluator_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_BSDS500,ParallelUtils::eNonParallel>::getColoredMask(const cv::Mat& oClassif, size_t nIdx) {
+cv::Mat lv::DataEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500,lv::eNonParallel>::getColoredMask(const cv::Mat& oClassif, size_t nIdx) {
     auto pLoader = shared_from_this_cast<IDataLoader>(true);
     return BSDS500MetricsAccumulator::getColoredMask(oClassif,pLoader->getGT(nIdx),pLoader->getInputROI(nIdx));
 }
 
-void litiv::DataEvaluator_<litiv::eDatasetEval_BinaryClassifier,litiv::eDataset_BSDS500,ParallelUtils::eNonParallel>::resetMetrics() {
+void lv::DataEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500,lv::eNonParallel>::resetMetrics() {
     m_pMetricsBase = BSDS500MetricsAccumulator::create(DATASETS_BSDS500_EVAL_DEFAULT_THRESH_BINS);
 }

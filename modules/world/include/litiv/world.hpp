@@ -19,9 +19,9 @@
 
 #include "litiv/litiv_modules.hpp"
 
-namespace litiv {
+namespace lv {
 
     //! for now, always returns true
     bool initAll();
 
-} //namespace litiv
+} // namespace lv

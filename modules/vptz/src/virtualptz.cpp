@@ -22,7 +22,7 @@ vptz::Camera::Camera( const std::string& sInputPath, double verti_FOV, double ou
             vptzErrorExt("cannot open the input panomaric video file at %s",m_sInputPath.c_str());
         m_nScenarioFrameCount = (int)panoCapture.get(cv::CAP_PROP_FRAME_COUNT);
         m_dFrameRate = panoCapture.get(cv::CAP_PROP_FPS);
-        if(m_dFrameRate<=0 || CxxUtils::isnan(m_dFrameRate)) {
+        if(m_dFrameRate<=0 || lv::isnan(m_dFrameRate)) {
             std::cerr << "VirtualPTZ Warning : could not determine frame rate for input video; check container support on platform" << std::endl;
             m_dFrameRate = 16.0;
         }
@@ -91,7 +91,7 @@ vptz::Camera::Camera( const std::string& sInputPath, double verti_FOV, double ou
     // constants
     sphereGridSize = 512;
 
-    m_pContext = std::unique_ptr<GLContext>(new GLContext(cv::Size((int)outputWidth,(int)outputHeight),"VPTZ Mapper"));
+    m_pContext = std::unique_ptr<lv::gl::Context>(new lv::gl::Context(cv::Size((int)outputWidth,(int)outputHeight),"VPTZ Mapper"));
 
     // set the projection transformation
     glMatrixMode(GL_PROJECTION);

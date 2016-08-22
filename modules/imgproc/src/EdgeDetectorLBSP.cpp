@@ -78,11 +78,11 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg) {
 #if HAVE_SSE2
             // no slower than fill_n if fill_n is implemented with SSE
             static_assert(LBSP::DESC_SIZE_BITS==16,"all channels should already be 16-byte-aligned");
-            CxxUtils::unroll<nChannels>([&](size_t nChIter){
-                ParallelUtils::copy_16ub((__m128i*)(aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS),*(aanCurrImg+nChIter));
+            lv::unroll<nChannels>([&](size_t nChIter){
+                lv::copy_16ub((__m128i*)(aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS),*(aanCurrImg+nChIter));
             });
 #else //(!HAVE_SSE2)
-            CxxUtils::unroll<nChannels>([&](size_t nChIter){
+            lv::unroll<nChannels>([&](size_t nChIter){
                 std::fill_n(aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS,LBSP::DESC_SIZE_BITS,*(aanCurrImg+nChIter));
             });
 #endif //(!HAVE_SSE2)
@@ -119,11 +119,11 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg) {
 #if HAVE_SSE2
                         static_assert(LBSP::DESC_SIZE_BITS==16,"all channels should already be 16-byte-aligned");
                         __m128i _anInputVals = _mm_load_si128((__m128i*)(aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS));
-                        size_t nLUTSum = (size_t)ParallelUtils::hsum_16ub(_anInputVals);
+                        size_t nLUTSum = (size_t)lv::hsum_16ub(_anInputVals);
 #else //(!HAVE_SSE2)
                         uchar* anCurrChLUT = aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS;
                         size_t nLUTSum = 0;
-                        CxxUtils::unroll<LBSP::DESC_SIZE_BITS>([&](size_t nLUTIter){
+                        lv::unroll<LBSP::DESC_SIZE_BITS>([&](size_t nLUTIter){
                             nLUTSum += anCurrChLUT[nLUTIter];
                         });
 #endif //(!HAVE_SSE2)
@@ -245,10 +245,10 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
                         const size_t nColIter_base = nColIter << 1;
                         CV_DbgAssert((nRowIter_base+1)<size_t(oMapSize.height));
                         CV_DbgAssert((nColIter_base+1)<size_t(oMapSize.width));
-                        CxxUtils::unroll<2>([&](int nRowIterOffset){
+                        lv::unroll<2>([&](int nRowIterOffset){
                             uchar* anNextScaleGradRow = oGradMap.data+(nRowIter_base+nRowIterOffset+nNMSHalfWinSize)*nGradMapRowStep+nGradMapColStep*nNMSHalfWinSize;
                             CV_DbgAssert(anNextScaleGradRow<oGradMap.dataend);
-                            CxxUtils::unroll<2>([&](int nColIterOffset){ // 4ch x 8ub = 32-bit chunks to copy
+                            lv::unroll<2>([&](int nColIterOffset){ // 4ch x 8ub = 32-bit chunks to copy
                                 *(uint32_t*)(anNextScaleGradRow+(nColIter_base+nColIterOffset)*nGradMapColStep) = *(uint32_t*)(anGradRow+nColIter*nGradMapColStep);
                             });
                         });
@@ -282,23 +282,23 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
                             const uint nGradY_abs = (uint)std::abs(nGradY)<<nShift_FPA;
                             uint nTG22GradX_FPA = nGradX_abs*nTG22deg_FPA; // == 0.4142135623730950488016887242097*nGradX_abs
                             if(nGradY_abs<nTG22GradX_FPA) { // if(nGradX_abs<0.4142135623730950488016887242097*nGradX_abs) == flat gradient (sector 0)
-                                if(litiv::isLocalMaximum_Horizontal<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep))
+                                if(lv::isLocalMaximum_Horizontal<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep))
                                     goto _edge_good; // push as 'edge'
                             }
                             else { // else(nGradX_abs>=0.4142135623730950488016887242097*nGradX_abs) == not a flat gradient (sectors 1, 2 or 3)
                                 uint nTG67GradX_FPA = nTG22GradX_FPA+(nGradX_abs<<(nShift_FPA+1)); // == 2.4142135623730950488016887242097*nGradX_abs == tan(3*pi/8)*nGradX_abs
                                 if(nGradY_abs>nTG67GradX_FPA) { // if(nGradX_abs>2.4142135623730950488016887242097*nGradX_abs == vertical gradient (sector 2)
-                                    if(litiv::isLocalMaximum_Vertical<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep))
+                                    if(lv::isLocalMaximum_Vertical<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep))
                                         goto _edge_good;
                                 }
                                 else { // else(nGradX_abs<=2.4142135623730950488016887242097*nGradX_abs == diagonal gradient (sector 1 or 3, depending on grad sign diff)
                                     if(nGradX || nGradY) {
-                                        if(litiv::isLocalMaximum_Diagonal<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep,(nGradX^nGradY)>=0))
+                                        if(lv::isLocalMaximum_Diagonal<nNMSHalfWinSize>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep,(nGradX^nGradY)>=0))
                                             goto _edge_good;
                                     }
                                     else {
-                                        if(litiv::isLocalMaximum_Diagonal<nNMSHalfWinSize,true>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep) ||
-                                           litiv::isLocalMaximum_Diagonal<nNMSHalfWinSize,false>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep))
+                                        if(lv::isLocalMaximum_Diagonal<nNMSHalfWinSize,true>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep) ||
+                                           lv::isLocalMaximum_Diagonal<nNMSHalfWinSize,false>(anGradRow+nColIter*nGradMapColStep+2,nGradMapColStep,nGradMapRowStep))
                                             goto _edge_good;
                                     }
                                 }

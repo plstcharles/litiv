@@ -50,11 +50,11 @@ int main(int /*argc*/, char **/*argv*/) {
 
         cv::Mat oGTTransMat_THERMAL,oGTTransMat_VISIBLE;
         cv::Mat oPolyListMat_THERMAL,oPolyListMat_VISIBLE;
-        DatasetUtils::LITIV2012::ReadTestSeqGroundtruth(oGTTransMat_THERMAL,oGTTransMat_VISIBLE,oPolyListMat_THERMAL,oPolyListMat_VISIBLE);
+        lv::LITIV2012::ReadTestSeqGroundtruth(oGTTransMat_THERMAL,oGTTransMat_VISIBLE,oPolyListMat_THERMAL,oPolyListMat_VISIBLE);
         cv::Mat oPolyPts_THERMAL,oPolyPts_VISIBLE;
-        DatasetUtils::LITIV2012::ConvertPolyPtsMatsToPtsLists(oPolyListMat_THERMAL,oPolyListMat_VISIBLE,oPolyPts_THERMAL,oPolyPts_VISIBLE);
+        lv::LITIV2012::ConvertPolyPtsMatsToPtsLists(oPolyListMat_THERMAL,oPolyListMat_VISIBLE,oPolyPts_THERMAL,oPolyPts_VISIBLE);
         cv::VideoCapture oCapOrig_THERMAL,oCapBGS_THERMAL,oCapOrig_VISIBLE,oCapBGS_VISIBLE;
-        const int nFrameCount = DatasetUtils::LITIV2012::OpenTestSeqVideos(oCapOrig_THERMAL,oCapBGS_THERMAL,oCapOrig_VISIBLE,oCapBGS_VISIBLE);
+        const int nFrameCount = lv::LITIV2012::OpenTestSeqVideos(oCapOrig_THERMAL,oCapBGS_THERMAL,oCapOrig_VISIBLE,oCapBGS_VISIBLE);
         std::cout << "(" << nFrameCount << " frames total)" << std::endl;
         cv::Mat oTempImg_THERMAL, oTempImg_VISIBLE;
         oCapOrig_THERMAL >> oTempImg_THERMAL; oCapOrig_THERMAL.set(cv::CAP_PROP_FRAME_COUNT,0);
@@ -62,7 +62,7 @@ int main(int /*argc*/, char **/*argv*/) {
         const cv::Size oInputSize_THERMAL = oTempImg_THERMAL.size();
         const cv::Size oInputSize_VISIBLE = oTempImg_VISIBLE.size();
         cv::Mat oPolyMat_THERMAL(oInputSize_THERMAL,CV_8UC1,cv::Scalar_<uchar>::all(0)),oPolyMat_VISIBLE(oInputSize_VISIBLE,CV_8UC1,cv::Scalar_<uchar>::all(0));
-        DatasetUtils::LITIV2012::DrawPolyPtsMatsToMat(oPolyListMat_THERMAL,oPolyListMat_VISIBLE,oPolyMat_THERMAL,oPolyMat_VISIBLE);
+        lv::LITIV2012::DrawPolyPtsMatsToMat(oPolyListMat_THERMAL,oPolyListMat_VISIBLE,oPolyMat_THERMAL,oPolyMat_VISIBLE);
 
         cv::Mat oSource_THERMAL,oSource_VISIBLE;
         cv::Mat oForeground_THERMAL,oForeground_VISIBLE;
@@ -105,9 +105,9 @@ int main(int /*argc*/, char **/*argv*/) {
         cv::Mat oGTTransformedPolyMat(oTransformedImageSize,CV_8UC1,cv::Scalar_<uchar>::all(0)); // eval
 
         cv::warpPerspective(oPolyMat_ToTransform,oGTTransformedPolyMat,oGTTransMat,oTransformedImageSize,cv::INTER_NEAREST|cv::WARP_INVERSE_MAP,cv::BORDER_CONSTANT);
-        const float fGTPolyOverlapError = DatasetUtils::CalcForegroundOverlapError(oPolyMat,oGTTransformedPolyMat);
+        const float fGTPolyOverlapError = lv::CalcForegroundOverlapError(oPolyMat,oGTTransformedPolyMat);
         const cv::Mat oGTTransformedPolyPts = oGTTransMat_inv*oPolyPts_ToTransform;
-        const cv::Point2d oGTPolyRegError = DatasetUtils::CalcPolyRegError(oPolyPts,oGTTransformedPolyPts);
+        const cv::Point2d oGTPolyRegError = lv::CalcPolyRegError(oPolyPts,oGTTransformedPolyPts);
 
 #if USE_VIDEOWRITER_RES_OUTPUT
         cv::VideoWriter oResultWriter(VIDEOWRITER_OUTPUT_FILE_PATH,cv::VideoWriter::fourcc('M','J','P','G'),15,cv::Size(oTransformedImageSize.width*3,oTransformedImageSize.height*2));
@@ -156,10 +156,10 @@ int main(int /*argc*/, char **/*argv*/) {
                 cv::warpPerspective(oContours_ToTransform,oTransformedContours,oTransMat,oTransformedImageSize,cv::INTER_LINEAR|cv::WARP_INVERSE_MAP,cv::BORDER_CONSTANT);
 #endif //USE_FULL_DEBUG_DISPLAY
                 cv::warpPerspective(oPolyMat_ToTransform,oTransformedPolyMat,oTransMat,oTransformedImageSize,cv::INTER_NEAREST|cv::WARP_INVERSE_MAP,cv::BORDER_CONSTANT);
-                const float fPolyOverlapError = DatasetUtils::CalcForegroundOverlapError(oPolyMat,oTransformedPolyMat);
+                const float fPolyOverlapError = lv::CalcForegroundOverlapError(oPolyMat,oTransformedPolyMat);
                 fCumulativePolyOverlapErrors += fPolyOverlapError;
                 const cv::Mat oTransformedPolyPts = oTransMat_inv*oPolyPts_ToTransform;
-                const cv::Point2d oPolyRegError = DatasetUtils::CalcPolyRegError(oPolyPts,oTransformedPolyPts);
+                const cv::Point2d oPolyRegError = lv::CalcPolyRegError(oPolyPts,oTransformedPolyPts);
                 oCumulativePolyRegErrors += oPolyRegError;
 #if USE_FILESTORAGE_RES_OUTPUT
                 oResultFS << "{";

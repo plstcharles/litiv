@@ -127,7 +127,7 @@ void thinning_internal_LamLeeSuen(cv::Mat& oInput, bool bIter) {
     }
 }
 
-void litiv::thinning(const cv::Mat& oInput, cv::Mat& oOutput, eThinningMode eMode) {
+void lv::thinning(const cv::Mat& oInput, cv::Mat& oOutput, eThinningMode eMode) {
     CV_Assert(!oInput.empty());
     CV_Assert(oInput.isContinuous());
     CV_Assert(oInput.type()==CV_8UC1);

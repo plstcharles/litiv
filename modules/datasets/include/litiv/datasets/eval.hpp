@@ -21,7 +21,7 @@
 
 #include "litiv/datasets/metrics.hpp"
 
-namespace litiv {
+namespace lv {
 
     //! dataset evaluator interface for top-level metrics computation & report writing
     template<eDatasetEvalList eDatasetEval>
@@ -80,13 +80,13 @@ namespace litiv {
     struct DataReporter_ : public IDataReporter_<eDatasetEval> {};
 
     //! default data evaluator interface specialization (will also determine which consumer interf to use based on eval impl)
-    template<eDatasetEvalList eDatasetEval, eDatasetList eDataset, ParallelUtils::eParallelAlgoType eEvalImpl>
+    template<eDatasetEvalList eDatasetEval, eDatasetList eDataset, lv::eParallelAlgoType eEvalImpl>
     struct DataEvaluator_ : // no evaluation specialization by default
-            public std::conditional<(eEvalImpl==ParallelUtils::eNonParallel),IDataConsumer_<eDatasetEval>,IAsyncDataConsumer_<eDatasetEval,eEvalImpl>>::type,
+            public std::conditional<(eEvalImpl==lv::eNonParallel),IDataConsumer_<eDatasetEval>,IAsyncDataConsumer_<eDatasetEval,eEvalImpl>>::type,
             public DataReporter_<eDatasetEval,eDataset> {};
 
     template<eDatasetList eDataset>
-    struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset,ParallelUtils::eNonParallel> :
+    struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset,lv::eNonParallel> :
             public IDataConsumer_<eDatasetEval_BinaryClassifier>,
             public DataReporter_<eDatasetEval_BinaryClassifier,eDataset> {
         //! overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
@@ -128,8 +128,8 @@ namespace litiv {
     };
 
     template<eDatasetList eDataset>
-    struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset,ParallelUtils::eGLSL> :
-            public IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>,
+    struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset,lv::eGLSL> :
+            public IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,lv::eGLSL>,
             public DataReporter_<eDatasetEval_BinaryClassifier,eDataset> {
         //! overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
         virtual IMetricsAccumulatorConstPtr getMetricsBase() const override {
@@ -152,14 +152,14 @@ namespace litiv {
         }
         //! overrides 'post_initialize_gl' from IAsyncDataConsumer_ to initialize an evaluation algo interface
         virtual void post_initialize_gl() override {
-            IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL>::post_initialize_gl();
+            IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,lv::eGLSL>::post_initialize_gl();
             if(getDatasetInfo()->isUsingEvaluator()) {
                 m_pEvalAlgo = std::make_shared<GLBinaryClassifierEvaluator>(m_pAlgo,getTotPackets());
                 m_pEvalAlgo->initialize_gl(m_oCurrGT,m_pLoader->getInputROI(m_nCurrIdx));
                 m_pMetricsBase = BinClassifMetricsAccumulator::create();
                 if(DATASETUTILS_VALIDATE_ASYNC_EVALUATORS) {
                     using namespace std::placeholders;
-                    m_lDataCallback = std::bind(&DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset,ParallelUtils::eGLSL>::validationCallback,this,_1,_2,_3,_4,_5,_6);
+                    m_lDataCallback = std::bind(&DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset,lv::eGLSL>::validationCallback,this,_1,_2,_3,_4,_5,_6);
                     m_pAlgo->setOutputFetching(true);
                 }
                 if(m_pAlgo->m_pDisplayHelper)
@@ -178,4 +178,4 @@ namespace litiv {
 
 #endif //HAVE_GLSL
 
-} //namespace litiv
+} // namespace lv

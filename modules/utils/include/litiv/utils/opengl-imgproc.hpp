@@ -28,6 +28,7 @@
 #define GLUTILS_IMGPROC_USE_PBO_UPDATE_REALLOC      1 // @@@@@ unused?
 
 // @@@@ switch all 'frames' for 'images'?
+// @@@@ rewrite all classes as part of lv::gl namespace?
 
 class GLImageProcAlgo {
 public:

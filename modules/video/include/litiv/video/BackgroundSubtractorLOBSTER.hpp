@@ -46,7 +46,7 @@
     G.-A. Bilodeau, "Improving Background Subtraction using Local Binary Similarity Patterns", in WACV 2014.
  */
 
-template<ParallelUtils::eParallelAlgoType eImpl>
+template<lv::eParallelAlgoType eImpl>
 struct IBackgroundSubtractorLOBSTER_ : public IBackgroundSubtractorLBSP_<eImpl> {
     IBackgroundSubtractorLOBSTER_(size_t nDescDistThreshold=BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD,
                                   size_t nColorDistThreshold=BGSLOBSTER_DEFAULT_COLOR_DIST_THRESHOLD,
@@ -67,21 +67,21 @@ protected:
     const size_t m_nRequiredBGSamples;
 };
 
-using IBackgroundSubtractorLOBSTER = IBackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>;
+using IBackgroundSubtractorLOBSTER = IBackgroundSubtractorLOBSTER_<lv::eNonParallel>;
 template<>
 IBackgroundSubtractorLOBSTER::IBackgroundSubtractorLOBSTER_(size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples, size_t nRequiredBGSamples, size_t nLBSPThresholdOffset, float fRelLBSPThreshold);
 #if HAVE_GLSL
-using IBackgroundSubtractorLOBSTER_GLSL = IBackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>;
+using IBackgroundSubtractorLOBSTER_GLSL = IBackgroundSubtractorLOBSTER_<lv::eGLSL>;
 template<>
 IBackgroundSubtractorLOBSTER_GLSL::IBackgroundSubtractorLOBSTER_(size_t nDescDistThreshold, size_t nColorDistThreshold, size_t nBGSamples, size_t nRequiredBGSamples, size_t nLBSPThresholdOffset, float fRelLBSPThreshold);
 #endif //HAVE_GLSL
 
-template<ParallelUtils::eParallelAlgoType eImpl>
+template<lv::eParallelAlgoType eImpl>
 struct BackgroundSubtractorLOBSTER_;
 
 #if HAVE_GLSL
 template<>
-struct BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL> : public IBackgroundSubtractorLOBSTER_GLSL {
+struct BackgroundSubtractorLOBSTER_<lv::eGLSL> : public IBackgroundSubtractorLOBSTER_GLSL {
     //! full constructor
     using IBackgroundSubtractorLOBSTER_GLSL::IBackgroundSubtractorLOBSTER_GLSL;
     //! refreshes all samples based on the last analyzed frame
@@ -111,7 +111,7 @@ protected:
     size_t m_nRowStepSize;
     size_t m_nBGModelSize;
     std::aligned_vector<uint,32> m_vnBGModelData;
-    std::aligned_vector<GLUtils::TMT32GenParams,32> m_voTMT32ModelData;
+    std::aligned_vector<lv::gl::TMT32GenParams,32> m_voTMT32ModelData;
     enum eLOBSTERStorageBufferBindingList {
         eLOBSTERStorageBuffer_BGModelBinding = GLImageProcAlgo::eStorageBufferDefaultBindingsCount,
         eLOBSTERStorageBuffer_TMT32ModelBinding,
@@ -119,19 +119,19 @@ protected:
     };
 };
 
-using BackgroundSubtractorLOBSTER_GLSL = BackgroundSubtractorLOBSTER_<ParallelUtils::eGLSL>;
+using BackgroundSubtractorLOBSTER_GLSL = BackgroundSubtractorLOBSTER_<lv::eGLSL>;
 #endif //HAVE_GLSL
 
 #if HAVE_CUDA
-// BackgroundSubtractorLOBSTER_<ParallelUtils::eCUDA> will not compile here, missing impl
+// BackgroundSubtractorLOBSTER_<lv::eCUDA> will not compile here, missing impl
 #endif //HAVE_CUDA
 
 #if HAVE_OPENCL
-// BackgroundSubtractorLOBSTER_<ParallelUtils::eOpenCL> will not compile here, missing impl
+// BackgroundSubtractorLOBSTER_<lv::eOpenCL> will not compile here, missing impl
 #endif //HAVE_OPENCL
 
 template<>
-struct BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel> : public IBackgroundSubtractorLOBSTER {
+struct BackgroundSubtractorLOBSTER_<lv::eNonParallel> : public IBackgroundSubtractorLOBSTER {
 public:
     //! full constructor
     using IBackgroundSubtractorLOBSTER::IBackgroundSubtractorLOBSTER;
@@ -153,4 +153,4 @@ protected:
     std::vector<cv::Mat> m_voBGDescSamples;
 };
 
-using BackgroundSubtractorLOBSTER = BackgroundSubtractorLOBSTER_<ParallelUtils::eNonParallel>;
+using BackgroundSubtractorLOBSTER = BackgroundSubtractorLOBSTER_<lv::eNonParallel>;

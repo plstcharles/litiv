@@ -34,7 +34,7 @@
 // as defined in the bsds500 evaluation script
 #define DATASETUTILS_IMAGEEDGDET_EVAL_THRESHOLD_BINS 99
 
-namespace litiv {
+namespace lv {
 
     enum eDatasetTaskList { // from the task type, we can derive the source and eval types
         eDatasetTask_ChgDet,
@@ -132,7 +132,7 @@ namespace litiv {
     using AsyncDataCallbackFunc = std::function<void(const cv::Mat& /*oInput*/,const cv::Mat& /*oDebug*/,const cv::Mat& /*oOutput*/,const cv::Mat& /*oGT*/,const cv::Mat& /*oROI*/,size_t /*nIdx*/)>;
 
     //! fully abstract dataset interface (dataset parser & evaluator implementations will derive from this)
-    struct IDataset : CxxUtils::enable_shared_from_this<IDataset> {
+    struct IDataset : lv::enable_shared_from_this<IDataset> {
         //! returns the dataset name
         virtual const std::string& getName() const = 0;
         //! returns the root data path
@@ -180,7 +180,7 @@ namespace litiv {
     };
 
     //! fully abstract data handler interface (work batch and work group implementations will derive from this)
-    struct IDataHandler : CxxUtils::enable_shared_from_this<IDataHandler> {
+    struct IDataHandler : lv::enable_shared_from_this<IDataHandler> {
         //! returns the work batch/group name
         virtual const std::string& getName() const = 0;
         //! returns the work batch/group data path
@@ -227,7 +227,7 @@ namespace litiv {
         //! work batch/group comparison function based on names
         template<typename Tp>
         static std::enable_if_t<std::is_base_of<IDataHandler,Tp>::value,bool> compare(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {
-            return PlatformUtils::compare_lowercase(i->getName(),j->getName());
+            return lv::compare_lowercase(i->getName(),j->getName());
         }
         //! work batch/group comparison function based on expected CPU load
         template<typename Tp>
@@ -256,7 +256,7 @@ namespace litiv {
         virtual void parseData() = 0;
         template<eDatasetEvalList eDatasetEval>
         friend struct IDatasetEvaluator_; // required for dataset evaluator interface to write eval reports
-        template<eDatasetTaskList eDatasetTask, eDatasetSourceList eDatasetSource, eDatasetList eDataset, eDatasetEvalList eDatasetEval, ParallelUtils::eParallelAlgoType eEvalImpl>
+        template<eDatasetTaskList eDatasetTask, eDatasetSourceList eDatasetSource, eDatasetList eDataset, eDatasetEvalList eDatasetEval, lv::eParallelAlgoType eEvalImpl>
         friend struct IDataset_; // required for data handler sorting and other top-level dataset utility functions
     };
 
@@ -443,7 +443,7 @@ namespace litiv {
     //! data producer interface specialization default constructor override for cleaner implementations
     template<eDatasetTaskList eDatasetTask, eDatasetSourceList eDatasetSource>
     struct DataProducer_c : public IDataProducer_<eDatasetSource> {
-        DataProducer_c() : IDataProducer_<eDatasetSource>(litiv::getOutputPacketType<eDatasetTask>(),litiv::getGTMappingType<eDatasetTask>(),litiv::getIOMappingType<eDatasetTask>()) {}
+        DataProducer_c() : IDataProducer_<eDatasetSource>(lv::getOutputPacketType<eDatasetTask>(),lv::getGTMappingType<eDatasetTask>(),lv::getIOMappingType<eDatasetTask>()) {}
     };
 
     //! default data producer interface specialization (will attempt to load data using predefined functions)
@@ -539,13 +539,13 @@ namespace litiv {
     };
 
     //! async data consumer interface for work batches for receiving processed packets & async context setup/init
-    template<eDatasetEvalList eDatasetEval, ParallelUtils::eParallelAlgoType eImpl>
+    template<eDatasetEvalList eDatasetEval, lv::eParallelAlgoType eImpl>
     struct IAsyncDataConsumer_;
 
 #if HAVE_GLSL
 
     template<>
-    struct IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,ParallelUtils::eGLSL> :
+    struct IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,lv::eGLSL> :
             public IDataArchiver,
             public DataCounter_<eNotGroup> {
         //! returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs, if available)
@@ -580,7 +580,7 @@ namespace litiv {
         virtual void post_apply_gl(size_t nNextIdx, bool bRebindAll);
         //! utility function for output/debug mask display (should be overloaded if also evaluating results)
         virtual void getColoredMasks(cv::Mat& oOutput, cv::Mat& oDebug, const cv::Mat& oGT=cv::Mat(), const cv::Mat& oROI=cv::Mat());
-        std::shared_ptr<ParallelUtils::IParallelAlgo_GLSL> m_pAlgo;
+        std::shared_ptr<lv::IParallelAlgo_GLSL> m_pAlgo;
         std::shared_ptr<GLImageProcEvaluatorAlgo> m_pEvalAlgo;
         std::shared_ptr<IDataLoader> m_pLoader;
         cv::Mat m_oLastInput,m_oCurrInput,m_oNextInput;
@@ -591,4 +591,4 @@ namespace litiv {
 
 #endif //HAVE_GLSL
 
-} //namespace litiv
+} // namespace lv

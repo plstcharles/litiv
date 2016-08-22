@@ -1,6 +1,6 @@
 
-// This file is part of the LITIV framework; visit the original repository at
-// https://github.com/plstcharles/litiv for more information.
+// This file is part of the lv framework; visit the original repository at
+// https://github.com/plstcharles/lv for more information.
 //
 // Copyright 2016 Pierre-Luc St-Charles; pierre-luc.st-charles<at>polymtl.ca
 //
@@ -31,7 +31,7 @@ void SafeRelease(T **ppT) {if(*ppT) {(*ppT)->Release();*ppT = nullptr;}}
 
 #include "litiv/3rdparty/DShowBase/ocvcompat.h"
 
-STDMETHODIMP litiv::initMatFromMediaType(const AM_MEDIA_TYPE* pmt, cv::Mat& oOutput, bool* pbVFlip) {
+STDMETHODIMP lv::initMatFromMediaType(const AM_MEDIA_TYPE* pmt, cv::Mat& oOutput, bool* pbVFlip) {
     if(!pmt)
         return E_POINTER;
     if(!pmt->bFixedSizeSamples)
@@ -73,7 +73,7 @@ STDMETHODIMP litiv::initMatFromMediaType(const AM_MEDIA_TYPE* pmt, cv::Mat& oOut
     return S_OK;
 }
 
-litiv::DShowFrameGrabber::DShowFrameGrabber(const CComPtr<ISampleGrabber>& pSG) {
+lv::DShowFrameGrabber::DShowFrameGrabber(const CComPtr<ISampleGrabber>& pSG) {
     AM_MEDIA_TYPE mt;
     assert(pSG!=nullptr && pSG->GetConnectedMediaType(&mt)==S_OK);
     initMatFromMediaType(&mt,m_oInternalSampleCopy);
@@ -85,11 +85,11 @@ litiv::DShowFrameGrabber::DShowFrameGrabber(const CComPtr<ISampleGrabber>& pSG) 
     m_nTotFramesProcessed = m_nCurrFramesProcessed = -1;
 }
 
-litiv::DShowFrameGrabber::~DShowFrameGrabber() {
+lv::DShowFrameGrabber::~DShowFrameGrabber() {
     m_pParent->SetCallback(NULL,0);
 }
 
-int64_t litiv::DShowFrameGrabber::GetLatestFrame(cv::Mat& oOutput, bool bVFlip) const {
+int64_t lv::DShowFrameGrabber::GetLatestFrame(cv::Mat& oOutput, bool bVFlip) const {
     std::lock_guard<std::mutex> oLock(m_oMutex);
     if(m_oInternalSampleCopy.empty())
         oOutput = cv::Mat();
@@ -108,13 +108,13 @@ int64_t litiv::DShowFrameGrabber::GetLatestFrame(cv::Mat& oOutput, bool bVFlip) 
     return m_nTotFramesProcessed;
 }
 
-void litiv::DShowFrameGrabber::SetFrameCallback(std::function<void(const cv::Mat&)> lCallback, bool bKeepInternalCopy) {
+void lv::DShowFrameGrabber::SetFrameCallback(std::function<void(const cv::Mat&)> lCallback, bool bKeepInternalCopy) {
     std::lock_guard<std::mutex> oLock(m_oMutex);
     m_bKeepInternalCopy = bKeepInternalCopy;
     m_lCallback = lCallback;
 }
 
-STDMETHODIMP litiv::DShowFrameGrabber::QueryInterface(REFIID riid, void** ppObj) {
+STDMETHODIMP lv::DShowFrameGrabber::QueryInterface(REFIID riid, void** ppObj) {
     if(ppObj==nullptr)
         return E_POINTER;
     else if(riid==IID_ISampleGrabberCB) {
@@ -124,7 +124,7 @@ STDMETHODIMP litiv::DShowFrameGrabber::QueryInterface(REFIID riid, void** ppObj)
     return E_NOINTERFACE;
 }
 
-STDMETHODIMP litiv::DShowFrameGrabber::SampleCB(double dSampleTime, IMediaSample* pSample) {
+STDMETHODIMP lv::DShowFrameGrabber::SampleCB(double dSampleTime, IMediaSample* pSample) {
     uchar* pBuffer;
     if(pSample->GetPointer(&pBuffer)==S_OK) {
         AM_MEDIA_TYPE* pmt = nullptr;
@@ -160,16 +160,16 @@ STDMETHODIMP litiv::DShowFrameGrabber::SampleCB(double dSampleTime, IMediaSample
     return S_OK;
 }
 
-litiv::DShowCameraGrabber::DShowCameraGrabber(const std::string& sVideoDeviceName, bool bDisplayOutput, HWND hwnd, UINT nMsgID) :
+lv::DShowCameraGrabber::DShowCameraGrabber(const std::string& sVideoDeviceName, bool bDisplayOutput, HWND hwnd, UINT nMsgID) :
         m_hwnd(hwnd), m_nMsgID(nMsgID), m_bDisplayOutput(bDisplayOutput), m_sVideoDeviceName(sVideoDeviceName) {
     Disconnect(); // init all ptrs to zero
 }
 
-litiv::DShowCameraGrabber::~DShowCameraGrabber() {
+lv::DShowCameraGrabber::~DShowCameraGrabber() {
     Disconnect();
 }
 
-STDMETHODIMP litiv::DShowCameraGrabber::HandleGraphEvent(GraphEventFN pfnOnGraphEvent) {
+STDMETHODIMP lv::DShowCameraGrabber::HandleGraphEvent(GraphEventFN pfnOnGraphEvent) {
     if(!m_pEvent)
         return E_UNEXPECTED;
     long evCode = 0;
@@ -184,7 +184,7 @@ STDMETHODIMP litiv::DShowCameraGrabber::HandleGraphEvent(GraphEventFN pfnOnGraph
     return hr;
 }
 
-STDMETHODIMP litiv::DShowCameraGrabber::Connect() {
+STDMETHODIMP lv::DShowCameraGrabber::Connect() {
     Disconnect();
     HRESULT hr;
     if(FAILED(hr=CoCreateInstance(CLSID_FilterGraph,NULL,CLSCTX_INPROC_SERVER,IID_PPV_ARGS(&m_pBuilder))))
@@ -224,7 +224,7 @@ STDMETHODIMP litiv::DShowCameraGrabber::Connect() {
         return hr;
     if(FAILED(hr=m_pCapBuilder->RenderStream(/*&PIN_CATEGORY_PREVIEW*/NULL,&MEDIATYPE_Video,m_pCam,m_pGrabber,m_pRenderer)))
         return hr;
-    m_pFrameGrabber = std::make_unique<litiv::DShowFrameGrabber>(pGrabberInterf);
+    m_pFrameGrabber = std::make_unique<lv::DShowFrameGrabber>(pGrabberInterf);
     CComQIPtr<IMediaFilter> pMedia = m_pBuilder;
     if(pMedia==NULL)
         return E_NOINTERFACE;
@@ -236,7 +236,7 @@ STDMETHODIMP litiv::DShowCameraGrabber::Connect() {
     return S_OK;
 }
 
-void litiv::DShowCameraGrabber::Disconnect() {
+void lv::DShowCameraGrabber::Disconnect() {
     m_bIsConnected = false;
     if(m_pControl)
         m_pControl->Stop();
@@ -270,7 +270,7 @@ void litiv::DShowCameraGrabber::Disconnect() {
     m_pBuilder = nullptr;
 }
 
-bool litiv::DShowCameraGrabber::SetFrameCallback(std::function<void(const cv::Mat&)> lCallback, bool bKeepInternalCopy) {
+bool lv::DShowCameraGrabber::SetFrameCallback(std::function<void(const cv::Mat&)> lCallback, bool bKeepInternalCopy) {
     if(m_bIsConnected)
         m_pFrameGrabber->SetFrameCallback(lCallback,bKeepInternalCopy);
     return m_bIsConnected;

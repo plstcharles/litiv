@@ -17,7 +17,7 @@
 
 #include "litiv/utils/platform.hpp"
 
-std::string PlatformUtils::GetCurrentWorkDirPath() {
+std::string lv::GetCurrentWorkDirPath() {
     static std::array<char,FILENAME_MAX> s_acCurrentPath = {};
 #if defined(_MSC_VER)
     if(!_getcwd(s_acCurrentPath.data(),int(s_acCurrentPath.size()-1)))
@@ -28,7 +28,7 @@ std::string PlatformUtils::GetCurrentWorkDirPath() {
     return std::string(s_acCurrentPath.data());
 }
 
-std::string PlatformUtils::AddDirSlashIfMissing(const std::string& sDirPath) {
+std::string lv::AddDirSlashIfMissing(const std::string& sDirPath) {
     if(sDirPath.empty())
         return std::string();
     if(sDirPath=="." || sDirPath=="..")
@@ -39,7 +39,7 @@ std::string PlatformUtils::AddDirSlashIfMissing(const std::string& sDirPath) {
     return sDirPath;
 }
 
-void PlatformUtils::GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths) {
+void lv::GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths) {
     vsFilePaths.clear();
 #if defined(_MSC_VER)
     WIN32_FIND_DATA ffd;
@@ -93,7 +93,7 @@ void PlatformUtils::GetFilesFromDir(const std::string& sDirPath, std::vector<std
 #endif //(!defined(_MSC_VER))
 }
 
-void PlatformUtils::GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths) {
+void lv::GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths) {
     vsSubDirPaths.clear();
 #if defined(_MSC_VER)
     WIN32_FIND_DATA ffd;
@@ -149,7 +149,7 @@ void PlatformUtils::GetSubDirsFromDir(const std::string& sDirPath, std::vector<s
 #endif //(!defined(_MSC_VER))
 }
 
-void PlatformUtils::FilterFilePaths(std::vector<std::string>& vsFilePaths, const std::vector<std::string>& vsRemoveTokens, const std::vector<std::string>& vsKeepTokens) {
+void lv::FilterFilePaths(std::vector<std::string>& vsFilePaths, const std::vector<std::string>& vsRemoveTokens, const std::vector<std::string>& vsKeepTokens) {
     // note: remove tokens take precedence over keep tokens, and no keep tokens means all are kept by default
     std::vector<std::string> vsResultFilePaths;
     vsResultFilePaths.reserve(vsFilePaths.size());
@@ -162,7 +162,7 @@ void PlatformUtils::FilterFilePaths(std::vector<std::string>& vsFilePaths, const
     vsFilePaths = vsResultFilePaths;
 }
 
-bool PlatformUtils::CreateDirIfNotExist(const std::string& sDirPath) {
+bool lv::CreateDirIfNotExist(const std::string& sDirPath) {
 #if defined(_MSC_VER)
     std::wstring dir(sDirPath.begin(),sDirPath.end());
     return CreateDirectory(dir.c_str(),NULL)!=ERROR_PATH_NOT_FOUND;
@@ -175,7 +175,7 @@ bool PlatformUtils::CreateDirIfNotExist(const std::string& sDirPath) {
 #endif //(!defined(_MSC_VER))
 }
 
-std::fstream PlatformUtils::CreateBinFileWithPrealloc(const std::string & sFilePath, size_t nPreallocBytes, bool bZeroInit) {
+std::fstream lv::CreateBinFileWithPrealloc(const std::string & sFilePath, size_t nPreallocBytes, bool bZeroInit) {
     std::fstream ssFile(sFilePath,std::ios::out|std::ios::in|std::ios::ate|std::ios::binary);
     if(!ssFile.is_open())
         ssFile.open(sFilePath,std::ios::out|std::ios::binary);
@@ -198,7 +198,7 @@ std::fstream PlatformUtils::CreateBinFileWithPrealloc(const std::string & sFileP
     return ssFile;
 }
 
-void PlatformUtils::RegisterAllConsoleSignals(void(*lHandler)(int)) {
+void lv::RegisterAllConsoleSignals(void(*lHandler)(int)) {
     signal(SIGINT,lHandler);
     signal(SIGTERM,lHandler);
 #ifdef SIGBREAK
@@ -206,7 +206,7 @@ void PlatformUtils::RegisterAllConsoleSignals(void(*lHandler)(int)) {
 #endif //def(SIGBREAK)
 }
 
-size_t PlatformUtils::GetCurrentPhysMemBytesUsed() {
+size_t lv::GetCurrentPhysMemBytesUsed() {
 #if defined(_MSC_VER)
     PROCESS_MEMORY_COUNTERS info;
     GetProcessMemoryInfo(GetCurrentProcess(),&info,sizeof(info));

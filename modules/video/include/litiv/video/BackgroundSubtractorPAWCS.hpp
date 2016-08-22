@@ -39,11 +39,11 @@
     For more details on the different parameters or on the algorithm itself, see P.-L. St-Charles et al.,
     "A Self-Adjusting Approach to Change Detection Based on Background Word Consensus", in WACV 2015.
  */
-template<ParallelUtils::eParallelAlgoType eImpl>
+template<lv::eParallelAlgoType eImpl>
 struct BackgroundSubtractorPAWCS_;
 
 template<>
-struct BackgroundSubtractorPAWCS_<ParallelUtils::eNonParallel> : public IBackgroundSubtractorLBSP {
+struct BackgroundSubtractorPAWCS_<lv::eNonParallel> : public IBackgroundSubtractorLBSP {
 public:
     //! full constructor
     BackgroundSubtractorPAWCS_(size_t nDescDistThresholdOffset=BGSPAWCS_DEFAULT_DESC_DIST_THRESHOLD_OFFSET,
@@ -173,4 +173,4 @@ protected:
     static float GetGlobalWordWeight(const GlobalWordBase& w);
 };
 
-using BackgroundSubtractorPAWCS = BackgroundSubtractorPAWCS_<ParallelUtils::eNonParallel>;
+using BackgroundSubtractorPAWCS = BackgroundSubtractorPAWCS_<lv::eNonParallel>;

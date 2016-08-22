@@ -12,6 +12,6 @@ namespace BSDS500 {
         double maxDist, double outlierCost,
         Matrix& match1, Matrix& match2);
 
-} //namespace BSDS500
+} // namespace BSDS500
 
 #endif // __match_hh__

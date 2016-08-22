@@ -17,25 +17,50 @@
 
 #pragma once
 
+// includes here really need cleanup @@@@ split between platform & cxx?
+
+#include <set>
+#include <map>
 #include <cmath>
 #include <mutex>
 #include <array>
+#include <queue>
+#include <deque>
+#include <string>
 #include <vector>
 #include <thread>
 #include <chrono>
 #include <atomic>
 #include <future>
 #include <memory>
-#include <numeric>
-#include <iomanip>
+#include <inttypes.h>
+#include <csignal>
+#include <stdexcept>
 #include <iostream>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <cstdlib>
+#include <cassert>
+#include <ctime>
+#include <numeric>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <exception>
+#include <unordered_map>
+#include <unordered_set>
+#include <algorithm>
 #include <functional>
 #include <type_traits>
 #include <condition_variable>
 #include <opencv2/core.hpp>
 #include "litiv/utils/defines.hpp"
 
-namespace CxxUtils {
+// @@@ cleanup, move impls down as inline?
+
+namespace lv {
 
     template<int> struct _; // used for compile-time integer expr printing via error; just write "_<expr> __;"
 
@@ -64,6 +89,180 @@ namespace CxxUtils {
         f(n-1);
     }
 
+    inline bool compare_lowercase(const std::string& i, const std::string& j) {
+        std::string i_lower(i), j_lower(j);
+        std::transform(i_lower.begin(),i_lower.end(),i_lower.begin(),tolower);
+        std::transform(j_lower.begin(),j_lower.end(),j_lower.begin(),tolower);
+        return i_lower<j_lower;
+    }
+
+    template<typename T>
+    inline int digit_count(T number) {
+        // counts sign as extra digit if negative
+        int digits = number<0?1:0;
+        while(std::abs(number)>=1) {
+            number /= 10;
+            digits++;
+        }
+        return digits;
+    }
+
+    inline bool string_contains_token(const std::string& s, const std::vector<std::string>& tokens) {
+        for(size_t i=0; i<tokens.size(); ++i)
+            if(s.find(tokens[i])!=std::string::npos)
+                return true;
+        return false;
+    }
+
+    template<typename T>
+    inline std::vector<size_t> sort_indices(const std::vector<T>& voVals) {
+        std::vector<size_t> vnIndices(voVals.size());
+        std::iota(vnIndices.begin(),vnIndices.end(),0);
+        std::sort(vnIndices.begin(),vnIndices.end(),[&voVals](size_t n1, size_t n2) {
+            return voVals[n1]<voVals[n2];
+        });
+        return vnIndices;
+    }
+
+    template<typename T, typename P>
+    inline std::vector<size_t> sort_indices(const std::vector<T>& voVals, P oSortFunctor) {
+        std::vector<size_t> vnIndices(voVals.size());
+        std::iota(vnIndices.begin(),vnIndices.end(),0);
+        std::sort(vnIndices.begin(),vnIndices.end(),oSortFunctor);
+        return vnIndices;
+    }
+
+    template<typename T>
+    inline std::vector<size_t> unique_indices(const std::vector<T>& voVals) {
+        std::vector<size_t> vnIndices = sort_indices(voVals);
+        auto pLastIdxIter = std::unique(vnIndices.begin(),vnIndices.end(),[&voVals](size_t n1, size_t n2) {
+            return voVals[n1]==voVals[n2];
+        });
+        return std::vector<size_t>(vnIndices.begin(),pLastIdxIter);
+    }
+
+    template<typename T, typename P1, typename P2>
+    inline std::vector<size_t> unique_indices(const std::vector<T>& voVals, P1 oSortFunctor, P2 oCompareFunctor) {
+        std::vector<size_t> vnIndices = sort_indices(voVals,oSortFunctor);
+        auto pLastIdxIter = std::unique(vnIndices.begin(),vnIndices.end(),oCompareFunctor);
+        return std::vector<size_t>(vnIndices.begin(),pLastIdxIter);
+    }
+
+    template<typename Titer>
+    inline std::vector<typename std::iterator_traits<Titer>::value_type> unique(Titer begin, Titer end) {
+        const std::set<typename std::iterator_traits<Titer>::value_type> mMap(begin,end);
+        return std::vector<typename std::iterator_traits<Titer>::value_type>(mMap.begin(),mMap.end());
+    }
+
+    template<typename T>
+    inline std::vector<T> unique(const cv::Mat_<T>& oMat) {
+        const std::set<T> mMap(oMat.begin(),oMat.end());
+        return std::vector<T>(mMap.begin(),mMap.end());
+    }
+
+    template<typename Tval, typename Tcomp>
+    size_t find_nn_index(Tval oReqVal, const std::vector<Tval>& voRefVals, const Tcomp& lCompFunc) {
+        decltype(lCompFunc(oReqVal,oReqVal)) oMinDist = std::numeric_limits<decltype(lCompFunc(oReqVal,oReqVal))>::max();
+        size_t nIdx = size_t(-1);
+        for(size_t n=0; n<voRefVals.size(); ++n) {
+            auto oCurrDist = lCompFunc(oReqVal,voRefVals[n]);
+            if(nIdx==size_t(-1) || oCurrDist<oMinDist) {
+                oMinDist = oCurrDist;
+                nIdx = n;
+            }
+        }
+        return nIdx;
+    }
+
+    template<typename Tx, typename Ty>
+    std::vector<Ty> interp1(const std::vector<Tx>& vX, const std::vector<Ty>& vY, const std::vector<Tx>& vXReq) {
+        // assumes that all vectors are sorted
+        CV_Assert(vX.size()==vY.size());
+        CV_Assert(vX.size()>1);
+        std::vector<Tx> vDX;
+        vDX.reserve(vX.size());
+        std::vector<Ty> vDY, vSlope, vIntercept;
+        vDY.reserve(vX.size());
+        vSlope.reserve(vX.size());
+        vIntercept.reserve(vX.size());
+        for(size_t i=0; i<vX.size(); ++i) {
+            if(i<vX.size()-1) {
+                vDX.push_back(vX[i+1]-vX[i]);
+                vDY.push_back(vY[i+1]-vY[i]);
+                vSlope.push_back(Ty(vDY[i]/vDX[i]));
+                vIntercept.push_back(vY[i]-Ty(vX[i]*vSlope[i]));
+            }
+            else {
+                vDX.push_back(vDX[i-1]);
+                vDY.push_back(vDY[i-1]);
+                vSlope.push_back(vSlope[i-1]);
+                vIntercept.push_back(vIntercept[i-1]);
+            }
+        }
+        std::vector<Ty> vYReq;
+        vYReq.reserve(vXReq.size());
+        for(size_t i=0; i<vXReq.size(); ++i) {
+            if(vXReq[i]>=vX.front() && vXReq[i]<=vX.back()) {
+                size_t nNNIdx = lv::find_nn_index(vXReq[i],vX,[](const Tx& a,const Tx& b){return std::abs(b-a);});
+                vYReq.push_back(vSlope[nNNIdx]*vXReq[i]+vIntercept[nNNIdx]);
+            }
+        }
+        return vYReq;
+    }
+
+    template<typename T>
+    inline std::enable_if_t<std::is_integral<T>::value,std::vector<T>> linspace(T a, T b, size_t steps, bool bIncludeInitVal=true) {
+        if(steps==0)
+            return std::vector<T>();
+        else if(steps==1)
+            return std::vector<T>(1,b);
+        std::vector<T> vnResult(steps);
+        const double dStep = double(b-a)/(steps-int(bIncludeInitVal));
+        if(bIncludeInitVal)
+            for(size_t nStepIter = 0; nStepIter<steps; ++nStepIter)
+                vnResult[nStepIter] = a+T(dStep*nStepIter);
+        else
+            for(size_t nStepIter = 1; nStepIter<=steps; ++nStepIter)
+                vnResult[nStepIter-1] = a+T(dStep*nStepIter);
+        return vnResult;
+    }
+
+    template<typename T>
+    inline std::enable_if_t<std::is_floating_point<T>::value,std::vector<T>> linspace(T a, T b, size_t steps, bool bIncludeInitVal=true) {
+        if(steps==0)
+            return std::vector<T>();
+        else if(steps==1)
+            return std::vector<T>(1,b);
+        std::vector<T> vfResult(steps);
+        const T fStep = (b-a)/(steps-int(bIncludeInitVal));
+        if(bIncludeInitVal)
+            for(size_t nStepIter = 0; nStepIter<steps; ++nStepIter)
+                vfResult[nStepIter] = a+fStep*T(nStepIter);
+        else
+            for(size_t nStepIter = 1; nStepIter<=steps; ++nStepIter)
+                vfResult[nStepIter] = a+fStep*T(nStepIter);
+        return vfResult;
+    }
+
+    template<size_t nWorkers>
+    struct WorkerPool {
+        static_assert(nWorkers>0,"Worker pool must have at least one work thread");
+        WorkerPool();
+        ~WorkerPool();
+        template<typename Tfunc, typename... Targs>
+        std::future<std::result_of_t<Tfunc(Targs...)>> queueTask(Tfunc&& lTaskEntryPoint, Targs&&... args);
+    protected:
+        std::queue<std::function<void()>> m_qTasks;
+        std::vector<std::thread> m_vhWorkers;
+        std::mutex m_oSyncMutex;
+        std::condition_variable m_oSyncVar;
+        std::atomic_bool m_bIsActive;
+    private:
+        void entry();
+        WorkerPool(const WorkerPool&) = delete;
+        WorkerPool& operator=(const WorkerPool&) = delete;
+    };
+
     template<size_t nWordBitSize, typename Tr>
     constexpr inline std::enable_if_t<nWordBitSize==1,Tr> expand_bits(const Tr& nBits, int=0) {
         return nBits;
@@ -75,62 +274,6 @@ namespace CxxUtils {
         // only the first [(sizeof(Tr)*8)/nWordBitSize] bits are kept (otherwise overflow/ignored)
         return (Tr)(bool(nBits&(1<<n))<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,Tr>(nBits,n-1):(Tr)0);
     }
-
-    template<typename T, std::size_t nByteAlign>
-    class AlignAllocator {
-    public:
-        typedef T value_type;
-        typedef T* pointer;
-        typedef T& reference;
-        typedef const T* const_pointer;
-        typedef const T& const_reference;
-        typedef std::size_t size_type;
-        typedef std::ptrdiff_t difference_type;
-        typedef std::true_type propagate_on_container_move_assignment;
-        template<typename T2> struct rebind {typedef AlignAllocator<T2,nByteAlign> other;};
-    public:
-        inline AlignAllocator() noexcept {}
-        template<typename T2> inline AlignAllocator(const AlignAllocator<T2,nByteAlign>&) noexcept {}
-        inline ~AlignAllocator() throw() {}
-        inline pointer address(reference r) {return std::addressof(r);}
-        inline const_pointer address(const_reference r) const noexcept {return std::addressof(r);}
-#ifdef _MSC_VER
-        inline pointer allocate(size_type n) {
-            const size_type alignment = static_cast<size_type>(nByteAlign);
-            size_t alloc_size = n*sizeof(value_type);
-            if((alloc_size%alignment)!=0) {
-                alloc_size += alignment - alloc_size%alignment;
-                CV_DbgAssert((alloc_size%alignment)==0);
-            }
-            void* ptr = _aligned_malloc(alloc_size,nByteAlign);
-            if(ptr==nullptr)
-                throw std::bad_alloc();
-            return reinterpret_cast<pointer>(ptr);
-        }
-        inline void deallocate(pointer p, size_type) noexcept {_aligned_free(p);}
-        inline void destroy(pointer p) {p->~value_type();p;}
-#else //(!def(_MSC_VER))
-        inline pointer allocate(size_type n) {
-            const size_type alignment = static_cast<size_type>(nByteAlign);
-            size_t alloc_size = n*sizeof(value_type);
-            if((alloc_size%alignment)!=0) {
-                alloc_size += alignment - alloc_size%alignment;
-                CV_DbgAssert((alloc_size%alignment)==0);
-            }
-            void* ptr = aligned_alloc(alignment,alloc_size);
-            if(ptr==nullptr)
-                throw std::bad_alloc();
-            return reinterpret_cast<pointer>(ptr);
-        }
-        inline void deallocate(pointer p, size_type) noexcept {free(p);}
-        inline void destroy(pointer p) {p->~value_type();}
-#endif //(!def(_MSC_VER))
-        template<typename T2, typename... Targs> inline void construct(T2* p, Targs&&... args) {::new(reinterpret_cast<void*>(p)) T2(std::forward<Targs>(args)...);}
-        inline void construct(pointer p, const value_type& wert) {new(p) value_type(wert);}
-        inline size_type max_size() const noexcept {return (size_type(~0)-size_type(nByteAlign))/sizeof(value_type);}
-        bool operator!=(const AlignAllocator<T,nByteAlign>& other) const {return !(*this==other);}
-        bool operator==(const AlignAllocator<T,nByteAlign>& other) const {return true;}
-    };
 
     template<int... anIndices>
     struct MetaIdxConcat {};
@@ -165,15 +308,6 @@ namespace CxxUtils {
         const int m_nLineNumber;
     };
 
-    template<typename T>
-    inline bool isnan(T dVal) {
-#ifdef _MSC_VER // needed for portability...
-        return _isnan((double)dVal)!=0;
-#else //(!def(_MSC_VER))
-        return std::isnan(dVal);
-#endif //(!def(_MSC_VER))
-    }
-
     struct StopWatch {
         StopWatch() {tick();}
         inline void tick() {m_nTick = std::chrono::high_resolution_clock::now();}
@@ -200,7 +334,7 @@ namespace CxxUtils {
     }
 
     inline std::string getLogStamp() {
-        return std::string("\n")+CxxUtils::getVersionStamp()+"\n["+CxxUtils::getTimeStamp()+"]\n";
+        return std::string("\n")+lv::getVersionStamp()+"\n["+lv::getTimeStamp()+"]\n";
     }
 
     inline std::string clampString(const std::string& sInput, size_t nSize, char cPadding=' ') {
@@ -352,30 +486,58 @@ namespace CxxUtils {
         size_t m_nCount;
     };
 
-} //namespace CxxUtils
+} // namespace lv
 
 namespace std { // extending std
 
-    template<typename T, size_t N>
-    using aligned_vector = vector<T,CxxUtils::AlignAllocator<T,N>>;
     template<typename T>
-    using unlock_guard = CxxUtils::unlock_guard<T>;
-    using semaphore = CxxUtils::Semaphore;
+    using unlock_guard = lv::unlock_guard<T>;
+    using semaphore = lv::Semaphore;
     using mutex_lock_guard = lock_guard<mutex>;
     using mutex_unique_lock = unique_lock<mutex>;
 
-#if !defined(_MSC_VER) && __cplusplus<=201103L // make_unique is missing from C++11 (at least on GCC)
-    template<typename T, typename... Targs>
-    inline std::enable_if_t<!std::is_array<T>::value,std::unique_ptr<T>> make_unique(Targs&&... args) {
-        return std::unique_ptr<T>(new T(std::forward<Targs>(args)...));
-    }
-    template<typename T>
-    inline std::enable_if_t<(std::is_array<T>::value && !std::extent<T>::value),std::unique_ptr<T>> make_unique(size_t nSize) {
-        using ElemType = std::remove_extent_t<T>;
-        return std::unique_ptr<T>(new ElemType[nSize]());
-    }
-    template<typename T, typename... Targs>
-    std::enable_if_t<(std::extent<T>::value!=0)> make_unique(Targs&&...) = delete;
-#endif //(!defined(_MSC_VER) && __cplusplus<=201103L)
+} // namespace std
 
-} //namespace std
+template<size_t nWorkers>
+lv::WorkerPool<nWorkers>::WorkerPool() : m_bIsActive(true) {
+    lv::unroll<nWorkers>([this](size_t){m_vhWorkers.emplace_back(std::bind(&WorkerPool::entry,this));});
+}
+
+template<size_t nWorkers>
+lv::WorkerPool<nWorkers>::~WorkerPool() {
+    m_bIsActive = false;
+    m_oSyncVar.notify_all();
+    for(std::thread& oWorker : m_vhWorkers)
+        oWorker.join();
+}
+
+template<size_t nWorkers>
+template<typename Tfunc, typename... Targs>
+std::future<std::result_of_t<Tfunc(Targs...)>> lv::WorkerPool<nWorkers>::queueTask(Tfunc&& lTaskEntryPoint, Targs&&... args) {
+    using task_return_t = std::result_of_t<Tfunc(Targs...)>;
+    using task_t = std::packaged_task<task_return_t()>;
+    // http://stackoverflow.com/questions/28179817/how-can-i-store-generic-packaged-tasks-in-a-container
+    std::shared_ptr<task_t> pSharableTask = std::make_shared<task_t>(std::bind(std::forward<Tfunc>(lTaskEntryPoint),std::forward<Targs>(args)...));
+    std::future<task_return_t> oTaskRes = pSharableTask->get_future();
+    {
+        std::mutex_lock_guard sync_lock(m_oSyncMutex);
+        m_qTasks.emplace([pSharableTask](){(*pSharableTask)();}); // lambda keeps a copy of the task in the queue
+    }
+    m_oSyncVar.notify_one();
+    return oTaskRes;
+}
+
+template<size_t nWorkers>
+void lv::WorkerPool<nWorkers>::entry() {
+    std::mutex_unique_lock sync_lock(m_oSyncMutex);
+    while(m_bIsActive || !m_qTasks.empty()) {
+        if(m_qTasks.empty())
+            m_oSyncVar.wait(sync_lock);
+        if(!m_qTasks.empty()) {
+            std::function<void()> task = std::move(m_qTasks.front());
+            m_qTasks.pop();
+            std::unlock_guard<std::mutex_unique_lock> oUnlock(sync_lock);
+            task();
+        }
+    }
+}

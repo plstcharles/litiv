@@ -54,22 +54,22 @@ GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t 
     glAssert(m_nLevels>0 && GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT>1 && m_nComputeStages>0);
     if(m_bUsingTexArrays && !glGetTextureSubImage && (m_bUsingDebugPBOs || m_bUsingOutputPBOs))
         glError("missing impl for texture arrays pbo fetch when glGetTextureSubImage is not available");
-    const std::array<int,3> anMaxWorkGroupSize = GLUtils::getIntegerVal<3>(GL_MAX_COMPUTE_WORK_GROUP_SIZE);
+    const std::array<int,3> anMaxWorkGroupSize = lv::gl::getIntegerVal<3>(GL_MAX_COMPUTE_WORK_GROUP_SIZE);
     if(anMaxWorkGroupSize[0]<(int)m_vDefaultWorkGroupSize.x || anMaxWorkGroupSize[1]<(int)m_vDefaultWorkGroupSize.y)
         glErrorExt("workgroup size limit is too small for the current impl (curr=[%d,%d], req=[%d,%d])",anMaxWorkGroupSize[0],anMaxWorkGroupSize[1],(int)m_vDefaultWorkGroupSize.x,(int)m_vDefaultWorkGroupSize.y);
     const size_t nCurrComputeStageInvocs = m_vDefaultWorkGroupSize.x*m_vDefaultWorkGroupSize.y;
     glAssert(nCurrComputeStageInvocs>0);
-    if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS)<nCurrComputeStageInvocs)
-        glErrorExt("compute invoc limit is too small for the current impl (curr=%lu, req=%lu)",(size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS),nCurrComputeStageInvocs);
-    if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_IMAGE_UNITS)<m_nImages || (size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_IMAGE_UNIFORMS)<m_nImages)
+    if((size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS)<nCurrComputeStageInvocs)
+        glErrorExt("compute invoc limit is too small for the current impl (curr=%lu, req=%lu)",(size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS),nCurrComputeStageInvocs);
+    if((size_t)lv::gl::getIntegerVal<1>(GL_MAX_IMAGE_UNITS)<m_nImages || (size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_IMAGE_UNIFORMS)<m_nImages)
         glError("image units limit is too small for the current impl");
-    if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_TEXTURE_UNITS)<m_nTextures)
+    if((size_t)lv::gl::getIntegerVal<1>(GL_MAX_TEXTURE_UNITS)<m_nTextures)
         glError("texture units limit is too small for the current impl");
-    if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS)<m_nSSBOs)
+    if((size_t)lv::gl::getIntegerVal<1>(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS)<m_nSSBOs)
         glError("ssbo bindings limit is too small for the current impl");
-    if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS)<m_nSSBOs)
+    if((size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS)<m_nSSBOs)
         glError("ssbo blocks limit is too small for the current impl");
-    if((size_t)GLUtils::getIntegerVal<1>(GL_MAX_ATOMIC_COUNTER_BUFFER_BINDINGS)<m_nACBOs)
+    if((size_t)lv::gl::getIntegerVal<1>(GL_MAX_ATOMIC_COUNTER_BUFFER_BINDINGS)<m_nACBOs)
         glError("atomic bo bindings limit is too small for the current impl");
     if(m_bUsingTimers)
         glGenQueries((GLsizei)m_nGLTimers.size(),m_nGLTimers.data());
@@ -108,7 +108,7 @@ void GLImageProcAlgo::initialize_gl(const cv::Mat& oInitInput, const cv::Mat& oR
         m_nInputType = oInitInput.type();
     }
     m_oFrameSize = oROI.size();
-    const std::array<int,3> anMaxWorkGroupCount = GLUtils::getIntegerVal<3>(GL_MAX_COMPUTE_WORK_GROUP_COUNT);
+    const std::array<int,3> anMaxWorkGroupCount = lv::gl::getIntegerVal<3>(GL_MAX_COMPUTE_WORK_GROUP_COUNT);
     if(anMaxWorkGroupCount[0]<(int)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x) || anMaxWorkGroupCount[1]<(int)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y))
         glError("workgroup count dispatch limit is too small for the current impl");
     for(size_t nPBOIter=0; nPBOIter<2; ++nPBOIter) {
@@ -446,7 +446,7 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
     if(m_bUsingTexArrays) {
         if(nInputType>=0) { ssSrc <<
              "    if(texCoord2DArrayIdx==0) {\n";
-            if(GLUtils::getChannelsFromMatType(nInputType)==1) ssSrc <<
+            if(lv::gl::getChannelsFromMatType(nInputType)==1) ssSrc <<
              "        out_color = vec4(textureGrad(texArrayInput,vec3(texCoord3D.xy,nCurrLayerIdx),texCoord2D_dPdx,texCoord2D_dPdy).xxx," << (m_bUsingIntegralFormat?"255":"1") << ");\n";
             else ssSrc <<
              "        out_color = textureGrad(texArrayInput,vec3(texCoord3D.xy,nCurrLayerIdx),texCoord2D_dPdx,texCoord2D_dPdy);\n";
@@ -455,7 +455,7 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
         }
         if(nDebugType>=0) { ssSrc <<
              "    " << (nInputType>=0?"else if":"if") << "(texCoord2DArrayIdx==" << int(nInputType>=0) << ") {\n";
-            if(GLUtils::getChannelsFromMatType(nDebugType)==1) ssSrc <<
+            if(lv::gl::getChannelsFromMatType(nDebugType)==1) ssSrc <<
              "        out_color = vec4(textureGrad(texArrayDebug,vec3(texCoord3D.xy,nCurrLayerIdx),texCoord2D_dPdx,texCoord2D_dPdy).xxx," << (m_bUsingIntegralFormat?"255":"1") << ");\n";
             else ssSrc <<
              "        out_color = textureGrad(texArrayDebug,vec3(texCoord3D.xy,nCurrLayerIdx),texCoord2D_dPdx,texCoord2D_dPdy);\n";
@@ -464,7 +464,7 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
         }
         if(nOutputType>=0) { ssSrc <<
              "    " << ((nInputType>=0||nDebugType>=0)?"else if":"if") << "(texCoord2DArrayIdx==" << int(nInputType>=0)+int(nDebugType>=0) << ") {\n";
-            if(GLUtils::getChannelsFromMatType(nOutputType)==1) ssSrc <<
+            if(lv::gl::getChannelsFromMatType(nOutputType)==1) ssSrc <<
              "        out_color = vec4(textureGrad(texArrayOutput,vec3(texCoord3D.xy,nCurrLayerIdx),texCoord2D_dPdx,texCoord2D_dPdy).xxx," << (m_bUsingIntegralFormat?"255":"1") << ");\n";
             else ssSrc <<
              "        out_color = textureGrad(texArrayOutput,vec3(texCoord3D.xy,nCurrLayerIdx),texCoord2D_dPdx,texCoord2D_dPdy);\n";
@@ -481,7 +481,7 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
              "    if(texCoord2DArrayIdx==0) {\n";
             for(size_t nLayerIter=0; nLayerIter<GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT; ++nLayerIter) { ssSrc <<
              "        " << ((nLayerIter>0)?"else if":"if") << "(nCurrLayerIdx==" << nLayerIter << ") {\n";
-                if(GLUtils::getChannelsFromMatType(nInputType)==1) ssSrc <<
+                if(lv::gl::getChannelsFromMatType(nInputType)==1) ssSrc <<
              "            out_color = vec4(textureGrad(texInput" << nLayerIter << ",texCoord3D.xy,texCoord2D_dPdx,texCoord2D_dPdy).xxx," << (m_bUsingIntegralFormat?"255":"1") << ");\n";
                 else ssSrc <<
              "            out_color = textureGrad(texInput" << nLayerIter << ",texCoord3D.xy,texCoord2D_dPdx,texCoord2D_dPdy);\n";
@@ -498,7 +498,7 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
              "    " << (nInputType>=0?"else if":"if") << "(texCoord2DArrayIdx==" << int(nInputType>=0) << ") {\n";
             for(size_t nLayerIter=0; nLayerIter<GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT; ++nLayerIter) { ssSrc <<
              "        " << ((nLayerIter>0)?"else if":"if") << "(nCurrLayerIdx==" << nLayerIter << ") {\n";
-                if(GLUtils::getChannelsFromMatType(nDebugType)==1) ssSrc <<
+                if(lv::gl::getChannelsFromMatType(nDebugType)==1) ssSrc <<
              "            out_color = vec4(textureGrad(texDebug" << nLayerIter << ",texCoord3D.xy,texCoord2D_dPdx,texCoord2D_dPdy).xxx," << (m_bUsingIntegralFormat?"255":"1") << ");\n";
                 else ssSrc <<
              "            out_color = textureGrad(texDebug" << nLayerIter << ",texCoord3D.xy,texCoord2D_dPdx,texCoord2D_dPdy);\n";
@@ -515,7 +515,7 @@ std::string GLImageProcAlgo::getFragmentShaderSource_internal(int nOutputType, i
              "    " << ((nInputType>=0||nDebugType>=0)?"else if":"if") << "(texCoord2DArrayIdx==" << int(nInputType>=0)+int(nDebugType>=0) << ") {\n";
             for(size_t nLayerIter=0; nLayerIter<GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT; ++nLayerIter) { ssSrc <<
              "        " << ((nLayerIter>0)?"else if":"if") << "(nCurrLayerIdx==" << nLayerIter << ") {\n";
-                if(GLUtils::getChannelsFromMatType(nOutputType)==1) ssSrc <<
+                if(lv::gl::getChannelsFromMatType(nOutputType)==1) ssSrc <<
              "            out_color = vec4(textureGrad(texOutput" << nLayerIter << ",texCoord3D.xy,texCoord2D_dPdx,texCoord2D_dPdy).xxx," << (m_bUsingIntegralFormat?"255":"1") << ");\n";
                 else ssSrc <<
              "            out_color = textureGrad(texOutput" << nLayerIter << ",texCoord3D.xy,texCoord2D_dPdx,texCoord2D_dPdy);\n";
@@ -548,7 +548,7 @@ GLImageProcEvaluatorAlgo::GLImageProcEvaluatorAlgo( const std::shared_ptr<GLImag
         m_nTotFrameCount(nTotFrameCount),
         m_nEvalBufferFrameSize(nCountersPerFrame*4),
         m_nEvalBufferTotSize(nTotFrameCount*nCountersPerFrame*4),
-        m_nEvalBufferMaxSize((size_t)GLUtils::getIntegerVal<1>(GL_MAX_ATOMIC_COUNTER_BUFFER_SIZE)),
+        m_nEvalBufferMaxSize((size_t)lv::gl::getIntegerVal<1>(GL_MAX_ATOMIC_COUNTER_BUFFER_SIZE)),
         m_nCurrEvalBufferSize(m_nEvalBufferTotSize),
         m_nCurrEvalBufferOffsetPtr(0),
         m_nCurrEvalBufferOffsetBlock(0),
@@ -792,7 +792,7 @@ GLImagePassThroughAlgo::GLImagePassThroughAlgo(int nFrameType, bool bUseDisplay,
 
 std::string GLImagePassThroughAlgo::getComputeShaderSource(size_t nStage) const {
     glAssert(nStage<m_nComputeStages);
-    return GLShader::getComputeShaderSource_PassThrough_ImgLoadCopy(m_vDefaultWorkGroupSize,GLUtils::getInternalFormatFromMatType(m_nOutputType,m_bUsingIntegralFormat),GLImageProcAlgo::eImage_InputBinding,GLImageProcAlgo::eImage_OutputBinding,m_bUsingIntegralFormat);
+    return GLShader::getComputeShaderSource_PassThrough_ImgLoadCopy(m_vDefaultWorkGroupSize,lv::gl::getInternalFormatFromMatType(m_nOutputType,m_bUsingIntegralFormat),GLImageProcAlgo::eImage_InputBinding,GLImageProcAlgo::eImage_OutputBinding,m_bUsingIntegralFormat);
 }
 
 /* @@@@ CLEANUP REQUIRED, NEED TO RE-VALIDATE WITH NEW PROJ STRUCTURE

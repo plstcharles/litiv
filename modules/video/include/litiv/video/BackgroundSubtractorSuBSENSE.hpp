@@ -42,11 +42,11 @@
     "Flexible Background Subtraction With Self-Balanced Local Sensitivity", in CVPRW 2014, or "SuBSENSE: A Universal
     Change Detection Method With Local Adaptive Sensitivity", in IEEE Trans. Image Processing vol.24 no.1, 2015.
  */
-template<ParallelUtils::eParallelAlgoType eImpl>
+template<lv::eParallelAlgoType eImpl>
 struct BackgroundSubtractorSuBSENSE_;
 
 template<>
-struct BackgroundSubtractorSuBSENSE_<ParallelUtils::eNonParallel> : public IBackgroundSubtractorLBSP {
+struct BackgroundSubtractorSuBSENSE_<lv::eNonParallel> : public IBackgroundSubtractorLBSP {
 public:
     //! full constructor
     BackgroundSubtractorSuBSENSE_(size_t nDescDistThresholdOffset=BGSSUBSENSE_DEFAULT_DESC_DIST_THRESHOLD_OFFSET,
@@ -132,4 +132,4 @@ protected:
     cv::Mat m_oMorphExStructElement;
 };
 
-using BackgroundSubtractorSuBSENSE = BackgroundSubtractorSuBSENSE_<ParallelUtils::eNonParallel>;
+using BackgroundSubtractorSuBSENSE = BackgroundSubtractorSuBSENSE_<lv::eNonParallel>;

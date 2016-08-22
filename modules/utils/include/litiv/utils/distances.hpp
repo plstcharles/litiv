@@ -17,11 +17,11 @@
 
 #pragma once
 
-#include "litiv/utils/parallel.hpp"
 #include <opencv2/core/types_c.h>
+#include "litiv/utils/parallel.hpp"
 #include "litiv/utils/defines.hpp"
 
-namespace DistanceUtils {
+namespace lv {
 
     //! computes the L1 distance between two integer values
     template<typename T>
@@ -591,4 +591,4 @@ namespace DistanceUtils {
 
 #endif //HAVE_GLSL
 
-} //namespace DistanceUtils
+} // namespace lv

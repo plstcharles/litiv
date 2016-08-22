@@ -21,7 +21,7 @@
 #include "litiv/utils/cxx.hpp"
 
 /**
- * ConsoleUtils.h (litiv version inspired from rlutil.h)
+ *        console.hpp (litiv version inspired from rlutil.h)
  *
  *            rlutil.h: Copyright (C) 2010 Tapio Vierros
  *  -- see https://github.com/tapio/rlutil for more information --
@@ -473,9 +473,9 @@ namespace rlutil {
         getch();
     }
 
-} //namespace rlutil
+} // namespace rlutil
 
-namespace litiv {
+namespace lv {
 
 #if defined(_MSC_VER)
     //! sets the console window to a certain size (with optional buffer resizing)
@@ -557,4 +557,4 @@ namespace litiv {
         fflush(stdout);
     }
 
-} //namespace litiv
+} // namespace lv

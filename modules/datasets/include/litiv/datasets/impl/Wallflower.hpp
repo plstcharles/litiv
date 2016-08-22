@@ -22,7 +22,7 @@
 #error "This file should never be included directly; use litiv/datasets.hpp instead"
 #endif //__LITIV_DATASETS_IMPL_H
 
-template<eDatasetTaskList eDatasetTask, ParallelUtils::eParallelAlgoType eEvalImpl>
+template<eDatasetTaskList eDatasetTask, lv::eParallelAlgoType eEvalImpl>
 struct Dataset_<eDatasetTask,eDataset_Wallflower,eEvalImpl> :
         public IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_Wallflower,getDatasetEval<eDatasetTask,eDataset_Wallflower>(),eEvalImpl> {
     static_assert(eDatasetTask!=eDatasetTask_Registr,"Wallflower dataset does not support image registration (no image arrays)");
@@ -36,8 +36,8 @@ protected: // should still be protected, as creation should always be done via d
     ) :
             IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_Wallflower,getDatasetEval<eDatasetTask,eDataset_Wallflower>(),eEvalImpl>(
                     "Wallflower",
-                    PlatformUtils::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"Wallflower/dataset/",
-                    PlatformUtils::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"Wallflower/"+PlatformUtils::AddDirSlashIfMissing(sOutputDirName),
+                    lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"Wallflower/dataset/",
+                    lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"Wallflower/"+lv::AddDirSlashIfMissing(sOutputDirName),
                     "bin",
                     ".png",
                     std::vector<std::string>{""},
@@ -59,14 +59,14 @@ protected:
         // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
         // @@@@ untested since 2016/01 refactoring
         std::vector<std::string> vsImgPaths;
-        PlatformUtils::GetFilesFromDir(this->getDataPath(),vsImgPaths);
+        lv::GetFilesFromDir(this->getDataPath(),vsImgPaths);
         bool bFoundScript=false, bFoundGTFile=false;
         const std::string sGTFilePrefix("hand_segmented_");
         const size_t nInputFileNbDecimals = 5;
         const std::string sInputFileSuffix(".bmp");
         this->m_mGTIndexLUT.clear();
         for(auto iter=vsImgPaths.begin(); iter!=vsImgPaths.end(); ++iter) {
-            if(*iter==PlatformUtils::AddDirSlashIfMissing(this->getDataPath())+"script.txt")
+            if(*iter==lv::AddDirSlashIfMissing(this->getDataPath())+"script.txt")
                 bFoundScript = true;
             else if(iter->find(sGTFilePrefix)!=std::string::npos) {
                 this->m_mGTIndexLUT[(size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str())] = this->m_vsGTFramePaths.size();

@@ -45,7 +45,7 @@ struct DatasetEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> :
     virtual IMetricsCalculatorPtr getMetrics() const;
 };
 
-template<eDatasetTaskList eDatasetTask, ParallelUtils::eParallelAlgoType eEvalImpl>
+template<eDatasetTaskList eDatasetTask, lv::eParallelAlgoType eEvalImpl>
 struct Dataset_<eDatasetTask,eDataset_BSDS500,eEvalImpl> :
         public IDataset_<eDatasetTask,eDatasetSource_Image,eDataset_BSDS500,getDatasetEval<eDatasetTask,eDataset_BSDS500>(),eEvalImpl> {
     static_assert(eDatasetTask!=eDatasetTask_Registr,"BSDS500 dataset does not support image registration (no image arrays)");
@@ -61,8 +61,8 @@ protected: // should still be protected, as creation should always be done via d
     ) :
             IDataset_<eDatasetTask,eDatasetSource_Image,eDataset_BSDS500,getDatasetEval<eDatasetTask,eDataset_BSDS500>(),eEvalImpl>(
                     "BSDS500",
-                    PlatformUtils::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"BSDS500/data/images/",
-                    PlatformUtils::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"BSDS500/BSR/"+PlatformUtils::AddDirSlashIfMissing(sOutputDirName),
+                    lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"BSDS500/data/images/",
+                    lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"BSDS500/BSR/"+lv::AddDirSlashIfMissing(sOutputDirName),
                     "",
                     ".png",
                     (eType==eBSDS500Dataset_Training)?std::vector<std::string>{"train"}:((eType==eBSDS500Dataset_Training_Validation)?std::vector<std::string>{"train","val"}:std::vector<std::string>{"train","val","test"}),
@@ -84,11 +84,11 @@ protected:
     virtual void parseData() override final {
         lvDbgExceptionWatch;
         // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
-        PlatformUtils::GetFilesFromDir(this->getDataPath(),this->m_vsInputPaths);
-        PlatformUtils::FilterFilePaths(this->m_vsInputPaths,{},{".jpg",".png",".bmp"});
+        lv::GetFilesFromDir(this->getDataPath(),this->m_vsInputPaths);
+        lv::FilterFilePaths(this->m_vsInputPaths,{},{".jpg",".png",".bmp"});
         if(this->m_vsInputPaths.empty())
             lvErrorExt("BSDS500 set '%s' did not possess any jpg/png/bmp image file",this->getName().c_str());
-        PlatformUtils::GetSubDirsFromDir(PlatformUtils::AddDirSlashIfMissing(this->getDatasetInfo()->getDatasetPath())+"../groundTruth_bdry_images/"+this->getRelativePath(),this->m_vsGTPaths);
+        lv::GetSubDirsFromDir(lv::AddDirSlashIfMissing(this->getDatasetInfo()->getDatasetPath())+"../groundTruth_bdry_images/"+this->getRelativePath(),this->m_vsGTPaths);
         if(this->m_vsGTPaths.empty())
             lvErrorExt("BSDS500 set '%s' did not possess any groundtruth image folders",this->getName().c_str());
         else if(this->m_vsGTPaths.size()!=this->m_vsInputPaths.size())
@@ -96,7 +96,7 @@ protected:
         // make sure folders are non-empty, and folders & images are similarliy ordered
         std::vector<std::string> vsTempPaths;
         for(size_t nImageIdx=0; nImageIdx<this->m_vsGTPaths.size(); ++nImageIdx) {
-            PlatformUtils::GetFilesFromDir(this->m_vsGTPaths[nImageIdx],vsTempPaths);
+            lv::GetFilesFromDir(this->m_vsGTPaths[nImageIdx],vsTempPaths);
             CV_Assert(!vsTempPaths.empty());
             const size_t nLastInputSlashPos = this->m_vsInputPaths[nImageIdx].find_last_of("/\\");
             const std::string sInputFullName = nLastInputSlashPos==std::string::npos?this->m_vsInputPaths[nImageIdx]:this->m_vsInputPaths[nImageIdx].substr(nLastInputSlashPos+1);
@@ -125,7 +125,7 @@ protected:
             this->m_vbInputTransposed.push_back(oCurrInput.size()==cv::Size(321,481));
             this->m_vbGTTransposed.push_back(false);
             this->m_voInputOrigSizes.push_back(oCurrInput.size());
-            PlatformUtils::GetFilesFromDir(this->m_vsGTPaths[nImageIdx],vsTempPaths);
+            lv::GetFilesFromDir(this->m_vsGTPaths[nImageIdx],vsTempPaths);
             CV_Assert(!vsTempPaths.empty());
             this->m_voGTOrigSizes.push_back(cv::Size(481,321*int(vsTempPaths.size())));
             this->m_voInputSizes.push_back(cv::Size(int(481*dScale),int(321*dScale)));
@@ -143,7 +143,7 @@ protected:
         // 'this' is always required here since function name lookup is done during instantiation because of not-fully-specialized class template
         if(this->m_vsGTPaths.size()>nIdx) {
             std::vector<std::string> vsTempPaths;
-            PlatformUtils::GetFilesFromDir(this->m_vsGTPaths[nIdx],vsTempPaths);
+            lv::GetFilesFromDir(this->m_vsGTPaths[nIdx],vsTempPaths);
             CV_Assert(!vsTempPaths.empty());
             cv::Mat oTempRefGTImage = cv::imread(vsTempPaths[0],cv::IMREAD_GRAYSCALE);
             CV_Assert(!oTempRefGTImage.empty());
@@ -180,7 +180,7 @@ protected:
 };
 
 template<>
-struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500,ParallelUtils::eNonParallel> :
+struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500,lv::eNonParallel> :
         public IDataConsumer_<eDatasetEval_BinaryClassifier>,
         public DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> {
 public:

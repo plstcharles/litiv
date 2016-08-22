@@ -17,15 +17,15 @@
 
 #include "litiv/utils/opengl.hpp"
 
-std::mutex GLContext::s_oGLFWErrorMessageMutex;
-std::string GLContext::s_sLatestGLFWErrorMessage;
-std::once_flag GLContext::s_oInitFlag;
+std::mutex lv::gl::Context::s_oGLFWErrorMessageMutex;
+std::string lv::gl::Context::s_sLatestGLFWErrorMessage;
+std::once_flag lv::gl::Context::s_oInitFlag;
 
-GLContext::GLContext(const cv::Size& oWinSize,
-                     const std::string& sWinName,
-                     bool bHide,
-                     size_t nGLVerMajor,
-                     size_t nGLVerMinor) :
+lv::gl::Context::Context(const cv::Size& oWinSize,
+                         const std::string& sWinName,
+                         bool bHide,
+                         size_t nGLVerMajor,
+                         size_t nGLVerMinor) :
         m_nGLVerMajor(nGLVerMajor),
         m_nGLVerMinor(nGLVerMinor) {
 #if HAVE_GLFW
@@ -64,7 +64,7 @@ GLContext::GLContext(const cv::Size& oWinSize,
     initGLEW(m_nGLVerMajor,m_nGLVerMinor);
 }
 
-void GLContext::setAsActive() {
+void lv::gl::Context::setAsActive() {
 #if HAVE_GLFW
     glfwMakeContextCurrent(m_pWindowHandle.get());
 #elif HAVE_FREEGLUT
@@ -72,7 +72,7 @@ void GLContext::setAsActive() {
 #endif //HAVE_FREEGLUT
 }
 
-void GLContext::setWindowVisibility(bool bVal) {
+void lv::gl::Context::setWindowVisibility(bool bVal) {
 #if HAVE_GLFW
     if(bVal)
         glfwShowWindow(m_pWindowHandle.get());
@@ -87,7 +87,7 @@ void GLContext::setWindowVisibility(bool bVal) {
 #endif //HAVE_FREEGLUT
 }
 
-void GLContext::setWindowSize(const cv::Size& oSize, bool bUpdateViewport) {
+void lv::gl::Context::setWindowSize(const cv::Size& oSize, bool bUpdateViewport) {
 #if HAVE_GLFW
     glfwSetWindowSize(m_pWindowHandle.get(),oSize.width,oSize.height);
 #elif HAVE_FREEGLUT
@@ -98,7 +98,7 @@ void GLContext::setWindowSize(const cv::Size& oSize, bool bUpdateViewport) {
         glViewport(0,0,oSize.width,oSize.height);
 }
 
-std::string GLContext::getLatestErrorMessage() { // also clears the latest error message
+std::string lv::gl::Context::getLatestErrorMessage() { // also clears the latest error message
 #if HAVE_GLFW
     std::lock_guard<std::mutex> oLock(s_oGLFWErrorMessageMutex);
     std::string sErrMsg;
@@ -109,7 +109,7 @@ std::string GLContext::getLatestErrorMessage() { // also clears the latest error
 #endif //HAVE_FREEGLUT
 }
 
-bool GLContext::pollEventsAndCheckIfShouldClose() {
+bool lv::gl::Context::pollEventsAndCheckIfShouldClose() {
 #if HAVE_GLFW
     glfwPollEvents();
     return glfwWindowShouldClose(m_pWindowHandle.get())!=0;
@@ -118,7 +118,7 @@ bool GLContext::pollEventsAndCheckIfShouldClose() {
 #endif //HAVE_FREEGLUT
 }
 
-bool GLContext::getKeyPressed(char nKeyID) {
+bool lv::gl::Context::getKeyPressed(char nKeyID) {
 #if HAVE_GLFW
     return glfwGetKey(m_pWindowHandle.get(),nKeyID)==GLFW_PRESS; // will not capture special keys (need custom define)
 #elif HAVE_FREEGLUT
@@ -126,7 +126,7 @@ bool GLContext::getKeyPressed(char nKeyID) {
 #endif //HAVE_FREEGLUT
 }
 
-void GLContext::swapBuffers(int nClearFlags) {
+void lv::gl::Context::swapBuffers(int nClearFlags) {
 #if HAVE_GLFW
     glfwSwapBuffers(m_pWindowHandle.get());
 #elif HAVE_FREEGLUT
@@ -137,7 +137,7 @@ void GLContext::swapBuffers(int nClearFlags) {
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 }
 
-void GLContext::initGLEW(size_t nGLVerMajor, size_t nGLVerMinor) {
+void lv::gl::Context::initGLEW(size_t nGLVerMajor, size_t nGLVerMinor) {
     glErrorCheck;
     glewExperimental = GLEW_EXPERIMENTAL?GL_TRUE:GL_FALSE;
     const GLenum glewerrn = glewInit();
@@ -152,14 +152,14 @@ void GLContext::initGLEW(size_t nGLVerMajor, size_t nGLVerMinor) {
         glErrorExt("Bad GL core/ext version detected (target is %s)",sGLEWVersionString.c_str());
 }
 
-cv::Mat GLUtils::deepCopyImage(GLsizei nWidth,GLsizei nHeight,GLvoid* pData,GLenum eDataFormat,GLenum eDataType) {
+cv::Mat lv::gl::deepCopyImage(GLsizei nWidth,GLsizei nHeight,GLvoid* pData,GLenum eDataFormat,GLenum eDataType) {
     glAssert(nWidth>0 && nHeight>0 && pData);
     const int nDepth = getMatDepthFromDataType(eDataType);
     const int nChannels = getChannelsFromDataFormat(eDataFormat);
     return cv::Mat(nHeight,nWidth,CV_MAKETYPE(nDepth,nChannels),pData,nWidth*nChannels*getByteSizeFromMatDepth(nDepth)).clone();
 }
 
-std::vector<cv::Mat> GLUtils::deepCopyImages(const std::vector<cv::Mat>& voInputMats) {
+std::vector<cv::Mat> lv::gl::deepCopyImages(const std::vector<cv::Mat>& voInputMats) {
     glAssert(!voInputMats.empty() && !voInputMats[0].empty());
     std::vector<cv::Mat> voOutputMats(voInputMats.size());
     for(size_t nMatIter=0; nMatIter<voInputMats.size(); ++nMatIter)
@@ -167,7 +167,7 @@ std::vector<cv::Mat> GLUtils::deepCopyImages(const std::vector<cv::Mat>& voInput
     return voOutputMats;
 }
 
-std::vector<cv::Mat> GLUtils::deepCopyImages(GLsizei nTextureCount,GLsizei nWidth,GLsizei nHeight,GLvoid* pData,GLenum eDataFormat,GLenum eDataType) {
+std::vector<cv::Mat> lv::gl::deepCopyImages(GLsizei nTextureCount,GLsizei nWidth,GLsizei nHeight,GLvoid* pData,GLenum eDataFormat,GLenum eDataType) {
     glAssert(nTextureCount>0 && nWidth>0 && nHeight>0 && pData);
     std::vector<cv::Mat> voOutputMats(nTextureCount);
     const int nDepth = getMatDepthFromDataType(eDataType);
@@ -178,7 +178,7 @@ std::vector<cv::Mat> GLUtils::deepCopyImages(GLsizei nTextureCount,GLsizei nWidt
     return voOutputMats;
 }
 
-std::string GLUtils::addLineNumbersToString(const std::string& sSrc, bool bPrefixTab) {
+std::string lv::gl::addLineNumbersToString(const std::string& sSrc, bool bPrefixTab) {
     if(sSrc.empty())
         return std::string();
     std::stringstream ssRes;
@@ -196,7 +196,7 @@ std::string GLUtils::addLineNumbersToString(const std::string& sSrc, bool bPrefi
     return ssRes.str();
 }
 
-void GLUtils::TMT32GenParams::initTinyMT32Generators(glm::uvec3 vGeneratorLayout,std::aligned_vector<GLUtils::TMT32GenParams,32>& voData) {
+void lv::gl::TMT32GenParams::initTinyMT32Generators(glm::uvec3 vGeneratorLayout,std::aligned_vector<lv::gl::TMT32GenParams,32>& voData) {
     static_assert(sizeof(TMT32GenParams)==sizeof(uint)*8,"Hmmm...?");
     glAssert(vGeneratorLayout.x>0 && vGeneratorLayout.y>0 && vGeneratorLayout.z>0);
     voData.resize(vGeneratorLayout.x*vGeneratorLayout.y*vGeneratorLayout.z);

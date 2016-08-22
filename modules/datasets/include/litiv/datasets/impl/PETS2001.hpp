@@ -22,7 +22,7 @@
 #error "This file should never be included directly; use litiv/datasets.hpp instead"
 #endif //__LITIV_DATASETS_IMPL_H
 
-template<eDatasetTaskList eDatasetTask, ParallelUtils::eParallelAlgoType eEvalImpl>
+template<eDatasetTaskList eDatasetTask, lv::eParallelAlgoType eEvalImpl>
 struct Dataset_<eDatasetTask,eDataset_PETS2001D3TC1,eEvalImpl> :
         public IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_PETS2001D3TC1,getDatasetEval<eDatasetTask,eDataset_PETS2001D3TC1>(),eEvalImpl> {
     static_assert(eDatasetTask!=eDatasetTask_Registr,"PETS2001 dataset does not support image registration (no image arrays)");
@@ -36,8 +36,8 @@ protected: // should still be protected, as creation should always be done via d
     ) :
             IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_PETS2001D3TC1,getDatasetEval<eDatasetTask,eDataset_PETS2001D3TC1>(),eEvalImpl>(
                     "PETS2001 Dataset#3",
-                    PlatformUtils::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"PETS2001/DATASET3/",
-                    PlatformUtils::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"PETS2001/DATASET3/"+PlatformUtils::AddDirSlashIfMissing(sOutputDirName),
+                    lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"PETS2001/DATASET3/",
+                    lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"PETS2001/DATASET3/"+lv::AddDirSlashIfMissing(sOutputDirName),
                     "bin",
                     ".png",
                     std::vector<std::string>{"TESTING"},
@@ -59,17 +59,17 @@ protected:
         // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
         // @@@@ untested since 2016/01 refactoring
         std::vector<std::string> vsVideoSeqPaths;
-        PlatformUtils::GetFilesFromDir(this->getDataPath(),vsVideoSeqPaths);
+        lv::GetFilesFromDir(this->getDataPath(),vsVideoSeqPaths);
         if(vsVideoSeqPaths.size()!=1)
             lvErrorExt("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one video sequence file)",this->getName().c_str());
         std::vector<std::string> vsGTSubdirPaths;
-        PlatformUtils::GetSubDirsFromDir(this->getDataPath(),vsGTSubdirPaths);
+        lv::GetSubDirsFromDir(this->getDataPath(),vsGTSubdirPaths);
         if(vsGTSubdirPaths.size()!=1)
             lvErrorExt("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one GT subdir)",this->getName().c_str());
         this->m_voVideoReader.open(vsVideoSeqPaths[0]);
         if(!this->m_voVideoReader.isOpened())
             lvErrorExt("PETS2006D3TC1 sequence '%s': video file could not be opened",this->getName().c_str());
-        PlatformUtils::GetFilesFromDir(vsGTSubdirPaths[0],this->m_vsGTFramePaths);
+        lv::GetFilesFromDir(vsGTSubdirPaths[0],this->m_vsGTFramePaths);
         if(this->m_vsGTFramePaths.empty())
             lvErrorExt("PETS2006D3TC1 sequence '%s': did not possess any valid GT frames",this->getName().c_str());
         const std::string sGTFilePrefix("image_");

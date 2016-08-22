@@ -20,9 +20,9 @@
 #include "litiv/imgproc/EdgeDetectorCanny.hpp"
 #include "litiv/imgproc/EdgeDetectorLBSP.hpp"
 
-namespace litiv {
+namespace lv {
 
-    //! possible implementation modes for litiv::thinning
+    //! possible implementation modes for lv::thinning
     enum eThinningMode {
         eThinningMode_ZhangSuen=0,
         eThinningMode_LamLeeSuen
@@ -41,10 +41,10 @@ namespace litiv {
         static_assert(nHalfWinSize>=1,"Window size needs to be at least 3x3");
         const Tr nVal = *anMap;
         bool bRes = true;
-        CxxUtils::unroll<nHalfWinSize>([&](int n){
+        lv::unroll<nHalfWinSize>([&](int n){
             bRes &= nVal>anMap[(-n-1)*nMapColStep];
         });
-        CxxUtils::unroll<nHalfWinSize>([&](int n){
+        lv::unroll<nHalfWinSize>([&](int n){
             bRes &= nVal>=anMap[(n+1)*nMapColStep];
         });
         return bRes;
@@ -56,10 +56,10 @@ namespace litiv {
         static_assert(nHalfWinSize>=1,"Window size needs to be at least 3x3");
         const Tr nVal = *anMap;
         bool bRes = true;
-        CxxUtils::unroll<nHalfWinSize>([&](int n){
+        lv::unroll<nHalfWinSize>([&](int n){
             bRes &= nVal>anMap[(-n-1)*nMapRowStep];
         });
-        CxxUtils::unroll<nHalfWinSize>([&](int n){
+        lv::unroll<nHalfWinSize>([&](int n){
             bRes &= nVal>=anMap[(n+1)*nMapRowStep];
         });
         return bRes;
@@ -71,10 +71,10 @@ namespace litiv {
         static_assert(nHalfWinSize>=1,"Window size needs to be at least 3x3");
         const Tr nVal = *anMap;
         bool bRes = true;
-        CxxUtils::unroll<nHalfWinSize>([&](int n){
+        lv::unroll<nHalfWinSize>([&](int n){
             bRes &= nVal>anMap[(bInvDiag?-1:1)*(-n-1)*nMapColStep+(-n-1)*nMapRowStep];
         });
-        CxxUtils::unroll<nHalfWinSize>([&](int n){
+        lv::unroll<nHalfWinSize>([&](int n){
             bRes &= nVal>=anMap[(bInvDiag?-1:1)*(n+1)*nMapColStep+(n+1)*nMapRowStep];
         });
         return bRes;
@@ -89,10 +89,10 @@ namespace litiv {
             return isLocalMaximum_Diagonal<nHalfWinSize,false>(anMap,nMapColStep,nMapRowStep);
     }
 
-} //namespace litiv
+} // namespace lv
 
 template<int nWinSize>
-void litiv::nonMaxSuppression(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat& oMask) {
+void lv::nonMaxSuppression(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat& oMask) {
     //  http://code.opencv.org/attachments/994/nms.cpp
     //  Copyright (c) 2012, Willow Garage, Inc.
     //  All rights reserved.

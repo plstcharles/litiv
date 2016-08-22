@@ -17,13 +17,9 @@
 
 #pragma once
 
-#include <stdio.h>
-#include <string>
-#include <map>
-#include <vector>
-#include <cstdlib>
-#include <cassert>
 #include "litiv/utils/opengl-draw.hpp"
+
+// @@@@ rewrite all classes as part of lv::gl namespace?
 
 class GLShader {
 public:

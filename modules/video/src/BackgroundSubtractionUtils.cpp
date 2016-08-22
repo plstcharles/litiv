@@ -157,7 +157,7 @@ void IIBackgroundSubtractor::initialize_common(const cv::Mat& oInitImg, const cv
 IBackgroundSubtractor_GLSL::IBackgroundSubtractor_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
                                                                      size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
                                                                      bool bUseTimers, bool bUseIntegralFormat) :
-        ParallelUtils::IParallelAlgo_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,CV_8UC1,nDebugType,true,bUseDisplay,bUseTimers,bUseIntegralFormat),
+        lv::IParallelAlgo_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,CV_8UC1,nDebugType,true,bUseDisplay,bUseTimers,bUseIntegralFormat),
         m_dCurrLearningRate(-1) {}
 
 void IBackgroundSubtractor_GLSL::getLatestForegroundMask(cv::OutputArray _oLastFGMask) {
@@ -175,7 +175,7 @@ void IBackgroundSubtractor_GLSL::initialize_gl(const cv::Mat& oInitImg, const cv
     cv::Mat oCurrROI = oROI;
     if(oCurrROI.empty())
         oCurrROI = cv::Mat(oInitImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
-    ParallelUtils::IParallelAlgo_GLSL::initialize_gl(oInitImg,oROI);
+    lv::IParallelAlgo_GLSL::initialize_gl(oInitImg,oROI);
 }
 
 void IBackgroundSubtractor_GLSL::initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) {
