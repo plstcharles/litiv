@@ -41,12 +41,12 @@ private:
     IIEdgeDetector(const IIEdgeDetector&) = delete;
 };
 
-template<lv::eParallelAlgoType eImpl>
+template<lv::ParallelAlgoType eImpl>
 struct IEdgeDetector_;
 
 #if HAVE_GLSL
 template<>
-struct IEdgeDetector_<lv::eGLSL> :
+struct IEdgeDetector_<lv::GLSL> :
         public lv::IParallelAlgo_GLSL,
         public IIEdgeDetector {
 
@@ -75,23 +75,23 @@ protected:
     double m_dCurrThreshold;
 };
 
-using IEdgeDetector_GLSL = IEdgeDetector_<lv::eGLSL>;
+using IEdgeDetector_GLSL = IEdgeDetector_<lv::GLSL>;
 #endif //HAVE_GLSL
 
 #if HAVE_CUDA
-// IEdgeDetector_<lv::eCUDA> will not compile here, missing impl
+// IEdgeDetector_<lv::CUDA> will not compile here, missing impl
 #endif //HAVE_CUDA
 
 #if HAVE_OPENCL
-// IEdgeDetector_<lv::eOpenCL> will not compile here, missing impl
+// IEdgeDetector_<lv::OpenCL> will not compile here, missing impl
 #endif //HAVE_OPENCL
 
 template<>
-struct IEdgeDetector_<lv::eNonParallel> :
+struct IEdgeDetector_<lv::NonParallel> :
         public lv::NonParallelAlgo,
         public IIEdgeDetector {
     /// required for derived class destruction from this interface
     virtual ~IEdgeDetector_() {}
 };
 
-using IEdgeDetector = IEdgeDetector_<lv::eNonParallel>;
+using IEdgeDetector = IEdgeDetector_<lv::NonParallel>;

@@ -92,12 +92,12 @@ private:
     IIBackgroundSubtractor(const IIBackgroundSubtractor&) = delete;
 };
 
-template<lv::eParallelAlgoType eImpl>
+template<lv::ParallelAlgoType eImpl>
 struct IBackgroundSubtractor_;
 
 #if HAVE_GLSL
 template<>
-struct IBackgroundSubtractor_<lv::eGLSL> :
+struct IBackgroundSubtractor_<lv::GLSL> :
         public lv::IParallelAlgo_GLSL,
         public IIBackgroundSubtractor {
     /// required for derived class destruction from this interface
@@ -124,23 +124,23 @@ protected:
     double m_dCurrLearningRate;
 };
 
-using IBackgroundSubtractor_GLSL = IBackgroundSubtractor_<lv::eGLSL>;
+using IBackgroundSubtractor_GLSL = IBackgroundSubtractor_<lv::GLSL>;
 #endif //HAVE_GLSL
 
 #if HAVE_CUDA
-// IBackgroundSubtractor_<lv::eCUDA> will not compile here, missing impl
+// IBackgroundSubtractor_<lv::CUDA> will not compile here, missing impl
 #endif //HAVE_CUDA
 
 #if HAVE_OPENCL
-// IBackgroundSubtractor_<lv::eOpenCL> will not compile here, missing impl
+// IBackgroundSubtractor_<lv::OpenCL> will not compile here, missing impl
 #endif //HAVE_OPENCL
 
 template<>
-struct IBackgroundSubtractor_<lv::eNonParallel> :
+struct IBackgroundSubtractor_<lv::NonParallel> :
         public lv::NonParallelAlgo,
         public IIBackgroundSubtractor {
     /// required for derived class destruction from this interface
     virtual ~IBackgroundSubtractor_() {}
 };
 
-using IBackgroundSubtractor = IBackgroundSubtractor_<lv::eNonParallel>;
+using IBackgroundSubtractor = IBackgroundSubtractor_<lv::NonParallel>;

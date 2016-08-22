@@ -52,7 +52,7 @@ void BackgroundSubtractorLOBSTER_GLSL::refreshModel(float fSamplesRefreshFrac, b
     const size_t nRefreshSampleStartPos = fSamplesRefreshFrac<1.0f?rand()%m_nBGSamples:0;
     if(!bForceFGUpdate)
         getLatestForegroundMask(m_oLastFGMask);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_BGModelBinding));
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER_::LOBSTERStorageBuffer_BGModelBinding));
     for(size_t nRowIdx=0; nRowIdx<(size_t)m_oFrameSize.height; ++nRowIdx) {
         const size_t nRowOffset = nRowIdx*m_oFrameSize.height;
         const size_t nModelRowOffset = nRowIdx*m_nRowStepSize;
@@ -91,7 +91,7 @@ void BackgroundSubtractorLOBSTER_GLSL::refreshModel(float fSamplesRefreshFrac, b
         }
     }
     glBufferData(GL_SHADER_STORAGE_BUFFER,m_nBGModelSize*sizeof(uint),m_vnBGModelData.data(),GL_STATIC_COPY);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER,BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_BGModelBinding,getSSBOId(BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_BGModelBinding));
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER,BackgroundSubtractorLOBSTER_::LOBSTERStorageBuffer_BGModelBinding,getSSBOId(BackgroundSubtractorLOBSTER_::LOBSTERStorageBuffer_BGModelBinding));
     glErrorCheck;
 }
 
@@ -113,9 +113,9 @@ void BackgroundSubtractorLOBSTER_GLSL::initialize_gl(const cv::Mat& oInitImg, co
     lv::gl::TMT32GenParams::initTinyMT32Generators(glm::uvec3(uint(m_oROI.cols),uint(m_oROI.rows),1),m_voTMT32ModelData);
     m_bInitialized = true;
     GLImageProcAlgo::initialize_gl(oInitImg,m_oROI);
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_TMT32ModelBinding));
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER_::LOBSTERStorageBuffer_TMT32ModelBinding));
     glBufferData(GL_SHADER_STORAGE_BUFFER,m_nTMT32ModelSize*sizeof(lv::gl::TMT32GenParams),m_voTMT32ModelData.data(),GL_STATIC_COPY);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER,BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_TMT32ModelBinding,getSSBOId(BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_TMT32ModelBinding));
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER,BackgroundSubtractorLOBSTER_::LOBSTERStorageBuffer_TMT32ModelBinding,getSSBOId(BackgroundSubtractorLOBSTER_::LOBSTERStorageBuffer_TMT32ModelBinding));
     refreshModel(1.0f,true);
     m_bModelInitialized = true;
 }
@@ -139,13 +139,13 @@ std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource_LOBSTER() c
              "#define NB_REQ_SAMPLES          " << m_nRequiredBGSamples << "\n"
              "#define MODEL_STEP_SIZE         " << m_oFrameSize.width << "\n"
              "layout(local_size_x=" << m_vDefaultWorkGroupSize.x << ",local_size_y=" << m_vDefaultWorkGroupSize.y << ") in;\n"
-             "layout(binding=" << GLImageProcAlgo::eImage_ROIBinding << ", r8ui) readonly uniform uimage2D mROI;\n"
-             "layout(binding=" << GLImageProcAlgo::eImage_InputBinding << ", " << (m_nImgChannels==4?"rgba8ui":"r8ui") << ") readonly uniform uimage2D mInput;\n"
+             "layout(binding=" << GLImageProcAlgo::Image_ROIBinding << ", r8ui) readonly uniform uimage2D mROI;\n"
+             "layout(binding=" << GLImageProcAlgo::Image_InputBinding << ", " << (m_nImgChannels==4?"rgba8ui":"r8ui") << ") readonly uniform uimage2D mInput;\n"
 #if BGSLOBSTER_GLSL_USE_DEBUG
-             //"layout(binding=" << GLImageProcAlgo::eImage_DebugBinding << ", rgba8) writeonly uniform image2D mDebug;\n"
-             "layout(binding=" << GLImageProcAlgo::eImage_DebugBinding << ", rgba8ui) writeonly uniform uimage2D mDebug;\n"
+             //"layout(binding=" << GLImageProcAlgo::Image_DebugBinding << ", rgba8) writeonly uniform image2D mDebug;\n"
+             "layout(binding=" << GLImageProcAlgo::Image_DebugBinding << ", rgba8ui) writeonly uniform uimage2D mDebug;\n"
 #endif //BGSLOBSTER_GLSL_USE_DEBUG
-             "layout(binding=" << GLImageProcAlgo::eImage_OutputBinding << ", r8ui) writeonly uniform uimage2D mOutput;\n" <<
+             "layout(binding=" << GLImageProcAlgo::Image_OutputBinding << ", r8ui) writeonly uniform uimage2D mOutput;\n" <<
              (m_nImgChannels==4?lv::getShaderFunctionSource_L1dist():std::string())+lv::getShaderFunctionSource_absdiff(true) <<
              lv::getShaderFunctionSource_hdist() <<
              GLShader::getShaderFunctionSource_urand_tinymt32() <<
@@ -161,10 +161,10 @@ std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource_LOBSTER() c
     if(m_nPxModelPadding>0) ssSrc <<
              "    uint pad[" << m_nPxModelPadding << "];\n";
     ssSrc << "};\n"
-             "layout(binding=" << BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_BGModelBinding << ", std430) coherent buffer bBGModel {\n"
+             "layout(binding=" << BackgroundSubtractorLOBSTER_::LOBSTERStorageBuffer_BGModelBinding << ", std430) coherent buffer bBGModel {\n"
              "    PxModel aoPxModels[];\n"
              "};\n"
-             "layout(binding=" << BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_TMT32ModelBinding << ", std430) buffer bTMT32Model {\n"
+             "layout(binding=" << BackgroundSubtractorLOBSTER_::LOBSTERStorageBuffer_TMT32ModelBinding << ", std430) buffer bTMT32Model {\n"
              "    TMT32Model aoTMT32Models[];\n"
              "};\n"
              "#define urand() urand(aoTMT32Models[nModelIdx])\n"
@@ -283,8 +283,8 @@ std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource_PostProc() 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "#version 430\n"
              "layout(local_size_x=" << m_vDefaultWorkGroupSize.x << ",local_size_y=" << m_vDefaultWorkGroupSize.y << ") in;\n"
-             //"layout(binding=" << GLImageProcAlgo::eImage_ROIBinding << ", r8ui) readonly uniform uimage2D mROI;\n"
-             "layout(binding=" << GLImageProcAlgo::eImage_OutputBinding << ", r8ui) uniform uimage2D mOutput;\n" <<
+             //"layout(binding=" << GLImageProcAlgo::Image_ROIBinding << ", r8ui) readonly uniform uimage2D mROI;\n"
+             "layout(binding=" << GLImageProcAlgo::Image_OutputBinding << ", r8ui) uniform uimage2D mOutput;\n" <<
              GLShader::getComputeShaderFunctionSource_BinaryMedianBlur(size_t(m_nDefaultMedianBlurKernelSize),BGSLOBSTER_GLSL_USE_SHAREDMEM,m_vDefaultWorkGroupSize);
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "void main() {\n"
@@ -334,7 +334,7 @@ void BackgroundSubtractorLOBSTER_GLSL::getBackgroundImage(cv::OutputArray oBGImg
     glAssert(m_bGLInitialized && !m_vnBGModelData.empty());
     oBGImg.create(m_oFrameSize,CV_8UC(int(m_nImgChannels)));
     cv::Mat oOutputImg = oBGImg.getMatRef();
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_BGModelBinding));
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER_::LOBSTERStorageBuffer_BGModelBinding));
     glGetBufferSubData(GL_SHADER_STORAGE_BUFFER,0,m_nBGModelSize*sizeof(uint),(void*)m_vnBGModelData.data());
     glErrorCheck;
     for(size_t nRowIdx=0; nRowIdx<(size_t)m_oFrameSize.height; ++nRowIdx) {
@@ -367,7 +367,7 @@ void BackgroundSubtractorLOBSTER_GLSL::getBackgroundDescriptorsImage(cv::OutputA
     static_assert(LBSP::DESC_SIZE==2,"Some assumptions are breaking below");
     oBGDescImg.create(m_oFrameSize,CV_16UC(int(m_nImgChannels)));
     cv::Mat oOutputImg = oBGDescImg.getMatRef();
-    glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER_::eLOBSTERStorageBuffer_BGModelBinding));
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER_::LOBSTERStorageBuffer_BGModelBinding));
     glGetBufferSubData(GL_SHADER_STORAGE_BUFFER,0,m_nBGModelSize*sizeof(uint),(void*)m_vnBGModelData.data());
     glErrorCheck;
     for(size_t nRowIdx=0; nRowIdx<(size_t)m_oFrameSize.height; ++nRowIdx) {
@@ -394,17 +394,17 @@ void BackgroundSubtractorLOBSTER_GLSL::getBackgroundDescriptorsImage(cv::OutputA
     }
 }
 
-template struct BackgroundSubtractorLOBSTER_<lv::eGLSL>;
+template struct BackgroundSubtractorLOBSTER_<lv::GLSL>;
 #endif //HAVE_GLSL
 
 #if HAVE_CUDA
 // ... @@@ add impl later
-//template struct BackgroundSubtractorLOBSTER_<lv::eCUDA>;
+//template struct BackgroundSubtractorLOBSTER_<lv::CUDA>;
 #endif //HAVE_CUDA
 
 #if HAVE_OPENCL
 // ... @@@ add impl later
-//template struct BackgroundSubtractorLOBSTER_<lv::eOpenCL>;
+//template struct BackgroundSubtractorLOBSTER_<lv::OpenCL>;
 #endif //HAVE_OPENCL
 
 void BackgroundSubtractorLOBSTER::refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate) {
@@ -619,4 +619,4 @@ void BackgroundSubtractorLOBSTER::getBackgroundDescriptorsImage(cv::OutputArray 
     oAvgBGDesc.convertTo(oBGDescImg,CV_16U);
 }
 
-template struct BackgroundSubtractorLOBSTER_<lv::eNonParallel>;
+template struct BackgroundSubtractorLOBSTER_<lv::NonParallel>;

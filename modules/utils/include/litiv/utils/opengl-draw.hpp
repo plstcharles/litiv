@@ -31,12 +31,12 @@ struct GLMatrices {
 };
 
 struct GLVertex {
-    enum eVertexAttribList {
-        eVertexAttrib_PositionIdx,
-        eVertexAttrib_NormalIdx,
-        eVertexAttrib_ColorIdx,
-        eVertexAttrib_TexCoordIdx,
-        eVertexAttribsCount,
+    enum VertexAttribList {
+        VertexAttrib_PositionIdx,
+        VertexAttrib_NormalIdx,
+        VertexAttrib_ColorIdx,
+        VertexAttrib_TexCoordIdx,
+        nVertexAttribsCount,
     };
     glm::vec4 vPosition;
     glm::vec4 vNormal;
@@ -76,16 +76,16 @@ private:
 
 struct GLTexture {
     // glPixelStore modifs might affect underlying behavior of this class
-    enum eDefaultImageLayoutList {
-        eDefaultImage_InputBinding,
-        eDefaultImage_OutputBinding,
-        eDefaultImageBindingsCount,
+    enum DefaultImageLayoutList {
+        DefaultImage_InputBinding,
+        DefaultImage_OutputBinding,
+        nDefaultImageBindingsCount,
     };
-    enum eDefaultTextureLayoutList {
-        eDefaultTexture_ColorBinding,
-        eDefaultTexture_NormalBinding,
-        eDefaultTexture_ShadowBinding,
-        eDefaultTextureBindingsCount,
+    enum DefaultTextureLayoutList {
+        DefaultTexture_ColorBinding,
+        DefaultTexture_NormalBinding,
+        DefaultTexture_ShadowBinding,
+        nDefaultTextureBindingsCount,
     };
     GLTexture();
     virtual ~GLTexture();

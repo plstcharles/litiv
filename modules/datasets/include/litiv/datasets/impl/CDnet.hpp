@@ -22,10 +22,10 @@
 #error "This file should never be included directly; use litiv/datasets.hpp instead"
 #endif //__LITIV_DATASETS_IMPL_H
 
-template<eDatasetTaskList eDatasetTask, lv::eParallelAlgoType eEvalImpl>
-struct Dataset_<eDatasetTask,eDataset_CDnet,eEvalImpl> :
-        public IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_CDnet,getDatasetEval<eDatasetTask,eDataset_CDnet>(),eEvalImpl> {
-    static_assert(eDatasetTask!=eDatasetTask_Registr,"CDnet dataset does not support image registration (no image arrays)");
+template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
+struct Dataset_<eDatasetTask,Dataset_CDnet,eEvalImpl> :
+        public IDataset_<eDatasetTask,DatasetSource_Video,Dataset_CDnet,getDatasetEval<eDatasetTask,Dataset_CDnet>(),eEvalImpl> {
+    static_assert(eDatasetTask!=DatasetTask_Registr,"CDnet dataset does not support image registration (no image arrays)");
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
             const std::string& sOutputDirName, ///< output directory (full) path for debug logs, evaluation reports and results archiving (will be created in CDnet dataset folder)
@@ -35,7 +35,7 @@ protected: // should still be protected, as creation should always be done via d
             double dScaleFactor=1.0, ///< defines the scale factor to use to resize/rescale read packets
             bool b2014=true ///< defines whether to use the 2012 or 2014 version of the dataset (each should have its own folder in dataset root)
     ) :
-            IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_CDnet,getDatasetEval<eDatasetTask,eDataset_CDnet>(),eEvalImpl>(
+            IDataset_<eDatasetTask,DatasetSource_Video,Dataset_CDnet,getDatasetEval<eDatasetTask,Dataset_CDnet>(),eEvalImpl>(
                     b2014?"CDnet 2014":"CDnet 2012",
                     lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+std::string(b2014?"CDNet2014/dataset/":"CDNet/dataset/"),
                     lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+std::string(b2014?"CDNet2014/":"CDNet/")+lv::AddDirSlashIfMissing(sOutputDirName),
@@ -52,9 +52,9 @@ protected: // should still be protected, as creation should always be done via d
             ) {}
 };
 
-template<eDatasetTaskList eDatasetTask>
-struct DataProducer_<eDatasetTask,eDatasetSource_Video,eDataset_CDnet> :
-        public DataProducer_c<eDatasetTask,eDatasetSource_Video> {
+template<DatasetTaskList eDatasetTask>
+struct DataProducer_<eDatasetTask,DatasetSource_Video,Dataset_CDnet> :
+        public DataProducer_c<eDatasetTask,DatasetSource_Video> {
 protected:
     virtual void parseData() override final {
         // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template

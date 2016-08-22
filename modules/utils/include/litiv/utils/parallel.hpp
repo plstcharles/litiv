@@ -38,70 +38,70 @@
 
 namespace lv {
 
-    enum eParallelAlgoType {
+    enum ParallelAlgoType {
 #if HAVE_GLSL
-        eGLSL,
+        GLSL,
 #endif //HAVE_GLSL
 #if HAVE_CUDA
-        eCUDA,
+        CUDA,
 #endif //HAVE_CUDA
 #if HAVE_OPENCL
-        eOpenCL,
+        OpenCL,
 #endif //HAVE_OPENCL
-        eNonParallel
+        NonParallel
     };
 
     struct IIParallelAlgo {
         /// returns whether the algorithm is implemented for parallel processing or not
         virtual bool isParallel() = 0;
         /// returns which type of parallel implementation is used in this algo
-        virtual eParallelAlgoType getParallelAlgoType() = 0;
+        virtual ParallelAlgoType getParallelAlgoType() = 0;
     public:
         // #### for debug purposes only ####
         cv::DisplayHelperPtr m_pDisplayHelper;
     };
 
-    template<eParallelAlgoType eImpl>
+    template<ParallelAlgoType eImpl>
     struct IParallelAlgo_;
 
 #if HAVE_GLSL
     template<>
-    struct IParallelAlgo_<eGLSL> : public GLImageProcAlgo, public IIParallelAlgo {
+    struct IParallelAlgo_<GLSL> : public GLImageProcAlgo, public IIParallelAlgo {
         IParallelAlgo_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs, size_t nExtraImages, size_t nExtraTextures, int nOutputType, int nDebugType, bool bUseInput, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat) :
             GLImageProcAlgo(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nOutputType,nDebugType,bUseInput,bUseDisplay,bUseTimers,bUseIntegralFormat) {}
         virtual bool isParallel() {return true;}
-        virtual eParallelAlgoType getParallelAlgoType() {return eGLSL;}
+        virtual ParallelAlgoType getParallelAlgoType() {return GLSL;}
     };
-    using IParallelAlgo_GLSL = IParallelAlgo_<eGLSL>;
+    using IParallelAlgo_GLSL = IParallelAlgo_<GLSL>;
 #endif //(!HAVE_GLSL)
 
 #if HAVE_CUDA
     template<>
-    struct IParallelAlgo_<eCUDA> : /*public CUDAImageProcAlgo,*/ public IIParallelAlgo {
+    struct IParallelAlgo_<CUDA> : /*public CUDAImageProcAlgo,*/ public IIParallelAlgo {
         static_assert(false,"Missing CUDA impl");
         virtual bool isParallel() {return true;}
-        virtual eParallelAlgoType getParallelAlgoType() {return eCUDA;}
+        virtual ParallelAlgoType getParallelAlgoType() {return CUDA;}
     };
-    using IParallelAlgo_CUDA = IParallelAlgo_<eCUDA>;
+    using IParallelAlgo_CUDA = IParallelAlgo_<CUDA>;
 #endif //HAVE_CUDA
 
 #if HAVE_CUDA
     template<>
-    struct IParallelAlgo_<eOpenCL> : /*public OpenCLImageProcAlgo,*/ public IIParallelAlgo {
+    struct IParallelAlgo_<OpenCL> : /*public OpenCLImageProcAlgo,*/ public IIParallelAlgo {
         static_assert(false,"Missing OpenCL impl");
         virtual bool isParallel() {return true;}
-        virtual eParallelAlgoType getParallelAlgoType() {return eOpenCL;}
+        virtual ParallelAlgoType getParallelAlgoType() {return OpenCL;}
     };
-    using IParallelAlgo_OpenCL = IParallelAlgo_<eOpenCL>;
+    using IParallelAlgo_OpenCL = IParallelAlgo_<OpenCL>;
 #endif //HAVE_CUDA
 
     template<>
-    struct IParallelAlgo_<eNonParallel> : public IIParallelAlgo {
+    struct IParallelAlgo_<NonParallel> : public IIParallelAlgo {
         IParallelAlgo_() {}
         virtual bool isParallel() {return false;}
-        virtual eParallelAlgoType getParallelAlgoType() {return eNonParallel;}
+        virtual ParallelAlgoType getParallelAlgoType() {return NonParallel;}
     };
-    using NonParallelAlgo = IParallelAlgo_<eNonParallel>;
+    using NonParallelAlgo = IParallelAlgo_<NonParallel>;
 
 #if HAVE_MMX
     /// returns the (horizontal) sum of the provided 8-unsigned-byte array

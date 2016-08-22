@@ -127,7 +127,7 @@ void thinning_internal_LamLeeSuen(cv::Mat& oInput, bool bIter) {
     }
 }
 
-void lv::thinning(const cv::Mat& oInput, cv::Mat& oOutput, eThinningMode eMode) {
+void lv::thinning(const cv::Mat& oInput, cv::Mat& oOutput, ThinningMode eMode) {
     CV_Assert(!oInput.empty());
     CV_Assert(oInput.isContinuous());
     CV_Assert(oInput.type()==CV_8UC1);
@@ -138,11 +138,11 @@ void lv::thinning(const cv::Mat& oInput, cv::Mat& oOutput, eThinningMode eMode) 
     cv::Mat oTempMarker;
     bool bEq;
     do {
-        if(eMode==eThinningMode_ZhangSuen) {
+        if(eMode==ThinningMode_ZhangSuen) {
             thinning_internal_ZhangSuen(oOutput,oTempMarker,false);
             thinning_internal_ZhangSuen(oOutput,oTempMarker,true);
         }
-        else { //eMode==eThinningMode_LamLeeSuen
+        else { //eMode==ThinningMode_LamLeeSuen
             thinning_internal_LamLeeSuen(oOutput,false);
             thinning_internal_LamLeeSuen(oOutput,true);
         }

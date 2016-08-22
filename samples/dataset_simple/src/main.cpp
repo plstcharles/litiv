@@ -43,10 +43,10 @@ int main(int, char**) { // this sample uses no command line argument
         // The 'DatasetType' alias below is only used to simplify templating; the 'Dataset_' interface
         // has three enum template parameters, namely the dataset task type ('eDatasetTask'), the datset
         // identifier ('eDataset'), and the implementation type ('eEvalImpl'). For this example, we use
-        // an edge detection algo, so we set the task type as 'eDatasetTask_EdgDet'; we are also defining
-        // a custom run-time dataset, so we set the dataset identifier as 'eDataset_Custom'; finally, we
-        // only require a traditional evaluation approach (i.e. not asynchronous), so we use 'eNonParallel'.
-        using DatasetType = lv::Dataset_<lv::eDatasetTask_EdgDet,lv::eDataset_Custom,lv::eNonParallel>;
+        // an edge detection algo, so we set the task type as 'DatasetTask_EdgDet'; we are also defining
+        // a custom run-time dataset, so we set the dataset identifier as 'Dataset_Custom'; finally, we
+        // only require a traditional evaluation approach (i.e. not asynchronous), so we use 'NonParallel'.
+        using DatasetType = lv::Dataset_<lv::DatasetTask_EdgDet,lv::Dataset_Custom,lv::NonParallel>;
 
         // The line below creates an instance of the dataset for parsing/evaluation, using the same template
         // parameters we used above. Since rely on the built-in custom dataset parser, we have to respect
@@ -97,7 +97,7 @@ int main(int, char**) { // this sample uses no command line argument
         // ** NOTE: I'll pay a beer to whoever finds how to make the template argument deduction work via:
         //            lv::IDatasetPtr pDataset = lv::datasets::create<DatasetType>(...);
         //
-        lv::IDatasetPtr pDataset = lv::datasets::create<lv::eDatasetTask_EdgDet,lv::eDataset_Custom,lv::eNonParallel>(
+        lv::IDatasetPtr pDataset = lv::datasets::create<lv::DatasetTask_EdgDet,lv::Dataset_Custom,lv::NonParallel>(
             "Custom Dataset Example",
             lv::AddDirSlashIfMissing(SAMPLES_DATA_ROOT)+"custom_dataset_ex/",
             "results_test",

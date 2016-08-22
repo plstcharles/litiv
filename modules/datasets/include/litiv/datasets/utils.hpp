@@ -36,87 +36,87 @@
 
 namespace lv {
 
-    enum eDatasetTaskList { // from the task type, we can derive the source and eval types
-        eDatasetTask_ChgDet,
-        eDatasetTask_Segm,
-        eDatasetTask_Registr,
-        eDatasetTask_EdgDet,
+    enum DatasetTaskList { // from the task type, we can derive the source and eval types
+        DatasetTask_ChgDet,
+        DatasetTask_Segm,
+        DatasetTask_Registr,
+        DatasetTask_EdgDet,
         // ...
     };
 
-    enum eDatasetSourceList { // from the source type, we can derive the input packet policy
-        eDatasetSource_Video,
-        eDatasetSource_VideoArray,
-        eDatasetSource_Image,
-        eDatasetSource_ImageArray,
+    enum DatasetSourceList { // from the source type, we can derive the input packet policy
+        DatasetSource_Video,
+        DatasetSource_VideoArray,
+        DatasetSource_Image,
+        DatasetSource_ImageArray,
         // ...
     };
 
-    enum eDatasetEvalList { // from the eval type, we can derive the gt packet mapping policy
-        eDatasetEval_BinaryClassifier,
-        eDatasetEval_Registr,
-        eDatasetEval_Segm,
-        eDatasetEval_BoundingBox,
+    enum DatasetEvalList { // from the eval type, we can derive the gt packet mapping policy
+        DatasetEval_BinaryClassifier,
+        DatasetEval_Registr,
+        DatasetEval_Segm,
+        DatasetEval_BoundingBox,
         // ...
-        eDatasetEval_None // will only count packets & monitor processing time
+        DatasetEval_None // will only count packets & monitor processing time
     };
 
-    enum eDatasetList { // dataset types are used for impl specializations only
-        eDataset_CDnet,
-        eDataset_Wallflower,
-        eDataset_PETS2001D3TC1,
-        eDataset_LITIV2012b,
-        eDataset_BSDS500,
+    enum DatasetList { // dataset types are used for impl specializations only
+        Dataset_CDnet,
+        Dataset_Wallflower,
+        Dataset_PETS2001D3TC1,
+        Dataset_LITIV2012b,
+        Dataset_BSDS500,
         // ...
-        eDataset_Custom // 'datasets::create' will forward all parameters from Dataset constr
+        Dataset_Custom // 'datasets::create' will forward all parameters from Dataset constr
     };
 
-    enum eGroupPolicy { // used to toggle group policy functions in data handler interfaces
-        eGroup,
-        eNotGroup,
+    enum GroupPolicy { // used to toggle group policy functions in data handler interfaces
+        Group,
+        NotGroup,
     };
 
-    enum ePacketPolicy { // used to toggle packet policy functions in data handler interfaces
-        eImagePacket,
-        eNotImagePacket
+    enum PacketPolicy { // used to toggle packet policy functions in data handler interfaces
+        ImagePacket,
+        NotImagePacket
     };
 
-    enum eMappingPolicy { // used to determine how data packets (input/output, or gt/output) can be mapped
-        ePixelMapping,
-        eIdxMapping,
-        eBatchMapping,
-        eNoMapping
+    enum MappingPolicy { // used to determine how data packets (input/output, or gt/output) can be mapped
+        PixelMapping,
+        IdxMapping,
+        BatchMapping,
+        NoMapping
     };
 
     /// returns the output packet type policy to use based on the dataset task type
-    template<eDatasetTaskList eDatasetTask>
-    constexpr ePacketPolicy getOutputPacketType() {
-        return (eDatasetTask==eDatasetTask_ChgDet)?eImagePacket:
-               (eDatasetTask==eDatasetTask_Segm)?eImagePacket:
-               (eDatasetTask==eDatasetTask_Registr)?eNotImagePacket:
-               (eDatasetTask==eDatasetTask_EdgDet)?eImagePacket:
+    template<DatasetTaskList eDatasetTask>
+    constexpr PacketPolicy getOutputPacketType() {
+        return (eDatasetTask==DatasetTask_ChgDet)?ImagePacket:
+               (eDatasetTask==DatasetTask_Segm)?ImagePacket:
+               (eDatasetTask==DatasetTask_Registr)?NotImagePacket:
+               (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
                // ...
                throw -1; // undefined behavior
     }
 
     /// returns the GT packet mapping style policy to use based on the dataset task type
-    template<eDatasetTaskList eDatasetTask>
-    constexpr eMappingPolicy getGTMappingType() {
-        return (eDatasetTask==eDatasetTask_ChgDet)?ePixelMapping:
-               (eDatasetTask==eDatasetTask_Segm)?ePixelMapping:
-               (eDatasetTask==eDatasetTask_Registr)?eBatchMapping:
-               (eDatasetTask==eDatasetTask_EdgDet)?eIdxMapping:
+    template<DatasetTaskList eDatasetTask>
+    constexpr MappingPolicy getGTMappingType() {
+        return (eDatasetTask==DatasetTask_ChgDet)?PixelMapping:
+               (eDatasetTask==DatasetTask_Segm)?PixelMapping:
+               (eDatasetTask==DatasetTask_Registr)?BatchMapping:
+               (eDatasetTask==DatasetTask_EdgDet)?IdxMapping:
                // ...
                throw -1; // undefined behavior
     }
 
     /// returns the I/O packet mapping style policy to use based on the dataset task type
-    template<eDatasetTaskList eDatasetTask>
-    constexpr eMappingPolicy getIOMappingType() {
-        return (eDatasetTask==eDatasetTask_ChgDet)?ePixelMapping:
-               (eDatasetTask==eDatasetTask_Segm)?ePixelMapping:
-               (eDatasetTask==eDatasetTask_Registr)?eBatchMapping:
-               (eDatasetTask==eDatasetTask_EdgDet)?ePixelMapping:
+    template<DatasetTaskList eDatasetTask>
+    constexpr MappingPolicy getIOMappingType() {
+        return (eDatasetTask==DatasetTask_ChgDet)?PixelMapping:
+               (eDatasetTask==DatasetTask_Segm)?PixelMapping:
+               (eDatasetTask==DatasetTask_Registr)?BatchMapping:
+               (eDatasetTask==DatasetTask_EdgDet)?PixelMapping:
                // ...
                throw -1; // undefined behavior
     }
@@ -204,13 +204,13 @@ namespace lv {
         /// returns a pointer to this work batch/group's parent dataset interface
         virtual IDatasetPtr getDatasetInfo() const = 0;
         /// returns which processing task this work batch/group was built for
-        virtual eDatasetTaskList getDatasetTask() const = 0;
+        virtual DatasetTaskList getDatasetTask() const = 0;
         /// returns which data source this work batch/group was built for
-        virtual eDatasetSourceList getDatasetSource() const = 0;
+        virtual DatasetSourceList getDatasetSource() const = 0;
         /// returns which dataset this work batch/group was built for
-        virtual eDatasetList getDataset() const = 0;
+        virtual DatasetList getDataset() const = 0;
         /// returns which evaluation method this work batch/group was built for
-        virtual eDatasetEvalList getDatasetEval() const = 0;
+        virtual DatasetEvalList getDatasetEval() const = 0;
         /// writes the batch-level evaluation report
         virtual void writeEvalReport() const = 0;
         /// virtual destructor for adequate cleanup from IDataHandler pointers
@@ -254,9 +254,9 @@ namespace lv {
         virtual void _stopProcessing() {}
         /// local folder data parsing function, dataset-specific
         virtual void parseData() = 0;
-        template<eDatasetEvalList eDatasetEval>
+        template<DatasetEvalList eDatasetEval>
         friend struct IDatasetEvaluator_; // required for dataset evaluator interface to write eval reports
-        template<eDatasetTaskList eDatasetTask, eDatasetSourceList eDatasetSource, eDatasetList eDataset, eDatasetEvalList eDatasetEval, lv::eParallelAlgoType eEvalImpl>
+        template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset, DatasetEvalList eDatasetEval, lv::ParallelAlgoType eEvalImpl>
         friend struct IDataset_; // required for data handler sorting and other top-level dataset utility functions
     };
 
@@ -291,13 +291,13 @@ namespace lv {
     /// data loader interface for work batch, applies basic packet transforms where needed and relies on precacher
     struct IDataLoader : public virtual IDataHandler {
         /// returns the input data packet type policy (used for internal packet auto-transformations)
-        inline ePacketPolicy getInputPacketType() const {return m_eInputType;}
+        inline PacketPolicy getInputPacketType() const {return m_eInputType;}
         /// returns the output data packet type policy (used for internal packet auto-transformations)
-        inline ePacketPolicy getOutputPacketType() const {return m_eOutputType;}
+        inline PacketPolicy getOutputPacketType() const {return m_eOutputType;}
         /// returns the gt/output data packet mapping type policy (used for internal packet auto-transformations)
-        inline eMappingPolicy getGTMappingType() const {return m_eGTMappingType;}
+        inline MappingPolicy getGTMappingType() const {return m_eGTMappingType;}
         /// returns the input/output data packet mapping type policy (used for internal packet auto-transformations)
-        inline eMappingPolicy getIOMappingType() const {return m_eIOMappingType;}
+        inline MappingPolicy getIOMappingType() const {return m_eIOMappingType;}
         /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
         virtual void startAsyncPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX);
         /// kills the asynchronyzed precacher, and clears internal buffers
@@ -328,7 +328,7 @@ namespace lv {
         virtual const cv::Size& getGTMaxSize() const = 0;
     protected:
         /// will automatically apply byte-alignment/scale in packet redirection if using image packets
-        IDataLoader(ePacketPolicy eInputType, ePacketPolicy eOutputType, eMappingPolicy eGTMappingType, eMappingPolicy eIOMappingType);
+        IDataLoader(PacketPolicy eInputType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
         /// input packet load function, dataset-specific (can return empty mats)
         virtual cv::Mat _getInputPacket_impl(size_t nIdx) = 0;
         /// gt packet load function, dataset-specific (can return empty mats)
@@ -338,16 +338,16 @@ namespace lv {
         DataPrecacher m_oInputPrecacher,m_oGTPrecacher;
         const cv::Mat& _getInputPacket_redirect(size_t nIdx);
         const cv::Mat& _getGTPacket_redirect(size_t nIdx);
-        const ePacketPolicy m_eInputType,m_eOutputType;
-        const eMappingPolicy m_eGTMappingType,m_eIOMappingType;
+        const PacketPolicy m_eInputType,m_eOutputType;
+        const MappingPolicy m_eGTMappingType,m_eIOMappingType;
     };
 
     /// data producer interface for work batch that must be specialized based on source type (wraps data loader interface)
-    template<eDatasetSourceList eDatasetSource>
+    template<DatasetSourceList eDatasetSource>
     struct IDataProducer_;
 
     template<>
-    struct IDataProducer_<eDatasetSource_Video> :
+    struct IDataProducer_<DatasetSource_Video> :
             public IDataLoader {
         /// redirects to getTotPackets()
         inline size_t getFrameCount() const {return getTotPackets();}
@@ -363,7 +363,7 @@ namespace lv {
         virtual const cv::Size& getFrameOrigSize() const {return m_oOrigSize;}
 
     protected:
-        IDataProducer_(ePacketPolicy eOutputType, eMappingPolicy eGTMappingType, eMappingPolicy eIOMappingType);
+        IDataProducer_(PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
         virtual size_t getTotPackets() const override;
         virtual bool isInputTransposed(size_t nPacketIdx) const override final;
         virtual bool isGTTransposed(size_t nPacketIdx) const override;
@@ -389,7 +389,7 @@ namespace lv {
     };
 
     template<>
-    struct IDataProducer_<eDatasetSource_Image> :
+    struct IDataProducer_<DatasetSource_Image> :
             public IDataLoader {
         /// redirects to getTotPackets()
         inline size_t getImageCount() const {return getTotPackets();}
@@ -425,7 +425,7 @@ namespace lv {
         virtual std::string getPacketName(size_t nPacketIdx) const override;
 
     protected:
-        IDataProducer_(ePacketPolicy eOutputType, eMappingPolicy eGTMappingType, eMappingPolicy eIOMappingType);
+        IDataProducer_(PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
         virtual size_t getTotPackets() const override;
         virtual cv::Mat _getInputPacket_impl(size_t nIdx) override;
         virtual cv::Mat _getGTPacket_impl(size_t nIdx) override;
@@ -441,21 +441,21 @@ namespace lv {
     };
 
     /// data producer interface specialization default constructor override for cleaner implementations
-    template<eDatasetTaskList eDatasetTask, eDatasetSourceList eDatasetSource>
+    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource>
     struct DataProducer_c : public IDataProducer_<eDatasetSource> {
         DataProducer_c() : IDataProducer_<eDatasetSource>(lv::getOutputPacketType<eDatasetTask>(),lv::getGTMappingType<eDatasetTask>(),lv::getIOMappingType<eDatasetTask>()) {}
     };
 
     /// default data producer interface specialization (will attempt to load data using predefined functions)
-    template<eDatasetTaskList eDatasetTask, eDatasetSourceList eDatasetSource, eDatasetList eDataset>
+    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset>
     struct DataProducer_ : public DataProducer_c<eDatasetTask,eDatasetSource> {};
 
     /// data counter interface for work batch/group (toggled via policy) for processed packet counting
-    template<eGroupPolicy ePolicy>
+    template<GroupPolicy ePolicy>
     struct DataCounter_;
 
     template<>
-    struct DataCounter_<eNotGroup> : public virtual IDataHandler {
+    struct DataCounter_<NotGroup> : public virtual IDataHandler {
     protected:
         /// default constructor
         DataCounter_() : m_nProcessedPackets(0) {}
@@ -473,7 +473,7 @@ namespace lv {
     };
 
     template<>
-    struct DataCounter_<eGroup> : public virtual IDataHandler {
+    struct DataCounter_<Group> : public virtual IDataHandler {
         /// gets processed packets count from children batch promises for async implementations
         virtual size_t getProcessedPacketsCountPromise() override final;
         /// gets current processed packets count from children batches
@@ -525,10 +525,10 @@ namespace lv {
     };
 
     /// data consumer interface for work batches for receiving processed packets
-    template<eDatasetEvalList eDatasetEval>
+    template<DatasetEvalList eDatasetEval>
     struct IDataConsumer_ :
             public IDataArchiver,
-            public DataCounter_<eNotGroup> {
+            public DataCounter_<NotGroup> {
         /// push a processed data packet for writing and/or evaluation (also registers it as 'done' for internal purposes)
         virtual void push(const cv::Mat& oOutput, size_t nIdx) {
             lvDbgAssert(isProcessing());
@@ -539,15 +539,15 @@ namespace lv {
     };
 
     /// async data consumer interface for work batches for receiving processed packets & async context setup/init
-    template<eDatasetEvalList eDatasetEval, lv::eParallelAlgoType eImpl>
+    template<DatasetEvalList eDatasetEval, lv::ParallelAlgoType eImpl>
     struct IAsyncDataConsumer_;
 
 #if HAVE_GLSL
 
     template<>
-    struct IAsyncDataConsumer_<eDatasetEval_BinaryClassifier,lv::eGLSL> :
+    struct IAsyncDataConsumer_<DatasetEval_BinaryClassifier,lv::GLSL> :
             public IDataArchiver,
-            public DataCounter_<eNotGroup> {
+            public DataCounter_<NotGroup> {
         /// returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs, if available)
         virtual cv::Size getIdealGLWindowSize() const;
         /// initializes internal params & calls 'initialize_gl' on algo with expanded args list

@@ -69,41 +69,41 @@ public:
     const bool m_bUsingIntegralFormat;
     const glm::uvec2 m_vDefaultWorkGroupSize; // make dynamic? @@@@@
 
-    enum eImageDefaultLayoutList {
-        eImage_OutputBinding,
-        eImage_DebugBinding,
-        eImage_InputBinding,
-        eImage_ROIBinding,
-        eImage_GTBinding,
+    enum ImageDefaultLayoutList {
+        Image_OutputBinding,
+        Image_DebugBinding,
+        Image_InputBinding,
+        Image_ROIBinding,
+        Image_GTBinding,
         // reserved here
-        eImageDefaultBindingsCount
+        nImageDefaultBindingsCount
     };
 
-    enum eTextureDefaultLayoutList {
-        eTexture_OutputBinding,
-        eTexture_DebugBinding,
-        eTexture_InputBinding,
-        eTexture_GTBinding,
+    enum TextureDefaultLayoutList {
+        Texture_OutputBinding,
+        Texture_DebugBinding,
+        Texture_InputBinding,
+        Texture_GTBinding,
         // reserved here
-        eTextureDefaultBindingsCount
+        nTextureDefaultBindingsCount
     };
 
-    enum eStorageBufferDefaultBindingList {
+    enum StorageBufferDefaultBindingList {
         // reserved here
-        eStorageBufferDefaultBindingsCount
+        nStorageBufferDefaultBindingsCount
     };
 
-    enum eAtomicCounterBufferDefaultBindingList {
-        eAtomicCounterBuffer_EvalBinding,
+    enum AtomicCounterBufferDefaultBindingList {
+        AtomicCounterBuffer_EvalBinding,
         // reserved here
-        eAtomicCounterBufferDefaultBindingsCount
+        nAtomicCounterBufferDefaultBindingsCount
     };
 
-    enum eGLTimersList {
-        eGLTimer_TextureUpdate,
-        eGLTimer_ComputeDispatch,
-        eGLTimer_DisplayUpdate,
-        eGLTimersCount
+    enum GLTimersList {
+        GLTimer_TextureUpdate,
+        GLTimer_ComputeDispatch,
+        GLTimer_DisplayUpdate,
+        nGLTimersCount
     };
 
 protected:
@@ -121,8 +121,8 @@ protected:
     cv::Mat m_oLastOutput, m_oLastDebug;
     size_t m_nNextLayer,m_nCurrLayer,m_nLastLayer;
     size_t m_nCurrPBO, m_nNextPBO;
-    std::array<GLuint,eGLTimersCount> m_nGLTimers;
-    std::array<GLuint64,eGLTimersCount> m_nGLTimerVals;
+    std::array<GLuint,nGLTimersCount> m_nGLTimers;
+    std::array<GLuint64,nGLTimersCount> m_nGLTimerVals;
     std::vector<std::unique_ptr<GLDynamicTexture2D>> m_vpInputArray;
     std::vector<std::unique_ptr<GLDynamicTexture2D>> m_vpDebugArray;
     std::vector<std::unique_ptr<GLDynamicTexture2D>> m_vpOutputArray;
@@ -208,7 +208,7 @@ public:
 protected:
     std::vector<std::string> m_vsComputeShaderSources;
     std::vector<glm::uvec3> m_vvComputeShaderDispatchSizes;
-    static const GLuint eImage_PPSAccumulator;
-    static const GLuint eImage_PPSAccumulator_T;
+    static const GLuint Image_PPSAccumulator;
+    static const GLuint Image_PPSAccumulator_T;
     virtual void dispatch(size_t nStage, GLShader& oShader);
 };

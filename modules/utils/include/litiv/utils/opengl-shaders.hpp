@@ -54,7 +54,7 @@ public:
     bool isEmpty()     {return m_bIsEmpty;}
     GLuint getProgID() {return m_nProgID;}
 
-    //static const char* getDefaultVertexAttribVarName(GLVertex::eVertexAttribList eVar); @@@@ todo?
+    //static const char* getDefaultVertexAttribVarName(GLVertex::VertexAttribList eVar); @@@@ todo?
 
     static std::string getVertexShaderSource_PassThrough(bool bPassNormals, bool bPassColors, bool bPassTexCoords);
     static std::string getVertexShaderSource_PassThrough_ConstArray(GLuint nVertexCount, const GLVertex* aVertices, bool bPassNormals, bool bPassColors, bool bPassTexCoords);

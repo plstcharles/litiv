@@ -33,8 +33,8 @@ lv::IMetricsCalculator& lv::IMetricsCalculator::operator+=(const IMetricsCalcula
     return *accumulate(m.shared_from_this());
 }
 
-bool lv::MetricsAccumulator_<lv::eDatasetEval_BinaryClassifier>::isEqual(const IMetricsAccumulatorConstPtr& m) const {
-    const auto& m2 = dynamic_cast<const MetricsAccumulator_<lv::eDatasetEval_BinaryClassifier>&>(*m.get());
+bool lv::MetricsAccumulator_<lv::DatasetEval_BinaryClassifier>::isEqual(const IMetricsAccumulatorConstPtr& m) const {
+    const auto& m2 = dynamic_cast<const MetricsAccumulator_<lv::DatasetEval_BinaryClassifier>&>(*m.get());
     return
         (this->nTP==m2.nTP) &&
         (this->nTN==m2.nTN) &&
@@ -43,8 +43,8 @@ bool lv::MetricsAccumulator_<lv::eDatasetEval_BinaryClassifier>::isEqual(const I
         (this->nSE==m2.nSE);
 }
 
-lv::IMetricsAccumulatorPtr lv::MetricsAccumulator_<lv::eDatasetEval_BinaryClassifier>::accumulate(const IMetricsAccumulatorConstPtr& m) {
-    const auto& m2 = dynamic_cast<const MetricsAccumulator_<lv::eDatasetEval_BinaryClassifier>&>(*m.get());
+lv::IMetricsAccumulatorPtr lv::MetricsAccumulator_<lv::DatasetEval_BinaryClassifier>::accumulate(const IMetricsAccumulatorConstPtr& m) {
+    const auto& m2 = dynamic_cast<const MetricsAccumulator_<lv::DatasetEval_BinaryClassifier>&>(*m.get());
     this->nTP += m2.nTP;
     this->nTN += m2.nTN;
     this->nFP += m2.nFP;
@@ -53,7 +53,7 @@ lv::IMetricsAccumulatorPtr lv::MetricsAccumulator_<lv::eDatasetEval_BinaryClassi
     return shared_from_this();
 }
 
-void lv::MetricsAccumulator_<lv::eDatasetEval_BinaryClassifier>::accumulate(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
+void lv::MetricsAccumulator_<lv::DatasetEval_BinaryClassifier>::accumulate(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
     CV_Assert(!oClassif.empty() && oClassif.type()==CV_8UC1 && (oGT.empty() || oGT.type()==CV_8UC1) && (oROI.empty() || oROI.type()==CV_8UC1));
     CV_Assert((oGT.empty() || oClassif.size()==oGT.size()) && (oROI.empty() || oClassif.size()==oROI.size()));
     if(oGT.empty()) {
@@ -93,7 +93,7 @@ void lv::MetricsAccumulator_<lv::eDatasetEval_BinaryClassifier>::accumulate(cons
     }
 }
 
-cv::Mat lv::MetricsAccumulator_<lv::eDatasetEval_BinaryClassifier>::getColoredMask(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
+cv::Mat lv::MetricsAccumulator_<lv::DatasetEval_BinaryClassifier>::getColoredMask(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
     CV_Assert(!oClassif.empty() && oClassif.type()==CV_8UC1 && (oGT.empty() || oGT.type()==CV_8UC1) && (oROI.empty() || oROI.type()==CV_8UC1));
     CV_Assert((oGT.empty() || oClassif.size()==oGT.size()) && (oROI.empty() || oClassif.size()==oROI.size()));
     if(oGT.empty()) {
@@ -147,17 +147,17 @@ cv::Mat lv::MetricsAccumulator_<lv::eDatasetEval_BinaryClassifier>::getColoredMa
     return oResult;
 }
 
-std::shared_ptr<lv::MetricsAccumulator_<lv::eDatasetEval_BinaryClassifier>> lv::MetricsAccumulator_<lv::eDatasetEval_BinaryClassifier>::create() {
-    struct MetricsAccumulatorWrapper : public MetricsAccumulator_<eDatasetEval_BinaryClassifier> {
-        MetricsAccumulatorWrapper() : MetricsAccumulator_<eDatasetEval_BinaryClassifier>() {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
+std::shared_ptr<lv::MetricsAccumulator_<lv::DatasetEval_BinaryClassifier>> lv::MetricsAccumulator_<lv::DatasetEval_BinaryClassifier>::create() {
+    struct MetricsAccumulatorWrapper : public MetricsAccumulator_<DatasetEval_BinaryClassifier> {
+        MetricsAccumulatorWrapper() : MetricsAccumulator_<DatasetEval_BinaryClassifier>() {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
     };
     return std::make_shared<MetricsAccumulatorWrapper>();
 }
 
-lv::MetricsAccumulator_<lv::eDatasetEval_BinaryClassifier>::MetricsAccumulator_() : nTP(0),nTN(0),nFP(0),nFN(0),nSE(0),nDC(0) {}
+lv::MetricsAccumulator_<lv::DatasetEval_BinaryClassifier>::MetricsAccumulator_() : nTP(0),nTN(0),nFP(0),nFN(0),nSE(0),nDC(0) {}
 
-lv::IMetricsCalculatorPtr lv::MetricsCalculator_<lv::eDatasetEval_BinaryClassifier>::accumulate(const IMetricsCalculatorConstPtr& m) {
-    const auto& m2 = dynamic_cast<const MetricsCalculator_<lv::eDatasetEval_BinaryClassifier>&>(*m.get());
+lv::IMetricsCalculatorPtr lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::accumulate(const IMetricsCalculatorConstPtr& m) {
+    const auto& m2 = dynamic_cast<const MetricsCalculator_<lv::DatasetEval_BinaryClassifier>&>(*m.get());
     const size_t nTotWeight = this->nWeight+m2.nWeight;
     this->dRecall = (m2.dRecall*m2.nWeight + this->dRecall*this->nWeight)/nTotWeight;
     this->dSpecificity = (m2.dSpecificity*m2.nWeight + this->dSpecificity*this->nWeight)/nTotWeight;
@@ -171,26 +171,26 @@ lv::IMetricsCalculatorPtr lv::MetricsCalculator_<lv::eDatasetEval_BinaryClassifi
     return shared_from_this();
 }
 
-lv::BinClassifMetricsCalculatorPtr lv::MetricsCalculator_<lv::eDatasetEval_BinaryClassifier>::create(const IMetricsAccumulatorConstPtr& m) {
-    struct MetricsCalculatorWrapper : public MetricsCalculator_<eDatasetEval_BinaryClassifier> {
-        MetricsCalculatorWrapper(const IMetricsAccumulatorConstPtr& m2) : MetricsCalculator_<eDatasetEval_BinaryClassifier>(m2) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
+lv::BinClassifMetricsCalculatorPtr lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::create(const IMetricsAccumulatorConstPtr& m) {
+    struct MetricsCalculatorWrapper : public MetricsCalculator_<DatasetEval_BinaryClassifier> {
+        MetricsCalculatorWrapper(const IMetricsAccumulatorConstPtr& m2) : MetricsCalculator_<DatasetEval_BinaryClassifier>(m2) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
     };
     return std::make_shared<MetricsCalculatorWrapper>(m);
 }
 
-double lv::MetricsCalculator_<lv::eDatasetEval_BinaryClassifier>::CalcFMeasure(double dRecall, double dPrecision) {return (dRecall+dPrecision)>0?(2.0*(dRecall*dPrecision)/(dRecall+dPrecision)):0;}
-double lv::MetricsCalculator_<lv::eDatasetEval_BinaryClassifier>::CalcFMeasure(const BinClassifMetricsAccumulator& m) {return CalcFMeasure(CalcRecall(m),CalcPrecision(m));}
-double lv::MetricsCalculator_<lv::eDatasetEval_BinaryClassifier>::CalcRecall(uint64_t nTP, uint64_t nTPFN) {return nTPFN>0?((double)nTP/nTPFN):0;}
-double lv::MetricsCalculator_<lv::eDatasetEval_BinaryClassifier>::CalcRecall(const BinClassifMetricsAccumulator& m) {return (m.nTP+m.nFN)>0?((double)m.nTP/(m.nTP+m.nFN)):0;}
-double lv::MetricsCalculator_<lv::eDatasetEval_BinaryClassifier>::CalcPrecision(uint64_t nTP, uint64_t nTPFP) {return nTPFP>0?((double)nTP/nTPFP):0;}
-double lv::MetricsCalculator_<lv::eDatasetEval_BinaryClassifier>::CalcPrecision(const BinClassifMetricsAccumulator& m) {return (m.nTP+m.nFP)>0?((double)m.nTP/(m.nTP+m.nFP)):0;}
-double lv::MetricsCalculator_<lv::eDatasetEval_BinaryClassifier>::CalcSpecificity(const BinClassifMetricsAccumulator& m) {return (m.nTN+m.nFP)>0?((double)m.nTN/(m.nTN+m.nFP)):0;}
-double lv::MetricsCalculator_<lv::eDatasetEval_BinaryClassifier>::CalcFalsePositiveRate(const BinClassifMetricsAccumulator& m) {return (m.nFP+m.nTN)>0?((double)m.nFP/(m.nFP+m.nTN)):0;}
-double lv::MetricsCalculator_<lv::eDatasetEval_BinaryClassifier>::CalcFalseNegativeRate(const BinClassifMetricsAccumulator& m) {return (m.nTP+m.nFN)>0?((double)m.nFN/(m.nTP+m.nFN)):0;}
-double lv::MetricsCalculator_<lv::eDatasetEval_BinaryClassifier>::CalcPercentBadClassifs(const BinClassifMetricsAccumulator& m) {return m.total()>0?(100.0*(m.nFN+m.nFP)/m.total()):0;}
-double lv::MetricsCalculator_<lv::eDatasetEval_BinaryClassifier>::CalcMatthewsCorrCoeff(const BinClassifMetricsAccumulator& m) {return ((m.nTP+m.nFP)>0)&&((m.nTP+m.nFN)>0)&&((m.nTN+m.nFP)>0)&&((m.nTN+m.nFN)>0)?((((double)m.nTP*m.nTN)-(m.nFP*m.nFN))/sqrt(((double)m.nTP+m.nFP)*(m.nTP+m.nFN)*(m.nTN+m.nFP)*(m.nTN+m.nFN))):0;}
+double lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::CalcFMeasure(double dRecall, double dPrecision) {return (dRecall+dPrecision)>0?(2.0*(dRecall*dPrecision)/(dRecall+dPrecision)):0;}
+double lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::CalcFMeasure(const BinClassifMetricsAccumulator& m) {return CalcFMeasure(CalcRecall(m),CalcPrecision(m));}
+double lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::CalcRecall(uint64_t nTP, uint64_t nTPFN) {return nTPFN>0?((double)nTP/nTPFN):0;}
+double lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::CalcRecall(const BinClassifMetricsAccumulator& m) {return (m.nTP+m.nFN)>0?((double)m.nTP/(m.nTP+m.nFN)):0;}
+double lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::CalcPrecision(uint64_t nTP, uint64_t nTPFP) {return nTPFP>0?((double)nTP/nTPFP):0;}
+double lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::CalcPrecision(const BinClassifMetricsAccumulator& m) {return (m.nTP+m.nFP)>0?((double)m.nTP/(m.nTP+m.nFP)):0;}
+double lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::CalcSpecificity(const BinClassifMetricsAccumulator& m) {return (m.nTN+m.nFP)>0?((double)m.nTN/(m.nTN+m.nFP)):0;}
+double lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::CalcFalsePositiveRate(const BinClassifMetricsAccumulator& m) {return (m.nFP+m.nTN)>0?((double)m.nFP/(m.nFP+m.nTN)):0;}
+double lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::CalcFalseNegativeRate(const BinClassifMetricsAccumulator& m) {return (m.nTP+m.nFN)>0?((double)m.nFN/(m.nTP+m.nFN)):0;}
+double lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::CalcPercentBadClassifs(const BinClassifMetricsAccumulator& m) {return m.total()>0?(100.0*(m.nFN+m.nFP)/m.total()):0;}
+double lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::CalcMatthewsCorrCoeff(const BinClassifMetricsAccumulator& m) {return ((m.nTP+m.nFP)>0)&&((m.nTP+m.nFN)>0)&&((m.nTN+m.nFP)>0)&&((m.nTN+m.nFN)>0)?((((double)m.nTP*m.nTN)-(m.nFP*m.nFN))/sqrt(((double)m.nTP+m.nFP)*(m.nTP+m.nFN)*(m.nTN+m.nFP)*(m.nTN+m.nFN))):0;}
 
-lv::MetricsCalculator_<lv::eDatasetEval_BinaryClassifier>::MetricsCalculator_(const IMetricsAccumulatorConstPtr& m) {
+lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::MetricsCalculator_(const IMetricsAccumulatorConstPtr& m) {
     lvAssert(m.get());
     const auto& m2 = std::dynamic_pointer_cast<const BinClassifMetricsAccumulator>(m);
     lvAssert(m2.get());

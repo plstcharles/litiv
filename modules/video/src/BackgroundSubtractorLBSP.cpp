@@ -17,7 +17,7 @@
 
 #include "litiv/video/BackgroundSubtractorLBSP.hpp"
 
-template<lv::eParallelAlgoType eImpl>
+template<lv::ParallelAlgoType eImpl>
 void IBackgroundSubtractorLBSP_<eImpl>::initialize_common(const cv::Mat& oInitImg, const cv::Mat& oROI) {
     lvDbgExceptionWatch;
     IIBackgroundSubtractor::initialize_common(oInitImg,oROI);
@@ -68,7 +68,7 @@ void IBackgroundSubtractorLBSP_<eImpl>::initialize_common(const cv::Mat& oInitIm
 
 template<>
 template<>
-std::string IBackgroundSubtractorLBSP_GLSL::getLBSPThresholdLUTShaderSource<lv::eGLSL>() const {
+std::string IBackgroundSubtractorLBSP_GLSL::getLBSPThresholdLUTShaderSource<lv::GLSL>() const {
     lvDbgExceptionWatch;
     glAssert(m_bInitialized);
     std::stringstream ssSrc;
@@ -85,18 +85,18 @@ std::string IBackgroundSubtractorLBSP_GLSL::getLBSPThresholdLUTShaderSource<lv::
     return ssSrc.str();
 }
 
-template struct IBackgroundSubtractorLBSP_<lv::eGLSL>;
+template struct IBackgroundSubtractorLBSP_<lv::GLSL>;
 
 #endif //HAVE_GLSL
 
 #if HAVE_CUDA
 // ... @@@ add impl later
-//template struct IBackgroundSubtractorLBSP_<lv::eCUDA>;
+//template struct IBackgroundSubtractorLBSP_<lv::CUDA>;
 #endif //HAVE_CUDA
 
 #if HAVE_OPENCL
 // ... @@@ add impl later
-//template struct IBackgroundSubtractorLBSP_<lv::eOpenCL>;
+//template struct IBackgroundSubtractorLBSP_<lv::OpenCL>;
 #endif //HAVE_OPENCL
 
-template struct IBackgroundSubtractorLBSP_<lv::eNonParallel>;
+template struct IBackgroundSubtractorLBSP_<lv::NonParallel>;

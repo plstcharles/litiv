@@ -23,13 +23,13 @@
 namespace lv {
 
     /// possible implementation modes for lv::thinning
-    enum eThinningMode {
-        eThinningMode_ZhangSuen=0,
-        eThinningMode_LamLeeSuen
+    enum ThinningMode {
+        ThinningMode_ZhangSuen=0,
+        ThinningMode_LamLeeSuen
     };
 
     /// 'thins' the provided image (currently only works on 1ch 8UC1 images, treated as binary)
-    void thinning(const cv::Mat& oInput, cv::Mat& oOutput, eThinningMode eMode=eThinningMode_LamLeeSuen);
+    void thinning(const cv::Mat& oInput, cv::Mat& oOutput, ThinningMode eMode=ThinningMode_LamLeeSuen);
 
     /// performs non-maximum suppression on the input image, with a (nWinSize)x(nWinSize) window
     template<int nWinSize>

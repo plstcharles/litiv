@@ -277,16 +277,16 @@ GLint GLShader::getUniformLocFromName(const std::string& sName) {
 std::string GLShader::getVertexShaderSource_PassThrough(bool bPassNormals, bool bPassColors, bool bPassTexCoords) {
     std::stringstream ssSrc;
     ssSrc << "#version 430\n"
-             "layout(location=" << GLVertex::eVertexAttrib_PositionIdx << ") in vec4 in_position;\n";
+             "layout(location=" << GLVertex::VertexAttrib_PositionIdx << ") in vec4 in_position;\n";
     if(bPassNormals) ssSrc <<
-             "layout(location=" << GLVertex::eVertexAttrib_NormalIdx << ") in vec4 in_normal;\n"
-             "layout(location=" << GLVertex::eVertexAttrib_NormalIdx << ") out vec4 out_normal;\n";
+             "layout(location=" << GLVertex::VertexAttrib_NormalIdx << ") in vec4 in_normal;\n"
+             "layout(location=" << GLVertex::VertexAttrib_NormalIdx << ") out vec4 out_normal;\n";
     if(bPassColors) ssSrc <<
-             "layout(location=" << GLVertex::eVertexAttrib_ColorIdx << ") in vec4 in_color;\n"
-             "layout(location=" << GLVertex::eVertexAttrib_ColorIdx << ") out vec4 out_color;\n";
+             "layout(location=" << GLVertex::VertexAttrib_ColorIdx << ") in vec4 in_color;\n"
+             "layout(location=" << GLVertex::VertexAttrib_ColorIdx << ") out vec4 out_color;\n";
     if(bPassTexCoords) ssSrc <<
-             "layout(location=" << GLVertex::eVertexAttrib_TexCoordIdx << ") in vec4 in_texCoord;\n"
-             "layout(location=" << GLVertex::eVertexAttrib_TexCoordIdx << ") out vec4 out_texCoord;\n";
+             "layout(location=" << GLVertex::VertexAttrib_TexCoordIdx << ") in vec4 in_texCoord;\n"
+             "layout(location=" << GLVertex::VertexAttrib_TexCoordIdx << ") out vec4 out_texCoord;\n";
     ssSrc << "void main() {\n"
              "    gl_Position = in_position;\n";
     if(bPassNormals) ssSrc <<
@@ -319,7 +319,7 @@ std::string GLShader::getVertexShaderSource_PassThrough_ConstArray(GLuint nVerte
                               aVertices[nVertexIter].vNormal[3] << (nVertexIter==nVertexCount-1?")\n":"),\n");
         ssSrc <<
              ");\n"
-             "layout(location=" << GLVertex::eVertexAttrib_NormalIdx << ") out vec4 out_normal;\n";
+             "layout(location=" << GLVertex::VertexAttrib_NormalIdx << ") out vec4 out_normal;\n";
     }
     if(bPassColors) { ssSrc <<
              "const vec4 colors[" << nVertexCount << "] = vec4[" << nVertexCount << "](\n";
@@ -330,7 +330,7 @@ std::string GLShader::getVertexShaderSource_PassThrough_ConstArray(GLuint nVerte
                               aVertices[nVertexIter].vColor[3] << (nVertexIter==nVertexCount-1?")\n":"),\n");
         ssSrc <<
              ");\n"
-             "layout(location=" << GLVertex::eVertexAttrib_ColorIdx << ") out vec4 out_color;\n";
+             "layout(location=" << GLVertex::VertexAttrib_ColorIdx << ") out vec4 out_color;\n";
     }
     if(bPassTexCoords) { ssSrc <<
              "const vec4 texCoords[" << nVertexCount << "] = vec4[" << nVertexCount << "](\n";
@@ -341,7 +341,7 @@ std::string GLShader::getVertexShaderSource_PassThrough_ConstArray(GLuint nVerte
                               aVertices[nVertexIter].vTexCoord[3] << (nVertexIter==nVertexCount-1?")\n":"),\n");
         ssSrc <<
              ");\n"
-             "layout(location=" << GLVertex::eVertexAttrib_TexCoordIdx << ") out vec4 out_texCoord;\n";
+             "layout(location=" << GLVertex::VertexAttrib_TexCoordIdx << ") out vec4 out_texCoord;\n";
     }
     ssSrc << "void main() {\n"
              "    gl_Position = positions[gl_VertexID];\n";
@@ -372,7 +372,7 @@ std::string GLShader::getFragmentShaderSource_PassThrough_PassedColor() {
     std::stringstream ssSrc;
     ssSrc << "#version 430\n"
              "layout(location=0) out vec4 out_color;\n"
-             "layout(location=" << GLVertex::eVertexAttrib_ColorIdx << ") in vec4 in_color;\n"
+             "layout(location=" << GLVertex::VertexAttrib_ColorIdx << ") in vec4 in_color;\n"
              "void main() {\n"
              "    out_color = in_color\n"
              "}\n";
@@ -383,7 +383,7 @@ std::string GLShader::getFragmentShaderSource_PassThrough_TexSampler2D(GLuint nS
     std::stringstream ssSrc;
     ssSrc << "#version 430\n"
              "layout(location=0) out vec4 out_color;\n"
-             "layout(location=" << GLVertex::eVertexAttrib_TexCoordIdx << ") in vec4 texCoord2D;\n"
+             "layout(location=" << GLVertex::VertexAttrib_TexCoordIdx << ") in vec4 texCoord2D;\n"
              "layout(binding=" << nSamplerBinding << ") uniform" << (bUseIntegralFormat?" u":" ") << "sampler2D texSampler2D;\n"
              "void main() {\n"
              "    out_color = texture(texSampler2D,texCoord2D.xy);\n";
@@ -398,7 +398,7 @@ std::string GLShader::getFragmentShaderSource_PassThrough_SxSTexSampler2D(const 
     std::stringstream ssSrc;
     ssSrc << "#version 430\n"
              "layout(location=0) out vec4 out_color;\n"
-             "layout(location=" << GLVertex::eVertexAttrib_TexCoordIdx << ") in vec4 texCoord2D;\n";
+             "layout(location=" << GLVertex::VertexAttrib_TexCoordIdx << ") in vec4 texCoord2D;\n";
     for(size_t nSamplerBindingIter=0; nSamplerBindingIter<vnSamplerBindings.size(); ++nSamplerBindingIter) ssSrc <<
              "layout(binding=" << vnSamplerBindings[nSamplerBindingIter] << ") uniform" << (bUseIntegralFormat?" u":" ") << "sampler2DArray texSampler2DArray" << nSamplerBindingIter << ";\n";
     ssSrc << "void main() {\n"
@@ -423,7 +423,7 @@ std::string GLShader::getFragmentShaderSource_PassThrough_SxSTexSampler2DArray(G
     std::stringstream ssSrc;
     ssSrc << "#version 430\n"
              "layout(location=0) out vec4 out_color;\n"
-             "layout(location=" << GLVertex::eVertexAttrib_TexCoordIdx << ") in vec4 texCoord2D;\n"
+             "layout(location=" << GLVertex::VertexAttrib_TexCoordIdx << ") in vec4 texCoord2D;\n"
              "layout(binding=" << nSamplerBinding << ") uniform" << (bUseIntegralFormat?" u":" ") << "sampler2DArray texSampler2DArray;\n"
              "const int texSampler2DArrayLayers = " << nTextureCount << ";\n"
              "void main() {\n"

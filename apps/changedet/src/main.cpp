@@ -35,7 +35,7 @@
 #define USE_CUDA_IMPL           0
 #define USE_OPENCL_IMPL         0
 ////////////////////////////////
-#define DATASET_ID              eDataset_CDnet // comment this line to fall back to custom dataset definition
+#define DATASET_ID              Dataset_CDnet // comment this line to fall back to custom dataset definition
 #define DATASET_OUTPUT_PATH     "results_test" // will be created in the app's working directory if using a custom dataset
 #define DATASET_PRECACHING      1
 #define DATASET_SCALE_FACTOR    1.0
@@ -50,7 +50,7 @@
 #error "Dataset root path should have been specified in CMake."
 #endif //ndef(EXTERNAL_DATA_ROOT)
 #ifndef DATASET_ID
-#define DATASET_ID eDataset_Custom
+#define DATASET_ID Dataset_Custom
 #define DATASET_PARAMS \
     "@@@@",                                                      /* => const std::string& sDatasetName */ \
     "@@@@",                                                      /* => const std::string& sDatasetDirPath */ \
@@ -75,11 +75,11 @@
 #endif //defined(DATASET_ID)
 void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch);
 #if USE_GLSL_IMPL
-constexpr lv::eParallelAlgoType eImplTypeEnum = lv::eGLSL;
+constexpr lv::ParallelAlgoType eImplTypeEnum = lv::GLSL;
 #else // USE_..._IMPL
-constexpr lv::eParallelAlgoType eImplTypeEnum = lv::eNonParallel;
+constexpr lv::ParallelAlgoType eImplTypeEnum = lv::NonParallel;
 #endif // USE_..._IMPL
-using DatasetType = lv::Dataset_<lv::eDatasetTask_ChgDet,lv::DATASET_ID,eImplTypeEnum>;
+using DatasetType = lv::Dataset_<lv::DatasetTask_ChgDet,lv::DATASET_ID,eImplTypeEnum>;
 #if USE_LOBSTER
 using BackgroundSubtractorType = BackgroundSubtractorLOBSTER_<eImplTypeEnum>;
 #elif USE_SUBSENSE
@@ -92,7 +92,7 @@ const size_t g_nMaxThreads = USE_GPU_IMPL?1:std::thread::hardware_concurrency()>
 
 int main(int, char**) {
     try {
-        lv::IDatasetPtr pDataset = lv::datasets::create<lv::eDatasetTask_ChgDet,lv::DATASET_ID,eImplTypeEnum>(DATASET_PARAMS);
+        lv::IDatasetPtr pDataset = lv::datasets::create<lv::DatasetTask_ChgDet,lv::DATASET_ID,eImplTypeEnum>(DATASET_PARAMS);
         lv::IDataHandlerPtrQueue vpBatches = pDataset->getSortedBatches(false);
         const size_t nTotPackets = pDataset->getTotPackets();
         const size_t nTotBatches = vpBatches.size();
@@ -136,7 +136,7 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
         const size_t nTotPacketCount = oBatch.getFrameCount();
         GLContext oContext(oBatch.getFrameSize(),std::string("[GPU] ")+oBatch.getRelativePath(),DISPLAY_OUTPUT==0);
-        std::shared_ptr<IBackgroundSubtractor_<lv::eGLSL>> pAlgo = std::make_shared<BackgroundSubtractorType>();
+        std::shared_ptr<IBackgroundSubtractor_<lv::GLSL>> pAlgo = std::make_shared<BackgroundSubtractorType>();
 #if DISPLAY_OUTPUT>1
         cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;

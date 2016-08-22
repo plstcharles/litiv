@@ -28,15 +28,15 @@
 
 struct BSDS500MetricsAccumulator;
 
-enum eBSDS500DatasetGroup {
-    eBSDS500Dataset_Training,
-    eBSDS500Dataset_Training_Validation,
-    eBSDS500Dataset_Training_Validation_Test,
+enum BSDS500DatasetGroup {
+    BSDS500Dataset_Training,
+    BSDS500Dataset_Training_Validation,
+    BSDS500Dataset_Training_Validation_Test,
 };
 
 template<>
-struct DatasetEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> :
-        public IDatasetEvaluator_<eDatasetEval_None> {
+struct DatasetEvaluator_<DatasetEval_BinaryClassifier,Dataset_BSDS500> :
+        public IDatasetEvaluator_<DatasetEval_None> {
     /// writes an overall evaluation report listing high-level binary classification metrics
     virtual void writeEvalReport() const override;
     /// accumulates overall metrics from all batch(es)
@@ -45,11 +45,11 @@ struct DatasetEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> :
     virtual IMetricsCalculatorPtr getMetrics() const;
 };
 
-template<eDatasetTaskList eDatasetTask, lv::eParallelAlgoType eEvalImpl>
-struct Dataset_<eDatasetTask,eDataset_BSDS500,eEvalImpl> :
-        public IDataset_<eDatasetTask,eDatasetSource_Image,eDataset_BSDS500,getDatasetEval<eDatasetTask,eDataset_BSDS500>(),eEvalImpl> {
-    static_assert(eDatasetTask!=eDatasetTask_Registr,"BSDS500 dataset does not support image registration (no image arrays)");
-    static_assert(eDatasetTask!=eDatasetTask_ChgDet,"BSDS500 dataset does not support change detection (no data streaming)");
+template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
+struct Dataset_<eDatasetTask,Dataset_BSDS500,eEvalImpl> :
+        public IDataset_<eDatasetTask,DatasetSource_Image,Dataset_BSDS500,getDatasetEval<eDatasetTask,Dataset_BSDS500>(),eEvalImpl> {
+    static_assert(eDatasetTask!=DatasetTask_Registr,"BSDS500 dataset does not support image registration (no image arrays)");
+    static_assert(eDatasetTask!=DatasetTask_ChgDet,"BSDS500 dataset does not support change detection (no data streaming)");
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
             const std::string& sOutputDirName, ///< output directory (full) path for debug logs, evaluation reports and results archiving (will be created in BSR dataset folder)
@@ -57,15 +57,15 @@ protected: // should still be protected, as creation should always be done via d
             bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
             bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
             double dScaleFactor=1.0, ///< defines the scale factor to use to resize/rescale read packets
-            eBSDS500DatasetGroup eType=eBSDS500Dataset_Training ///< defines which dataset groups to use
+            BSDS500DatasetGroup eType=BSDS500Dataset_Training ///< defines which dataset groups to use
     ) :
-            IDataset_<eDatasetTask,eDatasetSource_Image,eDataset_BSDS500,getDatasetEval<eDatasetTask,eDataset_BSDS500>(),eEvalImpl>(
+            IDataset_<eDatasetTask,DatasetSource_Image,Dataset_BSDS500,getDatasetEval<eDatasetTask,Dataset_BSDS500>(),eEvalImpl>(
                     "BSDS500",
                     lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"BSDS500/data/images/",
                     lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"BSDS500/BSR/"+lv::AddDirSlashIfMissing(sOutputDirName),
                     "",
                     ".png",
-                    (eType==eBSDS500Dataset_Training)?std::vector<std::string>{"train"}:((eType==eBSDS500Dataset_Training_Validation)?std::vector<std::string>{"train","val"}:std::vector<std::string>{"train","val","test"}),
+                    (eType==BSDS500Dataset_Training)?std::vector<std::string>{"train"}:((eType==BSDS500Dataset_Training_Validation)?std::vector<std::string>{"train","val"}:std::vector<std::string>{"train","val","test"}),
                     std::vector<std::string>{},
                     std::vector<std::string>{},
                     0,
@@ -76,9 +76,9 @@ protected: // should still be protected, as creation should always be done via d
             ) {}
 };
 
-template<eDatasetTaskList eDatasetTask>
-struct DataProducer_<eDatasetTask,eDatasetSource_Image,eDataset_BSDS500> :
-        public DataProducer_c<eDatasetTask,eDatasetSource_Image> {
+template<DatasetTaskList eDatasetTask>
+struct DataProducer_<eDatasetTask,DatasetSource_Image,Dataset_BSDS500> :
+        public DataProducer_c<eDatasetTask,DatasetSource_Image> {
 protected:
     /// data parsing function, dataset-specific (default parser is not satisfactory)
     virtual void parseData() override final {
@@ -164,8 +164,8 @@ protected:
 };
 
 template<>
-struct DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> :
-        public IDataReporter_<eDatasetEval_None> {
+struct DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500> :
+        public IDataReporter_<DatasetEval_None> {
     /// accumulates basic metrics from current batch(es) --- provides group-impl only
     virtual IMetricsAccumulatorConstPtr getMetricsBase() const;
     /// accumulates high-level metrics from current batch(es)
@@ -176,13 +176,13 @@ protected:
     /// returns a one-line string listing high-level metrics for current batch(es)
     std::string writeInlineEvalReport(size_t nIndentSize) const;
     /// required so that dataset-level evaluation report can write dataset-specific reports
-    friend struct DatasetEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500>;
+    friend struct DatasetEvaluator_<DatasetEval_BinaryClassifier,Dataset_BSDS500>;
 };
 
 template<>
-struct DataEvaluator_<eDatasetEval_BinaryClassifier,eDataset_BSDS500,lv::eNonParallel> :
-        public IDataConsumer_<eDatasetEval_BinaryClassifier>,
-        public DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500> {
+struct DataEvaluator_<DatasetEval_BinaryClassifier,Dataset_BSDS500,lv::NonParallel> :
+        public IDataConsumer_<DatasetEval_BinaryClassifier>,
+        public DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500> {
 public:
     /// overrides 'getMetricsBase' from IDataReporter_ for non-group-impl (as always required)
     virtual IMetricsAccumulatorConstPtr getMetricsBase() const;

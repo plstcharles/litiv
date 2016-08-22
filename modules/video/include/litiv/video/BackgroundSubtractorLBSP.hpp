@@ -35,7 +35,7 @@
     in Feature Space Using Local Binary Similarity Patterns", in CRV 2013.
  */
 
-template<lv::eParallelAlgoType eImpl>
+template<lv::ParallelAlgoType eImpl>
 struct IBackgroundSubtractorLBSP_ : public IBackgroundSubtractor_<eImpl> {
 
     /// returns a copy of the latest reconstructed background descriptors image
@@ -43,11 +43,11 @@ struct IBackgroundSubtractorLBSP_ : public IBackgroundSubtractor_<eImpl> {
 
 protected:
     /// default impl constructor (defined here as MSVC is very prude with template-class-template-cstor-definitions)
-    template<lv::eParallelAlgoType eImplTemp = eImpl>
+    template<lv::ParallelAlgoType eImplTemp = eImpl>
     IBackgroundSubtractorLBSP_(float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
                                size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
                                int nDefaultMedianBlurKernelSize=BGSLBSP_DEFAULT_MEDIAN_BLUR_KERNEL_SIZE,
-                               std::enable_if_t<eImplTemp==lv::eNonParallel>* /*pUnused*/=0) :
+                               std::enable_if_t<eImplTemp==lv::NonParallel>* /*pUnused*/=0) :
             m_nLBSPThresholdOffset(nLBSPThresholdOffset),
             m_fRelLBSPThreshold(fRelLBSPThreshold),
             m_nDefaultMedianBlurKernelSize(nDefaultMedianBlurKernelSize) {
@@ -56,14 +56,14 @@ protected:
     }
 #if HAVE_GLSL
     /// glsl impl constructor (defined here as MSVC is very prude with template-class-template-cstor-definitions)
-    template<lv::eParallelAlgoType eImplTemp = eImpl>
+    template<lv::ParallelAlgoType eImplTemp = eImpl>
     IBackgroundSubtractorLBSP_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
                                size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
                                bool bUseTimers, bool bUseIntegralFormat,
                                float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
                                size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
                                int nDefaultMedianBlurKernelSize=BGSLBSP_DEFAULT_MEDIAN_BLUR_KERNEL_SIZE,
-                               std::enable_if_t<eImplTemp==lv::eGLSL>* /*pUnused*/=0) :
+                               std::enable_if_t<eImplTemp==lv::GLSL>* /*pUnused*/=0) :
             IBackgroundSubtractor_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat),
             m_nLBSPThresholdOffset(nLBSPThresholdOffset),
             m_fRelLBSPThreshold(fRelLBSPThreshold),
@@ -72,16 +72,16 @@ protected:
         IIBackgroundSubtractor::m_nROIBorderSize = LBSP::PATCH_SIZE/2;
     }
     /// returns the GLSL compute shader source code for LBSP lookup/description functions
-    template<lv::eParallelAlgoType eImplTemp = eImpl> // dont pass arguments here!
-    std::enable_if_t<eImplTemp==lv::eGLSL,std::string> getLBSPThresholdLUTShaderSource() const;
+    template<lv::ParallelAlgoType eImplTemp = eImpl> // dont pass arguments here!
+    std::enable_if_t<eImplTemp==lv::GLSL,std::string> getLBSPThresholdLUTShaderSource() const;
 #endif //HAVE_GLSL
 #if HAVE_CUDA
     // ... @@@ add impl later
-    static_assert(eImpl!=lv::eCUDA),"Missing impl");
+    static_assert(eImpl!=lv::CUDA),"Missing impl");
 #endif //HAVE_CUDA
 #if HAVE_OPENCL
     // ... @@@ add impl later
-    static_assert(eImpl!=lv::eOpenCL),"Missing impl");
+    static_assert(eImpl!=lv::OpenCL),"Missing impl");
 #endif //HAVE_OPENCL
 
     /// required for derived class destruction from this interface
@@ -101,12 +101,12 @@ protected:
 };
 
 #if HAVE_GLSL
-using IBackgroundSubtractorLBSP_GLSL = IBackgroundSubtractorLBSP_<lv::eGLSL>;
+using IBackgroundSubtractorLBSP_GLSL = IBackgroundSubtractorLBSP_<lv::GLSL>;
 #endif //HAVE_GLSL
 #if HAVE_CUDA
-//using IBackgroundSubtractorLBSP_CUDA = IBackgroundSubtractorLBSP_<lv::eCUDA>;
+//using IBackgroundSubtractorLBSP_CUDA = IBackgroundSubtractorLBSP_<lv::CUDA>;
 #endif //HAVE_CUDA
 #if HAVE_OPENCL
-//using IBackgroundSubtractorLBSP_OpenCL = IBackgroundSubtractorLBSP_<lv::eOpenCL>;
+//using IBackgroundSubtractorLBSP_OpenCL = IBackgroundSubtractorLBSP_<lv::OpenCL>;
 #endif //HAVE_OPENCL
-using IBackgroundSubtractorLBSP = IBackgroundSubtractorLBSP_<lv::eNonParallel>;
+using IBackgroundSubtractorLBSP = IBackgroundSubtractorLBSP_<lv::NonParallel>;

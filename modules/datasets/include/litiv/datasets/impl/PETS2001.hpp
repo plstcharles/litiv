@@ -22,10 +22,10 @@
 #error "This file should never be included directly; use litiv/datasets.hpp instead"
 #endif //__LITIV_DATASETS_IMPL_H
 
-template<eDatasetTaskList eDatasetTask, lv::eParallelAlgoType eEvalImpl>
-struct Dataset_<eDatasetTask,eDataset_PETS2001D3TC1,eEvalImpl> :
-        public IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_PETS2001D3TC1,getDatasetEval<eDatasetTask,eDataset_PETS2001D3TC1>(),eEvalImpl> {
-    static_assert(eDatasetTask!=eDatasetTask_Registr,"PETS2001 dataset does not support image registration (no image arrays)");
+template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
+struct Dataset_<eDatasetTask,Dataset_PETS2001D3TC1,eEvalImpl> :
+        public IDataset_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1,getDatasetEval<eDatasetTask,Dataset_PETS2001D3TC1>(),eEvalImpl> {
+    static_assert(eDatasetTask!=DatasetTask_Registr,"PETS2001 dataset does not support image registration (no image arrays)");
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
             const std::string& sOutputDirName, ///< output directory (full) path for debug logs, evaluation reports and results archiving (will be created in PETS dataset folder)
@@ -34,7 +34,7 @@ protected: // should still be protected, as creation should always be done via d
             bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
             double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
     ) :
-            IDataset_<eDatasetTask,eDatasetSource_Video,eDataset_PETS2001D3TC1,getDatasetEval<eDatasetTask,eDataset_PETS2001D3TC1>(),eEvalImpl>(
+            IDataset_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1,getDatasetEval<eDatasetTask,Dataset_PETS2001D3TC1>(),eEvalImpl>(
                     "PETS2001 Dataset#3",
                     lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"PETS2001/DATASET3/",
                     lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"PETS2001/DATASET3/"+lv::AddDirSlashIfMissing(sOutputDirName),
@@ -51,9 +51,9 @@ protected: // should still be protected, as creation should always be done via d
             ) {}
 };
 
-template<eDatasetTaskList eDatasetTask>
-struct DataProducer_<eDatasetTask,eDatasetSource_Video,eDataset_PETS2001D3TC1> :
-        public DataProducer_c<eDatasetTask,eDatasetSource_Video> {
+template<DatasetTaskList eDatasetTask>
+struct DataProducer_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1> :
+        public DataProducer_c<eDatasetTask,DatasetSource_Video> {
 protected:
     virtual void parseData() override final {
         // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template

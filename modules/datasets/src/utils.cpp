@@ -237,7 +237,7 @@ void lv::IDataLoader::stopAsyncPrecaching() {
     m_oGTPrecacher.stopAsyncPrecaching();
 }
 
-lv::IDataLoader::IDataLoader(ePacketPolicy eInputType, ePacketPolicy eOutputType, eMappingPolicy eGTMappingType, eMappingPolicy eIOMappingType) :
+lv::IDataLoader::IDataLoader(PacketPolicy eInputType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
         m_oInputPrecacher(std::bind(&IDataLoader::_getInputPacket_redirect,this,std::placeholders::_1)),
         m_oGTPrecacher(std::bind(&IDataLoader::_getGTPacket_redirect,this,std::placeholders::_1)),
         m_eInputType(eInputType),m_eOutputType(eOutputType),m_eGTMappingType(eGTMappingType),m_eIOMappingType(eIOMappingType) {}
@@ -248,7 +248,7 @@ const cv::Mat& lv::IDataLoader::_getInputPacket_redirect(size_t nIdx) {
     m_oLatestInputPacket = _getInputPacket_impl(nIdx);
     if(!m_oLatestInputPacket.empty()) {
         CV_Assert(getInputOrigSize(nIdx)==m_oLatestInputPacket.size());
-        if(m_eInputType==eImagePacket) {
+        if(m_eInputType==ImagePacket) {
             if(isInputTransposed(nIdx))
                 cv::transpose(m_oLatestInputPacket,m_oLatestInputPacket);
 #if HARDCODE_IMAGE_PACKET_INDEX
@@ -272,7 +272,7 @@ const cv::Mat& lv::IDataLoader::_getGTPacket_redirect(size_t nIdx) {
     m_oLatestGTPacket = _getGTPacket_impl(nIdx);
     if(!m_oLatestGTPacket.empty()) {
         CV_Assert(getGTOrigSize(nIdx)==m_oLatestGTPacket.size());
-        if(m_eGTMappingType==ePixelMapping && m_eInputType==eImagePacket) {
+        if(m_eGTMappingType==PixelMapping && m_eInputType==ImagePacket) {
             if(isGTTransposed(nIdx))
                 cv::transpose(m_oLatestGTPacket,m_oLatestGTPacket);
 #if HARDCODE_IMAGE_PACKET_INDEX
@@ -294,63 +294,63 @@ const cv::Mat& lv::IDataLoader::_getGTPacket_redirect(size_t nIdx) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-double lv::IDataProducer_<lv::eDatasetSource_Video>::getExpectedLoad() const {
+double lv::IDataProducer_<lv::DatasetSource_Video>::getExpectedLoad() const {
     return m_oROI.empty()?0.0:(double)cv::countNonZero(m_oROI)*m_nFrameCount*(int(!isGrayscale())+1);
 }
 
-void lv::IDataProducer_<lv::eDatasetSource_Video>::startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/) {
+void lv::IDataProducer_<lv::DatasetSource_Video>::startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/) {
     return IDataLoader::startAsyncPrecaching(bUsingGT,m_oSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
 }
 
-lv::IDataProducer_<lv::eDatasetSource_Video>::IDataProducer_(ePacketPolicy eOutputType, eMappingPolicy eGTMappingType, eMappingPolicy eIOMappingType) :
-        IDataLoader(eImagePacket,eOutputType,eGTMappingType,eIOMappingType),m_nFrameCount(0),m_nNextExpectedVideoReaderFrameIdx(size_t(-1)),m_bTransposeFrames(false) {}
+lv::IDataProducer_<lv::DatasetSource_Video>::IDataProducer_(PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
+        IDataLoader(ImagePacket,eOutputType,eGTMappingType,eIOMappingType),m_nFrameCount(0),m_nNextExpectedVideoReaderFrameIdx(size_t(-1)),m_bTransposeFrames(false) {}
 
-size_t lv::IDataProducer_<lv::eDatasetSource_Video>::getTotPackets() const {
+size_t lv::IDataProducer_<lv::DatasetSource_Video>::getTotPackets() const {
     return m_nFrameCount;
 }
 
-bool lv::IDataProducer_<lv::eDatasetSource_Video>::isInputTransposed(size_t /*nPacketIdx*/) const {
+bool lv::IDataProducer_<lv::DatasetSource_Video>::isInputTransposed(size_t /*nPacketIdx*/) const {
     return m_bTransposeFrames;
 }
 
-bool lv::IDataProducer_<lv::eDatasetSource_Video>::isGTTransposed(size_t nPacketIdx) const {
-    return getGTMappingType()==ePixelMapping?isInputTransposed(nPacketIdx):false;
+bool lv::IDataProducer_<lv::DatasetSource_Video>::isGTTransposed(size_t nPacketIdx) const {
+    return getGTMappingType()==PixelMapping?isInputTransposed(nPacketIdx):false;
 }
 
-const cv::Mat& lv::IDataProducer_<lv::eDatasetSource_Video>::getInputROI(size_t /*nPacketIdx*/) const {
+const cv::Mat& lv::IDataProducer_<lv::DatasetSource_Video>::getInputROI(size_t /*nPacketIdx*/) const {
     return getROI();
 }
 
-const cv::Mat& lv::IDataProducer_<lv::eDatasetSource_Video>::getGTROI(size_t nPacketIdx) const {
-    return getGTMappingType()==ePixelMapping?getInputROI(nPacketIdx):cv::emptyMat();
+const cv::Mat& lv::IDataProducer_<lv::DatasetSource_Video>::getGTROI(size_t nPacketIdx) const {
+    return getGTMappingType()==PixelMapping?getInputROI(nPacketIdx):cv::emptyMat();
 }
 
-const cv::Size& lv::IDataProducer_<lv::eDatasetSource_Video>::getInputSize(size_t /*nPacketIdx*/) const {
+const cv::Size& lv::IDataProducer_<lv::DatasetSource_Video>::getInputSize(size_t /*nPacketIdx*/) const {
     return getFrameSize();
 }
 
-const cv::Size& lv::IDataProducer_<lv::eDatasetSource_Video>::getGTSize(size_t nPacketIdx) const {
-    return getGTMappingType()==ePixelMapping?getInputSize(nPacketIdx):cv::emptySize();
+const cv::Size& lv::IDataProducer_<lv::DatasetSource_Video>::getGTSize(size_t nPacketIdx) const {
+    return getGTMappingType()==PixelMapping?getInputSize(nPacketIdx):cv::emptySize();
 }
 
-const cv::Size& lv::IDataProducer_<lv::eDatasetSource_Video>::getInputOrigSize(size_t /*nPacketIdx*/) const {
+const cv::Size& lv::IDataProducer_<lv::DatasetSource_Video>::getInputOrigSize(size_t /*nPacketIdx*/) const {
     return getFrameOrigSize();
 }
 
-const cv::Size& lv::IDataProducer_<lv::eDatasetSource_Video>::getGTOrigSize(size_t nPacketIdx) const {
-    return getGTMappingType()==ePixelMapping?getInputOrigSize(nPacketIdx):cv::emptySize();
+const cv::Size& lv::IDataProducer_<lv::DatasetSource_Video>::getGTOrigSize(size_t nPacketIdx) const {
+    return getGTMappingType()==PixelMapping?getInputOrigSize(nPacketIdx):cv::emptySize();
 }
 
-const cv::Size& lv::IDataProducer_<lv::eDatasetSource_Video>::getInputMaxSize() const {
+const cv::Size& lv::IDataProducer_<lv::DatasetSource_Video>::getInputMaxSize() const {
     return getFrameSize();
 }
 
-const cv::Size& lv::IDataProducer_<lv::eDatasetSource_Video>::getGTMaxSize() const {
-    return getGTMappingType()==ePixelMapping?getFrameSize():cv::emptySize();
+const cv::Size& lv::IDataProducer_<lv::DatasetSource_Video>::getGTMaxSize() const {
+    return getGTMappingType()==PixelMapping?getFrameSize():cv::emptySize();
 }
 
-cv::Mat lv::IDataProducer_<lv::eDatasetSource_Video>::_getInputPacket_impl(size_t nFrameIdx) {
-    lvDbgAssert(getInputPacketType()==eImagePacket);
+cv::Mat lv::IDataProducer_<lv::DatasetSource_Video>::_getInputPacket_impl(size_t nFrameIdx) {
+    lvDbgAssert(getInputPacketType()==ImagePacket);
     lvDbgAssert(nFrameIdx<getTotPackets());
     cv::Mat oFrame;
     if(!m_voVideoReader.isOpened())
@@ -367,20 +367,20 @@ cv::Mat lv::IDataProducer_<lv::eDatasetSource_Video>::_getInputPacket_impl(size_
     return oFrame;
 }
 
-cv::Mat lv::IDataProducer_<lv::eDatasetSource_Video>::_getGTPacket_impl(size_t nFrameIdx) {
+cv::Mat lv::IDataProducer_<lv::DatasetSource_Video>::_getGTPacket_impl(size_t nFrameIdx) {
     lvDbgAssert(nFrameIdx<getTotPackets());
     if(m_mGTIndexLUT.count(nFrameIdx)) {
         const size_t nGTIdx = m_mGTIndexLUT[nFrameIdx];
         if(m_vsGTPaths.size()>nGTIdx) {
-            lvAssert(getGTMappingType()==ePixelMapping); // loading as an image wouldnt make sense otherwise
+            lvAssert(getGTMappingType()==PixelMapping); // loading as an image wouldnt make sense otherwise
             return cv::imread(m_vsGTPaths[nGTIdx],cv::IMREAD_GRAYSCALE); // @@@@ expose grayscale flag in class member?
         }
     }
     return cv::Mat();
 }
 
-void lv::IDataProducer_<lv::eDatasetSource_Video>::parseData() {
-    lvAssert(getInputPacketType()==eImagePacket);
+void lv::IDataProducer_<lv::DatasetSource_Video>::parseData() {
+    lvAssert(getInputPacketType()==ImagePacket);
     cv::Mat oTempImg;
     m_voVideoReader.open(getDataPath());
     if(!m_voVideoReader.isOpened()) {
@@ -410,109 +410,109 @@ void lv::IDataProducer_<lv::eDatasetSource_Video>::parseData() {
     CV_Assert(m_nFrameCount>0);
 }
 
-double lv::IDataProducer_<lv::eDatasetSource_Image>::getExpectedLoad() const {
+double lv::IDataProducer_<lv::DatasetSource_Image>::getExpectedLoad() const {
     return (double)getInputMaxSize().area()*m_nImageCount*(int(!isGrayscale())+1);
 }
 
-void lv::IDataProducer_<lv::eDatasetSource_Image>::startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/) {
+void lv::IDataProducer_<lv::DatasetSource_Image>::startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/) {
     return IDataLoader::startAsyncPrecaching(bUsingGT,getInputMaxSize().area()*(m_nImageCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
 }
 
-bool lv::IDataProducer_<lv::eDatasetSource_Image>::isInputConstantSize() const {
+bool lv::IDataProducer_<lv::DatasetSource_Image>::isInputConstantSize() const {
     return m_bIsInputConstantSize;
 }
 
-bool lv::IDataProducer_<lv::eDatasetSource_Image>::isGTConstantSize() const {
+bool lv::IDataProducer_<lv::DatasetSource_Image>::isGTConstantSize() const {
     return m_bIsGTConstantSize;
 }
 
-bool lv::IDataProducer_<lv::eDatasetSource_Image>::isInputTransposed(size_t nPacketIdx) const {
+bool lv::IDataProducer_<lv::DatasetSource_Image>::isInputTransposed(size_t nPacketIdx) const {
     lvAssert(nPacketIdx<m_nImageCount);
     return m_vbInputTransposed[nPacketIdx];
 }
 
-bool lv::IDataProducer_<lv::eDatasetSource_Image>::isGTTransposed(size_t nPacketIdx) const {
-    lvAssert(getGTMappingType()<=eIdxMapping);
+bool lv::IDataProducer_<lv::DatasetSource_Image>::isGTTransposed(size_t nPacketIdx) const {
+    lvAssert(getGTMappingType()<=IdxMapping);
     lvAssert(nPacketIdx<m_nImageCount);
     return m_vbGTTransposed[nPacketIdx];
 }
 
-const cv::Mat& lv::IDataProducer_<lv::eDatasetSource_Image>::getInputROI(size_t /*nPacketIdx*/) const {
+const cv::Mat& lv::IDataProducer_<lv::DatasetSource_Image>::getInputROI(size_t /*nPacketIdx*/) const {
     return cv::emptyMat();
 }
 
-const cv::Mat& lv::IDataProducer_<lv::eDatasetSource_Image>::getGTROI(size_t /*nPacketIdx*/) const {
+const cv::Mat& lv::IDataProducer_<lv::DatasetSource_Image>::getGTROI(size_t /*nPacketIdx*/) const {
     return cv::emptyMat();
 }
 
-const cv::Size& lv::IDataProducer_<lv::eDatasetSource_Image>::getInputSize(size_t nPacketIdx) const {
+const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getInputSize(size_t nPacketIdx) const {
     if(nPacketIdx>=m_nImageCount)
         return cv::emptySize();
     return m_voInputSizes[nPacketIdx];
 }
 
-const cv::Size& lv::IDataProducer_<lv::eDatasetSource_Image>::getGTSize(size_t nPacketIdx) const {
-    lvAssert(getGTMappingType()<=eIdxMapping);
+const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getGTSize(size_t nPacketIdx) const {
+    lvAssert(getGTMappingType()<=IdxMapping);
     if(nPacketIdx>=m_nImageCount)
         return cv::emptySize();
     return m_voGTSizes[nPacketIdx];
 }
 
-const cv::Size& lv::IDataProducer_<lv::eDatasetSource_Image>::getInputOrigSize(size_t nPacketIdx) const {
+const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getInputOrigSize(size_t nPacketIdx) const {
     if(nPacketIdx>=m_nImageCount)
         return cv::emptySize();
     return m_voInputOrigSizes[nPacketIdx];
 }
 
-const cv::Size& lv::IDataProducer_<lv::eDatasetSource_Image>::getGTOrigSize(size_t nPacketIdx) const {
-    lvAssert(getGTMappingType()<=eIdxMapping);
+const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getGTOrigSize(size_t nPacketIdx) const {
+    lvAssert(getGTMappingType()<=IdxMapping);
     if(nPacketIdx>=m_nImageCount)
         return cv::emptySize();
     return m_voGTOrigSizes[nPacketIdx];
 }
 
-const cv::Size& lv::IDataProducer_<lv::eDatasetSource_Image>::getInputMaxSize() const {
+const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getInputMaxSize() const {
     return m_oInputMaxSize;
 }
 
-const cv::Size& lv::IDataProducer_<lv::eDatasetSource_Image>::getGTMaxSize() const {
+const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getGTMaxSize() const {
     return m_oGTMaxSize;
 }
 
-std::string lv::IDataProducer_<lv::eDatasetSource_Image>::getPacketName(size_t nPacketIdx) const {
+std::string lv::IDataProducer_<lv::DatasetSource_Image>::getPacketName(size_t nPacketIdx) const {
     lvAssert(nPacketIdx<m_nImageCount);
     const size_t nLastSlashPos = m_vsInputPaths[nPacketIdx].find_last_of("/\\");
     std::string sFileName = (nLastSlashPos==std::string::npos)?m_vsInputPaths[nPacketIdx]:m_vsInputPaths[nPacketIdx].substr(nLastSlashPos+1);
     return sFileName.substr(0,sFileName.find_last_of("."));
 }
 
-lv::IDataProducer_<lv::eDatasetSource_Image>::IDataProducer_(ePacketPolicy eOutputType, eMappingPolicy eGTMappingType, eMappingPolicy eIOMappingType) :
-        IDataLoader(eImagePacket,eOutputType,eGTMappingType,eIOMappingType),m_nImageCount(0) {}
+lv::IDataProducer_<lv::DatasetSource_Image>::IDataProducer_(PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
+        IDataLoader(ImagePacket,eOutputType,eGTMappingType,eIOMappingType),m_nImageCount(0) {}
 
-size_t lv::IDataProducer_<lv::eDatasetSource_Image>::getTotPackets() const {
+size_t lv::IDataProducer_<lv::DatasetSource_Image>::getTotPackets() const {
     return m_nImageCount;
 }
 
-cv::Mat lv::IDataProducer_<lv::eDatasetSource_Image>::_getInputPacket_impl(size_t nImageIdx) {
-    lvDbgAssert(getInputPacketType()==eImagePacket);
+cv::Mat lv::IDataProducer_<lv::DatasetSource_Image>::_getInputPacket_impl(size_t nImageIdx) {
+    lvDbgAssert(getInputPacketType()==ImagePacket);
     lvDbgAssert(nImageIdx<getTotPackets());
     return cv::imread(m_vsInputPaths[nImageIdx],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
 }
 
-cv::Mat lv::IDataProducer_<lv::eDatasetSource_Image>::_getGTPacket_impl(size_t nImageIdx) {
+cv::Mat lv::IDataProducer_<lv::DatasetSource_Image>::_getGTPacket_impl(size_t nImageIdx) {
     lvDbgAssert(nImageIdx<getTotPackets());
     if(m_mGTIndexLUT.count(nImageIdx)) {
         const size_t nGTIdx = m_mGTIndexLUT[nImageIdx];
         if(m_vsGTPaths.size()>nGTIdx) {
-            lvAssert(getGTMappingType()==ePixelMapping); // loading as an image wouldnt make sense otherwise
+            lvAssert(getGTMappingType()==PixelMapping); // loading as an image wouldnt make sense otherwise
             return cv::imread(m_vsGTPaths[m_mGTIndexLUT[nGTIdx]],cv::IMREAD_GRAYSCALE); // @@@@ expose grayscale flag in class member?
         }
     }
     return cv::Mat();
 }
 
-void lv::IDataProducer_<lv::eDatasetSource_Image>::parseData() {
-    lvAssert(getInputPacketType()==eImagePacket);
+void lv::IDataProducer_<lv::DatasetSource_Image>::parseData() {
+    lvAssert(getInputPacketType()==ImagePacket);
     lv::GetFilesFromDir(getDataPath(),m_vsInputPaths);
     lv::FilterFilePaths(m_vsInputPaths,{},{".jpg",".png",".bmp"});
     if(m_vsInputPaths.empty())
@@ -564,19 +564,19 @@ void lv::IDataProducer_<lv::eDatasetSource_Image>::parseData() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-size_t lv::DataCounter_<lv::eNotGroup>::getProcessedPacketsCountPromise() {
+size_t lv::DataCounter_<lv::NotGroup>::getProcessedPacketsCountPromise() {
     return m_nProcessedPacketsPromise.get_future().get();
 }
 
-size_t lv::DataCounter_<lv::eNotGroup>::getProcessedPacketsCount() const {
+size_t lv::DataCounter_<lv::NotGroup>::getProcessedPacketsCount() const {
     return m_nProcessedPackets;
 }
 
-size_t lv::DataCounter_<lv::eGroup>::getProcessedPacketsCountPromise() {
+size_t lv::DataCounter_<lv::Group>::getProcessedPacketsCountPromise() {
     return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCountPromise();});
 }
 
-size_t lv::DataCounter_<lv::eGroup>::getProcessedPacketsCount() const {
+size_t lv::DataCounter_<lv::Group>::getProcessedPacketsCount() const {
     return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCount();});
 }
 
@@ -688,7 +688,7 @@ size_t lv::IDataArchiver::save(const cv::Mat& oOutput, size_t nIdx) const {
     std::stringstream sOutputFilePath;
     sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << getPacketName(nIdx) << getDatasetInfo()->getOutputNameSuffix();
     const auto pLoader = shared_from_this_cast<const IDataLoader>(true);
-    if(pLoader->getIOMappingType()==ePixelMapping && pLoader->getOutputPacketType()==eImagePacket) {
+    if(pLoader->getIOMappingType()==PixelMapping && pLoader->getOutputPacketType()==ImagePacket) {
         const cv::Mat& oROI = pLoader->getInputROI(nIdx);
         cv::Mat oOutputClone = oOutput.clone();
         if(!oROI.empty() && oROI.size()==oOutputClone.size())
@@ -712,7 +712,7 @@ cv::Mat lv::IDataArchiver::load(size_t nIdx) const {
     std::stringstream sOutputFilePath;
     sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << getPacketName(nIdx) << getDatasetInfo()->getOutputNameSuffix();
     const auto pLoader = shared_from_this_cast<const IDataLoader>(true);
-    if(pLoader->getIOMappingType()==ePixelMapping && pLoader->getOutputPacketType()==eImagePacket) {
+    if(pLoader->getIOMappingType()==PixelMapping && pLoader->getOutputPacketType()==ImagePacket) {
         cv::Mat oOutput = cv::imread(sOutputFilePath.str(),isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
         if(pLoader->isInputTransposed(nIdx))
             cv::transpose(oOutput,oOutput);
@@ -734,7 +734,7 @@ cv::Mat lv::IDataArchiver::load(size_t nIdx) const {
 
 #if HAVE_GLSL
 
-cv::Size lv::IAsyncDataConsumer_<lv::eDatasetEval_BinaryClassifier,lv::eGLSL>::getIdealGLWindowSize() const {
+cv::Size lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::getIdealGLWindowSize() const {
     glAssert(getTotPackets()>1);
     cv::Size oWindowSize = shared_from_this_cast<const IDataLoader>(true)->getInputMaxSize();
     if(m_pEvalAlgo) {
@@ -748,12 +748,12 @@ cv::Size lv::IAsyncDataConsumer_<lv::eDatasetEval_BinaryClassifier,lv::eGLSL>::g
     return oWindowSize;
 }
 
-lv::IAsyncDataConsumer_<lv::eDatasetEval_BinaryClassifier,lv::eGLSL>::IAsyncDataConsumer_() :
+lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::IAsyncDataConsumer_() :
         m_nLastIdx(0),
         m_nCurrIdx(0),
         m_nNextIdx(1) {}
 
-void lv::IAsyncDataConsumer_<lv::eDatasetEval_BinaryClassifier,lv::eGLSL>::pre_initialize_gl() {
+void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::pre_initialize_gl() {
     m_pLoader = shared_from_this_cast<IDataLoader>(true);
     glAssert(m_pLoader->getTotPackets()>1);
     glDbgAssert(m_pAlgo);
@@ -777,11 +777,11 @@ void lv::IAsyncDataConsumer_<lv::eDatasetEval_BinaryClassifier,lv::eGLSL>::pre_i
     }
 }
 
-void lv::IAsyncDataConsumer_<lv::eDatasetEval_BinaryClassifier,lv::eGLSL>::post_initialize_gl() {
+void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::post_initialize_gl() {
     glDbgAssert(m_pAlgo);
 }
 
-void lv::IAsyncDataConsumer_<lv::eDatasetEval_BinaryClassifier,lv::eGLSL>::pre_apply_gl(size_t nNextIdx, bool bRebindAll) {
+void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::pre_apply_gl(size_t nNextIdx, bool bRebindAll) {
     UNUSED(bRebindAll);
     glDbgAssert(m_pLoader);
     glDbgAssert(m_pAlgo);
@@ -791,7 +791,7 @@ void lv::IAsyncDataConsumer_<lv::eDatasetEval_BinaryClassifier,lv::eGLSL>::pre_a
         m_oNextGT = m_pLoader->getGT(nNextIdx);
 }
 
-void lv::IAsyncDataConsumer_<lv::eDatasetEval_BinaryClassifier,lv::eGLSL>::post_apply_gl(size_t nNextIdx, bool bRebindAll) {
+void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::post_apply_gl(size_t nNextIdx, bool bRebindAll) {
     glDbgAssert(m_pLoader);
     glDbgAssert(m_pAlgo);
     if(m_pEvalAlgo && getDatasetInfo()->isUsingEvaluator())
@@ -833,7 +833,7 @@ void lv::IAsyncDataConsumer_<lv::eDatasetEval_BinaryClassifier,lv::eGLSL>::post_
     }
 }
 
-void lv::IAsyncDataConsumer_<lv::eDatasetEval_BinaryClassifier,lv::eGLSL>::getColoredMasks(cv::Mat& oOutput, cv::Mat& oDebug, const cv::Mat& /*oGT*/, const cv::Mat& oROI) {
+void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::getColoredMasks(cv::Mat& oOutput, cv::Mat& oDebug, const cv::Mat& /*oGT*/, const cv::Mat& oROI) {
     if(!oROI.empty()) {
         lvAssert(oOutput.size()==oROI.size());
         lvAssert(oDebug.size()==oROI.size());

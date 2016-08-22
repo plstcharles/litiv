@@ -26,10 +26,10 @@ namespace lv {
     namespace datasets {
 
         /// global dataset object creation method with dataset impl specialization (forwards extra args to dataset constructor)
-        template<eDatasetTaskList eDatasetTask, eDatasetList eDataset, lv::eParallelAlgoType eEvalImpl, typename... Targs>
+        template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl, typename... Targs>
         IDatasetPtr create(Targs&&... args);
         /// global dataset object creation method (uses 'custom' dataset interface, forwards extra args to dataset constructor)
-        template<eDatasetTaskList eDatasetTask, lv::eParallelAlgoType eEvalImpl, typename... Targs>
+        template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl, typename... Targs>
         IDatasetPtr create(Targs&&... args);
 
     } // namespace datasets
@@ -65,7 +65,7 @@ namespace lv {
     };
 
     /// top-level dataset interface where work batches & groups are implemented based on template policies --- all internal methods can be overriden via dataset impl headers
-    template<eDatasetTaskList eDatasetTask, eDatasetSourceList eDatasetSource, eDatasetList eDataset, eDatasetEvalList eDatasetEval, lv::eParallelAlgoType eEvalImpl>
+    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset, DatasetEvalList eDatasetEval, lv::ParallelAlgoType eEvalImpl>
     struct IDataset_ : public DatasetEvaluator_<eDatasetEval,eDataset> {
         /// fully implemented work batch interface with template specializations
         struct WorkBatch :
@@ -75,13 +75,13 @@ namespace lv {
             /// default destructor, should stay public so smart pointers can access it
             virtual ~WorkBatch() = default;
             /// returns the currently implemented task type for this work batch
-            virtual eDatasetTaskList getDatasetTask() const override final {return eDatasetTask;}
+            virtual DatasetTaskList getDatasetTask() const override final {return eDatasetTask;}
             /// returns the currently implemented source type for this work batch
-            virtual eDatasetSourceList getDatasetSource() const override final {return eDatasetSource;}
+            virtual DatasetSourceList getDatasetSource() const override final {return eDatasetSource;}
             /// returns the currently implemented dataset type for this work batch
-            virtual eDatasetList getDataset() const override final {return eDataset;}
+            virtual DatasetList getDataset() const override final {return eDataset;}
             /// returns the currently implemented evaluation type for this work batch
-            virtual eDatasetEvalList getDatasetEval() const override final {return eDatasetEval;}
+            virtual DatasetEvalList getDatasetEval() const override final {return eDatasetEval;}
             /// always returns false for non-group work batches
             virtual bool isBare() const override final {return false;}
             /// always returns false for non-group work batches
@@ -131,18 +131,18 @@ namespace lv {
         /// fully implemented work group interface with template specializations
         struct WorkBatchGroup :
                 public DataHandler,
-                public DataCounter_<eGroup>,
+                public DataCounter_<Group>,
                 public DataReporter_<eDatasetEval,eDataset> {
             /// default destructor, should stay public so smart pointers can access it
             virtual ~WorkBatchGroup() = default;
             /// returns which processing task this work batch/group was built for
-            virtual eDatasetTaskList getDatasetTask() const override final {return eDatasetTask;}
+            virtual DatasetTaskList getDatasetTask() const override final {return eDatasetTask;}
             /// returns which data source this work batch/group was built for
-            virtual eDatasetSourceList getDatasetSource() const override final {return eDatasetSource;}
+            virtual DatasetSourceList getDatasetSource() const override final {return eDatasetSource;}
             /// returns which dataset this work batch/group was built for
-            virtual eDatasetList getDataset() const override final {return eDataset;}
+            virtual DatasetList getDataset() const override final {return eDataset;}
             /// returns which evaluation method this work batch/group was built for
-            virtual eDatasetEvalList getDatasetEval() const override final {return eDatasetEval;}
+            virtual DatasetEvalList getDatasetEval() const override final {return eDatasetEval;}
             /// returns whether the work group is a pass-through container
             virtual bool isBare() const override final {return m_bIsBare;}
             /// always returns true for work groups
@@ -322,31 +322,31 @@ namespace lv {
     };
 
     /// returns the eval type policy to use based on the dataset task type (can also be overriden by dataset type)
-    template<eDatasetTaskList eDatasetTask, eDatasetList eDataset>
-    constexpr eDatasetEvalList getDatasetEval() {
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
+    constexpr DatasetEvalList getDatasetEval() {
         // note: these are only defaults, they can be overriden via full specialization in their impl header
-        return (eDatasetTask==eDatasetTask_ChgDet)?eDatasetEval_BinaryClassifier:
-               (eDatasetTask==eDatasetTask_Segm)?eDatasetEval_Segm:
-               (eDatasetTask==eDatasetTask_Registr)?eDatasetEval_Registr:
-               (eDatasetTask==eDatasetTask_EdgDet)?eDatasetEval_BinaryClassifier:
+        return (eDatasetTask==DatasetTask_ChgDet)?DatasetEval_BinaryClassifier:
+               (eDatasetTask==DatasetTask_Segm)?DatasetEval_Segm:
+               (eDatasetTask==DatasetTask_Registr)?DatasetEval_Registr:
+               (eDatasetTask==DatasetTask_EdgDet)?DatasetEval_BinaryClassifier:
                // ...
                throw -1; // undefined behavior
     }
 
     /// returns the source type policy to use based on the dataset task type (can also be overriden by dataset type)
-    template<eDatasetTaskList eDatasetTask, eDatasetList eDataset>
-    constexpr eDatasetSourceList getDatasetSource() {
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
+    constexpr DatasetSourceList getDatasetSource() {
         // note: these are only defaults, they can be overriden via full specialization in their impl header
-        return (eDatasetTask==eDatasetTask_ChgDet)?eDatasetSource_Video:
-               (eDatasetTask==eDatasetTask_Segm)?eDatasetSource_Video:
-               (eDatasetTask==eDatasetTask_Registr)?eDatasetSource_VideoArray:
-               (eDatasetTask==eDatasetTask_EdgDet)?eDatasetSource_Image:
+        return (eDatasetTask==DatasetTask_ChgDet)?DatasetSource_Video:
+               (eDatasetTask==DatasetTask_Segm)?DatasetSource_Video:
+               (eDatasetTask==DatasetTask_Registr)?DatasetSource_VideoArray:
+               (eDatasetTask==DatasetTask_EdgDet)?DatasetSource_Image:
                // ...
                throw -1; // undefined behavior
     }
 
     /// dataset interface that must be specialized based on task & eval types, and dataset (in impl headers, if required)
-    template<eDatasetTaskList eDatasetTask, eDatasetList eDataset, lv::eParallelAlgoType eEvalImpl>
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl>
     struct Dataset_;
 
     #define __LITIV_DATASETS_IMPL_H
@@ -358,7 +358,7 @@ namespace lv {
     #undef __LITIV_DATASETS_IMPL_H
 
     /// default dataset interface implementation w/ default specialization & constructor pass-through
-    template<eDatasetTaskList eDatasetTask, eDatasetList eDataset, lv::eParallelAlgoType eEvalImpl>
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl>
     struct Dataset_ : public IDataset_<eDatasetTask,getDatasetSource<eDatasetTask,eDataset>(),eDataset,getDatasetEval<eDatasetTask,eDataset>(),eEvalImpl> {
         // if the task/dataset is not specialized, this redirects creation to the default IDataset_ constructor
         using IDataset_<eDatasetTask,getDatasetSource<eDatasetTask,eDataset>(),eDataset,getDatasetEval<eDatasetTask,eDataset>(),eEvalImpl>::IDataset_;
@@ -367,7 +367,7 @@ namespace lv {
     namespace datasets {
 
         /// global dataset object creation method with dataset impl specialization (forwards extra args to dataset constructor)
-        template<eDatasetTaskList eDatasetTask, eDatasetList eDataset, lv::eParallelAlgoType eEvalImpl, typename... Targs>
+        template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl, typename... Targs>
         IDatasetPtr create(Targs&&... args) {
             struct DatasetWrapper : public Dataset_<eDatasetTask,eDataset,eEvalImpl> {
                 DatasetWrapper(Targs&&... args) : Dataset_<eDatasetTask,eDataset,eEvalImpl>(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
@@ -377,9 +377,9 @@ namespace lv {
             return pDataset;
         }
         /// global dataset object creation method (uses 'custom' dataset interface, forwards extra args to dataset constructor)
-        template<eDatasetTaskList eDatasetTask, lv::eParallelAlgoType eEvalImpl, typename... Targs>
+        template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl, typename... Targs>
         IDatasetPtr create(Targs&&... args) {
-            return create<eDatasetTask,eDataset_Custom,eEvalImpl>(std::forward<Targs>(args)...);
+            return create<eDatasetTask,Dataset_Custom,eEvalImpl>(std::forward<Targs>(args)...);
         }
 
     } // namespace datasets

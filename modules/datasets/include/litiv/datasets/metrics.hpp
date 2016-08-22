@@ -51,49 +51,49 @@ namespace lv {
     using IMetricsCalculatorPtr = std::shared_ptr<IMetricsCalculator>;
     using IMetricsCalculatorConstPtr = std::shared_ptr<const IMetricsCalculator>;
 
-    template<eDatasetEvalList eDatasetEval>
+    template<DatasetEvalList eDatasetEval>
     struct MetricsAccumulator_;
 
     template<> /// basic metrics counter used to evaluate 2d binary classifiers
-    struct MetricsAccumulator_<eDatasetEval_BinaryClassifier> :
+    struct MetricsAccumulator_<DatasetEval_BinaryClassifier> :
             public IMetricsAccumulator {
         virtual bool isEqual(const IMetricsAccumulatorConstPtr& m) const override;
         virtual IMetricsAccumulatorPtr accumulate(const IMetricsAccumulatorConstPtr& m) override;
         virtual void accumulate(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI=cv::Mat());
         static cv::Mat getColoredMask(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI=cv::Mat());
         inline uint64_t total(bool bWithDontCare=false) const {return nTP+nTN+nFP+nFN+(bWithDontCare?nDC:uint64_t(0));}
-        static std::shared_ptr<MetricsAccumulator_<eDatasetEval_BinaryClassifier>> create();
+        static std::shared_ptr<MetricsAccumulator_<DatasetEval_BinaryClassifier>> create();
         uint64_t nTP;
         uint64_t nTN;
         uint64_t nFP;
         uint64_t nFN;
         uint64_t nSE; // 'special error' counter (usage is optional -- useful for e.g. shadow error)
         uint64_t nDC; // 'dont care' counter (usage is optional -- useful with unknowns or small ROIs)
-        enum eCountersList { // used for packed array indexing
-            eCounter_TP,
-            eCounter_TN,
-            eCounter_FP,
-            eCounter_FN,
-            eCounter_SE,
-            eCounter_DC,
-            eCountersCount,
+        enum CountersList { // used for packed array indexing
+            Counter_TP,
+            Counter_TN,
+            Counter_FP,
+            Counter_FN,
+            Counter_SE,
+            Counter_DC,
+            nCountersCount,
         };
     protected:
         /// default constructor sets all counters to zero
         MetricsAccumulator_();
     };
-    using BinClassifMetricsAccumulator = MetricsAccumulator_<eDatasetEval_BinaryClassifier>;
+    using BinClassifMetricsAccumulator = MetricsAccumulator_<DatasetEval_BinaryClassifier>;
     using BinClassifMetricsAccumulatorPtr = std::shared_ptr<BinClassifMetricsAccumulator>;
     using BinClassifMetricsAccumulatorConstPtr = std::shared_ptr<const BinClassifMetricsAccumulator>;
 
-    template<eDatasetEvalList eDatasetEval>
+    template<DatasetEvalList eDatasetEval>
     struct MetricsCalculator_;
 
     template<> /// high-level metrics used to evaluate 2d binary classifiers
-    struct MetricsCalculator_<eDatasetEval_BinaryClassifier> :
+    struct MetricsCalculator_<DatasetEval_BinaryClassifier> :
             public IMetricsCalculator {
         virtual IMetricsCalculatorPtr accumulate(const IMetricsCalculatorConstPtr& m) override;
-        static std::shared_ptr<MetricsCalculator_<eDatasetEval_BinaryClassifier>> create(const IMetricsAccumulatorConstPtr& m);
+        static std::shared_ptr<MetricsCalculator_<DatasetEval_BinaryClassifier>> create(const IMetricsAccumulatorConstPtr& m);
         static double CalcFMeasure(double dRecall, double dPrecision);
         static double CalcFMeasure(const BinClassifMetricsAccumulator& m);
         static double CalcRecall(uint64_t nTP, uint64_t nTPFN);
@@ -117,7 +117,7 @@ namespace lv {
         /// default contructor requires a base metrics counters, as otherwise, we may obtain NaN's
         MetricsCalculator_(const IMetricsAccumulatorConstPtr& m);
     };
-    using BinClassifMetricsCalculator = MetricsCalculator_<eDatasetEval_BinaryClassifier>;
+    using BinClassifMetricsCalculator = MetricsCalculator_<DatasetEval_BinaryClassifier>;
     using BinClassifMetricsCalculatorPtr = std::shared_ptr<BinClassifMetricsCalculator>;
     using BinClassifMetricsCalculatorConstPtr = std::shared_ptr<const BinClassifMetricsCalculator>;
 

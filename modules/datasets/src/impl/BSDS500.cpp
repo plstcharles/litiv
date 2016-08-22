@@ -679,13 +679,13 @@ namespace lv {
 
 } // namespace lv
 
-void lv::DatasetEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500>::writeEvalReport() const {
+void lv::DatasetEvaluator_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::writeEvalReport() const {
     if(getBatches(false).empty() || !isUsingEvaluator()) {
-        IDatasetEvaluator_<lv::eDatasetEval_None>::writeEvalReport();
+        IDatasetEvaluator_<lv::DatasetEval_None>::writeEvalReport();
         return;
     }
     for(const auto& pGroupIter : getBatches(true))
-        pGroupIter->shared_from_this_cast<const DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500>>(true)->DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500>::writeEvalReport();
+        pGroupIter->shared_from_this_cast<const DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>>(true)->DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>::writeEvalReport();
     IMetricsCalculatorConstPtr pMetrics = getMetrics();
     lvAssert(pMetrics.get());
     const BSDS500MetricsCalculator& oMetrics = dynamic_cast<const BSDS500MetricsCalculator&>(*pMetrics.get());
@@ -704,7 +704,7 @@ void lv::DatasetEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS50
         size_t nOverallPacketCount = 0;
         double dOverallTimeElapsed = 0.0;
         for(const auto& pGroupIter : getBatches(true)) {
-            oMetricsOutput << pGroupIter->shared_from_this_cast<const DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500>>(true)->DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500>::writeInlineEvalReport(0);
+            oMetricsOutput << pGroupIter->shared_from_this_cast<const DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>>(true)->DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>::writeInlineEvalReport(0);
             nOverallPacketCount += pGroupIter->getTotPackets();
             dOverallTimeElapsed += pGroupIter->getProcessTime();
         }
@@ -722,31 +722,31 @@ void lv::DatasetEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS50
     }
 }
 
-lv::IMetricsAccumulatorConstPtr lv::DatasetEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500>::getMetricsBase() const {
+lv::IMetricsAccumulatorConstPtr lv::DatasetEvaluator_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::getMetricsBase() const {
     BSDS500MetricsAccumulatorPtr pMetricsBase = BSDS500MetricsAccumulator::create(DATASETS_BSDS500_EVAL_DEFAULT_THRESH_BINS);
     for(const auto& pBatch : getBatches(true))
-        pMetricsBase->accumulate(dynamic_cast<const DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500>&>(*pBatch).getMetricsBase());
+        pMetricsBase->accumulate(dynamic_cast<const DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>&>(*pBatch).getMetricsBase());
     return pMetricsBase;
 }
 
-lv::IMetricsCalculatorPtr lv::DatasetEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500>::getMetrics() const {
+lv::IMetricsCalculatorPtr lv::DatasetEvaluator_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::getMetrics() const {
     return BSDS500MetricsCalculator::create(getMetricsBase());
 }
 
-lv::IMetricsAccumulatorConstPtr lv::DataReporter_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500>::getMetricsBase() const {
+lv::IMetricsAccumulatorConstPtr lv::DataReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::getMetricsBase() const {
     lvAssert(isGroup()); // non-group specialization should override this method
     BSDS500MetricsAccumulatorPtr pMetricsBase = BSDS500MetricsAccumulator::create(DATASETS_BSDS500_EVAL_DEFAULT_THRESH_BINS);
     for(const auto& pBatch : getBatches(true))
-        pMetricsBase->accumulate(dynamic_cast<const DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500>&>(*pBatch).getMetricsBase());
+        pMetricsBase->accumulate(dynamic_cast<const DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>&>(*pBatch).getMetricsBase());
     return pMetricsBase;
 }
 
-lv::IMetricsCalculatorPtr lv::DataReporter_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500>::getMetrics() const {
+lv::IMetricsCalculatorPtr lv::DataReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::getMetrics() const {
     return BSDS500MetricsCalculator::create(getMetricsBase());
 }
 
-void lv::DataReporter_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500>::writeEvalReport() const {
-    IDataReporter_<eDatasetEval_None>::writeEvalReport();
+void lv::DataReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::writeEvalReport() const {
+    IDataReporter_<DatasetEval_None>::writeEvalReport();
     if(!getTotPackets() || !getDatasetInfo()->isUsingEvaluator())
         return;
     else if(isGroup() && !isBare())
@@ -776,7 +776,7 @@ void lv::DataReporter_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500>::
         oOverallMetricsOutput << cv::format("%10g %10g %10g %10g %10g %10g %10g %10g\n",oMetrics.oBestScore.dThreshold,oMetrics.oBestScore.dRecall,oMetrics.oBestScore.dPrecision,oMetrics.oBestScore.dFMeasure,oMetrics.dMaxRecall,oMetrics.dMaxPrecision,oMetrics.dMaxFMeasure,oMetrics.dAreaPR);
 }
 
-std::string lv::DataReporter_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500>::writeInlineEvalReport(size_t nIndentSize) const {
+std::string lv::DataReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::writeInlineEvalReport(size_t nIndentSize) const {
     if(!getTotPackets())
         return std::string();
     const size_t nCellSize = 12;
@@ -784,7 +784,7 @@ std::string lv::DataReporter_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSD
     ssStr << std::fixed;
     if(isGroup() && !isBare())
         for(const auto& pBatch : getBatches(true))
-            ssStr << pBatch->shared_from_this_cast<const DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500>>(true)->DataReporter_<eDatasetEval_BinaryClassifier,eDataset_BSDS500>::writeInlineEvalReport(nIndentSize+1);
+            ssStr << pBatch->shared_from_this_cast<const DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>>(true)->DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>::writeInlineEvalReport(nIndentSize+1);
     IMetricsCalculatorConstPtr pMetrics = getMetrics();
     lvAssert(pMetrics.get());
     const BSDS500MetricsCalculator& oMetrics = dynamic_cast<const BSDS500MetricsCalculator&>(*pMetrics.get());
@@ -799,14 +799,14 @@ std::string lv::DataReporter_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSD
     return ssStr.str();
 }
 
-lv::IMetricsAccumulatorConstPtr lv::DataEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500,lv::eNonParallel>::getMetricsBase() const {
+lv::IMetricsAccumulatorConstPtr lv::DataEvaluator_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500,lv::NonParallel>::getMetricsBase() const {
     if(!m_pMetricsBase)
         return BSDS500MetricsAccumulator::create(DATASETS_BSDS500_EVAL_DEFAULT_THRESH_BINS);
     return m_pMetricsBase;
 }
 
-void lv::DataEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500,lv::eNonParallel>::push(const cv::Mat& oClassif, size_t nIdx) {
-    IDataConsumer_<eDatasetEval_BinaryClassifier>::push(oClassif,nIdx);
+void lv::DataEvaluator_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500,lv::NonParallel>::push(const cv::Mat& oClassif, size_t nIdx) {
+    IDataConsumer_<DatasetEval_BinaryClassifier>::push(oClassif,nIdx);
     if(getDatasetInfo()->isUsingEvaluator()) {
         auto pLoader = shared_from_this_cast<IDataLoader>(true);
         if(!m_pMetricsBase)
@@ -815,11 +815,11 @@ void lv::DataEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500,l
     }
 }
 
-cv::Mat lv::DataEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500,lv::eNonParallel>::getColoredMask(const cv::Mat& oClassif, size_t nIdx) {
+cv::Mat lv::DataEvaluator_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500,lv::NonParallel>::getColoredMask(const cv::Mat& oClassif, size_t nIdx) {
     auto pLoader = shared_from_this_cast<IDataLoader>(true);
     return BSDS500MetricsAccumulator::getColoredMask(oClassif,pLoader->getGT(nIdx),pLoader->getInputROI(nIdx));
 }
 
-void lv::DataEvaluator_<lv::eDatasetEval_BinaryClassifier,lv::eDataset_BSDS500,lv::eNonParallel>::resetMetrics() {
+void lv::DataEvaluator_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500,lv::NonParallel>::resetMetrics() {
     m_pMetricsBase = BSDS500MetricsAccumulator::create(DATASETS_BSDS500_EVAL_DEFAULT_THRESH_BINS);
 }

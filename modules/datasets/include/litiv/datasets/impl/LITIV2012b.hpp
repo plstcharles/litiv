@@ -22,9 +22,9 @@
 #error "This file should never be included directly; use litiv/datasets.hpp instead"
 #endif //__LITIV_DATASETS_IMPL_H
 
-template<lv::eParallelAlgoType eEvalImpl>
-struct Dataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b,eEvalImpl> :
-        public IDataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b,eEvalImpl> {
+template<lv::ParallelAlgoType eEvalImpl>
+struct Dataset_<eDatasetType_VideoRegistr,Dataset_VideoRegistr_LITIV2012b,eEvalImpl> :
+        public IDataset_<eDatasetType_VideoRegistr,Dataset_VideoRegistr_LITIV2012b,eEvalImpl> {
 protected: // should still be protected, as creation should always be done via datasets::create
     Dataset_(
             const std::string& sOutputDirName, ///< output directory (full) path for debug logs, evaluation reports and results archiving (will be created in LITIV dataset folder)
@@ -33,7 +33,7 @@ protected: // should still be protected, as creation should always be done via d
             bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
             double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
     ) :
-            IDataset_<eDatasetType_VideoRegistr,eDataset_VideoRegistr_LITIV2012b,eEvalImpl>(
+            IDataset_<eDatasetType_VideoRegistr,Dataset_VideoRegistr_LITIV2012b,eEvalImpl>(
                     "LITIV 2012b (CVPRW2015 update)",
                     lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"litiv/litiv2012b/",
                     lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"litiv/litiv2012b/"+lv::AddDirSlashIfMissing(sOutputDirName),
@@ -50,9 +50,9 @@ protected: // should still be protected, as creation should always be done via d
             ) {}
 };
 
-template<eDatasetTaskList eDatasetTask>
-struct DataProducer_<eDatasetTask,eDatasetSource_Video,eDataset_LITIV2012b> :
-        public DataProducer_c<eDatasetTask,eDatasetSource_Video> {
+template<DatasetTaskList eDatasetTask>
+struct DataProducer_<eDatasetTask,DatasetSource_Video,Dataset_LITIV2012b> :
+        public DataProducer_c<eDatasetTask,DatasetSource_Video> {
 protected:
     virtual void parseData() override final {
         /* @@@@ old bsds500 below
@@ -123,8 +123,8 @@ protected:
             CV_Assert(!oImage.empty());
             CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size() || m_voOrigImageSizes[nImageIdx]==oImage.size());
             m_voOrigImageSizes[nImageIdx] = oImage.size();
-            if(m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid || m_eDatasetID==eDataset_BSDS500_segm_train_valid_test ||
-               m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test) {
+            if(m_eDatasetID==Dataset_BSDS500_segm_train || m_eDatasetID==Dataset_BSDS500_segm_train_valid || m_eDatasetID==Dataset_BSDS500_segm_train_valid_test ||
+               m_eDatasetID==Dataset_BSDS500_edge_train || m_eDatasetID==Dataset_BSDS500_edge_train_valid || m_eDatasetID==Dataset_BSDS500_edge_train_valid_test) {
                 CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
                 if(oImage.size()==cv::Size(321,481))
                     cv::transpose(oImage,oImage);
@@ -143,7 +143,7 @@ protected:
         /*
         cv::Mat lv::Image::Segm::Set::GetGTFromIndex_external(size_t nImageIdx) {
             cv::Mat oImage;
-            if(m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test) {
+            if(m_eDatasetID==Dataset_BSDS500_edge_train || m_eDatasetID==Dataset_BSDS500_edge_train_valid || m_eDatasetID==Dataset_BSDS500_edge_train_valid_test) {
                 if(m_vsGTImagePaths.size()>nImageIdx) {
                     std::vector<std::string> vsTempPaths;
                     lv::GetFilesFromDir(m_vsGTImagePaths[nImageIdx],vsTempPaths);
@@ -184,8 +184,8 @@ protected:
             std::stringstream sResultFilePath;
             sResultFilePath << m_sResultsPath << m_sResultNamePrefix << m_vsOrigImageNames[nImageIdx] << m_sResultNameSuffix;
             cv::Mat oImage = cv::imread(sResultFilePath.str(),m_bForcingGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
-            if(m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid || m_eDatasetID==eDataset_BSDS500_segm_train_valid_test ||
-               m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test) {
+            if(m_eDatasetID==Dataset_BSDS500_segm_train || m_eDatasetID==Dataset_BSDS500_segm_train_valid || m_eDatasetID==Dataset_BSDS500_segm_train_valid_test ||
+               m_eDatasetID==Dataset_BSDS500_edge_train || m_eDatasetID==Dataset_BSDS500_edge_train_valid || m_eDatasetID==Dataset_BSDS500_edge_train_valid_test) {
                 CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
                 CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size() || m_voOrigImageSizes[nImageIdx]==oImage.size());
                 m_voOrigImageSizes[nImageIdx] = oImage.size();
@@ -200,8 +200,8 @@ protected:
             CV_Assert(m_vsOrigImageNames[nImageIdx]!=std::string());
             CV_Assert(!m_sResultNameSuffix.empty());
             cv::Mat oImage = oResult;
-            if(m_eDatasetID==eDataset_BSDS500_segm_train || m_eDatasetID==eDataset_BSDS500_segm_train_valid || m_eDatasetID==eDataset_BSDS500_segm_train_valid_test ||
-               m_eDatasetID==eDataset_BSDS500_edge_train || m_eDatasetID==eDataset_BSDS500_edge_train_valid || m_eDatasetID==eDataset_BSDS500_edge_train_valid_test) {
+            if(m_eDatasetID==Dataset_BSDS500_segm_train || m_eDatasetID==Dataset_BSDS500_segm_train_valid || m_eDatasetID==Dataset_BSDS500_segm_train_valid_test ||
+               m_eDatasetID==Dataset_BSDS500_edge_train || m_eDatasetID==Dataset_BSDS500_edge_train_valid || m_eDatasetID==Dataset_BSDS500_edge_train_valid_test) {
                 CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
                 CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size(481,321) || m_voOrigImageSizes[nImageIdx]==cv::Size(321,481));
                 if(m_voOrigImageSizes[nImageIdx]==cv::Size(321,481))

@@ -100,27 +100,27 @@ namespace rlutil {
 #endif //ndef RLUTIL_STRING_T
     inline void RLUTIL_PRINT(RLUTIL_STRING_T st) { std::cout << st; }
 
-    enum eColorCode {
-        eColor_BLACK=0,
-        eColor_BLUE,
-        eColor_GREEN,
-        eColor_CYAN,
-        eColor_RED,
-        eColor_MAGENTA,
-        eColor_BROWN,
-        eColor_GREY,
-        eColor_DARKGREY,
-        eColor_LIGHTBLUE,
-        eColor_LIGHTGREEN,
-        eColor_LIGHTCYAN,
-        eColor_LIGHTRED,
-        eColor_LIGHTMAGENTA,
-        eColor_BOLDYELLOW,
-        eColor_BOLDWHITE,
-        eColor_RESET,
+    enum ColorCode {
+        Color_BLACK=0,
+        Color_BLUE,
+        Color_GREEN,
+        Color_CYAN,
+        Color_RED,
+        Color_MAGENTA,
+        Color_BROWN,
+        Color_GREY,
+        Color_DARKGREY,
+        Color_LIGHTBLUE,
+        Color_LIGHTGREEN,
+        Color_LIGHTCYAN,
+        Color_LIGHTRED,
+        Color_LIGHTMAGENTA,
+        Color_BOLDYELLOW,
+        Color_BOLDWHITE,
+        Color_RESET,
         // codes below are not supported on windows
-        eColor_BOLDGREEN,
-        eColor_BOLDRED,
+        Color_BOLDGREEN,
+        Color_BOLDRED,
     };
 
     /**
@@ -314,37 +314,37 @@ namespace rlutil {
     }
 
     // returns ANSI color escape sequence for specified color enum
-    inline RLUTIL_STRING_T getANSIColor(const eColorCode c) {
+    inline RLUTIL_STRING_T getANSIColor(const ColorCode c) {
         switch(c) {
-            case eColor_BLACK : return ANSI_BLACK;
-            case eColor_BLUE : return ANSI_BLUE; // non-ANSI
-            case eColor_GREEN : return ANSI_GREEN;
-            case eColor_BOLDGREEN : return ANSI_BOLDGREEN;
-            case eColor_CYAN : return ANSI_CYAN; // non-ANSI
-            case eColor_RED : return ANSI_RED; // non-ANSI
-            case eColor_BOLDRED : return ANSI_BOLDRED;
-            case eColor_MAGENTA : return ANSI_MAGENTA;
-            case eColor_BROWN : return ANSI_BROWN;
-            case eColor_GREY : return ANSI_GREY;
-            case eColor_DARKGREY : return ANSI_DARKGREY;
-            case eColor_LIGHTBLUE : return ANSI_LIGHTBLUE; // non-ANSI
-            case eColor_LIGHTGREEN: return ANSI_LIGHTGREEN;
-            case eColor_LIGHTCYAN: return ANSI_LIGHTCYAN; // non-ANSI;
-            case eColor_LIGHTRED: return ANSI_LIGHTRED; // non-ANSI;
-            case eColor_LIGHTMAGENTA: return ANSI_LIGHTMAGENTA;
-            case eColor_BOLDYELLOW: return ANSI_BOLDYELLOW; // non-ANSI
-            case eColor_BOLDWHITE: return ANSI_BOLDWHITE;
-            case eColor_RESET: return ANSI_RESET;
+            case Color_BLACK : return ANSI_BLACK;
+            case Color_BLUE : return ANSI_BLUE; // non-ANSI
+            case Color_GREEN : return ANSI_GREEN;
+            case Color_BOLDGREEN : return ANSI_BOLDGREEN;
+            case Color_CYAN : return ANSI_CYAN; // non-ANSI
+            case Color_RED : return ANSI_RED; // non-ANSI
+            case Color_BOLDRED : return ANSI_BOLDRED;
+            case Color_MAGENTA : return ANSI_MAGENTA;
+            case Color_BROWN : return ANSI_BROWN;
+            case Color_GREY : return ANSI_GREY;
+            case Color_DARKGREY : return ANSI_DARKGREY;
+            case Color_LIGHTBLUE : return ANSI_LIGHTBLUE; // non-ANSI
+            case Color_LIGHTGREEN: return ANSI_LIGHTGREEN;
+            case Color_LIGHTCYAN: return ANSI_LIGHTCYAN; // non-ANSI;
+            case Color_LIGHTRED: return ANSI_LIGHTRED; // non-ANSI;
+            case Color_LIGHTMAGENTA: return ANSI_LIGHTMAGENTA;
+            case Color_BOLDYELLOW: return ANSI_BOLDYELLOW; // non-ANSI
+            case Color_BOLDWHITE: return ANSI_BOLDWHITE;
+            case Color_RESET: return ANSI_RESET;
             default: return "";
         }
     }
 
     // changes color specified by enum (Windows / QBasic colors)
-    inline void setColor(eColorCode c) {
+    inline void setColor(ColorCode c) {
 #if defined(_WIN32) && !defined(RLUTIL_USE_ANSI)
-        if(c==eColor_RESET)
+        if(c==Color_RESET)
             system("color 07");
-        else if(c<eColor_RESET) {
+        else if(c<Color_RESET) {
             HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
             SetConsoleTextAttribute(hConsole,(WORD)c);
         }
@@ -518,17 +518,17 @@ namespace lv {
         const int nCols = rlutil::tcols();
         printf("\r%s  ",sMsg.c_str());
         if(nRows>0 && nCols>0)
-            rlutil::setColor(rlutil::eColor_BOLDWHITE);
+            rlutil::setColor(rlutil::Color_BOLDWHITE);
         printf("[");
         const size_t nComplBars = size_t(fCompletion*nBarCols);
         for(size_t n=0; n<nBarCols; ++n) {
             if(nRows>0 && nCols>0) {
                 if(n<nBarCols/3)
-                    rlutil::setColor(rlutil::eColor_BOLDRED);
+                    rlutil::setColor(rlutil::Color_BOLDRED);
                 else if(n>=(nBarCols-nBarCols/3))
-                    rlutil::setColor(rlutil::eColor_BOLDGREEN);
+                    rlutil::setColor(rlutil::Color_BOLDGREEN);
                 else
-                    rlutil::setColor(rlutil::eColor_BOLDYELLOW);
+                    rlutil::setColor(rlutil::Color_BOLDYELLOW);
             }
             if(n<=nComplBars)
                 printf("=");
@@ -536,10 +536,10 @@ namespace lv {
                 printf(" ");
         }
         if(nRows>0 && nCols>0)
-            rlutil::setColor(rlutil::eColor_BOLDWHITE);
+            rlutil::setColor(rlutil::Color_BOLDWHITE);
         printf("]");
         if(nRows>0 && nCols>0)
-            rlutil::setColor(rlutil::eColor_RESET);
+            rlutil::setColor(rlutil::Color_RESET);
         printf(" ");
         fflush(stdout);
     }
