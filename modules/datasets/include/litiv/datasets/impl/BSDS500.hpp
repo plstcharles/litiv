@@ -87,12 +87,12 @@ protected:
         lv::GetFilesFromDir(this->getDataPath(),this->m_vsInputPaths);
         lv::FilterFilePaths(this->m_vsInputPaths,{},{".jpg",".png",".bmp"});
         if(this->m_vsInputPaths.empty())
-            lvErrorExt("BSDS500 set '%s' did not possess any jpg/png/bmp image file",this->getName().c_str());
+            lvError_("BSDS500 set '%s' did not possess any jpg/png/bmp image file",this->getName().c_str());
         lv::GetSubDirsFromDir(lv::AddDirSlashIfMissing(this->getDatasetInfo()->getDatasetPath())+"../groundTruth_bdry_images/"+this->getRelativePath(),this->m_vsGTPaths);
         if(this->m_vsGTPaths.empty())
-            lvErrorExt("BSDS500 set '%s' did not possess any groundtruth image folders",this->getName().c_str());
+            lvError_("BSDS500 set '%s' did not possess any groundtruth image folders",this->getName().c_str());
         else if(this->m_vsGTPaths.size()!=this->m_vsInputPaths.size())
-            lvErrorExt("BSDS500 set '%s' input/groundtruth count mismatch",this->getName().c_str());
+            lvError_("BSDS500 set '%s' input/groundtruth count mismatch",this->getName().c_str());
         // make sure folders are non-empty, and folders & images are similarliy ordered
         std::vector<std::string> vsTempPaths;
         for(size_t nImageIdx=0; nImageIdx<this->m_vsGTPaths.size(); ++nImageIdx) {

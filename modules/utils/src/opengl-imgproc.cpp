@@ -51,26 +51,26 @@ GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t 
         m_nOutputType(nOutputType),
         m_nDebugType(nDebugType),
         m_nInputType(-1) {
-    glAssert(m_nLevels>0 && GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT>1 && m_nComputeStages>0);
+    lvAssert(m_nLevels>0 && GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT>1 && m_nComputeStages>0);
     if(m_bUsingTexArrays && !glGetTextureSubImage && (m_bUsingDebugPBOs || m_bUsingOutputPBOs))
-        glError("missing impl for texture arrays pbo fetch when glGetTextureSubImage is not available");
+        lvError("missing impl for texture arrays pbo fetch when glGetTextureSubImage is not available");
     const std::array<int,3> anMaxWorkGroupSize = lv::gl::getIntegerVal<3>(GL_MAX_COMPUTE_WORK_GROUP_SIZE);
     if(anMaxWorkGroupSize[0]<(int)m_vDefaultWorkGroupSize.x || anMaxWorkGroupSize[1]<(int)m_vDefaultWorkGroupSize.y)
-        glErrorExt("workgroup size limit is too small for the current impl (curr=[%d,%d], req=[%d,%d])",anMaxWorkGroupSize[0],anMaxWorkGroupSize[1],(int)m_vDefaultWorkGroupSize.x,(int)m_vDefaultWorkGroupSize.y);
+        lvError_("workgroup size limit is too small for the current impl (curr=[%d,%d], req=[%d,%d])",anMaxWorkGroupSize[0],anMaxWorkGroupSize[1],(int)m_vDefaultWorkGroupSize.x,(int)m_vDefaultWorkGroupSize.y);
     const size_t nCurrComputeStageInvocs = m_vDefaultWorkGroupSize.x*m_vDefaultWorkGroupSize.y;
-    glAssert(nCurrComputeStageInvocs>0);
+    lvAssert(nCurrComputeStageInvocs>0);
     if((size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS)<nCurrComputeStageInvocs)
-        glErrorExt("compute invoc limit is too small for the current impl (curr=%lu, req=%lu)",(size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS),nCurrComputeStageInvocs);
+        lvError_("compute invoc limit is too small for the current impl (curr=%lu, req=%lu)",(size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS),nCurrComputeStageInvocs);
     if((size_t)lv::gl::getIntegerVal<1>(GL_MAX_IMAGE_UNITS)<m_nImages || (size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_IMAGE_UNIFORMS)<m_nImages)
-        glError("image units limit is too small for the current impl");
+        lvError("image units limit is too small for the current impl");
     if((size_t)lv::gl::getIntegerVal<1>(GL_MAX_TEXTURE_UNITS)<m_nTextures)
-        glError("texture units limit is too small for the current impl");
+        lvError("texture units limit is too small for the current impl");
     if((size_t)lv::gl::getIntegerVal<1>(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS)<m_nSSBOs)
-        glError("ssbo bindings limit is too small for the current impl");
+        lvError("ssbo bindings limit is too small for the current impl");
     if((size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_SHADER_STORAGE_BLOCKS)<m_nSSBOs)
-        glError("ssbo blocks limit is too small for the current impl");
+        lvError("ssbo blocks limit is too small for the current impl");
     if((size_t)lv::gl::getIntegerVal<1>(GL_MAX_ATOMIC_COUNTER_BUFFER_BINDINGS)<m_nACBOs)
-        glError("atomic bo bindings limit is too small for the current impl");
+        lvError("atomic bo bindings limit is too small for the current impl");
     if(m_bUsingTimers)
         glGenQueries((GLsizei)m_nGLTimers.size(),m_nGLTimers.data());
     if(m_nSSBOs) {
@@ -102,15 +102,15 @@ std::string GLImageProcAlgo::getFragmentShaderSource() const {
 
 void GLImageProcAlgo::initialize_gl(const cv::Mat& oInitInput, const cv::Mat& oROI) {
     m_bGLInitialized = false;
-    glAssert(!oROI.empty() && oROI.isContinuous() && oROI.type()==CV_8UC1);
+    lvAssert(!oROI.empty() && oROI.isContinuous() && oROI.type()==CV_8UC1);
     if(m_bUsingInput) {
-        glAssert(!oInitInput.empty() && oInitInput.size()==oROI.size() && oInitInput.isContinuous());
+        lvAssert(!oInitInput.empty() && oInitInput.size()==oROI.size() && oInitInput.isContinuous());
         m_nInputType = oInitInput.type();
     }
     m_oFrameSize = oROI.size();
     const std::array<int,3> anMaxWorkGroupCount = lv::gl::getIntegerVal<3>(GL_MAX_COMPUTE_WORK_GROUP_COUNT);
     if(anMaxWorkGroupCount[0]<(int)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x) || anMaxWorkGroupCount[1]<(int)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y))
-        glError("workgroup count dispatch limit is too small for the current impl");
+        lvError("workgroup count dispatch limit is too small for the current impl");
     for(size_t nPBOIter=0; nPBOIter<2; ++nPBOIter) {
         if(m_bUsingOutputPBOs)
             m_apOutputPBOs[nPBOIter] = std::make_unique<GLPixelBufferObject>(cv::Mat(m_oFrameSize,m_nOutputType),GL_PIXEL_PACK_BUFFER,GL_STREAM_READ);
@@ -183,20 +183,20 @@ void GLImageProcAlgo::initialize_gl(const cv::Mat& oInitInput, const cv::Mat& oR
         m_vpImgProcShaders[nCurrStageIter] = std::make_unique<GLShader>();
         m_vpImgProcShaders[nCurrStageIter]->addSource(getComputeShaderSource(nCurrStageIter),GL_COMPUTE_SHADER);
         if(!m_vpImgProcShaders[nCurrStageIter]->link())
-            glError("Could not link image processing shader");
+            lvError("Could not link image processing shader");
     }
     m_oDisplayShader.clear();
     m_oDisplayShader.addSource(this->getVertexShaderSource(),GL_VERTEX_SHADER);
     m_oDisplayShader.addSource(this->getFragmentShaderSource(),GL_FRAGMENT_SHADER);
     if(!m_oDisplayShader.link())
-        glError("Could not link display shader");
+        lvError("Could not link display shader");
     glErrorCheck;
     m_nInternalFrameIdx = 0;
     m_bGLInitialized = true;
 }
 
 void GLImageProcAlgo::apply_gl(const cv::Mat& oNextInput, bool bRebindAll) {
-    glAssert(m_bGLInitialized && (oNextInput.empty() || (oNextInput.type()==m_nInputType && oNextInput.size()==m_oFrameSize && oNextInput.isContinuous())));
+    lvAssert(m_bGLInitialized && (oNextInput.empty() || (oNextInput.type()==m_nInputType && oNextInput.size()==m_oFrameSize && oNextInput.isContinuous())));
     m_nLastLayer = m_nCurrLayer;
     m_nCurrLayer = m_nNextLayer;
     ++m_nNextLayer %= GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT;
@@ -266,7 +266,7 @@ void GLImageProcAlgo::apply_gl(const cv::Mat& oNextInput, bool bRebindAll) {
         glBeginQuery(GL_TIME_ELAPSED,m_nGLTimers[GLImageProcAlgo::GLTimer_ComputeDispatch]);
     }
     for(size_t nCurrStageIter=0; nCurrStageIter<m_nComputeStages; ++nCurrStageIter) {
-        glAssert(m_vpImgProcShaders[nCurrStageIter]->activate());
+        lvAssert(m_vpImgProcShaders[nCurrStageIter]->activate());
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getCurrTextureLayerUniformName(),(GLuint)m_nCurrLayer);
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getLastTextureLayerUniformName(),(GLuint)m_nLastLayer);
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getFrameIndexUniformName(),(GLuint)m_nInternalFrameIdx);
@@ -349,7 +349,7 @@ void GLImageProcAlgo::apply_gl(const cv::Mat& oNextInput, bool bRebindAll) {
         }
         if(m_bUsingTimers)
             glBeginQuery(GL_TIME_ELAPSED,m_nGLTimers[GLImageProcAlgo::GLTimer_DisplayUpdate]);
-        glAssert(m_oDisplayShader.activate());
+        lvAssert(m_oDisplayShader.activate());
         m_oDisplayShader.setUniform1ui(getCurrTextureLayerUniformName(),(GLuint)m_nCurrLayer);
         m_oDisplayBillboard.render();
         if(m_bUsingTimers)
@@ -375,7 +375,7 @@ void GLImageProcAlgo::apply_gl(const cv::Mat& oNextInput, bool bRebindAll) {
 }
 
 size_t GLImageProcAlgo::fetchLastOutput(cv::Mat& oOutput) const {
-    glAssert(m_bFetchingOutput);
+    lvAssert(m_bFetchingOutput);
     oOutput.create(m_oFrameSize,m_nOutputType);
     if(m_bUsingOutputPBOs)
         m_apOutputPBOs[m_nNextPBO]->fetchBuffer(oOutput,true);
@@ -385,7 +385,7 @@ size_t GLImageProcAlgo::fetchLastOutput(cv::Mat& oOutput) const {
 }
 
 size_t GLImageProcAlgo::fetchLastDebug(cv::Mat& oDebug) const {
-    glAssert(m_bFetchingDebug);
+    lvAssert(m_bFetchingDebug);
     oDebug.create(m_oFrameSize,m_nDebugType);
     if(m_bUsingDebugPBOs)
         m_apDebugPBOs[m_nNextPBO]->fetchBuffer(oDebug,true);
@@ -395,7 +395,7 @@ size_t GLImageProcAlgo::fetchLastDebug(cv::Mat& oDebug) const {
 }
 
 void GLImageProcAlgo::dispatch(size_t nStage, GLShader&) {
-    glAssert(nStage<m_nComputeStages);
+    lvAssert(nStage<m_nComputeStages);
     glDispatchCompute((GLuint)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x),(GLuint)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y),1);
 }
 
@@ -553,11 +553,11 @@ GLImageProcEvaluatorAlgo::GLImageProcEvaluatorAlgo( const std::shared_ptr<GLImag
         m_nCurrEvalBufferOffsetPtr(0),
         m_nCurrEvalBufferOffsetBlock(0),
         m_pParent(pParent) {
-    glAssert(m_bUsingInput && m_pParent->m_bUsingOutput);
-    glAssert(m_nGroundtruthType>=0 && m_nGroundtruthType==m_pParent->m_nOutputType);
-    glAssert(!dynamic_cast<GLImageProcEvaluatorAlgo*>(m_pParent.get()));
-    glAssert(nTotFrameCount>0 && nCountersPerFrame>0);
-    glAssert(m_nEvalBufferMaxSize>nCountersPerFrame*4);
+    lvAssert(m_bUsingInput && m_pParent->m_bUsingOutput);
+    lvAssert(m_nGroundtruthType>=0 && m_nGroundtruthType==m_pParent->m_nOutputType);
+    lvAssert(!dynamic_cast<GLImageProcEvaluatorAlgo*>(m_pParent.get()));
+    lvAssert(nTotFrameCount>0 && nCountersPerFrame>0);
+    lvAssert(m_nEvalBufferMaxSize>nCountersPerFrame*4);
     if(m_nEvalBufferMaxSize<=m_nCurrEvalBufferSize) {
         while(m_nEvalBufferMaxSize<=m_nCurrEvalBufferSize)
             m_nCurrEvalBufferSize /= 2;
@@ -570,7 +570,7 @@ GLImageProcEvaluatorAlgo::GLImageProcEvaluatorAlgo( const std::shared_ptr<GLImag
 GLImageProcEvaluatorAlgo::~GLImageProcEvaluatorAlgo() {}
 
 const cv::Mat& GLImageProcEvaluatorAlgo::getEvaluationAtomicCounterBuffer() {
-    glAssert(m_bGLInitialized);
+    lvAssert(m_bGLInitialized);
     glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER,getACBOId(GLImageProcAlgo::AtomicCounterBuffer_EvalBinding));
     if(m_nCurrEvalBufferOffsetPtr)
@@ -588,9 +588,9 @@ void GLImageProcEvaluatorAlgo::initialize_gl(const cv::Mat& oInitInput, const cv
 }
 
 void GLImageProcEvaluatorAlgo::initialize_gl(const cv::Mat& oInitGT, const cv::Mat& oROI) {
-    glAssert(!oROI.empty() && oROI.isContinuous() && oROI.type()==CV_8UC1);
-    glAssert(oROI.size()==m_pParent->m_oFrameSize);
-    glAssert(oInitGT.type()==m_nGroundtruthType && oInitGT.size()==oROI.size() && oInitGT.isContinuous());
+    lvAssert(!oROI.empty() && oROI.isContinuous() && oROI.type()==CV_8UC1);
+    lvAssert(oROI.size()==m_pParent->m_oFrameSize);
+    lvAssert(oInitGT.type()==m_nGroundtruthType && oInitGT.size()==oROI.size() && oInitGT.isContinuous());
     m_bGLInitialized = false;
     m_oFrameSize = oROI.size();
     for(size_t nPBOIter=0; nPBOIter<2; ++nPBOIter) {
@@ -648,19 +648,19 @@ void GLImageProcEvaluatorAlgo::initialize_gl(const cv::Mat& oInitGT, const cv::M
         m_vpImgProcShaders[nCurrStageIter] = std::make_unique<GLShader>();
         m_vpImgProcShaders[nCurrStageIter]->addSource(getComputeShaderSource(nCurrStageIter),GL_COMPUTE_SHADER);
         if(!m_vpImgProcShaders[nCurrStageIter]->link())
-            glError("Could not link image processing shader");
+            lvError("Could not link image processing shader");
     }
     m_oDisplayShader.clear();
     m_oDisplayShader.addSource(this->getVertexShaderSource(),GL_VERTEX_SHADER);
     m_oDisplayShader.addSource(this->getFragmentShaderSource(),GL_FRAGMENT_SHADER);
     if(!m_oDisplayShader.link())
-        glError("Could not link display shader");
+        lvError("Could not link display shader");
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER,getACBOId(GLImageProcAlgo::AtomicCounterBuffer_EvalBinding));
     glBufferData(GL_ATOMIC_COUNTER_BUFFER,m_nCurrEvalBufferSize,NULL,GL_DYNAMIC_READ);
     glClearBufferData(GL_ATOMIC_COUNTER_BUFFER,GL_R32UI,GL_RED_INTEGER,GL_INT,NULL);
     /*GLuint* pAtomicCountersPtr = (GLuint*)glMapBufferRange(GL_ATOMIC_COUNTER_BUFFER,0,m_nCurrEvalBufferSize,GL_MAP_WRITE_BIT|GL_MAP_INVALIDATE_BUFFER_BIT|GL_MAP_UNSYNCHRONIZED_BIT);
     if(!pAtomicCountersPtr)
-        glError("Could not init atomic counters");
+        lvError("Could not init atomic counters");
     memset(pAtomicCountersPtr,0,m_nCurrEvalBufferSize);
     glUnmapBuffer(GL_ATOMIC_COUNTER_BUFFER);*/
     m_nCurrEvalBufferOffsetPtr = 0;
@@ -678,7 +678,7 @@ void GLImageProcEvaluatorAlgo::apply_gl(const cv::Mat& oNextInput, const cv::Mat
 }
 
 void GLImageProcEvaluatorAlgo::apply_gl(const cv::Mat& oNextGT, bool bRebindAll) {
-    glAssert(m_bGLInitialized && (oNextGT.empty() || (oNextGT.type()==m_nGroundtruthType && oNextGT.size()==m_oFrameSize && oNextGT.isContinuous())));
+    lvAssert(m_bGLInitialized && (oNextGT.empty() || (oNextGT.type()==m_nGroundtruthType && oNextGT.size()==m_oFrameSize && oNextGT.isContinuous())));
     CV_Assert(m_nInternalFrameIdx<m_nTotFrameCount);
     m_nLastLayer = m_nCurrLayer;
     m_nCurrLayer = m_nNextLayer;
@@ -729,7 +729,7 @@ void GLImageProcEvaluatorAlgo::apply_gl(const cv::Mat& oNextGT, bool bRebindAll)
     }
     m_pROITexture->bindToImage(GLImageProcAlgo::Image_ROIBinding,0,GL_READ_ONLY);
     for(size_t nCurrStageIter=0; nCurrStageIter<m_nComputeStages; ++nCurrStageIter) {
-        glAssert(m_vpImgProcShaders[nCurrStageIter]->activate());
+        lvAssert(m_vpImgProcShaders[nCurrStageIter]->activate());
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getCurrTextureLayerUniformName(),(GLuint)m_nCurrLayer);
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getLastTextureLayerUniformName(),(GLuint)m_nLastLayer);
         m_vpImgProcShaders[nCurrStageIter]->setUniform1ui(getFrameIndexUniformName(),(GLuint)m_nInternalFrameIdx);
@@ -777,7 +777,7 @@ void GLImageProcEvaluatorAlgo::apply_gl(const cv::Mat& oNextGT, bool bRebindAll)
             else
                 m_vpDebugArray[m_nCurrLayer]->bindToSampler((GLuint)getTextureBinding(m_nCurrLayer,GLImageProcAlgo::Texture_DebugBinding));
         }
-        glAssert(m_oDisplayShader.activate());
+        lvAssert(m_oDisplayShader.activate());
         m_oDisplayShader.setUniform1ui(getCurrTextureLayerUniformName(),(GLuint)m_nCurrLayer);
         m_oDisplayBillboard.render();
     }
@@ -787,11 +787,11 @@ void GLImageProcEvaluatorAlgo::apply_gl(const cv::Mat& oNextGT, bool bRebindAll)
 
 GLImagePassThroughAlgo::GLImagePassThroughAlgo(int nFrameType, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat) :
         GLImageProcAlgo(1,1,0,0,0,0,nFrameType,-1,true,bUseDisplay,bUseTimers,bUseIntegralFormat) {
-    glAssert(nFrameType>=0);
+    lvAssert(nFrameType>=0);
 }
 
 std::string GLImagePassThroughAlgo::getComputeShaderSource(size_t nStage) const {
-    glAssert(nStage<m_nComputeStages);
+    lvAssert(nStage<m_nComputeStages);
     return GLShader::getComputeShaderSource_PassThrough_ImgLoadCopy(m_vDefaultWorkGroupSize,lv::gl::getInternalFormatFromMatType(m_nOutputType,m_bUsingIntegralFormat),GLImageProcAlgo::Image_InputBinding,GLImageProcAlgo::Image_OutputBinding,m_bUsingIntegralFormat);
 }
 
@@ -807,18 +807,18 @@ BinaryMedianFilter::BinaryMedianFilter( size_t nKernelSize, size_t nBorderSize, 
         GLImageProcAlgo(1,4+bool(oROI.cols>m_nPPSMaxRowSize)+bool(oROI.rows>m_nPPSMaxRowSize),CV_8UC1,-1,CV_8UC1,bUseOutputPBOs,false,bUseInputPBOs,bUseTexArrays,bUseDisplay,bUseTimers,bUseIntegralFormat),
         m_nKernelSize(nKernelSize),
         m_nBorderSize(nBorderSize) {
-    glAssert((m_nKernelSize%2)==1 && m_nKernelSize>1 && m_nKernelSize<m_oFrameSize.width && m_nKernelSize<m_oFrameSize.height);
-    glAssert(m_nBorderSize<(m_oFrameSize.width-m_nKernelSize) && m_nBorderSize<(m_oFrameSize.height-m_nKernelSize));
+    lvAssert((m_nKernelSize%2)==1 && m_nKernelSize>1 && m_nKernelSize<m_oFrameSize.width && m_nKernelSize<m_oFrameSize.height);
+    lvAssert(m_nBorderSize<(m_oFrameSize.width-m_nKernelSize) && m_nBorderSize<(m_oFrameSize.height-m_nKernelSize));
     int nMaxComputeInvocs;@@@@ recheck for new workgroup sizes?
     glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS,&nMaxComputeInvocs);
     const size_t nCurrComputeStageInvocs = m_vDefaultWorkGroupSize.x*m_vDefaultWorkGroupSize.y;
-    glAssert(nCurrComputeStageInvocs>0 && nCurrComputeStageInvocs<nMaxComputeInvocs);
-    glAssert(m_nTransposeBlockSize*m_nTransposeBlockSize>0 && m_nTransposeBlockSize*m_nTransposeBlockSize<nMaxComputeInvocs);
+    lvAssert(nCurrComputeStageInvocs>0 && nCurrComputeStageInvocs<nMaxComputeInvocs);
+    lvAssert(m_nTransposeBlockSize*m_nTransposeBlockSize>0 && m_nTransposeBlockSize*m_nTransposeBlockSize<nMaxComputeInvocs);
     int nMaxWorkGroupCount_X, nMaxWorkGroupCount_Y;
     glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT,0,&nMaxWorkGroupCount_X);
     glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT,1,&nMaxWorkGroupCount_Y);
-    glAssert(m_oFrameSize.width<nMaxWorkGroupCount_X && m_oFrameSize.width<nMaxWorkGroupCount_Y);
-    glAssert(m_oFrameSize.height<nMaxWorkGroupCount_X && m_oFrameSize.height<nMaxWorkGroupCount_Y);
+    lvAssert(m_oFrameSize.width<nMaxWorkGroupCount_X && m_oFrameSize.width<nMaxWorkGroupCount_Y);
+    lvAssert(m_oFrameSize.height<nMaxWorkGroupCount_X && m_oFrameSize.height<nMaxWorkGroupCount_Y);
     const GLenum eInputInternalFormat = getIntegralFormatFromInternalFormat(getInternalFormatFromMatType(m_nInputType,m_bUsingIntegralFormat));
     const GLenum eAccumInternalFormat = getIntegralFormatFromInternalFormat(getInternalFormatFromMatType(CV_32SC1));
     if(m_oFrameSize.width>m_nPPSMaxRowSize) {
@@ -875,17 +875,17 @@ BinaryMedianFilter::BinaryMedianFilter( size_t nKernelSize, size_t nBorderSize, 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     m_vsComputeShaderSources.push_back(ssSrc.str());
     m_vvComputeShaderDispatchSizes.push_back(glm::uvec3((GLuint)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x),(GLuint)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y),1));
-    glAssert((int)m_vsComputeShaderSources.size()==m_nComputeStages && (int)m_vvComputeShaderDispatchSizes.size()==m_nComputeStages);
+    lvAssert((int)m_vsComputeShaderSources.size()==m_nComputeStages && (int)m_vvComputeShaderDispatchSizes.size()==m_nComputeStages);
 }
 
 std::string BinaryMedianFilter::getComputeShaderSource(size_t nStage) const {
     // @@@@ go check how opencv handles borders (sets as 0...?)
-    glAssert(nStage<m_nComputeStages);
+    lvAssert(nStage<m_nComputeStages);
     return m_vsComputeShaderSources[nStage];
 }
 
 void BinaryMedianFilter::dispatchCompute(size_t nStage, GLShader*) {
-    glAssert(nStage<m_nComputeStages);
+    lvAssert(nStage<m_nComputeStages);
     if(nCurrStageIter>0)
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // add barrier for acbo? ssbo? @@@@@
     glDispatchCompute(m_vvComputeShaderDispatchSizes[nStage].x,m_vvComputeShaderDispatchSizes[nStage].y,m_vvComputeShaderDispatchSizes[nStage].z);

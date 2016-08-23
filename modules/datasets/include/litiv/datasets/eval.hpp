@@ -144,9 +144,9 @@ namespace lv {
         virtual void _stopProcessing() override {
             if(m_pEvalAlgo && m_pEvalAlgo->getIsGLInitialized()) {
                 auto pEvalAlgo = std::dynamic_pointer_cast<GLBinaryClassifierEvaluator>(m_pEvalAlgo);
-                glAssert(pEvalAlgo);
+                lvAssert(pEvalAlgo);
                 BinClassifMetricsAccumulatorPtr pMetricsBase = pEvalAlgo->getMetricsBase();
-                glAssert(!DATASETUTILS_VALIDATE_ASYNC_EVALUATORS || !m_pMetricsBase || m_pMetricsBase->isEqual(pMetricsBase));
+                lvAssert(!DATASETUTILS_VALIDATE_ASYNC_EVALUATORS || !m_pMetricsBase || m_pMetricsBase->isEqual(pMetricsBase));
                 m_pMetricsBase = pMetricsBase;
             }
         }

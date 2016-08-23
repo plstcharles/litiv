@@ -399,7 +399,7 @@ void lv::IDataProducer_<lv::DatasetSource_Video>::parseData() {
         m_nFrameCount = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
     }
     if(oTempImg.empty())
-        lvErrorExt("Sequence '%s': video could not be opened via VideoReader or imread (you might need to implement your own DataProducer_ interface)",getName().c_str());
+        lvError_("Sequence '%s': video could not be opened via VideoReader or imread (you might need to implement your own DataProducer_ interface)",getName().c_str());
     m_oOrigSize = oTempImg.size();
     const double dScale = getDatasetInfo()->getScaleFactor();
     if(dScale!=1.0)
@@ -516,7 +516,7 @@ void lv::IDataProducer_<lv::DatasetSource_Image>::parseData() {
     lv::GetFilesFromDir(getDataPath(),m_vsInputPaths);
     lv::FilterFilePaths(m_vsInputPaths,{},{".jpg",".png",".bmp"});
     if(m_vsInputPaths.empty())
-        lvErrorExt("Set '%s' did not possess any jpg/png/bmp image file",getName().c_str());
+        lvError_("Set '%s' did not possess any jpg/png/bmp image file",getName().c_str());
     m_bIsInputConstantSize = m_bIsGTConstantSize = true;
     m_oInputMaxSize = m_oGTMaxSize = cv::Size(0,0);
     m_voInputSizes.clear();
@@ -735,14 +735,14 @@ cv::Mat lv::IDataArchiver::load(size_t nIdx) const {
 #if HAVE_GLSL
 
 cv::Size lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::getIdealGLWindowSize() const {
-    glAssert(getTotPackets()>1);
+    lvAssert(getTotPackets()>1);
     cv::Size oWindowSize = shared_from_this_cast<const IDataLoader>(true)->getInputMaxSize();
     if(m_pEvalAlgo) {
-        glAssert(m_pEvalAlgo->getIsGLInitialized());
+        lvAssert(m_pEvalAlgo->getIsGLInitialized());
         oWindowSize.width *= int(m_pEvalAlgo->m_nSxSDisplayCount);
     }
     else if(m_pAlgo) {
-        glAssert(m_pAlgo->getIsGLInitialized());
+        lvAssert(m_pAlgo->getIsGLInitialized());
         oWindowSize.width *= int(m_pAlgo->m_nSxSDisplayCount);
     }
     return oWindowSize;
@@ -755,14 +755,14 @@ lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::IAsyncDataCo
 
 void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::pre_initialize_gl() {
     m_pLoader = shared_from_this_cast<IDataLoader>(true);
-    glAssert(m_pLoader->getTotPackets()>1);
-    glDbgAssert(m_pAlgo);
+    lvAssert(m_pLoader->getTotPackets()>1);
+    lvDbgAssert(m_pAlgo);
     m_oCurrInput = m_pLoader->getInput(m_nCurrIdx).clone();
     m_oNextInput = m_pLoader->getInput(m_nNextIdx).clone();
     m_oLastInput = m_oCurrInput.clone();
     CV_Assert(!m_oCurrInput.empty());
     CV_Assert(m_oCurrInput.isContinuous());
-    glAssert(m_oCurrInput.channels()==1 || m_oCurrInput.channels()==4);
+    lvAssert(m_oCurrInput.channels()==1 || m_oCurrInput.channels()==4);
     if(getDatasetInfo()->isSavingOutput() || m_pAlgo->m_pDisplayHelper)
         m_pAlgo->setOutputFetching(true);
     if(m_pAlgo->m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
@@ -773,18 +773,18 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::pre_ini
         m_oLastGT = m_oCurrGT.clone();
         CV_Assert(!m_oCurrGT.empty());
         CV_Assert(m_oCurrGT.isContinuous());
-        glAssert(m_oCurrGT.channels()==1 || m_oCurrGT.channels()==4);
+        lvAssert(m_oCurrGT.channels()==1 || m_oCurrGT.channels()==4);
     }
 }
 
 void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::post_initialize_gl() {
-    glDbgAssert(m_pAlgo);
+    lvDbgAssert(m_pAlgo);
 }
 
 void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::pre_apply_gl(size_t nNextIdx, bool bRebindAll) {
     UNUSED(bRebindAll);
-    glDbgAssert(m_pLoader);
-    glDbgAssert(m_pAlgo);
+    lvDbgAssert(m_pLoader);
+    lvDbgAssert(m_pAlgo);
     if(nNextIdx!=m_nNextIdx)
         m_oNextInput = m_pLoader->getInput(nNextIdx);
     if(getDatasetInfo()->isUsingEvaluator() && nNextIdx!=m_nNextIdx)
@@ -792,8 +792,8 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::pre_app
 }
 
 void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::post_apply_gl(size_t nNextIdx, bool bRebindAll) {
-    glDbgAssert(m_pLoader);
-    glDbgAssert(m_pAlgo);
+    lvDbgAssert(m_pLoader);
+    lvDbgAssert(m_pAlgo);
     if(m_pEvalAlgo && getDatasetInfo()->isUsingEvaluator())
         m_pEvalAlgo->apply_gl(m_oNextGT,bRebindAll);
     m_nLastIdx = m_nCurrIdx;

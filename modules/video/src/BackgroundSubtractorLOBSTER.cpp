@@ -108,7 +108,7 @@ void BackgroundSubtractorLOBSTER_GLSL::initialize_gl(const cv::Mat& oInitImg, co
     m_nRowStepSize = m_nColStepSize*m_oROI.cols;
     m_nBGModelSize = m_nRowStepSize*m_oROI.rows;
     const int nMaxSSBOBlockSize = lv::gl::getIntegerVal<1>(GL_MAX_SHADER_STORAGE_BLOCK_SIZE);
-    glAssert(nMaxSSBOBlockSize>(int)(m_nBGModelSize*sizeof(uint)) && nMaxSSBOBlockSize>(int)(m_nTMT32ModelSize*sizeof(lv::gl::TMT32GenParams)));
+    lvAssert(nMaxSSBOBlockSize>(int)(m_nBGModelSize*sizeof(uint)) && nMaxSSBOBlockSize>(int)(m_nTMT32ModelSize*sizeof(lv::gl::TMT32GenParams)));
     m_vnBGModelData.resize(m_nBGModelSize,0);
     lv::gl::TMT32GenParams::initTinyMT32Generators(glm::uvec3(uint(m_oROI.cols),uint(m_oROI.rows),1),m_voTMT32ModelData);
     m_bInitialized = true;
@@ -278,7 +278,7 @@ std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource_LOBSTER() c
 
 std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource_PostProc() const {
     lvDbgExceptionWatch;
-    glAssert(m_nDefaultMedianBlurKernelSize>0);
+    lvAssert(m_nDefaultMedianBlurKernelSize>0);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "#version 430\n"
@@ -306,8 +306,8 @@ std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource_PostProc() 
 
 std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource(size_t nStage) const {
     lvDbgExceptionWatch;
-    glAssert(m_bInitialized);
-    glAssert(nStage<m_nComputeStages);
+    lvAssert(m_bInitialized);
+    lvAssert(nStage<m_nComputeStages);
     if(nStage==0)
         return getComputeShaderSource_LOBSTER();
     else //nStage==1 && BGSLOBSTER_GLSL_USE_POSTPROC
@@ -316,7 +316,7 @@ std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource(size_t nSta
 
 void BackgroundSubtractorLOBSTER_GLSL::dispatch(size_t nStage, GLShader& oShader) {
     lvDbgExceptionWatch;
-    glAssert(nStage<m_nComputeStages);
+    lvAssert(nStage<m_nComputeStages);
     if(nStage==0) {
         if(m_dCurrLearningRate>0)
             oShader.setUniform1ui("nResamplingRate",(GLuint)ceil(m_dCurrLearningRate));
@@ -331,7 +331,7 @@ void BackgroundSubtractorLOBSTER_GLSL::dispatch(size_t nStage, GLShader& oShader
 void BackgroundSubtractorLOBSTER_GLSL::getBackgroundImage(cv::OutputArray oBGImg) const {
     lvDbgExceptionWatch;
     CV_Assert(m_bInitialized);
-    glAssert(m_bGLInitialized && !m_vnBGModelData.empty());
+    lvAssert(m_bGLInitialized && !m_vnBGModelData.empty());
     oBGImg.create(m_oFrameSize,CV_8UC(int(m_nImgChannels)));
     cv::Mat oOutputImg = oBGImg.getMatRef();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER_::LOBSTERStorageBuffer_BGModelBinding));
@@ -363,7 +363,7 @@ void BackgroundSubtractorLOBSTER_GLSL::getBackgroundImage(cv::OutputArray oBGImg
 void BackgroundSubtractorLOBSTER_GLSL::getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const {
     lvDbgExceptionWatch;
     CV_Assert(m_bInitialized);
-    glAssert(m_bGLInitialized && !m_vnBGModelData.empty());
+    lvAssert(m_bGLInitialized && !m_vnBGModelData.empty());
     static_assert(LBSP::DESC_SIZE==2,"Some assumptions are breaking below");
     oBGDescImg.create(m_oFrameSize,CV_16UC(int(m_nImgChannels)));
     cv::Mat oOutputImg = oBGDescImg.getMatRef();

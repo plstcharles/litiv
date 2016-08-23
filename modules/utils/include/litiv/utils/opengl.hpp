@@ -56,24 +56,6 @@ struct glutWindowDeleter {
 };
 #endif //HAVE_FREEGLUT
 
-#define glError(msg) throw lv::Exception(std::string("[glError] ")+msg,__PRETTY_FUNCTION__,__FILE__,__LINE__)
-#define glErrorExt(msg,...) throw lv::Exception(std::string("[glError] ")+msg,__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
-#define glAssert(expr) {if(!!(expr)); else glError("assertion failed ("#expr")");}
-#define glErrorCheck { \
-    GLenum __errn = glGetError(); \
-    if(__errn!=GL_NO_ERROR) \
-        glErrorExt("glErrorCheck failed [code=%d, msg=%s]",__errn,gluErrorString(__errn)); \
-}
-#ifdef _DEBUG
-#define glDbgAssert(expr) glAssert(expr)
-#define glDbgErrorCheck glErrorCheck
-#define glDbgExceptionWatch lv::UncaughtExceptionLogger __logger(__PRETTY_FUNCTION__,__FILE__,__LINE__)
-#else //(!defined(_DEBUG))
-#define glDbgAssert(expr)
-#define glDbgErrorCheck
-#define glDbgExceptionWatch
-#endif //(!defined(_DEBUG))
-
 namespace lv {
 
     namespace gl {
@@ -164,13 +146,13 @@ namespace lv {
                 case CV_32FC4:
                     return GL_RGBA32F;
                 case CV_32SC1:
-                    return bUseIntegralFormat?GL_R32UI:glError("opencv mat input format type cannot be matched to a predefined setup");
+                    return bUseIntegralFormat?GL_R32UI:lvError("opencv mat input format type cannot be matched to a predefined setup");
                 case CV_32SC3:
-                    return bUseIntegralFormat?GL_RGB32UI:glError("opencv mat input format type cannot be matched to a predefined setup");
+                    return bUseIntegralFormat?GL_RGB32UI:lvError("opencv mat input format type cannot be matched to a predefined setup");
                 case CV_32SC4:
-                    return bUseIntegralFormat?GL_RGBA32UI:glError("opencv mat input format type cannot be matched to a predefined setup");
+                    return bUseIntegralFormat?GL_RGBA32UI:lvError("opencv mat input format type cannot be matched to a predefined setup");
                 default:
-                    glError("opencv mat input format type did not match any predefined setup");
+                    lvError("opencv mat input format type did not match any predefined setup");
             }
         }
 
@@ -190,7 +172,7 @@ namespace lv {
                 case GL_RGB32UI:
                 case GL_RGBA32UI:
                 default:
-                    glError("input internal format did not match any predefined normalized format");
+                    lvError("input internal format did not match any predefined normalized format");
             }
         }
 
@@ -210,7 +192,7 @@ namespace lv {
                 case GL_RGB32F:
                 case GL_RGBA32F:
                 default:
-                    glError("input normalized format did not match any predefined integral format");
+                    lvError("input normalized format did not match any predefined integral format");
                     return 0;
             }
         }
@@ -238,7 +220,7 @@ namespace lv {
                 case GL_RGBA32UI:
                     return "rgba32ui";
                 default:
-                    glError("input internal format did not match any predefined glsl layout");
+                    lvError("input internal format did not match any predefined glsl layout");
             }
         }
 
@@ -257,7 +239,7 @@ namespace lv {
                 case GL_RGBA32F:
                     return false;
                 default:
-                    glError("input internal format did not match any predefined integer format setup");
+                    lvError("input internal format did not match any predefined integer format setup");
             }
         }
 
@@ -282,7 +264,7 @@ namespace lv {
                 case GL_RGBA32UI:
                     return CV_32SC4;
                 default:
-                    glError("input internal format did not match any predefined opencv mat setup");
+                    lvError("input internal format did not match any predefined opencv mat setup");
                     return 0;
             }
         }
@@ -296,7 +278,7 @@ namespace lv {
                 case 4:
                     return bUseIntegralFormat?GL_BGRA_INTEGER:GL_BGRA;
                 default:
-                    glError("opencv mat input format type did not match any predefined setup");
+                    lvError("opencv mat input format type did not match any predefined setup");
             }
         }
 
@@ -312,7 +294,7 @@ namespace lv {
                 case GL_BGRA_INTEGER:
                     return 4;
                 default:
-                    glError("input data format did not match any predefined opencv mat setup");
+                    lvError("input data format did not match any predefined opencv mat setup");
             }
         }
 
@@ -325,7 +307,7 @@ namespace lv {
                 case CV_32S:
                     return GL_UNSIGNED_INT;
                 default:
-                    glError("opencv mat input format type did not match any predefined setup");
+                    lvError("opencv mat input format type did not match any predefined setup");
             }
         }
 
@@ -339,7 +321,7 @@ namespace lv {
                 case GL_UNSIGNED_INT:
                     return CV_32S;
                 default:
-                    glError("input data type did not match any predefined opencv mat setup");
+                    lvError("input data type did not match any predefined opencv mat setup");
             }
         }
 
@@ -351,7 +333,7 @@ namespace lv {
                 case CV_32S:
                     return 4;
                 default:
-                    glError("input depth did not match any predefined byte size");
+                    lvError("input depth did not match any predefined byte size");
             }
         }
 
@@ -370,7 +352,7 @@ namespace lv {
                 case CV_32SC4:
                     return 4;
                 default:
-                    glError("input type did not match any predefined channel size");
+                    lvError("input type did not match any predefined channel size");
             }
         }
 
@@ -390,7 +372,7 @@ namespace lv {
                 case GL_RGBA32UI:
                     return 4;
                 default:
-                    glError("input internal format did not match any predefined channel size");
+                    lvError("input internal format did not match any predefined channel size");
                     return 0;
             }
         }

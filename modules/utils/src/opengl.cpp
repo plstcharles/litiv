@@ -32,7 +32,7 @@ lv::gl::Context::Context(const cv::Size& oWinSize,
     std::call_once(s_oInitFlag,[](){
         glfwSetErrorCallback(onGLFWErrorCallback);
         if(glfwInit()==GL_FALSE)
-            glError("Failed to init GLFW");
+            lvError("Failed to init GLFW");
         std::atexit(glfwTerminate);
     });
     if(nGLVerMajor>3 || (nGLVerMajor==3 && nGLVerMinor>=2))
@@ -44,22 +44,22 @@ lv::gl::Context::Context(const cv::Size& oWinSize,
         glfwWindowHint(GLFW_VISIBLE,GL_FALSE);
     m_pWindowHandle = std::unique_ptr<GLFWwindow,glfwWindowDeleter>(glfwCreateWindow(oWinSize.width,oWinSize.height,sWinName.c_str(),nullptr,nullptr),glfwWindowDeleter());
     if(!m_pWindowHandle.get())
-        glErrorExt("Failed to create [%d,%d] window via GLFW for core GL profile v%d.%d",oWinSize.width,oWinSize.height,nGLVerMajor,nGLVerMinor);
+        lvError_("Failed to create [%d,%d] window via GLFW for core GL profile v%d.%d",oWinSize.width,oWinSize.height,nGLVerMajor,nGLVerMinor);
     glfwMakeContextCurrent(m_pWindowHandle.get());
 #elif HAVE_FREEGLUT
     std::call_once(s_oInitFlag,[](){
-            int argc = 0;
-            glutInit(&argc,NULL);
-        });
-        glutInitDisplayMode(GLUT_SINGLE);
-        glutInitWindowSize(oWinSize.width,oWinSize.height);
-        glutInitWindowPosition(0,0);
-        m_oWindowHandle = std::unique_ptr<glutHandle,glutWindowDeleter>(glutHandle(glutCreateWindow(sWinName.c_str())),glutWindowDeleter());
-        if(!(m_oWindowHandle.get().m_nHandle))
-            glError("Failed to create window via glut");
-        glutSetWindow(m_oWindowHandle.get().m_nHandle);
-        if(bHide)
-            glutHideWindow();
+        int argc = 0;
+        glutInit(&argc,NULL);
+    });
+    glutInitDisplayMode(GLUT_SINGLE);
+    glutInitWindowSize(oWinSize.width,oWinSize.height);
+    glutInitWindowPosition(0,0);
+    m_oWindowHandle = std::unique_ptr<glutHandle,glutWindowDeleter>(glutHandle(glutCreateWindow(sWinName.c_str())),glutWindowDeleter());
+    if(!(m_oWindowHandle.get().m_nHandle))
+        lvError("Failed to create window via glut");
+    glutSetWindow(m_oWindowHandle.get().m_nHandle);
+    if(bHide)
+        glutHideWindow();
 #endif //HAVE_FREEGLUT
     initGLEW(m_nGLVerMajor,m_nGLVerMinor);
 }
@@ -142,25 +142,25 @@ void lv::gl::Context::initGLEW(size_t nGLVerMajor, size_t nGLVerMinor) {
     glewExperimental = GLEW_EXPERIMENTAL?GL_TRUE:GL_FALSE;
     const GLenum glewerrn = glewInit();
     if(glewerrn!=GLEW_OK)
-        glErrorExt("Failed to init GLEW [code=%d, msg=%s]",glewerrn,glewGetErrorString(glewerrn));
+        lvError_("Failed to init GLEW [code=%d, msg=%s]",glewerrn,glewGetErrorString(glewerrn));
     const GLenum errn = glGetError();
     // see glew init GL_INVALID_ENUM bug discussion at https://www.opengl.org/wiki/OpenGL_Loading_Library
     if(errn!=GL_NO_ERROR && errn!=GL_INVALID_ENUM)
-        glErrorExt("Unexpected GLEW init error [code=%d, msg=%s]",errn,gluErrorString(errn));
+        lvError_("Unexpected GLEW init error [code=%d, msg=%s]",errn,gluErrorString(errn));
     const std::string sGLEWVersionString = std::string("GL_VERSION_")+std::to_string(nGLVerMajor)+"_"+std::to_string(nGLVerMinor);
     if(!glewIsSupported(sGLEWVersionString.c_str()))
-        glErrorExt("Bad GL core/ext version detected (target is %s)",sGLEWVersionString.c_str());
+        lvError_("Bad GL core/ext version detected (target is %s)",sGLEWVersionString.c_str());
 }
 
 cv::Mat lv::gl::deepCopyImage(GLsizei nWidth,GLsizei nHeight,GLvoid* pData,GLenum eDataFormat,GLenum eDataType) {
-    glAssert(nWidth>0 && nHeight>0 && pData);
+    lvAssert(nWidth>0 && nHeight>0 && pData);
     const int nDepth = getMatDepthFromDataType(eDataType);
     const int nChannels = getChannelsFromDataFormat(eDataFormat);
     return cv::Mat(nHeight,nWidth,CV_MAKETYPE(nDepth,nChannels),pData,nWidth*nChannels*getByteSizeFromMatDepth(nDepth)).clone();
 }
 
 std::vector<cv::Mat> lv::gl::deepCopyImages(const std::vector<cv::Mat>& voInputMats) {
-    glAssert(!voInputMats.empty() && !voInputMats[0].empty());
+    lvAssert(!voInputMats.empty() && !voInputMats[0].empty());
     std::vector<cv::Mat> voOutputMats(voInputMats.size());
     for(size_t nMatIter=0; nMatIter<voInputMats.size(); ++nMatIter)
         voInputMats[nMatIter].copyTo(voOutputMats[nMatIter]);
@@ -168,7 +168,7 @@ std::vector<cv::Mat> lv::gl::deepCopyImages(const std::vector<cv::Mat>& voInputM
 }
 
 std::vector<cv::Mat> lv::gl::deepCopyImages(GLsizei nTextureCount,GLsizei nWidth,GLsizei nHeight,GLvoid* pData,GLenum eDataFormat,GLenum eDataType) {
-    glAssert(nTextureCount>0 && nWidth>0 && nHeight>0 && pData);
+    lvAssert(nTextureCount>0 && nWidth>0 && nHeight>0 && pData);
     std::vector<cv::Mat> voOutputMats(nTextureCount);
     const int nDepth = getMatDepthFromDataType(eDataType);
     const int nChannels = getChannelsFromDataFormat(eDataFormat);
@@ -198,7 +198,7 @@ std::string lv::gl::addLineNumbersToString(const std::string& sSrc, bool bPrefix
 
 void lv::gl::TMT32GenParams::initTinyMT32Generators(glm::uvec3 vGeneratorLayout,std::aligned_vector<lv::gl::TMT32GenParams,32>& voData) {
     static_assert(sizeof(TMT32GenParams)==sizeof(uint)*8,"Hmmm...?");
-    glAssert(vGeneratorLayout.x>0 && vGeneratorLayout.y>0 && vGeneratorLayout.z>0);
+    lvAssert(vGeneratorLayout.x>0 && vGeneratorLayout.y>0 && vGeneratorLayout.z>0);
     voData.resize(vGeneratorLayout.x*vGeneratorLayout.y*vGeneratorLayout.z);
     TMT32GenParams* pData = voData.data();
     // tinymt32dc:cecf43a2417bd5c41e5d6f80cf2ce903,32,1337,f20d1b78,ff90ffe5,30fbdfff,65,0

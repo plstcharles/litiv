@@ -228,7 +228,7 @@ lv::GLBinaryClassifierEvaluator::GLBinaryClassifierEvaluator(const std::shared_p
         GLImageProcEvaluatorAlgo(pParent,nTotFrameCount,(size_t)BinClassifMetricsAccumulator::nCountersCount,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,true) {}
 
 std::string lv::GLBinaryClassifierEvaluator::getComputeShaderSource(size_t nStage) const {
-    glAssert(nStage<m_nComputeStages);
+    lvAssert(nStage<m_nComputeStages);
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc <<"#version 430\n"

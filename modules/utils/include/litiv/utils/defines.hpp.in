@@ -40,17 +40,28 @@
 #define TIMER_TOC(x) int64 XSTR_CONCAT(__nCPUTimerVal_,x) = cv::getTickCount()-XSTR_CONCAT(__nCPUTimerTick_,x)
 #define TIMER_ELAPSED_MS(x) (double(XSTR_CONCAT(__nCPUTimerVal_,x))/(cv::getTickFrequency()/1000))
 
-// @@@@ replace lvAssert/lvDbgAssert with version with obligatory msg param? (also replace all cv asserts by those)
-
-#define lvError(msg) throw lv::Exception(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__)
-#define lvErrorExt(msg,...) throw lv::Exception(msg,__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
-#define lvAssert(expr) {if(!!(expr)); else lvError("assertion failed ("#expr")");}
+#define lvError(msg) throw lv::Exception(std::string("[lvError: ")+msg+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__)
+#define lvError_(msg,...) throw lv::Exception(std::string("[lvError: ")+msg+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
+#define lvAssert(expr) {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);}
+#define lvAssert_(expr,msg) {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);}
+#define lvAssert__(expr,msg,...) {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);}
+#define glErrorCheck { \
+    GLenum __errn = glGetError(); \
+    if(__errn!=GL_NO_ERROR) \
+        lvError_("glErrorCheck failed [code=%d, msg=%s]",__errn,gluErrorString(__errn)); \
+}
 #ifdef _DEBUG
 #define lvDbgAssert(expr) lvAssert(expr)
+#define lvDbgAssert_(expr,msg) lvAssert_(expr,msg)
+#define lvDbgAssert__(expr,msg,...) lvAssert__(expr,msg,__VA_ARGS__)
 #define lvDbgExceptionWatch lv::UncaughtExceptionLogger XSTR_CONCAT(__logger,__LINE__)(__PRETTY_FUNCTION__,__FILE__,__LINE__)
+#define glDbgErrorCheck glErrorCheck
 #else //ndefined(_DEBUG)
 #define lvDbgAssert(expr)
+#define lvDbgAssert_(expr,msg)
+#define lvDbgAssert__(expr,msg,...)
 #define lvDbgExceptionWatch
+#define glDbgErrorCheck
 #endif //ndefined(_DEBUG)
 #define lvIgnore(x) (void)(x)
 #define UNUSED(x) lvIgnore(x)
@@ -75,7 +86,7 @@
 #ifndef __func__
 #define __func__ __FUNCTION__
 #endif //ndefined(__func__)
-#define lvAssertHR(expr) [](HRESULT hr){if(FAILED(hr)) lvErrorExt("HR assertion failed ("#expr" = 0x%x), %ws",hr,_com_error(hr).ErrorMessage());}(expr)
+#define lvAssertHR(expr) [](HRESULT hr){if(FAILED(hr)) lvError_("HR assertion failed ("#expr" = 0x%x), %ws",hr,_com_error(hr).ErrorMessage());}(expr)
 #ifdef _DEBUG
 #define lvDbgAssertHR(expr) lvAssertHR(expr)
 #else //ndefined(_DEBUG)

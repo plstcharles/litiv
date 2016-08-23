@@ -14,7 +14,7 @@ vptz::Camera::Camera( const std::string& sInputPath, double verti_FOV, double ou
                       double output_height, double hori_angle, double verti_angle,
                       double hori_speed, double verti_speed, double communication_delay) :
         m_sInputPath(sInputPath) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     panoImage = cv::imread(m_sInputPath);
     isVideo = panoImage.empty();
     if(isVideo) {
@@ -121,13 +121,13 @@ vptz::Camera::Camera( const std::string& sInputPath, double verti_FOV, double ou
 }
 
 vptz::Camera::~Camera() {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     gluDeleteQuadric(m_pSphereObj);
     glDeleteTextures(1, &m_nTexID);
 }
 
 void vptz::Camera::GoToPosition(int x, int y) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     double tempHoriAngle = horiAngle;
     double tempVertiAngle = vertiAngle;
     PTZPointXYtoHV(x, y, horiAngle, vertiAngle, int(outputWidth), int(outputHeight), vertiFOV, horiAngle, vertiAngle);
@@ -140,19 +140,19 @@ void vptz::Camera::GoToPosition(int x, int y) {
 }
 
 void vptz::Camera::GoToPosition(cv::Point target) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     GoToPosition(target.x, target.y);
 }
 
 void vptz::Camera::BeginPlaying(int nFrameIdx) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     Set(PTZ_CAM_FRAME_POS,(double)nFrameIdx);
     currentTime = nFrameIdx/m_dFrameRate;
     firstTick = double(cv::getTickCount());
 }
 
 bool vptz::Camera::WaitDelay(bool bSleep) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     if(m_nCurrFrameIdx>=m_nScenarioFrameCount)
         return false;
     // The end of other parts (tracker's analysing, get frame)
@@ -174,7 +174,7 @@ bool vptz::Camera::WaitDelay(bool bSleep) {
 }
 
 const cv::Mat& vptz::Camera::GetFrame() {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     m_pContext->setAsActive();
     double duration = double(cv::getTickCount());
     if(isVideo) {
@@ -199,13 +199,13 @@ const cv::Mat& vptz::Camera::GetFrame() {
 }
 
 void vptz::Camera::UpdatePanoImage(cv::Mat& image) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(!isVideo);
     image.copyTo(panoImage);
 }
 
 double vptz::Camera::Get(CameraPropertyFlag flag) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     switch(flag) {
         case PTZ_CAM_IS_VIDEO : return isVideo;
         case PTZ_CAM_FRAME_NUM : return m_nScenarioFrameCount;
@@ -228,7 +228,7 @@ double vptz::Camera::Get(CameraPropertyFlag flag) {
 }
 
 void vptz::Camera::Set(CameraPropertyFlag flag, double value) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     switch(flag) {
         case PTZ_CAM_FRAME_RATE:
             m_dFrameRate = value;
@@ -299,7 +299,7 @@ void vptz::Camera::Set(CameraPropertyFlag flag, double value) {
 
 vptz::GTTranslator::GTTranslator( Camera* pCam, int bgt_output_width, int bgt_output_height, double bgt_verti_FOV) :
         m_pCamera(pCam) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     if(bgt_output_width<1 || bgt_output_height<1 || bgt_verti_FOV<=0.0 || bgt_verti_FOV>=180.0)
         vptzError("invalid parameter(s)");
     curOutputWidth = int(m_pCamera->Get(PTZ_CAM_OUTPUT_WIDTH));
@@ -316,7 +316,7 @@ vptz::GTTranslator::GTTranslator( int cur_output_width, int cur_output_height, d
                                   double cur_hori_angle, double cur_verti_angle, int bgt_output_width,
                                   int bgt_output_height, double bgt_verti_FOV) :
         m_pCamera(NULL) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     if(cur_output_width<1 || cur_output_height<1 || cur_verti_FOV<=0.0 || cur_verti_FOV>=180.0 ||
         bgt_output_width<1 || bgt_output_height<1 || bgt_verti_FOV<=0.0 || bgt_verti_FOV>=180.0 ||
         curHoriAngle<=-180.0 || curHoriAngle>180.0 || curVertiAngle<0.0 || curVertiAngle>180.0)
@@ -332,7 +332,7 @@ vptz::GTTranslator::GTTranslator( int cur_output_width, int cur_output_height, d
 }
 
 void vptz::GTTranslator::UpdateViewAngle(double cur_hori_angle, double cur_verti_angle) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     if(curHoriAngle<=-180.0 || curHoriAngle>180.0 || curVertiAngle<0.0 || curVertiAngle>180.0)
         vptzError("invalid input parameter");
     curHoriAngle = cur_hori_angle;
@@ -340,7 +340,7 @@ void vptz::GTTranslator::UpdateViewAngle(double cur_hori_angle, double cur_verti
 }
 
 bool vptz::GTTranslator::GetGTTargetPoint(double bgtHoriAngle, double bgtVertiAngle, cv::Point& tgtTargetPoint) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     if(bgtHoriAngle<=-180.0 || bgtHoriAngle>180.0 || bgtVertiAngle<0.0 || bgtVertiAngle>180.0)
         vptzError("invalid input parameter");
     if(m_pCamera) {
@@ -354,7 +354,7 @@ bool vptz::GTTranslator::GetGTTargetPoint(double bgtHoriAngle, double bgtVertiAn
 }
 
 bool vptz::GTTranslator::GetGTBoundingBox(double bgtHoriAngle, double bgtVertiAngle, int bgtBBoxWidth, int bgtBBoxHeight, cv::Rect& tgtBoundingBox) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     if(bgtHoriAngle<=-180.0 || bgtHoriAngle>180.0 || bgtVertiAngle<0.0 || bgtVertiAngle>180.0 ||
         bgtBBoxWidth<0 || bgtBBoxWidth>bgtOutputWidth || bgtBBoxHeight<0 || bgtBBoxHeight>bgtOutputHeight)
         vptzError("VirtualPTZ Error: in GTTranslator::GetGTBoundingBox, invalid input parameter\n");
@@ -392,7 +392,7 @@ vptz::Evaluator::Evaluator( const std::string& sInputScenarioPath, const std::st
                             const std::string& sInputTargetMaskPath, const std::string& sOutputEvalFilePath,
                             double dCommDelay, double dExecDelayRatio, int nFirstTestFrameIdx, int nLastTestFrameIdx) :
         m_bUsingMultiTestSet(false) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     TestMetadata oDefaultTest = { "default_test",
                                   sInputScenarioPath,
                                   sInputGTSequencePath,
@@ -420,7 +420,7 @@ vptz::Evaluator::Evaluator( const std::string& sInputScenarioPath, const std::st
 vptz::Evaluator::Evaluator( const std::string& sInputTestSetPath, const std::string& sOutputEvalFilePath,
                             double dCommDelay, double dExecDelayRatio) :
         m_bUsingMultiTestSet(true) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     cv::FileStorage oTestSet_FS(sInputTestSetPath,cv::FileStorage::READ);
     if(!oTestSet_FS.isOpened())
         vptzError("cannot open the input test set file storage");
@@ -457,7 +457,7 @@ vptz::Evaluator::Evaluator( const std::string& sInputTestSetPath, const std::str
 }
 
 vptz::Evaluator::~Evaluator() {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     if(std::uncaught_exception())
         return; // YML file is most likely in an irrecuperable state
     if(m_bUsingMultiTestSet) {
@@ -483,7 +483,7 @@ int vptz::Evaluator::GetCurrTestIdx() {
 }
 
 void vptz::Evaluator::SetupTesting(int nTestIdx) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(nTestIdx<(int)m_voTestSet.size() && nTestIdx>=0);
     vptzAssert(!m_bRunning);
     if(m_bUsingMultiTestSet) {
@@ -514,7 +514,7 @@ void vptz::Evaluator::SetupTesting(int nTestIdx) {
 }
 
 void vptz::Evaluator::BeginTesting() {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(m_bReady && m_pCamera.get());
     try {
         m_pCamera->BeginPlaying(m_nFirstTestFrameIdx);
@@ -538,7 +538,7 @@ void vptz::Evaluator::BeginTesting() {
 }
 
 void vptz::Evaluator::EndTesting() {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(m_bRunning);
     const int nValidProcessedFrames = std::max(m_nCurrProcessedFrameCount-m_nCurrOutOfViewFrameCount,1);
     const double dTargetPointError = m_dCurrTargetPointErrorSum/nValidProcessedFrames;
@@ -572,43 +572,43 @@ void vptz::Evaluator::EndTesting() {
 }
 
 double vptz::Evaluator::GetCurrCameraProperty(CameraPropertyFlag flag) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(m_bReady && m_pCamera.get());
     return m_pCamera->Get(flag);
 }
 
 std::string vptz::Evaluator::GetCurrTestSequenceName() {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(m_nCurrTestIdx<(int)m_voTestSet.size() && m_nCurrTestIdx>=0);
     return m_voTestSet[m_nCurrTestIdx].sTestName;
 }
 
 int vptz::Evaluator::GetPotentialTestFrameCount() {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(m_bReady && m_pCamera.get());
     return m_nTestFrameCount;
 }
 
 cv::Mat vptz::Evaluator::GetInitTarget() {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(m_bReady && m_pCamera.get());
     return m_oInitTarget;
 }
 
 cv::Mat vptz::Evaluator::GetInitTargetMask() {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(m_bReady && m_pCamera.get());
     return m_oInitTargetMask;
 }
 
 cv::Mat vptz::Evaluator::GetInitTargetFrame() {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(m_bReady && m_pCamera.get());
     return m_oInitTargetFrame;
 }
 
 cv::Rect vptz::Evaluator::GetInitTargetBBox() {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(m_bReady && m_pCamera.get());
     return cv::Rect(m_oInitTargetFrame.cols/2-m_oInitTarget.cols/2,
                     m_oInitTargetFrame.rows/2-m_oInitTarget.rows/2,
@@ -616,7 +616,7 @@ cv::Rect vptz::Evaluator::GetInitTargetBBox() {
 }
 
 cv::Mat vptz::Evaluator::GetNextFrame(const cv::Point& oExpectedTargetPosition, bool bUseWaitDelaySleep) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(m_bReady && m_bRunning && m_pCamera.get());
     m_pCamera->GoToPosition(oExpectedTargetPosition);
     if(!m_pCamera->WaitDelay(bUseWaitDelaySleep))
@@ -633,7 +633,7 @@ cv::Mat vptz::Evaluator::GetNextFrame(const cv::Point& oExpectedTargetPosition, 
 }
 
 cv::Mat vptz::Evaluator::GetNextFrame(double dExpectedTargetAngle_H, double dExpectedTargetAngle_V, bool bUseWaitDelaySleep) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(m_bReady && m_bRunning && m_pCamera.get());
     m_pCamera->Set(PTZ_CAM_HORI_ANGLE,dExpectedTargetAngle_H);
     m_pCamera->Set(PTZ_CAM_VERTI_ANGLE,dExpectedTargetAngle_V);
@@ -651,13 +651,13 @@ cv::Mat vptz::Evaluator::GetNextFrame(double dExpectedTargetAngle_H, double dExp
 }
 
 cv::Rect vptz::Evaluator::GetLastGTBoundingBox() {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(m_bReady && m_bRunning && m_pCamera.get());
     return tgtBoundingBox;
 }
 
 void vptz::Evaluator::UpdateCurrentResult(cv::Rect& rCurrTargetBBox, bool bPrintResult) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(m_bReady && m_bRunning && m_pCamera.get());
     vptzAssert(m_bQueried);
     // basic ground truth for required frame
@@ -704,7 +704,7 @@ void vptz::Evaluator::UpdateCurrentResult(cv::Rect& rCurrTargetBBox, bool bPrint
 
 void vptz::Evaluator::Setup( const std::string& sInputScenarioPath, const std::string& sInputGTSequencePath,
                              const std::string& sInputTargetMaskPath, int nFirstTestFrameIdx, int nLastTestFrameIdx) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     vptzAssert(nFirstTestFrameIdx<nLastTestFrameIdx && nLastTestFrameIdx>0);
     m_bReady = m_bRunning = m_bQueried = false;
     m_pCamera.reset();
@@ -785,7 +785,7 @@ void vptz::Evaluator::Setup( const std::string& sInputScenarioPath, const std::s
 void vptz::PTZPointXYtoHV( int target2dX, int target2dY, double& tarHoriAngle, double& tarVertiAngle,
                            int camOutputWidth, int camOutputHeight,
                            double camVertiFOV, double camHoriAngle, double camVertiAngle) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     if(camOutputWidth<1)
         vptzError("invalid camOutputWidth");
     else if(camOutputHeight<1)
@@ -839,14 +839,14 @@ void vptz::PTZPointXYtoHV( int target2dX, int target2dY, double& tarHoriAngle, d
 
 void vptz::PTZPointXYtoHV( cv::Point2i targetXY, cv::Point2d& targetHV, int camOutputWidth, int camOutputHeight,
                            double camVertiFOV, double camHoriAngle, double camVertiAngle) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     PTZPointXYtoHV(targetXY.x,targetXY.y,targetHV.x,targetHV.y, camOutputWidth, camOutputHeight, camVertiFOV, camHoriAngle, camVertiAngle);
 }
 
 bool vptz::PTZPointHVtoXY( double tarHoriAngle, double tarVertiAngle, int& target2dX, int& target2dY,
                            int camOutputWidth, int camOutputHeight,
                            double camVertiFOV, double camHoriAngle, double camVertiAngle) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     if(camOutputWidth<1)
         vptzError("invalid camOutputWidth");
     else if(camOutputHeight<1)
@@ -926,6 +926,6 @@ bool vptz::PTZPointHVtoXY( double tarHoriAngle, double tarVertiAngle, int& targe
 
 bool vptz::PTZPointHVtoXY( cv::Point2d targetHV, cv::Point2i& targetXY, int camOutputWidth, int camOutputHeight,
                            double camVertiFOV, double camHoriAngle, double camVertiAngle) {
-    glDbgExceptionWatch;
+    lvDbgExceptionWatch;
     return PTZPointHVtoXY(targetHV.x, targetHV.y, targetXY.x, targetXY.y, camOutputWidth, camOutputHeight, camVertiFOV, camHoriAngle, camVertiAngle);
 }

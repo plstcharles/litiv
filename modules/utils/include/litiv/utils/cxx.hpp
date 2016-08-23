@@ -286,11 +286,13 @@ namespace lv {
 
     struct UncaughtExceptionLogger {
         UncaughtExceptionLogger(const char* sFunc, const char* sFile, int nLine) :
-                m_sMsg(cv::format("Unwinding at function '%s' from %s(%d) due to uncaught exception\n",sFunc,sFile,nLine)) {}
-        const std::string m_sMsg;
+                m_sFunc(sFunc),m_sFile(sFile),m_nLine(nLine) {}
+        const char* const m_sFunc;
+        const char* const m_sFile;
+        const int m_nLine;
         ~UncaughtExceptionLogger() {
             if(std::uncaught_exception())
-                std::cerr << m_sMsg;
+                std::cerr << cv::format("Unwinding at function '%s' from %s(%d) due to uncaught exception\n",m_sFunc,m_sFile,m_nLine);
         }
     };
 
@@ -377,7 +379,7 @@ namespace lv {
         inline std::shared_ptr<const Tcast> shared_from_this_cast(bool bThrowIfFail=false) const {
             auto pCast = std::dynamic_pointer_cast<const Tcast>(this->shared_from_this());
             if(bThrowIfFail && !pCast)
-                lvErrorExt("Failed shared_from_this_cast from type '%s' to type '%s'",typeid(T).name(),typeid(Tcast).name());
+                lvError_("Failed shared_from_this_cast from type '%s' to type '%s'",typeid(T).name(),typeid(Tcast).name());
             return pCast;
         }
         template<typename Tcast>

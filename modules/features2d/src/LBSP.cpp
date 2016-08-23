@@ -276,7 +276,7 @@ void LBSP::validateROI(cv::Mat& oROI) {
 #if HAVE_GLSL
 
 std::string LBSP::getShaderFunctionSource(size_t nChannels, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize) {
-    glAssert(nChannels==4 || nChannels==1);
+    lvAssert(nChannels==4 || nChannels==1);
     std::stringstream ssSrc;
     // @@@@@ split lookup/threshold?
     if(!bUseSharedDataPreload) ssSrc <<

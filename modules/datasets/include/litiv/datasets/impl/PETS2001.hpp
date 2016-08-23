@@ -61,17 +61,17 @@ protected:
         std::vector<std::string> vsVideoSeqPaths;
         lv::GetFilesFromDir(this->getDataPath(),vsVideoSeqPaths);
         if(vsVideoSeqPaths.size()!=1)
-            lvErrorExt("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one video sequence file)",this->getName().c_str());
+            lvError_("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one video sequence file)",this->getName().c_str());
         std::vector<std::string> vsGTSubdirPaths;
         lv::GetSubDirsFromDir(this->getDataPath(),vsGTSubdirPaths);
         if(vsGTSubdirPaths.size()!=1)
-            lvErrorExt("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one GT subdir)",this->getName().c_str());
+            lvError_("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one GT subdir)",this->getName().c_str());
         this->m_voVideoReader.open(vsVideoSeqPaths[0]);
         if(!this->m_voVideoReader.isOpened())
-            lvErrorExt("PETS2006D3TC1 sequence '%s': video file could not be opened",this->getName().c_str());
+            lvError_("PETS2006D3TC1 sequence '%s': video file could not be opened",this->getName().c_str());
         lv::GetFilesFromDir(vsGTSubdirPaths[0],this->m_vsGTFramePaths);
         if(this->m_vsGTFramePaths.empty())
-            lvErrorExt("PETS2006D3TC1 sequence '%s': did not possess any valid GT frames",this->getName().c_str());
+            lvError_("PETS2006D3TC1 sequence '%s': did not possess any valid GT frames",this->getName().c_str());
         const std::string sGTFilePrefix("image_");
         const size_t nInputFileNbDecimals = 4;
         this->m_mGTIndexLUT.clear();
@@ -79,7 +79,7 @@ protected:
             this->m_mGTIndexLUT[(size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str())] = iter-this->m_vsGTFramePaths.begin();
         cv::Mat oTempImg = cv::imread(this->m_vsGTFramePaths[0]);
         if(oTempImg.empty())
-            lvErrorExt("PETS2006D3TC1 sequence '%s': did not possess valid GT file(s)",this->getName().c_str());
+            lvError_("PETS2006D3TC1 sequence '%s': did not possess valid GT file(s)",this->getName().c_str());
         this->m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
         this->m_oOrigSize = this->m_oROI.size();
         const double dScale = this->getDatasetInfo()->getScaleFactor();

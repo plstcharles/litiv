@@ -330,7 +330,7 @@ namespace lv {
                (eDatasetTask==DatasetTask_Registr)?DatasetEval_Registr:
                (eDatasetTask==DatasetTask_EdgDet)?DatasetEval_BinaryClassifier:
                // ...
-               throw -1; // undefined behavior
+               DatasetEval_None; // undefined behavior
     }
 
     /// returns the source type policy to use based on the dataset task type (can also be overriden by dataset type)
@@ -342,7 +342,7 @@ namespace lv {
                (eDatasetTask==DatasetTask_Registr)?DatasetSource_VideoArray:
                (eDatasetTask==DatasetTask_EdgDet)?DatasetSource_Image:
                // ...
-               throw -1; // undefined behavior
+               DatasetSource_Video; // undefined behavior
     }
 
     /// dataset interface that must be specialized based on task & eval types, and dataset (in impl headers, if required)

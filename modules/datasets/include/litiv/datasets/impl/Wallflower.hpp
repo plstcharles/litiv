@@ -75,15 +75,15 @@ protected:
             }
             else {
                 if(iter->find(sInputFileSuffix)!=iter->size()-sInputFileSuffix.size())
-                    lvErrorExt("Wallflower sequence '%s' contained an unknown file ('%s')",this->getName().c_str(),iter->c_str());
+                    lvError_("Wallflower sequence '%s' contained an unknown file ('%s')",this->getName().c_str(),iter->c_str());
                 this->m_vsInputPaths.push_back(*iter);
             }
         }
         if(!bFoundGTFile || !bFoundScript || this->m_vsInputPaths.empty() || this->m_vsGTFramePaths.size()!=1)
-            lvErrorExt("Wallflower sequence '%s' did not possess the required groundtruth and input files",this->getName().c_str());
+            lvError_("Wallflower sequence '%s' did not possess the required groundtruth and input files",this->getName().c_str());
         cv::Mat oTempImg = cv::imread(this->m_vsGTFramePaths[0]);
         if(oTempImg.empty())
-            lvErrorExt("Wallflower sequence '%s' did not possess a valid GT file",this->getName().c_str());
+            lvError_("Wallflower sequence '%s' did not possess a valid GT file",this->getName().c_str());
         this->m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
         this->m_oOrigSize = this->m_oROI.size();
         const double dScale = this->getDatasetInfo()->getScaleFactor();

@@ -121,7 +121,7 @@ int main(int, char**) { // this sample uses no command line argument
 
         lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false); // returns a list of all work batches in the dataset without considering hierarchy (or images sets, in this case)
         if(vpBatches.size()==0 || pDataset->getTotPackets()==0) // check that data was indeed properly parsed automatically from the dataset directory
-            lvErrorExt("Could not parse any data for dataset '%s'",pDataset->getName().c_str());
+            lvError_("Could not parse any data for dataset '%s'",pDataset->getName().c_str());
         std::cout << "Parsing complete. [" << vpBatches.size() << " batch(es)]" << std::endl;
         std::shared_ptr<IEdgeDetector> pAlgo = std::make_shared<EdgeDetectorLBSP>(); // instantiate an edge detector algo with default parameters
         cv::Mat oEdgeMask; // no need to preallocate the output matrix (the algo will make sure it is allocated at some point)

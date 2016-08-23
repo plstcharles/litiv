@@ -23,10 +23,10 @@ IIEdgeDetector::IIEdgeDetector() :
 #if HAVE_GLSL
 
 void IEdgeDetector_GLSL::getLatestEdgeMask(cv::OutputArray _oLastEdgeMask) {
-    glAssert(GLImageProcAlgo::m_bGLInitialized);
+    lvAssert(GLImageProcAlgo::m_bGLInitialized);
     _oLastEdgeMask.create(GLImageProcAlgo::m_oFrameSize,CV_8UC1);
     cv::Mat oLastEdgeMask = _oLastEdgeMask.getMat();
-    glAssert(GLImageProcAlgo::m_bFetchingOutput || GLImageProcAlgo::setOutputFetching(true))
+    lvAssert(GLImageProcAlgo::m_bFetchingOutput || GLImageProcAlgo::setOutputFetching(true))
     if(GLImageProcAlgo::m_nInternalFrameIdx>0)
         GLImageProcAlgo::fetchLastOutput(oLastEdgeMask);
     else
@@ -34,11 +34,11 @@ void IEdgeDetector_GLSL::getLatestEdgeMask(cv::OutputArray _oLastEdgeMask) {
 }
 
 void IEdgeDetector_GLSL::apply_gl(cv::InputArray _oNextImage, bool bRebindAll, double dThreshold) {
-    glAssert(GLImageProcAlgo::m_bGLInitialized);
+    lvAssert(GLImageProcAlgo::m_bGLInitialized);
     m_dCurrThreshold = dThreshold;
     cv::Mat oNextInputImg = _oNextImage.getMat();
-    glAssert(oNextInputImg.size()==GLImageProcAlgo::m_oFrameSize);
-    glAssert(oNextInputImg.isContinuous());
+    lvAssert(oNextInputImg.size()==GLImageProcAlgo::m_oFrameSize);
+    lvAssert(oNextInputImg.isContinuous());
     GLImageProcAlgo::apply_gl(oNextInputImg,bRebindAll);
 }
 

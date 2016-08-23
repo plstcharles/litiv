@@ -31,8 +31,8 @@ GLPixelBufferObject::GLPixelBufferObject(const cv::Mat& oInitBufferData, GLenum 
         m_nBufferSize(oInitBufferData.rows*oInitBufferData.cols*oInitBufferData.channels()*lv::gl::getByteSizeFromMatDepth(oInitBufferData.depth())),
         m_nFrameType(oInitBufferData.type()),
         m_oFrameSize(oInitBufferData.size()) {
-    glAssert(m_eBufferTarget==GL_PIXEL_PACK_BUFFER || (m_eBufferTarget==GL_PIXEL_UNPACK_BUFFER && oInitBufferData.isContinuous()));
-    glAssert(m_nBufferSize>0);
+    lvAssert(m_eBufferTarget==GL_PIXEL_PACK_BUFFER || (m_eBufferTarget==GL_PIXEL_UNPACK_BUFFER && oInitBufferData.isContinuous()));
+    lvAssert(m_nBufferSize>0);
     glGenBuffers(1,&m_nPBO);
     glBindBuffer(m_eBufferTarget,m_nPBO);
     glBufferData(m_eBufferTarget,m_nBufferSize,(m_eBufferTarget==GL_PIXEL_PACK_BUFFER)?nullptr:oInitBufferData.data,m_eBufferUsage);
@@ -44,8 +44,8 @@ GLPixelBufferObject::~GLPixelBufferObject() {
 }
 
 bool GLPixelBufferObject::updateBuffer(const cv::Mat& oBufferData, bool bRealloc, bool bRebindAll) {
-    glDbgAssert(m_eBufferTarget==GL_PIXEL_UNPACK_BUFFER);
-    glDbgAssert(oBufferData.type()==m_nFrameType && oBufferData.size()==m_oFrameSize && oBufferData.isContinuous());
+    lvDbgAssert(m_eBufferTarget==GL_PIXEL_UNPACK_BUFFER);
+    lvDbgAssert(oBufferData.type()==m_nFrameType && oBufferData.size()==m_oFrameSize && oBufferData.isContinuous());
     glBindBuffer(m_eBufferTarget,m_nPBO);
     if(bRealloc)
         glBufferData(m_eBufferTarget,m_nBufferSize,nullptr,m_eBufferUsage);
@@ -60,8 +60,8 @@ bool GLPixelBufferObject::updateBuffer(const cv::Mat& oBufferData, bool bRealloc
 }
 
 bool GLPixelBufferObject::fetchBuffer(cv::Mat& oBufferData, bool bRebindAll) {
-    glDbgAssert(m_eBufferTarget==GL_PIXEL_PACK_BUFFER);
-    glDbgAssert(oBufferData.type()==m_nFrameType && oBufferData.size()==m_oFrameSize && oBufferData.isContinuous());
+    lvDbgAssert(m_eBufferTarget==GL_PIXEL_PACK_BUFFER);
+    lvDbgAssert(oBufferData.type()==m_nFrameType && oBufferData.size()==m_oFrameSize && oBufferData.isContinuous());
     glBindBuffer(m_eBufferTarget,m_nPBO);
     void* pBufferClientPtr = glMapBuffer(m_eBufferTarget,GL_READ_ONLY);
     if(pBufferClientPtr) {
@@ -92,7 +92,7 @@ GLTexture2D::GLTexture2D( GLsizei nLevels, GLenum eInternalFormat, GLsizei nWidt
         m_eDataFormat(eDataFormat),
         m_eDataType(eDataType),
         m_oInitTexture(lv::gl::deepCopyImage(nWidth,nHeight,pData,eDataFormat,eDataType)) {
-    glAssert(m_nLevels>=1 && m_nWidth>0 && m_nHeight>0);
+    lvAssert(m_nLevels>=1 && m_nWidth>0 && m_nHeight>0);
     glBindTexture(GL_TEXTURE_2D,getTexId());
     glTexStorage2D(GL_TEXTURE_2D,m_nLevels,m_eInternalFormat,m_nWidth,m_nHeight);
     glTexSubImage2D(GL_TEXTURE_2D,0,0,0,m_nWidth,m_nHeight,m_eDataFormat,m_eDataType,m_oInitTexture.data);
@@ -120,7 +120,7 @@ GLTexture2D::GLTexture2D(GLsizei nLevels, const cv::Mat& oTexture, bool bUseInte
         m_eDataFormat(lv::gl::getDataFormatFromChannels(oTexture.channels(),bUseIntegralFormat)),
         m_eDataType(lv::gl::getDataTypeFromMatDepth(oTexture.depth(),oTexture.channels())),
         m_oInitTexture(oTexture.clone()) {
-    glAssert(m_nLevels>=1 && !m_oInitTexture.empty());
+    lvAssert(m_nLevels>=1 && !m_oInitTexture.empty());
     glBindTexture(GL_TEXTURE_2D,getTexId());
     glTexStorage2D(GL_TEXTURE_2D,m_nLevels,m_eInternalFormat,m_nWidth,m_nHeight);
     glTexSubImage2D(GL_TEXTURE_2D,0,0,0,m_nWidth,m_nHeight,m_eDataFormat,m_eDataType,m_oInitTexture.data);
@@ -141,7 +141,7 @@ GLTexture2D::GLTexture2D(GLsizei nLevels, const cv::Mat& oTexture, bool bUseInte
 GLTexture2D::~GLTexture2D() {}
 
 void GLTexture2D::bindToImage(GLuint nUnit, int nLevel, GLenum eAccess) {
-    glDbgAssert(nLevel>=0 && nLevel<m_nLevels);
+    lvDbgAssert(nLevel>=0 && nLevel<m_nLevels);
     glBindImageTexture(nUnit,getTexId(),nLevel,GL_FALSE,0,eAccess,m_eInternalFormat);
 }
 
@@ -162,7 +162,7 @@ GLTexture2DArray::GLTexture2DArray( GLsizei nTextureCount, GLsizei nLevels, GLen
         m_eDataFormat(eDataFormat),
         m_eDataType(eDataType),
         m_voInitTextures(lv::gl::deepCopyImages(nTextureCount,nWidth,nHeight,pData,eDataFormat,eDataType)) {
-    glAssert(m_nTextureCount>0 && m_nLevels>=1 && m_nWidth>0 && m_nHeight>0);
+    lvAssert(m_nTextureCount>0 && m_nLevels>=1 && m_nWidth>0 && m_nHeight>0);
     glBindTexture(GL_TEXTURE_2D_ARRAY,getTexId());
     glTexStorage3D(GL_TEXTURE_2D_ARRAY,m_nLevels,m_eInternalFormat,m_nWidth,m_nHeight,m_nTextureCount);
     glTexSubImage3D(GL_TEXTURE_2D_ARRAY,0,0,0,0,m_nWidth,m_nHeight,m_nTextureCount,m_eDataFormat,m_eDataType,pData);
@@ -191,11 +191,11 @@ GLTexture2DArray::GLTexture2DArray(GLsizei nLevels, const std::vector<cv::Mat>& 
         m_eDataFormat(lv::gl::getDataFormatFromChannels(voTextures[0].channels(),bUseIntegralFormat)),
         m_eDataType(lv::gl::getDataTypeFromMatDepth(voTextures[0].depth(),voTextures[0].channels())),
         m_voInitTextures(lv::gl::deepCopyImages(voTextures)) {
-    glAssert(m_nLevels>=1);
+    lvAssert(m_nLevels>=1);
     glBindTexture(GL_TEXTURE_2D_ARRAY,getTexId());
     glTexStorage3D(GL_TEXTURE_2D_ARRAY,m_nLevels,m_eInternalFormat,m_nWidth,m_nHeight,m_nTextureCount);
     for(int nTexIter=0; nTexIter<m_nTextureCount; ++nTexIter) {
-        glAssert(m_voInitTextures[nTexIter].size()==m_voInitTextures[0].size() && m_voInitTextures[nTexIter].type()==m_voInitTextures[0].type());
+        lvAssert(m_voInitTextures[nTexIter].size()==m_voInitTextures[0].size() && m_voInitTextures[nTexIter].type()==m_voInitTextures[0].type());
         glTexSubImage3D(GL_TEXTURE_2D_ARRAY,0,0,0,nTexIter,m_nWidth,m_nHeight,1,m_eDataFormat,m_eDataType,m_voInitTextures[nTexIter].data);
     }
     glTexParameteri(GL_TEXTURE_2D_ARRAY,GL_TEXTURE_WRAP_S,GL_MIRRORED_REPEAT);
@@ -215,12 +215,12 @@ GLTexture2DArray::GLTexture2DArray(GLsizei nLevels, const std::vector<cv::Mat>& 
 GLTexture2DArray::~GLTexture2DArray() {}
 
 void GLTexture2DArray::bindToImage(GLuint nUnit, int nLevel, int nLayer, GLenum eAccess) {
-    glDbgAssert(nLevel>=0 && nLevel<m_nLevels && nLayer>=0 && nLayer<m_nTextureCount);
+    lvDbgAssert(nLevel>=0 && nLevel<m_nLevels && nLayer>=0 && nLayer<m_nTextureCount);
     glBindImageTexture(nUnit,getTexId(),nLevel,GL_FALSE,nLayer,eAccess,m_eInternalFormat);
 }
 
 void GLTexture2DArray::bindToImageArray(GLuint nUnit, int nLevel, GLenum eAccess) {
-    glDbgAssert(nLevel>=0 && nLevel<m_nLevels);
+    lvDbgAssert(nLevel>=0 && nLevel<m_nLevels);
     glBindImageTexture(nUnit,getTexId(),nLevel,GL_TRUE,0,eAccess,m_eInternalFormat);
 }
 
@@ -235,9 +235,9 @@ GLDynamicTexture2D::GLDynamicTexture2D(GLsizei nLevels, const cv::Mat& oInitText
 GLDynamicTexture2D::~GLDynamicTexture2D() {}
 
 void GLDynamicTexture2D::updateTexture(const cv::Mat& oTexture, bool bRebindAll) {
-    glDbgAssert(!oTexture.empty());
-    glDbgAssert(oTexture.size()==m_oInitTexture.size() && oTexture.type()==m_oInitTexture.type());
-    glDbgAssert(oTexture.isContinuous());
+    lvDbgAssert(!oTexture.empty());
+    lvDbgAssert(oTexture.size()==m_oInitTexture.size() && oTexture.type()==m_oInitTexture.type());
+    lvDbgAssert(oTexture.isContinuous());
     if(bRebindAll)
         glBindTexture(GL_TEXTURE_2D,getTexId());
     glTexSubImage2D(GL_TEXTURE_2D,0,0,0,m_nWidth,m_nHeight,m_eDataFormat,m_eDataType,oTexture.data);
@@ -246,8 +246,8 @@ void GLDynamicTexture2D::updateTexture(const cv::Mat& oTexture, bool bRebindAll)
 }
 
 void GLDynamicTexture2D::updateTexture(const GLPixelBufferObject& oPBO, bool bRebindAll) {
-    glDbgAssert(oPBO.m_eBufferTarget==GL_PIXEL_UNPACK_BUFFER);
-    glDbgAssert(oPBO.size()==m_oInitTexture.size() && oPBO.type()==m_oInitTexture.type());
+    lvDbgAssert(oPBO.m_eBufferTarget==GL_PIXEL_UNPACK_BUFFER);
+    lvDbgAssert(oPBO.size()==m_oInitTexture.size() && oPBO.type()==m_oInitTexture.type());
     if(bRebindAll)
         glBindTexture(GL_TEXTURE_2D,getTexId());
     glBindBuffer(oPBO.m_eBufferTarget,oPBO.getPBOId());
@@ -257,16 +257,16 @@ void GLDynamicTexture2D::updateTexture(const GLPixelBufferObject& oPBO, bool bRe
 }
 
 void GLDynamicTexture2D::fetchTexture(cv::Mat& oTexture) {
-    glDbgAssert(!oTexture.empty());
-    glDbgAssert(oTexture.size()==m_oInitTexture.size() && oTexture.type()==m_oInitTexture.type());
-    glDbgAssert(oTexture.isContinuous());
+    lvDbgAssert(!oTexture.empty());
+    lvDbgAssert(oTexture.size()==m_oInitTexture.size() && oTexture.type()==m_oInitTexture.type());
+    lvDbgAssert(oTexture.isContinuous());
     glBindTexture(GL_TEXTURE_2D,getTexId());
     glGetTexImage(GL_TEXTURE_2D,0,m_eDataFormat,m_eDataType,oTexture.data);
 }
 
 void GLDynamicTexture2D::fetchTexture(const GLPixelBufferObject& oPBO, bool bRebindAll) {
-    glDbgAssert(oPBO.m_eBufferTarget==GL_PIXEL_PACK_BUFFER);
-    glDbgAssert(oPBO.size()==m_oInitTexture.size() && oPBO.type()==m_oInitTexture.type());
+    lvDbgAssert(oPBO.m_eBufferTarget==GL_PIXEL_PACK_BUFFER);
+    lvDbgAssert(oPBO.size()==m_oInitTexture.size() && oPBO.type()==m_oInitTexture.type());
     glBindTexture(GL_TEXTURE_2D,getTexId());
     glBindBuffer(oPBO.m_eBufferTarget,oPBO.getPBOId());
     glGetTexImage(GL_TEXTURE_2D,0,m_eDataFormat,m_eDataType,nullptr);
@@ -287,10 +287,10 @@ GLDynamicTexture2DArray::GLDynamicTexture2DArray(GLsizei nLevels, const std::vec
 GLDynamicTexture2DArray::~GLDynamicTexture2DArray() {}
 
 void GLDynamicTexture2DArray::updateTexture(const cv::Mat& oTexture, int nLayer, bool bRebindAll, bool bRegenMipmaps) {
-    glDbgAssert(!oTexture.empty());
-    glDbgAssert(oTexture.size()==m_voInitTextures[0].size() && oTexture.type()==m_voInitTextures[0].type());
-    glDbgAssert(oTexture.isContinuous());
-    glDbgAssert(nLayer>=0 && nLayer<m_nTextureCount);
+    lvDbgAssert(!oTexture.empty());
+    lvDbgAssert(oTexture.size()==m_voInitTextures[0].size() && oTexture.type()==m_voInitTextures[0].type());
+    lvDbgAssert(oTexture.isContinuous());
+    lvDbgAssert(nLayer>=0 && nLayer<m_nTextureCount);
     if(bRebindAll)
         glBindTexture(GL_TEXTURE_2D_ARRAY,getTexId());
     glTexSubImage3D(GL_TEXTURE_2D_ARRAY,0,0,0,nLayer,m_nWidth,m_nHeight,1,m_eDataFormat,m_eDataType,oTexture.data);
@@ -299,9 +299,9 @@ void GLDynamicTexture2DArray::updateTexture(const cv::Mat& oTexture, int nLayer,
 }
 
 void GLDynamicTexture2DArray::updateTexture(const GLPixelBufferObject& oPBO, int nLayer, bool bRebindAll) {
-    glDbgAssert(oPBO.m_eBufferTarget==GL_PIXEL_UNPACK_BUFFER);
-    glDbgAssert(oPBO.size()==m_voInitTextures[0].size() && oPBO.type()==m_voInitTextures[0].type());
-    glDbgAssert(nLayer>=0 && nLayer<m_nTextureCount);
+    lvDbgAssert(oPBO.m_eBufferTarget==GL_PIXEL_UNPACK_BUFFER);
+    lvDbgAssert(oPBO.size()==m_voInitTextures[0].size() && oPBO.type()==m_voInitTextures[0].type());
+    lvDbgAssert(nLayer>=0 && nLayer<m_nTextureCount);
     if(bRebindAll)
         glBindTexture(GL_TEXTURE_2D_ARRAY,getTexId());
     glBindBuffer(oPBO.m_eBufferTarget,oPBO.getPBOId());
@@ -311,10 +311,10 @@ void GLDynamicTexture2DArray::updateTexture(const GLPixelBufferObject& oPBO, int
 }
 
 void GLDynamicTexture2DArray::fetchTexture(cv::Mat& oTexture, int nLayer) {
-    glDbgAssert(!oTexture.empty());
-    glDbgAssert(oTexture.size()==m_voInitTextures[0].size() && oTexture.type()==m_voInitTextures[0].type());
-    glDbgAssert(oTexture.isContinuous());
-    glDbgAssert(nLayer>=0 && nLayer<m_nTextureCount);
+    lvDbgAssert(!oTexture.empty());
+    lvDbgAssert(oTexture.size()==m_voInitTextures[0].size() && oTexture.type()==m_voInitTextures[0].type());
+    lvDbgAssert(oTexture.isContinuous());
+    lvDbgAssert(nLayer>=0 && nLayer<m_nTextureCount);
     if(glGetTextureSubImage)
         glGetTextureSubImage(getTexId(),0,0,0,nLayer,(GLsizei)m_nWidth,(GLsizei)m_nHeight,1,m_eDataFormat,m_eDataType,(GLsizei)(m_voInitTextures[0].step.p[0]*m_nHeight),oTexture.data);
     else {
@@ -325,15 +325,15 @@ void GLDynamicTexture2DArray::fetchTexture(cv::Mat& oTexture, int nLayer) {
 }
 
 void GLDynamicTexture2DArray::fetchTexture(const GLPixelBufferObject& oPBO, int nLayer, bool bRebindAll) {
-    glDbgAssert(oPBO.m_eBufferTarget==GL_PIXEL_PACK_BUFFER);
-    glDbgAssert(nLayer>=0 && nLayer<m_nTextureCount);
+    lvDbgAssert(oPBO.m_eBufferTarget==GL_PIXEL_PACK_BUFFER);
+    lvDbgAssert(nLayer>=0 && nLayer<m_nTextureCount);
     if(glGetTextureSubImage) {
-        glDbgAssert(oPBO.size()==m_voInitTextures[0].size() && oPBO.type()==m_voInitTextures[0].type());
+        lvDbgAssert(oPBO.size()==m_voInitTextures[0].size() && oPBO.type()==m_voInitTextures[0].type());
         glBindBuffer(oPBO.m_eBufferTarget,oPBO.getPBOId());
         glGetTextureSubImage(getTexId(),0,0,0,nLayer,(GLsizei)m_nWidth,(GLsizei)m_nHeight,1,m_eDataFormat,m_eDataType,(GLsizei)(m_voInitTextures[0].step.p[0]*m_nHeight),nullptr);
     }
     else {
-        glDbgAssert(oPBO.size()==m_oTextureArrayFetchBuffer.size() && oPBO.type()==m_oTextureArrayFetchBuffer.type());
+        lvDbgAssert(oPBO.size()==m_oTextureArrayFetchBuffer.size() && oPBO.type()==m_oTextureArrayFetchBuffer.type());
         glBindTexture(GL_TEXTURE_2D_ARRAY,getTexId());
         glBindBuffer(oPBO.m_eBufferTarget,oPBO.getPBOId());
         glGetTexImage(GL_TEXTURE_2D_ARRAY,0,m_eDataFormat,m_eDataType,nullptr);

@@ -70,7 +70,7 @@ template<>
 template<>
 std::string IBackgroundSubtractorLBSP_GLSL::getLBSPThresholdLUTShaderSource<lv::GLSL>() const {
     lvDbgExceptionWatch;
-    glAssert(m_bInitialized);
+    lvAssert(m_bInitialized);
     std::stringstream ssSrc;
     ssSrc << "const uint anLBSPThresLUT[256] = uint[256](\n    ";
     for(size_t t=0; t<=UCHAR_MAX; ++t) {

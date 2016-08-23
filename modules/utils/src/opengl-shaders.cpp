@@ -54,7 +54,7 @@ GLShader::GLShader(bool bFixedFunct) :
         m_bIsEmpty(true),
         m_nProgID(bFixedFunct?0:glCreateProgram()) {
     if(!bFixedFunct && !m_nProgID)
-        glError("glCreateProgram failed");
+        lvError("glCreateProgram failed");
     glErrorCheck;
 }
 
@@ -68,7 +68,7 @@ GLShader::~GLShader() {
 
 GLuint GLShader::addSource(const std::string& sSource, GLenum eType) {
     if(!m_nProgID)
-        glError("attempted to add source to default shader pipeline program");
+        lvError("attempted to add source to default shader pipeline program");
     GLuint shaderID = glCreateShader(eType);
     glErrorCheck;
     try {
@@ -89,7 +89,7 @@ bool GLShader::removeSource(GLuint id) {
     auto oSrcIter = m_mShaderSources.find(id);
     if(oSrcIter!=m_mShaderSources.end()) {
         if(m_bIsActive)
-            glAssert(useShaderProgram(nullptr));
+            lvAssert(useShaderProgram(nullptr));
         glDetachShader(m_nProgID,oSrcIter->first);
         glDeleteShader(oSrcIter->first);
         m_mShaderSources.erase(oSrcIter);
@@ -106,7 +106,7 @@ bool GLShader::compile() {
     GLboolean bCompilerSupport;
     glGetBooleanv(GL_SHADER_COMPILER,&bCompilerSupport);
     if(bCompilerSupport==GL_FALSE)
-        glError("shader compiler not supported");
+        lvError("shader compiler not supported");
     GLint nCompiled = GL_TRUE;
     for(auto oSrcIter=m_mShaderSources.begin(); oSrcIter!=m_mShaderSources.end(); ++oSrcIter) {
         glGetShaderiv(oSrcIter->first,GL_COMPILE_STATUS,&nCompiled);
@@ -121,7 +121,7 @@ bool GLShader::compile() {
             glGetShaderiv(oSrcIter->first, GL_INFO_LOG_LENGTH, &nLogSize);
             std::vector<char> vcLog(nLogSize);
             glGetShaderInfoLog(oSrcIter->first, nLogSize, &nLogSize, &vcLog[0]);
-            glErrorExt("shader compilation error in shader source #%d of program #%d:\n%s\n%s\n",oSrcIter->first,m_nProgID,lv::gl::addLineNumbersToString(oSrcIter->second,true).c_str(),&vcLog[0]);
+            lvError_("shader compilation error in shader source #%d of program #%d:\n%s\n%s\n",oSrcIter->first,m_nProgID,lv::gl::addLineNumbersToString(oSrcIter->second,true).c_str(),&vcLog[0]);
         }
     }
     return (m_bIsCompiled=!m_mShaderSources.empty());
@@ -148,7 +148,7 @@ bool GLShader::link(bool bDiscardSources) {
         glGetProgramiv(m_nProgID, GL_INFO_LOG_LENGTH, &nLogSize);
         std::vector<char> vcLog(nLogSize);
         glGetProgramInfoLog(m_nProgID, nLogSize, &nLogSize, &vcLog[0]);
-        glErrorExt("shader link error in program #%d:\n%s\n",m_nProgID,&vcLog[0]);
+        lvError_("shader link error in program #%d:\n%s\n",m_nProgID,&vcLog[0]);
     }
     else if(bDiscardSources) {
         while(!m_mShaderSources.empty())
@@ -300,7 +300,7 @@ std::string GLShader::getVertexShaderSource_PassThrough(bool bPassNormals, bool 
 }
 
 std::string GLShader::getVertexShaderSource_PassThrough_ConstArray(GLuint nVertexCount, const GLVertex* aVertices, bool bPassNormals, bool bPassColors, bool bPassTexCoords) {
-    glAssert(nVertexCount>0 && aVertices);
+    lvAssert(nVertexCount>0 && aVertices);
     std::stringstream ssSrc;
     ssSrc << "#version 430\n"
              "const vec4 positions[" << nVertexCount << "] = vec4[" << nVertexCount << "](\n";
@@ -394,7 +394,7 @@ std::string GLShader::getFragmentShaderSource_PassThrough_TexSampler2D(GLuint nS
 }
 
 std::string GLShader::getFragmentShaderSource_PassThrough_SxSTexSampler2D(const std::vector<GLuint>& vnSamplerBindings, GLint nTextureLayer, bool bUseIntegralFormat) {
-    glAssert(vnSamplerBindings.size()>1 && nTextureLayer>=0);
+    lvAssert(vnSamplerBindings.size()>1 && nTextureLayer>=0);
     std::stringstream ssSrc;
     ssSrc << "#version 430\n"
              "layout(location=0) out vec4 out_color;\n"
@@ -465,7 +465,7 @@ std::string GLShader::getFragmentShaderSource_PassThrough_ImgLoad(bool bUseTopLe
     else if(!bUseIntegralFormat && !bInternalFormatIsIntegral) ssSrc <<
              "layout(binding=" << nImageBinding << ", " << lv::gl::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform image2D img;\n";
     else
-        glError("bad internal format & useintegral setup");
+        lvError("bad internal format & useintegral setup");
     ssSrc << "void main() {\n"
              "    ivec2 imgCoord = ivec2(gl_FragCoord.xy);\n"
              "    out_color = imageLoad(img,imgCoord);\n";
@@ -476,7 +476,7 @@ std::string GLShader::getFragmentShaderSource_PassThrough_ImgLoad(bool bUseTopLe
 }
 
 std::string GLShader::getFragmentShaderSource_PassThrough_SxSImgLoad(bool bUseTopLeftFragCoordOrigin, GLenum eInternalFormat, const std::vector<GLuint> vnImageBindings, GLint nImageLayer, bool bUseIntegralFormat) {
-    glAssert(vnImageBindings.size()>1 && nImageLayer>=0);
+    lvAssert(vnImageBindings.size()>1 && nImageLayer>=0);
     std::stringstream ssSrc;
     ssSrc << "#version 430\n"
              "layout(location=0) out vec4 out_color;\n";
@@ -493,7 +493,7 @@ std::string GLShader::getFragmentShaderSource_PassThrough_SxSImgLoad(bool bUseTo
         for(size_t nImageBindingIter=0; nImageBindingIter<vnImageBindings.size(); ++nImageBindingIter) ssSrc <<
              "layout(binding=" << nImageBindingIter << ", " << lv::gl::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform image2D" << (nImageLayer>0?"Array imgArray":" img") << nImageBindingIter << ";\n";
     else
-        glError("bad internal format & useintegral setup");
+        lvError("bad internal format & useintegral setup");
     ssSrc << "void main() {\n";
     if(nImageLayer>0) { ssSrc <<
              "    ivec3 imgSize = imageSize(imgArray1);\n"
@@ -537,7 +537,7 @@ std::string GLShader::getFragmentShaderSource_PassThrough_SxSImgArrayLoad(bool b
     else if(!bUseIntegralFormat && !bInternalFormatIsIntegral) ssSrc <<
              "layout(binding=" << nImageBinding << ", " << lv::gl::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform image2D" << (nImageCount>1?"Array imgArray":" img") << ";\n";
     else
-        glError("bad internal format & useintegral setup");
+        lvError("bad internal format & useintegral setup");
     ssSrc << "const int imgArrayLayers = " << nImageCount << ";\n"
              "void main() {\n";
     if(nImageCount>1) ssSrc <<
@@ -567,7 +567,7 @@ std::string GLShader::getComputeShaderSource_PassThrough_ImgLoadCopy(const glm::
              "layout(binding=" << nInputImageBinding << ", " << lv::gl::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") readonly uniform image2D imgInput;\n"
              "layout(binding=" << nOutputImageBinding << ", " << lv::gl::getGLSLFormatNameFromInternalFormat(eInternalFormat) << ") writeonly uniform image2D imgOutput;\n";
     else
-        glError("bad internal format & useintegral setup");
+        lvError("bad internal format & useintegral setup");
     ssSrc << "void main() {\n"
              "    ivec2 imgCoord = ivec2(gl_GlobalInvocationID.xy);\n"
              "    imageStore(imgOutput,imgCoord,imageLoad(imgInput,imgCoord));\n"
@@ -577,11 +577,11 @@ std::string GLShader::getComputeShaderSource_PassThrough_ImgLoadCopy(const glm::
 
 std::string GLShader::getComputeShaderSource_ParallelPrefixSum(size_t nMaxRowSize, bool bBinaryProc, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding) {
     // dispatch must use x=ceil(ceil(nColumns/2)/nMaxRowSize), y=nRows, z=1
-    glAssert(lv::gl::isInternalFormatIntegral(eInternalFormat));
-    glAssert(nMaxRowSize>1);
+    lvAssert(lv::gl::isInternalFormatIntegral(eInternalFormat));
+    lvAssert(nMaxRowSize>1);
     const size_t nInvocations = (size_t)ceil((float)nMaxRowSize/2);
-    glAssert((!(nMaxRowSize%2) && nInvocations==nMaxRowSize/2) || ((nMaxRowSize%2) && nInvocations-1==nMaxRowSize/2));
-    glAssert(nMaxRowSize*4*4<(size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE));
+    lvAssert((!(nMaxRowSize%2) && nInvocations==nMaxRowSize/2) || ((nMaxRowSize%2) && nInvocations-1==nMaxRowSize/2));
+    lvAssert(nMaxRowSize*4*4<(size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE));
     const char* acInternalFormatName = lv::gl::getGLSLFormatNameFromInternalFormat(eInternalFormat);
     std::stringstream ssSrc;
     ssSrc << "#version 430\n"
@@ -631,9 +631,9 @@ std::string GLShader::getComputeShaderSource_ParallelPrefixSum(size_t nMaxRowSiz
 std::string GLShader::getComputeShaderSource_ParallelPrefixSum_BlockMerge(size_t nColumns, size_t nMaxRowSize, size_t nRows, GLenum eInternalFormat, GLuint nImageBinding) {
     // dispatch must use x=1, y=1, z=1
     // @@@@ get rid of this step with atomic shared var?
-    glAssert(nMaxRowSize>0);
-    glAssert(nColumns>nMaxRowSize); // shader step is useless otherwise
-    glAssert(lv::gl::isInternalFormatIntegral(eInternalFormat));
+    lvAssert(nMaxRowSize>0);
+    lvAssert(nColumns>nMaxRowSize); // shader step is useless otherwise
+    lvAssert(lv::gl::isInternalFormatIntegral(eInternalFormat));
     const char* acInternalFormatName = lv::gl::getGLSLFormatNameFromInternalFormat(eInternalFormat);
     const int nBlockCount = (int)ceil((float)nColumns/nMaxRowSize);
     std::stringstream ssSrc;
@@ -656,8 +656,8 @@ std::string GLShader::getComputeShaderSource_ParallelPrefixSum_BlockMerge(size_t
 
 std::string GLShader::getComputeShaderSource_Transpose(size_t nBlockSize, GLenum eInternalFormat, GLuint nInputImageBinding, GLuint nOutputImageBinding) {
     // dispatch must use x=ceil(nCols/nBlockSize), y=ceil(nRows/nBlockSize), z=1
-    glAssert(nBlockSize*nBlockSize*4*4<(size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE));
-    glAssert(nInputImageBinding!=nOutputImageBinding);
+    lvAssert(nBlockSize*nBlockSize*4*4<(size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_SHARED_MEMORY_SIZE));
+    lvAssert(nInputImageBinding!=nOutputImageBinding);
     const bool bUsingIntegralFormat = lv::gl::isInternalFormatIntegral(eInternalFormat);
     const char* acInternalFormatName = lv::gl::getGLSLFormatNameFromInternalFormat(eInternalFormat);
     std::stringstream ssSrc;
@@ -677,8 +677,8 @@ std::string GLShader::getComputeShaderSource_Transpose(size_t nBlockSize, GLenum
 }
 
 std::string GLShader::getComputeShaderFunctionSource_SharedDataPreLoad(size_t nChannels, const glm::uvec2& vWorkGroupSize, size_t nExternalBorderSize) {
-    glAssert(nChannels==4 || nChannels==1);
-    glAssert(vWorkGroupSize.x>3 && vWorkGroupSize.y>3);
+    lvAssert(nChannels==4 || nChannels==1);
+    lvAssert(vWorkGroupSize.x>3 && vWorkGroupSize.y>3);
     std::stringstream ssSrc;
     ssSrc << "shared uvec4 avPreloadData[" << vWorkGroupSize.y+nExternalBorderSize*2 << "][" << vWorkGroupSize.x+nExternalBorderSize*2 << "];\n"
              "shared uint anQuadrantLockstep[4];\n"

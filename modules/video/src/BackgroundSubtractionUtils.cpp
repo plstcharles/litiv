@@ -163,7 +163,7 @@ IBackgroundSubtractor_GLSL::IBackgroundSubtractor_(size_t nLevels, size_t nCompu
 void IBackgroundSubtractor_GLSL::getLatestForegroundMask(cv::OutputArray _oLastFGMask) {
     _oLastFGMask.create(m_oImgSize,CV_8UC1);
     cv::Mat oLastFGMask = _oLastFGMask.getMat();
-    glAssert(GLImageProcAlgo::m_bFetchingOutput || GLImageProcAlgo::setOutputFetching(true))
+    lvAssert(GLImageProcAlgo::m_bFetchingOutput || GLImageProcAlgo::setOutputFetching(true))
     if(GLImageProcAlgo::m_nInternalFrameIdx>0)
         GLImageProcAlgo::fetchLastOutput(oLastFGMask);
     else
@@ -171,7 +171,7 @@ void IBackgroundSubtractor_GLSL::getLatestForegroundMask(cv::OutputArray _oLastF
 }
 
 void IBackgroundSubtractor_GLSL::initialize_gl(const cv::Mat& oInitImg, const cv::Mat& oROI) {
-    glAssert(!oInitImg.empty());
+    lvAssert(!oInitImg.empty());
     cv::Mat oCurrROI = oROI;
     if(oCurrROI.empty())
         oCurrROI = cv::Mat(oInitImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
@@ -183,7 +183,7 @@ void IBackgroundSubtractor_GLSL::initialize(const cv::Mat& oInitImg, const cv::M
 }
 
 void IBackgroundSubtractor_GLSL::apply_gl(cv::InputArray _oNextImage, bool bRebindAll, double dLearningRate) {
-    glAssert(m_bInitialized && m_bModelInitialized);
+    lvAssert(m_bInitialized && m_bModelInitialized);
     m_dCurrLearningRate = dLearningRate;
     cv::Mat oNextInputImg = _oNextImage.getMat();
     CV_Assert(oNextInputImg.type()==m_nImgType && oNextInputImg.size()==m_oImgSize);

@@ -63,15 +63,15 @@ protected:
         auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),lv::AddDirSlashIfMissing(this->getDataPath())+"groundtruth");
         auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),lv::AddDirSlashIfMissing(this->getDataPath())+"input");
         if(gtDir==vsSubDirs.end() || inputDir==vsSubDirs.end())
-            lvErrorExt("CDnet sequence '%s' did not possess the required groundtruth and input directories",this->getName().c_str());
+            lvError_("CDnet sequence '%s' did not possess the required groundtruth and input directories",this->getName().c_str());
         lv::GetFilesFromDir(*inputDir,this->m_vsInputPaths);
         lv::GetFilesFromDir(*gtDir,this->m_vsGTPaths);
         if(this->m_vsGTPaths.size()!=this->m_vsInputPaths.size())
-            lvErrorExt("CDnet sequence '%s' did not possess same amount of GT & input frames",this->getName().c_str());
+            lvError_("CDnet sequence '%s' did not possess same amount of GT & input frames",this->getName().c_str());
         this->m_oROI = cv::imread(lv::AddDirSlashIfMissing(this->getDataPath())+"ROI.bmp",cv::IMREAD_GRAYSCALE);
         cv::Mat oTempROI = cv::imread(lv::AddDirSlashIfMissing(this->getDataPath())+"ROI.jpg");
         if(this->m_oROI.empty() || oTempROI.empty())
-            lvErrorExt("CDnet sequence '%s' did not possess ROI.bmp/ROI.jpg files",this->getName().c_str());
+            lvError_("CDnet sequence '%s' did not possess ROI.bmp/ROI.jpg files",this->getName().c_str());
         if(this->m_oROI.size()!=oTempROI.size()) {
             std::cerr << "CDnet sequence '" << this->getName().c_str() << "' ROI images size mismatch; will keep smallest overlap." << std::endl;
             this->m_oROI = this->m_oROI(cv::Rect(0,0,std::min(this->m_oROI.cols,oTempROI.cols),std::min(this->m_oROI.rows,oTempROI.rows))).clone();

@@ -44,8 +44,8 @@ public:
     inline bool setDebugFetching(bool b) {return (m_bFetchingDebug=(b&&m_bUsingDebug));}
     inline bool getIsUsingDisplay() const {return m_bUsingDisplay;}
     inline bool getIsGLInitialized() const {return m_bGLInitialized;}
-    inline GLuint getACBOId(size_t n) const {glAssert(n<m_nACBOs); return m_vnACBO[n];}
-    inline GLuint getSSBOId(size_t n) const {glAssert(n<m_nSSBOs); return m_vnSSBO[n];}
+    inline GLuint getACBOId(size_t n) const {lvAssert(n<m_nACBOs); return m_vnACBO[n];}
+    inline GLuint getSSBOId(size_t n) const {lvAssert(n<m_nSSBOs); return m_vnSSBO[n];}
     inline size_t getTextureBinding(size_t nLayer, size_t eTexID) const {return (m_bUsingTexArrays?0:nLayer)*m_nTextures+eTexID;}
 
     size_t fetchLastOutput(cv::Mat& oOutput) const;
