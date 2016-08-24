@@ -64,6 +64,32 @@ namespace lv {
 
     template<int> struct _; // used for compile-time integer expr printing via error; just write "_<expr> __;"
 
+    struct UncaughtExceptionLogger {
+        UncaughtExceptionLogger(const char* sFunc, const char* sFile, int nLine) :
+                m_sFunc(sFunc),m_sFile(sFile),m_nLine(nLine) {}
+        const char* const m_sFunc;
+        const char* const m_sFile;
+        const int m_nLine;
+        ~UncaughtExceptionLogger() {
+            if(std::uncaught_exception())
+                std::cerr << cv::format("Unwinding at function '%s' from %s(%d) due to uncaught exception\n",m_sFunc,m_sFile,m_nLine);
+        }
+    };
+
+    struct Exception : public std::runtime_error {
+        template<typename... Targs>
+        Exception(const std::string& sErrMsg, const char* sFunc, const char* sFile, int nLine, Targs&&... args) :
+                std::runtime_error(cv::format((std::string("Exception in function '%s' from %s(%d) : \n")+sErrMsg).c_str(),sFunc,sFile,nLine,std::forward<Targs>(args)...)),
+                m_acFuncName(sFunc),
+                m_acFileName(sFile),
+                m_nLineNumber(nLine) {
+            std::cerr << this->what() << std::endl;
+        }
+        const char* const m_acFuncName;
+        const char* const m_acFileName;
+        const int m_nLineNumber;
+    };
+
     template<typename TDerived, typename TBase, typename TDeleter>
     inline std::unique_ptr<TDerived,TDeleter> static_unique_ptr_cast(std::unique_ptr<TBase,TDeleter>&& p) {
         auto d = static_cast<TDerived*>(p.release());
@@ -177,8 +203,8 @@ namespace lv {
     template<typename Tx, typename Ty>
     std::vector<Ty> interp1(const std::vector<Tx>& vX, const std::vector<Ty>& vY, const std::vector<Tx>& vXReq) {
         // assumes that all vectors are sorted
-        CV_Assert(vX.size()==vY.size());
-        CV_Assert(vX.size()>1);
+        lvAssert_(vX.size()==vY.size(),"size of input X and Y vectors must be identical");
+        lvAssert_(vX.size()>1,"input vectors must contain at least one element");
         std::vector<Tx> vDX;
         vDX.reserve(vX.size());
         std::vector<Ty> vDY, vSlope, vIntercept;
@@ -284,32 +310,6 @@ namespace lv {
     template<int... anIndices>
     struct MetaIdxConcatenator<0, anIndices...> : MetaIdxConcat<anIndices...> {};
 
-    struct UncaughtExceptionLogger {
-        UncaughtExceptionLogger(const char* sFunc, const char* sFile, int nLine) :
-                m_sFunc(sFunc),m_sFile(sFile),m_nLine(nLine) {}
-        const char* const m_sFunc;
-        const char* const m_sFile;
-        const int m_nLine;
-        ~UncaughtExceptionLogger() {
-            if(std::uncaught_exception())
-                std::cerr << cv::format("Unwinding at function '%s' from %s(%d) due to uncaught exception\n",m_sFunc,m_sFile,m_nLine);
-        }
-    };
-
-    struct Exception : public std::runtime_error {
-        template<typename... Targs>
-        Exception(const std::string& sErrMsg, const char* sFunc, const char* sFile, int nLine, Targs&&... args) :
-                std::runtime_error(cv::format((std::string("Exception in function '%s' from %s(%d) : \n")+sErrMsg).c_str(),sFunc,sFile,nLine,std::forward<Targs>(args)...)),
-                m_acFuncName(sFunc),
-                m_acFileName(sFile),
-                m_nLineNumber(nLine) {
-            std::cerr << this->what() << std::endl;
-        }
-        const char* const m_acFuncName;
-        const char* const m_acFileName;
-        const int m_nLineNumber;
-    };
-
     struct StopWatch {
         StopWatch() {tick();}
         inline void tick() {m_nTick = std::chrono::high_resolution_clock::now();}
@@ -359,17 +359,21 @@ namespace lv {
         return v;
     }
 
+    /// will return all elements of vVals which were not matched to an element in vTokens
     template<typename T>
     inline std::vector<T> filter_out(const std::vector<T>& vVals, const std::vector<T>& vTokens) {
-        std::vector<T> vRet = vVals; // will return all values not found in token list
-        vRet.erase(std::remove_if(vRet.begin(),vRet.end(),[&](const T& o){return std::find(vTokens.begin(),vTokens.end(),o)!=vTokens.end();}),vRet.end());
+        std::vector<T> vRet;
+        vRet.reserve(vVals.size());
+        std::copy_if(vVals.begin(),vVals.end(),std::back_inserter(vRet),[&](const T& o){return std::find(vTokens.begin(),vTokens.end(),o)==vTokens.end();});
         return vRet;
     }
 
+    /// will return all elements of vVals which were matched to an element in vTokens
     template<typename T>
     inline std::vector<T> filter_in(const std::vector<T>& vVals, const std::vector<T>& vTokens) {
-        std::vector<T> vRet = vVals; // will returns all values found in token list
-        vRet.erase(std::remove_if(vRet.begin(),vRet.end(),[&](const T& o){return std::find(vTokens.begin(),vTokens.end(),o)==vTokens.end();}),vRet.end());
+        std::vector<T> vRet;
+        vRet.reserve(vVals.size());
+        std::copy_if(vVals.begin(),vVals.end(),std::back_inserter(vRet),[&](const T& o){return std::find(vTokens.begin(),vTokens.end(),o)!=vTokens.end();});
         return vRet;
     }
 

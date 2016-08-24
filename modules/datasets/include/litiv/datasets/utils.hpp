@@ -531,7 +531,7 @@ namespace lv {
             public DataCounter_<NotGroup> {
         /// push a processed data packet for writing and/or evaluation (also registers it as 'done' for internal purposes)
         virtual void push(const cv::Mat& oOutput, size_t nIdx) {
-            lvDbgAssert(isProcessing());
+            lvAssert_(isProcessing(),"data processing must be toggled via 'startProcessing()' before pushing packets");
             processPacket();
             if(getDatasetInfo()->isSavingOutput())
                 save(oOutput,nIdx);

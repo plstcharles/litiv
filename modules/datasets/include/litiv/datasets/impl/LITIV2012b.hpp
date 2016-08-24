@@ -84,7 +84,7 @@ protected:
         m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
         m_oSize = oTempImg.size();
         m_nTotFrameCount = m_vsInputFramePaths.size();
-        CV_Assert(m_nTotFrameCount>0);
+        lvAssert(m_nTotFrameCount>0);
         m_dExpectedLoad = (double)m_oSize.height*m_oSize.width*m_nTotFrameCount*(int(!m_bForcingGrayscale)+1);
         m_pEvaluator = std::shared_ptr<EvaluatorBase>(new BinarySegmEvaluator("WALLFLOWER_EVAL"));
         */
@@ -120,16 +120,16 @@ protected:
         cv::Mat lv::Image::Segm::Set::GetInputFromIndex_external(size_t nImageIdx) {
             cv::Mat oImage;
             oImage = cv::imread(m_vsInputImagePaths[nImageIdx],m_bForcingGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
-            CV_Assert(!oImage.empty());
-            CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size() || m_voOrigImageSizes[nImageIdx]==oImage.size());
+            lvAssert(!oImage.empty());
+            lvAssert(m_voOrigImageSizes[nImageIdx]==cv::Size() || m_voOrigImageSizes[nImageIdx]==oImage.size());
             m_voOrigImageSizes[nImageIdx] = oImage.size();
             if(m_eDatasetID==Dataset_BSDS500_segm_train || m_eDatasetID==Dataset_BSDS500_segm_train_valid || m_eDatasetID==Dataset_BSDS500_segm_train_valid_test ||
                m_eDatasetID==Dataset_BSDS500_edge_train || m_eDatasetID==Dataset_BSDS500_edge_train_valid || m_eDatasetID==Dataset_BSDS500_edge_train_valid_test) {
-                CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
+                lvAssert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
                 if(oImage.size()==cv::Size(321,481))
                     cv::transpose(oImage,oImage);
             }
-            CV_Assert(oImage.cols<=m_oMaxSize.width && oImage.rows<=m_oMaxSize.height);
+            lvAssert(oImage.cols<=m_oMaxSize.width && oImage.rows<=m_oMaxSize.height);
             if(m_bForcing4ByteDataAlign && oImage.channels()==3)
                 cv::cvtColor(oImage,oImage,cv::COLOR_BGR2BGRA);
         #if HARDCODE_FRAME_INDEX
@@ -147,18 +147,18 @@ protected:
                 if(m_vsGTImagePaths.size()>nImageIdx) {
                     std::vector<std::string> vsTempPaths;
                     lv::GetFilesFromDir(m_vsGTImagePaths[nImageIdx],vsTempPaths);
-                    CV_Assert(!vsTempPaths.empty());
+                    lvAssert(!vsTempPaths.empty());
                     cv::Mat oTempRefGTImage = cv::imread(vsTempPaths[0],cv::IMREAD_GRAYSCALE);
-                    CV_Assert(!oTempRefGTImage.empty());
-                    CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size() || m_voOrigImageSizes[nImageIdx]==oTempRefGTImage.size());
-                    CV_Assert(oTempRefGTImage.size()==cv::Size(481,321) || oTempRefGTImage.size()==cv::Size(321,481));
+                    lvAssert(!oTempRefGTImage.empty());
+                    lvAssert(m_voOrigImageSizes[nImageIdx]==cv::Size() || m_voOrigImageSizes[nImageIdx]==oTempRefGTImage.size());
+                    lvAssert(oTempRefGTImage.size()==cv::Size(481,321) || oTempRefGTImage.size()==cv::Size(321,481));
                     m_voOrigImageSizes[nImageIdx] = oTempRefGTImage.size();
                     if(oTempRefGTImage.size()==cv::Size(321,481))
                         cv::transpose(oTempRefGTImage,oTempRefGTImage);
                     oImage.create(int(oTempRefGTImage.rows*vsTempPaths.size()),oTempRefGTImage.cols,CV_8UC1);
                     for(size_t nGTImageIdx=0; nGTImageIdx<vsTempPaths.size(); ++nGTImageIdx) {
                         cv::Mat oTempGTImage = cv::imread(vsTempPaths[nGTImageIdx],cv::IMREAD_GRAYSCALE);
-                        CV_Assert(!oTempGTImage.empty() && (oTempGTImage.size()==cv::Size(481,321) || oTempGTImage.size()==cv::Size(321,481)));
+                        lvAssert(!oTempGTImage.empty() && (oTempGTImage.size()==cv::Size(481,321) || oTempGTImage.size()==cv::Size(321,481)));
                         if(oTempGTImage.size()==cv::Size(321,481))
                             cv::transpose(oTempGTImage,oTempGTImage);
                         oTempGTImage.copyTo(cv::Mat(oImage,cv::Rect(0,int(oTempGTImage.rows*nGTImageIdx),oTempGTImage.cols,oTempGTImage.rows)));
@@ -179,15 +179,15 @@ protected:
         */
         /*
         cv::Mat lv::Image::Segm::Set::ReadResult(size_t nImageIdx) {
-            CV_Assert(m_vsOrigImageNames[nImageIdx]!=std::string());
-            CV_Assert(!m_sResultNameSuffix.empty());
+            lvAssert(m_vsOrigImageNames[nImageIdx]!=std::string());
+            lvAssert(!m_sResultNameSuffix.empty());
             std::stringstream sResultFilePath;
             sResultFilePath << m_sResultsPath << m_sResultNamePrefix << m_vsOrigImageNames[nImageIdx] << m_sResultNameSuffix;
             cv::Mat oImage = cv::imread(sResultFilePath.str(),m_bForcingGrayscale?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
             if(m_eDatasetID==Dataset_BSDS500_segm_train || m_eDatasetID==Dataset_BSDS500_segm_train_valid || m_eDatasetID==Dataset_BSDS500_segm_train_valid_test ||
                m_eDatasetID==Dataset_BSDS500_edge_train || m_eDatasetID==Dataset_BSDS500_edge_train_valid || m_eDatasetID==Dataset_BSDS500_edge_train_valid_test) {
-                CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
-                CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size() || m_voOrigImageSizes[nImageIdx]==oImage.size());
+                lvAssert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
+                lvAssert(m_voOrigImageSizes[nImageIdx]==cv::Size() || m_voOrigImageSizes[nImageIdx]==oImage.size());
                 m_voOrigImageSizes[nImageIdx] = oImage.size();
                 if(oImage.size()==cv::Size(321,481))
                     cv::transpose(oImage,oImage);
@@ -197,13 +197,13 @@ protected:
         */
         /*
         void lv::Image::Segm::Set::WriteResult(size_t nImageIdx, const cv::Mat& oResult) {
-            CV_Assert(m_vsOrigImageNames[nImageIdx]!=std::string());
-            CV_Assert(!m_sResultNameSuffix.empty());
+            lvAssert(m_vsOrigImageNames[nImageIdx]!=std::string());
+            lvAssert(!m_sResultNameSuffix.empty());
             cv::Mat oImage = oResult;
             if(m_eDatasetID==Dataset_BSDS500_segm_train || m_eDatasetID==Dataset_BSDS500_segm_train_valid || m_eDatasetID==Dataset_BSDS500_segm_train_valid_test ||
                m_eDatasetID==Dataset_BSDS500_edge_train || m_eDatasetID==Dataset_BSDS500_edge_train_valid || m_eDatasetID==Dataset_BSDS500_edge_train_valid_test) {
-                CV_Assert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
-                CV_Assert(m_voOrigImageSizes[nImageIdx]==cv::Size(481,321) || m_voOrigImageSizes[nImageIdx]==cv::Size(321,481));
+                lvAssert(oImage.size()==cv::Size(481,321) || oImage.size()==cv::Size(321,481));
+                lvAssert(m_voOrigImageSizes[nImageIdx]==cv::Size(481,321) || m_voOrigImageSizes[nImageIdx]==cv::Size(321,481));
                 if(m_voOrigImageSizes[nImageIdx]==cv::Size(321,481))
                     cv::transpose(oImage,oImage);
             }

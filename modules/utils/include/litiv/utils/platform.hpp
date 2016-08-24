@@ -75,7 +75,7 @@ namespace lv {
             size_t alloc_size = n*sizeof(value_type);
             if((alloc_size%alignment)!=0) {
                 alloc_size += alignment - alloc_size%alignment;
-                CV_DbgAssert((alloc_size%alignment)==0);
+                lvDbgAssert((alloc_size%alignment)==0);
             }
             void* ptr = _aligned_malloc(alloc_size,nByteAlign);
             if(ptr==nullptr)
@@ -90,7 +90,7 @@ namespace lv {
             size_t alloc_size = n*sizeof(value_type);
             if((alloc_size%alignment)!=0) {
                 alloc_size += alignment - alloc_size%alignment;
-                CV_DbgAssert((alloc_size%alignment)==0);
+                lvDbgAssert((alloc_size%alignment)==0);
             }
             void* ptr = aligned_alloc(alignment,alloc_size);
             if(ptr==nullptr)

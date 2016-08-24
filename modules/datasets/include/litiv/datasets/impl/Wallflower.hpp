@@ -91,6 +91,6 @@ protected:
             cv::resize(this->m_oROI,this->m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
         this->m_oSize = this->m_oROI.size();
         this->m_nFrameCount = this->m_vsInputPaths.size();
-        CV_Assert(this->m_nFrameCount>0);
+        lvAssert_(this->m_nFrameCount>0,"could not find any input frames");
     }
 };

@@ -23,10 +23,10 @@ IIEdgeDetector::IIEdgeDetector() :
 #if HAVE_GLSL
 
 void IEdgeDetector_GLSL::getLatestEdgeMask(cv::OutputArray _oLastEdgeMask) {
-    lvAssert(GLImageProcAlgo::m_bGLInitialized);
+    lvAssert_(GLImageProcAlgo::m_bGLInitialized,"algo must be initialized first");
     _oLastEdgeMask.create(GLImageProcAlgo::m_oFrameSize,CV_8UC1);
     cv::Mat oLastEdgeMask = _oLastEdgeMask.getMat();
-    lvAssert(GLImageProcAlgo::m_bFetchingOutput || GLImageProcAlgo::setOutputFetching(true))
+    lvAssert_(GLImageProcAlgo::m_bFetchingOutput || GLImageProcAlgo::setOutputFetching(true),"algo not initialized with mat output support")
     if(GLImageProcAlgo::m_nInternalFrameIdx>0)
         GLImageProcAlgo::fetchLastOutput(oLastEdgeMask);
     else
@@ -34,11 +34,11 @@ void IEdgeDetector_GLSL::getLatestEdgeMask(cv::OutputArray _oLastEdgeMask) {
 }
 
 void IEdgeDetector_GLSL::apply_gl(cv::InputArray _oNextImage, bool bRebindAll, double dThreshold) {
-    lvAssert(GLImageProcAlgo::m_bGLInitialized);
+    lvAssert_(GLImageProcAlgo::m_bGLInitialized,"algo must be initialized first");
     m_dCurrThreshold = dThreshold;
     cv::Mat oNextInputImg = _oNextImage.getMat();
-    lvAssert(oNextInputImg.size()==GLImageProcAlgo::m_oFrameSize);
-    lvAssert(oNextInputImg.isContinuous());
+    lvAssert_(oNextInputImg.size()==GLImageProcAlgo::m_oFrameSize,"input image size must match initialization size");
+    lvAssert_(oNextInputImg.isContinuous(),"input image must be continuous");
     GLImageProcAlgo::apply_gl(oNextInputImg,bRebindAll);
 }
 

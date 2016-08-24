@@ -31,16 +31,17 @@ EdgeDetectorLBSP::EdgeDetectorLBSP(size_t nLevels, double dHystLowThrshFactor, b
         m_vvuInputPyrMaps(std::max(nLevels,size_t(1))-1),
         m_vvuLBSPLookupMaps(nLevels),
         m_voMapSizeList(nLevels) {
+    lvAssert_(m_dHystLowThrshFactor>0 && m_dHystLowThrshFactor<1,"lower hysteresis threshold factor must be between 0 and 1");
+    lvAssert_(m_dGaussianKernelSigma>=0,"gaussian smoothing kernel sigma must be non-negative");
     m_nROIBorderSize = LBSP::PATCH_SIZE/2;
-    CV_Assert(m_nLevels>0);
+    lvAssert_(m_nLevels>0,"number of pyramid levels must be positive");
 }
 
 template<size_t nChannels>
 void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg) {
-    CV_DbgAssert(!oInputImg.empty());
-    CV_DbgAssert(oInputImg.isContinuous());
+    lvAssert_(!oInputImg.empty() && oInputImg.isContinuous(),"input image must be non-empty and continuous");
     const int nOrigType = CV_8UC(int(nChannels));
-    CV_DbgAssert(m_nROIBorderSize==LBSP::PATCH_SIZE/2);
+    lvDbgAssert(m_nROIBorderSize==LBSP::PATCH_SIZE/2);
     constexpr size_t nROIBorderSize = LBSP::PATCH_SIZE/2;
     const size_t nColLUTStep = LBSP::DESC_SIZE_BITS*nChannels;
     size_t nNextScaleRows = size_t(oInputImg.rows);
@@ -68,13 +69,13 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg) {
             m_vvuLBSPLookupMaps[nLevelIter+1].resize(nNextScaleMapSize*nChannels*LBSP::DESC_SIZE_BITS);
             m_voMapSizeList[nLevelIter+1] = oNextScaleSize;
             oNextPyrInputMap = cv::Mat(oNextScaleSize,nOrigType,m_vvuInputPyrMaps[nLevelIter].data());
-            CV_DbgAssert(size_t(oNextScaleSize.area()*nChannels)==m_vvuInputPyrMaps[nLevelIter].size());
+            lvDbgAssert(size_t(oNextScaleSize.area()*nChannels)==m_vvuInputPyrMaps[nLevelIter].size());
         }
         const auto lBorderColLookup = [&](size_t nRowIter, size_t nCurrRowLUTIdx, size_t nColIter){
             const size_t nCurrColLUTIdx = nCurrRowLUTIdx+nColIter*nColLUTStep;
             uchar* aanCurrLUT = m_vvuLBSPLookupMaps[nLevelIter].data()+nCurrColLUTIdx;
             const uchar* aanCurrImg = oCurrPyrInputMap.data+nCurrColLUTIdx/LBSP::DESC_SIZE_BITS;
-            CV_DbgAssert(nCurrColLUTIdx<m_vvuLBSPLookupMaps[nLevelIter].size() && (nCurrColLUTIdx%LBSP::DESC_SIZE_BITS)==0);
+            lvDbgAssert(nCurrColLUTIdx<m_vvuLBSPLookupMaps[nLevelIter].size() && (nCurrColLUTIdx%LBSP::DESC_SIZE_BITS)==0);
 #if HAVE_SSE2
             // no slower than fill_n if fill_n is implemented with SSE
             static_assert(LBSP::DESC_SIZE_BITS==16,"all channels should already be 16-byte-aligned");
@@ -90,7 +91,7 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg) {
                 const size_t nNextColLUTIdx = (nRowIter/2)*nNextRowLUTStep + (nColIter/2)*nColLUTStep;
                 for(size_t nChIter = 0; nChIter<nChannels; ++nChIter) {
                     const size_t nNextPyrImgIdx = nNextColLUTIdx/LBSP::DESC_SIZE_BITS + nChIter;
-                    CV_DbgAssert(nNextPyrImgIdx<size_t(oNextPyrInputMap.dataend-oNextPyrInputMap.datastart));
+                    lvDbgAssert(nNextPyrImgIdx<size_t(oNextPyrInputMap.dataend-oNextPyrInputMap.datastart));
                     *(oNextPyrInputMap.data+nNextPyrImgIdx) = *(aanCurrImg+nChIter);
                 }
             }
@@ -111,7 +112,7 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg) {
             for(; nColIter<nCurrScaleCols-nROIBorderSize; ++nColIter) {
                 const size_t nCurrColLUTIdx = nCurrRowLUTIdx+nColIter*nColLUTStep;
                 uchar* aanCurrLUT = m_vvuLBSPLookupMaps[nLevelIter].data()+nCurrColLUTIdx;
-                CV_DbgAssert(nCurrColLUTIdx<m_vvuLBSPLookupMaps[nLevelIter].size() && (nCurrColLUTIdx%LBSP::DESC_SIZE_BITS)==0);
+                lvDbgAssert(nCurrColLUTIdx<m_vvuLBSPLookupMaps[nLevelIter].size() && (nCurrColLUTIdx%LBSP::DESC_SIZE_BITS)==0);
                 LBSP::computeDescriptor_lookup<nChannels>(oCurrPyrInputMap,int(nColIter),int(nRowIter),aanCurrLUT);
                 if(nNextScaleMapSize && !(nRowIter%2) && !(nColIter%2)) {
                     const size_t nNextColLUTIdx = (nRowIter/2)*nNextRowLUTStep + (nColIter/2)*nColLUTStep;
@@ -128,7 +129,7 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg) {
                         });
 #endif //(!HAVE_SSE2)
                         const size_t nNextPyrImgIdx = nNextColLUTIdx/LBSP::DESC_SIZE_BITS + nChIter;
-                        CV_DbgAssert(nNextPyrImgIdx<size_t(oNextPyrInputMap.dataend-oNextPyrInputMap.datastart));
+                        lvDbgAssert(nNextPyrImgIdx<size_t(oNextPyrInputMap.dataend-oNextPyrInputMap.datastart));
                         *(oNextPyrInputMap.data+nNextPyrImgIdx) = uchar(nLUTSum/LBSP::DESC_SIZE_BITS);
                     }
                 }
@@ -161,10 +162,8 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg, size_t nC
 
 template<size_t nChannels>
 void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Mat& oEdgeMask, uchar nDetThreshold) {
-    CV_DbgAssert(!oInputImg.empty());
-    CV_DbgAssert(oInputImg.isContinuous());
-    CV_DbgAssert(!oEdgeMask.empty());
-    CV_DbgAssert(oEdgeMask.isContinuous());
+    lvAssert_(!oInputImg.empty() && oInputImg.isContinuous(),"input image must be non-empty and continuous");
+    lvAssert_(!oEdgeMask.empty() && oEdgeMask.isContinuous(),"output mask must be non-empty and continuous");
     const int nOrigType = CV_8UC(int(nChannels));
     const size_t nColLUTStep = LBSP::DESC_SIZE_BITS*nChannels;
     const uchar nHystHighThreshold = nDetThreshold;
@@ -197,12 +196,12 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
     uchar** pauHystStack_top = &m_vuHystStack[0];
     uchar** pauHystStack_bottom = &m_vuHystStack[0];
     auto stack_push = [&](uchar* pAddr) {
-        CV_DbgAssert(pAddr>=oEdgeTempMask.datastart+nEdgeMapRowStep*nNMSHalfWinSize);
-        CV_DbgAssert(pAddr<oEdgeTempMask.dataend-nEdgeMapRowStep*nNMSHalfWinSize);
+        lvDbgAssert(pAddr>=oEdgeTempMask.datastart+nEdgeMapRowStep*nNMSHalfWinSize);
+        lvDbgAssert(pAddr<oEdgeTempMask.dataend-nEdgeMapRowStep*nNMSHalfWinSize);
         *pAddr = 2, *pauHystStack_top++ = pAddr;
     };
     auto stack_pop = [&]() -> uchar* {
-        CV_DbgAssert(pauHystStack_top>pauHystStack_bottom);
+        lvDbgAssert(pauHystStack_top>pauHystStack_bottom);
         return *--pauHystStack_top;
     };
     auto stack_check_size = [&](size_t nPotentialSize) {
@@ -220,7 +219,7 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
         const size_t nRowLUTStep = nColLUTStep*(size_t)oCurrScaleSize.width;
         for(int nRowIter = oCurrScaleSize.height-1; nRowIter>=-(int)nNMSHalfWinSize; --nRowIter) {
             uchar* anGradRow = oGradMap.data+(nRowIter+nNMSHalfWinSize)*nGradMapRowStep+nGradMapColStep*nNMSHalfWinSize;
-            CV_DbgAssert(anGradRow>oGradMap.datastart && anGradRow<oGradMap.dataend);
+            lvDbgAssert(anGradRow>oGradMap.datastart && anGradRow<oGradMap.dataend);
             if(nRowIter>=0) {
                 const size_t nRowLUTIdx = nRowIter*nRowLUTStep;
                 for(size_t nColIter = (size_t)oCurrScaleSize.width-1; nColIter!=size_t(-1); --nColIter) {
@@ -234,8 +233,8 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
                     (char&)(anGradRow[nColIter*nGradMapColStep]) = std::min(nGradX,char(anGradRow[nColIter*nGradMapColStep]),lAbsCharComp);
                     (char&)(anGradRow[nColIter*nGradMapColStep+1]) = std::min(nGradY,char(anGradRow[nColIter*nGradMapColStep+1]),lAbsCharComp);
 #else //(!USE_MIN_GRAD_ORIENT)
-                    CV_DbgAssert((nGradX+(char)(anGradRow[nColIter*nGradMapColStep]*2))/2<=UCHAR_MAX);
-                    CV_DbgAssert((nGradY+(char)(anGradRow[nColIter*nGradMapColStep+1]*2))/2<=UCHAR_MAX);
+                    lvDbgAssert((nGradX+(char)(anGradRow[nColIter*nGradMapColStep]*2))/2<=UCHAR_MAX);
+                    lvDbgAssert((nGradY+(char)(anGradRow[nColIter*nGradMapColStep+1]*2))/2<=UCHAR_MAX);
                     (char&)(anGradRow[nColIter*nGradMapColStep]) = ((nGradX+(char)(anGradRow[nColIter*nGradMapColStep]*2))/2);
                     (char&)(anGradRow[nColIter*nGradMapColStep+1]) = ((nGradY+(char)(anGradRow[nColIter*nGradMapColStep+1]*2))/2);
 #endif //(!USE_MIN_GRAD_ORIENT)
@@ -243,11 +242,11 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
                     if(nLevelIter>0) {
                         const size_t nRowIter_base = nRowIter << 1;
                         const size_t nColIter_base = nColIter << 1;
-                        CV_DbgAssert((nRowIter_base+1)<size_t(oMapSize.height));
-                        CV_DbgAssert((nColIter_base+1)<size_t(oMapSize.width));
+                        lvDbgAssert((nRowIter_base+1)<size_t(oMapSize.height));
+                        lvDbgAssert((nColIter_base+1)<size_t(oMapSize.width));
                         lv::unroll<2>([&](int nRowIterOffset){
                             uchar* anNextScaleGradRow = oGradMap.data+(nRowIter_base+nRowIterOffset+nNMSHalfWinSize)*nGradMapRowStep+nGradMapColStep*nNMSHalfWinSize;
-                            CV_DbgAssert(anNextScaleGradRow<oGradMap.dataend);
+                            lvDbgAssert(anNextScaleGradRow<oGradMap.dataend);
                             lv::unroll<2>([&](int nColIterOffset){ // 4ch x 8ub = 32-bit chunks to copy
                                 *(uint32_t*)(anNextScaleGradRow+(nColIter_base+nColIterOffset)*nGradMapColStep) = *(uint32_t*)(anGradRow+nColIter*nGradMapColStep);
                             });
@@ -267,10 +266,10 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
                     bool nNeighbMax = false;
                     for(size_t nColIter = 0; nColIter<(size_t)oInputImg.cols; ++nColIter) {
                         // make sure all 'quick-idx' lookups are at the right positions...
-                        CV_DbgAssert(anGradRow[nColIter*nGradMapColStep]==oGradMap.at<cv::Vec4b>(int(nRowIter+(nNMSHalfWinSize*2)),int(nColIter+nNMSHalfWinSize))[0]);
-                        CV_DbgAssert(anGradRow[nColIter*nGradMapColStep+1]==oGradMap.at<cv::Vec4b>(int(nRowIter+(nNMSHalfWinSize*2)),int(nColIter+nNMSHalfWinSize))[1]);
+                        lvDbgAssert(anGradRow[nColIter*nGradMapColStep]==oGradMap.at<cv::Vec4b>(int(nRowIter+(nNMSHalfWinSize*2)),int(nColIter+nNMSHalfWinSize))[0]);
+                        lvDbgAssert(anGradRow[nColIter*nGradMapColStep+1]==oGradMap.at<cv::Vec4b>(int(nRowIter+(nNMSHalfWinSize*2)),int(nColIter+nNMSHalfWinSize))[1]);
                         for(int nNMSWinIter=-(int)nNMSHalfWinSize; nNMSWinIter<=(int)nNMSHalfWinSize; ++nNMSWinIter)
-                            CV_DbgAssert(anGradRow[nColIter*nGradMapColStep+nGradMapRowStep*nNMSWinIter+2]==oGradMap.at<cv::Vec4b>(int(nRowIter+nNMSWinIter+(nNMSHalfWinSize*2)),int(nColIter+nNMSHalfWinSize))[2]);
+                            lvDbgAssert(anGradRow[nColIter*nGradMapColStep+nGradMapRowStep*nNMSWinIter+2]==oGradMap.at<cv::Vec4b>(int(nRowIter+nNMSWinIter+(nNMSHalfWinSize*2)),int(nColIter+nNMSHalfWinSize))[2]);
                         const uchar nGradMag = anGradRow[nColIter*nGradMapColStep+2];
                         if(nGradMag>=nHystLowThreshold) {
 #if USE_3_AXIS_ORIENT
@@ -328,8 +327,8 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
             }
         }
     }
-    CV_DbgAssert(oEdgeTempMask.step.p[0]==nEdgeMapRowStep);
-    CV_DbgAssert(oEdgeTempMask.step.p[1]==nEdgeMapColStep);
+    lvDbgAssert(oEdgeTempMask.step.p[0]==nEdgeMapRowStep);
+    lvDbgAssert(oEdgeTempMask.step.p[1]==nEdgeMapColStep);
     while(pauHystStack_top>pauHystStack_bottom) {
         stack_check_size(8);
         uchar* pEdgeAddr = stack_pop();
@@ -377,8 +376,8 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
 
 void EdgeDetectorLBSP::apply_threshold(cv::InputArray _oInputImage, cv::OutputArray _oEdgeMask, double dDetThreshold) {
     cv::Mat oInputImg = _oInputImage.getMat();
-    CV_Assert(!oInputImg.empty());
-    CV_Assert(oInputImg.isContinuous());
+    lvAssert_(!oInputImg.empty() && oInputImg.isContinuous(),"input image must be non-empty and continuous");
+    lvAssert_(oInputImg.depth()==CV_8U,"input image depth must be 8U")
     if(m_dGaussianKernelSigma>0) {
         const int nDefaultKernelSize = int(8*ceil(m_dGaussianKernelSigma));
         const int nRealKernelSize = nDefaultKernelSize%2==0?nDefaultKernelSize+1:nDefaultKernelSize;
@@ -396,8 +395,8 @@ void EdgeDetectorLBSP::apply_threshold(cv::InputArray _oInputImage, cv::OutputAr
 
 void EdgeDetectorLBSP::apply(cv::InputArray _oInputImage, cv::OutputArray _oEdgeMask) {
     cv::Mat oInputImg = _oInputImage.getMat();
-    CV_Assert(!oInputImg.empty());
-    CV_Assert(oInputImg.isContinuous());
+    lvAssert_(!oInputImg.empty() && oInputImg.isContinuous(),"input image must be non-empty and continuous");
+    lvAssert_(oInputImg.depth()==CV_8U,"input image depth must be 8U")
     if(m_dGaussianKernelSigma>0) {
         const int nDefaultKernelSize = int(8*ceil(m_dGaussianKernelSigma));
         const int nRealKernelSize = nDefaultKernelSize%2==0?nDefaultKernelSize+1:nDefaultKernelSize;

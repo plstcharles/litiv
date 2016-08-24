@@ -102,13 +102,13 @@ BackgroundSubtractorPAWCS::BackgroundSubtractorPAWCS_(size_t nDescDistThresholdO
         m_pLocalWordListIter_3ch(m_voLocalWordList_3ch.end()),
         m_pGlobalWordListIter_1ch(m_voGlobalWordList_1ch.end()),
         m_pGlobalWordListIter_3ch(m_voGlobalWordList_3ch.end()) {
-    CV_Assert(m_nMaxLocalWords>0 && m_nMaxGlobalWords>0);
+    lvAssert_(m_nMaxLocalWords>0 && m_nMaxGlobalWords>0,"max local/global word counts must be positive");
 }
 
 void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDecrFrac, bool bForceFGUpdate) {
     // == refresh
-    CV_Assert(m_bInitialized);
-    CV_Assert(fOccDecrFrac>=0.0f && fOccDecrFrac<=1.0f);
+    lvAssert_(m_bInitialized,"algo must be initialized first");
+    lvAssert_(fOccDecrFrac>=0.0f && fOccDecrFrac<=1.0f,"model occurrence decrementation must be given as a non-null fraction");
     if(m_nImgChannels==1) {
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
             const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
@@ -168,7 +168,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                         }
                     }
                 }
-                CV_Assert(m_vpLocalWordDict[nLocalDictIdx]);
+                lvDbgAssert(m_vpLocalWordDict[nLocalDictIdx]);
                 for(size_t nLocalWordIdx=1; nLocalWordIdx<m_nCurrLocalWords; ++nLocalWordIdx) {
                     // == refresh: local random resampling
                     if(!(LocalWord_1ch*)m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx]) {
@@ -186,7 +186,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                 }
             }
         }
-        CV_Assert(m_voLocalWordList_1ch.end()==m_pLocalWordListIter_1ch);
+        lvDbgAssert(m_voLocalWordList_1ch.end()==m_pLocalWordListIter_1ch);
         cv::Mat oGlobalDictPresenceLookupMap(m_oImgSize,CV_8UC1,cv::Scalar_<uchar>(0));
         size_t nPxIterIncr = std::max(m_nTotPxCount/m_nCurrGlobalWords,(size_t)1);
         for(size_t nSamplingPasses=0; nSamplingPasses<GWORD_DEFAULT_NB_INIT_SAMPL_PASSES; ++nSamplingPasses) {
@@ -202,7 +202,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                         const float fCurrDistThresholdFactor = *(float*)(m_oDistThresholdFrame.data+nFloatIter);
                         const size_t nCurrColorDistThreshold = (size_t)(sqrt(fCurrDistThresholdFactor)*m_nMinColorDistThreshold)/2;
                         const size_t nCurrDescDistThreshold = ((size_t)1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThresholdOffset+(bCurrRegionIsUnstable*UNSTAB_DESC_DIST_OFFSET);
-                        CV_Assert(m_vpLocalWordDict[nLocalDictIdx]);
+                        lvDbgAssert(m_vpLocalWordDict[nLocalDictIdx]);
                         const LocalWord_1ch& oRefBestLocalWord = *(LocalWord_1ch*)m_vpLocalWordDict[nLocalDictIdx];
                         const float fRefBestLocalWordWeight = GetLocalWordWeight(oRefBestLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
                         const uchar nRefBestLocalWordDescBITS = (uchar)lv::popcount(oRefBestLocalWord.oFeature.anDesc[0]);
@@ -255,7 +255,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                 m_vpGlobalWordDict[nGlobalWordIdx] = &oCurrNewGlobalWord;
             }
         }
-        CV_Assert(m_voGlobalWordList_1ch.end()==m_pGlobalWordListIter_1ch);
+        lvDbgAssert(m_voGlobalWordList_1ch.end()==m_pGlobalWordListIter_1ch);
     }
     else { //m_nImgChannels==3
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
@@ -319,7 +319,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                         }
                     }
                 }
-                CV_Assert(m_vpLocalWordDict[nLocalDictIdx]);
+                lvDbgAssert(m_vpLocalWordDict[nLocalDictIdx]);
                 for(size_t nLocalWordIdx=1; nLocalWordIdx<m_nCurrLocalWords; ++nLocalWordIdx) {
                     // == refresh: local random resampling
                     if(!(LocalWord_3ch*)m_vpLocalWordDict[nLocalDictIdx+nLocalWordIdx]) {
@@ -339,7 +339,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                 }
             }
         }
-        CV_Assert(m_voLocalWordList_3ch.end()==m_pLocalWordListIter_3ch);
+        lvDbgAssert(m_voLocalWordList_3ch.end()==m_pLocalWordListIter_3ch);
         cv::Mat oGlobalDictPresenceLookupMap(m_oImgSize,CV_8UC1,cv::Scalar_<uchar>(0));
         size_t nPxIterIncr = std::max(m_nTotPxCount/m_nCurrGlobalWords,(size_t)1);
         for(size_t nSamplingPasses=0; nSamplingPasses<GWORD_DEFAULT_NB_INIT_SAMPL_PASSES; ++nSamplingPasses) {
@@ -355,7 +355,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                         const float fCurrDistThresholdFactor = *(float*)(m_oDistThresholdFrame.data+nFloatIter);
                         const size_t nCurrTotColorDistThreshold = (size_t)(sqrt(fCurrDistThresholdFactor)*m_nMinColorDistThreshold)*3;
                         const size_t nCurrTotDescDistThreshold = (((size_t)1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThresholdOffset+(bCurrRegionIsUnstable*UNSTAB_DESC_DIST_OFFSET))*3;
-                        CV_Assert(m_vpLocalWordDict[nLocalDictIdx]);
+                        lvDbgAssert(m_vpLocalWordDict[nLocalDictIdx]);
                         const LocalWord_3ch& oRefBestLocalWord = *(LocalWord_3ch*)m_vpLocalWordDict[nLocalDictIdx];
                         const float fRefBestLocalWordWeight = GetLocalWordWeight(oRefBestLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
                         const uchar nRefBestLocalWordDescBITS = (uchar)lv::popcount(oRefBestLocalWord.oFeature.anDesc);
@@ -412,7 +412,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                 m_vpGlobalWordDict[nGlobalWordIdx] = &oCurrNewGlobalWord;
             }
         }
-        CV_Assert(m_voGlobalWordList_3ch.end()==m_pGlobalWordListIter_3ch);
+        lvDbgAssert(m_voGlobalWordList_3ch.end()==m_pGlobalWordListIter_3ch);
     }
     for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
         // == refresh: per-px global word sort
@@ -559,10 +559,10 @@ void BackgroundSubtractorPAWCS::initialize(const cv::Mat& oInitImg, const cv::Ma
 
 void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fgmask, double learningRateOverride) {
     // == process
-    CV_Assert(m_bInitialized && m_bModelInitialized);
+    lvAssert_(m_bInitialized && m_bModelInitialized,"algo & model must be initialized first");
     cv::Mat oInputImg = _image.getMat();
-    CV_Assert(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize);
-    CV_Assert(oInputImg.isContinuous());
+    lvAssert_(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize,"input image type/size mismatch with initialization type/size");
+    lvAssert_(oInputImg.isContinuous(),"input image data must be continuous");
     _fgmask.create(m_oImgSize,CV_8UC1);
     cv::Mat oCurrFGMask = _fgmask.getMat();
     memset(oCurrFGMask.data,0,oCurrFGMask.cols*oCurrFGMask.rows);
@@ -657,9 +657,9 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                 ++nFlatRegionCount;
             const size_t nCurrWordOccIncr = (DEFAULT_LWORD_OCC_INCR+m_nModelResetCooldown)<<int(bCurrRegionIsFlat||bBootstrapping);
 #if USE_FEEDBACK_ADJUSTMENTS
-            const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):bCurrRegionIsFlat?(size_t)ceil(fCurrLearningRate+FEEDBACK_T_LOWER)/2:(size_t)ceil(fCurrLearningRate);
+            const size_t nCurrLocalWordUpdateRate = std::isinf(learningRateOverride)?SIZE_MAX:(learningRateOverride>0?(size_t)ceil(learningRateOverride):bCurrRegionIsFlat?(size_t)ceil(fCurrLearningRate+FEEDBACK_T_LOWER)/2:(size_t)ceil(fCurrLearningRate));
 #else //(!USE_FEEDBACK_ADJUSTMENTS)
-            const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)DEFAULT_RESAMPLING_RATE;
+            const size_t nCurrLocalWordUpdateRate = std::isinf(learningRateOverride)?SIZE_MAX:(learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)DEFAULT_RESAMPLING_RATE);
 #endif //(!USE_FEEDBACK_ADJUSTMENTS)
             const size_t nCurrColorDistThreshold = (size_t)(sqrt(fCurrDistThresholdFactor)*m_nMinColorDistThreshold)/2;
             const size_t nCurrDescDistThreshold = ((size_t)1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThresholdOffset+(bCurrRegionIsUnstable*UNSTAB_DESC_DIST_OFFSET);
@@ -987,9 +987,9 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
                 ++nFlatRegionCount;
             const size_t nCurrWordOccIncr = (DEFAULT_LWORD_OCC_INCR+m_nModelResetCooldown)<<int(bCurrRegionIsFlat||bBootstrapping);
 #if USE_FEEDBACK_ADJUSTMENTS
-            const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):bCurrRegionIsFlat?(size_t)ceil(fCurrLearningRate+FEEDBACK_T_LOWER)/2:(size_t)ceil(fCurrLearningRate);
+            const size_t nCurrLocalWordUpdateRate = std::isinf(learningRateOverride)?SIZE_MAX:(learningRateOverride>0?(size_t)ceil(learningRateOverride):bCurrRegionIsFlat?(size_t)ceil(fCurrLearningRate+FEEDBACK_T_LOWER)/2:(size_t)ceil(fCurrLearningRate));
 #else //(!USE_FEEDBACK_ADJUSTMENTS)
-            const size_t nCurrLocalWordUpdateRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)DEFAULT_RESAMPLING_RATE;
+            const size_t nCurrLocalWordUpdateRate = std::isinf(learningRateOverride)?SIZE_MAX:(learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)DEFAULT_RESAMPLING_RATE);
 #endif //(!USE_FEEDBACK_ADJUSTMENTS)
             const size_t nCurrTotColorDistThreshold = (size_t)(sqrt(fCurrDistThresholdFactor)*m_nMinColorDistThreshold)*3;
             const size_t nCurrTotDescDistThreshold = (((size_t)1<<((size_t)floor(fCurrDistThresholdFactor+0.5f)))+m_nDescDistThresholdOffset+(bCurrRegionIsUnstable*UNSTAB_DESC_DIST_OFFSET))*3;
@@ -1524,7 +1524,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
 }
 
 void BackgroundSubtractorPAWCS::getBackgroundImage(cv::OutputArray backgroundImage) const { // @@@ add option to reconstruct from gwords?
-    CV_Assert(m_bInitialized);
+    lvAssert_(m_bInitialized,"algo must be initialized first");
     cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
     for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
         const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
@@ -1560,7 +1560,7 @@ void BackgroundSubtractorPAWCS::getBackgroundImage(cv::OutputArray backgroundIma
 
 void BackgroundSubtractorPAWCS::getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const { // @@@ add option to reconstruct from gwords?
     static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
-    CV_Assert(m_bInitialized);
+    lvAssert_(m_bInitialized,"algo must be initialized first");
     cv::Mat oAvgBGDescImg = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
     for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
         const size_t nPxIter = m_vnPxIdxLUT[nModelIter];

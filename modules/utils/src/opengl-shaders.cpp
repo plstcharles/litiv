@@ -89,7 +89,7 @@ bool GLShader::removeSource(GLuint id) {
     auto oSrcIter = m_mShaderSources.find(id);
     if(oSrcIter!=m_mShaderSources.end()) {
         if(m_bIsActive)
-            lvAssert(useShaderProgram(nullptr));
+            lvAssert_(useShaderProgram(nullptr),"could not activate default shader");
         glDetachShader(m_nProgID,oSrcIter->first);
         glDeleteShader(oSrcIter->first);
         m_mShaderSources.erase(oSrcIter);

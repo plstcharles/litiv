@@ -97,11 +97,11 @@ protected:
         std::vector<std::string> vsTempPaths;
         for(size_t nImageIdx=0; nImageIdx<this->m_vsGTPaths.size(); ++nImageIdx) {
             lv::GetFilesFromDir(this->m_vsGTPaths[nImageIdx],vsTempPaths);
-            CV_Assert(!vsTempPaths.empty());
+            lvAssert(!vsTempPaths.empty());
             const size_t nLastInputSlashPos = this->m_vsInputPaths[nImageIdx].find_last_of("/\\");
             const std::string sInputFullName = nLastInputSlashPos==std::string::npos?this->m_vsInputPaths[nImageIdx]:this->m_vsInputPaths[nImageIdx].substr(nLastInputSlashPos+1);
             const size_t nLastGTSlashPos = this->m_vsGTPaths[nImageIdx].find_last_of("/\\");
-            CV_Assert(sInputFullName.find(nLastGTSlashPos==std::string::npos?this->m_vsGTPaths[nImageIdx]:this->m_vsGTPaths[nImageIdx].substr(nLastGTSlashPos+1))!=std::string::npos);
+            lvAssert(sInputFullName.find(nLastGTSlashPos==std::string::npos?this->m_vsGTPaths[nImageIdx]:this->m_vsGTPaths[nImageIdx].substr(nLastGTSlashPos+1))!=std::string::npos);
         }
         this->m_bIsInputConstantSize = this->m_bIsGTConstantSize = true;
         this->m_oInputMaxSize = this->m_oGTMaxSize = cv::Size(481,321);
@@ -126,7 +126,7 @@ protected:
             this->m_vbGTTransposed.push_back(false);
             this->m_voInputOrigSizes.push_back(oCurrInput.size());
             lv::GetFilesFromDir(this->m_vsGTPaths[nImageIdx],vsTempPaths);
-            CV_Assert(!vsTempPaths.empty());
+            lvAssert(!vsTempPaths.empty());
             this->m_voGTOrigSizes.push_back(cv::Size(481,321*int(vsTempPaths.size())));
             this->m_voInputSizes.push_back(cv::Size(int(481*dScale),int(321*dScale)));
             this->m_voGTSizes.push_back(cv::Size(int(481*dScale),int(321*vsTempPaths.size()*dScale)));
@@ -135,7 +135,7 @@ protected:
             this->m_oGTMaxSize.width = std::max(this->m_oGTMaxSize.width,this->m_voGTSizes[nImageIdx].width);
             this->m_oGTMaxSize.height = std::max(this->m_oGTMaxSize.height,this->m_voGTSizes[nImageIdx].height);
         }
-        CV_Assert(this->m_nImageCount>0);
+        lvAssert(this->m_nImageCount>0);
     }
     /// gt packet load function, dataset-specific (default gt loader is not satisfactory)
     virtual cv::Mat _getGTPacket_impl(size_t nIdx) override final {
@@ -144,19 +144,19 @@ protected:
         if(this->m_vsGTPaths.size()>nIdx) {
             std::vector<std::string> vsTempPaths;
             lv::GetFilesFromDir(this->m_vsGTPaths[nIdx],vsTempPaths);
-            CV_Assert(!vsTempPaths.empty());
+            lvAssert(!vsTempPaths.empty());
             cv::Mat oTempRefGTImage = cv::imread(vsTempPaths[0],cv::IMREAD_GRAYSCALE);
-            CV_Assert(!oTempRefGTImage.empty());
-            CV_Assert(oTempRefGTImage.size()==cv::Size(481,321) || oTempRefGTImage.size()==cv::Size(321,481));
+            lvAssert(!oTempRefGTImage.empty());
+            lvAssert(oTempRefGTImage.size()==cv::Size(481,321) || oTempRefGTImage.size()==cv::Size(321,481));
             cv::Mat oGTMask(321*int(vsTempPaths.size()),481,CV_8UC1);
             for(size_t nGTImageIdx=0; nGTImageIdx<vsTempPaths.size(); ++nGTImageIdx) {
                 cv::Mat oTempGTImage = cv::imread(vsTempPaths[nGTImageIdx],cv::IMREAD_GRAYSCALE);
-                CV_Assert(!oTempGTImage.empty() && (oTempGTImage.size()==cv::Size(481,321) || oTempGTImage.size()==cv::Size(321,481)));
+                lvAssert(!oTempGTImage.empty() && (oTempGTImage.size()==cv::Size(481,321) || oTempGTImage.size()==cv::Size(321,481)));
                 if(oTempGTImage.size()==cv::Size(321,481))
                     cv::transpose(oTempGTImage,oTempGTImage);
                 oTempGTImage.copyTo(cv::Mat(oGTMask,cv::Rect(0,321*int(nGTImageIdx),481,321)));
             }
-            CV_Assert(this->m_voGTOrigSizes[nIdx]==oGTMask.size());
+            lvAssert(this->m_voGTOrigSizes[nIdx]==oGTMask.size());
             return oGTMask;
         }
         return cv::Mat();

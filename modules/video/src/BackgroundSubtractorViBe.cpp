@@ -25,13 +25,13 @@ BackgroundSubtractorViBe::BackgroundSubtractorViBe(size_t nColorDistThreshold, s
         m_voBGImg(nBGSamples),
         m_nColorDistThreshold(nColorDistThreshold),
         m_bInitialized(false) {
-    CV_Assert(m_nRequiredBGSamples<=m_nBGSamples);
+    lvAssert(m_nBGSamples>0 && m_nRequiredBGSamples<=m_nBGSamples);
 }
 
 BackgroundSubtractorViBe::~BackgroundSubtractorViBe() {}
 
 void BackgroundSubtractorViBe::getBackgroundImage(cv::OutputArray backgroundImage) const {
-    CV_Assert(m_bInitialized);
+    lvAssert(m_bInitialized);
     cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_32FC(m_voBGImg[0].channels()));
     for(size_t n=0; n<m_nBGSamples; ++n) {
         for(int y=0; y<m_oImgSize.height; ++y) {
@@ -54,11 +54,11 @@ BackgroundSubtractorViBe_1ch::BackgroundSubtractorViBe_1ch(size_t nColorDistThre
 BackgroundSubtractorViBe_1ch::~BackgroundSubtractorViBe_1ch() {}
 
 void BackgroundSubtractorViBe_1ch::initialize(const cv::Mat& oInitImg) {
-    CV_Assert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
-    CV_Assert(oInitImg.isContinuous());
-    CV_Assert(oInitImg.type()==CV_8UC1);
+    lvAssert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
+    lvAssert(oInitImg.isContinuous());
+    lvAssert(oInitImg.type()==CV_8UC1);
     m_oImgSize = oInitImg.size();
-    CV_Assert(m_voBGImg.size()==(size_t)m_nBGSamples);
+    lvAssert(m_voBGImg.size()==(size_t)m_nBGSamples);
     for(size_t s=0; s<m_nBGSamples; s++) {
         m_voBGImg[s].create(m_oImgSize,CV_8UC1);
         m_voBGImg[s] = cv::Scalar(0);
@@ -74,10 +74,10 @@ void BackgroundSubtractorViBe_1ch::initialize(const cv::Mat& oInitImg) {
 }
 
 void BackgroundSubtractorViBe_1ch::apply(cv::InputArray _image, cv::OutputArray _fgmask, double learningRate) {
-    CV_Assert(m_bInitialized);
-    CV_Assert(learningRate>0);
+    lvAssert(m_bInitialized);
+    lvAssert(learningRate>0);
     cv::Mat oInputImg = _image.getMat();
-    CV_Assert(oInputImg.type()==CV_8UC1 && oInputImg.size()==m_oImgSize);
+    lvAssert(oInputImg.type()==CV_8UC1 && oInputImg.size()==m_oImgSize);
     _fgmask.create(m_oImgSize,CV_8UC1);
     cv::Mat oFGMask = _fgmask.getMat();
     oFGMask = cv::Scalar_<uchar>(0);
@@ -111,16 +111,16 @@ BackgroundSubtractorViBe_3ch::BackgroundSubtractorViBe_3ch(size_t nColorDistThre
 BackgroundSubtractorViBe_3ch::~BackgroundSubtractorViBe_3ch() {}
 
 void BackgroundSubtractorViBe_3ch::initialize(const cv::Mat& oInitImg) {
-    CV_Assert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
-    CV_Assert(oInitImg.isContinuous());
-    CV_Assert(oInitImg.type()==CV_8UC3 || oInitImg.type()==CV_8UC1);
+    lvAssert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
+    lvAssert(oInitImg.isContinuous());
+    lvAssert(oInitImg.type()==CV_8UC3 || oInitImg.type()==CV_8UC1);
     cv::Mat oInitImgRGB;
     if(oInitImg.type()==CV_8UC3)
         oInitImgRGB = oInitImg;
     else
         cv::cvtColor(oInitImg,oInitImgRGB,cv::COLOR_GRAY2BGR);
     m_oImgSize = oInitImgRGB.size();
-    CV_Assert(m_voBGImg.size()==(size_t)m_nBGSamples);
+    lvAssert(m_voBGImg.size()==(size_t)m_nBGSamples);
     int y_sample, x_sample;
     for(size_t s=0; s<m_nBGSamples; s++) {
         m_voBGImg[s].create(m_oImgSize,CV_8UC3);
@@ -136,10 +136,10 @@ void BackgroundSubtractorViBe_3ch::initialize(const cv::Mat& oInitImg) {
 }
 
 void BackgroundSubtractorViBe_3ch::apply(cv::InputArray _image, cv::OutputArray _fgmask, double learningRate) {
-    CV_Assert(m_bInitialized);
-    CV_Assert(learningRate>0);
+    lvAssert(m_bInitialized);
+    lvAssert(learningRate>0);
     cv::Mat oInputImg = _image.getMat();
-    CV_Assert((oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3) && oInputImg.size()==m_oImgSize);
+    lvAssert((oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3) && oInputImg.size()==m_oImgSize);
     cv::Mat oInputImgRGB;
     if(oInputImg.type()==CV_8UC3)
         oInputImgRGB = oInputImg;

@@ -51,14 +51,16 @@ GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t 
         m_nOutputType(nOutputType),
         m_nDebugType(nDebugType),
         m_nInputType(-1) {
-    lvAssert(m_nLevels>0 && GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT>1 && m_nComputeStages>0);
+    lvAssert_(m_nLevels>0,"textures must have at least one level each");
+    lvAssert_(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT>1,"texture arrays must have at least one layer each");
+    lvAssert_(m_nComputeStages>0,"image processing pipeline must have at least one compute stage");
     if(m_bUsingTexArrays && !glGetTextureSubImage && (m_bUsingDebugPBOs || m_bUsingOutputPBOs))
         lvError("missing impl for texture arrays pbo fetch when glGetTextureSubImage is not available");
     const std::array<int,3> anMaxWorkGroupSize = lv::gl::getIntegerVal<3>(GL_MAX_COMPUTE_WORK_GROUP_SIZE);
     if(anMaxWorkGroupSize[0]<(int)m_vDefaultWorkGroupSize.x || anMaxWorkGroupSize[1]<(int)m_vDefaultWorkGroupSize.y)
         lvError_("workgroup size limit is too small for the current impl (curr=[%d,%d], req=[%d,%d])",anMaxWorkGroupSize[0],anMaxWorkGroupSize[1],(int)m_vDefaultWorkGroupSize.x,(int)m_vDefaultWorkGroupSize.y);
     const size_t nCurrComputeStageInvocs = m_vDefaultWorkGroupSize.x*m_vDefaultWorkGroupSize.y;
-    lvAssert(nCurrComputeStageInvocs>0);
+    lvAssert_(nCurrComputeStageInvocs>0,"work group size dimensions must be non-null");
     if((size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS)<nCurrComputeStageInvocs)
         lvError_("compute invoc limit is too small for the current impl (curr=%lu, req=%lu)",(size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS),nCurrComputeStageInvocs);
     if((size_t)lv::gl::getIntegerVal<1>(GL_MAX_IMAGE_UNITS)<m_nImages || (size_t)lv::gl::getIntegerVal<1>(GL_MAX_COMPUTE_IMAGE_UNIFORMS)<m_nImages)
@@ -102,9 +104,9 @@ std::string GLImageProcAlgo::getFragmentShaderSource() const {
 
 void GLImageProcAlgo::initialize_gl(const cv::Mat& oInitInput, const cv::Mat& oROI) {
     m_bGLInitialized = false;
-    lvAssert(!oROI.empty() && oROI.isContinuous() && oROI.type()==CV_8UC1);
+    lvAssert_(!oROI.empty() && oROI.isContinuous() && oROI.type()==CV_8UC1,"provided ROI must be non-empty, continuous, and of type 8UC1");
     if(m_bUsingInput) {
-        lvAssert(!oInitInput.empty() && oInitInput.size()==oROI.size() && oInitInput.isContinuous());
+        lvAssert_(!oInitInput.empty() && oInitInput.size()==oROI.size() && oInitInput.isContinuous(),"provided input must be non-empty, continuous, and of the same size as the ROI");
         m_nInputType = oInitInput.type();
     }
     m_oFrameSize = oROI.size();
@@ -196,7 +198,8 @@ void GLImageProcAlgo::initialize_gl(const cv::Mat& oInitInput, const cv::Mat& oR
 }
 
 void GLImageProcAlgo::apply_gl(const cv::Mat& oNextInput, bool bRebindAll) {
-    lvAssert(m_bGLInitialized && (oNextInput.empty() || (oNextInput.type()==m_nInputType && oNextInput.size()==m_oFrameSize && oNextInput.isContinuous())));
+    lvAssert_(m_bGLInitialized,"algo must be initialized first");
+    lvAssert_(oNextInput.empty() || (oNextInput.type()==m_nInputType && oNextInput.size()==m_oFrameSize && oNextInput.isContinuous()),"input must be the same size/type as initially provided, and continuous");
     m_nLastLayer = m_nCurrLayer;
     m_nCurrLayer = m_nNextLayer;
     ++m_nNextLayer %= GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT;
@@ -375,7 +378,7 @@ void GLImageProcAlgo::apply_gl(const cv::Mat& oNextInput, bool bRebindAll) {
 }
 
 size_t GLImageProcAlgo::fetchLastOutput(cv::Mat& oOutput) const {
-    lvAssert(m_bFetchingOutput);
+    lvAssert_(m_bFetchingOutput,"algo is not configured for cpu-side output mat fetching");
     oOutput.create(m_oFrameSize,m_nOutputType);
     if(m_bUsingOutputPBOs)
         m_apOutputPBOs[m_nNextPBO]->fetchBuffer(oOutput,true);
@@ -385,7 +388,7 @@ size_t GLImageProcAlgo::fetchLastOutput(cv::Mat& oOutput) const {
 }
 
 size_t GLImageProcAlgo::fetchLastDebug(cv::Mat& oDebug) const {
-    lvAssert(m_bFetchingDebug);
+    lvAssert_(m_bFetchingDebug,"algo is not configured for cpu-side debug mat fetching");
     oDebug.create(m_oFrameSize,m_nDebugType);
     if(m_bUsingDebugPBOs)
         m_apDebugPBOs[m_nNextPBO]->fetchBuffer(oDebug,true);
@@ -395,7 +398,7 @@ size_t GLImageProcAlgo::fetchLastDebug(cv::Mat& oDebug) const {
 }
 
 void GLImageProcAlgo::dispatch(size_t nStage, GLShader&) {
-    lvAssert(nStage<m_nComputeStages);
+    lvAssert_(nStage<m_nComputeStages,"required compute stage does not exist");
     glDispatchCompute((GLuint)ceil((float)m_oFrameSize.width/m_vDefaultWorkGroupSize.x),(GLuint)ceil((float)m_oFrameSize.height/m_vDefaultWorkGroupSize.y),1);
 }
 
@@ -553,11 +556,11 @@ GLImageProcEvaluatorAlgo::GLImageProcEvaluatorAlgo( const std::shared_ptr<GLImag
         m_nCurrEvalBufferOffsetPtr(0),
         m_nCurrEvalBufferOffsetBlock(0),
         m_pParent(pParent) {
-    lvAssert(m_bUsingInput && m_pParent->m_bUsingOutput);
-    lvAssert(m_nGroundtruthType>=0 && m_nGroundtruthType==m_pParent->m_nOutputType);
-    lvAssert(!dynamic_cast<GLImageProcEvaluatorAlgo*>(m_pParent.get()));
-    lvAssert(nTotFrameCount>0 && nCountersPerFrame>0);
-    lvAssert(m_nEvalBufferMaxSize>nCountersPerFrame*4);
+    lvAssert_(m_bUsingInput && m_pParent->m_bUsingOutput,"gpu evaluator must use an input, and the parent must provide an output");
+    lvAssert_(m_nGroundtruthType>=0 && m_nGroundtruthType==m_pParent->m_nOutputType,"gpu evaluator gt type must be the same as the parent's output type"); // @@@ relax constraint later?
+    lvAssert_(!dynamic_cast<GLImageProcEvaluatorAlgo*>(m_pParent.get()),"parent algo must not be an evaluator algo");
+    lvAssert_(nTotFrameCount>0 && nCountersPerFrame>0,"total frame count & counters per frame must be known and positive");
+    lvAssert_(m_nEvalBufferMaxSize>nCountersPerFrame*4,"evaluation max buffer size is too small for required counters");
     if(m_nEvalBufferMaxSize<=m_nCurrEvalBufferSize) {
         while(m_nEvalBufferMaxSize<=m_nCurrEvalBufferSize)
             m_nCurrEvalBufferSize /= 2;
@@ -570,7 +573,7 @@ GLImageProcEvaluatorAlgo::GLImageProcEvaluatorAlgo( const std::shared_ptr<GLImag
 GLImageProcEvaluatorAlgo::~GLImageProcEvaluatorAlgo() {}
 
 const cv::Mat& GLImageProcEvaluatorAlgo::getEvaluationAtomicCounterBuffer() {
-    lvAssert(m_bGLInitialized);
+    lvAssert_(m_bGLInitialized,"algo must be initialized first");
     glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER,getACBOId(GLImageProcAlgo::AtomicCounterBuffer_EvalBinding));
     if(m_nCurrEvalBufferOffsetPtr)
@@ -588,9 +591,9 @@ void GLImageProcEvaluatorAlgo::initialize_gl(const cv::Mat& oInitInput, const cv
 }
 
 void GLImageProcEvaluatorAlgo::initialize_gl(const cv::Mat& oInitGT, const cv::Mat& oROI) {
-    lvAssert(!oROI.empty() && oROI.isContinuous() && oROI.type()==CV_8UC1);
-    lvAssert(oROI.size()==m_pParent->m_oFrameSize);
-    lvAssert(oInitGT.type()==m_nGroundtruthType && oInitGT.size()==oROI.size() && oInitGT.isContinuous());
+    lvAssert_(!oROI.empty() && oROI.isContinuous() && oROI.type()==CV_8UC1,"provided ROI must be non-empty, continuous, and of type 8UC1");
+    lvAssert_(oROI.size()==m_pParent->m_oFrameSize,"provided ROI size must match parent algo frame size");
+    lvAssert_(oInitGT.type()==m_nGroundtruthType && oInitGT.size()==oROI.size() && oInitGT.isContinuous(),"provided init gt mat must match original type/size, and be continuous");
     m_bGLInitialized = false;
     m_oFrameSize = oROI.size();
     for(size_t nPBOIter=0; nPBOIter<2; ++nPBOIter) {
@@ -678,8 +681,9 @@ void GLImageProcEvaluatorAlgo::apply_gl(const cv::Mat& oNextInput, const cv::Mat
 }
 
 void GLImageProcEvaluatorAlgo::apply_gl(const cv::Mat& oNextGT, bool bRebindAll) {
-    lvAssert(m_bGLInitialized && (oNextGT.empty() || (oNextGT.type()==m_nGroundtruthType && oNextGT.size()==m_oFrameSize && oNextGT.isContinuous())));
-    CV_Assert(m_nInternalFrameIdx<m_nTotFrameCount);
+    lvAssert_(m_bGLInitialized,"algo must be initialized first");
+    lvAssert_(oNextGT.empty() || (oNextGT.type()==m_nGroundtruthType && oNextGT.size()==m_oFrameSize && oNextGT.isContinuous()),"input gt must be the same size/type as initially provided, and continuous");
+    lvAssert_(m_nInternalFrameIdx<m_nTotFrameCount,"internal frame counter exceeded the sequence's total frame count");
     m_nLastLayer = m_nCurrLayer;
     m_nCurrLayer = m_nNextLayer;
     ++m_nNextLayer %= GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT;
@@ -787,11 +791,11 @@ void GLImageProcEvaluatorAlgo::apply_gl(const cv::Mat& oNextGT, bool bRebindAll)
 
 GLImagePassThroughAlgo::GLImagePassThroughAlgo(int nFrameType, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat) :
         GLImageProcAlgo(1,1,0,0,0,0,nFrameType,-1,true,bUseDisplay,bUseTimers,bUseIntegralFormat) {
-    lvAssert(nFrameType>=0);
+    lvAssert_(nFrameType>=0,"must provide a valid frame type for pass-through usage");
 }
 
 std::string GLImagePassThroughAlgo::getComputeShaderSource(size_t nStage) const {
-    lvAssert(nStage<m_nComputeStages);
+    lvAssert_(nStage<m_nComputeStages,"required compute stage does not exist");
     return GLShader::getComputeShaderSource_PassThrough_ImgLoadCopy(m_vDefaultWorkGroupSize,lv::gl::getInternalFormatFromMatType(m_nOutputType,m_bUsingIntegralFormat),GLImageProcAlgo::Image_InputBinding,GLImageProcAlgo::Image_OutputBinding,m_bUsingIntegralFormat);
 }
 
@@ -880,12 +884,12 @@ BinaryMedianFilter::BinaryMedianFilter( size_t nKernelSize, size_t nBorderSize, 
 
 std::string BinaryMedianFilter::getComputeShaderSource(size_t nStage) const {
     // @@@@ go check how opencv handles borders (sets as 0...?)
-    lvAssert(nStage<m_nComputeStages);
+    lvAssert_(nStage<m_nComputeStages,"required compute stage does not exist");
     return m_vsComputeShaderSources[nStage];
 }
 
 void BinaryMedianFilter::dispatchCompute(size_t nStage, GLShader*) {
-    lvAssert(nStage<m_nComputeStages);
+    lvAssert_(nStage<m_nComputeStages,"required compute stage does not exist");
     if(nCurrStageIter>0)
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT); // add barrier for acbo? ssbo? @@@@@
     glDispatchCompute(m_vvComputeShaderDispatchSizes[nStage].x,m_vvComputeShaderDispatchSizes[nStage].y,m_vvComputeShaderDispatchSizes[nStage].z);

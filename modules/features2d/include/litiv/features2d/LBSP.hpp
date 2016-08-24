@@ -20,9 +20,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/features2d.hpp>
-#include "litiv/utils/parallel.hpp"
 #include "litiv/utils/distances.hpp"
-#include "litiv/utils/cxx.hpp"
 
 /*!
     Local Binary Similarity Pattern (LBSP) feature extractor
@@ -134,7 +132,7 @@ public:
     template<size_t nChannels>
     static inline void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, std::array<std::array<uchar,DESC_SIZE_BITS>,nChannels>& aanVals) {
         static_assert(sizeof(std::array<std::array<uchar,DESC_SIZE_BITS>,nChannels>)==sizeof(uchar)*DESC_SIZE_BITS*nChannels,"terrible impl of std::array right here");
-        CV_DbgAssert((void*)aanVals.data()==(void*)aanVals[0].data());
+        lvDbgAssert_((void*)aanVals.data()==(void*)aanVals[0].data(),"bad indexing in array-of-array impl");
         LBSP::computeDescriptor_lookup<nChannels>(oInputImg,_x,_y,aanVals[0].data());
     }
 
@@ -142,11 +140,10 @@ public:
     template<size_t nChannels>
     static inline void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, const size_t _c, uchar* anVals) {
         static_assert(nChannels>0,"need at least one image channel");
-        CV_DbgAssert(anVals);
-        CV_DbgAssert(!oInputImg.empty());
-        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels) && _c<nChannels);
-        CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
-        CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
+        lvDbgAssert_(anVals,"need to provide a valid pixel pointer");
+        lvDbgAssert__(!oInputImg.empty() && oInputImg.type()==CV_8UC(nChannels) && _c<nChannels,"need to provide a non-empty matrix of %d channels, with _c<%d",(int)nChannels,(int)nChannels);
+        lvDbgAssert__(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2,"descriptor center needs to be at least %d pixels from image borders",(int)LBSP::PATCH_SIZE/2);
+        lvDbgAssert__(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2,"descriptor center needs to be at least %d pixels from image borders",(int)LBSP::PATCH_SIZE/2);
         const size_t nRowStep = oInputImg.step.p[0];
         const size_t nColStep = oInputImg.step.p[1];
         const uchar* const anData = oInputImg.data+_y*nRowStep+_x*nColStep+_c;
@@ -157,11 +154,10 @@ public:
     template<size_t nChannels>
     static inline void computeDescriptor_lookup(const cv::Mat& oInputImg, const int _x, const int _y, uchar* aanVals) {
         static_assert(nChannels>0,"need at least one image channel");
-        CV_DbgAssert(aanVals);
-        CV_DbgAssert(!oInputImg.empty());
-        CV_DbgAssert(oInputImg.type()==CV_8UC(nChannels));
-        CV_DbgAssert(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2);
-        CV_DbgAssert(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2);
+        lvDbgAssert_(aanVals,"need to provide a valid pixel pointer");
+        lvDbgAssert__(!oInputImg.empty() && oInputImg.type()==CV_8UC(nChannels),"need to provide a non-empty matrix of %d channels",(int)nChannels);
+        lvDbgAssert__(_x>=(int)LBSP::PATCH_SIZE/2 && _y>=(int)LBSP::PATCH_SIZE/2,"descriptor center needs to be at least %d pixels from image borders",(int)LBSP::PATCH_SIZE/2);
+        lvDbgAssert__(_x<oInputImg.cols-(int)LBSP::PATCH_SIZE/2 && _y<oInputImg.rows-(int)LBSP::PATCH_SIZE/2,"descriptor center needs to be at least %d pixels from image borders",(int)LBSP::PATCH_SIZE/2);
         const size_t nRowStep = oInputImg.step.p[0];
         const size_t nColStep = oInputImg.step.p[1];
         lv::unroll<nChannels>([&](int _c) {
@@ -180,7 +176,7 @@ public:
     static inline desc_t computeDescriptor_threshold(const uchar* const anVals, const uchar nRef, const uchar nThreshold) {
         // note: this function is used to threshold an LBSP pattern based on a predefined lookup array (see LBSP_16bits_dbcross_lookup for more information)
         // @@@ todo: use array template to unroll loops & allow any descriptor size here
-        CV_DbgAssert(anVals);
+        lvDbgAssert_(anVals,"need to provide a valid pixel pointer");
 #if (!HAVE_SSE4_1 && !HAVE_SSE2)
         desc_t nDesc = 0;
         lv::unroll<LBSP::DESC_SIZE_BITS>([&](int n) {
@@ -190,7 +186,7 @@ public:
 #else //(HAVE_SSE4_1 || HAVE_SSE2)
         static_assert(LBSP::DESC_SIZE_BITS==16,"current sse impl can only manage 16-byte chunks");
         // @@@@ send <16byte back to non-sse, and >16 to loop via template enableif?
-        CV_DbgAssert(((uintptr_t)(&anVals[0])&15)==0);
+        lvDbgAssert_(((uintptr_t)(&anVals[0])&15)==0,"pixel pointer must be 16-byte aligned");
         __m128i _anInputVals = _mm_load_si128((__m128i*)&anVals[0]); // @@@@@ load? or just cast?
         __m128i _anRefVals = _mm_set1_epi8(nRef);
 #if HAVE_SSE4_1
@@ -225,8 +221,8 @@ public:
         // @@@ todo: use array template to unroll loops & allow any descriptor size here
         static_assert(std::numeric_limits<Tr1>::max()>=4*LBSP::DESC_SIZE_BITS,"output size is too small for descriptor config");
         static_assert(nChannels>0,"need at least one image channel");
-        CV_DbgAssert(aanVals);
-        CV_DbgAssert(anRefs);
+        lvDbgAssert_(aanVals,"need to provide a valid pixel pointer");
+        lvDbgAssert_(anRefs,"need to provide a valid ref pixel pointer");
         desc_t nTempDesc = computeDescriptor_threshold(aanVals+(nChannels-1)*LBSP::DESC_SIZE_BITS,anRefs[nChannels-1],((anRefs[nChannels-1]>>nRelShift)+nAbsOffset)/2);
         nGradMag = (Tr2)lv::popcount(nTempDesc);
         lv::unroll<nChannels-1>([&](int cn) {
@@ -239,7 +235,7 @@ public:
         });
         nGradX = (Tr1)lv::popcount(nTempDesc&s_nDesc_16bitdbcross_GradX_Pos)-(Tr1)lv::popcount(nTempDesc&s_nDesc_16bitdbcross_GradX_Neg);
         nGradY = (Tr1)lv::popcount(nTempDesc&s_nDesc_16bitdbcross_GradY_Pos)-(Tr1)lv::popcount(nTempDesc&s_nDesc_16bitdbcross_GradY_Neg);
-        CV_DbgAssert(nGradMag<=MAX_GRAD_MAG);
+        lvDbgAssert(nGradMag<=MAX_GRAD_MAG);
     }
 
 protected:
@@ -282,7 +278,7 @@ protected:
     static inline void lookup_16bits_dbcross(const Tv* const anData, const size_t nRowStep, const size_t nColStep, Tv* const anVals) {
 /*#if !HAVE_SSE2
         // SSE2 version is not faster than fully optimized version
-        CV_DbgAssert(nRowStep*2+nColStep*2<INT32_MAX); // map index offsets will be stored in signed 32-bit integers
+        lvDbgAssert(nRowStep*2+nColStep*2<INT32_MAX); // map index offsets will be stored in signed 32-bit integers
         const __m128i vnColStep = _mm_set1_epi32((int)nColStep);
         const __m128i vnRowStep = _mm_set1_epi32((int)nRowStep);
         lv::unroll<4>([&](int n) {

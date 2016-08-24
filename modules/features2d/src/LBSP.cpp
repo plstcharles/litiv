@@ -35,7 +35,7 @@ LBSP::LBSP(float fRelThreshold, size_t nThresholdOffset) :
         m_fRelThreshold(fRelThreshold),
         m_nThreshold(nThresholdOffset),
         m_oRefImage() {
-    CV_Assert(m_fRelThreshold>=0);
+    lvAssert_(m_fRelThreshold>=0,"relative LBSP threshold must be non-negative");
 }
 
 LBSP::~LBSP() {}
@@ -49,7 +49,7 @@ void LBSP::write(cv::FileStorage& /*fs*/) const {
 }
 
 void LBSP::setReference(const cv::Mat& img) {
-    CV_DbgAssert(img.empty() || img.type()==CV_8UC1 || img.type()==CV_8UC3);
+    lvAssert_(img.empty() || ((img.type()==CV_8UC1 || img.type()==CV_8UC3) && img.isContinuous()),"reference image must be non-empty, or of type 8UC1/8UC3 and continuous");
     m_oRefImage = img;
 }
 
@@ -77,11 +77,10 @@ namespace {
 
 void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const std::vector<cv::KeyPoint>& voKeyPoints, cv::Mat& oDesc, bool bSingleColumnDesc, size_t nThreshold) {
     static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
-    CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
-    CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
+    lvAssert_(!oInputImg.empty() && oInputImg.isContinuous() && (oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3),"input image must be non-empty, continuous, and of type 8UC1/8UC3");
+    lvAssert_(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()),"ref image must be empty, or of the same size/type as the input image");
     const size_t nChannels = (size_t)oInputImg.channels();
     const cv::Mat& oRefMat = oRefImg.empty()?oInputImg:oRefImg;
-    CV_DbgAssert(oInputImg.isContinuous() && oRefMat.isContinuous());
     const size_t nKeyPoints = voKeyPoints.size();
     const uchar t = cv::saturate_cast<uchar>(nThreshold);
     if(nChannels==1) {
@@ -113,12 +112,11 @@ void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const st
 
 void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const std::vector<cv::KeyPoint>& voKeyPoints, cv::Mat& oDesc, bool bSingleColumnDesc, float fThreshold, size_t nThresholdOffset) {
     static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
-    CV_DbgAssert(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()));
-    CV_DbgAssert(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3);
-    CV_DbgAssert(fThreshold>=0);
+    lvAssert_(!oInputImg.empty() && oInputImg.isContinuous() && (oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3),"input image must be non-empty, continuous, and of type 8UC1/8UC3");
+    lvAssert_(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()),"ref image must be empty, or of the same size/type as the input image");
+    lvAssert_(fThreshold>=0,"lbsp internal relative threshold must be non-negative");
     const size_t nChannels = (size_t)oInputImg.channels();
     const cv::Mat& oRefMat = oRefImg.empty()?oInputImg:oRefImg;
-    CV_DbgAssert(oInputImg.isContinuous() && oRefMat.isContinuous());
     const size_t nKeyPoints = voKeyPoints.size();
     if(nChannels==1) {
         if(bSingleColumnDesc)
@@ -154,7 +152,7 @@ void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const st
 } // namespace
 
 void LBSP::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const {
-    CV_Assert(!oImage.empty());
+    lvAssert_(!oImage.empty(),"input image must be non-empty");
     cv::KeyPointsFilter::runByImageBorder(voKeypoints,oImage.size(),PATCH_SIZE/2);
     cv::KeyPointsFilter::runByKeypointSize(voKeypoints,std::numeric_limits<float>::epsilon());
     if(voKeypoints.empty()) {
@@ -168,14 +166,14 @@ void LBSP::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoint
 }
 
 void LBSP::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat>& voDescCollection) const {
-    CV_Assert(voImageCollection.size() == vvoPointCollection.size());
+    lvAssert_(voImageCollection.size()==vvoPointCollection.size(),"number of images must match number of keypoint lists");
     voDescCollection.resize(voImageCollection.size());
     for(size_t i=0; i<voImageCollection.size(); i++)
         compute2(voImageCollection[i], vvoPointCollection[i], voDescCollection[i]);
 }
 
 void LBSP::computeImpl(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const {
-    CV_Assert(!oImage.empty());
+    lvAssert_(!oImage.empty(),"input image must be non-empty");
     cv::KeyPointsFilter::runByImageBorder(voKeypoints,oImage.size(),PATCH_SIZE/2);
     cv::KeyPointsFilter::runByKeypointSize(voKeypoints,std::numeric_limits<float>::epsilon());
     if(voKeypoints.empty()) {
@@ -190,10 +188,10 @@ void LBSP::computeImpl(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypo
 
 void LBSP::reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoints, const cv::Mat& oDescriptors, cv::Mat& oOutput) {
     static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
-    CV_DbgAssert(!voKeypoints.empty());
-    CV_DbgAssert(!oDescriptors.empty() && oDescriptors.cols==1);
-    CV_DbgAssert(oSize.width>0 && oSize.height>0);
-    CV_DbgAssert(oDescriptors.type()==CV_16UC1 || oDescriptors.type()==CV_16UC3);
+    lvAssert_(!voKeypoints.empty(),"keypoint array must be non-empty");
+    lvAssert_(!oDescriptors.empty() && oDescriptors.isContinuous() && oDescriptors.cols==1,"descriptor mat must be non-empty, continuous, and have only one column");
+    lvAssert_(oSize.width>0 && oSize.height>0,"expected output desc image size must not contain null dimensions");
+    lvAssert_(oDescriptors.type()==CV_16UC1 || oDescriptors.type()==CV_16UC3,"descriptor mat type must be 16UC1/16UC3");
     const size_t nChannels = (size_t)oDescriptors.channels();
     const size_t nKeyPoints = voKeypoints.size();
     if(nChannels==1) {
@@ -218,10 +216,10 @@ void LBSP::reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoi
 void LBSP::calcDescImgDiff(const cv::Mat& oDesc1, const cv::Mat& oDesc2, cv::Mat& oOutput, bool bForceMergeChannels) {
     static_assert(LBSP::DESC_SIZE_BITS<=UCHAR_MAX,"bad assumptions in impl below");
     static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
-    CV_DbgAssert(oDesc1.size()==oDesc2.size() && oDesc1.type()==oDesc2.type());
-    CV_DbgAssert(oDesc1.type()==CV_16UC1 || oDesc1.type()==CV_16UC3);
-    CV_DbgAssert(CV_MAT_DEPTH(oDesc1.type())==CV_16U);
-    CV_DbgAssert(oDesc1.step.p[0]==oDesc2.step.p[0] && oDesc1.step.p[1]==oDesc2.step.p[1]);
+    lvAssert_(oDesc1.isContinuous() && (oDesc1.type()==CV_16UC1 || oDesc1.type()==CV_16UC3),"desc1 mat must be continuous, and of type 16UC1/16UC3");
+    lvAssert_(oDesc2.isContinuous() && (oDesc2.type()==CV_16UC1 || oDesc2.type()==CV_16UC3),"desc2 mat must be continuous, and of type 16UC1/16UC3");
+    lvAssert_(oDesc1.size()==oDesc2.size() && oDesc1.type()==oDesc2.type(),"size/type of descriptor mats must match");
+    lvDbgAssert(oDesc1.step.p[0]==oDesc2.step.p[0] && oDesc1.step.p[1]==oDesc2.step.p[1]);
     const float fScaleFactor = (float)UCHAR_MAX/(LBSP::DESC_SIZE_BITS);
     const size_t nChannels = CV_MAT_CN(oDesc1.type());
     const size_t _step_row = oDesc1.step.p[0];
@@ -265,7 +263,7 @@ void LBSP::validateKeyPoints(std::vector<cv::KeyPoint>& voKeypoints, cv::Size oI
 }
 
 void LBSP::validateROI(cv::Mat& oROI) {
-    CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
+    lvAssert_(!oROI.empty() && oROI.type()==CV_8UC1,"input ROI must be non-empty and of type 8UC1");
     cv::Mat oROI_new(oROI.size(),CV_8UC1,cv::Scalar_<uchar>(0));
     const size_t nBorderSize = PATCH_SIZE/2;
     const cv::Rect nROI_inner(nBorderSize,nBorderSize,oROI.cols-nBorderSize*2,oROI.rows-nBorderSize*2);
@@ -276,7 +274,7 @@ void LBSP::validateROI(cv::Mat& oROI) {
 #if HAVE_GLSL
 
 std::string LBSP::getShaderFunctionSource(size_t nChannels, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize) {
-    lvAssert(nChannels==4 || nChannels==1);
+    lvAssert_(nChannels==4 || nChannels==1,"code can only be generated for 1ch/4ch textures");
     std::stringstream ssSrc;
     // @@@@@ split lookup/threshold?
     if(!bUseSharedDataPreload) ssSrc <<

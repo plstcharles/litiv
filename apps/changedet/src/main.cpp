@@ -132,7 +132,7 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
     //srand((unsigned int)time(NULL));
     try {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
-        CV_Assert(oBatch.getFrameCount()>1);
+        lvAssert(oBatch.getFrameCount()>1);
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
         const size_t nTotPacketCount = oBatch.getFrameCount();
         GLContext oContext(oBatch.getFrameSize(),std::string("[GPU] ")+oBatch.getRelativePath(),DISPLAY_OUTPUT==0);
@@ -202,13 +202,12 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
     size_t nCurrIdx = 0;
     try {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
-        CV_Assert(oBatch.getFrameCount()>1);
+        lvAssert(oBatch.getFrameCount()>1);
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
         const size_t nTotPacketCount = oBatch.getFrameCount();
         const cv::Mat oROI = oBatch.getROI();
         cv::Mat oCurrInput = oBatch.getInput(nCurrIdx).clone();
-        CV_Assert(!oCurrInput.empty());
-        CV_Assert(oCurrInput.isContinuous());
+        lvAssert(!oCurrInput.empty() && oCurrInput.isContinuous());
         cv::Mat oCurrFGMask(oBatch.getFrameSize(),CV_8UC1,cv::Scalar_<uchar>(0));
         std::shared_ptr<IBackgroundSubtractor> pAlgo = std::make_shared<BackgroundSubtractorType>();
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();

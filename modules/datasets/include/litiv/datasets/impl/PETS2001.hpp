@@ -88,6 +88,6 @@ protected:
         this->m_oSize = this->m_oROI.size();
         this->m_nNextExpectedVideoReaderFrameIdx = 0;
         this->m_nFrameCount = (size_t)this->m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
-        CV_Assert(this->m_nFrameCount>0);
+        lvAssert_(this->m_nFrameCount>0,"could not find any input frames");
     }
 };

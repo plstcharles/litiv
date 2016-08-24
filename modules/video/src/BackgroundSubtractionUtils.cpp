@@ -26,7 +26,7 @@ void IIBackgroundSubtractor::setAutomaticModelReset(bool bVal) {
 }
 
 void IIBackgroundSubtractor::validateROI(cv::Mat& oROI) const {
-    CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
+    lvAssert_(!oROI.empty() && oROI.type()==CV_8UC1,"provided ROI must be non-empty and of type 8UC1");
     if(m_nROIBorderSize>0) {
         cv::Mat oROI_new(oROI.size(),CV_8UC1,cv::Scalar_<uchar>(0));
         const cv::Rect oROI_inner((int)m_nROIBorderSize,(int)m_nROIBorderSize,oROI.cols-int(m_nROIBorderSize*2),oROI.rows-int(m_nROIBorderSize*2));
@@ -37,7 +37,7 @@ void IIBackgroundSubtractor::validateROI(cv::Mat& oROI) const {
 
 void IIBackgroundSubtractor::setROI(cv::Mat& oROI) {
     validateROI(oROI);
-    CV_Assert(cv::countNonZero(oROI)>0);
+    lvAssert_(cv::countNonZero(oROI)>0,"provided ROI must have at least one valid pixel");
     if(m_bInitialized) {
         cv::Mat oLatestBackgroundImage;
         getBackgroundImage(oLatestBackgroundImage);
@@ -68,9 +68,7 @@ IIBackgroundSubtractor::IIBackgroundSubtractor() :
         m_bUsingMovingCamera(false) {}
 
 void IIBackgroundSubtractor::initialize_common(const cv::Mat& oInitImg, const cv::Mat& oROI) {
-    CV_Assert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
-    CV_Assert(oInitImg.isContinuous());
-    CV_Assert(oInitImg.type()==CV_8UC1 || oInitImg.type()==CV_8UC3 || oInitImg.type()==CV_8UC4);
+    lvAssert_(!oInitImg.empty() && oInitImg.isContinuous() && (oInitImg.type()==CV_8UC1 || oInitImg.type()==CV_8UC3 || oInitImg.type()==CV_8UC4),"provided image for initialization must be non-empty, continuous, and of type 8UC1/3/4");
     if(oInitImg.channels()>1) {
         std::vector<cv::Mat> voInitImgs;
         cv::split(oInitImg,voInitImgs);
@@ -82,25 +80,25 @@ void IIBackgroundSubtractor::initialize_common(const cv::Mat& oInitImg, const cv
             std::cerr << "\n\tIIBackgroundSubtractor : Warning, grayscale images should always be passed in CV_8UC1 format for optimal performance.\n" << std::endl;
     }
     cv::Mat oNewBGROI;
-    if(oROI.empty() && (m_oROI.empty() || oROI.size()!=oInitImg.size())) {
+    if(oROI.empty() && m_oROI.size()!=oInitImg.size()) {
         oNewBGROI.create(oInitImg.size(),CV_8UC1);
         oNewBGROI = cv::Scalar_<uchar>(UCHAR_MAX);
     }
     else if(oROI.empty())
-        oNewBGROI = m_oROI;
+        oNewBGROI = m_oROI; // reuse last ROI if sizes match, and no new ROI is provided
     else {
-        CV_Assert(oROI.size()==oInitImg.size() && oROI.type()==CV_8UC1);
-        CV_Assert(cv::countNonZero((oROI<UCHAR_MAX)&(oROI>0))==0);
+        lvAssert_(oROI.size()==oInitImg.size() && oROI.type()==CV_8UC1,"provided ROI mat size must be equal to the init frame size, and its type must be 8UC1");
+        lvAssert_(cv::countNonZero((oROI<UCHAR_MAX)&(oROI>0))==0,"provided ROI mat values must be 0 or 255 only");
         oNewBGROI = oROI.clone();
         cv::Mat oTempROI;
         cv::dilate(oNewBGROI,oTempROI,cv::Mat(),cv::Point(-1,-1),(int)m_nROIBorderSize);
-        cv::bitwise_or(oNewBGROI,oTempROI/2,oNewBGROI);
+        cv::bitwise_or(oNewBGROI,oTempROI/2,oNewBGROI); // sets value of pixels close to ROI borders as UCHAR_MAX/2 to help internal bounds check
     }
     m_nOrigROIPxCount = (size_t)cv::countNonZero(oNewBGROI);
-    CV_Assert(m_nOrigROIPxCount>0);
+    lvAssert_(m_nOrigROIPxCount>0,"provided ROI mat contains no useful pixels");
     validateROI(oNewBGROI);
     m_nFinalROIPxCount = (size_t)cv::countNonZero(oNewBGROI);
-    CV_Assert(m_nFinalROIPxCount>0);
+    lvAssert_(m_nFinalROIPxCount>0,"provided ROI mat contains no useful pixels away from borders (descriptors will hit image bounds)");
     m_bInitialized = false;
     m_bModelInitialized = false;
     m_oROI = oNewBGROI;
@@ -119,7 +117,7 @@ void IIBackgroundSubtractor::initialize_common(const cv::Mat& oInitImg, const cv
     m_vnPxIdxLUT.resize(m_nTotRelevantPxCount);
     m_voPxInfoLUT.resize(m_nTotPxCount);
     if(m_nImgChannels==1) {
-        CV_Assert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width && m_oLastColorFrame.step.p[1]==1);
+        lvAssert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width && m_oLastColorFrame.step.p[1]==1);
         for(size_t nPxIter=0, nModelIter=0; nPxIter<m_nTotPxCount; ++nPxIter) {
             if(m_oROI.data[nPxIter]) {
                 m_vnPxIdxLUT[nModelIter] = nPxIter;
@@ -132,7 +130,7 @@ void IIBackgroundSubtractor::initialize_common(const cv::Mat& oInitImg, const cv
         }
     }
     else { //(m_nImgChannels==3 || m_nImgChannels==4)
-        CV_Assert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width*m_nImgChannels && m_oLastColorFrame.step.p[1]==m_nImgChannels);
+        lvAssert(m_oLastColorFrame.step.p[0]==(size_t)m_oImgSize.width*m_nImgChannels && m_oLastColorFrame.step.p[1]==m_nImgChannels);
         for(size_t nPxIter=0, nModelIter=0; nPxIter<m_nTotPxCount; ++nPxIter) {
             if(m_oROI.data[nPxIter]) {
                 m_vnPxIdxLUT[nModelIter] = nPxIter;
@@ -161,9 +159,9 @@ IBackgroundSubtractor_GLSL::IBackgroundSubtractor_(size_t nLevels, size_t nCompu
         m_dCurrLearningRate(-1) {}
 
 void IBackgroundSubtractor_GLSL::getLatestForegroundMask(cv::OutputArray _oLastFGMask) {
+    lvAssert_(GLImageProcAlgo::m_bFetchingOutput || GLImageProcAlgo::setOutputFetching(true),"algo not initialized with mat output support")
     _oLastFGMask.create(m_oImgSize,CV_8UC1);
     cv::Mat oLastFGMask = _oLastFGMask.getMat();
-    lvAssert(GLImageProcAlgo::m_bFetchingOutput || GLImageProcAlgo::setOutputFetching(true))
     if(GLImageProcAlgo::m_nInternalFrameIdx>0)
         GLImageProcAlgo::fetchLastOutput(oLastFGMask);
     else
@@ -171,7 +169,7 @@ void IBackgroundSubtractor_GLSL::getLatestForegroundMask(cv::OutputArray _oLastF
 }
 
 void IBackgroundSubtractor_GLSL::initialize_gl(const cv::Mat& oInitImg, const cv::Mat& oROI) {
-    lvAssert(!oInitImg.empty());
+    lvAssert_(!oInitImg.empty(),"algo requires a valid initialization image as input");
     cv::Mat oCurrROI = oROI;
     if(oCurrROI.empty())
         oCurrROI = cv::Mat(oInitImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
@@ -183,11 +181,11 @@ void IBackgroundSubtractor_GLSL::initialize(const cv::Mat& oInitImg, const cv::M
 }
 
 void IBackgroundSubtractor_GLSL::apply_gl(cv::InputArray _oNextImage, bool bRebindAll, double dLearningRate) {
-    lvAssert(m_bInitialized && m_bModelInitialized);
+    lvAssert_(m_bInitialized && m_bModelInitialized,"algo must be initialized first");
     m_dCurrLearningRate = dLearningRate;
     cv::Mat oNextInputImg = _oNextImage.getMat();
-    CV_Assert(oNextInputImg.type()==m_nImgType && oNextInputImg.size()==m_oImgSize);
-    CV_Assert(oNextInputImg.isContinuous());
+    lvAssert_(oNextInputImg.type()==m_nImgType && oNextInputImg.size()==m_oImgSize,"input image type/size mismatch with initialization type/size");
+    lvAssert_(oNextInputImg.isContinuous(),"input image data must be continuous");
     ++m_nFrameIdx;
     GLImageProcAlgo::apply_gl(oNextInputImg,bRebindAll);
     oNextInputImg.copyTo(m_oLastColorFrame);

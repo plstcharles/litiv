@@ -54,8 +54,10 @@ lv::IMetricsAccumulatorPtr lv::MetricsAccumulator_<lv::DatasetEval_BinaryClassif
 }
 
 void lv::MetricsAccumulator_<lv::DatasetEval_BinaryClassifier>::accumulate(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
-    CV_Assert(!oClassif.empty() && oClassif.type()==CV_8UC1 && (oGT.empty() || oGT.type()==CV_8UC1) && (oROI.empty() || oROI.type()==CV_8UC1));
-    CV_Assert((oGT.empty() || oClassif.size()==oGT.size()) && (oROI.empty() || oClassif.size()==oROI.size()));
+    lvAssert_(!oClassif.empty() && oClassif.type()==CV_8UC1,"binary classifier results must be non-empty and of type 8UC1");
+    lvAssert_(oGT.empty() || oGT.type()==CV_8UC1,"gt mat must be empty, or of type 8UC1")
+    lvAssert_(oROI.empty() || oROI.type()==CV_8UC1,"ROI mat must be empty, or of type 8UC1");
+    lvAssert_((oGT.empty() || oClassif.size()==oGT.size()) && (oROI.empty() || oClassif.size()==oROI.size()),"all input mat sizes must match");
     if(oGT.empty()) {
         nDC += oClassif.size().area();
         return;
@@ -94,8 +96,10 @@ void lv::MetricsAccumulator_<lv::DatasetEval_BinaryClassifier>::accumulate(const
 }
 
 cv::Mat lv::MetricsAccumulator_<lv::DatasetEval_BinaryClassifier>::getColoredMask(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
-    CV_Assert(!oClassif.empty() && oClassif.type()==CV_8UC1 && (oGT.empty() || oGT.type()==CV_8UC1) && (oROI.empty() || oROI.type()==CV_8UC1));
-    CV_Assert((oGT.empty() || oClassif.size()==oGT.size()) && (oROI.empty() || oClassif.size()==oROI.size()));
+    lvAssert_(!oClassif.empty() && oClassif.type()==CV_8UC1,"binary classifier results must be non-empty and of type 8UC1");
+    lvAssert_(oGT.empty() || oGT.type()==CV_8UC1,"gt mat must be empty, or of type 8UC1")
+    lvAssert_(oROI.empty() || oROI.type()==CV_8UC1,"ROI mat must be empty, or of type 8UC1");
+    lvAssert_((oGT.empty() || oClassif.size()==oGT.size()) && (oROI.empty() || oClassif.size()==oROI.size()),"all input mat sizes must match");
     if(oGT.empty()) {
         cv::Mat oResult;
         cv::cvtColor(oClassif,oResult,cv::COLOR_GRAY2BGR);
@@ -191,9 +195,9 @@ double lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::CalcPercentBadC
 double lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::CalcMatthewsCorrCoeff(const BinClassifMetricsAccumulator& m) {return ((m.nTP+m.nFP)>0)&&((m.nTP+m.nFN)>0)&&((m.nTN+m.nFP)>0)&&((m.nTN+m.nFN)>0)?((((double)m.nTP*m.nTN)-(m.nFP*m.nFN))/sqrt(((double)m.nTP+m.nFP)*(m.nTP+m.nFN)*(m.nTN+m.nFP)*(m.nTN+m.nFN))):0;}
 
 lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier>::MetricsCalculator_(const IMetricsAccumulatorConstPtr& m) {
-    lvAssert(m.get());
+    lvAssert_(m.get(),"bad input pointer");
     const auto& m2 = std::dynamic_pointer_cast<const BinClassifMetricsAccumulator>(m);
-    lvAssert(m2.get());
+    lvAssert_(m2.get(),"input metrics accumulator did not possess a BinClassifMetricsAccumulator interface");
     const BinClassifMetricsAccumulator& m3 = *m2.get();
     dRecall = CalcRecall(m3);
     dSpecificity = CalcSpecificity(m3);

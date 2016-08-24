@@ -195,7 +195,7 @@ int main(int /*argc*/, char** /*argv*/) {
                     return -1;
                 nTotPotentialFrameCount += (int)oCap.get(CV_CAP_PROP_FRAME_COUNT);
 #endif //(!USE_VPTZ_TRACKING)
-                CV_Assert(oTargetImg.type()==CV_8UC4);
+                lvAssert(oTargetImg.type()==CV_8UC4);
                 const int nImageWidth = oCurrImg.cols;
                 const int nImageHeight = oCurrImg.rows;
 #if CAMSHIFT_USE_POSE_PREDICT
@@ -273,7 +273,7 @@ int main(int /*argc*/, char** /*argv*/) {
 #endif //(!USE_VPTZ_TRACKING)
                     if(oCurrImg.empty())
                         break;
-                    CV_Assert(oCurrImg.type()==CV_8UC4);
+                    lvAssert(oCurrImg.type()==CV_8UC4);
                     cv::Mat oCurrImg_BP;
 #if CAMSHIFT_USE_PURE_HSV
                     cv::Mat oCurrImg_HSV, oCurrImg_MASK;

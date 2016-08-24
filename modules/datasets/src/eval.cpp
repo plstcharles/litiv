@@ -55,7 +55,7 @@ void lv::IDatasetEvaluator_<lv::DatasetEval_BinaryClassifier>::writeEvalReport()
     for(const auto& pGroupIter : getBatches(true))
         pGroupIter->shared_from_this_cast<const IDataReporter_<DatasetEval_BinaryClassifier>>(true)->IDataReporter_<DatasetEval_BinaryClassifier>::writeEvalReport();
     IMetricsCalculatorConstPtr pMetrics = getMetrics(true);
-    lvAssert(pMetrics.get());
+    lvDbgAssert(pMetrics.get());
     const BinClassifMetricsCalculator& oMetrics = dynamic_cast<const BinClassifMetricsCalculator&>(*pMetrics.get());
     std::cout << lv::clampString(getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
     std::ofstream oMetricsOutput(getOutputPath()+"/overall.txt");
@@ -98,7 +98,7 @@ lv::IMetricsCalculatorPtr lv::IDatasetEvaluator_<lv::DatasetEval_BinaryClassifie
         IDataHandlerPtrArray vpBatches = getBatches(true);
         auto ppBatchIter = vpBatches.begin();
         for(; ppBatchIter!=vpBatches.end() && !(*ppBatchIter)->getTotPackets(); ++ppBatchIter);
-        CV_Assert(ppBatchIter!=vpBatches.end());
+        lvAssert_(ppBatchIter!=vpBatches.end(),"found no packets in the work group");
         IMetricsCalculatorPtr pMetrics = dynamic_cast<const IDataReporter_<DatasetEval_BinaryClassifier>&>(**ppBatchIter).getMetrics(bAverage);
         for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
             if((*ppBatchIter)->getTotPackets())
@@ -148,7 +148,7 @@ std::string lv::IDataReporter_<lv::DatasetEval_None>::writeInlineEvalReport(size
 }
 
 lv::IMetricsAccumulatorConstPtr lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::getMetricsBase() const {
-    lvAssert(isGroup()); // non-group specialization should override this method
+    lvAssert_(isGroup(),"non-group data reporter specialization attempt to call non-overriden method");
     BinClassifMetricsAccumulatorPtr pMetricsBase = BinClassifMetricsAccumulator::create();
     for(const auto& pBatch : getBatches(true))
         pMetricsBase->accumulate(dynamic_cast<const IDataReporter_<DatasetEval_BinaryClassifier>&>(*pBatch).getMetricsBase());
@@ -160,7 +160,7 @@ lv::IMetricsCalculatorPtr lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::
         const IDataHandlerPtrArray& vpBatches = getBatches(true);
         auto ppBatchIter = vpBatches.begin();
         for(; ppBatchIter!=vpBatches.end() && !(*ppBatchIter)->getTotPackets(); ++ppBatchIter);
-        CV_Assert(ppBatchIter!=vpBatches.end());
+        lvAssert_(ppBatchIter!=vpBatches.end(),"found no packets in the work group");
         IMetricsCalculatorPtr pMetrics = dynamic_cast<const IDataReporter_<DatasetEval_BinaryClassifier>&>(**ppBatchIter).getMetrics(bAverage);
         for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
             if((*ppBatchIter)->getTotPackets())
@@ -179,7 +179,7 @@ void lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::writeEvalReport() con
         for(const auto& pBatch : getBatches(true))
             pBatch->writeEvalReport();
     IMetricsCalculatorConstPtr pMetrics = getMetrics(true);
-    lvAssert(pMetrics.get());
+    lvDbgAssert(pMetrics.get());
     const BinClassifMetricsCalculator& oMetrics = dynamic_cast<const BinClassifMetricsCalculator&>(*pMetrics.get());;
     std::cout << "\t" << lv::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
     std::ofstream oMetricsOutput(lv::AddDirSlashIfMissing(getOutputPath())+"../"+getName()+".txt");
@@ -204,7 +204,7 @@ std::string lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::writeInlineEva
         for(const auto& pBatch : getBatches(true))
             ssStr << pBatch->shared_from_this_cast<const IDataReporter_<DatasetEval_BinaryClassifier>>(true)->IDataReporter_<DatasetEval_BinaryClassifier>::writeInlineEvalReport(nIndentSize+1);
     IMetricsCalculatorConstPtr pMetrics = getMetrics(true);
-    lvAssert(pMetrics.get());
+    lvDbgAssert(pMetrics.get());
     const BinClassifMetricsCalculator& oMetrics = dynamic_cast<const BinClassifMetricsCalculator&>(*pMetrics.get());
     ssStr << lv::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
              std::setw(nCellSize) << oMetrics.dRecall << "|" <<
@@ -228,7 +228,7 @@ lv::GLBinaryClassifierEvaluator::GLBinaryClassifierEvaluator(const std::shared_p
         GLImageProcEvaluatorAlgo(pParent,nTotFrameCount,(size_t)BinClassifMetricsAccumulator::nCountersCount,pParent->getIsUsingDisplay()?CV_8UC4:-1,CV_8UC1,true) {}
 
 std::string lv::GLBinaryClassifierEvaluator::getComputeShaderSource(size_t nStage) const {
-    lvAssert(nStage<m_nComputeStages);
+    lvAssert_(nStage<m_nComputeStages,"requested compute shader stage does not exist");
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc <<"#version 430\n"

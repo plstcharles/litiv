@@ -131,7 +131,7 @@ namespace cv { // extending cv
 
     /// removes all keypoints from voKPs which fall on null values (or outside the bounds) of oROI
     inline void validateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoint>& voKPs) {
-        CV_Assert(!oROI.empty() && oROI.type()==CV_8UC1);
+        lvAssert_(!oROI.empty() && oROI.type()==CV_8UC1,"input ROI must be non-empty and of type 8UC1");
         std::vector<cv::KeyPoint> voNewKPs;
         for(size_t k=0; k<voKPs.size(); ++k) {
             if( voKPs[k].pt.x>=0 && voKPs[k].pt.x<oROI.cols &&

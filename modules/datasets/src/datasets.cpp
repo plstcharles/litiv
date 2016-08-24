@@ -46,12 +46,12 @@ lv::IDataHandlerConstPtr lv::DataHandler::getBatch(size_t& nPacketIdx) const {
             nCurrPacketCount += nNextPacketIncr;
             ++ppBatchIter;
         }
-        CV_Assert(ppBatchIter!=vpBatches.end());
+        lvAssert_(ppBatchIter!=vpBatches.end(),"requested packet index was out of range for the current batch group");
         nPacketIdx -= nCurrPacketCount;
         return (*ppBatchIter)->shared_from_this_cast<DataHandler>(true)->getBatch(nPacketIdx);
     }
     else {
-        CV_Assert(nPacketIdx<getTotPackets());
+        lvAssert_(nPacketIdx<getTotPackets(),"requested packet index was out of range for the current batch");
         return shared_from_this();
     }
 }

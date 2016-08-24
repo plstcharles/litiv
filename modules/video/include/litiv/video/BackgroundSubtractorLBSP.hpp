@@ -51,7 +51,7 @@ protected:
             m_nLBSPThresholdOffset(nLBSPThresholdOffset),
             m_fRelLBSPThreshold(fRelLBSPThreshold),
             m_nDefaultMedianBlurKernelSize(nDefaultMedianBlurKernelSize) {
-        CV_Assert(m_fRelLBSPThreshold>=0);
+        lvAssert_(m_fRelLBSPThreshold>=0,"relative threshold for LBSP features must be non-negative");
         IIBackgroundSubtractor::m_nROIBorderSize = LBSP::PATCH_SIZE/2;
     }
 #if HAVE_GLSL
@@ -68,7 +68,7 @@ protected:
             m_nLBSPThresholdOffset(nLBSPThresholdOffset),
             m_fRelLBSPThreshold(fRelLBSPThreshold),
             m_nDefaultMedianBlurKernelSize(nDefaultMedianBlurKernelSize) {
-        CV_Assert(m_fRelLBSPThreshold>=0);
+        lvAssert_(m_fRelLBSPThreshold>=0,"relative threshold for LBSP features must be non-negative");
         IIBackgroundSubtractor::m_nROIBorderSize = LBSP::PATCH_SIZE/2;
     }
     /// returns the GLSL compute shader source code for LBSP lookup/description functions

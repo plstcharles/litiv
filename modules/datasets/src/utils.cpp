@@ -59,7 +59,7 @@ std::string lv::IDataHandler::getPacketName(size_t nPacketIdx) const {
 
 lv::DataPrecacher::DataPrecacher(std::function<const cv::Mat&(size_t)> lDataLoaderCallback) :
         m_lCallback(lDataLoaderCallback) {
-    CV_Assert(m_lCallback);
+    lvAssert_(m_lCallback,"invalid data precacher callback");
     m_bIsActive = false;
     m_nReqIdx = m_nLastReqIdx = size_t(-1);
 }
@@ -228,8 +228,8 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void lv::IDataLoader::startAsyncPrecaching(bool bUsingGT, size_t nSuggestedBufferSize) {
-    CV_Assert(m_oInputPrecacher.startAsyncPrecaching(nSuggestedBufferSize));
-    CV_Assert(!bUsingGT || m_oGTPrecacher.startAsyncPrecaching(nSuggestedBufferSize));
+    lvAssert_(m_oInputPrecacher.startAsyncPrecaching(nSuggestedBufferSize),"could not start precaching input packets");
+    lvAssert_(!bUsingGT || m_oGTPrecacher.startAsyncPrecaching(nSuggestedBufferSize),"could not start precaching gt packets");
 }
 
 void lv::IDataLoader::stopAsyncPrecaching() {
@@ -247,7 +247,7 @@ const cv::Mat& lv::IDataLoader::_getInputPacket_redirect(size_t nIdx) {
         return cv::emptyMat();
     m_oLatestInputPacket = _getInputPacket_impl(nIdx);
     if(!m_oLatestInputPacket.empty()) {
-        CV_Assert(getInputOrigSize(nIdx)==m_oLatestInputPacket.size());
+        lvAssert_(getInputOrigSize(nIdx)==m_oLatestInputPacket.size(),"expected packet size does not match loaded packet size"); // @@@ compare N-dims here?
         if(m_eInputType==ImagePacket) {
             if(isInputTransposed(nIdx))
                 cv::transpose(m_oLatestInputPacket,m_oLatestInputPacket);
@@ -271,7 +271,7 @@ const cv::Mat& lv::IDataLoader::_getGTPacket_redirect(size_t nIdx) {
         return cv::emptyMat();
     m_oLatestGTPacket = _getGTPacket_impl(nIdx);
     if(!m_oLatestGTPacket.empty()) {
-        CV_Assert(getGTOrigSize(nIdx)==m_oLatestGTPacket.size());
+        lvAssert_(getGTOrigSize(nIdx)==m_oLatestGTPacket.size(),"expected packet size does not match loaded packet size"); // @@@ compare N-dims here?
         if(m_eGTMappingType==PixelMapping && m_eInputType==ImagePacket) {
             if(isGTTransposed(nIdx))
                 cv::transpose(m_oLatestGTPacket,m_oLatestGTPacket);
@@ -350,8 +350,8 @@ const cv::Size& lv::IDataProducer_<lv::DatasetSource_Video>::getGTMaxSize() cons
 }
 
 cv::Mat lv::IDataProducer_<lv::DatasetSource_Video>::_getInputPacket_impl(size_t nFrameIdx) {
-    lvDbgAssert(getInputPacketType()==ImagePacket);
-    lvDbgAssert(nFrameIdx<getTotPackets());
+    lvDbgAssert_(getInputPacketType()==ImagePacket,"video data producer must be associated with a image packet data loader");
+    lvAssert_(nFrameIdx<getTotPackets(),"requested frame index is out of range");
     cv::Mat oFrame;
     if(!m_voVideoReader.isOpened())
         oFrame = cv::imread(m_vsInputPaths[nFrameIdx],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
@@ -368,11 +368,11 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_Video>::_getInputPacket_impl(size_t
 }
 
 cv::Mat lv::IDataProducer_<lv::DatasetSource_Video>::_getGTPacket_impl(size_t nFrameIdx) {
-    lvDbgAssert(nFrameIdx<getTotPackets());
+    lvAssert_(nFrameIdx<getTotPackets(),"requested gt frame index is out of range");
     if(m_mGTIndexLUT.count(nFrameIdx)) {
         const size_t nGTIdx = m_mGTIndexLUT[nFrameIdx];
         if(m_vsGTPaths.size()>nGTIdx) {
-            lvAssert(getGTMappingType()==PixelMapping); // loading as an image wouldnt make sense otherwise
+            lvAssert_(getGTMappingType()==PixelMapping,"tried to load a gt packet that was not an image via imread");
             return cv::imread(m_vsGTPaths[nGTIdx],cv::IMREAD_GRAYSCALE); // @@@@ expose grayscale flag in class member?
         }
     }
@@ -380,7 +380,7 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_Video>::_getGTPacket_impl(size_t nF
 }
 
 void lv::IDataProducer_<lv::DatasetSource_Video>::parseData() {
-    lvAssert(getInputPacketType()==ImagePacket);
+    lvAssert_(getInputPacketType()==ImagePacket,"video data producer can only ready image packets");
     cv::Mat oTempImg;
     m_voVideoReader.open(getDataPath());
     if(!m_voVideoReader.isOpened()) {
@@ -407,7 +407,7 @@ void lv::IDataProducer_<lv::DatasetSource_Video>::parseData() {
     m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
     m_oSize = oTempImg.size();
     m_nNextExpectedVideoReaderFrameIdx = 0;
-    CV_Assert(m_nFrameCount>0);
+    lvAssert_(m_nFrameCount>0,"could not find any input frames");
 }
 
 double lv::IDataProducer_<lv::DatasetSource_Image>::getExpectedLoad() const {
@@ -427,13 +427,13 @@ bool lv::IDataProducer_<lv::DatasetSource_Image>::isGTConstantSize() const {
 }
 
 bool lv::IDataProducer_<lv::DatasetSource_Image>::isInputTransposed(size_t nPacketIdx) const {
-    lvAssert(nPacketIdx<m_nImageCount);
+    lvAssert_(nPacketIdx<m_nImageCount,"required packet index is out of range");
     return m_vbInputTransposed[nPacketIdx];
 }
 
 bool lv::IDataProducer_<lv::DatasetSource_Image>::isGTTransposed(size_t nPacketIdx) const {
-    lvAssert(getGTMappingType()<=IdxMapping);
-    lvAssert(nPacketIdx<m_nImageCount);
+    lvAssert_(getGTMappingType()<=IdxMapping,"mapping type does not allow index-based query on gt packets");
+    lvAssert_(nPacketIdx<m_nImageCount,"required packet index is out of range");
     return m_vbGTTransposed[nPacketIdx];
 }
 
@@ -452,7 +452,7 @@ const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getInputSize(size_t
 }
 
 const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getGTSize(size_t nPacketIdx) const {
-    lvAssert(getGTMappingType()<=IdxMapping);
+    lvAssert_(getGTMappingType()<=IdxMapping,"mapping type does not allow index-based query on gt packets");
     if(nPacketIdx>=m_nImageCount)
         return cv::emptySize();
     return m_voGTSizes[nPacketIdx];
@@ -465,7 +465,7 @@ const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getInputOrigSize(si
 }
 
 const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getGTOrigSize(size_t nPacketIdx) const {
-    lvAssert(getGTMappingType()<=IdxMapping);
+    lvAssert_(getGTMappingType()<=IdxMapping,"mapping type does not allow index-based query on gt packets");
     if(nPacketIdx>=m_nImageCount)
         return cv::emptySize();
     return m_voGTOrigSizes[nPacketIdx];
@@ -480,7 +480,7 @@ const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getGTMaxSize() cons
 }
 
 std::string lv::IDataProducer_<lv::DatasetSource_Image>::getPacketName(size_t nPacketIdx) const {
-    lvAssert(nPacketIdx<m_nImageCount);
+    lvAssert_(nPacketIdx<m_nImageCount,"required packet index is out of range");
     const size_t nLastSlashPos = m_vsInputPaths[nPacketIdx].find_last_of("/\\");
     std::string sFileName = (nLastSlashPos==std::string::npos)?m_vsInputPaths[nPacketIdx]:m_vsInputPaths[nPacketIdx].substr(nLastSlashPos+1);
     return sFileName.substr(0,sFileName.find_last_of("."));
@@ -494,17 +494,17 @@ size_t lv::IDataProducer_<lv::DatasetSource_Image>::getTotPackets() const {
 }
 
 cv::Mat lv::IDataProducer_<lv::DatasetSource_Image>::_getInputPacket_impl(size_t nImageIdx) {
-    lvDbgAssert(getInputPacketType()==ImagePacket);
-    lvDbgAssert(nImageIdx<getTotPackets());
+    lvDbgAssert_(getInputPacketType()==ImagePacket,"image data producer must be associated with a image packet data loader");
+    lvAssert_(nImageIdx<getTotPackets(),"requested image index is out of range");
     return cv::imread(m_vsInputPaths[nImageIdx],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
 }
 
 cv::Mat lv::IDataProducer_<lv::DatasetSource_Image>::_getGTPacket_impl(size_t nImageIdx) {
-    lvDbgAssert(nImageIdx<getTotPackets());
+    lvAssert_(nImageIdx<getTotPackets(),"requested gt image index is out of range");
     if(m_mGTIndexLUT.count(nImageIdx)) {
         const size_t nGTIdx = m_mGTIndexLUT[nImageIdx];
         if(m_vsGTPaths.size()>nGTIdx) {
-            lvAssert(getGTMappingType()==PixelMapping); // loading as an image wouldnt make sense otherwise
+            lvAssert_(getGTMappingType()==PixelMapping,"tried to load a gt packet that was not an image via imread");
             return cv::imread(m_vsGTPaths[m_mGTIndexLUT[nGTIdx]],cv::IMREAD_GRAYSCALE); // @@@@ expose grayscale flag in class member?
         }
     }
@@ -512,7 +512,7 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_Image>::_getGTPacket_impl(size_t nI
 }
 
 void lv::IDataProducer_<lv::DatasetSource_Image>::parseData() {
-    lvAssert(getInputPacketType()==ImagePacket);
+    lvAssert_(getInputPacketType()==ImagePacket,"image data producer can only read image packets");
     lv::GetFilesFromDir(getDataPath(),m_vsInputPaths);
     lv::FilterFilePaths(m_vsInputPaths,{},{".jpg",".png",".bmp"});
     if(m_vsInputPaths.empty())
@@ -557,7 +557,7 @@ void lv::IDataProducer_<lv::DatasetSource_Image>::parseData() {
         m_vbInputTransposed.push_back(false);
     }
     m_nImageCount = m_vsInputPaths.size();
-    CV_Assert(m_nImageCount>0);
+    lvAssert_(m_nImageCount>0,"could not find any input images");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -586,7 +586,7 @@ size_t lv::DataCounter_<lv::Group>::getProcessedPacketsCount() const {
 
 lv::DataWriter::DataWriter(std::function<size_t(const cv::Mat&,size_t)> lDataArchiverCallback) :
         m_lCallback(lDataArchiverCallback) {
-    CV_Assert(m_lCallback);
+    lvAssert_(m_lCallback,"invalid data writer callback");
     m_bIsActive = false;
     m_bAllowPacketDrop = false;
     m_nQueueSize = 0;
@@ -664,11 +664,11 @@ void lv::DataWriter::entry() {
             m_oQueueCondVar.wait(sync_lock);
         if(m_nQueueCount>0) {
             auto pCurrPacket = m_mQueue.begin();
-            lvDbgAssert(pCurrPacket!=m_mQueue.end());
+            lvAssert_(pCurrPacket!=m_mQueue.end(),"data writer notified for missing packet");
             const cv::Mat oPacketData(std::move(pCurrPacket->second));
             const size_t nPacketIdx = pCurrPacket->first;
             const size_t nPacketSize = oPacketData.total()*oPacketData.elemSize();
-            lvDbgAssert(nPacketSize<=m_nQueueSize);
+            lvAssert_(nPacketSize<=m_nQueueSize,"data writer packet size exceeds queue size");
             m_nQueueSize -= nPacketSize;
             m_mQueue.erase(pCurrPacket);
             --m_nQueueCount;
@@ -684,7 +684,7 @@ void lv::DataWriter::entry() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 size_t lv::IDataArchiver::save(const cv::Mat& oOutput, size_t nIdx) const {
-    CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
+    lvAssert_(!getDatasetInfo()->getOutputNameSuffix().empty(),"data archiver requires packet output name suffix (i.e. file extension)");
     std::stringstream sOutputFilePath;
     sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << getPacketName(nIdx) << getDatasetInfo()->getOutputNameSuffix();
     const auto pLoader = shared_from_this_cast<const IDataLoader>(true);
@@ -708,7 +708,7 @@ size_t lv::IDataArchiver::save(const cv::Mat& oOutput, size_t nIdx) const {
 }
 
 cv::Mat lv::IDataArchiver::load(size_t nIdx) const {
-    CV_Assert(!getDatasetInfo()->getOutputNameSuffix().empty());
+    lvAssert_(!getDatasetInfo()->getOutputNameSuffix().empty(),"data archiver requires packet output name suffix (i.e. file extension)");
     std::stringstream sOutputFilePath;
     sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << getPacketName(nIdx) << getDatasetInfo()->getOutputNameSuffix();
     const auto pLoader = shared_from_this_cast<const IDataLoader>(true);
@@ -735,14 +735,14 @@ cv::Mat lv::IDataArchiver::load(size_t nIdx) const {
 #if HAVE_GLSL
 
 cv::Size lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::getIdealGLWindowSize() const {
-    lvAssert(getTotPackets()>1);
+    lvAssert_(getTotPackets()>1,"async data consumer requires work batch to have more than one packet");
     cv::Size oWindowSize = shared_from_this_cast<const IDataLoader>(true)->getInputMaxSize();
     if(m_pEvalAlgo) {
-        lvAssert(m_pEvalAlgo->getIsGLInitialized());
+        lvAssert_(m_pEvalAlgo->getIsGLInitialized(),"evaluator algo must be initialized first");
         oWindowSize.width *= int(m_pEvalAlgo->m_nSxSDisplayCount);
     }
     else if(m_pAlgo) {
-        lvAssert(m_pAlgo->getIsGLInitialized());
+        lvAssert_(m_pAlgo->getIsGLInitialized(),"algo must be initialized first");
         oWindowSize.width *= int(m_pAlgo->m_nSxSDisplayCount);
     }
     return oWindowSize;
@@ -755,14 +755,13 @@ lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::IAsyncDataCo
 
 void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::pre_initialize_gl() {
     m_pLoader = shared_from_this_cast<IDataLoader>(true);
-    lvAssert(m_pLoader->getTotPackets()>1);
-    lvDbgAssert(m_pAlgo);
+    lvAssert_(m_pLoader->getTotPackets()>1,"async data consumer work batch should contain more than one packet");
+    lvAssert_(m_pAlgo,"invalid algo given to async data consumer");
     m_oCurrInput = m_pLoader->getInput(m_nCurrIdx).clone();
     m_oNextInput = m_pLoader->getInput(m_nNextIdx).clone();
     m_oLastInput = m_oCurrInput.clone();
-    CV_Assert(!m_oCurrInput.empty());
-    CV_Assert(m_oCurrInput.isContinuous());
-    lvAssert(m_oCurrInput.channels()==1 || m_oCurrInput.channels()==4);
+    lvAssert_(!m_oCurrInput.empty() && m_oCurrInput.isContinuous(),"invalid input fetched from loader");
+    lvAssert_(m_oCurrInput.channels()==1 || m_oCurrInput.channels()==4,"loaded data must be 1ch or 4ch to avoid alignment problems");
     if(getDatasetInfo()->isSavingOutput() || m_pAlgo->m_pDisplayHelper)
         m_pAlgo->setOutputFetching(true);
     if(m_pAlgo->m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
@@ -771,9 +770,8 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::pre_ini
         m_oCurrGT = m_pLoader->getGT(m_nCurrIdx).clone();
         m_oNextGT = m_pLoader->getGT(m_nNextIdx).clone();
         m_oLastGT = m_oCurrGT.clone();
-        CV_Assert(!m_oCurrGT.empty());
-        CV_Assert(m_oCurrGT.isContinuous());
-        lvAssert(m_oCurrGT.channels()==1 || m_oCurrGT.channels()==4);
+        lvAssert_(!m_oCurrGT.empty() && m_oCurrGT.isContinuous(),"invalid gt fetched from loader");
+        lvAssert_(m_oCurrGT.channels()==1 || m_oCurrGT.channels()==4,"gt data must be 1ch or 4ch to avoid alignment problems");
     }
 }
 
@@ -783,8 +781,8 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::post_in
 
 void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::pre_apply_gl(size_t nNextIdx, bool bRebindAll) {
     UNUSED(bRebindAll);
-    lvDbgAssert(m_pLoader);
-    lvDbgAssert(m_pAlgo);
+    lvDbgAssert_(m_pLoader,"invalid data loader given to async data consumer");
+    lvDbgAssert_(m_pAlgo,"invalid algo given to async data consumer");
     if(nNextIdx!=m_nNextIdx)
         m_oNextInput = m_pLoader->getInput(nNextIdx);
     if(getDatasetInfo()->isUsingEvaluator() && nNextIdx!=m_nNextIdx)
@@ -792,8 +790,7 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::pre_app
 }
 
 void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::post_apply_gl(size_t nNextIdx, bool bRebindAll) {
-    lvDbgAssert(m_pLoader);
-    lvDbgAssert(m_pAlgo);
+    lvDbgAssert(m_pLoader && m_pAlgo);
     if(m_pEvalAlgo && getDatasetInfo()->isUsingEvaluator())
         m_pEvalAlgo->apply_gl(m_oNextGT,bRebindAll);
     m_nLastIdx = m_nCurrIdx;
@@ -835,8 +832,7 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::post_ap
 
 void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::getColoredMasks(cv::Mat& oOutput, cv::Mat& oDebug, const cv::Mat& /*oGT*/, const cv::Mat& oROI) {
     if(!oROI.empty()) {
-        lvAssert(oOutput.size()==oROI.size());
-        lvAssert(oDebug.size()==oROI.size());
+        lvAssert_(oOutput.size()==oROI.size() && oDebug.size()==oROI.size(),"output and debug mat sizes must match ROI size");
         cv::bitwise_or(oOutput,UCHAR_MAX/2,oOutput,oROI==0);
         cv::bitwise_or(oDebug,UCHAR_MAX/2,oDebug,oROI==0);
     }

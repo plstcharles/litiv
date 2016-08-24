@@ -179,7 +179,7 @@ std::fstream lv::CreateBinFileWithPrealloc(const std::string & sFilePath, size_t
     std::fstream ssFile(sFilePath,std::ios::out|std::ios::in|std::ios::ate|std::ios::binary);
     if(!ssFile.is_open())
         ssFile.open(sFilePath,std::ios::out|std::ios::binary);
-    lvAssert(ssFile.is_open());
+    lvAssert__(ssFile.is_open(),"could not create file at '%s'",sFilePath.c_str());
     const std::streampos nInitFileSize = ssFile.tellp();
     if(nInitFileSize<(std::streampos)nPreallocBytes) {
         size_t nBytesToWrite = nPreallocBytes-size_t(nInitFileSize);
@@ -194,7 +194,7 @@ std::fstream lv::CreateBinFileWithPrealloc(const std::string & sFilePath, size_t
             nBytesToWrite -= nBufferSize;
         }
     }
-    lvAssert(ssFile.seekp(0));
+    lvAssert_(ssFile.seekp(0),"could not return seek pointer to beg of file");
     return ssFile;
 }
 

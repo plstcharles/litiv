@@ -20,14 +20,13 @@
 EdgeDetectorCanny::EdgeDetectorCanny(double dHystLowThrshFactor, double dGaussianKernelSigma) :
         m_dHystLowThrshFactor(dHystLowThrshFactor),
         m_dGaussianKernelSigma(dGaussianKernelSigma) {
-    CV_Assert(m_dHystLowThrshFactor>0 && m_dHystLowThrshFactor<1);
-    CV_Assert(m_dGaussianKernelSigma>=0);
+    lvAssert_(m_dHystLowThrshFactor>0 && m_dHystLowThrshFactor<1,"lower hysteresis threshold factor must be between 0 and 1");
+    lvAssert_(m_dGaussianKernelSigma>=0,"gaussian smoothing kernel sigma must be non-negative");
 }
 
 void EdgeDetectorCanny::apply_threshold(cv::InputArray _oInputImage, cv::OutputArray _oEdgeMask, double dThreshold) {
     cv::Mat oInputImg = _oInputImage.getMat();
-    CV_Assert(!oInputImg.empty());
-    CV_Assert(oInputImg.channels()==1 || oInputImg.channels()==3 || oInputImg.channels()==4);
+    lvAssert_(!oInputImg.empty() && (oInputImg.channels()==1 || oInputImg.channels()==3 || oInputImg.channels()==4),"input image must be non-empty, and of type 8UC1/8UC3/8UC4");
     if(m_dGaussianKernelSigma>0) {
         // follows the approach used in Matlab's edge.m implementation of Canny's method
         const int nDefaultKernelSize = int(8*ceil(m_dGaussianKernelSigma));
@@ -46,8 +45,7 @@ void EdgeDetectorCanny::apply_threshold(cv::InputArray _oInputImage, cv::OutputA
 
 void EdgeDetectorCanny::apply(cv::InputArray _oInputImage, cv::OutputArray _oEdgeMask) {
     cv::Mat oInputImg = _oInputImage.getMat();
-    CV_Assert(!oInputImg.empty());
-    CV_Assert(oInputImg.channels()==1 || oInputImg.channels()==3 || oInputImg.channels()==4);
+    lvAssert_(!oInputImg.empty() && (oInputImg.channels()==1 || oInputImg.channels()==3 || oInputImg.channels()==4),"input image must be non-empty, and of type 8UC1/8UC3/8UC4");
     _oEdgeMask.create(oInputImg.size(),CV_8UC1);
     cv::Mat oEdgeMask = _oEdgeMask.getMat();
     oEdgeMask = cv::Scalar_<uchar>(0);

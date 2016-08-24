@@ -73,15 +73,15 @@ BackgroundSubtractorSuBSENSE::BackgroundSubtractorSuBSENSE_(size_t nDescDistThre
         m_fCurrLearningRateUpperCap(FEEDBACK_T_UPPER),
         m_nMedianBlurKernelSize(m_nDefaultMedianBlurKernelSize),
         m_bUse3x3Spread(true) {
-    CV_Assert(m_nBGSamples>0 && m_nRequiredBGSamples<=m_nBGSamples);
-    CV_Assert(m_nMinColorDistThreshold>=STAB_COLOR_DIST_OFFSET);
+    lvAssert_(m_nBGSamples>0 && m_nRequiredBGSamples<=m_nBGSamples,"algo cannot require more sample matches than sample count in model");
+    lvAssert_(m_nMinColorDistThreshold>0 || m_nDescDistThresholdOffset>0,"distance thresholds must be positive values");
 }
 
 void BackgroundSubtractorSuBSENSE::refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate) {
     // == refresh
-    CV_Assert(m_bInitialized);
-    CV_Assert(!m_voBGColorSamples.empty() && !m_voBGColorSamples[0].empty());
-    CV_Assert(fSamplesRefreshFrac>0.0f && fSamplesRefreshFrac<=1.0f);
+    lvAssert_(m_bInitialized,"algo must be initialized first");
+    lvAssert_(fSamplesRefreshFrac>0.0f && fSamplesRefreshFrac<=1.0f,"model refresh must be given as a non-null fraction");
+    lvDbgAssert(!m_voBGColorSamples.empty() && !m_voBGColorSamples[0].empty());
     const size_t nModelSamplesToRefresh = fSamplesRefreshFrac<1.0f?(size_t)(fSamplesRefreshFrac*m_nBGSamples):m_nBGSamples;
     const size_t nRefreshSampleStartPos = fSamplesRefreshFrac<1.0f?rand()%m_nBGSamples:0;
     const size_t nChannels = m_voBGColorSamples[0].channels();
@@ -187,10 +187,10 @@ void BackgroundSubtractorSuBSENSE::initialize(const cv::Mat& oInitImg, const cv:
 
 void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray _fgmask, double learningRateOverride) {
     // == process
-    CV_Assert(m_bInitialized && m_bModelInitialized);
+    lvAssert_(m_bInitialized && m_bModelInitialized,"algo & model must be initialized first");
     cv::Mat oInputImg = _image.getMat();
-    CV_Assert(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize);
-    CV_Assert(oInputImg.isContinuous());
+    lvAssert_(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize,"input image type/size mismatch with initialization type/size");
+    lvAssert_(oInputImg.isContinuous(),"input image data must be continuous");
     _fgmask.create(m_oImgSize,CV_8UC1);
     cv::Mat oCurrFGMask = _fgmask.getMat();
     memset(oCurrFGMask.data,0,oCurrFGMask.cols*oCurrFGMask.rows);
@@ -274,7 +274,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                 *pfCurrMeanMinDist_ST = (*pfCurrMeanMinDist_ST)*(1.0f-fRollAvgFactor_ST) + fNormalizedMinDist*fRollAvgFactor_ST;
                 *pfCurrMeanRawSegmRes_LT = (*pfCurrMeanRawSegmRes_LT)*(1.0f-fRollAvgFactor_LT);
                 *pfCurrMeanRawSegmRes_ST = (*pfCurrMeanRawSegmRes_ST)*(1.0f-fRollAvgFactor_ST);
-                const size_t nLearningRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil(*pfCurrLearningRate);
+                const size_t nLearningRate = std::isinf(learningRateOverride)?SIZE_MAX:(learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil(*pfCurrLearningRate));
                 if((rand()%nLearningRate)==0) {
                     const size_t s_rand = rand()%m_nBGSamples;
                     *((ushort*)(m_voBGDescSamples[s_rand].data+nDescIter)) = nCurrIntraDesc;
@@ -418,7 +418,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
                 *pfCurrMeanMinDist_ST = (*pfCurrMeanMinDist_ST)*(1.0f-fRollAvgFactor_ST) + fNormalizedMinDist*fRollAvgFactor_ST;
                 *pfCurrMeanRawSegmRes_LT = (*pfCurrMeanRawSegmRes_LT)*(1.0f-fRollAvgFactor_LT);
                 *pfCurrMeanRawSegmRes_ST = (*pfCurrMeanRawSegmRes_ST)*(1.0f-fRollAvgFactor_ST);
-                const size_t nLearningRate = learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil(*pfCurrLearningRate);
+                const size_t nLearningRate = std::isinf(learningRateOverride)?SIZE_MAX:(learningRateOverride>0?(size_t)ceil(learningRateOverride):(size_t)ceil(*pfCurrLearningRate));
                 if((rand()%nLearningRate)==0) {
                     const size_t s_rand = rand()%m_nBGSamples;
                     for(size_t c=0; c<3; ++c) {
@@ -612,7 +612,7 @@ void BackgroundSubtractorSuBSENSE::apply(cv::InputArray _image, cv::OutputArray 
 }
 
 void BackgroundSubtractorSuBSENSE::getBackgroundImage(cv::OutputArray backgroundImage) const {
-    CV_Assert(m_bInitialized);
+    lvAssert_(m_bInitialized,"algo must be initialized first");
     cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
     for(size_t s=0; s<m_nBGSamples; ++s) {
         for(int y=0; y<m_oImgSize.height; ++y) {
@@ -631,7 +631,7 @@ void BackgroundSubtractorSuBSENSE::getBackgroundImage(cv::OutputArray background
 
 void BackgroundSubtractorSuBSENSE::getBackgroundDescriptorsImage(cv::OutputArray backgroundDescImage) const {
     static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
-    CV_Assert(m_bInitialized);
+    lvAssert_(m_bInitialized,"algo must be initialized first");
     cv::Mat oAvgBGDesc = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
     for(size_t n=0; n<m_voBGDescSamples.size(); ++n) {
         for(int y=0; y<m_oImgSize.height; ++y) {

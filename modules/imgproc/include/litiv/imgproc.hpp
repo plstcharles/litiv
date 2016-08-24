@@ -123,7 +123,7 @@ void lv::nonMaxSuppression(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Ma
     //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
     //  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
     //  POSSIBILITY OF SUCH DAMAGE.
-    CV_Assert(oInput.channels()==1);
+    lvAssert(oInput.channels()==1);
     // initialise the block oMask and destination
     const int M = oInput.rows;
     const int N = oInput.cols;

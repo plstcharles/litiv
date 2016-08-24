@@ -128,10 +128,9 @@ void thinning_internal_LamLeeSuen(cv::Mat& oInput, bool bIter) {
 }
 
 void lv::thinning(const cv::Mat& oInput, cv::Mat& oOutput, ThinningMode eMode) {
-    CV_Assert(!oInput.empty());
-    CV_Assert(oInput.isContinuous());
-    CV_Assert(oInput.type()==CV_8UC1);
-    CV_Assert(oInput.rows>3 && oInput.cols>3);
+    lvAssert_(!oInput.empty() && oInput.isContinuous(),"input image must be non-empty and continuous");
+    lvAssert_(oInput.type()==CV_8UC1,"input image type must be 8UC1");
+    lvAssert_(oInput.rows>3 && oInput.cols>3,"input image size must be greater than 3x3");
     oOutput.create(oInput.size(),CV_8UC1);
     oInput.copyTo(oOutput);
     cv::Mat oPrevious(oInput.size(),CV_8UC1,cv::Scalar_<uchar>(0));

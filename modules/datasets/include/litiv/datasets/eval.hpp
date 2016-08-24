@@ -144,9 +144,9 @@ namespace lv {
         virtual void _stopProcessing() override {
             if(m_pEvalAlgo && m_pEvalAlgo->getIsGLInitialized()) {
                 auto pEvalAlgo = std::dynamic_pointer_cast<GLBinaryClassifierEvaluator>(m_pEvalAlgo);
-                lvAssert(pEvalAlgo);
+                lvAssert_(pEvalAlgo,"evaluation algo did not have a GLBinaryClassifierEvaluator interface");
                 BinClassifMetricsAccumulatorPtr pMetricsBase = pEvalAlgo->getMetricsBase();
-                lvAssert(!DATASETUTILS_VALIDATE_ASYNC_EVALUATORS || !m_pMetricsBase || m_pMetricsBase->isEqual(pMetricsBase));
+                lvAssert_(!DATASETUTILS_VALIDATE_ASYNC_EVALUATORS || !m_pMetricsBase || m_pMetricsBase->isEqual(pMetricsBase),"gpu evaluation algo did not return same results as cpu evaluation");
                 m_pMetricsBase = pMetricsBase;
             }
         }
@@ -170,7 +170,8 @@ namespace lv {
         }
         /// callback entrypoint for gpu-cpu evaluation validation
         void validationCallback(const cv::Mat& /*oInput*/, const cv::Mat& /*oDebug*/, const cv::Mat& oOutput, const cv::Mat& oGT, const cv::Mat& oROI, size_t /*nIdx*/) {
-            lvAssert(m_pMetricsBase && !oOutput.empty() && !oGT.empty());
+            lvAssert_(m_pMetricsBase,"algo needs to be initialized first")
+            lvAssert_(!oOutput.empty() && !oGT.empty(),"provided output and gt mats need to be non-empty");
             m_pMetricsBase->accumulate(oOutput,oGT,oROI);
         }
         BinClassifMetricsAccumulatorPtr m_pMetricsBase;

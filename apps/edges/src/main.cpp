@@ -139,7 +139,7 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
     bool bGPUContextInitialized = false;
     try {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
-        CV_Assert(oBatch.getImageCount()>1);
+        lvAssert(oBatch.getImageCount()>1);
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
         const size_t nTotPacketCount = oBatch.getImageCount();
         GLContext oContext(oBatch.getMaxImageSize(),std::string("[GPU] ")+oBatch.getRelativePath(),DISPLAY_OUTPUT==0);
@@ -209,13 +209,12 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
     size_t nCurrIdx = 0;
     try {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
-        CV_Assert(oBatch.getImageCount()>1);
+        lvAssert(oBatch.getImageCount()>1);
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
         const size_t nTotPacketCount = oBatch.getImageCount();
         cv::Mat oCurrInput = oBatch.getInput(nCurrIdx).clone();
-        CV_Assert(!oCurrInput.empty());
-        CV_Assert(oCurrInput.isContinuous());
-        CV_Assert(oBatch.isInputConstantSize() && oBatch.getInputPacketType()==lv::ImagePacket);
+        lvAssert(!oCurrInput.empty() && oCurrInput.isContinuous());
+        lvAssert(oBatch.isInputConstantSize() && oBatch.getInputPacketType()==lv::ImagePacket);
         cv::Mat oCurrEdgeMask(oBatch.getInputMaxSize(),CV_8UC1,cv::Scalar_<uchar>(0));
         std::shared_ptr<IEdgeDetector> pAlgo = std::make_shared<EdgeDetectorType>();
 #if !FULL_THRESH_ANALYSIS

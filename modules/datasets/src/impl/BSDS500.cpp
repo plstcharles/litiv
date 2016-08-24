@@ -67,7 +67,7 @@ namespace lv {
             vnTotalTP(nThresholdsBins,0),
             vnTotalTPFP(nThresholdsBins,0),
             vnThresholds(lv::linspace<uchar>(0,UCHAR_MAX,nThresholdsBins,false)) {
-            CV_Assert(nThresholdsBins>0 && nThresholdsBins<=UCHAR_MAX);
+            lvAssert(nThresholdsBins>0 && nThresholdsBins<=UCHAR_MAX);
         }
         std::vector<uint64_t> vnIndivTP; // one count per threshold
         std::vector<uint64_t> vnIndivTPFN; // one count per threshold
@@ -101,15 +101,15 @@ namespace lv {
         virtual void accumulate(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& /*oROI*/) {
             if(oGT.empty())
                 return;
-            CV_Assert(oClassif.type()==CV_8UC1 && oGT.type()==CV_8UC1);
-            CV_Assert(oClassif.isContinuous() && oGT.isContinuous());
-            CV_Assert(oClassif.cols==oGT.cols && (oGT.rows%oClassif.rows)==0 && (oGT.rows/oClassif.rows)>=1);
-            CV_Assert(oClassif.step.p[0]==oGT.step.p[0]);
+            lvAssert(oClassif.type()==CV_8UC1 && oGT.type()==CV_8UC1);
+            lvAssert(oClassif.isContinuous() && oGT.isContinuous());
+            lvAssert(oClassif.cols==oGT.cols && (oGT.rows%oClassif.rows)==0 && (oGT.rows/oClassif.rows)>=1);
+            lvAssert(oClassif.step.p[0]==oGT.step.p[0]);
 
             const double dMaxDist = DATASETS_BSDS500_EVAL_IMAGE_DIAG_RATIO_DIST*sqrt(double(oClassif.cols*oClassif.cols+oClassif.rows*oClassif.rows));
             const double dMaxDistSqr = dMaxDist*dMaxDist;
             const int nMaxDist = (int)ceil(dMaxDist);
-            CV_Assert(dMaxDist>0 && nMaxDist>0);
+            lvAssert(dMaxDist>0 && nMaxDist>0);
 
             BSDS500Counters oMetricsBase(m_nThresholdBins);
             const std::vector<uchar> vuEvalUniqueVals = lv::unique<uchar>(oClassif);
@@ -128,7 +128,7 @@ namespace lv {
                 ///////////////////////////////////////////////////////
 
                 const double dOutlierCost = 100*dMaxDist;
-                CV_Assert(dOutlierCost>1);
+                lvAssert(dOutlierCost>1);
                 oSegmTPAccumulator = cv::Scalar_<uchar>(0);
                 cv::Mat oGTAccumulator(oCurrSegmMask.size(),CV_8UC1,cv::Scalar_<uchar>(0));
                 uint64_t nIndivTP = 0;
@@ -215,8 +215,8 @@ namespace lv {
                                     e.nNodeIdx_SEGM = oPxToNodeLUT_SEGM.at<int>(i+u,j+v);
                                     e.nNodeIdx_GT = oPxToNodeLUT_GT.at<int>(i,j);
                                     e.dEdgeDist = sqrt(dCurrDistSqr);
-                                    CV_DbgAssert(e.nNodeIdx_SEGM>=0 && e.nNodeIdx_SEGM<nNodeCount_SEGM);
-                                    CV_DbgAssert(e.nNodeIdx_GT>=0 && e.nNodeIdx_GT<nNodeCount_GT);
+                                    lvDbgAssert(e.nNodeIdx_SEGM>=0 && e.nNodeIdx_SEGM<nNodeCount_SEGM);
+                                    lvDbgAssert(e.nNodeIdx_GT>=0 && e.nNodeIdx_GT<nNodeCount_GT);
                                     voEdges.push_back(e);
                                 }
                             }
@@ -234,9 +234,9 @@ namespace lv {
                     const int degree_mix = std::min(degree,std::min(nNodeCount_SEGM,nNodeCount_GT)); // between outliers
                     const int dmax = std::max(degree_SEGM,std::max(degree_GT,degree_mix));
 
-                    CV_DbgAssert(nNodeCount_SEGM==0 || (degree_SEGM>=0 && degree_SEGM<nNodeCount_SEGM));
-                    CV_DbgAssert(nNodeCount_GT==0 || (degree_GT>=0 && degree_GT<nNodeCount_GT));
-                    CV_DbgAssert(degree_mix>=0 && degree_mix<=nmin);
+                    lvDbgAssert(nNodeCount_SEGM==0 || (degree_SEGM>=0 && degree_SEGM<nNodeCount_SEGM));
+                    lvDbgAssert(nNodeCount_GT==0 || (degree_GT>=0 && degree_GT<nNodeCount_GT));
+                    lvDbgAssert(degree_mix>=0 && degree_mix<=nmin);
 
                     // Count the number of edges.
                     int m = 0;
@@ -258,8 +258,8 @@ namespace lv {
                         for(int a=0; a<(int)voEdges.size(); ++a) {
                             int nNodeIdx_SEGM = voEdges[a].nNodeIdx_SEGM;
                             int nNodeIdx_GT = voEdges[a].nNodeIdx_GT;
-                            CV_DbgAssert(nNodeIdx_SEGM>=0 && nNodeIdx_SEGM<nNodeCount_SEGM);
-                            CV_DbgAssert(nNodeIdx_GT>=0 && nNodeIdx_GT<nNodeCount_GT);
+                            lvDbgAssert(nNodeIdx_SEGM>=0 && nNodeIdx_SEGM<nNodeCount_SEGM);
+                            lvDbgAssert(nNodeIdx_GT>=0 && nNodeIdx_GT<nNodeCount_GT);
                             oGraph.at<int>(nGraphIdx,0) = nNodeIdx_SEGM;
                             oGraph.at<int>(nGraphIdx,1) = nNodeIdx_GT;
                             oGraph.at<int>(nGraphIdx,2) = (int)rint(voEdges[a].dEdgeDist*multiplier);
@@ -271,8 +271,8 @@ namespace lv {
                             for(int a=0; a<degree_SEGM; a++) {
                                 int j = vnOutliers[a];
                                 if(j>=nNodeIdx_SEGM) {j++;}
-                                CV_DbgAssert(nNodeIdx_SEGM!=j);
-                                CV_DbgAssert(j>=0 && j<nNodeCount_SEGM);
+                                lvDbgAssert(nNodeIdx_SEGM!=j);
+                                lvDbgAssert(j>=0 && j<nNodeCount_SEGM);
                                 oGraph.at<int>(nGraphIdx,0) = nNodeIdx_SEGM;
                                 oGraph.at<int>(nGraphIdx,1) = nNodeCount_GT+j;
                                 oGraph.at<int>(nGraphIdx,2) = nOutlierWeight;
@@ -285,8 +285,8 @@ namespace lv {
                             for(int a = 0; a<degree_GT; a++) {
                                 int i = vnOutliers[a];
                                 if(i>=nNodeIdx_GT) {i++;}
-                                CV_DbgAssert(i!=nNodeIdx_GT);
-                                CV_DbgAssert(i>=0 && i<nNodeCount_GT);
+                                lvDbgAssert(i!=nNodeIdx_GT);
+                                lvDbgAssert(i>=0 && i<nNodeCount_GT);
                                 oGraph.at<int>(nGraphIdx,0) = nNodeCount_SEGM+i;
                                 oGraph.at<int>(nGraphIdx,1) = nNodeIdx_GT;
                                 oGraph.at<int>(nGraphIdx,2) = nOutlierWeight;
@@ -298,16 +298,16 @@ namespace lv {
                             BSDS500::kOfN(degree_mix,nmin,vnOutliers.data());
                             for(int a = 0; a<degree_mix; a++) {
                                 const int j = vnOutliers[a];
-                                CV_DbgAssert(j>=0 && j<nmin);
+                                lvDbgAssert(j>=0 && j<nmin);
                                 if(nNodeCount_SEGM<nNodeCount_GT) {
-                                    CV_DbgAssert(i>=0 && i<nNodeCount_GT);
-                                    CV_DbgAssert(j>=0 && j<nNodeCount_SEGM);
+                                    lvDbgAssert(i>=0 && i<nNodeCount_GT);
+                                    lvDbgAssert(j>=0 && j<nNodeCount_SEGM);
                                     oGraph.at<int>(nGraphIdx,0) = nNodeCount_SEGM+i;
                                     oGraph.at<int>(nGraphIdx,1) = nNodeCount_GT+j;
                                 }
                                 else {
-                                    CV_DbgAssert(i>=0 && i<nNodeCount_SEGM);
-                                    CV_DbgAssert(j>=0 && j<nNodeCount_GT);
+                                    lvDbgAssert(i>=0 && i<nNodeCount_SEGM);
+                                    lvDbgAssert(j>=0 && j<nNodeCount_GT);
                                     oGraph.at<int>(nGraphIdx,0) = nNodeCount_SEGM+j;
                                     oGraph.at<int>(nGraphIdx,1) = nNodeCount_GT+i;
                                 }
@@ -328,19 +328,19 @@ namespace lv {
                             oGraph.at<int>(nGraphIdx,2) = nOutlierWeight*multiplier;
                             nGraphIdx++;
                         }
-                        CV_DbgAssert(nGraphIdx==m);
+                        lvDbgAssert(nGraphIdx==m);
 
                         // Check all the edges, and set the values up for CSA.
                         for(int i = 0; i<m; i++) {
-                            CV_DbgAssert(oGraph.at<int>(i,0)>=0 && oGraph.at<int>(i,0)<n);
-                            CV_DbgAssert(oGraph.at<int>(i,1)>=0 && oGraph.at<int>(i,1)<n);
+                            lvDbgAssert(oGraph.at<int>(i,0)>=0 && oGraph.at<int>(i,0)<n);
+                            lvDbgAssert(oGraph.at<int>(i,1)>=0 && oGraph.at<int>(i,1)<n);
                             oGraph.at<int>(i,0) += 1;
                             oGraph.at<int>(i,1) += 1+n;
                         }
 
                         // Solve the assignment problem.
                         BSDS500::CSA oCSASolver(2*n,m,(int*)oGraph.data);
-                        CV_Assert(oCSASolver.edges()==n);
+                        lvAssert(oCSASolver.edges()==n);
 
                         cv::Mat oOutGraph(n,3,CV_32SC1);
                         for(int i = 0; i<n; i++) {
@@ -359,16 +359,16 @@ namespace lv {
                             const int i = oOutGraph.at<int>(a,0);
                             const int j = oOutGraph.at<int>(a,1);
                             const int c = oOutGraph.at<int>(a,2);
-                            CV_DbgAssert(i>=0 && i<n);
-                            CV_DbgAssert(j>=0 && j<n);
-                            CV_DbgAssert(c>=0);
+                            lvDbgAssert(i>=0 && i<n);
+                            lvDbgAssert(j>=0 && j<n);
+                            lvDbgAssert(c>=0);
                             // edge from high-cost perfect match overlay
                             if(c==nOutlierWeight*multiplier) {nOverlayCount++;}
                             // skip outlier edges
                             if(i>=nNodeCount_SEGM) {continue;}
                             if(j>=nNodeCount_GT) {continue;}
                             // for edges between real nodes, check the edge weight
-                            CV_DbgAssert((int)rint(sqrt((voNodeToPxLUT_SEGM[i].x-voNodeToPxLUT_GT[j].x)*(voNodeToPxLUT_SEGM[i].x-voNodeToPxLUT_GT[j].x)+(voNodeToPxLUT_SEGM[i].y-voNodeToPxLUT_GT[j].y)*(voNodeToPxLUT_SEGM[i].y-voNodeToPxLUT_GT[j].y))*multiplier)==c);
+                            lvDbgAssert((int)rint(sqrt((voNodeToPxLUT_SEGM[i].x-voNodeToPxLUT_GT[j].x)*(voNodeToPxLUT_SEGM[i].x-voNodeToPxLUT_GT[j].x)+(voNodeToPxLUT_SEGM[i].y-voNodeToPxLUT_GT[j].y)*(voNodeToPxLUT_SEGM[i].y-voNodeToPxLUT_GT[j].y))*multiplier)==c);
                         }
 
                         // Print a warning if any of the edges from the perfect match overlay
@@ -390,7 +390,7 @@ namespace lv {
                             const cv::Point2i oPx_SEGM = voNodeToPxLUT_SEGM[i];
                             const cv::Point2i oPx_GT = voNodeToPxLUT_GT[j];
                             // record edges
-                            CV_Assert(oCurrSegmMask.at<uchar>(oPx_SEGM) && oCurrGTSegmMask.at<uchar>(oPx_GT));
+                            lvAssert(oCurrSegmMask.at<uchar>(oPx_SEGM) && oCurrGTSegmMask.at<uchar>(oPx_GT));
                             oSegmTPAccumulator.at<uchar>(oPx_SEGM) = UCHAR_MAX;
                             ++nIndivTP;
                         }
@@ -435,14 +435,14 @@ namespace lv {
     #endif //(!USE_BSDS500_BENCHMARK)
 
                 //re = TP / (TP + FN)
-                CV_Assert(nGTPosCount>=nIndivTP);
+                lvAssert(nGTPosCount>=nIndivTP);
                 oMetricsBase.vnIndivTP[nThresholdBinIdx] = nIndivTP;
                 oMetricsBase.vnIndivTPFN[nThresholdBinIdx] = nGTPosCount;
 
                 //pr = TP / (TP + FP)
                 uint64_t nSegmTPAccCount = uint64_t(cv::countNonZero(oSegmTPAccumulator));
                 uint64_t nSegmPosCount = uint64_t(cv::countNonZero(oCurrSegmMask));
-                CV_Assert(nSegmPosCount>=nSegmTPAccCount);
+                lvAssert(nSegmPosCount>=nSegmTPAccCount);
                 oMetricsBase.vnTotalTP[nThresholdBinIdx] = nSegmTPAccCount;
                 oMetricsBase.vnTotalTPFP[nThresholdBinIdx] = nSegmPosCount;
                 while(nNextEvalUniqueValIdx+1<vuEvalUniqueVals.size() && vuEvalUniqueVals[nNextEvalUniqueValIdx]<=oMetricsBase.vnThresholds[nThresholdBinIdx])
@@ -462,17 +462,17 @@ namespace lv {
         }
         static cv::Mat getColoredMask(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& /*oROI*/) {
             if(oGT.empty()) {
-                CV_Assert(!oClassif.empty() && oClassif.type()==CV_8UC1);
+                lvAssert(!oClassif.empty() && oClassif.type()==CV_8UC1);
                 cv::Mat oResult;
                 cv::cvtColor(oClassif,oResult,cv::COLOR_GRAY2BGR);
                 return oResult;
             }
-            CV_Assert(oClassif.type()==CV_8UC1 && oGT.type()==CV_8UC1);
-            CV_Assert(oClassif.cols==oGT.cols && (oGT.rows%oClassif.rows)==0 && (oGT.rows/oClassif.rows)>=1);
-            CV_Assert(oClassif.step.p[0]==oGT.step.p[0]);
+            lvAssert(oClassif.type()==CV_8UC1 && oGT.type()==CV_8UC1);
+            lvAssert(oClassif.cols==oGT.cols && (oGT.rows%oClassif.rows)==0 && (oGT.rows/oClassif.rows)>=1);
+            lvAssert(oClassif.step.p[0]==oGT.step.p[0]);
             const double dMaxDist = DATASETS_BSDS500_EVAL_IMAGE_DIAG_RATIO_DIST*sqrt(double(oClassif.cols*oClassif.cols+oClassif.rows*oClassif.rows));
             const int nMaxDist = (int)ceil(dMaxDist);
-            CV_Assert(dMaxDist>0 && nMaxDist>0);
+            lvAssert(dMaxDist>0 && nMaxDist>0);
             cv::Mat oSegm_TP(oClassif.size(),CV_16UC1,cv::Scalar_<ushort>(0));
             cv::Mat oSegm_FN(oClassif.size(),CV_16UC1,cv::Scalar_<ushort>(0));
             cv::Mat oSegm_FP(oClassif.size(),CV_16UC1,cv::Scalar_<ushort>(0));
@@ -505,7 +505,7 @@ namespace lv {
         std::vector<BSDS500Counters> m_voMetricsBase; // one counter block per image
         const size_t m_nThresholdBins;
     protected:
-        BSDS500MetricsAccumulator(size_t nThresholdBins) : m_nThresholdBins(nThresholdBins) {CV_Assert(m_nThresholdBins>0 && m_nThresholdBins<=UCHAR_MAX);}
+        BSDS500MetricsAccumulator(size_t nThresholdBins) : m_nThresholdBins(nThresholdBins) {lvAssert(m_nThresholdBins>0 && m_nThresholdBins<=UCHAR_MAX);}
     };
     using BSDS500MetricsAccumulatorPtr = std::shared_ptr<BSDS500MetricsAccumulator>;
     using BSDS500MetricsAccumulatorConstPtr = std::shared_ptr<const BSDS500MetricsAccumulator>;
@@ -518,8 +518,8 @@ namespace lv {
     };
 
     inline BSDS500Score FindMaxFMeasure(const std::vector<uchar>& vnThresholds, const std::vector<double>& vdRecall, const std::vector<double>& vdPrecision) {
-        CV_Assert(!vnThresholds.empty() && !vdRecall.empty() && !vdPrecision.empty());
-        CV_Assert(vnThresholds.size()==vdRecall.size() && vdRecall.size()==vdPrecision.size());
+        lvAssert(!vnThresholds.empty() && !vdRecall.empty() && !vdPrecision.empty());
+        lvAssert(vnThresholds.size()==vdRecall.size() && vdRecall.size()==vdPrecision.size());
         BSDS500Score oRes;
         oRes.dFMeasure = lv::BinClassifMetricsCalculator::CalcFMeasure(vdRecall[0],vdPrecision[0]);
         oRes.dPrecision = vdPrecision[0];
@@ -545,7 +545,7 @@ namespace lv {
     }
 
     inline BSDS500Score FindMaxFMeasure(const std::vector<BSDS500Score>& voScores) {
-        CV_Assert(!voScores.empty());
+        lvAssert(!voScores.empty());
         BSDS500Score oRes = voScores[0];
         for(size_t nScoreIdx=1; nScoreIdx<voScores.size(); ++nScoreIdx) {
             const size_t nInterpCount = 100;
@@ -603,14 +603,14 @@ namespace lv {
             const size_t nImageCount = m_voMetricsBase.size();
             voBestImageScores.resize(nImageCount);
             for(size_t nImageIdx = 0; nImageIdx<nImageCount; ++nImageIdx) {
-                CV_DbgAssert(!m_voMetricsBase[nImageIdx].vnIndivTP.empty() && !m_voMetricsBase[nImageIdx].vnIndivTPFN.empty());
-                CV_DbgAssert(!m_voMetricsBase[nImageIdx].vnTotalTP.empty() && !m_voMetricsBase[nImageIdx].vnTotalTPFP.empty());
-                CV_DbgAssert(m_voMetricsBase[nImageIdx].vnIndivTP.size()==m_voMetricsBase[nImageIdx].vnIndivTPFN.size());
-                CV_DbgAssert(m_voMetricsBase[nImageIdx].vnTotalTP.size()==m_voMetricsBase[nImageIdx].vnTotalTPFP.size());
-                CV_DbgAssert(m_voMetricsBase[nImageIdx].vnIndivTP.size()==m_voMetricsBase[nImageIdx].vnTotalTP.size());
-                CV_DbgAssert(m_voMetricsBase[nImageIdx].vnThresholds.size()==m_voMetricsBase[nImageIdx].vnTotalTP.size());
-                CV_DbgAssert(nImageIdx==0 || m_voMetricsBase[nImageIdx].vnIndivTP.size()==m_voMetricsBase[nImageIdx-1].vnIndivTP.size());
-                CV_DbgAssert(nImageIdx==0 || m_voMetricsBase[nImageIdx].vnThresholds==m_voMetricsBase[nImageIdx-1].vnThresholds);
+                lvDbgAssert(!m_voMetricsBase[nImageIdx].vnIndivTP.empty() && !m_voMetricsBase[nImageIdx].vnIndivTPFN.empty());
+                lvDbgAssert(!m_voMetricsBase[nImageIdx].vnTotalTP.empty() && !m_voMetricsBase[nImageIdx].vnTotalTPFP.empty());
+                lvDbgAssert(m_voMetricsBase[nImageIdx].vnIndivTP.size()==m_voMetricsBase[nImageIdx].vnIndivTPFN.size());
+                lvDbgAssert(m_voMetricsBase[nImageIdx].vnTotalTP.size()==m_voMetricsBase[nImageIdx].vnTotalTPFP.size());
+                lvDbgAssert(m_voMetricsBase[nImageIdx].vnIndivTP.size()==m_voMetricsBase[nImageIdx].vnTotalTP.size());
+                lvDbgAssert(m_voMetricsBase[nImageIdx].vnThresholds.size()==m_voMetricsBase[nImageIdx].vnTotalTP.size());
+                lvDbgAssert(nImageIdx==0 || m_voMetricsBase[nImageIdx].vnIndivTP.size()==m_voMetricsBase[nImageIdx-1].vnIndivTP.size());
+                lvDbgAssert(nImageIdx==0 || m_voMetricsBase[nImageIdx].vnThresholds==m_voMetricsBase[nImageIdx-1].vnThresholds);
                 std::vector<BSDS500Score> voImageScore_PerThreshold(m_nThresholdBins);
                 for(size_t nThresholdIdx = 0; nThresholdIdx<m_nThresholdBins; ++nThresholdIdx) {
                     voImageScore_PerThreshold[nThresholdIdx].dRecall = lv::BinClassifMetricsCalculator::CalcRecall(m_voMetricsBase[nImageIdx].vnIndivTP[nThresholdIdx],m_voMetricsBase[nImageIdx].vnIndivTPFN[nThresholdIdx]);

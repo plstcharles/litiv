@@ -25,7 +25,7 @@ void IBackgroundSubtractorLBSP_<eImpl>::initialize_common(const cv::Mat& oInitIm
     m_oLastDescFrame = cv::Scalar_<ushort>::all(0);
     const int nLBSPBorderSize = (int)LBSP::PATCH_SIZE/2;
     if(this->m_nImgChannels==1) {
-        CV_Assert(m_oLastDescFrame.step.p[0]==this->m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==this->m_oLastColorFrame.step.p[1]*2);
+        lvAssert(m_oLastDescFrame.step.p[0]==this->m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==this->m_oLastColorFrame.step.p[1]*2);
         for(size_t t=0; t<=UCHAR_MAX; ++t)
             m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>((t*m_fRelLBSPThreshold+m_nLBSPThresholdOffset)/3);
         for(size_t nPxIter=0; nPxIter<this->m_nTotPxCount; ++nPxIter) {
@@ -38,7 +38,7 @@ void IBackgroundSubtractorLBSP_<eImpl>::initialize_common(const cv::Mat& oInitIm
         }
     }
     else { //(m_nImgChannels==3 || m_nImgChannels==4)
-        CV_Assert(m_oLastDescFrame.step.p[0]==this->m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==this->m_oLastColorFrame.step.p[1]*2);
+        lvAssert(m_oLastDescFrame.step.p[0]==this->m_oLastColorFrame.step.p[0]*2 && m_oLastDescFrame.step.p[1]==this->m_oLastColorFrame.step.p[1]*2);
         for(size_t t=0; t<=UCHAR_MAX; ++t)
             m_anLBSPThreshold_8bitLUT[t] = cv::saturate_cast<uchar>(t*m_fRelLBSPThreshold+m_nLBSPThresholdOffset);
         for(size_t nPxIter=0; nPxIter<this->m_nTotPxCount; ++nPxIter) {
@@ -70,7 +70,7 @@ template<>
 template<>
 std::string IBackgroundSubtractorLBSP_GLSL::getLBSPThresholdLUTShaderSource<lv::GLSL>() const {
     lvDbgExceptionWatch;
-    lvAssert(m_bInitialized);
+    lvAssert_(m_bInitialized,"algo must be initialized first");
     std::stringstream ssSrc;
     ssSrc << "const uint anLBSPThresLUT[256] = uint[256](\n    ";
     for(size_t t=0; t<=UCHAR_MAX; ++t) {

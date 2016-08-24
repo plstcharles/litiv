@@ -25,8 +25,8 @@ IBackgroundSubtractorLOBSTER::IBackgroundSubtractorLOBSTER_(size_t nDescDistThre
         m_nDescDistThreshold(nDescDistThreshold),
         m_nBGSamples(nBGSamples),
         m_nRequiredBGSamples(nRequiredBGSamples) {
-    CV_Assert(m_nRequiredBGSamples<=m_nBGSamples);
-    CV_Assert(m_nColorDistThreshold>0 || m_nDescDistThreshold>0);
+    lvAssert_(m_nBGSamples>0 && m_nRequiredBGSamples<=m_nBGSamples,"algo cannot require more sample matches than sample count in model");
+    lvAssert_(m_nColorDistThreshold>0 || m_nDescDistThreshold>0,"distance thresholds must be positive values");
 }
 
 #if HAVE_GLSL
@@ -38,16 +38,16 @@ IBackgroundSubtractorLOBSTER_GLSL::IBackgroundSubtractorLOBSTER_(size_t nDescDis
         m_nDescDistThreshold(nDescDistThreshold),
         m_nBGSamples(nBGSamples),
         m_nRequiredBGSamples(nRequiredBGSamples) {
-    CV_Assert(m_nRequiredBGSamples<=m_nBGSamples);
-    CV_Assert(m_nColorDistThreshold>0 || m_nDescDistThreshold>0);
+    lvAssert_(m_nRequiredBGSamples<=m_nBGSamples,"algo cannot require more sample matches than sample count in model");
+    lvAssert_(m_nColorDistThreshold>0 || m_nDescDistThreshold>0,"distance thresholds must be positive values");
     glErrorCheck;
 }
 
 void BackgroundSubtractorLOBSTER_GLSL::refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate) {
     lvDbgExceptionWatch;
     // == refresh
-    CV_Assert(m_bInitialized);
-    CV_Assert(fSamplesRefreshFrac>0.0f && fSamplesRefreshFrac<=1.0f);
+    lvAssert_(m_bInitialized,"algo must be initialized first");
+    lvAssert_(fSamplesRefreshFrac>0.0f && fSamplesRefreshFrac<=1.0f,"model refresh must be given as a non-null fraction");
     const size_t nModelSamplesToRefresh = fSamplesRefreshFrac<1.0f?(size_t)(fSamplesRefreshFrac*m_nBGSamples):m_nBGSamples;
     const size_t nRefreshSampleStartPos = fSamplesRefreshFrac<1.0f?rand()%m_nBGSamples:0;
     if(!bForceFGUpdate)
@@ -108,7 +108,7 @@ void BackgroundSubtractorLOBSTER_GLSL::initialize_gl(const cv::Mat& oInitImg, co
     m_nRowStepSize = m_nColStepSize*m_oROI.cols;
     m_nBGModelSize = m_nRowStepSize*m_oROI.rows;
     const int nMaxSSBOBlockSize = lv::gl::getIntegerVal<1>(GL_MAX_SHADER_STORAGE_BLOCK_SIZE);
-    lvAssert(nMaxSSBOBlockSize>(int)(m_nBGModelSize*sizeof(uint)) && nMaxSSBOBlockSize>(int)(m_nTMT32ModelSize*sizeof(lv::gl::TMT32GenParams)));
+    lvAssert_(nMaxSSBOBlockSize>(int)(m_nBGModelSize*sizeof(uint)) && nMaxSSBOBlockSize>(int)(m_nTMT32ModelSize*sizeof(lv::gl::TMT32GenParams)),"max ssbo block size is tool small for the predicted model size");
     m_vnBGModelData.resize(m_nBGModelSize,0);
     lv::gl::TMT32GenParams::initTinyMT32Generators(glm::uvec3(uint(m_oROI.cols),uint(m_oROI.rows),1),m_voTMT32ModelData);
     m_bInitialized = true;
@@ -278,7 +278,7 @@ std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource_LOBSTER() c
 
 std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource_PostProc() const {
     lvDbgExceptionWatch;
-    lvAssert(m_nDefaultMedianBlurKernelSize>0);
+    lvAssert_(m_nDefaultMedianBlurKernelSize>0,"postproc median blur kernel size must be positive");
     std::stringstream ssSrc;
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ssSrc << "#version 430\n"
@@ -306,8 +306,8 @@ std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource_PostProc() 
 
 std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource(size_t nStage) const {
     lvDbgExceptionWatch;
-    lvAssert(m_bInitialized);
-    lvAssert(nStage<m_nComputeStages);
+    lvAssert_(m_bInitialized,"algo must be initialized first");
+    lvAssert_(nStage<m_nComputeStages,"required compute stage does not exist");
     if(nStage==0)
         return getComputeShaderSource_LOBSTER();
     else //nStage==1 && BGSLOBSTER_GLSL_USE_POSTPROC
@@ -316,7 +316,7 @@ std::string BackgroundSubtractorLOBSTER_GLSL::getComputeShaderSource(size_t nSta
 
 void BackgroundSubtractorLOBSTER_GLSL::dispatch(size_t nStage, GLShader& oShader) {
     lvDbgExceptionWatch;
-    lvAssert(nStage<m_nComputeStages);
+    lvAssert_(nStage<m_nComputeStages,"required compute stage does not exist");
     if(nStage==0) {
         if(m_dCurrLearningRate>0)
             oShader.setUniform1ui("nResamplingRate",(GLuint)ceil(m_dCurrLearningRate));
@@ -330,8 +330,8 @@ void BackgroundSubtractorLOBSTER_GLSL::dispatch(size_t nStage, GLShader& oShader
 
 void BackgroundSubtractorLOBSTER_GLSL::getBackgroundImage(cv::OutputArray oBGImg) const {
     lvDbgExceptionWatch;
-    CV_Assert(m_bInitialized);
-    lvAssert(m_bGLInitialized && !m_vnBGModelData.empty());
+    lvAssert_(m_bInitialized,"algo must be initialized first");
+    lvAssert_(m_bGLInitialized && !m_vnBGModelData.empty(),"algo gpu bg model not initialized");
     oBGImg.create(m_oFrameSize,CV_8UC(int(m_nImgChannels)));
     cv::Mat oOutputImg = oBGImg.getMatRef();
     glBindBuffer(GL_SHADER_STORAGE_BUFFER,getSSBOId(BackgroundSubtractorLOBSTER_::LOBSTERStorageBuffer_BGModelBinding));
@@ -362,8 +362,8 @@ void BackgroundSubtractorLOBSTER_GLSL::getBackgroundImage(cv::OutputArray oBGImg
 
 void BackgroundSubtractorLOBSTER_GLSL::getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const {
     lvDbgExceptionWatch;
-    CV_Assert(m_bInitialized);
-    lvAssert(m_bGLInitialized && !m_vnBGModelData.empty());
+    lvAssert_(m_bInitialized,"algo must be initialized first");
+    lvAssert_(m_bGLInitialized && !m_vnBGModelData.empty(),"algo gpu bg model not initialized");
     static_assert(LBSP::DESC_SIZE==2,"Some assumptions are breaking below");
     oBGDescImg.create(m_oFrameSize,CV_16UC(int(m_nImgChannels)));
     cv::Mat oOutputImg = oBGDescImg.getMatRef();
@@ -410,8 +410,8 @@ template struct BackgroundSubtractorLOBSTER_<lv::GLSL>;
 void BackgroundSubtractorLOBSTER::refreshModel(float fSamplesRefreshFrac, bool bForceFGUpdate) {
     lvDbgExceptionWatch;
     // == refresh
-    CV_Assert(m_bInitialized);
-    CV_Assert(fSamplesRefreshFrac>0.0f && fSamplesRefreshFrac<=1.0f);
+    lvAssert_(m_bInitialized,"algo must be initialized first");
+    lvAssert_(fSamplesRefreshFrac>0.0f && fSamplesRefreshFrac<=1.0f,"model refresh must be given as a non-null fraction");
     const size_t nModelSamplesToRefresh = fSamplesRefreshFrac<1.0f?(size_t)(fSamplesRefreshFrac*m_nBGSamples):m_nBGSamples;
     const size_t nRefreshSampleStartPos = fSamplesRefreshFrac<1.0f?rand()%m_nBGSamples:0;
     for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
@@ -459,15 +459,15 @@ void BackgroundSubtractorLOBSTER::initialize(const cv::Mat& oInitImg, const cv::
 void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArray _oFGMask, double dLearningRate) {
     lvDbgExceptionWatch;
     // == process_sync
-    CV_Assert(m_bInitialized && m_bModelInitialized);
-    CV_Assert(dLearningRate>0);
+    lvAssert_(m_bInitialized && m_bModelInitialized,"algo & model must be initialized first");
+    lvAssert_(dLearningRate>0,"learning rate must be a positive value; faster learning is achieved with smaller values");
     cv::Mat oInputImg = _oInputImg.getMat();
-    CV_Assert(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize);
-    CV_Assert(oInputImg.isContinuous());
+    lvAssert_(oInputImg.type()==m_nImgType && oInputImg.size()==m_oImgSize,"input image type/size mismatch with initialization type/size");
+    lvAssert_(oInputImg.isContinuous(),"input image data must be continuous");
     _oFGMask.create(m_oImgSize,CV_8UC1);
     cv::Mat oCurrFGMask = _oFGMask.getMat();
     oCurrFGMask = cv::Scalar_<uchar>(0);
-    const size_t nLearningRate = (size_t)ceil(dLearningRate);
+    const size_t nLearningRate = std::isinf(dLearningRate)?SIZE_MAX:(size_t)ceil(dLearningRate);
     if(m_nImgChannels==1) {
         for(size_t nModelIter=0; nModelIter<m_nTotRelevantPxCount; ++nModelIter) {
             const size_t nPxIter = m_vnPxIdxLUT[nModelIter];
@@ -582,7 +582,7 @@ void BackgroundSubtractorLOBSTER::apply(cv::InputArray _oInputImg, cv::OutputArr
 
 void BackgroundSubtractorLOBSTER::getBackgroundImage(cv::OutputArray oBGImg) const {
     lvDbgExceptionWatch;
-    CV_Assert(m_bInitialized);
+    lvAssert_(m_bInitialized,"algo must be initialized first");
     cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
     for(size_t s=0; s<m_nBGSamples; ++s) {
         for(int y=0; y<m_oImgSize.height; ++y) {
@@ -602,7 +602,7 @@ void BackgroundSubtractorLOBSTER::getBackgroundImage(cv::OutputArray oBGImg) con
 void BackgroundSubtractorLOBSTER::getBackgroundDescriptorsImage(cv::OutputArray oBGDescImg) const {
     static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
     lvDbgExceptionWatch;
-    CV_Assert(m_bInitialized);
+    lvAssert_(m_bInitialized,"algo must be initialized first");
     cv::Mat oAvgBGDesc = cv::Mat::zeros(m_oImgSize,CV_32FC((int)m_nImgChannels));
     for(size_t n=0; n<m_voBGDescSamples.size(); ++n) {
         for(int y=0; y<m_oImgSize.height; ++y) {

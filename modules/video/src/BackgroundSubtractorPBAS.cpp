@@ -28,14 +28,14 @@ BackgroundSubtractorPBAS::BackgroundSubtractorPBAS(size_t nInitColorDistThreshol
         m_fDefaultUpdateRate(fInitUpdateRate),
         m_fFormerMeanGradDist(20),
         m_bInitialized(false) {
-    CV_Assert(m_nRequiredBGSamples<=m_nBGSamples);
-    CV_Assert(m_fDefaultUpdateRate>0 && m_fDefaultUpdateRate<=UCHAR_MAX);
+    lvAssert(m_nBGSamples>0 && m_nRequiredBGSamples<=m_nBGSamples);
+    lvAssert(m_fDefaultUpdateRate>0 && m_fDefaultUpdateRate<=UCHAR_MAX);
 }
 
 BackgroundSubtractorPBAS::~BackgroundSubtractorPBAS() {}
 
 void BackgroundSubtractorPBAS::getBackgroundImage(cv::OutputArray backgroundImage) const {
-    CV_Assert(m_bInitialized);
+    lvAssert(m_bInitialized);
     cv::Mat oAvgBGImg = cv::Mat::zeros(m_oImgSize,CV_32FC(m_voBGImg[0].channels()));
     for(size_t n=0; n<m_voBGImg.size(); ++n) {
         for(int y=0; y<m_oImgSize.height; ++y) {
@@ -59,9 +59,9 @@ BackgroundSubtractorPBAS_1ch::BackgroundSubtractorPBAS_1ch(size_t nInitColorDist
 BackgroundSubtractorPBAS_1ch::~BackgroundSubtractorPBAS_1ch() {}
 
 void BackgroundSubtractorPBAS_1ch::initialize(const cv::Mat& oInitImg) {
-    CV_Assert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
-    CV_Assert(oInitImg.isContinuous());
-    CV_Assert(oInitImg.type()==CV_8UC1);
+    lvAssert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
+    lvAssert(oInitImg.isContinuous());
+    lvAssert(oInitImg.type()==CV_8UC1);
     m_oImgSize = oInitImg.size();
     m_oDistThresholdFrame.create(m_oImgSize,CV_32FC1);
     m_oDistThresholdFrame = cv::Scalar(1.0f);
@@ -77,8 +77,8 @@ void BackgroundSubtractorPBAS_1ch::initialize(const cv::Mat& oInitImg) {
     m_oLastFGMask = cv::Scalar(0);
     m_oFloodedFGMask.create(m_oImgSize,CV_8UC1);
     m_oFloodedFGMask = cv::Scalar(0);
-    CV_Assert(m_voBGImg.size()==(size_t)m_nBGSamples);
-    CV_Assert(m_voBGGrad.size()==(size_t)m_nBGSamples);
+    lvAssert(m_voBGImg.size()==(size_t)m_nBGSamples);
+    lvAssert(m_voBGGrad.size()==(size_t)m_nBGSamples);
     cv::Mat oBlurredInitImg;
     cv::GaussianBlur(oInitImg,oBlurredInitImg,cv::Size(3,3),0,0,cv::BORDER_DEFAULT);
     cv::Mat oBlurredInitImg_GradX, oBlurredInitImg_GradY;
@@ -107,9 +107,9 @@ void BackgroundSubtractorPBAS_1ch::initialize(const cv::Mat& oInitImg) {
 }
 
 void BackgroundSubtractorPBAS_1ch::apply(cv::InputArray _image, cv::OutputArray _fgmask, double learningRateOverride) {
-    CV_Assert(m_bInitialized);
+    lvAssert(m_bInitialized);
     cv::Mat oInputImg = _image.getMat();
-    CV_Assert(oInputImg.type()==CV_8UC1 && oInputImg.size()==m_oImgSize);
+    lvAssert(oInputImg.type()==CV_8UC1 && oInputImg.size()==m_oImgSize);
     _fgmask.create(m_oImgSize,CV_8UC1);
     cv::Mat oFGMask = _fgmask.getMat();
     oFGMask = cv::Scalar_<uchar>(0);
@@ -273,9 +273,9 @@ BackgroundSubtractorPBAS_3ch::BackgroundSubtractorPBAS_3ch(size_t nInitColorDist
 BackgroundSubtractorPBAS_3ch::~BackgroundSubtractorPBAS_3ch() {}
 
 void BackgroundSubtractorPBAS_3ch::initialize(const cv::Mat& oInitImg) {
-    CV_Assert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
-    CV_Assert(oInitImg.isContinuous());
-    CV_Assert(oInitImg.type()==CV_8UC3 || oInitImg.type()==CV_8UC1);
+    lvAssert(!oInitImg.empty() && oInitImg.cols>0 && oInitImg.rows>0);
+    lvAssert(oInitImg.isContinuous());
+    lvAssert(oInitImg.type()==CV_8UC3 || oInitImg.type()==CV_8UC1);
     cv::Mat oInitImgRGB;
     if(oInitImg.type()==CV_8UC3)
         oInitImgRGB = oInitImg;
@@ -296,8 +296,8 @@ void BackgroundSubtractorPBAS_3ch::initialize(const cv::Mat& oInitImg) {
     m_oLastFGMask = cv::Scalar(0);
     m_oFloodedFGMask.create(m_oImgSize,CV_8UC1);
     m_oFloodedFGMask = cv::Scalar(0);
-    CV_Assert(m_voBGImg.size()==(size_t)m_nBGSamples);
-    CV_Assert(m_voBGGrad.size()==(size_t)m_nBGSamples);
+    lvAssert(m_voBGImg.size()==(size_t)m_nBGSamples);
+    lvAssert(m_voBGGrad.size()==(size_t)m_nBGSamples);
     cv::Mat oBlurredInitImg;
     cv::GaussianBlur(oInitImgRGB,oBlurredInitImg,cv::Size(3,3),0,0,cv::BORDER_DEFAULT);
     cv::Mat oBlurredInitImg_GradX, oBlurredInitImg_GradY;
@@ -326,9 +326,9 @@ void BackgroundSubtractorPBAS_3ch::initialize(const cv::Mat& oInitImg) {
 }
 
 void BackgroundSubtractorPBAS_3ch::apply(cv::InputArray _image, cv::OutputArray _fgmask, double learningRateOverride) {
-    CV_Assert(m_bInitialized);
+    lvAssert(m_bInitialized);
     cv::Mat oInputImg = _image.getMat();
-    CV_Assert((oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3) && oInputImg.size()==m_oImgSize);
+    lvAssert((oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3) && oInputImg.size()==m_oImgSize);
     cv::Mat oInputImgRGB;
     if(oInputImg.type()==CV_8UC3)
         oInputImgRGB = oInputImg;

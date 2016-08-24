@@ -84,7 +84,7 @@ namespace lv {
     /// computes the L1 distance between two generic arrays
     template<typename T>
     inline auto L1dist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) -> decltype(L1dist<3>(a,b,nElements,m)) {
-        CV_Assert(nChannels>0 && nChannels<=4);
+        lvAssert_(nChannels>0 && nChannels<=4,"non-templated distance function only defined for 1 to 4 channels");
         switch(nChannels) {
             case 1: return L1dist<1>(a,b,nElements,m);
             case 2: return L1dist<2>(a,b,nElements,m);
@@ -162,7 +162,7 @@ namespace lv {
     /// computes the squared L2 distance between two generic arrays
     template<typename T>
     inline auto L2sqrdist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) -> decltype(L2sqrdist<3>(a,b,nElements,m)) {
-        CV_Assert(nChannels>0 && nChannels<=4);
+        lvAssert_(nChannels>0 && nChannels<=4,"non-templated distance function only defined for 1 to 4 channels");
         switch(nChannels) {
             case 1: return L2sqrdist<1>(a,b,nElements,m);
             case 2: return L2sqrdist<2>(a,b,nElements,m);
@@ -231,7 +231,7 @@ namespace lv {
     /// computes the squared L2 distance between two generic arrays
     template<typename T>
     inline float L2dist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) {
-        CV_Assert(nChannels>0 && nChannels<=4);
+        lvAssert_(nChannels>0 && nChannels<=4,"non-templated distance function only defined for 1 to 4 channels");
         switch(nChannels) {
             case 1: return L2dist<1>(a,b,nElements,m);
             case 2: return L2dist<2>(a,b,nElements,m);
@@ -357,7 +357,7 @@ namespace lv {
     /// computes the color distortion between two generic arrays
     template<typename T>
     inline auto cdist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) -> decltype(cdist<3>(a,b,nElements,m)) {
-        CV_Assert(nChannels<=4);
+        lvAssert_(nChannels>1 && nChannels<=4,"non-templated distance function only defined for 2 to 4 channels");
         switch(nChannels) {
             case 2: return cdist<2>(a,b,nElements,m);
             case 3: return cdist<3>(a,b,nElements,m);

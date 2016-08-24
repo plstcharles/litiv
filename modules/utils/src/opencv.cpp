@@ -43,7 +43,7 @@ cv::DisplayHelper::~DisplayHelper() {
 }
 
 void cv::DisplayHelper::display(const cv::Mat& oImage, size_t nIdx) {
-    CV_Assert(!oImage.empty() && (oImage.type()==CV_8UC1 || oImage.type()==CV_8UC3 || oImage.type()==CV_8UC4));
+    lvAssert_(!oImage.empty() && (oImage.type()==CV_8UC1 || oImage.type()==CV_8UC3 || oImage.type()==CV_8UC4),"image to display must be non-empty, and of type 8UC1/8UC3/8UC4");
     cv::Mat oImageBYTE3;
     if(oImage.channels()==1)
         cv::cvtColor(oImage,oImageBYTE3,cv::COLOR_GRAY2BGR);
@@ -79,9 +79,10 @@ void cv::DisplayHelper::display(const cv::Mat& oImage, size_t nIdx) {
     m_oLastDisplaySize = oCurrDisplaySize;
 }
 void cv::DisplayHelper::display(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oOutputImg, size_t nIdx) {
-    CV_Assert(!oInputImg.empty() && (oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3 || oInputImg.type()==CV_8UC4));
-    CV_Assert(!oDebugImg.empty() && (oDebugImg.type()==CV_8UC1 || oDebugImg.type()==CV_8UC3 || oDebugImg.type()==CV_8UC4) && oDebugImg.size()==oInputImg.size());
-    CV_Assert(!oOutputImg.empty() && (oOutputImg.type()==CV_8UC1 || oOutputImg.type()==CV_8UC3 || oOutputImg.type()==CV_8UC4) && oOutputImg.size()==oInputImg.size());
+    lvAssert_(!oInputImg.empty() && (oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3 || oInputImg.type()==CV_8UC4),"input image must be 8UC1/8UC3/8UC4");
+    lvAssert_(!oDebugImg.empty() && (oDebugImg.type()==CV_8UC1 || oDebugImg.type()==CV_8UC3 || oDebugImg.type()==CV_8UC4),"debug image must be 8UC1/8UC3/8UC4");
+    lvAssert_(!oOutputImg.empty() && (oOutputImg.type()==CV_8UC1 || oOutputImg.type()==CV_8UC3 || oOutputImg.type()==CV_8UC4),"output image must be 8UC1/8UC3/8UC4");
+    lvAssert_(oOutputImg.size()==oInputImg.size() && oDebugImg.size()==oInputImg.size(),"all provided mat sizes must match");
     cv::Mat oInputImgBYTE3, oDebugImgBYTE3, oOutputImgBYTE3;
     if(oInputImg.channels()==1)
         cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_GRAY2BGR);
