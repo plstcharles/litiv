@@ -195,15 +195,6 @@ namespace lv {
         }
     };
 
-    template<typename T>
-    inline bool isnan(T dVal) {
-#ifdef _MSC_VER // needed for portability...
-        return _isnan((double)dVal)!=0;
-#else //(!def(_MSC_VER))
-        return std::isnan(dVal);
-#endif //(!def(_MSC_VER))
-    }
-
     struct Exception : public std::runtime_error {
         template<typename... Targs>
         Exception(const std::string& sErrMsg, const char* sFunc, const char* sFile, int nLine, Targs&&... args) :
@@ -217,6 +208,15 @@ namespace lv {
         const char* const m_acFileName;
         const int m_nLineNumber;
     };
+
+    template<typename T>
+    inline bool isnan(T dVal) {
+#ifdef _MSC_VER // needed for portability...
+        return _isnan((double)dVal)!=0;
+#else //(!def(_MSC_VER))
+        return std::isnan(dVal);
+#endif //(!def(_MSC_VER))
+    }
 
     namespace gl {
 
