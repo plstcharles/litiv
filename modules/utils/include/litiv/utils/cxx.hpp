@@ -59,6 +59,7 @@
 #include "litiv/utils/defines.hpp"
 
 // @@@ cleanup, move impls down as inline?
+// @@@ replace some vector args by templated begin/end iterators? (stl-like)
 
 namespace lv {
 
@@ -138,6 +139,16 @@ namespace lv {
             if(s.find(tokens[i])!=std::string::npos)
                 return true;
         return false;
+    }
+
+    template<typename T>
+    inline std::vector<size_t> indices_of(const std::vector<T>& voVals, const std::vector<T>& voRefs) {
+        std::vector<size_t> vnIndices(voVals.size());
+        size_t nIdx = 0;
+        std::for_each(voVals.begin(),voVals.end(),[&](const T& oVal){
+            vnIndices[nIdx++] = std::distance(voRefs.begin(),std::find(voRefs.begin(),voRefs.end(),oVal));
+        });
+        return vnIndices;
     }
 
     template<typename T>
