@@ -166,7 +166,7 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
     add_definitions(-Wall)
     add_definitions(-Wfatal-errors)
     add_definitions(-fPIC) # @@@@ for shared libs only?
-elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
     add_definitions(-DUNICODE -D_UNICODE)
     if(USE_FAST_MATH)
         add_definitions(/fp:fast)
@@ -194,7 +194,7 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
     add_definitions(-Wshadow)
     add_definitions(-Werror)
     add_definitions(-pedantic-errors)
-elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
     add_definitions(/W4)
     add_definitions(/wd4201) # disables C4201, "nonstandard extension used : nameless struct/union"
     add_definitions(/wd4505) # disables C4505, "unreferenced local function has been removed"

@@ -50,7 +50,7 @@ if(BUILD_VPTZ)
 
     if(USE_VPTZ_STANDALONE)
         add_definitions(-DVPTZ_EXPORT)
-        if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+        if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
             # disables C4251 + C4275 to allow STL/template classes to be used in exported classes/members
             # need to eliminate these using pImpl idiom in exported classes to add abstraction layer @@@@
             add_definitions(/wd4251) # disables C4251, "'identifier' : class 'type' needs to have dll-interface to be used by clients of class 'type2'"

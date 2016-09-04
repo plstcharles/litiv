@@ -36,11 +36,11 @@ add_files(SOURCE_FILES
 add_files(INCLUDE_FILES
     "include/litiv/world.hpp"
 )
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
     add_library(litiv_world STATIC ${SOURCE_FILES} ${INCLUDE_FILES}) # need to add API export/import config later @@@@
-else(NOT "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+else()
     add_library(litiv_world SHARED ${SOURCE_FILES} ${INCLUDE_FILES})
-endif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
+endif()
 
 target_link_libraries(litiv_world ${litiv_projects})
 target_include_directories(litiv_world
