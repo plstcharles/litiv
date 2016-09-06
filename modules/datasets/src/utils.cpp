@@ -1,6 +1,6 @@
 
-// This file is part of the lv framework; visit the original repository at
-// https://github.com/plstcharles/lv for more information.
+// This file is part of the LITIV framework; visit the original repository at
+// https://github.com/plstcharles/litiv for more information.
 //
 // Copyright 2015 Pierre-Luc St-Charles; pierre-luc.st-charles<at>polymtl.ca
 //
