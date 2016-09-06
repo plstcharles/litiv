@@ -18,6 +18,7 @@
 #pragma once
 
 #include "litiv/utils/opencv.hpp"
+#include "litiv/utils/platform.hpp"
 #include <type_traits>
 
 #if HAVE_GLSL
