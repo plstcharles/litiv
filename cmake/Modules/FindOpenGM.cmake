@@ -139,4 +139,11 @@ if(OpenGM_FOUND)
         OpenGM_EXT_LIBRARY
         OpenGM_LIBRARIES
     )
+    mark_as_advanced(CLEAR
+        USE_OPENGM_WITH_EXTLIB
+    )
+else()
+    mark_as_advanced(
+        USE_OPENGM_WITH_EXTLIB
+    )
 endif()
