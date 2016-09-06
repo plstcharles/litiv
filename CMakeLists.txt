@@ -133,6 +133,11 @@ set_eval(USE_OPENCL 0)
 ### EXTRA LIBS CHECK
 if(WIN32)
     find_package(KinectSDK2)
+    mark_as_advanced(
+        KinectSDK2_FACE
+        KinectSDK2_FUSION
+        KinectSDK2_VGB
+    )
 endif()
 if(KinectSDK2_FOUND)
     message(STATUS "Kinectv2 SDK found, will disable internal SDK standalone utilities.")
