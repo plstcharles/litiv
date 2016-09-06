@@ -150,7 +150,12 @@ else()
 endif()
 
 ### SIMD CHECK
-try_cvhardwaresupport_runcheck_and_set_success(MMX OFF)
+if(NOT TARGET_PLATFORM_x64)
+    try_cvhardwaresupport_runcheck_and_set_success(MMX ON)
+else()
+    option(USE_MMX "Allow implementations to use MMX instructions" FALSE)
+    mark_as_advanced(USE_MMX)
+endif()
 try_cvhardwaresupport_runcheck_and_set_success(SSE ON)
 try_cvhardwaresupport_runcheck_and_set_success(SSE2 ON)
 try_cvhardwaresupport_runcheck_and_set_success(SSE3 ON)

@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "litiv/utils/cxx.hpp"
+#include "litiv/utils/defines.hpp"
 #if defined(_MSC_VER)
 #include <windows.h>
 #include <winerror.h>
@@ -38,6 +38,7 @@ void SafeRelease(T **ppT) {if(*ppT) {(*ppT)->Release();*ppT = nullptr;}}
 #include <sys/resource.h>
 #include <stdio.h>
 #endif //(!defined(_MSC_VER))
+#include "litiv/utils/cxx.hpp"
 
 namespace lv {
 

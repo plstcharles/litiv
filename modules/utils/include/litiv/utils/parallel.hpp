@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include "litiv/utils/defines.hpp"
 #include "litiv/utils/opencv.hpp"
 #include <type_traits>
 
@@ -32,6 +31,11 @@
 #endif //HAVE_OPENCL
 #if defined(_MSC_VER)
 #include <intrin.h>
+#if TARGET_PLATFORM_x64 && HAVE_MMX
+// msvc does not define mmx intrinsics for x64 targets (even though it could...)
+#undef HAVE_MMX
+#define HAVE_MMX 0
+#endif //TARGET_PLATFORM_x64 && HAVE_MMX
 #else //(!defined(_MSC_VER))
 #include <x86intrin.h>
 #endif //(!defined(_MSC_VER))
