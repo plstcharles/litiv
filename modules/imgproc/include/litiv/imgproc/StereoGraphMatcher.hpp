@@ -40,7 +40,7 @@
 // unary costs params
 #define VISSIM_COST_OCCLUDED     10.0f
 #define VISSIM_COST_MAXTRUNC     30.0f
-#define UNIQUE_COST_OVERASSOC    5.0f
+#define UNIQUE_COST_OVERASSOC    10.0f
 #define UNIQUE_COST_OOBASSOC     10.0f
 // pairwise costs params
 #define LBLSIM_COST_EQUAL      0.0f
@@ -437,7 +437,7 @@ inline opengm::InferenceTermination StereoGraphMatcher::StereoGraphInference::in
                 const AssocCountType nModifAssocCount = nColIdx>=(size_t)nNodeInitLabel?((AssocCountType*)m_oAssocCounts.data)[nNodeIdx-m_nAlphaLabel]:(UNIQUE_COST_OOBASSOC); // @@@@ replace const by something more... wise
                 const ValueType fNodeInitOverAssocEnergy = (ValueType)(nInitAssocCount*(ValueType)UNIQUE_COST_OVERASSOC);
                 const ValueType fNodeModifOverAssocEnergy = (ValueType)(nModifAssocCount*(ValueType)UNIQUE_COST_OVERASSOC);
-                oHigherOrderEnergyReducer.AddUnaryTerm(nNodeIdx,(fNodeModifVisSimEnergy)-(fNodeInitVisSimEnergy)); // @@@@ check sign of term?
+                oHigherOrderEnergyReducer.AddUnaryTerm(nNodeIdx,(fNodeModifVisSimEnergy+fNodeModifOverAssocEnergy)-(fNodeInitVisSimEnergy+fNodeInitOverAssocEnergy)); // @@@@ check sign of term?
             }
             else if(nCurrFactOrder>1) {
                 // rewritten from Fix's HigherOrderEnergy<R,D>::AddClique(vars,etable)
