@@ -45,6 +45,9 @@ if(USE_BSDS500_BENCHMARK)
     target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} BSDS500)
 endif()
 target_link_litiv_dependencies(${LITIV_CURRENT_PROJECT_NAME})
+if(UNIX)
+    target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} pthread)
+endif()
 target_include_directories(${LITIV_CURRENT_PROJECT_NAME}
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
     PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
