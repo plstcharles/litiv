@@ -20,7 +20,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
-#include "litiv/utils/cxx.hpp"
+#include "litiv/utils/platform.hpp"
 
 namespace cv { // extending cv
 
