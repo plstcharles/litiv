@@ -23,6 +23,8 @@
 
 #include "litiv/datasets.hpp" // for parsers only, not truly required here
 
+#error "@@@ STILL WIP, need to reimplement parsing based on new structure"
+
 namespace lv {
 
     template<lv::ParallelAlgoType eEvalImpl>
@@ -42,15 +44,30 @@ namespace lv {
                         lv::datasets::getDatasetsRootPath()+"litiv/litiv2012b/"+lv::AddDirSlashIfMissing(sOutputDirName),
                         "homography",
                         ".cvmat",
-                        std::vector<std::string>{""},
-                        std::vector<std::string>{},
-                        std::vector<std::string>{"THERMAL"},
+                        getWorkBatchDirNames(),
+                        getSkippedWorkBatchDirNames(),
+                        getGrayscaleWorkBatchDirNames(),
                         0,
                         bSaveOutput,
                         bUseEvaluator,
                         bForce4ByteDataAlign,
                         dScaleFactor
                 ) {}
+        /// returns the names of all work batch directories available for this dataset specialization
+        static const std::vector<std::string>& getWorkBatchDirNames() {
+            static std::vector<std::string> s_vsWorkBatchDirs = {/*TODO*/};
+            return s_vsWorkBatchDirs;
+        }
+        /// returns the names of all work batch directories which should be skipped for this dataset speialization
+        static const std::vector<std::string>& getSkippedWorkBatchDirNames() {
+            static std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
+            return s_vsSkippedWorkBatchDirs;
+        }
+        /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
+        static const std::vector<std::string>& getGrayscaleWorkBatchDirNames() {
+            static std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {"THERMAL"};
+            return s_vsGrayscaleWorkBatchDirs;
+        }
     };
 
     template<DatasetTaskList eDatasetTask>

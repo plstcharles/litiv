@@ -43,15 +43,30 @@ namespace lv {
                         lv::datasets::getDatasetsRootPath()+"Wallflower/"+lv::AddDirSlashIfMissing(sOutputDirName),
                         "bin",
                         ".png",
-                        std::vector<std::string>{""},
-                        std::vector<std::string>{},
-                        std::vector<std::string>{},
+                        getWorkBatchDirNames(),
+                        getSkippedWorkBatchDirNames(),
+                        getGrayscaleWorkBatchDirNames(),
                         0,
                         bSaveOutput,
                         bUseEvaluator,
                         bForce4ByteDataAlign,
                         dScaleFactor
                 ) {}
+        /// returns the names of all work batch directories available for this dataset specialization
+        static const std::vector<std::string>& getWorkBatchDirNames() {
+            static std::vector<std::string> s_vsWorkBatchDirs = {""}; // 'current' directory should contain the videos
+            return s_vsWorkBatchDirs;
+        }
+        /// returns the names of all work batch directories which should be skipped for this dataset speialization
+        static const std::vector<std::string>& getSkippedWorkBatchDirNames() {
+            static std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
+            return s_vsSkippedWorkBatchDirs;
+        }
+        /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
+        static const std::vector<std::string>& getGrayscaleWorkBatchDirNames() {
+            static std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {};
+            return s_vsGrayscaleWorkBatchDirs;
+        }
     };
 
     template<DatasetTaskList eDatasetTask>

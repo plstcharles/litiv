@@ -29,8 +29,6 @@
 
 namespace lv {
 
-    struct BSDS500MetricsAccumulator;
-
     enum BSDS500DatasetGroup {
         BSDS500Dataset_Training,
         BSDS500Dataset_Training_Validation,
@@ -67,15 +65,37 @@ namespace lv {
                         lv::datasets::getDatasetsRootPath()+"BSDS500/BSR/"+lv::AddDirSlashIfMissing(sOutputDirName),
                         "",
                         ".png",
-                        (eType==BSDS500Dataset_Training)?std::vector<std::string>{"train"}:((eType==BSDS500Dataset_Training_Validation)?std::vector<std::string>{"train","val"}:std::vector<std::string>{"train","val","test"}),
-                        std::vector<std::string>{},
-                        std::vector<std::string>{},
+                        getWorkBatchDirNames(eType),
+                        getSkippedWorkBatchDirNames(),
+                        getGrayscaleWorkBatchDirNames(),
                         0,
                         bSaveOutput,
                         bUseEvaluator,
                         bForce4ByteDataAlign,
                         dScaleFactor
                 ) {}
+        /// returns the names of all work batch directories available for this dataset specialization
+        static const std::vector<std::string>& getWorkBatchDirNames(BSDS500DatasetGroup eType=BSDS500Dataset_Training) {
+            static std::vector<std::string> s_vsWorkBatchDirs_train = {"train"};
+            static std::vector<std::string> s_vsWorkBatchDirs_trainval = {"train","val"};
+            static std::vector<std::string> s_vsWorkBatchDirs_trainvaltest = {"train","val","test"};
+            if(eType==BSDS500Dataset_Training)
+                return s_vsWorkBatchDirs_train;
+            else if(eType==BSDS500Dataset_Training_Validation)
+                return s_vsWorkBatchDirs_trainval;
+            else
+                return s_vsWorkBatchDirs_trainvaltest;
+        }
+        /// returns the names of all work batch directories which should be skipped for this dataset speialization
+        static const std::vector<std::string>& getSkippedWorkBatchDirNames() {
+            static std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
+            return s_vsSkippedWorkBatchDirs;
+        }
+        /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
+        static const std::vector<std::string>& getGrayscaleWorkBatchDirNames() {
+            static std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {};
+            return s_vsGrayscaleWorkBatchDirs;
+        }
     };
 
     template<DatasetTaskList eDatasetTask>
@@ -180,6 +200,8 @@ namespace lv {
         /// required so that dataset-level evaluation report can write dataset-specific reports
         friend struct DatasetEvaluator_<DatasetEval_BinaryClassifier,Dataset_BSDS500>;
     };
+
+    struct BSDS500MetricsAccumulator;
 
     template<>
     struct DataEvaluator_<DatasetEval_BinaryClassifier,Dataset_BSDS500,lv::NonParallel> :

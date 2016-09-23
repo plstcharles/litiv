@@ -72,6 +72,7 @@ namespace lv {
     /// top-level dataset interface where work batches & groups are implemented based on template policies --- all internal methods can be overriden via dataset impl headers
     template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset, DatasetEvalList eDatasetEval, lv::ParallelAlgoType eEvalImpl>
     struct IDataset_ : public DatasetEvaluator_<eDatasetEval,eDataset> {
+        // @@@@ add static checks here to make sure task is compatible with source and eval?
         /// fully implemented work batch interface with template specializations
         struct WorkBatch :
                 public DataHandler,

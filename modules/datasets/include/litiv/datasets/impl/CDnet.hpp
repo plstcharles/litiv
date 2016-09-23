@@ -44,15 +44,35 @@ namespace lv {
                         lv::datasets::getDatasetsRootPath()+std::string(b2014?"CDNet2014/":"CDNet/")+lv::AddDirSlashIfMissing(sOutputDirName),
                         "bin",
                         ".png",
-                        /*std::vector<std::string>{"baseline_highway_cut2"},*/b2014?std::vector<std::string>{"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"}:std::vector<std::string>{"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"},
-                        std::vector<std::string>{},
-                        b2014?std::vector<std::string>{"thermal","turbulence"}:std::vector<std::string>{"thermal"},
+                        getWorkBatchDirNames(b2014),
+                        getSkippedWorkBatchDirNames(),
+                        getGrayscaleWorkBatchDirNames(),
                         1,
                         bSaveOutput,
                         bUseEvaluator,
                         bForce4ByteDataAlign,
                         dScaleFactor
                 ) {}
+        /// returns the names of all work batch directories available for this dataset specialization
+        static const std::vector<std::string>& getWorkBatchDirNames(bool b2014=true) {
+            static std::vector<std::string> s_vsWorkBatchDirs_2014 = {"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"};
+            static std::vector<std::string> s_vsWorkBatchDirs_2012 = {"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"};
+            //return std::vector<std::string>{"baseline_highway_cut2"}
+            if(b2014)
+                return s_vsWorkBatchDirs_2014;
+            else
+                return s_vsWorkBatchDirs_2012;
+        }
+        /// returns the names of all work batch directories which should be skipped for this dataset speialization
+        static const std::vector<std::string>& getSkippedWorkBatchDirNames() {
+            static std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
+            return s_vsSkippedWorkBatchDirs;
+        }
+        /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
+        static const std::vector<std::string>& getGrayscaleWorkBatchDirNames() {
+            static std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {"thermal","turbulence"};
+            return s_vsGrayscaleWorkBatchDirs;
+        }
     };
 
     template<DatasetTaskList eDatasetTask>
