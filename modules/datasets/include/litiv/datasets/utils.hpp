@@ -37,7 +37,6 @@
 namespace lv {
 
     enum DatasetTaskList { // from the task type, we can derive the source and eval types
-        DatasetTask_ChgDet,
         DatasetTask_Segm,
         DatasetTask_Registr,
         DatasetTask_EdgDet,
@@ -54,8 +53,8 @@ namespace lv {
 
     enum DatasetEvalList { // from the eval type, we can derive the gt packet mapping policy
         DatasetEval_BinaryClassifier,
+        DatasetEval_MultiClassifier,
         DatasetEval_Registr,
-        DatasetEval_Segm,
         DatasetEval_BoundingBox,
         // ...
         DatasetEval_None // will only count packets & monitor processing time
@@ -91,8 +90,7 @@ namespace lv {
     /// returns the output packet type policy to use based on the dataset task type
     template<DatasetTaskList eDatasetTask>
     constexpr PacketPolicy getOutputPacketType() {
-        return (eDatasetTask==DatasetTask_ChgDet)?ImagePacket:
-               (eDatasetTask==DatasetTask_Segm)?ImagePacket:
+        return (eDatasetTask==DatasetTask_Segm)?ImagePacket:
                (eDatasetTask==DatasetTask_Registr)?NotImagePacket:
                (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
                // ...
@@ -102,8 +100,7 @@ namespace lv {
     /// returns the GT packet mapping style policy to use based on the dataset task type
     template<DatasetTaskList eDatasetTask>
     constexpr MappingPolicy getGTMappingType() {
-        return (eDatasetTask==DatasetTask_ChgDet)?PixelMapping:
-               (eDatasetTask==DatasetTask_Segm)?PixelMapping:
+        return (eDatasetTask==DatasetTask_Segm)?PixelMapping:
                (eDatasetTask==DatasetTask_Registr)?BatchMapping:
                (eDatasetTask==DatasetTask_EdgDet)?IdxMapping:
                // ...
@@ -113,8 +110,7 @@ namespace lv {
     /// returns the I/O packet mapping style policy to use based on the dataset task type
     template<DatasetTaskList eDatasetTask>
     constexpr MappingPolicy getIOMappingType() {
-        return (eDatasetTask==DatasetTask_ChgDet)?PixelMapping:
-               (eDatasetTask==DatasetTask_Segm)?PixelMapping:
+        return (eDatasetTask==DatasetTask_Segm)?PixelMapping:
                (eDatasetTask==DatasetTask_Registr)?BatchMapping:
                (eDatasetTask==DatasetTask_EdgDet)?PixelMapping:
                // ...

@@ -79,7 +79,7 @@ constexpr lv::ParallelAlgoType eImplTypeEnum = lv::GLSL;
 #else // USE_..._IMPL
 constexpr lv::ParallelAlgoType eImplTypeEnum = lv::NonParallel;
 #endif // USE_..._IMPL
-using DatasetType = lv::Dataset_<lv::DatasetTask_ChgDet,lv::DATASET_ID,eImplTypeEnum>;
+using DatasetType = lv::Dataset_<lv::DatasetTask_Segm,lv::DATASET_ID,eImplTypeEnum>;
 #if USE_LOBSTER
 using BackgroundSubtractorType = BackgroundSubtractorLOBSTER_<eImplTypeEnum>;
 #elif USE_SUBSENSE
@@ -92,7 +92,7 @@ const size_t g_nMaxThreads = USE_GPU_IMPL?1:std::thread::hardware_concurrency()>
 
 int main(int, char**) {
     try {
-        lv::IDatasetPtr pDataset = lv::datasets::create<lv::DatasetTask_ChgDet,lv::DATASET_ID,eImplTypeEnum>(DATASET_PARAMS);
+        lv::IDatasetPtr pDataset = lv::datasets::create<lv::DatasetTask_Segm,lv::DATASET_ID,eImplTypeEnum>(DATASET_PARAMS);
         lv::IDataHandlerPtrQueue vpBatches = pDataset->getSortedBatches(false);
         const size_t nTotPackets = pDataset->getTotPackets();
         const size_t nTotBatches = vpBatches.size();

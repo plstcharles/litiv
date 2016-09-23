@@ -325,8 +325,7 @@ namespace lv {
     template<DatasetTaskList eDatasetTask, DatasetList eDataset>
     constexpr DatasetEvalList getDatasetEval() {
         // note: these are only defaults, they can be overriden via full specialization in their impl header
-        return (eDatasetTask==DatasetTask_ChgDet)?DatasetEval_BinaryClassifier:
-               (eDatasetTask==DatasetTask_Segm)?DatasetEval_Segm:
+        return (eDatasetTask==DatasetTask_Segm)?DatasetEval_BinaryClassifier:
                (eDatasetTask==DatasetTask_Registr)?DatasetEval_Registr:
                (eDatasetTask==DatasetTask_EdgDet)?DatasetEval_BinaryClassifier:
                // ...
@@ -337,8 +336,7 @@ namespace lv {
     template<DatasetTaskList eDatasetTask, DatasetList eDataset>
     constexpr DatasetSourceList getDatasetSource() {
         // note: these are only defaults, they can be overriden via full specialization in their impl header
-        return (eDatasetTask==DatasetTask_ChgDet)?DatasetSource_Video:
-               (eDatasetTask==DatasetTask_Segm)?DatasetSource_Video:
+        return (eDatasetTask==DatasetTask_Segm)?DatasetSource_Video:
                (eDatasetTask==DatasetTask_Registr)?DatasetSource_VideoArray:
                (eDatasetTask==DatasetTask_EdgDet)?DatasetSource_Image:
                // ...
