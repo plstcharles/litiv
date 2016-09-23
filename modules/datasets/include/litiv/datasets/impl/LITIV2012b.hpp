@@ -38,8 +38,8 @@ namespace lv {
         ) :
                 IDataset_<eDatasetType_VideoRegistr,Dataset_VideoRegistr_LITIV2012b,eEvalImpl>(
                         "LITIV 2012b (CVPRW2015 update)",
-                        lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"litiv/litiv2012b/",
-                        lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"litiv/litiv2012b/"+lv::AddDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getDatasetsRootPath()+"litiv/litiv2012b/",
+                        lv::datasets::getDatasetsRootPath()+"litiv/litiv2012b/"+lv::AddDirSlashIfMissing(sOutputDirName),
                         "homography",
                         ".cvmat",
                         std::vector<std::string>{""},

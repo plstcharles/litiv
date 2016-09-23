@@ -17,6 +17,16 @@
 
 #include "litiv/datasets.hpp"
 
+std::string g_sDatasetsRootPath = lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT);
+
+const std::string& lv::datasets::getDatasetsRootPath() {
+    return g_sDatasetsRootPath;
+}
+
+void lv::datasets::setDatasetsRootPath(const std::string& sNewPath) {
+    g_sDatasetsRootPath = lv::AddDirSlashIfMissing(sNewPath);
+}
+
 const std::string& lv::DataHandler::getName() const {return m_sBatchName;}
 const std::string& lv::DataHandler::getDataPath() const {return m_sDataPath;}
 const std::string& lv::DataHandler::getOutputPath() const {return m_sOutputPath;}

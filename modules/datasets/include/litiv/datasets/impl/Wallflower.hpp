@@ -39,8 +39,8 @@ namespace lv {
         ) :
                 IDataset_<eDatasetTask,DatasetSource_Video,Dataset_Wallflower,getDatasetEval<eDatasetTask,Dataset_Wallflower>(),eEvalImpl>(
                         "Wallflower",
-                        lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"Wallflower/dataset/",
-                        lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"Wallflower/"+lv::AddDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getDatasetsRootPath()+"Wallflower/dataset/",
+                        lv::datasets::getDatasetsRootPath()+"Wallflower/"+lv::AddDirSlashIfMissing(sOutputDirName),
                         "bin",
                         ".png",
                         std::vector<std::string>{""},

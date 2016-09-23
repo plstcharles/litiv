@@ -40,8 +40,8 @@ namespace lv {
         ) :
                 IDataset_<eDatasetTask,DatasetSource_Video,Dataset_CDnet,getDatasetEval<eDatasetTask,Dataset_CDnet>(),eEvalImpl>(
                         b2014?"CDnet 2014":"CDnet 2012",
-                        lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+std::string(b2014?"CDNet2014/dataset/":"CDNet/dataset/"),
-                        lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+std::string(b2014?"CDNet2014/":"CDNet/")+lv::AddDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getDatasetsRootPath()+std::string(b2014?"CDNet2014/dataset/":"CDNet/dataset/"),
+                        lv::datasets::getDatasetsRootPath()+std::string(b2014?"CDNet2014/":"CDNet/")+lv::AddDirSlashIfMissing(sOutputDirName),
                         "bin",
                         ".png",
                         /*std::vector<std::string>{"baseline_highway_cut2"},*/b2014?std::vector<std::string>{"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"}:std::vector<std::string>{"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"},

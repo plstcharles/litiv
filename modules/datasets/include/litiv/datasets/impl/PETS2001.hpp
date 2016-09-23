@@ -39,8 +39,8 @@ namespace lv {
         ) :
                 IDataset_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1,getDatasetEval<eDatasetTask,Dataset_PETS2001D3TC1>(),eEvalImpl>(
                         "PETS2001 Dataset#3",
-                        lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"PETS2001/DATASET3/",
-                        lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"PETS2001/DATASET3/"+lv::AddDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getDatasetsRootPath()+"PETS2001/DATASET3/",
+                        lv::datasets::getDatasetsRootPath()+"PETS2001/DATASET3/"+lv::AddDirSlashIfMissing(sOutputDirName),
                         "bin",
                         ".png",
                         std::vector<std::string>{"TESTING"},

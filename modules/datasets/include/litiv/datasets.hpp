@@ -25,6 +25,11 @@ namespace lv {
 
     namespace datasets {
 
+        /// returns the path where datasets should be found on the system (the default is given by the EXTERNAL_DATA_ROOT cmake variable)
+        const std::string& getDatasetsRootPath();
+        /// sets the path where datasets should be found on the system (will be kept using a global variable)
+        void setDatasetsRootPath(const std::string& sNewPath);
+
         /// global dataset object creation method with dataset impl specialization (forwards extra args to dataset constructor)
         template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl, typename... Targs>
         IDatasetPtr create(Targs&&... args);
