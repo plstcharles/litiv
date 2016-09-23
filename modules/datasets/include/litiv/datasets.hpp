@@ -347,13 +347,14 @@ namespace lv {
     template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl>
     struct Dataset_;
 
-    #define __LITIV_DATASETS_IMPL_H
-    #include "litiv/datasets/impl/BSDS500.hpp"
-    #include "litiv/datasets/impl/CDnet.hpp"
-    //#include "litiv/datasets/impl/LITIV2012b.hpp"  @@@@ still need to work on interfaces for eDatasetType_VideoRegistr
-    #include "litiv/datasets/impl/PETS2001.hpp"
-    #include "litiv/datasets/impl/Wallflower.hpp"
-    #undef __LITIV_DATASETS_IMPL_H
+} // namespace lv
+
+#define _LITIV_DATASETS_IMPL_H_
+// will include all dataset specializations
+#include "litiv/datasets/impl/all.hpp"
+#undef _LITIV_DATASETS_IMPL_H_
+
+namespace lv {
 
     /// default dataset interface implementation w/ default specialization & constructor pass-through
     template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl>

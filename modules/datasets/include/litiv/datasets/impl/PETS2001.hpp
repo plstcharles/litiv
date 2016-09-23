@@ -17,77 +17,82 @@
 
 #pragma once
 
-// note: we should already be in the litiv namespace
-#ifndef __LITIV_DATASETS_IMPL_H
+#ifndef _LITIV_DATASETS_IMPL_H_
 #error "This file should never be included directly; use litiv/datasets.hpp instead"
-#endif //__LITIV_DATASETS_IMPL_H
+#endif //_LITIV_DATASETS_IMPL_H_
 
-template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
-struct Dataset_<eDatasetTask,Dataset_PETS2001D3TC1,eEvalImpl> :
-        public IDataset_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1,getDatasetEval<eDatasetTask,Dataset_PETS2001D3TC1>(),eEvalImpl> {
-    static_assert(eDatasetTask!=DatasetTask_Registr,"PETS2001 dataset does not support image registration (no image arrays)");
-protected: // should still be protected, as creation should always be done via datasets::create
-    Dataset_(
-            const std::string& sOutputDirName, ///< output directory (full) path for debug logs, evaluation reports and results archiving (will be created in PETS dataset folder)
-            bool bSaveOutput=false, ///< defines whether results should be archived or not
-            bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
-            bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
-            double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
-    ) :
-            IDataset_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1,getDatasetEval<eDatasetTask,Dataset_PETS2001D3TC1>(),eEvalImpl>(
-                    "PETS2001 Dataset#3",
-                    lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"PETS2001/DATASET3/",
-                    lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"PETS2001/DATASET3/"+lv::AddDirSlashIfMissing(sOutputDirName),
-                    "bin",
-                    ".png",
-                    std::vector<std::string>{"TESTING"},
-                    std::vector<std::string>{},
-                    std::vector<std::string>{},
-                    0,
-                    bSaveOutput,
-                    bUseEvaluator,
-                    bForce4ByteDataAlign,
-                    dScaleFactor
-            ) {}
-};
+#include "litiv/datasets.hpp" // for parsers only, not truly required here
 
-template<DatasetTaskList eDatasetTask>
-struct DataProducer_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1> :
-        public DataProducer_c<eDatasetTask,DatasetSource_Video> {
-protected:
-    virtual void parseData() override final {
-        // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
-        // @@@@ untested since 2016/01 refactoring
-        std::vector<std::string> vsVideoSeqPaths;
-        lv::GetFilesFromDir(this->getDataPath(),vsVideoSeqPaths);
-        if(vsVideoSeqPaths.size()!=1)
-            lvError_("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one video sequence file)",this->getName().c_str());
-        std::vector<std::string> vsGTSubdirPaths;
-        lv::GetSubDirsFromDir(this->getDataPath(),vsGTSubdirPaths);
-        if(vsGTSubdirPaths.size()!=1)
-            lvError_("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one GT subdir)",this->getName().c_str());
-        this->m_voVideoReader.open(vsVideoSeqPaths[0]);
-        if(!this->m_voVideoReader.isOpened())
-            lvError_("PETS2006D3TC1 sequence '%s': video file could not be opened",this->getName().c_str());
-        lv::GetFilesFromDir(vsGTSubdirPaths[0],this->m_vsGTFramePaths);
-        if(this->m_vsGTFramePaths.empty())
-            lvError_("PETS2006D3TC1 sequence '%s': did not possess any valid GT frames",this->getName().c_str());
-        const std::string sGTFilePrefix("image_");
-        const size_t nInputFileNbDecimals = 4;
-        this->m_mGTIndexLUT.clear();
-        for(auto iter=this->m_vsGTFramePaths.begin(); iter!=this->m_vsGTFramePaths.end(); ++iter)
-            this->m_mGTIndexLUT[(size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str())] = iter-this->m_vsGTFramePaths.begin();
-        cv::Mat oTempImg = cv::imread(this->m_vsGTFramePaths[0]);
-        if(oTempImg.empty())
-            lvError_("PETS2006D3TC1 sequence '%s': did not possess valid GT file(s)",this->getName().c_str());
-        this->m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
-        this->m_oOrigSize = this->m_oROI.size();
-        const double dScale = this->getDatasetInfo()->getScaleFactor();
-        if(dScale!=1.0)
-            cv::resize(this->m_oROI,this->m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
-        this->m_oSize = this->m_oROI.size();
-        this->m_nNextExpectedVideoReaderFrameIdx = 0;
-        this->m_nFrameCount = (size_t)this->m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
-        lvAssert_(this->m_nFrameCount>0,"could not find any input frames");
-    }
-};
+namespace lv {
+
+    template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
+    struct Dataset_<eDatasetTask,Dataset_PETS2001D3TC1,eEvalImpl> :
+            public IDataset_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1,getDatasetEval<eDatasetTask,Dataset_PETS2001D3TC1>(),eEvalImpl> {
+        static_assert(eDatasetTask!=DatasetTask_Registr,"PETS2001 dataset does not support image registration (no image arrays)");
+    protected: // should still be protected, as creation should always be done via datasets::create
+        Dataset_(
+                const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving (will be created in PETS dataset folder)
+                bool bSaveOutput=false, ///< defines whether results should be archived or not
+                bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
+                bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
+                double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
+        ) :
+                IDataset_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1,getDatasetEval<eDatasetTask,Dataset_PETS2001D3TC1>(),eEvalImpl>(
+                        "PETS2001 Dataset#3",
+                        lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"PETS2001/DATASET3/",
+                        lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT)+"PETS2001/DATASET3/"+lv::AddDirSlashIfMissing(sOutputDirName),
+                        "bin",
+                        ".png",
+                        std::vector<std::string>{"TESTING"},
+                        std::vector<std::string>{},
+                        std::vector<std::string>{},
+                        0,
+                        bSaveOutput,
+                        bUseEvaluator,
+                        bForce4ByteDataAlign,
+                        dScaleFactor
+                ) {}
+    };
+
+    template<DatasetTaskList eDatasetTask>
+    struct DataProducer_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1> :
+            public DataProducer_c<eDatasetTask,DatasetSource_Video> {
+    protected:
+        virtual void parseData() override final {
+            // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
+            // @@@@ untested since 2016/01 refactoring
+            std::vector<std::string> vsVideoSeqPaths;
+            lv::GetFilesFromDir(this->getDataPath(),vsVideoSeqPaths);
+            if(vsVideoSeqPaths.size()!=1)
+                lvError_("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one video sequence file)",this->getName().c_str());
+            std::vector<std::string> vsGTSubdirPaths;
+            lv::GetSubDirsFromDir(this->getDataPath(),vsGTSubdirPaths);
+            if(vsGTSubdirPaths.size()!=1)
+                lvError_("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one GT subdir)",this->getName().c_str());
+            this->m_voVideoReader.open(vsVideoSeqPaths[0]);
+            if(!this->m_voVideoReader.isOpened())
+                lvError_("PETS2006D3TC1 sequence '%s': video file could not be opened",this->getName().c_str());
+            lv::GetFilesFromDir(vsGTSubdirPaths[0],this->m_vsGTFramePaths);
+            if(this->m_vsGTFramePaths.empty())
+                lvError_("PETS2006D3TC1 sequence '%s': did not possess any valid GT frames",this->getName().c_str());
+            const std::string sGTFilePrefix("image_");
+            const size_t nInputFileNbDecimals = 4;
+            this->m_mGTIndexLUT.clear();
+            for(auto iter=this->m_vsGTFramePaths.begin(); iter!=this->m_vsGTFramePaths.end(); ++iter)
+                this->m_mGTIndexLUT[(size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str())] = iter-this->m_vsGTFramePaths.begin();
+            cv::Mat oTempImg = cv::imread(this->m_vsGTFramePaths[0]);
+            if(oTempImg.empty())
+                lvError_("PETS2006D3TC1 sequence '%s': did not possess valid GT file(s)",this->getName().c_str());
+            this->m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
+            this->m_oOrigSize = this->m_oROI.size();
+            const double dScale = this->getDatasetInfo()->getScaleFactor();
+            if(dScale!=1.0)
+                cv::resize(this->m_oROI,this->m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
+            this->m_oSize = this->m_oROI.size();
+            this->m_nNextExpectedVideoReaderFrameIdx = 0;
+            this->m_nFrameCount = (size_t)this->m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
+            lvAssert_(this->m_nFrameCount>0,"could not find any input frames");
+        }
+    };
+
+} // namespace lv
