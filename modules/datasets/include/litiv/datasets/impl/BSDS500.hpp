@@ -49,7 +49,6 @@ namespace lv {
     template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
     struct Dataset_<eDatasetTask,Dataset_BSDS500,eEvalImpl> :
             public IDataset_<eDatasetTask,DatasetSource_Image,Dataset_BSDS500,getDatasetEval<eDatasetTask,Dataset_BSDS500>(),eEvalImpl> {
-        static_assert(eDatasetTask!=DatasetTask_Registr,"BSDS500 dataset does not support image registration (no image arrays)");
     protected: // should still be protected, as creation should always be done via datasets::create
         Dataset_(
                 const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving (will be created in BSR dataset folder)

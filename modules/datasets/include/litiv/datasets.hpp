@@ -39,6 +39,41 @@ namespace lv {
 
     } // namespace datasets
 
+    /// returns the eval type policy to use based on the dataset task type (can also be overriden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
+    constexpr DatasetEvalList getDatasetEval() {
+        // note: these are only defaults, they can be overriden via full specialization in their impl header
+        return
+                (eDatasetTask==DatasetTask_Segm)?DatasetEval_BinaryClassifier:
+                (eDatasetTask==DatasetTask_Registr)?DatasetEval_Registr:
+                (eDatasetTask==DatasetTask_EdgDet)?DatasetEval_BinaryClassifier:
+                // ...
+                DatasetEval_None; // undefined behavior
+    }
+
+    /// returns the source type policy to use based on the dataset task type (can also be overriden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
+    constexpr DatasetSourceList getDatasetSource() {
+        // note: these are only defaults, they can be overriden via full specialization in their impl header
+        return
+                (eDatasetTask==DatasetTask_Segm)?DatasetSource_Video:
+                (eDatasetTask==DatasetTask_Registr)?DatasetSource_VideoArray:
+                (eDatasetTask==DatasetTask_EdgDet)?DatasetSource_Image:
+                // ...
+                DatasetSource_Video; // undefined behavior
+    }
+
+    /// returns whether task, source, and eval types are all compatible (can also be overriden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset, DatasetEvalList eDatasetEval>
+    constexpr bool isDatasetSpecValid() {
+        return
+                (eDatasetTask==DatasetTask_Segm)?((eDatasetEval==DatasetEval_BinaryClassifier)||(eDatasetEval==DatasetEval_MultiClassifier)||(eDatasetEval==DatasetEval_None)):
+                (eDatasetTask==DatasetTask_Registr)?(((eDatasetSource==DatasetSource_VideoArray)||(eDatasetSource==DatasetSource_ImageArray))&&((eDatasetEval==DatasetEval_Registr)||(eDatasetEval==DatasetEval_None))):
+                (eDatasetTask==DatasetTask_EdgDet)?(((eDatasetSource==DatasetSource_Video)||(eDatasetSource==DatasetSource_Image))&&((eDatasetEval==DatasetEval_BinaryClassifier)||(eDatasetEval==DatasetEval_None))):
+                // ...
+                false; // undefined behavior
+    }
+
     /// full implementation of basic data handler interface functions (used in work batch & group impl)
     struct DataHandler : public virtual IDataHandler {
         /// returns the work batch/group name
@@ -72,7 +107,7 @@ namespace lv {
     /// top-level dataset interface where work batches & groups are implemented based on template policies --- all internal methods can be overriden via dataset impl headers
     template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset, DatasetEvalList eDatasetEval, lv::ParallelAlgoType eEvalImpl>
     struct IDataset_ : public DatasetEvaluator_<eDatasetEval,eDataset> {
-        // @@@@ add static checks here to make sure task is compatible with source and eval?
+        static_assert(lv::isDatasetSpecValid<eDatasetTask,eDatasetSource,eDataset,eDatasetEval>(),"dataset does not support the required task/source/eval combo");
         /// fully implemented work batch interface with template specializations
         struct WorkBatch :
                 public DataHandler,
@@ -279,7 +314,7 @@ namespace lv {
             return vpBatches;
         }
     protected:
-        /// full dataset constructor; see individual parameter comments for descriptions
+        /// full dataset constructor; parameters are passed through lv::datasets::create<...>(...), and may be caught/simplified by a specialization
         IDataset_(
                 const std::string& sDatasetName, ///< user-friendly dataset name (used for identification only)
                 const std::string& sDatasetDirPath, ///< dataset directory (full) path where work batches can be found
@@ -327,28 +362,6 @@ namespace lv {
         IDataset_(const IDataset_&) = delete;
     };
 
-    /// returns the eval type policy to use based on the dataset task type (can also be overriden by dataset type)
-    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
-    constexpr DatasetEvalList getDatasetEval() {
-        // note: these are only defaults, they can be overriden via full specialization in their impl header
-        return (eDatasetTask==DatasetTask_Segm)?DatasetEval_BinaryClassifier:
-               (eDatasetTask==DatasetTask_Registr)?DatasetEval_Registr:
-               (eDatasetTask==DatasetTask_EdgDet)?DatasetEval_BinaryClassifier:
-               // ...
-               DatasetEval_None; // undefined behavior
-    }
-
-    /// returns the source type policy to use based on the dataset task type (can also be overriden by dataset type)
-    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
-    constexpr DatasetSourceList getDatasetSource() {
-        // note: these are only defaults, they can be overriden via full specialization in their impl header
-        return (eDatasetTask==DatasetTask_Segm)?DatasetSource_Video:
-               (eDatasetTask==DatasetTask_Registr)?DatasetSource_VideoArray:
-               (eDatasetTask==DatasetTask_EdgDet)?DatasetSource_Image:
-               // ...
-               DatasetSource_Video; // undefined behavior
-    }
-
     /// dataset interface that must be specialized based on task & eval types, and dataset (in impl headers, if required)
     template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl>
     struct Dataset_;
@@ -356,7 +369,7 @@ namespace lv {
 } // namespace lv
 
 #define _LITIV_DATASETS_IMPL_H_
-// will include all dataset specializations
+// will include all specializations of 'Dataset_<...>'
 #include "litiv/datasets/impl/all.hpp"
 #undef _LITIV_DATASETS_IMPL_H_
 
