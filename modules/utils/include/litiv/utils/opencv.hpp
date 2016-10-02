@@ -186,13 +186,25 @@ namespace cv { // extending cv
         static void onMouseEvent(int nEvent, int x, int y, int nFlags, void* pData);
     };
 
-    /// always-empty-mat, which allows functions to return const-references to an empty mat without dangling ref issues
-    static const cv::Mat g_oEmptyMat = cv::Mat();
-    /// always-empty-size, which allows functions to return const-references to an empty size without dangling ref issues
-    static const cv::Size g_oEmptySize = cv::Size();
     /// returns an always-empty-mat by reference
-    inline const cv::Mat& emptyMat() {return g_oEmptyMat;}
+    inline const cv::Mat& emptyMat() {
+        static const cv::Mat s_oEmptyMat = cv::Mat();
+        return s_oEmptyMat;
+    }
     /// returns an always-empty-size by reference
-    inline const cv::Size& emptySize() {return g_oEmptySize;}
+    inline const cv::Size& emptySize() {
+        static const cv::Size s_oEmptySize = cv::Size();
+        return s_oEmptySize;
+    }
+    /// returns an always-empty-mat by reference
+    inline const std::vector<cv::Mat>& emptyMatArray() {
+        static const std::vector<cv::Mat> s_vEmptyMatArray = std::vector<cv::Mat>();
+        return s_vEmptyMatArray;
+    }
+    /// returns an always-empty-size by reference
+    inline const std::vector<cv::Size>& emptySizeArray() {
+        static const std::vector<cv::Size> s_vEmptySizeArray = std::vector<cv::Size>();
+        return s_vEmptySizeArray;
+    }
 
 } // namespace cv
