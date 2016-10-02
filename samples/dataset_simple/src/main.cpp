@@ -69,9 +69,9 @@ int main(int, char**) { // this sample uses no command line argument
         // task types using the run-time custom dataset parser. However, building a specialized dataset
         // inferface offers a lot more flexibility, and it should be considered the only true solution. For
         // more information on automatic groundtruth parsing, you will have to dig in the datasets module
-        // source code.
+        // source code (check the classes derived from the IIDataLoader super-interface primarily).
         //
-        // Besides, we need to provide arguments to the 'datasets::create' function to guide the automatic
+        // Besides, we need to provide arguments to the 'DatasetType::create' function to guide the automatic
         // parser; these arguments are sent to the constructor of the 'IDataset_' interface via pass-through
         // constructors, or caught by overrides in the interface of pre-implemented specializations (based on
         // the dataset identifier). These arguments (along with their parameter name) are described below:
@@ -127,11 +127,11 @@ int main(int, char**) { // this sample uses no command line argument
         cv::Mat oEdgeMask; // no need to preallocate the output matrix (the algo will make sure it is allocated at some point)
         size_t nProcessedBatches = 0; // used to keep track of how many work batches have been processed (for display purposes only)
         for(auto pBatchIter = vpBatches.begin(); pBatchIter!=vpBatches.end(); ++pBatchIter) { // loop over all batches (or over all image sets, in this case)
-            DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(**pBatchIter); // get rid of the iterator to pointer for cleanliness, and cast it for full dataset interface accessibility
+            DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(**pBatchIter); // get rid of the iterator to pointer for cleanliness, and cast it for full interface accessibility
             std::cout << "\tProcessing batch '" << oBatch.getName() << "' [" << ++nProcessedBatches << "/" << vpBatches.size() << "]" << std::endl;
             const size_t nTotPackets = oBatch.getImageCount(); // get the total number of images to process in this batch (this function becomes available due to the edge detection task template specialization)
             size_t nProcessedPackets = 0; // used to keep track of how many packets have been processed in this work batch
-            oBatch.startProcessing(); // will initialize real-time evaluation components, if any, and call the specialized dataset initialization routine (if available)
+            oBatch.startProcessing(); // will initialize real-time evaluation components (if any), and call the specialized dataset initialization routine (if available)
             while(nProcessedPackets<nTotPackets) { // loop over all data packets (or images, in this case)
                 cv::Mat oImage = oBatch.getInput(nProcessedPackets++); // will return the 'input' data packet to be processed, based on its packet index (in this case, simply an image)
                 std::cout << "\t\tProcessing packet [" << nProcessedPackets << "/" << nTotPackets << "]" << std::endl;

@@ -31,8 +31,8 @@
 #include "litiv/utils/opengl-imgproc.hpp"
 #endif //HAVE_GLSL
 #if HAVE_CUDA
-// ... @@@
+// ...
 #endif //HAVE_CUDA
 #if HAVE_OPENCL
-// ... @@@
+// ...
 #endif //HAVE_OPENCL

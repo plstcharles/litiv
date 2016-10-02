@@ -120,7 +120,7 @@ protected:
     IBackgroundSubtractor_(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs,
                            size_t nExtraImages, size_t nExtraTextures, int nDebugType, bool bUseDisplay,
                            bool bUseTimers, bool bUseIntegralFormat);
-    /// used to pass learning rate parameter to overriden dispatch call, if needed
+    /// used to pass learning rate parameter to overridden dispatch call, if needed
     double m_dCurrLearningRate;
 };
 

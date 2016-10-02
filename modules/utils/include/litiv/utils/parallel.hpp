@@ -25,10 +25,10 @@
 #include "litiv/utils/opengl-imgproc.hpp"
 #endif //HAVE_GLSL
 #if HAVE_CUDA
-#include @@@@@
+// ...
 #endif //HAVE_CUDA
 #if HAVE_OPENCL
-#include @@@@@
+// ...
 #endif //HAVE_OPENCL
 #if defined(_MSC_VER)
 #include <intrin.h>

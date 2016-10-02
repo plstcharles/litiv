@@ -50,7 +50,7 @@ void cv::DisplayHelper::display(const cv::Mat& oImage, size_t nIdx) {
     else if(oImage.channels()==4)
         cv::cvtColor(oImage,oImageBYTE3,cv::COLOR_BGRA2BGR);
     else
-        oImageBYTE3 = oImage;
+        oImageBYTE3 = oImage.clone();
     cv::Size oCurrDisplaySize;
     if(m_oMaxDisplaySize.area()>0 && (oImageBYTE3.cols>m_oMaxDisplaySize.width || oImageBYTE3.rows>m_oMaxDisplaySize.height)) {
         if(oImageBYTE3.cols>m_oMaxDisplaySize.width && oImageBYTE3.cols>oImageBYTE3.rows)
@@ -89,19 +89,19 @@ void cv::DisplayHelper::display(const cv::Mat& oInputImg, const cv::Mat& oDebugI
     else if(oInputImg.channels()==4)
         cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_BGRA2BGR);
     else
-        oInputImgBYTE3 = oInputImg;
+        oInputImgBYTE3 = oInputImg.clone();
     if(oDebugImg.channels()==1)
         cv::cvtColor(oDebugImg,oDebugImgBYTE3,cv::COLOR_GRAY2BGR);
     else if(oDebugImg.channels()==4)
         cv::cvtColor(oDebugImg,oDebugImgBYTE3,cv::COLOR_BGRA2BGR);
     else
-        oDebugImgBYTE3 = oDebugImg;
+        oDebugImgBYTE3 = oDebugImg.clone();
     if(oOutputImg.channels()==1)
         cv::cvtColor(oOutputImg,oOutputImgBYTE3,cv::COLOR_GRAY2BGR);
     else if(oOutputImg.channels()==4)
         cv::cvtColor(oOutputImg,oDebugImgBYTE3,cv::COLOR_BGRA2BGR);
     else
-        oOutputImgBYTE3 = oOutputImg;
+        oOutputImgBYTE3 = oOutputImg.clone();
     cv::Size oCurrDisplaySize;
     if(m_oMaxDisplaySize.area()>0 && (oOutputImgBYTE3.cols*3>m_oMaxDisplaySize.width || oOutputImgBYTE3.rows>m_oMaxDisplaySize.height)) {
         if(oOutputImgBYTE3.cols*3>m_oMaxDisplaySize.width && oOutputImgBYTE3.cols>oOutputImgBYTE3.rows)
