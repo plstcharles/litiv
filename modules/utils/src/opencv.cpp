@@ -124,19 +124,85 @@ void cv::DisplayHelper::display(const cv::Mat& oInputImg, const cv::Mat& oDebugI
         m_bFirstDisplay = false;
     }
     std::mutex_lock_guard oLock(m_oEventMutex);
-    const cv::Point2i& oDbgPt = m_oLatestMouseEvent.oPosition;
-    const cv::Size& oLastDbgSize = m_oLatestMouseEvent.oDisplaySize;
-    if(oDbgPt.x>=0 && oDbgPt.y>=0 && oDbgPt.x<oLastDbgSize.width*3 && oDbgPt.y<oLastDbgSize.height) {
-        const cv::Point2i oDbgPt_rescaled(int(oCurrDisplaySize.width*(float(oDbgPt.x%oLastDbgSize.width)/oLastDbgSize.width)),int(oCurrDisplaySize.height*(float(oDbgPt.y)/oLastDbgSize.height)));
-        cv::circle(oInputImgBYTE3,oDbgPt_rescaled,5,cv::Scalar(255,255,255));
-        cv::circle(oDebugImgBYTE3,oDbgPt_rescaled,5,cv::Scalar(255,255,255));
-        cv::circle(oOutputImgBYTE3,oDbgPt_rescaled,5,cv::Scalar(255,255,255));
+    const cv::Point2i& oDisplayPt = m_oLatestMouseEvent.oPosition;
+    const cv::Size& oLastDisplaySize = m_oLatestMouseEvent.oDisplaySize;
+    if(oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oLastDisplaySize.width && oDisplayPt.y<oLastDisplaySize.height) {
+        const cv::Point2i oDisplayPt_rescaled(int(oCurrDisplaySize.width*(float(oDisplayPt.x%(oLastDisplaySize.width/3))/(oLastDisplaySize.width/3))),int(oCurrDisplaySize.height*(float(oDisplayPt.y)/oLastDisplaySize.height)));
+        cv::circle(oInputImgBYTE3,oDisplayPt_rescaled,5,cv::Scalar(255,255,255));
+        cv::circle(oDebugImgBYTE3,oDisplayPt_rescaled,5,cv::Scalar(255,255,255));
+        cv::circle(oOutputImgBYTE3,oDisplayPt_rescaled,5,cv::Scalar(255,255,255));
     }
     cv::Mat displayH;
     cv::hconcat(oInputImgBYTE3,oDebugImgBYTE3,displayH);
     cv::hconcat(displayH,oOutputImgBYTE3,displayH);
     cv::imshow(m_sDisplayName,displayH);
-    m_oLastDisplaySize = oCurrDisplaySize;
+    m_oLastDisplaySize = displayH.size();
+}
+
+void cv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,std::string>>>& vvImageNamePairs, const cv::Size& oSuggestedTileSize) {
+    lvAssert_(!vvImageNamePairs.empty(),"must provide at least one row to display");
+    lvAssert_(oSuggestedTileSize.area()>0,"must provide non-null tile size");
+    const size_t nRowCount = vvImageNamePairs.size();
+    size_t nColCount = SIZE_MAX;
+    for(size_t nRowIdx=0; nRowIdx<nRowCount; ++nRowIdx) {
+        lvAssert_(!vvImageNamePairs[nRowIdx].empty(),"must provide at least one column to display");
+        lvAssert_(nColCount==SIZE_MAX || vvImageNamePairs[nRowIdx].size()==nColCount,"image map column count mismatch");
+        nColCount = vvImageNamePairs[nRowIdx].size();
+        for(size_t nColIdx=0; nColIdx<nColCount; ++nColIdx) {
+            const cv::Mat& oImage = vvImageNamePairs[nRowIdx][nColIdx].first;
+            lvAssert_(!oImage.empty(),"all images must be non-null");
+            lvAssert_(oImage.type()==CV_8UC1 || oImage.type()==CV_8UC3 || oImage.type()==CV_8UC4,"all images must be 8uc1/8uc3/8uc4");
+        }
+    }
+    cv::Size oCurrDisplaySize(oSuggestedTileSize.width*nColCount,oSuggestedTileSize.height*nRowCount);
+    if(m_oMaxDisplaySize.area()>0 && (oCurrDisplaySize.width>m_oMaxDisplaySize.width || oCurrDisplaySize.height>m_oMaxDisplaySize.height)) {
+        if(oCurrDisplaySize.width>m_oMaxDisplaySize.width && oCurrDisplaySize.width>oCurrDisplaySize.height)
+            oCurrDisplaySize = cv::Size(m_oMaxDisplaySize.width,int(m_oMaxDisplaySize.width*float(oCurrDisplaySize.height)/oCurrDisplaySize.width));
+        else
+            oCurrDisplaySize = cv::Size(int(m_oMaxDisplaySize.height*(float(oCurrDisplaySize.width)/oCurrDisplaySize.height)),m_oMaxDisplaySize.height);
+    }
+    const cv::Size oNewTileSize(oCurrDisplaySize.width/nColCount,oCurrDisplaySize.height/nRowCount);
+    const cv::Size oFinalDisplaySize(oNewTileSize.width*nColCount,oNewTileSize.height*nRowCount);
+    std::mutex_lock_guard oLock(m_oEventMutex);
+    const cv::Point2i& oDisplayPt = m_oLatestMouseEvent.oPosition;
+    const cv::Size& oLastDisplaySize = m_oLatestMouseEvent.oDisplaySize;
+    cv::Mat oOutput;
+    for(size_t nRowIdx=0; nRowIdx<nRowCount; ++nRowIdx) {
+        cv::Mat oOutputRow;
+        for(size_t nColIdx=0; nColIdx<nColCount; ++nColIdx) {
+            const cv::Mat& oImage = vvImageNamePairs[nRowIdx][nColIdx].first;
+            cv::Mat oImageBYTE3;
+            if(oImage.channels()==1)
+                cv::cvtColor(oImage,oImageBYTE3,cv::COLOR_GRAY2BGR);
+            else if(oImage.channels()==4)
+                cv::cvtColor(oImage,oImageBYTE3,cv::COLOR_BGRA2BGR);
+            else
+                oImageBYTE3 = oImage.clone();
+            if(oImageBYTE3.size()!=oNewTileSize)
+                cv::resize(oImageBYTE3,oImageBYTE3,oNewTileSize);
+            if(!vvImageNamePairs[nRowIdx][nColIdx].second.empty())
+                putText(oImageBYTE3,vvImageNamePairs[nRowIdx][nColIdx].second,cv::Scalar_<uchar>(0,0,255));
+            if(oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oLastDisplaySize.width && oDisplayPt.y<oLastDisplaySize.height && oLastDisplaySize==oFinalDisplaySize) {
+                const cv::Point2i oDisplayPt_raw(oDisplayPt.x%oNewTileSize.width,oDisplayPt.y%oNewTileSize.height);
+                cv::circle(oImageBYTE3,oDisplayPt_raw,5,cv::Scalar(255,255,255));
+            }
+            if(oOutputRow.empty())
+                oOutputRow = oImageBYTE3;
+            else
+                cv::hconcat(oOutputRow,oImageBYTE3,oOutputRow);
+        }
+        if(oOutput.empty())
+            oOutput = oOutputRow;
+        else
+            cv::vconcat(oOutput,oOutputRow,oOutput);
+    }
+    if(m_bFirstDisplay) {
+        putText(oOutput,"[Press space to continue]",cv::Scalar_<uchar>(0,0,255),true,cv::Point2i(oOutput.cols/2-100,15),1,1.0);
+        m_bFirstDisplay = false;
+    }
+    lvAssert(oOutput.size()==oFinalDisplaySize);
+    cv::imshow(m_sDisplayName,oOutput);
+    m_oLastDisplaySize = oOutput.size();
 }
 
 int cv::DisplayHelper::waitKey(int nDefaultSleepDelay) {
