@@ -87,34 +87,96 @@ namespace lv {
         NoMapping
     };
 
-    /// returns the output packet type policy to use based on the dataset task type
-    template<DatasetTaskList eDatasetTask>
+    /// returns the gt packet type policy to use based on the dataset task type (can also be overridden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
+    constexpr PacketPolicy getGTPacketType() {
+        return
+                (eDatasetTask==DatasetTask_Segm)?ImagePacket:
+                (eDatasetTask==DatasetTask_Cosegm)?ImageArrayPacket:
+                (eDatasetTask==DatasetTask_Registr)?NotImagePacket:
+                (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
+                // ...
+                throw -1; // undefined behavior
+    }
+
+    /// returns the output packet type policy to use based on the dataset task type (can also be overridden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
     constexpr PacketPolicy getOutputPacketType() {
-        return (eDatasetTask==DatasetTask_Segm)?ImagePacket:
-               (eDatasetTask==DatasetTask_Registr)?NotImagePacket:
-               (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
-               // ...
-               throw -1; // undefined behavior
+        return
+                (eDatasetTask==DatasetTask_Segm)?ImagePacket:
+                (eDatasetTask==DatasetTask_Cosegm)?ImageArrayPacket:
+                (eDatasetTask==DatasetTask_Registr)?NotImagePacket:
+                (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
+                // ...
+                throw -1; // undefined behavior
     }
 
-    /// returns the GT packet mapping style policy to use based on the dataset task type
-    template<DatasetTaskList eDatasetTask>
+    /// returns the GT packet mapping style policy to use based on the dataset task type (can also be overridden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
     constexpr MappingPolicy getGTMappingType() {
-        return (eDatasetTask==DatasetTask_Segm)?PixelMapping:
-               (eDatasetTask==DatasetTask_Registr)?BatchMapping:
-               (eDatasetTask==DatasetTask_EdgDet)?IdxMapping:
-               // ...
-               throw -1; // undefined behavior
+        return
+                (eDatasetTask==DatasetTask_Segm)?PixelMapping:
+                (eDatasetTask==DatasetTask_Cosegm)?IndexMapping:
+                (eDatasetTask==DatasetTask_Registr)?BatchMapping:
+                (eDatasetTask==DatasetTask_EdgDet)?PixelMapping:
+                // ...
+                throw -1; // undefined behavior
     }
 
-    /// returns the I/O packet mapping style policy to use based on the dataset task type
-    template<DatasetTaskList eDatasetTask>
+    /// returns the I/O packet mapping style policy to use based on the dataset task type (can also be overridden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
     constexpr MappingPolicy getIOMappingType() {
-        return (eDatasetTask==DatasetTask_Segm)?PixelMapping:
-               (eDatasetTask==DatasetTask_Registr)?BatchMapping:
-               (eDatasetTask==DatasetTask_EdgDet)?PixelMapping:
-               // ...
-               throw -1; // undefined behavior
+        return
+                (eDatasetTask==DatasetTask_Segm)?PixelMapping:
+                (eDatasetTask==DatasetTask_Cosegm)?IndexMapping:
+                (eDatasetTask==DatasetTask_Registr)?BatchMapping:
+                (eDatasetTask==DatasetTask_EdgDet)?PixelMapping:
+                // ...
+                throw -1; // undefined behavior
+    }
+
+    /// returns the eval type policy to use based on the dataset task type (can also be overridden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
+    constexpr DatasetEvalList getDatasetEval() {
+        // note: these are only defaults, they can be overridden via full specialization in their impl header
+        return
+                (eDatasetTask==DatasetTask_Segm)?DatasetEval_BinaryClassifier:
+                (eDatasetTask==DatasetTask_Cosegm)?DatasetEval_BinaryClassifierArray:
+                (eDatasetTask==DatasetTask_Registr)?DatasetEval_Registr:
+                (eDatasetTask==DatasetTask_EdgDet)?DatasetEval_BinaryClassifier:
+                // ...
+                DatasetEval_None; // undefined behavior
+    }
+
+    /// returns the array type policy to use based on the dataset eval type
+    template<DatasetEvalList eDatasetEval>
+    constexpr ArrayPolicy getArrayPolicy() {
+        return ((eDatasetEval==DatasetEval_BinaryClassifierArray)||(eDatasetEval==DatasetEval_MultiClassifierArray))?Array:NotArray;
+    }
+
+    /// returns the source type policy to use based on the dataset task type (can also be overridden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
+    constexpr DatasetSourceList getDatasetSource() {
+        // note: these are only defaults, they can be overridden via full specialization in their impl header
+        return
+                (eDatasetTask==DatasetTask_Segm)?DatasetSource_Video:
+                (eDatasetTask==DatasetTask_Cosegm)?DatasetSource_VideoArray:
+                (eDatasetTask==DatasetTask_Registr)?DatasetSource_VideoArray:
+                (eDatasetTask==DatasetTask_EdgDet)?DatasetSource_Image:
+                // ...
+                DatasetSource_Video; // undefined behavior
+    }
+
+    /// returns whether task, source, and eval types are all compatible (can also be overridden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset, DatasetEvalList eDatasetEval>
+    constexpr bool isDatasetSpecValid() {
+        return
+                (eDatasetTask==DatasetTask_Segm)?(((eDatasetSource==DatasetSource_Video)||(eDatasetSource==DatasetSource_Image))&&((eDatasetEval==DatasetEval_BinaryClassifier)||(eDatasetEval==DatasetEval_MultiClassifier)||(eDatasetEval==DatasetEval_None))):
+                (eDatasetTask==DatasetTask_Cosegm)?(((eDatasetSource==DatasetSource_VideoArray)||(eDatasetSource==DatasetSource_ImageArray))&&((eDatasetEval==DatasetEval_BinaryClassifierArray)||(eDatasetEval==DatasetEval_MultiClassifierArray)||(eDatasetEval==DatasetEval_None))):
+                (eDatasetTask==DatasetTask_Registr)?(((eDatasetSource==DatasetSource_VideoArray)||(eDatasetSource==DatasetSource_ImageArray))&&((eDatasetEval==DatasetEval_Registr)||(eDatasetEval==DatasetEval_None))):
+                (eDatasetTask==DatasetTask_EdgDet)?(((eDatasetSource==DatasetSource_Video)||(eDatasetSource==DatasetSource_Image))&&((eDatasetEval==DatasetEval_BinaryClassifier)||(eDatasetEval==DatasetEval_None))):
+                // ...
+                false; // undefined behavior
     }
 
     struct IDataset;
@@ -125,10 +187,12 @@ namespace lv {
     using IDataHandlerConstPtr = std::shared_ptr<const IDataHandler>;
     using IDataHandlerConstPtrArray = std::vector<IDataHandlerConstPtr>;
     using IDataHandlerPtrQueue = std::priority_queue<IDataHandlerPtr,IDataHandlerPtrArray,std::function<bool(const IDataHandlerPtr&,const IDataHandlerPtr&)>>;
-    using AsyncDataCallbackFunc = std::function<void(const cv::Mat& /*oInput*/,const cv::Mat& /*oDebug*/,const cv::Mat& /*oOutput*/,const cv::Mat& /*oGT*/,const cv::Mat& /*oROI*/,size_t /*nIdx*/)>;
+    using AsyncDataCallbackFunc = std::function<void(const cv::Mat& /*oInput*/,const cv::Mat& /*oDebug*/,const cv::Mat& /*oOutput*/,const cv::Mat& /*oGT*/,const cv::Mat& /*oGTROI*/,size_t /*nIdx*/)>;
 
     /// fully abstract dataset interface (dataset parser & evaluator implementations will derive from this)
     struct IDataset : lv::enable_shared_from_this<IDataset> {
+        /// virtual destructor for adequate cleanup from IDataset pointers
+        virtual ~IDataset() = default;
         /// returns the dataset name
         virtual const std::string& getName() const = 0;
         /// returns the root data path
@@ -155,16 +219,20 @@ namespace lv {
         virtual bool isUsingEvaluator() const = 0;
         /// returns whether loaded data should be 4-byte aligned or not (4-byte alignment is ideal for GPU upload)
         virtual bool is4ByteAligned() const = 0;
-        /// virtual destructor for adequate cleanup from IDataset pointers
-        virtual ~IDataset() = default;
-        /// returns the total number of packets in the dataset (recursively queried from work batches)
-        virtual size_t getTotPackets() const = 0;
+        /// returns whether this dataset defines some evaluation procedure or not
+        virtual bool isEvaluable() const {return false;}
+        /// returns the total input packet count in the dataset (recursively queried from work batches)
+        virtual size_t getInputCount() const = 0;
+        /// returns the total gt packet count in the dataset (recursively queried from work batches)
+        virtual size_t getGTCount() const = 0;
+        /// returns the total output packet count expected to be processed by the dataset evaluator (recursively queried from work batches)
+        virtual size_t getExpectedOutputCount() const = 0;
+        /// returns the total output packet count so far processed by the dataset evaluator (recursively queried from work batches)
+        virtual size_t getProcessedOutputCount() const = 0;
+        /// returns the total output packet count so far processed by the dataset evaluator, blocking if processing is not finished yet (recursively queried from work batches)
+        virtual size_t getProcessedOutputCountPromise() = 0;
         /// returns the total time it took to process the dataset (recursively queried from work batches)
         virtual double getProcessTime() const = 0;
-        /// returns the total processed packet count, blocking if processing is not finished yet (recursively queried from work batches)
-        virtual size_t getProcessedPacketsCountPromise() = 0;
-        /// returns the total processed packet count (recursively queried from work batches)
-        virtual size_t getProcessedPacketsCount() const = 0;
         /// clears all batches and reparses them from the dataset metadata
         virtual void parseDataset() = 0;
         /// writes the dataset-level evaluation report
@@ -187,14 +255,28 @@ namespace lv {
         virtual const std::string& getRelativePath() const = 0;
         /// returns the expected CPU load of the work batch/group (only relevant for intra-dataset load comparisons)
         virtual double getExpectedLoad() const = 0;
-        /// returns the total packet count for this work batch/group
-        virtual size_t getTotPackets() const = 0;
+        /// returns the total input packet count for this work batch/group
+        virtual size_t getInputCount() const = 0;
+        /// returns the total gt packet count for this work batch/group
+        virtual size_t getGTCount() const = 0;
+        /// returns the total output packet count expected to be processed by the work batch/group evaluator
+        virtual size_t getExpectedOutputCount() const = 0;
+        /// returns the total output packet count so far processed by the work batch/group evaluator
+        virtual size_t getProcessedOutputCount() const = 0;
+        /// returns the total output packet count so far processed by the work batch/group evaluator, blocking if processing is not finished yet
+        virtual size_t getProcessedOutputCountPromise() = 0;
+        /// returns a name (not necessarily used for parsing) associated with an input data packet index (useful for data archiving)
+        virtual std::string getInputName(size_t nPacketIdx) const;
+        /// returns a name that should be given to an output data packet based on its index (useful for data archiving)
+        virtual std::string getOutputName(size_t nPacketIdx) const;
         /// returns whether the work batch/group data will be treated as grayscale
         virtual bool isGrayscale() const = 0;
         /// returns whether the work group is a pass-through container (always false for work batches)
         virtual bool isBare() const = 0;
         /// returns whether this data handler interface points to a work batch or a work group
         virtual bool isGroup() const = 0;
+        /// returns whether this dataset defines some evaluation procedure or not
+        virtual bool isEvaluable() const {return false;}
         /// returns this work group's children (work batch array)
         virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const = 0;
         /// returns a pointer to this work batch/group's parent dataset interface
@@ -203,10 +285,10 @@ namespace lv {
         virtual DatasetTaskList getDatasetTask() const = 0;
         /// returns which data source this work batch/group was built for
         virtual DatasetSourceList getDatasetSource() const = 0;
-        /// returns which dataset this work batch/group was built for
-        virtual DatasetList getDataset() const = 0;
         /// returns which evaluation method this work batch/group was built for
         virtual DatasetEvalList getDatasetEval() const = 0;
+        /// returns which dataset this work batch/group was built for
+        virtual DatasetList getDataset() const = 0;
         /// writes the batch-level evaluation report
         virtual void writeEvalReport() const = 0;
         /// virtual destructor for adequate cleanup from IDataHandler pointers
@@ -215,10 +297,6 @@ namespace lv {
         virtual bool isProcessing() const = 0;
         /// returns the current (or final) duration elapsed between start/stopProcessing calls (recursively queried for work groups)
         virtual double getProcessTime() const = 0;
-        /// returns the total processed packet count, blocking if processing is not finished yet (recursively queried for work groups)
-        virtual size_t getProcessedPacketsCountPromise() = 0;
-        /// returns the total processed packet count (recursively queried from work batches)
-        virtual size_t getProcessedPacketsCount() const = 0;
     protected:
         /// work batch/group comparison function based on names
         template<typename Tp>
