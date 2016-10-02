@@ -24,21 +24,12 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 
-// as defined in the 2012/2014 CDNet evaluation scripts
-#define DATASETUTILS_POSITIVE_VAL    uchar(255)
-#define dATASETUTILS_NEGATIVE_VAL    uchar(0)
-#define DATASETUTILS_OUTOFSCOPE_VAL  uchar(85)
-#define DATASETUTILS_UNKNOWN_VAL     uchar(170)
-#define DATASETUTILS_SHADOW_VAL      uchar(50)
-
-// as defined in the bsds500 evaluation script
-#define DATASETUTILS_IMAGEEDGDET_EVAL_THRESHOLD_BINS 99
-
 namespace lv {
 
     enum DatasetTaskList { // from the task type, we can derive the source and eval types
         DatasetTask_Segm,
-        DatasetTask_Registr,
+        DatasetTask_Cosegm,
+        DatasetTask_Registr, // @@@ specialization todo
         DatasetTask_EdgDet,
         // ...
     };
@@ -53,9 +44,11 @@ namespace lv {
 
     enum DatasetEvalList { // from the eval type, we can derive the gt packet mapping policy
         DatasetEval_BinaryClassifier,
-        DatasetEval_MultiClassifier,
-        DatasetEval_Registr,
-        DatasetEval_BoundingBox,
+        DatasetEval_BinaryClassifierArray,
+        DatasetEval_MultiClassifier, // @@@ specialization todo
+        DatasetEval_MultiClassifierArray, // @@@ specialization todo
+        DatasetEval_Registr, // @@@ specialization todo
+        DatasetEval_BoundingBox, // @@@ specialization todo
         // ...
         DatasetEval_None // will only count packets & monitor processing time
     };
@@ -66,6 +59,7 @@ namespace lv {
         Dataset_PETS2001D3TC1,
         Dataset_LITIV2012b,
         Dataset_BSDS500,
+        Dataset_VAPtrimod2016,
         // ...
         Dataset_Custom // 'datasets::create' will forward all parameters from Dataset constr
     };
@@ -75,14 +69,20 @@ namespace lv {
         NotGroup,
     };
 
+    enum ArrayPolicy { // used to toggle data array policy functions in data handler interfaces
+        Array,
+        NotArray,
+    };
+
     enum PacketPolicy { // used to toggle packet policy functions in data handler interfaces
         ImagePacket,
+        ImageArrayPacket,
         NotImagePacket
     };
 
     enum MappingPolicy { // used to determine how data packets (input/output, or gt/output) can be mapped
         PixelMapping,
-        IdxMapping,
+        IndexMapping,
         BatchMapping,
         NoMapping
     };
