@@ -316,23 +316,57 @@ namespace lv {
         static bool compare(const IDataHandler& i, const IDataHandler& j);
         /// work batch/group comparison function based on expected CPU load
         static bool compare_load(const IDataHandler& i, const IDataHandler& j);
-        /// returns the internal name of a given data packet (useful for data archiving)
-        virtual std::string getPacketName(size_t nPacketIdx) const;
         /// returns the children batch associated with the given packet index; will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
         virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const = 0;
         /// returns the children batch associated with the given packet index; will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
         virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) = 0;
         /// overrideable method to be called when the user 'starts processing' the data batch (by default, always inits counters after calling this)
-        virtual void _startProcessing() {}
+        virtual void startProcessing_impl() {}
         /// overrideable method to be called when the user 'stops processing' the data batch (by default, always stops counters before calling this)
-        virtual void _stopProcessing() {}
+        virtual void stopProcessing_impl() {}
         /// local folder data parsing function, dataset-specific
         virtual void parseData() = 0;
         template<DatasetEvalList eDatasetEval>
-        friend struct IDatasetEvaluator_; // required for dataset evaluator interface to write eval reports
+        friend struct IDatasetReporter_; // required for external interface to write eval reports
         template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset, DatasetEvalList eDatasetEval, lv::ParallelAlgoType eEvalImpl>
         friend struct IDataset_; // required for data handler sorting and other top-level dataset utility functions
+        friend struct IGroupDataParser; // required for recursive parsing of work batch data through groups
     };
+
+    /// group data parser interface for work batch groups @@@@ replace by IDataParser + templ spec? like counter (mostly final overrides)
+    struct IGroupDataParser : public virtual IDataHandler {
+        /// returns whether the work group is a pass-through container
+        virtual bool isBare() const override final;
+        /// always returns true for work groups
+        virtual bool isGroup() const override final;
+        /// returns this work group's children (work batch array)
+        virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const override final;
+        /// returns whether any of this work group's children batches is currently processing data
+        virtual bool isProcessing() const override final;
+        /// returns the current (or final) duration elapsed between start/stopProcessing calls, recursively queried for all children work batches
+        virtual double getProcessTime() const override final;
+        /// accumulates the expected CPU load for this data batch based on all children work batches load
+        virtual double getExpectedLoad() const override final;
+        /// accumulate total input packet count from all children work batches
+        virtual size_t getInputCount() const override final;
+        /// accumulate total gt packet count from all children work batches
+        virtual size_t getGTCount() const override final;
+    protected:
+        /// creates and returns a work batch for a given relative dataset path
+        virtual IDataHandlerPtr createWorkBatch(const std::string& sBatchName, const std::string& sRelativePath=std::string("./")) const = 0;
+        /// creates group/nongroup workbatches based on internal datset info and current relative path, and recursively calls parse data on all childrens
+        virtual void parseData() override;
+        /// default constructor; automatically sets 'isBare' to true
+        inline IGroupDataParser() : m_bIsBare(true) {}
+        /// contains children work batches (which may also be groups containing children)
+        IDataHandlerPtrArray m_vpBatches;
+        /// defines whether the group is pass-through (with zero or one non-group child) or not
+        bool m_bIsBare;
+    };
+
+    /// group data parser full (default) specialization --- can be overridden by dataset type in 'impl' headers
+    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset>
+    struct GroupDataParser_ : public IGroupDataParser {};
 
     /// general-purpose data packet precacher, fully implemented (i.e. can be used stand-alone)
     struct DataPrecacher {
@@ -362,10 +396,12 @@ namespace lv {
         DataPrecacher(const DataPrecacher&) = delete;
     };
 
-    /// data loader interface for work batch, applies basic packet transforms where needed and relies on precacher
-    struct IDataLoader : public virtual IDataHandler {
+    /// data loader super-interface for work batch, exposes basic packet get functions and internal precacher wiring
+    struct IIDataLoader : public virtual IDataHandler {
         /// returns the input data packet type policy (used for internal packet auto-transformations)
         inline PacketPolicy getInputPacketType() const {return m_eInputType;}
+        /// returns the gt data packet type policy (used for internal packet auto-transformations)
+        inline PacketPolicy getGTPacketType() const {return m_eGTType;}
         /// returns the output data packet type policy (used for internal packet auto-transformations)
         inline PacketPolicy getOutputPacketType() const {return m_eOutputType;}
         /// returns the gt/output data packet mapping type policy (used for internal packet auto-transformations)
@@ -376,43 +412,41 @@ namespace lv {
         virtual void startAsyncPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX);
         /// kills the asynchronyzed precacher, and clears internal buffers
         virtual void stopAsyncPrecaching();
-        /// returns an input packet by index (with both with and without precaching enabled)
-        const cv::Mat& getInput(size_t nPacketIdx) {return m_oInputPrecacher.getPacket(nPacketIdx);}
-        /// returns a gt packet by index (with both with and without precaching enabled)
-        const cv::Mat& getGT(size_t nPacketIdx) {return m_oGTPrecacher.getPacket(nPacketIdx);}
-        /// returns whether an input packet should be transposed or not (only applicable to image packets)
-        virtual bool isInputTransposed(size_t /*nPacketIdx*/) const {return false;}
-        /// returns whether a gt packet should be transposed or not (only applicable to image packets)
-        virtual bool isGTTransposed(size_t /*nPacketIdx*/) const {return false;}
-        /// returns the roi associated with an input packet (only applicable to image packets, or dataset-specific)
-        virtual const cv::Mat& getInputROI(size_t /*nPacketIdx*/) const {return cv::emptyMat();}
-        /// returns the roi associated with an input packet (only applicable to image packets, or dataset-specific)
-        virtual const cv::Mat& getGTROI(size_t /*nPacketIdx*/) const {return cv::emptyMat();}
-        /// returns the size of a pre-transformed input packet @@@@@ override later to make size N-Dim?
-        virtual const cv::Size& getInputSize(size_t nPacketIdx) const = 0;
-        /// returns the size of a pre-transformed gt packet @@@@@ override later to make size N-Dim?
-        virtual const cv::Size& getGTSize(size_t nPacketIdx) const = 0;
-        /// returns the original size of an input packet @@@@@ override later to make size N-Dim?
-        virtual const cv::Size& getInputOrigSize(size_t nPacketIdx) const = 0;
-        /// returns the original size of a GT packet @@@@@ override later to make size N-Dim?
-        virtual const cv::Size& getGTOrigSize(size_t nPacketIdx) const = 0;
-        /// returns the maximum size of all input packets for this data batch @@@@@ override later to make size N-Dim?
-        virtual const cv::Size& getInputMaxSize() const = 0;
-        /// returns the maximum size of all gt packets for this data batch @@@@@ override later to make size N-Dim?
-        virtual const cv::Size& getGTMaxSize() const = 0;
+        /// returns an input packet by index (works both with and without precaching enabled)
+        const cv::Mat& getInput(size_t nPacketIdx);
+        /// returns a gt packet by index (works both with and without precaching enabled)
+        const cv::Mat& getGT(size_t nPacketIdx);
+        /// returns the ROI associated with an input packet by index (returns empty mat by default)
+        virtual const cv::Mat& getInputROI(size_t nPacketIdx) const;
+        /// returns the ROI associated with a gt packet by index (returns empty mat by default)
+        virtual const cv::Mat& getGTROI(size_t nPacketIdx) const;
+        /// returns the size associated with an input packet by index (returns empty size by default) @@@@@ override later to make size N-Dim?
+        virtual const cv::Size& getInputSize(size_t nPacketIdx) const;
+        /// returns the size associated with a gt packet by index (returns empty size by default) @@@@@ override later to make size N-Dim?
+        virtual const cv::Size& getGTSize(size_t nPacketIdx) const;
+        /// returns the maximum size associated with any input packet (returns empty size by default) @@@@@ override later to make size N-Dim?
+        virtual const cv::Size& getInputMaxSize() const;
+        /// returns the maximum size associated with any gt packet (returns empty size by default) @@@@@ override later to make size N-Dim?
+        virtual const cv::Size& getGTMaxSize() const;
     protected:
-        /// will automatically apply byte-alignment/scale in packet redirection if using image packets
-        IDataLoader(PacketPolicy eInputType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
-        /// input packet load function, dataset-specific (can return empty mats)
-        virtual cv::Mat _getInputPacket_impl(size_t nIdx) = 0;
-        /// gt packet load function, dataset-specific (can return empty mats)
-        virtual cv::Mat _getGTPacket_impl(size_t nIdx) = 0;
+        /// types serve to automatically transform packets & define default implementations
+        IIDataLoader(PacketPolicy eInputType, PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
+        /// input packet load function, pre-transformations (can return empty mats)
+        virtual cv::Mat getRawInput(size_t nPacketIdx) = 0;
+        /// gt packet load function, pre-transformations (can return empty mats)
+        virtual cv::Mat getRawGT(size_t nPacketIdx) = 0;
+        /// input packet transformation function (used e.g. for rescaling and color space conversion)
+        virtual const cv::Mat& getInput_redirect(size_t nPacketIdx);
+        /// gt packet transformation function (used e.g. for rescaling and color space conversion)
+        virtual const cv::Mat& getGT_redirect(size_t nPacketIdx);
     private:
-        cv::Mat m_oLatestInputPacket, m_oLatestGTPacket;
+        /// holds the loaded copies of the latest input/gt packets queried by the precachers
+        cv::Mat m_oLatestInput,m_oLatestGT;
+        /// precacher objects which may spin up a thread to pre-fetch data packets
         DataPrecacher m_oInputPrecacher,m_oGTPrecacher;
-        const cv::Mat& _getInputPacket_redirect(size_t nIdx);
-        const cv::Mat& _getGTPacket_redirect(size_t nIdx);
-        const PacketPolicy m_eInputType,m_eOutputType;
+        /// input/gt/output packet policy types
+        const PacketPolicy m_eInputType,m_eGTType,m_eOutputType;
+        /// output-gt and input-output mapping policy types
         const MappingPolicy m_eGTMappingType,m_eIOMappingType;
     };
 
