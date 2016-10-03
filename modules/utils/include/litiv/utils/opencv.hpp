@@ -155,7 +155,7 @@ namespace cv { // extending cv
         /// will reformat the given images, print the index and mouse cursor point on them, and show them horizontally concatenated
         void display(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oOutputImg, size_t nIdx);
         /// will reformat the given images, print their names and mouse cursor point on them, and show them based on row-col ordering
-        void display(const std::vector<std::vector<std::pair<cv::Mat,std::string>>>& oImageNamePairs, const cv::Size& oSuggestedTileSize);
+        void display(const std::vector<std::vector<std::pair<cv::Mat,std::string>>>& vvImageNamePairs, const cv::Size& oSuggestedTileSize);
 
         /// will call cv::waitKey and block if m_bContinuousUpdates is false, and loop otherwise (also returns cv::waitKey's captured value)
         int waitKey(int nDefaultSleepDelay=1);

@@ -151,7 +151,8 @@ void cv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
         for(size_t nColIdx=0; nColIdx<nColCount; ++nColIdx) {
             const cv::Mat& oImage = vvImageNamePairs[nRowIdx][nColIdx].first;
             lvAssert_(!oImage.empty(),"all images must be non-null");
-            lvAssert_(oImage.type()==CV_8UC1 || oImage.type()==CV_8UC3 || oImage.type()==CV_8UC4,"all images must be 8uc1/8uc3/8uc4");
+            lvAssert_(oImage.channels()==1 || oImage.channels()==3 || oImage.channels()==4,"all images must be 1/3/4 channels");
+            lvAssert_(oImage.depth()==CV_8U || oImage.depth()==CV_16U || oImage.depth()==CV_32F,"all images must be 8u/16u/32f depth");
         }
     }
     cv::Size oCurrDisplaySize(oSuggestedTileSize.width*nColCount,oSuggestedTileSize.height*nRowCount);
@@ -172,12 +173,16 @@ void cv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
         for(size_t nColIdx=0; nColIdx<nColCount; ++nColIdx) {
             const cv::Mat& oImage = vvImageNamePairs[nRowIdx][nColIdx].first;
             cv::Mat oImageBYTE3;
-            if(oImage.channels()==1)
-                cv::cvtColor(oImage,oImageBYTE3,cv::COLOR_GRAY2BGR);
-            else if(oImage.channels()==4)
-                cv::cvtColor(oImage,oImageBYTE3,cv::COLOR_BGRA2BGR);
+            if(oImage.depth()==CV_16U)
+                oImage.convertTo(oImageBYTE3,CV_8U,double(UCHAR_MAX)/(USHRT_MAX));
+            else if(oImage.depth()==CV_32F)
+                oImage.convertTo(oImageBYTE3,CV_8U,double(UCHAR_MAX));
             else
                 oImageBYTE3 = oImage.clone();
+            if(oImageBYTE3.channels()==1)
+                cv::cvtColor(oImageBYTE3,oImageBYTE3,cv::COLOR_GRAY2BGR);
+            else if(oImageBYTE3.channels()==4)
+                cv::cvtColor(oImageBYTE3,oImageBYTE3,cv::COLOR_BGRA2BGR);
             if(oImageBYTE3.size()!=oNewTileSize)
                 cv::resize(oImageBYTE3,oImageBYTE3,oNewTileSize);
             if(!vvImageNamePairs[nRowIdx][nColIdx].second.empty())
