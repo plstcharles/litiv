@@ -89,10 +89,9 @@ const size_t g_nMaxThreads = USE_GPU_IMPL?1:std::thread::hardware_concurrency()>
 
 int main(int, char**) {
     try {
-        lv::IDatasetPtr pDataset = lv::datasets::create<lv::DatasetTask_Segm,lv::DATASET_ID,eImplTypeEnum>(DATASET_PARAMS);
+        lv::IDatasetPtr pDataset = DatasetType::create(DATASET_PARAMS);
         lv::IDataHandlerPtrQueue vpBatches = pDataset->getSortedBatches(false);
         const size_t nTotPackets = pDataset->getInputCount();
-        lvAssert(pDataset->getExpectedOutputCount()==0 || nTotPackets==pDataset->getExpectedOutputCount());
         const size_t nTotBatches = vpBatches.size();
         if(nTotBatches==0 || nTotPackets==0)
             lvError_("Could not parse any data for dataset '%s'",pDataset->getName().c_str());
@@ -106,7 +105,7 @@ int main(int, char**) {
             lv::IDataHandlerPtr pBatch = vpBatches.top();
             std::cout << "\tProcessing [" << ++nProcessedBatches << "/" << nTotBatches << "] (" << pBatch->getRelativePath() << ", L=" << std::scientific << std::setprecision(2) << pBatch->getExpectedLoad() << ")" << std::endl;
             if(DATASET_PRECACHING)
-                dynamic_cast<DatasetType::WorkBatch&>(*pBatch).startAsyncPrecaching(EVALUATE_OUTPUT);
+                pBatch->startPrecaching(EVALUATE_OUTPUT);
             ++g_nActiveThreads;
             std::thread(Analyze,(int)nProcessedBatches,pBatch).detach();
             vpBatches.pop();
@@ -130,10 +129,10 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
     //srand((unsigned int)time(NULL));
     try {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
+        lvAssert(oBatch.getInputPacketType()==lv::ImagePacket && oBatch.getOutputPacketType()==lv::ImagePacket);
         lvAssert(oBatch.getFrameCount()>1);
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
         const size_t nTotPacketCount = oBatch.getFrameCount();
-        lvAssert(oBatch.getExpectedOutputCount()==0 || nTotPacketCount==oBatch.getExpectedOutputCount());
         GLContext oContext(oBatch.getFrameSize(),std::string("[GPU] ")+oBatch.getRelativePath(),DISPLAY_OUTPUT==0);
         std::shared_ptr<IBackgroundSubtractor_<lv::GLSL>> pAlgo = std::make_shared<BackgroundSubtractorType>();
 #if DISPLAY_OUTPUT>1
@@ -182,9 +181,8 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
     catch(...) {std::cout << "\nAnalyze caught unhandled exception\n" << std::endl;}
     --g_nActiveThreads;
     try {
-        DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
-        if(oBatch.isProcessing())
-            oBatch.stopProcessing();
+        if(pBatch->isProcessing())
+            dynamic_cast<DatasetType::WorkBatch&>(*pBatch).stopProcessing();
     } catch(...) {
         std::cout << "\nAnalyze caught unhandled exception while attempting to stop batch processing.\n" << std::endl;
         throw;
@@ -201,10 +199,10 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
     size_t nCurrIdx = 0;
     try {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
+        lvAssert(oBatch.getInputPacketType()==lv::ImagePacket && oBatch.getOutputPacketType()==lv::ImagePacket);
         lvAssert(oBatch.getFrameCount()>1);
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
         const size_t nTotPacketCount = oBatch.getFrameCount();
-        lvAssert(oBatch.getExpectedOutputCount()==0 || nTotPacketCount==oBatch.getExpectedOutputCount());
         const cv::Mat& oROI = oBatch.getFrameROI();
         cv::Mat oCurrInput = oBatch.getInput(nCurrIdx).clone();
         lvAssert(!oCurrInput.empty() && oCurrInput.isContinuous());
@@ -248,9 +246,8 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
     catch(...) {std::cout << "\nAnalyze caught unhandled exception\n" << std::endl;}
     --g_nActiveThreads;
     try {
-        DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
-        if(oBatch.isProcessing())
-            oBatch.stopProcessing();
+        if(pBatch->isProcessing())
+            dynamic_cast<DatasetType::WorkBatch&>(*pBatch).stopProcessing();
     } catch(...) {
         std::cout << "\nAnalyze caught unhandled exception while attempting to stop batch processing.\n" << std::endl;
         throw;
