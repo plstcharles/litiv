@@ -450,145 +450,237 @@ namespace lv {
         const MappingPolicy m_eGTMappingType,m_eIOMappingType;
     };
 
-    /// data producer interface for work batch that must be specialized based on source type (wraps data loader interface)
+    /// default (specializable) forward declaration of the data loader interface
+    template<ArrayPolicy ePolicy>
+    struct IDataLoader_;
+
+    /// data loader specialization for non-array processing (exposes more auto-transform getters for packets, and simple ROIs)
+    template<>
+    struct IDataLoader_<NotArray> : public IIDataLoader {
+    protected:
+        /// pass-through constructor to super-interface
+        using IIDataLoader::IIDataLoader;
+    };
+
+    /// data loader specialization for array processing (exposes unpacked array getters)
+    template<>
+    struct IDataLoader_<Array> : public IIDataLoader {
+        /// returns the number of parallel input streams (defaults to 1)
+        virtual size_t getInputStreamCount() const;
+        /// returns the number of parallel gt streams (defaults to 1)
+        virtual size_t getGTStreamCount() const;
+        /// returns the (friendly) name of an input stream specified by index
+        virtual std::string getInputStreamName(size_t nStreamIdx) const;
+        /// returns the (friendly) name of a gt stream specified by index
+        virtual std::string getGTStreamName(size_t nStreamIdx) const;
+        /// unpacks and returns an input array by packet index, with each stream its own cv::Mat (works both with and without precaching enabled)
+        const std::vector<cv::Mat>& getInputArray(size_t nPacketIdx);
+        /// unpacks and returns a gt array by packet index, with each stream its own cv::Mat (works both with and without precaching enabled)
+        const std::vector<cv::Mat>& getGTArray(size_t nPacketIdx);
+        /// unpacks and returns an input ROI array by packet index, with each stream its own cv::Mat
+        virtual const std::vector<cv::Mat>& getInputROIArray(size_t nPacketIdx) const;
+        /// unpacks and returns a gt ROI array by packet index, with each stream its own cv::Mat
+        virtual const std::vector<cv::Mat>& getGTROIArray(size_t nPacketIdx) const;
+        /// returns the size array associated with an input packet by index (returns empty vector by default) @@@@@ override later to make size N-Dim?
+        virtual const std::vector<cv::Size>& getInputSizeArray(size_t nPacketIdx) const;
+        /// returns the size associated with a gt packet by index (returns empty vector by default) @@@@@ override later to make size N-Dim?
+        virtual const std::vector<cv::Size>& getGTSizeArray(size_t nPacketIdx) const;
+        /// returns whether an input data stream should be force-loaded as grayscale
+        virtual bool isStreamGrayscale(size_t nStreamIdx) const;
+    protected:
+        /// pass-through constructor to super-interface
+        using IIDataLoader::IIDataLoader;
+        /// hides the 'packed' input accessor from public interface
+        using IIDataLoader::getInput;
+        /// hides the 'packed' gt accessor from public interface
+        using IIDataLoader::getGT;
+        /// hides useless non-array-only function from public interface (can be unhidden by derived class)
+        using IIDataLoader::getInputROI;
+        /// hides useless non-array-only function from public interface (can be unhidden by derived class)
+        using IIDataLoader::getGTROI;
+        /// hides useless non-array-only function from public interface (can be unhidden by derived class)
+        using IIDataLoader::getInputSize;
+        /// hides useless non-array-only function from public interface (can be unhidden by derived class)
+        using IIDataLoader::getGTSize;
+        /// input 'unpacking' function, which essentially unmerges the streams in a packet and assigns them to individual mats in the vector
+        virtual void unpackInput(size_t nPacketIdx, std::vector<cv::Mat>& vUnpackedInput);
+        /// gt 'unpacking' function, which essentially unmerges the streams in a packet and assigns them to individual mats in the vector
+        virtual void unpackGT(size_t nPacketIdx, std::vector<cv::Mat>& vUnpackedGT);
+    private:
+        std::vector<cv::Mat> m_vLatestUnpackedInput,m_vLatestUnpackedGT;
+    };
+
+    /// default (specializable) forward declaration of the data producer interface
     template<DatasetSourceList eDatasetSource>
     struct IDataProducer_;
 
+    /// data producer specialization for video processing
     template<>
     struct IDataProducer_<DatasetSource_Video> :
-            public IDataLoader {
-        /// redirects to getTotPackets()
-        inline size_t getFrameCount() const {return getTotPackets();}
+            public IDataLoader_<NotArray> {
+        /// returns the total frame count for this work batch/group (redirects to getInputCount())
+        inline size_t getFrameCount() const {return getInputCount();}
+        /// returns the ROI associated with all frames
+        virtual const cv::Mat& getFrameROI() const;
+        /// returns the size associated with all frames @@@@@ override later to make size N-Dim?
+        virtual const cv::Size& getFrameSize() const;
+        /// returns the total input frame count for this work batch/group
+        virtual size_t getInputCount() const override;
+        /// returns the total gt frame count for this work batch/group
+        virtual size_t getGTCount() const override;
         /// compute the expected CPU load for this data batch based on frame size, frame count, and channel count
         virtual double getExpectedLoad() const override;
         /// initializes frame precaching for this work batch (will try to allocate enough memory for the entire sequence)
         virtual void startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
-        /// returns the ROI associated with the video sequence (if any)
-        virtual const cv::Mat& getROI() const {return m_oROI;}
-        /// return the (constant) frame size used in this video sequence, post-transformations
-        virtual const cv::Size& getFrameSize() const {return m_oSize;}
-        /// return the original (constant) frame size used in this video sequence
-        virtual const cv::Size& getFrameOrigSize() const {return m_oOrigSize;}
-
     protected:
-        IDataProducer_(PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
-        virtual size_t getTotPackets() const override;
-        virtual bool isInputTransposed(size_t nPacketIdx) const override final;
-        virtual bool isGTTransposed(size_t nPacketIdx) const override;
-        virtual const cv::Mat& getInputROI(size_t nPacketIdx) const override final;
+        /// specialized constructor; still need to specify gt type, output type, and mappings
+        IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
+        virtual const cv::Mat& getInputROI(size_t nPacketIdx) const override;
         virtual const cv::Mat& getGTROI(size_t nPacketIdx) const override;
-        virtual const cv::Size& getInputSize(size_t nPacketIdx) const override final;
+        virtual const cv::Size& getInputSize(size_t nPacketIdx) const override;
         virtual const cv::Size& getGTSize(size_t nPacketIdx) const override;
-        virtual const cv::Size& getInputOrigSize(size_t nPacketIdx) const override final;
-        virtual const cv::Size& getGTOrigSize(size_t nPacketIdx) const override;
-        virtual const cv::Size& getInputMaxSize() const override final;
+        virtual const cv::Size& getInputMaxSize() const override;
         virtual const cv::Size& getGTMaxSize() const override;
-        virtual cv::Mat _getInputPacket_impl(size_t nIdx) override;
-        virtual cv::Mat _getGTPacket_impl(size_t nIdx) override;
+        virtual cv::Mat getRawInput(size_t nPacketIdx) override;
+        virtual cv::Mat getRawGT(size_t nPacketIdx) override;
         virtual void parseData() override;
-        size_t m_nFrameCount;
+        size_t m_nFrameCount; ///< needed as a separate variable for VideoCapture+imread support
         std::unordered_map<size_t,size_t> m_mGTIndexLUT;
         std::vector<std::string> m_vsInputPaths,m_vsGTPaths;
         cv::VideoCapture m_voVideoReader;
         size_t m_nNextExpectedVideoReaderFrameIdx;
-        bool m_bTransposeFrames;
-        cv::Mat m_oROI;
-        cv::Size m_oOrigSize,m_oSize;
+        cv::Mat m_oInputROI,m_oGTROI;
+        cv::Size m_oInputSize,m_oGTSize;
     };
 
+    /// data producer specialization for multi-video processing
+    template<>
+    struct IDataProducer_<DatasetSource_VideoArray> :
+            public IDataLoader_<Array> {
+        /// returns the total frame count for this work batch/group (redirects to getInputCount())
+        inline size_t getFrameCount() const {return getInputCount();}
+        /// returns the ROIs associated with all frames
+        virtual const std::vector<cv::Mat>& getFrameROIArray() const;
+        /// returns the sizes associated with all frames @@@@@ override later to make size N-Dim?
+        virtual const std::vector<cv::Size>& getFrameSizeArray() const;
+        /// returns the total input frame count for this work batch/group --- all streams should be sync'd
+        virtual size_t getInputCount() const override;
+        /// returns the total gt frame count for this work batch/group --- all streams should be sync'd
+        virtual size_t getGTCount() const override;
+        /// compute the expected CPU load for this data batch based on frame size, frame count, and channel count
+        virtual double getExpectedLoad() const override;
+        /// initializes frame precaching for this work batch (will try to allocate enough memory for the entire sequence)
+        virtual void startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
+    protected:
+        /// specialized constructor; still need to specify gt type, output type, and mappings
+        IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
+        virtual const std::vector<cv::Mat>& getInputROIArray(size_t nPacketIdx) const override;
+        virtual const std::vector<cv::Mat>& getGTROIArray(size_t nPacketIdx) const override;
+        virtual const std::vector<cv::Size>& getInputSizeArray(size_t nPacketIdx) const override;
+        virtual const std::vector<cv::Size>& getGTSizeArray(size_t nPacketIdx) const override;
+        virtual const cv::Size& getInputMaxSize() const override;
+        virtual const cv::Size& getGTMaxSize() const override;
+        virtual cv::Mat getRawInput(size_t nPacketIdx) override; ///< loads and returns a 'packed' input packet
+        virtual cv::Mat getRawGT(size_t nPacketIdx) override; ///< loads and returns a 'packed' gt packet
+        //virtual void parseData() override;
+        std::unordered_map<size_t,size_t> m_mGTIndexLUT;
+        std::vector<std::vector<std::string>> m_vvsInputPaths,m_vvsGTPaths; // first dimension is packet index, 2nd is stream index
+        std::vector<cv::Mat> m_vInputROIs,m_vGTROIs; // one ROI per stream
+        std::vector<cv::Size> m_vInputSizes,m_vGTSizes;
+        cv::Size m_oMaxInputSize,m_oMaxGTSize;
+    };
+
+    /// data producer specialization for image processing
     template<>
     struct IDataProducer_<DatasetSource_Image> :
-            public IDataLoader {
-        /// redirects to getTotPackets()
-        inline size_t getImageCount() const {return getTotPackets();}
+            public IDataLoader_<NotArray> {
+        /// returns the total image count for this work batch/group (redirects to getInputCount())
+        inline size_t getImageCount() const {return getInputCount();}
+        /// returns whether all input images in this batch have the same size
+        virtual bool isInputConstantSize() const;
+        /// returns whether all gt images in this batch have the same size
+        virtual bool isGTConstantSize() const;
+        /// returns the total input image count for this work batch/group
+        virtual size_t getInputCount() const override;
+        /// returns the total gt image count for this work batch/group
+        virtual size_t getGTCount() const override;
         /// compute the expected CPU load for this data batch based on max image size, image count, and channel count
         virtual double getExpectedLoad() const override;
         /// initializes image precaching for this work batch (will try to allocate enough memory for the entire set)
         virtual void startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
-        /// returns whether all input images in this batch have the same size
-        virtual bool isInputConstantSize() const;
-        /// returns whether all input images in this batch have the same size
-        virtual bool isGTConstantSize() const;
-        /// returns whether an input packet should be transposed or not (only applicable to image packets)
-        virtual bool isInputTransposed(size_t nPacketIdx) const override;
-        /// returns whether a gt packet should be transposed or not (only applicable to image packets)
-        virtual bool isGTTransposed(size_t nPacketIdx) const override;
-        /// returns the roi associated with an input image packet
-        virtual const cv::Mat& getInputROI(size_t nPacketIdx) const override;
-        /// returns the roi associated with a gt image packet
-        virtual const cv::Mat& getGTROI(size_t nPacketIdx) const override;
-        /// returns the size of a pre-transformed input image packet
+        /// returns the size associated with an input image by index @@@@@ override later to make size N-Dim?
         virtual const cv::Size& getInputSize(size_t nPacketIdx) const override;
-        /// returns the size of a pre-transformed gt image packet
+        /// returns the size associated with a gt image by index @@@@@ override later to make size N-Dim?
         virtual const cv::Size& getGTSize(size_t nPacketIdx) const override;
-        /// returns the original size of an input image packet
-        virtual const cv::Size& getInputOrigSize(size_t nPacketIdx) const override;
-        /// returns the original size of a gt image packet
-        virtual const cv::Size& getGTOrigSize(size_t nPacketIdx) const override;
-        /// returns the maximum size of all input image packets for this data batch
+        /// returns the maximum size associated with an input image @@@@@ override later to make size N-Dim?
         virtual const cv::Size& getInputMaxSize() const override;
-        /// returns the maximum size of all image packets for this data batch
+        /// returns the maximum size associated with a gt image @@@@@ override later to make size N-Dim?
         virtual const cv::Size& getGTMaxSize() const override;
-        /// returns the (file) name associated with an image packet (useful for archiving/evaluation)
-        virtual std::string getPacketName(size_t nPacketIdx) const override;
-
+        /// returns the file name associated with an input data packet index (useful for data archiving)
+        virtual std::string getInputName(size_t nPacketIdx) const override;
     protected:
-        IDataProducer_(PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
-        virtual size_t getTotPackets() const override;
-        virtual cv::Mat _getInputPacket_impl(size_t nIdx) override;
-        virtual cv::Mat _getGTPacket_impl(size_t nIdx) override;
+        /// specialized constructor; still need to specify gt type, output type, and mappings
+        IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
+        virtual cv::Mat getRawInput(size_t nPacketIdx) override;
+        virtual cv::Mat getRawGT(size_t nPacketIdx) override;
         virtual void parseData() override;
-        size_t m_nImageCount;
         std::unordered_map<size_t,size_t> m_mGTIndexLUT;
         std::vector<std::string> m_vsInputPaths,m_vsGTPaths;
-        std::vector<cv::Size> m_voInputSizes,m_voGTSizes;
-        std::vector<cv::Size> m_voInputOrigSizes,m_voGTOrigSizes;
-        std::vector<bool> m_vbInputTransposed,m_vbGTTransposed;
+        std::vector<cv::Size> m_vInputSizes,m_vGTSizes;
         bool m_bIsInputConstantSize,m_bIsGTConstantSize;
         cv::Size m_oInputMaxSize,m_oGTMaxSize;
     };
 
-    /// data producer interface specialization default constructor override for cleaner implementations
-    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource>
-    struct DataProducer_c : public IDataProducer_<eDatasetSource> {
-        DataProducer_c() : IDataProducer_<eDatasetSource>(lv::getOutputPacketType<eDatasetTask>(),lv::getGTMappingType<eDatasetTask>(),lv::getIOMappingType<eDatasetTask>()) {}
-    };
-
-    /// default data producer interface specialization (will attempt to load data using predefined functions)
-    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset>
-    struct DataProducer_ : public DataProducer_c<eDatasetTask,eDatasetSource> {};
-
-    /// data counter interface for work batch/group (toggled via policy) for processed packet counting
-    template<GroupPolicy ePolicy>
-    struct DataCounter_;
-
+    /// data producer specialization for multi-image processing
     template<>
-    struct DataCounter_<NotGroup> : public virtual IDataHandler {
+    struct IDataProducer_<DatasetSource_ImageArray> : // @@@ to be tested
+            public IDataLoader_<Array> {
+        /// returns the total image count for this work batch/group (redirects to getInputCount())
+        inline size_t getImageCount() const {return getInputCount();}
+        /// returns whether all input images in this batch have the same size
+        virtual bool isInputConstantSize() const;
+        /// returns whether all gt images in this batch have the same size
+        virtual bool isGTConstantSize() const;
+        /// returns the total input image count for this work batch/group
+        virtual size_t getInputCount() const override;
+        /// returns the total gt image count for this work batch/group
+        virtual size_t getGTCount() const override;
+        /// compute the expected CPU load for this data batch based on max image size, image count, and channel count
+        virtual double getExpectedLoad() const override;
+        /// initializes frame precaching for this work batch (will try to allocate enough memory for the entire sequence)
+        virtual void startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
+        /// returns the size associated with an input image by index @@@@@ override later to make size N-Dim?
+        virtual const std::vector<cv::Size>& getInputSizeArray(size_t nPacketIdx) const override;
+        /// returns the size associated with a gt image by index @@@@@ override later to make size N-Dim?
+        virtual const std::vector<cv::Size>& getGTSizeArray(size_t nPacketIdx) const override;
+        /// returns the maximum size associated with an input image @@@@@ override later to make size N-Dim?
+        virtual const cv::Size& getInputMaxSize() const override;
+        /// returns the maximum size associated with a gt image @@@@@ override later to make size N-Dim?
+        virtual const cv::Size& getGTMaxSize() const override;
     protected:
-        /// default constructor
-        DataCounter_() : m_nProcessedPackets(0) {}
-        /// increments processed packets count
-        inline void processPacket() {++m_nProcessedPackets;}
-        /// sets processed packets count promise for async implementations
-        inline void setProcessedPacketsPromise() {m_nProcessedPacketsPromise.set_value(m_nProcessedPackets);}
-        /// gets processed packets count from promise for async implementations (blocks until stopProcessing is called)
-        virtual size_t getProcessedPacketsCountPromise() override final;
-        /// gets current processed packets count
-        virtual size_t getProcessedPacketsCount() const override final;
-    private:
-        size_t m_nProcessedPackets;
-        std::promise<size_t> m_nProcessedPacketsPromise;
+        /// specialized constructor; still need to specify gt type, output type, and mappings
+        IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
+        virtual cv::Mat getRawInput(size_t nPacketIdx) override; ///< loads and returns a 'packed' input packet
+        virtual cv::Mat getRawGT(size_t nPacketIdx) override; ///< loads and returns a 'packed' gt packet
+        //virtual void parseData() override;
+        std::unordered_map<size_t,size_t> m_mGTIndexLUT;
+        std::vector<std::vector<std::string>> m_vvsInputPaths,m_vvsGTPaths; ///< one path per packet per stream
+        std::vector<std::vector<cv::Size>> m_vvInputSizes,m_vvGTSizes; ///< one size per packet per stream
+        bool m_bIsInputConstantSize,m_bIsGTConstantSize; ///< all streams use same logic
+        cv::Size m_oInputMaxSize,m_oGTMaxSize;
     };
 
-    template<>
-    struct DataCounter_<Group> : public virtual IDataHandler {
-        /// gets processed packets count from children batch promises for async implementations
-        virtual size_t getProcessedPacketsCountPromise() override final;
-        /// gets current processed packets count from children batches
-        virtual size_t getProcessedPacketsCount() const override final;
+    /// data producer constructor wrapper for cleaner specializations in 'impl' headers (if needed, custom data producers should inherit this instead of IDataProducer_)
+    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset>
+    struct IDataProducerWrapper_ : public IDataProducer_<eDatasetSource> {
+        IDataProducerWrapper_() : IDataProducer_<eDatasetSource>(lv::getGTPacketType<eDatasetTask,eDataset>(),lv::getOutputPacketType<eDatasetTask,eDataset>(),lv::getGTMappingType<eDatasetTask,eDataset>(),lv::getIOMappingType<eDatasetTask,eDataset>()) {}
     };
 
-    /// general-purpose data packet writer, fully implemented (i.e. can be used stand-alone)
+    /// data producer full (default) specialization --- can be overridden by dataset type in 'impl' headers
+    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset>
+    struct DataProducer_ : public IDataProducerWrapper_<eDatasetTask,eDatasetSource,eDataset> {};
+
+    /// general-purpose, stand-alone data packet writer
     struct DataWriter {
         /// attaches to data archiver (the callback is the actual 'writing' action, with a signature similar to 'queue')
         DataWriter(std::function<size_t(const cv::Mat&,size_t)> lDataArchiverCallback);
@@ -623,39 +715,138 @@ namespace lv {
         DataWriter(const DataWriter&) = delete;
     };
 
-    /// data archiver interface for work batches for processed packet saving/loading from disk
-    struct IDataArchiver : public virtual IDataHandler {
+    /// default (specializable) forward declaration of the data archiver interface (used to save/load outputs)
+    template<ArrayPolicy ePolicy>
+    struct IDataArchiver_;
+
+    /// data archiver specialization for non-array output processing
+    template<>
+    struct IDataArchiver_<NotArray> : public virtual IDataHandler {
     protected:
-        /// saves a processed data packet locally based on idx and packet name (if available)
-        virtual size_t save(const cv::Mat& oOutput, size_t nIdx) const;
-        /// loads a processed data packet based on idx and packet name (if available)
-        virtual cv::Mat load(size_t nIdx) const;
+        /// saves a processed data packet locally based on idx and packet name (if available), with optional flags (-1 = internal defaults)
+        virtual void save(const cv::Mat& oOutput, size_t nIdx, int nFlags=-1);
+        /// loads a processed data packet based on idx and packet name (if available), with optional flags (-1 = internal defaults)
+        virtual cv::Mat load(size_t nIdx, int nFlags=-1);
     };
 
-    /// data consumer interface for work batches for receiving processed packets
+    /// data archiver specialization for array output processing
+    template<>
+    struct IDataArchiver_<Array> : public virtual IDataHandler {
+    protected:
+        /// saves a processed data packet array locally based on idx and packet name (if available), with optional flags (-1 = internal defaults)
+        virtual void saveArray(const std::vector<cv::Mat>& vOutput, size_t nIdx, int nFlags=-1);
+        /// loads a processed data packet array based on idx and packet name (if available), with optional flags (-1 = internal defaults)
+        virtual std::vector<cv::Mat> loadArray(size_t nIdx, int nFlags=-1);
+    };
+
+    /// default (specializable) forward declaration of the data counter interface (used only for packet counting)
+    template<GroupPolicy ePolicy>
+    struct IDataCounter_;
+
+    /// data counter specialization for individual work batches (exposes counting logic)
+    template<>
+    struct IDataCounter_<NotGroup> : public virtual IDataHandler {
+    protected:
+        /// increments processed packets count
+        inline void countOutput(size_t nPacketIdx) {m_mProcessedPackets.insert(nPacketIdx);}
+        /// sets the processed packets count promise for async implementations
+        inline void setProcessedOutputCountPromise() {m_nProcessedPacketsPromise.set_value(m_mProcessedPackets.size());}
+        /// resets the processed packets count
+        inline void resetProcessedOutputCount() {m_mProcessedPackets.clear();}
+        /// gets current processed packets count
+        virtual size_t getProcessedOutputCount() const override final;
+        /// gets processed packets count from promise for async implementations (blocks until stopProcessing is called)
+        virtual size_t getProcessedOutputCountPromise() override final;
+    private:
+        std::unordered_set<size_t> m_mProcessedPackets;
+        std::promise<size_t> m_nProcessedPacketsPromise;
+    };
+
+    /// data counter specialization for work batch groups (exposes recursive counting logic)
+    template<>
+    struct IDataCounter_<Group> : public virtual IDataHandler {
+        /// returns the total output packet count expected to be processed by the data consumer
+        virtual size_t getExpectedOutputCount() const override final;
+        /// returns the total output packet count so far processed by the data consumer
+        virtual size_t getProcessedOutputCount() const override final;
+        /// returns the total output packet count so far processed by the data consumer, blocking if processing is not finished yet
+        virtual size_t getProcessedOutputCountPromise() override final;
+    };
+
+    /// default (specializable) forward declaration of the data consumer interface
+    template<DatasetEvalList eDatasetEval, typename ENABLE=void>
+    struct IDataConsumer_;
+
+    /// data consumer specialization for receiving processed packets (evaluation entrypoint)
     template<DatasetEvalList eDatasetEval>
-    struct IDataConsumer_ :
-            public IDataArchiver,
-            public DataCounter_<NotGroup> {
-        /// push a processed data packet for writing and/or evaluation (also registers it as 'done' for internal purposes)
-        virtual void push(const cv::Mat& oOutput, size_t nIdx) {
-            lvAssert_(isProcessing(),"data processing must be toggled via 'startProcessing()' before pushing packets");
-            processPacket();
-            if(getDatasetInfo()->isSavingOutput())
-                save(oOutput,nIdx);
+    struct IDataConsumer_<eDatasetEval,std::enable_if_t<getArrayPolicy<eDatasetEval>()==NotArray>> :
+            public IDataArchiver_<NotArray>,
+            public IDataCounter_<NotGroup> {
+        /// returns the total output packet count expected to be processed by the data consumer (defaults to GT count)
+        virtual size_t getExpectedOutputCount() const override {
+            return getGTCount();
         }
+        /// pushes an output (processed) data packet array for writing and/or evaluation
+        inline void push(const cv::Mat& oOutput, size_t nPacketIdx) {
+            lvAssert_(isProcessing(),"data processing must be toggled via 'startProcessing()' before pushing packets");
+            if(isEvaluable() && getExpectedOutputCount()>0)
+                lvAssert_(nPacketIdx<getExpectedOutputCount(),"tried to push an output packet beyond expected packet limit");
+            countOutput(nPacketIdx);
+            processOutput(oOutput,nPacketIdx);
+            if(getDatasetInfo()->isSavingOutput() && !oOutput.empty())
+                this->save(oOutput,nPacketIdx);
+        }
+    protected:
+        /// processes an output packet (does nothing by default, but may be overridden for evaluation/pipelining)
+        virtual void processOutput(const cv::Mat& /*oOutput*/, size_t /*nPacketIdx*/) {}
     };
 
-    /// async data consumer interface for work batches for receiving processed packets & async context setup/init
+    /// data consumer specialization for receiving processed packet arrays (evaluation entrypoint)
+    template<DatasetEvalList eDatasetEval>
+    struct IDataConsumer_<eDatasetEval,std::enable_if_t<getArrayPolicy<eDatasetEval>()==Array>> :
+            public IDataArchiver_<Array>,
+            public IDataCounter_<NotGroup> {
+        /// returns the number of parallel output streams (defaults to GT stream count if loader is array-based, and 1 otherwise)
+        virtual size_t getOutputStreamCount() const {
+            auto pLoader = shared_from_this_cast<IDataLoader_<Array>>();
+            if(pLoader)
+                return pLoader->getGTStreamCount();
+            return 1;
+        }
+        /// returns the total output packet count expected to be processed by the data consumer (defaults to GT count)
+        virtual size_t getExpectedOutputCount() const override {
+            return getGTCount();
+        }
+        /// returns the (friendly) name of an output stream specified by index
+        virtual std::string getOutputStreamName(size_t nStreamIdx) const {
+            return cv::format("out[%02d]",(int)nStreamIdx);
+        }
+        /// pushes an output (processed) data packet array for writing and/or evaluation
+        inline void push(const std::vector<cv::Mat>& vOutput, size_t nPacketIdx) {
+            lvAssert_(isProcessing(),"data processing must be toggled via 'startProcessing()' before pushing packets");
+            lvAssert_(nPacketIdx<getExpectedOutputCount(),"tried to push an output packet beyond expected packet limit");
+            lvAssert_(vOutput.empty() || vOutput.size()==getOutputStreamCount(),"bad output array size");
+            countOutput(nPacketIdx);
+            processOutput(vOutput,nPacketIdx);
+            if(getDatasetInfo()->isSavingOutput() && !vOutput.empty())
+                this->saveArray(vOutput,nPacketIdx);
+        }
+    protected:
+        /// processes an output array packet (does nothing by default, but may be overridden for evaluation/pipelining)
+        virtual void processOutput(const std::vector<cv::Mat>& /*vOutput*/, size_t /*nPacketIdx*/) {}
+    };
+
+    /// default (specializable) forward declaration of the async data consumer interface used for receiving processed packets (evaluation entrypoint)
     template<DatasetEvalList eDatasetEval, lv::ParallelAlgoType eImpl>
     struct IAsyncDataConsumer_;
 
 #if HAVE_GLSL
 
+    /// async data consumer specialization for non-array binary classification processing
     template<>
     struct IAsyncDataConsumer_<DatasetEval_BinaryClassifier,lv::GLSL> :
-            public IDataArchiver,
-            public DataCounter_<NotGroup> {
+            public IDataArchiver_<NotArray>,
+            public IDataCounter_<NotGroup> {
         /// returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs, if available)
         virtual cv::Size getIdealGLWindowSize() const;
         /// initializes internal params & calls 'initialize_gl' on algo with expanded args list
@@ -687,10 +878,10 @@ namespace lv {
         /// called just after the GL algorithm/evaluator process a new packet
         virtual void post_apply_gl(size_t nNextIdx, bool bRebindAll);
         /// utility function for output/debug mask display (should be overloaded if also evaluating results)
-        virtual void getColoredMasks(cv::Mat& oOutput, cv::Mat& oDebug, const cv::Mat& oGT=cv::Mat(), const cv::Mat& oROI=cv::Mat());
+        virtual void getColoredMasks(cv::Mat& oOutput, cv::Mat& oDebug, const cv::Mat& oGT=cv::Mat(), const cv::Mat& oGTROI=cv::Mat());
         std::shared_ptr<lv::IParallelAlgo_GLSL> m_pAlgo;
         std::shared_ptr<GLImageProcEvaluatorAlgo> m_pEvalAlgo;
-        std::shared_ptr<IDataLoader> m_pLoader;
+        std::shared_ptr<IIDataLoader> m_pLoader;
         cv::Mat m_oLastInput,m_oCurrInput,m_oNextInput;
         cv::Mat m_oLastGT,m_oCurrGT,m_oNextGT;
         size_t m_nLastIdx,m_nCurrIdx,m_nNextIdx;
