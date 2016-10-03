@@ -53,24 +53,24 @@ namespace lv {
                 ) {}
         /// returns the names of all work batch directories available for this dataset specialization
         static const std::vector<std::string>& getWorkBatchDirNames() {
-            static std::vector<std::string> s_vsWorkBatchDirs = {"TESTING"};
+            static const std::vector<std::string> s_vsWorkBatchDirs = {"TESTING"};
             return s_vsWorkBatchDirs;
         }
         /// returns the names of all work batch directories which should be skipped for this dataset speialization
         static const std::vector<std::string>& getSkippedWorkBatchDirNames() {
-            static std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
+            static const std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
             return s_vsSkippedWorkBatchDirs;
         }
         /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
         static const std::vector<std::string>& getGrayscaleWorkBatchDirNames() {
-            static std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {};
+            static const std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {};
             return s_vsGrayscaleWorkBatchDirs;
         }
     };
 
     template<DatasetTaskList eDatasetTask>
     struct DataProducer_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1> :
-            public DataProducer_c<eDatasetTask,DatasetSource_Video> {
+            public IDataProducerWrapper_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1> {
     protected:
         virtual void parseData() override final {
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
@@ -86,23 +86,23 @@ namespace lv {
             this->m_voVideoReader.open(vsVideoSeqPaths[0]);
             if(!this->m_voVideoReader.isOpened())
                 lvError_("PETS2006D3TC1 sequence '%s': video file could not be opened",this->getName().c_str());
-            lv::GetFilesFromDir(vsGTSubdirPaths[0],this->m_vsGTFramePaths);
-            if(this->m_vsGTFramePaths.empty())
+            lv::GetFilesFromDir(vsGTSubdirPaths[0],this->m_vsGTPaths);
+            if(this->m_vsGTPaths.empty())
                 lvError_("PETS2006D3TC1 sequence '%s': did not possess any valid GT frames",this->getName().c_str());
             const std::string sGTFilePrefix("image_");
             const size_t nInputFileNbDecimals = 4;
             this->m_mGTIndexLUT.clear();
-            for(auto iter=this->m_vsGTFramePaths.begin(); iter!=this->m_vsGTFramePaths.end(); ++iter)
-                this->m_mGTIndexLUT[(size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str())] = iter-this->m_vsGTFramePaths.begin();
-            cv::Mat oTempImg = cv::imread(this->m_vsGTFramePaths[0]);
+            for(auto iter=this->m_vsGTPaths.begin(); iter!=this->m_vsGTPaths.end(); ++iter)
+                this->m_mGTIndexLUT[(size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str())] = iter-this->m_vsGTPaths.begin();
+            cv::Mat oTempImg = cv::imread(this->m_vsGTPaths[0]);
             if(oTempImg.empty())
                 lvError_("PETS2006D3TC1 sequence '%s': did not possess valid GT file(s)",this->getName().c_str());
-            this->m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
-            this->m_oOrigSize = this->m_oROI.size();
+            this->m_oInputROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
             const double dScale = this->getDatasetInfo()->getScaleFactor();
             if(dScale!=1.0)
-                cv::resize(this->m_oROI,this->m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
-            this->m_oSize = this->m_oROI.size();
+                cv::resize(this->m_oInputROI,this->m_oInputROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
+            this->m_oGTROI = this->m_oInputROI;
+            this->m_oInputSize = this->m_oGTSize = this->m_oInputROI.size();
             this->m_nNextExpectedVideoReaderFrameIdx = 0;
             this->m_nFrameCount = (size_t)this->m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
             lvAssert_(this->m_nFrameCount>0,"could not find any input frames");

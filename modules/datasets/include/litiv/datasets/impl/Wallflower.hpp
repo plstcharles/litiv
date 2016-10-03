@@ -53,24 +53,24 @@ namespace lv {
                 ) {}
         /// returns the names of all work batch directories available for this dataset specialization
         static const std::vector<std::string>& getWorkBatchDirNames() {
-            static std::vector<std::string> s_vsWorkBatchDirs = {""}; // 'current' directory should contain the videos
+            static const std::vector<std::string> s_vsWorkBatchDirs = {""}; // 'current' directory should contain the videos
             return s_vsWorkBatchDirs;
         }
         /// returns the names of all work batch directories which should be skipped for this dataset speialization
         static const std::vector<std::string>& getSkippedWorkBatchDirNames() {
-            static std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
+            static const std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
             return s_vsSkippedWorkBatchDirs;
         }
         /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
         static const std::vector<std::string>& getGrayscaleWorkBatchDirNames() {
-            static std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {};
+            static const std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {};
             return s_vsGrayscaleWorkBatchDirs;
         }
     };
 
     template<DatasetTaskList eDatasetTask>
     struct DataProducer_<eDatasetTask,DatasetSource_Video,Dataset_Wallflower> :
-            public DataProducer_c<eDatasetTask,DatasetSource_Video> {
+            public IDataProducerWrapper_<eDatasetTask,DatasetSource_Video,Dataset_Wallflower> {
     protected:
         virtual void parseData() override final {
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
@@ -86,8 +86,8 @@ namespace lv {
                 if(*iter==lv::AddDirSlashIfMissing(this->getDataPath())+"script.txt")
                     bFoundScript = true;
                 else if(iter->find(sGTFilePrefix)!=std::string::npos) {
-                    this->m_mGTIndexLUT[(size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str())] = this->m_vsGTFramePaths.size();
-                    this->m_vsGTFramePaths.push_back(*iter);
+                    this->m_mGTIndexLUT[(size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str())] = this->m_vsGTPaths.size();
+                    this->m_vsGTPaths.push_back(*iter);
                     bFoundGTFile = true;
                 }
                 else {
@@ -96,17 +96,17 @@ namespace lv {
                     this->m_vsInputPaths.push_back(*iter);
                 }
             }
-            if(!bFoundGTFile || !bFoundScript || this->m_vsInputPaths.empty() || this->m_vsGTFramePaths.size()!=1)
+            if(!bFoundGTFile || !bFoundScript || this->m_vsInputPaths.empty() || this->m_vsGTPaths.size()!=1)
                 lvError_("Wallflower sequence '%s' did not possess the required groundtruth and input files",this->getName().c_str());
-            cv::Mat oTempImg = cv::imread(this->m_vsGTFramePaths[0]);
+            cv::Mat oTempImg = cv::imread(this->m_vsGTPaths[0]);
             if(oTempImg.empty())
                 lvError_("Wallflower sequence '%s' did not possess a valid GT file",this->getName().c_str());
-            this->m_oROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
-            this->m_oOrigSize = this->m_oROI.size();
+            this->m_oInputROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
             const double dScale = this->getDatasetInfo()->getScaleFactor();
             if(dScale!=1.0)
-                cv::resize(this->m_oROI,this->m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
-            this->m_oSize = this->m_oROI.size();
+                cv::resize(this->m_oInputROI,this->m_oInputROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
+            this->m_oGTROI = this->m_oInputROI;
+            this->m_oInputSize = this->m_oGTSize = this->m_oInputROI.size();
             this->m_nFrameCount = this->m_vsInputPaths.size();
             lvAssert_(this->m_nFrameCount>0,"could not find any input frames");
         }

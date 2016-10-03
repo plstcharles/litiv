@@ -54,9 +54,10 @@ namespace lv {
                 ) {}
         /// returns the names of all work batch directories available for this dataset specialization
         static const std::vector<std::string>& getWorkBatchDirNames(bool b2014=true) {
-            static std::vector<std::string> s_vsWorkBatchDirs_2014 = {"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"};
-            static std::vector<std::string> s_vsWorkBatchDirs_2012 = {"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"};
-            //return std::vector<std::string>{"baseline_highway_cut2"}
+            static const std::vector<std::string> s_vsWorkBatchDirs_2014 = {"badWeather","baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","lowFramerate","nightVideos","PTZ","shadow","thermal","turbulence"};
+            static const std::vector<std::string> s_vsWorkBatchDirs_2012 = {"baseline","cameraJitter","dynamicBackground","intermittentObjectMotion","shadow","thermal"};
+            //static const std::vector<std::string> tmp = std::vector<std::string>{"baseline_highway"};
+            //return tmp;
             if(b2014)
                 return s_vsWorkBatchDirs_2014;
             else
@@ -64,19 +65,19 @@ namespace lv {
         }
         /// returns the names of all work batch directories which should be skipped for this dataset speialization
         static const std::vector<std::string>& getSkippedWorkBatchDirNames() {
-            static std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
+            static const std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
             return s_vsSkippedWorkBatchDirs;
         }
         /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
         static const std::vector<std::string>& getGrayscaleWorkBatchDirNames() {
-            static std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {"thermal","turbulence"};
+            static const std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {"thermal","turbulence"};
             return s_vsGrayscaleWorkBatchDirs;
         }
     };
 
     template<DatasetTaskList eDatasetTask>
     struct DataProducer_<eDatasetTask,DatasetSource_Video,Dataset_CDnet> :
-            public DataProducer_c<eDatasetTask,DatasetSource_Video> {
+            public IDataProducerWrapper_<eDatasetTask,DatasetSource_Video,Dataset_CDnet> {
     protected:
         virtual void parseData() override final {
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
@@ -88,24 +89,24 @@ namespace lv {
                 lvError_("CDnet sequence '%s' did not possess the required groundtruth and input directories",this->getName().c_str());
             lv::GetFilesFromDir(*inputDir,this->m_vsInputPaths);
             lv::GetFilesFromDir(*gtDir,this->m_vsGTPaths);
-            if(this->m_vsGTPaths.size()!=this->m_vsInputPaths.size())
-                lvError_("CDnet sequence '%s' did not possess same amount of GT & input frames",this->getName().c_str());
-            this->m_oROI = cv::imread(lv::AddDirSlashIfMissing(this->getDataPath())+"ROI.bmp",cv::IMREAD_GRAYSCALE);
-            cv::Mat oTempROI = cv::imread(lv::AddDirSlashIfMissing(this->getDataPath())+"ROI.jpg");
-            if(this->m_oROI.empty() || oTempROI.empty())
-                lvError_("CDnet sequence '%s' did not possess ROI.bmp/ROI.jpg files",this->getName().c_str());
-            if(this->m_oROI.size()!=oTempROI.size()) {
-                std::cerr << "CDnet sequence '" << this->getName().c_str() << "' ROI images size mismatch; will keep smallest overlap." << std::endl;
-                this->m_oROI = this->m_oROI(cv::Rect(0,0,std::min(this->m_oROI.cols,oTempROI.cols),std::min(this->m_oROI.rows,oTempROI.rows))).clone();
-            }
-            this->m_oROI = this->m_oROI>0;
-            this->m_oOrigSize = this->m_oROI.size();
-            const double dScale = this->getDatasetInfo()->getScaleFactor();
-            if(dScale!=1.0)
-                cv::resize(this->m_oROI,this->m_oROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
-            this->m_oSize = this->m_oROI.size();
             this->m_nFrameCount = this->m_vsInputPaths.size();
             lvAssert_(this->m_nFrameCount>0,"could not find any input frames");
+            if(this->m_vsGTPaths.size()!=this->m_vsInputPaths.size())
+                lvError_("CDnet sequence '%s' did not possess same amount of GT & input frames",this->getName().c_str());
+            cv::Mat oROI = cv::imread(lv::AddDirSlashIfMissing(this->getDataPath())+"ROI.bmp",cv::IMREAD_GRAYSCALE);
+            cv::Mat oTempROI = cv::imread(lv::AddDirSlashIfMissing(this->getDataPath())+"ROI.jpg");
+            if(oROI.empty() || oTempROI.empty())
+                lvError_("CDnet sequence '%s' did not possess ROI.bmp/ROI.jpg files",this->getName().c_str());
+            if(oROI.size()!=oTempROI.size()) {
+                std::cerr << "CDnet sequence '" << this->getName().c_str() << "' ROI images size mismatch; will keep smallest overlap." << std::endl;
+                oROI = oROI(cv::Rect(0,0,std::min(oROI.cols,oTempROI.cols),std::min(oROI.rows,oTempROI.rows))).clone();
+            }
+            this->m_oInputROI = oROI>0;
+            const double dScale = this->getDatasetInfo()->getScaleFactor();
+            if(dScale!=1.0)
+                cv::resize(this->m_oInputROI,this->m_oInputROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
+            this->m_oGTROI = this->m_oInputROI;
+            this->m_oInputSize = this->m_oGTSize = this->m_oInputROI.size();
             this->m_mGTIndexLUT.clear();
             for(size_t i=0; i<this->m_nFrameCount; ++i)
                 this->m_mGTIndexLUT[i] = i; // direct gt path index to frame index mapping

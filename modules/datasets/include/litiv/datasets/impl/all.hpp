@@ -22,7 +22,7 @@
 #else //_LITIV_DATASETS_IMPL_H_
 #include "litiv/datasets/impl/BSDS500.hpp"
 #include "litiv/datasets/impl/CDnet.hpp"
-//#include "litiv/datasets/impl/LITIV2012b.hpp"  @@@@ still need to work on interfaces for eDatasetType_VideoRegistr
+//#include "litiv/datasets/impl/LITIV2012b.hpp"  @@@@ still need to work on interfaces for DatasetTask_Registr
 #include "litiv/datasets/impl/PETS2001.hpp"
 //#include "litiv/datasets/impl/vap-trimod2016.hpp" @@@ curr wip
 #include "litiv/datasets/impl/Wallflower.hpp"
