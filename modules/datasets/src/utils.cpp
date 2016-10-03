@@ -892,7 +892,7 @@ size_t lv::IDataProducer_<lv::DatasetSource_ImageArray>::getInputCount() const {
 }
 
 size_t lv::IDataProducer_<lv::DatasetSource_ImageArray>::getGTCount() const {
-    return m_vvsGTPaths.size();
+    return m_mGTIndexLUT.size();
 }
 
 double lv::IDataProducer_<lv::DatasetSource_ImageArray>::getExpectedLoad() const {
