@@ -137,7 +137,7 @@ namespace lv {
         std::vector<BinClassif> m_vCounters;
     protected:
         /// default constructor; resizes the counters array based on array size
-        inline IMetricsAccumulator_(size_t nArraySize) : m_vCounters(nArraySize) {}
+        inline IMetricsAccumulator_(size_t nArraySize=0) : m_vCounters(nArraySize) {}
     };
     using BinClassifMetricsArrayAccumulator = IMetricsAccumulator_<DatasetEval_BinaryClassifierArray>;
     using BinClassifMetricsArrayAccumulatorPtr = std::shared_ptr<BinClassifMetricsArrayAccumulator>;
