@@ -91,7 +91,8 @@ int main(int, char**) {
     try {
         lv::IDatasetPtr pDataset = lv::datasets::create<lv::DatasetTask_Segm,lv::DATASET_ID,eImplTypeEnum>(DATASET_PARAMS);
         lv::IDataHandlerPtrQueue vpBatches = pDataset->getSortedBatches(false);
-        const size_t nTotPackets = pDataset->getTotPackets();
+        const size_t nTotPackets = pDataset->getInputCount();
+        lvAssert(pDataset->getExpectedOutputCount()==0 || nTotPackets==pDataset->getExpectedOutputCount());
         const size_t nTotBatches = vpBatches.size();
         if(nTotBatches==0 || nTotPackets==0)
             lvError_("Could not parse any data for dataset '%s'",pDataset->getName().c_str());
@@ -112,7 +113,7 @@ int main(int, char**) {
         }
         while(g_nActiveThreads>0) // @@@ check if thread crashed?
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        if(pDataset->getProcessedPacketsCountPromise()==nTotPackets)
+        if(pDataset->getProcessedOutputCountPromise()==nTotPackets)
             pDataset->writeEvalReport();
     }
     catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
@@ -132,6 +133,7 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
         lvAssert(oBatch.getFrameCount()>1);
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
         const size_t nTotPacketCount = oBatch.getFrameCount();
+        lvAssert(oBatch.getExpectedOutputCount()==0 || nTotPacketCount==oBatch.getExpectedOutputCount());
         GLContext oContext(oBatch.getFrameSize(),std::string("[GPU] ")+oBatch.getRelativePath(),DISPLAY_OUTPUT==0);
         std::shared_ptr<IBackgroundSubtractor_<lv::GLSL>> pAlgo = std::make_shared<BackgroundSubtractorType>();
 #if DISPLAY_OUTPUT>1
@@ -202,7 +204,8 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
         lvAssert(oBatch.getFrameCount()>1);
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
         const size_t nTotPacketCount = oBatch.getFrameCount();
-        const cv::Mat oROI = oBatch.getROI();
+        lvAssert(oBatch.getExpectedOutputCount()==0 || nTotPacketCount==oBatch.getExpectedOutputCount());
+        const cv::Mat& oROI = oBatch.getFrameROI();
         cv::Mat oCurrInput = oBatch.getInput(nCurrIdx).clone();
         lvAssert(!oCurrInput.empty() && oCurrInput.isContinuous());
         cv::Mat oCurrFGMask(oBatch.getFrameSize(),CV_8UC1,cv::Scalar_<uchar>(0));

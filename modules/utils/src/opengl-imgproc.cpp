@@ -586,6 +586,7 @@ std::string GLImageProcEvaluatorAlgo::getFragmentShaderSource() const {
 }
 
 void GLImageProcEvaluatorAlgo::initialize_gl(const cv::Mat& oInitInput, const cv::Mat& oInitGT, const cv::Mat& oROI) {
+    lvAssert_(oROI.empty() || (oROI.size()==oInitInput.size() && oROI.size()==oInitGT.size()),"roi size mismatch w/ input+gt");
     m_pParent->initialize_gl(oInitInput,oROI);
     this->initialize_gl(oInitGT,oROI);
 }

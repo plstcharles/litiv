@@ -94,10 +94,7 @@ int main(int, char**) { // this sample uses no command line argument
         // In our case, the data packets are simply images that we should apply edge detection on, and the
         // output is an edge detection mask.
         //
-        // ** NOTE: I'll pay a beer to whoever finds how to make the template argument deduction work via:
-        //            lv::IDatasetPtr pDataset = lv::datasets::create<DatasetType>(...);
-        //
-        lv::IDatasetPtr pDataset = lv::datasets::create<lv::DatasetTask_EdgDet,lv::Dataset_Custom,lv::NonParallel>(
+        lv::IDatasetPtr pDataset = DatasetType::create(
             "Custom Dataset Example",
             lv::AddDirSlashIfMissing(SAMPLES_DATA_ROOT)+"custom_dataset_ex/",
             "results_test",
@@ -119,9 +116,8 @@ int main(int, char**) { // this sample uses no command line argument
         // a high-level report to still be generated and written to disk with the processing time and other
         // useful metadata on the session duration and framework version.
 
-        lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false); // returns a list of all work batches in the dataset without considering hierarchy (or images sets, in this case)
-        if(vpBatches.size()==0 || pDataset->getTotPackets()==0) // check that data was indeed properly parsed automatically from the dataset directory
-            lvError_("Could not parse any data for dataset '%s'",pDataset->getName().c_str());
+        lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false); // returns a list of all work batches in the dataset without considering hierarchy
+        lvAssert__(vpBatches.size()>0 && pDataset->getInputCount()>0,"Could not parse any data for dataset '%s'",pDataset->getName().c_str()); // check that data was indeed properly parsed
         std::cout << "Parsing complete. [" << vpBatches.size() << " batch(es)]" << std::endl;
         std::shared_ptr<IEdgeDetector> pAlgo = std::make_shared<EdgeDetectorLBSP>(); // instantiate an edge detector algo with default parameters
         cv::Mat oEdgeMask; // no need to preallocate the output matrix (the algo will make sure it is allocated at some point)
