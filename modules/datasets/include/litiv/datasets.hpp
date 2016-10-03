@@ -123,7 +123,7 @@ namespace lv {
                     this->m_dElapsedTime_sec = this->m_oStopWatch.tock();
                     this->stopProcessing_impl();
                     this->m_bIsProcessing = false;
-                    this->stopAsyncPrecaching();
+                    this->stopPrecaching();
                     this->setProcessedOutputCountPromise();
                 }
             }

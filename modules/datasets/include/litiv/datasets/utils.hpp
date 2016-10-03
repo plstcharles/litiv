@@ -293,6 +293,10 @@ namespace lv {
         virtual void writeEvalReport() const = 0;
         /// virtual destructor for adequate cleanup from IDataHandler pointers
         virtual ~IDataHandler() = default;
+        /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
+        virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) = 0;
+        /// kills the asynchronyzed precacher, and clears internal buffers
+        virtual void stopPrecaching() = 0;
         /// returns whether this work batch (or any of this work group's children batches) is currently processing data
         virtual bool isProcessing() const = 0;
         /// returns the current (or final) duration elapsed between start/stopProcessing calls (recursively queried for work groups)
@@ -341,6 +345,10 @@ namespace lv {
         virtual bool isGroup() const override final;
         /// returns this work group's children (work batch array)
         virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const override final;
+        /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
+        virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) override final;
+        /// kills the asynchronyzed precacher, and clears internal buffers
+        virtual void stopPrecaching() override final;
         /// returns whether any of this work group's children batches is currently processing data
         virtual bool isProcessing() const override final;
         /// returns the current (or final) duration elapsed between start/stopProcessing calls, recursively queried for all children work batches
@@ -409,9 +417,9 @@ namespace lv {
         /// returns the input/output data packet mapping type policy (used for internal packet auto-transformations)
         inline MappingPolicy getIOMappingType() const {return m_eIOMappingType;}
         /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
-        virtual void startAsyncPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize=SIZE_MAX);
+        virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) override;
         /// kills the asynchronyzed precacher, and clears internal buffers
-        virtual void stopAsyncPrecaching();
+        virtual void stopPrecaching() override;
         /// returns an input packet by index (works both with and without precaching enabled)
         const cv::Mat& getInput(size_t nPacketIdx);
         /// returns a gt packet by index (works both with and without precaching enabled)
@@ -530,8 +538,8 @@ namespace lv {
         virtual size_t getGTCount() const override;
         /// compute the expected CPU load for this data batch based on frame size, frame count, and channel count
         virtual double getExpectedLoad() const override;
-        /// initializes frame precaching for this work batch (will try to allocate enough memory for the entire sequence)
-        virtual void startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
+        /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
+        virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) override;
     protected:
         /// specialized constructor; still need to specify gt type, output type, and mappings
         IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
@@ -569,8 +577,8 @@ namespace lv {
         virtual size_t getGTCount() const override;
         /// compute the expected CPU load for this data batch based on frame size, frame count, and channel count
         virtual double getExpectedLoad() const override;
-        /// initializes frame precaching for this work batch (will try to allocate enough memory for the entire sequence)
-        virtual void startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
+        /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
+        virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) override;
     protected:
         /// specialized constructor; still need to specify gt type, output type, and mappings
         IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
@@ -606,8 +614,8 @@ namespace lv {
         virtual size_t getGTCount() const override;
         /// compute the expected CPU load for this data batch based on max image size, image count, and channel count
         virtual double getExpectedLoad() const override;
-        /// initializes image precaching for this work batch (will try to allocate enough memory for the entire set)
-        virtual void startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
+        /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
+        virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) override;
         /// returns the size associated with an input image by index @@@@@ override later to make size N-Dim?
         virtual const cv::Size& getInputSize(size_t nPacketIdx) const override;
         /// returns the size associated with a gt image by index @@@@@ override later to make size N-Dim?
@@ -647,8 +655,8 @@ namespace lv {
         virtual size_t getGTCount() const override;
         /// compute the expected CPU load for this data batch based on max image size, image count, and channel count
         virtual double getExpectedLoad() const override;
-        /// initializes frame precaching for this work batch (will try to allocate enough memory for the entire sequence)
-        virtual void startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/=0) override;
+        /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
+        virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) override;
         /// returns the size associated with an input image by index @@@@@ override later to make size N-Dim?
         virtual const std::vector<cv::Size>& getInputSizeArray(size_t nPacketIdx) const override;
         /// returns the size associated with a gt image by index @@@@@ override later to make size N-Dim?

@@ -93,6 +93,16 @@ lv::IDataHandlerPtrArray lv::IGroupDataParser::getBatches(bool bWithHierarchy) c
     return vpBatches;
 }
 
+void lv::IGroupDataParser::startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize) {
+    for(const auto& pBatch : getBatches(true))
+        pBatch->startPrecaching(bPrecacheGT,nSuggestedBufferSize);
+}
+
+void lv::IGroupDataParser::stopPrecaching() {
+    for(const auto& pBatch : getBatches(true))
+        pBatch->stopPrecaching();
+}
+
 bool lv::IGroupDataParser::isProcessing() const {
     for(const auto& pBatch : getBatches(true))
         if(pBatch->isProcessing())
@@ -321,12 +331,12 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void lv::IIDataLoader::startAsyncPrecaching(bool bUsingGT, size_t nSuggestedBufferSize) {
+void lv::IIDataLoader::startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize) {
     lvAssert_(m_oInputPrecacher.startAsyncPrecaching(nSuggestedBufferSize),"could not start precaching input packets");
-    lvAssert_(!bUsingGT || m_oGTPrecacher.startAsyncPrecaching(nSuggestedBufferSize),"could not start precaching gt packets");
+    lvAssert_(!bPrecacheGT || m_oGTPrecacher.startAsyncPrecaching(nSuggestedBufferSize),"could not start precaching gt packets");
 }
 
-void lv::IIDataLoader::stopAsyncPrecaching() {
+void lv::IIDataLoader::stopPrecaching() {
     m_oInputPrecacher.stopAsyncPrecaching();
     m_oGTPrecacher.stopAsyncPrecaching();
 }
@@ -552,8 +562,8 @@ double lv::IDataProducer_<lv::DatasetSource_Video>::getExpectedLoad() const {
     return (double)(m_oInputROI.empty()?m_oInputSize.area():cv::countNonZero(m_oInputROI))*m_nFrameCount*(int(!isGrayscale())+1);
 }
 
-void lv::IDataProducer_<lv::DatasetSource_Video>::startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/) {
-    return IIDataLoader::startAsyncPrecaching(bUsingGT,m_oInputSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
+void lv::IDataProducer_<lv::DatasetSource_Video>::startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize) {
+    return IIDataLoader::startPrecaching(bPrecacheGT,(nSuggestedBufferSize==SIZE_MAX)?m_oInputSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3):nSuggestedBufferSize);
 }
 
 lv::IDataProducer_<lv::DatasetSource_Video>::IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
@@ -664,8 +674,8 @@ double lv::IDataProducer_<lv::DatasetSource_VideoArray>::getExpectedLoad() const
     return dLoad;
 }
 
-void lv::IDataProducer_<lv::DatasetSource_VideoArray>::startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/) {
-    return IIDataLoader::startAsyncPrecaching(bUsingGT,getInputMaxSize().area()*(m_vvsInputPaths.size()+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
+void lv::IDataProducer_<lv::DatasetSource_VideoArray>::startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize) {
+    return IIDataLoader::startPrecaching(bPrecacheGT,(nSuggestedBufferSize==SIZE_MAX)?getInputMaxSize().area()*(m_vvsInputPaths.size()+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3):nSuggestedBufferSize);
 }
 
 lv::IDataProducer_<lv::DatasetSource_VideoArray>::IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
@@ -790,8 +800,8 @@ double lv::IDataProducer_<lv::DatasetSource_Image>::getExpectedLoad() const {
     return (double)m_oInputMaxSize.area()*m_vsInputPaths.size()*(int(!isGrayscale())+1);
 }
 
-void lv::IDataProducer_<lv::DatasetSource_Image>::startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/) {
-    return IIDataLoader::startAsyncPrecaching(bUsingGT,m_oInputMaxSize.area()*(m_vsInputPaths.size()+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
+void lv::IDataProducer_<lv::DatasetSource_Image>::startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize) {
+    return IIDataLoader::startPrecaching(bPrecacheGT,(nSuggestedBufferSize==SIZE_MAX)?m_oInputMaxSize.area()*(m_vsInputPaths.size()+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3):nSuggestedBufferSize);
 }
 
 const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getInputSize(size_t nPacketIdx) const {
@@ -899,8 +909,8 @@ double lv::IDataProducer_<lv::DatasetSource_ImageArray>::getExpectedLoad() const
     return (double)m_oInputMaxSize.area()*m_vvsInputPaths.size()*(int(!isGrayscale())+1);
 }
 
-void lv::IDataProducer_<lv::DatasetSource_ImageArray>::startAsyncPrecaching(bool bUsingGT, size_t /*nUnused*/) {
-    return IIDataLoader::startAsyncPrecaching(bUsingGT,m_oInputMaxSize.area()*(m_vvsInputPaths.size()+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3));
+void lv::IDataProducer_<lv::DatasetSource_ImageArray>::startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize) {
+    return IIDataLoader::startPrecaching(bPrecacheGT,(nSuggestedBufferSize==SIZE_MAX)?m_oInputMaxSize.area()*(m_vvsInputPaths.size()+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3):nSuggestedBufferSize);
 }
 
 const std::vector<cv::Size>& lv::IDataProducer_<lv::DatasetSource_ImageArray>::getInputSizeArray(size_t nPacketIdx) const {
