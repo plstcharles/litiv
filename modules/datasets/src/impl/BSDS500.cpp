@@ -28,7 +28,6 @@
 #pragma clang diagnostic ignored "-Wformat-security"
 #pragma clang diagnostic ignored "-Wunused-variable"
 #pragma clang diagnostic ignored "-Wshadow"
-#pragma clang diagnostic ignored "-pedantic-errors"
 #endif //__clang__
 #if (defined(__GNUC__) || defined(__GNUG__))
 #pragma GCC diagnostic push
@@ -39,7 +38,6 @@
 #pragma GCC diagnostic ignored "-Wformat-security"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wshadow"
-#pragma GCC diagnostic ignored "-pedantic-errors"
 #endif //(defined(__GNUC__) || defined(__GNUG__))
 #ifdef _MSC_VER
 #pragma warning(push,0)
