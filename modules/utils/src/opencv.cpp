@@ -34,7 +34,7 @@ cv::DisplayHelper::DisplayHelper(const std::string& sDisplayName, const std::str
         m_bContinuousUpdates(false),
         m_bFirstDisplay(true),
         m_oMouseEventCallback(std::bind(&DisplayHelper::onMouseEventCallback,this,std::placeholders::_1,std::placeholders::_2,std::placeholders::_3,std::placeholders::_4)) {
-    cv::namedWindow(m_sDisplayName,nWindowFlags);
+    cv::namedWindow(m_sDisplayName,nWindowFlags); // @@@ if it blocks, recompile opencv without Qt (bug still here as of OpenCV 3.1)
     cv::setMouseCallback(m_sDisplayName,onMouseEvent,(void*)&m_oMouseEventCallback);
 }
 
