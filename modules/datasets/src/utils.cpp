@@ -23,7 +23,7 @@
 #define PRECACHE_REQUEST_TIMEOUT_MS        1
 #define PRECACHE_QUERY_TIMEOUT_MS          10
 #define PRECACHE_QUERY_END_TIMEOUT_MS      500
-#define PRECACHE_PREFILL_TIMEOUT_MS        5000
+#define PRECACHE_REFILL_TIMEOUT_MS         10000
 #if (!(defined(_M_X64) || defined(__amd64__)) && CACHE_MAX_SIZE_GB>2)
 #error "Cache max size exceeds system limit (x86)."
 #endif //(!(defined(_M_X64) || defined(__amd64__)) && CACHE_MAX_SIZE_GB>2)
@@ -158,7 +158,7 @@ lv::DataPrecacher::DataPrecacher(std::function<const cv::Mat&(size_t)> lDataLoad
         m_lCallback(lDataLoaderCallback) {
     lvAssert_(m_lCallback,"invalid data precacher callback");
     m_bIsActive = false;
-    m_nReqIdx = m_nLastReqIdx = size_t(-1);
+    m_nAnswIdx = m_nReqIdx = m_nLastReqIdx = size_t(-1);
 }
 
 lv::DataPrecacher::~DataPrecacher() {
@@ -176,16 +176,18 @@ const cv::Mat& lv::DataPrecacher::getPacket(size_t nIdx) {
     std::mutex_unique_lock sync_lock(m_oSyncMutex);
     m_nReqIdx = nIdx;
     std::cv_status res;
+    size_t nAnswIdx;
     do {
         m_oReqCondVar.notify_one();
         res = m_oSyncCondVar.wait_for(sync_lock,std::chrono::milliseconds(PRECACHE_REQUEST_TIMEOUT_MS));
+        nAnswIdx = m_nAnswIdx.load();
 #if CONSOLE_DEBUG
-        if(res==std::cv_status::timeout)
+        if(res==std::cv_status::timeout && nAnswIdx!=m_nReqIdx)
             std::cout << "data precacher [" << uintptr_t(this) << "] retrying request for packet #" << nIdx << "..." << std::endl;
 #endif //CONSOLE_DEBUG
-    } while(res==std::cv_status::timeout);
+    } while(res==std::cv_status::timeout && nAnswIdx!=m_nReqIdx);
     m_oLastReqPacket = m_oReqPacket;
-    m_nLastReqIdx = nIdx;
+    m_nLastReqIdx = nAnswIdx;
     return m_oLastReqPacket;
 }
 
@@ -193,12 +195,12 @@ bool lv::DataPrecacher::startAsyncPrecaching(size_t nSuggestedBufferSize) {
     static_assert(PRECACHE_REQUEST_TIMEOUT_MS>0,"Precache request timeout must be a positive value");
     static_assert(PRECACHE_QUERY_TIMEOUT_MS>0,"Precache query timeout must be a positive value");
     static_assert(PRECACHE_QUERY_END_TIMEOUT_MS>0,"Precache query post-end timeout must be a positive value");
-    static_assert(PRECACHE_PREFILL_TIMEOUT_MS>0,"Precache prefill timeout must be a positive value");
+    static_assert(PRECACHE_REFILL_TIMEOUT_MS>0,"Precache refill timeout must be a positive value");
     if(m_bIsActive)
         stopAsyncPrecaching();
     if(nSuggestedBufferSize>0) {
         m_bIsActive = true;
-        m_nReqIdx = size_t(-1);
+        m_nAnswIdx = m_nReqIdx = size_t(-1);
         m_hWorker = std::thread(&DataPrecacher::entry,this,std::max(std::min(nSuggestedBufferSize,CACHE_MAX_SIZE),CACHE_MIN_SIZE));
     }
     return m_bIsActive;
@@ -213,29 +215,58 @@ void lv::DataPrecacher::stopAsyncPrecaching() {
 
 void lv::DataPrecacher::entry(const size_t nBufferSize) {
     std::mutex_unique_lock sync_lock(m_oSyncMutex);
+#if CONSOLE_DEBUG
+    std::cout << "data precacher [" << uintptr_t(this) << "] init w/ buffer size = " << (nBufferSize/1024)/1024 << " mb" << std::endl;
+#endif //CONSOLE_DEBUG
     std::queue<cv::Mat> qoCache;
     std::vector<uchar> vcBuffer(nBufferSize);
     size_t nNextExpectedReqIdx = 0;
     size_t nNextPrecacheIdx = 0;
-    size_t nFirstBufferIdx = 0;
-    size_t nNextBufferIdx = 0;
+    size_t nFirstBufferIdx = size_t(-1);
+    size_t nNextBufferIdx = size_t(-1);
     bool bReachedEnd = false;
-#if CONSOLE_DEBUG
-    std::cout << "data precacher [" << uintptr_t(this) << "] init w/ buffer size = " << (nBufferSize/1024)/1024 << " mb" << std::endl;
-#endif //CONSOLE_DEBUG
-    const std::chrono::time_point<std::chrono::high_resolution_clock> nPrefillTick = std::chrono::high_resolution_clock::now();
-    while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nPrefillTick).count()<PRECACHE_PREFILL_TIMEOUT_MS) {
+    const auto lCacheNextPacket = [&]() -> size_t {
         const cv::Mat& oNextPacket = m_lCallback(nNextPrecacheIdx);
         const size_t nNextPacketSize = oNextPacket.total()*oNextPacket.elemSize();
-        if(nNextPacketSize>0 && nNextBufferIdx+nNextPacketSize<nBufferSize) {
+        if(nNextPacketSize==0) {
+            bReachedEnd = true;
+            return 0;
+        }
+        else if(nFirstBufferIdx<=nNextBufferIdx) {
+            bReachedEnd = false;
+            if(nNextBufferIdx==size_t(-1) || (nNextBufferIdx+nNextPacketSize>=nBufferSize)) {
+                if((nFirstBufferIdx!=size_t(-1) && nNextPacketSize>=nFirstBufferIdx) || nNextPacketSize>=nBufferSize)
+                    return 0;
+                cv::Mat oNextPacket_cache(oNextPacket.size(),oNextPacket.type(),vcBuffer.data());
+                oNextPacket.copyTo(oNextPacket_cache);
+                qoCache.push(oNextPacket_cache);
+                nNextBufferIdx = nNextPacketSize;
+                if(nFirstBufferIdx==size_t(-1))
+                    nFirstBufferIdx = 0;
+            }
+            else { // nNextBufferIdx+nNextPacketSize<m_nBufferSize
+                cv::Mat oNextPacket_cache(oNextPacket.size(),oNextPacket.type(),vcBuffer.data()+nNextBufferIdx);
+                oNextPacket.copyTo(oNextPacket_cache);
+                qoCache.push(oNextPacket_cache);
+                nNextBufferIdx += nNextPacketSize;
+            }
+        }
+        else if(nNextBufferIdx+nNextPacketSize<nFirstBufferIdx) {
             cv::Mat oNextPacket_cache(oNextPacket.size(),oNextPacket.type(),vcBuffer.data()+nNextBufferIdx);
             oNextPacket.copyTo(oNextPacket_cache);
             qoCache.push(oNextPacket_cache);
             nNextBufferIdx += nNextPacketSize;
-            ++nNextPrecacheIdx;
         }
-        else break;
-    }
+        else // nNextBufferIdx+nNextPacketSize>=nFirstBufferIdx
+            return 0;
+        ++nNextPrecacheIdx;
+#if CONSOLE_DEBUG
+        //std::cout << "data precacher [" << uintptr_t(this) << "] filled one packet w/ size = " << nNextPacketSize/1024 << " kb" << std::endl;
+#endif //CONSOLE_DEBUG
+        return nNextPacketSize;
+    };
+    const std::chrono::time_point<std::chrono::high_resolution_clock> nPrefillTick = std::chrono::high_resolution_clock::now();
+    while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nPrefillTick).count()<PRECACHE_REFILL_TIMEOUT_MS && lCacheNextPacket());
     while(m_bIsActive) {
         if(m_oReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(bReachedEnd?PRECACHE_QUERY_END_TIMEOUT_MS:PRECACHE_QUERY_TIMEOUT_MS))!=std::cv_status::timeout) {
             if(m_nReqIdx!=nNextExpectedReqIdx-1) {
@@ -247,6 +278,7 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
 #endif //CONSOLE_DEBUG
                         while(m_nReqIdx-nNextExpectedReqIdx+1>0) {
                             m_oReqPacket = qoCache.front();
+                            m_nAnswIdx = m_nReqIdx;
                             nFirstBufferIdx = (size_t)(m_oReqPacket.data-vcBuffer.data());
                             qoCache.pop();
                             ++nNextExpectedReqIdx;
@@ -258,6 +290,7 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
 #endif //CONSOLE_DEBUG
                         qoCache = std::queue<cv::Mat>();
                         m_oReqPacket = m_lCallback(m_nReqIdx);
+                        m_nAnswIdx = m_nReqIdx;
                         nFirstBufferIdx = nNextBufferIdx = size_t(-1);
                         nNextExpectedReqIdx = nNextPrecacheIdx = m_nReqIdx+1;
                         bReachedEnd = false;
@@ -268,6 +301,7 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
                     std::cout << "data precacher [" << uintptr_t(this) << "] answering request manually, precaching is falling behind" << std::endl;
 #endif //CONSOLE_DEBUG
                     m_oReqPacket = m_lCallback(m_nReqIdx);
+                    m_nAnswIdx = m_nReqIdx;
                     nFirstBufferIdx = nNextBufferIdx = size_t(-1);
                     nNextExpectedReqIdx = nNextPrecacheIdx = m_nReqIdx+1;
                 }
@@ -277,51 +311,17 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
                 std::cout << "data precacher [" << uintptr_t(this) << "] answering request using last packet" << std::endl;
 #endif //CONSOLE_DEBUG
             m_oSyncCondVar.notify_one();
+            lCacheNextPacket();
         }
-        else {
-            size_t nUsedBufferSize = nFirstBufferIdx==size_t(-1)?0:(nFirstBufferIdx<nNextBufferIdx?nNextBufferIdx-nFirstBufferIdx:nBufferSize-nFirstBufferIdx+nNextBufferIdx);
+        else if(!bReachedEnd) {
+            const size_t nUsedBufferSize = nFirstBufferIdx==size_t(-1)?0:(nFirstBufferIdx<nNextBufferIdx?nNextBufferIdx-nFirstBufferIdx:nBufferSize-nFirstBufferIdx+nNextBufferIdx);
             if(nUsedBufferSize<nBufferSize/4) {
 #if CONSOLE_DEBUG
-                std::cout << "data precacher [" << uintptr_t(this) << "] filling precache buffer... (current size = " << (nUsedBufferSize/1024)/1024 << " mb)" << std::endl;
+                std::cout << "data precacher [" << uintptr_t(this) << "] force refilling precache buffer... (current size = " << (nUsedBufferSize/1024)/1024 << " mb)" << std::endl;
 #endif //CONSOLE_DEBUG
                 size_t nFillCount = 0;
-                while(nUsedBufferSize<nBufferSize && nFillCount<10) {
-                    const cv::Mat& oNextPacket = m_lCallback(nNextPrecacheIdx);
-                    const size_t nNextPacketSize = oNextPacket.total()*oNextPacket.elemSize();
-                    if(nNextPacketSize==0) {
-                        bReachedEnd = true;
-                        break;
-                    }
-                    else if(nFirstBufferIdx<=nNextBufferIdx) {
-                        bReachedEnd = false;
-                        if(nNextBufferIdx==size_t(-1) || (nNextBufferIdx+nNextPacketSize>=nBufferSize)) {
-                            if((nFirstBufferIdx!=size_t(-1) && nNextPacketSize>=nFirstBufferIdx) || nNextPacketSize>=nBufferSize)
-                                break;
-                            cv::Mat oNextPacket_cache(oNextPacket.size(),oNextPacket.type(),vcBuffer.data());
-                            oNextPacket.copyTo(oNextPacket_cache);
-                            qoCache.push(oNextPacket_cache);
-                            nNextBufferIdx = nNextPacketSize;
-                            if(nFirstBufferIdx==size_t(-1))
-                                nFirstBufferIdx = 0;
-                        }
-                        else { // nNextBufferIdx+nNextPacketSize<m_nBufferSize
-                            cv::Mat oNextPacket_cache(oNextPacket.size(),oNextPacket.type(),vcBuffer.data()+nNextBufferIdx);
-                            oNextPacket.copyTo(oNextPacket_cache);
-                            qoCache.push(oNextPacket_cache);
-                            nNextBufferIdx += nNextPacketSize;
-                        }
-                    }
-                    else if(nNextBufferIdx+nNextPacketSize<nFirstBufferIdx) {
-                        cv::Mat oNextPacket_cache(oNextPacket.size(),oNextPacket.type(),vcBuffer.data()+nNextBufferIdx);
-                        oNextPacket.copyTo(oNextPacket_cache);
-                        qoCache.push(oNextPacket_cache);
-                        nNextBufferIdx += nNextPacketSize;
-                    }
-                    else // nNextBufferIdx+nNextPacketSize>=nFirstBufferIdx
-                        break;
-                    nUsedBufferSize += nNextPacketSize;
-                    ++nNextPrecacheIdx;
-                }
+                const std::chrono::time_point<std::chrono::high_resolution_clock> nRefillTick = std::chrono::high_resolution_clock::now();
+                while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nRefillTick).count()<PRECACHE_REFILL_TIMEOUT_MS && nFillCount++<10 && lCacheNextPacket());
             }
         }
     }

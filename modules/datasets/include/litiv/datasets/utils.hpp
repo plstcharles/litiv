@@ -399,6 +399,7 @@ namespace lv {
         std::condition_variable m_oSyncCondVar;
         std::atomic_bool m_bIsActive;
         size_t m_nReqIdx,m_nLastReqIdx;
+        std::atomic_size_t m_nAnswIdx;
         cv::Mat m_oReqPacket,m_oLastReqPacket;
         DataPrecacher& operator=(const DataPrecacher&) = delete;
         DataPrecacher(const DataPrecacher&) = delete;
