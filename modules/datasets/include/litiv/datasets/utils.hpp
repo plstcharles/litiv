@@ -789,8 +789,6 @@ namespace lv {
         /// pushes an output (processed) data packet array for writing and/or evaluation
         inline void push(const cv::Mat& oOutput, size_t nPacketIdx) {
             lvAssert_(isProcessing(),"data processing must be toggled via 'startProcessing()' before pushing packets");
-            if(isEvaluable() && getExpectedOutputCount()>0)
-                lvAssert_(nPacketIdx<getExpectedOutputCount(),"tried to push an output packet beyond expected packet limit");
             countOutput(nPacketIdx);
             processOutput(oOutput,nPacketIdx);
             if(getDatasetInfo()->isSavingOutput() && !oOutput.empty())
@@ -824,7 +822,6 @@ namespace lv {
         /// pushes an output (processed) data packet array for writing and/or evaluation
         inline void push(const std::vector<cv::Mat>& vOutput, size_t nPacketIdx) {
             lvAssert_(isProcessing(),"data processing must be toggled via 'startProcessing()' before pushing packets");
-            lvAssert_(nPacketIdx<getExpectedOutputCount(),"tried to push an output packet beyond expected packet limit");
             lvAssert_(vOutput.empty() || vOutput.size()==getOutputStreamCount(),"bad output array size");
             countOutput(nPacketIdx);
             processOutput(vOutput,nPacketIdx);
