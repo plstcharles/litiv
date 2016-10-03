@@ -39,41 +39,6 @@ namespace lv {
 
     } // namespace datasets
 
-    /// returns the eval type policy to use based on the dataset task type (can also be overriden by dataset type)
-    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
-    constexpr DatasetEvalList getDatasetEval() {
-        // note: these are only defaults, they can be overriden via full specialization in their impl header
-        return
-                (eDatasetTask==DatasetTask_Segm)?DatasetEval_BinaryClassifier:
-                (eDatasetTask==DatasetTask_Registr)?DatasetEval_Registr:
-                (eDatasetTask==DatasetTask_EdgDet)?DatasetEval_BinaryClassifier:
-                // ...
-                DatasetEval_None; // undefined behavior
-    }
-
-    /// returns the source type policy to use based on the dataset task type (can also be overriden by dataset type)
-    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
-    constexpr DatasetSourceList getDatasetSource() {
-        // note: these are only defaults, they can be overriden via full specialization in their impl header
-        return
-                (eDatasetTask==DatasetTask_Segm)?DatasetSource_Video:
-                (eDatasetTask==DatasetTask_Registr)?DatasetSource_VideoArray:
-                (eDatasetTask==DatasetTask_EdgDet)?DatasetSource_Image:
-                // ...
-                DatasetSource_Video; // undefined behavior
-    }
-
-    /// returns whether task, source, and eval types are all compatible (can also be overriden by dataset type)
-    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset, DatasetEvalList eDatasetEval>
-    constexpr bool isDatasetSpecValid() {
-        return
-                (eDatasetTask==DatasetTask_Segm)?((eDatasetEval==DatasetEval_BinaryClassifier)||(eDatasetEval==DatasetEval_MultiClassifier)||(eDatasetEval==DatasetEval_None)):
-                (eDatasetTask==DatasetTask_Registr)?(((eDatasetSource==DatasetSource_VideoArray)||(eDatasetSource==DatasetSource_ImageArray))&&((eDatasetEval==DatasetEval_Registr)||(eDatasetEval==DatasetEval_None))):
-                (eDatasetTask==DatasetTask_EdgDet)?(((eDatasetSource==DatasetSource_Video)||(eDatasetSource==DatasetSource_Image))&&((eDatasetEval==DatasetEval_BinaryClassifier)||(eDatasetEval==DatasetEval_None))):
-                // ...
-                false; // undefined behavior
-    }
-
     /// full implementation of basic data handler interface functions (used in work batch & group impl)
     struct DataHandler : public virtual IDataHandler {
         /// returns the work batch/group name
@@ -88,12 +53,13 @@ namespace lv {
         virtual bool isGrayscale() const override final;
         /// returns a pointer to this work batch/group's parent dataset interface
         virtual IDatasetPtr getDatasetInfo() const override final;
+
     protected:
         /// fills internal impl parameters based on batch name, dataset parameters & current relative data path
         DataHandler(const std::string& sBatchName, std::shared_ptr<IDataset> pDataset, const std::string& sRelativePath);
-        /// returns the children batch associated with the given packet index; will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
+        /// returns the children batch associated with the given (input) packet index; will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
         virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const override final;
-        /// returns the children batch associated with the given packet index; will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
+        /// returns the children batch associated with the given (input) packet index; will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
         virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) override final;
     private:
         const std::string m_sBatchName;
@@ -104,10 +70,20 @@ namespace lv {
         const IDatasetPtr m_pDataset;
     };
 
-    /// top-level dataset interface where work batches & groups are implemented based on template policies --- all internal methods can be overriden via dataset impl headers
+    /// top-level dataset interface where work batches & groups are implemented based on template policies --- all internal methods can be overridden via dataset impl headers
     template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset, DatasetEvalList eDatasetEval, lv::ParallelAlgoType eEvalImpl>
-    struct IDataset_ : public DatasetEvaluator_<eDatasetEval,eDataset> {
+    struct IDataset_ : public DatasetReporter_<eDatasetEval,eDataset> {
         static_assert(lv::isDatasetSpecValid<eDatasetTask,eDatasetSource,eDataset,eDatasetEval>(),"dataset does not support the required task/source/eval combo");
+
+        /// static dataset object creation method with dataset impl specialization (forwards extra args to dataset constructor)
+        template<typename... Targs>
+        static inline IDatasetPtr create(Targs&&... args) {
+            return lv::datasets::create<eDatasetTask,eDataset,eEvalImpl>(std::forward<Targs>(args)...);
+        }
+
+        /// work batch group implementation forward declaration (required before friending, as it hides some templates from top class)
+        struct WorkBatchGroup;
+
         /// fully implemented work batch interface with template specializations
         struct WorkBatch :
                 public DataHandler,
@@ -119,10 +95,10 @@ namespace lv {
             virtual DatasetTaskList getDatasetTask() const override final {return eDatasetTask;}
             /// returns the currently implemented source type for this work batch
             virtual DatasetSourceList getDatasetSource() const override final {return eDatasetSource;}
-            /// returns the currently implemented dataset type for this work batch
-            virtual DatasetList getDataset() const override final {return eDataset;}
             /// returns the currently implemented evaluation type for this work batch
             virtual DatasetEvalList getDatasetEval() const override final {return eDatasetEval;}
+            /// returns the currently implemented dataset type for this work batch
+            virtual DatasetList getDataset() const override final {return eDataset;}
             /// always returns false for non-group work batches
             virtual bool isBare() const override final {return false;}
             /// always returns false for non-group work batches
@@ -134,30 +110,22 @@ namespace lv {
             /// returns whether the work batch is still being processed or not (i.e. between start/stopProcessing calls)
             virtual bool isProcessing() const override final {return m_bIsProcessing;}
             /// sets the work batch in 'processing' mode, initializing timers, packet counters and other time-critical evaluation components (if any)
-            void startProcessing() {
-                if(!m_bIsProcessing) {
-                    _startProcessing();
-                    m_oStopWatch.tick();
-                    m_bIsProcessing = true;
+            inline void startProcessing() {
+                if(!this->m_bIsProcessing) {
+                    this->startProcessing_impl();
+                    this->m_bIsProcessing = true;
+                    this->m_oStopWatch.tick();
                 }
             }
             /// exits 'processing' mode, releasing time-critical evaluation components (if any) and setting the processed packets promise
-            void stopProcessing() {
-                if(m_bIsProcessing) {
-                    m_dElapsedTime_sec = m_oStopWatch.tock();
-                    m_bIsProcessing = false;
-                    _stopProcessing();
+            inline void stopProcessing() {
+                if(this->m_bIsProcessing) {
+                    this->m_dElapsedTime_sec = this->m_oStopWatch.tock();
+                    this->stopProcessing_impl();
+                    this->m_bIsProcessing = false;
                     this->stopAsyncPrecaching();
-                    this->setProcessedPacketsPromise();
+                    this->setProcessedOutputCountPromise();
                 }
-            }
-            /// work batch object creation method with dataset impl specialization (forwards extra args to work batch constructor)
-            template<typename... Targs>
-            static std::shared_ptr<WorkBatch> create(Targs&&... args) {
-                struct WorkBatchWrapper : public WorkBatch {
-                    WorkBatchWrapper(Targs&&... args) : WorkBatch(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
-                };
-                return std::make_shared<WorkBatchWrapper>(std::forward<Targs>(args)...);
             }
         protected:
             /// work batch default constructor (protected, objects should always be instantiated via 'create' member function)
@@ -165,14 +133,17 @@ namespace lv {
                     DataHandler(sBatchName,pDataset,sRelativePath),m_dElapsedTime_sec(0),m_bIsProcessing(false) {parseData();}
             WorkBatch& operator=(const WorkBatch&) = delete;
             WorkBatch(const WorkBatch&) = delete;
+            friend struct WorkBatchGroup;
             lv::StopWatch m_oStopWatch;
             double m_dElapsedTime_sec;
             bool m_bIsProcessing;
         };
+
         /// fully implemented work group interface with template specializations
         struct WorkBatchGroup :
                 public DataHandler,
-                public DataCounter_<Group>,
+                public GroupDataParser_<eDatasetTask,eDatasetSource,eDataset>,
+                public IDataCounter_<Group>,
                 public DataReporter_<eDatasetEval,eDataset> {
             /// default destructor, should stay public so smart pointers can access it
             virtual ~WorkBatchGroup() = default;
@@ -180,76 +151,24 @@ namespace lv {
             virtual DatasetTaskList getDatasetTask() const override final {return eDatasetTask;}
             /// returns which data source this work batch/group was built for
             virtual DatasetSourceList getDatasetSource() const override final {return eDatasetSource;}
-            /// returns which dataset this work batch/group was built for
-            virtual DatasetList getDataset() const override final {return eDataset;}
             /// returns which evaluation method this work batch/group was built for
             virtual DatasetEvalList getDatasetEval() const override final {return eDatasetEval;}
-            /// returns whether the work group is a pass-through container
-            virtual bool isBare() const override final {return m_bIsBare;}
-            /// always returns true for work groups
-            virtual bool isGroup() const override final {return true;}
-            /// returns this work group's children (work batch array)
-            virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const override final {
-                if(bWithHierarchy)
-                    return m_vpBatches;
-                IDataHandlerPtrArray vpBatches;
-                std::function<void(const IDataHandlerPtr&)> lPushBatches = [&](const IDataHandlerPtr& pBatch) {
-                    if(pBatch->isGroup())
-                        for(const auto& pSubBatch : pBatch->getBatches(true))
-                            lPushBatches(pSubBatch);
-                    else
-                        vpBatches.push_back(pBatch);
-                };
-                for(const auto& pBatch : getBatches(true))
-                    lPushBatches(pBatch);
-                return vpBatches;
-            }
-            /// returns whether any of this work group's children batches is currently processing data
-            virtual bool isProcessing() const override final {for(const auto& pBatch : getBatches(true)) if(pBatch->isProcessing()) return true; return false;}
-            /// returns the current (or final) duration elapsed between start/stopProcessing calls, recursively queried for all children work batches
-            virtual double getProcessTime() const override final {return lv::accumulateMembers<double,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessTime();});}
-            /// accumulates the expected CPU load for this data batch based on all children work batches load
-            virtual double getExpectedLoad() const override final {return lv::accumulateMembers<double,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getExpectedLoad();});}
-            /// accumulate total packet count from all children work batches
-            virtual size_t getTotPackets() const override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getTotPackets();});}
-            /// work group object creation method with dataset impl specialization (forwards extra args to work group constructor)
-            template<typename... Targs>
-            static std::shared_ptr<WorkBatchGroup> create(Targs&&... args) {
-                struct WorkBatchGroupWrapper : public WorkBatchGroup {
-                    WorkBatchGroupWrapper(Targs&&... args) : WorkBatchGroup(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
-                };
-                return std::make_shared<WorkBatchGroupWrapper>(std::forward<Targs>(args)...);
-            }
+            /// returns which dataset this work batch/group was built for
+            virtual DatasetList getDataset() const override final {return eDataset;}
         protected:
-            /// recursively calls parse data on all childrens
-            virtual void parseData() override final { for(const auto& pBatch : getBatches(true)) pBatch->parseData(); }
+            /// creates and returns a work batch for a given relative dataset path
+            virtual IDataHandlerPtr createWorkBatch(const std::string& sBatchName, const std::string& sRelativePath=std::string("./")) const override {
+                return std::shared_ptr<WorkBatch>(new WorkBatch(sBatchName,getDatasetInfo(),sRelativePath));
+            }
             /// work group default constructor (protected, objects should always be instantiated via 'create' member function)
             WorkBatchGroup(const std::string& sGroupName, std::shared_ptr<IDataset> pDataset, const std::string& sRelativePath=std::string("./")) :
-                    DataHandler(sGroupName,pDataset,lv::AddDirSlashIfMissing(sRelativePath)+sGroupName+"/"),m_bIsBare(false) {
-                if(!lv::string_contains_token(getName(),pDataset->getSkippedDirTokens())) {
-                    std::cout << "\tParsing directory '" << pDataset->getDatasetPath()+sRelativePath << "' for work group '" << getName() << "'..." << std::endl;
-                    std::vector<std::string> vsWorkBatchPaths;
-                    // all subdirs are considered work batch directories (if none, the category directory itself is a batch, and 'bare')
-                    lv::GetSubDirsFromDir(getDataPath(),vsWorkBatchPaths);
-                    if(vsWorkBatchPaths.empty()) {
-                        m_vpBatches.push_back(WorkBatch::create(getName(),pDataset,getRelativePath()));
-                        m_bIsBare = true;
-                    }
-                    else {
-                        for(const auto& sPathIter : vsWorkBatchPaths) {
-                            const size_t nLastSlashPos = sPathIter.find_last_of("/\\");
-                            const std::string sNewBatchName = nLastSlashPos==std::string::npos?sPathIter:sPathIter.substr(nLastSlashPos+1);
-                            if(!lv::string_contains_token(sNewBatchName,pDataset->getSkippedDirTokens()))
-                                m_vpBatches.push_back(WorkBatch::create(sNewBatchName,pDataset,lv::AddDirSlashIfMissing(getRelativePath())+sNewBatchName+"/"));
-                        }
-                    }
-                }
-            }
+                    DataHandler(sGroupName,pDataset,lv::AddDirSlashIfMissing(sRelativePath)+sGroupName+"/") {parseData();}
             WorkBatchGroup& operator=(const WorkBatchGroup&) = delete;
             WorkBatchGroup(const WorkBatchGroup&) = delete;
-            IDataHandlerPtrArray m_vpBatches;
+            friend struct IDataset_<eDatasetTask,eDatasetSource,eDataset,eDatasetEval,eEvalImpl>;
             bool m_bIsBare;
         };
+
         /// returns the dataset name
         virtual const std::string& getName() const override final {return m_sDatasetName;}
         /// returns the root data path
@@ -276,14 +195,18 @@ namespace lv {
         virtual bool isUsingEvaluator() const override final {return m_bUsingEvaluator;}
         /// returns whether loaded data should be 4-byte aligned or not (4-byte alignment is ideal for GPU upload)
         virtual bool is4ByteAligned() const override final {return m_bForce4ByteDataAlign;}
-        /// returns the total number of packets in the dataset (recursively queried from work batches)
-        virtual size_t getTotPackets() const override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getTotPackets();});}
+        /// returns the total input packet count in the dataset (recursively queried from work batches)
+        virtual size_t getInputCount() const override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getInputCount();});}
+        /// returns the total gt packet count in the dataset (recursively queried from work batches)
+        virtual size_t getGTCount() const override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getGTCount();});}
+        /// returns the total output packet count expected to be processed by the dataset evaluator (recursively queried from work batches)
+        virtual size_t getExpectedOutputCount() const override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getExpectedOutputCount();});}
+        /// returns the total output packet count so far processed by the dataset evaluator (recursively queried from work batches)
+        virtual size_t getProcessedOutputCount() const override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessedOutputCount();});}
+        /// returns the total output packet count so far processed by the dataset evaluator, blocking if processing is not finished yet (recursively queried from work batches)
+        virtual size_t getProcessedOutputCountPromise() override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessedOutputCountPromise();});}
         /// returns the total time it took to process the dataset (recursively queried from work batches)
         virtual double getProcessTime() const override final {return lv::accumulateMembers<double,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessTime();});}
-        /// returns the total processed packet count, blocking if processing is not finished yet (recursively queried from work batches)
-        virtual size_t getProcessedPacketsCountPromise() override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCountPromise();});}
-        /// returns the total processed packet count (recursively queried from work batches)
-        virtual size_t getProcessedPacketsCount() const override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessedPacketsCount();});}
         /// clears all batches and reparses them from the dataset metadata
         virtual void parseDataset() override final {
             std::cout << "Parsing dataset '" << getName() << "'..." << std::endl;
@@ -291,19 +214,22 @@ namespace lv {
             if(!getOutputPath().empty())
                 lv::CreateDirIfNotExist(getOutputPath());
             for(const auto& sPathIter : getWorkBatchDirs())
-                m_vpBatches.push_back(WorkBatchGroup::create(sPathIter,this->shared_from_this()));
+                m_vpBatches.push_back(std::shared_ptr<WorkBatchGroup>(new WorkBatchGroup(sPathIter,this->shared_from_this())));
         }
         /// returns the array of work batches (or groups) contained in this dataset
         virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const override final {
             if(bWithHierarchy)
                 return m_vpBatches;
             IDataHandlerPtrArray vpBatches;
-            for(const auto& pBatch : getBatches(true))
+            std::function<void(const IDataHandlerPtr&)> lPushBatches = [&](const IDataHandlerPtr& pBatch) {
                 if(pBatch->isGroup())
-                    for(const auto& pSubBatch : pBatch->getBatches(false))
-                        vpBatches.push_back(pSubBatch);
+                    for(const auto& pSubBatch : pBatch->getBatches(true))
+                        lPushBatches(pSubBatch);
                 else
                     vpBatches.push_back(pBatch);
+            };
+            for(const auto& pBatch : getBatches(true))
+                lPushBatches(pBatch);
             return vpBatches;
         }
         /// returns the array of work batches (or groups) contained in this dataset, sorted by expected CPU load
@@ -369,13 +295,13 @@ namespace lv {
 } // namespace lv
 
 #define _LITIV_DATASETS_IMPL_H_
-// will include all specializations of 'Dataset_<...>'
+// will include all specializations of 'Dataset_<...>' and its interfaces
 #include "litiv/datasets/impl/all.hpp"
 #undef _LITIV_DATASETS_IMPL_H_
 
 namespace lv {
 
-    /// default dataset interface implementation w/ default specialization & constructor pass-through
+    /// dataset full (default) specialization --- can be overridden by dataset type in 'impl' headers
     template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl>
     struct Dataset_ : public IDataset_<eDatasetTask,getDatasetSource<eDatasetTask,eDataset>(),eDataset,getDatasetEval<eDatasetTask,eDataset>(),eEvalImpl> {
         // if the task/dataset is not specialized, this redirects creation to the default IDataset_ constructor
