@@ -36,6 +36,7 @@ add_files(INCLUDE_FILES
     "include/litiv/datasets/impl/CDnet.hpp"
     "include/litiv/datasets/impl/LITIV2012b.hpp"
     "include/litiv/datasets/impl/PETS2001.hpp"
+    "include/litiv/datasets/impl/vap-trimod2016.hpp"
     "include/litiv/datasets/impl/Wallflower.hpp"
 )
 
