@@ -62,7 +62,8 @@ void lv::GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& 
             while(ret) {
                 if(!(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
                     std::wstring file(ffd.cFileName);
-                    vsFilePaths.push_back(AddDirSlashIfMissing(sDirPath)+std::string(file.begin(),file.end()));
+                    if(file!=L"Thumbs.db")
+                        vsFilePaths.push_back(AddDirSlashIfMissing(sDirPath)+std::string(file.begin(),file.end()));
                 }
                 ret = FindNextFile(h, &ffd);
             }
