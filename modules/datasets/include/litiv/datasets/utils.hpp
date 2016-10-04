@@ -154,6 +154,12 @@ namespace lv {
         return ((eDatasetEval==DatasetEval_BinaryClassifierArray)||(eDatasetEval==DatasetEval_MultiClassifierArray))?Array:NotArray;
     }
 
+    /// required due to MSVC2015 failure to use constexpr functions in SFINAE expressions
+    template<DatasetEvalList eDatasetEval>
+    struct ArrayPolicyHelper {
+        static constexpr ArrayPolicy value = getArrayPolicy<eDatasetEval>();
+    };
+
     /// returns the source type policy to use based on the dataset task type (can also be overridden by dataset type)
     template<DatasetTaskList eDatasetTask, DatasetList eDataset>
     constexpr DatasetSourceList getDatasetSource() {
@@ -788,7 +794,7 @@ namespace lv {
 
     /// data consumer specialization for receiving processed packets (evaluation entrypoint)
     template<DatasetEvalList eDatasetEval>
-    struct IDataConsumer_<eDatasetEval,std::enable_if_t<getArrayPolicy<eDatasetEval>()==NotArray>> :
+    struct IDataConsumer_<eDatasetEval,std::enable_if_t<ArrayPolicyHelper<eDatasetEval>::value==NotArray>> :
             public IDataArchiver_<NotArray>,
             public IDataCounter_<NotGroup> {
         /// returns the total output packet count expected to be processed by the data consumer (defaults to GT count)
@@ -810,7 +816,7 @@ namespace lv {
 
     /// data consumer specialization for receiving processed packet arrays (evaluation entrypoint)
     template<DatasetEvalList eDatasetEval>
-    struct IDataConsumer_<eDatasetEval,std::enable_if_t<getArrayPolicy<eDatasetEval>()==Array>> :
+    struct IDataConsumer_<eDatasetEval,std::enable_if_t<ArrayPolicyHelper<eDatasetEval>::value==Array>> :
             public IDataArchiver_<Array>,
             public IDataCounter_<NotGroup> {
         /// returns the number of parallel output streams (defaults to GT stream count if loader is array-based, and 1 otherwise)
