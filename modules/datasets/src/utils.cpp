@@ -493,7 +493,7 @@ void lv::IDataLoader_<lv::Array>::unpackInput(size_t nPacketIdx, std::vector<cv:
                 const size_t nCurrPacketSize = oInput.elemSize()*vSizes[s].area();
                 lvAssert_(nCurrPacketIdx+nCurrPacketSize<uintptr_t(oInput.dataend),"unpack out-of-bounds");
                 if(nCurrPacketSize>0)
-                    vUnpackedInput[s] = cv::Mat(vSizes[s],oInput.type(),nCurrPacketIdx);
+                    vUnpackedInput[s] = cv::Mat(vSizes[s],oInput.type(),(void*)nCurrPacketIdx);
                 else
                     vUnpackedInput[s] = cv::Mat();
                 nCurrPacketIdx += nCurrPacketSize;
@@ -526,7 +526,7 @@ void lv::IDataLoader_<lv::Array>::unpackGT(size_t nPacketIdx, std::vector<cv::Ma
                 const size_t nCurrPacketSize = oGT.elemSize()*vSizes[s].area();
                 lvAssert_(nCurrPacketIdx+nCurrPacketSize<uintptr_t(oGT.dataend),"unpack out-of-bounds");
                 if(nCurrPacketSize>0)
-                    vUnpackedGT[s] = cv::Mat(vSizes[s],oGT.type(),nCurrPacketIdx);
+                    vUnpackedGT[s] = cv::Mat(vSizes[s],oGT.type(),(void*)nCurrPacketIdx);
                 else
                     vUnpackedGT[s] = cv::Mat();
                 nCurrPacketIdx += nCurrPacketSize;

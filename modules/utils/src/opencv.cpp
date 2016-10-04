@@ -155,15 +155,15 @@ void cv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
             lvAssert_(oImage.depth()==CV_8U || oImage.depth()==CV_16U || oImage.depth()==CV_32F,"all images must be 8u/16u/32f depth");
         }
     }
-    cv::Size oCurrDisplaySize(oSuggestedTileSize.width*nColCount,oSuggestedTileSize.height*nRowCount);
+    cv::Size oCurrDisplaySize(int(oSuggestedTileSize.width*nColCount),int(oSuggestedTileSize.height*nRowCount));
     if(m_oMaxDisplaySize.area()>0 && (oCurrDisplaySize.width>m_oMaxDisplaySize.width || oCurrDisplaySize.height>m_oMaxDisplaySize.height)) {
         if(oCurrDisplaySize.width>m_oMaxDisplaySize.width && oCurrDisplaySize.width>oCurrDisplaySize.height)
             oCurrDisplaySize = cv::Size(m_oMaxDisplaySize.width,int(m_oMaxDisplaySize.width*float(oCurrDisplaySize.height)/oCurrDisplaySize.width));
         else
             oCurrDisplaySize = cv::Size(int(m_oMaxDisplaySize.height*(float(oCurrDisplaySize.width)/oCurrDisplaySize.height)),m_oMaxDisplaySize.height);
     }
-    const cv::Size oNewTileSize(oCurrDisplaySize.width/nColCount,oCurrDisplaySize.height/nRowCount);
-    const cv::Size oFinalDisplaySize(oNewTileSize.width*nColCount,oNewTileSize.height*nRowCount);
+    const cv::Size oNewTileSize(int(oCurrDisplaySize.width/nColCount),int(oCurrDisplaySize.height/nRowCount));
+    const cv::Size oFinalDisplaySize(int(oNewTileSize.width*nColCount),int(oNewTileSize.height*nRowCount));
     std::mutex_lock_guard oLock(m_oEventMutex);
     const cv::Point2i& oDisplayPt = m_oLatestMouseEvent.oPosition;
     const cv::Size& oLastDisplaySize = m_oLatestMouseEvent.oDisplaySize;
