@@ -51,8 +51,8 @@ GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t 
         m_nOutputType(nOutputType),
         m_nDebugType(nDebugType),
         m_nInputType(-1) {
+    static_assert(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT>1,"texture arrays must have at least one layer each");
     lvAssert_(m_nLevels>0,"textures must have at least one level each");
-    lvAssert_(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT>1,"texture arrays must have at least one layer each");
     lvAssert_(m_nComputeStages>0,"image processing pipeline must have at least one compute stage");
     if(m_bUsingTexArrays && !glGetTextureSubImage && (m_bUsingDebugPBOs || m_bUsingOutputPBOs))
         lvError("missing impl for texture arrays pbo fetch when glGetTextureSubImage is not available");
