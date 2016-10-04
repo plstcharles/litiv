@@ -75,6 +75,9 @@
 #ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
 #endif //ndefined(__STDC_FORMAT_MACROS)
+#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES
+#endif //ndefined(_USE_MATH_DEFINES)
 
 #if defined(_MSC_VER)
 #ifndef __PRETTY_FUNCTION__
