@@ -200,7 +200,7 @@ FIND_LIBRARY(CPLEX_CONCERT_LIBRARY
 message(STATUS "CONCERT Library: ${CPLEX_CONCERT_LIBRARY}")
 
 if(WIN32)
-	FIND_PATH(CPLEX_BIN_DIR
+    FIND_PATH(CPLEX_BIN_DIR
         NAMES
             cplex${CPLEX_WIN_VERSION}.dll
         HINTS
@@ -210,9 +210,9 @@ if(WIN32)
             $ENV{CPLEX_ROOT}/bin/${CPLEX_WIN_PLATFORM}
     )
 else()
-	FIND_PATH(CPLEX_BIN_DIR
+    FIND_PATH(CPLEX_BIN_DIR
         NAMES
-	        cplex
+            cplex
         HINTS
             ${CPLEX_ROOT_DIR}/cplex/bin/x86-64_sles10_4.1
             ${CPLEX_ROOT_DIR}/bin/x86-64_sles10_4.1
