@@ -68,9 +68,9 @@ vptz::Camera::Camera( const std::string& sInputPath, double verti_FOV, double ou
     cv::cvtColor(panoImage,panoImage,cv::COLOR_BGR2BGRA);
 
     // initialize the parameters
+    outputWidth = std::max((int)output_width,1);
+    outputHeight = std::max((int)output_height,1);
     Set(PTZ_CAM_VERTI_FOV, verti_FOV);
-    Set(PTZ_CAM_OUTPUT_WIDTH, output_width);
-    Set(PTZ_CAM_OUTPUT_HEIGHT, output_height);
     Set(PTZ_CAM_HORI_ANGLE, hori_angle);
     Set(PTZ_CAM_VERTI_ANGLE, verti_angle);
     Set(PTZ_CAM_HORI_SPEED, hori_speed);
@@ -228,6 +228,7 @@ double vptz::Camera::Get(CameraPropertyFlag flag) {
 
 void vptz::Camera::Set(CameraPropertyFlag flag, double value) {
     lvDbgExceptionWatch;
+    bool bRefreshProj = false;
     switch(flag) {
         case PTZ_CAM_FRAME_RATE:
             m_dFrameRate = value;
@@ -241,16 +242,7 @@ void vptz::Camera::Set(CameraPropertyFlag flag, double value) {
             if(value>=180.0 || value<=0.0)
                 lvError("invalid vertiFOV value");
             vertiFOV = value;
-            break;
-        case PTZ_CAM_OUTPUT_WIDTH:
-            if(value<=1.0)
-                lvError("invalid outputWidth value");
-            outputWidth = value;
-            break;
-        case PTZ_CAM_OUTPUT_HEIGHT:
-            if(value<=1.0)
-                lvError("invalid outputHeight value");
-            outputHeight = value;
+            bRefreshProj = true;
             break;
         case PTZ_CAM_HORI_ANGLE: {
             if(value<=-180.0 || value>180.0)
@@ -293,6 +285,13 @@ void vptz::Camera::Set(CameraPropertyFlag flag, double value) {
             break;
         default:
             lvError("invalid flag");
+    }
+    if(bRefreshProj && m_pContext) {
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        gluPerspective(vertiFOV, outputWidth/outputHeight, 0.01, 10.0);
+        glErrorCheck;
+        glMatrixMode(GL_MODELVIEW);
     }
 }
 
@@ -345,6 +344,7 @@ bool vptz::GTTranslator::GetGTTargetPoint(double bgtHoriAngle, double bgtVertiAn
     if(m_pCamera) {
         curHoriAngle = m_pCamera->Get(PTZ_CAM_HORI_ANGLE);
         curVertiAngle = m_pCamera->Get(PTZ_CAM_VERTI_ANGLE);
+        curVertiFOV = m_pCamera->Get(PTZ_CAM_VERTI_FOV);
     }
     return PTZPointHVtoXY( bgtHoriAngle, bgtVertiAngle,
                            tgtTargetPoint.x, tgtTargetPoint.y,
@@ -360,6 +360,7 @@ bool vptz::GTTranslator::GetGTBoundingBox(double bgtHoriAngle, double bgtVertiAn
     if(m_pCamera) {
         curHoriAngle = m_pCamera->Get(PTZ_CAM_HORI_ANGLE);
         curVertiAngle = m_pCamera->Get(PTZ_CAM_VERTI_ANGLE);
+        curVertiFOV = m_pCamera->Get(PTZ_CAM_VERTI_FOV);
     }
     // 1. Ground Truth Domain
     // the four vertexes of bounding box on image plane
@@ -728,9 +729,6 @@ void vptz::Evaluator::Setup( const std::string& sInputScenarioPath, const std::s
         lvError("invalid parameter(s) in input file");
     else if(m_nScenarioFrameCount != int(m_pCamera->Get(PTZ_CAM_FRAME_NUM)))
         lvError("frame count saved in ground truth file and panoramic video conflict");
-    m_pCamera->Set(PTZ_CAM_OUTPUT_WIDTH,bgtFrameWidth);
-    m_pCamera->Set(PTZ_CAM_OUTPUT_HEIGHT,bgtFrameHeight);
-    m_pCamera->Set(PTZ_CAM_VERTI_FOV,bgtVerticalFOV);
     m_voCurrGTSequence_FN = m_oCurrGTSequence_FS["basicGroundTruth"];
     if(m_voCurrGTSequence_FN.empty())
         lvError("ground truth file contains no frame data");
