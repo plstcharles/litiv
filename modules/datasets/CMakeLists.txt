@@ -47,7 +47,7 @@ if(USE_BSDS500_BENCHMARK)
     target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} BSDS500)
 endif()
 target_link_litiv_dependencies(${LITIV_CURRENT_PROJECT_NAME})
-if(UNIX)
+if(UNIX AND NOT ANDROID AND NOT (APPLE AND CMAKE_COMPILER_IS_CLANGCXX))
     target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} pthread)
 endif()
 target_include_directories(${LITIV_CURRENT_PROJECT_NAME}
