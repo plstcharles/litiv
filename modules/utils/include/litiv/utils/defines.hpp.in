@@ -115,6 +115,31 @@
 #define LITIV_VERSION_PATCH @LITIV_VERSION_PATCH@
 #define LITIV_VERSION_SHA1  "@GIT_SHA1@"
 
+#if (defined(_MSC_VER) || defined(_WIN32) || defined(WIN32) || defined(__CYGWIN__))
+#ifdef BUILDING_DLL
+#ifdef __GNUC__
+#define LV_PUBLIC __attribute__ ((dllexport))
+#else //ndef(__GNUC__)
+#define LV_PUBLIC __declspec(dllexport)
+#endif //ndef(__GNUC__)
+#else //ndef(BUILDING_DLL)
+#ifdef __GNUC__
+#define LV_PUBLIC __attribute__ ((dllimport))
+#else //ndef(__GNUC__)
+#define LV_PUBLIC __declspec(dllimport)
+#endif //ndef(__GNUC__)
+#endif //ndef(BUILDING_DLL)
+#define LV_LOCAL
+#else // if not on windows
+#if (defined(__GNUC__) && (__GNUC__>=4))
+#define LV_PUBLIC __attribute__ ((visibility ("default")))
+#define LV_LOCAL  __attribute__ ((visibility ("hidden")))
+#else // if not gcc, or not compat version
+#define LV_PUBLIC
+#define LV_LOCAL
+#endif // if not gcc, or not compat version
+#endif // if not on windows
+
 #define EXTERNAL_DATA_ROOT  XSTR(@EXTERNAL_DATA_ROOT@)
 #define SAMPLES_DATA_ROOT   XSTR(@SAMPLES_DATA_ROOT@)
 #define CACHE_MAX_SIZE_GB   @DATASETS_CACHE_SIZE@LLU
