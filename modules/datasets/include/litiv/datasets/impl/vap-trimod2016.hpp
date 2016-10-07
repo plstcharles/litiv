@@ -25,8 +25,16 @@
 
 namespace lv {
 
+    struct IVAPtrimod2016Dataset {
+        /// returns whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
+        virtual bool isLoadingDepth() const = 0;
+        /// returns whether images should be undistorted when loaded or not, using the calib files provided with the dataset
+        virtual bool isUndistorting() const = 0;
+    };
+
     template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
     struct Dataset_<eDatasetTask,Dataset_VAPtrimod2016,eEvalImpl> :
+            public IVAPtrimod2016Dataset,
             public IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016,getDatasetEval<eDatasetTask,Dataset_VAPtrimod2016>(),eEvalImpl> {
     protected: // should still be protected, as creation should always be done via datasets::create
         Dataset_(
@@ -35,7 +43,8 @@ namespace lv {
                 bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
                 bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
                 double dScaleFactor=1.0, ///< defines the scale factor to use to resize/rescale read packets
-                bool bLoadDepth=true ///< defines whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
+                bool bLoadDepth=true, ///< defines whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
+                bool bUndistort=true ///< defines whether images should be undistorted when loaded or not, using the calib files provided with the dataset
         ) :
                 IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016,getDatasetEval<eDatasetTask,Dataset_VAPtrimod2016>(),eEvalImpl>(
                         "VAP-trimodal2016",
@@ -44,30 +53,36 @@ namespace lv {
                         "bin",
                         ".png",
                         getWorkBatchDirNames(),
-                        getSkippedWorkBatchDirNames(bLoadDepth),
+                        getSkippedWorkBatchDirNames(),
                         getGrayscaleWorkBatchDirNames(),
                         0,
                         bSaveOutput,
                         bUseEvaluator,
                         bForce4ByteDataAlign,
                         dScaleFactor
-                ) {}
+                ), m_bLoadDepth(bLoadDepth),m_bUndistort(bUndistort) {}
         /// returns the names of all work batch directories available for this dataset specialization
         static const std::vector<std::string>& getWorkBatchDirNames() {
-            static const std::vector<std::string> s_vsWorkBatchDirs = {"Scene 1","Scene 2","Scene 3"};// @@@@ groups = these, batches...? will not auto-dig deeper?
+            static const std::vector<std::string> s_vsWorkBatchDirs = {"Scene 1","Scene 2","Scene 3"};
             return s_vsWorkBatchDirs;
         }
         /// returns the names of all work batch directories which should be skipped for this dataset speialization
-        static const std::vector<std::string>& getSkippedWorkBatchDirNames(bool bLoadDepth=true) {
-            static const std::vector<std::string> s_vsSkippedWorkBatchDirs_nodepth = {"SyncD"};
+        static const std::vector<std::string>& getSkippedWorkBatchDirNames() {
             static const std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
-            return bLoadDepth?s_vsSkippedWorkBatchDirs:s_vsSkippedWorkBatchDirs_nodepth;
+            return s_vsSkippedWorkBatchDirs;
         }
         /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
         static const std::vector<std::string>& getGrayscaleWorkBatchDirNames() {
             static const std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {"SyncD","SyncT"};
             return s_vsGrayscaleWorkBatchDirs;
         }
+        /// returns whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
+        virtual bool isLoadingDepth() const override {return m_bLoadDepth;}
+        /// returns whether images should be undistorted when loaded or not, using the calib files provided with the dataset
+        virtual bool isUndistorting() const override {return m_bUndistort;}
+    protected:
+        const bool m_bLoadDepth;
+        const bool m_bUndistort;
     };
 
     template<DatasetTaskList eDatasetTask>
@@ -115,7 +130,9 @@ namespace lv {
             auto psThermalDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),lv::AddDirSlashIfMissing(this->getDataPath())+"SyncT");
             if((psDepthDir==vsSubDirs.end() || psDepthGTDir==vsSubDirs.end()) || (psRGBDir==vsSubDirs.end() || psRGBGTDir==vsSubDirs.end()) || (psThermalDir==vsSubDirs.end() || psThermalGTDir==vsSubDirs.end()))
                 lvError_("VAPtrimod2016 sequence '%s' did not possess the required groundtruth and input directories",this->getName().c_str());
-            this->m_bLoadDepth = !lv::string_contains_token("SyncD",this->getDatasetInfo()->getSkippedDirTokens());
+            const IVAPtrimod2016Dataset& oDataset = dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getDatasetInfo());
+            this->m_bLoadDepth = oDataset.isLoadingDepth();
+            this->m_bUndistort = oDataset.isUndistorting();
             const size_t nStreamCount = this->m_bLoadDepth?3:2;
             this->m_vInputROIs.resize(nStreamCount);
             this->m_vGTROIs.resize(nStreamCount);
@@ -131,6 +148,23 @@ namespace lv {
                 this->m_vInputSizes[s] = this->m_vGTSizes[s] = oGlobalROI.size();
             }
             this->m_oMaxInputSize = this->m_oMaxGTSize = oGlobalROI.size();
+            const cv::Size oImageSize(640,480);
+            if(this->m_bUndistort) {
+                cv::FileStorage oParamsFS(lv::AddDirSlashIfMissing(this->getDataPath())+"calibVars.yml",cv::FileStorage::READ);
+                lvAssert_(oParamsFS.isOpened(),"could not open calibration yml file");
+                oParamsFS["rgbCamMat"] >> this->m_oRGBCameraParams;
+                oParamsFS["rgbDistCoeff"] >> this->m_oRGBDistortParams;
+                lvAssert_(!this->m_oRGBCameraParams.empty() && !this->m_oRGBDistortParams.empty(),"failed to load RGB camera calibration parameters");
+                cv::initUndistortRectifyMap(this->m_oRGBCameraParams,this->m_oRGBDistortParams,cv::Mat(),
+                                          //cv::getOptimalNewCameraMatrix(this->m_oRGBCameraParams,this->m_oRGBDistortParams,oImageSize,0.5,oImageSize,0),
+                                            this->m_oRGBCameraParams,oImageSize,CV_16SC2,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2);
+                oParamsFS["tCamMat"] >> this->m_oThermalCameraParams;
+                oParamsFS["tDistCoeff"] >> this->m_oThermalDistortParams;
+                lvAssert_(!this->m_oThermalCameraParams.empty() && !this->m_oThermalDistortParams.empty(),"failed to load thermal camera calibration parameters");
+                cv::initUndistortRectifyMap(this->m_oThermalCameraParams,this->m_oThermalDistortParams,cv::Mat(),
+                                          //cv::getOptimalNewCameraMatrix(this->m_oThermalCameraParams,this->m_oThermalDistortParams,oImageSize,0.5,oImageSize,0),
+                                            this->m_oThermalCameraParams,oImageSize,CV_16SC2,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2);
+            }
             //
             // NOTE: internal stream indexing
             //    stream[0] = RGB     (default:CV_8UC3)
@@ -139,7 +173,7 @@ namespace lv {
             //
             std::vector<std::string> vsRGBPaths;
             lv::GetFilesFromDir(*psRGBDir,vsRGBPaths);
-            if(vsRGBPaths.empty() || cv::imread(vsRGBPaths[0]).size()!=cv::Size(640,480))
+            if(vsRGBPaths.empty() || cv::imread(vsRGBPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected RGB data",this->getName().c_str());
             this->m_vvsInputPaths.resize(vsRGBPaths.size());
             std::vector<std::string> vsTempInputFileNames(vsRGBPaths.size());
@@ -153,7 +187,7 @@ namespace lv {
             }
             std::vector<std::string> vsRGBGTPaths;
             lv::GetFilesFromDir(*psRGBGTDir,vsRGBGTPaths);
-            if(vsRGBGTPaths.empty() || cv::imread(vsRGBGTPaths[0]).size()!=cv::Size(640,480))
+            if(vsRGBGTPaths.empty() || cv::imread(vsRGBGTPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected RGB gt data",this->getName().c_str());
             this->m_vvsGTPaths.resize(vsRGBGTPaths.size());
             this->m_mGTIndexLUT.clear();
@@ -174,7 +208,7 @@ namespace lv {
             }
             std::vector<std::string> vsThermalPaths;
             lv::GetFilesFromDir(*psThermalDir,vsThermalPaths);
-            if(vsThermalPaths.empty() || cv::imread(vsThermalPaths[0]).size()!=cv::Size(640,480))
+            if(vsThermalPaths.empty() || cv::imread(vsThermalPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected thermal data",this->getName().c_str());
             if(vsThermalPaths.size()!=vsRGBPaths.size())
                 lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/thermal frames",this->getName().c_str());
@@ -182,7 +216,7 @@ namespace lv {
                 this->m_vvsInputPaths[nInputPacketIdx][1] = vsThermalPaths[nInputPacketIdx];
             std::vector<std::string> vsThermalGTPaths;
             lv::GetFilesFromDir(*psThermalGTDir,vsThermalGTPaths);
-            if(vsThermalGTPaths.empty() || cv::imread(vsThermalGTPaths[0]).size()!=cv::Size(640,480))
+            if(vsThermalGTPaths.empty() || cv::imread(vsThermalGTPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected thermal gt data",this->getName().c_str());
             if(vsThermalGTPaths.size()!=vsRGBGTPaths.size())
                 lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/thermal gt frames",this->getName().c_str());
@@ -191,7 +225,7 @@ namespace lv {
             if(this->m_bLoadDepth) {
                 std::vector<std::string> vsDepthPaths;
                 lv::GetFilesFromDir(*psDepthDir,vsDepthPaths);
-                if(vsDepthPaths.empty() || cv::imread(vsDepthPaths[0]).size()!=cv::Size(640,480))
+                if(vsDepthPaths.empty() || cv::imread(vsDepthPaths[0]).size()!=oImageSize)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess expected depth data",this->getName().c_str());
                 if(vsDepthPaths.size()!=vsRGBPaths.size())
                     lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/depth frames",this->getName().c_str());
@@ -199,7 +233,7 @@ namespace lv {
                     this->m_vvsInputPaths[nInputPacketIdx][2] = vsDepthPaths[nInputPacketIdx];
                 std::vector<std::string> vsDepthGTPaths;
                 lv::GetFilesFromDir(*psDepthGTDir,vsDepthGTPaths);
-                if(vsDepthGTPaths.empty() || cv::imread(vsDepthGTPaths[0]).size()!=cv::Size(640,480))
+                if(vsDepthGTPaths.empty() || cv::imread(vsDepthGTPaths[0]).size()!=oImageSize)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess expected depth gt data",this->getName().c_str());
                 if(vsDepthGTPaths.size()!=vsRGBGTPaths.size())
                     lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/depth gt frames",this->getName().c_str());
@@ -244,20 +278,36 @@ namespace lv {
                 std::copy(oNewPacket.datastart,oNewPacket.dataend,oFullPacket.data+nPacketOffset);
                 nPacketOffset += ptrdiff_t(oNewPacket.dataend-oNewPacket.datastart);
             };
+            const cv::Size oImageSize(640,480);
             cv::Mat oRGBPacket = cv::imread(vsInputPaths[0]);
-            lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC3 && oRGBPacket.size()==cv::Size(640,480));
+            lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC3 && oRGBPacket.size()==oImageSize);
+            if(this->m_bUndistort) {
+                cv::imshow("test distort",oRGBPacket);
+                cv::Mat oTemp = oRGBPacket.clone();
+                cv::remap(oRGBPacket,oTemp,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
+                lvDbgAssert(oTemp.size()==oRGBPacket.size() && oTemp.type()==oRGBPacket.type());
+                oRGBPacket = oTemp;
+                cv::imshow("test undistort",oRGBPacket);
+                cv::waitKey(0);
+            }
             if(oRGBPacket.size()!=vInputSizes[0])
                 cv::resize(oRGBPacket,oRGBPacket,vInputSizes[0]);
             lAppendPacket(oRGBPacket);
             cv::Mat oThermalPacket = cv::imread(vsInputPaths[1],cv::IMREAD_GRAYSCALE);
-            lvAssert(!oThermalPacket.empty() && oThermalPacket.type()==CV_8UC1 && oThermalPacket.size()==cv::Size(640,480));
+            lvAssert(!oThermalPacket.empty() && oThermalPacket.type()==CV_8UC1 && oThermalPacket.size()==oImageSize);
             lvDbgAssert(vInputSizes[1]==vInputSizes[0]);
+            if(this->m_bUndistort) {
+                cv::Mat oTemp = oThermalPacket.clone();
+                cv::remap(oThermalPacket,oTemp,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_LINEAR);
+                lvDbgAssert(oTemp.size()==oThermalPacket.size() && oTemp.type()==oThermalPacket.type());
+                oThermalPacket = oTemp;
+            }
             if(oThermalPacket.size()!=vInputSizes[0])
                 cv::resize(oThermalPacket,oThermalPacket,vInputSizes[0]);
             lAppendPacket(oThermalPacket);
             if(this->m_bLoadDepth) {
                 cv::Mat oDepthPacket = cv::imread(vsInputPaths[2],cv::IMREAD_ANYDEPTH);
-                lvAssert(!oDepthPacket.empty() && oDepthPacket.type()==CV_16UC1 && oDepthPacket.size()==cv::Size(640,480));
+                lvAssert(!oDepthPacket.empty() && oDepthPacket.type()==CV_16UC1 && oDepthPacket.size()==oImageSize);
                 lvDbgAssert(vInputSizes[2]==vInputSizes[0]);
                 if(oDepthPacket.size()!=vInputSizes[0])
                     cv::resize(oDepthPacket,oDepthPacket,vInputSizes[0]);
@@ -267,6 +317,13 @@ namespace lv {
             return oFullPacket;
         }
         bool m_bLoadDepth; ///< defines whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
+        bool m_bUndistort; ///< defines whether images should be undistorted when loaded or not, using the calib files provided with the dataset
+        cv::Mat m_oRGBCameraParams;
+        cv::Mat m_oThermalCameraParams;
+        cv::Mat m_oRGBDistortParams;
+        cv::Mat m_oThermalDistortParams;
+        cv::Mat m_oRGBCalibMap1,m_oRGBCalibMap2;
+        cv::Mat m_oThermalCalibMap1,m_oThermalCalibMap2;
     };
 
 } // namespace lv
