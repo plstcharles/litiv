@@ -86,8 +86,8 @@ namespace lv {
     };
 
     template<DatasetTaskList eDatasetTask>
-    struct GroupDataParser_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016> :
-            public IGroupDataParser {
+    struct DataGroupHandler_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016> :
+            public DataGroupHandler {
     protected:
         virtual void parseData() override {
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template

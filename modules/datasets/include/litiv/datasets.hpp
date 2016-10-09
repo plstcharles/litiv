@@ -39,37 +39,6 @@ namespace lv {
 
     } // namespace datasets
 
-    /// full implementation of basic data handler interface functions (used in work batch & group impl)
-    struct DataHandler : public virtual IDataHandler {
-        /// returns the work batch/group name
-        virtual const std::string& getName() const override final;
-        /// returns the work batch/group data path
-        virtual const std::string& getDataPath() const override final;
-        /// returns the work batch/group output path
-        virtual const std::string& getOutputPath() const override final;
-        /// returns the work batch/group relative path offset w.r.t. dataset root
-        virtual const std::string& getRelativePath() const override final;
-        /// returns whether the work batch/group data will be treated as grayscale
-        virtual bool isGrayscale() const override final;
-        /// returns a pointer to this work batch/group's parent dataset interface
-        virtual IDatasetPtr getDatasetInfo() const override final;
-
-    protected:
-        /// fills internal impl parameters based on batch name, dataset parameters & current relative data path
-        DataHandler(const std::string& sBatchName, std::shared_ptr<IDataset> pDataset, const std::string& sRelativePath);
-        /// returns the children batch associated with the given (input) packet index; will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
-        virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const override final;
-        /// returns the children batch associated with the given (input) packet index; will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
-        virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) override final;
-    private:
-        const std::string m_sBatchName;
-        const std::string m_sRelativePath;
-        const std::string m_sDataPath;
-        const std::string m_sOutputPath;
-        const bool m_bForcingGrayscale;
-        const IDatasetPtr m_pDataset;
-    };
-
     /// top-level dataset interface where work batches & groups are implemented based on template policies --- all internal methods can be overridden via dataset impl headers
     template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset, DatasetEvalList eDatasetEval, lv::ParallelAlgoType eEvalImpl>
     struct IDataset_ : public DatasetReporter_<eDatasetEval,eDataset> {
@@ -86,11 +55,23 @@ namespace lv {
 
         /// fully implemented work batch interface with template specializations
         struct WorkBatch :
-                public DataHandler,
+                public DataHandler_<eDatasetTask,eDatasetSource,eDataset>,
                 public DataProducer_<eDatasetTask,eDatasetSource,eDataset>,
                 public DataEvaluator_<eDatasetEval,eDataset,eEvalImpl> {
             /// default destructor, should stay public so smart pointers can access it
             virtual ~WorkBatch() = default;
+            /// returns the time taken so far to process the work batch data (i.e. between start/stopProcessing calls)
+            virtual double getCurrentProcessTime() const override final {return this->m_bIsProcessing?this->m_oStopWatch.elapsed():this->m_dFinalElapsedTime;}
+            /// returns the final time taken to process the work batch data (i.e. between start/stopProcessing calls)
+            virtual double getFinalProcessTime() override final {return this->m_dElapsedTimeFuture.valid()?(this->m_dFinalElapsedTime=this->m_dElapsedTimeFuture.get()):this->m_dFinalElapsedTime;}
+            /// returns whether the work batch is still being processed or not (i.e. between start/stopProcessing calls)
+            virtual bool isProcessing() const override final {return m_bIsProcessing;}
+            /// always returns false for non-group work batches
+            virtual bool isBare() const override final {return false;}
+            /// always returns false for non-group work batches
+            virtual bool isGroup() const override final {return false;}
+            /// always returns an empty data handler array for non-group work batches
+            virtual IDataHandlerPtrArray getBatches(bool /*bWithHierarchy*/) const override final {return IDataHandlerPtrArray();}
             /// returns the currently implemented task type for this work batch
             virtual DatasetTaskList getDatasetTask() const override final {return eDatasetTask;}
             /// returns the currently implemented source type for this work batch
@@ -99,19 +80,13 @@ namespace lv {
             virtual DatasetEvalList getDatasetEval() const override final {return eDatasetEval;}
             /// returns the currently implemented dataset type for this work batch
             virtual DatasetList getDataset() const override final {return eDataset;}
-            /// always returns false for non-group work batches
-            virtual bool isBare() const override final {return false;}
-            /// always returns false for non-group work batches
-            virtual bool isGroup() const override final {return false;}
-            /// always returns an empty data handler array for non-group work batches
-            virtual IDataHandlerPtrArray getBatches(bool /*bWithHierarchy*/) const override final {return IDataHandlerPtrArray();}
-            /// returns the current (or final) duration elapsed between start/stopProcessing calls
-            virtual double getProcessTime() const override final {return m_dElapsedTime_sec;}
-            /// returns whether the work batch is still being processed or not (i.e. between start/stopProcessing calls)
-            virtual bool isProcessing() const override final {return m_bIsProcessing;}
             /// sets the work batch in 'processing' mode, initializing timers, packet counters and other time-critical evaluation components (if any)
             inline void startProcessing() {
                 if(!this->m_bIsProcessing) {
+                    m_dElapsedTimePromise = std::promise<double>();
+                    m_dElapsedTimeFuture = m_dElapsedTimePromise.get_future();
+                    m_dFinalElapsedTime = 0.0;
+                    this->resetOutputCount();
                     this->startProcessing_impl();
                     this->m_bIsProcessing = true;
                     this->m_oStopWatch.tick();
@@ -120,30 +95,32 @@ namespace lv {
             /// exits 'processing' mode, releasing time-critical evaluation components (if any) and setting the processed packets promise
             inline void stopProcessing() {
                 if(this->m_bIsProcessing) {
-                    this->m_dElapsedTime_sec = this->m_oStopWatch.tock();
+                    this->m_dElapsedTimePromise.set_value(this->m_oStopWatch.tock());
+                    this->getFinalProcessTime();
+                    this->setOutputCountPromise();
                     this->stopProcessing_impl();
                     this->m_bIsProcessing = false;
                     this->stopPrecaching();
-                    this->setProcessedOutputCountPromise();
                 }
             }
         protected:
             /// work batch default constructor (protected, objects should always be instantiated via 'create' member function)
             WorkBatch(const std::string& sBatchName, IDatasetPtr pDataset, const std::string& sRelativePath=std::string("./")) :
-                    DataHandler(sBatchName,pDataset,sRelativePath),m_dElapsedTime_sec(0),m_bIsProcessing(false) {parseData();}
+                    DataHandler_<eDatasetTask,eDatasetSource,eDataset>(sBatchName,pDataset,sRelativePath),m_dFinalElapsedTime(0),m_bIsProcessing(false) {this->parseData();}
             WorkBatch& operator=(const WorkBatch&) = delete;
             WorkBatch(const WorkBatch&) = delete;
             friend struct WorkBatchGroup;
             lv::StopWatch m_oStopWatch;
-            double m_dElapsedTime_sec;
-            bool m_bIsProcessing;
+            std::promise<double> m_dElapsedTimePromise;
+            std::future<double> m_dElapsedTimeFuture;
+            double m_dFinalElapsedTime; ///< returns final time elapsed between start/stop processing calls (always in seconds)
+            bool m_bIsProcessing; ///< returns whether in between start/stop processing calls
         };
 
         /// fully implemented work group interface with template specializations
         struct WorkBatchGroup :
-                public DataHandler,
-                public GroupDataParser_<eDatasetTask,eDatasetSource,eDataset>,
-                public IDataCounter_<Group>,
+                public DataHandler_<eDatasetTask,eDatasetSource,eDataset>,
+                public DataGroupHandler_<eDatasetTask,eDatasetSource,eDataset>,
                 public DataReporter_<eDatasetEval,eDataset> {
             /// default destructor, should stay public so smart pointers can access it
             virtual ~WorkBatchGroup() = default;
@@ -158,11 +135,11 @@ namespace lv {
         protected:
             /// creates and returns a work batch for a given relative dataset path
             virtual IDataHandlerPtr createWorkBatch(const std::string& sBatchName, const std::string& sRelativePath=std::string("./")) const override {
-                return std::shared_ptr<WorkBatch>(new WorkBatch(sBatchName,getDatasetInfo(),sRelativePath));
+                return std::shared_ptr<WorkBatch>(new WorkBatch(sBatchName,this->getDatasetInfo(),sRelativePath));
             }
             /// work group default constructor (protected, objects should always be instantiated via 'create' member function)
             WorkBatchGroup(const std::string& sGroupName, std::shared_ptr<IDataset> pDataset, const std::string& sRelativePath=std::string("./")) :
-                    DataHandler(sGroupName,pDataset,lv::AddDirSlashIfMissing(sRelativePath)+sGroupName+"/") {parseData();}
+                    DataHandler_<eDatasetTask,eDatasetSource,eDataset>(sGroupName,pDataset,lv::AddDirSlashIfMissing(sRelativePath)+sGroupName+"/") {this->parseData();}
             WorkBatchGroup& operator=(const WorkBatchGroup&) = delete;
             WorkBatchGroup(const WorkBatchGroup&) = delete;
             friend struct IDataset_<eDatasetTask,eDatasetSource,eDataset,eDatasetEval,eEvalImpl>;
@@ -199,14 +176,18 @@ namespace lv {
         virtual size_t getInputCount() const override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getInputCount();});}
         /// returns the total gt packet count in the dataset (recursively queried from work batches)
         virtual size_t getGTCount() const override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getGTCount();});}
-        /// returns the total output packet count expected to be processed by the dataset evaluator (recursively queried from work batches)
+        /// returns the output packet count expected to be processed by the dataset evaluator (recursively queried from work batches)
         virtual size_t getExpectedOutputCount() const override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getExpectedOutputCount();});}
-        /// returns the total output packet count so far processed by the dataset evaluator (recursively queried from work batches)
-        virtual size_t getProcessedOutputCount() const override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessedOutputCount();});}
-        /// returns the total output packet count so far processed by the dataset evaluator, blocking if processing is not finished yet (recursively queried from work batches)
-        virtual size_t getProcessedOutputCountPromise() override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessedOutputCountPromise();});}
-        /// returns the total time it took to process the dataset (recursively queried from work batches)
-        virtual double getProcessTime() const override final {return lv::accumulateMembers<double,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessTime();});}
+        /// returns the output packet count so far processed by the dataset evaluator (recursively queried from work batches)
+        virtual size_t getCurrentOutputCount() const override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getCurrentOutputCount();});}
+        /// returns the final output packet count processed by the dataset evaluator, blocking if processing is not finished yet (recursively queried from work batches)
+        virtual size_t getFinalOutputCount() override final {return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getFinalOutputCount();});}
+        /// returns the time taken so far to process the dataset (recursively queried from work batches)
+        virtual double getCurrentProcessTime() const override final {return lv::accumulateMembers<double,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getCurrentProcessTime();});}
+        /// returns the final time taken to process the dataset, blocking if processing is not finished yet (recursively queried from work batches)
+        virtual double getFinalProcessTime() override final {return lv::accumulateMembers<double,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getFinalProcessTime();});}
+        /// resets internal evaluation and packet count metrics (recursively called for work batches)
+        virtual void resetMetrics() override final {for (auto& pBatch : getBatches(true)) pBatch->resetMetrics();}
         /// clears all batches and reparses them from the dataset metadata
         virtual void parseDataset() override final {
             std::cout << "Parsing dataset '" << getName() << "'..." << std::endl;

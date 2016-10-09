@@ -110,11 +110,11 @@ namespace lv {
             if(bAverage && this->isGroup() && !this->isBare()) {
                 IDataHandlerPtrArray vpBatches = this->getBatches(true);
                 auto ppBatchIter = vpBatches.begin();
-                for(; ppBatchIter!=vpBatches.end() && (*ppBatchIter)->getProcessedOutputCount()==0; ++ppBatchIter);
+                for(; ppBatchIter!=vpBatches.end() && (*ppBatchIter)->getCurrentOutputCount()==0; ++ppBatchIter);
                 lvAssert_(ppBatchIter!=vpBatches.end(),"found no processed output packets");
                 IIMetricsCalculatorPtr pMetrics = dynamic_cast<const IMetricRetriever_<IDataHandler>&>(**ppBatchIter).getMetrics(bAverage);
                 for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
-                    if((*ppBatchIter)->getProcessedOutputCount()>0)
+                    if((*ppBatchIter)->getCurrentOutputCount()>0)
                         pMetrics->accumulate(dynamic_cast<const IMetricRetriever_<IDataHandler>&>(**ppBatchIter).getMetrics(bAverage));
                 return pMetrics;
             }
@@ -126,6 +126,9 @@ namespace lv {
     /// data reporter full (default) specialization --- can be overridden by dataset type in 'impl' headers
     template<DatasetEvalList eDatasetEval, DatasetList eDataset>
     struct DataReporter_ : public DataReporterWrapper_<eDatasetEval,eDataset> {};
+
+    /// data evaluator interface; expose function to reset internal metrics (by default, only packet counts)
+
 
     /// data evaluator full (default) specialization --- can be overridden by dataset type in 'impl' headers
     template<DatasetEvalList eDatasetEval, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl>
@@ -145,9 +148,9 @@ namespace lv {
             lvAssert_(pLoader->getOutputPacketType()==ImagePacket && pLoader->getGTPacketType()==ImagePacket && pLoader->getGTMappingType()==PixelMapping,"default impl cannot display mask without 1:1 image pixel mapping");
             return BinClassif::getColoredMask(oClassif,pLoader->getGT(nIdx),pLoader->getGTROI(nIdx));
         }
-        /// resets internal metrics counters to zero
-        virtual void resetMetrics() {
-            resetProcessedOutputCount();
+        /// resets internal packet count + classification metrics
+        virtual void resetMetrics() override {
+            IDataConsumer_<DatasetEval_BinaryClassifier>::resetMetrics();
             m_pMetricsBase = IIMetricsAccumulator::create<MetricsAccumulator_<DatasetEval_BinaryClassifier,eDataset>>();
         }
     protected:
@@ -188,9 +191,9 @@ namespace lv {
                 vMasks.push_back(BinClassif::getColoredMask(vClassif[s],vGTArray[s],vGTROIArray.empty()?cv::Mat():vGTROIArray[s]));
             return vMasks;
         }
-        /// resets internal metrics counters to zero
-        virtual void resetMetrics() {
-            resetProcessedOutputCount();
+        /// resets internal packet count + classification metrics
+        virtual void resetMetrics() override {
+            IDataConsumer_<DatasetEval_BinaryClassifierArray>::resetMetrics();
             m_pMetricsBase = IIMetricsAccumulator::create<MetricsAccumulator_<DatasetEval_BinaryClassifierArray,eDataset>>();
         }
     protected:
@@ -232,6 +235,12 @@ namespace lv {
     struct DataEvaluator_<DatasetEval_BinaryClassifier,eDataset,lv::GLSL> :
             public IAsyncDataConsumer_<DatasetEval_BinaryClassifier,lv::GLSL>,
             public DataReporter_<DatasetEval_BinaryClassifier,eDataset> {
+        /// resets internal packet count + classification metrics
+        virtual void resetMetrics() override {
+            IAsyncDataConsumer_<DatasetEval_BinaryClassifier,lv::GLSL>::resetMetrics();
+            // ... @@@@ reset glsl eval? need a 'setEvaluationAtomicCounterBuffer' function
+            m_pMetricsBase = IIMetricsAccumulator::create<MetricsAccumulator_<DatasetEval_BinaryClassifier,eDataset>>();
+        }
     protected:
         /// overrides 'getMetricsBase' from IMetricRetriever_ for non-group-impl (as always required)
         virtual IIMetricsAccumulatorConstPtr getMetricsBase() const override {
@@ -335,11 +344,11 @@ namespace lv {
             if(bAverage) {
                 IDataHandlerPtrArray vpBatches = this->getBatches(true);
                 auto ppBatchIter = vpBatches.begin();
-                for(; ppBatchIter!=vpBatches.end() && (*ppBatchIter)->getProcessedOutputCount()==0; ++ppBatchIter);
+                for(; ppBatchIter!=vpBatches.end() && (*ppBatchIter)->getCurrentOutputCount()==0; ++ppBatchIter);
                 lvAssert_(ppBatchIter!=vpBatches.end(),"found no processed output packets");
                 IIMetricsCalculatorPtr pMetrics = dynamic_cast<const IMetricRetriever_<IDataHandler>&>(**ppBatchIter).getMetrics(bAverage);
                 for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
-                    if((*ppBatchIter)->getProcessedOutputCount()>0)
+                    if((*ppBatchIter)->getCurrentOutputCount()>0)
                         pMetrics->accumulate(dynamic_cast<const IMetricRetriever_<IDataHandler>&>(**ppBatchIter).getMetrics(bAverage));
                 return pMetrics;
             }

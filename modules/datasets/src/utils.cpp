@@ -69,15 +69,123 @@ bool lv::IDataHandler::compare_load(const IDataHandler& i, const IDataHandler& j
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool lv::IGroupDataParser::isBare() const {
+const std::string& lv::DataHandler::getName() const {
+    return m_sBatchName;
+}
+
+const std::string& lv::DataHandler::getDataPath() const {
+    return m_sDataPath;
+}
+
+const std::string& lv::DataHandler::getOutputPath() const {
+    return m_sOutputPath;
+}
+
+const std::string& lv::DataHandler::getRelativePath() const {
+    return m_sRelativePath;
+}
+
+bool lv::DataHandler::isGrayscale() const {
+    return m_bForcingGrayscale;
+}
+
+lv::IDatasetPtr lv::DataHandler::getDatasetInfo() const {
+    return m_pDataset;
+}
+
+lv::DataHandler::DataHandler(const std::string& sBatchName, IDatasetPtr pDataset, const std::string& sRelativePath) :
+        m_sBatchName(sBatchName),
+        m_sRelativePath(sRelativePath),
+        m_sDataPath(pDataset->getDatasetPath()+sRelativePath),
+        m_sOutputPath(pDataset->getOutputPath()+sRelativePath),
+        m_bForcingGrayscale(lv::string_contains_token(sRelativePath,pDataset->getGrayscaleDirTokens())),
+        m_pDataset(pDataset) {
+    lv::CreateDirIfNotExist(m_sOutputPath);
+}
+
+lv::IDataHandlerConstPtr lv::DataHandler::getBatch(size_t& nPacketIdx) const {
+    if(isGroup()) {
+        size_t nCurrPacketCount = 0;
+        auto vpBatches = getBatches(true);
+        auto ppBatchIter = vpBatches.begin();
+        while(ppBatchIter!=vpBatches.end()) {
+            const size_t nNextPacketIncr = (*ppBatchIter)->getInputCount();
+            if(nPacketIdx<nCurrPacketCount+nNextPacketIncr)
+                break;
+            nCurrPacketCount += nNextPacketIncr;
+            ++ppBatchIter;
+        }
+        lvAssert_(ppBatchIter!=vpBatches.end(),"requested packet index was out of range for the current batch group");
+        nPacketIdx -= nCurrPacketCount;
+        return (*ppBatchIter)->shared_from_this_cast<DataHandler>(true)->getBatch(nPacketIdx);
+    }
+    else {
+        lvAssert_(nPacketIdx<getInputCount(),"requested packet index was out of range for the current batch");
+        return shared_from_this();
+    }
+}
+
+lv::IDataHandlerPtr lv::DataHandler::getBatch(size_t& nPacketIdx) {
+    return std::const_pointer_cast<IDataHandler>(static_cast<const DataHandler*>(this)->getBatch(nPacketIdx));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+double lv::DataGroupHandler::getExpectedLoad() const {
+    return lv::accumulateMembers<double,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getExpectedLoad();});
+}
+
+size_t lv::DataGroupHandler::getInputCount() const {
+    return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getInputCount();});
+}
+
+size_t lv::DataGroupHandler::getGTCount() const {
+    return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getGTCount();});
+}
+
+size_t lv::DataGroupHandler::getExpectedOutputCount() const {
+    return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getExpectedOutputCount();});
+}
+
+size_t lv::DataGroupHandler::getCurrentOutputCount() const {
+    return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getCurrentOutputCount();});
+}
+
+size_t lv::DataGroupHandler::getFinalOutputCount() {
+    return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getFinalOutputCount();});
+}
+
+double lv::DataGroupHandler::getCurrentProcessTime() const {
+    return lv::accumulateMembers<double,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getCurrentProcessTime();});
+}
+
+double lv::DataGroupHandler::getFinalProcessTime() {
+    return lv::accumulateMembers<double,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getFinalProcessTime();});
+}
+
+void lv::DataGroupHandler::resetMetrics() {
+    for(auto& pBatch : getBatches(true))
+        pBatch->resetMetrics();
+}
+
+bool lv::DataGroupHandler::isProcessing() const {
+    for(const auto& pBatch : getBatches(true))
+        if(pBatch->isProcessing())
+            return true;
+    return false;
+}
+
+bool lv::DataGroupHandler::isBare() const {
     return m_bIsBare;
 }
 
-bool lv::IGroupDataParser::isGroup() const {
+bool lv::DataGroupHandler::isGroup() const {
     return true;
 }
 
-lv::IDataHandlerPtrArray lv::IGroupDataParser::getBatches(bool bWithHierarchy) const {
+lv::IDataHandlerPtrArray lv::DataGroupHandler::getBatches(bool bWithHierarchy) const {
     if(bWithHierarchy)
         return m_vpBatches;
     IDataHandlerPtrArray vpBatches;
@@ -93,40 +201,17 @@ lv::IDataHandlerPtrArray lv::IGroupDataParser::getBatches(bool bWithHierarchy) c
     return vpBatches;
 }
 
-void lv::IGroupDataParser::startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize) {
+void lv::DataGroupHandler::startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize) {
     for(const auto& pBatch : getBatches(true))
         pBatch->startPrecaching(bPrecacheGT,nSuggestedBufferSize);
 }
 
-void lv::IGroupDataParser::stopPrecaching() {
+void lv::DataGroupHandler::stopPrecaching() {
     for(const auto& pBatch : getBatches(true))
         pBatch->stopPrecaching();
 }
 
-bool lv::IGroupDataParser::isProcessing() const {
-    for(const auto& pBatch : getBatches(true))
-        if(pBatch->isProcessing())
-            return true;
-    return false;
-}
-
-double lv::IGroupDataParser::getProcessTime() const {
-    return lv::accumulateMembers<double,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessTime();});
-}
-
-double lv::IGroupDataParser::getExpectedLoad() const {
-    return lv::accumulateMembers<double,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getExpectedLoad();});
-}
-
-size_t lv::IGroupDataParser::getInputCount() const {
-    return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getInputCount();});
-}
-
-size_t lv::IGroupDataParser::getGTCount() const {
-    return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getGTCount();});
-}
-
-void lv::IGroupDataParser::parseData() {
+void lv::DataGroupHandler::parseData() {
     m_vpBatches.clear();
     m_bIsBare = true;
     IDatasetPtr pDataset = getDatasetInfo();
@@ -158,6 +243,7 @@ lv::DataPrecacher::DataPrecacher(std::function<const cv::Mat&(size_t)> lDataLoad
         m_lCallback(lDataLoaderCallback) {
     lvAssert_(m_lCallback,"invalid data precacher callback");
     m_bIsActive = false;
+    m_pWorkerException = nullptr;
     m_nAnswIdx = m_nReqIdx = m_nLastReqIdx = size_t(-1);
 }
 
@@ -185,7 +271,12 @@ const cv::Mat& lv::DataPrecacher::getPacket(size_t nIdx) {
         if(res==std::cv_status::timeout && nAnswIdx!=m_nReqIdx)
             std::cout << "data precacher [" << uintptr_t(this) << "] retrying request for packet #" << nIdx << "..." << std::endl;
 #endif //CONSOLE_DEBUG
-    } while(res==std::cv_status::timeout && nAnswIdx!=m_nReqIdx);
+    } while(res==std::cv_status::timeout && nAnswIdx!=m_nReqIdx && !m_pWorkerException);
+    if(m_pWorkerException) {
+        m_bIsActive = false;
+        m_hWorker.join();
+        std::rethrow_exception(m_pWorkerException);
+    }
     m_oLastReqPacket = m_oReqPacket;
     m_nLastReqIdx = nAnswIdx;
     return m_oLastReqPacket;
@@ -196,10 +287,10 @@ bool lv::DataPrecacher::startAsyncPrecaching(size_t nSuggestedBufferSize) {
     static_assert(PRECACHE_QUERY_TIMEOUT_MS>0,"Precache query timeout must be a positive value");
     static_assert(PRECACHE_QUERY_END_TIMEOUT_MS>0,"Precache query post-end timeout must be a positive value");
     static_assert(PRECACHE_REFILL_TIMEOUT_MS>0,"Precache refill timeout must be a positive value");
-    if(m_bIsActive)
-        stopAsyncPrecaching();
+    stopAsyncPrecaching();
     if(nSuggestedBufferSize>0) {
         m_bIsActive = true;
+        m_pWorkerException = nullptr;
         m_nAnswIdx = m_nReqIdx = size_t(-1);
         m_hWorker = std::thread(&DataPrecacher::entry,this,std::max(std::min(nSuggestedBufferSize,CACHE_MAX_SIZE),CACHE_MIN_SIZE));
     }
@@ -211,119 +302,126 @@ void lv::DataPrecacher::stopAsyncPrecaching() {
         m_bIsActive = false;
         m_hWorker.join();
     }
+    if(m_pWorkerException)
+        std::rethrow_exception(m_pWorkerException);
 }
 
 void lv::DataPrecacher::entry(const size_t nBufferSize) {
     std::mutex_unique_lock sync_lock(m_oSyncMutex);
+    try {
 #if CONSOLE_DEBUG
-    std::cout << "data precacher [" << uintptr_t(this) << "] init w/ buffer size = " << (nBufferSize/1024)/1024 << " mb" << std::endl;
+        std::cout << "data precacher [" << uintptr_t(this) << "] init w/ buffer size = " << (nBufferSize/1024)/1024 << " mb" << std::endl;
 #endif //CONSOLE_DEBUG
-    std::queue<cv::Mat> qoCache;
-    std::vector<uchar> vcBuffer(nBufferSize);
-    size_t nNextExpectedReqIdx = 0;
-    size_t nNextPrecacheIdx = 0;
-    size_t nFirstBufferIdx = size_t(-1);
-    size_t nNextBufferIdx = size_t(-1);
-    bool bReachedEnd = false;
-    const auto lCacheNextPacket = [&]() -> size_t {
-        const cv::Mat& oNextPacket = m_lCallback(nNextPrecacheIdx);
-        const size_t nNextPacketSize = oNextPacket.total()*oNextPacket.elemSize();
-        if(nNextPacketSize==0) {
-            bReachedEnd = true;
-            return 0;
-        }
-        else if(nFirstBufferIdx<=nNextBufferIdx) {
-            bReachedEnd = false;
-            if(nNextBufferIdx==size_t(-1) || (nNextBufferIdx+nNextPacketSize>=nBufferSize)) {
-                if((nFirstBufferIdx!=size_t(-1) && nNextPacketSize>=nFirstBufferIdx) || nNextPacketSize>=nBufferSize)
-                    return 0;
-                cv::Mat oNextPacket_cache(oNextPacket.size(),oNextPacket.type(),vcBuffer.data());
-                oNextPacket.copyTo(oNextPacket_cache);
-                qoCache.push(oNextPacket_cache);
-                nNextBufferIdx = nNextPacketSize;
-                if(nFirstBufferIdx==size_t(-1))
-                    nFirstBufferIdx = 0;
+        std::queue<cv::Mat> qoCache;
+        std::vector<uchar> vcBuffer(nBufferSize);
+        size_t nNextExpectedReqIdx = 0;
+        size_t nNextPrecacheIdx = 0;
+        size_t nFirstBufferIdx = size_t(-1);
+        size_t nNextBufferIdx = size_t(-1);
+        bool bReachedEnd = false;
+        const auto lCacheNextPacket = [&]() -> size_t {
+            const cv::Mat& oNextPacket = m_lCallback(nNextPrecacheIdx);
+            const size_t nNextPacketSize = oNextPacket.total()*oNextPacket.elemSize();
+            if(nNextPacketSize==0) {
+                bReachedEnd = true;
+                return 0;
             }
-            else { // nNextBufferIdx+nNextPacketSize<m_nBufferSize
+            else if(nFirstBufferIdx<=nNextBufferIdx) {
+                bReachedEnd = false;
+                if(nNextBufferIdx==size_t(-1) || (nNextBufferIdx+nNextPacketSize>=nBufferSize)) {
+                    if((nFirstBufferIdx!=size_t(-1) && nNextPacketSize>=nFirstBufferIdx) || nNextPacketSize>=nBufferSize)
+                        return 0;
+                    cv::Mat oNextPacket_cache(oNextPacket.size(),oNextPacket.type(),vcBuffer.data());
+                    oNextPacket.copyTo(oNextPacket_cache);
+                    qoCache.push(oNextPacket_cache);
+                    nNextBufferIdx = nNextPacketSize;
+                    if(nFirstBufferIdx==size_t(-1))
+                        nFirstBufferIdx = 0;
+                }
+                else { // nNextBufferIdx+nNextPacketSize<m_nBufferSize
+                    cv::Mat oNextPacket_cache(oNextPacket.size(),oNextPacket.type(),vcBuffer.data()+nNextBufferIdx);
+                    oNextPacket.copyTo(oNextPacket_cache);
+                    qoCache.push(oNextPacket_cache);
+                    nNextBufferIdx += nNextPacketSize;
+                }
+            }
+            else if(nNextBufferIdx+nNextPacketSize<nFirstBufferIdx) {
                 cv::Mat oNextPacket_cache(oNextPacket.size(),oNextPacket.type(),vcBuffer.data()+nNextBufferIdx);
                 oNextPacket.copyTo(oNextPacket_cache);
                 qoCache.push(oNextPacket_cache);
                 nNextBufferIdx += nNextPacketSize;
             }
-        }
-        else if(nNextBufferIdx+nNextPacketSize<nFirstBufferIdx) {
-            cv::Mat oNextPacket_cache(oNextPacket.size(),oNextPacket.type(),vcBuffer.data()+nNextBufferIdx);
-            oNextPacket.copyTo(oNextPacket_cache);
-            qoCache.push(oNextPacket_cache);
-            nNextBufferIdx += nNextPacketSize;
-        }
-        else // nNextBufferIdx+nNextPacketSize>=nFirstBufferIdx
-            return 0;
-        ++nNextPrecacheIdx;
+            else // nNextBufferIdx+nNextPacketSize>=nFirstBufferIdx
+                return 0;
+            ++nNextPrecacheIdx;
 #if CONSOLE_DEBUG
-        //std::cout << "data precacher [" << uintptr_t(this) << "] filled one packet w/ size = " << nNextPacketSize/1024 << " kb" << std::endl;
+            //std::cout << "data precacher [" << uintptr_t(this) << "] filled one packet w/ size = " << nNextPacketSize/1024 << " kb" << std::endl;
 #endif //CONSOLE_DEBUG
-        return nNextPacketSize;
-    };
-    const std::chrono::time_point<std::chrono::high_resolution_clock> nPrefillTick = std::chrono::high_resolution_clock::now();
-    while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nPrefillTick).count()<PRECACHE_REFILL_TIMEOUT_MS && lCacheNextPacket());
-    while(m_bIsActive) {
-        if(m_oReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(bReachedEnd?PRECACHE_QUERY_END_TIMEOUT_MS:PRECACHE_QUERY_TIMEOUT_MS))!=std::cv_status::timeout) {
-            if(m_nReqIdx!=nNextExpectedReqIdx-1) {
-                if(!qoCache.empty()) {
-                    if(m_nReqIdx<nNextPrecacheIdx && m_nReqIdx>=nNextExpectedReqIdx) {
+            return nNextPacketSize;
+        };
+        const std::chrono::time_point<std::chrono::high_resolution_clock> nPrefillTick = std::chrono::high_resolution_clock::now();
+        while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nPrefillTick).count()<PRECACHE_REFILL_TIMEOUT_MS && lCacheNextPacket());
+        while(m_bIsActive) {
+            if(m_oReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(bReachedEnd?PRECACHE_QUERY_END_TIMEOUT_MS:PRECACHE_QUERY_TIMEOUT_MS))!=std::cv_status::timeout) {
+                if(m_nReqIdx!=nNextExpectedReqIdx-1) {
+                    if(!qoCache.empty()) {
+                        if(m_nReqIdx<nNextPrecacheIdx && m_nReqIdx>=nNextExpectedReqIdx) {
 #if CONSOLE_DEBUG
-                        if(m_nReqIdx>nNextExpectedReqIdx)
-                            std::cout << "data precacher [" << uintptr_t(this) << "] popping " << m_nReqIdx-nNextExpectedReqIdx << " extra packet(s) from cache" << std::endl;
+                            if(m_nReqIdx>nNextExpectedReqIdx)
+                                std::cout << "data precacher [" << uintptr_t(this) << "] popping " << m_nReqIdx-nNextExpectedReqIdx << " extra packet(s) from cache" << std::endl;
 #endif //CONSOLE_DEBUG
-                        while(m_nReqIdx-nNextExpectedReqIdx+1>0) {
-                            m_oReqPacket = qoCache.front();
+                            while(m_nReqIdx-nNextExpectedReqIdx+1>0) {
+                                m_oReqPacket = qoCache.front();
+                                m_nAnswIdx = m_nReqIdx;
+                                nFirstBufferIdx = (size_t)(m_oReqPacket.data-vcBuffer.data());
+                                qoCache.pop();
+                                ++nNextExpectedReqIdx;
+                            }
+                        }
+                        else {
+#if CONSOLE_DEBUG
+                            std::cout << "data precacher [" << uintptr_t(this) << "] out-of-order request, destroying cache" << std::endl;
+#endif //CONSOLE_DEBUG
+                            qoCache = std::queue<cv::Mat>();
+                            m_oReqPacket = m_lCallback(m_nReqIdx);
                             m_nAnswIdx = m_nReqIdx;
-                            nFirstBufferIdx = (size_t)(m_oReqPacket.data-vcBuffer.data());
-                            qoCache.pop();
-                            ++nNextExpectedReqIdx;
+                            nFirstBufferIdx = nNextBufferIdx = size_t(-1);
+                            nNextExpectedReqIdx = nNextPrecacheIdx = m_nReqIdx+1;
+                            bReachedEnd = false;
                         }
                     }
                     else {
 #if CONSOLE_DEBUG
-                        std::cout << "data precacher [" << uintptr_t(this) << "] out-of-order request, destroying cache" << std::endl;
+                        std::cout << "data precacher [" << uintptr_t(this) << "] answering request manually, precaching is falling behind" << std::endl;
 #endif //CONSOLE_DEBUG
-                        qoCache = std::queue<cv::Mat>();
                         m_oReqPacket = m_lCallback(m_nReqIdx);
                         m_nAnswIdx = m_nReqIdx;
                         nFirstBufferIdx = nNextBufferIdx = size_t(-1);
                         nNextExpectedReqIdx = nNextPrecacheIdx = m_nReqIdx+1;
-                        bReachedEnd = false;
                     }
                 }
-                else {
 #if CONSOLE_DEBUG
-                    std::cout << "data precacher [" << uintptr_t(this) << "] answering request manually, precaching is falling behind" << std::endl;
+                else
+                    std::cout << "data precacher [" << uintptr_t(this) << "] answering request using last packet" << std::endl;
 #endif //CONSOLE_DEBUG
-                    m_oReqPacket = m_lCallback(m_nReqIdx);
-                    m_nAnswIdx = m_nReqIdx;
-                    nFirstBufferIdx = nNextBufferIdx = size_t(-1);
-                    nNextExpectedReqIdx = nNextPrecacheIdx = m_nReqIdx+1;
+                m_oSyncCondVar.notify_one();
+                lCacheNextPacket();
+            }
+            else if(!bReachedEnd) {
+                const size_t nUsedBufferSize = nFirstBufferIdx==size_t(-1)?0:(nFirstBufferIdx<nNextBufferIdx?nNextBufferIdx-nFirstBufferIdx:nBufferSize-nFirstBufferIdx+nNextBufferIdx);
+                if(nUsedBufferSize<nBufferSize/4) {
+#if CONSOLE_DEBUG
+                    std::cout << "data precacher [" << uintptr_t(this) << "] force refilling precache buffer... (current size = " << (nUsedBufferSize/1024)/1024 << " mb)" << std::endl;
+#endif //CONSOLE_DEBUG
+                    size_t nFillCount = 0;
+                    const std::chrono::time_point<std::chrono::high_resolution_clock> nRefillTick = std::chrono::high_resolution_clock::now();
+                    while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nRefillTick).count()<PRECACHE_REFILL_TIMEOUT_MS && nFillCount++<10 && lCacheNextPacket());
                 }
             }
-#if CONSOLE_DEBUG
-            else
-                std::cout << "data precacher [" << uintptr_t(this) << "] answering request using last packet" << std::endl;
-#endif //CONSOLE_DEBUG
-            m_oSyncCondVar.notify_one();
-            lCacheNextPacket();
         }
-        else if(!bReachedEnd) {
-            const size_t nUsedBufferSize = nFirstBufferIdx==size_t(-1)?0:(nFirstBufferIdx<nNextBufferIdx?nNextBufferIdx-nFirstBufferIdx:nBufferSize-nFirstBufferIdx+nNextBufferIdx);
-            if(nUsedBufferSize<nBufferSize/4) {
-#if CONSOLE_DEBUG
-                std::cout << "data precacher [" << uintptr_t(this) << "] force refilling precache buffer... (current size = " << (nUsedBufferSize/1024)/1024 << " mb)" << std::endl;
-#endif //CONSOLE_DEBUG
-                size_t nFillCount = 0;
-                const std::chrono::time_point<std::chrono::high_resolution_clock> nRefillTick = std::chrono::high_resolution_clock::now();
-                while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nRefillTick).count()<PRECACHE_REFILL_TIMEOUT_MS && nFillCount++<10 && lCacheNextPacket());
-            }
-        }
+    }
+    catch(...) {
+        m_pWorkerException = std::current_exception();
     }
 }
 
@@ -1016,26 +1114,27 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_ImageArray>::getRawGT(size_t nPacke
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-size_t lv::IDataCounter_<lv::NotGroup>::getProcessedOutputCount() const {
+void lv::IDataCounter::countOutput(size_t nPacketIdx) {
+    m_mProcessedPackets.insert(nPacketIdx);
+}
+
+void lv::IDataCounter::setOutputCountPromise() {
+    m_nPacketCountPromise.set_value(m_mProcessedPackets.size());
+}
+
+void lv::IDataCounter::resetOutputCount() {
+    m_mProcessedPackets.clear();
+    m_nPacketCountPromise = std::promise<size_t>();
+    m_nPacketCountFuture = m_nPacketCountPromise.get_future();
+    m_nFinalPacketCount = 0;
+}
+
+size_t lv::IDataCounter::getCurrentOutputCount() const {
     return m_mProcessedPackets.size();
 }
 
-size_t lv::IDataCounter_<lv::NotGroup>::getProcessedOutputCountPromise() {
-    return m_nProcessedPacketsPromise.get_future().get();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-size_t lv::IDataCounter_<lv::Group>::getExpectedOutputCount() const {
-    return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getExpectedOutputCount();});
-}
-
-size_t lv::IDataCounter_<lv::Group>::getProcessedOutputCount() const {
-    return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessedOutputCount();});
-}
-
-size_t lv::IDataCounter_<lv::Group>::getProcessedOutputCountPromise() {
-    return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getProcessedOutputCountPromise();});
+size_t lv::IDataCounter::getFinalOutputCount() {
+    return m_nPacketCountFuture.valid()?(m_nFinalPacketCount=m_nPacketCountFuture.get()):m_nFinalPacketCount;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1058,8 +1157,10 @@ lv::DataWriter::~DataWriter() {
 size_t lv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
     if(!m_bIsActive)
         return m_lCallback(oPacket,nIdx);
-    cv::Mat oPacketCopy = oPacket.clone();
     const size_t nPacketSize = oPacket.total()*oPacket.elemSize();
+    if(nPacketSize>m_nQueueMaxSize)
+        return m_lCallback(oPacket,nIdx);
+    cv::Mat oPacketCopy = oPacket.clone();
     size_t nPacketPosition;
     {
         std::mutex_unique_lock sync_lock(m_oSyncMutex);
@@ -1071,6 +1172,7 @@ size_t lv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
             // @@@ could cut a find operation here using C++17's map::insert_or_assign above
             nPacketPosition = std::distance(m_mQueue.begin(),m_mQueue.find(nIdx));
             ++m_nQueueCount;
+            m_oQueueCondVar.notify_one();
         }
         else {
 #if CONSOLE_DEBUG
@@ -1079,7 +1181,6 @@ size_t lv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
             nPacketPosition = SIZE_MAX; // packet dropped
         }
     }
-    m_oQueueCondVar.notify_one();
 #if CONSOLE_DEBUG
     if((nIdx%50)==0)
         std::cout << "data writer [" << uintptr_t(this) << "] queue @ " << (int)(((float)m_nQueueSize*100)/m_nQueueMaxSize) << "% capacity" << std::endl;
@@ -1088,15 +1189,15 @@ size_t lv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
 }
 
 bool lv::DataWriter::startAsyncWriting(size_t nSuggestedQueueSize, bool bDropPacketsIfFull, size_t nWorkers) {
-    if(m_bIsActive)
-        stopAsyncWriting();
+    stopAsyncWriting();
     if(nSuggestedQueueSize>0) {
         m_bIsActive = true;
         m_bAllowPacketDrop = bDropPacketsIfFull;
-        m_nQueueMaxSize = (nSuggestedQueueSize>CACHE_MAX_SIZE)?(CACHE_MAX_SIZE):nSuggestedQueueSize;
+        m_nQueueMaxSize = std::max(std::min(nSuggestedQueueSize,CACHE_MAX_SIZE),CACHE_MIN_SIZE);
         m_nQueueSize = 0;
         m_nQueueCount = 0;
         m_mQueue.clear();
+        m_vhWorkers.clear();
         for(size_t n=0; n<nWorkers; ++n)
             m_vhWorkers.emplace_back(std::bind(&DataWriter::entry,this));
     }
@@ -1110,6 +1211,11 @@ void lv::DataWriter::stopAsyncWriting() {
         for(std::thread& oWorker : m_vhWorkers)
             oWorker.join();
     }
+    while(!m_vWorkerExceptions.empty()) {
+        std::exception_ptr pLatestException = m_vWorkerExceptions.top().first; // add packet idx to exception...? somewhow?
+        m_vWorkerExceptions.pop();
+        std::rethrow_exception(pLatestException);
+    }
 }
 
 void lv::DataWriter::entry() {
@@ -1122,17 +1228,22 @@ void lv::DataWriter::entry() {
             m_oQueueCondVar.wait(sync_lock);
         if(m_nQueueCount>0) {
             auto pCurrPacket = m_mQueue.begin();
-            lvAssert_(pCurrPacket!=m_mQueue.end(),"data writer notified for missing packet");
-            const cv::Mat oPacketData(std::move(pCurrPacket->second));
-            const size_t nPacketIdx = pCurrPacket->first;
-            const size_t nPacketSize = oPacketData.total()*oPacketData.elemSize();
-            lvAssert_(nPacketSize<=m_nQueueSize,"data writer packet size exceeds queue size");
-            m_nQueueSize -= nPacketSize;
-            m_mQueue.erase(pCurrPacket);
-            --m_nQueueCount;
-            std::unlock_guard<std::mutex_unique_lock> oUnlock(sync_lock);
-            m_lCallback(oPacketData,nPacketIdx);
-            m_oClearCondVar.notify_all();
+            if(pCurrPacket!=m_mQueue.end()) {
+                const size_t nPacketSize = pCurrPacket->second.total()*pCurrPacket->second.elemSize();
+                if(nPacketSize<=m_nQueueSize) {
+                    try {
+                        std::unlock_guard<std::mutex_unique_lock> oUnlock(sync_lock);
+                        m_lCallback(pCurrPacket->second,pCurrPacket->first);
+                    }
+                    catch(...) {
+                        m_vWorkerExceptions.push(std::make_pair(std::current_exception(),pCurrPacket->first));
+                    }
+                    m_nQueueSize -= nPacketSize;
+                    m_mQueue.erase(pCurrPacket);
+                    --m_nQueueCount;
+                    m_oClearCondVar.notify_all();
+                }
+            }
         }
     }
 }

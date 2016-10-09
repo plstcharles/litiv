@@ -108,7 +108,7 @@ int main(int, char**) {
         }
         while(g_nActiveThreads>0)
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        if(pDataset->getProcessedOutputCountPromise()==nTotPackets)
+        if(pDataset->getFinalOutputCount()==nTotPackets)
             pDataset->writeEvalReport();
     }
     catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
@@ -166,7 +166,7 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
 #endif //DISPLAY_OUTPUT>0
         }
         oBatch.stopProcessing();
-        const double dTimeElapsed = oBatch.getProcessTime();
+        const double dTimeElapsed = oBatch.getFinalProcessTime();
         const double dProcessSpeed = (double)(nNextIdx-1)/dTimeElapsed;
         std::cout << "\t\t" << sCurrBatchName << " @ F:" << (nNextIdx-1) << "/" << nTotPacketCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
         oBatch.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
@@ -235,7 +235,7 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
             oBatch.push(oCurrEdgeMask,nCurrIdx++);
         }
         oBatch.stopProcessing();
-        const double dTimeElapsed = oBatch.getProcessTime();
+        const double dTimeElapsed = oBatch.getFinalProcessTime();
         const double dProcessSpeed = (double)nCurrIdx/dTimeElapsed;
         std::cout << "\t\t" << sCurrBatchName << " @ F:" << nCurrIdx << "/" << nTotPacketCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
         oBatch.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed

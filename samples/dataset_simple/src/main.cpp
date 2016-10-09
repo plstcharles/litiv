@@ -135,7 +135,7 @@ int main(int, char**) { // this sample uses no command line argument
                 oBatch.push(oEdgeMask,nProcessedPackets-1); // push the last edge detection result for evaluation and/or logging, if needed
             }
             oBatch.stopProcessing(); // releases all real-time evaluation components, and halts data precaching (if it was activated)
-            const double dTimeElapsed = oBatch.getProcessTime(); // returns the time elapsed between the 'startProcessing' and 'stopProcessing' calls for this work batch
+            const double dTimeElapsed = oBatch.getFinalProcessTime(); // returns the time elapsed between the 'startProcessing' and 'stopProcessing' calls for this work batch
             const double dProcessSpeed = (double)nProcessedPackets/dTimeElapsed; // evaluate the average processing speed of the algorithm for this work batch
             std::cout << "\tBatch '" << oBatch.getName() << "' done at ~" << dProcessSpeed << " Hz" << std::endl;
         }

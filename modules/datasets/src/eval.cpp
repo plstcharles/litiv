@@ -19,7 +19,7 @@
 //#include "litiv/utils/console.hpp" @@@@@ reuse later?
 
 void lv::IDataReporter_<lv::DatasetEval_None>::writeEvalReport() const {
-    if(getProcessedOutputCount()==0) {
+    if(getCurrentOutputCount()==0) {
         std::cout << "No report to write for '" << getName() << "', skipping..." << std::endl;
         return;
     }
@@ -39,7 +39,7 @@ void lv::IDataReporter_<lv::DatasetEval_None>::writeEvalReport() const {
 }
 
 std::string lv::IDataReporter_<lv::DatasetEval_None>::writeInlineEvalReport(size_t nIndentSize) const {
-    if(getProcessedOutputCount()==0)
+    if(getCurrentOutputCount()==0)
         return std::string();
     const size_t nCellSize = 12;
     std::stringstream ssStr;
@@ -48,16 +48,16 @@ std::string lv::IDataReporter_<lv::DatasetEval_None>::writeInlineEvalReport(size
         for(const auto& pBatch : getBatches(true))
             ssStr << pBatch->shared_from_this_cast<const IDataReporter_<DatasetEval_None>>(true)->IDataReporter_<DatasetEval_None>::writeInlineEvalReport(nIndentSize+1);
     ssStr << lv::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
-             std::setw(nCellSize) << getProcessedOutputCount() << "|" <<
-             std::setw(nCellSize) << getProcessTime() << "|" <<
-             std::setw(nCellSize) << getProcessedOutputCount()/getProcessTime() << "\n";
+             std::setw(nCellSize) << getCurrentOutputCount() << "|" <<
+             std::setw(nCellSize) << getCurrentProcessTime() << "|" <<
+             std::setw(nCellSize) << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
     return ssStr.str();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::writeEvalReport() const {
-    if(getProcessedOutputCount()==0 || !getDatasetInfo()->isUsingEvaluator()) {
+    if(getCurrentOutputCount()==0 || !getDatasetInfo()->isUsingEvaluator()) {
         IDataReporter_<lv::DatasetEval_None>::writeEvalReport();
         return;
     }
@@ -76,13 +76,13 @@ void lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::writeEvalReport() con
         oMetricsOutput << "            |     Rcl    |     Spc    |     FPR    |     FNR    |     PBC    |     Prc    |     FM     |     MCC    \n";
         oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
         oMetricsOutput << IDataReporter_<DatasetEval_BinaryClassifier>::writeInlineEvalReport(0);
-        oMetricsOutput << "\nHz: " << getProcessedOutputCount()/getProcessTime() << "\n";
+        oMetricsOutput << "\nHz: " << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
         oMetricsOutput << lv::getLogStamp();
     }
 }
 
 std::string lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::writeInlineEvalReport(size_t nIndentSize) const {
-    if(getProcessedOutputCount()==0)
+    if(getCurrentOutputCount()==0)
         return std::string();
     const size_t nCellSize = 12;
     std::stringstream ssStr;
@@ -108,7 +108,7 @@ std::string lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::writeInlineEva
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void lv::IDataReporter_<lv::DatasetEval_BinaryClassifierArray>::writeEvalReport() const {
-    if(getProcessedOutputCount()==0 || !getDatasetInfo()->isUsingEvaluator()) {
+    if(getCurrentOutputCount()==0 || !getDatasetInfo()->isUsingEvaluator()) {
         IDataReporter_<lv::DatasetEval_None>::writeEvalReport();
         return;
     }
@@ -129,13 +129,13 @@ void lv::IDataReporter_<lv::DatasetEval_BinaryClassifierArray>::writeEvalReport(
         oMetricsOutput << "            |   Stream   ||     Rcl    |     Spc    |     FPR    |     FNR    |     PBC    |     Prc    |     FM     |     MCC    \n";
         oMetricsOutput << "------------|------------||------------|------------|------------|------------|------------|------------|------------|------------\n";
         oMetricsOutput << IDataReporter_<DatasetEval_BinaryClassifierArray>::writeInlineEvalReport(0);
-        oMetricsOutput << "\nHz: " << getProcessedOutputCount()/getProcessTime() << "\n";
+        oMetricsOutput << "\nHz: " << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
         oMetricsOutput << lv::getLogStamp();
     }
 }
 
 std::string lv::IDataReporter_<lv::DatasetEval_BinaryClassifierArray>::writeInlineEvalReport(size_t nIndentSize) const {
-    if(getProcessedOutputCount()==0)
+    if(getCurrentOutputCount()==0)
         return std::string();
     const size_t nCellSize = 12;
     std::stringstream ssStr;
@@ -286,7 +286,7 @@ lv::BinClassifMetricsAccumulatorPtr lv::GLBinaryClassifierEvaluator::getMetricsB
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void lv::IDatasetReporter_<lv::DatasetEval_None>::writeEvalReport() const {
-    if(getProcessedOutputCount()==0 || getBatches(false).empty()) {
+    if(getCurrentOutputCount()==0 || getBatches(false).empty()) {
         std::cout << "No report to write for dataset '" << getName() << "', skipping." << std::endl;
         return;
     }
@@ -298,18 +298,13 @@ void lv::IDatasetReporter_<lv::DatasetEval_None>::writeEvalReport() const {
         oMetricsOutput << "Default evaluation report for dataset '" << getName() << "' :\n\n";
         oMetricsOutput << "            |   Packets  |   Seconds  |     Hz     \n";
         oMetricsOutput << "------------|------------|------------|------------\n";
-        size_t nOverallPacketCount = 0;
-        double dOverallTimeElapsed = 0.0;
-        for(const auto& pGroupIter : getBatches(true)) {
+        for(const auto& pGroupIter : getBatches(true))
             oMetricsOutput << pGroupIter->shared_from_this_cast<const IDataReporter_<DatasetEval_None>>(true)->IDataReporter_<DatasetEval_None>::writeInlineEvalReport(0);
-            nOverallPacketCount += pGroupIter->getProcessedOutputCount();
-            dOverallTimeElapsed += pGroupIter->getProcessTime();
-        }
         oMetricsOutput << "------------|------------|------------|------------\n";
         oMetricsOutput << "     overall|" <<
-                       std::setw(12) << nOverallPacketCount << "|" <<
-                       std::setw(12) << dOverallTimeElapsed << "|" <<
-                       std::setw(12) << nOverallPacketCount/dOverallTimeElapsed << "\n";
+                       std::setw(12) << getCurrentOutputCount() << "|" <<
+                       std::setw(12) << getCurrentProcessTime() << "|" <<
+                       std::setw(12) << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
         oMetricsOutput << lv::getLogStamp();
     }
 }
@@ -317,7 +312,7 @@ void lv::IDatasetReporter_<lv::DatasetEval_None>::writeEvalReport() const {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void lv::IDatasetReporter_<lv::DatasetEval_BinaryClassifier>::writeEvalReport() const {
-    if(getProcessedOutputCount()==0 || getBatches(false).empty() || !isUsingEvaluator()) {
+    if(getCurrentOutputCount()==0 || getBatches(false).empty() || !isUsingEvaluator()) {
         IDatasetReporter_<lv::DatasetEval_None>::writeEvalReport();
         return;
     }
@@ -333,13 +328,8 @@ void lv::IDatasetReporter_<lv::DatasetEval_BinaryClassifier>::writeEvalReport() 
         oMetricsOutput << "Binary classification evaluation report for dataset '" << getName() << "' :\n\n";
         oMetricsOutput << "            |     Rcl    |     Spc    |     FPR    |     FNR    |     PBC    |     Prc    |     FM     |     MCC    \n";
         oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
-        size_t nOverallPacketCount = 0;
-        double dOverallTimeElapsed = 0.0;
-        for(const auto& pGroupIter : getBatches(true)) {
+        for(const auto& pGroupIter : getBatches(true))
             oMetricsOutput << pGroupIter->shared_from_this_cast<const IDataReporter_<DatasetEval_BinaryClassifier>>(true)->IDataReporter_<DatasetEval_BinaryClassifier>::writeInlineEvalReport(0);
-            nOverallPacketCount += pGroupIter->getProcessedOutputCount();
-            dOverallTimeElapsed += pGroupIter->getProcessTime();
-        }
         oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
         oMetricsOutput << "     overall|" <<
                        std::setw(12) << oMetrics.dRecall << "|" <<
@@ -350,7 +340,7 @@ void lv::IDatasetReporter_<lv::DatasetEval_BinaryClassifier>::writeEvalReport() 
                        std::setw(12) << oMetrics.dPrecision << "|" <<
                        std::setw(12) << oMetrics.dFMeasure << "|" <<
                        std::setw(12) << oMetrics.dMCC << "\n";
-        oMetricsOutput << "\nHz: " << nOverallPacketCount/dOverallTimeElapsed << "\n";
+        oMetricsOutput << "\nHz: " << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
         oMetricsOutput << lv::getLogStamp();
     }
 }
@@ -358,7 +348,7 @@ void lv::IDatasetReporter_<lv::DatasetEval_BinaryClassifier>::writeEvalReport() 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void lv::IDatasetReporter_<lv::DatasetEval_BinaryClassifierArray>::writeEvalReport() const {
-    if(getProcessedOutputCount()==0 || getBatches(false).empty() || !isUsingEvaluator()) {
+    if(getCurrentOutputCount()==0 || getBatches(false).empty() || !isUsingEvaluator()) {
         IDatasetReporter_<lv::DatasetEval_None>::writeEvalReport();
         return;
     }
@@ -378,8 +368,6 @@ void lv::IDatasetReporter_<lv::DatasetEval_BinaryClassifierArray>::writeEvalRepo
         oMetricsOutput << "            |   Stream   ||     Rcl    |     Spc    |     FPR    |     FNR    |     PBC    |     Prc    |     FM     |     MCC    \n";
         oMetricsOutput << "------------|------------||------------|------------|------------|------------|------------|------------|------------|------------\n";
         std::vector<std::string> vsStreamNames;
-        size_t nOverallPacketCount = 0;
-        double dOverallTimeElapsed = 0.0;
         for(const auto& pGroupIter : getBatches(true)) {
             const auto pReporter = pGroupIter->shared_from_this_cast<const IDataReporter_<DatasetEval_BinaryClassifierArray>>(true);
             oMetricsOutput << pReporter->IDataReporter_<DatasetEval_BinaryClassifierArray>::writeInlineEvalReport(0);
@@ -394,8 +382,6 @@ void lv::IDatasetReporter_<lv::DatasetEval_BinaryClassifierArray>::writeEvalRepo
                 for(size_t s=0; s<vsStreamNames.size(); ++s)
                 lvAssert_(vsStreamNames[s]==pConsumer->getOutputStreamName(s),"output stream names mismatch");
             }
-            nOverallPacketCount += pGroupIter->getProcessedOutputCount();
-            dOverallTimeElapsed += pGroupIter->getProcessTime();
         }
         oMetricsOutput << "------------|------------||------------|------------|------------|------------|------------|------------|------------|------------\n";
         lvAssert_(oMetrics.m_vMetrics.size()==vsStreamNames.size(),"output stream count mismatch");
@@ -420,7 +406,7 @@ void lv::IDatasetReporter_<lv::DatasetEval_BinaryClassifierArray>::writeEvalRepo
                        std::setw(12) << oOverallMetrics.dPrecision << "|" <<
                        std::setw(12) << oOverallMetrics.dFMeasure << "|" <<
                        std::setw(12) << oOverallMetrics.dMCC << "\n";
-        oMetricsOutput << "\nHz: " << nOverallPacketCount/dOverallTimeElapsed << "\n";
+        oMetricsOutput << "\nHz: " << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
         oMetricsOutput << lv::getLogStamp();
     }
 }

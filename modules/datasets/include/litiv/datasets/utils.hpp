@@ -64,11 +64,6 @@ namespace lv {
         Dataset_Custom // 'datasets::create' will forward all parameters from Dataset constr
     };
 
-    enum GroupPolicy { // used to toggle group policy functions in data handler interfaces
-        Group,
-        NotGroup,
-    };
-
     enum ArrayPolicy { // used to toggle data array policy functions in data handler interfaces
         Array,
         NotArray,
@@ -231,14 +226,18 @@ namespace lv {
         virtual size_t getInputCount() const = 0;
         /// returns the total gt packet count in the dataset (recursively queried from work batches)
         virtual size_t getGTCount() const = 0;
-        /// returns the total output packet count expected to be processed by the dataset evaluator (recursively queried from work batches)
+        /// returns the output packet count expected to be processed by the dataset evaluator (recursively queried from work batches)
         virtual size_t getExpectedOutputCount() const = 0;
-        /// returns the total output packet count so far processed by the dataset evaluator (recursively queried from work batches)
-        virtual size_t getProcessedOutputCount() const = 0;
-        /// returns the total output packet count so far processed by the dataset evaluator, blocking if processing is not finished yet (recursively queried from work batches)
-        virtual size_t getProcessedOutputCountPromise() = 0;
-        /// returns the total time it took to process the dataset (recursively queried from work batches)
-        virtual double getProcessTime() const = 0;
+        /// returns the output packet count so far processed by the dataset evaluator (recursively queried from work batches)
+        virtual size_t getCurrentOutputCount() const = 0;
+        /// returns the final output packet count processed by the dataset evaluator, blocking if processing is not finished yet (recursively queried from work batches)
+        virtual size_t getFinalOutputCount() = 0;
+        /// returns the time taken so far to process the dataset (recursively queried from work batches)
+        virtual double getCurrentProcessTime() const = 0;
+        /// returns the final time taken to process the dataset, blocking if processing is not finished yet (recursively queried from work batches)
+        virtual double getFinalProcessTime() = 0;
+        /// resets internal evaluation and packet count metrics (recursively called for work batches)
+        virtual void resetMetrics() = 0;
         /// clears all batches and reparses them from the dataset metadata
         virtual void parseDataset() = 0;
         /// writes the dataset-level evaluation report
@@ -259,22 +258,30 @@ namespace lv {
         virtual const std::string& getOutputPath() const = 0;
         /// returns the work batch/group relative path offset w.r.t. dataset root
         virtual const std::string& getRelativePath() const = 0;
+        /// returns a name (not necessarily used for parsing) associated with an input data packet index (useful for data archiving)
+        virtual std::string getInputName(size_t nPacketIdx) const;
+        /// returns a name that should be given to an output data packet based on its index (useful for data archiving)
+        virtual std::string getOutputName(size_t nPacketIdx) const;
         /// returns the expected CPU load of the work batch/group (only relevant for intra-dataset load comparisons)
         virtual double getExpectedLoad() const = 0;
         /// returns the total input packet count for this work batch/group
         virtual size_t getInputCount() const = 0;
         /// returns the total gt packet count for this work batch/group
         virtual size_t getGTCount() const = 0;
-        /// returns the total output packet count expected to be processed by the work batch/group evaluator
+        /// returns the output packet count expected to be processed by the work batch/group evaluator
         virtual size_t getExpectedOutputCount() const = 0;
-        /// returns the total output packet count so far processed by the work batch/group evaluator
-        virtual size_t getProcessedOutputCount() const = 0;
-        /// returns the total output packet count so far processed by the work batch/group evaluator, blocking if processing is not finished yet
-        virtual size_t getProcessedOutputCountPromise() = 0;
-        /// returns a name (not necessarily used for parsing) associated with an input data packet index (useful for data archiving)
-        virtual std::string getInputName(size_t nPacketIdx) const;
-        /// returns a name that should be given to an output data packet based on its index (useful for data archiving)
-        virtual std::string getOutputName(size_t nPacketIdx) const;
+        /// returns the output packet count so far processed by the work batch/group evaluator
+        virtual size_t getCurrentOutputCount() const = 0;
+        /// returns the final output packet count processed by the work batch/group evaluator, blocking if processing is not finished yet
+        virtual size_t getFinalOutputCount() = 0;
+        /// returns the time taken so far to process the work batch/group data
+        virtual double getCurrentProcessTime() const = 0;
+        /// returns the final time taken to process the work batch/group data, blocking if processing is not finished yet
+        virtual double getFinalProcessTime() = 0;
+        /// resets internal work batch/group evaluation and packet count metrics
+        virtual void resetMetrics() = 0;
+        /// returns whether this work batch/group is currently processing data
+        virtual bool isProcessing() const = 0;
         /// returns whether the work batch/group data will be treated as grayscale
         virtual bool isGrayscale() const = 0;
         /// returns whether the work group is a pass-through container (always false for work batches)
@@ -283,7 +290,7 @@ namespace lv {
         virtual bool isGroup() const = 0;
         /// returns whether this dataset defines some evaluation procedure or not
         virtual bool isEvaluable() const {return false;}
-        /// returns this work group's children (work batch array)
+        /// returns the children of this work batch/group (if any) as a work batch array
         virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const = 0;
         /// returns a pointer to this work batch/group's parent dataset interface
         virtual IDatasetPtr getDatasetInfo() const = 0;
@@ -303,10 +310,6 @@ namespace lv {
         virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) = 0;
         /// kills the asynchronyzed precacher, and clears internal buffers
         virtual void stopPrecaching() = 0;
-        /// returns whether this work batch (or any of this work group's children batches) is currently processing data
-        virtual bool isProcessing() const = 0;
-        /// returns the current (or final) duration elapsed between start/stopProcessing calls (recursively queried for work groups)
-        virtual double getProcessTime() const = 0;
     protected:
         /// work batch/group comparison function based on names
         template<typename Tp>
@@ -340,47 +343,94 @@ namespace lv {
         friend struct IDatasetReporter_; // required for external interface to write eval reports
         template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset, DatasetEvalList eDatasetEval, lv::ParallelAlgoType eEvalImpl>
         friend struct IDataset_; // required for data handler sorting and other top-level dataset utility functions
-        friend struct IGroupDataParser; // required for recursive parsing of work batch data through groups
+        friend struct IDataGroupHandler; // required for recursive parsing of work batch data through groups
     };
 
-    /// group data parser interface for work batch groups @@@@ replace by IDataParser + templ spec? like counter (mostly final overrides)
-    struct IGroupDataParser : public virtual IDataHandler {
+    /// full implementation of basic data handler interface functions (used in work batch & group impl)
+    struct DataHandler : public virtual IDataHandler {
+        /// returns the work batch/group name
+        virtual const std::string& getName() const override final;
+        /// returns the work batch/group data path
+        virtual const std::string& getDataPath() const override final;
+        /// returns the work batch/group output path
+        virtual const std::string& getOutputPath() const override final;
+        /// returns the work batch/group relative path offset w.r.t. dataset root
+        virtual const std::string& getRelativePath() const override final;
+        /// returns whether the work batch/group data will be treated as grayscale
+        virtual bool isGrayscale() const override final;
+        /// returns a pointer to this work batch/group's parent dataset interface
+        virtual IDatasetPtr getDatasetInfo() const override final;
+    protected:
+        /// fills internal impl parameters based on batch name, dataset parameters & current relative data path
+        DataHandler(const std::string& sBatchName, std::shared_ptr<IDataset> pDataset, const std::string& sRelativePath);
+        /// returns the children batch associated with the given (input) packet index; will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
+        virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const override final;
+        /// returns the children batch associated with the given (input) packet index; will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
+        virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) override final;
+    private:
+        const std::string m_sBatchName;
+        const std::string m_sRelativePath;
+        const std::string m_sDataPath;
+        const std::string m_sOutputPath;
+        const bool m_bForcingGrayscale;
+        const IDatasetPtr m_pDataset;
+    };
+
+    /// data handler full (default) specialization --- can be overridden by dataset type in 'impl' headers
+    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset>
+    struct DataHandler_ : public DataHandler {
+    protected:
+        using DataHandler::DataHandler;
+    };
+
+    /// group data parser interface for work batch groups
+    struct DataGroupHandler : public virtual IDataHandler {
+        /// accumulates and returns the expected CPU load from all children work batch loads
+        virtual double getExpectedLoad() const override final;
+        /// accumulates and returns the total input packet count from all children work batch counts
+        virtual size_t getInputCount() const override final;
+        /// accumulate and returns the total gt packet count from all children work batch counts
+        virtual size_t getGTCount() const override final;
+        /// accumulates and returns the output packet count expected to be processed from all children work batch counts
+        virtual size_t getExpectedOutputCount() const override final;
+        /// accumulates and returns the output packet count so far processed from all children work batch counts
+        virtual size_t getCurrentOutputCount() const override final;
+        /// accumulates and returns the final output packet count processed from all children work batch counts, blocking if processing is not finished yet
+        virtual size_t getFinalOutputCount() override final;
+        /// accumulates and returns the time taken so far to process all children work batches
+        virtual double getCurrentProcessTime() const override final;
+        /// accumulates and returns the final time taken to process all children work batches, blocking if processing is not finished yet
+        virtual double getFinalProcessTime() override final;
+        /// resets all internal children work batch evaluation and packet count metrics
+        virtual void resetMetrics() override final;
+        /// returns whether *any* children work batch is currently processing data
+        virtual bool isProcessing() const override final;
         /// returns whether the work group is a pass-through container
         virtual bool isBare() const override final;
-        /// always returns true for work groups
+        /// returns whether this data handler interface points to a work group (always true here)
         virtual bool isGroup() const override final;
-        /// returns this work group's children (work batch array)
+        /// returns this work group's children batches
         virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const override final;
-        /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
+        /// initializes precaching in all children work batches
         virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) override final;
-        /// kills the asynchronyzed precacher, and clears internal buffers
+        /// stops precaching in all children work batches
         virtual void stopPrecaching() override final;
-        /// returns whether any of this work group's children batches is currently processing data
-        virtual bool isProcessing() const override final;
-        /// returns the current (or final) duration elapsed between start/stopProcessing calls, recursively queried for all children work batches
-        virtual double getProcessTime() const override final;
-        /// accumulates the expected CPU load for this data batch based on all children work batches load
-        virtual double getExpectedLoad() const override final;
-        /// accumulate total input packet count from all children work batches
-        virtual size_t getInputCount() const override final;
-        /// accumulate total gt packet count from all children work batches
-        virtual size_t getGTCount() const override final;
     protected:
         /// creates and returns a work batch for a given relative dataset path
         virtual IDataHandlerPtr createWorkBatch(const std::string& sBatchName, const std::string& sRelativePath=std::string("./")) const = 0;
         /// creates group/nongroup workbatches based on internal datset info and current relative path, and recursively calls parse data on all childrens
         virtual void parseData() override;
         /// default constructor; automatically sets 'isBare' to true
-        inline IGroupDataParser() : m_bIsBare(true) {}
-        /// contains children work batches (which may also be groups containing children)
+        inline DataGroupHandler() : m_bIsBare(true) {}
+        /// contains the group's children work batches (which may also be groups, themselves containing children)
         IDataHandlerPtrArray m_vpBatches;
-        /// defines whether the group is pass-through (with zero or one non-group child) or not
+        /// defines whether the group is pass-through (i.e. contains zero or one non-group child) or not
         bool m_bIsBare;
     };
 
     /// group data parser full (default) specialization --- can be overridden by dataset type in 'impl' headers
     template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset>
-    struct GroupDataParser_ : public IGroupDataParser {};
+    struct DataGroupHandler_ : public DataGroupHandler {};
 
     /// general-purpose data packet precacher, fully implemented (i.e. can be used stand-alone)
     struct DataPrecacher {
@@ -400,6 +450,7 @@ namespace lv {
         void entry(const size_t nBufferSize);
         const std::function<const cv::Mat&(size_t)> m_lCallback;
         std::thread m_hWorker;
+        std::exception_ptr m_pWorkerException;
         std::mutex m_oSyncMutex;
         std::condition_variable m_oReqCondVar;
         std::condition_variable m_oSyncCondVar;
@@ -717,6 +768,7 @@ namespace lv {
         void entry();
         const std::function<size_t(const cv::Mat&,size_t)> m_lCallback;
         std::vector<std::thread> m_vhWorkers;
+        std::stack<std::pair<std::exception_ptr,size_t>> m_vWorkerExceptions;
         std::mutex m_oSyncMutex;
         std::condition_variable m_oQueueCondVar;
         std::condition_variable m_oClearCondVar;
@@ -754,38 +806,26 @@ namespace lv {
         virtual std::vector<cv::Mat> loadArray(size_t nIdx, int nFlags=-1);
     };
 
-    /// default (specializable) forward declaration of the data counter interface (used only for packet counting)
-    template<GroupPolicy ePolicy>
-    struct IDataCounter_;
-
-    /// data counter specialization for individual work batches (exposes counting logic)
-    template<>
-    struct IDataCounter_<NotGroup> : public virtual IDataHandler {
+    /// data counter interface for non-group work batches (exposes output packet counting logic)
+    struct IDataCounter : public virtual IDataHandler {
     protected:
-        /// increments processed packets count
-        inline void countOutput(size_t nPacketIdx) {m_mProcessedPackets.insert(nPacketIdx);}
-        /// sets the processed packets count promise for async implementations
-        inline void setProcessedOutputCountPromise() {m_nProcessedPacketsPromise.set_value(m_mProcessedPackets.size());}
-        /// resets the processed packets count
-        inline void resetProcessedOutputCount() {m_mProcessedPackets.clear();}
-        /// gets current processed packets count
-        virtual size_t getProcessedOutputCount() const override final;
-        /// gets processed packets count from promise for async implementations (blocks until stopProcessing is called)
-        virtual size_t getProcessedOutputCountPromise() override final;
+        /// checks output with index 'nPacketIdx' as processed
+        void countOutput(size_t nPacketIdx);
+        /// sets the processed packets count promise for async count fetching
+        void setOutputCountPromise();
+        /// resets the processed packets count (and reinitializes promise)
+        void resetOutputCount();
+        /// returns the output packet count so far processed by the work batch evaluator
+        virtual size_t getCurrentOutputCount() const override final;
+        /// returns the final output packet count processed by the work batch evaluator, blocking if processing is not finished yet
+        virtual size_t getFinalOutputCount() override final;
+        /// default constructor (calls resetOutputCount to initialize all members)
+        inline IDataCounter() {resetOutputCount();}
     private:
         std::unordered_set<size_t> m_mProcessedPackets;
-        std::promise<size_t> m_nProcessedPacketsPromise;
-    };
-
-    /// data counter specialization for work batch groups (exposes recursive counting logic)
-    template<>
-    struct IDataCounter_<Group> : public virtual IDataHandler {
-        /// returns the total output packet count expected to be processed by the data consumer
-        virtual size_t getExpectedOutputCount() const override final;
-        /// returns the total output packet count so far processed by the data consumer
-        virtual size_t getProcessedOutputCount() const override final;
-        /// returns the total output packet count so far processed by the data consumer, blocking if processing is not finished yet
-        virtual size_t getProcessedOutputCountPromise() override final;
+        std::promise<size_t> m_nPacketCountPromise;
+        std::future<size_t> m_nPacketCountFuture;
+        size_t m_nFinalPacketCount;
     };
 
     /// default (specializable) forward declaration of the data consumer interface
@@ -796,10 +836,14 @@ namespace lv {
     template<DatasetEvalList eDatasetEval>
     struct IDataConsumer_<eDatasetEval,std::enable_if_t<ArrayPolicyHelper<eDatasetEval>::value==NotArray>> :
             public IDataArchiver_<NotArray>,
-            public IDataCounter_<NotGroup> {
+            public IDataCounter {
         /// returns the total output packet count expected to be processed by the data consumer (defaults to GT count)
         virtual size_t getExpectedOutputCount() const override {
             return getGTCount();
+        }
+        /// resets internal packet count metrics (no evaluation metrics for this interface)
+        virtual void resetMetrics() override {
+            resetOutputCount();
         }
         /// pushes an output (processed) data packet array for writing and/or evaluation
         inline void push(const cv::Mat& oOutput, size_t nPacketIdx) {
@@ -818,7 +862,7 @@ namespace lv {
     template<DatasetEvalList eDatasetEval>
     struct IDataConsumer_<eDatasetEval,std::enable_if_t<ArrayPolicyHelper<eDatasetEval>::value==Array>> :
             public IDataArchiver_<Array>,
-            public IDataCounter_<NotGroup> {
+            public IDataCounter {
         /// returns the number of parallel output streams (defaults to GT stream count if loader is array-based, and 1 otherwise)
         virtual size_t getOutputStreamCount() const {
             auto pLoader = shared_from_this_cast<IDataLoader_<Array>>();
@@ -829,6 +873,10 @@ namespace lv {
         /// returns the total output packet count expected to be processed by the data consumer (defaults to GT count)
         virtual size_t getExpectedOutputCount() const override {
             return getGTCount();
+        }
+        /// resets internal packet count metrics (no evaluation metrics for this interface)
+        virtual void resetMetrics() override {
+            resetOutputCount();
         }
         /// returns the (friendly) name of an output stream specified by index
         virtual std::string getOutputStreamName(size_t nStreamIdx) const {
@@ -858,9 +906,17 @@ namespace lv {
     template<>
     struct IAsyncDataConsumer_<DatasetEval_BinaryClassifier,lv::GLSL> :
             public IDataArchiver_<NotArray>,
-            public IDataCounter_<NotGroup> {
+            public IDataCounter {
         /// returns the ideal size for the GL context window to use for debug display purposes (queries the algo based on dataset specs, if available)
         virtual cv::Size getIdealGLWindowSize() const;
+        /// returns the total output packet count expected to be processed by the data consumer (defaults to GT count)
+        virtual size_t getExpectedOutputCount() const override {
+            return getGTCount();
+        }
+        /// resets internal packet count metrics (no evaluation metrics for this interface)
+        virtual void resetMetrics() override {
+            resetOutputCount();
+        }
         /// initializes internal params & calls 'initialize_gl' on algo with expanded args list
         template<typename Talgo, typename... Targs>
         void initialize_gl(const std::shared_ptr<Talgo>& pAlgo, Targs&&... args) {

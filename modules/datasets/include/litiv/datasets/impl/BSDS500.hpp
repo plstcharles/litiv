@@ -266,7 +266,7 @@ namespace lv {
         /// provides a visual feedback on result quality based on evaluation guidelines
         virtual cv::Mat getColoredMask(const cv::Mat& oClassif, size_t nIdx);
         /// resets internal metrics counters to zero
-        virtual void resetMetrics();
+        virtual void resetMetrics() override;
     protected:
         /// overrides 'getMetricsBase' from IMetricRetriever for non-group-impl (as always required)
         virtual IIMetricsAccumulatorConstPtr getMetricsBase() const override;

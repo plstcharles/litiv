@@ -603,7 +603,7 @@ void lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500
 }
 
 void lv::DatasetReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::writeEvalReport() const {
-    if(getProcessedOutputCount()==0 || getBatches(false).empty() || !isUsingEvaluator()) {
+    if(getCurrentOutputCount()==0 || getBatches(false).empty() || !isUsingEvaluator()) {
         IDatasetReporter_<lv::DatasetEval_None>::writeEvalReport();
         return;
     }
@@ -624,13 +624,8 @@ void lv::DatasetReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>:
         oMetricsOutput << "BSDS500 edge detection evaluation report :\n\n";
         oMetricsOutput << "            ||   MaxRcl   |   MaxPrc   |    MaxFM   ||   BestRcl  |   BestPrc  |   BestFM   | @Threshold \n";
         oMetricsOutput << "------------||------------|------------|------------||------------|------------|------------|------------\n";
-        size_t nOverallPacketCount = 0;
-        double dOverallTimeElapsed = 0.0;
-        for(const auto& pGroupIter : getBatches(true)) {
+        for(const auto& pGroupIter : getBatches(true))
             oMetricsOutput << pGroupIter->shared_from_this_cast<const DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>>(true)->DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>::writeInlineEvalReport(0);
-            nOverallPacketCount += pGroupIter->getProcessedOutputCount();
-            dOverallTimeElapsed += pGroupIter->getProcessTime();
-        }
         oMetricsOutput << "------------||------------|------------|------------||------------|------------|------------|------------\n";
         oMetricsOutput << "     overall||" <<
             std::setw(12) << oMetrics.dMaxRecall << "|" <<
@@ -640,14 +635,14 @@ void lv::DatasetReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>:
             std::setw(12) << oMetrics.oBestScore.dPrecision << "|" <<
             std::setw(12) << oMetrics.oBestScore.dFMeasure << "|" <<
             std::setw(12) << oMetrics.oBestScore.dThreshold << "\n";
-        oMetricsOutput << "\nHz: " << nOverallPacketCount/dOverallTimeElapsed << "\n";
+        oMetricsOutput << "\nHz: " << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
         oMetricsOutput << lv::getLogStamp();
     }
 }
 
 void lv::DataReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::writeEvalReport() const {
     IDataReporter_<DatasetEval_None>::writeEvalReport();
-    if(getProcessedOutputCount()==0 || !getDatasetInfo()->isUsingEvaluator())
+    if(getCurrentOutputCount()==0 || !getDatasetInfo()->isUsingEvaluator())
         return;
     for(const auto& pBatch : getBatches(true))
         pBatch->shared_from_this_cast<const DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>>(true)->DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>::writeEvalReport();
@@ -678,7 +673,7 @@ void lv::DataReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::wr
 }
 
 std::string lv::DataReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::writeInlineEvalReport(size_t nIndentSize) const {
-    if(getProcessedOutputCount()==0)
+    if(getCurrentOutputCount()==0)
         return std::string();
     const size_t nCellSize = 12;
     std::stringstream ssStr;
@@ -706,7 +701,7 @@ cv::Mat lv::DataEvaluator_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500,
 }
 
 void lv::DataEvaluator_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500,lv::NonParallel>::resetMetrics() {
-    resetProcessedOutputCount();
+    IDataConsumer_<DatasetEval_BinaryClassifier>::resetMetrics();
     m_pMetricsBase = IIMetricsAccumulator::create<MetricsAccumulator_<DatasetEval_BinaryClassifier,Dataset_BSDS500>>();
 }
 
