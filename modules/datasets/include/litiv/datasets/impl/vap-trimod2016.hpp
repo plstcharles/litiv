@@ -149,6 +149,7 @@ namespace lv {
             }
             this->m_oMaxInputSize = this->m_oMaxGTSize = oGlobalROI.size();
             const cv::Size oImageSize(640,480);
+            const double dUndistortMapCameraMatrixAlpha = 0.0;
             if(this->m_bUndistort) {
                 cv::FileStorage oParamsFS(lv::AddDirSlashIfMissing(this->getDataPath())+"calibVars.yml",cv::FileStorage::READ);
                 lvAssert_(oParamsFS.isOpened(),"could not open calibration yml file");
@@ -156,14 +157,14 @@ namespace lv {
                 oParamsFS["rgbDistCoeff"] >> this->m_oRGBDistortParams;
                 lvAssert_(!this->m_oRGBCameraParams.empty() && !this->m_oRGBDistortParams.empty(),"failed to load RGB camera calibration parameters");
                 cv::initUndistortRectifyMap(this->m_oRGBCameraParams,this->m_oRGBDistortParams,cv::Mat(),
-                                          //cv::getOptimalNewCameraMatrix(this->m_oRGBCameraParams,this->m_oRGBDistortParams,oImageSize,0.5,oImageSize,0),
-                                            this->m_oRGBCameraParams,oImageSize,CV_16SC2,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2);
+                                            (dUndistortMapCameraMatrixAlpha<0)?this->m_oRGBCameraParams:cv::getOptimalNewCameraMatrix(this->m_oRGBCameraParams,this->m_oRGBDistortParams,oImageSize,dUndistortMapCameraMatrixAlpha,oImageSize,0),
+                                            oImageSize,CV_16SC2,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2);
                 oParamsFS["tCamMat"] >> this->m_oThermalCameraParams;
                 oParamsFS["tDistCoeff"] >> this->m_oThermalDistortParams;
                 lvAssert_(!this->m_oThermalCameraParams.empty() && !this->m_oThermalDistortParams.empty(),"failed to load thermal camera calibration parameters");
                 cv::initUndistortRectifyMap(this->m_oThermalCameraParams,this->m_oThermalDistortParams,cv::Mat(),
-                                          //cv::getOptimalNewCameraMatrix(this->m_oThermalCameraParams,this->m_oThermalDistortParams,oImageSize,0.5,oImageSize,0),
-                                            this->m_oThermalCameraParams,oImageSize,CV_16SC2,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2);
+                                            (dUndistortMapCameraMatrixAlpha<0)?this->m_oThermalCameraParams:cv::getOptimalNewCameraMatrix(this->m_oThermalCameraParams,this->m_oThermalDistortParams,oImageSize,dUndistortMapCameraMatrixAlpha,oImageSize,0),
+                                            oImageSize,CV_16SC2,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2);
             }
             //
             // NOTE: internal stream indexing
@@ -184,6 +185,15 @@ namespace lv {
                 const std::string sInputFileNameExt = nLastInputSlashPos==std::string::npos?vsRGBPaths[nInputPacketIdx]:vsRGBPaths[nInputPacketIdx].substr(nLastInputSlashPos+1);
                 const size_t nLastInputDotPos = sInputFileNameExt.find_last_of('.');
                 vsTempInputFileNames[nInputPacketIdx] = nLastInputDotPos==std::string::npos?sInputFileNameExt:sInputFileNameExt.substr(0,nLastInputDotPos);
+            }
+            cv::Mat oRGBROI = cv::imread(lv::AddDirSlashIfMissing(this->getDataPath())+"rgb_roi.png",cv::IMREAD_GRAYSCALE);
+            if(!oRGBROI.empty()) {
+                lvAssert(oRGBROI.size()==this->m_vInputSizes[0] && oRGBROI.type()==CV_8UC1);
+                oRGBROI = oRGBROI>0;
+                if(this->m_bUndistort)
+                    cv::remap(oRGBROI.clone(),oRGBROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
+                this->m_vInputROIs[0] = oRGBROI.clone();
+                this->m_vGTROIs[0] = oRGBROI.clone();
             }
             std::vector<std::string> vsRGBGTPaths;
             lv::GetFilesFromDir(*psRGBGTDir,vsRGBGTPaths);
@@ -214,6 +224,15 @@ namespace lv {
                 lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/thermal frames",this->getName().c_str());
             for(size_t nInputPacketIdx=0; nInputPacketIdx<vsThermalPaths.size(); ++nInputPacketIdx)
                 this->m_vvsInputPaths[nInputPacketIdx][1] = vsThermalPaths[nInputPacketIdx];
+            cv::Mat oThermalROI = cv::imread(lv::AddDirSlashIfMissing(this->getDataPath())+"thermal_roi.png",cv::IMREAD_GRAYSCALE);
+            if(!oThermalROI.empty()) {
+                lvAssert(oThermalROI.size()==this->m_vInputSizes[0] && oThermalROI.type()==CV_8UC1);
+                oThermalROI = oThermalROI>0;
+                if(this->m_bUndistort)
+                    cv::remap(oThermalROI.clone(),oThermalROI,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_LINEAR);
+                this->m_vInputROIs[1] = oThermalROI.clone();
+                this->m_vGTROIs[1] = oThermalROI.clone();
+            }
             std::vector<std::string> vsThermalGTPaths;
             lv::GetFilesFromDir(*psThermalGTDir,vsThermalGTPaths);
             if(vsThermalGTPaths.empty() || cv::imread(vsThermalGTPaths[0]).size()!=oImageSize)
@@ -268,53 +287,85 @@ namespace lv {
             const std::vector<std::string>& vsInputPaths = this->m_vvsInputPaths[nPacketIdx];
             lvDbgAssert(!vsInputPaths.empty() && vsInputPaths.size()==getInputStreamCount() && vsInputPaths.size()==(this->m_bLoadDepth?3:2));
             const std::vector<cv::Size>& vInputSizes = this->m_vInputSizes;
-            lvDbgAssert(vInputSizes.size()==vsInputPaths.size() && vInputSizes[0].area()>0);
-            cv::Mat oFullPacket(1,vInputSizes[0].area()*(this->m_bLoadDepth?6:4),CV_8UC1);
+            lvDbgAssert(vInputSizes.size()==vsInputPaths.size() && (lv::accumulateMembers<int,cv::Size>(vInputSizes,[](const cv::Size& s){return s.area();}))>0);
+            cv::Mat oFullPacket(1,vInputSizes[0].area()*3+vInputSizes[1].area()+(this->m_bLoadDepth?vInputSizes[2].area()*2:0),CV_8UC1);
             lvAssert_(!this->getDatasetInfo()->is4ByteAligned(),"missing conversion/alignment impl");
             ptrdiff_t nPacketOffset = 0;
             const auto lAppendPacket = [&](const cv::Mat& oNewPacket) {
-                lvDbgAssert(oNewPacket.size()==vInputSizes[0]);
                 lvDbgAssert(oFullPacket.isContinuous() && oNewPacket.isContinuous());
                 std::copy(oNewPacket.datastart,oNewPacket.dataend,oFullPacket.data+nPacketOffset);
                 nPacketOffset += ptrdiff_t(oNewPacket.dataend-oNewPacket.datastart);
             };
-            const cv::Size oImageSize(640,480);
             cv::Mat oRGBPacket = cv::imread(vsInputPaths[0]);
-            lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC3 && oRGBPacket.size()==oImageSize);
-            if(this->m_bUndistort) {
-                cv::imshow("test distort",oRGBPacket);
-                cv::Mat oTemp = oRGBPacket.clone();
-                cv::remap(oRGBPacket,oTemp,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
-                lvDbgAssert(oTemp.size()==oRGBPacket.size() && oTemp.type()==oRGBPacket.type());
-                oRGBPacket = oTemp;
-                cv::imshow("test undistort",oRGBPacket);
-                cv::waitKey(0);
-            }
+            lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC3 && oRGBPacket.size()==cv::Size(640,480));
             if(oRGBPacket.size()!=vInputSizes[0])
                 cv::resize(oRGBPacket,oRGBPacket,vInputSizes[0]);
+            if(this->m_bUndistort)
+                cv::remap(oRGBPacket.clone(),oRGBPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
             lAppendPacket(oRGBPacket);
             cv::Mat oThermalPacket = cv::imread(vsInputPaths[1],cv::IMREAD_GRAYSCALE);
-            lvAssert(!oThermalPacket.empty() && oThermalPacket.type()==CV_8UC1 && oThermalPacket.size()==oImageSize);
-            lvDbgAssert(vInputSizes[1]==vInputSizes[0]);
-            if(this->m_bUndistort) {
-                cv::Mat oTemp = oThermalPacket.clone();
-                cv::remap(oThermalPacket,oTemp,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_LINEAR);
-                lvDbgAssert(oTemp.size()==oThermalPacket.size() && oTemp.type()==oThermalPacket.type());
-                oThermalPacket = oTemp;
-            }
-            if(oThermalPacket.size()!=vInputSizes[0])
-                cv::resize(oThermalPacket,oThermalPacket,vInputSizes[0]);
+            lvAssert(!oThermalPacket.empty() && oThermalPacket.type()==CV_8UC1 && oThermalPacket.size()==cv::Size(640,480));
+            if(oThermalPacket.size()!=vInputSizes[1])
+                cv::resize(oThermalPacket,oThermalPacket,vInputSizes[1]);
+            if(this->m_bUndistort)
+                cv::remap(oThermalPacket.clone(),oThermalPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_LINEAR);
             lAppendPacket(oThermalPacket);
             if(this->m_bLoadDepth) {
+                CV_Assert(false);
                 cv::Mat oDepthPacket = cv::imread(vsInputPaths[2],cv::IMREAD_ANYDEPTH);
-                lvAssert(!oDepthPacket.empty() && oDepthPacket.type()==CV_16UC1 && oDepthPacket.size()==oImageSize);
-                lvDbgAssert(vInputSizes[2]==vInputSizes[0]);
-                if(oDepthPacket.size()!=vInputSizes[0])
-                    cv::resize(oDepthPacket,oDepthPacket,vInputSizes[0]);
+                lvAssert(!oDepthPacket.empty() && oDepthPacket.type()==CV_16UC1 && oDepthPacket.size()==cv::Size(640,480));
+                if(oDepthPacket.size()!=vInputSizes[2])
+                    cv::resize(oDepthPacket,oDepthPacket,vInputSizes[2]);
+                // depth should be already undistorted
                 lAppendPacket(oDepthPacket);
             }
             lvDbgAssert(nPacketOffset==ptrdiff_t(oFullPacket.dataend-oFullPacket.datastart));
             return oFullPacket;
+        }
+        virtual cv::Mat getRawGT(size_t nPacketIdx) override final {
+            if(this->m_mGTIndexLUT.count(nPacketIdx)) {
+                const size_t nGTIdx = this->m_mGTIndexLUT[nPacketIdx];
+                lvDbgAssert(nGTIdx<this->m_vvsGTPaths.size());
+                const std::vector<std::string>& vsGTPaths = this->m_vvsGTPaths[nGTIdx];
+                lvDbgAssert(!vsGTPaths.empty() && vsGTPaths.size()==getGTStreamCount() && vsGTPaths.size()==(this->m_bLoadDepth?3:2));
+                const std::vector<cv::Size>& vGTSizes = this->m_vGTSizes;
+                const int nTotPacketSize = lv::accumulateMembers<int,cv::Size>(vGTSizes,[](const cv::Size& s){return s.area();});
+                lvDbgAssert(vGTSizes.size()==vsGTPaths.size() && nTotPacketSize>0);
+                cv::Mat oFullPacket(1,nTotPacketSize,CV_8UC1);
+                lvAssert_(!this->getDatasetInfo()->is4ByteAligned(),"missing conversion/alignment impl");
+                ptrdiff_t nPacketOffset = 0;
+                const auto lAppendPacket = [&](const cv::Mat& oNewPacket) {
+                    lvDbgAssert(oFullPacket.isContinuous() && oNewPacket.isContinuous());
+                    std::copy(oNewPacket.datastart,oNewPacket.dataend,oFullPacket.data+nPacketOffset);
+                    nPacketOffset += ptrdiff_t(oNewPacket.dataend-oNewPacket.datastart);
+                };
+                cv::Mat oRGBPacket = cv::imread(vsGTPaths[0],cv::IMREAD_GRAYSCALE);
+                lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC1 && oRGBPacket.size()==cv::Size(640,480));
+                if(oRGBPacket.size()!=vGTSizes[0])
+                    cv::resize(oRGBPacket,oRGBPacket,vGTSizes[0],0,0,cv::INTER_NEAREST);
+                if(this->m_bUndistort)
+                    cv::remap(oRGBPacket.clone(),oRGBPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_NEAREST);
+                lAppendPacket(oRGBPacket);
+                cv::Mat oThermalPacket = cv::imread(vsGTPaths[1],cv::IMREAD_GRAYSCALE);
+                lvAssert(!oThermalPacket.empty() && oThermalPacket.type()==CV_8UC1 && oThermalPacket.size()==cv::Size(640,480));
+                if(oThermalPacket.size()!=vGTSizes[1])
+                    cv::resize(oThermalPacket,oThermalPacket,vGTSizes[1],0,0,cv::INTER_NEAREST);
+                if(this->m_bUndistort)
+                    cv::remap(oThermalPacket.clone(),oThermalPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_NEAREST);
+                lAppendPacket(oThermalPacket);
+                if(this->m_bLoadDepth) {
+                    CV_Assert(false);
+                    cv::Mat oDepthPacket = cv::imread(vsGTPaths[2],cv::IMREAD_GRAYSCALE);
+                    lvAssert(!oDepthPacket.empty() && oDepthPacket.type()==CV_8UC1 && oDepthPacket.size()==cv::Size(640,480));
+                    if(oDepthPacket.size()!=vGTSizes[2])
+                        cv::resize(oDepthPacket,oDepthPacket,vGTSizes[2]);
+                    // depth should be already undistorted
+                    lAppendPacket(oDepthPacket);
+                }
+                lvDbgAssert(nPacketOffset==ptrdiff_t(oFullPacket.dataend-oFullPacket.datastart));
+                return oFullPacket;
+            }
+            return cv::Mat();
         }
         bool m_bLoadDepth; ///< defines whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
         bool m_bUndistort; ///< defines whether images should be undistorted when loaded or not, using the calib files provided with the dataset
