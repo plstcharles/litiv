@@ -26,6 +26,7 @@
 #include <array>
 #include <queue>
 #include <deque>
+#include <stack>
 #include <string>
 #include <vector>
 #include <thread>
@@ -324,11 +325,13 @@ namespace lv {
     struct StopWatch {
         StopWatch() {tick();}
         inline void tick() {m_nTick = std::chrono::high_resolution_clock::now();}
-        inline double tock(bool bReset=true) {
+        inline double elapsed() const {
+            return std::chrono::duration<double>(std::chrono::high_resolution_clock::now()-m_nTick).count();
+        }
+        inline double tock() {
             const std::chrono::high_resolution_clock::time_point nNow = std::chrono::high_resolution_clock::now();
             const std::chrono::duration<double> dElapsed_sec = nNow-m_nTick;
-            if(bReset)
-                m_nTick = nNow;
+            m_nTick = nNow;
             return dElapsed_sec.count();
         }
     private:
@@ -355,8 +358,8 @@ namespace lv {
     }
 
     template<typename TSum, typename TObj>
-    inline TSum accumulateMembers(const std::vector<TObj>& vObjArray, const std::function<TSum(const TObj&)>& lFunc) {
-        return std::accumulate(vObjArray.begin(),vObjArray.end(),TSum(0),[&](TSum tSum, const TObj& p) {
+    inline TSum accumulateMembers(const std::vector<TObj>& vObjArray, const std::function<TSum(const TObj&)>& lFunc, TSum tInit=TSum(0)) {
+        return std::accumulate(vObjArray.begin(),vObjArray.end(),tInit,[&](TSum tSum, const TObj& p) {
             return tSum + lFunc(p);
         });
     }
@@ -554,7 +557,7 @@ void lv::WorkerPool<nWorkers>::entry() {
             std::function<void()> task = std::move(m_qTasks.front());
             m_qTasks.pop();
             std::unlock_guard<std::mutex_unique_lock> oUnlock(sync_lock);
-            task();
+            task(); // if the execution throws, the exception will be contained in the shared state returned on queue
         }
     }
 }

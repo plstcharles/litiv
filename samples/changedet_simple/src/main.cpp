@@ -63,7 +63,7 @@ int main(int, char**) { // this sample uses no command line argument
             if(oInput.empty()) // if the frame is empty, we hit the end of the video, or the webcam was shut off
                 break;
             if((++nCurrInputIdx%30)==0) // every 30 frames, display the total average processing speed
-                std::cout << " avgFPS = " << nCurrInputIdx/oStopWatch.tock(false) << std::endl;
+                std::cout << " avgFPS = " << nCurrInputIdx/oStopWatch.elapsed() << std::endl;
         }
 
     }
