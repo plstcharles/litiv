@@ -47,7 +47,6 @@ namespace lv {
                         getWorkBatchDirNames(),
                         getSkippedWorkBatchDirNames(),
                         getGrayscaleWorkBatchDirNames(),
-                        0,
                         bSaveOutput,
                         bUseEvaluator,
                         bForce4ByteDataAlign,
@@ -60,7 +59,7 @@ namespace lv {
         }
         /// returns the names of all work batch directories which should be skipped for this dataset speialization
         static const std::vector<std::string>& getSkippedWorkBatchDirNames() {
-            static const std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
+            static const std::vector<std::string> s_vsSkippedWorkBatchDirs = {/*TODO*/};
             return s_vsSkippedWorkBatchDirs;
         }
         /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
@@ -75,6 +74,7 @@ namespace lv {
             public IDataProducerWrapper_<eDatasetTask,DatasetSource_Video,Dataset_LITIV2012b> {
     protected:
         virtual void parseData() override final {
+            lvDbgExceptionWatch;
             /* @@@@ old bsds500 below
             std::vector<std::string> vsImgPaths;
             lv::GetFilesFromDir(m_sDatasetPath,vsImgPaths);

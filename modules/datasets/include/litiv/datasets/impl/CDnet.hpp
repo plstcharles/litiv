@@ -44,9 +44,8 @@ namespace lv {
                         "bin",
                         ".png",
                         getWorkBatchDirNames(b2014),
-                        getSkippedWorkBatchDirNames(),
+                        std::vector<std::string>(),
                         getGrayscaleWorkBatchDirNames(),
-                        1,
                         bSaveOutput,
                         bUseEvaluator,
                         bForce4ByteDataAlign,
@@ -63,11 +62,6 @@ namespace lv {
             else
                 return s_vsWorkBatchDirs_2012;
         }
-        /// returns the names of all work batch directories which should be skipped for this dataset speialization
-        static const std::vector<std::string>& getSkippedWorkBatchDirNames() {
-            static const std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
-            return s_vsSkippedWorkBatchDirs;
-        }
         /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
         static const std::vector<std::string>& getGrayscaleWorkBatchDirNames() {
             static const std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {"thermal","turbulence"};
@@ -80,11 +74,12 @@ namespace lv {
             public IDataProducerWrapper_<eDatasetTask,DatasetSource_Video,Dataset_CDnet> {
     protected:
         virtual void parseData() override final {
+            lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
             std::vector<std::string> vsSubDirs;
             lv::GetSubDirsFromDir(this->getDataPath(),vsSubDirs);
-            auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),lv::AddDirSlashIfMissing(this->getDataPath())+"groundtruth");
-            auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),lv::AddDirSlashIfMissing(this->getDataPath())+"input");
+            auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"groundtruth");
+            auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"input");
             if(gtDir==vsSubDirs.end() || inputDir==vsSubDirs.end())
                 lvError_("CDnet sequence '%s' did not possess the required groundtruth and input directories",this->getName().c_str());
             lv::GetFilesFromDir(*inputDir,this->m_vsInputPaths);
@@ -93,8 +88,8 @@ namespace lv {
             lvAssert_(this->m_nFrameCount>0,"could not find any input frames");
             if(this->m_vsGTPaths.size()!=this->m_vsInputPaths.size())
                 lvError_("CDnet sequence '%s' did not possess same amount of GT & input frames",this->getName().c_str());
-            cv::Mat oROI = cv::imread(lv::AddDirSlashIfMissing(this->getDataPath())+"ROI.bmp",cv::IMREAD_GRAYSCALE);
-            cv::Mat oTempROI = cv::imread(lv::AddDirSlashIfMissing(this->getDataPath())+"ROI.jpg");
+            cv::Mat oROI = cv::imread(this->getDataPath()+"ROI.bmp",cv::IMREAD_GRAYSCALE);
+            cv::Mat oTempROI = cv::imread(this->getDataPath()+"ROI.jpg");
             if(oROI.empty() || oTempROI.empty())
                 lvError_("CDnet sequence '%s' did not possess ROI.bmp/ROI.jpg files",this->getName().c_str());
             if(oROI.size()!=oTempROI.size()) {
@@ -102,7 +97,7 @@ namespace lv {
                 oROI = oROI(cv::Rect(0,0,std::min(oROI.cols,oTempROI.cols),std::min(oROI.rows,oTempROI.rows))).clone();
             }
             this->m_oInputROI = oROI>0;
-            const double dScale = this->getDatasetInfo()->getScaleFactor();
+            const double dScale = this->getScaleFactor();
             if(dScale!=1.0)
                 cv::resize(this->m_oInputROI,this->m_oInputROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
             this->m_oGTROI = this->m_oInputROI;
@@ -110,6 +105,16 @@ namespace lv {
             this->m_mGTIndexLUT.clear();
             for(size_t i=0; i<this->m_nFrameCount; ++i)
                 this->m_mGTIndexLUT[i] = i; // direct gt path index to frame index mapping
+        }
+    };
+
+    template<DatasetEvalList eDatasetEval, lv::ParallelAlgoType eEvalImpl>
+    struct DataEvaluator_<eDatasetEval,Dataset_CDnet,eEvalImpl> :
+            public DataEvaluatorWrapper_<eDatasetEval,Dataset_CDnet,eEvalImpl> {
+        virtual std::string getOutputName(size_t nPacketIdx) const override final {
+            std::array<char,32> acBuffer;
+            snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nPacketIdx+1);
+            return std::string(acBuffer.data());
         }
     };
 

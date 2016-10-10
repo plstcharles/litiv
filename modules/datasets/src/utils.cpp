@@ -85,48 +85,71 @@ const std::string& lv::DataHandler::getRelativePath() const {
     return m_sRelativePath;
 }
 
+const std::string& lv::DataHandler::getOutputNamePrefix() const {
+    return m_oParent.getOutputNamePrefix();
+}
+
+const std::string& lv::DataHandler::getOutputNameSuffix() const {
+    return m_oParent.getOutputNameSuffix();
+}
+
+const std::vector<std::string>& lv::DataHandler::getSkippedDirTokens() const {
+    return m_oParent.getSkippedDirTokens();
+}
+
+const std::vector<std::string>& lv::DataHandler::getGrayscaleDirTokens() const {
+    return m_oParent.getGrayscaleDirTokens();
+}
+
+double lv::DataHandler::getScaleFactor() const {
+    return m_oParent.getScaleFactor();
+}
+
+lv::IDataHandlerConstPtr lv::DataHandler::getRoot() const {
+    return m_oRoot.shared_from_this();
+}
+
+lv::IDataHandlerConstPtr lv::DataHandler::getParent() const {
+    return m_oParent.shared_from_this();
+}
+
+bool lv::DataHandler::isRoot() const {
+    return false;
+}
+
+bool lv::DataHandler::is4ByteAligned() const {
+    return m_oParent.is4ByteAligned();
+}
+
+bool lv::DataHandler::isSavingOutput() const {
+    return m_oParent.isSavingOutput();
+}
+
+bool lv::DataHandler::isEvaluating() const {
+    return m_oParent.isEvaluating();
+}
+
 bool lv::DataHandler::isGrayscale() const {
-    return m_bForcingGrayscale;
+    return m_oParent.isGrayscale() || m_bForcingGrayscale;
 }
 
-lv::IDatasetPtr lv::DataHandler::getDatasetInfo() const {
-    return m_pDataset;
+inline const lv::IDataHandler& getRootNodeHelper(const lv::IDataHandler& oStart) {
+    lvDbgExceptionWatch;
+    lv::IDataHandlerConstPtr p=oStart.shared_from_this();
+    while(!p->isRoot())
+        p = p->getParent();
+    return *p.get();
 }
 
-lv::DataHandler::DataHandler(const std::string& sBatchName, IDatasetPtr pDataset, const std::string& sRelativePath) :
+lv::DataHandler::DataHandler(const std::string& sBatchName, const std::string& sRelativePath, const IDataHandler& oParent) :
         m_sBatchName(sBatchName),
-        m_sRelativePath(sRelativePath),
-        m_sDataPath(pDataset->getDatasetPath()+sRelativePath),
-        m_sOutputPath(pDataset->getOutputPath()+sRelativePath),
-        m_bForcingGrayscale(lv::string_contains_token(sRelativePath,pDataset->getGrayscaleDirTokens())),
-        m_pDataset(pDataset) {
+        m_sRelativePath(lv::AddDirSlashIfMissing(sRelativePath)),
+        m_sDataPath(getRootNodeHelper(oParent).getDataPath()+lv::AddDirSlashIfMissing(sRelativePath)),
+        m_sOutputPath(getRootNodeHelper(oParent).getOutputPath()+lv::AddDirSlashIfMissing(sRelativePath)),
+        m_bForcingGrayscale(lv::string_contains_token(sRelativePath,oParent.getGrayscaleDirTokens())),
+        m_oParent(oParent),
+        m_oRoot(getRootNodeHelper(oParent)) {
     lv::CreateDirIfNotExist(m_sOutputPath);
-}
-
-lv::IDataHandlerConstPtr lv::DataHandler::getBatch(size_t& nPacketIdx) const {
-    if(isGroup()) {
-        size_t nCurrPacketCount = 0;
-        auto vpBatches = getBatches(true);
-        auto ppBatchIter = vpBatches.begin();
-        while(ppBatchIter!=vpBatches.end()) {
-            const size_t nNextPacketIncr = (*ppBatchIter)->getInputCount();
-            if(nPacketIdx<nCurrPacketCount+nNextPacketIncr)
-                break;
-            nCurrPacketCount += nNextPacketIncr;
-            ++ppBatchIter;
-        }
-        lvAssert_(ppBatchIter!=vpBatches.end(),"requested packet index was out of range for the current batch group");
-        nPacketIdx -= nCurrPacketCount;
-        return (*ppBatchIter)->shared_from_this_cast<DataHandler>(true)->getBatch(nPacketIdx);
-    }
-    else {
-        lvAssert_(nPacketIdx<getInputCount(),"requested packet index was out of range for the current batch");
-        return shared_from_this();
-    }
-}
-
-lv::IDataHandlerPtr lv::DataHandler::getBatch(size_t& nPacketIdx) {
-    return std::const_pointer_cast<IDataHandler>(static_cast<const DataHandler*>(this)->getBatch(nPacketIdx));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -201,6 +224,13 @@ lv::IDataHandlerPtrArray lv::DataGroupHandler::getBatches(bool bWithHierarchy) c
     return vpBatches;
 }
 
+lv::IDataHandlerPtrQueue lv::DataGroupHandler::getSortedBatches(bool bWithHierarchy) const {
+    IDataHandlerPtrQueue vpBatches(&IDataHandler::compare_load<IDataHandler>);
+    for(const auto& pBatch : getBatches(bWithHierarchy))
+        vpBatches.push(pBatch);
+    return vpBatches;
+}
+
 void lv::DataGroupHandler::startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize) {
     for(const auto& pBatch : getBatches(true))
         pBatch->startPrecaching(bPrecacheGT,nSuggestedBufferSize);
@@ -212,12 +242,11 @@ void lv::DataGroupHandler::stopPrecaching() {
 }
 
 void lv::DataGroupHandler::parseData() {
+    lvDbgExceptionWatch;
     m_vpBatches.clear();
     m_bIsBare = true;
-    IDatasetPtr pDataset = getDatasetInfo();
-    const std::string& sRelativePath = getRelativePath();
-    if(!lv::string_contains_token(getName(),pDataset->getSkippedDirTokens())) {
-        std::cout << "\tParsing directory '" << pDataset->getDatasetPath()+sRelativePath << "' for work group '" << getName() << "'..." << std::endl;
+    if(!lv::string_contains_token(getName(),getSkippedDirTokens())) {
+        std::cout << "\tParsing directory '" << getDataPath() << "' for work group '" << getName() << "'..." << std::endl;
         std::vector<std::string> vsWorkBatchPaths;
         // by default, all subdirs are considered work batch directories (if none, the category directory itself is a batch, and 'bare')
         lv::GetSubDirsFromDir(getDataPath(),vsWorkBatchPaths);
@@ -228,8 +257,8 @@ void lv::DataGroupHandler::parseData() {
             for(const auto& sPathIter : vsWorkBatchPaths) {
                 const size_t nLastSlashPos = sPathIter.find_last_of("/\\");
                 const std::string sNewBatchName = nLastSlashPos==std::string::npos?sPathIter:sPathIter.substr(nLastSlashPos+1);
-                if(!lv::string_contains_token(sNewBatchName,pDataset->getSkippedDirTokens()))
-                    m_vpBatches.push_back(createWorkBatch(sNewBatchName,lv::AddDirSlashIfMissing(getRelativePath())+sNewBatchName+"/"));
+                if(!lv::string_contains_token(sNewBatchName,getSkippedDirTokens()))
+                    m_vpBatches.push_back(createWorkBatch(sNewBatchName,getRelativePath()+lv::AddDirSlashIfMissing(sNewBatchName)));
             }
         }
     }
@@ -485,7 +514,7 @@ const cv::Mat& lv::IIDataLoader::getInput_redirect(size_t nIdx) {
             sstr << "Packet #" << nIdx;
             writeOnImage(m_oLatestInput,sstr.str(),cv::Scalar_<uchar>::all(255);
 #endif //HARDCODE_IMAGE_PACKET_INDEX
-            if(getDatasetInfo()->is4ByteAligned() && m_oLatestInput.channels()==3)
+            if(is4ByteAligned() && m_oLatestInput.channels()==3)
                 cv::cvtColor(m_oLatestInput,m_oLatestInput,cv::COLOR_BGR2BGRA);
             const cv::Size& oPacketSize = getInputSize(nIdx);
             if(oPacketSize.area()>0 && m_oLatestInput.size()!=oPacketSize)
@@ -504,7 +533,7 @@ const cv::Mat& lv::IIDataLoader::getGT_redirect(size_t nIdx) {
             sstr << "Packet #" << nIdx;
             writeOnImage(m_oLatestGT,sstr.str(),cv::Scalar_<uchar>::all(255);
 #endif //HARDCODE_IMAGE_PACKET_INDEX
-            if(getDatasetInfo()->is4ByteAligned() && m_oLatestGT.channels()==3)
+            if(is4ByteAligned() && m_oLatestGT.channels()==3)
                 cv::cvtColor(m_oLatestGT,m_oLatestGT,cv::COLOR_BGR2BGRA);
             const cv::Size& oPacketSize = getGTSize(nIdx);
             if(oPacketSize.area()>0 && m_oLatestGT.size()!=oPacketSize)
@@ -661,7 +690,7 @@ double lv::IDataProducer_<lv::DatasetSource_Video>::getExpectedLoad() const {
 }
 
 void lv::IDataProducer_<lv::DatasetSource_Video>::startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize) {
-    return IIDataLoader::startPrecaching(bPrecacheGT,(nSuggestedBufferSize==SIZE_MAX)?m_oInputSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3):nSuggestedBufferSize);
+    return IIDataLoader::startPrecaching(bPrecacheGT,(nSuggestedBufferSize==SIZE_MAX)?m_oInputSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:is4ByteAligned()?4:3):nSuggestedBufferSize);
 }
 
 lv::IDataProducer_<lv::DatasetSource_Video>::IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
@@ -718,6 +747,7 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_Video>::getRawGT(size_t nPacketIdx)
 }
 
 void lv::IDataProducer_<lv::DatasetSource_Video>::parseData() {
+    lvDbgExceptionWatch;
     cv::Mat oTempImg;
     m_voVideoReader.open(getDataPath());
     if(!m_voVideoReader.isOpened()) {
@@ -737,7 +767,7 @@ void lv::IDataProducer_<lv::DatasetSource_Video>::parseData() {
     }
     if(oTempImg.empty())
         lvError_("Sequence '%s': video could not be opened via VideoReader or imread (you might need to implement your own DataProducer_ interface)",getName().c_str());
-    const double dScale = getDatasetInfo()->getScaleFactor();
+    const double dScale = getScaleFactor();
     if(dScale!=1.0)
         cv::resize(oTempImg,oTempImg,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
     m_oInputROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
@@ -773,7 +803,7 @@ double lv::IDataProducer_<lv::DatasetSource_VideoArray>::getExpectedLoad() const
 }
 
 void lv::IDataProducer_<lv::DatasetSource_VideoArray>::startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize) {
-    return IIDataLoader::startPrecaching(bPrecacheGT,(nSuggestedBufferSize==SIZE_MAX)?getInputMaxSize().area()*(m_vvsInputPaths.size()+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3):nSuggestedBufferSize);
+    return IIDataLoader::startPrecaching(bPrecacheGT,(nSuggestedBufferSize==SIZE_MAX)?getInputMaxSize().area()*(m_vvsInputPaths.size()+1)*(isGrayscale()?1:is4ByteAligned()?4:3):nSuggestedBufferSize);
 }
 
 lv::IDataProducer_<lv::DatasetSource_VideoArray>::IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
@@ -817,7 +847,7 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_VideoArray>::getRawInput(size_t nPa
         cv::Mat oCurrImg = cv::imread(vsInputPaths[nStreamIdx]);
         if(oCurrImg.empty()) // if a single image is missing/cannot load, we skip the entire packet
             return cv::Mat();
-        if(getDatasetInfo()->is4ByteAligned() && oCurrImg.channels()==3)
+        if(is4ByteAligned() && oCurrImg.channels()==3)
             cv::cvtColor(oCurrImg,oCurrImg,cv::COLOR_BGR2BGRA);
         const cv::Size& oPacketSize = vsInputSizes[nStreamIdx];
         lvAssert_(oPacketSize.area(),"proper per-stream packet size is needed for packing/unpacking");
@@ -899,7 +929,7 @@ double lv::IDataProducer_<lv::DatasetSource_Image>::getExpectedLoad() const {
 }
 
 void lv::IDataProducer_<lv::DatasetSource_Image>::startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize) {
-    return IIDataLoader::startPrecaching(bPrecacheGT,(nSuggestedBufferSize==SIZE_MAX)?m_oInputMaxSize.area()*(m_vsInputPaths.size()+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3):nSuggestedBufferSize);
+    return IIDataLoader::startPrecaching(bPrecacheGT,(nSuggestedBufferSize==SIZE_MAX)?m_oInputMaxSize.area()*(m_vsInputPaths.size()+1)*(isGrayscale()?1:is4ByteAligned()?4:3):nSuggestedBufferSize);
 }
 
 const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getInputSize(size_t nPacketIdx) const {
@@ -953,6 +983,7 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_Image>::getRawGT(size_t nPacketIdx)
 }
 
 void lv::IDataProducer_<lv::DatasetSource_Image>::parseData() {
+    lvDbgExceptionWatch;
     lv::GetFilesFromDir(getDataPath(),m_vsInputPaths);
     lv::FilterFilePaths(m_vsInputPaths,{},{".jpg",".png",".bmp"});
     if(m_vsInputPaths.empty())
@@ -962,7 +993,7 @@ void lv::IDataProducer_<lv::DatasetSource_Image>::parseData() {
     m_vInputSizes.clear();
     m_vInputSizes.reserve(m_vsInputPaths.size());
     cv::Size oLastSize;
-    const double dScale = getDatasetInfo()->getScaleFactor();
+    const double dScale = getScaleFactor();
     for(size_t n = 0; n<m_vsInputPaths.size(); ++n) {
         cv::Mat oCurrInput = cv::imread(m_vsInputPaths[n],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
         while(oCurrInput.empty()) {
@@ -1008,7 +1039,7 @@ double lv::IDataProducer_<lv::DatasetSource_ImageArray>::getExpectedLoad() const
 }
 
 void lv::IDataProducer_<lv::DatasetSource_ImageArray>::startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize) {
-    return IIDataLoader::startPrecaching(bPrecacheGT,(nSuggestedBufferSize==SIZE_MAX)?m_oInputMaxSize.area()*(m_vvsInputPaths.size()+1)*(isGrayscale()?1:getDatasetInfo()->is4ByteAligned()?4:3):nSuggestedBufferSize);
+    return IIDataLoader::startPrecaching(bPrecacheGT,(nSuggestedBufferSize==SIZE_MAX)?m_oInputMaxSize.area()*(m_vvsInputPaths.size()+1)*(isGrayscale()?1:is4ByteAligned()?4:3):nSuggestedBufferSize);
 }
 
 const std::vector<cv::Size>& lv::IDataProducer_<lv::DatasetSource_ImageArray>::getInputSizeArray(size_t nPacketIdx) const {
@@ -1051,7 +1082,7 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_ImageArray>::getRawInput(size_t nPa
         cv::Mat oCurrImg = cv::imread(vsInputPaths[nStreamIdx]);
         if(oCurrImg.empty()) // if a single image is missing/cannot load, we skip the entire packet
             return cv::Mat();
-        if(getDatasetInfo()->is4ByteAligned() && oCurrImg.channels()==3)
+        if(is4ByteAligned() && oCurrImg.channels()==3)
             cv::cvtColor(oCurrImg,oCurrImg,cv::COLOR_BGR2BGRA);
         const cv::Size& oPacketSize = vsInputSizes[nStreamIdx];
         lvAssert_(oPacketSize.area(),"proper per-stream packet size is needed for packing/unpacking");
@@ -1255,9 +1286,9 @@ void lv::DataWriter::entry() {
 void lv::IDataArchiver_<lv::NotArray>::save(const cv::Mat& oOutput, size_t nIdx, int /*nFlags*/) {
     const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
     if(pLoader->getOutputPacketType()==ImagePacket) {
-        lvAssert_(!getDatasetInfo()->getOutputNameSuffix().empty(),"data archiver requires image packet output name suffix (i.e. file extension)");
+        lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires image packet output name suffix (i.e. file extension)");
         std::stringstream sOutputFilePath;
-        sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << getOutputName(nIdx) << getDatasetInfo()->getOutputNameSuffix();
+        sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
         cv::Mat oOutputClone = oOutput.clone();
         // automatically gray-out zones outside ROI if output is binary image mask with 1:1 mapping (e.g. segmentation)
         if(pLoader->getGTPacketType()==ImagePacket && pLoader->getGTMappingType()==PixelMapping && oOutput.type()==CV_8UC1 && (cv::countNonZero(oOutput==UCHAR_MAX)+cv::countNonZero(oOutput==0))==oOutput.size().area()) {
@@ -1279,9 +1310,9 @@ void lv::IDataArchiver_<lv::NotArray>::save(const cv::Mat& oOutput, size_t nIdx,
 cv::Mat lv::IDataArchiver_<lv::NotArray>::load(size_t nIdx, int nFlags) {
     const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
     if(pLoader->getOutputPacketType()==ImagePacket) {
-        lvAssert_(!getDatasetInfo()->getOutputNameSuffix().empty(),"data archiver requires packet output name suffix (i.e. file extension)");
+        lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires packet output name suffix (i.e. file extension)");
         std::stringstream sOutputFilePath;
-        sOutputFilePath << getOutputPath() << getDatasetInfo()->getOutputNamePrefix() << getOutputName(nIdx) << getDatasetInfo()->getOutputNameSuffix();
+        sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
         return cv::imread(sOutputFilePath.str(),(nFlags==-1)?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
     }
     else {
@@ -1339,11 +1370,11 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::pre_ini
     m_oLastInput = m_oCurrInput.clone();
     lvAssert_(!m_oCurrInput.empty() && m_oCurrInput.isContinuous(),"invalid input fetched from loader");
     lvAssert_(m_oCurrInput.channels()==1 || m_oCurrInput.channels()==4,"loaded data must be 1ch or 4ch to avoid alignment problems");
-    if(getDatasetInfo()->isSavingOutput() || m_pAlgo->m_pDisplayHelper)
+    if(isSavingOutput() || m_pAlgo->m_pDisplayHelper)
         m_pAlgo->setOutputFetching(true);
     if(m_pAlgo->m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
         m_pAlgo->setDebugFetching(true);
-    if(getDatasetInfo()->isUsingEvaluator()) {
+    if(isEvaluating()) {
         lvAssert_(m_pLoader->getGTPacketType()==ImagePacket && m_pLoader->getGTMappingType()==PixelMapping,"async data consumer only defined to work with gt image packets under 1:1 mapping");
         m_oCurrGT = m_pLoader->getGT(m_nCurrIdx).clone();
         m_oNextGT = m_pLoader->getGT(m_nNextIdx).clone();
@@ -1363,13 +1394,13 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::pre_app
     lvDbgAssert_(m_pAlgo,"invalid algo given to async data consumer");
     if(nNextIdx!=m_nNextIdx)
         m_oNextInput = m_pLoader->getInput(nNextIdx);
-    if(getDatasetInfo()->isUsingEvaluator() && nNextIdx!=m_nNextIdx)
+    if(isEvaluating() && nNextIdx!=m_nNextIdx)
         m_oNextGT = m_pLoader->getGT(nNextIdx);
 }
 
 void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::post_apply_gl(size_t nNextIdx, bool bRebindAll) {
     lvDbgAssert(m_pLoader && m_pAlgo);
-    if(m_pEvalAlgo && getDatasetInfo()->isUsingEvaluator())
+    if(m_pEvalAlgo && isEvaluating())
         m_pEvalAlgo->apply_gl(m_oNextGT,bRebindAll);
     m_nLastIdx = m_nCurrIdx;
     m_nCurrIdx = nNextIdx;
@@ -1377,17 +1408,17 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::post_ap
     if(m_pAlgo->m_pDisplayHelper || m_lDataCallback) {
         m_oCurrInput.copyTo(m_oLastInput);
         m_oNextInput.copyTo(m_oCurrInput);
-        if(getDatasetInfo()->isUsingEvaluator()) {
+        if(isEvaluating()) {
             m_oCurrGT.copyTo(m_oLastGT);
             m_oNextGT.copyTo(m_oCurrGT);
         }
     }
     if(m_nNextIdx<getInputCount()) {
         m_oNextInput = m_pLoader->getInput(m_nNextIdx);
-        if(getDatasetInfo()->isUsingEvaluator())
+        if(isEvaluating())
             m_oNextGT = m_pLoader->getGT(m_nNextIdx);
     }
-    if(getDatasetInfo()->isSavingOutput() || m_pAlgo->m_pDisplayHelper || m_lDataCallback) {
+    if(isSavingOutput() || m_pAlgo->m_pDisplayHelper || m_lDataCallback) {
         cv::Mat oLastOutput,oLastDebug;
         m_pAlgo->fetchLastOutput(oLastOutput);
         if(m_pAlgo->m_pDisplayHelper && m_pEvalAlgo && m_pEvalAlgo->m_bUsingDebug)
@@ -1399,7 +1430,7 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::post_ap
         countOutput(m_nLastIdx);
         if(m_lDataCallback)
             m_lDataCallback(m_oLastInput,oLastDebug,oLastOutput,m_oLastGT,m_pLoader->getGTROI(m_nLastIdx),m_nLastIdx);
-        if(getDatasetInfo()->isSavingOutput() && !oLastOutput.empty())
+        if(isSavingOutput() && !oLastOutput.empty())
             save(oLastOutput,m_nLastIdx);
         if(m_pAlgo->m_pDisplayHelper && m_pLoader->getGTPacketType()==ImagePacket && m_pLoader->getGTMappingType()==PixelMapping) {
             getColoredMasks(oLastOutput,oLastDebug,m_oLastGT,m_pLoader->getGTROI(m_nLastIdx));
@@ -1420,3 +1451,92 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::getColo
 }
 
 #endif //HAVE_GLSL
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const std::string& lv::DatasetHandler::getName() const {
+    return m_sDatasetName;
+}
+
+const std::string& lv::DatasetHandler::getDataPath() const {
+    return m_sDatasetPath;
+}
+
+const std::string& lv::DatasetHandler::getOutputPath() const {
+    return m_sOutputPath;
+}
+
+const std::string& lv::DatasetHandler::getRelativePath() const {
+    return m_sRelativePath;
+}
+
+const std::string& lv::DatasetHandler::getOutputNamePrefix() const {
+    return m_sOutputNamePrefix;
+}
+
+const std::string& lv::DatasetHandler::getOutputNameSuffix() const {
+    return m_sOutputNameSuffix;
+}
+
+const std::vector<std::string>& lv::DatasetHandler::getWorkBatchDirs() const {
+    return m_vsWorkBatchDirs;
+}
+
+const std::vector<std::string>& lv::DatasetHandler::getSkippedDirTokens() const {
+    return m_vsSkippedDirTokens;
+}
+
+const std::vector<std::string>& lv::DatasetHandler::getGrayscaleDirTokens() const {
+    return m_vsGrayscaleDirTokens;
+}
+
+double lv::DatasetHandler::getScaleFactor() const {
+    return m_dScaleFactor;
+}
+
+lv::IDataHandlerConstPtr lv::DatasetHandler::getRoot() const {
+    return shared_from_this();
+}
+
+lv::IDataHandlerConstPtr lv::DatasetHandler::getParent() const {
+    return IDataHandlerConstPtr();
+}
+
+bool lv::DatasetHandler::isRoot() const {
+    return true;
+}
+
+bool lv::DatasetHandler::is4ByteAligned() const {
+    return m_bForce4ByteDataAlign;
+}
+
+bool lv::DatasetHandler::isSavingOutput() const {
+    return m_bSavingOutput;
+}
+
+bool lv::DatasetHandler::isEvaluating() const {
+    return m_bUsingEvaluator;
+}
+
+bool lv::DatasetHandler::isGrayscale() const {
+    return false;
+}
+
+lv::DatasetHandler::DatasetHandler(const std::string& sDatasetName,const std::string& sDatasetDirPath,const std::string& sOutputDirPath,
+                                   const std::string& sOutputNamePrefix,const std::string& sOutputNameSuffix,const std::vector<std::string>& vsWorkBatchDirs,
+                                   const std::vector<std::string>& vsSkippedDirTokens,const std::vector<std::string>& vsGrayscaleDirTokens,bool bSaveOutput,
+                                   bool bUseEvaluator,bool bForce4ByteDataAlign,double dScaleFactor) :
+        m_sDatasetName(sDatasetName),
+        m_sDatasetPath(lv::AddDirSlashIfMissing(sDatasetDirPath)),
+        m_sOutputPath(lv::AddDirSlashIfMissing(sOutputDirPath)),
+        m_sOutputNamePrefix(sOutputNamePrefix),
+        m_sOutputNameSuffix(sOutputNameSuffix),
+        m_vsWorkBatchDirs(vsWorkBatchDirs),
+        m_vsSkippedDirTokens(vsSkippedDirTokens),
+        m_vsGrayscaleDirTokens(vsGrayscaleDirTokens),
+        m_bSavingOutput(bSaveOutput),
+        m_bUsingEvaluator(bUseEvaluator),
+        m_bForce4ByteDataAlign(bForce4ByteDataAlign),
+        m_dScaleFactor(dScaleFactor) {}

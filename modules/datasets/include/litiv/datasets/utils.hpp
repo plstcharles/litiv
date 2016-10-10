@@ -180,9 +180,7 @@ namespace lv {
                 false; // undefined behavior
     }
 
-    struct IDataset;
     struct IDataHandler;
-    using IDatasetPtr = std::shared_ptr<IDataset>;
     using IDataHandlerPtr = std::shared_ptr<IDataHandler>;
     using IDataHandlerPtrArray = std::vector<IDataHandlerPtr>;
     using IDataHandlerConstPtr = std::shared_ptr<const IDataHandler>;
@@ -190,78 +188,32 @@ namespace lv {
     using IDataHandlerPtrQueue = std::priority_queue<IDataHandlerPtr,IDataHandlerPtrArray,std::function<bool(const IDataHandlerPtr&,const IDataHandlerPtr&)>>;
     using AsyncDataCallbackFunc = std::function<void(const cv::Mat& /*oInput*/,const cv::Mat& /*oDebug*/,const cv::Mat& /*oOutput*/,const cv::Mat& /*oGT*/,const cv::Mat& /*oGTROI*/,size_t /*nIdx*/)>;
 
-    /// fully abstract dataset interface (dataset parser & evaluator implementations will derive from this)
-    struct IDataset : lv::enable_shared_from_this<IDataset> {
-        /// virtual destructor for adequate cleanup from IDataset pointers
-        virtual ~IDataset() = default;
-        /// returns the dataset name
-        virtual const std::string& getName() const = 0;
-        /// returns the root data path
-        virtual const std::string& getDatasetPath() const = 0;
-        /// returns the root output path
-        virtual const std::string& getOutputPath() const = 0;
-        /// returns the output file name prefix for results archiving
-        virtual const std::string& getOutputNamePrefix() const = 0;
-        /// returns the output file name suffix for results archiving
-        virtual const std::string& getOutputNameSuffix() const = 0;
-        /// returns the directory names of top-level work batches
-        virtual const std::vector<std::string>& getWorkBatchDirs() const = 0;
-        /// returns the directory name tokens which, if found, should be skipped
-        virtual const std::vector<std::string>& getSkippedDirTokens() const = 0;
-        /// returns the directory name tokens which, if found, should be treated as grayscale
-        virtual const std::vector<std::string>& getGrayscaleDirTokens() const = 0;
-        /// returns the output file/packet index offset for results archiving
-        virtual size_t getOutputIdxOffset() const = 0;
-        /// returns the input data scaling scaling factor
-        virtual double getScaleFactor() const = 0;
-        /// returns whether we should save the results through DataConsumers or not
-        virtual bool isSavingOutput() const = 0;
-        /// returns whether we should evaluate the results through DataConsumers or not
-        virtual bool isUsingEvaluator() const = 0;
-        /// returns whether loaded data should be 4-byte aligned or not (4-byte alignment is ideal for GPU upload)
-        virtual bool is4ByteAligned() const = 0;
-        /// returns whether this dataset defines some evaluation procedure or not
-        virtual bool isEvaluable() const {return false;}
-        /// returns the total input packet count in the dataset (recursively queried from work batches)
-        virtual size_t getInputCount() const = 0;
-        /// returns the total gt packet count in the dataset (recursively queried from work batches)
-        virtual size_t getGTCount() const = 0;
-        /// returns the output packet count expected to be processed by the dataset evaluator (recursively queried from work batches)
-        virtual size_t getExpectedOutputCount() const = 0;
-        /// returns the output packet count so far processed by the dataset evaluator (recursively queried from work batches)
-        virtual size_t getCurrentOutputCount() const = 0;
-        /// returns the final output packet count processed by the dataset evaluator, blocking if processing is not finished yet (recursively queried from work batches)
-        virtual size_t getFinalOutputCount() = 0;
-        /// returns the time taken so far to process the dataset (recursively queried from work batches)
-        virtual double getCurrentProcessTime() const = 0;
-        /// returns the final time taken to process the dataset, blocking if processing is not finished yet (recursively queried from work batches)
-        virtual double getFinalProcessTime() = 0;
-        /// resets internal evaluation and packet count metrics (recursively called for work batches)
-        virtual void resetMetrics() = 0;
-        /// clears all batches and reparses them from the dataset metadata
-        virtual void parseDataset() = 0;
-        /// writes the dataset-level evaluation report
-        virtual void writeEvalReport() const = 0;
-        /// returns the array of work batches (or groups, if requested with hierarchy) contained in this dataset
-        virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const = 0;
-        /// returns the array of work batches (or groups, if requested with hierarchy) contained in this dataset, sorted by expected CPU load
-        virtual IDataHandlerPtrQueue getSortedBatches(bool bWithHierarchy) const = 0;
-    };
-
     /// fully abstract data handler interface (work batch and work group implementations will derive from this)
     struct IDataHandler : lv::enable_shared_from_this<IDataHandler> {
+        /// virtual destructor for adequate cleanup from IDataHandler pointers
+        virtual ~IDataHandler() = default;
         /// returns the work batch/group name
         virtual const std::string& getName() const = 0;
-        /// returns the work batch/group data path
+        /// returns the work batch/group data path (always slash-terminated)
         virtual const std::string& getDataPath() const = 0;
-        /// returns the work batch/group output path
+        /// returns the work batch/group output path (always slash-terminated)
         virtual const std::string& getOutputPath() const = 0;
-        /// returns the work batch/group relative path offset w.r.t. dataset root
+        /// returns the work batch/group relative path offset w.r.t. parent (always slash-terminated)
         virtual const std::string& getRelativePath() const = 0;
         /// returns a name (not necessarily used for parsing) associated with an input data packet index (useful for data archiving)
         virtual std::string getInputName(size_t nPacketIdx) const;
         /// returns a name that should be given to an output data packet based on its index (useful for data archiving)
         virtual std::string getOutputName(size_t nPacketIdx) const;
+        /// returns the output file name prefix used for results archiving
+        virtual const std::string& getOutputNamePrefix() const = 0;
+        /// returns the output file name suffix for results archiving (typically specifies file extension)
+        virtual const std::string& getOutputNameSuffix() const = 0;
+        /// returns the directory name tokens which, if found in a batch name, should force it to be skipped
+        virtual const std::vector<std::string>& getSkippedDirTokens() const = 0;
+        /// returns the directory name tokens which, if found in a batch name, should force it to be treated as grayscale
+        virtual const std::vector<std::string>& getGrayscaleDirTokens() const = 0;
+        /// returns the data scaling factor to apply when loading packets
+        virtual double getScaleFactor() const = 0;
         /// returns the expected CPU load of the work batch/group (only relevant for intra-dataset load comparisons)
         virtual double getExpectedLoad() const = 0;
         /// returns the total input packet count for this work batch/group
@@ -278,8 +230,22 @@ namespace lv {
         virtual double getCurrentProcessTime() const = 0;
         /// returns the final time taken to process the work batch/group data, blocking if processing is not finished yet
         virtual double getFinalProcessTime() = 0;
+        /// returns the top-level data handler (typically a work batch group) for this dataset
+        virtual IDataHandlerConstPtr getRoot() const = 0;
+        /// returns the current data handler's parent (will be null if already top level)
+        virtual IDataHandlerConstPtr getParent() const = 0;
         /// resets internal work batch/group evaluation and packet count metrics
         virtual void resetMetrics() = 0;
+        /// returns whether this data handler interface points to the dataset's top level (root) interface or not
+        virtual bool isRoot() const = 0;
+        /// returns whether loaded data should be 4-byte aligned or not (4-byte alignment is ideal for GPU upload)
+        virtual bool is4ByteAligned() const = 0;
+        /// returns whether the pushed results will be saved in the output directory or not
+        virtual bool isSavingOutput() const = 0;
+        /// returns whether the pushed results will be evaluated or not
+        virtual bool isEvaluating() const = 0;
+        /// returns whether this dataset defines an evaluation procedure or not
+        virtual bool isEvaluable() const {return false;}
         /// returns whether this work batch/group is currently processing data
         virtual bool isProcessing() const = 0;
         /// returns whether the work batch/group data will be treated as grayscale
@@ -288,12 +254,10 @@ namespace lv {
         virtual bool isBare() const = 0;
         /// returns whether this data handler interface points to a work batch or a work group
         virtual bool isGroup() const = 0;
-        /// returns whether this dataset defines some evaluation procedure or not
-        virtual bool isEvaluable() const {return false;}
         /// returns the children of this work batch/group (if any) as a work batch array
         virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const = 0;
-        /// returns a pointer to this work batch/group's parent dataset interface
-        virtual IDatasetPtr getDatasetInfo() const = 0;
+        /// returns the children of this work batch/group (if any) as a work batch array, sorted by expected CPU load
+        virtual IDataHandlerPtrQueue getSortedBatches(bool bWithHierarchy) const = 0;
         /// returns which processing task this work batch/group was built for
         virtual DatasetTaskList getDatasetTask() const = 0;
         /// returns which data source this work batch/group was built for
@@ -304,8 +268,6 @@ namespace lv {
         virtual DatasetList getDataset() const = 0;
         /// writes the batch-level evaluation report
         virtual void writeEvalReport() const = 0;
-        /// virtual destructor for adequate cleanup from IDataHandler pointers
-        virtual ~IDataHandler() = default;
         /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
         virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) = 0;
         /// kills the asynchronyzed precacher, and clears internal buffers
@@ -329,20 +291,13 @@ namespace lv {
         static bool compare(const IDataHandler& i, const IDataHandler& j);
         /// work batch/group comparison function based on expected CPU load
         static bool compare_load(const IDataHandler& i, const IDataHandler& j);
-        /// returns the children batch associated with the given packet index; will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
-        virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const = 0;
-        /// returns the children batch associated with the given packet index; will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
-        virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) = 0;
         /// overrideable method to be called when the user 'starts processing' the data batch (by default, always inits counters after calling this)
         virtual void startProcessing_impl() {}
         /// overrideable method to be called when the user 'stops processing' the data batch (by default, always stops counters before calling this)
         virtual void stopProcessing_impl() {}
         /// local folder data parsing function, dataset-specific
         virtual void parseData() = 0;
-        template<DatasetEvalList eDatasetEval>
-        friend struct IDatasetReporter_; // required for external interface to write eval reports
-        template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset, DatasetEvalList eDatasetEval, lv::ParallelAlgoType eEvalImpl>
-        friend struct IDataset_; // required for data handler sorting and other top-level dataset utility functions
+    private:
         friend struct IDataGroupHandler; // required for recursive parsing of work batch data through groups
     };
 
@@ -350,30 +305,46 @@ namespace lv {
     struct DataHandler : public virtual IDataHandler {
         /// returns the work batch/group name
         virtual const std::string& getName() const override final;
-        /// returns the work batch/group data path
+        /// returns the work batch/group data path (always slash-terminated)
         virtual const std::string& getDataPath() const override final;
-        /// returns the work batch/group output path
+        /// returns the work batch/group output path (always slash-terminated)
         virtual const std::string& getOutputPath() const override final;
-        /// returns the work batch/group relative path offset w.r.t. dataset root
+        /// returns the work batch/group relative path offset w.r.t. parent (always slash-terminated)
         virtual const std::string& getRelativePath() const override final;
+        /// returns the output file name prefix used for results archiving
+        virtual const std::string& getOutputNamePrefix() const override;
+        /// returns the output file name suffix for results archiving (typically specifies file extension)
+        virtual const std::string& getOutputNameSuffix() const override;
+        /// returns the directory name tokens which, if found in a batch name, should force it to be skipped
+        virtual const std::vector<std::string>& getSkippedDirTokens() const override;
+        /// returns the directory name tokens which, if found in a batch name, should force it to be treated as grayscale
+        virtual const std::vector<std::string>& getGrayscaleDirTokens() const override;
+        /// returns the data scaling factor to apply when loading packets
+        virtual double getScaleFactor() const override;
+        /// returns the top-level data handler (typically a work batch group) for this dataset
+        virtual IDataHandlerConstPtr getRoot() const override;
+        /// returns the current data handler's parent (will be null if already top level)
+        virtual IDataHandlerConstPtr getParent() const override;
+        /// returns whether this data handler interface points to the dataset's top level (root) interface or not (always false here)
+        virtual bool isRoot() const override final;
+        /// returns whether loaded data should be 4-byte aligned or not (4-byte alignment is ideal for GPU upload)
+        virtual bool is4ByteAligned() const override;
+        /// returns whether the pushed results will be saved in the output directory or not
+        virtual bool isSavingOutput() const override;
+        /// returns whether the pushed results will be evaluated or not
+        virtual bool isEvaluating() const override;
         /// returns whether the work batch/group data will be treated as grayscale
         virtual bool isGrayscale() const override final;
-        /// returns a pointer to this work batch/group's parent dataset interface
-        virtual IDatasetPtr getDatasetInfo() const override final;
     protected:
         /// fills internal impl parameters based on batch name, dataset parameters & current relative data path
-        DataHandler(const std::string& sBatchName, std::shared_ptr<IDataset> pDataset, const std::string& sRelativePath);
-        /// returns the children batch associated with the given (input) packet index; will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
-        virtual IDataHandlerConstPtr getBatch(size_t& nPacketIdx) const override final;
-        /// returns the children batch associated with the given (input) packet index; will throw if out of range, and readjust nPacketIdx for returned batch range otherwise
-        virtual IDataHandlerPtr getBatch(size_t& nPacketIdx) override final;
-    private:
+        DataHandler(const std::string& sBatchName, const std::string& sRelativePath, const IDataHandler& oParent);
         const std::string m_sBatchName;
         const std::string m_sRelativePath;
         const std::string m_sDataPath;
         const std::string m_sOutputPath;
         const bool m_bForcingGrayscale;
-        const IDatasetPtr m_pDataset;
+        const IDataHandler& m_oParent;
+        const IDataHandler& m_oRoot;
     };
 
     /// data handler full (default) specialization --- can be overridden by dataset type in 'impl' headers
@@ -411,16 +382,18 @@ namespace lv {
         virtual bool isGroup() const override final;
         /// returns this work group's children batches
         virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const override final;
+        /// returns this work group's children batches, sorted by expected CPU load
+        virtual IDataHandlerPtrQueue getSortedBatches(bool bWithHierarchy) const override final;
         /// initializes precaching in all children work batches
         virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) override final;
         /// stops precaching in all children work batches
         virtual void stopPrecaching() override final;
     protected:
         /// creates and returns a work batch for a given relative dataset path
-        virtual IDataHandlerPtr createWorkBatch(const std::string& sBatchName, const std::string& sRelativePath=std::string("./")) const = 0;
+        virtual IDataHandlerPtr createWorkBatch(const std::string& sBatchName, const std::string& sRelativePath) const = 0;
         /// creates group/nongroup workbatches based on internal datset info and current relative path, and recursively calls parse data on all childrens
         virtual void parseData() override;
-        /// default constructor; automatically sets 'isBare' to true
+        /// protected default constructor; automatically sets 'isBare' to true
         inline DataGroupHandler() : m_bIsBare(true) {}
         /// contains the group's children work batches (which may also be groups, themselves containing children)
         IDataHandlerPtrArray m_vpBatches;
@@ -431,6 +404,19 @@ namespace lv {
     /// group data parser full (default) specialization --- can be overridden by dataset type in 'impl' headers
     template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset>
     struct DataGroupHandler_ : public DataGroupHandler {};
+
+    /// data handler specialized templace getters interface (shared by work batches, groups, and dataset interfaces)
+    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset, DatasetEvalList eDatasetEval>
+    struct DataTemplSpec_ : public virtual IDataHandler {
+        /// returns which processing task this work batch/group was built for
+        virtual DatasetTaskList getDatasetTask() const override final {return eDatasetTask;}
+        /// returns which data source this work batch/group was built for
+        virtual DatasetSourceList getDatasetSource() const override final {return eDatasetSource;}
+        /// returns which evaluation method this work batch/group was built for
+        virtual DatasetEvalList getDatasetEval() const override final {return eDatasetEval;}
+        /// returns which dataset this work batch/group was built for
+        virtual DatasetList getDataset() const override final {return eDataset;}
+    };
 
     /// general-purpose data packet precacher, fully implemented (i.e. can be used stand-alone)
     struct DataPrecacher {
@@ -850,7 +836,7 @@ namespace lv {
             lvAssert_(isProcessing(),"data processing must be toggled via 'startProcessing()' before pushing packets");
             countOutput(nPacketIdx);
             processOutput(oOutput,nPacketIdx);
-            if(getDatasetInfo()->isSavingOutput() && !oOutput.empty())
+            if(isSavingOutput() && !oOutput.empty())
                 this->save(oOutput,nPacketIdx);
         }
     protected:
@@ -888,7 +874,7 @@ namespace lv {
             lvAssert_(vOutput.empty() || vOutput.size()==getOutputStreamCount(),"bad output array size");
             countOutput(nPacketIdx);
             processOutput(vOutput,nPacketIdx);
-            if(getDatasetInfo()->isSavingOutput() && !vOutput.empty())
+            if(isSavingOutput() && !vOutput.empty())
                 this->saveArray(vOutput,nPacketIdx);
         }
     protected:
@@ -957,5 +943,80 @@ namespace lv {
     };
 
 #endif //HAVE_GLSL
+
+    /// full implementation of basic dataset handler interface functions
+    struct DatasetHandler : public virtual IDataHandler {
+        /// returns the dataset name
+        virtual const std::string& getName() const override final;
+        /// returns the dataset data path (always slash-terminated)
+        virtual const std::string& getDataPath() const override final;
+        /// returns the dataset output path (always slash-terminated)
+        virtual const std::string& getOutputPath() const override final;
+        /// returns the dataset relative path offset (always empty string, since this is root interface)
+        virtual const std::string& getRelativePath() const override final;
+        /// returns the output file name prefix used for results archiving
+        virtual const std::string& getOutputNamePrefix() const override final;
+        /// returns the output file name suffix for results archiving (typically specifies file extension)
+        virtual const std::string& getOutputNameSuffix() const override final;
+        /// returns the directory names of potential top-level work batches/groups
+        virtual const std::vector<std::string>& getWorkBatchDirs() const;
+        /// returns the directory name tokens which, if found in a batch name, should force it to be skipped
+        virtual const std::vector<std::string>& getSkippedDirTokens() const override final;
+        /// returns the directory name tokens which, if found in a batch name, should force it to be treated as grayscale
+        virtual const std::vector<std::string>& getGrayscaleDirTokens() const override final;
+        /// returns the data scaling factor to apply when loading packets
+        virtual double getScaleFactor() const override final;
+        /// returns the top-level data handler for this dataset (i.e. this instance)
+        virtual IDataHandlerConstPtr getRoot() const override;
+        /// returns the current data handler's parent (always null here, since we are the root)
+        virtual IDataHandlerConstPtr getParent() const override;
+        /// returns whether this data handler interface points to the dataset's top level (root) interface or not (always true here)
+        virtual bool isRoot() const override final;
+        /// returns whether loaded data should be 4-byte aligned or not (4-byte alignment is ideal for GPU upload)
+        virtual bool is4ByteAligned() const override final;
+        /// returns whether the pushed results will be saved in the output directory or not
+        virtual bool isSavingOutput() const override final;
+        /// returns whether the pushed results will be evaluated or not
+        virtual bool isEvaluating() const override final;
+        /// returns whether the dataset will be treated as grayscale (false by default)
+        virtual bool isGrayscale() const override final;
+    protected:
+        /// full dataset handler constructor; parameters are passed through lv::datasets::create<...>(...), and may be caught/simplified by a specialization
+        DatasetHandler(
+            const std::string& sDatasetName, ///< user-friendly dataset name (used for identification only)
+            const std::string& sDatasetDirPath, ///< dataset directory (full) path where work batches can be found
+            const std::string& sOutputDirPath, ///< output directory (full) path for debug logs, evaluation reports and results archiving
+            const std::string& sOutputNamePrefix, ///< output name prefix for results archiving (if null, only packet idx will be used as file name)
+            const std::string& sOutputNameSuffix, ///< output name suffix for results archiving (if null, no file extension will be used)
+            const std::vector<std::string>& vsWorkBatchDirs, ///< array of directory names for top-level work batch groups (one group typically contains multiple work batches)
+            const std::vector<std::string>& vsSkippedDirTokens, ///< array of tokens which allow directories to be skipped if one is found in their name
+            const std::vector<std::string>& vsGrayscaleDirTokens, ///< array of tokens which allow directories to be treated as grayscale input only if one is found in their name
+            bool bSaveOutput, ///< defines whether results should be archived or not
+            bool bUseEvaluator, ///< defines whether results should be fully evaluated, or simply acknowledged
+            bool bForce4ByteDataAlign, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
+            double dScaleFactor ///< defines the scale factor to use to resize/rescale read packets
+        );
+    private:
+        const std::string m_sDatasetName; ///< user-friendly dataset name (used for identification only)
+        const std::string m_sDatasetPath; ///< dataset directory (full) path where work batches can be found
+        const std::string m_sRelativePath; ///< dataset directory relative path where work batches can be found (always empty by default)
+        const std::string m_sOutputPath; ///< output directory (full) path for debug logs, evaluation reports and results archiving
+        const std::string m_sOutputNamePrefix; ///< output name prefix for results archiving (if null, only packet idx will be used as file name)
+        const std::string m_sOutputNameSuffix; ///< output name suffix for results archiving (if null, no file extension will be used)
+        const std::vector<std::string> m_vsWorkBatchDirs; ///< array of directory names for top-level work batch groups (one group typically contains multiple work batches)
+        const std::vector<std::string> m_vsSkippedDirTokens; ///< array of tokens which allow directories to be skipped if one is found in their name
+        const std::vector<std::string> m_vsGrayscaleDirTokens; ///< array of tokens which allow directories to be treated as grayscale input only if one is found in their name
+        const bool m_bSavingOutput; ///< defines whether results should be archived or not
+        const bool m_bUsingEvaluator; ///< defines whether results should be fully evaluated, or simply acknowledged
+        const bool m_bForce4ByteDataAlign; ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
+        const double m_dScaleFactor; ///< defines the scale factor to use to resize/rescale read packets
+    };
+
+    /// dataset handler full (default) specialization --- can be overridden by dataset type in 'impl' headers
+    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset>
+    struct DatasetHandler_ : public DatasetHandler {
+    protected:
+        using DatasetHandler::DatasetHandler;
+    };
 
 } // namespace lv

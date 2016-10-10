@@ -127,7 +127,7 @@ namespace lv {
     template<>
     struct IMetricsAccumulator_<DatasetEval_BinaryClassifierArray> :
             public IIMetricsAccumulator {
-        /// returns whether the binary classification counters of 'm' are equal to those of this object
+        /// returns whether the binary classification counters of 'm' are equal to those of this object (ignores stream names)
         virtual bool isEqual(const IIMetricsAccumulatorConstPtr& m) const override;
         /// accumulates the binary classification counters of 'm' into those of this object
         virtual IIMetricsAccumulatorPtr accumulate(const IIMetricsAccumulatorConstPtr& m) override;
@@ -135,9 +135,11 @@ namespace lv {
         virtual BinClassifMetricsAccumulatorPtr reduce() const;
         /// contains the actual counters used for binary classification evaluation
         std::vector<BinClassif> m_vCounters;
+        /// contains the stream names used for printing eval reports (should be the same size as m_vCounters)
+        std::vector<std::string> m_vsStreamNames;
     protected:
         /// default constructor; resizes the counters array based on array size
-        inline IMetricsAccumulator_(size_t nArraySize=0) : m_vCounters(nArraySize) {}
+        IMetricsAccumulator_(size_t nArraySize=0);
     };
     using BinClassifMetricsArrayAccumulator = IMetricsAccumulator_<DatasetEval_BinaryClassifierArray>;
     using BinClassifMetricsArrayAccumulatorPtr = std::shared_ptr<BinClassifMetricsArrayAccumulator>;
@@ -248,11 +250,11 @@ namespace lv {
         BinClassifMetrics m_oMetrics;
     protected:
         /// default contructor; requires a base metrics counters, as otherwise, we would obtain NaN's
-        inline IMetricsCalculator_(const IIMetricsAccumulatorConstPtr& m) : m_oMetrics(dynamic_cast<const BinClassifMetricsAccumulator&>(*m.get()).m_oCounters) {}
+        IMetricsCalculator_(const IIMetricsAccumulatorConstPtr& m);
         /// default contructor; requires a pre-filled BinClassifMetrics object
-        inline IMetricsCalculator_(const BinClassifMetrics& m) : m_oMetrics(m) {}
+        IMetricsCalculator_(const BinClassifMetrics& m);
         /// default contructor; requires a pre-filled BinClassif object
-        inline IMetricsCalculator_(const BinClassif& m) : m_oMetrics(m) {}
+        IMetricsCalculator_(const BinClassif& m);
     };
     using BinClassifMetricsCalculator = IMetricsCalculator_<DatasetEval_BinaryClassifier>;
     using BinClassifMetricsCalculatorPtr = std::shared_ptr<BinClassifMetricsCalculator>;
@@ -268,19 +270,13 @@ namespace lv {
         virtual BinClassifMetricsCalculatorPtr reduce() const;
         /// contains the actual metrics used for binary classification evaluation
         std::vector<BinClassifMetrics> m_vMetrics;
+        /// contains the stream names used for printing eval reports (should be the same size as m_vMetrics)
+        std::vector<std::string> m_vsStreamNames;
     protected:
         /// default contructor; requires a base metrics counters, as otherwise, we would obtain NaN's
-        inline IMetricsCalculator_(const IIMetricsAccumulatorConstPtr& m) : m_vMetrics(initMetricsArray(dynamic_cast<const BinClassifMetricsArrayAccumulator&>(*m.get()))) {}
-        /// default contructor; requires a pre-filled BinClassifMetrics array object
-        inline IMetricsCalculator_(const std::vector<BinClassifMetrics>& vm) : m_vMetrics(vm) {}
-    private:
-        /// constructor metrics array helper
-        static inline std::vector<BinClassifMetrics> initMetricsArray(const BinClassifMetricsArrayAccumulator& m) {
-            std::vector<BinClassifMetrics> vMetrics;
-            for(const BinClassif& m2 : m.m_vCounters)
-                vMetrics.push_back(BinClassifMetrics(m2));
-            return vMetrics;
-        }
+        IMetricsCalculator_(const IIMetricsAccumulatorConstPtr& m);
+        /// default contructor; requires pre-filled BinClassifMetrics array object + stream names array
+        IMetricsCalculator_(const std::vector<BinClassifMetrics>& vm, const std::vector<std::string>& vs);
     };
     using BinClassifMetricsArrayCalculator = IMetricsCalculator_<DatasetEval_BinaryClassifierArray>;
     using BinClassifMetricsArrayCalculatorPtr = std::shared_ptr<BinClassifMetricsArrayCalculator>;
@@ -293,5 +289,46 @@ namespace lv {
         /// fowards the constructors of the underlying interface (useful if they have mandatory parameters)
         using IMetricsCalculator_<eDatasetEval>::IMetricsCalculator_;
     };
+
+    /// metric retriever super-interface; exposes utility functions to recursively parse metrics through all work batches
+    struct IIMetricRetriever : public virtual IDataHandler {
+        /// virtual destructor for adequate cleanup from IIMetricRetriever pointers
+        virtual ~IIMetricRetriever() = default;
+        /// returns whether this data handler defines some evaluation procedure or not (always true for this interface)
+        virtual bool isEvaluable() const override final {return true;}
+        /// accumulates and returns a sum of all base evaluation metrics for children batches, e.g. sums all classification counters (provides group-impl only)
+        virtual IIMetricsAccumulatorConstPtr getMetricsBase() const = 0;
+        /// accumulates and returns high-level evaluation metrics, e.g. computes F-Measure from classification counters
+        virtual IIMetricsCalculatorPtr getMetrics(bool bAverage) const = 0;
+    };
+
+    /// metric retriever interface specialization; exposes utility functions to recursively parse metrics through all work batches
+    template<DatasetEvalList eDatasetEval, DatasetList eDataset>
+    struct MetricRetriever_ : protected virtual IIMetricRetriever {
+        /// accumulates and returns a sum of all base evaluation metrics for children batches, e.g. sums all classification counters (provides group-impl only)
+        virtual IIMetricsAccumulatorConstPtr getMetricsBase() const override {
+            lvAssert_(this->isGroup(),"non-group data reporter specialization attempt to call non-overridden method");
+            IIMetricsAccumulatorPtr pMetricsBase = IIMetricsAccumulator::create<MetricsAccumulator_<eDatasetEval,eDataset>>();
+            for(const auto& pBatch : this->getBatches(true))
+                pMetricsBase->accumulate(dynamic_cast<const IIMetricRetriever&>(*pBatch).getMetricsBase());
+            return pMetricsBase;
+        }
+        /// accumulates and returns high-level evaluation metrics, e.g. computes F-Measure from classification counters
+        virtual IIMetricsCalculatorPtr getMetrics(bool bAverage) const override final {
+            if(bAverage && this->isGroup() && !this->isBare()) {
+                IDataHandlerPtrArray vpBatches = this->getBatches(true);
+                auto ppBatchIter = vpBatches.begin();
+                for(; ppBatchIter!=vpBatches.end() && (*ppBatchIter)->getCurrentOutputCount()==0; ++ppBatchIter);
+                lvAssert_(ppBatchIter!=vpBatches.end(),"found no processed output packets");
+                IIMetricsCalculatorPtr pMetrics = dynamic_cast<const IIMetricRetriever&>(**ppBatchIter).getMetrics(bAverage);
+                for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
+                    if((*ppBatchIter)->getCurrentOutputCount()>0)
+                        pMetrics->accumulate(dynamic_cast<const IIMetricRetriever&>(**ppBatchIter).getMetrics(bAverage));
+                return pMetrics;
+            }
+            return IIMetricsCalculator::create<MetricsCalculator_<eDatasetEval,eDataset>>(getMetricsBase());
+        }
+    };
+
 
 } // namespace lv

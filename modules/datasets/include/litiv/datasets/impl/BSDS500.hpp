@@ -35,13 +35,6 @@ namespace lv {
         BSDS500Dataset_Training_Validation_Test,
     };
 
-    template<>
-    struct DatasetReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500> :
-            public DatasetReporterWrapper_<DatasetEval_BinaryClassifier,Dataset_BSDS500> {
-        /// writes an overall evaluation report listing high-level binary classification metrics
-        virtual void writeEvalReport() const override;
-    };
-
     template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
     struct Dataset_<eDatasetTask,Dataset_BSDS500,eEvalImpl> :
             public IDataset_<eDatasetTask,DatasetSource_Image,Dataset_BSDS500,getDatasetEval<eDatasetTask,Dataset_BSDS500>(),eEvalImpl> {
@@ -61,9 +54,8 @@ namespace lv {
                         "",
                         ".png",
                         getWorkBatchDirNames(eType),
-                        getSkippedWorkBatchDirNames(),
-                        getGrayscaleWorkBatchDirNames(),
-                        0,
+                        std::vector<std::string>(),
+                        std::vector<std::string>(),
                         bSaveOutput,
                         bUseEvaluator,
                         bForce4ByteDataAlign,
@@ -80,16 +72,6 @@ namespace lv {
                 return s_vsWorkBatchDirs_trainval;
             else
                 return s_vsWorkBatchDirs_trainvaltest;
-        }
-        /// returns the names of all work batch directories which should be skipped for this dataset speialization
-        static const std::vector<std::string>& getSkippedWorkBatchDirNames() {
-            static const std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
-            return s_vsSkippedWorkBatchDirs;
-        }
-        /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
-        static const std::vector<std::string>& getGrayscaleWorkBatchDirNames() {
-            static const std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {};
-            return s_vsGrayscaleWorkBatchDirs;
         }
     };
 
@@ -108,14 +90,14 @@ namespace lv {
             lv::FilterFilePaths(this->m_vsInputPaths,{},{".jpg",".png",".bmp"});
             if(this->m_vsInputPaths.empty())
                 lvError_("BSDS500 set '%s' did not possess any jpg/png/bmp image file",this->getName().c_str());
-            lv::GetSubDirsFromDir(lv::AddDirSlashIfMissing(this->getDatasetInfo()->getDatasetPath())+"../groundTruth_bdry_images/"+this->getRelativePath(),this->m_vsGTPaths);
+            lv::GetSubDirsFromDir(this->getRoot()->getDataPath()+"../groundTruth_bdry_images/"+this->getRelativePath(),this->m_vsGTPaths);
             if(this->m_vsGTPaths.empty())
                 lvError_("BSDS500 set '%s' did not possess any groundtruth image folders",this->getName().c_str());
             else if(this->m_vsGTPaths.size()!=this->m_vsInputPaths.size())
                 lvError_("BSDS500 set '%s' input/groundtruth count mismatch",this->getName().c_str());
-            m_mGTIndexLUT.clear();
-            for(size_t n=0; n<m_vsInputPaths.size(); ++n)
-                m_mGTIndexLUT[n] = n;
+            this->m_mGTIndexLUT.clear();
+            for(size_t n=0; n<this->m_vsInputPaths.size(); ++n)
+                this->m_mGTIndexLUT[n] = n;
             // make sure folders are non-empty, and folders & images are similarliy ordered
             std::vector<std::string> vsTempPaths;
             for(size_t nImageIdx=0; nImageIdx<this->m_vsGTPaths.size(); ++nImageIdx) {
@@ -132,7 +114,7 @@ namespace lv {
             this->m_vInputSizes.reserve(this->m_vsInputPaths.size());
             this->m_vGTSizes.clear();
             this->m_vGTSizes.reserve(this->m_vsGTPaths.size());
-            const double dScale = this->getDatasetInfo()->getScaleFactor();
+            const double dScale = this->getScaleFactor();
             for(size_t nImageIdx=0; nImageIdx<this->m_vsInputPaths.size(); ++nImageIdx) {
                 const cv::Mat oCurrInput = cv::imread(this->m_vsInputPaths[nImageIdx],this->isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
                 lvAssert(!oCurrInput.empty() && (oCurrInput.size()==cv::Size(321,481) || oCurrInput.size()==cv::Size(481,321)));
@@ -159,18 +141,18 @@ namespace lv {
                     lvAssert(!vsTempPaths.empty());
                     cv::Mat oTempRefGTImage = cv::imread(vsTempPaths[0],cv::IMREAD_GRAYSCALE);
                     lvAssert(!oTempRefGTImage.empty() && (oTempRefGTImage.size()==cv::Size(481,321) || oTempRefGTImage.size()==cv::Size(321,481)));
-                    if(oTempRefGTImage.size()!=m_vInputSizes[nGTIdx])
-                        cv::resize(oTempRefGTImage,oTempRefGTImage,m_vInputSizes[nGTIdx],0,0,cv::INTER_NEAREST);
+                    if(oTempRefGTImage.size()!=this->m_vInputSizes[nGTIdx])
+                        cv::resize(oTempRefGTImage,oTempRefGTImage,this->m_vInputSizes[nGTIdx],0,0,cv::INTER_NEAREST);
                     cv::Mat oGTMask(oTempRefGTImage.rows*int(vsTempPaths.size()),oTempRefGTImage.cols,CV_8UC1);
                     for(size_t nGTImageIdx=0; nGTImageIdx<vsTempPaths.size(); ++nGTImageIdx) {
                         cv::Mat oTempGTImage = cv::imread(vsTempPaths[nGTImageIdx],cv::IMREAD_GRAYSCALE);
                         lvAssert(!oTempGTImage.empty() && (oTempGTImage.size()==cv::Size(481,321) || oTempGTImage.size()==cv::Size(321,481)));
-                        if(oTempGTImage.size()!=m_vInputSizes[nGTIdx])
-                            cv::resize(oTempGTImage,oTempGTImage,m_vInputSizes[nGTIdx],0,0,cv::INTER_NEAREST);
+                        if(oTempGTImage.size()!=this->m_vInputSizes[nGTIdx])
+                            cv::resize(oTempGTImage,oTempGTImage,this->m_vInputSizes[nGTIdx],0,0,cv::INTER_NEAREST);
                         lvAssert(oTempGTImage.size()==oTempRefGTImage.size());
                         oTempGTImage.copyTo(oGTMask(cv::Rect(0,oTempRefGTImage.rows*int(nGTImageIdx),oTempRefGTImage.cols,oTempRefGTImage.rows)));
                     }
-                    lvAssert(oGTMask.size()==m_vGTSizes[nGTIdx]);
+                    lvAssert(oGTMask.size()==this->m_vGTSizes[nGTIdx]);
                     return oGTMask;
                 }
             }
@@ -250,10 +232,10 @@ namespace lv {
     template<>
     struct DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500> :
             public DataReporterWrapper_<DatasetEval_BinaryClassifier,Dataset_BSDS500> {
-        /// writes an evaluation report listing high-level metrics for current batch(es)
+        /// writes an evaluation report listing custom high-level metrics for current batch(es)
         virtual void writeEvalReport() const override;
     protected:
-        /// returns a one-line string listing high-level metrics for current batch(es)
+        /// returns a one-line string listing custom high-level metrics for current batch(es)
         std::string writeInlineEvalReport(size_t nIndentSize) const;
         friend struct DatasetReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>;
     };
@@ -268,14 +250,21 @@ namespace lv {
         /// resets internal metrics counters to zero
         virtual void resetMetrics() override;
     protected:
-        /// overrides 'getMetricsBase' from IMetricRetriever for non-group-impl (as always required)
-        virtual IIMetricsAccumulatorConstPtr getMetricsBase() const override;
+        /// overrides 'getMetricsBase' from IIMetricRetriever for non-group-impl (as always required)
+        virtual IIMetricsAccumulatorConstPtr getMetricsBase() const override final;
         /// overrides 'processOutput' from IDataConsumer_ to evaluate the provided output packet
         virtual void processOutput(const cv::Mat& oClassif, size_t nIdx) override;
         /// default constructor; automatically creates an instance of the base metrics accumulator object
         inline DataEvaluator_() : m_pMetricsBase(IIMetricsAccumulator::create<MetricsAccumulator_<DatasetEval_BinaryClassifier,Dataset_BSDS500>>()) {}
         /// contains low-level metric accumulation logic
         std::shared_ptr<MetricsAccumulator_<DatasetEval_BinaryClassifier,Dataset_BSDS500>> m_pMetricsBase;
+    };
+
+    template<>
+    struct DatasetReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500> :
+            public DatasetReporterWrapper_<DatasetEval_BinaryClassifier,Dataset_BSDS500> {
+        /// writes an overall evaluation report listing high-level binary classification metrics
+        virtual void writeEvalReport() const override;
     };
 
 } // namespace lv

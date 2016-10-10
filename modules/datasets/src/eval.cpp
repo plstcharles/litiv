@@ -24,21 +24,21 @@ void lv::IDataReporter_<lv::DatasetEval_None>::writeEvalReport() const {
         return;
     }
     for(const auto& pBatch : getBatches(true))
-        pBatch->shared_from_this_cast<const IDataReporter_<DatasetEval_None>>(true)->IDataReporter_<DatasetEval_None>::writeEvalReport();
+        pBatch->writeEvalReport();
     if(isBare())
         return;
-    std::ofstream oMetricsOutput(lv::AddDirSlashIfMissing(getOutputPath())+"../"+getName()+".txt");
+    std::ofstream oMetricsOutput(getOutputPath()+(isRoot()?"":"../")+getName()+".txt");
     if(oMetricsOutput.is_open()) {
         oMetricsOutput << std::fixed;
         oMetricsOutput << "Default evaluation report for '" << getName() << "' :\n\n";
         oMetricsOutput << "            |   Packets  |   Seconds  |     Hz     \n";
         oMetricsOutput << "------------|------------|------------|------------\n";
-        oMetricsOutput << IDataReporter_<DatasetEval_None>::writeInlineEvalReport(0);
+        oMetricsOutput << IDataReporter_<DatasetEval_None>::writeInlineBasicReport(0);
         oMetricsOutput << lv::getLogStamp();
     }
 }
 
-std::string lv::IDataReporter_<lv::DatasetEval_None>::writeInlineEvalReport(size_t nIndentSize) const {
+std::string lv::IDataReporter_<lv::DatasetEval_None>::writeInlineBasicReport(size_t nIndentSize) const {
     if(getCurrentOutputCount()==0)
         return std::string();
     const size_t nCellSize = 12;
@@ -46,7 +46,7 @@ std::string lv::IDataReporter_<lv::DatasetEval_None>::writeInlineEvalReport(size
     ssStr << std::fixed;
     if(isGroup() && !isBare())
         for(const auto& pBatch : getBatches(true))
-            ssStr << pBatch->shared_from_this_cast<const IDataReporter_<DatasetEval_None>>(true)->IDataReporter_<DatasetEval_None>::writeInlineEvalReport(nIndentSize+1);
+            ssStr << pBatch->shared_from_this_cast<const IDataReporter_<DatasetEval_None>>(true)->IDataReporter_<DatasetEval_None>::writeInlineBasicReport(nIndentSize+1);
     ssStr << lv::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
              std::setw(nCellSize) << getCurrentOutputCount() << "|" <<
              std::setw(nCellSize) << getCurrentProcessTime() << "|" <<
@@ -57,31 +57,31 @@ std::string lv::IDataReporter_<lv::DatasetEval_None>::writeInlineEvalReport(size
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::writeEvalReport() const {
-    if(getCurrentOutputCount()==0 || !getDatasetInfo()->isUsingEvaluator()) {
+    if(getCurrentOutputCount()==0 || !isEvaluating()) {
         IDataReporter_<lv::DatasetEval_None>::writeEvalReport();
         return;
     }
     for(const auto& pBatch : getBatches(true))
-        pBatch->shared_from_this_cast<const IDataReporter_<DatasetEval_BinaryClassifier>>(true)->IDataReporter_<DatasetEval_BinaryClassifier>::writeEvalReport();
+        pBatch->writeEvalReport();
     if(isBare())
         return;
     IIMetricsCalculatorConstPtr pMetrics = getMetrics(true);
     lvDbgAssert(pMetrics.get());
     const BinClassifMetrics& oMetrics = dynamic_cast<const BinClassifMetricsCalculator&>(*pMetrics.get()).m_oMetrics;
     std::cout << "\t" << lv::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
-    std::ofstream oMetricsOutput(lv::AddDirSlashIfMissing(getOutputPath())+"../"+getName()+".txt");
+    std::ofstream oMetricsOutput(getOutputPath()+(isRoot()?"":"../")+getName()+".txt");
     if(oMetricsOutput.is_open()) {
         oMetricsOutput << std::fixed;
         oMetricsOutput << "Binary classification evaluation report for '" << getName() << "' :\n\n";
         oMetricsOutput << "            |     Rcl    |     Spc    |     FPR    |     FNR    |     PBC    |     Prc    |     FM     |     MCC    \n";
         oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
-        oMetricsOutput << IDataReporter_<DatasetEval_BinaryClassifier>::writeInlineEvalReport(0);
+        oMetricsOutput << IDataReporter_<DatasetEval_BinaryClassifier>::writeInlineBinClassifEvalReport(0);
         oMetricsOutput << "\nHz: " << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
         oMetricsOutput << lv::getLogStamp();
     }
 }
 
-std::string lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::writeInlineEvalReport(size_t nIndentSize) const {
+std::string lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::writeInlineBinClassifEvalReport(size_t nIndentSize) const {
     if(getCurrentOutputCount()==0)
         return std::string();
     const size_t nCellSize = 12;
@@ -89,7 +89,7 @@ std::string lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::writeInlineEva
     ssStr << std::fixed;
     if(isGroup() && !isBare())
         for(const auto& pBatch : getBatches(true))
-            ssStr << pBatch->shared_from_this_cast<const IDataReporter_<DatasetEval_BinaryClassifier>>(true)->IDataReporter_<DatasetEval_BinaryClassifier>::writeInlineEvalReport(nIndentSize+1);
+            ssStr << pBatch->shared_from_this_cast<const IDataReporter_<DatasetEval_BinaryClassifier>>(true)->IDataReporter_<DatasetEval_BinaryClassifier>::writeInlineBinClassifEvalReport(nIndentSize+1);
     IIMetricsCalculatorConstPtr pMetrics = getMetrics(true);
     lvDbgAssert(pMetrics.get());
     const BinClassifMetrics& oMetrics = dynamic_cast<const BinClassifMetricsCalculator&>(*pMetrics.get()).m_oMetrics;
@@ -108,7 +108,7 @@ std::string lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::writeInlineEva
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void lv::IDataReporter_<lv::DatasetEval_BinaryClassifierArray>::writeEvalReport() const {
-    if(getCurrentOutputCount()==0 || !getDatasetInfo()->isUsingEvaluator()) {
+    if(getCurrentOutputCount()==0 || !isEvaluating()) {
         IDataReporter_<lv::DatasetEval_None>::writeEvalReport();
         return;
     }
@@ -118,23 +118,26 @@ void lv::IDataReporter_<lv::DatasetEval_BinaryClassifierArray>::writeEvalReport(
         return;
     IIMetricsCalculatorConstPtr pMetrics = getMetrics(true);
     lvDbgAssert(pMetrics.get());
-    const BinClassifMetricsCalculatorPtr pOverallMetrics = dynamic_cast<const BinClassifMetricsArrayCalculator&>(*pMetrics.get()).reduce();
-    lvAssert(pOverallMetrics);
-    const BinClassifMetrics& oOverallMetrics = pOverallMetrics->m_oMetrics;
-    std::cout << "\t" << lv::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oOverallMetrics.dRecall << " Prc=" << oOverallMetrics.dPrecision << " FM=" << oOverallMetrics.dFMeasure << " MCC=" << oOverallMetrics.dMCC << std::endl;
-    std::ofstream oMetricsOutput(lv::AddDirSlashIfMissing(getOutputPath())+"../"+getName()+".txt");
+    const BinClassifMetricsArrayCalculator& oMetrics = dynamic_cast<const BinClassifMetricsArrayCalculator&>(*pMetrics.get());
+    const BinClassifMetricsCalculatorPtr pReducedMetrics = oMetrics.reduce();
+    lvDbgAssert(pReducedMetrics);
+    const BinClassifMetrics& oReducedMetrics = pReducedMetrics->m_oMetrics;
+    std::cout << "\t" << lv::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oReducedMetrics.dRecall << " Prc=" << oReducedMetrics.dPrecision << " FM=" << oReducedMetrics.dFMeasure << " MCC=" << oReducedMetrics.dMCC << std::endl;
+    std::ofstream oMetricsOutput(getOutputPath()+(isRoot()?"":"../")+getName()+".txt");
     if(oMetricsOutput.is_open()) {
         oMetricsOutput << std::fixed;
         oMetricsOutput << "Binary classification evaluation report for dataset '" << getName() << "' :\n\n";
         oMetricsOutput << "            |   Stream   ||     Rcl    |     Spc    |     FPR    |     FNR    |     PBC    |     Prc    |     FM     |     MCC    \n";
         oMetricsOutput << "------------|------------||------------|------------|------------|------------|------------|------------|------------|------------\n";
-        oMetricsOutput << IDataReporter_<DatasetEval_BinaryClassifierArray>::writeInlineEvalReport(0);
+        oMetricsOutput << IDataReporter_<DatasetEval_BinaryClassifierArray>::writeInlineBinClassifArrayEvalReport(0);
+        oMetricsOutput << "------------|------------||------------|------------|------------|------------|------------|------------|------------|------------\n";
+        oMetricsOutput << IDataReporter_<DatasetEval_BinaryClassifierArray>::writeInlineBinClassifArrayReducedEvalReport(0);
         oMetricsOutput << "\nHz: " << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
         oMetricsOutput << lv::getLogStamp();
     }
 }
 
-std::string lv::IDataReporter_<lv::DatasetEval_BinaryClassifierArray>::writeInlineEvalReport(size_t nIndentSize) const {
+std::string lv::IDataReporter_<lv::DatasetEval_BinaryClassifierArray>::writeInlineBinClassifArrayEvalReport(size_t nIndentSize) const {
     if(getCurrentOutputCount()==0)
         return std::string();
     const size_t nCellSize = 12;
@@ -142,15 +145,14 @@ std::string lv::IDataReporter_<lv::DatasetEval_BinaryClassifierArray>::writeInli
     ssStr << std::fixed;
     if(isGroup() && !isBare())
         for(const auto& pBatch : getBatches(true))
-            ssStr << pBatch->shared_from_this_cast<const IDataReporter_<DatasetEval_BinaryClassifierArray>>(true)->IDataReporter_<DatasetEval_BinaryClassifierArray>::writeInlineEvalReport(nIndentSize+1);
+            ssStr << pBatch->shared_from_this_cast<const IDataReporter_<DatasetEval_BinaryClassifierArray>>(true)->IDataReporter_<DatasetEval_BinaryClassifierArray>::writeInlineBinClassifArrayEvalReport(nIndentSize+1);
     IIMetricsCalculatorConstPtr pMetrics = getMetrics(true);
     lvDbgAssert(pMetrics.get());
     const BinClassifMetricsArrayCalculator& oMetrics = dynamic_cast<const BinClassifMetricsArrayCalculator&>(*pMetrics.get());
-    const auto pConsumer = shared_from_this_cast<const IDataConsumer_<DatasetEval_BinaryClassifierArray>>(true);
-    lvAssert_(oMetrics.m_vMetrics.size()==pConsumer->getOutputStreamCount(),"output array size mismatch");
+    lvDbgAssert(oMetrics.m_vsStreamNames.size()==oMetrics.m_vMetrics.size());
     for(size_t s=0; s<oMetrics.m_vMetrics.size(); ++s)
         ssStr << lv::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
-                 lv::clampString(pConsumer->getOutputStreamName(s),nCellSize) << "||" <<
+                 lv::clampString((oMetrics.m_vsStreamNames[s].empty())?std::string("s")+std::to_string(s):(oMetrics.m_vsStreamNames[s]),nCellSize) << "||" <<
                  std::setw(nCellSize) << oMetrics.m_vMetrics[s].dRecall << "|" <<
                  std::setw(nCellSize) << oMetrics.m_vMetrics[s].dSpecificity << "|" <<
                  std::setw(nCellSize) << oMetrics.m_vMetrics[s].dFPR << "|" <<
@@ -159,6 +161,34 @@ std::string lv::IDataReporter_<lv::DatasetEval_BinaryClassifierArray>::writeInli
                  std::setw(nCellSize) << oMetrics.m_vMetrics[s].dPrecision << "|" <<
                  std::setw(nCellSize) << oMetrics.m_vMetrics[s].dFMeasure << "|" <<
                  std::setw(nCellSize) << oMetrics.m_vMetrics[s].dMCC << "\n";
+    return ssStr.str();
+}
+
+std::string lv::IDataReporter_<lv::DatasetEval_BinaryClassifierArray>::writeInlineBinClassifArrayReducedEvalReport(size_t nIndentSize) const {
+    if(getCurrentOutputCount()==0)
+        return std::string();
+    const size_t nCellSize = 12;
+    std::stringstream ssStr;
+    ssStr << std::fixed;
+    if(isGroup() && !isBare())
+        for(const auto& pBatch : getBatches(true))
+            ssStr << pBatch->shared_from_this_cast<const IDataReporter_<DatasetEval_BinaryClassifierArray>>(true)->IDataReporter_<DatasetEval_BinaryClassifierArray>::writeInlineBinClassifArrayReducedEvalReport(nIndentSize+1);
+    IIMetricsCalculatorConstPtr pMetrics = getMetrics(true);
+    lvDbgAssert(pMetrics.get());
+    const BinClassifMetricsArrayCalculator& oMetrics = dynamic_cast<const BinClassifMetricsArrayCalculator&>(*pMetrics.get());
+    const BinClassifMetricsCalculatorPtr pReducedMetrics = oMetrics.reduce();
+    lvDbgAssert(pReducedMetrics);
+    const BinClassifMetrics& oReducedMetrics = pReducedMetrics->m_oMetrics;
+    ssStr << lv::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
+             lv::clampString("all/reduced",nCellSize) << "|" <<
+             std::setw(nCellSize) << oReducedMetrics.dRecall << "|" <<
+             std::setw(nCellSize) << oReducedMetrics.dSpecificity << "|" <<
+             std::setw(nCellSize) << oReducedMetrics.dFPR << "|" <<
+             std::setw(nCellSize) << oReducedMetrics.dFNR << "|" <<
+             std::setw(nCellSize) << oReducedMetrics.dPBC << "|" <<
+             std::setw(nCellSize) << oReducedMetrics.dPrecision << "|" <<
+             std::setw(nCellSize) << oReducedMetrics.dFMeasure << "|" <<
+             std::setw(nCellSize) << oReducedMetrics.dMCC << "\n";
     return ssStr.str();
 }
 
@@ -280,133 +310,3 @@ lv::BinClassifMetricsAccumulatorPtr lv::GLBinaryClassifierEvaluator::getMetricsB
 }
 
 #endif //HAVE_GLSL
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void lv::IDatasetReporter_<lv::DatasetEval_None>::writeEvalReport() const {
-    if(getCurrentOutputCount()==0 || getBatches(false).empty()) {
-        std::cout << "No report to write for dataset '" << getName() << "', skipping." << std::endl;
-        return;
-    }
-    for(const auto& pBatch : getBatches(true))
-        pBatch->writeEvalReport();
-    std::ofstream oMetricsOutput(getOutputPath()+"/overall.txt");
-    if(oMetricsOutput.is_open()) {
-        oMetricsOutput << std::fixed;
-        oMetricsOutput << "Default evaluation report for dataset '" << getName() << "' :\n\n";
-        oMetricsOutput << "            |   Packets  |   Seconds  |     Hz     \n";
-        oMetricsOutput << "------------|------------|------------|------------\n";
-        for(const auto& pGroupIter : getBatches(true))
-            oMetricsOutput << pGroupIter->shared_from_this_cast<const IDataReporter_<DatasetEval_None>>(true)->IDataReporter_<DatasetEval_None>::writeInlineEvalReport(0);
-        oMetricsOutput << "------------|------------|------------|------------\n";
-        oMetricsOutput << "     overall|" <<
-                       std::setw(12) << getCurrentOutputCount() << "|" <<
-                       std::setw(12) << getCurrentProcessTime() << "|" <<
-                       std::setw(12) << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
-        oMetricsOutput << lv::getLogStamp();
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void lv::IDatasetReporter_<lv::DatasetEval_BinaryClassifier>::writeEvalReport() const {
-    if(getCurrentOutputCount()==0 || getBatches(false).empty() || !isUsingEvaluator()) {
-        IDatasetReporter_<lv::DatasetEval_None>::writeEvalReport();
-        return;
-    }
-    for(const auto& pBatch : getBatches(true))
-        pBatch->writeEvalReport();
-    IIMetricsCalculatorConstPtr pMetrics = getMetrics(true);
-    lvDbgAssert(pMetrics.get());
-    const BinClassifMetrics& oMetrics = dynamic_cast<const BinClassifMetricsCalculator&>(*pMetrics.get()).m_oMetrics;
-    std::cout << lv::clampString(getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
-    std::ofstream oMetricsOutput(getOutputPath()+"/overall.txt");
-    if(oMetricsOutput.is_open()) {
-        oMetricsOutput << std::fixed;
-        oMetricsOutput << "Binary classification evaluation report for dataset '" << getName() << "' :\n\n";
-        oMetricsOutput << "            |     Rcl    |     Spc    |     FPR    |     FNR    |     PBC    |     Prc    |     FM     |     MCC    \n";
-        oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
-        for(const auto& pGroupIter : getBatches(true))
-            oMetricsOutput << pGroupIter->shared_from_this_cast<const IDataReporter_<DatasetEval_BinaryClassifier>>(true)->IDataReporter_<DatasetEval_BinaryClassifier>::writeInlineEvalReport(0);
-        oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
-        oMetricsOutput << "     overall|" <<
-                       std::setw(12) << oMetrics.dRecall << "|" <<
-                       std::setw(12) << oMetrics.dSpecificity << "|" <<
-                       std::setw(12) << oMetrics.dFPR << "|" <<
-                       std::setw(12) << oMetrics.dFNR << "|" <<
-                       std::setw(12) << oMetrics.dPBC << "|" <<
-                       std::setw(12) << oMetrics.dPrecision << "|" <<
-                       std::setw(12) << oMetrics.dFMeasure << "|" <<
-                       std::setw(12) << oMetrics.dMCC << "\n";
-        oMetricsOutput << "\nHz: " << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
-        oMetricsOutput << lv::getLogStamp();
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void lv::IDatasetReporter_<lv::DatasetEval_BinaryClassifierArray>::writeEvalReport() const {
-    if(getCurrentOutputCount()==0 || getBatches(false).empty() || !isUsingEvaluator()) {
-        IDatasetReporter_<lv::DatasetEval_None>::writeEvalReport();
-        return;
-    }
-    for(const auto& pBatch : getBatches(true))
-        pBatch->writeEvalReport();
-    IIMetricsCalculatorConstPtr pMetrics = getMetrics(true);
-    lvDbgAssert(pMetrics.get());
-    const BinClassifMetricsArrayCalculator& oMetrics = dynamic_cast<const BinClassifMetricsArrayCalculator&>(*pMetrics.get());
-    const BinClassifMetricsCalculatorPtr pOverallMetrics = oMetrics.reduce();
-    lvAssert(pOverallMetrics);
-    const BinClassifMetrics& oOverallMetrics = pOverallMetrics->m_oMetrics;
-    std::cout << lv::clampString(getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oOverallMetrics.dRecall << " Prc=" << oOverallMetrics.dPrecision << " FM=" << oOverallMetrics.dFMeasure << " MCC=" << oOverallMetrics.dMCC << std::endl;
-    std::ofstream oMetricsOutput(getOutputPath()+"/overall.txt");
-    if(oMetricsOutput.is_open()) {
-        oMetricsOutput << std::fixed;
-        oMetricsOutput << "Binary classification evaluation report for dataset '" << getName() << "' :\n\n";
-        oMetricsOutput << "            |   Stream   ||     Rcl    |     Spc    |     FPR    |     FNR    |     PBC    |     Prc    |     FM     |     MCC    \n";
-        oMetricsOutput << "------------|------------||------------|------------|------------|------------|------------|------------|------------|------------\n";
-        std::vector<std::string> vsStreamNames;
-        for(const auto& pGroupIter : getBatches(true)) {
-            const auto pReporter = pGroupIter->shared_from_this_cast<const IDataReporter_<DatasetEval_BinaryClassifierArray>>(true);
-            oMetricsOutput << pReporter->IDataReporter_<DatasetEval_BinaryClassifierArray>::writeInlineEvalReport(0);
-            const auto pConsumer = pGroupIter->shared_from_this_cast<const IDataConsumer_<DatasetEval_BinaryClassifierArray>>(true);
-            if(vsStreamNames.empty()) {
-                vsStreamNames.resize(pConsumer->getOutputStreamCount());
-                for(size_t s=0; s<vsStreamNames.size(); ++s)
-                    vsStreamNames[s] = pConsumer->getOutputStreamName(s);
-            }
-            else {
-                lvAssert_(vsStreamNames.size()==pConsumer->getOutputStreamCount(),"output stream count mismatch");
-                for(size_t s=0; s<vsStreamNames.size(); ++s)
-                lvAssert_(vsStreamNames[s]==pConsumer->getOutputStreamName(s),"output stream names mismatch");
-            }
-        }
-        oMetricsOutput << "------------|------------||------------|------------|------------|------------|------------|------------|------------|------------\n";
-        lvAssert_(oMetrics.m_vMetrics.size()==vsStreamNames.size(),"output stream count mismatch");
-        for(size_t s=0; s<oMetrics.m_vMetrics.size(); ++s)
-            oMetricsOutput << "     overall|" << lv::clampString(vsStreamNames[s],12) << "||" <<
-                           std::setw(12) << oMetrics.m_vMetrics[s].dRecall << "|" <<
-                           std::setw(12) << oMetrics.m_vMetrics[s].dSpecificity << "|" <<
-                           std::setw(12) << oMetrics.m_vMetrics[s].dFPR << "|" <<
-                           std::setw(12) << oMetrics.m_vMetrics[s].dFNR << "|" <<
-                           std::setw(12) << oMetrics.m_vMetrics[s].dPBC << "|" <<
-                           std::setw(12) << oMetrics.m_vMetrics[s].dPrecision << "|" <<
-                           std::setw(12) << oMetrics.m_vMetrics[s].dFMeasure << "|" <<
-                           std::setw(12) << oMetrics.m_vMetrics[s].dMCC << "\n";
-
-        oMetricsOutput << "------------|------------||------------|------------|------------|------------|------------|------------|------------|------------\n";
-        oMetricsOutput << "         overall         ||" <<
-                       std::setw(12) << oOverallMetrics.dRecall << "|" <<
-                       std::setw(12) << oOverallMetrics.dSpecificity << "|" <<
-                       std::setw(12) << oOverallMetrics.dFPR << "|" <<
-                       std::setw(12) << oOverallMetrics.dFNR << "|" <<
-                       std::setw(12) << oOverallMetrics.dPBC << "|" <<
-                       std::setw(12) << oOverallMetrics.dPrecision << "|" <<
-                       std::setw(12) << oOverallMetrics.dFMeasure << "|" <<
-                       std::setw(12) << oOverallMetrics.dMCC << "\n";
-        oMetricsOutput << "\nHz: " << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
-        oMetricsOutput << lv::getLogStamp();
-    }
-}

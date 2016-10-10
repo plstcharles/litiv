@@ -602,50 +602,12 @@ void lv::MetricsCalculator_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500
     // ^^^ oCumulScore,dMaxRecall,dMaxPrecision,dMaxFMeasure,dAreaPR => eval_bdry.txt
 }
 
-void lv::DatasetReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::writeEvalReport() const {
-    if(getCurrentOutputCount()==0 || getBatches(false).empty() || !isUsingEvaluator()) {
-        IDatasetReporter_<lv::DatasetEval_None>::writeEvalReport();
-        return;
-    }
-    for(const auto& pBatch : getBatches(true))
-        pBatch->writeEvalReport();
-    IIMetricsCalculatorConstPtr pMetrics = getMetrics(false);
-    lvAssert(pMetrics.get());
-    const MetricsCalculator_<DatasetEval_BinaryClassifier,Dataset_BSDS500>& oMetrics = dynamic_cast<const MetricsCalculator_<DatasetEval_BinaryClassifier,Dataset_BSDS500>&>(*pMetrics.get());
-    std::cout << lv::clampString(getName(),12) << " => MaxRcl=" << std::fixed << std::setprecision(4) << oMetrics.dMaxRecall << " MaxPrc=" << oMetrics.dMaxPrecision << " MaxFM=" << oMetrics.dMaxFMeasure << std::endl;
-    std::cout << "                BestRcl=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dRecall << " BestPrc=" << oMetrics.oBestScore.dPrecision << " BestFM=" << oMetrics.oBestScore.dFMeasure << "  (@ T=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dThreshold << ")" << std::endl;
-#if USE_BSDS500_BENCHMARK
-    std::ofstream oMetricsOutput(getOutputPath()+"/overall_reimpl_eval.txt");
-#else //(!USE_BSDS500_BENCHMARK)
-    std::ofstream oMetricsOutput(getOutputPath()+"/overall_homemade_eval.txt");
-#endif //(!USE_BSDS500_BENCHMARK)
-    if(oMetricsOutput.is_open()) {
-        oMetricsOutput << std::fixed;
-        oMetricsOutput << "BSDS500 edge detection evaluation report :\n\n";
-        oMetricsOutput << "            ||   MaxRcl   |   MaxPrc   |    MaxFM   ||   BestRcl  |   BestPrc  |   BestFM   | @Threshold \n";
-        oMetricsOutput << "------------||------------|------------|------------||------------|------------|------------|------------\n";
-        for(const auto& pGroupIter : getBatches(true))
-            oMetricsOutput << pGroupIter->shared_from_this_cast<const DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>>(true)->DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>::writeInlineEvalReport(0);
-        oMetricsOutput << "------------||------------|------------|------------||------------|------------|------------|------------\n";
-        oMetricsOutput << "     overall||" <<
-            std::setw(12) << oMetrics.dMaxRecall << "|" <<
-            std::setw(12) << oMetrics.dMaxPrecision << "|" <<
-            std::setw(12) << oMetrics.dMaxFMeasure << "||" <<
-            std::setw(12) << oMetrics.oBestScore.dRecall << "|" <<
-            std::setw(12) << oMetrics.oBestScore.dPrecision << "|" <<
-            std::setw(12) << oMetrics.oBestScore.dFMeasure << "|" <<
-            std::setw(12) << oMetrics.oBestScore.dThreshold << "\n";
-        oMetricsOutput << "\nHz: " << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
-        oMetricsOutput << lv::getLogStamp();
-    }
-}
-
 void lv::DataReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::writeEvalReport() const {
     IDataReporter_<DatasetEval_None>::writeEvalReport();
-    if(getCurrentOutputCount()==0 || !getDatasetInfo()->isUsingEvaluator())
+    if(getCurrentOutputCount()==0 || !isEvaluating())
         return;
     for(const auto& pBatch : getBatches(true))
-        pBatch->shared_from_this_cast<const DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>>(true)->DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>::writeEvalReport();
+        pBatch->writeEvalReport();
     if(isBare())
         return;
     IIMetricsCalculatorConstPtr pMetrics = getMetrics(false);
@@ -654,9 +616,9 @@ void lv::DataReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::wr
     std::cout << "\t" << lv::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => MaxRcl=" << std::fixed << std::setprecision(4) << oMetrics.dMaxRecall << " MaxPrc=" << oMetrics.dMaxPrecision << " MaxFM=" << oMetrics.dMaxFMeasure << std::endl;
     std::cout << "\t" << "                BestRcl=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dRecall << " BestPrc=" << oMetrics.oBestScore.dPrecision << " BestFM=" << oMetrics.oBestScore.dFMeasure << "  (@ T=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dThreshold << ")" << std::endl;
 #if USE_BSDS500_BENCHMARK
-    const std::string sOutputPath = lv::AddDirSlashIfMissing(getOutputPath())+"../"+getName()+"_reimpl_eval/";
+    const std::string sOutputPath = getOutputPath()+"../"+getName()+"_reimpl_eval/";
 #else //(!USE_BSDS500_BENCHMARK)
-    const std::string sOutputPath = lv::AddDirSlashIfMissing(getOutputPath())+"../"+getName()+"_homemade_eval/";
+    const std::string sOutputPath = getOutputPath()+"../"+getName()+"_homemade_eval/";
 #endif //(!USE_BSDS500_BENCHMARK)
     lv::CreateDirIfNotExist(sOutputPath);
     std::ofstream oImageScoresOutput(sOutputPath+"/eval_bdry_img.txt");
@@ -710,9 +672,47 @@ lv::IIMetricsAccumulatorConstPtr lv::DataEvaluator_<lv::DatasetEval_BinaryClassi
 }
 
 void lv::DataEvaluator_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500,lv::NonParallel>::processOutput(const cv::Mat& oClassif, size_t nIdx) {
-    if(getDatasetInfo()->isUsingEvaluator()) {
+    if(isEvaluating()) {
         lvAssert_(!oClassif.empty(),"output must be non-empty for evaluation");
         auto pLoader = shared_from_this_cast<IDataLoader_<NotArray>>(true);
         m_pMetricsBase->accumulate(oClassif,pLoader->getGT(nIdx),pLoader->getGTROI(nIdx));
+    }
+}
+
+void lv::DatasetReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::writeEvalReport() const {
+    if(getCurrentOutputCount()==0 || !isEvaluating()) {
+        IDataReporter_<lv::DatasetEval_None>::writeEvalReport();
+        return;
+    }
+    for(const auto& pBatch : getBatches(true))
+        pBatch->writeEvalReport();
+    IIMetricsCalculatorConstPtr pMetrics = getMetrics(false);
+    lvAssert(pMetrics.get());
+    const MetricsCalculator_<DatasetEval_BinaryClassifier,Dataset_BSDS500>& oMetrics = dynamic_cast<const MetricsCalculator_<DatasetEval_BinaryClassifier,Dataset_BSDS500>&>(*pMetrics.get());
+    std::cout << lv::clampString(getName(),12) << " => MaxRcl=" << std::fixed << std::setprecision(4) << oMetrics.dMaxRecall << " MaxPrc=" << oMetrics.dMaxPrecision << " MaxFM=" << oMetrics.dMaxFMeasure << std::endl;
+    std::cout << "                BestRcl=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dRecall << " BestPrc=" << oMetrics.oBestScore.dPrecision << " BestFM=" << oMetrics.oBestScore.dFMeasure << "  (@ T=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dThreshold << ")" << std::endl;
+#if USE_BSDS500_BENCHMARK
+    std::ofstream oMetricsOutput(getOutputPath()+"overall_reimpl_eval.txt");
+#else //(!USE_BSDS500_BENCHMARK)
+    std::ofstream oMetricsOutput(getOutputPath()+"overall_homemade_eval.txt");
+#endif //(!USE_BSDS500_BENCHMARK)
+    if(oMetricsOutput.is_open()) {
+        oMetricsOutput << std::fixed;
+        oMetricsOutput << "BSDS500 edge detection evaluation report :\n\n";
+        oMetricsOutput << "            ||   MaxRcl   |   MaxPrc   |    MaxFM   ||   BestRcl  |   BestPrc  |   BestFM   | @Threshold \n";
+        oMetricsOutput << "------------||------------|------------|------------||------------|------------|------------|------------\n";
+        for(const auto& pGroupIter : getBatches(true))
+            oMetricsOutput << pGroupIter->shared_from_this_cast<const DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>>(true)->DataReporter_<DatasetEval_BinaryClassifier,Dataset_BSDS500>::writeInlineEvalReport(0);
+        oMetricsOutput << "------------||------------|------------|------------||------------|------------|------------|------------\n";
+        oMetricsOutput << "     overall||" <<
+                       std::setw(12) << oMetrics.dMaxRecall << "|" <<
+                       std::setw(12) << oMetrics.dMaxPrecision << "|" <<
+                       std::setw(12) << oMetrics.dMaxFMeasure << "||" <<
+                       std::setw(12) << oMetrics.oBestScore.dRecall << "|" <<
+                       std::setw(12) << oMetrics.oBestScore.dPrecision << "|" <<
+                       std::setw(12) << oMetrics.oBestScore.dFMeasure << "|" <<
+                       std::setw(12) << oMetrics.oBestScore.dThreshold << "\n";
+        oMetricsOutput << "\nHz: " << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
+        oMetricsOutput << lv::getLogStamp();
     }
 }

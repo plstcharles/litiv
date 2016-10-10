@@ -149,8 +149,16 @@ lv::IIMetricsAccumulatorPtr lv::IMetricsAccumulator_<lv::DatasetEval_BinaryClass
         m_vCounters.resize(m2.m_vCounters.size());
     else
         lvAssert_(this->m_vCounters.size()==m2.m_vCounters.size(),"array size mismatch");
-    for(size_t s=0; s<this->m_vCounters.size(); ++s)
+    if(m_vsStreamNames.empty())
+        m_vsStreamNames = m2.m_vsStreamNames;
+    else
+        lvAssert_(this->m_vsStreamNames.size()==m2.m_vsStreamNames.size(),"array size mismatch");
+    lvAssert_(this->m_vCounters.size()==this->m_vsStreamNames.size(),"array size mismatch");
+    for(size_t s=0; s<this->m_vCounters.size(); ++s) {
         this->m_vCounters[s].accumulate(m2.m_vCounters[s]);
+        if(this->m_vsStreamNames[s].empty())
+            this->m_vsStreamNames[s] = m2.m_vsStreamNames[s];
+    }
     return shared_from_this();
 }
 
@@ -160,6 +168,9 @@ lv::BinClassifMetricsAccumulatorPtr lv::IMetricsAccumulator_<lv::DatasetEval_Bin
         m->m_oCounters.accumulate(this->m_vCounters[s]);
     return m;
 }
+
+lv::IMetricsAccumulator_<lv::DatasetEval_BinaryClassifierArray>::IMetricsAccumulator_(size_t nArraySize) :
+        m_vCounters(nArraySize),m_vsStreamNames(nArraySize) {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -179,6 +190,15 @@ lv::IIMetricsCalculatorPtr lv::IMetricsCalculator_<lv::DatasetEval_BinaryClassif
     this->nWeight = nTotWeight;
     return shared_from_this();
 }
+
+lv::IMetricsCalculator_<lv::DatasetEval_BinaryClassifier>::IMetricsCalculator_(const IIMetricsAccumulatorConstPtr& m) :
+        m_oMetrics(dynamic_cast<const BinClassifMetricsAccumulator&>(*m.get()).m_oCounters) {}
+
+lv::IMetricsCalculator_<lv::DatasetEval_BinaryClassifier>::IMetricsCalculator_(const BinClassifMetrics& m) :
+        m_oMetrics(m) {}
+
+lv::IMetricsCalculator_<lv::DatasetEval_BinaryClassifier>::IMetricsCalculator_(const BinClassif& m) :
+        m_oMetrics(m) {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -222,4 +242,22 @@ lv::BinClassifMetricsCalculatorPtr lv::IMetricsCalculator_<lv::DatasetEval_Binar
     m.dFMeasure /= this->m_vMetrics.size();
     m.dMCC /= this->m_vMetrics.size();
     return IIMetricsCalculator::create<BinClassifMetricsCalculator>(m);
+}
+
+inline std::vector<lv::BinClassifMetrics> initMetricsArray(const lv::BinClassifMetricsArrayAccumulator& m) {
+    std::vector<lv::BinClassifMetrics> vMetrics;
+    for(const lv::BinClassif& m2 : m.m_vCounters)
+        vMetrics.push_back(lv::BinClassifMetrics(m2));
+    return vMetrics;
+}
+
+lv::IMetricsCalculator_<lv::DatasetEval_BinaryClassifierArray>::IMetricsCalculator_(const IIMetricsAccumulatorConstPtr& m) :
+        m_vMetrics(initMetricsArray(dynamic_cast<const BinClassifMetricsArrayAccumulator&>(*m.get()))),
+        m_vsStreamNames(dynamic_cast<const BinClassifMetricsArrayAccumulator&>(*m.get()).m_vsStreamNames) {
+    lvAssert(m_vMetrics.size()==m_vsStreamNames.size());
+}
+
+lv::IMetricsCalculator_<lv::DatasetEval_BinaryClassifierArray>::IMetricsCalculator_(const std::vector<BinClassifMetrics>& vm, const std::vector<std::string>& vs) :
+        m_vMetrics(vm),m_vsStreamNames(vs) {
+    lvAssert(m_vMetrics.size()==m_vsStreamNames.size());
 }

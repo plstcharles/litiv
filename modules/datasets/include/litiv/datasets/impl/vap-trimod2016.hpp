@@ -53,9 +53,8 @@ namespace lv {
                         "bin",
                         ".png",
                         getWorkBatchDirNames(),
-                        getSkippedWorkBatchDirNames(),
+                        std::vector<std::string>(),
                         getGrayscaleWorkBatchDirNames(),
-                        0,
                         bSaveOutput,
                         bUseEvaluator,
                         bForce4ByteDataAlign,
@@ -65,11 +64,6 @@ namespace lv {
         static const std::vector<std::string>& getWorkBatchDirNames() {
             static const std::vector<std::string> s_vsWorkBatchDirs = {"Scene 1","Scene 2","Scene 3"};
             return s_vsWorkBatchDirs;
-        }
-        /// returns the names of all work batch directories which should be skipped for this dataset speialization
-        static const std::vector<std::string>& getSkippedWorkBatchDirNames() {
-            static const std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
-            return s_vsSkippedWorkBatchDirs;
         }
         /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
         static const std::vector<std::string>& getGrayscaleWorkBatchDirNames() {
@@ -90,11 +84,11 @@ namespace lv {
             public DataGroupHandler {
     protected:
         virtual void parseData() override {
+            lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
             this->m_vpBatches.clear();
-            this->m_bIsBare = true;
-            // in this dataset, work batch groups are always bare
-            if(!lv::string_contains_token(this->getName(),this->getDatasetInfo()->getSkippedDirTokens()))
+            this->m_bIsBare = true; // in this dataset, work batch groups are always bare
+            if(!lv::string_contains_token(this->getName(),this->getSkippedDirTokens()))
                 this->m_vpBatches.push_back(this->createWorkBatch(this->getName(),this->getRelativePath()));
         }
     };
@@ -119,18 +113,19 @@ namespace lv {
         }
     protected:
         virtual void parseData() override final {
+            lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
             std::vector<std::string> vsSubDirs;
             lv::GetSubDirsFromDir(this->getDataPath(),vsSubDirs);
-            auto psDepthGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),lv::AddDirSlashIfMissing(this->getDataPath())+"depthMasks");
-            auto psDepthDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),lv::AddDirSlashIfMissing(this->getDataPath())+"SyncD");
-            auto psRGBGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),lv::AddDirSlashIfMissing(this->getDataPath())+"rgbMasks");
-            auto psRGBDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),lv::AddDirSlashIfMissing(this->getDataPath())+"SyncRGB");
-            auto psThermalGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),lv::AddDirSlashIfMissing(this->getDataPath())+"thermalMasks");
-            auto psThermalDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),lv::AddDirSlashIfMissing(this->getDataPath())+"SyncT");
+            auto psDepthGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"depthMasks");
+            auto psDepthDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"SyncD");
+            auto psRGBGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"rgbMasks");
+            auto psRGBDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"SyncRGB");
+            auto psThermalGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"thermalMasks");
+            auto psThermalDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"SyncT");
             if((psDepthDir==vsSubDirs.end() || psDepthGTDir==vsSubDirs.end()) || (psRGBDir==vsSubDirs.end() || psRGBGTDir==vsSubDirs.end()) || (psThermalDir==vsSubDirs.end() || psThermalGTDir==vsSubDirs.end()))
                 lvError_("VAPtrimod2016 sequence '%s' did not possess the required groundtruth and input directories",this->getName().c_str());
-            const IVAPtrimod2016Dataset& oDataset = dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getDatasetInfo());
+            const IVAPtrimod2016Dataset& oDataset = dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot());
             this->m_bLoadDepth = oDataset.isLoadingDepth();
             this->m_bUndistort = oDataset.isUndistorting();
             const size_t nStreamCount = this->m_bLoadDepth?3:2;
@@ -139,7 +134,7 @@ namespace lv {
             this->m_vInputSizes.resize(nStreamCount);
             this->m_vGTSizes.resize(nStreamCount);
             cv::Mat oGlobalROI(480,640,CV_8UC1,cv::Scalar_<uchar>(255));
-            const double dScale = this->getDatasetInfo()->getScaleFactor();
+            const double dScale = this->getScaleFactor();
             if(dScale!=1.0)
                 cv::resize(oGlobalROI,oGlobalROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
             for(size_t s=0; s<nStreamCount; ++s) {
@@ -151,7 +146,7 @@ namespace lv {
             const cv::Size oImageSize(640,480);
             const double dUndistortMapCameraMatrixAlpha = 0.0;
             if(this->m_bUndistort) {
-                cv::FileStorage oParamsFS(lv::AddDirSlashIfMissing(this->getDataPath())+"calibVars.yml",cv::FileStorage::READ);
+                cv::FileStorage oParamsFS(this->getDataPath()+"calibVars.yml",cv::FileStorage::READ);
                 lvAssert_(oParamsFS.isOpened(),"could not open calibration yml file");
                 oParamsFS["rgbCamMat"] >> this->m_oRGBCameraParams;
                 oParamsFS["rgbDistCoeff"] >> this->m_oRGBDistortParams;
@@ -186,7 +181,7 @@ namespace lv {
                 const size_t nLastInputDotPos = sInputFileNameExt.find_last_of('.');
                 vsTempInputFileNames[nInputPacketIdx] = nLastInputDotPos==std::string::npos?sInputFileNameExt:sInputFileNameExt.substr(0,nLastInputDotPos);
             }
-            cv::Mat oRGBROI = cv::imread(lv::AddDirSlashIfMissing(this->getDataPath())+"rgb_roi.png",cv::IMREAD_GRAYSCALE);
+            cv::Mat oRGBROI = cv::imread(this->getDataPath()+"rgb_roi.png",cv::IMREAD_GRAYSCALE);
             if(!oRGBROI.empty()) {
                 lvAssert(oRGBROI.size()==this->m_vInputSizes[0] && oRGBROI.type()==CV_8UC1);
                 oRGBROI = oRGBROI>0;
@@ -224,7 +219,7 @@ namespace lv {
                 lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/thermal frames",this->getName().c_str());
             for(size_t nInputPacketIdx=0; nInputPacketIdx<vsThermalPaths.size(); ++nInputPacketIdx)
                 this->m_vvsInputPaths[nInputPacketIdx][1] = vsThermalPaths[nInputPacketIdx];
-            cv::Mat oThermalROI = cv::imread(lv::AddDirSlashIfMissing(this->getDataPath())+"thermal_roi.png",cv::IMREAD_GRAYSCALE);
+            cv::Mat oThermalROI = cv::imread(this->getDataPath()+"thermal_roi.png",cv::IMREAD_GRAYSCALE);
             if(!oThermalROI.empty()) {
                 lvAssert(oThermalROI.size()==this->m_vInputSizes[0] && oThermalROI.type()==CV_8UC1);
                 oThermalROI = oThermalROI>0;
@@ -289,7 +284,7 @@ namespace lv {
             const std::vector<cv::Size>& vInputSizes = this->m_vInputSizes;
             lvDbgAssert(vInputSizes.size()==vsInputPaths.size() && (lv::accumulateMembers<int,cv::Size>(vInputSizes,[](const cv::Size& s){return s.area();}))>0);
             cv::Mat oFullPacket(1,vInputSizes[0].area()*3+vInputSizes[1].area()+(this->m_bLoadDepth?vInputSizes[2].area()*2:0),CV_8UC1);
-            lvAssert_(!this->getDatasetInfo()->is4ByteAligned(),"missing conversion/alignment impl");
+            lvAssert_(!this->is4ByteAligned(),"missing conversion/alignment impl");
             ptrdiff_t nPacketOffset = 0;
             const auto lAppendPacket = [&](const cv::Mat& oNewPacket) {
                 lvDbgAssert(oFullPacket.isContinuous() && oNewPacket.isContinuous());
@@ -332,7 +327,7 @@ namespace lv {
                 const int nTotPacketSize = lv::accumulateMembers<int,cv::Size>(vGTSizes,[](const cv::Size& s){return s.area();});
                 lvDbgAssert(vGTSizes.size()==vsGTPaths.size() && nTotPacketSize>0);
                 cv::Mat oFullPacket(1,nTotPacketSize,CV_8UC1);
-                lvAssert_(!this->getDatasetInfo()->is4ByteAligned(),"missing conversion/alignment impl");
+                lvAssert_(!this->is4ByteAligned(),"missing conversion/alignment impl");
                 ptrdiff_t nPacketOffset = 0;
                 const auto lAppendPacket = [&](const cv::Mat& oNewPacket) {
                     lvDbgAssert(oFullPacket.isContinuous() && oNewPacket.isContinuous());

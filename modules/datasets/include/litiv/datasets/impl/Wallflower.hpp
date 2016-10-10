@@ -43,9 +43,8 @@ namespace lv {
                         "bin",
                         ".png",
                         getWorkBatchDirNames(),
-                        getSkippedWorkBatchDirNames(),
-                        getGrayscaleWorkBatchDirNames(),
-                        0,
+                        std::vector<std::string>(),
+                        std::vector<std::string>(),
                         bSaveOutput,
                         bUseEvaluator,
                         bForce4ByteDataAlign,
@@ -56,16 +55,6 @@ namespace lv {
             static const std::vector<std::string> s_vsWorkBatchDirs = {""}; // 'current' directory should contain the videos
             return s_vsWorkBatchDirs;
         }
-        /// returns the names of all work batch directories which should be skipped for this dataset speialization
-        static const std::vector<std::string>& getSkippedWorkBatchDirNames() {
-            static const std::vector<std::string> s_vsSkippedWorkBatchDirs = {};
-            return s_vsSkippedWorkBatchDirs;
-        }
-        /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
-        static const std::vector<std::string>& getGrayscaleWorkBatchDirNames() {
-            static const std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {};
-            return s_vsGrayscaleWorkBatchDirs;
-        }
     };
 
     template<DatasetTaskList eDatasetTask>
@@ -73,6 +62,7 @@ namespace lv {
             public IDataProducerWrapper_<eDatasetTask,DatasetSource_Video,Dataset_Wallflower> {
     protected:
         virtual void parseData() override final {
+            lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
             // @@@@ untested since 2016/01 refactoring
             std::vector<std::string> vsImgPaths;
@@ -83,7 +73,7 @@ namespace lv {
             const std::string sInputFileSuffix(".bmp");
             this->m_mGTIndexLUT.clear();
             for(auto iter=vsImgPaths.begin(); iter!=vsImgPaths.end(); ++iter) {
-                if(*iter==lv::AddDirSlashIfMissing(this->getDataPath())+"script.txt")
+                if(*iter==this->getDataPath()+"script.txt")
                     bFoundScript = true;
                 else if(iter->find(sGTFilePrefix)!=std::string::npos) {
                     this->m_mGTIndexLUT[(size_t)atoi(iter->substr(iter->find(sGTFilePrefix)+sGTFilePrefix.size(),nInputFileNbDecimals).c_str())] = this->m_vsGTPaths.size();
@@ -102,7 +92,7 @@ namespace lv {
             if(oTempImg.empty())
                 lvError_("Wallflower sequence '%s' did not possess a valid GT file",this->getName().c_str());
             this->m_oInputROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
-            const double dScale = this->getDatasetInfo()->getScaleFactor();
+            const double dScale = this->getScaleFactor();
             if(dScale!=1.0)
                 cv::resize(this->m_oInputROI,this->m_oInputROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
             this->m_oGTROI = this->m_oInputROI;
