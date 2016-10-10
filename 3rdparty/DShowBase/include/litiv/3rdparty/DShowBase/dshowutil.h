@@ -1202,7 +1202,7 @@ done:
     return hr;
 }
 
-// @@@ custom function
+// custom function
 inline HRESULT AddFilterByName(
     IGraphBuilder* pGraph,            // pointer to the filter graph manager
     const std::string& sFilterName,   // friendly name of the filter to create
@@ -1779,7 +1779,7 @@ done:
     return hr;
 }
 
-// @@@ custom function
+// custom function
 inline std::vector<std::string> ListFilterNamesByDeviceCategory(GUID DEVICE_CLSID) {
     std::vector<std::string> vsFilterNames;
     HRESULT hr;
