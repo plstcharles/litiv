@@ -35,7 +35,7 @@ namespace lv {
     template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
     struct Dataset_<eDatasetTask,Dataset_VAPtrimod2016,eEvalImpl> :
             public IVAPtrimod2016Dataset,
-            public IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016,getDatasetEval<eDatasetTask,Dataset_VAPtrimod2016>(),eEvalImpl> {
+            public IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016,lv::getDatasetEval<eDatasetTask,Dataset_VAPtrimod2016>(),eEvalImpl> {
     protected: // should still be protected, as creation should always be done via datasets::create
         Dataset_(
                 const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving (will be created in VAP trimodal dataset results folder)
@@ -46,7 +46,7 @@ namespace lv {
                 bool bLoadDepth=true, ///< defines whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
                 bool bUndistort=true ///< defines whether images should be undistorted when loaded or not, using the calib files provided with the dataset
         ) :
-                IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016,getDatasetEval<eDatasetTask,Dataset_VAPtrimod2016>(),eEvalImpl>(
+                IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016,lv::getDatasetEval<eDatasetTask,Dataset_VAPtrimod2016>(),eEvalImpl>(
                         "VAP-trimodal2016",
                         lv::datasets::getDatasetsRootPath()+"vap/rgbdt-stereo/",
                         lv::datasets::getDatasetsRootPath()+"vap/rgbdt-stereo/results/"+lv::AddDirSlashIfMissing(sOutputDirName),

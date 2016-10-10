@@ -27,7 +27,7 @@ namespace lv {
 
     template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
     struct Dataset_<eDatasetTask,Dataset_CDnet,eEvalImpl> :
-            public IDataset_<eDatasetTask,DatasetSource_Video,Dataset_CDnet,getDatasetEval<eDatasetTask,Dataset_CDnet>(),eEvalImpl> {
+            public IDataset_<eDatasetTask,DatasetSource_Video,Dataset_CDnet,lv::getDatasetEval<eDatasetTask,Dataset_CDnet>(),eEvalImpl> {
     protected: // should still be protected, as creation should always be done via datasets::create
         Dataset_(
                 const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving (will be created in CDnet dataset folder)
@@ -37,7 +37,7 @@ namespace lv {
                 double dScaleFactor=1.0, ///< defines the scale factor to use to resize/rescale read packets
                 bool b2014=true ///< defines whether to use the 2012 or 2014 version of the dataset (each should have its own folder in dataset root)
         ) :
-                IDataset_<eDatasetTask,DatasetSource_Video,Dataset_CDnet,getDatasetEval<eDatasetTask,Dataset_CDnet>(),eEvalImpl>(
+                IDataset_<eDatasetTask,DatasetSource_Video,Dataset_CDnet,lv::getDatasetEval<eDatasetTask,Dataset_CDnet>(),eEvalImpl>(
                         b2014?"CDnet 2014":"CDnet 2012",
                         lv::datasets::getDatasetsRootPath()+std::string(b2014?"CDNet2014/dataset/":"CDNet/dataset/"),
                         lv::datasets::getDatasetsRootPath()+std::string(b2014?"CDNet2014/":"CDNet/")+lv::AddDirSlashIfMissing(sOutputDirName),

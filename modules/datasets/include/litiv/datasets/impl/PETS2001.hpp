@@ -27,7 +27,7 @@ namespace lv {
 
     template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
     struct Dataset_<eDatasetTask,Dataset_PETS2001D3TC1,eEvalImpl> :
-            public IDataset_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1,getDatasetEval<eDatasetTask,Dataset_PETS2001D3TC1>(),eEvalImpl> {
+            public IDataset_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1,lv::getDatasetEval<eDatasetTask,Dataset_PETS2001D3TC1>(),eEvalImpl> {
     protected: // should still be protected, as creation should always be done via datasets::create
         Dataset_(
                 const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving (will be created in PETS dataset folder)
@@ -36,7 +36,7 @@ namespace lv {
                 bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
                 double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
         ) :
-                IDataset_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1,getDatasetEval<eDatasetTask,Dataset_PETS2001D3TC1>(),eEvalImpl>(
+                IDataset_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1,lv::getDatasetEval<eDatasetTask,Dataset_PETS2001D3TC1>(),eEvalImpl>(
                         "PETS2001 Dataset#3",
                         lv::datasets::getDatasetsRootPath()+"PETS2001/DATASET3/",
                         lv::datasets::getDatasetsRootPath()+"PETS2001/DATASET3/"+lv::AddDirSlashIfMissing(sOutputDirName),

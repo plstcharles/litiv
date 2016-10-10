@@ -27,7 +27,7 @@ namespace lv {
 
     template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
     struct Dataset_<eDatasetTask,Dataset_Wallflower,eEvalImpl> :
-            public IDataset_<eDatasetTask,DatasetSource_Video,Dataset_Wallflower,getDatasetEval<eDatasetTask,Dataset_Wallflower>(),eEvalImpl> {
+            public IDataset_<eDatasetTask,DatasetSource_Video,Dataset_Wallflower,lv::getDatasetEval<eDatasetTask,Dataset_Wallflower>(),eEvalImpl> {
     protected: // should still be protected, as creation should always be done via datasets::create
         Dataset_(
                 const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving (will be created in Wallflower dataset folder)
@@ -36,7 +36,7 @@ namespace lv {
                 bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
                 double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
         ) :
-                IDataset_<eDatasetTask,DatasetSource_Video,Dataset_Wallflower,getDatasetEval<eDatasetTask,Dataset_Wallflower>(),eEvalImpl>(
+                IDataset_<eDatasetTask,DatasetSource_Video,Dataset_Wallflower,lv::getDatasetEval<eDatasetTask,Dataset_Wallflower>(),eEvalImpl>(
                         "Wallflower",
                         lv::datasets::getDatasetsRootPath()+"Wallflower/dataset/",
                         lv::datasets::getDatasetsRootPath()+"Wallflower/"+lv::AddDirSlashIfMissing(sOutputDirName),

@@ -75,11 +75,11 @@ std::string IBackgroundSubtractorLBSP_GLSL::getLBSPThresholdLUTShaderSource<lv::
     ssSrc << "const uint anLBSPThresLUT[256] = uint[256](\n    ";
     for(size_t t=0; t<=UCHAR_MAX; ++t) {
         if(t>0 && (t%((UCHAR_MAX+1)/8))==(((UCHAR_MAX+1)/8)-1) && t<UCHAR_MAX)
-            ssSrc << m_anLBSPThreshold_8bitLUT[t] << ",\n    ";
+            ssSrc << (int)m_anLBSPThreshold_8bitLUT[t] << ",\n    ";
         else if(t<UCHAR_MAX)
-            ssSrc << m_anLBSPThreshold_8bitLUT[t] << ",";
+            ssSrc << (int)m_anLBSPThreshold_8bitLUT[t] << ",";
         else
-            ssSrc << m_anLBSPThreshold_8bitLUT[t] << "\n";
+            ssSrc << (int)m_anLBSPThreshold_8bitLUT[t] << "\n";
     }
     ssSrc << ");\n";
     return ssSrc.str();

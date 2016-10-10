@@ -37,7 +37,7 @@ namespace lv {
 
     template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
     struct Dataset_<eDatasetTask,Dataset_BSDS500,eEvalImpl> :
-            public IDataset_<eDatasetTask,DatasetSource_Image,Dataset_BSDS500,getDatasetEval<eDatasetTask,Dataset_BSDS500>(),eEvalImpl> {
+            public IDataset_<eDatasetTask,DatasetSource_Image,Dataset_BSDS500,lv::getDatasetEval<eDatasetTask,Dataset_BSDS500>(),eEvalImpl> {
     protected: // should still be protected, as creation should always be done via datasets::create
         Dataset_(
                 const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving (will be created in BSR dataset folder)
@@ -47,7 +47,7 @@ namespace lv {
                 double dScaleFactor=1.0, ///< defines the scale factor to use to resize/rescale read packets
                 BSDS500DatasetGroup eType=BSDS500Dataset_Training ///< defines which dataset groups to use
         ) :
-                IDataset_<eDatasetTask,DatasetSource_Image,Dataset_BSDS500,getDatasetEval<eDatasetTask,Dataset_BSDS500>(),eEvalImpl>(
+                IDataset_<eDatasetTask,DatasetSource_Image,Dataset_BSDS500,lv::getDatasetEval<eDatasetTask,Dataset_BSDS500>(),eEvalImpl>(
                         "BSDS500",
                         lv::datasets::getDatasetsRootPath()+"BSDS500/data/images/",
                         lv::datasets::getDatasetsRootPath()+"BSDS500/BSR/"+lv::AddDirSlashIfMissing(sOutputDirName),

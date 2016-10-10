@@ -175,8 +175,21 @@ namespace lv {
                 this->m_vpBatches.push_back(createWorkBatch(sPathIter,lv::AddDirSlashIfMissing(sPathIter)));
         }
     protected:
-        /// full dataset constructor; parameters are passed through lv::datasets::create<...>(...), and may be caught/simplified by a specialization
-        using DatasetHandler_<eDatasetTask,eDatasetSource,eDataset>::DatasetHandler_;
+        /// full dataset constructor (copied from DatasetHandler to avoid msvc2015 bug); parameters are passed through lv::datasets::create<...>(...), and may be caught/simplified by a specialization
+		IDataset_(
+			const std::string& sDatasetName, ///< user-friendly dataset name (used for identification only)
+			const std::string& sDatasetDirPath, ///< dataset directory (full) path where work batches can be found
+			const std::string& sOutputDirPath, ///< output directory (full) path for debug logs, evaluation reports and results archiving
+			const std::string& sOutputNamePrefix, ///< output name prefix for results archiving (if null, only packet idx will be used as file name)
+			const std::string& sOutputNameSuffix, ///< output name suffix for results archiving (if null, no file extension will be used)
+			const std::vector<std::string>& vsWorkBatchDirs, ///< array of directory names for top-level work batch groups (one group typically contains multiple work batches)
+			const std::vector<std::string>& vsSkippedDirTokens, ///< array of tokens which allow directories to be skipped if one is found in their name
+			const std::vector<std::string>& vsGrayscaleDirTokens, ///< array of tokens which allow directories to be treated as grayscale input only if one is found in their name
+			bool bSaveOutput, ///< defines whether results should be archived or not
+			bool bUseEvaluator, ///< defines whether results should be fully evaluated, or simply acknowledged
+			bool bForce4ByteDataAlign, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
+			double dScaleFactor ///< defines the scale factor to use to resize/rescale read packets
+		) : DatasetHandler_<eDatasetTask,eDatasetSource,eDataset>(sDatasetName,sDatasetDirPath,sOutputDirPath,sOutputNamePrefix,sOutputNameSuffix,vsWorkBatchDirs,vsSkippedDirTokens,vsGrayscaleDirTokens,bSaveOutput,bUseEvaluator,bForce4ByteDataAlign,dScaleFactor) {}
     };
 
 } // namespace lv
@@ -190,9 +203,9 @@ namespace lv {
 
     /// dataset full (default) specialization --- can be overridden by dataset type in 'impl' headers
     template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl>
-    struct Dataset_ : public IDataset_<eDatasetTask,getDatasetSource<eDatasetTask,eDataset>(),eDataset,getDatasetEval<eDatasetTask,eDataset>(),eEvalImpl> {
-        // if the task/dataset is not specialized, this redirects creation to the default IDataset_ constructor
-        using IDataset_<eDatasetTask,getDatasetSource<eDatasetTask,eDataset>(),eDataset,getDatasetEval<eDatasetTask,eDataset>(),eEvalImpl>::IDataset_;
+    struct Dataset_ : public IDataset_<eDatasetTask,lv::getDatasetSource<eDatasetTask,eDataset>(),eDataset,lv::getDatasetEval<eDatasetTask,eDataset>(),eEvalImpl> {
+        // if the task/dataset is not specialized, this redirects creation to the default DatasetHandler_ constructor
+		using IDataset_<eDatasetTask,lv::getDatasetSource<eDatasetTask,eDataset>(),eDataset,lv::getDatasetEval<eDatasetTask,eDataset>(),eEvalImpl>::IDataset_;
     };
 
     namespace datasets {
