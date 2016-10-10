@@ -27,6 +27,7 @@ namespace lv {
     template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl>
     struct Dataset_;
 
+    /// pointer type for highest-level dataset specialization implementation
     template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl>
     using DatasetPtr_ = std::shared_ptr<Dataset_<eDatasetTask,eDataset,eEvalImpl>>;
 
@@ -60,6 +61,9 @@ namespace lv {
         static inline DatasetPtr_<eDatasetTask,eDataset,eEvalImpl> create(Targs&&... args) {
             return lv::datasets::create<eDatasetTask,eDataset,eEvalImpl>(std::forward<Targs>(args)...);
         }
+
+        /// internal specialization of dataset interface pointer
+        using Ptr = DatasetPtr_<eDatasetTask,eDataset,eEvalImpl>;
 
         /// work batch group implementation forward declaration (required before friending, as it hides some templates from top class)
         struct WorkBatchGroup;

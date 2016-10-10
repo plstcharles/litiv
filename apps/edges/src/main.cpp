@@ -20,7 +20,7 @@
 
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
-#define EVALUATE_OUTPUT         1
+#define EVALUATE_OUTPUT         0
 #define DISPLAY_OUTPUT          1
 ////////////////////////////////
 #define USE_CANNY               0
@@ -28,19 +28,13 @@
 ////////////////////////////////
 #define FULL_THRESH_ANALYSIS    1
 ////////////////////////////////
-#define USE_GLSL_IMPL           0
-#define USE_CUDA_IMPL           0
-#define USE_OPENCL_IMPL         0
-////////////////////////////////
 #define DATASET_ID              Dataset_BSDS500 // comment this line to fall back to custom dataset definition
 #define DATASET_OUTPUT_PATH     "results_test" // will be created in the app's working directory if using a custom dataset
 #define DATASET_PRECACHING      1
 #define DATASET_SCALE_FACTOR    1.0
+#define DATASET_WORKTHREADS     1
 ////////////////////////////////
-#define USE_GPU_IMPL (USE_GLSL_IMPL||USE_CUDA_IMPL||USE_OPENCL_IMPL)
-#if (USE_GLSL_IMPL+USE_CUDA_IMPL+USE_OPENCL_IMPL)>1
-#error "Must specify a single impl."
-#elif (USE_CANNY+USE_LBSP)!=1
+#if (USE_CANNY+USE_LBSP)!=1
 #error "Must specify a single algorithm."
 #endif //USE_...
 #ifndef DATASET_ID
@@ -54,38 +48,30 @@
     std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsWorkBatchDirs */ \
     std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsSkippedDirTokens */ \
     std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsGrayscaleDirTokens */ \
-    0,                                                           /* => size_t nOutputIdxOffset */ \
     bool(WRITE_IMG_OUTPUT),                                      /* => bool bSaveOutput */ \
     bool(EVALUATE_OUTPUT),                                       /* => bool bUseEvaluator */ \
-    bool(USE_GPU_IMPL),                                          /* => bool bForce4ByteDataAlign */ \
+    false,                                                       /* => bool bForce4ByteDataAlign */ \
     DATASET_SCALE_FACTOR                                         /* => double dScaleFactor */
 #else //defined(DATASET_ID)
 #define DATASET_PARAMS \
     DATASET_OUTPUT_PATH,                                         /* => const std::string& sOutputDirName */ \
     bool(WRITE_IMG_OUTPUT),                                      /* => bool bSaveOutput */ \
     bool(EVALUATE_OUTPUT),                                       /* => bool bUseEvaluator */ \
-    bool(USE_GPU_IMPL),                                          /* => bool bForce4ByteDataAlign */ \
+    false,                                                       /* => bool bForce4ByteDataAlign */ \
     DATASET_SCALE_FACTOR                                         /* => double dScaleFactor */
 #endif //defined(DATASET_ID)
-void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch);
-#if USE_GLSL_IMPL
-static_assert(false,"Missing impl");
-constexpr lv::ParallelAlgoType eImplTypeEnum = lv::GLSL;
-#else // USE_..._IMPL
-constexpr lv::ParallelAlgoType eImplTypeEnum = lv::NonParallel;
-#endif // USE_..._IMPL
-using DatasetType = lv::Dataset_<lv::DatasetTask_EdgDet,lv::DATASET_ID,eImplTypeEnum>;
+
+void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch);
+using DatasetType = lv::Dataset_<lv::DatasetTask_EdgDet,lv::DATASET_ID,lv::NonParallel>;
 #if USE_CANNY
 using EdgeDetectorType = EdgeDetectorCanny;
 #elif USE_LBSP
 using EdgeDetectorType = EdgeDetectorLBSP;
 #endif //USE_...
-std::atomic_size_t g_nActiveThreads(0);
-const size_t g_nMaxThreads = USE_GPU_IMPL?1:std::thread::hardware_concurrency()>0?std::thread::hardware_concurrency():DEFAULT_NB_THREADS;
 
 int main(int, char**) {
     try {
-        lv::IDatasetPtr pDataset = DatasetType::create(DATASET_PARAMS);
+        DatasetType::Ptr pDataset = DatasetType::create(DATASET_PARAMS);
         lv::IDataHandlerPtrQueue vpBatches = pDataset->getSortedBatches(false);
         const size_t nTotPackets = pDataset->getInputCount();
         const size_t nTotBatches = vpBatches.size();
@@ -93,118 +79,41 @@ int main(int, char**) {
             lvError_("Could not parse any data for dataset '%s'",pDataset->getName().c_str());
         std::cout << "Parsing complete. [" << nTotBatches << " batch(es)]" << std::endl;
         std::cout << "\n[" << lv::getTimeStamp() << "]\n" << std::endl;
-        std::cout << "Executing edge detection with " << ((g_nMaxThreads>nTotBatches)?nTotBatches:g_nMaxThreads) << " thread(s)..." << std::endl;
-        size_t nProcessedBatches = 0;
+        std::cout << "Executing algorithm with " << DATASET_WORKTHREADS << " thread(s)..." << std::endl;
+        lv::WorkerPool<DATASET_WORKTHREADS> oPool;
+        std::queue<std::future<void>> vTaskResults;
         while(!vpBatches.empty()) {
-            while(g_nActiveThreads>=g_nMaxThreads)
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             lv::IDataHandlerPtr pBatch = vpBatches.top();
-            std::cout << "\tProcessing [" << ++nProcessedBatches << "/" << nTotBatches << "] (" << pBatch->getRelativePath() << ", L=" << std::scientific << std::setprecision(2) << pBatch->getExpectedLoad() << ")" << std::endl;
-            if(DATASET_PRECACHING)
-                pBatch->startPrecaching(EVALUATE_OUTPUT);
-            ++g_nActiveThreads;
-            std::thread(Analyze,(int)nProcessedBatches,pBatch).detach();
+            vTaskResults.push(oPool.queueTask(Analyze,std::to_string(nTotBatches-vpBatches.size()+1)+"/"+std::to_string(nTotBatches),pBatch));
             vpBatches.pop();
         }
-        while(g_nActiveThreads>0)
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        if(pDataset->getFinalOutputCount()==nTotPackets)
-            pDataset->writeEvalReport();
+        while(!vTaskResults.empty()) {
+            vTaskResults.front().get();
+            vTaskResults.pop();
+        }
+        pDataset->writeEvalReport();
     }
-    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
-    catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
-    catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
+    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
+    catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
+    catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
     std::cout << "\n[" << lv::getTimeStamp() << "]\n" << std::endl;
-    std::cout << "All done." << std::endl;
     return 0;
 }
 
-#if (HAVE_GLSL && USE_GLSL_IMPL)
-static_assert(false,"Missing impl");
-void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
+void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
-    size_t nCurrImageIdx = 0;
-    size_t nNextImageIdx = nCurrImageIdx+1;
-    bool bGPUContextInitialized = false;
-    try {
-        DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
-        lvAssert(oBatch.getInputPacketType()==lv::ImagePacket && oBatch.getOutputPacketType()==lv::ImagePacket);
-        lvAssert(oBatch.getImageCount()>1);
-        lvAssert(oBatch.isInputConstantSize());
-        const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
-        const size_t nTotPacketCount = oBatch.getImageCount();
-        GLContext oContext(oBatch.getMaxImageSize(),std::string("[GPU] ")+oBatch.getRelativePath(),DISPLAY_OUTPUT==0);
-        std::shared_ptr<IEdgeDetector_<lv::GLSL>> pAlgo = std::make_shared<EdgeDetectorType>();
-#if DISPLAY_OUTPUT>1
-        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
-        pAlgo->m_pDisplayHelper = pDisplayHelper;
-#endif //DISPLAY_OUTPUT>1
-        const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
-        oBatch.initialize_gl(pAlgo);
-        oContext.setWindowSize(oBatch.getIdealGLWindowSize());
-        oBatch.startProcessing();
-        size_t nNextIdx = 1;
-        while(nNextIdx<=nTotPacketCount) {
-            if(!(nNextIdx%100))
-                std::cout << "\t\t" << lv::clampString(sCurrBatchName,12) << " @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nNextIdx << "/" << nTotPacketCount << "   [GPU]" << std::endl;
-            const double dCurrLearningRate = nNextIdx<=100?1:dDefaultLearningRate;
-            oBatch.apply_gl(pAlgo,nNextIdx++,false,dCurrLearningRate);
-            //pGLSLAlgoEvaluator->apply_gl(oNextGTMask);
-            glErrorCheck;
-            if(oContext.pollEventsAndCheckIfShouldClose())
-                break;
-#if DISPLAY_OUTPUT>0
-            if(oContext.getKeyPressed('q'))
-                break;
-            oContext.swapBuffers(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-#if DISPLAY_OUTPUT>1
-            const int nKeyPressed = pDisplayHelper->waitKey();
-            if(nKeyPressed==(int)'q')
-                break;
-#endif //DISPLAY_OUTPUT>1
-#endif //DISPLAY_OUTPUT>0
-        }
-        oBatch.stopProcessing();
-        const double dTimeElapsed = oBatch.getFinalProcessTime();
-        const double dProcessSpeed = (double)(nNextIdx-1)/dTimeElapsed;
-        std::cout << "\t\t" << sCurrBatchName << " @ F:" << (nNextIdx-1) << "/" << nTotPacketCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
-        oBatch.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
-    }
-    catch(const lv::Exception& e) {
-        std::cout << "\nAnalyze caught Exception:\n" << e.what();
-        const std::string sContextErrMsg = GLContext::getLatestErrorMessage();
-        if(!sContextErrMsg.empty())
-            std::cout << "\nContext error: " << sContextErrMsg << "\n" << std::endl;
-    }
-    catch(const cv::Exception& e) {std::cout << "\nAnalyze caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
-    catch(const std::exception& e) {std::cout << "\nAnalyze caught std::exception:\n" << e.what() << "\n" << std::endl;}
-    catch(...) {std::cout << "\nAnalyze caught unhandled exception\n" << std::endl;}
-    --g_nActiveThreads;
-    try {
-        if(pBatch->isProcessing())
-            dynamic_cast<DatasetType::WorkBatch&>(*pBatch).stopProcessing();
-    } catch(...) {
-        std::cout << "\nAnalyze caught unhandled exception while attempting to stop batch processing.\n" << std::endl;
-        throw;
-    }
-}
-#elif (HAVE_CUDA && USE_CUDA_IMPL)
-static_assert(false,"missing impl");
-#elif (HAVE_OPENCL && USE_OPENCL_IMPL)
-static_assert(false,"missing impl");
-#elif !USE_GPU_IMPL
-void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
-    srand(0); // for now, assures that two consecutive runs on the same data return the same results
-    //srand((unsigned int)time(NULL));
-    size_t nCurrIdx = 0;
     try {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
         lvAssert(oBatch.getInputPacketType()==lv::ImagePacket && oBatch.getOutputPacketType()==lv::ImagePacket);
         lvAssert(oBatch.getImageCount()>=1);
         lvAssert(oBatch.isInputConstantSize());
+        if(DATASET_PRECACHING)
+            oBatch.startPrecaching(EVALUATE_OUTPUT);
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
+        std::cout << "\t\t" << sCurrBatchName << " @ init [" << sWorkerName << "]" << std::endl;
         const size_t nTotPacketCount = oBatch.getImageCount();
+        size_t nCurrIdx = 0;
         cv::Mat oCurrInput = oBatch.getInput(nCurrIdx).clone();
         lvAssert(!oCurrInput.empty() && oCurrInput.isContinuous());
         cv::Mat oCurrEdgeMask(oBatch.getInputMaxSize(),CV_8UC1,cv::Scalar_<uchar>(0));
@@ -213,13 +122,13 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
         const double dDefaultThreshold = pAlgo->getDefaultThreshold();
 #endif //(!FULL_THRESH_ANALYSIS)
 #if DISPLAY_OUTPUT>0
-        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
+        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
 #endif //DISPLAY_OUTPUT>0
         oBatch.startProcessing();
         while(nCurrIdx<nTotPacketCount) {
-            //if(!((nCurrIdx+1)%100) && nCurrIdx<nTotPacketCount)
-                std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << "   [T=" << nThreadIdx << "]" << std::endl;
+            //if(!((nCurrIdx+1)%100))
+                std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << "   [" << sWorkerName << "]" << std::endl;
             oCurrInput = oBatch.getInput(nCurrIdx);
 #if FULL_THRESH_ANALYSIS
             pAlgo->apply(oCurrInput,oCurrEdgeMask);
@@ -237,13 +146,12 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
         oBatch.stopProcessing();
         const double dTimeElapsed = oBatch.getFinalProcessTime();
         const double dProcessSpeed = (double)nCurrIdx/dTimeElapsed;
-        std::cout << "\t\t" << sCurrBatchName << " @ F:" << nCurrIdx << "/" << nTotPacketCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
+        std::cout << "\t\t" << sCurrBatchName << " @ end [" << sWorkerName << "] (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
         oBatch.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
     }
     catch(const cv::Exception& e) {std::cout << "\nAnalyze caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
     catch(const std::exception& e) {std::cout << "\nAnalyze caught std::exception:\n" << e.what() << "\n" << std::endl;}
     catch(...) {std::cout << "\nAnalyze caught unhandled exception\n" << std::endl;}
-    --g_nActiveThreads;
     try {
         if(pBatch->isProcessing())
             dynamic_cast<DatasetType::WorkBatch&>(*pBatch).stopProcessing();
@@ -252,4 +160,3 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
         throw;
     }
 }
-#endif //(!USE_GPU_IMPL)

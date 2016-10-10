@@ -33,8 +33,6 @@
 #include "litiv/imgproc.hpp" // includes all edge detection algos, along with most core utility & opencv headers
 #include "litiv/datasets.hpp" // includes all datasets module utilities (along with pre-implemented datset specializations)
 
-#define USE_PRECACHING 1 // defines whether work batches should be preloaded to memory or not (1/0)
-
 int main(int, char**) { // this sample uses no command line argument
     try { // its always a good idea to scope your app's top level in some try/catch blocks!
 
@@ -84,17 +82,16 @@ int main(int, char**) { // this sample uses no command line argument
         //   6.   {"batch1","batch2","batch3"}                => const std::vector<std::string>& vsWorkBatchDirs => list of dataset directory names to be treated as work batches
         //   7.   {}                                          => const std::vector<std::string>& vsSkippedDirTokens => list of tokens which, if found in a directory/batch name, will remove it from the dataset
         //   8.   {}                                          => const std::vector<std::string>& vsGrayscaleDirTokens => list of tokens which, if found in a directory/batch name, will set it to only be processed as grayscale (1ch) data
-        //   9.   0                                           => size_t nOutputIdxOffset => specifies the integer offset to be added to packet indices when automatically saving the processed output
-        //   10.  true                                        => bool bSaveOutput => defines whether the processed output should be automatically saved when pushed for evaluation
-        //   11.  false                                       => bool bUseEvaluator => defines whether the processed output should be fully evaluated internally or not (for a custom dataset, it might still not produce anything useful without specialization)
-        //   12.  false                                       => bool bForce4ByteDataAlign => defines whether data packets (typically images) should be 4-byte aligned or not --- this helps when uploading data to GPU, for example
-        //   13.  1.0                                         => double dScaleFactor => defines the scaling factor to be applied to the data packets (if applicable, typically only useful for images)
+        //   9.   true                                        => bool bSaveOutput => defines whether the processed output should be automatically saved when pushed for evaluation
+        //   10.  false                                       => bool bUseEvaluator => defines whether the processed output should be fully evaluated internally or not (for a custom dataset, it might still not produce anything useful without specialization)
+        //   11.  false                                       => bool bForce4ByteDataAlign => defines whether data packets (typically images) should be 4-byte aligned or not --- this helps when uploading data to GPU, for example
+        //   12.  1.0                                         => double dScaleFactor => defines the scaling factor to be applied to the data packets (if applicable, typically only useful for images)
         //
         // The dataset object then returned can finally be queried for data packets, and to evaluate output.
         // In our case, the data packets are simply images that we should apply edge detection on, and the
         // output is an edge detection mask.
         //
-        lv::IDatasetPtr pDataset = DatasetType::create(
+        DatasetType::Ptr pDataset = DatasetType::create(
             "Custom Dataset Example",
             lv::AddDirSlashIfMissing(SAMPLES_DATA_ROOT)+"custom_dataset_ex/",
             "results_test",
@@ -103,7 +100,6 @@ int main(int, char**) { // this sample uses no command line argument
             std::vector<std::string>{"batch1","batch2","batch3"},
             std::vector<std::string>(),
             std::vector<std::string>(),
-            0,
             true,
             false,
             false,
