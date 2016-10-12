@@ -611,22 +611,19 @@ void lv::IDataLoader_<lv::Array>::unpackInput(size_t nPacketIdx, std::vector<cv:
         if(oInput.empty()) {
             for(size_t s=0; s<vSizes.size(); ++s)
                 vUnpackedInput[s] = cv::Mat();
+            return;
         }
-        else {
-            lvAssert(oInput.isContinuous());
-            // for now, we assume all stream packets have the type of the original packed matrix
-            uintptr_t nCurrPacketIdx = (uintptr_t)oInput.datastart;
-            for(size_t s=0; s<vSizes.size(); ++s) {
-                const size_t nCurrPacketSize = oInput.elemSize()*vSizes[s].area();
-                lvAssert_(nCurrPacketIdx+nCurrPacketSize<uintptr_t(oInput.dataend),"unpack out-of-bounds");
-                if(nCurrPacketSize>0)
-                    vUnpackedInput[s] = cv::Mat(vSizes[s],oInput.type(),(void*)nCurrPacketIdx);
-                else
-                    vUnpackedInput[s] = cv::Mat();
-                nCurrPacketIdx += nCurrPacketSize;
-            }
-            lvAssert_(nCurrPacketIdx==uintptr_t(oInput.dataend),"unpack has leftover data");
+        lvAssert(oInput.isContinuous());
+        // for now, we assume all stream packets have the type of the original packed matrix
+        size_t nCurrPacketIdxOffset = 0;
+        const size_t nTotPacketSize = oInput.elemSize()*oInput.total();
+        for(size_t s=0; s<vSizes.size(); ++s) {
+            const size_t nCurrPacketSize = oInput.elemSize()*vSizes[s].area();
+            lvAssert_(nCurrPacketIdxOffset+nCurrPacketSize<=nTotPacketSize,"unpack out-of-bounds");
+            vUnpackedInput[s] = (nCurrPacketSize>0)?cv::Mat(vSizes[s],oInput.type(),(void*)(oInput.data+nCurrPacketIdxOffset)):cv::Mat();
+            nCurrPacketIdxOffset += nCurrPacketSize;
         }
+        lvAssert_(nCurrPacketIdxOffset==nTotPacketSize,"unpack has leftover data");
     }
     else
         lvError("unhandled packet type in unpackInput");
@@ -644,22 +641,19 @@ void lv::IDataLoader_<lv::Array>::unpackGT(size_t nPacketIdx, std::vector<cv::Ma
         if(oGT.empty()) {
             for(size_t s=0; s<vSizes.size(); ++s)
                 vUnpackedGT[s] = cv::Mat();
+            return;
         }
-        else {
-            lvAssert(oGT.isContinuous());
-            // for now, we assume all stream packets have the type of the original packed matrix
-            uintptr_t nCurrPacketIdx = (uintptr_t)oGT.datastart;
-            for(size_t s=0; s<vSizes.size(); ++s) {
-                const size_t nCurrPacketSize = oGT.elemSize()*vSizes[s].area();
-                lvAssert_(nCurrPacketIdx+nCurrPacketSize<uintptr_t(oGT.dataend),"unpack out-of-bounds");
-                if(nCurrPacketSize>0)
-                    vUnpackedGT[s] = cv::Mat(vSizes[s],oGT.type(),(void*)nCurrPacketIdx);
-                else
-                    vUnpackedGT[s] = cv::Mat();
-                nCurrPacketIdx += nCurrPacketSize;
-            }
-            lvAssert_(nCurrPacketIdx==uintptr_t(oGT.dataend),"unpack has leftover data");
+        lvAssert(oGT.isContinuous());
+        // for now, we assume all stream packets have the type of the original packed matrix
+        size_t nCurrPacketIdxOffset = 0;
+        const size_t nTotPacketSize = oGT.elemSize()*oGT.total();
+        for(size_t s=0; s<vSizes.size(); ++s) {
+            const size_t nCurrPacketSize = oGT.elemSize()*vSizes[s].area();
+            lvAssert_(nCurrPacketIdxOffset+nCurrPacketSize<=nTotPacketSize,"unpack out-of-bounds");
+            vUnpackedGT[s] = (nCurrPacketSize>0)?cv::Mat(vSizes[s],oGT.type(),(void*)(oGT.data+nCurrPacketIdxOffset)):cv::Mat();
+            nCurrPacketIdxOffset += nCurrPacketSize;
         }
+        lvAssert_(nCurrPacketIdxOffset==nTotPacketSize,"unpack has leftover data");
     }
     else
         lvError("unhandled packet type in unpackGT");
