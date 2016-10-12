@@ -512,7 +512,7 @@ const cv::Mat& lv::IIDataLoader::getInput_redirect(size_t nIdx) {
 #if HARDCODE_IMAGE_PACKET_INDEX
             std::stringstream sstr;
             sstr << "Packet #" << nIdx;
-            writeOnImage(m_oLatestInput,sstr.str(),cv::Scalar_<uchar>::all(255);
+            cv::putText(m_oLatestInput,sstr.str(),cv::Scalar_<uchar>::all(255));
 #endif //HARDCODE_IMAGE_PACKET_INDEX
             if(is4ByteAligned() && m_oLatestInput.channels()==3)
                 cv::cvtColor(m_oLatestInput,m_oLatestInput,cv::COLOR_BGR2BGRA);
@@ -531,7 +531,7 @@ const cv::Mat& lv::IIDataLoader::getGT_redirect(size_t nIdx) {
 #if HARDCODE_IMAGE_PACKET_INDEX
             std::stringstream sstr;
             sstr << "Packet #" << nIdx;
-            writeOnImage(m_oLatestGT,sstr.str(),cv::Scalar_<uchar>::all(255);
+            cv::putText(m_oLatestGT,sstr.str(),cv::Scalar_<uchar>::all(255));
 #endif //HARDCODE_IMAGE_PACKET_INDEX
             if(is4ByteAligned() && m_oLatestGT.channels()==3)
                 cv::cvtColor(m_oLatestGT,m_oLatestGT,cv::COLOR_BGR2BGRA);

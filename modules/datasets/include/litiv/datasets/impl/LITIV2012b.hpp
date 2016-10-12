@@ -152,11 +152,6 @@ namespace lv {
                 lvAssert(oImage.cols<=m_oMaxSize.width && oImage.rows<=m_oMaxSize.height);
                 if(m_bForcing4ByteDataAlign && oImage.channels()==3)
                     cv::cvtColor(oImage,oImage,cv::COLOR_BGR2BGRA);
-            #if HARDCODE_FRAME_INDEX
-                std::stringstream sstr;
-                sstr << "Image #" << nImageIdx;
-                WriteOnImage(oImage,sstr.str(),cv::Scalar_<uchar>::all(255);
-            #endif //HARDCODE_FRAME_INDEX
                 return oImage;
             }
             */
@@ -189,11 +184,6 @@ namespace lv {
                 }
                 if(oImage.empty())
                     oImage = cv::Mat(m_oMaxSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_OUT_OF_SCOPE_DEFAULT_VAL));
-            #if HARDCODE_FRAME_INDEX
-                std::stringstream sstr;
-                sstr << "Image #" << nImageIdx;
-                WriteOnImage(oImage,sstr.str(),cv::Scalar_<uchar>::all(255);
-            #endif //HARDCODE_FRAME_INDEX
                 return oImage;
             }
             */

@@ -23,6 +23,9 @@
 
 #include "litiv/datasets.hpp" // for parsers only, not truly required here
 
+#define DATASETS_VAP_FIX_SCENE2_DISTORT 1
+#define DATASETS_VAP_FIX_SCENE3_OFFSET  1
+
 namespace lv {
 
     struct IVAPtrimod2016Dataset {
@@ -137,14 +140,11 @@ namespace lv {
             const double dScale = this->getScaleFactor();
             if(dScale!=1.0)
                 cv::resize(oGlobalROI,oGlobalROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
-            for(size_t s=0; s<nStreamCount; ++s) {
-                this->m_vInputROIs[s] = oGlobalROI.clone();
-                this->m_vGTROIs[s] = oGlobalROI.clone();
+            for(size_t s=0; s<nStreamCount; ++s)
                 this->m_vInputSizes[s] = this->m_vGTSizes[s] = oGlobalROI.size();
-            }
             this->m_oMaxInputSize = this->m_oMaxGTSize = oGlobalROI.size();
             const cv::Size oImageSize(640,480);
-            const double dUndistortMapCameraMatrixAlpha = 1.0;
+            const double dUndistortMapCameraMatrixAlpha = -1.0;
             if(this->m_bUndistort) {
                 cv::FileStorage oParamsFS(this->getDataPath()+"calibVars.yml",cv::FileStorage::READ);
                 lvAssert_(oParamsFS.isOpened(),"could not open calibration yml file");
@@ -185,13 +185,15 @@ namespace lv {
             if(!oRGBROI.empty()) {
                 lvAssert(oRGBROI.type()==CV_8UC1 && oRGBROI.size()==oImageSize);
                 oRGBROI = oRGBROI>0;
-                if(oRGBROI.size()!=this->m_vInputSizes[0])
-                    cv::resize(oRGBROI,oRGBROI,this->m_vInputSizes[0],0,0,cv::INTER_NEAREST);
-                if(this->m_bUndistort)
-                    cv::remap(oRGBROI.clone(),oRGBROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
-                this->m_vInputROIs[0] = oRGBROI.clone();
-                this->m_vGTROIs[0] = oRGBROI.clone();
             }
+            else
+                oRGBROI = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
+            if(oRGBROI.size()!=this->m_vInputSizes[0])
+                cv::resize(oRGBROI,oRGBROI,this->m_vInputSizes[0],0,0,cv::INTER_NEAREST);
+            if(this->m_bUndistort)
+                cv::remap(oRGBROI.clone(),oRGBROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_NEAREST);
+            this->m_vInputROIs[0] = oRGBROI.clone();
+            this->m_vGTROIs[0] = oRGBROI.clone();
             std::vector<std::string> vsRGBGTPaths;
             lv::GetFilesFromDir(*psRGBGTDir,vsRGBGTPaths);
             if(vsRGBGTPaths.empty() || cv::imread(vsRGBGTPaths[0]).size()!=oImageSize)
@@ -225,13 +227,15 @@ namespace lv {
             if(!oThermalROI.empty()) {
                 lvAssert(oThermalROI.type()==CV_8UC1 && oThermalROI.size()==oImageSize);
                 oThermalROI = oThermalROI>0;
-                if(oThermalROI.size()!=this->m_vInputSizes[1])
-                    cv::resize(oThermalROI,oThermalROI,this->m_vInputSizes[1],0,0,cv::INTER_NEAREST);
-                if(this->m_bUndistort)
-                    cv::remap(oThermalROI.clone(),oThermalROI,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_LINEAR);
-                this->m_vInputROIs[1] = oThermalROI.clone();
-                this->m_vGTROIs[1] = oThermalROI.clone();
             }
+            else
+                oThermalROI = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
+            if(oThermalROI.size()!=this->m_vInputSizes[1])
+                cv::resize(oThermalROI,oThermalROI,this->m_vInputSizes[1],0,0,cv::INTER_NEAREST);
+            if(this->m_bUndistort)
+                cv::remap(oThermalROI.clone(),oThermalROI,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_NEAREST);
+            this->m_vInputROIs[1] = oThermalROI.clone();
+            this->m_vGTROIs[1] = oThermalROI.clone();
             std::vector<std::string> vsThermalGTPaths;
             lv::GetFilesFromDir(*psThermalGTDir,vsThermalGTPaths);
             if(vsThermalGTPaths.empty() || cv::imread(vsThermalGTPaths[0]).size()!=oImageSize)
@@ -253,11 +257,13 @@ namespace lv {
                 if(!oDepthROI.empty()) {
                     lvAssert(oDepthROI.type()==CV_8UC1 && oDepthROI.size()==oImageSize);
                     oDepthROI = oDepthROI>0;
-                    if(oDepthROI.size()!=this->m_vInputSizes[2])
-                        cv::resize(oDepthROI,oDepthROI,this->m_vInputSizes[2],0,0,cv::INTER_NEAREST);
-                    this->m_vInputROIs[2] = oDepthROI.clone();
-                    this->m_vGTROIs[2] = oDepthROI.clone();
                 }
+                else
+                    oDepthROI = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
+                if(oDepthROI.size()!=this->m_vInputSizes[2])
+                    cv::resize(oDepthROI,oDepthROI,this->m_vInputSizes[2],0,0,cv::INTER_NEAREST);
+                this->m_vInputROIs[2] = oDepthROI.clone();
+                this->m_vGTROIs[2] = oDepthROI.clone();
                 std::vector<std::string> vsDepthGTPaths;
                 lv::GetFilesFromDir(*psDepthGTDir,vsDepthGTPaths);
                 if(vsDepthGTPaths.empty() || cv::imread(vsDepthGTPaths[0]).size()!=oImageSize)
@@ -349,7 +355,6 @@ namespace lv {
                     nPacketOffset += ptrdiff_t(oNewPacket.dataend-oNewPacket.datastart);
                 };
                 cv::Mat oRGBPacket = cv::imread(vsGTPaths[0],cv::IMREAD_GRAYSCALE);
-                cv::imshow("rgbgt",oRGBPacket);
                 lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC1 && oRGBPacket.size()==cv::Size(640,480));
                 if(oRGBPacket.size()!=vGTSizes[0])
                     cv::resize(oRGBPacket,oRGBPacket,vGTSizes[0],0,0,cv::INTER_NEAREST);
@@ -358,12 +363,24 @@ namespace lv {
                 lAppendPacket(oRGBPacket);
                 lvDbgAssert(nPacketOffset<nTotPacketSize);
                 cv::Mat oThermalPacket = cv::imread(vsGTPaths[1],cv::IMREAD_GRAYSCALE);
-                cv::imshow("thermalgt",oThermalPacket);
                 lvAssert(!oThermalPacket.empty() && oThermalPacket.type()==CV_8UC1 && oThermalPacket.size()==cv::Size(640,480));
+#if DATASETS_VAP_FIX_SCENE3_OFFSET
+                // fail: calibration really breaks up for scene 3 (need to translate [x,y]=[13,4], and it's still not great)
+                if(this->getName()=="Scene 3") {
+                    static const cv::Mat_<double> oAffineTransf = (cv::Mat_<double>(2,3) << 1.0,0.0,13.0,0.0,1.0,4.0);
+                    cv::warpAffine(oThermalPacket.clone(),oThermalPacket,oAffineTransf,oThermalPacket.size());
+                }
+#endif //DATASETS_VAP_FIX_SCENE3_OFFSET
                 if(oThermalPacket.size()!=vGTSizes[1])
                     cv::resize(oThermalPacket,oThermalPacket,vGTSizes[1],0,0,cv::INTER_NEAREST);
-                if(this->m_bUndistort)
-                    cv::remap(oThermalPacket.clone(),oThermalPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_NEAREST);
+#if DATASETS_VAP_FIX_SCENE2_DISTORT
+                // fail: input 'distorted' thermal gt images are actually already undistorted in 'Scene 2' (so no need to remap again)
+                if(this->getName()!="Scene 2")
+#endif //DATASETS_VAP_FIX_SCENE2_DISTORT
+                {
+                    if(this->m_bUndistort)
+                        cv::remap(oThermalPacket.clone(),oThermalPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_NEAREST);
+                }
                 lAppendPacket(oThermalPacket);
                 lvDbgAssert(nPacketOffset<=nTotPacketSize);
                 if(this->m_bLoadDepth) {
