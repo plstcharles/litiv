@@ -27,6 +27,7 @@
 #define DATASET_OUTPUT_PATH     "results_test"
 #define DATASET_PRECACHING      1
 #define DATASET_SCALE_FACTOR    1.0
+#define DATASET_WORKTHREADS     1
 ////////////////////////////////
 #define DATASET_PARAMS \
     DATASET_OUTPUT_PATH,                                         /* => const std::string& sOutputDirName */ \
@@ -35,14 +36,12 @@
     false,                                                       /* => bool bForce4ByteDataAlign */ \
     DATASET_SCALE_FACTOR                                         /* => double dScaleFactor */
 
-void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch);
+void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch);
 using DatasetType = lv::Dataset_<lv::DatasetTask_Cosegm,lv::DATASET_ID,lv::NonParallel>;
-std::atomic_size_t g_nActiveThreads(0);
-const size_t g_nMaxThreads = 1;
 
 int main(int, char**) {
     try {
-        lv::IDatasetPtr pDataset = DatasetType::create(DATASET_PARAMS);
+        DatasetType::Ptr pDataset = DatasetType::create(DATASET_PARAMS);
         lv::IDataHandlerPtrQueue vpBatches = pDataset->getSortedBatches(false);
         const size_t nTotPackets = pDataset->getInputCount();
         const size_t nTotBatches = vpBatches.size();
@@ -50,45 +49,44 @@ int main(int, char**) {
             lvError_("Could not parse any data for dataset '%s'",pDataset->getName().c_str());
         std::cout << "Parsing complete. [" << nTotBatches << " batch(es)]" << std::endl;
         std::cout << "\n[" << lv::getTimeStamp() << "]\n" << std::endl;
-        std::cout << "Executing edge detection with " << ((g_nMaxThreads>nTotBatches)?nTotBatches:g_nMaxThreads) << " thread(s)..." << std::endl;
-        size_t nProcessedBatches = 0;
+        std::cout << "Executing algorithm with " << DATASET_WORKTHREADS << " thread(s)..." << std::endl;
+        lv::WorkerPool<DATASET_WORKTHREADS> oPool;
+        std::queue<std::future<void>> vTaskResults;
         while(!vpBatches.empty()) {
-            while(g_nActiveThreads>=g_nMaxThreads)
-                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
             lv::IDataHandlerPtr pBatch = vpBatches.top();
-            std::cout << "\tProcessing [" << ++nProcessedBatches << "/" << nTotBatches << "] (" << pBatch->getRelativePath() << ", L=" << std::scientific << std::setprecision(2) << pBatch->getExpectedLoad() << ")" << std::endl;
-            if(DATASET_PRECACHING)
-                pBatch->startPrecaching(EVALUATE_OUTPUT);
-            std::this_thread::sleep_for(std::chrono::seconds(3));
-            ++g_nActiveThreads;
-            std::thread(Analyze,(int)nProcessedBatches,pBatch).detach();
+            vTaskResults.push(oPool.queueTask(Analyze,std::to_string(nTotBatches-vpBatches.size()+1)+"/"+std::to_string(nTotBatches),pBatch));
             vpBatches.pop();
         }
-        while(g_nActiveThreads>0)
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        if(pDataset->getProcessedOutputCountPromise()==nTotPackets)
-            pDataset->writeEvalReport();
+        while(!vTaskResults.empty()) {
+            vTaskResults.front().get();
+            vTaskResults.pop();
+        }
+        pDataset->writeEvalReport();
     }
-    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
-    catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
-    catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl; return 1;}
+    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
+    catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
+    catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
     std::cout << "\n[" << lv::getTimeStamp() << "]\n" << std::endl;
-    std::cout << "All done." << std::endl;
     return 0;
 }
 
-void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
+void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
     srand(0); // for now, assures that two consecutive runs on the same data return the same results
     //srand((unsigned int)time(NULL));
-    size_t nCurrIdx = 0;
     try {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
         lvAssert(oBatch.getInputPacketType()==lv::ImageArrayPacket && oBatch.getOutputPacketType()==lv::ImageArrayPacket);
-        lvAssert(oBatch.getOutputStreamCount()==oBatch.getInputStreamCount()); // curr only support 1:1 cosegm
+        lvAssert(oBatch.getOutputStreamCount()==oBatch.getInputStreamCount()); // app currently only supports 1:1 cosegm
         lvAssert(oBatch.getFrameCount()>1);
+        if(DATASET_PRECACHING)
+            oBatch.startPrecaching(EVALUATE_OUTPUT);
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
+        std::cout << "\t\t" << sCurrBatchName << " @ init [" << sWorkerName << "]" << std::endl;
         const size_t nTotPacketCount = oBatch.getFrameCount();
-        std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // mat content becomes invalid on next getInput call
+        const std::vector<cv::Mat>& vROIs = oBatch.getFrameROIArray();
+        lvAssert(!vROIs.empty() && vROIs.size()==oBatch.getInputStreamCount());
+        size_t nCurrIdx = 0;
+        const std::vector<cv::Mat>& vInitInput = oBatch.getInputArray(nCurrIdx); // mat content becomes invalid on next getInput call
         lvAssert(!vInitInput.empty() && vInitInput.size()==oBatch.getInputStreamCount());
         std::vector<cv::Mat> vCurrFGMasks(vInitInput.size());
         //std::shared_ptr<IEdgeDetector> pAlgo = std::make_shared<CosegmenterType>();
@@ -99,7 +97,7 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
         std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs;
         for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vInitInput.size(); ++nDisplayRowIdx) {
             std::vector<std::pair<cv::Mat,std::string>> vRow(3);
-            vRow[0] = std::make_pair(vInitInput[nDisplayRowIdx].clone(),oBatch.getInputStreamName(nDisplayRowIdx));
+            vRow[0] = std::make_pair(vInitInput[nDisplayRowIdx].clone(),std::string()/*oBatch.getInputStreamName(nDisplayRowIdx)*/);
             vRow[1] = std::make_pair(cv::Mat(vInitInput[nDisplayRowIdx].size(),CV_8UC1,cv::Scalar_<uchar>(128)),"DEBUG");
             vRow[2] = std::make_pair(cv::Mat(vInitInput[nDisplayRowIdx].size(),CV_8UC1,cv::Scalar_<uchar>(128)),"OUTPUT");
             vvDisplayPairs.push_back(vRow);
@@ -107,13 +105,35 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
 #endif //DISPLAY_OUTPUT>0
         oBatch.startProcessing();
         while(nCurrIdx<nTotPacketCount) {
-            if(!((nCurrIdx+1)%100) && nCurrIdx<nTotPacketCount)
-                std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << "   [T=" << nThreadIdx << "]" << std::endl;
+            if(!((nCurrIdx+1)%100))
+                std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << "   [" << sWorkerName << "]" << std::endl;
             const std::vector<cv::Mat>& vCurrInput = oBatch.getInputArray(nCurrIdx);
-            lvAssert(vCurrInput.size()==vInitInput.size());
+            lvDbgAssert(vCurrInput.size()==vInitInput.size());
             //pAlgo->apply(vCurrInput,vCurrFGMasks,dDefaultThreshold);
-            lvAssert(vCurrInput.size()==vCurrFGMasks.size());
 #if DISPLAY_OUTPUT>0
+            const std::vector<cv::Mat>& vCurrGT = oBatch.getGTArray(nCurrIdx);
+            lvDbgAssert(vCurrGT.size()==vCurrFGMasks.size());
+
+            if(!vCurrGT[0].empty() && !vCurrGT[1].empty()) {
+
+                cv::Mat test_rgb = vCurrInput[0].clone(), test_rgb_mask;
+                cv::bitwise_or(test_rgb/2,cv::Mat(vCurrInput[0].size(),CV_8UC3,cv::Scalar_<uchar>(127)),test_rgb_mask,vCurrGT[0]);
+                cv::imshow("rgb mask",test_rgb_mask);
+
+                cv::Mat test_thermal = vCurrInput[1].clone(), test_thermal_mask;
+                cv::cvtColor(test_thermal,test_thermal,cv::COLOR_GRAY2BGR);
+                cv::bitwise_or(test_thermal/2,cv::Mat(vCurrInput[1].size(),CV_8UC3,cv::Scalar_<uchar>(127)),test_thermal_mask,vCurrGT[1]);
+                cv::imshow("thermal mask",test_thermal_mask);
+
+                cv::Mat test_merge = test_rgb/2+test_thermal/2;
+                cv::imshow("merge",test_merge);
+
+                cv::Mat test_gt;
+                cv::merge(std::vector<cv::Mat>{vCurrGT[0]&vROIs[0],cv::Mat::zeros(vCurrGT[0].size(),CV_8UC1),vCurrGT[1]&vROIs[1]},test_gt);
+                cv::imshow("merge mask",test_gt);
+
+            }
+
             for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vCurrInput.size(); ++nDisplayRowIdx) {
                 vvDisplayPairs[nDisplayRowIdx][0].first = vCurrInput[nDisplayRowIdx];
                 //vvDisplayPairs[nDisplayRowIdx][1].first = ... output;
@@ -127,15 +147,14 @@ void Analyze(int nThreadIdx, lv::IDataHandlerPtr pBatch) {
             oBatch.push(vCurrFGMasks,nCurrIdx++);
         }
         oBatch.stopProcessing();
-        const double dTimeElapsed = oBatch.getProcessTime();
+        const double dTimeElapsed = oBatch.getFinalProcessTime();
         const double dProcessSpeed = (double)nCurrIdx/dTimeElapsed;
-        std::cout << "\t\t" << sCurrBatchName << " @ F:" << nCurrIdx << "/" << nTotPacketCount << "   [T=" << nThreadIdx << "]   (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
+        std::cout << "\t\t" << sCurrBatchName << " @ end [" << sWorkerName << "] (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
         oBatch.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
     }
     catch(const cv::Exception& e) {std::cout << "\nAnalyze caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
     catch(const std::exception& e) {std::cout << "\nAnalyze caught std::exception:\n" << e.what() << "\n" << std::endl;}
     catch(...) {std::cout << "\nAnalyze caught unhandled exception\n" << std::endl;}
-    --g_nActiveThreads;
     try {
         if(pBatch->isProcessing())
             dynamic_cast<DatasetType::WorkBatch&>(*pBatch).stopProcessing();
