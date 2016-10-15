@@ -17,26 +17,64 @@
 //
 /////////////////////////////////////////////////////////////////////////////
 //
-// This sample demonstrates how to set up a custom dataset to be used with a
-// litiv algo (in this case, an edge detector). All the data required here is
-// already located in the 'samples/data' directory.
+// This sample demonstrates two things: how to set up a custom dataset to be
+// used with a litiv algo (in this case, an edge detector), and how to create
+// a dataset specialization with custom parsing routines. You can toggle
+// between the two using the 'USE_MIDDLEBURY_SPECIALIZATION' define. All the
+// data required here is already located in the 'samples/data' directory.
 //
-// The custom dataset created here does not include categories or groundtruth;
-// examples which include these can be found in the pre-implemented dataset
-// interface specializations in the datasets module (e.g. CDnet or BSDS500).
-//
-// For an example on how to use a pre-implemented specialization from the
-// module, see the 'changedet' or 'edges' projects in the 'apps' directory.
+// By default, datasets created at run-time cannot parse ground truth, but
+// specialized datasets (such as the Middlebury2005 demo below) can, with
+// your own code.
 //
 /////////////////////////////////////////////////////////////////////////////
 
-#include "litiv/imgproc.hpp" // includes all edge detection algos, along with most core utility & opencv headers
+#define USE_MIDDLEBURY_SPECIALIZATION 1
+
 #include "litiv/datasets.hpp" // includes all datasets module utilities (along with pre-implemented datset specializations)
+#if USE_MIDDLEBURY_SPECIALIZATION
+#include "middlebury2005.hpp" // includes a custom dataset specialization used to parse middlebury stereo 2005 two-views data
+#else //!USE_MIDDLEBURY_SPECIALIZATION
+#include "litiv/imgproc.hpp" // includes all edge detection algos, along with most core utility & opencv headers
+#endif //!USE_MIDDLEBURY_SPECIALIZATION
 
 int main(int, char**) { // this sample uses no command line argument
     try { // its always a good idea to scope your app's top level in some try/catch blocks!
-
         std::cout << "\nNote: a directory will be created at '" << lv::GetCurrentWorkDirPath() << "'\n" << std::endl;
+
+#if USE_MIDDLEBURY_SPECIALIZATION
+
+        // The 'DatasetType' alias below is only used to simplify templating; the 'Dataset_' interface
+        // has three enum template parameters, namely the dataset task type ('eDatasetTask'), the datset
+        // identifier ('eDataset'), and the implementation type ('eEvalImpl'). For this example, we ask for
+        // the cosegmentation task interface since it is compatible with stereo disparity estimation; we are
+        // also using our own specialized dataset implementation, so we set the dataset identifier to our own
+        // predefined ID; finally, we only require a traditional evaluation approach (i.e. not asynchronous),
+        // so we use 'NonParallel'.
+        using DatasetType = lv::Dataset_<lv::DatasetTask_Cosegm,lv::Dataset_Middlebury2005_demo,lv::NonParallel>;
+
+        // Next, creating the dataset will automatically create work batches, and parse the data for each using
+        // the specialized functions from 'middlebury2005.hpp'.
+        DatasetType::Ptr pDataset = DatasetType::create("results_test",true);
+        lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false); // returns a list of all work batches in the dataset without considering hierarchy
+        lvAssert__(vpBatches.size()>0 && pDataset->getInputCount()>0,"Could not parse any data for dataset '%s'",pDataset->getName().c_str()); // check that data was indeed properly parsed
+        std::cout << "Parsing complete. [" << vpBatches.size() << " batch(es)]" << std::endl; // a 'batch' is an instance of evaluable work for the specified task (batches can also be grouped by category)
+        for(auto& pBatch : vpBatches) { // loop over all batches (or over all image array sets, in this case)
+            DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch); // cast the batch object for full task-specific interface accessibility
+            std::cout << "\tDisplaying batch '" << oBatch.getName() << "'" << std::endl;
+            lvAssert_(oBatch.getInputCount()==1 && oBatch.getGTCount()==1,"bad packet count"); // each work batch of the middlebury dataset has a single packet (i.e. a stereo array)
+            const std::vector<cv::Mat>& vImages = oBatch.getInputArray(0); // will return the input array packet to be processed
+            const std::vector<cv::Mat>& vGTMaps = oBatch.getGTArray(0); // will return the gt array packet to be processed
+            lvAssert_(vImages.size()==2 && vGTMaps.size()==2,"bad packet array size"); // the array should only contain two matrices (one for each stereo head)
+            for(size_t nStreamIdx=0; nStreamIdx<vImages.size(); ++nStreamIdx) {
+                cv::imshow(oBatch.getInputStreamName(nStreamIdx),vImages[nStreamIdx]);
+                cv::imshow(oBatch.getGTStreamName(nStreamIdx),vGTMaps[nStreamIdx]);
+            }
+            cv::waitKey(0);
+        }
+        std::cout << "All done!\n" << std::endl;
+
+#else //USE_MIDDLEBURY_SPECIALIZATION
 
         // The 'DatasetType' alias below is only used to simplify templating; the 'Dataset_' interface
         // has three enum template parameters, namely the dataset task type ('eDatasetTask'), the datset
@@ -137,6 +175,9 @@ int main(int, char**) { // this sample uses no command line argument
         }
         pDataset->writeEvalReport(); // will write a basic evaluation report listing processed packet counts, processing speed, session duration, and framework version
         std::cout << "All done!\n" << std::endl;
+
+#endif //USE_MIDDLEBURY_SPECIALIZATION
+
     }
     catch(const cv::Exception& e) {std::cout << "\nmain caught cv::Exception:\n" << e.what() << "\n" << std::endl; return -1;}
     catch(const std::exception& e) {std::cout << "\nmain caught std::exception:\n" << e.what() << "\n" << std::endl; return -1;}

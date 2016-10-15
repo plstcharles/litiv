@@ -16,6 +16,6 @@
 # limitations under the License.
 
 project(dataset_simple)
-add_executable(dataset_simple src/main.cpp) # only one source file in this project
+add_executable(dataset_simple src/main.cpp src/middlebury2005.hpp)
 target_link_libraries(dataset_simple litiv_world) # litiv_world indirectly links all subdependencies (opencv, ...)
 set_target_properties(dataset_simple PROPERTIES FOLDER "samples") # groups this project with other samples in the IDE
