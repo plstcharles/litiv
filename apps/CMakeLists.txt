@@ -19,5 +19,6 @@ add_subdirectory("capture") # sync'd RGB-D-NIR-FLIR video capture application (p
 add_subdirectory("changedet") # change detection/background subtraction benchmark application
 #add_subdirectory("cosegm") # cosegmentation testbench & development sandbox (WiP, requires OpenGM)
 add_subdirectory("edges") # edge detection benchmark application
+add_subdirectory("handregistr") # manual, visual-point-driven video registration application
 #add_subdirectory("vidreg") # video registration benchmark application (disabled as of march 2016, incomplete)
 add_subdirectory("vptz") # vptz module visualization utilities & evaluation applications
