@@ -144,7 +144,20 @@ namespace cv { // extending cv
 
     /// helper struct for image display & callback management (must be created via DisplayHelper::create due to enable_shared_from_this interface)
     struct DisplayHelper : lv::enable_shared_from_this<DisplayHelper> {
-
+        /// displayed window title (specified on creation)
+        const std::string m_sDisplayName;
+        /// displayed window maximum size (specified on creation)
+        const cv::Size m_oMaxDisplaySize;
+        /// general-use file storage tied to the display helper (will be closed & printed on helper destruction)
+        cv::FileStorage m_oFS;
+        /// public mutex that should be always used if m_oLatestMouseEvent is accessed externally
+        std::mutex m_oEventMutex;
+        /// raw-interpreted callback data structure
+        struct CallbackData {
+            cv::Point2i oPosition,oInternalPosition;
+            cv::Size oTileSize,oDisplaySize;
+            int nEvent,nFlags;
+        } m_oLatestMouseEvent;
         /// by default, comes with a filestorage algorithms can use for debug
         static DisplayHelperPtr create(const std::string& sDisplayName,
                                        const std::string& sDebugFSDirPath="./",
@@ -156,34 +169,26 @@ namespace cv { // extending cv
         void display(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oOutputImg, size_t nIdx);
         /// will reformat the given images, print their names and mouse cursor point on them, and show them based on row-col ordering
         void display(const std::vector<std::vector<std::pair<cv::Mat,std::string>>>& vvImageNamePairs, const cv::Size& oSuggestedTileSize);
-
-        /// will call cv::waitKey and block if m_bContinuousUpdates is false, and loop otherwise (also returns cv::waitKey's captured value)
+        /// sets the provided external function to be called when mouse events are captured for the displayed window
+        void setMouseCallback(std::function<void(const CallbackData&)> lCallback);
+        /// sets whether the waitKey call should block and wait for a key press or allow timeouts and return without one
+        void setContinuousUpdates(bool b);
+        /// calls cv::waitKey (blocking for a key press if m_bContinuousUpdates is false) and returns the cv::waitKey result
         int waitKey(int nDefaultSleepDelay=1);
         /// desctructor automatically closes its window
         ~DisplayHelper();
-
-        const std::string m_sDisplayName;
-        const cv::Size m_oMaxDisplaySize;
-        cv::FileStorage m_oDebugFS; // will be closed & printed when released, i.e. on destruction
-        std::mutex m_oEventMutex; // should be always used if m_oLatestMouseEvent is accessed externally
-        struct {
-            cv::Point2i oPosition;
-            cv::Size oDisplaySize;
-            int nEvent;
-            int nFlags;
-        } m_oLatestMouseEvent;
-
-    private:
-        DisplayHelper(const std::string& sDisplayName,
-                      const std::string& sDebugFSDirPath,
-                      const cv::Size& oMaxSize,
-                      int nWindowFlags);
-        cv::Size m_oLastDisplaySize;
-        bool m_bContinuousUpdates;
-        bool m_bFirstDisplay;
-        std::function<void(int,int,int,int)> m_oMouseEventCallback;
+    protected:
+        /// should always be constructor via static 'create' member due to enable_shared_from_this interface
+        DisplayHelper(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags);
+        /// local entrypoint for opencv mouse callbacks
         void onMouseEventCallback(int nEvent, int x, int y, int nFlags);
+        /// global entrypoint for opencv mouse callbacks
         static void onMouseEvent(int nEvent, int x, int y, int nFlags, void* pData);
+        cv::Size m_oLastDisplaySize,m_oLastTileSize;
+        bool m_bContinuousUpdates,m_bFirstDisplay;
+        cv::Mat m_oLastDisplay;
+        std::function<void(int,int,int,int)> m_lInternalCallback;
+        std::function<void(const CallbackData&)> m_lExternalCallback;
     };
 
     /// returns an always-empty-mat by reference

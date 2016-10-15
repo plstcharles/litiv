@@ -29,13 +29,14 @@ cv::DisplayHelperPtr cv::DisplayHelper::create(const std::string& sDisplayName, 
 cv::DisplayHelper::DisplayHelper(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) :
         m_sDisplayName(sDisplayName),
         m_oMaxDisplaySize(oMaxSize),
-        m_oDebugFS(lv::AddDirSlashIfMissing(sDebugFSDirPath)+sDisplayName+"_debug.yml",cv::FileStorage::WRITE),
+        m_oFS(lv::AddDirSlashIfMissing(sDebugFSDirPath)+sDisplayName+".yml",cv::FileStorage::WRITE),
         m_oLastDisplaySize(cv::Size(0,0)),
+        m_oLastTileSize(cv::Size(0,0)),
         m_bContinuousUpdates(false),
         m_bFirstDisplay(true),
-        m_oMouseEventCallback(std::bind(&DisplayHelper::onMouseEventCallback,this,std::placeholders::_1,std::placeholders::_2,std::placeholders::_3,std::placeholders::_4)) {
+        m_lInternalCallback(std::bind(&DisplayHelper::onMouseEventCallback,this,std::placeholders::_1,std::placeholders::_2,std::placeholders::_3,std::placeholders::_4)) {
     cv::namedWindow(m_sDisplayName,nWindowFlags); // @@@ if it blocks, recompile opencv without Qt (bug still here as of OpenCV 3.1)
-    cv::setMouseCallback(m_sDisplayName,onMouseEvent,(void*)&m_oMouseEventCallback);
+    cv::setMouseCallback(m_sDisplayName,onMouseEvent,(void*)&m_lInternalCallback);
 }
 
 cv::DisplayHelper::~DisplayHelper() {
@@ -43,100 +44,14 @@ cv::DisplayHelper::~DisplayHelper() {
 }
 
 void cv::DisplayHelper::display(const cv::Mat& oImage, size_t nIdx) {
-    lvAssert_(!oImage.empty() && (oImage.type()==CV_8UC1 || oImage.type()==CV_8UC3 || oImage.type()==CV_8UC4),"image to display must be non-empty, and of type 8UC1/8UC3/8UC4");
-    cv::Mat oImageBYTE3;
-    if(oImage.channels()==1)
-        cv::cvtColor(oImage,oImageBYTE3,cv::COLOR_GRAY2BGR);
-    else if(oImage.channels()==4)
-        cv::cvtColor(oImage,oImageBYTE3,cv::COLOR_BGRA2BGR);
-    else
-        oImageBYTE3 = oImage.clone();
-    cv::Size oCurrDisplaySize;
-    if(m_oMaxDisplaySize.area()>0 && (oImageBYTE3.cols>m_oMaxDisplaySize.width || oImageBYTE3.rows>m_oMaxDisplaySize.height)) {
-        if(oImageBYTE3.cols>m_oMaxDisplaySize.width && oImageBYTE3.cols>oImageBYTE3.rows)
-            oCurrDisplaySize = cv::Size(m_oMaxDisplaySize.width,int(m_oMaxDisplaySize.width*(float(oImageBYTE3.rows)/oImageBYTE3.cols)));
-        else
-            oCurrDisplaySize = cv::Size(int(m_oMaxDisplaySize.height*(float(oImageBYTE3.cols)/oImageBYTE3.rows)),m_oMaxDisplaySize.height);
-        cv::resize(oImageBYTE3,oImageBYTE3,oCurrDisplaySize);
-    }
-    else
-        oCurrDisplaySize = oImageBYTE3.size();
-    std::stringstream sstr;
-    sstr << "Image #" << nIdx;
-    putText(oImageBYTE3,sstr.str(),cv::Scalar_<uchar>(0,0,255));
-    if(m_bFirstDisplay) {
-        putText(oImageBYTE3,"[Press space to continue]",cv::Scalar_<uchar>(0,0,255),true,cv::Point2i(oImageBYTE3.cols/2-40,15));
-        m_bFirstDisplay = false;
-    }
-    std::mutex_lock_guard oLock(m_oEventMutex);
-    const cv::Point2i& oDbgPt = m_oLatestMouseEvent.oPosition;
-    const cv::Size& oLastDbgSize = m_oLatestMouseEvent.oDisplaySize;
-    if(oDbgPt.x>=0 && oDbgPt.y>=0 && oDbgPt.x<oLastDbgSize.width && oDbgPt.y<oLastDbgSize.height) {
-        const cv::Point2i oDbgPt_rescaled(int(oCurrDisplaySize.width*(float(oDbgPt.x)/oLastDbgSize.width)),int(oCurrDisplaySize.height*(float(oDbgPt.y)/oLastDbgSize.height)));
-        cv::circle(oImageBYTE3,oDbgPt_rescaled,5,cv::Scalar(255,255,255));
-    }
-    cv::imshow(m_sDisplayName,oImageBYTE3);
-    m_oLastDisplaySize = oCurrDisplaySize;
+    display(std::vector<std::vector<std::pair<cv::Mat,std::string>>>{{std::make_pair(oImage,cv::format("Image #%d",(int)nIdx))}},oImage.size());
 }
 void cv::DisplayHelper::display(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oOutputImg, size_t nIdx) {
-    lvAssert_(!oInputImg.empty() && (oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3 || oInputImg.type()==CV_8UC4),"input image must be 8UC1/8UC3/8UC4");
-    lvAssert_(!oDebugImg.empty() && (oDebugImg.type()==CV_8UC1 || oDebugImg.type()==CV_8UC3 || oDebugImg.type()==CV_8UC4),"debug image must be 8UC1/8UC3/8UC4");
-    lvAssert_(!oOutputImg.empty() && (oOutputImg.type()==CV_8UC1 || oOutputImg.type()==CV_8UC3 || oOutputImg.type()==CV_8UC4),"output image must be 8UC1/8UC3/8UC4");
-    lvAssert_(oOutputImg.size()==oInputImg.size() && oDebugImg.size()==oInputImg.size(),"all provided mat sizes must match");
-    cv::Mat oInputImgBYTE3, oDebugImgBYTE3, oOutputImgBYTE3;
-    if(oInputImg.channels()==1)
-        cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_GRAY2BGR);
-    else if(oInputImg.channels()==4)
-        cv::cvtColor(oInputImg,oInputImgBYTE3,cv::COLOR_BGRA2BGR);
-    else
-        oInputImgBYTE3 = oInputImg.clone();
-    if(oDebugImg.channels()==1)
-        cv::cvtColor(oDebugImg,oDebugImgBYTE3,cv::COLOR_GRAY2BGR);
-    else if(oDebugImg.channels()==4)
-        cv::cvtColor(oDebugImg,oDebugImgBYTE3,cv::COLOR_BGRA2BGR);
-    else
-        oDebugImgBYTE3 = oDebugImg.clone();
-    if(oOutputImg.channels()==1)
-        cv::cvtColor(oOutputImg,oOutputImgBYTE3,cv::COLOR_GRAY2BGR);
-    else if(oOutputImg.channels()==4)
-        cv::cvtColor(oOutputImg,oDebugImgBYTE3,cv::COLOR_BGRA2BGR);
-    else
-        oOutputImgBYTE3 = oOutputImg.clone();
-    cv::Size oCurrDisplaySize;
-    if(m_oMaxDisplaySize.area()>0 && (oOutputImgBYTE3.cols*3>m_oMaxDisplaySize.width || oOutputImgBYTE3.rows>m_oMaxDisplaySize.height)) {
-        if(oOutputImgBYTE3.cols*3>m_oMaxDisplaySize.width && oOutputImgBYTE3.cols>oOutputImgBYTE3.rows)
-            oCurrDisplaySize = cv::Size((m_oMaxDisplaySize.width/3),int((m_oMaxDisplaySize.width/3)*(float(oOutputImgBYTE3.rows)/oOutputImgBYTE3.cols)));
-        else
-            oCurrDisplaySize = cv::Size(int(m_oMaxDisplaySize.height*(float(oOutputImgBYTE3.cols)/oOutputImgBYTE3.rows)),m_oMaxDisplaySize.height);
-        cv::resize(oInputImgBYTE3,oInputImgBYTE3,oCurrDisplaySize);
-        cv::resize(oDebugImgBYTE3,oDebugImgBYTE3,oCurrDisplaySize);
-        cv::resize(oOutputImgBYTE3,oOutputImgBYTE3,oCurrDisplaySize);
-    }
-    else
-        oCurrDisplaySize = oOutputImgBYTE3.size();
-    std::stringstream sstr;
-    sstr << "Input #" << nIdx;
-    putText(oInputImgBYTE3,sstr.str(),cv::Scalar_<uchar>(0,0,255));
-    putText(oDebugImgBYTE3,"Debug",cv::Scalar_<uchar>(0,0,255));
-    putText(oOutputImgBYTE3,"Output",cv::Scalar_<uchar>(0,0,255));
-    if(m_bFirstDisplay) {
-        putText(oDebugImgBYTE3,"[Press space to continue]",cv::Scalar_<uchar>(0,0,255),true,cv::Point2i(oDebugImgBYTE3.cols/2-100,15),1,1.0);
-        m_bFirstDisplay = false;
-    }
-    std::mutex_lock_guard oLock(m_oEventMutex);
-    const cv::Point2i& oDisplayPt = m_oLatestMouseEvent.oPosition;
-    const cv::Size& oLastDisplaySize = m_oLatestMouseEvent.oDisplaySize;
-    if(oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oLastDisplaySize.width && oDisplayPt.y<oLastDisplaySize.height) {
-        const cv::Point2i oDisplayPt_rescaled(int(oCurrDisplaySize.width*(float(oDisplayPt.x%(oLastDisplaySize.width/3))/(oLastDisplaySize.width/3))),int(oCurrDisplaySize.height*(float(oDisplayPt.y)/oLastDisplaySize.height)));
-        cv::circle(oInputImgBYTE3,oDisplayPt_rescaled,5,cv::Scalar(255,255,255));
-        cv::circle(oDebugImgBYTE3,oDisplayPt_rescaled,5,cv::Scalar(255,255,255));
-        cv::circle(oOutputImgBYTE3,oDisplayPt_rescaled,5,cv::Scalar(255,255,255));
-    }
-    cv::Mat displayH;
-    cv::hconcat(oInputImgBYTE3,oDebugImgBYTE3,displayH);
-    cv::hconcat(displayH,oOutputImgBYTE3,displayH);
-    cv::imshow(m_sDisplayName,displayH);
-    m_oLastDisplaySize = displayH.size();
+    display(std::vector<std::vector<std::pair<cv::Mat,std::string>>>{{
+        std::make_pair(oInputImg,cv::format("Input #%d",(int)nIdx)),
+        std::make_pair(oDebugImg,std::string("Debug")),
+        std::make_pair(oOutputImg,std::string("Output")),
+    }},oInputImg.size());
 }
 
 void cv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,std::string>>>& vvImageNamePairs, const cv::Size& oSuggestedTileSize) {
@@ -164,10 +79,7 @@ void cv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
     }
     const cv::Size oNewTileSize(int(oCurrDisplaySize.width/nColCount),int(oCurrDisplaySize.height/nRowCount));
     const cv::Size oFinalDisplaySize(int(oNewTileSize.width*nColCount),int(oNewTileSize.height*nRowCount));
-    std::mutex_lock_guard oLock(m_oEventMutex);
-    const cv::Point2i& oDisplayPt = m_oLatestMouseEvent.oPosition;
-    const cv::Size& oLastDisplaySize = m_oLatestMouseEvent.oDisplaySize;
-    cv::Mat oOutput;
+    const cv::Point2i& oDisplayPt = m_oLatestMouseEvent.oInternalPosition;
     for(size_t nRowIdx=0; nRowIdx<nRowCount; ++nRowIdx) {
         cv::Mat oOutputRow;
         for(size_t nColIdx=0; nColIdx<nColCount; ++nColIdx) {
@@ -187,27 +99,35 @@ void cv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
                 cv::resize(oImageBYTE3,oImageBYTE3,oNewTileSize);
             if(!vvImageNamePairs[nRowIdx][nColIdx].second.empty())
                 putText(oImageBYTE3,vvImageNamePairs[nRowIdx][nColIdx].second,cv::Scalar_<uchar>(0,0,255));
-            if(oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oLastDisplaySize.width && oDisplayPt.y<oLastDisplaySize.height && oLastDisplaySize==oFinalDisplaySize) {
-                const cv::Point2i oDisplayPt_raw(oDisplayPt.x%oNewTileSize.width,oDisplayPt.y%oNewTileSize.height);
-                cv::circle(oImageBYTE3,oDisplayPt_raw,5,cv::Scalar(255,255,255));
-            }
+            if(oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oNewTileSize.width && oDisplayPt.y<oNewTileSize.height && m_oLatestMouseEvent.oTileSize==oNewTileSize)
+                cv::circle(oImageBYTE3,oDisplayPt,5,cv::Scalar(255,255,255));
             if(oOutputRow.empty())
                 oOutputRow = oImageBYTE3;
             else
                 cv::hconcat(oOutputRow,oImageBYTE3,oOutputRow);
         }
-        if(oOutput.empty())
-            oOutput = oOutputRow;
+        if(nRowIdx==0)
+            m_oLastDisplay = oOutputRow;
         else
-            cv::vconcat(oOutput,oOutputRow,oOutput);
+            cv::vconcat(m_oLastDisplay,oOutputRow,m_oLastDisplay);
     }
-    if(m_bFirstDisplay) {
-        putText(oOutput,"[Press space to continue]",cv::Scalar_<uchar>(0,0,255),true,cv::Point2i(oOutput.cols/2-100,15),1,1.0);
+    if(m_bFirstDisplay && !m_bContinuousUpdates) {
+        putText(m_oLastDisplay,"[Press space to continue]",cv::Scalar_<uchar>(0,0,255),true,cv::Point2i(m_oLastDisplay.cols/2-100,15),1,1.0);
         m_bFirstDisplay = false;
     }
-    lvAssert(oOutput.size()==oFinalDisplaySize);
-    cv::imshow(m_sDisplayName,oOutput);
-    m_oLastDisplaySize = oOutput.size();
+    lvAssert(m_oLastDisplay.size()==oFinalDisplaySize);
+    cv::imshow(m_sDisplayName,m_oLastDisplay);
+    m_oLastDisplaySize = m_oLastDisplay.size();
+    m_oLastTileSize = oNewTileSize;
+}
+
+void cv::DisplayHelper::setMouseCallback(std::function<void(const CallbackData&)> lCallback) {
+    std::mutex_lock_guard oLock(m_oEventMutex);
+    m_lExternalCallback = lCallback;
+}
+
+void cv::DisplayHelper::setContinuousUpdates(bool b) {
+    m_bContinuousUpdates = b;
 }
 
 int cv::DisplayHelper::waitKey(int nDefaultSleepDelay) {
@@ -225,10 +145,15 @@ int cv::DisplayHelper::waitKey(int nDefaultSleepDelay) {
 
 void cv::DisplayHelper::onMouseEventCallback(int nEvent, int x, int y, int nFlags) {
     std::mutex_lock_guard oLock(m_oEventMutex);
-    m_oLatestMouseEvent.oPosition = cv::Point2i(x,y);
+    m_oLatestMouseEvent.oPosition = m_oLatestMouseEvent.oInternalPosition = cv::Point2i(x,y);
+    m_oLatestMouseEvent.oTileSize = m_oLastTileSize;
     m_oLatestMouseEvent.oDisplaySize = m_oLastDisplaySize;
+    if(x>=0 && y>=0 && x<m_oLastDisplaySize.width && y<m_oLastDisplaySize.height && m_oLastTileSize.area()>0)
+        m_oLatestMouseEvent.oInternalPosition = cv::Point2i(x%m_oLastTileSize.width,y%m_oLastTileSize.height);
     m_oLatestMouseEvent.nEvent = nEvent;
     m_oLatestMouseEvent.nFlags = nFlags;
+    if(m_lExternalCallback)
+        m_lExternalCallback(m_oLatestMouseEvent);
 }
 
 void cv::DisplayHelper::onMouseEvent(int nEvent, int x, int y, int nFlags, void* pData) {

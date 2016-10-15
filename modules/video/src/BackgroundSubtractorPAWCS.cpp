@@ -1488,13 +1488,13 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
             const float fCurrModelL1DistRatio = lv::L1dist((float*)m_oMeanDownSampledLastDistFrame_LT.data,(float*)oDownSampledBackgroundImg_32F.data,m_oMeanDownSampledLastDistFrame_LT.total(),m_nImgChannels,cv::Mat(m_oDownSampledROI_MotionAnalysis==UCHAR_MAX).data)/m_nDownSampledROIPxCount;
             const float fCurrModelCDistRatio = lv::cdist((float*)m_oMeanDownSampledLastDistFrame_LT.data,(float*)oDownSampledBackgroundImg_32F.data,m_oMeanDownSampledLastDistFrame_LT.total(),m_nImgChannels,cv::Mat(m_oDownSampledROI_MotionAnalysis==UCHAR_MAX).data)/m_nDownSampledROIPxCount;
             if(m_bUsingMovingCamera && fCurrModelL1DistRatio<FRAMELEVEL_MIN_L1DIST_THRES/4 && fCurrModelCDistRatio<FRAMELEVEL_MIN_CDIST_THRES/4) {
-                if(m_pDisplayHelper) m_pDisplayHelper->m_oDebugFS << m_pDisplayHelper->m_sDisplayName << "{:" << "deactivated low offset mode at" << (int)m_nFrameIdx << "}";
+                if(m_pDisplayHelper) m_pDisplayHelper->m_oFS << m_pDisplayHelper->m_sDisplayName << "{:" << "deactivated low offset mode at" << (int)m_nFrameIdx << "}";
                 m_nLocalWordWeightOffset = DEFAULT_LWORD_WEIGHT_OFFSET;
                 m_bUsingMovingCamera = false;
                 refreshModel(1,1,true);
             }
             else if(bBootstrapping && !m_bUsingMovingCamera && (fCurrModelL1DistRatio>=FRAMELEVEL_MIN_L1DIST_THRES || fCurrModelCDistRatio>=FRAMELEVEL_MIN_CDIST_THRES)) {
-                if(m_pDisplayHelper) m_pDisplayHelper->m_oDebugFS << m_pDisplayHelper->m_sDisplayName << "{:" << "activated low offset mode at" << (int)m_nFrameIdx << "}";
+                if(m_pDisplayHelper) m_pDisplayHelper->m_oFS << m_pDisplayHelper->m_sDisplayName << "{:" << "activated low offset mode at" << (int)m_nFrameIdx << "}";
                 m_nLocalWordWeightOffset = 5;
                 m_bUsingMovingCamera = true;
                 refreshModel(1,1,true);
@@ -1503,7 +1503,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
         if(m_nFramesSinceLastReset>DEFAULT_BOOTSTRAP_WIN_SIZE*2)
             m_bAutoModelResetEnabled = false;
         else if(fCurrMeanL1DistRatio>=FRAMELEVEL_MIN_L1DIST_THRES && m_nModelResetCooldown==0) {
-            if(m_pDisplayHelper) m_pDisplayHelper->m_oDebugFS << m_pDisplayHelper->m_sDisplayName << "{:" << "triggered model reset at" << (int)m_nFrameIdx << "}";
+            if(m_pDisplayHelper) m_pDisplayHelper->m_oFS << m_pDisplayHelper->m_sDisplayName << "{:" << "triggered model reset at" << (int)m_nFrameIdx << "}";
             m_nFramesSinceLastReset = 0;
             refreshModel(m_nLocalWordWeightOffset/8,0,true);
             m_nModelResetCooldown = nCurrSamplesForMovingAvg_ST;
