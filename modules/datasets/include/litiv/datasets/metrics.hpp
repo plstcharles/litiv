@@ -330,5 +330,8 @@ namespace lv {
         }
     };
 
+    /// metric retriever interface specialization; exposes no functions when eval type is 'none'
+    template<DatasetList eDataset>
+    struct MetricRetriever_<DatasetEval_None,eDataset> {};
 
 } // namespace lv
