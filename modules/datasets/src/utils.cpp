@@ -851,11 +851,13 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_VideoArray>::getRawInput(size_t nPa
             oPacket = oCurrImg;
         else {
             // default 'packing' strategy for image packets is continuous data concat
-            lvAssert(oPacket.isContinuous() && oCurrImg.isContinuous() && oPacket.type()==oCurrImg.type());
+            lvAssert_(oPacket.type()==oCurrImg.type(),"all packets must have same type in default impl");
+            lvDbgAssert(oPacket.isContinuous() && oCurrImg.isContinuous());
             lvDbgAssert(size_t(oPacket.dataend-oPacket.datastart)==oPacket.total()*oPacket.elemSize());
-            cv::Mat oNewPacket(1,oPacket.size().area()+oPacketSize.area(),oPacket.type());
+            cv::Mat oNewPacket(int(oPacket.total())+oPacketSize.area(),1,oPacket.type());
             std::copy(oPacket.datastart,oPacket.dataend,oNewPacket.data);
             std::copy(oCurrImg.datastart,oCurrImg.dataend,oNewPacket.data+uintptr_t(oPacket.dataend-oPacket.datastart));
+            oPacket = oNewPacket;
         }
     }
     return oPacket;
@@ -887,11 +889,13 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_VideoArray>::getRawGT(size_t nPacke
                     oPacket = oCurrImg;
                 else {
                     // default 'packing' strategy for image packets is continuous data concat
-                    lvAssert(oPacket.isContinuous() && oCurrImg.isContinuous() && oPacket.type()==oCurrImg.type());
+                    lvAssert_(oPacket.type()==oCurrImg.type(),"all packets must have same type in default impl");
+                    lvDbgAssert(oPacket.isContinuous() && oCurrImg.isContinuous());
                     lvDbgAssert(size_t(oPacket.dataend-oPacket.datastart)==oPacket.total()*oPacket.elemSize());
-                    cv::Mat oNewPacket(1,oPacket.size().area()+oPacketSize.area(),oPacket.type());
+                    cv::Mat oNewPacket(int(oPacket.total())+oPacketSize.area(),1,oPacket.type());
                     std::copy(oPacket.datastart,oPacket.dataend,oNewPacket.data);
                     std::copy(oCurrImg.datastart,oCurrImg.dataend,oNewPacket.data+uintptr_t(oPacket.dataend-oPacket.datastart));
+                    oPacket = oNewPacket;
                 }
             }
             return oPacket;
@@ -1060,7 +1064,7 @@ const cv::Size& lv::IDataProducer_<lv::DatasetSource_ImageArray>::getGTMaxSize()
 }
 
 lv::IDataProducer_<lv::DatasetSource_ImageArray>::IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
-        IDataLoader_<Array>(ImagePacket,eGTType,eOutputType,eGTMappingType,eIOMappingType) {}
+        IDataLoader_<Array>(ImageArrayPacket,eGTType,eOutputType,eGTMappingType,eIOMappingType) {}
 
 cv::Mat lv::IDataProducer_<lv::DatasetSource_ImageArray>::getRawInput(size_t nPacketIdx) {
     if(nPacketIdx>=m_vvsInputPaths.size())
@@ -1086,11 +1090,13 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_ImageArray>::getRawInput(size_t nPa
             oPacket = oCurrImg;
         else {
             // default 'packing' strategy for image packets is continuous data concat
-            lvAssert(oPacket.isContinuous() && oCurrImg.isContinuous() && oPacket.type()==oCurrImg.type());
+            lvAssert_(oPacket.type()==oCurrImg.type(),"all packets must have same type in default impl");
+            lvDbgAssert(oPacket.isContinuous() && oCurrImg.isContinuous());
             lvDbgAssert(size_t(oPacket.dataend-oPacket.datastart)==oPacket.total()*oPacket.elemSize());
-            cv::Mat oNewPacket(1,oPacket.size().area()+oPacketSize.area(),oPacket.type());
+            cv::Mat oNewPacket(int(oPacket.total())+oPacketSize.area(),1,oPacket.type());
             std::copy(oPacket.datastart,oPacket.dataend,oNewPacket.data);
             std::copy(oCurrImg.datastart,oCurrImg.dataend,oNewPacket.data+uintptr_t(oPacket.dataend-oPacket.datastart));
+            oPacket = oNewPacket;
         }
     }
     return oPacket;
@@ -1122,11 +1128,13 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_ImageArray>::getRawGT(size_t nPacke
                     oPacket = oCurrImg;
                 else {
                     // default 'packing' strategy for image packets is continuous data concat
-                    lvAssert(oPacket.isContinuous() && oCurrImg.isContinuous() && oPacket.type()==oCurrImg.type());
+                    lvAssert_(oPacket.type()==oCurrImg.type(),"all packets must have same type in default impl");
+                    lvDbgAssert(oPacket.isContinuous() && oCurrImg.isContinuous());
                     lvDbgAssert(size_t(oPacket.dataend-oPacket.datastart)==oPacket.total()*oPacket.elemSize());
-                    cv::Mat oNewPacket(1,oPacket.size().area()+oPacketSize.area(),oPacket.type());
+                    cv::Mat oNewPacket(int(oPacket.total())+oPacketSize.area(),1,oPacket.type());
                     std::copy(oPacket.datastart,oPacket.dataend,oNewPacket.data);
                     std::copy(oCurrImg.datastart,oCurrImg.dataend,oNewPacket.data+uintptr_t(oPacket.dataend-oPacket.datastart));
+                    oPacket = oNewPacket;
                 }
             }
             return oPacket;
