@@ -185,7 +185,6 @@ namespace lv {
     using IDataHandlerPtrArray = std::vector<IDataHandlerPtr>;
     using IDataHandlerConstPtr = std::shared_ptr<const IDataHandler>;
     using IDataHandlerConstPtrArray = std::vector<IDataHandlerConstPtr>;
-    using IDataHandlerPtrQueue = std::priority_queue<IDataHandlerPtr,IDataHandlerPtrArray,std::function<bool(const IDataHandlerPtr&,const IDataHandlerPtr&)>>;
     using AsyncDataCallbackFunc = std::function<void(const cv::Mat& /*oInput*/,const cv::Mat& /*oDebug*/,const cv::Mat& /*oOutput*/,const cv::Mat& /*oGT*/,const cv::Mat& /*oGTROI*/,size_t /*nIdx*/)>;
 
     /// fully abstract data handler interface (work batch and work group implementations will derive from this)
@@ -256,8 +255,6 @@ namespace lv {
         virtual bool isGroup() const = 0;
         /// returns the children of this work batch/group (if any) as a work batch array
         virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const = 0;
-        /// returns the children of this work batch/group (if any) as a work batch array, sorted by expected CPU load
-        virtual IDataHandlerPtrQueue getSortedBatches(bool bWithHierarchy) const = 0;
         /// returns which processing task this work batch/group was built for
         virtual DatasetTaskList getDatasetTask() const = 0;
         /// returns which data source this work batch/group was built for
@@ -382,8 +379,6 @@ namespace lv {
         virtual bool isGroup() const override final;
         /// returns this work group's children batches
         virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const override final;
-        /// returns this work group's children batches, sorted by expected CPU load
-        virtual IDataHandlerPtrQueue getSortedBatches(bool bWithHierarchy) const override final;
         /// initializes precaching in all children work batches
         virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) override final;
         /// stops precaching in all children work batches

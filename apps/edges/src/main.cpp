@@ -72,7 +72,7 @@ using EdgeDetectorType = EdgeDetectorLBSP;
 int main(int, char**) {
     try {
         DatasetType::Ptr pDataset = DatasetType::create(DATASET_PARAMS);
-        lv::IDataHandlerPtrQueue vpBatches = pDataset->getSortedBatches(false);
+        lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false);
         const size_t nTotPackets = pDataset->getInputCount();
         const size_t nTotBatches = vpBatches.size();
         if(nTotBatches==0 || nTotPackets==0)
@@ -81,16 +81,11 @@ int main(int, char**) {
         std::cout << "\n[" << lv::getTimeStamp() << "]\n" << std::endl;
         std::cout << "Executing algorithm with " << DATASET_WORKTHREADS << " thread(s)..." << std::endl;
         lv::WorkerPool<DATASET_WORKTHREADS> oPool;
-        std::queue<std::future<void>> vTaskResults;
-        while(!vpBatches.empty()) {
-            lv::IDataHandlerPtr pBatch = vpBatches.top();
-            vTaskResults.push(oPool.queueTask(Analyze,std::to_string(nTotBatches-vpBatches.size()+1)+"/"+std::to_string(nTotBatches),pBatch));
-            vpBatches.pop();
-        }
-        while(!vTaskResults.empty()) {
-            vTaskResults.front().get();
-            vTaskResults.pop();
-        }
+        std::vector<std::future<void>> vTaskResults;
+        for(lv::IDataHandlerPtr pBatch : vpBatches)
+            vTaskResults.push_back(oPool.queueTask(Analyze,std::to_string(nTotBatches-vpBatches.size()+1)+"/"+std::to_string(nTotBatches),pBatch));
+        for(std::future<void>& oTaskRes : vTaskResults)
+            oTaskRes.get();
         pDataset->writeEvalReport();
     }
     catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}

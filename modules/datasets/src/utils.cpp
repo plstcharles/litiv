@@ -224,13 +224,6 @@ lv::IDataHandlerPtrArray lv::DataGroupHandler::getBatches(bool bWithHierarchy) c
     return vpBatches;
 }
 
-lv::IDataHandlerPtrQueue lv::DataGroupHandler::getSortedBatches(bool bWithHierarchy) const {
-    IDataHandlerPtrQueue vpBatches(&IDataHandler::compare_load<IDataHandler>);
-    for(const auto& pBatch : getBatches(bWithHierarchy))
-        vpBatches.push(pBatch);
-    return vpBatches;
-}
-
 void lv::DataGroupHandler::startPrecaching(bool bPrecacheGT, size_t nSuggestedBufferSize) {
     for(const auto& pBatch : getBatches(true))
         pBatch->startPrecaching(bPrecacheGT,nSuggestedBufferSize);

@@ -88,8 +88,6 @@ namespace lv {
             virtual bool isGroup() const override final {return false;}
             /// always returns an empty data handler array for non-group work batches
             virtual IDataHandlerPtrArray getBatches(bool /*bWithHierarchy*/) const override final {return IDataHandlerPtrArray();}
-            /// always returns an empty data handler array for non-group work batches
-            virtual IDataHandlerPtrQueue getSortedBatches(bool /*bWithHierarchy*/) const override final {return IDataHandlerPtrQueue();}
             /// sets the work batch in 'processing' mode, initializing timers, packet counters and other time-critical evaluation components (if any)
             inline void startProcessing() {
                 lvDbgExceptionWatch;
