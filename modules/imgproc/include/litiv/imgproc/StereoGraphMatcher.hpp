@@ -250,7 +250,7 @@ struct StereoGraphMatcher : public ICosegmentor<STEREOGRPHMATCH_LABEL_TYPE,2> {
     }
 
     /// stereo matcher function; solves the graph model to find pixel-level matches on epipolar lines, and returns disparity masks
-    virtual void apply(const MatArray& aImages, MatArray& oMasks) override {
+    virtual void apply(const MatArrayIn& aImages, MatArrayOut& oMasks) override {
         for(size_t nImgIdx=0; nImgIdx<s_nArraySize; ++nImgIdx)
             lvAssert__(aImages[nImgIdx].size()==m_oGridSize && aImages[nImgIdx].type()==CV_8UC1,"input image in array at index=%d had the wrong size/type",nImgIdx);
         const size_t nRealLabels = m_vRealLabels.size();
@@ -306,20 +306,20 @@ struct StereoGraphMatcher : public ICosegmentor<STEREOGRPHMATCH_LABEL_TYPE,2> {
         oSolver.infer(visitor);
         oSolver.arg(vOutputLabels);
         std::cout << "Inference completed in " << oLocalTimer.tock() << " second(s)." << std::endl;
-        oMasks[0].create(m_oGridSize,CV_8UC3);
-        lvAssert_(m_vRealLabels.back()<=UCHAR_MAX,"label values will not fit in output mat depth (8U)");
+        oMasks[0].create(m_oGridSize);
+        lvAssert_((size_t)m_vRealLabels.back()<(size_t)s_nOccludedLabel,"label values will not fit in output mat depth");
         for(size_t nRowIdx=0; nRowIdx<(size_t)m_oGridSize.height; ++nRowIdx) {
             for(size_t nColIdx=0; nColIdx<(size_t)m_oGridSize.width; ++nColIdx) {
                 const size_t nNodeIdx = nRowIdx*((size_t)m_oGridSize.width)+nColIdx;
                 const LabelType nNodeLabel = vOutputLabels[nNodeIdx];
-                oMasks[0].at<cv::Vec3b>(nRowIdx,nColIdx) = ((size_t)nNodeLabel>=m_vRealLabels.size())?cv::Vec3b(255,255,0):cv::Vec3b(m_vRealLabels[nNodeLabel],m_vRealLabels[nNodeLabel],m_vRealLabels[nNodeLabel]);
+                oMasks[0](nRowIdx,nColIdx) = ((size_t)nNodeLabel>=m_vRealLabels.size())?s_nOccludedLabel:m_vRealLabels[nNodeLabel];
             }
         }
     }
     /// returns the (maximum) number of labels used in the output masks, or -1 if it cannot be predetermined
     virtual int getMaxLabelCount() const override {return (int)m_vLabels.size();}
     /// returns the list of labels used in the output masks, or an empty array if it cannot be predetermined
-    virtual std::vector<LabelType> getLabels() const override {return m_vLabels;}
+    virtual const std::vector<LabelType>& getLabels() const override {return m_vLabels;}
 
 protected:
     //std::unique_ptr<StereoGraphInference> m_pInf;
