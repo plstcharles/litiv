@@ -30,7 +30,7 @@
 /// defines the default value for BackgroundSubtractorSuBSENSE::m_nSamplesForMovingAvgs
 #define BGSSUBSENSE_DEFAULT_N_SAMPLES_FOR_MV_AVGS (100)
 
-/*!
+/**
     Self-Balanced Sensitivity segmenTER (SuBSENSE) algorithm for FG/BG video segmentation via change detection.
 
     Note: both grayscale and RGB/BGR images may be used with this extractor (parameters are adjusted automatically).
@@ -41,7 +41,7 @@
     For more details on the different parameters or on the algorithm itself, see P.-L. St-Charles et al.,
     "Flexible Background Subtraction With Self-Balanced Local Sensitivity", in CVPRW 2014, or "SuBSENSE: A Universal
     Change Detection Method With Local Adaptive Sensitivity", in IEEE Trans. Image Processing vol.24 no.1, 2015.
- */
+*/
 template<lv::ParallelAlgoType eImpl>
 struct BackgroundSubtractorSuBSENSE_;
 

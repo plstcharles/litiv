@@ -102,7 +102,6 @@ namespace lv {
 
     template<>
     struct IParallelAlgo_<NonParallel> : public IIParallelAlgo {
-        IParallelAlgo_() {}
         virtual bool isParallel() {return false;}
         virtual ParallelAlgoType getParallelAlgoType() {return NonParallel;}
     };

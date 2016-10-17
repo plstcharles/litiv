@@ -86,11 +86,7 @@
 /// defines whether we should use single channel variation checks for fg/bg segmentation validation or not
 #define BGSPBAS_USE_SC_THRS_VALIDATION 0
 
-/*!
-    PBAS foreground-background segmentation algorithm (abstract version).
-
-    @@@@@@ IMPL MIGHT STILL BE BROKEN, CHECK Dmin UPDATES WHEN FG/BG @@@@@@
- */
+/// PBAS foreground-background segmentation algorithm (abstract version) @@@@@@ IMPL MIGHT STILL BE BROKEN, CHECK Dmin UPDATES WHEN FG/BG @@@@@@
 class BackgroundSubtractorPBAS : public cv::BackgroundSubtractor {
 public:
     /// full constructor
@@ -140,9 +136,7 @@ protected:
     bool m_bInitialized;
 };
 
-/*!
-    PBAS foreground-background segmentation algorithm (1ch/grayscale version).
- */
+/// PBAS foreground-background segmentation algorithm (1ch/grayscale version)
 class BackgroundSubtractorPBAS_1ch : public BackgroundSubtractorPBAS {
 public:
     /// full constructor
@@ -158,9 +152,7 @@ public:
     virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRateOverride=BGSPBAS_DEFAULT_LEARNING_RATE_OVERRIDE);
 };
 
-/*!
-    PBAS foreground-background segmentation algorithm (3ch/RGB version).
- */
+/// PBAS foreground-background segmentation algorithm (3ch/RGB version)
 class BackgroundSubtractorPBAS_3ch : public BackgroundSubtractorPBAS {
 public:
     /// full constructor

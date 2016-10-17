@@ -36,7 +36,7 @@
 #define BGSLOBSTER_GLSL_USE_SHAREDMEM  1
 #define BGSLOBSTER_GLSL_USE_POSTPROC   1
 
-/*!
+/**
     LOcal Binary Similarity segmenTER (LOBSTER) algorithm for FG/BG video segmentation via change detection.
 
     Note: both grayscale and RGB/BGR images may be used with this extractor (parameters are adjusted automatically).
@@ -44,8 +44,7 @@
 
     For more details on the different parameters or on the algorithm itself, see P.-L. St-Charles and
     G.-A. Bilodeau, "Improving Background Subtraction using Local Binary Similarity Patterns", in WACV 2014.
- */
-
+*/
 template<lv::ParallelAlgoType eImpl>
 struct IBackgroundSubtractorLOBSTER_ : public IBackgroundSubtractorLBSP_<eImpl> {
     IBackgroundSubtractorLOBSTER_(size_t nDescDistThreshold=BGSLOBSTER_DEFAULT_DESC_DIST_THRESHOLD,

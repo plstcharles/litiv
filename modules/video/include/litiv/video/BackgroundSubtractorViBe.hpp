@@ -53,9 +53,7 @@
 /// defines whether we should use L1 distance or L2 distance for change detection
 #define BGSVIBE_USE_L1_DISTANCE_CHECK 0
 
-/*!
-    ViBe foreground-background segmentation algorithm (abstract version).
- */
+/// ViBe foreground-background segmentation algorithm (abstract version)
 class BackgroundSubtractorViBe : public cv::BackgroundSubtractor {
 public:
     /// full constructor
@@ -86,9 +84,7 @@ protected:
     bool m_bInitialized;
 };
 
-/*!
-    ViBe foreground-background segmentation algorithm (1ch/grayscale version).
- */
+/// ViBe foreground-background segmentation algorithm (1ch/grayscale version)
 class BackgroundSubtractorViBe_1ch : public BackgroundSubtractorViBe {
 public:
     /// full constructor
@@ -103,9 +99,7 @@ public:
     virtual void apply(cv::InputArray image, cv::OutputArray fgmask, double learningRate=BGSVIBE_DEFAULT_LEARNING_RATE);
 };
 
-/*!
-    ViBe foreground-background segmentation algorithm (3ch/RGB version).
- */
+/// ViBe foreground-background segmentation algorithm (3ch/RGB version)
 class BackgroundSubtractorViBe_3ch : public BackgroundSubtractorViBe {
 public:
     /// full constructor

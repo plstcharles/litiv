@@ -21,8 +21,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/features2d.hpp>
 #include "litiv/utils/distances.hpp"
-
-/*!
+/**
     Local Binary Similarity Pattern (LBSP) feature extractor
 
     Note 1: both grayscale and RGB/BGR images may be used with this extractor.
@@ -30,7 +29,7 @@
 
     For more details on the different parameters, see G.-A. Bilodeau et al, "Change Detection in Feature Space Using Local
     Binary Similarity Patterns", in CRV 2013.
- */
+*/
 class LBSP : public cv::Feature2D {
 public:
     /// constructor 1, threshold = absolute intensity 'similarity' threshold used when computing comparisons

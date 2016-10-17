@@ -32,13 +32,13 @@
 /// defines the default value for EdgeDetectorCanny::m_dGaussianKernelSigma
 #define EDGCANNY_DEFAULT_GAUSSIAN_KERNEL_SIGMA (sqrt(2.0))
 
-/*!
+/**
     Canny edge detection algorithm (wraps the OpenCV implementation).
 
     Only available in non-parallel version.
 
     Note: converts all RGB/RGBA images to grayscale internally.
- */
+*/
 struct EdgeDetectorCanny : public IEdgeDetector {
     /// full constructor
     EdgeDetectorCanny(double dHystLowThrshFactor=EDGCANNY_DEFAULT_HYST_LOW_THRSH_FACT,

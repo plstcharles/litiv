@@ -21,6 +21,7 @@
 #include "litiv/utils/opencv.hpp"
 #include <opencv2/video/background_segm.hpp>
 
+/// super-interface for background subtraction algos which exposes common interface functions
 struct IIBackgroundSubtractor : public cv::BackgroundSubtractor {
 
     // @@@ add refresh model as virtual pure func here?
@@ -31,6 +32,10 @@ struct IIBackgroundSubtractor : public cv::BackgroundSubtractor {
     virtual void initialize(const cv::Mat& oInitImg, const cv::Mat& oROI) = 0;
     /// returns the default learning rate value used in 'apply'
     virtual double getDefaultLearningRate() const = 0;
+    /// segments the input image into fg/bg based on the so-far-learned background model, simultanously updating the latter based on 'dLearningRate'
+    virtual void apply(cv::InputArray oImage, cv::OutputArray oFGMask, double dLearningRate=-1) = 0;
+    /// computes the current empty background image based on model data
+    virtual void getBackgroundImage(cv::OutputArray oBackgroundImage) const = 0;
     /// turns automatic model reset on or off
     virtual void setAutomaticModelReset(bool);
     /// modifies the given ROI so it will not cause lookup errors near borders when used in the processing step
@@ -40,7 +45,7 @@ struct IIBackgroundSubtractor : public cv::BackgroundSubtractor {
     /// returns a copy of the ROI used for input analysis
     virtual cv::Mat getROICopy() const;
     /// required for derived class destruction from this interface
-    virtual ~IIBackgroundSubtractor() {}
+    virtual ~IIBackgroundSubtractor() = default;
 
 protected:
     /// default impl constructor (for common parameters only -- none must be const to avoid constructor hell when deriving)

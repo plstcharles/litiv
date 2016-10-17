@@ -27,14 +27,13 @@
 /// defines the default value for BackgroundSubtractorLBSP::m_nDefaultMedianBlurKernelSize
 #define BGSLBSP_DEFAULT_MEDIAN_BLUR_KERNEL_SIZE (9)
 
-/*!
+/**
     Local Binary Similarity Pattern (LBSP) algorithm interface for FG/BG video segmentation via change detection.
 
     For more details on the different parameters, see P.-L. St-Charles and G.-A. Bilodeau, "Improving Background
     Subtraction using Local Binary Similarity Patterns", in WACV 2014, or G.-A. Bilodeau et al, "Change Detection
     in Feature Space Using Local Binary Similarity Patterns", in CRV 2013.
- */
-
+*/
 template<lv::ParallelAlgoType eImpl>
 struct IBackgroundSubtractorLBSP_ : public IBackgroundSubtractor_<eImpl> {
 

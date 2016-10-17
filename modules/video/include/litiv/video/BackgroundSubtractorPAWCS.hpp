@@ -28,7 +28,7 @@
 /// defines the default value for BackgroundSubtractorPAWCS::m_nSamplesForMovingAvgs
 #define BGSPAWCS_DEFAULT_N_SAMPLES_FOR_MV_AVGS (100)
 
-/*!
+/**
     Pixel-based Adaptive Word Consensus Segmenter (PAWCS) algorithm for FG/BG video segmentation via change detection.
 
     Note: both grayscale and RGB/BGR images may be used with this extractor (parameters are adjusted automatically).
@@ -37,8 +37,10 @@
     For now, only the algorithm's default CPU implementation is offered here.
 
     For more details on the different parameters or on the algorithm itself, see P.-L. St-Charles et al.,
-    "A Self-Adjusting Approach to Change Detection Based on Background Word Consensus", in WACV 2015.
- */
+    "A Self-Adjusting Approach to Change Detection Based on Background Word Consensus", in WACV 2015, or
+    P.-L. St-Charles et al., "Universal Background Subtraction Using Word Consensus Models", in IEEE Trans.
+    on Image Processing, vol. 25 (10), 2016.
+*/
 template<lv::ParallelAlgoType eImpl>
 struct BackgroundSubtractorPAWCS_;
 

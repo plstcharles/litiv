@@ -20,6 +20,7 @@
 #include "litiv/utils/parallel.hpp"
 #include "litiv/utils/opencv.hpp"
 
+/// super-interface for edge detection algos which exposes common interface functions
 struct IIEdgeDetector : public cv::Algorithm {
 
     /// returns the default threshold value used in 'apply'
@@ -29,7 +30,7 @@ struct IIEdgeDetector : public cv::Algorithm {
     /// edge detection function; performs a full sensitivty sweep and returns a non-binary (grayscale confidence) edge map
     virtual void apply(cv::InputArray oInputImage, cv::OutputArray oEdgeMask) = 0;
     /// required for derived class destruction from this interface
-    virtual ~IIEdgeDetector() {}
+    virtual ~IIEdgeDetector() = default;
 
 protected:
     /// default impl constructor (for common parameters only -- none must be const to avoid constructor hell when deriving)
