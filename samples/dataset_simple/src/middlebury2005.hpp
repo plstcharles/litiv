@@ -106,8 +106,8 @@ namespace lv {
             const cv::Mat oInput_R = cv::imread(this->m_vvsInputPaths[0][1]); // load 'right' image from the stereo pair
             lvAssert(!oInput_L.empty() && !oInput_R.empty() && oInput_L.size()==oInput_R.size()); // make sure the data fits expectations
             this->m_vvsGTPaths.push_back(std::vector<std::string>{this->getDataPath()+"disp1.png",this->getDataPath()+"disp5.png"}); // do the same for GT data (one packet = two disparity maps, one for each stereo head)
-            const cv::Mat oGT_L = cv::imread(this->m_vvsInputPaths[0][0],cv::IMREAD_GRAYSCALE); // load 'left' disparity map
-            const cv::Mat oGT_R = cv::imread(this->m_vvsInputPaths[0][1],cv::IMREAD_GRAYSCALE); // load 'right' disparity map
+            const cv::Mat oGT_L = cv::imread(this->m_vvsGTPaths[0][0],cv::IMREAD_GRAYSCALE); // load 'left' disparity map
+            const cv::Mat oGT_R = cv::imread(this->m_vvsGTPaths[0][1],cv::IMREAD_GRAYSCALE); // load 'right' disparity map
             lvAssert(!oGT_L.empty() && !oGT_R.empty() && oGT_L.size()==oGT_R.size() && oGT_L.size()==oInput_L.size());
             this->m_bIsInputConstantSize = this->m_bIsGTConstantSize = true; // all packets have the same size (there is only one packet anyway)
             this->m_vvInputSizes = this->m_vvGTSizes = std::vector<std::vector<cv::Size>>{{oInput_L.size(),oInput_R.size()}}; // all packets have the same size
