@@ -17,7 +17,7 @@
 
 if(USE_OPENGM)
     project(cosegm)
-    add_executable(cosegm src/main.cpp)
+    add_executable(cosegm src/main.cpp src/cosegm_tests.hpp)
     target_link_libraries(cosegm litiv_world)
     set_target_properties(cosegm PROPERTIES FOLDER "apps")
     install(TARGETS cosegm RUNTIME DESTINATION bin COMPONENT apps)
