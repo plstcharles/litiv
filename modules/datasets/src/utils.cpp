@@ -831,7 +831,7 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_VideoArray>::getRawInput(size_t nPa
     lvAssert_(vsInputPaths.size()==vsInputSizes.size(),"input path count did not match size count");
     cv::Mat oPacket;
     for(size_t nStreamIdx=0; nStreamIdx<vsInputPaths.size(); ++nStreamIdx) {
-        cv::Mat oCurrImg = cv::imread(vsInputPaths[nStreamIdx]);
+        cv::Mat oCurrImg = cv::imread(vsInputPaths[nStreamIdx],isStreamGrayscale(nStreamIdx)?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
         if(oCurrImg.empty()) // if a single image is missing/cannot load, we skip the entire packet
             return cv::Mat();
         if(is4ByteAligned() && oCurrImg.channels()==3)
@@ -1070,7 +1070,7 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_ImageArray>::getRawInput(size_t nPa
     lvAssert_(vsInputPaths.size()==vsInputSizes.size(),"input path count did not match size count");
     cv::Mat oPacket;
     for(size_t nStreamIdx=0; nStreamIdx<vsInputPaths.size(); ++nStreamIdx) {
-        cv::Mat oCurrImg = cv::imread(vsInputPaths[nStreamIdx]);
+        cv::Mat oCurrImg = cv::imread(vsInputPaths[nStreamIdx],isStreamGrayscale(nStreamIdx)?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
         if(oCurrImg.empty()) // if a single image is missing/cannot load, we skip the entire packet
             return cv::Mat();
         if(is4ByteAligned() && oCurrImg.channels()==3)
