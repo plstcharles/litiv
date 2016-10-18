@@ -22,14 +22,12 @@
 /// super-interface for cosegmentation algos which exposes common interface functions
 template<typename TLabel, size_t nArraySize>
 struct ICosegmentor : public cv::Algorithm {
-    /// referenceable variable holding image array size template parameter
-    static constexpr size_t s_nArraySize = nArraySize;
     /// shortcut to label template typename parameter
     using LabelType = TLabel;
-    /// shortcut to matrix array input type for apply operation
-    using MatArrayIn = std::array<cv::Mat,s_nArraySize>;
-    /// shortcut to matrix array output type for apply operation
-    using MatArrayOut = std::array<cv::Mat_<LabelType>,s_nArraySize>;
+    /// shortcut to input matrix array type
+    using MatArrayIn = std::array<cv::Mat,nArraySize>;
+    /// shortcut to output matrix array type
+    using MatArrayOut = std::array<cv::Mat_<LabelType>,nArraySize>;
     /// image cosegmentation function; will isolate visible structures common to all input images and label them similarily in all output masks
     virtual void apply(const MatArrayIn& aImages, MatArrayOut& aMasks) = 0;
     /// image cosegmentation function; check that the input/output arrays are the right size+type, and redirect to the other 'apply' interface
@@ -47,16 +45,16 @@ void ICosegmentor<TLabel,nArraySize>::apply(cv::InputArrayOfArrays _aImages, cv:
     lvAssert_(_aImages.isMatVector(),"first argument must be a mat vector (or mat array)");
     std::vector<cv::Mat> vImages;
     _aImages.getMatVector(vImages);
-    lvAssert__(vImages.size()==s_nArraySize,"number of images in the input array must match the predetermined one (%d)",(int)s_nArraySize);
     MatArrayIn aImages;
-    std::copy_n(vImages.begin(),s_nArraySize,aImages.begin());
+    lvAssert__(vImages.size()==aImages.size(),"number of images in the input array must match the predetermined one (%d)",(int)aImages.size());
+    std::copy_n(vImages.begin(),aImages.size(),aImages.begin());
     MatArrayOut aMasks;
     if(!_aMasks.empty()) {
         lvAssert_(_aMasks.isMatVector(),"second argument must be an empty mat or a mat vector (or mat array)");
         std::vector<cv::Mat> vMasks;
         _aMasks.getMatVector(vMasks);
-        lvAssert__(vMasks.size()==s_nArraySize,"number of images in the output array must match the predetermined one (%d)",(int)s_nArraySize);
-        for(size_t nArrayIdx=0; nArrayIdx<s_nArraySize; ++nArrayIdx) {
+        lvAssert__(vMasks.size()==aMasks.size(),"number of images in the output array must match the predetermined one (%d)",(int)aMasks.size());
+        for(size_t nArrayIdx=0; nArrayIdx<aMasks.size(); ++nArrayIdx) {
             lvAssert_(vMasks[nArrayIdx].elemSize()==sizeof(LabelType),"depth of images in the output array must match sizeof(LabelType)");
             aMasks[nArrayIdx] = vMasks[nArrayIdx];
         }

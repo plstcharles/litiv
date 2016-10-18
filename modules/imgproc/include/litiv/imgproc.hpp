@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include "litiv/features2d.hpp"
 #include "litiv/imgproc/EdgeDetectorCanny.hpp"
 #include "litiv/imgproc/EdgeDetectorLBSP.hpp"
 #include "litiv/imgproc/CosegmentationUtils.hpp"

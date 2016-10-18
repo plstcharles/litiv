@@ -251,7 +251,7 @@ struct StereoGraphMatcher : public ICosegmentor<STEREOGRPHMATCH_LABEL_TYPE,2> {
 
     /// stereo matcher function; solves the graph model to find pixel-level matches on epipolar lines, and returns disparity masks
     virtual void apply(const MatArrayIn& aImages, MatArrayOut& oMasks) override {
-        for(size_t nImgIdx=0; nImgIdx<s_nArraySize; ++nImgIdx)
+        for(size_t nImgIdx=0; nImgIdx<aImages.size(); ++nImgIdx)
             lvAssert__(aImages[nImgIdx].size()==m_oGridSize && aImages[nImgIdx].type()==CV_8UC1,"input image in array at index=%d had the wrong size/type",nImgIdx);
         const size_t nRealLabels = m_vRealLabels.size();
         const size_t nOccludedLabelIdx = nRealLabels;
