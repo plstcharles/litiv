@@ -26,7 +26,7 @@ add_files(INCLUDE_FILES
     "include/litiv/imgproc/EdgeDetectionUtils.hpp"
     "include/litiv/imgproc/EdgeDetectorCanny.hpp"
     "include/litiv/imgproc/EdgeDetectorLBSP.hpp"
-    "include/litiv/imgproc/StereoGraphMatcher.hpp"
+    "include/litiv/imgproc/StereoMatcher.hpp"
     "include/litiv/imgproc.hpp"
 )
 

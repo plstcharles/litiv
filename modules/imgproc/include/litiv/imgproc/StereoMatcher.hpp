@@ -31,25 +31,25 @@
 #include <opengm/inference/external/qpbo/QPBO.h>
 
 /// defines the internal type to be used for label values in the graph
-#define STEREOGRPHMATCH_LABEL_TYPE       size_t
+#define STEREOMATCH_LABEL_TYPE        size_t
 /// defines the max factor order expected in the graphical model
-#define STEREOGRPHMATCH_MAX_FACT_ORDER    (6)
+#define STEREOMATCH_MAX_FACT_ORDER    (6)
 /// defines whether to use a global potts function for the label smoothness term, or an explicit one
-#define STEREOGRPHMATCH_USE_SMOOTH_POTTS  1
+#define STEREOMATCH_USE_SMOOTH_POTTS  1
 
 // unary costs params
-#define VISSIM_COST_OCCLUDED     10.0f
-#define VISSIM_COST_MAXTRUNC     30.0f
-#define UNIQUE_COST_OVERASSOC    10.0f
-#define UNIQUE_COST_OOBASSOC     10.0f
+#define STEREOMATCH_VISSIM_COST_OCCLUDED     10.0f
+#define STEREOMATCH_VISSIM_COST_MAXTRUNC     30.0f
+#define STEREOMATCH_UNIQUE_COST_OVERASSOC    10.0f
+#define STEREOMATCH_UNIQUE_COST_OOBASSOC     10.0f
 // pairwise costs params
-#define LBLSIM_COST_EQUAL      0.0f
-#define LBLSIM_COST_NEQUAL     10.0f
+#define STEREOMATCH_LBLSIM_COST_EQUAL         0.0f
+#define STEREOMATCH_LBLSIM_COST_NEQUAL        10.0f
 // higher order costs params
 // ...
 
 /// this stereo matcher assumes input images are rectified and have the same size
-struct StereoGraphMatcher : public ICosegmentor<STEREOGRPHMATCH_LABEL_TYPE,2> {
+struct StereoMatcher : public ICosegmentor<STEREOMATCH_LABEL_TYPE,2> {
 
     using ValueType = float; // type used for factor values (@@@@ could be integer? retest speed later?)
     using IndexType = size_t; // type used for node indexing (note: pretty much hardcoded everywhere in impl below)
@@ -57,14 +57,14 @@ struct StereoGraphMatcher : public ICosegmentor<STEREOGRPHMATCH_LABEL_TYPE,2> {
     using ExplicitFunction = opengm::ExplicitFunction<ValueType,IndexType,LabelType>; // shortcut for explicit function
     using PottsFunction = opengm::PottsFunction<ValueType,IndexType,LabelType>; // shortcut for Potts function
     using FunctionTypeList = opengm::meta::TypeListGenerator<ExplicitFunction,PottsFunction>::type;  // list of all function the model can use
-    using SpaceType = opengm::SimpleDiscreteSpace<IndexType,LabelType>; // shortcut for simple discrete space type
+    using SpaceType = opengm::SimpleDiscreteSpace<IndexType,LabelType>; // shortcut for discrete space type (simple = all nodes have the same # of labels)
     using AccumulatorType = opengm::Minimizer; // shortcut for energy accumulator type
     using ModelType = opengm::GraphicalModel<ValueType,OpType,FunctionTypeList,SpaceType>; // shortcut for graphical model type
     using FactorType = ModelType::FactorType; // shortcut for model factor type
     using IndepFactorType = ModelType::IndependentFactorType; // shortcut for model indep factor type
     using FunctionID = ModelType::FunctionIdentifier; // shortcut for model function identifier type
     static constexpr LabelType s_nOccludedLabel = std::numeric_limits<LabelType>::max(); // last label value reserved for occluded pixels
-    static constexpr size_t s_nMaxOrder = STEREOGRPHMATCH_MAX_FACT_ORDER; // used to limit internal static assignment array sizes
+    static constexpr size_t s_nMaxOrder = STEREOMATCH_MAX_FACT_ORDER; // used to limit internal static assignment array sizes
     static constexpr size_t s_nMaxCliqueAssign = 1<<s_nMaxOrder; // used to limit internal static assignment array sizes
     static_assert(std::is_integral<IndexType>::value,"Graph index type must be integral");
     static_assert(std::is_integral<LabelType>::value,"Graph label type must be integral");
@@ -99,7 +99,7 @@ struct StereoGraphMatcher : public ICosegmentor<STEREOGRPHMATCH_LABEL_TYPE,2> {
         /// full constructor of the inference algorithm structures; the graphical model must have already been constructed prior to this call
         StereoGraphInference(const ModelType&, const std::vector<LabelType>& vRealLabels, const cv::Size& oGridSize, Parameter=Parameter());
         /// returns the name of this inference method, for debugging/identification purposes
-        virtual std::string name() const override {return std::string("litiv-stereo-graph-matcher");}
+        virtual std::string name() const override {return std::string("litiv-stereo-matcher");}
         /// returns a copy of the internal const reference to the graphical model to solve
         virtual const ModelType& graphicalModel() const override {return m_oGM;}
         /// redirects inference to the infer(TVisitor&) implementation, passing along an empty visitor
@@ -147,7 +147,7 @@ struct StereoGraphMatcher : public ICosegmentor<STEREOGRPHMATCH_LABEL_TYPE,2> {
     };
 
     /// full stereo graph matcher constructor; relies on provided parameters to build the graphical model base without assigning full factor costs
-    StereoGraphMatcher(const cv::Size& oImagesSize, const std::vector<LabelType>& vAllowedDisparities) :
+    StereoMatcher(const cv::Size& oImagesSize, const std::vector<LabelType>& vAllowedDisparities) :
             m_vRealLabels(lv::unique(vAllowedDisparities.begin(),vAllowedDisparities.end())),
             m_vLabels(lv::concat<LabelType>(m_vRealLabels,std::vector<LabelType>{s_nOccludedLabel})),
             m_oGridSize(oImagesSize) {
@@ -180,33 +180,33 @@ struct StereoGraphMatcher : public ICosegmentor<STEREOGRPHMATCH_LABEL_TYPE,2> {
         {
             std::cout << "\tadding label similarity factor for each grid pixel pair..." << std::endl;
             // note: current def w/ explicit function will require too much memory if using >>50 labels
-#if STEREOGRPHMATCH_USE_SMOOTH_POTTS
-            const FunctionID nPottsFID = m_pGM->addFunction(PottsFunction(nRealLabels+1,nRealLabels+1,LBLSIM_COST_EQUAL,LBLSIM_COST_NEQUAL));
+#if STEREOMATCH_USE_SMOOTH_POTTS
+            const FunctionID nPottsFID = m_pGM->addFunction(PottsFunction(nRealLabels+1,nRealLabels+1,STEREOMATCH_LBLSIM_COST_EQUAL,STEREOMATCH_LBLSIM_COST_NEQUAL));
             m_vaSmoothPairwFuncIDs.resize(nNodes,std::array<FunctionID,2>{nPottsFID,nPottsFID});
-#else //(!STEREOGRPHMATCH_USE_SMOOTH_POTTS)
+#else //(!STEREOMATCH_USE_SMOOTH_POTTS)
             const std::array<LabelType,2> aPairwiseFuncDims = {nRealLabels+1,nRealLabels+1}; // +1 to account for occluded px label
             m_vaSmoothPairwFuncIDs.resize(nNodes);
-#endif //(!STEREOGRPHMATCH_USE_SMOOTH_POTTS)
+#endif //(!STEREOMATCH_USE_SMOOTH_POTTS)
             std::array<size_t,2> aNodeIndices;
             for(size_t nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
                 for(size_t nColIdx=0; nColIdx<nCols; ++nColIdx) {
                     aNodeIndices[0] = nRowIdx*nCols+nColIdx;
                     if(nRowIdx+1<nRows) {
                         aNodeIndices[1] = (nRowIdx+1)*nCols+nColIdx;
-#if !STEREOGRPHMATCH_USE_SMOOTH_POTTS
+#if !STEREOMATCH_USE_SMOOTH_POTTS
                         m_vaSmoothPairwFuncIDs[aNodeIndices[0]][0] = m_pGM->addFunction(ExplicitFunction());
                         ExplicitFunction& vVerticalPairwiseFunc = m_pGM->getFunction<ExplicitFunction>(m_vaSmoothPairwFuncIDs[aNodeIndices[0]][0]);
                         vVerticalPairwiseFunc.resize(aPairwiseFuncDims.begin(),aPairwiseFuncDims.end());
-#endif //(!STEREOGRPHMATCH_USE_SMOOTH_POTTS)
+#endif //(!STEREOMATCH_USE_SMOOTH_POTTS)
                         m_pGM->addFactorNonFinalized(m_vaSmoothPairwFuncIDs[aNodeIndices[0]][0],aNodeIndices.begin(),aNodeIndices.end());
                     }
                     if(nColIdx+1<nCols) {
                         aNodeIndices[1] = nRowIdx*nCols+nColIdx+1;
-#if !STEREOGRPHMATCH_USE_SMOOTH_POTTS
+#if !STEREOMATCH_USE_SMOOTH_POTTS
                         m_vaSmoothPairwFuncIDs[aNodeIndices[0]][1] = m_pGM->addFunction(ExplicitFunction());
                         ExplicitFunction& vHorizontalPairwiseFunc = m_pGM->getFunction<ExplicitFunction>(m_vaSmoothPairwFuncIDs[aNodeIndices[0]][1]);
                         vHorizontalPairwiseFunc.resize(aPairwiseFuncDims.begin(),aPairwiseFuncDims.end());
-#endif //(!STEREOGRPHMATCH_USE_SMOOTH_POTTS)
+#endif //(!STEREOMATCH_USE_SMOOTH_POTTS)
                         m_pGM->addFactorNonFinalized(m_vaSmoothPairwFuncIDs[aNodeIndices[0]][1],aNodeIndices.begin(),aNodeIndices.end());
                     }
                 }
@@ -270,11 +270,11 @@ struct StereoGraphMatcher : public ICosegmentor<STEREOGRPHMATCH_LABEL_TYPE,2> {
                     lvDbgAssert(vUnaryFunc.dimension()==1 && vUnaryFunc.size()==nRealLabels+1);
                     for(size_t nLabelIdx = 0; nLabelIdx<nRealLabels; ++nLabelIdx) {
                         const size_t nColOffsetIdx = (nColIdx<size_t(m_vLabels[nLabelIdx]))?0:nColIdx-size_t(m_vLabels[nLabelIdx]);
-                        vUnaryFunc(nLabelIdx) = std::min(VISSIM_COST_MAXTRUNC,std::abs((float)aImages[0].at<uchar>(nRowIdx,nColIdx)-(float)aImages[1].at<uchar>(nRowIdx,nColOffsetIdx)));
+                        vUnaryFunc(nLabelIdx) = std::min(STEREOMATCH_VISSIM_COST_MAXTRUNC,std::abs((float)aImages[0].at<uchar>(nRowIdx,nColIdx)-(float)aImages[1].at<uchar>(nRowIdx,nColOffsetIdx)));
                     }
-                    vUnaryFunc(nOccludedLabelIdx) = VISSIM_COST_OCCLUDED;
+                    vUnaryFunc(nOccludedLabelIdx) = STEREOMATCH_VISSIM_COST_OCCLUDED;
                 }
-#if !STEREOGRPHMATCH_USE_SMOOTH_POTTS
+#if !STEREOMATCH_USE_SMOOTH_POTTS
                 {
                     // update smoothness pairwise terms for each grid pixel
                     const std::array<FunctionID,2>& anFIDs = m_vaSmoothPairwFuncIDs[nNodeIdx];
@@ -283,19 +283,19 @@ struct StereoGraphMatcher : public ICosegmentor<STEREOGRPHMATCH_LABEL_TYPE,2> {
                         lvDbgAssert(vPairwiseFunc.dimension()==2 && vPairwiseFunc.size()==(nRealLabels+1)*(nRealLabels+1));
                         for(size_t nLabelIdx1 = 0; nLabelIdx1<nRealLabels; ++nLabelIdx1)
                             for(size_t nLabelIdx2 = 0; nLabelIdx2<nRealLabels; ++nLabelIdx2)
-                                vPairwiseFunc(nLabelIdx1,nLabelIdx2) = (nLabelIdx1==nLabelIdx2)?LBLSIM_COST_EQUAL:LBLSIM_COST_NEQUAL;
+                                vPairwiseFunc(nLabelIdx1,nLabelIdx2) = (nLabelIdx1==nLabelIdx2)?STEREOMATCH_LBLSIM_COST_EQUAL:STEREOMATCH_LBLSIM_COST_NEQUAL;
                         for(size_t nLabelIdx = 0; nLabelIdx<nRealLabels; ++nLabelIdx) {
-                            vPairwiseFunc(nOccludedLabelIdx,nLabelIdx) = LBLSIM_COST_NEQUAL; // @@@ change later for vis-data-dependent energies?
-                            vPairwiseFunc(nLabelIdx,nOccludedLabelIdx) = LBLSIM_COST_NEQUAL;
+                            vPairwiseFunc(nOccludedLabelIdx,nLabelIdx) = STEREOMATCH_LBLSIM_COST_NEQUAL; // @@@ change later for vis-data-dependent energies?
+                            vPairwiseFunc(nLabelIdx,nOccludedLabelIdx) = STEREOMATCH_LBLSIM_COST_NEQUAL;
                         }
-                        vPairwiseFunc(nOccludedLabelIdx,nOccludedLabelIdx) = LBLSIM_COST_EQUAL;
+                        vPairwiseFunc(nOccludedLabelIdx,nOccludedLabelIdx) = STEREOMATCH_LBLSIM_COST_EQUAL;
                     };
                     if(nRowIdx+1<nRows)
                         lPairwiseUpdater(0);
                     if(nColIdx+1<nCols)
                         lPairwiseUpdater(1);
                 }
-#endif //(!STEREOGRPHMATCH_USE_SMOOTH_POTTS)
+#endif //(!STEREOMATCH_USE_SMOOTH_POTTS)
             }
         }
         std::cout << "Energy terms update completed in " << oLocalTimer.tock() << " second(s)." << std::endl;
@@ -332,7 +332,7 @@ protected:
 
 };
 
-inline StereoGraphMatcher::StereoGraphInference::StereoGraphInference(const ModelType& oGM, const std::vector<LabelType>& vRealLabels, const cv::Size& oGridSize, Parameter p) :
+inline StereoMatcher::StereoGraphInference::StereoGraphInference(const ModelType& oGM, const std::vector<LabelType>& vRealLabels, const cv::Size& oGridSize, Parameter p) :
         m_oGM(oGM),m_oParams(p),m_oGridSize(oGridSize),m_vRealLabels(lv::unique(vRealLabels.begin(),vRealLabels.end())),m_vLabels(lv::concat<LabelType>(m_vRealLabels,std::vector<LabelType>{s_nOccludedLabel})),m_nLabels(m_vLabels.size()) {
     lvAssert_(m_vRealLabels.size()>1,"graph must have at least two output labels");
     lvAssert_(m_oGridSize.area()>1,"graph must have at least two nodes");
@@ -350,7 +350,7 @@ inline StereoGraphMatcher::StereoGraphInference::StereoGraphInference(const Mode
     reset();
 }
 
-inline void StereoGraphMatcher::StereoGraphInference::reset() {
+inline void StereoMatcher::StereoGraphInference::reset() {
     if(m_oParams.m_eInitLabelType == Parameter::RANDOM_LABEL) {
         srand(m_oParams.m_nInitLabelRandomSeed);
         for(size_t nNodeIdx=0; nNodeIdx<m_oGM.numberOfVariables(); ++nNodeIdx) {
@@ -410,7 +410,7 @@ inline void StereoGraphMatcher::StereoGraphInference::reset() {
 }
 
 template<typename TVisitor>
-inline opengm::InferenceTermination StereoGraphMatcher::StereoGraphInference::infer(TVisitor& oVisitor) {
+inline opengm::InferenceTermination StereoMatcher::StereoGraphInference::infer(TVisitor& oVisitor) {
     const size_t nTotNodeCount = m_oGM.numberOfVariables();
     lvAssert_(nTotNodeCount==m_oLabeling.total(),"graph node count and labeling mat size mismatch");
     kolmogorov::qpbo::QPBO<ValueType> oBinaryEnergyMinimizer(nTotNodeCount,0);
@@ -434,9 +434,9 @@ inline opengm::InferenceTermination StereoGraphMatcher::StereoGraphInference::in
                 lvDbgAssert(m_oAssocCounts.step.p[0]==(size_t)m_oGridSize.width*sizeof(AssocCountType) && m_oAssocCounts.step.p[1]==sizeof(AssocCountType));
                 const size_t nColIdx = nNodeIdx%m_oGridSize.width;
                 const AssocCountType nInitAssocCount = ((AssocCountType*)m_oAssocCounts.data)[nNodeIdx];
-                const AssocCountType nModifAssocCount = nColIdx>=(size_t)nNodeInitLabel?((AssocCountType*)m_oAssocCounts.data)[nNodeIdx-m_nAlphaLabel]:(UNIQUE_COST_OOBASSOC); // @@@@ replace const by something more... wise
-                const ValueType fNodeInitOverAssocEnergy = (ValueType)(nInitAssocCount*(ValueType)UNIQUE_COST_OVERASSOC);
-                const ValueType fNodeModifOverAssocEnergy = (ValueType)(nModifAssocCount*(ValueType)UNIQUE_COST_OVERASSOC);
+                const AssocCountType nModifAssocCount = nColIdx>=(size_t)nNodeInitLabel?((AssocCountType*)m_oAssocCounts.data)[nNodeIdx-m_nAlphaLabel]:(STEREOMATCH_UNIQUE_COST_OOBASSOC); // @@@@ replace const by something more... wise
+                const ValueType fNodeInitOverAssocEnergy = (ValueType)(nInitAssocCount*(ValueType)STEREOMATCH_UNIQUE_COST_OVERASSOC);
+                const ValueType fNodeModifOverAssocEnergy = (ValueType)(nModifAssocCount*(ValueType)STEREOMATCH_UNIQUE_COST_OVERASSOC);
                 oHigherOrderEnergyReducer.AddUnaryTerm(nNodeIdx,(fNodeModifVisSimEnergy+fNodeModifOverAssocEnergy)-(fNodeInitVisSimEnergy+fNodeInitOverAssocEnergy)); // @@@@ check sign of term?
             }
             else if(nCurrFactOrder>1) {

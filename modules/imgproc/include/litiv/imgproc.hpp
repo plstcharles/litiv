@@ -21,7 +21,7 @@
 #include "litiv/imgproc/EdgeDetectorLBSP.hpp"
 #include "litiv/imgproc/CosegmentationUtils.hpp"
 #if HAVE_OPENGM
-#include "litiv/imgproc/StereoGraphMatcher.hpp"
+#include "litiv/imgproc/StereoMatcher.hpp"
 #endif //HAVE_OPENGM
 #if HAVE_CUDA
 #include "litiv/imgproc/SLIC.hpp"
