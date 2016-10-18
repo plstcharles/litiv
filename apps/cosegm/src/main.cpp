@@ -16,7 +16,7 @@
 // limitations under the License.
 
 #include "litiv/datasets.hpp"
-#include "litiv/imgproc.hpp"
+#include "litiv/video.hpp"
 
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0

@@ -32,6 +32,7 @@ add_files(INCLUDE_FILES
     "include/litiv/video/BackgroundSubtractorPBAS.hpp"
     "include/litiv/video/BackgroundSubtractorSuBSENSE.hpp"
     "include/litiv/video/BackgroundSubtractorViBe.hpp"
+    "include/litiv/video/VideoCosegmentationUtils.hpp"
     "include/litiv/video.hpp"
 )
 
@@ -39,4 +40,5 @@ litiv_module(video SOURCE_FILES INCLUDE_FILES)
 target_link_libraries(litiv_video
     PUBLIC
         litiv_imgproc
+        litiv_features2d
 )

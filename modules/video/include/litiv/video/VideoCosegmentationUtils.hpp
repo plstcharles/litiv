@@ -1,0 +1,212 @@
+
+// This file is part of the LITIV framework; visit the original repository at
+// https://github.com/plstcharles/litiv for more information.
+//
+// Copyright 2015 Pierre-Luc St-Charles; pierre-luc.st-charles<at>polymtl.ca
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#pragma once
+
+#include "litiv/imgproc/CosegmentationUtils.hpp"
+
+/// super-interface for background subtraction algos which exposes common interface functions
+template<typename TLabel, size_t nArraySize>
+struct IVideoCosegmentor : public ICosegmentor<TLabel,nArraySize> {
+    /// shortcut to label template typename parameter
+    using LabelType = TLabel;
+    /// shortcut to input matrix array type
+    using FrameArrayIn = std::array<cv::Mat,nArraySize>;
+    /// shortcut to output matrix array type
+    using FrameArrayOut = std::array<cv::Mat_<LabelType>,nArraySize>;
+    /// shortcut to ROI matrix array type
+    using FrameArrayROI = std::array<cv::Mat_<uchar>,nArraySize>;
+    /// (re)initiaization method; needs to be called before starting cosegmentation (assumes no specific ROI)
+    void initialize(const FrameArrayIn& aImages);
+    /// (re)initiaization method; needs to be called before starting cosegmentation
+    virtual void initialize(const FrameArrayIn& aImages, const FrameArrayROI& aROIs) = 0;
+    /// returns the default learning rate value used in 'apply'
+    virtual double getDefaultLearningRate() const = 0;
+    /// segments the input images based on common visual data and on the temporal model, simultanously updating the latter based on 'dLearningRate'
+    virtual void apply(const FrameArrayIn& aImages, FrameArrayOut& aMasks, double dLearningRate=-1) = 0;
+    /// turns automatic model reset on or off
+    virtual void setAutomaticModelReset(bool);
+    /// modifies the given ROIs so they will not cause lookup errors near borders when used in the processing step
+    virtual void validateROIs(FrameArrayROI& aROIs) const;
+    /// sets the ROIs to be used for input analysis (calls validateROIs internally -- derived method may need to also reset its model)
+    virtual void setROIs(FrameArrayROI& aROIs);
+    /// returns a copy of the ROIs used for input analysis
+    virtual FrameArrayROI getROIsCopy() const;
+    /// required for derived class destruction from this interface
+    virtual ~IVideoCosegmentor() = default;
+
+protected:
+    /// default impl constructor (for common parameters only -- none must be const to avoid constructor hell when deriving)
+    IVideoCosegmentor();
+    /// common (re)initiaization method for all impl types (should be called in impl-specific initialize func)
+    virtual void initialize_common(const FrameArrayIn& aImages, const FrameArrayROI& aROIs);
+    /// basic info struct used in px model LUTs
+    struct PxInfoBase {
+        int nCoord_Y;
+        int nCoord_X;
+        size_t nModelIdx;
+    };
+    /// ROI border size to be ignored, useful for descriptor-based methods
+    size_t m_nROIBorderSize;
+    /// model ROI used for input analysis (specific to the input image size)
+    std::array<cv::Mat_<uchar>,nArraySize> m_aROIs;
+    /// input/output image sizes
+    std::array<cv::Size,nArraySize> m_aSizes;
+    /// input image channel counts
+    std::array<size_t,nArraySize> m_anChannels;
+    /// input image types
+    std::array<int,nArraySize> m_anTypes;
+    /// total number of pixels, and ROI pixels before & after border cleanup for all input images
+    std::array<size_t,nArraySize> m_anTotPxCounts, m_anOrigROIPxCounts, m_anFinalROIPxCounts;
+    /// current frame index, frame count since last model reset & model reset cooldown counters
+    size_t m_nFrameIdx, m_nFramesSinceLastReset, m_nModelResetCooldown;
+    /// internal pixel index LUTs for all relevant analysis regions (based on the provided ROIs)
+    std::array<std::vector<size_t>,nArraySize> m_avnPxIdxLUTs;
+    /// internal pixel info LUTs for all possible pixel indexes
+    std::array<std::vector<PxInfoBase>,nArraySize> m_avPxInfoLUTs;
+    /// specifies whether the algorithm parameters are fully initialized or not (must be handled by derived class)
+    bool m_bInitialized;
+    /// specifies whether the model has been fully initialized or not (must be handled by derived class)
+    bool m_bModelInitialized;
+    /// specifies whether automatic model resets are enabled or not
+    bool m_bAutoModelResetEnabled;
+    /// specifies whether the camera is considered moving or not
+    bool m_bUsingMovingCamera;
+    /// the segmentation masks generated by the method at [t-1]
+    std::array<cv::Mat_<LabelType>,nArraySize> m_aLastMasks;
+    /// the input frames processed by the method at [t-1]
+    std::array<cv::Mat,nArraySize> m_aLastInputs;
+
+private:
+    IVideoCosegmentor& operator=(const IVideoCosegmentor&) = delete;
+    IVideoCosegmentor(const IVideoCosegmentor&) = delete;
+};
+
+template<typename TLabel, size_t nArraySize>
+void IVideoCosegmentor<TLabel,nArraySize>::initialize(const FrameArrayIn& aImages) {
+    initialize(aImages,FrameArrayROI());
+}
+
+template<typename TLabel, size_t nArraySize>
+void IVideoCosegmentor<TLabel,nArraySize>::setAutomaticModelReset(bool bVal) {
+    m_bAutoModelResetEnabled = bVal;
+}
+
+template<typename TLabel, size_t nArraySize>
+void IVideoCosegmentor<TLabel,nArraySize>::validateROIs(FrameArrayROI& aROIs) const {
+    for(size_t nArrayIdx=0; nArrayIdx<aROIs.size(); ++nArrayIdx) {
+        lvAssert_(!aROIs[nArrayIdx].empty(),"provided ROIs must be non-empty");
+        lvAssert_(cv::countNonZero(aROIs[nArrayIdx])>0,"provided ROIs must have at least one non-zero pixel");
+    }
+    if(m_nROIBorderSize>0) {
+        for(size_t nArrayIdx=0; nArrayIdx<aROIs.size(); ++nArrayIdx) {
+            cv::Mat oROI_new(aROIs[nArrayIdx].size(),CV_8UC1,cv::Scalar_<uchar>(0));
+            const cv::Rect oROI_inner((int)m_nROIBorderSize,(int)m_nROIBorderSize,aROIs[nArrayIdx].cols-int(m_nROIBorderSize*2),aROIs[nArrayIdx].rows-int(m_nROIBorderSize*2));
+            cv::Mat(aROIs[nArrayIdx],oROI_inner).copyTo(cv::Mat(oROI_new,oROI_inner));
+            aROIs[nArrayIdx] = oROI_new;
+        }
+    }
+}
+
+template<typename TLabel, size_t nArraySize>
+void IVideoCosegmentor<TLabel,nArraySize>::setROIs(FrameArrayROI& aROIs) {
+    validateROIs(aROIs);
+    for(size_t nArrayIdx=0; nArrayIdx<aROIs.size(); ++nArrayIdx)
+        m_aROIs[nArrayIdx] = aROIs[nArrayIdx].clone();
+}
+
+template<typename TLabel, size_t nArraySize>
+std::array<cv::Mat_<uchar>,nArraySize> IVideoCosegmentor<TLabel,nArraySize>::getROIsCopy() const {
+    FrameArrayROI aROIs;
+    for(size_t nArrayIdx=0; nArrayIdx<aROIs.size(); ++nArrayIdx)
+        aROIs[nArrayIdx] = m_aROIs[nArrayIdx].clone();
+    return aROIs;
+}
+
+template<typename TLabel, size_t nArraySize>
+IVideoCosegmentor<TLabel,nArraySize>::IVideoCosegmentor() :
+        m_nROIBorderSize(0),
+        m_anChannels{},
+        m_anTypes{},
+        m_anTotPxCounts{},
+        m_anOrigROIPxCounts{},
+        m_anFinalROIPxCounts{},
+        m_nFrameIdx(SIZE_MAX),
+        m_nFramesSinceLastReset(0),
+        m_nModelResetCooldown(0),
+        m_bInitialized(false),
+        m_bModelInitialized(false),
+        m_bAutoModelResetEnabled(true),
+        m_bUsingMovingCamera(false) {}
+
+template<typename TLabel, size_t nArraySize>
+void IVideoCosegmentor<TLabel,nArraySize>::initialize_common(const FrameArrayIn& aImages, const FrameArrayROI& aROIs) {
+    m_bInitialized = false;
+    m_bModelInitialized = false;
+    bool bFoundChDiff = false;
+    std::array<cv::Mat_<uchar>,nArraySize> aNewROIs;
+    for(size_t nArrayIdx=0; nArrayIdx<aROIs.size(); ++nArrayIdx) {
+        lvAssert_(!aImages[nArrayIdx].empty() && aImages[nArrayIdx].isContinuous(),"provided images for initialization must be non-empty and continuous");
+        if(aImages[nArrayIdx].channels()>1 && !bFoundChDiff) {
+            std::vector<cv::Mat> vChannels;
+            cv::split(aImages[nArrayIdx],vChannels);
+            for(size_t c = 1; c<vChannels.size(); ++c)
+                if((bFoundChDiff = (cv::countNonZero(vChannels[0]!=vChannels[c])!=0)))
+                    break;
+            if(!bFoundChDiff)
+                std::cerr << "\n\tIVideoCosegmentor : Warning, grayscale images should always be passed in CV_8UC1 format for optimal performance.\n" << std::endl;
+        }
+        if(aROIs[nArrayIdx].empty())
+            aNewROIs[nArrayIdx] = cv::Mat_<uchar>(aImages[nArrayIdx].size(),uchar(UCHAR_MAX));
+        else {
+            lvAssert_(aROIs[nArrayIdx].size()==aImages[nArrayIdx].size(),"provided ROIs mat size must be equal to the init images size");
+            aNewROIs[nArrayIdx] = aROIs[nArrayIdx].clone();
+        }
+        m_anOrigROIPxCounts[nArrayIdx] = (size_t)cv::countNonZero(aNewROIs[nArrayIdx]);
+        lvAssert_(m_anOrigROIPxCounts[nArrayIdx]>0,"provided ROI mat contains no useful pixels");
+    }
+    validateROIs(aNewROIs);
+    for(size_t nArrayIdx=0; nArrayIdx<aROIs.size(); ++nArrayIdx) {
+        m_anFinalROIPxCounts[nArrayIdx] = (size_t)cv::countNonZero(aNewROIs[nArrayIdx]);
+        lvAssert_(m_anFinalROIPxCounts[nArrayIdx]>0,"provided ROI mat contains no useful pixels away from borders (descriptors will hit image bounds)");
+        m_aROIs[nArrayIdx] = aNewROIs[nArrayIdx];
+        m_aSizes[nArrayIdx] = aNewROIs[nArrayIdx].size();
+        m_anTypes[nArrayIdx] = aImages[nArrayIdx].type();
+        m_anChannels[nArrayIdx] = aImages[nArrayIdx].channels();
+        m_anTotPxCounts[nArrayIdx] = aNewROIs[nArrayIdx].total();
+        m_nFrameIdx = 0;
+        m_nFramesSinceLastReset = 0;
+        m_nModelResetCooldown = 0;
+        m_aLastMasks[nArrayIdx].create(m_aSizes[nArrayIdx]);
+        m_aLastMasks[nArrayIdx] = LabelType(0);
+        m_aLastInputs[nArrayIdx].create(m_aSizes[nArrayIdx],m_anTypes[nArrayIdx]);
+        m_aLastInputs[nArrayIdx] = cv::Scalar_<uchar>::all(0);
+        m_avnPxIdxLUTs[nArrayIdx].resize(m_anFinalROIPxCounts[nArrayIdx]);
+        m_avPxInfoLUTs[nArrayIdx].resize(m_anTotPxCounts[nArrayIdx]);
+        for(size_t nPxIter=0, nModelIter=0; nPxIter<m_anTotPxCounts[nArrayIdx]; ++nPxIter) {
+            if(m_aROIs[nArrayIdx].data[nPxIter]) {
+                m_avnPxIdxLUTs[nArrayIdx][nModelIter] = nPxIter;
+                m_avPxInfoLUTs[nArrayIdx][nPxIter].nImgCoord_Y = (int)nPxIter/m_aSizes[nArrayIdx].width;
+                m_avPxInfoLUTs[nArrayIdx][nPxIter].nImgCoord_X = (int)nPxIter%m_aSizes[nArrayIdx].width;
+                m_avPxInfoLUTs[nArrayIdx][nPxIter].nModelIdx = nModelIter;
+                for(size_t nChannelIdx=0, nElemIdx=nPxIter*m_anChannels[nArrayIdx]; nChannelIdx<m_anChannels[nArrayIdx]; ++nChannelIdx)
+                    m_aLastInputs[nArrayIdx].data[nElemIdx+nChannelIdx] = aImages[nArrayIdx].data[nElemIdx+nChannelIdx];
+                ++nModelIter;
+            }
+        }
+    }
+}
