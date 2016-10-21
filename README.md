@@ -30,10 +30,10 @@ My primary goal is to have the framework core only depend on OpenCV/CMake, and h
 * [GLEW](http://glew.sourceforge.net/) >= 1.9.0 (optional, for GLSL implementations)
 * [GLM](http://glm.g-truc.net/) (optional, for GLSL implementations)
 * [CUDA](https://developer.nvidia.com/cuda-toolkit) >= 7.0 with compute >=3.0 (optional, for some algo implementations, e.g. SLIC)
+* [OpenGM](https://github.com/opengm/opengm) (optional, for cosegmentation implementations)
 * [GTest](https://github.com/google/googletest) (optional, for regression testing, downloaded/imported automatically)
 * [Benchmark](https://github.com/google/benchmark) (optional, for performance testing, downloaded/imported automatically)
 * (OpenCL may eventually be added as optional)
-* (OpenGM + Gurobi/CPLEX/HDF5 will eventually be added as optional)
 
 A dockerfile which builds an Ubuntu image including all these dependencies is available [here](./Dockerfile).
 
