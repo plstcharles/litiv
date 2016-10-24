@@ -72,6 +72,11 @@ if(USE_CVCORE_WITH_UTILS)
             "include/litiv/utils/opengl.hpp"
         )
     endif(USE_GLSL)
+    if(USE_OPENGM)
+        add_files(INCLUDE_FILES
+            "include/litiv/utils/opengm.hpp"
+        )
+    endif(USE_OPENGM)
 endif()
 if(USE_CUDA)
     add_files(INCLUDE_FILES
