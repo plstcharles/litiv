@@ -18,17 +18,7 @@
 #pragma once
 
 #include "litiv/imgproc/CosegmentationUtils.hpp"
-#include "litiv/utils/platform.hpp"
-#include <opengm/graphicalmodel/graphicalmodel.hxx>
-#include <opengm/functions/potts.hxx>
-#include <opengm/graphicalmodel/space/simplediscretespace.hxx>
-#include <opengm/inference/inference.hxx>
-#include <opengm/inference/visitors/visitors.hxx>
-#include <opengm/inference/fix-fusion/higher-order-energy.hpp>
-#if !HAVE_OPENGM_EXTLIB
-#error "Stereo pair cosegmentor requires opengm extlib for QPBO."
-#endif //(!HAVE_OPENGM_EXTLIB)
-#include <opengm/inference/external/qpbo/QPBO.h>
+#include "litiv/utils/opengm.hpp"
 
 /// defines the internal type to be used for label values in the graph
 #define STEREOMATCH_LABEL_TYPE        size_t
@@ -233,20 +223,7 @@ struct StereoMatcher : public ICosegmentor<STEREOMATCH_LABEL_TYPE,2> {
 
         m_pGM->finalize();
         std::cout << "Model constructed in " << oLocalTimer.tock() << " second(s)." << std::endl;
-        size_t nMinVarLabelCount = SIZE_MAX, nMaxVarLabelCount = 0;
-        for(size_t v=0; v<m_pGM->numberOfVariables(); ++v) {
-            nMinVarLabelCount = std::min(m_pGM->numberOfLabels(v),nMinVarLabelCount);
-            nMaxVarLabelCount = std::max(m_pGM->numberOfLabels(v),nMaxVarLabelCount);
-        }
-        std::map<size_t,size_t> mFactOrderHist;
-        for(size_t f=0; f<m_pGM->numberOfFactors(); ++f)
-            mFactOrderHist[m_pGM->operator[](f).numberOfVariables()] += 1;
-        lvAssert_(std::accumulate(mFactOrderHist.begin(),mFactOrderHist.end(),size_t(0),[](const size_t n, const auto& p){return n+p.second;})==m_pGM->numberOfFactors(),"factor count mismatch");
-        std::cout << "Model has " << m_pGM->numberOfVariables() << " variables (" << ((nMinVarLabelCount==nMaxVarLabelCount)?std::to_string(nMinVarLabelCount)+" labels each)":std::to_string(nMinVarLabelCount)+" labels min, "+std::to_string(nMaxVarLabelCount)+" labels max)") << std::endl;
-        std::cout << "Model has " << m_pGM->numberOfFactors() << " factors;" << std::endl;
-        for(const auto& oOrderBin : mFactOrderHist) {
-            std::cout << "\t" << oOrderBin.second << " factors w/ order=" << oOrderBin.first << std::endl;
-        }
+        lv::gm::printModelInfo(*m_pGM);
     }
 
     /// stereo matcher function; solves the graph model to find pixel-level matches on epipolar lines, and returns disparity masks
@@ -316,8 +293,8 @@ struct StereoMatcher : public ICosegmentor<STEREOMATCH_LABEL_TYPE,2> {
             }
         }
     }
-    /// returns the (maximum) number of labels used in the output masks, or -1 if it cannot be predetermined
-    virtual int getMaxLabelCount() const override {return (int)m_vLabels.size();}
+    /// returns the (maximum) number of labels used in the output masks, or 0 if it cannot be predetermined
+    virtual size_t getMaxLabelCount() const override {return m_vLabels.size();}
     /// returns the list of labels used in the output masks, or an empty array if it cannot be predetermined
     virtual const std::vector<LabelType>& getLabels() const override {return m_vLabels;}
 

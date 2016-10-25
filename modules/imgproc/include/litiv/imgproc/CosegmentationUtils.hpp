@@ -31,9 +31,9 @@ struct ICosegmentor : public cv::Algorithm {
     /// image cosegmentation function; will isolate visible structures common to all input images and label them similarily in all output masks
     virtual void apply(const MatArrayIn& aImages, MatArrayOut& aMasks) = 0;
     /// image cosegmentation function; check that the input/output arrays are the right size+type, and redirect to the other 'apply' interface
-    void apply(cv::InputArrayOfArrays _aImages, cv::OutputArrayOfArrays _aMasks);
-    /// returns the (maximum) number of labels used in the output masks, or -1 if it cannot be predetermined
-    virtual int getMaxLabelCount() const = 0;
+    void apply(cv::InputArrayOfArrays aImages, cv::OutputArrayOfArrays aMasks);
+    /// returns the maximum number of labels used in the output masks, or 0 if it cannot be predetermined
+    virtual size_t getMaxLabelCount() const = 0;
     /// returns the list of labels used in the output masks, or an empty array if it cannot be predetermined
     virtual const std::vector<LabelType>& getLabels() const = 0;
     /// required for derived class destruction from this interface
