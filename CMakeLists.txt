@@ -33,18 +33,19 @@ if(WIN32)
     elseif(MSVC)
         set(CMAKE_USE_RELATIVE_PATHS ON CACHE INTERNAL "" FORCE)
     endif()
-    # add hardcoded guesses for find_package here (caution: top level project is not defined yet!)
-    list(APPEND CMAKE_PREFIX_PATH
-        $ENV{USER_DEVELOP}/opencv/ $ENV{USER_DEVELOP}/opencv/build/
-        $ENV{USER_DEVELOP}/freeglut/ $ENV{USER_DEVELOP}/freeglut/build/
-        $ENV{USER_DEVELOP}/glfw/ $ENV{USER_DEVELOP}/glfw/build/
-        $ENV{USER_DEVELOP}/glew/ $ENV{USER_DEVELOP}/glew/build/
-        $ENV{USER_DEVELOP}/glm/ $ENV{USER_DEVELOP}/glm/build/
-    )
     set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/install CACHE PATH "Install path prefix, prepended onto install directories (optional)")
 else(NOT WIN32)
     set(CMAKE_INSTALL_PREFIX "/usr/local/" CACHE PATH "Install path prefix, prepended onto install directories (optional)")
 endif()
+# add hardcoded guesses for find_package here (caution: top level project is not defined yet!)
+list(APPEND CMAKE_PREFIX_PATH
+    $ENV{USER_DEVELOP}/opencv/build-litiv/install/ $ENV{USER_DEVELOP}/opencv/build/ $ENV{USER_DEVELOP}/opencv/
+    $ENV{USER_DEVELOP}/freeglut/build-litiv/install/ $ENV{USER_DEVELOP}/freeglut/build/ $ENV{USER_DEVELOP}/freeglut/
+    $ENV{USER_DEVELOP}/glfw/build-litiv/install/ $ENV{USER_DEVELOP}/glfw/build/ $ENV{USER_DEVELOP}/glfw/
+    $ENV{USER_DEVELOP}/glew/build-litiv/install/ $ENV{USER_DEVELOP}/glew/build/ $ENV{USER_DEVELOP}/glew/
+    $ENV{USER_DEVELOP}/glm/build-litiv/install/ $ENV{USER_DEVELOP}/glm/build/ $ENV{USER_DEVELOP}/glm/
+    $ENV{USER_DEVELOP}/opengm/build-litiv/install/ $ENV{USER_DEVELOP}/opengm/build/ $ENV{USER_DEVELOP}/opengm/
+)
 
 project(litiv)
 set(LITIV_VERSION_MAJOR 1) # last change: 2015/10
