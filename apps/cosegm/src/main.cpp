@@ -16,6 +16,7 @@
 // limitations under the License.
 
 #include "litiv/datasets.hpp"
+#include "litiv/imgproc.hpp"
 #include "litiv/video.hpp"
 
 ////////////////////////////////

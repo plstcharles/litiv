@@ -40,7 +40,6 @@
 
 /// this stereo matcher assumes input images are rectified and have the same size
 struct StereoMatcher : public ICosegmentor<STEREOMATCH_LABEL_TYPE,2> {
-
     using ValueType = float; // type used for factor values (@@@@ could be integer? retest speed later?)
     using IndexType = size_t; // type used for node indexing (note: pretty much hardcoded everywhere in impl below)
     using OpType = opengm::Adder; // operation used to combine factors

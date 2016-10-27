@@ -20,14 +20,14 @@
 #include "litiv/utils/opencv.hpp"
 
 /// super-interface for cosegmentation algos which exposes common interface functions
-template<typename TLabel, size_t nArraySize>
+template<typename TLabel, size_t nInputArraySize, size_t nOutputArraySize=nInputArraySize>
 struct ICosegmentor : public cv::Algorithm {
     /// shortcut to label template typename parameter
     using LabelType = TLabel;
     /// shortcut to input matrix array type
-    using MatArrayIn = std::array<cv::Mat,nArraySize>;
+    using MatArrayIn = std::array<cv::Mat,nInputArraySize>;
     /// shortcut to output matrix array type
-    using MatArrayOut = std::array<cv::Mat_<LabelType>,nArraySize>;
+    using MatArrayOut = std::array<cv::Mat_<LabelType>,nOutputArraySize>;
     /// image cosegmentation function; will isolate visible structures common to all input images and label them similarily in all output masks
     virtual void apply(const MatArrayIn& aImages, MatArrayOut& aMasks) = 0;
     /// image cosegmentation function; check that the input/output arrays are the right size+type, and redirect to the other 'apply' interface
@@ -40,8 +40,8 @@ struct ICosegmentor : public cv::Algorithm {
     virtual ~ICosegmentor() = default;
 };
 
-template<typename TLabel, size_t nArraySize>
-void ICosegmentor<TLabel,nArraySize>::apply(cv::InputArrayOfArrays _aImages, cv::OutputArrayOfArrays _aMasks) {
+template<typename TLabel, size_t nInputArraySize, size_t nOutputArraySize>
+void ICosegmentor<TLabel,nInputArraySize,nOutputArraySize>::apply(cv::InputArrayOfArrays _aImages, cv::OutputArrayOfArrays _aMasks) {
     lvAssert_(_aImages.isMatVector(),"first argument must be a mat vector (or mat array)");
     std::vector<cv::Mat> vImages;
     _aImages.getMatVector(vImages);
