@@ -19,11 +19,27 @@
 
 #include <GL/glew.h>
 #include <GL/glu.h>
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+#elif (defined(__GNUC__) || defined(__GNUG__))
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wshadow"
+#elif defined(_MSC_VER)
+#pragma warning(push,0)
+#endif //defined(_MSC_VER)
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/random.hpp>
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#elif (defined(__GNUC__) || defined(__GNUG__))
+#pragma GCC diagnostic pop
+#elif defined(__clang__)
+#pragma clang diagnostic pop
+#endif //defined(__clang__)
 #include <opencv2/opencv.hpp>
 #include "litiv/utils/cxx.hpp"
 #include "litiv/utils/platform.hpp"
