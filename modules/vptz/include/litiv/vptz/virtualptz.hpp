@@ -25,6 +25,9 @@
 
 #pragma once
 
+#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES
+#endif //ndefined(_USE_MATH_DEFINES)
 #include "litiv/vptz/utils.hpp"
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
