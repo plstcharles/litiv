@@ -33,7 +33,6 @@ if(WIN32)
         "src/dllentry.cpp"
         "src/dllsetup.cpp"
         "src/mtype.cpp"
-        "src/ocvcompat.cpp"
         "src/outputq.cpp"
         "src/perflog.cpp"
         "src/pstream.cpp"
@@ -73,7 +72,6 @@ if(WIN32)
         "include/litiv/3rdparty/dshowbase/msgthrd.h"
         "include/litiv/3rdparty/dshowbase/mtype.h"
         "include/litiv/3rdparty/dshowbase/outputq.h"
-        "include/litiv/3rdparty/dshowbase/ocvcompat.h"
         "include/litiv/3rdparty/dshowbase/perflog.h"
         "include/litiv/3rdparty/dshowbase/perfstruct.h"
         "include/litiv/3rdparty/dshowbase/pstream.h"
@@ -117,6 +115,15 @@ if(WIN32)
             "include/litiv/3rdparty/dshowbase/gmf/sink.h"
         )
     endif()
+    option(BUILD_DSHOWBASE_OCVCOMPAT "Specifies whether the OpenCV compat utility should be included/linked in the dshowbase project build" ON)
+    if(BUILD_DSHOWBASE_OCVCOMPAT)
+        add_files(SOURCE_FILES
+            "src/ocvcompat.cpp"
+        )
+        add_files(INCLUDE_FILES
+            "include/litiv/3rdparty/dshowbase/ocvcompat.h"
+        )
+    endif()
 
     add_library(litiv_dshowbase STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
     set_target_properties(litiv_dshowbase PROPERTIES FOLDER "3rdparty")
@@ -133,6 +140,15 @@ if(WIN32)
         dmoguids
         wmcodecdspuuid
     )
+    if(BUILD_DSHOWBASE_OCVCOMPAT)
+        target_include_directories(litiv_dshowbase
+            PUBLIC
+                "$<BUILD_INTERFACE:${OpenCV_INCLUDE_DIRS}>"
+        )
+        target_link_libraries(litiv_dshowbase
+            ${OpenCV_LIBRARIES}
+        )
+    endif()
 
     install(TARGETS litiv_dshowbase
         RUNTIME DESTINATION bin
