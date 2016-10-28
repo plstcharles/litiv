@@ -141,6 +141,7 @@ namespace lv {
             /// creates and returns a work batch for a given relative dataset path
             virtual IDataHandlerPtr createWorkBatch(const std::string& sBatchName, const std::string& sRelativePath) const override {
                 lvDbgExceptionWatch;
+                static_assert((!std::is_abstract<WorkBatch>::value),"Work batch class must be non-abstract (check for missing virtual pure impls in interface specializations)");
                 auto p = std::shared_ptr<WorkBatch>(new WorkBatch(sBatchName,sRelativePath,*this));
                 p->parseData();
                 return p;
@@ -157,6 +158,7 @@ namespace lv {
         /// creates and returns a work batch group for a given relative dataset path
         virtual IDataHandlerPtr createWorkBatch(const std::string& sBatchName, const std::string& sRelativePath) const override {
             lvDbgExceptionWatch;
+            static_assert((!std::is_abstract<WorkBatchGroup>::value),"Work batch group class must be non-abstract (check for missing virtual pure impls in interface specializations)");
             auto p = std::shared_ptr<WorkBatchGroup>(new WorkBatchGroup(sBatchName,sRelativePath,*this));
             p->parseData();
             return p;
@@ -212,6 +214,7 @@ namespace lv {
         template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl, typename... Targs>
         DatasetPtr_<eDatasetTask,eDataset,eEvalImpl> create(Targs&&... args) {
             lvDbgExceptionWatch;
+            static_assert((!std::is_abstract<Dataset_<eDatasetTask,eDataset,eEvalImpl>>::value),"Requested dataset class must be non-abstract (check for missing virtual pure impls in interface specializations)");
             struct DatasetWrapper : public Dataset_<eDatasetTask,eDataset,eEvalImpl> {
                 DatasetWrapper(Targs&&... args) : Dataset_<eDatasetTask,eDataset,eEvalImpl>(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
             };
