@@ -23,7 +23,6 @@ add_files(SOURCE_FILES
     "src/EdgeDetectorLBSP.cpp"
     "src/imgproc.cpp"
 )
-
 add_files(INCLUDE_FILES
     "include/litiv/imgproc/EdgeDetectionUtils.hpp"
     "include/litiv/imgproc/EdgeDetectorCanny.hpp"
@@ -31,17 +30,18 @@ add_files(INCLUDE_FILES
     "include/litiv/imgproc.hpp"
 )
 
-add_library(${LITIV_CURRENT_PROJECT_NAME} STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
-
-target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} litiv_features2d)
-target_include_directories(${LITIV_CURRENT_PROJECT_NAME}
-    PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
-    PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
-    INTERFACE "$<INSTALL_INTERFACE:include/>"
+add_library(litiv_imgproc STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
+set_target_properties(litiv_imgproc PROPERTIES FOLDER "modules")
+#target_compile_definitions(litiv_imgproc PRIVATE BUILDING_DLL)
+target_include_directories(litiv_imgproc
+    PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
+        "$<INSTALL_INTERFACE:include/>"
 )
-set_target_properties(${LITIV_CURRENT_PROJECT_NAME} PROPERTIES FOLDER "modules")
+target_link_libraries(litiv_imgproc litiv_features2d)
 
-install(TARGETS ${LITIV_CURRENT_PROJECT_NAME}
+install(TARGETS litiv_imgproc
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib

@@ -16,7 +16,6 @@
 // limitations under the License.
 
 #include "litiv/utils/opencv.hpp"
-#include "litiv/utils/platform.hpp"
 
 cv::DisplayHelperPtr cv::DisplayHelper::create(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) {
     struct DisplayHelperWrapper : public DisplayHelper {

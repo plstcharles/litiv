@@ -16,23 +16,9 @@
 # limitations under the License.
 
 if(USE_GLSL)
-    option(BUILD_VPTZ "Build VPTZ library; requires full OpenGL support" ON)
-endif(USE_GLSL)
-if(BUILD_VPTZ)
-    if(NOT ${USE_GLSL})
-        message(ERROR "VirtualPTZ library requires full OpenGL support")
-    endif(NOT ${USE_GLSL})
     option(USE_VPTZ_STANDALONE "Build VPTZ library as standalone lib from LITIV framework" ON)
-    if(USE_VPTZ_STANDALONE)
-        project(litiv_vptz)
-        set(LITIV_CURRENT_MODULE_NAME vptz)
-        set(LITIV_CURRENT_PROJECT_NAME litiv_vptz)
-    else(NOT USE_VPTZ_STANDALONE)
-        litiv_module(vptz)
-    endif(USE_VPTZ_STANDALONE)
 
     file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/utils.hpp)
-
     configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/include/litiv/vptz/utils.hpp.in"
         "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/utils.hpp"
@@ -41,7 +27,6 @@ if(BUILD_VPTZ)
     add_files(SOURCE_FILES
         "src/virtualptz.cpp"
     )
-
     add_files(INCLUDE_FILES
         "include/litiv/vptz/utils.hpp"
         "include/litiv/vptz/virtualptz.hpp"
@@ -49,39 +34,83 @@ if(BUILD_VPTZ)
     )
 
     if(USE_VPTZ_STANDALONE)
-        add_definitions(-DVPTZ_EXPORT)
+
+        project(vptz)
+
+        add_library(vptz SHARED ${SOURCE_FILES} ${INCLUDE_FILES})
+        set_target_properties(vptz PROPERTIES FOLDER "vptz")
+        target_compile_definitions(vptz PRIVATE VPTZ_EXPORT)
         if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
             # disables C4251 + C4275 to allow STL/template classes to be used in exported classes/members
             # need to eliminate these using pImpl idiom in exported classes to add abstraction layer @@@@
-            add_definitions(/wd4251) # disables C4251, "'identifier' : class 'type' needs to have dll-interface to be used by clients of class 'type2'"
-            add_definitions(/wd4275) # disables C4275, "non DLL-interface classkey 'identifier' used as base for DLL-interface classkey 'identifier'"
+            target_compile_options(vptz PUBLIC /wd4251) # disables C4251, "'identifier' : class 'type' needs to have dll-interface to be used by clients of class 'type2'"
+            target_compile_options(vptz PUBLIC /wd4275) # disables C4275, "non DLL-interface classkey 'identifier' used as base for DLL-interface classkey 'identifier'"
         endif()
-        add_library(${LITIV_CURRENT_PROJECT_NAME} SHARED ${SOURCE_FILES} ${INCLUDE_FILES})
-        target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} ${OpenCV_LIBRARIES})
+        target_include_directories(vptz
+            PUBLIC
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
+                "$<INSTALL_INTERFACE:include/>"
+                "$<BUILD_INTERFACE:${OpenCV_INCLUDE_DIRS}>"
+                "$<BUILD_INTERFACE:${OpenGL_INCLUDE_DIRS}>"
+                "$<BUILD_INTERFACE:${GLEW_INCLUDE_DIRS}>"
+                "$<BUILD_INTERFACE:${GLM_INCLUDE_DIRS}>"
+        )
+        target_link_libraries(vptz
+            ${OpenCV_LIBRARIES}
+            ${OPENGL_LIBRARIES}
+            ${GLEW_LIBRARIES}
+            ${GLM_LIBRARIES}
+        )
         if(USE_GLFW)
-            target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} ${GLFW_LIBRARIES})
+            target_include_directories(vptz
+                PUBLIC
+                    "$<BUILD_INTERFACE:${GLFW_INCLUDE_DIR}>"
+            )
+            target_link_libraries(vptz
+                ${GLFW_LIBRARIES}
+            )
         elseif(USE_FREEGLUT)
-            target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} ${FREEGLUT_LIBRARY})
-        endif(USE_GLFW)
-        target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} ${OPENGL_LIBRARIES})
-        target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} ${GLEW_LIBRARIES})
-    else(NOT USE_VPTZ_STANDALONE)
-        add_library(${LITIV_CURRENT_PROJECT_NAME} STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
-        target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} litiv_utils)
-    endif(USE_VPTZ_STANDALONE)
-    target_include_directories(${LITIV_CURRENT_PROJECT_NAME}
-        PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
-        PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
-        INTERFACE "$<INSTALL_INTERFACE:include/>"
-    )
-    set_target_properties(${LITIV_CURRENT_PROJECT_NAME} PROPERTIES FOLDER "modules")
+            target_include_directories(vptz
+                PUBLIC
+                    "$<BUILD_INTERFACE:${FREEGLUT_INCLUDE_DIR}>"
+            )
+            target_link_libraries(vptz
+                ${FREEGLUT_LIBRARY}
+            )
+        endif()
 
-    install(TARGETS ${LITIV_CURRENT_PROJECT_NAME}
-        RUNTIME DESTINATION bin
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-        COMPONENT modules
-    )
+        install(TARGETS vptz
+            RUNTIME DESTINATION bin
+            LIBRARY DESTINATION lib
+            ARCHIVE DESTINATION lib
+            COMPONENT vptz
+        )
+
+    else(NOT USE_VPTZ_STANDALONE)
+
+        litiv_module(vptz)
+
+        add_library(litiv_vptz STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
+        set_target_properties(litiv_vptz PROPERTIES FOLDER "modules")
+        #target_compile_definitions(litiv_vptz PRIVATE BUILDING_DLL)
+        target_include_directories(litiv_vptz
+            PUBLIC
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
+                "$<INSTALL_INTERFACE:include/>"
+        )
+        target_link_libraries(litiv_vptz litiv_utils)
+
+        install(TARGETS litiv_vptz
+            RUNTIME DESTINATION bin
+            LIBRARY DESTINATION lib
+            ARCHIVE DESTINATION lib
+            COMPONENT modules
+        )
+        
+    endif(USE_VPTZ_STANDALONE)
+    
     install(DIRECTORY "include/"
         DESTINATION "include/"
         COMPONENT modules
@@ -92,4 +121,4 @@ if(BUILD_VPTZ)
         COMPONENT modules
     )
 
-endif(BUILD_VPTZ)
+endif(USE_GLSL)

@@ -15,16 +15,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(WIN32) # project based on Kinectv2 SDK & DirectShow for FLIR A40
-    option(BUILD_CAPTURE_APP "Sets whether the RGBDT stereo capture app should be built or not (win32 only due to Microsoft SDK dependencies)" ${KinectSDK2_FOUND})
-    if(BUILD_CAPTURE_APP)
-        if(USE_KINECTSDK_STANDALONE)
-            message(FATAL_ERROR "The RGBDT capture app requires the full Kinectv2 SDK.")
-        endif()
-        project(capture_rgbdt)
-        add_executable(capture_rgbdt src/main.cpp)
-        target_link_libraries(capture_rgbdt litiv_world DShowBase ${KinectSDK2_LIBRARIES})
-        set_target_properties(capture_rgbdt PROPERTIES FOLDER "apps")
-        install(TARGETS capture_rgbdt RUNTIME DESTINATION bin COMPONENT apps)
-    endif()
+if(WIN32 AND KinectSDK2_FOUND) # only for WIN32 due to Kinectv2SDK & DirectShow
+
+    litiv_app(capture)
+
+    add_executable(litiv_app_capture src/main.cpp)
+    set_target_properties(litiv_app_capture PROPERTIES FOLDER "apps")
+    target_include_directories(litiv_app_capture
+        PUBLIC
+            "$<BUILD_INTERFACE:${KinectSDK2_INCLUDE_DIRS}>"
+    )
+    target_link_libraries(litiv_app_capture
+        litiv_world
+        litiv_dshowbase
+        ${KinectSDK2_LIBRARIES}
+    )
+
+    install(TARGETS litiv_app_capture
+        RUNTIME DESTINATION bin
+        COMPONENT apps
+    )
+
 endif()

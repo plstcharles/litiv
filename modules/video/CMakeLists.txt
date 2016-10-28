@@ -26,7 +26,6 @@ add_files(SOURCE_FILES
     "src/BackgroundSubtractorSuBSENSE.cpp"
     "src/BackgroundSubtractorViBe.cpp"
 )
-
 add_files(INCLUDE_FILES
     "include/litiv/video/BackgroundSubtractionUtils.hpp"
     "include/litiv/video/BackgroundSubtractorLBSP.hpp"
@@ -38,17 +37,18 @@ add_files(INCLUDE_FILES
     "include/litiv/video.hpp"
 )
 
-add_library(${LITIV_CURRENT_PROJECT_NAME} STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
-
-target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} litiv_features2d)
-target_include_directories(${LITIV_CURRENT_PROJECT_NAME}
-    PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
-    PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
-    INTERFACE "$<INSTALL_INTERFACE:include/>"
+add_library(litiv_video STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
+set_target_properties(litiv_video PROPERTIES FOLDER "modules")
+#target_compile_definitions(litiv_video PRIVATE BUILDING_DLL)
+target_include_directories(litiv_video
+    PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
+        "$<INSTALL_INTERFACE:include/>"
 )
-set_target_properties(${LITIV_CURRENT_PROJECT_NAME} PROPERTIES FOLDER "modules")
+target_link_libraries(litiv_video litiv_features2d)
 
-install(TARGETS ${LITIV_CURRENT_PROJECT_NAME}
+install(TARGETS litiv_video
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib

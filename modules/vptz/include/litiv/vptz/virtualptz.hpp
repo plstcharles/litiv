@@ -31,10 +31,10 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/video/tracking.hpp>
 #if !USE_VPTZ_STANDALONE
+#include "litiv/utils/defines.hpp"
 #if !HAVE_GLSL
 #error "vptz requires full OpenGL support"
 #endif //(!HAVE_GLSL)
-#include "litiv/utils/defines.hpp"
 #include "litiv/utils/parallel.hpp"
 #include "litiv/utils/distances.hpp"
 #include "litiv/utils/cxx.hpp"

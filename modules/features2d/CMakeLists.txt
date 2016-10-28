@@ -20,23 +20,23 @@ litiv_module(features2d)
 add_files(SOURCE_FILES
     "src/LBSP.cpp"
 )
-
 add_files(INCLUDE_FILES
     "include/litiv/features2d/LBSP.hpp"
     "include/litiv/features2d.hpp"
 )
 
-add_library(${LITIV_CURRENT_PROJECT_NAME} STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
-
-target_link_libraries(${LITIV_CURRENT_PROJECT_NAME} litiv_utils)
-target_include_directories(${LITIV_CURRENT_PROJECT_NAME}
-    PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
-    PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
-    INTERFACE "$<INSTALL_INTERFACE:include/>"
+add_library(litiv_features2d STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
+set_target_properties(litiv_features2d PROPERTIES FOLDER "modules")
+#target_compile_definitions(litiv_features2d PRIVATE BUILDING_DLL)
+target_include_directories(litiv_features2d
+    PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
+        "$<INSTALL_INTERFACE:include/>"
 )
-set_target_properties(${LITIV_CURRENT_PROJECT_NAME} PROPERTIES FOLDER "modules")
+target_link_libraries(litiv_features2d litiv_utils)
 
-install(TARGETS ${LITIV_CURRENT_PROJECT_NAME}
+install(TARGETS litiv_features2d
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib

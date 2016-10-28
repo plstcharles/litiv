@@ -15,8 +15,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-project(gtviewer)
-add_executable(gtviewer src/main.cpp)
-target_link_libraries(gtviewer ${VPTZ_LINK_LIBS})
-set_target_properties(gtviewer PROPERTIES FOLDER "apps/vptz")
-install(TARGETS gtviewer RUNTIME DESTINATION bin COMPONENT apps)
+if(USE_GLSL)
+
+    if(USE_VPTZ_STANDALONE)
+
+        project(vptz_gtviewer)
+
+        add_executable(vptz_gtviewer src/main.cpp)
+        set_target_properties(vptz_gtviewer PROPERTIES FOLDER "vptz")
+        target_compile_definitions(vptz_gtviewer PRIVATE VPTZ_IMPORT)
+        target_link_libraries(vptz_gtviewer vptz)
+
+        install(TARGETS vptz_gtviewer
+            RUNTIME DESTINATION bin
+            COMPONENT vptz
+        )
+
+    else(NOT USE_VPTZ_STANDALONE)
+
+        litiv_app(gtviewer)
+
+        add_executable(litiv_app_gtviewer src/main.cpp)
+        set_target_properties(litiv_app_gtviewer PROPERTIES FOLDER "apps/vptz")
+        target_link_libraries(litiv_app_gtviewer litiv_vptz)
+
+        install(TARGETS litiv_app_gtviewer
+            RUNTIME DESTINATION bin
+            COMPONENT apps
+        )
+
+    endif(USE_VPTZ_STANDALONE)
+
+endif(USE_GLSL)

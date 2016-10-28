@@ -32,23 +32,30 @@ unset(CMAKE_CONFIGURABLE_FILE_CONTENT)
 add_files(SOURCE_FILES
     "src/world.cpp"
 )
-
 add_files(INCLUDE_FILES
-    "include/litiv/world.hpp"
+    "include/litiv/litiv.hpp"
 )
 if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
     add_library(litiv_world STATIC ${SOURCE_FILES} ${INCLUDE_FILES}) # need to add API export/import config later @@@@
 else()
     add_library(litiv_world SHARED ${SOURCE_FILES} ${INCLUDE_FILES})
 endif()
-
-target_link_libraries(litiv_world ${litiv_projects})
-target_include_directories(litiv_world
-    PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
-    PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
-    INTERFACE "$<INSTALL_INTERFACE:include/>"
-)
 set_target_properties(litiv_world PROPERTIES FOLDER "modules")
+#target_compile_definitions(litiv_world PRIVATE BUILDING_DLL)
+target_include_directories(litiv_world
+    PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
+        "$<INSTALL_INTERFACE:include/>"
+)
+set(litiv_module_names ${litiv_modules})
+xfix_list_tokens(litiv_module_names "litiv_" "")
+list(LENGTH litiv_module_names litiv_module_count)
+message(STATUS "litiv_world will link to ${litiv_module_count} modules...")
+foreach(litiv_module_name IN LISTS litiv_module_names)
+    message(STATUS " - ${litiv_module_name}")
+endforeach()
+target_link_libraries(litiv_world ${litiv_module_names})
 
 install(TARGETS litiv_world
     RUNTIME DESTINATION bin

@@ -47,6 +47,8 @@ list(APPEND CMAKE_PREFIX_PATH
     $ENV{USER_DEVELOP}/opengm/build-litiv/install/ $ENV{USER_DEVELOP}/opengm/build/ $ENV{USER_DEVELOP}/opengm/
 )
 
+################################################################
+
 project(litiv)
 set(LITIV_VERSION_MAJOR 1) # last change: 2015/10
 set(LITIV_VERSION_MINOR 3) # last change: 2016/10
@@ -75,9 +77,6 @@ mark_as_advanced(USE_FAST_MATH DATASETS_CACHE_SIZE)
 
 ### OPENCV CHECK
 find_package(OpenCV 3.0 REQUIRED)
-include_directories(${OpenCV_INCLUDE_DIRS})
-link_directories(${OpenCV_LIBRARY_DIRS})
-add_definitions(${OpenCV_DEFINITIONS})
 
 ### GLSL CHECK
 find_package(OpenGL)
@@ -86,33 +85,27 @@ find_package(GLFW)
 find_package(GLEW)
 find_package(GLM)
 set_eval(USE_GLSL ((${GLFW_FOUND} OR ${FREEGLUT_FOUND}) AND ${OPENGL_FOUND} AND ${GLEW_FOUND} AND ${GLM_FOUND}))
+option(USE_GLSL "Specifies whether GLSL support should be enabled or not; if false, projects that depend on it will be disabled" ${USE_GLSL})
 if(USE_GLSL)
-    if(${GLFW_FOUND} AND ${FREEGLUT_FOUND})
-        set(USE_GLFW 1 CACHE BOOL "Use GLFW as the OpenGL window manager")
-        set(USE_FREEGLUT 0 CACHE BOOL "Use FREEGLUT as the OpenGL window manager")
-    elseif(${GLFW_FOUND})
-        set(USE_GLFW 1)
-        set(USE_FREEGLUT 0)
+    find_package(OpenGL REQUIRED)
+    find_package(GLEW REQUIRED)
+    find_package(GLM REQUIRED)
+    option(USE_GLFW "Use GLFW as the OpenGL window manager for GLSL implementations" ${GLFW_FOUND})
+    option(USE_FREEGLUT "Use FREEGLUT as the OpenGL window manager for GLSL implementations" ${FREEGLUT_FOUND})
+    if((${GLFW_FOUND} AND ${FREEGLUT_FOUND}) OR ((NOT ${GLFW_FOUND}) AND (NOT ${FREEGLUT_FOUND})))
+        set(USE_GLFW ON)
+        set(USE_FREEGLUT OFF)
+    endif()
+    if(${USE_GLFW})
+        find_package(GLFW REQUIRED)
     elseif(${FREEGLUT_FOUND})
-        set(USE_GLFW 0)
-        set(USE_FREEGLUT 1)
+        find_package(FREEGLUT REQUIRED)
     endif()
-    if(${USE_GLFW} EQUAL ${USE_FREEGLUT})
-        message(FATAL_ERROR "Need to select one window manager.")
-    endif()
-    if(USE_GLFW)
-        include_directories(${GLFW_INCLUDE_DIR})
-    elseif(USE_FREEGLUT)
-        include_directories(${FREEGLUT_INCLUDE_DIR})
-    endif()
-    include_directories(${OpenGL_INCLUDE_DIRS})
-    include_directories(${GLEW_INCLUDE_DIRS})
-    include_directories(${GLM_INCLUDE_DIRS})
     set(TARGET_GL_VER_MAJOR 4 CACHE STRING "Target OpenGL profile major version")
     set(TARGET_GL_VER_MINOR 4 CACHE STRING "Target OpenGL profile minor version")
     option(GLEW_EXPERIMENTAL "Use experimental GLEW features" ON)
 else()
-    message(WARNING "Missing OpenGL library(ies), vptz module & GLSL implementations will be disabled")
+    message("Without GLSL support enabled, vptz module & shader-based implementations will be disabled")
 endif()
 
 ### OPENGM CHECK
@@ -120,10 +113,8 @@ find_package(OpenGM COMPONENTS ext)
 option(USE_OPENGM "Specifies whether OpenGM should be included/linked or not; if false, projects that depend on it will be disabled" ${OpenGM_FOUND})
 if(USE_OPENGM)
     find_package(OpenGM REQUIRED COMPONENTS ext)
-    include_directories(${OpenGM_INCLUDE_DIRS})
-    link_directories(${OpenGM_LIBRARY_DIRS})
 else()
-    message(WARNING "Missing OpenGM library w/ external dependencies, cosegm project & utilities will be disabled")
+    message("Without OpenGM support w/ external dependencies enabled, cosegm project & utilities will be disabled")
 endif()
 
 ### CUDA CHECK @@@@ add later for parallel utils & impls
@@ -132,7 +123,7 @@ set_eval(USE_CUDA 0)
 ### OPENCL CHECK @@@@ add later for parallel utils & impls
 set_eval(USE_OPENCL 0)
 
-### EXTRA LIBS CHECK
+### Kinect SDK CHECK
 if(WIN32)
     find_package(KinectSDK2)
     mark_as_advanced(
@@ -140,16 +131,27 @@ if(WIN32)
         KinectSDK2_FUSION
         KinectSDK2_VGB
     )
+    option(USE_KINECTSDK "Specifies whether the Kinectv2 SDK should be included/linked or not; if false, projects that depend on it will be disabled" ${KinectSDK2_FOUND})
+    if(USE_KINECTSDK)
+        find_package(KinectSDK2 REQUIRED)
+    else()
+        message("Without full Kinectv2 SDK support, capture app will be disabled")
+    endif()
 endif()
 if(KinectSDK2_FOUND)
     message(STATUS "Kinectv2 SDK found, will disable internal SDK standalone utilities.")
     set(USE_KINECTSDK_STANDALONE FALSE CACHE INTERNAL "" FORCE)
-    include_directories(${KinectSDK2_INCLUDE_DIRS})
-    link_directories(${KinectSDK2_LIBRARY_DIRS})
 else()
-    message(STATUS "Kinectv2 SDK not found, will enable internal SDK standalone utilities.")
     set(USE_KINECTSDK_STANDALONE TRUE CACHE INTERNAL "" FORCE)
 endif()
+
+initialize_internal_list(litiv_projects)
+initialize_internal_list(litiv_3rdparty_modules)
+initialize_internal_list(litiv_modules)
+initialize_internal_list(litiv_apps)
+initialize_internal_list(litiv_samples)
+
+################################################################
 
 add_subdirectory(cmake/checks/simd)
 if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang"))
@@ -182,9 +184,6 @@ else()
 endif()
 
 add_subdirectory(3rdparty)
-
-initialize_internal_list(litiv_modules)
-initialize_internal_list(litiv_projects)
 if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang"))
     add_definitions(-Wextra)
     add_definitions(-Wshadow)
@@ -200,13 +199,14 @@ elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
     # ... @@@
 endif()
-
 add_subdirectory(modules)
 add_subdirectory(samples)
 add_subdirectory(apps)
 add_subdirectory(doc)
 
-install(FILES "LICENSE.txt" DESTINATION ".")
+################################################################
+
+install(FILES "LICENSE.txt" DESTINATION "share/litiv/")
 if(EXISTS "${CMAKE_ROOT}/Modules/CPack.cmake")
     option(USE_CPACK "Use CPack to build installation package" OFF)
     if(USE_CPACK)

@@ -15,23 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(BUILD_VPTZ)
-    if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
-        # disables C4251 + C4275 to allow STL/template classes to be used in exported classes/members
-        # need to eliminate these using pImpl idiom in exported classes to add abstraction layer @@@@
-        add_definitions(/wd4251) # disables C4251, "'identifier' : class 'type' needs to have dll-interface to be used by clients of class 'type2'"
-        add_definitions(/wd4275) # disables C4275, "non DLL-interface classkey 'identifier' used as base for DLL-interface classkey 'identifier'"
-    endif()
-    if(USE_VPTZ_STANDALONE)
-        add_definitions(-DVPTZ_IMPORT)
-        include_directories(${litiv_vptz_INCLUDE_DIR})
-        set(VPTZ_LINK_LIBS litiv_vptz)
-    else(NOT USE_VPTZ_STANDALONE)
-        include_directories(${litiv_vptz_INCLUDE_DIR} ${litiv_utils_INCLUDE_DIR})
-        set(VPTZ_LINK_LIBS litiv_world)
-    endif()
-    get_subdirectory_list(subdirs ${CMAKE_CURRENT_SOURCE_DIR})
-    foreach(subdir ${subdirs})
-        add_subdirectory(${subdir})
-    endforeach()
-endif()
+get_subdirectory_list(subdirs ${CMAKE_CURRENT_SOURCE_DIR})
+foreach(subdir ${subdirs})
+    add_subdirectory(${subdir})
+endforeach()

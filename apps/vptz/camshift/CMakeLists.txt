@@ -15,8 +15,35 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-project(camshift)
-add_executable(camshift src/main.cpp)
-target_link_libraries(camshift ${VPTZ_LINK_LIBS})
-set_target_properties(camshift PROPERTIES FOLDER "apps/vptz")
-install(TARGETS camshift RUNTIME DESTINATION bin COMPONENT apps)
+if(USE_GLSL)
+
+    if(USE_VPTZ_STANDALONE)
+
+        project(vptz_camshift)
+
+        add_executable(vptz_camshift src/main.cpp)
+        set_target_properties(vptz_camshift PROPERTIES FOLDER "vptz")
+        target_compile_definitions(vptz_camshift PRIVATE VPTZ_IMPORT)
+        target_link_libraries(vptz_camshift vptz)
+
+        install(TARGETS vptz_camshift
+            RUNTIME DESTINATION bin
+            COMPONENT vptz
+        )
+
+    else(NOT USE_VPTZ_STANDALONE)
+
+        litiv_app(camshift)
+
+        add_executable(litiv_app_camshift src/main.cpp)
+        set_target_properties(litiv_app_camshift PROPERTIES FOLDER "apps/vptz")
+        target_link_libraries(litiv_app_camshift litiv_vptz)
+
+        install(TARGETS litiv_app_camshift
+            RUNTIME DESTINATION bin
+            COMPONENT apps
+        )
+
+    endif(USE_VPTZ_STANDALONE)
+
+endif(USE_GLSL)

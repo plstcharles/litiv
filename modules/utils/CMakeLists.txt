@@ -18,7 +18,6 @@
 litiv_module(utils)
 
 file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/include/litiv/utils/defines.hpp)
-
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/include/litiv/utils/defines.hpp.in"
     "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/utils/defines.hpp"
@@ -53,17 +52,72 @@ if(USE_GLSL)
     )
 endif(USE_GLSL)
 
-add_library(${LITIV_CURRENT_PROJECT_NAME} STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
-
-target_link_litiv_dependencies(${LITIV_CURRENT_PROJECT_NAME})
-target_include_directories(${LITIV_CURRENT_PROJECT_NAME}
-    PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
-    PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
-    INTERFACE "$<INSTALL_INTERFACE:include/>"
+add_library(litiv_utils STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
+set_target_properties(litiv_utils PROPERTIES FOLDER "modules")
+#target_compile_definitions(litiv_utils PRIVATE BUILDING_DLL)
+#if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
+#    # disables C4251 + C4275 to allow STL/template classes to be used in exported classes/members
+#    # need to eliminate these using pImpl idiom in exported classes to add abstraction layer @@@@
+#    target_compile_options(litiv_utils PUBLIC /wd4251) # disables C4251, "'identifier' : class 'type' needs to have dll-interface to be used by clients of class 'type2'"
+#    target_compile_options(litiv_utils PUBLIC /wd4275) # disables C4275, "non DLL-interface classkey 'identifier' used as base for DLL-interface classkey 'identifier'"
+#endif()
+target_include_directories(litiv_utils
+    PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
+        "$<INSTALL_INTERFACE:include/>"
+        "$<BUILD_INTERFACE:${OpenCV_INCLUDE_DIRS}>"
 )
-set_target_properties(${LITIV_CURRENT_PROJECT_NAME} PROPERTIES FOLDER "modules")
+target_link_libraries(litiv_utils
+    ${OpenCV_LIBRARIES}
+)
+if(USE_GLSL)
+    target_include_directories(litiv_utils
+        PUBLIC
+            "$<BUILD_INTERFACE:${OpenGL_INCLUDE_DIRS}>"
+            "$<BUILD_INTERFACE:${GLEW_INCLUDE_DIRS}>"
+            "$<BUILD_INTERFACE:${GLM_INCLUDE_DIRS}>"
+    )
+    target_link_libraries(litiv_utils
+        ${OPENGL_LIBRARIES}
+        ${GLEW_LIBRARIES}
+        ${GLM_LIBRARIES}
+    )
+    if(USE_GLFW)
+        target_include_directories(litiv_utils
+            PUBLIC
+                "$<BUILD_INTERFACE:${GLFW_INCLUDE_DIR}>"
+        )
+        target_link_libraries(litiv_utils
+            ${GLFW_LIBRARIES}
+        )
+    elseif(USE_FREEGLUT)
+        target_include_directories(litiv_utils
+            PUBLIC
+                "$<BUILD_INTERFACE:${FREEGLUT_INCLUDE_DIR}>"
+        )
+        target_link_libraries(litiv_utils
+            ${FREEGLUT_LIBRARY}
+        )
+    endif()
+endif()
+if(KinectSDK2_FOUND)
+    target_include_directories(litiv_utils
+        PUBLIC
+            "$<BUILD_INTERFACE:${KinectSDK2_INCLUDE_DIRS}>"
+    )
+    target_link_libraries(litiv_utils
+        ${KinectSDK2_LIBRARIES}
+    )
+endif()
+if(UNIX AND NOT ANDROID AND NOT (APPLE AND CMAKE_COMPILER_IS_CLANGCXX))
+    # build fails without this for some platforms... broken external dependency? (see PR#5)
+    target_link_libraries(litiv_utils
+        pthread
+    )
+endif()
 
-install(TARGETS ${LITIV_CURRENT_PROJECT_NAME}
+install(TARGETS litiv_utils
     RUNTIME DESTINATION bin
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib

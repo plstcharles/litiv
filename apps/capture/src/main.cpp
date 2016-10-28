@@ -17,7 +17,7 @@
 
 #include "litiv/datasets.hpp"
 #include "litiv/video.hpp"
-#include "litiv/3rdparty/DShowBase/ocvcompat.h"
+#include "litiv/3rdparty/dshowbase/ocvcompat.h"
 #include <Kinect.h>
 
 /////////////////////////////////

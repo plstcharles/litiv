@@ -15,8 +15,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-project(vidreg)
-add_executable(vidreg src/main.cpp)
-target_link_libraries(vidreg litiv_world)
-set_target_properties(vidreg PROPERTIES FOLDER "apps")
-install(TARGETS vidreg RUNTIME DESTINATION bin COMPONENT apps)
+if(0) ## (disabled as of march 2016, incomplete)
+
+    litiv_app(vidreg)
+
+    add_executable(litiv_app_vidreg src/main.cpp)
+    set_target_properties(litiv_app_vidreg PROPERTIES FOLDER "apps")
+    target_link_libraries(litiv_app_vidreg litiv_world)
+
+    install(TARGETS litiv_app_vidreg
+        RUNTIME DESTINATION bin
+        COMPONENT apps
+    )
+
+endif()

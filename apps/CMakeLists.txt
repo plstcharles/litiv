@@ -15,10 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory("capture") # sync'd RGB-D-NIR-FLIR video capture application (project only added on WIN32)
-add_subdirectory("changedet") # change detection/background subtraction benchmark application
-#add_subdirectory("cosegm") # cosegmentation testbench & development sandbox (WiP, requires OpenGM)
-add_subdirectory("edges") # edge detection benchmark application
-add_subdirectory("handregistr") # manual, visual-point-driven video registration application
-#add_subdirectory("vidreg") # video registration benchmark application (disabled as of march 2016, incomplete)
-add_subdirectory("vptz") # vptz module visualization utilities & evaluation applications
+get_subdirectory_list(subdirs ${CMAKE_CURRENT_SOURCE_DIR})
+foreach(subdir ${subdirs})
+    add_subdirectory(${subdir})
+endforeach()

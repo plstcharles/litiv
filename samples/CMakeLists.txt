@@ -15,6 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory("changedet_simple") # minimalistic example of change detection using a litiv algo
-add_subdirectory("dataset_simple") # minimalistic example of defining a custom dataset for a litiv algo
-add_subdirectory("edges_simple") # minimalistic example of edge detection using a litiv algo
+get_subdirectory_list(subdirs ${CMAKE_CURRENT_SOURCE_DIR})
+foreach(subdir ${subdirs})
+    if(NOT(${subdir} STREQUAL "data"))
+        add_subdirectory(${subdir})
+    endif(NOT(${subdir} STREQUAL "data"))
+endforeach()

@@ -15,8 +15,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-project(handregistr)
-add_executable(handregistr src/main.cpp)
-target_link_libraries(handregistr litiv_world)
-set_target_properties(handregistr PROPERTIES FOLDER "apps")
-install(TARGETS handregistr RUNTIME DESTINATION bin COMPONENT apps)
+litiv_app(handregistr)
+
+add_executable(litiv_app_handregistr src/main.cpp)
+set_target_properties(litiv_app_handregistr PROPERTIES FOLDER "apps")
+target_link_libraries(litiv_app_handregistr litiv_world)
+
+install(TARGETS litiv_app_handregistr
+    RUNTIME DESTINATION bin
+    COMPONENT apps
+)
