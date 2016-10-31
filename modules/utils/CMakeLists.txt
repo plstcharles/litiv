@@ -146,6 +146,16 @@ if(KinectSDK2_FOUND)
             "${KinectSDK2_LIBRARIES}"
     )
 endif()
+if(USE_OPENGM)
+    target_include_directories(litiv_utils
+        PUBLIC
+            "$<BUILD_INTERFACE:${OpenGM_INCLUDE_DIRS}>"
+    )
+    target_link_libraries(litiv_utils
+        PUBLIC
+            "${OpenGM_LIBRARIES}"
+    )
+endif()
 if(UNIX AND NOT ANDROID AND NOT (APPLE AND CMAKE_COMPILER_IS_CLANGCXX))
     # build fails without this for some platforms... broken external dependency? (see PR#5)
     target_link_libraries(litiv_utils
