@@ -90,8 +90,7 @@ lv::DShowFrameGrabber::DShowFrameGrabber(const CComPtr<ISampleGrabber>& pSG) {
     m_bKeepInternalCopy = true;
     m_pParent = pSG;
     m_pParent->SetCallback(this,0);
-    m_nLastTick = 0;
-    m_nTotFramesProcessed = m_nCurrFramesProcessed = -1;
+    m_nTotFramesProcessed = 0;
 }
 
 lv::DShowFrameGrabber::~DShowFrameGrabber() {
@@ -150,23 +149,11 @@ STDMETHODIMP lv::DShowFrameGrabber::SampleCB(double dSampleTime, IMediaSample* p
         const size_t nPacketSize = pSample->GetActualDataLength();
         if(nPacketSize>m_oInternalSampleCopy.total()*m_oInternalSampleCopy.elemSize())
             return E_OUTOFMEMORY;
-        ++m_nCurrFramesProcessed;
-        ++m_nTotFramesProcessed;
         if(m_lCallback)
             m_lCallback(cv::Mat(m_oInternalSampleCopy.size(),m_oInternalSampleCopy.type(),pBuffer));
         if(m_bKeepInternalCopy)
             std::copy(pBuffer,pBuffer+nPacketSize,m_oInternalSampleCopy.data);
-        if(m_nLastTick==0)
-            m_nLastTick = cv::getTickCount();
-        else {
-            const int64_t nCurrTick = cv::getTickCount();
-            const int64_t nCurrTickDiff = nCurrTick-m_nLastTick;
-            if(nCurrTickDiff>cv::getTickFrequency()*3) {
-                std::cout << "DShowFrameGrabber @ " << double(m_nCurrFramesProcessed)/(nCurrTickDiff/cv::getTickFrequency()) << " FPS" << std::endl;
-                m_nLastTick = nCurrTick;
-                m_nCurrFramesProcessed = 0;
-            }
-        }
+        ++m_nTotFramesProcessed;
     }
     return S_OK;
 }
