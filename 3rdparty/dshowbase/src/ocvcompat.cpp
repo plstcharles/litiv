@@ -74,10 +74,19 @@ STDMETHODIMP lv::initMatFromMediaType(const AM_MEDIA_TYPE* pmt, cv::Mat& oOutput
 }
 
 lv::DShowFrameGrabber::DShowFrameGrabber(const CComPtr<ISampleGrabber>& pSG) {
+    if(pSG==nullptr)
+        throw std::invalid_argument("bad sample grabber interface");
     AM_MEDIA_TYPE mt;
-    assert(pSG!=nullptr && pSG->GetConnectedMediaType(&mt)==S_OK);
-    initMatFromMediaType(&mt,m_oInternalSampleCopy);
+    ZeroMemory(&mt,sizeof(mt));
+    if(pSG->GetConnectedMediaType(&mt)!=S_OK)
+        throw std::runtime_error("cannot get sample grabber media type");
+    if(initMatFromMediaType(&mt,m_oInternalSampleCopy)!=S_OK) {
+        FreeMediaType(mt);
+        throw std::runtime_error("unhandled media type");
+    }
     FreeMediaType(mt);
+    if(m_oInternalSampleCopy.empty())
+        throw std::runtime_error("bad internal sample copy type");
     m_bKeepInternalCopy = true;
     m_pParent = pSG;
     m_pParent->SetCallback(this,0);
@@ -91,8 +100,10 @@ lv::DShowFrameGrabber::~DShowFrameGrabber() {
 
 int64_t lv::DShowFrameGrabber::GetLatestFrame(cv::Mat& oOutput, bool bVFlip) const {
     std::lock_guard<std::mutex> oLock(m_oMutex);
-    if(m_oInternalSampleCopy.empty())
+    if(!m_bKeepInternalCopy || m_oInternalSampleCopy.empty()) {
         oOutput = cv::Mat();
+        return -1;
+    }
     else {
         oOutput.create(m_oInternalSampleCopy.size(),m_oInternalSampleCopy.type());
         if(bVFlip) {
@@ -199,8 +210,6 @@ STDMETHODIMP lv::DShowCameraGrabber::Connect() {
         return hr;
     if(FAILED(hr=m_pEvent->SetNotifyWindow((OAHWND)m_hwnd,m_hwnd==NULL?NULL:m_nMsgID,NULL)))
         return hr;
-    if(FAILED(hr=m_pBuilder->QueryInterface(IID_PPV_ARGS(&m_pFilterGraph))))
-        return hr;
     if(FAILED(hr=AddFilterByName(m_pBuilder,m_sVideoDeviceName,&m_pCam,CLSID_VideoInputDeviceCategory,L"DShow Camera Grabber Input Device")))
         return hr;
     if(m_bDisplayOutput && FAILED(hr=AddFilterByCLSID(m_pBuilder,CLSID_VideoMixingRenderer9,&m_pRenderer,L"VMR9")))
@@ -212,9 +221,10 @@ STDMETHODIMP lv::DShowCameraGrabber::Connect() {
     CComPtr<ISampleGrabber> pGrabberInterf;
     if(FAILED(hr=m_pGrabber->QueryInterface(IID_ISampleGrabber,(void**)&pGrabberInterf)))
         return hr;
-    AM_MEDIA_TYPE mt = {};
+    AM_MEDIA_TYPE mt;
+    ZeroMemory(&mt,sizeof(mt));
     mt.majortype = MEDIATYPE_Video;
-    mt.subtype = MEDIASUBTYPE_ARGB32; // @@@ rgb24?
+    mt.subtype = MEDIASUBTYPE_RGB24;
     mt.formattype = FORMAT_VideoInfo;
     if(FAILED(hr=pGrabberInterf->SetMediaType(&mt)))
         return hr;
@@ -265,7 +275,6 @@ void lv::DShowCameraGrabber::Disconnect() {
     m_pRenderer = nullptr;
     m_pEvent = nullptr;
     m_pControl = nullptr;
-    m_pFilterGraph = nullptr;
     m_pCapBuilder = nullptr;
     m_pBuilder = nullptr;
 }
