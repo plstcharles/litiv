@@ -113,7 +113,15 @@ int main() {
         lv::DataWriter oColorVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oColorVideoWriter,nLastSavedColorFrameIdx));
         lvAssert(oColorVideoAsyncWriter.startAsyncWriting(HIGHDEF_QUEUE_BUFFER_SIZE,true));
 #endif //WRITE_OUTPUT
-
+#if DISPLAY_OUTPUT
+#if USE_FLIR_SENSOR
+        cv::namedWindow("oFLIRFrame",cv::WINDOW_NORMAL);
+#endif //USE_FLIR_SENSOR
+        cv::namedWindow("oBodyIdxFrame",cv::WINDOW_NORMAL);
+        cv::namedWindow("oNIRFrame",cv::WINDOW_NORMAL);
+        cv::namedWindow("oDepthFrame",cv::WINDOW_NORMAL);
+        cv::namedWindow("oColorFrame",cv::WINDOW_NORMAL);
+#endif //DISPLAY_OUTPUT
         CComPtr<IMultiSourceFrame> pMultiFrame;
         lv::WorkerPool<nStreamCount> oPool;
         std::array<std::future<bool>,nStreamCount> abGrabResults;
@@ -254,7 +262,7 @@ int main() {
 #if DISPLAY_OUTPUT
 #if USE_FLIR_SENSOR
                 if(!oFLIRFrame.empty())
-                    cv::imshow("oFIRFrame",oFIRFrame);
+                    cv::imshow("oFLIRFrame",oFLIRFrame);
 #endif //USE_FLIR_SENSOR
                 if(!oBodyIdxFrame.empty())
                     cv::imshow("oBodyIdxFrame",oBodyIdxFrame);
@@ -281,7 +289,7 @@ int main() {
                     ++nGoodFrameIdx;
                 }
                 else
-                    std::cout << "The color steam is dropping frames!" << std::endl;
+                    std::cout << "The color stream is dropping frames!" << std::endl;
 #endif //WRITE_OUTPUT
             }
             ++nTempFrameIdx;
