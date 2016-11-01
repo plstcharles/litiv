@@ -118,7 +118,7 @@ int64_t lv::DShowFrameGrabber::GetLatestFrame(cv::Mat& oOutput, bool bVFlip) con
     return m_nTotFramesProcessed;
 }
 
-void lv::DShowFrameGrabber::SetFrameCallback(std::function<void(const cv::Mat&)> lCallback, bool bKeepInternalCopy) {
+void lv::DShowFrameGrabber::SetFrameCallback(std::function<void(const cv::Mat&, int64_t)> lCallback, bool bKeepInternalCopy) {
     std::lock_guard<std::mutex> oLock(m_oMutex);
     m_bKeepInternalCopy = bKeepInternalCopy;
     m_lCallback = lCallback;
@@ -150,7 +150,7 @@ STDMETHODIMP lv::DShowFrameGrabber::SampleCB(double dSampleTime, IMediaSample* p
         if(nPacketSize>m_oInternalSampleCopy.total()*m_oInternalSampleCopy.elemSize())
             return E_OUTOFMEMORY;
         if(m_lCallback)
-            m_lCallback(cv::Mat(m_oInternalSampleCopy.size(),m_oInternalSampleCopy.type(),pBuffer));
+            m_lCallback(cv::Mat(m_oInternalSampleCopy.size(),m_oInternalSampleCopy.type(),pBuffer),m_nTotFramesProcessed);
         if(m_bKeepInternalCopy)
             std::copy(pBuffer,pBuffer+nPacketSize,m_oInternalSampleCopy.data);
         ++m_nTotFramesProcessed;
@@ -266,7 +266,7 @@ void lv::DShowCameraGrabber::Disconnect() {
     m_pBuilder = nullptr;
 }
 
-bool lv::DShowCameraGrabber::SetFrameCallback(std::function<void(const cv::Mat&)> lCallback, bool bKeepInternalCopy) {
+bool lv::DShowCameraGrabber::SetFrameCallback(std::function<void(const cv::Mat&, int64_t)> lCallback, bool bKeepInternalCopy) {
     if(m_bIsConnected)
         m_pFrameGrabber->SetFrameCallback(lCallback,bKeepInternalCopy);
     return m_bIsConnected;
