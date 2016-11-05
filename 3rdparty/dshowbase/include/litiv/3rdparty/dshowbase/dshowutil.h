@@ -1219,7 +1219,7 @@ inline HRESULT AddFilterByName(
     hr = pSysDevEnum->CreateClassEnumerator(DEVICE_CLSID,&pEnumCat,0);
     SafeRelease(&pSysDevEnum);
     if(hr!=S_OK)
-        return hr;
+        return (hr==S_FALSE?E_FAIL:hr);
     IBaseFilter* pFilter = NULL;
     IMoniker* pMoniker = NULL;
     ULONG cFetched;
