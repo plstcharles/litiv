@@ -18,18 +18,29 @@
 #include "litiv/datasets.hpp"
 #include "litiv/video.hpp"
 #include "litiv/3rdparty/dshowbase/ocvcompat.h"
+#include <tuple>
 #include <Kinect.h>
 
 /////////////////////////////////
-#define USE_FLIR_SENSOR         0
+#define USE_FLIR_SENSOR         1
 /////////////////////////////////
-#define DISPLAY_OUTPUT          0
-#define WRITE_OUTPUT            1
+#define DISPLAY_OUTPUT          2
+#define WRITE_OUTPUT            2
 /////////////////////////////////
 #define DEFAULT_QUEUE_BUFFER_SIZE   1024*1024*50  // max = 50MB per queue (default)
 #define HIGHDEF_QUEUE_BUFFER_SIZE   1024*1024*1024 // max = 1GB per queue (high-defition stream)
 #define VIDEO_FILE_PREALLOC_SIZE    1024*1024*1024 // tot = 1GB per video file
 #define STRUCT_FILE_PREALLOC_SIZE   1024*1024*20 // tot = 200MB per struct file
+/////////////////////////////////
+//// cv::VideoWriter params /////          filename           fourcc  framerate       frame size      is color
+#define FLIR_OUTPUT_VIDEO_PARAMS    "c:/temp/test_flir.avi",    -1,     30.0,     cv::Size(320,240),   false
+#define BODYIDX_OUTPUT_VIDEO_PARAMS "c:/temp/test_bodyidx.avi", -1,     30.0,     cv::Size(512,424),   false
+#define NIR_OUTPUT_VIDEO_PARAMS     "c:/temp/test_nir.avi",     -1,     30.0,     cv::Size(512,424),   false
+#define DEPTH_OUTPUT_VIDEO_PARAMS   "c:/temp/test_depth.avi",   -1,     30.0,     cv::Size(512,424),   false
+#define COLOR_OUTPUT_VIDEO_PARAMS   "e:/temp/test_color.avi",   -1,     30.0,     cv::Size(1920,1080), true
+/////////////////////////////////
+#define BODY_DATA_OUTPUT_PARAMS     "c:/temp/test_body.bin",     std::ios::out|std::ios::binary
+#define META_DATA_OUTPUT_PARAMS     "c:/temp/test_metadata.yml", cv::FileStorage::WRITE
 /////////////////////////////////
 
 std::atomic_bool g_bIsActive = true;
@@ -59,10 +70,11 @@ int main() {
         std::unique_ptr<lv::DShowCameraGrabber> pFLIRSensor = std::make_unique<lv::DShowCameraGrabber>("FLIR ThermaCAM",(bool)DISPLAY_OUTPUT);
         lvAssertHR(pFLIRSensor->Connect());
         cv::Mat oFLIRFrame;
+        const cv::Size oFLIRFrameSize = std::get<3>(std::make_tuple(FLIR_OUTPUT_VIDEO_PARAMS));
 #if WRITE_OUTPUT
         std::cout << "Setting up FLIR video writer..." << std::endl;
         size_t nLastSavedFLIRFrameIdx = SIZE_MAX;
-        cv::VideoWriter oFLIRVideoWriter("c:/temp/test_flir.avi",-1,30.0,cv::Size(320,240),false);
+        cv::VideoWriter oFLIRVideoWriter(FLIR_OUTPUT_VIDEO_PARAMS);
         lvAssert(oFLIRVideoWriter.isOpened());
         lv::DataWriter oFLIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oFLIRVideoWriter,nLastSavedFLIRFrameIdx));
         lvAssert(oFLIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
@@ -79,39 +91,48 @@ int main() {
         lv::KinectBodyFrame oBodyFrame;
         const cv::Mat oBodyFrameWrapper(1,(int)sizeof(lv::KinectBodyFrame),CV_8UC1,&oBodyFrame);
         cv::Mat oBodyIdxFrame,oNIRFrame,oDepthFrame,oColorFrame;
+        const cv::Size oBodyIdxFrameSize = std::get<3>(std::make_tuple(BODYIDX_OUTPUT_VIDEO_PARAMS));
+        const cv::Size oNIRFrameSize = std::get<3>(std::make_tuple(NIR_OUTPUT_VIDEO_PARAMS));
+        const cv::Size oDepthFrameSize = std::get<3>(std::make_tuple(DEPTH_OUTPUT_VIDEO_PARAMS));
+        const cv::Size oColorFrameSize = std::get<3>(std::make_tuple(COLOR_OUTPUT_VIDEO_PARAMS));
 #if WRITE_OUTPUT
         std::cout << "Setting up Kinect body data writer..." << std::endl;
         size_t nLastSavedBodyFrameIdx = SIZE_MAX;
-        std::ofstream oBodyStructWriter("c:/temp/test_body.bin",std::ios::out|std::ios::binary);
+        std::ofstream oBodyStructWriter(BODY_DATA_OUTPUT_PARAMS);
         lvAssert(oBodyStructWriter && oBodyStructWriter.is_open());
         lv::DataWriter oBodyStructAsyncWriter(std::bind(lEncodeAndSaveBodyFrame,std::placeholders::_1,std::placeholders::_2,&oBodyStructWriter,nLastSavedBodyFrameIdx));
         lvAssert(oBodyStructAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
         std::cout << "Setting up BODYINDEX video writer..." << std::endl;
         size_t nLastSavedBodyIdxFrameIdx = SIZE_MAX;
-        cv::VideoWriter oBodyIdxVideoWriter("c:/temp/test_bodyidx.avi",-1,30.0,cv::Size(512,424),false);
+        cv::VideoWriter oBodyIdxVideoWriter(BODYIDX_OUTPUT_VIDEO_PARAMS);
         lvAssert(oBodyIdxVideoWriter.isOpened());
         lv::DataWriter oBodyIdxVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oBodyIdxVideoWriter,nLastSavedBodyIdxFrameIdx));
         lvAssert(oBodyIdxVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
         std::cout << "Setting up NIR video writer..." << std::endl;
         size_t nLastSavedNIRFrameIdx = SIZE_MAX;
-        cv::VideoWriter oNIRVideoWriter("c:/temp/test_nir.avi",-1,30.0,cv::Size(512,424),false);
+        cv::VideoWriter oNIRVideoWriter(NIR_OUTPUT_VIDEO_PARAMS);
         lvAssert(oNIRVideoWriter.isOpened());
         lv::DataWriter oNIRVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oNIRVideoWriter,nLastSavedNIRFrameIdx));
         lvAssert(oNIRVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
         std::cout << "Setting up DEPTH video writer..." << std::endl;
         size_t nLastSavedDepthFrameIdx = SIZE_MAX;
-        cv::VideoWriter oDepthVideoWriter("c:/temp/test_depth.avi",-1,30.0,cv::Size(512,424),false);
+        cv::VideoWriter oDepthVideoWriter(DEPTH_OUTPUT_VIDEO_PARAMS);
         lvAssert(oDepthVideoWriter.isOpened());
         lv::DataWriter oDepthVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oDepthVideoWriter,nLastSavedDepthFrameIdx));
         lvAssert(oDepthVideoAsyncWriter.startAsyncWriting(DEFAULT_QUEUE_BUFFER_SIZE,true));
         std::cout << "Setting up COLOR video writer..." << std::endl;
         size_t nLastSavedColorFrameIdx = SIZE_MAX;
-        const std::string sColorVideoFilePath = "e:/temp/test_color.avi";
-        lvAssert(lv::CreateBinFileWithPrealloc(sColorVideoFilePath,VIDEO_FILE_PREALLOC_SIZE));
-        cv::VideoWriter oColorVideoWriter(sColorVideoFilePath,-1,30.0,cv::Size(1920,1080),true);
+        lvAssert(lv::CreateBinFileWithPrealloc(std::get<0>(std::make_tuple(COLOR_OUTPUT_VIDEO_PARAMS)),VIDEO_FILE_PREALLOC_SIZE));
+        cv::VideoWriter oColorVideoWriter(COLOR_OUTPUT_VIDEO_PARAMS);
         lvAssert(oColorVideoWriter.isOpened());
         lv::DataWriter oColorVideoAsyncWriter(std::bind(lEncodeAndSaveFrame,std::placeholders::_1,std::placeholders::_2,oColorVideoWriter,nLastSavedColorFrameIdx));
         lvAssert(oColorVideoAsyncWriter.startAsyncWriting(HIGHDEF_QUEUE_BUFFER_SIZE,true));
+#if WRITE_OUTPUT>1
+        std::mutex oMetadataStorageMutex;
+        cv::FileStorage oMetadataStorage(META_DATA_OUTPUT_PARAMS);
+        oMetadataStorage << "htag" << lv::getVersionStamp();
+        oMetadataStorage << "date" << lv::getTimeStamp();
+#endif //WRITE_OUTPUT>1
 #endif //WRITE_OUTPUT
 #if DISPLAY_OUTPUT
 #if USE_FLIR_SENSOR
@@ -132,8 +153,8 @@ int main() {
                 CComPtr<IBodyFrame> pFrame;
                 IBody* apBodies[BODY_COUNT] = {};
                 const bool bGotFrame = SUCCEEDED(pFrameRef->AcquireFrame(&pFrame)) && SUCCEEDED(pFrame->GetAndRefreshBodyData(BODY_COUNT,apBodies));
+                oBodyFrame.bIsValid = bGotFrame;
                 if(bGotFrame) {
-                    oBodyFrame.bIsValid = true;
                     pFrameRef.Release();
                     for(size_t nBodyIdx=0; nBodyIdx<BODY_COUNT; ++nBodyIdx) {
                         lvAssertHR(apBodies[nBodyIdx]->get_IsRestricted(&oBodyFrame.aBodyData[nBodyIdx].bIsRestricted));
@@ -164,13 +185,31 @@ int main() {
                 const bool bGotFrame = SUCCEEDED(pFrameRef->AcquireFrame(&pFrame));
                 if(bGotFrame) {
                     pFrameRef.Release();
-                    if(oBodyIdxFrame.empty()) {
+                    if(oBodyIdxFrame.empty()) { // must enter only once
                         CComPtr<IFrameDescription> pFrameDesc;
                         lvAssertHR(pFrame->get_FrameDescription(&pFrameDesc));
                         int nFrameHeight,nFrameWidth;
                         lvAssertHR(pFrameDesc->get_Height(&nFrameHeight));
                         lvAssertHR(pFrameDesc->get_Width(&nFrameWidth));
-                        oBodyIdxFrame.create(nFrameHeight,nFrameWidth,CV_8UC1);
+                        lvAssert(cv::Size(nFrameWidth,nFrameHeight)==oBodyIdxFrameSize);
+                        uint nFrameBytesPerPixel;
+                        lvAssertHR(pFrameDesc->get_BytesPerPixel(&nFrameBytesPerPixel));
+                        lvAssert_(nFrameBytesPerPixel==1,"bodyidx frame not one byte per pixel");
+#if WRITE_OUTPUT>1
+                        float fHorizFOV,fVertiFOV;
+                        lvAssertHR(pFrameDesc->get_HorizontalFieldOfView(&fHorizFOV));
+                        lvAssertHR(pFrameDesc->get_VerticalFieldOfView(&fVertiFOV));
+                        {
+                            std::lock_guard<std::mutex> oMetadataStorageLock(oMetadataStorageMutex);
+                            oMetadataStorage << "bodyidx_metadata" << "{";
+                            oMetadataStorage << "orig_size" << oBodyIdxFrameSize;
+                            oMetadataStorage << "cv_type" << (int)CV_8UC1;
+                            oMetadataStorage << "hfov" << fHorizFOV;
+                            oMetadataStorage << "vfov" << fVertiFOV;
+                            oMetadataStorage << "}";
+                        }
+#endif //WRITE_OUTPUT>1
+                        oBodyIdxFrame.create(oBodyIdxFrameSize,CV_8UC1);
                     }
                     lvAssertHR(pFrame->CopyFrameDataToArray((UINT)oBodyIdxFrame.total(),oBodyIdxFrame.data));
                 }
@@ -183,13 +222,31 @@ int main() {
                 const bool bGotFrame = SUCCEEDED(pFrameRef->AcquireFrame(&pFrame));
                 if(bGotFrame) {
                     pFrameRef.Release();
-                    if(oNIRFrame.empty()) {
+                    if(oNIRFrame.empty()) { // must enter only once
                         CComPtr<IFrameDescription> pFrameDesc;
                         lvAssertHR(pFrame->get_FrameDescription(&pFrameDesc));
                         int nFrameHeight,nFrameWidth;
                         lvAssertHR(pFrameDesc->get_Height(&nFrameHeight));
                         lvAssertHR(pFrameDesc->get_Width(&nFrameWidth));
-                        oNIRFrame.create(nFrameHeight,nFrameWidth,CV_16UC1);
+                        lvAssert(cv::Size(nFrameWidth,nFrameHeight)==oNIRFrameSize);
+                        uint nFrameBytesPerPixel;
+                        lvAssertHR(pFrameDesc->get_BytesPerPixel(&nFrameBytesPerPixel));
+                        lvAssert_(nFrameBytesPerPixel==2,"nir frame not two bytes per pixel");
+#if WRITE_OUTPUT>1
+                        float fHorizFOV,fVertiFOV;
+                        lvAssertHR(pFrameDesc->get_HorizontalFieldOfView(&fHorizFOV));
+                        lvAssertHR(pFrameDesc->get_VerticalFieldOfView(&fVertiFOV));
+                        {
+                            std::lock_guard<std::mutex> oMetadataStorageLock(oMetadataStorageMutex);
+                            oMetadataStorage << "nir_metadata" << "{";
+                            oMetadataStorage << "orig_size" << oNIRFrameSize;
+                            oMetadataStorage << "cv_type" << (int)CV_16UC1;
+                            oMetadataStorage << "hfov" << fHorizFOV;
+                            oMetadataStorage << "vfov" << fVertiFOV;
+                            oMetadataStorage << "}";
+                        }
+#endif //WRITE_OUTPUT>1
+                        oNIRFrame.create(oNIRFrameSize,CV_16UC1);
                     }
                     lvAssertHR(pFrame->CopyFrameDataToArray((UINT)oNIRFrame.total(),(uint16_t*)oNIRFrame.data));
                 }
@@ -202,13 +259,36 @@ int main() {
                 const bool bGotFrame = SUCCEEDED(pFrameRef->AcquireFrame(&pFrame));
                 if(bGotFrame) {
                     pFrameRef.Release();
-                    if(oDepthFrame.empty()) {
+                    if(oDepthFrame.empty()) { // must enter only once
                         CComPtr<IFrameDescription> pFrameDesc;
                         lvAssertHR(pFrame->get_FrameDescription(&pFrameDesc));
                         int nFrameHeight,nFrameWidth;
                         lvAssertHR(pFrameDesc->get_Height(&nFrameHeight));
                         lvAssertHR(pFrameDesc->get_Width(&nFrameWidth));
-                        oDepthFrame.create(nFrameHeight,nFrameWidth,CV_16UC1);
+                        lvAssert(cv::Size(nFrameWidth,nFrameHeight)==oDepthFrameSize);
+                        uint nFrameBytesPerPixel;
+                        lvAssertHR(pFrameDesc->get_BytesPerPixel(&nFrameBytesPerPixel));
+                        lvAssert_(nFrameBytesPerPixel==2,"depth frame not two bytes per pixel");
+#if WRITE_OUTPUT>1
+                        float fHorizFOV,fVertiFOV;
+                        lvAssertHR(pFrameDesc->get_HorizontalFieldOfView(&fHorizFOV));
+                        lvAssertHR(pFrameDesc->get_VerticalFieldOfView(&fVertiFOV));
+                        USHORT nMaxReliableDist,nMinReliableDist;
+                        lvAssertHR(pFrame->get_DepthMaxReliableDistance(&nMaxReliableDist));
+                        lvAssertHR(pFrame->get_DepthMinReliableDistance(&nMinReliableDist));
+                        {
+                            std::lock_guard<std::mutex> oMetadataStorageLock(oMetadataStorageMutex);
+                            oMetadataStorage << "depth_metadata" << "{";
+                            oMetadataStorage << "orig_size" << oDepthFrameSize;
+                            oMetadataStorage << "cv_type" << (int)CV_16UC1;
+                            oMetadataStorage << "hfov" << fHorizFOV;
+                            oMetadataStorage << "vfov" << fVertiFOV;
+                            oMetadataStorage << "max_reliable_dist" << nMaxReliableDist;
+                            oMetadataStorage << "min_reliable_dist" << nMinReliableDist;
+                            oMetadataStorage << "}";
+                        }
+#endif //WRITE_OUTPUT>1
+                        oDepthFrame.create(oDepthFrameSize,CV_16UC1);
                     }
                     lvAssertHR(pFrame->CopyFrameDataToArray((UINT)oDepthFrame.total(),(uint16_t*)oDepthFrame.data));
                 }
@@ -221,17 +301,46 @@ int main() {
                 const bool bGotFrame = SUCCEEDED(pFrameRef->AcquireFrame(&pFrame));
                 if(bGotFrame) {
                     pFrameRef.Release();
-                    if(oColorFrame.empty()) {
-                        //ColorImageFormat eColorFormat;
-                        //lvAssertHR(pFrame->get_RawColorImageFormat(&eColorFormat));
-                        //CComPtr<IColorCameraSettings> pColorCameraSettings;
-                        //lvAssertHR(pFrame->get_ColorCameraSettings(&pColorCameraSettings));
+                    if(oColorFrame.empty()) { // must enter only once
                         CComPtr<IFrameDescription> pFrameDesc;
                         lvAssertHR(pFrame->get_FrameDescription(&pFrameDesc));
                         int nFrameHeight,nFrameWidth;
                         lvAssertHR(pFrameDesc->get_Height(&nFrameHeight));
                         lvAssertHR(pFrameDesc->get_Width(&nFrameWidth));
-                        oColorFrame.create(nFrameHeight,nFrameWidth,CV_8UC3);
+                        lvAssert(cv::Size(nFrameWidth,nFrameHeight)==oColorFrameSize);
+                        uint nFrameBytesPerPixel;
+                        lvAssertHR(pFrameDesc->get_BytesPerPixel(&nFrameBytesPerPixel));
+                        lvAssert_(nFrameBytesPerPixel==2,"raw color frame not two bytes per pixel");
+#if WRITE_OUTPUT>1
+                        float fHorizFOV,fVertiFOV;
+                        lvAssertHR(pFrameDesc->get_HorizontalFieldOfView(&fHorizFOV));
+                        lvAssertHR(pFrameDesc->get_VerticalFieldOfView(&fVertiFOV));
+                        ColorImageFormat eColorFormat;
+                        lvAssertHR(pFrame->get_RawColorImageFormat(&eColorFormat));
+                        lvAssert(eColorFormat==ColorImageFormat_Yuy2);
+                        CComPtr<IColorCameraSettings> pColorCameraSettings;
+                        lvAssertHR(pFrame->get_ColorCameraSettings(&pColorCameraSettings));
+                        TIMESPAN nExposureTime,nFrameInterval;
+                        lvAssertHR(pColorCameraSettings->get_ExposureTime(&nExposureTime));
+                        lvAssertHR(pColorCameraSettings->get_FrameInterval(&nFrameInterval));
+                        float fGain,fGamma;
+                        lvAssertHR(pColorCameraSettings->get_Gain(&fGain));
+                        lvAssertHR(pColorCameraSettings->get_Gamma(&fGamma));
+                        {
+                            std::lock_guard<std::mutex> oMetadataStorageLock(oMetadataStorageMutex);
+                            oMetadataStorage << "color_metadata" << "{";
+                            oMetadataStorage << "orig_size" << oColorFrameSize;
+                            oMetadataStorage << "cv_type" << (int)CV_8UC3;
+                            oMetadataStorage << "hfov" << fHorizFOV;
+                            oMetadataStorage << "vfov" << fVertiFOV;
+                            oMetadataStorage << "init_exposure" << (double)nExposureTime;
+                            oMetadataStorage << "init_frameinterv" << (double)nFrameInterval;
+                            oMetadataStorage << "init_gain" << (double)fGain;
+                            oMetadataStorage << "init_gamma" << (double)fGamma;
+                            oMetadataStorage << "}";
+                        }
+#endif //WRITE_OUTPUT>1
+                        oColorFrame.create(oColorFrameSize,CV_8UC3);
                     }
                     UINT nBufferSize;
                     BYTE* pBuffer;
@@ -252,26 +361,41 @@ int main() {
             while(!SUCCEEDED(pMultiFrameReader->AcquireLatestFrame(&pMultiFrame)));
             for(size_t n=0; n<alGrabTasks.size(); ++n)
                 abGrabResults[n] = oPool.queueTask(alGrabTasks[n]);
-#if USE_FLIR_SENSOR
-            pFLIRSensor->GetLatestFrame(oFLIRFrame,true);
-#endif //USE_FLIR_SENSOR
             bool bFinalGrabResult = true;
+#if USE_FLIR_SENSOR
+            bFinalGrabResult &= (pFLIRSensor->GetLatestFrame(oFLIRFrame,true)>=0);
+#endif //USE_FLIR_SENSOR
             for(size_t n=0; n<abGrabResults.size(); ++n)
                 bFinalGrabResult &= abGrabResults[n].get();
             if(bFinalGrabResult) {
-#if DISPLAY_OUTPUT
 #if USE_FLIR_SENSOR
-                if(!oFLIRFrame.empty())
-                    cv::imshow("oFLIRFrame",oFLIRFrame);
+                static std::once_flag s_oFLIRMetadataWriteFlag;
+                std::call_once(s_oFLIRMetadataWriteFlag,[&]() {
+                    lvAssert(oFLIRFrame.size()==oFLIRFrameSize);
+#if WRITE_OUTPUT>1
+                    {
+                        std::lock_guard<std::mutex> oMetadataStorageLock(oMetadataStorageMutex);
+                        oMetadataStorage << "flir_metadata" << "{";
+                        oMetadataStorage << "orig_size" << oFLIRFrameSize;
+                        oMetadataStorage << "cv_type" << oFLIRFrame.type();
+                        oMetadataStorage << "}";
+                    }
+#endif //WRITE_OUTPUT>1
+                });
+#if DISPLAY_OUTPUT
+                cv::imshow("oFLIRFrame",oFLIRFrame);
+#endif //DISPLAY_OUTPUT
 #endif //USE_FLIR_SENSOR
-                if(!oBodyIdxFrame.empty())
-                    cv::imshow("oBodyIdxFrame",oBodyIdxFrame);
-                if(!oNIRFrame.empty())
-                    cv::imshow("oNIRFrame",oNIRFrame);
-                if(!oDepthFrame.empty())
-                    cv::imshow("oDepthFrame",oDepthFrame);
-                if(!oColorFrame.empty())
-                    cv::imshow("oColorFrame",oColorFrame);
+#if DISPLAY_OUTPUT
+                cv::imshow("oBodyIdxFrame",oBodyIdxFrame);
+                cv::imshow("oColorFrame",oColorFrame);
+#if DISPLAY_OUTPUT>1
+                cv::imshow("oNIRFrame",oNIRFrame);
+                cv::imshow("oDepthFrame",oDepthFrame);
+#else //DISPLAY_OUTPUT<=1
+                cv::imshow("oNIRFrame",oNIRFrame);
+                cv::imshow("oDepthFrame",oDepthFrame);
+#endif //DISPLAY_OUTPUT<=1
                 const char c = (char)cv::waitKey(1);
                 if(c=='q' || c==27)
                     break;
