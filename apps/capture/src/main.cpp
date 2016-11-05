@@ -25,7 +25,7 @@
 #define USE_FLIR_SENSOR         1
 /////////////////////////////////
 #define DISPLAY_OUTPUT          2
-#define WRITE_OUTPUT            2
+#define WRITE_OUTPUT            0
 /////////////////////////////////
 #define DEFAULT_QUEUE_BUFFER_SIZE   1024*1024*50  // max = 50MB per queue (default)
 #define HIGHDEF_QUEUE_BUFFER_SIZE   1024*1024*1024 // max = 1GB per queue (high-defition stream)
@@ -67,7 +67,7 @@ int main() {
 #if USE_FLIR_SENSOR
         std::cout << "Setting up FLIR device..." << std::endl;
         lvAssertHR(CoInitializeEx(0,COINIT_MULTITHREADED|COINIT_DISABLE_OLE1DDE));
-        std::unique_ptr<lv::DShowCameraGrabber> pFLIRSensor = std::make_unique<lv::DShowCameraGrabber>("FLIR ThermaCAM",(bool)DISPLAY_OUTPUT);
+        std::unique_ptr<lv::DShowCameraGrabber> pFLIRSensor = std::make_unique<lv::DShowCameraGrabber>("FLIR ThermaCAM");
         lvAssertHR(pFLIRSensor->Connect());
         cv::Mat oFLIRFrame;
         const cv::Size oFLIRFrameSize = std::get<3>(std::make_tuple(FLIR_OUTPUT_VIDEO_PARAMS));
@@ -135,12 +135,19 @@ int main() {
 #endif //WRITE_OUTPUT>1
 #endif //WRITE_OUTPUT
 #if DISPLAY_OUTPUT
+#if DISPLAY_OUTPUT>1
+        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create("DISPLAY","c:/temp/",cv::Size(1920,1200),cv::WINDOW_NORMAL);
+        CComPtr<ICoordinateMapper> pCoordMapper;
+        lvAssertHR(pKinectSensor->get_CoordinateMapper(&pCoordMapper));
+        std::map<UINT64,cv::Scalar_<uchar>> mBodyColors;
+#else //!(DISPLAY_OUTPUT>1)
 #if USE_FLIR_SENSOR
         cv::namedWindow("oFLIRFrame",cv::WINDOW_NORMAL);
 #endif //USE_FLIR_SENSOR
         cv::namedWindow("oBodyIdxFrame",cv::WINDOW_NORMAL);
         cv::namedWindow("oNIRFrame",cv::WINDOW_NORMAL);
         cv::namedWindow("oDepthFrame",cv::WINDOW_NORMAL);
+#endif //!(DISPLAY_OUTPUT>1)
         cv::namedWindow("oColorFrame",cv::WINDOW_NORMAL);
 #endif //DISPLAY_OUTPUT
         CComPtr<IMultiSourceFrame> pMultiFrame;
@@ -382,17 +389,87 @@ int main() {
                     }
 #endif //WRITE_OUTPUT>1
                 });
-#if DISPLAY_OUTPUT
-                cv::imshow("oFLIRFrame",oFLIRFrame);
-#endif //DISPLAY_OUTPUT
 #endif //USE_FLIR_SENSOR
 #if DISPLAY_OUTPUT
+#if DISPLAY_OUTPUT>1
+                cv::Mat oBodyIdxFrameTemp = oBodyIdxFrame<UCHAR_MAX;
+                std::vector<std::vector<cv::Point>> vvBodyIdxContours;
+                cv::findContours(oBodyIdxFrameTemp,vvBodyIdxContours,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE);
+                std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvImageNamePairs(2);
+                const cv::Size oSuggestedTileSize = oDepthFrame.size();
+                cv::Mat oNIRFrameRaw,oNIRFrameDisplay;
+                oNIRFrame.convertTo(oNIRFrameRaw,CV_32F,1.0/USHRT_MAX);
+                cv::Scalar vNIRFrameMean,vNIRFrameStdDev;
+                cv::meanStdDev(oNIRFrameRaw,vNIRFrameMean,vNIRFrameStdDev);
+                oNIRFrameRaw = cv::max(cv::min(oNIRFrameRaw/(vNIRFrameMean[0]*5),0.9f),0.01f);
+                cv::applyColorMap(oNIRFrameRaw,oNIRFrameDisplay,cv::COLORMAP_COOL);
+                cv::drawContours(oNIRFrameDisplay,vvBodyIdxContours,-1,cv::Scalar(USHRT_MAX),3);
+                cv::flip(oNIRFrameDisplay,oNIRFrameDisplay,1);
+                vvImageNamePairs[0].emplace_back(oNIRFrameDisplay,"NIR");
+                cv::Mat oDepthFrameRaw,oDepthFrameDisplay;
+                cv::normalize(oDepthFrame,oDepthFrameRaw,1.0,0.0,cv::NORM_MINMAX,CV_32FC1);
+                cv::applyColorMap(oDepthFrameRaw,oDepthFrameDisplay,cv::COLORMAP_BONE);
+                cv::drawContours(oDepthFrameDisplay,vvBodyIdxContours,-1,cv::Scalar(USHRT_MAX),3);
+                cv::flip(oDepthFrameDisplay,oDepthFrameDisplay,1);
+                vvImageNamePairs[0].emplace_back(oDepthFrameDisplay,"Depth");
+#if USE_FLIR_SENSOR
+                cv::Mat oFLIRFrameDisplay;
+                cv::applyColorMap(oFLIRFrame,oFLIRFrameDisplay,cv::COLORMAP_HOT);
+                vvImageNamePairs[1].emplace_back(oFLIRFrameDisplay,"Thermal");
+#else //!(USE_FLIR_SENSOR)
+                vvImageNamePairs[1].emplace_back(cv::Mat(oDepthFrameDisplay.size(),CV_8UC3,cv::Scalar_<uchar>::all(128)),"Thermal");
+#endif //!(USE_FLIR_SENSOR)
+                cv::Mat oBodyFrameDisplay(oDepthFrameDisplay.size(),CV_8UC3,cv::Scalar_<uchar>::all(88));
+                const auto lBodyToScreen = [&](const CameraSpacePoint& oInputPt) {
+                    DepthSpacePoint depthPoint = {0};
+                    pCoordMapper->MapCameraPointToDepthSpace(oInputPt, &depthPoint);
+                    return cv::Point2i((int)depthPoint.X,(int)depthPoint.Y);
+                };
+                const auto lDrawBone = [&](const Joint& i, const Joint& j, const cv::Scalar_<uchar>& vBodyColor) {
+                    if(i.TrackingState<=TrackingState_Inferred && j.TrackingState<=TrackingState_Inferred)
+                        return;
+                    const int nThickness = (i.TrackingState==TrackingState_Inferred || j.TrackingState==TrackingState_Inferred)?3:6;
+                    cv::line(oBodyFrameDisplay,lBodyToScreen(i.Position),lBodyToScreen(j.Position),vBodyColor,nThickness);
+                };
+                for(size_t nBodyIdx=0; nBodyIdx<BODY_COUNT; ++nBodyIdx) {
+                    if(oBodyFrame.aBodyData[nBodyIdx].bIsTracked) {
+                        if(mBodyColors.count(oBodyFrame.aBodyData[nBodyIdx].nTrackingID)==0)
+                            mBodyColors.insert(std::make_pair(oBodyFrame.aBodyData[nBodyIdx].nTrackingID,cv::Scalar_<uchar>(55+rand()%200,55+rand()%200,55+rand()%200)));
+                        const cv::Scalar_<uchar>& vBodyColor = mBodyColors[oBodyFrame.aBodyData[nBodyIdx].nTrackingID];
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_Head],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_Neck],vBodyColor);
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_Neck],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_SpineShoulder],vBodyColor);
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_SpineShoulder],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_SpineMid],vBodyColor);
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_SpineMid],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_SpineBase],vBodyColor);
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_SpineShoulder],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_ShoulderRight],vBodyColor);
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_SpineShoulder],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_ShoulderLeft],vBodyColor);
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_ShoulderRight],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_ElbowRight],vBodyColor);
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_ElbowRight],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_WristRight],vBodyColor);
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_WristRight],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_HandRight],vBodyColor);
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_HandRight],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_HandTipRight],vBodyColor);
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_WristRight],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_ThumbRight],vBodyColor);
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_ShoulderLeft],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_ElbowLeft],vBodyColor);
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_ElbowLeft],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_WristLeft],vBodyColor);
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_WristLeft],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_HandLeft],vBodyColor);
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_HandLeft],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_HandTipLeft],vBodyColor);
+                        lDrawBone(oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_WristLeft],oBodyFrame.aBodyData[nBodyIdx].aJointData[JointType_ThumbLeft],vBodyColor);
+                        for(size_t nJointIdx=0; nJointIdx<JointType::JointType_Count; ++nJointIdx) {
+                            if(oBodyFrame.aBodyData[nBodyIdx].aJointData[nJointIdx].TrackingState>TrackingState_NotTracked && (nJointIdx<(size_t)JointType_HipLeft || nJointIdx>(size_t)JointType_FootRight)) {
+                                const int nThickness = (oBodyFrame.aBodyData[nBodyIdx].aJointData[nJointIdx].TrackingState==TrackingState_Inferred)?2:4;
+                                cv::circle(oBodyFrameDisplay,lBodyToScreen(oBodyFrame.aBodyData[nBodyIdx].aJointData[nJointIdx].Position),nThickness,cv::Scalar_<uchar>::all(176),-1);
+                            }
+                        }
+                    }
+                }
+                cv::flip(oBodyFrameDisplay,oBodyFrameDisplay,1);
+                vvImageNamePairs[1].emplace_back(oBodyFrameDisplay,"Skeleton");
+                pDisplayHelper->display(vvImageNamePairs,oSuggestedTileSize);
+                cv::imshow("oColorFrame",oColorFrame);
+#else //DISPLAY_OUTPUT<=1
+#if USE_FLIR_SENSOR
+                cv::imshow("oFLIRFrame",oFLIRFrame);
+#endif //USE_FLIR_SENSOR
                 cv::imshow("oBodyIdxFrame",oBodyIdxFrame);
                 cv::imshow("oColorFrame",oColorFrame);
-#if DISPLAY_OUTPUT>1
-                cv::imshow("oNIRFrame",oNIRFrame);
-                cv::imshow("oDepthFrame",oDepthFrame);
-#else //DISPLAY_OUTPUT<=1
                 cv::imshow("oNIRFrame",oNIRFrame);
                 cv::imshow("oDepthFrame",oDepthFrame);
 #endif //DISPLAY_OUTPUT<=1
