@@ -282,7 +282,7 @@ namespace lv {
                     vUnpackedInput[s] = cv::Mat();
             }
             else {
-                lvDbgAssert(vUnpackedInput.size()==this->m_bLoadDepth?3:2);
+                lvDbgAssert(vUnpackedInput.size()==(this->m_bLoadDepth?3:2));
                 lvDbgAssert(this->getInputPacketType()==ImageArrayPacket);
                 const std::vector<cv::Size>& vSizes = this->m_vInputSizes;
                 lvDbgAssert(vSizes.size()==vUnpackedInput.size() && vSizes[0].area()>0);
