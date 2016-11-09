@@ -189,6 +189,9 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
     add_definitions(-Wshadow)
     add_definitions(-Werror)
     add_definitions(-pedantic-errors)
+    if(APPLE)
+        add_definitions(-Wno-missing-braces)
+    endif()
 elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
     add_definitions(/W4)
     add_definitions(/wd4201) # disables C4201, "nonstandard extension used : nameless struct/union"
