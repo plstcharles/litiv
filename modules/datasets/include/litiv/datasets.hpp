@@ -216,7 +216,7 @@ namespace lv {
             lvDbgExceptionWatch;
             static_assert((!std::is_abstract<Dataset_<eDatasetTask,eDataset,eEvalImpl>>::value),"Requested dataset class must be non-abstract (check for missing virtual pure impls in interface specializations)");
             struct DatasetWrapper : public Dataset_<eDatasetTask,eDataset,eEvalImpl> {
-                DatasetWrapper(Targs&&... args) : Dataset_<eDatasetTask,eDataset,eEvalImpl>(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
+                DatasetWrapper(Targs&&... _args) : Dataset_<eDatasetTask,eDataset,eEvalImpl>(std::forward<Targs>(_args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
             };
             auto p = std::make_shared<DatasetWrapper>(std::forward<Targs>(args)...);
             p->parseData();

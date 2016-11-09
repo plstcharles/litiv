@@ -90,7 +90,7 @@ namespace lv {
         template<typename MetricsAccumulator, typename... Targs>
         static std::enable_if_t<std::is_base_of<IIMetricsAccumulator,MetricsAccumulator>::value,std::shared_ptr<MetricsAccumulator>> create(Targs&&... args) {
             struct MetricsAccumulatorWrapper : public MetricsAccumulator {
-                MetricsAccumulatorWrapper(Targs&&... args) : MetricsAccumulator(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
+                MetricsAccumulatorWrapper(Targs&&... _args) : MetricsAccumulator(std::forward<Targs>(_args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
             };
             return std::make_shared<MetricsAccumulatorWrapper>(std::forward<Targs>(args)...);
         }
@@ -223,7 +223,7 @@ namespace lv {
         template<typename MetricsCalculator, typename... Targs>
         static std::enable_if_t<std::is_base_of<IIMetricsCalculator,MetricsCalculator>::value,std::shared_ptr<MetricsCalculator>> create(Targs&&... args) {
             struct MetricsCalculatorWrapper : public MetricsCalculator {
-                MetricsCalculatorWrapper(Targs&&... args) : MetricsCalculator(std::forward<Targs>(args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
+                MetricsCalculatorWrapper(Targs&&... _args) : MetricsCalculator(std::forward<Targs>(_args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
             };
             return std::make_shared<MetricsCalculatorWrapper>(std::forward<Targs>(args)...);
         }
