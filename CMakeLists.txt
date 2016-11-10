@@ -164,6 +164,8 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
     add_definitions(-Wall)
     add_definitions(-Wfatal-errors)
     add_definitions(-fPIC) # @@@@ for shared libs only?
+    check_function_exists(aligned_alloc USE_STL_ALIGNED_ALLOC)
+    check_function_exists(posix_memalign USE_POSIX_ALIGNED_ALLOC)
 elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
     add_definitions(-DUNICODE -D_UNICODE)
     if(USE_FAST_MATH)

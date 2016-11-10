@@ -95,7 +95,15 @@ namespace lv {
                 alloc_size += alignment - alloc_size%alignment;
                 lvDbgAssert((alloc_size%alignment)==0);
             }
+#if HAVE_STL_ALIGNED_ALLOC
             void* ptr = aligned_alloc(alignment,alloc_size);
+#elif HAVE_POSIX_ALIGNED_ALLOC
+            void* ptr;
+            if(posix_memalign(&ptr,alignment,alloc_size)!=0)
+                throw std::bad_alloc();
+#else //HAVE_..._ALIGNED_ALLOC
+#error "Missing aligned mem allocator"
+#endif //HAVE_..._ALIGNED_ALLOC
             if(ptr==nullptr)
                 throw std::bad_alloc();
             return reinterpret_cast<pointer>(ptr);
