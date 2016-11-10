@@ -19,9 +19,11 @@ litiv_module(features2d)
 
 add_files(SOURCE_FILES
     "src/LBSP.cpp"
+    "src/DASC.cpp"
 )
 add_files(INCLUDE_FILES
     "include/litiv/features2d/LBSP.hpp"
+    "include/litiv/features2d/DASC.hpp"
     "include/litiv/features2d.hpp"
 )
 
