@@ -154,7 +154,7 @@ initialize_internal_list(litiv_samples)
 ################################################################
 
 add_subdirectory(cmake/checks/simd)
-if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang"))
+if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
     if(NOT CMAKE_CROSSCOMPILING)
         add_definitions(-march=native)
     endif()
@@ -184,13 +184,12 @@ else()
 endif()
 
 add_subdirectory(3rdparty)
-if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang"))
+if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
     add_definitions(-Wextra)
     add_definitions(-Wshadow)
-    if(NOT APPLE) # temporary fix for OS X compilation -- see issue #8 on github
-        add_definitions(-Werror)
-        add_definitions(-pedantic-errors)
-    endif()
+    add_definitions(-Werror)
+    add_definitions(-pedantic-errors)
+    add_definitions(-Wno-missing-braces)
 elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
     add_definitions(/W4)
     add_definitions(/wd4201) # disables C4201, "nonstandard extension used : nameless struct/union"

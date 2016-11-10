@@ -158,7 +158,7 @@ bool vptz::Camera::WaitDelay(bool bSleep) {
     executionEndTime = (double(cv::getTickCount())-firstTick)/cv::getTickFrequency();
     // two of the three kinds of delay
     executionDelay = (executionEndTime-executionBeginTime)-getFrameOverhead;
-    motionDelay = abs(horiAngleChange)/horiSpeed+abs(vertiAngleChange)/vertiSpeed;
+    motionDelay = std::abs(horiAngleChange)/horiSpeed+std::abs(vertiAngleChange)/vertiSpeed;
     // calculate frame position
     currentTime += executionDelayRatio*executionDelay + motionDelay + communicationDelay;
     m_nCurrFrameIdx = std::max(int(currentTime*m_dFrameRate+0.5),m_nCurrFrameIdx+1);

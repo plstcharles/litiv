@@ -33,13 +33,13 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/random.hpp>
-#if defined(_MSC_VER)
-#pragma warning(pop)
+#if defined(__clang__)
+#pragma clang diagnostic pop
 #elif (defined(__GNUC__) || defined(__GNUG__))
 #pragma GCC diagnostic pop
-#elif defined(__clang__)
-#pragma clang diagnostic pop
-#endif //defined(__clang__)
+#elif defined(_MSC_VER)
+#pragma warning(pop)
+#endif //defined(_MSC_VER)
 #include <opencv2/opencv.hpp>
 #include "litiv/utils/cxx.hpp"
 #include "litiv/utils/platform.hpp"

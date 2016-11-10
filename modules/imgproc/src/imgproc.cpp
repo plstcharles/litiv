@@ -93,12 +93,10 @@ void thinning_internal_LamLeeSuen(cv::Mat& oInput, bool bIter) {
                 // G2:
                 n1 += bool(anLUT[2*(k+1)-2] || anLUT[2*(k+1)-1]);
                 n2 += bool(anLUT[2*(k+1)-1] || anLUT[(2*(k+1))%8]);
-#else //(!defined(_MSC_VER) && !USE_IMGPROC_THINNING_MATLAB_IMPL_FIX)
-#ifdef __clang__
+#elif defined(__clang__)
 #pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wmaybe-uninitialized"
-#endif //__clang__
-#if (defined(__GNUC__) || defined(__GNUG__))
+// but no warnings to push...?
+#elif (defined(__GNUC__) || defined(__GNUG__))
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #endif //(defined(__GNUC__) || defined(__GNUG__))
@@ -107,13 +105,11 @@ void thinning_internal_LamLeeSuen(cv::Mat& oInput, bool bIter) {
                 // G2:
                 n1 += bool(anLUT[2*(k+1)-2] || anLUT[2*(k+1)-1]);
                 n2 += bool(anLUT[2*(k+1)-1] || anLUT[2*(k+1)]);
-#if (defined(__GNUC__) || defined(__GNUG__))
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif (defined(__GNUC__) || defined(__GNUG__))
 #pragma GCC diagnostic pop
 #endif //(defined(__GNUC__) || defined(__GNUG__))
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif //__clang__
-#endif //(!defined(_MSC_VER) && !USE_IMGPROC_THINNING_MATLAB_IMPL_FIX)
             }
             size_t n_min = std::min(n1,n2);
             if(x_h==1 && n_min>=2 && n_min<=3) {

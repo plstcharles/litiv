@@ -402,7 +402,7 @@ namespace lv {
         }
         template<typename Tcast>
         inline std::shared_ptr<Tcast> shared_from_this_cast(bool bThrowIfFail=false) {
-            return std::const_pointer_cast<Tcast>(static_cast<const T*>(this)->shared_from_this_cast<Tcast>(bThrowIfFail));
+            return std::const_pointer_cast<Tcast>(static_cast<const T*>(this)->template shared_from_this_cast<Tcast>(bThrowIfFail));
         }
     };
 

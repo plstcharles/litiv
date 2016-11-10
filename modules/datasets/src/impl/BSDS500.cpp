@@ -22,14 +22,11 @@
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wwrite-strings"
-#pragma clang diagnostic ignored "-Wunused-but-set-variable"
-#pragma clang diagnostic ignored "-Wformat="
 #pragma clang diagnostic ignored "-Wparentheses"
 #pragma clang diagnostic ignored "-Wformat-security"
 #pragma clang diagnostic ignored "-Wunused-variable"
 #pragma clang diagnostic ignored "-Wshadow"
-#endif //__clang__
-#if (defined(__GNUC__) || defined(__GNUG__))
+#elif (defined(__GNUC__) || defined(__GNUG__))
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
@@ -38,22 +35,19 @@
 #pragma GCC diagnostic ignored "-Wformat-security"
 #pragma GCC diagnostic ignored "-Wunused-variable"
 #pragma GCC diagnostic ignored "-Wshadow"
-#endif //(defined(__GNUC__) || defined(__GNUG__))
-#ifdef _MSC_VER
+#elif defined(_MSC_VER)
 #pragma warning(push,0)
 #endif //defined(_MSC_VER)
 #include "litiv/3rdparty/bsds500/csa.hpp"
 #include "litiv/3rdparty/bsds500/kofn.hpp"
 #include "litiv/3rdparty/bsds500/match.hpp"
-#ifdef _MSC_VER
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif (defined(__GNUC__) || defined(__GNUG__))
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
 #pragma warning(pop)
 #endif //defined(_MSC_VER)
-#if (defined(__GNUC__) || defined(__GNUG__))
-#pragma GCC diagnostic pop
-#endif //(defined(__GNUC__) || defined(__GNUG__))
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif //__clang__
 #endif //USE_BSDS500_BENCHMARK
 
 bool lv::MetricsAccumulator_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::isEqual(const IIMetricsAccumulatorConstPtr& m) const {

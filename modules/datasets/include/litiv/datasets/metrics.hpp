@@ -318,7 +318,7 @@ namespace lv {
             if(bAverage && this->isGroup() && !this->isBare()) {
                 IDataHandlerPtrArray vpBatches = this->getBatches(true);
                 auto ppBatchIter = vpBatches.begin();
-                for(; ppBatchIter!=vpBatches.end() && (*ppBatchIter)->getCurrentOutputCount()==0; ++ppBatchIter);
+                for(; ppBatchIter!=vpBatches.end() && (*ppBatchIter)->getCurrentOutputCount()==0; ++ppBatchIter) {}
                 lvAssert_(ppBatchIter!=vpBatches.end(),"found no processed output packets");
                 IIMetricsCalculatorPtr pMetrics = dynamic_cast<const IIMetricRetriever&>(**ppBatchIter).getMetrics(bAverage);
                 for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)

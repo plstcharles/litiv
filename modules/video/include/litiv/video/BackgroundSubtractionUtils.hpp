@@ -127,6 +127,8 @@ protected:
                            bool bUseTimers, bool bUseIntegralFormat);
     /// used to pass learning rate parameter to overridden dispatch call, if needed
     double m_dCurrLearningRate;
+    /// eliminates 'hides overloaded virtual func' warning on some platforms
+    using lv::IParallelAlgo_GLSL::apply_gl;
 };
 
 using IBackgroundSubtractor_GLSL = IBackgroundSubtractor_<lv::GLSL>;

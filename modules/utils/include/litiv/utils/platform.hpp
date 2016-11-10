@@ -63,10 +63,12 @@ namespace lv {
         typedef std::size_t size_type;
         typedef std::ptrdiff_t difference_type;
         typedef std::true_type propagate_on_container_move_assignment;
-        template<typename T2> struct rebind {typedef AlignedMemAllocator<T2,nByteAlign> other;};
+        template<typename T2>
+        struct rebind {typedef AlignedMemAllocator<T2,nByteAlign> other;};
     public:
         inline AlignedMemAllocator() noexcept {}
-        template<typename T2> inline AlignedMemAllocator(const AlignedMemAllocator<T2,nByteAlign>&) noexcept {}
+        template<typename T2>
+        inline AlignedMemAllocator(const AlignedMemAllocator<T2,nByteAlign>&) noexcept {}
         inline ~AlignedMemAllocator() throw() {}
         inline pointer address(reference r) {return std::addressof(r);}
         inline const_pointer address(const_reference r) const noexcept {return std::addressof(r);}
@@ -101,11 +103,12 @@ namespace lv {
         inline void deallocate(pointer p, size_type) noexcept {free(p);}
         inline void destroy(pointer p) {p->~value_type();}
 #endif //(!def(_MSC_VER))
-        template<typename T2, typename... Targs> inline void construct(T2* p, Targs&&... args) {::new(reinterpret_cast<void*>(p)) T2(std::forward<Targs>(args)...);}
+        template<typename T2, typename... Targs>
+        inline void construct(T2* p, Targs&&... args) {::new(reinterpret_cast<void*>(p)) T2(std::forward<Targs>(args)...);}
         inline void construct(pointer p, const value_type& wert) {new(p) value_type(wert);}
         inline size_type max_size() const noexcept {return (size_type(~0)-size_type(nByteAlign))/sizeof(value_type);}
         bool operator!=(const AlignedMemAllocator<T,nByteAlign>& other) const {return !(*this==other);}
-        bool operator==(const AlignedMemAllocator<T,nByteAlign>& other) const {return true;}
+        bool operator==(const AlignedMemAllocator<T,nByteAlign>&) const {return true;}
     };
 
     template<typename T>

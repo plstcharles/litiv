@@ -74,6 +74,8 @@ protected:
                    bool bUseTimers, bool bUseIntegralFormat);
     /// used to pass threshold parameter to overridden dispatch call, if needed
     double m_dCurrThreshold;
+    /// eliminates 'hides overloaded virtual func' warning on some platforms
+    using lv::IParallelAlgo_GLSL::apply_gl;
 };
 
 using IEdgeDetector_GLSL = IEdgeDetector_<lv::GLSL>;
