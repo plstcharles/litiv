@@ -425,6 +425,16 @@ namespace lv {
         for_each(t,f,IndexSequenceGenerator<sizeof...(TTupleTypes)>{});
     }
 
+    template<typename TValue, size_t nArraySize, typename TFunc, size_t... anIndices>
+    constexpr auto static_transform(const std::array<TValue,nArraySize>& a, const std::array<TValue,nArraySize>& b, TFunc lOp, IndexSequence<anIndices...>) -> std::array<decltype(lOp(a[0],b[0])),nArraySize> {
+        return {lOp(a[anIndices],b[anIndices])...};
+    }
+
+    template<typename TValue, size_t nArraySize, typename TFunc>
+    constexpr auto static_transform(const std::array<TValue,nArraySize>& a, const std::array<TValue,nArraySize>& b, TFunc lOp) -> decltype(static_transform(a,b,lOp,IndexSequenceGenerator<nArraySize>{})) {
+        return static_transform(a,b,lOp,IndexSequenceGenerator<nArraySize>{});
+    }
+
     template<typename... TMutexes>
     struct unlock_guard {
         explicit unlock_guard(TMutexes&... aMutexes) noexcept :
