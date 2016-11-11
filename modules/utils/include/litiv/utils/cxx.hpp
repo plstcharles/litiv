@@ -313,14 +313,12 @@ namespace lv {
         return (Tr)(bool(nBits&(1<<n))<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,Tr>(nBits,n-1):(Tr)0);
     }
 
-    template<int... anIndices>
-    struct MetaIdxConcat {};
-
-    template<int N, int... anIndices>
-    struct MetaIdxConcatenator : MetaIdxConcatenator<N - 1, N - 1, anIndices...> {};
-
-    template<int... anIndices>
-    struct MetaIdxConcatenator<0, anIndices...> : MetaIdxConcat<anIndices...> {};
+    template<size_t... anIndices>
+    struct IndexSequence {};
+    template<size_t nNextIndex, size_t... anIndices>
+    struct IndexSequenceGenerator : IndexSequenceGenerator<nNextIndex-1,nNextIndex-1,anIndices...> {};
+    template<size_t... anIndices>
+    struct IndexSequenceGenerator<0,anIndices...> : IndexSequence<anIndices...> {};
 
     struct StopWatch {
         StopWatch() {tick();}
@@ -417,14 +415,14 @@ namespace lv {
         enum {value=(sizeof(test<TContainer>(0))==sizeof(char))};
     };
 
-    template<typename TTuple, typename TFunc, int... anIndices>
-    inline void for_each(TTuple&& t, TFunc f, MetaIdxConcat<anIndices...>) {
-        auto l = { (f(std::get<anIndices>(t)),0)... };
+    template<typename TTuple, typename TFunc, size_t... anIndices>
+    inline void for_each(TTuple&& t, TFunc f, IndexSequence<anIndices...>) {
+        auto l = {(f(std::get<anIndices>(t)),0)...};
     }
 
     template<typename... TTupleTypes, typename TFunc>
     inline void for_each_in_tuple(const std::tuple<TTupleTypes...>& t, TFunc f) {
-        for_each(t, f, MetaIdxConcatenator<sizeof...(TTupleTypes)>());
+        for_each(t,f,IndexSequenceGenerator<sizeof...(TTupleTypes)>{});
     }
 
     template<typename... TMutexes>
