@@ -158,3 +158,123 @@ void cv::DisplayHelper::onMouseEventCallback(int nEvent, int x, int y, int nFlag
 void cv::DisplayHelper::onMouseEvent(int nEvent, int x, int y, int nFlags, void* pData) {
     (*(std::function<void(int,int,int,int)>*)pData)(nEvent,x,y,nFlags);
 }
+
+void cv::write(const std::string& sFilePath, const cv::Mat& _oData, cv::MatArchiveList eArchiveType) {
+    lvAssert_(!sFilePath.empty() && !_oData.empty(),"output file path and matrix must both be non-empty");
+    cv::Mat oData = _oData.isContinuous()?_oData:_oData.clone();
+    if(eArchiveType==MatArchive_FILESTORAGE) {
+        cv::FileStorage oArchive(sFilePath,cv::FileStorage::WRITE);
+        lvAssert__(oArchive.isOpened(),"could not open archive at '%s' for writing",sFilePath.c_str());
+        oArchive << "htag" << lv::getVersionStamp();
+        oArchive << "date" << lv::getTimeStamp();
+        oArchive << "matrix" << oData;
+    }
+    else if(eArchiveType==MatArchive_PLAINTEXT) {
+        std::ofstream ssStr(sFilePath);
+        lvAssert__(ssStr.is_open(),"could not open text file at '%s' for writing",sFilePath.c_str());
+        ssStr << "htag " << lv::getVersionStamp() << std::endl;
+        ssStr << "date " << lv::getTimeStamp() << std::endl;
+        ssStr << "nDataType " << (int32_t)oData.type() << std::endl;
+        ssStr << "nDataDepth " << (int32_t)oData.depth() << std::endl;
+        ssStr << "nChannels " << (int32_t)oData.channels() << std::endl;
+        ssStr << "nElemSize " << (uint64_t)oData.elemSize() << std::endl;
+        ssStr << "nElemCount " << (uint64_t)oData.total() << std::endl;
+        ssStr << "nDims " << (int32_t)oData.dims << std::endl;
+        ssStr << "anSizes";
+        for(int nDimIdx=0; nDimIdx<oData.dims; ++nDimIdx)
+            ssStr << " " << (int32_t)oData.size[nDimIdx];
+        ssStr << std::endl << std::endl;
+        if(oData.depth()!=CV_64F)
+            _oData.convertTo(oData,CV_64F);
+        double* pdData = (double*)oData.data;
+        for(size_t nElemIdx=0; nElemIdx<oData.total(); ++nElemIdx) {
+            ssStr << *pdData++;
+            for(size_t nElemPackIdx=1; nElemPackIdx<oData.channels(); ++nElemPackIdx)
+                ssStr << " " << *pdData++;
+            if(((nElemIdx+1)%oData.size[oData.dims-1])==0)
+                ssStr << std::endl;
+            else
+                ssStr << " ";
+        }
+        lvAssert_(ssStr,"plain text archive write failed");
+    }
+    else if(eArchiveType==MatArchive_BINARY) {
+        std::ofstream ssStr(sFilePath,std::ios::binary);
+        lvAssert__(ssStr.is_open(),"could not open binary file at '%s' for writing",sFilePath.c_str());
+        const int32_t nDataType = (int32_t)oData.type();
+        ssStr.write((const char*)&nDataType,sizeof(nDataType));
+        const uint64_t nElemSize = (uint64_t)oData.elemSize();
+        ssStr.write((const char*)&nElemSize,sizeof(nElemSize));
+        const uint64_t nElemCount = (uint64_t)oData.total();
+        ssStr.write((const char*)&nElemCount,sizeof(nElemCount));
+        const int32_t nDims = (int32_t)oData.dims;
+        ssStr.write((const char*)&nDims,sizeof(nDims));
+        for(int32_t nDimIdx=0; nDimIdx<nDims; ++nDimIdx) {
+            const int32_t nDimSize = (int32_t)oData.size[nDimIdx];
+            ssStr.write((const char*)&nDimSize,sizeof(nDimSize));
+        }
+        ssStr.write((const char*)(oData.data),nElemSize*nElemCount);
+        lvAssert_(ssStr,"binary archive write failed");
+    }
+    else
+        lvError("unrecognized mat archive type flag");
+}
+
+void cv::read(const std::string& sFilePath, cv::Mat& oData, cv::MatArchiveList eArchiveType) {
+    lvAssert_(!sFilePath.empty(),"input file path must be non-empty");
+    if(eArchiveType==MatArchive_FILESTORAGE) {
+        cv::FileStorage oArchive(sFilePath,cv::FileStorage::READ);
+        lvAssert__(oArchive.isOpened(),"could not open archive at '%s' for reading",sFilePath.c_str());
+        oArchive["matrix"] >> oData;
+        lvAssert_(!oData.empty(),"could not read valid matrix from storage");
+    }
+    else if(eArchiveType==MatArchive_PLAINTEXT) {
+        std::ifstream ssStr(sFilePath);
+        lvAssert__(ssStr.is_open(),"could not open text file at '%s' for reading",sFilePath.c_str());
+        std::string sFieldName,sFieldValue;
+        lvAssert_((ssStr >> sFieldName) && sFieldName=="htag" && std::getline(ssStr,sFieldValue),"could not parse 'htag' field from archive");
+        lvAssert_((ssStr >> sFieldName) && sFieldName=="date" && std::getline(ssStr,sFieldValue),"could not parse 'date' field from archive");
+        int32_t nDataType,nDataDepth,nChannels;
+        lvAssert_((ssStr >> sFieldName >> nDataType) && sFieldName=="nDataType","could not parse 'nDataType' field from archive");
+        lvAssert_((ssStr >> sFieldName >> nDataDepth) && sFieldName=="nDataDepth","could not parse 'nDataDepth' field from archive");
+        lvAssert_((ssStr >> sFieldName >> nChannels) && sFieldName=="nChannels","could not parse 'nChannels' field from archive");
+        uint64_t nElemSize,nElemCount;
+        lvAssert_((ssStr >> sFieldName >> nElemSize) && sFieldName=="nElemSize","could not parse 'nElemSize' field from archive");
+        lvAssert_((ssStr >> sFieldName >> nElemCount) && sFieldName=="nElemCount","could not parse 'nElemCount' field from archive");
+        int32_t nDims;
+        lvAssert_((ssStr >> sFieldName >> nDims) && sFieldName=="nDims","could not parse 'nDims' field from archive");
+        std::vector<int32_t> anSizes(nDims);
+        lvAssert_((ssStr >> sFieldName) && sFieldName=="anSizes","could not parse 'anSizes' field from archive");
+        for(int32_t nDimIdx=0; nDimIdx<nDims; ++nDimIdx)
+            lvAssert_((ssStr >> anSizes[nDimIdx]),"could not parse dim size value from archive");
+        cv::Mat oDataTemp(nDims,anSizes.data(),CV_64FC(nChannels));
+        double* pdData = (double*)oDataTemp.data;
+        for(size_t nElemIdx=0; nElemIdx<oDataTemp.total(); ++nElemIdx) {
+            ssStr >> *pdData++;
+            for(size_t nElemPackIdx=1; nElemPackIdx<oDataTemp.channels(); ++nElemPackIdx)
+                ssStr >> *pdData++;
+        }
+        lvAssert_(ssStr,"plain text archive read failed");
+        oDataTemp.convertTo(oData,nDataDepth);
+    }
+    else if(eArchiveType==MatArchive_BINARY) {
+        std::ifstream ssStr(sFilePath,std::ios::binary);
+        lvAssert__(ssStr.is_open(),"could not open binary file at '%s' for reading",sFilePath.c_str());
+        int32_t nDataType;
+        ssStr.read((char*)&nDataType,sizeof(nDataType));
+        uint64_t nElemSize;
+        ssStr.read((char*)&nElemSize,sizeof(nElemSize));
+        uint64_t nElemCount;
+        ssStr.read((char*)&nElemCount,sizeof(nElemCount));
+        int32_t nDims;
+        ssStr.read((char*)&nDims,sizeof(nDims));
+        std::vector<int32_t> anSizes(nDims);
+        for(int32_t nDimIdx=0; nDimIdx<nDims; ++nDimIdx)
+            ssStr.read((char*)&anSizes[nDimIdx],sizeof(anSizes[nDimIdx]));
+        oData.create(nDims,anSizes.data(),nDataType);
+        ssStr.read((char*)(oData.data),nElemSize*nElemCount);
+        lvAssert_(ssStr,"binary archive read failed");
+    }
+    else
+        lvError("unrecognized mat archive type flag");
+}

@@ -28,7 +28,7 @@ namespace cv { // extending cv
     using DisplayHelperPtr = std::shared_ptr<DisplayHelper>;
 
     /// returns pixel coordinates clamped to the given image & border size
-    inline void clampImageCoords(int& nSampleCoord_X,int& nSampleCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
+    inline void clampImageCoords(int& nSampleCoord_X, int& nSampleCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
         if(nSampleCoord_X<nBorderSize)
             nSampleCoord_X = nBorderSize;
         else if(nSampleCoord_X>=oImageSize.width-nBorderSize)
@@ -42,8 +42,8 @@ namespace cv { // extending cv
     /// returns a random init/sampling position for the specified pixel position, given a predefined kernel; also guards against out-of-bounds values via image/border size check.
     template<int nKernelHeight,int nKernelWidth>
     inline void getRandSamplePosition(const std::array<std::array<int,nKernelWidth>,nKernelHeight>& anSamplesInitPattern,
-                                             const int nSamplesInitPatternTot,int& nSampleCoord_X,int& nSampleCoord_Y,
-                                             const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
+                                      const int nSamplesInitPatternTot, int& nSampleCoord_X, int& nSampleCoord_Y,
+                                      const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
         int r = 1+rand()%nSamplesInitPatternTot;
         for(nSampleCoord_X=0; nSampleCoord_X<nKernelWidth; ++nSampleCoord_X) {
             for(nSampleCoord_Y=0; nSampleCoord_Y<nKernelHeight; ++nSampleCoord_Y) {
@@ -59,7 +59,7 @@ namespace cv { // extending cv
     }
 
     /// returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-    inline void getRandSamplePosition_3x3_std1(int& nSampleCoord_X,int& nSampleCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
+    inline void getRandSamplePosition_3x3_std1(int& nSampleCoord_X, int& nSampleCoord_Y, const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
         // based on 'floor(fspecial('gaussian',3,1)*256)'
         static_assert(sizeof(std::array<int,3>)==sizeof(int)*3,"bad std::array stl impl");
         static const int s_nSamplesInitPatternTot = 256;
@@ -72,7 +72,7 @@ namespace cv { // extending cv
     }
 
     /// returns a random init/sampling position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-    inline void getRandSamplePosition_7x7_std2(int& nSampleCoord_X,int& nSampleCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
+    inline void getRandSamplePosition_7x7_std2(int& nSampleCoord_X, int& nSampleCoord_Y, const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
         // based on 'floor(fspecial('gaussian',7,2)*512)'
         static_assert(sizeof(std::array<int,7>)==sizeof(int)*7,"bad std::array stl impl");
         static const int s_nSamplesInitPatternTot = 512;
@@ -91,9 +91,9 @@ namespace cv { // extending cv
     /// returns a random neighbor position for the specified pixel position, given a predefined neighborhood; also guards against out-of-bounds values via image/border size check.
     template<int nNeighborCount>
     inline void getRandNeighborPosition(const std::array<std::array<int,2>,nNeighborCount>& anNeighborPattern,
-                                               int& nNeighborCoord_X,int& nNeighborCoord_Y,
-                                               const int nOrigCoord_X,const int nOrigCoord_Y,
-                                               const int nBorderSize,const cv::Size& oImageSize) {
+                                        int& nNeighborCoord_X, int& nNeighborCoord_Y,
+                                        const int nOrigCoord_X, const int nOrigCoord_Y,
+                                        const int nBorderSize, const cv::Size& oImageSize) {
         int r = rand()%nNeighborCount;
         nNeighborCoord_X = nOrigCoord_X+anNeighborPattern[r][0];
         nNeighborCoord_Y = nOrigCoord_Y+anNeighborPattern[r][1];
@@ -101,7 +101,7 @@ namespace cv { // extending cv
     }
 
     /// returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-    inline void getRandNeighborPosition_3x3(int& nNeighborCoord_X,int& nNeighborCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
+    inline void getRandNeighborPosition_3x3(int& nNeighborCoord_X, int& nNeighborCoord_Y, const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
         typedef std::array<int,2> Nb;
         static const std::array<std::array<int,2>,8> s_anNeighborPattern ={
                 Nb{-1, 1},Nb{0, 1},Nb{1, 1},
@@ -112,7 +112,7 @@ namespace cv { // extending cv
     }
 
     /// returns a random neighbor position for the specified pixel position; also guards against out-of-bounds values via image/border size check.
-    inline void getRandNeighborPosition_5x5(int& nNeighborCoord_X,int& nNeighborCoord_Y,const int nOrigCoord_X,const int nOrigCoord_Y,const int nBorderSize,const cv::Size& oImageSize) {
+    inline void getRandNeighborPosition_5x5(int& nNeighborCoord_X, int& nNeighborCoord_Y, const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
         typedef std::array<int,2> Nb;
         static const std::array<std::array<int,2>,24> s_anNeighborPattern ={
                 Nb{-2, 2},Nb{-1, 2},Nb{0, 2},Nb{1, 2},Nb{2, 2},
@@ -190,6 +190,24 @@ namespace cv { // extending cv
         std::function<void(int,int,int,int)> m_lInternalCallback;
         std::function<void(const CallbackData&)> m_lExternalCallback;
     };
+
+    /// list of archive types supported by cv::write and cv::read
+    enum MatArchiveList {
+        MatArchive_FILESTORAGE,
+        MatArchive_PLAINTEXT,
+        MatArchive_BINARY
+    };
+
+    /// writes matrix data locally using a binary/yml/text file format
+    void write(const std::string& sFilePath, const cv::Mat& _oData, MatArchiveList eArchiveType=MatArchive_BINARY);
+    /// reads matrix data locally using a binary/yml/text file format
+    void read(const std::string& sFilePath, cv::Mat& oData, MatArchiveList eArchiveType=MatArchive_BINARY);
+    /// reads matrix data locally using a binary/yml/text file format (inline version)
+    inline cv::Mat read(const std::string& sFilePath, MatArchiveList eArchiveType=MatArchive_BINARY) {
+        cv::Mat oData;
+        cv::read(sFilePath,oData,eArchiveType);
+        return oData;
+    }
 
     /// returns an always-empty-mat by reference
     inline const cv::Mat& emptyMat() {
