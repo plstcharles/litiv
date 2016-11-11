@@ -60,31 +60,31 @@ inline void diff(const cv::Mat_<float>& oImage, cv::Mat_<float>& oLocalDiff) {
             oLocalDiff(nRowIdx,nColIdx) = oImage(nRowIdx-nRowOffset,nColIdx-nColOffset)-oImage(nRowIdx,nColIdx);
     lv::unroll<nRowOffset>([&](size_t nRowIdx){
         for(int nColIdx=0; nColIdx<oImage.cols; ++nColIdx)
-            oLocalDiff(nRowIdx,nColIdx) = 0.0f;
+            oLocalDiff((int)nRowIdx,nColIdx) = 0.0f;
     });
     lv::unroll<nColOffset>([&](size_t nColIdx){
         for(int nRowIdx=nRowOffset; nRowIdx<oImage.rows; ++nRowIdx)
-            oLocalDiff(nRowIdx,nColIdx) = 0.0f;
+            oLocalDiff(nRowIdx,(int)nColIdx) = 0.0f;
     });
 }
 
 inline void domaintransform_runfilter(const cv::Mat_<float>& oImage, const cv::Mat_<float>& oRef_V_dHdx, const cv::Mat_<float>& oRef_V_dVdy_t, cv::Mat_<float>& oOutput, size_t nIters) {
     lvDbgAssert(!oImage.empty() && !oRef_V_dHdx.empty() && !oRef_V_dHdx.empty() && nIters>0 && oImage.dims==2 && oRef_V_dHdx.dims==3 && oRef_V_dVdy_t.dims==3);
-    lvDbgAssert(oImage.rows==oRef_V_dHdx.size[1] && oImage.rows==oRef_V_dHdx.size[2] && oImage.cols==oRef_V_dHdx.size[2] && oImage.rows==oRef_V_dHdx.size[1]);
+    lvDbgAssert(oImage.rows==oRef_V_dHdx.size[1] && oImage.rows==oRef_V_dVdy_t.size[2] && oImage.cols==oRef_V_dHdx.size[2] && oImage.cols==oRef_V_dVdy_t.size[1]);
     lvDbgAssert(oRef_V_dHdx.size[0]==(int)nIters && oRef_V_dVdy_t.size[0]==(int)nIters);
     oImage.copyTo(oOutput);
     cv::Mat_<float> oOutput_t;
-    const auto lTransfDomRecursFilter_H = [](cv::Mat_<float>& _oImage, const cv::Mat_<float>& oRef, size_t nIterIdx) {
+    const auto lTransfDomRecursFilter_H = [](cv::Mat_<float>& _oImage, const cv::Mat_<float>& oRef, int nIterIdx) {
         lvDbgAssert(!_oImage.empty() && _oImage.dims==2 && !oRef.empty() && oRef.dims==3);
         lvDbgAssert(_oImage.rows==oRef.size[1] && _oImage.cols==oRef.size[2]);
         for(int nRowIdx=0; nRowIdx<_oImage.rows; ++nRowIdx) {
             for(int nColIdx=1; nColIdx<_oImage.cols; ++nColIdx)
                 _oImage(nRowIdx,nColIdx) += oRef(nIterIdx,nRowIdx,nColIdx)*(_oImage(nRowIdx,nColIdx-1)-_oImage(nRowIdx,nColIdx));
             for(int nColIdx=_oImage.cols-2; nColIdx>=0; --nColIdx)
-                _oImage(nRowIdx,nColIdx) += oRef(nIterIdx,nRowIdx,nColIdx+1)*(_oImage(nRowIdx,nColIdx-1)-_oImage(nRowIdx,nColIdx));
+                _oImage(nRowIdx,nColIdx) += oRef(nIterIdx,nRowIdx,nColIdx+1)*(_oImage(nRowIdx,nColIdx+1)-_oImage(nRowIdx,nColIdx));
         }
     };
-    for(size_t nIterIdx=0; nIterIdx<nIters; ++nIterIdx) {
+    for(int nIterIdx=0; nIterIdx<(int)nIters; ++nIterIdx) {
         lTransfDomRecursFilter_H(oOutput,oRef_V_dHdx,nIterIdx);
         cv::transpose(oOutput,oOutput_t);
         lTransfDomRecursFilter_H(oOutput_t,oRef_V_dVdy_t,nIterIdx);
@@ -122,9 +122,10 @@ cv::Mat dasc(const cv::Mat& _oImage, float fSigma_s, float fSigma_r, size_t nIte
     cv::Mat_<float> oRef_dHdx = 1.0f + fSigma_s/fSigma_r*cv::abs(oImageLocalDiff_X);
     const std::array<int,3> anRefDims = {(int)nIters,nRows,nCols};
     cv::Mat_<float> oRef_V_dHdx(3,anRefDims.data());
-    cv::Mat_<float> oRef_V_dVdy_t(3,anRefDims.data());
-    for(size_t nIterIdx=0; nIterIdx<nIters; ++nIterIdx) {
-        const float fBase = exp(-sqrt(2.0f)/(fSigma_s*sqrt(3.0f)*pow(2.0f,nIters-(nIterIdx+1))/sqrt(pow(4.0f,nIters)-1)));
+    const std::array<int,3> anRefDims_t = {(int)nIters,nCols,nRows};
+    cv::Mat_<float> oRef_V_dVdy_t(3,anRefDims_t.data());
+    for(int nIterIdx=0; nIterIdx<(int)nIters; ++nIterIdx) {
+        const float fBase = exp(-sqrt(2.0f)/(fSigma_s*sqrt(3.0f)*(float)pow(2.0f,(int)nIters-(nIterIdx+1))/sqrt((float)pow(4.0f,(int)nIters)-1)));
         for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
             for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
                 oRef_V_dHdx(nIterIdx,nRowIdx,nColIdx) = pow(fBase,oRef_dHdx(nRowIdx,nColIdx));
@@ -134,7 +135,7 @@ cv::Mat dasc(const cv::Mat& _oImage, float fSigma_s, float fSigma_r, size_t nIte
     }
     cv::Mat_<float> oImage_AdaptiveMean,oImage_AdaptiveMeanSqr;
     domaintransform_runfilter(oImage,oRef_V_dHdx,oRef_V_dVdy_t,oImage_AdaptiveMean,nIters);
-    domaintransform_runfilter(oImage*oImage,oRef_V_dHdx,oRef_V_dVdy_t,oImage_AdaptiveMeanSqr,nIters);
+    domaintransform_runfilter(oImage.mul(oImage),oRef_V_dHdx,oRef_V_dVdy_t,oImage_AdaptiveMeanSqr,nIters);
     cv::Mat_<float> oLookupImage(oImageSize),oLookupImage_Sqr(oImageSize),oLookupImage_Mix(oImageSize);
     cv::Mat_<float> oLookupImage_AdaptiveMean,oLookupImage_AdaptiveMeanSqr,oLookupImage_AdaptiveMeanMix;
     const std::array<int,3> anDescDims = {nRows,nCols,DASC_SIZE};
