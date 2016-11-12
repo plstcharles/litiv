@@ -22,6 +22,7 @@
 #endif //_LITIV_DATASETS_IMPL_H_
 
 #include "litiv/datasets.hpp" // for parsers only, not truly required here
+#include <opencv2/calib3d.hpp>
 
 #define DATASETS_VAP_FIX_SCENE2_DISTORT 1
 #define DATASETS_VAP_FIX_SCENE3_OFFSET  1
