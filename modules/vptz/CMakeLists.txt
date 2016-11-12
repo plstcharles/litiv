@@ -16,7 +16,6 @@
 # limitations under the License.
 
 if(USE_GLSL)
-    option(USE_VPTZ_STANDALONE "Build VPTZ library as standalone lib from LITIV framework" ON)
 
     file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/utils.hpp)
     configure_file(
