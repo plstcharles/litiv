@@ -82,7 +82,7 @@ void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const st
     const size_t nChannels = (size_t)oInputImg.channels();
     const cv::Mat& oRefMat = oRefImg.empty()?oInputImg:oRefImg;
     const size_t nKeyPoints = voKeyPoints.size();
-    const uchar t = cv::saturate_cast<uchar>(nThreshold);
+    const uchar t = cv::saturate_cast<uchar>((int)nThreshold);
     if(nChannels==1) {
         if(bSingleColumnDesc)
             oDesc.create((int)nKeyPoints,1,CV_16UC1);
