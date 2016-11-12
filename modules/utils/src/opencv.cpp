@@ -187,9 +187,9 @@ void cv::write(const std::string& sFilePath, const cv::Mat& _oData, cv::MatArchi
         if(oData.depth()!=CV_64F)
             _oData.convertTo(oData,CV_64F);
         double* pdData = (double*)oData.data;
-        for(size_t nElemIdx=0; nElemIdx<oData.total(); ++nElemIdx) {
+        for(int nElemIdx=0; nElemIdx<(int)oData.total(); ++nElemIdx) {
             ssStr << *pdData++;
-            for(size_t nElemPackIdx=1; nElemPackIdx<oData.channels(); ++nElemPackIdx)
+            for(int nElemPackIdx=1; nElemPackIdx<oData.channels(); ++nElemPackIdx)
                 ssStr << " " << *pdData++;
             if(((nElemIdx+1)%oData.size[oData.dims-1])==0)
                 ssStr << std::endl;
@@ -249,9 +249,9 @@ void cv::read(const std::string& sFilePath, cv::Mat& oData, cv::MatArchiveList e
             lvAssert_((ssStr >> anSizes[nDimIdx]),"could not parse dim size value from archive");
         cv::Mat oDataTemp(nDims,anSizes.data(),CV_64FC(nChannels));
         double* pdData = (double*)oDataTemp.data;
-        for(size_t nElemIdx=0; nElemIdx<oDataTemp.total(); ++nElemIdx) {
+        for(int nElemIdx=0; nElemIdx<(int)oDataTemp.total(); ++nElemIdx) {
             ssStr >> *pdData++;
-            for(size_t nElemPackIdx=1; nElemPackIdx<oDataTemp.channels(); ++nElemPackIdx)
+            for(int nElemPackIdx=1; nElemPackIdx<oDataTemp.channels(); ++nElemPackIdx)
                 ssStr >> *pdData++;
         }
         lvAssert_(ssStr,"plain text archive read failed");
