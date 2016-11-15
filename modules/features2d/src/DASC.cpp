@@ -68,12 +68,11 @@ inline void diff(const cv::Mat_<float>& oImage, cv::Mat_<float>& oLocalDiff) {
     });
 }
 
-inline void domaintransform_runfilter(const cv::Mat_<float>& oImage, const cv::Mat_<float>& oRef_V_dHdx, const cv::Mat_<float>& oRef_V_dVdy_t, cv::Mat_<float>& oOutput, size_t nIters) {
+inline void domainTransfFilter(const cv::Mat_<float>& oImage, const cv::Mat_<float>& oRef_V_dHdx, const cv::Mat_<float>& oRef_V_dVdy_t, cv::Mat_<float>& oOutput, size_t nIters) {
     lvDbgAssert(!oImage.empty() && !oRef_V_dHdx.empty() && !oRef_V_dHdx.empty() && nIters>0 && oImage.dims==2 && oRef_V_dHdx.dims==3 && oRef_V_dVdy_t.dims==3);
     lvDbgAssert(oImage.rows==oRef_V_dHdx.size[1] && oImage.rows==oRef_V_dVdy_t.size[2] && oImage.cols==oRef_V_dHdx.size[2] && oImage.cols==oRef_V_dVdy_t.size[1]);
     lvDbgAssert(oRef_V_dHdx.size[0]==(int)nIters && oRef_V_dVdy_t.size[0]==(int)nIters);
     oImage.copyTo(oOutput);
-    cv::Mat_<float> oOutput_t;
     const auto lTransfDomRecursFilter_H = [](cv::Mat_<float>& _oImage, const cv::Mat_<float>& oRef, int nIterIdx) {
         lvDbgAssert(!_oImage.empty() && _oImage.dims==2 && !oRef.empty() && oRef.dims==3);
         lvDbgAssert(_oImage.rows==oRef.size[1] && _oImage.cols==oRef.size[2]);
@@ -84,6 +83,7 @@ inline void domaintransform_runfilter(const cv::Mat_<float>& oImage, const cv::M
                 _oImage(nRowIdx,nColIdx) += oRef(nIterIdx,nRowIdx,nColIdx+1)*(_oImage(nRowIdx,nColIdx+1)-_oImage(nRowIdx,nColIdx));
         }
     };
+    cv::Mat_<float> oOutput_t;
     for(int nIterIdx=0; nIterIdx<(int)nIters; ++nIterIdx) {
         lTransfDomRecursFilter_H(oOutput,oRef_V_dHdx,nIterIdx);
         cv::transpose(oOutput,oOutput_t);
@@ -92,13 +92,7 @@ inline void domaintransform_runfilter(const cv::Mat_<float>& oImage, const cv::M
     }
 }
 
-//M_half = 15;
-//N_half = 2;
-//epsil = 0.09;
-//downSize = 1;
-
-//cv::Mat dasc(const cv::Mat& _oImage, float fSigma_s=2.0f, float fSigma_r=0.2f, size_t nIters=1, bool bPrefilter=true) {
-cv::Mat dasc(const cv::Mat& _oImage, float fSigma_s, float fSigma_r, size_t nIters, bool bPrefilter) {
+cv::Mat dasc_rf(const cv::Mat& _oImage, float fSigma_s, float fSigma_r, size_t nIters, bool bPrefilter) {
     lvAssert(!_oImage.empty() && fSigma_s>0.0f && fSigma_r>0.0f && nIters>0);
     lvAssert((_oImage.channels()==1 || _oImage.channels()==3) && (_oImage.depth()==CV_32F || _oImage.depth()==CV_8U));
     cv::Mat oImageTemp;
@@ -134,8 +128,8 @@ cv::Mat dasc(const cv::Mat& _oImage, float fSigma_s, float fSigma_r, size_t nIte
         }
     }
     cv::Mat_<float> oImage_AdaptiveMean,oImage_AdaptiveMeanSqr;
-    domaintransform_runfilter(oImage,oRef_V_dHdx,oRef_V_dVdy_t,oImage_AdaptiveMean,nIters);
-    domaintransform_runfilter(oImage.mul(oImage),oRef_V_dHdx,oRef_V_dVdy_t,oImage_AdaptiveMeanSqr,nIters);
+    domainTransfFilter(oImage,oRef_V_dHdx,oRef_V_dVdy_t,oImage_AdaptiveMean,nIters);
+    domainTransfFilter(oImage.mul(oImage),oRef_V_dHdx,oRef_V_dVdy_t,oImage_AdaptiveMeanSqr,nIters);
     cv::Mat_<float> oLookupImage(oImageSize),oLookupImage_Sqr(oImageSize),oLookupImage_Mix(oImageSize);
     cv::Mat_<float> oLookupImage_AdaptiveMean,oLookupImage_AdaptiveMeanSqr,oLookupImage_AdaptiveMeanMix;
     const std::array<int,3> anDescDims = {nRows,nCols,DASC_SIZE};
@@ -154,9 +148,9 @@ cv::Mat dasc(const cv::Mat& _oImage, float fSigma_s, float fSigma_r, size_t nIte
                     oLookupImage(nRowIdx,nColIdx) = oLookupImage_Sqr(nRowIdx,nColIdx) = oLookupImage_Mix(nRowIdx,nColIdx) = 0.0f;
             }
         }
-        domaintransform_runfilter(oLookupImage,oRef_V_dHdx,oRef_V_dVdy_t,oLookupImage_AdaptiveMean,nIters);
-        domaintransform_runfilter(oLookupImage_Sqr,oRef_V_dHdx,oRef_V_dVdy_t,oLookupImage_AdaptiveMeanSqr,nIters);
-        domaintransform_runfilter(oLookupImage_Mix,oRef_V_dHdx,oRef_V_dVdy_t,oLookupImage_AdaptiveMeanMix,nIters);
+        domainTransfFilter(oLookupImage,oRef_V_dHdx,oRef_V_dVdy_t,oLookupImage_AdaptiveMean,nIters);
+        domainTransfFilter(oLookupImage_Sqr,oRef_V_dHdx,oRef_V_dVdy_t,oLookupImage_AdaptiveMeanSqr,nIters);
+        domainTransfFilter(oLookupImage_Mix,oRef_V_dHdx,oRef_V_dVdy_t,oLookupImage_AdaptiveMeanMix,nIters);
         for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
             for(int nColIdx = 0; nColIdx<nCols; ++nColIdx) {
                 const int nOffsetRowIdx = nRowIdx+pretrained::anRP1[nLUTIdx*2];
@@ -174,6 +168,121 @@ cv::Mat dasc(const cv::Mat& _oImage, float fSigma_s, float fSigma_r, size_t nIte
         }
     }
     for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
+        for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
+            float fNorm = 0;
+            for(int nLUTIdx=0; nLUTIdx<DASC_SIZE; ++nLUTIdx)
+                fNorm += oDesc(nRowIdx,nColIdx,nLUTIdx)*oDesc(nRowIdx,nColIdx,nLUTIdx);
+            const float fNormSqrt = sqrt(fNorm);
+            for(int nLUTIdx=0; nLUTIdx<DASC_SIZE; ++nLUTIdx)
+                oDesc(nRowIdx,nColIdx,nLUTIdx) = (fNormSqrt>1e-10)?oDesc(nRowIdx,nColIdx,nLUTIdx)/fNormSqrt:0.0f;
+        }
+    }
+    return oDesc;
+}
+
+struct OBJECTDATA {
+    cv::Size oImageSize;
+    cv::Size oSubSamplSize;
+    cv::Size oBlurKernelSize;
+    cv::Mat_<float> oImage_SubSampl;
+    cv::Mat_<float> oImage_SubSamplBlur;
+    cv::Mat_<float> oImage_SubSamplVar;
+    cv::Mat_<float> oRef_SubSampl;
+    cv::Mat_<float> oRef_SubSamplCross;
+    cv::Mat_<float> oRef_SubSamplBlur;
+    cv::Mat_<float> oRef_SubSamplCrossBlur;
+    cv::Mat_<float> oNormVar_SubSampl;
+    cv::Mat_<float> oNormVar_SubSamplBlur;
+    cv::Mat_<float> oNormVarDiff_SubSampl;
+    cv::Mat_<float> oNormVarDiff_SubSamplBlur;
+    cv::Mat_<float> oNormVar;
+    cv::Mat_<float> oNormVarDiff;
+};
+
+inline void guidedFilter(const cv::Mat_<float>& oImage, const cv::Mat_<float>& oRef, cv::Mat_<float>& oOutput, OBJECTDATA* obj) {
+    cv::resize(oRef,obj->oRef_SubSampl,obj->oSubSamplSize,0.0,0.0,cv::INTER_NEAREST);
+	obj->oRef_SubSamplCross = obj->oImage_SubSampl.mul(obj->oRef_SubSampl);
+    cv::blur(obj->oRef_SubSampl,obj->oRef_SubSamplBlur,obj->oBlurKernelSize);
+    cv::blur(obj->oRef_SubSamplCross,obj->oRef_SubSamplCrossBlur,obj->oBlurKernelSize);
+	obj->oNormVar_SubSampl = (obj->oRef_SubSamplCrossBlur-obj->oImage_SubSamplBlur.mul(obj->oRef_SubSamplBlur))/obj->oImage_SubSamplVar;
+	obj->oNormVarDiff_SubSampl = obj->oRef_SubSamplBlur - obj->oNormVar_SubSampl.mul(obj->oImage_SubSamplBlur);
+    cv::blur(obj->oNormVar_SubSampl,obj->oNormVar_SubSamplBlur,obj->oBlurKernelSize);
+    cv::blur(obj->oNormVarDiff_SubSampl,obj->oNormVarDiff_SubSamplBlur,obj->oBlurKernelSize);
+    cv::resize(obj->oNormVar_SubSamplBlur,obj->oNormVar,obj->oImageSize,0,0,cv::INTER_LINEAR);
+    cv::resize(obj->oNormVarDiff_SubSamplBlur,obj->oNormVarDiff,obj->oImageSize,0,0,cv::INTER_LINEAR);
+	oOutput = obj->oNormVar.mul(oImage)+obj->oNormVarDiff;
+}
+
+cv::Mat dasc_gf(const cv::Mat& _oImage, size_t nRadius, float fEpsilon, size_t nSubSamplFrac, bool bPrefilter) {
+    lvAssert(!_oImage.empty() && nRadius>0 && fEpsilon>0.0f && nSubSamplFrac>0 && nRadius>=nSubSamplFrac);
+    lvAssert((_oImage.channels()==1 || _oImage.channels()==3) && (_oImage.depth()==CV_32F || _oImage.depth()==CV_8U));
+    cv::Mat oImageTemp;
+    if(_oImage.depth()==CV_8U)
+        _oImage.convertTo(oImageTemp,CV_32F,1.0/UCHAR_MAX);
+    else
+        oImageTemp = _oImage;
+    if(oImageTemp.channels()==3)
+        cv::cvtColor(oImageTemp,oImageTemp,cv::COLOR_BGR2GRAY);
+    lvDbgAssert(cv::countNonZero((oImageTemp>1.0f)|(oImageTemp<0.0f))==0);
+    cv::Mat_<float> oImage = oImageTemp;
+    if(bPrefilter)
+        cv::GaussianBlur(oImage,oImage,cv::Size(7,7),1.0);
+    OBJECTDATA _obj; OBJECTDATA* obj = &_obj;
+    obj->oImageSize = oImage.size();
+    lvAssert(obj->oImageSize.area()>0);
+    obj->oSubSamplSize = cv::Size(int(obj->oImageSize.width/nSubSamplFrac),int(obj->oImageSize.height/nSubSamplFrac));
+    lvAssert(obj->oSubSamplSize.area()>0);
+    const int nKernelRadius = (int)(nRadius/nSubSamplFrac);
+    lvAssert(nKernelRadius>0);
+    obj->oBlurKernelSize = cv::Size(2*nKernelRadius+1,2*nKernelRadius+1);
+    const int nRows = obj->oImageSize.height;
+    const int nCols = obj->oImageSize.width;
+    cv::resize(oImage,obj->oImage_SubSampl,obj->oSubSamplSize,0.0,0.0,cv::INTER_NEAREST);
+    cv::blur(obj->oImage_SubSampl,obj->oImage_SubSamplBlur,obj->oBlurKernelSize);
+    cv::Mat_<float> oImage_SubSamplBlurSqr;
+    cv::blur(obj->oImage_SubSampl.mul(obj->oImage_SubSampl),oImage_SubSamplBlurSqr,obj->oBlurKernelSize);
+    obj->oImage_SubSamplVar = oImage_SubSamplBlurSqr-obj->oImage_SubSamplBlur.mul(obj->oImage_SubSamplBlur)+fEpsilon;
+    cv::Mat_<float> oImage_AdaptiveMean,oImage_AdaptiveMeanSqr;
+	guidedFilter(oImage,oImage,oImage_AdaptiveMean,obj);
+	guidedFilter(oImage,oImage.mul(oImage),oImage_AdaptiveMeanSqr,obj);
+    cv::Mat_<float> oLookupImage(obj->oImageSize),oLookupImage_Sqr(obj->oImageSize),oLookupImage_Mix(obj->oImageSize);
+    cv::Mat_<float> oLookupImage_AdaptiveMean,oLookupImage_AdaptiveMeanSqr,oLookupImage_AdaptiveMeanMix;
+    const std::array<int,3> anDescDims = {nRows,nCols,DASC_SIZE};
+    cv::Mat_<float> oDesc(3,anDescDims.data(),CV_32FC1);
+    for(int nLUTIdx=0; nLUTIdx<DASC_SIZE; nLUTIdx++) {
+        const int nRowOffset = pretrained::anRPDiff[nLUTIdx*2];
+        const int nColOffset = pretrained::anRPDiff[nLUTIdx*2+1];
+        for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
+            for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
+                if(nRowIdx+nRowOffset>=0 && nRowIdx+nRowOffset<nRows && nColIdx+nColOffset>=0 && nColIdx+nColOffset<nCols) {
+                    oLookupImage(nRowIdx,nColIdx) = oImage(nRowIdx+nRowOffset,nColIdx+nColOffset);
+                    oLookupImage_Sqr(nRowIdx,nColIdx) = oImage(nRowIdx+nRowOffset,nColIdx+nColOffset)*oImage(nRowIdx+nRowOffset,nColIdx+nColOffset);
+                    oLookupImage_Mix(nRowIdx,nColIdx) = oImage(nRowIdx,nColIdx)*oImage(nRowIdx+nRowOffset,nColIdx+nColOffset);
+                }
+                else
+                    oLookupImage(nRowIdx,nColIdx) = oLookupImage_Sqr(nRowIdx,nColIdx) = oLookupImage_Mix(nRowIdx,nColIdx) = 0.0f;
+            }
+        }
+		guidedFilter(oImage,oLookupImage,oLookupImage_AdaptiveMean,obj);
+		guidedFilter(oImage,oLookupImage_Sqr,oLookupImage_AdaptiveMeanSqr,obj);
+		guidedFilter(oImage,oLookupImage_Mix,oLookupImage_AdaptiveMeanMix,obj);
+        for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
+            for(int nColIdx = 0; nColIdx<nCols; ++nColIdx) {
+                const int nOffsetRowIdx = nRowIdx+pretrained::anRP1[nLUTIdx*2];
+                const int nOffsetColIdx = nColIdx+pretrained::anRP1[nLUTIdx*2+1];
+                if(nOffsetRowIdx>0 && nOffsetRowIdx<nRows && nOffsetColIdx>0 && nOffsetColIdx<nCols) {
+                    const float fCorrSurfDenom = sqrt((oImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)) * (oLookupImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)));
+                    if(fCorrSurfDenom>1e-10)
+                        oDesc(nRowIdx,nColIdx,nLUTIdx) = exp(-(1-(oLookupImage_AdaptiveMeanMix(nOffsetRowIdx,nOffsetColIdx)-oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx))/fCorrSurfDenom)/0.5f);
+                    else
+                        oDesc(nRowIdx,nColIdx,nLUTIdx) = 1.0f;
+                }
+                else
+                    oDesc(nRowIdx,nColIdx,nLUTIdx) = 0.0f;
+            }
+        }
+	}
+	for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
         for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
             float fNorm = 0;
             for(int nLUTIdx=0; nLUTIdx<DASC_SIZE; ++nLUTIdx)

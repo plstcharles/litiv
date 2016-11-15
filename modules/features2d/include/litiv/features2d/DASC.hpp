@@ -294,4 +294,6 @@ protected:
 };
 #endif
 
-cv::Mat dasc(const cv::Mat& _oImage, float fSigma_s=2.0f, float fSigma_r=0.2f, size_t nIters=1, bool bPrefilter=true);
+cv::Mat dasc_rf(const cv::Mat& oImage, float fSigma_s=2.0f, float fSigma_r=0.2f, size_t nIters=1, bool bPrefilter=true);
+
+cv::Mat dasc_gf(const cv::Mat& oImage, size_t nRadius=2, float fEpsilon=0.09, size_t nSubSamplFrac=1, bool bPrefilter=true);
