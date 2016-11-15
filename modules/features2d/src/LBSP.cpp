@@ -61,6 +61,14 @@ int LBSP::descriptorType() const {
     return CV_16U;
 }
 
+int LBSP::defaultNorm() const {
+    return cv::NORM_HAMMING;
+}
+
+bool LBSP::empty() const {
+    return m_oRefImage.empty();
+}
+
 bool LBSP::isUsingRelThreshold() const {
     return !m_bOnlyUsingAbsThreshold;
 }
@@ -172,10 +180,21 @@ void LBSP::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<s
         compute2(voImageCollection[i], vvoPointCollection[i], voDescCollection[i]);
 }
 
-void LBSP::computeImpl(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const {
+void LBSP::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMask, std::vector<cv::KeyPoint>& voKeypoints, cv::OutputArray _oDescriptors, bool bUseProvidedKeypoints) {
+    cv::Mat oImage = _oImage.getMat();
     lvAssert_(!oImage.empty(),"input image must be non-empty");
+    cv::Mat oMask = _oMask.getMat();
+    lvAssert_(oMask.empty() || (!oMask.empty() && oMask.size()==oImage.size()),"mask must be empty or of equal size to the input image");
+    cv::Mat oDescriptors = _oDescriptors.getMat();
+    if(!bUseProvidedKeypoints) {
+        voKeypoints.clear();
+        for(int nRowIdx=0; nRowIdx<oImage.rows; ++nRowIdx)
+            for(int nColIdx=0; nColIdx<oImage.cols; ++nColIdx)
+                voKeypoints.emplace_back(cv::Point2f((float)nColIdx,(float)nRowIdx),(float)PATCH_SIZE);
+    }
     cv::KeyPointsFilter::runByImageBorder(voKeypoints,oImage.size(),PATCH_SIZE/2);
-    cv::KeyPointsFilter::runByKeypointSize(voKeypoints,std::numeric_limits<float>::epsilon());
+    if(!oMask.empty())
+        cv::KeyPointsFilter::runByPixelsMask(voKeypoints,oMask);
     if(voKeypoints.empty()) {
         oDescriptors.release();
         return;

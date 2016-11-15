@@ -30,7 +30,7 @@
     For more details on the different parameters, see G.-A. Bilodeau et al, "Change Detection in Feature Space Using Local
     Binary Similarity Patterns", in CRV 2013.
 */
-class LBSP : public cv::Feature2D {
+class LBSP : public cv::DescriptorExtractor {
 public:
     /// constructor 1, threshold = absolute intensity 'similarity' threshold used when computing comparisons
     LBSP(size_t nThreshold);
@@ -44,10 +44,15 @@ public:
     virtual void write(cv::FileStorage&) const;
     /// sets the 'reference' image to be used for inter-frame comparisons (note: if no image is set or if the image is empty, the algorithm will default back to intra-frame comparisons)
     virtual void setReference(const cv::Mat&);
-    /// returns the current descriptor size, in bytes
-    virtual int descriptorSize() const;
-    /// returns the current descriptor data type
-    virtual int descriptorType() const;
+    /// returns the current descriptor size, in bytes (overrides cv::DescriptorExtractor's)
+    virtual int descriptorSize() const override;
+    /// returns the current descriptor data type (overrides cv::DescriptorExtractor's)
+    virtual int descriptorType() const override;
+    /// returns the default norm type to use with this descriptor (overrides cv::DescriptorExtractor's)
+    virtual int defaultNorm() const override;
+    /// return true if detector object is empty (overrides cv::DescriptorExtractor's)
+    virtual bool empty() const override;
+
     /// returns whether this extractor is using a relative threshold or not
     virtual bool isUsingRelThreshold() const;
     /// returns the current relative threshold used for comparisons (-1 = invalid/not used)
@@ -238,11 +243,17 @@ public:
     }
 
 protected:
-    /// classic 'compute' implementation, based on the regular DescriptorExtractor::computeImpl arguments & expected output
-    virtual void computeImpl(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const;
+    /// hides default keypoint detection impl (this class is a descriptor extractor only)
+    using cv::DescriptorExtractor::detect;
+    /// classic 'compute' implementation, based on DescriptorExtractor's arguments & expected output
+    virtual void detectAndCompute(cv::InputArray oImage, cv::InputArray oMask, std::vector<cv::KeyPoint>& voKeypoints, cv::OutputArray oDescriptors, bool bUseProvidedKeypoints=false) override;
+    /// defines whether to only use the absolute distance threshold internally or not
     const bool m_bOnlyUsingAbsThreshold;
+    /// internal relative distance threshold value
     const float m_fRelThreshold;
+    /// internal absolute distance threshold value
     const size_t m_nThreshold;
+    /// internal reference image for inter-LBSP computation
     cv::Mat m_oRefImage;
 
     // arrays below do not rely on std::array to avoid multi-dim init problems w/ static constexpr in header files
