@@ -89,6 +89,24 @@ namespace lv {
             return isLocalMaximum_Diagonal<nHalfWinSize,false>(anMap,nMapColStep,nMapRowStep);
     }
 
+    /// computes a local intensity difference map for a given image
+    template<size_t nRowOffset, size_t nColOffset, typename TValue>
+    inline void localDiff(const cv::Mat_<TValue>& oImage, cv::Mat_<TValue>& oLocalDiff) {
+        lvDbgAssert(!oImage.empty() && (nColOffset>0 || nRowOffset>0));
+        oLocalDiff.create(oImage.size());
+        for(int nRowIdx=int(nRowOffset); nRowIdx<oImage.rows; ++nRowIdx)
+            for(int nColIdx=int(nColOffset); nColIdx<oImage.cols; ++nColIdx)
+                oLocalDiff(nRowIdx,nColIdx) = oImage(nRowIdx-nRowOffset,nColIdx-nColOffset)-oImage(nRowIdx,nColIdx);
+        lv::unroll<nRowOffset>([&](size_t nRowIdx){
+            for(int nColIdx=0; nColIdx<oImage.cols; ++nColIdx)
+                oLocalDiff((int)nRowIdx,nColIdx) = (TValue)0;
+        });
+        lv::unroll<nColOffset>([&](size_t nColIdx){
+            for(int nRowIdx=nRowOffset; nRowIdx<oImage.rows; ++nRowIdx)
+                oLocalDiff(nRowIdx,(int)nColIdx) = (TValue)0;
+        });
+    }
+
 } // namespace lv
 
 template<int nWinSize>
