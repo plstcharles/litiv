@@ -39,7 +39,7 @@ target_include_directories(litiv_imgproc
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
         "$<INSTALL_INTERFACE:include/>"
 )
-target_link_libraries(litiv_imgproc litiv_features2d)
+target_link_libraries(litiv_imgproc litiv_features2d litiv_utils)
 
 install(TARGETS litiv_imgproc
     RUNTIME DESTINATION bin
