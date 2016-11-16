@@ -435,6 +435,27 @@ namespace lv {
         return static_transform(a,b,lOp,IndexSequenceGenerator<nArraySize>{});
     }
 
+    template<typename TValue, typename TFunc>
+    constexpr auto static_reduce(const TValue* begin, const TValue* end, TFunc lOp) -> decltype(lOp(*begin,*begin)) {
+        return (begin>=end)?TValue{}:(begin+1)==end?*begin:lOp(*begin,static_reduce(begin+1,end,lOp));
+    }
+
+    template<size_t nArrayIdx, typename TValue, size_t nArraySize, typename TFunc>
+    constexpr std::enable_if_t<nArrayIdx==0,TValue> _static_reduce_impl(const std::array<TValue,nArraySize>& a, TFunc) {
+        return std::get<nArrayIdx>(a);
+    }
+
+    template<size_t nArrayIdx, typename TValue, size_t nArraySize, typename TFunc>
+    constexpr std::enable_if_t<(nArrayIdx>0),std::result_of_t<TFunc(const TValue&,const TValue&)>> _static_reduce_impl(const std::array<TValue,nArraySize>& a, TFunc lOp) {
+        return lOp(std::get<nArrayIdx>(a),_static_reduce_impl<nArrayIdx-1>(a,lOp));
+    }
+
+    template<typename TValue, size_t nArraySize, typename TFunc>
+    constexpr auto static_reduce(const std::array<TValue,nArraySize>& a, TFunc lOp) -> decltype(lOp(std::get<0>(a),std::get<0>(a))) {
+        static_assert(nArraySize>0,"need non-empty array for reduction");
+        return _static_reduce_impl<nArraySize-1>(a,lOp);
+    }
+
     template<typename... TMutexes>
     struct unlock_guard {
         explicit unlock_guard(TMutexes&... aMutexes) noexcept :
