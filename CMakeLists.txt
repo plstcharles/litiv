@@ -164,6 +164,7 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
     add_definitions(-Wall)
     add_definitions(-Wfatal-errors)
     add_definitions(-fPIC) # @@@@ for shared libs only?
+    add_definitions(-ftemplate-depth=900) # already default for gcc, but not for clang
     check_function_exists(aligned_alloc USE_STL_ALIGNED_ALLOC)
     if(NOT USE_STL_ALIGNED_ALLOC)
         set(USE_STL_ALIGNED_ALLOC 0 CACHE INTERNAL "Have function aligned_alloc")
