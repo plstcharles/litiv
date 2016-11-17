@@ -313,13 +313,6 @@ namespace lv {
         return (Tr)(bool(nBits&(1<<n))<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,Tr>(nBits,n-1):(Tr)0);
     }
 
-    template<size_t... anIndices>
-    struct IndexSequence {};
-    template<size_t nNextIndex, size_t... anIndices>
-    struct IndexSequenceGenerator : IndexSequenceGenerator<nNextIndex-1,nNextIndex-1,anIndices...> {};
-    template<size_t... anIndices>
-    struct IndexSequenceGenerator<0,anIndices...> : IndexSequence<anIndices...> {};
-
     struct StopWatch {
         StopWatch() {tick();}
         inline void tick() {m_nTick = std::chrono::high_resolution_clock::now();}
@@ -416,23 +409,23 @@ namespace lv {
     };
 
     template<typename TTuple, typename TFunc, size_t... anIndices>
-    inline void for_each(TTuple&& t, TFunc f, IndexSequence<anIndices...>) {
+    inline void for_each(TTuple&& t, TFunc f, std::index_sequence<anIndices...>) {
         auto l = {(f(std::get<anIndices>(t)),0)...};
     }
 
     template<typename... TTupleTypes, typename TFunc>
     inline void for_each_in_tuple(const std::tuple<TTupleTypes...>& t, TFunc f) {
-        for_each(t,f,IndexSequenceGenerator<sizeof...(TTupleTypes)>{});
+        for_each(t,f,std::make_index_sequence<sizeof...(TTupleTypes)>{});
     }
 
     template<typename TValue, size_t nArraySize, typename TFunc, size_t... anIndices>
-    constexpr auto static_transform(const std::array<TValue,nArraySize>& a, const std::array<TValue,nArraySize>& b, TFunc lOp, IndexSequence<anIndices...>) -> std::array<decltype(lOp(a[0],b[0])),nArraySize> {
+    constexpr auto static_transform(const std::array<TValue,nArraySize>& a, const std::array<TValue,nArraySize>& b, TFunc lOp, std::index_sequence<anIndices...>) -> std::array<decltype(lOp(a[0],b[0])),nArraySize> {
         return {lOp(a[anIndices],b[anIndices])...};
     }
 
     template<typename TValue, size_t nArraySize, typename TFunc>
-    constexpr auto static_transform(const std::array<TValue,nArraySize>& a, const std::array<TValue,nArraySize>& b, TFunc lOp) -> decltype(static_transform(a,b,lOp,IndexSequenceGenerator<nArraySize>{})) {
-        return static_transform(a,b,lOp,IndexSequenceGenerator<nArraySize>{});
+    constexpr auto static_transform(const std::array<TValue,nArraySize>& a, const std::array<TValue,nArraySize>& b, TFunc lOp) -> decltype(static_transform(a,b,lOp,std::make_index_sequence<nArraySize>{})) {
+        return static_transform(a,b,lOp,std::make_index_sequence<nArraySize>{});
     }
 
     template<typename TValue, typename TFunc>
