@@ -39,9 +39,9 @@ public:
     /// default destructor
     virtual ~LBSP();
     /// loads extractor params from the specified file node @@@@ not impl
-    virtual void read(const cv::FileNode&);
+    virtual void read(const cv::FileNode&) override;
     /// writes extractor params to the specified file storage @@@@ not impl
-    virtual void write(cv::FileStorage&) const;
+    virtual void write(cv::FileStorage&) const override;
     /// sets the 'reference' image to be used for inter-frame comparisons (note: if no image is set or if the image is empty, the algorithm will default back to intra-frame comparisons)
     virtual void setReference(const cv::Mat&);
     /// returns the current descriptor size, in bytes (overrides cv::DescriptorExtractor's)

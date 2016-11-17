@@ -36,9 +36,9 @@ public:
     /// default destructor
     virtual ~DASC();
     /// loads extractor params from the specified file node @@@@ not impl
-    virtual void read(const cv::FileNode&);
+    virtual void read(const cv::FileNode&) override;
     /// writes extractor params to the specified file storage @@@@ not impl
-    virtual void write(cv::FileStorage&) const;
+    virtual void write(cv::FileStorage&) const override;
     /// returns the current descriptor size, in bytes (overrides cv::DescriptorExtractor's)
     virtual int descriptorSize() const override;
     /// returns the current descriptor data type (overrides cv::DescriptorExtractor's)
