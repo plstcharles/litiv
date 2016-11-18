@@ -36,14 +36,10 @@ public:
     LBSP(size_t nThreshold);
     /// constructor 2, threshold = relative intensity 'similarity' threshold used when computing comparisons
     LBSP(float fRelThreshold, size_t nThresholdOffset=0);
-    /// default destructor
-    virtual ~LBSP();
     /// loads extractor params from the specified file node @@@@ not impl
     virtual void read(const cv::FileNode&) override;
     /// writes extractor params to the specified file storage @@@@ not impl
     virtual void write(cv::FileStorage&) const override;
-    /// sets the 'reference' image to be used for inter-frame comparisons (note: if no image is set or if the image is empty, the algorithm will default back to intra-frame comparisons)
-    virtual void setReference(const cv::Mat&);
     /// returns the current descriptor size, in bytes (overrides cv::DescriptorExtractor's)
     virtual int descriptorSize() const override;
     /// returns the current descriptor data type (overrides cv::DescriptorExtractor's)
@@ -53,12 +49,14 @@ public:
     /// return true if detector object is empty (overrides cv::DescriptorExtractor's)
     virtual bool empty() const override;
 
+    /// sets the 'reference' image to be used for inter-frame comparisons (note: if no image is set or if the image is empty, the algorithm will default back to intra-frame comparisons)
+    void setReference(const cv::Mat&);
     /// returns whether this extractor is using a relative threshold or not
-    virtual bool isUsingRelThreshold() const;
+    bool isUsingRelThreshold() const;
     /// returns the current relative threshold used for comparisons (-1 = invalid/not used)
-    virtual float getRelThreshold() const;
+    float getRelThreshold() const;
     /// returns the current absolute threshold used for comparisons (-1 = invalid/not used)
-    virtual size_t getAbsThreshold() const;
+    size_t getAbsThreshold() const;
 
     /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix
     void compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const;

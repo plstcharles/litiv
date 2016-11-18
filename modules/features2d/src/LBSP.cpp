@@ -38,19 +38,12 @@ LBSP::LBSP(float fRelThreshold, size_t nThresholdOffset) :
     lvAssert_(m_fRelThreshold>=0,"relative LBSP threshold must be non-negative");
 }
 
-LBSP::~LBSP() {}
-
 void LBSP::read(const cv::FileNode& /*fn*/) {
     // ... = fn["..."];
 }
 
 void LBSP::write(cv::FileStorage& /*fs*/) const {
     //fs << "..." << ...;
-}
-
-void LBSP::setReference(const cv::Mat& img) {
-    lvAssert_(img.empty() || ((img.type()==CV_8UC1 || img.type()==CV_8UC3) && img.isContinuous()),"reference image must be non-empty, or of type 8UC1/8UC3 and continuous");
-    m_oRefImage = img;
 }
 
 int LBSP::descriptorSize() const {
@@ -67,6 +60,11 @@ int LBSP::defaultNorm() const {
 
 bool LBSP::empty() const {
     return m_oRefImage.empty();
+}
+
+void LBSP::setReference(const cv::Mat& img) {
+    lvAssert_(img.empty() || ((img.type()==CV_8UC1 || img.type()==CV_8UC3) && img.isContinuous()),"reference image must be non-empty, or of type 8UC1/8UC3 and continuous");
+    m_oRefImage = img;
 }
 
 bool LBSP::isUsingRelThreshold() const {

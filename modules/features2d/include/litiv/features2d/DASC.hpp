@@ -33,8 +33,6 @@ public:
     explicit DASC(float fSigma_s/*=2.0f*/, float fSigma_r/*=0.2f*/, size_t nIters=1, bool bPreProcess=true);
     /// constructor for guided filtering-based DASC feature descriptor extractor (see original paper for parameter info)
     explicit DASC(size_t nRadius/*=2*/, float fEpsilon/*=0.09f*/, size_t nSubSamplFrac=1, bool bPreProcess=true);
-    /// default destructor
-    virtual ~DASC();
     /// loads extractor params from the specified file node @@@@ not impl
     virtual void read(const cv::FileNode&) override;
     /// writes extractor params to the specified file storage @@@@ not impl
@@ -49,9 +47,9 @@ public:
     virtual bool empty() const override;
 
     /// returns whether this extractor will use the recursive filtering approach (true) or the guided filtering approach (false) for description
-    virtual bool isUsingRF() const;
+    bool isUsingRF() const;
     /// returns whether input images will be preprocessed using a gaussian filter or not
-    virtual bool isPreProcessing() const;
+    bool isPreProcessing() const;
 
     /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix, and all image points are described
     void compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescriptors);

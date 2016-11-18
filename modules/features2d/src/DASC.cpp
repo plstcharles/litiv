@@ -76,8 +76,6 @@ DASC::DASC(size_t nRadius, float fEpsilon, size_t nSubSamplFrac, bool bPreProces
     lvAssert_(nRadius>0 && fEpsilon>0.0f && nSubSamplFrac>0 && nRadius>=nSubSamplFrac,"invalid parameter(s)");
 }
 
-DASC::~DASC() {}
-
 void DASC::read(const cv::FileNode& /*fn*/) {
     // ... = fn["..."];
 }
