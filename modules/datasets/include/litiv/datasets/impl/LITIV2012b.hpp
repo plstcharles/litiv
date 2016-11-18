@@ -41,7 +41,7 @@ namespace lv {
                 IDataset_<eDatasetType_VideoRegistr,Dataset_VideoRegistr_LITIV2012b,eEvalImpl>(
                         "LITIV 2012b (CVPRW2015 update)",
                         lv::datasets::getDatasetsRootPath()+"litiv/litiv2012b/",
-                        lv::datasets::getDatasetsRootPath()+"litiv/litiv2012b/"+lv::AddDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getDatasetsRootPath()+"litiv/litiv2012b/"+lv::addDirSlashIfMissing(sOutputDirName),
                         "homography",
                         ".cvmat",
                         getWorkBatchDirNames(),
@@ -76,8 +76,7 @@ namespace lv {
         virtual void parseData() override final {
             lvDbgExceptionWatch;
             /* @@@@ old bsds500 below
-            std::vector<std::string> vsImgPaths;
-            lv::GetFilesFromDir(m_sDatasetPath,vsImgPaths);
+            std::vector<std::string> vsImgPaths = lv::getFilesFromDir(m_sDatasetPath);
             bool bFoundScript=false, bFoundGTFile=false;
             const std::string sGTFilePrefix("hand_segmented_");
             const size_t nInputFileNbDecimals = 5;
@@ -109,8 +108,8 @@ namespace lv {
             m_pEvaluator = std::shared_ptr<EvaluatorBase>(new BinarySegmEvaluator("WALLFLOWER_EVAL"));
             */
             /* @@@@ old default below
-            lv::GetFilesFromDir(m_sDatasetPath,m_vsInputImagePaths);
-            lv::FilterFilePaths(m_vsInputImagePaths,{},{".jpg"});
+            m_vsInputImagePaths = lv::getFilesFromDir(m_sDatasetPath);
+            lv::filterFilePaths(m_vsInputImagePaths,{},{".jpg"});
             if(m_vsInputImagePaths.empty())
                 throw std::runtime_error(cv::format("Image set '%s' did not possess any jpg image file",sSetName.c_str()));
             for(size_t n=0; n<m_vsInputImagePaths.size(); ++n) {
@@ -160,8 +159,7 @@ namespace lv {
                 cv::Mat oImage;
                 if(m_eDatasetID==Dataset_BSDS500_edge_train || m_eDatasetID==Dataset_BSDS500_edge_train_valid || m_eDatasetID==Dataset_BSDS500_edge_train_valid_test) {
                     if(m_vsGTImagePaths.size()>nImageIdx) {
-                        std::vector<std::string> vsTempPaths;
-                        lv::GetFilesFromDir(m_vsGTImagePaths[nImageIdx],vsTempPaths);
+                        std::vector<std::string> vsTempPaths = lv::getFilesFromDir(m_vsGTImagePaths[nImageIdx]);
                         lvAssert(!vsTempPaths.empty());
                         cv::Mat oTempRefGTImage = cv::imread(vsTempPaths[0],cv::IMREAD_GRAYSCALE);
                         lvAssert(!oTempRefGTImage.empty());

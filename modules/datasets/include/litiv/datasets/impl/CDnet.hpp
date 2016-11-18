@@ -40,7 +40,7 @@ namespace lv {
                 IDataset_<eDatasetTask,DatasetSource_Video,Dataset_CDnet,lv::getDatasetEval<eDatasetTask,Dataset_CDnet>(),eEvalImpl>(
                         b2014?"CDnet 2014":"CDnet 2012",
                         lv::datasets::getDatasetsRootPath()+std::string(b2014?"CDNet2014/dataset/":"CDNet/dataset/"),
-                        lv::datasets::getDatasetsRootPath()+std::string(b2014?"CDNet2014/":"CDNet/")+lv::AddDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getDatasetsRootPath()+std::string(b2014?"CDNet2014/":"CDNet/")+lv::addDirSlashIfMissing(sOutputDirName),
                         "bin",
                         ".png",
                         getWorkBatchDirNames(b2014),
@@ -76,14 +76,13 @@ namespace lv {
         virtual void parseData() override final {
             lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
-            std::vector<std::string> vsSubDirs;
-            lv::GetSubDirsFromDir(this->getDataPath(),vsSubDirs);
+            const std::vector<std::string> vsSubDirs = lv::getSubDirsFromDir(this->getDataPath());
             auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"groundtruth");
             auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"input");
             if(gtDir==vsSubDirs.end() || inputDir==vsSubDirs.end())
                 lvError_("CDnet sequence '%s' did not possess the required groundtruth and input directories",this->getName().c_str());
-            lv::GetFilesFromDir(*inputDir,this->m_vsInputPaths);
-            lv::GetFilesFromDir(*gtDir,this->m_vsGTPaths);
+            this->m_vsInputPaths = lv::getFilesFromDir(*inputDir);
+            this->m_vsGTPaths = lv::getFilesFromDir(*gtDir);
             this->m_nFrameCount = this->m_vsInputPaths.size();
             lvAssert_(this->m_nFrameCount>0,"could not find any input frames");
             if(this->m_vsGTPaths.size()!=this->m_vsInputPaths.size())

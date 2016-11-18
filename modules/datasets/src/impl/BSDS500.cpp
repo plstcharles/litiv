@@ -614,7 +614,7 @@ void lv::DataReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::wr
 #else //(!USE_BSDS500_BENCHMARK)
     const std::string sOutputPath = getOutputPath()+"../"+getName()+"_homemade_eval/";
 #endif //(!USE_BSDS500_BENCHMARK)
-    lv::CreateDirIfNotExist(sOutputPath);
+    lv::createDirIfNotExist(sOutputPath);
     std::ofstream oImageScoresOutput(sOutputPath+"/eval_bdry_img.txt");
     if(oImageScoresOutput.is_open())
         for(size_t n=0; n<oMetrics.voBestImageScores.size(); ++n)

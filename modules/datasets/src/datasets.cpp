@@ -17,12 +17,12 @@
 
 #include "litiv/datasets.hpp"
 
-std::string g_sDatasetsRootPath = lv::AddDirSlashIfMissing(EXTERNAL_DATA_ROOT);
+std::string g_sDatasetsRootPath = lv::addDirSlashIfMissing(EXTERNAL_DATA_ROOT);
 
 const std::string& lv::datasets::getDatasetsRootPath() {
     return g_sDatasetsRootPath;
 }
 
 void lv::datasets::setDatasetsRootPath(const std::string& sNewPath) {
-    g_sDatasetsRootPath = lv::AddDirSlashIfMissing(sNewPath);
+    g_sDatasetsRootPath = lv::addDirSlashIfMissing(sNewPath);
 }

@@ -48,7 +48,7 @@ namespace lv {
         ) :
                 IDataset_<eDatasetTask,DatasetSource_ImageArray,Dataset_Middlebury2005_demo,DatasetEval_None,eEvalImpl>(
                         "middlebury2005",
-                        lv::AddDirSlashIfMissing(SAMPLES_DATA_ROOT)+"middlebury2005_dataset_ex/",
+                        lv::addDirSlashIfMissing(SAMPLES_DATA_ROOT)+"middlebury2005_dataset_ex/",
                         sOutputDirName,
                         "",
                         "",

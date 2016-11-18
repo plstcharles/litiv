@@ -39,7 +39,7 @@ namespace lv {
                 IDataset_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1,lv::getDatasetEval<eDatasetTask,Dataset_PETS2001D3TC1>(),eEvalImpl>(
                         "PETS2001 Dataset#3",
                         lv::datasets::getDatasetsRootPath()+"PETS2001/DATASET3/",
-                        lv::datasets::getDatasetsRootPath()+"PETS2001/DATASET3/"+lv::AddDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getDatasetsRootPath()+"PETS2001/DATASET3/"+lv::addDirSlashIfMissing(sOutputDirName),
                         "bin",
                         ".png",
                         getWorkBatchDirNames(),
@@ -65,18 +65,16 @@ namespace lv {
             lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
             // @@@@ untested since 2016/01 refactoring
-            std::vector<std::string> vsVideoSeqPaths;
-            lv::GetFilesFromDir(this->getDataPath(),vsVideoSeqPaths);
+            const std::vector<std::string> vsVideoSeqPaths = lv::getFilesFromDir(this->getDataPath());
             if(vsVideoSeqPaths.size()!=1)
                 lvError_("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one video sequence file)",this->getName().c_str());
-            std::vector<std::string> vsGTSubdirPaths;
-            lv::GetSubDirsFromDir(this->getDataPath(),vsGTSubdirPaths);
+            const std::vector<std::string> vsGTSubdirPaths = lv::getSubDirsFromDir(this->getDataPath());
             if(vsGTSubdirPaths.size()!=1)
                 lvError_("PETS2006D3TC1 sequence '%s': bad subdirectory for parsing (should contain only one GT subdir)",this->getName().c_str());
             this->m_voVideoReader.open(vsVideoSeqPaths[0]);
             if(!this->m_voVideoReader.isOpened())
                 lvError_("PETS2006D3TC1 sequence '%s': video file could not be opened",this->getName().c_str());
-            lv::GetFilesFromDir(vsGTSubdirPaths[0],this->m_vsGTPaths);
+            this->m_vsGTPaths = lv::getFilesFromDir(vsGTSubdirPaths[0]);
             if(this->m_vsGTPaths.empty())
                 lvError_("PETS2006D3TC1 sequence '%s': did not possess any valid GT frames",this->getName().c_str());
             const std::string sGTFilePrefix("image_");

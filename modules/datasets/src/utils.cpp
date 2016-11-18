@@ -143,13 +143,13 @@ inline const lv::IDataHandler& getRootNodeHelper(const lv::IDataHandler& oStart)
 
 lv::DataHandler::DataHandler(const std::string& sBatchName, const std::string& sRelativePath, const IDataHandler& oParent) :
         m_sBatchName(sBatchName),
-        m_sRelativePath(lv::AddDirSlashIfMissing(sRelativePath)),
-        m_sDataPath(getRootNodeHelper(oParent).getDataPath()+lv::AddDirSlashIfMissing(sRelativePath)),
-        m_sOutputPath(getRootNodeHelper(oParent).getOutputPath()+lv::AddDirSlashIfMissing(sRelativePath)),
+        m_sRelativePath(lv::addDirSlashIfMissing(sRelativePath)),
+        m_sDataPath(getRootNodeHelper(oParent).getDataPath()+lv::addDirSlashIfMissing(sRelativePath)),
+        m_sOutputPath(getRootNodeHelper(oParent).getOutputPath()+lv::addDirSlashIfMissing(sRelativePath)),
         m_bForcingGrayscale(lv::string_contains_token(sRelativePath,oParent.getGrayscaleDirTokens())),
         m_oParent(oParent),
         m_oRoot(getRootNodeHelper(oParent)) {
-    lv::CreateDirIfNotExist(m_sOutputPath);
+    lv::createDirIfNotExist(m_sOutputPath);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -240,9 +240,8 @@ void lv::DataGroupHandler::parseData() {
     m_bIsBare = true;
     if(!lv::string_contains_token(getName(),getSkippedDirTokens())) {
         std::cout << "\tParsing directory '" << getDataPath() << "' for work group '" << getName() << "'..." << std::endl;
-        std::vector<std::string> vsWorkBatchPaths;
         // by default, all subdirs are considered work batch directories (if none, the category directory itself is a batch, and 'bare')
-        lv::GetSubDirsFromDir(getDataPath(),vsWorkBatchPaths);
+        const std::vector<std::string> vsWorkBatchPaths = lv::getSubDirsFromDir(getDataPath());
         if(vsWorkBatchPaths.empty())
             m_vpBatches.push_back(createWorkBatch(getName(),getRelativePath()));
         else {
@@ -251,7 +250,7 @@ void lv::DataGroupHandler::parseData() {
                 const size_t nLastSlashPos = sPathIter.find_last_of("/\\");
                 const std::string sNewBatchName = nLastSlashPos==std::string::npos?sPathIter:sPathIter.substr(nLastSlashPos+1);
                 if(!lv::string_contains_token(sNewBatchName,getSkippedDirTokens()))
-                    m_vpBatches.push_back(createWorkBatch(sNewBatchName,getRelativePath()+lv::AddDirSlashIfMissing(sNewBatchName)));
+                    m_vpBatches.push_back(createWorkBatch(sNewBatchName,getRelativePath()+lv::addDirSlashIfMissing(sNewBatchName)));
             }
         }
     }
@@ -738,7 +737,7 @@ void lv::IDataProducer_<lv::DatasetSource_Video>::parseData() {
     cv::Mat oTempImg;
     m_voVideoReader.open(getDataPath());
     if(!m_voVideoReader.isOpened()) {
-        lv::GetFilesFromDir(getDataPath(),m_vsInputPaths);
+        m_vsInputPaths = lv::getFilesFromDir(getDataPath());
         if(m_vsInputPaths.size()>1) {
             oTempImg = cv::imread(m_vsInputPaths[0]);
             m_nFrameCount = m_vsInputPaths.size();
@@ -975,8 +974,8 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_Image>::getRawGT(size_t nPacketIdx)
 
 void lv::IDataProducer_<lv::DatasetSource_Image>::parseData() {
     lvDbgExceptionWatch;
-    lv::GetFilesFromDir(getDataPath(),m_vsInputPaths);
-    lv::FilterFilePaths(m_vsInputPaths,{},{".jpg",".png",".bmp"});
+    m_vsInputPaths = lv::getFilesFromDir(getDataPath());
+    lv::filterFilePaths(m_vsInputPaths,{},{".jpg",".png",".bmp"});
     if(m_vsInputPaths.empty())
         lvError_("Set '%s' did not possess any jpg/png/bmp image file",getName().c_str());
     m_bIsInputConstantSize = true;
@@ -1524,8 +1523,8 @@ lv::DatasetHandler::DatasetHandler(const std::string& sDatasetName,const std::st
                                    const std::vector<std::string>& vsSkippedDirTokens,const std::vector<std::string>& vsGrayscaleDirTokens,bool bSaveOutput,
                                    bool bUseEvaluator,bool bForce4ByteDataAlign,double dScaleFactor) :
         m_sDatasetName(sDatasetName),
-        m_sDatasetPath(lv::AddDirSlashIfMissing(sDatasetDirPath)),
-        m_sOutputPath(lv::AddDirSlashIfMissing(sOutputDirPath)),
+        m_sDatasetPath(lv::addDirSlashIfMissing(sDatasetDirPath)),
+        m_sOutputPath(lv::addDirSlashIfMissing(sOutputDirPath)),
         m_sOutputNamePrefix(sOutputNamePrefix),
         m_sOutputNameSuffix(sOutputNameSuffix),
         m_vsWorkBatchDirs(vsWorkBatchDirs),

@@ -26,7 +26,7 @@
 #include <direct.h>
 #include <psapi.h>
 template<class T>
-void SafeRelease(T **ppT) {if(*ppT) {(*ppT)->Release();*ppT = nullptr;}}
+void SafeRelease(T** ppT) {if(*ppT) {(*ppT)->Release(); *ppT = nullptr;}}
 #if !USE_KINECTSDK_STANDALONE
 #include <Kinect.h>
 #endif //(!USE_KINECTSDK_STANDALONE)
@@ -42,15 +42,24 @@ void SafeRelease(T **ppT) {if(*ppT) {(*ppT)->Release();*ppT = nullptr;}}
 
 namespace lv {
 
-    std::string GetCurrentWorkDirPath();
-    std::string AddDirSlashIfMissing(const std::string& sDirPath);
-    void GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths);
-    void GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths);
-    void FilterFilePaths(std::vector<std::string>& vsFilePaths, const std::vector<std::string>& vsRemoveTokens, const std::vector<std::string>& vsKeepTokens);
-    bool CreateDirIfNotExist(const std::string& sDirPath);
-    std::fstream CreateBinFileWithPrealloc(const std::string& sFilePath, size_t nPreallocBytes, bool bZeroInit=false);
-    void RegisterAllConsoleSignals(void(*lHandler)(int));
-    size_t GetCurrentPhysMemBytesUsed();
+    /// returns the executable's current working directory path; relies on getcwd, and may return an empty string
+    std::string getCurrentWorkDirPath();
+    /// adds a forward slash to the given directory path if it ends without one, with handling for special cases (useful for path concatenation)
+    std::string addDirSlashIfMissing(const std::string& sDirPath);
+    /// returns a sorted list of all files located at a given directory path
+    std::vector<std::string> getFilesFromDir(const std::string& sDirPath);
+    /// returns a sorted list of all subdirectories located at a given directory path
+    std::vector<std::string> getSubDirsFromDir(const std::string& sDirPath);
+    /// filters a list of paths using string tokens; if a token is found in a path, it is removed/kept from the list
+    void filterFilePaths(std::vector<std::string>& vsFilePaths, const std::vector<std::string>& vsRemoveTokens, const std::vector<std::string>& vsKeepTokens);
+    /// creates a local directory at the given path if one does not already exist (does not work recursively)
+    bool createDirIfNotExist(const std::string& sDirPath);
+    /// creates a binary file at the specified location, and fills it with unspecified/zero data bytes (useful for critical/real-time stream writing without continuous reallocation)
+    std::fstream createBinFileWithPrealloc(const std::string& sFilePath, size_t nPreallocBytes, bool bZeroInit=false);
+    /// registers the SIGINT, SIGTERM, and SIGBREAK (if available) console signals to the given handler
+    void registerAllConsoleSignals(void(*lHandler)(int));
+    /// returns the amount of physical memory currently used on the system
+    size_t getCurrentPhysMemBytesUsed();
 
     template<typename T, std::size_t nByteAlign>
     class AlignedMemAllocator {
@@ -119,6 +128,7 @@ namespace lv {
         bool operator==(const AlignedMemAllocator<T,nByteAlign>&) const {return true;}
     };
 
+    /// returns whether a value is NaN (required due to non-portable msvc signature)
     template<typename T>
     inline bool isnan(T dVal) {
 #ifdef _MSC_VER // needed for portability...
@@ -238,6 +248,8 @@ namespace lv {
     };
 #endif //ndef(_JointOrientation_)
 #endif //USE_KINECTSDK_STANDALONE
+
+    /// portable structure containing kinect body data for one frame
     struct KinectBodyFrame {
         bool bIsValid;
         TIMESPAN nTimeStamp;
@@ -263,6 +275,7 @@ namespace lv {
 
 namespace std { // extending std
 
+    /// helper alias; std-friendly version of vector with N-byte aligned memory allocator
     template<typename T, size_t N>
     using aligned_vector = vector<T,lv::AlignedMemAllocator<T,N>>;
 

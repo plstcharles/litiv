@@ -53,7 +53,7 @@ namespace lv {
                 IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016,lv::getDatasetEval<eDatasetTask,Dataset_VAPtrimod2016>(),eEvalImpl>(
                         "VAP-trimodal2016",
                         lv::datasets::getDatasetsRootPath()+"vap/rgbdt-stereo/",
-                        lv::datasets::getDatasetsRootPath()+"vap/rgbdt-stereo/results/"+lv::AddDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getDatasetsRootPath()+"vap/rgbdt-stereo/results/"+lv::addDirSlashIfMissing(sOutputDirName),
                         "bin",
                         ".png",
                         getWorkBatchDirNames(),
@@ -119,8 +119,7 @@ namespace lv {
         virtual void parseData() override final {
             lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
-            std::vector<std::string> vsSubDirs;
-            lv::GetSubDirsFromDir(this->getDataPath(),vsSubDirs);
+            const std::vector<std::string> vsSubDirs = lv::getSubDirsFromDir(this->getDataPath());
             auto psDepthGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"depthMasks");
             auto psDepthDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"SyncD");
             auto psRGBGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"rgbMasks");
@@ -168,8 +167,7 @@ namespace lv {
             //    stream[1] = thermal (default:?)
             //    stream[2] = depth   (default:?) --- if enabled only
             //
-            std::vector<std::string> vsRGBPaths;
-            lv::GetFilesFromDir(*psRGBDir,vsRGBPaths);
+            const std::vector<std::string> vsRGBPaths = lv::getFilesFromDir(*psRGBDir);
             if(vsRGBPaths.empty() || cv::imread(vsRGBPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected RGB data",this->getName().c_str());
             this->m_vvsInputPaths.resize(vsRGBPaths.size());
@@ -195,8 +193,7 @@ namespace lv {
                 cv::remap(oRGBROI.clone(),oRGBROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_NEAREST);
             this->m_vInputROIs[0] = oRGBROI.clone();
             this->m_vGTROIs[0] = oRGBROI.clone();
-            std::vector<std::string> vsRGBGTPaths;
-            lv::GetFilesFromDir(*psRGBGTDir,vsRGBGTPaths);
+            const std::vector<std::string> vsRGBGTPaths = lv::getFilesFromDir(*psRGBGTDir);
             if(vsRGBGTPaths.empty() || cv::imread(vsRGBGTPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected RGB gt data",this->getName().c_str());
             this->m_vvsGTPaths.resize(vsRGBGTPaths.size());
@@ -216,8 +213,7 @@ namespace lv {
                 lvAssert(nInputPacketIdx<vsTempInputFileNames.size());
                 this->m_mGTIndexLUT[nInputPacketIdx] = nGTPacketIdx; // direct gt path index to frame index mapping
             }
-            std::vector<std::string> vsThermalPaths;
-            lv::GetFilesFromDir(*psThermalDir,vsThermalPaths);
+            const std::vector<std::string> vsThermalPaths = lv::getFilesFromDir(*psThermalDir);
             if(vsThermalPaths.empty() || cv::imread(vsThermalPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected thermal data",this->getName().c_str());
             if(vsThermalPaths.size()!=vsRGBPaths.size())
@@ -237,8 +233,7 @@ namespace lv {
                 cv::remap(oThermalROI.clone(),oThermalROI,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_NEAREST);
             this->m_vInputROIs[1] = oThermalROI.clone();
             this->m_vGTROIs[1] = oThermalROI.clone();
-            std::vector<std::string> vsThermalGTPaths;
-            lv::GetFilesFromDir(*psThermalGTDir,vsThermalGTPaths);
+            const std::vector<std::string> vsThermalGTPaths = lv::getFilesFromDir(*psThermalGTDir);
             if(vsThermalGTPaths.empty() || cv::imread(vsThermalGTPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected thermal gt data",this->getName().c_str());
             if(vsThermalGTPaths.size()!=vsRGBGTPaths.size())
@@ -246,8 +241,7 @@ namespace lv {
             for(size_t nGTPacketIdx=0; nGTPacketIdx<vsThermalGTPaths.size(); ++nGTPacketIdx)
                 this->m_vvsGTPaths[nGTPacketIdx][1] = vsThermalGTPaths[nGTPacketIdx];
             if(this->m_bLoadDepth) {
-                std::vector<std::string> vsDepthPaths;
-                lv::GetFilesFromDir(*psDepthDir,vsDepthPaths);
+                const std::vector<std::string> vsDepthPaths = lv::getFilesFromDir(*psDepthDir);
                 if(vsDepthPaths.empty() || cv::imread(vsDepthPaths[0]).size()!=oImageSize)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess expected depth data",this->getName().c_str());
                 if(vsDepthPaths.size()!=vsRGBPaths.size())
@@ -265,8 +259,7 @@ namespace lv {
                     cv::resize(oDepthROI,oDepthROI,this->m_vInputSizes[2],0,0,cv::INTER_NEAREST);
                 this->m_vInputROIs[2] = oDepthROI.clone();
                 this->m_vGTROIs[2] = oDepthROI.clone();
-                std::vector<std::string> vsDepthGTPaths;
-                lv::GetFilesFromDir(*psDepthGTDir,vsDepthGTPaths);
+                const std::vector<std::string> vsDepthGTPaths = lv::getFilesFromDir(*psDepthGTDir);
                 if(vsDepthGTPaths.empty() || cv::imread(vsDepthGTPaths[0]).size()!=oImageSize)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess expected depth gt data",this->getName().c_str());
                 if(vsDepthGTPaths.size()!=vsRGBGTPaths.size())

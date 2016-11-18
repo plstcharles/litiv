@@ -40,7 +40,7 @@
 
 int main(int, char**) { // this sample uses no command line argument
     try { // its always a good idea to scope your app's top level in some try/catch blocks!
-        std::cout << "\nNote: a directory will be created at '" << lv::GetCurrentWorkDirPath() << "'\n" << std::endl;
+        std::cout << "\nNote: a directory will be created at '" << lv::getCurrentWorkDirPath() << "'\n" << std::endl;
 
 #if USE_MIDDLEBURY_SPECIALIZATION
 
@@ -131,7 +131,7 @@ int main(int, char**) { // this sample uses no command line argument
         //
         DatasetType::Ptr pDataset = DatasetType::create(
             "Custom Dataset Example",
-            lv::AddDirSlashIfMissing(SAMPLES_DATA_ROOT)+"custom_dataset_ex/",
+            lv::addDirSlashIfMissing(SAMPLES_DATA_ROOT)+"custom_dataset_ex/",
             "results_test",
             "edge_mask_",
             ".png",

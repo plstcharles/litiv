@@ -17,18 +17,18 @@
 
 #include "litiv/utils/platform.hpp"
 
-std::string lv::GetCurrentWorkDirPath() {
-    static std::array<char,FILENAME_MAX> s_acCurrentPath = {};
+std::string lv::getCurrentWorkDirPath() {
+    std::array<char,FILENAME_MAX> acCurrentPath = {};
 #if defined(_MSC_VER)
-    if(!_getcwd(s_acCurrentPath.data(),int(s_acCurrentPath.size()-1)))
+    if(!_getcwd(acCurrentPath.data(),int(acCurrentPath.size()-1)))
 #else //(!defined(_MSC_VER))
-    if(!getcwd(s_acCurrentPath.data(),s_acCurrentPath.size()-1))
+    if(!getcwd(acCurrentPath.data(),acCurrentPath.size()-1))
 #endif //(!defined(_MSC_VER))
         return std::string();
-    return std::string(s_acCurrentPath.data());
+    return std::string(acCurrentPath.data());
 }
 
-std::string lv::AddDirSlashIfMissing(const std::string& sDirPath) {
+std::string lv::addDirSlashIfMissing(const std::string& sDirPath) {
     if(sDirPath.empty())
         return std::string();
     if(sDirPath=="." || sDirPath=="..")
@@ -39,8 +39,8 @@ std::string lv::AddDirSlashIfMissing(const std::string& sDirPath) {
     return sDirPath;
 }
 
-void lv::GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& vsFilePaths) {
-    vsFilePaths.clear();
+std::vector<std::string> lv::getFilesFromDir(const std::string& sDirPath) {
+    std::vector<std::string> vsFilePaths;
 #if defined(_MSC_VER)
     WIN32_FIND_DATA ffd;
     std::wstring dir(sDirPath.begin(),sDirPath.end());
@@ -63,7 +63,7 @@ void lv::GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& 
                 if(!(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
                     std::wstring file(ffd.cFileName);
                     if(file!=L"Thumbs.db")
-                        vsFilePaths.push_back(AddDirSlashIfMissing(sDirPath)+std::string(file.begin(),file.end()));
+                        vsFilePaths.push_back(addDirSlashIfMissing(sDirPath)+std::string(file.begin(),file.end()));
                 }
                 ret = FindNextFile(h, &ffd);
             }
@@ -81,7 +81,7 @@ void lv::GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& 
             rewinddir(dp);
             while((dirp = readdir(dp))!=nullptr) {
                 struct stat sb;
-                std::string sFullPath = AddDirSlashIfMissing(sDirPath)+dirp->d_name;
+                std::string sFullPath = addDirSlashIfMissing(sDirPath)+dirp->d_name;
                 int ret = stat(sFullPath.c_str(),&sb);
                 if(!ret && S_ISREG(sb.st_mode)
                         && strcmp(dirp->d_name,"Thumbs.db"))
@@ -92,10 +92,11 @@ void lv::GetFilesFromDir(const std::string& sDirPath, std::vector<std::string>& 
         closedir(dp);
     }
 #endif //(!defined(_MSC_VER))
+    return vsFilePaths;
 }
 
-void lv::GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>& vsSubDirPaths) {
-    vsSubDirPaths.clear();
+std::vector<std::string> lv::getSubDirsFromDir(const std::string& sDirPath) {
+    std::vector<std::string> vsSubDirPaths;
 #if defined(_MSC_VER)
     WIN32_FIND_DATA ffd;
     std::wstring dir(sDirPath.begin(),sDirPath.end());
@@ -118,7 +119,7 @@ void lv::GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>
                 if(ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
                     std::wstring subdir(ffd.cFileName);
                     if(subdir!=L"." && subdir!=L"..")
-                        vsSubDirPaths.push_back(AddDirSlashIfMissing(sDirPath)+std::string(subdir.begin(),subdir.end()));
+                        vsSubDirPaths.push_back(addDirSlashIfMissing(sDirPath)+std::string(subdir.begin(),subdir.end()));
                 }
                 ret = FindNextFile(h, &ffd);
             }
@@ -136,7 +137,7 @@ void lv::GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>
             rewinddir(dp);
             while((dirp = readdir(dp))!=nullptr) {
                 struct stat sb;
-                std::string sFullPath = AddDirSlashIfMissing(sDirPath)+dirp->d_name;
+                std::string sFullPath = addDirSlashIfMissing(sDirPath)+dirp->d_name;
                 int ret = stat(sFullPath.c_str(),&sb);
                 if(!ret && S_ISDIR(sb.st_mode)
                         && strcmp(dirp->d_name,".")
@@ -148,9 +149,10 @@ void lv::GetSubDirsFromDir(const std::string& sDirPath, std::vector<std::string>
         closedir(dp);
     }
 #endif //(!defined(_MSC_VER))
+    return vsSubDirPaths;
 }
 
-void lv::FilterFilePaths(std::vector<std::string>& vsFilePaths, const std::vector<std::string>& vsRemoveTokens, const std::vector<std::string>& vsKeepTokens) {
+void lv::filterFilePaths(std::vector<std::string>& vsFilePaths, const std::vector<std::string>& vsRemoveTokens, const std::vector<std::string>& vsKeepTokens) {
     // note: remove tokens take precedence over keep tokens, and no keep tokens means all are kept by default
     std::vector<std::string> vsResultFilePaths;
     vsResultFilePaths.reserve(vsFilePaths.size());
@@ -163,7 +165,7 @@ void lv::FilterFilePaths(std::vector<std::string>& vsFilePaths, const std::vecto
     vsFilePaths = vsResultFilePaths;
 }
 
-bool lv::CreateDirIfNotExist(const std::string& sDirPath) {
+bool lv::createDirIfNotExist(const std::string& sDirPath) {
 #if defined(_MSC_VER)
     std::wstring dir(sDirPath.begin(),sDirPath.end());
     return CreateDirectory(dir.c_str(),NULL)!=ERROR_PATH_NOT_FOUND;
@@ -176,7 +178,7 @@ bool lv::CreateDirIfNotExist(const std::string& sDirPath) {
 #endif //(!defined(_MSC_VER))
 }
 
-std::fstream lv::CreateBinFileWithPrealloc(const std::string & sFilePath, size_t nPreallocBytes, bool bZeroInit) {
+std::fstream lv::createBinFileWithPrealloc(const std::string & sFilePath, size_t nPreallocBytes, bool bZeroInit) {
     std::fstream ssFile(sFilePath,std::ios::out|std::ios::in|std::ios::ate|std::ios::binary);
     if(!ssFile.is_open())
         ssFile.open(sFilePath,std::ios::out|std::ios::binary);
@@ -199,7 +201,7 @@ std::fstream lv::CreateBinFileWithPrealloc(const std::string & sFilePath, size_t
     return ssFile;
 }
 
-void lv::RegisterAllConsoleSignals(void(*lHandler)(int)) {
+void lv::registerAllConsoleSignals(void(*lHandler)(int)) {
     signal(SIGINT,lHandler);
     signal(SIGTERM,lHandler);
 #ifdef SIGBREAK
@@ -207,7 +209,7 @@ void lv::RegisterAllConsoleSignals(void(*lHandler)(int)) {
 #endif //def(SIGBREAK)
 }
 
-size_t lv::GetCurrentPhysMemBytesUsed() {
+size_t lv::getCurrentPhysMemBytesUsed() {
 #if defined(_MSC_VER)
     PROCESS_MEMORY_COUNTERS info;
     GetProcessMemoryInfo(GetCurrentProcess(),&info,sizeof(info));

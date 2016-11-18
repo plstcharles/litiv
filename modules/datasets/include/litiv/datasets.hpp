@@ -170,9 +170,9 @@ namespace lv {
             this->m_vpBatches.clear();
             this->m_bIsBare = false; // always false by default for top level
             if(!this->getOutputPath().empty())
-                lv::CreateDirIfNotExist(this->getOutputPath());
+                lv::createDirIfNotExist(this->getOutputPath());
             for(const auto& sPathIter : this->getWorkBatchDirs())
-                this->m_vpBatches.push_back(createWorkBatch(sPathIter,lv::AddDirSlashIfMissing(sPathIter)));
+                this->m_vpBatches.push_back(createWorkBatch(sPathIter,lv::addDirSlashIfMissing(sPathIter)));
         }
     protected:
         /// full dataset constructor (copied from DatasetHandler to avoid msvc2015 bug); parameters are passed through lv::datasets::create<...>(...), and may be caught/simplified by a specialization

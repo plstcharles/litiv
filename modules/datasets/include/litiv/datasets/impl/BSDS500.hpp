@@ -50,7 +50,7 @@ namespace lv {
                 IDataset_<eDatasetTask,DatasetSource_Image,Dataset_BSDS500,lv::getDatasetEval<eDatasetTask,Dataset_BSDS500>(),eEvalImpl>(
                         "BSDS500",
                         lv::datasets::getDatasetsRootPath()+"BSDS500/data/images/",
-                        lv::datasets::getDatasetsRootPath()+"BSDS500/BSR/"+lv::AddDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getDatasetsRootPath()+"BSDS500/BSR/"+lv::addDirSlashIfMissing(sOutputDirName),
                         "",
                         ".png",
                         getWorkBatchDirNames(eType),
@@ -86,11 +86,11 @@ namespace lv {
         virtual void parseData() override final {
             lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
-            lv::GetFilesFromDir(this->getDataPath(),this->m_vsInputPaths);
-            lv::FilterFilePaths(this->m_vsInputPaths,{},{".jpg",".png",".bmp"});
+            this->m_vsInputPaths = lv::getFilesFromDir(this->getDataPath());
+            lv::filterFilePaths(this->m_vsInputPaths,{},{".jpg",".png",".bmp"});
             if(this->m_vsInputPaths.empty())
                 lvError_("BSDS500 set '%s' did not possess any jpg/png/bmp image file",this->getName().c_str());
-            lv::GetSubDirsFromDir(this->getRoot()->getDataPath()+"../groundTruth_bdry_images/"+this->getRelativePath(),this->m_vsGTPaths);
+            this->m_vsGTPaths = lv::getSubDirsFromDir(this->getRoot()->getDataPath()+"../groundTruth_bdry_images/"+this->getRelativePath());
             if(this->m_vsGTPaths.empty())
                 lvError_("BSDS500 set '%s' did not possess any groundtruth image folders",this->getName().c_str());
             else if(this->m_vsGTPaths.size()!=this->m_vsInputPaths.size())
@@ -99,9 +99,8 @@ namespace lv {
             for(size_t n=0; n<this->m_vsInputPaths.size(); ++n)
                 this->m_mGTIndexLUT[n] = n;
             // make sure folders are non-empty, and folders & images are similarliy ordered
-            std::vector<std::string> vsTempPaths;
             for(size_t nImageIdx=0; nImageIdx<this->m_vsGTPaths.size(); ++nImageIdx) {
-                lv::GetFilesFromDir(this->m_vsGTPaths[nImageIdx],vsTempPaths);
+                const std::vector<std::string> vsTempPaths = lv::getFilesFromDir(this->m_vsGTPaths[nImageIdx]);
                 lvAssert(!vsTempPaths.empty());
                 const size_t nLastInputSlashPos = this->m_vsInputPaths[nImageIdx].find_last_of("/\\");
                 const std::string sInputFullName = nLastInputSlashPos==std::string::npos?this->m_vsInputPaths[nImageIdx]:this->m_vsInputPaths[nImageIdx].substr(nLastInputSlashPos+1);
@@ -118,7 +117,7 @@ namespace lv {
             for(size_t nImageIdx=0; nImageIdx<this->m_vsInputPaths.size(); ++nImageIdx) {
                 const cv::Mat oCurrInput = cv::imread(this->m_vsInputPaths[nImageIdx],this->isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
                 lvAssert(!oCurrInput.empty() && (oCurrInput.size()==cv::Size(321,481) || oCurrInput.size()==cv::Size(481,321)));
-                lv::GetFilesFromDir(this->m_vsGTPaths[nImageIdx],vsTempPaths);
+                const std::vector<std::string> vsTempPaths = lv::getFilesFromDir(this->m_vsGTPaths[nImageIdx]);
                 lvAssert(!vsTempPaths.empty());
                 this->m_vInputSizes.push_back(cv::Size(int(oCurrInput.cols*dScale),int(oCurrInput.rows*dScale)));
                 this->m_vGTSizes.push_back(cv::Size(int(oCurrInput.cols*dScale),int(oCurrInput.rows*vsTempPaths.size()*dScale)));
@@ -136,8 +135,7 @@ namespace lv {
             if(this->m_mGTIndexLUT.count(nIdx)) {
                 const size_t nGTIdx = this->m_mGTIndexLUT[nIdx];
                 if(nGTIdx<this->m_vsGTPaths.size()) {
-                    std::vector<std::string> vsTempPaths;
-                    lv::GetFilesFromDir(this->m_vsGTPaths[nIdx],vsTempPaths);
+                    const std::vector<std::string> vsTempPaths = lv::getFilesFromDir(this->m_vsGTPaths[nIdx]);
                     lvAssert(!vsTempPaths.empty());
                     cv::Mat oTempRefGTImage = cv::imread(vsTempPaths[0],cv::IMREAD_GRAYSCALE);
                     lvAssert(!oTempRefGTImage.empty() && (oTempRefGTImage.size()==cv::Size(481,321) || oTempRefGTImage.size()==cv::Size(321,481)));

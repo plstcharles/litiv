@@ -39,7 +39,7 @@ namespace lv {
                 IDataset_<eDatasetTask,DatasetSource_Video,Dataset_Wallflower,lv::getDatasetEval<eDatasetTask,Dataset_Wallflower>(),eEvalImpl>(
                         "Wallflower",
                         lv::datasets::getDatasetsRootPath()+"Wallflower/dataset/",
-                        lv::datasets::getDatasetsRootPath()+"Wallflower/"+lv::AddDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getDatasetsRootPath()+"Wallflower/"+lv::addDirSlashIfMissing(sOutputDirName),
                         "bin",
                         ".png",
                         getWorkBatchDirNames(),
@@ -65,8 +65,7 @@ namespace lv {
             lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
             // @@@@ untested since 2016/01 refactoring
-            std::vector<std::string> vsImgPaths;
-            lv::GetFilesFromDir(this->getDataPath(),vsImgPaths);
+            const std::vector<std::string> vsImgPaths = lv::getFilesFromDir(this->getDataPath());
             bool bFoundScript=false, bFoundGTFile=false;
             const std::string sGTFilePrefix("hand_segmented_");
             const size_t nInputFileNbDecimals = 5;

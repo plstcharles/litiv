@@ -28,7 +28,7 @@ cv::DisplayHelperPtr cv::DisplayHelper::create(const std::string& sDisplayName, 
 cv::DisplayHelper::DisplayHelper(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) :
         m_sDisplayName(sDisplayName),
         m_oMaxDisplaySize(oMaxSize),
-        m_oFS(lv::AddDirSlashIfMissing(sDebugFSDirPath)+sDisplayName+".yml",cv::FileStorage::WRITE),
+        m_oFS(lv::addDirSlashIfMissing(sDebugFSDirPath)+sDisplayName+".yml",cv::FileStorage::WRITE),
         m_oLastDisplaySize(cv::Size(0,0)),
         m_oLastTileSize(cv::Size(0,0)),
         m_bContinuousUpdates(false),
