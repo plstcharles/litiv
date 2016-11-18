@@ -61,9 +61,10 @@ namespace lv {
     /// returns the amount of physical memory currently used on the system
     size_t getCurrentPhysMemBytesUsed();
 
+    /// defines an stl-friendly aligned memory allocator to be used in container classes
     template<typename T, std::size_t nByteAlign>
-    class AlignedMemAllocator {
-    public:
+    struct AlignedMemAllocator {
+        static_assert(nByteAlign>0,"byte alignment must be a non-null value");
         typedef T value_type;
         typedef T* pointer;
         typedef T& reference;
@@ -72,17 +73,19 @@ namespace lv {
         typedef std::size_t size_type;
         typedef std::ptrdiff_t difference_type;
         typedef std::true_type propagate_on_container_move_assignment;
+        typedef AlignedMemAllocator<T,nByteAlign> this_type;
         template<typename T2>
         struct rebind {typedef AlignedMemAllocator<T2,nByteAlign> other;};
-    public:
         inline AlignedMemAllocator() noexcept {}
         template<typename T2>
         inline AlignedMemAllocator(const AlignedMemAllocator<T2,nByteAlign>&) noexcept {}
-        inline ~AlignedMemAllocator() throw() {}
-        inline pointer address(reference r) {return std::addressof(r);}
-        inline const_pointer address(const_reference r) const noexcept {return std::addressof(r);}
+        template<typename T2>
+        inline this_type& operator=(const AlignedMemAllocator<T2,nByteAlign>&) noexcept {return *this;}
+        inline ~AlignedMemAllocator() noexcept {}
+        static inline pointer address(reference r) {return std::addressof(r);}
+        static inline const_pointer address(const_reference r) noexcept {return std::addressof(r);}
 #ifdef _MSC_VER
-        inline pointer allocate(size_type n) {
+        static inline pointer allocate(size_type n) {
             const size_type alignment = static_cast<size_type>(nByteAlign);
             size_t alloc_size = n*sizeof(value_type);
             if((alloc_size%alignment)!=0) {
@@ -94,10 +97,10 @@ namespace lv {
                 throw std::bad_alloc();
             return reinterpret_cast<pointer>(ptr);
         }
-        inline void deallocate(pointer p, size_type) noexcept {_aligned_free(p);}
-        inline void destroy(pointer p) {p->~value_type();p;}
+        static inline void deallocate(pointer p, size_type) noexcept {_aligned_free(p);}
+        static inline void destroy(pointer p) {p->~value_type();p;}
 #else //(!def(_MSC_VER))
-        inline pointer allocate(size_type n) {
+        static inline pointer allocate(size_type n) {
             const size_type alignment = static_cast<size_type>(nByteAlign);
             size_t alloc_size = n*sizeof(value_type);
             if((alloc_size%alignment)!=0) {
@@ -117,15 +120,15 @@ namespace lv {
                 throw std::bad_alloc();
             return reinterpret_cast<pointer>(ptr);
         }
-        inline void deallocate(pointer p, size_type) noexcept {free(p);}
-        inline void destroy(pointer p) {p->~value_type();}
+        static inline void deallocate(pointer p, size_type) noexcept {free(p);}
+        static inline void destroy(pointer p) {p->~value_type();}
 #endif //(!def(_MSC_VER))
         template<typename T2, typename... Targs>
-        inline void construct(T2* p, Targs&&... args) {::new(reinterpret_cast<void*>(p)) T2(std::forward<Targs>(args)...);}
-        inline void construct(pointer p, const value_type& wert) {new(p) value_type(wert);}
-        inline size_type max_size() const noexcept {return (size_type(~0)-size_type(nByteAlign))/sizeof(value_type);}
-        bool operator!=(const AlignedMemAllocator<T,nByteAlign>& other) const {return !(*this==other);}
-        bool operator==(const AlignedMemAllocator<T,nByteAlign>&) const {return true;}
+        static inline void construct(T2* p, Targs&&... args) {::new(reinterpret_cast<void*>(p)) T2(std::forward<Targs>(args)...);}
+        static inline void construct(pointer p, const value_type& wert) {new(p) value_type(wert);}
+        static inline size_type max_size() noexcept {return (size_type(~0)-size_type(nByteAlign))/sizeof(value_type);}
+        bool operator!=(const AlignedMemAllocator<T,nByteAlign>& other) const noexcept {return !(*this==other);}
+        bool operator==(const AlignedMemAllocator<T,nByteAlign>&) const noexcept {return true;}
     };
 
     /// returns whether a value is NaN (required due to non-portable msvc signature)
@@ -278,6 +281,12 @@ namespace std { // extending std
     /// helper alias; std-friendly version of vector with N-byte aligned memory allocator
     template<typename T, size_t N>
     using aligned_vector = vector<T,lv::AlignedMemAllocator<T,N>>;
+    /// helper alias; std-friendly version of vector with 16-byte aligned memory allocator
+    template<typename T>
+    using vec16a = vector<T,lv::AlignedMemAllocator<T,16>>;
+    /// helper alias; std-friendly version of vector with 32-byte aligned memory allocator
+    template<typename T>
+    using vec32a = vector<T,lv::AlignedMemAllocator<T,32>>;
 
 #if !defined(_MSC_VER) && __cplusplus<=201103L // make_unique is missing from C++11 (at least on GCC)
     template<typename T, typename... Targs>
