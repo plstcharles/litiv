@@ -500,7 +500,7 @@ void vptz::Evaluator::SetupTesting(int nTestIdx) {
         m_pCamera->Set(PTZ_CAM_HORI_ANGLE,m_bgtInitHoriAngle);
         m_pCamera->Set(PTZ_CAM_VERTI_ANGLE,m_bgtInitVertiAngle);
     }
-    catch(const vptz::Exception&) {
+    catch(const lv::Exception&) {
         if(m_bUsingMultiTestSet)
             m_oOutputEvalFS << "}";
         m_bReady = m_bQueried = false;
@@ -519,7 +519,7 @@ void vptz::Evaluator::BeginTesting() {
     try {
         m_pCamera->BeginPlaying(m_nFirstTestFrameIdx);
     }
-    catch(const vptz::Exception&) {
+    catch(const lv::Exception&) {
         if(m_bUsingMultiTestSet)
             m_oOutputEvalFS << "}";
         m_bReady = m_bQueried = false;

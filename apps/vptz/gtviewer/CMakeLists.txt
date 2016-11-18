@@ -23,7 +23,7 @@ if(USE_GLSL)
 
         add_executable(vptz_gtviewer src/main.cpp)
         set_target_properties(vptz_gtviewer PROPERTIES FOLDER "vptz")
-        target_compile_definitions(vptz_gtviewer PRIVATE VPTZ_IMPORT)
+        target_compile_definitions(vptz_gtviewer PRIVATE LV_IMPORT_API)
         target_link_libraries(vptz_gtviewer vptz)
 
         install(TARGETS vptz_gtviewer

@@ -54,7 +54,7 @@ endif(USE_GLSL)
 
 add_library(litiv_utils STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
 set_target_properties(litiv_utils PROPERTIES FOLDER "modules")
-#target_compile_definitions(litiv_utils PRIVATE BUILDING_DLL)
+#target_compile_definitions(litiv_utils PRIVATE LV_EXPORT_API)
 #if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
 #    # disables C4251 + C4275 to allow STL/template classes to be used in exported classes/members
 #    # need to eliminate these using pImpl idiom in exported classes to add abstraction layer @@@@

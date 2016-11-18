@@ -29,7 +29,7 @@ add_files(INCLUDE_FILES
 
 add_library(litiv_features2d STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
 set_target_properties(litiv_features2d PROPERTIES FOLDER "modules")
-#target_compile_definitions(litiv_features2d PRIVATE BUILDING_DLL)
+#target_compile_definitions(litiv_features2d PRIVATE LV_EXPORT_API)
 target_include_directories(litiv_features2d
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"

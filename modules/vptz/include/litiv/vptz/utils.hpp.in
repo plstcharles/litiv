@@ -17,115 +17,13 @@
 
 #pragma once
 
-#ifndef __CMAKE_VAR_DEF_DROP_IN__
-#define __CMAKE_VAR_DEF_DROP_IN__
-// required for cmake cached variable drop-in
-#define ON        1
-#define TRUE      1
-#define OFF       0
-#define FALSE     0
-#endif //__CMAKE_VAR_DEF_DROP_IN__
-
-#define USE_VPTZ_STANDALONE       @USE_VPTZ_STANDALONE@
+#include "litiv/vptz/defines.hpp"
 
 //
 //       -- Below are code snippets taken from the LITIV framework --
 //
 
 #if USE_VPTZ_STANDALONE
-
-#define XSTR_CONCAT(s1,s2) XSTR_CONCAT_BASE(s1,s2)
-#define XSTR_CONCAT_BASE(s1,s2) s1##s2
-#define XSTR(s) XSTR_BASE(s)
-#define XSTR_BASE(s) #s
-
-#define TIMER_TIC(x) int64 XSTR_CONCAT(__nCPUTimerTick_,x) = cv::getTickCount()
-#define TIMER_TOC(x) int64 XSTR_CONCAT(__nCPUTimerVal_,x) = cv::getTickCount()-XSTR_CONCAT(__nCPUTimerTick_,x)
-#define TIMER_ELAPSED_MS(x) (double(XSTR_CONCAT(__nCPUTimerVal_,x))/(cv::getTickFrequency()/1000))
-
-#define lvError(msg) throw lv::Exception(std::string("[lvError: ")+msg+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__)
-#define lvError_(msg,...) throw lv::Exception(std::string("[lvError: ")+msg+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
-#define lvAssert(expr) {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);}
-#define lvAssert_(expr,msg) {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);}
-#define lvAssert__(expr,msg,...) {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);}
-#define glErrorCheck { \
-    GLenum __errn = glGetError(); \
-    if(__errn!=GL_NO_ERROR) \
-        lvError_("glErrorCheck failed [code=%d, msg=%s]",__errn,gluErrorString(__errn)); \
-}
-#ifdef _DEBUG
-#define lvDbgAssert(expr) lvAssert(expr)
-#define lvDbgAssert_(expr,msg) lvAssert_(expr,msg)
-#define lvDbgAssert__(expr,msg,...) lvAssert__(expr,msg,__VA_ARGS__)
-#define lvDbgExceptionWatch lv::UncaughtExceptionLogger XSTR_CONCAT(__logger,__LINE__)(__PRETTY_FUNCTION__,__FILE__,__LINE__)
-#define glDbgErrorCheck glErrorCheck
-#else //ndefined(_DEBUG)
-#define lvDbgAssert(expr)
-#define lvDbgAssert_(expr,msg)
-#define lvDbgAssert__(expr,msg,...)
-#define lvDbgExceptionWatch
-#define glDbgErrorCheck
-#endif //ndefined(_DEBUG)
-#define lvIgnore(x) (void)(x)
-#define UNUSED(x) lvIgnore(x)
-
-#ifndef D2R
-#define D2R(d) ((d)*(M_PI/180.0))
-#endif //ndefined(D2R)
-#ifndef R2D
-#define R2D(r) ((r)*(180.0/M_PI))
-#endif //ndefined(R2D)
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif //ndefined(__STDC_FORMAT_MACROS)
-#ifndef _USE_MATH_DEFINES
-#define _USE_MATH_DEFINES
-#endif //ndefined(_USE_MATH_DEFINES)
-
-#if defined(_MSC_VER)
-#ifndef __PRETTY_FUNCTION__
-#define __PRETTY_FUNCTION__ __FUNCSIG__
-#endif //ndefined(__PRETTY_FUNCTION__)
-#ifndef NOMINMAX
-#define NOMINMAX // go ahead, try using std::numeric_limits<...>::max() with the 'max' macro enabled
-#endif //ndefined(NOMINMAX)
-#ifndef __func__
-#define __func__ __FUNCTION__
-#endif //ndefined(__func__)
-#define lvAssertHR(expr) [](HRESULT hr){if(FAILED(hr)) lvError_("HR assertion failed ("#expr" = 0x%x), %ws",hr,_com_error(hr).ErrorMessage());}(expr)
-#ifdef _DEBUG
-#define lvDbgAssertHR(expr) lvAssertHR(expr)
-#else //ndefined(_DEBUG)
-#define lvDbgAssertHR(expr)
-#endif //ndefined(_DEBUG)
-#if _MSC_VER<1900 // need >= MSVC 2015 (v140) toolchain
-#error "This project requires full C++11 support (including constexpr and SFINAE)."
-#endif //_MSC_VER<1900
-#else //ndefined(_MSC_VER)
-#if __cplusplus<201103L
-#error "This project requires full C++11 support (including constexpr and SFINAE)."
-#endif //__cplusplus<201103L
-#endif //ndefined(_MSC_VER)
-#define DEFAULT_NB_THREADS  1
-#if DEFAULT_NB_THREADS<1
-#error "Bad default number of threads specified."
-#endif //DEFAULT_NB_THREADS<1
-
-#if defined(_MSC_VER)
-#include <windows.h>
-#if (defined(VPTZ_EXPORT) && defined(VPTZ_IMPORT))
-#error "API Lib import/export config error"
-#endif //(defined(VPTZ_EXPORT) && defined(VPTZ_IMPORT))
-#if defined(VPTZ_EXPORT)
-#define VPTZ_API __declspec(dllexport)
-#elif defined(VPTZ_IMPORT)
-#define VPTZ_API __declspec(dllimport)
-#else //ndef(VPTZ_...)
-#define VPTZ_API
-#endif //ndef(VPTZ_...)
-#else //ndef(_MSC_VER)
-#define VPTZ_API
-#endif //ndef(_MSC_VER)
 
 #define VPTZ_VERSION        @LITIV_VERSION@
 #define VPTZ_VERSION_STR    XSTR(LITIV_VERSION)
@@ -134,10 +32,9 @@
 #define VPTZ_VERSION_PATCH  @LITIV_VERSION_PATCH@
 #define VPTZ_VERSION_SHA1   "@GIT_SHA1@"
 
-#define HAVE_GLSL           @USE_GLSL@
-#define HAVE_GLFW           @USE_GLFW@
-#define HAVE_FREEGLUT       @USE_FREEGLUT@
-
+#if defined(_MSC_VER)
+#include <windows.h>
+#endif //ndef(_MSC_VER)
 #include <cmath>
 #include <mutex>
 #include <vector>
@@ -180,10 +77,6 @@ struct glutWindowDeleter {
 };
 #endif //HAVE_FREEGLUT
 
-#define TARGET_GL_VER_MAJOR  3
-#define TARGET_GL_VER_MINOR  0
-#define GLEW_EXPERIMENTAL    1
-
 namespace lv {
 
     struct UncaughtExceptionLogger {
@@ -225,7 +118,7 @@ namespace lv {
 
         class Context {
         public:
-            Context(const cv::Size& oWinSize, const std::string& sWinName, bool bHide=true, size_t nGLVerMajor=TARGET_GL_VER_MAJOR, size_t nGLVerMinor=TARGET_GL_VER_MINOR) {
+            Context(const cv::Size& oWinSize, const std::string& sWinName, bool bHide=true, size_t nGLVerMajor=3, size_t nGLVerMinor=0) {
 #if HAVE_GLFW
                 std::call_once(getInitFlag(),[](){
                     if(glfwInit()==GL_FALSE)
@@ -271,7 +164,7 @@ namespace lv {
         private:
             static void initGLEW(size_t nGLVerMajor, size_t nGLVerMinor) {
                 glErrorCheck;
-                glewExperimental = GLEW_EXPERIMENTAL?GL_TRUE:GL_FALSE;
+                glewExperimental = GL_TRUE;
                 const GLenum glewerrn = glewInit();
                 if(glewerrn!=GLEW_OK)
                     lvError_("Failed to init GLEW [code=%d, msg=%s]",glewerrn,glewGetErrorString(glewerrn));

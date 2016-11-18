@@ -22,174 +22,208 @@
 
 #pragma once
 
-#ifndef __CMAKE_VAR_DEF_DROP_IN__
-#define __CMAKE_VAR_DEF_DROP_IN__
-// required for cmake cached variable drop-in
-#define ON        1
-#define TRUE      1
-#define OFF       0
-#define FALSE     0
-#endif //__CMAKE_VAR_DEF_DROP_IN__
+#ifndef __CMAKE_VAR_DEFS__
+    #define __CMAKE_VAR_DEFS__
+    #define ON    1
+    #define TRUE  1
+    #define OFF   0
+    #define FALSE 0
+#endif //ndef(__CMAKE_VAR_DEFS__)
 
-#define XSTR_CONCAT(s1,s2) XSTR_CONCAT_BASE(s1,s2)
-#define XSTR_CONCAT_BASE(s1,s2) s1##s2
-#define XSTR(s) XSTR_BASE(s)
-#define XSTR_BASE(s) #s
+#ifndef __COMMON_LIBS_DEFS__
+    #define __COMMON_LIBS_DEFS__
+    #ifndef D2R
+        #define D2R(d) ((d)*(M_PI/180.0))
+    #endif //ndef(D2R)
+    #ifndef R2D
+        #define R2D(r) ((r)*(180.0/M_PI))
+    #endif //ndef(R2D)
+    #ifndef __STDC_FORMAT_MACROS
+        #define __STDC_FORMAT_MACROS
+    #endif //ndef(__STDC_FORMAT_MACROS)
+    #ifndef _USE_MATH_DEFINES
+        #define _USE_MATH_DEFINES
+    #endif //ndef(_USE_MATH_DEFINES)
+    #ifndef __XSTR_DEFINES__
+        #define __XSTR_DEFINES__
+        #define XSTR_CONCAT(s1,s2) XSTR_CONCAT_BASE(s1,s2)
+        #define XSTR_CONCAT_BASE(s1,s2) s1##s2
+        #define XSTR(s) XSTR_BASE(s)
+        #define XSTR_BASE(s) #s
+    #endif //ndef(__XSTR_DEFINES__)
+    #if defined(_MSC_VER)
+        #if _MSC_VER<1900 // need >= MSVC 2015 (v140) toolchain
+            #error "This project requires full C++14 support (including constexpr and SFINAE)."
+        #endif //_MSC_VER<1900
+        #ifndef __PRETTY_FUNCTION__
+            #define __PRETTY_FUNCTION__ __FUNCSIG__
+        #endif //ndef(__PRETTY_FUNCTION__)
+        #ifndef NOMINMAX
+            #define NOMINMAX // go ahead, try using std::numeric_limits<...>::max() with the 'max' macro enabled
+        #endif //ndef(NOMINMAX)
+        #ifndef __func__
+            #define __func__ __FUNCTION__
+        #endif //ndef(__func__)
+    #else //ndef(_MSC_VER)
+        #if __cplusplus<201402L
+            #error "This project requires full C++14 support (including constexpr and SFINAE)."
+        #endif //__cplusplus<201402L
+    #endif //ndef(_MSC_VER)
+    #ifndef TIMER_DEFS
+        #define TIMER_DEFS
+        #define TIMER_TIC(x) int64 XSTR_CONCAT(__nCPUTimerTick_,x) = cv::getTickCount()
+        #define TIMER_TOC(x) int64 XSTR_CONCAT(__nCPUTimerVal_,x) = cv::getTickCount()-XSTR_CONCAT(__nCPUTimerTick_,x)
+        #define TIMER_ELAPSED_MS(x) (double(XSTR_CONCAT(__nCPUTimerVal_,x))/(cv::getTickFrequency()/1000))
+    #endif //ndef(TIMER_DEFS)
+#endif //ndef(__COMMON_LIBS_DEFS__)
 
-#define TIMER_TIC(x) int64 XSTR_CONCAT(__nCPUTimerTick_,x) = cv::getTickCount()
-#define TIMER_TOC(x) int64 XSTR_CONCAT(__nCPUTimerVal_,x) = cv::getTickCount()-XSTR_CONCAT(__nCPUTimerTick_,x)
-#define TIMER_ELAPSED_MS(x) (double(XSTR_CONCAT(__nCPUTimerVal_,x))/(cv::getTickFrequency()/1000))
+#ifndef __LV_VERSION_DEFS__
+    #define __LV_VERSION_DEFS__
+    #define LITIV_VERSION             @LITIV_VERSION@
+    #define LITIV_VERSION_STR         XSTR(LITIV_VERSION)
+    #define LITIV_VERSION_MAJOR       @LITIV_VERSION_MAJOR@
+    #define LITIV_VERSION_MINOR       @LITIV_VERSION_MINOR@
+    #define LITIV_VERSION_PATCH       @LITIV_VERSION_PATCH@
+    #define LITIV_VERSION_SHA1        "@GIT_SHA1@"
+#endif //ndef(__LV_VERSION_DEFS__)
 
-#define lvError(msg) throw lv::Exception(std::string("[lvError: ")+msg+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__)
-#define lvError_(msg,...) throw lv::Exception(std::string("[lvError: ")+msg+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
-#define lvAssert(expr) {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);}
-#define lvAssert_(expr,msg) {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);}
-#define lvAssert__(expr,msg,...) {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);}
-#define glErrorCheck { \
-    GLenum __errn = glGetError(); \
-    if(__errn!=GL_NO_ERROR) \
-        lvError_("glErrorCheck failed [code=%d, msg=%s]",__errn,gluErrorString(__errn)); \
-}
-#ifdef _DEBUG
-#define lvDbgAssert(expr) lvAssert(expr)
-#define lvDbgAssert_(expr,msg) lvAssert_(expr,msg)
-#define lvDbgAssert__(expr,msg,...) lvAssert__(expr,msg,__VA_ARGS__)
-#define lvDbgExceptionWatch lv::UncaughtExceptionLogger XSTR_CONCAT(__logger,__LINE__)(__PRETTY_FUNCTION__,__FILE__,__LINE__)
-#define glDbgErrorCheck glErrorCheck
-#else //ndefined(_DEBUG)
-#define lvDbgAssert(expr)
-#define lvDbgAssert_(expr,msg)
-#define lvDbgAssert__(expr,msg,...)
-#define lvDbgExceptionWatch
-#define glDbgErrorCheck
-#endif //ndefined(_DEBUG)
-#define lvIgnore(x) (void)(x)
-#define UNUSED(x) lvIgnore(x)
+#ifndef __LV_EXCEP_DEFS__
+    #define __LV_EXCEP_DEFS__
+    #define lvError(msg) throw lv::Exception(std::string("[lvError: ")+msg+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__)
+    #define lvError_(msg,...) throw lv::Exception(std::string("[lvError: ")+msg+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
+    #define lvAssert(expr) {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);}
+    #define lvAssert_(expr,msg) {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);}
+    #define lvAssert__(expr,msg,...) {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);}
+    #define glErrorCheck { \
+        GLenum __errn = glGetError(); \
+        if(__errn!=GL_NO_ERROR) \
+            lvError_("glErrorCheck failed [code=%d, msg=%s]",__errn,gluErrorString(__errn)); \
+    }
+    #ifdef _DEBUG
+        #define lvDbgAssert(expr) lvAssert(expr)
+        #define lvDbgAssert_(expr,msg) lvAssert_(expr,msg)
+        #define lvDbgAssert__(expr,msg,...) lvAssert__(expr,msg,__VA_ARGS__)
+        #define lvDbgExceptionWatch lv::UncaughtExceptionLogger XSTR_CONCAT(__logger,__LINE__)(__PRETTY_FUNCTION__,__FILE__,__LINE__)
+        #define glDbgErrorCheck glErrorCheck
+    #else //ndef(_DEBUG)
+        #define lvDbgAssert(expr)
+        #define lvDbgAssert_(expr,msg)
+        #define lvDbgAssert__(expr,msg,...)
+        #define lvDbgExceptionWatch
+        #define glDbgErrorCheck
+    #endif //ndef(_DEBUG)
+    #define lvIgnore(x) (void)(x)
+    #ifndef UNUSED
+        #define UNUSED(x) lvIgnore(x)
+    #endif //ndef(UNUSED)
+    #if defined(_MSC_VER)
+        #define lvAssertHR(expr) [](HRESULT hr){if(FAILED(hr)) lvError_("HR assertion failed ("#expr" = 0x%x), %ws",hr,_com_error(hr).ErrorMessage());}(expr)
+        #ifdef _DEBUG
+            #define lvDbgAssertHR(expr) lvAssertHR(expr)
+        #else //ndef(_DEBUG)
+            #define lvDbgAssertHR(expr)
+        #endif //ndef(_DEBUG)
+    #endif //def(_MSC_VER)
+#endif //ndef(__LV_EXCEP_DEFS__)
 
-#ifndef D2R
-#define D2R(d) ((d)*(M_PI/180.0))
-#endif //ndefined(D2R)
-#ifndef R2D
-#define R2D(r) ((r)*(180.0/M_PI))
-#endif //ndefined(R2D)
-#ifndef __STDC_FORMAT_MACROS
-#define __STDC_FORMAT_MACROS
-#endif //ndefined(__STDC_FORMAT_MACROS)
-#ifndef _USE_MATH_DEFINES
-#define _USE_MATH_DEFINES
-#endif //ndefined(_USE_MATH_DEFINES)
+#ifndef __LV_CONFIG_DEFS__
+    #define __LV_CONFIG_DEFS__
 
-#if defined(_MSC_VER)
-#ifndef __PRETTY_FUNCTION__
-#define __PRETTY_FUNCTION__ __FUNCSIG__
-#endif //ndefined(__PRETTY_FUNCTION__)
-#ifndef NOMINMAX
-#define NOMINMAX // go ahead, try using std::numeric_limits<...>::max() with the 'max' macro enabled
-#endif //ndefined(NOMINMAX)
-#ifndef __func__
-#define __func__ __FUNCTION__
-#endif //ndefined(__func__)
-#define lvAssertHR(expr) [](HRESULT hr){if(FAILED(hr)) lvError_("HR assertion failed ("#expr" = 0x%x), %ws",hr,_com_error(hr).ErrorMessage());}(expr)
-#ifdef _DEBUG
-#define lvDbgAssertHR(expr) lvAssertHR(expr)
-#else //ndefined(_DEBUG)
-#define lvDbgAssertHR(expr)
-#endif //ndefined(_DEBUG)
-#if _MSC_VER<1900 // need >= MSVC 2015 (v140) toolchain
-#error "This project requires full C++11 support (including constexpr and SFINAE)."
-#endif //_MSC_VER<1900
-#else //ndefined(_MSC_VER)
-#if __cplusplus<201103L
-#error "This project requires full C++11 support (including constexpr and SFINAE)."
-#endif //__cplusplus<201103L
-#endif //ndefined(_MSC_VER)
-#define DEFAULT_NB_THREADS  1
-#if DEFAULT_NB_THREADS<1
-#error "Bad default number of threads specified."
-#endif //DEFAULT_NB_THREADS<1
+    #define USE_VPTZ_STANDALONE       @USE_VPTZ_STANDALONE@
+    #define USE_BSDS500_BENCHMARK     @USE_BSDS500_BENCHMARK@
+    #define USE_KINECTSDK_STANDALONE  @USE_KINECTSDK_STANDALONE@
+    #define USE_CVCORE_WITH_UTILS     @USE_CVCORE_WITH_UTILS@
+    #define EXTERNAL_DATA_ROOT        XSTR(@EXTERNAL_DATA_ROOT@)
+    #define SAMPLES_DATA_ROOT         XSTR(@SAMPLES_DATA_ROOT@)
+    #define CACHE_MAX_SIZE_GB         @DATASETS_CACHE_SIZE@LLU
+    #define TARGET_PLATFORM_x64       @TARGET_PLATFORM_x64@
+    #define DEFAULT_NB_THREADS        1
 
-#define LITIV_VERSION       @LITIV_VERSION@
-#define LITIV_VERSION_STR   XSTR(LITIV_VERSION)
-#define LITIV_VERSION_MAJOR @LITIV_VERSION_MAJOR@
-#define LITIV_VERSION_MINOR @LITIV_VERSION_MINOR@
-#define LITIV_VERSION_PATCH @LITIV_VERSION_PATCH@
-#define LITIV_VERSION_SHA1  "@GIT_SHA1@"
+    #if (defined(_MSC_VER) || defined(_WIN32) || defined(WIN32) || defined(__CYGWIN__))
+        #if (defined(LV_EXPORT_API) && defined(LV_IMPORT_API))
+            #error "API import/export config error"
+        #elif defined(LV_EXPORT_API)
+            #if (defined(__GNUC__) || defined(__clang__))
+                #define LV_PUBLIC __attribute__ ((dllexport))
+            #elif defined(_MSC_VER)
+                #define LV_PUBLIC __declspec(dllexport)
+            #else // unknown platform?
+                #define LV_PUBLIC
+            #endif / unknown platform?
+        #elif defined(LV_IMPORT_API)
+            #if (defined(__GNUC__) || defined(__clang__))
+                #define LV_PUBLIC __attribute__ ((dllimport))
+            #elif defined(_MSC_VER)
+                #define LV_PUBLIC __declspec(dllimport)
+            #else // unknown platform?
+                #define LV_PUBLIC
+            #endif / unknown platform?
+        #else //(ndef(LV_EXPORT_API) && ndef(LV_IMPORT_API))
+            #define LV_PUBLIC
+        #endif //(ndef(LV_EXPORT_API) && ndef(LV_IMPORT_API))
+        #define LV_LOCAL
+    #else // if not on windows
+        #if ((defined(__GNUC__) && (__GNUC__>=4)) || defined(__clang__))
+            #if (defined(LV_EXPORT_API) || defined(LV_IMPORT_API))
+                #define LV_PUBLIC __attribute__ ((visibility("default")))
+                #define LV_LOCAL  __attribute__ ((visibility("hidden")))
+            #else //!(defined(LV_EXPORT_API) || defined(LV_IMPORT_API))
+                #define LV_PUBLIC
+                #define LV_LOCAL
+            #endif //!(defined(LV_EXPORT_API) || defined(LV_IMPORT_API))
+        #else // if not clang and not gcc, or gcc not compat version
+            #define LV_PUBLIC
+            #define LV_LOCAL
+        #endif // if not clang and not gcc, or gcc not compat version
+    #endif // if not on windows
+    #if DEFAULT_NB_THREADS<1
+        #error "Bad default number of threads specified."
+    #endif //DEFAULT_NB_THREADS<1
 
-#if (defined(_MSC_VER) || defined(_WIN32) || defined(WIN32) || defined(__CYGWIN__))
-#ifdef BUILDING_DLL
-#ifdef __GNUC__
-#define LV_PUBLIC __attribute__ ((dllexport))
-#else //ndef(__GNUC__)
-#define LV_PUBLIC __declspec(dllexport)
-#endif //ndef(__GNUC__)
-#else //ndef(BUILDING_DLL)
-#ifdef __GNUC__
-#define LV_PUBLIC __attribute__ ((dllimport))
-#else //ndef(__GNUC__)
-#define LV_PUBLIC __declspec(dllimport)
-#endif //ndef(__GNUC__)
-#endif //ndef(BUILDING_DLL)
-#define LV_LOCAL
-#else // if not on windows
-#if (defined(__GNUC__) && (__GNUC__>=4))
-#define LV_PUBLIC __attribute__ ((visibility ("default")))
-#define LV_LOCAL  __attribute__ ((visibility ("hidden")))
-#else // if not gcc, or not compat version
-#define LV_PUBLIC
-#define LV_LOCAL
-#endif // if not gcc, or not compat version
-#endif // if not on windows
+#endif //ndef(__LV_CONFIG_DEFS__)
 
-#define EXTERNAL_DATA_ROOT  XSTR(@EXTERNAL_DATA_ROOT@)
-#define SAMPLES_DATA_ROOT   XSTR(@SAMPLES_DATA_ROOT@)
-#define CACHE_MAX_SIZE_GB   @DATASETS_CACHE_SIZE@LLU
-#define TARGET_PLATFORM_x64 @TARGET_PLATFORM_x64@
+#ifndef __LV_EXTCONFIG_DEFS__
+    #define __LV_EXTCONFIG_DEFS__
 
-#define HAVE_GLSL           @USE_GLSL@
-#if HAVE_GLSL
-#define TARGET_GL_VER_MAJOR @TARGET_GL_VER_MAJOR@
-#define TARGET_GL_VER_MINOR @TARGET_GL_VER_MINOR@
-#define GLEW_EXPERIMENTAL   @GLEW_EXPERIMENTAL@
-#define HAVE_GLFW           @USE_GLFW@
-#define HAVE_FREEGLUT       @USE_FREEGLUT@
-#endif //HAVE_GLSL
+    #define HAVE_GLSL                 @USE_GLSL@
+    #if HAVE_GLSL
+        #define TARGET_GL_VER_MAJOR   @TARGET_GL_VER_MAJOR@
+        #define TARGET_GL_VER_MINOR   @TARGET_GL_VER_MINOR@
+        #define GLEW_EXPERIMENTAL     @GLEW_EXPERIMENTAL@
+        #define HAVE_GLFW             @USE_GLFW@
+        #define HAVE_FREEGLUT         @USE_FREEGLUT@
+    #endif //HAVE_GLSL
 
-#define HAVE_CUDA           @USE_CUDA@
-#if HAVE_CUDA
-// ...
-#endif //HAVE_CUDA
+    #define HAVE_CUDA                 @USE_CUDA@
+    #if HAVE_CUDA
+        // ...
+    #endif //HAVE_CUDA
 
-#define HAVE_OPENCL         @USE_OPENCL@
-#if HAVE_OPENCL
-// ...
-#endif //HAVE_OPENCL
+    #define HAVE_OPENCL               @USE_OPENCL@
+    #if HAVE_OPENCL
+        // ...
+    #endif //HAVE_OPENCL
 
-#define HAVE_OPENGM         @USE_OPENGM@
-#if HAVE_OPENGM
-#define HAVE_OPENGM_EXTLIB  @USE_OPENGM_WITH_EXTLIB@
-#define HAVE_OPENGM_CPLEX   @USE_OPENGM_WITH_CPLEX@
-#define HAVE_OPENGM_GUROBI  @USE_OPENGM_WITH_GUROBI@
-#define HAVE_OPENGM_HDF5    @USE_OPENGM_WITH_HDF5@
-#endif //HAVE_OPENGM
+    #define HAVE_OPENGM               @USE_OPENGM@
+    #if HAVE_OPENGM
+        #define HAVE_OPENGM_EXTLIB    @USE_OPENGM_WITH_EXTLIB@
+        #define HAVE_OPENGM_CPLEX     @USE_OPENGM_WITH_CPLEX@
+        #define HAVE_OPENGM_GUROBI    @USE_OPENGM_WITH_GUROBI@
+        #define HAVE_OPENGM_HDF5      @USE_OPENGM_WITH_HDF5@
+    #endif //HAVE_OPENGM
 
-#define HAVE_MMX            @USE_MMX@
-#define HAVE_SSE            @USE_SSE@
-#define HAVE_SSE2           @USE_SSE2@
-#define HAVE_SSE3           @USE_SSE3@
-#define HAVE_SSSE3          @USE_SSSE3@
-#define HAVE_SSE4_1         @USE_SSE4_1@
-#define HAVE_SSE4_2         @USE_SSE4_2@
-#define HAVE_POPCNT         @USE_POPCNT@
-#define HAVE_AVX            @USE_AVX@
-#define HAVE_AVX2           @USE_AVX2@
+    #define HAVE_MMX                  @USE_MMX@
+    #define HAVE_SSE                  @USE_SSE@
+    #define HAVE_SSE2                 @USE_SSE2@
+    #define HAVE_SSE3                 @USE_SSE3@
+    #define HAVE_SSSE3                @USE_SSSE3@
+    #define HAVE_SSE4_1               @USE_SSE4_1@
+    #define HAVE_SSE4_2               @USE_SSE4_2@
+    #define HAVE_POPCNT               @USE_POPCNT@
+    #define HAVE_AVX                  @USE_AVX@
+    #define HAVE_AVX2                 @USE_AVX2@
 
-#define HAVE_STL_ALIGNED_ALLOC    @USE_STL_ALIGNED_ALLOC@
-#define HAVE_POSIX_ALIGNED_ALLOC  @USE_POSIX_ALIGNED_ALLOC@
+    #define HAVE_STL_ALIGNED_ALLOC    @USE_STL_ALIGNED_ALLOC@
+    #define HAVE_POSIX_ALIGNED_ALLOC  @USE_POSIX_ALIGNED_ALLOC@
 
-#ifndef USE_VPTZ_STANDALONE
-#define USE_VPTZ_STANDALONE       @USE_VPTZ_STANDALONE@
-#endif //USE_VPTZ_STANDALONE
-#ifndef USE_BSDS500_BENCHMARK
-#define USE_BSDS500_BENCHMARK     @USE_BSDS500_BENCHMARK@
-#endif //USE_BSDS500_BENCHMARK
-#define USE_KINECTSDK_STANDALONE  @USE_KINECTSDK_STANDALONE@
+#endif //ndef(__LV_EXTCONFIG_DEFS__)

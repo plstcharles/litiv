@@ -23,7 +23,7 @@ if(USE_GLSL)
 
         add_executable(vptz_camshift src/main.cpp)
         set_target_properties(vptz_camshift PROPERTIES FOLDER "vptz")
-        target_compile_definitions(vptz_camshift PRIVATE VPTZ_IMPORT)
+        target_compile_definitions(vptz_camshift PRIVATE LV_IMPORT_API)
         target_link_libraries(vptz_camshift vptz)
 
         install(TARGETS vptz_camshift

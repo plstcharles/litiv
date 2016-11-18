@@ -17,6 +17,11 @@
 
 if(USE_GLSL)
 
+    file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/defines.hpp)
+    configure_file(
+        "${CMAKE_SOURCE_DIR}/modules/utils/include/litiv/utils/defines.hpp.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/defines.hpp"
+    )
     file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/utils.hpp)
     configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/include/litiv/vptz/utils.hpp.in"
@@ -27,6 +32,7 @@ if(USE_GLSL)
         "src/virtualptz.cpp"
     )
     add_files(INCLUDE_FILES
+        "include/litiv/vptz/defines.hpp"
         "include/litiv/vptz/utils.hpp"
         "include/litiv/vptz/virtualptz.hpp"
         "include/litiv/vptz.hpp"
@@ -38,7 +44,7 @@ if(USE_GLSL)
 
         add_library(vptz SHARED ${SOURCE_FILES} ${INCLUDE_FILES})
         set_target_properties(vptz PROPERTIES FOLDER "vptz")
-        target_compile_definitions(vptz PRIVATE VPTZ_EXPORT)
+        target_compile_definitions(vptz PRIVATE LV_EXPORT_API)
         if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
             # disables C4251 + C4275 to allow STL/template classes to be used in exported classes/members
             # need to eliminate these using pImpl idiom in exported classes to add abstraction layer @@@@
@@ -92,7 +98,7 @@ if(USE_GLSL)
 
         add_library(litiv_vptz STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
         set_target_properties(litiv_vptz PROPERTIES FOLDER "modules")
-        #target_compile_definitions(litiv_vptz PRIVATE BUILDING_DLL)
+        #target_compile_definitions(litiv_vptz PRIVATE LV_EXPORT_API)
         target_include_directories(litiv_vptz
             PUBLIC
                 "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"

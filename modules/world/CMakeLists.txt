@@ -41,7 +41,7 @@ else()
     add_library(litiv_world SHARED ${SOURCE_FILES} ${INCLUDE_FILES})
 endif()
 set_target_properties(litiv_world PROPERTIES FOLDER "modules")
-#target_compile_definitions(litiv_world PRIVATE BUILDING_DLL)
+#target_compile_definitions(litiv_world PRIVATE LV_EXPORT_API)
 target_include_directories(litiv_world
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"

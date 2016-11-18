@@ -40,7 +40,7 @@ add_files(INCLUDE_FILES
 
 add_library(litiv_datasets STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
 set_target_properties(litiv_datasets PROPERTIES FOLDER "modules")
-#target_compile_definitions(litiv_datasets PRIVATE BUILDING_DLL)
+#target_compile_definitions(litiv_datasets PRIVATE LV_EXPORT_API)
 target_include_directories(litiv_datasets
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"

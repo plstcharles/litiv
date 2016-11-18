@@ -32,7 +32,7 @@ add_files(INCLUDE_FILES
 
 add_library(litiv_imgproc STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
 set_target_properties(litiv_imgproc PROPERTIES FOLDER "modules")
-#target_compile_definitions(litiv_imgproc PRIVATE BUILDING_DLL)
+#target_compile_definitions(litiv_imgproc PRIVATE LV_EXPORT_API)
 target_include_directories(litiv_imgproc
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"

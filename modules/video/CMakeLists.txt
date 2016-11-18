@@ -39,7 +39,7 @@ add_files(INCLUDE_FILES
 
 add_library(litiv_video STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
 set_target_properties(litiv_video PROPERTIES FOLDER "modules")
-#target_compile_definitions(litiv_video PRIVATE BUILDING_DLL)
+#target_compile_definitions(litiv_video PRIVATE LV_EXPORT_API)
 target_include_directories(litiv_video
     PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
