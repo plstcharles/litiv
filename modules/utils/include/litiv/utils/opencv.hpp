@@ -17,10 +17,10 @@
 
 #pragma once
 
+#include "litiv/utils/platform.hpp"
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
-#include "litiv/utils/platform.hpp"
 
 namespace cv { // extending cv
 
@@ -142,6 +142,13 @@ namespace cv { // extending cv
         voKPs = voNewKPs;
     }
 
+    /// returns the vector of all sorted unique values contained in a templated matrix
+    template<typename T>
+    inline std::vector<T> unique(const cv::Mat_<T>& oMat) {
+        const std::set<T> mMap(oMat.begin(),oMat.end());
+        return std::vector<T>(mMap.begin(),mMap.end());
+    }
+
     /// helper struct for image display & callback management (must be created via DisplayHelper::create due to enable_shared_from_this interface)
     struct DisplayHelper : lv::enable_shared_from_this<DisplayHelper> {
         /// displayed window title (specified on creation)
@@ -189,6 +196,9 @@ namespace cv { // extending cv
         cv::Mat m_oLastDisplay;
         std::function<void(int,int,int,int)> m_lInternalCallback;
         std::function<void(const CallbackData&)> m_lExternalCallback;
+    private:
+        DisplayHelper(const DisplayHelper&) = delete;
+        DisplayHelper& operator=(const DisplayHelper&) = delete;
     };
 
     /// list of archive types supported by cv::write and cv::read
