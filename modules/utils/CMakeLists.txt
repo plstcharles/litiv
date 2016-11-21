@@ -25,7 +25,6 @@ configure_file(
 
 add_files(SOURCE_FILES
     "src/platform.cpp"
-    "src/opencv.cpp"
 )
 add_files(INCLUDE_FILES
     "include/litiv/utils/console.hpp"
@@ -34,23 +33,30 @@ add_files(INCLUDE_FILES
     "include/litiv/utils/distances.hpp"
     "include/litiv/utils/parallel.hpp"
     "include/litiv/utils/platform.hpp"
-    "include/litiv/utils/opencv.hpp"
     "include/litiv/utils.hpp"
 )
-if(USE_GLSL)
+if(USE_CVCORE_WITH_UTILS)
     add_files(SOURCE_FILES
-        "src/opengl-imgproc.cpp"
-        "src/opengl-shaders.cpp"
-        "src/opengl-draw.cpp"
-        "src/opengl.cpp"
+        "src/opencv.cpp"
     )
     add_files(INCLUDE_FILES
-        "include/litiv/utils/opengl-imgproc.hpp"
-        "include/litiv/utils/opengl-draw.hpp"
-        "include/litiv/utils/opengl-shaders.hpp"
-        "include/litiv/utils/opengl.hpp"
+        "include/litiv/utils/opencv.hpp"
     )
-endif(USE_GLSL)
+    if(USE_GLSL)
+        add_files(SOURCE_FILES
+            "src/opengl-imgproc.cpp"
+            "src/opengl-shaders.cpp"
+            "src/opengl-draw.cpp"
+            "src/opengl.cpp"
+        )
+        add_files(INCLUDE_FILES
+            "include/litiv/utils/opengl-imgproc.hpp"
+            "include/litiv/utils/opengl-draw.hpp"
+            "include/litiv/utils/opengl-shaders.hpp"
+            "include/litiv/utils/opengl.hpp"
+        )
+    endif(USE_GLSL)
+endif()
 
 add_library(litiv_utils STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
 set_target_properties(litiv_utils PROPERTIES FOLDER "modules")
@@ -66,39 +72,44 @@ target_include_directories(litiv_utils
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
         "$<INSTALL_INTERFACE:include/>"
-        "$<BUILD_INTERFACE:${OpenCV_INCLUDE_DIRS}>"
 )
-target_link_libraries(litiv_utils
-    ${OpenCV_LIBRARIES}
-)
-if(USE_GLSL)
+if(USE_CVCORE_WITH_UTILS)
     target_include_directories(litiv_utils
         PUBLIC
-            "$<BUILD_INTERFACE:${OpenGL_INCLUDE_DIRS}>"
-            "$<BUILD_INTERFACE:${GLEW_INCLUDE_DIRS}>"
-            "$<BUILD_INTERFACE:${GLM_INCLUDE_DIRS}>"
+            "$<BUILD_INTERFACE:${OpenCV_INCLUDE_DIRS}>"
     )
     target_link_libraries(litiv_utils
-        ${OPENGL_LIBRARIES}
-        ${GLEW_LIBRARIES}
-        ${GLM_LIBRARIES}
+        ${OpenCV_LIBRARIES}
     )
-    if(USE_GLFW)
+    if(USE_GLSL)
         target_include_directories(litiv_utils
             PUBLIC
-                "$<BUILD_INTERFACE:${GLFW_INCLUDE_DIR}>"
+                "$<BUILD_INTERFACE:${OpenGL_INCLUDE_DIRS}>"
+                "$<BUILD_INTERFACE:${GLEW_INCLUDE_DIRS}>"
+                "$<BUILD_INTERFACE:${GLM_INCLUDE_DIRS}>"
         )
         target_link_libraries(litiv_utils
-            ${GLFW_LIBRARIES}
+            ${OPENGL_LIBRARIES}
+            ${GLEW_LIBRARIES}
+            ${GLM_LIBRARIES}
         )
-    elseif(USE_FREEGLUT)
-        target_include_directories(litiv_utils
-            PUBLIC
-                "$<BUILD_INTERFACE:${FREEGLUT_INCLUDE_DIR}>"
-        )
-        target_link_libraries(litiv_utils
-            ${FREEGLUT_LIBRARY}
-        )
+        if(USE_GLFW)
+            target_include_directories(litiv_utils
+                PUBLIC
+                    "$<BUILD_INTERFACE:${GLFW_INCLUDE_DIR}>"
+            )
+            target_link_libraries(litiv_utils
+                ${GLFW_LIBRARIES}
+            )
+        elseif(USE_FREEGLUT)
+            target_include_directories(litiv_utils
+                PUBLIC
+                    "$<BUILD_INTERFACE:${FREEGLUT_INCLUDE_DIR}>"
+            )
+            target_link_libraries(litiv_utils
+                ${FREEGLUT_LIBRARY}
+            )
+        endif()
     endif()
 endif()
 if(KinectSDK2_FOUND)

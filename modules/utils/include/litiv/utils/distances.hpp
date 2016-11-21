@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include <opencv2/core/types_c.h>
 #include "litiv/utils/parallel.hpp"
 
 namespace lv {
@@ -65,7 +64,7 @@ namespace lv {
 
     /// computes the L1 distance between two generic arrays
     template<size_t nChannels, typename T>
-    inline auto L1dist(const T* const a, const T* const b, size_t nElements, const uchar* m=NULL) -> decltype(L1dist<nChannels>(a,b)) {
+    inline auto L1dist(const T* const a, const T* const b, size_t nElements, const uint8_t* m=NULL) -> decltype(L1dist<nChannels>(a,b)) {
         decltype(L1dist<nChannels>(a,b)) gResult = 0;
         size_t nTotElements = nElements*nChannels;
         if(m) {
@@ -82,7 +81,7 @@ namespace lv {
 
     /// computes the L1 distance between two generic arrays
     template<typename T>
-    inline auto L1dist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) -> decltype(L1dist<3>(a,b,nElements,m)) {
+    inline auto L1dist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uint8_t* m=NULL) -> decltype(L1dist<3>(a,b,nElements,m)) {
         lvAssert_(nChannels>0 && nChannels<=4,"non-templated distance function only defined for 1 to 4 channels");
         switch(nChannels) {
             case 1: return L1dist<1>(a,b,nElements,m);
@@ -92,6 +91,8 @@ namespace lv {
             default: return 0;
         }
     }
+
+#if USE_CVCORE_WITH_UTILS
 
     /// computes the L1 distance between two opencv vectors
     template<int nChannels, typename T>
@@ -103,6 +104,8 @@ namespace lv {
         }
         return L1dist<nChannels>(a_array,b_array);
     }
+
+#endif //USE_CVCORE_WITH_UTILS
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -143,7 +146,7 @@ namespace lv {
 
     /// computes the squared L2 distance between two generic arrays
     template<size_t nChannels, typename T>
-    inline auto L2sqrdist(const T* const a, const T* const b, size_t nElements, const uchar* m=NULL) -> decltype(L2sqrdist<nChannels>(a,b)) {
+    inline auto L2sqrdist(const T* const a, const T* const b, size_t nElements, const uint8_t* m=NULL) -> decltype(L2sqrdist<nChannels>(a,b)) {
         decltype(L2sqrdist<nChannels>(a,b)) gResult = 0;
         size_t nTotElements = nElements*nChannels;
         if(m) {
@@ -160,7 +163,7 @@ namespace lv {
 
     /// computes the squared L2 distance between two generic arrays
     template<typename T>
-    inline auto L2sqrdist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) -> decltype(L2sqrdist<3>(a,b,nElements,m)) {
+    inline auto L2sqrdist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uint8_t* m=NULL) -> decltype(L2sqrdist<3>(a,b,nElements,m)) {
         lvAssert_(nChannels>0 && nChannels<=4,"non-templated distance function only defined for 1 to 4 channels");
         switch(nChannels) {
             case 1: return L2sqrdist<1>(a,b,nElements,m);
@@ -170,6 +173,8 @@ namespace lv {
             default: return 0;
         }
     }
+
+#if USE_CVCORE_WITH_UTILS
 
     /// computes the squared L2 distance between two opencv vectors
     template<int nChannels, typename T>
@@ -181,6 +186,8 @@ namespace lv {
         }
         return L2sqrdist<nChannels>(a_array,b_array);
     }
+
+#endif //USE_CVCORE_WITH_UTILS
 
     /// computes the L2 distance between two generic arrays
     template<size_t nChannels, typename T>
@@ -212,7 +219,7 @@ namespace lv {
 
     /// computes the L2 distance between two generic arrays
     template<size_t nChannels, typename T>
-    inline float L2dist(const T* const a, const T* const b, size_t nElements, const uchar* m=NULL) {
+    inline float L2dist(const T* const a, const T* const b, size_t nElements, const uint8_t* m=NULL) {
         decltype(L2sqrdist<nChannels>(a,b)) gResult = 0;
         size_t nTotElements = nElements*nChannels;
         if(m) {
@@ -229,7 +236,7 @@ namespace lv {
 
     /// computes the squared L2 distance between two generic arrays
     template<typename T>
-    inline float L2dist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) {
+    inline float L2dist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uint8_t* m=NULL) {
         lvAssert_(nChannels>0 && nChannels<=4,"non-templated distance function only defined for 1 to 4 channels");
         switch(nChannels) {
             case 1: return L2dist<1>(a,b,nElements,m);
@@ -239,6 +246,8 @@ namespace lv {
             default: return 0;
         }
     }
+
+#if USE_CVCORE_WITH_UTILS
 
     /// computes the L2 distance between two opencv vectors
     template<int nChannels, typename T>
@@ -250,6 +259,8 @@ namespace lv {
         }
         return L2dist<nChannels>(a_array,b_array);
     }
+
+#endif //USE_CVCORE_WITH_UTILS
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -338,7 +349,7 @@ namespace lv {
 
     /// computes the color distortion between two generic arrays
     template<size_t nChannels, typename T>
-    inline auto cdist(const T* const a, const T* const b, size_t nElements, const uchar* m=NULL) -> decltype(cdist<nChannels>(a,b)) {
+    inline auto cdist(const T* const a, const T* const b, size_t nElements, const uint8_t* m=NULL) -> decltype(cdist<nChannels>(a,b)) {
         decltype(cdist<nChannels>(a,b)) gResult = 0;
         size_t nTotElements = nElements*nChannels;
         if(m) {
@@ -355,7 +366,7 @@ namespace lv {
 
     /// computes the color distortion between two generic arrays
     template<typename T>
-    inline auto cdist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uchar* m=NULL) -> decltype(cdist<3>(a,b,nElements,m)) {
+    inline auto cdist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uint8_t* m=NULL) -> decltype(cdist<3>(a,b,nElements,m)) {
         lvAssert_(nChannels>1 && nChannels<=4,"non-templated distance function only defined for 2 to 4 channels");
         switch(nChannels) {
             case 2: return cdist<2>(a,b,nElements,m);
@@ -364,6 +375,8 @@ namespace lv {
             default: return 0;
         }
     }
+
+#if USE_CVCORE_WITH_UTILS
 
     /// computes the color distortion between two opencv vectors
     template<int nChannels, typename T>
@@ -375,6 +388,8 @@ namespace lv {
         }
         return cdist<nChannels>(a_array,b_array);
     }
+
+#endif //USE_CVCORE_WITH_UTILS
 
     /// computes a color distortion-distance mix using two generic distances
     template<typename T>
@@ -459,7 +474,7 @@ namespace lv {
         static_assert(std::is_integral<T>::value,"type must be integral");
         size_t nResult = 0;
         for(size_t l=0; l<sizeof(T); ++l)
-            nResult += s_anPopcntLUT8[(uchar)(x>>l*8)];
+            nResult += s_anPopcntLUT8[x>>l*8];
         return nResult;
     }
 

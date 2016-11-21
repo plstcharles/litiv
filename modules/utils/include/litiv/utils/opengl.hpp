@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include "litiv/utils/platform.hpp"
 #include <GL/glew.h>
 #include <GL/glu.h>
 #if defined(__clang__)
@@ -28,7 +29,9 @@
 #elif defined(_MSC_VER)
 #pragma warning(push,0)
 #endif //defined(_MSC_VER)
+#ifndef GLM_FORCE_RADIANS
 #define GLM_FORCE_RADIANS
+#endif //GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -41,8 +44,6 @@
 #pragma warning(pop)
 #endif //defined(_MSC_VER)
 #include <opencv2/opencv.hpp>
-#include "litiv/utils/cxx.hpp"
-#include "litiv/utils/platform.hpp"
 
 #if HAVE_GLFW
 #include <GLFW/glfw3.h>

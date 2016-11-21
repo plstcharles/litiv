@@ -17,10 +17,9 @@
 
 #pragma once
 
-#include "litiv/utils/opencv.hpp"
 #include "litiv/utils/platform.hpp"
-#include <type_traits>
-
+#if USE_CVCORE_WITH_UTILS
+#include "litiv/utils/opencv.hpp"
 #if HAVE_GLSL
 #include "litiv/utils/opengl-imgproc.hpp"
 #endif //HAVE_GLSL
@@ -30,6 +29,7 @@
 #if HAVE_OPENCL
 // ...
 #endif //HAVE_OPENCL
+#endif //USE_CVCORE_WITH_UTILS
 #if defined(_MSC_VER)
 #include <intrin.h>
 #if TARGET_PLATFORM_x64 && HAVE_MMX
@@ -61,13 +61,16 @@ namespace lv {
         virtual bool isParallel() = 0;
         /// returns which type of parallel implementation is used in this algo
         virtual ParallelAlgoType getParallelAlgoType() = 0;
-    public:
+#if USE_CVCORE_WITH_UTILS
         // #### for debug purposes only ####
         cv::DisplayHelperPtr m_pDisplayHelper;
+#endif //USE_CVCORE_WITH_UTILS
     };
 
     template<ParallelAlgoType eImpl>
     struct IParallelAlgo_;
+
+#if USE_CVCORE_WITH_UTILS
 
 #if HAVE_GLSL
     template<>
@@ -100,6 +103,8 @@ namespace lv {
     using IParallelAlgo_OpenCL = IParallelAlgo_<OpenCL>;
 #endif //HAVE_CUDA
 
+#endif //USE_CVCORE_WITH_UTILS
+
     template<>
     struct IParallelAlgo_<NonParallel> : public IIParallelAlgo {
         virtual bool isParallel() {return false;}
@@ -117,13 +122,13 @@ namespace lv {
 
 #if HAVE_SSE2
     /// returns the (horizontal) sum of the provided 16-unsigned-byte array
-    inline uint hsum_16ub(const __m128i& anBuffer) {
+    inline uint32_t hsum_16ub(const __m128i& anBuffer) {
         __m128i _anRes = _mm_sad_epu8(anBuffer,_mm_set1_epi8(char(0)));
-        return uint(_mm_cvtsi128_si32(_mm_add_epi64(_mm_srli_si128(_anRes,8),_anRes)));
+        return uint32_t(_mm_cvtsi128_si32(_mm_add_epi64(_mm_srli_si128(_anRes,8),_anRes)));
     }
 
     /// fills the provided 16-byte array with a constant
-    inline void copy_16ub(__m128i* anBuffer, uchar nVal) {
+    inline void copy_16ub(__m128i* anBuffer, uint8_t nVal) {
         _mm_store_si128(anBuffer,_mm_set1_epi8((char)nVal));
     }
 
@@ -148,14 +153,14 @@ namespace lv {
 
 #if HAVE_SSE4_1
     /// returns the maximum value of the provided 16-unsigned-byte array
-    inline uchar hmax_16ub(const __m128i& anBuffer) {
+    inline uint8_t hmax_16ub(const __m128i& anBuffer) {
         __m128i _anTmp = _mm_sub_epi8(_mm_set1_epi8(char(CHAR_MAX)),anBuffer);
-        return uchar(char(CHAR_MAX)-_mm_cvtsi128_si32(_mm_minpos_epu16(_mm_min_epu8(_anTmp,_mm_srli_epi16(_anTmp,8)))));
+        return uint8_t(char(CHAR_MAX)-_mm_cvtsi128_si32(_mm_minpos_epu16(_mm_min_epu8(_anTmp,_mm_srli_epi16(_anTmp,8)))));
     }
 
     /// returns the minimum value of the provided 16-unsigned-byte array
-    inline uchar hmin_16ub(const __m128i& anBuffer) {
-        return uchar(_mm_cvtsi128_si32(_mm_minpos_epu16(_mm_min_epu8(anBuffer,_mm_srli_epi16(anBuffer,8)))));
+    inline uint8_t hmin_16ub(const __m128i& anBuffer) {
+        return uint8_t(_mm_cvtsi128_si32(_mm_minpos_epu16(_mm_min_epu8(anBuffer,_mm_srli_epi16(anBuffer,8)))));
     }
 #endif //HAVE_SSE4_1
 

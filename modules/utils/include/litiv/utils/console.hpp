@@ -17,7 +17,6 @@
 
 #pragma once
 
-#include "litiv/utils/defines.hpp"
 #include "litiv/utils/cxx.hpp"
 
 /**

@@ -19,10 +19,11 @@
 
 #include "litiv/utils/defines.hpp"
 #include "litiv/utils/cxx.hpp"
+#include "litiv/utils/console.hpp"
+#include "litiv/utils/platform.hpp"
 #include "litiv/utils/parallel.hpp"
 #include "litiv/utils/distances.hpp"
-#include "litiv/utils/platform.hpp"
-#include "litiv/utils/console.hpp"
+#if USE_CVCORE_WITH_UTILS
 #include "litiv/utils/opencv.hpp"
 #if HAVE_GLSL
 #include "litiv/utils/opengl.hpp"
@@ -36,3 +37,4 @@
 #if HAVE_OPENCL
 // ...
 #endif //HAVE_OPENCL
+#endif //USE_CVCORE_WITH_UTILS

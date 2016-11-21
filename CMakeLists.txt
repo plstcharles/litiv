@@ -74,8 +74,14 @@ else()
     message(FATAL_ERROR "Could not detect x64/x86 platform identity using void pointer size (s=${CMAKE_SIZEOF_VOID_P}).")
 endif()
 option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark implementation in litiv_datasets (cleaned 3rd party code; will use an approximative solution otherwise)" ON)
+option(USE_CVCORE_WITH_UTILS "Include OpenCV core components in utils module" ON)
 option(USE_FAST_MATH "Enable fast math optimizations" OFF)
-mark_as_advanced(USE_FAST_MATH DATASETS_CACHE_SIZE)
+mark_as_advanced(
+    USE_BSDS500_BENCHMARK
+    USE_CVCORE_WITH_UTILS
+    USE_FAST_MATH
+    DATASETS_CACHE_SIZE
+)
 
 ### OPENCV CHECK
 find_package(OpenCV 3.0 REQUIRED)
