@@ -21,6 +21,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/features2d.hpp>
 #include "litiv/utils/distances.hpp"
+
 /**
     Local Binary Similarity Pattern (LBSP) feature extractor
 

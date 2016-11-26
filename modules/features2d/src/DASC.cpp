@@ -15,8 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "litiv/features2d/DASC.hpp"
-#include "litiv/imgproc.hpp"
+#include "litiv/features2d.hpp"
 
 namespace pretrained { // obtained via middlebury dataset (imported here from original mat archives)
 
