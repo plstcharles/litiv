@@ -15,13 +15,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-litiv_app(changedet)
-
-add_executable(litiv_app_changedet src/main.cpp)
-set_target_properties(litiv_app_changedet PROPERTIES FOLDER "apps")
-target_link_libraries(litiv_app_changedet litiv_world)
-
-install(TARGETS litiv_app_changedet
-    RUNTIME DESTINATION bin
-    COMPONENT apps
-)
+litiv_app(changedet "src/main.cpp")

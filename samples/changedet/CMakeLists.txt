@@ -15,13 +15,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-litiv_sample(changedet) # macro defines the project as part of the 'sample' group with correct prefix/suffix
-
-add_executable(litiv_sample_changedet src/main.cpp) # only one source file in this project
-set_target_properties(litiv_sample_changedet PROPERTIES FOLDER "samples") # groups this project with other samples in the IDE
-target_link_libraries(litiv_sample_changedet litiv_world) # litiv_world indirectly links all subdependencies (opencv, ...)
-
-install(TARGETS litiv_sample_changedet
-    RUNTIME DESTINATION bin
-    COMPONENT samples
-) # exports the executable binary, once built, to the 'bin' install directory
+litiv_sample(changedet "src/main.cpp")

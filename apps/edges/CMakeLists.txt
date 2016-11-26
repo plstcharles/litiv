@@ -15,13 +15,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-litiv_app(edges)
-
-add_executable(litiv_app_edges src/main.cpp)
-set_target_properties(litiv_app_edges PROPERTIES FOLDER "apps")
-target_link_libraries(litiv_app_edges litiv_world)
-
-install(TARGETS litiv_app_edges
-    RUNTIME DESTINATION bin
-    COMPONENT apps
-)
+litiv_app(edges "src/main.cpp")

@@ -15,8 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-litiv_3rdparty_module(bsds500)
-
 add_files(SOURCE_FILES
     "src/kofn.cpp"
     "src/csa.cpp"
@@ -28,24 +26,4 @@ add_files(INCLUDE_FILES
     "include/litiv/3rdparty/bsds500/kofn.hpp"
     "include/litiv/3rdparty/bsds500/match.hpp"
 )
-
-add_library(litiv_bsds500 STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
-set_target_properties(litiv_bsds500 PROPERTIES FOLDER "3rdparty")
-target_include_directories(litiv_bsds500
-    PUBLIC
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
-        "$<INSTALL_INTERFACE:include/>"
-)
-
-install(TARGETS litiv_bsds500
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    COMPONENT 3rdparty
-)
-install(DIRECTORY "include/"
-    DESTINATION "include/"
-    COMPONENT 3rdparty
-    FILES_MATCHING PATTERN "*.hpp"
-)
+litiv_3rdparty_module(bsds500 SOURCE_FILES INCLUDE_FILES)

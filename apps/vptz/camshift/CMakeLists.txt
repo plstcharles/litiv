@@ -20,29 +20,22 @@ if(USE_GLSL)
     if(USE_VPTZ_STANDALONE)
 
         project(vptz_camshift)
-
-        add_executable(vptz_camshift src/main.cpp)
-        set_target_properties(vptz_camshift PROPERTIES FOLDER "vptz")
-        target_compile_definitions(vptz_camshift PRIVATE LV_IMPORT_API)
+        add_executable(vptz_camshift "src/main.cpp")
+        set_target_properties(vptz_camshift
+            PROPERTIES
+                FOLDER "vptz"
+                DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
+        )
         target_link_libraries(vptz_camshift vptz)
-
-        install(TARGETS vptz_camshift
-            RUNTIME DESTINATION bin
-            COMPONENT vptz
+        install(
+            TARGETS vptz_camshift
+            RUNTIME DESTINATION "bin"
+            COMPONENT "vptz"
         )
 
     else(NOT USE_VPTZ_STANDALONE)
 
-        litiv_app(camshift)
-
-        add_executable(litiv_app_camshift src/main.cpp)
-        set_target_properties(litiv_app_camshift PROPERTIES FOLDER "apps/vptz")
-        target_link_libraries(litiv_app_camshift litiv_vptz)
-
-        install(TARGETS litiv_app_camshift
-            RUNTIME DESTINATION bin
-            COMPONENT apps
-        )
+        litiv_app(vptz_camshift "src/main.cpp")
 
     endif(USE_VPTZ_STANDALONE)
 

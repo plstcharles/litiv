@@ -20,29 +20,22 @@ if(USE_GLSL)
     if(USE_VPTZ_STANDALONE)
 
         project(vptz_gtviewer)
-
-        add_executable(vptz_gtviewer src/main.cpp)
-        set_target_properties(vptz_gtviewer PROPERTIES FOLDER "vptz")
-        target_compile_definitions(vptz_gtviewer PRIVATE LV_IMPORT_API)
+        add_executable(vptz_gtviewer "src/main.cpp")
+        set_target_properties(vptz_gtviewer
+            PROPERTIES
+                FOLDER "vptz"
+                DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
+        )
         target_link_libraries(vptz_gtviewer vptz)
-
-        install(TARGETS vptz_gtviewer
-            RUNTIME DESTINATION bin
-            COMPONENT vptz
+        install(
+            TARGETS vptz_gtviewer
+            RUNTIME DESTINATION "bin"
+            COMPONENT "vptz"
         )
 
     else(NOT USE_VPTZ_STANDALONE)
 
-        litiv_app(gtviewer)
-
-        add_executable(litiv_app_gtviewer src/main.cpp)
-        set_target_properties(litiv_app_gtviewer PROPERTIES FOLDER "apps/vptz")
-        target_link_libraries(litiv_app_gtviewer litiv_vptz)
-
-        install(TARGETS litiv_app_gtviewer
-            RUNTIME DESTINATION bin
-            COMPONENT apps
-        )
+        litiv_app(vptz_gtviewer "src/main.cpp")
 
     endif(USE_VPTZ_STANDALONE)
 

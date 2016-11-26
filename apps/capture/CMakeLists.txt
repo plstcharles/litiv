@@ -17,23 +17,7 @@
 
 if(WIN32 AND KinectSDK2_FOUND) # only for WIN32 due to Kinectv2SDK & DirectShow
 
-    litiv_app(capture)
-
-    add_executable(litiv_app_capture src/main.cpp)
-    set_target_properties(litiv_app_capture PROPERTIES FOLDER "apps")
-    target_include_directories(litiv_app_capture
-        PUBLIC
-            "$<BUILD_INTERFACE:${KinectSDK2_INCLUDE_DIRS}>"
-    )
-    target_link_libraries(litiv_app_capture
-        litiv_world
-        litiv_dshowbase
-        ${KinectSDK2_LIBRARIES}
-    )
-
-    install(TARGETS litiv_app_capture
-        RUNTIME DESTINATION bin
-        COMPONENT apps
-    )
+    litiv_app(capture "src/main.cpp")
+    target_link_libraries(${PROJECT_NAME} litiv_3rdparty_dshowbase)
 
 endif()

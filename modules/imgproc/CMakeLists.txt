@@ -15,8 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-litiv_module(imgproc)
-
 add_files(SOURCE_FILES
     "src/EdgeDetectionUtils.cpp"
     "src/EdgeDetectorCanny.cpp"
@@ -30,25 +28,9 @@ add_files(INCLUDE_FILES
     "include/litiv/imgproc.hpp"
 )
 
-add_library(litiv_imgproc STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
-set_target_properties(litiv_imgproc PROPERTIES FOLDER "modules")
-#target_compile_definitions(litiv_imgproc PRIVATE LV_EXPORT_API)
-target_include_directories(litiv_imgproc
+litiv_module(imgproc SOURCE_FILES INCLUDE_FILES)
+target_link_libraries(litiv_imgproc
     PUBLIC
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
-        "$<INSTALL_INTERFACE:include/>"
-)
-target_link_libraries(litiv_imgproc litiv_features2d litiv_utils)
-
-install(TARGETS litiv_imgproc
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    COMPONENT modules
-)
-install(DIRECTORY "include/"
-    DESTINATION "include/"
-    COMPONENT modules
-    FILES_MATCHING PATTERN "*.hpp"
+        litiv_features2d
+        litiv_utils
 )

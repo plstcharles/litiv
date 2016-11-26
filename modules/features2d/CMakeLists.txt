@@ -15,8 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-litiv_module(features2d)
-
 add_files(SOURCE_FILES
     "src/LBSP.cpp"
     "src/DASC.cpp"
@@ -27,25 +25,8 @@ add_files(INCLUDE_FILES
     "include/litiv/features2d.hpp"
 )
 
-add_library(litiv_features2d STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
-set_target_properties(litiv_features2d PROPERTIES FOLDER "modules")
-#target_compile_definitions(litiv_features2d PRIVATE LV_EXPORT_API)
-target_include_directories(litiv_features2d
+litiv_module(features2d SOURCE_FILES INCLUDE_FILES)
+target_link_libraries(litiv_features2d
     PUBLIC
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
-        "$<INSTALL_INTERFACE:include/>"
-)
-target_link_libraries(litiv_features2d litiv_imgproc litiv_utils)
-
-install(TARGETS litiv_features2d
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    COMPONENT modules
-)
-install(DIRECTORY "include/"
-    DESTINATION "include/"
-    COMPONENT modules
-    FILES_MATCHING PATTERN "*.hpp"
+        litiv_utils
 )

@@ -17,8 +17,6 @@
 
 if(WIN32)
 
-    litiv_3rdparty_module(dshowbase)
-
     add_files(SOURCE_FILES
         "src/wxlist.cpp"
         "src/wxutil.cpp"
@@ -124,41 +122,24 @@ if(WIN32)
             "include/litiv/3rdparty/dshowbase/ocvcompat.h"
         )
     endif()
-
-    add_library(litiv_dshowbase STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
-    set_target_properties(litiv_dshowbase PROPERTIES FOLDER "3rdparty")
-    target_include_directories(litiv_dshowbase
+    litiv_3rdparty_module(dshowbase SOURCE_FILES INCLUDE_FILES)
+    target_link_libraries(${PROJECT_NAME}
         PUBLIC
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
-            "$<INSTALL_INTERFACE:include/>"
-    )
-    target_link_libraries(litiv_dshowbase
-        strmiids
-        winmm
-        msdmo
-        dmoguids
-        wmcodecdspuuid
+            strmiids
+            winmm
+            msdmo
+            dmoguids
+            wmcodecdspuuid
     )
     if(BUILD_DSHOWBASE_OCVCOMPAT)
-        target_include_directories(litiv_dshowbase
+        target_include_directories(${PROJECT_NAME}
             PUBLIC
                 "$<BUILD_INTERFACE:${OpenCV_INCLUDE_DIRS}>"
         )
-        target_link_libraries(litiv_dshowbase
-            ${OpenCV_LIBRARIES}
+        target_link_libraries(${PROJECT_NAME}
+            PUBLIC
+                "${OpenCV_LIBRARIES}"
         )
     endif()
 
-    install(TARGETS litiv_dshowbase
-        RUNTIME DESTINATION bin
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-        COMPONENT 3rdparty
-    )
-    install(DIRECTORY "include/"
-        DESTINATION "include/"
-        COMPONENT 3rdparty
-        FILES_MATCHING PATTERN "*.hpp"
-    )
 endif()

@@ -16,11 +16,17 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/ ${CMAKE_SOURCE_DIR}/cmake/Modules/)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+list(APPEND CMAKE_MODULE_PATH
+    "${CMAKE_SOURCE_DIR}/cmake/"
+    "${CMAKE_SOURCE_DIR}/cmake/Modules/"
+)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib:$ORIGIN/")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 include(FrameworkUtils)
+include(CMakePackageConfigHelpers)
 include(GetGitRevisionDescription)
 include(CheckFunctionExists) # should be pre-packaged with CMake...
 get_git_head_revision(GIT_REFSPEC GIT_SHA1)
@@ -28,22 +34,23 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 set(EXTERNAL_DATA_ROOT "${CMAKE_SOURCE_DIR}/data/" CACHE PATH "External data root folder (this is where all datasets should be located for applications to find them automatically)")
 set(SAMPLES_DATA_ROOT "${CMAKE_SOURCE_DIR}/samples/data/" CACHE PATH "Sample data root folder (should contain necessary files so that samples can be used out-of-the-box)")
-set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/install CACHE PATH "Install path prefix, prepended onto install directories (optional)")
+set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "Install path prefix, prepended onto install directories (optional)")
 if(WIN32)
     if(MSVC AND (MSVC_VERSION LESS 1900))
         message(FATAL_ERROR "MSVC toolchains older than 2015 (v140) are not supported!")
     elseif(MSVC)
         set(CMAKE_USE_RELATIVE_PATHS ON CACHE INTERNAL "" FORCE)
+        set(CMAKE_DEBUG_POSTFIX "d" CACHE INTERNAL "" FORCE)
     endif()
 endif()
 # add hardcoded guesses for find_package here (caution: top level project is not defined yet!)
 list(APPEND CMAKE_PREFIX_PATH
-    $ENV{USER_DEVELOP}/opencv/build-litiv/install/ $ENV{USER_DEVELOP}/opencv/build/ $ENV{USER_DEVELOP}/opencv/
-    $ENV{USER_DEVELOP}/freeglut/build-litiv/install/ $ENV{USER_DEVELOP}/freeglut/build/ $ENV{USER_DEVELOP}/freeglut/
-    $ENV{USER_DEVELOP}/glfw/build-litiv/install/ $ENV{USER_DEVELOP}/glfw/build/ $ENV{USER_DEVELOP}/glfw/
-    $ENV{USER_DEVELOP}/glew/build-litiv/install/ $ENV{USER_DEVELOP}/glew/build/ $ENV{USER_DEVELOP}/glew/
-    $ENV{USER_DEVELOP}/glm/build-litiv/install/ $ENV{USER_DEVELOP}/glm/build/ $ENV{USER_DEVELOP}/glm/
-    $ENV{USER_DEVELOP}/opengm/build-litiv/install/ $ENV{USER_DEVELOP}/opengm/build/ $ENV{USER_DEVELOP}/opengm/
+    "$ENV{USER_DEVELOP}/opencv/build-litiv/install/" "$ENV{USER_DEVELOP}/opencv/build/" "$ENV{USER_DEVELOP}/opencv/"
+    "$ENV{USER_DEVELOP}/freeglut/build-litiv/install/" "$ENV{USER_DEVELOP}/freeglut/build/" "$ENV{USER_DEVELOP}/freeglut/"
+    "$ENV{USER_DEVELOP}/glfw/build-litiv/install/" "$ENV{USER_DEVELOP}/glfw/build/" "$ENV{USER_DEVELOP}/glfw/"
+    "$ENV{USER_DEVELOP}/glew/build-litiv/install/" "$ENV{USER_DEVELOP}/glew/build/" "$ENV{USER_DEVELOP}/glew/"
+    "$ENV{USER_DEVELOP}/glm/build-litiv/install/" "$ENV{USER_DEVELOP}/glm/build/" "$ENV{USER_DEVELOP}/glm/"
+    "$ENV{USER_DEVELOP}/opengm/build-litiv/install/" "$ENV{USER_DEVELOP}/opengm/build/" "$ENV{USER_DEVELOP}/opengm/"
 )
 
 ################################################################
@@ -52,7 +59,8 @@ project(litiv)
 set(LITIV_VERSION_MAJOR 1) # last change: 2015/10
 set(LITIV_VERSION_MINOR 3) # last change: 2016/10
 set(LITIV_VERSION_PATCH 2) # last change: 2016/11
-set(LITIV_VERSION ${LITIV_VERSION_MAJOR}.${LITIV_VERSION_MINOR}.${LITIV_VERSION_PATCH})
+set(LITIV_VERSION "${LITIV_VERSION_MAJOR}.${LITIV_VERSION_MINOR}.${LITIV_VERSION_PATCH}")
+set(LITIV_VERSION_ABI 0) # still unstable
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "Configs" FORCE)
@@ -60,8 +68,8 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Forced project build type" FORCE)
 endif(NOT CMAKE_BUILD_TYPE)
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS ${CMAKE_CONFIGURATION_TYPES})
-set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:DEBUG>)
-set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS $<$<CONFIG:Debug>:_DEBUG>)
+set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS "$<$<CONFIG:Debug>:DEBUG>")
+set_property(DIRECTORY APPEND PROPERTY COMPILE_DEFINITIONS "$<$<CONFIG:Debug>:_DEBUG>")
 if(CMAKE_SIZEOF_VOID_P EQUAL 8) # 64-bit toolchain/platform
     set(DATASETS_CACHE_SIZE 6 CACHE STRING "Cache size to be used for dataset preloading, if needed (in GB)")
     set(TARGET_PLATFORM_x64 TRUE CACHE INTERNAL "" FORCE)
@@ -154,11 +162,16 @@ endif()
 
 initialize_internal_list(litiv_projects)
 initialize_internal_list(litiv_3rdparty_modules)
+initialize_internal_list(litiv_3rdparty_modules_sourcelist)
+initialize_internal_list(litiv_3rdparty_modules_include_dirs)
 initialize_internal_list(litiv_modules)
+initialize_internal_list(litiv_modules_sourcelist)
+initialize_internal_list(litiv_modules_include_dirs)
 initialize_internal_list(litiv_apps)
 initialize_internal_list(litiv_samples)
 add_subdirectory(cmake/checks/simd)
 if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
+    option(BUILD_SHARED_LIBS "Build shared libraries (.so) instead of static ones (.a)" ON)
     if(NOT CMAKE_CROSSCOMPILING)
         add_definitions(-march=native)
     endif()
@@ -178,6 +191,10 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
         set(USE_POSIX_ALIGNED_ALLOC 0 CACHE INTERNAL "Have function posix_memalign")
     endif()
 elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
+    option(BUILD_SHARED_LIBS "Build shared libraries (.dll) instead of static ones (.lib)" OFF)
+    if(BUILD_SHARED_LIBS)
+        message("LITIV DLLs are still missing symbol exports, and might be incomplete for some targets")
+    endif()
     add_definitions(-DUNICODE -D_UNICODE)
     if(USE_FAST_MATH)
         add_definitions(/fp:fast)
@@ -217,3 +234,32 @@ add_subdirectory(modules)
 add_subdirectory(samples)
 add_subdirectory(apps)
 add_subdirectory(doc)
+
+write_basic_package_version_file(
+    "${CMAKE_BINARY_DIR}/cmake/litiv-config-version.cmake"
+    VERSION
+        "${LITIV_VERSION}"
+    COMPATIBILITY
+        ExactVersion # will switch to 'SameMajorVersion' later, when api more stable
+)
+configure_package_config_file(
+    "${CMAKE_SOURCE_DIR}/cmake/litiv-config.cmake.in"
+    "${CMAKE_BINARY_DIR}/cmake/litiv-config.cmake"
+    INSTALL_DESTINATION
+        "lib/cmake/litiv"
+)
+install(
+    FILES
+        "${CMAKE_BINARY_DIR}/cmake/litiv-config.cmake"
+        "${CMAKE_BINARY_DIR}/cmake/litiv-config-version.cmake"
+    DESTINATION
+        "lib/cmake/litiv"
+)
+install(
+    EXPORT
+        "litiv-targets"
+    NAMESPACE
+        "litiv::"
+    DESTINATION
+        "lib/cmake/litiv"
+)

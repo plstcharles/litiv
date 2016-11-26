@@ -15,8 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-litiv_module(datasets)
-
 add_files(SOURCE_FILES
     "src/datasets.cpp"
     "src/eval.cpp"
@@ -38,28 +36,14 @@ add_files(INCLUDE_FILES
     "include/litiv/datasets/impl/Wallflower.hpp"
 )
 
-add_library(litiv_datasets STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
-set_target_properties(litiv_datasets PROPERTIES FOLDER "modules")
-#target_compile_definitions(litiv_datasets PRIVATE LV_EXPORT_API)
-target_include_directories(litiv_datasets
+litiv_module(datasets SOURCE_FILES INCLUDE_FILES)
+target_link_libraries(litiv_datasets
     PUBLIC
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
-        "$<INSTALL_INTERFACE:include/>"
+        litiv_imgproc
 )
-target_link_libraries(litiv_datasets litiv_imgproc)
 if(USE_BSDS500_BENCHMARK)
-    target_link_libraries(litiv_datasets litiv_bsds500)
+    target_link_libraries(litiv_datasets
+        PUBLIC
+            litiv_3rdparty_bsds500
+    )
 endif()
-
-install(TARGETS litiv_datasets
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    COMPONENT modules
-)
-install(DIRECTORY "include/"
-    DESTINATION "include/"
-    COMPONENT modules
-    FILES_MATCHING PATTERN "*.hpp"
-)

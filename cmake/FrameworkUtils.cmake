@@ -36,36 +36,184 @@ macro(initialize_internal_list list_name)
     set(${list_name} "" CACHE INTERNAL "Internal list variable")
 endmacro(initialize_internal_list)
 
-macro(litiv_module name)
+macro(litiv_module name sourcelist headerlist)
     project(litiv_${name})
-    append_internal_list(litiv_modules ${name})
-    append_internal_list(litiv_projects litiv_${name})
-    set(LITIV_CURRENT_MODULE_NAME ${name})
-    set(LITIV_CURRENT_PROJECT_NAME litiv_${name})
+    if(NOT(${name} STREQUAL "world"))
+        append_internal_list(litiv_modules ${name})
+        foreach(source ${${sourcelist}})
+            append_internal_list(litiv_modules_sourcelist "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/${source}")
+        endforeach()
+        append_internal_list(litiv_modules_include_dirs "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>")
+        append_internal_list(litiv_modules_include_dirs "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>")
+    endif()
+    append_internal_list(litiv_projects ${PROJECT_NAME})
+    if(BUILD_SHARED_LIBS)
+        add_library(${PROJECT_NAME} SHARED ${${sourcelist}} ${${headerlist}})
+        set_target_properties(${PROJECT_NAME}
+            PROPERTIES
+                VERSION "${LITIV_VERSION}"
+                SOVERSION "${LITIV_VERSION_ABI}"
+        )
+        target_compile_definitions(${PROJECT_NAME}
+            PRIVATE
+                "LV_EXPORT_API"
+            INTERFACE
+                "LV_IMPORT_API"
+        )
+        if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
+            # disables C4251 + C4275 to allow STL/template classes to be used in exported classes/members
+            # need to eliminate these using pImpl idiom in exported classes to add abstraction layer @@@@
+            target_compile_options(${PROJECT_NAME}
+                PUBLIC
+                    /wd4251 # disables C4251, "'identifier' : class 'type' needs to have dll-interface to be used by clients of class 'type2'"
+                    /wd4275 # disables C4275, "non DLL-interface classkey 'identifier' used as base for DLL-interface classkey 'identifier'"
+            )
+        endif()
+    else()
+        add_library(${PROJECT_NAME} STATIC ${${sourcelist}} ${${headerlist}})
+    endif()
+    set_target_properties(${PROJECT_NAME}
+        PROPERTIES
+            FOLDER "modules"
+    )
+    target_compile_definitions(${PROJECT_NAME}
+        PUBLIC
+            "LITIV_DEBUG=$<CONFIG:Debug>"
+    )
+    target_include_directories(${PROJECT_NAME}
+        PUBLIC
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
+    )
+    install(
+        TARGETS ${PROJECT_NAME}
+        EXPORT "litiv-targets"
+        RUNTIME DESTINATION "bin"
+        LIBRARY DESTINATION "lib"
+        ARCHIVE DESTINATION "lib"
+        INCLUDES DESTINATION "include"
+        COMPONENT "modules"
+    )
+    install(
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        DESTINATION "include"
+        COMPONENT "modules"
+        FILES_MATCHING PATTERN "*.hpp"
+    )
+    install(
+        DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include"
+        DESTINATION "include"
+        COMPONENT "modules"
+        FILES_MATCHING PATTERN "*.hpp"
+    )
 endmacro(litiv_module)
 
-macro(litiv_3rdparty_module name)
-    project(litiv_${name})
-    append_internal_list(litiv_3rdparty_modules ${name})
-    append_internal_list(litiv_projects litiv_${name})
-    set(LITIV_CURRENT_3RDPARTY_MODULE_NAME ${name})
-    set(LITIV_CURRENT_PROJECT_NAME litiv_${name})
+macro(litiv_3rdparty_module name sourcelist headerlist)
+    project(litiv_3rdparty_${name})
+    if(NOT(${name} STREQUAL "world"))
+        append_internal_list(litiv_3rdparty_modules ${name})
+        foreach(source ${${sourcelist}})
+            append_internal_list(litiv_3rdparty_modules_sourcelist "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/${source}")
+        endforeach()
+        append_internal_list(litiv_3rdparty_modules_include_dirs "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>")
+        append_internal_list(litiv_3rdparty_modules_include_dirs "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>")
+    endif()
+    append_internal_list(litiv_projects ${PROJECT_NAME})
+#    if(BUILD_SHARED_LIBS)
+#        add_library(${PROJECT_NAME} SHARED ${${sourcelist}} ${${headerlist}})
+#        set_target_properties(${PROJECT_NAME}
+#            PROPERTIES
+#                VERSION "${LITIV_VERSION}"
+#                SOVERSION "${LITIV_VERSION_ABI}"
+#        )
+#        target_compile_definitions(${PROJECT_NAME}
+#            PRIVATE
+#                "LV_EXPORT_API"
+#            INTERFACE
+#                "LV_IMPORT_API"
+#        )
+#        if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
+#            # disables C4251 + C4275 to allow STL/template classes to be used in exported classes/members
+#            # need to eliminate these using pImpl idiom in exported classes to add abstraction layer @@@@
+#            target_compile_options(${PROJECT_NAME}
+#                PUBLIC
+#                    /wd4251 # disables C4251, "'identifier' : class 'type' needs to have dll-interface to be used by clients of class 'type2'"
+#                    /wd4275 # disables C4275, "non DLL-interface classkey 'identifier' used as base for DLL-interface classkey 'identifier'"
+#            )
+#        endif()
+#    else()
+        add_library(${PROJECT_NAME} STATIC ${${sourcelist}} ${${headerlist}})
+#    endif()
+    set_target_properties(${PROJECT_NAME}
+        PROPERTIES
+            FOLDER "3rdparty"
+    )
+    target_compile_definitions(${PROJECT_NAME}
+        PUBLIC
+            "LITIV_DEBUG=$<CONFIG:Debug>"
+    )
+    target_include_directories(${PROJECT_NAME}
+        PUBLIC
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
+    )
+    install(
+        TARGETS ${PROJECT_NAME}
+        EXPORT "litiv-targets"
+        RUNTIME DESTINATION "bin"
+        LIBRARY DESTINATION "lib"
+        ARCHIVE DESTINATION "lib"
+        INCLUDES DESTINATION "include"
+        COMPONENT "3rdparty"
+    )
+    install(
+        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include"
+        DESTINATION "include"
+        COMPONENT "3rdparty"
+        FILES_MATCHING PATTERN "*.hpp"
+    )
+    install(
+        DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include"
+        DESTINATION "include"
+        COMPONENT "3rdparty"
+        FILES_MATCHING PATTERN "*.hpp"
+    )
 endmacro(litiv_3rdparty_module)
 
-macro(litiv_app name)
+macro(litiv_app name sources)
     project(litiv_app_${name})
     append_internal_list(litiv_apps ${name})
-    append_internal_list(litiv_projects litiv_app_${name})
-    set(LITIV_CURRENT_APP_NAME ${name})
-    set(LITIV_CURRENT_PROJECT_NAME litiv_app_${name})
+    append_internal_list(litiv_projects ${PROJECT_NAME})
+    add_executable(${PROJECT_NAME} ${sources})
+    set_target_properties(${PROJECT_NAME}
+        PROPERTIES
+            FOLDER "apps"
+            DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
+    )
+    target_link_libraries(${PROJECT_NAME} litiv_world)
+    install(
+        TARGETS ${PROJECT_NAME}
+        RUNTIME DESTINATION "bin"
+        COMPONENT "apps"
+    )
 endmacro(litiv_app)
 
-macro(litiv_sample name)
+macro(litiv_sample name sources)
     project(litiv_sample_${name})
     append_internal_list(litiv_samples ${name})
-    append_internal_list(litiv_projects litiv_sample_${name})
-    set(LITIV_CURRENT_SAMPLE_NAME ${name})
-    set(LITIV_CURRENT_PROJECT_NAME litiv_sample_${name})
+    append_internal_list(litiv_projects ${PROJECT_NAME})
+    add_executable(${PROJECT_NAME} ${sources})
+    set_target_properties(${PROJECT_NAME}
+        PROPERTIES
+            FOLDER "samples"
+            DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
+    )
+    target_link_libraries(${PROJECT_NAME} litiv_world)
+    install(
+        TARGETS ${PROJECT_NAME}
+        RUNTIME DESTINATION "bin"
+        COMPONENT "samples"
+    )
 endmacro(litiv_sample)
 
 macro(set_eval name)

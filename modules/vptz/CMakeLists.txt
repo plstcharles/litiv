@@ -17,12 +17,12 @@
 
 if(USE_GLSL)
 
-    file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/defines.hpp)
+    file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/defines.hpp")
     configure_file(
         "${CMAKE_SOURCE_DIR}/modules/utils/include/litiv/utils/defines.hpp.in"
         "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/defines.hpp"
     )
-    file(REMOVE ${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/utils.hpp)
+    file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/utils.hpp")
     configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/include/litiv/vptz/utils.hpp.in"
         "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/utils.hpp"
@@ -41,31 +41,43 @@ if(USE_GLSL)
     if(USE_VPTZ_STANDALONE)
 
         project(vptz)
-
-        add_library(vptz SHARED ${SOURCE_FILES} ${INCLUDE_FILES})
-        set_target_properties(vptz PROPERTIES FOLDER "vptz")
-        target_compile_definitions(vptz PRIVATE LV_EXPORT_API)
+        add_library(vptz SHARED "${SOURCE_FILES};${INCLUDE_FILES}")
+        set_target_properties(vptz
+            PROPERTIES
+                FOLDER "vptz"
+        )
+        target_compile_definitions(vptz
+            PUBLIC
+                "LITIV_DEBUG=$<CONFIG:Debug>"
+            PRIVATE
+                "LV_EXPORT_API"
+            INTERFACE
+                "LV_IMPORT_API"
+        )
         if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
             # disables C4251 + C4275 to allow STL/template classes to be used in exported classes/members
-            # need to eliminate these using pImpl idiom in exported classes to add abstraction layer @@@@
-            target_compile_options(vptz PUBLIC /wd4251) # disables C4251, "'identifier' : class 'type' needs to have dll-interface to be used by clients of class 'type2'"
-            target_compile_options(vptz PUBLIC /wd4275) # disables C4275, "non DLL-interface classkey 'identifier' used as base for DLL-interface classkey 'identifier'"
+            target_compile_options(vptz
+                PUBLIC
+                    # need to eliminate these using pImpl idiom in exported classes to add abstraction layer @@@@
+                    /wd4251 # disables C4251, "'identifier' : class 'type' needs to have dll-interface to be used by clients of class 'type2'"
+                    /wd4275 # disables C4275, "non DLL-interface classkey 'identifier' used as base for DLL-interface classkey 'identifier'"
+            )
         endif()
         target_include_directories(vptz
             PUBLIC
                 "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
                 "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
-                "$<INSTALL_INTERFACE:include/>"
                 "$<BUILD_INTERFACE:${OpenCV_INCLUDE_DIRS}>"
                 "$<BUILD_INTERFACE:${OpenGL_INCLUDE_DIRS}>"
                 "$<BUILD_INTERFACE:${GLEW_INCLUDE_DIRS}>"
                 "$<BUILD_INTERFACE:${GLM_INCLUDE_DIRS}>"
         )
         target_link_libraries(vptz
-            ${OpenCV_LIBRARIES}
-            ${OPENGL_LIBRARIES}
-            ${GLEW_LIBRARIES}
-            ${GLM_LIBRARIES}
+            PUBLIC
+                "${OpenCV_LIBRARIES}"
+                "${OPENGL_LIBRARIES}"
+                "${GLEW_LIBRARIES}"
+                "${GLM_LIBRARIES}"
         )
         if(USE_GLFW)
             target_include_directories(vptz
@@ -73,7 +85,8 @@ if(USE_GLSL)
                     "$<BUILD_INTERFACE:${GLFW_INCLUDE_DIR}>"
             )
             target_link_libraries(vptz
-                ${GLFW_LIBRARIES}
+                PUBLIC
+                    "${GLFW_LIBRARIES}"
             )
         elseif(USE_FREEGLUT)
             target_include_directories(vptz
@@ -81,49 +94,40 @@ if(USE_GLSL)
                     "$<BUILD_INTERFACE:${FREEGLUT_INCLUDE_DIR}>"
             )
             target_link_libraries(vptz
-                ${FREEGLUT_LIBRARY}
+                PUBLIC
+                    "${FREEGLUT_LIBRARY}"
             )
         endif()
-
-        install(TARGETS vptz
-            RUNTIME DESTINATION bin
-            LIBRARY DESTINATION lib
-            ARCHIVE DESTINATION lib
-            COMPONENT vptz
+        install(
+            TARGETS vptz
+            EXPORT "litiv-targets"
+            RUNTIME DESTINATION "bin"
+            LIBRARY DESTINATION "lib"
+            ARCHIVE DESTINATION "lib"
+            INCLUDES DESTINATION "include"
+            COMPONENT "vptz"
+        )
+        install(
+            DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include"
+            DESTINATION "include"
+            COMPONENT "vptz"
+            FILES_MATCHING PATTERN "*.hpp"
+        )
+        install(
+            DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include"
+            DESTINATION "include"
+            COMPONENT "vptz"
+            FILES_MATCHING PATTERN "*.hpp"
         )
 
     else(NOT USE_VPTZ_STANDALONE)
 
-        litiv_module(vptz)
-
-        add_library(litiv_vptz STATIC ${SOURCE_FILES} ${INCLUDE_FILES})
-        set_target_properties(litiv_vptz PROPERTIES FOLDER "modules")
-        #target_compile_definitions(litiv_vptz PRIVATE LV_EXPORT_API)
-        target_include_directories(litiv_vptz
+        litiv_module(vptz SOURCE_FILES INCLUDE_FILES)
+        target_link_libraries(litiv_vptz
             PUBLIC
-                "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
-                "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
-                "$<INSTALL_INTERFACE:include/>"
+                litiv_utils
         )
-        target_link_libraries(litiv_vptz litiv_utils)
 
-        install(TARGETS litiv_vptz
-            RUNTIME DESTINATION bin
-            LIBRARY DESTINATION lib
-            ARCHIVE DESTINATION lib
-            COMPONENT modules
-        )
-        
     endif(USE_VPTZ_STANDALONE)
-    
-    install(DIRECTORY "include/"
-        DESTINATION "include/"
-        COMPONENT modules
-        FILES_MATCHING PATTERN "*.hpp"
-    )
-    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/vptz/utils.hpp"
-        DESTINATION "include/litiv/vptz/"
-        COMPONENT modules
-    )
 
 endif(USE_GLSL)
