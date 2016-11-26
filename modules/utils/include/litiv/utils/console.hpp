@@ -478,7 +478,7 @@ namespace lv {
 
 #if defined(_MSC_VER)
     /// sets the console window to a certain size (with optional buffer resizing)
-    void SetConsoleWindowSize(int x, int y, int buffer_lines=-1) {
+    inline void SetConsoleWindowSize(int x, int y, int buffer_lines=-1) {
         // derived from http://www.cplusplus.com/forum/windows/121444/
         HANDLE h = GetStdHandle(STD_OUTPUT_HANDLE);
         if(h==INVALID_HANDLE_VALUE)
@@ -510,7 +510,7 @@ namespace lv {
 #endif //defined(_MSC_VER)
 
     /// shows a progression bar in the console
-    void updateConsoleProgressBar(const std::string& sMsg, float fCompletion, size_t nBarCols=20) {
+    inline void updateConsoleProgressBar(const std::string& sMsg, float fCompletion, size_t nBarCols=20) {
         if(nBarCols==0)
             return;
         const int nRows = rlutil::trows();
@@ -544,7 +544,7 @@ namespace lv {
     }
 
     /// cleans a specific row from the console (default=last)
-    void cleanConsoleRow(int nRowIdx=INT_MAX) {
+    inline void cleanConsoleRow(int nRowIdx=INT_MAX) {
         if(nRowIdx<0)
             return;
         const int nRows = rlutil::trows();
