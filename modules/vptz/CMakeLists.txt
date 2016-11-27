@@ -65,8 +65,8 @@ if(USE_GLSL)
         endif()
         target_include_directories(vptz
             PUBLIC
-                "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
-                "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
                 "$<BUILD_INTERFACE:${OpenCV_INCLUDE_DIRS}>"
                 "$<BUILD_INTERFACE:${OpenGL_INCLUDE_DIRS}>"
                 "$<BUILD_INTERFACE:${GLEW_INCLUDE_DIRS}>"
@@ -101,23 +101,29 @@ if(USE_GLSL)
         install(
             TARGETS vptz
             EXPORT "litiv-targets"
+            COMPONENT "vptz"
             RUNTIME DESTINATION "bin"
             LIBRARY DESTINATION "lib"
             ARCHIVE DESTINATION "lib"
             INCLUDES DESTINATION "include"
-            COMPONENT "vptz"
         )
         install(
             DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include"
-            DESTINATION "include"
+            DESTINATION "."
             COMPONENT "vptz"
-            FILES_MATCHING PATTERN "*.hpp"
+            FILES_MATCHING
+                PATTERN "*.hpp"
+                PATTERN "*.hxx"
+                PATTERN "*.h"
         )
         install(
             DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include"
-            DESTINATION "include"
+            DESTINATION "."
             COMPONENT "vptz"
-            FILES_MATCHING PATTERN "*.hpp"
+            FILES_MATCHING
+                PATTERN "*.hpp"
+                PATTERN "*.hxx"
+                PATTERN "*.h"
         )
 
     else(NOT USE_VPTZ_STANDALONE)

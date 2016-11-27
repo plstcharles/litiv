@@ -68,7 +68,10 @@ if(USE_WORLD_SOURCE_GLOB)
         foreach(lib ${libs})
             if(NOT(";${litiv_3rdparty_module_names};" MATCHES ";${lib};") AND NOT(";${litiv_module_names};" MATCHES ";${lib};"))
                 #message("module '${litiv_3rdparty_module_name}' had lib '${lib}'")
-                target_link_libraries(litiv_world PUBLIC "${lib}")
+                target_link_libraries(litiv_world
+                    PUBLIC
+                        "${lib}"
+                )
             endif()
         endforeach()
         get_property(includedirs
@@ -77,7 +80,10 @@ if(USE_WORLD_SOURCE_GLOB)
             PROPERTY
                 INCLUDE_DIRECTORIES
         )
-        target_include_directories(litiv_world PUBLIC "$<BUILD_INTERFACE:${includedirs}>")
+        target_include_directories(litiv_world
+            PUBLIC
+                "$<BUILD_INTERFACE:${includedirs}>"
+        )
     endforeach()
     foreach(litiv_module_name ${litiv_module_names})
         add_dependencies(litiv_world "${litiv_module_name}")
@@ -90,7 +96,10 @@ if(USE_WORLD_SOURCE_GLOB)
         foreach(lib ${libs})
             if(NOT(";${litiv_3rdparty_module_names};" MATCHES ";${lib};") AND NOT(";${litiv_module_names};" MATCHES ";${lib};"))
                 #message("module '${litiv_module_name}' had lib '${lib}'")
-                target_link_libraries(litiv_world PUBLIC "${lib}")
+                target_link_libraries(litiv_world
+                    PUBLIC
+                        "${lib}"
+                )
             endif()
         endforeach()
         get_property(includedirs
@@ -99,7 +108,10 @@ if(USE_WORLD_SOURCE_GLOB)
             PROPERTY
                 INCLUDE_DIRECTORIES
         )
-        target_include_directories(litiv_world PUBLIC "$<BUILD_INTERFACE:${includedirs}>")
+        target_include_directories(litiv_world
+            PUBLIC
+                "$<BUILD_INTERFACE:${includedirs}>"
+        )
     endforeach()
 else()
     litiv_module(world SOURCE_FILES INCLUDE_FILES)

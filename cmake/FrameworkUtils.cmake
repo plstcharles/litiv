@@ -80,29 +80,35 @@ macro(litiv_module name sourcelist headerlist)
     )
     target_include_directories(${PROJECT_NAME}
         PUBLIC
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     )
     install(
         TARGETS ${PROJECT_NAME}
         EXPORT "litiv-targets"
+        COMPONENT "modules"
         RUNTIME DESTINATION "bin"
         LIBRARY DESTINATION "lib"
         ARCHIVE DESTINATION "lib"
         INCLUDES DESTINATION "include"
-        COMPONENT "modules"
     )
     install(
         DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include"
-        DESTINATION "include"
+        DESTINATION "."
         COMPONENT "modules"
-        FILES_MATCHING PATTERN "*.hpp"
+        FILES_MATCHING
+            PATTERN "*.hpp"
+            PATTERN "*.hxx"
+            PATTERN "*.h"
     )
     install(
         DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include"
-        DESTINATION "include"
+        DESTINATION "."
         COMPONENT "modules"
-        FILES_MATCHING PATTERN "*.hpp"
+        FILES_MATCHING
+            PATTERN "*.hpp"
+            PATTERN "*.hxx"
+            PATTERN "*.h"
     )
 endmacro(litiv_module)
 
@@ -150,29 +156,35 @@ macro(litiv_3rdparty_module name sourcelist headerlist)
     )
     target_include_directories(${PROJECT_NAME}
         PUBLIC
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/>"
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>"
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     )
     install(
         TARGETS ${PROJECT_NAME}
         EXPORT "litiv-targets"
+        COMPONENT "3rdparty"
         RUNTIME DESTINATION "bin"
         LIBRARY DESTINATION "lib"
         ARCHIVE DESTINATION "lib"
         INCLUDES DESTINATION "include"
-        COMPONENT "3rdparty"
     )
     install(
         DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include"
-        DESTINATION "include"
+        DESTINATION "."
         COMPONENT "3rdparty"
-        FILES_MATCHING PATTERN "*.hpp"
+        FILES_MATCHING
+            PATTERN "*.hpp"
+            PATTERN "*.hxx"
+            PATTERN "*.h"
     )
     install(
         DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include"
-        DESTINATION "include"
+        DESTINATION "."
         COMPONENT "3rdparty"
-        FILES_MATCHING PATTERN "*.hpp"
+        FILES_MATCHING
+            PATTERN "*.hpp"
+            PATTERN "*.hxx"
+            PATTERN "*.h"
     )
 endmacro(litiv_3rdparty_module)
 
