@@ -247,7 +247,7 @@ if(WIN32)
     set(package_config_install_dirs
         "lib/cmake/litiv"
         "lib"
-        "."
+        "${CMAKE_INSTALL_PREFIX}"
     )
 else()
     set(package_config_install_dirs
