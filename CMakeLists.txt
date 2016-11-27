@@ -35,14 +35,6 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set(EXTERNAL_DATA_ROOT "${CMAKE_SOURCE_DIR}/data/" CACHE PATH "External data root folder (this is where all datasets should be located for applications to find them automatically)")
 set(SAMPLES_DATA_ROOT "${CMAKE_SOURCE_DIR}/samples/data/" CACHE PATH "Sample data root folder (should contain necessary files so that samples can be used out-of-the-box)")
 set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "Install path prefix, prepended onto install directories (optional)")
-if(WIN32)
-    if(MSVC AND (MSVC_VERSION LESS 1900))
-        message(FATAL_ERROR "MSVC toolchains older than 2015 (v140) are not supported!")
-    elseif(MSVC)
-        set(CMAKE_USE_RELATIVE_PATHS ON CACHE INTERNAL "" FORCE)
-        set(CMAKE_DEBUG_POSTFIX "d" CACHE INTERNAL "" FORCE)
-    endif()
-endif()
 # add hardcoded guesses for find_package here (caution: top level project is not defined yet!)
 list(APPEND CMAKE_PREFIX_PATH
     "$ENV{USER_DEVELOP}/opencv/build-litiv/install/" "$ENV{USER_DEVELOP}/opencv/build/" "$ENV{USER_DEVELOP}/opencv/"
@@ -60,6 +52,7 @@ set(LITIV_VERSION_MAJOR 1) # last change: 2015/10
 set(LITIV_VERSION_MINOR 3) # last change: 2016/10
 set(LITIV_VERSION_PATCH 2) # last change: 2016/11
 set(LITIV_VERSION "${LITIV_VERSION_MAJOR}.${LITIV_VERSION_MINOR}.${LITIV_VERSION_PATCH}")
+set(LITIV_VERSION_PLAIN "${LITIV_VERSION_MAJOR}${LITIV_VERSION_MINOR}${LITIV_VERSION_PATCH}")
 set(LITIV_VERSION_ABI 0) # still unstable
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -189,6 +182,12 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
         set(USE_POSIX_ALIGNED_ALLOC 0 CACHE INTERNAL "Have function posix_memalign")
     endif()
 elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
+    if(MSVC_VERSION LESS 1900)
+        message(FATAL_ERROR "MSVC toolchains older than 2015 (v140) are not supported!")
+    endif()
+    #set(CMAKE_USE_RELATIVE_PATHS ON CACHE INTERNAL "" FORCE)
+    set(CMAKE_DEBUG_POSTFIX "d" CACHE INTERNAL "" FORCE)
+    option(USE_VERSION_TAGS "Apply version tags suffixes on built libraries" ON)
     option(BUILD_SHARED_LIBS "Build shared libraries (.dll) instead of static ones (.lib)" OFF)
     if(BUILD_SHARED_LIBS)
         message("LITIV DLLs are still missing symbol exports, and might be incomplete for some targets")

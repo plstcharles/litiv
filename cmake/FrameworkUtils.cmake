@@ -70,6 +70,14 @@ macro(litiv_module name sourcelist headerlist)
     else()
         add_library(${PROJECT_NAME} STATIC ${${sourcelist}} ${${headerlist}})
     endif()
+    if(WIN32)
+        if(USE_VERSION_TAGS)
+            set_target_properties(${PROJECT_NAME}
+                PROPERTIES
+                    OUTPUT_NAME "${PROJECT_NAME}${LITIV_VERSION_PLAIN}"
+            )
+        endif()
+    endif()
     set_target_properties(${PROJECT_NAME}
         PROPERTIES
             FOLDER "modules"
@@ -146,6 +154,14 @@ macro(litiv_3rdparty_module name sourcelist headerlist)
 #    else()
         add_library(${PROJECT_NAME} STATIC ${${sourcelist}} ${${headerlist}})
 #    endif()
+    if(WIN32)
+        if(USE_VERSION_TAGS)
+            set_target_properties(${PROJECT_NAME}
+                PROPERTIES
+                    OUTPUT_NAME "${PROJECT_NAME}${LITIV_VERSION_PLAIN}"
+            )
+        endif()
+    endif()
     set_target_properties(${PROJECT_NAME}
         PROPERTIES
             FOLDER "3rdparty"
