@@ -57,11 +57,6 @@ if(USE_WORLD_SOURCE_GLOB)
     list(LENGTH WORLD_SOURCE_FILES world_source_count)
     litiv_module(world WORLD_SOURCE_FILES INCLUDE_FILES)
     message(STATUS "litiv_world will pull ${world_source_count} source files from ${total_module_count} modules...")
-    target_include_directories(${PROJECT_NAME}
-        PUBLIC
-            ${litiv_3rdparty_modules_include_dirs}
-            ${litiv_modules_include_dirs}
-    )
     foreach(litiv_3rdparty_module_name ${litiv_3rdparty_module_names})
         add_dependencies(litiv_world "${litiv_3rdparty_module_name}")
         get_property(libs
@@ -73,9 +68,16 @@ if(USE_WORLD_SOURCE_GLOB)
         foreach(lib ${libs})
             if(NOT(";${litiv_3rdparty_module_names};" MATCHES ";${lib};") AND NOT(";${litiv_module_names};" MATCHES ";${lib};"))
                 #message("module '${litiv_3rdparty_module_name}' had lib '${lib}'")
-                target_link_libraries(litiv_world PUBLIC ${lib})
+                target_link_libraries(litiv_world PUBLIC "${lib}")
             endif()
         endforeach()
+        get_property(includedirs
+            TARGET
+                ${litiv_3rdparty_module_name}
+            PROPERTY
+                INCLUDE_DIRECTORIES
+        )
+        target_include_directories(litiv_world PUBLIC "$<BUILD_INTERFACE:${includedirs}>")
     endforeach()
     foreach(litiv_module_name ${litiv_module_names})
         add_dependencies(litiv_world "${litiv_module_name}")
@@ -88,9 +90,16 @@ if(USE_WORLD_SOURCE_GLOB)
         foreach(lib ${libs})
             if(NOT(";${litiv_3rdparty_module_names};" MATCHES ";${lib};") AND NOT(";${litiv_module_names};" MATCHES ";${lib};"))
                 #message("module '${litiv_module_name}' had lib '${lib}'")
-                target_link_libraries(litiv_world PUBLIC ${lib})
+                target_link_libraries(litiv_world PUBLIC "${lib}")
             endif()
         endforeach()
+        get_property(includedirs
+            TARGET
+                ${litiv_module_name}
+            PROPERTY
+                INCLUDE_DIRECTORIES
+        )
+        target_include_directories(litiv_world PUBLIC "$<BUILD_INTERFACE:${includedirs}>")
     endforeach()
 else()
     litiv_module(world SOURCE_FILES INCLUDE_FILES)
