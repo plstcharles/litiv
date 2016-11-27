@@ -234,7 +234,7 @@ add_subdirectory(apps)
 add_subdirectory(doc)
 
 write_basic_package_version_file(
-    "${CMAKE_BINARY_DIR}/cmake/litiv-config-version.cmake"
+    "${CMAKE_BINARY_DIR}/cmake/generated/litiv-config-version.cmake"
     VERSION
         "${LITIV_VERSION}"
     COMPATIBILITY
@@ -242,14 +242,14 @@ write_basic_package_version_file(
 )
 configure_package_config_file(
     "${CMAKE_SOURCE_DIR}/cmake/litiv-config.cmake.in"
-    "${CMAKE_BINARY_DIR}/cmake/litiv-config.cmake"
+    "${CMAKE_BINARY_DIR}/cmake/generated/litiv-config.cmake"
     INSTALL_DESTINATION
         "lib/cmake/litiv"
 )
 install(
     FILES
-        "${CMAKE_BINARY_DIR}/cmake/litiv-config.cmake"
-        "${CMAKE_BINARY_DIR}/cmake/litiv-config-version.cmake"
+        "${CMAKE_BINARY_DIR}/cmake/generated/litiv-config.cmake"
+        "${CMAKE_BINARY_DIR}/cmake/generated/litiv-config-version.cmake"
     DESTINATION
         "lib/cmake/litiv"
 )
