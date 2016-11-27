@@ -1,4 +1,21 @@
 @PACKAGE_INIT@
 
+include(CMakeFindDependencyMacro)
+find_dependency(OpenCV 3.0)
+find_dependency(OpenGL)
+find_dependency(FREEGLUT)
+find_dependency(GLFW)
+find_dependency(GLEW)
+find_dependency(GLM)
+find_dependency(OpenGM)
+if(WIN32)
+    find_dependency(KinectSDK2)
+endif()
 include("${CMAKE_CURRENT_LIST_DIR}/litiv-targets.cmake")
+
+set_and_check(LITIV_RUNTIME_DIR "@PACKAGE_RUNTIME_INSTALL_DIR@")
+set_and_check(LITIV_INCLUDE_DIR "@PACKAGE_INCLUDE_INSTALL_DIR@")
+set_and_check(LITIV_LIBRARY_DIR "@PACKAGE_LIBRARY_INSTALL_DIR@")
+#set_and_check(LITIV_CONFIG_DIR "@PACKAGE_CONFIG_INSTALL_DIR@")
+
 check_required_components(litiv)

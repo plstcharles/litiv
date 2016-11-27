@@ -239,24 +239,56 @@ write_basic_package_version_file(
     COMPATIBILITY
         ExactVersion # will switch to 'SameMajorVersion' later, when api more stable
 )
-configure_package_config_file(
-    "${CMAKE_SOURCE_DIR}/cmake/litiv-config.cmake.in"
-    "${CMAKE_BINARY_DIR}/cmake/generated/litiv-config.cmake"
-    INSTALL_DESTINATION
+set(RUNTIME_INSTALL_DIR "bin")
+set(INCLUDE_INSTALL_DIR "include")
+set(LIBRARY_INSTALL_DIR "lib")
+set(CONFIG_INSTALL_DIR "etc/litiv")
+if(WIN32)
+    set(package_config_install_dirs
         "lib/cmake/litiv"
-)
-install(
-    FILES
-        "${CMAKE_BINARY_DIR}/cmake/generated/litiv-config.cmake"
-        "${CMAKE_BINARY_DIR}/cmake/generated/litiv-config-version.cmake"
-    DESTINATION
+        "lib"
+        "."
+    )
+else()
+    set(package_config_install_dirs
         "lib/cmake/litiv"
-)
-install(
-    EXPORT
-        "litiv-targets"
-    NAMESPACE
-        "litiv::"
-    DESTINATION
-        "lib/cmake/litiv"
-)
+        # @@@@ tbd
+    )
+endif()
+list(LENGTH package_config_install_dirs package_config_install_dir_count)
+set(package_config_install_dir_index 0)
+while(package_config_install_dir_index LESS package_config_install_dir_count)
+    list(GET package_config_install_dirs ${package_config_install_dir_index} package_config_install_dir)
+    math(EXPR package_config_install_dir_index "${package_config_install_dir_index}+1")
+    configure_package_config_file(
+        "${CMAKE_SOURCE_DIR}/cmake/litiv-config.cmake.in"
+        "${CMAKE_BINARY_DIR}/cmake/generated/litiv-config-${package_config_install_dir_index}.cmake"
+        INSTALL_DESTINATION
+            "${package_config_install_dir}"
+        PATH_VARS
+            RUNTIME_INSTALL_DIR
+            INCLUDE_INSTALL_DIR
+            LIBRARY_INSTALL_DIR
+            CONFIG_INSTALL_DIR
+    )
+    install(
+        FILES
+            "${CMAKE_BINARY_DIR}/cmake/generated/litiv-config-version.cmake"
+        DESTINATION
+            "${package_config_install_dir}"
+    )
+    install(
+        FILES
+            "${CMAKE_BINARY_DIR}/cmake/generated/litiv-config-${package_config_install_dir_index}.cmake"
+        DESTINATION
+            "${package_config_install_dir}"
+        RENAME
+            "litiv-config.cmake"
+    )
+    install(
+        EXPORT
+            "litiv-targets"
+        DESTINATION
+            "${package_config_install_dir}"
+    )
+endwhile()
