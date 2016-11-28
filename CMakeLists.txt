@@ -72,10 +72,12 @@ elseif(CMAKE_SIZEOF_VOID_P EQUAL 4) # 32-bit toolchain/platform
 else()
     message(FATAL_ERROR "Could not detect x64/x86 platform identity using void pointer size (s=${CMAKE_SIZEOF_VOID_P}).")
 endif()
+option(USE_WORLD_SOURCE_GLOB "Compile all LITIV modules as part of the world module instead of soft-linking them" OFF)
 option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark implementation in litiv_datasets (cleaned 3rd party code; will use an approximative solution otherwise)" ON)
 option(USE_CVCORE_WITH_UTILS "Include OpenCV core components in utils module" ON)
 option(USE_FAST_MATH "Enable fast math optimizations" OFF)
 mark_as_advanced(
+    USE_WORLD_SOURCE_GLOB
     USE_BSDS500_BENCHMARK
     USE_CVCORE_WITH_UTILS
     USE_FAST_MATH
@@ -161,6 +163,7 @@ initialize_internal_list(litiv_modules_sourcelist)
 initialize_internal_list(litiv_apps)
 initialize_internal_list(litiv_samples)
 add_subdirectory(cmake/checks/simd)
+add_definitions(-DLITIV_BUILD)
 if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
     option(BUILD_SHARED_LIBS "Build shared libraries (.so) instead of static ones (.a)" ON)
     if(NOT CMAKE_CROSSCOMPILING)

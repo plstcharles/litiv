@@ -64,6 +64,12 @@
         #ifndef __func__
             #define __func__ __FUNCTION__
         #endif //ndef(__func__)
+        #ifndef _SCL_SECURE_NO_WARNINGS
+            #define _SCL_SECURE_NO_WARNINGS
+        #endif //ndef(_SCL_SECURE_NO_WARNINGS)
+        #ifndef _CRT_SECURE_NO_WARNINGS
+            #define _CRT_SECURE_NO_WARNINGS
+        #endif //ndef(_CRT_SECURE_NO_WARNINGS)
     #else //ndef(_MSC_VER)
         #if __cplusplus<201402L
             #error "This project requires full C++14 support (including constexpr and SFINAE)."
@@ -100,22 +106,38 @@
             lvError_("glErrorCheck failed [code=%d, msg=%s]",__errn,gluErrorString(__errn)); \
     }
     #ifdef _DEBUG
-        #ifndef LITIV_DEBUG
-            #error "Missing external compiler definition 'LITIV_DEBUG'."
-        #elif !LITIV_DEBUG
-            #error "Current build config mismatch with LITIV internal build config."
-        #endif //!LITIV_DEBUG
+        #ifdef LITIV_BUILD
+            #ifndef LITIV_DEBUG
+                #error "Missing compiler definition 'LITIV_DEBUG'."
+            #elif !LITIV_DEBUG
+                #error "Current build config mismatch with LITIV internal build config."
+            #endif //!LITIV_DEBUG
+        #else //ndef(LITIV_BUILD)
+            #ifndef LITIV_DEBUG
+                #define LITIV_DEBUG 1
+            #elif !LITIV_DEBUG
+                #error "Current build config mismatch with LITIV external build config."
+            #endif //!LITIV_DEBUG
+        #endif //ndef(LITIV_BUILD)
         #define lvDbgAssert(expr) lvAssert(expr)
         #define lvDbgAssert_(expr,msg) lvAssert_(expr,msg)
         #define lvDbgAssert__(expr,msg,...) lvAssert__(expr,msg,__VA_ARGS__)
         #define lvDbgExceptionWatch lv::UncaughtExceptionLogger XSTR_CONCAT(__logger,__LINE__)(__PRETTY_FUNCTION__,__FILE__,__LINE__)
         #define glDbgErrorCheck glErrorCheck
     #else //ndef(_DEBUG)
-        #ifndef LITIV_DEBUG
-            #error "Missing external compiler definition 'LITIV_DEBUG'."
-        #elif LITIV_DEBUG
-            #error "Current build config mismatch with LITIV internal build config."
-        #endif //LITIV_DEBUG
+        #ifdef LITIV_BUILD
+            #ifndef LITIV_DEBUG
+                #error "Missing compiler definition 'LITIV_DEBUG'."
+            #elif LITIV_DEBUG
+                #error "Current build config mismatch with LITIV internal build config."
+            #endif //LITIV_DEBUG
+        #else //ndef(LITIV_BUILD)
+            #ifndef LITIV_DEBUG
+                #define LITIV_DEBUG 0
+            #elif LITIV_DEBUG
+                #error "Current build config mismatch with LITIV external build config."
+            #endif //LITIV_DEBUG
+        #endif //ndef(LITIV_BUILD)
         #define lvDbgAssert(expr)
         #define lvDbgAssert_(expr,msg)
         #define lvDbgAssert__(expr,msg,...)
@@ -139,7 +161,7 @@
 #ifndef __LV_CONFIG_DEFS__
     #define __LV_CONFIG_DEFS__
 
-    #define USE_VPTZ_STANDALONE       @USE_VPTZ_STANDALONE@
+    #define USE_WORLD_SOURCE_GLOB     @USE_WORLD_SOURCE_GLOB@
     #define USE_BSDS500_BENCHMARK     @USE_BSDS500_BENCHMARK@
     #define USE_KINECTSDK_STANDALONE  @USE_KINECTSDK_STANDALONE@
     #define USE_CVCORE_WITH_UTILS     @USE_CVCORE_WITH_UTILS@
@@ -148,8 +170,13 @@
     #define CACHE_MAX_SIZE_GB         @DATASETS_CACHE_SIZE@LLU
     #define TARGET_PLATFORM_x64       @TARGET_PLATFORM_x64@
     #define DEFAULT_NB_THREADS        1
+    #define LITIV_SHARED              @BUILD_SHARED_LIBS@
+    #define LITIV_STATIC              (!(LITIV_SHARED))
 
     #if (defined(_MSC_VER) || defined(_WIN32) || defined(WIN32) || defined(__CYGWIN__))
+        #ifdef _MSC_VER
+            #define USE_VERSION_TAGS  @USE_VERSION_TAGS@
+        #endif //def(_MSC_VER)
         #if (defined(LV_EXPORT_API) && defined(LV_IMPORT_API))
             #error "API import/export config error"
         #elif defined(LV_EXPORT_API)
@@ -202,6 +229,7 @@
         #define GLEW_EXPERIMENTAL     @GLEW_EXPERIMENTAL@
         #define HAVE_GLFW             @USE_GLFW@
         #define HAVE_FREEGLUT         @USE_FREEGLUT@
+        #define USE_VPTZ_STANDALONE   @USE_VPTZ_STANDALONE@
     #endif //HAVE_GLSL
 
     #define HAVE_CUDA                 @USE_CUDA@
@@ -221,6 +249,8 @@
         #define HAVE_OPENGM_GUROBI    @USE_OPENGM_WITH_GUROBI@
         #define HAVE_OPENGM_HDF5      @USE_OPENGM_WITH_HDF5@
     #endif //HAVE_OPENGM
+
+    #define HAVE_KINECTSDK            @USE_KINECTSDK@
 
     #define HAVE_MMX                  @USE_MMX@
     #define HAVE_SSE                  @USE_SSE@

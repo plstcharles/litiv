@@ -2,7 +2,7 @@
 // This file is part of the LITIV framework; visit the original repository at
 // https://github.com/plstcharles/litiv for more information.
 //
-// Copyright 2015 Pierre-Luc St-Charles; pierre-luc.st-charles<at>polymtl.ca
+// Copyright 2016 Pierre-Luc St-Charles; pierre-luc.st-charles<at>polymtl.ca
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,13 +15,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "litiv/litiv.hpp"
+#pragma once
 
-bool lv::info() {
-#if LITIV_DEBUG
-    std::cout << lv::getVersionStamp() << " [Build='Debug']" << std::endl;
-#else //!LITIV_DEBUG
-    std::cout << lv::getVersionStamp() << " [Build='Release']" << std::endl;
-#endif //!LITIV_DEBUG
-    return true;
-}
+#include "litiv/utils/defines.hpp"

@@ -25,11 +25,12 @@
 
 #pragma once
 
-#include "litiv/litiv_modules.hpp"
+#include "litiv/config.hpp"
+#include "litiv/modules.hpp"
 
 namespace lv {
 
-    /// for now, always returns true
-    bool initAll();
+    /// prints framework version/build info to stdout; always returns true
+    bool info();
 
 } // namespace lv

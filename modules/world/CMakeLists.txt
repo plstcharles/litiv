@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/litiv_modules.hpp")
+file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/modules.hpp")
 set(CMAKE_CONFIGURABLE_FILE_CONTENT "#pragma once\n")
 foreach(l ${litiv_modules})
     set(CMAKE_CONFIGURABLE_FILE_CONTENT "${CMAKE_CONFIGURABLE_FILE_CONTENT}\n#include \"litiv/${l}.hpp\"")
@@ -23,7 +23,7 @@ endforeach(l ${${litiv_modules}})
 set(CMAKE_CONFIGURABLE_FILE_CONTENT "${CMAKE_CONFIGURABLE_FILE_CONTENT}")
 configure_file(
     "${CMAKE_SOURCE_DIR}/cmake/CMakeConfigurableFile.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/litiv_modules.hpp"
+    "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/modules.hpp"
 )
 unset(CMAKE_CONFIGURABLE_FILE_CONTENT)
 add_files(SOURCE_FILES
@@ -31,9 +31,9 @@ add_files(SOURCE_FILES
 )
 add_files(INCLUDE_FILES
     "include/litiv/litiv.hpp"
+    "include/litiv/config.hpp"
+    "include/litiv/modules.hpp"
 )
-option(USE_WORLD_SOURCE_GLOB "Compile all LITIV modules as part of the world module instead of soft-linking them" OFF)
-mark_as_advanced(USE_WORLD_SOURCE_GLOB)
 set(litiv_3rdparty_module_names ${litiv_3rdparty_modules})
 xfix_list_tokens(litiv_3rdparty_module_names "litiv_3rdparty_" "")
 list(LENGTH litiv_3rdparty_module_names litiv_3rdparty_module_count)
