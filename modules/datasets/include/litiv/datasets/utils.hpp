@@ -24,6 +24,11 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 
+#ifdef _MSC_VER
+// disable some very verbose warnings, use #pragma warning(enable:###) to re-enable
+#pragma warning(disable:4250) // disables C4250, "'class1' : inherits 'class2::member' via dominance"
+#endif //_MSC_VER
+
 namespace lv {
 
     enum DatasetTaskList { // from the task type, we can derive the source and eval types
