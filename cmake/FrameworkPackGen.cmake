@@ -51,6 +51,7 @@ endforeach()
 set(RUNTIME_INSTALL_DIR "bin")
 set(INCLUDE_INSTALL_DIR "include")
 set(LIBRARY_INSTALL_DIR "lib")
+set(MODULES_INSTALL_DIR "lib/cmake/Modules")
 set(CONFIG_INSTALL_DIR "etc/litiv")
 write_basic_package_version_file(
     "${CMAKE_BINARY_DIR}/cmake/generated/litiv-config-version.cmake"
@@ -64,6 +65,18 @@ file(
         "${CMAKE_BINARY_DIR}/cmake/generated/litiv-config-version.cmake"
     DESTINATION
         "${CMAKE_BINARY_DIR}"
+)
+file(
+    COPY
+        "${CMAKE_SOURCE_DIR}/cmake/checks"
+    DESTINATION
+        "${CMAKE_BINARY_DIR}/cmake/"
+)
+file(
+    COPY
+        "${CMAKE_SOURCE_DIR}/cmake/Modules"
+    DESTINATION
+        "${CMAKE_BINARY_DIR}/cmake/"
 )
 if(WIN32)
     set(package_config_install_dirs
@@ -94,6 +107,7 @@ while(package_config_install_dir_index LESS package_config_install_dir_count)
             RUNTIME_INSTALL_DIR
             INCLUDE_INSTALL_DIR
             LIBRARY_INSTALL_DIR
+            MODULES_INSTALL_DIR
             CONFIG_INSTALL_DIR
     )
     install(
@@ -123,10 +137,23 @@ export(
     FILE
         "${CMAKE_BINARY_DIR}/litiv-targets.cmake"
 )
+install(
+    DIRECTORY
+        "${CMAKE_SOURCE_DIR}/cmake/checks"
+    DESTINATION
+        "lib/cmake"
+)
+install(
+    DIRECTORY
+        "${CMAKE_SOURCE_DIR}/cmake/Modules"
+    DESTINATION
+        "lib/cmake"
+)
 
 set(CURRENT_CONFIG_INSTALL 0)
 set(LITIV_BUILD_RUNTIME_DIR "${CMAKE_BINARY_DIR}/bin")
 set(LITIV_BUILD_LIBRARY_DIR "${CMAKE_BINARY_DIR}/lib")
+set(LITIV_BUILD_MODULES_DIR "${CMAKE_BINARY_DIR}/cmake/Modules")
 set(LITIV_BUILD_CONFIG_DIR "${CMAKE_BINARY_DIR}/etc/litiv")
 set(LITIV_BUILD_INCLUDE_DIRS "${litiv_build_includedirs}")
 

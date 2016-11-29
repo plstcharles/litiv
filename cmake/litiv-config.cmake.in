@@ -33,6 +33,7 @@
 #    * LITIV_RUNTIME_DIRS         : Directory(ies) where executables and DLLs are located; typically not needed by CMake projects
 #    * LITIV_INCLUDE_DIRS         : Directory(ies) where headers are located; typically not needed by CMake projects
 #    * LITIV_LIBRARY_DIRS         : Directory(ies) where libraries are located; typically not needed by CMake projects
+#    * LITIV_MODULES_DIRS         : Directory(ies) where cmake modules are located; automatically added to CMAKE_MODULE_PATH
 #    * LITIV_CONFIG_DIRS          : Directory(ies) where config/model files; typically not needed by CMake projects
 #      LITIV_EXT_INCLUDE_DIRS     : Directories where headers for external dependencies are located
 #    * LITIV_COMPONENTS           : List of all built framework components which can be used externally
@@ -60,19 +61,24 @@ if(LITIV_INSTALLED)
     set_and_check(LITIV_RUNTIME_DIRS "@PACKAGE_RUNTIME_INSTALL_DIR@")
     set_and_check(LITIV_INCLUDE_DIRS "@PACKAGE_INCLUDE_INSTALL_DIR@")
     set_and_check(LITIV_LIBRARY_DIRS "@PACKAGE_LIBRARY_INSTALL_DIR@")
+    set_and_check(LITIV_MODULES_DIRS "@PACKAGE_MODULES_INSTALL_DIR@")
     #set_and_check(LITIV_CONFIG_DIRS "@PACKAGE_CONFIG_INSTALL_DIR@")
 else()
     set(LITIV_RUNTIME_DIRS "@LITIV_BUILD_RUNTIME_DIR@")
     set(LITIV_INCLUDE_DIRS "@LITIV_BUILD_INCLUDE_DIRS@")
     set(LITIV_LIBRARY_DIRS "@LITIV_BUILD_LIBRARY_DIR@")
+    set(LITIV_MODULES_DIRS "@LITIV_BUILD_MODULES_DIR@")
     #set(LITIV_CONFIG_DIRS "@LITIV_BUILD_CONFIG_DIR@")
 endif()
+list(APPEND CMAKE_MODULE_PATH "${LITIV_MODULES_DIRS}")
 set(LITIV_COMPONENTS "@LITIV_COMPONENTS@")
 
 include(CMakeFindDependencyMacro)
 set(LITIV_EXT_INCLUDE_DIRS "")
+message(STATUS "LITIV Framework searching for OpenCV >=3.0 dependency...")
 find_dependency(OpenCV 3.0)
 if(@USE_GLSL@)
+    message(STATUS "LITIV Framework searching for OpenGL dependencies...")
     find_dependency(OpenGL)
     list(APPEND LITIV_EXT_INCLUDE_DIRS "${OpenGL_INCLUDE_DIRS}")
     find_dependency(GLEW)
@@ -88,11 +94,12 @@ if(@USE_GLSL@)
     endif()
 endif()
 if(@USE_OPENGM@)
-    find_dependency(OpenGM)
-    # ...
+    message(STATUS "LITIV Framework searching for OpenGM dependency with external lib...")
+    find_package(OpenGM REQUIRED COMPONENTS ext) # not using find_dependency due to component here
 endif()
 if(WIN32)
     if(@USE_KINECTSDK@)
+        message(STATUS "LITIV Framework searching for KinectSDK2 dependency...")
         find_dependency(KinectSDK2)
         list(APPEND LITIV_EXT_INCLUDE_DIRS "${KinectSDK2_INCLUDE_DIRS}")
     endif()
@@ -108,6 +115,7 @@ mark_as_advanced(
     LITIV_RUNTIME_DIRS
     LITIV_INCLUDE_DIRS
     LITIV_LIBRARY_DIRS
+    LITIV_MODULES_DIRS
     #LITIV_CONFIG_DIRS
     LITIV_COMPONENTS
     LITIV_VERSION
