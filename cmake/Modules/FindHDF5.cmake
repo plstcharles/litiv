@@ -41,7 +41,7 @@ set(HDF5_SUFFICIENT_VERSION FALSE)
 
 TRY_COMPILE(HDF5_SUFFICIENT_VERSION
     ${CMAKE_BINARY_DIR}/cmake/checks/
-    ${CMAKE_SOURCE_DIR}/cmake/checks/checkHDF5version.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../checks/checkHDF5version.cpp
     COMPILE_DEFINITIONS
         "-I\"${HDF5_INCLUDE_DIR}\" -DMIN_MAJOR=${HDF5_VERSION_MAJOR} -DMIN_MINOR=${HDF5_VERSION_MINOR}"
 )
@@ -56,7 +56,7 @@ endif()
 set(HDF5_USES_ZLIB FALSE)
 TRY_COMPILE(HDF5_USES_ZLIB
     ${CMAKE_BINARY_DIR}/cmake/checks/
-    ${CMAKE_SOURCE_DIR}/cmake/checks/checkHDF5usesCompression.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../checks/checkHDF5usesCompression.cpp
     COMPILE_DEFINITIONS "-I\"${HDF5_INCLUDE_DIR}\" -DH5_SOMETHING=H5_HAVE_FILTER_DEFLATE"
 )
 
@@ -71,7 +71,7 @@ endif()
 set(HDF5_USES_SZLIB FALSE)
 TRY_COMPILE(HDF5_USES_SZLIB
     ${CMAKE_BINARY_DIR}/cmake/checks/
-    ${CMAKE_SOURCE_DIR}/cmake/checks/checkHDF5usesCompression.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/../checks/checkHDF5usesCompression.cpp
     COMPILE_DEFINITIONS "-I\"${HDF5_INCLUDE_DIR}\" -DH5_SOMETHING=H5_HAVE_FILTER_SZIP"
 )
 
