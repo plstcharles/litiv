@@ -1,3 +1,22 @@
+
+The LITIV Framework is licensed under the Apache License, Version 2.0; see the
+original repository at https://github.com/plstcharles/litiv for more information.
+This license applies to all files which contain the following line:
+
+   Copyright 2015 Pierre-Luc St-Charles; pierre-luc.st-charles<at>polymtl.ca
+
+Short summary of the License (covers the main points only):
+
+ - You CAN use the code commercially, and in private applications
+ - You CAN modify/redistribute/sublicense the code
+ - You CANNOT hold the license owner responsible for damages caused by the code
+ - You MUST retain the original copyright when redistributing (in code/app form)
+ - You MUST state significant changes made to the software when redistributing
+
+...but of course, you should read the whole thing below for the true legalese.
+
+---------------------------------------------------------------------------------
+
                                  Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
@@ -174,29 +193,4 @@
       of your accepting any such warranty or additional liability.
 
    END OF TERMS AND CONDITIONS
-
-   APPENDIX: How to apply the Apache License to your work.
-
-      To apply the Apache License to your work, attach the following
-      boilerplate notice, with the fields enclosed by brackets "{}"
-      replaced with your own identifying information. (Don't include
-      the brackets!)  The text should be enclosed in the appropriate
-      comment syntax for the file format. We also recommend that a
-      file or class name and description of purpose be included on the
-      same "printed page" as the copyright notice for easier
-      identification within third-party archives.
-
-   Copyright {yyyy} {name of copyright owner}
-
-   Licensed under the Apache License, Version 2.0 (the "License");
-   you may not use this file except in compliance with the License.
-   You may obtain a copy of the License at
-
-       http://www.apache.org/licenses/LICENSE-2.0
-
-   Unless required by applicable law or agreed to in writing, software
-   distributed under the License is distributed on an "AS IS" BASIS,
-   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   See the License for the specific language governing permissions and
-   limitations under the License.
 
