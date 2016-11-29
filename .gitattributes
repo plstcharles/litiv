@@ -1,13 +1,26 @@
-# Explicitly declare text files we want to always be normalized and converted 
-# to native line endings on checkout.
+# source files that will always be normalized/converted to native line endings on checkout
 *.c text
+*.cc text
+*.cxx text
 *.cpp text
+*.c++ text
 *.i text
+*.ii text
+*.ixx text
 *.ipp text
+*.i++ text
 *.h text
+*.hh text
+*.hxx text
 *.hpp text
+*.h++ text
+*.m text
+*.md text
+*.cu text
+*.csv text
 
-# Declare files that will always have CRLF line endings on checkout.
+# misc Win-only files that will always have CRLF line endings on checkout
 *.sln text eol=crlf
+*.props text eol=crlf
 *.vcxproj text eol=crlf
 *.vcxproj.filters text eol=crlf
