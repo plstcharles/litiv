@@ -86,11 +86,18 @@ macro(litiv_module name sourcelist headerlist)
         PUBLIC
             "LITIV_DEBUG=$<CONFIG:Debug>"
     )
-    target_include_directories(${PROJECT_NAME}
-        PUBLIC
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-    )
+    if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/include")
+        target_include_directories(${PROJECT_NAME}
+            PUBLIC
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+        )
+    endif()
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/include")
+        target_include_directories(${PROJECT_NAME}
+            PUBLIC
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+        )
+    endif()
     install(
         TARGETS ${PROJECT_NAME}
         EXPORT "litiv-targets"
@@ -170,11 +177,18 @@ macro(litiv_3rdparty_module name sourcelist headerlist)
         PUBLIC
             "LITIV_DEBUG=$<CONFIG:Debug>"
     )
-    target_include_directories(${PROJECT_NAME}
-        PUBLIC
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-    )
+    if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/include")
+        target_include_directories(${PROJECT_NAME}
+            PUBLIC
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+        )
+    endif()
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/include")
+        target_include_directories(${PROJECT_NAME}
+            PUBLIC
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+        )
+    endif()
     install(
         TARGETS ${PROJECT_NAME}
         EXPORT "litiv-targets"
