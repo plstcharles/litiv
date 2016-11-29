@@ -74,8 +74,10 @@ if(WIN32)
 else()
     set(package_config_install_dirs
         "lib/cmake/litiv"
-        # @@@@ tbd
     )
+    if("${CMAKE_INSTALL_PREFIX}" STREQUAL "${CMAKE_BINARY_DIR}/install")
+        list(APPEND package_config_install_dirs "${CMAKE_INSTALL_PREFIX}")
+    endif()
 endif()
 set(CURRENT_CONFIG_INSTALL 1)
 list(LENGTH package_config_install_dirs package_config_install_dir_count)
