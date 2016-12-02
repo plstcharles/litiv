@@ -61,4 +61,6 @@ RUN cmake \
  && make externalLibs && cmake .. && make -j${nbthreads} install && make clean
 
 RUN ldconfig
-CMD ["bash"]
+WORKDIR /litiv/build
+ADD . /litiv
+CMD ["/bin/bash"]
