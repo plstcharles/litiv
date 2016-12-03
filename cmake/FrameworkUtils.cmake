@@ -69,6 +69,12 @@ macro(litiv_module name sourcelist headerlist)
         endif()
     else()
         add_library(${PROJECT_NAME} STATIC ${${sourcelist}} ${${headerlist}})
+        if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
+            target_compile_options(${PROJECT_NAME}
+                PRIVATE
+                    -fPIC
+            )
+        endif()
     endif()
     if(WIN32)
         if(USE_VERSION_TAGS)
@@ -160,6 +166,12 @@ macro(litiv_3rdparty_module name sourcelist headerlist)
 #        endif()
 #    else()
         add_library(${PROJECT_NAME} STATIC ${${sourcelist}} ${${headerlist}})
+        if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
+            target_compile_options(${PROJECT_NAME}
+                PRIVATE
+                    -fPIC
+            )
+        endif()
 #    endif()
     if(WIN32)
         if(USE_VERSION_TAGS)

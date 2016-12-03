@@ -89,6 +89,7 @@ mark_as_advanced(
 
 ### OPENCV CHECK
 find_package(OpenCV 3.0 REQUIRED)
+message(STATUS "Found OpenCV >=3.0 at '${OpenCV_DIR}'")
 
 ### GLSL CHECK
 find_package(OpenGL)
@@ -177,7 +178,6 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
     endif()
     add_definitions(-Wall)
     add_definitions(-Wfatal-errors)
-    add_definitions(-fPIC) # @@@@ for shared libs only?
     add_definitions(-ftemplate-depth=900) # already default for gcc, but not for clang
     check_function_exists(aligned_alloc USE_STL_ALIGNED_ALLOC)
     if(NOT USE_STL_ALIGNED_ALLOC)
