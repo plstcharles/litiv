@@ -166,6 +166,7 @@ endif()
 ### GoogleTest CHECK
 if(BUILD_TESTS)
     enable_testing()
+    find_package(Threads REQUIRED)
     if(UNIX)
         find_package(GTest)
     endif()
