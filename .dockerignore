@@ -37,9 +37,10 @@ Dockerfile
 *.tar
 *.zip
 
-# Test data #
-#############
-data/
+# External sources #
+####################
+**/external/
+**/data/
 !/samples/data/
 
 # Logs and databases #
