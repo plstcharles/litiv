@@ -91,7 +91,7 @@ else()
         REQUIRED_VARS
             OpenGM_INCLUDE_DIR
     )
-    message("Will use OpenGM without its external dependencies, some inference algos might be disabled.")
+    message(STATUS "Will use OpenGM without its external dependencies, some inference algos might be disabled.")
 endif()
 
 if(OpenGM_FOUND)
@@ -108,7 +108,7 @@ if(OpenGM_FOUND)
         list(APPEND OpenGM_INCLUDE_DIRS ${CPLEX_INCLUDE_DIRS})
         list(APPEND OpenGM_LIBRARIES ${CPLEX_LIBRARIES})
     else()
-        message("Will use OpenGM without IBM CPLEX support, some inference algos might be disabled.")
+        message(STATUS "Will use OpenGM without IBM CPLEX support, some inference algos might be disabled.")
     endif()
 
     find_package(GUROBI QUIET)
@@ -119,7 +119,7 @@ if(OpenGM_FOUND)
         list(APPEND OpenGM_INCLUDE_DIRS ${GUROBI_INCLUDE_DIRS})
         list(APPEND OpenGM_LIBRARIES ${GUROBI_LIBRARIES})
     else()
-        message("Will use OpenGM without GUROBI support, some inference algos might be disabled.")
+        message(STATUS "Will use OpenGM without GUROBI support, some inference algos might be disabled.")
     endif()
 
     find_package(HDF5 QUIET)
@@ -130,7 +130,7 @@ if(OpenGM_FOUND)
         list(APPEND OpenGM_INCLUDE_DIRS ${HDF5_INCLUDE_DIR})
         list(APPEND OpenGM_LIBRARIES ${HDF5_LIBRARIES})
     else()
-        message("Will use OpenGM without HDF5 support, some I/O methods might be disabled.")
+        message(STATUS "Will use OpenGM without HDF5 support, some I/O methods might be disabled.")
     endif()
 
     mark_as_advanced(
