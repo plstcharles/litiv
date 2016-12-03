@@ -43,6 +43,10 @@ ExternalProject_Add(googletest
     INSTALL_DIR
         ""
 )
+set_target_properties(googletest
+    PROPERTIES
+        FOLDER "3rdparty"
+)
 
 set(GTEST_ROOT "${CMAKE_CURRENT_BINARY_DIR}/install" CACHE INTERNAL "")
 set(GTEST_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/install/include" CACHE INTERNAL "")
