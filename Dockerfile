@@ -19,9 +19,19 @@ FROM plstcharles/litiv-base
 MAINTAINER Pierre-Luc St-Charles <pierre-luc.st-charles@polymtl.ca>
 LABEL Description="LITIV framework test build"
 
+ARG CMAKECFG_BUILD_SHARED_LIBS=OFF
+ENV CMAKECFG_BUILD_SHARED_LIBS=${CMAKECFG_BUILD_SHARED_LIBS}
+ARG CMAKECFG_USE_WORLD_SOURCE_GLOB=OFF
+ENV CMAKECFG_USE_WORLD_SOURCE_GLOB=${CMAKECFG_USE_WORLD_SOURCE_GLOB}
+
 WORKDIR /litiv/build
 ADD . /litiv
-
-# todo: add full build here
+RUN rm -r /opencv/build && rm -r /opengm/build
+RUN cmake \
+    -D CMAKE_BUILD_TYPE=RELEASE \
+    -D CMAKE_INSTALL_PREFIX=/usr/local \
+    -D BUILD_SHARED_LIBS=${CMAKECFG_BUILD_SHARED_LIBS} \
+    -D USE_WORLD_SOURCE_GLOB=${CMAKECFG_USE_WORLD_SOURCE_GLOB} \
+    .. && make -j${nbthreads} install && make clean
 
 CMD ["/bin/bash"]
