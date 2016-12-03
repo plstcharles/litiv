@@ -104,6 +104,22 @@ macro(litiv_module name sourcelist headerlist)
                 "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         )
     endif()
+    if(BUILD_TESTS AND (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test"))
+        file(GLOB testlist ${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp)
+        add_executable(${PROJECT_NAME}_test ${testlist})
+        set_target_properties(${PROJECT_NAME}_test
+            PROPERTIES
+                FOLDER "tests"
+                DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
+        )
+        target_include_directories(${PROJECT_NAME}_test ${GTEST_INCLUDE_DIRS})
+        target_link_libraries(${PROJECT_NAME}_test ${PROJECT_NAME} ${GTEST_BOTH_LIBRARIES})
+        if(NOT GTEST_FOUND)
+            add_dependencies(${PROJECT_NAME}_test googletest)
+        endif()
+        append_internal_list(litiv_tests ${name})
+        add_test(litiv_test_${name} ${PROJECT_NAME}_test)
+    endif()
     install(
         TARGETS ${PROJECT_NAME}
         EXPORT "litiv-targets"
@@ -200,6 +216,22 @@ macro(litiv_3rdparty_module name sourcelist headerlist)
             PUBLIC
                 "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         )
+    endif()
+    if(BUILD_TESTS AND (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test"))
+        file(GLOB testlist ${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp)
+        add_executable(${PROJECT_NAME}_test ${testlist})
+        set_target_properties(${PROJECT_NAME}_test
+            PROPERTIES
+                FOLDER "tests"
+                DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
+        )
+        target_include_directories(${PROJECT_NAME}_test ${GTEST_INCLUDE_DIRS})
+        target_link_libraries(${PROJECT_NAME}_test ${PROJECT_NAME} ${GTEST_BOTH_LIBRARIES})
+        if(NOT GTEST_FOUND)
+            add_dependencies(${PROJECT_NAME}_test googletest)
+        endif()
+        append_internal_list(litiv_tests ${name})
+        add_test(litiv_test_${name} ${PROJECT_NAME}_test)
     endif()
     install(
         TARGETS ${PROJECT_NAME}

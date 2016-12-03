@@ -80,6 +80,9 @@ option(USE_WORLD_SOURCE_GLOB "Compile all LITIV modules as part of the world mod
 option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark implementation in litiv_datasets (cleaned 3rd party code; will use an approximative solution otherwise)" ON)
 option(USE_CVCORE_WITH_UTILS "Include OpenCV core components in utils module" ON)
 option(USE_FAST_MATH "Enable fast math optimizations" OFF)
+if(NOT CMAKE_CROSSCOMPILING)
+    option(BUILD_TESTS "Build regression tests with GoogleTest framework" ON)
+endif()
 mark_as_advanced(
     USE_WORLD_SOURCE_GLOB
     USE_BSDS500_BENCHMARK
@@ -183,6 +186,7 @@ initialize_internal_list(litiv_modules)
 initialize_internal_list(litiv_modules_sourcelist)
 initialize_internal_list(litiv_apps)
 initialize_internal_list(litiv_samples)
+initialize_internal_list(litiv_tests)
 add_subdirectory(cmake/checks/simd)
 add_definitions(-DLITIV_BUILD)
 if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
