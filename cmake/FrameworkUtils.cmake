@@ -122,7 +122,12 @@ macro(litiv_module name sourcelist headerlist)
             add_dependencies(${PROJECT_NAME}_test googletest)
         endif()
         append_internal_list(litiv_tests ${name})
-        add_test(litiv_test_${name} ${PROJECT_NAME}_test)
+        add_test(
+            NAME
+                litiv_test_${name}
+            COMMAND
+                ${CMAKE_BINARY_DIR}/bin/${PROJECT_NAME}_test${CMAKE_DEBUG_POSTFIX}
+        )
     endif()
     install(
         TARGETS ${PROJECT_NAME}
@@ -239,7 +244,12 @@ macro(litiv_3rdparty_module name sourcelist headerlist)
             add_dependencies(${PROJECT_NAME}_test googletest)
         endif()
         append_internal_list(litiv_tests ${name})
-        add_test(litiv_test_${name} ${PROJECT_NAME}_test)
+        add_test(
+            NAME
+                litiv_test_${name}
+            COMMAND
+                ${CMAKE_BINARY_DIR}/bin/${PROJECT_NAME}_test${CMAKE_DEBUG_POSTFIX}
+        )
     endif()
     install(
         TARGETS ${PROJECT_NAME}
