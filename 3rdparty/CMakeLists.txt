@@ -15,7 +15,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory("googletest")
 get_subdirectory_list(subdirs ${CMAKE_CURRENT_SOURCE_DIR})
 foreach(subdir ${subdirs})
-    add_subdirectory(${subdir})
+    if(NOT(${subdir} STREQUAL "googletest"))
+        add_subdirectory(${subdir})
+    endif(NOT(${subdir} STREQUAL "googletest"))
 endforeach()
