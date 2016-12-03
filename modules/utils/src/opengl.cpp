@@ -17,8 +17,10 @@
 
 #include "litiv/utils/opengl.hpp"
 
+#if HAVE_GLFW
 std::mutex lv::gl::Context::s_oGLFWErrorMessageMutex;
 std::string lv::gl::Context::s_sLatestGLFWErrorMessage;
+#endif //HAVE_GLFW
 std::once_flag lv::gl::Context::s_oInitFlag;
 
 lv::gl::Context::Context(const cv::Size& oWinSize,
@@ -122,6 +124,7 @@ bool lv::gl::Context::getKeyPressed(char nKeyID) {
 #if HAVE_GLFW
     return glfwGetKey(m_pWindowHandle.get(),nKeyID)==GLFW_PRESS; // will not capture special keys (need custom define)
 #elif HAVE_FREEGLUT
+    UNUSED(nKeyID);
     return false; // seriously, ditch glut
 #endif //HAVE_FREEGLUT
 }
