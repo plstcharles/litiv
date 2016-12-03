@@ -26,8 +26,9 @@
 *.tar
 *.zip
 
-# Test data #
-#############
+# External sources #
+####################
+external/
 /data
 
 # Logs and databases #
