@@ -188,6 +188,11 @@ if(BUILD_TESTS)
             WORKING_DIRECTORY
                 ${CMAKE_BINARY_DIR}
         )
+        set_target_properties(check
+            PROPERTIES
+                EXCLUDE_FROM_ALL
+                    TRUE
+        )
     elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
         add_custom_target(ALL_BUILD_AND_TEST
             ${CMAKE_COMMAND} -E echo CMD=${CMAKE_CTEST_COMMAND} -C $<CONFIG>
@@ -198,6 +203,11 @@ if(BUILD_TESTS)
                 ALL_BUILD
             WORKING_DIRECTORY
                 ${CMAKE_BINARY_DIR}
+        )
+        set_target_properties(ALL_BUILD_AND_TEST
+            PROPERTIES
+                EXCLUDE_FROM_ALL
+                    TRUE
         )
     endif()
 endif()
