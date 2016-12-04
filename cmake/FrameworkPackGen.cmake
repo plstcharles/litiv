@@ -20,8 +20,12 @@ configure_file(
     "${CMAKE_BINARY_DIR}/cmake/generated/uninstall.cmake"
     @ONLY
 )
-add_custom_target(UNINSTALL "${CMAKE_COMMAND}" -P "${CMAKE_BINARY_DIR}/cmake/generated/uninstall.cmake")
-set_target_properties(UNINSTALL PROPERTIES FOLDER "CMakePredefinedTargets")
+set(uninstall_target_name "uninstall")
+if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
+    set(uninstall_target_name "UNINSTALL")
+endif()
+add_custom_target(${uninstall_target_name} "${CMAKE_COMMAND}" -P "${CMAKE_BINARY_DIR}/cmake/generated/uninstall.cmake")
+set_target_properties(${uninstall_target_name} PROPERTIES FOLDER "CMakePredefinedTargets")
 
 set(LITIV_COMPONENTS "")
 set(litiv_build_includedirs "")
