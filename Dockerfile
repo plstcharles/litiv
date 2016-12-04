@@ -24,14 +24,14 @@ ENV CMAKECFG_BUILD_SHARED_LIBS=${CMAKECFG_BUILD_SHARED_LIBS}
 ARG CMAKECFG_USE_WORLD_SOURCE_GLOB=OFF
 ENV CMAKECFG_USE_WORLD_SOURCE_GLOB=${CMAKECFG_USE_WORLD_SOURCE_GLOB}
 
+RUN rm -r /opencv/build && rm -r /opengm/build
 WORKDIR /litiv/build
 ADD . /litiv
-RUN rm -r /opencv/build && rm -r /opengm/build
 RUN cmake \
     -D CMAKE_BUILD_TYPE=RELEASE \
     -D CMAKE_INSTALL_PREFIX=/usr/local \
     -D BUILD_SHARED_LIBS=${CMAKECFG_BUILD_SHARED_LIBS} \
     -D USE_WORLD_SOURCE_GLOB=${CMAKECFG_USE_WORLD_SOURCE_GLOB} \
-    .. && make -j${nbthreads} install && make test && make clean
-
+    .. && make -j${nbthreads}
+RUN make check && make install && make clean
 CMD ["/bin/bash"]
