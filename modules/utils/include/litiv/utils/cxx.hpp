@@ -167,6 +167,8 @@ namespace lv {
     /// returns the number of decimal digits required to display the non-fractional part of a given number (counts sign as extra digit if negative)
     template<typename T>
     inline int digit_count(T number) {
+        if(std::isnan(number))
+            return 3;
         int digits = number<0?2:1;
         while(std::abs(number)>=10) {
             number /= 10;
@@ -243,11 +245,13 @@ namespace lv {
 
     /// returns the index of the nearest neighbor of the requested value in the reference value array, using a custom distance functor
     template<typename Tval, typename Tcomp>
-    inline size_t find_nn_index(Tval oReqVal, const std::vector<Tval>& voRefVals, const Tcomp& lCompFunc) {
+    inline size_t find_nn_index(const Tval& oReqVal, const std::vector<Tval>& vRefVals, Tcomp lCompFunc) {
+        if(vRefVals.empty())
+            return size_t(-1);
         decltype(lCompFunc(oReqVal,oReqVal)) oMinDist = std::numeric_limits<decltype(lCompFunc(oReqVal,oReqVal))>::max();
         size_t nIdx = size_t(-1);
-        for(size_t n=0; n<voRefVals.size(); ++n) {
-            auto oCurrDist = lCompFunc(oReqVal,voRefVals[n]);
+        for(size_t n=0; n<vRefVals.size(); ++n) {
+            auto oCurrDist = lCompFunc(oReqVal,vRefVals[n]);
             if(nIdx==size_t(-1) || oCurrDist<oMinDist) {
                 oMinDist = oCurrDist;
                 nIdx = n;
