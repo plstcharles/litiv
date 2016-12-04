@@ -126,7 +126,8 @@ macro(litiv_module name sourcelist headerlist)
             NAME
                 litiv_test_${name}
             COMMAND
-                ${CMAKE_BINARY_DIR}/bin/${PROJECT_NAME}_test${CMAKE_DEBUG_POSTFIX}
+                "${CMAKE_BINARY_DIR}/bin/${PROJECT_NAME}_test${CMAKE_DEBUG_POSTFIX}"
+                "--gtest_output=xml:${CMAKE_BINARY_DIR}/Testing/${PROJECT_NAME}_test.xml"
         )
     endif()
     install(
@@ -248,7 +249,8 @@ macro(litiv_3rdparty_module name sourcelist headerlist)
             NAME
                 litiv_test_${name}
             COMMAND
-                ${CMAKE_BINARY_DIR}/bin/${PROJECT_NAME}_test${CMAKE_DEBUG_POSTFIX}
+                "${CMAKE_BINARY_DIR}/bin/${PROJECT_NAME}_test${CMAKE_DEBUG_POSTFIX}"
+                "--gtest_output=xml:${CMAKE_BINARY_DIR}/Testing/${PROJECT_NAME}_test.xml"
         )
     endif()
     install(
