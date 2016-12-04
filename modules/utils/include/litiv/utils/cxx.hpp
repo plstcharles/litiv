@@ -164,11 +164,11 @@ namespace lv {
         return i_lower<j_lower;
     }
 
-    /// returns the number of decimal digits required to display a given number (counts sign as extra digit if negative)
+    /// returns the number of decimal digits required to display the non-fractional part of a given number (counts sign as extra digit if negative)
     template<typename T>
     inline int digit_count(T number) {
-        int digits = number<0?1:0;
-        while(std::abs(number)>=1) {
+        int digits = number<0?2:1;
+        while(std::abs(number)>=10) {
             number /= 10;
             digits++;
         }
@@ -186,6 +186,8 @@ namespace lv {
     /// returns the index of all provided values in the reference array (uses std::find to match objects)
     template<typename T>
     inline std::vector<size_t> indices_of(const std::vector<T>& voVals, const std::vector<T>& voRefs) {
+        if(voRefs.empty())
+            return std::vector<size_t>(voVals.size(),1); // all out-of-range indices
         std::vector<size_t> vnIndices(voVals.size());
         size_t nIdx = 0;
         std::for_each(voVals.begin(),voVals.end(),[&](const T& oVal){
