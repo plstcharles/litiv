@@ -166,10 +166,10 @@ endif()
 ### GoogleTest CHECK
 if(BUILD_TESTS)
     enable_testing()
-    find_package(Threads REQUIRED)
     if(UNIX)
         find_package(GTest)
     endif()
+    find_package(Threads REQUIRED)
     if(NOT GTEST_FOUND)
         # these will later be set in external build
         set(GTEST_ROOT "GTEST-NOTFOUND" CACHE INTERNAL "")
@@ -177,6 +177,28 @@ if(BUILD_TESTS)
         set(GTEST_LIBRARIES "GTEST-NOTFOUND" CACHE INTERNAL "")
         set(GTEST_MAIN_LIBRARIES "GTEST-NOTFOUND" CACHE INTERNAL "")
         set(GTEST_BOTH_LIBRARIES "GTEST-NOTFOUND" CACHE INTERNAL "")
+    endif()
+    if(UNIX)
+        add_custom_target(check
+            ${CMAKE_MAKE_PROGRAM} all
+            COMMAND ${CMAKE_COMMAND} -E echo CMD=${CMAKE_CTEST_COMMAND} -C $<CONFIG>
+            COMMAND ${CMAKE_COMMAND} -E echo ----------------------------------
+            COMMAND ${CMAKE_COMMAND} -E env CTEST_OUTPUT_ON_FAILURE=1
+                    ${CMAKE_CTEST_COMMAND} -C $<CONFIG>
+            WORKING_DIRECTORY
+                ${CMAKE_BINARY_DIR}
+        )
+    elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
+        add_custom_target(ALL_BUILD_AND_TEST
+            ${CMAKE_COMMAND} -E echo CMD=${CMAKE_CTEST_COMMAND} -C $<CONFIG>
+            COMMAND ${CMAKE_COMMAND} -E echo ----------------------------------
+            COMMAND ${CMAKE_COMMAND} -E env CTEST_OUTPUT_ON_FAILURE=1
+                    ${CMAKE_CTEST_COMMAND} -C $<CONFIG>
+            DEPENDS
+                ALL_BUILD
+            WORKING_DIRECTORY
+                ${CMAKE_BINARY_DIR}
+        )
     endif()
 endif()
 
