@@ -444,7 +444,7 @@ namespace lv {
     };
 
     /// type traits helper to check if a class possesses a const iterator
-    template<template<typename,typename...> class TContainer>
+    template<typename TContainer>
     struct has_const_iterator {
     private:
         template<typename T>
