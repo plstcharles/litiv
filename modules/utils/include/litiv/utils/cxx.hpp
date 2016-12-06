@@ -337,16 +337,16 @@ namespace lv {
 
     /// bitfield expansion function (specialized for unit word size)
     template<size_t nWordBitSize, typename Tr>
-    constexpr std::enable_if_t<nWordBitSize==1,Tr> expand_bits(const Tr& nBits, int=0) {
+    constexpr std::enable_if_t<nWordBitSize==1,Tr> expand_bits(const Tr& nBits, size_t=0) {
         return nBits;
     }
 
     /// bitfield expansion function (specialized for non-unit word size)
     template<size_t nWordBitSize, typename Tr>
-    constexpr std::enable_if_t<(nWordBitSize>1),Tr> expand_bits(const Tr& nBits, int n=((sizeof(Tr)*8)/nWordBitSize)-1) {
+    constexpr std::enable_if_t<(nWordBitSize>1),Tr> expand_bits(const Tr& nBits, size_t n=((sizeof(Tr)*8)/nWordBitSize)-1) {
         static_assert(std::is_integral<Tr>::value,"nBits type must be integral");
         // only the first [(sizeof(Tr)*8)/nWordBitSize] bits are kept (otherwise overflow/ignored)
-        return (Tr)(bool(nBits&(1<<n))<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,Tr>(nBits,n-1):(Tr)0);
+        return (Tr)(bool((nBits&(1<<n))!=0)<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,Tr>(nBits,n-1):(Tr)0);
     }
 
     /// stopwatch/chrono helper class; relies on std::chrono::high_resolution_clock internally
