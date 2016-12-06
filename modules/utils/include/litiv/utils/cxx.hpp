@@ -458,7 +458,7 @@ namespace lv {
     /// helper function to apply a functor to all members of a tuple/array (impl)
     template<typename TTuple, typename TFunc, size_t... anIndices>
     inline void _for_each(TTuple&& t, TFunc f, std::index_sequence<anIndices...>) {
-        auto l = {(f(std::get<anIndices>(t)),0)...};
+        auto l = {(f(std::get<anIndices>(t)),0)...}; UNUSED(l);
     }
 
     /// helper function to apply a functor to all members of a tuple
