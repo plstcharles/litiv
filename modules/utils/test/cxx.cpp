@@ -1,6 +1,6 @@
 
 #include "gtest/gtest.h"
-#include "litiv/utils.hpp"
+#include "litiv/utils/cxx.hpp"
 
 TEST(putf,regression) {
     EXPECT_EQ(std::string(),lv::putf(""));
@@ -152,8 +152,8 @@ namespace {
     struct find_nn_index_fixture : testing::Test {};
     template<typename T>
     struct find_nn_index_dist {
-        auto operator()(const T& a, const T& b) -> decltype(lv::L1dist<T>(a,b)) {
-            return lv::L1dist<T>(a,b);
+        double operator()(const T& a, const T& b) {
+            return double(a)>=double(b)?double(a)-double(b):double(b)-double(a);
         }
     };
     typedef testing::Types<char, int, float> find_nn_index_types;
