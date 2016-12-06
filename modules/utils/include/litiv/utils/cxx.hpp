@@ -614,7 +614,7 @@ namespace lv {
         }
         /// relocks all mutexes simultaneously
         ~unlock_guard() {
-            std::lock(m_aMutexes);
+            lv::unpacked_tuple_call<void(TMutexes&...)>(m_aMutexes,std::lock);
         }
     private:
         std::tuple<TMutexes&...> m_aMutexes;
