@@ -30,6 +30,7 @@ set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib:$ORIGIN/")
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 include(FrameworkUtils)
 include(ExternalProject)
+include(DownloadProject)
 include(CMakePackageConfigHelpers)
 include(GetGitRevisionDescription)
 include(CheckFunctionExists) # should be pre-packaged with CMake...
@@ -166,18 +167,8 @@ endif()
 ### GoogleTest CHECK
 if(BUILD_TESTS)
     enable_testing()
-    if(UNIX)
-        find_package(GTest)
-    endif()
     find_package(Threads REQUIRED)
-    if(NOT GTEST_FOUND)
-        # these will later be set in external build
-        set(GTEST_ROOT "GTEST-NOTFOUND" CACHE INTERNAL "")
-        set(GTEST_INCLUDE_DIRS "GTEST-NOTFOUND" CACHE INTERNAL "")
-        set(GTEST_LIBRARIES "GTEST-NOTFOUND" CACHE INTERNAL "")
-        set(GTEST_MAIN_LIBRARIES "GTEST-NOTFOUND" CACHE INTERNAL "")
-        set(GTEST_BOTH_LIBRARIES "GTEST-NOTFOUND" CACHE INTERNAL "")
-    endif()
+    # we do not check for GTest package, it will be downloaded/built in-tree
     if(UNIX)
         add_custom_target(check
             ${CMAKE_MAKE_PROGRAM} all

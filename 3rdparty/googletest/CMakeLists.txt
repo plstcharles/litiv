@@ -15,46 +15,64 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(GTEST_FOUND OR (NOT BUILD_TESTS))
+if(NOT BUILD_TESTS)
     return()
 endif()
 
-set(GTEST_DISABLE_PTHREADS OFF)
-if(MINGW)
-    set(GTEST_DISABLE_PTHREADS ON)
+if(CMAKE_VERSION VERSION_LESS 3.2)
+    set(UPDATE_DISCONNECTED_IF_AVAILABLE "")
+else()
+    set(UPDATE_DISCONNECTED_IF_AVAILABLE "UPDATE_DISCONNECTED 1")
 endif()
 
-ExternalProject_Add(googletest
+download_project(
+    PROJ
+        googletest
+    PREFIX
+        "${CMAKE_CURRENT_BINARY_DIR}"
     GIT_REPOSITORY
         https://github.com/google/googletest.git
     GIT_TAG
         "release-1.8.0"
-    SOURCE_DIR
-        "${CMAKE_CURRENT_SOURCE_DIR}/external"
-    CMAKE_ARGS
-        -DBUILD_GTEST=ON
-        -DBUILD_GMOCK=ON
-        -DBUILD_SHARED_LIBS=OFF
-        -Dgtest_force_shared_crt=ON
-        -Dgtest_disable_pthreads=${GTEST_DISABLE_PTHREADS}
-        -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/install
-    BINARY_DIR
-        "${CMAKE_CURRENT_BINARY_DIR}"
-    INSTALL_DIR
-        ""
-)
-set_target_properties(googletest
-    PROPERTIES
-        FOLDER "3rdparty"
+    QUIET
+    ${UPDATE_DISCONNECTED_IF_AVAILABLE}
 )
 
-set(GTEST_ROOT "${CMAKE_CURRENT_BINARY_DIR}/install" CACHE INTERNAL "")
-set(GTEST_INCLUDE_DIRS "${CMAKE_CURRENT_BINARY_DIR}/install/include" CACHE INTERNAL "")
-if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
-    set(GTEST_LIBRARIES "${CMAKE_CURRENT_BINARY_DIR}/install/lib/gtest.lib" CACHE INTERNAL "")
-    set(GTEST_MAIN_LIBRARIES "${CMAKE_CURRENT_BINARY_DIR}/install/lib/gtest_main.lib" CACHE INTERNAL "")
+add_subdirectory(
+    ${googletest_SOURCE_DIR}
+    ${googletest_BINARY_DIR}
+    EXCLUDE_FROM_ALL
+)
+
+set(BUILD_GTEST ON CACHE BOOL "" FORCE)
+set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+set(gtest_build_samples OFF CACHE BOOL "" FORCE)
+set(gtest_build_tests OFF CACHE BOOL "" FORCE)
+if(MINGW)
+    set(gtest_disable_pthreads ON CACHE BOOL "" FORCE)
 else()
-    set(GTEST_LIBRARIES "${CMAKE_CURRENT_BINARY_DIR}/install/lib/libgtest.a" CACHE INTERNAL "")
-    set(GTEST_MAIN_LIBRARIES "${CMAKE_CURRENT_BINARY_DIR}/install/lib/libgtest_main.a" CACHE INTERNAL "")
+    set(gtest_disable_pthreads OFF CACHE BOOL "" FORCE)
 endif()
-set(GTEST_BOTH_LIBRARIES "${GTEST_LIBRARIES}" "${GTEST_MAIN_LIBRARIES}" CACHE INTERNAL "")
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+set(gtest_hide_internal_symbols OFF CACHE BOOL "" FORCE)
+set(gmock_build_tests OFF CACHE BOOL "" FORCE)
+
+mark_as_advanced(
+    BUILD_GTEST
+    BUILD_GMOCK
+    gtest_build_samples
+    gtest_build_tests
+    gtest_disable_pthreads
+    gtest_force_shared_crt
+    gtest_hide_internal_symbols
+    gmock_build_tests
+)
+
+set_target_properties(gtest
+    PROPERTIES
+        FOLDER "3rdparty/googletest"
+)
+set_target_properties(gtest_main
+    PROPERTIES
+        FOLDER "3rdparty/googletest"
+)

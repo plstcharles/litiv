@@ -112,15 +112,11 @@ macro(litiv_module name sourcelist headerlist)
                 FOLDER "tests"
                 DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
         )
-        target_include_directories(${PROJECT_NAME}_test PUBLIC ${GTEST_INCLUDE_DIRS})
         target_link_libraries(${PROJECT_NAME}_test
             ${PROJECT_NAME}
-            ${GTEST_BOTH_LIBRARIES}
+            gtest gtest_main
             ${CMAKE_THREAD_LIBS_INIT}
         )
-        if(NOT GTEST_FOUND)
-            add_dependencies(${PROJECT_NAME}_test googletest)
-        endif()
         append_internal_list(litiv_tests ${name})
         add_test(
             NAME
@@ -235,15 +231,11 @@ macro(litiv_3rdparty_module name sourcelist headerlist)
                 FOLDER "tests"
                 DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
         )
-        target_include_directories(${PROJECT_NAME}_test PUBLIC ${GTEST_INCLUDE_DIRS})
         target_link_libraries(${PROJECT_NAME}_test
             ${PROJECT_NAME}
-            ${GTEST_BOTH_LIBRARIES}
+            gtest gtest_main
             ${CMAKE_THREAD_LIBS_INIT}
         )
-        if(NOT GTEST_FOUND)
-            add_dependencies(${PROJECT_NAME}_test googletest)
-        endif()
         append_internal_list(litiv_tests ${name})
         add_test(
             NAME
