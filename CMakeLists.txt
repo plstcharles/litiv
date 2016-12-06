@@ -83,6 +83,10 @@ option(USE_CVCORE_WITH_UTILS "Include OpenCV core components in utils module" ON
 option(USE_FAST_MATH "Enable fast math optimizations" OFF)
 if(NOT CMAKE_CROSSCOMPILING)
     option(BUILD_TESTS "Build regression tests with GoogleTest framework" ON)
+    option(BUILD_PERF_TESTS "Build performance tests with GoogleBenchmark framework" ON)
+    if(NOT BUILD_TESTS)
+        set(BUILD_PERF_TESTS OFF)
+    endif()
 endif()
 mark_as_advanced(
     USE_WORLD_SOURCE_GLOB
@@ -168,7 +172,7 @@ endif()
 if(BUILD_TESTS)
     enable_testing()
     find_package(Threads REQUIRED)
-    # we do not check for GTest package, it will be downloaded/built in-tree
+    # we do not check for GTest/Benchmark packages, they will be downloaded/built in-tree
     if(UNIX)
         add_custom_target(check
             ${CMAKE_MAKE_PROGRAM} all

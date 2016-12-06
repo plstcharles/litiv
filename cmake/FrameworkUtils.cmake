@@ -114,7 +114,7 @@ macro(litiv_module name sourcelist headerlist)
         )
         target_link_libraries(${PROJECT_NAME}_test
             ${PROJECT_NAME}
-            gtest gtest_main
+            gtest gtest_main benchmark
             ${CMAKE_THREAD_LIBS_INIT}
         )
         append_internal_list(litiv_tests ${name})
@@ -233,7 +233,7 @@ macro(litiv_3rdparty_module name sourcelist headerlist)
         )
         target_link_libraries(${PROJECT_NAME}_test
             ${PROJECT_NAME}
-            gtest gtest_main
+            gtest gtest_main benchmark
             ${CMAKE_THREAD_LIBS_INIT}
         )
         append_internal_list(litiv_tests ${name})
