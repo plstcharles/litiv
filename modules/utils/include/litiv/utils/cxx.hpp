@@ -390,10 +390,10 @@ namespace lv {
     }
 
     /// accumulates the values of some object members in the given array
-    template<typename TSum, typename TObj>
-    inline TSum accumulateMembers(const std::vector<TObj>& vObjArray, const std::function<TSum(const TObj&)>& lFunc, TSum tInit=TSum(0)) {
+    template<typename TSum, typename TObj, typename TFunc>
+    inline TSum accumulateMembers(const std::vector<TObj>& vObjArray, TFunc lObjEval, TSum tInit=TSum(0)) {
         return std::accumulate(vObjArray.begin(),vObjArray.end(),tInit,[&](TSum tSum, const TObj& p) {
-            return tSum + lFunc(p);
+            return tSum + lObjEval(p);
         });
     }
 
