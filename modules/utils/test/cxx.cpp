@@ -58,8 +58,8 @@ TEST(string_contains_token,regression) {
 
 namespace {
     template<typename T>
-    struct indices_of_fixture : ::testing::Test {};
-    typedef ::testing::Types<char, int, size_t, float> indices_of_types;
+    struct indices_of_fixture : testing::Test {};
+    typedef testing::Types<char, int, size_t, float> indices_of_types;
 }
 TYPED_TEST_CASE(indices_of_fixture,indices_of_types);
 TYPED_TEST(indices_of_fixture,regression) {
@@ -78,7 +78,7 @@ TYPED_TEST(indices_of_fixture,regression) {
 
 namespace {
     template<typename T>
-    struct sort_indices_fixture : ::testing::Test {};
+    struct sort_indices_fixture : testing::Test {};
     template<typename T>
     struct sort_indices_custom_sort {
         const std::vector<T>& m_vVals;
@@ -87,7 +87,7 @@ namespace {
             return m_vVals[a]>m_vVals[b];
         }
     };
-    typedef ::testing::Types<char, int, float> sort_indices_types;
+    typedef testing::Types<char, int, float> sort_indices_types;
 }
 TYPED_TEST_CASE(sort_indices_fixture,sort_indices_types);
 TYPED_TEST(sort_indices_fixture,regression) {
@@ -102,7 +102,7 @@ TYPED_TEST(sort_indices_fixture,regression) {
 
 namespace {
     template<typename T>
-    struct unique_indices_fixture : ::testing::Test {};
+    struct unique_indices_fixture : testing::Test {};
     template<typename T>
     struct unique_indices_custom_comp {
         const std::vector<T>& m_vVals;
@@ -119,7 +119,7 @@ namespace {
             return m_vVals[a]<m_vVals[b];
         }
     };
-    typedef ::testing::Types<char, int, float> unique_indices_types;
+    typedef testing::Types<char, int, float> unique_indices_types;
 }
 TYPED_TEST_CASE(unique_indices_fixture,unique_indices_types);
 TYPED_TEST(unique_indices_fixture,regression) {
@@ -134,8 +134,8 @@ TYPED_TEST(unique_indices_fixture,regression) {
 
 namespace {
     template<typename T>
-    struct unique_fixture : ::testing::Test {};
-    typedef ::testing::Types<char, int, float> unique_types;
+    struct unique_fixture : testing::Test {};
+    typedef testing::Types<char, int, float> unique_types;
 }
 TYPED_TEST_CASE(unique_fixture,unique_types);
 TYPED_TEST(unique_fixture,regression) {
@@ -149,14 +149,14 @@ TYPED_TEST(unique_fixture,regression) {
 
 namespace {
     template<typename T>
-    struct find_nn_index_fixture : ::testing::Test {};
+    struct find_nn_index_fixture : testing::Test {};
     template<typename T>
     struct find_nn_index_dist {
         auto operator()(const T& a, const T& b) -> decltype(lv::L1dist<T>(a,b)) {
             return lv::L1dist<T>(a,b);
         }
     };
-    typedef ::testing::Types<char, int, float> find_nn_index_types;
+    typedef testing::Types<char, int, float> find_nn_index_types;
 }
 TYPED_TEST_CASE(find_nn_index_fixture,find_nn_index_types);
 TYPED_TEST(find_nn_index_fixture,regression) {
@@ -180,4 +180,363 @@ TEST(interp1,regression) {
     ASSERT_EQ(vYAnsw.size(),size_t(2));
     EXPECT_FLOAT_EQ(vYAnsw[0],4.0f);
     EXPECT_FLOAT_EQ(vYAnsw[1],10.0f);
+}
+
+TEST(linspace,regression) {
+    EXPECT_EQ(lv::linspace(5.0f,10.0f,0,true),std::vector<float>());
+    EXPECT_EQ(lv::linspace(5.0f,10.0f,1,true),std::vector<float>{10.0f});
+    EXPECT_EQ(lv::linspace(5.0f,10.0f,2,true),(std::vector<float>{5.0f,10.0f}));
+    EXPECT_EQ(lv::linspace(5.0f,5.0f,100,false),std::vector<float>(100,5.0f));
+    EXPECT_EQ(lv::linspace(5.0f,5.0f,100,true),std::vector<float>(100,5.0f));
+    const std::vector<float> vTest1 = lv::linspace(4.0f,5.0f,2,false);
+    ASSERT_EQ(vTest1.size(),size_t(2));
+    EXPECT_FLOAT_EQ(vTest1[0],4.5f);
+    EXPECT_FLOAT_EQ(vTest1[1],5.0f);
+}
+
+TEST(WorkerPool,regression_1thread) {
+    lv::WorkerPool<1> wp1;
+    std::future<size_t> nRes1 = wp1.queueTask([](){std::this_thread::sleep_for(std::chrono::seconds(1));return size_t(13);});
+    std::future<size_t> nRes2 = wp1.queueTask([](){std::this_thread::sleep_for(std::chrono::milliseconds(200));return size_t(13);});
+    ASSERT_TRUE(nRes1.valid() && nRes2.valid());
+    ASSERT_EQ(nRes1.wait_for(std::chrono::seconds(2)),std::future_status::ready);
+    ASSERT_EQ(nRes2.wait_for(std::chrono::seconds(2)),std::future_status::ready);
+    EXPECT_EQ(nRes1.get(),size_t(13));
+    EXPECT_EQ(nRes2.get(),size_t(13));
+}
+
+TEST(WorkerPool,regression_4threads) {
+    lv::WorkerPool<4> wp4;
+    std::array<std::future<size_t>,5> vRes;
+    for(size_t i=0; i<vRes.size(); ++i) {
+        vRes[i] = wp4.queueTask([](){std::this_thread::sleep_for(std::chrono::milliseconds(200));return size_t(13);});
+        ASSERT_TRUE(vRes[i].valid());
+    }
+    for(size_t i=0; i<vRes.size(); ++i)
+        ASSERT_EQ(vRes[i].wait_for(std::chrono::seconds(2)),std::future_status::ready);
+    for(size_t i=0; i<vRes.size(); ++i)
+        EXPECT_EQ(vRes[i].get(),size_t(13));
+}
+
+TEST(expand_bits,regression) {
+    const uint32_t nTest0 = 0;
+    EXPECT_EQ(lv::expand_bits<4>(nTest0),uint32_t(0));
+    const uint32_t nTest1 = 0b1111;
+    EXPECT_EQ(lv::expand_bits<4>(nTest1),uint32_t(0b0001000100010001));
+    const uint32_t nTest2 = 0b101010;
+    EXPECT_EQ(lv::expand_bits<4>(nTest2),uint32_t(0b000100000001000000010000));
+}
+
+TEST(StopWatch,regression) {
+    lv::StopWatch sw;
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    const double dELapsed0 = sw.elapsed();
+    const double dElapsed = sw.tock();
+    EXPECT_NEAR(dElapsed,dELapsed0,0.05f);
+    EXPECT_NEAR(dElapsed,1.0f,0.05f);
+}
+
+TEST(getTimeStamp,regression) {
+    EXPECT_TRUE(!lv::getTimeStamp().empty());
+}
+
+TEST(getVersionStamp,regression) {
+    EXPECT_TRUE(lv::getVersionStamp().find(LITIV_VERSION_STR)!=std::string::npos);
+    EXPECT_TRUE(lv::getVersionStamp().find(LITIV_VERSION_SHA1)!=std::string::npos);
+}
+
+TEST(getLogStamp,regression) {
+    EXPECT_TRUE(lv::getLogStamp().find(lv::getTimeStamp())!=std::string::npos);
+    EXPECT_TRUE(lv::getLogStamp().find(lv::getLogStamp())!=std::string::npos);
+}
+
+TEST(clampString,regression) {
+    EXPECT_EQ(lv::clampString("",0),std::string());
+    EXPECT_EQ(lv::clampString("test",3),std::string("tes"));
+    EXPECT_EQ(lv::clampString("test",5),std::string(" test"));
+    EXPECT_EQ(lv::clampString("test",6,'x'),std::string("xxtest"));
+}
+
+TEST(accumulateMembers,regression) {
+    auto lObjEval = [](const float& a) {return a;};
+    EXPECT_EQ((lv::accumulateMembers(std::vector<float>{},lObjEval,0.0f)),0.0f);
+    EXPECT_EQ((lv::accumulateMembers(std::vector<float>{0.0f},lObjEval,0.0f)),0.0f);
+    EXPECT_EQ((lv::accumulateMembers(std::vector<float>{1.0f},lObjEval,0.0f)),1.0f);
+    EXPECT_EQ((lv::accumulateMembers(std::vector<float>{1.0f,2.0f,3.0f},lObjEval,0.0f)),6.0f);
+    EXPECT_EQ((lv::accumulateMembers(std::vector<float>{1.0f,2.0f,3.0f},lObjEval,2.0f)),8.0f);
+}
+
+namespace {
+    template<typename T>
+    struct concat_fixture : testing::Test {};
+    typedef testing::Types<char, int, ushort, size_t, float> concat_types;
+}
+TYPED_TEST_CASE(concat_fixture,concat_types);
+TYPED_TEST(concat_fixture,regression) {
+    EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>(),std::vector<TypeParam>())),(std::vector<TypeParam>{}));
+    EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>{TypeParam(1)},std::vector<TypeParam>{})),(std::vector<TypeParam>{TypeParam(1)}));
+    EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>{},std::vector<TypeParam>{TypeParam(1)})),(std::vector<TypeParam>{TypeParam(1)}));
+    EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>{TypeParam(1)},std::vector<TypeParam>{TypeParam(2)})),(std::vector<TypeParam>{TypeParam(1),TypeParam(2)}));
+    EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>{TypeParam(1),TypeParam(3)},std::vector<TypeParam>{TypeParam(2)})),(std::vector<TypeParam>{TypeParam(1),TypeParam(3),TypeParam(2)}));
+}
+
+TEST(filter_out,regression) {
+    std::vector<std::string> vNoVals;
+    EXPECT_EQ((lv::filter_out(vNoVals,vNoVals)),(vNoVals));
+    std::vector<std::string> vTokens{"sadf","//","12"};
+    EXPECT_EQ((lv::filter_out(vNoVals,vTokens)),(vNoVals));
+    std::vector<std::string> vVals = {"test","test2","12","test3"};
+    EXPECT_EQ((lv::filter_out(vVals,vTokens)),(std::vector<std::string>{"test","test2","test3"}));
+    EXPECT_EQ((lv::filter_out(vVals,vNoVals)),(vVals));
+}
+
+TEST(filter_in,regression) {
+    std::vector<std::string> vNoVals;
+    EXPECT_EQ((lv::filter_in(vNoVals,vNoVals)),(vNoVals));
+    std::vector<std::string> vTokens{"sadf","//","12"};
+    EXPECT_EQ((lv::filter_in(vNoVals,vTokens)),(vNoVals));
+    std::vector<std::string> vVals = {"test","test2","12","test3"};
+    EXPECT_EQ((lv::filter_in(vVals,vTokens)),(std::vector<std::string>{"12"}));
+    EXPECT_EQ((lv::filter_in(vVals,vNoVals)),(vNoVals));
+}
+
+TEST(enable_shared_from_this,regression) {
+    struct enable_shared_from_this_test :
+        lv::enable_shared_from_this<enable_shared_from_this_test> {
+        virtual ~enable_shared_from_this_test() {}
+    };
+    struct enable_shared_from_this_test2 :
+        enable_shared_from_this_test {};
+    struct enable_shared_from_this_test3 {};
+    std::shared_ptr<const enable_shared_from_this_test> test1 = std::make_shared<enable_shared_from_this_test2>();
+    EXPECT_TRUE(test1->shared_from_this_cast<enable_shared_from_this_test2>()!=nullptr);
+    std::shared_ptr<enable_shared_from_this_test> test2 = std::make_shared<enable_shared_from_this_test2>();
+    EXPECT_TRUE(test2->shared_from_this_cast<enable_shared_from_this_test2>()!=nullptr);
+    EXPECT_TRUE(test2->shared_from_this_cast<enable_shared_from_this_test3>()==nullptr);
+}
+
+TEST(has_const_iterator,regression) {
+    static_assert(lv::has_const_iterator<std::vector<int>>::value,"gtest:has_const_iterator:regression failed");
+    static_assert(!lv::has_const_iterator<int>::value,"gtest:has_const_iterator:regression failed");
+}
+
+TEST(for_each_in_tuple,regression) {
+    const auto test = std::make_tuple(uchar(1),int(-34),3.2f,size_t(52),-13.34);
+    float tot = 0.0;
+    lv::for_each_in_tuple(test,[&](const auto& v){tot += float(v);});
+    EXPECT_FLOAT_EQ(tot,1.0f-34.0f+3.2f+52.0f-13.34f);
+}
+
+TEST(unpacked_tuple_call,regression) {
+    const auto test = std::make_tuple(uchar(1),int(-34),3.2f,size_t(52),-13.34);
+    const auto testfunc = [](auto v1, auto v2, auto v3, auto v4, auto v5) {
+        return double(v1)+double(v2)+double(v3)+double(v4)+double(v5);
+    };
+    EXPECT_FLOAT_EQ((float)lv::unpacked_tuple_call(test,testfunc),1.0f-34.0f+3.2f+52.0f-13.34f);
+}
+
+namespace {
+    constexpr float static_transform_absdiff(float a, float b) {
+        return a>b?a-b:b-a;
+    }
+}
+TEST(static_transform,regression_static) {
+    constexpr std::array<float,5> a1 = {5.0f,6.0f,7.0f,8.0f,9.0f};
+    constexpr std::array<float,5> a2 = {10.0f,11.0f,12.0f,13.0f,14.0f};
+    constexpr std::array<float,5> a3 = lv::static_transform(a1,a2,static_transform_absdiff);
+    EXPECT_EQ(a3,(std::array<float,5>{5.0f,5.0f,5.0f,5.0f,5.0f}));
+}
+
+TEST(static_transform,regression_runtime) {
+    const std::array<float,5> a1 = {5.0f,6.0f,7.0f,8.0f,9.0f};
+    const std::array<float,5> a2 = {10.0f,11.0f,12.0f,13.0f,14.0f};
+    const std::array<float,5> a3 = lv::static_transform(a1,a2,[](float a, float b){return std::abs(a-b);});
+    EXPECT_EQ(a3,(std::array<float,5>{5.0f,5.0f,5.0f,5.0f,5.0f}));
+}
+
+namespace {
+    constexpr float static_transform_abssum(float a, float b) {
+        return (a>=0.0f?a:-a)+(b>=0.0f?b:-b);
+    }
+}
+TEST(static_reduce,regression_static) {
+    constexpr std::array<float,5> a1 = {5.0f,6.0f,7.0f,8.0f,9.0f};
+    constexpr float res1 = lv::static_reduce(a1,static_transform_abssum);
+    EXPECT_FLOAT_EQ(res1,35.0f);
+}
+
+TEST(static_reduce,regression_runtime) {
+    const std::array<float,5> a1 = {5.0f,6.0f,7.0f,8.0f,9.0f};
+    EXPECT_FLOAT_EQ((lv::static_reduce(a1,[](float a, float b){return std::abs(a)+std::abs(b);})),35.0f);
+    EXPECT_FLOAT_EQ((lv::static_reduce(&a1[0],&a1[0]+a1.size(),[](float a, float b){return std::abs(a)+std::abs(b);})),35.0f);
+}
+
+TEST(LUT,regression_identity9) {
+    constexpr size_t bins = 9;
+    constexpr size_t safety = 0;
+    const auto func_identity = [&](float x){return x;};
+    lv::LUT<float,float,bins,safety> lut(0.0f,1.0f,func_identity);
+    ASSERT_GE(lut.m_vLUT.size(),bins);
+    ASSERT_FLOAT_EQ(lut.m_vLUT[0],0.0f);
+    ASSERT_FLOAT_EQ(lut.m_vLUT[lut.m_vLUT.size()-1],1.0f);
+    ASSERT_FLOAT_EQ(lut.m_tMin,0.0f);
+    ASSERT_FLOAT_EQ(lut.m_tMax,1.0f);
+    ASSERT_FLOAT_EQ(lut.m_tMidOffset,0.5f);
+    ASSERT_FLOAT_EQ(lut.m_tLowOffset,0.0f);
+    ASSERT_FLOAT_EQ(lut.m_tScale,float(bins-1));
+    ASSERT_FLOAT_EQ(lut.m_tStep,1.0f/(bins-1));
+    ASSERT_FLOAT_EQ(*lut.m_pMid,0.5f);
+    ASSERT_FLOAT_EQ(*lut.m_pLow,0.0f);
+    const float step = lut.m_tStep;
+    for(size_t i=0; i<bins; ++i) {
+        ASSERT_FLOAT_EQ(lut.eval(step*i),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_round(step*i),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_noffset(step*i-lut.m_tLowOffset),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_noffset_round(step*i-lut.m_tLowOffset),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_raw(i),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid(step*i),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_round(step*i),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_noffset(step*i-lut.m_tMidOffset),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_noffset_round(step*i-lut.m_tMidOffset),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_raw(i-bins/2),(step*i)) << "@ i=[" << i << "]";
+    }
+}
+
+TEST(LUT,regression_identity9_safe) {
+    constexpr size_t bins = 9;
+    constexpr size_t safety = 2;
+    const auto func_identity = [&](float x){return x;};
+    lv::LUT<float,float,bins,safety> lut(0.0f,1.0f,func_identity);
+    ASSERT_GE(lut.m_vLUT.size(),bins+safety);
+    ASSERT_FLOAT_EQ(lut.m_vLUT[0],0.0f);
+    ASSERT_FLOAT_EQ(lut.m_vLUT[lut.m_vLUT.size()-1],1.0f);
+    ASSERT_FLOAT_EQ(lut.m_tMin,0.0f);
+    ASSERT_FLOAT_EQ(lut.m_tMax,1.0f);
+    ASSERT_FLOAT_EQ(lut.m_tMidOffset,0.5f);
+    ASSERT_FLOAT_EQ(lut.m_tLowOffset,0.0f);
+    ASSERT_FLOAT_EQ(lut.m_tScale,float(bins-1));
+    ASSERT_FLOAT_EQ(lut.m_tStep,1.0f/(bins-1));
+    ASSERT_FLOAT_EQ(*lut.m_pMid,0.5f);
+    ASSERT_FLOAT_EQ(*lut.m_pLow,0.0f);
+    const float step = lut.m_tStep;
+    for(size_t i=0; i<bins; ++i) {
+        ASSERT_FLOAT_EQ(lut.eval(step*i),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_round(step*i),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_noffset(step*i-lut.m_tLowOffset),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_noffset_round(step*i-lut.m_tLowOffset),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_raw(ptrdiff_t(i)),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid(step*i),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_round(step*i),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_noffset(step*i-lut.m_tMidOffset),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_noffset_round(step*i-lut.m_tMidOffset),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_raw(ptrdiff_t(i)-bins/2),(step*i)) << "@ i=[" << i << "]";
+    }
+}
+
+TEST(LUT,regression_arccos1000_safe) {
+    constexpr size_t bins = 999;
+    constexpr size_t safety = 10;
+    const auto func_acos = [&](float x){return std::acos(x);};
+    lv::LUT<float,float,bins,safety> lut(-1.0f,1.0f,func_acos);
+    ASSERT_GE(lut.m_vLUT.size(),bins+safety);
+    ASSERT_FLOAT_EQ(lut.m_vLUT[0],func_acos(-1.0f));
+    ASSERT_FLOAT_EQ(lut.m_vLUT[lut.m_vLUT.size()-1],func_acos(1.0f));
+    ASSERT_FLOAT_EQ(lut.m_tMin,-1.0f);
+    ASSERT_FLOAT_EQ(lut.m_tMax,1.0f);
+    ASSERT_FLOAT_EQ(lut.m_tMidOffset,0.0f);
+    ASSERT_FLOAT_EQ(lut.m_tLowOffset,-1.0f);
+    ASSERT_FLOAT_EQ(lut.m_tScale,float(bins-1)/2);
+    ASSERT_FLOAT_EQ(lut.m_tStep,2.0f/(bins-1));
+    ASSERT_NEAR(*lut.m_pMid,func_acos(0.0f),lut.m_tStep);
+    ASSERT_NEAR(*lut.m_pLow,func_acos(-1.0f),lut.m_tStep);
+    const float fMinX = -1.0f;
+    for(size_t i=0; i<bins/2; ++i) {
+        const float fLastY = func_acos(i==0?fMinX:fMinX+lut.m_tStep*(i-1));
+        const float fX = fMinX+lut.m_tStep*i;
+        const float fY = func_acos(fX);
+        const float fDelta = std::abs(fLastY-fY);
+        ASSERT_NEAR(lut.eval(fX),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_round(fX),func_acos(fX)) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_noffset(fX-lut.m_tLowOffset),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_noffset_round(fX-lut.m_tLowOffset),func_acos(fX)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_raw(ptrdiff_t(i)),func_acos(fX)) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_mid(fX),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_round(fX),func_acos(fX)) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_mid_noffset(fX-lut.m_tMidOffset),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_noffset_round(fX-lut.m_tMidOffset),func_acos(fX)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_raw(ptrdiff_t(i)-bins/2),func_acos(fX)) << "@ i=[" << i << "]";
+    }
+    const float fMaxX = 1.0f;
+    for(size_t i=bins/2; i<bins; ++i) {
+        const float fNextY = func_acos(i==(bins-1)?fMaxX:fMinX+lut.m_tStep*(i+1));
+        const float fX = fMinX+lut.m_tStep*i;
+        const float fY = func_acos(fX);
+        const float fDelta = std::abs(fY-fNextY);
+        ASSERT_NEAR(lut.eval(fX),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_round(fX),func_acos(fX)) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_noffset(fX-lut.m_tLowOffset),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_noffset_round(fX-lut.m_tLowOffset),func_acos(fX)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_raw(ptrdiff_t(i)),func_acos(fX)) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_mid(fX),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_round(fX),func_acos(fX)) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_mid_noffset(fX-lut.m_tMidOffset),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_noffset_round(fX-lut.m_tMidOffset),func_acos(fX)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_raw(ptrdiff_t(i)-bins/2),func_acos(fX)) << "@ i=[" << i << "]";
+    }
+}
+
+TEST(unlock_guard,regression_tuple) {
+    std::mutex m1,m2,m3;
+    std::lock_guard<std::mutex> g1(m1); // cannot merge locks without c++17 on gcc
+    std::lock_guard<std::mutex> g2(m2);
+    std::lock_guard<std::mutex> g3(m3);
+    {
+        ASSERT_FALSE(m1.try_lock() || m2.try_lock() || m3.try_lock());
+        lv::unlock_guard<std::mutex,std::mutex,std::mutex> g4(m1,m2,m3);
+        {
+            ASSERT_TRUE(m1.try_lock() && m2.try_lock() && m3.try_lock());
+            m1.unlock();
+            m2.unlock();
+            m3.unlock();
+        }
+    }
+    ASSERT_FALSE(m1.try_lock() || m2.try_lock() || m3.try_lock());
+}
+
+TEST(unlock_guard,regression_single) {
+    std::mutex m;
+    std::lock_guard<std::mutex> g1(m);
+    {
+        ASSERT_FALSE(m.try_lock());
+        lv::unlock_guard<std::mutex> g2(m);
+        {
+            ASSERT_TRUE(m.try_lock());
+            m.unlock();
+        }
+    }
+    ASSERT_FALSE(m.try_lock());
+}
+
+TEST(Semaphore,regression_simple) {
+    lv::Semaphore s0(0);
+    ASSERT_EQ(s0.count(),size_t(0));
+    ASSERT_FALSE(s0.try_wait());
+    s0.notify();
+    ASSERT_EQ(s0.count(),size_t(1));
+    ASSERT_TRUE(s0.try_wait());
+    ASSERT_EQ(s0.count(),size_t(0));
+}
+
+TEST(Semaphore,regression_workers) {
+    lv::Semaphore s2(2);
+    ASSERT_EQ(s2.count(),size_t(2));
+    {
+        lv::WorkerPool<4> wp4;
+        const auto work = [](){std::this_thread::sleep_for(std::chrono::milliseconds(rand()%100));};
+        const auto lockwork = [&](){s2.wait();work();s2.notify();};
+        for(size_t i=0; i<10; ++i) {
+            wp4.queueTask(lockwork);
+        }
+    }
+    ASSERT_EQ(s2.count(),size_t(2));
 }
