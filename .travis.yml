@@ -22,15 +22,13 @@ services:
 env:
   - CMAKECFG_BUILD_SHARED_LIBS=ON
   - CMAKECFG_BUILD_SHARED_LIBS=OFF
-  - CMAKECFG_USE_WORLD_SOURCE_GLOB=ON
-  - CMAKECFG_USE_WORLD_SOURCE_GLOB=OFF
 before_install:
   - docker --version
   - docker login --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD
   - docker pull plstcharles/litiv-base
   - echo "ENV GIT_SHA ${TRAVIS_COMMIT}" >> Dockerfile
 install:
-  - docker build --build-arg CMAKECFG_BUILD_SHARED_LIBS=${CMAKECFG_BUILD_SHARED_LIBS} --build-arg CMAKECFG_USE_WORLD_SOURCE_GLOB=${CMAKECFG_USE_WORLD_SOURCE_GLOB} -t ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT} .
+  - docker build --build-arg CMAKECFG_BUILD_SHARED_LIBS=${CMAKECFG_BUILD_SHARED_LIBS} -t ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT} .
 script:
 #  - docker run ...
   - echo 'todo, add testing!'
