@@ -167,7 +167,7 @@ namespace lv {
     /// returns the number of decimal digits required to display the non-fractional part of a given number (counts sign as extra digit if negative)
     template<typename T>
     inline int digit_count(T number) {
-        if(std::isnan(number))
+        if(std::isnan((float)number))
             return 3;
         int digits = number<0?2:1;
         while(std::abs(number)>=10) {
