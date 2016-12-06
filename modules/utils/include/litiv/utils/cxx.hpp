@@ -645,6 +645,10 @@ namespace lv {
         /// initializes internal resource count to 'nInitCount'
         inline explicit Semaphore(size_t nInitCount) :
                 m_nCount(nInitCount) {}
+        /// returns the current internal resource count
+        inline size_t count() {
+            return m_nCount;
+        }
         /// notifies one waiter that a resource is now available
         inline void notify() {
             std::unique_lock<std::mutex> oLock(m_oMutex);
