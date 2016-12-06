@@ -25,6 +25,8 @@ else()
     set(UPDATE_DISCONNECTED_IF_AVAILABLE "UPDATE_DISCONNECTED 1")
 endif()
 
+string(REPLACE " " "\\ " CMAKE_COMMAND_ESCAPED ${CMAKE_COMMAND})
+
 download_project(
     PROJ
         googlebench
@@ -34,6 +36,8 @@ download_project(
         https://github.com/google/benchmark.git
     GIT_TAG
         "v1.1.0"
+    PATCH_COMMAND
+        "${CMAKE_COMMAND_ESCAPED} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/changes-v1.1.0 ${CMAKE_CURRENT_BINARY_DIR}/googlebench-src"
     QUIET
     ${UPDATE_DISCONNECTED_IF_AVAILABLE}
 )
