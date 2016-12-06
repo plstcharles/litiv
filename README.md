@@ -24,7 +24,8 @@ My primary goal is to have the framework core only depend on OpenCV/CMake, and h
 * [GLFW](http://www.glfw.org/) >= 3.0.0 or [FreeGLUT](http://freeglut.sourceforge.net/) >= 2.8.0 (optional, for GLSL implementations)
 * [GLEW](http://glew.sourceforge.net/) >= 1.9.0 (optional, for GLSL implementations)
 * [GLM](http://glm.g-truc.net/) (optional, for GLSL implementations)
-* [GTest] (https://github.com/google/googletest) (optional, for regression testing)
+* [GTest](https://github.com/google/googletest) (optional, for regression testing)
+* [Benchmark](https://github.com/google/benchmark) (optional, for performance testing)
 * (CUDA/OpenCL will eventually be added as optional)
 * (OpenGM + Gurobi/CPLEX/HDF5 will eventually be added as optional)
 
