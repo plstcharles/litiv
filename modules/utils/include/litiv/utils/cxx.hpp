@@ -467,6 +467,18 @@ namespace lv {
         _for_each(t,f,std::make_index_sequence<sizeof...(TTupleTypes)>{});
     }
 
+    /// helper function to unpack a tuple/array into function arguments (impl)
+    template<typename TTuple, typename TFunc, size_t... anIndices>
+    inline auto _unpack(const TTuple& t, TFunc f, std::index_sequence<anIndices...>) {
+        return f(std::get<anIndices>(t)...);
+    }
+
+    /// helper function to unpack tuple into function arguments
+    template<typename TFunc, typename... TTupleTypes>
+    inline auto unpacked_tuple_call(const std::tuple<TTupleTypes...>& t, TFunc f) {
+        return _unpack(t,f,std::make_index_sequence<sizeof...(TTupleTypes)>{});
+    }
+
     /// computes a 2D array -> 1D array transformation with constexpr support (impl)
     template<typename TValue, size_t nArraySize, typename TFunc, size_t... anIndices>
     constexpr auto _static_transform(const std::array<TValue,nArraySize>& a, const std::array<TValue,nArraySize>& b, TFunc lOp, std::index_sequence<anIndices...>) -> std::array<decltype(lOp(a[0],b[0])),nArraySize> {
