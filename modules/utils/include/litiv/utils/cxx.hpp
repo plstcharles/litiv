@@ -517,7 +517,7 @@ namespace lv {
     }
 
     /// helper structure to create lookup tables with generic functors (also exposes multiple lookup interfaces)
-    template<typename Tx, typename Ty, size_t nBins, size_t nSafety=0>
+    template<typename Tx, typename Ty, size_t nBins, size_t nSafety=0, typename TStep=float>
     struct LUT {
         static_assert(nBins>1 && (nBins%2)==1,"LUT bin count must be at least two and odd");
         /// default constructor; will automatically fill the LUT array for lFunc([tMinLookup,tMaxLookup])
@@ -525,32 +525,55 @@ namespace lv {
         LUT(Tx tMinLookup, Tx tMaxLookup, TFunc lFunc) :
                 m_tMin(std::min(tMinLookup,tMaxLookup)),m_tMax(std::max(tMinLookup,tMaxLookup)),
                 m_tMidOffset((m_tMax+m_tMin)/2),m_tLowOffset(m_tMin),
-                m_fScale(float(nBins-1)/(m_tMax-m_tMin)),m_vLUT(init(m_tMin,m_tMax,lFunc)),
-                m_pMid(m_vLUT.data()+nBins/2+nSafety),m_pLow(m_vLUT.data()+nSafety) {}
-        /// returns the evaluation result of lFunc(x) using the LUT mid pointer after offsetting x (i.e. assuming tOffset!=0)
+                m_tScale(TStep(nBins-1)/(m_tMax-m_tMin)),
+                m_tStep(TStep(m_tMax-m_tMin)/(nBins-1)),
+                m_vLUT(init(m_tMin,m_tMax,m_tStep,lFunc)),
+                m_pMid(m_vLUT.data()+nBins/2+nSafety),
+                m_pLow(m_vLUT.data()+nSafety) {}
+        /// returns the evaluation result of lFunc(x) using the LUT mid pointer after offsetting and scaling x (i.e. assuming tOffset!=0)
         inline Ty eval_mid(Tx x) const {
-            lvDbgAssert(ptrdiff_t((x-m_tMidOffset)*m_fScale)>=-ptrdiff_t(nBins/2+nSafety) && ptrdiff_t((x-m_tMidOffset)*m_fScale)<=ptrdiff_t(nBins/2+nSafety));
-            return m_pMid[ptrdiff_t((x-m_tMidOffset)*m_fScale)];
+            lvDbgAssert(ptrdiff_t((x-m_tMidOffset)*m_tScale)>=-ptrdiff_t(nBins/2+nSafety) && ptrdiff_t((x-m_tMidOffset)*m_tScale)<=ptrdiff_t(nBins/2+nSafety));
+            return m_pMid[ptrdiff_t((x-m_tMidOffset)*m_tScale)];
         }
-        /// returns the evaluation result of lFunc(x) using the LUT mid pointer without offsetting x (i.e. assuming tOffset==0)
+        /// returns the evaluation result of lFunc(x) using the LUT mid pointer after offsetting, scaling, and rounding x (i.e. assuming tOffset!=0)
+        inline Ty eval_mid_round(Tx x) const {
+            lvDbgAssert((ptrdiff_t)std::llround((x-m_tMidOffset)*m_tScale)>=-ptrdiff_t(nBins/2+nSafety) && (ptrdiff_t)std::llround((x-m_tMidOffset)*m_tScale)<=ptrdiff_t(nBins/2+nSafety));
+            return m_pMid[(ptrdiff_t)std::llround((x-m_tMidOffset)*m_tScale)];
+        }
+        /// returns the evaluation result of lFunc(x) using the LUT mid pointer after scaling x (i.e. assuming tOffset==0)
         inline Ty eval_mid_noffset(Tx x) const {
-            lvDbgAssert(ptrdiff_t(x*m_fScale)>=-ptrdiff_t(nBins/2+nSafety) && ptrdiff_t(x*m_fScale)<=ptrdiff_t(nBins/2+nSafety));
-            return m_pMid[ptrdiff_t(x*m_fScale)];
+            lvDbgAssert(ptrdiff_t(x*m_tScale)>=-ptrdiff_t(nBins/2+nSafety) && ptrdiff_t(x*m_tScale)<=ptrdiff_t(nBins/2+nSafety));
+            return m_pMid[ptrdiff_t(x*m_tScale)];
+        }
+        /// returns the evaluation result of lFunc(x) using the LUT mid pointer after scaling and rounding x (i.e. assuming tOffset==0)
+        inline Ty eval_mid_noffset_round(Tx x) const {
+            lvDbgAssert((ptrdiff_t)std::llround(x*m_tScale)>=-ptrdiff_t(nBins/2+nSafety) && (ptrdiff_t)std::llround(x*m_tScale)<=ptrdiff_t(nBins/2+nSafety));
+            return m_pMid[(ptrdiff_t)std::llround(x*m_tScale)];
         }
         /// returns the evaluation result of lFunc(x) using the LUT mid pointer with x as a direct index value
         inline Ty eval_mid_raw(ptrdiff_t x) const {
             lvDbgAssert(x>=-ptrdiff_t(nBins/2+nSafety) && x<=ptrdiff_t(nBins/2+nSafety));
             return m_pMid[x];
         }
-        /// returns the evaluation result of lFunc(x) using the LUT low pointer after offsetting x (i.e. assuming tOffset!=0)
+        /// returns the evaluation result of lFunc(x) using the LUT low pointer after offsetting and scaling x (i.e. assuming tOffset!=0)
         inline Ty eval(Tx x) const {
-            lvDbgAssert(ptrdiff_t((x-m_tLowOffset)*m_fScale)>=-ptrdiff_t(nSafety) && ptrdiff_t((x-m_tLowOffset)*m_fScale)<ptrdiff_t(nBins+nSafety));
-            return m_pLow[ptrdiff_t((x-m_tLowOffset)*m_fScale)];
+            lvDbgAssert(ptrdiff_t((x-m_tLowOffset)*m_tScale)>=-ptrdiff_t(nSafety) && ptrdiff_t((x-m_tLowOffset)*m_tScale)<ptrdiff_t(nBins+nSafety));
+            return m_pLow[ptrdiff_t((x-m_tLowOffset)*m_tScale)];
         }
-        /// returns the evaluation result of lFunc(x) using the LUT low pointer without offsetting x (i.e. assuming tOffset==0)
+        /// returns the evaluation result of lFunc(x) using the LUT low pointer after offsetting, scaling, and rounding x (i.e. assuming tOffset!=0)
+        inline Ty eval_round(Tx x) const {
+            lvDbgAssert((ptrdiff_t)std::llround((x-m_tLowOffset)*m_tScale)>=-ptrdiff_t(nSafety) && (ptrdiff_t)std::llround((x-m_tLowOffset)*m_tScale)<ptrdiff_t(nBins+nSafety));
+            return m_pLow[(ptrdiff_t)std::llround((x-m_tLowOffset)*m_tScale)];
+        }
+        /// returns the evaluation result of lFunc(x) using the LUT low pointer after scaling x (i.e. assuming tOffset==0)
         inline Ty eval_noffset(Tx x) const {
-            lvDbgAssert(ptrdiff_t(x*m_fScale)>=-ptrdiff_t(nSafety) && ptrdiff_t(x*m_fScale)<ptrdiff_t(nBins+nSafety));
-            return m_pLow[ptrdiff_t(x*m_fScale)];
+            lvDbgAssert(ptrdiff_t(x*m_tScale)>=-ptrdiff_t(nSafety) && ptrdiff_t(x*m_tScale)<ptrdiff_t(nBins+nSafety));
+            return m_pLow[ptrdiff_t(x*m_tScale)];
+        }
+        /// returns the evaluation result of lFunc(x) using the LUT low pointer after scaling and rounding x (i.e. assuming tOffset==0)
+        inline Ty eval_noffset_round(Tx x) const {
+            lvDbgAssert((ptrdiff_t)std::llround(x*m_tScale)>=-ptrdiff_t(nSafety) && (ptrdiff_t)std::llround(x*m_tScale)<ptrdiff_t(nBins+nSafety));
+            return m_pLow[(ptrdiff_t)std::llround(x*m_tScale)];
         }
         /// returns the evaluation result of lFunc(x) using the LUT low pointer with x as a direct index value
         inline Ty eval_raw(ptrdiff_t x) const {
@@ -561,21 +584,20 @@ namespace lv {
         const Tx m_tMin,m_tMax;
         /// input value offsets for lookup
         const Tx m_tMidOffset,m_tLowOffset;
-        /// scale coefficient for lookup
-        const float m_fScale;
+        /// scale coefficient & step for lookup
+        const TStep m_tScale,m_tStep;
         /// functor lookup table
         const std::vector<Ty> m_vLUT;
         /// base LUT pointers for lookup
         const Ty* m_pMid,*m_pLow;
     private:
         template<typename TFunc>
-        static std::vector<Ty> init(Tx tMin, Tx tMax, TFunc lFunc) {
+        static std::vector<Ty> init(Tx tMin, Tx tMax, TStep tStep, TFunc lFunc) {
             std::vector<Ty> vLUT(nBins+nSafety*2);
             for(size_t n=0; n<=nSafety; ++n)
                 vLUT[n] = lFunc(tMin);
-            const Tx tStep = (tMax-tMin)/(nBins-1);
             for(size_t n=nSafety+1; n<nBins+nSafety-1; ++n)
-                vLUT[n] = lFunc(tMin+(Tx)(n*tStep));
+                vLUT[n] = lFunc(tMin+Tx((n-nSafety)*tStep));
             for(size_t n=nBins+nSafety-1; n<nBins+nSafety*2; ++n)
                 vLUT[n] = lFunc(tMax);
             return vLUT;
