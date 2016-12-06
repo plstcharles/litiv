@@ -78,14 +78,14 @@ TYPED_TEST(indices_of_fixture,regression) {
 
 namespace {
     template<typename T>
-    struct sort_indices_fixture : testing::Test {};
-    template<typename T>
-    struct sort_indices_custom_sort {
-        const std::vector<T>& m_vVals;
-        sort_indices_custom_sort(const std::vector<T>& vVals) : m_vVals(vVals) {}
-        bool operator()(const size_t& a, const size_t& b) {
-            return m_vVals[a]>m_vVals[b];
-        }
+    struct sort_indices_fixture : testing::Test {
+        struct custom_sort {
+            const std::vector<T>& m_vVals;
+            custom_sort(const std::vector<T>& vVals) : m_vVals(vVals) {}
+            bool operator()(const size_t& a, const size_t& b) {
+                return m_vVals[a]>m_vVals[b];
+            }
+        };
     };
     typedef testing::Types<char, int, float> sort_indices_types;
 }
@@ -97,27 +97,27 @@ TYPED_TEST(sort_indices_fixture,regression) {
     EXPECT_EQ(lv::sort_indices(vSingleVal),std::vector<size_t>{0});
     const std::vector<TypeParam> vVals = {TypeParam(1),TypeParam(7),TypeParam(3),TypeParam(8),TypeParam(0),TypeParam(-1),TypeParam(-100),TypeParam(100)};
     EXPECT_EQ(lv::sort_indices(vVals),(std::vector<size_t>{6,5,4,0,2,1,3,7}));
-    EXPECT_EQ((lv::sort_indices(vVals,sort_indices_custom_sort<TypeParam>(vVals))),(std::vector<size_t>{7,3,1,2,0,4,5,6}));
+    typedef typename sort_indices_fixture<TypeParam>::custom_sort Sorter;
+    EXPECT_EQ((lv::sort_indices(vVals,Sorter(vVals))),(std::vector<size_t>{7,3,1,2,0,4,5,6}));
 }
 
 namespace {
     template<typename T>
-    struct unique_indices_fixture : testing::Test {};
-    template<typename T>
-    struct unique_indices_custom_comp {
-        const std::vector<T>& m_vVals;
-        unique_indices_custom_comp(const std::vector<T>& vVals) : m_vVals(vVals) {}
-        bool operator()(const size_t& a, const size_t& b) {
-            return m_vVals[a]==m_vVals[b];
-        }
-    };
-    template<typename T>
-    struct unique_indices_custom_sort {
-        const std::vector<T>& m_vVals;
-        unique_indices_custom_sort(const std::vector<T>& vVals) : m_vVals(vVals) {}
-        bool operator()(const size_t& a, const size_t& b) {
-            return m_vVals[a]<m_vVals[b];
-        }
+    struct unique_indices_fixture : testing::Test {
+        struct custom_comp {
+            const std::vector<T>& m_vVals;
+            custom_comp(const std::vector<T>& vVals) : m_vVals(vVals) {}
+            bool operator()(const size_t& a, const size_t& b) {
+                return m_vVals[a]==m_vVals[b];
+            }
+        };
+        struct custom_sort {
+            const std::vector<T>& m_vVals;
+            custom_sort(const std::vector<T>& vVals) : m_vVals(vVals) {}
+            bool operator()(const size_t& a, const size_t& b) {
+                return m_vVals[a]<m_vVals[b];
+            }
+        };
     };
     typedef testing::Types<char, int, float> unique_indices_types;
 }
@@ -129,7 +129,9 @@ TYPED_TEST(unique_indices_fixture,regression) {
     EXPECT_EQ(lv::unique_indices(vSingleVal),std::vector<size_t>{0});
     const std::vector<TypeParam> vVals = {TypeParam(1),TypeParam(7),TypeParam(1),TypeParam(3),TypeParam(8),TypeParam(0),TypeParam(-1),TypeParam(-100),TypeParam(8),TypeParam(100)};
     EXPECT_EQ(lv::unique_indices(vVals),(std::vector<size_t>{7,6,5,0,3,1,4,9}));
-    EXPECT_EQ((lv::unique_indices(vVals,unique_indices_custom_sort<TypeParam>(vVals),unique_indices_custom_comp<TypeParam>(vVals))),(std::vector<size_t>{7,6,5,0,3,1,4,9}));
+    typedef typename unique_indices_fixture<TypeParam>::custom_sort Sorter;
+    typedef typename unique_indices_fixture<TypeParam>::custom_comp Comparer;
+    EXPECT_EQ((lv::unique_indices(vVals,Sorter(vVals),Comparer(vVals))),(std::vector<size_t>{7,6,5,0,3,1,4,9}));
 }
 
 namespace {
@@ -149,27 +151,29 @@ TYPED_TEST(unique_fixture,regression) {
 
 namespace {
     template<typename T>
-    struct find_nn_index_fixture : testing::Test {};
-    template<typename T>
-    struct find_nn_index_dist {
-        double operator()(const T& a, const T& b) {
-            return double(a)>=double(b)?double(a)-double(b):double(b)-double(a);
-        }
+    struct find_nn_index_fixture : testing::Test {
+        struct custom_dist {
+            double operator()(const T& a, const T& b) {
+                return double(a)>=double(b)?double(a)-double(b):double(b)-double(a);
+            }
+        };
     };
     typedef testing::Types<char, int, float> find_nn_index_types;
 }
 TYPED_TEST_CASE(find_nn_index_fixture,find_nn_index_types);
 TYPED_TEST(find_nn_index_fixture,regression) {
     const std::vector<TypeParam> vNoVal;
-    EXPECT_EQ(lv::find_nn_index(TypeParam(-10),vNoVal,find_nn_index_dist<TypeParam>()),size_t(-1));
+    typedef typename find_nn_index_fixture<TypeParam>::custom_dist Dist;
+    Dist dist;
+    EXPECT_EQ(lv::find_nn_index(TypeParam(-10),vNoVal,dist),size_t(-1));
     const std::vector<TypeParam> vSingleVal = {TypeParam(55)};
-    EXPECT_EQ(lv::find_nn_index(TypeParam(-10),vSingleVal,find_nn_index_dist<TypeParam>()),size_t(0));
+    EXPECT_EQ(lv::find_nn_index(TypeParam(-10),vSingleVal,dist),size_t(0));
     const std::vector<TypeParam> vVals = {TypeParam(1),TypeParam(7),TypeParam(3),TypeParam(8),TypeParam(0),TypeParam(-1),TypeParam(-100),TypeParam(100)};
-    EXPECT_EQ(lv::find_nn_index(TypeParam(-10),vVals,find_nn_index_dist<TypeParam>()),size_t(5));
-    EXPECT_EQ(lv::find_nn_index(TypeParam(10),vVals,find_nn_index_dist<TypeParam>()),size_t(3));
-    EXPECT_EQ(lv::find_nn_index(TypeParam(100),vVals,find_nn_index_dist<TypeParam>()),size_t(7));
-    EXPECT_EQ(lv::find_nn_index(TypeParam(7.2),vVals,find_nn_index_dist<TypeParam>()),size_t(1));
-    EXPECT_EQ(lv::find_nn_index(TypeParam(5),vVals,find_nn_index_dist<TypeParam>()),size_t(1));
+    EXPECT_EQ(lv::find_nn_index(TypeParam(-10),vVals,dist),size_t(5));
+    EXPECT_EQ(lv::find_nn_index(TypeParam(10),vVals,dist),size_t(3));
+    EXPECT_EQ(lv::find_nn_index(TypeParam(100),vVals,dist),size_t(7));
+    EXPECT_EQ(lv::find_nn_index(TypeParam(7.2),vVals,dist),size_t(1));
+    EXPECT_EQ(lv::find_nn_index(TypeParam(5),vVals,dist),size_t(1));
 }
 
 TEST(interp1,regression) {
