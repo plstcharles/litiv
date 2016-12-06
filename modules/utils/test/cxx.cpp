@@ -201,8 +201,8 @@ TEST(WorkerPool,regression_1thread) {
     ASSERT_TRUE(nRes1.valid() && nRes2.valid());
     ASSERT_EQ(nRes1.wait_for(std::chrono::seconds(2)),std::future_status::ready);
     ASSERT_EQ(nRes2.wait_for(std::chrono::seconds(2)),std::future_status::ready);
-    EXPECT_EQ(nRes1.get(),size_t(13));
-    EXPECT_EQ(nRes2.get(),size_t(13));
+    ASSERT_EQ(nRes1.get(),size_t(13));
+    ASSERT_EQ(nRes2.get(),size_t(13));
 }
 
 TEST(WorkerPool,regression_4threads) {
@@ -215,7 +215,7 @@ TEST(WorkerPool,regression_4threads) {
     for(size_t i=0; i<vRes.size(); ++i)
         ASSERT_EQ(vRes[i].wait_for(std::chrono::seconds(2)),std::future_status::ready);
     for(size_t i=0; i<vRes.size(); ++i)
-        EXPECT_EQ(vRes[i].get(),size_t(13));
+        ASSERT_EQ(vRes[i].get(),size_t(13));
 }
 
 TEST(expand_bits,regression) {
