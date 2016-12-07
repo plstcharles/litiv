@@ -82,11 +82,7 @@ option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark implementatio
 option(USE_CVCORE_WITH_UTILS "Include OpenCV core components in utils module" ON)
 option(USE_FAST_MATH "Enable fast math optimizations" OFF)
 if(NOT CMAKE_CROSSCOMPILING)
-    option(BUILD_TESTS "Build regression tests with GoogleTest framework" ON)
-    option(BUILD_PERF_TESTS "Build performance tests with GoogleBenchmark framework" ON)
-    if(NOT BUILD_TESTS)
-        set(BUILD_PERF_TESTS OFF)
-    endif()
+    option(BUILD_TESTS "Build regression tests with Google Test/Benchmark frameworks" ON)
 endif()
 mark_as_advanced(
     USE_WORLD_SOURCE_GLOB

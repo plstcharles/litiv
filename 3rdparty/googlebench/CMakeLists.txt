@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(NOT BUILD_PERF_TESTS)
+if(NOT BUILD_TESTS)
     return()
 endif()
 
