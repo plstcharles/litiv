@@ -61,11 +61,20 @@ namespace {
 
 TYPED_TEST_CASE(l1dist_float_fixture,l1dist_float_types);
 TYPED_TEST(l1dist_float_fixture,regression) {
-    EXPECT_EQ((lv::L1dist(TypeParam(0),TypeParam(0))),float(0));
+    EXPECT_EQ((lv::L1dist(TypeParam(0),TypeParam(0))),TypeParam(0));
+    EXPECT_EQ((lv::L1dist(TypeParam(1),TypeParam(0))),TypeParam(1));
+    EXPECT_EQ((lv::L1dist(TypeParam(0),TypeParam(1))),TypeParam(1));
+    EXPECT_EQ((lv::L1dist(TypeParam(1),TypeParam(1))),TypeParam(0));
+    EXPECT_EQ((lv::L1dist(TypeParam(-1),TypeParam(0))),TypeParam(1));
+    EXPECT_EQ((lv::L1dist(TypeParam(0),TypeParam(-1))),TypeParam(1));
+    EXPECT_EQ((lv::L1dist(TypeParam(-1),TypeParam(-1))),TypeParam(0));
+    EXPECT_EQ((lv::L1dist(TypeParam(-10),TypeParam(10))),TypeParam(20));
+    EXPECT_EQ((lv::L1dist(TypeParam(-20),TypeParam(0))),TypeParam(20));
+    EXPECT_EQ((lv::L1dist(TypeParam(0),TypeParam(20))),TypeParam(20));
 }
 
-BENCHMARK_TEMPLATE(l1dist_perftest,float)->Arg(10)->Repetitions(2)->MinTime(5.0)->ReportAggregatesOnly(true);
-BENCHMARK_TEMPLATE(l1dist_perftest,double)->Arg(10)->Repetitions(2)->MinTime(5.0)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE(l1dist_perftest,float)->Arg(10)->Repetitions(5)->MinTime(1.0)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE(l1dist_perftest,double)->Arg(10)->Repetitions(5)->MinTime(1.0)->ReportAggregatesOnly(true);
 
 namespace {
     template<typename T>
