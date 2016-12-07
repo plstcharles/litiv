@@ -48,17 +48,28 @@ add_subdirectory(
     EXCLUDE_FROM_ALL
 )
 
-set(BENCHMARK_ENABLE_LTO OFF CACHE BOOL "" FORCE)
+set(BENCHMARK_ENABLE_LTO ON CACHE BOOL "" FORCE)
 set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
 set(BENCHMARK_USE_LIBCXX OFF CACHE BOOL "" FORCE)
-
 mark_as_advanced(
     BENCHMARK_ENABLE_LTO
     BENCHMARK_ENABLE_TESTING
     BENCHMARK_USE_LIBCXX
 )
 
+add_library(benchmark_main STATIC "src/main.cpp")
+target_link_libraries(benchmark_main
+    benchmark
+    ${CMAKE_THREAD_LIBS_INIT}
+)
+set_target_properties(benchmark_main
+    PROPERTIES
+        FOLDER "3rdparty/googlebench"
+        DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
+        EXCLUDE_FROM_ALL ON
+)
 set_target_properties(benchmark
     PROPERTIES
         FOLDER "3rdparty/googlebench"
+        EXCLUDE_FROM_ALL ON
 )
