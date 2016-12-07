@@ -15,6 +15,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+option(USE_SIGNEXT_SHIFT_TRICK "Use sign-extended right shift bit trick in float absolute value computation" OFF)
+
+mark_as_advanced(
+    USE_SIGNEXT_SHIFT_TRICK
+)
+
 file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/utils/defines.hpp")
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/include/litiv/utils/defines.hpp.in"

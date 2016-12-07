@@ -24,15 +24,44 @@ namespace lv {
     /// computes the L1 distance between two integer values
     template<typename T>
     inline std::enable_if_t<std::is_integral<T>::value,size_t> L1dist(T a, T b) {
-        static_assert(sizeof(T)<=sizeof(int),"l1dist for integer types casts as int internally");
+        // use std::conditional_t<std::is_unsigned<T>,T,std::make_unsigned_t<T>>? specialize in enable if for signed/unsigned types, and handle differently?
+        static_assert(sizeof(T)<=sizeof(int),"L1dist for integer types casts as int internally");
         return (size_t)abs((int)a-b);
     }
 
-    /// computes the L1 distance between two float values
+#if USE_SIGNEXT_SHIFT_TRICK
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wstrict-aliasing"
+#elif (defined(__GNUC__) || defined(__GNUG__))
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#endif //defined(...GCC)
+
+    /// computes the L1 distance between two floating point values (with bit trick)
     template<typename T>
-    inline std::enable_if_t<std::is_floating_point<T>::value,float> L1dist(T a, T b) {
-        return fabs((float)a-(float)b);
+    inline std::enable_if_t<std::is_floating_point<T>::value,T> L1dist(T a, T b) {
+        static_assert(sizeof(T)==4 || sizeof(T)==8,"L1dist not defined for long double or non-ieee fp types");
+        using Tint = std::conditional_t<sizeof(T)==4,int32_t,int64_t>;
+        T fDiff = a-b;
+        Tint MAY_ALIAS nCast = reinterpret_cast<Tint&>(fDiff);
+        nCast &= std::numeric_limits<Tint>::max();
+        return reinterpret_cast<T&>(nCast);
     }
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif (defined(__GNUC__) || defined(__GNUG__))
+#pragma GCC diagnostic pop
+#endif //defined(...GCC)
+#else //!USE_SIGNEXT_SHIFT_TRICK
+
+    template<typename T>
+    inline std::enable_if_t<std::is_floating_point<T>::value,T> L1dist(T a, T b) {
+        return std::abs(a-b);
+    }
+
+#endif //!USE_SIGNEXT_SHIFT_TRICK
 
     /// computes the L1 distance between two generic arrays
     template<size_t nChannels, typename T>

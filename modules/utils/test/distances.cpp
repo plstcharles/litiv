@@ -4,6 +4,30 @@
 #include "litiv/utils/distances.hpp"
 #include <random>
 
+#if USE_SIGNEXT_SHIFT_TRICK
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wstrict-aliasing"
+#elif (defined(__GNUC__) || defined(__GNUG__))
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#endif //defined(...GCC)
+
+TEST(bittrick_signextshift,regression) {
+    float fVal = -123.45f;
+    int MAY_ALIAS nCast = reinterpret_cast<int&>(fVal);
+    nCast &= 0x7FFFFFFF;
+    const float fRes = reinterpret_cast<float&>(nCast);
+    ASSERT_EQ(fRes,123.45f) << "sign-extended right shift not supported, bit trick for floating point abs value will fail";
+}
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif (defined(__GNUC__) || defined(__GNUG__))
+#pragma GCC diagnostic pop
+#endif //defined(...GCC)
+#endif //USE_SIGNEXT_SHIFT_TRICK
+
 namespace {
 
     template<typename T>
