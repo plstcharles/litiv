@@ -80,7 +80,8 @@ endif()
 option(USE_WORLD_SOURCE_GLOB "Compile all LITIV modules as part of the world module instead of soft-linking them" OFF)
 option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark implementation in litiv_datasets (cleaned 3rd party code; will use an approximative solution otherwise)" ON)
 option(USE_CVCORE_WITH_UTILS "Include OpenCV core components in utils module" ON)
-option(USE_FAST_MATH "Enable fast math optimizations" OFF)
+option(USE_LINK_TIME_OPTIM "Enable link time optimization" ON)
+option(USE_FAST_MATH "Enable fast math optimization" OFF)
 if(NOT CMAKE_CROSSCOMPILING)
     option(BUILD_TESTS "Build regression tests with Google Test/Benchmark frameworks" ON)
 endif()
@@ -88,6 +89,7 @@ mark_as_advanced(
     USE_WORLD_SOURCE_GLOB
     USE_BSDS500_BENCHMARK
     USE_CVCORE_WITH_UTILS
+    USE_LINK_TIME_OPTIM
     USE_FAST_MATH
     DATASETS_CACHE_SIZE
 )
@@ -232,6 +234,19 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
     if(NOT USE_POSIX_ALIGNED_ALLOC)
         set(USE_POSIX_ALIGNED_ALLOC 0 CACHE INTERNAL "Have function posix_memalign")
     endif()
+    if(USE_LINK_TIME_OPTIM)
+        add_definitions(-flto)
+        if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+          find_program(GCC_AR gcc-ar)
+          if(GCC_AR)
+            set(CMAKE_AR ${GCC_AR})
+          endif()
+          find_program(GCC_RANLIB gcc-ranlib)
+          if(GCC_RANLIB)
+            set(CMAKE_RANLIB ${GCC_RANLIB})
+          endif()
+        endif()
+    endif()
 elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
     if(MSVC_VERSION LESS 1900)
         message(FATAL_ERROR "MSVC toolchains older than 2015 (v140) are not supported!")
@@ -254,6 +269,12 @@ elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
     add_definitions(/W1)
     add_definitions(/openmp)
     add_definitions(/arch:AVX) # check performance difference? vs 387? @@@
+    if(USE_LINK_TIME_OPTIM)
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /GL")
+        set(CMAKE_STATIC_LINKER_FLAGS_RELEASE "${CMAKE_STATIC_LINKER_FLAGS_RELEASE} /LTCG")
+        set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /LTCG")
+        set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /LTCG")
+    endif()
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
     message(FATAL_ERROR "Intel compiler still unsupported; please edit the main CMakeList.txt file to add proper configuration")
     # ... @@@
