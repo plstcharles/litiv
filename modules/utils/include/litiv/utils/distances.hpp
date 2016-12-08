@@ -21,12 +21,11 @@
 
 namespace lv {
 
-    /// computes the L1 distance between two integer values
-    template<typename T>
-    inline std::enable_if_t<std::is_integral<T>::value,size_t> L1dist(T a, T b) {
-        // use std::conditional_t<std::is_unsigned<T>,T,std::make_unsigned_t<T>>? specialize in enable if for signed/unsigned types, and handle differently?
-        static_assert(sizeof(T)<=sizeof(int),"L1dist for integer types casts as int internally");
-        return (size_t)abs((int)a-b);
+    /// computes the L1 distance between two integer values; returns an unsigned type twice as large as the input
+    template<typename T, typename=std::enable_if_t<std::is_integral<T>::value>>
+    inline auto L1dist(T a, T b) {
+        static_assert(!std::is_same<T,bool>::value,"L1dist not specialized for boolean types");
+        return (std::make_unsigned_t<T>)std::abs(((std::make_signed_t<typename lv::get_bigger_integer<T>::type>)a)-b);
     }
 
 #if USE_SIGNEXT_SHIFT_TRICK
@@ -39,8 +38,8 @@ namespace lv {
 #endif //defined(...GCC)
 
     /// computes the L1 distance between two floating point values (with bit trick)
-    template<typename T>
-    inline std::enable_if_t<std::is_floating_point<T>::value,T> L1dist(T a, T b) {
+    template<typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
+    inline T L1dist(T a, T b) {
         static_assert(sizeof(T)==4 || sizeof(T)==8,"L1dist not defined for long double or non-ieee fp types");
         using Tint = std::conditional_t<sizeof(T)==4,int32_t,int64_t>;
         T fDiff = a-b;
@@ -56,8 +55,9 @@ namespace lv {
 #endif //defined(...GCC)
 #else //!USE_SIGNEXT_SHIFT_TRICK
 
-    template<typename T>
-    inline std::enable_if_t<std::is_floating_point<T>::value,T> L1dist(T a, T b) {
+    /// computes the L1 distance between two floating point values (without bit trick)
+    template<typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
+    inline T L1dist(T a, T b) {
         return std::abs(a-b);
     }
 
