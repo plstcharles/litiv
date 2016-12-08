@@ -66,6 +66,12 @@
 // @@@ cleanup, move impls down as inline?
 // @@@ replace some vector args by templated begin/end iterators? (stl-like)
 
+#define NEXT_BIGGER_INTEGER(curr, next) \
+    template<> \
+    struct get_bigger_integer<curr> {\
+        typedef next type; \
+    }
+
 namespace lv {
 
     /// helper struct used for compile-time integer expr printing via error; just write "_<expr> test;"
@@ -454,6 +460,20 @@ namespace lv {
     public:
         enum {value=(sizeof(test<TContainer>(0))==sizeof(char))};
     };
+
+    /// type traits helper which provides the smallest integer type that is bigger than Tint
+    template<typename Tint>
+    struct get_bigger_integer {
+        static_assert(!std::is_same<uint64_t,Tint>::value,"missing uint128_t impl");
+        static_assert(!std::is_same<int64_t,Tint>::value,"missing int128_t impl");
+    };
+    NEXT_BIGGER_INTEGER(char,int16_t);
+    NEXT_BIGGER_INTEGER(uint8_t,uint16_t);
+    NEXT_BIGGER_INTEGER(uint16_t,uint32_t);
+    NEXT_BIGGER_INTEGER(uint32_t,uint64_t);
+    NEXT_BIGGER_INTEGER(int8_t,int16_t);
+    NEXT_BIGGER_INTEGER(int16_t,int32_t);
+    NEXT_BIGGER_INTEGER(int32_t,int64_t);
 
     /// helper function to apply a functor to all members of a tuple/array (impl)
     template<typename TTuple, typename TFunc, size_t... anIndices>
