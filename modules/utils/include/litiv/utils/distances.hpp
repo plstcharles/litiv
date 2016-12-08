@@ -326,7 +326,7 @@ namespace lv {
 
     /// computes the color distortion between two float arrays
     template<size_t nChannels, typename T>
-    inline std::enable_if_t<std::is_floating_point<T>::value,float> cdist(const T* const curr, const T* const bg) {
+    inline std::enable_if_t<std::is_floating_point<T>::value,T> cdist(const T* const curr, const T* const bg) {
         static_assert(nChannels>1,"vectors should have more than one channel");
         bool bNonConstDist = false;
         bool bNonNullDist = (curr[0]!=bg[0]);
@@ -339,23 +339,23 @@ namespace lv {
         if(!bNonConstDist || !bNonNullDist)
             return 0;
         if(!bNonNullBG) {
-            float nulldist = 0;
+            T nulldist = 0;
             for(size_t c=0; c<nChannels; ++c)
                 nulldist += curr[c];
             return nulldist;
         }
-        float curr_sqr = 0;
-        float bg_sqr = 0;
-        float mix = 0;
+        T curr_sqr = 0;
+        T bg_sqr = 0;
+        T mix = 0;
         for(size_t c=0; c<nChannels; ++c) {
-            curr_sqr += (float)curr[c]*curr[c];
-            bg_sqr += (float)bg[c]*bg[c];
-            mix += (float)curr[c]*bg[c];
+            curr_sqr += curr[c]*curr[c];
+            bg_sqr += bg[c]*bg[c];
+            mix += curr[c]*bg[c];
         }
         if(curr_sqr<(mix*mix)/bg_sqr)
             return 0;
         else
-            return (float)sqrt(curr_sqr-(mix*mix)/bg_sqr);
+            return sqrt(curr_sqr-(mix*mix)/bg_sqr);
     }
 
     /// computes the color distortion between two generic arrays
@@ -421,14 +421,14 @@ namespace lv {
 #endif //USE_CVCORE_WITH_UTILS
 
     /// computes a color distortion-distance mix using two generic distances
-    template<typename T>
-    inline T cmixdist(T oL1Distance, T oCDistortion) {
-        return (oL1Distance/2+oCDistortion*4);
+    template<typename TL1Dist, typename TCDist>
+    inline auto cmixdist(TL1Dist tL1Distance, TCDist tCDistortion) {
+        return (tL1Distance/2+tCDistortion*4);
     }
 
     /// computes a color distortion-distance mix using two generic arrays
     template<size_t nChannels, typename T>
-    inline auto cmixdist(const T* const curr, const T* const bg) -> decltype(L1dist<nChannels>(curr,bg)) {
+    inline auto cmixdist(const T* const curr, const T* const bg) {
         return cmixdist(L1dist<nChannels>(curr,bg),cdist<nChannels>(curr,bg));
     }
 
