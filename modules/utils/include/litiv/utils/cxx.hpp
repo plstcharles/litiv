@@ -720,8 +720,11 @@ lv::WorkerPool<nWorkers>::WorkerPool() : m_bIsActive(true) {
 
 template<size_t nWorkers>
 lv::WorkerPool<nWorkers>::~WorkerPool() {
-    m_bIsActive = false;
-    m_oSyncVar.notify_all();
+    {
+        std::unique_lock<std::mutex> oLock(m_oSyncMutex);
+        m_bIsActive = false;
+        m_oSyncVar.notify_all();
+    }
     for(std::thread& oWorker : m_vhWorkers)
         oWorker.join();
 }
@@ -748,8 +751,7 @@ template<size_t nWorkers>
 void lv::WorkerPool<nWorkers>::entry() {
     std::mutex_unique_lock sync_lock(m_oSyncMutex);
     while(m_bIsActive || !m_qTasks.empty()) {
-        if(m_qTasks.empty())
-            m_oSyncVar.wait(sync_lock);
+        m_oSyncVar.wait(sync_lock,[&](){return !m_bIsActive || !m_qTasks.empty();});
         if(!m_qTasks.empty()) {
             std::function<void()> task = std::move(m_qTasks.front());
             m_qTasks.pop();

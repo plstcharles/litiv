@@ -1189,7 +1189,7 @@ size_t lv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
     size_t nPacketPosition;
     {
         std::mutex_unique_lock sync_lock(m_oSyncMutex);
-        if(!m_bAllowPacketDrop && m_nQueueSize+nPacketSize>m_nQueueMaxSize)
+        if(!m_bAllowPacketDrop)
             m_oClearCondVar.wait(sync_lock,[&]{return m_nQueueSize+nPacketSize<=m_nQueueMaxSize;});
         if(m_nQueueSize+nPacketSize<=m_nQueueMaxSize) {
             m_mQueue[nIdx] = std::move(oPacketCopy);
@@ -1231,8 +1231,11 @@ bool lv::DataWriter::startAsyncWriting(size_t nSuggestedQueueSize, bool bDropPac
 
 void lv::DataWriter::stopAsyncWriting() {
     if(m_bIsActive) {
-        m_bIsActive = false;
-        m_oQueueCondVar.notify_all();
+        {
+            std::mutex_unique_lock sync_lock(m_oSyncMutex);
+            m_bIsActive = false;
+            m_oQueueCondVar.notify_all();
+        }
         for(std::thread& oWorker : m_vhWorkers)
             oWorker.join();
     }
@@ -1249,8 +1252,7 @@ void lv::DataWriter::entry() {
     std::cout << "data writer [" << uintptr_t(this) << "] init w/ max buffer size = " << (m_nQueueMaxSize/1024)/1024 << " mb" << std::endl;
 #endif //CONSOLE_DEBUG
     while(m_bIsActive || m_nQueueCount>0) {
-        if(m_nQueueCount==0)
-            m_oQueueCondVar.wait(sync_lock);
+        m_oQueueCondVar.wait(sync_lock,[&](){return !m_bIsActive || m_nQueueCount>0;});
         if(m_nQueueCount>0) {
             auto pCurrPacket = m_mQueue.begin();
             if(pCurrPacket!=m_mQueue.end()) {
