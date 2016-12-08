@@ -83,7 +83,11 @@ option(USE_CVCORE_WITH_UTILS "Include OpenCV core components in utils module" ON
 option(USE_LINK_TIME_OPTIM "Enable link time optimization" ON)
 option(USE_FAST_MATH "Enable fast math optimization" OFF)
 if(NOT CMAKE_CROSSCOMPILING)
-    option(BUILD_TESTS "Build regression tests with Google Test/Benchmark frameworks" ON)
+    option(BUILD_TESTS "Build regression tests with Google Test framework" ON)
+    option(BUILD_PERF_TESTS "Build performance tests with Google Benchmark framework" OFF)
+    if(NOT BUILD_TESTS)
+        set(BUILD_PERF_TESTS OFF)
+    endif()
 endif()
 mark_as_advanced(
     USE_WORLD_SOURCE_GLOB

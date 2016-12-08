@@ -130,36 +130,40 @@ macro(litiv_library name groupname canbeshared sourcelist headerlist)
                 FOLDER "tests"
                 DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
         )
+        set(testbinname "${PROJECT_NAME}_test$<$<CONFIG:Debug>:${CMAKE_DEBUG_POSTFIX}>")
         add_test(
             NAME
                 litiv_test_${name}
             COMMAND
-                "${CMAKE_BINARY_DIR}/bin/${PROJECT_NAME}_test${CMAKE_DEBUG_POSTFIX}"
-                "--gtest_output=xml:${CMAKE_BINARY_DIR}/Testing/${PROJECT_NAME}_test.xml"
+                "${CMAKE_BINARY_DIR}/bin/${testbinname}"
+                "--gtest_output=xml:${CMAKE_BINARY_DIR}/Testing/${testbinname}.xml"
         )
-        add_executable(${PROJECT_NAME}_perftest ${testlist})
-        target_compile_definitions(${PROJECT_NAME}_perftest
-            PUBLIC
-                BUILD_PERF_TEST=1
-        )
-        target_link_libraries(${PROJECT_NAME}_perftest
-            ${PROJECT_NAME}
-            gtest benchmark benchmark_main
-        )
-        set_target_properties(${PROJECT_NAME}_perftest
-            PROPERTIES
-                FOLDER "tests"
-                DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
-        )
-        add_test(
-            NAME
-                litiv_perftest_${name}
-            COMMAND
-                "${CMAKE_BINARY_DIR}/bin/${PROJECT_NAME}_perftest${CMAKE_DEBUG_POSTFIX}"
-                "--benchmark_format=console"
-                "--benchmark_out_format=console"
-                "--benchmark_out=${CMAKE_BINARY_DIR}/Testing/${PROJECT_NAME}_perf.txt"
-        )
+        if(BUILD_PERF_TESTS)
+            add_executable(${PROJECT_NAME}_perftest ${testlist})
+            target_compile_definitions(${PROJECT_NAME}_perftest
+                PUBLIC
+                    BUILD_PERF_TEST=1
+            )
+            target_link_libraries(${PROJECT_NAME}_perftest
+                ${PROJECT_NAME}
+                gtest benchmark benchmark_main
+            )
+            set_target_properties(${PROJECT_NAME}_perftest
+                PROPERTIES
+                    FOLDER "tests"
+                    DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
+            )
+            set(perftestbinname "${PROJECT_NAME}_perftest$<$<CONFIG:Debug>:${CMAKE_DEBUG_POSTFIX}>")
+            add_test(
+                NAME
+                    litiv_perftest_${name}
+                COMMAND
+                    "${CMAKE_BINARY_DIR}/bin/${perftestbinname}"
+                    "--benchmark_format=console"
+                    "--benchmark_out_format=console"
+                    "--benchmark_out=${CMAKE_BINARY_DIR}/Testing/${perftestbinname}.txt"
+            )
+        endif()
     endif()
     install(
         TARGETS ${PROJECT_NAME}
