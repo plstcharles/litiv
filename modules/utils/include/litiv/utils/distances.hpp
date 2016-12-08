@@ -64,59 +64,58 @@ namespace lv {
 #endif //!USE_SIGNEXT_SHIFT_TRICK
 
     /// computes the L1 distance between two generic arrays
-    template<size_t nChannels, typename T>
-    inline auto L1dist(const T* const a, const T* const b) -> decltype(L1dist(*a,*b)) {
-        static_assert(nChannels>0,"vectors should have at least one channel");
-        decltype(L1dist(*a,*b)) gResult = 0;
+    template<size_t nChannels, typename Tin, typename Tout=decltype(L1dist(Tin(),Tin()))>
+    inline Tout L1dist(const Tin* const a, const Tin* const b) {
+        Tout tResult = 0;
         for(size_t c=0; c<nChannels; ++c)
-            gResult += L1dist(a[c],b[c]);
-        return gResult;
+            tResult += (Tout)L1dist(a[c],b[c]);
+        return tResult;
     }
 
     /// computes the L1 distance between two generic arrays
-    template<size_t nChannels, typename T>
-    inline auto L1dist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) -> decltype(L1dist<nChannels>(a.data(),b.data())) {
-        return L1dist<nChannels>(a.data(),b.data());
+    template<size_t nChannels, typename Tin, typename Tout=decltype(L1dist(Tin(),Tin()))>
+    inline Tout L1dist(const std::array<Tin,nChannels>& a, const std::array<Tin,nChannels>& b) {
+        return L1dist<nChannels,Tin,Tout>(a.data(),b.data());
     }
 
     /// computes the L1 distance between two generic arrays
-    template<size_t nChannels, typename T>
-    inline auto L1dist(const std::array<T,nChannels>& a, const T* const b) -> decltype(L1dist<nChannels>(a.data(),b)) {
-        return L1dist<nChannels>(a.data(),b);
+    template<size_t nChannels, typename Tin, typename Tout=decltype(L1dist(Tin(),Tin()))>
+    inline Tout L1dist(const std::array<Tin,nChannels>& a, const Tin* const b) {
+        return L1dist<nChannels,Tin,Tout>(a.data(),b);
     }
 
     /// computes the L1 distance between two generic arrays
-    template<size_t nChannels, typename T>
-    inline auto L1dist(const T* const a, const std::array<T,nChannels>& b) -> decltype(L1dist<nChannels>(a,b.data())) {
-        return L1dist<nChannels>(a,b.data());
+    template<size_t nChannels, typename Tin, typename Tout=decltype(L1dist(Tin(),Tin()))>
+    inline Tout L1dist(const Tin* const a, const std::array<Tin,nChannels>& b) {
+        return L1dist<nChannels,Tin,Tout>(a,b.data());
     }
 
     /// computes the L1 distance between two generic arrays
-    template<size_t nChannels, typename T>
-    inline auto L1dist(const T* const a, const T* const b, size_t nElements, const uint8_t* m=NULL) -> decltype(L1dist<nChannels>(a,b)) {
-        decltype(L1dist<nChannels>(a,b)) gResult = 0;
-        size_t nTotElements = nElements*nChannels;
+    template<size_t nChannels, typename Tin, typename Tout=std::conditional_t<std::is_integral<Tin>::value,size_t,float>>
+    inline Tout L1dist(const Tin* const a, const Tin* const b, size_t nElements, const uint8_t* m=nullptr) {
+        Tout tResult = 0;
+        const size_t nTotElements = nElements*nChannels;
         if(m) {
             for(size_t n=0,i=0; n<nTotElements; n+=nChannels,++i)
                 if(m[i])
-                    gResult += L1dist<nChannels>(a+n,b+n);
+                    tResult += L1dist<nChannels,Tin,Tout>(a+n,b+n);
         }
         else {
             for(size_t n=0; n<nTotElements; n+=nChannels)
-                gResult += L1dist<nChannels>(a+n,b+n);
+                tResult += L1dist<nChannels,Tin,Tout>(a+n,b+n);
         }
-        return gResult;
+        return tResult;
     }
 
     /// computes the L1 distance between two generic arrays
-    template<typename T>
-    inline auto L1dist(const T* const a, const T* const b, size_t nElements, size_t nChannels, const uint8_t* m=NULL) -> decltype(L1dist<3>(a,b,nElements,m)) {
-        lvAssert_(nChannels>0 && nChannels<=4,"non-templated distance function only defined for 1 to 4 channels");
+    template<typename Tin, typename Tout=std::conditional_t<std::is_integral<Tin>::value,size_t,float>>
+    inline Tout L1dist(const Tin* const a, const Tin* const b, size_t nElements, size_t nChannels, const uint8_t* m=nullptr) {
+        lvAssert_(nChannels>0 && nChannels<=4,"untemplated distance function only defined for 1 to 4 channels");
         switch(nChannels) {
-            case 1: return L1dist<1>(a,b,nElements,m);
-            case 2: return L1dist<2>(a,b,nElements,m);
-            case 3: return L1dist<3>(a,b,nElements,m);
-            case 4: return L1dist<4>(a,b,nElements,m);
+            case 1: return L1dist<1,Tin,Tout>(a,b,nElements,m);
+            case 2: return L1dist<2,Tin,Tout>(a,b,nElements,m);
+            case 3: return L1dist<3,Tin,Tout>(a,b,nElements,m);
+            case 4: return L1dist<4,Tin,Tout>(a,b,nElements,m);
             default: return 0;
         }
     }
@@ -124,14 +123,14 @@ namespace lv {
 #if USE_CVCORE_WITH_UTILS
 
     /// computes the L1 distance between two opencv vectors
-    template<int nChannels, typename T>
-    inline auto L1dist(const cv::Vec<T,nChannels>& a, const cv::Vec<T,nChannels>& b) -> decltype(L1dist<nChannels,T>(T(),T())) {
-        T a_array[nChannels], b_array[nChannels];
+    template<int nChannels, typename Tin, typename Tout=decltype(L1dist(Tin(),Tin()))>
+    inline Tout L1dist(const cv::Vec<Tin,nChannels>& a, const cv::Vec<Tin,nChannels>& b) {
+        Tin a_array[nChannels], b_array[nChannels];
         for(int c=0; c<nChannels; ++c) {
-            a_array[c] = a[(int)c];
-            b_array[c] = b[(int)c];
+            a_array[c] = a[c];
+            b_array[c] = b[c];
         }
-        return L1dist<nChannels>(a_array,b_array);
+        return L1dist<nChannels,Tin,Tout>(a_array,b_array);
     }
 
 #endif //USE_CVCORE_WITH_UTILS
