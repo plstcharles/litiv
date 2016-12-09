@@ -237,7 +237,7 @@
     #if HAVE_GLSL
         #define TARGET_GL_VER_MAJOR   @TARGET_GL_VER_MAJOR@
         #define TARGET_GL_VER_MINOR   @TARGET_GL_VER_MINOR@
-        #define GLEW_EXPERIMENTAL     @GLEW_EXPERIMENTAL@
+        #define GLEW_EXPERIMENTAL     @USE_GLEW_EXPERIMENTAL@
         #define HAVE_GLFW             @USE_GLFW@
         #define HAVE_FREEGLUT         @USE_FREEGLUT@
         #define USE_VPTZ_STANDALONE   @USE_VPTZ_STANDALONE@

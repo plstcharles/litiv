@@ -100,5 +100,7 @@ if(DOXYGEN_FOUND)
                 docs
             OPTIONAL
         )
+    else()
+        unset(BUILD_DOCUMENTATION_LATEX CACHE)
     endif()
 endif()
