@@ -470,6 +470,8 @@ namespace lv {
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+    static_assert(std::numeric_limits<unsigned char>::digits==8,"lots of stuff is going to break...");
+
     /// popcount LUT for 8-bit vectors
     static constexpr size_t s_anPopcntLUT8[256] = {
         0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
@@ -521,7 +523,7 @@ namespace lv {
         static_assert(std::is_integral<T>::value,"type must be integral");
         size_t nResult = 0;
         for(size_t l=0; l<sizeof(T); ++l)
-            nResult += s_anPopcntLUT8[x>>l*8];
+            nResult += s_anPopcntLUT8[(uchar)(x>>(l*8))];
         return nResult;
     }
 
