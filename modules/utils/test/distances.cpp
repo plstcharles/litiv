@@ -34,7 +34,17 @@ namespace {
     std::unique_ptr<T[]> genarray(size_t n, T min, T max) {
         std::random_device rd;
         std::mt19937 gen(rd());
-        typedef std::conditional_t<std::is_integral<T>::value,std::uniform_int_distribution<int64_t>,std::uniform_real_distribution<double>> unif_distr;
+        typedef std::conditional_t<
+            std::is_integral<T>::value,
+            std::uniform_int_distribution<
+                std::conditional_t<
+                    std::is_same<uint64_t,T>::value,
+                    uint64_t,
+                    int64_t
+                >
+            >,
+            std::uniform_real_distribution<double>
+        > unif_distr;
         unif_distr uniform_dist(min,max);
         std::unique_ptr<T[]> v(new T[n]);
         for(size_t i=0; i<n; ++i)
@@ -77,7 +87,7 @@ namespace {
 }
 TYPED_TEST_CASE(L1dist_signed_fixture,L1dist_signed_types);
 
-TYPED_TEST(L1dist_signed_fixture,regression_single) {
+TYPED_TEST(L1dist_signed_fixture,regression_base) {
     EXPECT_DOUBLE_EQ(double(lv::L1dist(TypeParam(0),TypeParam(0))),0.0);
     EXPECT_DOUBLE_EQ(double(lv::L1dist(TypeParam(1),TypeParam(0))),1.0);
     EXPECT_DOUBLE_EQ(double(lv::L1dist(TypeParam(0),TypeParam(1))),1.0);
@@ -120,7 +130,7 @@ namespace {
 }
 TYPED_TEST_CASE(L1dist_unsigned_fixture,L1dist_unsigned_types);
 
-TYPED_TEST(L1dist_unsigned_fixture,regression_single) {
+TYPED_TEST(L1dist_unsigned_fixture,regression_base) {
     EXPECT_EQ((lv::L1dist(TypeParam(0),TypeParam(0))),TypeParam(0));
     EXPECT_EQ((lv::L1dist(TypeParam(1),TypeParam(0))),TypeParam(1));
     EXPECT_EQ((lv::L1dist(TypeParam(0),TypeParam(1))),TypeParam(1));
@@ -244,7 +254,7 @@ namespace {
 }
 TYPED_TEST_CASE(L2sqrdist_signed_fixture,L2sqrdist_signed_types);
 
-TYPED_TEST(L2sqrdist_signed_fixture,regression_single) {
+TYPED_TEST(L2sqrdist_signed_fixture,regression_base) {
     EXPECT_DOUBLE_EQ(double(lv::L2sqrdist(TypeParam(0),TypeParam(0))),0.0);
     EXPECT_DOUBLE_EQ(double(lv::L2sqrdist(TypeParam(1),TypeParam(0))),1.0);
     EXPECT_DOUBLE_EQ(double(lv::L2sqrdist(TypeParam(0),TypeParam(1))),1.0);
@@ -282,7 +292,7 @@ namespace {
 }
 TYPED_TEST_CASE(L2sqrdist_unsigned_fixture,L2sqrdist_unsigned_types);
 
-TYPED_TEST(L2sqrdist_unsigned_fixture,regression_single) {
+TYPED_TEST(L2sqrdist_unsigned_fixture,regression_base) {
     EXPECT_EQ(double(lv::L2sqrdist(TypeParam(0),TypeParam(0))),0.0);
     EXPECT_EQ(double(lv::L2sqrdist(TypeParam(1),TypeParam(0))),1.0);
     EXPECT_EQ(double(lv::L2sqrdist(TypeParam(0),TypeParam(1))),1.0);
@@ -625,3 +635,104 @@ TYPED_TEST(cdist_fixture,regression_mat_500_3) {
     EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),nullptr)),double(nCols*nCols*Tout(std::sqrt((255*255)*2.0))));
     EXPECT_DOUBLE_EQ(double(lv::cdist<nChannels>((TypeParam*)a.data,(TypeParam*)b.data,a.total(),m.data)),double(nCols*Tout(std::sqrt((255*255)*2.0))));
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+namespace {
+
+    template<typename T, size_t nChannels>
+    void popcount_perftest(benchmark::State& st) {
+        static_assert(nChannels>0,"need at least one channel!");
+        const size_t nArraySize = size_t(st.range(0));
+        const size_t nLoopSize = size_t(st.range(1));
+        const T tMinVal = std::numeric_limits<T>::min();
+        const T tMaxVal = std::numeric_limits<T>::max();
+        std::unique_ptr<T[]> aVals = genarray<T>(nArraySize,tMinVal,tMaxVal);
+        decltype(lv::popcount<nChannels>((T*)0)) tLast = 0;
+        volatile size_t nArrayIdx = 0;
+        while(st.KeepRunning()) {
+            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+nChannels)%nArraySize;
+                tLast = (tLast + lv::popcount<nChannels>(&aVals[nArrayIdx]))/2;
+            }
+        }
+        benchmark::DoNotOptimize(tLast);
+    }
+
+}
+
+BENCHMARK_TEMPLATE2(popcount_perftest,int64_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE2(popcount_perftest,uint64_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE2(popcount_perftest,int32_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE2(popcount_perftest,uint32_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE2(popcount_perftest,int16_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE2(popcount_perftest,uint16_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE2(popcount_perftest,int8_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE2(popcount_perftest,uint8_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+
+namespace {
+    template<typename T>
+    struct popcount_fixture : testing::Test {};
+    typedef testing::Types<int8_t,uint8_t,int16_t,uint16_t,int32_t,uint32_t,int64_t,uint64_t> popcount_types;
+}
+TYPED_TEST_CASE(popcount_fixture,popcount_types);
+
+TYPED_TEST(popcount_fixture,regression_base) {
+    EXPECT_EQ((lv::popcount(TypeParam(0))),size_t(0));
+    EXPECT_EQ((lv::popcount(TypeParam(1))),size_t(1));
+    EXPECT_EQ((lv::popcount(TypeParam(3))),size_t(2));
+    EXPECT_EQ((lv::popcount(TypeParam(8))),size_t(1));
+    EXPECT_EQ((lv::popcount(TypeParam(-1))),size_t(sizeof(TypeParam)*8));
+}
+
+TYPED_TEST(popcount_fixture,regression_array) {
+    EXPECT_EQ((lv::popcount<1>(std::array<TypeParam,1>{0}.data())),size_t(0));
+    EXPECT_EQ((lv::popcount<1>(std::array<TypeParam,1>{1}.data())),size_t(1));
+    EXPECT_EQ((lv::popcount<2>(std::array<TypeParam,2>{1,0}.data())),size_t(1));
+    EXPECT_EQ((lv::popcount<2>(std::array<TypeParam,2>{1,3}.data())),size_t(3));
+    EXPECT_EQ((lv::popcount<3>(std::array<TypeParam,3>{1,3,TypeParam(-1)}.data())),size_t(3+sizeof(TypeParam)*8));
+}
+
+TYPED_TEST(popcount_fixture,regression_stdarray) {
+    EXPECT_EQ((lv::popcount<1>(std::array<TypeParam,1>{0})),size_t(0));
+    EXPECT_EQ((lv::popcount<1>(std::array<TypeParam,1>{1})),size_t(1));
+    EXPECT_EQ((lv::popcount<2>(std::array<TypeParam,2>{1,0})),size_t(1));
+    EXPECT_EQ((lv::popcount<2>(std::array<TypeParam,2>{1,3})),size_t(3));
+    EXPECT_EQ((lv::popcount<3>(std::array<TypeParam,3>{1,3,TypeParam(-1)})),size_t(3+sizeof(TypeParam)*8));
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+namespace {
+
+    template<typename T, size_t nChannels>
+    void hdist_perftest(benchmark::State& st) {
+        static_assert(nChannels>0,"need at least one channel!");
+        const size_t nArraySize = size_t(st.range(0));
+        const size_t nLoopSize = size_t(st.range(1));
+        const T tMinVal = std::numeric_limits<T>::min();
+        const T tMaxVal = std::numeric_limits<T>::max();
+        std::unique_ptr<T[]> aVals = genarray<T>(nArraySize,tMinVal,tMaxVal);
+        decltype(lv::hdist<nChannels>((T*)0,(T*)0)) tLast = 0;
+        volatile size_t nArrayIdx1 = 0;
+        volatile size_t nArrayIdx2 = nArraySize/2;
+        while(st.KeepRunning()) {
+            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
+                nArrayIdx1 = (nArrayIdx1+nChannels)%nArraySize;
+                nArrayIdx2 = (nArrayIdx2+nChannels)%nArraySize;
+                tLast = (tLast + lv::hdist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]))/2;
+            }
+        }
+        benchmark::DoNotOptimize(tLast);
+    }
+
+}
+
+BENCHMARK_TEMPLATE2(hdist_perftest,int64_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE2(hdist_perftest,uint64_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE2(hdist_perftest,int32_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE2(hdist_perftest,uint32_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE2(hdist_perftest,int16_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE2(hdist_perftest,uint16_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE2(hdist_perftest,int8_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE2(hdist_perftest,uint8_t,3)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
