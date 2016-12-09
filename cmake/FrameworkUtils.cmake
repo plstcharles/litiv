@@ -118,7 +118,7 @@ macro(litiv_library name groupname canbeshared sourcelist headerlist)
         add_executable(${PROJECT_NAME}_test ${testlist})
         target_compile_definitions(${PROJECT_NAME}_test
             PUBLIC
-                BUILD_PERF_TEST=0
+                PERFTEST=0
         )
         target_link_libraries(${PROJECT_NAME}_test
             ${PROJECT_NAME}
@@ -138,21 +138,21 @@ macro(litiv_library name groupname canbeshared sourcelist headerlist)
                 "${CMAKE_BINARY_DIR}/bin/${testbinname}"
                 "--gtest_output=xml:${CMAKE_BINARY_DIR}/Testing/${testbinname}.xml"
         )
-        if(BUILD_PERF_TESTS)
-            add_executable(${PROJECT_NAME}_perftest ${testlist})
-            target_compile_definitions(${PROJECT_NAME}_perftest
-                PUBLIC
-                    BUILD_PERF_TEST=1
-            )
-            target_link_libraries(${PROJECT_NAME}_perftest
-                ${PROJECT_NAME}
-                gtest benchmark benchmark_main
-            )
-            set_target_properties(${PROJECT_NAME}_perftest
-                PROPERTIES
-                    FOLDER "tests"
-                    DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
-            )
+        add_executable(${PROJECT_NAME}_perftest ${testlist})
+        target_compile_definitions(${PROJECT_NAME}_perftest
+            PUBLIC
+                PERFTEST=1
+        )
+        target_link_libraries(${PROJECT_NAME}_perftest
+            ${PROJECT_NAME}
+            gtest benchmark benchmark_main
+        )
+        set_target_properties(${PROJECT_NAME}_perftest
+            PROPERTIES
+                FOLDER "tests"
+                DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
+        )
+        if(BUILD_TESTS_PERF)
             set(perftestbinname "${PROJECT_NAME}_perftest$<$<CONFIG:Debug>:${CMAKE_DEBUG_POSTFIX}>")
             add_test(
                 NAME
