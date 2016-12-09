@@ -32,6 +32,5 @@ RUN cmake \
     -D CMAKE_INSTALL_PREFIX=/usr/local \
     -D BUILD_SHARED_LIBS=${CMAKECFG_BUILD_SHARED_LIBS} \
     -D USE_WORLD_SOURCE_GLOB=${CMAKECFG_USE_WORLD_SOURCE_GLOB} \
-    .. && make -j${nbthreads}
-RUN make check && make install && make clean
-CMD ["/bin/bash"]
+    .. && make -j${nbthreads} && make install
+CMD ["/usr/bin/make","check"]

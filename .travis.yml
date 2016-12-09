@@ -30,8 +30,7 @@ before_install:
 install:
   - docker build --build-arg CMAKECFG_BUILD_SHARED_LIBS=${CMAKECFG_BUILD_SHARED_LIBS} -t ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT} .
 script:
-#  - docker run ...
-  - echo 'todo, add testing!'
+  - docker run -t ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT}
 after_success:
   - if [ ! -z "$TRAVIS_TAG" ]; then docker tag ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT} ${DOCKER_HUB_REPO}:${TRAVIS_TAG}; fi
   - docker push ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT}
