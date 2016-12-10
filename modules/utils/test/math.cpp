@@ -6,30 +6,6 @@
 
 #define BENCHMARK_NB_CHANNELS 3
 
-#if USE_SIGNEXT_SHIFT_TRICK
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wstrict-aliasing"
-#elif (defined(__GNUC__) || defined(__GNUG__))
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstrict-aliasing"
-#endif //defined(...GCC)
-
-TEST(bittrick_signextshift,regression) {
-    float fVal = -123.45f;
-    int MAY_ALIAS nCast = reinterpret_cast<int&>(fVal);
-    nCast &= 0x7FFFFFFF;
-    const float fRes = reinterpret_cast<float&>(nCast);
-    ASSERT_EQ(fRes,123.45f) << "sign-extended right shift not supported, bit trick for floating point abs value will fail";
-}
-
-#if defined(__clang__)
-#pragma clang diagnostic pop
-#elif (defined(__GNUC__) || defined(__GNUG__))
-#pragma GCC diagnostic pop
-#endif //defined(...GCC)
-#endif //USE_SIGNEXT_SHIFT_TRICK
-
 namespace {
 
     template<typename T>
@@ -52,6 +28,66 @@ namespace {
         for(size_t i=0; i<n; ++i)
             v[i] = (T)uniform_dist(gen);
         return std::move(v);
+    }
+
+}
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wstrict-aliasing"
+#elif (defined(__GNUC__) || defined(__GNUG__))
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#endif //defined(...GCC)
+
+TEST(bittrick_signextshift,regression) {
+    float fVal = -123.45f;
+    int32_t& nCast = reinterpret_cast<int32_t&>(fVal);
+    nCast &= 0x7FFFFFFF;
+    const float fRes = reinterpret_cast<float&>(nCast);
+    EXPECT_EQ(fRes,123.45f) << "sign-extended right shift not supported, bit trick for floating point abs value will fail";
+}
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif (defined(__GNUC__) || defined(__GNUG__))
+#pragma GCC diagnostic pop
+#endif //defined(...GCC)
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+namespace {
+
+    void L1dist_cheat_perftest(benchmark::State& st) {
+        const volatile size_t nArraySize = size_t(st.range(0));
+        const volatile size_t nLoopSize = size_t(st.range(1));
+        const volatile float fMinVal = (float)st.range(2);
+        const volatile float fMaxVal = (float)st.range(3);
+        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        size_t nArrayIdx = 0;
+        while(st.KeepRunning()) {
+            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+2)%nArraySize;
+                auto tLast = lv::_L1dist_cheat(afVals[nArrayIdx],afVals[nArrayIdx+1]);
+                benchmark::DoNotOptimize(tLast);
+            }
+        }
+    }
+
+    void L1dist_nocheat_perftest(benchmark::State& st) {
+        const volatile size_t nArraySize = size_t(st.range(0));
+        const volatile size_t nLoopSize = size_t(st.range(1));
+        const volatile float fMinVal = (float)st.range(2);
+        const volatile float fMaxVal = (float)st.range(3);
+        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        size_t nArrayIdx = 0;
+        while(st.KeepRunning()) {
+            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+2)%nArraySize;
+                auto tLast = lv::_L1dist_nocheat(afVals[nArrayIdx],afVals[nArrayIdx+1]);
+                benchmark::DoNotOptimize(tLast);
+            }
+        }
     }
 
     template<typename T, size_t nChannels>
@@ -77,6 +113,8 @@ namespace {
 
 }
 
+BENCHMARK(L1dist_cheat_perftest)->Args({1000000,250,-10,10})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK(L1dist_nocheat_perftest)->Args({1000000,250,-10,10})->Repetitions(15)->ReportAggregatesOnly(true);
 BENCHMARK_TEMPLATE2(L1dist_perftest,float,BENCHMARK_NB_CHANNELS)->Args({1000000,100,-10,10})->Repetitions(10)->ReportAggregatesOnly(true);
 BENCHMARK_TEMPLATE2(L1dist_perftest,int32_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100,-10,10})->Repetitions(10)->ReportAggregatesOnly(true);
 BENCHMARK_TEMPLATE2(L1dist_perftest,int16_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100,-10,10})->Repetitions(10)->ReportAggregatesOnly(true);
@@ -795,14 +833,71 @@ TEST(linspace,regression) {
     EXPECT_FLOAT_EQ(vTest1[1],5.0f);
 }
 
-TEST(expand_bits,regression) {
-    const uint32_t nTest0 = 0;
-    EXPECT_EQ(lv::expand_bits<4>(nTest0),uint32_t(0));
-    const uint32_t nTest1 = 0b1111;
-    EXPECT_EQ(lv::expand_bits<4>(nTest1),uint32_t(0b0001000100010001));
-    const uint32_t nTest2 = 0b101010;
-    EXPECT_EQ(lv::expand_bits<4>(nTest2),uint32_t(0b000100000001000000010000));
+TEST(extend_bits,regression) {
+    EXPECT_EQ(uint32_t(lv::extend_bits(0b0u,5,8)),uint32_t(0b0));
+    EXPECT_EQ(uint32_t(lv::extend_bits(0b111u,3,3)),uint32_t(0b111));
+    EXPECT_EQ(uint32_t(lv::extend_bits(0b11111u,5,8)),uint32_t(0b11111111));
+    EXPECT_NEAR(uint32_t(lv::extend_bits(0b10101u,5,8)),uint32_t(0b10101*256/32),256/32);
 }
+
+TEST(expand_bits,regression) {
+    EXPECT_EQ(uint32_t(lv::expand_bits<4>(0)),uint32_t(0));
+    EXPECT_EQ(uint32_t(lv::expand_bits<4>(0b1111)),uint32_t(0b0001000100010001));
+    EXPECT_EQ(uint32_t(lv::expand_bits<4>(0b101010)),uint32_t(0b000100000001000000010000));
+}
+
+TEST(inverse_fast,regression) {
+    // allow +/- 15% deviation off result
+    constexpr float fErr = 0.15f;
+    EXPECT_FLOAT_EQ(lv::inverse_fast(1.0f),1.0f);
+    EXPECT_FLOAT_EQ(lv::inverse_fast(0.5f),2.0f);
+    EXPECT_FLOAT_EQ(lv::inverse_fast(2.0f),0.5f);
+    EXPECT_NEAR(lv::inverse_fast(10.0f),0.1f,0.1f*fErr);
+    EXPECT_NEAR(lv::inverse_fast(0.1f),10.0f,10.0f*fErr);
+    constexpr size_t nArraySize = 100000;
+    const std::unique_ptr<float[]> afVals = genarray(nArraySize,-10000.0f,10000.0f);
+    for(size_t i=0; i<nArraySize; ++i)
+        ASSERT_NEAR(lv::inverse_fast(afVals[i]),1.0f/afVals[i],std::abs((1.0f/afVals[i])*fErr));
+}
+
+namespace {
+
+    void inverse_fast_perftest(benchmark::State& st) {
+        const volatile size_t nArraySize = size_t(st.range(0));
+        const volatile size_t nLoopSize = size_t(st.range(1));
+        const volatile float fMinVal = std::numeric_limits<float>::min();
+        const volatile float fMaxVal = std::numeric_limits<float>::max();
+        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        size_t nArrayIdx = 0;
+        while(st.KeepRunning()) {
+            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+1)%nArraySize;
+                auto tLast = lv::inverse_fast(afVals[nArrayIdx]);
+                benchmark::DoNotOptimize(tLast);
+            }
+        }
+    }
+
+    void inverse_orig_perftest(benchmark::State& st) {
+        const volatile size_t nArraySize = size_t(st.range(0));
+        const volatile size_t nLoopSize = size_t(st.range(1));
+        const volatile float fMinVal = std::numeric_limits<float>::min();
+        const volatile float fMaxVal = std::numeric_limits<float>::max();
+        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        size_t nArrayIdx = 0;
+        while(st.KeepRunning()) {
+            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+1)%nArraySize;
+                auto tLast = 1.0f/afVals[nArrayIdx];
+                benchmark::DoNotOptimize(tLast);
+            }
+        }
+    }
+
+}
+
+BENCHMARK(inverse_fast_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK(inverse_orig_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
 
 TEST(isnan,regression) {
     EXPECT_EQ(lv::isnan(std::numeric_limits<float>::quiet_NaN()),true);
