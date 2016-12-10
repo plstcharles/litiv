@@ -727,19 +727,55 @@ namespace lv {
         return vResult;
     }
 
+    /// helper global constexpr variable for endianness testing
+    constexpr union {uint32_t i;uint8_t c[4];} s_oEndianessTest = {0x01020304};
+
+    /// returns whether the machine uses a big endian architecture or not
+    constexpr bool is_big_endian() {
+        return s_oEndianessTest.c[0]==1;
+    }
+
+    /// bitfield linear unpacking function w/ almost linear scaling & 0-0/max-max mapping
+    template<typename T>
+    constexpr T extend_bits(T nValue, int32_t nOrigBitCount, int32_t nExtendedBitCount) {
+        static_assert(std::is_unsigned<T>::value,"input value type must be unsigned integer");
+        return (nValue<<(nExtendedBitCount-nOrigBitCount))|(nValue>>std::max(nOrigBitCount-(nExtendedBitCount-nOrigBitCount),0));
+    }
+
     /// bitfield expansion function (specialized for unit word size)
-    template<size_t nWordBitSize, typename Tr>
-    constexpr std::enable_if_t<nWordBitSize==1,Tr> expand_bits(const Tr& nBits, size_t=0) {
+    template<size_t nWordBitSize, typename T>
+    constexpr std::enable_if_t<nWordBitSize==1,T> expand_bits(const T& nBits, size_t=0) {
         return nBits;
     }
 
     /// bitfield expansion function (specialized for non-unit word size)
-    template<size_t nWordBitSize, typename Tr>
-    constexpr std::enable_if_t<(nWordBitSize>1),Tr> expand_bits(const Tr& nBits, size_t n=((sizeof(Tr)*8)/nWordBitSize)-1) {
-        static_assert(std::is_integral<Tr>::value,"nBits type must be integral");
-        // only the first [(sizeof(Tr)*8)/nWordBitSize] bits are kept (otherwise overflow/ignored)
-        return (Tr)(bool((nBits&(1<<n))!=0)<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,Tr>(nBits,n-1):(Tr)0);
+    template<size_t nWordBitSize, typename T>
+    constexpr std::enable_if_t<(nWordBitSize>1),T> expand_bits(const T& nBits, size_t n=((sizeof(T)*8)/nWordBitSize)-1) {
+        static_assert(std::is_integral<T>::value,"input value type must be integer");
+        // only the first [(sizeof(T)*8)/nWordBitSize] bits are kept (otherwise overflow/ignored)
+        return (T)(bool((nBits&(1<<n))!=0)<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,T>(nBits,n-1):(T)0);
     }
+
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wstrict-aliasing"
+#elif (defined(__GNUC__) || defined(__GNUG__))
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstrict-aliasing"
+#endif //defined(...GCC)
+
+    /// computes the fast inverse of a floating point value, ~8% avg deviation -- http://bits.stephan-brumme.com/inverse.html
+    inline float inverse_fast(float x) {
+        uint32_t& i = reinterpret_cast<uint32_t&>(x);
+        i = 0x7F000000 - i;
+        return reinterpret_cast<float&>(i);
+    }
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif (defined(__GNUC__) || defined(__GNUG__))
+#pragma GCC diagnostic pop
+#endif //defined(...GCC)
 
     /// returns whether a value is NaN (required due to non-portable msvc signature)
     template<typename T>
