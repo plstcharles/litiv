@@ -28,7 +28,6 @@ namespace lv {
         return (std::make_unsigned_t<T>)std::abs(((std::make_signed_t<typename lv::get_bigger_integer<T>::type>)a)-b);
     }
 
-#if USE_SIGNEXT_SHIFT_TRICK
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wstrict-aliasing"
@@ -39,11 +38,11 @@ namespace lv {
 
     /// computes the L1 distance between two floating point values (with bit trick)
     template<typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
-    inline T L1dist(T a, T b) {
+    inline T _L1dist_cheat(T a, T b) {
         static_assert(sizeof(T)==4 || sizeof(T)==8,"L1dist not defined for long double or non-ieee fp types");
         using Tint = std::conditional_t<sizeof(T)==4,int32_t,int64_t>;
         T fDiff = a-b;
-        Tint MAY_ALIAS nCast = reinterpret_cast<Tint&>(fDiff);
+        Tint& nCast = reinterpret_cast<Tint&>(fDiff);
         nCast &= std::numeric_limits<Tint>::max();
         return reinterpret_cast<T&>(nCast);
     }
@@ -53,15 +52,22 @@ namespace lv {
 #elif (defined(__GNUC__) || defined(__GNUG__))
 #pragma GCC diagnostic pop
 #endif //defined(...GCC)
-#else //!USE_SIGNEXT_SHIFT_TRICK
+
+    /// computes the L1 distance between two floating point values (without bit trick)
+    template<typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
+    inline T _L1dist_nocheat(T a, T b) {
+        return std::abs(a-b);
+    }
 
     /// computes the L1 distance between two floating point values (without bit trick)
     template<typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
     inline T L1dist(T a, T b) {
-        return std::abs(a-b);
-    }
-
+#if USE_SIGNEXT_SHIFT_TRICK
+        return _L1dist_cheat(a,b);
+#else //!USE_SIGNEXT_SHIFT_TRICK
+        return _L1dist_nocheat(a,b);
 #endif //!USE_SIGNEXT_SHIFT_TRICK
+    }
 
     /// computes the L1 distance between two generic arrays
     template<size_t nChannels, typename Tin, typename Tout=decltype(L1dist(Tin(),Tin()))>
