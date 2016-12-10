@@ -31,12 +31,13 @@ add_files(SOURCE_FILES
     "src/platform.cpp"
 )
 add_files(INCLUDE_FILES
+    "include/litiv/utils/algo.hpp"
     "include/litiv/utils/console.hpp"
     "include/litiv/utils/cxx.hpp"
     "include/litiv/utils/defines.hpp"
-    "include/litiv/utils/distances.hpp"
-    "include/litiv/utils/parallel.hpp"
+    "include/litiv/utils/math.hpp"
     "include/litiv/utils/platform.hpp"
+    "include/litiv/utils/simd.hpp"
     "include/litiv/utils.hpp"
 )
 if(USE_CVCORE_WITH_UTILS)

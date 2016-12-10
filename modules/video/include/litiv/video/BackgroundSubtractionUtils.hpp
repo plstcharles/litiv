@@ -17,8 +17,7 @@
 
 #pragma once
 
-#include "litiv/utils/parallel.hpp"
-#include "litiv/utils/opencv.hpp"
+#include "litiv/utils/algo.hpp"
 #include <opencv2/video/background_segm.hpp>
 
 /// super-interface for background subtraction algos which exposes common interface functions

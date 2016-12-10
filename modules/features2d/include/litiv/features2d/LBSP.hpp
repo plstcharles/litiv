@@ -20,7 +20,10 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/features2d.hpp>
-#include "litiv/utils/distances.hpp"
+#include "litiv/utils/math.hpp"
+#if HAVE_GLSL
+#include "litiv/utils/opengl-imgproc.hpp"
+#endif //HAVE_GLSL
 
 /**
     Local Binary Similarity Pattern (LBSP) feature extractor

@@ -17,8 +17,7 @@
 
 #pragma once
 
-#include "litiv/utils/parallel.hpp"
-#include "litiv/utils/opencv.hpp"
+#include "litiv/utils/algo.hpp"
 
 /// super-interface for edge detection algos which exposes common interface functions
 struct IIEdgeDetector : public cv::Algorithm {

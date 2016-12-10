@@ -56,6 +56,56 @@ TEST(string_contains_token,regression) {
     EXPECT_TRUE(lv::string_contains_token(sStr,std::vector<std::string>(vsTokens.begin(),vsTokens.begin()+4)));
 }
 
+TEST(clampString,regression) {
+    EXPECT_EQ(lv::clampString("",0),std::string());
+    EXPECT_EQ(lv::clampString("test",3),std::string("tes"));
+    EXPECT_EQ(lv::clampString("test",5),std::string(" test"));
+    EXPECT_EQ(lv::clampString("test",6,'x'),std::string("xxtest"));
+}
+
+namespace {
+    template<typename T>
+    struct concat_fixture : testing::Test {};
+    typedef testing::Types<char, int, ushort, size_t, float> concat_types;
+}
+TYPED_TEST_CASE(concat_fixture,concat_types);
+TYPED_TEST(concat_fixture,regression) {
+    EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>(),std::vector<TypeParam>())),(std::vector<TypeParam>{}));
+    EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>{TypeParam(1)},std::vector<TypeParam>{})),(std::vector<TypeParam>{TypeParam(1)}));
+    EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>{},std::vector<TypeParam>{TypeParam(1)})),(std::vector<TypeParam>{TypeParam(1)}));
+    EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>{TypeParam(1)},std::vector<TypeParam>{TypeParam(2)})),(std::vector<TypeParam>{TypeParam(1),TypeParam(2)}));
+    EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>{TypeParam(1),TypeParam(3)},std::vector<TypeParam>{TypeParam(2)})),(std::vector<TypeParam>{TypeParam(1),TypeParam(3),TypeParam(2)}));
+}
+
+TEST(filter_out,regression) {
+    std::vector<std::string> vNoVals;
+    EXPECT_EQ((lv::filter_out(vNoVals,vNoVals)),(vNoVals));
+    std::vector<std::string> vTokens{"sadf","//","12"};
+    EXPECT_EQ((lv::filter_out(vNoVals,vTokens)),(vNoVals));
+    std::vector<std::string> vVals = {"test","test2","12","test3"};
+    EXPECT_EQ((lv::filter_out(vVals,vTokens)),(std::vector<std::string>{"test","test2","test3"}));
+    EXPECT_EQ((lv::filter_out(vVals,vNoVals)),(vVals));
+}
+
+TEST(filter_in,regression) {
+    std::vector<std::string> vNoVals;
+    EXPECT_EQ((lv::filter_in(vNoVals,vNoVals)),(vNoVals));
+    std::vector<std::string> vTokens{"sadf","//","12"};
+    EXPECT_EQ((lv::filter_in(vNoVals,vTokens)),(vNoVals));
+    std::vector<std::string> vVals = {"test","test2","12","test3"};
+    EXPECT_EQ((lv::filter_in(vVals,vTokens)),(std::vector<std::string>{"12"}));
+    EXPECT_EQ((lv::filter_in(vVals,vNoVals)),(vNoVals));
+}
+
+TEST(accumulateMembers,regression) {
+    auto lObjEval = [](const float& a) {return a;};
+    EXPECT_EQ((lv::accumulateMembers(std::vector<float>{},lObjEval,0.0f)),0.0f);
+    EXPECT_EQ((lv::accumulateMembers(std::vector<float>{0.0f},lObjEval,0.0f)),0.0f);
+    EXPECT_EQ((lv::accumulateMembers(std::vector<float>{1.0f},lObjEval,0.0f)),1.0f);
+    EXPECT_EQ((lv::accumulateMembers(std::vector<float>{1.0f,2.0f,3.0f},lObjEval,0.0f)),6.0f);
+    EXPECT_EQ((lv::accumulateMembers(std::vector<float>{1.0f,2.0f,3.0f},lObjEval,2.0f)),8.0f);
+}
+
 namespace {
     template<typename T>
     struct indices_of_fixture : testing::Test {};
@@ -149,55 +199,6 @@ TYPED_TEST(unique_fixture,regression) {
     EXPECT_EQ(lv::unique(vVals.begin(),vVals.end()),(std::vector<TypeParam>{TypeParam(-100),TypeParam(-1),TypeParam(0),TypeParam(1),TypeParam(3),TypeParam(7),TypeParam(8),TypeParam(100)}));
 }
 
-namespace {
-    template<typename T>
-    struct find_nn_index_fixture : testing::Test {
-        struct custom_dist {
-            double operator()(const T& a, const T& b) {
-                return double(a)>=double(b)?double(a)-double(b):double(b)-double(a);
-            }
-        };
-    };
-    typedef testing::Types<char, int, float> find_nn_index_types;
-}
-TYPED_TEST_CASE(find_nn_index_fixture,find_nn_index_types);
-TYPED_TEST(find_nn_index_fixture,regression) {
-    const std::vector<TypeParam> vNoVal;
-    typedef typename find_nn_index_fixture<TypeParam>::custom_dist Dist;
-    Dist dist;
-    EXPECT_EQ(lv::find_nn_index(TypeParam(-10),vNoVal,dist),size_t(-1));
-    const std::vector<TypeParam> vSingleVal = {TypeParam(55)};
-    EXPECT_EQ(lv::find_nn_index(TypeParam(-10),vSingleVal,dist),size_t(0));
-    const std::vector<TypeParam> vVals = {TypeParam(1),TypeParam(7),TypeParam(3),TypeParam(8),TypeParam(0),TypeParam(-1),TypeParam(-100),TypeParam(100)};
-    EXPECT_EQ(lv::find_nn_index(TypeParam(-10),vVals,dist),size_t(5));
-    EXPECT_EQ(lv::find_nn_index(TypeParam(10),vVals,dist),size_t(3));
-    EXPECT_EQ(lv::find_nn_index(TypeParam(100),vVals,dist),size_t(7));
-    EXPECT_EQ(lv::find_nn_index(TypeParam(7.2),vVals,dist),size_t(1));
-    EXPECT_EQ(lv::find_nn_index(TypeParam(5),vVals,dist),size_t(1));
-}
-
-TEST(interp1,regression) {
-    const std::vector<int> vX = {1,3,4,6};
-    const std::vector<float> vY = {2.0f,6.0f,8.0f,12.0f};
-    const std::vector<int> vXReq = {2,5};
-    const std::vector<float> vYAnsw = lv::interp1(vX,vY,vXReq);
-    ASSERT_EQ(vYAnsw.size(),size_t(2));
-    EXPECT_FLOAT_EQ(vYAnsw[0],4.0f);
-    EXPECT_FLOAT_EQ(vYAnsw[1],10.0f);
-}
-
-TEST(linspace,regression) {
-    EXPECT_EQ(lv::linspace(5.0f,10.0f,0,true),std::vector<float>());
-    EXPECT_EQ(lv::linspace(5.0f,10.0f,1,true),std::vector<float>{10.0f});
-    EXPECT_EQ(lv::linspace(5.0f,10.0f,2,true),(std::vector<float>{5.0f,10.0f}));
-    EXPECT_EQ(lv::linspace(5.0f,5.0f,100,false),std::vector<float>(100,5.0f));
-    EXPECT_EQ(lv::linspace(5.0f,5.0f,100,true),std::vector<float>(100,5.0f));
-    const std::vector<float> vTest1 = lv::linspace(4.0f,5.0f,2,false);
-    ASSERT_EQ(vTest1.size(),size_t(2));
-    EXPECT_FLOAT_EQ(vTest1[0],4.5f);
-    EXPECT_FLOAT_EQ(vTest1[1],5.0f);
-}
-
 TEST(WorkerPool,regression_1thread) {
     lv::WorkerPool<1> wp1;
     std::future<size_t> nRes1 = wp1.queueTask([](){std::this_thread::sleep_for(std::chrono::seconds(1));return size_t(13);});
@@ -222,15 +223,6 @@ TEST(WorkerPool,regression_4threads) {
         ASSERT_EQ(vRes[i].get(),size_t(13));
 }
 
-TEST(expand_bits,regression) {
-    const uint32_t nTest0 = 0;
-    EXPECT_EQ(lv::expand_bits<4>(nTest0),uint32_t(0));
-    const uint32_t nTest1 = 0b1111;
-    EXPECT_EQ(lv::expand_bits<4>(nTest1),uint32_t(0b0001000100010001));
-    const uint32_t nTest2 = 0b101010;
-    EXPECT_EQ(lv::expand_bits<4>(nTest2),uint32_t(0b000100000001000000010000));
-}
-
 TEST(StopWatch,regression) {
     lv::StopWatch sw;
     std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -252,56 +244,6 @@ TEST(getVersionStamp,regression) {
 TEST(getLogStamp,regression) {
     EXPECT_TRUE(lv::getLogStamp().find(lv::getTimeStamp())!=std::string::npos);
     EXPECT_TRUE(lv::getLogStamp().find(lv::getLogStamp())!=std::string::npos);
-}
-
-TEST(clampString,regression) {
-    EXPECT_EQ(lv::clampString("",0),std::string());
-    EXPECT_EQ(lv::clampString("test",3),std::string("tes"));
-    EXPECT_EQ(lv::clampString("test",5),std::string(" test"));
-    EXPECT_EQ(lv::clampString("test",6,'x'),std::string("xxtest"));
-}
-
-TEST(accumulateMembers,regression) {
-    auto lObjEval = [](const float& a) {return a;};
-    EXPECT_EQ((lv::accumulateMembers(std::vector<float>{},lObjEval,0.0f)),0.0f);
-    EXPECT_EQ((lv::accumulateMembers(std::vector<float>{0.0f},lObjEval,0.0f)),0.0f);
-    EXPECT_EQ((lv::accumulateMembers(std::vector<float>{1.0f},lObjEval,0.0f)),1.0f);
-    EXPECT_EQ((lv::accumulateMembers(std::vector<float>{1.0f,2.0f,3.0f},lObjEval,0.0f)),6.0f);
-    EXPECT_EQ((lv::accumulateMembers(std::vector<float>{1.0f,2.0f,3.0f},lObjEval,2.0f)),8.0f);
-}
-
-namespace {
-    template<typename T>
-    struct concat_fixture : testing::Test {};
-    typedef testing::Types<char, int, ushort, size_t, float> concat_types;
-}
-TYPED_TEST_CASE(concat_fixture,concat_types);
-TYPED_TEST(concat_fixture,regression) {
-    EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>(),std::vector<TypeParam>())),(std::vector<TypeParam>{}));
-    EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>{TypeParam(1)},std::vector<TypeParam>{})),(std::vector<TypeParam>{TypeParam(1)}));
-    EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>{},std::vector<TypeParam>{TypeParam(1)})),(std::vector<TypeParam>{TypeParam(1)}));
-    EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>{TypeParam(1)},std::vector<TypeParam>{TypeParam(2)})),(std::vector<TypeParam>{TypeParam(1),TypeParam(2)}));
-    EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>{TypeParam(1),TypeParam(3)},std::vector<TypeParam>{TypeParam(2)})),(std::vector<TypeParam>{TypeParam(1),TypeParam(3),TypeParam(2)}));
-}
-
-TEST(filter_out,regression) {
-    std::vector<std::string> vNoVals;
-    EXPECT_EQ((lv::filter_out(vNoVals,vNoVals)),(vNoVals));
-    std::vector<std::string> vTokens{"sadf","//","12"};
-    EXPECT_EQ((lv::filter_out(vNoVals,vTokens)),(vNoVals));
-    std::vector<std::string> vVals = {"test","test2","12","test3"};
-    EXPECT_EQ((lv::filter_out(vVals,vTokens)),(std::vector<std::string>{"test","test2","test3"}));
-    EXPECT_EQ((lv::filter_out(vVals,vNoVals)),(vVals));
-}
-
-TEST(filter_in,regression) {
-    std::vector<std::string> vNoVals;
-    EXPECT_EQ((lv::filter_in(vNoVals,vNoVals)),(vNoVals));
-    std::vector<std::string> vTokens{"sadf","//","12"};
-    EXPECT_EQ((lv::filter_in(vNoVals,vTokens)),(vNoVals));
-    std::vector<std::string> vVals = {"test","test2","12","test3"};
-    EXPECT_EQ((lv::filter_in(vVals,vTokens)),(std::vector<std::string>{"12"}));
-    EXPECT_EQ((lv::filter_in(vVals,vNoVals)),(vNoVals));
 }
 
 TEST(enable_shared_from_this,regression) {

@@ -74,9 +74,13 @@
 
 namespace lv {
 
-    /// helper struct used for compile-time integer expr printing via error; just write "_<expr> test;"
+    /// helper struct used for compile-time integer expr printing via error; just write "IntegerPrinter<expr> test;"
     template<int>
-    struct _;
+    struct IntegerPrinter;
+
+    /// helper struct used for compile-time typename printing via error; just write "TypePrinter<type> test;"
+    template<typename T>
+    struct TypePrinter;
 
     /// vsnprintf wrapper for std::string output (avoids using two buffers via C++11 string contiguous memory access)
     inline std::string putf(const char* acFormat, ...) {
@@ -191,6 +195,47 @@ namespace lv {
         return false;
     }
 
+    /// clamps a given string to a specific size, padding with a given character if the string is too small
+    inline std::string clampString(const std::string& sInput, size_t nSize, char cPadding=' ') {
+        return sInput.size()>nSize?sInput.substr(0,nSize):std::string(nSize-sInput.size(),cPadding)+sInput;
+    }
+
+    /// concatenates the given vectors (useful for inline constructor where performance doesn't matter too much)
+    template<typename To, typename Ta, typename Tb>
+    inline std::vector<To> concat(const std::vector<Ta>& a, const std::vector<Tb>& b) {
+        std::vector<To> v;
+        v.reserve(v.size()+b.size());
+        v.insert(v.end(),a.begin(),a.end());
+        v.insert(v.end(),b.begin(),b.end());
+        return v;
+    }
+
+    /// will return all elements of vVals which were not matched to an element in vTokens
+    template<typename T>
+    inline std::vector<T> filter_out(const std::vector<T>& vVals, const std::vector<T>& vTokens) {
+        std::vector<T> vRet;
+        vRet.reserve(vVals.size());
+        std::copy_if(vVals.begin(),vVals.end(),std::back_inserter(vRet),[&](const T& o){return std::find(vTokens.begin(),vTokens.end(),o)==vTokens.end();});
+        return vRet;
+    }
+
+    /// will return all elements of vVals which were matched to an element in vTokens
+    template<typename T>
+    inline std::vector<T> filter_in(const std::vector<T>& vVals, const std::vector<T>& vTokens) {
+        std::vector<T> vRet;
+        vRet.reserve(vVals.size());
+        std::copy_if(vVals.begin(),vVals.end(),std::back_inserter(vRet),[&](const T& o){return std::find(vTokens.begin(),vTokens.end(),o)!=vTokens.end();});
+        return vRet;
+    }
+
+    /// accumulates the values of some object members in the given array
+    template<typename TSum, typename TObj, typename TFunc>
+    inline TSum accumulateMembers(const std::vector<TObj>& vObjArray, TFunc lObjEval, TSum tInit=TSum(0)) {
+        return std::accumulate(vObjArray.begin(),vObjArray.end(),tInit,[&](TSum tSum, const TObj& p) {
+            return tSum + lObjEval(p);
+        });
+    }
+
     /// returns the index of all provided values in the reference array (uses std::find to match objects)
     template<typename T>
     inline std::vector<size_t> indices_of(const std::vector<T>& voVals, const std::vector<T>& voRefs) {
@@ -249,75 +294,6 @@ namespace lv {
         return std::vector<typename std::iterator_traits<Titer>::value_type>(mMap.begin(),mMap.end());
     }
 
-    /// returns the index of the nearest neighbor of the requested value in the reference value array, using a custom distance functor
-    template<typename Tval, typename Tcomp>
-    inline size_t find_nn_index(const Tval& oReqVal, const std::vector<Tval>& vRefVals, Tcomp lCompFunc) {
-        if(vRefVals.empty())
-            return size_t(-1);
-        decltype(lCompFunc(oReqVal,oReqVal)) oMinDist = std::numeric_limits<decltype(lCompFunc(oReqVal,oReqVal))>::max();
-        size_t nIdx = size_t(-1);
-        for(size_t n=0; n<vRefVals.size(); ++n) {
-            auto oCurrDist = lCompFunc(oReqVal,vRefVals[n]);
-            if(nIdx==size_t(-1) || oCurrDist<oMinDist) {
-                oMinDist = oCurrDist;
-                nIdx = n;
-            }
-        }
-        return nIdx;
-    }
-
-    /// given a pair vx,vy of arrays describing a 1D function x->y (assumed sorted based on vx), linearly interpolates the outputs (y) for a new set of inputs (x)
-    template<typename Tx, typename Ty>
-    inline std::vector<Ty> interp1(const std::vector<Tx>& vX, const std::vector<Ty>& vY, const std::vector<Tx>& vXReq) {
-        const size_t nSize = std::min(vY.size(),vX.size()); // input vector sizes *should* be identical (use min overlap otherwise)
-        if(nSize==0)
-            return std::vector<Ty>();
-        std::vector<Ty> vSlope(nSize),vOffset(nSize);
-        Ty tSlope = Ty();
-        for(size_t i=0; i<nSize; ++i) {
-            if(i<nSize-1) {
-                Tx dX = vX[i+1]-vX[i];
-#ifdef _DEBUG
-                if(dX<0)
-                    throw std::invalid_argument("input domain vector must be sorted");
-#endif //defined(_DEBUG)
-                Ty dY = vY[i+1]-vY[i];
-                tSlope = Ty(dY/dX);
-            }
-            vSlope[i] = tSlope;
-            vOffset[i] = vY[i]-Ty(tSlope*vX[i]);
-        }
-        const size_t nReqSize = vXReq.size();
-        std::vector<Ty> vYReq(nReqSize);
-        for(size_t i=0; i<nReqSize; ++i) {
-            if(vXReq[i]>=vX.front() && vXReq[i]<=vX.back()) {
-                const size_t nNNIdx = lv::find_nn_index(vXReq[i],vX,[](const Tx& a,const Tx& b){return std::abs(b-a);});
-                vYReq[i] = vSlope[nNNIdx]*vXReq[i]+vOffset[nNNIdx];
-            }
-            else
-                throw std::domain_error("extrapolation not supported");
-        }
-        return vYReq;
-    }
-
-    /// returns a linearly spaced array of n points in [a,b]
-    template<typename T>
-    inline std::vector<T> linspace(T a, T b, size_t n, bool bIncludeInitVal=true) {
-        if(n==0)
-            return std::vector<T>();
-        else if(n==1)
-            return std::vector<T>(1,b);
-        std::vector<T> vResult(n);
-        const double dStep = double(b-a)/(n-size_t(bIncludeInitVal));
-        if(bIncludeInitVal)
-            for(size_t nStepIter = 0; nStepIter<n; ++nStepIter)
-                vResult[nStepIter] = T(a+dStep*nStepIter);
-        else
-            for(size_t nStepIter = 1; nStepIter<=n; ++nStepIter)
-                vResult[nStepIter-1] = T(a+dStep*nStepIter);
-        return vResult;
-    }
-
     /// implements a work thread pool used to process packaged tasks asynchronously
     template<size_t nWorkers>
     struct WorkerPool {
@@ -340,20 +316,6 @@ namespace lv {
         WorkerPool(const WorkerPool&) = delete;
         WorkerPool& operator=(const WorkerPool&) = delete;
     };
-
-    /// bitfield expansion function (specialized for unit word size)
-    template<size_t nWordBitSize, typename Tr>
-    constexpr std::enable_if_t<nWordBitSize==1,Tr> expand_bits(const Tr& nBits, size_t=0) {
-        return nBits;
-    }
-
-    /// bitfield expansion function (specialized for non-unit word size)
-    template<size_t nWordBitSize, typename Tr>
-    constexpr std::enable_if_t<(nWordBitSize>1),Tr> expand_bits(const Tr& nBits, size_t n=((sizeof(Tr)*8)/nWordBitSize)-1) {
-        static_assert(std::is_integral<Tr>::value,"nBits type must be integral");
-        // only the first [(sizeof(Tr)*8)/nWordBitSize] bits are kept (otherwise overflow/ignored)
-        return (Tr)(bool((nBits&(1<<n))!=0)<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,Tr>(nBits,n-1):(Tr)0);
-    }
 
     /// stopwatch/chrono helper class; relies on std::chrono::high_resolution_clock internally
     struct StopWatch {
@@ -388,47 +350,6 @@ namespace lv {
     /// returns a combined version of 'getVersionStamp()' and 'getTimeStamp()' for inline use by loggers
     inline std::string getLogStamp() {
         return std::string("\n")+lv::getVersionStamp()+"\n["+lv::getTimeStamp()+"]\n";
-    }
-
-    /// clamps a given string to a specific size, padding with a given character if the string is too small
-    inline std::string clampString(const std::string& sInput, size_t nSize, char cPadding=' ') {
-        return sInput.size()>nSize?sInput.substr(0,nSize):std::string(nSize-sInput.size(),cPadding)+sInput;
-    }
-
-    /// accumulates the values of some object members in the given array
-    template<typename TSum, typename TObj, typename TFunc>
-    inline TSum accumulateMembers(const std::vector<TObj>& vObjArray, TFunc lObjEval, TSum tInit=TSum(0)) {
-        return std::accumulate(vObjArray.begin(),vObjArray.end(),tInit,[&](TSum tSum, const TObj& p) {
-            return tSum + lObjEval(p);
-        });
-    }
-
-    /// concatenates the given vectors (useful for inline constructor where performance doesn't matter too much)
-    template<typename To, typename Ta, typename Tb>
-    inline std::vector<To> concat(const std::vector<Ta>& a, const std::vector<Tb>& b) {
-        std::vector<To> v;
-        v.reserve(v.size()+b.size());
-        v.insert(v.end(),a.begin(),a.end());
-        v.insert(v.end(),b.begin(),b.end());
-        return v;
-    }
-
-    /// will return all elements of vVals which were not matched to an element in vTokens
-    template<typename T>
-    inline std::vector<T> filter_out(const std::vector<T>& vVals, const std::vector<T>& vTokens) {
-        std::vector<T> vRet;
-        vRet.reserve(vVals.size());
-        std::copy_if(vVals.begin(),vVals.end(),std::back_inserter(vRet),[&](const T& o){return std::find(vTokens.begin(),vTokens.end(),o)==vTokens.end();});
-        return vRet;
-    }
-
-    /// will return all elements of vVals which were matched to an element in vTokens
-    template<typename T>
-    inline std::vector<T> filter_in(const std::vector<T>& vVals, const std::vector<T>& vTokens) {
-        std::vector<T> vRet;
-        vRet.reserve(vVals.size());
-        std::copy_if(vVals.begin(),vVals.end(),std::back_inserter(vRet),[&](const T& o){return std::find(vTokens.begin(),vTokens.end(),o)!=vTokens.end();});
-        return vRet;
     }
 
     /// helper struct for std::enable_shared_from_this to allow easier dynamic casting

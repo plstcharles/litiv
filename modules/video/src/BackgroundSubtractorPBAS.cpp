@@ -16,7 +16,7 @@
 // limitations under the License.
 
 #include "litiv/video/BackgroundSubtractorPBAS.hpp"
-#include "litiv/utils/distances.hpp"
+#include "litiv/utils/math.hpp"
 #include "litiv/utils/opencv.hpp"
 
 BackgroundSubtractorPBAS::BackgroundSubtractorPBAS(size_t nInitColorDistThreshold, float fInitUpdateRate, size_t nBGSamples, size_t nRequiredBGSamples) :

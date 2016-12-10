@@ -158,16 +158,6 @@ namespace lv {
         }
     };
 
-    /// returns whether a value is NaN (required due to non-portable msvc signature)
-    template<typename T>
-    inline bool isnan(T dVal) {
-#ifdef _MSC_VER // needed for portability...
-        return _isnan((double)dVal)!=0;
-#else //(!def(_MSC_VER))
-        return std::isnan(dVal);
-#endif //(!def(_MSC_VER))
-    }
-
 #if USE_KINECTSDK_STANDALONE
 #ifndef BODY_COUNT
 #define BODY_COUNT 6

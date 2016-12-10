@@ -20,7 +20,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/features2d.hpp>
-#include "litiv/utils/distances.hpp"
+#include "litiv/utils/math.hpp"
 
 /**
     Dense Adaptive Self-Correlation (DASC) feature extractor

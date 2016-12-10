@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "litiv/utils/parallel.hpp"
+#include "litiv/utils/simd.hpp"
 
 namespace lv {
 
@@ -649,5 +649,100 @@ namespace lv {
     }
 
 #endif //HAVE_GLSL
+
+    /// returns the index of the nearest neighbor of the requested value in the reference value array, using a custom distance functor
+    template<typename Tval, typename Tcomp>
+    inline size_t find_nn_index(const Tval& oReqVal, const std::vector<Tval>& vRefVals, Tcomp lCompFunc) {
+        if(vRefVals.empty())
+            return size_t(-1);
+        decltype(lCompFunc(oReqVal,oReqVal)) oMinDist = std::numeric_limits<decltype(lCompFunc(oReqVal,oReqVal))>::max();
+        size_t nIdx = size_t(-1);
+        for(size_t n=0; n<vRefVals.size(); ++n) {
+            auto oCurrDist = lCompFunc(oReqVal,vRefVals[n]);
+            if(nIdx==size_t(-1) || oCurrDist<oMinDist) {
+                oMinDist = oCurrDist;
+                nIdx = n;
+            }
+        }
+        return nIdx;
+    }
+
+    /// given a pair vx,vy of arrays describing a 1D function x->y (assumed sorted based on vx), linearly interpolates the outputs (y) for a new set of inputs (x)
+    template<typename Tx, typename Ty>
+    inline std::vector<Ty> interp1(const std::vector<Tx>& vX, const std::vector<Ty>& vY, const std::vector<Tx>& vXReq) {
+        const size_t nSize = std::min(vY.size(),vX.size()); // input vector sizes *should* be identical (use min overlap otherwise)
+        if(nSize==0)
+            return std::vector<Ty>();
+        std::vector<Ty> vSlope(nSize),vOffset(nSize);
+        Ty tSlope = Ty();
+        for(size_t i=0; i<nSize; ++i) {
+            if(i<nSize-1) {
+                Tx dX = vX[i+1]-vX[i];
+#ifdef _DEBUG
+                if(dX<0)
+                    throw std::invalid_argument("input domain vector must be sorted");
+#endif //defined(_DEBUG)
+                Ty dY = vY[i+1]-vY[i];
+                tSlope = Ty(dY/dX);
+            }
+            vSlope[i] = tSlope;
+            vOffset[i] = vY[i]-Ty(tSlope*vX[i]);
+        }
+        const size_t nReqSize = vXReq.size();
+        std::vector<Ty> vYReq(nReqSize);
+        typedef decltype(lv::L1dist<Tx>((Tx)0,(Tx)0)) DistType;
+        DistType (&rlDist)(Tx,Tx) = lv::L1dist<Tx>;
+        for(size_t i=0; i<nReqSize; ++i) {
+            if(vXReq[i]>=vX.front() && vXReq[i]<=vX.back()) {
+                const size_t nNNIdx = lv::find_nn_index(vXReq[i],vX,rlDist);
+                vYReq[i] = vSlope[nNNIdx]*vXReq[i]+vOffset[nNNIdx];
+            }
+            else
+                throw std::domain_error("extrapolation not supported");
+        }
+        return vYReq;
+    }
+
+    /// returns a linearly spaced array of n points in [a,b]
+    template<typename T>
+    inline std::vector<T> linspace(T a, T b, size_t n, bool bIncludeInitVal=true) {
+        if(n==0)
+            return std::vector<T>();
+        else if(n==1)
+            return std::vector<T>(1,b);
+        std::vector<T> vResult(n);
+        const double dStep = double(b-a)/(n-size_t(bIncludeInitVal));
+        if(bIncludeInitVal)
+            for(size_t nStepIter = 0; nStepIter<n; ++nStepIter)
+                vResult[nStepIter] = T(a+dStep*nStepIter);
+        else
+            for(size_t nStepIter = 1; nStepIter<=n; ++nStepIter)
+                vResult[nStepIter-1] = T(a+dStep*nStepIter);
+        return vResult;
+    }
+
+    /// bitfield expansion function (specialized for unit word size)
+    template<size_t nWordBitSize, typename Tr>
+    constexpr std::enable_if_t<nWordBitSize==1,Tr> expand_bits(const Tr& nBits, size_t=0) {
+        return nBits;
+    }
+
+    /// bitfield expansion function (specialized for non-unit word size)
+    template<size_t nWordBitSize, typename Tr>
+    constexpr std::enable_if_t<(nWordBitSize>1),Tr> expand_bits(const Tr& nBits, size_t n=((sizeof(Tr)*8)/nWordBitSize)-1) {
+        static_assert(std::is_integral<Tr>::value,"nBits type must be integral");
+        // only the first [(sizeof(Tr)*8)/nWordBitSize] bits are kept (otherwise overflow/ignored)
+        return (Tr)(bool((nBits&(1<<n))!=0)<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,Tr>(nBits,n-1):(Tr)0);
+    }
+
+    /// returns whether a value is NaN (required due to non-portable msvc signature)
+    template<typename T>
+    inline bool isnan(T dVal) {
+#ifdef _MSC_VER // needed for portability...
+        return _isnan((double)dVal)!=0;
+#else //(!def(_MSC_VER))
+        return std::isnan(dVal);
+#endif //(!def(_MSC_VER))
+    }
 
 } // namespace lv

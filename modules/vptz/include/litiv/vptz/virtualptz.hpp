@@ -31,9 +31,7 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/video/tracking.hpp>
 #if !USE_VPTZ_STANDALONE
-#include "litiv/utils/parallel.hpp"
-#include "litiv/utils/distances.hpp"
-#include "litiv/utils/cxx.hpp"
+#include "litiv/utils/algo.hpp"
 #endif //(!USE_VPTZ_STANDALONE)
 
 #define VPTZ_MINIMUM_BBOX_RADIUS 3

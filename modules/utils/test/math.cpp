@@ -1,7 +1,7 @@
 
 #include "gtest/gtest.h"
 #include "benchmark/benchmark.h"
-#include "litiv/utils/distances.hpp"
+#include "litiv/utils/math.hpp"
 #include <random>
 
 #define BENCHMARK_NB_CHANNELS 3
@@ -742,3 +742,71 @@ BENCHMARK_TEMPLATE2(hdist_perftest,int16_t,BENCHMARK_NB_CHANNELS)->Args({1000000
 BENCHMARK_TEMPLATE2(hdist_perftest,uint16_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
 BENCHMARK_TEMPLATE2(hdist_perftest,int8_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
 BENCHMARK_TEMPLATE2(hdist_perftest,uint8_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+namespace {
+    template<typename T>
+    struct find_nn_index_fixture : testing::Test {
+        struct custom_dist {
+            double operator()(const T& a, const T& b) {
+                return double(a)>=double(b)?double(a)-double(b):double(b)-double(a);
+            }
+        };
+    };
+    typedef testing::Types<char, int, float> find_nn_index_types;
+}
+TYPED_TEST_CASE(find_nn_index_fixture,find_nn_index_types);
+
+TYPED_TEST(find_nn_index_fixture,regression) {
+    const std::vector<TypeParam> vNoVal;
+    typedef typename find_nn_index_fixture<TypeParam>::custom_dist Dist;
+    Dist dist;
+    EXPECT_EQ(lv::find_nn_index(TypeParam(-10),vNoVal,dist),size_t(-1));
+    const std::vector<TypeParam> vSingleVal = {TypeParam(55)};
+    EXPECT_EQ(lv::find_nn_index(TypeParam(-10),vSingleVal,dist),size_t(0));
+    const std::vector<TypeParam> vVals = {TypeParam(1),TypeParam(7),TypeParam(3),TypeParam(8),TypeParam(0),TypeParam(-1),TypeParam(-100),TypeParam(100)};
+    EXPECT_EQ(lv::find_nn_index(TypeParam(-10),vVals,dist),size_t(5));
+    EXPECT_EQ(lv::find_nn_index(TypeParam(10),vVals,dist),size_t(3));
+    EXPECT_EQ(lv::find_nn_index(TypeParam(100),vVals,dist),size_t(7));
+    EXPECT_EQ(lv::find_nn_index(TypeParam(7.2),vVals,dist),size_t(1));
+    EXPECT_EQ(lv::find_nn_index(TypeParam(5),vVals,dist),size_t(1));
+}
+
+TEST(interp1,regression) {
+    const std::vector<int> vX = {1,3,4,6};
+    const std::vector<float> vY = {2.0f,6.0f,8.0f,12.0f};
+    const std::vector<int> vXReq = {2,5};
+    const std::vector<float> vYAnsw = lv::interp1(vX,vY,vXReq);
+    ASSERT_EQ(vYAnsw.size(),size_t(2));
+    EXPECT_FLOAT_EQ(vYAnsw[0],4.0f);
+    EXPECT_FLOAT_EQ(vYAnsw[1],10.0f);
+}
+
+TEST(linspace,regression) {
+    EXPECT_EQ(lv::linspace(5.0f,10.0f,0,true),std::vector<float>());
+    EXPECT_EQ(lv::linspace(5.0f,10.0f,1,true),std::vector<float>{10.0f});
+    EXPECT_EQ(lv::linspace(5.0f,10.0f,2,true),(std::vector<float>{5.0f,10.0f}));
+    EXPECT_EQ(lv::linspace(5.0f,5.0f,100,false),std::vector<float>(100,5.0f));
+    EXPECT_EQ(lv::linspace(5.0f,5.0f,100,true),std::vector<float>(100,5.0f));
+    const std::vector<float> vTest1 = lv::linspace(4.0f,5.0f,2,false);
+    ASSERT_EQ(vTest1.size(),size_t(2));
+    EXPECT_FLOAT_EQ(vTest1[0],4.5f);
+    EXPECT_FLOAT_EQ(vTest1[1],5.0f);
+}
+
+TEST(expand_bits,regression) {
+    const uint32_t nTest0 = 0;
+    EXPECT_EQ(lv::expand_bits<4>(nTest0),uint32_t(0));
+    const uint32_t nTest1 = 0b1111;
+    EXPECT_EQ(lv::expand_bits<4>(nTest1),uint32_t(0b0001000100010001));
+    const uint32_t nTest2 = 0b101010;
+    EXPECT_EQ(lv::expand_bits<4>(nTest2),uint32_t(0b000100000001000000010000));
+}
+
+TEST(isnan,regression) {
+    EXPECT_EQ(lv::isnan(std::numeric_limits<float>::quiet_NaN()),true);
+    EXPECT_EQ(lv::isnan(std::numeric_limits<double>::quiet_NaN()),true);
+    EXPECT_EQ(lv::isnan(std::numeric_limits<float>::max()),false);
+    EXPECT_EQ(lv::isnan(std::numeric_limits<double>::max()),false);
+}
