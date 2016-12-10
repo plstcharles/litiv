@@ -205,7 +205,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                         lvDbgAssert(m_vpLocalWordDict[nLocalDictIdx]);
                         const LocalWord_1ch& oRefBestLocalWord = *(LocalWord_1ch*)m_vpLocalWordDict[nLocalDictIdx];
                         const float fRefBestLocalWordWeight = GetLocalWordWeight(oRefBestLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
-                        const uchar nRefBestLocalWordDescBITS = (uchar)lv::popcount(oRefBestLocalWord.oFeature.anDesc[0]);
+                        const uchar nRefBestLocalWordDescBITS = lv::popcount(oRefBestLocalWord.oFeature.anDesc[0]);
                         bool bFoundUninitd = false;
                         size_t nGlobalWordIdx;
                         for(nGlobalWordIdx=0; nGlobalWordIdx<m_nCurrGlobalWords; ++nGlobalWordIdx) {
@@ -358,7 +358,7 @@ void BackgroundSubtractorPAWCS::refreshModel(size_t nBaseOccCount, float fOccDec
                         lvDbgAssert(m_vpLocalWordDict[nLocalDictIdx]);
                         const LocalWord_3ch& oRefBestLocalWord = *(LocalWord_3ch*)m_vpLocalWordDict[nLocalDictIdx];
                         const float fRefBestLocalWordWeight = GetLocalWordWeight(oRefBestLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset);
-                        const uchar nRefBestLocalWordDescBITS = (uchar)lv::popcount(oRefBestLocalWord.oFeature.anDesc);
+                        const uchar nRefBestLocalWordDescBITS = lv::popcount(oRefBestLocalWord.oFeature.anDesc);
                         bool bFoundUninitd = false;
                         size_t nGlobalWordIdx;
                         for(nGlobalWordIdx=0; nGlobalWordIdx<m_nCurrGlobalWords; ++nGlobalWordIdx) {
@@ -651,7 +651,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
             alignas(16) std::array<uchar,LBSP::DESC_SIZE_BITS> anLBSPLookupVals;
             LBSP::computeDescriptor_lookup<1>(oInputImg,nCurrImgCoord_X,nCurrImgCoord_Y,0,anLBSPLookupVals);
             const ushort nCurrIntraDesc = LBSP::computeDescriptor_threshold(anLBSPLookupVals,nCurrColor,m_anLBSPThreshold_8bitLUT[nCurrColor]);
-            const uchar nCurrIntraDescBITS = (uchar)lv::popcount(nCurrIntraDesc);
+            const uchar nCurrIntraDescBITS = lv::popcount(nCurrIntraDesc);
             const bool bCurrRegionIsFlat = nCurrIntraDescBITS<FLAT_REGION_BIT_COUNT;
             if(bCurrRegionIsFlat)
                 ++nFlatRegionCount;
@@ -981,7 +981,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
             std::array<ushort,3> anCurrIntraDesc;
             for(size_t c=0; c<3; ++c)
                 anCurrIntraDesc[c] = LBSP::computeDescriptor_threshold(aanLBSPLookupVals[c],anCurrColor[c],m_anLBSPThreshold_8bitLUT[anCurrColor[c]]);
-            const uchar nCurrIntraDescBITS = (uchar)lv::popcount(anCurrIntraDesc);
+            const uchar nCurrIntraDescBITS = lv::popcount(anCurrIntraDesc);
             const bool bCurrRegionIsFlat = nCurrIntraDescBITS<FLAT_REGION_BIT_COUNT*2;
             if(bCurrRegionIsFlat)
                 ++nFlatRegionCount;
@@ -1357,7 +1357,7 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
         cv::imshow("oGlobalWordsCoverageMap",oGlobalWordsCoverageMap);
         printf("\nDBG[%2d,%2d] : \n",oDbgPt.x,oDbgPt.y);
         printf("\t Color=[%03d,%03d,%03d]\n",(int)anDBGColor[0],(int)anDBGColor[1],(int)anDBGColor[2]);
-        printf("\t IntraDesc=[%05d,%05d,%05d], IntraDescBITS=[%02lu,%02lu,%02lu]\n",anDBGIntraDesc[0],anDBGIntraDesc[1],anDBGIntraDesc[2],lv::popcount(anDBGIntraDesc[0]),lv::popcount(anDBGIntraDesc[1]),lv::popcount(anDBGIntraDesc[2]));
+        printf("\t IntraDesc=[%05d,%05d,%05d], IntraDescBITS=[%02lu,%02lu,%02lu]\n",anDBGIntraDesc[0],anDBGIntraDesc[1],anDBGIntraDesc[2],(size_t)lv::popcount(anDBGIntraDesc[0]),(size_t)lv::popcount(anDBGIntraDesc[1]),(size_t)lv::popcount(anDBGIntraDesc[2]));
         std::array<char,1024> gword_dbg_str;
         if(bDBGMaskModifiedByGDict) {
             if(m_nImgChannels==1) {
@@ -1375,11 +1375,11 @@ void BackgroundSubtractorPAWCS::apply(cv::InputArray _image, cv::OutputArray _fg
         for(size_t nDBGWordIdx=0; nDBGWordIdx<m_nCurrLocalWords; ++nDBGWordIdx) {
             if(m_nImgChannels==1) {
                 LocalWord_1ch* pDBGLocalWord = (LocalWord_1ch*)m_vpLocalWordDict[nLocalDictDBGIdx+nDBGWordIdx];
-                printf("\t [%02lu] : weight=[%02.03f], nColor=[%03d], nDescBITS=[%02lu]  %s\n",nDBGWordIdx,GetLocalWordWeight(*pDBGLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset),(int)pDBGLocalWord->oFeature.anColor[0],lv::popcount(pDBGLocalWord->oFeature.anDesc[0]),vsWordModList[nLocalDictDBGIdx+nDBGWordIdx].c_str());
+                printf("\t [%02lu] : weight=[%02.03f], nColor=[%03d], nDescBITS=[%02lu]  %s\n",nDBGWordIdx,GetLocalWordWeight(*pDBGLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset),(int)pDBGLocalWord->oFeature.anColor[0],(size_t)lv::popcount(pDBGLocalWord->oFeature.anDesc[0]),vsWordModList[nLocalDictDBGIdx+nDBGWordIdx].c_str());
             }
             else { //m_nImgChannels==3
                 LocalWord_3ch* pDBGLocalWord = (LocalWord_3ch*)m_vpLocalWordDict[nLocalDictDBGIdx+nDBGWordIdx];
-                printf("\t [%02lu] : weight=[%02.03f], anColor=[%03d,%03d,%03d], anDescBITS=[%02lu,%02lu,%02lu]  %s\n",nDBGWordIdx,GetLocalWordWeight(*pDBGLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset),(int)pDBGLocalWord->oFeature.anColor[0],(int)pDBGLocalWord->oFeature.anColor[1],(int)pDBGLocalWord->oFeature.anColor[2],lv::popcount(pDBGLocalWord->oFeature.anDesc[0]),lv::popcount(pDBGLocalWord->oFeature.anDesc[1]),lv::popcount(pDBGLocalWord->oFeature.anDesc[2]),vsWordModList[nLocalDictDBGIdx+nDBGWordIdx].c_str());
+                printf("\t [%02lu] : weight=[%02.03f], anColor=[%03d,%03d,%03d], anDescBITS=[%02lu,%02lu,%02lu]  %s\n",nDBGWordIdx,GetLocalWordWeight(*pDBGLocalWord,m_nFrameIdx,m_nLocalWordWeightOffset),(int)pDBGLocalWord->oFeature.anColor[0],(int)pDBGLocalWord->oFeature.anColor[1],(int)pDBGLocalWord->oFeature.anColor[2],(size_t)lv::popcount(pDBGLocalWord->oFeature.anDesc[0]),(size_t)lv::popcount(pDBGLocalWord->oFeature.anDesc[1]),(size_t)lv::popcount(pDBGLocalWord->oFeature.anDesc[2]),vsWordModList[nLocalDictDBGIdx+nDBGWordIdx].c_str());
             }
         }
         std::cout << std::fixed << std::setprecision(5) << " w_thrs(" << dbgpt << ") = " << fDBGLocalWordsWeightSumThreshold << std::endl;

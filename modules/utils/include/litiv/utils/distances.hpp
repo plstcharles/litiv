@@ -473,6 +473,7 @@ namespace lv {
     /// computes the population count of an 8-bit vector using an 8-bit popcount LUT
     template<typename Tin, typename Tout=uint8_t>
     inline std::enable_if_t<sizeof(Tin)==1,Tout> popcount(const Tin x) {
+        static_assert(std::is_integral<Tin>::value,"type must be integral");
         static_assert(std::numeric_limits<unsigned char>::digits==8,"lots of stuff is going to break...");
         static constexpr Tout s_anPopcntLUT8[256] = {
             0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,
@@ -501,16 +502,13 @@ namespace lv {
     template<typename Tin, typename Tout=uint8_t>
     inline std::enable_if_t<(sizeof(Tin)==2 || sizeof(Tin)==4),Tout> popcount(const Tin x) {
         static_assert(std::is_integral<Tin>::value,"type must be integral");
-        static_assert(std::is_same<Tin,unsigned short>::value||std::is_same<Tin,short>::value||
-                      std::is_same<Tin,unsigned int>::value||std::is_same<Tin,int>::value,"type must be standard 16/32-bit integral type");
         return (Tout)_mm_popcnt_u32((uint)reinterpret_cast<std::make_unsigned_t<const Tin>&>(x));
     }
 
     /// computes the population count of an 8-byte vector using 64-bit popcnt instruction
     template<typename Tin, typename Tout=uint8_t>
     inline std::enable_if_t<sizeof(Tin)==8,Tout> popcount(const Tin x) {
-        static_assert(std::is_same<Tin,unsigned long long int>::value||std::is_same<Tin,long long int>::value,"type must be standard 64-bit integral type");
-        static_assert(std::is_same<decltype(_mm_popcnt_u64(0)),int64_t>::value,"unexpected sse4 popcount signature");
+        static_assert(std::is_integral<Tin>::value,"type must be integral");
         return (Tout)_mm_popcnt_u64(reinterpret_cast<const uint64_t&>(x));
     }
 

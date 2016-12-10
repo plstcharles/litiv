@@ -227,17 +227,17 @@ public:
         lvDbgAssert_(aanVals,"need to provide a valid pixel pointer");
         lvDbgAssert_(anRefs,"need to provide a valid ref pixel pointer");
         desc_t nTempDesc = computeDescriptor_threshold(aanVals+(nChannels-1)*LBSP::DESC_SIZE_BITS,anRefs[nChannels-1],((anRefs[nChannels-1]>>nRelShift)+nAbsOffset)/2);
-        nGradMag = (Tr2)lv::popcount(nTempDesc);
+        nGradMag = lv::popcount<desc_t,Tr2>(nTempDesc);
         lv::unroll<nChannels-1>([&](int cn) {
             desc_t nNewTempDesc = computeDescriptor_threshold(aanVals+cn*LBSP::DESC_SIZE_BITS,anRefs[cn],((anRefs[cn]>>nRelShift)+nAbsOffset)/2);
-            const Tr2 nNewGradMag = (Tr2)lv::popcount(nNewTempDesc);
+            const Tr2 nNewGradMag = lv::popcount<desc_t,Tr2>(nNewTempDesc);
             if(nGradMag<nNewGradMag) {
                 nGradMag = nNewGradMag;
                 nTempDesc = nNewTempDesc;
             }
         });
-        nGradX = (Tr1)lv::popcount(nTempDesc&s_nDesc_16bitdbcross_GradX_Pos)-(Tr1)lv::popcount(nTempDesc&s_nDesc_16bitdbcross_GradX_Neg);
-        nGradY = (Tr1)lv::popcount(nTempDesc&s_nDesc_16bitdbcross_GradY_Pos)-(Tr1)lv::popcount(nTempDesc&s_nDesc_16bitdbcross_GradY_Neg);
+        nGradX = lv::popcount<desc_t,Tr1>(nTempDesc&s_nDesc_16bitdbcross_GradX_Pos)-lv::popcount<desc_t,Tr1>(nTempDesc&s_nDesc_16bitdbcross_GradX_Neg);
+        nGradY = lv::popcount<desc_t,Tr1>(nTempDesc&s_nDesc_16bitdbcross_GradY_Pos)-lv::popcount<desc_t,Tr1>(nTempDesc&s_nDesc_16bitdbcross_GradY_Neg);
         lvDbgAssert(nGradMag<=MAX_GRAD_MAG);
     }
 
