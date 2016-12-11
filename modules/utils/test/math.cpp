@@ -50,6 +50,7 @@ TEST(abs_fast,regression) {
 
 namespace {
 
+    template<bool bUseFast>
     void abs_fast_perftest(benchmark::State& st) {
         const volatile size_t nArraySize = size_t(st.range(0));
         const volatile size_t nLoopSize = size_t(st.range(1));
@@ -62,25 +63,7 @@ namespace {
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
                 nArrayIdx = (nArrayIdx+1)%nCurrArraySize;
-                volatile auto tLast = lv::abs_fast(afVals[nArrayIdx]);
-                benchmark::DoNotOptimize(tLast);
-            }
-        }
-    }
-
-    void abs_orig_perftest(benchmark::State& st) {
-        const volatile size_t nArraySize = size_t(st.range(0));
-        const volatile size_t nLoopSize = size_t(st.range(1));
-        const volatile float fMinVal = std::numeric_limits<float>::min();
-        const volatile float fMaxVal = std::numeric_limits<float>::max();
-        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
-        size_t nArrayIdx = 0;
-        while(st.KeepRunning()) {
-            const size_t nCurrLoopSize = nLoopSize;
-            const size_t nCurrArraySize = nArraySize;
-            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx = (nArrayIdx+1)%nCurrArraySize;
-                volatile auto tLast = std::abs(afVals[nArrayIdx]);
+                volatile auto tLast = bUseFast?(lv::abs_fast(afVals[nArrayIdx])):(std::abs(afVals[nArrayIdx]));
                 benchmark::DoNotOptimize(tLast);
             }
         }
@@ -88,8 +71,8 @@ namespace {
 
 }
 
-BENCHMARK(abs_fast_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
-BENCHMARK(abs_orig_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE1(abs_fast_perftest,true)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE1(abs_fast_perftest,false)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -108,6 +91,7 @@ TEST(inv_fast,regression) {
 
 namespace {
 
+    template<bool bUseFast>
     void inv_fast_perftest(benchmark::State& st) {
         const volatile size_t nArraySize = size_t(st.range(0));
         const volatile size_t nLoopSize = size_t(st.range(1));
@@ -120,25 +104,7 @@ namespace {
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
                 nArrayIdx = (nArrayIdx+1)%nCurrArraySize;
-                volatile auto tLast = lv::inv_fast(afVals[nArrayIdx]);
-                benchmark::DoNotOptimize(tLast);
-            }
-        }
-    }
-
-    void inv_orig_perftest(benchmark::State& st) {
-        const volatile size_t nArraySize = size_t(st.range(0));
-        const volatile size_t nLoopSize = size_t(st.range(1));
-        const volatile float fMinVal = std::numeric_limits<float>::min();
-        const volatile float fMaxVal = std::numeric_limits<float>::max();
-        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
-        size_t nArrayIdx = 0;
-        while(st.KeepRunning()) {
-            const size_t nCurrLoopSize = nLoopSize;
-            const size_t nCurrArraySize = nArraySize;
-            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx = (nArrayIdx+1)%nCurrArraySize;
-                volatile auto tLast = 1.0f/afVals[nArrayIdx];
+                volatile auto tLast = bUseFast?(lv::inv_fast(afVals[nArrayIdx])):(1.0f/afVals[nArrayIdx]);
                 benchmark::DoNotOptimize(tLast);
             }
         }
@@ -146,8 +112,8 @@ namespace {
 
 }
 
-BENCHMARK(inv_fast_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
-BENCHMARK(inv_orig_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE1(inv_fast_perftest,true)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE1(inv_fast_perftest,false)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -185,24 +151,7 @@ INVSQRT_REGRESSION_TEST(8)
 
 namespace {
 
-    void invsqrt_fastest_perftest(benchmark::State& st) {
-        const volatile size_t nArraySize = size_t(st.range(0));
-        const volatile size_t nLoopSize = size_t(st.range(1));
-        const volatile float fMinVal = 0.0f;
-        const volatile float fMaxVal = std::numeric_limits<float>::max();
-        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
-        size_t nArrayIdx = 0;
-        while(st.KeepRunning()) {
-            const size_t nCurrLoopSize = nLoopSize;
-            const size_t nCurrArraySize = nArraySize;
-            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx = (nArrayIdx+1)%nCurrArraySize;
-                volatile auto tLast = lv::invsqrt_fastest(afVals[nArrayIdx]);
-                benchmark::DoNotOptimize(tLast);
-            }
-        }
-    }
-
+    template<int nSpeedup>
     void invsqrt_fast_perftest(benchmark::State& st) {
         const volatile size_t nArraySize = size_t(st.range(0));
         const volatile size_t nLoopSize = size_t(st.range(1));
@@ -215,25 +164,7 @@ namespace {
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
                 nArrayIdx = (nArrayIdx+1)%nCurrArraySize;
-                volatile auto tLast = lv::invsqrt_fast(afVals[nArrayIdx]);
-                benchmark::DoNotOptimize(tLast);
-            }
-        }
-    }
-
-    void invsqrt_orig_perftest(benchmark::State& st) {
-        const volatile size_t nArraySize = size_t(st.range(0));
-        const volatile size_t nLoopSize = size_t(st.range(1));
-        const volatile float fMinVal = 0.0f;
-        const volatile float fMaxVal = std::numeric_limits<float>::max();
-        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
-        size_t nArrayIdx = 0;
-        while(st.KeepRunning()) {
-            const size_t nCurrLoopSize = nLoopSize;
-            const size_t nCurrArraySize = nArraySize;
-            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx = (nArrayIdx+1)%nCurrArraySize;
-                volatile auto tLast = 1.0f/std::sqrt(afVals[nArrayIdx]);
+                volatile auto tLast = (nSpeedup>=2)?(lv::invsqrt_fastest(afVals[nArrayIdx])):((nSpeedup==1)?(lv::invsqrt_fast(afVals[nArrayIdx])):(1.0f/std::sqrt(afVals[nArrayIdx])));
                 benchmark::DoNotOptimize(tLast);
             }
         }
@@ -241,15 +172,16 @@ namespace {
 
 }
 
-BENCHMARK(invsqrt_fastest_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
-BENCHMARK(invsqrt_fast_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
-BENCHMARK(invsqrt_orig_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE1(invsqrt_fast_perftest,2)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE1(invsqrt_fast_perftest,1)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE1(invsqrt_fast_perftest,0)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace {
 
-    void L1dist_cheat_perftest(benchmark::State& st) {
+    template<bool bUseFast>
+    void L1dist_perftest(benchmark::State& st) {
         const volatile size_t nArraySize = size_t(st.range(0));
         const volatile size_t nLoopSize = size_t(st.range(1));
         const volatile float fMinVal = (float)st.range(2);
@@ -261,25 +193,7 @@ namespace {
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
                 nArrayIdx = (nArrayIdx+2)%nCurrArraySize;
-                volatile auto tLast = lv::_L1dist_cheat(afVals[nArrayIdx],afVals[nArrayIdx+1]);
-                benchmark::DoNotOptimize(tLast);
-            }
-        }
-    }
-
-    void L1dist_nocheat_perftest(benchmark::State& st) {
-        const volatile size_t nArraySize = size_t(st.range(0));
-        const volatile size_t nLoopSize = size_t(st.range(1));
-        const volatile float fMinVal = (float)st.range(2);
-        const volatile float fMaxVal = (float)st.range(3);
-        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
-        size_t nArrayIdx = 0;
-        while(st.KeepRunning()) {
-            const size_t nCurrLoopSize = nLoopSize;
-            const size_t nCurrArraySize = nArraySize;
-            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx = (nArrayIdx+2)%nCurrArraySize;
-                volatile auto tLast = lv::_L1dist_nocheat(afVals[nArrayIdx],afVals[nArrayIdx+1]);
+                volatile auto tLast = bUseFast?(lv::_L1dist_cheat(afVals[nArrayIdx],afVals[nArrayIdx+1])):(lv::_L1dist_nocheat(afVals[nArrayIdx],afVals[nArrayIdx+1]));
                 benchmark::DoNotOptimize(tLast);
             }
         }
@@ -310,8 +224,8 @@ namespace {
 
 }
 
-BENCHMARK(L1dist_cheat_perftest)->Args({1000000,250,-10,10})->Repetitions(15)->ReportAggregatesOnly(true);
-BENCHMARK(L1dist_nocheat_perftest)->Args({1000000,250,-10,10})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE1(L1dist_perftest,true)->Args({1000000,250,-10,10})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE1(L1dist_perftest,false)->Args({1000000,250,-10,10})->Repetitions(15)->ReportAggregatesOnly(true);
 BENCHMARK_TEMPLATE2(L1dist_perftest,float,BENCHMARK_NB_CHANNELS)->Args({1000000,100,-10,10})->Repetitions(10)->ReportAggregatesOnly(true);
 BENCHMARK_TEMPLATE2(L1dist_perftest,int32_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100,-10,10})->Repetitions(10)->ReportAggregatesOnly(true);
 BENCHMARK_TEMPLATE2(L1dist_perftest,int16_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100,-10,10})->Repetitions(10)->ReportAggregatesOnly(true);
