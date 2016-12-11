@@ -31,6 +31,13 @@ namespace lv {
 #endif //(!def(_MSC_VER))
     }
 
+    /// returns whether an integer is a power of two
+    template<typename T>
+    inline bool ispow2(T nVal) {
+        static_assert(std::is_integral<T>::value,"ispow2 only excepts integer types");
+        return ((nVal&(nVal-1))==0);
+    }
+
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wstrict-aliasing"

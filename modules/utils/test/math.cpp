@@ -41,6 +41,17 @@ TEST(isnan,regression) {
     EXPECT_EQ(lv::isnan(std::numeric_limits<double>::max()),false);
 }
 
+TEST(ispow2,regression) {
+    EXPECT_EQ(lv::ispow2(1),true);
+    EXPECT_EQ(lv::ispow2(2),true);
+    EXPECT_EQ(lv::ispow2(3),false);
+    EXPECT_EQ(lv::ispow2(4),true);
+    EXPECT_EQ(lv::ispow2(16),true);
+    EXPECT_EQ(lv::ispow2(17),false);
+    EXPECT_EQ(lv::ispow2(32),true);
+    EXPECT_EQ(lv::ispow2(std::numeric_limits<int>::max()),false);
+}
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 TEST(abs_fast,regression) {
