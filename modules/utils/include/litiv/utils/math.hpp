@@ -21,11 +21,14 @@
 
 namespace lv {
 
-    /// computes the L1 distance between two integer values; returns an unsigned type of the same size as the input type
-    template<typename T, typename=std::enable_if_t<std::is_integral<T>::value>>
-    inline auto L1dist(T a, T b) {
-        static_assert(!std::is_same<T,bool>::value,"L1dist not specialized for boolean types");
-        return (std::make_unsigned_t<T>)std::abs(((std::make_signed_t<typename lv::get_bigger_integer<T>::type>)a)-b);
+    /// returns whether a value is NaN (required due to non-portable msvc signature)
+    template<typename T>
+    inline bool isnan(T dVal) {
+#ifdef _MSC_VER // needed for portability...
+        return _isnan((double)dVal)!=0;
+#else //(!def(_MSC_VER))
+        return std::isnan(dVal);
+#endif //(!def(_MSC_VER))
     }
 
 #ifdef __clang__
@@ -36,15 +39,40 @@ namespace lv {
 #pragma GCC diagnostic ignored "-Wstrict-aliasing"
 #endif //defined(...GCC)
 
-    /// computes the L1 distance between two floating point values (with bit trick)
+    /// computes the fast absolute value of a floating point value (relies on sign-extended shift)
     template<typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
-    inline T _L1dist_cheat(T a, T b) {
-        static_assert(sizeof(T)==4 || sizeof(T)==8,"L1dist not defined for long double or non-ieee fp types");
+    inline T abs_fast(T x) {
+        static_assert(std::is_same<T,float>::value||std::is_same<T,double>::value,"abs_fast not defined for long double or non-ieee fp types");
+        static_assert(sizeof(T)==4||sizeof(T)==8,"unexpected fp type size");
         using Tint = std::conditional_t<sizeof(T)==4,int32_t,int64_t>;
-        T fDiff = a-b;
-        Tint& nCast = reinterpret_cast<Tint&>(fDiff);
+        Tint& nCast = reinterpret_cast<Tint&>(x);
         nCast &= std::numeric_limits<Tint>::max();
-        return reinterpret_cast<T&>(nCast);
+        return x;
+    }
+
+    /// computes the fast inverse of a floating point value -- http://bits.stephan-brumme.com/inverse.html
+    inline float inv_fast(float x) {
+        uint32_t& i = reinterpret_cast<uint32_t&>(x);
+        i = 0x7F000000 - i;
+        return x;
+    }
+
+    /// computes the fast inverse square root of a floating point value -- http://bits.stephan-brumme.com/invSquareRoot.html
+    inline float invsqrt_fastest(float x) {
+        uint32_t& i = reinterpret_cast<uint32_t&>(x);
+        i = 0x5F375A86 - (i>>1);
+        return x;
+    }
+
+    /// computes the fast inverse square root of a floating point value w/ optional newton iterations optimization -- http://bits.stephan-brumme.com/invSquareRoot.html
+    template<size_t nNewtonIters=1>
+    inline float invsqrt_fast(float x) {
+        static_assert(nNewtonIters>=1,"use invsqrt_fastest to skip Newton iterations");
+        const float fHalf = 0.5f*x;
+        float fRes = invsqrt_fastest(x);
+        for(size_t i=0; i<nNewtonIters; ++i)
+            fRes = fRes*(1.5f-fHalf*fRes*fRes);
+        return fRes;
     }
 
 #if defined(__clang__)
@@ -52,6 +80,21 @@ namespace lv {
 #elif (defined(__GNUC__) || defined(__GNUG__))
 #pragma GCC diagnostic pop
 #endif //defined(...GCC)
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /// computes the L1 distance between two integer values; returns an unsigned type of the same size as the input type
+    template<typename T, typename=std::enable_if_t<std::is_integral<T>::value>>
+    inline auto L1dist(T a, T b) {
+        static_assert(!std::is_same<T,bool>::value,"L1dist not specialized for boolean types");
+        return (std::make_unsigned_t<T>)std::abs(((std::make_signed_t<typename lv::get_bigger_integer<T>::type>)a)-b);
+    }
+
+    /// computes the L1 distance between two floating point values (with bit trick)
+    template<typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
+    inline T _L1dist_cheat(T a, T b) {
+        return abs_fast(a-b);
+    }
 
     /// computes the L1 distance between two floating point values (without bit trick)
     template<typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
@@ -754,37 +797,6 @@ namespace lv {
         static_assert(std::is_integral<T>::value,"input value type must be integer");
         // only the first [(sizeof(T)*8)/nWordBitSize] bits are kept (otherwise overflow/ignored)
         return (T)(bool((nBits&(1<<n))!=0)<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,T>(nBits,n-1):(T)0);
-    }
-
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wstrict-aliasing"
-#elif (defined(__GNUC__) || defined(__GNUG__))
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstrict-aliasing"
-#endif //defined(...GCC)
-
-    /// computes the fast inverse of a floating point value, ~8% avg deviation -- http://bits.stephan-brumme.com/inverse.html
-    inline float inverse_fast(float x) {
-        uint32_t& i = reinterpret_cast<uint32_t&>(x);
-        i = 0x7F000000 - i;
-        return reinterpret_cast<float&>(i);
-    }
-
-#if defined(__clang__)
-#pragma clang diagnostic pop
-#elif (defined(__GNUC__) || defined(__GNUG__))
-#pragma GCC diagnostic pop
-#endif //defined(...GCC)
-
-    /// returns whether a value is NaN (required due to non-portable msvc signature)
-    template<typename T>
-    inline bool isnan(T dVal) {
-#ifdef _MSC_VER // needed for portability...
-        return _isnan((double)dVal)!=0;
-#else //(!def(_MSC_VER))
-        return std::isnan(dVal);
-#endif //(!def(_MSC_VER))
     }
 
 } // namespace lv
