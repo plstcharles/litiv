@@ -189,14 +189,15 @@ namespace lv {
     /// computes the squared L2 distance between two integer values (i.e. == squared L1dist); returns an unsigned type of twice the size of the input type
     template<typename T, typename=std::enable_if_t<std::is_integral<T>::value>>
     inline auto L2sqrdist(T a, T b) {
-        const typename lv::get_bigger_integer<decltype(L1dist(T(),T()))>::type tResult = L1dist(a,b);
-        return tResult*tResult;
+        typedef std::make_signed_t<typename lv::get_bigger_integer<T>::type> Tintern;
+        const Tintern tResult = Tintern(a)-Tintern(b);
+        return std::make_unsigned_t<Tintern>(tResult*tResult);
     }
 
     /// computes the squared L2 distance between two floating point values (i.e. == squared L1dist)
     template<typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
     inline T L2sqrdist(T a, T b) {
-        const T tResult = L1dist(a,b);
+        const T tResult = a-b;
         return tResult*tResult;
     }
 
@@ -311,18 +312,18 @@ namespace lv {
     }
 
     /// computes the L2 distance between two generic arrays (note: for very large arrays, using ocv matrix ops will be faster)
-    template<size_t nChannels, typename Tin, typename Tout=decltype(L2dist<nChannels>((Tin*)0,(Tin*)0))>
+    template<size_t nChannels, typename Tin, typename Tout=float, typename Tintern=std::conditional_t<std::is_integral<Tin>::value,size_t,float>>
     inline Tout L2dist(const Tin* a, const Tin* b, size_t nElements, const uint8_t* m=nullptr) {
-        decltype(L2sqrdist<nChannels>((Tin*)0,(Tin*)0)) tResult = 0;
+        Tintern tResult = 0;
         const size_t nTotElements = nElements*nChannels;
         if(m) {
             for(size_t n=0,i=0; n<nTotElements; n+=nChannels,++i)
                 if(m[i])
-                    tResult += L2sqrdist<nChannels>(a+n,b+n);
+                    tResult += L2sqrdist<nChannels,Tin,Tintern>(a+n,b+n);
         }
         else {
             for(size_t n=0; n<nTotElements; n+=nChannels)
-                tResult += L2sqrdist<nChannels>(a+n,b+n);
+                tResult += L2sqrdist<nChannels,Tin,Tintern>(a+n,b+n);
         }
         return (Tout)std::sqrt(tResult);
     }
