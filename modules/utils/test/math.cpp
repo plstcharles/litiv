@@ -32,27 +32,218 @@ namespace {
 
 }
 
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wstrict-aliasing"
-#elif (defined(__GNUC__) || defined(__GNUG__))
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wstrict-aliasing"
-#endif //defined(...GCC)
+///////////////////////////////////////////////////////////////////////////////////////////////////
 
-TEST(bittrick_signextshift,regression) {
-    float fVal = -123.45f;
-    int32_t& nCast = reinterpret_cast<int32_t&>(fVal);
-    nCast &= 0x7FFFFFFF;
-    const float fRes = reinterpret_cast<float&>(nCast);
-    EXPECT_EQ(fRes,123.45f) << "sign-extended right shift not supported, bit trick for floating point abs value will fail";
+TEST(isnan,regression) {
+    EXPECT_EQ(lv::isnan(std::numeric_limits<float>::quiet_NaN()),true);
+    EXPECT_EQ(lv::isnan(std::numeric_limits<double>::quiet_NaN()),true);
+    EXPECT_EQ(lv::isnan(std::numeric_limits<float>::max()),false);
+    EXPECT_EQ(lv::isnan(std::numeric_limits<double>::max()),false);
 }
 
-#if defined(__clang__)
-#pragma clang diagnostic pop
-#elif (defined(__GNUC__) || defined(__GNUG__))
-#pragma GCC diagnostic pop
-#endif //defined(...GCC)
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST(abs_fast,regression) {
+    ASSERT_EQ(lv::abs_fast(0.0f),0.0f) << "sign-extended right shift not supported, bit trick for floating point abs value will fail";
+    ASSERT_EQ(lv::abs_fast(-123.45f),123.45f) << "sign-extended right shift not supported, bit trick for floating point abs value will fail";
+}
+
+namespace {
+
+    void abs_fast_perftest(benchmark::State& st) {
+        const volatile size_t nArraySize = size_t(st.range(0));
+        const volatile size_t nLoopSize = size_t(st.range(1));
+        const volatile float fMinVal = std::numeric_limits<float>::min();
+        const volatile float fMaxVal = std::numeric_limits<float>::max();
+        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        size_t nArrayIdx = 0;
+        while(st.KeepRunning()) {
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+1)%nCurrArraySize;
+                volatile auto tLast = lv::abs_fast(afVals[nArrayIdx]);
+                benchmark::DoNotOptimize(tLast);
+            }
+        }
+    }
+
+    void abs_orig_perftest(benchmark::State& st) {
+        const volatile size_t nArraySize = size_t(st.range(0));
+        const volatile size_t nLoopSize = size_t(st.range(1));
+        const volatile float fMinVal = std::numeric_limits<float>::min();
+        const volatile float fMaxVal = std::numeric_limits<float>::max();
+        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        size_t nArrayIdx = 0;
+        while(st.KeepRunning()) {
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+1)%nCurrArraySize;
+                volatile auto tLast = std::abs(afVals[nArrayIdx]);
+                benchmark::DoNotOptimize(tLast);
+            }
+        }
+    }
+
+}
+
+BENCHMARK(abs_fast_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK(abs_orig_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST(inv_fast,regression) {
+    constexpr float fErr = 0.15f; // allow +/- 15% deviation off result
+    EXPECT_FLOAT_EQ(lv::inv_fast(1.0f),1.0f);
+    EXPECT_FLOAT_EQ(lv::inv_fast(0.5f),2.0f);
+    EXPECT_FLOAT_EQ(lv::inv_fast(2.0f),0.5f);
+    EXPECT_NEAR(lv::inv_fast(10.0f),0.1f,0.1f*fErr);
+    EXPECT_NEAR(lv::inv_fast(0.1f),10.0f,10.0f*fErr);
+    constexpr size_t nArraySize = 100000;
+    const std::unique_ptr<float[]> afVals = genarray(nArraySize,-10000.0f,10000.0f);
+    for(size_t i=0; i<nArraySize; ++i)
+        ASSERT_NEAR(lv::inv_fast(afVals[i]),1.0f/afVals[i],std::abs((1.0f/afVals[i])*fErr));
+}
+
+namespace {
+
+    void inv_fast_perftest(benchmark::State& st) {
+        const volatile size_t nArraySize = size_t(st.range(0));
+        const volatile size_t nLoopSize = size_t(st.range(1));
+        const volatile float fMinVal = std::numeric_limits<float>::min();
+        const volatile float fMaxVal = std::numeric_limits<float>::max();
+        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        size_t nArrayIdx = 0;
+        while(st.KeepRunning()) {
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+1)%nCurrArraySize;
+                volatile auto tLast = lv::inv_fast(afVals[nArrayIdx]);
+                benchmark::DoNotOptimize(tLast);
+            }
+        }
+    }
+
+    void inv_orig_perftest(benchmark::State& st) {
+        const volatile size_t nArraySize = size_t(st.range(0));
+        const volatile size_t nLoopSize = size_t(st.range(1));
+        const volatile float fMinVal = std::numeric_limits<float>::min();
+        const volatile float fMaxVal = std::numeric_limits<float>::max();
+        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        size_t nArrayIdx = 0;
+        while(st.KeepRunning()) {
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+1)%nCurrArraySize;
+                volatile auto tLast = 1.0f/afVals[nArrayIdx];
+                benchmark::DoNotOptimize(tLast);
+            }
+        }
+    }
+
+}
+
+BENCHMARK(inv_fast_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK(inv_orig_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+TEST(invsqrt_fast_0iter,regression) {
+    constexpr float fErr = 0.05f; // allow +/- 5% deviation off result
+    EXPECT_NEAR(lv::invsqrt_fastest(1.0f),1.0f,1.0f*fErr);
+    EXPECT_NEAR(lv::invsqrt_fastest(4.0f),0.5f,0.5f*fErr);
+    EXPECT_NEAR(lv::invsqrt_fastest(16.0f),0.25f,0.25f*fErr);
+    EXPECT_NEAR(lv::invsqrt_fastest(0.5f),1.0f/0.7071067f,(1.0f/0.7071067f)*fErr);
+    EXPECT_NEAR(lv::invsqrt_fastest(223.31f),1.0f/14.94356f,(1.0f/14.94356f)*fErr);
+    constexpr size_t nArraySize = 100000;
+    const std::unique_ptr<float[]> afVals = genarray(nArraySize,0.0f,10000.0f);
+    for(size_t i=0; i<nArraySize; ++i)
+        ASSERT_NEAR(lv::invsqrt_fastest(afVals[i]),1.0f/std::sqrt(afVals[i]),(1.0f/std::sqrt(afVals[i]))*fErr);
+}
+
+#define INVSQRT_REGRESSION_TEST(n) \
+TEST(invsqrt_fast_##n##iter,regression) { \
+    const float fErr = 0.005f/std::pow(2.0f,(float)n); \
+    EXPECT_NEAR(lv::invsqrt_fast<n>(1.0f),1.0f,1.0f*fErr); \
+    EXPECT_NEAR(lv::invsqrt_fast<n>(4.0f),0.5f,0.5f*fErr); \
+    EXPECT_NEAR(lv::invsqrt_fast<n>(16.0f),0.25f,0.25f*fErr); \
+    EXPECT_NEAR(lv::invsqrt_fast<n>(0.5f),1.0f/0.7071067f,(1.0f/0.7071067f)*fErr); \
+    EXPECT_NEAR(lv::invsqrt_fast<n>(223.31f),1.0f/14.94356f,(1.0f/14.94356f)*fErr); \
+    constexpr size_t nArraySize = 100000; \
+    const std::unique_ptr<float[]> afVals = genarray(nArraySize,0.0f,10000.0f); \
+    for(size_t i=0; i<nArraySize; ++i) \
+        ASSERT_NEAR(lv::invsqrt_fast<n>(afVals[i]),1.0f/std::sqrt(afVals[i]),(1.0f/std::sqrt(afVals[i]))*fErr); \
+}
+
+INVSQRT_REGRESSION_TEST(1)
+INVSQRT_REGRESSION_TEST(2)
+INVSQRT_REGRESSION_TEST(4)
+INVSQRT_REGRESSION_TEST(8)
+
+namespace {
+
+    void invsqrt_fastest_perftest(benchmark::State& st) {
+        const volatile size_t nArraySize = size_t(st.range(0));
+        const volatile size_t nLoopSize = size_t(st.range(1));
+        const volatile float fMinVal = 0.0f;
+        const volatile float fMaxVal = std::numeric_limits<float>::max();
+        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        size_t nArrayIdx = 0;
+        while(st.KeepRunning()) {
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+1)%nCurrArraySize;
+                volatile auto tLast = lv::invsqrt_fastest(afVals[nArrayIdx]);
+                benchmark::DoNotOptimize(tLast);
+            }
+        }
+    }
+
+    void invsqrt_fast_perftest(benchmark::State& st) {
+        const volatile size_t nArraySize = size_t(st.range(0));
+        const volatile size_t nLoopSize = size_t(st.range(1));
+        const volatile float fMinVal = 0.0f;
+        const volatile float fMaxVal = std::numeric_limits<float>::max();
+        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        size_t nArrayIdx = 0;
+        while(st.KeepRunning()) {
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+1)%nCurrArraySize;
+                volatile auto tLast = lv::invsqrt_fast(afVals[nArrayIdx]);
+                benchmark::DoNotOptimize(tLast);
+            }
+        }
+    }
+
+    void invsqrt_orig_perftest(benchmark::State& st) {
+        const volatile size_t nArraySize = size_t(st.range(0));
+        const volatile size_t nLoopSize = size_t(st.range(1));
+        const volatile float fMinVal = 0.0f;
+        const volatile float fMaxVal = std::numeric_limits<float>::max();
+        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        size_t nArrayIdx = 0;
+        while(st.KeepRunning()) {
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+1)%nCurrArraySize;
+                volatile auto tLast = 1.0f/std::sqrt(afVals[nArrayIdx]);
+                benchmark::DoNotOptimize(tLast);
+            }
+        }
+    }
+
+}
+
+BENCHMARK(invsqrt_fastest_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK(invsqrt_fast_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK(invsqrt_orig_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -66,9 +257,11 @@ namespace {
         const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
         size_t nArrayIdx = 0;
         while(st.KeepRunning()) {
-            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
-                nArrayIdx = (nArrayIdx+2)%nArraySize;
-                auto tLast = lv::_L1dist_cheat(afVals[nArrayIdx],afVals[nArrayIdx+1]);
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+2)%nCurrArraySize;
+                volatile auto tLast = lv::_L1dist_cheat(afVals[nArrayIdx],afVals[nArrayIdx+1]);
                 benchmark::DoNotOptimize(tLast);
             }
         }
@@ -82,9 +275,11 @@ namespace {
         const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
         size_t nArrayIdx = 0;
         while(st.KeepRunning()) {
-            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
-                nArrayIdx = (nArrayIdx+2)%nArraySize;
-                auto tLast = lv::_L1dist_nocheat(afVals[nArrayIdx],afVals[nArrayIdx+1]);
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+2)%nCurrArraySize;
+                volatile auto tLast = lv::_L1dist_nocheat(afVals[nArrayIdx],afVals[nArrayIdx+1]);
                 benchmark::DoNotOptimize(tLast);
             }
         }
@@ -102,10 +297,12 @@ namespace {
         size_t nArrayIdx2 = nArraySize/2;
         lvAssert(nArraySize>nChannels*2);
         while(st.KeepRunning()) {
-            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
-                nArrayIdx1 = (nArrayIdx1+nChannels)%nArraySize;
-                nArrayIdx2 = (nArrayIdx2+nChannels)%nArraySize;
-                auto tLast = lv::L1dist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx1 = (nArrayIdx1+nChannels)%nCurrArraySize;
+                nArrayIdx2 = (nArrayIdx2+nChannels)%nCurrArraySize;
+                volatile auto tLast = lv::L1dist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
                 benchmark::DoNotOptimize(tLast);
             }
         }
@@ -274,10 +471,12 @@ namespace {
         size_t nArrayIdx2 = nArraySize/2;
         lvAssert(nArraySize>nChannels*2);
         while(st.KeepRunning()) {
-            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
-                nArrayIdx1 = (nArrayIdx1+nChannels)%nArraySize;
-                nArrayIdx2 = (nArrayIdx2+nChannels)%nArraySize;
-                auto tLast = lv::L2sqrdist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx1 = (nArrayIdx1+nChannels)%nCurrArraySize;
+                nArrayIdx2 = (nArrayIdx2+nChannels)%nCurrArraySize;
+                volatile auto tLast = lv::L2sqrdist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
                 benchmark::DoNotOptimize(tLast);
             }
         }
@@ -438,10 +637,12 @@ namespace {
         size_t nArrayIdx2 = nArraySize/2;
         lvAssert(nArraySize>nChannels*2);
         while(st.KeepRunning()) {
-            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
-                nArrayIdx1 = (nArrayIdx1+nChannels)%nArraySize;
-                nArrayIdx2 = (nArrayIdx2+nChannels)%nArraySize;
-                auto tLast = lv::L2dist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx1 = (nArrayIdx1+nChannels)%nCurrArraySize;
+                nArrayIdx2 = (nArrayIdx2+nChannels)%nCurrArraySize;
+                volatile auto tLast = lv::L2dist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
                 benchmark::DoNotOptimize(tLast);
             }
         }
@@ -578,10 +779,12 @@ namespace {
         size_t nArrayIdx2 = nArraySize/2;
         lvAssert(nArraySize>nChannels*2);
         while(st.KeepRunning()) {
-            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
-                nArrayIdx1 = (nArrayIdx1+nChannels)%nArraySize;
-                nArrayIdx2 = (nArrayIdx2+nChannels)%nArraySize;
-                auto tLast = lv::cdist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx1 = (nArrayIdx1+nChannels)%nCurrArraySize;
+                nArrayIdx2 = (nArrayIdx2+nChannels)%nCurrArraySize;
+                volatile auto tLast = lv::cdist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
                 benchmark::DoNotOptimize(tLast);
             }
         }
@@ -695,9 +898,11 @@ namespace {
         size_t nArrayIdx = 0;
         lvAssert(nArraySize>nChannels);
         while(st.KeepRunning()) {
-            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
-                nArrayIdx = (nArrayIdx+nChannels)%nArraySize;
-                auto tLast = lv::popcount<nChannels>(&aVals[nArrayIdx]);
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+nChannels)%nCurrArraySize;
+                volatile auto tLast = lv::popcount<nChannels>(&aVals[nArrayIdx]);
                 benchmark::DoNotOptimize(tLast);
             }
         }
@@ -761,10 +966,12 @@ namespace {
         size_t nArrayIdx2 = nArraySize/2;
         lvAssert(nArraySize>nChannels*2);
         while(st.KeepRunning()) {
-            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
-                nArrayIdx1 = (nArrayIdx1+nChannels)%nArraySize;
-                nArrayIdx2 = (nArrayIdx2+nChannels)%nArraySize;
-                auto tLast = lv::hdist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx1 = (nArrayIdx1+nChannels)%nCurrArraySize;
+                nArrayIdx2 = (nArrayIdx2+nChannels)%nCurrArraySize;
+                volatile auto tLast = lv::hdist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
                 benchmark::DoNotOptimize(tLast);
             }
         }
@@ -844,64 +1051,4 @@ TEST(expand_bits,regression) {
     EXPECT_EQ(uint32_t(lv::expand_bits<4>(0)),uint32_t(0));
     EXPECT_EQ(uint32_t(lv::expand_bits<4>(0b1111)),uint32_t(0b0001000100010001));
     EXPECT_EQ(uint32_t(lv::expand_bits<4>(0b101010)),uint32_t(0b000100000001000000010000));
-}
-
-TEST(inverse_fast,regression) {
-    // allow +/- 15% deviation off result
-    constexpr float fErr = 0.15f;
-    EXPECT_FLOAT_EQ(lv::inverse_fast(1.0f),1.0f);
-    EXPECT_FLOAT_EQ(lv::inverse_fast(0.5f),2.0f);
-    EXPECT_FLOAT_EQ(lv::inverse_fast(2.0f),0.5f);
-    EXPECT_NEAR(lv::inverse_fast(10.0f),0.1f,0.1f*fErr);
-    EXPECT_NEAR(lv::inverse_fast(0.1f),10.0f,10.0f*fErr);
-    constexpr size_t nArraySize = 100000;
-    const std::unique_ptr<float[]> afVals = genarray(nArraySize,-10000.0f,10000.0f);
-    for(size_t i=0; i<nArraySize; ++i)
-        ASSERT_NEAR(lv::inverse_fast(afVals[i]),1.0f/afVals[i],std::abs((1.0f/afVals[i])*fErr));
-}
-
-namespace {
-
-    void inverse_fast_perftest(benchmark::State& st) {
-        const volatile size_t nArraySize = size_t(st.range(0));
-        const volatile size_t nLoopSize = size_t(st.range(1));
-        const volatile float fMinVal = std::numeric_limits<float>::min();
-        const volatile float fMaxVal = std::numeric_limits<float>::max();
-        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
-        size_t nArrayIdx = 0;
-        while(st.KeepRunning()) {
-            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
-                nArrayIdx = (nArrayIdx+1)%nArraySize;
-                auto tLast = lv::inverse_fast(afVals[nArrayIdx]);
-                benchmark::DoNotOptimize(tLast);
-            }
-        }
-    }
-
-    void inverse_orig_perftest(benchmark::State& st) {
-        const volatile size_t nArraySize = size_t(st.range(0));
-        const volatile size_t nLoopSize = size_t(st.range(1));
-        const volatile float fMinVal = std::numeric_limits<float>::min();
-        const volatile float fMaxVal = std::numeric_limits<float>::max();
-        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
-        size_t nArrayIdx = 0;
-        while(st.KeepRunning()) {
-            for(size_t nLoopIdx=0; nLoopIdx<nLoopSize; ++nLoopIdx) {
-                nArrayIdx = (nArrayIdx+1)%nArraySize;
-                auto tLast = 1.0f/afVals[nArrayIdx];
-                benchmark::DoNotOptimize(tLast);
-            }
-        }
-    }
-
-}
-
-BENCHMARK(inverse_fast_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
-BENCHMARK(inverse_orig_perftest)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
-
-TEST(isnan,regression) {
-    EXPECT_EQ(lv::isnan(std::numeric_limits<float>::quiet_NaN()),true);
-    EXPECT_EQ(lv::isnan(std::numeric_limits<double>::quiet_NaN()),true);
-    EXPECT_EQ(lv::isnan(std::numeric_limits<float>::max()),false);
-    EXPECT_EQ(lv::isnan(std::numeric_limits<double>::max()),false);
 }
