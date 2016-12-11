@@ -405,7 +405,8 @@ namespace lv {
             bg_sqr += uint64_t(bg[c]*bg[c]);
             mix += uint64_t(curr[c]*bg[c]);
         }
-        return (size_t)sqrt((float)(curr_sqr-(mix*mix)/bg_sqr));
+        const float fSqrDistort = (float)(curr_sqr-(mix*mix)/bg_sqr);
+        return (size_t)std::sqrt(fSqrDistort);
     }
 
     /// computes the color distortion between two floating point arrays
@@ -440,8 +441,10 @@ namespace lv {
         }
         if(curr_sqr<=(mix*mix)/bg_sqr)
             return (T)0;
-        else
-            return (T)sqrt(curr_sqr-(mix*mix)/bg_sqr);
+        else {
+            const float fSqrDistort = (float)(curr_sqr-(mix*mix)/bg_sqr);
+            return (T)(lv::invsqrt_fast(fSqrDistort)*fSqrDistort);
+        }
     }
 
     /// computes the color distortion between two generic arrays
