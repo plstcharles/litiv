@@ -189,6 +189,47 @@ BENCHMARK_TEMPLATE1(invsqrt_fast_perftest,0)->Args({1000000,250})->Repetitions(1
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
+TEST(sqrt_fast,regression) {
+    constexpr float fErr = 0.07f; // allow +/- 7% deviation off result
+    EXPECT_NEAR(lv::sqrt_fast(1.0f),1.0f,1.0f*fErr);
+    EXPECT_NEAR(lv::sqrt_fast(4.0f),2.0f,2.0f*fErr);
+    EXPECT_NEAR(lv::sqrt_fast(16.0f),4.0f,4.0f*fErr);
+    EXPECT_NEAR(lv::sqrt_fast(0.5f),0.7071067f,0.7071067f*fErr);
+    EXPECT_NEAR(lv::sqrt_fast(223.31f),14.94356f,14.94356f*fErr);
+    constexpr size_t nArraySize = 100000;
+    const std::unique_ptr<float[]> afVals = genarray(nArraySize,0.0f,10000.0f);
+    for(size_t i=0; i<nArraySize; ++i)
+        ASSERT_NEAR(lv::sqrt_fast(afVals[i]),std::sqrt(afVals[i]),std::sqrt(afVals[i])*fErr);
+}
+
+namespace {
+
+    template<bool bUseFast>
+    void sqrt_fast_perftest(benchmark::State& st) {
+        const volatile size_t nArraySize = size_t(st.range(0));
+        const volatile size_t nLoopSize = size_t(st.range(1));
+        const volatile float fMinVal = 0.0f;
+        const volatile float fMaxVal = std::numeric_limits<float>::max();
+        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        size_t nArrayIdx = 0;
+        while(st.KeepRunning()) {
+            const size_t nCurrLoopSize = nLoopSize;
+            const size_t nCurrArraySize = nArraySize;
+            for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
+                nArrayIdx = (nArrayIdx+1)%nCurrArraySize;
+                volatile auto tLast = bUseFast?(lv::sqrt_fast(afVals[nArrayIdx])):(std::sqrt(afVals[nArrayIdx]));
+                benchmark::DoNotOptimize(tLast);
+            }
+        }
+    }
+
+}
+
+BENCHMARK_TEMPLATE1(sqrt_fast_perftest,true)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+BENCHMARK_TEMPLATE1(sqrt_fast_perftest,false)->Args({1000000,250})->Repetitions(15)->ReportAggregatesOnly(true);
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
 namespace {
 
     template<bool bUseFast>

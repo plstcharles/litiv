@@ -66,6 +66,7 @@ namespace lv {
 
     /// computes the fast inverse square root of a floating point value -- http://bits.stephan-brumme.com/invSquareRoot.html
     inline float invsqrt_fastest(float x) {
+        lvDbgAssert_(x>=0.0f,"function undefined for negative values");
         uint32_t& i = reinterpret_cast<uint32_t&>(x);
         i = 0x5F375A86 - (i>>1);
         return x;
@@ -74,12 +75,22 @@ namespace lv {
     /// computes the fast inverse square root of a floating point value w/ optional newton iterations optimization -- http://bits.stephan-brumme.com/invSquareRoot.html
     template<size_t nNewtonIters=1>
     inline float invsqrt_fast(float x) {
+        lvDbgAssert_(x>=0.0f,"function undefined for negative values");
         static_assert(nNewtonIters>=1,"use invsqrt_fastest to skip Newton iterations");
         const float fHalf = 0.5f*x;
         float fRes = invsqrt_fastest(x);
         for(size_t i=0; i<nNewtonIters; ++i)
             fRes = fRes*(1.5f-fHalf*fRes*fRes);
         return fRes;
+    }
+
+    /// computes the fast square root of a floating point value -- http://bits.stephan-brumme.com/squareRoot.html
+    inline float sqrt_fast(float x) {
+        lvDbgAssert_(x>=0.0f,"function undefined for negative values");
+        uint32_t& i = reinterpret_cast<uint32_t&>(x);
+        i += 127<<23;
+        i >>= 1;
+        return x;
     }
 
 #if defined(__clang__)
