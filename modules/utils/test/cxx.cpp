@@ -1,5 +1,5 @@
 
-#include "gtest/gtest.h"
+#include "common.hpp"
 #include "litiv/utils/cxx.hpp"
 
 TEST(putf,regression) {
