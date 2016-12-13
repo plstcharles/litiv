@@ -29,6 +29,8 @@ namespace cv { // extending cv
 
     /// returns pixel coordinates clamped to the given image & border size
     inline void clampImageCoords(int& nSampleCoord_X, int& nSampleCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
+        lvDbgAssert_(nBorderSize>=0,"border size cannot be negative");
+        lvDbgAssert_(oImageSize.area()>=0,"image size cannot be negative");
         if(nSampleCoord_X<nBorderSize)
             nSampleCoord_X = nBorderSize;
         else if(nSampleCoord_X>=oImageSize.width-nBorderSize)
@@ -39,14 +41,16 @@ namespace cv { // extending cv
             nSampleCoord_Y = oImageSize.height-nBorderSize-1;
     }
 
-    /// returns a random init/sampling position for the specified pixel position, given a predefined kernel; also guards against out-of-bounds values via image/border size check.
-    template<int nKernelHeight,int nKernelWidth>
+    /// returns a random init/sampling position for the specified pixel position, given a predefined kernel; also guards against out-of-bounds values via image/border size check
+    template<int nKernelHeight, int nKernelWidth>
     inline void getRandSamplePosition(const std::array<std::array<int,nKernelWidth>,nKernelHeight>& anSamplesInitPattern,
                                       const int nSamplesInitPatternTot, int& nSampleCoord_X, int& nSampleCoord_Y,
                                       const int nOrigCoord_X, const int nOrigCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
+        static_assert(nKernelWidth>0 && nKernelHeight>0,"invalid init pattern array size");
+        lvDbgAssert_(nSamplesInitPatternTot>0,"pattern max count must be positive");
         int r = 1+rand()%nSamplesInitPatternTot;
-        for(nSampleCoord_X=0; nSampleCoord_X<nKernelWidth; ++nSampleCoord_X) {
-            for(nSampleCoord_Y=0; nSampleCoord_Y<nKernelHeight; ++nSampleCoord_Y) {
+        for(nSampleCoord_Y=0; nSampleCoord_Y<nKernelHeight; ++nSampleCoord_Y) {
+            for(nSampleCoord_X=0; nSampleCoord_X<nKernelWidth; ++nSampleCoord_X) {
                 r -= anSamplesInitPattern[nSampleCoord_Y][nSampleCoord_X];
                 if(r<=0)
                     goto stop;
@@ -94,6 +98,7 @@ namespace cv { // extending cv
                                         int& nNeighborCoord_X, int& nNeighborCoord_Y,
                                         const int nOrigCoord_X, const int nOrigCoord_Y,
                                         const int nBorderSize, const cv::Size& oImageSize) {
+        static_assert(nNeighborCount>0,"invalid input neighbor pattern array size");
         int r = rand()%nNeighborCount;
         nNeighborCoord_X = nOrigCoord_X+anNeighborPattern[r][0];
         nNeighborCoord_Y = nOrigCoord_Y+anNeighborPattern[r][1];
@@ -131,12 +136,13 @@ namespace cv { // extending cv
 
     /// removes all keypoints from voKPs which fall on null values (or outside the bounds) of oROI
     inline void validateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoint>& voKPs) {
-        lvAssert_(!oROI.empty() && oROI.type()==CV_8UC1,"input ROI must be non-empty and of type 8UC1");
+        if(oROI.empty())
+            return;
+        lvAssert_(oROI.type()==CV_8UC1,"input ROI must be of type 8UC1");
         std::vector<cv::KeyPoint> voNewKPs;
+        voNewKPs.reserve(voKPs.size());
         for(size_t k=0; k<voKPs.size(); ++k) {
-            if( voKPs[k].pt.x>=0 && voKPs[k].pt.x<oROI.cols &&
-                voKPs[k].pt.y>=0 && voKPs[k].pt.y<oROI.rows &&
-                oROI.at<uchar>(voKPs[k].pt)>0)
+            if(voKPs[k].pt.x>=0 && voKPs[k].pt.x<oROI.cols && voKPs[k].pt.y>=0 && voKPs[k].pt.y<oROI.rows && oROI.at<uchar>(voKPs[k].pt)>0)
                 voNewKPs.push_back(voKPs[k]);
         }
         voKPs = voNewKPs;
@@ -145,6 +151,8 @@ namespace cv { // extending cv
     /// returns the vector of all sorted unique values contained in a templated matrix
     template<typename T>
     inline std::vector<T> unique(const cv::Mat_<T>& oMat) {
+        if(oMat.empty())
+            return std::vector<T>();
         const std::set<T> mMap(oMat.begin(),oMat.end());
         return std::vector<T>(mMap.begin(),mMap.end());
     }

@@ -1,6 +1,6 @@
 
-#include "common.hpp"
 #include "litiv/utils/math.hpp"
+#include "common.hpp"
 
 #define BENCHMARK_NB_CHANNELS 3
 
