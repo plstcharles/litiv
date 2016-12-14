@@ -178,6 +178,7 @@
     #define USE_FAST_MATH             @USE_FAST_MATH@
     #define EXTERNAL_DATA_ROOT        XSTR(@EXTERNAL_DATA_ROOT@)
     #define SAMPLES_DATA_ROOT         XSTR(@SAMPLES_DATA_ROOT@)
+    #define TEST_DATA_ROOT            XSTR(@TEST_DATA_ROOT@)
     #define CACHE_MAX_SIZE_GB         @DATASETS_CACHE_SIZE@LLU
     #define TARGET_PLATFORM_x64       @TARGET_PLATFORM_x64@
     #define DEFAULT_NB_THREADS        1
