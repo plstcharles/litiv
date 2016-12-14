@@ -16,9 +16,11 @@
 # limitations under the License.
 
 option(USE_SIGNEXT_SHIFT_TRICK "Use sign-extended right shift bit trick in float absolute value computation" OFF)
+option(USE_FAST_SQRT_FOR_CDIST "Use fast approximate square root inside floating point version of color distortion" OFF)
 
 mark_as_advanced(
     USE_SIGNEXT_SHIFT_TRICK
+    USE_FAST_SQRT_FOR_CDIST
 )
 
 file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/utils/defines.hpp")

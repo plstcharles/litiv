@@ -406,7 +406,7 @@ namespace lv {
             mix += uint64_t(curr[c]*bg[c]);
         }
         const float fSqrDistort = (float)(curr_sqr-(mix*mix)/bg_sqr);
-        return (size_t)std::sqrt(fSqrDistort);
+        return (size_t)std::sqrt(fSqrDistort); // will already be well optimized for integer output
     }
 
     /// computes the color distortion between two floating point arrays
@@ -443,7 +443,11 @@ namespace lv {
             return (T)0;
         else {
             const float fSqrDistort = (float)(curr_sqr-(mix*mix)/bg_sqr);
+#if USE_FAST_SQRT_FOR_CDIST
             return (T)(lv::invsqrt_fast(fSqrDistort)*fSqrDistort);
+#else //!USE_FAST_SQRT_FOR_CDIST
+            return (T)std::sqrt(fSqrDistort);
+#endif //!USE_FAST_SQRT_FOR_CDIST
         }
     }
 
