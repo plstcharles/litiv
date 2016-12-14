@@ -48,16 +48,20 @@ mark_as_advanced(
     gmock_build_tests
 )
 
-download_project(
-    PROJ
-        googletest
-    PREFIX
-        "${CMAKE_CURRENT_BINARY_DIR}"
-    URL
-        "https://github.com/google/googletest/archive/release-1.8.0.zip"
-    QUIET
-#    ${UPDATE_DISCONNECTED_IF_AVAILABLE} # bugged in some cmake versions, needs patch
-)
+if((NOT DEFINED googletest_SOURCE_DIR) OR (NOT EXISTS ${googletest_SOURCE_DIR}))
+    download_project(
+        PROJ
+            googletest
+        PREFIX
+            "${CMAKE_CURRENT_BINARY_DIR}"
+        URL
+            "https://github.com/google/googletest/archive/release-1.8.0.zip"
+        QUIET
+    #    ${UPDATE_DISCONNECTED_IF_AVAILABLE} # bugged in some cmake versions, needs patch
+    )
+    set(googletest_SOURCE_DIR ${googletest_SOURCE_DIR} CACHE INTERNAL "")
+    set(googletest_BINARY_DIR ${googletest_BINARY_DIR} CACHE INTERNAL "")
+endif()
 
 add_subdirectory(
     ${googletest_SOURCE_DIR}

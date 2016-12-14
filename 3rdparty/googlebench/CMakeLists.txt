@@ -36,18 +36,22 @@ mark_as_advanced(
     BENCHMARK_USE_LIBCXX
 )
 
-download_project(
-    PROJ
-        googlebench
-    PREFIX
-        "${CMAKE_CURRENT_BINARY_DIR}"
-    URL
-        "https://github.com/google/benchmark/archive/v1.1.0.zip"
-    PATCH_COMMAND
-        "${CMAKE_COMMAND_ESCAPED} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/changes-v1.1.0 ${CMAKE_CURRENT_BINARY_DIR}/googlebench-src"
-    QUIET
-#    ${UPDATE_DISCONNECTED_IF_AVAILABLE} # bugged in some cmake versions, needs patch
-)
+if((NOT DEFINED googlebench_SOURCE_DIR) OR (NOT EXISTS ${googlebench_SOURCE_DIR}))
+    download_project(
+        PROJ
+            googlebench
+        PREFIX
+            "${CMAKE_CURRENT_BINARY_DIR}"
+        URL
+            "https://github.com/google/benchmark/archive/v1.1.0.zip"
+        PATCH_COMMAND
+            "${CMAKE_COMMAND_ESCAPED} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/changes-v1.1.0 ${CMAKE_CURRENT_BINARY_DIR}/googlebench-src"
+        QUIET
+    #    ${UPDATE_DISCONNECTED_IF_AVAILABLE} # bugged in some cmake versions, needs patch
+    )
+    set(googlebench_SOURCE_DIR ${googlebench_SOURCE_DIR} CACHE INTERNAL "")
+    set(googlebench_BINARY_DIR ${googlebench_BINARY_DIR} CACHE INTERNAL "")
+endif()
 
 add_subdirectory(
     ${googlebench_SOURCE_DIR}
