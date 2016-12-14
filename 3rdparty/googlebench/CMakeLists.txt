@@ -46,7 +46,7 @@ download_project(
     PATCH_COMMAND
         "${CMAKE_COMMAND_ESCAPED} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/changes-v1.1.0 ${CMAKE_CURRENT_BINARY_DIR}/googlebench-src"
     QUIET
-    ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+#    ${UPDATE_DISCONNECTED_IF_AVAILABLE} # bugged in some cmake versions, needs patch
 )
 
 add_subdirectory(

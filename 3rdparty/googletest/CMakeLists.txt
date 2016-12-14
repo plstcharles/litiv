@@ -56,7 +56,7 @@ download_project(
     URL
         "https://github.com/google/googletest/archive/release-1.8.0.zip"
     QUIET
-    ${UPDATE_DISCONNECTED_IF_AVAILABLE}
+#    ${UPDATE_DISCONNECTED_IF_AVAILABLE} # bugged in some cmake versions, needs patch
 )
 
 add_subdirectory(
