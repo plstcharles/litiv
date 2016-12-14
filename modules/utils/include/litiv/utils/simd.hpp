@@ -32,14 +32,37 @@
 namespace lv {
 
 #if HAVE_MMX
+
     /// returns the (horizontal) sum of the provided 8-unsigned-byte array
     inline uint hsum_8ub(const __m64& anBuffer) {
         __m64 _anRes = _mm_sad_pu8(anBuffer,_mm_set1_pi8(char(0)));
         return uint(_mm_cvtsi64_si32(_anRes));
     }
+
 #endif //HAVE_MMX
 
 #if HAVE_SSE2
+
+    /// returns whether the 128-bit array contains all zero bits or not
+    inline bool cmp_zero_128i(const __m128i& anBuffer) {
+        #if HAVE_SSE4_1
+        return _mm_testz_si128(anBuffer,anBuffer)!=0;
+        #else //!HAVE_SSE4_1
+        static constexpr __m128i anZeroBuffer = {0}; // compare to _mm_setzero_si128?
+        return _mm_movemask_epi8(_mm_cmpeq_epi32(anBuffer,anZeroBuffer))==0xFFFF;
+        #endif //!HAVE_SSE4_1
+    }
+
+    /// returns whether the two 128-bit arrays are identical or not
+    inline bool cmp_eq_128i(const __m128i& a, const __m128i& b) {
+        static constexpr __m128i anZeroBuffer = {0}; // compare to _mm_setzero_si128?
+        #if HAVE_SSE4_1
+        return _mm_testc_si128(anZeroBuffer,_mm_xor_si128(a, b))!=0;
+        #else //!HAVE_SSE4_1
+        return _mm_movemask_epi8(_mm_cmpeq_epi32(a,b))==0xFFFF;
+        #endif //!HAVE_SSE4_1
+    }
+
     /// returns the (horizontal) sum of the provided 16-unsigned-byte array
     inline uint32_t hsum_16ub(const __m128i& anBuffer) {
         __m128i _anRes = _mm_sad_epu8(anBuffer,_mm_set1_epi8(char(0)));
@@ -51,26 +74,30 @@ namespace lv {
         _mm_store_si128(anBuffer,_mm_set1_epi8((char)nVal));
     }
 
+    /// multiplies two sets of four 32-bit signed integers
     inline __m128i mult_32si(const __m128i& a, const __m128i& b) {
-#if HAVE_SSE4_1
+        #if HAVE_SSE4_1
         return _mm_mullo_epi32(a, b);
-#else //(!HAVE_SSE4_1)
+        #else //(!HAVE_SSE4_1)
         return _mm_unpacklo_epi32(_mm_shuffle_epi32(_mm_mul_epu32(a,b),_MM_SHUFFLE(0,0,2,0)),_mm_shuffle_epi32(_mm_mul_epu32(_mm_srli_si128(a,4),_mm_srli_si128(b,4)),_MM_SHUFFLE(0,0,2,0)));
-#endif //(!HAVE_SSE4_1)
+        #endif //(!HAVE_SSE4_1)
     }
 
+    /// extracts a single 32-bit signed integer value at position 'nPos' from the given array
     template<int nPos>
     inline int extract_32si(const __m128i& anBuffer) {
         static_assert(nPos>=0 && nPos<4,"Integer position out of bounds");
-#if HAVE_SSE4_1
+        #if HAVE_SSE4_1
         return _mm_extract_epi32(anBuffer,nPos);
-#else //(!HAVE_SSE4_1)
+        #else //(!HAVE_SSE4_1)
         return _mm_extract_epi16(anBuffer,nPos*2)+_mm_extract_epi16(anBuffer,nPos*2+1)<<16;
-#endif //(!HAVE_SSE4_1)
+        #endif //(!HAVE_SSE4_1)
     }
+
 #endif //HAVE_SSE2
 
 #if HAVE_SSE4_1
+
     /// returns the maximum value of the provided 16-unsigned-byte array
     inline uint8_t hmax_16ub(const __m128i& anBuffer) {
         __m128i _anTmp = _mm_sub_epi8(_mm_set1_epi8(char(CHAR_MAX)),anBuffer);
@@ -81,6 +108,7 @@ namespace lv {
     inline uint8_t hmin_16ub(const __m128i& anBuffer) {
         return uint8_t(_mm_cvtsi128_si32(_mm_minpos_epu16(_mm_min_epu8(anBuffer,_mm_srli_epi16(anBuffer,8)))));
     }
+
 #endif //HAVE_SSE4_1
 
 } // namespace lv
