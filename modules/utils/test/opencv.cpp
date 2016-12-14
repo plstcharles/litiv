@@ -26,22 +26,22 @@ TEST(clampImageCoords,regression) {
 TEST(getRandSamplePosition,regression) {
     int nX,nY;
     const std::array<std::array<int,1>,1> anTestPattern1u = {{1}};
-    cv::getRandSamplePosition(anTestPattern1u,1,nX,nY,0,0,0,cv::Size(640,480));
+    cv::getRandSamplePosition<1,1>(anTestPattern1u,1,nX,nY,0,0,0,cv::Size(640,480));
     EXPECT_TRUE(nX==0 && nY==0);
-    cv::getRandSamplePosition(anTestPattern1u,1,nX,nY,320,240,0,cv::Size(640,480));
+    cv::getRandSamplePosition<1,1>(anTestPattern1u,1,nX,nY,320,240,0,cv::Size(640,480));
     EXPECT_TRUE(nX==320 && nY==240);
-    cv::getRandSamplePosition(anTestPattern1u,1,nX,nY,640,480,0,cv::Size(640,480));
+    cv::getRandSamplePosition<1,1>(anTestPattern1u,1,nX,nY,640,480,0,cv::Size(640,480));
     EXPECT_TRUE(nX==639 && nY==479);
     const std::array<std::array<int,3>,3> anTestPattern3i = {std::array<int,3>{0,0,100},std::array<int,3>{0,0,0},std::array<int,3>{0,0,0}};
-    cv::getRandSamplePosition(anTestPattern3i,5,nX,nY,0,0,0,cv::Size(640,480));
+    cv::getRandSamplePosition<3,3>(anTestPattern3i,5,nX,nY,0,0,0,cv::Size(640,480));
     EXPECT_TRUE(nX==1 && nY==0);
-    cv::getRandSamplePosition(anTestPattern3i,5,nX,nY,320,240,0,cv::Size(640,480));
+    cv::getRandSamplePosition<3,3>(anTestPattern3i,5,nX,nY,320,240,0,cv::Size(640,480));
     EXPECT_TRUE(nX==321 && nY==239);
-    cv::getRandSamplePosition(anTestPattern3i,5,nX,nY,640,480,0,cv::Size(640,480));
+    cv::getRandSamplePosition<3,3>(anTestPattern3i,5,nX,nY,640,480,0,cv::Size(640,480));
     EXPECT_TRUE(nX==639 && nY==479);
     const std::array<std::array<int,3>,3> anTestPattern3u = {std::array<int,3>{1,1,1},std::array<int,3>{1,1,1},std::array<int,3>{1,1,1}};
     for(size_t i=0; i<10000; ++i) {
-        cv::getRandSamplePosition(anTestPattern3u,9,nX,nY,320,240,0,cv::Size(640,480));
+        cv::getRandSamplePosition<3,3>(anTestPattern3u,9,nX,nY,320,240,0,cv::Size(640,480));
         ASSERT_TRUE(nX>=319 && nX<=321);
         ASSERT_TRUE(nY>=239 && nY<=241);
     }
@@ -56,7 +56,7 @@ TEST(getRandNeighborPosition,regression) {
     };
     for(size_t i=0; i<10000; ++i) {
         int nX, nY;
-        cv::getRandNeighborPosition(anTestPattern8,nX,nY,320,240,0,cv::Size(640,480));
+        cv::getRandNeighborPosition<8>(anTestPattern8,nX,nY,320,240,0,cv::Size(640,480));
         ASSERT_TRUE(nX>=319 && nX<=321);
         ASSERT_TRUE(nY>=239 && nY<=241);
         ASSERT_FALSE(nX==320 && nY==240);
@@ -160,10 +160,10 @@ TYPED_TEST(AlignedMatAllocator_fixture,regression) {
     cv::Mat_<TypeParam> oTest;
     oTest.allocator = &alloc16a;
     oTest.create(45,23);
-    ASSERT_TRUE(((uintptr_t)oTest.datastart%16)==0);
+    ASSERT_TRUE(((uintptr_t)oTest.datastart%16)==size_t(0));
     const int aDims1[4] = {4,5,6,7};
     oTest.create(4,aDims1);
-    ASSERT_TRUE(((uintptr_t)oTest.datastart%16)==0);
+    ASSERT_TRUE(((uintptr_t)oTest.datastart%16)==size_t(0));
     cv::AlignedMatAllocator<32,false> alloc32a;
     oTest = cv::Mat_<TypeParam>();
     oTest.allocator = &alloc32a;
@@ -178,11 +178,11 @@ TEST(AlignedMatAllocatorPremade,regression) {
     ASSERT_TRUE(pAlloc16a!=nullptr);
     oTest.allocator = pAlloc16a;
     oTest.create(12,13);
-    ASSERT_TRUE(((uintptr_t)oTest.datastart%16)==0);
+    ASSERT_TRUE(((uintptr_t)oTest.datastart%16)==size_t(0));
     cv::MatAllocator* pAlloc32a = cv::getMatAllocator32a();
     ASSERT_TRUE(pAlloc32a!=nullptr);
     oTest = cv::Mat_<float>();
     oTest.allocator = pAlloc32a;
     oTest.create(12,13);
-    ASSERT_TRUE(((uintptr_t)oTest.datastart%32)==0);
+    ASSERT_TRUE(((uintptr_t)oTest.datastart%32)==size_t(0));
 }
