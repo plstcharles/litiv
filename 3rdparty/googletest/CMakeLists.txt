@@ -53,10 +53,8 @@ download_project(
         googletest
     PREFIX
         "${CMAKE_CURRENT_BINARY_DIR}"
-    GIT_REPOSITORY
-        https://github.com/google/googletest.git
-    GIT_TAG
-        "release-1.8.0"
+    URL
+        "https://github.com/google/googletest/archive/release-1.8.0.zip"
     QUIET
     ${UPDATE_DISCONNECTED_IF_AVAILABLE}
 )

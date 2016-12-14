@@ -41,10 +41,8 @@ download_project(
         googlebench
     PREFIX
         "${CMAKE_CURRENT_BINARY_DIR}"
-    GIT_REPOSITORY
-        https://github.com/google/benchmark.git
-    GIT_TAG
-        "v1.1.0"
+    URL
+        "https://github.com/google/benchmark/archive/v1.1.0.zip"
     PATCH_COMMAND
         "${CMAKE_COMMAND_ESCAPED} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/changes-v1.1.0 ${CMAKE_CURRENT_BINARY_DIR}/googlebench-src"
     QUIET
