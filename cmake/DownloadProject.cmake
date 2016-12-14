@@ -137,7 +137,7 @@ function(download_project)
     else()
         unset(OUTPUT_QUIET)
     endif()
-    message(STATUS "Downloading/updating ${DL_ARGS_PROJ}...")
+    message(STATUS "Downloading/updating external project '${DL_ARGS_PROJ}'...")
 
     # Set up where we will put our temporary CMakeLists.txt file and also
     # the base point below which the default source and binary dirs will be
