@@ -36,21 +36,22 @@ macro(initialize_internal_list list_name)
     set(${list_name} "" CACHE INTERNAL "Internal list variable")
 endmacro(initialize_internal_list)
 
-macro(litiv_library name groupname canbeshared sourcelist headerlist)
+macro(litiv_library libname groupname canbeshared sourcelist headerlist)
     if(${groupname} STREQUAL "module")
-        project(litiv_${name})
-        if(NOT(${name} STREQUAL "world"))
-            append_internal_list(litiv_modules ${name})
+        project(litiv_${libname})
+        if(NOT(${libname} STREQUAL "world"))
+            append_internal_list(litiv_modules ${libname})
             foreach(source ${${sourcelist}})
                 append_internal_list(litiv_modules_sourcelist "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/${source}")
             endforeach()
         endif()
     else()
-        project(litiv_${groupname}_${name})
-        append_internal_list(litiv_${groupname}_modules ${name})
+        project(litiv_${groupname}_${libname})
+        append_internal_list(litiv_${groupname}_modules ${libname})
         foreach(source ${${sourcelist}})
             append_internal_list(litiv_${groupname}_modules_sourcelist "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/${source}")
         endforeach()
+        set(libname ${groupname}_${libname})
     endif()
     append_internal_list(litiv_projects ${PROJECT_NAME})
     if(${BUILD_SHARED_LIBS} AND ${canbeshared})
@@ -113,57 +114,62 @@ macro(litiv_library name groupname canbeshared sourcelist headerlist)
         )
     endif()
     if(BUILD_TESTS AND (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test"))
-        file(GLOB testlist ${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp)
-        append_internal_list(litiv_tests ${name})
-        add_executable(${PROJECT_NAME}_test ${testlist})
-        target_compile_definitions(${PROJECT_NAME}_test
-            PUBLIC
-                PERFTEST=0
-        )
-        target_link_libraries(${PROJECT_NAME}_test
-            ${PROJECT_NAME}
-            benchmark gtest gtest_main
-            ${CMAKE_THREAD_LIBS_INIT}
-        )
-        set_target_properties(${PROJECT_NAME}_test
-            PROPERTIES
-                FOLDER "tests"
-                DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
-        )
-        set(testbinname "${PROJECT_NAME}_test$<$<CONFIG:Debug>:${CMAKE_DEBUG_POSTFIX}>")
-        add_test(
-            NAME
-                litiv_test_${name}
-            COMMAND
-                "${CMAKE_BINARY_DIR}/bin/${testbinname}"
-                "--gtest_output=xml:${CMAKE_BINARY_DIR}/Testing/${testbinname}.xml"
-        )
-        add_executable(${PROJECT_NAME}_perftest ${testlist})
-        target_compile_definitions(${PROJECT_NAME}_perftest
-            PUBLIC
-                PERFTEST=1
-        )
-        target_link_libraries(${PROJECT_NAME}_perftest
-            ${PROJECT_NAME}
-            gtest benchmark benchmark_main
-        )
-        set_target_properties(${PROJECT_NAME}_perftest
-            PROPERTIES
-                FOLDER "tests"
-                DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
-        )
-        if(BUILD_TESTS_PERF)
-            set(perftestbinname "${PROJECT_NAME}_perftest$<$<CONFIG:Debug>:${CMAKE_DEBUG_POSTFIX}>")
+        file(GLOB testfiles ${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp)
+        foreach(testfile ${testfiles})
+            get_filename_component(testname "${testfile}" NAME_WE)
+            set(testname "${libname}_${testname}")
+            append_internal_list(litiv_tests "${testname}")
+            add_executable(litiv_utest_app_${testname} "${testfile}")
+            target_compile_definitions(litiv_utest_app_${testname}
+                PUBLIC
+                    PERFTEST=0
+            )
+            target_link_libraries(litiv_utest_app_${testname}
+                ${PROJECT_NAME}
+                benchmark gtest gtest_main
+                ${CMAKE_THREAD_LIBS_INIT}
+            )
+            set_target_properties(litiv_utest_app_${testname}
+                PROPERTIES
+                    FOLDER "tests/${libname}"
+                    DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
+            )
+            set(utestbinname "litiv_utest_app_${testname}$<$<CONFIG:Debug>:${CMAKE_DEBUG_POSTFIX}>")
             add_test(
                 NAME
-                    litiv_perftest_${name}
+                    "litiv_utest_${testname}"
                 COMMAND
-                    "${CMAKE_BINARY_DIR}/bin/${perftestbinname}"
-                    "--benchmark_format=console"
-                    "--benchmark_out_format=console"
-                    "--benchmark_out=${CMAKE_BINARY_DIR}/Testing/${perftestbinname}.txt"
+                    "${CMAKE_BINARY_DIR}/bin/${utestbinname}"
+                    "--gtest_output=xml:${CMAKE_BINARY_DIR}/Testing/${utestbinname}.xml"
             )
-        endif()
+            add_executable(litiv_ptest_app_${testname} "${testfile}")
+            target_compile_definitions(litiv_ptest_app_${testname}
+                PUBLIC
+                    PERFTEST=1
+            )
+            target_link_libraries(litiv_ptest_app_${testname}
+                ${PROJECT_NAME}
+                gtest benchmark benchmark_main
+                ${CMAKE_THREAD_LIBS_INIT}
+            )
+            set_target_properties(litiv_ptest_app_${testname}
+                PROPERTIES
+                    FOLDER "tests/${libname}"
+                    DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
+            )
+            if(BUILD_TESTS_PERF)
+                set(ptestbinname "litiv_ptest_app_${testname}$<$<CONFIG:Debug>:${CMAKE_DEBUG_POSTFIX}>")
+                add_test(
+                    NAME
+                        "litiv_ptest_${testname}"
+                    COMMAND
+                        "${CMAKE_BINARY_DIR}/bin/${ptestbinname}"
+                        "--benchmark_format=console"
+                        "--benchmark_out_format=console"
+                        "--benchmark_out=${CMAKE_BINARY_DIR}/Testing/${ptestbinname}.txt"
+                )
+            endif()
+        endforeach()
     endif()
     install(
         TARGETS ${PROJECT_NAME}
@@ -195,7 +201,7 @@ macro(litiv_library name groupname canbeshared sourcelist headerlist)
 endmacro(litiv_library)
 
 macro(litiv_module name sourcelist headerlist)
-    litiv_library(${name} "module" true ${sourcelist} ${headerlist})
+    litiv_library(${name} "module" TRUE ${sourcelist} ${headerlist})
 endmacro(litiv_module)
 
 macro(litiv_3rdparty_module name sourcelist headerlist)
