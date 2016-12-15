@@ -68,16 +68,18 @@ if(USE_OPENGM_WITH_EXTLIB)
             "opengm-external"
         HINTS
             "${OpenGM_INCLUDE_DIR}/../lib/"
-            "${OpenGM_INCLUDE_DIR}/../lib64/"
             "${OpenGM_LIBRARY_DIR}"
             "${OpenGM_ROOT_DIR}/lib/"
             "${OpenGM_ROOT_DIR}/build/lib/"
             "${OpenGM_ROOT_DIR}/build/lib/Release/"
+            "${OpenGM_ROOT_DIR}/build/install/lib/"
             "$ENV{OPENGM_ROOT}/lib/"
             "$ENV{OPENGM_ROOT}/build/lib/"
             "$ENV{OPENGM_ROOT}/build/lib/Release/"
-            "$ENV{USER_DEVELOP}/opengm/build/Release/"
-            "$ENV{USER_DEVELOP}/vendor/opengm/build/Release/"
+            "$ENV{OPENGM_ROOT}/build/install/lib/"
+            "$ENV{USER_DEVELOP}/opengm/build/lib/"
+            "$ENV{USER_DEVELOP}/opengm/build/lib/Release/"
+            "$ENV{USER_DEVELOP}/opengm/build/install/lib/"
     )
     find_package_handle_standard_args(OpenGM
         REQUIRED_VARS
