@@ -9,6 +9,10 @@ Dockerfile
 .svn
 .hg
 
+# External configs #
+####################
+.travis.yml
+
 # Compiled source #
 ###################
 *.com
