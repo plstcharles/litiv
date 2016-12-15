@@ -31,5 +31,4 @@ install:
 script:
   - docker run -t ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT}
 after_success:
-  - if [ ! -z "$TRAVIS_TAG" ]; then docker tag ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT} ${DOCKER_HUB_REPO}:${TRAVIS_TAG}; fi
-  - docker push ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT}
+  - if [ ! -z "$TRAVIS_TAG" ]; then docker tag ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT} ${DOCKER_HUB_REPO}:${TRAVIS_TAG} && docker push ${DOCKER_HUB_REPO}:${TRAVIS_TAG}; fi
