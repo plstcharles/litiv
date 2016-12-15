@@ -23,7 +23,7 @@ TEST(cmp_zero_128i,regression) {
     for(size_t i=1; i<16; ++i) {
         uData.n[i-1] = 0;
         for(size_t j=0; j<8; ++j) {
-            uData.n[i] = 1<<j;
+            uData.n[i] = uint8_t(1ULL<<j);
             ASSERT_FALSE(lv::cmp_zero_128i(uData.a));
         }
     }
@@ -123,7 +123,7 @@ TEST(store1_8ui,regression) {
 
 TEST(store_8ui,regression) {
     for(size_t i=0; i<10; ++i) {
-        std::vector<uint8_t,lv::AlignedMemAllocator<uint8_t,16>> vData((1<<i)*size_t(16));
+        std::vector<uint8_t,lv::AlignedMemAllocator<uint8_t,16>> vData((1ULL<<i)*size_t(16));
         ASSERT_EQ(((uintptr_t)vData.data()%16),uintptr_t(0));
         for(uint8_t v=0; v<255; ++v) {
             lv::store_8ui((__m128i*)vData.data(),vData.size()/16,uint8_t(v));

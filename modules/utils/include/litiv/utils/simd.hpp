@@ -35,7 +35,7 @@ namespace lv {
 
     /// returns the (horizontal) sum of the provided unsigned byte array
     inline uint32_t hsum_8ui(const __m64& anBuffer) {
-        __m64 _anRes = _mm_sad_pu8(anBuffer,_mm_set1_pi8(int8_t(0)));
+        const __m64 _anRes = _mm_sad_pu8(anBuffer,_mm_set1_pi8(int8_t(0)));
         return uint32_t(_mm_cvtsi64_si32(_anRes));
     }
 
@@ -114,15 +114,14 @@ namespace lv {
 
 #if HAVE_SSE4_1
 
-    /// returns the maximum value of the provided 16-unsigned-byte array
-    inline uint8_t hmax_8ui(const __m128i& anBuffer) {
-        __m128i _anTmp = _mm_sub_epi8(_mm_set1_epi8(char(255)),anBuffer);
-        return uint8_t(int8_t(255)-_mm_cvtsi128_si32(_mm_minpos_epu16(_mm_min_epu8(_anTmp,_mm_srli_epi16(_anTmp,8)))));
-    }
-
     /// returns the minimum value of the provided 16-unsigned-byte array
     inline uint8_t hmin_8ui(const __m128i& anBuffer) {
         return uint8_t(_mm_cvtsi128_si32(_mm_minpos_epu16(_mm_min_epu8(anBuffer,_mm_srli_epi16(anBuffer,8)))));
+    }
+
+    /// returns the maximum value of the provided 16-unsigned-byte array
+    inline uint8_t hmax_8ui(const __m128i& anBuffer) {
+        return uint8_t(255)-lv::hmin_8ui(_mm_sub_epi8(_mm_set1_epi8(int8_t(-1)),anBuffer));
     }
 
     /// returns the maximum value of the provided signed integer array
