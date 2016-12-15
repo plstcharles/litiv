@@ -21,7 +21,6 @@ services:
   - docker
 env:
   - CMAKECFG_BUILD_SHARED_LIBS=ON
-  - CMAKECFG_BUILD_SHARED_LIBS=OFF
 before_install:
   - docker --version
   - docker login --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD
