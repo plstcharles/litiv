@@ -80,7 +80,7 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg) {
             // no slower than fill_n if fill_n is implemented with SSE
             static_assert(LBSP::DESC_SIZE_BITS==16,"all channels should already be 16-byte-aligned");
             lv::unroll<nChannels>([&](size_t nChIter){
-                lv::copy_16ub((__m128i*)(aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS),*(aanCurrImg+nChIter));
+                lv::store1_8ui((__m128i*)(aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS),*(aanCurrImg+nChIter));
             });
 #else //(!HAVE_SSE2)
             lv::unroll<nChannels>([&](size_t nChIter){
@@ -120,7 +120,7 @@ void EdgeDetectorLBSP::apply_internal_lookup(const cv::Mat& oInputImg) {
 #if HAVE_SSE2
                         static_assert(LBSP::DESC_SIZE_BITS==16,"all channels should already be 16-byte-aligned");
                         __m128i _anInputVals = _mm_load_si128((__m128i*)(aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS));
-                        size_t nLUTSum = (size_t)lv::hsum_16ub(_anInputVals);
+                        const size_t nLUTSum = (size_t)lv::hsum_8ui(_anInputVals);
 #else //(!HAVE_SSE2)
                         uchar* anCurrChLUT = aanCurrLUT+nChIter*LBSP::DESC_SIZE_BITS;
                         size_t nLUTSum = 0;
