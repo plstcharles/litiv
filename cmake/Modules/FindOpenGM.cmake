@@ -30,18 +30,7 @@ macro(_set_eval name)
     endif()
 endmacro(_set_eval)
 
-find_path(OpenGM_INCLUDE_DIR
-    NAMES
-        opengm/opengm.hxx
-    HINTS
-        "${OpenGM_ROOT_DIR}/include/"
-        "$ENV{OPENGM_ROOT}/include/"
-        "$ENV{USER_DEVELOP}/OpenGM/include/"
-        "$ENV{USER_DEVELOP}/vendor/OpenGM/include/"
-)
-
 include(FindPackageHandleStandardArgs)
-
 set(_supported_components gurobi cplex hdf5 ext)
 set(_opengm_gurobi_default OFF)
 set(_opengm_cplex_default OFF)
@@ -67,20 +56,36 @@ if(USE_OPENGM_WITH_EXTLIB)
         NAMES
             "opengm-external"
         HINTS
-            "${OpenGM_INCLUDE_DIR}/../lib/"
             "${OpenGM_LIBRARY_DIR}"
-            "${OpenGM_ROOT_DIR}/lib/"
-            "${OpenGM_ROOT_DIR}/build/lib/"
-            "${OpenGM_ROOT_DIR}/build/lib/Release/"
             "${OpenGM_ROOT_DIR}/build/install/lib/"
-            "$ENV{OPENGM_ROOT}/lib/"
-            "$ENV{OPENGM_ROOT}/build/lib/"
-            "$ENV{OPENGM_ROOT}/build/lib/Release/"
+            "${OpenGM_ROOT_DIR}/build/lib/Release/"
+            "${OpenGM_ROOT_DIR}/build/lib/"
+            "${OpenGM_ROOT_DIR}/lib/"
             "$ENV{OPENGM_ROOT}/build/install/lib/"
-            "$ENV{USER_DEVELOP}/opengm/build/lib/"
-            "$ENV{USER_DEVELOP}/opengm/build/lib/Release/"
+            "$ENV{OPENGM_ROOT}/build/lib/Release/"
+            "$ENV{OPENGM_ROOT}/build/lib/"
+            "$ENV{OPENGM_ROOT}/lib/"
             "$ENV{USER_DEVELOP}/opengm/build/install/lib/"
+            "$ENV{USER_DEVELOP}/opengm/build/lib/Release/"
+            "$ENV{USER_DEVELOP}/opengm/build/lib/"
     )
+    get_filename_component(OpenGM_LIBRARY_ROOT ${OpenGM_EXT_LIBRARY} DIRECTORY)
+    find_path(OpenGM_INCLUDE_DIR
+        NAMES
+            opengm/opengm.hxx
+        HINTS
+            "${OpenGM_LIBRARY_ROOT}/../include"
+            "${OpenGM_LIBRARY_DIR}/../include"
+            "${OpenGM_ROOT_DIR}/build/install/include/"
+            "${OpenGM_ROOT_DIR}/include/"
+            "$ENV{OPENGM_ROOT}/build/install/include/"
+            "$ENV{OPENGM_ROOT}/include/"
+            "$ENV{USER_DEVELOP}/opengm/build/install/include/"
+            "$ENV{USER_DEVELOP}/opengm/include/"
+    )
+    if(NOT OpenGM_EXT_LIBRARY)
+        set(OpenGM_INCLUDE_DIR "OpenGM_INCLUDE_DIR-NOTFOUND" CACHE PATH "Include directory where opengm/opengm.hxx can be found" FORCE)
+    endif()
     find_package_handle_standard_args(OpenGM
         REQUIRED_VARS
             OpenGM_INCLUDE_DIR
@@ -89,6 +94,17 @@ if(USE_OPENGM_WITH_EXTLIB)
     list(APPEND OpenGM_LIBRARIES OpenGM_EXT_LIBRARY)
 else()
     set(OpenGM_EXT_LIBRARY "")
+    find_path(OpenGM_INCLUDE_DIR
+        NAMES
+            opengm/opengm.hxx
+        HINTS
+            "${OpenGM_ROOT_DIR}/build/install/include/"
+            "${OpenGM_ROOT_DIR}/include/"
+            "$ENV{OPENGM_ROOT}/build/install/include/"
+            "$ENV{OPENGM_ROOT}/include/"
+            "$ENV{USER_DEVELOP}/opengm/build/install/include/"
+            "$ENV{USER_DEVELOP}/opengm/include/"
+    )
     find_package_handle_standard_args(OpenGM
         REQUIRED_VARS
             OpenGM_INCLUDE_DIR
