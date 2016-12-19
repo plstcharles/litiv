@@ -44,12 +44,12 @@ set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "Install path 
 # add hardcoded guesses for find_package here (caution: top level project is not defined yet!)
 list(APPEND CMAKE_PREFIX_PATH
     "$ENV{USER_DEVELOP}/cuda-litiv/" "$ENV{USER_DEVELOP}/cuda-latest/" "$ENV{USER_DEVELOP}/cuda/"
-    "$ENV{USER_DEVELOP}/opencv/build-litiv/install/" "$ENV{USER_DEVELOP}/opencv/build/" "$ENV{USER_DEVELOP}/opencv/"
-    "$ENV{USER_DEVELOP}/freeglut/build-litiv/install/" "$ENV{USER_DEVELOP}/freeglut/build/" "$ENV{USER_DEVELOP}/freeglut/"
-    "$ENV{USER_DEVELOP}/glfw/build-litiv/install/" "$ENV{USER_DEVELOP}/glfw/build/" "$ENV{USER_DEVELOP}/glfw/"
-    "$ENV{USER_DEVELOP}/glew/build-litiv/install/" "$ENV{USER_DEVELOP}/glew/build/" "$ENV{USER_DEVELOP}/glew/"
-    "$ENV{USER_DEVELOP}/glm/build-litiv/install/" "$ENV{USER_DEVELOP}/glm/build/" "$ENV{USER_DEVELOP}/glm/"
-    "$ENV{USER_DEVELOP}/opengm/build-litiv/install/" "$ENV{USER_DEVELOP}/opengm/build/" "$ENV{USER_DEVELOP}/opengm/"
+    "$ENV{USER_DEVELOP}/opencv/build-litiv/install/" "$ENV{USER_DEVELOP}/opencv/build/install/" "$ENV{USER_DEVELOP}/opencv/"
+    "$ENV{USER_DEVELOP}/freeglut/build-litiv/install/" "$ENV{USER_DEVELOP}/freeglut/build/install/" "$ENV{USER_DEVELOP}/freeglut/"
+    "$ENV{USER_DEVELOP}/glfw/build-litiv/install/" "$ENV{USER_DEVELOP}/glfw/build/install/" "$ENV{USER_DEVELOP}/glfw/"
+    "$ENV{USER_DEVELOP}/glew/build-litiv/install/" "$ENV{USER_DEVELOP}/glew/build/install/" "$ENV{USER_DEVELOP}/glew/"
+    "$ENV{USER_DEVELOP}/glm/build-litiv/install/" "$ENV{USER_DEVELOP}/glm/build/install/" "$ENV{USER_DEVELOP}/glm/"
+    "$ENV{USER_DEVELOP}/opengm/build-litiv/install/" "$ENV{USER_DEVELOP}/opengm/build/install/" "$ENV{USER_DEVELOP}/opengm/"
 )
 
 ################################################################
