@@ -15,8 +15,12 @@ TEST(filesystem_ops,regression) {
     ASSERT_TRUE(lv::createDirIfNotExist(sDirPath+"subdir1"));
     ASSERT_TRUE(lv::createDirIfNotExist(sDirPath+"subdir2/"));
     ASSERT_TRUE(lv::createDirIfNotExist(sDirPath+"subdir2/subdir3"));
+    ASSERT_TRUE(lv::checkIfExists(sDirPath+"subdir2/subdir3"));
+    ASSERT_FALSE(lv::checkIfExists(sDirPath+"subdir2/subdir4"));
     std::fstream oTestFile(sDirPath+"test1.txt",std::ios::out);
     ASSERT_TRUE(oTestFile.is_open());
+    ASSERT_TRUE(lv::checkIfExists(sDirPath+"test1.txt"));
+    ASSERT_FALSE(lv::checkIfExists(sDirPath+"test2.txt"));
     oTestFile << "test" << std::endl;
     oTestFile.close();
     oTestFile = lv::createBinFileWithPrealloc(sDirPath+"test2.bin",1024);
