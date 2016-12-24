@@ -184,10 +184,20 @@ void lv::filterFilePaths(std::vector<std::string>& vsFilePaths, const std::vecto
     vsFilePaths = vsResultFilePaths;
 }
 
+bool lv::checkIfExists(const std::string& sPath) {
+#if defined(_MSC_VER)
+    const std::wstring swPath(sPath.begin(),sPath.end());
+    return (GetFileAttributes(swPath.c_str())!=INVALID_FILE_ATTRIBUTES);
+#else //(!defined(_MSC_VER))
+    struct stat st;
+    return stat(sPath.c_str(),&st)==0;
+#endif //(!defined(_MSC_VER))
+}
+
 bool lv::createDirIfNotExist(const std::string& sDirPath) {
 #if defined(_MSC_VER)
-    std::wstring dir(sDirPath.begin(),sDirPath.end());
-    return CreateDirectory(dir.c_str(),NULL)!=ERROR_PATH_NOT_FOUND;
+    std::wstring swDirPath(sDirPath.begin(),sDirPath.end());
+    return CreateDirectory(swDirPath.c_str(),NULL)!=ERROR_PATH_NOT_FOUND;
 #else //(!defined(_MSC_VER))
     struct stat st;
     if(stat(sDirPath.c_str(),&st)==-1)

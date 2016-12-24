@@ -31,6 +31,8 @@ namespace lv {
     std::vector<std::string> getSubDirsFromDir(const std::string& sDirPath);
     /// filters a list of paths using string tokens; if a token is found in a path, it is removed/kept from the list
     void filterFilePaths(std::vector<std::string>& vsFilePaths, const std::vector<std::string>& vsRemoveTokens, const std::vector<std::string>& vsKeepTokens);
+    /// returns whether a local file or directory already exists
+    bool checkIfExists(const std::string& sPath);
     /// creates a local directory at the given path if one does not already exist (does not work recursively)
     bool createDirIfNotExist(const std::string& sDirPath);
     /// creates a binary file at the specified location, and fills it with unspecified/zero data bytes (useful for critical/real-time stream writing without continuous reallocation)
