@@ -110,6 +110,51 @@ TYPED_TEST(cvunique_fixture,regression) {
 
 namespace {
     template<typename T>
+    struct isEqual_fixture : testing::Test {};
+    typedef testing::Types<char,short,int,float> isUnique_types;
+}
+
+TYPED_TEST_CASE(isEqual_fixture,isUnique_types);
+TYPED_TEST(isEqual_fixture,regression_mdims) {
+    cv::Mat_<TypeParam> a,b;
+    EXPECT_TRUE(cv::isEqual(a,b));
+    cv::RNG rng((unsigned int)time(NULL));
+    for(size_t i=0; i<1000; ++i) {
+        const int nDims = rand()%4+2;
+        std::vector<int> vnDims(nDims);
+        for(int n=0; n<nDims; ++n)
+            vnDims[n] = rand()%10+1;
+        a.create(nDims,vnDims.data());
+        rng.fill(a,cv::RNG::UNIFORM,-200,200,true);
+        b = a.clone();
+        ASSERT_TRUE(cv::isEqual(a,b));
+        TypeParam& oVal = *(((TypeParam*)(b.data))+rand()%b.total());
+        oVal += TypeParam(1);
+        ASSERT_FALSE(cv::isEqual(a,b));
+    }
+}
+
+TEST(isEqual,regression_mchannels) {
+    cv::Mat a,b;
+    EXPECT_TRUE(cv::isEqual(a,b));
+    cv::RNG rng((unsigned int)time(NULL));
+    for(size_t i=0; i<1000; ++i) {
+        const int nDims = rand()%4+2;
+        std::vector<int> vnDims(nDims);
+        for(int n=0; n<nDims; ++n)
+            vnDims[n] = rand()%10+1;
+        a.create(nDims,vnDims.data(),CV_8UC3);
+        rng.fill(a,cv::RNG::UNIFORM,-200,200,true);
+        b = a.clone();
+        ASSERT_TRUE(cv::isEqual(a,b));
+        char& oVal = *(((char*)(b.data))+rand()%b.total());
+        oVal += char(1);
+        ASSERT_FALSE(cv::isEqual(a,b));
+    }
+}
+
+namespace {
+    template<typename T>
     struct readwrite_fixture : testing::Test {};
     typedef testing::Types<char, short, int, uint8_t, uint16_t, float, double> readwrite_types;
 }

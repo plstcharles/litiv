@@ -157,6 +157,27 @@ namespace cv { // extending cv
         return std::vector<T>(mMap.begin(),mMap.end());
     }
 
+    /// returns whether the two matrices are equal or not
+    inline bool isEqual(const cv::Mat& a, const cv::Mat& b) {
+        if(a.empty() && b.empty())
+            return true;
+        if(a.dims!=b.dims)
+            return false;
+        if(a.dims==2) {
+            if(a.type()!=b.type())
+                return false;
+            if(a.size()!=b.size())
+                return false;
+        }
+        else {
+            for(int n=0; n<a.dims; ++n)
+                if(a.size[0]!=b.size[0])
+                    return false;
+        }
+        lvDbgAssert(a.total()*a.elemSize()==b.total()*b.elemSize());
+        return std::equal(a.datastart,a.dataend,b.datastart);
+    }
+
     /// helper struct for image display & callback management (must be created via DisplayHelper::create due to enable_shared_from_this interface)
     struct DisplayHelper : lv::enable_shared_from_this<DisplayHelper> {
         /// displayed window title (specified on creation)
