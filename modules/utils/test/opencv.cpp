@@ -128,9 +128,11 @@ TYPED_TEST(isEqual_fixture,regression_mdims) {
         rng.fill(a,cv::RNG::UNIFORM,-200,200,true);
         b = a.clone();
         ASSERT_TRUE(cv::isEqual(a,b));
+        ASSERT_TRUE(cv::isEqual<TypeParam>(a,b));
         TypeParam& oVal = *(((TypeParam*)(b.data))+rand()%b.total());
         oVal += TypeParam(1);
         ASSERT_FALSE(cv::isEqual(a,b));
+        ASSERT_FALSE(cv::isEqual<TypeParam>(a,b));
     }
 }
 

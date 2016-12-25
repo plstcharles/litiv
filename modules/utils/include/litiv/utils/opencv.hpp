@@ -158,6 +158,7 @@ namespace cv { // extending cv
     }
 
     /// returns whether the two matrices are equal or not
+    template<typename T=uchar>
     inline bool isEqual(const cv::Mat& a, const cv::Mat& b) {
         if(a.empty() && b.empty())
             return true;
@@ -175,7 +176,7 @@ namespace cv { // extending cv
                     return false;
         }
         lvDbgAssert(a.total()*a.elemSize()==b.total()*b.elemSize());
-        return std::equal(a.datastart,a.dataend,b.datastart);
+        return std::equal((T*)a.datastart,(T*)a.dataend,(T*)b.datastart);
     }
 
     /// helper struct for image display & callback management (must be created via DisplayHelper::create due to enable_shared_from_this interface)
