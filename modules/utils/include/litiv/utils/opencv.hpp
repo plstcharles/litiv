@@ -134,6 +134,41 @@ namespace cv { // extending cv
         cv::putText(oImg,sText,cv::Point(oOffset.x,bBottom?(oImg.rows-oOffset.y):oOffset.y),cv::FONT_HERSHEY_PLAIN,dScale,vColor,nThickness,cv::LINE_AA);
     }
 
+    /// prints the content of a matrix to the given stream with constant output element size
+    template<typename T>
+    inline void printMatrix(const cv::Mat_<T>& oMat, std::ostream& os=std::cout) {
+        lvAssert_(oMat.dims==2,"function currently only defined for 2d mats; split dims and call for 2d slices");
+        if(oMat.empty() || oMat.size().area()==0) {
+            os << "   <empty>" << std::endl;
+            return;
+        }
+        const size_t nMaxMetaColWidth = (size_t)std::max(lv::digit_count(oMat.cols),lv::digit_count(oMat.rows));
+        double dMin,dMax;
+        cv::minMaxIdx(oMat,&dMin,&dMax);
+        const T tMin = (T)dMin;
+        const T tMax = (T)dMax;
+        constexpr bool bIsFloat = !std::is_integral<T>::value;
+        using PrintType = std::conditional_t<bIsFloat,float,int64_t>;
+        const bool bIsNormalized = tMax<=T(1) && tMin>=T(0); // useful for floats only
+        const bool bHasNegative = int64_t(tMin)<int64_t(0);
+        const size_t nMaxColWidth = size_t(bIsFloat?(bIsNormalized?4:(std::max(lv::digit_count((int64_t)tMin),lv::digit_count((int64_t)tMax))+4+int(bHasNegative!=0))):(std::max(lv::digit_count(tMin),lv::digit_count(tMax))+int(bHasNegative!=0)));
+        const std::string sFormat = bIsFloat?(bIsNormalized?(std::string("%1.")+std::to_string(nMaxColWidth-1)+"f"):((bHasNegative?std::string("%+"):std::string("%"))+std::to_string(nMaxColWidth-4)+std::string(".4f"))):((bHasNegative?std::string("%+"):std::string("%"))+std::to_string(nMaxColWidth)+std::string(PRId64));
+        const std::string sMetaFormat = std::string("%")+std::to_string(nMaxMetaColWidth)+"i";
+        const std::string sSpacer = "  ";
+        const auto lPrinter = [&](const T& v) {os << sSpacer << lv::putf(sFormat.c_str(),(PrintType)v);};
+        os << std::endl << std::string("   ")+std::string(nMaxMetaColWidth,' ')+std::string("x=");
+        for(int nColIdx=0; nColIdx<oMat.cols; ++nColIdx)
+            os << sSpacer << lv::clampString(lv::putf(sMetaFormat.c_str(),nColIdx),nMaxColWidth);
+        os << std::endl << std::endl;
+        for(int nRowIdx=0; nRowIdx<oMat.rows; ++nRowIdx) {
+            os << " y=" << lv::putf(sMetaFormat.c_str(),nRowIdx) << sSpacer;
+            for(int nColIdx=0; nColIdx<oMat.cols; ++nColIdx)
+                lPrinter(oMat.at<T>(nRowIdx,nColIdx));
+            os << std::endl;
+        }
+        os << std::endl;
+    }
+
     /// removes all keypoints from voKPs which fall on null values (or outside the bounds) of oROI
     inline void validateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoint>& voKPs) {
         if(oROI.empty())
