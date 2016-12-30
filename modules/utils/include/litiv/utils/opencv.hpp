@@ -214,6 +214,57 @@ namespace cv { // extending cv
         return std::equal((T*)a.datastart,(T*)a.dataend,(T*)b.datastart);
     }
 
+    /// converts a single HSL triplet (0-360 hue, 0-1 sat & lightness) into an 8-bit RGB triplet
+    inline cv::Vec3b getBGRFromHSL(float fHue, float fSaturation, float fLightness) {
+        // this function is not intended for fast conversions; use OpenCV's cvtColor for large-scale stuff
+        lvDbgAssert_(fHue>=0.0f && fHue<360.0f,"bad input hue range");
+        lvDbgAssert_(fSaturation>=0.0f && fSaturation<=1.0f,"bad input saturation range");
+        lvDbgAssert_(fLightness>=0.0f && fLightness<=1.0f,"bad input lightness range");
+        if(fSaturation==0.0f)
+            return cv::Vec3b::all(cv::saturate_cast<uchar>(std::round(fLightness*255)));
+        if(fLightness==0.0f)
+            return cv::Vec3b::all(0);
+        if(fLightness==1.0f)
+            return cv::Vec3b::all(255);
+        const auto lH2RGB = [&](float p, float q, float t) {
+            if(t<0.0f)
+                t += 1;
+            if(t>1.0f)
+                t -= 1;
+            if(t<1.0f/6)
+                return p + (q - p) * 6.0f * t;
+            if(t<1.0f/2)
+                return q;
+            if(t<2.0f/3)
+                return p + (q - p) * (2.0f/3 - t) * 6.0f;
+            return p;
+        };
+        const float q = (fLightness<0.5f)?fLightness*(1+fSaturation):fLightness+fSaturation-fLightness*fSaturation;
+        const float p = 2.0f*fLightness-q;
+        const float h = fHue/360.0f;
+        return cv::Vec3b(cv::saturate_cast<uchar>(std::round(lH2RGB(p,q,h-1.0f/3)*255)),cv::saturate_cast<uchar>(std::round(lH2RGB(p,q,h)*255)),cv::saturate_cast<uchar>(std::round(lH2RGB(p,q,h+1.0f/3)*255)));
+    }
+
+    /// converts a single HSL triplet (0-360 hue, 0-1 sat & lightness) into an 8-bit RGB triplet
+    inline cv::Vec3b getBGRFromHSL(const cv::Vec3f& vHSL) {
+        return getBGRFromHSL(vHSL[0],vHSL[1],vHSL[2]);
+    }
+
+    /// converts a single 8-bit RGB triplet into an HSL triplet (0-360 hue, 0-1 sat & lightness)
+    inline cv::Vec3f getHSLFromBGR(const cv::Vec3b& vBGR) {
+        // this function is not intended for fast conversions; use OpenCV's cvtColor for large-scale stuff
+        const float r = vBGR[2]/255.0f, g=vBGR[1]/255.0f, b=vBGR[0]/255.0f;
+        const float fMaxChroma = std::max(r,std::max(g,b));
+        const float fMinChroma = std::min(r,std::min(g,b));
+        const float fLightness = (fMaxChroma+fMinChroma)/2.0f;
+        if(fMaxChroma==fMinChroma)
+            return cv::Vec3f(0.0f,0.0f,fLightness);
+        const float fDiffChroma = fMaxChroma-fMinChroma;
+        const float fSaturation = std::max(0.0f,std::min(fDiffChroma/(1.0f-std::abs(2.0f*fLightness-1.0f)),1.0f));
+        const float fHue = (fMaxChroma==r?(((g-b)/fDiffChroma)+(g<b?6.0f:0.0f)):(fMaxChroma==g?((b-r)/fDiffChroma+2.0f):(r-g)/fDiffChroma+4.0f))*60.0f;
+        return cv::Vec3f(fHue,fSaturation,fLightness);
+    }
+
     /// helper struct for image display & callback management (must be created via DisplayHelper::create due to enable_shared_from_this interface)
     struct DisplayHelper : lv::enable_shared_from_this<DisplayHelper> {
         /// displayed window title (specified on creation)

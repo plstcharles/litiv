@@ -155,6 +155,93 @@ TEST(isEqual,regression_mchannels) {
     }
 }
 
+TEST(cvtcolor,hsl2bgr) {
+    {
+        const cv::Vec3b& vBGR1 = cv::getBGRFromHSL(0.0f,0.0f,0.0f);
+        EXPECT_EQ(vBGR1[0],uchar(0));
+        EXPECT_EQ(vBGR1[1],uchar(0));
+        EXPECT_EQ(vBGR1[2],uchar(0));
+        const cv::Vec3b& vBGR2 = cv::getBGRFromHSL(127.0f,0.0f,0.0f);
+        EXPECT_EQ(vBGR1,vBGR2);
+    }
+    {
+        const cv::Vec3b& vBGR1 = cv::getBGRFromHSL(0.0f,1.0f,1.0f);
+        EXPECT_EQ(vBGR1[0],uchar(255));
+        EXPECT_EQ(vBGR1[1],uchar(255));
+        EXPECT_EQ(vBGR1[2],uchar(255));
+        const cv::Vec3b& vBGR2 = cv::getBGRFromHSL(278.0f,1.0f,1.0f);
+        EXPECT_EQ(vBGR1,vBGR2);
+    }
+    {
+        const cv::Vec3b& vBGR = cv::getBGRFromHSL(0.0f,0.0f,0.5f);
+        EXPECT_EQ(vBGR[0],uchar(128));
+        EXPECT_EQ(vBGR[1],uchar(128));
+        EXPECT_EQ(vBGR[2],uchar(128));
+    }
+    {
+        const cv::Vec3b& vBGR = cv::getBGRFromHSL(0.0f,1.0f,0.5f);
+        EXPECT_EQ(vBGR[0],uchar(0));
+        EXPECT_EQ(vBGR[1],uchar(0));
+        EXPECT_EQ(vBGR[2],uchar(255));
+    }
+    {
+        const cv::Vec3b& vBGR = cv::getBGRFromHSL(120.0f,1.0f,0.5f);
+        EXPECT_EQ(vBGR[0],uchar(0));
+        EXPECT_EQ(vBGR[1],uchar(255));
+        EXPECT_EQ(vBGR[2],uchar(0));
+    }
+    {
+        const cv::Vec3b& vBGR = cv::getBGRFromHSL(240.0f,1.0f,0.5f);
+        EXPECT_EQ(vBGR[0],uchar(255));
+        EXPECT_EQ(vBGR[1],uchar(0));
+        EXPECT_EQ(vBGR[2],uchar(0));
+    }
+}
+
+TEST(cvtcolor,bgr2hsl) {
+    {
+        const cv::Vec3f& vHSL = cv::getHSLFromBGR(cv::Vec3b(0,0,0));
+        EXPECT_FLOAT_EQ(vHSL[2],0.0f);
+    }
+    {
+        const cv::Vec3f& vHSL = cv::getHSLFromBGR(cv::Vec3b(255,255,255));
+        EXPECT_FLOAT_EQ(vHSL[2],1.0f);
+    }
+    {
+        const cv::Vec3f& vHSL = cv::getHSLFromBGR(cv::Vec3b(128,128,128));
+        EXPECT_FLOAT_EQ(vHSL[1],0.0f);
+        EXPECT_NEAR(vHSL[2],0.5f,1.0f/255);
+    }
+    {
+        const cv::Vec3f& vHSL = cv::getHSLFromBGR(cv::Vec3b(0,0,255));
+        EXPECT_FLOAT_EQ(vHSL[0],0.0f);
+        EXPECT_FLOAT_EQ(vHSL[1],1.0f);
+        EXPECT_FLOAT_EQ(vHSL[2],0.5f);
+    }
+    {
+        const cv::Vec3f& vHSL = cv::getHSLFromBGR(cv::Vec3b(0,255,0));
+        EXPECT_FLOAT_EQ(vHSL[0],120.0f);
+        EXPECT_FLOAT_EQ(vHSL[1],1.0f);
+        EXPECT_FLOAT_EQ(vHSL[2],0.5f);
+    }
+    {
+        const cv::Vec3f& vHSL = cv::getHSLFromBGR(cv::Vec3b(255,0,0));
+        EXPECT_FLOAT_EQ(vHSL[0],240.0f);
+        EXPECT_FLOAT_EQ(vHSL[1],1.0f);
+        EXPECT_FLOAT_EQ(vHSL[2],0.5f);
+    }
+}
+
+TEST(cvtcolor,bgr2hsl2bgr) {
+    srand(time(NULL));
+    for(size_t i=0; i<10000; ++i) {
+        const cv::Vec3b vBGR = cv::Vec3b(uchar(rand()%256),uchar(rand()%256),uchar(rand()%256));
+        const cv::Vec3f vHSL = cv::getHSLFromBGR(vBGR);
+        const cv::Vec3f test = cv::Vec3f((vHSL[0]/360.0f)*255.0f,vHSL[1]*255.0f,vHSL[2]*255.0f);
+        ASSERT_EQ(vBGR,cv::getBGRFromHSL(cv::getHSLFromBGR(vBGR))) << " @ " << i << "/10000";
+    }
+}
+
 namespace {
     template<typename T>
     struct readwrite_fixture : testing::Test {};
