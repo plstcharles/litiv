@@ -233,7 +233,7 @@ TEST(cvtcolor,bgr2hsl) {
 }
 
 TEST(cvtcolor,bgr2hsl2bgr) {
-    srand(time(NULL));
+    srand((uint)time((time_t*)nullptr));
     for(size_t i=0; i<10000; ++i) {
         const cv::Vec3b vBGR = cv::Vec3b(uchar(rand()%256),uchar(rand()%256),uchar(rand()%256));
         const cv::Vec3f vHSL = cv::getHSLFromBGR(vBGR);

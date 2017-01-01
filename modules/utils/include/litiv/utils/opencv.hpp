@@ -267,7 +267,7 @@ namespace cv { // extending cv
 
     /// returns a 8uc3 color map such that all equal values in the given matrix are assigned the same unique color in the map
     template<typename T>
-    inline cv::Mat getUniqueColorMap(const cv::Mat_<T>& m, std::vector<std::pair<T,cv::Vec3f>>* pvPairs=nullptr) {
+    inline cv::Mat getUniqueColorMap(const cv::Mat_<T>& m, std::map<T,cv::Vec3b>* pmColorMap=nullptr) {
         static_assert(std::is_integral<T>::value,"function only defined for integer maps");
         lvAssert_(m.dims==2,"function currently only defined for 2d mats; split dims and call for 2d slices");
         if(m.empty())
@@ -284,7 +284,7 @@ namespace cv { // extending cv
         std::vector<cv::Vec3b> vColors(nColors);
         size_t nColorIdx = 0;
         for(size_t nDivIdx=0; nDivIdx<nDivs && nColorIdx<nColors; ++nDivIdx) {
-            const size_t nSampleCount = std::min(std::max(nColors/(1<<(nDivIdx+1)),(360/nMaxAng)-1),nColors-nColorIdx);
+            const size_t nSampleCount = std::min(std::max(nColors/(size_t(1)<<(nDivIdx+1)),(360/nMaxAng)-1),nColors-nColorIdx);
             const float fCurrSat = 1.0f; //const float fCurrSat = fMaxSat-((fMaxSat-fMinSat)/nDivs)*nDivIdx;
             const float fCurrLight = fAvgLight + int(nDivIdx>0)*(((nDivIdx%2)?-fVarLight:fVarLight)/((std::max(nDivIdx,size_t(1))+1)/2));
             std::unordered_set<ushort> mDivAngSet;
@@ -306,7 +306,9 @@ namespace cv { // extending cv
             mColorMap[vUniques[nColorIdx]] = vColors[nColorIdx];
         cv::Mat oOutputMap(m.size(),CV_8UC3);
         for(size_t nElemIdx=0; nElemIdx<m.total(); ++nElemIdx)
-            oOutputMap.at<cv::Vec3b>(nElemIdx) = mColorMap[m(nElemIdx)];
+            oOutputMap.at<cv::Vec3b>((int)nElemIdx) = mColorMap[m((int)nElemIdx)];
+        if(pmColorMap)
+            std::swap(*pmColorMap,mColorMap);
         return oOutputMap;
     }
 
