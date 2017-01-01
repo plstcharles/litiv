@@ -163,7 +163,7 @@ namespace cv { // extending cv
         for(int nRowIdx=0; nRowIdx<oMat.rows; ++nRowIdx) {
             os << " y=" << lv::putf(sMetaFormat.c_str(),nRowIdx) << sSpacer;
             for(int nColIdx=0; nColIdx<oMat.cols; ++nColIdx)
-                lPrinter(oMat.at<T>(nRowIdx,nColIdx));
+                lPrinter(oMat.template at<T>(nRowIdx,nColIdx));
             os << std::endl;
         }
         os << std::endl;
@@ -217,9 +217,9 @@ namespace cv { // extending cv
     /// converts a single HSL triplet (0-360 hue, 0-1 sat & lightness) into an 8-bit RGB triplet
     inline cv::Vec3b getBGRFromHSL(float fHue, float fSaturation, float fLightness) {
         // this function is not intended for fast conversions; use OpenCV's cvtColor for large-scale stuff
-        lvDbgAssert_(fHue>=0.0f && fHue<360.0f,"bad input hue range");
-        lvDbgAssert_(fSaturation>=0.0f && fSaturation<=1.0f,"bad input saturation range");
-        lvDbgAssert_(fLightness>=0.0f && fLightness<=1.0f,"bad input lightness range");
+        lvDbgAssert__(fHue>=0.0f && fHue<360.0f,"bad input hue range (fHue=%f)",fHue);
+        lvDbgAssert__(fSaturation>=0.0f && fSaturation<=1.0f,"bad input saturation range (fSaturation=%f)",fSaturation);
+        lvDbgAssert__(fLightness>=0.0f && fLightness<=1.0f,"bad input lightness range (fLightness=%f)",fLightness);
         if(fSaturation==0.0f)
             return cv::Vec3b::all(cv::saturate_cast<uchar>(std::round(fLightness*255)));
         if(fLightness==0.0f)
