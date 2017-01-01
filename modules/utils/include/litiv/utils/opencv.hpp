@@ -265,6 +265,51 @@ namespace cv { // extending cv
         return cv::Vec3f(fHue,fSaturation,fLightness);
     }
 
+    /// returns a 8uc3 color map such that all equal values in the given matrix are assigned the same unique color in the map
+    template<typename T>
+    inline cv::Mat getUniqueColorMap(const cv::Mat_<T>& m, std::vector<std::pair<T,cv::Vec3f>>* pvPairs=nullptr) {
+        static_assert(std::is_integral<T>::value,"function only defined for integer maps");
+        lvAssert_(m.dims==2,"function currently only defined for 2d mats; split dims and call for 2d slices");
+        if(m.empty())
+            return cv::Mat();
+        const std::vector<T> vUniques = cv::unique(m);
+        const size_t nColors = vUniques.size();
+        if(nColors<=1)
+            return cv::Mat(m.size(),CV_8UC3,cv::Scalar::all(255));
+        lvAssert_(nColors<720,"too many uniques for internal multi-slice HSL model");
+        const size_t nMaxAng = 45;
+        //const float fMinSat = 0.33f, fMaxSat = 1.0f;
+        const float fAvgLight = 0.50f, fVarLight = 0.25f;
+        const size_t nDivs = size_t(std::ceil(std::log2(nColors)));
+        std::vector<cv::Vec3b> vColors(nColors);
+        size_t nColorIdx = 0;
+        for(size_t nDivIdx=0; nDivIdx<nDivs && nColorIdx<nColors; ++nDivIdx) {
+            const size_t nSampleCount = std::min(std::max(nColors/(1<<(nDivIdx+1)),(360/nMaxAng)-1),nColors-nColorIdx);
+            const float fCurrSat = 1.0f; //const float fCurrSat = fMaxSat-((fMaxSat-fMinSat)/nDivs)*nDivIdx;
+            const float fCurrLight = fAvgLight + int(nDivIdx>0)*(((nDivIdx%2)?-fVarLight:fVarLight)/((std::max(nDivIdx,size_t(1))+1)/2));
+            std::unordered_set<ushort> mDivAngSet;
+            ushort nCurrAng = ushort(rand())%nMaxAng;
+            for(size_t nSampleIdx=0; nSampleIdx<nSampleCount; ++nSampleIdx) {
+                lvDbgAssert(mDivAngSet.size()<360);
+                while(mDivAngSet.count(nCurrAng))
+                    ++nCurrAng %= 360;
+                mDivAngSet.insert(nCurrAng);
+                vColors[nColorIdx++] = cv::getBGRFromHSL(float(nCurrAng),fCurrSat,fCurrLight);
+                nCurrAng = (nCurrAng+360/nSampleCount)%360;
+            }
+        }
+        std::random_device oRandDev;
+        std::default_random_engine oRandEng(oRandDev());
+        std::shuffle(vColors.begin(),vColors.end(),oRandEng);
+        std::map<T,cv::Vec3b> mColorMap;
+        for(nColorIdx=0; nColorIdx<nColors; ++nColorIdx)
+            mColorMap[vUniques[nColorIdx]] = vColors[nColorIdx];
+        cv::Mat oOutputMap(m.size(),CV_8UC3);
+        for(size_t nElemIdx=0; nElemIdx<m.total(); ++nElemIdx)
+            oOutputMap.at<cv::Vec3b>(nElemIdx) = mColorMap[m(nElemIdx)];
+        return oOutputMap;
+    }
+
     /// helper struct for image display & callback management (must be created via DisplayHelper::create due to enable_shared_from_this interface)
     struct DisplayHelper : lv::enable_shared_from_this<DisplayHelper> {
         /// displayed window title (specified on creation)
