@@ -193,51 +193,41 @@ namespace cv { // extending cv
     }
 
     /// returns whether the two matrices are equal or not
-    template<typename T=uchar>
+    template<typename T>
     inline bool isEqual(const cv::Mat& a, const cv::Mat& b) {
         if(a.empty() && b.empty())
             return true;
-        if(a.dims!=b.dims)
+        if(a.dims!=b.dims || a.size!=b.size || a.type()!=b.type())
             return false;
-        if(a.dims==2) {
-            if(a.type()!=b.type())
-                return false;
-            if(a.size()!=b.size())
-                return false;
-        }
-        else {
-            for(int n=0; n<a.dims; ++n)
-                if(a.size[0]!=b.size[0])
-                    return false;
-        }
         lvDbgAssert(a.total()*a.elemSize()==b.total()*b.elemSize());
-        return std::equal((T*)a.datastart,(T*)a.dataend,(T*)b.datastart);
+        if(a.isContinuous() && b.isContinuous())
+            return std::equal((T*)a.data,(T*)(a.data+a.total()*a.elemSize()),(T*)b.data);
+        else {
+            for(size_t nElemIdx=0; nElemIdx<a.total(); ++nElemIdx)
+                if(a.at<T>(int(nElemIdx))!=b.at<T>(int(nElemIdx)))
+                    return false;
+            return true;
+        }
     }
 
-    /// returns whether the two matrices are nearly equal or not, given epsilon (maximum allowed error)
+    /// returns whether the two matrices are nearly equal or not, given a maximum allowed error
     template<typename T>
-    inline bool isNearlyEqual(const cv::Mat_<T>& a, const cv::Mat_<T>& b, T eps) {
+    inline bool isNearlyEqual(const cv::Mat& a, const cv::Mat& b, T eps) {
         if(a.empty() && b.empty())
             return true;
-        if(a.dims!=b.dims)
+        if(a.dims!=b.dims || a.size!=b.size || a.type()!=b.type())
             return false;
-        if(a.dims==2) {
-            if(a.type()!=b.type())
-                return false;
-            if(a.size()!=b.size())
-                return false;
-        }
-        else {
-            for(int n=0; n<a.dims; ++n)
-                if(a.size[0]!=b.size[0])
-                    return false;
-        }
         lvDbgAssert(a.total()*a.elemSize()==b.total()*b.elemSize());
-        return std::equal((T*)a.datastart,(T*)a.dataend,(T*)b.datastart,[&eps](const T& _a, const T& _b){
-            if(!(std::abs(double(_a)-double(_b))<double(eps)))
-                int i =1;
-            return std::abs(double(_a)-double(_b))<double(eps);
-        });
+        if(a.isContinuous() && b.isContinuous())
+            return std::equal((T*)a.data,(T*)(a.data+a.total()*a.elemSize()),(T*)b.data,[&eps](const T& _a, const T& _b){
+                return std::abs(double(_a)-double(_b))<=double(eps);
+            });
+        else {
+            for(size_t nElemIdx=0; nElemIdx<a.total(); ++nElemIdx)
+                if(std::abs(double(a.at<T>(int(nElemIdx)))-double(b.at<T>(int(nElemIdx))))>double(eps))
+                    return false;
+            return true;
+        }
     }
 
     /// converts a single HSL triplet (0-360 hue, 0-1 sat & lightness) into an 8-bit RGB triplet

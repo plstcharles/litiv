@@ -117,7 +117,7 @@ namespace {
 TYPED_TEST_CASE(isEqual_fixture,isUnique_types);
 TYPED_TEST(isEqual_fixture,regression_mdims) {
     cv::Mat_<TypeParam> a,b;
-    EXPECT_TRUE(cv::isEqual(a,b));
+    EXPECT_TRUE(cv::isEqual<TypeParam>(a,b));
     cv::RNG rng((unsigned int)time(NULL));
     for(size_t i=0; i<1000; ++i) {
         const int nDims = rand()%4+2;
@@ -127,18 +127,17 @@ TYPED_TEST(isEqual_fixture,regression_mdims) {
         a.create(nDims,vnDims.data());
         rng.fill(a,cv::RNG::UNIFORM,-200,200,true);
         b = a.clone();
-        ASSERT_TRUE(cv::isEqual(a,b));
         ASSERT_TRUE(cv::isEqual<TypeParam>(a,b));
         TypeParam& oVal = *(((TypeParam*)(b.data))+rand()%b.total());
         oVal += TypeParam(1);
-        ASSERT_FALSE(cv::isEqual(a,b));
         ASSERT_FALSE(cv::isEqual<TypeParam>(a,b));
     }
 }
 
 TEST(isEqual,regression_mchannels) {
     cv::Mat a,b;
-    EXPECT_TRUE(cv::isEqual(a,b));
+    EXPECT_TRUE(cv::isEqual<uchar>(a,b));
+    EXPECT_TRUE(cv::isEqual<float>(a,b));
     cv::RNG rng((unsigned int)time(NULL));
     for(size_t i=0; i<1000; ++i) {
         const int nDims = rand()%4+2;
@@ -148,10 +147,10 @@ TEST(isEqual,regression_mchannels) {
         a.create(nDims,vnDims.data(),CV_8UC3);
         rng.fill(a,cv::RNG::UNIFORM,-200,200,true);
         b = a.clone();
-        ASSERT_TRUE(cv::isEqual(a,b));
+        ASSERT_TRUE(cv::isEqual<cv::Vec3b>(a,b));
         char& oVal = *(((char*)(b.data))+rand()%b.total());
         oVal += char(1);
-        ASSERT_FALSE(cv::isEqual(a,b));
+        ASSERT_FALSE(cv::isEqual<cv::Vec3b>(a,b));
     }
 }
 
