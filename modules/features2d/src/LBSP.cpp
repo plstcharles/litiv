@@ -186,6 +186,7 @@ void LBSP::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMask, std::
     cv::Mat oDescriptors = _oDescriptors.getMat();
     if(!bUseProvidedKeypoints) {
         voKeypoints.clear();
+        voKeypoints.reserve(size_t(oImage.rows*oImage.cols));
         for(int nRowIdx=0; nRowIdx<oImage.rows; ++nRowIdx)
             for(int nColIdx=0; nColIdx<oImage.cols; ++nColIdx)
                 voKeypoints.emplace_back(cv::Point2f((float)nColIdx,(float)nRowIdx),(float)PATCH_SIZE);

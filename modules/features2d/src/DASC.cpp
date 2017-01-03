@@ -118,6 +118,7 @@ void DASC::compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescriptors) {
 void DASC::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat_<float>& oDescriptors) {
     lvAssert_(!oImage.empty(),"input image must be non-empty");
     voKeypoints.clear();
+    voKeypoints.reserve(size_t(oImage.rows*oImage.cols));
     for(int nRowIdx=0; nRowIdx<oImage.rows; ++nRowIdx)
         for(int nColIdx=0; nColIdx<oImage.cols; ++nColIdx)
             voKeypoints.emplace_back(cv::Point2f((float)nColIdx,(float)nRowIdx),(float)pretrained::nRPAbsMax*2);
@@ -149,6 +150,7 @@ void DASC::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMask, std::
     cv::Mat oDescriptors = _oDescriptors.getMat();
     if(!bUseProvidedKeypoints) {
         voKeypoints.clear();
+        voKeypoints.reserve(size_t(oImage.rows*oImage.cols));
         for(int nRowIdx=0; nRowIdx<oImage.rows; ++nRowIdx)
             for(int nColIdx=0; nColIdx<oImage.cols; ++nColIdx)
                 voKeypoints.emplace_back(cv::Point2f((float)nColIdx,(float)nRowIdx),(float)pretrained::nRPAbsMax*2);
