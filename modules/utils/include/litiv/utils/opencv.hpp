@@ -398,6 +398,9 @@ namespace cv { // extending cv
         return oData;
     }
 
+    /// shifts the values in a matrix by an (x,y) offset (see definition for full info)
+    void shift(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Point2f& vDelta, int nFillType=cv::BORDER_CONSTANT, const cv::Scalar& vConstantFillValue=cv::Scalar(0,0,0,0));
+
     /// returns an always-empty-mat by reference
     inline const cv::Mat& emptyMat() {
         static const cv::Mat s_oEmptyMat = cv::Mat();

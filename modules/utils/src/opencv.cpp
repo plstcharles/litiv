@@ -285,6 +285,129 @@ void cv::doNotOptimize(const cv::Mat& m) {
     lv::doNotOptimize(m); // we don't even need to call this it seems...
 }
 
+/** @brief shift the values in a matrix by an (x,y) offset
+ *
+ * Given a matrix and an integer (x,y) offset, the matrix will be shifted
+ * such that:
+ *
+ * 	oInput(a,b) ---> oOutput(a+y,b+x)
+ *
+ * In the case of a non-integer offset, (e.g. cv::Point2f(-2.1, 3.7)),
+ * the shift will be calculated with subpixel precision using bilinear
+ * interpolation.
+ *
+ * All valid OpenCV datatypes are supported. If the source datatype is
+ * fixed-point, and a non-integer offset is supplied, the output will
+ * be a floating point matrix to preserve subpixel accuracy.
+ *
+ * All border types are supported. If no border type is supplied, the
+ * function defaults to BORDER_CONSTANT with 0-padding.
+ *
+ * The function supports in-place operation.
+ *
+ * Some common examples are provided following:
+ * \code
+ * 	// read an image from file
+ * 	Mat mat = imread(filename);
+ * 	Mat oOutput;
+ *
+ * 	// Perform Matlab-esque 'circshift' in-place
+ * 	shift(mat, mat, Point(5, 5), BORDER_WRAP);
+ *
+ * 	// Perform shift with subpixel accuracy, padding the missing pixels with 1s
+ * 	// NOTE: if mat is of type CV_8U, then it will be converted to type CV_32F
+ * 	shift(mat, mat, Point2f(-13.7, 3.28), BORDER_CONSTANT, 1);
+ *
+ * 	// Perform subpixel shift, preserving the boundary values
+ * 	shift(mat, oOutput, Point2f(0.093, 0.125), BORDER_REPLICATE);
+ *
+ * 	// Perform a vanilla shift, integer offset, very fast
+ * 	shift(mat, oOutput, Point(2, 2));
+ * \endcode
+ *
+ * @param oInput the source matrix
+ * @param oOutput the destination matrix, can be the same as source
+ * @param vDelta the amount to shift the matrix in (x,y) coordinates. Can be
+ * integer of floating point precision
+ * @param nFillType the method used to fill the null entries, defaults to BORDER_CONSTANT
+ * @param vConstantFillValue the value of the null entries if the fill type is BORDER_CONSTANT
+ */
+void cv::shift(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Point2f& vDelta, int nFillType, const cv::Scalar& vConstantFillValue) {
+    /*
+     *  ORIGINAL SOURCE : http://code.opencv.org/issues/2299
+     *
+     *  Software License Agreement (BSD License)
+     *
+     *  Copyright (c) 2012, Willow Garage, Inc.
+     *  All rights reserved.
+     *
+     *  Redistribution and use in source and binary forms, with or without
+     *  modification, are permitted provided that the following conditions
+     *  are met:
+     *
+     *   * Redistributions of source code must retain the above copyright
+     *     notice, this list of conditions and the following disclaimer.
+     *   * Redistributions in binary form must reproduce the above
+     *     copyright notice, this list of conditions and the following
+     *     disclaimer in the documentation and/or other materials provided
+     *     with the distribution.
+     *   * Neither the name of Willow Garage, Inc. nor the names of its
+     *     contributors may be used to endorse or promote products derived
+     *     from this software without specific prior written permission.
+     *
+     *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+     *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+     *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+     *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+     *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+     *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+     *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+     *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+     *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+     *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+     *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+     *  POSSIBILITY OF SUCH DAMAGE.
+     *
+     *  Original Author:  Hilton Bristow
+     *  Created: Aug 23, 2012
+     *  Modified: Jan 21, 2015
+     */
+    lvAssert_(std::abs(vDelta.x)<oInput.cols && std::abs(vDelta.y)<oInput.rows,"delta too big; cannot loop-shift mat data");
+    const cv::Point2i vDeltaInt((int)std::ceil(vDelta.x),(int)std::ceil(vDelta.y));
+    const cv::Point2f vDeltaSubPx(std::abs(vDelta.x-vDeltaInt.x),std::abs(vDelta.y-vDeltaInt.y));
+    const int nTop = (vDeltaInt.y>0)?vDeltaInt.y:0;
+    const int nBottom = (vDeltaInt.y<0)?-vDeltaInt.y:0;
+    const int nLeft = (vDeltaInt.x>0)?vDeltaInt.x:0;
+    const int nRight = (vDeltaInt.x<0)?-vDeltaInt.x:0;
+    cv::Mat oPaddedInput;
+    cv::copyMakeBorder(oInput,oPaddedInput,nTop,nBottom,nLeft,nRight,nFillType,vConstantFillValue);
+    if(vDeltaSubPx.x>std::numeric_limits<float>::epsilon() || vDeltaSubPx.y>std::numeric_limits<float>::epsilon()) {
+        switch(oInput.depth()) {
+            case CV_32F: {
+                cv::Matx<float,1,2> dx(1-vDeltaSubPx.x,vDeltaSubPx.x);
+                cv::Matx<float,2,1> dy(1-vDeltaSubPx.y,vDeltaSubPx.y);
+                cv::sepFilter2D(oPaddedInput,oPaddedInput,-1,dx,dy,cv::Point(0,0),0,cv::BORDER_CONSTANT);
+                break;
+            }
+            case CV_64F: {
+                cv::Matx<double,1,2> dx(1-vDeltaSubPx.x,vDeltaSubPx.x);
+                cv::Matx<double,2,1> dy(1-vDeltaSubPx.y,vDeltaSubPx.y);
+                cv::sepFilter2D(oPaddedInput,oPaddedInput,-1,dx,dy,cv::Point(0,0),0,cv::BORDER_CONSTANT);
+                break;
+            }
+            default: {
+                cv::Matx<float,1,2> dx(1-vDeltaSubPx.x,vDeltaSubPx.x);
+                cv::Matx<float,2,1> dy(1-vDeltaSubPx.y,vDeltaSubPx.y);
+                oPaddedInput.convertTo(oPaddedInput,CV_32F);
+                cv::sepFilter2D(oPaddedInput,oPaddedInput,CV_32F,dx,dy,cv::Point(0,0),0,cv::BORDER_CONSTANT);
+                break;
+            }
+        }
+    }
+    const cv::Rect oROI = cv::Rect(std::max(-vDeltaInt.x,0),std::max(-vDeltaInt.y,0),0,0)+oInput.size();
+    oOutput = oPaddedInput(oROI);
+}
+
 // these are really empty shells, but we need actual allocation due to ocv's virtual interface
 cv::AlignedMatAllocator<16,false> g_oMatAlloc16a = cv::AlignedMatAllocator<16,false>();
 cv::AlignedMatAllocator<32,false> g_oMatAlloc32a = cv::AlignedMatAllocator<32,false>();
