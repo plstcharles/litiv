@@ -236,8 +236,6 @@ TEST(cvtcolor,bgr2hsl2bgr) {
     srand((uint)time((time_t*)nullptr));
     for(size_t i=0; i<10000; ++i) {
         const cv::Vec3b vBGR = cv::Vec3b(uchar(rand()%256),uchar(rand()%256),uchar(rand()%256));
-        const cv::Vec3f vHSL = cv::getHSLFromBGR(vBGR);
-        const cv::Vec3f test = cv::Vec3f((vHSL[0]/360.0f)*255.0f,vHSL[1]*255.0f,vHSL[2]*255.0f);
         ASSERT_EQ(vBGR,cv::getBGRFromHSL(cv::getHSLFromBGR(vBGR))) << " @ " << i << "/10000";
     }
 }
