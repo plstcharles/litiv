@@ -228,7 +228,7 @@ void DASC::dasc_rf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
     if(_oImage.depth()==CV_8U)
         _oImage.convertTo(oImageTemp,CV_32F,1.0/UCHAR_MAX);
     else
-        oImageTemp = _oImage;
+        oImageTemp = _oImage.clone();
     if(oImageTemp.channels()==3)
         cv::cvtColor(oImageTemp,oImageTemp,cv::COLOR_BGR2GRAY);
     lvDbgAssert(cv::countNonZero((oImageTemp>1.0f)|(oImageTemp<0.0f))==0);
@@ -328,7 +328,7 @@ void DASC::dasc_gf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
     if(_oImage.depth()==CV_8U)
         _oImage.convertTo(oImageTemp,CV_32F,1.0/UCHAR_MAX);
     else
-        oImageTemp = _oImage;
+        oImageTemp = _oImage.clone();
     if(oImageTemp.channels()==3)
         cv::cvtColor(oImageTemp,oImageTemp,cv::COLOR_BGR2GRAY);
     lvDbgAssert(cv::countNonZero((oImageTemp>1.0f)|(oImageTemp<0.0f))==0);
