@@ -273,6 +273,30 @@ TYPED_TEST(readwrite_fixture,regression) {
     }
 }
 
+TEST(shift,regression_intconstborder) {
+    const cv::Mat oInput = (cv::Mat_<int>(4,5) << 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19);
+    {
+        cv::Mat oTestOut; cv::shift(oInput,oTestOut,cv::Point2f(1.0f,0.0f),cv::BORDER_CONSTANT,cv::Scalar(-1));
+        const cv::Mat oTestGT = (cv::Mat_<int>(4,5) << -1,0,1,2,3,-1,5,6,7,8,-1,10,11,12,13,-1,15,16,17,18);
+        ASSERT_TRUE(cv::isEqual<int>(oTestOut,oTestGT));
+    }
+    {
+        cv::Mat oTestOut; cv::shift(oInput,oTestOut,cv::Point2f(0.0f,2.0f),cv::BORDER_CONSTANT,cv::Scalar(-1));
+        const cv::Mat oTestGT = (cv::Mat_<int>(4,5) << -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,1,2,3,4,5,6,7,8,9);
+        ASSERT_TRUE(cv::isEqual<int>(oTestOut,oTestGT));
+    }
+    {
+        cv::Mat oTestOut; cv::shift(oInput,oTestOut,cv::Point2f(1.0f,1.0f),cv::BORDER_CONSTANT,cv::Scalar(-1));
+        const cv::Mat oTestGT = (cv::Mat_<int>(4,5) << -1,-1,-1,-1,-1,-1,0,1,2,3,-1,5,6,7,8,-1,10,11,12,13);
+        ASSERT_TRUE(cv::isEqual<int>(oTestOut,oTestGT));
+    }
+    {
+        cv::Mat oTestOut; cv::shift(oInput,oTestOut,cv::Point2f(-2.0f,-2.0f),cv::BORDER_CONSTANT,cv::Scalar(-1));
+        const cv::Mat oTestGT = (cv::Mat_<int>(4,5) << 12,13,14,-1,-1,17,18,19,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1);
+        ASSERT_TRUE(cv::isEqual<int>(oTestOut,oTestGT));
+    }
+}
+
 TEST(empty_stuff,regression) {
     ASSERT_TRUE(cv::emptyMat().empty());
     ASSERT_TRUE(cv::emptySize().area()==0);
