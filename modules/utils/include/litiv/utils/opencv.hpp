@@ -214,6 +214,32 @@ namespace cv { // extending cv
         return std::equal((T*)a.datastart,(T*)a.dataend,(T*)b.datastart);
     }
 
+    /// returns whether the two matrices are nearly equal or not, given epsilon (maximum allowed error)
+    template<typename T>
+    inline bool isNearlyEqual(const cv::Mat_<T>& a, const cv::Mat_<T>& b, T eps) {
+        if(a.empty() && b.empty())
+            return true;
+        if(a.dims!=b.dims)
+            return false;
+        if(a.dims==2) {
+            if(a.type()!=b.type())
+                return false;
+            if(a.size()!=b.size())
+                return false;
+        }
+        else {
+            for(int n=0; n<a.dims; ++n)
+                if(a.size[0]!=b.size[0])
+                    return false;
+        }
+        lvDbgAssert(a.total()*a.elemSize()==b.total()*b.elemSize());
+        return std::equal((T*)a.datastart,(T*)a.dataend,(T*)b.datastart,[&eps](const T& _a, const T& _b){
+            if(!(std::abs(double(_a)-double(_b))<double(eps)))
+                int i =1;
+            return std::abs(double(_a)-double(_b))<double(eps);
+        });
+    }
+
     /// converts a single HSL triplet (0-360 hue, 0-1 sat & lightness) into an 8-bit RGB triplet
     inline cv::Vec3b getBGRFromHSL(float fHue, float fSaturation, float fLightness) {
         // this function is not intended for fast conversions; use OpenCV's cvtColor for large-scale stuff
