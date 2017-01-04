@@ -22,10 +22,27 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 
+#define MAT_COND_DEPTH_TYPE(depth_flag,depth_type,depth_alt) \
+    std::conditional_t<CV_MAT_DEPTH(nTypeFlag)==depth_flag,depth_type,depth_alt>
+
 namespace cv { // extending cv
 
     struct DisplayHelper;
     using DisplayHelperPtr = std::shared_ptr<DisplayHelper>;
+
+    /// type traits helper which provides basic static info on ocv matrix element types
+    template<int nTypeFlag>
+    struct MatTypeInfo {
+        typedef std::enable_if_t<(CV_MAT_DEPTH(nTypeFlag)>=0 && CV_MAT_DEPTH(nTypeFlag)<=6),
+            MAT_COND_DEPTH_TYPE(0,uchar,
+                MAT_COND_DEPTH_TYPE(1,char,
+                    MAT_COND_DEPTH_TYPE(2,ushort,
+                        MAT_COND_DEPTH_TYPE(3,short,
+                            MAT_COND_DEPTH_TYPE(4,int,
+                                MAT_COND_DEPTH_TYPE(5,float,
+                                    MAT_COND_DEPTH_TYPE(6,double,void)))))))> base_type;
+        static constexpr int nChannels = CV_MAT_CN(nTypeFlag);
+    };
 
     /// returns pixel coordinates clamped to the given image & border size
     inline void clampImageCoords(int& nSampleCoord_X, int& nSampleCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {

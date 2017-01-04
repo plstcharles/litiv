@@ -2,6 +2,31 @@
 #include "litiv/utils/opencv.hpp"
 #include "common.hpp"
 
+#define TEST_MAT_TYPE_INFO(ch) \
+    do { \
+        ASSERT_TRUE((std::is_same<cv::MatTypeInfo<CV_8UC(ch)>::base_type,uchar>::value));\
+        ASSERT_TRUE(cv::MatTypeInfo<CV_8UC(ch)>::nChannels==ch);\
+        ASSERT_TRUE((std::is_same<cv::MatTypeInfo<CV_8SC(ch)>::base_type,char>::value));\
+        ASSERT_TRUE(cv::MatTypeInfo<CV_8SC(ch)>::nChannels==ch);\
+        ASSERT_TRUE((std::is_same<cv::MatTypeInfo<CV_16UC(ch)>::base_type,ushort>::value));\
+        ASSERT_TRUE(cv::MatTypeInfo<CV_16UC(ch)>::nChannels==ch);\
+        ASSERT_TRUE((std::is_same<cv::MatTypeInfo<CV_16SC(ch)>::base_type,short>::value));\
+        ASSERT_TRUE(cv::MatTypeInfo<CV_16SC(ch)>::nChannels==ch);\
+        ASSERT_TRUE((std::is_same<cv::MatTypeInfo<CV_32SC(ch)>::base_type,int>::value));\
+        ASSERT_TRUE(cv::MatTypeInfo<CV_32SC(ch)>::nChannels==ch);\
+        ASSERT_TRUE((std::is_same<cv::MatTypeInfo<CV_32FC(ch)>::base_type,float>::value));\
+        ASSERT_TRUE(cv::MatTypeInfo<CV_32FC(ch)>::nChannels==ch);\
+        ASSERT_TRUE((std::is_same<cv::MatTypeInfo<CV_64FC(ch)>::base_type,double>::value));\
+        ASSERT_TRUE(cv::MatTypeInfo<CV_64FC(ch)>::nChannels==ch);\
+    } while(0)
+
+TEST(MatTypeInfo,regression) {
+    TEST_MAT_TYPE_INFO(1);
+    TEST_MAT_TYPE_INFO(2);
+    TEST_MAT_TYPE_INFO(3);
+    TEST_MAT_TYPE_INFO(4);
+}
+
 TEST(clampImageCoords,regression) {
     const int nBS0 = 0;
     const int nBS5 = 5;
