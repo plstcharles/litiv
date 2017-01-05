@@ -68,7 +68,17 @@ namespace cv { // extending cv
         return oMat(idx);
     }
 
-    /// helper function to count valid/allocated elements in sparse and non-sparse matrices
+    /// helper function to count valid/allocated elements in sparse and non-sparse matrices (sparse mat overload)
+    template<typename T>
+    inline size_t getElemCount(cv::SparseMat_<T>& oMat) {
+        return oMat.nzcount();
+    }
+
+    /// helper function to count valid/allocated elements in sparse and non-sparse matrices (regular mat overload)
+    template<typename T>
+    inline size_t getElemCount(cv::Mat_<T>& oMat) {
+        return oMat.total();
+    }
 
     /// returns pixel coordinates clamped to the given image & border size
     inline void clampImageCoords(int& nSampleCoord_X, int& nSampleCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
