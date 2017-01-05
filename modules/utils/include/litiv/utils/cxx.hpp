@@ -405,14 +405,14 @@ namespace lv {
 
     /// helper function to unpack a tuple/array into function arguments (impl)
     template<typename TTuple, typename TFunc, size_t... anIndices>
-    inline auto _unpack(const TTuple& t, TFunc f, std::index_sequence<anIndices...>) {
+    inline auto _unpack_and_call(const TTuple& t, TFunc f, std::index_sequence<anIndices...>) {
         return f(std::get<anIndices>(t)...);
     }
 
     /// helper function to unpack tuple into function arguments
     template<typename TFunc, typename... TTupleTypes>
-    inline auto unpacked_tuple_call(const std::tuple<TTupleTypes...>& t, TFunc f) {
-        return _unpack(t,f,std::make_index_sequence<sizeof...(TTupleTypes)>{});
+    inline auto unpack_and_call(const std::tuple<TTupleTypes...>& t, TFunc f) {
+        return _unpack_and_call(t,f,std::make_index_sequence<sizeof...(TTupleTypes)>{});
     }
 
     /// computes a 2D array -> 1D array transformation with constexpr support (impl)
@@ -550,7 +550,7 @@ namespace lv {
         }
         /// relocks all mutexes simultaneously
         ~unlock_guard() {
-            lv::unpacked_tuple_call<void(TMutexes&...)>(m_aMutexes,std::lock);
+            lv::unpack_and_call<void(TMutexes&...)>(m_aMutexes,std::lock);
         }
     private:
         std::tuple<TMutexes&...> m_aMutexes;
