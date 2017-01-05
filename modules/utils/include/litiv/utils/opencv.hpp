@@ -44,6 +44,32 @@ namespace cv { // extending cv
         static constexpr int nChannels = CV_MAT_CN(nTypeFlag);
     };
 
+    /// helper function to zero-init sparse and non-sparse matrices (sparse mat overload)
+    template<typename T>
+    inline void zeroMat(cv::SparseMat_<T>& oMat) {
+        oMat.clear();
+    }
+
+    /// helper function to zero-init sparse and non-sparse matrices (regular mat specialization)
+    template<typename T>
+    inline void zeroMat(cv::Mat_<T>& oMat) {
+        oMat = T();
+    }
+
+    /// helper function to fetch references from sparse and non-sparse matrices (sparse mat overload)
+    template<typename T>
+    inline T& getElem(cv::SparseMat_<T>& oMat, const int* idx) {
+        return oMat.ref(idx);
+    }
+
+    /// helper function to fetch references from sparse and non-sparse matrices (regular mat overload)
+    template<typename T>
+    inline T& getElem(cv::Mat_<T>& oMat, const int* idx) {
+        return oMat(idx);
+    }
+
+    /// helper function to count valid/allocated elements in sparse and non-sparse matrices
+
     /// returns pixel coordinates clamped to the given image & border size
     inline void clampImageCoords(int& nSampleCoord_X, int& nSampleCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
         lvDbgAssert_(nBorderSize>=0,"border size cannot be negative");
