@@ -400,13 +400,31 @@ namespace lv {
     /// helper function to apply a functor to all members of a tuple
     template<typename TFunc, typename... TTupleTypes>
     inline void for_each(const std::tuple<TTupleTypes...>& t, TFunc f) {
-        _for_each(t,f,std::make_index_sequence<sizeof...(TTupleTypes)>{});
+        _for_each<TFunc>(t,f,std::make_index_sequence<sizeof...(TTupleTypes)>{});
     }
 
     /// helper function to apply a functor to all members of an array
     template<typename TFunc, typename TArrayType, size_t nArraySize>
     inline void for_each(const std::array<TArrayType,nArraySize>& a, TFunc f) {
-        _for_each(a,f,std::make_index_sequence<nArraySize>{});
+        _for_each<TFunc>(a,f,std::make_index_sequence<nArraySize>{});
+    }
+
+    /// helper function to apply a functor to all members of a tuple/array (impl, also passes index to functor)
+    template<typename TFunc, typename TTuple, size_t... anIndices>
+    inline void _for_each_w_idx(TTuple&& t, TFunc f, std::index_sequence<anIndices...>) {
+        auto l = {(f(std::get<anIndices>(t),anIndices),0)...}; UNUSED(l);
+    }
+
+    /// helper function to apply a functor to all members of a tuple (also passes index to functor)
+    template<typename TFunc, typename... TTupleTypes>
+    inline void for_each_w_idx(const std::tuple<TTupleTypes...>& t, TFunc f) {
+        _for_each_w_idx<TFunc>(t,f,std::make_index_sequence<sizeof...(TTupleTypes)>{});
+    }
+
+    /// helper function to apply a functor to all members of an array (also passes index to functor)
+    template<typename TFunc, typename TArrayType, size_t nArraySize>
+    inline void for_each_w_idx(const std::array<TArrayType,nArraySize>& a, TFunc f) {
+        _for_each_w_idx<TFunc>(a,f,std::make_index_sequence<nArraySize>{});
     }
 
     /// helper function to unpack a tuple/array into function arguments (impl)

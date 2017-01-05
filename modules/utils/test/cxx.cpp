@@ -268,13 +268,19 @@ TEST(has_const_iterator,regression) {
 
 TEST(for_each,regression) {
     const auto test1 = std::make_tuple(uchar(1),int(-34),3.2f,size_t(52),-13.34);
-    float tot1 = 0.0f;
-    lv::for_each(test1,[&tot1](const auto& v){tot1 += float(v);});
-    EXPECT_FLOAT_EQ(tot1,1.0f-34.0f+3.2f+52.0f-13.34f);
+    float tot = 0.0f;
+    lv::for_each(test1,[&tot](const auto& v){tot += float(v);});
+    EXPECT_FLOAT_EQ(tot,1.0f-34.0f+3.2f+52.0f-13.34f);
+    tot = 0.0f;
+    lv::for_each_w_idx(test1,[&tot](const auto& v, size_t idx){tot += float(v)+float(idx);});
+    EXPECT_FLOAT_EQ(tot,1.0f-34.0f+3.2f+52.0f-13.34f+(1.0f+2.0f+3.0f+4.0f));
     const std::array<float,5> test2 = {1.0f,-34.0f,3.2f,52.0f,-13.34f};
-    float tot2 = 0.0f;
-    lv::for_each(test2,[&tot2](const auto& v){tot2 += v;});
-    EXPECT_FLOAT_EQ(tot2,1.0f-34.0f+3.2f+52.0f-13.34f);
+    tot = 0.0f;
+    lv::for_each(test2,[&tot](const auto& v){tot += v;});
+    EXPECT_FLOAT_EQ(tot,1.0f-34.0f+3.2f+52.0f-13.34f);
+    tot = 0.0f;
+    lv::for_each_w_idx(test2,[&tot](const auto& v, size_t idx){tot += v+float(idx);});
+    EXPECT_FLOAT_EQ(tot,1.0f-34.0f+3.2f+52.0f-13.34f+(1.0f+2.0f+3.0f+4.0f));
 }
 
 TEST(unpack_and_call,regression) {
