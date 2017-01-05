@@ -39,7 +39,7 @@ endmacro(initialize_internal_list)
 macro(litiv_library libname groupname canbeshared sourcelist headerlist)
     if(${groupname} STREQUAL "module")
         project(litiv_${libname})
-        if(NOT(${libname} STREQUAL "world"))
+        if((NOT(${libname} STREQUAL "world")) AND (NOT(${libname} STREQUAL "test")))
             append_internal_list(litiv_modules ${libname})
             foreach(source ${${sourcelist}})
                 append_internal_list(litiv_modules_sourcelist "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/${source}")
@@ -147,91 +147,95 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
             )
         endif()
     endif()
-    if(BUILD_TESTS AND (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test"))
-        file(GLOB testfiles ${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp)
-        foreach(testfile ${testfiles})
-            get_filename_component(testname "${testfile}" NAME_WE)
-            set(testname "${libname}_${testname}")
-            append_internal_list(litiv_tests "${testname}")
-            add_executable(litiv_utest_app_${testname} "${testfile}")
-            target_compile_definitions(litiv_utest_app_${testname}
-                PUBLIC
-                    PERFTEST=0
-            )
-            target_link_libraries(litiv_utest_app_${testname}
-                ${PROJECT_NAME}
-                benchmark gtest gtest_main
-                ${CMAKE_THREAD_LIBS_INIT}
-            )
-            set_target_properties(litiv_utest_app_${testname}
-                PROPERTIES
-                    FOLDER "tests/${libname}"
-                    DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
-            )
-            set(utestbinname "litiv_utest_app_${testname}$<$<CONFIG:Debug>:${CMAKE_DEBUG_POSTFIX}>")
-            add_test(
-                NAME
-                    "litiv_utest_${testname}"
-                COMMAND
-                    "${CMAKE_BINARY_DIR}/bin/${utestbinname}"
-                    "--gtest_output=xml:${CMAKE_BINARY_DIR}/Testing/${utestbinname}.xml"
-            )
-            add_executable(litiv_ptest_app_${testname} "${testfile}")
-            target_compile_definitions(litiv_ptest_app_${testname}
-                PUBLIC
-                    PERFTEST=1
-            )
-            target_link_libraries(litiv_ptest_app_${testname}
-                ${PROJECT_NAME}
-                gtest benchmark benchmark_main
-                ${CMAKE_THREAD_LIBS_INIT}
-            )
-            set_target_properties(litiv_ptest_app_${testname}
-                PROPERTIES
-                    FOLDER "tests/${libname}"
-                    DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
-            )
-            if(BUILD_TESTS_PERF)
-                set(ptestbinname "litiv_ptest_app_${testname}$<$<CONFIG:Debug>:${CMAKE_DEBUG_POSTFIX}>")
+    if(NOT(${libname} STREQUAL "test"))
+        if(BUILD_TESTS AND (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test"))
+            file(GLOB testfiles ${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp)
+            foreach(testfile ${testfiles})
+                get_filename_component(testname "${testfile}" NAME_WE)
+                set(testname "${libname}_${testname}")
+                append_internal_list(litiv_tests "${testname}")
+                add_executable(litiv_utest_app_${testname} "${testfile}")
+                target_compile_definitions(litiv_utest_app_${testname}
+                    PUBLIC
+                        PERFTEST=0
+                        UNITTEST=1
+                )
+                target_link_libraries(litiv_utest_app_${testname}
+                    ${PROJECT_NAME}
+                    litiv_test
+                    gtest_main
+                )
+                set_target_properties(litiv_utest_app_${testname}
+                    PROPERTIES
+                        FOLDER "tests/${libname}"
+                        DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
+                )
+                set(utestbinname "litiv_utest_app_${testname}$<$<CONFIG:Debug>:${CMAKE_DEBUG_POSTFIX}>")
                 add_test(
                     NAME
-                        "litiv_ptest_${testname}"
+                        "litiv_utest_${testname}"
                     COMMAND
-                        "${CMAKE_BINARY_DIR}/bin/${ptestbinname}"
-                        "--benchmark_format=console"
-                        "--benchmark_out_format=console"
-                        "--benchmark_out=${CMAKE_BINARY_DIR}/Testing/${ptestbinname}.txt"
+                        "${CMAKE_BINARY_DIR}/bin/${utestbinname}"
+                        "--gtest_output=xml:${CMAKE_BINARY_DIR}/Testing/${utestbinname}.xml"
                 )
-            endif()
-        endforeach()
+                add_executable(litiv_ptest_app_${testname} "${testfile}")
+                target_compile_definitions(litiv_ptest_app_${testname}
+                    PUBLIC
+                        PERFTEST=1
+                        UNITTEST=0
+                )
+                target_link_libraries(litiv_ptest_app_${testname}
+                    ${PROJECT_NAME}
+                    litiv_test
+                    benchmark_main
+                )
+                set_target_properties(litiv_ptest_app_${testname}
+                    PROPERTIES
+                        FOLDER "tests/${libname}"
+                        DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
+                )
+                if(BUILD_TESTS_PERF)
+                    set(ptestbinname "litiv_ptest_app_${testname}$<$<CONFIG:Debug>:${CMAKE_DEBUG_POSTFIX}>")
+                    add_test(
+                        NAME
+                            "litiv_ptest_${testname}"
+                        COMMAND
+                            "${CMAKE_BINARY_DIR}/bin/${ptestbinname}"
+                            "--benchmark_format=console"
+                            "--benchmark_out_format=console"
+                            "--benchmark_out=${CMAKE_BINARY_DIR}/Testing/${ptestbinname}.txt"
+                    )
+                endif()
+            endforeach()
+        endif()
+        install(
+            TARGETS ${project_install_targets}
+            EXPORT "litiv-targets"
+            COMPONENT "${groupname}"
+            RUNTIME DESTINATION "bin"
+            LIBRARY DESTINATION "lib"
+            ARCHIVE DESTINATION "lib"
+            INCLUDES DESTINATION "include"
+        )
+        install(
+            DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include"
+            DESTINATION "."
+            COMPONENT "${groupname}"
+            FILES_MATCHING
+                PATTERN "*.hpp"
+                PATTERN "*.hxx"
+                PATTERN "*.h"
+        )
+        install(
+            DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include"
+            DESTINATION "."
+            COMPONENT "${groupname}"
+            FILES_MATCHING
+                PATTERN "*.hpp"
+                PATTERN "*.hxx"
+                PATTERN "*.h"
+        )
     endif()
-    install(
-        TARGETS ${project_install_targets}
-        EXPORT "litiv-targets"
-        COMPONENT "${groupname}"
-        RUNTIME DESTINATION "bin"
-        LIBRARY DESTINATION "lib"
-        ARCHIVE DESTINATION "lib"
-        INCLUDES DESTINATION "include"
-    )
-    install(
-        DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/include"
-        DESTINATION "."
-        COMPONENT "${groupname}"
-        FILES_MATCHING
-            PATTERN "*.hpp"
-            PATTERN "*.hxx"
-            PATTERN "*.h"
-    )
-    install(
-        DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/include"
-        DESTINATION "."
-        COMPONENT "${groupname}"
-        FILES_MATCHING
-            PATTERN "*.hpp"
-            PATTERN "*.hxx"
-            PATTERN "*.h"
-    )
 endmacro(litiv_library)
 
 macro(litiv_module name sourcelist headerlist)

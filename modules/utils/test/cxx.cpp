@@ -1,6 +1,6 @@
 
 #include "litiv/utils/cxx.hpp"
-#include "common.hpp"
+#include "litiv/test.hpp"
 
 TEST(putf,regression) {
     EXPECT_EQ(std::string(),lv::putf(""));

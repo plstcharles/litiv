@@ -1,6 +1,6 @@
 
 #include "litiv/utils/platform.hpp"
-#include "common.hpp"
+#include "litiv/test.hpp"
 
 TEST(filesystem_ops,regression) {
     EXPECT_EQ(lv::addDirSlashIfMissing(""),std::string());

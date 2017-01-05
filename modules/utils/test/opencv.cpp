@@ -1,6 +1,6 @@
 
 #include "litiv/utils/opencv.hpp"
-#include "common.hpp"
+#include "litiv/test.hpp"
 
 #define TEST_MAT_TYPE_INFO(ch) \
     do { \

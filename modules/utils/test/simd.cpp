@@ -1,6 +1,6 @@
 
 #include "litiv/utils/simd.hpp"
-#include "common.hpp"
+#include "litiv/test.hpp"
 
 #if HAVE_MMX
 

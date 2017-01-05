@@ -1,6 +1,6 @@
 
 #include "litiv/utils/math.hpp"
-#include "common.hpp"
+#include "litiv/test.hpp"
 
 #define BENCHMARK_NB_CHANNELS 3
 
@@ -37,7 +37,7 @@ namespace {
         const volatile size_t nLoopSize = size_t(st.range(1));
         const volatile float fMinVal = std::numeric_limits<float>::min();
         const volatile float fMaxVal = std::numeric_limits<float>::max();
-        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        const std::unique_ptr<float[]> afVals = lv::test::genarray<float>(nArraySize,fMinVal,fMaxVal);
         size_t nArrayIdx = 0;
         while(st.KeepRunning()) {
             const size_t nCurrLoopSize = nLoopSize;
@@ -65,7 +65,7 @@ TEST(inv_fast,regression) {
     EXPECT_NEAR(lv::inv_fast(10.0f),0.1f,0.1f*fErr);
     EXPECT_NEAR(lv::inv_fast(0.1f),10.0f,10.0f*fErr);
     constexpr size_t nArraySize = 100000;
-    const std::unique_ptr<float[]> afVals = genarray(nArraySize,-10000.0f,10000.0f);
+    const std::unique_ptr<float[]> afVals = lv::test::genarray(nArraySize,-10000.0f,10000.0f);
     for(size_t i=0; i<nArraySize; ++i)
         ASSERT_NEAR(lv::inv_fast(afVals[i]),1.0f/afVals[i],std::abs((1.0f/afVals[i])*fErr));
 }
@@ -78,7 +78,7 @@ namespace {
         const volatile size_t nLoopSize = size_t(st.range(1));
         const volatile float fMinVal = std::numeric_limits<float>::min();
         const volatile float fMaxVal = std::numeric_limits<float>::max();
-        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        const std::unique_ptr<float[]> afVals = lv::test::genarray<float>(nArraySize,fMinVal,fMaxVal);
         size_t nArrayIdx = 0;
         while(st.KeepRunning()) {
             const size_t nCurrLoopSize = nLoopSize;
@@ -106,7 +106,7 @@ TEST(invsqrt_fast_0iter,regression) {
     EXPECT_NEAR(lv::invsqrt_fastest(0.5f),1.0f/0.7071067f,(1.0f/0.7071067f)*fErr);
     EXPECT_NEAR(lv::invsqrt_fastest(223.31f),1.0f/14.94356f,(1.0f/14.94356f)*fErr);
     constexpr size_t nArraySize = 100000;
-    const std::unique_ptr<float[]> afVals = genarray(nArraySize,0.0f,10000.0f);
+    const std::unique_ptr<float[]> afVals = lv::test::genarray(nArraySize,0.0f,10000.0f);
     for(size_t i=0; i<nArraySize; ++i)
         ASSERT_NEAR(lv::invsqrt_fastest(afVals[i]),1.0f/std::sqrt(afVals[i]),(1.0f/std::sqrt(afVals[i]))*fErr);
 }
@@ -120,7 +120,7 @@ TEST(invsqrt_fast_##n##iter,regression) { \
     EXPECT_NEAR(lv::invsqrt_fast<n>(0.5f),1.0f/0.7071067f,(1.0f/0.7071067f)*fErr); \
     EXPECT_NEAR(lv::invsqrt_fast<n>(223.31f),1.0f/14.94356f,(1.0f/14.94356f)*fErr); \
     constexpr size_t nArraySize = 100000; \
-    const std::unique_ptr<float[]> afVals = genarray(nArraySize,0.0f,10000.0f); \
+    const std::unique_ptr<float[]> afVals = lv::test::genarray(nArraySize,0.0f,10000.0f); \
     for(size_t i=0; i<nArraySize; ++i) \
         ASSERT_NEAR(lv::invsqrt_fast<n>(afVals[i]),1.0f/std::sqrt(afVals[i]),(1.0f/std::sqrt(afVals[i]))*fErr); \
 }
@@ -138,7 +138,7 @@ namespace {
         const volatile size_t nLoopSize = size_t(st.range(1));
         const volatile float fMinVal = 0.0f;
         const volatile float fMaxVal = std::numeric_limits<float>::max();
-        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        const std::unique_ptr<float[]> afVals = lv::test::genarray<float>(nArraySize,fMinVal,fMaxVal);
         size_t nArrayIdx = 0;
         while(st.KeepRunning()) {
             const size_t nCurrLoopSize = nLoopSize;
@@ -167,7 +167,7 @@ TEST(sqrt_fast,regression) {
     EXPECT_NEAR(lv::sqrt_fast(0.5f),0.7071067f,0.7071067f*fErr);
     EXPECT_NEAR(lv::sqrt_fast(223.31f),14.94356f,14.94356f*fErr);
     constexpr size_t nArraySize = 100000;
-    const std::unique_ptr<float[]> afVals = genarray(nArraySize,0.0f,10000.0f);
+    const std::unique_ptr<float[]> afVals = lv::test::genarray(nArraySize,0.0f,10000.0f);
     for(size_t i=0; i<nArraySize; ++i)
         ASSERT_NEAR(lv::sqrt_fast(afVals[i]),std::sqrt(afVals[i]),std::sqrt(afVals[i])*fErr);
 }
@@ -180,7 +180,7 @@ namespace {
         const volatile size_t nLoopSize = size_t(st.range(1));
         const volatile float fMinVal = 0.0f;
         const volatile float fMaxVal = std::numeric_limits<float>::max();
-        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        const std::unique_ptr<float[]> afVals = lv::test::genarray<float>(nArraySize,fMinVal,fMaxVal);
         size_t nArrayIdx = 0;
         while(st.KeepRunning()) {
             const size_t nCurrLoopSize = nLoopSize;
@@ -208,7 +208,7 @@ namespace {
         const volatile size_t nLoopSize = size_t(st.range(1));
         const volatile float fMinVal = (float)st.range(2);
         const volatile float fMaxVal = (float)st.range(3);
-        const std::unique_ptr<float[]> afVals = genarray<float>(nArraySize,fMinVal,fMaxVal);
+        const std::unique_ptr<float[]> afVals = lv::test::genarray<float>(nArraySize,fMinVal,fMaxVal);
         size_t nArrayIdx = 0;
         while(st.KeepRunning()) {
             const size_t nCurrLoopSize = nLoopSize;
@@ -228,7 +228,7 @@ namespace {
         const volatile size_t nLoopSize = size_t(st.range(1));
         const volatile T tMinVal = (T)st.range(2);
         const volatile T tMaxVal = (T)st.range(3);
-        const std::unique_ptr<T[]> aVals = genarray<T>(nArraySize,tMinVal,tMaxVal);
+        const std::unique_ptr<T[]> aVals = lv::test::genarray<T>(nArraySize,tMinVal,tMaxVal);
         size_t nArrayIdx1 = 0;
         size_t nArrayIdx2 = nArraySize/2;
         lvAssert(nArraySize>nChannels*2);
@@ -402,7 +402,7 @@ namespace {
         const volatile size_t nLoopSize = size_t(st.range(1));
         const volatile T tMinVal = (T)st.range(2);
         const volatile T tMaxVal = (T)st.range(3);
-        const std::unique_ptr<T[]> aVals = genarray<T>(nArraySize,tMinVal,tMaxVal);
+        const std::unique_ptr<T[]> aVals = lv::test::genarray<T>(nArraySize,tMinVal,tMaxVal);
         size_t nArrayIdx1 = 0;
         size_t nArrayIdx2 = nArraySize/2;
         lvAssert(nArraySize>nChannels*2);
@@ -568,7 +568,7 @@ namespace {
         const volatile size_t nLoopSize = size_t(st.range(1));
         const volatile T tMinVal = (T)st.range(2);
         const volatile T tMaxVal = (T)st.range(3);
-        const std::unique_ptr<T[]> aVals = genarray<T>(nArraySize,tMinVal,tMaxVal);
+        const std::unique_ptr<T[]> aVals = lv::test::genarray<T>(nArraySize,tMinVal,tMaxVal);
         size_t nArrayIdx1 = 0;
         size_t nArrayIdx2 = nArraySize/2;
         lvAssert(nArraySize>nChannels*2);
@@ -710,7 +710,7 @@ namespace {
         const volatile size_t nLoopSize = size_t(st.range(1));
         const volatile T tMinVal = (T)st.range(2);
         const volatile T tMaxVal = (T)st.range(3);
-        const std::unique_ptr<T[]> aVals = genarray<T>(nArraySize,tMinVal,tMaxVal);
+        const std::unique_ptr<T[]> aVals = lv::test::genarray<T>(nArraySize,tMinVal,tMaxVal);
         size_t nArrayIdx1 = 0;
         size_t nArrayIdx2 = nArraySize/2;
         lvAssert(nArraySize>nChannels*2);
@@ -742,8 +742,8 @@ TYPED_TEST_CASE(cdist_fixture,L2dist_unsigned_types);
 
 TYPED_TEST(cdist_fixture,regression_array) {
     constexpr size_t nArraySize = 1000;
-    const std::unique_ptr<TypeParam[]> aVals_0_1 = genarray(nArraySize,TypeParam(0),TypeParam(1));
-    const std::unique_ptr<TypeParam[]> aVals_0_255 = genarray(nArraySize,TypeParam(0),TypeParam(255));
+    const std::unique_ptr<TypeParam[]> aVals_0_1 = lv::test::genarray(nArraySize,TypeParam(0),TypeParam(1));
+    const std::unique_ptr<TypeParam[]> aVals_0_255 = lv::test::genarray(nArraySize,TypeParam(0),TypeParam(255));
     #define __cdist_mch(c) \
         ASSERT_GE(double(lv::cdist<c>(aVals_0_1.get()+i,aVals_0_1.get()+i+nArraySize/2)),0.0); \
         ASSERT_LE(double(lv::cdist<c>(aVals_0_1.get()+i,aVals_0_1.get()+i+nArraySize/2)),1.0*(c-1)); \
@@ -830,7 +830,7 @@ namespace {
         const volatile size_t nLoopSize = size_t(st.range(1));
         const volatile T tMinVal = std::numeric_limits<T>::min();
         const volatile T tMaxVal = std::numeric_limits<T>::max();
-        const std::unique_ptr<T[]> aVals = genarray<T>(nArraySize,tMinVal,tMaxVal);
+        const std::unique_ptr<T[]> aVals = lv::test::genarray<T>(nArraySize,tMinVal,tMaxVal);
         size_t nArrayIdx = 0;
         lvAssert(nArraySize>nChannels);
         while(st.KeepRunning()) {
@@ -902,7 +902,7 @@ namespace {
         const volatile size_t nLoopSize = size_t(st.range(1));
         const volatile T tMinVal = std::numeric_limits<T>::min();
         const volatile T tMaxVal = std::numeric_limits<T>::max();
-        const std::unique_ptr<T[]> aVals = genarray<T>(nArraySize,tMinVal,tMaxVal);
+        const std::unique_ptr<T[]> aVals = lv::test::genarray<T>(nArraySize,tMinVal,tMaxVal);
         size_t nArrayIdx1 = 0;
         size_t nArrayIdx2 = nArraySize/2;
         lvAssert(nArraySize>nChannels*2);
