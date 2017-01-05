@@ -392,25 +392,25 @@ namespace lv {
     NEXT_BIGGER_INTEGER(int32_t,int64_t);
 
     /// helper function to apply a functor to all members of a tuple/array (impl)
-    template<typename TTuple, typename TFunc, size_t... anIndices>
+    template<typename TFunc, typename TTuple, size_t... anIndices>
     inline void _for_each(TTuple&& t, TFunc f, std::index_sequence<anIndices...>) {
         auto l = {(f(std::get<anIndices>(t)),0)...}; UNUSED(l);
     }
 
     /// helper function to apply a functor to all members of a tuple
-    template<typename... TTupleTypes, typename TFunc>
+    template<typename TFunc, typename... TTupleTypes>
     inline void for_each(const std::tuple<TTupleTypes...>& t, TFunc f) {
         _for_each(t,f,std::make_index_sequence<sizeof...(TTupleTypes)>{});
     }
 
     /// helper function to apply a functor to all members of an array
-    template<typename TArrayType, size_t nArraySize, typename TFunc>
+    template<typename TFunc, typename TArrayType, size_t nArraySize>
     inline void for_each(const std::array<TArrayType,nArraySize>& a, TFunc f) {
         _for_each(a,f,std::make_index_sequence<nArraySize>{});
     }
 
     /// helper function to unpack a tuple/array into function arguments (impl)
-    template<typename TTuple, typename TFunc, size_t... anIndices>
+    template<typename TFunc, typename TTuple, size_t... anIndices>
     inline auto _unpack_and_call(const TTuple& t, TFunc f, std::index_sequence<anIndices...>) {
         return f(std::get<anIndices>(t)...);
     }
@@ -421,38 +421,44 @@ namespace lv {
         return _unpack_and_call(t,f,std::make_index_sequence<sizeof...(TTupleTypes)>{});
     }
 
+    /// helper function to unpack array into function arguments
+    template<typename TFunc, typename TArrayType, size_t nArraySize>
+    inline auto unpack_and_call(const std::array<TArrayType,nArraySize>& a, TFunc f) {
+        return _unpack_and_call(a,f,std::make_index_sequence<nArraySize>{});
+    }
+
     /// computes a 2D array -> 1D array transformation with constexpr support (impl)
-    template<typename TValue, size_t nArraySize, typename TFunc, size_t... anIndices>
+    template<typename TFunc, typename TValue, size_t nArraySize, size_t... anIndices>
     constexpr auto _static_transform(const std::array<TValue,nArraySize>& a, const std::array<TValue,nArraySize>& b, TFunc lOp, std::index_sequence<anIndices...>) -> std::array<decltype(lOp(a[0],b[0])),nArraySize> {
         return {lOp(a[anIndices],b[anIndices])...};
     }
 
     /// computes a 2D array -> 1D array transformation with constexpr support
-    template<typename TValue, size_t nArraySize, typename TFunc>
+    template<typename TFunc, typename TValue, size_t nArraySize>
     constexpr auto static_transform(const std::array<TValue,nArraySize>& a, const std::array<TValue,nArraySize>& b, TFunc lOp) -> decltype(_static_transform(a,b,lOp,std::make_index_sequence<nArraySize>{})) {
         return _static_transform(a,b,lOp,std::make_index_sequence<nArraySize>{});
     }
 
     /// computes a 1D array -> 1D scalar reduction with constexpr support (iterator-based version)
-    template<typename TValue, typename TFunc>
+    template<typename TFunc, typename TValue>
     constexpr auto static_reduce(const TValue* begin, const TValue* end, TFunc lOp) -> decltype(lOp(*begin,*begin)) {
         return (begin>=end)?TValue{}:(begin+1)==end?*begin:lOp(*begin,static_reduce(begin+1,end,lOp));
     }
 
     /// computes a 1D array -> 1D scalar reduction with constexpr support (array-based version, impl, specialization for last array value)
-    template<size_t nArrayIdx, typename TValue, size_t nArraySize, typename TFunc>
+    template<size_t nArrayIdx, typename TFunc, typename TValue, size_t nArraySize>
     constexpr std::enable_if_t<nArrayIdx==0,TValue> _static_reduce_impl(const std::array<TValue,nArraySize>& a, TFunc) {
         return std::get<nArrayIdx>(a);
     }
 
     /// computes a 1D array -> 1D scalar reduction with constexpr support (array-based version, impl, specialization for non-last array value)
-    template<size_t nArrayIdx, typename TValue, size_t nArraySize, typename TFunc>
+    template<size_t nArrayIdx, typename TFunc, typename TValue, size_t nArraySize>
     constexpr std::enable_if_t<(nArrayIdx>0),std::result_of_t<TFunc(const TValue&,const TValue&)>> _static_reduce_impl(const std::array<TValue,nArraySize>& a, TFunc lOp) {
         return lOp(std::get<nArrayIdx>(a),_static_reduce_impl<nArrayIdx-1>(a,lOp));
     }
 
     /// computes a 1D array -> 1D scalar reduction with constexpr support (array-based version)
-    template<typename TValue, size_t nArraySize, typename TFunc>
+    template<typename TFunc, typename TValue, size_t nArraySize>
     constexpr auto static_reduce(const std::array<TValue,nArraySize>& a, TFunc lOp) -> decltype(lOp(std::get<0>(a),std::get<0>(a))) {
         static_assert(nArraySize>0,"need non-empty array for reduction");
         return _static_reduce_impl<nArraySize-1>(a,lOp);

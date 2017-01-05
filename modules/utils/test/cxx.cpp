@@ -278,11 +278,13 @@ TEST(for_each,regression) {
 }
 
 TEST(unpack_and_call,regression) {
-    const auto test = std::make_tuple(uchar(1),int(-34),3.2f,size_t(52),-13.34);
+    const auto test1 = std::make_tuple(uchar(1),int(-34),3.2f,size_t(52),-13.34);
     const auto testfunc = [](auto v1, auto v2, auto v3, auto v4, auto v5) {
         return double(v1)+double(v2)+double(v3)+double(v4)+double(v5);
     };
-    EXPECT_FLOAT_EQ((float)lv::unpack_and_call(test,testfunc),1.0f-34.0f+3.2f+52.0f-13.34f);
+    const std::array<float,5> test2 = {1.0f,-34.0f,3.2f,52.0f,-13.34f};
+    EXPECT_FLOAT_EQ((float)lv::unpack_and_call(test1,testfunc),1.0f-34.0f+3.2f+52.0f-13.34f);
+    EXPECT_FLOAT_EQ((float)lv::unpack_and_call(test2,testfunc),1.0f-34.0f+3.2f+52.0f-13.34f);
 }
 
 namespace {
