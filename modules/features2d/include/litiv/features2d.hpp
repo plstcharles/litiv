@@ -20,6 +20,7 @@
 #include "litiv/features2d/DASC.hpp"
 #include "litiv/features2d/LBSP.hpp"
 #include "litiv/features2d/LSS.hpp"
+#include "litiv/utils/opencv.hpp"
 
 namespace lv {
 
@@ -45,77 +46,95 @@ namespace lv {
         });
     }
 
-    /// helper struct containing joint & marginal probability histograms
-    template<typename... TMatTypes>
-    struct JointProbData {
+    /// helper struct containing joint & marginal probability histograms (dense/full-range version)
+    template<bool bUseSparseMats, typename... TMatTypes>
+    struct JointHistData {
         static constexpr size_t nDims = sizeof...(TMatTypes);
         static_assert(nDims>1,"must provide at least two matrix types in template pack");
         static constexpr bool bAllTypesIntegral = lv::static_reduce(std::array<bool,sizeof...(TMatTypes)>{(std::is_integral<TMatTypes>::value)...},lv::static_reduce_and);
         static constexpr bool bAllTypesNonUINT = lv::static_reduce(std::array<bool,sizeof...(TMatTypes)>{(!(std::is_same<TMatTypes,uint>::value))...},lv::static_reduce_and);
         static constexpr bool bAllTypesSmall = lv::static_reduce(std::array<bool,sizeof...(TMatTypes)>{(sizeof(TMatTypes)<=sizeof(int))...},lv::static_reduce_and);
         static constexpr bool bAllTypesByte = lv::static_reduce(std::array<bool,sizeof...(TMatTypes)>{(sizeof(TMatTypes)==1)...},lv::static_reduce_and);
-        static_assert(bAllTypesIntegral,"matrix types must be integral & ocv-arithmetic-compat");
-        static_assert(bAllTypesNonUINT,"matrix types must be integral & ocv-arithmetic-compat");
-        static_assert(bAllTypesSmall,"matrix types must be integral & ocv-arithmetic-compat");
+        static_assert(bAllTypesIntegral && bAllTypesNonUINT && bAllTypesSmall,"matrix types must be integral & ocv-arithmetic-compat");
+        static_assert(bUseSparseMats || bAllTypesByte,"very unlikely to have enough memory for full-range w/ large ints...");
         static_assert(std::is_same<std::common_type_t<int,TMatTypes...>,int>::value,"matrix types must be ocv-arithmetic-compat");
+        typedef std::conditional_t<bUseSparseMats,cv::SparseMat_<float>,cv::Mat_<float>> HistMat;
+        typedef std::conditional_t<bUseSparseMats,cv::SparseMat_<int>,cv::Mat_<int>> CountMat;
         std::array<int,nDims> aMinVals,aMaxVals;
         std::array<size_t,nDims> aStates;
-        std::array<cv::Mat_<float>,nDims> aMargHists;
-        cv::Mat_<float> oJointHist;
         size_t nJointStates;
+        std::array<CountMat,nDims> aMargCounts;
+        std::array<HistMat,nDims> aMargHists;
+        CountMat oJointCount;
+        HistMat oJointHist;
     };
 
     /// computes the joint & marginal probability histograms for a given array of matrices
-    template<size_t nQuantifStep=1, bool bUseFullRange=false, bool bUseFracSum=true, typename... TMatTypes>
-    inline void calcJointProbHist(const std::tuple<cv::Mat_<TMatTypes>...>& aInputs, JointProbData<TMatTypes...>& oOutput) {
-        typedef JointProbData<TMatTypes...> HistData;
-        static_assert(!bUseFullRange || HistData::bAllTypesByte,"very unlikely to have enough memory for full-range w/ large ints...");
+    template<size_t nQuantifStep=1, bool bUseSparseMats=true, bool bFastNumApprox=false, typename... TMatTypes>
+    inline void calcJointProbHist(const std::tuple<cv::Mat_<TMatTypes>...>& aInputs, JointHistData<bUseSparseMats,TMatTypes...>& oOutput) {
         static_assert(nQuantifStep>0,"quantification step must be greater than zero (used in division)");
-        std::array<int,HistData::nDims> aJointHistDims;
+        typedef JointHistData<bUseSparseMats,TMatTypes...> HistData;
+        std::array<int,HistData::nDims> aJointHistMaxDims;
         lv::for_each_w_idx(aInputs,[&](auto oInput, size_t nInputIdx) {
             lvAssert_(!oInput.empty() && oInput.size==std::get<0>(aInputs).size,"input matrices must all have the same size");
-            if(bUseFullRange) {
-                oOutput.aMinVals[nInputIdx] = int(std::numeric_limits<decltype(oInput)::value_type>::min());
-                oOutput.aMaxVals[nInputIdx] = int(std::numeric_limits<decltype(oInput)::value_type>::max());
+            oOutput.aMinVals[nInputIdx] = int(std::numeric_limits<decltype(oInput)::value_type>::min());
+            oOutput.aMaxVals[nInputIdx] = int(std::numeric_limits<decltype(oInput)::value_type>::max());
+            @@@@ dynamic min/max when signed, or templated true?
+            const size_t nMaxStates = (size_t(oOutput.aMaxVals[nInputIdx]-oOutput.aMinVals[nInputIdx])+1)/nQuantifStep;
+            lvAssert_(nMaxStates<size_t(std::numeric_limits<int>::max()),"element type too big to fit in matrix histograms due to int-indexing");
+            aJointHistMaxDims[nInputIdx] = int(nMaxStates);
+            const std::array<int,2> aMargHistDims = {1,aJointHistMaxDims[nInputIdx]};
+            oOutput.aMargHists[nInputIdx].create(2,aMargHistDims.data());
+            cv::zeroMat(oOutput.aMargHists[nInputIdx]);
+            if(!bFastNumApprox) {
+                oOutput.aMargCounts[nInputIdx].create(2,aMargHistDims.data());
+                cv::zeroMat(oOutput.aMargCounts[nInputIdx]);
             }
-            else {
-                double dMin,dMax;
-                cv::minMaxIdx(oInput,&dMin,&dMax);
-                oOutput.aMinVals[nInputIdx] = int(dMin);
-                oOutput.aMaxVals[nInputIdx] = int(dMax);
-            }
-            const size_t nCurrStates = size_t(oOutput.aMaxVals[nInputIdx]-oOutput.aMinVals[nInputIdx])/nQuantifStep;
-            lvAssert_(nCurrStates<size_t(std::numeric_limits<int>::max()),"element type too big to fit in matrix histograms due to int-indexing");
-            aJointHistDims[nInputIdx] = int(oOutput.aStates[nInputIdx] = nCurrStates);
-            oOutput.aMargHists[nInputIdx].create(1,aJointHistDims[nInputIdx]);
-            oOutput.aMargHists[nInputIdx] = 0.0f;
         });
-        oOutput.oJointHist.create(int(HistData::nDims),aJointHistDims.data());
-        oOutput.oJointHist = 0.0f;
-        oOutput.nJointStates = oOutput.oJointHist.total();
+        oOutput.oJointHist.create(int(HistData::nDims),aJointHistMaxDims.data());
+        cv::zeroMat(oOutput.oJointHist);
         const size_t nElemCount = std::get<0>(aInputs).total();
-        std::array<int,HistData::nDims> aCurrHistIndxs;
+        std::array<int,HistData::nDims> aCurrJointHistIndxs;
+        std::array<int,2> anCurrMargHistIndxs = {0,0};
         const float fCountIncr = 1.0f/nElemCount;
         for(size_t nElemIdx=0; nElemIdx<nElemCount; ++nElemIdx) {
             lv::for_each_w_idx(aInputs,[&](auto oInput, size_t nInputIdx) {
-                const int nCurrElem = int(oInput(int(nElemIdx)));
-                aCurrHistIndxs[nInputIdx] = nQuantifStep>1?nCurrElem/int(nQuantifStep):nCurrElem;
-                oOutput.aMargHists[nInputIdx](aCurrHistIndxs[nInputIdx]) += bUseFracSum?fCountIncr:1.0f;
+                const int nCurrElem = int(oInput(int(nElemIdx)))-oOutput.aMinVals[nInputIdx];
+                anCurrMargHistIndxs[1] = aCurrJointHistIndxs[nInputIdx] = nQuantifStep>1?nCurrElem/int(nQuantifStep):nCurrElem;
+                if(bFastNumApprox)
+                    cv::getElem(oOutput.aMargHists[nInputIdx],anCurrMargHistIndxs.data()) += fCountIncr;
+                else
+                    ++cv::getElem(oOutput.aMargCounts[nInputIdx],anCurrMargHistIndxs.data());
             });
-            oOutput.oJointHist(aJointHistDims.data()) += bUseFracSum?fCountIncr:1.0f;
+            if(bFastNumApprox)
+                cv::getElem(oOutput.oJointHist,aCurrJointHistIndxs.data()) += fCountIncr;
+            else
+                ++cv::getElem(oOutput.oJointHist,aCurrJointHistIndxs.data());
         }
-        if(!bUseFracSum) {
+        if(!bFastNumApprox) {
             for(size_t nInputIdx=0; nInputIdx<HistData::nDims; ++nInputIdx)
-                oOutput.aMargHists[nInputIdx] *= fCountIncr;
-            oOutput.oJointHist *= fCountIncr;
+                for(auto pIter=oOutput.aMargCounts[nInputIdx].begin(); pIter!=oOutput.aMargCounts[nInputIdx].end(); ++pIter)
+                    cv::getElem(oOutput.aMargHists[nInputIdx],pIter.node()->idx) = (*pIter)*fCountIncr;
+            for(auto pIter=oOutput.oJointCount.begin(); pIter!=oOutput.oJointCount.end(); ++pIter)
+                cv::getElem(oOutput.oJointHist,pIter.node()->idx) = (*pIter)*fCountIncr;
+        }
+        if(bUseSparseMats) {
+            oOutput.nJointStates = cv::getElemCount(oOutput.oJointCount);
+            for(size_t nInputIdx=0; nInputIdx<HistData::nDims; ++nInputIdx)
+                oOutput.aStates[nInputIdx] = cv::getElemCount(oOutput.aMargCounts[nInputIdx]);
+        }
+        else {
+            oOutput.nJointStates = size_t(lv::static_reduce(aJointHistMaxDims,[](int a, int b){return a*b;}));
+            for(size_t nInputIdx=0; nInputIdx<HistData::nDims; ++nInputIdx)
+                oOutput.aStates[nInputIdx] = size_t(aJointHistMaxDims[nInputIdx]);
         }
     }
 
     /// computes the joint & marginal probability histograms for a given array of matrices (inline return version)
-    template<size_t nQuantifStep=1, bool bUseFullRange=false, bool bUseFracSum=true, typename... TMatTypes>
-    inline JointProbData<TMatTypes...> calcJointProbHist(const std::tuple<cv::Mat_<TMatTypes>...>& aInputs) {
-        JointProbData<TMatTypes...> oOutput;
-        calcJointProbHist<nQuantifStep,bUseFullRange,bUseFracSum,TMatTypes...>(aInputs,oOutput);
+    template<size_t nQuantifStep=1, bool bUseSparseMats=true, bool bFastNumApprox=false, typename... TMatTypes>
+    inline JointHistData<bUseSparseMats,TMatTypes...> calcJointProbHist(const std::tuple<cv::Mat_<TMatTypes>...>& aInputs) {
+        JointHistData<bUseSparseMats,TMatTypes...> oOutput;
+        calcJointProbHist<nQuantifStep,bUseSparseMats,bFastNumApprox,TMatTypes...>(aInputs,oOutput);
         return oOutput;
     }
 
