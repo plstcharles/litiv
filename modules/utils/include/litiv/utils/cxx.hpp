@@ -464,6 +464,11 @@ namespace lv {
         return _static_reduce_impl<nArraySize-1>(a,lOp);
     }
 
+    /// helper constexpr 'logical and' folding expression for often-used static array reduction
+    constexpr bool static_reduce_and(bool a, bool b) {
+        return a&&b;
+    }
+
     /// helper structure to create lookup tables with generic functors (also exposes multiple lookup interfaces)
     template<typename Tx, typename Ty, size_t nBins, size_t nSafety=0, typename TStep=float>
     struct LUT {
