@@ -399,8 +399,14 @@ namespace lv {
 
     /// helper function to apply a functor to all members of a tuple
     template<typename... TTupleTypes, typename TFunc>
-    inline void for_each_in_tuple(const std::tuple<TTupleTypes...>& t, TFunc f) {
+    inline void for_each(const std::tuple<TTupleTypes...>& t, TFunc f) {
         _for_each(t,f,std::make_index_sequence<sizeof...(TTupleTypes)>{});
+    }
+
+    /// helper function to apply a functor to all members of an array
+    template<typename TArrayType, size_t nArraySize, typename TFunc>
+    inline void for_each(const std::array<TArrayType,nArraySize>& a, TFunc f) {
+        _for_each(a,f,std::make_index_sequence<nArraySize>{});
     }
 
     /// helper function to unpack a tuple/array into function arguments (impl)
@@ -546,7 +552,7 @@ namespace lv {
         /// unlocks all given mutexes, one at a time, until destruction
         explicit unlock_guard(TMutexes&... aMutexes) noexcept :
                 m_aMutexes(aMutexes...) {
-            lv::for_each_in_tuple(m_aMutexes,[](auto& oMutex) noexcept {oMutex.unlock();});
+            lv::for_each(m_aMutexes,[](auto& oMutex) noexcept {oMutex.unlock();});
         }
         /// relocks all mutexes simultaneously
         ~unlock_guard() {
