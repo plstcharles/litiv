@@ -178,24 +178,51 @@
 #ifndef __LV_CONFIG_DEFS__
     #define __LV_CONFIG_DEFS__
 
-    #define USE_SIGNEXT_SHIFT_TRICK   @USE_SIGNEXT_SHIFT_TRICK@
-    #define USE_FAST_SQRT_FOR_CDIST   @USE_FAST_SQRT_FOR_CDIST@
-    #define USE_WORLD_SOURCE_GLOB     @USE_WORLD_SOURCE_GLOB@
-    #define USE_BSDS500_BENCHMARK     @USE_BSDS500_BENCHMARK@
-    #define USE_KINECTSDK_STANDALONE  @USE_KINECTSDK_STANDALONE@
-    #define USE_CVCORE_WITH_UTILS     @USE_CVCORE_WITH_UTILS@
-    #define USE_LINK_TIME_OPTIM       @USE_LINK_TIME_OPTIM@
-    #define USE_FAST_MATH             @USE_FAST_MATH@
-    #define EXTERNAL_DATA_ROOT        XSTR(@EXTERNAL_DATA_ROOT@)
-    #define SAMPLES_DATA_ROOT         XSTR(@SAMPLES_DATA_ROOT@)
-    #define TEST_DATA_ROOT            XSTR(@TEST_DATA_ROOT@)
-    #define CACHE_MAX_SIZE_GB         @DATASETS_CACHE_SIZE@LLU
+    // config defs that may still change from CMake values have ifndef's
+    #ifndef USE_SIGNEXT_SHIFT_TRICK
+        #define USE_SIGNEXT_SHIFT_TRICK     @USE_SIGNEXT_SHIFT_TRICK@
+    #endif //ndef(USE_SIGNEXT_SHIFT_TRICK)
+    #ifndef USE_FAST_SQRT_FOR_CDIST
+        #define USE_FAST_SQRT_FOR_CDIST     @USE_FAST_SQRT_FOR_CDIST@
+    #endif //ndef(USE_FAST_SQRT_FOR_CDIST)
+    #ifndef USE_BSDS500_BENCHMARK
+        #define USE_BSDS500_BENCHMARK       @USE_BSDS500_BENCHMARK@
+    #endif //ndef(USE_BSDS500_BENCHMARK)
+    #ifndef USE_KINECTSDK_STANDALONE
+        #define USE_KINECTSDK_STANDALONE    @USE_KINECTSDK_STANDALONE@
+    #endif //ndef(USE_KINECTSDK_STANDALONE)
+    #ifndef USE_CVCORE_WITH_UTILS
+        #define USE_CVCORE_WITH_UTILS       @USE_CVCORE_WITH_UTILS@
+    #endif //ndef(USE_CVCORE_WITH_UTILS)
+    #ifndef EXTERNAL_DATA_ROOT
+        #define EXTERNAL_DATA_ROOT          XSTR(@EXTERNAL_DATA_ROOT@)
+    #endif //ndef(EXTERNAL_DATA_ROOT)
+    #ifndef SAMPLES_DATA_ROOT
+        #define SAMPLES_DATA_ROOT           XSTR(@SAMPLES_DATA_ROOT@)
+    #endif //SAMPLES_DATA_ROOT
+    #ifndef TEST_DATA_ROOT
+        #define TEST_DATA_ROOT              XSTR(@TEST_DATA_ROOT@)
+    #endif //ndef(TEST_DATA_ROOT)
+    #ifndef CACHE_MAX_SIZE_GB
+        #define CACHE_MAX_SIZE_GB           @DATASETS_CACHE_SIZE@LLU
+    #endif //ndef(CACHE_MAX_SIZE_GB)
+    #ifndef DEFAULT_NB_THREADS
+        #define DEFAULT_NB_THREADS          1
+    #endif //ndef(DEFAULT_NB_THREADS)
+    #ifndef USE_RLUTIL_ANSI_DEFINE
+        #define USE_RLUTIL_ANSI_DEFINE      @USE_RLUTIL_ANSI_DEFINE@
+    #endif //ndef(USE_RLUTIL_ANSI_DEFINE)
+    #ifndef RLUTIL_STRING_TYPE
+        #define RLUTIL_STRING_TYPE          @RLUTIL_STRING_TYPE@
+    #endif //ndef(RLUTIL_STRING_TYPE)
+
+    // config defs below cannot change from CMake values
     #define TARGET_PLATFORM_x64       @TARGET_PLATFORM_x64@
-    #define DEFAULT_NB_THREADS        1
-    #define USE_RLUTIL_ANSI_DEFINE    @USE_RLUTIL_ANSI_DEFINE@
-    #define RLUTIL_STRING_TYPE        @RLUTIL_STRING_TYPE@
     #define LITIV_SHARED              @BUILD_SHARED_LIBS@
     #define LITIV_STATIC              (!(LITIV_SHARED))
+    #define USING_LINK_TIME_OPTIM     @USE_LINK_TIME_OPTIM@
+    #define USING_FAST_MATH           @USE_FAST_MATH@
+    #define USING_WORLD_SOURCE_GLOB   @USE_WORLD_SOURCE_GLOB@
 
     #if (defined(_MSC_VER) || defined(_WIN32) || defined(WIN32) || defined(__CYGWIN__))
         #ifdef _MSC_VER
@@ -278,18 +305,42 @@
 
     #define HAVE_KINECTSDK            @USE_KINECTSDK@
 
-    #define HAVE_MMX                  @USE_MMX@
-    #define HAVE_SSE                  @USE_SSE@
-    #define HAVE_SSE2                 @USE_SSE2@
-    #define HAVE_SSE3                 @USE_SSE3@
-    #define HAVE_SSSE3                @USE_SSSE3@
-    #define HAVE_SSE4_1               @USE_SSE4_1@
-    #define HAVE_SSE4_2               @USE_SSE4_2@
-    #define HAVE_POPCNT               @USE_POPCNT@
-    #define HAVE_AVX                  @USE_AVX@
-    #define HAVE_AVX2                 @USE_AVX2@
+    #ifndef HAVE_MMX
+        #define HAVE_MMX              @USE_MMX@
+    #endif //ndef(HAVE_MMX)
+    #ifndef HAVE_SSE
+        #define HAVE_SSE              @USE_SSE@
+    #endif //ndef(HAVE_SSE)
+    #ifndef HAVE_SSE2
+        #define HAVE_SSE2             @USE_SSE2@
+    #endif //ndef(HAVE_SSE2)
+    #ifndef HAVE_SSE3
+        #define HAVE_SSE3             @USE_SSE3@
+    #endif //ndef(HAVE_SSE3)
+    #ifndef HAVE_SSSE3
+        #define HAVE_SSSE3            @USE_SSSE3@
+    #endif //ndef(HAVE_SSSE3)
+    #ifndef HAVE_SSE4_1
+        #define HAVE_SSE4_1           @USE_SSE4_1@
+    #endif //ndef(HAVE_SSE4_1)
+    #ifndef HAVE_SSE4_2
+        #define HAVE_SSE4_2           @USE_SSE4_2@
+    #endif //ndef(HAVE_SSE4_2)
+    #ifndef HAVE_POPCNT
+        #define HAVE_POPCNT           @USE_POPCNT@
+    #endif //ndef(HAVE_POPCNT)
+    #ifndef HAVE_AVX
+        #define HAVE_AVX              @USE_AVX@
+    #endif //ndef(HAVE_AVX)
+    #ifndef HAVE_AVX2
+        #define HAVE_AVX2             @USE_AVX2@
+    #endif //ndef(HAVE_AVX2)
 
-    #define HAVE_STL_ALIGNED_ALLOC    @USE_STL_ALIGNED_ALLOC@
-    #define HAVE_POSIX_ALIGNED_ALLOC  @USE_POSIX_ALIGNED_ALLOC@
+    #ifndef HAVE_STL_ALIGNED_ALLOC
+        #define HAVE_STL_ALIGNED_ALLOC        @USE_STL_ALIGNED_ALLOC@
+    #endif //ndef(HAVE_STL_ALIGNED_ALLOC)
+    #ifndef HAVE_POSIX_ALIGNED_ALLOC
+        #define HAVE_POSIX_ALIGNED_ALLOC      @USE_POSIX_ALIGNED_ALLOC@
+    #endif //ndef(HAVE_POSIX_ALIGNED_ALLOC)
 
 #endif //ndef(__LV_EXTCONFIG_DEFS__)
