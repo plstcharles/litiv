@@ -70,71 +70,88 @@ namespace lv {
     };
 
     /// computes the joint & marginal probability histograms for a given array of matrices
-    template<size_t nQuantifStep=1, bool bUseSparseMats=true, bool bFastNumApprox=false, typename... TMatTypes>
+    template<size_t nQuantifStep=1, bool bUseSparseMats=true, bool bFastNumApprox=false, bool bSkipMinMax=false, typename... TMatTypes>
     inline void calcJointProbHist(const std::tuple<cv::Mat_<TMatTypes>...>& aInputs, JointHistData<bUseSparseMats,TMatTypes...>& oOutput) {
         static_assert(nQuantifStep>0,"quantification step must be greater than zero (used in division)");
         typedef JointHistData<bUseSparseMats,TMatTypes...> HistData;
-        std::array<int,HistData::nDims> aJointHistMaxDims;
+        std::array<int,HistData::dims()> aJointHistMaxStates;
         lv::for_each_w_idx(aInputs,[&](auto oInput, size_t nInputIdx) {
             lvAssert_(!oInput.empty() && oInput.size==std::get<0>(aInputs).size,"input matrices must all have the same size");
-            oOutput.aMinVals[nInputIdx] = int(std::numeric_limits<decltype(oInput)::value_type>::min());
-            oOutput.aMaxVals[nInputIdx] = int(std::numeric_limits<decltype(oInput)::value_type>::max());
-            @@@@ dynamic min/max when signed, or templated true?
-            const size_t nMaxStates = (size_t(oOutput.aMaxVals[nInputIdx]-oOutput.aMinVals[nInputIdx])+1)/nQuantifStep;
+            typedef typename decltype(oInput)::value_type InputElemType;
+            constexpr bool bSkippingMinMax = (bSkipMinMax && !std::is_same<InputElemType,int>::value);
+            if(bSkippingMinMax) {
+                oOutput.aMinVals[nInputIdx] = int(std::numeric_limits<InputElemType>::min());
+                oOutput.aMaxVals[nInputIdx] = int(std::numeric_limits<InputElemType>::max());
+            }
+            else {
+                double dMin,dMax;
+                cv::minMaxIdx(oInput,&dMin,&dMax);
+                oOutput.aMinVals[nInputIdx] = int(dMin);
+                oOutput.aMaxVals[nInputIdx] = int(dMax);
+            }
+            const size_t nMaxStates = size_t(oOutput.aMaxVals[nInputIdx]-oOutput.aMinVals[nInputIdx])/nQuantifStep+size_t(1);
             lvAssert_(nMaxStates<size_t(std::numeric_limits<int>::max()),"element type too big to fit in matrix histograms due to int-indexing");
-            aJointHistMaxDims[nInputIdx] = int(nMaxStates);
-            const std::array<int,2> aMargHistDims = {1,aJointHistMaxDims[nInputIdx]};
-            oOutput.aMargHists[nInputIdx].create(2,aMargHistDims.data());
+            const std::array<int,2> aMargHistMaxStates = {(aJointHistMaxStates[nInputIdx]=int(nMaxStates)),1};
+            oOutput.aMargHists[nInputIdx].create(bUseSparseMats?1:2,aMargHistMaxStates.data());
             cv::zeroMat(oOutput.aMargHists[nInputIdx]);
             if(!bFastNumApprox) {
-                oOutput.aMargCounts[nInputIdx].create(2,aMargHistDims.data());
+                oOutput.aMargCounts[nInputIdx].create(bUseSparseMats?1:2,aMargHistMaxStates.data());
                 cv::zeroMat(oOutput.aMargCounts[nInputIdx]);
             }
         });
-        oOutput.oJointHist.create(int(HistData::nDims),aJointHistMaxDims.data());
+        oOutput.oJointHist.create(int(HistData::dims()),aJointHistMaxStates.data());
         cv::zeroMat(oOutput.oJointHist);
+        if(!bFastNumApprox) {
+            oOutput.oJointCount.create(int(HistData::dims()),aJointHistMaxStates.data());
+            cv::zeroMat(oOutput.oJointCount);
+        }
         const size_t nElemCount = std::get<0>(aInputs).total();
-        std::array<int,HistData::nDims> aCurrJointHistIndxs;
-        std::array<int,2> anCurrMargHistIndxs = {0,0};
+        std::array<int,HistData::dims()> aCurrJointHistIdxs;
         const float fCountIncr = 1.0f/nElemCount;
         for(size_t nElemIdx=0; nElemIdx<nElemCount; ++nElemIdx) {
             lv::for_each_w_idx(aInputs,[&](auto oInput, size_t nInputIdx) {
-                const int nCurrElem = int(oInput(int(nElemIdx)))-oOutput.aMinVals[nInputIdx];
-                anCurrMargHistIndxs[1] = aCurrJointHistIndxs[nInputIdx] = nQuantifStep>1?nCurrElem/int(nQuantifStep):nCurrElem;
+                typedef typename decltype(oInput)::value_type InputElemType;
+                constexpr bool bSkippingMinMax = (bSkipMinMax && !std::is_same<InputElemType,int>::value);
+                const int nCurrElem = int(oInput(int(nElemIdx)))-(bSkippingMinMax?int(std::numeric_limits<InputElemType>::min()):oOutput.aMinVals[nInputIdx]);
+                lvDbgAssert(nCurrElem>=0);
+                const std::array<int,2> aMargHistIdxs = {(aCurrJointHistIdxs[nInputIdx]=nQuantifStep>1?nCurrElem/int(nQuantifStep):nCurrElem),0};
                 if(bFastNumApprox)
-                    cv::getElem(oOutput.aMargHists[nInputIdx],anCurrMargHistIndxs.data()) += fCountIncr;
+                    cv::getElem(oOutput.aMargHists[nInputIdx],aMargHistIdxs.data()) += fCountIncr;
                 else
-                    ++cv::getElem(oOutput.aMargCounts[nInputIdx],anCurrMargHistIndxs.data());
+                    ++cv::getElem(oOutput.aMargCounts[nInputIdx],aMargHistIdxs.data());
             });
             if(bFastNumApprox)
-                cv::getElem(oOutput.oJointHist,aCurrJointHistIndxs.data()) += fCountIncr;
+                cv::getElem(oOutput.oJointHist,aCurrJointHistIdxs.data()) += fCountIncr;
             else
-                ++cv::getElem(oOutput.oJointHist,aCurrJointHistIndxs.data());
+                ++cv::getElem(oOutput.oJointCount,aCurrJointHistIdxs.data());
         }
         if(!bFastNumApprox) {
-            for(size_t nInputIdx=0; nInputIdx<HistData::nDims; ++nInputIdx)
+            for(size_t nInputIdx=0; nInputIdx<HistData::dims(); ++nInputIdx) {
+                std::array<int,bUseSparseMats?1:2> anIterPos;
                 for(auto pIter=oOutput.aMargCounts[nInputIdx].begin(); pIter!=oOutput.aMargCounts[nInputIdx].end(); ++pIter)
-                    cv::getElem(oOutput.aMargHists[nInputIdx],pIter.node()->idx) = (*pIter)*fCountIncr;
+                    cv::getElem(oOutput.aMargHists[nInputIdx],cv::getIterPos(pIter,anIterPos)) = (*pIter)*fCountIncr;
+            }
+            std::array<int,HistData::dims()> anIterPos;
             for(auto pIter=oOutput.oJointCount.begin(); pIter!=oOutput.oJointCount.end(); ++pIter)
-                cv::getElem(oOutput.oJointHist,pIter.node()->idx) = (*pIter)*fCountIncr;
+                cv::getElem(oOutput.oJointHist,cv::getIterPos(pIter,anIterPos)) = (*pIter)*fCountIncr;
         }
         if(bUseSparseMats) {
-            oOutput.nJointStates = cv::getElemCount(oOutput.oJointCount);
-            for(size_t nInputIdx=0; nInputIdx<HistData::nDims; ++nInputIdx)
-                oOutput.aStates[nInputIdx] = cv::getElemCount(oOutput.aMargCounts[nInputIdx]);
+            oOutput.nJointStates = cv::getElemCount(oOutput.oJointHist);
+            for(size_t nInputIdx=0; nInputIdx<HistData::dims(); ++nInputIdx)
+                oOutput.aStates[nInputIdx] = cv::getElemCount(oOutput.aMargHists[nInputIdx]);
         }
         else {
-            oOutput.nJointStates = size_t(lv::static_reduce(aJointHistMaxDims,[](int a, int b){return a*b;}));
-            for(size_t nInputIdx=0; nInputIdx<HistData::nDims; ++nInputIdx)
-                oOutput.aStates[nInputIdx] = size_t(aJointHistMaxDims[nInputIdx]);
+            oOutput.nJointStates = size_t(lv::static_reduce(aJointHistMaxStates,[](int a, int b){return a*b;}));
+            for(size_t nInputIdx=0; nInputIdx<HistData::dims(); ++nInputIdx)
+                oOutput.aStates[nInputIdx] = size_t(aJointHistMaxStates[nInputIdx]);
         }
     }
 
     /// computes the joint & marginal probability histograms for a given array of matrices (inline return version)
-    template<size_t nQuantifStep=1, bool bUseSparseMats=true, bool bFastNumApprox=false, typename... TMatTypes>
+    template<size_t nQuantifStep=1, bool bUseSparseMats=true, bool bFastNumApprox=false, bool bSkipMinMax=false, typename... TMatTypes>
     inline JointHistData<bUseSparseMats,TMatTypes...> calcJointProbHist(const std::tuple<cv::Mat_<TMatTypes>...>& aInputs) {
         JointHistData<bUseSparseMats,TMatTypes...> oOutput;
-        calcJointProbHist<nQuantifStep,bUseSparseMats,bFastNumApprox,TMatTypes...>(aInputs,oOutput);
+        calcJointProbHist<nQuantifStep,bUseSparseMats,bFastNumApprox,bSkipMinMax,TMatTypes...>(aInputs,oOutput);
         return oOutput;
     }
 
