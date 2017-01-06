@@ -56,6 +56,23 @@ namespace cv { // extending cv
         oMat = T();
     }
 
+    /// helper function to fetch iterator location from sparse and non-sparse matrices (sparse iter overload)
+    template<size_t nDims>
+    inline const int* getIterPos(const cv::SparseMatConstIterator& pIter, std::array<int,nDims>& /*anIndices_TempStorage*/) {
+        static_assert(nDims>0,"matrix dimension count too small");
+        lvDbgAssert(pIter.m->dims()==int(nDims));
+        return pIter.node()->idx; // not using idx_opt
+    }
+
+    /// helper function to fetch iterator location from sparse and non-sparse matrices (regular iter overload)
+    template<size_t nDims>
+    inline const int* getIterPos(const cv::MatConstIterator& pIter, std::array<int,nDims>& anIndices_TempStorage) {
+        static_assert(nDims>1,"matrix dimension count too small");
+        lvDbgAssert(pIter.m->dims==int(nDims));
+        pIter.pos(anIndices_TempStorage.data());
+        return anIndices_TempStorage.data();
+    }
+
     /// helper function to fetch references from sparse and non-sparse matrices (sparse mat overload)
     template<typename T>
     inline T& getElem(cv::SparseMat_<T>& oMat, const int* idx) {
@@ -70,13 +87,13 @@ namespace cv { // extending cv
 
     /// helper function to count valid/allocated elements in sparse and non-sparse matrices (sparse mat overload)
     template<typename T>
-    inline size_t getElemCount(cv::SparseMat_<T>& oMat) {
+    inline size_t getElemCount(const cv::SparseMat_<T>& oMat) {
         return oMat.nzcount();
     }
 
     /// helper function to count valid/allocated elements in sparse and non-sparse matrices (regular mat overload)
     template<typename T>
-    inline size_t getElemCount(cv::Mat_<T>& oMat) {
+    inline size_t getElemCount(const cv::Mat_<T>& oMat) {
         return oMat.total();
     }
 
