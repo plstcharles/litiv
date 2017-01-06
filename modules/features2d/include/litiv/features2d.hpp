@@ -49,8 +49,8 @@ namespace lv {
     /// helper struct containing joint & marginal probability histograms (dense/full-range version)
     template<bool bUseSparseMats, typename... TMatTypes>
     struct JointHistData {
-        static constexpr size_t nDims = sizeof...(TMatTypes);
-        static_assert(nDims>1,"must provide at least two matrix types in template pack");
+        static constexpr inline size_t dims() {return sizeof...(TMatTypes);}
+        static_assert(dims()>1,"must provide at least two matrix types in template pack");
         static constexpr bool bAllTypesIntegral = lv::static_reduce(std::array<bool,sizeof...(TMatTypes)>{(std::is_integral<TMatTypes>::value)...},lv::static_reduce_and);
         static constexpr bool bAllTypesNonUINT = lv::static_reduce(std::array<bool,sizeof...(TMatTypes)>{(!(std::is_same<TMatTypes,uint>::value))...},lv::static_reduce_and);
         static constexpr bool bAllTypesSmall = lv::static_reduce(std::array<bool,sizeof...(TMatTypes)>{(sizeof(TMatTypes)<=sizeof(int))...},lv::static_reduce_and);
@@ -60,11 +60,11 @@ namespace lv {
         static_assert(std::is_same<std::common_type_t<int,TMatTypes...>,int>::value,"matrix types must be ocv-arithmetic-compat");
         typedef std::conditional_t<bUseSparseMats,cv::SparseMat_<float>,cv::Mat_<float>> HistMat;
         typedef std::conditional_t<bUseSparseMats,cv::SparseMat_<int>,cv::Mat_<int>> CountMat;
-        std::array<int,nDims> aMinVals,aMaxVals;
-        std::array<size_t,nDims> aStates;
+        std::array<int,dims()> aMinVals,aMaxVals;
+        std::array<size_t,dims()> aStates;
         size_t nJointStates;
-        std::array<CountMat,nDims> aMargCounts;
-        std::array<HistMat,nDims> aMargHists;
+        std::array<CountMat,dims()> aMargCounts;
+        std::array<HistMat,dims()> aMargHists;
         CountMat oJointCount;
         HistMat oJointHist;
     };
