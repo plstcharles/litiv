@@ -155,4 +155,31 @@ namespace lv {
         return oOutput;
     }
 
+    /// computes the mutual information score for a given pair of matrices
+    template<size_t nHistQuantifStep=1, bool bUseSparseHistMats=true, bool bFastNumApprox=false, bool bSkipMinMax=false, typename T1, typename T2>
+    inline double calcMutualInfo(const cv::Mat_<T1>& oInput1, const cv::Mat_<T2>& oInput2, JointHistData<bUseSparseMats,T1,T2>* pJointProbHistOutput=nullptr) {
+        std::unique_ptr<JointHistData<bUseSparseMats,T1,T2>> pNewJointProbHistOutput;
+        if(!pJointProbHistOutput) {
+            pNewJointProbHistOutput = std::make_unique<JointHistData<bUseSparseMats,T1,T2>>();
+            pJointProbHistOutput = pNewJointProbHistOutput.get();
+        }
+        calcJointProbHist<nHistQuantifStep,bUseSparseHistMats,bFastNumApprox,bSkipMinMax>(std::make_tuple(oInput1,oInput2),*pJointProbHistOutput);
+        lvDbgAssert(pJointProbHistOutput->aStates[0]>0 && pJointProbHistOutput->aStates[1]>0 && pJointProbHistOutput->nJointStates>0);
+        lvDbgAssert(!pJointProbHistOutput->aMargHists[0].empty() && !pJointProbHistOutput->aMargHists[1].empty() && !pJointProbHistOutput->oJointHist.empty());
+        double dMutualInfoScore = 0.0f;
+        std::array<int,2> anIterPos;
+        for(auto pIter=pJointProbHistOutput->oJointCount.begin(); pIter!=pJointProbHistOutput->oJointCount.end(); ++pIter) {
+            const int* anPos = cv::getIterPos(pIter,anIterPos);
+            const float& fCurrElemJointProb = cv::getElem(pJointProbHistOutput->oJointHist,anPos);
+            if(fCurrElemJointProb>0) {
+                const float& fCurrElemMargProb1 = cv::getElem(pJointProbHistOutput->aMargHists[0],{anPos[0],0});
+                const float& fCurrElemMargProb2 = cv::getElem(pJointProbHistOutput->aMargHists[1],{anPos[1],0});
+                if(fCurrElemMargProb1>0 && fCurrElemMargProb2>0)
+                    dMutualInfoScore += double(fCurrElemJointProb*std::log(fCurrElemJointProb/fCurrElemMargProb1/fCurrElemMargProb2)); // @@@@ check precision/speed for mult instead of double-div
+            }
+        }
+        dMutualInfoScore /= std::log(2.0);
+        return dMutualInfoScore;
+    }
+
 } // namespace lv
