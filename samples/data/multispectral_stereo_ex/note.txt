@@ -1,0 +1,3 @@
+The images in this subdirectory were taken from the 2014 "Multi-modal and Multi-spectral Registration for Natural Images" ECCV paper dataset; see http://www.cse.cuhk.edu.hk/leojia/projects/multimodal/index.html for more information.
+
+The NIR image has been shifted down by 8 pixels to make horizontal sliding window tests more accurate, but the groundtruth has not been modified.
