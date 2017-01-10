@@ -91,6 +91,13 @@ namespace lv {
             _mm_store_si128(anBuffer+nIter,vVal);
     }
 
+    /// multiplies two sets of 8-bit integers (discarding overflow)
+    inline __m128i mult_8i(const __m128i& a, const __m128i& b) {
+        const __m128i anMultEven = _mm_mullo_epi16(a,b);
+        const __m128i anMultOdd = _mm_mullo_epi16(_mm_srli_epi16(a,8),_mm_srli_epi16(b,8));
+        return _mm_or_si128(_mm_slli_epi16(anMultOdd,8),_mm_srli_epi16(_mm_slli_epi16(anMultEven,8),8));
+    }
+
     /// multiplies two sets of four 32-bit signed integers
     inline __m128i mult_32si(const __m128i& a, const __m128i& b) {
     #if HAVE_SSE4_1

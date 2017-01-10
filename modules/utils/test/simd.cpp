@@ -143,13 +143,54 @@ TEST(store_8ui,regression) {
     }
 }
 
+TEST(mult_8i,regression_signed) {
+    union {
+        int8_t n[16];
+        __m128i a;
+    } a, b, c, aa;
+    a.n[0] = 0; a.n[1] = 1; a.n[2] = 2; a.n[3] = 3;
+    a.n[4] = -1; a.n[5] = -2; a.n[6] = -3; a.n[7] = 1;
+    a.n[8] = 8; a.n[9] = 16; a.n[10] = 32; a.n[11] = 64;
+    a.n[12] = 8; a.n[13] = 32; a.n[14] = 127; a.n[15]= 0;
+    aa.a = lv::mult_8i(a.a,a.a);
+    ASSERT_EQ(aa.n[0],0); ASSERT_EQ(aa.n[1],1); ASSERT_EQ(aa.n[2],4); ASSERT_EQ(aa.n[3],9);
+    ASSERT_EQ(aa.n[4],1); ASSERT_EQ(aa.n[5],4); ASSERT_EQ(aa.n[6],9); ASSERT_EQ(aa.n[7],1);
+    ASSERT_EQ(aa.n[8],64); ASSERT_EQ(aa.n[9],0); ASSERT_EQ(aa.n[10],0); ASSERT_EQ(aa.n[11],0);
+    ASSERT_EQ(aa.n[12],64); ASSERT_EQ(aa.n[13],0); ASSERT_EQ(aa.n[14],1); ASSERT_EQ(aa.n[15],0);
+    b.n[0] = 1; b.n[1] = 2; b.n[2] = -2; b.n[3] = 10;
+    b.n[4] = -127; b.n[5] = 64; b.n[6] = 10; b.n[7] = -128;
+    b.n[8] = 8; b.n[9] = 8; b.n[10] = 4; b.n[11] = 1;
+    b.n[12] = 17; b.n[13] = 1; b.n[14] = 2; b.n[15] = 0;
+    c.a = lv::mult_8i(a.a,b.a);
+    ASSERT_EQ(c.n[0],0); ASSERT_EQ(c.n[1],2); ASSERT_EQ(c.n[2],-4); ASSERT_EQ(c.n[3],30);
+    ASSERT_EQ(c.n[4],127); ASSERT_EQ(c.n[5],-128); ASSERT_EQ(c.n[6],-30); ASSERT_EQ(c.n[7],-128);
+    ASSERT_EQ(c.n[8],64); ASSERT_EQ(c.n[9],-128); ASSERT_EQ(c.n[10],-128); ASSERT_EQ(c.n[11],64);
+    ASSERT_EQ(c.n[12],-120); ASSERT_EQ(c.n[13],32); ASSERT_EQ(c.n[14],-2); ASSERT_EQ(c.n[15],0);
+}
+
+
+TEST(mult_8i,regression_unsigned) {
+    union {
+        uint8_t n[16];
+        __m128i a;
+    } a, aa;
+    a.n[0] = 0; a.n[1] = 1; a.n[2] = 2; a.n[3] = 3;
+    a.n[4] = 4; a.n[5] = 5; a.n[6] = 6; a.n[7] = 7;
+    a.n[8] = 8; a.n[9] = 9; a.n[10] = 10; a.n[11] = 11;
+    a.n[12] = 15; a.n[13] = 16; a.n[14] = 17; a.n[15]= 0;
+    aa.a = lv::mult_8i(a.a,a.a);
+    ASSERT_EQ(aa.n[0],0); ASSERT_EQ(aa.n[1],1); ASSERT_EQ(aa.n[2],4); ASSERT_EQ(aa.n[3],9);
+    ASSERT_EQ(aa.n[4],16); ASSERT_EQ(aa.n[5],25); ASSERT_EQ(aa.n[6],36); ASSERT_EQ(aa.n[7],49);
+    ASSERT_EQ(aa.n[8],64); ASSERT_EQ(aa.n[9],81); ASSERT_EQ(aa.n[10],100); ASSERT_EQ(aa.n[11],121);
+    ASSERT_EQ(aa.n[12],225); ASSERT_EQ(aa.n[13],0); ASSERT_EQ(aa.n[14],33); ASSERT_EQ(aa.n[15],0);
+}
+
 TEST(mult_32si,regression) {
     union {
         int32_t n[4];
         __m128i a;
     } a, b, c;
-    a.n[0] = 65535; a.n[1] = -512; a.n[2] = 77910; a.n[3] = 0;
-    b.n[0] = 2;     b.n[1] = 4431; b.n[2] = -7969; b.n[3] = 240000000;
+    a.n[0] = 65535; a.n[1] = -512; a.n[2] = 77910; a.n[3] = 0; b.n[0] = 2; b.n[1] = 4431; b.n[2] = -7969; b.n[3] = 240000000;
     c.a = lv::mult_32si(a.a,b.a);
     ASSERT_EQ(c.n[0],131070);
     ASSERT_EQ(c.n[1],-2268672);
