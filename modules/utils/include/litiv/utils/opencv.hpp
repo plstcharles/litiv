@@ -407,6 +407,13 @@ namespace cv { // extending cv
         }
     }
 
+    /// converts a 3-ch RGB image into a packed ushort YCbCr image where Cb and Cr are quantified to 4 bits each (inline version)
+    inline cv::Mat_<ushort> cvtBGRToPackedYCbCr(const cv::Mat_<cv::Vec3b>& oInput) {
+        cv::Mat_<ushort> oOutput;
+        cvtBGRToPackedYCbCr(oInput,oOutput);
+        return oOutput;
+    }
+
     /// converts a packed ushort YCbCr image where Cb and Cr are quantified to 4 bits each into a 3-ch RGB image
     inline void cvtPackedYCbCrToBGR(const cv::Mat_<ushort>& oInput, cv::Mat_<cv::Vec3b>& oOutput) {
         lvAssert_(oInput.dims==2,"function only defined for 2-dims matrices");
@@ -449,6 +456,13 @@ namespace cv { // extending cv
         cv::Mat_<cv::Vec3b> oOutput_YCrCb;
         cv::merge(voOutputs,oOutput_YCrCb);
         cv::cvtColor(oOutput_YCrCb,oOutput,cv::COLOR_YCrCb2BGR);
+    }
+
+    /// converts a packed ushort YCbCr image where Cb and Cr are quantified to 4 bits each into a 3-ch RGB image (inline version)
+    inline cv::Mat_<cv::Vec3b> cvtPackedYCbCrToBGR(const cv::Mat_<ushort>& oInput) {
+        cv::Mat_<cv::Vec3b> oOutput;
+        cvtPackedYCbCrToBGR(oInput,oOutput);
+        return oOutput;
     }
 
     /// returns a 8uc3 color map such that all equal values in the given matrix are assigned the same unique color in the map
