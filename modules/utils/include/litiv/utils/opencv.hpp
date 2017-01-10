@@ -367,12 +367,14 @@ namespace cv { // extending cv
     inline void cvtBGRToPackedYCbCr(const cv::Mat_<cv::Vec3b>& oInput, cv::Mat_<ushort>& oOutput) {
         lvAssert_(oInput.dims==2,"function only defined for 2-dims, 3-ch matrices");
         if(oInput.empty()) {
-            oOutput = cv::Mat_<ushort>();
+            oOutput.release();
             return;
         }
         cv::Mat_<cv::Vec3b> oInput_YCrCb;
         cv::cvtColor(oInput,oInput_YCrCb,cv::COLOR_BGR2YCrCb);
         std::vector<cv::Mat_<uchar>> voInputs(3);
+        if(!oOutput.empty() && oOutput.allocator!=getMatAllocator16a())
+            oOutput.release();
         oOutput.allocator = voInputs[0].allocator = voInputs[1].allocator = voInputs[2].allocator = getMatAllocator16a();
         cv::split(oInput_YCrCb,voInputs);
         lvDbgAssert(voInputs.size()==size_t(3) && voInputs[0].size==oInput.size && voInputs[1].size==oInput.size && voInputs[2].size==oInput.size);
@@ -384,6 +386,8 @@ namespace cv { // extending cv
             int nColIdx = 0;
         #if HAVE_SSE2
             for(; nColIdx<=oInput.cols-16; nColIdx+=16) {
+                lvDbgAssert(isAligned<16>(pYRow+nColIdx) && isAligned<16>(pCrRow+nColIdx) && isAligned<16>(pCbRow+nColIdx));
+                lvDbgAssert(isAligned<16>(pOutputRow+nColIdx) && isAligned<16>(pOutputRow+nColIdx+8));
                 const __m128i aYVals_8ui = _mm_load_si128((__m128i*)(pYRow+nColIdx));
                 const __m128i aYVals_lo = lv::unpack_8ui_to_16ui<true>(aYVals_8ui);
                 const __m128i aYVals_hi = lv::unpack_8ui_to_16ui<false>(aYVals_8ui);
@@ -406,10 +410,12 @@ namespace cv { // extending cv
     inline void cvtPackedYCbCrToBGR(const cv::Mat_<ushort>& oInput, cv::Mat_<cv::Vec3b>& oOutput) {
         lvAssert_(oInput.dims==2,"function only defined for 2-dims matrices");
         if(oInput.empty()) {
-            oOutput = cv::Mat_<cv::Vec3b>();
+            oOutput.release();
             return;
         }
         std::vector<cv::Mat_<uchar>> voOutputs(3);
+        if(!oOutput.empty() && oOutput.allocator!=getMatAllocator16a())
+            oOutput.release();
         oOutput.allocator = voOutputs[0].allocator = voOutputs[1].allocator = voOutputs[2].allocator = getMatAllocator16a();
         oOutput.create(oInput.size()); voOutputs[0].create(oInput.size()); voOutputs[1].create(oInput.size()); voOutputs[2].create(oInput.size());
         for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {

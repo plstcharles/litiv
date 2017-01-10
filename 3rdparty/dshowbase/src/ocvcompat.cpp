@@ -100,7 +100,7 @@ lv::DShowFrameGrabber::~DShowFrameGrabber() {
 int64_t lv::DShowFrameGrabber::GetLatestFrame(cv::Mat& oOutput, bool bVFlip) const {
     std::lock_guard<std::mutex> oLock(m_oMutex);
     if(!m_bKeepInternalCopy || m_oInternalSampleCopy.empty()) {
-        oOutput = cv::Mat();
+        oOutput.release();
         return -1;
     }
     else {

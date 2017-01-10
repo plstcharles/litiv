@@ -602,7 +602,7 @@ void lv::IDataLoader_<lv::Array>::unpackInput(size_t nPacketIdx, std::vector<cv:
             lvError("cannot handle image array packet type in unpackInput due to missing packet size(s)");
         if(oInput.empty()) {
             for(size_t s=0; s<vSizes.size(); ++s)
-                vUnpackedInput[s] = cv::Mat();
+                vUnpackedInput[s].release();
             return;
         }
         lvAssert(oInput.isContinuous());
@@ -632,7 +632,7 @@ void lv::IDataLoader_<lv::Array>::unpackGT(size_t nPacketIdx, std::vector<cv::Ma
             lvError("cannot handle image array packet type in unpackGT due to missing packet size(s)");
         if(oGT.empty()) {
             for(size_t s=0; s<vSizes.size(); ++s)
-                vUnpackedGT[s] = cv::Mat();
+                vUnpackedGT[s].release();
             return;
         }
         lvAssert(oGT.isContinuous());

@@ -273,7 +273,7 @@ namespace lv {
             const cv::Mat& oInput = this->getInput(nPacketIdx)/*.clone()*/;
             if(oInput.empty()) {
                 for(size_t s=0; s<vUnpackedInput.size(); ++s)
-                    vUnpackedInput[s] = cv::Mat();
+                    vUnpackedInput[s].release();
             }
             else {
                 lvDbgAssert(vUnpackedInput.size()==size_t(this->m_bLoadDepth?3:2));

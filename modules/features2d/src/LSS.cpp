@@ -221,13 +221,13 @@ void LSS::reshapeDesc(cv::Size oSize, cv::Mat& oDescriptors) const {
 }
 
 void LSS::validateKeyPoints(std::vector<cv::KeyPoint>& voKeypoints, cv::Size oImgSize) const {
-    cv::KeyPointsFilter::runByImageBorder(voKeypoints,oImgSize,m_nRadialBins*m_nAngularBins);
+    cv::KeyPointsFilter::runByImageBorder(voKeypoints,oImgSize,m_nCorrWinSize/2);
 }
 
 void LSS::validateROI(cv::Mat& oROI) const {
     lvAssert_(!oROI.empty() && oROI.type()==CV_8UC1,"input ROI must be non-empty and of type 8UC1");
     cv::Mat oROI_new(oROI.size(),CV_8UC1,cv::Scalar_<uchar>(0));
-    const int nBorderSize = m_nRadialBins*m_nAngularBins;
+    const int nBorderSize = m_nCorrWinSize/2;
     const cv::Rect nROI_inner(nBorderSize,nBorderSize,oROI.cols-nBorderSize*2,oROI.rows-nBorderSize*2);
     cv::Mat(oROI,nROI_inner).copyTo(cv::Mat(oROI_new,nROI_inner));
     oROI = oROI_new;
@@ -264,7 +264,7 @@ void LSS::ssdescs_impl(const cv::Mat& _oImage, std::vector<cv::KeyPoint>& voKeyp
     lvAssert_(m_nCorrWinSize<_oImage.cols && m_nCorrWinSize<_oImage.rows,"image is too small to compute descriptors with current correlation area size");
     cv::KeyPointsFilter::runByImageBorder(voKeypoints,_oImage.size(),m_nCorrWinSize/2);
     if(voKeypoints.empty()) {
-        oDescriptors = cv::Mat_<float>();
+        oDescriptors.release();
         return;
     }
     cv::Mat oImage;

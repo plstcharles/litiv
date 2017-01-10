@@ -127,13 +127,14 @@ void lv::nonMaxSuppression(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Ma
     //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
     //  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
     //  POSSIBILITY OF SUCH DAMAGE.
-    lvAssert(oInput.channels()==1);
+    lvAssert(oInput.dims==2 && oInput.channels()==1);
     // initialise the block oMask and destination
     const int M = oInput.rows;
     const int N = oInput.cols;
     const bool masked = !oMask.empty();
     cv::Mat block = 255*cv::Mat_<uint8_t>::ones(cv::Size(2*nWinSize+1,2*nWinSize+1));
-    oOutput = cv::Mat_<uint8_t>::zeros(oInput.size());
+    oOutput.create(oInput.size(),CV_8UC1);
+    oOutput = cv::Scalar_<uchar>(0);
     // iterate over image blocks
     for(int m = 0; m < M; m+=nWinSize+1) {
         for(int n = 0; n < N; n+=nWinSize+1) {

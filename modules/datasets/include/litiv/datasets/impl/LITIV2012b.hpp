@@ -234,7 +234,7 @@ namespace lv {
                     cv::resize(oFrame,oFrame,m_oSize,0,0,cv::INTER_NEAREST);
             }
             else
-                oFrame = cv::Mat();//cv::Mat(m_oSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_OUTOFSCOPE_VAL));
+                oFrame.release();//cv::Mat(m_oSize,CV_8UC1,cv::Scalar_<uchar>(DATASETUTILS_OUTOFSCOPE_VAL));
             return oFrame;
         }
     };
