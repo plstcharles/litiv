@@ -38,6 +38,7 @@ namespace cv { // extending cv
     /// returns whether a given memory address is aligned to the templated step or not
     template<size_t nByteAlign, typename TAddr>
     bool isAligned(TAddr pData) {
+        static_assert(std::is_pointer<TAddr>::value,"need to pass pointer type");
         static_assert(nByteAlign>0,"byte align must be positive value");
         return (uintptr_t(pData)%nByteAlign)==0;
     }
