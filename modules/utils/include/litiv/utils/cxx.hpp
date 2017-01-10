@@ -487,6 +487,12 @@ namespace lv {
         return a&&b;
     }
 
+    /// helper constexpr addition folding expression for often-used static array reduction
+    template<typename T>
+    constexpr auto static_reduce_add(T a, T b) {
+        return a+b;
+    }
+
     /// helper structure to create lookup tables with generic functors (also exposes multiple lookup interfaces)
     template<typename Tx, typename Ty, size_t nBins, size_t nSafety=0, typename TStep=float>
     struct LUT {
