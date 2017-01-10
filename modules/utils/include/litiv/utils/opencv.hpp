@@ -30,6 +30,18 @@ namespace cv { // extending cv
     struct DisplayHelper;
     using DisplayHelperPtr = std::shared_ptr<DisplayHelper>;
 
+    /// returns a 16-byte aligned matrix allocator for SSE(1/2/3/4.1/4.2) support (should never be modified, despite non-const!)
+    cv::MatAllocator* getMatAllocator16a();
+    /// returns a 16-byte aligned matrix allocator for AVX(1/2) support (should never be modified, despite non-const!)
+    cv::MatAllocator* getMatAllocator32a();
+
+    /// returns whether a given memory address is aligned to the templated step or not
+    template<size_t nByteAlign, typename TAddr>
+    bool isAligned(TAddr pData) {
+        static_assert(nByteAlign>0,"byte align must be positive value");
+        return (uintptr_t(pData)%nByteAlign)==0;
+    }
+
     /// type traits helper which provides basic static info on ocv matrix element types
     template<int nTypeFlag>
     struct MatTypeInfo {
@@ -537,10 +549,5 @@ namespace cv { // extending cv
 
     /// temp function; msvc seems to disable cuda output unless it is passed as argument to an external-lib function call...?
     void doNotOptimize(const cv::Mat& m);
-
-    /// returns a 16-byte aligned matrix allocator for SSE(1/2/3/4.1/4.2) support (should never be modified, despite non-const!)
-    cv::MatAllocator* getMatAllocator16a();
-    /// returns a 16-byte aligned matrix allocator for AVX(1/2) support (should never be modified, despite non-const!)
-    cv::MatAllocator* getMatAllocator32a();
 
 } // namespace cv

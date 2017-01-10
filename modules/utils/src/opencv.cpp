@@ -19,6 +19,13 @@
 #include "litiv/utils/platform.hpp"
 #include <fstream>
 
+// these are really empty shells, but we need actual allocation due to ocv's virtual interface
+cv::AlignedMatAllocator<16,false> g_oMatAlloc16a = cv::AlignedMatAllocator<16,false>();
+cv::AlignedMatAllocator<32,false> g_oMatAlloc32a = cv::AlignedMatAllocator<32,false>();
+
+cv::MatAllocator* cv::getMatAllocator16a() {return (cv::MatAllocator*)&g_oMatAlloc16a;}
+cv::MatAllocator* cv::getMatAllocator32a() {return (cv::MatAllocator*)&g_oMatAlloc32a;}
+
 cv::DisplayHelperPtr cv::DisplayHelper::create(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) {
     struct DisplayHelperWrapper : public DisplayHelper {
         DisplayHelperWrapper(const std::string& _sDisplayName, const std::string& _sDebugFSDirPath, const cv::Size& _oMaxSize, int _nWindowFlags) :
@@ -407,10 +414,3 @@ void cv::shift(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Point2f& vDelt
     const cv::Rect oROI = cv::Rect(std::max(-vDeltaInt.x,0),std::max(-vDeltaInt.y,0),0,0)+oInput.size();
     oOutput = oPaddedInput(oROI);
 }
-
-// these are really empty shells, but we need actual allocation due to ocv's virtual interface
-cv::AlignedMatAllocator<16,false> g_oMatAlloc16a = cv::AlignedMatAllocator<16,false>();
-cv::AlignedMatAllocator<32,false> g_oMatAlloc32a = cv::AlignedMatAllocator<32,false>();
-
-cv::MatAllocator* cv::getMatAllocator16a() {return (cv::MatAllocator*)&g_oMatAlloc16a;}
-cv::MatAllocator* cv::getMatAllocator32a() {return (cv::MatAllocator*)&g_oMatAlloc32a;}
