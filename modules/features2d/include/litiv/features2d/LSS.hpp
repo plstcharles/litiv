@@ -37,8 +37,8 @@ public:
     virtual void read(const cv::FileNode&) override;
     /// writes extractor params to the specified file storage @@@@ not impl
     virtual void write(cv::FileStorage&) const override;
-    /// returns the current descriptor border size, i.e. the expected border size requirement around a pixel for proper description
-    virtual int borderSize() const;
+    /// returns the window size that will be used around each keypoint (also gives the minimum image size required for description)
+    virtual cv::Size windowSize() const;
     /// returns the current descriptor size, in bytes (overrides cv::DescriptorExtractor's)
     virtual int descriptorSize() const override;
     /// returns the current descriptor data type (overrides cv::DescriptorExtractor's)

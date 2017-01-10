@@ -23,15 +23,13 @@
 class MutualInfo : public cv::Algorithm {
 public:
     /// default constructor
-    MutualInfo(const cv::Size& oWinSize=cv::Size(40,40), bool bUseDenseHist=false, bool bUse24BitPair=true);
+    MutualInfo(const cv::Size& oWinSize=cv::Size(41,41), bool bUseDenseHist=false, bool bUse24BitPair=true);
     /// loads params from the specified file node @@@@ not impl
     virtual void read(const cv::FileNode&) override;
     /// writes params to the specified file storage @@@@ not impl
     virtual void write(cv::FileStorage&) const override;
-    /// returns the minimum expected border size around a pixel (i.e. max dimension of win size)
-    virtual int borderSize() const;
-    /// returns the window size used with keypoint-based calls
-    virtual const cv::Size& windowSize() const;
+    /// returns the window size that will be used around each keypoint
+    virtual cv::Size windowSize() const;
     /// returns the mutual information score for the given image pair (will use full matrices instead of subwindow)
     double compute(const cv::Mat& oImage1, const cv::Mat& oImage2);
     /// returns the mutual information scores for the given keypoints located in the image pair using subwindows of the size passed in constructor

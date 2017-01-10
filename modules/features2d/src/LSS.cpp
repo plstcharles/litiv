@@ -124,8 +124,8 @@ void LSS::write(cv::FileStorage& /*fs*/) const {
     //fs << "..." << ...;
 }
 
-int LSS::borderSize() const {
-    return m_nCorrWinSize/2;
+cv::Size LSS::windowSize() const {
+    return cv::Size(m_nCorrWinSize,m_nCorrWinSize);
 }
 
 int LSS::descriptorSize() const {

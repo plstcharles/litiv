@@ -83,8 +83,8 @@ void DASC::write(cv::FileStorage& /*fs*/) const {
     //fs << "..." << ...;
 }
 
-int DASC::borderSize() const {
-    return pretrained::nRPAbsMax;
+cv::Size DASC::windowSize() const {
+    return cv::Size(pretrained::nRPAbsMax,pretrained::nRPAbsMax);
 }
 
 int DASC::descriptorSize() const {

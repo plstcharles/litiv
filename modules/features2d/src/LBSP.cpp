@@ -46,8 +46,8 @@ void LBSP::write(cv::FileStorage& /*fs*/) const {
     //fs << "..." << ...;
 }
 
-int LBSP::borderSize() const {
-    return int(PATCH_SIZE/2);
+cv::Size LBSP::windowSize() const {
+    return cv::Size(PATCH_SIZE,PATCH_SIZE);
 }
 
 int LBSP::descriptorSize() const {

@@ -36,11 +36,7 @@ void MutualInfo::write(cv::FileStorage& /*fs*/) const {
     //fs << "..." << ...;
 }
 
-int MutualInfo::borderSize() const {
-    return std::max(m_oWinSize.height,m_oWinSize.width);
-}
-
-const cv::Size& MutualInfo::windowSize() const {
+cv::Size MutualInfo::windowSize() const {
     return m_oWinSize;
 }
 
@@ -108,14 +104,13 @@ std::vector<double> MutualInfo::compute(const cv::Mat& oImage1, const cv::Mat& o
 }
 
 void MutualInfo::validateKeyPoints(std::vector<cv::KeyPoint>& voKeypoints, cv::Size oImgSize) const {
-    cv::KeyPointsFilter::runByImageBorder(voKeypoints,oImgSize,borderSize());
+    cv::KeyPointsFilter::runByImageBorder(voKeypoints,oImgSize,std::max(m_oWinSize.width,m_oWinSize.height));
 }
 
 void MutualInfo::validateROI(cv::Mat& oROI) const {
     lvAssert_(!oROI.empty() && oROI.type()==CV_8UC1,"input ROI must be non-empty and of type 8UC1");
     cv::Mat oROI_new(oROI.size(),CV_8UC1,cv::Scalar_<uchar>(0));
-    const int nBorderSize = borderSize();
-    const cv::Rect nROI_inner(nBorderSize,nBorderSize,oROI.cols-nBorderSize*2,oROI.rows-nBorderSize*2);
+    const cv::Rect nROI_inner(m_oWinSize.width/2,m_oWinSize.height/2,oROI.cols-m_oWinSize.width,oROI.rows-m_oWinSize.height);
     cv::Mat(oROI,nROI_inner).copyTo(cv::Mat(oROI_new,nROI_inner));
     oROI = oROI_new;
 }
