@@ -445,6 +445,18 @@ namespace lv {
         return _unpack_and_call(a,f,std::make_index_sequence<nArraySize>{});
     }
 
+    /// computes a 1D array -> 1D array transformation with constexpr support (impl)
+    template<typename TFunc, typename TValue, size_t nArraySize, size_t... anIndices>
+    constexpr auto _static_transform(const std::array<TValue,nArraySize>& a, TFunc lOp, std::index_sequence<anIndices...>) -> std::array<decltype(lOp(a[0])),nArraySize> {
+        return {lOp(a[anIndices])...};
+    }
+
+    /// computes a 1D array -> 1D array transformation with constexpr support
+    template<typename TFunc, typename TValue, size_t nArraySize>
+    constexpr auto static_transform(const std::array<TValue,nArraySize>& a, TFunc lOp) -> decltype(_static_transform(a,lOp,std::make_index_sequence<nArraySize>{})) {
+        return _static_transform(a,lOp,std::make_index_sequence<nArraySize>{});
+    }
+
     /// computes a 2D array -> 1D array transformation with constexpr support (impl)
     template<typename TFunc, typename TValue, size_t nArraySize, size_t... anIndices>
     constexpr auto _static_transform(const std::array<TValue,nArraySize>& a, const std::array<TValue,nArraySize>& b, TFunc lOp, std::index_sequence<anIndices...>) -> std::array<decltype(lOp(a[0],b[0])),nArraySize> {
