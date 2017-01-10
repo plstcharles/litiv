@@ -91,6 +91,12 @@ namespace lv {
             _mm_store_si128(anBuffer+nIter,vVal);
     }
 
+    /// unpacks the low/high 8-bit unsigned integers of the input register to 16-bit unsigned integer values
+    template<bool bLowBits>
+    inline __m128i unpack_8ui_to_16ui(const __m128i& aInput_8i) {
+        return bLowBits?_mm_unpacklo_epi8(aInput_8i,_mm_setzero_si128()):_mm_unpackhi_epi8(aInput_8i,_mm_setzero_si128());
+    }
+
     /// multiplies two sets of 8-bit integers (discarding overflow)
     inline __m128i mult_8i(const __m128i& a, const __m128i& b) {
         const __m128i anMultEven = _mm_mullo_epi16(a,b);

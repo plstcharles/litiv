@@ -143,6 +143,24 @@ TEST(store_8ui,regression) {
     }
 }
 
+TEST(unpack_8ui_to_16ui,regression) {
+    union {
+        uint8_t n[16];
+        uint16_t s[8];
+        __m128i a;
+    } a,b,c;
+    a.n[0] = 0; a.n[1] = 1; a.n[2] = 2; a.n[3] = 3;
+    a.n[4] = 255; a.n[5] = 254; a.n[6] = 253; a.n[7] = 128;
+    a.n[8] = 8; a.n[9] = 16; a.n[10] = 32; a.n[11] = 64;
+    a.n[12] = 8; a.n[13] = 32; a.n[14] = 127; a.n[15]= 0;
+    b.a = lv::unpack_8ui_to_16ui<true>(a.a);
+    ASSERT_EQ(b.s[0],0); ASSERT_EQ(b.s[1],1); ASSERT_EQ(b.s[2],2); ASSERT_EQ(b.s[3],3);
+    ASSERT_EQ(b.s[4],255); ASSERT_EQ(b.s[5],254); ASSERT_EQ(b.s[6],253); ASSERT_EQ(b.s[7],128);
+    c.a = lv::unpack_8ui_to_16ui<false>(a.a);
+    ASSERT_EQ(c.s[0],8); ASSERT_EQ(c.s[1],16); ASSERT_EQ(c.s[2],32); ASSERT_EQ(c.s[3],64);
+    ASSERT_EQ(c.s[4],8); ASSERT_EQ(c.s[5],32); ASSERT_EQ(c.s[6],127); ASSERT_EQ(c.s[7],0);
+}
+
 TEST(mult_8i,regression_signed) {
     union {
         int8_t n[16];
@@ -167,7 +185,6 @@ TEST(mult_8i,regression_signed) {
     ASSERT_EQ(c.n[8],64); ASSERT_EQ(c.n[9],-128); ASSERT_EQ(c.n[10],-128); ASSERT_EQ(c.n[11],64);
     ASSERT_EQ(c.n[12],-120); ASSERT_EQ(c.n[13],32); ASSERT_EQ(c.n[14],-2); ASSERT_EQ(c.n[15],0);
 }
-
 
 TEST(mult_8i,regression_unsigned) {
     union {
