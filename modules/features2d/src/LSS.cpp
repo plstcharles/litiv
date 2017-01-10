@@ -124,6 +124,10 @@ void LSS::write(cv::FileStorage& /*fs*/) const {
     //fs << "..." << ...;
 }
 
+int LSS::borderSize() const {
+    return m_nCorrWinSize/2;
+}
+
 int LSS::descriptorSize() const {
     return m_nRadialBins*m_nAngularBins*int(sizeof(float));
 }
