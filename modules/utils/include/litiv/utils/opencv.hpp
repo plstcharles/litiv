@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "litiv/utils/platform.hpp"
+#include "litiv/utils/simd.hpp"
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
@@ -361,6 +361,76 @@ namespace cv { // extending cv
         const float fSaturation = std::max(0.0f,std::min(fDiffChroma/(1.0f-std::abs(2.0f*fLightness-1.0f)),1.0f));
         const float fHue = (fMaxChroma==r?(((g-b)/fDiffChroma)+(g<b?6.0f:0.0f)):(fMaxChroma==g?((b-r)/fDiffChroma+2.0f):(r-g)/fDiffChroma+4.0f))*60.0f;
         return cv::Vec3f(fHue,fSaturation,fLightness);
+    }
+
+    /// converts a 3-ch RGB image into a packed ushort YCbCr image where Cb and Cr are quantified to 4 bits each
+    inline void cvtBGRToPackedYCbCr(const cv::Mat_<cv::Vec3b>& oInput, cv::Mat_<ushort>& oOutput) {
+        lvAssert_(oInput.dims==2,"function only defined for 2-dims, 3-ch matrices");
+        if(oInput.empty()) {
+            oOutput = cv::Mat_<ushort>();
+            return;
+        }
+        cv::Mat_<cv::Vec3b> oInput_YCrCb;
+        cv::cvtColor(oInput,oInput_YCrCb,cv::COLOR_BGR2YCrCb);
+        std::vector<cv::Mat_<uchar>> voInputs(3);
+        oOutput.allocator = voInputs[0].allocator = voInputs[1].allocator = voInputs[2].allocator = getMatAllocator16a();
+        cv::split(oInput_YCrCb,voInputs);
+        lvDbgAssert(voInputs.size()==size_t(3) && voInputs[0].size==oInput.size && voInputs[1].size==oInput.size && voInputs[2].size==oInput.size);
+        oOutput.create(oInput.dims,oInput.size.operator const int *());
+        for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {
+            const uchar* pYRow = voInputs[0].ptr<uchar>(nRowIdx), *pCrRow = voInputs[1].ptr<uchar>(nRowIdx), *pCbRow = voInputs[2].ptr<uchar>(nRowIdx);
+            ushort* pOutputRow = oOutput.ptr<ushort>(nRowIdx);
+            lvDbgAssert(isAligned<16>(pYRow) && isAligned<16>(pCrRow) && isAligned<16>(pCbRow) && isAligned<16>(pOutputRow));
+            int nColIdx = 0;
+        #if HAVE_SSE2
+            for(; nColIdx<=oInput.cols-16; nColIdx+=16) {
+                const __m128i aYVals_8ui = _mm_load_si128((__m128i*)(pYRow+nColIdx));
+                const __m128i aYVals_lo = lv::unpack_8ui_to_16ui<true>(aYVals_8ui);
+                const __m128i aYVals_hi = lv::unpack_8ui_to_16ui<false>(aYVals_8ui);
+                const __m128i aCrVals_8ui = _mm_load_si128((__m128i*)(pCrRow+nColIdx));
+                const __m128i aCrVals_lo = _mm_slli_epi16(_mm_srli_epi16(lv::unpack_8ui_to_16ui<true>(aCrVals_8ui),4),8);
+                const __m128i aCrVals_hi = _mm_slli_epi16(_mm_srli_epi16(lv::unpack_8ui_to_16ui<false>(aCrVals_8ui),4),8);
+                const __m128i aCbVals_8ui = _mm_load_si128((__m128i*)(pCbRow+nColIdx));
+                const __m128i aCbVals_lo = _mm_slli_epi16(_mm_srli_epi16(lv::unpack_8ui_to_16ui<true>(aCbVals_8ui),4),12);
+                const __m128i aCbVals_hi = _mm_slli_epi16(_mm_srli_epi16(lv::unpack_8ui_to_16ui<false>(aCbVals_8ui),4),12);
+                _mm_store_si128((__m128i*)(pOutputRow+nColIdx),_mm_or_si128(aYVals_lo,_mm_or_si128(aCrVals_lo,aCbVals_lo)));
+                _mm_store_si128((__m128i*)(pOutputRow+nColIdx+8),_mm_or_si128(aYVals_hi,_mm_or_si128(aCrVals_hi,aCbVals_hi)));
+            }
+        #endif //HAVE_SSE2
+            for(; nColIdx<oInput.cols; ++nColIdx)
+                pOutputRow[nColIdx] = ushort(pYRow[nColIdx]+((pCrRow[nColIdx]>>4)<<8)+((pCbRow[nColIdx]>>4)<<12));
+        }
+    }
+
+    /// converts a packed ushort YCbCr image where Cb and Cr are quantified to 4 bits each into a 3-ch RGB image
+    inline void cvtPackedYCbCrToBGR(const cv::Mat_<ushort>& oInput, cv::Mat_<cv::Vec3b>& oOutput) {
+        lvAssert_(oInput.dims==2,"function only defined for 2-dims matrices");
+        if(oInput.empty()) {
+            oOutput = cv::Mat_<cv::Vec3b>();
+            return;
+        }
+        std::vector<cv::Mat_<uchar>> voOutputs(3);
+        oOutput.allocator = voOutputs[0].allocator = voOutputs[1].allocator = voOutputs[2].allocator = getMatAllocator16a();
+        oOutput.create(oInput.size()); voOutputs[0].create(oInput.size()); voOutputs[1].create(oInput.size()); voOutputs[2].create(oInput.size());
+        for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {
+            const ushort* pPackedRow = oInput.ptr<ushort>(nRowIdx);
+            uchar* pYRow = voOutputs[0].ptr<uchar>(nRowIdx), *pCrRow = voOutputs[1].ptr<uchar>(nRowIdx), *pCbRow = voOutputs[2].ptr<uchar>(nRowIdx);
+            lvDbgAssert(isAligned<16>(pPackedRow) && isAligned<16>(pYRow) && isAligned<16>(pCrRow) && isAligned<16>(pCbRow));
+            int nColIdx = 0;
+    #if 0//SIMD
+            for(; nColIdx<=oInput.cols-16; nColIdx+=16) {
+
+            }
+    #endif //SIMD
+            for(; nColIdx<oInput.cols; ++nColIdx) {
+                pYRow[nColIdx] = uchar(pPackedRow[nColIdx]);
+                pCrRow[nColIdx] = uchar(((pPackedRow[nColIdx]>>8)&15)<<4);
+                pCbRow[nColIdx] = uchar((pPackedRow[nColIdx]>>12)<<4);
+            }
+        }
+        cv::Mat_<cv::Vec3b> oOutput_YCrCb;
+        cv::merge(voOutputs,oOutput_YCrCb);
+        cv::cvtColor(oOutput_YCrCb,oOutput,cv::COLOR_YCrCb2BGR);
     }
 
     /// returns a 8uc3 color map such that all equal values in the given matrix are assigned the same unique color in the map
