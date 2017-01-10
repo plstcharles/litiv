@@ -17,10 +17,9 @@
 
 #pragma once
 
-#include "litiv/features2d/DASC.hpp"
-#include "litiv/features2d/LBSP.hpp"
-#include "litiv/features2d/LSS.hpp"
 #include "litiv/utils/opencv.hpp"
+
+// feature descriptor impls headers are included below
 
 namespace lv {
 
@@ -54,20 +53,25 @@ namespace lv {
         static constexpr bool bAllTypesIntegral = lv::static_reduce(std::array<bool,sizeof...(TMatTypes)>{(std::is_integral<TMatTypes>::value)...},lv::static_reduce_and);
         static constexpr bool bAllTypesNonUINT = lv::static_reduce(std::array<bool,sizeof...(TMatTypes)>{(!(std::is_same<TMatTypes,uint>::value))...},lv::static_reduce_and);
         static constexpr bool bAllTypesSmall = lv::static_reduce(std::array<bool,sizeof...(TMatTypes)>{(sizeof(TMatTypes)<=sizeof(int))...},lv::static_reduce_and);
-        static constexpr bool bAllTypesByte = lv::static_reduce(std::array<bool,sizeof...(TMatTypes)>{(sizeof(TMatTypes)==1)...},lv::static_reduce_and);
+        static constexpr size_t nByteSum = lv::static_reduce(std::array<size_t,sizeof...(TMatTypes)>{(sizeof(TMatTypes))...},lv::static_reduce_add<size_t>);
         static_assert(bAllTypesIntegral && bAllTypesNonUINT && bAllTypesSmall,"matrix types must be integral & ocv-arithmetic-compat");
-        static_assert(bUseSparseMats || bAllTypesByte,"very unlikely to have enough memory for full-range w/ large ints...");
+        static_assert(bUseSparseMats || (nByteSum<=3),"very unlikely to have enough memory for dense histograms w/ large integers...");
         static_assert(std::is_same<std::common_type_t<int,TMatTypes...>,int>::value,"matrix types must be ocv-arithmetic-compat");
         typedef std::conditional_t<bUseSparseMats,cv::SparseMat_<float>,cv::Mat_<float>> HistMat;
         typedef std::conditional_t<bUseSparseMats,cv::SparseMat_<int>,cv::Mat_<int>> CountMat;
-        std::array<int,dims()> aMinVals,aMaxVals;
-        std::array<size_t,dims()> aStates;
-        size_t nJointStates;
-        std::array<CountMat,dims()> aMargCounts;
-        std::array<HistMat,dims()> aMargHists;
+        std::array<int,sizeof...(TMatTypes)> aMinVals,aMaxVals;
+        std::array<CountMat,sizeof...(TMatTypes)> aMargCounts;
+        std::array<HistMat,sizeof...(TMatTypes)> aMargHists;
+        std::array<size_t,sizeof...(TMatTypes)> aStates;
         CountMat oJointCount;
         HistMat oJointHist;
+        size_t nJointStates;
     };
+
+    template<typename... TMatTypes>
+    using JointSparseHistData = JointHistData<true,TMatTypes...>;
+    template<typename... TMatTypes>
+    using JointDenseHistData = JointHistData<false,TMatTypes...>;
 
     /// computes the joint & marginal probability histograms for a given array of matrices
     template<size_t nQuantifStep=1, bool bUseSparseMats=true, bool bFastNumApprox=false, bool bSkipMinMax=false, typename... TMatTypes>
@@ -157,25 +161,25 @@ namespace lv {
 
     /// computes the mutual information score for a given pair of matrices
     template<size_t nHistQuantifStep=1, bool bUseSparseHistMats=true, bool bFastNumApprox=false, bool bSkipMinMax=false, typename T1, typename T2>
-    inline double calcMutualInfo(const cv::Mat_<T1>& oInput1, const cv::Mat_<T2>& oInput2, JointHistData<bUseSparseMats,T1,T2>* pJointProbHistOutput=nullptr) {
-        std::unique_ptr<JointHistData<bUseSparseMats,T1,T2>> pNewJointProbHistOutput;
+    inline double calcMutualInfo(const cv::Mat_<T1>& oInput1, const cv::Mat_<T2>& oInput2, JointHistData<bUseSparseHistMats,T1,T2>* pJointProbHistOutput=nullptr) {
+        std::unique_ptr<JointHistData<bUseSparseHistMats,T1,T2>> pNewJointProbHistOutput;
         if(!pJointProbHistOutput) {
-            pNewJointProbHistOutput = std::make_unique<JointHistData<bUseSparseMats,T1,T2>>();
+            pNewJointProbHistOutput = std::make_unique<JointHistData<bUseSparseHistMats,T1,T2>>();
             pJointProbHistOutput = pNewJointProbHistOutput.get();
         }
         calcJointProbHist<nHistQuantifStep,bUseSparseHistMats,bFastNumApprox,bSkipMinMax>(std::make_tuple(oInput1,oInput2),*pJointProbHistOutput);
         lvDbgAssert(pJointProbHistOutput->aStates[0]>0 && pJointProbHistOutput->aStates[1]>0 && pJointProbHistOutput->nJointStates>0);
-        lvDbgAssert(!pJointProbHistOutput->aMargHists[0].empty() && !pJointProbHistOutput->aMargHists[1].empty() && !pJointProbHistOutput->oJointHist.empty());
+        lvDbgAssert(cv::getElemCount(pJointProbHistOutput->aMargHists[0])>0 && cv::getElemCount(pJointProbHistOutput->aMargHists[1])>0 && cv::getElemCount(pJointProbHistOutput->oJointHist)>0);
         double dMutualInfoScore = 0.0f;
         std::array<int,2> anIterPos;
         for(auto pIter=pJointProbHistOutput->oJointCount.begin(); pIter!=pJointProbHistOutput->oJointCount.end(); ++pIter) {
             const int* anPos = cv::getIterPos(pIter,anIterPos);
             const float& fCurrElemJointProb = cv::getElem(pJointProbHistOutput->oJointHist,anPos);
             if(fCurrElemJointProb>0) {
-                const float& fCurrElemMargProb1 = cv::getElem(pJointProbHistOutput->aMargHists[0],{anPos[0],0});
-                const float& fCurrElemMargProb2 = cv::getElem(pJointProbHistOutput->aMargHists[1],{anPos[1],0});
+                const float& fCurrElemMargProb1 = cv::getElem(pJointProbHistOutput->aMargHists[0],std::array<int,2>{anPos[0],0}.data());
+                const float& fCurrElemMargProb2 = cv::getElem(pJointProbHistOutput->aMargHists[1],std::array<int,2>{anPos[1],0}.data());
                 if(fCurrElemMargProb1>0 && fCurrElemMargProb2>0)
-                    dMutualInfoScore += double(fCurrElemJointProb*std::log(fCurrElemJointProb/fCurrElemMargProb1/fCurrElemMargProb2)); // @@@@ check precision/speed for mult instead of double-div
+                    dMutualInfoScore += double(fCurrElemJointProb*std::log(fCurrElemJointProb/fCurrElemMargProb1/fCurrElemMargProb2)); // @@@@ check precision/speed for mult instead of double-div? set as FastNumApprox?
             }
         }
         dMutualInfoScore /= std::log(2.0);
@@ -183,3 +187,8 @@ namespace lv {
     }
 
 } // namespace lv
+
+#include "litiv/features2d/DASC.hpp"
+#include "litiv/features2d/LBSP.hpp"
+#include "litiv/features2d/LSS.hpp"
+#include "litiv/features2d/MI.hpp"
