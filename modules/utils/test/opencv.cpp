@@ -279,17 +279,36 @@ TEST(cvtcolor,bgr2packedycbcr_red) {
     test.at<cv::Vec3b>(2,5) = cv::Vec3b(160,160,160);
     cv::Mat_<ushort> oOutput;
     cv::cvtBGRToPackedYCbCr(test,oOutput);
-    cv::Mat_<cv::Vec3b> rebuilt;
-    cv::cvtPackedYCbCrToBGR(oOutput,rebuilt);
-    std::vector<cv::Mat> vrebuilt;
-    cv::split(rebuilt,vrebuilt);
-    ASSERT_EQ(vrebuilt.size(),size_t(3));
-    ASSERT_EQ(cv::countNonZero(vrebuilt[0]==ushort(0)),test.size().area()-1);
-    ASSERT_EQ(cv::countNonZero(vrebuilt[1]==ushort(3)),test.size().area()-1); // noise in green channel due to quantification
-    ASSERT_EQ(cv::countNonZero(vrebuilt[2]==ushort(128)),test.size().area()-1);
-    ASSERT_EQ(cv::countNonZero(vrebuilt[0]==ushort(160)),1);
-    ASSERT_EQ(cv::countNonZero(vrebuilt[1]==ushort(160)),1);
-    ASSERT_EQ(cv::countNonZero(vrebuilt[2]==ushort(160)),1);
+    {
+        cv::Mat_<cv::Vec3b> rebuilt;
+        cv::cvtPackedYCbCrToBGR(oOutput,rebuilt);
+        std::vector<cv::Mat> vrebuilt;
+        cv::split(rebuilt,vrebuilt);
+        ASSERT_EQ(vrebuilt.size(),size_t(3));
+        ASSERT_EQ(cv::countNonZero(vrebuilt[0]==ushort(0)),test.size().area()-1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[1]==ushort(3)),test.size().area()-1); // noise in green channel due to quantification
+        ASSERT_EQ(cv::countNonZero(vrebuilt[2]==ushort(128)),test.size().area()-1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[0]==ushort(160)),1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[1]==ushort(160)),1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[2]==ushort(160)),1);
+    }
+    {
+        std::unique_ptr<ushort[]> pData(new ushort[20*20+7]);
+        cv::Mat_<ushort> oOutput_unaligned(oOutput.rows,oOutput.cols,pData.get()+7);
+        oOutput.copyTo(oOutput_unaligned);
+        cv::Mat_<cv::Vec3b> rebuilt;
+        cv::cvtPackedYCbCrToBGR(oOutput_unaligned,rebuilt);
+        std::vector<cv::Mat> vrebuilt;
+        cv::split(rebuilt,vrebuilt);
+        ASSERT_EQ(vrebuilt.size(),size_t(3));
+        ASSERT_EQ(cv::countNonZero(vrebuilt[0]==ushort(0)),test.size().area()-1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[1]==ushort(3)),test.size().area()-1); // noise in green channel due to quantification
+        ASSERT_EQ(cv::countNonZero(vrebuilt[2]==ushort(128)),test.size().area()-1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[0]==ushort(160)),1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[1]==ushort(160)),1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[2]==ushort(160)),1);
+    }
+
 }
 
 namespace {

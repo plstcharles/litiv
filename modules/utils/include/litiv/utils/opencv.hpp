@@ -421,14 +421,25 @@ namespace cv { // extending cv
         oOutput.create(oInput.size()); voOutputs[0].create(oInput.size()); voOutputs[1].create(oInput.size()); voOutputs[2].create(oInput.size());
         for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {
             const ushort* pPackedRow = oInput.ptr<ushort>(nRowIdx);
+            const bool bPackedRowAligned = isAligned<16>(pPackedRow);
             uchar* pYRow = voOutputs[0].ptr<uchar>(nRowIdx), *pCrRow = voOutputs[1].ptr<uchar>(nRowIdx), *pCbRow = voOutputs[2].ptr<uchar>(nRowIdx);
-            lvDbgAssert(isAligned<16>(pPackedRow) && isAligned<16>(pYRow) && isAligned<16>(pCrRow) && isAligned<16>(pCbRow));
+            lvDbgAssert(isAligned<16>(pYRow) && isAligned<16>(pCrRow) && isAligned<16>(pCbRow));
             int nColIdx = 0;
-    #if 0//SIMD
+        #if HAVE_SSE2
+            const __m128i aCrMask = _mm_set1_epi16(short(15));
+            const __m128i aYMask = _mm_set1_epi16(short(255));
             for(; nColIdx<=oInput.cols-16; nColIdx+=16) {
-
+                lvDbgAssert(!bPackedRowAligned || isAligned<16>(pPackedRow+nColIdx) && isAligned<16>(pPackedRow+nColIdx+8));
+                const __m128i aPackedVals_lo = bPackedRowAligned?_mm_load_si128((__m128i*)(pPackedRow+nColIdx)):_mm_loadu_si128((__m128i*)(pPackedRow+nColIdx));
+                const __m128i aPackedVals_hi = bPackedRowAligned?_mm_load_si128((__m128i*)(pPackedRow+nColIdx+8)):_mm_loadu_si128((__m128i*)(pPackedRow+nColIdx+8));
+                const __m128i aYVals = _mm_packus_epi16(_mm_and_si128(aPackedVals_lo,aYMask),_mm_and_si128(aPackedVals_hi,aYMask));
+                _mm_store_si128((__m128i*)(pYRow+nColIdx),aYVals);
+                const __m128i aCrVals = _mm_packus_epi16(_mm_slli_epi16(_mm_and_si128(_mm_srli_epi16(aPackedVals_lo,8),aCrMask),4),_mm_slli_epi16(_mm_and_si128(_mm_srli_epi16(aPackedVals_hi,8),aCrMask),4));
+                _mm_store_si128((__m128i*)(pCrRow+nColIdx),aCrVals);
+                const __m128i aCbVals = _mm_packus_epi16(_mm_slli_epi16(_mm_srli_epi16(aPackedVals_lo,12),4),_mm_slli_epi16(_mm_srli_epi16(aPackedVals_hi,12),4));
+                _mm_store_si128((__m128i*)(pCbRow+nColIdx),aCbVals);
             }
-    #endif //SIMD
+        #endif //HAVE_SSE2
             for(; nColIdx<oInput.cols; ++nColIdx) {
                 pYRow[nColIdx] = uchar(pPackedRow[nColIdx]);
                 pCrRow[nColIdx] = uchar(((pPackedRow[nColIdx]>>8)&15)<<4);
