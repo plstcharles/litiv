@@ -33,4 +33,4 @@ RUN cmake \
     -D BUILD_SHARED_LIBS=${CMAKECFG_BUILD_SHARED_LIBS} \
     -D USE_WORLD_SOURCE_GLOB=${CMAKECFG_USE_WORLD_SOURCE_GLOB} \
     .. && make -j${nbthreads} && make install
-CMD ["/usr/bin/make","check"]
+CMD ["/bin/bash"]
