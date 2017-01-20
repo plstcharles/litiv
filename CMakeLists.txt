@@ -42,6 +42,7 @@ set(SAMPLES_DATA_ROOT "${CMAKE_SOURCE_DIR}/samples/data/" CACHE PATH "Sample dat
 set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install" CACHE PATH "Install path prefix, prepended onto install directories (optional)")
 # add hardcoded guesses for find_package here (caution: top level project is not defined yet!)
 list(APPEND CMAKE_PREFIX_PATH
+    "$ENV{USER_DEVELOP}/cuda-litiv/" "$ENV{USER_DEVELOP}/cuda-latest/" "$ENV{USER_DEVELOP}/cuda/"
     "$ENV{USER_DEVELOP}/opencv/build-litiv/install/" "$ENV{USER_DEVELOP}/opencv/build/" "$ENV{USER_DEVELOP}/opencv/"
     "$ENV{USER_DEVELOP}/freeglut/build-litiv/install/" "$ENV{USER_DEVELOP}/freeglut/build/" "$ENV{USER_DEVELOP}/freeglut/"
     "$ENV{USER_DEVELOP}/glfw/build-litiv/install/" "$ENV{USER_DEVELOP}/glfw/build/" "$ENV{USER_DEVELOP}/glfw/"
@@ -146,8 +147,25 @@ else()
     message("Without OpenGM support w/ external dependencies enabled, cosegm project & utilities will be disabled.")
 endif()
 
-### CUDA CHECK @@@@ add later for parallel utils & impls
-set_eval(USE_CUDA 0)
+### CUDA CHECK
+if(CMAKE_CROSSCOMPILING OR (WIN32 AND NOT MSVC) OR (CMAKE_COMPILER_IS_GNUCXX AND ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")))
+    set_eval(USE_CUDA 0)
+    message("Cannot use CUDA, invalid platform/compiler combination.")
+else()
+    find_package(CUDA)
+    option(USE_CUDA "Specifies whether CUDA should be included/linked or not; if false, projects that depend on it will be disabled" ${CUDA_FOUND})
+    if(USE_CUDA)
+        find_package(CUDA REQUIRED)
+        set(CUDA_COMPUTE_CAPABILITY "20")
+        set(CUDA_GENERATE_CODE "arch=compute_${CUDA_COMPUTE_CAPABILITY},code=sm_${CUDA_COMPUTE_CAPABILITY}" CACHE STRING "Which GPU architectures to generate code for (each arch/code pair will be passed as --generate-code option to nvcc, separate multiple pairs by ;)")
+        set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -arch compute_${CUDA_COMPUTE_CAPABILITY})
+        if(USE_FAST_MATH)
+            set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} --use_fast_math)
+        endif()
+    else()
+        message("Without CUDA support enabled, some imgproc utilities will be disabled.")
+    endif()
+endif()
 
 ### OPENCL CHECK @@@@ add later for parallel utils & impls
 set_eval(USE_OPENCL 0)

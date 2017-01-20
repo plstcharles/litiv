@@ -245,9 +245,11 @@
         #define USE_VPTZ_STANDALONE   @USE_VPTZ_STANDALONE@
     #endif //HAVE_GLSL
 
-    #define HAVE_CUDA                 @USE_CUDA@
+    #define HAVE_CUDA                      @USE_CUDA@
     #if HAVE_CUDA
-        // ...
+        #define CUDA_VERSION               XSTR(@CUDA_VERSION@)
+        #define CUDA_64_BIT_DEVICE_CODE    @CUDA_64_BIT_DEVICE_CODE@
+        #define CUDA_PROPAGATE_HOST_FLAGS  @CUDA_PROPAGATE_HOST_FLAGS@
     #endif //HAVE_CUDA
 
     #define HAVE_OPENCL               @USE_OPENCL@

@@ -23,12 +23,6 @@
 #if HAVE_GLSL
 #include "litiv/utils/opengl-imgproc.hpp"
 #endif //HAVE_GLSL
-#if HAVE_CUDA
-// ...
-#endif //HAVE_CUDA
-#if HAVE_OPENCL
-// ...
-#endif //HAVE_OPENCL
 #endif //USE_CVCORE_WITH_UTILS
 
 namespace lv {
@@ -75,15 +69,14 @@ namespace lv {
 
 #if HAVE_CUDA
     template<>
-    struct IParallelAlgo_<CUDA> : /*public CUDAImageProcAlgo,*/ public IIParallelAlgo {
-        static_assert(false,"Missing CUDA impl");
+    struct IParallelAlgo_<CUDA> : /*public CUDAImageProcAlgo @@@ TODO?,*/ public IIParallelAlgo {
         virtual bool isParallel() {return true;}
         virtual ParallelAlgoType getParallelAlgoType() {return CUDA;}
     };
     using IParallelAlgo_CUDA = IParallelAlgo_<CUDA>;
 #endif //HAVE_CUDA
 
-#if HAVE_CUDA
+#if HAVE_OPENCL
     template<>
     struct IParallelAlgo_<OpenCL> : /*public OpenCLImageProcAlgo,*/ public IIParallelAlgo {
         static_assert(false,"Missing OpenCL impl");
@@ -91,7 +84,7 @@ namespace lv {
         virtual ParallelAlgoType getParallelAlgoType() {return OpenCL;}
     };
     using IParallelAlgo_OpenCL = IParallelAlgo_<OpenCL>;
-#endif //HAVE_CUDA
+#endif //HAVE_OPENCL
 
 #endif //USE_CVCORE_WITH_UTILS
 

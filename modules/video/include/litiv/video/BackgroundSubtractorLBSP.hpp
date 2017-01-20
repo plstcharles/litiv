@@ -76,11 +76,11 @@ protected:
 #endif //HAVE_GLSL
 #if HAVE_CUDA
     // ... @@@ add impl later
-    static_assert(eImpl!=lv::CUDA),"Missing impl");
+    static_assert(eImpl!=lv::CUDA,"Missing impl");
 #endif //HAVE_CUDA
 #if HAVE_OPENCL
     // ... @@@ add impl later
-    static_assert(eImpl!=lv::OpenCL),"Missing impl");
+    static_assert(eImpl!=lv::OpenCL,"Missing impl");
 #endif //HAVE_OPENCL
 
     /// required for derived class destruction from this interface
