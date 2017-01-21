@@ -107,6 +107,16 @@ if(USE_CVCORE_WITH_UTILS)
         endif()
     endif()
 endif()
+if(USE_CUDA)
+    target_include_directories(litiv_utils
+        PUBLIC
+            "$<BUILD_INTERFACE:${CUDA_INCLUDE_DIRS}>"
+    )
+    target_link_libraries(litiv_utils
+        PUBLIC
+            "${CUDA_LIBRARIES}"
+    )
+endif()
 if(KinectSDK2_FOUND)
     target_include_directories(litiv_utils
         PUBLIC

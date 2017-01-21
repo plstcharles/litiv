@@ -54,6 +54,7 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
         set(libname ${groupname}_${libname})
     endif()
     append_internal_list(litiv_projects ${PROJECT_NAME})
+    set(project_install_targets "${PROJECT_NAME}")
     if(${BUILD_SHARED_LIBS} AND ${canbeshared})
         add_library(${PROJECT_NAME} SHARED ${${sourcelist}} ${${headerlist}})
         set_target_properties(${PROJECT_NAME}
@@ -101,17 +102,29 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
         PUBLIC
             "LITIV_DEBUG=$<CONFIG:Debug>"
     )
-    if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/include")
-        target_include_directories(${PROJECT_NAME}
-            PUBLIC
-                "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
-        )
+    target_include_directories(${PROJECT_NAME}
+        PUBLIC
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+    )
+    if((${groupname} STREQUAL "module") AND NOT(${libname} STREQUAL "utils"))
+        target_link_libraries(${PROJECT_NAME} PUBLIC litiv_utils)
     endif()
-    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/include")
-        target_include_directories(${PROJECT_NAME}
-            PUBLIC
-                "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-        )
+    if(USE_CUDA AND (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cuda"))
+        file(GLOB cudafiles ${CMAKE_CURRENT_SOURCE_DIR}/cuda/*.cu)
+            if(cudafiles)
+                # needed here since cuda_add_library ignores target properties (i.e. include dirs)
+                cuda_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
+                cuda_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+                cuda_include_directories(${CMAKE_SOURCE_DIR}/modules/utils/cuda)
+                cuda_include_directories($<$<BOOL:$<TARGET_PROPERTY:litiv_utils,INTERFACE_INCLUDE_DIRECTORIES>>:$<JOIN:$<TARGET_PROPERTY:litiv_utils,INTERFACE_INCLUDE_DIRECTORIES>,;>>)
+                cuda_add_library(${PROJECT_NAME}_cuda "${cudafiles}" STATIC)
+                if((${groupname} STREQUAL "module") AND NOT(${libname} STREQUAL "utils"))
+                    target_link_libraries(${PROJECT_NAME}_cuda litiv_utils)
+                endif()
+                target_link_libraries(${PROJECT_NAME} PUBLIC ${PROJECT_NAME}_cuda)
+                set(project_install_targets ${project_install_targets} ${PROJECT_NAME}_cuda)
+            endif()
     endif()
     if(BUILD_TESTS AND (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test"))
         file(GLOB testfiles ${CMAKE_CURRENT_SOURCE_DIR}/test/*.cpp)
@@ -172,7 +185,7 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
         endforeach()
     endif()
     install(
-        TARGETS ${PROJECT_NAME}
+        TARGETS ${project_install_targets}
         EXPORT "litiv-targets"
         COMPONENT "${groupname}"
         RUNTIME DESTINATION "bin"

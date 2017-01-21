@@ -28,6 +28,17 @@ add_files(INCLUDE_FILES
     "include/litiv/imgproc.hpp"
 )
 
+if(USE_CUDA)
+    add_files(CUDA_SOURCE_FILES
+        "src/SLIC_device.hpp"
+        "src/SLIC_device.cu"
+        "src/SLIC_host.cu"
+    )
+    add_files(CUDA_INCLUDE_FILES
+        "include/litiv/imgproc/SLIC.hpp"
+    )
+endif()
+
 litiv_module(imgproc SOURCE_FILES INCLUDE_FILES)
 target_link_libraries(litiv_imgproc
     PUBLIC
