@@ -124,6 +124,18 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
                 endif()
                 target_link_libraries(${PROJECT_NAME} PUBLIC ${PROJECT_NAME}_cuda)
                 set(project_install_targets ${project_install_targets} ${PROJECT_NAME}_cuda)
+                if(WIN32)
+                    if(USE_VERSION_TAGS)
+                        set_target_properties(${PROJECT_NAME}_cuda
+                            PROPERTIES
+                                OUTPUT_NAME "${PROJECT_NAME}_cuda${LITIV_VERSION_PLAIN}"
+                        )
+                    endif()
+                endif()
+                set_target_properties(${PROJECT_NAME}_cuda
+                    PROPERTIES
+                        FOLDER "${groupname}/cuda"
+                )
             endif()
     endif()
     if(BUILD_TESTS AND (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test"))
