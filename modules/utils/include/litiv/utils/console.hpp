@@ -90,7 +90,11 @@ namespace rlutil {
 #else //def(RLUTIL_STRING_TYPE)
     typedef RLUTIL_STRING_TYPE str_t;
 #endif //ndef RLUTIL_STRING_TYPE
-    inline void RLUTIL_PRINT(str_t st) { std::cout << st; }
+
+    template<typename Tstr>
+    inline void RLUTIL_PRINT(Tstr str) {
+        std::cout << str;
+    }
 
     enum ColorCode {
         Color_BLACK=0,
@@ -137,26 +141,26 @@ namespace rlutil {
      * ANSI_BOLDWHITE - White (bold/bright)
      * ANSI_RESET - Resets formatting
      */
-    const str_t ANSI_CLS = "\033[2J";
-    const str_t ANSI_BLACK = "\033[22;30m";
-    const str_t ANSI_RED = "\033[22;31m";
-    const str_t ANSI_BOLDRED = "\033[22;31;1m";
-    const str_t ANSI_GREEN = "\033[22;32m";
-    const str_t ANSI_BOLDGREEN = "\033[22;32;1m";
-    const str_t ANSI_BROWN = "\033[22;33m";
-    const str_t ANSI_BLUE = "\033[22;34m";
-    const str_t ANSI_MAGENTA = "\033[22;35m";
-    const str_t ANSI_CYAN = "\033[22;36m";
-    const str_t ANSI_GREY = "\033[22;37m";
-    const str_t ANSI_DARKGREY = "\033[01;30m";
-    const str_t ANSI_LIGHTRED = "\033[01;31m";
-    const str_t ANSI_LIGHTGREEN = "\033[01;32m";
-    const str_t ANSI_BOLDYELLOW = "\033[01;33m";
-    const str_t ANSI_LIGHTBLUE = "\033[01;34m";
-    const str_t ANSI_LIGHTMAGENTA = "\033[01;35m";
-    const str_t ANSI_LIGHTCYAN = "\033[01;36m";
-    const str_t ANSI_BOLDWHITE = "\033[01;37m";
-    const str_t ANSI_RESET = "\033[39;49m\033[0m";
+    str_t ANSI_CLS = "\033[2J";
+    str_t ANSI_BLACK = "\033[22;30m";
+    str_t ANSI_RED = "\033[22;31m";
+    str_t ANSI_BOLDRED = "\033[22;31;1m";
+    str_t ANSI_GREEN = "\033[22;32m";
+    str_t ANSI_BOLDGREEN = "\033[22;32;1m";
+    str_t ANSI_BROWN = "\033[22;33m";
+    str_t ANSI_BLUE = "\033[22;34m";
+    str_t ANSI_MAGENTA = "\033[22;35m";
+    str_t ANSI_CYAN = "\033[22;36m";
+    str_t ANSI_GREY = "\033[22;37m";
+    str_t ANSI_DARKGREY = "\033[01;30m";
+    str_t ANSI_LIGHTRED = "\033[01;31m";
+    str_t ANSI_LIGHTGREEN = "\033[01;32m";
+    str_t ANSI_BOLDYELLOW = "\033[01;33m";
+    str_t ANSI_LIGHTBLUE = "\033[01;34m";
+    str_t ANSI_LIGHTMAGENTA = "\033[01;35m";
+    str_t ANSI_LIGHTCYAN = "\033[01;36m";
+    str_t ANSI_BOLDWHITE = "\033[01;37m";
+    str_t ANSI_RESET = "\033[39;49m\033[0m";
 
     /**
      * Key codes for keyhit()
