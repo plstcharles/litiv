@@ -216,6 +216,8 @@ namespace cv { // extending cv
         MatArchive_BINARY
     };
 
+    void testfunc(const cv::Mat& testmat);
+
     /// writes matrix data locally using a binary/yml/text file format
     void write(const std::string& sFilePath, const cv::Mat& _oData, MatArchiveList eArchiveType=MatArchive_BINARY);
     /// reads matrix data locally using a binary/yml/text file format

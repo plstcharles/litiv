@@ -80,7 +80,7 @@ __device__ inline int2 operator+(const int2 & a, const int2 & b) { return make_i
 __device__ inline float computeDistance(float2 c_p_xy, float3 c_p_Lab, float areaSpx, float wc2){
     float ds2 = pow(c_p_xy.x, 2) + pow(c_p_xy.y, 2);
     float dc2 = pow(c_p_Lab.x, 2) + pow(c_p_Lab.y, 2) + pow(c_p_Lab.z, 2);
-    float dist = sqrt(dc2 + ds2 / areaSpx*wc2);
+    float dist = sqrt(dc2 + ds2/areaSpx*wc2);
     return dist;
 }
 

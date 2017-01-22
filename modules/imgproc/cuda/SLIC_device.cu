@@ -46,7 +46,7 @@
 // SOFTWARE.
 //
 
-#include "SLIC_device.hpp"
+#include "SLIC_device.cuh"
 
 __global__ void kRgb2CIELab(const cudaTextureObject_t texFrameBGRA, cudaSurfaceObject_t surfFrameLab, int width, int height) {
 
@@ -54,40 +54,35 @@ __global__ void kRgb2CIELab(const cudaTextureObject_t texFrameBGRA, cudaSurfaceO
     int py = blockIdx.y*blockDim.y + threadIdx.y;
 
     if (px<width && py<height) {
-        uchar4 nPixel = tex2D<uchar4>(texFrameBGRA, px, py);//inputImg[offset];
+        const uchar4 nPixel = tex2D<uchar4>(texFrameBGRA, px, py);//inputImg[offset];
 
-        float _b = (float)nPixel.x / 255.0;
-        float _g = (float)nPixel.y / 255.0;
-        float _r = (float)nPixel.z / 255.0;
+        const float _b = nPixel.x/255.0f;
+        const float _g = nPixel.y/255.0f;
+        const float _r = nPixel.z/255.0f;
 
-        float x = _r * 0.412453 + _g * 0.357580 + _b * 0.180423;
-        float y = _r * 0.212671 + _g * 0.715160 + _b * 0.072169;
-        float z = _r * 0.019334 + _g * 0.119193 + _b * 0.950227;
+        float x = _r * 0.412453f + _g * 0.357580f + _b * 0.180423f;
+        float y = _r * 0.212671f + _g * 0.715160f + _b * 0.072169f;
+        float z = _r * 0.019334f + _g * 0.119193f + _b * 0.950227f;
 
-        x /= 0.950456;
-        float y3 = exp(log(y) / 3.0);
-        z /= 1.088754;
+        x /= 0.950456f;
+        float y3 = exp(log(y)/3.0f);
+        z /= 1.088754f;
 
         float l, a, b;
 
-        x = x > 0.008856 ? exp(log(x) / 3.0) : (7.787 * x + 0.13793);
-        y = y > 0.008856 ? y3 : 7.787 * y + 0.13793;
-        z = z > 0.008856 ? z /= exp(log(z) / 3.0) : (7.787 * z + 0.13793);
+        x = x > 0.008856f ? exp(log(x)/3.0f) : (7.787f * x + 0.13793f);
+        y = y > 0.008856f ? y3 : 7.787f * y + 0.13793f;
+        z = z > 0.008856f ? z /= exp(log(z)/3.0f) : (7.787f * z + 0.13793f);
 
-        l = y > 0.008856 ? (116.0 * y3 - 16.0) : 903.3 * y;
-        a = (x - y) * 500.0;
-        b = (y - z) * 200.0;
+        l = y > 0.008856f ? (116.0f * y3 - 16.0f) : 903.3f * y;
+        a = (x - y) * 500.0f;
+        b = (y - z) * 200.0f;
 
         float4 fPixel;
         fPixel.x = l;
         fPixel.y = a;
         fPixel.z = b;
         fPixel.w = 0;
-
-        fPixel.x = (float)nPixel.x;
-        fPixel.y = (float)nPixel.y;
-        fPixel.z = (float)nPixel.z;
-        fPixel.w = (float)nPixel.w;
 
         surf2Dwrite(fPixel, surfFrameLab, px * 16, py);
     }

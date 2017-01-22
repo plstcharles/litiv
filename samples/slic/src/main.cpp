@@ -31,14 +31,19 @@ int main(int, char**) { // this sample uses no command line argument
         const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg"); // load a training image taken from the BSDS500 dataset
         if(oInput.empty()) // check if the mat is empty (i.e. if the image failed to load)
             CV_Error(-1,"Could not load test image from internal sample data folder");
+        cv::imshow("oInput",oInput);
         SLIC oAlgo; // instantiate SLIC segmentation algo (with default empty constructor)
-        oAlgo.initialize(oInput); // use default parameters for SLIC constructor initialization
+        cudaErrorCheck(cudaGetLastError());
+        oAlgo.initialize(oInput.size()/*, ...*/); // use default parameters for SLIC constructor initialization
+        cudaErrorCheck(cudaGetLastError());
         oAlgo.segment(oInput); // run SLIC segmentation algo
-		oAlgo.enforceConnectivity(); // enforce superpixel connectivity
-        const cv::Mat oSPXMask = oAlgo.getLabels(); // returns segmentation labels for the input image
-        cv::Mat oDisplay = oInput.clone(); // make a copy of the input, as we will draw on it
-        SLIC::displayBound(oDisplay,(float*)oSPXMask.data,cv::Scalar(255,0,0)); // used for display only
-        cv::imshow("Segmentation output",oDisplay); // display the output superpixel mask
+        cudaErrorCheck(cudaGetLastError());
+		//oAlgo.enforceConnectivity(); // enforce superpixel connectivity
+        const cv::Mat& oSPXMask = oAlgo.getLabels(); // returns segmentation labels for the input image
+        //cv::testfunc(oSPXMask);
+        cudaErrorCheck(cudaGetLastError());
+        cv::imshow("Segmentation output",SLIC::displayBound(oInput,oSPXMask,cv::Scalar(255,0,0)));
+        cudaErrorCheck(cudaGetLastError());
         cv::waitKey(0); // wait for the user to press a key before shutting down
     }
     catch(const cv::Exception& e) {std::cout << "\nmain caught cv::Exception:\n" << e.what() << "\n" << std::endl; return -1;}

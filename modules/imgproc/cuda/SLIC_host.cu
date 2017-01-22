@@ -47,12 +47,55 @@
 //
 
 #include "litiv/imgproc/SLIC.hpp"
-#include "SLIC_device.hpp"
+#include "SLIC_device.cuh"
 
 using namespace std;
 using namespace cv;
 
+static void getSpxSizeFromDiam(const int imWidth, const int imHeight, const int diamSpx, int* spxWidth, int* spxHeight){
+    int wl1, wl2;
+    int hl1, hl2;
+    wl1 = wl2 = diamSpx;
+    hl1 = hl2 = diamSpx;
+
+    while ((imWidth%wl1) != 0) {
+        wl1++;
+    }
+    while ((imWidth%wl2) != 0) {
+        wl2--;
+    }
+    while ((imHeight%hl1) != 0) {
+        hl1++;
+    }
+
+    while ((imHeight%hl2) != 0) {
+        hl2--;
+    }
+    *spxWidth = ((diamSpx - wl2) < (wl1 - diamSpx)) ? wl2 : wl1;
+    *spxHeight = ((diamSpx - hl2) < (hl1 - diamSpx)) ? hl2 : hl1;
+}
+
+#define printest(x) std::cout << (" " #x " = ") << x << std::endl;
+
+__global__ void testkernel(int width, int height) {
+
+    int px = blockIdx.x*blockDim.x + threadIdx.x;
+    int py = blockIdx.y*blockDim.y + threadIdx.y;
+
+    printf("px = %d, py = %d\n",px,py);
+}
+
 SLIC::SLIC(){
+
+    // @@@@@
+    {
+        dim3 threadsPerBlock(1,1);
+        dim3 numBlocks(2,2);
+        testkernel<<<numBlocks, threadsPerBlock>>>(m_FrameWidth,m_FrameHeight);
+        cudaErrorCheck(cudaGetLastError());
+    }
+    // @@@@@
+
     int nbGpu = 0;
     cudaErrorCheck(cudaGetDeviceCount(&nbGpu));
     cout << "Detected " << nbGpu << " cuda capable gpu" << endl;
@@ -62,11 +105,15 @@ SLIC::SLIC(){
         cerr << "compute capability found = " << m_deviceProp.major << ", compute capability >= 3 required !" << endl;
         exit(EXIT_FAILURE);
     }
+    else {
+        std::cout << "name = " << m_deviceProp.name << std::endl;
+        std::cout << "mem = " << m_deviceProp.totalGlobalMem << std::endl;
+        std::cout << "major = " << m_deviceProp.major << std::endl;
+        std::cout << "minor = " << m_deviceProp.minor << std::endl;
+    }
 }
 
 SLIC::~SLIC(){
-    delete[] h_fClusters;
-    delete[] h_fLabels;
     cudaErrorCheck(cudaFree(d_fClusters));
     cudaErrorCheck(cudaFree(d_fAccAtt));
     cudaErrorCheck(cudaFreeArray(cuArrayFrameBGRA));
@@ -74,62 +121,65 @@ SLIC::~SLIC(){
     cudaErrorCheck(cudaFreeArray(cuArrayLabels));
 }
 
-void SLIC::initialize(const cv::Mat& frame0, const int diamSpxOrNbSpx , const InitType initType, const float wc , const int nbIteration ) {
+void SLIC::initialize(const cv::Size& size, const int diamSpxOrNbSpx , const InitType initType, const float wc , const int nbIteration ) {
+
+    // @@@@@
+    {
+        dim3 threadsPerBlock(1,1);
+        dim3 numBlocks(2,2);
+        testkernel<<<numBlocks, threadsPerBlock>>>(m_FrameWidth,m_FrameHeight);
+        cudaErrorCheck(cudaGetLastError());
+    }
+    // @@@@@
+
     m_nbIteration = nbIteration;
-    m_FrameWidth = frame0.cols;
-    m_FrameHeight = frame0.rows;
+    printest(nbIteration);
+    m_FrameWidth = size.width;
+    printest(m_FrameWidth);
+    m_FrameHeight = size.height;
+    printest(m_FrameHeight);
     m_nbPx = m_FrameWidth*m_FrameHeight;
+    printest(m_nbPx);
     m_InitType = initType;
+    printest(m_InitType);
     m_wc = wc;
+    printest(m_wc);
     if (m_InitType == SLIC_NSPX){
         m_SpxDiam = diamSpxOrNbSpx;
         m_SpxDiam = (int)sqrt(m_nbPx / (float)diamSpxOrNbSpx);
     }
     else m_SpxDiam = diamSpxOrNbSpx;
+    printest(m_SpxDiam);
 
     getSpxSizeFromDiam(m_FrameWidth, m_FrameHeight, m_SpxDiam, &m_SpxWidth, &m_SpxHeight); // determine w and h of Spx based on diamSpx
+    printest(m_SpxWidth);
+    printest(m_SpxHeight);
     m_SpxArea = m_SpxWidth*m_SpxHeight;
+    printest(m_SpxArea);
     CV_Assert(m_nbPx%m_SpxArea == 0);
+    printest(m_nbSpx);
     m_nbSpx = m_nbPx / m_SpxArea;
 
-    h_fClusters = new float[m_nbSpx * 5]; // m_nbSpx * [L,a,b,x,y]
-    h_fLabels = new float[m_nbPx];
+    m_oLabels.create(m_FrameHeight,m_FrameWidth);
+    cudaErrorCheck(cudaGetLastError());
 
-    initGpuBuffers();
-}
-
-void SLIC::segment(const Mat& frameBGR) {
-    uploadFrame(frameBGR);
-    gpuRGBA2Lab();
-    gpuInitClusters();
-
-    for (int i = 0; i<m_nbIteration; i++) {
-        assignment();
-        cudaDeviceSynchronize();
-        update();
-        cudaDeviceSynchronize();
-    }
-    downloadLabels();
-}
-
-void SLIC::initGpuBuffers() {
     //allocate buffers on gpu
-
-    cudaChannelFormatDesc channelDescrBGRA = cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
+    const cudaChannelFormatDesc channelDescrBGRA = cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
     cudaErrorCheck(cudaMallocArray(&cuArrayFrameBGRA, &channelDescrBGRA, m_FrameWidth, m_FrameHeight));
 
-    cudaChannelFormatDesc channelDescrLab = cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat);
+    const cudaChannelFormatDesc channelDescrLab = cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat);
     cudaErrorCheck(cudaMallocArray(&cuArrayFrameLab, &channelDescrLab, m_FrameWidth, m_FrameHeight, cudaArraySurfaceLoadStore));
 
-    cudaChannelFormatDesc channelDescrLabels = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
+    const cudaChannelFormatDesc channelDescrLabels = cudaCreateChannelDesc(32, 0, 0, 0, cudaChannelFormatKindFloat);
     cudaErrorCheck(cudaMallocArray(&cuArrayLabels, &channelDescrLabels, m_FrameWidth, m_FrameHeight, cudaArraySurfaceLoadStore));
+
+    cudaErrorCheck(cudaGetLastError());
 
     // Specify texture frameBGRA object parameters
     cudaResourceDesc resDesc;
     memset(&resDesc, 0, sizeof(resDesc));
     resDesc.resType = cudaResourceTypeArray;
     resDesc.res.array.array = cuArrayFrameBGRA;
-
     cudaTextureDesc texDesc;
     memset(&texDesc, 0, sizeof(texDesc));
     texDesc.addressMode[0] = cudaAddressModeClamp;
@@ -139,77 +189,107 @@ void SLIC::initGpuBuffers() {
     texDesc.normalizedCoords = false;
     cudaErrorCheck(cudaCreateTextureObject(&oTexFrameBGRA, &resDesc, &texDesc, NULL));
 
+    cudaErrorCheck(cudaGetLastError());
+
     // surface frameLab
     cudaResourceDesc rescDescFrameLab;
     memset(&rescDescFrameLab, 0, sizeof(rescDescFrameLab));
     rescDescFrameLab.resType = cudaResourceTypeArray;
-
     rescDescFrameLab.res.array.array = cuArrayFrameLab;
     cudaErrorCheck(cudaCreateSurfaceObject(&oSurfFrameLab, &rescDescFrameLab));
+
+    cudaErrorCheck(cudaGetLastError());
 
     // surface labels
     cudaResourceDesc resDescLabels;
     memset(&resDescLabels, 0, sizeof(resDescLabels));
     resDescLabels.resType = cudaResourceTypeArray;
-
     resDescLabels.res.array.array = cuArrayLabels;
     cudaErrorCheck(cudaCreateSurfaceObject(&oSurfLabels, &resDescLabels));
 
+    cudaErrorCheck(cudaGetLastError());
+
     // buffers clusters , accAtt
     cudaErrorCheck(cudaMalloc((void**)&d_fClusters, m_nbSpx*sizeof(float) * 5)); // 5-D centroid
+    cudaErrorCheck(cudaMemset(d_fClusters, 0, m_nbSpx*sizeof(float) * 5));
     cudaErrorCheck(cudaMalloc((void**)&d_fAccAtt, m_nbSpx*sizeof(float) * 6)); // 5-D centroid acc + 1 counter
-    cudaMemset(d_fAccAtt, 0, m_nbSpx*sizeof(float) * 6);//initialize accAtt to 0
+    cudaErrorCheck(cudaMemset(d_fAccAtt, 0, m_nbSpx*sizeof(float) * 6));
 
+    //std::this_thread::sleep_for(std::chrono::seconds(2));
+    cudaErrorCheck(cudaGetLastError());
 }
 
+void SLIC::segment(const Mat& frameBGR) {
 
-void SLIC::uploadFrame(const Mat& frameBGR) {
     cv::Mat frameBGRA;
     cv::cvtColor(frameBGR, frameBGRA, CV_BGR2BGRA);
     CV_Assert(frameBGRA.type() == CV_8UC4);
     CV_Assert(frameBGRA.isContinuous());
     cudaErrorCheck(cudaMemcpyToArray(cuArrayFrameBGRA, 0, 0, (uchar*)frameBGRA.data, m_nbPx* sizeof(uchar4), cudaMemcpyHostToDevice));
 
+    cudaErrorCheck(cudaGetLastError());
 
-    /*uchar* dst = new uchar[4 * m_nbPx];
-    cudaMemcpyFromArray(dst, cuArrayFrameBGRA, 0, 0, m_nbPx*sizeof(uchar4), cudaMemcpyDeviceToHost);
-    Mat matDst(m_FrameHeight, m_FrameWidth, CV_8UC4, dst);
-    cout << matDst << endl;*/
-}
+    // @@@@@
+    cv::Mat test(frameBGRA.size(),frameBGRA.type());
+    cudaErrorCheck(cudaMemcpyFromArray(test.data, cuArrayFrameBGRA, 0, 0, m_nbPx* sizeof(uchar4), cudaMemcpyDeviceToHost));
+    CV_Assert(std::equal(test.datastart,test.dataend,frameBGRA.datastart));
+    //cv::write("spx_input_new.txt",test,cv::MatArchive_PLAINTEXT);
+    cv::imwrite("spx_input_new.png",test);
+    {
+        dim3 threadsPerBlock(1,1);
+        dim3 numBlocks(2,2);
+        testkernel<<<numBlocks, threadsPerBlock>>>(m_FrameWidth,m_FrameHeight);
+        cudaErrorCheck(cudaGetLastError());
+    }
+    // @@@@@
+    cudaErrorCheck(cudaGetLastError());
+    {
+        const int blockW = 16;
+        const int blockH = blockW;
+        CV_Assert(blockW*blockH <= m_deviceProp.maxThreadsPerBlock);
+        dim3 threadsPerBlock(blockW, blockH);
+        dim3 numBlocks(iDivUp(m_FrameWidth, blockW), iDivUp(m_FrameHeight, blockH));
+        kRgb2CIELab << <numBlocks, threadsPerBlock >> >(oTexFrameBGRA, oSurfFrameLab, m_FrameWidth, m_FrameHeight);
+    }
+    cudaErrorCheck(cudaGetLastError());
+    {
+        int blockW = 16;
+        dim3 threadsPerBlock(blockW);
+        dim3 numBlocks(iDivUp(m_nbSpx, blockW));
 
-void SLIC::gpuRGBA2Lab() {
-    const int blockW = 16;
-    const int blockH = blockW;
-    CV_Assert(blockW*blockH <= m_deviceProp.maxThreadsPerBlock);
-    dim3 threadsPerBlock(blockW, blockH);
-    dim3 numBlocks(iDivUp(m_FrameWidth, blockW), iDivUp(m_FrameHeight, blockH));
-
-    kRgb2CIELab << <numBlocks, threadsPerBlock >> >(oTexFrameBGRA, oSurfFrameLab, m_FrameWidth, m_FrameHeight);
-
-    /*float* dst = new float[4 * m_nbPx];
-    cudaMemcpyFromArray(dst, cuArrayFrameLab, 0, 0, m_nbPx*sizeof(float4), cudaMemcpyDeviceToHost);
-    Mat matDst(m_FrameHeight, m_FrameWidth, CV_32FC4, dst);
-    cout << matDst << endl;*/
-}
-
-
-
-void SLIC::gpuInitClusters() {
-    int blockW = 16;
-    dim3 threadsPerBlock(blockW);
-    dim3 numBlocks(iDivUp(m_nbSpx, blockW));
-
-    kInitClusters << <numBlocks, threadsPerBlock >> >(oSurfFrameLab,
-        d_fClusters,
-        m_FrameWidth,
-        m_FrameHeight,
-        m_FrameWidth / m_SpxWidth,
-        m_FrameHeight / m_SpxHeight);
-
+        kInitClusters << <numBlocks, threadsPerBlock >> >(oSurfFrameLab,
+            d_fClusters,
+            m_FrameWidth,
+            m_FrameHeight,
+            m_FrameWidth / m_SpxWidth,
+            m_FrameHeight / m_SpxHeight);
+    }
+    cudaErrorCheck(cudaGetLastError());
+    // @@@@@
     /*float* fTmp = new float[m_nbSpx * 5];
     cudaMemcpy(fTmp, d_fClusters, m_nbSpx * 5 * sizeof(float), cudaMemcpyDeviceToHost);
     Mat matTmp(1, m_nbSpx*5, CV_32F, fTmp);
     cout << matTmp << endl;*/
+    // @@@@@
+    cudaErrorCheck(cudaGetLastError());
+    for (int i = 0; i<m_nbIteration; i++) {
+        assignment();
+        cudaDeviceSynchronize();
+        update();
+        cudaDeviceSynchronize();
+    }
+    cudaErrorCheck(cudaGetLastError());
+    cudaDeviceSynchronize(); // @@@@
+    cudaErrorCheck(cudaMemcpyFromArray(m_oLabels.data,cuArrayLabels,0,0,m_oLabels.total()*m_oLabels.elemSize(),cudaMemcpyDeviceToHost));
+    cudaDeviceSynchronize(); // @@@@
+    cudaErrorCheck(cudaGetLastError());
+    lv::doNotOptimize(m_oLabels.data);
+
+    /*float& test = m_oLabels(10,10);
+    volatile float* ptest = &test;
+    *ptest = 1.0f;*/
+    //CV_Assert(cv::countNonZero(m_oLabels!=0.0f)>0); // @@@@
+    cudaErrorCheck(cudaGetLastError());
 }
 
 void SLIC::assignment(){
@@ -238,10 +318,6 @@ void SLIC::update(){
     dim3 threadsPerBlock(m_deviceProp.maxThreadsPerBlock);
     dim3 numBlocks(iDivUp(m_nbSpx, m_deviceProp.maxThreadsPerBlock));
     kUpdate << <numBlocks, threadsPerBlock >> >(m_nbSpx, d_fClusters, d_fAccAtt);
-}
-
-void SLIC::downloadLabels(){
-    cudaMemcpyFromArray(h_fLabels, cuArrayLabels, 0, 0, m_nbPx* sizeof(float), cudaMemcpyDeviceToHost);
 }
 
 int SLIC::enforceConnectivity() {
@@ -276,7 +352,7 @@ int SLIC::enforceConnectivity() {
                     for (int k = 0; k < 4; k++){
                         int x = elements[c].x + dx4[k], y = elements[c].y + dy4[k];
                         if (x >= 0 && x < m_FrameWidth && y >= 0 && y < m_FrameHeight){
-                            if (newLabels[y][x] == -1 && h_fLabels[i*m_FrameWidth + j] == h_fLabels[y*m_FrameWidth + x]){
+                            if (newLabels[y][x] == -1 && m_oLabels(i,j) == m_oLabels(y,x)) {
                                 elements.push_back(cv::Point(x, y));
                                 newLabels[y][x] = label;//m_labels[i][j];
                                 count += 1;
@@ -297,74 +373,34 @@ int SLIC::enforceConnectivity() {
     int nbSpxNoOrphan = label; // new number of spx
     for (int i = 0; i < newLabels.size(); i++)
         for (int j = 0; j < newLabels[i].size(); j++)
-            h_fLabels[i*m_FrameWidth + j] = (float)newLabels[i][j];
+            m_oLabels(i,j) = (float)newLabels[i][j];
 
     return nbSpxNoOrphan;
 }
 
-
-void SLIC::displayBound(cv::Mat& image, const float* labels, const cv::Scalar colour){
+cv::Mat SLIC::displayBound(const cv::Mat& image, const cv::Mat& labels, const cv::Scalar& colour) {
+    lvAssert(image.size()==labels.size());
+    lvAssert(image.type()==CV_8UC1 || image.type()==CV_8UC3);
+    lvAssert(labels.type()==CV_32FC1);
+    cv::Mat_<uchar> mask(image.size(),uchar(0));
+    cv::Mat output = image.clone();
+    if(output.channels()==1)
+        cv::cvtColor(output,output,cv::COLOR_GRAY2BGR);
     const int dx8[8] = { -1, -1, 0, 1, 1, 1, 0, -1 };
     const int dy8[8] = { 0, -1, -1, -1, 0, 1, 1, 1 };
-
-    /* Initialize the contour vector and the matrix detailing whether a pixel
-    * is already taken to be a contour. */
-    vector<cv::Point> contours;
-    vector<vector<bool> > istaken;
-    for (int i = 0; i < image.rows; i++) {
-        vector<bool> nb;
-        for (int j = 0; j < image.cols; j++) {
-            nb.push_back(false);
-        }
-        istaken.push_back(nb);
-    }
-    // Go through all the pixels.
-    for (int i = 0; i<image.rows; i++) {
-        for (int j = 0; j < image.cols; j++) {
-
-            int nr_p = 0;
-            // Compare the pixel to its 8 neighbours.
-            for (int k = 0; k < 8; k++) {
-                int x = j + dx8[k], y = i + dy8[k];
-
-                if (x >= 0 && x < image.cols && y >= 0 && y < image.rows) {
-                    if (istaken[y][x] == false && labels[i*image.cols + j] != labels[y*image.cols + x]) {
-                        nr_p += 1;
+    for(int i = 0; i<image.rows; i++) {
+        for(int j = 0; j < image.cols; j++) {
+            for(int k = 0; k < 8; k++) {
+                const int x = j + dx8[k], y = i + dy8[k];
+                if(x >= 0 && x < image.cols && y >= 0 && y < image.rows) {
+                    if(labels.at<float>(i,j) != labels.at<float>(y,x) && mask(y,x)<2) {
+                        ++mask(i,j);
                     }
                 }
             }
-            /* Add the pixel to the contour list if desired. */
-            if (nr_p >= 2) {
-                contours.push_back(cv::Point(j, i));
-                istaken[i][j] = true;
-            }
-
+            if(mask(i,j)>=2)
+                output.at<cv::Vec3b>(i,j) = cv::Vec3b((uchar)colour[0],(uchar)colour[1],(uchar)colour[2]);
         }
     }
-    // Draw the contour pixels.
-    for (int i = 0; i < (int)contours.size(); i++) {
-        image.at<cv::Vec3b>(contours[i].y, contours[i].x) = cv::Vec3b((uchar)colour[0], (uchar)colour[1], (uchar)colour[2]);
-    }
-}
-static void getSpxSizeFromDiam(const int imWidth, const int imHeight, const int diamSpx, int* spxWidth, int* spxHeight){
-    int wl1, wl2;
-    int hl1, hl2;
-    wl1 = wl2 = diamSpx;
-    hl1 = hl2 = diamSpx;
-
-    while ((imWidth%wl1) != 0) {
-        wl1++;
-    }
-    while ((imWidth%wl2) != 0) {
-        wl2--;
-    }
-    while ((imHeight%hl1) != 0) {
-        hl1++;
-    }
-
-    while ((imHeight%hl2) != 0) {
-        hl2--;
-    }
-    *spxWidth = ((diamSpx - wl2) < (wl1 - diamSpx)) ? wl2 : wl1;
-    *spxHeight = ((diamSpx - hl2) < (hl1 - diamSpx)) ? hl2 : hl1;
+    return output;
 }

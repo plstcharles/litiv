@@ -246,3 +246,5 @@ size_t lv::getCurrentPhysMemBytesUsed() {
     return size_t(nMemUsed*sysconf(_SC_PAGESIZE));
 #endif //ndef(_MSC_VER)
 }
+
+void lv::doNotOptimizeCharPointer(char const volatile*) {}

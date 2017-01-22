@@ -137,6 +137,19 @@ namespace lv {
         }
     };
 
+    /// prevents a data block given by a char pointer from being optimized away
+    void doNotOptimizeCharPointer(char const volatile*);
+
+    /// prevents a value/expression from being optimized away (see https://youtu.be/nXaxk27zwlk?t=2441)
+    template<typename T>
+    inline void doNotOptimize(const T& v) {
+    #if defined(__GNUC__)
+        asm volatile("" : : "g"(v) : "memory");
+    #else //ndef(__GNUC__)
+        doNotOptimizeCharPointer(&reinterpret_cast<char const volatile&>(v));
+    #endif //ndef(__GNUC__)
+    }
+
     /// helper alias; std-friendly version of vector with N-byte aligned memory allocator
     template<typename T, size_t N>
     using aligned_vector = std::vector<T,lv::AlignedMemAllocator<T,N>>;

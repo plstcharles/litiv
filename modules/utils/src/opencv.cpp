@@ -161,6 +161,10 @@ void cv::DisplayHelper::onMouseEvent(int nEvent, int x, int y, int nFlags, void*
     (*(std::function<void(int,int,int,int)>*)pData)(nEvent,x,y,nFlags);
 }
 
+void cv::testfunc(const cv::Mat& testmat) {
+    //lv::doNotOptimize(testmat);
+}
+
 void cv::write(const std::string& sFilePath, const cv::Mat& _oData, cv::MatArchiveList eArchiveType) {
     lvAssert_(!sFilePath.empty() && !_oData.empty(),"output file path and matrix must both be non-empty");
     cv::Mat oData = _oData.isContinuous()?_oData:_oData.clone();

@@ -48,7 +48,6 @@
 
 #pragma once
 
-#include "litiv/utils/opencv.hpp"
 #include "litiv/utils/cuda.hpp"
 
 /// SLIC superpixel segmentation algorithm
@@ -64,17 +63,17 @@ struct SLIC {
     ~SLIC();
 
     /// set up the parameters and initalize all gpu buffer for faster video segmentation
-    void initialize(const cv::Mat& frame0, const int diamSpxOrNbSpx = 15, const InitType initType = SLIC_SIZE, const float wc = 35, const int nbIteration = 5);
+    void initialize(const cv::Size& size, const int diamSpxOrNbSpx = 15, const InitType initType = SLIC_SIZE, const float wc = 35, const int nbIteration = 5);
     /// segment a frame in superpixel
     void segment(const cv::Mat& frame);
     /// returns computed superpixel labels for the previous frame
-    inline cv::Mat getLabels() const {
-        return cv::Mat(m_FrameHeight, m_FrameWidth, CV_32F, h_fLabels);
+    inline const cv::Mat& getLabels() const {
+        return m_oLabels;
     }
     /// discard orphan clusters (optional)
     int enforceConnectivity();
-    /// displays the label bounds for a given image (cpu-side drawing)
-    static void displayBound(cv::Mat& image, const float* labels, const cv::Scalar colour);
+    /// returns a displayable version of the given input with overlying superpixels (cpu-side drawing)
+    static cv::Mat displayBound(const cv::Mat& image, const cv::Mat& labels, const cv::Scalar& colour);
 
 protected:
     const int m_deviceId = 0;
@@ -89,8 +88,7 @@ protected:
     InitType m_InitType;
 
     // cpu buffer
-    float* h_fClusters;
-    float* h_fLabels;
+    cv::Mat_<float> m_oLabels;
 
     // gpu variable
     float* d_fClusters;
@@ -107,12 +105,6 @@ protected:
     cudaSurfaceObject_t oSurfFrameLab;
     cudaSurfaceObject_t oSurfLabels;
 
-    void initGpuBuffers();
-    void uploadFrame(const cv::Mat& frameBGR);
-    void gpuRGBA2Lab();
-    /// initialize centroids uniformly on a grid with a step of diamSpx
-    void gpuInitClusters();
-    void downloadLabels();
     /// assign the closest centroid to each pixel
     void assignment();
     /// update the clusters' centroids with the belonging pixels
