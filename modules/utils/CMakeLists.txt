@@ -41,6 +41,7 @@ add_files(INCLUDE_FILES
     "include/litiv/utils/console.hpp"
     "include/litiv/utils/cxx.hpp"
     "include/litiv/utils/defines.hpp"
+    "include/litiv/utils/kinect.hpp"
     "include/litiv/utils/math.hpp"
     "include/litiv/utils/platform.hpp"
     "include/litiv/utils/simd.hpp"
@@ -112,6 +113,9 @@ if(USE_CVCORE_WITH_UTILS)
     endif()
 endif()
 if(USE_CUDA)
+    add_files(INCLUDE_FILES
+        "include/litiv/utils/cuda.hpp"
+    )
     target_include_directories(litiv_utils
         PUBLIC
             "$<BUILD_INTERFACE:${CUDA_INCLUDE_DIRS}>"

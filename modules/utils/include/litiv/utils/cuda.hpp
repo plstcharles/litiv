@@ -17,26 +17,11 @@
 
 #pragma once
 
-#include "litiv/utils/defines.hpp"
-#include "litiv/utils/cxx.hpp"
-#include "litiv/utils/console.hpp"
-#include "litiv/utils/platform.hpp"
-#include "litiv/utils/kinect.hpp"
-#include "litiv/utils/simd.hpp"
-#include "litiv/utils/math.hpp"
-#if USE_CVCORE_WITH_UTILS
 #include "litiv/utils/opencv.hpp"
-#if HAVE_GLSL
-#include "litiv/utils/opengl.hpp"
-#include "litiv/utils/opengl-draw.hpp"
-#include "litiv/utils/opengl-shaders.hpp"
-#include "litiv/utils/opengl-imgproc.hpp"
-#endif //HAVE_GLSL
-#if HAVE_CUDA
-#include "litiv/utils/cuda.hpp"
-#endif //HAVE_CUDA
-#if HAVE_OPENCL
-// ...
-#endif //HAVE_OPENCL
-#endif //USE_CVCORE_WITH_UTILS
-#include "litiv/utils/algo.hpp"
+#include <cuda_runtime.h>
+
+namespace lv {
+
+    // @@@@ TODO, ship helper structs + common utils here
+
+} // namespace lv

@@ -109,9 +109,16 @@
     #define lvAssert_(expr,msg) {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);}
     #define lvAssert__(expr,msg,...) {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);}
     #define glErrorCheck { \
-        GLenum __errn = glGetError(); \
+        const GLenum __errn = glGetError(); \
         if(__errn!=GL_NO_ERROR) \
-            lvError_("glErrorCheck failed [code=%d, msg=%s]",__errn,gluErrorString(__errn)); \
+            lvError_("glErrorCheck failed [code=%d, msg=%s]",(int)__errn,gluErrorString(__errn)); \
+    }
+    #define cudaErrorCheck(test) { \
+        const cudaError_t __errn = test; \
+        if(__errn!=cudaSuccess) {\
+            printf("cudaErrorCheck failed ('" #test "') [code=%d, msg=%s]",(int)__errn,cudaGetErrorString(__errn)); \
+            std::exit((int)__errn); \
+        } \
     }
     #ifdef _DEBUG
         #ifdef LITIV_BUILD
@@ -132,6 +139,7 @@
         #define lvDbgAssert__(expr,msg,...) lvAssert__(expr,msg,__VA_ARGS__)
         #define lvDbgExceptionWatch lv::UncaughtExceptionLogger XSTR_CONCAT(__logger,__LINE__)(__PRETTY_FUNCTION__,__FILE__,__LINE__)
         #define glDbgErrorCheck glErrorCheck
+        #define cudaDbgErrorCheck cudaErrorCheck
     #else //ndef(_DEBUG)
         #ifdef LITIV_BUILD
             #ifndef LITIV_DEBUG
@@ -151,6 +159,7 @@
         #define lvDbgAssert__(expr,msg,...)
         #define lvDbgExceptionWatch
         #define glDbgErrorCheck
+        #define cudaDbgErrorCheck
     #endif //ndef(_DEBUG)
     #define lvIgnore(x) (void)(x)
     #ifndef UNUSED

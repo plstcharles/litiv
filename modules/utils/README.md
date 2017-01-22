@@ -16,6 +16,8 @@ Here is a non-exhaustive (and probably not fully up-to-date) list of features:
     - GLSL source code for passthrough fragment/vertex/compute shaders
     - Pre-coded shaders for various compute operations (parallel sums, shared data preloading, ...)
     - Image processing GLSL algorithm interface (hides all the ugly binding/prep calls)
+  - CUDA:
+    - helper functions for error handling
   - OpenCV:
     - Display helper object with mouse feedback for debugging
     - Random pixel lookup functions (based on 4-NN, 8-NN, Gaussian kernels, ...)
@@ -28,7 +30,8 @@ Here is a non-exhaustive (and probably not fully up-to-date) list of features:
     - Files/subdirectories query functions with name filtering
     - Aligned memory allocator for STL containers
     - Default-init memory allocator for STL containers
-    - Kinect SDK data structures standalone re-implementation for body joint tracking
+  - Kinect:
+    - Data structures re-implementation for body joint tracking
   - Console:
     - Various line/symbol/block drawing & updating utilities (most taken from [rlutil](https://github.com/tapio/rlutil))
     - Console window/buffer resizing utilities (win32 only)

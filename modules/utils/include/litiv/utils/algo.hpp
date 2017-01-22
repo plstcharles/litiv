@@ -23,6 +23,9 @@
 #if HAVE_GLSL
 #include "litiv/utils/opengl-imgproc.hpp"
 #endif //HAVE_GLSL
+#if HAVE_CUDA
+#include "litiv/utils/cuda.hpp"
+#endif //HAVE_CUDA
 #endif //USE_CVCORE_WITH_UTILS
 
 namespace lv {
