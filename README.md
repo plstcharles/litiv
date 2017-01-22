@@ -29,9 +29,10 @@ My primary goal is to have the framework core only depend on OpenCV/CMake, and h
 * [GLFW](http://www.glfw.org/) >= 3.0.0 or [FreeGLUT](http://freeglut.sourceforge.net/) >= 2.8.0 (optional, for GLSL implementations)
 * [GLEW](http://glew.sourceforge.net/) >= 1.9.0 (optional, for GLSL implementations)
 * [GLM](http://glm.g-truc.net/) (optional, for GLSL implementations)
+* [CUDA](https://developer.nvidia.com/cuda-toolkit) (optional, for some imgproc algo implementations, e.g. SLIC)
 * [GTest](https://github.com/google/googletest) (optional, for regression testing, downloaded/imported automatically)
 * [Benchmark](https://github.com/google/benchmark) (optional, for performance testing, downloaded/imported automatically)
-* (CUDA/OpenCL will eventually be added as optional)
+* (OpenCL may eventually be added as optional)
 * (OpenGM + Gurobi/CPLEX/HDF5 will eventually be added as optional)
 
 A dockerfile which builds an Ubuntu image including all these dependencies is available [here](./Dockerfile).
@@ -42,8 +43,8 @@ Modules Overview
 A list of all modules (including some 3rd party ones) is presented below; for more information, refer to their README files.
 
 * [**datasets**](./modules/datasets/) : Contains dataset parsing and evaluation utilities with data precaching and async processing support.
-* [**features2d**](./modules/features2d/) : Contains feature descriptors (e.g. LBSP, DASC, FHOG).
-* [**imgproc**](./modules/imgproc/) : Contains image processing algos and utilities (e.g. for edge detection, non-max suppresion).
+* [**features2d**](./modules/features2d/) : Contains feature descriptors (e.g. LBSP, DASC, LSS, FHOG).
+* [**imgproc**](./modules/imgproc/) : Contains image processing algos and utilities (e.g. for edge detection and superpixel segmentation).
 * [**utils**](./modules/utils/) : Equivalent of OpenCV's "core" module; contains miscellaneous utilities required by other modules.
 * [**video**](./modules/video/) : Contains video processing algos and utilities (e.g. for background subtraction/change detection, registration).
 * [**vptz**](./modules/vptz/) : Contains a compact version of the [VirtualPTZ library](https://bitbucket.org/pierre_luc_st_charles/virtualptz_standalone) used to evaluate PTZ trackers.
