@@ -22,6 +22,7 @@
 #include <dshow.h>
 #include <strsafe.h>
 #include <assert.h>
+#include <comdef.h>
 
 #ifndef ASSERT
 #define ASSERT assert

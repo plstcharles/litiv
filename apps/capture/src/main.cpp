@@ -19,6 +19,7 @@
 #include "litiv/video.hpp"
 #include "litiv/3rdparty/dshowbase/ocvcompat.h"
 #include "litiv/utils/kinect.hpp"
+#include <fstream>
 
 /////////////////////////////////
 #define USE_FLIR_SENSOR         1
@@ -46,7 +47,7 @@ std::atomic_bool g_bIsActive = true;
 
 int main() {
     try {
-        lv::RegisterAllConsoleSignals([](int){g_bIsActive = false;});
+        lv::registerAllConsoleSignals([](int){g_bIsActive = false;});
         const auto lEncodeAndSaveFrame = [](const cv::Mat& oImage, size_t nIndex, cv::VideoWriter& oWriter, size_t& nLastSavedIndex) {
             lvAssert(!oImage.empty() && oWriter.isOpened());
             lvAssert(nLastSavedIndex==SIZE_MAX || nLastSavedIndex<nIndex);
