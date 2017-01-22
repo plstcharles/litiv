@@ -29,12 +29,7 @@ add_files(INCLUDE_FILES
 )
 
 if(USE_CUDA)
-    add_files(CUDA_SOURCE_FILES
-        "src/SLIC_device.hpp"
-        "src/SLIC_device.cu"
-        "src/SLIC_host.cu"
-    )
-    add_files(CUDA_INCLUDE_FILES
+    add_files(INCLUDE_FILES
         "include/litiv/imgproc/SLIC.hpp"
     )
 endif()

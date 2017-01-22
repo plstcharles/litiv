@@ -20,6 +20,9 @@
 #include "litiv/features2d.hpp"
 #include "litiv/imgproc/EdgeDetectorCanny.hpp"
 #include "litiv/imgproc/EdgeDetectorLBSP.hpp"
+#if HAVE_CUDA
+#include "litiv/imgproc/SLIC.hpp"
+#endif //HAVE_CUDA
 
 namespace lv {
 

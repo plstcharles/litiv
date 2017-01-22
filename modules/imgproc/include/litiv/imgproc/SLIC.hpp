@@ -1,122 +1,125 @@
-/*
-Superpixel oversegmentation
-GPU implementation of the algorithm SLIC of
-Achanta et al. [PAMI 2012, vol. 34, num. 11, pp. 2274-2282]
 
-Library required :
-Opencv 3.0 min
-CUDA arch>=3.0
-
-Author : Derue Fran?ois-Xavier
-francois.xavier.derue@gmail.com
-
-
-*/
+// This file is part of the LITIV framework; visit the original repository at
+// https://github.com/plstcharles/litiv for more information.
+//
+// Copyright 2017 Pierre-Luc St-Charles; pierre-luc.st-charles<at>polymtl.ca
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+//
+// //////////////////////////////////////////////////////////////////////////
+//
+//               SLIC Superpixel Oversegmentation Algorithm
+//       CUDA implementation of Achanta et al.'s method (TPAMI 2012)
+//
+// Note: requires CUDA compute architecture >= 3.0
+// Author: Francois-Xavier Derue
+// Contact: francois.xavier.derue@gmail.com
+// Source: https://github.com/fderue/SLIC_CUDA
+//
+// Copyright (c) 2016 fderue
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
 
 #pragma once
 
-#include <opencv2/opencv.hpp>
-#include <cuda_runtime.h>
+#include "litiv/utils/opencv.hpp"
+#include "litiv/utils/cuda.hpp"
 
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+/// SLIC superpixel segmentation algorithm
+struct SLIC {
 
-class SlicCuda {
-public:
-	enum InitType {
-		SLIC_SIZE, // initialize with a size of spx
-		SLIC_NSPX // initialize with a number of spx
-	};
-private:
-	const int m_deviceId = 0;
+    /// algorithm initialization method type list
+    enum InitType {
+        SLIC_SIZE, ///< initialize with spx size
+        SLIC_NSPX ///< initialize with spx count
+    };
 
-	cudaDeviceProp m_deviceProp;
+    SLIC();
+    ~SLIC();
 
-	int m_nbPx;
-	int m_nbSpx;
-	int m_SpxDiam;
-	int m_SpxWidth, m_SpxHeight, m_SpxArea;
-	int m_FrameWidth, m_FrameHeight;
-	float m_wc;
-	int m_nbIteration;
-	InitType m_InitType;
+    /// set up the parameters and initalize all gpu buffer for faster video segmentation
+    void initialize(const cv::Mat& frame0, const int diamSpxOrNbSpx = 15, const InitType initType = SLIC_SIZE, const float wc = 35, const int nbIteration = 5);
+    /// segment a frame in superpixel
+    void segment(const cv::Mat& frame);
+    /// returns computed superpixel labels for the previous frame
+    inline cv::Mat getLabels() const {
+        return cv::Mat(m_FrameHeight, m_FrameWidth, CV_32F, h_fLabels);
+    }
+    /// discard orphan clusters (optional)
+    int enforceConnectivity();
+    /// displays the label bounds for a given image (cpu-side drawing)
+    static void displayBound(cv::Mat& image, const float* labels, const cv::Scalar colour);
 
-	//cpu buffer
-	float* h_fClusters;
-	float* h_fLabels;
+protected:
+    const int m_deviceId = 0;
+    cudaDeviceProp m_deviceProp;
+    int m_nbPx;
+    int m_nbSpx;
+    int m_SpxDiam;
+    int m_SpxWidth, m_SpxHeight, m_SpxArea;
+    int m_FrameWidth, m_FrameHeight;
+    float m_wc;
+    int m_nbIteration;
+    InitType m_InitType;
 
-	// gpu variable
-	float* d_fClusters;
-	float* d_fLabels;
-	float* d_fAccAtt;
+    // cpu buffer
+    float* h_fClusters;
+    float* h_fLabels;
 
-	//cudaArray
-	cudaArray* cuArrayFrameBGRA;
-	cudaArray* cuArrayFrameLab;
-	cudaArray* cuArrayLabels;
+    // gpu variable
+    float* d_fClusters;
+    float* d_fLabels;
+    float* d_fAccAtt;
 
-	// Texture and surface Object
-	cudaTextureObject_t oTexFrameBGRA;
-	cudaSurfaceObject_t oSurfFrameLab;
-	cudaSurfaceObject_t oSurfLabels;
+    // cudaArray
+    cudaArray* cuArrayFrameBGRA;
+    cudaArray* cuArrayFrameLab;
+    cudaArray* cuArrayLabels;
 
-	//========= methods ===========
+    // texture and surface Object
+    cudaTextureObject_t oTexFrameBGRA;
+    cudaSurfaceObject_t oSurfFrameLab;
+    cudaSurfaceObject_t oSurfLabels;
 
-	void initGpuBuffers();
-	void uploadFrame(const cv::Mat& frameBGR);
-	void gpuRGBA2Lab();
-
-	/*
-	Initialize centroids uniformly on a grid with a step of diamSpx
-	*/
-	void gpuInitClusters();
-	void downloadLabels();
-
-	/*
-	Assign the closest centroid to each pixel
-	*/
-	void assignment();
-
-	/*
-	Update the clusters' centroids with the belonging pixels
-	*/
-	void update();
-
-public:
-	SlicCuda();
-	SlicCuda(const cv::Mat& frame0, const int diamSpxOrNbSpx = 15, const InitType initType = SLIC_SIZE, const float wc = 35, const int nbIteration = 5);
-	~SlicCuda();
-
-	/*
-	Set up the parameters and initalize all gpu buffer for faster video segmentation.
-	*/
-	void initialize(const cv::Mat& frame0, const int diamSpxOrNbSpx = 15, const InitType initType = SLIC_SIZE, const float wc = 35, const int nbIteration = 5);
-
-	/*
-	Segment a frame in superpixel
-	*/
-	void segment(const cv::Mat& frame);
-	cv::Mat getLabels(){ return cv::Mat(m_FrameHeight, m_FrameWidth, CV_32F, h_fLabels); }
-
-	/*
-	Discard orphan clusters (optional)
-	*/
-	int enforceConnectivity();
-
-	static void displayBound(cv::Mat& image, const float* labels, const cv::Scalar colour); // cpu draw
+    void initGpuBuffers();
+    void uploadFrame(const cv::Mat& frameBGR);
+    void gpuRGBA2Lab();
+    /// initialize centroids uniformly on a grid with a step of diamSpx
+    void gpuInitClusters();
+    void downloadLabels();
+    /// assign the closest centroid to each pixel
+    void assignment();
+    /// update the clusters' centroids with the belonging pixels
+    void update();
 };
 
 static inline int iDivUp(int a, int b){ return (a%b == 0) ? a / b : a / b + 1; }
 
-/*
-Find best width and height from a given diameter to best fit the image size given by imWidth and imHeigh
-*/
+/// find best width and height from a given diameter to best fit the image size given by imWidth and imHeigh
 static void getSpxSizeFromDiam(const int imWidth, const int imHeight, const int diamSpx, int* spxWidth, int* spxHeight);
-
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true)
-{
-	if (code != cudaSuccess)
-	{
-		fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-		if (abort) exit(code);
-	}
-}
