@@ -580,12 +580,16 @@ namespace lv {
         return (Tout)_mm_popcnt_u32((uint)reinterpret_cast<std::make_unsigned_t<const Tin>&>(x));
     }
 
+#if TARGET_PLATFORM_x64
+
     /// computes the population count of an 8-byte vector using 64-bit popcnt instruction
     template<typename Tin, typename Tout=uint8_t>
     inline std::enable_if_t<sizeof(Tin)==8,Tout> popcount(const Tin x) {
         static_assert(std::is_integral<Tin>::value,"type must be integral");
         return (Tout)_mm_popcnt_u64(reinterpret_cast<const uint64_t&>(x));
     }
+
+#endif //TARGET_PLATFORM_x64
 
 #else //(!HAVE_POPCNT)
 

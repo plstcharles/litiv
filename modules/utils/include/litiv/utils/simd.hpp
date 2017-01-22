@@ -36,7 +36,8 @@ namespace lv {
     /// returns the (horizontal) sum of the provided unsigned byte array
     inline uint32_t hsum_8ui(const __m64& anBuffer) {
         const __m64 _anRes = _mm_sad_pu8(anBuffer,_mm_set1_pi8(int8_t(0)));
-        return uint32_t(_mm_cvtsi64_si32(_anRes));
+        const uint32_t nRes = uint32_t(_mm_cvtsi64_si32(_anRes));
+        return (_mm_empty(),nRes);
     }
 
 #endif //HAVE_MMX

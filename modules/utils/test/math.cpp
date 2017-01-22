@@ -845,9 +845,10 @@ namespace {
     }
 
 }
-
+#if TARGET_PLATFORM_x64
 BENCHMARK_TEMPLATE2(popcount_perftest,int64_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
 BENCHMARK_TEMPLATE2(popcount_perftest,uint64_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+#endif //TARGET_PLATFORM_x64
 BENCHMARK_TEMPLATE2(popcount_perftest,int32_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
 BENCHMARK_TEMPLATE2(popcount_perftest,uint32_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
 BENCHMARK_TEMPLATE2(popcount_perftest,int16_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
@@ -858,7 +859,11 @@ BENCHMARK_TEMPLATE2(popcount_perftest,uint8_t,BENCHMARK_NB_CHANNELS)->Args({1000
 namespace {
     template<typename T>
     struct popcount_fixture : testing::Test {};
-    typedef testing::Types<int8_t,uint8_t,int16_t,uint16_t,int32_t,uint32_t,int64_t,uint64_t> popcount_types;
+    typedef testing::Types<int8_t,uint8_t,int16_t,uint16_t,int32_t,uint32_t
+#if TARGET_PLATFORM_x64
+        ,int64_t,uint64_t
+#endif //TARGET_PLATFORM_x64
+    > popcount_types;
 }
 TYPED_TEST_CASE(popcount_fixture,popcount_types);
 
@@ -914,9 +919,10 @@ namespace {
     }
 
 }
-
+#if TARGET_PLATFORM_x64
 BENCHMARK_TEMPLATE2(hdist_perftest,int64_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
 BENCHMARK_TEMPLATE2(hdist_perftest,uint64_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
+#endif //TARGET_PLATFORM_x64
 BENCHMARK_TEMPLATE2(hdist_perftest,int32_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
 BENCHMARK_TEMPLATE2(hdist_perftest,uint32_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
 BENCHMARK_TEMPLATE2(hdist_perftest,int16_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);

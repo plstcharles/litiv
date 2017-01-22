@@ -38,6 +38,7 @@
 #include <cstddef>
 #include <cstdarg>
 #include <cstdint>
+#include <iomanip>
 #include <stdexcept>
 #include <iostream>
 #include <sstream>

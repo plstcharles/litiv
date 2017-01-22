@@ -4,8 +4,19 @@
 
 #if HAVE_MMX
 
-TEST(hsum_8ui,regression) {
-    // @@@@ todo & verify on 32bit build
+TEST(hsum_8ui,regression_32bit) {
+    std::vector<uint8_t,lv::AlignedMemAllocator<uint8_t,16>> vData(8);
+    ASSERT_EQ(((uintptr_t)vData.data()%16),uintptr_t(0));
+    ASSERT_EQ(lv::hsum_8ui(*(__m64*)vData.data()),uint32_t(0));
+    std::iota(vData.begin(),vData.end(),uint8_t(1));
+    ASSERT_EQ(lv::hsum_8ui(*(__m64*)vData.data()),uint32_t((vData.size()*(vData.size()+1))/2));
+    std::fill(vData.begin(),vData.end(),uint8_t(255));
+    ASSERT_EQ(lv::hsum_8ui(*(__m64*)vData.data()),uint32_t(vData.size()*255));
+    for(size_t i=0; i<1000; ++i) {
+        for(size_t j=0; j<vData.size(); ++j)
+            vData[j] = uint8_t(rand()%256);
+        ASSERT_EQ(lv::hsum_8ui(*(__m64*)vData.data()),std::accumulate(vData.begin(),vData.end(),uint32_t(0)));
+    }
 }
 
 #endif //HAVE_MMX

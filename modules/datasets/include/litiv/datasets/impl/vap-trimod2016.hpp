@@ -276,7 +276,7 @@ namespace lv {
                     vUnpackedInput[s] = cv::Mat();
             }
             else {
-                lvDbgAssert(vUnpackedInput.size()==(this->m_bLoadDepth?3:2));
+                lvDbgAssert(vUnpackedInput.size()==size_t(this->m_bLoadDepth?3:2));
                 lvDbgAssert(this->getInputPacketType()==ImageArrayPacket);
                 const std::vector<cv::Size>& vSizes = this->m_vInputSizes;
                 lvDbgAssert(vSizes.size()==vUnpackedInput.size() && vSizes[0].area()>0);
@@ -293,7 +293,7 @@ namespace lv {
             if(nPacketIdx>=this->m_vvsInputPaths.size())
                 return cv::Mat();
             const std::vector<std::string>& vsInputPaths = this->m_vvsInputPaths[nPacketIdx];
-            lvDbgAssert(!vsInputPaths.empty() && vsInputPaths.size()==getInputStreamCount() && vsInputPaths.size()==(this->m_bLoadDepth?3:2));
+            lvDbgAssert(!vsInputPaths.empty() && vsInputPaths.size()==getInputStreamCount() && vsInputPaths.size()==size_t(this->m_bLoadDepth?3:2));
             const std::vector<cv::Size>& vInputSizes = this->m_vInputSizes;
             lvDbgAssert(vInputSizes.size()==vsInputPaths.size() && (lv::accumulateMembers<int,cv::Size>(vInputSizes,[](const cv::Size& s){return s.area();}))>0);
             cv::Mat oFullPacket(1,vInputSizes[0].area()*3+vInputSizes[1].area()+(this->m_bLoadDepth?vInputSizes[2].area()*2:0),CV_8UC1);
@@ -336,7 +336,7 @@ namespace lv {
                 const size_t nGTIdx = this->m_mGTIndexLUT[nPacketIdx];
                 lvDbgAssert(nGTIdx<this->m_vvsGTPaths.size());
                 const std::vector<std::string>& vsGTPaths = this->m_vvsGTPaths[nGTIdx];
-                lvDbgAssert(!vsGTPaths.empty() && vsGTPaths.size()==getGTStreamCount() && vsGTPaths.size()==(this->m_bLoadDepth?3:2));
+                lvDbgAssert(!vsGTPaths.empty() && vsGTPaths.size()==getGTStreamCount() && vsGTPaths.size()==size_t(this->m_bLoadDepth?3:2));
                 const std::vector<cv::Size>& vGTSizes = this->m_vGTSizes;
                 const int nTotPacketSize = lv::accumulateMembers<int,cv::Size>(vGTSizes,[](const cv::Size& s){return s.area();});
                 lvDbgAssert(vGTSizes.size()==vsGTPaths.size() && nTotPacketSize>0);

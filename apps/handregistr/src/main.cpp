@@ -18,7 +18,6 @@
 #include "litiv/datasets.hpp"
 #include "litiv/imgproc.hpp"
 #include <opencv2/calib3d.hpp>
-#include <iomanip>
 
 ////////////////////////////////
 #define USE_FMAT_RANSAC_ESTIM   0
