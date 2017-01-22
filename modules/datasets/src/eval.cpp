@@ -17,6 +17,8 @@
 
 #include "litiv/datasets/eval.hpp"
 //#include "litiv/utils/console.hpp" @@@@@ reuse later?
+#include <fstream>
+#include <iomanip>
 
 void lv::IDataReporter_<lv::DatasetEval_None>::writeEvalReport() const {
     if(getCurrentOutputCount()==0) {

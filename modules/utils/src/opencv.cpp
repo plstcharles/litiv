@@ -16,6 +16,8 @@
 // limitations under the License.
 
 #include "litiv/utils/opencv.hpp"
+#include "litiv/utils/platform.hpp"
+#include <fstream>
 
 cv::DisplayHelperPtr cv::DisplayHelper::create(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) {
     struct DisplayHelperWrapper : public DisplayHelper {
@@ -121,7 +123,7 @@ void cv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
 }
 
 void cv::DisplayHelper::setMouseCallback(std::function<void(const CallbackData&)> lCallback) {
-    std::mutex_lock_guard oLock(m_oEventMutex);
+    lv::mutex_lock_guard oLock(m_oEventMutex);
     m_lExternalCallback = lCallback;
 }
 
@@ -143,7 +145,7 @@ int cv::DisplayHelper::waitKey(int nDefaultSleepDelay) {
 }
 
 void cv::DisplayHelper::onMouseEventCallback(int nEvent, int x, int y, int nFlags) {
-    std::mutex_lock_guard oLock(m_oEventMutex);
+    lv::mutex_lock_guard oLock(m_oEventMutex);
     m_oLatestMouseEvent.oPosition = m_oLatestMouseEvent.oInternalPosition = cv::Point2i(x,y);
     m_oLatestMouseEvent.oTileSize = m_oLastTileSize;
     m_oLatestMouseEvent.oDisplaySize = m_oLastDisplaySize;

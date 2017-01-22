@@ -53,13 +53,13 @@ protected:
     /// defines whether the output is normalized to the full 0-255 range or not
     const bool m_bNormalizeOutput;
     /// pre-allocated image pyramid maps for multi-scale LBSP lookup
-    std::vector<std::aligned_vector<uchar,32>> m_vvuInputPyrMaps;
+    std::vector<lv::aligned_vector<uchar,32>> m_vvuInputPyrMaps;
     /// pre-allocated image pyramid LUT maps for multi-scale LBSP computation
-    std::vector<std::aligned_vector<uchar,32>> m_vvuLBSPLookupMaps;
+    std::vector<lv::aligned_vector<uchar,32>> m_vvuLBSPLookupMaps;
     /// pre-allocated image gradient reconstruction map
-    std::aligned_vector<uchar,32> m_vuLBSPGradMapData;
+    lv::aligned_vector<uchar,32> m_vuLBSPGradMapData;
     /// pre-allocated image edge reconstruction map
-    std::aligned_vector<uchar,32> m_vuEdgeTempMaskData;
+    lv::aligned_vector<uchar,32> m_vuEdgeTempMaskData;
     /// multi-level image map size lookup list
     std::vector<cv::Size> m_voMapSizeList;
     /// hysteresis recursive search stack

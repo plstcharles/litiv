@@ -17,10 +17,14 @@
 
 option(USE_SIGNEXT_SHIFT_TRICK "Use sign-extended right shift bit trick in float absolute value computation" OFF)
 option(USE_FAST_SQRT_FOR_CDIST "Use fast approximate square root inside floating point version of color distortion" OFF)
+option(USE_RLUTIL_ANSI_DEFINE "Use ANSI escape sequences also on Windows in console utils (defaults to using WinAPI otherwise)" OFF)
+set(RLUTIL_STRING_TYPE "char*" CACHE STRING "Preferred string type for console utils (defaults to std::string otherwise)")
 
 mark_as_advanced(
     USE_SIGNEXT_SHIFT_TRICK
     USE_FAST_SQRT_FOR_CDIST
+    USE_RLUTIL_ANSI_DEFINE
+    RLUTIL_STRING_TYPE
 )
 
 file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/include/litiv/utils/defines.hpp")

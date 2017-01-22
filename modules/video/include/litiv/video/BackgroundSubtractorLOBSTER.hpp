@@ -109,8 +109,8 @@ protected:
     size_t m_nColStepSize;
     size_t m_nRowStepSize;
     size_t m_nBGModelSize;
-    std::aligned_vector<uint,32> m_vnBGModelData;
-    std::aligned_vector<lv::gl::TMT32GenParams,32> m_voTMT32ModelData;
+    lv::aligned_vector<uint,32> m_vnBGModelData;
+    lv::aligned_vector<lv::gl::TMT32GenParams,32> m_voTMT32ModelData;
     enum LOBSTERStorageBufferBindingList {
         LOBSTERStorageBuffer_BGModelBinding = GLImageProcAlgo::nStorageBufferDefaultBindingsCount,
         LOBSTERStorageBuffer_TMT32ModelBinding,

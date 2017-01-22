@@ -280,7 +280,7 @@ const cv::Mat& lv::DataPrecacher::getPacket(size_t nIdx) {
         m_nLastReqIdx = nIdx;
         return m_oLastReqPacket;
     }
-    std::mutex_unique_lock sync_lock(m_oSyncMutex);
+    lv::mutex_unique_lock sync_lock(m_oSyncMutex);
     m_nReqIdx = nIdx;
     std::cv_status res;
     size_t nAnswIdx;
@@ -328,7 +328,7 @@ void lv::DataPrecacher::stopAsyncPrecaching() {
 }
 
 void lv::DataPrecacher::entry(const size_t nBufferSize) {
-    std::mutex_unique_lock sync_lock(m_oSyncMutex);
+    lv::mutex_unique_lock sync_lock(m_oSyncMutex);
     try {
 #if CONSOLE_DEBUG
         std::cout << "data precacher [" << uintptr_t(this) << "] init w/ buffer size = " << (nBufferSize/1024)/1024 << " mb" << std::endl;
@@ -1188,7 +1188,7 @@ size_t lv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
     cv::Mat oPacketCopy = oPacket.clone();
     size_t nPacketPosition;
     {
-        std::mutex_unique_lock sync_lock(m_oSyncMutex);
+        lv::mutex_unique_lock sync_lock(m_oSyncMutex);
         if(!m_bAllowPacketDrop)
             m_oClearCondVar.wait(sync_lock,[&]{return m_nQueueSize+nPacketSize<=m_nQueueMaxSize;});
         if(m_nQueueSize+nPacketSize<=m_nQueueMaxSize) {
@@ -1232,7 +1232,7 @@ bool lv::DataWriter::startAsyncWriting(size_t nSuggestedQueueSize, bool bDropPac
 void lv::DataWriter::stopAsyncWriting() {
     if(m_bIsActive) {
         {
-            std::mutex_unique_lock sync_lock(m_oSyncMutex);
+            lv::mutex_unique_lock sync_lock(m_oSyncMutex);
             m_bIsActive = false;
             m_oQueueCondVar.notify_all();
         }
@@ -1247,7 +1247,7 @@ void lv::DataWriter::stopAsyncWriting() {
 }
 
 void lv::DataWriter::entry() {
-    std::mutex_unique_lock sync_lock(m_oSyncMutex);
+    lv::mutex_unique_lock sync_lock(m_oSyncMutex);
 #if CONSOLE_DEBUG
     std::cout << "data writer [" << uintptr_t(this) << "] init w/ max buffer size = " << (m_nQueueMaxSize/1024)/1024 << " mb" << std::endl;
 #endif //CONSOLE_DEBUG
@@ -1259,7 +1259,7 @@ void lv::DataWriter::entry() {
                 const size_t nPacketSize = pCurrPacket->second.total()*pCurrPacket->second.elemSize();
                 if(nPacketSize<=m_nQueueSize) {
                     try {
-                        std::unlock_guard<std::mutex_unique_lock> oUnlock(sync_lock);
+                        lv::unlock_guard<lv::mutex_unique_lock> oUnlock(sync_lock);
                         m_lCallback(pCurrPacket->second,pCurrPacket->first);
                     }
                     catch(...) {

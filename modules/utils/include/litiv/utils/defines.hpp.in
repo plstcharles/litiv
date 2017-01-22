@@ -183,6 +183,8 @@
     #define CACHE_MAX_SIZE_GB         @DATASETS_CACHE_SIZE@LLU
     #define TARGET_PLATFORM_x64       @TARGET_PLATFORM_x64@
     #define DEFAULT_NB_THREADS        1
+    #define USE_RLUTIL_ANSI_DEFINE    @USE_RLUTIL_ANSI_DEFINE@
+    #define RLUTIL_STRING_TYPE        @RLUTIL_STRING_TYPE@
     #define LITIV_SHARED              @BUILD_SHARED_LIBS@
     #define LITIV_STATIC              (!(LITIV_SHARED))
 

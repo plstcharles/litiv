@@ -18,8 +18,7 @@
 #include "litiv/datasets.hpp"
 #include "litiv/video.hpp"
 #include "litiv/3rdparty/dshowbase/ocvcompat.h"
-#include <tuple>
-#include <Kinect.h>
+#include "litiv/utils/kinect.hpp"
 
 /////////////////////////////////
 #define USE_FLIR_SENSOR         1

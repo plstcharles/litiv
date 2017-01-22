@@ -199,7 +199,7 @@ std::string lv::gl::addLineNumbersToString(const std::string& sSrc, bool bPrefix
     return ssRes.str();
 }
 
-void lv::gl::TMT32GenParams::initTinyMT32Generators(glm::uvec3 vGeneratorLayout,std::aligned_vector<lv::gl::TMT32GenParams,32>& voData) {
+void lv::gl::TMT32GenParams::initTinyMT32Generators(glm::uvec3 vGeneratorLayout,lv::aligned_vector<lv::gl::TMT32GenParams,32>& voData) {
     static_assert(sizeof(TMT32GenParams)==sizeof(uint)*8,"Hmmm...?");
     lvAssert(vGeneratorLayout.x>0 && vGeneratorLayout.y>0 && vGeneratorLayout.z>0);
     voData.resize(vGeneratorLayout.x*vGeneratorLayout.y*vGeneratorLayout.z);

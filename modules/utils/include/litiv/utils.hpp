@@ -21,6 +21,7 @@
 #include "litiv/utils/cxx.hpp"
 #include "litiv/utils/console.hpp"
 #include "litiv/utils/platform.hpp"
+#include "litiv/utils/kinect.hpp"
 #include "litiv/utils/simd.hpp"
 #include "litiv/utils/math.hpp"
 #if USE_CVCORE_WITH_UTILS

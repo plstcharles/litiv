@@ -49,6 +49,8 @@
 #pragma warning(pop)
 #endif //defined(_MSC_VER)
 #endif //USE_BSDS500_BENCHMARK
+#include <fstream>
+#include <iomanip>
 
 bool lv::MetricsAccumulator_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::isEqual(const IIMetricsAccumulatorConstPtr& m) const {
     const auto& m2 = dynamic_cast<const MetricsAccumulator_<DatasetEval_BinaryClassifier,Dataset_BSDS500>&>(*m.get());

@@ -16,6 +16,25 @@
 // limitations under the License.
 
 #include "litiv/utils/platform.hpp"
+#if defined(_MSC_VER)
+#include <windows.h>
+#include <winerror.h>
+#include <comdef.h>
+#include <stdint.h>
+#include <direct.h>
+#include <psapi.h>
+#if !USE_KINECTSDK_STANDALONE
+#include <Kinect.h>
+#endif //(!USE_KINECTSDK_STANDALONE)
+#else //(!defined(_MSC_VER))
+#include <dirent.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/resource.h>
+#endif //(!defined(_MSC_VER))
+#include <fstream>
+#include <csignal>
 
 std::string lv::getCurrentWorkDirPath() {
     std::array<char,FILENAME_MAX> acCurrentPath = {};

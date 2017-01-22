@@ -28,18 +28,9 @@
  */
 
 // define this to use ANSI escape sequences also on Windows (defaults to using WinAPI otherwise)
-#if 0
+#if USE_RLUTIL_ANSI_DEFINE
 #define RLUTIL_USE_ANSI
-#endif
-// define/typedef this to your preference to override rlutil's string type
-#if 0
-#define RLUTIL_STRING_T char*
-#endif
-
-#include <iostream>
-#include <string>
-#include <sstream>
-
+#endif //USE_RLUTIL_ANSI_DEFINE
 #ifdef _WIN32
 #include <windows.h>  // for WinAPI and Sleep()
 #define _NO_OLDNAMES  // for MinGW compatibility
@@ -94,10 +85,12 @@ inline int kbhit(void) {
 
 namespace rlutil {
 
-#ifndef RLUTIL_STRING_T
-    typedef std::string RLUTIL_STRING_T;
-#endif //ndef RLUTIL_STRING_T
-    inline void RLUTIL_PRINT(RLUTIL_STRING_T st) { std::cout << st; }
+#ifndef RLUTIL_STRING_TYPE
+    typedef std::string str_t;
+#else //def(RLUTIL_STRING_TYPE)
+    typedef RLUTIL_STRING_TYPE str_t;
+#endif //ndef RLUTIL_STRING_TYPE
+    inline void RLUTIL_PRINT(str_t st) { std::cout << st; }
 
     enum ColorCode {
         Color_BLACK=0,
@@ -144,26 +137,26 @@ namespace rlutil {
      * ANSI_BOLDWHITE - White (bold/bright)
      * ANSI_RESET - Resets formatting
      */
-    const RLUTIL_STRING_T ANSI_CLS = "\033[2J";
-    const RLUTIL_STRING_T ANSI_BLACK = "\033[22;30m";
-    const RLUTIL_STRING_T ANSI_RED = "\033[22;31m";
-    const RLUTIL_STRING_T ANSI_BOLDRED = "\033[22;31;1m";
-    const RLUTIL_STRING_T ANSI_GREEN = "\033[22;32m";
-    const RLUTIL_STRING_T ANSI_BOLDGREEN = "\033[22;32;1m";
-    const RLUTIL_STRING_T ANSI_BROWN = "\033[22;33m";
-    const RLUTIL_STRING_T ANSI_BLUE = "\033[22;34m";
-    const RLUTIL_STRING_T ANSI_MAGENTA = "\033[22;35m";
-    const RLUTIL_STRING_T ANSI_CYAN = "\033[22;36m";
-    const RLUTIL_STRING_T ANSI_GREY = "\033[22;37m";
-    const RLUTIL_STRING_T ANSI_DARKGREY = "\033[01;30m";
-    const RLUTIL_STRING_T ANSI_LIGHTRED = "\033[01;31m";
-    const RLUTIL_STRING_T ANSI_LIGHTGREEN = "\033[01;32m";
-    const RLUTIL_STRING_T ANSI_BOLDYELLOW = "\033[01;33m";
-    const RLUTIL_STRING_T ANSI_LIGHTBLUE = "\033[01;34m";
-    const RLUTIL_STRING_T ANSI_LIGHTMAGENTA = "\033[01;35m";
-    const RLUTIL_STRING_T ANSI_LIGHTCYAN = "\033[01;36m";
-    const RLUTIL_STRING_T ANSI_BOLDWHITE = "\033[01;37m";
-    const RLUTIL_STRING_T ANSI_RESET = "\033[39;49m\033[0m";
+    const str_t ANSI_CLS = "\033[2J";
+    const str_t ANSI_BLACK = "\033[22;30m";
+    const str_t ANSI_RED = "\033[22;31m";
+    const str_t ANSI_BOLDRED = "\033[22;31;1m";
+    const str_t ANSI_GREEN = "\033[22;32m";
+    const str_t ANSI_BOLDGREEN = "\033[22;32;1m";
+    const str_t ANSI_BROWN = "\033[22;33m";
+    const str_t ANSI_BLUE = "\033[22;34m";
+    const str_t ANSI_MAGENTA = "\033[22;35m";
+    const str_t ANSI_CYAN = "\033[22;36m";
+    const str_t ANSI_GREY = "\033[22;37m";
+    const str_t ANSI_DARKGREY = "\033[01;30m";
+    const str_t ANSI_LIGHTRED = "\033[01;31m";
+    const str_t ANSI_LIGHTGREEN = "\033[01;32m";
+    const str_t ANSI_BOLDYELLOW = "\033[01;33m";
+    const str_t ANSI_LIGHTBLUE = "\033[01;34m";
+    const str_t ANSI_LIGHTMAGENTA = "\033[01;35m";
+    const str_t ANSI_LIGHTCYAN = "\033[01;36m";
+    const str_t ANSI_BOLDWHITE = "\033[01;37m";
+    const str_t ANSI_RESET = "\033[39;49m\033[0m";
 
     /**
      * Key codes for keyhit()
@@ -313,7 +306,7 @@ namespace rlutil {
     }
 
     // returns ANSI color escape sequence for specified color enum
-    inline RLUTIL_STRING_T getANSIColor(const ColorCode c) {
+    inline str_t getANSIColor(const ColorCode c) {
         switch(c) {
             case Color_BLACK : return ANSI_BLACK;
             case Color_BLUE : return ANSI_BLUE; // non-ANSI

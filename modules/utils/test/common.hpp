@@ -2,6 +2,7 @@
 #include "gtest/gtest.h"
 #include "benchmark/benchmark.h"
 #include <random>
+#include <fstream>
 
 namespace {
 

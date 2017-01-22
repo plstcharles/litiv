@@ -17,17 +17,16 @@
 
 #pragma once
 
-// includes here really need cleanup @@@@ split between platform & cxx?
-
 #include "litiv/utils/defines.hpp"
 #include <set>
-#include <map>
 #include <cmath>
 #include <mutex>
 #include <array>
 #include <queue>
-#include <deque>
-#include <stack>
+#include <tuple>
+#include <utility>
+#include <type_traits>
+#include <iterator>
 #include <string>
 #include <vector>
 #include <thread>
@@ -36,28 +35,22 @@
 #include <future>
 #include <memory>
 #include <inttypes.h>
+#include <cstddef>
 #include <cstdarg>
 #include <cstdint>
-#include <csignal>
 #include <stdexcept>
 #include <iostream>
-#include <fstream>
 #include <sstream>
-#include <iomanip>
 #include <cstdlib>
-#include <cassert>
 #include <ctime>
 #include <numeric>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <assert.h>
+#include <cstdio>
+#include <ratio>
 #include <exception>
-#include <unordered_map>
-#include <unordered_set>
 #include <algorithm>
+#include <cctype>
+#include <clocale>
 #include <functional>
-#include <type_traits>
 #include <condition_variable>
 #if USE_CVCORE_WITH_UTILS
 #include <opencv2/core.hpp>
@@ -157,11 +150,11 @@ namespace lv {
 
     /// explicit loop unroller helper function (specialization for null iter count)
     template<size_t n, typename TFunc>
-    constexpr std::enable_if_t<n==0> unroll(const TFunc&) {}
+    std::enable_if_t<n==0> unroll(const TFunc&) {}
 
     /// explicit loop unroller helper function (specialization for non-null iter count)
     template<size_t n, typename TFunc>
-    constexpr std::enable_if_t<(n>0)> unroll(const TFunc& f) {
+    std::enable_if_t<(n>0)> unroll(const TFunc& f) {
         unroll<n-1>(f);
         f(n-1);
     }
@@ -551,7 +544,7 @@ namespace lv {
         /// unlocks all given mutexes, one at a time, until destruction
         explicit unlock_guard(TMutexes&... aMutexes) noexcept :
                 m_aMutexes(aMutexes...) {
-            for_each_in_tuple(m_aMutexes,[](auto& oMutex) noexcept {oMutex.unlock();});
+            lv::for_each_in_tuple(m_aMutexes,[](auto& oMutex) noexcept {oMutex.unlock();});
         }
         /// relocks all mutexes simultaneously
         ~unlock_guard() {
@@ -642,17 +635,10 @@ namespace lv {
         Semaphore& operator=(const Semaphore&) = delete;
     };
 
+    using mutex_lock_guard = std::lock_guard<std::mutex>;
+    using mutex_unique_lock = std::unique_lock<std::mutex>;
+
 } // namespace lv
-
-namespace std { // extending std
-
-    template<typename T>
-    using unlock_guard = lv::unlock_guard<T>;
-    using semaphore = lv::Semaphore;
-    using mutex_lock_guard = lock_guard<mutex>;
-    using mutex_unique_lock = unique_lock<mutex>;
-
-} // namespace std
 
 template<size_t nWorkers>
 lv::WorkerPool<nWorkers>::WorkerPool() : m_bIsActive(true) {
@@ -681,7 +667,7 @@ std::future<std::result_of_t<Tfunc(Targs...)>> lv::WorkerPool<nWorkers>::queueTa
     std::shared_ptr<task_t> pSharableTask = std::make_shared<task_t>(std::bind(std::forward<Tfunc>(lTaskEntryPoint),std::forward<Targs>(args)...));
     std::future<task_return_t> oTaskRes = pSharableTask->get_future();
     {
-        std::mutex_lock_guard sync_lock(m_oSyncMutex);
+        lv::mutex_lock_guard sync_lock(m_oSyncMutex);
         m_qTasks.emplace([pSharableTask](){(*pSharableTask)();}); // lambda keeps a copy of the task in the queue
     }
     m_oSyncVar.notify_one();
@@ -690,13 +676,13 @@ std::future<std::result_of_t<Tfunc(Targs...)>> lv::WorkerPool<nWorkers>::queueTa
 
 template<size_t nWorkers>
 void lv::WorkerPool<nWorkers>::entry() {
-    std::mutex_unique_lock sync_lock(m_oSyncMutex);
+    lv::mutex_unique_lock sync_lock(m_oSyncMutex);
     while(m_bIsActive || !m_qTasks.empty()) {
         m_oSyncVar.wait(sync_lock,[&](){return !m_bIsActive || !m_qTasks.empty();});
         if(!m_qTasks.empty()) {
             std::function<void()> task = std::move(m_qTasks.front());
             m_qTasks.pop();
-            std::unlock_guard<std::mutex_unique_lock> oUnlock(sync_lock);
+            lv::unlock_guard<lv::mutex_unique_lock> oUnlock(sync_lock);
             task(); // if the execution throws, the exception will be contained in the shared state returned on queue
         }
     }

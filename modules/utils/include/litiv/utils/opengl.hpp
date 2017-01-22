@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "litiv/utils/platform.hpp"
+#include "litiv/utils/opencv.hpp"
 #include <GL/glew.h>
 #include <GL/glu.h>
 #if defined(__clang__)
@@ -43,9 +43,10 @@
 #elif defined(_MSC_VER)
 #pragma warning(pop)
 #endif //defined(_MSC_VER)
-#include <opencv2/opencv.hpp>
-
 #if HAVE_GLFW
+#if defined(_MSC_VER)
+#include <windows.h>
+#endif //def(_MSC_VER)
 #include <GLFW/glfw3.h>
 struct glfwWindowDeleter {
     void operator()(GLFWwindow* pWindow) {
@@ -423,7 +424,7 @@ namespace lv {
             uint mat2;
             uint tmat;
             uint pad;
-            static void initTinyMT32Generators(glm::uvec3 vGeneratorLayout,std::aligned_vector<TMT32GenParams,32>& voData);
+            static void initTinyMT32Generators(glm::uvec3 vGeneratorLayout,lv::aligned_vector<TMT32GenParams,32>& voData);
         };
 
     } // namespace gl
