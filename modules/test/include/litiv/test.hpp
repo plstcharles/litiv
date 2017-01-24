@@ -23,6 +23,7 @@
 #include "benchmark/benchmark.h"
 #include <random>
 #include <memory>
+#include <fstream>
 
 namespace lv {
 
