@@ -17,7 +17,7 @@ Here is a non-exhaustive (and probably not fully up-to-date) list of features:
     - Pre-coded shaders for various compute operations (parallel sums, shared data preloading, ...)
     - Image processing GLSL algorithm interface (hides all the ugly binding/prep calls)
   - CUDA:
-    - helper functions for error handling
+    - helper functions for error handling, + basic test kernel
   - OpenCV:
     - Display helper object with mouse feedback for debugging
     - Random pixel lookup functions (based on 4-NN, 8-NN, Gaussian kernels, ...)
