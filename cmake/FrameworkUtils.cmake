@@ -107,18 +107,9 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     )
-    if((${groupname} STREQUAL "module") AND NOT(${libname} STREQUAL "utils"))
-        target_link_libraries(${PROJECT_NAME} PUBLIC litiv_utils)
-    endif()
     if(USE_CUDA AND (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cuda"))
         file(GLOB cudasources ${CMAKE_CURRENT_SOURCE_DIR}/cuda/*.cu)
         if(cudasources)
-            # needed here since cuda_add_library ignores target properties (i.e. include dirs)
-            #cuda_include_directories(${CMAKE_CURRENT_BINARY_DIR}/include)
-            #cuda_include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-            #cuda_include_directories(${CMAKE_BINARY_DIR}/modules/utils/cuda)
-            #cuda_include_directories(${CMAKE_SOURCE_DIR}/modules/utils/cuda)
-            #cuda_include_directories($<$<BOOL:$<TARGET_PROPERTY:litiv_utils,INTERFACE_INCLUDE_DIRECTORIES>>:$<JOIN:$<TARGET_PROPERTY:litiv_utils,INTERFACE_INCLUDE_DIRECTORIES>,;>>)
             cuda_include_directories(${CMAKE_SOURCE_DIR}/modules/utils/include) # for litiv/utils/cuda.hpp only
             file(GLOB cudaheaders ${CMAKE_CURRENT_SOURCE_DIR}/cuda/*.cuh)
             if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
