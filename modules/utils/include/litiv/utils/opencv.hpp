@@ -21,6 +21,8 @@
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <unordered_set>
+#include <map>
 
 #define MAT_COND_DEPTH_TYPE(depth_flag,depth_type,depth_alt) \
     std::conditional_t<CV_MAT_DEPTH(nTypeFlag)==depth_flag,depth_type,depth_alt>

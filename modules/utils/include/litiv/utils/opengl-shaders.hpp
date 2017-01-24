@@ -18,7 +18,6 @@
 #pragma once
 
 #include "litiv/utils/opengl-draw.hpp"
-#include <map>
 
 // @@@@ rewrite all classes as part of lv::gl namespace?
 

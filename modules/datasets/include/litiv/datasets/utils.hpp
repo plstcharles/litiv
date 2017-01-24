@@ -22,9 +22,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <unordered_map>
-#include <unordered_set>
 #include <stack>
-#include <map>
 
 #ifdef _MSC_VER
 // disable some very verbose warnings, use #pragma warning(enable:###) to re-enable

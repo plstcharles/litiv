@@ -501,7 +501,7 @@ namespace lv {
 
     /// helper constexpr addition folding expression for often-used static array reduction
     template<typename T>
-    constexpr auto static_reduce_add(T a, T b) {
+    constexpr T static_reduce_add(T a, T b) {
         return a+b;
     }
 
