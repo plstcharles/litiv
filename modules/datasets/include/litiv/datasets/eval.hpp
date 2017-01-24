@@ -222,7 +222,7 @@ namespace lv {
         }
         /// callback entrypoint for gpu-cpu evaluation validation
         void validationCallback(const cv::Mat& /*oInput*/, const cv::Mat& /*oDebug*/, const cv::Mat& oOutput, const cv::Mat& oGT, const cv::Mat& oGTROI, size_t /*nIdx*/) {
-            lvAssert_(m_pMetricsBase,"algo needs to be initialized first")
+            lvAssert_(m_pMetricsBase,"algo needs to be initialized first");
             lvAssert_(!oOutput.empty() && !oGT.empty(),"provided output and gt mats need to be non-empty");
             m_pMetricsBase->m_oCounters.accumulate(oOutput,oGT,oGTROI);
         }

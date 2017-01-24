@@ -377,7 +377,7 @@ void EdgeDetectorLBSP::apply_internal_threshold(const cv::Mat& oInputImg, cv::Ma
 void EdgeDetectorLBSP::apply_threshold(cv::InputArray _oInputImage, cv::OutputArray _oEdgeMask, double dDetThreshold) {
     cv::Mat oInputImg = _oInputImage.getMat();
     lvAssert_(!oInputImg.empty() && oInputImg.isContinuous(),"input image must be non-empty and continuous");
-    lvAssert_(oInputImg.depth()==CV_8U,"input image depth must be 8U")
+    lvAssert_(oInputImg.depth()==CV_8U,"input image depth must be 8U");
     if(m_dGaussianKernelSigma>0) {
         const int nDefaultKernelSize = int(8*ceil(m_dGaussianKernelSigma));
         const int nRealKernelSize = nDefaultKernelSize%2==0?nDefaultKernelSize+1:nDefaultKernelSize;
@@ -396,7 +396,7 @@ void EdgeDetectorLBSP::apply_threshold(cv::InputArray _oInputImage, cv::OutputAr
 void EdgeDetectorLBSP::apply(cv::InputArray _oInputImage, cv::OutputArray _oEdgeMask) {
     cv::Mat oInputImg = _oInputImage.getMat();
     lvAssert_(!oInputImg.empty() && oInputImg.isContinuous(),"input image must be non-empty and continuous");
-    lvAssert_(oInputImg.depth()==CV_8U,"input image depth must be 8U")
+    lvAssert_(oInputImg.depth()==CV_8U,"input image depth must be 8U");
     if(m_dGaussianKernelSigma>0) {
         const int nDefaultKernelSize = int(8*ceil(m_dGaussianKernelSigma));
         const int nRealKernelSize = nDefaultKernelSize%2==0?nDefaultKernelSize+1:nDefaultKernelSize;

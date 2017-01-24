@@ -26,7 +26,7 @@ void IEdgeDetector_GLSL::getLatestEdgeMask(cv::OutputArray _oLastEdgeMask) {
     lvAssert_(GLImageProcAlgo::m_bGLInitialized,"algo must be initialized first");
     _oLastEdgeMask.create(GLImageProcAlgo::m_oFrameSize,CV_8UC1);
     cv::Mat oLastEdgeMask = _oLastEdgeMask.getMat();
-    lvAssert_(GLImageProcAlgo::m_bFetchingOutput || GLImageProcAlgo::setOutputFetching(true),"algo not initialized with mat output support")
+    lvAssert_(GLImageProcAlgo::m_bFetchingOutput || GLImageProcAlgo::setOutputFetching(true),"algo not initialized with mat output support");
     if(GLImageProcAlgo::m_nInternalFrameIdx>0)
         GLImageProcAlgo::fetchLastOutput(oLastEdgeMask);
     else

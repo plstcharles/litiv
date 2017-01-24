@@ -20,7 +20,7 @@
 
 void lv::BinClassif::accumulate(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
     lvAssert_(!oClassif.empty() && oClassif.type()==CV_8UC1,"binary classifier results must be non-empty and of type 8UC1");
-    lvAssert_(oGT.empty() || oGT.type()==CV_8UC1,"gt mat must be empty, or of type 8UC1")
+    lvAssert_(oGT.empty() || oGT.type()==CV_8UC1,"gt mat must be empty, or of type 8UC1");
     lvAssert_(oROI.empty() || oROI.type()==CV_8UC1,"ROI mat must be empty, or of type 8UC1");
     lvAssert_((oGT.empty() || oClassif.size()==oGT.size()) && (oROI.empty() || oClassif.size()==oROI.size()),"all input mat sizes must match");
     if(oGT.empty()) {
@@ -62,7 +62,7 @@ void lv::BinClassif::accumulate(const cv::Mat& oClassif, const cv::Mat& oGT, con
 
 cv::Mat lv::BinClassif::getColoredMask(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
     lvAssert_(!oClassif.empty() && oClassif.type()==CV_8UC1,"binary classifier results must be non-empty and of type 8UC1");
-    lvAssert_(oGT.empty() || oGT.type()==CV_8UC1,"gt mat must be empty, or of type 8UC1")
+    lvAssert_(oGT.empty() || oGT.type()==CV_8UC1,"gt mat must be empty, or of type 8UC1");
     lvAssert_(oROI.empty() || oROI.type()==CV_8UC1,"ROI mat must be empty, or of type 8UC1");
     lvAssert_((oGT.empty() || oClassif.size()==oGT.size()) && (oROI.empty() || oClassif.size()==oROI.size()),"all input mat sizes must match");
     if(oGT.empty()) {

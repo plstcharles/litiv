@@ -33,17 +33,12 @@ int main(int, char**) { // this sample uses no command line argument
             CV_Error(-1,"Could not load test image from internal sample data folder");
         cv::imshow("oInput",oInput);
         SLIC oAlgo; // instantiate SLIC segmentation algo (with default empty constructor)
-        cudaErrorCheck(cudaGetLastError());
         oAlgo.initialize(oInput.size()/*, ...*/); // use default parameters for SLIC constructor initialization
-        cudaErrorCheck(cudaGetLastError());
         oAlgo.segment(oInput); // run SLIC segmentation algo
-        cudaErrorCheck(cudaGetLastError());
-		//oAlgo.enforceConnectivity(); // enforce superpixel connectivity
+        oAlgo.enforceConnectivity(); // enforce superpixel connectivity
         const cv::Mat& oSPXMask = oAlgo.getLabels(); // returns segmentation labels for the input image
-        //cv::testfunc(oSPXMask);
-        cudaErrorCheck(cudaGetLastError());
+        cv::doNotOptimize(oSPXMask); // for some reason, unless we pass the algo output to another lib call, kernels don't execute on MSVC2015 in release...
         cv::imshow("Segmentation output",SLIC::displayBound(oInput,oSPXMask,cv::Scalar(255,0,0)));
-        cudaErrorCheck(cudaGetLastError());
         cv::waitKey(0); // wait for the user to press a key before shutting down
     }
     catch(const cv::Exception& e) {std::cout << "\nmain caught cv::Exception:\n" << e.what() << "\n" << std::endl; return -1;}

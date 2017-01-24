@@ -29,6 +29,9 @@ add_files(INCLUDE_FILES
 )
 
 if(USE_CUDA)
+    add_files(SOURCE_FILES
+        "src/SLIC.cpp"
+    )
     add_files(INCLUDE_FILES
         "include/litiv/imgproc/SLIC.hpp"
     )

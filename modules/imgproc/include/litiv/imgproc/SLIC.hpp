@@ -48,6 +48,7 @@
 
 #pragma once
 
+#include "litiv/utils/opencv.hpp"
 #include "litiv/utils/cuda.hpp"
 
 /// SLIC superpixel segmentation algorithm
@@ -110,8 +111,3 @@ protected:
     /// update the clusters' centroids with the belonging pixels
     void update();
 };
-
-static inline int iDivUp(int a, int b){ return (a%b == 0) ? a / b : a / b + 1; }
-
-/// find best width and height from a given diameter to best fit the image size given by imWidth and imHeigh
-static void getSpxSizeFromDiam(const int imWidth, const int imHeight, const int diamSpx, int* spxWidth, int* spxHeight);

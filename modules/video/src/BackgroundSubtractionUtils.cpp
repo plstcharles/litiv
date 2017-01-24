@@ -159,7 +159,7 @@ IBackgroundSubtractor_GLSL::IBackgroundSubtractor_(size_t nLevels, size_t nCompu
         m_dCurrLearningRate(-1) {}
 
 void IBackgroundSubtractor_GLSL::getLatestForegroundMask(cv::OutputArray _oLastFGMask) {
-    lvAssert_(GLImageProcAlgo::m_bFetchingOutput || GLImageProcAlgo::setOutputFetching(true),"algo not initialized with mat output support")
+    lvAssert_(GLImageProcAlgo::m_bFetchingOutput || GLImageProcAlgo::setOutputFetching(true),"algo not initialized with mat output support");
     _oLastFGMask.create(m_oImgSize,CV_8UC1);
     cv::Mat oLastFGMask = _oLastFGMask.getMat();
     if(GLImageProcAlgo::m_nInternalFrameIdx>0)

@@ -69,6 +69,11 @@ if(USE_CVCORE_WITH_UTILS)
         )
     endif(USE_GLSL)
 endif()
+if(USE_CUDA)
+    add_files(INCLUDE_FILES
+        "include/litiv/utils/cuda.hpp"
+    )
+endif()
 
 litiv_module(utils SOURCE_FILES INCLUDE_FILES)
 
@@ -113,9 +118,6 @@ if(USE_CVCORE_WITH_UTILS)
     endif()
 endif()
 if(USE_CUDA)
-    add_files(INCLUDE_FILES
-        "include/litiv/utils/cuda.hpp"
-    )
     target_include_directories(litiv_utils
         PUBLIC
             "$<BUILD_INTERFACE:${CUDA_INCLUDE_DIRS}>"

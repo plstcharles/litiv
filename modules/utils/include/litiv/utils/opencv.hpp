@@ -216,8 +216,6 @@ namespace cv { // extending cv
         MatArchive_BINARY
     };
 
-    void testfunc(const cv::Mat& testmat);
-
     /// writes matrix data locally using a binary/yml/text file format
     void write(const std::string& sFilePath, const cv::Mat& _oData, MatArchiveList eArchiveType=MatArchive_BINARY);
     /// reads matrix data locally using a binary/yml/text file format
@@ -292,6 +290,9 @@ namespace cv { // extending cv
             }
         }
     };
+
+    /// temp function; msvc seems to disable cuda output unless it is passed as argument to an external-lib function call...?
+    void doNotOptimize(const cv::Mat& m);
 
     /// returns a 16-byte aligned matrix allocator for SSE(1/2/3/4.1/4.2) support (should never be modified, despite non-const!)
     cv::MatAllocator* getMatAllocator16a();
