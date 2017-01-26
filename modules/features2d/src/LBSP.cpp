@@ -50,6 +50,11 @@ cv::Size LBSP::windowSize() const {
     return cv::Size(PATCH_SIZE,PATCH_SIZE);
 }
 
+int LBSP::borderSize(int nDim) const {
+    lvAssert(nDim==0 || nDim==1);
+    return PATCH_SIZE/2;
+}
+
 int LBSP::descriptorSize() const {
     return LBSP::DESC_SIZE;
 }

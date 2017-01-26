@@ -30,6 +30,8 @@ public:
     virtual void write(cv::FileStorage&) const override;
     /// returns the window size that will be used around each keypoint
     virtual cv::Size windowSize() const;
+    /// returns the border size required around each keypoint in x or y direction
+    virtual int borderSize(int nDim=0) const; // typically equal to windowSize().width/2
     /// returns the mutual information score for the given image pair (will use full matrices instead of subwindow)
     double compute(const cv::Mat& oImage1, const cv::Mat& oImage2);
     /// returns the mutual information scores for the given keypoints located in the image pair using subwindows of the size passed in constructor

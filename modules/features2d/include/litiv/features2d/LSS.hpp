@@ -39,6 +39,8 @@ public:
     virtual void write(cv::FileStorage&) const override;
     /// returns the window size that will be used around each keypoint (also gives the minimum image size required for description)
     virtual cv::Size windowSize() const;
+    /// returns the border size required around each keypoint in x or y direction (also gives the invalid descriptor border size for output maps to ignore)
+    virtual int borderSize(int nDim=0) const; // typically equal to windowSize().width/2
     /// returns the current descriptor size, in bytes (overrides cv::DescriptorExtractor's)
     virtual int descriptorSize() const override;
     /// returns the current descriptor data type (overrides cv::DescriptorExtractor's)

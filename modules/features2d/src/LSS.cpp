@@ -128,6 +128,11 @@ cv::Size LSS::windowSize() const {
     return cv::Size(m_nCorrWinSize,m_nCorrWinSize);
 }
 
+int LSS::borderSize(int nDim) const {
+    lvAssert(nDim==0 || nDim==1);
+    return m_nCorrWinSize/2;
+}
+
 int LSS::descriptorSize() const {
     return m_nRadialBins*m_nAngularBins*int(sizeof(float));
 }

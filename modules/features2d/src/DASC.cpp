@@ -48,6 +48,7 @@ namespace pretrained { // obtained via middlebury dataset (imported here from or
     constexpr int static_absmax(int a, int b) {return std::max(static_abs(a),static_abs(b));}
     constexpr std::array<int,nLUTSize*2> anRPDiff = lv::static_transform(anRP1,anRP2,static_diff);
     constexpr int nRPAbsMax = lv::static_reduce(lv::static_transform(anRP1,anRP2,static_absmax),static_absmax);
+    constexpr int nMaxPatternDiam = nRPAbsMax*2+1;
 
 } // namespace pretrained
 
@@ -84,11 +85,16 @@ void DASC::write(cv::FileStorage& /*fs*/) const {
 }
 
 cv::Size DASC::windowSize() const {
-    return cv::Size(pretrained::nRPAbsMax,pretrained::nRPAbsMax);
+    return cv::Size(pretrained::nMaxPatternDiam,pretrained::nMaxPatternDiam);
+}
+
+int DASC::borderSize(int nDim) const {
+    lvAssert(nDim==0 || nDim==1);
+    return pretrained::nRPAbsMax;
 }
 
 int DASC::descriptorSize() const {
-    return pretrained::nLUTSize*sizeof(float);
+    return int(pretrained::nLUTSize*sizeof(float));
 }
 
 int DASC::descriptorType() const {

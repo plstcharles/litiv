@@ -40,6 +40,11 @@ cv::Size MutualInfo::windowSize() const {
     return m_oWinSize;
 }
 
+int MutualInfo::borderSize(int nDim) const {
+    lvAssert(nDim==0 || nDim==1);
+    return (nDim==0?m_oWinSize.width:m_oWinSize.height)/2;
+}
+
 double MutualInfo::compute(const cv::Mat& _oImage1, const cv::Mat& _oImage2) {
     lvAssert_(_oImage1.rows>=m_oWinSize.height && _oImage1.cols>=m_oWinSize.width && _oImage1.size()==_oImage2.size(),"invalid input image(s) size");
     if(m_bUse24BitPair && ((_oImage1.type()==CV_8UC3 && _oImage2.type()==CV_8UC1) || (_oImage2.type()==CV_8UC3 && _oImage1.type()==CV_8UC1))) {
