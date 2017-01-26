@@ -654,4 +654,10 @@ namespace cv { // extending cv
     /// temp function; msvc seems to disable cuda output unless it is passed as argument to an external-lib function call...?
     void doNotOptimize(const cv::Mat& m);
 
+#if USE_OPENCV_MAT_CONSTR_FIX
+    template<typename _Tp>
+    inline Mat_<_Tp>::Mat_(int _dims, const int* _sz, _Tp* _data, const size_t* _steps) :
+            Mat(_dims, _sz, DataType<_Tp>::type, _data, _steps) {}
+#endif //USE_OPENCV_MAT_CONSTR_FIX
+
 } // namespace cv

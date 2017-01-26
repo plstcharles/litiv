@@ -179,6 +179,9 @@
     #define __LV_CONFIG_DEFS__
 
     // config defs that may still change from CMake values have ifndef's
+    #ifndef USE_OPENCV_MAT_CONSTR_FIX
+        #define USE_OPENCV_MAT_CONSTR_FIX   @USE_OPENCV_MAT_CONSTR_FIX@
+    #endif //ndef(USE_OPENCV_MAT_CONSTR_FIX)
     #ifndef USE_SIGNEXT_SHIFT_TRICK
         #define USE_SIGNEXT_SHIFT_TRICK     @USE_SIGNEXT_SHIFT_TRICK@
     #endif //ndef(USE_SIGNEXT_SHIFT_TRICK)
