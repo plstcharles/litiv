@@ -35,7 +35,8 @@ int main(int, char**) { // this sample uses no command line argument
         const std::vector<cv::Point> vTargetPointsRGB = {cv::Point(603,122)}; // target points in the RGB image (known, treated as input)
         const std::vector<cv::Point> vTargetPointNIR = {cv::Point(613,122)}; // target points in the NIR image (unknown, treated as gt)
         const int nMinDisparityOffset = 0; // sets the minimum disparity offset for objects in the scene
-        const int nMaxDisparityOffset = 40; // sets the maximum disparity offset for objects in the scene
+        const int nMaxDisparityOffset = 20; // sets the maximum disparity offset for objects in the scene
+        lvAssert(vTargetPointNIR.size()==vTargetPointsRGB.size());
 
         std::unique_ptr<LSS> pLSS = std::make_unique<LSS>(); // instantiation of LSS feature descriptor with default parameters
         const cv::Size oWindowSize_LSS = pLSS->windowSize(); // minimum size required for LSS description
@@ -44,51 +45,81 @@ int main(int, char**) { // this sample uses no command line argument
         std::unique_ptr<MutualInfo> pMI = std::make_unique<MutualInfo>(); // instantiation of MI score extractor helper with default parameters
         const cv::Size oWindowSize_MI = pMI->windowSize(); // minimum size required for MI scoring
 
+        // this lambda will be called for each search point --- inside it is the disparity lookup loop
         const auto lStereoMatcher = [&](const cv::Point& oTargetPoint, const cv::Mat& oRefImg, const cv::Mat& oSearchImg, int nMinOffset, int nMaxOffset) {
-            if(nMinOffset>nMaxOffset)
+            if(nMinOffset>nMaxOffset) // flip min/max disparity offsets if needed
                 std::swap(nMinOffset,nMaxOffset);
-            const int nTestCount = nMaxOffset-nMinOffset;
-            const cv::Rect oRefZone(0,0,oRefImg.cols,oRefImg.rows);
+            const int nTestCount = nMaxOffset-nMinOffset+1; // number of tests = number of different disparity offsets to verify
+            const cv::Rect oRefZone(0,0,oRefImg.cols,oRefImg.rows); // default reference zone = entire input (reference) image
 
-            const cv::Rect oRefZone_LSS(oTargetPoint.x-oWindowSize_LSS.width/2,oTargetPoint.y-oWindowSize_LSS.height/2,oWindowSize_LSS.width,oWindowSize_LSS.height);
-            lvAssert(oRefZone.contains(oRefZone_LSS.tl()) && oRefZone.contains(oRefZone_LSS.br()));
-            const cv::Rect oSearchZone_LSS(oRefZone_LSS.x+nMinOffset,oRefZone_LSS.y,oRefZone_LSS.width+nTestCount,oRefZone_LSS.height);
-            lvAssert(oRefZone.contains(oSearchZone_LSS.tl()) && oRefZone.contains(oSearchZone_LSS.br()));
-            const cv::Mat oRef_LSS = oRefImg(oRefZone_LSS), oSearch_LSS = oSearchImg(oSearchZone_LSS);
-            cv::Mat oRefDesc_LSS,oSearchDesc_LSS;
-            pLSS->compute2(oRef_LSS,oRefDesc_LSS);
-            lvAssert(oRefDesc_LSS.dims==3 && oSearchDesc_LSS.size[0]==1 && oSearchDesc_LSS.size[1]==1);
-            pLSS->compute2(oSearch_LSS,oSearchDesc_LSS);
-            lvAssert(oRefDesc_LSS.dims==3 && oSearchDesc_LSS.size[0]==1 && oSearchDesc_LSS.size[1]==size_t(nTestCount));
-            pLSS->calcDistance(oRefDesc_LSS,)
-
-            const cv::Rect oRefZone_DASC(oTargetPoint.x-oWindowSize_DASC.width/2,oTargetPoint.y-oWindowSize_DASC.height/2,oWindowSize_DASC.width,oWindowSize_DASC.height);
-            lvAssert(oRefZone.contains(oRefZone_DASC.tl()) && oRefZone.contains(oRefZone_DASC.br()));
-            const cv::Rect oSearchZone_DASC(oRefZone_DASC.x+nMinOffset,oRefZone_DASC.y,oRefZone_DASC.width+nTestCount,oRefZone_DASC.height);
-            lvAssert(oRefZone.contains(oSearchZone_DASC.tl()) && oRefZone.contains(oSearchZone_DASC.br()));
-            const cv::Mat oRef_DASC = oRefImg(oRefZone_DASC), oSearch_DASC = oSearchImg(oSearchZone_DASC);
-            cv::Mat oRefDesc_DASC,oSearchDesc_DASC;
-            pDASC->compute2(oRef_DASC,oRefDesc_DASC);
-            pDASC->compute2(oSearch_DASC,oSearchDesc_DASC);
-
-            const cv::Rect oRefZone_MI(oTargetPoint.x-oWindowSize_MI.width/2,oTargetPoint.y-oWindowSize_MI.height/2,oWindowSize_MI.width,oWindowSize_MI.height);
-            lvAssert(oRefZone.contains(oRefZone_MI.tl()) && oRefZone.contains(oRefZone_MI.br()));
-            const cv::Mat oRef_MI = oRefImg(oRefZone_MI);
-            std::vector<double> vdMatchRes_MI(size_t(nMaxOffset-nMinOffset),0.0);
-            for(int nOffset=nMinOffset; nOffset<nMaxOffset; ++nOffset) {
-                const cv::Rect oCurrSearchZone_MI(oRefZone_MI.x+nOffset,oRefZone_MI.y,oRefZone_MI.width,oRefZone_MI.height);
-                lvAssert(oRefZone.contains(oCurrSearchZone_MI.tl()) && oRefZone.contains(oCurrSearchZone_MI.br()));
-                const cv::Mat oCurrSearch_MI = oSearchImg(oCurrSearchZone_MI);
-                vdMatchRes_MI[nOffset-nMinOffset] = pMI->compute(oRef_MI,oCurrSearch_MI);
+            // below is the lookup loop for the LSS matcher
+            const cv::Rect oRefZone_LSS(oTargetPoint.x-oWindowSize_LSS.width/2,oTargetPoint.y-oWindowSize_LSS.height/2,oWindowSize_LSS.width,oWindowSize_LSS.height); // lookup window for the reference image
+            lvAssert(oRefZone.contains(oRefZone_LSS.tl()) && oRefZone.contains(oRefZone_LSS.br())); // lookup window should be contained in the reference image
+            const cv::Rect oSearchZone_LSS(oRefZone_LSS.x+nMinOffset,oRefZone_LSS.y,oRefZone_LSS.width+(nMaxOffset-nMinOffset),oRefZone_LSS.height); // lookup window for the 'search' image
+            lvAssert(oRefZone.contains(oSearchZone_LSS.tl()) && oRefZone.contains(oSearchZone_LSS.br())); // search window should be contained in the reference image
+            const cv::Mat oRef_LSS = oRefImg(oRefZone_LSS), oSearch_LSS = oSearchImg(oSearchZone_LSS); // grabs reference & search subimages using preset windows
+            cv::Mat_<float> oRefDescMap_LSS,oSearchDescMap_LSS; // 3D maps where descriptor values will be generated for valid pixels (i.e. pixels far enough from image borders)
+            pLSS->compute2(oRef_LSS,oRefDescMap_LSS); // extracts the actual descriptors for each (valid) input image pixel
+            lvAssert(oRefDescMap_LSS.dims==3 && oRefDescMap_LSS.size[0]==oRefZone_LSS.height && oRefDescMap_LSS.size[1]==oRefZone_LSS.width); // output dense desc map should have the first two dims of the input
+            const cv::Mat_<float> oRefDesc_LSS(1,oRefDescMap_LSS.size[2],oRefDescMap_LSS.ptr<float>(oWindowSize_LSS.height/2,oWindowSize_LSS.width/2)); // extract the only relevant reference descriptor (mid pixel)
+            pLSS->compute2(oSearch_LSS,oSearchDescMap_LSS); // extracts the actual descriptors for each (valid) input image pixel
+            lvAssert(oSearchDescMap_LSS.dims==3 && oSearchDescMap_LSS.size[0]==oSearchZone_LSS.height && oSearchDescMap_LSS.size[1]==oSearchZone_LSS.width); // output dense desc map should have the first two dims of the input
+            std::vector<double> vdMatchRes_LSS((size_t)nTestCount,0.0); // output match score vector (contains one double per disparity test)
+            for(size_t nTestIdx=0; nTestIdx<size_t(nTestCount); ++nTestIdx) {// for each disparity test
+                const cv::Mat_<float> oSearchDesc_LSS(1,oSearchDescMap_LSS.size[2],oSearchDescMap_LSS.ptr<float>(oWindowSize_LSS.height/2,oWindowSize_LSS.width/2+int(nTestIdx))); // extract the only relevant descriptor for this test
+                vdMatchRes_LSS[nTestIdx] = pLSS->calcDistance(oRefDesc_LSS,oSearchDesc_LSS); // calculate the distance between the reference image and search image descriptors
             }
+            std::cout << "\nLSS Match Results (offset = " << (oTargetPoint.x+nMinOffset) << ") : \n";
+            cv::printMatrix(cv::Mat_<double>(1,nTestCount,vdMatchRes_LSS.data())); // prints the match score matrix (one line, and one match score per column)
+
+            // below is the lookup loop for the DASC matcher
+            const cv::Rect oRefZone_DASC(oTargetPoint.x-oWindowSize_DASC.width/2,oTargetPoint.y-oWindowSize_DASC.height/2,oWindowSize_DASC.width,oWindowSize_DASC.height); // lookup window for the reference image
+            lvAssert(oRefZone.contains(oRefZone_DASC.tl()) && oRefZone.contains(oRefZone_DASC.br())); // lookup window should be contained in the reference image
+            const cv::Rect oSearchZone_DASC(oRefZone_DASC.x+nMinOffset,oRefZone_DASC.y,oRefZone_DASC.width+(nMaxOffset-nMinOffset),oRefZone_DASC.height); // lookup window for the 'search' image
+            lvAssert(oRefZone.contains(oSearchZone_DASC.tl()) && oRefZone.contains(oSearchZone_DASC.br())); // search window should be contained in the reference image
+            const cv::Mat oRef_DASC = oRefImg(oRefZone_DASC), oSearch_DASC = oSearchImg(oSearchZone_DASC); // grabs reference & search subimages using preset windows
+            cv::Mat_<float> oRefDescMap_DASC,oSearchDescMap_DASC; // 3D maps where descriptor values will be generated for valid pixels (i.e. pixels far enough from image borders)
+            pDASC->compute2(oRef_DASC,oRefDescMap_DASC); // extracts the actual descriptors for each (valid) input image pixel
+            lvAssert(oRefDescMap_DASC.dims==3 && oRefDescMap_DASC.size[0]==oRefZone_DASC.height && oRefDescMap_DASC.size[1]==oRefZone_DASC.width); // output dense desc map should have the first two dims of the input
+            const cv::Mat_<float> oRefDesc_DASC(1,oRefDescMap_DASC.size[2],oRefDescMap_DASC.ptr<float>(oWindowSize_DASC.height/2,oWindowSize_DASC.width/2)); // extract the only relevant reference descriptor (mid pixel)
+            pDASC->compute2(oSearch_DASC,oSearchDescMap_DASC); // extracts the actual descriptors for each (valid) input image pixel
+            lvAssert(oSearchDescMap_DASC.dims==3 && oSearchDescMap_DASC.size[0]==oSearchZone_DASC.height && oSearchDescMap_DASC.size[1]==oSearchZone_DASC.width); // output dense desc map should have the first two dims of the input
+            std::vector<double> vdMatchRes_DASC((size_t)nTestCount,0.0); // output match score vector (contains one double per disparity test)
+            for(size_t nTestIdx=0; nTestIdx<size_t(nTestCount); ++nTestIdx) { // for each disparity test
+                const cv::Mat_<float> oSearchDesc_DASC(1,oSearchDescMap_DASC.size[2],oSearchDescMap_DASC.ptr<float>(oWindowSize_DASC.height/2,oWindowSize_DASC.width/2+int(nTestIdx))); // extract the only relevant descriptor for this test
+                vdMatchRes_DASC[nTestIdx] = pDASC->calcDistance(oRefDesc_DASC,oSearchDesc_DASC); // calculate the distance between the reference image and search image descriptors
+            }
+            std::cout << "\nDASC Match Results (offset = " << (oTargetPoint.x+nMinOffset) << ") : \n";
+            cv::printMatrix(cv::Mat_<double>(1,nTestCount,vdMatchRes_DASC.data())); // prints the match score matrix (one line, and one match score per column)
+
+            // below is the lookup loop for the MI matcher
+            const cv::Rect oRefZone_MI(oTargetPoint.x-oWindowSize_MI.width/2,oTargetPoint.y-oWindowSize_MI.height/2,oWindowSize_MI.width,oWindowSize_MI.height); // lookup window for the reference image
+            lvAssert(oRefZone.contains(oRefZone_MI.tl()) && oRefZone.contains(oRefZone_MI.br())); // lookup window should be contained in the reference image
+            const cv::Mat oRef_MI = oRefImg(oRefZone_MI); // grabs reference subimage using preset window
+            std::vector<double> vdMatchRes_MI((size_t)nTestCount,0.0); // output match score vector (contains one double per disparity test)
+            for(int nOffset=nMinOffset; nOffset<=nMaxOffset; ++nOffset) { // for each disparity test
+                const cv::Rect oCurrSearchZone_MI(oRefZone_MI.x+nOffset,oRefZone_MI.y,oRefZone_MI.width,oRefZone_MI.height); // lookup window for the 'search' image
+                lvAssert(oRefZone.contains(oCurrSearchZone_MI.tl()) && oRefZone.contains(oCurrSearchZone_MI.br())); // search window should be contained in the reference image
+                const cv::Mat oCurrSearch_MI = oSearchImg(oCurrSearchZone_MI); // grabs search subimage using preset window
+                vdMatchRes_MI[nOffset-nMinOffset] = pMI->compute(oRef_MI,oCurrSearch_MI); // calculate the mutual info score between the reference image and search image
+            }
+            std::cout << "\nMI Match Results (offset = " << (oTargetPoint.x+nMinOffset) << ") : \n";
+            cv::printMatrix(cv::Mat_<double>(1,nTestCount,vdMatchRes_MI.data())); // prints the match score matrix (one line, and one match score per column)
         };
 
-
-        for(const cv::Point& oCurrTargetPointRGB : vTargetPointsRGB) // for each target point in the RGB image
-            lStereoMatcher(oCurrTargetPointRGB,oInputRGB,oInputNIR,nMinDisparityOffset,nMaxDisparityOffset);
-
-        // @@@ display match curves
-
+        for(size_t nTargetPtIdx=0; nTargetPtIdx<vTargetPointsRGB.size(); ++nTargetPtIdx) { // for each test point, run the stereo matcher
+            const cv::Point& oCurrTargetPointRGB = vTargetPointsRGB[nTargetPtIdx]; // get ref to current RGB point (used as 'reference')
+            const cv::Point& oCurrTargetPointNIR = vTargetPointNIR[nTargetPtIdx]; // get ref to current NIR point (used as 'groundtruth')
+            std::cout << "\n-------------------------------------\n" << std::endl;
+            std::cout << "Target RGB Point = " << oCurrTargetPointRGB << std::endl;
+            std::cout << "Target NIR Point = " << oCurrTargetPointNIR << "   (gt)" << std::endl;
+            std::cout << "Min Disp Offset = " << nMinDisparityOffset << std::endl;
+            std::cout << "Max Disp Offset = " << nMaxDisparityOffset << std::endl;
+            std::cout << "Ideal Disp Offset = " << (oCurrTargetPointNIR.x-oCurrTargetPointRGB.x) << "\n" << std::endl;
+            lStereoMatcher(oCurrTargetPointRGB,oInputRGB,oInputNIR,nMinDisparityOffset,nMaxDisparityOffset); // run the stereo matching algos
+            std::cout << std::endl;
+        }
+        std::cout << "\nAll done.\n" << std::endl;
     }
     catch(const cv::Exception& e) {std::cout << "\nmain caught cv::Exception:\n" << e.what() << "\n" << std::endl; return -1;}
     catch(const std::exception& e) {std::cout << "\nmain caught std::exception:\n" << e.what() << "\n" << std::endl; return -1;}
