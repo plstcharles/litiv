@@ -177,8 +177,8 @@ void DASC::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMask, std::
     else
         dasc_gf_impl(oImage,oDenseDecriptors);
     lvDbgAssert(oDenseDecriptors.isContinuous() && oDenseDecriptors.type()==CV_32FC1);
-    lvDbgAssert(oDenseDecriptors.dims==3 && oDenseDecriptors.size[0]==oImage.rows && oDenseDecriptors.size[1]==oImage.cols && oDenseDecriptors.size[2]==pretrained::nLUTSize);
-    oDescriptors.create((int)voKeypoints.size(),pretrained::nLUTSize,CV_32FC1);
+    lvDbgAssert(oDenseDecriptors.dims==3 && oDenseDecriptors.size[0]==oImage.rows && oDenseDecriptors.size[1]==oImage.cols && oDenseDecriptors.size[2]==int(pretrained::nLUTSize));
+    oDescriptors.create((int)voKeypoints.size(),(int)pretrained::nLUTSize,CV_32FC1);
     for(size_t nKeyPtIdx=0; nKeyPtIdx<voKeypoints.size(); ++nKeyPtIdx) {
         const int nRowIdx = (int)voKeypoints[nKeyPtIdx].pt.y;
         const int nColIdx = (int)voKeypoints[nKeyPtIdx].pt.x;
@@ -191,7 +191,7 @@ void DASC::reshapeDesc(cv::Size oSize, cv::Mat& oDescriptors) {
     lvAssert_(!oDescriptors.empty() && oDescriptors.isContinuous(),"descriptor mat must be non-empty, and continuous");
     lvAssert_(oSize.area()>0 && oDescriptors.total()==(size_t)oSize.area()*pretrained::nLUTSize,"bad expected output desc image size");
     lvAssert_(oDescriptors.dims==2 && oDescriptors.rows==oSize.area() && oDescriptors.type()==CV_32FC1,"descriptor mat type must be 2D, and 32FC1");
-    std::array<int,3> anDims = {oSize.height,oSize.width,pretrained::nLUTSize};
+    std::array<int,3> anDims = {oSize.height,oSize.width,(int)pretrained::nLUTSize};
     oDescriptors = oDescriptors.reshape(0,(int)anDims.size(),anDims.data());
 }
 
@@ -274,7 +274,8 @@ void DASC::recursFilter(const cv::Mat_<float>& oImage, const cv::Mat_<float>& oR
 }
 
 void DASC::dasc_rf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
-    lvAssert(!_oImage.empty() && (_oImage.channels()==1 || _oImage.channels()==3) && (_oImage.depth()==CV_32F || _oImage.depth()==CV_8U));
+    lvAssert_(!_oImage.empty() && (_oImage.channels()==1 || _oImage.channels()==3) && (_oImage.depth()==CV_32F || _oImage.depth()==CV_8U),"invalid input image");
+    lvAssert__(pretrained::nMaxPatternDiam<=_oImage.cols && pretrained::nMaxPatternDiam<=_oImage.rows,"image is too small to compute descriptors with current pattern size -- need at least (%d,%d) and got (%d,%d)",pretrained::nMaxPatternDiam,pretrained::nMaxPatternDiam,_oImage.cols,_oImage.rows);
     cv::Mat oImageTemp;
     if(_oImage.depth()==CV_8U)
         _oImage.convertTo(oImageTemp,CV_32F,1.0/UCHAR_MAX);
@@ -298,11 +299,11 @@ void DASC::dasc_rf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
     const std::array<int,3> anRefDims_t = {(int)m_nIters,nCols,nRows};
     m_oRef_V_dVdy_t.create(3,anRefDims_t.data());
     for(int nIterIdx=0; nIterIdx<(int)m_nIters; ++nIterIdx) {
-        const float fBase = exp(-sqrt(2.0f)/(m_fSigma_s*sqrt(3.0f)*(float)pow(2.0f,(int)m_nIters-(nIterIdx+1))/sqrt((float)pow(4.0f,(int)m_nIters)-1)));
+        const float fBase = std::exp(-std::sqrt(2.0f)/(m_fSigma_s*std::sqrt(3.0f)*(float)std::pow(2.0f,(int)m_nIters-(nIterIdx+1))/std::sqrt((float)std::pow(4.0f,(int)m_nIters)-1)));
         for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
             for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
-                m_oRef_V_dHdx(nIterIdx,nRowIdx,nColIdx) = pow(fBase,m_oRef_dHdx(nRowIdx,nColIdx));
-                m_oRef_V_dVdy_t(nIterIdx,nColIdx,nRowIdx) = pow(fBase,m_oRef_dVdy(nRowIdx,nColIdx));
+                m_oRef_V_dHdx(nIterIdx,nRowIdx,nColIdx) = std::pow(fBase,m_oRef_dHdx(nRowIdx,nColIdx));
+                m_oRef_V_dVdy_t(nIterIdx,nColIdx,nRowIdx) = std::pow(fBase,m_oRef_dVdy(nRowIdx,nColIdx));
             }
         }
     }
@@ -335,9 +336,9 @@ void DASC::dasc_rf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
                 const int nOffsetRowIdx = nRowIdx+pretrained::anRP1[nLUTIdx*2];
                 const int nOffsetColIdx = nColIdx+pretrained::anRP1[nLUTIdx*2+1];
                 if(nOffsetRowIdx>0 && nOffsetRowIdx<nRows && nOffsetColIdx>0 && nOffsetColIdx<nCols) {
-                    const float fCorrSurfDenom = sqrt((m_oImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)) * (m_oLookupImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)));
+                    const float fCorrSurfDenom = std::sqrt((m_oImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)) * (m_oLookupImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)));
                     if(fCorrSurfDenom>1e-10)
-                        oDescriptors(nRowIdx,nColIdx,nLUTIdx) = exp(-(1-(m_oLookupImage_AdaptiveMeanMix(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx))/fCorrSurfDenom)/0.5f);
+                        oDescriptors(nRowIdx,nColIdx,nLUTIdx) = std::exp(-(1-(m_oLookupImage_AdaptiveMeanMix(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx))/fCorrSurfDenom)/0.5f);
                     else
                         oDescriptors(nRowIdx,nColIdx,nLUTIdx) = 1.0f;
                 }
@@ -351,7 +352,7 @@ void DASC::dasc_rf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
             float fNorm = 0;
             for(int nLUTIdx=0; nLUTIdx<(int)pretrained::nLUTSize; ++nLUTIdx)
                 fNorm += oDescriptors(nRowIdx,nColIdx,nLUTIdx)*oDescriptors(nRowIdx,nColIdx,nLUTIdx);
-            const float fNormSqrt = sqrt(fNorm);
+            const float fNormSqrt = std::sqrt(fNorm);
             for(int nLUTIdx=0; nLUTIdx<(int)pretrained::nLUTSize; ++nLUTIdx)
                 oDescriptors(nRowIdx,nColIdx,nLUTIdx) = (fNormSqrt>1e-10)?oDescriptors(nRowIdx,nColIdx,nLUTIdx)/fNormSqrt:0.0f;
         }
@@ -374,7 +375,8 @@ void DASC::guidedFilter(const cv::Mat_<float>& oImage, const cv::Mat_<float>& oR
 }
 
 void DASC::dasc_gf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
-    lvAssert(!_oImage.empty() && (_oImage.channels()==1 || _oImage.channels()==3) && (_oImage.depth()==CV_32F || _oImage.depth()==CV_8U));
+    lvAssert_(!_oImage.empty() && (_oImage.channels()==1 || _oImage.channels()==3) && (_oImage.depth()==CV_32F || _oImage.depth()==CV_8U),"invalid input image");
+    lvAssert__(pretrained::nMaxPatternDiam<=_oImage.cols && pretrained::nMaxPatternDiam<=_oImage.rows,"image is too small to compute descriptors with current pattern size -- need at least (%d,%d) and got (%d,%d)",pretrained::nMaxPatternDiam,pretrained::nMaxPatternDiam,_oImage.cols,_oImage.rows);
     cv::Mat oImageTemp;
     if(_oImage.depth()==CV_8U)
         _oImage.convertTo(oImageTemp,CV_32F,1.0/UCHAR_MAX);
@@ -428,9 +430,9 @@ void DASC::dasc_gf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
                 const int nOffsetRowIdx = nRowIdx+pretrained::anRP1[nLUTIdx*2];
                 const int nOffsetColIdx = nColIdx+pretrained::anRP1[nLUTIdx*2+1];
                 if(nOffsetRowIdx>0 && nOffsetRowIdx<nRows && nOffsetColIdx>0 && nOffsetColIdx<nCols) {
-                    const float fCorrSurfDenom = sqrt((m_oImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)) * (m_oLookupImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)));
+                    const float fCorrSurfDenom = std::sqrt((m_oImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)) * (m_oLookupImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)));
                     if(fCorrSurfDenom>1e-10)
-                        oDescriptors(nRowIdx,nColIdx,nLUTIdx) = exp(-(1-(m_oLookupImage_AdaptiveMeanMix(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx))/fCorrSurfDenom)/0.5f);
+                        oDescriptors(nRowIdx,nColIdx,nLUTIdx) = std::exp(-(1-(m_oLookupImage_AdaptiveMeanMix(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx))/fCorrSurfDenom)/0.5f);
                     else
                         oDescriptors(nRowIdx,nColIdx,nLUTIdx) = 1.0f;
                 }
@@ -444,7 +446,7 @@ void DASC::dasc_gf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
             float fNorm = 0;
             for(int nLUTIdx=0; nLUTIdx<(int)pretrained::nLUTSize; ++nLUTIdx)
                 fNorm += oDescriptors(nRowIdx,nColIdx,nLUTIdx)*oDescriptors(nRowIdx,nColIdx,nLUTIdx);
-            const float fNormSqrt = sqrt(fNorm);
+            const float fNormSqrt = std::sqrt(fNorm);
             for(int nLUTIdx=0; nLUTIdx<(int)pretrained::nLUTSize; ++nLUTIdx)
                 oDescriptors(nRowIdx,nColIdx,nLUTIdx) = (fNormSqrt>1e-10)?oDescriptors(nRowIdx,nColIdx,nLUTIdx)/fNormSqrt:0.0f;
         }
