@@ -165,25 +165,25 @@ bool LSS::isPreProcessing() const {
     return m_bPreProcess;
 }
 
-void LSS::compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescriptors) {
-    ssdescs_impl(oImage,oDescriptors);
+void LSS::compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescMap) {
+    ssdescs_impl(oImage,oDescMap);
 }
 
-void LSS::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat_<float>& oDescriptors) {
-    ssdescs_impl(oImage,voKeypoints,oDescriptors);
+void LSS::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat_<float>& oDescMap) {
+    ssdescs_impl(oImage,voKeypoints,oDescMap);
 }
 
-void LSS::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<cv::Mat_<float>>& voDescCollection) {
-    voDescCollection.resize(voImageCollection.size());
+void LSS::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<cv::Mat_<float>>& voDescMapCollection) {
+    voDescMapCollection.resize(voImageCollection.size());
     for(size_t i=0; i<voImageCollection.size(); i++)
-        compute2(voImageCollection[i],voDescCollection[i]);
+        compute2(voImageCollection[i],voDescMapCollection[i]);
 }
 
-void LSS::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat_<float>>& voDescCollection) {
+void LSS::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat_<float>>& voDescMapCollection) {
     lvAssert_(voImageCollection.size()==vvoPointCollection.size(),"number of images must match number of keypoint lists");
-    voDescCollection.resize(voImageCollection.size());
+    voDescMapCollection.resize(voImageCollection.size());
     for(size_t i=0; i<voImageCollection.size(); i++)
-        compute2(voImageCollection[i],vvoPointCollection[i],voDescCollection[i]);
+        compute2(voImageCollection[i],vvoPointCollection[i],voDescMapCollection[i]);
 }
 
 void LSS::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMask, std::vector<cv::KeyPoint>& voKeypoints, cv::OutputArray _oDescriptors, bool bUseProvidedKeypoints) {

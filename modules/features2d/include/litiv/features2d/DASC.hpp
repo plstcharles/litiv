@@ -56,14 +56,14 @@ public:
     /// returns whether input images will be preprocessed using a gaussian filter or not
     bool isPreProcessing() const;
 
-    /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix, and all image points are described
-    void compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescriptors);
+    /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix, and all image points are described (note: descriptors close to borders will be invalid)
+    void compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescMap);
     /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix
-    void compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat_<float>& oDescriptors);
+    void compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat_<float>& oDescMap);
     /// batch version of LBSP::compute2(const cv::Mat& image, ...)
-    void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<cv::Mat_<float>>& voDescCollection);
+    void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<cv::Mat_<float>>& voDescMapCollection);
     /// batch version of LBSP::compute2(const cv::Mat& image, ...)
-    void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat_<float>>& voDescCollection);
+    void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat_<float>>& voDescMapCollection);
 
     /// utility function, used to reshape a descriptors matrix to its input image size (assumes fully-dense keypoints over input)
     static void reshapeDesc(cv::Size oSize, cv::Mat& oDescriptors);

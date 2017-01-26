@@ -66,10 +66,10 @@ public:
     /// returns the current absolute threshold used for comparisons (-1 = invalid/not used)
     size_t getAbsThreshold() const;
 
-    /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix
-    void compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const;
+    /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix (note: descriptors close to borders will be invalid)
+    void compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescMap) const;
     /// batch version of LBSP::compute2(const cv::Mat& image, ...)
-    void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat>& voDescCollection) const;
+    void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint>>& vvoPointCollection, std::vector<cv::Mat>& voDescMapCollection) const;
 
     /// utility function, used to reshape a descriptors matrix to its input image size via their keypoint locations
     static void reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoints, const cv::Mat& oDescriptors, cv::Mat& oOutput);

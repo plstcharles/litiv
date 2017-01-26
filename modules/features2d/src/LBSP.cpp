@@ -166,25 +166,25 @@ void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const st
 
 } // namespace
 
-void LBSP::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescriptors) const {
+void LBSP::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescMap) const {
     lvAssert_(!oImage.empty(),"input image must be non-empty");
     cv::KeyPointsFilter::runByImageBorder(voKeypoints,oImage.size(),PATCH_SIZE/2);
     cv::KeyPointsFilter::runByKeypointSize(voKeypoints,std::numeric_limits<float>::epsilon());
     if(voKeypoints.empty()) {
-        oDescriptors.release();
+        oDescMap.release();
         return;
     }
     if(m_bOnlyUsingAbsThreshold)
-        lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,oDescriptors,false,m_nThreshold);
+        lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,oDescMap,false,m_nThreshold);
     else
-        lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,oDescriptors,false,m_fRelThreshold,m_nThreshold);
+        lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,oDescMap,false,m_fRelThreshold,m_nThreshold);
 }
 
-void LBSP::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat>& voDescCollection) const {
+void LBSP::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat>& voDescMapCollection) const {
     lvAssert_(voImageCollection.size()==vvoPointCollection.size(),"number of images must match number of keypoint lists");
-    voDescCollection.resize(voImageCollection.size());
+    voDescMapCollection.resize(voImageCollection.size());
     for(size_t i=0; i<voImageCollection.size(); i++)
-        compute2(voImageCollection[i], vvoPointCollection[i], voDescCollection[i]);
+        compute2(voImageCollection[i], vvoPointCollection[i], voDescMapCollection[i]);
 }
 
 void LBSP::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMask, std::vector<cv::KeyPoint>& voKeypoints, cv::OutputArray _oDescriptors, bool bUseProvidedKeypoints) {
