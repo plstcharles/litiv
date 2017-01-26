@@ -438,7 +438,7 @@ namespace cv { // extending cv
             const __m128i aCrMask = _mm_set1_epi16(short(15));
             const __m128i aYMask = _mm_set1_epi16(short(255));
             for(; nColIdx<=oInput.cols-16; nColIdx+=16) {
-                lvDbgAssert(!bPackedRowAligned || isAligned<16>(pPackedRow+nColIdx) && isAligned<16>(pPackedRow+nColIdx+8));
+                lvDbgAssert(!bPackedRowAligned || (isAligned<16>(pPackedRow+nColIdx) && isAligned<16>(pPackedRow+nColIdx+8)));
                 const __m128i aPackedVals_lo = bPackedRowAligned?_mm_load_si128((__m128i*)(pPackedRow+nColIdx)):_mm_loadu_si128((__m128i*)(pPackedRow+nColIdx));
                 const __m128i aPackedVals_hi = bPackedRowAligned?_mm_load_si128((__m128i*)(pPackedRow+nColIdx+8)):_mm_loadu_si128((__m128i*)(pPackedRow+nColIdx+8));
                 const __m128i aYVals = _mm_packus_epi16(_mm_and_si128(aPackedVals_lo,aYMask),_mm_and_si128(aPackedVals_hi,aYMask));
