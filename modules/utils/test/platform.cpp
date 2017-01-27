@@ -10,7 +10,7 @@ TEST(filesystem_ops,regression) {
     EXPECT_EQ(lv::addDirSlashIfMissing(".."),std::string("../"));
     EXPECT_EQ(lv::addDirSlashIfMissing("/test/path"),std::string("/test/path/"));
     EXPECT_EQ(lv::addDirSlashIfMissing("/test/path/.."),std::string("/test/path/../"));
-    const std::string sDirPath = TEST_DATA_ROOT "/platformtest/";
+    const std::string sDirPath = TEST_OUTPUT_DATA_ROOT "/platformtest/";
     ASSERT_TRUE(lv::createDirIfNotExist(sDirPath));
     ASSERT_TRUE(lv::createDirIfNotExist(sDirPath+"subdir1"));
     ASSERT_TRUE(lv::createDirIfNotExist(sDirPath+"subdir2/"));

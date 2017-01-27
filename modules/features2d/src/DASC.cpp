@@ -17,6 +17,8 @@
 
 #include "litiv/features2d.hpp"
 
+// @@@@ test with nan in oob lookup
+
 namespace pretrained { // obtained via middlebury dataset (imported here from original mat archives)
 
     constexpr size_t nLUTSize = 128;

@@ -39,6 +39,19 @@ do { \
     lv::Exception::setVerbose(true); \
 } while(0)
 
+#define EXPECT_NEAR_MINRATIO(val1,val2,ratio) \
+do { \
+    const auto v1 = val1, v2 = val2; \
+    EXPECT_NEAR(v1,v2,std::min(v1,v2)*ratio) << "with ratio = " << ratio; \
+} while(0)
+
+
+#define ASSERT_NEAR_MINRATIO(val1,val2,ratio) \
+do { \
+    const auto v1 = val1, v2 = val2; \
+    ASSERT_NEAR(v1,v2,std::min(v1,v2)*ratio) << "with ratio = " << ratio; \
+} while(0)
+
 namespace lv {
 
     namespace test {

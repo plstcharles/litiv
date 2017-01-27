@@ -203,9 +203,12 @@
     #ifndef SAMPLES_DATA_ROOT
         #define SAMPLES_DATA_ROOT           XSTR(@SAMPLES_DATA_ROOT@)
     #endif //SAMPLES_DATA_ROOT
-    #ifndef TEST_DATA_ROOT
-        #define TEST_DATA_ROOT              XSTR(@TEST_DATA_ROOT@)
-    #endif //ndef(TEST_DATA_ROOT)
+    #ifndef TEST_INPUT_DATA_ROOT
+        #define TEST_INPUT_DATA_ROOT        XSTR(@TEST_INPUT_DATA_ROOT@)
+    #endif //ndef(TEST_INPUT_DATA_ROOT)
+    #ifndef TEST_OUTPUT_DATA_ROOT
+        #define TEST_OUTPUT_DATA_ROOT       XSTR(@TEST_OUTPUT_DATA_ROOT@)
+    #endif //ndef(TEST_OUTPUT_DATA_ROOT)
     #ifndef CACHE_MAX_SIZE_GB
         #define CACHE_MAX_SIZE_GB           @DATASETS_CACHE_SIZE@LLU
     #endif //ndef(CACHE_MAX_SIZE_GB)

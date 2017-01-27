@@ -319,7 +319,7 @@ namespace {
 TYPED_TEST_CASE(readwrite_fixture,readwrite_types);
 TYPED_TEST(readwrite_fixture,regression) {
     cv::RNG rng((unsigned int)time(NULL));
-    const std::string sArchivePath = TEST_DATA_ROOT "/test_readwrite.mat";
+    const std::string sArchivePath = TEST_OUTPUT_DATA_ROOT "/test_readwrite.mat";
     for(size_t i=0; i<100; ++i) {
         cv::Mat_<TypeParam> oMat(rng.uniform(100,200),rng.uniform(100,200));
         rng.fill(oMat,cv::RNG::UNIFORM,-200,200,true);
@@ -327,7 +327,7 @@ TYPED_TEST(readwrite_fixture,regression) {
         const cv::Mat oNewMat = cv::read(sArchivePath,cv::MatArchive_BINARY);
         ASSERT_EQ(cv::countNonZero(oNewMat!=oNewMat),0);
     }
-    const std::string sYMLPath = TEST_DATA_ROOT "/test_readwrite.yml";
+    const std::string sYMLPath = TEST_OUTPUT_DATA_ROOT "/test_readwrite.yml";
     for(size_t i=0; i<100; ++i) {
         cv::Mat_<TypeParam> oMat(rng.uniform(10,20),rng.uniform(10,20));
         rng.fill(oMat,cv::RNG::UNIFORM,-200,200,true);
@@ -335,7 +335,7 @@ TYPED_TEST(readwrite_fixture,regression) {
         const cv::Mat oNewMat = cv::read(sYMLPath,cv::MatArchive_FILESTORAGE);
         ASSERT_EQ(cv::countNonZero(oNewMat!=oNewMat),0);
     }
-    const std::string sTextFilePath = TEST_DATA_ROOT "/test_readwrite.txt";
+    const std::string sTextFilePath = TEST_OUTPUT_DATA_ROOT "/test_readwrite.txt";
     for(size_t i=0; i<100; ++i) {
         cv::Mat_<TypeParam> oMat(rng.uniform(10,20),rng.uniform(10,20));
         rng.fill(oMat,cv::RNG::UNIFORM,-200,200,true);

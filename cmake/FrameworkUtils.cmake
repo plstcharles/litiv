@@ -144,12 +144,14 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
             foreach(testfile ${testfiles})
                 get_filename_component(testname "${testfile}" NAME_WE)
                 set(testname "${libname}_${testname}")
+                set(TEST_CURR_INPUT_DATA_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/test/data/")
                 append_internal_list(litiv_tests "${testname}")
                 add_executable(litiv_utest_app_${testname} "${testfile}")
                 target_compile_definitions(litiv_utest_app_${testname}
                     PUBLIC
                         PERFTEST=0
                         UNITTEST=1
+                        "TEST_CURR_INPUT_DATA_ROOT=\"${TEST_CURR_INPUT_DATA_ROOT}\""
                 )
                 target_link_libraries(litiv_utest_app_${testname}
                     ${PROJECT_NAME}
@@ -174,6 +176,7 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
                     PUBLIC
                         PERFTEST=1
                         UNITTEST=0
+                        "TEST_CURR_INPUT_DATA_ROOT=\"${TEST_CURR_INPUT_DATA_ROOT}\""
                 )
                 target_link_libraries(litiv_ptest_app_${testname}
                     ${PROJECT_NAME}

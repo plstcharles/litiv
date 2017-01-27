@@ -20,6 +20,8 @@
 //    http://www.robots.ox.ac.uk/~vgg/software/SelfSimilarity/
 //    https://github.com/opencv/opencv/blob/2.4/modules/contrib/src/selfsimilarity.cpp
 
+// @@@@ test with nan in oob lookup
+
 #define USE_CHATFIELD_MASK      0 // 0 == use Lienhart's mask
 #define USE_STATIC_VAR_NOISE    1 // 0 == dynamically determine variation based on original paper suggestion
 #define USE_ITERATIVE_SSD       0 // 0 == use per-pixel 'matchTemplate' call (less prone to cumulative float error)

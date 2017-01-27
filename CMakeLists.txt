@@ -236,9 +236,10 @@ if(BUILD_TESTS)
                     TRUE
         )
     endif()
-    set(TEST_DATA_ROOT "${CMAKE_BINARY_DIR}/Testing/data/" CACHE PATH "Test data root folder (used internally for testing, light external data may be downloaded and kept there)")
-    mark_as_advanced(TEST_DATA_ROOT)
-    file(MAKE_DIRECTORY ${TEST_DATA_ROOT})
+    set(TEST_INPUT_DATA_ROOT "${CMAKE_SOURCE_DIR}/modules/test/data" CACHE PATH "Test input data root folder (used internally for testing, contains binary reference files)")
+    set(TEST_OUTPUT_DATA_ROOT "${CMAKE_BINARY_DIR}/Testing/data" CACHE PATH "Test output data root folder (used internally for testing, light external data may be downloaded and kept there)")
+    mark_as_advanced(TEST_INPUT_DATA_ROOT TEST_OUTPUT_DATA_ROOT)
+    file(MAKE_DIRECTORY ${TEST_OUTPUT_DATA_ROOT})
 endif()
 
 initialize_internal_list(litiv_projects)
