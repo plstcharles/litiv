@@ -22,6 +22,14 @@
 #include <opencv2/features2d.hpp>
 #include "litiv/utils/math.hpp"
 
+#define DASC_DEFAULT_RF_SIGMAS (2.0f)
+#define DASC_DEFAULT_RF_SIGMAR (0.2f)
+#define DASC_DEFAULT_RF_ITERS  (size_t(1))
+#define DASC_DEFAULT_GF_RADIUS (size_t(2))
+#define DASC_DEFAULT_GF_EPS    (0.09f)
+#define DASC_DEFAULT_GF_SUBSPL (size_t(1))
+#define DASC_DEFAULT_PREPROCESS (true)
+
 /**
     Dense Adaptive Self-Correlation (DASC) feature extractor
 
@@ -31,9 +39,9 @@
 class DASC : public cv::DescriptorExtractor {
 public:
     /// constructor for recursive filtering-based DASC feature descriptor extractor (see original paper for parameter info)
-    explicit DASC(float fSigma_s/*=2.0f*/, float fSigma_r/*=0.2f*/, size_t nIters=1, bool bPreProcess=true);
+    explicit DASC(float fSigma_s/*=DASC_DEFAULT_RF_SIGMAS*/, float fSigma_r/*=DASC_DEFAULT_RF_SIGMAR*/, size_t nIters=DASC_DEFAULT_RF_ITERS, bool bPreProcess=DASC_DEFAULT_PREPROCESS);
     /// constructor for guided filtering-based DASC feature descriptor extractor (see original paper for parameter info)
-    explicit DASC(size_t nRadius/*=2*/, float fEpsilon/*=0.09f*/, size_t nSubSamplFrac=1, bool bPreProcess=true);
+    explicit DASC(size_t nRadius/*=DASC_DEFAULT_GF_RADIUS*/, float fEpsilon/*=DASC_DEFAULT_GF_EPS*/, size_t nSubSamplFrac=DASC_DEFAULT_GF_SUBSPL, bool bPreProcess=DASC_DEFAULT_PREPROCESS);
     /// loads extractor params from the specified file node @@@@ not impl
     virtual void read(const cv::FileNode&) override;
     /// writes extractor params to the specified file storage @@@@ not impl
