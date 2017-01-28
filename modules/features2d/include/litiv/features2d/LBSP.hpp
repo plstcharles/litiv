@@ -66,10 +66,14 @@ public:
     /// returns the current absolute threshold used for comparisons (-1 = invalid/not used)
     size_t getAbsThreshold() const;
 
-    /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix (note: descriptors close to borders will be invalid)
+    /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix, and all image points are described (note: descriptors close to borders will be invalid)
+    void compute2(const cv::Mat& oImage, cv::Mat& oDescMap) const;
+    /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix
     void compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescMap) const;
     /// batch version of LBSP::compute2(const cv::Mat& image, ...)
-    void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint>>& vvoPointCollection, std::vector<cv::Mat>& voDescMapCollection) const;
+    void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<cv::Mat>& voDescMapCollection) const;
+    /// batch version of LBSP::compute2(const cv::Mat& image, ...)
+    void compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat>& voDescMapCollection) const;
 
     /// utility function, used to reshape a descriptors matrix to its input image size via their keypoint locations
     static void reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoints, const cv::Mat& oDescriptors, cv::Mat& oOutput);
@@ -79,6 +83,8 @@ public:
     static void validateKeyPoints(std::vector<cv::KeyPoint>& voKeypoints, cv::Size oImgSize);
     /// utility function, used to filter out bad pixels in a ROI that would trigger out of bounds error because they're too close to the image border
     static void validateROI(cv::Mat& oROI);
+    /// utility function, used to calculate per-desc Hamming distance between two descriptor sets/maps
+    static void calcDistance(const cv::Mat& oDescriptors1, const cv::Mat& oDescriptors2, cv::Mat_<uchar>& oDistances);
 #if HAVE_GLSL
     /// utility function, returns the glsl source code required to describe an LBSP descriptor based on the image load store
     static std::string getShaderFunctionSource(size_t nChannels, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize);

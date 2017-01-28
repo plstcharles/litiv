@@ -47,12 +47,12 @@ void LBSP::write(cv::FileStorage& /*fs*/) const {
 }
 
 cv::Size LBSP::windowSize() const {
-    return cv::Size(PATCH_SIZE,PATCH_SIZE);
+    return cv::Size(int(PATCH_SIZE),int(PATCH_SIZE));
 }
 
 int LBSP::borderSize(int nDim) const {
     lvAssert(nDim==0 || nDim==1);
-    return PATCH_SIZE/2;
+    return int(PATCH_SIZE)/2;
 }
 
 int LBSP::descriptorSize() const {
@@ -90,6 +90,58 @@ size_t LBSP::getAbsThreshold() const {
 
 namespace {
 
+void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, cv::Mat& oDesc, size_t nThreshold) {
+    static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
+    lvAssert_(!oInputImg.empty() && oInputImg.isContinuous() && (oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3),"input image must be non-empty, continuous, and of type 8UC1/8UC3");
+    lvAssert_(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()),"ref image must be empty, or of the same size/type as the input image");
+    const size_t nChannels = (size_t)oInputImg.channels();
+    const cv::Mat& oRefMat = oRefImg.empty()?oInputImg:oRefImg;
+    const uchar t = cv::saturate_cast<uchar>((int)nThreshold);
+    if(nChannels==1) {
+        oDesc.create(oInputImg.size(),CV_16UC1);
+        for(int y=int(LBSP::PATCH_SIZE)/2; y<oInputImg.rows-int(LBSP::PATCH_SIZE)/2; ++y)
+            for(int x=int(LBSP::PATCH_SIZE)/2; x<oInputImg.cols-int(LBSP::PATCH_SIZE)/2; ++x)
+                LBSP::computeDescriptor<1>(oInputImg,oRefMat.at<uchar>(y,x),x,y,0,t,oDesc.at<ushort>(y,x));
+    }
+    else { //nChannels==3
+        oDesc.create(oInputImg.size(),CV_16UC3);
+        alignas(16) const std::array<uchar,3> anThreshold = {t,t,t};
+        for(int y=int(LBSP::PATCH_SIZE)/2; y<oInputImg.rows-int(LBSP::PATCH_SIZE)/2; ++y)
+            for(int x=int(LBSP::PATCH_SIZE)/2; x<oInputImg.cols-int(LBSP::PATCH_SIZE)/2; ++x)
+                LBSP::computeDescriptor(oInputImg,oRefMat.ptr<uchar>(y,x),x,y,anThreshold,oDesc.ptr<ushort>(y,x));
+    }
+}
+
+void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, cv::Mat& oDesc, float fThreshold, size_t nThresholdOffset) {
+    static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
+    lvAssert_(!oInputImg.empty() && oInputImg.isContinuous() && (oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3),"input image must be non-empty, continuous, and of type 8UC1/8UC3");
+    lvAssert_(oRefImg.empty() || (oRefImg.size==oInputImg.size && oRefImg.type()==oInputImg.type()),"ref image must be empty, or of the same size/type as the input image");
+    lvAssert_(fThreshold>=0,"lbsp internal relative threshold must be non-negative");
+    const size_t nChannels = (size_t)oInputImg.channels();
+    const cv::Mat& oRefMat = oRefImg.empty()?oInputImg:oRefImg;
+    if(nChannels==1) {
+        oDesc.create(oInputImg.size(),CV_16UC1);
+        for(int y=int(LBSP::PATCH_SIZE)/2; y<oInputImg.rows-int(LBSP::PATCH_SIZE)/2; ++y) {
+            for(int x=int(LBSP::PATCH_SIZE)/2; x<oInputImg.cols-int(LBSP::PATCH_SIZE)/2; ++x) {
+                const uchar nThreshold = cv::saturate_cast<uchar>(oRefMat.at<uchar>(y,x)*fThreshold+nThresholdOffset);
+                LBSP::computeDescriptor<1>(oInputImg,oRefMat.at<uchar>(y,x),x,y,0,nThreshold,oDesc.at<ushort>(y,x));
+            }
+        }
+    }
+    else { //nChannels==3
+        oDesc.create(oInputImg.size(),CV_16UC3);
+        for(int y=int(LBSP::PATCH_SIZE)/2; y<oInputImg.rows-int(LBSP::PATCH_SIZE)/2; ++y) {
+            for(int x=int(LBSP::PATCH_SIZE)/2; x<oInputImg.cols-int(LBSP::PATCH_SIZE)/2; ++x) {
+                const uchar* acRef = oRefMat.ptr<uchar>(y,x);
+                alignas(16) const std::array<uchar,3> anThreshold = {cv::saturate_cast<uchar>(acRef[0]*fThreshold+nThresholdOffset),
+                                                                     cv::saturate_cast<uchar>(acRef[1]*fThreshold+nThresholdOffset),
+                                                                     cv::saturate_cast<uchar>(acRef[2]*fThreshold+nThresholdOffset)};
+                LBSP::computeDescriptor(oInputImg,acRef,x,y,anThreshold,oDesc.ptr<ushort>(y,x));
+            }
+        }
+    }
+}
+
 void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const std::vector<cv::KeyPoint>& voKeyPoints, cv::Mat& oDesc, bool bSingleColumnDesc, size_t nThreshold) {
     static_assert(LBSP::DESC_SIZE==2,"bad assumptions in impl below");
     lvAssert_(!oInputImg.empty() && oInputImg.isContinuous() && (oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3),"input image must be non-empty, continuous, and of type 8UC1/8UC3");
@@ -109,7 +161,6 @@ void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const st
             ushort& nResult = bSingleColumnDesc?oDesc.at<ushort>((int)k):oDesc.at<ushort>(y,x);
             LBSP::computeDescriptor<1>(oInputImg,oRefMat.at<uchar>(y,x),x,y,0,t,nResult);
         }
-        return;
     }
     else { //nChannels==3
         if(bSingleColumnDesc)
@@ -168,6 +219,14 @@ void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const st
 
 } // namespace
 
+void LBSP::compute2(const cv::Mat& oImage, cv::Mat& oDescMap) const {
+    lvAssert_(!oImage.empty(),"input image must be non-empty");
+    if(m_bOnlyUsingAbsThreshold)
+        lbsp_computeImpl(oImage,m_oRefImage,oDescMap,m_nThreshold);
+    else
+        lbsp_computeImpl(oImage,m_oRefImage,oDescMap,m_fRelThreshold,m_nThreshold);
+}
+
 void LBSP::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescMap) const {
     lvAssert_(!oImage.empty(),"input image must be non-empty");
     cv::KeyPointsFilter::runByImageBorder(voKeypoints,oImage.size(),PATCH_SIZE/2);
@@ -181,7 +240,13 @@ void LBSP::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoint
         lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,oDescMap,false,m_fRelThreshold,m_nThreshold);
 }
 
-void LBSP::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint> >& vvoPointCollection, std::vector<cv::Mat>& voDescMapCollection) const {
+void LBSP::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<cv::Mat>& voDescMapCollection) const {
+    voDescMapCollection.resize(voImageCollection.size());
+    for(size_t i=0; i<voImageCollection.size(); i++)
+        compute2(voImageCollection[i], voDescMapCollection[i]);
+}
+
+void LBSP::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<std::vector<cv::KeyPoint>>& vvoPointCollection, std::vector<cv::Mat>& voDescMapCollection) const {
     lvAssert_(voImageCollection.size()==vvoPointCollection.size(),"number of images must match number of keypoint lists");
     voDescMapCollection.resize(voImageCollection.size());
     for(size_t i=0; i<voImageCollection.size(); i++)
@@ -296,6 +361,29 @@ void LBSP::validateROI(cv::Mat& oROI) {
     const cv::Rect nROI_inner(nBorderSize,nBorderSize,oROI.cols-nBorderSize*2,oROI.rows-nBorderSize*2);
     cv::Mat(oROI,nROI_inner).copyTo(cv::Mat(oROI_new,nROI_inner));
     oROI = oROI_new;
+}
+
+void LBSP::calcDistance(const cv::Mat& oDescriptors1, const cv::Mat& oDescriptors2, cv::Mat_<uchar>& oDistances) {
+    lvAssert_(oDescriptors1.dims==2 && oDescriptors2.dims==2 && oDescriptors1.size()==oDescriptors2.size(),"descriptor mat sizes mismatch");
+    lvAssert_(oDescriptors1.depth()==CV_16U && oDescriptors2.depth()==CV_16U,"unexpected descriptor matrix type");
+    lvAssert_(oDescriptors1.type()==oDescriptors2.type(),"descriptor mat types mismatch");
+    oDistances.create(oDescriptors1.rows,oDescriptors1.cols);
+    if(oDescriptors1.channels()==1)
+        for(int nDescRowIdx=0; nDescRowIdx<oDescriptors1.rows; ++nDescRowIdx)
+            for(int nDescColIdx=0; nDescColIdx<oDescriptors1.cols; ++nDescColIdx)
+                oDistances(nDescRowIdx,nDescColIdx) = lv::hdist<ushort,uchar>(oDescriptors1.at<ushort>(nDescRowIdx,nDescColIdx),oDescriptors2.at<ushort>(nDescRowIdx,nDescColIdx));
+    else if(oDescriptors1.channels()==2)
+        for(int nDescRowIdx=0; nDescRowIdx<oDescriptors1.rows; ++nDescRowIdx)
+            for(int nDescColIdx=0; nDescColIdx<oDescriptors1.cols; ++nDescColIdx)
+                oDistances(nDescRowIdx,nDescColIdx) = lv::hdist<2,ushort,uchar>(oDescriptors1.ptr<ushort>(nDescRowIdx,nDescColIdx),oDescriptors2.ptr<ushort>(nDescRowIdx,nDescColIdx));
+    else if(oDescriptors1.channels()==3)
+        for(int nDescRowIdx=0; nDescRowIdx<oDescriptors1.rows; ++nDescRowIdx)
+            for(int nDescColIdx=0; nDescColIdx<oDescriptors1.cols; ++nDescColIdx)
+                oDistances(nDescRowIdx,nDescColIdx) = lv::hdist<3,ushort,uchar>(oDescriptors1.ptr<ushort>(nDescRowIdx,nDescColIdx),oDescriptors2.ptr<ushort>(nDescRowIdx,nDescColIdx));
+    else if(oDescriptors1.channels()==4)
+        for(int nDescRowIdx=0; nDescRowIdx<oDescriptors1.rows; ++nDescRowIdx)
+            for(int nDescColIdx=0; nDescColIdx<oDescriptors1.cols; ++nDescColIdx)
+                oDistances(nDescRowIdx,nDescColIdx) = lv::hdist<4,ushort,uchar>(oDescriptors1.ptr<ushort>(nDescRowIdx,nDescColIdx),oDescriptors2.ptr<ushort>(nDescRowIdx,nDescColIdx));
 }
 
 #if HAVE_GLSL
