@@ -37,6 +37,7 @@ configure_file(
 )
 
 add_files(SOURCE_FILES
+    "src/cxx.cpp"
     "src/platform.cpp"
 )
 add_files(INCLUDE_FILES

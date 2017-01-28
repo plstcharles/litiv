@@ -69,6 +69,21 @@
 
 namespace lv {
 
+    /// vsnprintf wrapper for std::string output (avoids using two buffers via C++11 string contiguous memory access)
+    std::string putf(const char* acFormat, ...);
+    /// returns the comparison of two strings, ignoring character case
+    bool compare_lowercase(const std::string& i, const std::string& j);
+    /// returns whether the input string contains any of the given tokens
+    bool string_contains_token(const std::string& s, const std::vector<std::string>& tokens);
+    /// clamps a given string to a specific size, padding with a given character if the string is too small
+    std::string clampString(const std::string& sInput, size_t nSize, char cPadding=' ');
+    /// returns the string of the current 'localtime' output (useful for log tagging)
+    std::string getTimeStamp();
+    /// returns the string of the current framework version and version control hash (useful for log tagging)
+    std::string getVersionStamp();
+    /// returns a combined version of 'getVersionStamp()' and 'getTimeStamp()' for inline use by loggers
+    std::string getLogStamp();
+
     /// helper struct used for compile-time integer expr printing via error; just write "IntegerPrinter<expr> test;"
     template<int>
     struct IntegerPrinter;
@@ -77,42 +92,14 @@ namespace lv {
     template<typename T>
     struct TypePrinter;
 
-    /// vsnprintf wrapper for std::string output (avoids using two buffers via C++11 string contiguous memory access)
-    inline std::string putf(const char* acFormat, ...) {
-        va_list vArgs;
-        va_start(vArgs,acFormat);
-        std::string vBuffer(1024,'\0');
-#ifdef _DEBUG
-        if(((&vBuffer[0])+vBuffer.size()-1)!=&vBuffer[vBuffer.size()-1])
-            throw std::runtime_error("basic_string should have contiguous memory (need C++11!)");
-#endif //defined(_DEBUG)
-        const int nWritten = vsnprintf(&vBuffer[0],(int)vBuffer.size(),acFormat,vArgs);
-        va_end(vArgs);
-        if(nWritten<0)
-            throw std::runtime_error("putf failed (1)");
-        if((size_t)nWritten<=vBuffer.size()) {
-            vBuffer.resize((size_t)nWritten);
-            return vBuffer;
-        }
-        vBuffer.resize((size_t)nWritten+1);
-        va_list vArgs2;
-        va_start(vArgs2,acFormat);
-        const int nWritten2 = vsnprintf(&vBuffer[0],(int)vBuffer.size(),acFormat,vArgs2);
-        va_end(vArgs2);
-        if(nWritten2<0 || (size_t)nWritten2>vBuffer.size())
-            throw std::runtime_error("putf failed (2)");
-        vBuffer.resize((size_t)nWritten2);
-        return vBuffer;
-    }
-
     /// debug helper class which prints status messages in console during stack unwinding (used through lvExceptionWatch macro)
     struct UncaughtExceptionLogger {
-        UncaughtExceptionLogger(const char* sFunc, const char* sFile, int nLine) :
+        inline UncaughtExceptionLogger(const char* sFunc, const char* sFile, int nLine) :
                 m_sFunc(sFunc),m_sFile(sFile),m_nLine(nLine) {}
         const char* const m_sFunc;
         const char* const m_sFile;
         const int m_nLine;
-        ~UncaughtExceptionLogger() {
+        inline ~UncaughtExceptionLogger() {
             if(std::uncaught_exception())
                 std::cerr << lv::putf("Unwinding at function '%s' from %s(%d) due to uncaught exception\n",m_sFunc,m_sFile,m_nLine);
         }
@@ -120,17 +107,27 @@ namespace lv {
 
     /// high-level (costly) exception class with extra mesagge + info on error location (used through lvAssert and lvError macros)
     struct Exception : public std::runtime_error {
+        /// default lv exception constructor; all exception should be created via macros
         template<typename... Targs>
-        Exception(const std::string& sErrMsg, const char* sFunc, const char* sFile, int nLine, Targs&&... args) :
+        inline Exception(const std::string& sErrMsg, const char* sFunc, const char* sFile, int nLine, Targs&&... args) :
                 std::runtime_error(lv::putf((std::string("Exception in function '%s' from %s(%d) : \n")+sErrMsg).c_str(),sFunc,sFile,nLine,std::forward<Targs>(args)...)),
-                m_acFuncName(sFunc),
-                m_acFileName(sFile),
-                m_nLineNumber(nLine) {
-            std::cerr << this->what() << std::endl;
+                m_acFuncName(sFunc),m_acFileName(sFile),m_nLineNumber(nLine) {
+            if(s_bVerbose)
+                std::cerr << this->what() << std::endl;
         }
+        /// sets whether exceptions should broadcast their error message to stderr on creation or not
+        static inline void setVerbose(bool bVal) {
+            s_bVerbose = bVal;
+        }
+        /// name of the function the exception originated from
         const char* const m_acFuncName;
+        /// name of the file the exception originated from
         const char* const m_acFileName;
+        /// line number the exception originated from
         const int m_nLineNumber;
+    private:
+        /// internal toggle for stderr broadcast toggle
+        static bool s_bVerbose;
     };
 
     /// unique pointer static cast helper utility (moves ownership to the returned pointer)
@@ -161,14 +158,6 @@ namespace lv {
         f(n-1);
     }
 
-    /// returns the comparison of two strings, ignoring character case
-    inline bool compare_lowercase(const std::string& i, const std::string& j) {
-        std::string i_lower(i), j_lower(j);
-        std::transform(i_lower.begin(),i_lower.end(),i_lower.begin(),[](auto c){return std::tolower(c);});
-        std::transform(j_lower.begin(),j_lower.end(),j_lower.begin(),[](auto c){return std::tolower(c);});
-        return i_lower<j_lower;
-    }
-
     /// returns the number of decimal digits required to display the non-fractional part of a given number (counts sign as extra digit if negative)
     template<typename T>
     inline int digit_count(T number) {
@@ -180,19 +169,6 @@ namespace lv {
             digits++;
         }
         return digits;
-    }
-
-    /// returns whether the input string contains any of the given tokens
-    inline bool string_contains_token(const std::string& s, const std::vector<std::string>& tokens) {
-        for(size_t i=0; i<tokens.size(); ++i)
-            if(s.find(tokens[i])!=std::string::npos)
-                return true;
-        return false;
-    }
-
-    /// clamps a given string to a specific size, padding with a given character if the string is too small
-    inline std::string clampString(const std::string& sInput, size_t nSize, char cPadding=' ') {
-        return sInput.size()>nSize?sInput.substr(0,nSize):std::string(nSize-sInput.size(),cPadding)+sInput;
     }
 
     /// concatenates the given vectors (useful for inline constructor where performance doesn't matter too much)
@@ -314,11 +290,19 @@ namespace lv {
 
     /// stopwatch/chrono helper class; relies on std::chrono::high_resolution_clock internally
     struct StopWatch {
-        StopWatch() {tick();}
-        inline void tick() {m_nTick = std::chrono::high_resolution_clock::now();}
+        /// default constructor; calls 'tick' for member initialization
+        inline StopWatch() {
+            tick();
+        }
+        /// updates the internal clock tick with the current tick
+        inline void tick() {
+            m_nTick = std::chrono::high_resolution_clock::now();
+        }
+        /// returns the elapsed time (in seconds) between the last 'tick' call and now
         inline double elapsed() const {
             return std::chrono::duration<double>(std::chrono::high_resolution_clock::now()-m_nTick).count();
         }
+        /// returns the elapsed time (in seconds) between the last 'tick' call and now, and sets 'tick' as now
         inline double tock() {
             const std::chrono::high_resolution_clock::time_point nNow = std::chrono::high_resolution_clock::now();
             const std::chrono::duration<double> dElapsed_sec = nNow-m_nTick;
@@ -328,24 +312,6 @@ namespace lv {
     private:
         std::chrono::high_resolution_clock::time_point m_nTick;
     };
-
-    /// returns the string of the current 'localtime' output (useful for log tagging)
-    inline std::string getTimeStamp() {
-        std::time_t tNow = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-        char acBuffer[128];
-        std::strftime(acBuffer,sizeof(acBuffer),"%F %T",std::localtime(&tNow)); // std::put_time missing w/ GCC<5.0
-        return std::string(acBuffer);
-    }
-
-    /// returns the string of the current framework version and version control hash (useful for log tagging)
-    inline std::string getVersionStamp() {
-        return "LITIV Framework v" LITIV_VERSION_STR " (SHA1=" LITIV_VERSION_SHA1 ")";
-    }
-
-    /// returns a combined version of 'getVersionStamp()' and 'getTimeStamp()' for inline use by loggers
-    inline std::string getLogStamp() {
-        return std::string("\n")+lv::getVersionStamp()+"\n["+lv::getTimeStamp()+"]\n";
-    }
 
     /// helper struct for std::enable_shared_from_this to allow easier dynamic casting
     template<typename T>
