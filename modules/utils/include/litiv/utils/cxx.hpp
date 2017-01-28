@@ -164,7 +164,7 @@ namespace lv {
         if(std::isnan((float)number))
             return 3;
         int digits = number<0?2:1;
-        while(std::abs(number)>=10) {
+        while(std::abs((int)number)>=10) {
             number /= 10;
             digits++;
         }
