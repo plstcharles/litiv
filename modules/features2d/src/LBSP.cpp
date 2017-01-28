@@ -169,7 +169,6 @@ void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const st
 void LBSP::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat& oDescMap) const {
     lvAssert_(!oImage.empty(),"input image must be non-empty");
     cv::KeyPointsFilter::runByImageBorder(voKeypoints,oImage.size(),PATCH_SIZE/2);
-    cv::KeyPointsFilter::runByKeypointSize(voKeypoints,std::numeric_limits<float>::epsilon());
     if(voKeypoints.empty()) {
         oDescMap.release();
         return;
