@@ -4,9 +4,9 @@
 #include "litiv/test.hpp"
 
 TEST(dasc_rf,regression_constr) {
-    EXPECT_THROW_LVQUIET(lv::doNotOptimize(std::make_unique<DASC>(0.0f,0.05f)),lv::Exception);
-    EXPECT_THROW_LVQUIET(lv::doNotOptimize(std::make_unique<DASC>(1.0f,0.0f)),lv::Exception);
-    EXPECT_THROW_LVQUIET(lv::doNotOptimize(std::make_unique<DASC>(1.0f,0.1f,size_t(0))),lv::Exception);
+    EXPECT_THROW_LVQUIET(std::make_unique<DASC>(0.0f,0.05f),lv::Exception);
+    EXPECT_THROW_LVQUIET(std::make_unique<DASC>(1.0f,0.0f),lv::Exception);
+    EXPECT_THROW_LVQUIET(std::make_unique<DASC>(1.0f,0.1f,size_t(0)),lv::Exception);
 }
 
 TEST(dasc_rf,regression_default_params) {
@@ -76,8 +76,8 @@ TEST(dasc_rf,regression_large_compute) {
     ASSERT_EQ(oInputCrop.size[0],oOutputDescMap1.size[0]);
     ASSERT_EQ(oInputCrop.size[1],oOutputDescMap1.size[1]);
     std::vector<cv::KeyPoint> vKeyPoints;
-    for(int nRowIdx=oTargetPt.y-nPatchSize; nRowIdx<=oTargetPt.y+nPatchSize; ++nRowIdx)
-        for(int nColIdx=oTargetPt.x-nPatchSize; nColIdx<=oTargetPt.x+nPatchSize; ++nColIdx)
+    for(int nRowIdx=oWindowSize.height/2; nRowIdx<=oWindowSize.height/2+2*nPatchSize; ++nRowIdx)
+        for(int nColIdx=oWindowSize.width/2; nColIdx<=oWindowSize.width/2+2*nPatchSize; ++nColIdx)
             vKeyPoints.emplace_back(cv::Point2f(float(nColIdx),float(nRowIdx)),float(std::max(oWindowSize.height,oWindowSize.width)));
     std::vector<cv::KeyPoint> vKeyPoints_modif = vKeyPoints;
     cv::Mat_<float> oOutputDescMap2;
@@ -184,8 +184,8 @@ TEST(dasc_gf,regression_large_compute) {
     ASSERT_EQ(oInputCrop.size[0],oOutputDescMap1.size[0]);
     ASSERT_EQ(oInputCrop.size[1],oOutputDescMap1.size[1]);
     std::vector<cv::KeyPoint> vKeyPoints;
-    for(int nRowIdx=oTargetPt.y-nPatchSize; nRowIdx<=oTargetPt.y+nPatchSize; ++nRowIdx)
-        for(int nColIdx=oTargetPt.x-nPatchSize; nColIdx<=oTargetPt.x+nPatchSize; ++nColIdx)
+    for(int nRowIdx=oWindowSize.height/2; nRowIdx<=oWindowSize.height/2+2*nPatchSize; ++nRowIdx)
+        for(int nColIdx=oWindowSize.width/2; nColIdx<=oWindowSize.width/2+2*nPatchSize; ++nColIdx)
             vKeyPoints.emplace_back(cv::Point2f(float(nColIdx),float(nRowIdx)),float(std::max(oWindowSize.height,oWindowSize.width)));
     std::vector<cv::KeyPoint> vKeyPoints_modif = vKeyPoints;
     cv::Mat_<float> oOutputDescMap2;
