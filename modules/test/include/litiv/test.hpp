@@ -25,6 +25,20 @@
 #include <memory>
 #include <fstream>
 
+#define EXPECT_THROW_LVQUIET(expr,etype) \
+do { \
+    lv::Exception::setVerbose(false); \
+    EXPECT_THROW(expr,etype); \
+    lv::Exception::setVerbose(true); \
+} while(0)
+
+#define ASSERT_THROW_LVQUIET(expr,etype) \
+do { \
+    lv::Exception::setVerbose(false); \
+    ASSERT_THROW(expr,etype); \
+    lv::Exception::setVerbose(true); \
+} while(0)
+
 namespace lv {
 
     namespace test {
