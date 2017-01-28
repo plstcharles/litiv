@@ -193,7 +193,6 @@ void LBSP::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMask, std::
     lvAssert_(!oImage.empty(),"input image must be non-empty");
     cv::Mat oMask = _oMask.getMat();
     lvAssert_(oMask.empty() || (!oMask.empty() && oMask.size()==oImage.size()),"mask must be empty or of equal size to the input image");
-    cv::Mat oDescriptors = _oDescriptors.getMat();
     if(!bUseProvidedKeypoints) {
         voKeypoints.clear();
         voKeypoints.reserve(size_t(oImage.rows*oImage.cols));
@@ -205,13 +204,13 @@ void LBSP::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMask, std::
     if(!oMask.empty())
         cv::KeyPointsFilter::runByPixelsMask(voKeypoints,oMask);
     if(voKeypoints.empty()) {
-        oDescriptors.release();
+        _oDescriptors.release();
         return;
     }
     if(m_bOnlyUsingAbsThreshold)
-        lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,oDescriptors,true,m_nThreshold);
+        lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,_oDescriptors.getMatRef(),true,m_nThreshold);
     else
-        lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,oDescriptors,true,m_fRelThreshold,m_nThreshold);
+        lbsp_computeImpl(oImage,m_oRefImage,voKeypoints,_oDescriptors.getMatRef(),true,m_fRelThreshold,m_nThreshold);
 }
 
 void LBSP::reshapeDesc(cv::Size oSize, const std::vector<cv::KeyPoint>& voKeypoints, const cv::Mat& oDescriptors, cv::Mat& oOutput) {

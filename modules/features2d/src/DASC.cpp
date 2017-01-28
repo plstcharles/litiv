@@ -156,7 +156,6 @@ void DASC::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMask, std::
     lvAssert_(!oImage.empty(),"input image must be non-empty");
     cv::Mat oMask = _oMask.getMat();
     lvAssert_(oMask.empty() || (!oMask.empty() && oMask.size()==oImage.size()),"mask must be empty or of equal size to the input image");
-    cv::Mat oDescriptors = _oDescriptors.getMat();
     if(!bUseProvidedKeypoints) {
         voKeypoints.clear();
         voKeypoints.reserve(size_t(oImage.rows*oImage.cols));
@@ -168,7 +167,7 @@ void DASC::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMask, std::
     if(!oMask.empty())
         cv::KeyPointsFilter::runByPixelsMask(voKeypoints,oMask);
     if(voKeypoints.empty()) {
-        oDescriptors.release();
+        _oDescriptors.release();
         return;
     }
     cv::Mat_<float> oDenseDecriptors;
@@ -178,11 +177,12 @@ void DASC::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMask, std::
         dasc_gf_impl(oImage,oDenseDecriptors);
     lvDbgAssert(oDenseDecriptors.isContinuous() && oDenseDecriptors.type()==CV_32FC1);
     lvDbgAssert(oDenseDecriptors.dims==3 && oDenseDecriptors.size[0]==oImage.rows && oDenseDecriptors.size[1]==oImage.cols && oDenseDecriptors.size[2]==int(pretrained::nLUTSize));
-    oDescriptors.create((int)voKeypoints.size(),(int)pretrained::nLUTSize,CV_32FC1);
+    _oDescriptors.create((int)voKeypoints.size(),(int)pretrained::nLUTSize,CV_32FC1);
+    cv::Mat oDescriptors = _oDescriptors.getMat();
     for(size_t nKeyPtIdx=0; nKeyPtIdx<voKeypoints.size(); ++nKeyPtIdx) {
         const int nRowIdx = (int)voKeypoints[nKeyPtIdx].pt.y;
         const int nColIdx = (int)voKeypoints[nKeyPtIdx].pt.x;
-        const float* pData = (float*)(oDenseDecriptors.data+oDenseDecriptors.step[0]*nRowIdx+oDenseDecriptors.step[1]*nColIdx);
+        const float* pData = oDenseDecriptors.ptr<float>(nRowIdx,nColIdx);
         std::copy_n(pData,pretrained::nLUTSize,oDescriptors.ptr<float>((int)nKeyPtIdx));
     }
 }
