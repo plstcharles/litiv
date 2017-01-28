@@ -103,7 +103,7 @@ protected:
 
 private:
     /// keypoint-based description approach impl
-    void ssdescs_impl(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat_<float>& oDescriptors);
+    void ssdescs_impl(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat_<float>& oDescriptors, bool bGenDescMap);
     /// dense description approach impl
     void ssdescs_impl(const cv::Mat& oImage, cv::Mat_<float>& oDescriptors);
     /// descriptor normalisation approach impl

@@ -172,7 +172,7 @@ void LSS::compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescMap) {
 }
 
 void LSS::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat_<float>& oDescMap) {
-    ssdescs_impl(oImage,voKeypoints,oDescMap);
+    ssdescs_impl(oImage,voKeypoints,oDescMap,true);
 }
 
 void LSS::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<cv::Mat_<float>>& voDescMapCollection) {
@@ -207,18 +207,9 @@ void LSS::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMask, std::v
         _oDescriptors.release();
         return;
     }
-    cv::Mat_<float> oDenseDecriptors;
-    ssdescs_impl(oImage,oDenseDecriptors);
-    lvDbgAssert(oDenseDecriptors.isContinuous() && oDenseDecriptors.type()==CV_32FC1);
-    lvDbgAssert(oDenseDecriptors.dims==3 && oDenseDecriptors.size[0]==oImage.rows && oDenseDecriptors.size[1]==oImage.cols && oDenseDecriptors.size[2]==m_nRadialBins*m_nAngularBins);
     _oDescriptors.create((int)voKeypoints.size(),m_nRadialBins*m_nAngularBins,CV_32FC1);
-    cv::Mat oDescriptors = _oDescriptors.getMat();
-    for(size_t nKeyPtIdx=0; nKeyPtIdx<voKeypoints.size(); ++nKeyPtIdx) {
-        const int nRowIdx = int(voKeypoints[nKeyPtIdx].pt.y);
-        const int nColIdx = int(voKeypoints[nKeyPtIdx].pt.x);
-        const float* pData = (float*)(oDenseDecriptors.data+oDenseDecriptors.step[0]*nRowIdx+oDenseDecriptors.step[1]*nColIdx);
-        std::copy_n(pData,m_nRadialBins*m_nAngularBins,oDescriptors.ptr<float>((int)nKeyPtIdx));
-    }
+    cv::Mat_<float> oDescriptors = cv::Mat_<float>(_oDescriptors.getMat());
+    ssdescs_impl(oImage,voKeypoints,oDescriptors,false);
 }
 
 void LSS::reshapeDesc(cv::Size oSize, cv::Mat& oDescriptors) const {
@@ -284,7 +275,7 @@ void LSS::calcDistance(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<floa
     }
 }
 
-void LSS::ssdescs_impl(const cv::Mat& _oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat_<float>& oDescriptors) {
+void LSS::ssdescs_impl(const cv::Mat& _oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat_<float>& oDescriptors, bool bGenDescMap) {
     // this method specialization for targeted keypoint description is slower (per keypoint) than the dense description method
     lvAssert_(!_oImage.empty() && ((_oImage.type()==CV_8UC1) || (_oImage.type()==CV_8UC3)),"invalid input image");
     lvAssert__(m_nCorrWinSize<=_oImage.cols && m_nCorrWinSize<=_oImage.rows,"image is too small to compute descriptors with current correlation area size -- need at least (%d,%d) and got (%d,%d)",m_nCorrWinSize,m_nCorrWinSize,_oImage.cols,_oImage.rows);
@@ -300,14 +291,17 @@ void LSS::ssdescs_impl(const cv::Mat& _oImage, std::vector<cv::KeyPoint>& voKeyp
         oImage = _oImage;
     std::vector<float> aTempDesc(size_t(m_nRadialBins*m_nAngularBins));
     cv::Mat_<float> oTempDesc(1,m_nRadialBins*m_nAngularBins,aTempDesc.data());
-    oDescriptors.create(int(voKeypoints.size()),m_nRadialBins*m_nAngularBins);
+    if(bGenDescMap)
+        oDescriptors.create(3,std::array<int,3>{oImage.rows,oImage.cols,m_nRadialBins*m_nAngularBins}.data());
+    else
+        oDescriptors.create(int(voKeypoints.size()),m_nRadialBins*m_nAngularBins);
     for(int nKeyPtIdx=0; nKeyPtIdx<int(voKeypoints.size()); ++nKeyPtIdx) {
         const cv::KeyPoint& oCurrKeyPt = voKeypoints[nKeyPtIdx];
-        const int nRowIdx = int(oCurrKeyPt.pt.y)-m_nCorrWinSize/2;
-        const int nColIdx = int(oCurrKeyPt.pt.x)-m_nCorrWinSize/2;
+        const int nRowIdx = int(oCurrKeyPt.pt.y);
+        const int nColIdx = int(oCurrKeyPt.pt.x);
         lvDbgAssert(nRowIdx>=0 && nColIdx>=0);
-        const cv::Mat oWindow = oImage(cv::Rect(nColIdx,nRowIdx,m_nCorrWinSize,m_nCorrWinSize));
-        const cv::Mat oTempl = oImage(cv::Rect(nColIdx+m_nCorrWinSize/2-m_nDescPatchSize/2,nRowIdx+m_nCorrWinSize/2-m_nDescPatchSize/2,m_nDescPatchSize,m_nDescPatchSize));
+        const cv::Mat oWindow = oImage(cv::Rect(nColIdx-m_nCorrWinSize/2,nRowIdx-m_nCorrWinSize/2,m_nCorrWinSize,m_nCorrWinSize));
+        const cv::Mat oTempl = oImage(cv::Rect(nColIdx-m_nDescPatchSize/2,nRowIdx-m_nDescPatchSize/2,m_nDescPatchSize,m_nDescPatchSize));
         cv::matchTemplate(oWindow,oTempl,m_oCorrMap,cv::TM_SQDIFF);
 #if USE_STATIC_VAR_NOISE
         const float fVarNormFact = -1.0f/m_fStaticNoiseVar;
@@ -323,7 +317,7 @@ void LSS::ssdescs_impl(const cv::Mat& _oImage, std::vector<cv::KeyPoint>& voKeyp
             if(m_oDescLUMap(nDescBinIdx)!=-1)
                 aTempDesc[m_oDescLUMap(nDescBinIdx)] = std::min(aTempDesc[m_oDescLUMap(nDescBinIdx)],((float*)m_oCorrMap.data)[nDescBinIdx]);
         oTempDesc *= fVarNormFact;
-        cv::exp(oTempDesc,cv::Mat_<float>(1,m_nRadialBins*m_nAngularBins,oDescriptors.ptr<float>(nKeyPtIdx)));
+        cv::exp(oTempDesc,cv::Mat_<float>(1,m_nRadialBins*m_nAngularBins,bGenDescMap?oDescriptors.ptr<float>(nRowIdx,nColIdx):oDescriptors.ptr<float>(nKeyPtIdx)));
     }
 #if USE_POST_NORMALISATION
     ssdescs_norm(oDescriptors);
