@@ -31,8 +31,17 @@ TEST(lbsp,regression_compute) {
     pLBSP->compute2(oInputCrop,oOutputDescMap1);
     ASSERT_EQ(oInputCrop.size[0],oOutputDescMap1.size[0]);
     ASSERT_EQ(oInputCrop.size[1],oOutputDescMap1.size[1]);
-    if(lv::checkIfExists(TEST_CURR_INPUT_DATA_ROOT "/test_lbsp.bin"))
-        ASSERT_TRUE(cv::isEqual<ushort>(oOutputDescMap1,cv::read(TEST_CURR_INPUT_DATA_ROOT "/test_lbsp.bin")));
+    if(lv::checkIfExists(TEST_CURR_INPUT_DATA_ROOT "/test_lbsp.bin")) {
+        const cv::Rect oValidZone(oWindowSize.width/2,oWindowSize.height/2,oInputCrop.cols-oWindowSize.width/2,oInputCrop.rows-oWindowSize.height/2);
+        const cv::Mat oOutputDescMap1_valid = oOutputDescMap1(oValidZone).clone();
+        const cv::Mat oDescRefMap = cv::read(TEST_CURR_INPUT_DATA_ROOT "/test_lbsp.bin");
+        const cv::Mat oDescRefMap_valid = oDescRefMap(oValidZone).clone();
+        for(int i=oWindowSize.height/2; i<oInputCrop.rows-oWindowSize.height/2; ++i)
+            for(int j=oWindowSize.width/2; j<oInputCrop.cols-oWindowSize.width/2; ++j)
+                for(int k=0; k<oInput.channels(); ++k)
+                    ASSERT_EQ(oOutputDescMap1.ptr<ushort>(i,j)[k],oDescRefMap.ptr<ushort>(i,j)[k]);
+        //ASSERT_TRUE(cv::isEqual<uchar>(oOutputDescMap1_valid,oDescRefMap_valid));
+    }
     else
         cv::write(TEST_CURR_INPUT_DATA_ROOT "/test_lbsp.bin",oOutputDescMap1);
     std::vector<cv::KeyPoint> vKeyPoints;
