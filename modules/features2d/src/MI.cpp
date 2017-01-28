@@ -75,9 +75,9 @@ void MutualInfo::compute(const cv::Mat& _oImage1, const cv::Mat& _oImage2, const
         const cv::Mat_<uchar> oImage2 = _oImage1.type()==CV_8UC3?_oImage2:_oImage1;
         const cv::Rect oSourceRect(0,0,oImage1.cols,oImage1.rows);
         for(size_t nKPIdx=0; nKPIdx<voKeypoints.size(); ++nKPIdx) {
-        const cv::Point oTargetPt(int(std::round(voKeypoints[nKPIdx].pt.x)),int(std::round(voKeypoints[nKPIdx].pt.y)));
+            const cv::Point oTargetPt(int(std::round(voKeypoints[nKPIdx].pt.x)),int(std::round(voKeypoints[nKPIdx].pt.y)));
             const cv::Rect oTargetRect(oTargetPt.x-m_oWinSize.width/2,oTargetPt.y-m_oWinSize.height/2,m_oWinSize.width,m_oWinSize.height);
-            lvAssert_(oSourceRect.contains(oTargetRect.tl()) && oSourceRect.contains(oTargetRect.br()),"got invalid input keypoint (oob)");
+            lvAssert_(oSourceRect.contains(oTargetRect.tl()) && oSourceRect.contains(oTargetRect.br()-cv::Point2i(1,1)),"got invalid input keypoint (oob)");
             if(m_bUseDenseHist)
                 vdScores[nKPIdx] = lv::calcMutualInfo<HIST_QUANTIF_FACTOR,false,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1(oTargetRect),oImage2(oTargetRect),&oDense24BitHistData);
             else
@@ -91,7 +91,7 @@ void MutualInfo::compute(const cv::Mat& _oImage1, const cv::Mat& _oImage2, const
         for(size_t nKPIdx=0; nKPIdx<voKeypoints.size(); ++nKPIdx) {
             const cv::Point oTargetPt(int(std::round(voKeypoints[nKPIdx].pt.x)),int(std::round(voKeypoints[nKPIdx].pt.y)));
             const cv::Rect oTargetRect(oTargetPt.x-m_oWinSize.width/2,oTargetPt.y-m_oWinSize.height/2,m_oWinSize.width,m_oWinSize.height);
-            lvAssert_(oSourceRect.contains(oTargetRect.tl()) && oSourceRect.contains(oTargetRect.br()),"got invalid input keypoint (oob)");
+            lvAssert_(oSourceRect.contains(oTargetRect.tl()) && oSourceRect.contains(oTargetRect.br()-cv::Point2i(1,1)),"got invalid input keypoint (oob)");
             if(m_bUseDenseHist)
                 vdScores[nKPIdx] = lv::calcMutualInfo<HIST_QUANTIF_FACTOR,false,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1(oTargetRect),oImage2(oTargetRect),&oDenseHistData);
             else
