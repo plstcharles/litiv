@@ -44,7 +44,7 @@ TEST(lss,regression_single_compute) {
         ASSERT_EQ(oOutputDesc.total(),oRefDesc.total());
         ASSERT_EQ(oOutputDesc.size,oRefDesc.size);
         for(int nDescIdx=0; nDescIdx<oRefDesc.size[2]; ++nDescIdx)
-            ASSERT_NEAR_MINRATIO(oOutputDesc.at<float>(0,0,nDescIdx),oRefDesc.at<float>(0,0,nDescIdx),0.04f);
+            ASSERT_NEAR_MINRATIO(oOutputDesc.at<float>(0,0,nDescIdx),oRefDesc.at<float>(0,0,nDescIdx),0.05f);
     }
     else
         cv::write(TEST_CURR_INPUT_DATA_ROOT "/test_lss.bin",oOutputDesc);

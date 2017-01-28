@@ -22,9 +22,9 @@ TEST(lbsp,regression_default_params) {
 
 TEST(lbsp,regression_compute) {
     std::unique_ptr<LBSP> pLBSP = std::make_unique<LBSP>(size_t(20));
-    const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
-    const cv::Point2i oTargetPt(364,135);
-    const int nPatchSize = 10;
+    const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/multispectral_stereo_ex/img2.png");
+    const cv::Point2i oTargetPt(371,371);
+    const int nPatchSize = 30;
     const cv::Size oWindowSize = pLBSP->windowSize();
     const int nBorderSize = pLBSP->borderSize();
     const cv::Mat oInputCrop = oInput(cv::Rect(oTargetPt.x-nBorderSize-nPatchSize,oTargetPt.y-nBorderSize-nPatchSize,oWindowSize.width+2*nPatchSize,oWindowSize.height+2*nPatchSize)).clone();
@@ -37,6 +37,10 @@ TEST(lbsp,regression_compute) {
         const cv::Mat oOutputDescMap1_valid = oOutputDescMap1(oValidZone).clone();
         const cv::Mat oDescRefMap = cv::read(TEST_CURR_INPUT_DATA_ROOT "/test_lbsp.bin");
         const cv::Mat oDescRefMap_valid = oDescRefMap(oValidZone).clone();
+        for(int i=0; i<oDescRefMap_valid.rows; ++i)
+            for(int j=0; j<oDescRefMap_valid.cols; ++j)
+                for(int k=0; k<oDescRefMap_valid.channels(); ++k)
+                    EXPECT_EQ(oOutputDescMap1_valid.ptr<ushort>(i,j)[k],oDescRefMap_valid.ptr<ushort>(i,j)[k]) << "i=" << i << ", j=" << j << ", k=" << k;
         ASSERT_TRUE(cv::isEqual<uchar>(oOutputDescMap1_valid,oDescRefMap_valid));
     }
     else

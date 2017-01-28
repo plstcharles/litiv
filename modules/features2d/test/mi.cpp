@@ -22,24 +22,24 @@ TEST(mi,regression_default_params) {
 
 TEST(mi,regression_compute) {
     std::unique_ptr<MutualInfo> pMI = std::make_unique<MutualInfo>();
-    const cv::Mat oInput1 = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
-    cv::Mat oInput2;
-    cv::cvtColor(oInput1,oInput2,cv::COLOR_BGR2GRAY);
-    cv::Mat(cv::Scalar_<uchar>(255)-oInput2).copyTo(oInput2);
-    cv::GaussianBlur(oInput2,oInput2,cv::Size(7,7),0.0);
-    const cv::Point2i oTargetPt(364,135);
+    const cv::Mat oInput1 = cv::imread(SAMPLES_DATA_ROOT "/multispectral_stereo_ex/img2.png");
+    ASSERT_TRUE(!oInput1.empty());
+    const cv::Mat oInput2 = cv::imread(SAMPLES_DATA_ROOT "/multispectral_stereo_ex/img1_corr_h0v8.png",cv::IMREAD_GRAYSCALE);
+    ASSERT_TRUE(!oInput2.empty());
+    const cv::Point oTargetPoint(603,122);
     const cv::Size oWindowSize = pMI->windowSize();
-    const cv::Rect oCropZone(oTargetPt.x-oWindowSize.width/2,oTargetPt.y-oWindowSize.height/2,oWindowSize.width,oWindowSize.height);
+    const cv::Rect oCropZone(oTargetPoint.x-oWindowSize.width/2,oTargetPoint.y-oWindowSize.height/2,oWindowSize.width,oWindowSize.height);
     const cv::Mat oInputCrop1 = oInput1(oCropZone).clone();
     const cv::Mat oInputCrop2 = oInput2(oCropZone).clone();
     const double dSingleScore = pMI->compute(oInputCrop1,oInputCrop2);
     ASSERT_GT(dSingleScore,0.0);
+    const cv::Size oPatchSize(100,60);
     std::vector<cv::KeyPoint> vKeyPoints;
     size_t nCurrIdx=0, nSingleTestIdx=0;
-    for(int nRowIdx=oWindowSize.height/2; nRowIdx<oInput1.rows-oWindowSize.height/2; ++nRowIdx) {
-        for(int nColIdx=oWindowSize.width/2; nColIdx<oInput1.cols-oWindowSize.width/2; ++nColIdx) {
+    for(int nRowIdx=oTargetPoint.y-oWindowSize.height/2-oPatchSize.height/2; nRowIdx<oTargetPoint.y+oWindowSize.height/2+oPatchSize.height/2; ++nRowIdx) {
+        for(int nColIdx=oTargetPoint.x-oWindowSize.width/2-oPatchSize.width/2; nColIdx<oTargetPoint.x+oWindowSize.width/2+oPatchSize.width/2; ++nColIdx) {
             vKeyPoints.emplace_back(cv::Point2f(float(nColIdx),float(nRowIdx)),float(std::max(oWindowSize.height,oWindowSize.width)));
-            if(nColIdx==oTargetPt.x && nRowIdx==oTargetPt.y)
+            if(nColIdx==oTargetPoint.x && nRowIdx==oTargetPoint.y)
                 nSingleTestIdx = nCurrIdx;
             ++nCurrIdx;
         }
@@ -52,7 +52,8 @@ TEST(mi,regression_compute) {
         const cv::Mat_<double> oRefScoresMat = cv::read(TEST_CURR_INPUT_DATA_ROOT "/test_mi.bin");
         ASSERT_EQ(oOutputScoresMat.total(),oRefScoresMat.total());
         ASSERT_EQ(oOutputScoresMat.type(),oRefScoresMat.type());
-        ASSERT_TRUE(cv::isEqual<double>(oOutputScoresMat,oRefScoresMat));
+        for(size_t nIdx=0; nIdx<oOutputScoresMat.total(); ++nIdx)
+            ASSERT_NEAR_MINRATIO(oOutputScoresMat(int(nIdx)),oRefScoresMat(int(nIdx)),0.05f);
     }
     else
         cv::write(TEST_CURR_INPUT_DATA_ROOT "/test_mi.bin",oOutputScoresMat);

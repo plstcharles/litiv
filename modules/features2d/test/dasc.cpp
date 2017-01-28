@@ -31,6 +31,7 @@ TEST(dasc_rf,regression_default_params) {
 TEST(dasc_rf,regression_single_compute) {
     std::unique_ptr<DASC> pDASC = std::make_unique<DASC>(DASC_DEFAULT_RF_SIGMAS,DASC_DEFAULT_RF_SIGMAR);
     const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
+    ASSERT_TRUE(!oInput.empty());
     const cv::Point2i oTargetPt(364,135);
     const cv::Size oWindowSize = pDASC->windowSize();
     const cv::Mat oInputCrop = oInput(cv::Rect(oTargetPt.x-oWindowSize.width/2,oTargetPt.y-oWindowSize.height/2,oWindowSize.width,oWindowSize.height)).clone();
@@ -67,6 +68,7 @@ TEST(dasc_rf,regression_single_compute) {
 TEST(dasc_rf,regression_large_compute) {
     std::unique_ptr<DASC> pDASC = std::make_unique<DASC>(DASC_DEFAULT_RF_SIGMAS,DASC_DEFAULT_RF_SIGMAR);
     const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
+    ASSERT_TRUE(!oInput.empty());
     const cv::Point2i oTargetPt(364,135);
     const int nPatchSize = 10;
     const cv::Size oWindowSize = pDASC->windowSize();
@@ -139,6 +141,7 @@ TEST(dasc_gf,regression_default_params) {
 TEST(dasc_gf,regression_single_compute) {
     std::unique_ptr<DASC> pDASC = std::make_unique<DASC>(DASC_DEFAULT_GF_RADIUS,DASC_DEFAULT_GF_EPS);
     const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
+    ASSERT_TRUE(!oInput.empty());
     const cv::Point2i oTargetPt(364,135);
     const cv::Size oWindowSize = pDASC->windowSize();
     const cv::Mat oInputCrop = oInput(cv::Rect(oTargetPt.x-oWindowSize.width/2,oTargetPt.y-oWindowSize.height/2,oWindowSize.width,oWindowSize.height)).clone();
@@ -175,6 +178,7 @@ TEST(dasc_gf,regression_single_compute) {
 TEST(dasc_gf,regression_large_compute) {
     std::unique_ptr<DASC> pDASC = std::make_unique<DASC>(DASC_DEFAULT_GF_RADIUS,DASC_DEFAULT_GF_EPS);
     const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
+    ASSERT_TRUE(!oInput.empty());
     const cv::Point2i oTargetPt(364,135);
     const int nPatchSize = 10;
     const cv::Size oWindowSize = pDASC->windowSize();
