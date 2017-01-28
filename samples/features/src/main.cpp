@@ -54,9 +54,9 @@ int main(int, char**) { // this sample uses no command line argument
 
             // below is the lookup loop for the LSS matcher
             const cv::Rect oRefZone_LSS(oTargetPoint.x-oWindowSize_LSS.width/2,oTargetPoint.y-oWindowSize_LSS.height/2,oWindowSize_LSS.width,oWindowSize_LSS.height); // lookup window for the reference image
-            lvAssert(oRefZone.contains(oRefZone_LSS.tl()) && oRefZone.contains(oRefZone_LSS.br())); // lookup window should be contained in the reference image
+            lvAssert(oRefZone.contains(oRefZone_LSS.tl()) && oRefZone.contains(oRefZone_LSS.br()-cv::Point2i(1,1))); // lookup window should be contained in the reference image
             const cv::Rect oSearchZone_LSS(oRefZone_LSS.x+nMinOffset,oRefZone_LSS.y,oRefZone_LSS.width+(nMaxOffset-nMinOffset),oRefZone_LSS.height); // lookup window for the 'search' image
-            lvAssert(oRefZone.contains(oSearchZone_LSS.tl()) && oRefZone.contains(oSearchZone_LSS.br())); // search window should be contained in the reference image
+            lvAssert(oRefZone.contains(oSearchZone_LSS.tl()) && oRefZone.contains(oSearchZone_LSS.br()-cv::Point2i(1,1))); // search window should be contained in the reference image
             const cv::Mat oRef_LSS = oRefImg(oRefZone_LSS), oSearch_LSS = oSearchImg(oSearchZone_LSS); // grabs reference & search subimages using preset windows
             cv::Mat_<float> oRefDescMap_LSS,oSearchDescMap_LSS; // 3D maps where descriptor values will be generated for valid pixels (i.e. pixels far enough from image borders)
             pLSS->compute2(oRef_LSS,oRefDescMap_LSS); // extracts the actual descriptors for each (valid) input image pixel
@@ -74,9 +74,9 @@ int main(int, char**) { // this sample uses no command line argument
 
             // below is the lookup loop for the DASC matcher
             const cv::Rect oRefZone_DASC(oTargetPoint.x-oWindowSize_DASC.width/2,oTargetPoint.y-oWindowSize_DASC.height/2,oWindowSize_DASC.width,oWindowSize_DASC.height); // lookup window for the reference image
-            lvAssert(oRefZone.contains(oRefZone_DASC.tl()) && oRefZone.contains(oRefZone_DASC.br())); // lookup window should be contained in the reference image
+            lvAssert(oRefZone.contains(oRefZone_DASC.tl()) && oRefZone.contains(oRefZone_DASC.br()-cv::Point2i(1,1))); // lookup window should be contained in the reference image
             const cv::Rect oSearchZone_DASC(oRefZone_DASC.x+nMinOffset,oRefZone_DASC.y,oRefZone_DASC.width+(nMaxOffset-nMinOffset),oRefZone_DASC.height); // lookup window for the 'search' image
-            lvAssert(oRefZone.contains(oSearchZone_DASC.tl()) && oRefZone.contains(oSearchZone_DASC.br())); // search window should be contained in the reference image
+            lvAssert(oRefZone.contains(oSearchZone_DASC.tl()) && oRefZone.contains(oSearchZone_DASC.br()-cv::Point2i(1,1))); // search window should be contained in the reference image
             const cv::Mat oRef_DASC = oRefImg(oRefZone_DASC), oSearch_DASC = oSearchImg(oSearchZone_DASC); // grabs reference & search subimages using preset windows
             cv::Mat_<float> oRefDescMap_DASC,oSearchDescMap_DASC; // 3D maps where descriptor values will be generated for valid pixels (i.e. pixels far enough from image borders)
             pDASC->compute2(oRef_DASC,oRefDescMap_DASC); // extracts the actual descriptors for each (valid) input image pixel
@@ -94,12 +94,12 @@ int main(int, char**) { // this sample uses no command line argument
 
             // below is the lookup loop for the MI matcher
             const cv::Rect oRefZone_MI(oTargetPoint.x-oWindowSize_MI.width/2,oTargetPoint.y-oWindowSize_MI.height/2,oWindowSize_MI.width,oWindowSize_MI.height); // lookup window for the reference image
-            lvAssert(oRefZone.contains(oRefZone_MI.tl()) && oRefZone.contains(oRefZone_MI.br())); // lookup window should be contained in the reference image
+            lvAssert(oRefZone.contains(oRefZone_MI.tl()) && oRefZone.contains(oRefZone_MI.br()-cv::Point2i(1,1))); // lookup window should be contained in the reference image
             const cv::Mat oRef_MI = oRefImg(oRefZone_MI); // grabs reference subimage using preset window
             std::vector<double> vdMatchRes_MI((size_t)nTestCount,0.0); // output match score vector (contains one double per disparity test)
             for(int nOffset=nMinOffset; nOffset<=nMaxOffset; ++nOffset) { // for each disparity test
                 const cv::Rect oCurrSearchZone_MI(oRefZone_MI.x+nOffset,oRefZone_MI.y,oRefZone_MI.width,oRefZone_MI.height); // lookup window for the 'search' image
-                lvAssert(oRefZone.contains(oCurrSearchZone_MI.tl()) && oRefZone.contains(oCurrSearchZone_MI.br())); // search window should be contained in the reference image
+                lvAssert(oRefZone.contains(oCurrSearchZone_MI.tl()) && oRefZone.contains(oCurrSearchZone_MI.br()-cv::Point2i(1,1))); // search window should be contained in the reference image
                 const cv::Mat oCurrSearch_MI = oSearchImg(oCurrSearchZone_MI); // grabs search subimage using preset window
                 vdMatchRes_MI[nOffset-nMinOffset] = pMI->compute(oRef_MI,oCurrSearch_MI); // calculate the mutual info score between the reference image and search image
             }
