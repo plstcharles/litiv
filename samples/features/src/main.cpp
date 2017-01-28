@@ -71,6 +71,8 @@ int main(int, char**) { // this sample uses no command line argument
             }
             std::cout << "\nLSS Match Results (offset = " << (oTargetPoint.x+nMinOffset) << ") : \n";
             cv::printMatrix(cv::Mat_<double>(1,nTestCount,vdMatchRes_LSS.data())); // prints the match score matrix (one line, and one match score per column)
+            const auto pMinScoreIter_LSS = std::min_element(vdMatchRes_LSS.begin(),vdMatchRes_LSS.end());
+            std::cout << "... best match score = '" << *pMinScoreIter_LSS << "', at x = " << int((oTargetPoint.x+nMinOffset)+std::distance(vdMatchRes_LSS.begin(),pMinScoreIter_LSS)) << std::endl;
 
             // below is the lookup loop for the DASC matcher
             const cv::Rect oRefZone_DASC(oTargetPoint.x-oWindowSize_DASC.width/2,oTargetPoint.y-oWindowSize_DASC.height/2,oWindowSize_DASC.width,oWindowSize_DASC.height); // lookup window for the reference image
@@ -91,6 +93,8 @@ int main(int, char**) { // this sample uses no command line argument
             }
             std::cout << "\nDASC Match Results (offset = " << (oTargetPoint.x+nMinOffset) << ") : \n";
             cv::printMatrix(cv::Mat_<double>(1,nTestCount,vdMatchRes_DASC.data())); // prints the match score matrix (one line, and one match score per column)
+            const auto pMinScoreIter_DASC = std::min_element(vdMatchRes_DASC.begin(),vdMatchRes_DASC.end());
+            std::cout << "... best match score = '" << *pMinScoreIter_DASC << "', at x = " << int((oTargetPoint.x+nMinOffset)+std::distance(vdMatchRes_DASC.begin(),pMinScoreIter_DASC)) << std::endl;
 
             // below is the lookup loop for the MI matcher
             const cv::Rect oRefZone_MI(oTargetPoint.x-oWindowSize_MI.width/2,oTargetPoint.y-oWindowSize_MI.height/2,oWindowSize_MI.width,oWindowSize_MI.height); // lookup window for the reference image
@@ -105,6 +109,8 @@ int main(int, char**) { // this sample uses no command line argument
             }
             std::cout << "\nMI Match Results (offset = " << (oTargetPoint.x+nMinOffset) << ") : \n";
             cv::printMatrix(cv::Mat_<double>(1,nTestCount,vdMatchRes_MI.data())); // prints the match score matrix (one line, and one match score per column)
+            const auto pMaxScoreIter_MI = std::max_element(vdMatchRes_MI.begin(),vdMatchRes_MI.end());
+            std::cout << "... best match score = '" << *pMaxScoreIter_MI << "', at x = " << int((oTargetPoint.x+nMinOffset)+std::distance(vdMatchRes_MI.begin(),pMaxScoreIter_MI)) << std::endl;
         };
 
         for(size_t nTargetPtIdx=0; nTargetPtIdx<vTargetPointsRGB.size(); ++nTargetPtIdx) { // for each test point, run the stereo matcher
