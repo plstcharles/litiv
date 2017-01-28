@@ -106,7 +106,8 @@ void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const st
         for(size_t k=0; k<nKeyPoints; ++k) {
             const int x = (int)voKeyPoints[k].pt.x;
             const int y = (int)voKeyPoints[k].pt.y;
-            LBSP::computeDescriptor<1>(oInputImg,oRefMat.at<uchar>(y,x),x,y,0,t,oDesc.at<ushort>((int)k));
+            ushort& nResult = bSingleColumnDesc?oDesc.at<ushort>((int)k):oDesc.at<ushort>(y,x);
+            LBSP::computeDescriptor<1>(oInputImg,oRefMat.at<uchar>(y,x),x,y,0,t,nResult);
         }
         return;
     }
@@ -120,7 +121,8 @@ void lbsp_computeImpl(const cv::Mat& oInputImg, const cv::Mat& oRefImg, const st
             const int x = (int)voKeyPoints[k].pt.x;
             const int y = (int)voKeyPoints[k].pt.y;
             const uchar* acRef = oRefMat.data+oInputImg.step.p[0]*y+oInputImg.step.p[1]*x;
-            LBSP::computeDescriptor(oInputImg,acRef,x,y,anThreshold,((ushort*)(oDesc.data+oDesc.step.p[0]*k)));
+            ushort* anResult = (ushort*)(bSingleColumnDesc?(oDesc.data+oDesc.step.p[0]*k):(oDesc.data+oDesc.step.p[0]*y+oDesc.step.p[1]*x));
+            LBSP::computeDescriptor(oInputImg,acRef,x,y,anThreshold,anResult);
         }
     }
 }
