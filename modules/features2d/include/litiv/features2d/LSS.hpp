@@ -74,7 +74,9 @@ public:
     void validateKeyPoints(std::vector<cv::KeyPoint>& voKeypoints, cv::Size oImgSize) const;
     /// utility function, used to filter out bad pixels in a ROI that would trigger out of bounds error because they're too close to the image border
     void validateROI(cv::Mat& oROI) const;
-    /// utility function, used to calculate per-desc distance between two descriptor sets/maps using L2 distance
+    /// utility function, used to calculate the L2 distance between two individual descriptors
+    double calcDistance(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2) const;
+    /// utility function, used to calculate per-desc L2 distance between two descriptor sets/maps
     void calcDistance(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<float>& oDescriptors2, cv::Mat_<float>& oDistances) const;
 
 protected:

@@ -71,6 +71,10 @@ public:
     static void validateKeyPoints(std::vector<cv::KeyPoint>& voKeypoints, cv::Size oImgSize);
     /// utility function, used to filter out bad pixels in a ROI that would trigger out of bounds error because they're too close to the image border
     static void validateROI(cv::Mat& oROI);
+    /// utility function, used to calculate the L2 distance between two individual descriptors
+    static double calcDistance(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2);
+    /// utility function, used to calculate per-desc L2 distance between two descriptor sets/maps
+    static void calcDistance(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<float>& oDescriptors2, cv::Mat_<float>& oDistances);
 
 protected:
     /// hides default keypoint detection impl (this class is a descriptor extractor only)

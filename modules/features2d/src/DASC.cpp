@@ -209,6 +209,48 @@ void DASC::validateROI(cv::Mat& oROI) {
     oROI = oROI_new;
 }
 
+double DASC::calcDistance(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2) {
+    lvAssert_(oDescriptor1.dims==oDescriptor2.dims && oDescriptor1.size==oDescriptor2.size,"descriptor mat sizes mismatch");
+    lvAssert_(oDescriptor1.dims==2 || oDescriptor1.dims==3,"unexpected descriptor matrix dim count");
+    if(oDescriptor1.dims==2) {
+        lvAssert_(oDescriptor1.total()==pretrained::nLUTSize,"unexpected descriptor size");
+        const cv::Mat_<float> oDesc1(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptor1.ptr<float>(0)));
+        const cv::Mat_<float> oDesc2(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptor2.ptr<float>(0)));
+        return cv::norm(oDesc1,oDesc2,cv::NORM_L2);
+    }
+    else { //oDescriptors1.dims==3
+        lvAssert_(oDescriptor1.size[0]==1 && oDescriptor1.size[1]==1 && oDescriptor1.size[2]==int(pretrained::nLUTSize),"unexpected descriptor size");
+        const cv::Mat_<float> oDesc1(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptor1.ptr<float>(0)));
+        const cv::Mat_<float> oDesc2(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptor2.ptr<float>(0)));
+        return cv::norm(oDesc1,oDesc2,cv::NORM_L2);
+    }
+}
+
+void DASC::calcDistance(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<float>& oDescriptors2, cv::Mat_<float>& oDistances) {
+    lvAssert_(oDescriptors1.dims==oDescriptors2.dims && oDescriptors1.size==oDescriptors2.size,"descriptor mat sizes mismatch");
+    lvAssert_(oDescriptors1.dims==2 || oDescriptors1.dims==3,"unexpected descriptor matrix dim count");
+    if(oDescriptors1.dims==2) {
+        lvAssert_(oDescriptors1.cols==int(pretrained::nLUTSize),"unexpected descriptor size");
+        oDistances.create(oDescriptors1.rows,1);
+        for(int nDescIdx=0; nDescIdx<oDescriptors1.rows; ++nDescIdx) {
+            const cv::Mat_<float> oDesc1(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptors1.ptr<float>(nDescIdx)));
+            const cv::Mat_<float> oDesc2(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptors2.ptr<float>(nDescIdx)));
+            oDistances(nDescIdx) = (float)cv::norm(oDesc1,oDesc2,cv::NORM_L2);
+        }
+    }
+    else { //oDescriptors1.dims==3
+        lvAssert_(oDescriptors1.size[2]==int(pretrained::nLUTSize),"unexpected descriptor size");
+        oDistances.create(oDescriptors1.size[0],oDescriptors1.size[1]);
+        for(int nDescRowIdx=0; nDescRowIdx<oDescriptors1.size[0]; ++nDescRowIdx) {
+            for(int nDescColIdx=0; nDescColIdx<oDescriptors1.size[1]; ++nDescColIdx) {
+                const cv::Mat_<float> oDesc1(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptors1.ptr<float>(nDescRowIdx,nDescColIdx)));
+                const cv::Mat_<float> oDesc2(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptors2.ptr<float>(nDescRowIdx,nDescColIdx)));
+                oDistances(nDescRowIdx,nDescColIdx) = (float)cv::norm(oDesc1,oDesc2,cv::NORM_L2);
+            }
+        }
+    }
+}
+
 void DASC::recursFilter(const cv::Mat_<float>& oImage, const cv::Mat_<float>& oRef_V_dHdx, const cv::Mat_<float>& oRef_V_dVdy_t, cv::Mat_<float>& oOutput) {
     lvDbgAssert(!oImage.empty() && !oRef_V_dHdx.empty() && !oRef_V_dHdx.empty() && m_nIters>0 && oImage.dims==2 && oRef_V_dHdx.dims==3 && oRef_V_dVdy_t.dims==3);
     lvDbgAssert(oImage.rows==oRef_V_dHdx.size[1] && oImage.rows==oRef_V_dVdy_t.size[2] && oImage.cols==oRef_V_dHdx.size[2] && oImage.cols==oRef_V_dVdy_t.size[1]);

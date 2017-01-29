@@ -242,6 +242,23 @@ void LSS::validateROI(cv::Mat& oROI) const {
     oROI = oROI_new;
 }
 
+double LSS::calcDistance(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2) const {
+    lvAssert_(oDescriptor1.dims==oDescriptor2.dims && oDescriptor1.size==oDescriptor2.size,"descriptor mat sizes mismatch");
+    lvAssert_(oDescriptor1.dims==2 || oDescriptor1.dims==3,"unexpected descriptor matrix dim count");
+    if(oDescriptor1.dims==2) {
+        lvAssert_(oDescriptor1.total()==size_t(m_nRadialBins*m_nAngularBins),"unexpected descriptor size");
+        const cv::Mat_<float> oDesc1(1,m_nRadialBins*m_nAngularBins,const_cast<float*>(oDescriptor1.ptr<float>(0)));
+        const cv::Mat_<float> oDesc2(1,m_nRadialBins*m_nAngularBins,const_cast<float*>(oDescriptor2.ptr<float>(0)));
+        return cv::norm(oDesc1,oDesc2,cv::NORM_L2);
+    }
+    else { //oDescriptors1.dims==3
+        lvAssert_(oDescriptor1.size[0]==1 && oDescriptor1.size[1]==1 && oDescriptor1.size[2]==m_nRadialBins*m_nAngularBins,"unexpected descriptor size");
+        const cv::Mat_<float> oDesc1(1,m_nRadialBins*m_nAngularBins,const_cast<float*>(oDescriptor1.ptr<float>(0)));
+        const cv::Mat_<float> oDesc2(1,m_nRadialBins*m_nAngularBins,const_cast<float*>(oDescriptor2.ptr<float>(0)));
+        return cv::norm(oDesc1,oDesc2,cv::NORM_L2);
+    }
+}
+
 void LSS::calcDistance(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<float>& oDescriptors2, cv::Mat_<float>& oDistances) const {
     lvAssert_(oDescriptors1.dims==oDescriptors2.dims && oDescriptors1.size==oDescriptors2.size,"descriptor mat sizes mismatch");
     lvAssert_(oDescriptors1.dims==2 || oDescriptors1.dims==3,"unexpected descriptor matrix dim count");
