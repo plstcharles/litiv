@@ -19,6 +19,7 @@
 
 #include "litiv/features2d/DASC.hpp"
 #include "litiv/features2d/LBSP.hpp"
+#include "litiv/features2d/LSS.hpp"
 
 namespace lv {
 
