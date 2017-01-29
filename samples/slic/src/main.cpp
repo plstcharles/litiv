@@ -39,6 +39,7 @@ int main(int, char**) { // this sample uses no command line argument
         const cv::Mat& oSPXMask = oAlgo.getLabels(); // returns segmentation labels for the input image
         cv::doNotOptimize(oSPXMask); // for some reason, unless we pass the algo output to another lib call, kernels don't execute on MSVC2015 in release...
         cv::imshow("Segmentation output",SLIC::displayBound(oInput,oSPXMask,cv::Scalar(255,0,0)));
+		cv::imshow("Superpixel RGB Mean", SLIC::displayMean(oInput, oSPXMask));
         cv::waitKey(0); // wait for the user to press a key before shutting down
     }
     catch(const cv::Exception& e) {std::cout << "\nmain caught cv::Exception:\n" << e.what() << "\n" << std::endl; return -1;}
