@@ -44,8 +44,7 @@ Dockerfile
 # External sources #
 ####################
 **/external/
-**/data/
-!/samples/data/
+/data/
 
 # Logs and databases #
 ######################
