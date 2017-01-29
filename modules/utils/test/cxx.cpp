@@ -4,7 +4,7 @@
 
 TEST(putf,regression) {
     EXPECT_EQ(std::string(),lv::putf(""));
-	EXPECT_EQ(std::string("test"),lv::putf("test"));
+    EXPECT_EQ(std::string("test"),lv::putf("test"));
     EXPECT_EQ(std::string("test 0.50 test"),lv::putf("test %.2f %s",0.5f,"test"));
 }
 

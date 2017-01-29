@@ -76,8 +76,8 @@ struct SLIC {
     /// returns a displayable version of the given input with overlying superpixels (cpu-side drawing)
     static cv::Mat displayBound(const cv::Mat& image, const cv::Mat& labels, const cv::Scalar& colour=cv::Scalar(255,0,0), const int& boundWidth = 1);
 
-	/// returns a displayable version of the given input represented with RGB mean of superpixels (cpu-side drawing)
-	static cv::Mat displayMean(const cv::Mat& image, const cv::Mat& labels);
+    /// returns a displayable version of the given input represented with RGB mean of superpixels (cpu-side drawing)
+    static cv::Mat displayMean(const cv::Mat& image, const cv::Mat& labels);
 
 protected:
     const int m_deviceId = 0;

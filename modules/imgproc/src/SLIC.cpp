@@ -262,74 +262,74 @@ int SLIC::enforceConnectivity() {
 }
 
 cv::Mat SLIC::displayMean(const cv::Mat& image, const cv::Mat& labels) {
-	CV_Assert(labels.type() == CV_32FC1);
-	cv::Mat outImage(image.size(), CV_8UC3, cv::Scalar(0, 0, 0));
-	double minVal, maxVal;
-	cv::minMaxLoc(labels, &minVal, &maxVal);
+    CV_Assert(labels.type() == CV_32FC1);
+    cv::Mat outImage(image.size(), CV_8UC3, cv::Scalar(0, 0, 0));
+    double minVal, maxVal;
+    cv::minMaxLoc(labels, &minVal, &maxVal);
 
-	std::vector<std::vector<cv::Point>> vLoc((int)maxVal + 1);
-	std::vector<std::vector<cv::Vec3b>> vColor((int)maxVal + 1);
-	for (int i = 0; i < image.rows; i++) {
-		const cv::Vec3b* pImage = image.ptr<cv::Vec3b>(i);
-		const float* pLabels = labels.ptr<float>(i);
+    std::vector<std::vector<cv::Point>> vLoc((int)maxVal + 1);
+    std::vector<std::vector<cv::Vec3b>> vColor((int)maxVal + 1);
+    for (int i = 0; i < image.rows; i++) {
+        const cv::Vec3b* pImage = image.ptr<cv::Vec3b>(i);
+        const float* pLabels = labels.ptr<float>(i);
 
-		for (int j = 0; j < image.cols; j++) {
-			int label = (int)pLabels[j];
-			if (label >= 0) {
-				vLoc[label].push_back(cv::Point(j, i));
-				vColor[label].push_back(pImage[j]);
-			}
+        for (int j = 0; j < image.cols; j++) {
+            int label = (int)pLabels[j];
+            if (label >= 0) {
+                vLoc[label].push_back(cv::Point(j, i));
+                vColor[label].push_back(pImage[j]);
+            }
 
-		}
-	}
+        }
+    }
 
-	for (int i = 0; i < vLoc.size(); i++) {
-		if (!vColor[i].empty()) {
-			cv::Vec3f meanColor(0, 0, 0);
-			for (int j = 0; j < vColor[i].size(); j++) {
-				meanColor += vColor[i][j];
-			}
-			for (int j = 0; j<3; j++) meanColor[j] /= vColor[i].size();
-			for (int j = 0; j < vLoc[i].size(); j++) {
-				outImage.at<cv::Vec3b>(vLoc[i][j]) = cv::Vec3b(meanColor);
-			}
-		}
-	}
-	return outImage;
+    for (int i = 0; i < vLoc.size(); i++) {
+        if (!vColor[i].empty()) {
+            cv::Vec3f meanColor(0, 0, 0);
+            for (int j = 0; j < vColor[i].size(); j++) {
+                meanColor += vColor[i][j];
+            }
+            for (int j = 0; j<3; j++) meanColor[j] /= vColor[i].size();
+            for (int j = 0; j < vLoc[i].size(); j++) {
+                outImage.at<cv::Vec3b>(vLoc[i][j]) = cv::Vec3b(meanColor);
+            }
+        }
+    }
+    return outImage;
 }
 
 cv::Mat SLIC::displayBound(const cv::Mat& image, const cv::Mat& labels, const cv::Scalar& colour, const int& boundWidth) {
-	CV_Assert(image.size() == labels.size());
-	CV_Assert(image.type() == CV_8UC1 || image.type() == CV_8UC3);
-	CV_Assert(labels.type() == CV_32FC1);
-	cv::Mat_<uchar> mask(image.size(), uchar(0));
-	cv::Mat output = image.clone();
-	cv::Mat segMask(image.size(), CV_8UC1, cv::Scalar(0));
-	if (output.channels() == 1)
-		cv::cvtColor(output, output, cv::COLOR_GRAY2BGR);
-	const int dx8[8] = { -1, -1, 0, 1, 1, 1, 0, -1 };
-	const int dy8[8] = { 0, -1, -1, -1, 0, 1, 1, 1 };
-	for (int i = 0; i<image.rows; i++) {
-		for (int j = 0; j < image.cols; j++) {
-			for (int k = 0; k < 8; k++) {
-				const int x = j + dx8[k], y = i + dy8[k];
-				if (x >= 0 && x < image.cols && y >= 0 && y < image.rows) {
-					if (labels.at<float>(i, j) != labels.at<float>(y, x) && mask(y, x)<2) {
-						++mask(i, j);
-					}
-				}
-			}
-			if (mask(i, j) >= 2) {
-				segMask.at<uchar>(i, j) = 255;
-			}
+    CV_Assert(image.size() == labels.size());
+    CV_Assert(image.type() == CV_8UC1 || image.type() == CV_8UC3);
+    CV_Assert(labels.type() == CV_32FC1);
+    cv::Mat_<uchar> mask(image.size(), uchar(0));
+    cv::Mat output = image.clone();
+    cv::Mat segMask(image.size(), CV_8UC1, cv::Scalar(0));
+    if (output.channels() == 1)
+        cv::cvtColor(output, output, cv::COLOR_GRAY2BGR);
+    const int dx8[8] = { -1, -1, 0, 1, 1, 1, 0, -1 };
+    const int dy8[8] = { 0, -1, -1, -1, 0, 1, 1, 1 };
+    for (int i = 0; i<image.rows; i++) {
+        for (int j = 0; j < image.cols; j++) {
+            for (int k = 0; k < 8; k++) {
+                const int x = j + dx8[k], y = i + dy8[k];
+                if (x >= 0 && x < image.cols && y >= 0 && y < image.rows) {
+                    if (labels.at<float>(i, j) != labels.at<float>(y, x) && mask(y, x)<2) {
+                        ++mask(i, j);
+                    }
+                }
+            }
+            if (mask(i, j) >= 2) {
+                segMask.at<uchar>(i, j) = 255;
+            }
 
-		}
-	}
-	if (boundWidth > 1) {
-		cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(boundWidth, boundWidth), cv::Point(1, 1));
-		cv::morphologyEx(segMask, segMask, cv::MORPH_DILATE, element);
-	}
-	cv::Mat colorMask(image.size(), CV_8UC3, colour);
-	colorMask.copyTo(output, segMask);
-	return output;
+        }
+    }
+    if (boundWidth > 1) {
+        cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(boundWidth, boundWidth), cv::Point(1, 1));
+        cv::morphologyEx(segMask, segMask, cv::MORPH_DILATE, element);
+    }
+    cv::Mat colorMask(image.size(), CV_8UC3, colour);
+    colorMask.copyTo(output, segMask);
+    return output;
 }

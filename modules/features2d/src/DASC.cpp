@@ -364,16 +364,16 @@ void DASC::dasc_rf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
 void DASC::guidedFilter(const cv::Mat_<float>& oImage, const cv::Mat_<float>& oRef, cv::Mat_<float>& oOutput) {
     lvDbgAssert(!oImage.empty() && !oRef.empty());
     cv::resize(oRef,m_oRef_SubSampl,m_oSubSamplSize,0.0,0.0,cv::INTER_NEAREST);
-	m_oRef_SubSamplCross = m_oImage_SubSampl.mul(m_oRef_SubSampl);
+    m_oRef_SubSamplCross = m_oImage_SubSampl.mul(m_oRef_SubSampl);
     cv::blur(m_oRef_SubSampl,m_oRef_SubSamplBlur,m_oBlurKernelSize);
     cv::blur(m_oRef_SubSamplCross,m_oRef_SubSamplCrossBlur,m_oBlurKernelSize);
-	m_oNormVar_SubSampl = (m_oRef_SubSamplCrossBlur-m_oImage_SubSamplBlur.mul(m_oRef_SubSamplBlur))/m_oImage_SubSamplVar;
-	m_oNormVarDiff_SubSampl = m_oRef_SubSamplBlur - m_oNormVar_SubSampl.mul(m_oImage_SubSamplBlur);
+    m_oNormVar_SubSampl = (m_oRef_SubSamplCrossBlur-m_oImage_SubSamplBlur.mul(m_oRef_SubSamplBlur))/m_oImage_SubSamplVar;
+    m_oNormVarDiff_SubSampl = m_oRef_SubSamplBlur - m_oNormVar_SubSampl.mul(m_oImage_SubSamplBlur);
     cv::blur(m_oNormVar_SubSampl,m_oNormVar_SubSamplBlur,m_oBlurKernelSize);
     cv::blur(m_oNormVarDiff_SubSampl,m_oNormVarDiff_SubSamplBlur,m_oBlurKernelSize);
     cv::resize(m_oNormVar_SubSamplBlur,m_oNormVar,m_oImageSize,0,0,cv::INTER_LINEAR);
     cv::resize(m_oNormVarDiff_SubSamplBlur,m_oNormVarDiff,m_oImageSize,0,0,cv::INTER_LINEAR);
-	oOutput = m_oNormVar.mul(oImage)+m_oNormVarDiff;
+    oOutput = m_oNormVar.mul(oImage)+m_oNormVarDiff;
 }
 
 void DASC::dasc_gf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
@@ -403,8 +403,8 @@ void DASC::dasc_gf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
     cv::blur(m_oImage_SubSampl,m_oImage_SubSamplBlur,m_oBlurKernelSize);
     cv::blur(m_oImage_SubSampl.mul(m_oImage_SubSampl),m_oImage_SubSamplBlurSqr,m_oBlurKernelSize);
     m_oImage_SubSamplVar = m_oImage_SubSamplBlurSqr-m_oImage_SubSamplBlur.mul(m_oImage_SubSamplBlur)+m_fEpsilon;
-	guidedFilter(oImage,oImage,m_oImage_AdaptiveMean);
-	guidedFilter(oImage,oImage.mul(oImage),m_oImage_AdaptiveMeanSqr);
+    guidedFilter(oImage,oImage,m_oImage_AdaptiveMean);
+    guidedFilter(oImage,oImage.mul(oImage),m_oImage_AdaptiveMeanSqr);
     m_oLookupImage.create(m_oImageSize);
     m_oLookupImage_Sqr.create(m_oImageSize);
     m_oLookupImage_Mix.create(m_oImageSize);
@@ -424,9 +424,9 @@ void DASC::dasc_gf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
                     m_oLookupImage(nRowIdx,nColIdx) = m_oLookupImage_Sqr(nRowIdx,nColIdx) = m_oLookupImage_Mix(nRowIdx,nColIdx) = 0.0f;
             }
         }
-		guidedFilter(oImage,m_oLookupImage,m_oLookupImage_AdaptiveMean);
-		guidedFilter(oImage,m_oLookupImage_Sqr,m_oLookupImage_AdaptiveMeanSqr);
-		guidedFilter(oImage,m_oLookupImage_Mix,m_oLookupImage_AdaptiveMeanMix);
+        guidedFilter(oImage,m_oLookupImage,m_oLookupImage_AdaptiveMean);
+        guidedFilter(oImage,m_oLookupImage_Sqr,m_oLookupImage_AdaptiveMeanSqr);
+        guidedFilter(oImage,m_oLookupImage_Mix,m_oLookupImage_AdaptiveMeanMix);
         for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
             for(int nColIdx = 0; nColIdx<nCols; ++nColIdx) {
                 const int nOffsetRowIdx = nRowIdx+pretrained::anRP1[nLUTIdx*2];
@@ -442,8 +442,8 @@ void DASC::dasc_gf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
                     oDescriptors(nRowIdx,nColIdx,nLUTIdx) = 0.0f;
             }
         }
-	}
-	for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
+    }
+    for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
         for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
             float fNorm = 0;
             for(int nLUTIdx=0; nLUTIdx<(int)pretrained::nLUTSize; ++nLUTIdx)

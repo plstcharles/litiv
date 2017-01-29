@@ -297,7 +297,7 @@ void cv::doNotOptimize(const cv::Mat& m) {
  * Given a matrix and an integer (x,y) offset, the matrix will be shifted
  * such that:
  *
- * 	oInput(a,b) ---> oOutput(a+y,b+x)
+ *     oInput(a,b) ---> oOutput(a+y,b+x)
  *
  * In the case of a non-integer offset, (e.g. cv::Point2f(-2.1, 3.7)),
  * the shift will be calculated with subpixel precision using bilinear
@@ -314,22 +314,22 @@ void cv::doNotOptimize(const cv::Mat& m) {
  *
  * Some common examples are provided following:
  * \code
- * 	// read an image from file
- * 	Mat mat = imread(filename);
- * 	Mat oOutput;
+ *     // read an image from file
+ *     Mat mat = imread(filename);
+ *     Mat oOutput;
  *
- * 	// Perform Matlab-esque 'circshift' in-place
- * 	shift(mat, mat, Point(5, 5), BORDER_WRAP);
+ *     // Perform Matlab-esque 'circshift' in-place
+ *     shift(mat, mat, Point(5, 5), BORDER_WRAP);
  *
- * 	// Perform shift with subpixel accuracy, padding the missing pixels with 1s
- * 	// NOTE: if mat is of type CV_8U, then it will be converted to type CV_32F
- * 	shift(mat, mat, Point2f(-13.7, 3.28), BORDER_CONSTANT, 1);
+ *     // Perform shift with subpixel accuracy, padding the missing pixels with 1s
+ *     // NOTE: if mat is of type CV_8U, then it will be converted to type CV_32F
+ *     shift(mat, mat, Point2f(-13.7, 3.28), BORDER_CONSTANT, 1);
  *
- * 	// Perform subpixel shift, preserving the boundary values
- * 	shift(mat, oOutput, Point2f(0.093, 0.125), BORDER_REPLICATE);
+ *     // Perform subpixel shift, preserving the boundary values
+ *     shift(mat, oOutput, Point2f(0.093, 0.125), BORDER_REPLICATE);
  *
- * 	// Perform a vanilla shift, integer offset, very fast
- * 	shift(mat, oOutput, Point(2, 2));
+ *     // Perform a vanilla shift, integer offset, very fast
+ *     shift(mat, oOutput, Point(2, 2));
  * \endcode
  *
  * @param oInput the source matrix
