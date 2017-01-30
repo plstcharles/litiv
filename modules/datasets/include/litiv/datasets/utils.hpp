@@ -81,7 +81,7 @@ namespace lv {
     };
 
     enum MappingPolicy { // used to determine how data packets (input/output, or gt/output) can be mapped
-        PixelMapping,
+        ElemMapping,
         IndexMapping,
         BatchMapping,
         NoMapping
@@ -115,10 +115,10 @@ namespace lv {
     template<DatasetTaskList eDatasetTask, DatasetList eDataset>
     constexpr MappingPolicy getGTMappingType() {
         return
-                (eDatasetTask==DatasetTask_Segm)?PixelMapping:
+                (eDatasetTask==DatasetTask_Segm)?ElemMapping:
                 (eDatasetTask==DatasetTask_Cosegm)?IndexMapping:
                 (eDatasetTask==DatasetTask_Registr)?BatchMapping:
-                (eDatasetTask==DatasetTask_EdgDet)?PixelMapping:
+                (eDatasetTask==DatasetTask_EdgDet)?ElemMapping:
                 // ...
                 throw -1; // undefined behavior
     }
@@ -127,10 +127,10 @@ namespace lv {
     template<DatasetTaskList eDatasetTask, DatasetList eDataset>
     constexpr MappingPolicy getIOMappingType() {
         return
-                (eDatasetTask==DatasetTask_Segm)?PixelMapping:
+                (eDatasetTask==DatasetTask_Segm)?ElemMapping:
                 (eDatasetTask==DatasetTask_Cosegm)?IndexMapping:
                 (eDatasetTask==DatasetTask_Registr)?BatchMapping:
-                (eDatasetTask==DatasetTask_EdgDet)?PixelMapping:
+                (eDatasetTask==DatasetTask_EdgDet)?ElemMapping:
                 // ...
                 throw -1; // undefined behavior
     }

@@ -1287,7 +1287,7 @@ void lv::IDataArchiver_<lv::NotArray>::save(const cv::Mat& oOutput, size_t nIdx,
         sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
         cv::Mat oOutputClone = oOutput.clone();
         // automatically gray-out zones outside ROI if output is binary image mask with 1:1 mapping (e.g. segmentation)
-        if(pLoader->getGTPacketType()==ImagePacket && pLoader->getGTMappingType()==PixelMapping && oOutput.type()==CV_8UC1 && (cv::countNonZero(oOutput==UCHAR_MAX)+cv::countNonZero(oOutput==0))==oOutput.size().area()) {
+        if(pLoader->getGTPacketType()==ImagePacket && pLoader->getGTMappingType()==ElemMapping && oOutput.type()==CV_8UC1 && (cv::countNonZero(oOutput==UCHAR_MAX)+cv::countNonZero(oOutput==0))==oOutput.size().area()) {
             const cv::Mat& oROI = pLoader->getGTROI(nIdx);
             if(!oROI.empty() && oROI.size()==oOutputClone.size()) {
                 cv::bitwise_or(oOutputClone,UCHAR_MAX/2,oOutputClone,oROI==0);
@@ -1359,7 +1359,7 @@ lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::IAsyncDataCo
 void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::pre_initialize_gl() {
     lvAssert_(getExpectedOutputCount()>1,"async data consumer requires work batch to expect more than one output packet");
     m_pLoader = shared_from_this_cast<IIDataLoader>(true);
-    lvAssert_(m_pLoader->getInputPacketType()==ImagePacket && m_pLoader->getOutputPacketType()==ImagePacket && m_pLoader->getIOMappingType()==PixelMapping,"async data consumer only defined to work with image packets under 1:1 mapping");
+    lvAssert_(m_pLoader->getInputPacketType()==ImagePacket && m_pLoader->getOutputPacketType()==ImagePacket && m_pLoader->getIOMappingType()==ElemMapping,"async data consumer only defined to work with image packets under 1:1 mapping");
     lvAssert_(m_pAlgo,"invalid algo given to async data consumer");
     m_oCurrInput = m_pLoader->getInput(m_nCurrIdx).clone();
     m_oNextInput = m_pLoader->getInput(m_nNextIdx).clone();
@@ -1371,7 +1371,7 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::pre_ini
     if(m_pAlgo->m_pDisplayHelper && m_pAlgo->m_bUsingDebug)
         m_pAlgo->setDebugFetching(true);
     if(isEvaluating()) {
-        lvAssert_(m_pLoader->getGTPacketType()==ImagePacket && m_pLoader->getGTMappingType()==PixelMapping,"async data consumer only defined to work with gt image packets under 1:1 mapping");
+        lvAssert_(m_pLoader->getGTPacketType()==ImagePacket && m_pLoader->getGTMappingType()==ElemMapping,"async data consumer only defined to work with gt image packets under 1:1 mapping");
         m_oCurrGT = m_pLoader->getGT(m_nCurrIdx).clone();
         m_oNextGT = m_pLoader->getGT(m_nNextIdx).clone();
         m_oLastGT = m_oCurrGT.clone();
@@ -1428,7 +1428,7 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::post_ap
             m_lDataCallback(m_oLastInput,oLastDebug,oLastOutput,m_oLastGT,m_pLoader->getGTROI(m_nLastIdx),m_nLastIdx);
         if(isSavingOutput() && !oLastOutput.empty())
             save(oLastOutput,m_nLastIdx);
-        if(m_pAlgo->m_pDisplayHelper && m_pLoader->getGTPacketType()==ImagePacket && m_pLoader->getGTMappingType()==PixelMapping) {
+        if(m_pAlgo->m_pDisplayHelper && m_pLoader->getGTPacketType()==ImagePacket && m_pLoader->getGTMappingType()==ElemMapping) {
             getColoredMasks(oLastOutput,oLastDebug,m_oLastGT,m_pLoader->getGTROI(m_nLastIdx));
             m_pAlgo->m_pDisplayHelper->display(m_oLastInput,oLastDebug,oLastOutput,m_nLastIdx);
         }

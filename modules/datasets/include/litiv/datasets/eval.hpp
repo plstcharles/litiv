@@ -88,7 +88,7 @@ namespace lv {
         virtual cv::Mat getColoredMask(const cv::Mat& oClassif, size_t nIdx) {
             lvAssert_(!oClassif.empty(),"output must be non-empty for display");
             auto pLoader = shared_from_this_cast<IIDataLoader>(true);
-            lvAssert_(pLoader->getOutputPacketType()==ImagePacket && pLoader->getGTPacketType()==ImagePacket && pLoader->getGTMappingType()==PixelMapping,"default impl cannot display mask without 1:1 image pixel mapping");
+            lvAssert_(pLoader->getOutputPacketType()==ImagePacket && pLoader->getGTPacketType()==ImagePacket && pLoader->getGTMappingType()==ElemMapping,"default impl cannot display mask without 1:1 image pixel mapping");
             return BinClassif::getColoredMask(oClassif,pLoader->getGT(nIdx),pLoader->getGTROI(nIdx));
         }
         /// resets internal packet count + classification metrics
@@ -106,7 +106,7 @@ namespace lv {
             if(isEvaluating()) {
                 lvAssert_(!oClassif.empty(),"output must be non-empty for evaluation");
                 auto pLoader = shared_from_this_cast<IIDataLoader>(true);
-                lvAssert_(pLoader->getOutputPacketType()==ImagePacket && pLoader->getGTPacketType()==ImagePacket && pLoader->getGTMappingType()==PixelMapping,"default impl cannot evaluate without 1:1 image pixel mapping");
+                lvAssert_(pLoader->getOutputPacketType()==ImagePacket && pLoader->getGTPacketType()==ImagePacket && pLoader->getGTMappingType()==ElemMapping,"default impl cannot evaluate without 1:1 image pixel mapping");
                 m_pMetricsBase->m_oCounters.accumulate(oClassif,pLoader->getGT(nIdx),pLoader->getGTROI(nIdx));
             }
         }
@@ -125,7 +125,7 @@ namespace lv {
         virtual std::vector<cv::Mat> getColoredMaskArray(const std::vector<cv::Mat>& vClassif, size_t nIdx) {
             lvAssert_(!vClassif.empty(),"output array must be non-empty for display");
             auto pLoader = shared_from_this_cast<IDataLoader_<Array>>(true);
-            lvAssert_(pLoader->getOutputPacketType()==ImageArrayPacket && pLoader->getGTPacketType()==ImageArrayPacket && pLoader->getGTMappingType()==PixelMapping,"default impl cannot display mask without 1:1 image pixel mapping");
+            lvAssert_(pLoader->getOutputPacketType()==ImageArrayPacket && pLoader->getGTPacketType()==ImageArrayPacket && pLoader->getGTMappingType()==ElemMapping,"default impl cannot display mask without 1:1 image pixel mapping");
             std::vector<cv::Mat> vMasks;
             const std::vector<cv::Mat>& vGTArray = pLoader->getGTArray(nIdx);
             const std::vector<cv::Mat>& vGTROIArray = pLoader->getGTROIArray(nIdx);
@@ -149,7 +149,7 @@ namespace lv {
             if(isEvaluating()) {
                 lvAssert_(!vClassif.empty(),"output array must be non-empty for evaluation");
                 auto pLoader = shared_from_this_cast<IDataLoader_<Array>>(true);
-                lvAssert_(pLoader->getOutputPacketType()==ImageArrayPacket && pLoader->getGTPacketType()==ImageArrayPacket && pLoader->getGTMappingType()==PixelMapping,"default impl cannot evaluate without 1:1 image pixel mapping");
+                lvAssert_(pLoader->getOutputPacketType()==ImageArrayPacket && pLoader->getGTPacketType()==ImageArrayPacket && pLoader->getGTMappingType()==ElemMapping,"default impl cannot evaluate without 1:1 image pixel mapping");
                 lvAssert_(pLoader->getGTStreamCount()==getOutputStreamCount() && vClassif.size()==getOutputStreamCount(),"gt/output array size mismatch");
                 const std::vector<cv::Mat>& vGTArray = pLoader->getGTArray(nIdx);
                 const std::vector<cv::Mat>& vGTROIArray = pLoader->getGTROIArray(nIdx);
