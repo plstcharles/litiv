@@ -23,7 +23,7 @@ env:
   - CMAKECFG_BUILD_SHARED_LIBS=ON
 before_install:
   - docker --version
-  - if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then docker login --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD; fi
+  - if [ "$TRAVIS_PULL_REQUEST" == "false" ]; then docker login --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD; fi
   - docker pull plstcharles/litiv-base
   - echo "ENV GIT_SHA ${TRAVIS_COMMIT}" >> Dockerfile
 install:
@@ -31,4 +31,4 @@ install:
 script:
   - docker run -t ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT} make check
 after_success:
-  - if [ "$TRAVIS_PULL_REQUEST" != "false" ] && [ ! -z "$TRAVIS_TAG" ]; then docker tag ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT} ${DOCKER_HUB_REPO}:${TRAVIS_TAG} && docker push ${DOCKER_HUB_REPO}; fi
+  - if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ ! -z "$TRAVIS_TAG" ]; then docker tag ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT} ${DOCKER_HUB_REPO}:${TRAVIS_TAG} && docker push ${DOCKER_HUB_REPO}; fi
