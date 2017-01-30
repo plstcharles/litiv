@@ -283,14 +283,14 @@ cv::Mat SLIC::displayMean(const cv::Mat& image, const cv::Mat& labels) {
         }
     }
 
-    for (int i = 0; i < vLoc.size(); i++) {
+    for (int i = 0; i < (int)vLoc.size(); i++) {
         if (!vColor[i].empty()) {
             cv::Vec3f meanColor(0, 0, 0);
-            for (int j = 0; j < vColor[i].size(); j++) {
+            for (int j = 0; j < (int)vColor[i].size(); j++) {
                 meanColor += vColor[i][j];
             }
             for (int j = 0; j<3; j++) meanColor[j] /= vColor[i].size();
-            for (int j = 0; j < vLoc[i].size(); j++) {
+            for (int j = 0; j < (int)vLoc[i].size(); j++) {
                 outImage.at<cv::Vec3b>(vLoc[i][j]) = cv::Vec3b(meanColor);
             }
         }
