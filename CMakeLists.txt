@@ -206,7 +206,7 @@ if(BUILD_TESTS)
     # we do not check for GTest/Benchmark packages, they will be downloaded/built in-tree
     if(UNIX)
         add_custom_target(check
-            ${CMAKE_MAKE_PROGRAM} all
+            COMMAND +env ${CMAKE_MAKE_PROGRAM} all
             COMMAND ${CMAKE_COMMAND} -E echo CMD=${CMAKE_CTEST_COMMAND} -C $<CONFIG>
             COMMAND ${CMAKE_COMMAND} -E echo ----------------------------------
             COMMAND ${CMAKE_COMMAND} -E env CTEST_OUTPUT_ON_FAILURE=1
