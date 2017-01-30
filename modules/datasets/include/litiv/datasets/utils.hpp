@@ -32,10 +32,10 @@
 namespace lv {
 
     enum DatasetTaskList { // from the task type, we can derive the source and eval types
-        DatasetTask_Segm,
-        DatasetTask_Cosegm,
-        DatasetTask_Registr, // @@@ specialization todo
-        DatasetTask_EdgDet,
+        DatasetTask_Segm, // segmentation
+        DatasetTask_Cosegm, // cosegmentation
+        DatasetTask_Registr, // registration @@@ specialization todo
+        DatasetTask_EdgDet, // edge detection
         // ...
     };
 
@@ -44,6 +44,7 @@ namespace lv {
         DatasetSource_VideoArray,
         DatasetSource_Image,
         DatasetSource_ImageArray,
+        DatasetSource_Unspecified, // requires explicit data producer specialization in user code
         // ...
     };
 
@@ -96,7 +97,7 @@ namespace lv {
                 (eDatasetTask==DatasetTask_Registr)?NotImagePacket:
                 (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
                 // ...
-                throw -1; // undefined behavior
+                throw -1;
     }
 
     /// returns the output packet type policy to use based on the dataset task type (can also be overridden by dataset type)
@@ -108,7 +109,7 @@ namespace lv {
                 (eDatasetTask==DatasetTask_Registr)?NotImagePacket:
                 (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
                 // ...
-                throw -1; // undefined behavior
+                throw -1;
     }
 
     /// returns the GT packet mapping style policy to use based on the dataset task type (can also be overridden by dataset type)
@@ -120,7 +121,7 @@ namespace lv {
                 (eDatasetTask==DatasetTask_Registr)?BatchMapping:
                 (eDatasetTask==DatasetTask_EdgDet)?ElemMapping:
                 // ...
-                throw -1; // undefined behavior
+                throw -1;
     }
 
     /// returns the I/O packet mapping style policy to use based on the dataset task type (can also be overridden by dataset type)
@@ -132,7 +133,7 @@ namespace lv {
                 (eDatasetTask==DatasetTask_Registr)?BatchMapping:
                 (eDatasetTask==DatasetTask_EdgDet)?ElemMapping:
                 // ...
-                throw -1; // undefined behavior
+                throw -1;
     }
 
     /// returns the eval type policy to use based on the dataset task type (can also be overridden by dataset type)
@@ -145,7 +146,7 @@ namespace lv {
                 (eDatasetTask==DatasetTask_Registr)?DatasetEval_Registr:
                 (eDatasetTask==DatasetTask_EdgDet)?DatasetEval_BinaryClassifier:
                 // ...
-                DatasetEval_None; // undefined behavior
+                DatasetEval_None;
     }
 
     /// returns the array type policy to use based on the dataset eval type
@@ -169,8 +170,9 @@ namespace lv {
                 (eDatasetTask==DatasetTask_Cosegm)?DatasetSource_VideoArray:
                 (eDatasetTask==DatasetTask_Registr)?DatasetSource_VideoArray:
                 (eDatasetTask==DatasetTask_EdgDet)?DatasetSource_Image:
+
                 // ...
-                DatasetSource_Video; // undefined behavior
+                throw -1;
     }
 
     /// returns whether task, source, and eval types are all compatible (can also be overridden by dataset type)
@@ -182,7 +184,7 @@ namespace lv {
                 (eDatasetTask==DatasetTask_Registr)?(((eDatasetSource==DatasetSource_VideoArray)||(eDatasetSource==DatasetSource_ImageArray))&&((eDatasetEval==DatasetEval_Registr)||(eDatasetEval==DatasetEval_None))):
                 (eDatasetTask==DatasetTask_EdgDet)?(((eDatasetSource==DatasetSource_Video)||(eDatasetSource==DatasetSource_Image))&&((eDatasetEval==DatasetEval_BinaryClassifier)||(eDatasetEval==DatasetEval_None))):
                 // ...
-                false; // undefined behavior
+                false;
     }
 
     struct IDataHandler;
@@ -563,6 +565,7 @@ namespace lv {
     };
 
     /// default (specializable) forward declaration of the data producer interface
+    /// note: producer must be fully specialized via DataProducer_<...> if using 'unspecified' source packet template type
     template<DatasetSourceList eDatasetSource>
     struct IDataProducer_;
 
