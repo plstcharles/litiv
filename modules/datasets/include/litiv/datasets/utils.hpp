@@ -78,14 +78,14 @@ namespace lv {
     enum PacketPolicy { // used to toggle packet policy functions in data handler interfaces
         ImagePacket,
         ImageArrayPacket,
-        NotImagePacket
+        UnspecifiedPacket
     };
 
     enum MappingPolicy { // used to determine how data packets (input/output, or gt/output) can be mapped
         ElemMapping,
         IndexMapping,
         BatchMapping,
-        NoMapping
+        UnspecifiedMapping
     };
 
     /// returns the gt packet type policy to use based on the dataset task type (can also be overridden by dataset type)
@@ -94,7 +94,7 @@ namespace lv {
         return
                 (eDatasetTask==DatasetTask_Segm)?ImagePacket:
                 (eDatasetTask==DatasetTask_Cosegm)?ImageArrayPacket:
-                (eDatasetTask==DatasetTask_Registr)?NotImagePacket:
+                (eDatasetTask==DatasetTask_Registr)?UnspecifiedPacket:
                 (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
                 // ...
                 throw -1;
@@ -106,7 +106,7 @@ namespace lv {
         return
                 (eDatasetTask==DatasetTask_Segm)?ImagePacket:
                 (eDatasetTask==DatasetTask_Cosegm)?ImageArrayPacket:
-                (eDatasetTask==DatasetTask_Registr)?NotImagePacket:
+                (eDatasetTask==DatasetTask_Registr)?UnspecifiedPacket:
                 (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
                 // ...
                 throw -1;

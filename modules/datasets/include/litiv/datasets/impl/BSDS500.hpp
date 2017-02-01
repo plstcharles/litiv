@@ -81,7 +81,7 @@ namespace lv {
     protected:
         /// default constructor; initializes base class with gt packet type as non-image (needs unpacking), and gt mapping as index only
         DataProducer_() :
-                IDataProducer_<DatasetSource_Image>(NotImagePacket,lv::getOutputPacketType<eDatasetTask,Dataset_BSDS500>(),IndexMapping,lv::getIOMappingType<eDatasetTask,Dataset_BSDS500>()) {}
+                IDataProducer_<DatasetSource_Image>(UnspecifiedPacket,lv::getOutputPacketType<eDatasetTask,Dataset_BSDS500>(),IndexMapping,lv::getIOMappingType<eDatasetTask,Dataset_BSDS500>()) {}
         /// data parsing function, dataset-specific (default parser is not satisfactory)
         virtual void parseData() override final {
             lvDbgExceptionWatch;
