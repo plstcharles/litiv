@@ -592,9 +592,10 @@ bool lv::IDataLoader_<lv::Array>::isStreamGrayscale(size_t /*nStreamIdx*/) const
 }
 
 void lv::IDataLoader_<lv::Array>::unpackInput(size_t nPacketIdx, std::vector<cv::Mat>& vUnpackedInput) {
-    // no need to clone if getInput does not allow reentrancy --- output mats in the vector will stay valid for as long as oInput is valid (typically until next getInput call)
+    lvDbgAssert(vUnpackedInput.size()==getInputStreamCount());
+    // no need to clone if getInput does not allow reentrancy --- output mats in the vector will stay valid without copy for as long as oInput is valid (typically until next getInput call)
     const cv::Mat& oInput = getInput(nPacketIdx)/*.clone()*/;
-    if(getInputPacketType()==ImagePacket)
+    if(getInputPacketType()==ImagePacket || getInputStreamCount()==size_t(1))
         vUnpackedInput[0] = oInput;
     else if(getInputPacketType()==ImageArrayPacket) {
         const std::vector<cv::Size>& vSizes = getInputSizeArray(nPacketIdx);
@@ -602,7 +603,7 @@ void lv::IDataLoader_<lv::Array>::unpackInput(size_t nPacketIdx, std::vector<cv:
             lvError("cannot handle image array packet type in unpackInput due to missing packet size(s)");
         if(oInput.empty()) {
             for(size_t s=0; s<vSizes.size(); ++s)
-                vUnpackedInput[s].release();
+                vUnpackedInput[s] = cv::Mat();
             return;
         }
         lvAssert(oInput.isContinuous());
@@ -622,9 +623,10 @@ void lv::IDataLoader_<lv::Array>::unpackInput(size_t nPacketIdx, std::vector<cv:
 }
 
 void lv::IDataLoader_<lv::Array>::unpackGT(size_t nPacketIdx, std::vector<cv::Mat>& vUnpackedGT) {
-    // no need to clone if getGT does not allow reentrancy --- output mats in the vector will stay valid for as long as oGT is valid (typically until next getGT call)
+    lvDbgAssert(vUnpackedGT.size()==getGTStreamCount());
+    // no need to clone if getGT does not allow reentrancy --- output mats in the vector will stay valid without copy for as long as oGT is valid (typically until next getGT call)
     const cv::Mat& oGT = getGT(nPacketIdx)/*.clone()*/;
-    if(getGTPacketType()==ImagePacket)
+    if(getGTPacketType()==ImagePacket || getGTStreamCount()==size_t(1))
         vUnpackedGT[0] = oGT;
     else if(getGTPacketType()==ImageArrayPacket) {
         const std::vector<cv::Size>& vSizes = getGTSizeArray(nPacketIdx);
@@ -632,7 +634,7 @@ void lv::IDataLoader_<lv::Array>::unpackGT(size_t nPacketIdx, std::vector<cv::Ma
             lvError("cannot handle image array packet type in unpackGT due to missing packet size(s)");
         if(oGT.empty()) {
             for(size_t s=0; s<vSizes.size(); ++s)
-                vUnpackedGT[s].release();
+                vUnpackedGT[s] = cv::Mat();
             return;
         }
         lvAssert(oGT.isContinuous());
@@ -1279,55 +1281,134 @@ void lv::DataWriter::entry() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void lv::IDataArchiver_<lv::NotArray>::save(const cv::Mat& oOutput, size_t nIdx, int /*nFlags*/) {
+void lv::IDataArchiver_<lv::NotArray>::save(const cv::Mat& _oOutput, size_t nIdx, int /*nFlags*/) {
     const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
+    std::stringstream sOutputFilePath;
+    sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
     if(pLoader->getOutputPacketType()==ImagePacket) {
         lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires image packet output name suffix (i.e. file extension)");
-        std::stringstream sOutputFilePath;
-        sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
-        cv::Mat oOutputClone = oOutput.clone();
+        cv::Mat oOutput = _oOutput;
         // automatically gray-out zones outside ROI if output is binary image mask with 1:1 mapping (e.g. segmentation)
-        if(pLoader->getGTPacketType()==ImagePacket && pLoader->getGTMappingType()==ElemMapping && oOutput.type()==CV_8UC1 && (cv::countNonZero(oOutput==UCHAR_MAX)+cv::countNonZero(oOutput==0))==oOutput.size().area()) {
+        if(pLoader->getGTPacketType()==ImagePacket && pLoader->getGTMappingType()==ElemMapping &&
+           _oOutput.type()==CV_8UC1 && (cv::countNonZero(_oOutput==UCHAR_MAX)+cv::countNonZero(_oOutput==0))==_oOutput.size().area()) {
             const cv::Mat& oROI = pLoader->getGTROI(nIdx);
-            if(!oROI.empty() && oROI.size()==oOutputClone.size()) {
-                cv::bitwise_or(oOutputClone,UCHAR_MAX/2,oOutputClone,oROI==0);
-                cv::bitwise_and(oOutputClone,UCHAR_MAX/2,oOutputClone,oROI==0);
+            if(!oROI.empty() && oROI.size()==_oOutput.size()) {
+                oOutput = _oOutput.clone();
+                cv::bitwise_or(oOutput,UCHAR_MAX/2,oOutput,oROI==0);
+                cv::bitwise_and(oOutput,UCHAR_MAX/2,oOutput,oROI==0);
             }
         }
         const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
-        cv::imwrite(sOutputFilePath.str(),oOutputClone,vnComprParams);
+        cv::imwrite(sOutputFilePath.str(),oOutput,vnComprParams);
     }
-    else {
-        // @@@@ save to YML/bin file?
-        lvError("Missing lv::IDataArchiver::save override impl");
-    }
+    else
+        cv::write(sOutputFilePath.str(),_oOutput);
 }
 
 cv::Mat lv::IDataArchiver_<lv::NotArray>::load(size_t nIdx, int nFlags) {
     const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
+    std::stringstream sOutputFilePath;
+    sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
     if(pLoader->getOutputPacketType()==ImagePacket) {
         lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires packet output name suffix (i.e. file extension)");
-        std::stringstream sOutputFilePath;
-        sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
-        return cv::imread(sOutputFilePath.str(),(nFlags==-1)?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+        if(nFlags==-1)
+            return cv::imread(sOutputFilePath.str());
+        else
+            return cv::imread(sOutputFilePath.str(),nFlags);
     }
-    else {
-        // @@@@ read from YML/bin file?
-        lvError("Missing lv::IDataArchiver::load override impl");
-    }
+    else
+        return cv::read(sOutputFilePath.str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void lv::IDataArchiver_<lv::Array>::saveArray(const std::vector<cv::Mat>& /*vOutput*/, size_t /*nIdx*/, int /*nFlags*/) {
-    // @@@@ save to YML/bin file?
-    lvError("Missing lv::IDataArchiver::saveArray override impl");
-
+void lv::IDataArchiver_<lv::Array>::saveArray(const std::vector<cv::Mat>& vOutput, size_t nIdx, int /*nFlags*/) {
+    const size_t nStreamCount = getOutputStreamCount();
+    lvAssert__(vOutput.size()==nStreamCount,"expected output vector to have %d elements, had %d",(int)nStreamCount,(int)vOutput.size());
+    if(nStreamCount==0)
+        return;
+    const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
+    if(nStreamCount==size_t(1)) {
+        const cv::Mat& _oOutput = vOutput[0];
+        std::stringstream sOutputFilePath;
+        sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
+        if(pLoader->getOutputPacketType()==ImagePacket || pLoader->getOutputPacketType()==ImageArrayPacket) {
+            lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires image packet output name suffix (i.e. file extension)");
+            cv::Mat oOutput = _oOutput;
+            // automatically gray-out zones outside ROI if output is binary image mask with 1:1 mapping (e.g. segmentation)
+            if((pLoader->getGTPacketType()==ImagePacket || pLoader->getGTPacketType()==ImageArrayPacket) && pLoader->getGTMappingType()==ElemMapping &&
+               _oOutput.type()==CV_8UC1 && (cv::countNonZero(_oOutput==UCHAR_MAX)+cv::countNonZero(_oOutput==0))==_oOutput.size().area()) {
+                const cv::Mat& oROI = pLoader->getGTROI(nIdx);
+                if(!oROI.empty() && oROI.size()==_oOutput.size()) {
+                    oOutput = _oOutput.clone();
+                    cv::bitwise_or(oOutput,UCHAR_MAX/2,oOutput,oROI==0);
+                    cv::bitwise_and(oOutput,UCHAR_MAX/2,oOutput,oROI==0);
+                }
+            }
+            const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
+            cv::imwrite(sOutputFilePath.str(),oOutput,vnComprParams);
+        }
+        else
+            cv::write(sOutputFilePath.str(),_oOutput);
+    }
+    else { // nStreamCount>size_t(1)
+        for(size_t nStreamIdx=0; nStreamIdx<nStreamCount; ++nStreamIdx) {
+            const cv::Mat& _oOutput = vOutput[nStreamIdx];
+            std::stringstream sOutputFilePath;
+            sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << "_" << nStreamIdx << getOutputNameSuffix();
+            if(pLoader->getOutputPacketType()==ImageArrayPacket) {
+                lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires image packet output name suffix (i.e. file extension)");
+                cv::Mat oOutput = _oOutput;
+                // automatically gray-out zones outside ROI if output is binary image mask with 1:1 mapping (e.g. segmentation)
+                if(pLoader->getGTPacketType()==ImageArrayPacket && pLoader->getGTMappingType()==ElemMapping &&
+                   _oOutput.type()==CV_8UC1 && (cv::countNonZero(_oOutput==UCHAR_MAX)+cv::countNonZero(_oOutput==0))==_oOutput.size().area()) {
+                    const cv::Mat& oROI = pLoader->getGTROI(nIdx);
+                    if(!oROI.empty() && oROI.size()==_oOutput.size()) {
+                        oOutput = _oOutput.clone();
+                        cv::bitwise_or(oOutput,UCHAR_MAX/2,oOutput,oROI==0);
+                        cv::bitwise_and(oOutput,UCHAR_MAX/2,oOutput,oROI==0);
+                    }
+                }
+                const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
+                cv::imwrite(sOutputFilePath.str(),oOutput,vnComprParams);
+            }
+            else
+                cv::write(sOutputFilePath.str(),_oOutput);
+        }
+    }
 }
 
-std::vector<cv::Mat> lv::IDataArchiver_<lv::Array>::loadArray(size_t /*nIdx*/, int /*nFlags*/) {
-    // @@@@ read from YML/bin file?
-    lvError("Missing lv::IDataArchiver::loadArray override impl");
+std::vector<cv::Mat> lv::IDataArchiver_<lv::Array>::loadArray(size_t nIdx, int nFlags) {
+    const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
+    std::vector<cv::Mat> vOutput(getOutputStreamCount());
+    for(size_t nStreamIdx=0; nStreamIdx<vOutput.size(); ++nStreamIdx) {
+        std::stringstream sOutputFilePath;
+        if(nStreamIdx==0 && vOutput.size()==1)
+            sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
+        else
+            sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << "_" << nStreamIdx << getOutputNameSuffix();
+        if(pLoader->getOutputPacketType()==ImagePacket || pLoader->getOutputPacketType()==ImageArrayPacket) {
+            lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires packet output name suffix (i.e. file extension)");
+            if(nFlags==-1)
+                vOutput[nStreamIdx] = cv::imread(sOutputFilePath.str());
+            else
+                vOutput[nStreamIdx] = cv::imread(sOutputFilePath.str(),nFlags);
+        }
+        else
+            vOutput[nStreamIdx] = cv::read(sOutputFilePath.str());
+    }
+    return vOutput;
+}
+
+size_t lv::IDataArchiver_<lv::Array>::getOutputStreamCount() const {
+    auto pLoader = shared_from_this_cast<IDataLoader_<Array>>();
+    if(pLoader) {
+        if(pLoader->getIOMappingType()<=ArrayMapping)
+            return pLoader->getInputStreamCount();
+        else if(pLoader->getGTMappingType()<=ArrayMapping)
+            return pLoader->getGTStreamCount();
+    }
+    return 1; // default output stream count; overload function if you require something else
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

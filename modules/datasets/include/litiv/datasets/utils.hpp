@@ -31,168 +31,189 @@
 
 namespace lv {
 
-    enum DatasetTaskList { // from the task type, we can derive the source and eval types
-        DatasetTask_Segm, // segmentation
-        DatasetTask_Cosegm, // cosegmentation
-        DatasetTask_Registr, // registration @@@ specialization todo
-        DatasetTask_EdgDet, // edge detection
-        // ...
-    };
-
-    enum DatasetSourceList { // from the source type, we can derive the input packet policy
-        DatasetSource_Video,
-        DatasetSource_VideoArray,
-        DatasetSource_Image,
-        DatasetSource_ImageArray,
-        DatasetSource_Unspecified, // requires explicit data producer specialization in user code
-        // ...
-    };
-
-    enum DatasetEvalList { // from the eval type, we can derive the gt packet mapping policy
-        DatasetEval_BinaryClassifier,
-        DatasetEval_BinaryClassifierArray,
-        DatasetEval_MultiClassifier, // @@@ specialization todo
-        DatasetEval_MultiClassifierArray, // @@@ specialization todo
-        DatasetEval_Registr, // @@@ specialization todo
-        DatasetEval_BoundingBox, // @@@ specialization todo
-        // ...
-        DatasetEval_None // will only count packets & monitor processing time
-    };
-
-    enum DatasetList { // dataset types are used for impl specializations only
-        Dataset_CDnet,
-        Dataset_Wallflower,
-        Dataset_PETS2001D3TC1,
-        Dataset_LITIV2012b,
-        Dataset_BSDS500,
-        Dataset_VAPtrimod2016,
-        // ...
-        Dataset_Custom // 'datasets::create' will forward all parameters from Dataset constr
-    };
-
-    enum ArrayPolicy { // used to toggle data array policy functions in data handler interfaces
-        Array,
-        NotArray,
-    };
-
-    enum PacketPolicy { // used to toggle packet policy functions in data handler interfaces
-        ImagePacket,
-        ImageArrayPacket,
-        UnspecifiedPacket
-    };
-
-    enum MappingPolicy { // used to determine how data packets (input/output, or gt/output) can be mapped
-        ElemMapping,
-        IndexMapping,
-        BatchMapping,
-        UnspecifiedMapping
-    };
-
-    /// returns the gt packet type policy to use based on the dataset task type (can also be overridden by dataset type)
-    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
-    constexpr PacketPolicy getGTPacketType() {
-        return
-                (eDatasetTask==DatasetTask_Segm)?ImagePacket:
-                (eDatasetTask==DatasetTask_Cosegm)?ImageArrayPacket:
-                (eDatasetTask==DatasetTask_Registr)?UnspecifiedPacket:
-                (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
-                // ...
-                throw -1;
-    }
-
-    /// returns the output packet type policy to use based on the dataset task type (can also be overridden by dataset type)
-    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
-    constexpr PacketPolicy getOutputPacketType() {
-        return
-                (eDatasetTask==DatasetTask_Segm)?ImagePacket:
-                (eDatasetTask==DatasetTask_Cosegm)?ImageArrayPacket:
-                (eDatasetTask==DatasetTask_Registr)?UnspecifiedPacket:
-                (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
-                // ...
-                throw -1;
-    }
-
-    /// returns the GT packet mapping style policy to use based on the dataset task type (can also be overridden by dataset type)
-    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
-    constexpr MappingPolicy getGTMappingType() {
-        return
-                (eDatasetTask==DatasetTask_Segm)?ElemMapping:
-                (eDatasetTask==DatasetTask_Cosegm)?IndexMapping:
-                (eDatasetTask==DatasetTask_Registr)?BatchMapping:
-                (eDatasetTask==DatasetTask_EdgDet)?ElemMapping:
-                // ...
-                throw -1;
-    }
-
-    /// returns the I/O packet mapping style policy to use based on the dataset task type (can also be overridden by dataset type)
-    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
-    constexpr MappingPolicy getIOMappingType() {
-        return
-                (eDatasetTask==DatasetTask_Segm)?ElemMapping:
-                (eDatasetTask==DatasetTask_Cosegm)?IndexMapping:
-                (eDatasetTask==DatasetTask_Registr)?BatchMapping:
-                (eDatasetTask==DatasetTask_EdgDet)?ElemMapping:
-                // ...
-                throw -1;
-    }
-
-    /// returns the eval type policy to use based on the dataset task type (can also be overridden by dataset type)
-    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
-    constexpr DatasetEvalList getDatasetEval() {
-        // note: these are only defaults, they can be overridden via full specialization in their impl header
-        return
-                (eDatasetTask==DatasetTask_Segm)?DatasetEval_BinaryClassifier:
-                (eDatasetTask==DatasetTask_Cosegm)?DatasetEval_BinaryClassifierArray:
-                (eDatasetTask==DatasetTask_Registr)?DatasetEval_Registr:
-                (eDatasetTask==DatasetTask_EdgDet)?DatasetEval_BinaryClassifier:
-                // ...
-                DatasetEval_None;
-    }
-
-    /// returns the array type policy to use based on the dataset eval type
-    template<DatasetEvalList eDatasetEval>
-    constexpr ArrayPolicy getArrayPolicy() {
-        return ((eDatasetEval==DatasetEval_BinaryClassifierArray)||(eDatasetEval==DatasetEval_MultiClassifierArray))?Array:NotArray;
-    }
-
-    /// required due to MSVC2015 failure to use constexpr functions in SFINAE expressions
-    template<DatasetEvalList eDatasetEval>
-    struct ArrayPolicyHelper {
-        static constexpr ArrayPolicy value = getArrayPolicy<eDatasetEval>();
-    };
-
-    /// returns the source type policy to use based on the dataset task type (can also be overridden by dataset type)
-    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
-    constexpr DatasetSourceList getDatasetSource() {
-        // note: these are only defaults, they can be overridden via full specialization in their impl header
-        return
-                (eDatasetTask==DatasetTask_Segm)?DatasetSource_Video:
-                (eDatasetTask==DatasetTask_Cosegm)?DatasetSource_VideoArray:
-                (eDatasetTask==DatasetTask_Registr)?DatasetSource_VideoArray:
-                (eDatasetTask==DatasetTask_EdgDet)?DatasetSource_Image:
-
-                // ...
-                throw -1;
-    }
-
-    /// returns whether task, source, and eval types are all compatible (can also be overridden by dataset type)
-    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset, DatasetEvalList eDatasetEval>
-    constexpr bool isDatasetSpecValid() {
-        return
-                (eDatasetTask==DatasetTask_Segm)?(((eDatasetSource==DatasetSource_Video)||(eDatasetSource==DatasetSource_Image))&&((eDatasetEval==DatasetEval_BinaryClassifier)||(eDatasetEval==DatasetEval_MultiClassifier)||(eDatasetEval==DatasetEval_None))):
-                (eDatasetTask==DatasetTask_Cosegm)?(((eDatasetSource==DatasetSource_VideoArray)||(eDatasetSource==DatasetSource_ImageArray))&&((eDatasetEval==DatasetEval_BinaryClassifierArray)||(eDatasetEval==DatasetEval_MultiClassifierArray)||(eDatasetEval==DatasetEval_None))):
-                (eDatasetTask==DatasetTask_Registr)?(((eDatasetSource==DatasetSource_VideoArray)||(eDatasetSource==DatasetSource_ImageArray))&&((eDatasetEval==DatasetEval_Registr)||(eDatasetEval==DatasetEval_None))):
-                (eDatasetTask==DatasetTask_EdgDet)?(((eDatasetSource==DatasetSource_Video)||(eDatasetSource==DatasetSource_Image))&&((eDatasetEval==DatasetEval_BinaryClassifier)||(eDatasetEval==DatasetEval_None))):
-                // ...
-                false;
-    }
-
+    // forward declarations (real declarations further down)
     struct IDataHandler;
     using IDataHandlerPtr = std::shared_ptr<IDataHandler>;
     using IDataHandlerPtrArray = std::vector<IDataHandlerPtr>;
     using IDataHandlerConstPtr = std::shared_ptr<const IDataHandler>;
     using IDataHandlerConstPtrArray = std::vector<IDataHandlerConstPtr>;
     using AsyncDataCallbackFunc = std::function<void(const cv::Mat& /*oInput*/,const cv::Mat& /*oDebug*/,const cv::Mat& /*oOutput*/,const cv::Mat& /*oGT*/,const cv::Mat& /*oGTROI*/,size_t /*nIdx*/)>;
+
+    /// list of computer vision tasks that can be studied using a dataset
+    enum DatasetTaskList { // note: from the task type, we can derive the source and eval types
+        DatasetTask_Segm, ///< image/video segmentation task id
+        DatasetTask_Cosegm, ///< image/video cosegmentation task id (always array-based)
+        DatasetTask_Registr, ///< image/video registration task id (always array-based) @@@ wip/todo
+        DatasetTask_EdgDet, ///< image edge detection task id
+        // ...
+        DatasetTask_Unspecified ///< unspecified task id; requires full specialization of dataset interfaces
+    };
+
+    /// list of data source types that can be offered by datasets
+    enum DatasetSourceList { // note: from the source type, we can derive the input packet policy
+        DatasetSource_Video, ///< video source id (all packets have same size)
+        DatasetSource_VideoArray, ///< synchonized videos source id (array size assumed constant)
+        DatasetSource_Image, ///< image source id (packets can have different sizes)
+        DatasetSource_ImageArray, ///< image arrays source id (size can vary for each packet)
+        // ...
+        DatasetSource_Unspecified ///< unspecified source id; requires full specialization of dataset interfaces
+    };
+
+    /// list of evaluation approaches that can be used for a task
+    enum DatasetEvalList { // note: from the eval type, we can derive the gt packet mapping policy
+        DatasetEval_BinaryClassifier, ///< binary classification evaluation id
+        DatasetEval_BinaryClassifierArray, ///< binary classification (multi-array) evaluation id
+        DatasetEval_MultiClassifier, ///< multilabel classification evaluation id @@@ wip/todo
+        DatasetEval_MultiClassifierArray, ///< multilabel classification (multi-array) evaluation id @@@ wip/todo
+        DatasetEval_Registr, ///< registration evaluation id @@@ wip/todo
+        DatasetEval_BoundingBox, ///< bounding box (for detection/tracking) evaluation id @@@ wip/todo
+        // ...
+        DatasetEval_None ///< no evaluation id; data consumer will only count packets & monitor processing time
+    };
+
+    /// list of datasets with built-in parsing/evaluation support
+    enum DatasetList { // note: these types are used for impl specializations only
+        Dataset_CDnet, ///< ChangeDetection.net (2012/2014) dataset id
+        Dataset_Wallflower, ///< Wallflower dataset id
+        Dataset_PETS2001D3TC1, ///< PETS2001 Dataset 3 Track 1 dataset id
+        Dataset_LITIV2012b, ///< LITIV2012 rev2 dataset id
+        Dataset_BSDS500, ///< Berkeley Segmentation Dataset (BSDS) dataset id
+        Dataset_VAPtrimod2016, ///< VAP Trimodal people Segmentation dataset id
+        // ...
+        Dataset_Custom ///< custom dataset id; 'datasets::create(...)' will forward parameters to custom constructor
+    };
+
+    /// array policy list; used to toggle data array policy functions in data handler interfaces
+    enum ArrayPolicy {
+        Array,
+        NotArray,
+    };
+
+    /// packet policy list; used to toggle packet policy functions in data handler interfaces
+    enum PacketPolicy {
+        ImagePacket, ///< image packet type id; allows packets to be saved/loaded via image container formats automatically
+        ImageArrayPacket, ///< image array packet type id; allows packets to be saved/loaded via image container formats automatically
+        // ...
+        UnspecifiedPacket ///< unspecified packet type id; forces packets to be saved/loaded via binary archive only
+    };
+
+    /// mapping policy list; used to detail the link between input/output and gt/output streams (in decreasing order of strictness)
+    enum MappingPolicy {
+        ElemMapping=0, ///< element-based mapping id; it means packets, matrices, and elements (or pixels) are mapped between streams
+        ArrayMapping, ///< array-based mapping id; it means all packets and matrices are mapped between stream (but not their elements)
+        IndexMapping, ///< index-based mapping id; it means packets are mapped between streams (but not their content)
+        NoMapping ///< no mapping id; it means there is no logical link between the packets of different streams
+    };
+
+    /// returns the gt packet type policy to use based on the dataset task type (can also be overridden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
+    constexpr PacketPolicy getGTPacketType() {
+        // note: these are only defaults, they can be overridden via full method specialization w/ task type + dataset id
+        return
+            (eDatasetTask==DatasetTask_Segm)?ImagePacket:
+            (eDatasetTask==DatasetTask_Cosegm)?ImageArrayPacket:
+            (eDatasetTask==DatasetTask_Registr)?UnspecifiedPacket:
+            (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
+            // ...
+            throw -1;
+    }
+
+    /// returns the output packet type policy to use based on the dataset task type (can also be overridden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
+    constexpr PacketPolicy getOutputPacketType() {
+        // note: these are only defaults, they can be overridden via full method specialization w/ task type + dataset id
+        return
+            (eDatasetTask==DatasetTask_Segm)?ImagePacket:
+            (eDatasetTask==DatasetTask_Cosegm)?ImageArrayPacket:
+            (eDatasetTask==DatasetTask_Registr)?UnspecifiedPacket:
+            (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
+            // ...
+            throw -1;
+    }
+
+    /// returns the GT packet mapping style policy to use based on the dataset task type (can also be overridden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
+    constexpr MappingPolicy getGTMappingType() {
+        // note: these are only defaults, they can be overridden via full method specialization w/ task type + dataset id
+        return
+            (eDatasetTask==DatasetTask_Segm)?ElemMapping:
+            (eDatasetTask==DatasetTask_Cosegm)?ArrayMapping:
+            (eDatasetTask==DatasetTask_Registr)?NoMapping:
+            (eDatasetTask==DatasetTask_EdgDet)?ElemMapping:
+            // ...
+            throw -1;
+    }
+
+    /// returns the I/O packet mapping style policy to use based on the dataset task type (can also be overridden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
+    constexpr MappingPolicy getIOMappingType() {
+        // note: these are only defaults, they can be overridden via full method specialization w/ task type + dataset id
+        return
+            (eDatasetTask==DatasetTask_Segm)?ElemMapping:
+            (eDatasetTask==DatasetTask_Cosegm)?ArrayMapping:
+            (eDatasetTask==DatasetTask_Registr)?NoMapping:
+            (eDatasetTask==DatasetTask_EdgDet)?ElemMapping:
+            // ...
+            throw -1;
+    }
+
+    /// returns the eval type policy to use based on the dataset task type (can also be overridden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
+    constexpr DatasetEvalList getDatasetEval() {
+        // note: these are only defaults, they can be overridden via full method specialization w/ task type + dataset id
+        return
+            (eDatasetTask==DatasetTask_Segm)?DatasetEval_BinaryClassifier:
+            (eDatasetTask==DatasetTask_Cosegm)?DatasetEval_BinaryClassifierArray:
+            (eDatasetTask==DatasetTask_Registr)?DatasetEval_Registr:
+            (eDatasetTask==DatasetTask_EdgDet)?DatasetEval_BinaryClassifier:
+            // ...
+            DatasetEval_None;
+    }
+
+    /// returns the source type policy to use based on the dataset task type (can also be overridden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetList eDataset>
+    constexpr DatasetSourceList getDatasetSource() {
+        // note: these are only defaults, they can be overridden via full method specialization w/ task type + dataset id
+        return
+            (eDatasetTask==DatasetTask_Segm)?DatasetSource_Video:
+            (eDatasetTask==DatasetTask_Cosegm)?DatasetSource_VideoArray:
+            (eDatasetTask==DatasetTask_Registr)?DatasetSource_VideoArray:
+            (eDatasetTask==DatasetTask_EdgDet)?DatasetSource_Image:
+            // ...
+            throw -1;
+    }
+
+    /// returns whether task, source, and eval types are all compatible (can also be overridden by dataset type)
+    template<DatasetTaskList eDatasetTask, DatasetSourceList eDatasetSource, DatasetList eDataset, DatasetEvalList eDatasetEval>
+    constexpr bool isDatasetSpecValid() {
+        return
+            (eDatasetTask==DatasetTask_Segm)?(((eDatasetSource==DatasetSource_Video)||(eDatasetSource==DatasetSource_Image))&&((eDatasetEval==DatasetEval_BinaryClassifier)||(eDatasetEval==DatasetEval_MultiClassifier)||(eDatasetEval==DatasetEval_None))):
+            (eDatasetTask==DatasetTask_Cosegm)?(((eDatasetSource==DatasetSource_VideoArray)||(eDatasetSource==DatasetSource_ImageArray))&&((eDatasetEval==DatasetEval_BinaryClassifierArray)||(eDatasetEval==DatasetEval_MultiClassifierArray)||(eDatasetEval==DatasetEval_None))):
+            (eDatasetTask==DatasetTask_Registr)?(((eDatasetSource==DatasetSource_VideoArray)||(eDatasetSource==DatasetSource_ImageArray))&&((eDatasetEval==DatasetEval_Registr)||(eDatasetEval==DatasetEval_None))):
+            (eDatasetTask==DatasetTask_EdgDet)?(((eDatasetSource==DatasetSource_Video)||(eDatasetSource==DatasetSource_Image))&&((eDatasetEval==DatasetEval_BinaryClassifier)||(eDatasetEval==DatasetEval_None))):
+            // ...
+            false;
+    }
+
+    /// returns the array type policy to use based on the dataset eval type
+    template<DatasetEvalList eDatasetEval>
+    constexpr ArrayPolicy getOutputArrayPolicy() { // helper func for data consumers
+        return
+            (eDatasetEval==DatasetEval_BinaryClassifier)?NotArray:
+            (eDatasetEval==DatasetEval_BinaryClassifierArray)?Array:
+            (eDatasetEval==DatasetEval_MultiClassifier)?NotArray:
+            (eDatasetEval==DatasetEval_MultiClassifierArray)?Array:
+            (eDatasetEval==DatasetEval_Registr)?NotArray:
+            (eDatasetEval==DatasetEval_BoundingBox)?NotArray:
+            // ...
+            throw -1;
+    }
+
+    /// required due to MSVC2015 failure to use constexpr functions in SFINAE expressions
+    template<DatasetEvalList eDatasetEval>
+    struct OutputArrayPolicyHelper {
+        static constexpr ArrayPolicy value = getOutputArrayPolicy<eDatasetEval>();
+    };
 
     /// fully abstract data handler interface (work batch and work group implementations will derive from this)
     struct IDataHandler : lv::enable_shared_from_this<IDataHandler> {
@@ -577,7 +598,7 @@ namespace lv {
         inline size_t getFrameCount() const {return getInputCount();}
         /// returns the ROI associated with all frames
         virtual const cv::Mat& getFrameROI() const;
-        /// returns the size associated with all frames @@@@@ override later to make size N-Dim?
+        /// returns the size associated with all frames
         virtual const cv::Size& getFrameSize() const;
         /// returns the total input frame count for this work batch/group
         virtual size_t getInputCount() const override;
@@ -616,7 +637,7 @@ namespace lv {
         inline size_t getFrameCount() const {return getInputCount();}
         /// returns the ROIs associated with all frames
         virtual const std::vector<cv::Mat>& getFrameROIArray() const;
-        /// returns the sizes associated with all frames @@@@@ override later to make size N-Dim?
+        /// returns the sizes associated with all frames
         virtual const std::vector<cv::Size>& getFrameSizeArray() const;
         /// returns the total input frame count for this work batch/group --- all streams should be sync'd
         virtual size_t getInputCount() const override;
@@ -688,7 +709,7 @@ namespace lv {
 
     /// data producer specialization for multi-image processing
     template<>
-    struct IDataProducer_<DatasetSource_ImageArray> : // @@@ to be tested
+    struct IDataProducer_<DatasetSource_ImageArray> :
             public IDataLoader_<Array> {
         /// returns the total image count for this work batch/group (redirects to getInputCount())
         inline size_t getImageCount() const {return getInputCount();}
@@ -793,6 +814,8 @@ namespace lv {
         virtual void saveArray(const std::vector<cv::Mat>& vOutput, size_t nIdx, int nFlags=-1);
         /// loads a processed data packet array based on idx and packet name (if available), with optional flags (-1 = internal defaults)
         virtual std::vector<cv::Mat> loadArray(size_t nIdx, int nFlags=-1);
+        /// returns the number of parallel output streams (defaults to input or GT stream count if loader is array-based & one mapping allows it, or 1 otherwise)
+        virtual size_t getOutputStreamCount() const;
     };
 
     /// data counter interface for non-group work batches (exposes output packet counting logic)
@@ -823,7 +846,7 @@ namespace lv {
 
     /// data consumer specialization for receiving processed packets (evaluation entrypoint)
     template<DatasetEvalList eDatasetEval>
-    struct IDataConsumer_<eDatasetEval,std::enable_if_t<ArrayPolicyHelper<eDatasetEval>::value==NotArray>> :
+    struct IDataConsumer_<eDatasetEval,std::enable_if_t<OutputArrayPolicyHelper<eDatasetEval>::value==NotArray>> :
             public IDataArchiver_<NotArray>,
             public IDataCounter {
         /// returns the total output packet count expected to be processed by the data consumer (defaults to GT count)
@@ -849,16 +872,9 @@ namespace lv {
 
     /// data consumer specialization for receiving processed packet arrays (evaluation entrypoint)
     template<DatasetEvalList eDatasetEval>
-    struct IDataConsumer_<eDatasetEval,std::enable_if_t<ArrayPolicyHelper<eDatasetEval>::value==Array>> :
+    struct IDataConsumer_<eDatasetEval,std::enable_if_t<OutputArrayPolicyHelper<eDatasetEval>::value==Array>> :
             public IDataArchiver_<Array>,
             public IDataCounter {
-        /// returns the number of parallel output streams (defaults to GT stream count if loader is array-based, and 1 otherwise)
-        virtual size_t getOutputStreamCount() const {
-            auto pLoader = shared_from_this_cast<IDataLoader_<Array>>();
-            if(pLoader)
-                return pLoader->getGTStreamCount();
-            return 1;
-        }
         /// returns the total output packet count expected to be processed by the data consumer (defaults to GT count)
         virtual size_t getExpectedOutputCount() const override {
             return getGTCount();
