@@ -53,9 +53,8 @@ int main(int, char**) { // this sample uses no command line argument
         // so we use 'NonParallel'.
         using DatasetType = lv::Dataset_<lv::DatasetTask_Cosegm,lv::Dataset_Middlebury2005_demo,lv::NonParallel>;
 
-        // Next, creating the dataset will automatically create work batches, and parse the data for each using
-        // the specialized functions from 'middlebury2005.hpp'.
-        DatasetType::Ptr pDataset = DatasetType::create("results_test",true);
+        // Next, creating the dataset will automatically create work batches, and parse the data for each using the specialized functions from 'middlebury2005.hpp'.
+        DatasetType::Ptr pDataset = DatasetType::create("results_test"); // 'results_test' is the name of the output folder where logs/results will be saved
         lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false); // returns a list of all work batches in the dataset without considering hierarchy
         lvAssert__(vpBatches.size()>0 && pDataset->getInputCount()>0,"Could not parse any data for dataset '%s'",pDataset->getName().c_str()); // check that data was indeed properly parsed
         std::cout << "Parsing complete. [" << vpBatches.size() << " batch(es)]" << std::endl; // a 'batch' is an instance of evaluable work for the specified task (batches can also be grouped by category)

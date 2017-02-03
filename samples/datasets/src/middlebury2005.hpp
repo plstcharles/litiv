@@ -21,44 +21,44 @@
 
 namespace lv {
 
-    static const DatasetList Dataset_Middlebury2005_demo = DatasetList(Dataset_Custom+1); // cheat; might cause problems if exposed in multiple external/custom specializations
+    // unique identifier for the demo dataset -- might cause problems if same code reused elsewhere
+    static const DatasetList Dataset_Middlebury2005_demo = DatasetList(Dataset_Custom+1);
 
-    // override the dataset evaluation type utility getter function to always set the eval type for this dataset as 'none'
-    template<>
+    // override the dataset evaluation type utility getter function to always set the eval type for this dataset as 'none' when used for cosegm
+    template<> // full specialization of 'getDatasetEval' declared in datasets/utils.hpp
     constexpr DatasetEvalList getDatasetEval<DatasetTask_Cosegm,Dataset_Middlebury2005_demo>() {
-        // @@@ update sample to use default multiclassif evaluator once implemented in the module?
         return DatasetEval_None;
     }
 
-    // override the dataset evaluation type utility getter function to always set the eval type for this dataset as 'none'
-    template<>
+    // override the dataset evaluation type utility getter function to always set the eval type for this dataset as 'none' when used for registr
+    template<> // full specialization of 'getDatasetEval' declared in datasets/utils.hpp
     constexpr DatasetEvalList getDatasetEval<DatasetTask_Registr,Dataset_Middlebury2005_demo>() {
         return DatasetEval_None;
     }
 
     // top-level dataset interface specialization; this allows us to simplify the default constructor
-    template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
-    struct Dataset_<eDatasetTask,Dataset_Middlebury2005_demo,eEvalImpl> :
-            public IDataset_<eDatasetTask,DatasetSource_ImageArray,Dataset_Middlebury2005_demo,DatasetEval_None,eEvalImpl> {
-        static_assert((eDatasetTask==DatasetTask_Cosegm || eDatasetTask==DatasetTask_Registr),"bad task chosen for middlebury stereo dataset");
-    protected: // should still be protected, as creation should always be done via datasets::create
-        Dataset_(
-            const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving
-            bool bSaveOutput=false ///< defines whether results should be archived or not
+    template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl> // two parameters that will be specified by the user at compile time
+    struct Dataset_<eDatasetTask,Dataset_Middlebury2005_demo,eEvalImpl> : // partial specialization of 'Dataset_' declared in datasets/utils.hpp
+            public IDataset_<eDatasetTask,DatasetSource_ImageArray,Dataset_Middlebury2005_demo,DatasetEval_None,eEvalImpl> { // dataset specializations should always inherit from 'IDataset_'
+        static_assert((eDatasetTask==DatasetTask_Cosegm || eDatasetTask==DatasetTask_Registr),"bad task chosen for middlebury stereo dataset"); // this dataset only supports two task types
+    protected: // should still be protected, as creation should always be done via datasets::create (avoids problems with shared_from_this)
+        Dataset_( // local specialization constructor (can receive any extra parameters you may which to have)
+            const std::string& sOutputDirPath, // output directory path for debug logs, evaluation reports and pushed results
+            bool bSaveOutput=true // defines whether pushed results should be saved or not
         ) :
-                IDataset_<eDatasetTask,DatasetSource_ImageArray,Dataset_Middlebury2005_demo,DatasetEval_None,eEvalImpl>(
-                        "middlebury2005",
-                        lv::addDirSlashIfMissing(SAMPLES_DATA_ROOT)+"middlebury2005_dataset_ex/",
-                        sOutputDirName,
-                        "",
-                        "",
-                        std::vector<std::string>{"art","dolls"},
-                        std::vector<std::string>(),
-                        std::vector<std::string>(),
-                        bSaveOutput,
-                        false,
-                        false,
-                        1.0
+                IDataset_<eDatasetTask,DatasetSource_ImageArray,Dataset_Middlebury2005_demo,DatasetEval_None,eEvalImpl>( // need to provide all necessary params to base 'IDataset_' constructor
+                        "middlebury2005", // name of the dataset (for debug purposes only)
+                        lv::addDirSlashIfMissing(SAMPLES_DATA_ROOT)+"middlebury2005_dataset_ex/", // location of the dataset's root folder
+                        sOutputDirPath, // location of the dataet's output folder
+                        "out", // output name prefix for saving pushed results
+                        ".png", // output name suffix for saving pushed results
+                        std::vector<std::string>{"art","dolls"}, // name of work batches for this dataset (here, one work batch = one stereo pair)
+                        std::vector<std::string>(), // names of directories which should be ignored by the parser (here, none in particular)
+                        std::vector<std::string>(), // names of directories which should be processed as grayscale by the parser (here, none in particular)
+                        bSaveOutput, // toggles whether pushed results will be saved or not
+                        false, // toggles whether pushed results should be evaluated or not
+                        false, // toggles whether image packets should be 4-byte aligned or not
+                        1.0 // sets internal scaling factor for image packets (1.0 = default)
                 ) {}
     };
 
