@@ -27,6 +27,109 @@ TEST(MatTypeInfo,regression) {
     TEST_MAT_TYPE_INFO(4);
 }
 
+namespace {
+    template<typename T>
+    struct MatSizeInfo_fixture : testing::Test {};
+    typedef testing::Types<uchar,short,ushort,int,uint,size_t> MatSizeInfo_types;
+}
+
+TYPED_TEST_CASE(MatSizeInfo_fixture,MatSizeInfo_types);
+TYPED_TEST(MatSizeInfo_fixture,regression_2d) {
+    cv::MatSizeInfo_<TypeParam> test;
+    ASSERT_EQ(test.dims(),TypeParam(0));
+#ifdef _DEBUG
+    ASSERT_THROW_LV_QUIET(test.size(0));
+    ASSERT_THROW_LV_QUIET(test.size(1));
+    ASSERT_THROW_LV_QUIET(test.size(2));
+#endif //def(_DEBUG)
+    ASSERT_EQ((const TypeParam*)test,nullptr);
+    ASSERT_EQ((const int*)test,nullptr);
+    ASSERT_EQ(((cv::MatSize)test).p[-1],0);
+    ASSERT_EQ(((cv::Size)test),cv::Size());
+    std::array<int,1> arr = {0};
+    ASSERT_TRUE(((cv::MatSize)test)==cv::MatSize(arr.data()+1));
+    std::array<int,3> arr_alt = {2,34,12};
+    ASSERT_TRUE(((cv::MatSize)test)!=cv::MatSize(arr_alt.data()+1));
+    ASSERT_TRUE(((cv::Size)test)==cv::Size());
+    ASSERT_TRUE(((cv::Size)test)!=cv::Size(12,34));
+    cv::MatSizeInfo_<TypeParam> test_alt1;
+    cv::MatSizeInfo_<TypeParam> test_alt2(cv::Size(12,34));
+    ASSERT_TRUE(test==test_alt1);
+    ASSERT_TRUE(test!=test_alt2);
+    ASSERT_EQ(test.total(),size_t(0));
+    ASSERT_TRUE(test.empty());
+    test = test_alt2;
+    ASSERT_TRUE(test==test_alt2);
+    ASSERT_TRUE(test!=test_alt1);
+    ASSERT_EQ(test.dims(),TypeParam(2));
+    ASSERT_EQ(test.size(0),TypeParam(34));
+    ASSERT_EQ(test.size(0),TypeParam(12));
+    ASSERT_NE((const TypeParam*)test,nullptr);
+    ASSERT_NE((const int*)test,nullptr);
+    ASSERT_EQ(((cv::MatSize)test).p[-1],2);
+    ASSERT_EQ(((cv::Size)test),cv::Size(12,34));
+    ASSERT_TRUE(((cv::MatSize)test)!=cv::MatSize(arr.data()+1));
+    ASSERT_TRUE(((cv::MatSize)test)==cv::MatSize(arr_alt.data()+1));
+    ASSERT_TRUE(((cv::Size)test)!=cv::Size());
+    ASSERT_TRUE(((cv::Size)test)==cv::Size(12,34));
+    ASSERT_EQ(test.total(),size_t(12*34));
+    ASSERT_FALSE(test.empty());
+    cv::MatSizeInfo test_alt3 = test;
+    ASSERT_TRUE(test==test_alt3);
+    cv::MatSizeInfo_<int> test_alt4(uchar(34),ushort(12));
+    ASSERT_TRUE(test==test_alt4);
+    std::array<int,4> arr_nd = {3,4,5,6};
+    cv::MatSizeInfo_<TypeParam> test_alt5(cv::MatSize(arr_nd.data()+1));
+    ASSERT_THROW_LV_QUIET(((cv::Size)test_alt5).area());
+    std::array<int,3> arr_neg1 = {-1,3,4};
+    ASSERT_THROW_LV_QUIET(cv::MatSizeInfo_<TypeParam>(cv::MatSize(arr_neg1.data()+1)));
+    std::array<int,3> arr_neg2 = {2,3,-4};
+    ASSERT_THROW_LV_QUIET(cv::MatSizeInfo_<TypeParam>(cv::MatSize(arr_neg2.data()+1)));
+}
+
+TYPED_TEST(MatSizeInfo_fixture,regression_nd) {
+    for(size_t i=0; i<100000; ++i) {
+        const TypeParam nDims = TypeParam(rand()%10);
+        std::vector<int> vnDimsPaddedInt(nDims+1);
+        std::vector<int> vnDimsInt(nDims);
+        std::vector<TypeParam> vnDimsPadded(nDims+1);
+        std::vector<TypeParam> vnDims(nDims);
+        vnDimsPaddedInt[0] = int(nDims);
+        vnDimsPadded[0] = nDims;
+        size_t nElems = 0;
+        for(int n=0; n<int(nDims); ++n) {
+            vnDimsPadded[n+1] = TypeParam(rand()%50);
+            vnDims.at(n) = vnDimsPadded[n+1];
+            vnDimsPaddedInt[n+1] = (int)vnDims[n];
+            vnDimsInt[n] = vnDimsPaddedInt[n+1];
+            if(n==TypeParam(0))
+                nElems = size_t(vnDims[n]);
+            else
+                nElems *= size_t(vnDims[n]);
+        }
+        cv::MatSizeInfo_<TypeParam> a(vnDims);
+        cv::MatSizeInfo_<TypeParam> b(vnDimsInt);
+        ASSERT_EQ(a,b);
+        ASSERT_EQ(a.total(),nElems);
+        ASSERT_EQ(b.total(),nElems);
+        ASSERT_EQ(a.dims(),vnDimsPadded[0]);
+        cv::MatSizeInfo_<TypeParam> c(cv::MatSize(vnDimsPaddedInt.data()+1));
+        ASSERT_EQ(c,a);
+        ASSERT_EQ(c.total(),nElems);
+        ASSERT_EQ(c.total(),nElems);
+        if(nDims>TypeParam(1)) {
+            a[nDims-1]++;
+            ASSERT_NE(a,b);
+            ASSERT_EQ(a.total(),nElems+1);
+            const size_t prev_tot = c.total();
+            const TypeParam prev_s0 = c[0];
+            c[0]++;
+            ASSERT_NE(c,b);
+            ASSERT_EQ(c.total(),((prev_tot/prev_s0)*c[0]));
+        }
+    }
+}
+
 TEST(clampImageCoords,regression) {
     const int nBS0 = 0;
     const int nBS5 = 5;
@@ -136,10 +239,10 @@ TYPED_TEST(cvunique_fixture,regression) {
 namespace {
     template<typename T>
     struct isEqual_fixture : testing::Test {};
-    typedef testing::Types<char,short,int,float> isUnique_types;
+    typedef testing::Types<char,short,int,float> isEqual_types;
 }
 
-TYPED_TEST_CASE(isEqual_fixture,isUnique_types);
+TYPED_TEST_CASE(isEqual_fixture,isEqual_types);
 TYPED_TEST(isEqual_fixture,regression_mdims) {
     cv::Mat_<TypeParam> a,b;
     EXPECT_TRUE(cv::isEqual<TypeParam>(a,b));

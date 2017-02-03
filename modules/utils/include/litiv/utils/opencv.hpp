@@ -38,9 +38,9 @@ namespace cv { // extending cv
     cv::MatAllocator* getMatAllocator32a();
 
     /// returns whether a given memory address is aligned to the templated step or not
-    template<size_t nByteAlign, typename TAddr>
-    bool isAligned(TAddr pData) {
-        static_assert(std::is_pointer<TAddr>::value,"need to pass pointer type");
+    template<size_t nByteAlign, typename Taddr>
+    bool isAligned(Taddr pData) {
+        static_assert(std::is_pointer<Taddr>::value,"need to pass pointer type");
         static_assert(nByteAlign>0,"byte align must be positive value");
         return (uintptr_t(pData)%nByteAlign)==0;
     }
@@ -57,6 +57,210 @@ namespace cv { // extending cv
                                 MAT_COND_DEPTH_TYPE(5,float,
                                     MAT_COND_DEPTH_TYPE(6,double,void)))))))> base_type;
         static constexpr int nChannels = CV_MAT_CN(nTypeFlag);
+    };
+
+    /// dim helper which provides easy-to-use and safe conversions from cv::Size and cv::MatSize (note: internally using 'major' dimension == first in vec)
+    template<typename Tinteger>
+    struct MatSizeInfo_ {
+        /// default constructor; initializes internal config as zero-dim (empty)
+        MatSizeInfo_() :
+                m_vSizes{Tinteger(0)},m_aSizes(nullptr) {printf("@@@@@\n");}
+        /// cv::MatSize-based constructor
+        MatSizeInfo_(const cv::MatSize& oSize) :
+                m_vSizes(cvtSizes(oSize.p)),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
+        /// cv::Size-based constructor
+        MatSizeInfo_(const cv::Size& oSize) : // row-major by default, like opencv
+                m_vSizes{Tinteger(2),Tinteger(oSize.height),Tinteger(oSize.width)},m_aSizes(m_vSizes.data()+1) {
+            lvAssert_(oSize.width>=0 && oSize.height>=0,"sizes must be null or positive values");
+        }
+        /// array-based constructor
+        template<size_t nDims, typename Tinteger2>
+        MatSizeInfo_(const std::array<Tinteger2,nDims>& aSizes) :
+                m_vSizes(cvtSizes((Tinteger2)nDims,aSizes.data())),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
+        /// vector-based constructor
+        template<typename Tinteger2>
+        MatSizeInfo_(const std::vector<Tinteger2>& vSizes) :
+                m_vSizes(cvtSizes((Tinteger2)vSizes.size(),vSizes.data())),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
+        /// explicit dims constructor; initializes internal config by casting all provided args
+        template<typename... Tintegers>
+        MatSizeInfo_(Tintegers... anSizes) :
+                m_vSizes{Tinteger(sizeof...(anSizes)),Tinteger(anSizes)...},m_aSizes(m_vSizes.data()+1) {
+            static_assert(lv::static_reduce(std::array<bool,sizeof...(Tintegers)>{(std::is_integral<Tintegers>::value)...},lv::static_reduce_and),"all given args should be integral");
+            for(int nDimIdx=0; nDimIdx<dims(); ++nDimIdx)
+                lvAssert_(m_aSizes[nDimIdx]>=Tinteger(0),"sizes must be null or positive values");
+        }
+        /// copy constructor for similar struct
+        template<typename Tinteger2>
+        MatSizeInfo_(const cv::MatSizeInfo_<Tinteger2>& oSize) :
+                m_vSizes(cvtSizes(oSize.m_vSizes.data()+1)),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
+        /// returns the dimension count
+        const Tinteger& dims() const {
+            lvDbgAssert(!m_vSizes.empty()); // all constructors should guarantee proper sizing
+            return m_vSizes[0];
+        }
+        /// returns the size at a given dimension index
+        template<typename Tindex>
+        const Tinteger& size(Tindex nDimIdx) const {
+            static_assert(std::is_integral<Tindex>::value,"need an integer type for dimensions/size indexing");
+            lvDbgAssert__((Tinteger)nDimIdx<dims(),"dimension index is out of bounds (dims=%d)",(int)dims());
+            return m_aSizes[nDimIdx];
+        }
+        /// returns the (modifiable) size at a given dimension index
+        template<typename Tindex>
+        Tinteger& size(Tindex nDimIdx) {
+            static_assert(std::is_integral<Tindex>::value,"need an integer type for dimensions/size indexing");
+            lvDbgAssert__((Tinteger)nDimIdx<dims(),"dimension index is out of bounds (dims=%d)",(int)dims());
+            return m_aSizes[nDimIdx];
+        }
+        /// returns the size at a given dimension index
+        template<typename Tindex>
+        const Tinteger& operator[](Tindex nDimIdx) const {
+            return size(nDimIdx);
+        }
+        /// returns the (modifiable) size at a given dimension index
+        template<typename Tindex>
+        Tinteger& operator[](Tindex nDimIdx) {
+            return size(nDimIdx);
+        }
+        /// returns the size at a given dimension index
+        template<typename Tindex>
+        const Tinteger& operator()(Tindex nDimIdx) const {
+            return size(nDimIdx);
+        }
+        /// returns the (modifiable) size at a given dimension index
+        template<typename Tindex>
+        Tinteger& operator()(Tindex nDimIdx) {
+            return size(nDimIdx);
+        }
+        /// implicit conversion op to raw 'Tinteger' size lookup array
+        operator const Tinteger*() const {
+            return m_aSizes;
+        }
+        /// implicit conversion op to raw 'int' size lookup array (non-trivial)
+        template<typename... TDummy, typename T=Tinteger>
+        operator std::enable_if_t<!std::is_same<T,int>::value,const int*>() const {
+            static_assert(sizeof...(TDummy)==0,"template args not needed");
+            m_vSizesExt.resize(m_vSizes.size());
+            for(size_t nIdx=0; nIdx<m_vSizes.size(); ++nIdx)
+                m_vSizesExt[nIdx] = (int)m_vSizes[nIdx];
+            return m_vSizesExt.data();
+        }
+        /// implicit conversion op to cv::MatSize (non-trivial)
+        operator cv::MatSize() const {
+            m_vSizesExt.resize(m_vSizes.size());
+            for(size_t nIdx=0; nIdx<m_vSizes.size(); ++nIdx)
+                m_vSizesExt[nIdx] = (int)m_vSizes[nIdx];
+            return cv::MatSize(m_vSizesExt.data()+1);
+        }
+        /// implicit conversion op to cv::Size (fails if this object contains more than two dimensions)
+        operator cv::Size() const {
+            lvAssert__(dims()<=Tinteger(2),"cannot fit dim count (%d) into cv::Size object",(int)dims());
+            return (dims()==Tinteger(0))?cv::Size():(dims()==Tinteger(1))?cv::Size((int)size(0),1):cv::Size((int)size(1),(int)size(0));
+        }
+        /// is-equal test operator for cv::Size structs
+        bool operator==(const cv::Size& oSize) const {
+            return dims()<=Tinteger(2) && oSize==this->operator cv::Size();
+        }
+        /// is-not-equal test operator for cv::Size structs
+        bool operator!=(const cv::Size& oSize) const {
+            return !(*this==oSize);
+        }
+        /// is-equal test operator for cv::MatSize structs
+        bool operator==(const cv::MatSize& oSize) const {
+            const Tinteger nDims = dims();
+            if(nDims!=(Tinteger)oSize[-1])
+                return false;
+            else if(nDims==Tinteger(2))
+                return size(0)==(Tinteger)oSize[0] && size(1)==(Tinteger)oSize[1];
+            for(Tinteger nDimIdx=0; nDimIdx<nDims; ++nDimIdx)
+                if(size(nDimIdx)!=(Tinteger)oSize[nDimIdx])
+                    return false;
+            return true;
+        }
+        /// is-not-equal test operator for cv::MatSize structs
+        bool operator!=(const cv::MatSize& oSize) const {
+            return !(*this==oSize);
+        }
+        /// is-equal test operator for other MatSizeInfo_ structs
+        template<typename Tinteger2>
+        bool operator==(const MatSizeInfo_<Tinteger2>& oSize) const {
+            const Tinteger nDims = dims();
+            if(nDims!=(Tinteger)oSize[-1])
+                return false;
+            else if(nDims==Tinteger(2))
+                return size(0)==(Tinteger)oSize[0] && size(1)==(Tinteger)oSize[1];
+            for(Tinteger nDimIdx=0; nDimIdx<nDims; ++nDimIdx)
+                if(size(nDimIdx)!=(Tinteger)oSize[nDimIdx])
+                    return false;
+            return true;
+        }
+        /// is-not-equal test operator for other MatSizeInfo_ structs
+        template<typename Tinteger2>
+        bool operator!=(const MatSizeInfo_<Tinteger2>& oSize) const {
+            return !(*this==oSize);
+        }
+        /// assignment operator for different templated integer struct
+        template<typename Tinteger2>
+        MatSizeInfo_& operator=(const cv::MatSizeInfo_<Tinteger2>& oSize) {
+            m_vSizes = cvtSizes(oSize.m_vSizes.data()+1);
+            m_aSizes = m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr;
+            return *this;
+        }
+        /// returns the number of elements in the current configuration (i.e. by multiplying all dim sizes)
+        size_t total() const {
+            if(dims()==Tinteger(0))
+                return size_t(0);
+            size_t nElem = size_t(size(0));
+            for(Tinteger nDimIdx=1; nDimIdx<dims(); ++nDimIdx)
+                nElem *= size_t(size(nDimIdx));
+            return nElem;
+        }
+        /// returns whether the current configuration contains elements or not (i.e. if all dim sizes are non-null)
+        bool empty() const {
+            return total()==size_t(0);
+        }
+    protected:
+        static_assert(std::is_integral<Tinteger>::value,"need an integer type for dimensions/size indexing");
+        template<typename Tinteger2>
+        static std::vector<Tinteger> cvtSizes(const Tinteger2* aSizes) {
+            lvAssert__((int)aSizes[-1]>=0,"negative MatSize dim count (got '%d')",(int)aSizes[-1]);
+            std::vector<Tinteger> vOutput((int)aSizes[-1]+1);
+            vOutput[0] = (Tinteger)aSizes[-1];
+            for(int nDimIdx=0; nDimIdx<(int)aSizes[-1]; ++nDimIdx) {
+                lvAssert_((int)aSizes[nDimIdx]>=0,"MatSize sizes must be null or positive values");
+                vOutput[nDimIdx+1] = (Tinteger)aSizes[nDimIdx];
+            }
+            return vOutput;
+        }
+        template<typename Tinteger2>
+        static std::vector<Tinteger> cvtSizes(Tinteger2 nDims, const Tinteger2* aSizes) {
+            lvAssert__((int)nDims>=0,"negative MatSize dim count (got '%d')",(int)nDims);
+            std::vector<Tinteger> vOutput((int)nDims+1);
+            vOutput[0] = (Tinteger)nDims;
+            for(int nDimIdx=0; nDimIdx<(int)nDims; ++nDimIdx) {
+                lvAssert_((int)aSizes[nDimIdx]>=0,"MatSize sizes must be null or positive values");
+                vOutput[nDimIdx+1] = (Tinteger)aSizes[nDimIdx];
+            }
+            return vOutput;
+        }
+    private:
+        template<typename Tinteger2>
+        friend struct MatSizeInfo_;
+        mutable std::vector<int> m_vSizesExt; // needed for cast to MatSize/int* only
+        std::vector<Tinteger> m_vSizes;
+        Tinteger* m_aSizes;
+    };
+
+    /// default MatSizeInfo struct defaults to size_t for dim/size indexing
+    using MatSizeInfo = MatSizeInfo_<size_t>;
+
+    /// simplified cv::Mat header info container for usage in datasets module; contains all required info to preallocate matrix packets
+    struct MatInfo {
+        /// contains info about the layout of the matrix's elements
+        MatSizeInfo m_oSize;
+        /// contains info about the type of the matrix's elements (i.e. using the OpenCV type defines)
+        int m_nCVType;
+        // @@@@ todo, add to datasets module to replace all cv::Size
     };
 
     /// helper function to zero-init sparse and non-sparse matrices (sparse mat overload)
@@ -620,10 +824,10 @@ namespace cv { // extending cv
         static_assert(nByteAlign>0,"byte alignment must be a non-null value");
     public:
         typedef AlignedMatAllocator<nByteAlign,bAlignSingleElem> this_type;
-        inline AlignedMatAllocator() noexcept {}
-        inline AlignedMatAllocator(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept {}
+        AlignedMatAllocator() noexcept {}
+        AlignedMatAllocator(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept {}
         template<typename T2>
-        inline this_type& operator=(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept {}
+        this_type& operator=(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept {}
         virtual ~AlignedMatAllocator() noexcept {}
         virtual cv::UMatData* allocate(int dims, const int* sizes, int type, void* data, size_t* step, int /*flags*/, cv::UMatUsageFlags /*usageFlags*/) const override {
             step[dims-1] = bAlignSingleElem?cv::alignSize(CV_ELEM_SIZE(type),nByteAlign):CV_ELEM_SIZE(type);
@@ -662,7 +866,7 @@ namespace cv { // extending cv
 
 #if USE_OPENCV_MAT_CONSTR_FIX
     template<typename _Tp>
-    inline Mat_<_Tp>::Mat_(int _dims, const int* _sz, _Tp* _data, const size_t* _steps) :
+    Mat_<_Tp>::Mat_(int _dims, const int* _sz, _Tp* _data, const size_t* _steps) :
             Mat(_dims, _sz, DataType<_Tp>::type, _data, _steps) {}
 #endif //USE_OPENCV_MAT_CONSTR_FIX
 
