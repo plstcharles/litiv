@@ -597,6 +597,12 @@ namespace cv { // extending cv
         static const cv::Size s_oEmptySize = cv::Size();
         return s_oEmptySize;
     }
+    /// returns an always-empty-mat-size by reference
+    inline const cv::MatSize& emptyMatSize() {
+        static const std::array<int,3> anDims = {0,0,0};
+        static const cv::MatSize s_oEmptyMatSize = cv::MatSize(const_cast<int*>(&anDims[1]));
+        return s_oEmptyMatSize;
+    }
     /// returns an always-empty-mat by reference
     inline const std::vector<cv::Mat>& emptyMatArray() {
         static const std::vector<cv::Mat> s_vEmptyMatArray = std::vector<cv::Mat>();
