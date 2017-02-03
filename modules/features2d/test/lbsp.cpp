@@ -4,7 +4,7 @@
 #include "litiv/test.hpp"
 
 TEST(lbsp,regression_constr) {
-    EXPECT_THROW_LVQUIET(std::make_unique<LBSP>(-0.5f),lv::Exception);
+    EXPECT_THROW_LV_QUIET(std::make_unique<LBSP>(-0.5f));
 }
 
 TEST(lbsp,regression_default_params) {
@@ -13,7 +13,7 @@ TEST(lbsp,regression_default_params) {
     EXPECT_EQ(pLBSP->windowSize().height,5);
     EXPECT_EQ(pLBSP->windowSize().width/2,pLBSP->borderSize());
     EXPECT_EQ(pLBSP->windowSize().width/2,pLBSP->borderSize(1));
-    ASSERT_THROW_LVQUIET(pLBSP->borderSize(2),lv::Exception);
+    ASSERT_THROW_LV_QUIET(pLBSP->borderSize(2));
     EXPECT_EQ(pLBSP->descriptorSize(),2);
     EXPECT_EQ(pLBSP->descriptorType(),CV_16U);
     EXPECT_EQ(pLBSP->descriptorType(),CV_16UC1);

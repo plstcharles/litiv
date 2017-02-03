@@ -25,17 +25,17 @@
 #include <memory>
 #include <fstream>
 
-#define EXPECT_THROW_LVQUIET(expr,etype) \
+#define EXPECT_THROW_LV_QUIET(expr) \
 do { \
     lv::Exception::setVerbose(false); \
-    EXPECT_THROW(expr,etype); \
+    EXPECT_THROW(expr,lv::Exception); \
     lv::Exception::setVerbose(true); \
 } while(0)
 
-#define ASSERT_THROW_LVQUIET(expr,etype) \
+#define ASSERT_THROW_LV_QUIET(expr) \
 do { \
     lv::Exception::setVerbose(false); \
-    ASSERT_THROW(expr,etype); \
+    ASSERT_THROW(expr,lv::Exception); \
     lv::Exception::setVerbose(true); \
 } while(0)
 

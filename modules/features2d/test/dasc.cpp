@@ -4,9 +4,9 @@
 #include "litiv/test.hpp"
 
 TEST(dasc_rf,regression_constr) {
-    EXPECT_THROW_LVQUIET(std::make_unique<DASC>(0.0f,0.05f),lv::Exception);
-    EXPECT_THROW_LVQUIET(std::make_unique<DASC>(1.0f,0.0f),lv::Exception);
-    EXPECT_THROW_LVQUIET(std::make_unique<DASC>(1.0f,0.1f,size_t(0)),lv::Exception);
+    EXPECT_THROW_LV_QUIET(std::make_unique<DASC>(0.0f,0.05f));
+    EXPECT_THROW_LV_QUIET(std::make_unique<DASC>(1.0f,0.0f));
+    EXPECT_THROW_LV_QUIET(std::make_unique<DASC>(1.0f,0.1f,size_t(0)));
 }
 
 TEST(dasc_rf,regression_default_params) {
@@ -18,7 +18,7 @@ TEST(dasc_rf,regression_default_params) {
     EXPECT_EQ(pDASC->windowSize().width,pDASC->windowSize().height);
     EXPECT_EQ(pDASC->windowSize().width/2,pDASC->borderSize());
     EXPECT_EQ(pDASC->windowSize().width/2,pDASC->borderSize(1));
-    ASSERT_THROW_LVQUIET(pDASC->borderSize(2),lv::Exception);
+    ASSERT_THROW_LV_QUIET(pDASC->borderSize(2));
     EXPECT_GT(pDASC->descriptorSize(),0);
     EXPECT_EQ(size_t(pDASC->descriptorSize())%sizeof(float),size_t(0));
     EXPECT_EQ(pDASC->descriptorType(),CV_32F);
@@ -114,9 +114,9 @@ TEST(dasc_rf,regression_large_compute) {
 }
 
 TEST(dasc_gf,regression_constr) {
-    EXPECT_THROW_LVQUIET(lv::doNotOptimize(std::make_unique<DASC>(size_t(0),0.05f)),lv::Exception);
-    EXPECT_THROW_LVQUIET(lv::doNotOptimize(std::make_unique<DASC>(size_t(1),0.0f)),lv::Exception);
-    EXPECT_THROW_LVQUIET(lv::doNotOptimize(std::make_unique<DASC>(size_t(1),0.05f,size_t(0))),lv::Exception);
+    EXPECT_THROW_LV_QUIET(lv::doNotOptimize(std::make_unique<DASC>(size_t(0),0.05f)));
+    EXPECT_THROW_LV_QUIET(lv::doNotOptimize(std::make_unique<DASC>(size_t(1),0.0f)));
+    EXPECT_THROW_LV_QUIET(lv::doNotOptimize(std::make_unique<DASC>(size_t(1),0.05f,size_t(0))));
 }
 
 TEST(dasc_gf,regression_default_params) {
@@ -128,7 +128,7 @@ TEST(dasc_gf,regression_default_params) {
     EXPECT_EQ(pDASC->windowSize().width,pDASC->windowSize().height);
     EXPECT_EQ(pDASC->windowSize().width/2,pDASC->borderSize());
     EXPECT_EQ(pDASC->windowSize().width/2,pDASC->borderSize(1));
-    ASSERT_THROW_LVQUIET(pDASC->borderSize(2),lv::Exception);
+    ASSERT_THROW_LV_QUIET(pDASC->borderSize(2));
     EXPECT_GT(pDASC->descriptorSize(),0);
     EXPECT_EQ(size_t(pDASC->descriptorSize())%sizeof(float),size_t(0));
     EXPECT_EQ(pDASC->descriptorType(),CV_32F);

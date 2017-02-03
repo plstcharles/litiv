@@ -4,8 +4,8 @@
 #include "litiv/test.hpp"
 
 TEST(mi,regression_constr) {
-    EXPECT_THROW_LVQUIET(std::make_unique<MutualInfo>(cv::Size(0,0)),lv::Exception);
-    EXPECT_THROW_LVQUIET(std::make_unique<MutualInfo>(cv::Size(2,2)),lv::Exception);
+    EXPECT_THROW_LV_QUIET(std::make_unique<MutualInfo>(cv::Size(0,0)));
+    EXPECT_THROW_LV_QUIET(std::make_unique<MutualInfo>(cv::Size(2,2)));
 }
 
 TEST(mi,regression_default_params) {
@@ -17,7 +17,7 @@ TEST(mi,regression_default_params) {
     EXPECT_EQ(pMI->windowSize().width,pMI->windowSize().height);
     EXPECT_EQ(pMI->windowSize().width/2,pMI->borderSize());
     EXPECT_EQ(pMI->windowSize().width/2,pMI->borderSize(1));
-    ASSERT_THROW_LVQUIET(pMI->borderSize(2),lv::Exception);
+    ASSERT_THROW_LV_QUIET(pMI->borderSize(2));
 }
 
 TEST(mi,regression_compute) {

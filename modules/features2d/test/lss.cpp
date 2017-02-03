@@ -4,11 +4,11 @@
 #include "litiv/test.hpp"
 
 TEST(lss,regression_constr) {
-    EXPECT_THROW_LVQUIET(std::make_unique<LSS>(0),lv::Exception);
-    EXPECT_THROW_LVQUIET(std::make_unique<LSS>(2),lv::Exception);
-    EXPECT_THROW_LVQUIET(std::make_unique<LSS>(3,1),lv::Exception);
-    EXPECT_THROW_LVQUIET(std::make_unique<LSS>(1,3,0),lv::Exception);
-    EXPECT_THROW_LVQUIET(std::make_unique<LSS>(1,3,2,0),lv::Exception);
+    EXPECT_THROW_LV_QUIET(std::make_unique<LSS>(0));
+    EXPECT_THROW_LV_QUIET(std::make_unique<LSS>(2));
+    EXPECT_THROW_LV_QUIET(std::make_unique<LSS>(3,1));
+    EXPECT_THROW_LV_QUIET(std::make_unique<LSS>(1,3,0));
+    EXPECT_THROW_LV_QUIET(std::make_unique<LSS>(1,3,2,0));
 }
 
 TEST(lss,regression_default_params) {
@@ -20,7 +20,7 @@ TEST(lss,regression_default_params) {
     EXPECT_EQ(pLSS->windowSize().width,pLSS->windowSize().height);
     EXPECT_EQ(pLSS->windowSize().width/2,pLSS->borderSize());
     EXPECT_EQ(pLSS->windowSize().width/2,pLSS->borderSize(1));
-    ASSERT_THROW_LVQUIET(pLSS->borderSize(2),lv::Exception);
+    ASSERT_THROW_LV_QUIET(pLSS->borderSize(2));
     EXPECT_GT(pLSS->descriptorSize(),0);
     EXPECT_EQ(size_t(pLSS->descriptorSize())%sizeof(float),size_t(0));
     EXPECT_EQ(pLSS->descriptorType(),CV_32F);
