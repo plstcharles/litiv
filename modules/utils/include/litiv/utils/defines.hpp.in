@@ -154,12 +154,12 @@
                 #error "Current build config mismatch with LITIV external build config."
             #endif //LITIV_DEBUG
         #endif //ndef(LITIV_BUILD)
-        #define lvDbgAssert(expr)
-        #define lvDbgAssert_(expr,msg)
-        #define lvDbgAssert__(expr,msg,...)
-        #define lvDbgExceptionWatch
-        #define glDbgErrorCheck
-        #define cudaDbgErrorCheck
+        #define lvDbgAssert(expr) ((void)0)
+        #define lvDbgAssert_(expr,msg) ((void)0)
+        #define lvDbgAssert__(expr,msg,...) ((void)0)
+        #define lvDbgExceptionWatch ((void)0)
+        #define glDbgErrorCheck ((void)0)
+        #define cudaDbgErrorCheck ((void)0)
     #endif //ndef(_DEBUG)
     #define lvIgnore(x) (void)(x)
     #ifndef UNUSED
@@ -170,7 +170,7 @@
         #ifdef _DEBUG
             #define lvDbgAssertHR(expr) lvAssertHR(expr)
         #else //ndef(_DEBUG)
-            #define lvDbgAssertHR(expr)
+            #define lvDbgAssertHR(expr) ((void)0)
         #endif //ndef(_DEBUG)
     #endif //def(_MSC_VER)
 #endif //ndef(__LV_EXCEP_DEFS__)
