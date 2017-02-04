@@ -64,7 +64,7 @@ struct SLIC {
     ~SLIC();
 
     /// set up the parameters and initalize all gpu buffer for faster video segmentation
-    void initialize(const cv::Size& size, const int diamSpxOrNbSpx = 15, const InitType initType = SLIC_SIZE, const float wc = 35, const int nbIteration = 5);
+    void initialize(const cv::Size& size, const int diamSpxOrNbSpx = 15, const InitType initType = SLIC_SIZE, const float wc = 35, const int nbIteration = 2);
     /// segment a frame in superpixel
     void segment(const cv::Mat& frame);
     /// returns computed superpixel labels for the previous frame
@@ -85,7 +85,8 @@ protected:
     int m_nbPx;
     int m_nbSpx;
     int m_SpxDiam;
-    int m_SpxWidth, m_SpxHeight, m_SpxArea;
+    int m_nbSpxPerRow;
+    int m_nbSpxPerCol;
     int m_FrameWidth, m_FrameHeight;
     float m_wc;
     int m_nbIteration;

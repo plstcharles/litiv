@@ -53,8 +53,8 @@
 namespace device {
 
     __global__ void kRgb2CIELab(const cudaTextureObject_t inputImg, cudaSurfaceObject_t outputImg, int width, int height);
-    __global__ void kInitClusters(const cudaSurfaceObject_t frameLab, float* clusters, int width, int height, int nSpxPerRow, int nSpxPerCol);
-    __global__ void kAssignment(const cudaSurfaceObject_t frameLab, const float* clusters, const int width, const int height, const int wSpx, const int hSpx, const float wc2, cudaSurfaceObject_t labels, float* accAtt_g);
+    __global__ void kInitClusters(const cudaSurfaceObject_t frameLab, float* clusters, int width, int height, int nSpxPerRow, int nSpxPerCol, float nbSpxD2);
+    __global__ void kAssignment(const cudaSurfaceObject_t surfFrameLab, const float* clusters, const int width, const int height, const int nClustPerRow, const int nbSpx, const int diamSpx, const float wc2, cudaSurfaceObject_t surfLabels, float* accAtt_g);
     __global__ void kUpdate(int nbSpx, float* clusters, float* accAtt_g);
 
 } // namespace device
@@ -62,8 +62,8 @@ namespace device {
 namespace host {
 
     void kRgb2CIELab(const lv::cuda::KernelParams& oKParams, const cudaTextureObject_t inputImg, cudaSurfaceObject_t outputImg, int width, int height);
-    void kInitClusters(const lv::cuda::KernelParams& oKParams, const cudaSurfaceObject_t frameLab, float* clusters, int width, int height, int nSpxPerRow, int nSpxPerCol);
-    void kAssignment(const lv::cuda::KernelParams& oKParams, const cudaSurfaceObject_t frameLab, const float* clusters, const int width, const int height, const int wSpx, const int hSpx, const float wc2, cudaSurfaceObject_t labels, float* accAtt_g);
+    void kInitClusters(const lv::cuda::KernelParams& oKParams, const cudaSurfaceObject_t frameLab, float* clusters, int width, int height, int nSpxPerRow, int nSpxPerCol,float diamSpxD2);
+    void kAssignment(const lv::cuda::KernelParams& oKParams, const cudaSurfaceObject_t surfFrameLab, const float* clusters, const int width, const int height, const int nClustPerRow, const int nbSpx, const int diamSpx, const float wc2, cudaSurfaceObject_t surfLabels, float* accAtt_g);
     void kUpdate(const lv::cuda::KernelParams& oKParams, int nbSpx, float* clusters, float* accAtt_g);
 
 } // namespace host

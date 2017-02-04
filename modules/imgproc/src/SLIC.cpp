@@ -49,23 +49,6 @@
 #include "litiv/imgproc/SLIC.hpp"
 #include "SLIC.cuh"
 
-inline void getSpxSizeFromDiam(const int imWidth, const int imHeight, const int diamSpx, int* spxWidth, int* spxHeight) {
-    int wl1, wl2;
-    int hl1, hl2;
-    wl1 = wl2 = diamSpx;
-    hl1 = hl2 = diamSpx;
-    while ((imWidth%wl1) != 0)
-        wl1++;
-    while ((imWidth%wl2) != 0)
-        wl2--;
-    while ((imHeight%hl1) != 0)
-        hl1++;
-    while ((imHeight%hl2) != 0)
-        hl2--;
-    *spxWidth = ((diamSpx - wl2) < (wl1 - diamSpx)) ? wl2 : wl1;
-    *spxHeight = ((diamSpx - hl2) < (hl1 - diamSpx)) ? hl2 : hl1;
-}
-
 inline int iDivUp(int a, int b) {
     return (a%b == 0) ? a / b : a / b + 1;
 }
@@ -103,10 +86,11 @@ void SLIC::initialize(const cv::Size& size, const int diamSpxOrNbSpx , const Ini
         m_SpxDiam = (int)sqrt(m_nbPx / (float)diamSpxOrNbSpx);
     }
     else m_SpxDiam = diamSpxOrNbSpx;
-    getSpxSizeFromDiam(m_FrameWidth, m_FrameHeight, m_SpxDiam, &m_SpxWidth, &m_SpxHeight); // determine w and h of Spx based on diamSpx
-    m_SpxArea = m_SpxWidth*m_SpxHeight;
-    CV_Assert(m_nbPx%m_SpxArea == 0);
-    m_nbSpx = m_nbPx / m_SpxArea;
+
+    m_nbSpxPerRow = iDivUp(m_FrameWidth, m_SpxDiam);
+    m_nbSpxPerCol = iDivUp(m_FrameHeight, m_SpxDiam);
+    m_nbSpx = m_nbSpxPerRow*m_nbSpxPerCol;
+
     m_oLabels.create(m_FrameHeight,m_FrameWidth);
 
     cudaErrorCheck(cudaGetLastError());
@@ -172,7 +156,7 @@ void SLIC::segment(const cv::Mat& frameBGR) {
     {
         const int blockW = 16;
         const lv::cuda::KernelParams oParams(dim3(iDivUp(m_nbSpx, blockW)),dim3(blockW));
-        host::kInitClusters(oParams,oSurfFrameLab,d_fClusters,m_FrameWidth,m_FrameHeight,m_FrameWidth/m_SpxWidth,m_FrameHeight/m_SpxHeight);
+        host::kInitClusters(oParams,oSurfFrameLab,d_fClusters,m_FrameWidth,m_FrameHeight,m_nbSpxPerRow,m_nbSpxPerCol,m_SpxDiam/2.f);
     }
     for (int i = 0; i<m_nbIteration; i++) {
         assignment();
@@ -184,19 +168,22 @@ void SLIC::segment(const cv::Mat& frameBGR) {
 }
 
 void SLIC::assignment() {
-    const int hMax = m_deviceProp.maxThreadsPerBlock / m_SpxHeight;
-    const int nBlockPerClust = iDivUp(m_SpxHeight, hMax);
-    const dim3 blockPerGrid(m_nbSpx, nBlockPerClust);
-    const dim3 threadPerBlock(m_SpxWidth, std::min(m_SpxHeight, hMax));
-    CV_Assert(threadPerBlock.x >= 3 && threadPerBlock.y >= 3);
+    const int nbBlockPerClust = iDivUp(m_SpxDiam*m_SpxDiam, m_deviceProp.maxThreadsPerBlock);
+    const dim3 gridSize(m_nbSpxPerRow, m_nbSpxPerCol,nbBlockPerClust);
+
+    const int hMax = m_deviceProp.maxThreadsPerBlock / m_SpxDiam;
+    const dim3 blockSize(m_SpxDiam, std::min(m_SpxDiam, hMax));
+
+    CV_Assert(blockSize.x >= 3 && blockSize.y >= 3);
     const float wc2 = m_wc * m_wc;
-    host::kAssignment(lv::cuda::KernelParams(blockPerGrid,threadPerBlock),
+    host::kAssignment(lv::cuda::KernelParams(gridSize, blockSize),
         oSurfFrameLab,
         d_fClusters,
         m_FrameWidth,
         m_FrameHeight,
-        m_SpxWidth,
-        m_SpxHeight,
+        m_nbSpxPerRow,
+        m_nbSpx,
+        m_SpxDiam,
         wc2,
         oSurfLabels,
         d_fAccAtt);
