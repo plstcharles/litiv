@@ -209,9 +209,17 @@ namespace lv {
             throw -1;
     }
 
+    /// default (specializable) forward declaration of output array policy helper, to toggle with NoEval
+    template<DatasetEvalList eDatasetEval, typename ENABLE=void>
+    struct OutputArrayPolicyHelper;
+
     /// required due to MSVC2015 failure to use constexpr functions in SFINAE expressions
     template<DatasetEvalList eDatasetEval>
-    struct OutputArrayPolicyHelper {
+    struct OutputArrayPolicyHelper<eDatasetEval,std::enable_if_t<(eDatasetEval==DatasetEval_None)>> {};
+
+    /// required due to MSVC2015 failure to use constexpr functions in SFINAE expressions
+    template<DatasetEvalList eDatasetEval>
+    struct OutputArrayPolicyHelper<eDatasetEval,std::enable_if_t<(eDatasetEval!=DatasetEval_None)>> {
         static constexpr ArrayPolicy value = getOutputArrayPolicy<eDatasetEval>();
     };
 
@@ -799,27 +807,31 @@ namespace lv {
     /// data archiver specialization for non-array output processing
     template<>
     struct IDataArchiver_<NotArray> : public virtual IDataHandler {
+        /// loads a processed data packet based on idx and packet name (if available), with optional flags (-1 = internal defaults)
+        virtual cv::Mat load(size_t nIdx, int nFlags=-1);
     protected:
         /// saves a processed data packet locally based on idx and packet name (if available), with optional flags (-1 = internal defaults)
         virtual void save(const cv::Mat& oOutput, size_t nIdx, int nFlags=-1);
-        /// loads a processed data packet based on idx and packet name (if available), with optional flags (-1 = internal defaults)
-        virtual cv::Mat load(size_t nIdx, int nFlags=-1);
     };
 
     /// data archiver specialization for array output processing
     template<>
     struct IDataArchiver_<Array> : public virtual IDataHandler {
-    protected:
-        /// saves a processed data packet array locally based on idx and packet name (if available), with optional flags (-1 = internal defaults)
-        virtual void saveArray(const std::vector<cv::Mat>& vOutput, size_t nIdx, int nFlags=-1);
         /// loads a processed data packet array based on idx and packet name (if available), with optional flags (-1 = internal defaults)
         virtual std::vector<cv::Mat> loadArray(size_t nIdx, int nFlags=-1);
         /// returns the number of parallel output streams (defaults to input or GT stream count if loader is array-based & one mapping allows it, or 1 otherwise)
         virtual size_t getOutputStreamCount() const;
+    protected:
+        /// saves a processed data packet array locally based on idx and packet name (if available), with optional flags (-1 = internal defaults)
+        virtual void saveArray(const std::vector<cv::Mat>& vOutput, size_t nIdx, int nFlags=-1);
     };
 
     /// data counter interface for non-group work batches (exposes output packet counting logic)
     struct IDataCounter : public virtual IDataHandler {
+        /// returns the output packet count so far processed by the work batch evaluator
+        virtual size_t getCurrentOutputCount() const override final;
+        /// returns the final output packet count processed by the work batch evaluator, blocking if processing is not finished yet
+        virtual size_t getFinalOutputCount() override final;
     protected:
         /// checks output with index 'nPacketIdx' as processed
         void countOutput(size_t nPacketIdx);
@@ -827,10 +839,6 @@ namespace lv {
         void setOutputCountPromise();
         /// resets the processed packets count (and reinitializes promise)
         void resetOutputCount();
-        /// returns the output packet count so far processed by the work batch evaluator
-        virtual size_t getCurrentOutputCount() const override final;
-        /// returns the final output packet count processed by the work batch evaluator, blocking if processing is not finished yet
-        virtual size_t getFinalOutputCount() override final;
         /// default constructor (calls resetOutputCount to initialize all members)
         inline IDataCounter() {resetOutputCount();}
     private:
@@ -843,6 +851,25 @@ namespace lv {
     /// default (specializable) forward declaration of the data consumer interface
     template<DatasetEvalList eDatasetEval, typename ENABLE=void>
     struct IDataConsumer_;
+
+    /// data consumer specialization for process monitoring only (no-eval entrypoint)
+    template<DatasetEvalList eDatasetEval>
+    struct IDataConsumer_<eDatasetEval,std::enable_if_t<eDatasetEval==DatasetEval_None>> :
+            public IDataCounter {
+        /// returns the total output packet count expected to be processed by the data consumer (defaults to 0)
+        virtual size_t getExpectedOutputCount() const override {
+            return 0;
+        }
+        /// resets internal packet count metrics (no evaluation metrics for this interface)
+        virtual void resetMetrics() override {
+            resetOutputCount();
+        }
+        /// pushes an output packet index for counting/speed analysis
+        inline void push(size_t nPacketIdx) {
+            lvAssert_(isProcessing(),"data processing must be toggled via 'startProcessing()' before pushing indices");
+            countOutput(nPacketIdx);
+        }
+    };
 
     /// data consumer specialization for receiving processed packets (evaluation entrypoint)
     template<DatasetEvalList eDatasetEval>
@@ -857,7 +884,7 @@ namespace lv {
         virtual void resetMetrics() override {
             resetOutputCount();
         }
-        /// pushes an output (processed) data packet array for writing and/or evaluation
+        /// pushes an output (processed) data packet for writing and/or evaluation
         inline void push(const cv::Mat& oOutput, size_t nPacketIdx) {
             lvAssert_(isProcessing(),"data processing must be toggled via 'startProcessing()' before pushing packets");
             countOutput(nPacketIdx);

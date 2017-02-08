@@ -1130,6 +1130,14 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_ImageArray>::getRawGT(size_t nPacke
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+size_t lv::IDataCounter::getCurrentOutputCount() const {
+    return m_mProcessedPackets.size();
+}
+
+size_t lv::IDataCounter::getFinalOutputCount() {
+    return m_nPacketCountFuture.valid()?(m_nFinalPacketCount=m_nPacketCountFuture.get()):m_nFinalPacketCount;
+}
+
 void lv::IDataCounter::countOutput(size_t nPacketIdx) {
     m_mProcessedPackets.insert(nPacketIdx);
 }
@@ -1143,14 +1151,6 @@ void lv::IDataCounter::resetOutputCount() {
     m_nPacketCountPromise = std::promise<size_t>();
     m_nPacketCountFuture = m_nPacketCountPromise.get_future();
     m_nFinalPacketCount = 0;
-}
-
-size_t lv::IDataCounter::getCurrentOutputCount() const {
-    return m_mProcessedPackets.size();
-}
-
-size_t lv::IDataCounter::getFinalOutputCount() {
-    return m_nPacketCountFuture.valid()?(m_nFinalPacketCount=m_nPacketCountFuture.get()):m_nFinalPacketCount;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
