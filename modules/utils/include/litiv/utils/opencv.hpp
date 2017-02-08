@@ -496,29 +496,34 @@ namespace cv { // extending cv
         if(a.isContinuous() && b.isContinuous())
             return std::equal((T*)a.data,(T*)(a.data+a.total()*a.elemSize()),(T*)b.data);
         else {
-            for(size_t nElemIdx=0; nElemIdx<a.total(); ++nElemIdx)
-                if(a.at<T>(int(nElemIdx))!=b.at<T>(int(nElemIdx)))
-                    return false;
+            lvAssert_(a.dims==2,"undefined for non-continuous, multi-dim matrices");
+            for(int nRowIdx=0; nRowIdx<a.rows; ++nRowIdx)
+                for(int nColIdx=0; nColIdx<a.cols; ++nColIdx)
+                    if(a.at<T>(nRowIdx,nColIdx)!=b.at<T>(nRowIdx,nColIdx))
+                        return false;
             return true;
         }
     }
 
     /// returns whether the two matrices are nearly equal or not, given a maximum allowed error
-    template<typename T>
-    inline bool isNearlyEqual(const cv::Mat& a, const cv::Mat& b, T eps) {
+    template<typename T, typename Teps>
+    inline bool isNearlyEqual(const cv::Mat& a, const cv::Mat& b, Teps eps) {
         if(a.empty() && b.empty())
             return true;
         if(a.dims!=b.dims || a.size!=b.size || a.type()!=b.type())
             return false;
         lvDbgAssert(a.total()*a.elemSize()==b.total()*b.elemSize());
+        const double dEps = double(eps);
         if(a.isContinuous() && b.isContinuous())
-            return std::equal((T*)a.data,(T*)(a.data+a.total()*a.elemSize()),(T*)b.data,[&eps](const T& _a, const T& _b){
-                return std::abs(double(_a)-double(_b))<=double(eps);
+            return std::equal((T*)a.data,(T*)(a.data+a.total()*a.elemSize()),(T*)b.data,[&dEps](const T& _a, const T& _b){
+                return std::abs(double(_a)-double(_b))<=dEps;
             });
         else {
-            for(size_t nElemIdx=0; nElemIdx<a.total(); ++nElemIdx)
-                if(std::abs(double(a.at<T>(int(nElemIdx)))-double(b.at<T>(int(nElemIdx))))>double(eps))
-                    return false;
+            lvAssert_(a.dims==2,"undefined for non-continuous, multi-dim matrices");
+            for(int nRowIdx=0; nRowIdx<a.rows; ++nRowIdx)
+                for(int nColIdx=0; nColIdx<a.cols; ++nColIdx)
+                    if(std::abs(double(a.at<T>(nRowIdx,nColIdx))-double(b.at<T>(nRowIdx,nColIdx)))>dEps)
+                        return false;
             return true;
         }
     }
