@@ -19,10 +19,10 @@
 
 std::string g_sDatasetsRootPath = lv::addDirSlashIfMissing(EXTERNAL_DATA_ROOT);
 
-const std::string& lv::datasets::getDatasetsRootPath() {
+const std::string& lv::datasets::getRootPath() {
     return g_sDatasetsRootPath;
 }
 
-void lv::datasets::setDatasetsRootPath(const std::string& sNewPath) {
+void lv::datasets::setRootPath(const std::string& sNewPath) {
     g_sDatasetsRootPath = lv::addDirSlashIfMissing(sNewPath);
 }

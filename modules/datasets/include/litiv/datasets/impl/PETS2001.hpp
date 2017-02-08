@@ -38,8 +38,8 @@ namespace lv {
         ) :
                 IDataset_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1,lv::getDatasetEval<eDatasetTask,Dataset_PETS2001D3TC1>(),eEvalImpl>(
                         "PETS2001 Dataset#3",
-                        lv::datasets::getDatasetsRootPath()+"PETS2001/DATASET3/",
-                        lv::datasets::getDatasetsRootPath()+"PETS2001/DATASET3/"+lv::addDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getRootPath()+"PETS2001/DATASET3/",
+                        lv::datasets::getRootPath()+"PETS2001/DATASET3/"+lv::addDirSlashIfMissing(sOutputDirName),
                         "bin",
                         ".png",
                         getWorkBatchDirNames(),

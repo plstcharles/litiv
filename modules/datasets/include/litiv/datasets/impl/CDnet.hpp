@@ -39,8 +39,8 @@ namespace lv {
         ) :
                 IDataset_<eDatasetTask,DatasetSource_Video,Dataset_CDnet,lv::getDatasetEval<eDatasetTask,Dataset_CDnet>(),eEvalImpl>(
                         b2014?"CDnet 2014":"CDnet 2012",
-                        lv::datasets::getDatasetsRootPath()+std::string(b2014?"CDNet2014/dataset/":"CDNet/dataset/"),
-                        lv::datasets::getDatasetsRootPath()+std::string(b2014?"CDNet2014/":"CDNet/")+lv::addDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getRootPath()+std::string(b2014?"CDNet2014/dataset/":"CDNet/dataset/"),
+                        lv::datasets::getRootPath()+std::string(b2014?"CDNet2014/":"CDNet/")+lv::addDirSlashIfMissing(sOutputDirName),
                         "bin",
                         ".png",
                         getWorkBatchDirNames(b2014),

@@ -38,8 +38,8 @@ namespace lv {
         ) :
                 IDataset_<eDatasetTask,DatasetSource_Video,Dataset_Wallflower,lv::getDatasetEval<eDatasetTask,Dataset_Wallflower>(),eEvalImpl>(
                         "Wallflower",
-                        lv::datasets::getDatasetsRootPath()+"Wallflower/dataset/",
-                        lv::datasets::getDatasetsRootPath()+"Wallflower/"+lv::addDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getRootPath()+"Wallflower/dataset/",
+                        lv::datasets::getRootPath()+"Wallflower/"+lv::addDirSlashIfMissing(sOutputDirName),
                         "bin",
                         ".png",
                         getWorkBatchDirNames(),

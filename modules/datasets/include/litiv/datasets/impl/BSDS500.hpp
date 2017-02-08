@@ -49,8 +49,8 @@ namespace lv {
         ) :
                 IDataset_<eDatasetTask,DatasetSource_Image,Dataset_BSDS500,lv::getDatasetEval<eDatasetTask,Dataset_BSDS500>(),eEvalImpl>(
                         "BSDS500",
-                        lv::datasets::getDatasetsRootPath()+"BSDS500/data/images/",
-                        lv::datasets::getDatasetsRootPath()+"BSDS500/BSR/"+lv::addDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getRootPath()+"BSDS500/data/images/",
+                        lv::datasets::getRootPath()+"BSDS500/BSR/"+lv::addDirSlashIfMissing(sOutputDirName),
                         "",
                         ".png",
                         getWorkBatchDirNames(eType),
