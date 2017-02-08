@@ -15,13 +15,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "litiv/datasets/eval.hpp"
+#include "litiv/datasets.hpp"
 //#include "litiv/utils/console.hpp" @@@@@ reuse later?
 #include <fstream>
 
 void lv::IDataReporter_<lv::DatasetEval_None>::writeEvalReport() const {
     if(getCurrentOutputCount()==0) {
-        std::cout << "No report to write for '" << getName() << "', skipping..." << std::endl;
+        if(datasets::getParserVerbosity()>1)
+            std::cout << "No report to write for '" << getName() << "', skipping..." << std::endl;
         return;
     }
     for(const auto& pBatch : getBatches(true))
@@ -69,7 +70,8 @@ void lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::writeEvalReport() con
     IIMetricsCalculatorConstPtr pMetrics = getMetrics(true);
     lvDbgAssert(pMetrics.get());
     const BinClassifMetrics& oMetrics = dynamic_cast<const BinClassifMetricsCalculator&>(*pMetrics.get()).m_oMetrics;
-    std::cout << "\t" << lv::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
+    if(datasets::getParserVerbosity()>0)
+        std::cout << "\t" << lv::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
     std::ofstream oMetricsOutput(getOutputPath()+(isRoot()?"":"../")+getName()+".txt");
     if(oMetricsOutput.is_open()) {
         oMetricsOutput << std::fixed;
@@ -123,7 +125,8 @@ void lv::IDataReporter_<lv::DatasetEval_BinaryClassifierArray>::writeEvalReport(
     const BinClassifMetricsCalculatorPtr pReducedMetrics = oMetrics.reduce();
     lvDbgAssert(pReducedMetrics);
     const BinClassifMetrics& oReducedMetrics = pReducedMetrics->m_oMetrics;
-    std::cout << "\t" << lv::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oReducedMetrics.dRecall << " Prc=" << oReducedMetrics.dPrecision << " FM=" << oReducedMetrics.dFMeasure << " MCC=" << oReducedMetrics.dMCC << std::endl;
+    if(datasets::getParserVerbosity()>0)
+        std::cout << "\t" << lv::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oReducedMetrics.dRecall << " Prc=" << oReducedMetrics.dPrecision << " FM=" << oReducedMetrics.dFMeasure << " MCC=" << oReducedMetrics.dMCC << std::endl;
     std::ofstream oMetricsOutput(getOutputPath()+(isRoot()?"":"../")+getName()+".txt");
     if(oMetricsOutput.is_open()) {
         oMetricsOutput << std::fixed;

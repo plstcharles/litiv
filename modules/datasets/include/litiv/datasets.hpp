@@ -37,6 +37,10 @@ namespace lv {
         const std::string& getRootPath();
         /// sets the path where datasets should be found on the system (will be kept using a global variable)
         void setRootPath(const std::string& sNewPath);
+        /// returns the global dataset parser verbosity level (greater = more verbose)
+        int getParserVerbosity();
+        /// sets the global datset parser verbosity level (greater = more verbose)
+        void setParserVerbosity(int nLevel);
 
         /// global dataset object creation method with dataset impl specialization (forwards extra args to dataset constructor)
         template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl, typename... Targs>
@@ -166,8 +170,8 @@ namespace lv {
         /// clears all batches and reparses them from the dataset metadata
         virtual void parseData() override final {
             lvDbgExceptionWatch;
-            std::cout << "Parsing directory '" << this->getDataPath() << "' for dataset '" << this->getName() << "'..." << std::endl;
-            this->m_vpBatches.clear();
+            if(datasets::getParserVerbosity()>0)
+                std::cout << "Parsing directory '" << this->getDataPath() << "' for dataset '" << this->getName() << "'..." << std::endl;
             this->m_bIsBare = false; // always false by default for top level
             this->m_vpBatches.clear();
             for(const auto& sPathIter : this->getWorkBatchDirs())

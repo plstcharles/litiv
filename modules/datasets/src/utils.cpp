@@ -15,11 +15,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <litiv/datasets/utils.hpp>
-#include "litiv/datasets/utils.hpp"
+#include "litiv/datasets.hpp"
 
 #define HARDCODE_IMAGE_PACKET_INDEX        0 // for sync debug only! will corrupt data for non-image packets
-#define CONSOLE_DEBUG                      0
 #define PRECACHE_REQUEST_TIMEOUT_MS        1
 #define PRECACHE_QUERY_TIMEOUT_MS          10
 #define PRECACHE_QUERY_END_TIMEOUT_MS      500
@@ -240,7 +238,8 @@ void lv::DataGroupHandler::parseData() {
     m_vpBatches.clear();
     m_bIsBare = true;
     if(!lv::string_contains_token(getName(),getSkippedDirTokens())) {
-        std::cout << "\tParsing directory '" << getDataPath() << "' for work group '" << getName() << "'..." << std::endl;
+        if(datasets::getParserVerbosity()>0)
+            std::cout << "\tParsing directory '" << getDataPath() << "' for work group '" << getName() << "'..." << std::endl;
         // by default, all subdirs are considered work batch directories (if none, the category directory itself is a batch, and 'bare')
         const std::vector<std::string> vsWorkBatchPaths = lv::getSubDirsFromDir(getDataPath());
         if(vsWorkBatchPaths.empty())
@@ -289,10 +288,8 @@ const cv::Mat& lv::DataPrecacher::getPacket(size_t nIdx) {
         m_oReqCondVar.notify_one();
         res = m_oSyncCondVar.wait_for(sync_lock,std::chrono::milliseconds(PRECACHE_REQUEST_TIMEOUT_MS));
         nAnswIdx = m_nAnswIdx.load();
-#if CONSOLE_DEBUG
-        if(res==std::cv_status::timeout && nAnswIdx!=m_nReqIdx)
+        if(datasets::getParserVerbosity()>2 && res==std::cv_status::timeout && nAnswIdx!=m_nReqIdx)
             std::cout << "data precacher [" << uintptr_t(this) << "] retrying request for packet #" << nIdx << "..." << std::endl;
-#endif //CONSOLE_DEBUG
     } while(res==std::cv_status::timeout && nAnswIdx!=m_nReqIdx && !m_pWorkerException);
     if(m_pWorkerException) {
         m_bIsActive = false;
@@ -331,9 +328,8 @@ void lv::DataPrecacher::stopAsyncPrecaching() {
 void lv::DataPrecacher::entry(const size_t nBufferSize) {
     lv::mutex_unique_lock sync_lock(m_oSyncMutex);
     try {
-#if CONSOLE_DEBUG
-        std::cout << "data precacher [" << uintptr_t(this) << "] init w/ buffer size = " << (nBufferSize/1024)/1024 << " mb" << std::endl;
-#endif //CONSOLE_DEBUG
+        if(datasets::getParserVerbosity()>1)
+            std::cout << "data precacher [" << uintptr_t(this) << "] init w/ buffer size = " << (nBufferSize/1024)/1024 << " mb" << std::endl;
         std::queue<cv::Mat> qoCache;
         std::vector<uchar> vcBuffer(nBufferSize);
         size_t nNextExpectedReqIdx = 0;
@@ -376,9 +372,8 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
             else // nNextBufferIdx+nNextPacketSize>=nFirstBufferIdx
                 return 0;
             ++nNextPrecacheIdx;
-#if CONSOLE_DEBUG
-            //std::cout << "data precacher [" << uintptr_t(this) << "] filled one packet w/ size = " << nNextPacketSize/1024 << " kb" << std::endl;
-#endif //CONSOLE_DEBUG
+            if(datasets::getParserVerbosity()>3)
+                std::cout << "data precacher [" << uintptr_t(this) << "] filled one packet w/ size = " << nNextPacketSize/1024 << " kb" << std::endl;
             return nNextPacketSize;
         };
         const std::chrono::time_point<std::chrono::high_resolution_clock> nPrefillTick = std::chrono::high_resolution_clock::now();
@@ -388,10 +383,8 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
                 if(m_nReqIdx!=nNextExpectedReqIdx-1) {
                     if(!qoCache.empty()) {
                         if(m_nReqIdx<nNextPrecacheIdx && m_nReqIdx>=nNextExpectedReqIdx) {
-#if CONSOLE_DEBUG
-                            if(m_nReqIdx>nNextExpectedReqIdx)
+                            if(datasets::getParserVerbosity()>2 && m_nReqIdx>nNextExpectedReqIdx)
                                 std::cout << "data precacher [" << uintptr_t(this) << "] popping " << m_nReqIdx-nNextExpectedReqIdx << " extra packet(s) from cache" << std::endl;
-#endif //CONSOLE_DEBUG
                             while(m_nReqIdx-nNextExpectedReqIdx+1>0) {
                                 m_oReqPacket = qoCache.front();
                                 m_nAnswIdx = m_nReqIdx;
@@ -401,9 +394,8 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
                             }
                         }
                         else {
-#if CONSOLE_DEBUG
-                            std::cout << "data precacher [" << uintptr_t(this) << "] out-of-order request, destroying cache" << std::endl;
-#endif //CONSOLE_DEBUG
+                            if(datasets::getParserVerbosity()>2)
+                                std::cout << "data precacher [" << uintptr_t(this) << "] out-of-order request, destroying cache" << std::endl;
                             qoCache = std::queue<cv::Mat>();
                             m_oReqPacket = m_lCallback(m_nReqIdx);
                             m_nAnswIdx = m_nReqIdx;
@@ -413,28 +405,24 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
                         }
                     }
                     else {
-#if CONSOLE_DEBUG
-                        std::cout << "data precacher [" << uintptr_t(this) << "] answering request manually, precaching is falling behind" << std::endl;
-#endif //CONSOLE_DEBUG
+                        if(datasets::getParserVerbosity()>2)
+                            std::cout << "data precacher [" << uintptr_t(this) << "] answering request manually, precaching is falling behind" << std::endl;
                         m_oReqPacket = m_lCallback(m_nReqIdx);
                         m_nAnswIdx = m_nReqIdx;
                         nFirstBufferIdx = nNextBufferIdx = size_t(-1);
                         nNextExpectedReqIdx = nNextPrecacheIdx = m_nReqIdx+1;
                     }
                 }
-#if CONSOLE_DEBUG
-                else
+                else if(datasets::getParserVerbosity()>2)
                     std::cout << "data precacher [" << uintptr_t(this) << "] answering request using last packet" << std::endl;
-#endif //CONSOLE_DEBUG
                 m_oSyncCondVar.notify_one();
                 lCacheNextPacket();
             }
             else if(!bReachedEnd) {
                 const size_t nUsedBufferSize = nFirstBufferIdx==size_t(-1)?0:(nFirstBufferIdx<nNextBufferIdx?nNextBufferIdx-nFirstBufferIdx:nBufferSize-nFirstBufferIdx+nNextBufferIdx);
                 if(nUsedBufferSize<nBufferSize/4) {
-#if CONSOLE_DEBUG
-                    std::cout << "data precacher [" << uintptr_t(this) << "] force refilling precache buffer... (current size = " << (nUsedBufferSize/1024)/1024 << " mb)" << std::endl;
-#endif //CONSOLE_DEBUG
+                    if(datasets::getParserVerbosity()>2)
+                        std::cout << "data precacher [" << uintptr_t(this) << "] force refilling precache buffer... (current size = " << (nUsedBufferSize/1024)/1024 << " mb)" << std::endl;
                     size_t nFillCount = 0;
                     const std::chrono::time_point<std::chrono::high_resolution_clock> nRefillTick = std::chrono::high_resolution_clock::now();
                     while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nRefillTick).count()<PRECACHE_REFILL_TIMEOUT_MS && nFillCount++<10 && lCacheNextPacket());
@@ -1203,16 +1191,13 @@ size_t lv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
             m_oQueueCondVar.notify_one();
         }
         else {
-#if CONSOLE_DEBUG
-            std::cout << "data writer [" << uintptr_t(this) << "] dropping packet #" << nIdx << std::endl;
-#endif //CONSOLE_DEBUG
+            if(datasets::getParserVerbosity()>2)
+                std::cout << "data writer [" << uintptr_t(this) << "] dropping packet #" << nIdx << std::endl;
             nPacketPosition = SIZE_MAX; // packet dropped
         }
     }
-#if CONSOLE_DEBUG
-    if((nIdx%50)==0)
+    if(datasets::getParserVerbosity()>2 && (nIdx%50)==0)
         std::cout << "data writer [" << uintptr_t(this) << "] queue @ " << (int)(((float)m_nQueueSize*100)/m_nQueueMaxSize) << "% capacity" << std::endl;
-#endif //CONSOLE_DEBUG
     return nPacketPosition;
 }
 
@@ -1251,9 +1236,8 @@ void lv::DataWriter::stopAsyncWriting() {
 
 void lv::DataWriter::entry() {
     lv::mutex_unique_lock sync_lock(m_oSyncMutex);
-#if CONSOLE_DEBUG
-    std::cout << "data writer [" << uintptr_t(this) << "] init w/ max buffer size = " << (m_nQueueMaxSize/1024)/1024 << " mb" << std::endl;
-#endif //CONSOLE_DEBUG
+    if(datasets::getParserVerbosity()>1)
+        std::cout << "data writer [" << uintptr_t(this) << "] init w/ max buffer size = " << (m_nQueueMaxSize/1024)/1024 << " mb" << std::endl;
     while(m_bIsActive || m_nQueueCount>0) {
         m_oQueueCondVar.wait(sync_lock,[&](){return !m_bIsActive || m_nQueueCount>0;});
         if(m_nQueueCount>0) {
