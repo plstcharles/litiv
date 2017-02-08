@@ -247,6 +247,17 @@ namespace cv { // extending cv
     /// default MatSizeInfo struct defaults to size_t for dim/size indexing
     using MatSizeInfo = MatSizeInfo_<size_t>;
 
+    /// ostream-friendly overload for MatSizeInfo (ADL will allow usage from this namespace)
+    template<typename Tinteger>
+    std::ostream& operator<<(std::ostream& os, const MatSizeInfo_<Tinteger>& oSize) {
+        if(oSize.dims()==Tinteger(0))
+            return os << "0-d:[]<empty>";
+        os << (int)oSize.dims() << "-d:[";
+        for(Tinteger nDimIdx=0; nDimIdx<oSize.dims(); ++nDimIdx)
+            os << (int)oSize[nDimIdx] << (nDimIdx<oSize.dims()-1?",":"");
+        return os << "]" << (oSize.total()>0?"":"<empty>");
+    }
+
     /// simplified cv::Mat header info container for usage in datasets module; contains all required info to preallocate matrix packets
     struct MatInfo {
         /// contains info about the layout of the matrix's elements
