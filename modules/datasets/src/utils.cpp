@@ -149,7 +149,8 @@ lv::DataHandler::DataHandler(const std::string& sBatchName, const std::string& s
         m_bForcingGrayscale(lv::string_contains_token(sRelativePath,oParent.getGrayscaleDirTokens())),
         m_oParent(oParent),
         m_oRoot(getRootNodeHelper(oParent)) {
-    lv::createDirIfNotExist(m_sOutputPath);
+    if(!m_sOutputPath.empty())
+        lv::createDirIfNotExist(m_sOutputPath);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1616,4 +1617,7 @@ lv::DatasetHandler::DatasetHandler(const std::string& sDatasetName,const std::st
         m_bSavingOutput(bSaveOutput),
         m_bUsingEvaluator(bUseEvaluator),
         m_bForce4ByteDataAlign(bForce4ByteDataAlign),
-        m_dScaleFactor(dScaleFactor) {}
+        m_dScaleFactor(dScaleFactor) {
+    if(!m_sOutputPath.empty())
+        lv::createDirIfNotExist(m_sOutputPath);
+}

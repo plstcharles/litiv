@@ -169,8 +169,7 @@ namespace lv {
             std::cout << "Parsing directory '" << this->getDataPath() << "' for dataset '" << this->getName() << "'..." << std::endl;
             this->m_vpBatches.clear();
             this->m_bIsBare = false; // always false by default for top level
-            if(!this->getOutputPath().empty())
-                lv::createDirIfNotExist(this->getOutputPath());
+            this->m_vpBatches.clear();
             for(const auto& sPathIter : this->getWorkBatchDirs())
                 this->m_vpBatches.push_back(createWorkBatch(sPathIter,lv::addDirSlashIfMissing(sPathIter)));
         }
