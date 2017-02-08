@@ -43,8 +43,8 @@ namespace lv {
         ) :
                 IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_CosegmTests,DatasetEval_BinaryClassifierArray,eEvalImpl>(
                         "cosegm_tests",
-                        lv::datasets::getDatasetsRootPath()+"litiv/cosegm_tests/",
-                        lv::datasets::getDatasetsRootPath()+"litiv/cosegm_tests/results/"+lv::addDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getRootPath()+"litiv/cosegm_tests/",
+                        lv::datasets::getRootPath()+"litiv/cosegm_tests/results/"+lv::addDirSlashIfMissing(sOutputDirName),
                         "bin",
                         ".png",
                         std::vector<std::string>{"test01"},
