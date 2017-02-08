@@ -64,7 +64,7 @@ namespace cv { // extending cv
     struct MatSizeInfo_ {
         /// default constructor; initializes internal config as zero-dim (empty)
         MatSizeInfo_() :
-                m_vSizes{Tinteger(0)},m_aSizes(nullptr) {printf("@@@@@\n");}
+                m_vSizes{Tinteger(0)},m_aSizes(nullptr) {}
         /// cv::MatSize-based constructor
         MatSizeInfo_(const cv::MatSize& oSize) :
                 m_vSizes(cvtSizes(oSize.p)),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
@@ -136,15 +136,6 @@ namespace cv { // extending cv
         operator const Tinteger*() const {
             return m_aSizes;
         }
-        /// implicit conversion op to raw 'int' size lookup array (non-trivial)
-        template<typename... TDummy, typename T=Tinteger>
-        operator std::enable_if_t<!std::is_same<T,int>::value,const int*>() const {
-            static_assert(sizeof...(TDummy)==0,"template args not needed");
-            m_vSizesExt.resize(m_vSizes.size());
-            for(size_t nIdx=0; nIdx<m_vSizes.size(); ++nIdx)
-                m_vSizesExt[nIdx] = (int)m_vSizes[nIdx];
-            return m_vSizesExt.data();
-        }
         /// implicit conversion op to cv::MatSize (non-trivial)
         operator cv::MatSize() const {
             m_vSizesExt.resize(m_vSizes.size());
@@ -184,13 +175,15 @@ namespace cv { // extending cv
         /// is-equal test operator for other MatSizeInfo_ structs
         template<typename Tinteger2>
         bool operator==(const MatSizeInfo_<Tinteger2>& oSize) const {
+            if(empty() && oSize.empty())
+                return true;
             const Tinteger nDims = dims();
-            if(nDims!=(Tinteger)oSize[-1])
+            if(nDims!=(Tinteger)oSize.dims())
                 return false;
             else if(nDims==Tinteger(2))
-                return size(0)==(Tinteger)oSize[0] && size(1)==(Tinteger)oSize[1];
+                return size(0)==(Tinteger)oSize.size(0) && size(1)==(Tinteger)oSize.size(1);
             for(Tinteger nDimIdx=0; nDimIdx<nDims; ++nDimIdx)
-                if(size(nDimIdx)!=(Tinteger)oSize[nDimIdx])
+                if(size(nDimIdx)!=(Tinteger)oSize.size(nDimIdx))
                     return false;
             return true;
         }
