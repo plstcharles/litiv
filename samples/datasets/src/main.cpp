@@ -73,7 +73,7 @@ int main(int, char**) { // this sample uses no command line argument
         }
         std::cout << "All done!\n" << std::endl;
 
-#else //USE_MIDDLEBURY_SPECIALIZATION
+#else //!USE_MIDDLEBURY_SPECIALIZATION
 
         // The 'DatasetType' alias below is only used to simplify templating; the 'Dataset_' interface
         // has three enum template parameters, namely the dataset task type ('eDatasetTask'), the datset
@@ -175,7 +175,7 @@ int main(int, char**) { // this sample uses no command line argument
         pDataset->writeEvalReport(); // will write a basic evaluation report listing processed packet counts, processing speed, session duration, and framework version
         std::cout << "All done!\n" << std::endl;
 
-#endif //USE_MIDDLEBURY_SPECIALIZATION
+#endif //!USE_MIDDLEBURY_SPECIALIZATION
 
     }
     catch(const cv::Exception& e) {std::cout << "\nmain caught cv::Exception:\n" << e.what() << "\n" << std::endl; return -1;}
