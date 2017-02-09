@@ -524,3 +524,15 @@ TEST(AlignedMatAllocatorPremade,regression) {
     oTest.create(12,13);
     ASSERT_TRUE(((uintptr_t)oTest.datastart%32)==size_t(0));
 }
+
+TEST(ffmpeg_compat,read_x264) {
+    const std::string sFileLocation = SAMPLES_DATA_ROOT "/tractor.mp4";
+    cv::VideoCapture oCap(sFileLocation);
+    ASSERT_TRUE(lv::checkIfExists(sFileLocation));
+    ASSERT_TRUE(oCap.isOpened()) << " --- make sure your OpenCV installation can read x264 videos!";
+    cv::Mat oFrame;
+    oCap >> oFrame;
+    ASSERT_TRUE(!oFrame.empty() && oFrame.type()==CV_8UC3 && oFrame.size()==cv::Size(1920,1080));
+    oCap >> oFrame;
+    ASSERT_TRUE(!oFrame.empty() && oFrame.type()==CV_8UC3 && oFrame.size()==cv::Size(1920,1080));
+}
