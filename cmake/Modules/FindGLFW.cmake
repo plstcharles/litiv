@@ -30,7 +30,9 @@
 # GLFW_LIBRARIES
 #
 
-find_path( GLFW_INCLUDE_DIR
+set(GLFW_FOUND 0)
+
+find_path(GLFW_INCLUDE_DIR
     NAMES
         GLFW/glfw3.h
     HINTS
@@ -54,10 +56,7 @@ find_path( GLFW_INCLUDE_DIR
         "The directory where GLFW/glfw3.h resides"
 )
 
-#
-# XXX: Do we still need to search for GL/glfw.h?
-#
-find_path( GLFW_INCLUDE_DIR
+find_path(GLFW_INCLUDE_DIR
     NAMES
         GL/glfw.h
     HINTS
@@ -81,9 +80,9 @@ find_path( GLFW_INCLUDE_DIR
         "The directory where GL/glfw.h resides"
 )
 
-if (WIN32)
+if(WIN32)
     if(CYGWIN)
-        find_library( GLFW_glfw_LIBRARY
+        find_library(GLFW_glfw_LIBRARY
             NAMES
                 glfw32
             HINTS
@@ -102,7 +101,7 @@ if (WIN32)
                 "The GLFW library"
         )
     else()
-        find_library( GLFW_glfw_LIBRARY
+        find_library(GLFW_glfw_LIBRARY
             NAMES
                 glfw32
                 glfw32s
@@ -127,9 +126,10 @@ if (WIN32)
                 "The GLFW library"
         )
     endif()
-else ()
-    if (APPLE)
-        find_library( GLFW_glfw_LIBRARY glfw
+    set(GLFW_FOUND_DEPS 1)
+else()
+    if(APPLE)
+        find_library(GLFW_glfw_LIBRARY glfw
             NAMES
                 glfw
                 glfw3
@@ -144,32 +144,60 @@ else ()
         set(GLFW_cocoa_LIBRARY "-framework Cocoa" CACHE STRING "Cocoa framework for OSX")
         set(GLFW_corevideo_LIBRARY "-framework CoreVideo" CACHE STRING "CoreVideo framework for OSX")
         set(GLFW_iokit_LIBRARY "-framework IOKit" CACHE STRING "IOKit framework for OSX")
-    else ()
-        # (*)NIX
-
-        find_package(Threads REQUIRED)
-
-        find_package(X11 REQUIRED)
-
-        if(NOT X11_Xrandr_FOUND)
-            message(FATAL_ERROR "Xrandr library not found - required for GLFW")
-        endif()
-
-        if(NOT X11_xf86vmode_FOUND)
-            message(FATAL_ERROR "xf86vmode library not found - required for GLFW")
-        endif()
-
-        if(NOT X11_Xcursor_FOUND)
-            message(FATAL_ERROR "Xcursor library not found - required for GLFW")
-        endif()
-
-        if(NOT X11_Xinerama_FOUND)
-            message(FATAL_ERROR "Xinerama library not found - required for GLFW")
+        set(GLFW_FOUND_DEPS 1)
+    else() # (*)NIX
+        if(GLFW_FIND_REQUIRED)
+            find_package(Threads REQUIRED)
+            find_package(X11 REQUIRED)
+            if(NOT X11_Xrandr_FOUND)
+                message(FATAL_ERROR "Xrandr library not found - required for GLFW")
+            endif()
+            if(NOT X11_xf86vmode_FOUND)
+                message(FATAL_ERROR "xf86vmode library not found - required for GLFW")
+            endif()
+            if(NOT X11_Xcursor_FOUND)
+                message(FATAL_ERROR "Xcursor library not found - required for GLFW")
+            endif()
+            if(NOT X11_Xinerama_FOUND)
+                message(FATAL_ERROR "Xinerama library not found - required for GLFW")
+            endif()
+            set(GLFW_FOUND_DEPS 1)
+        else()
+            find_package(Threads)
+            if(NOT Threads_FOUND)
+                if(NOT GLFW_FIND_QUIETLY)
+                    message(STATUS "Threading library not found - required for GLFW")
+                endif()
+            else()
+                find_package(X11)
+                if(NOT X11_FOUND)
+                    if(NOT GLFW_FIND_QUIETLY)
+                        message(STATUS "X11 library not found - required for GLFW")
+                    endif()
+                elseif(NOT X11_Xrandr_FOUND)
+                    if(NOT GLFW_FIND_QUIETLY)
+                        message(STATUS "Xrandr library not found - required for GLFW")
+                    endif()
+                elseif(NOT X11_xf86vmode_FOUND)
+                    if(NOT GLFW_FIND_QUIETLY)
+                        message(STATUS "xf86vmode library not found - required for GLFW")
+                    endif()
+                elseif(NOT X11_Xcursor_FOUND)
+                    if(NOT GLFW_FIND_QUIETLY)
+                        message(STATUS "Xcursor library not found - required for GLFW")
+                    endif()
+                elseif(NOT X11_Xinerama_FOUND)
+                    if(NOT GLFW_FIND_QUIETLY)
+                        message(STATUS "Xinerama library not found - required for GLFW")
+                    endif()
+                else()
+                    set(GLFW_FOUND_DEPS 1)
+                endif()
+            endif()
         endif()
 
         list(APPEND GLFW_x11_LIBRARY "${X11_Xrandr_LIB}" "${X11_Xxf86vm_LIB}" "${X11_Xcursor_LIB}" "${X11_Xinerama_LIB}" "${CMAKE_THREAD_LIBS_INIT}" -lrt -lXi)
-
-        find_library( GLFW_glfw_LIBRARY
+        find_library(GLFW_glfw_LIBRARY
             NAMES
                 glfw
                 glfw3
@@ -190,71 +218,54 @@ else ()
             DOC
                 "The GLFW library"
         )
-    endif (APPLE)
-endif (WIN32)
-
-set( GLFW_FOUND "NO" )
+    endif()
+endif()
 
 if(GLFW_INCLUDE_DIR)
-
     if(GLFW_glfw_LIBRARY)
-        set( GLFW_LIBRARIES "${GLFW_glfw_LIBRARY}"
-                            "${GLFW_x11_LIBRARY}"
-                            "${GLFW_cocoa_LIBRARY}"
-                            "${GLFW_iokit_LIBRARY}"
-                            "${GLFW_corevideo_LIBRARY}" )
-        set( GLFW_FOUND "YES" )
-        set (GLFW_LIBRARY "${GLFW_LIBRARIES}")
-        set (GLFW_INCLUDE_PATH "${GLFW_INCLUDE_DIR}")
+        set(GLFW_LIBRARIES
+`           "${GLFW_glfw_LIBRARY}"
+            "${GLFW_x11_LIBRARY}"
+            "${GLFW_cocoa_LIBRARY}"
+            "${GLFW_iokit_LIBRARY}"
+            "${GLFW_corevideo_LIBRARY}"
+        )
+        set(GLFW_FOUND 1)
+        set(GLFW_LIBRARY "${GLFW_LIBRARIES}")
+        set(GLFW_INCLUDE_PATH "${GLFW_INCLUDE_DIR}")
     endif(GLFW_glfw_LIBRARY)
-
-
     # Tease the GLFW_VERSION numbers from the lib headers
     function(parseVersion FILENAME VARNAME)
-
         set(PATTERN "^#define ${VARNAME}.*$")
-
         file(STRINGS "${GLFW_INCLUDE_DIR}/${FILENAME}" TMP REGEX ${PATTERN})
-
         string(REGEX MATCHALL "[0-9]+" TMP ${TMP})
-
         set(${VARNAME} ${TMP} PARENT_SCOPE)
-
     endfunction()
-
-
     if(EXISTS "${GLFW_INCLUDE_DIR}/GL/glfw.h")
-
         parseVersion(GL/glfw.h GLFW_VERSION_MAJOR)
         parseVersion(GL/glfw.h GLFW_VERSION_MINOR)
         parseVersion(GL/glfw.h GLFW_VERSION_REVISION)
-
     elseif(EXISTS "${GLFW_INCLUDE_DIR}/GLFW/glfw3.h")
-
         parseVersion(GLFW/glfw3.h GLFW_VERSION_MAJOR)
         parseVersion(GLFW/glfw3.h GLFW_VERSION_MINOR)
         parseVersion(GLFW/glfw3.h GLFW_VERSION_REVISION)
-
     endif()
-
     if(${GLFW_VERSION_MAJOR} OR ${GLFW_VERSION_MINOR} OR ${GLFW_VERSION_REVISION})
         set(GLFW_VERSION "${GLFW_VERSION_MAJOR}.${GLFW_VERSION_MINOR}.${GLFW_VERSION_REVISION}")
         set(GLFW_VERSION_STRING "${GLFW_VERSION}")
         mark_as_advanced(GLFW_VERSION)
     endif()
-
 endif(GLFW_INCLUDE_DIR)
 
 include(FindPackageHandleStandardArgs)
-
 find_package_handle_standard_args(GLFW
     REQUIRED_VARS
         GLFW_INCLUDE_DIR
         GLFW_LIBRARIES
+        GLFW_FOUND_DEPS
     VERSION_VAR
         GLFW_VERSION
 )
-
 if(GLFW_FOUND)
     mark_as_advanced(
         GLFW_INCLUDE_DIR
