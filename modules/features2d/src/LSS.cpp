@@ -90,8 +90,8 @@ inline void ssdesc_genmask(int nMaskSize, int nRadialBins, int nAngularBins, cv:
     //std::cout << "nAngularBins = " << nAngularBins << std::endl;
     //std::cout << "nRadialBins = " << nRadialBins << std::endl;
     //std::cout << "oMask = \n";
-    //cv::printMatrix(oMask);
-    //cv::Mat oMask_out = cv::getUniqueColorMap(oMask);
+    //lv::print(oMask);
+    //cv::Mat oMask_out = lv::getUniqueColorMap(oMask);
     //cv::resize(oMask_out,oMask_out,cv::Size(400,400),0,0,cv::INTER_NEAREST);
     //cv::imshow("oMask",oMask_out);
     //cv::waitKey(0);

@@ -97,17 +97,17 @@ namespace lv {
             lvAssert_(nMaxStates<size_t(std::numeric_limits<int>::max()),"element type too big to fit in matrix histograms due to int-indexing");
             const std::array<int,2> aMargHistMaxStates = {(aJointHistMaxStates[nInputIdx]=int(nMaxStates)),1};
             oOutput.aMargHists[nInputIdx].create(bUseSparseMats?1:2,aMargHistMaxStates.data());
-            cv::zeroMat(oOutput.aMargHists[nInputIdx]);
+            lv::zeroMat(oOutput.aMargHists[nInputIdx]);
             if(!bFastNumApprox) {
                 oOutput.aMargCounts[nInputIdx].create(bUseSparseMats?1:2,aMargHistMaxStates.data());
-                cv::zeroMat(oOutput.aMargCounts[nInputIdx]);
+                lv::zeroMat(oOutput.aMargCounts[nInputIdx]);
             }
         });
         oOutput.oJointHist.create(int(HistData::dims()),aJointHistMaxStates.data());
-        cv::zeroMat(oOutput.oJointHist);
+        lv::zeroMat(oOutput.oJointHist);
         if(!bFastNumApprox) {
             oOutput.oJointCount.create(int(HistData::dims()),aJointHistMaxStates.data());
-            cv::zeroMat(oOutput.oJointCount);
+            lv::zeroMat(oOutput.oJointCount);
         }
         const size_t nElemCount = std::get<0>(aInputs).total();
         std::array<int,HistData::dims()> aCurrJointHistIdxs;
@@ -120,29 +120,29 @@ namespace lv {
                 lvDbgAssert(nCurrElem>=0);
                 const std::array<int,2> aMargHistIdxs = {(aCurrJointHistIdxs[nInputIdx]=nQuantifStep>1?nCurrElem/int(nQuantifStep):nCurrElem),0};
                 if(bFastNumApprox)
-                    cv::getElem(oOutput.aMargHists[nInputIdx],aMargHistIdxs.data()) += fCountIncr;
+                    lv::getElem(oOutput.aMargHists[nInputIdx],aMargHistIdxs.data()) += fCountIncr;
                 else
-                    ++cv::getElem(oOutput.aMargCounts[nInputIdx],aMargHistIdxs.data());
+                    ++lv::getElem(oOutput.aMargCounts[nInputIdx],aMargHistIdxs.data());
             });
             if(bFastNumApprox)
-                cv::getElem(oOutput.oJointHist,aCurrJointHistIdxs.data()) += fCountIncr;
+                lv::getElem(oOutput.oJointHist,aCurrJointHistIdxs.data()) += fCountIncr;
             else
-                ++cv::getElem(oOutput.oJointCount,aCurrJointHistIdxs.data());
+                ++lv::getElem(oOutput.oJointCount,aCurrJointHistIdxs.data());
         }
         if(!bFastNumApprox) {
             for(size_t nInputIdx=0; nInputIdx<HistData::dims(); ++nInputIdx) {
                 std::array<int,bUseSparseMats?1:2> anIterPos;
                 for(auto pIter=oOutput.aMargCounts[nInputIdx].begin(); pIter!=oOutput.aMargCounts[nInputIdx].end(); ++pIter)
-                    cv::getElem(oOutput.aMargHists[nInputIdx],cv::getIterPos(pIter,anIterPos)) = (*pIter)*fCountIncr;
+                    lv::getElem(oOutput.aMargHists[nInputIdx],lv::getIterPos(pIter,anIterPos)) = (*pIter)*fCountIncr;
             }
             std::array<int,HistData::dims()> anIterPos;
             for(auto pIter=oOutput.oJointCount.begin(); pIter!=oOutput.oJointCount.end(); ++pIter)
-                cv::getElem(oOutput.oJointHist,cv::getIterPos(pIter,anIterPos)) = (*pIter)*fCountIncr;
+                lv::getElem(oOutput.oJointHist,lv::getIterPos(pIter,anIterPos)) = (*pIter)*fCountIncr;
         }
         if(bUseSparseMats) {
-            oOutput.nJointStates = cv::getElemCount(oOutput.oJointHist);
+            oOutput.nJointStates = lv::getElemCount(oOutput.oJointHist);
             for(size_t nInputIdx=0; nInputIdx<HistData::dims(); ++nInputIdx)
-                oOutput.aStates[nInputIdx] = cv::getElemCount(oOutput.aMargHists[nInputIdx]);
+                oOutput.aStates[nInputIdx] = lv::getElemCount(oOutput.aMargHists[nInputIdx]);
         }
         else {
             oOutput.nJointStates = size_t(lv::static_reduce(aJointHistMaxStates,[](int a, int b){return a*b;}));
@@ -169,15 +169,15 @@ namespace lv {
         }
         calcJointProbHist<nHistQuantifStep,bUseSparseHistMats,bFastNumApprox,bSkipMinMax>(std::make_tuple(oInput1,oInput2),*pJointProbHistOutput);
         lvDbgAssert(pJointProbHistOutput->aStates[0]>0 && pJointProbHistOutput->aStates[1]>0 && pJointProbHistOutput->nJointStates>0);
-        lvDbgAssert(cv::getElemCount(pJointProbHistOutput->aMargHists[0])>0 && cv::getElemCount(pJointProbHistOutput->aMargHists[1])>0 && cv::getElemCount(pJointProbHistOutput->oJointHist)>0);
+        lvDbgAssert(lv::getElemCount(pJointProbHistOutput->aMargHists[0])>0 && lv::getElemCount(pJointProbHistOutput->aMargHists[1])>0 && lv::getElemCount(pJointProbHistOutput->oJointHist)>0);
         double dMutualInfoScore = 0.0f;
         std::array<int,2> anIterPos;
         for(auto pIter=pJointProbHistOutput->oJointCount.begin(); pIter!=pJointProbHistOutput->oJointCount.end(); ++pIter) {
-            const int* anPos = cv::getIterPos(pIter,anIterPos);
-            const float& fCurrElemJointProb = cv::getElem(pJointProbHistOutput->oJointHist,anPos);
+            const int* anPos = lv::getIterPos(pIter,anIterPos);
+            const float& fCurrElemJointProb = lv::getElem(pJointProbHistOutput->oJointHist,anPos);
             if(fCurrElemJointProb>0) {
-                const float& fCurrElemMargProb1 = cv::getElem(pJointProbHistOutput->aMargHists[0],std::array<int,2>{anPos[0],0}.data());
-                const float& fCurrElemMargProb2 = cv::getElem(pJointProbHistOutput->aMargHists[1],std::array<int,2>{anPos[1],0}.data());
+                const float& fCurrElemMargProb1 = lv::getElem(pJointProbHistOutput->aMargHists[0],std::array<int,2>{anPos[0],0}.data());
+                const float& fCurrElemMargProb2 = lv::getElem(pJointProbHistOutput->aMargHists[1],std::array<int,2>{anPos[1],0}.data());
                 if(fCurrElemMargProb1>0 && fCurrElemMargProb2>0)
                     dMutualInfoScore += double(fCurrElemJointProb*std::log(fCurrElemJointProb/fCurrElemMargProb1/fCurrElemMargProb2)); // @@@@ check precision/speed for mult instead of double-div? set as FastNumApprox?
             }

@@ -458,27 +458,27 @@ const cv::Mat& lv::IIDataLoader::getGT(size_t nPacketIdx) {
 }
 
 const cv::Mat& lv::IIDataLoader::getInputROI(size_t /*nPacketIdx*/) const {
-    return cv::emptyMat();
+    return lv::emptyMat();
 }
 
 const cv::Mat& lv::IIDataLoader::getGTROI(size_t /*nPacketIdx*/) const {
-    return cv::emptyMat();
+    return lv::emptyMat();
 }
 
 const cv::Size& lv::IIDataLoader::getInputSize(size_t /*nPacketIdx*/) const {
-    return cv::emptySize();
+    return lv::emptySize();
 }
 
 const cv::Size& lv::IIDataLoader::getGTSize(size_t /*nPacketIdx*/) const {
-    return cv::emptySize();
+    return lv::emptySize();
 }
 
 const cv::Size& lv::IIDataLoader::getInputMaxSize() const {
-    return cv::emptySize();
+    return lv::emptySize();
 }
 
 const cv::Size& lv::IIDataLoader::getGTMaxSize() const {
-    return cv::emptySize();
+    return lv::emptySize();
 }
 
 lv::IIDataLoader::IIDataLoader(PacketPolicy eInputType, PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
@@ -493,7 +493,7 @@ const cv::Mat& lv::IIDataLoader::getInput_redirect(size_t nIdx) {
 #if HARDCODE_IMAGE_PACKET_INDEX
             std::stringstream sstr;
             sstr << "Packet #" << nIdx;
-            cv::putText(m_oLatestInput,sstr.str(),cv::Scalar_<uchar>::all(255));
+            lv::putText(m_oLatestInput,sstr.str(),cv::Scalar_<uchar>::all(255));
 #endif //HARDCODE_IMAGE_PACKET_INDEX
             if(is4ByteAligned() && m_oLatestInput.channels()==3)
                 cv::cvtColor(m_oLatestInput,m_oLatestInput,cv::COLOR_BGR2BGRA);
@@ -512,7 +512,7 @@ const cv::Mat& lv::IIDataLoader::getGT_redirect(size_t nIdx) {
 #if HARDCODE_IMAGE_PACKET_INDEX
             std::stringstream sstr;
             sstr << "Packet #" << nIdx;
-            cv::putText(m_oLatestGT,sstr.str(),cv::Scalar_<uchar>::all(255));
+            lv::putText(m_oLatestGT,sstr.str(),cv::Scalar_<uchar>::all(255));
 #endif //HARDCODE_IMAGE_PACKET_INDEX
             if(is4ByteAligned() && m_oLatestGT.channels()==3)
                 cv::cvtColor(m_oLatestGT,m_oLatestGT,cv::COLOR_BGR2BGRA);
@@ -544,7 +544,7 @@ std::string lv::IDataLoader_<lv::Array>::getGTStreamName(size_t nStreamIdx) cons
 
 const std::vector<cv::Mat>& lv::IDataLoader_<lv::Array>::getInputArray(size_t nPacketIdx) {
     if(getInputStreamCount()==0)
-        return cv::emptyMatArray();
+        return lv::emptyMatArray();
     // add last check logic...?
     m_vLatestUnpackedInput.resize(getInputStreamCount());
     unpackInput(nPacketIdx,m_vLatestUnpackedInput);
@@ -553,7 +553,7 @@ const std::vector<cv::Mat>& lv::IDataLoader_<lv::Array>::getInputArray(size_t nP
 
 const std::vector<cv::Mat>& lv::IDataLoader_<lv::Array>::getGTArray(size_t nPacketIdx) {
     if(getGTStreamCount()==0)
-        return cv::emptyMatArray();
+        return lv::emptyMatArray();
     // add last check logic...?
     m_vLatestUnpackedGT.resize(getGTStreamCount());
     unpackGT(nPacketIdx,m_vLatestUnpackedGT);
@@ -561,19 +561,19 @@ const std::vector<cv::Mat>& lv::IDataLoader_<lv::Array>::getGTArray(size_t nPack
 }
 
 const std::vector<cv::Mat>& lv::IDataLoader_<lv::Array>::getInputROIArray(size_t /*nPacketIdx*/) const {
-    return cv::emptyMatArray();
+    return lv::emptyMatArray();
 }
 
 const std::vector<cv::Mat>& lv::IDataLoader_<lv::Array>::getGTROIArray(size_t /*nPacketIdx*/) const {
-    return cv::emptyMatArray();
+    return lv::emptyMatArray();
 }
 
 const std::vector<cv::Size>& lv::IDataLoader_<lv::Array>::getInputSizeArray(size_t /*nPacketIdx*/) const {
-    return cv::emptySizeArray();
+    return lv::emptySizeArray();
 }
 
 const std::vector<cv::Size>& lv::IDataLoader_<lv::Array>::getGTSizeArray(size_t /*nPacketIdx*/) const {
-    return cv::emptySizeArray();
+    return lv::emptySizeArray();
 }
 
 bool lv::IDataLoader_<lv::Array>::isStreamGrayscale(size_t /*nStreamIdx*/) const {
@@ -915,7 +915,7 @@ void lv::IDataProducer_<lv::DatasetSource_Image>::startPrecaching(bool bPrecache
 
 const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getInputSize(size_t nPacketIdx) const {
     if(nPacketIdx>=m_vInputSizes.size())
-        return cv::emptySize();
+        return lv::emptySize();
     return m_vInputSizes[nPacketIdx];
 }
 
@@ -925,7 +925,7 @@ const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getGTSize(size_t nP
         if(nGTIdx<m_vGTSizes.size())
             return m_vGTSizes[nGTIdx];
     }
-    return cv::emptySize();
+    return lv::emptySize();
 }
 
 const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getInputMaxSize() const {
@@ -1025,7 +1025,7 @@ void lv::IDataProducer_<lv::DatasetSource_ImageArray>::startPrecaching(bool bPre
 
 const std::vector<cv::Size>& lv::IDataProducer_<lv::DatasetSource_ImageArray>::getInputSizeArray(size_t nPacketIdx) const {
     if(nPacketIdx>=m_vvInputSizes.size())
-        return cv::emptySizeArray();
+        return lv::emptySizeArray();
     return m_vvInputSizes[nPacketIdx];
 }
 
@@ -1035,7 +1035,7 @@ const std::vector<cv::Size>& lv::IDataProducer_<lv::DatasetSource_ImageArray>::g
         if(nGTIdx<m_vvGTSizes.size())
             return m_vvGTSizes[nGTIdx];
     }
-    return cv::emptySizeArray();
+    return lv::emptySizeArray();
 }
 
 const cv::Size& lv::IDataProducer_<lv::DatasetSource_ImageArray>::getInputMaxSize() const {
@@ -1287,7 +1287,7 @@ void lv::IDataArchiver_<lv::NotArray>::save(const cv::Mat& _oOutput, size_t nIdx
         cv::imwrite(sOutputFilePath.str(),oOutput,vnComprParams);
     }
     else
-        cv::write(sOutputFilePath.str(),_oOutput);
+        lv::write(sOutputFilePath.str(),_oOutput);
 }
 
 cv::Mat lv::IDataArchiver_<lv::NotArray>::load(size_t nIdx, int nFlags) {
@@ -1302,7 +1302,7 @@ cv::Mat lv::IDataArchiver_<lv::NotArray>::load(size_t nIdx, int nFlags) {
             return cv::imread(sOutputFilePath.str(),nFlags);
     }
     else
-        return cv::read(sOutputFilePath.str());
+        return lv::read(sOutputFilePath.str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1334,7 +1334,7 @@ void lv::IDataArchiver_<lv::Array>::saveArray(const std::vector<cv::Mat>& vOutpu
             cv::imwrite(sOutputFilePath.str(),oOutput,vnComprParams);
         }
         else
-            cv::write(sOutputFilePath.str(),_oOutput);
+            lv::write(sOutputFilePath.str(),_oOutput);
     }
     else { // nStreamCount>size_t(1)
         for(size_t nStreamIdx=0; nStreamIdx<nStreamCount; ++nStreamIdx) {
@@ -1358,7 +1358,7 @@ void lv::IDataArchiver_<lv::Array>::saveArray(const std::vector<cv::Mat>& vOutpu
                 cv::imwrite(sOutputFilePath.str(),oOutput,vnComprParams);
             }
             else
-                cv::write(sOutputFilePath.str(),_oOutput);
+                lv::write(sOutputFilePath.str(),_oOutput);
         }
     }
 }
@@ -1380,7 +1380,7 @@ std::vector<cv::Mat> lv::IDataArchiver_<lv::Array>::loadArray(size_t nIdx, int n
                 vOutput[nStreamIdx] = cv::imread(sOutputFilePath.str(),nFlags);
         }
         else
-            vOutput[nStreamIdx] = cv::read(sOutputFilePath.str());
+            vOutput[nStreamIdx] = lv::read(sOutputFilePath.str());
     }
     return vOutput;
 }

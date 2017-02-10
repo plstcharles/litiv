@@ -117,7 +117,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         const double dDefaultThreshold = pAlgo->getDefaultThreshold();
 #endif //(!FULL_THRESH_ANALYSIS)
 #if DISPLAY_OUTPUT>0
-        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
+        lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
 #endif //DISPLAY_OUTPUT>0
         oBatch.startProcessing();

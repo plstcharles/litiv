@@ -70,7 +70,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     oFS["pts0"] >> avMarkers[0];
     oFS["pts1"] >> avMarkers[1];
 #else //!LOAD_POINTS_FROM_LAST
-    cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getName()+" calib",oBatch.getOutputPath()+"/../");
+    lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName()+" calib",oBatch.getOutputPath()+"/../");
     std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs = {{
             std::make_pair(vInitInput[0].clone(),oBatch.getInputStreamName(0)),
             std::make_pair(vInitInput[1].clone(),oBatch.getInputStreamName(1))
@@ -91,7 +91,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
                 if(lIsValidCoord(vaMarkers[a][m]))
                     cv::circle(aMarkerMasks[m],cv::Point2i(int(vaMarkers[a][m].x*aMarkerMasks[m].cols),int(vaMarkers[a][m].y*aMarkerMasks[m].rows)),1,cv::Scalar::all(lIsValidCoord(vaMarkers[a][m^1])?255:127),-1);
     };
-    auto lUpdateMarkers = [&](const cv::DisplayHelper::CallbackData& oData) {
+    auto lUpdateMarkers = [&](const lv::DisplayHelper::CallbackData& oData) {
         const cv::Point2f vClickPos(float(oData.oInternalPosition.x)/oData.oTileSize.width,float(oData.oInternalPosition.y)/oData.oTileSize.height);
         if(lIsValidCoord(vClickPos)) {
             const int nCurrTile = oData.oPosition.x/oData.oTileSize.width;
@@ -125,7 +125,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         }
     };
     const cv::Size oDisplayTileSize(960,720);
-    pDisplayHelper->setMouseCallback([&](const cv::DisplayHelper::CallbackData& oData) {
+    pDisplayHelper->setMouseCallback([&](const lv::DisplayHelper::CallbackData& oData) {
         if(oData.nEvent==cv::EVENT_LBUTTONDOWN || oData.nEvent==cv::EVENT_RBUTTONDOWN)
             lUpdateMarkers(oData);
         pDisplayHelper->display(vvDisplayPairs,oDisplayTileSize);

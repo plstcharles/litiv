@@ -81,7 +81,7 @@ TEST(datasets_notarray,regression_custom) {
             sstr << sOutputRootPath << "/" << oBatch.getName() << "/" << sOutputPrefix << oBatch.getOutputName(nProcessedPackets++) << sOutputSuffix;
             ASSERT_TRUE(lv::checkIfExists(sstr.str()));
             cv::Mat oOut = cv::imread(sstr.str(),cv::IMREAD_GRAYSCALE);
-            ASSERT_TRUE(cv::isEqual<uint8_t>(oEdgeMask,oOut));
+            ASSERT_TRUE(lv::isEqual<uint8_t>(oEdgeMask,oOut));
         }
         oBatch.stopProcessing();
         EXPECT_GT(oBatch.getFinalProcessTime(),0.0);

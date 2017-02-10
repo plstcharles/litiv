@@ -27,7 +27,7 @@
 #define MAT_COND_DEPTH_TYPE(depth_flag,depth_type,depth_alt) \
     std::conditional_t<CV_MAT_DEPTH(nTypeFlag)==depth_flag,depth_type,depth_alt>
 
-namespace cv { // extending cv
+namespace lv {
 
     struct DisplayHelper;
     using DisplayHelperPtr = std::shared_ptr<DisplayHelper>;
@@ -91,7 +91,7 @@ namespace cv { // extending cv
         }
         /// copy constructor for similar struct
         template<typename Tinteger2>
-        MatSizeInfo_(const cv::MatSizeInfo_<Tinteger2>& oSize) :
+        MatSizeInfo_(const MatSizeInfo_<Tinteger2>& oSize) :
                 m_vSizes(cvtSizes(oSize.m_vSizes.data()+1)),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
         /// returns the dimension count
         const Tinteger& dims() const {
@@ -194,7 +194,7 @@ namespace cv { // extending cv
         }
         /// assignment operator for different templated integer struct
         template<typename Tinteger2>
-        MatSizeInfo_& operator=(const cv::MatSizeInfo_<Tinteger2>& oSize) {
+        MatSizeInfo_& operator=(const MatSizeInfo_<Tinteger2>& oSize) {
             m_vSizes = cvtSizes(oSize.m_vSizes.data()+1);
             m_aSizes = m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr;
             return *this;
@@ -422,14 +422,14 @@ namespace cv { // extending cv
         getRandNeighborPosition<24>(s_anNeighborPattern,nNeighborCoord_X,nNeighborCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
     }
 
-    /// writes a given text string on an image using the original cv::putText (this function only acts as a simplification wrapper)
+    /// writes a given text string on an image using the original cv::putText
     inline void putText(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom=false, const cv::Point2i& oOffset=cv::Point2i(4,15), int nThickness=2, double dScale=1.2) {
         cv::putText(oImg,sText,cv::Point(oOffset.x,bBottom?(oImg.rows-oOffset.y):oOffset.y),cv::FONT_HERSHEY_PLAIN,dScale,vColor,nThickness,cv::LINE_AA);
     }
 
     /// prints the content of a matrix to the given stream with constant output element size
     template<typename T>
-    inline void printMatrix(const cv::Mat_<T>& oMat, std::ostream& os=std::cout) {
+    inline void print(const cv::Mat_<T>& oMat, std::ostream& os=std::cout) {
         lvAssert_(oMat.dims==2,"function currently only defined for 2d mats; split dims and call for 2d slices");
         if(oMat.empty() || oMat.size().area()==0) {
             os << "   <empty>" << std::endl;
@@ -687,7 +687,7 @@ namespace cv { // extending cv
         lvAssert_(m.dims==2,"function currently only defined for 2d mats; split dims and call for 2d slices");
         if(m.empty())
             return cv::Mat();
-        const std::vector<T> vUniques = cv::unique(m);
+        const std::vector<T> vUniques = lv::unique(m);
         const size_t nColors = vUniques.size();
         if(nColors<=1)
             return cv::Mat(m.size(),CV_8UC3,cv::Scalar::all(255));
@@ -709,7 +709,7 @@ namespace cv { // extending cv
                 while(mDivAngSet.count(nCurrAng))
                     ++nCurrAng %= 360;
                 mDivAngSet.insert(nCurrAng);
-                vColors[nColorIdx++] = cv::getBGRFromHSL(float(nCurrAng),fCurrSat,fCurrLight);
+                vColors[nColorIdx++] = lv::getBGRFromHSL(float(nCurrAng),fCurrSat,fCurrLight);
                 nCurrAng = (nCurrAng+360/nSampleCount)%360;
             }
         }
@@ -779,7 +779,7 @@ namespace cv { // extending cv
         DisplayHelper& operator=(const DisplayHelper&) = delete;
     };
 
-    /// list of archive types supported by cv::write and cv::read
+    /// list of archive types supported by lv::write and lv::read
     enum MatArchiveList {
         MatArchive_FILESTORAGE,
         MatArchive_PLAINTEXT,
@@ -793,7 +793,7 @@ namespace cv { // extending cv
     /// reads matrix data locally using a binary/yml/text file format (inline version)
     inline cv::Mat read(const std::string& sFilePath, MatArchiveList eArchiveType=MatArchive_BINARY) {
         cv::Mat oData;
-        cv::read(sFilePath,oData,eArchiveType);
+        lv::read(sFilePath,oData,eArchiveType);
         return oData;
     }
 
@@ -836,7 +836,7 @@ namespace cv { // extending cv
         AlignedMatAllocator() noexcept {}
         AlignedMatAllocator(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept {}
         template<typename T2>
-        this_type& operator=(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept {}
+        this_type& operator=(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept {return *this;}
         virtual ~AlignedMatAllocator() noexcept {}
         virtual cv::UMatData* allocate(int dims, const int* sizes, int type, void* data, size_t* step, int /*flags*/, cv::UMatUsageFlags /*usageFlags*/) const override {
             step[dims-1] = bAlignSingleElem?cv::alignSize(CV_ELEM_SIZE(type),nByteAlign):CV_ELEM_SIZE(type);
@@ -872,6 +872,10 @@ namespace cv { // extending cv
 
     /// temp function; msvc seems to disable cuda output unless it is passed as argument to an external-lib function call...?
     void doNotOptimize(const cv::Mat& m);
+
+} // namespace lv
+
+namespace cv { // extending cv for fixes
 
 #if USE_OPENCV_MAT_CONSTR_FIX
     template<typename _Tp>

@@ -41,14 +41,14 @@ TEST(dasc_rf,regression_single_compute) {
     ASSERT_EQ(oInputCrop.size[1],oOutputDescMap.size[1]);
     const cv::Mat_<float> oOutputDesc = cv::Mat_<float>(3,std::array<int,3>{1,1,oOutputDescMap.size[2]}.data(),oOutputDescMap.ptr<float>(oWindowSize.width/2,oWindowSize.height/2)).clone();
     if(lv::checkIfExists(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_rf.bin")) {
-        const cv::Mat_<float> oRefDesc = cv::read(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_rf.bin");
+        const cv::Mat_<float> oRefDesc = lv::read(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_rf.bin");
         ASSERT_EQ(oOutputDesc.total(),oRefDesc.total());
         ASSERT_EQ(oOutputDesc.size,oRefDesc.size);
         for(int nDescIdx=0; nDescIdx<oRefDesc.size[2]; ++nDescIdx)
             ASSERT_NEAR_MINRATIO(oOutputDesc.at<float>(0,0,nDescIdx),oRefDesc.at<float>(0,0,nDescIdx),0.04f);
     }
     else
-        cv::write(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_rf.bin",oOutputDesc);
+        lv::write(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_rf.bin",oOutputDesc);
     const std::vector<cv::KeyPoint> vKeyPoints_orig = {cv::KeyPoint(cv::Point2f(float(oWindowSize.width/2),float(oWindowSize.height/2)),float(std::max(oWindowSize.height,oWindowSize.width)))};
     std::vector<cv::KeyPoint> vKeyPoints = vKeyPoints_orig;
     pDASC->compute2(oInputCrop,vKeyPoints,oOutputDescMap);
@@ -151,14 +151,14 @@ TEST(dasc_gf,regression_single_compute) {
     ASSERT_EQ(oInputCrop.size[1],oOutputDescMap.size[1]);
     const cv::Mat_<float> oOutputDesc = cv::Mat_<float>(3,std::array<int,3>{1,1,oOutputDescMap.size[2]}.data(),oOutputDescMap.ptr<float>(oWindowSize.width/2,oWindowSize.height/2)).clone();
     if(lv::checkIfExists(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_gf.bin")) {
-        const cv::Mat_<float> oRefDesc = cv::read(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_gf.bin");
+        const cv::Mat_<float> oRefDesc = lv::read(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_gf.bin");
         ASSERT_EQ(oOutputDesc.total(),oRefDesc.total());
         ASSERT_EQ(oOutputDesc.size,oRefDesc.size);
         for(int nDescIdx=0; nDescIdx<oRefDesc.size[2]; ++nDescIdx)
             ASSERT_NEAR_MINRATIO(oOutputDesc.at<float>(0,0,nDescIdx),oRefDesc.at<float>(0,0,nDescIdx),0.04f);
     }
     else
-        cv::write(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_gf.bin",oOutputDesc);
+        lv::write(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_gf.bin",oOutputDesc);
     const std::vector<cv::KeyPoint> vKeyPoints_orig = {cv::KeyPoint(cv::Point2f(float(oWindowSize.width/2),float(oWindowSize.height/2)),float(std::max(oWindowSize.height,oWindowSize.width)))};
     std::vector<cv::KeyPoint> vKeyPoints = vKeyPoints_orig;
     pDASC->compute2(oInputCrop,vKeyPoints,oOutputDescMap);

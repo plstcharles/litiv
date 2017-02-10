@@ -136,7 +136,7 @@ int main() {
 #endif //WRITE_OUTPUT
 #if DISPLAY_OUTPUT
 #if DISPLAY_OUTPUT>1
-        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create("DISPLAY","c:/temp/",cv::Size(1920,1200),cv::WINDOW_NORMAL);
+        lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create("DISPLAY","c:/temp/",cv::Size(1920,1200),cv::WINDOW_NORMAL);
         CComPtr<ICoordinateMapper> pCoordMapper;
         lvAssertHR(pKinectSensor->get_CoordinateMapper(&pCoordMapper));
         std::map<UINT64,cv::Scalar_<uchar>> mBodyColors;

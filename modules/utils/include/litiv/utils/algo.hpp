@@ -50,7 +50,7 @@ namespace lv {
         virtual ParallelAlgoType getParallelAlgoType() = 0;
 #if USE_CVCORE_WITH_UTILS
         // #### for debug purposes only ####
-        cv::DisplayHelperPtr m_pDisplayHelper;
+        lv::DisplayHelperPtr m_pDisplayHelper;
 #endif //USE_CVCORE_WITH_UTILS
     };
 

@@ -48,7 +48,7 @@ int MutualInfo::borderSize(int nDim) const {
 double MutualInfo::compute(const cv::Mat& _oImage1, const cv::Mat& _oImage2) {
     lvAssert_(_oImage1.rows>=m_oWinSize.height && _oImage1.cols>=m_oWinSize.width && _oImage1.size()==_oImage2.size(),"invalid input image(s) size");
     if(m_bUse24BitPair && ((_oImage1.type()==CV_8UC3 && _oImage2.type()==CV_8UC1) || (_oImage2.type()==CV_8UC3 && _oImage1.type()==CV_8UC1))) {
-        const cv::Mat_<ushort> oImage1 = cv::cvtBGRToPackedYCbCr(_oImage1.type()==CV_8UC3?_oImage1:_oImage2);
+        const cv::Mat_<ushort> oImage1 = lv::cvtBGRToPackedYCbCr(_oImage1.type()==CV_8UC3?_oImage1:_oImage2);
         const cv::Mat_<uchar> oImage2 = _oImage1.type()==CV_8UC3?_oImage2:_oImage1;
         if(m_bUseDenseHist)
             return lv::calcMutualInfo<HIST_QUANTIF_FACTOR,false,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1,oImage2,&oDense24BitHistData);
@@ -71,7 +71,7 @@ void MutualInfo::compute(const cv::Mat& _oImage1, const cv::Mat& _oImage2, const
     lvAssert_(_oImage1.rows>=m_oWinSize.height && _oImage1.cols>=m_oWinSize.width && _oImage1.size()==_oImage2.size(),"invalid input image(s) size");
     vdScores.resize(voKeypoints.size());
     if(m_bUse24BitPair && ((_oImage1.type()==CV_8UC3 && _oImage2.type()==CV_8UC1) || (_oImage2.type()==CV_8UC3 && _oImage1.type()==CV_8UC1))) {
-        const cv::Mat_<ushort> oImage1 = cv::cvtBGRToPackedYCbCr(_oImage1.type()==CV_8UC3?_oImage1:_oImage2);
+        const cv::Mat_<ushort> oImage1 = lv::cvtBGRToPackedYCbCr(_oImage1.type()==CV_8UC3?_oImage1:_oImage2);
         const cv::Mat_<uchar> oImage2 = _oImage1.type()==CV_8UC3?_oImage2:_oImage1;
         const cv::Rect oSourceRect(0,0,oImage1.cols,oImage1.rows);
         for(size_t nKPIdx=0; nKPIdx<voKeypoints.size(); ++nKPIdx) {

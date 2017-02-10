@@ -97,7 +97,7 @@ void BackgroundSubtractorPBAS_1ch::initialize(const cv::Mat& oInitImg) {
         for(int y=0; y<m_oImgSize.height; ++y) {
             for(int x=0; x<m_oImgSize.width; ++x) {
                 int x_sample,y_sample;
-                cv::getRandSamplePosition_7x7_std2(x_sample,y_sample,x,y,0,m_oImgSize);
+                lv::getRandSamplePosition_7x7_std2(x_sample,y_sample,x,y,0,m_oImgSize);
                 m_voBGImg[s].at<uchar>(y,x) = oInitImg.at<uchar>(y_sample,x_sample);
                 m_voBGGrad[s].at<uchar>(y,x) = oBlurredInitImg_AbsGrad.at<uchar>(y_sample,x_sample);
             }
@@ -179,7 +179,7 @@ void BackgroundSubtractorPBAS_1ch::apply(cv::InputArray _image, cv::OutputArray 
                 }
                 if((rand()%nLearningRate)==0) {
                     int x_rand,y_rand;
-                    cv::getRandNeighborPosition_3x3(x_rand,y_rand,x,y,0,m_oImgSize);
+                    lv::getRandNeighborPosition_3x3(x_rand,y_rand,x,y,0,m_oImgSize);
                     const size_t s_rand = rand()%m_nBGSamples;
 #if BGSPBAS_USE_SELF_DIFFUSION
                     m_voBGImg[s_rand].at<uchar>(y_rand,x_rand) = oInputImg.at<uchar>(y_rand,x_rand);
@@ -316,7 +316,7 @@ void BackgroundSubtractorPBAS_3ch::initialize(const cv::Mat& oInitImg) {
         for(int y=0; y<m_oImgSize.height; ++y) {
             for(int x=0; x<m_oImgSize.width; ++x) {
                 int x_sample,y_sample;
-                cv::getRandSamplePosition_7x7_std2(x_sample,y_sample,x,y,0,m_oImgSize);
+                lv::getRandSamplePosition_7x7_std2(x_sample,y_sample,x,y,0,m_oImgSize);
                 m_voBGImg[s].at<cv::Vec3b>(y,x) = oInitImgRGB.at<cv::Vec3b>(y_sample,x_sample);
                 m_voBGGrad[s].at<cv::Vec3b>(y,x) = oBlurredInitImg_AbsGrad.at<cv::Vec3b>(y_sample,x_sample);
             }
@@ -407,7 +407,7 @@ void BackgroundSubtractorPBAS_3ch::apply(cv::InputArray _image, cv::OutputArray 
                 }
                 if((rand()%nLearningRate)==0) {
                     int x_rand,y_rand;
-                    cv::getRandNeighborPosition_3x3(x_rand,y_rand,x,y,0,m_oImgSize);
+                    lv::getRandNeighborPosition_3x3(x_rand,y_rand,x,y,0,m_oImgSize);
                     const size_t s_rand = rand()%m_nBGSamples;
 #if BGSPBAS_USE_SELF_DIFFUSION
                     m_voBGImg[s_rand].at<cv::Vec3b>(y_rand,x_rand) = oInputImgRGB.at<cv::Vec3b>(y_rand,x_rand);

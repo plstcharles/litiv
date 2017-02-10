@@ -49,12 +49,12 @@ TEST(mi,regression_compute) {
     ASSERT_DOUBLE_EQ(dSingleScore,vOutputScores[nSingleTestIdx]);
     cv::Mat_<double> oOutputScoresMat(int(vOutputScores.size()),1,vOutputScores.data());
     if(lv::checkIfExists(TEST_CURR_INPUT_DATA_ROOT "/test_mi.bin")) {
-        const cv::Mat_<double> oRefScoresMat = cv::read(TEST_CURR_INPUT_DATA_ROOT "/test_mi.bin");
+        const cv::Mat_<double> oRefScoresMat = lv::read(TEST_CURR_INPUT_DATA_ROOT "/test_mi.bin");
         ASSERT_EQ(oOutputScoresMat.total(),oRefScoresMat.total());
         ASSERT_EQ(oOutputScoresMat.type(),oRefScoresMat.type());
         for(size_t nIdx=0; nIdx<oOutputScoresMat.total(); ++nIdx)
             ASSERT_NEAR_MINRATIO(oOutputScoresMat(int(nIdx)),oRefScoresMat(int(nIdx)),0.05f);
     }
     else
-        cv::write(TEST_CURR_INPUT_DATA_ROOT "/test_mi.bin",oOutputScoresMat);
+        lv::write(TEST_CURR_INPUT_DATA_ROOT "/test_mi.bin",oOutputScoresMat);
 }

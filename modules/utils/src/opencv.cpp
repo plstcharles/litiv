@@ -20,13 +20,13 @@
 #include <fstream>
 
 // these are really empty shells, but we need actual allocation due to ocv's virtual interface
-cv::AlignedMatAllocator<16,false> g_oMatAlloc16a = cv::AlignedMatAllocator<16,false>();
-cv::AlignedMatAllocator<32,false> g_oMatAlloc32a = cv::AlignedMatAllocator<32,false>();
+lv::AlignedMatAllocator<16,false> g_oMatAlloc16a = lv::AlignedMatAllocator<16,false>();
+lv::AlignedMatAllocator<32,false> g_oMatAlloc32a = lv::AlignedMatAllocator<32,false>();
 
-cv::MatAllocator* cv::getMatAllocator16a() {return (cv::MatAllocator*)&g_oMatAlloc16a;}
-cv::MatAllocator* cv::getMatAllocator32a() {return (cv::MatAllocator*)&g_oMatAlloc32a;}
+cv::MatAllocator* lv::getMatAllocator16a() {return (cv::MatAllocator*)&g_oMatAlloc16a;}
+cv::MatAllocator* lv::getMatAllocator32a() {return (cv::MatAllocator*)&g_oMatAlloc32a;}
 
-cv::DisplayHelperPtr cv::DisplayHelper::create(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) {
+lv::DisplayHelperPtr lv::DisplayHelper::create(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) {
     struct DisplayHelperWrapper : public DisplayHelper {
         DisplayHelperWrapper(const std::string& _sDisplayName, const std::string& _sDebugFSDirPath, const cv::Size& _oMaxSize, int _nWindowFlags) :
                 DisplayHelper(_sDisplayName,_sDebugFSDirPath,_oMaxSize,_nWindowFlags) {}
@@ -34,7 +34,7 @@ cv::DisplayHelperPtr cv::DisplayHelper::create(const std::string& sDisplayName, 
     return std::make_shared<DisplayHelperWrapper>(sDisplayName,sDebugFSDirPath,oMaxSize,nWindowFlags);
 }
 
-cv::DisplayHelper::DisplayHelper(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) :
+lv::DisplayHelper::DisplayHelper(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) :
         m_sDisplayName(sDisplayName),
         m_oMaxDisplaySize(oMaxSize),
         m_oFS(lv::addDirSlashIfMissing(sDebugFSDirPath)+sDisplayName+".yml",cv::FileStorage::WRITE),
@@ -47,14 +47,14 @@ cv::DisplayHelper::DisplayHelper(const std::string& sDisplayName, const std::str
     cv::setMouseCallback(m_sDisplayName,onMouseEvent,(void*)&m_lInternalCallback);
 }
 
-cv::DisplayHelper::~DisplayHelper() {
+lv::DisplayHelper::~DisplayHelper() {
     cv::destroyWindow(m_sDisplayName);
 }
 
-void cv::DisplayHelper::display(const cv::Mat& oImage, size_t nIdx) {
+void lv::DisplayHelper::display(const cv::Mat& oImage, size_t nIdx) {
     display(std::vector<std::vector<std::pair<cv::Mat,std::string>>>{{std::make_pair(oImage,cv::format("Image #%d",(int)nIdx))}},oImage.size());
 }
-void cv::DisplayHelper::display(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oOutputImg, size_t nIdx) {
+void lv::DisplayHelper::display(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oOutputImg, size_t nIdx) {
     display(std::vector<std::vector<std::pair<cv::Mat,std::string>>>{{
         std::make_pair(oInputImg,cv::format("Input #%d",(int)nIdx)),
         std::make_pair(oDebugImg,std::string("Debug")),
@@ -62,7 +62,7 @@ void cv::DisplayHelper::display(const cv::Mat& oInputImg, const cv::Mat& oDebugI
     }},oInputImg.size());
 }
 
-void cv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,std::string>>>& vvImageNamePairs, const cv::Size& oSuggestedTileSize) {
+void lv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,std::string>>>& vvImageNamePairs, const cv::Size& oSuggestedTileSize) {
     lvAssert_(!vvImageNamePairs.empty(),"must provide at least one row to display");
     lvAssert_(oSuggestedTileSize.area()>0,"must provide non-null tile size");
     const size_t nRowCount = vvImageNamePairs.size();
@@ -129,16 +129,16 @@ void cv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
     m_oLastTileSize = oNewTileSize;
 }
 
-void cv::DisplayHelper::setMouseCallback(std::function<void(const CallbackData&)> lCallback) {
+void lv::DisplayHelper::setMouseCallback(std::function<void(const CallbackData&)> lCallback) {
     lv::mutex_lock_guard oLock(m_oEventMutex);
     m_lExternalCallback = lCallback;
 }
 
-void cv::DisplayHelper::setContinuousUpdates(bool b) {
+void lv::DisplayHelper::setContinuousUpdates(bool b) {
     m_bContinuousUpdates = b;
 }
 
-int cv::DisplayHelper::waitKey(int nDefaultSleepDelay) {
+int lv::DisplayHelper::waitKey(int nDefaultSleepDelay) {
     int nKeyPressed;
     if(m_bContinuousUpdates)
         nKeyPressed = cv::waitKey(nDefaultSleepDelay);
@@ -151,7 +151,7 @@ int cv::DisplayHelper::waitKey(int nDefaultSleepDelay) {
     return nKeyPressed;
 }
 
-void cv::DisplayHelper::onMouseEventCallback(int nEvent, int x, int y, int nFlags) {
+void lv::DisplayHelper::onMouseEventCallback(int nEvent, int x, int y, int nFlags) {
     lv::mutex_lock_guard oLock(m_oEventMutex);
     m_oLatestMouseEvent.oPosition = m_oLatestMouseEvent.oInternalPosition = cv::Point2i(x,y);
     m_oLatestMouseEvent.oTileSize = m_oLastTileSize;
@@ -164,11 +164,11 @@ void cv::DisplayHelper::onMouseEventCallback(int nEvent, int x, int y, int nFlag
         m_lExternalCallback(m_oLatestMouseEvent);
 }
 
-void cv::DisplayHelper::onMouseEvent(int nEvent, int x, int y, int nFlags, void* pData) {
+void lv::DisplayHelper::onMouseEvent(int nEvent, int x, int y, int nFlags, void* pData) {
     (*(std::function<void(int,int,int,int)>*)pData)(nEvent,x,y,nFlags);
 }
 
-void cv::write(const std::string& sFilePath, const cv::Mat& _oData, cv::MatArchiveList eArchiveType) {
+void lv::write(const std::string& sFilePath, const cv::Mat& _oData, lv::MatArchiveList eArchiveType) {
     lvAssert_(!sFilePath.empty() && !_oData.empty(),"output file path and matrix must both be non-empty");
     cv::Mat oData = _oData.isContinuous()?_oData:_oData.clone();
     if(eArchiveType==MatArchive_FILESTORAGE) {
@@ -229,7 +229,7 @@ void cv::write(const std::string& sFilePath, const cv::Mat& _oData, cv::MatArchi
         lvError("unrecognized mat archive type flag");
 }
 
-void cv::read(const std::string& sFilePath, cv::Mat& oData, cv::MatArchiveList eArchiveType) {
+void lv::read(const std::string& sFilePath, cv::Mat& oData, lv::MatArchiveList eArchiveType) {
     lvAssert_(!sFilePath.empty(),"input file path must be non-empty");
     if(eArchiveType==MatArchive_FILESTORAGE) {
         cv::FileStorage oArchive(sFilePath,cv::FileStorage::READ);
@@ -288,8 +288,8 @@ void cv::read(const std::string& sFilePath, cv::Mat& oData, cv::MatArchiveList e
         lvError("unrecognized mat archive type flag");
 }
 
-void cv::doNotOptimize(const cv::Mat& m) {
-    lv::doNotOptimize(m); // we don't even need to call this it seems...
+void lv::doNotOptimize(const cv::Mat& m) {
+    lv::doNotOptimize(m.data); // we don't even need to call this it seems...
 }
 
 /** @brief shift the values in a matrix by an (x,y) offset
@@ -339,7 +339,7 @@ void cv::doNotOptimize(const cv::Mat& m) {
  * @param nFillType the method used to fill the null entries, defaults to BORDER_CONSTANT
  * @param vConstantFillValue the value of the null entries if the fill type is BORDER_CONSTANT
  */
-void cv::shift(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Point2f& vDelta, int nFillType, const cv::Scalar& vConstantFillValue) {
+void lv::shift(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Point2f& vDelta, int nFillType, const cv::Scalar& vConstantFillValue) {
     /*
      *  ORIGINAL SOURCE : http://code.opencv.org/issues/2299
      *
