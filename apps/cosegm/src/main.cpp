@@ -107,7 +107,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         //std::shared_ptr<IEdgeDetector> pAlgo = std::make_shared<CosegmenterType>();
         // init & defaults...
 #if DISPLAY_OUTPUT>0
-        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
+        lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
         //pAlgo->m_pDisplayHelper = pDisplayHelper;
         std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs;
         for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vInitInput.size(); ++nDisplayRowIdx) {
