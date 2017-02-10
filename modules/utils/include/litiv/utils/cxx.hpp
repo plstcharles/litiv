@@ -85,12 +85,8 @@ namespace std {
     template<typename T, typename... Targs>
     typename std::enable_if<(std::extent<T>::value!=0)>::type make_unique(Targs&&...) = delete;
 
-
-#endif //!defined(_MSC_VER) && __cplusplus<=201103L
-#if __cplusplus<=201103L
-
     template<typename T, T... anInts>
-    class integer_sequence {
+    struct integer_sequence {
         static_assert(std::is_integral<T>::value,"sequence type must be integral");
     public:
         typedef T value_type;
@@ -120,7 +116,7 @@ namespace std {
     template<std::size_t n>
     using make_index_sequence = make_integer_sequence<std::size_t,n>;
 
-#endif //__cplusplus<=201103L)
+#endif //!defined(_MSC_VER) && __cplusplus<=201103L
 
 } // namespace std
 
