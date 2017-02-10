@@ -215,11 +215,11 @@ namespace lv {
 
     /// required due to MSVC2015 failure to use constexpr functions in SFINAE expressions
     template<DatasetEvalList eDatasetEval>
-    struct OutputArrayPolicyHelper<eDatasetEval,std::enable_if_t<(eDatasetEval==DatasetEval_None)>> {};
+    struct OutputArrayPolicyHelper<eDatasetEval,typename std::enable_if<(eDatasetEval==DatasetEval_None)>::type> {};
 
     /// required due to MSVC2015 failure to use constexpr functions in SFINAE expressions
     template<DatasetEvalList eDatasetEval>
-    struct OutputArrayPolicyHelper<eDatasetEval,std::enable_if_t<(eDatasetEval!=DatasetEval_None)>> {
+    struct OutputArrayPolicyHelper<eDatasetEval,typename std::enable_if<(eDatasetEval!=DatasetEval_None)>::type> {
         static constexpr ArrayPolicy value = getOutputArrayPolicy<eDatasetEval>();
     };
 
@@ -308,12 +308,12 @@ namespace lv {
     protected:
         /// work batch/group comparison function based on names
         template<typename Tp>
-        static std::enable_if_t<std::is_base_of<IDataHandler,Tp>::value,bool> compare(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {
+        static typename std::enable_if<std::is_base_of<IDataHandler,Tp>::value,bool>::type compare(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {
             return lv::compare_lowercase(i->getName(),j->getName());
         }
         /// work batch/group comparison function based on expected CPU load
         template<typename Tp>
-        static std::enable_if_t<std::is_base_of<IDataHandler,Tp>::value,bool> compare_load(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {
+        static typename std::enable_if<std::is_base_of<IDataHandler,Tp>::value,bool>::type compare_load(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {
             return i->getExpectedLoad()<j->getExpectedLoad();
         }
         /// work batch/group comparison function based on names
@@ -854,7 +854,7 @@ namespace lv {
 
     /// data consumer specialization for process monitoring only (no-eval entrypoint)
     template<DatasetEvalList eDatasetEval>
-    struct IDataConsumer_<eDatasetEval,std::enable_if_t<eDatasetEval==DatasetEval_None>> :
+    struct IDataConsumer_<eDatasetEval,typename std::enable_if<eDatasetEval==DatasetEval_None>::type> :
             public IDataCounter {
         /// returns the total output packet count expected to be processed by the data consumer (defaults to 0)
         virtual size_t getExpectedOutputCount() const override {
@@ -873,7 +873,7 @@ namespace lv {
 
     /// data consumer specialization for receiving processed packets (evaluation entrypoint)
     template<DatasetEvalList eDatasetEval>
-    struct IDataConsumer_<eDatasetEval,std::enable_if_t<OutputArrayPolicyHelper<eDatasetEval>::value==NotArray>> :
+    struct IDataConsumer_<eDatasetEval,typename std::enable_if<OutputArrayPolicyHelper<eDatasetEval>::value==NotArray>::type> :
             public IDataArchiver_<NotArray>,
             public IDataCounter {
         /// returns the total output packet count expected to be processed by the data consumer (defaults to GT count)
@@ -899,7 +899,7 @@ namespace lv {
 
     /// data consumer specialization for receiving processed packet arrays (evaluation entrypoint)
     template<DatasetEvalList eDatasetEval>
-    struct IDataConsumer_<eDatasetEval,std::enable_if_t<OutputArrayPolicyHelper<eDatasetEval>::value==Array>> :
+    struct IDataConsumer_<eDatasetEval,typename std::enable_if<OutputArrayPolicyHelper<eDatasetEval>::value==Array>::type> :
             public IDataArchiver_<Array>,
             public IDataCounter {
         /// returns the total output packet count expected to be processed by the data consumer (defaults to GT count)

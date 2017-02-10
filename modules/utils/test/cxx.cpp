@@ -269,23 +269,23 @@ TEST(has_const_iterator,regression) {
 TEST(for_each,regression) {
     const auto test1 = std::make_tuple(uchar(1),int(-34),3.2f,size_t(52),-13.34);
     float tot = 0.0f;
-    lv::for_each(test1,[&tot](const auto& v){tot += float(v);});
+    lv::for_each(test1,[&tot](float v){tot += v;});
     EXPECT_FLOAT_EQ(tot,1.0f-34.0f+3.2f+52.0f-13.34f);
     tot = 0.0f;
-    lv::for_each_w_idx(test1,[&tot](const auto& v, size_t idx){tot += float(v)+float(idx);});
+    lv::for_each_w_idx(test1,[&tot](float v, size_t idx){tot += v+float(idx);});
     EXPECT_FLOAT_EQ(tot,1.0f-34.0f+3.2f+52.0f-13.34f+(1.0f+2.0f+3.0f+4.0f));
     const std::array<float,5> test2 = {1.0f,-34.0f,3.2f,52.0f,-13.34f};
     tot = 0.0f;
-    lv::for_each(test2,[&tot](const auto& v){tot += v;});
+    lv::for_each(test2,[&tot](float v){tot += v;});
     EXPECT_FLOAT_EQ(tot,1.0f-34.0f+3.2f+52.0f-13.34f);
     tot = 0.0f;
-    lv::for_each_w_idx(test2,[&tot](const auto& v, size_t idx){tot += v+float(idx);});
+    lv::for_each_w_idx(test2,[&tot](float v, size_t idx){tot += v+float(idx);});
     EXPECT_FLOAT_EQ(tot,1.0f-34.0f+3.2f+52.0f-13.34f+(1.0f+2.0f+3.0f+4.0f));
 }
 
 TEST(unpack_and_call,regression) {
     const auto test1 = std::make_tuple(uchar(1),int(-34),3.2f,size_t(52),-13.34);
-    const auto testfunc = [](auto v1, auto v2, auto v3, auto v4, auto v5) {
+    const auto testfunc = [](double v1, double v2, double v3, double v4, double v5) {
         return double(v1)+double(v2)+double(v3)+double(v4)+double(v5);
     };
     const std::array<float,5> test2 = {1.0f,-34.0f,3.2f,52.0f,-13.34f};
@@ -443,6 +443,8 @@ TEST(LUT,regression_arccos1000_safe) {
     }
 }
 
+#if __cplusplus>=201402L
+
 TEST(unlock_guard,regression_tuple) {
     std::mutex m1,m2,m3;
     std::lock_guard<std::mutex> g1(m1); // cannot merge locks without c++17 on gcc
@@ -460,6 +462,8 @@ TEST(unlock_guard,regression_tuple) {
     }
     ASSERT_FALSE(m1.try_lock() || m2.try_lock() || m3.try_lock());
 }
+
+#endif //__cplusplus>=201402L
 
 TEST(unlock_guard,regression_single) {
     std::mutex m;

@@ -46,7 +46,7 @@ protected:
     IBackgroundSubtractorLBSP_(float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
                                size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
                                int nDefaultMedianBlurKernelSize=BGSLBSP_DEFAULT_MEDIAN_BLUR_KERNEL_SIZE,
-                               std::enable_if_t<eImplTemp==lv::NonParallel>* /*pUnused*/=0) :
+                               typename std::enable_if<eImplTemp==lv::NonParallel>::type* /*pUnused*/=0) :
             m_nLBSPThresholdOffset(nLBSPThresholdOffset),
             m_fRelLBSPThreshold(fRelLBSPThreshold),
             m_nDefaultMedianBlurKernelSize(nDefaultMedianBlurKernelSize) {
@@ -62,7 +62,7 @@ protected:
                                float fRelLBSPThreshold=BGSLBSP_DEFAULT_LBSP_REL_SIMILARITY_THRESHOLD,
                                size_t nLBSPThresholdOffset=BGSLBSP_DEFAULT_LBSP_OFFSET_SIMILARITY_THRESHOLD,
                                int nDefaultMedianBlurKernelSize=BGSLBSP_DEFAULT_MEDIAN_BLUR_KERNEL_SIZE,
-                               std::enable_if_t<eImplTemp==lv::GLSL>* /*pUnused*/=0) :
+                               typename std::enable_if<eImplTemp==lv::GLSL>::type* /*pUnused*/=0) :
             IBackgroundSubtractor_GLSL(nLevels,nComputeStages,nExtraSSBOs,nExtraACBOs,nExtraImages,nExtraTextures,nDebugType,bUseDisplay,bUseTimers,bUseIntegralFormat),
             m_nLBSPThresholdOffset(nLBSPThresholdOffset),
             m_fRelLBSPThreshold(fRelLBSPThreshold),
@@ -72,7 +72,7 @@ protected:
     }
     /// returns the GLSL compute shader source code for LBSP lookup/description functions
     template<lv::ParallelAlgoType eImplTemp = eImpl> // dont pass arguments here!
-    std::enable_if_t<eImplTemp==lv::GLSL,std::string> getLBSPThresholdLUTShaderSource() const;
+    typename std::enable_if<eImplTemp==lv::GLSL,std::string>::type getLBSPThresholdLUTShaderSource() const;
 #endif //HAVE_GLSL
 #if HAVE_CUDA
     // ... @@@ add impl later

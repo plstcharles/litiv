@@ -42,8 +42,10 @@ int main(int, char**) { // this sample uses no command line argument
         const cv::Size oWindowSize_LSS = pLSS->windowSize(); // minimum size required for LSS description
         std::unique_ptr<DASC> pDASC = std::make_unique<DASC>(size_t(2),0.09f); // instantiation of DASC feature descriptor with default parameters
         const cv::Size oWindowSize_DASC = pDASC->windowSize(); // minimum size required for DASC description
+#if __cplusplus>=201402L
         std::unique_ptr<MutualInfo> pMI = std::make_unique<MutualInfo>(); // instantiation of MI score extractor helper with default parameters
         const cv::Size oWindowSize_MI = pMI->windowSize(); // minimum size required for MI scoring
+#endif //__cplusplus>=201402L
 
         // this lambda will be called for each search point --- inside it is the disparity lookup loop
         const auto lStereoMatcher = [&](const cv::Point& oTargetPoint, const cv::Mat& oRefImg, const cv::Mat& oSearchImg, int nMinOffset, int nMaxOffset) {
@@ -96,6 +98,7 @@ int main(int, char**) { // this sample uses no command line argument
             const auto pMinScoreIter_DASC = std::min_element(vdMatchRes_DASC.begin(),vdMatchRes_DASC.end());
             std::cout << "... best match score = '" << *pMinScoreIter_DASC << "', at x = " << int((oTargetPoint.x+nMinOffset)+std::distance(vdMatchRes_DASC.begin(),pMinScoreIter_DASC)) << std::endl;
 
+#if __cplusplus>=201402L
             // below is the lookup loop for the MI matcher
             const cv::Rect oRefZone_MI(oTargetPoint.x-oWindowSize_MI.width/2,oTargetPoint.y-oWindowSize_MI.height/2,oWindowSize_MI.width,oWindowSize_MI.height); // lookup window for the reference image
             lvAssert(oRefZone.contains(oRefZone_MI.tl()) && oRefZone.contains(oRefZone_MI.br()-cv::Point2i(1,1))); // lookup window should be contained in the reference image
@@ -111,6 +114,7 @@ int main(int, char**) { // this sample uses no command line argument
             cv::printMatrix(cv::Mat_<double>(1,nTestCount,vdMatchRes_MI.data())); // prints the match score matrix (one line, and one match score per column)
             const auto pMaxScoreIter_MI = std::max_element(vdMatchRes_MI.begin(),vdMatchRes_MI.end());
             std::cout << "... best match score = '" << *pMaxScoreIter_MI << "', at x = " << int((oTargetPoint.x+nMinOffset)+std::distance(vdMatchRes_MI.begin(),pMaxScoreIter_MI)) << std::endl;
+#endif //__cplusplus>=201402L
         };
 
         for(size_t nTargetPtIdx=0; nTargetPtIdx<vTargetPointsRGB.size(); ++nTargetPtIdx) { // for each test point, run the stereo matcher

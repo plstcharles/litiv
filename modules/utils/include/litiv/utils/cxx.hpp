@@ -67,6 +67,63 @@
         typedef next type; \
     }
 
+namespace std {
+
+#if !defined(_MSC_VER) && __cplusplus<=201103L
+
+    template<typename T, typename... Targs>
+    inline typename std::enable_if<!std::is_array<T>::value,std::unique_ptr<T>>::type make_unique(Targs&&... args) {
+        return std::unique_ptr<T>(new T(std::forward<Targs>(args)...));
+    }
+
+    template<typename T>
+    inline typename std::enable_if<(std::is_array<T>::value && !std::extent<T>::value),std::unique_ptr<T>>::type make_unique(size_t nSize) {
+        using ElemType = typename std::remove_extent<T>::type;
+        return std::unique_ptr<T>(new ElemType[nSize]());
+    }
+
+    template<typename T, typename... Targs>
+    typename std::enable_if<(std::extent<T>::value!=0)>::type make_unique(Targs&&...) = delete;
+
+
+#endif //!defined(_MSC_VER) && __cplusplus<=201103L
+#if __cplusplus<=201103L
+
+    template<typename T, T... anInts>
+    class integer_sequence {
+        static_assert(std::is_integral<T>::value,"sequence type must be integral");
+    public:
+        typedef T value_type;
+        static constexpr std::size_t size () {
+            return sizeof...(anInts);
+        }
+    };
+
+    namespace impl {
+
+        template<typename T,T i,T n,T... anInts>
+        struct _make_integer_sequence : public _make_integer_sequence<T,i+1,n,anInts...,i> {};
+
+        template<typename T,T n,T... anInts>
+        struct _make_integer_sequence<T,n,n,anInts...> {
+            using type = integer_sequence<T,anInts...>;
+        };
+
+    } // namespace impl
+
+    template<typename T, T n>
+    using make_integer_sequence = typename impl::_make_integer_sequence<T,0,n>::type;
+
+    template<size_t ... nIdxs>
+    using index_sequence = integer_sequence<size_t,nIdxs...>;
+
+    template<std::size_t n>
+    using make_index_sequence = make_integer_sequence<std::size_t,n>;
+
+#endif //__cplusplus<=201103L)
+
+} // namespace std
+
 namespace lv {
 
     /// vsnprintf wrapper for std::string output (avoids using two buffers via C++11 string contiguous memory access)
@@ -149,11 +206,11 @@ namespace lv {
 
     /// explicit loop unroller helper function (specialization for null iter count)
     template<size_t n, typename TFunc>
-    std::enable_if_t<n==0> unroll(const TFunc&) {}
+    typename std::enable_if<n==0>::type unroll(const TFunc&) {}
 
     /// explicit loop unroller helper function (specialization for non-null iter count)
     template<size_t n, typename TFunc>
-    std::enable_if_t<(n>0)> unroll(const TFunc& f) {
+    typename std::enable_if<(n>0)>::type unroll(const TFunc& f) {
         unroll<n-1>(f);
         f(n-1);
     }
@@ -275,7 +332,7 @@ namespace lv {
         ~WorkerPool();
         /// queues a task to be processed by the pool, and returns a future tied to its result
         template<typename Tfunc, typename... Targs>
-        std::future<std::result_of_t<Tfunc(Targs...)>> queueTask(Tfunc&& lTaskEntryPoint, Targs&&... args);
+        std::future<typename std::result_of<Tfunc(Targs...)>::type> queueTask(Tfunc&& lTaskEntryPoint, Targs&&... args);
     protected:
         std::queue<std::function<void()>> m_qTasks;
         std::vector<std::thread> m_vhWorkers;
@@ -395,19 +452,19 @@ namespace lv {
 
     /// helper function to unpack a tuple/array into function arguments (impl)
     template<typename TFunc, typename TTuple, size_t... anIndices>
-    inline auto _unpack_and_call(const TTuple& t, TFunc f, std::index_sequence<anIndices...>) {
+    inline typename std::result_of<TFunc(decltype(std::get<anIndices>(TTuple()))...)>::type _unpack_and_call(const TTuple& t, TFunc f, std::index_sequence<anIndices...>) {
         return f(std::get<anIndices>(t)...);
     }
 
     /// helper function to unpack tuple into function arguments
     template<typename TFunc, typename... TTupleTypes>
-    inline auto unpack_and_call(const std::tuple<TTupleTypes...>& t, TFunc f) {
+    inline auto unpack_and_call(const std::tuple<TTupleTypes...>& t, TFunc f) -> decltype(_unpack_and_call(t,f,std::make_index_sequence<sizeof...(TTupleTypes)>{})) {
         return _unpack_and_call(t,f,std::make_index_sequence<sizeof...(TTupleTypes)>{});
     }
 
     /// helper function to unpack array into function arguments
     template<typename TFunc, typename TArrayType, size_t nArraySize>
-    inline auto unpack_and_call(const std::array<TArrayType,nArraySize>& a, TFunc f) {
+    inline auto unpack_and_call(const std::array<TArrayType,nArraySize>& a, TFunc f) -> decltype(_unpack_and_call(a,f,std::make_index_sequence<nArraySize>{})) {
         return _unpack_and_call(a,f,std::make_index_sequence<nArraySize>{});
     }
 
@@ -443,13 +500,13 @@ namespace lv {
 
     /// computes a 1D array -> 1D scalar reduction with constexpr support (array-based version, impl, specialization for last array value)
     template<size_t nArrayIdx, typename TFunc, typename TValue, size_t nArraySize>
-    constexpr std::enable_if_t<nArrayIdx==0,TValue> _static_reduce_impl(const std::array<TValue,nArraySize>& a, TFunc) {
+    constexpr typename std::enable_if<nArrayIdx==0,TValue>::type _static_reduce_impl(const std::array<TValue,nArraySize>& a, TFunc) {
         return std::get<nArrayIdx>(a);
     }
 
     /// computes a 1D array -> 1D scalar reduction with constexpr support (array-based version, impl, specialization for non-last array value)
     template<size_t nArrayIdx, typename TFunc, typename TValue, size_t nArraySize>
-    constexpr std::enable_if_t<(nArrayIdx>0),std::result_of_t<TFunc(const TValue&,const TValue&)>> _static_reduce_impl(const std::array<TValue,nArraySize>& a, TFunc lOp) {
+    constexpr typename std::enable_if<(nArrayIdx>0),typename std::result_of<TFunc(const TValue&,const TValue&)>::type>::type _static_reduce_impl(const std::array<TValue,nArraySize>& a, TFunc lOp) {
         return lOp(std::get<nArrayIdx>(a),_static_reduce_impl<nArrayIdx-1>(a,lOp));
     }
 
@@ -559,13 +616,15 @@ namespace lv {
         }
     };
 
+#if __cplusplus>=201402L
+
     /// helper class used to unlock several mutexes in the current scope (logical inverse of lock_guard)
     template<typename... TMutexes>
     struct unlock_guard {
         /// unlocks all given mutexes, one at a time, until destruction
         explicit unlock_guard(TMutexes&... aMutexes) noexcept :
                 m_aMutexes(aMutexes...) {
-            lv::for_each(m_aMutexes,[](auto& oMutex) noexcept {oMutex.unlock();});
+            lv::for_each(m_aMutexes,[](auto& m){m.unlock();});
         }
         /// relocks all mutexes simultaneously
         ~unlock_guard() {
@@ -577,9 +636,15 @@ namespace lv {
         unlock_guard& operator=(const unlock_guard&) = delete;
     };
 
+#endif //__cplusplus>=201402L
+
     /// helper class used to unlock a mutex in the current scope (logical inverse of lock_guard)
     template<typename TMutex>
+#if __cplusplus>=201402L
     struct unlock_guard<TMutex> {
+#else //__cplusplus<201402L
+    struct unlock_guard {
+#endif //__cplusplus<201402L
         /// unlocks the given mutex until destruction
         explicit unlock_guard(TMutex& oMutex) noexcept :
                 m_oMutex(oMutex) {
@@ -679,10 +744,10 @@ lv::WorkerPool<nWorkers>::~WorkerPool() {
 
 template<size_t nWorkers>
 template<typename Tfunc, typename... Targs>
-std::future<std::result_of_t<Tfunc(Targs...)>> lv::WorkerPool<nWorkers>::queueTask(Tfunc&& lTaskEntryPoint, Targs&&... args) {
+std::future<typename std::result_of<Tfunc(Targs...)>::type> lv::WorkerPool<nWorkers>::queueTask(Tfunc&& lTaskEntryPoint, Targs&&... args) {
     if(!m_bIsActive)
         throw std::runtime_error("cannot queue task, destruction in progress");
-    using task_return_t = std::result_of_t<Tfunc(Targs...)>;
+    using task_return_t = typename std::result_of<Tfunc(Targs...)>::type;
     using task_t = std::packaged_task<task_return_t()>;
     // http://stackoverflow.com/questions/28179817/how-can-i-store-generic-packaged-tasks-in-a-container
     std::shared_ptr<task_t> pSharableTask = std::make_shared<task_t>(std::bind(std::forward<Tfunc>(lTaskEntryPoint),std::forward<Targs>(args)...));

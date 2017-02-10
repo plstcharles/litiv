@@ -61,17 +61,17 @@ namespace lv {
         std::unique_ptr<T[]> genarray(size_t n, T min, T max) {
             std::random_device rd;
             std::mt19937 gen(rd());
-            typedef std::conditional_t<
+            typedef typename std::conditional<
                 std::is_integral<T>::value,
                 std::uniform_int_distribution<
-                    std::conditional_t<
+                    typename std::conditional<
                         std::is_same<uint64_t,T>::value,
                         uint64_t,
                         int64_t
-                    >
+                    >::type
                 >,
                 std::uniform_real_distribution<double>
-            > unif_distr;
+            >::type unif_distr;
             unif_distr uniform_dist(min,max);
             std::unique_ptr<T[]> v(new T[n]);
             for(size_t i=0; i<n; ++i)

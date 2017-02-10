@@ -46,8 +46,8 @@ std::string lv::putf(const char* acFormat, ...) {
 
 bool lv::compare_lowercase(const std::string& i, const std::string& j) {
     std::string i_lower(i), j_lower(j);
-    std::transform(i_lower.begin(),i_lower.end(),i_lower.begin(),[](auto c){return std::tolower(c);});
-    std::transform(j_lower.begin(),j_lower.end(),j_lower.begin(),[](auto c){return std::tolower(c);});
+    std::transform(i_lower.begin(),i_lower.end(),i_lower.begin(),[](std::string::value_type c){return std::tolower(c);});
+    std::transform(j_lower.begin(),j_lower.end(),j_lower.begin(),[](std::string::value_type c){return std::tolower(c);});
     return i_lower<j_lower;
 }
 

@@ -15,6 +15,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#if __cplusplus>=201402L
+
 #define HIST_QUANTIF_FACTOR 1
 #define USE_FAST_NUM_APPROX false
 #define SKIP_MINMAX_HIST    false
@@ -119,3 +121,5 @@ void MutualInfo::validateROI(cv::Mat& oROI) const {
     cv::Mat(oROI,nROI_inner).copyTo(cv::Mat(oROI_new,nROI_inner));
     oROI = oROI_new;
 }
+
+#endif //__cplusplus>=201402L

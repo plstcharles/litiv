@@ -53,7 +53,7 @@
     #endif //ndef(__XSTR_DEFINES__)
     #if defined(_MSC_VER)
         #if _MSC_VER<1900 // need >= MSVC 2015 (v140) toolchain
-            #error "This project requires full C++14 support (including constexpr and SFINAE)."
+            #error "This project requires full C++11 support (including constexpr and SFINAE)."
         #endif //_MSC_VER<1900
         #ifndef __PRETTY_FUNCTION__
             #define __PRETTY_FUNCTION__ __FUNCSIG__
@@ -74,9 +74,9 @@
             #define MAY_ALIAS
         #endif //MAY_ALIAS
     #else //ndef(_MSC_VER)
-        #if __cplusplus<201402L
-            #error "This project requires full C++14 support (including constexpr and SFINAE)."
-        #endif //__cplusplus<201402L
+        #if __cplusplus<201103L
+            #error "This project requires full C++11 support (including constexpr and SFINAE)."
+        #endif //__cplusplus<201103L
         #if (defined(__GNUC__) || defined(__clang__))
             #ifndef MAY_ALIAS
                 #define MAY_ALIAS __attribute__((__may_alias__))

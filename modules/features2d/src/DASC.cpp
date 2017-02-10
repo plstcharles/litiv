@@ -47,7 +47,7 @@ namespace pretrained { // obtained via middlebury dataset (imported here from or
 
     constexpr int static_diff(int a, int b) {return b-a;}
     constexpr int static_abs(int a) {return (a<0)?-a:a;}
-    constexpr int static_absmax(int a, int b) {return std::max(static_abs(a),static_abs(b));}
+    constexpr int static_absmax(int a, int b) {return static_abs(a)>static_abs(b)?a:b;}
     constexpr std::array<int,nLUTSize*2> anRPDiff = lv::static_transform(anRP1,anRP2,static_diff);
     constexpr int nRPAbsMax = lv::static_reduce(lv::static_transform(anRP1,anRP2,static_absmax),static_absmax);
     constexpr int nMaxPatternDiam = nRPAbsMax*2+1;

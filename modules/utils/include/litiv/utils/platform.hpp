@@ -113,7 +113,7 @@ namespace lv {
         }
         static_assert(!bDefaultInit || std::is_default_constructible<value_type>::value,"object type not default-constructible");
         template<typename T2, typename... TDummy, bool _bDefaultInit=bDefaultInit>
-        static inline std::enable_if_t<_bDefaultInit> construct(T2* p) noexcept(std::is_nothrow_default_constructible<T2>::value) {
+        static inline typename std::enable_if<_bDefaultInit>::type construct(T2* p) noexcept(std::is_nothrow_default_constructible<T2>::value) {
             static_assert(sizeof...(TDummy)==0,"template args not needed");
             ::new((void*)p) T2;
         }

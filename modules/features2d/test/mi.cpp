@@ -3,6 +3,8 @@
 #include "litiv/utils/opencv.hpp"
 #include "litiv/test.hpp"
 
+#if __cplusplus>=201402L
+
 TEST(mi,regression_constr) {
     EXPECT_THROW_LV_QUIET(std::make_unique<MutualInfo>(cv::Size(0,0)));
     EXPECT_THROW_LV_QUIET(std::make_unique<MutualInfo>(cv::Size(2,2)));
@@ -58,3 +60,5 @@ TEST(mi,regression_compute) {
     else
         cv::write(TEST_CURR_INPUT_DATA_ROOT "/test_mi.bin",oOutputScoresMat);
 }
+
+#endif //__cplusplus>=201402L

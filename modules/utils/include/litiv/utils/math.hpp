@@ -47,11 +47,11 @@ namespace lv {
 #endif //defined(...GCC)
 
     /// computes the fast absolute value of a floating point value (relies on sign-extended shift)
-    template<typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
+    template<typename T, typename=typename std::enable_if<std::is_floating_point<T>::value>::type>
     inline T abs_fast(T x) {
         static_assert(std::is_same<T,float>::value||std::is_same<T,double>::value,"abs_fast not defined for long double or non-ieee fp types");
         static_assert(sizeof(T)==4||sizeof(T)==8,"unexpected fp type size");
-        using Tint = std::conditional_t<sizeof(T)==4,int32_t,int64_t>;
+        using Tint = typename std::conditional<sizeof(T)==4,int32_t,int64_t>::type;
         Tint& nCast = reinterpret_cast<Tint&>(x);
         nCast &= std::numeric_limits<Tint>::max();
         return x;
@@ -102,26 +102,26 @@ namespace lv {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     /// computes the L1 distance between two integer values; returns an unsigned type of the same size as the input type
-    template<typename T, typename=std::enable_if_t<std::is_integral<T>::value>>
-    inline auto L1dist(T a, T b) {
+    template<typename T, typename=typename std::enable_if<std::is_integral<T>::value>::type>
+    inline auto L1dist(T a, T b) -> decltype((typename std::make_unsigned<T>::type)std::abs(((typename std::make_signed<typename lv::get_bigger_integer<T>::type>::type)a)-b)) {
         static_assert(!std::is_same<T,bool>::value,"L1dist not specialized for boolean types");
-        return (std::make_unsigned_t<T>)std::abs(((std::make_signed_t<typename lv::get_bigger_integer<T>::type>)a)-b);
+        return (typename std::make_unsigned<T>::type)std::abs(((typename std::make_signed<typename lv::get_bigger_integer<T>::type>::type)a)-b);
     }
 
     /// computes the L1 distance between two floating point values (with bit trick)
-    template<typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
+    template<typename T, typename=typename std::enable_if<std::is_floating_point<T>::value>::type>
     inline T _L1dist_cheat(T a, T b) {
         return abs_fast(a-b);
     }
 
     /// computes the L1 distance between two floating point values (without bit trick)
-    template<typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
+    template<typename T, typename=typename std::enable_if<std::is_floating_point<T>::value>::type>
     inline T _L1dist_nocheat(T a, T b) {
         return std::abs(a-b);
     }
 
     /// computes the L1 distance between two floating point values (without bit trick)
-    template<typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
+    template<typename T, typename=typename std::enable_if<std::is_floating_point<T>::value>::type>
     inline T L1dist(T a, T b) {
 #if USE_SIGNEXT_SHIFT_TRICK
         return _L1dist_cheat(a,b);
@@ -158,7 +158,7 @@ namespace lv {
     }
 
     /// computes the L1 distance between two generic arrays (note: for very large arrays, using ocv matrix ops will be faster)
-    template<size_t nChannels, typename Tin, typename Tout=std::conditional_t<std::is_integral<Tin>::value,size_t,float>>
+    template<size_t nChannels, typename Tin, typename Tout=typename std::conditional<std::is_integral<Tin>::value,size_t,float>::type>
     inline Tout L1dist(const Tin* a, const Tin* b, size_t nElements, const uint8_t* m=nullptr) {
         Tout tResult = 0;
         const size_t nTotElements = nElements*nChannels;
@@ -175,7 +175,7 @@ namespace lv {
     }
 
     /// computes the L1 distance between two generic arrays (note: for very large arrays, using ocv matrix ops will be faster)
-    template<typename Tin, typename Tout=std::conditional_t<std::is_integral<Tin>::value,size_t,float>>
+    template<typename Tin, typename Tout=typename std::conditional<std::is_integral<Tin>::value,size_t,float>::type>
     inline Tout L1dist(const Tin* a, const Tin* b, size_t nElements, size_t nChannels, const uint8_t* m=nullptr) {
         lvAssert_(nChannels>0 && nChannels<=4,"untemplated distance function only defined for 1 to 4 channels");
         switch(nChannels) {
@@ -205,15 +205,15 @@ namespace lv {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     /// computes the squared L2 distance between two integer values (i.e. == squared L1dist); returns an unsigned type of twice the size of the input type
-    template<typename T, typename=std::enable_if_t<std::is_integral<T>::value>>
-    inline auto L2sqrdist(T a, T b) {
-        typedef std::make_signed_t<typename lv::get_bigger_integer<T>::type> Tintern;
+    template<typename T, typename=typename std::enable_if<std::is_integral<T>::value>::type>
+    inline auto L2sqrdist(T a, T b) -> typename std::make_unsigned<typename std::make_signed<typename lv::get_bigger_integer<T>::type>::type>::type {
+        typedef typename std::make_signed<typename lv::get_bigger_integer<T>::type>::type Tintern;
         const Tintern tResult = Tintern(a)-Tintern(b);
-        return std::make_unsigned_t<Tintern>(tResult*tResult);
+        return typename std::make_unsigned<Tintern>::type(tResult*tResult);
     }
 
     /// computes the squared L2 distance between two floating point values (i.e. == squared L1dist)
-    template<typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
+    template<typename T, typename=typename std::enable_if<std::is_floating_point<T>::value>::type>
     inline T L2sqrdist(T a, T b) {
         const T tResult = a-b;
         return tResult*tResult;
@@ -247,7 +247,7 @@ namespace lv {
     }
 
     /// computes the squared L2 distance between two generic arrays (note: for very large arrays, using ocv matrix ops will be faster)
-    template<size_t nChannels, typename Tin, typename Tout=std::conditional_t<std::is_integral<Tin>::value,size_t,float>>
+    template<size_t nChannels, typename Tin, typename Tout=typename std::conditional<std::is_integral<Tin>::value,size_t,float>::type>
     inline Tout L2sqrdist(const Tin* a, const Tin* b, size_t nElements, const uint8_t* m=nullptr) {
         Tout tResult = 0;
         const size_t nTotElements = nElements*nChannels;
@@ -264,7 +264,7 @@ namespace lv {
     }
 
     /// computes the squared L2 distance between two generic arrays (note: for very large arrays, using ocv matrix ops will be faster)
-    template<typename Tin, typename Tout=std::conditional_t<std::is_integral<Tin>::value,size_t,float>>
+    template<typename Tin, typename Tout=typename std::conditional<std::is_integral<Tin>::value,size_t,float>::type>
     inline Tout L2sqrdist(const Tin* a, const Tin* b, size_t nElements, size_t nChannels, const uint8_t* m=nullptr) {
         lvAssert_(nChannels>0 && nChannels<=4,"untemplated distance function only defined for 1 to 4 channels");
         switch(nChannels) {
@@ -294,7 +294,7 @@ namespace lv {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     /// computes the L2 distance between two integer arrays
-    template<size_t nChannels, typename Tin, typename Tout=float, typename=std::enable_if_t<std::is_integral<Tin>::value>>
+    template<size_t nChannels, typename Tin, typename Tout=float, typename=typename std::enable_if<std::is_integral<Tin>::value>::type>
     inline Tout L2dist(const Tin* a, const Tin* b) {
         decltype(L2sqrdist(Tin(),Tin())) tResult = 0;
         for(size_t c=0; c<nChannels; ++c)
@@ -303,7 +303,7 @@ namespace lv {
     }
 
     /// computes the L2 distance between two floating point arrays
-    template<size_t nChannels, typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
+    template<size_t nChannels, typename T, typename=typename std::enable_if<std::is_floating_point<T>::value>::type>
     inline T L2dist(const T* a, const T* b) {
         T tResult = 0;
         for(size_t c=0; c<nChannels; ++c)
@@ -330,7 +330,7 @@ namespace lv {
     }
 
     /// computes the L2 distance between two generic arrays (note: for very large arrays, using ocv matrix ops will be faster)
-    template<size_t nChannels, typename Tin, typename Tout=float, typename Tintern=std::conditional_t<std::is_integral<Tin>::value,size_t,float>>
+    template<size_t nChannels, typename Tin, typename Tout=float, typename Tintern=typename std::conditional<std::is_integral<Tin>::value,size_t,float>::type>
     inline Tout L2dist(const Tin* a, const Tin* b, size_t nElements, const uint8_t* m=nullptr) {
         Tintern tResult = 0;
         const size_t nTotElements = nElements*nChannels;
@@ -377,7 +377,7 @@ namespace lv {
     ///////////////////////////////////////////////////////////////////////////////////////////////////
 
     /// computes the color distortion between two unsigned integer arrays
-    template<size_t nChannels, typename T, typename=std::enable_if_t<std::is_integral<T>::value>>
+    template<size_t nChannels, typename T, typename=typename std::enable_if<std::is_integral<T>::value>::type>
     inline size_t cdist(const T* curr, const T* bg) {
         static_assert(std::is_unsigned<T>::value,"cdist does not support negative values");
         static_assert(nChannels>1,"vectors should have more than one channel");
@@ -410,7 +410,7 @@ namespace lv {
     }
 
     /// computes the color distortion between two floating point arrays
-    template<size_t nChannels, typename T, typename=std::enable_if_t<std::is_floating_point<T>::value>>
+    template<size_t nChannels, typename T, typename=typename std::enable_if<std::is_floating_point<T>::value>::type>
     inline T cdist(const T* curr, const T* bg) {
         static_assert(nChannels>1,"vectors should have more than one channel");
         lvDbgAssert_(curr[0]>=0.0f && bg[0]>=0.0f,"cdist does not support negative values");
@@ -515,31 +515,31 @@ namespace lv {
 
     /// computes a color distortion-distance mix using two generic distances
     template<typename TL1Dist, typename TCDist>
-    inline auto cmixdist(TL1Dist tL1Distance, TCDist tCDistortion) {
+    inline auto cmixdist(TL1Dist tL1Distance, TCDist tCDistortion) -> decltype(tL1Distance/2+tCDistortion*4) {
         return (tL1Distance/2+tCDistortion*4);
     }
 
     /// computes a color distortion-distance mix using two generic arrays
     template<size_t nChannels, typename T>
-    inline auto cmixdist(const T* curr, const T* bg) {
+    inline auto cmixdist(const T* curr, const T* bg) -> decltype(cmixdist(L1dist<nChannels>(curr,bg),cdist<nChannels>(curr,bg))) {
         return cmixdist(L1dist<nChannels>(curr,bg),cdist<nChannels>(curr,bg));
     }
 
     /// computes a color distortion-distance mix using two generic arrays
     template<size_t nChannels, typename T>
-    inline auto cmixdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) {
+    inline auto cmixdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) -> decltype(cmixdist<nChannels>(a.data(),b.data())) {
         return cmixdist<nChannels>(a.data(),b.data());
     }
 
     /// computes a color distortion-distance mix using two generic arrays
     template<size_t nChannels, typename T>
-    inline auto cmixdist(const std::array<T,nChannels>& a, const T* b) {
+    inline auto cmixdist(const std::array<T,nChannels>& a, const T* b) -> decltype(cmixdist<nChannels>(a.data(),b)) {
         return cmixdist<nChannels>(a.data(),b);
     }
 
     /// computes a color distortion-distance mix using two generic arrays
     template<size_t nChannels, typename T>
-    inline auto cmixdist(const T* a, const std::array<T,nChannels>& b) {
+    inline auto cmixdist(const T* a, const std::array<T,nChannels>& b) -> decltype(cmixdist<nChannels>(a,b.data())) {
         return cmixdist<nChannels>(a,b.data());
     }
 
@@ -547,7 +547,7 @@ namespace lv {
 
     /// computes the population count of an 8-bit vector using an 8-bit popcount LUT
     template<typename Tin, typename Tout=uint8_t>
-    inline std::enable_if_t<sizeof(Tin)==1,Tout> popcount(const Tin x) {
+    inline typename std::enable_if<sizeof(Tin)==1,Tout>::type popcount(const Tin x) {
         static_assert(std::is_integral<Tin>::value,"type must be integral");
         static_assert(std::numeric_limits<unsigned char>::digits==8,"lots of stuff is going to break...");
         static constexpr Tout s_anPopcntLUT8[256] = {
@@ -575,16 +575,16 @@ namespace lv {
 
     /// computes the population count of a 2- or 4-byte vector using 32-bit popcnt instruction
     template<typename Tin, typename Tout=uint8_t>
-    inline std::enable_if_t<(sizeof(Tin)==2 || sizeof(Tin)==4),Tout> popcount(const Tin x) {
+    inline typename std::enable_if<(sizeof(Tin)==2 || sizeof(Tin)==4),Tout>::type popcount(const Tin x) {
         static_assert(std::is_integral<Tin>::value,"type must be integral");
-        return (Tout)_mm_popcnt_u32((uint)reinterpret_cast<std::make_unsigned_t<const Tin>&>(x));
+        return (Tout)_mm_popcnt_u32((uint)reinterpret_cast<typename std::make_unsigned<const Tin>::type&>(x));
     }
 
 #if TARGET_PLATFORM_x64
 
     /// computes the population count of an 8-byte vector using 64-bit popcnt instruction
     template<typename Tin, typename Tout=uint8_t>
-    inline std::enable_if_t<sizeof(Tin)==8,Tout> popcount(const Tin x) {
+    inline typename std::enable_if<sizeof(Tin)==8,Tout>::type popcount(const Tin x) {
         static_assert(std::is_integral<Tin>::value,"type must be integral");
         return (Tout)_mm_popcnt_u64(reinterpret_cast<const uint64_t&>(x));
     }
@@ -595,7 +595,7 @@ namespace lv {
 
     /// computes the population count of an N-byte vector using an 8-bit popcount LUT
     template<typename Tin, typename Tout=uint8_t>
-    inline std::enable_if_t<(sizeof(Tin)>1),Tout> popcount(const Tin x) {
+    inline typename std::enable_if<(sizeof(Tin)>1),Tout>::type popcount(const Tin x) {
         static_assert(std::is_integral<Tin>::value,"type must be integral");
         Tout tResult = 0;
         for(size_t l=0; l<sizeof(Tin); ++l)
@@ -657,31 +657,31 @@ namespace lv {
 
     /// computes the gradient magnitude distance between two N-byte vectors
     template<typename T>
-    inline auto gdist(T a, T b) {
+    inline auto gdist(T a, T b) -> decltype(L1dist(popcount(a),popcount(b))) {
         return L1dist(popcount(a),popcount(b));
     }
 
     /// computes the gradient magnitude distance between two (nChannels*N)-byte vectors
     template<size_t nChannels, typename T>
-    inline auto gdist(const T* a, const T* b) {
+    inline auto gdist(const T* a, const T* b) -> decltype(L1dist(popcount<nChannels>(a),popcount<nChannels>(b))) {
         return L1dist(popcount<nChannels>(a),popcount<nChannels>(b));
     }
 
     /// computes the gradient magnitude distance between two (nChannels*N)-byte vectors
     template<size_t nChannels, typename T>
-    inline auto gdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) {
+    inline auto gdist(const std::array<T,nChannels>& a, const std::array<T,nChannels>& b) -> decltype(gdist<nChannels>(a.data(),b.data())) {
         return gdist<nChannels>(a.data(),b.data());
     }
 
     /// computes the gradient magnitude distance between two (nChannels*N)-byte vectors
     template<size_t nChannels, typename T>
-    inline auto gdist(const std::array<T,nChannels>& a, const T* b) {
+    inline auto gdist(const std::array<T,nChannels>& a, const T* b) -> decltype(gdist<nChannels>(a.data(),b)) {
         return gdist<nChannels>(a.data(),b);
     }
 
     /// computes the gradient magnitude distance between two (nChannels*N)-byte vectors
     template<size_t nChannels, typename T>
-    inline auto gdist(const T* a, const std::array<T,nChannels>& b) {
+    inline auto gdist(const T* a, const std::array<T,nChannels>& b) -> decltype(gdist<nChannels>(a,b.data())) {
         return gdist<nChannels>(a,b.data());
     }
 
@@ -769,8 +769,7 @@ namespace lv {
         }
         const size_t nReqSize = vXReq.size();
         std::vector<Ty> vYReq(nReqSize);
-        typedef decltype(lv::L1dist<Tx>((Tx)0,(Tx)0)) DistType;
-        DistType (&rlDist)(Tx,Tx) = lv::L1dist<Tx>;
+        auto rlDist = [](Tx a, Tx b) {return double(a)>double(b)?a-b:b-a;};
         for(size_t i=0; i<nReqSize; ++i) {
             if(vXReq[i]>=vX.front() && vXReq[i]<=vX.back()) {
                 const size_t nNNIdx = lv::find_nn_index(vXReq[i],vX,rlDist);
@@ -817,13 +816,13 @@ namespace lv {
 
     /// bitfield expansion function (specialized for unit word size)
     template<size_t nWordBitSize, typename T>
-    constexpr std::enable_if_t<nWordBitSize==1,T> expand_bits(const T& nBits, size_t=0) {
+    constexpr typename std::enable_if<nWordBitSize==1,T>::type expand_bits(const T& nBits, size_t=0) {
         return nBits;
     }
 
     /// bitfield expansion function (specialized for non-unit word size)
     template<size_t nWordBitSize, typename T>
-    constexpr std::enable_if_t<(nWordBitSize>1),T> expand_bits(const T& nBits, size_t n=((sizeof(T)*8)/nWordBitSize)-1) {
+    constexpr typename std::enable_if<(nWordBitSize>1),T>::type expand_bits(const T& nBits, size_t n=((sizeof(T)*8)/nWordBitSize)-1) {
         static_assert(std::is_integral<T>::value,"input value type must be integer");
         // only the first [(sizeof(T)*8)/nWordBitSize] bits are kept (otherwise overflow/ignored)
         return (T)(bool((nBits&(1<<n))!=0)<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,T>(nBits,n-1):(T)0);

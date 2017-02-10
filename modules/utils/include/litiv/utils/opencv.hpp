@@ -25,7 +25,7 @@
 #include <map>
 
 #define MAT_COND_DEPTH_TYPE(depth_flag,depth_type,depth_alt) \
-    std::conditional_t<CV_MAT_DEPTH(nTypeFlag)==depth_flag,depth_type,depth_alt>
+    typename std::conditional<CV_MAT_DEPTH(nTypeFlag)==depth_flag,depth_type,depth_alt>::type
 
 namespace cv { // extending cv
 
@@ -48,14 +48,14 @@ namespace cv { // extending cv
     /// type traits helper which provides basic static info on ocv matrix element types
     template<int nTypeFlag>
     struct MatTypeInfo {
-        typedef std::enable_if_t<(CV_MAT_DEPTH(nTypeFlag)>=0 && CV_MAT_DEPTH(nTypeFlag)<=6),
+        typedef typename std::enable_if<(CV_MAT_DEPTH(nTypeFlag)>=0 && CV_MAT_DEPTH(nTypeFlag)<=6),
             MAT_COND_DEPTH_TYPE(0,uchar,
                 MAT_COND_DEPTH_TYPE(1,char,
                     MAT_COND_DEPTH_TYPE(2,ushort,
                         MAT_COND_DEPTH_TYPE(3,short,
                             MAT_COND_DEPTH_TYPE(4,int,
                                 MAT_COND_DEPTH_TYPE(5,float,
-                                    MAT_COND_DEPTH_TYPE(6,double,void)))))))> base_type;
+                                    MAT_COND_DEPTH_TYPE(6,double,void)))))))>::type base_type;
         static constexpr int nChannels = CV_MAT_CN(nTypeFlag);
     };
 
@@ -441,7 +441,7 @@ namespace cv { // extending cv
         const T tMin = (T)dMin;
         const T tMax = (T)dMax;
         constexpr bool bIsFloat = !std::is_integral<T>::value;
-        using PrintType = std::conditional_t<bIsFloat,float,int64_t>;
+        using PrintType = typename std::conditional<bIsFloat,float,int64_t>::type;
         const bool bIsNormalized = tMax<=T(1) && tMin>=T(0); // useful for floats only
         const bool bHasNegative = int64_t(tMin)<int64_t(0);
         const size_t nMaxColWidth = size_t(bIsFloat?(bIsNormalized?6:(std::max(lv::digit_count((int64_t)tMin),lv::digit_count((int64_t)tMax))+5+int(bHasNegative!=0))):(std::max(lv::digit_count(tMin),lv::digit_count(tMax))+int(bHasNegative!=0)));

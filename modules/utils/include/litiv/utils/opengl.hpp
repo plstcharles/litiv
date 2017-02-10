@@ -396,7 +396,7 @@ namespace lv {
         }
 
         template<uint N>
-        inline std::enable_if_t<(N==1),int> getIntegerVal(GLenum eParamName) {
+        inline typename std::enable_if<(N==1),int>::type getIntegerVal(GLenum eParamName) {
             int nVal;
             glGetIntegerv(eParamName,&nVal);
             glErrorCheck;
@@ -404,7 +404,7 @@ namespace lv {
         }
 
         template<uint N>
-        inline std::enable_if_t<(N>1),std::array<int,N>> getIntegerVal(GLenum eParamName) {
+        inline typename std::enable_if<(N>1),std::array<int,N>>::type getIntegerVal(GLenum eParamName) {
             std::array<int,N> anVal;
             for(uint n=0; n<N; ++n)
                 glGetIntegeri_v(eParamName,n,&anVal[n]);

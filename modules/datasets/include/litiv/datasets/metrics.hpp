@@ -88,7 +88,7 @@ namespace lv {
         virtual std::shared_ptr<IIMetricsAccumulator> accumulate(const std::shared_ptr<const IIMetricsAccumulator>& m) = 0;
         /// returns a new instance of type 'MetricsAccumulator', passing 'args' to its constructor
         template<typename MetricsAccumulator, typename... Targs>
-        static std::enable_if_t<std::is_base_of<IIMetricsAccumulator,MetricsAccumulator>::value,std::shared_ptr<MetricsAccumulator>> create(Targs&&... args) {
+        static typename std::enable_if<std::is_base_of<IIMetricsAccumulator,MetricsAccumulator>::value,std::shared_ptr<MetricsAccumulator>>::type create(Targs&&... args) {
             struct MetricsAccumulatorWrapper : public MetricsAccumulator {
                 MetricsAccumulatorWrapper(Targs&&... _args) : MetricsAccumulator(std::forward<Targs>(_args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
             };
@@ -221,7 +221,7 @@ namespace lv {
         virtual std::shared_ptr<IIMetricsCalculator> accumulate(const std::shared_ptr<const IIMetricsCalculator>& m) = 0;
         /// returns a new instance of type 'MetricsCalculator', passing 'args' to its constructor
         template<typename MetricsCalculator, typename... Targs>
-        static std::enable_if_t<std::is_base_of<IIMetricsCalculator,MetricsCalculator>::value,std::shared_ptr<MetricsCalculator>> create(Targs&&... args) {
+        static typename std::enable_if<std::is_base_of<IIMetricsCalculator,MetricsCalculator>::value,std::shared_ptr<MetricsCalculator>>::type create(Targs&&... args) {
             struct MetricsCalculatorWrapper : public MetricsCalculator {
                 MetricsCalculatorWrapper(Targs&&... _args) : MetricsCalculator(std::forward<Targs>(_args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
             };

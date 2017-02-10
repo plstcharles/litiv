@@ -274,7 +274,7 @@ TYPED_TEST(L1dist_signed_fixture,regression_base) {
     EXPECT_DOUBLE_EQ(double(lv::L1dist(TypeParam(-10),TypeParam(10))),20.0);
     EXPECT_DOUBLE_EQ(double(lv::L1dist(TypeParam(-20),TypeParam(0))),20.0);
     EXPECT_DOUBLE_EQ(double(lv::L1dist(TypeParam(0),TypeParam(20))),20.0);
-    using TestTypeParam = std::conditional_t<std::is_same<double,TypeParam>::value,float,TypeParam>;
+    using TestTypeParam = typename std::conditional<std::is_same<double,TypeParam>::value,float,TypeParam>::type;
     const TestTypeParam tMax = std::numeric_limits<TestTypeParam>::max();
     const TestTypeParam tMin = std::numeric_limits<TestTypeParam>::min();
     EXPECT_DOUBLE_EQ(double(lv::L1dist(tMax,tMin)),(double(tMax)-tMin));
@@ -983,14 +983,14 @@ TEST(linspace,regression) {
 }
 
 TEST(extend_bits,regression) {
-    EXPECT_EQ(uint32_t(lv::extend_bits(0b0u,5,8)),uint32_t(0b0));
-    EXPECT_EQ(uint32_t(lv::extend_bits(0b111u,3,3)),uint32_t(0b111));
-    EXPECT_EQ(uint32_t(lv::extend_bits(0b11111u,5,8)),uint32_t(0b11111111));
-    EXPECT_NEAR(uint32_t(lv::extend_bits(0b10101u,5,8)),uint32_t(0b10101*256/32),256/32);
+    EXPECT_EQ(uint32_t(lv::extend_bits((uint32_t)0,5,8)),uint32_t(0));
+    EXPECT_EQ(uint32_t(lv::extend_bits((uint32_t)7,3,3)),uint32_t(7));
+    EXPECT_EQ(uint32_t(lv::extend_bits((uint32_t)31,5,8)),uint32_t(255));
+    EXPECT_NEAR(uint32_t(lv::extend_bits((uint32_t)21,5,8)),uint32_t(21*256/32),256/32);
 }
 
 TEST(expand_bits,regression) {
-    EXPECT_EQ(uint32_t(lv::expand_bits<4>(0)),uint32_t(0));
-    EXPECT_EQ(uint32_t(lv::expand_bits<4>(0b1111)),uint32_t(0b0001000100010001));
-    EXPECT_EQ(uint32_t(lv::expand_bits<4>(0b101010)),uint32_t(0b000100000001000000010000));
+    EXPECT_EQ(uint32_t(lv::expand_bits<4>((uint32_t)0)),uint32_t(0));
+    EXPECT_EQ(uint32_t(lv::expand_bits<4>((uint32_t)15)),uint32_t(4369));
+    EXPECT_EQ(uint32_t(lv::expand_bits<4>((uint32_t)42)),uint32_t(1052688));
 }

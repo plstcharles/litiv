@@ -19,6 +19,8 @@
 
 #include "litiv/features2d.hpp"
 
+#if __cplusplus>=201402L
+
 /// Mutual Information (MI) calculation helper (interface is similar to feature extractors, works only for 8U images)
 class MutualInfo : public cv::Algorithm {
 public:
@@ -58,3 +60,5 @@ private:
     lv::JointDenseHistData<uchar,uchar> oDenseHistData;
     lv::JointDenseHistData<ushort,uchar> oDense24BitHistData;
 };
+
+#endif //__cplusplus>=201402L

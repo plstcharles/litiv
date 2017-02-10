@@ -6,6 +6,8 @@ TEST(localDiff,regression) {
     // ... @@@@ TODO
 }
 
+#if __cplusplus>=201402L
+
 TEST(calcJointProbHist,regression_mixed3d) {
     std::array<int,3> vals = {10,356,-5};
     cv::Mat_<uchar> test1(3,3); test1 = uchar(vals[0]);
@@ -111,3 +113,5 @@ TEST(calcJointProbHist,regression_2d3vnz_quant) {
     lTester(lv::calcJointProbHist<64,true,true,false>(std::make_tuple(test1,test2)),false,true);
     lTester(lv::calcJointProbHist<64,true,true,true>(std::make_tuple(test1,test2)),true,true);
 }
+
+#endif //__cplusplus>=201402L
