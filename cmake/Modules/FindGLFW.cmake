@@ -224,7 +224,7 @@ endif()
 if(GLFW_INCLUDE_DIR)
     if(GLFW_glfw_LIBRARY)
         set(GLFW_LIBRARIES
-`           "${GLFW_glfw_LIBRARY}"
+            "${GLFW_glfw_LIBRARY}"
             "${GLFW_x11_LIBRARY}"
             "${GLFW_cocoa_LIBRARY}"
             "${GLFW_iokit_LIBRARY}"
