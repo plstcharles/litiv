@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 2.8.5 FATAL_ERROR)
 project(${DL_ARGS_PROJ}-download NONE)
 include(ExternalProject)
 ExternalProject_Add(

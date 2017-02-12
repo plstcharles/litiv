@@ -23,7 +23,7 @@ TEST(filesystem_ops,regression) {
     ASSERT_FALSE(lv::checkIfExists(sDirPath+"test2.txt"));
     oTestFile << "test" << std::endl;
     oTestFile.close();
-    oTestFile = lv::createBinFileWithPrealloc(sDirPath+"test2.bin",1024);
+    lv::createBinFileWithPrealloc(sDirPath+"test2.bin",1024,oTestFile);
     ASSERT_TRUE(oTestFile.is_open());
     oTestFile << "test" << std::endl;
     oTestFile.close();

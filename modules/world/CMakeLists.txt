@@ -125,6 +125,11 @@ endif()
 foreach(litiv_3rdparty_module_name IN LISTS litiv_3rdparty_module_names)
     message(STATUS " - ${litiv_3rdparty_module_name}")
 endforeach()
-foreach(litiv_module_name IN LISTS litiv_module_names)
-    message(STATUS " - ${litiv_module_name}")
+foreach(litiv_module_name IN LISTS litiv_modules)
+    message(STATUS " - litiv_${litiv_module_name}")
+    target_include_directories(litiv_world
+        PUBLIC
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../${litiv_module_name}/include>"
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/../${litiv_module_name}/include>"
+    )
 endforeach()

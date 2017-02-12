@@ -37,7 +37,7 @@
 #include <csignal>
 
 std::string lv::getCurrentWorkDirPath() {
-    std::array<char,FILENAME_MAX> acCurrentPath = {};
+    std::array<char,FILENAME_MAX> acCurrentPath = {0};
 #if defined(_MSC_VER)
     if(!_getcwd(acCurrentPath.data(),int(acCurrentPath.size()-1)))
 #else //(!defined(_MSC_VER))
@@ -207,8 +207,8 @@ bool lv::createDirIfNotExist(const std::string& sDirPath) {
 #endif //(!defined(_MSC_VER))
 }
 
-std::fstream lv::createBinFileWithPrealloc(const std::string & sFilePath, size_t nPreallocBytes, bool bZeroInit) {
-    std::fstream ssFile(sFilePath,std::ios::out|std::ios::in|std::ios::ate|std::ios::binary);
+void lv::createBinFileWithPrealloc(const std::string & sFilePath, size_t nPreallocBytes, std::fstream& ssFile, bool bZeroInit) {
+    ssFile.open(sFilePath,std::ios::out|std::ios::in|std::ios::ate|std::ios::binary);
     if(!ssFile.is_open())
         ssFile.open(sFilePath,std::ios::out|std::ios::binary);
     lvAssert__(ssFile.is_open(),"could not create file at '%s'",sFilePath.c_str());
@@ -227,7 +227,6 @@ std::fstream lv::createBinFileWithPrealloc(const std::string & sFilePath, size_t
         }
     }
     lvAssert_(ssFile.seekp(0),"could not return seek pointer to beg of file");
-    return ssFile;
 }
 
 void lv::registerAllConsoleSignals(void(*lHandler)(int)) {

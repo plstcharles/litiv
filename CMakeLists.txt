@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 2.8.5 FATAL_ERROR)
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_SOURCE_DIR}/cmake/"
     "${CMAKE_SOURCE_DIR}/cmake/Modules/"
@@ -204,37 +204,39 @@ if(BUILD_TESTS)
     enable_testing()
     find_package(Threads REQUIRED)
     # we do not check for GTest/Benchmark packages, they will be downloaded/built in-tree
-    if(UNIX)
-        add_custom_target(check
-            COMMAND +env ${CMAKE_MAKE_PROGRAM} all
-            COMMAND ${CMAKE_COMMAND} -E echo CMD=${CMAKE_CTEST_COMMAND} -C $<CONFIG>
-            COMMAND ${CMAKE_COMMAND} -E echo ----------------------------------
-            COMMAND ${CMAKE_COMMAND} -E env CTEST_OUTPUT_ON_FAILURE=1
-                    ${CMAKE_CTEST_COMMAND} -C $<CONFIG>
-            WORKING_DIRECTORY
-                ${CMAKE_BINARY_DIR}
-        )
-        set_target_properties(check
-            PROPERTIES
-                EXCLUDE_FROM_ALL
-                    TRUE
-        )
-    elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
-        add_custom_target(ALL_BUILD_AND_TEST
-            ${CMAKE_COMMAND} -E echo CMD=${CMAKE_CTEST_COMMAND} -C $<CONFIG>
-            COMMAND ${CMAKE_COMMAND} -E echo ----------------------------------
-            COMMAND ${CMAKE_COMMAND} -E env CTEST_OUTPUT_ON_FAILURE=1
-                    ${CMAKE_CTEST_COMMAND} -C $<CONFIG>
-            DEPENDS
-                ALL_BUILD
-            WORKING_DIRECTORY
-                ${CMAKE_BINARY_DIR}
-        )
-        set_target_properties(ALL_BUILD_AND_TEST
-            PROPERTIES
-                EXCLUDE_FROM_ALL
-                    TRUE
-        )
+    if(CMAKE_VERSION VERSION_GREATER 3.0)
+        if(UNIX)
+            add_custom_target(check
+                COMMAND +env ${CMAKE_MAKE_PROGRAM} all
+                COMMAND ${CMAKE_COMMAND} -E echo CMD=${CMAKE_CTEST_COMMAND} -C $<CONFIG>
+                COMMAND ${CMAKE_COMMAND} -E echo ----------------------------------
+                COMMAND ${CMAKE_COMMAND} -E env CTEST_OUTPUT_ON_FAILURE=1
+                        ${CMAKE_CTEST_COMMAND} -C $<CONFIG>
+                WORKING_DIRECTORY
+                    ${CMAKE_BINARY_DIR}
+            )
+            set_target_properties(check
+                PROPERTIES
+                    EXCLUDE_FROM_ALL
+                        TRUE
+            )
+        elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
+            add_custom_target(ALL_BUILD_AND_TEST
+                ${CMAKE_COMMAND} -E echo CMD=${CMAKE_CTEST_COMMAND} -C $<CONFIG>
+                COMMAND ${CMAKE_COMMAND} -E echo ----------------------------------
+                COMMAND ${CMAKE_COMMAND} -E env CTEST_OUTPUT_ON_FAILURE=1
+                        ${CMAKE_CTEST_COMMAND} -C $<CONFIG>
+                DEPENDS
+                    ALL_BUILD
+                WORKING_DIRECTORY
+                    ${CMAKE_BINARY_DIR}
+            )
+            set_target_properties(ALL_BUILD_AND_TEST
+                PROPERTIES
+                    EXCLUDE_FROM_ALL
+                        TRUE
+            )
+        endif()
     endif()
     set(TEST_INPUT_DATA_ROOT "${CMAKE_SOURCE_DIR}/modules/test/data" CACHE PATH "Test input data root folder (used internally for testing, contains binary reference files)")
     set(TEST_OUTPUT_DATA_ROOT "${CMAKE_BINARY_DIR}/Testing/data" CACHE PATH "Test output data root folder (used internally for testing, light external data may be downloaded and kept there)")
@@ -263,6 +265,7 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
     add_definitions(-Wall)
     add_definitions(-Wfatal-errors)
     add_definitions(-ftemplate-depth=900) # already default for gcc, but not for clang
+    add_definitions(-std=c++11) # some old cmake versions dont pass this to the compiler
     check_function_exists(aligned_alloc USE_STL_ALIGNED_ALLOC)
     if(NOT USE_STL_ALIGNED_ALLOC)
         set(USE_STL_ALIGNED_ALLOC 0 CACHE INTERNAL "Have function aligned_alloc")
@@ -341,4 +344,6 @@ add_subdirectory(samples)
 add_subdirectory(apps)
 add_subdirectory(doc)
 
-include(FrameworkPackGen)
+if(CMAKE_VERSION VERSION_GREATER 3.0)
+    include(FrameworkPackGen)
+endif()

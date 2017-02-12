@@ -36,7 +36,7 @@ namespace lv {
     /// creates a local directory at the given path if one does not already exist (does not work recursively)
     bool createDirIfNotExist(const std::string& sDirPath);
     /// creates a binary file at the specified location, and fills it with unspecified/zero data bytes (useful for critical/real-time stream writing without continuous reallocation)
-    std::fstream createBinFileWithPrealloc(const std::string& sFilePath, size_t nPreallocBytes, bool bZeroInit=false);
+    void createBinFileWithPrealloc(const std::string& sFilePath, size_t nPreallocBytes, std::fstream& ssFile, bool bZeroInit=false);
     /// registers the SIGINT, SIGTERM, and SIGBREAK (if available) console signals to the given handler
     void registerAllConsoleSignals(void(*lHandler)(int));
     /// returns the amount of physical memory currently used on the system

@@ -441,7 +441,7 @@ namespace cv { // extending cv
         const T tMin = (T)dMin;
         const T tMax = (T)dMax;
         constexpr bool bIsFloat = !std::is_integral<T>::value;
-        using PrintType = typename std::conditional<bIsFloat,float,int64_t>::type;
+        using PrintType = typename std::conditional<!std::is_integral<T>::value,float,int64_t>::type;
         const bool bIsNormalized = tMax<=T(1) && tMin>=T(0); // useful for floats only
         const bool bHasNegative = int64_t(tMin)<int64_t(0);
         const size_t nMaxColWidth = size_t(bIsFloat?(bIsNormalized?6:(std::max(lv::digit_count((int64_t)tMin),lv::digit_count((int64_t)tMax))+5+int(bHasNegative!=0))):(std::max(lv::digit_count(tMin),lv::digit_count(tMax))+int(bHasNegative!=0)));

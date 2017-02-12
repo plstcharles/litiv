@@ -15,9 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM plstcharles/litiv-base
+FROM plstcharles/litiv-base:centos7-latest
 MAINTAINER Pierre-Luc St-Charles <pierre-luc.st-charles@polymtl.ca>
-LABEL Description="LITIV framework test build"
+LABEL Description="LITIV framework test build (C++11 compat edition)"
 
 ARG CMAKECFG_BUILD_SHARED_LIBS=OFF
 ENV CMAKECFG_BUILD_SHARED_LIBS=${CMAKECFG_BUILD_SHARED_LIBS}

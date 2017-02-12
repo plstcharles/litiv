@@ -27,8 +27,8 @@ before_install:
   - docker pull plstcharles/litiv-base
   - echo "ENV GIT_SHA ${TRAVIS_COMMIT}" >> Dockerfile
 install:
-  - docker build --build-arg CMAKECFG_BUILD_SHARED_LIBS=${CMAKECFG_BUILD_SHARED_LIBS} -t ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT} -t ${DOCKER_HUB_REPO}:latest .
+  - docker build --build-arg CMAKECFG_BUILD_SHARED_LIBS=${CMAKECFG_BUILD_SHARED_LIBS} -t ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT} -t ${DOCKER_HUB_REPO}:centos7-latest .
 script:
-  - docker run -t ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT} make check
+  - docker run -t ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT} make test
 after_success:
   - if [ "$TRAVIS_PULL_REQUEST" == "false" ] && [ ! -z "$TRAVIS_TAG" ]; then docker tag ${DOCKER_HUB_REPO}:${TRAVIS_COMMIT} ${DOCKER_HUB_REPO}:${TRAVIS_TAG} && docker push ${DOCKER_HUB_REPO}; fi
