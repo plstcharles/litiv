@@ -29,13 +29,13 @@ TEST(MatTypeInfo,regression) {
 
 namespace {
     template<typename T>
-    struct MatSizeInfo_fixture : testing::Test {};
-    typedef testing::Types<uchar,short,ushort,int,uint,size_t> MatSizeInfo_types;
+    struct MatSize_fixture : testing::Test {};
+    typedef testing::Types<uchar,short,ushort,int,uint,size_t> Size_types;
 }
 
-TYPED_TEST_CASE(MatSizeInfo_fixture,MatSizeInfo_types);
-TYPED_TEST(MatSizeInfo_fixture,regression_2d) {
-    lv::MatSizeInfo_<TypeParam> test;
+TYPED_TEST_CASE(MatSize_fixture,Size_types);
+TYPED_TEST(MatSize_fixture,regression_2d) {
+    lv::MatSize_<TypeParam> test;
     ASSERT_EQ(test.dims(),TypeParam(0));
 #ifdef _DEBUG
     ASSERT_THROW_LV_QUIET(test.size(0));
@@ -51,8 +51,8 @@ TYPED_TEST(MatSizeInfo_fixture,regression_2d) {
     ASSERT_TRUE(((cv::MatSize)test)!=cv::MatSize(arr_alt.data()+1));
     ASSERT_TRUE(((cv::Size)test)==cv::Size());
     ASSERT_TRUE(((cv::Size)test)!=cv::Size(12,34));
-    lv::MatSizeInfo_<TypeParam> test_alt1;
-    lv::MatSizeInfo_<TypeParam> test_alt2(cv::Size(12,34));
+    lv::MatSize_<TypeParam> test_alt1;
+    lv::MatSize_<TypeParam> test_alt2(cv::Size(12,34));
     ASSERT_TRUE(test==test_alt1);
     ASSERT_TRUE(test!=test_alt2);
     ASSERT_EQ(test.total(),size_t(0));
@@ -75,11 +75,11 @@ TYPED_TEST(MatSizeInfo_fixture,regression_2d) {
     ASSERT_TRUE(((cv::Size)test)==cv::Size(12,34));
     ASSERT_EQ(test.total(),size_t(12*34));
     ASSERT_FALSE(test.empty());
-    lv::MatSizeInfo test_alt3 = test;
+    lv::MatSize test_alt3 = test;
     ASSERT_TRUE(test==test_alt3);
-    lv::MatSizeInfo_<int> test_alt4(uchar(34),ushort(12));
+    lv::MatSize_<int> test_alt4(uchar(34),ushort(12));
     ASSERT_TRUE(test==test_alt4);
-    lv::MatSizeInfo_<int> test_alt6{uchar(34),uchar(12)};
+    lv::MatSize_<int> test_alt6{uchar(34),uchar(12)};
     ASSERT_TRUE(test==test_alt6);
     std::stringstream sstr1;
     sstr1 << test;
@@ -89,15 +89,15 @@ TYPED_TEST(MatSizeInfo_fixture,regression_2d) {
     sstr2 << test;
     ASSERT_EQ(sstr2.str(),std::string("2-d:[34,0]<empty>"));
     std::array<int,4> arr_nd = {3,4,5,6};
-    lv::MatSizeInfo_<TypeParam> test_alt5(cv::MatSize(arr_nd.data()+1));
+    lv::MatSize_<TypeParam> test_alt5(cv::MatSize(arr_nd.data()+1));
     ASSERT_THROW_LV_QUIET(((cv::Size)test_alt5).area());
     std::array<int,3> arr_neg1 = {-1,3,4};
-    ASSERT_THROW_LV_QUIET(lv::MatSizeInfo_<TypeParam>(cv::MatSize(arr_neg1.data()+1)));
+    ASSERT_THROW_LV_QUIET(lv::MatSize_<TypeParam>(cv::MatSize(arr_neg1.data()+1)));
     std::array<int,3> arr_neg2 = {2,3,-4};
-    ASSERT_THROW_LV_QUIET(lv::MatSizeInfo_<TypeParam>(cv::MatSize(arr_neg2.data()+1)));
+    ASSERT_THROW_LV_QUIET(lv::MatSize_<TypeParam>(cv::MatSize(arr_neg2.data()+1)));
 }
 
-TYPED_TEST(MatSizeInfo_fixture,regression_nd) {
+TYPED_TEST(MatSize_fixture,regression_nd) {
     for(size_t i=0; i<100000; ++i) {
         const TypeParam nDims = TypeParam(rand()%10);
         std::vector<int> vnDimsPaddedInt(nDims+1);
@@ -115,13 +115,13 @@ TYPED_TEST(MatSizeInfo_fixture,regression_nd) {
             else
                 nElems *= size_t(vnDims[n]);
         }
-        lv::MatSizeInfo_<TypeParam> a(vnDims);
-        lv::MatSizeInfo_<TypeParam> b(vnDimsInt);
+        lv::MatSize_<TypeParam> a(vnDims);
+        lv::MatSize_<TypeParam> b(vnDimsInt);
         ASSERT_EQ(a,b);
         ASSERT_EQ(a.total(),nElems);
         ASSERT_EQ(b.total(),nElems);
         ASSERT_EQ(a.dims(),vnDimsPadded[0]);
-        lv::MatSizeInfo_<TypeParam> c(cv::MatSize(vnDimsPaddedInt.data()+1));
+        lv::MatSize_<TypeParam> c(cv::MatSize(vnDimsPaddedInt.data()+1));
         ASSERT_EQ(c,a);
         ASSERT_EQ(c.total(),nElems);
         ASSERT_EQ(c.total(),nElems);

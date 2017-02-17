@@ -59,35 +59,36 @@ namespace lv {
         static constexpr int nChannels = CV_MAT_CN(nTypeFlag);
     };
 
-    /// dim helper which provides easy-to-use and safe conversions from cv::Size and cv::MatSize (note: internally using 'major' dimension == first in vec)
+    /// mat dim size helper which provides easy-to-use and safe conversions from cv::Size and cv::MatSize
+    /// (note: internally using 'major' dimension == first in vec)
     template<typename Tinteger>
-    struct MatSizeInfo_ {
+    struct MatSize_ {
         /// default constructor; initializes internal config as zero-dim (empty)
-        MatSizeInfo_() :
+        MatSize_() :
                 m_vSizes{Tinteger(0)},m_aSizes(nullptr) {}
         /// cv::MatSize-based constructor
-        MatSizeInfo_(const cv::MatSize& oSize) :
+        MatSize_(const cv::MatSize& oSize) :
                 m_vSizes(cvtSizes(oSize.p)),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
         /// cv::Size-based constructor
-        MatSizeInfo_(const cv::Size& oSize) : // row-major by default, like opencv
+        MatSize_(const cv::Size& oSize) : // row-major by default, like opencv
                 m_vSizes{Tinteger(2),Tinteger(oSize.height),Tinteger(oSize.width)},m_aSizes(m_vSizes.data()+1) {
             lvAssert_(oSize.width>=0 && oSize.height>=0,"sizes must be null or positive values");
         }
         /// array-based constructor
         template<size_t nDims, typename Tinteger2>
-        MatSizeInfo_(const std::array<Tinteger2,nDims>& aSizes) :
+        MatSize_(const std::array<Tinteger2,nDims>& aSizes) :
                 m_vSizes(cvtSizes((Tinteger2)nDims,aSizes.data())),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
         /// vector-based constructor
         template<typename Tinteger2>
-        MatSizeInfo_(const std::vector<Tinteger2>& vSizes) :
+        MatSize_(const std::vector<Tinteger2>& vSizes) :
                 m_vSizes(cvtSizes((Tinteger2)vSizes.size(),vSizes.data())),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
         /// initlist-based constructor
         template<typename Tinteger2>
-        MatSizeInfo_(const std::initializer_list<Tinteger2>& aSizes) :
+        MatSize_(const std::initializer_list<Tinteger2>& aSizes) :
                 m_vSizes(cvtSizes((Tinteger2)aSizes.size(),aSizes.begin())),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
         /// explicit dims constructor; initializes internal config by casting all provided args
         template<typename... Tintegers>
-        MatSizeInfo_(Tintegers... anSizes) :
+        MatSize_(Tintegers... anSizes) :
                 m_vSizes{Tinteger(sizeof...(anSizes)),Tinteger(anSizes)...},m_aSizes(m_vSizes.data()+1) {
             static_assert(lv::static_reduce(std::array<bool,sizeof...(Tintegers)>{(std::is_integral<Tintegers>::value)...},lv::static_reduce_and),"all given args should be integral");
             for(int nDimIdx=0; nDimIdx<dims(); ++nDimIdx)
@@ -95,7 +96,7 @@ namespace lv {
         }
         /// copy constructor for similar struct
         template<typename Tinteger2>
-        MatSizeInfo_(const MatSizeInfo_<Tinteger2>& oSize) :
+        MatSize_(const MatSize_<Tinteger2>& oSize) :
                 m_vSizes(cvtSizes(oSize.m_vSizes.data()+1)),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
         /// returns the dimension count
         const Tinteger& dims() const {
@@ -176,9 +177,9 @@ namespace lv {
         bool operator!=(const cv::MatSize& oSize) const {
             return !(*this==oSize);
         }
-        /// is-equal test operator for other MatSizeInfo_ structs
+        /// is-equal test operator for other MatSize_ structs
         template<typename Tinteger2>
-        bool operator==(const MatSizeInfo_<Tinteger2>& oSize) const {
+        bool operator==(const MatSize_<Tinteger2>& oSize) const {
             if(empty() && oSize.empty())
                 return true;
             const Tinteger nDims = dims();
@@ -191,14 +192,14 @@ namespace lv {
                     return false;
             return true;
         }
-        /// is-not-equal test operator for other MatSizeInfo_ structs
+        /// is-not-equal test operator for other MatSize_ structs
         template<typename Tinteger2>
-        bool operator!=(const MatSizeInfo_<Tinteger2>& oSize) const {
+        bool operator!=(const MatSize_<Tinteger2>& oSize) const {
             return !(*this==oSize);
         }
         /// assignment operator for different templated integer struct
         template<typename Tinteger2>
-        MatSizeInfo_& operator=(const MatSizeInfo_<Tinteger2>& oSize) {
+        MatSize_& operator=(const MatSize_<Tinteger2>& oSize) {
             m_vSizes = cvtSizes(oSize.m_vSizes.data()+1);
             m_aSizes = m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr;
             return *this;
@@ -242,18 +243,18 @@ namespace lv {
         }
     private:
         template<typename Tinteger2>
-        friend struct MatSizeInfo_;
+        friend struct MatSize_;
         mutable std::vector<int> m_vSizesExt; // needed for cast to MatSize/int* only
         std::vector<Tinteger> m_vSizes;
         Tinteger* m_aSizes;
     };
 
-    /// default MatSizeInfo struct defaults to size_t for dim/size indexing
-    using MatSizeInfo = MatSizeInfo_<size_t>;
+    /// mat dim size helper struct defaults to size_t for dim/size indexing
+    using MatSize = MatSize_<size_t>;
 
-    /// ostream-friendly overload for MatSizeInfo (ADL will allow usage from this namespace)
+    /// ostream-friendly overload for MatSize (ADL will allow usage from this namespace)
     template<typename Tinteger>
-    std::ostream& operator<<(std::ostream& os, const MatSizeInfo_<Tinteger>& oSize) {
+    std::ostream& operator<<(std::ostream& os, const MatSize_<Tinteger>& oSize) {
         if(oSize.dims()==Tinteger(0))
             return os << "0-d:[]<empty>";
         os << (int)oSize.dims() << "-d:[";
@@ -265,7 +266,7 @@ namespace lv {
     /// simplified cv::Mat header info container for usage in datasets module; contains all required info to preallocate matrix packets
     struct MatInfo {
         /// contains info about the layout of the matrix's elements
-        MatSizeInfo m_oSize;
+        MatSize m_oSize;
         /// contains info about the type of the matrix's elements (i.e. using the OpenCV type defines)
         int m_nCVType;
         // @@@@ todo, add to datasets module to replace all cv::Size
