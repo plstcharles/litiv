@@ -81,6 +81,10 @@ namespace lv {
         template<typename Tinteger2>
         MatSizeInfo_(const std::vector<Tinteger2>& vSizes) :
                 m_vSizes(cvtSizes((Tinteger2)vSizes.size(),vSizes.data())),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
+        /// initlist-based constructor
+        template<typename Tinteger2>
+        MatSizeInfo_(const std::initializer_list<Tinteger2>& aSizes) :
+                m_vSizes(cvtSizes((Tinteger2)aSizes.size(),aSizes.begin())),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
         /// explicit dims constructor; initializes internal config by casting all provided args
         template<typename... Tintegers>
         MatSizeInfo_(Tintegers... anSizes) :

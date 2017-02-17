@@ -79,6 +79,8 @@ TYPED_TEST(MatSizeInfo_fixture,regression_2d) {
     ASSERT_TRUE(test==test_alt3);
     lv::MatSizeInfo_<int> test_alt4(uchar(34),ushort(12));
     ASSERT_TRUE(test==test_alt4);
+    lv::MatSizeInfo_<int> test_alt6{uchar(34),uchar(12)};
+    ASSERT_TRUE(test==test_alt6);
     std::stringstream sstr1;
     sstr1 << test;
     ASSERT_EQ(sstr1.str(),std::string("2-d:[34,12]"));
