@@ -1266,7 +1266,22 @@ void lv::DataWriter::entry() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void lv::IDataArchiver_<lv::NotArray>::save(const cv::Mat& _oOutput, size_t nIdx, int /*nFlags*/) {
+cv::Mat lv::IDataArchiver_<lv::NotArray>::loadOutput(size_t nIdx, int nFlags) {
+    const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
+    std::stringstream sOutputFilePath;
+    sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
+    if(pLoader->getOutputPacketType()==ImagePacket) {
+        lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires packet output name suffix (i.e. file extension)");
+        if(nFlags==-1)
+            return cv::imread(sOutputFilePath.str());
+        else
+            return cv::imread(sOutputFilePath.str(),nFlags);
+    }
+    else
+        return lv::read(sOutputFilePath.str());
+}
+
+void lv::IDataArchiver_<lv::NotArray>::saveOutput(const cv::Mat& _oOutput, size_t nIdx, int /*nFlags*/) {
     const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
     std::stringstream sOutputFilePath;
     sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
@@ -1290,24 +1305,42 @@ void lv::IDataArchiver_<lv::NotArray>::save(const cv::Mat& _oOutput, size_t nIdx
         lv::write(sOutputFilePath.str(),_oOutput);
 }
 
-cv::Mat lv::IDataArchiver_<lv::NotArray>::load(size_t nIdx, int nFlags) {
-    const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
-    std::stringstream sOutputFilePath;
-    sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
-    if(pLoader->getOutputPacketType()==ImagePacket) {
-        lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires packet output name suffix (i.e. file extension)");
-        if(nFlags==-1)
-            return cv::imread(sOutputFilePath.str());
-        else
-            return cv::imread(sOutputFilePath.str(),nFlags);
-    }
-    else
-        return lv::read(sOutputFilePath.str());
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void lv::IDataArchiver_<lv::Array>::saveArray(const std::vector<cv::Mat>& vOutput, size_t nIdx, int /*nFlags*/) {
+std::vector<cv::Mat> lv::IDataArchiver_<lv::Array>::loadOutputArray(size_t nIdx, int nFlags) {
+    const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
+    std::vector<cv::Mat> vOutput(getOutputStreamCount());
+    for(size_t nStreamIdx=0; nStreamIdx<vOutput.size(); ++nStreamIdx) {
+        std::stringstream sOutputFilePath;
+        if(nStreamIdx==0 && vOutput.size()==1)
+            sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
+        else
+            sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << "_" << nStreamIdx << getOutputNameSuffix();
+        if(pLoader->getOutputPacketType()==ImagePacket || pLoader->getOutputPacketType()==ImageArrayPacket) {
+            lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires packet output name suffix (i.e. file extension)");
+            if(nFlags==-1)
+                vOutput[nStreamIdx] = cv::imread(sOutputFilePath.str());
+            else
+                vOutput[nStreamIdx] = cv::imread(sOutputFilePath.str(),nFlags);
+        }
+        else
+            vOutput[nStreamIdx] = lv::read(sOutputFilePath.str());
+    }
+    return vOutput;
+}
+
+size_t lv::IDataArchiver_<lv::Array>::getOutputStreamCount() const {
+    auto pLoader = shared_from_this_cast<IDataLoader_<Array>>();
+    if(pLoader) {
+        if(pLoader->getIOMappingType()<=ArrayMapping)
+            return pLoader->getInputStreamCount();
+        else if(pLoader->getGTMappingType()<=ArrayMapping)
+            return pLoader->getGTStreamCount();
+    }
+    return 1; // default output stream count; overload function if you require something else
+}
+
+void lv::IDataArchiver_<lv::Array>::saveOutputArray(const std::vector<cv::Mat>& vOutput, size_t nIdx, int /*nFlags*/) {
     const size_t nStreamCount = getOutputStreamCount();
     lvAssert__(vOutput.size()==nStreamCount,"expected output vector to have %d elements, had %d",(int)nStreamCount,(int)vOutput.size());
     if(nStreamCount==0)
@@ -1361,39 +1394,6 @@ void lv::IDataArchiver_<lv::Array>::saveArray(const std::vector<cv::Mat>& vOutpu
                 lv::write(sOutputFilePath.str(),_oOutput);
         }
     }
-}
-
-std::vector<cv::Mat> lv::IDataArchiver_<lv::Array>::loadArray(size_t nIdx, int nFlags) {
-    const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
-    std::vector<cv::Mat> vOutput(getOutputStreamCount());
-    for(size_t nStreamIdx=0; nStreamIdx<vOutput.size(); ++nStreamIdx) {
-        std::stringstream sOutputFilePath;
-        if(nStreamIdx==0 && vOutput.size()==1)
-            sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
-        else
-            sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << "_" << nStreamIdx << getOutputNameSuffix();
-        if(pLoader->getOutputPacketType()==ImagePacket || pLoader->getOutputPacketType()==ImageArrayPacket) {
-            lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires packet output name suffix (i.e. file extension)");
-            if(nFlags==-1)
-                vOutput[nStreamIdx] = cv::imread(sOutputFilePath.str());
-            else
-                vOutput[nStreamIdx] = cv::imread(sOutputFilePath.str(),nFlags);
-        }
-        else
-            vOutput[nStreamIdx] = lv::read(sOutputFilePath.str());
-    }
-    return vOutput;
-}
-
-size_t lv::IDataArchiver_<lv::Array>::getOutputStreamCount() const {
-    auto pLoader = shared_from_this_cast<IDataLoader_<Array>>();
-    if(pLoader) {
-        if(pLoader->getIOMappingType()<=ArrayMapping)
-            return pLoader->getInputStreamCount();
-        else if(pLoader->getGTMappingType()<=ArrayMapping)
-            return pLoader->getGTStreamCount();
-    }
-    return 1; // default output stream count; overload function if you require something else
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1493,7 +1493,7 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::post_ap
         if(m_lDataCallback)
             m_lDataCallback(m_oLastInput,oLastDebug,oLastOutput,m_oLastGT,m_pLoader->getGTROI(m_nLastIdx),m_nLastIdx);
         if(isSavingOutput() && !oLastOutput.empty())
-            save(oLastOutput,m_nLastIdx);
+            saveOutput(oLastOutput,m_nLastIdx);
         if(m_pAlgo->m_pDisplayHelper && m_pLoader->getGTPacketType()==ImagePacket && m_pLoader->getGTMappingType()==ElemMapping) {
             getColoredMasks(oLastOutput,oLastDebug,m_oLastGT,m_pLoader->getGTROI(m_nLastIdx));
             m_pAlgo->m_pDisplayHelper->display(m_oLastInput,oLastDebug,oLastOutput,m_nLastIdx);

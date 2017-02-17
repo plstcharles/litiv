@@ -807,23 +807,23 @@ namespace lv {
     /// data archiver specialization for non-array output processing
     template<>
     struct IDataArchiver_<NotArray> : public virtual IDataHandler {
-        /// loads a processed data packet based on idx and packet name (if available), with optional flags (-1 = internal defaults)
-        virtual cv::Mat load(size_t nIdx, int nFlags=-1);
+        /// loads an output data packet based on idx, with optional flags (-1 = internal defaults)
+        virtual cv::Mat loadOutput(size_t nIdx, int nFlags=-1);
     protected:
-        /// saves a processed data packet locally based on idx and packet name (if available), with optional flags (-1 = internal defaults)
-        virtual void save(const cv::Mat& oOutput, size_t nIdx, int nFlags=-1);
+        /// saves an output data packet based on idx, with optional flags (-1 = internal defaults)
+        virtual void saveOutput(const cv::Mat& oOutput, size_t nIdx, int nFlags=-1);
     };
 
     /// data archiver specialization for array output processing
     template<>
     struct IDataArchiver_<Array> : public virtual IDataHandler {
-        /// loads a processed data packet array based on idx and packet name (if available), with optional flags (-1 = internal defaults)
-        virtual std::vector<cv::Mat> loadArray(size_t nIdx, int nFlags=-1);
+        /// loads an output data packet array based on idx, with optional flags (-1 = internal defaults)
+        virtual std::vector<cv::Mat> loadOutputArray(size_t nIdx, int nFlags=-1);
         /// returns the number of parallel output streams (defaults to input or GT stream count if loader is array-based & one mapping allows it, or 1 otherwise)
         virtual size_t getOutputStreamCount() const;
     protected:
-        /// saves a processed data packet array locally based on idx and packet name (if available), with optional flags (-1 = internal defaults)
-        virtual void saveArray(const std::vector<cv::Mat>& vOutput, size_t nIdx, int nFlags=-1);
+        /// saves an output data packet array based on idx, with optional flags (-1 = internal defaults)
+        virtual void saveOutputArray(const std::vector<cv::Mat>& vOutput, size_t nIdx, int nFlags=-1);
     };
 
     /// data counter interface for non-group work batches (exposes output packet counting logic)
@@ -890,7 +890,7 @@ namespace lv {
             countOutput(nPacketIdx);
             processOutput(oOutput,nPacketIdx);
             if(isSavingOutput() && !oOutput.empty())
-                this->save(oOutput,nPacketIdx);
+                this->saveOutput(oOutput,nPacketIdx);
         }
     protected:
         /// processes an output packet (does nothing by default, but may be overridden for evaluation/pipelining)
