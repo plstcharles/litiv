@@ -4,23 +4,121 @@
 
 #define TEST_MAT_TYPE_INFO(ch) \
     do { \
-        ASSERT_TRUE((std::is_same<lv::MatTypeInfo<CV_8UC(ch)>::base_type,uchar>::value));\
-        ASSERT_TRUE(lv::MatTypeInfo<CV_8UC(ch)>::nChannels==ch);\
-        ASSERT_TRUE((std::is_same<lv::MatTypeInfo<CV_8SC(ch)>::base_type,char>::value));\
-        ASSERT_TRUE(lv::MatTypeInfo<CV_8SC(ch)>::nChannels==ch);\
-        ASSERT_TRUE((std::is_same<lv::MatTypeInfo<CV_16UC(ch)>::base_type,ushort>::value));\
-        ASSERT_TRUE(lv::MatTypeInfo<CV_16UC(ch)>::nChannels==ch);\
-        ASSERT_TRUE((std::is_same<lv::MatTypeInfo<CV_16SC(ch)>::base_type,short>::value));\
-        ASSERT_TRUE(lv::MatTypeInfo<CV_16SC(ch)>::nChannels==ch);\
-        ASSERT_TRUE((std::is_same<lv::MatTypeInfo<CV_32SC(ch)>::base_type,int>::value));\
-        ASSERT_TRUE(lv::MatTypeInfo<CV_32SC(ch)>::nChannels==ch);\
-        ASSERT_TRUE((std::is_same<lv::MatTypeInfo<CV_32FC(ch)>::base_type,float>::value));\
-        ASSERT_TRUE(lv::MatTypeInfo<CV_32FC(ch)>::nChannels==ch);\
-        ASSERT_TRUE((std::is_same<lv::MatTypeInfo<CV_64FC(ch)>::base_type,double>::value));\
-        ASSERT_TRUE(lv::MatTypeInfo<CV_64FC(ch)>::nChannels==ch);\
+        const lv::MatType oType8U(CV_8UC(ch)); \
+        ASSERT_TRUE(oType8U.channels()==ch);\
+        ASSERT_TRUE(oType8U.depth()==CV_8U);\
+        ASSERT_TRUE(oType8U.depthBytes()==size_t(1));\
+        ASSERT_TRUE(oType8U.type()==CV_8UC(ch));\
+        ASSERT_TRUE((oType8U.isTypeCompat<uint8_t>())); \
+        ASSERT_FALSE((oType8U.isTypeCompat<int8_t>())); \
+        if(ch>1) { \
+            ASSERT_TRUE((oType8U.isTypeCompat<cv::Vec<uint8_t,ch>,true>())); \
+            ASSERT_FALSE((oType8U.isTypeCompat<cv::Vec<int8_t,ch>,true>())); \
+        } \
+        ASSERT_TRUE((std::is_same<lv::MatType_<CV_8UC(ch)>::base_type,uchar>::value));\
+        ASSERT_TRUE(lv::MatType_<CV_8UC(ch)>::channels()==ch);\
+        ASSERT_TRUE(lv::MatType_<CV_8UC(ch)>::depth()==CV_8U);\
+        ASSERT_TRUE(lv::MatType_<CV_8UC(ch)>::depthBytes()==size_t(1));\
+        ASSERT_TRUE(lv::MatType_<CV_8UC(ch)>::type()==CV_8UC(ch));\
+        const lv::MatType oType8S(CV_8SC(ch)); \
+        ASSERT_TRUE(oType8S.channels()==ch);\
+        ASSERT_TRUE(oType8S.depth()==CV_8S);\
+        ASSERT_TRUE(oType8S.depthBytes()==size_t(1));\
+        ASSERT_TRUE(oType8S.type()==CV_8SC(ch));\
+        ASSERT_TRUE((oType8S.isTypeCompat<int8_t>())); \
+        ASSERT_FALSE((oType8S.isTypeCompat<uint8_t>())); \
+        if(ch>1) { \
+            ASSERT_TRUE((oType8S.isTypeCompat<cv::Vec<int8_t,ch>,true>())); \
+            ASSERT_FALSE((oType8S.isTypeCompat<cv::Vec<uint8_t,ch>,true>())); \
+        } \
+        ASSERT_TRUE((std::is_same<lv::MatType_<CV_8SC(ch)>::base_type,char>::value));\
+        ASSERT_TRUE(lv::MatType_<CV_8SC(ch)>::channels()==ch);\
+        ASSERT_TRUE(lv::MatType_<CV_8SC(ch)>::depth()==CV_8S);\
+        ASSERT_TRUE(lv::MatType_<CV_8SC(ch)>::depthBytes()==size_t(1));\
+        ASSERT_TRUE(lv::MatType_<CV_8SC(ch)>::type()==CV_8SC(ch));\
+        const lv::MatType oType16U(CV_16UC(ch)); \
+        ASSERT_TRUE(oType16U.channels()==ch);\
+        ASSERT_TRUE(oType16U.depth()==CV_16U);\
+        ASSERT_TRUE(oType16U.depthBytes()==size_t(2));\
+        ASSERT_TRUE(oType16U.type()==CV_16UC(ch));\
+        ASSERT_TRUE((oType16U.isTypeCompat<uint16_t>())); \
+        ASSERT_FALSE((oType16U.isTypeCompat<uint8_t>())); \
+        if(ch>1) { \
+            ASSERT_TRUE((oType16U.isTypeCompat<cv::Vec<uint16_t,ch>,true>())); \
+            ASSERT_FALSE((oType16U.isTypeCompat<cv::Vec<uint8_t,ch>,true>())); \
+        } \
+        ASSERT_TRUE((std::is_same<lv::MatType_<CV_16UC(ch)>::base_type,ushort>::value));\
+        ASSERT_TRUE(lv::MatType_<CV_16UC(ch)>::channels()==ch);\
+        ASSERT_TRUE(lv::MatType_<CV_16UC(ch)>::depth()==CV_16U);\
+        ASSERT_TRUE(lv::MatType_<CV_16UC(ch)>::depthBytes()==size_t(2));\
+        ASSERT_TRUE(lv::MatType_<CV_16UC(ch)>::type()==CV_16UC(ch));\
+        const lv::MatType oType16S(CV_16SC(ch)); \
+        ASSERT_TRUE(oType16S.channels()==ch);\
+        ASSERT_TRUE(oType16S.depth()==CV_16S);\
+        ASSERT_TRUE(oType16S.depthBytes()==size_t(2));\
+        ASSERT_TRUE(oType16S.type()==CV_16SC(ch));\
+        ASSERT_TRUE((oType16S.isTypeCompat<int16_t>())); \
+        ASSERT_FALSE((oType16S.isTypeCompat<uint8_t>())); \
+        if(ch>1) { \
+            ASSERT_TRUE((oType16S.isTypeCompat<cv::Vec<int16_t,ch>,true>())); \
+            ASSERT_FALSE((oType16S.isTypeCompat<cv::Vec<uint8_t,ch>,true>())); \
+        } \
+        ASSERT_TRUE((std::is_same<lv::MatType_<CV_16SC(ch)>::base_type,short>::value));\
+        ASSERT_TRUE(lv::MatType_<CV_16SC(ch)>::channels()==ch);\
+        ASSERT_TRUE(lv::MatType_<CV_16SC(ch)>::depth()==CV_16S);\
+        ASSERT_TRUE(lv::MatType_<CV_16SC(ch)>::depthBytes()==size_t(2));\
+        ASSERT_TRUE(lv::MatType_<CV_16SC(ch)>::type()==CV_16SC(ch));\
+        const lv::MatType oType32S(CV_32SC(ch)); \
+        ASSERT_TRUE(oType32S.channels()==ch);\
+        ASSERT_TRUE(oType32S.depth()==CV_32S);\
+        ASSERT_TRUE(oType32S.depthBytes()==size_t(4));\
+        ASSERT_TRUE(oType32S.type()==CV_32SC(ch));\
+        ASSERT_TRUE((oType32S.isTypeCompat<int32_t>())); \
+        ASSERT_FALSE((oType32S.isTypeCompat<uint8_t>())); \
+        if(ch>1) { \
+            ASSERT_TRUE((oType32S.isTypeCompat<cv::Vec<int32_t,ch>,true>())); \
+            ASSERT_FALSE((oType32S.isTypeCompat<cv::Vec<uint8_t,ch>,true>())); \
+        } \
+        ASSERT_TRUE((std::is_same<lv::MatType_<CV_32SC(ch)>::base_type,int>::value));\
+        ASSERT_TRUE(lv::MatType_<CV_32SC(ch)>::channels()==ch);\
+        ASSERT_TRUE(lv::MatType_<CV_32SC(ch)>::depth()==CV_32S);\
+        ASSERT_TRUE(lv::MatType_<CV_32SC(ch)>::depthBytes()==size_t(4));\
+        ASSERT_TRUE(lv::MatType_<CV_32SC(ch)>::type()==CV_32SC(ch));\
+        const lv::MatType oType32F(CV_32FC(ch)); \
+        ASSERT_TRUE(oType32F.channels()==ch);\
+        ASSERT_TRUE(oType32F.depth()==CV_32F);\
+        ASSERT_TRUE(oType32F.depthBytes()==size_t(4));\
+        ASSERT_TRUE(oType32F.type()==CV_32FC(ch));\
+        ASSERT_TRUE((oType32F.isTypeCompat<float>())); \
+        ASSERT_FALSE((oType32F.isTypeCompat<uint8_t>())); \
+        if(ch>1) { \
+            ASSERT_TRUE((oType32F.isTypeCompat<cv::Vec<float,ch>,true>())); \
+            ASSERT_FALSE((oType32F.isTypeCompat<cv::Vec<uint8_t,ch>,true>())); \
+        } \
+        ASSERT_TRUE((std::is_same<lv::MatType_<CV_32FC(ch)>::base_type,float>::value));\
+        ASSERT_TRUE(lv::MatType_<CV_32FC(ch)>::channels()==ch);\
+        ASSERT_TRUE(lv::MatType_<CV_32FC(ch)>::depth()==CV_32F);\
+        ASSERT_TRUE(lv::MatType_<CV_32FC(ch)>::depthBytes()==size_t(4));\
+        ASSERT_TRUE(lv::MatType_<CV_32FC(ch)>::type()==CV_32FC(ch));\
+        const lv::MatType oType64F(CV_64FC(ch)); \
+        ASSERT_TRUE(oType64F.channels()==ch);\
+        ASSERT_TRUE(oType64F.depth()==CV_64F);\
+        ASSERT_TRUE(oType64F.depthBytes()==size_t(8));\
+        ASSERT_TRUE(oType64F.type()==CV_64FC(ch));\
+        ASSERT_TRUE((oType64F.isTypeCompat<double>())); \
+        ASSERT_FALSE((oType64F.isTypeCompat<uint8_t>())); \
+        if(ch>1) { \
+            ASSERT_TRUE((oType64F.isTypeCompat<cv::Vec<double,ch>,true>())); \
+            ASSERT_FALSE((oType64F.isTypeCompat<cv::Vec<uint8_t,ch>,true>())); \
+        } \
+        ASSERT_TRUE((std::is_same<lv::MatType_<CV_64FC(ch)>::base_type,double>::value));\
+        ASSERT_TRUE(lv::MatType_<CV_64FC(ch)>::channels()==ch);\
+        ASSERT_TRUE(lv::MatType_<CV_64FC(ch)>::depth()==CV_64F);\
+        ASSERT_TRUE(lv::MatType_<CV_64FC(ch)>::depthBytes()==size_t(8));\
+        ASSERT_TRUE(lv::MatType_<CV_64FC(ch)>::type()==CV_64FC(ch));\
     } while(0)
 
-TEST(MatTypeInfo,regression) {
+TEST(MatType,regression) {
     TEST_MAT_TYPE_INFO(1);
     TEST_MAT_TYPE_INFO(2);
     TEST_MAT_TYPE_INFO(3);

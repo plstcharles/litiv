@@ -24,8 +24,11 @@
 #include <unordered_set>
 #include <map>
 
-#define MAT_COND_DEPTH_TYPE(depth_flag,depth_type,depth_alt) \
-    std::conditional_t<CV_MAT_DEPTH(nTypeFlag)==depth_flag,depth_type,depth_alt>
+#define MAT_COND_DEPTH_TYPE(cvtype_flag,depth_flag,depth_type,depth_alt) \
+    std::conditional_t<CV_MAT_DEPTH(cvtype_flag)==depth_flag,depth_type,depth_alt>
+
+#define MAT_DEPTH_BYTES(cvtype_flag) \
+    (CV_MAT_DEPTH(cvtype_flag)<=1?1:CV_MAT_DEPTH(cvtype_flag)<4?2:CV_MAT_DEPTH(cvtype_flag)<6?4:8)
 
 namespace lv {
 
@@ -45,18 +48,93 @@ namespace lv {
         return (uintptr_t(pData)%nByteAlign)==0;
     }
 
-    /// type traits helper which provides basic static info on ocv matrix element types
-    template<int nTypeFlag>
-    struct MatTypeInfo {
-        typedef std::enable_if_t<(CV_MAT_DEPTH(nTypeFlag)>=0 && CV_MAT_DEPTH(nTypeFlag)<=6),
-            MAT_COND_DEPTH_TYPE(0,uchar,
-                MAT_COND_DEPTH_TYPE(1,char,
-                    MAT_COND_DEPTH_TYPE(2,ushort,
-                        MAT_COND_DEPTH_TYPE(3,short,
-                            MAT_COND_DEPTH_TYPE(4,int,
-                                MAT_COND_DEPTH_TYPE(5,float,
-                                    MAT_COND_DEPTH_TYPE(6,double,void)))))))> base_type;
-        static constexpr int nChannels = CV_MAT_CN(nTypeFlag);
+    /// mat type helper struct which provides basic static traits info on ocv matrix element types
+    template<int nCVType>
+    struct MatType_ {
+        /// holds the typename for underlying mat data
+        typedef std::enable_if_t<(CV_MAT_DEPTH(nCVType)>=0 && CV_MAT_DEPTH(nCVType)<=6),
+            MAT_COND_DEPTH_TYPE(nCVType,0/**/,uchar,
+                MAT_COND_DEPTH_TYPE(nCVType,1,char,
+                    MAT_COND_DEPTH_TYPE(nCVType,2,ushort,
+                        MAT_COND_DEPTH_TYPE(nCVType,3,short,
+                            MAT_COND_DEPTH_TYPE(nCVType,4,int,
+                                MAT_COND_DEPTH_TYPE(nCVType,5,float,
+                                    MAT_COND_DEPTH_TYPE(nCVType,6,double,void)))))))> base_type;
+        /// returns the channel count for the underlying mat data (i.e. smallest implicit mat dim)
+        static constexpr int channels() {return CV_MAT_CN(nCVType);}
+        /// returns the ocv depth id (NOT A BYTE COUNT!) for the underlying mat data
+        static constexpr int depth() {return CV_MAT_DEPTH(nCVType);}
+        /// returns the byte depth for the underlying mat data
+        static constexpr size_t depthBytes() {return MAT_DEPTH_BYTES(nCVType);}
+        /// returns the internal opencv mat type argument
+        static constexpr int type() {return nCVType;}
+        /// returns the internal opencv mat type argument
+        int operator()() const {return nCVType;}
+    };
+
+    /// mat type helper struct which provides basic dynamic info on ocv matrix element types
+    struct MatType {
+        /// default constructor; also validates m_nCVType for possible ocv mat configs
+        MatType(int nCVType) : m_nCVType(nCVType) {
+            lvAssert__((CV_MAT_DEPTH(m_nCVType)>=0 && CV_MAT_DEPTH(m_nCVType)<=6),"bad ocv type depth (type=%d, depth=%d)",m_nCVType,CV_MAT_DEPTH(m_nCVType));
+            lvAssert__((CV_MAT_CN(m_nCVType)>0 && CV_MAT_CN(m_nCVType)<=4),"bad ocv type channels (type=%d, channels=%d)",m_nCVType,CV_MAT_CN(m_nCVType));
+        }
+        /// returns the channel count for the underlying mat data (i.e. smallest implicit mat dim)
+        int channels() const {return CV_MAT_CN(m_nCVType);}
+        /// returns the ocv depth id (NOT A BYTE COUNT!) for the underlying mat data
+        int depth() const {return CV_MAT_DEPTH(m_nCVType);}
+        /// returns the byte depth for the underlying mat data
+        size_t depthBytes() const {return MAT_DEPTH_BYTES(m_nCVType);}
+        /// returns the internal opencv mat type argument
+        int type() const {return m_nCVType;}
+        /// returns the internal opencv mat type argument
+        int operator()() const {return m_nCVType;}
+        /// returns whether the given typename is compatible with the internal opencv mat type (does not consider channels by default)
+        template<typename T, bool bCheckWithChannels=false>
+        bool isTypeCompat() const {
+            const int nChannels = channels();
+            const int nDepth = depth();
+            if(bCheckWithChannels && nChannels>1) {
+                if(nChannels==2)
+                    return
+                        (nDepth==CV_8U && std::is_same<T,cv::Vec<uint8_t,2>>::value) ||
+                        (nDepth==CV_8S && std::is_same<T,cv::Vec<int8_t,2>>::value) ||
+                        (nDepth==CV_16U && std::is_same<T,cv::Vec<uint16_t,2>>::value) ||
+                        (nDepth==CV_16S && std::is_same<T,cv::Vec<int16_t,2>>::value) ||
+                        (nDepth==CV_32S && std::is_same<T,cv::Vec<int32_t,2>>::value) ||
+                        (nDepth==CV_32F && std::is_same<T,cv::Vec<float,2>>::value) ||
+                        (nDepth==CV_64F && std::is_same<T,cv::Vec<double,2>>::value);
+                else if(nChannels==3)
+                    return
+                        (nDepth==CV_8U && std::is_same<T,cv::Vec<uint8_t,3>>::value) ||
+                        (nDepth==CV_8S && std::is_same<T,cv::Vec<int8_t,3>>::value) ||
+                        (nDepth==CV_16U && std::is_same<T,cv::Vec<uint16_t,3>>::value) ||
+                        (nDepth==CV_16S && std::is_same<T,cv::Vec<int16_t,3>>::value) ||
+                        (nDepth==CV_32S && std::is_same<T,cv::Vec<int32_t,3>>::value) ||
+                        (nDepth==CV_32F && std::is_same<T,cv::Vec<float,3>>::value) ||
+                        (nDepth==CV_64F && std::is_same<T,cv::Vec<double,3>>::value);
+                else //if(nChannels==4)
+                    return
+                        (nDepth==CV_8U && std::is_same<T,cv::Vec<uint8_t,4>>::value) ||
+                        (nDepth==CV_8S && std::is_same<T,cv::Vec<int8_t,4>>::value) ||
+                        (nDepth==CV_16U && std::is_same<T,cv::Vec<uint16_t,4>>::value) ||
+                        (nDepth==CV_16S && std::is_same<T,cv::Vec<int16_t,4>>::value) ||
+                        (nDepth==CV_32S && std::is_same<T,cv::Vec<int32_t,4>>::value) ||
+                        (nDepth==CV_32F && std::is_same<T,cv::Vec<float,4>>::value) ||
+                        (nDepth==CV_64F && std::is_same<T,cv::Vec<double,4>>::value);
+            }
+            return
+                (nDepth==CV_8U && std::is_same<T,uint8_t>::value) ||
+                (nDepth==CV_8S && std::is_same<T,int8_t>::value) ||
+                (nDepth==CV_16U && std::is_same<T,uint16_t>::value) ||
+                (nDepth==CV_16S && std::is_same<T,int16_t>::value) ||
+                (nDepth==CV_32S && std::is_same<T,int32_t>::value) ||
+                (nDepth==CV_32F && std::is_same<T,float>::value) ||
+                (nDepth==CV_64F && std::is_same<T,double>::value);
+        }
+    private:
+        /// holds the internal opencv mat type argument
+        const int m_nCVType;
     };
 
     /// mat dim size helper which provides easy-to-use and safe conversions from cv::Size and cv::MatSize
@@ -267,8 +345,8 @@ namespace lv {
     struct MatInfo {
         /// contains info about the layout of the matrix's elements
         MatSize m_oSize;
-        /// contains info about the type of the matrix's elements (i.e. using the OpenCV type defines)
-        int m_nCVType;
+        /// contains info about the type of the matrix's elements
+        MatType m_oType;
         // @@@@ todo, add to datasets module to replace all cv::Size
     };
 
