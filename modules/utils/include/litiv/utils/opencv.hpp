@@ -24,11 +24,15 @@
 #include <unordered_set>
 #include <map>
 
-#define MAT_COND_DEPTH_TYPE(cvtype_flag,depth_flag,depth_type,depth_alt) \
+#ifndef CV_MAT_COND_DEPTH_TYPE
+#define CV_MAT_COND_DEPTH_TYPE(cvtype_flag,depth_flag,depth_type,depth_alt) \
     std::conditional_t<CV_MAT_DEPTH(cvtype_flag)==depth_flag,depth_type,depth_alt>
+#endif //ndef(CV_MAT_COND_DEPTH_TYPE)
 
-#define MAT_DEPTH_BYTES(cvtype_flag) \
-    (CV_MAT_DEPTH(cvtype_flag)<=1?1:CV_MAT_DEPTH(cvtype_flag)<4?2:CV_MAT_DEPTH(cvtype_flag)<6?4:8)
+#ifndef CV_MAT_DEPTH_BYTES
+#define CV_MAT_DEPTH_BYTES(cvtype_flag) \
+    (size_t(CV_MAT_DEPTH(cvtype_flag)<=1?1:CV_MAT_DEPTH(cvtype_flag)<4?2:CV_MAT_DEPTH(cvtype_flag)<6?4:8))
+#endif //ndef(CV_MAT_DEPTH_BYTES)
 
 namespace lv {
 
@@ -53,19 +57,21 @@ namespace lv {
     struct MatType_ {
         /// holds the typename for underlying mat data
         typedef std::enable_if_t<(CV_MAT_DEPTH(nCVType)>=0 && CV_MAT_DEPTH(nCVType)<=6),
-            MAT_COND_DEPTH_TYPE(nCVType,0/**/,uchar,
-                MAT_COND_DEPTH_TYPE(nCVType,1,char,
-                    MAT_COND_DEPTH_TYPE(nCVType,2,ushort,
-                        MAT_COND_DEPTH_TYPE(nCVType,3,short,
-                            MAT_COND_DEPTH_TYPE(nCVType,4,int,
-                                MAT_COND_DEPTH_TYPE(nCVType,5,float,
-                                    MAT_COND_DEPTH_TYPE(nCVType,6,double,void)))))))> base_type;
+            CV_MAT_COND_DEPTH_TYPE(nCVType,0/**/,uchar,
+                CV_MAT_COND_DEPTH_TYPE(nCVType,1,char,
+                    CV_MAT_COND_DEPTH_TYPE(nCVType,2,ushort,
+                        CV_MAT_COND_DEPTH_TYPE(nCVType,3,short,
+                            CV_MAT_COND_DEPTH_TYPE(nCVType,4,int,
+                                CV_MAT_COND_DEPTH_TYPE(nCVType,5,float,
+                                    CV_MAT_COND_DEPTH_TYPE(nCVType,6,double,void)))))))> base_type;
         /// returns the channel count for the underlying mat data (i.e. smallest implicit mat dim)
         static constexpr int channels() {return CV_MAT_CN(nCVType);}
         /// returns the ocv depth id (NOT A BYTE COUNT!) for the underlying mat data
         static constexpr int depth() {return CV_MAT_DEPTH(nCVType);}
         /// returns the byte depth for the underlying mat data
-        static constexpr size_t depthBytes() {return MAT_DEPTH_BYTES(nCVType);}
+        static constexpr size_t depthBytes() {return CV_MAT_DEPTH_BYTES(nCVType);}
+        /// returns the element size (in bytes) for the underlying mat data
+        static constexpr size_t elemSize() {return CV_MAT_DEPTH_BYTES(nCVType)*size_t(CV_MAT_CN(nCVType));}
         /// returns the internal opencv mat type argument
         static constexpr int type() {return nCVType;}
         /// returns the internal opencv mat type argument
@@ -74,17 +80,28 @@ namespace lv {
 
     /// mat type helper struct which provides basic dynamic info on ocv matrix element types
     struct MatType {
-        /// default constructor; also validates m_nCVType for possible ocv mat configs
+        /// default constructor; assigns type as CV_8UC1 internally
+        MatType() : m_nCVType(CV_8UC1) {}
+        /// cv type-based constructor; also validates m_nCVType for possible ocv mat configs
         MatType(int nCVType) : m_nCVType(nCVType) {
             lvAssert__((CV_MAT_DEPTH(m_nCVType)>=0 && CV_MAT_DEPTH(m_nCVType)<=6),"bad ocv type depth (type=%d, depth=%d)",m_nCVType,CV_MAT_DEPTH(m_nCVType));
             lvAssert__((CV_MAT_CN(m_nCVType)>0 && CV_MAT_CN(m_nCVType)<=4),"bad ocv type channels (type=%d, channels=%d)",m_nCVType,CV_MAT_CN(m_nCVType));
+        }
+        /// assignment operator for new opencv matrix data type
+        MatType& operator=(int nCVType) {
+            lvAssert__((CV_MAT_DEPTH(nCVType)>=0 && CV_MAT_DEPTH(nCVType)<=6),"bad ocv type depth (type=%d, depth=%d)",nCVType,CV_MAT_DEPTH(nCVType));
+            lvAssert__((CV_MAT_CN(nCVType)>0 && CV_MAT_CN(nCVType)<=4),"bad ocv type channels (type=%d, channels=%d)",nCVType,CV_MAT_CN(nCVType));
+            m_nCVType = nCVType;
+            return *this;
         }
         /// returns the channel count for the underlying mat data (i.e. smallest implicit mat dim)
         int channels() const {return CV_MAT_CN(m_nCVType);}
         /// returns the ocv depth id (NOT A BYTE COUNT!) for the underlying mat data
         int depth() const {return CV_MAT_DEPTH(m_nCVType);}
         /// returns the byte depth for the underlying mat data
-        size_t depthBytes() const {return MAT_DEPTH_BYTES(m_nCVType);}
+        size_t depthBytes() const {return CV_MAT_DEPTH_BYTES(m_nCVType);}
+        /// returns the element size (in bytes) for the underlying mat data
+        size_t elemSize() const {return CV_MAT_DEPTH_BYTES(m_nCVType)*size_t(CV_MAT_CN(m_nCVType));}
         /// returns the internal opencv mat type argument
         int type() const {return m_nCVType;}
         /// returns the internal opencv mat type argument
@@ -134,7 +151,7 @@ namespace lv {
         }
     private:
         /// holds the internal opencv mat type argument
-        const int m_nCVType;
+        int m_nCVType;
     };
 
     /// mat dim size helper which provides easy-to-use and safe conversions from cv::Size and cv::MatSize
@@ -341,13 +358,12 @@ namespace lv {
         return os << "]" << (oSize.total()>0?"":"<empty>");
     }
 
-    /// simplified cv::Mat header info container for usage in datasets module; contains all required info to preallocate matrix packets
+    /// simplified cv::Mat header info container for matrix preallocation
     struct MatInfo {
         /// contains info about the layout of the matrix's elements
-        MatSize m_oSize;
+        MatSize size;
         /// contains info about the type of the matrix's elements
-        MatType m_oType;
-        // @@@@ todo, add to datasets module to replace all cv::Size
+        MatType type;
     };
 
     /// helper function to zero-init sparse and non-sparse matrices (sparse mat overload)
@@ -677,7 +693,7 @@ namespace lv {
         oOutput.allocator = voInputs[0].allocator = voInputs[1].allocator = voInputs[2].allocator = getMatAllocator16a();
         cv::split(oInput_YCrCb,voInputs);
         lvDbgAssert(voInputs.size()==size_t(3) && voInputs[0].size==oInput.size && voInputs[1].size==oInput.size && voInputs[2].size==oInput.size);
-        oOutput.create(oInput.dims,oInput.size.operator const int *());
+        oOutput.create(oInput.dims,oInput.size.operator const int*());
         for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {
             const uchar* pYRow = voInputs[0].ptr<uchar>(nRowIdx), *pCrRow = voInputs[1].ptr<uchar>(nRowIdx), *pCbRow = voInputs[2].ptr<uchar>(nRowIdx);
             ushort* pOutputRow = oOutput.ptr<ushort>(nRowIdx);
