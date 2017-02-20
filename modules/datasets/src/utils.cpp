@@ -83,14 +83,6 @@ const std::string& lv::DataHandler::getRelativePath() const {
     return m_sRelativePath;
 }
 
-const std::string& lv::DataHandler::getOutputNamePrefix() const {
-    return m_oParent.getOutputNamePrefix();
-}
-
-const std::string& lv::DataHandler::getOutputNameSuffix() const {
-    return m_oParent.getOutputNameSuffix();
-}
-
 const std::vector<std::string>& lv::DataHandler::getSkippedDirTokens() const {
     return m_oParent.getSkippedDirTokens();
 }
@@ -1269,24 +1261,25 @@ void lv::DataWriter::entry() {
 cv::Mat lv::IDataArchiver_<lv::NotArray>::loadOutput(size_t nIdx, int nFlags) {
     const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
     std::stringstream sOutputFilePath;
-    sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
+    sOutputFilePath << getOutputPath() << getOutputName(nIdx);
     if(pLoader->getOutputPacketType()==ImagePacket) {
-        lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires packet output name suffix (i.e. file extension)");
+        sOutputFilePath << ".png";
         if(nFlags==-1)
             return cv::imread(sOutputFilePath.str());
         else
             return cv::imread(sOutputFilePath.str(),nFlags);
     }
-    else
+    else {
+        sOutputFilePath << ".bin";
         return lv::read(sOutputFilePath.str());
+    }
 }
 
 void lv::IDataArchiver_<lv::NotArray>::saveOutput(const cv::Mat& _oOutput, size_t nIdx, int /*nFlags*/) {
     const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
     std::stringstream sOutputFilePath;
-    sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
+    sOutputFilePath << getOutputPath() << getOutputName(nIdx);
     if(pLoader->getOutputPacketType()==ImagePacket) {
-        lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires image packet output name suffix (i.e. file extension)");
         cv::Mat oOutput = _oOutput;
         // automatically gray-out zones outside ROI if output is binary image mask with 1:1 mapping (e.g. segmentation)
         if(pLoader->getGTPacketType()==ImagePacket && pLoader->getGTMappingType()==ElemMapping &&
@@ -1299,10 +1292,13 @@ void lv::IDataArchiver_<lv::NotArray>::saveOutput(const cv::Mat& _oOutput, size_
             }
         }
         const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
+        sOutputFilePath << ".png";
         cv::imwrite(sOutputFilePath.str(),oOutput,vnComprParams);
     }
-    else
+    else {
+        sOutputFilePath << ".bin";
         lv::write(sOutputFilePath.str(),_oOutput);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1312,19 +1308,20 @@ std::vector<cv::Mat> lv::IDataArchiver_<lv::Array>::loadOutputArray(size_t nIdx,
     std::vector<cv::Mat> vOutput(getOutputStreamCount());
     for(size_t nStreamIdx=0; nStreamIdx<vOutput.size(); ++nStreamIdx) {
         std::stringstream sOutputFilePath;
-        if(nStreamIdx==0 && vOutput.size()==1)
-            sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
-        else
-            sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << "_" << nStreamIdx << getOutputNameSuffix();
+        sOutputFilePath << getOutputPath() << getOutputName(nIdx);
+        if(vOutput.size()>size_t(1))
+            sOutputFilePath << "_" << nStreamIdx;
         if(pLoader->getOutputPacketType()==ImagePacket || pLoader->getOutputPacketType()==ImageArrayPacket) {
-            lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires packet output name suffix (i.e. file extension)");
+            sOutputFilePath << ".png";
             if(nFlags==-1)
                 vOutput[nStreamIdx] = cv::imread(sOutputFilePath.str());
             else
                 vOutput[nStreamIdx] = cv::imread(sOutputFilePath.str(),nFlags);
         }
-        else
+        else {
+            sOutputFilePath << ".bin";
             vOutput[nStreamIdx] = lv::read(sOutputFilePath.str());
+        }
     }
     return vOutput;
 }
@@ -1349,9 +1346,8 @@ void lv::IDataArchiver_<lv::Array>::saveOutputArray(const std::vector<cv::Mat>& 
     if(nStreamCount==size_t(1)) {
         const cv::Mat& _oOutput = vOutput[0];
         std::stringstream sOutputFilePath;
-        sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << getOutputNameSuffix();
+        sOutputFilePath << getOutputPath() << getOutputName(nIdx);
         if(pLoader->getOutputPacketType()==ImagePacket || pLoader->getOutputPacketType()==ImageArrayPacket) {
-            lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires image packet output name suffix (i.e. file extension)");
             cv::Mat oOutput = _oOutput;
             // automatically gray-out zones outside ROI if output is binary image mask with 1:1 mapping (e.g. segmentation)
             if((pLoader->getGTPacketType()==ImagePacket || pLoader->getGTPacketType()==ImageArrayPacket) && pLoader->getGTMappingType()==ElemMapping &&
@@ -1364,18 +1360,21 @@ void lv::IDataArchiver_<lv::Array>::saveOutputArray(const std::vector<cv::Mat>& 
                 }
             }
             const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
+            sOutputFilePath << ".png";
             cv::imwrite(sOutputFilePath.str(),oOutput,vnComprParams);
         }
-        else
+        else {
+            sOutputFilePath << ".bin";
             lv::write(sOutputFilePath.str(),_oOutput);
+        }
     }
     else { // nStreamCount>size_t(1)
         for(size_t nStreamIdx=0; nStreamIdx<nStreamCount; ++nStreamIdx) {
             const cv::Mat& _oOutput = vOutput[nStreamIdx];
             std::stringstream sOutputFilePath;
-            sOutputFilePath << getOutputPath() << getOutputNamePrefix() << getOutputName(nIdx) << "_" << nStreamIdx << getOutputNameSuffix();
+            sOutputFilePath << getOutputPath() << getOutputName(nIdx) << "_" << nStreamIdx;
+            lvDbgAssert(pLoader->getOutputPacketType()!=ImagePacket);
             if(pLoader->getOutputPacketType()==ImageArrayPacket) {
-                lvAssert_(!getOutputNameSuffix().empty(),"data archiver requires image packet output name suffix (i.e. file extension)");
                 cv::Mat oOutput = _oOutput;
                 // automatically gray-out zones outside ROI if output is binary image mask with 1:1 mapping (e.g. segmentation)
                 if(pLoader->getGTPacketType()==ImageArrayPacket && pLoader->getGTMappingType()==ElemMapping &&
@@ -1388,10 +1387,13 @@ void lv::IDataArchiver_<lv::Array>::saveOutputArray(const std::vector<cv::Mat>& 
                     }
                 }
                 const std::vector<int> vnComprParams = {cv::IMWRITE_PNG_COMPRESSION,9};
+                sOutputFilePath << ".png";
                 cv::imwrite(sOutputFilePath.str(),oOutput,vnComprParams);
             }
-            else
+            else {
+                sOutputFilePath << ".bin";
                 lv::write(sOutputFilePath.str(),_oOutput);
+            }
         }
     }
 }
@@ -1534,14 +1536,6 @@ const std::string& lv::DatasetHandler::getRelativePath() const {
     return m_sRelativePath;
 }
 
-const std::string& lv::DatasetHandler::getOutputNamePrefix() const {
-    return m_sOutputNamePrefix;
-}
-
-const std::string& lv::DatasetHandler::getOutputNameSuffix() const {
-    return m_sOutputNameSuffix;
-}
-
 const std::vector<std::string>& lv::DatasetHandler::getWorkBatchDirs() const {
     return m_vsWorkBatchDirs;
 }
@@ -1587,14 +1581,12 @@ bool lv::DatasetHandler::isGrayscale() const {
 }
 
 lv::DatasetHandler::DatasetHandler(const std::string& sDatasetName,const std::string& sDatasetDirPath,const std::string& sOutputDirPath,
-                                   const std::string& sOutputNamePrefix,const std::string& sOutputNameSuffix,const std::vector<std::string>& vsWorkBatchDirs,
-                                   const std::vector<std::string>& vsSkippedDirTokens,const std::vector<std::string>& vsGrayscaleDirTokens,bool bSaveOutput,
+                                   const std::vector<std::string>& vsWorkBatchDirs, const std::vector<std::string>& vsSkippedDirTokens,
+                                   const std::vector<std::string>& vsGrayscaleDirTokens,bool bSaveOutput,
                                    bool bUseEvaluator,bool bForce4ByteDataAlign,double dScaleFactor) :
         m_sDatasetName(sDatasetName),
         m_sDatasetPath(lv::addDirSlashIfMissing(sDatasetDirPath)),
         m_sOutputPath(lv::addDirSlashIfMissing(sOutputDirPath)),
-        m_sOutputNamePrefix(sOutputNamePrefix),
-        m_sOutputNameSuffix(sOutputNameSuffix),
         m_vsWorkBatchDirs(vsWorkBatchDirs),
         m_vsSkippedDirTokens(vsSkippedDirTokens),
         m_vsGrayscaleDirTokens(vsGrayscaleDirTokens),

@@ -40,8 +40,6 @@ namespace lv {
                         "Wallflower",
                         lv::datasets::getRootPath()+"Wallflower/dataset/",
                         lv::datasets::getRootPath()+"Wallflower/"+lv::addDirSlashIfMissing(sOutputDirName),
-                        "bin",
-                        ".png",
                         getWorkBatchDirNames(),
                         std::vector<std::string>(),
                         std::vector<std::string>(),

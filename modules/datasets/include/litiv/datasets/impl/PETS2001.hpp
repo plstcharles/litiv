@@ -40,8 +40,6 @@ namespace lv {
                         "PETS2001 Dataset#3",
                         lv::datasets::getRootPath()+"PETS2001/DATASET3/",
                         lv::datasets::getRootPath()+"PETS2001/DATASET3/"+lv::addDirSlashIfMissing(sOutputDirName),
-                        "bin",
-                        ".png",
                         getWorkBatchDirNames(),
                         std::vector<std::string>(),
                         std::vector<std::string>(),

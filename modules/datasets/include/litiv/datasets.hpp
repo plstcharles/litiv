@@ -181,10 +181,8 @@ namespace lv {
         /// full dataset constructor (copied from DatasetHandler to avoid msvc2015 bug); parameters are passed through lv::datasets::create<...>(...), and may be caught/simplified by a specialization
         IDataset_(
             const std::string& sDatasetName, ///< user-friendly dataset name (used for identification only)
-            const std::string& sDatasetDirPath, ///< dataset directory (full) path where work batches can be found
-            const std::string& sOutputDirPath, ///< output directory (full) path for debug logs, evaluation reports and results archiving
-            const std::string& sOutputNamePrefix, ///< output name prefix for results archiving (if null, only packet idx will be used as file name)
-            const std::string& sOutputNameSuffix, ///< output name suffix for results archiving (if null, no file extension will be used)
+            const std::string& sDatasetDirPath, ///< root path from which work batches can be parsed
+            const std::string& sOutputDirPath, ///< root path for work batch output (debug logs, evaluation reports, and generated results)
             const std::vector<std::string>& vsWorkBatchDirs, ///< array of directory names for top-level work batch groups (one group typically contains multiple work batches)
             const std::vector<std::string>& vsSkippedDirTokens, ///< array of tokens which allow directories to be skipped if one is found in their name
             const std::vector<std::string>& vsGrayscaleDirTokens, ///< array of tokens which allow directories to be treated as grayscale input only if one is found in their name
@@ -192,7 +190,7 @@ namespace lv {
             bool bUseEvaluator, ///< defines whether results should be fully evaluated, or simply acknowledged
             bool bForce4ByteDataAlign, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
             double dScaleFactor ///< defines the scale factor to use to resize/rescale read packets
-        ) : DatasetHandler_<eDatasetTask,eDatasetSource,eDataset>(sDatasetName,sDatasetDirPath,sOutputDirPath,sOutputNamePrefix,sOutputNameSuffix,vsWorkBatchDirs,vsSkippedDirTokens,vsGrayscaleDirTokens,bSaveOutput,bUseEvaluator,bForce4ByteDataAlign,dScaleFactor) {}
+        ) : DatasetHandler_<eDatasetTask,eDatasetSource,eDataset>(sDatasetName,sDatasetDirPath,sOutputDirPath,vsWorkBatchDirs,vsSkippedDirTokens,vsGrayscaleDirTokens,bSaveOutput,bUseEvaluator,bForce4ByteDataAlign,dScaleFactor) {}
     };
 
 } // namespace lv

@@ -51,8 +51,6 @@ namespace lv {
                         "BSDS500",
                         lv::datasets::getRootPath()+"BSDS500/data/images/",
                         lv::datasets::getRootPath()+"BSDS500/BSR/"+lv::addDirSlashIfMissing(sOutputDirName),
-                        "",
-                        ".png",
                         getWorkBatchDirNames(eType),
                         std::vector<std::string>(),
                         std::vector<std::string>(),

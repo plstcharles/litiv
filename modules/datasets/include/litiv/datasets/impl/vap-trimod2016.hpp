@@ -54,8 +54,6 @@ namespace lv {
                         "VAP-trimodal2016",
                         lv::datasets::getRootPath()+"vap/rgbdt-stereo/",
                         lv::datasets::getRootPath()+"vap/rgbdt-stereo/results/"+lv::addDirSlashIfMissing(sOutputDirName),
-                        "bin",
-                        ".png",
                         getWorkBatchDirNames(),
                         std::vector<std::string>(),
                         getGrayscaleWorkBatchDirNames(),

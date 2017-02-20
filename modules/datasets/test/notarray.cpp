@@ -9,14 +9,10 @@ TEST(datasets_notarray,regression_custom) {
     const std::string sDatasetName = "customtest";
     const std::string sOutputRootPath = TEST_OUTPUT_DATA_ROOT "/custom_dataset_test/";
     const std::vector<std::string> vsWorkBatchDirs = {"batch1","batch2","batch3"};
-    const std::string sOutputPrefix = "edge_mask_";
-    const std::string sOutputSuffix = ".png";
     DatasetType::Ptr pDataset = DatasetType::create(
         sDatasetName,
         lv::addDirSlashIfMissing(SAMPLES_DATA_ROOT)+"custom_dataset_ex/",
         sOutputRootPath,
-        sOutputPrefix,
-        sOutputSuffix,
         vsWorkBatchDirs,
         std::vector<std::string>(),
         std::vector<std::string>(),
@@ -35,8 +31,6 @@ TEST(datasets_notarray,regression_custom) {
     ASSERT_EQ(pDataset->getGTCount(),size_t(0));
     ASSERT_FALSE(pDataset->isBare());
     ASSERT_TRUE(pDataset->isGroup());
-    ASSERT_EQ(pDataset->getOutputNamePrefix(),sOutputPrefix);
-    ASSERT_EQ(pDataset->getOutputNameSuffix(),sOutputSuffix);
     EXPECT_EQ(pDataset->getWorkBatchDirs(),vsWorkBatchDirs);
     EXPECT_EQ(pDataset->getSkippedDirTokens(),std::vector<std::string>());
     EXPECT_EQ(pDataset->getGrayscaleDirTokens(),std::vector<std::string>());
@@ -53,8 +47,6 @@ TEST(datasets_notarray,regression_custom) {
         ASSERT_TRUE(lv::checkIfExists(sOutputRootPath+oBatch.getName()));
         ASSERT_FALSE(oBatch.isBare());
         ASSERT_FALSE(oBatch.isGroup());
-        ASSERT_EQ(oBatch.getOutputNamePrefix(),sOutputPrefix);
-        ASSERT_EQ(oBatch.getOutputNameSuffix(),sOutputSuffix);
         EXPECT_DOUBLE_EQ(oBatch.getScaleFactor(),1.0);
         EXPECT_FALSE(oBatch.isRoot());
         EXPECT_EQ(oBatch.getRoot(),pDataset);
@@ -78,10 +70,11 @@ TEST(datasets_notarray,regression_custom) {
             pAlgo->apply(oImage,oEdgeMask);
             oBatch.push(oEdgeMask,nProcessedPackets);
             std::stringstream sstr;
-            sstr << sOutputRootPath << "/" << oBatch.getName() << "/" << sOutputPrefix << oBatch.getOutputName(nProcessedPackets++) << sOutputSuffix;
+            sstr << sOutputRootPath << "/" << oBatch.getName() << "/" << oBatch.getOutputName(nProcessedPackets) << ".png";
             ASSERT_TRUE(lv::checkIfExists(sstr.str()));
             cv::Mat oOut = cv::imread(sstr.str(),cv::IMREAD_GRAYSCALE);
             ASSERT_TRUE(lv::isEqual<uint8_t>(oEdgeMask,oOut));
+            ++nProcessedPackets;
         }
         oBatch.stopProcessing();
         EXPECT_GT(oBatch.getFinalProcessTime(),0.0);

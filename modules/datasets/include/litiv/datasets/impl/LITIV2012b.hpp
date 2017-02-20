@@ -42,8 +42,6 @@ namespace lv {
                         "LITIV 2012b (CVPRW2015 update)",
                         lv::datasets::getRootPath()+"litiv/litiv2012b/",
                         lv::datasets::getRootPath()+"litiv/litiv2012b/"+lv::addDirSlashIfMissing(sOutputDirName),
-                        "homography",
-                        ".cvmat",
                         getWorkBatchDirNames(),
                         getSkippedWorkBatchDirNames(),
                         getGrayscaleWorkBatchDirNames(),

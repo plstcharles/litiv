@@ -41,8 +41,6 @@ namespace lv {
                         b2014?"CDnet 2014":"CDnet 2012",
                         lv::datasets::getRootPath()+std::string(b2014?"CDNet2014/dataset/":"CDNet/dataset/"),
                         lv::datasets::getRootPath()+std::string(b2014?"CDNet2014/":"CDNet/")+lv::addDirSlashIfMissing(sOutputDirName),
-                        "bin",
-                        ".png",
                         getWorkBatchDirNames(b2014),
                         std::vector<std::string>(),
                         getGrayscaleWorkBatchDirNames(),
@@ -110,9 +108,10 @@ namespace lv {
     template<DatasetEvalList eDatasetEval, lv::ParallelAlgoType eEvalImpl>
     struct DataEvaluator_<eDatasetEval,Dataset_CDnet,eEvalImpl> :
             public DataEvaluatorWrapper_<eDatasetEval,Dataset_CDnet,eEvalImpl> {
+        // standardized names needed here since we might evaluate externally using matlab/python scripts
         virtual std::string getOutputName(size_t nPacketIdx) const override final {
             std::array<char,32> acBuffer;
-            snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nPacketIdx+1);
+            snprintf(acBuffer.data(),acBuffer.size(),"bin%06zu",nPacketIdx+1);
             return std::string(acBuffer.data());
         }
     };

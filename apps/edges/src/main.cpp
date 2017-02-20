@@ -43,8 +43,6 @@
     "@@@@",                                                      /* => const std::string& sDatasetName */ \
     "@@@@",                                                      /* => const std::string& sDatasetDirPath */ \
     DATASET_OUTPUT_PATH,                                         /* => const std::string& sOutputDirPath */ \
-    "edge_mask_",                                                /* => const std::string& sOutputNamePrefix */ \
-    ".png",                                                      /* => const std::string& sOutputNameSuffix */ \
     std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsWorkBatchDirs */ \
     std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsSkippedDirTokens */ \
     std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsGrayscaleDirTokens */ \

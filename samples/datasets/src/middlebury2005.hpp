@@ -50,8 +50,6 @@ namespace lv {
                         "middlebury2005", // name of the dataset (for debug purposes only)
                         lv::addDirSlashIfMissing(SAMPLES_DATA_ROOT)+"middlebury2005_dataset_ex/", // location of the dataset's root folder
                         sOutputDirPath, // location of the dataet's output folder
-                        "out", // output name prefix for saving pushed results
-                        ".png", // output name suffix for saving pushed results
                         std::vector<std::string>{"art","dolls"}, // name of work batches for this dataset (here, one work batch = one stereo pair)
                         std::vector<std::string>(), // names of directories which should be ignored by the parser (here, none in particular)
                         std::vector<std::string>(), // names of directories which should be processed as grayscale by the parser (here, none in particular)
