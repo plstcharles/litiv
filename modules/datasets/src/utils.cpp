@@ -518,12 +518,8 @@ const cv::Mat& lv::IIDataLoader::getGT_redirect(size_t nIdx) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-size_t lv::IDataLoader_<lv::Array>::getInputStreamCount() const {
-    return 1;
-}
-
 size_t lv::IDataLoader_<lv::Array>::getGTStreamCount() const {
-    return 1;
+    return 0;
 }
 
 std::string lv::IDataLoader_<lv::Array>::getInputStreamName(size_t nStreamIdx) const {
@@ -1327,12 +1323,19 @@ std::vector<cv::Mat> lv::IDataArchiver_<lv::Array>::loadOutputArray(size_t nIdx,
 size_t lv::IDataArchiver_<lv::Array>::getOutputStreamCount() const {
     auto pLoader = shared_from_this_cast<IDataLoader_<Array>>();
     if(pLoader) {
-        if(pLoader->getIOMappingType()<=ArrayMapping)
+        if(pLoader->getIOMappingType()<=ArrayMapping) {
+            // if you catch this error, whoever developed your dataset specialization is in trouble
+            lvAssert__(pLoader->getInputStreamCount()>=1,"input stream count (%d) for dataset is bad, need at least one stream",(int)pLoader->getInputStreamCount());
             return pLoader->getInputStreamCount();
-        else if(pLoader->getGTMappingType()<=ArrayMapping)
+        }
+        else if(pLoader->getGTMappingType()<=ArrayMapping) {
+            // if you catch this error, whoever developed your dataset specialization is in trouble
+            lvAssert__(pLoader->getGTStreamCount()>=1,"gt stream count (%d) for dataset is bad, need at least one stream",(int)pLoader->getGTStreamCount());
             return pLoader->getGTStreamCount();
+        }
     }
-    return 1; // default output stream count; overload function if you require something else
+    // if you catch this error, whoever developed your dataset specialization is in trouble
+    lvError("output stream count not specified, and cannot be deduced from data loader mappings");
 }
 
 void lv::IDataArchiver_<lv::Array>::saveOutputArray(const std::vector<cv::Mat>& vOutput, size_t nIdx, int /*nFlags*/) {

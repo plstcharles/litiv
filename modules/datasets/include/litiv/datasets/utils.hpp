@@ -546,9 +546,9 @@ namespace lv {
     /// data loader specialization for array processing (exposes unpacked array getters)
     template<>
     struct IDataLoader_<Array> : public IIDataLoader {
-        /// returns the number of parallel input streams (defaults to 1)
-        virtual size_t getInputStreamCount() const;
-        /// returns the number of parallel gt streams (defaults to 1)
+        /// returns the number of parallel input streams (must be overloaded)
+        virtual size_t getInputStreamCount() const = 0;
+        /// returns the number of parallel gt streams (defaults to 0)
         virtual size_t getGTStreamCount() const;
         /// returns the (friendly) name of an input stream specified by index
         virtual std::string getInputStreamName(size_t nStreamIdx) const;
@@ -817,7 +817,7 @@ namespace lv {
     struct IDataArchiver_<Array> : public virtual IDataHandler {
         /// loads an output data packet array based on idx, with optional flags (-1 = internal defaults)
         virtual std::vector<cv::Mat> loadOutputArray(size_t nIdx, int nFlags=-1);
-        /// returns the number of parallel output streams (defaults to input or GT stream count if loader is array-based & one mapping allows it, or 1 otherwise)
+        /// returns the number of parallel output streams (defaults to input or GT stream count if loader is array-based & one mapping allows it)
         virtual size_t getOutputStreamCount() const;
     protected:
         /// saves an output data packet array based on idx, with optional flags (-1 = internal defaults)
