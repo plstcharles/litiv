@@ -32,5 +32,15 @@ TEST(datasets_array,regression_specialization) {
         ASSERT_TRUE(!vGTMaps[0].empty() && !vGTMaps[1].empty());
         ASSERT_TRUE(vGTMaps[0].size()==vGTMaps[1].size());
         ASSERT_TRUE(vImages[0].size()==vGTMaps[0].size());
+        const cv::Mat oInput0 = cv::imread(std::string(SAMPLES_DATA_ROOT "/middlebury2005_dataset_ex/")+pBatch->getName()+"/view1.png");
+        const cv::Mat oInput1 = cv::imread(std::string(SAMPLES_DATA_ROOT "/middlebury2005_dataset_ex/")+pBatch->getName()+"/view5.png");
+        ASSERT_TRUE(!oInput0.empty() && !oInput1.empty());
+        ASSERT_TRUE(lv::isEqual<uchar>(oInput0,vImages[0]));
+        ASSERT_TRUE(lv::isEqual<uchar>(oInput1,vImages[1]));
+        const cv::Mat oGT0 = cv::imread(std::string(SAMPLES_DATA_ROOT "/middlebury2005_dataset_ex/")+pBatch->getName()+"/disp1.png",cv::IMREAD_GRAYSCALE);
+        const cv::Mat oGT1 = cv::imread(std::string(SAMPLES_DATA_ROOT "/middlebury2005_dataset_ex/")+pBatch->getName()+"/disp5.png",cv::IMREAD_GRAYSCALE);
+        ASSERT_TRUE(!oGT0.empty() && !oGT1.empty());
+        ASSERT_TRUE(lv::isEqual<uchar>(oGT0,vGTMaps[0]));
+        ASSERT_TRUE(lv::isEqual<uchar>(oGT1,vGTMaps[1]));
     }
 }
