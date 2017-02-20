@@ -438,7 +438,7 @@ namespace lv {
     /// computes a 1D array -> 1D scalar reduction with constexpr support (iterator-based version)
     template<typename TFunc, typename TValue>
     constexpr auto static_reduce(const TValue* begin, const TValue* end, TFunc lOp) -> decltype(lOp(*begin,*begin)) {
-        return (begin>=end)?TValue{}:(begin+1)==end?*begin:lOp(*begin,static_reduce(begin+1,end,lOp));
+        return (begin>=end)?throw std::runtime_error("bad iters"):(begin+1)==end?*begin:lOp(*begin,static_reduce(begin+1,end,lOp));
     }
 
     /// computes a 1D array -> 1D scalar reduction with constexpr support (array-based version, impl, specialization for last array value)
