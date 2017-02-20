@@ -302,12 +302,26 @@ cv::Mat lv::packData(const std::vector<cv::Mat>& vMats, std::vector<lv::MatInfo>
     if(vMats.size()==1)
         return vMats[0].clone();
     size_t nTotPacketSize = 0;
-    for(size_t nMatIdx=0; nMatIdx<vMats.size(); ++nMatIdx)
-        nTotPacketSize += vMats[nMatIdx].total()*vMats[nMatIdx].elemSize();
+    size_t nFirstNonEmptyMatIdx = size_t(-1);
+    bool bAllSameType = true;
+    for(size_t nMatIdx=0; nMatIdx<vMats.size(); ++nMatIdx) {
+        const size_t nCurrPacketSize = vMats[nMatIdx].total()*vMats[nMatIdx].elemSize();
+        if(nCurrPacketSize>0) {
+            if(nFirstNonEmptyMatIdx==size_t(-1))
+                nFirstNonEmptyMatIdx = nMatIdx;
+            nTotPacketSize += nCurrPacketSize;
+            bAllSameType &= vMats[nMatIdx].type()==vMats[nFirstNonEmptyMatIdx].type();
+        }
+    }
     if(nTotPacketSize==0)
         return cv::Mat();
-    lvAssert_(nTotPacketSize<(size_t)std::numeric_limits<int>::max(),"packed mat data alloc too big");
-    cv::Mat oPacket(1,(int)nTotPacketSize,CV_8UC1);
+    lvDbgAssert_(nTotPacketSize<(size_t)std::numeric_limits<int>::max(),"packed mat data alloc too big");
+    lvDbgAssert(nFirstNonEmptyMatIdx!=size_t(-1));
+    cv::Mat oPacket;
+    if(bAllSameType)
+        oPacket.create(1,(int)(nTotPacketSize/vMats[nFirstNonEmptyMatIdx].elemSize()),vMats[nFirstNonEmptyMatIdx].type());
+    else
+        oPacket.create(1,(int)nTotPacketSize,CV_8UC1);
     size_t nCurrPacketIdxOffset = 0;
     for(size_t nMatIdx=0; nMatIdx<vMats.size(); ++nMatIdx) {
         const size_t nCurrPacketSize = vMats[nMatIdx].total()*vMats[nMatIdx].elemSize();
