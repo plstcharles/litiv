@@ -94,7 +94,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         lvAssert(oBatch.getInputPacketType()==lv::ImageArrayPacket && oBatch.getOutputPacketType()==lv::ImageArrayPacket);
         lvAssert(oBatch.getOutputStreamCount()>=2 && oBatch.getInputStreamCount()>=2); // app works with stereo heads (min 2 images at once)
         if(DATASET_PRECACHING)
-            oBatch.startPrecaching(EVALUATE_OUTPUT);
+            oBatch.startPrecaching(!bool(EVALUATE_OUTPUT));
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
         std::cout << "\t\t" << sCurrBatchName << " @ init [" << sWorkerName << "]" << std::endl;
         const size_t nTotPacketCount = oBatch.getFrameCount();
