@@ -233,12 +233,16 @@ namespace lv {
         virtual const std::string& getDataPath() const = 0;
         /// returns the work batch/group output path (always slash-terminated)
         virtual const std::string& getOutputPath() const = 0;
+        /// returns the work batch/group features path (for save/load ops; always slash-terminated)
+        virtual const std::string& getFeaturesPath() const = 0;
         /// returns the work batch/group relative path offset w.r.t. parent (always slash-terminated)
         virtual const std::string& getRelativePath() const = 0;
         /// returns a name (not necessarily used for parsing) associated with an input data packet index (useful for data archiving)
         virtual std::string getInputName(size_t nPacketIdx) const;
         /// returns a name that should be given to an output data packet based on its index (useful for data archiving)
         virtual std::string getOutputName(size_t nPacketIdx) const;
+        /// returns a name that should be given to features data packet based on its index (useful for data archiving)
+        virtual std::string getFeaturesName(size_t nPacketIdx) const;
         /// returns the directory name tokens which, if found in a batch name, should force it to be skipped
         virtual const std::vector<std::string>& getSkippedDirTokens() const = 0;
         /// returns the directory name tokens which, if found in a batch name, should force it to be treated as grayscale
@@ -298,7 +302,7 @@ namespace lv {
         /// writes the batch-level evaluation report
         virtual void writeEvalReport() const = 0;
         /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
-        virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) = 0;
+        virtual void startPrecaching(bool bPrecacheInputOnly=true, size_t nSuggestedBufferSize=SIZE_MAX) = 0;
         /// kills the asynchronyzed precacher, and clears internal buffers
         virtual void stopPrecaching() = 0;
     protected:
@@ -338,6 +342,8 @@ namespace lv {
         virtual const std::string& getDataPath() const override final;
         /// returns the work batch/group output path (always slash-terminated)
         virtual const std::string& getOutputPath() const override final;
+        /// returns the work batch/group features path (for save/load ops; always slash-terminated)
+        virtual const std::string& getFeaturesPath() const override final;
         /// returns the work batch/group relative path offset w.r.t. parent (always slash-terminated)
         virtual const std::string& getRelativePath() const override final;
         /// returns the directory name tokens which, if found in a batch name, should force it to be skipped
@@ -409,7 +415,7 @@ namespace lv {
         /// returns this work group's children batches
         virtual IDataHandlerPtrArray getBatches(bool bWithHierarchy) const override final;
         /// initializes precaching in all children work batches
-        virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) override final;
+        virtual void startPrecaching(bool bPrecacheInputOnly=true, size_t nSuggestedBufferSize=SIZE_MAX) override final;
         /// stops precaching in all children work batches
         virtual void stopPrecaching() override final;
     protected:
@@ -487,13 +493,17 @@ namespace lv {
         /// returns the input/output data packet mapping type policy (used for internal packet auto-transformations)
         inline MappingPolicy getIOMappingType() const {return m_eIOMappingType;}
         /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
-        virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) override;
+        virtual void startPrecaching(bool bPrecacheInputOnly=true, size_t nSuggestedBufferSize=SIZE_MAX) override;
         /// kills the asynchronyzed precacher, and clears internal buffers
         virtual void stopPrecaching() override;
         /// returns an input packet by index (works both with and without precaching enabled)
         const cv::Mat& getInput(size_t nPacketIdx);
         /// returns a gt packet by index (works both with and without precaching enabled)
         const cv::Mat& getGT(size_t nPacketIdx);
+        /// loads a user-defined features data packet by index (works both with and without precaching enabled)
+        const cv::Mat& loadFeatures(size_t nPacketIdx);
+        /// saves a user-defined features data packet by index (useful when extraction is hard/slow)
+        void saveFeatures(size_t nPacketIdx, const cv::Mat& oFeatures) const;
         /// returns the ROI associated with an input packet by index (returns empty mat by default)
         virtual const cv::Mat& getInputROI(size_t nPacketIdx) const;
         /// returns the ROI associated with a gt packet by index (returns empty mat by default)
@@ -513,18 +523,20 @@ namespace lv {
         virtual cv::Mat getRawInput(size_t nPacketIdx) = 0;
         /// gt packet load function, pre-transformations (can return empty mats)
         virtual cv::Mat getRawGT(size_t nPacketIdx) = 0;
+        /// features packet load function (can return empty mats)
+        virtual const cv::Mat& loadRawFeatures(size_t nPacketIdx);
         /// input packet transformation function (used e.g. for rescaling and color space conversion)
         virtual const cv::Mat& getInput_redirect(size_t nPacketIdx);
         /// gt packet transformation function (used e.g. for rescaling and color space conversion)
         virtual const cv::Mat& getGT_redirect(size_t nPacketIdx);
     private:
-        /// holds the loaded copies of the latest input/gt packets queried by the precachers
-        cv::Mat m_oLatestInput,m_oLatestGT;
         /// required friend for access to precachers
         template<ArrayPolicy ePolicy>
         friend struct IDataLoader_;
+        /// holds the loaded copies of the latest packets queried by the precachers
+        cv::Mat m_oLatestInput,m_oLatestGT,m_oLatestFeatures;
         /// precacher objects which may spin up a thread to pre-fetch data packets
-        DataPrecacher m_oInputPrecacher,m_oGTPrecacher;
+        DataPrecacher m_oInputPrecacher,m_oGTPrecacher,m_oFeaturesPrecacher;
         /// input/gt/output packet policy types
         const PacketPolicy m_eInputType,m_eGTType,m_eOutputType;
         /// output-gt and input-output mapping policy types
@@ -558,6 +570,10 @@ namespace lv {
         const std::vector<cv::Mat>& getInputArray(size_t nPacketIdx);
         /// unpacks and returns a gt array by packet index, with each stream its own cv::Mat (works both with and without precaching enabled)
         const std::vector<cv::Mat>& getGTArray(size_t nPacketIdx);
+        /// unpacks and returns a user-defined features data packet by index, with provided pack info (works both with and without precaching enabled)
+        const std::vector<cv::Mat>& loadFeaturesArray(size_t nPacketIdx, const std::vector<lv::MatInfo>& vPackingInfo);
+        /// packs and saves a user-defined features data array packet by index, with each (input) stream its own cv::Mat (useful when necessary features extraction is hard/slow)
+        void saveFeaturesArray(size_t nPacketIdx, const std::vector<cv::Mat>& oFeatures, std::vector<lv::MatInfo>* pvOutputPackingInfo=nullptr) const;
         /// unpacks and returns an input ROI array by packet index, with each stream its own cv::Mat
         virtual const std::vector<cv::Mat>& getInputROIArray(size_t nPacketIdx) const;
         /// unpacks and returns a gt ROI array by packet index, with each stream its own cv::Mat
@@ -575,6 +591,10 @@ namespace lv {
         using IIDataLoader::getInput;
         /// hides the 'packed' gt accessor from public interface
         using IIDataLoader::getGT;
+        /// hides the 'packed' features accessor from public interface
+        using IIDataLoader::loadFeatures;
+        /// hides the 'packed' features accessor from public interface
+        using IIDataLoader::saveFeatures;
         /// hides useless non-array-only function from public interface (can be unhidden by derived class)
         using IIDataLoader::getInputROI;
         /// hides useless non-array-only function from public interface (can be unhidden by derived class)
@@ -583,12 +603,14 @@ namespace lv {
         using IIDataLoader::getInputSize;
         /// hides useless non-array-only function from public interface (can be unhidden by derived class)
         using IIDataLoader::getGTSize;
-        /// input 'unpacking' function, which essentially unmerges the streams in a packet and assigns them to individual mats in the vector
-        virtual void unpackInput(size_t nPacketIdx, std::vector<cv::Mat>& vUnpackedInput);
-        /// gt 'unpacking' function, which essentially unmerges the streams in a packet and assigns them to individual mats in the vector
-        virtual void unpackGT(size_t nPacketIdx, std::vector<cv::Mat>& vUnpackedGT);
+        /// input 'unpacking' function, which essentially unmerges the streams in a packet and assigns them to individual mats in the vector (without copy/realloc!)
+        virtual std::vector<cv::Mat> unpackInput(size_t nPacketIdx);
+        /// gt 'unpacking' function, which essentially unmerges the streams in a packet and assigns them to individual mats in the vector (without copy/realloc!)
+        virtual std::vector<cv::Mat> unpackGT(size_t nPacketIdx);
+        /// gt 'unpacking' function, which essentially unmerges the streams in a packet and assigns them to individual mats in the vector (without copy/realloc!)
+        virtual std::vector<cv::Mat> unpackFeatures(size_t nPacketIdx, const std::vector<lv::MatInfo>& vPackingInfo);
     private:
-        std::vector<cv::Mat> m_vLatestUnpackedInput,m_vLatestUnpackedGT;
+        std::vector<cv::Mat> m_vLatestUnpackedInput,m_vLatestUnpackedGT,m_vLatestUnpackedFeatures;
     };
 
     /// default (specializable) forward declaration of the data producer interface
@@ -613,7 +635,7 @@ namespace lv {
         /// compute the expected CPU load for this data batch based on frame size, frame count, and channel count
         virtual double getExpectedLoad() const override;
         /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
-        virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) override;
+        virtual void startPrecaching(bool bPrecacheInputOnly=true, size_t nSuggestedBufferSize=SIZE_MAX) override;
     protected:
         /// specialized constructor; still need to specify gt type, output type, and mappings
         IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
@@ -652,7 +674,7 @@ namespace lv {
         /// compute the expected CPU load for this data batch based on frame size, frame count, and channel count
         virtual double getExpectedLoad() const override;
         /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
-        virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) override;
+        virtual void startPrecaching(bool bPrecacheInputOnly=true, size_t nSuggestedBufferSize=SIZE_MAX) override;
     protected:
         /// specialized constructor; still need to specify gt type, output type, and mappings
         IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
@@ -689,7 +711,7 @@ namespace lv {
         /// compute the expected CPU load for this data batch based on max image size, image count, and channel count
         virtual double getExpectedLoad() const override;
         /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
-        virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) override;
+        virtual void startPrecaching(bool bPrecacheInputOnly=true, size_t nSuggestedBufferSize=SIZE_MAX) override;
         /// returns the size associated with an input image by index @@@@@ override later to make size N-Dim?
         virtual const cv::Size& getInputSize(size_t nPacketIdx) const override;
         /// returns the size associated with a gt image by index @@@@@ override later to make size N-Dim?
@@ -730,7 +752,7 @@ namespace lv {
         /// compute the expected CPU load for this data batch based on max image size, image count, and channel count
         virtual double getExpectedLoad() const override;
         /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
-        virtual void startPrecaching(bool bPrecacheGT=false, size_t nSuggestedBufferSize=SIZE_MAX) override;
+        virtual void startPrecaching(bool bPrecacheInputOnly=true, size_t nSuggestedBufferSize=SIZE_MAX) override;
         /// returns the size associated with an input image by index @@@@@ override later to make size N-Dim?
         virtual const std::vector<cv::Size>& getInputSizeArray(size_t nPacketIdx) const override;
         /// returns the size associated with a gt image by index @@@@@ override later to make size N-Dim?
@@ -996,6 +1018,8 @@ namespace lv {
         virtual const std::string& getDataPath() const override final;
         /// returns the dataset output path (always slash-terminated)
         virtual const std::string& getOutputPath() const override final;
+        /// returns the dataset features path (for save/load ops; always slash-terminated)
+        virtual const std::string& getFeaturesPath() const override final;
         /// returns the dataset relative path offset (always empty string, since this is root interface)
         virtual const std::string& getRelativePath() const override final;
         /// returns the directory names of potential top-level work batches/groups

@@ -102,7 +102,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         lvAssert(oBatch.getImageCount()>=1);
         lvAssert(oBatch.isInputConstantSize());
         if(DATASET_PRECACHING)
-            oBatch.startPrecaching(EVALUATE_OUTPUT);
+            oBatch.startPrecaching(!bool(EVALUATE_OUTPUT));
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
         std::cout << "\t\t" << sCurrBatchName << " @ init [" << sWorkerName << "]" << std::endl;
         const size_t nTotPacketCount = oBatch.getImageCount();

@@ -69,11 +69,14 @@ TEST(datasets_notarray,regression_custom) {
             cv::Mat oEdgeMask;
             pAlgo->apply(oImage,oEdgeMask);
             oBatch.push(oEdgeMask,nProcessedPackets);
+            oBatch.saveFeatures(nProcessedPackets,oEdgeMask);
             std::stringstream sstr;
             sstr << sOutputRootPath << "/" << oBatch.getName() << "/" << oBatch.getOutputName(nProcessedPackets) << ".png";
             ASSERT_TRUE(lv::checkIfExists(sstr.str()));
             cv::Mat oOut = cv::imread(sstr.str(),cv::IMREAD_GRAYSCALE);
             ASSERT_TRUE(lv::isEqual<uint8_t>(oEdgeMask,oOut));
+            const cv::Mat oFeatures = oBatch.loadFeatures(nProcessedPackets);
+            ASSERT_TRUE(lv::isEqual<uint8_t>(oEdgeMask,oFeatures));
             ++nProcessedPackets;
         }
         oBatch.stopProcessing();

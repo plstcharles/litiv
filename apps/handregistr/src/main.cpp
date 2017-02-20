@@ -54,7 +54,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
     lvAssert(oBatch.getInputPacketType()==lv::ImageArrayPacket && oBatch.getInputStreamCount()==2 && oBatch.getInputCount()>=1);
     if(DATASET_PRECACHING)
-        oBatch.startPrecaching(false);
+        oBatch.startPrecaching();
     const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
     std::cout << "\t\t" << sCurrBatchName << " @ init" << std::endl;
     const size_t nTotPacketCount = oBatch.getInputCount();

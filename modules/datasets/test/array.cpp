@@ -42,5 +42,13 @@ TEST(datasets_array,regression_specialization) {
         ASSERT_TRUE(!oGT0.empty() && !oGT1.empty());
         ASSERT_TRUE(lv::isEqual<uchar>(oGT0,vGTMaps[0]));
         ASSERT_TRUE(lv::isEqual<uchar>(oGT1,vGTMaps[1]));
+        const std::vector<cv::Mat> vFeaturesTest = {oInput0,oInput1,oGT0,oGT1};
+        std::vector<lv::MatInfo> vPackInfo;
+        oBatch.saveFeaturesArray(0,vFeaturesTest,&vPackInfo);
+        const std::vector<cv::Mat>& vFeaturesTestOut = oBatch.loadFeaturesArray(0,vPackInfo);
+        ASSERT_TRUE(lv::isEqual<uchar>(vFeaturesTestOut[0],oInput0));
+        ASSERT_TRUE(lv::isEqual<uchar>(vFeaturesTestOut[1],oInput1));
+        ASSERT_TRUE(lv::isEqual<uchar>(vFeaturesTestOut[2],oGT0));
+        ASSERT_TRUE(lv::isEqual<uchar>(vFeaturesTestOut[3],oGT1));
     }
 }
