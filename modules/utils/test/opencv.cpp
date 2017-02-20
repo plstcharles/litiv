@@ -556,6 +556,40 @@ TYPED_TEST(readwrite_fixture,regression) {
     }
 }
 
+TEST(pack_unpack,regression) {
+    srand((uint)time(nullptr));
+    cv::RNG rng((unsigned int)time(NULL));
+    for(size_t i=0; i<10000; ++i) {
+        const size_t nMats = (size_t(rand()%10));
+        std::vector<cv::Mat> vMats(nMats);
+        size_t nTotalPacketSize = 0;
+        for(size_t nMatIdx=0; nMatIdx<nMats; ++nMatIdx) {
+            cv::Mat& oCurrMat = vMats[nMatIdx];
+            if(rand()%10) {
+                const int nDims = rand()%4+1;
+                std::vector<int> vSizes((size_t)nDims);
+                std::generate(vSizes.begin(),vSizes.end(),[](){return rand()%20+1;});
+                oCurrMat.create(nDims,vSizes.data(),CV_MAKETYPE(rand()%7,rand()%4+1));
+                rng.fill(oCurrMat,cv::RNG::UNIFORM,-200,200,true);
+                nTotalPacketSize += oCurrMat.total()*oCurrMat.elemSize();
+            }
+        }
+        std::vector<lv::MatInfo> vPackInfo;
+        const cv::Mat oPacket = lv::packData(vMats,&vPackInfo);
+        ASSERT_TRUE(oPacket.empty() || oPacket.isContinuous());
+        ASSERT_EQ(vPackInfo.size(),vMats.size());
+        ASSERT_EQ(oPacket.total()*oPacket.elemSize(),nTotalPacketSize);
+        for(size_t nMatIdx=0; nMatIdx<nMats; ++nMatIdx) {
+            ASSERT_TRUE(vPackInfo[nMatIdx].size==vMats[nMatIdx].size);
+            ASSERT_TRUE(vPackInfo[nMatIdx].type()==vMats[nMatIdx].type());
+        }
+        const std::vector<cv::Mat> vNewMats = lv::unpackData(oPacket,vPackInfo);
+        ASSERT_EQ(vPackInfo.size(),vNewMats.size());
+        for(size_t nMatIdx=0; nMatIdx<nMats; ++nMatIdx)
+            ASSERT_TRUE(lv::isEqual<uchar>(vMats[nMatIdx],vNewMats[nMatIdx]));
+    }
+}
+
 TEST(shift,regression_intconstborder) {
     const cv::Mat oInput = (cv::Mat_<int>(4,5) << 0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19);
     {
