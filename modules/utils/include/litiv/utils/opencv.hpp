@@ -896,6 +896,11 @@ namespace lv {
         return oData;
     }
 
+    /// packs the data of several matrices into a bigger one (memalloc defrag helper)
+    cv::Mat packData(const std::vector<cv::Mat>& vMats, std::vector<MatInfo>* pvOutputPackInfo=nullptr);
+    /// unpacks the data of a matrix into several matrices (note: no allocation is done! lifetime of mat vec is tied to lifetime of input mat)
+    std::vector<cv::Mat> unpackData(const cv::Mat& oPacket, const std::vector<MatInfo>& vPackInfo);
+
     /// shifts the values in a matrix by an (x,y) offset (see definition for full info)
     void shift(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Point2f& vDelta, int nFillType=cv::BORDER_CONSTANT, const cv::Scalar& vConstantFillValue=cv::Scalar(0,0,0,0));
 

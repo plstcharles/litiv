@@ -288,8 +288,66 @@ void lv::read(const std::string& sFilePath, cv::Mat& oData, lv::MatArchiveList e
         lvError("unrecognized mat archive type flag");
 }
 
-void lv::doNotOptimize(const cv::Mat& m) {
-    lv::doNotOptimize(m.data); // we don't even need to call this it seems...
+cv::Mat lv::packData(const std::vector<cv::Mat>& vMats, std::vector<lv::MatInfo>* pvOutputPackInfo) {
+    if(pvOutputPackInfo!=nullptr) {
+        std::vector<lv::MatInfo>& vPackInfo = *pvOutputPackInfo;
+        vPackInfo.resize(vMats.size());
+        for(size_t nMatIdx=0; nMatIdx<vMats.size(); ++nMatIdx) {
+            vPackInfo[nMatIdx].size = vMats[nMatIdx].size;
+            vPackInfo[nMatIdx].type = vMats[nMatIdx].type();
+        }
+    }
+    if(vMats.empty())
+        return cv::Mat();
+    if(vMats.size()==1)
+        return vMats[0].clone();
+    size_t nTotPacketSize = 0;
+    for(size_t nMatIdx=0; nMatIdx<vMats.size(); ++nMatIdx)
+        nTotPacketSize += vMats[nMatIdx].total()*vMats[nMatIdx].elemSize();
+    if(nTotPacketSize==0)
+        return cv::Mat();
+    lvAssert_(nTotPacketSize<(size_t)std::numeric_limits<int>::max(),"packed mat data alloc too big");
+    cv::Mat oPacket(1,(int)nTotPacketSize,CV_8UC1);
+    size_t nCurrPacketIdxOffset = 0;
+    for(size_t nMatIdx=0; nMatIdx<vMats.size(); ++nMatIdx) {
+        const size_t nCurrPacketSize = vMats[nMatIdx].total()*vMats[nMatIdx].elemSize();
+        if(nCurrPacketSize>0) {
+            lvDbgAssert_(nCurrPacketIdxOffset+nCurrPacketSize<=nTotPacketSize,"pack out-of-bounds");
+            vMats[nMatIdx].copyTo(cv::Mat(vMats[nMatIdx].dims,vMats[nMatIdx].size,vMats[nMatIdx].type(),oPacket.data+nCurrPacketIdxOffset));
+            nCurrPacketIdxOffset += nCurrPacketSize;
+        }
+    }
+    lvDbgAssert_(nCurrPacketIdxOffset==nTotPacketSize,"unpack has leftover data");
+    return oPacket;
+}
+
+std::vector<cv::Mat> lv::unpackData(const cv::Mat& oPacket, const std::vector<lv::MatInfo>& vPackInfo) {
+    if(oPacket.empty()) {
+        bool bAllEmpty = true;
+        for(size_t nPackInfoIdx=0; nPackInfoIdx<vPackInfo.size(); ++nPackInfoIdx)
+            bAllEmpty &= vPackInfo[nPackInfoIdx].size.empty();
+        lvAssert_(bAllEmpty,"empty matrix given with non-empty pack");
+        return std::vector<cv::Mat>(vPackInfo.size());
+    }
+    lvAssert_(oPacket.isContinuous(),"input packed matrix must be continuous");
+    lvAssert_(!vPackInfo.empty(),"did not provide any mat unpacking info");
+    size_t nTotPacketSize = 0;
+    for(size_t nPackInfoIdx=0; nPackInfoIdx<vPackInfo.size(); ++nPackInfoIdx)
+        nTotPacketSize += vPackInfo[nPackInfoIdx].size.total()*vPackInfo[nPackInfoIdx].type.elemSize();
+    lvAssert_(nTotPacketSize>0,"trying to unpack non-empty mat with empty packing info");
+    lvAssert_(nTotPacketSize==oPacket.total()*oPacket.elemSize(),"input mat and packing info total byte size mismatch");
+    std::vector<cv::Mat> vOutputMats(vPackInfo.size());
+    size_t nCurrPacketIdxOffset = 0;
+    for(size_t nPackInfoIdx=0; nPackInfoIdx<vPackInfo.size(); ++nPackInfoIdx) {
+        const size_t nCurrPacketSize = vPackInfo[nPackInfoIdx].size.total()*vPackInfo[nPackInfoIdx].type.elemSize();
+        if(nCurrPacketSize>0) {
+            lvDbgAssert_(nCurrPacketIdxOffset+nCurrPacketSize<=nTotPacketSize,"unpack out-of-bounds");
+            vOutputMats[nPackInfoIdx] = cv::Mat((int)vPackInfo[nPackInfoIdx].size.dims(),(const int*)vPackInfo[nPackInfoIdx].size,vPackInfo[nPackInfoIdx].type(),(void*)(oPacket.data+nCurrPacketIdxOffset));
+            nCurrPacketIdxOffset += nCurrPacketSize;
+        }
+    }
+    lvDbgAssert_(nCurrPacketIdxOffset==nTotPacketSize,"unpack has leftover data");
+    return vOutputMats;
 }
 
 /** @brief shift the values in a matrix by an (x,y) offset
@@ -413,4 +471,8 @@ void lv::shift(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Point2f& vDelt
     }
     const cv::Rect oROI = cv::Rect(std::max(-vDeltaInt.x,0),std::max(-vDeltaInt.y,0),0,0)+oInput.size();
     oOutput = oPaddedInput(oROI);
+}
+
+void lv::doNotOptimize(const cv::Mat& m) {
+    lv::doNotOptimize(m.data);
 }
