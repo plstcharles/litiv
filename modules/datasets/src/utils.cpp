@@ -537,18 +537,16 @@ std::string lv::IDataLoader_<lv::Array>::getGTStreamName(size_t nStreamIdx) cons
 const std::vector<cv::Mat>& lv::IDataLoader_<lv::Array>::getInputArray(size_t nPacketIdx) {
     if(getInputStreamCount()==0)
         return lv::emptyMatArray();
-    // add last check logic...?
-    m_vLatestUnpackedInput.resize(getInputStreamCount());
-    unpackInput(nPacketIdx,m_vLatestUnpackedInput);
+    else if(m_oInputPrecacher.getLastReqIdx()!=nPacketIdx)
+        m_vLatestUnpackedInput = unpackInput(nPacketIdx);
     return m_vLatestUnpackedInput;
 }
 
 const std::vector<cv::Mat>& lv::IDataLoader_<lv::Array>::getGTArray(size_t nPacketIdx) {
     if(getGTStreamCount()==0)
         return lv::emptyMatArray();
-    // add last check logic...?
-    m_vLatestUnpackedGT.resize(getGTStreamCount());
-    unpackGT(nPacketIdx,m_vLatestUnpackedGT);
+    else if(m_oGTPrecacher.getLastReqIdx()!=nPacketIdx)
+        m_vLatestUnpackedGT = unpackGT(nPacketIdx);
     return m_vLatestUnpackedGT;
 }
 

@@ -456,6 +456,8 @@ namespace lv {
         void stopAsyncPrecaching();
         /// returns whether the precaching thread has already been started or not
         inline bool isActive() const {return m_bIsActive;}
+        /// returns the last requested packet index (i.e. the index to data still being held)
+        inline size_t getLastReqIdx() const {return m_nLastReqIdx;}
     private:
         void entry(const size_t nBufferSize);
         const std::function<const cv::Mat&(size_t)> m_lCallback;
@@ -518,6 +520,9 @@ namespace lv {
     private:
         /// holds the loaded copies of the latest input/gt packets queried by the precachers
         cv::Mat m_oLatestInput,m_oLatestGT;
+        /// required friend for access to precachers
+        template<ArrayPolicy ePolicy>
+        friend struct IDataLoader_;
         /// precacher objects which may spin up a thread to pre-fetch data packets
         DataPrecacher m_oInputPrecacher,m_oGTPrecacher;
         /// input/gt/output packet policy types
