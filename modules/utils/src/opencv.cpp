@@ -342,7 +342,7 @@ std::vector<cv::Mat> lv::unpackData(const cv::Mat& oPacket, const std::vector<lv
         const size_t nCurrPacketSize = vPackInfo[nPackInfoIdx].size.total()*vPackInfo[nPackInfoIdx].type.elemSize();
         if(nCurrPacketSize>0) {
             lvDbgAssert_(nCurrPacketIdxOffset+nCurrPacketSize<=nTotPacketSize,"unpack out-of-bounds");
-            vOutputMats[nPackInfoIdx] = cv::Mat((int)vPackInfo[nPackInfoIdx].size.dims(),(const int*)vPackInfo[nPackInfoIdx].size,vPackInfo[nPackInfoIdx].type(),(void*)(oPacket.data+nCurrPacketIdxOffset));
+            vOutputMats[nPackInfoIdx] = cv::Mat((int)vPackInfo[nPackInfoIdx].size.dims(),vPackInfo[nPackInfoIdx].size.sizes(),vPackInfo[nPackInfoIdx].type(),(void*)(oPacket.data+nCurrPacketIdxOffset));
             nCurrPacketIdxOffset += nCurrPacketSize;
         }
     }

@@ -212,6 +212,13 @@ namespace lv {
             lvDbgAssert__((Tinteger)nDimIdx<dims(),"dimension index is out of bounds (dims=%d)",(int)dims());
             return m_aSizes[nDimIdx];
         }
+        /// returns the (unmodifiable) size array converted to int, for inline cv mat creation (non-trivial)
+        const int* sizes() const {
+            m_vSizesExt.resize(m_vSizes.size());
+            for(size_t nIdx=0; nIdx<m_vSizes.size(); ++nIdx)
+                m_vSizesExt[nIdx] = (int)m_vSizes[nIdx];
+            return m_vSizesExt.data()+1;
+        }
         /// returns the size at a given dimension index
         template<typename Tindex>
         const Tinteger& operator[](Tindex nDimIdx) const {
