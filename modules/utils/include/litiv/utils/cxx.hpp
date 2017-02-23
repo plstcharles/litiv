@@ -327,7 +327,10 @@ namespace lv {
         /// cast helper function (non-const version)
         template<typename Tcast>
         inline std::shared_ptr<Tcast> shared_from_this_cast(bool bThrowIfFail=false) {
-            return std::const_pointer_cast<Tcast>(static_cast<const T*>(this)->template shared_from_this_cast<Tcast>(bThrowIfFail));
+            auto pCast = std::dynamic_pointer_cast<Tcast>(this->shared_from_this());
+            if(bThrowIfFail && !pCast)
+                throw std::bad_cast();
+            return pCast;
         }
     };
 
