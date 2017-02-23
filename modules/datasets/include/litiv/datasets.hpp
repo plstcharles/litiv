@@ -114,8 +114,8 @@ namespace lv {
                     this->setOutputCountPromise();
                     this->stopProcessing_impl();
                     this->m_bIsProcessing = false;
-                    this->stopPrecaching();
                 }
+                this->stopPrecaching();
             }
         protected:
             /// work batch instances can only be created by work groups via their protected 'createWorkBatch' function
