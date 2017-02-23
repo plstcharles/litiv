@@ -1548,6 +1548,8 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::post_ap
         if(isEvaluating())
             m_oNextGT = m_pLoader->getGT(m_nNextIdx);
     }
+    if(m_pLoader->getIOMappingType()<=IndexMapping)
+        countOutput(m_nLastIdx);
     if(isSavingOutput() || m_pAlgo->m_pDisplayHelper || m_lDataCallback) {
         cv::Mat oLastOutput,oLastDebug;
         m_pAlgo->fetchLastOutput(oLastOutput);
@@ -1557,7 +1559,6 @@ void lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::post_ap
             m_pAlgo->fetchLastDebug(oLastDebug);
         else
             oLastDebug = oLastOutput.clone();
-        countOutput(m_nLastIdx);
         if(m_lDataCallback)
             m_lDataCallback(m_oLastInput,oLastDebug,oLastOutput,m_oLastGT,m_pLoader->getGTROI(m_nLastIdx),m_nLastIdx);
         if(isSavingOutput() && !oLastOutput.empty())
