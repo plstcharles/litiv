@@ -535,7 +535,7 @@ namespace {
             oCvtOutput = oPacket;
         cv::Mat oResizeOutput;
         if(oInfo.size!=oCvtOutput.size())
-            cv::resize(oPacket,oResizeOutput,oInfo.size(),0,0,cv::INTER_NEAREST);
+            cv::resize(oCvtOutput,oResizeOutput,oInfo.size(),0,0,cv::INTER_NEAREST);
         else
             oResizeOutput = oCvtOutput;
         return oResizeOutput;
