@@ -34,6 +34,12 @@
     (size_t(CV_MAT_DEPTH(cvtype_flag)<=1?1:CV_MAT_DEPTH(cvtype_flag)<4?2:CV_MAT_DEPTH(cvtype_flag)<6?4:8))
 #endif //ndef(CV_MAT_DEPTH_BYTES)
 
+#ifndef CV_MAT_DEPTH_STR
+#define CV_MAT_DEPTH_STR(cvtype_flag) \
+    (std::string(CV_MAT_DEPTH(cvtype_flag)==0?"CV_8U":CV_MAT_DEPTH(cvtype_flag)==1?"CV_8S":CV_MAT_DEPTH(cvtype_flag)==2?"CV_16U":\
+                 CV_MAT_DEPTH(cvtype_flag)==3?"CV_16S":CV_MAT_DEPTH(cvtype_flag)==4?"CV_32S":CV_MAT_DEPTH(cvtype_flag)==5?"CV_32F":"CV_64F"))
+#endif //ndef(CV_MAT_DEPTH_STR)
+
 namespace lv {
 
     struct DisplayHelper;
@@ -106,6 +112,8 @@ namespace lv {
         int type() const {return m_nCVType;}
         /// returns the internal opencv mat type argument
         int operator()() const {return m_nCVType;}
+        /// implicit cast operation; returns a string containing the ocv type id
+        operator std::string() const {return CV_MAT_DEPTH_STR(m_nCVType)+"C"+std::to_string(CV_MAT_CN(m_nCVType));}
         /// is-equal test operator for other MatType structs
         bool operator==(const MatType& o) const {return m_nCVType==o.m_nCVType;}
         /// is-not-equal test operator for other MatType structs
@@ -157,6 +165,11 @@ namespace lv {
         /// holds the internal opencv mat type argument
         int m_nCVType;
     };
+
+    /// ostream-friendly overload for MatType (ADL will allow usage from this namespace)
+    inline std::ostream& operator<<(std::ostream& os, const MatType& oType) {
+        return os << (std::string)oType;
+    }
 
     /// mat dim size helper which provides easy-to-use and safe conversions from cv::Size and cv::MatSize
     /// (note: internally using 'major' dimension == first in vec)
@@ -388,6 +401,11 @@ namespace lv {
         /// is-not-equal test operator for other MatInfo structs
         bool operator!=(const MatInfo& o) const {return !(*this==o);}
     };
+
+    /// ostream-friendly overload for MatInfo (ADL will allow usage from this namespace)
+    inline std::ostream& operator<<(std::ostream& os, const MatInfo& oInfo) {
+        return os << "{ " << oInfo.size << " " << oInfo.type << " }";
+    }
 
     /// helper function to zero-init sparse and non-sparse matrices (sparse mat overload)
     template<typename T>
