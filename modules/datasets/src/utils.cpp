@@ -593,7 +593,7 @@ const cv::Mat& lv::IIDataLoader::getInput_redirect(size_t nPacketIdx) {
     }
     const lv::MatInfo& oPacketInfo = getInputInfo(nPacketIdx);
     if(!m_oLatestInput.empty() || !oPacketInfo.size.empty())
-        lvAssert__(m_oLatestInput.type()==oPacketInfo.type() && m_oLatestInput.size==oPacketInfo.size,"unexpected output packet size/type --- need redirect override (packet = %s)",getInputName(nPacketIdx).c_str());
+        lvAssert__(m_oLatestInput.type()==oPacketInfo.type() && m_oLatestInput.size==oPacketInfo.size,"unexpected post-transform packet size/type --- need redirect override (packet = %s)",getInputName(nPacketIdx).c_str());
     return m_oLatestInput;
 }
 
@@ -647,7 +647,7 @@ const cv::Mat& lv::IIDataLoader::getGT_redirect(size_t nPacketIdx) {
     }
     const lv::MatInfo& oPacketInfo = getGTInfo(nPacketIdx);
     if(!m_oLatestGT.empty() || !oPacketInfo.size.empty())
-        lvAssert__(m_oLatestGT.type()==oPacketInfo.type() && m_oLatestGT.size==oPacketInfo.size,"unexpected output packet size/type --- need redirect override (gt packet #%d)",(int)nPacketIdx);
+        lvAssert__(m_oLatestGT.type()==oPacketInfo.type() && m_oLatestGT.size==oPacketInfo.size,"unexpected post-transform packet size/type --- need redirect override (gt packet #%d)",(int)nPacketIdx);
     return m_oLatestGT;
 }
 

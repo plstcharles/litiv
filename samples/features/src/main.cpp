@@ -127,7 +127,8 @@ int main(int, char**) { // this sample uses no command line argument
         }
         std::cout << "\nAll done.\n" << std::endl;
     }
-    catch(const cv::Exception& e) {std::cout << "\nmain caught cv::Exception:\n" << e.what() << "\n" << std::endl; return -1;}
+    catch(const lv::Exception& e) {std::cout << "\nmain caught lv::Exception (check stderr)\n" << std::endl; return -1;}
+    catch(const cv::Exception& e) {std::cout << "\nmain caught cv::Exception (check stderr)\n" << std::endl; return -1;}
     catch(const std::exception& e) {std::cout << "\nmain caught std::exception:\n" << e.what() << "\n" << std::endl; return -1;}
     catch(...) {std::cout << "\nmain caught unhandled exception\n" << std::endl; return -1;}
     return 0;

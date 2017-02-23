@@ -219,6 +219,7 @@ namespace lv {
                 DatasetWrapper(Targs&&... _args) : Dataset_<eDatasetTask,eDataset,eEvalImpl>(std::forward<Targs>(_args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
             };
             auto p = std::make_shared<DatasetWrapper>(std::forward<Targs>(args)...);
+            lvAssert__(lv::checkIfExists(p->getDataPath()),"\ndirectory for dataset '%s' not found!\n\t --- searched at '%s';\n\t --- try moving the root search path via lv::datasets::setRootPath(...)\n",p->getName().c_str(),p->getDataPath().c_str());
             p->parseData();
             return p;
         }

@@ -103,7 +103,8 @@ int main(int, char**) {
             oTaskRes.get();
         pDataset->writeEvalReport();
     }
-    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
+    catch(const lv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught lv::Exception (check stderr)\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
+    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception (check stderr)\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
     catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
     catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
     std::cout << "\n[" << lv::getTimeStamp() << "]\n" << std::endl;
@@ -139,7 +140,6 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nNextIdx+1 << "/" << nTotPacketCount << " [" << sWorkerName << "]" << std::endl;
             const double dCurrLearningRate = nNextIdx<=100?1:dDefaultLearningRate;
             oBatch.apply_gl(pAlgo,nNextIdx++,false,dCurrLearningRate);
-            //pGLSLAlgoEvaluator->apply_gl(oNextGTMask);
             glErrorCheck;
             if(oContext.pollEventsAndCheckIfShouldClose())
                 break;
@@ -161,12 +161,12 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         oBatch.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
     }
     catch(const lv::Exception& e) {
-        std::cout << "\nAnalyze caught Exception:\n" << e.what();
+        std::cout << "\nAnalyze caught lv::Exception (check stderr)\n" << std::endl;
         const std::string sContextErrMsg = lv::gl::Context::getLatestErrorMessage();
         if(!sContextErrMsg.empty())
-            std::cout << "\nContext error: " << sContextErrMsg << "\n" << std::endl;
+            std::cout << "\n\tContext error: " << sContextErrMsg << "\n" << std::endl;
     }
-    catch(const cv::Exception& e) {std::cout << "\nAnalyze caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
+    catch(const cv::Exception& e) {std::cout << "\nAnalyze caught cv::Exception (check stderr)\n" << std::endl;}
     catch(const std::exception& e) {std::cout << "\nAnalyze caught std::exception:\n" << e.what() << "\n" << std::endl;}
     catch(...) {std::cout << "\nAnalyze caught unhandled exception\n" << std::endl;}
     try {
@@ -233,7 +233,8 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         std::cout << "\t\t" << sCurrBatchName << " @ end [" << sWorkerName << "] (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
         oBatch.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
     }
-    catch(const cv::Exception& e) {std::cout << "\nAnalyze caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
+    catch(const lv::Exception& e) {std::cout << "\nAnalyze caught lv::Exception (check stderr)\n" << std::endl;}
+    catch(const cv::Exception& e) {std::cout << "\nAnalyze caught cv::Exception (check stderr)\n" << std::endl;}
     catch(const std::exception& e) {std::cout << "\nAnalyze caught std::exception:\n" << e.what() << "\n" << std::endl;}
     catch(...) {std::cout << "\nAnalyze caught unhandled exception\n" << std::endl;}
     try {
