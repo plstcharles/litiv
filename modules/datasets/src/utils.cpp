@@ -316,6 +316,7 @@ bool lv::DataPrecacher::startAsyncPrecaching(size_t nSuggestedBufferSize) {
 }
 
 void lv::DataPrecacher::stopAsyncPrecaching() {
+    lvDbgExceptionWatch;
     if(m_bIsActive) {
         m_bIsActive = false;
         m_hWorker.join();
@@ -325,9 +326,9 @@ void lv::DataPrecacher::stopAsyncPrecaching() {
 }
 
 void lv::DataPrecacher::entry(const size_t nBufferSize) {
-    lvDbgExceptionWatch;
     lv::mutex_unique_lock sync_lock(m_oSyncMutex);
     try {
+        lvDbgExceptionWatch;
         if(datasets::getParserVerbosity()>1)
             std::cout << "data precacher [" << uintptr_t(this) << "] init w/ buffer size = " << (nBufferSize/1024)/1024 << " mb" << std::endl;
         std::queue<cv::Mat> qoCache;
@@ -545,7 +546,7 @@ namespace {
 
 const cv::Mat& lv::IIDataLoader::getInput_redirect(size_t nPacketIdx) {
     lvDbgExceptionWatch;
-    auto pNotArrayLoader = shared_from_this_cast<IDataLoader_<NotArray>>();
+    auto pNotArrayLoader = dynamic_cast<IDataLoader_<NotArray>*>(this);
     if(pNotArrayLoader) {
         lvDbgExceptionWatch;
         const lv::MatInfo& oPacketInfo = getInputInfo(nPacketIdx);
@@ -562,7 +563,7 @@ const cv::Mat& lv::IIDataLoader::getInput_redirect(size_t nPacketIdx) {
             lvAssert__(oPacketInfo.size.empty(),"unexpected empty raw image (packet = %s)",getInputName(nPacketIdx).c_str());
     }
     else {
-        auto pArrayLoader = shared_from_this_cast<IDataLoader_<Array>>(true);
+        auto pArrayLoader = dynamic_cast<IDataLoader_<Array>*>(this);
         if(pArrayLoader) {
             lvDbgExceptionWatch;
             std::vector<cv::Mat> vLatestInputs = pArrayLoader->getRawInputArray(nPacketIdx);
@@ -599,7 +600,7 @@ const cv::Mat& lv::IIDataLoader::getInput_redirect(size_t nPacketIdx) {
 
 const cv::Mat& lv::IIDataLoader::getGT_redirect(size_t nPacketIdx) {
     lvDbgExceptionWatch;
-    auto pNotArrayLoader = shared_from_this_cast<IDataLoader_<NotArray>>();
+    auto pNotArrayLoader = dynamic_cast<IDataLoader_<NotArray>*>(this);
     if(pNotArrayLoader) {
         lvDbgExceptionWatch;
         const lv::MatInfo& oPacketInfo = getGTInfo(nPacketIdx);
@@ -616,7 +617,7 @@ const cv::Mat& lv::IIDataLoader::getGT_redirect(size_t nPacketIdx) {
             lvAssert__(oPacketInfo.size.empty(),"unexpected empty raw image (gt packet #%d)",(int)nPacketIdx);
     }
     else {
-        auto pArrayLoader = shared_from_this_cast<IDataLoader_<Array>>(true);
+        auto pArrayLoader = dynamic_cast<IDataLoader_<Array>*>(this);
         if(pArrayLoader) {
             lvDbgExceptionWatch;
             std::vector<cv::Mat> vLatestGTs = pArrayLoader->getRawGTArray(nPacketIdx);
@@ -1262,6 +1263,7 @@ bool lv::DataWriter::startAsyncWriting(size_t nSuggestedQueueSize, bool bDropPac
 }
 
 void lv::DataWriter::stopAsyncWriting() {
+    lvDbgExceptionWatch;
     if(m_bIsActive) {
         {
             lv::mutex_unique_lock sync_lock(m_oSyncMutex);
