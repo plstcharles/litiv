@@ -396,6 +396,14 @@ namespace lv {
         MatSize size;
         /// contains info about the type of the matrix's elements
         MatType type;
+        /// default MatInfo constructor
+        MatInfo() = default;
+        /// cv::Mat-based constructor
+        MatInfo(const cv::Mat& m) : size(m.size),type(m.type()) {}
+        /// size/type-based constructor
+        MatInfo(const MatSize& s, const MatType& t) : size(s),type(t) {}
+        /// copy constructor
+        MatInfo(const MatInfo& o) = default;
         /// is-equal test operator for other MatInfo structs
         bool operator==(const MatInfo& o) const {return size==o.size && type==o.type;}
         /// is-not-equal test operator for other MatInfo structs
