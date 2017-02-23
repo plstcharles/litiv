@@ -68,7 +68,7 @@ namespace lv {
         virtual void parseData() override final {
             lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
-            const bool bIsGrayscale = this->getName().find("thermal")!=std::string::npos || this->getName().find("turbulence")!=std::string::npos;
+            const bool bIsGrayscale = this->getRelativePath().find("thermal")!=std::string::npos || this->getRelativePath().find("turbulence")!=std::string::npos;
             const std::vector<std::string> vsSubDirs = lv::getSubDirsFromDir(this->getDataPath());
             auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"groundtruth");
             auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"input");
