@@ -73,8 +73,9 @@ int main(int, char**) {
         std::cout << "Executing algorithm with " << DATASET_WORKTHREADS << " thread(s)..." << std::endl;
         lv::WorkerPool<DATASET_WORKTHREADS> oPool;
         std::vector<std::future<void>> vTaskResults;
+        size_t nCurrBatchIdx = 1;
         for(lv::IDataHandlerPtr pBatch : vpBatches)
-            vTaskResults.push_back(oPool.queueTask(Analyze,std::to_string(nTotBatches-vpBatches.size()+1)+"/"+std::to_string(nTotBatches),pBatch));
+            vTaskResults.push_back(oPool.queueTask(Analyze,std::to_string(nCurrBatchIdx++)+"/"+std::to_string(nTotBatches),pBatch));
         for(std::future<void>& oTaskRes : vTaskResults)
             oTaskRes.get();
         pDataset->writeEvalReport();
