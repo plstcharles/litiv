@@ -243,6 +243,10 @@ namespace lv {
         Tinteger& operator()(Tindex nDimIdx) {
             return size(nDimIdx);
         }
+        /// converts the internal sizes and returns them as a cv::Size struct
+        cv::Size operator()() const {
+            return (cv::Size)*this;
+        }
         /// implicit conversion op to raw 'Tinteger' size lookup array
         operator const Tinteger*() const {
             return m_aSizes;
