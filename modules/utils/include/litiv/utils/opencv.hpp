@@ -106,6 +106,10 @@ namespace lv {
         int type() const {return m_nCVType;}
         /// returns the internal opencv mat type argument
         int operator()() const {return m_nCVType;}
+        /// is-equal test operator for other MatType structs
+        bool operator==(const MatType& o) const {return m_nCVType==o.m_nCVType;}
+        /// is-not-equal test operator for other MatType structs
+        bool operator!=(const MatType& o) const {return !(*this==o);}
         /// returns whether the given typename is compatible with the internal opencv mat type (does not consider channels by default)
         template<typename T, bool bCheckWithChannels=false>
         bool isTypeCompat() const {
@@ -371,6 +375,10 @@ namespace lv {
         MatSize size;
         /// contains info about the type of the matrix's elements
         MatType type;
+        /// is-equal test operator for other MatInfo structs
+        bool operator==(const MatInfo& o) const {return size==o.size && type==o.type;}
+        /// is-not-equal test operator for other MatInfo structs
+        bool operator!=(const MatInfo& o) const {return !(*this==o);}
     };
 
     /// helper function to zero-init sparse and non-sparse matrices (sparse mat overload)
