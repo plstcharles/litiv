@@ -249,8 +249,8 @@ namespace lv {
         virtual const std::vector<std::string>& getGrayscaleDirTokens() const = 0;
         /// returns the data scaling factor to apply when loading packets
         virtual double getScaleFactor() const = 0;
-        /// returns the expected CPU load of the work batch/group (only relevant for intra-dataset load comparisons)
-        virtual double getExpectedLoad() const = 0;
+        /// returns the total size (in bytes) of input data that may be loaded by the work batch/group
+        virtual size_t getExpectedLoadSize() const = 0;
         /// returns the total input packet count for this work batch/group
         virtual size_t getInputCount() const = 0;
         /// returns the total gt packet count for this work batch/group
@@ -311,10 +311,10 @@ namespace lv {
         static std::enable_if_t<std::is_base_of<IDataHandler,Tp>::value,bool> compare(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {
             return lv::compare_lowercase(i->getName(),j->getName());
         }
-        /// work batch/group comparison function based on expected CPU load
+        /// work batch/group comparison function based on expected input data load size
         template<typename Tp>
         static std::enable_if_t<std::is_base_of<IDataHandler,Tp>::value,bool> compare_load(const std::shared_ptr<Tp>& i, const std::shared_ptr<Tp>& j) {
-            return i->getExpectedLoad()<j->getExpectedLoad();
+            return i->getExpectedLoadSize()<j->getExpectedLoadSize();
         }
         /// work batch/group comparison function based on names
         static bool compare(const IDataHandler* i, const IDataHandler* j);
@@ -388,8 +388,8 @@ namespace lv {
 
     /// group data parser interface for work batch groups
     struct DataGroupHandler : public virtual IDataHandler {
-        /// accumulates and returns the expected CPU load from all children work batch loads
-        virtual double getExpectedLoad() const override final;
+        /// accumulates and returns the expected load size from all children work batch data loads
+        virtual size_t getExpectedLoadSize() const override final;
         /// accumulates and returns the total input packet count from all children work batch counts
         virtual size_t getInputCount() const override final;
         /// accumulate and returns the total gt packet count from all children work batch counts
@@ -632,10 +632,8 @@ namespace lv {
         virtual size_t getInputCount() const override;
         /// returns the total gt frame count for this work batch/group
         virtual size_t getGTCount() const override;
-        /// compute the expected CPU load for this data batch based on frame size, frame count, and channel count
-        virtual double getExpectedLoad() const override;
-        /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
-        virtual void startPrecaching(bool bPrecacheInputOnly=true, size_t nSuggestedBufferSize=SIZE_MAX) override;
+        /// compute the expected data load size for this batch based on frame size, frame count, and channel count
+        virtual size_t getExpectedLoadSize() const override;
     protected:
         /// specialized constructor; still need to specify gt type, output type, and mappings
         IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
@@ -671,10 +669,8 @@ namespace lv {
         virtual size_t getInputCount() const override;
         /// returns the total gt frame count for this work batch/group --- all streams should be sync'd
         virtual size_t getGTCount() const override;
-        /// compute the expected CPU load for this data batch based on frame size, frame count, and channel count
-        virtual double getExpectedLoad() const override;
-        /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
-        virtual void startPrecaching(bool bPrecacheInputOnly=true, size_t nSuggestedBufferSize=SIZE_MAX) override;
+        /// compute the expected data load size for this batch based on frame size, frame count, channel count, and stream count
+        virtual size_t getExpectedLoadSize() const override;
     protected:
         /// specialized constructor; still need to specify gt type, output type, and mappings
         IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
@@ -708,10 +704,6 @@ namespace lv {
         virtual size_t getInputCount() const override;
         /// returns the total gt image count for this work batch/group
         virtual size_t getGTCount() const override;
-        /// compute the expected CPU load for this data batch based on max image size, image count, and channel count
-        virtual double getExpectedLoad() const override;
-        /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
-        virtual void startPrecaching(bool bPrecacheInputOnly=true, size_t nSuggestedBufferSize=SIZE_MAX) override;
         /// returns the size associated with an input image by index @@@@@ override later to make size N-Dim?
         virtual const cv::Size& getInputSize(size_t nPacketIdx) const override;
         /// returns the size associated with a gt image by index @@@@@ override later to make size N-Dim?
@@ -720,6 +712,8 @@ namespace lv {
         virtual const cv::Size& getInputMaxSize() const override;
         /// returns the maximum size associated with a gt image @@@@@ override later to make size N-Dim?
         virtual const cv::Size& getGTMaxSize() const override;
+        /// compute the expected data load size for this batch based on image sizes, image count, and channel count
+        virtual size_t getExpectedLoadSize() const override;
         /// returns the file name associated with an input data packet index (useful for data archiving)
         virtual std::string getInputName(size_t nPacketIdx) const override;
     protected:
@@ -749,10 +743,6 @@ namespace lv {
         virtual size_t getInputCount() const override;
         /// returns the total gt image count for this work batch/group
         virtual size_t getGTCount() const override;
-        /// compute the expected CPU load for this data batch based on max image size, image count, and channel count
-        virtual double getExpectedLoad() const override;
-        /// initializes data spooling by starting an asynchronyzed precacher to pre-fetch data packets based on queried ids
-        virtual void startPrecaching(bool bPrecacheInputOnly=true, size_t nSuggestedBufferSize=SIZE_MAX) override;
         /// returns the size associated with an input image by index @@@@@ override later to make size N-Dim?
         virtual const std::vector<cv::Size>& getInputSizeArray(size_t nPacketIdx) const override;
         /// returns the size associated with a gt image by index @@@@@ override later to make size N-Dim?
@@ -761,6 +751,8 @@ namespace lv {
         virtual const cv::Size& getInputMaxSize() const override;
         /// returns the maximum size associated with a gt image @@@@@ override later to make size N-Dim?
         virtual const cv::Size& getGTMaxSize() const override;
+        /// compute the expected data load size for this batch based on image sizes, image count, channel count, and stream count
+        virtual size_t getExpectedLoadSize() const override;
     protected:
         /// specialized constructor; still need to specify gt type, output type, and mappings
         IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);

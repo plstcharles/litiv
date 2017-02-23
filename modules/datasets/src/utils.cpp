@@ -61,7 +61,7 @@ bool lv::IDataHandler::compare(const IDataHandler* i, const IDataHandler* j) {
 }
 
 bool lv::IDataHandler::compare_load(const IDataHandler* i, const IDataHandler* j) {
-    return i->getExpectedLoad()<j->getExpectedLoad();
+    return i->getExpectedLoadSize()<j->getExpectedLoadSize();
 }
 
 bool lv::IDataHandler::compare(const IDataHandler& i, const IDataHandler& j) {
@@ -69,7 +69,7 @@ bool lv::IDataHandler::compare(const IDataHandler& i, const IDataHandler& j) {
 }
 
 bool lv::IDataHandler::compare_load(const IDataHandler& i, const IDataHandler& j) {
-    return i.getExpectedLoad()<j.getExpectedLoad();
+    return i.getExpectedLoadSize()<j.getExpectedLoadSize();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -162,8 +162,8 @@ lv::DataHandler::DataHandler(const std::string& sBatchName, const std::string& s
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-double lv::DataGroupHandler::getExpectedLoad() const {
-    return lv::accumulateMembers<double,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getExpectedLoad();});
+size_t lv::DataGroupHandler::getExpectedLoadSize() const {
+    return lv::accumulateMembers<size_t,IDataHandlerPtr>(getBatches(true),[](const IDataHandlerPtr& p){return p->getExpectedLoadSize();});
 }
 
 size_t lv::DataGroupHandler::getInputCount() const {
@@ -447,6 +447,9 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void lv::IIDataLoader::startPrecaching(bool bPrecacheInputOnly, size_t nSuggestedBufferSize) {
+    lvDbgExceptionWatch;
+    if(nSuggestedBufferSize==SIZE_MAX)
+        nSuggestedBufferSize = getExpectedLoadSize();
     lvAssert_(m_oInputPrecacher.startAsyncPrecaching(nSuggestedBufferSize),"could not start precaching input packets");
     if(!bPrecacheInputOnly) {
         lvAssert_(m_oGTPrecacher.startAsyncPrecaching(nSuggestedBufferSize),"could not start precaching gt packets");
@@ -696,12 +699,10 @@ size_t lv::IDataProducer_<lv::DatasetSource_Video>::getGTCount() const {
     return m_mGTIndexLUT.size();
 }
 
-double lv::IDataProducer_<lv::DatasetSource_Video>::getExpectedLoad() const {
-    return (double)(m_oInputROI.empty()?m_oInputSize.area():cv::countNonZero(m_oInputROI))*m_nFrameCount*(int(!isGrayscale())+1);
-}
-
-void lv::IDataProducer_<lv::DatasetSource_Video>::startPrecaching(bool bPrecacheInputOnly, size_t nSuggestedBufferSize) {
-    return IIDataLoader::startPrecaching(bPrecacheInputOnly,(nSuggestedBufferSize==SIZE_MAX)?m_oInputSize.area()*(m_nFrameCount+1)*(isGrayscale()?1:is4ByteAligned()?4:3):nSuggestedBufferSize);
+size_t lv::IDataProducer_<lv::DatasetSource_Video>::getExpectedLoadSize() const {
+    const cv::Mat& oROI = getFrameROI();
+    const lv::MatInfo& oMatInfo = getInputInfo();
+    return (oROI.empty()?oMatInfo.size.total():(size_t)cv::countNonZero(oROI))*oMatInfo.type.elemSize()*getFrameCount();
 }
 
 lv::IDataProducer_<lv::DatasetSource_Video>::IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
@@ -805,16 +806,14 @@ size_t lv::IDataProducer_<lv::DatasetSource_VideoArray>::getGTCount() const {
     return m_mGTIndexLUT.size();
 }
 
-double lv::IDataProducer_<lv::DatasetSource_VideoArray>::getExpectedLoad() const {
-    lvAssert_(m_vInputROIs.size()==m_vInputSizes.size(),"internal array sizes mismatch");
-    double dLoad = 0.0;
-    for(size_t s=0; s<m_vInputSizes.size(); ++s)
-        dLoad += (double)(m_vInputROIs[s].empty()?m_vInputSizes[s].area():cv::countNonZero(m_vInputROIs[s]))*m_vvsInputPaths.size()*(int(!isGrayscale())+1);
-    return dLoad;
-}
-
-void lv::IDataProducer_<lv::DatasetSource_VideoArray>::startPrecaching(bool bPrecacheInputOnly, size_t nSuggestedBufferSize) {
-    return IIDataLoader::startPrecaching(bPrecacheInputOnly,(nSuggestedBufferSize==SIZE_MAX)?getInputMaxSize().area()*(m_vvsInputPaths.size()+1)*(isGrayscale()?1:is4ByteAligned()?4:3):nSuggestedBufferSize);
+size_t lv::IDataProducer_<lv::DatasetSource_VideoArray>::getExpectedLoadSize() const {
+    const std::vector<cv::Mat>& vROIArray = getFrameROIArray();
+    const std::vector<lv::MatInfo>& vMatInfos = getInputInfoArray();
+    lvAssert_(vROIArray.size()==vMatInfos.size(),"internal array sizes mismatch");
+    size_t nLoad = size_t(0);
+    for(size_t nStreamIdx=0; nStreamIdx<vMatInfos.size(); ++nStreamIdx)
+        nLoad += (vROIArray[nStreamIdx].empty()?vMatInfos[nStreamIdx].size.total():(size_t)cv::countNonZero(vROIArray[nStreamIdx]))*vMatInfos[nStreamIdx].type.elemSize()*getFrameCount();
+    return nLoad;
 }
 
 lv::IDataProducer_<lv::DatasetSource_VideoArray>::IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
@@ -939,12 +938,14 @@ size_t lv::IDataProducer_<lv::DatasetSource_Image>::getGTCount() const {
     return m_mGTIndexLUT.size();
 }
 
-double lv::IDataProducer_<lv::DatasetSource_Image>::getExpectedLoad() const {
-    return (double)m_oInputMaxSize.area()*m_vsInputPaths.size()*(int(!isGrayscale())+1);
-}
-
-void lv::IDataProducer_<lv::DatasetSource_Image>::startPrecaching(bool bPrecacheInputOnly, size_t nSuggestedBufferSize) {
-    return IIDataLoader::startPrecaching(bPrecacheInputOnly,(nSuggestedBufferSize==SIZE_MAX)?m_oInputMaxSize.area()*(m_vsInputPaths.size()+1)*(isGrayscale()?1:is4ByteAligned()?4:3):nSuggestedBufferSize);
+size_t lv::IDataProducer_<lv::DatasetSource_Image>::getExpectedLoadSize() const {
+    size_t nLoad = size_t(0);
+    for(size_t nPacketIdx=0; nPacketIdx<getInputCount(); ++nPacketIdx) {
+        const cv::Mat& oROI = getInputROI(nPacketIdx);
+        const lv::MatInfo& oMatInfo = getInputInfo(nPacketIdx);
+        nLoad += (oROI.empty()?oMatInfo.size.total():(size_t)cv::countNonZero(oROI))*oMatInfo.type.elemSize();
+    }
+    return nLoad;
 }
 
 const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getInputSize(size_t nPacketIdx) const {
@@ -1049,12 +1050,16 @@ size_t lv::IDataProducer_<lv::DatasetSource_ImageArray>::getGTCount() const {
     return m_mGTIndexLUT.size();
 }
 
-double lv::IDataProducer_<lv::DatasetSource_ImageArray>::getExpectedLoad() const {
-    return (double)m_oInputMaxSize.area()*m_vvsInputPaths.size()*(int(!isGrayscale())+1);
-}
-
-void lv::IDataProducer_<lv::DatasetSource_ImageArray>::startPrecaching(bool bPrecacheInputOnly, size_t nSuggestedBufferSize) {
-    return IIDataLoader::startPrecaching(bPrecacheInputOnly,(nSuggestedBufferSize==SIZE_MAX)?m_oInputMaxSize.area()*(m_vvsInputPaths.size()+1)*(isGrayscale()?1:is4ByteAligned()?4:3):nSuggestedBufferSize);
+size_t lv::IDataProducer_<lv::DatasetSource_ImageArray>::getExpectedLoadSize() const {
+    size_t nLoad = size_t(0);
+    for(size_t nPacketIdx=0; nPacketIdx<getInputCount(); ++nPacketIdx) {
+        const std::vector<cv::Mat>& vROIArray = getInputROIArray(nPacketIdx);
+        const std::vector<lv::MatInfo>& vMatInfos = getInputInfoArray(nPacketIdx);
+        lvAssert_(vROIArray.size()==vMatInfos.size(),"internal array sizes mismatch");
+        for(size_t nStreamIdx=0; nStreamIdx<vMatInfos.size(); ++nStreamIdx)
+            nLoad += (vROIArray[nStreamIdx].empty()?vMatInfos[nStreamIdx].size.total():(size_t)cv::countNonZero(vROIArray[nStreamIdx]))*vMatInfos[nStreamIdx].type.elemSize();
+    }
+    return nLoad;
 }
 
 const std::vector<cv::Size>& lv::IDataProducer_<lv::DatasetSource_ImageArray>::getInputSizeArray(size_t nPacketIdx) const {
