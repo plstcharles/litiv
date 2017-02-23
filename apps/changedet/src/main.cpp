@@ -55,7 +55,6 @@
     DATASET_OUTPUT_PATH,                                         /* => const std::string& sOutputDirPath */ \
     std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsWorkBatchDirs */ \
     std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsSkippedDirTokens */ \
-    std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsGrayscaleDirTokens */ \
     bool(WRITE_IMG_OUTPUT),                                      /* => bool bSaveOutput */ \
     bool(EVALUATE_OUTPUT),                                       /* => bool bUseEvaluator */ \
     bool(USE_GPU_IMPL),                                          /* => bool bForce4ByteDataAlign */ \

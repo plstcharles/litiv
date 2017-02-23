@@ -116,11 +116,10 @@ int main(int, char**) { // this sample uses no command line argument
         //   3.   "results_test"                              => const std::string& sOutputDirPath => full path to the output directory, where logs/evaluation results will be written
         //   4.   {"batch1","batch2","batch3"}                => const std::vector<std::string>& vsWorkBatchDirs => list of dataset directory names to be treated as work batches
         //   5.   {}                                          => const std::vector<std::string>& vsSkippedDirTokens => list of tokens which, if found in a directory/batch name, will remove it from the dataset
-        //   6.   {}                                          => const std::vector<std::string>& vsGrayscaleDirTokens => list of tokens which, if found in a directory/batch name, will set it to only be processed as grayscale (1ch) data
-        //   7.   true                                        => bool bSaveOutput => defines whether the processed output should be automatically saved when pushed for evaluation
-        //   8.   false                                       => bool bUseEvaluator => defines whether the processed output should be fully evaluated internally or not (for a custom dataset, it might still not produce anything useful without specialization)
-        //   9.   false                                       => bool bForce4ByteDataAlign => defines whether data packets (typically images) should be 4-byte aligned or not --- this helps when uploading data to GPU, for example
-        //   10.  1.0                                         => double dScaleFactor => defines the scaling factor to be applied to the data packets (if applicable, typically only useful for images)
+        //   6.   true                                        => bool bSaveOutput => defines whether the processed output should be automatically saved when pushed for evaluation
+        //   7.   false                                       => bool bUseEvaluator => defines whether the processed output should be fully evaluated internally or not (for a custom dataset, it might still not produce anything useful without specialization)
+        //   8.   false                                       => bool bForce4ByteDataAlign => defines whether data packets (typically images) should be 4-byte aligned or not --- this helps when uploading data to GPU, for example
+        //   9.   1.0                                         => double dScaleFactor => defines the scaling factor to be applied to the data packets (if applicable, typically only useful for images)
         //
         // The dataset object then returned can finally be queried for data packets, and to evaluate output.
         // In our case, the data packets are simply images that we should apply edge detection on, and the
@@ -131,7 +130,6 @@ int main(int, char**) { // this sample uses no command line argument
             lv::addDirSlashIfMissing(SAMPLES_DATA_ROOT)+"custom_dataset_ex/",
             "results_test",
             std::vector<std::string>{"batch1","batch2","batch3"},
-            std::vector<std::string>(),
             std::vector<std::string>(),
             true,
             false,

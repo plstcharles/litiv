@@ -45,7 +45,6 @@
     DATASET_OUTPUT_PATH,                                         /* => const std::string& sOutputDirPath */ \
     std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsWorkBatchDirs */ \
     std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsSkippedDirTokens */ \
-    std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsGrayscaleDirTokens */ \
     bool(WRITE_IMG_OUTPUT),                                      /* => bool bSaveOutput */ \
     bool(EVALUATE_OUTPUT),                                       /* => bool bUseEvaluator */ \
     false,                                                       /* => bool bForce4ByteDataAlign */ \
@@ -55,7 +54,6 @@
     DATASET_OUTPUT_PATH,                                         /* => const std::string& sOutputDirName */ \
     bool(WRITE_IMG_OUTPUT),                                      /* => bool bSaveOutput */ \
     bool(EVALUATE_OUTPUT),                                       /* => bool bUseEvaluator */ \
-    false,                                                       /* => bool bForce4ByteDataAlign */ \
     DATASET_SCALE_FACTOR                                         /* => double dScaleFactor */
 #endif //defined(DATASET_ID)
 
@@ -100,7 +98,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
         lvAssert(oBatch.getInputPacketType()==lv::ImagePacket && oBatch.getOutputPacketType()==lv::ImagePacket);
         lvAssert(oBatch.getImageCount()>=1);
-        lvAssert(oBatch.isInputConstantSize());
+        lvAssert(oBatch.isInputInfoConst());
         if(DATASET_PRECACHING)
             oBatch.startPrecaching(!bool(EVALUATE_OUTPUT));
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);

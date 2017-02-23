@@ -140,7 +140,6 @@ TYPED_TEST(MatSize_fixture,regression_2d) {
     ASSERT_THROW_LV_QUIET(test.size(1));
     ASSERT_THROW_LV_QUIET(test.size(2));
 #endif //def(_DEBUG)
-    ASSERT_EQ(test,(const TypeParam*)nullptr);
     ASSERT_EQ(((cv::MatSize)test).p[-1],0);
     ASSERT_EQ(((cv::Size)test),cv::Size());
     std::array<int,1> arr = {0};

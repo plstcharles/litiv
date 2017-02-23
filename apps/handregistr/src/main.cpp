@@ -32,7 +32,7 @@ void Analyze(lv::IDataHandlerPtr pBatch);
 
 int main(int, char**) {
     try {
-        DatasetType::Ptr pDataset = DatasetType::create(DATASET_OUTPUT_PATH,false,false,false,1.0,false,true);
+        DatasetType::Ptr pDataset = DatasetType::create(DATASET_OUTPUT_PATH,false,false,1.0,false,true);
         lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false);
         const size_t nTotPackets = pDataset->getInputCount();
         const size_t nTotBatches = vpBatches.size();

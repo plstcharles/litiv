@@ -54,8 +54,10 @@ namespace lv {
                         lv::datasets::getRootPath()+"vap/rgbdt-stereo/",
                         lv::datasets::getRootPath()+"vap/rgbdt-stereo/results/"+lv::addDirSlashIfMissing(sOutputDirName),
                         getWorkBatchDirNames(),
+                        std::vector<std::string>(),
                         bSaveOutput,
                         bUseEvaluator,
+                        false,
                         dScaleFactor
                 ), m_bLoadDepth(bLoadDepth),m_bUndistort(bUndistort) {}
         /// returns the names of all work batch directories available for this dataset specialization
@@ -127,8 +129,8 @@ namespace lv {
             if(dScale!=1.0)
                 cv::resize(oGlobalROI,oGlobalROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
             for(size_t s=0; s<nStreamCount; ++s) {
-                this->m_vInputInfo[s] = lv::MatInfo{oGlobalROI.size(),(s==0?CV_8UC3:CV_8UC1)};
-                this->m_vGTInfo[s] = lv::MatInfo{oGlobalROI.size(),CV_8UC1};
+                this->m_vInputInfos[s] = lv::MatInfo{oGlobalROI.size(),(s==0?CV_8UC3:CV_8UC1)};
+                this->m_vGTInfos[s] = lv::MatInfo{oGlobalROI.size(),CV_8UC1};
             }
             const cv::Size oImageSize(640,480);
             const double dUndistortMapCameraMatrixAlpha = -1.0;
