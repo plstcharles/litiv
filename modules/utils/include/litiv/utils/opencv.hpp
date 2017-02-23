@@ -332,6 +332,19 @@ namespace lv {
             m_vSizes = cvtSizes(oSize.m_vSizes.data()+1);
             return *this;
         }
+        /// mult-assign operator to rescale all internal dimensions at once
+        MatSize_& operator*=(double dScale) {
+            for(Tinteger nDimIdx=0; nDimIdx<dims(); ++nDimIdx)
+                size(nDimIdx) *= dScale;
+            return *this;
+        }
+        /// mult operator which returns a rescaled copy of this object
+        MatSize_ operator*(double dScale) const {
+            lv::MatSize_<Tinteger> oNewSize = *this;
+            for(Tinteger nDimIdx=0; nDimIdx<oNewSize.dims(); ++nDimIdx)
+                oNewSize.size(nDimIdx) *= dScale;
+            return oNewSize;
+        }
         /// returns the number of elements in the current configuration (i.e. by multiplying all dim sizes)
         size_t total() const {
             if(dims()==Tinteger(0))
