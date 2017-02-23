@@ -100,10 +100,6 @@ const std::vector<std::string>& lv::DataHandler::getSkippedDirTokens() const {
     return m_oParent.getSkippedDirTokens();
 }
 
-const std::vector<std::string>& lv::DataHandler::getGrayscaleDirTokens() const {
-    return m_oParent.getGrayscaleDirTokens();
-}
-
 double lv::DataHandler::getScaleFactor() const {
     return m_oParent.getScaleFactor();
 }
@@ -132,10 +128,6 @@ bool lv::DataHandler::isEvaluating() const {
     return m_oParent.isEvaluating();
 }
 
-bool lv::DataHandler::isGrayscale() const {
-    return m_oParent.isGrayscale() || m_bForcingGrayscale;
-}
-
 inline const lv::IDataHandler& getRootNodeHelper(const lv::IDataHandler& oStart) {
     lvDbgExceptionWatch;
     lv::IDataHandlerConstPtr p=oStart.shared_from_this();
@@ -150,7 +142,6 @@ lv::DataHandler::DataHandler(const std::string& sBatchName, const std::string& s
         m_sDataPath(getRootNodeHelper(oParent).getDataPath()+lv::addDirSlashIfMissing(sRelativePath)),
         m_sOutputPath(getRootNodeHelper(oParent).getOutputPath()+lv::addDirSlashIfMissing(sRelativePath)),
         m_sFeaturesPath(getRootNodeHelper(oParent).getOutputPath()+lv::addDirSlashIfMissing(sRelativePath)+"precomp/"),
-        m_bForcingGrayscale(lv::string_contains_token(sRelativePath,oParent.getGrayscaleDirTokens())),
         m_oParent(oParent),
         m_oRoot(getRootNodeHelper(oParent)) {
     if(!m_sOutputPath.empty())
@@ -280,6 +271,7 @@ lv::DataPrecacher::~DataPrecacher() {
 }
 
 const cv::Mat& lv::DataPrecacher::getPacket(size_t nIdx) {
+    lvDbgExceptionWatch;
     if(nIdx==m_nLastReqIdx)
         return m_oLastReqPacket;
     else if(!m_bIsActive) {
@@ -333,6 +325,7 @@ void lv::DataPrecacher::stopAsyncPrecaching() {
 }
 
 void lv::DataPrecacher::entry(const size_t nBufferSize) {
+    lvDbgExceptionWatch;
     lv::mutex_unique_lock sync_lock(m_oSyncMutex);
     try {
         if(datasets::getParserVerbosity()>1)
@@ -464,18 +457,22 @@ void lv::IIDataLoader::stopPrecaching() {
 }
 
 const cv::Mat& lv::IIDataLoader::getInput(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
     return m_oInputPrecacher.getPacket(nPacketIdx);
 }
 
 const cv::Mat& lv::IIDataLoader::getGT(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
     return m_oGTPrecacher.getPacket(nPacketIdx);
 }
 
 const cv::Mat& lv::IIDataLoader::loadFeatures(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
     return m_oFeaturesPrecacher.getPacket(nPacketIdx);
 }
 
 void lv::IIDataLoader::saveFeatures(size_t nPacketIdx, const cv::Mat& oFeatures) const {
+    lvDbgExceptionWatch;
     if(!oFeatures.empty()) {
         // could use a datawriter here for REALLY big features (but its unlikely that they can be produced faster than saved)
         std::stringstream ssFeatsFilePath;
@@ -492,22 +489,6 @@ const cv::Mat& lv::IIDataLoader::getGTROI(size_t /*nPacketIdx*/) const {
     return lv::emptyMat();
 }
 
-const cv::Size& lv::IIDataLoader::getInputSize(size_t /*nPacketIdx*/) const {
-    return lv::emptySize();
-}
-
-const cv::Size& lv::IIDataLoader::getGTSize(size_t /*nPacketIdx*/) const {
-    return lv::emptySize();
-}
-
-const cv::Size& lv::IIDataLoader::getInputMaxSize() const {
-    return lv::emptySize();
-}
-
-const cv::Size& lv::IIDataLoader::getGTMaxSize() const {
-    return lv::emptySize();
-}
-
 lv::IIDataLoader::IIDataLoader(PacketPolicy eInputType, PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
         m_oInputPrecacher(std::bind(&IIDataLoader::getInput_redirect,this,std::placeholders::_1)),
         m_oGTPrecacher(std::bind(&IIDataLoader::getGT_redirect,this,std::placeholders::_1)),
@@ -515,6 +496,7 @@ lv::IIDataLoader::IIDataLoader(PacketPolicy eInputType, PacketPolicy eGTType, Pa
         m_eInputType(eInputType),m_eGTType(eGTType),m_eOutputType(eOutputType),m_eGTMappingType(eGTMappingType),m_eIOMappingType(eIOMappingType) {}
 
 const cv::Mat& lv::IIDataLoader::loadRawFeatures(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
     std::stringstream ssFeatsFilePath;
     ssFeatsFilePath << getFeaturesPath() << getFeaturesName(nPacketIdx) << ".bin";
     // all features are user-defined, so we keep no mapping information, and offer no default transformations
@@ -525,41 +507,147 @@ const cv::Mat& lv::IIDataLoader::loadRawFeatures(size_t nPacketIdx) {
     return m_oLatestFeatures;
 }
 
-const cv::Mat& lv::IIDataLoader::getInput_redirect(size_t nIdx) {
-    m_oLatestInput = getRawInput(nIdx);
-    if(!m_oLatestInput.empty()) {
-        if(m_eInputType==ImagePacket) {
-#if HARDCODE_IMAGE_PACKET_INDEX
-            std::stringstream sstr;
-            sstr << "Packet #" << nIdx;
-            lv::putText(m_oLatestInput,sstr.str(),cv::Scalar_<uchar>::all(255));
-#endif //HARDCODE_IMAGE_PACKET_INDEX
-            if(is4ByteAligned() && m_oLatestInput.channels()==3)
-                cv::cvtColor(m_oLatestInput,m_oLatestInput,cv::COLOR_BGR2BGRA);
-            const cv::Size& oPacketSize = getInputSize(nIdx);
-            if(oPacketSize.area()>0 && m_oLatestInput.size()!=oPacketSize)
-                cv::resize(m_oLatestInput,m_oLatestInput,oPacketSize,0,0,cv::INTER_NEAREST);
+namespace {
+
+    cv::Mat transformImagePacket(size_t nPacketIdx, const cv::Mat& oPacket, const lv::MatInfo& oInfo) {
+        lvDbgExceptionWatch;
+        lvDbgAssert(!oPacket.empty());
+        lvDbgAssert(!oInfo.size.empty());
+        lvDbgAssert(oInfo.size.dims()<=2);
+        lvDbgAssert(oInfo.type()>=0);
+    #if HARDCODE_IMAGE_PACKET_INDEX
+        std::stringstream sstr;
+        sstr << "Packet #" << nPacketIdx;
+        lv::putText(m_oLatestInput,sstr.str(),cv::Scalar_<uchar>::all(255));
+    #else //!HARDCODE_IMAGE_PACKET_INDEX
+        UNUSED(nPacketIdx);
+    #endif //!HARDCODE_IMAGE_PACKET_INDEX
+        cv::Mat oCvtOutput;
+        if(oInfo.type.depth()==oPacket.depth() && oInfo.type.channels()!=oPacket.channels()) {
+            if(oInfo.type.channels()==4 && oPacket.channels()==3)
+                cv::cvtColor(oPacket,oCvtOutput,cv::COLOR_BGR2BGRA);
+            else if(oInfo.type.channels()==1 && oPacket.channels()==3)
+                cv::cvtColor(oPacket,oCvtOutput,cv::COLOR_BGR2GRAY);
+            else
+                oCvtOutput = oPacket; // dont know how to handle this here; need override of 'redirect'
         }
+        else
+            oCvtOutput = oPacket;
+        cv::Mat oResizeOutput;
+        if(oInfo.size!=oCvtOutput.size())
+            cv::resize(oPacket,oResizeOutput,oInfo.size(),0,0,cv::INTER_NEAREST);
+        else
+            oResizeOutput = oCvtOutput;
+        return oResizeOutput;
     }
+
+} // anonymous namespace
+
+const cv::Mat& lv::IIDataLoader::getInput_redirect(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
+    auto pNotArrayLoader = shared_from_this_cast<IDataLoader_<NotArray>>();
+    if(pNotArrayLoader) {
+        lvDbgExceptionWatch;
+        const lv::MatInfo& oPacketInfo = getInputInfo(nPacketIdx);
+        m_oLatestInput = pNotArrayLoader->getRawInput(nPacketIdx);
+        if(!m_oLatestInput.empty()) {
+            if(m_eInputType==ImagePacket) {
+                lvAssert__(m_oLatestInput.dims<=2 && oPacketInfo.size.dims()<=2,"bad raw image formatting (packet = %s)",getInputName(nPacketIdx).c_str());
+                m_oLatestInput = transformImagePacket(nPacketIdx,m_oLatestInput,oPacketInfo);
+            }
+            else
+                lvAssert_(m_eInputType==UnspecifiedPacket,"unexpected packet type for not-array loader");
+        }
+        else
+            lvAssert__(oPacketInfo.size.empty(),"unexpected empty raw image (packet = %s)",getInputName(nPacketIdx).c_str());
+    }
+    else {
+        auto pArrayLoader = shared_from_this_cast<IDataLoader_<Array>>(true);
+        if(pArrayLoader) {
+            lvDbgExceptionWatch;
+            std::vector<cv::Mat> vLatestInputs = pArrayLoader->getRawInputArray(nPacketIdx);
+            lvAssert__(vLatestInputs.size()==pArrayLoader->getInputStreamCount(),"unexpected raw input array size (packet = %s)",getInputName(nPacketIdx).c_str());
+            const std::vector<lv::MatInfo>& vStreamInfos = pArrayLoader->getInputInfoArray(nPacketIdx);
+            lvAssert__(vStreamInfos.size()==pArrayLoader->getInputStreamCount(),"unexpected raw input info array size (packet = %s)",getInputName(nPacketIdx).c_str());
+            for(size_t nStreamIdx=0; nStreamIdx<vLatestInputs.size(); ++nStreamIdx) {
+                if(!vLatestInputs[nStreamIdx].empty()) {
+                    if(m_eInputType==ImageArrayPacket) {
+                        lvAssert__(vLatestInputs[nStreamIdx].dims<=2 && vStreamInfos[nStreamIdx].size.dims()<=2,"bad raw image formatting (stream = %s, packet = %s)",pArrayLoader->getInputStreamName(nStreamIdx).c_str(),getInputName(nPacketIdx).c_str());
+                        vLatestInputs[nStreamIdx] = transformImagePacket(nPacketIdx,vLatestInputs[nStreamIdx],vStreamInfos[nStreamIdx]);
+                    }
+                    else
+                        lvAssert_(m_eInputType==UnspecifiedPacket,"unexpected packet type for not-array loader");
+                    lvAssert__(vLatestInputs[nStreamIdx].type()==vStreamInfos[nStreamIdx].type() && vLatestInputs[nStreamIdx].size==vStreamInfos[nStreamIdx].size,
+                               "unexpected stream size/type --- need redirect override (stream = %s, packet = %s)",pArrayLoader->getInputStreamName(nStreamIdx).c_str(),getInputName(nPacketIdx).c_str());
+                }
+                else
+                    lvAssert__(vStreamInfos[nStreamIdx].size.empty(),"unexpected empty raw stream (stream = %s, packet = %s)",pArrayLoader->getInputStreamName(nStreamIdx).c_str(),getInputName(nPacketIdx).c_str());
+            }
+            m_oLatestInput = lv::packData(vLatestInputs);
+            if(pArrayLoader->m_vPackedInputInfos.size()!=getInputCount())
+                pArrayLoader->m_vPackedInputInfos.resize(getInputCount());
+            pArrayLoader->m_vPackedInputInfos[nPacketIdx] = lv::MatInfo{m_oLatestInput.size,m_oLatestInput.type()};
+        }
+        else
+            lvError("unexpected data loader type");
+    }
+    const lv::MatInfo& oPacketInfo = getInputInfo(nPacketIdx);
+    if(!m_oLatestInput.empty() || !oPacketInfo.size.empty())
+        lvAssert__(m_oLatestInput.type()==oPacketInfo.type() && m_oLatestInput.size==oPacketInfo.size,"unexpected output packet size/type --- need redirect override (packet = %s)",getInputName(nPacketIdx).c_str());
     return m_oLatestInput;
 }
 
-const cv::Mat& lv::IIDataLoader::getGT_redirect(size_t nIdx) {
-    m_oLatestGT = getRawGT(nIdx);
-    if(!m_oLatestGT.empty()) {
-        if(m_eGTType==ImagePacket) {
-#if HARDCODE_IMAGE_PACKET_INDEX
-            std::stringstream sstr;
-            sstr << "Packet #" << nIdx;
-            lv::putText(m_oLatestGT,sstr.str(),cv::Scalar_<uchar>::all(255));
-#endif //HARDCODE_IMAGE_PACKET_INDEX
-            if(is4ByteAligned() && m_oLatestGT.channels()==3)
-                cv::cvtColor(m_oLatestGT,m_oLatestGT,cv::COLOR_BGR2BGRA);
-            const cv::Size& oPacketSize = getGTSize(nIdx);
-            if(oPacketSize.area()>0 && m_oLatestGT.size()!=oPacketSize)
-                cv::resize(m_oLatestGT,m_oLatestGT,oPacketSize,0,0,cv::INTER_NEAREST);
+const cv::Mat& lv::IIDataLoader::getGT_redirect(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
+    auto pNotArrayLoader = shared_from_this_cast<IDataLoader_<NotArray>>();
+    if(pNotArrayLoader) {
+        lvDbgExceptionWatch;
+        const lv::MatInfo& oPacketInfo = getGTInfo(nPacketIdx);
+        m_oLatestGT = pNotArrayLoader->getRawGT(nPacketIdx);
+        if(!m_oLatestGT.empty()) {
+            if(m_eGTType==ImagePacket) {
+                lvAssert__(m_oLatestGT.dims<=2 && oPacketInfo.size.dims()<=2,"bad raw image formatting (gt packet #%d)",(int)nPacketIdx);
+                m_oLatestGT = transformImagePacket(nPacketIdx,m_oLatestGT,oPacketInfo);
+            }
+            else
+                lvAssert_(m_eGTType==UnspecifiedPacket,"unexpected packet type for not-array loader");
         }
+        else
+            lvAssert__(oPacketInfo.size.empty(),"unexpected empty raw image (gt packet #%d)",(int)nPacketIdx);
     }
+    else {
+        auto pArrayLoader = shared_from_this_cast<IDataLoader_<Array>>(true);
+        if(pArrayLoader) {
+            lvDbgExceptionWatch;
+            std::vector<cv::Mat> vLatestGTs = pArrayLoader->getRawGTArray(nPacketIdx);
+            lvAssert__(vLatestGTs.size()==pArrayLoader->getGTStreamCount(),"unexpected raw GT array size (gt packet #%d)",(int)nPacketIdx);
+            const std::vector<lv::MatInfo>& vStreamInfos = pArrayLoader->getGTInfoArray(nPacketIdx);
+            lvAssert__(vStreamInfos.size()==pArrayLoader->getGTStreamCount(),"unexpected raw GT info array size (gt packet #%d)",(int)nPacketIdx);
+            for(size_t nStreamIdx=0; nStreamIdx<vLatestGTs.size(); ++nStreamIdx) {
+                if(!vLatestGTs[nStreamIdx].empty()) {
+                    if(m_eGTType==ImageArrayPacket) {
+                        lvAssert__(vLatestGTs[nStreamIdx].dims<=2 && vStreamInfos[nStreamIdx].size.dims()<=2,"bad raw image formatting (stream = %s, gt packet #%d)",pArrayLoader->getGTStreamName(nStreamIdx).c_str(),(int)nPacketIdx);
+                        vLatestGTs[nStreamIdx] = transformImagePacket(nPacketIdx,vLatestGTs[nStreamIdx],vStreamInfos[nStreamIdx]);
+                    }
+                    else
+                        lvAssert_(m_eGTType==UnspecifiedPacket,"unexpected packet type for not-array loader");
+                    lvAssert__(vLatestGTs[nStreamIdx].type()==vStreamInfos[nStreamIdx].type() && vLatestGTs[nStreamIdx].size==vStreamInfos[nStreamIdx].size,
+                               "unexpected stream size/type --- need redirect override (stream = %s, gt packet #%d)",pArrayLoader->getGTStreamName(nStreamIdx).c_str(),(int)nPacketIdx);
+                }
+                else
+                    lvAssert__(vStreamInfos[nStreamIdx].size.empty(),"unexpected empty raw stream (stream = %s, gt packet #%d)",pArrayLoader->getGTStreamName(nStreamIdx).c_str(),(int)nPacketIdx);
+            }
+            m_oLatestGT = lv::packData(vLatestGTs);
+            if(pArrayLoader->m_vPackedGTInfos.size()!=getGTCount())
+                pArrayLoader->m_vPackedGTInfos.resize(getGTCount());
+            pArrayLoader->m_vPackedGTInfos[nPacketIdx] = lv::MatInfo{m_oLatestGT.size,m_oLatestGT.type()};
+        }
+        else
+            lvError("unexpected data loader type");
+    }
+    const lv::MatInfo& oPacketInfo = getGTInfo(nPacketIdx);
+    if(!m_oLatestGT.empty() || !oPacketInfo.size.empty())
+        lvAssert__(m_oLatestGT.type()==oPacketInfo.type() && m_oLatestGT.size==oPacketInfo.size,"unexpected output packet size/type --- need redirect override (gt packet #%d)",(int)nPacketIdx);
     return m_oLatestGT;
 }
 
@@ -570,113 +658,79 @@ size_t lv::IDataLoader_<lv::Array>::getGTStreamCount() const {
 }
 
 std::string lv::IDataLoader_<lv::Array>::getInputStreamName(size_t nStreamIdx) const {
-    return cv::format("in[%02d]",(int)nStreamIdx);
+    return cv::format("in%02d",(int)nStreamIdx);
 }
 
 std::string lv::IDataLoader_<lv::Array>::getGTStreamName(size_t nStreamIdx) const {
-    return cv::format("gt[%02d]",(int)nStreamIdx);
+    return cv::format("gt%02d",(int)nStreamIdx);
 }
 
 const std::vector<cv::Mat>& lv::IDataLoader_<lv::Array>::getInputArray(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
     if(getInputStreamCount()==0)
-        return lv::emptyMatArray();
-    else if(m_oInputPrecacher.getLastReqIdx()!=nPacketIdx)
-        m_vLatestUnpackedInput = unpackInput(nPacketIdx);
+        m_vLatestUnpackedInput.resize(0);
+    else if(m_oInputPrecacher.getLastReqIdx()!=nPacketIdx) {
+        const std::vector<lv::MatInfo>& vPackInfo = getInputInfoArray(nPacketIdx);
+        lvAssert_(vPackInfo.size()==getInputStreamCount(),"unexpected stream pack info array size");
+        // no need to clone if getInput does not allow reentrancy
+        const cv::Mat& oPacket = getInput(nPacketIdx)/*.clone()*/;
+        // output mats in the vector will stay valid without copy for as long as oPacket is valid (typically until next call)
+        m_vLatestUnpackedInput = lv::unpackData(oPacket,vPackInfo);
+    }
     return m_vLatestUnpackedInput;
 }
 
 const std::vector<cv::Mat>& lv::IDataLoader_<lv::Array>::getGTArray(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
     if(getGTStreamCount()==0)
-        return lv::emptyMatArray();
-    else if(m_oGTPrecacher.getLastReqIdx()!=nPacketIdx)
-        m_vLatestUnpackedGT = unpackGT(nPacketIdx);
+        m_vLatestUnpackedGT.resize(0);
+    else if(m_oGTPrecacher.getLastReqIdx()!=nPacketIdx) {
+        const std::vector<lv::MatInfo>& vPackInfo = getGTInfoArray(nPacketIdx);
+        lvAssert_(vPackInfo.size()==getGTStreamCount(),"unexpected stream pack info array size");
+        // no need to clone if getter does not allow reentrancy
+        const cv::Mat& oPacket = getGT(nPacketIdx)/*.clone()*/;
+        // output mats in the vector will stay valid without copy for as long as oPacket is valid (typically until next call)
+        m_vLatestUnpackedGT = lv::unpackData(oPacket,vPackInfo);
+    }
     return m_vLatestUnpackedGT;
 }
 
 const std::vector<cv::Mat>& lv::IDataLoader_<lv::Array>::loadFeaturesArray(size_t nPacketIdx, const std::vector<lv::MatInfo>& vPackingInfo) {
-    if(m_oFeaturesPrecacher.getLastReqIdx()!=nPacketIdx)
-        m_vLatestUnpackedFeatures = unpackFeatures(nPacketIdx,vPackingInfo);
+    lvDbgExceptionWatch;
+    if(m_oFeaturesPrecacher.getLastReqIdx()!=nPacketIdx) {
+        // no need to clone from packed data if loadFeatures does not allow reentrancy
+        const cv::Mat& oFeatures = loadFeatures(nPacketIdx)/*.clone()*/;
+        // output mats in the vector will stay valid without copy for as long as oFeatures is valid (typically until next loadFeatures call)
+        m_vLatestUnpackedFeatures = lv::unpackData(oFeatures,vPackingInfo);
+    }
     return m_vLatestUnpackedFeatures;
 }
 
 void lv::IDataLoader_<lv::Array>::saveFeaturesArray(size_t nPacketIdx, const std::vector<cv::Mat>& oFeatures, std::vector<lv::MatInfo>* pvOutputPackingInfo) const {
+    lvDbgExceptionWatch;
     saveFeatures(nPacketIdx,lv::packData(oFeatures,pvOutputPackingInfo));
 }
 
 const std::vector<cv::Mat>& lv::IDataLoader_<lv::Array>::getInputROIArray(size_t /*nPacketIdx*/) const {
-    return lv::emptyMatArray();
+    m_vEmptyInputROIArray.resize(getInputStreamCount());
+    return m_vEmptyInputROIArray;
 }
 
 const std::vector<cv::Mat>& lv::IDataLoader_<lv::Array>::getGTROIArray(size_t /*nPacketIdx*/) const {
-    return lv::emptyMatArray();
+    m_vEmptyGTROIArray.resize(getGTStreamCount());
+    return m_vEmptyGTROIArray;
 }
 
-const std::vector<cv::Size>& lv::IDataLoader_<lv::Array>::getInputSizeArray(size_t /*nPacketIdx*/) const {
-    return lv::emptySizeArray();
+lv::MatInfo lv::IDataLoader_<lv::Array>::getInputInfo(size_t nPacketIdx) const {
+    if(nPacketIdx>=m_vPackedInputInfos.size())
+        return lv::MatInfo();
+    return m_vPackedInputInfos[nPacketIdx];
 }
 
-const std::vector<cv::Size>& lv::IDataLoader_<lv::Array>::getGTSizeArray(size_t /*nPacketIdx*/) const {
-    return lv::emptySizeArray();
-}
-
-bool lv::IDataLoader_<lv::Array>::isStreamGrayscale(size_t /*nStreamIdx*/) const {
-    return isGrayscale();
-}
-
-std::vector<cv::Mat> lv::IDataLoader_<lv::Array>::unpackInput(size_t nPacketIdx) {
-    // no need to clone if getInput does not allow reentrancy --- output mats in the vector will stay valid without copy for as long as oInput is valid (typically until next getInput call)
-    const cv::Mat& oInput = getInput(nPacketIdx)/*.clone()*/;
-    const std::vector<cv::Size>& vSizes = getInputSizeArray(nPacketIdx); // @@@ replace with MatInfo array?
-    if(oInput.empty())
-        return std::vector<cv::Mat>();
-    else if(getInputPacketType()==ImagePacket) {
-        lvAssert_(getInputStreamCount()==size_t(1) && getInputStreamCount()==vSizes.size(),"bad data loader config for non-array packets");
-        lvAssert_(size_t(vSizes[0].area())==oInput.total(),"bad total elem count in given packet");
-        return std::vector<cv::Mat>{oInput.reshape(0,vSizes[0].height)};
-    }
-    else if(getInputPacketType()==ImageArrayPacket) {
-        lvAssert_(getInputStreamCount()>size_t(1) && getInputStreamCount()==vSizes.size(),"bad data loader config for array packets");
-        std::vector<lv::MatInfo> vPackInfo(vSizes.size());
-        for(size_t s=0; s<vSizes.size(); ++s) {
-            vPackInfo[s].size = vSizes[s];
-            vPackInfo[s].type = oInput.type(); // @@@ for now, we assume all stream packets have the type of the original packed matrix
-        }
-        return lv::unpackData(oInput,vPackInfo);
-    }
-    else
-        lvError("unhandled packet type in unpackInput");
-}
-
-std::vector<cv::Mat> lv::IDataLoader_<lv::Array>::unpackGT(size_t nPacketIdx) {
-    // no need to clone if getGT does not allow reentrancy --- output mats in the vector will stay valid without copy for as long as oGT is valid (typically until next getGT call)
-    const cv::Mat& oGT = getGT(nPacketIdx)/*.clone()*/;
-    const std::vector<cv::Size>& vSizes = getGTSizeArray(nPacketIdx); // @@@ replace with MatInfo array?
-    if(oGT.empty())
-        return std::vector<cv::Mat>();
-    else if(getGTPacketType()==ImagePacket) {
-        lvAssert_(getGTStreamCount()==size_t(1) && getGTStreamCount()==vSizes.size(),"bad data loader config for non-array packets");
-        lvAssert_(size_t(vSizes[0].area())==oGT.total(),"bad total elem count in given packet");
-        return std::vector<cv::Mat>{oGT.reshape(0,vSizes[0].height)};
-    }
-    else if(getGTPacketType()==ImageArrayPacket) {
-        lvAssert_(getGTStreamCount()>size_t(1) && getGTStreamCount()==vSizes.size(),"bad data loader config for array packets");
-        std::vector<lv::MatInfo> vPackInfo(vSizes.size());
-        for(size_t s=0; s<vSizes.size(); ++s) {
-            vPackInfo[s].size = vSizes[s];
-            vPackInfo[s].type = oGT.type(); // @@@ for now, we assume all stream packets have the type of the original packed matrix
-        }
-        return lv::unpackData(oGT,vPackInfo);
-    }
-    else
-        lvError("unhandled packet type in unpackGT");
-}
-
-std::vector<cv::Mat> lv::IDataLoader_<lv::Array>::unpackFeatures(size_t nPacketIdx, const std::vector<lv::MatInfo>& vPackingInfo) {
-    // no need to clone if loadFeatures does not allow reentrancy --- output mats in the vector will stay valid without copy for as long as oFeatures is valid (typically until next loadFeatures call)
-    const cv::Mat& oFeatures = loadFeatures(nPacketIdx)/*.clone()*/;
-    if(oFeatures.empty())
-        return std::vector<cv::Mat>();
-    return lv::unpackData(oFeatures,vPackingInfo);
+lv::MatInfo lv::IDataLoader_<lv::Array>::getGTInfo(size_t nPacketIdx) const {
+    if(nPacketIdx>=m_vPackedGTInfos.size())
+        return lv::MatInfo();
+    return m_vPackedGTInfos[nPacketIdx];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -687,8 +741,16 @@ const cv::Mat& lv::IDataProducer_<lv::DatasetSource_Video>::getFrameROI() const 
     return m_oInputROI;
 }
 
-const cv::Size& lv::IDataProducer_<lv::DatasetSource_Video>::getFrameSize() const {
-    return m_oInputSize;
+lv::MatSize lv::IDataProducer_<lv::DatasetSource_Video>::getFrameSize() const {
+    return m_oInputInfo.size;
+}
+
+lv::MatInfo lv::IDataProducer_<lv::DatasetSource_Video>::getInputInfo() const {
+    return m_oInputInfo;
+}
+
+lv::MatInfo lv::IDataProducer_<lv::DatasetSource_Video>::getGTInfo() const {
+    return m_oGTInfo;
 }
 
 size_t lv::IDataProducer_<lv::DatasetSource_Video>::getInputCount() const {
@@ -716,26 +778,27 @@ const cv::Mat& lv::IDataProducer_<lv::DatasetSource_Video>::getGTROI(size_t /*nP
     return m_oGTROI;
 }
 
-const cv::Size& lv::IDataProducer_<lv::DatasetSource_Video>::getInputSize(size_t /*nPacketIdx*/) const {
-    return m_oInputSize;
+lv::MatInfo lv::IDataProducer_<lv::DatasetSource_Video>::getInputInfo(size_t /*nPacketIdx*/) const {
+    return m_oInputInfo;
 }
 
-const cv::Size& lv::IDataProducer_<lv::DatasetSource_Video>::getGTSize(size_t /*nPacketIdx*/) const {
-    return m_oGTSize;
+lv::MatInfo lv::IDataProducer_<lv::DatasetSource_Video>::getGTInfo(size_t /*nPacketIdx*/) const {
+    return m_oGTInfo;
 }
 
-const cv::Size& lv::IDataProducer_<lv::DatasetSource_Video>::getInputMaxSize() const {
-    return m_oInputSize;
+bool lv::IDataProducer_<lv::DatasetSource_Video>::isInputInfoConst() const {
+    return true;
 }
 
-const cv::Size& lv::IDataProducer_<lv::DatasetSource_Video>::getGTMaxSize() const {
-    return m_oGTSize;
+bool lv::IDataProducer_<lv::DatasetSource_Video>::isGTInfoConst() const {
+    return true;
 }
 
 cv::Mat lv::IDataProducer_<lv::DatasetSource_Video>::getRawInput(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
     cv::Mat oFrame;
     if(!m_voVideoReader.isOpened() && nPacketIdx<m_vsInputPaths.size())
-        oFrame = cv::imread(m_vsInputPaths[nPacketIdx],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+        oFrame = cv::imread(m_vsInputPaths[nPacketIdx],cv::IMREAD_UNCHANGED);
     else {
         if(m_nNextExpectedVideoReaderFrameIdx!=nPacketIdx) {
             m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,(double)nPacketIdx);
@@ -749,23 +812,34 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_Video>::getRawInput(size_t nPacketI
 }
 
 cv::Mat lv::IDataProducer_<lv::DatasetSource_Video>::getRawGT(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
     lvAssert_(getGTPacketType()==ImagePacket,"default impl only works for image gt packets");
     if(m_mGTIndexLUT.count(nPacketIdx)) {
         const size_t nGTIdx = m_mGTIndexLUT[nPacketIdx];
         if(nGTIdx<m_vsGTPaths.size())
-            return cv::imread(m_vsGTPaths[nGTIdx],cv::IMREAD_GRAYSCALE); // default = load as grayscale (override if not ok)
+            return cv::imread(m_vsGTPaths[nGTIdx],cv::IMREAD_UNCHANGED);
     }
     return cv::Mat();
 }
 
 void lv::IDataProducer_<lv::DatasetSource_Video>::parseData() {
     lvDbgExceptionWatch;
+    m_nFrameCount = 0;
+    m_mGTIndexLUT.clear();
+    m_vsInputPaths.clear();
+    m_vsGTPaths.clear();
+    m_voVideoReader.release();
+    m_nNextExpectedVideoReaderFrameIdx = 0;
+    m_oInputROI = cv::Mat();
+    m_oGTROI = cv::Mat();
+    m_oInputInfo = lv::MatInfo();
+    m_oGTInfo = lv::MatInfo();
     cv::Mat oTempImg;
     m_voVideoReader.open(getDataPath());
     if(!m_voVideoReader.isOpened()) {
         m_vsInputPaths = lv::getFilesFromDir(getDataPath());
         if(m_vsInputPaths.size()>1) {
-            oTempImg = cv::imread(m_vsInputPaths[0]);
+            oTempImg = cv::imread(m_vsInputPaths[0],cv::IMREAD_UNCHANGED);
             m_nFrameCount = m_vsInputPaths.size();
         }
         else if(m_vsInputPaths.size()==1)
@@ -783,9 +857,9 @@ void lv::IDataProducer_<lv::DatasetSource_Video>::parseData() {
     if(dScale!=1.0)
         cv::resize(oTempImg,oTempImg,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
     m_oInputROI = cv::Mat(oTempImg.size(),CV_8UC1,cv::Scalar_<uchar>(255));
-    m_oInputSize = oTempImg.size();
-    m_nNextExpectedVideoReaderFrameIdx = 0;
-    lvAssert_(m_nFrameCount>0,"could not find any input frames");
+    m_oInputInfo.size = oTempImg.size();
+    m_oInputInfo.type = (oTempImg.channels()==3&&is4ByteAligned())?CV_MAKE_TYPE(oTempImg.depth(),4):oTempImg.type();
+    lvAssert__(m_nFrameCount>0,"could not find any input frames at data root '%s'",getDataPath().c_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -794,8 +868,19 @@ const std::vector<cv::Mat>& lv::IDataProducer_<lv::DatasetSource_VideoArray>::ge
     return m_vInputROIs;
 }
 
-const std::vector<cv::Size>& lv::IDataProducer_<lv::DatasetSource_VideoArray>::getFrameSizeArray() const {
-    return m_vInputSizes;
+std::vector<cv::Size> lv::IDataProducer_<lv::DatasetSource_VideoArray>::getFrameSizeArray() const {
+    std::vector<cv::Size> vSizes(m_vInputInfos.size());
+    for(size_t nSizeIdx=0; nSizeIdx<m_vInputInfos.size(); ++nSizeIdx)
+        vSizes[nSizeIdx] = m_vInputInfos[nSizeIdx].size;
+    return vSizes;
+}
+
+std::vector<lv::MatInfo> lv::IDataProducer_<lv::DatasetSource_VideoArray>::getInputInfoArray() const {
+    return m_vInputInfos;
+}
+
+std::vector<lv::MatInfo> lv::IDataProducer_<lv::DatasetSource_VideoArray>::getGTInfoArray() const {
+    return m_vGTInfos;
 }
 
 size_t lv::IDataProducer_<lv::DatasetSource_VideoArray>::getInputCount() const {
@@ -827,108 +912,52 @@ const std::vector<cv::Mat>& lv::IDataProducer_<lv::DatasetSource_VideoArray>::ge
     return m_vGTROIs;
 }
 
-const std::vector<cv::Size>& lv::IDataProducer_<lv::DatasetSource_VideoArray>::getInputSizeArray(size_t /*nPacketIdx*/) const {
-    return m_vInputSizes;
+std::vector<lv::MatInfo> lv::IDataProducer_<lv::DatasetSource_VideoArray>::getInputInfoArray(size_t /*nPacketIdx*/) const {
+    return m_vInputInfos;
 }
 
-const std::vector<cv::Size>& lv::IDataProducer_<lv::DatasetSource_VideoArray>::getGTSizeArray(size_t /*nPacketIdx*/) const {
-    return m_vGTSizes;
+std::vector<lv::MatInfo> lv::IDataProducer_<lv::DatasetSource_VideoArray>::getGTInfoArray(size_t /*nPacketIdx*/) const {
+    return m_vGTInfos;
 }
 
-const cv::Size& lv::IDataProducer_<lv::DatasetSource_VideoArray>::getInputMaxSize() const {
-    return m_oMaxInputSize;
+bool lv::IDataProducer_<lv::DatasetSource_VideoArray>::isInputInfoConst() const {
+    return true;
 }
 
-const cv::Size& lv::IDataProducer_<lv::DatasetSource_VideoArray>::getGTMaxSize() const {
-    return m_oMaxGTSize;
+bool lv::IDataProducer_<lv::DatasetSource_VideoArray>::isGTInfoConst() const {
+    return true;
 }
 
-cv::Mat lv::IDataProducer_<lv::DatasetSource_VideoArray>::getRawInput(size_t nPacketIdx) {
+std::vector<cv::Mat> lv::IDataProducer_<lv::DatasetSource_VideoArray>::getRawInputArray(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
     if(nPacketIdx>=m_vvsInputPaths.size())
-        return cv::Mat();
+        return std::vector<cv::Mat>(getInputStreamCount());
     const std::vector<std::string>& vsInputPaths = m_vvsInputPaths[nPacketIdx];
-    if(vsInputPaths.empty())
-        return cv::Mat();
     lvAssert_(vsInputPaths.size()==getInputStreamCount(),"input path count did not match stream count");
-    const std::vector<cv::Size>& vsInputSizes = getInputSizeArray(nPacketIdx);
-    lvAssert_(vsInputPaths.size()==vsInputSizes.size(),"input path count did not match size count");
-    cv::Mat oPacket;
-    for(size_t nStreamIdx=0; nStreamIdx<vsInputPaths.size(); ++nStreamIdx) {
-        cv::Mat oCurrImg = cv::imread(vsInputPaths[nStreamIdx],isStreamGrayscale(nStreamIdx)?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
-        if(oCurrImg.empty()) // if a single image is missing/cannot load, we skip the entire packet
-            return cv::Mat();
-        if(is4ByteAligned() && oCurrImg.channels()==3)
-            cv::cvtColor(oCurrImg,oCurrImg,cv::COLOR_BGR2BGRA);
-        const cv::Size& oPacketSize = vsInputSizes[nStreamIdx];
-        lvAssert_(oPacketSize.area(),"proper per-stream packet size is needed for packing/unpacking");
-        if(oCurrImg.size()!=oPacketSize)
-            cv::resize(oCurrImg,oCurrImg,oPacketSize,0,0,cv::INTER_NEAREST);
-        if(oPacket.empty())
-            oPacket = oCurrImg;
-        else {
-            // default 'packing' strategy for image packets is continuous data concat
-            lvAssert_(oPacket.type()==oCurrImg.type(),"all packets must have same type in default impl");
-            lvDbgAssert(oPacket.isContinuous() && oCurrImg.isContinuous());
-            lvDbgAssert(size_t(oPacket.dataend-oPacket.datastart)==oPacket.total()*oPacket.elemSize());
-            cv::Mat oNewPacket(int(oPacket.total())+oPacketSize.area(),1,oPacket.type());
-            std::copy(oPacket.datastart,oPacket.dataend,oNewPacket.data);
-            std::copy(oCurrImg.datastart,oCurrImg.dataend,oNewPacket.data+uintptr_t(oPacket.dataend-oPacket.datastart));
-            oPacket = oNewPacket;
-        }
-    }
-    return oPacket;
+    std::vector<cv::Mat> vInputs(vsInputPaths.size());
+    for(size_t nStreamIdx=0; nStreamIdx<vsInputPaths.size(); ++nStreamIdx)
+        vInputs[nStreamIdx] = cv::imread(vsInputPaths[nStreamIdx],cv::IMREAD_UNCHANGED);
+    return vInputs;
 }
 
-cv::Mat lv::IDataProducer_<lv::DatasetSource_VideoArray>::getRawGT(size_t nPacketIdx) {
-    lvAssert_(getGTPacketType()<=ImageArrayPacket,"default impl only works for image array or image gt packets");
+std::vector<cv::Mat> lv::IDataProducer_<lv::DatasetSource_VideoArray>::getRawGTArray(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
+    lvAssert_(getGTPacketType()==ImageArrayPacket,"default impl only works for image array packets");
     if(m_mGTIndexLUT.count(nPacketIdx)) {
         const size_t nGTIdx = m_mGTIndexLUT[nPacketIdx];
         if(nGTIdx<m_vvsGTPaths.size()) {
             const std::vector<std::string>& vsGTPaths = m_vvsGTPaths[nGTIdx];
-            if(vsGTPaths.empty())
-                return cv::Mat();
             lvAssert_(vsGTPaths.size()==getGTStreamCount(),"GT path count did not match stream count");
-            if(vsGTPaths.size()==1 && getGTPacketType()==ImagePacket)
-                return cv::imread(vsGTPaths[0],cv::IMREAD_GRAYSCALE);
-            const std::vector<cv::Size>& vsGTSizes = getGTSizeArray(nGTIdx);
-            lvAssert_(vsGTPaths.size()==vsGTSizes.size(),"GT path count did not match size count");
-            cv::Mat oPacket;
-            for(size_t nStreamIdx=0; nStreamIdx<vsGTPaths.size(); ++nStreamIdx) {
-                cv::Mat oCurrImg = cv::imread(vsGTPaths[nStreamIdx],cv::IMREAD_GRAYSCALE); // default = load as grayscale (override if not ok)
-                if(oCurrImg.empty()) // if a single image is missing/cannot load, we skip the entire packet
-                    return cv::Mat();
-                const cv::Size& oPacketSize = vsGTSizes[nStreamIdx];
-                lvAssert_(oPacketSize.area(),"proper per-stream packet size is needed for packing/unpacking");
-                if(oCurrImg.size()!=oPacketSize)
-                    cv::resize(oCurrImg,oCurrImg,oPacketSize,0,0,cv::INTER_NEAREST);
-                if(oPacket.empty())
-                    oPacket = oCurrImg;
-                else {
-                    // default 'packing' strategy for image packets is continuous data concat
-                    lvAssert_(oPacket.type()==oCurrImg.type(),"all packets must have same type in default impl");
-                    lvDbgAssert(oPacket.isContinuous() && oCurrImg.isContinuous());
-                    lvDbgAssert(size_t(oPacket.dataend-oPacket.datastart)==oPacket.total()*oPacket.elemSize());
-                    cv::Mat oNewPacket(int(oPacket.total())+oPacketSize.area(),1,oPacket.type());
-                    std::copy(oPacket.datastart,oPacket.dataend,oNewPacket.data);
-                    std::copy(oCurrImg.datastart,oCurrImg.dataend,oNewPacket.data+uintptr_t(oPacket.dataend-oPacket.datastart));
-                    oPacket = oNewPacket;
-                }
-            }
-            return oPacket;
+            std::vector<cv::Mat> vGTs(vsGTPaths.size());
+            for(size_t nStreamIdx=0; nStreamIdx<vsGTPaths.size(); ++nStreamIdx)
+                vGTs[nStreamIdx] = cv::imread(vsGTPaths[nStreamIdx],cv::IMREAD_UNCHANGED);
+            return vGTs;
         }
     }
-    return cv::Mat();
+    return std::vector<cv::Mat>(getGTStreamCount());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-bool lv::IDataProducer_<lv::DatasetSource_Image>::isInputConstantSize() const {
-    return m_bIsInputConstantSize;
-}
-
-bool lv::IDataProducer_<lv::DatasetSource_Image>::isGTConstantSize() const {
-    return m_bIsGTConstantSize;
-}
 
 size_t lv::IDataProducer_<lv::DatasetSource_Image>::getInputCount() const {
     return m_vsInputPaths.size();
@@ -948,27 +977,27 @@ size_t lv::IDataProducer_<lv::DatasetSource_Image>::getExpectedLoadSize() const 
     return nLoad;
 }
 
-const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getInputSize(size_t nPacketIdx) const {
-    if(nPacketIdx>=m_vInputSizes.size())
-        return lv::emptySize();
-    return m_vInputSizes[nPacketIdx];
+lv::MatInfo lv::IDataProducer_<lv::DatasetSource_Image>::getInputInfo(size_t nPacketIdx) const {
+    if(nPacketIdx>=m_vInputInfos.size())
+        return lv::MatInfo();
+    return m_vInputInfos[nPacketIdx];
 }
 
-const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getGTSize(size_t nPacketIdx) const {
+lv::MatInfo lv::IDataProducer_<lv::DatasetSource_Image>::getGTInfo(size_t nPacketIdx) const {
     if(m_mGTIndexLUT.count(nPacketIdx)) {
         const size_t& nGTIdx = m_mGTIndexLUT.at(nPacketIdx);
-        if(nGTIdx<m_vGTSizes.size())
-            return m_vGTSizes[nGTIdx];
+        if(nGTIdx<m_vGTInfos.size())
+            return m_vGTInfos[nGTIdx];
     }
-    return lv::emptySize();
+    return lv::MatInfo();
 }
 
-const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getInputMaxSize() const {
-    return m_oInputMaxSize;
+bool lv::IDataProducer_<lv::DatasetSource_Image>::isInputInfoConst() const {
+    return m_bIsInputInfoConst;
 }
 
-const cv::Size& lv::IDataProducer_<lv::DatasetSource_Image>::getGTMaxSize() const {
-    return m_oGTMaxSize;
+bool lv::IDataProducer_<lv::DatasetSource_Image>::isGTInfoConst() const {
+    return m_bIsGTInfoConst;
 }
 
 std::string lv::IDataProducer_<lv::DatasetSource_Image>::getInputName(size_t nPacketIdx) const {
@@ -983,64 +1012,59 @@ lv::IDataProducer_<lv::DatasetSource_Image>::IDataProducer_(PacketPolicy eGTType
         IDataLoader_<NotArray>(ImagePacket,eGTType,eOutputType,eGTMappingType,eIOMappingType) {}
 
 cv::Mat lv::IDataProducer_<lv::DatasetSource_Image>::getRawInput(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
     if(nPacketIdx>=m_vsInputPaths.size())
         return cv::Mat();
-    return cv::imread(m_vsInputPaths[nPacketIdx],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+    return cv::imread(m_vsInputPaths[nPacketIdx],cv::IMREAD_UNCHANGED);
 }
 
 cv::Mat lv::IDataProducer_<lv::DatasetSource_Image>::getRawGT(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
     lvAssert_(getGTPacketType()==ImagePacket,"default impl only works for image gt packets");
     if(m_mGTIndexLUT.count(nPacketIdx)) {
         const size_t nGTIdx = m_mGTIndexLUT[nPacketIdx];
         if(nGTIdx<m_vsGTPaths.size())
-            return cv::imread(m_vsGTPaths[nGTIdx],cv::IMREAD_GRAYSCALE); // default = load as grayscale (override if not ok)
+            return cv::imread(m_vsGTPaths[nGTIdx],cv::IMREAD_UNCHANGED);
     }
     return cv::Mat();
 }
 
 void lv::IDataProducer_<lv::DatasetSource_Image>::parseData() {
     lvDbgExceptionWatch;
+    m_mGTIndexLUT.clear();
+    m_vsGTPaths.clear();
+    m_vInputInfos.clear();
+    m_vGTInfos.clear();
+    m_bIsInputInfoConst = true;
+    m_bIsGTInfoConst = true;
     m_vsInputPaths = lv::getFilesFromDir(getDataPath());
     lv::filterFilePaths(m_vsInputPaths,{},{".jpg",".png",".bmp"});
     if(m_vsInputPaths.empty())
-        lvError_("Set '%s' did not possess any jpg/png/bmp image file",getName().c_str());
-    m_bIsInputConstantSize = true;
-    m_oInputMaxSize = cv::Size(0,0);
-    m_vInputSizes.clear();
-    m_vInputSizes.reserve(m_vsInputPaths.size());
-    cv::Size oLastSize;
+        lvError_("Set '%s' did not possess any jpg/png/bmp image files",getName().c_str());
+    m_vInputInfos.reserve(m_vsInputPaths.size());
+    lv::MatInfo oLastInfo;
     const double dScale = getScaleFactor();
     for(size_t n = 0; n<m_vsInputPaths.size(); ++n) {
-        cv::Mat oCurrInput = cv::imread(m_vsInputPaths[n],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+        cv::Mat oCurrInput = cv::imread(m_vsInputPaths[n],cv::IMREAD_UNCHANGED);
         while(oCurrInput.empty()) {
             m_vsInputPaths.erase(m_vsInputPaths.begin()+n);
             if(n>=m_vsInputPaths.size())
                 break;
-            oCurrInput = cv::imread(m_vsInputPaths[n],isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+            oCurrInput = cv::imread(m_vsInputPaths[n],cv::IMREAD_UNCHANGED);
         }
         if(oCurrInput.empty())
             break;
         if(dScale!=1.0)
             cv::resize(oCurrInput,oCurrInput,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
-        m_vInputSizes.push_back(oCurrInput.size());
-        m_oInputMaxSize.width = std::max(oCurrInput.cols,m_oInputMaxSize.width);
-        m_oInputMaxSize.height = std::max(oCurrInput.rows,m_oInputMaxSize.height);
-        if(oLastSize.area() && oCurrInput.size()!=oLastSize)
-            m_bIsInputConstantSize = false;
-        oLastSize = oCurrInput.size();
+        m_vInputInfos.push_back(lv::MatInfo{oCurrInput.size(),((oCurrInput.channels()==3&&is4ByteAligned())?CV_MAKE_TYPE(oCurrInput.depth(),4):oCurrInput.type())});
+        if(!oLastInfo.size.empty() && oLastInfo!=m_vInputInfos.back())
+            m_bIsInputInfoConst = false;
+        oLastInfo = m_vInputInfos.back();
     }
-    lvAssert_(!m_vInputSizes.empty(),"could not find any input images");
+    lvAssert__(!m_vInputInfos.empty(),"could not find any input images at data root '%s'",getDataPath().c_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-bool lv::IDataProducer_<lv::DatasetSource_ImageArray>::isInputConstantSize() const {
-    return m_bIsInputConstantSize;
-}
-
-bool lv::IDataProducer_<lv::DatasetSource_ImageArray>::isGTConstantSize() const {
-    return m_bIsGTConstantSize;
-}
 
 size_t lv::IDataProducer_<lv::DatasetSource_ImageArray>::getInputCount() const {
     return m_vvsInputPaths.size();
@@ -1062,107 +1086,59 @@ size_t lv::IDataProducer_<lv::DatasetSource_ImageArray>::getExpectedLoadSize() c
     return nLoad;
 }
 
-const std::vector<cv::Size>& lv::IDataProducer_<lv::DatasetSource_ImageArray>::getInputSizeArray(size_t nPacketIdx) const {
-    if(nPacketIdx>=m_vvInputSizes.size())
-        return lv::emptySizeArray();
-    return m_vvInputSizes[nPacketIdx];
+std::vector<lv::MatInfo> lv::IDataProducer_<lv::DatasetSource_ImageArray>::getInputInfoArray(size_t nPacketIdx) const {
+    if(nPacketIdx>=m_vvInputInfos.size())
+        return std::vector<lv::MatInfo>();
+    return m_vvInputInfos[nPacketIdx];
 }
 
-const std::vector<cv::Size>& lv::IDataProducer_<lv::DatasetSource_ImageArray>::getGTSizeArray(size_t nPacketIdx) const {
+std::vector<lv::MatInfo> lv::IDataProducer_<lv::DatasetSource_ImageArray>::getGTInfoArray(size_t nPacketIdx) const {
     if(m_mGTIndexLUT.count(nPacketIdx)) {
         const size_t& nGTIdx = m_mGTIndexLUT.at(nPacketIdx);
-        if(nGTIdx<m_vvGTSizes.size())
-            return m_vvGTSizes[nGTIdx];
+        if(nGTIdx<m_vvGTInfos.size())
+            return m_vvGTInfos[nGTIdx];
     }
-    return lv::emptySizeArray();
+    return std::vector<lv::MatInfo>();
 }
 
-const cv::Size& lv::IDataProducer_<lv::DatasetSource_ImageArray>::getInputMaxSize() const {
-    return m_oInputMaxSize;
+bool lv::IDataProducer_<lv::DatasetSource_ImageArray>::isInputInfoConst() const {
+    return m_bIsInputInfoConst;
 }
 
-const cv::Size& lv::IDataProducer_<lv::DatasetSource_ImageArray>::getGTMaxSize() const {
-    return m_oGTMaxSize;
+bool lv::IDataProducer_<lv::DatasetSource_ImageArray>::isGTInfoConst() const {
+    return m_bIsGTInfoConst;
 }
 
 lv::IDataProducer_<lv::DatasetSource_ImageArray>::IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
         IDataLoader_<Array>(ImageArrayPacket,eGTType,eOutputType,eGTMappingType,eIOMappingType) {}
 
-cv::Mat lv::IDataProducer_<lv::DatasetSource_ImageArray>::getRawInput(size_t nPacketIdx) {
+std::vector<cv::Mat> lv::IDataProducer_<lv::DatasetSource_ImageArray>::getRawInputArray(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
     if(nPacketIdx>=m_vvsInputPaths.size())
-        return cv::Mat();
+        return std::vector<cv::Mat>(getInputStreamCount());
     const std::vector<std::string>& vsInputPaths = m_vvsInputPaths[nPacketIdx];
-    if(vsInputPaths.empty())
-        return cv::Mat();
     lvAssert_(vsInputPaths.size()==getInputStreamCount(),"input path count did not match stream count");
-    const std::vector<cv::Size>& vsInputSizes = getInputSizeArray(nPacketIdx);
-    lvAssert_(vsInputPaths.size()==vsInputSizes.size(),"input path count did not match size count");
-    cv::Mat oPacket;
-    for(size_t nStreamIdx=0; nStreamIdx<vsInputPaths.size(); ++nStreamIdx) {
-        cv::Mat oCurrImg = cv::imread(vsInputPaths[nStreamIdx],isStreamGrayscale(nStreamIdx)?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
-        if(oCurrImg.empty()) // if a single image is missing/cannot load, we skip the entire packet
-            return cv::Mat();
-        if(is4ByteAligned() && oCurrImg.channels()==3)
-            cv::cvtColor(oCurrImg,oCurrImg,cv::COLOR_BGR2BGRA);
-        const cv::Size& oPacketSize = vsInputSizes[nStreamIdx];
-        lvAssert_(oPacketSize.area(),"proper per-stream packet size is needed for packing/unpacking");
-        if(oCurrImg.size()!=oPacketSize)
-            cv::resize(oCurrImg,oCurrImg,oPacketSize,0,0,cv::INTER_NEAREST);
-        if(oPacket.empty())
-            oPacket = oCurrImg;
-        else {
-            // default 'packing' strategy for image packets is continuous data concat
-            lvAssert_(oPacket.type()==oCurrImg.type(),"all packets must have same type in default impl");
-            lvDbgAssert(oPacket.isContinuous() && oCurrImg.isContinuous());
-            lvDbgAssert(size_t(oPacket.dataend-oPacket.datastart)==oPacket.total()*oPacket.elemSize());
-            cv::Mat oNewPacket(int(oPacket.total())+oPacketSize.area(),1,oPacket.type());
-            std::copy(oPacket.datastart,oPacket.dataend,oNewPacket.data);
-            std::copy(oCurrImg.datastart,oCurrImg.dataend,oNewPacket.data+uintptr_t(oPacket.dataend-oPacket.datastart));
-            oPacket = oNewPacket;
-        }
-    }
-    return oPacket;
+    std::vector<cv::Mat> vInputs(vsInputPaths.size());
+    for(size_t nStreamIdx=0; nStreamIdx<vsInputPaths.size(); ++nStreamIdx)
+        vInputs[nStreamIdx] = cv::imread(vsInputPaths[nStreamIdx],cv::IMREAD_UNCHANGED);
+    return vInputs;
 }
 
-cv::Mat lv::IDataProducer_<lv::DatasetSource_ImageArray>::getRawGT(size_t nPacketIdx) {
-    lvAssert_(getGTPacketType()<=ImageArrayPacket,"default impl only works for image array or image gt packets");
+std::vector<cv::Mat> lv::IDataProducer_<lv::DatasetSource_ImageArray>::getRawGTArray(size_t nPacketIdx) {
+    lvDbgExceptionWatch;
+    lvAssert_(getGTPacketType()==ImageArrayPacket,"default impl only works for image array packets");
     if(m_mGTIndexLUT.count(nPacketIdx)) {
         const size_t nGTIdx = m_mGTIndexLUT[nPacketIdx];
         if(nGTIdx<m_vvsGTPaths.size()) {
             const std::vector<std::string>& vsGTPaths = m_vvsGTPaths[nGTIdx];
-            if(vsGTPaths.empty())
-                return cv::Mat();
             lvAssert_(vsGTPaths.size()==getGTStreamCount(),"GT path count did not match stream count");
-            if(vsGTPaths.size()==1 && getGTPacketType()==ImagePacket)
-                return cv::imread(vsGTPaths[0],cv::IMREAD_GRAYSCALE);
-            const std::vector<cv::Size>& vsGTSizes = getGTSizeArray(nGTIdx);
-            lvAssert_(vsGTPaths.size()==vsGTSizes.size(),"GT path count did not match size count");
-            cv::Mat oPacket;
-            for(size_t nStreamIdx=0; nStreamIdx<vsGTPaths.size(); ++nStreamIdx) {
-                cv::Mat oCurrImg = cv::imread(vsGTPaths[nStreamIdx],cv::IMREAD_GRAYSCALE); // default = load as grayscale (override if not ok)
-                if(oCurrImg.empty()) // if a single image is missing/cannot load, we skip the entire packet
-                    return cv::Mat();
-                const cv::Size& oPacketSize = vsGTSizes[nStreamIdx];
-                lvAssert_(oPacketSize.area(),"proper per-stream packet size is needed for packing/unpacking");
-                if(oCurrImg.size()!=oPacketSize)
-                    cv::resize(oCurrImg,oCurrImg,oPacketSize,0,0,cv::INTER_NEAREST);
-                if(oPacket.empty())
-                    oPacket = oCurrImg;
-                else {
-                    // default 'packing' strategy for image packets is continuous data concat
-                    lvAssert_(oPacket.type()==oCurrImg.type(),"all packets must have same type in default impl");
-                    lvDbgAssert(oPacket.isContinuous() && oCurrImg.isContinuous());
-                    lvDbgAssert(size_t(oPacket.dataend-oPacket.datastart)==oPacket.total()*oPacket.elemSize());
-                    cv::Mat oNewPacket(int(oPacket.total())+oPacketSize.area(),1,oPacket.type());
-                    std::copy(oPacket.datastart,oPacket.dataend,oNewPacket.data);
-                    std::copy(oCurrImg.datastart,oCurrImg.dataend,oNewPacket.data+uintptr_t(oPacket.dataend-oPacket.datastart));
-                    oPacket = oNewPacket;
-                }
-            }
-            return oPacket;
+            std::vector<cv::Mat> vGTs(vsGTPaths.size());
+            for(size_t nStreamIdx=0; nStreamIdx<vsGTPaths.size(); ++nStreamIdx)
+                vGTs[nStreamIdx] = cv::imread(vsGTPaths[nStreamIdx],cv::IMREAD_UNCHANGED);
+            return vGTs;
         }
     }
-    return cv::Mat();
+    return std::vector<cv::Mat>(getGTStreamCount());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1210,6 +1186,7 @@ lv::DataWriter::~DataWriter() {
 }
 
 size_t lv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
+    lvDbgExceptionWatch;
     if(!m_bIsActive)
         return m_lCallback(oPacket,nIdx);
     const size_t nPacketSize = oPacket.total()*oPacket.elemSize();
@@ -1274,6 +1251,7 @@ void lv::DataWriter::stopAsyncWriting() {
 }
 
 void lv::DataWriter::entry() {
+    lvDbgExceptionWatch;
     lv::mutex_unique_lock sync_lock(m_oSyncMutex);
     if(datasets::getParserVerbosity()>1)
         std::cout << "data writer [" << uintptr_t(this) << "] init w/ max buffer size = " << (m_nQueueMaxSize/1024)/1024 << " mb" << std::endl;
@@ -1306,13 +1284,14 @@ void lv::DataWriter::entry() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 cv::Mat lv::IDataArchiver_<lv::NotArray>::loadOutput(size_t nIdx, int nFlags) {
+    lvDbgExceptionWatch;
     const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
     std::stringstream sOutputFilePath;
     sOutputFilePath << getOutputPath() << getOutputName(nIdx);
     if(pLoader->getOutputPacketType()==ImagePacket) {
         sOutputFilePath << ".png";
         if(nFlags==-1)
-            return cv::imread(sOutputFilePath.str());
+            return cv::imread(sOutputFilePath.str(),cv::IMREAD_UNCHANGED);
         else
             return cv::imread(sOutputFilePath.str(),nFlags);
     }
@@ -1323,6 +1302,7 @@ cv::Mat lv::IDataArchiver_<lv::NotArray>::loadOutput(size_t nIdx, int nFlags) {
 }
 
 void lv::IDataArchiver_<lv::NotArray>::saveOutput(const cv::Mat& _oOutput, size_t nIdx, int /*nFlags*/) {
+    lvDbgExceptionWatch;
     const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
     std::stringstream sOutputFilePath;
     sOutputFilePath << getOutputPath() << getOutputName(nIdx);
@@ -1351,6 +1331,7 @@ void lv::IDataArchiver_<lv::NotArray>::saveOutput(const cv::Mat& _oOutput, size_
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::vector<cv::Mat> lv::IDataArchiver_<lv::Array>::loadOutputArray(size_t nIdx, int nFlags) {
+    lvDbgExceptionWatch;
     const auto pLoader = shared_from_this_cast<const IIDataLoader>(true);
     std::vector<cv::Mat> vOutput(getOutputStreamCount());
     for(size_t nStreamIdx=0; nStreamIdx<vOutput.size(); ++nStreamIdx) {
@@ -1361,7 +1342,7 @@ std::vector<cv::Mat> lv::IDataArchiver_<lv::Array>::loadOutputArray(size_t nIdx,
         if(pLoader->getOutputPacketType()==ImagePacket || pLoader->getOutputPacketType()==ImageArrayPacket) {
             sOutputFilePath << ".png";
             if(nFlags==-1)
-                vOutput[nStreamIdx] = cv::imread(sOutputFilePath.str());
+                vOutput[nStreamIdx] = cv::imread(sOutputFilePath.str(),cv::IMREAD_UNCHANGED);
             else
                 vOutput[nStreamIdx] = cv::imread(sOutputFilePath.str(),nFlags);
         }
@@ -1392,6 +1373,7 @@ size_t lv::IDataArchiver_<lv::Array>::getOutputStreamCount() const {
 }
 
 void lv::IDataArchiver_<lv::Array>::saveOutputArray(const std::vector<cv::Mat>& vOutput, size_t nIdx, int /*nFlags*/) {
+    lvDbgExceptionWatch;
     const size_t nStreamCount = getOutputStreamCount();
     lvAssert__(vOutput.size()==nStreamCount,"expected output vector to have %d elements, had %d",(int)nStreamCount,(int)vOutput.size());
     if(nStreamCount==0)
@@ -1460,8 +1442,10 @@ void lv::IDataArchiver_<lv::Array>::saveOutputArray(const std::vector<cv::Mat>& 
 
 cv::Size lv::IAsyncDataConsumer_<lv::DatasetEval_BinaryClassifier,lv::GLSL>::getIdealGLWindowSize() const {
     lvAssert_(getExpectedOutputCount()>1,"async data consumer requires work batch to expect more than one output packet");
-    cv::Size oWindowSize = shared_from_this_cast<const IDataLoader_<NotArray>>(true)->getInputMaxSize();
-    lvAssert_(oWindowSize.area(),"max input size must be non-null");
+    auto pLoader = shared_from_this_cast<const IDataLoader_<NotArray>>(true);
+    lvAssert_(pLoader->isInputInfoConst(),"async data consumer requires input data to be constant size/type");
+    cv::Size oWindowSize = pLoader->getInputInfo(0).size;
+    lvAssert_(oWindowSize.area(),"input size must be non-null");
     if(m_pEvalAlgo) {
         lvAssert_(m_pEvalAlgo->getIsGLInitialized(),"evaluator algo must be initialized first");
         oWindowSize.width *= int(m_pEvalAlgo->m_nSxSDisplayCount);
@@ -1602,10 +1586,6 @@ const std::vector<std::string>& lv::DatasetHandler::getSkippedDirTokens() const 
     return m_vsSkippedDirTokens;
 }
 
-const std::vector<std::string>& lv::DatasetHandler::getGrayscaleDirTokens() const {
-    return m_vsGrayscaleDirTokens;
-}
-
 double lv::DatasetHandler::getScaleFactor() const {
     return m_dScaleFactor;
 }
@@ -1634,21 +1614,15 @@ bool lv::DatasetHandler::isEvaluating() const {
     return m_bUsingEvaluator;
 }
 
-bool lv::DatasetHandler::isGrayscale() const {
-    return false;
-}
-
-lv::DatasetHandler::DatasetHandler(const std::string& sDatasetName,const std::string& sDatasetDirPath,const std::string& sOutputDirPath,
+lv::DatasetHandler::DatasetHandler(const std::string& sDatasetName, const std::string& sDatasetDirPath, const std::string& sOutputDirPath,
                                    const std::vector<std::string>& vsWorkBatchDirs, const std::vector<std::string>& vsSkippedDirTokens,
-                                   const std::vector<std::string>& vsGrayscaleDirTokens,bool bSaveOutput,
-                                   bool bUseEvaluator,bool bForce4ByteDataAlign,double dScaleFactor) :
+                                   bool bSaveOutput, bool bUseEvaluator, bool bForce4ByteDataAlign, double dScaleFactor) :
         m_sDatasetName(sDatasetName),
         m_sDatasetPath(lv::addDirSlashIfMissing(sDatasetDirPath)),
         m_sOutputPath(lv::addDirSlashIfMissing(sOutputDirPath)),
         m_sFeaturesPath(lv::addDirSlashIfMissing(sOutputDirPath)+"precomp/"),
         m_vsWorkBatchDirs(vsWorkBatchDirs),
         m_vsSkippedDirTokens(vsSkippedDirTokens),
-        m_vsGrayscaleDirTokens(vsGrayscaleDirTokens),
         m_bSavingOutput(bSaveOutput),
         m_bUsingEvaluator(bUseEvaluator),
         m_bForce4ByteDataAlign(bForce4ByteDataAlign),

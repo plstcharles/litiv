@@ -33,7 +33,7 @@ namespace lv {
                 const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving (will be created in PETS dataset folder)
                 bool bSaveOutput=false, ///< defines whether results should be archived or not
                 bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
-                bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
+                bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned
                 double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
         ) :
                 IDataset_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1,lv::getDatasetEval<eDatasetTask,Dataset_PETS2001D3TC1>(),eEvalImpl>(
@@ -41,7 +41,6 @@ namespace lv {
                         lv::datasets::getRootPath()+"PETS2001/DATASET3/",
                         lv::datasets::getRootPath()+"PETS2001/DATASET3/"+lv::addDirSlashIfMissing(sOutputDirName),
                         getWorkBatchDirNames(),
-                        std::vector<std::string>(),
                         std::vector<std::string>(),
                         bSaveOutput,
                         bUseEvaluator,
@@ -88,7 +87,8 @@ namespace lv {
             if(dScale!=1.0)
                 cv::resize(this->m_oInputROI,this->m_oInputROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
             this->m_oGTROI = this->m_oInputROI;
-            this->m_oInputSize = this->m_oGTSize = this->m_oInputROI.size();
+            this->m_oInputInfo = lv::MatInfo{this->m_oInputROI.size(),(this->is4ByteAligned()?CV_8UC4:CV_8UC3)};
+            this->m_oGTInfo = lv::MatInfo{this->m_oInputROI.size(),CV_8UC1};
             this->m_nNextExpectedVideoReaderFrameIdx = 0;
             this->m_nFrameCount = (size_t)this->m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
             lvAssert_(this->m_nFrameCount>0,"could not find any input frames");

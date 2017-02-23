@@ -45,7 +45,6 @@ namespace lv {
                 const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving (will be created in VAP trimodal dataset results folder)
                 bool bSaveOutput=false, ///< defines whether results should be archived or not
                 bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
-                bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
                 double dScaleFactor=1.0, ///< defines the scale factor to use to resize/rescale read packets
                 bool bLoadDepth=true, ///< defines whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
                 bool bUndistort=true ///< defines whether images should be undistorted when loaded or not, using the calib files provided with the dataset
@@ -55,22 +54,14 @@ namespace lv {
                         lv::datasets::getRootPath()+"vap/rgbdt-stereo/",
                         lv::datasets::getRootPath()+"vap/rgbdt-stereo/results/"+lv::addDirSlashIfMissing(sOutputDirName),
                         getWorkBatchDirNames(),
-                        std::vector<std::string>(),
-                        getGrayscaleWorkBatchDirNames(),
                         bSaveOutput,
                         bUseEvaluator,
-                        bForce4ByteDataAlign,
                         dScaleFactor
                 ), m_bLoadDepth(bLoadDepth),m_bUndistort(bUndistort) {}
         /// returns the names of all work batch directories available for this dataset specialization
         static const std::vector<std::string>& getWorkBatchDirNames() {
             static const std::vector<std::string> s_vsWorkBatchDirs = {"Scene 1","Scene 2","Scene 3"};
             return s_vsWorkBatchDirs;
-        }
-        /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
-        static const std::vector<std::string>& getGrayscaleWorkBatchDirNames() {
-            static const std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {"SyncD","SyncT"};
-            return s_vsGrayscaleWorkBatchDirs;
         }
         /// returns whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
         virtual bool isLoadingDepth() const override {return m_bLoadDepth;}
@@ -110,9 +101,6 @@ namespace lv {
         virtual std::string getGTStreamName(size_t nStreamIdx) const override final {
             return getInputStreamName(nStreamIdx)+"_GT";
         }
-        virtual bool isStreamGrayscale(size_t nStreamIdx) const override final {
-            return nStreamIdx!=0;
-        }
     protected:
         virtual void parseData() override final {
             lvDbgExceptionWatch;
@@ -132,15 +120,16 @@ namespace lv {
             const size_t nStreamCount = this->m_bLoadDepth?3:2;
             this->m_vInputROIs.resize(nStreamCount);
             this->m_vGTROIs.resize(nStreamCount);
-            this->m_vInputSizes.resize(nStreamCount);
-            this->m_vGTSizes.resize(nStreamCount);
+            this->m_vInputInfos.resize(nStreamCount);
+            this->m_vGTInfos.resize(nStreamCount);
             cv::Mat oGlobalROI(480,640,CV_8UC1,cv::Scalar_<uchar>(255));
             const double dScale = this->getScaleFactor();
             if(dScale!=1.0)
                 cv::resize(oGlobalROI,oGlobalROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
-            for(size_t s=0; s<nStreamCount; ++s)
-                this->m_vInputSizes[s] = this->m_vGTSizes[s] = oGlobalROI.size();
-            this->m_oMaxInputSize = this->m_oMaxGTSize = oGlobalROI.size();
+            for(size_t s=0; s<nStreamCount; ++s) {
+                this->m_vInputInfo[s] = lv::MatInfo{oGlobalROI.size(),(s==0?CV_8UC3:CV_8UC1)};
+                this->m_vGTInfo[s] = lv::MatInfo{oGlobalROI.size(),CV_8UC1};
+            }
             const cv::Size oImageSize(640,480);
             const double dUndistortMapCameraMatrixAlpha = -1.0;
             if(this->m_bUndistort) {
@@ -185,8 +174,8 @@ namespace lv {
             }
             else
                 oRGBROI = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
-            if(oRGBROI.size()!=this->m_vInputSizes[0])
-                cv::resize(oRGBROI,oRGBROI,this->m_vInputSizes[0],0,0,cv::INTER_NEAREST);
+            if(oRGBROI.size()!=this->m_vInputInfos[0].size())
+                cv::resize(oRGBROI,oRGBROI,this->m_vInputInfos[0].size(),0,0,cv::INTER_NEAREST);
             if(this->m_bUndistort)
                 cv::remap(oRGBROI.clone(),oRGBROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_NEAREST);
             this->m_vInputROIs[0] = oRGBROI.clone();
@@ -225,8 +214,8 @@ namespace lv {
             }
             else
                 oThermalROI = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
-            if(oThermalROI.size()!=this->m_vInputSizes[1])
-                cv::resize(oThermalROI,oThermalROI,this->m_vInputSizes[1],0,0,cv::INTER_NEAREST);
+            if(oThermalROI.size()!=this->m_vInputInfos[1].size())
+                cv::resize(oThermalROI,oThermalROI,this->m_vInputInfos[1].size(),0,0,cv::INTER_NEAREST);
             if(this->m_bUndistort)
                 cv::remap(oThermalROI.clone(),oThermalROI,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_NEAREST);
             this->m_vInputROIs[1] = oThermalROI.clone();
@@ -253,8 +242,8 @@ namespace lv {
                 }
                 else
                     oDepthROI = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
-                if(oDepthROI.size()!=this->m_vInputSizes[2])
-                    cv::resize(oDepthROI,oDepthROI,this->m_vInputSizes[2],0,0,cv::INTER_NEAREST);
+                if(oDepthROI.size()!=this->m_vInputInfos[2].size())
+                    cv::resize(oDepthROI,oDepthROI,this->m_vInputInfos[2].size(),0,0,cv::INTER_NEAREST);
                 this->m_vInputROIs[2] = oDepthROI.clone();
                 this->m_vGTROIs[2] = oDepthROI.clone();
                 const std::vector<std::string> vsDepthGTPaths = lv::getFilesFromDir(*psDepthGTDir);
@@ -266,94 +255,56 @@ namespace lv {
                     this->m_vvsGTPaths[nGTPacketIdx][2] = vsDepthGTPaths[nGTPacketIdx];
             }
         }
-        virtual void unpackInput(size_t nPacketIdx, std::vector<cv::Mat>& vUnpackedInput) override final {
-            // no need to clone if getInput does not allow reentrancy --- output mats in the vector will stay valid for as long as oInput is valid (typically until next getInput call)
-            const cv::Mat& oInput = this->getInput(nPacketIdx)/*.clone()*/;
-            if(oInput.empty()) {
-                for(size_t s=0; s<vUnpackedInput.size(); ++s)
-                    vUnpackedInput[s].release();
-            }
-            else {
-                lvDbgAssert(vUnpackedInput.size()==size_t(this->m_bLoadDepth?3:2));
-                lvDbgAssert(this->getInputPacketType()==ImageArrayPacket);
-                const std::vector<cv::Size>& vSizes = this->m_vInputSizes;
-                lvDbgAssert(vSizes.size()==vUnpackedInput.size() && vSizes[0].area()>0);
-                lvDbgAssert(oInput.size().area()*(int)oInput.elemSize()==vSizes[0].area()*(this->m_bLoadDepth?6:4));
-                lvDbgAssert(oInput.isContinuous());
-                const size_t nArea = (size_t)vSizes[0].area();
-                vUnpackedInput[0] = cv::Mat(vSizes[0],CV_8UC3,oInput.data);
-                vUnpackedInput[1] = cv::Mat(vSizes[0],CV_8UC1,oInput.data+nArea*vUnpackedInput[0].elemSize());
-                if(this->m_bLoadDepth)
-                    vUnpackedInput[2] = cv::Mat(vSizes[0],CV_16UC1,oInput.data+nArea*vUnpackedInput[0].elemSize()+nArea*vUnpackedInput[1].elemSize());
-            }
-        }
-        virtual cv::Mat getRawInput(size_t nPacketIdx) override final {
+        virtual std::vector<cv::Mat> getRawInputArray(size_t nPacketIdx) override final {
+            lvDbgExceptionWatch;
             if(nPacketIdx>=this->m_vvsInputPaths.size())
-                return cv::Mat();
+                return std::vector<cv::Mat>(this->getInputStreamCount());
             const std::vector<std::string>& vsInputPaths = this->m_vvsInputPaths[nPacketIdx];
-            lvDbgAssert(!vsInputPaths.empty() && vsInputPaths.size()==getInputStreamCount() && vsInputPaths.size()==size_t(this->m_bLoadDepth?3:2));
-            const std::vector<cv::Size>& vInputSizes = this->m_vInputSizes;
-            lvDbgAssert(vInputSizes.size()==vsInputPaths.size() && (lv::accumulateMembers<int,cv::Size>(vInputSizes,[](const cv::Size& s){return s.area();}))>0);
-            cv::Mat oFullPacket(1,vInputSizes[0].area()*3+vInputSizes[1].area()+(this->m_bLoadDepth?vInputSizes[2].area()*2:0),CV_8UC1);
-            lvAssert_(!this->is4ByteAligned(),"missing conversion/alignment impl");
-            ptrdiff_t nPacketOffset = 0;
-            const auto lAppendPacket = [&](const cv::Mat& oNewPacket) {
-                lvDbgAssert(oFullPacket.isContinuous() && oNewPacket.isContinuous());
-                std::copy(oNewPacket.datastart,oNewPacket.dataend,oFullPacket.data+nPacketOffset);
-                nPacketOffset += ptrdiff_t(oNewPacket.dataend-oNewPacket.datastart);
-            };
-            cv::Mat oRGBPacket = cv::imread(vsInputPaths[0]);
+            lvDbgAssert(!vsInputPaths.empty() && vsInputPaths.size()==this->getInputStreamCount());
+            const std::vector<lv::MatInfo>& vInputInfos = this->m_vInputInfos;
+            lvDbgAssert(!vInputInfos.empty() && vInputInfos.size()==getInputStreamCount());
+            std::vector<cv::Mat> vInputs(vsInputPaths.size());
+            cv::Mat oRGBPacket = cv::imread(vsInputPaths[0],cv::IMREAD_COLOR);
             lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC3 && oRGBPacket.size()==cv::Size(640,480));
-            if(oRGBPacket.size()!=vInputSizes[0])
-                cv::resize(oRGBPacket,oRGBPacket,vInputSizes[0]);
+            if(oRGBPacket.size()!=vInputInfos[0].size())
+                cv::resize(oRGBPacket,oRGBPacket,vInputInfos[0].size());
             if(this->m_bUndistort)
                 cv::remap(oRGBPacket.clone(),oRGBPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
-            lAppendPacket(oRGBPacket);
-            lvDbgAssert(nPacketOffset<ptrdiff_t(oFullPacket.dataend-oFullPacket.datastart));
+            vInputs[0] = oRGBPacket;
             cv::Mat oThermalPacket = cv::imread(vsInputPaths[1],cv::IMREAD_GRAYSCALE);
             lvAssert(!oThermalPacket.empty() && oThermalPacket.type()==CV_8UC1 && oThermalPacket.size()==cv::Size(640,480));
-            if(oThermalPacket.size()!=vInputSizes[1])
-                cv::resize(oThermalPacket,oThermalPacket,vInputSizes[1]);
+            if(oThermalPacket.size()!=vInputInfos[1].size())
+                cv::resize(oThermalPacket,oThermalPacket,vInputInfos[1].size());
             if(this->m_bUndistort)
                 cv::remap(oThermalPacket.clone(),oThermalPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_LINEAR);
-            lAppendPacket(oThermalPacket);
-            lvDbgAssert(nPacketOffset<=ptrdiff_t(oFullPacket.dataend-oFullPacket.datastart));
+            vInputs[1] = oThermalPacket;
             if(this->m_bLoadDepth) {
                 cv::Mat oDepthPacket = cv::imread(vsInputPaths[2],cv::IMREAD_ANYDEPTH);
                 lvAssert(!oDepthPacket.empty() && oDepthPacket.type()==CV_16UC1 && oDepthPacket.size()==cv::Size(640,480));
-                if(oDepthPacket.size()!=vInputSizes[2])
-                    cv::resize(oDepthPacket,oDepthPacket,vInputSizes[2]);
+                if(oDepthPacket.size()!=vInputInfos[2].size())
+                    cv::resize(oDepthPacket,oDepthPacket,vInputInfos[2].size());
                 // depth should be already undistorted
-                lAppendPacket(oDepthPacket);
+                vInputs[2] = oThermalPacket;
             }
-            lvDbgAssert(nPacketOffset==ptrdiff_t(oFullPacket.dataend-oFullPacket.datastart));
-            return oFullPacket;
+            return vInputs;
         }
-        virtual cv::Mat getRawGT(size_t nPacketIdx) override final {
+        virtual std::vector<cv::Mat> getRawGTArray(size_t nPacketIdx) override final {
+            lvDbgExceptionWatch;
             if(this->m_mGTIndexLUT.count(nPacketIdx)) {
                 const size_t nGTIdx = this->m_mGTIndexLUT[nPacketIdx];
                 lvDbgAssert(nGTIdx<this->m_vvsGTPaths.size());
                 const std::vector<std::string>& vsGTPaths = this->m_vvsGTPaths[nGTIdx];
-                lvDbgAssert(!vsGTPaths.empty() && vsGTPaths.size()==getGTStreamCount() && vsGTPaths.size()==size_t(this->m_bLoadDepth?3:2));
-                const std::vector<cv::Size>& vGTSizes = this->m_vGTSizes;
-                const int nTotPacketSize = lv::accumulateMembers<int,cv::Size>(vGTSizes,[](const cv::Size& s){return s.area();});
-                lvDbgAssert(vGTSizes.size()==vsGTPaths.size() && nTotPacketSize>0);
-                cv::Mat oFullPacket(1,nTotPacketSize,CV_8UC1);
-                lvAssert_(!this->is4ByteAligned(),"missing conversion/alignment impl");
-                ptrdiff_t nPacketOffset = 0;
-                const auto lAppendPacket = [&](const cv::Mat& oNewPacket) {
-                    lvDbgAssert(oFullPacket.isContinuous() && oNewPacket.isContinuous());
-                    std::copy(oNewPacket.datastart,oNewPacket.dataend,oFullPacket.data+nPacketOffset);
-                    nPacketOffset += ptrdiff_t(oNewPacket.dataend-oNewPacket.datastart);
-                };
+                lvDbgAssert(!vsGTPaths.empty() && vsGTPaths.size()==getGTStreamCount());
+                const std::vector<lv::MatInfo>& vGTInfos = this->m_vGTInfos;
+                lvDbgAssert(!vGTInfos.empty() && vGTInfos.size()==getGTStreamCount());
+                std::vector<cv::Mat> vGTs(vsGTPaths.size());
                 cv::Mat oRGBPacket = cv::imread(vsGTPaths[0],cv::IMREAD_GRAYSCALE);
                 lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC1 && oRGBPacket.size()==cv::Size(640,480));
-                if(oRGBPacket.size()!=vGTSizes[0])
-                    cv::resize(oRGBPacket,oRGBPacket,vGTSizes[0],0,0,cv::INTER_NEAREST);
+                if(oRGBPacket.size()!=vGTInfos[0].size())
+                    cv::resize(oRGBPacket,oRGBPacket,vGTInfos[0].size(),0,0,cv::INTER_NEAREST);
                 if(this->m_bUndistort)
                     cv::remap(oRGBPacket.clone(),oRGBPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_NEAREST);
-                lAppendPacket(oRGBPacket);
-                lvDbgAssert(nPacketOffset<nTotPacketSize);
+                vGTs[0] = oRGBPacket;
                 cv::Mat oThermalPacket = cv::imread(vsGTPaths[1],cv::IMREAD_GRAYSCALE);
                 lvAssert(!oThermalPacket.empty() && oThermalPacket.type()==CV_8UC1 && oThermalPacket.size()==cv::Size(640,480));
 #if DATASETS_VAP_FIX_SCENE3_OFFSET
@@ -363,28 +314,26 @@ namespace lv {
                     cv::warpAffine(oThermalPacket.clone(),oThermalPacket,oAffineTransf,oThermalPacket.size());
                 }
 #endif //DATASETS_VAP_FIX_SCENE3_OFFSET
-                if(oThermalPacket.size()!=vGTSizes[1])
-                    cv::resize(oThermalPacket,oThermalPacket,vGTSizes[1],0,0,cv::INTER_NEAREST);
+                if(oThermalPacket.size()!=vGTInfos[1].size())
+                    cv::resize(oThermalPacket,oThermalPacket,vGTInfos[1].size(),0,0,cv::INTER_NEAREST);
 #if DATASETS_VAP_FIX_SCENE2_DISTORT
-                // fail: input 'distorted' thermal gt images are actually already undistorted in 'Scene 2' (so no need to remap again)
+                // fail: 'distorted' thermal gt images are actually already undistorted in 'Scene 2' (so no need to remap again)
                 if(this->getName()!="Scene 2")
 #endif //DATASETS_VAP_FIX_SCENE2_DISTORT
                 {
                     if(this->m_bUndistort)
                         cv::remap(oThermalPacket.clone(),oThermalPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_NEAREST);
                 }
-                lAppendPacket(oThermalPacket);
-                lvDbgAssert(nPacketOffset<=nTotPacketSize);
+                vGTs[1] = oThermalPacket;
                 if(this->m_bLoadDepth) {
                     cv::Mat oDepthPacket = cv::imread(vsGTPaths[2],cv::IMREAD_GRAYSCALE);
                     lvAssert(!oDepthPacket.empty() && oDepthPacket.type()==CV_8UC1 && oDepthPacket.size()==cv::Size(640,480));
-                    if(oDepthPacket.size()!=vGTSizes[2])
-                        cv::resize(oDepthPacket,oDepthPacket,vGTSizes[2]);
+                    if(oDepthPacket.size()!=vGTInfos[2].size())
+                        cv::resize(oDepthPacket,oDepthPacket,vGTInfos[2].size(),0,0,cv::INTER_NEAREST);
                     // depth should be already undistorted
-                    lAppendPacket(oDepthPacket);
+                    vGTs[2] = oDepthPacket;
                 }
-                lvDbgAssert(nPacketOffset==nTotPacketSize);
-                return oFullPacket;
+                return vGTs;
             }
             return cv::Mat();
         }

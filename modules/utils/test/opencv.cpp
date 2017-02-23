@@ -614,13 +614,6 @@ TEST(shift,regression_intconstborder) {
     }
 }
 
-TEST(empty_stuff,regression) {
-    ASSERT_TRUE(lv::emptyMat().empty());
-    ASSERT_TRUE(lv::emptySize().area()==0);
-    ASSERT_TRUE(lv::emptyMatArray().empty());
-    ASSERT_TRUE(lv::emptySizeArray().empty());
-}
-
 namespace {
     template<typename T>
     struct AlignedMatAllocator_fixture : testing::Test {};

@@ -15,7 +15,6 @@ TEST(datasets_notarray,regression_custom) {
         sOutputRootPath,
         vsWorkBatchDirs,
         std::vector<std::string>(),
-        std::vector<std::string>(),
         true,
         false,
         false,
@@ -33,13 +32,11 @@ TEST(datasets_notarray,regression_custom) {
     ASSERT_TRUE(pDataset->isGroup());
     EXPECT_EQ(pDataset->getWorkBatchDirs(),vsWorkBatchDirs);
     EXPECT_EQ(pDataset->getSkippedDirTokens(),std::vector<std::string>());
-    EXPECT_EQ(pDataset->getGrayscaleDirTokens(),std::vector<std::string>());
     EXPECT_DOUBLE_EQ(pDataset->getScaleFactor(),1.0);
     EXPECT_EQ(pDataset->getParent(),lv::IDataHandlerConstPtr());
     EXPECT_TRUE(pDataset->isRoot());
     EXPECT_EQ(pDataset->getRoot(),pDataset);
-    EXPECT_FALSE(pDataset->isGrayscale());
-    EXPECT_GE(pDataset->getExpectedLoad(),0.0);
+    EXPECT_GE(pDataset->getExpectedLoadSize(),size_t(0));
     std::shared_ptr<IEdgeDetector> pAlgo = std::make_shared<EdgeDetectorLBSP>();
     size_t nBatchIdx = 0;
     for(auto pBatchIter = vpBatches.begin(); pBatchIter!=vpBatches.end(); ++pBatchIter) {
@@ -50,8 +47,7 @@ TEST(datasets_notarray,regression_custom) {
         EXPECT_DOUBLE_EQ(oBatch.getScaleFactor(),1.0);
         EXPECT_FALSE(oBatch.isRoot());
         EXPECT_EQ(oBatch.getRoot(),pDataset);
-        EXPECT_FALSE(oBatch.isGrayscale());
-        EXPECT_GE(oBatch.getExpectedLoad(),0.0);
+        EXPECT_GE(oBatch.getExpectedLoadSize(),size_t(0));
         ASSERT_EQ(oBatch.getImageCount(),oBatch.getInputCount());
         EXPECT_EQ(oBatch.getBatches(false),lv::IDataHandlerPtrArray());
         ASSERT_EQ(oBatch.getDatasetTask(),lv::DatasetTask_EdgDet);

@@ -35,8 +35,6 @@ namespace lv {
                 const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving (will be created in LITIV dataset folder)
                 bool bSaveOutput=false, ///< defines whether results should be archived or not
                 bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
-                bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
-                double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
         ) :
                 IDataset_<eDatasetType_VideoRegistr,Dataset_VideoRegistr_LITIV2012b,eEvalImpl>(
                         "LITIV 2012b (CVPRW2015 update)",
@@ -47,8 +45,6 @@ namespace lv {
                         getGrayscaleWorkBatchDirNames(),
                         bSaveOutput,
                         bUseEvaluator,
-                        bForce4ByteDataAlign,
-                        dScaleFactor
                 ) {}
         /// returns the names of all work batch directories available for this dataset specialization
         static const std::vector<std::string>& getWorkBatchDirNames() {
@@ -73,7 +69,18 @@ namespace lv {
     protected:
         virtual void parseData() override final {
             lvDbgExceptionWatch;
-            /* @@@@ old bsds500 below
+            /*
+            this->m_nFrameCount = 0;
+            this->m_mGTIndexLUT.clear();
+            this->m_vsInputPaths.clear();
+            this->m_vsGTPaths.clear();
+            this->m_voVideoReader.release();
+            this->m_nNextExpectedVideoReaderFrameIdx = 0;
+            this->m_oInputROI = cv::Mat();
+            this->m_oGTROI = cv::Mat();
+            this->m_oInputInfo = lv::MatInfo();
+            this->m_oGTInfo = lv::MatInfo();
+            *//* @@@@ old bsds500 below
             std::vector<std::string> vsImgPaths = lv::getFilesFromDir(m_sDatasetPath);
             bool bFoundScript=false, bFoundGTFile=false;
             const std::string sGTFilePrefix("hand_segmented_");

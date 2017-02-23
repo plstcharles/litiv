@@ -43,7 +43,6 @@ namespace lv {
                 const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving (will be created in BSR dataset folder)
                 bool bSaveOutput=false, ///< defines whether results should be archived or not
                 bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
-                bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
                 double dScaleFactor=1.0, ///< defines the scale factor to use to resize/rescale read packets
                 BSDS500DatasetGroup eType=BSDS500Dataset_Training ///< defines which dataset groups to use
         ) :
@@ -53,10 +52,9 @@ namespace lv {
                         lv::datasets::getRootPath()+"BSDS500/BSR/"+lv::addDirSlashIfMissing(sOutputDirName),
                         getWorkBatchDirNames(eType),
                         std::vector<std::string>(),
-                        std::vector<std::string>(),
                         bSaveOutput,
                         bUseEvaluator,
-                        bForce4ByteDataAlign,
+                        false,
                         dScaleFactor
                 ) {}
         /// returns the names of all work batch directories available for this dataset specialization
@@ -105,26 +103,21 @@ namespace lv {
                 const size_t nLastGTSlashPos = this->m_vsGTPaths[nImageIdx].find_last_of("/\\");
                 lvAssert(sInputFullName.find(nLastGTSlashPos==std::string::npos?this->m_vsGTPaths[nImageIdx]:this->m_vsGTPaths[nImageIdx].substr(nLastGTSlashPos+1))!=std::string::npos);
             }
-            this->m_bIsInputConstantSize = this->m_bIsGTConstantSize = true;
-            this->m_oInputMaxSize = this->m_oGTMaxSize = cv::Size(0,0);
-            this->m_vInputSizes.clear();
-            this->m_vInputSizes.reserve(this->m_vsInputPaths.size());
-            this->m_vGTSizes.clear();
-            this->m_vGTSizes.reserve(this->m_vsGTPaths.size());
+            this->m_bIsInputInfoConst = this->m_bIsGTInfoConst = true;
+            this->m_vInputInfos.clear();
+            this->m_vInputInfos.reserve(this->m_vsInputPaths.size());
+            this->m_vGTInfos.clear();
+            this->m_vGTInfos.reserve(this->m_vsGTPaths.size());
             const double dScale = this->getScaleFactor();
             for(size_t nImageIdx=0; nImageIdx<this->m_vsInputPaths.size(); ++nImageIdx) {
-                const cv::Mat oCurrInput = cv::imread(this->m_vsInputPaths[nImageIdx],this->isGrayscale()?cv::IMREAD_GRAYSCALE:cv::IMREAD_COLOR);
+                const cv::Mat oCurrInput = cv::imread(this->m_vsInputPaths[nImageIdx],cv::IMREAD_COLOR);
                 lvAssert(!oCurrInput.empty() && (oCurrInput.size()==cv::Size(321,481) || oCurrInput.size()==cv::Size(481,321)));
                 const std::vector<std::string> vsTempPaths = lv::getFilesFromDir(this->m_vsGTPaths[nImageIdx]);
                 lvAssert(!vsTempPaths.empty());
-                this->m_vInputSizes.push_back(cv::Size(int(oCurrInput.cols*dScale),int(oCurrInput.rows*dScale)));
-                this->m_vGTSizes.push_back(cv::Size(int(oCurrInput.cols*dScale),int(oCurrInput.rows*vsTempPaths.size()*dScale)));
-                this->m_oInputMaxSize.width = std::max(this->m_oInputMaxSize.width,this->m_vInputSizes[nImageIdx].width);
-                this->m_oInputMaxSize.height = std::max(this->m_oInputMaxSize.height,this->m_vInputSizes[nImageIdx].height);
-                this->m_oGTMaxSize.width = std::max(this->m_oGTMaxSize.width,this->m_vGTSizes[nImageIdx].width);
-                this->m_oGTMaxSize.height = std::max(this->m_oGTMaxSize.height,this->m_vGTSizes[nImageIdx].height);
+                this->m_vInputInfos.push_back(lv::MatInfo{cv::Size(int(oCurrInput.cols*dScale),int(oCurrInput.rows*dScale)),CV_8UC3});
+                this->m_vGTInfos.push_back(lv::MatInfo{cv::Size(int(oCurrInput.cols*dScale),int(oCurrInput.rows*vsTempPaths.size()*dScale)),CV_8UC1});
             }
-            lvAssert(this->m_vInputSizes.size()>0);
+            lvAssert(this->m_vInputInfos.size()>0);
         }
         /// gt packet load function, dataset-specific (default gt loader is not satisfactory)
         virtual cv::Mat getRawGT(size_t nIdx) override final {
@@ -137,18 +130,18 @@ namespace lv {
                     lvAssert(!vsTempPaths.empty());
                     cv::Mat oTempRefGTImage = cv::imread(vsTempPaths[0],cv::IMREAD_GRAYSCALE);
                     lvAssert(!oTempRefGTImage.empty() && (oTempRefGTImage.size()==cv::Size(481,321) || oTempRefGTImage.size()==cv::Size(321,481)));
-                    if(oTempRefGTImage.size()!=this->m_vInputSizes[nGTIdx])
-                        cv::resize(oTempRefGTImage,oTempRefGTImage,this->m_vInputSizes[nGTIdx],0,0,cv::INTER_NEAREST);
+                    if(oTempRefGTImage.size()!=this->m_vInputInfos[nGTIdx].size())
+                        cv::resize(oTempRefGTImage,oTempRefGTImage,this->m_vInputInfos[nGTIdx].size(),0,0,cv::INTER_NEAREST);
                     cv::Mat oGTMask(oTempRefGTImage.rows*int(vsTempPaths.size()),oTempRefGTImage.cols,CV_8UC1);
                     for(size_t nGTImageIdx=0; nGTImageIdx<vsTempPaths.size(); ++nGTImageIdx) {
                         cv::Mat oTempGTImage = cv::imread(vsTempPaths[nGTImageIdx],cv::IMREAD_GRAYSCALE);
                         lvAssert(!oTempGTImage.empty() && (oTempGTImage.size()==cv::Size(481,321) || oTempGTImage.size()==cv::Size(321,481)));
-                        if(oTempGTImage.size()!=this->m_vInputSizes[nGTIdx])
-                            cv::resize(oTempGTImage,oTempGTImage,this->m_vInputSizes[nGTIdx],0,0,cv::INTER_NEAREST);
+                        if(oTempGTImage.size()!=this->m_vInputInfos[nGTIdx].size())
+                            cv::resize(oTempGTImage,oTempGTImage,this->m_vInputInfos[nGTIdx].size(),0,0,cv::INTER_NEAREST);
                         lvAssert(oTempGTImage.size()==oTempRefGTImage.size());
                         oTempGTImage.copyTo(oGTMask(cv::Rect(0,oTempRefGTImage.rows*int(nGTImageIdx),oTempRefGTImage.cols,oTempRefGTImage.rows)));
                     }
-                    lvAssert(oGTMask.size()==this->m_vGTSizes[nGTIdx]);
+                    lvAssert(oGTMask.size()==this->m_vGTInfos[nGTIdx].size());
                     return oGTMask;
                 }
             }

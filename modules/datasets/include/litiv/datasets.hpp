@@ -185,12 +185,11 @@ namespace lv {
             const std::string& sOutputDirPath, ///< root path for work batch output (debug logs, evaluation reports, and generated results)
             const std::vector<std::string>& vsWorkBatchDirs, ///< array of directory names for top-level work batch groups (one group typically contains multiple work batches)
             const std::vector<std::string>& vsSkippedDirTokens, ///< array of tokens which allow directories to be skipped if one is found in their name
-            const std::vector<std::string>& vsGrayscaleDirTokens, ///< array of tokens which allow directories to be treated as grayscale input only if one is found in their name
             bool bSaveOutput, ///< defines whether results should be archived or not
             bool bUseEvaluator, ///< defines whether results should be fully evaluated, or simply acknowledged
-            bool bForce4ByteDataAlign, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
-            double dScaleFactor ///< defines the scale factor to use to resize/rescale read packets
-        ) : DatasetHandler_<eDatasetTask,eDatasetSource,eDataset>(sDatasetName,sDatasetDirPath,sOutputDirPath,vsWorkBatchDirs,vsSkippedDirTokens,vsGrayscaleDirTokens,bSaveOutput,bUseEvaluator,bForce4ByteDataAlign,dScaleFactor) {}
+            bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned
+            double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
+        ) : DatasetHandler_<eDatasetTask,eDatasetSource,eDataset>(sDatasetName,sDatasetDirPath,sOutputDirPath,vsWorkBatchDirs,vsSkippedDirTokens,bSaveOutput,bUseEvaluator,bForce4ByteDataAlign,dScaleFactor) {}
     };
 
 } // namespace lv

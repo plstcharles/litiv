@@ -52,11 +52,8 @@ namespace lv {
                         sOutputDirPath, // location of the dataet's output folder
                         std::vector<std::string>{"art","dolls"}, // name of work batches for this dataset (here, one work batch = one stereo pair)
                         std::vector<std::string>(), // names of directories which should be ignored by the parser (here, none in particular)
-                        std::vector<std::string>(), // names of directories which should be processed as grayscale by the parser (here, none in particular)
                         bSaveOutput, // toggles whether pushed results will be saved or not
-                        false, // toggles whether pushed results should be evaluated or not
-                        false, // toggles whether image packets should be 4-byte aligned or not
-                        1.0 // sets internal scaling factor for image packets (1.0 = default)
+                        false // toggles whether pushed results should be evaluated or not
                 ) {}
     };
 
@@ -98,7 +95,9 @@ namespace lv {
         // implement the 'parseData()' abstract member from IDataHandler with our own parsing routine
         virtual void parseData() override final {
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
-            // we have to fill the members declared in 'IDataProducer_<DatasetSource_ImageArray>', which is the base data producer for this dataset
+            // we have to fill the following member vars, declared in 'IDataProducer_<DatasetSource_ImageArray>', which is the base data producer for this dataset:
+            //    m_mGTIndexLUT,m_vvsInputPaths,m_vvsGTPaths,m_vvInputInfos,m_vvGTInfos,m_bIsInputInfoConst,m_bIsGTInfoConst
+            this->m_vvsInputPaths.clear();this->m_vvsGTPaths.clear(); // start with empty vectors, useful if re-parsing over a previous attempt
             this->m_vvsInputPaths.push_back(std::vector<std::string>{this->getDataPath()+"view1.png",this->getDataPath()+"view5.png"}); // batch contains only one 'packet', i.e. one stereo image array containing two images
             const cv::Mat oInput_L = cv::imread(this->m_vvsInputPaths[0][0]); // load 'left' image from the stereo pair
             const cv::Mat oInput_R = cv::imread(this->m_vvsInputPaths[0][1]); // load 'right' image from the stereo pair
@@ -107,9 +106,9 @@ namespace lv {
             const cv::Mat oGT_L = cv::imread(this->m_vvsGTPaths[0][0],cv::IMREAD_GRAYSCALE); // load 'left' disparity map
             const cv::Mat oGT_R = cv::imread(this->m_vvsGTPaths[0][1],cv::IMREAD_GRAYSCALE); // load 'right' disparity map
             lvAssert(!oGT_L.empty() && !oGT_R.empty() && oGT_L.size()==oGT_R.size() && oGT_L.size()==oInput_L.size());
-            this->m_bIsInputConstantSize = this->m_bIsGTConstantSize = true; // all packets have the same size (there is only one packet anyway)
-            this->m_vvInputSizes = this->m_vvGTSizes = std::vector<std::vector<cv::Size>>{{oInput_L.size(),oInput_R.size()}}; // all packets have the same size
-            this->m_oInputMaxSize = this->m_oGTMaxSize = oInput_L.size(); // max input frame size is already known (there is only one packet size anyway)
+            this->m_bIsInputInfoConst = this->m_bIsGTInfoConst = true; // all packets have the same size/type (there is only one packet anyway)
+            this->m_vvInputInfos = std::vector<std::vector<lv::MatInfo>>{{lv::MatInfo{oInput_L.size(),oInput_L.type()},lv::MatInfo{oInput_R.size(),oInput_R.type()}}};
+            this->m_vvGTInfos = std::vector<std::vector<lv::MatInfo>>{{lv::MatInfo{oGT_L.size(),oGT_L.type()},lv::MatInfo{oGT_R.size(),oGT_R.type()}}};
             this->m_mGTIndexLUT[0] = 0; // gt packet with index #0 is associated with input packet with index #0
         }
     };

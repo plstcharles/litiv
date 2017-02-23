@@ -109,7 +109,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         size_t nCurrIdx = 0;
         cv::Mat oCurrInput = oBatch.getInput(nCurrIdx).clone();
         lvAssert(!oCurrInput.empty() && oCurrInput.isContinuous());
-        cv::Mat oCurrEdgeMask(oBatch.getInputMaxSize(),CV_8UC1,cv::Scalar_<uchar>(0));
+        cv::Mat oCurrEdgeMask;
         std::shared_ptr<IEdgeDetector> pAlgo = std::make_shared<EdgeDetectorType>();
 #if !FULL_THRESH_ANALYSIS
         const double dDefaultThreshold = pAlgo->getDefaultThreshold();

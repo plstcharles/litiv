@@ -33,7 +33,7 @@ namespace lv {
                 const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving (will be created in CDnet dataset folder)
                 bool bSaveOutput=false, ///< defines whether results should be archived or not
                 bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
-                bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
+                bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned
                 double dScaleFactor=1.0, ///< defines the scale factor to use to resize/rescale read packets
                 bool b2014=true ///< defines whether to use the 2012 or 2014 version of the dataset (each should have its own folder in dataset root)
         ) :
@@ -43,7 +43,6 @@ namespace lv {
                         lv::datasets::getRootPath()+std::string(b2014?"CDNet2014/":"CDNet/")+lv::addDirSlashIfMissing(sOutputDirName),
                         getWorkBatchDirNames(b2014),
                         std::vector<std::string>(),
-                        getGrayscaleWorkBatchDirNames(),
                         bSaveOutput,
                         bUseEvaluator,
                         bForce4ByteDataAlign,
@@ -60,11 +59,6 @@ namespace lv {
             else
                 return s_vsWorkBatchDirs_2012;
         }
-        /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
-        static const std::vector<std::string>& getGrayscaleWorkBatchDirNames() {
-            static const std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {"thermal","turbulence"};
-            return s_vsGrayscaleWorkBatchDirs;
-        }
     };
 
     template<DatasetTaskList eDatasetTask>
@@ -74,6 +68,7 @@ namespace lv {
         virtual void parseData() override final {
             lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
+            const bool bIsGrayscale = this->getName().find("thermal")!=std::string::npos || this->getName().find("turbulence")!=std::string::npos;
             const std::vector<std::string> vsSubDirs = lv::getSubDirsFromDir(this->getDataPath());
             auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"groundtruth");
             auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"input");
@@ -98,7 +93,8 @@ namespace lv {
             if(dScale!=1.0)
                 cv::resize(this->m_oInputROI,this->m_oInputROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
             this->m_oGTROI = this->m_oInputROI;
-            this->m_oInputSize = this->m_oGTSize = this->m_oInputROI.size();
+            this->m_oInputInfo = lv::MatInfo{this->m_oInputROI.size(),(bIsGrayscale?CV_8UC1:this->is4ByteAligned()?CV_8UC4:CV_8UC3)};
+            this->m_oGTInfo = lv::MatInfo{this->m_oInputROI.size(),CV_8UC1};
             this->m_mGTIndexLUT.clear();
             for(size_t i=0; i<this->m_nFrameCount; ++i)
                 this->m_mGTIndexLUT[i] = i; // direct gt path index to frame index mapping

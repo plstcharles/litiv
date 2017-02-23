@@ -928,27 +928,6 @@ namespace lv {
         static const cv::Mat s_oEmptyMat = cv::Mat();
         return s_oEmptyMat;
     }
-    /// returns an always-empty-size by reference
-    inline const cv::Size& emptySize() {
-        static const cv::Size s_oEmptySize = cv::Size();
-        return s_oEmptySize;
-    }
-    /// returns an always-empty-mat-size by reference
-    inline const cv::MatSize& emptyMatSize() {
-        static const std::array<int,3> anDims = {0,0,0};
-        static const cv::MatSize s_oEmptyMatSize = cv::MatSize(const_cast<int*>(&anDims[1]));
-        return s_oEmptyMatSize;
-    }
-    /// returns an always-empty-mat by reference
-    inline const std::vector<cv::Mat>& emptyMatArray() {
-        static const std::vector<cv::Mat> s_vEmptyMatArray = std::vector<cv::Mat>();
-        return s_vEmptyMatArray;
-    }
-    /// returns an always-empty-size by reference
-    inline const std::vector<cv::Size>& emptySizeArray() {
-        static const std::vector<cv::Size> s_vEmptySizeArray = std::vector<cv::Size>();
-        return s_vEmptySizeArray;
-    }
 
     /// defines an aligned memory allocator to be used in matrices
     template<size_t nByteAlign, bool bAlignSingleElem=false>
