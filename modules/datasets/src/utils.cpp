@@ -770,20 +770,34 @@ size_t lv::IDataProducer_<lv::DatasetSource_Video>::getExpectedLoadSize() const 
 lv::IDataProducer_<lv::DatasetSource_Video>::IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
         IDataLoader_<NotArray>(ImagePacket,eGTType,eOutputType,eGTMappingType,eIOMappingType),m_nFrameCount(0),m_nNextExpectedVideoReaderFrameIdx(size_t(-1)) {}
 
-const cv::Mat& lv::IDataProducer_<lv::DatasetSource_Video>::getInputROI(size_t /*nPacketIdx*/) const {
+const cv::Mat& lv::IDataProducer_<lv::DatasetSource_Video>::getInputROI(size_t nPacketIdx) const {
+    if(nPacketIdx>=m_nFrameCount)
+        return lv::emptyMat();
     return m_oInputROI;
 }
 
-const cv::Mat& lv::IDataProducer_<lv::DatasetSource_Video>::getGTROI(size_t /*nPacketIdx*/) const {
-    return m_oGTROI;
+const cv::Mat& lv::IDataProducer_<lv::DatasetSource_Video>::getGTROI(size_t nPacketIdx) const {
+    if(m_mGTIndexLUT.count(nPacketIdx)) {
+        const size_t nGTIdx = m_mGTIndexLUT.at(nPacketIdx);
+        if(nGTIdx<m_vsGTPaths.size())
+            return m_oGTROI;
+    }
+    return lv::emptyMat();
 }
 
-lv::MatInfo lv::IDataProducer_<lv::DatasetSource_Video>::getInputInfo(size_t /*nPacketIdx*/) const {
+lv::MatInfo lv::IDataProducer_<lv::DatasetSource_Video>::getInputInfo(size_t nPacketIdx) const {
+    if(nPacketIdx>=m_nFrameCount)
+        return lv::MatInfo();
     return m_oInputInfo;
 }
 
-lv::MatInfo lv::IDataProducer_<lv::DatasetSource_Video>::getGTInfo(size_t /*nPacketIdx*/) const {
-    return m_oGTInfo;
+lv::MatInfo lv::IDataProducer_<lv::DatasetSource_Video>::getGTInfo(size_t nPacketIdx) const {
+    if(m_mGTIndexLUT.count(nPacketIdx)) {
+        const size_t nGTIdx = m_mGTIndexLUT.at(nPacketIdx);
+        if(nGTIdx<m_vsGTPaths.size())
+            return m_oGTInfo;
+    }
+    return lv::MatInfo();
 }
 
 bool lv::IDataProducer_<lv::DatasetSource_Video>::isInputInfoConst() const {
@@ -799,7 +813,7 @@ cv::Mat lv::IDataProducer_<lv::DatasetSource_Video>::getRawInput(size_t nPacketI
     cv::Mat oFrame;
     if(!m_voVideoReader.isOpened() && nPacketIdx<m_vsInputPaths.size())
         oFrame = cv::imread(m_vsInputPaths[nPacketIdx],cv::IMREAD_UNCHANGED);
-    else {
+    else if(m_voVideoReader.isOpened()) {
         if(m_nNextExpectedVideoReaderFrameIdx!=nPacketIdx) {
             m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,(double)nPacketIdx);
             m_nNextExpectedVideoReaderFrameIdx = nPacketIdx+1;
@@ -904,20 +918,34 @@ size_t lv::IDataProducer_<lv::DatasetSource_VideoArray>::getExpectedLoadSize() c
 lv::IDataProducer_<lv::DatasetSource_VideoArray>::IDataProducer_(PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType) :
         IDataLoader_<Array>(ImageArrayPacket,eGTType,eOutputType,eGTMappingType,eIOMappingType) {}
 
-const std::vector<cv::Mat>& lv::IDataProducer_<lv::DatasetSource_VideoArray>::getInputROIArray(size_t /*nPacketIdx*/) const {
+const std::vector<cv::Mat>& lv::IDataProducer_<lv::DatasetSource_VideoArray>::getInputROIArray(size_t nPacketIdx) const {
+    if(nPacketIdx>=m_vvsInputPaths.size())
+        return lv::IDataLoader_<lv::Array>::getInputROIArray(nPacketIdx);
     return m_vInputROIs;
 }
 
-const std::vector<cv::Mat>& lv::IDataProducer_<lv::DatasetSource_VideoArray>::getGTROIArray(size_t /*nPacketIdx*/) const {
-    return m_vGTROIs;
+const std::vector<cv::Mat>& lv::IDataProducer_<lv::DatasetSource_VideoArray>::getGTROIArray(size_t nPacketIdx) const {
+    if(m_mGTIndexLUT.count(nPacketIdx)) {
+        const size_t nGTIdx = m_mGTIndexLUT.at(nPacketIdx);
+        if(nGTIdx<m_vvsGTPaths.size())
+            return m_vGTROIs;
+    }
+    return lv::IDataLoader_<lv::Array>::getGTROIArray(nPacketIdx);
 }
 
-std::vector<lv::MatInfo> lv::IDataProducer_<lv::DatasetSource_VideoArray>::getInputInfoArray(size_t /*nPacketIdx*/) const {
+std::vector<lv::MatInfo> lv::IDataProducer_<lv::DatasetSource_VideoArray>::getInputInfoArray(size_t nPacketIdx) const {
+    if(nPacketIdx>=m_vvsInputPaths.size())
+        return std::vector<lv::MatInfo>(getInputStreamCount());
     return m_vInputInfos;
 }
 
-std::vector<lv::MatInfo> lv::IDataProducer_<lv::DatasetSource_VideoArray>::getGTInfoArray(size_t /*nPacketIdx*/) const {
-    return m_vGTInfos;
+std::vector<lv::MatInfo> lv::IDataProducer_<lv::DatasetSource_VideoArray>::getGTInfoArray(size_t nPacketIdx) const {
+    if(m_mGTIndexLUT.count(nPacketIdx)) {
+        const size_t nGTIdx = m_mGTIndexLUT.at(nPacketIdx);
+        if(nGTIdx<m_vvsGTPaths.size())
+            return m_vGTInfos;
+    }
+    return std::vector<lv::MatInfo>(getGTStreamCount());
 }
 
 bool lv::IDataProducer_<lv::DatasetSource_VideoArray>::isInputInfoConst() const {
@@ -1088,7 +1116,7 @@ size_t lv::IDataProducer_<lv::DatasetSource_ImageArray>::getExpectedLoadSize() c
 
 std::vector<lv::MatInfo> lv::IDataProducer_<lv::DatasetSource_ImageArray>::getInputInfoArray(size_t nPacketIdx) const {
     if(nPacketIdx>=m_vvInputInfos.size())
-        return std::vector<lv::MatInfo>();
+        return std::vector<lv::MatInfo>(getInputStreamCount());
     return m_vvInputInfos[nPacketIdx];
 }
 
@@ -1098,7 +1126,7 @@ std::vector<lv::MatInfo> lv::IDataProducer_<lv::DatasetSource_ImageArray>::getGT
         if(nGTIdx<m_vvGTInfos.size())
             return m_vvGTInfos[nGTIdx];
     }
-    return std::vector<lv::MatInfo>();
+    return std::vector<lv::MatInfo>(getGTStreamCount());
 }
 
 bool lv::IDataProducer_<lv::DatasetSource_ImageArray>::isInputInfoConst() const {

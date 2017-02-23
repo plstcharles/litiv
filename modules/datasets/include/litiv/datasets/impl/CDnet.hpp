@@ -73,7 +73,7 @@ namespace lv {
             auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"groundtruth");
             auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"input");
             if(gtDir==vsSubDirs.end() || inputDir==vsSubDirs.end())
-                lvError_("CDnet sequence '%s' did not possess the required groundtruth and input directories",this->getName().c_str());
+                lvError_("CDnet sequence '%s' at '%s' did not possess the required groundtruth and input directories",this->getName().c_str(),this->getDataPath().c_str());
             this->m_vsInputPaths = lv::getFilesFromDir(*inputDir);
             this->m_vsGTPaths = lv::getFilesFromDir(*gtDir);
             this->m_nFrameCount = this->m_vsInputPaths.size();
