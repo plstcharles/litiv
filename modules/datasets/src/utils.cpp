@@ -1385,15 +1385,15 @@ std::vector<cv::Mat> lv::IDataArchiver_<lv::Array>::loadOutputArray(size_t nIdx,
 size_t lv::IDataArchiver_<lv::Array>::getOutputStreamCount() const {
     auto pLoader = shared_from_this_cast<IDataLoader_<Array>>();
     if(pLoader) {
-        if(pLoader->getIOMappingType()<=ArrayMapping) {
-            // if you catch this error, whoever developed your dataset specialization is in trouble
-            lvAssert__(pLoader->getInputStreamCount()>=1,"input stream count (%d) for dataset is bad, need at least one stream",(int)pLoader->getInputStreamCount());
-            return pLoader->getInputStreamCount();
-        }
-        else if(pLoader->getGTMappingType()<=ArrayMapping) {
+        if(pLoader->getGTMappingType()<=ArrayMapping) {
             // if you catch this error, whoever developed your dataset specialization is in trouble
             lvAssert__(pLoader->getGTStreamCount()>=1,"gt stream count (%d) for dataset is bad, need at least one stream",(int)pLoader->getGTStreamCount());
             return pLoader->getGTStreamCount();
+        }
+        else if(pLoader->getIOMappingType()<=ArrayMapping) {
+            // if you catch this error, whoever developed your dataset specialization is in trouble
+            lvAssert__(pLoader->getInputStreamCount()>=1,"input stream count (%d) for dataset is bad, need at least one stream",(int)pLoader->getInputStreamCount());
+            return pLoader->getInputStreamCount();
         }
     }
     // if you catch this error, whoever developed your dataset specialization is in trouble

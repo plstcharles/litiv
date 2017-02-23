@@ -137,7 +137,7 @@ namespace lv {
         // note: these are only defaults, they can be overridden via full method specialization w/ task type + dataset id
         return
             (eDatasetTask==DatasetTask_Segm)?ElemMapping:
-            (eDatasetTask==DatasetTask_Cosegm)?ArrayMapping:
+            (eDatasetTask==DatasetTask_Cosegm)?ElemMapping:
             (eDatasetTask==DatasetTask_Registr)?NoMapping:
             (eDatasetTask==DatasetTask_EdgDet)?ElemMapping:
             // ...
@@ -150,7 +150,7 @@ namespace lv {
         // note: these are only defaults, they can be overridden via full method specialization w/ task type + dataset id
         return
             (eDatasetTask==DatasetTask_Segm)?ElemMapping:
-            (eDatasetTask==DatasetTask_Cosegm)?ArrayMapping:
+            (eDatasetTask==DatasetTask_Cosegm)?ArrayMapping: // but may have interlaced input streams for same segmentation output
             (eDatasetTask==DatasetTask_Registr)?NoMapping:
             (eDatasetTask==DatasetTask_EdgDet)?ElemMapping:
             // ...
