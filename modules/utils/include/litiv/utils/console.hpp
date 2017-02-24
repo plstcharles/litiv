@@ -141,26 +141,26 @@ namespace rlutil {
      * ANSI_BOLDWHITE - White (bold/bright)
      * ANSI_RESET - Resets formatting
      */
-    str_t ANSI_CLS = "\033[2J";
-    str_t ANSI_BLACK = "\033[22;30m";
-    str_t ANSI_RED = "\033[22;31m";
-    str_t ANSI_BOLDRED = "\033[22;31;1m";
-    str_t ANSI_GREEN = "\033[22;32m";
-    str_t ANSI_BOLDGREEN = "\033[22;32;1m";
-    str_t ANSI_BROWN = "\033[22;33m";
-    str_t ANSI_BLUE = "\033[22;34m";
-    str_t ANSI_MAGENTA = "\033[22;35m";
-    str_t ANSI_CYAN = "\033[22;36m";
-    str_t ANSI_GREY = "\033[22;37m";
-    str_t ANSI_DARKGREY = "\033[01;30m";
-    str_t ANSI_LIGHTRED = "\033[01;31m";
-    str_t ANSI_LIGHTGREEN = "\033[01;32m";
-    str_t ANSI_BOLDYELLOW = "\033[01;33m";
-    str_t ANSI_LIGHTBLUE = "\033[01;34m";
-    str_t ANSI_LIGHTMAGENTA = "\033[01;35m";
-    str_t ANSI_LIGHTCYAN = "\033[01;36m";
-    str_t ANSI_BOLDWHITE = "\033[01;37m";
-    str_t ANSI_RESET = "\033[39;49m\033[0m";
+    constexpr str_t ANSI_CLS = "\033[2J";
+    constexpr str_t ANSI_BLACK = "\033[22;30m";
+    constexpr str_t ANSI_RED = "\033[22;31m";
+    constexpr str_t ANSI_BOLDRED = "\033[22;31;1m";
+    constexpr str_t ANSI_GREEN = "\033[22;32m";
+    constexpr str_t ANSI_BOLDGREEN = "\033[22;32;1m";
+    constexpr str_t ANSI_BROWN = "\033[22;33m";
+    constexpr str_t ANSI_BLUE = "\033[22;34m";
+    constexpr str_t ANSI_MAGENTA = "\033[22;35m";
+    constexpr str_t ANSI_CYAN = "\033[22;36m";
+    constexpr str_t ANSI_GREY = "\033[22;37m";
+    constexpr str_t ANSI_DARKGREY = "\033[01;30m";
+    constexpr str_t ANSI_LIGHTRED = "\033[01;31m";
+    constexpr str_t ANSI_LIGHTGREEN = "\033[01;32m";
+    constexpr str_t ANSI_BOLDYELLOW = "\033[01;33m";
+    constexpr str_t ANSI_LIGHTBLUE = "\033[01;34m";
+    constexpr str_t ANSI_LIGHTMAGENTA = "\033[01;35m";
+    constexpr str_t ANSI_LIGHTCYAN = "\033[01;36m";
+    constexpr str_t ANSI_BOLDWHITE = "\033[01;37m";
+    constexpr str_t ANSI_RESET = "\033[39;49m\033[0m";
 
     /**
      * Key codes for keyhit()
@@ -202,46 +202,46 @@ namespace rlutil {
      * KEY_NUMPAD8 - Numpad 8
      * KEY_NUMPAD9 - Numpad 9
      */
-    const int KEY_ESCAPE  = 0;
-    const int KEY_ENTER   = 1;
-    const int KEY_SPACE   = 32;
+    constexpr int KEY_ESCAPE  = 0;
+    constexpr int KEY_ENTER   = 1;
+    constexpr int KEY_SPACE   = 32;
 
-    const int KEY_INSERT  = 2;
-    const int KEY_HOME    = 3;
-    const int KEY_PGUP    = 4;
-    const int KEY_DELETE  = 5;
-    const int KEY_END     = 6;
-    const int KEY_PGDOWN  = 7;
+    constexpr int KEY_INSERT  = 2;
+    constexpr int KEY_HOME    = 3;
+    constexpr int KEY_PGUP    = 4;
+    constexpr int KEY_DELETE  = 5;
+    constexpr int KEY_END     = 6;
+    constexpr int KEY_PGDOWN  = 7;
 
-    const int KEY_UP      = 14;
-    const int KEY_DOWN    = 15;
-    const int KEY_LEFT    = 16;
-    const int KEY_RIGHT   = 17;
+    constexpr int KEY_UP      = 14;
+    constexpr int KEY_DOWN    = 15;
+    constexpr int KEY_LEFT    = 16;
+    constexpr int KEY_RIGHT   = 17;
 
-    const int KEY_F1      = 18;
-    const int KEY_F2      = 19;
-    const int KEY_F3      = 20;
-    const int KEY_F4      = 21;
-    const int KEY_F5      = 22;
-    const int KEY_F6      = 23;
-    const int KEY_F7      = 24;
-    const int KEY_F8      = 25;
-    const int KEY_F9      = 26;
-    const int KEY_F10     = 27;
-    const int KEY_F11     = 28;
-    const int KEY_F12     = 29;
+    constexpr int KEY_F1      = 18;
+    constexpr int KEY_F2      = 19;
+    constexpr int KEY_F3      = 20;
+    constexpr int KEY_F4      = 21;
+    constexpr int KEY_F5      = 22;
+    constexpr int KEY_F6      = 23;
+    constexpr int KEY_F7      = 24;
+    constexpr int KEY_F8      = 25;
+    constexpr int KEY_F9      = 26;
+    constexpr int KEY_F10     = 27;
+    constexpr int KEY_F11     = 28;
+    constexpr int KEY_F12     = 29;
 
-    const int KEY_NUMDEL  = 30;
-    const int KEY_NUMPAD0 = 31;
-    const int KEY_NUMPAD1 = 127;
-    const int KEY_NUMPAD2 = 128;
-    const int KEY_NUMPAD3 = 129;
-    const int KEY_NUMPAD4 = 130;
-    const int KEY_NUMPAD5 = 131;
-    const int KEY_NUMPAD6 = 132;
-    const int KEY_NUMPAD7 = 133;
-    const int KEY_NUMPAD8 = 134;
-    const int KEY_NUMPAD9 = 135;
+    constexpr int KEY_NUMDEL  = 30;
+    constexpr int KEY_NUMPAD0 = 31;
+    constexpr int KEY_NUMPAD1 = 127;
+    constexpr int KEY_NUMPAD2 = 128;
+    constexpr int KEY_NUMPAD3 = 129;
+    constexpr int KEY_NUMPAD4 = 130;
+    constexpr int KEY_NUMPAD5 = 131;
+    constexpr int KEY_NUMPAD6 = 132;
+    constexpr int KEY_NUMPAD7 = 133;
+    constexpr int KEY_NUMPAD8 = 134;
+    constexpr int KEY_NUMPAD9 = 135;
 
     // reads a key press (blocking) and returns a key code; see key codes for info (note: only Arrows, Esc, Enter and Space are currently working properly)
     inline int getkey(void) {
@@ -310,29 +310,28 @@ namespace rlutil {
     }
 
     // returns ANSI color escape sequence for specified color enum
-    inline str_t getANSIColor(const ColorCode c) {
-        switch(c) {
-            case Color_BLACK : return ANSI_BLACK;
-            case Color_BLUE : return ANSI_BLUE; // non-ANSI
-            case Color_GREEN : return ANSI_GREEN;
-            case Color_BOLDGREEN : return ANSI_BOLDGREEN;
-            case Color_CYAN : return ANSI_CYAN; // non-ANSI
-            case Color_RED : return ANSI_RED; // non-ANSI
-            case Color_BOLDRED : return ANSI_BOLDRED;
-            case Color_MAGENTA : return ANSI_MAGENTA;
-            case Color_BROWN : return ANSI_BROWN;
-            case Color_GREY : return ANSI_GREY;
-            case Color_DARKGREY : return ANSI_DARKGREY;
-            case Color_LIGHTBLUE : return ANSI_LIGHTBLUE; // non-ANSI
-            case Color_LIGHTGREEN: return ANSI_LIGHTGREEN;
-            case Color_LIGHTCYAN: return ANSI_LIGHTCYAN; // non-ANSI;
-            case Color_LIGHTRED: return ANSI_LIGHTRED; // non-ANSI;
-            case Color_LIGHTMAGENTA: return ANSI_LIGHTMAGENTA;
-            case Color_BOLDYELLOW: return ANSI_BOLDYELLOW; // non-ANSI
-            case Color_BOLDWHITE: return ANSI_BOLDWHITE;
-            case Color_RESET: return ANSI_RESET;
-            default: return "";
-        }
+    constexpr str_t getANSIColor(ColorCode c) {
+        return
+            c==Color_BLACK?ANSI_BLACK:
+            c==Color_BLUE?ANSI_BLUE: // non-ANSI
+            c==Color_GREEN?ANSI_GREEN:
+            c==Color_BOLDGREEN?ANSI_BOLDGREEN:
+            c==Color_CYAN?ANSI_CYAN: // non-ANSI
+            c==Color_RED?ANSI_RED: // non-ANSI
+            c==Color_BOLDRED?ANSI_BOLDRED:
+            c==Color_MAGENTA?ANSI_MAGENTA:
+            c==Color_BROWN?ANSI_BROWN:
+            c==Color_GREY?ANSI_GREY:
+            c==Color_DARKGREY?ANSI_DARKGREY:
+            c==Color_LIGHTBLUE?ANSI_LIGHTBLUE: // non-ANSI
+            c==Color_LIGHTGREEN?ANSI_LIGHTGREEN:
+            c==Color_LIGHTCYAN?ANSI_LIGHTCYAN: // non-ANSI;
+            c==Color_LIGHTRED?ANSI_LIGHTRED: // non-ANSI;
+            c==Color_LIGHTMAGENTA?ANSI_LIGHTMAGENTA:
+            c==Color_BOLDYELLOW?ANSI_BOLDYELLOW: // non-ANSI
+            c==Color_BOLDWHITE?ANSI_BOLDWHITE:
+            c==Color_RESET?ANSI_RESET:
+            "";
     }
 
     // changes color specified by enum (Windows / QBasic colors)
