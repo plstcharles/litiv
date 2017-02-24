@@ -40,8 +40,11 @@
 #pragma warning(push,0)
 #endif //defined(_MSC_VER)
 #if !HAVE_OPENGM_EXTLIB
-#error "OpenGM utils requires opengm extlib for QPBO/FastPD."
+#error "OpenGM utils require extlib."
 #endif //(!HAVE_OPENGM_EXTLIB)
+#if !HAVE_OPENGM_EXTLIB_QPBO
+#error "OpenGM utils require QPBO in extlib."
+#endif //(!HAVE_OPENGM_EXTLIB_QPBO)
 #include <opengm/graphicalmodel/graphicalmodel.hxx>
 #include <opengm/functions/potts.hxx>
 #include <opengm/graphicalmodel/space/simplediscretespace.hxx>
@@ -50,6 +53,7 @@
 #include <opengm/inference/visitors/visitors.hxx>
 #include <opengm/inference/fix-fusion/higher-order-energy.hpp>
 #include <opengm/inference/external/qpbo/QPBO.h>
+#if HAVE_OPENGM_EXTLIB_FASTPD
 #ifndef FASTPDENERGYVALUE
 #define FASTPDENERGYVALUE float
 #endif //ndef(FASTPDENERGYVALUE)
@@ -57,6 +61,7 @@
 #define FASTPDLABELVALUE uint8_t
 #endif //ndef(FASTPDLABELVALUE)
 #include <opengm/inference/external/fastPD.hxx>
+#endif //HAVE_OPENGM_EXTLIB_FASTPD
 #if defined(_MSC_VER)
 #pragma warning(pop)
 #elif (defined(__GNUC__) || defined(__GNUG__))
