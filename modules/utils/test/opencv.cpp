@@ -119,10 +119,16 @@
     } while(0)
 
 TEST(MatType,regression) {
+#if defined(_MSC_VER)
+#pragma warning(push,0)
+#endif //defined(_MSC_VER)
     TEST_MAT_TYPE_INFO(1);
     TEST_MAT_TYPE_INFO(2);
     TEST_MAT_TYPE_INFO(3);
     TEST_MAT_TYPE_INFO(4);
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif //defined(_MSC_VER)
 }
 
 namespace {

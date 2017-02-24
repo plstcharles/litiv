@@ -123,7 +123,13 @@ namespace lv {
         bool isTypeCompat() const {
             const int nChannels = channels();
             const int nDepth = depth();
+            #if defined(_MSC_VER)
+            #pragma warning(push,0)
+            #endif //defined(_MSC_VER)
             if(bCheckWithChannels && nChannels>1) {
+            #if defined(_MSC_VER)
+            #pragma warning(pop)
+            #endif //defined(_MSC_VER)
                 if(nChannels==2)
                     return
                         (nDepth==CV_8U && std::is_same<T,cv::Vec<uint8_t,2>>::value) ||
@@ -292,7 +298,7 @@ namespace lv {
             else if(nDims==Tinteger(2))
                 return size(0)==(Tinteger)oSize[0] && size(1)==(Tinteger)oSize[1];
             for(Tinteger nDimIdx=0; nDimIdx<nDims; ++nDimIdx)
-                if(size(nDimIdx)!=(Tinteger)oSize[nDimIdx])
+                if(size(nDimIdx)!=(Tinteger)oSize[(int)nDimIdx])
                     return false;
             return true;
         }
