@@ -105,11 +105,11 @@ find_package(OpenCV 3.0 REQUIRED)
 message(STATUS "Found OpenCV >=3.0 at '${OpenCV_DIR}'")
 
 ### GLSL CHECK
-find_package(OpenGL)
-find_package(FREEGLUT)
-find_package(GLFW)
-find_package(GLEW)
-find_package(GLM)
+find_package(OpenGL QUIET)
+find_package(FREEGLUT QUIET)
+find_package(GLFW QUIET)
+find_package(GLEW QUIET)
+find_package(GLM QUIET)
 set_eval(USE_GLSL_INIT ((${GLFW_FOUND} OR ${FREEGLUT_FOUND}) AND ${OPENGL_FOUND} AND ${GLEW_FOUND} AND ${GLM_FOUND}))
 option(USE_GLSL "Specifies whether GLSL support should be enabled or not; if false, projects that depend on it will be disabled" ${USE_GLSL_INIT})
 if(USE_GLSL)
@@ -140,7 +140,7 @@ else()
 endif()
 
 ### OPENGM CHECK
-find_package(OpenGM COMPONENTS ext)
+find_package(OpenGM QUIET COMPONENTS ext)
 option(USE_OPENGM "Specifies whether OpenGM should be included/linked or not; if false, projects that depend on it will be disabled" ${OpenGM_FOUND})
 if(USE_OPENGM)
     find_package(OpenGM REQUIRED COMPONENTS ext)
@@ -153,7 +153,7 @@ if(CMAKE_CROSSCOMPILING OR (WIN32 AND NOT MSVC) OR (CMAKE_COMPILER_IS_GNUCXX AND
     set_eval(USE_CUDA 0)
     message("Cannot use CUDA, invalid platform/compiler combination.")
 else()
-    find_package(CUDA)
+    find_package(CUDA QUIET)
     option(USE_CUDA "Specifies whether CUDA should be included/linked or not; if false, projects that depend on it will be disabled" ${CUDA_FOUND})
     if(USE_CUDA)
         find_package(CUDA REQUIRED)
@@ -179,7 +179,7 @@ set_eval(USE_OPENCL 0)
 
 ### Kinect SDK CHECK
 if(WIN32)
-    find_package(KinectSDK2)
+    find_package(KinectSDK2 QUIET)
     mark_as_advanced(
         KinectSDK2_FACE
         KinectSDK2_FUSION
