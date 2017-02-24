@@ -19,8 +19,15 @@
 #
 # This module defines the following variables:
 #   OpenGM_INCLUDE_DIRS
-#   OpenGM_LIBRARIES      (may be empty)
+#   OpenGM_LIBRARIES          (may be empty)
 #   OpenGM_FOUND
+#   USE_OPENGM_WITH_EXTLIB    (option)
+#   USE_OPENGM_WITH_CPLEX     (option)
+#   USE_OPENGM_WITH_GUROBI    (option)
+#   USE_OPENGM_WITH_HDF5      (option)
+#   HAVE_OPENGM_EXTLIB_FASTPD (internal)
+#   HAVE_OPENGM_EXTLIB_QPBO   (internal)
+#   ...
 
 macro(_set_eval name)
     if(${ARGN})
@@ -51,6 +58,8 @@ foreach(_comp ${OpenGM_FIND_COMPONENTS})
 endforeach()
 
 option(USE_OPENGM_WITH_EXTLIB "Specifies whether OpenGM should be linked with its external/3rd-party library." ${_opengm_ext_default})
+set(HAVE_OPENGM_EXTLIB_FASTPD OFF CACHE INTERNAL "Specifies if FastPD was found among OpenGM's external libs.")
+set(HAVE_OPENGM_EXTLIB_QPBO OFF CACHE INTERNAL "Specifies if QPBO was found among OpenGM's external libs.")
 if(USE_OPENGM_WITH_EXTLIB)
     find_library(OpenGM_EXT_LIBRARY
         NAMES
@@ -92,6 +101,27 @@ if(USE_OPENGM_WITH_EXTLIB)
             OpenGM_EXT_LIBRARY
     )
     list(APPEND OpenGM_LIBRARIES OpenGM_EXT_LIBRARY)
+
+    find_path(OpenGM_EXTLIB_FASTPD_TEST NAMES opengm/inference/external/fastpd/Fast_PD.h HINTS "${OpenGM_INCLUDE_DIR}")
+    if(OpenGM_EXTLIB_FASTPD_TEST)
+        set(HAVE_OPENGM_EXTLIB_FASTPD ON CACHE INTERNAL "Specifies if FastPD was found among OpenGM's external libs.")
+        if(NOT OpenGM_FIND_QUIETLY)
+            message(STATUS "Found FastPD in OpenGM external headers.")
+        endif()
+    endif()
+    mark_as_advanced(OpenGM_EXTLIB_FASTPD_TEST)
+
+    find_path(OpenGM_EXTLIB_QPBO_TEST NAMES opengm/inference/external/qpbo/QPBO.h HINTS "${OpenGM_INCLUDE_DIR}")
+    if(OpenGM_EXTLIB_QPBO_TEST)
+        set(HAVE_OPENGM_EXTLIB_QPBO ON CACHE INTERNAL "Specifies if QPBO was found among OpenGM's external libs.")
+        if(NOT OpenGM_FIND_QUIETLY)
+            message(STATUS "Found QPBO in OpenGM external headers.")
+        endif()
+    endif()
+    mark_as_advanced(OpenGM_EXTLIB_QPBO_TEST)
+
+    # @@@ add missing external libs checks here
+
 else()
     set(OpenGM_EXT_LIBRARY "")
     find_path(OpenGM_INCLUDE_DIR
@@ -109,14 +139,14 @@ else()
         REQUIRED_VARS
             OpenGM_INCLUDE_DIR
     )
-    message(STATUS "Will use OpenGM without its external dependencies, some inference algos might be disabled.")
+    if(NOT OpenGM_FIND_QUIETLY)
+        message(STATUS "Will use OpenGM without its external dependencies, some inference algos might be disabled.")
+    endif()
 endif()
 
 if(OpenGM_FOUND)
     set(OpenGM_INCLUDE_DIRS ${OpenGM_INCLUDE_DIR})
     set(OpenGM_LIBRARIES ${OpenGM_EXT_LIBRARY})
-
-    # @@@ might be able to deduce USE_OPENGM_WITH... vals using header presence
 
     find_package(CPLEX QUIET)
     _set_eval(_opengm_cplex_current (${_opengm_cplex_default} OR ${CPLEX_FOUND}))
@@ -125,7 +155,7 @@ if(OpenGM_FOUND)
         find_package(CPLEX REQUIRED)
         list(APPEND OpenGM_INCLUDE_DIRS ${CPLEX_INCLUDE_DIRS})
         list(APPEND OpenGM_LIBRARIES ${CPLEX_LIBRARIES})
-    else()
+    elseif(NOT OpenGM_FIND_QUIETLY)
         message(STATUS "Will use OpenGM without IBM CPLEX support, some inference algos might be disabled.")
     endif()
 
@@ -136,7 +166,7 @@ if(OpenGM_FOUND)
         find_package(GUROBI REQUIRED)
         list(APPEND OpenGM_INCLUDE_DIRS ${GUROBI_INCLUDE_DIRS})
         list(APPEND OpenGM_LIBRARIES ${GUROBI_LIBRARIES})
-    else()
+    elseif(NOT OpenGM_FIND_QUIETLY)
         message(STATUS "Will use OpenGM without GUROBI support, some inference algos might be disabled.")
     endif()
 
@@ -147,7 +177,7 @@ if(OpenGM_FOUND)
         find_package(HDF5 REQUIRED)
         list(APPEND OpenGM_INCLUDE_DIRS ${HDF5_INCLUDE_DIR})
         list(APPEND OpenGM_LIBRARIES ${HDF5_LIBRARIES})
-    else()
+    elseif(NOT OpenGM_FIND_QUIETLY)
         message(STATUS "Will use OpenGM without HDF5 support, some I/O methods might be disabled.")
     endif()
 
