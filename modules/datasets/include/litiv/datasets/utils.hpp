@@ -442,7 +442,7 @@ namespace lv {
     /// general-purpose data packet precacher, fully implemented (i.e. can be used stand-alone)
     struct DataPrecacher {
         /// attaches to data loader (will halt auto-precaching if an empty packet is fetched)
-        DataPrecacher(std::function<const cv::Mat&(size_t)> lDataLoaderCallback);
+        DataPrecacher(std::function<cv::Mat(size_t)> lDataLoaderCallback);
         /// default destructor (joins the precaching thread, if still running)
         ~DataPrecacher();
         /// fetches a packet, with or without precaching enabled (should never be called concurrently, returned packets should never be altered directly, and a single packet loaded twice is assumed identical)
@@ -457,7 +457,7 @@ namespace lv {
         inline size_t getLastReqIdx() const {return m_nLastReqIdx;}
     private:
         void entry(const size_t nBufferSize);
-        const std::function<const cv::Mat&(size_t)> m_lCallback;
+        const std::function<cv::Mat(size_t)> m_lCallback;
         std::thread m_hWorker;
         std::exception_ptr m_pWorkerException;
         std::mutex m_oSyncMutex;
@@ -511,17 +511,15 @@ namespace lv {
         /// types serve to automatically transform packets & define default implementations
         IIDataLoader(PacketPolicy eInputType, PacketPolicy eGTType, PacketPolicy eOutputType, MappingPolicy eGTMappingType, MappingPolicy eIOMappingType);
         /// features packet load function (can return empty mat)
-        virtual const cv::Mat& loadRawFeatures(size_t nPacketIdx);
+        virtual cv::Mat loadRawFeatures(size_t nPacketIdx);
         /// input packet transformation function (used e.g. for rescaling and color space conversion on images)
-        virtual const cv::Mat& getInput_redirect(size_t nPacketIdx);
+        virtual cv::Mat getInput_redirect(size_t nPacketIdx);
         /// gt packet transformation function (used e.g. for rescaling and color space conversion on images)
-        virtual const cv::Mat& getGT_redirect(size_t nPacketIdx);
+        virtual cv::Mat getGT_redirect(size_t nPacketIdx);
     private:
         /// required friend for access to precachers
         template<ArrayPolicy ePolicy>
         friend struct IDataLoader_;
-        /// holds the loaded copies of the latest packets queried by the precachers
-        cv::Mat m_oLatestInput,m_oLatestGT,m_oLatestFeatures;
         /// precacher objects which may spin up a thread to pre-fetch data packets
         DataPrecacher m_oInputPrecacher,m_oGTPrecacher,m_oFeaturesPrecacher;
         /// input/gt/output packet policy types
@@ -592,17 +590,16 @@ namespace lv {
         using IIDataLoader::getInputROI;
         /// hides useless non-array-only function from public interface (can be unhidden by derived class)
         using IIDataLoader::getGTROI;
-        /// hides the 'packed' input array info getter from public interface
-        virtual lv::MatInfo getInputInfo(size_t nPacketIdx) const override final;
-        /// hides the 'packed' gt array info getter from public interface
-        virtual lv::MatInfo getGTInfo(size_t nPacketIdx) const override final;
+        /// hides the 'packed' input array info getter from public interface (throws by default)
+        virtual lv::MatInfo getInputInfo(size_t nPacketIdx) const override;
+        /// hides the 'packed' gt array info getter from public interface (throws by default)
+        virtual lv::MatInfo getGTInfo(size_t nPacketIdx) const override;
         /// input array load function, pre-transformations (can return vector of empty mats)
         virtual std::vector<cv::Mat> getRawInputArray(size_t nPacketIdx) = 0;
         /// gt array load function, pre-transformations (can return vector of empty mats)
         virtual std::vector<cv::Mat> getRawGTArray(size_t nPacketIdx) = 0;
     private:
         std::vector<cv::Mat> m_vLatestUnpackedInput,m_vLatestUnpackedGT,m_vLatestUnpackedFeatures;
-        std::vector<lv::MatInfo> m_vPackedInputInfos,m_vPackedGTInfos; // one size/type per packet
         mutable std::vector<cv::Mat> m_vEmptyInputROIArray,m_vEmptyGTROIArray;
     };
 

@@ -258,7 +258,7 @@ void lv::DataGroupHandler::parseData() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-lv::DataPrecacher::DataPrecacher(std::function<const cv::Mat&(size_t)> lDataLoaderCallback) :
+lv::DataPrecacher::DataPrecacher(std::function<cv::Mat(size_t)> lDataLoaderCallback) :
         m_lCallback(lDataLoaderCallback) {
     lvAssert_(m_lCallback,"invalid data precacher callback");
     m_bIsActive = false;
@@ -339,7 +339,7 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
         size_t nNextBufferIdx = size_t(-1);
         bool bReachedEnd = false;
         const auto lCacheNextPacket = [&]() -> size_t {
-            const cv::Mat& oNextPacket = m_lCallback(nNextPrecacheIdx);
+            const cv::Mat oNextPacket = m_lCallback(nNextPrecacheIdx);
             const size_t nNextPacketSize = oNextPacket.total()*oNextPacket.elemSize();
             if(nNextPacketSize==0) {
                 bReachedEnd = true;
@@ -496,21 +496,19 @@ lv::IIDataLoader::IIDataLoader(PacketPolicy eInputType, PacketPolicy eGTType, Pa
         m_oFeaturesPrecacher(std::bind(&IIDataLoader::loadRawFeatures,this,std::placeholders::_1)),
         m_eInputType(eInputType),m_eGTType(eGTType),m_eOutputType(eOutputType),m_eGTMappingType(eGTMappingType),m_eIOMappingType(eIOMappingType) {}
 
-const cv::Mat& lv::IIDataLoader::loadRawFeatures(size_t nPacketIdx) {
+cv::Mat lv::IIDataLoader::loadRawFeatures(size_t nPacketIdx) {
     lvDbgExceptionWatch;
     std::stringstream ssFeatsFilePath;
     ssFeatsFilePath << getFeaturesPath() << getFeaturesName(nPacketIdx) << ".bin";
     // all features are user-defined, so we keep no mapping information, and offer no default transformations
     if(lv::checkIfExists(ssFeatsFilePath.str()))
-        m_oLatestFeatures = lv::read(ssFeatsFilePath.str());
-    else
-        m_oLatestFeatures = cv::Mat();
-    return m_oLatestFeatures;
+        return lv::read(ssFeatsFilePath.str());
+    return cv::Mat();
 }
 
 namespace {
 
-    cv::Mat transformImagePacket(size_t nPacketIdx, const cv::Mat& oPacket, const lv::MatInfo& oInfo) {
+    cv::Mat transformImagePacket(size_t nPacketIdx, cv::Mat oPacket, const lv::MatInfo& oInfo) {
         lvDbgExceptionWatch;
         lvDbgAssert(!oPacket.empty());
         lvDbgAssert(!oInfo.size.empty());
@@ -519,7 +517,7 @@ namespace {
     #if HARDCODE_IMAGE_PACKET_INDEX
         std::stringstream sstr;
         sstr << "Packet #" << nPacketIdx;
-        lv::putText(m_oLatestInput,sstr.str(),cv::Scalar_<uchar>::all(255));
+        lv::putText(oPacket,sstr.str(),cv::Scalar_<uchar>::all(255));
     #else //!HARDCODE_IMAGE_PACKET_INDEX
         UNUSED(nPacketIdx);
     #endif //!HARDCODE_IMAGE_PACKET_INDEX
@@ -544,112 +542,96 @@ namespace {
 
 } // anonymous namespace
 
-const cv::Mat& lv::IIDataLoader::getInput_redirect(size_t nPacketIdx) {
+cv::Mat lv::IIDataLoader::getInput_redirect(size_t nPacketIdx) {
     lvDbgExceptionWatch;
     auto pNotArrayLoader = dynamic_cast<IDataLoader_<NotArray>*>(this);
     if(pNotArrayLoader) {
         lvDbgExceptionWatch;
         const lv::MatInfo& oPacketInfo = getInputInfo(nPacketIdx);
-        m_oLatestInput = pNotArrayLoader->getRawInput(nPacketIdx);
-        if(!m_oLatestInput.empty()) {
+        cv::Mat oLatestInput = pNotArrayLoader->getRawInput(nPacketIdx);
+        if(!oLatestInput.empty()) {
             if(m_eInputType==ImagePacket) {
-                lvAssert__(m_oLatestInput.dims<=2 && oPacketInfo.size.dims()<=2,"bad raw image formatting (packet = %s)",getInputName(nPacketIdx).c_str());
-                m_oLatestInput = transformImagePacket(nPacketIdx,m_oLatestInput,oPacketInfo);
+                lvAssert__(oLatestInput.dims<=2 && oPacketInfo.size.dims()<=2,"bad raw image formatting (packet = %s)",getInputName(nPacketIdx).c_str());
+                oLatestInput = transformImagePacket(nPacketIdx,oLatestInput,oPacketInfo);
             }
             else
                 lvAssert_(m_eInputType==UnspecifiedPacket,"unexpected packet type for not-array loader");
+            lvAssert__(oLatestInput.type()==oPacketInfo.type() && oLatestInput.size==oPacketInfo.size,"unexpected post-transform packet size/type --- need redirect override (packet = %s)",getInputName(nPacketIdx).c_str());
         }
         else
             lvAssert__(oPacketInfo.size.empty(),"unexpected empty raw image (packet = %s)",getInputName(nPacketIdx).c_str());
+        return oLatestInput;
     }
     else {
         auto pArrayLoader = dynamic_cast<IDataLoader_<Array>*>(this);
-        if(pArrayLoader) {
-            lvDbgExceptionWatch;
-            std::vector<cv::Mat> vLatestInputs = pArrayLoader->getRawInputArray(nPacketIdx);
-            lvAssert__(vLatestInputs.size()==pArrayLoader->getInputStreamCount(),"unexpected raw input array size (packet = %s)",getInputName(nPacketIdx).c_str());
-            const std::vector<lv::MatInfo>& vStreamInfos = pArrayLoader->getInputInfoArray(nPacketIdx);
-            lvAssert__(vStreamInfos.size()==pArrayLoader->getInputStreamCount(),"unexpected raw input info array size (packet = %s)",getInputName(nPacketIdx).c_str());
-            for(size_t nStreamIdx=0; nStreamIdx<vLatestInputs.size(); ++nStreamIdx) {
-                if(!vLatestInputs[nStreamIdx].empty()) {
-                    if(m_eInputType==ImageArrayPacket) {
-                        lvAssert__(vLatestInputs[nStreamIdx].dims<=2 && vStreamInfos[nStreamIdx].size.dims()<=2,"bad raw image formatting (stream = %s, packet = %s)",pArrayLoader->getInputStreamName(nStreamIdx).c_str(),getInputName(nPacketIdx).c_str());
-                        vLatestInputs[nStreamIdx] = transformImagePacket(nPacketIdx,vLatestInputs[nStreamIdx],vStreamInfos[nStreamIdx]);
-                    }
-                    else
-                        lvAssert_(m_eInputType==UnspecifiedPacket,"unexpected packet type for not-array loader");
-                    lvAssert__(vLatestInputs[nStreamIdx].type()==vStreamInfos[nStreamIdx].type() && vLatestInputs[nStreamIdx].size==vStreamInfos[nStreamIdx].size,
-                               "unexpected stream size/type --- need redirect override (stream = %s, packet = %s)",pArrayLoader->getInputStreamName(nStreamIdx).c_str(),getInputName(nPacketIdx).c_str());
+        lvDbgExceptionWatch;
+        lvAssert_(pArrayLoader,"unexpected data loader type");
+        std::vector<cv::Mat> vLatestInput = pArrayLoader->getRawInputArray(nPacketIdx);
+        lvAssert__(vLatestInput.size()==pArrayLoader->getInputStreamCount(),"unexpected raw input array size (packet = %s)",getInputName(nPacketIdx).c_str());
+        const std::vector<lv::MatInfo>& vStreamInfos = pArrayLoader->getInputInfoArray(nPacketIdx);
+        lvAssert__(vStreamInfos.size()==pArrayLoader->getInputStreamCount(),"unexpected raw input info array size (packet = %s)",getInputName(nPacketIdx).c_str());
+        for(size_t nStreamIdx=0; nStreamIdx<vLatestInput.size(); ++nStreamIdx) {
+            if(!vLatestInput[nStreamIdx].empty()) {
+                if(m_eInputType==ImageArrayPacket) {
+                    lvAssert__(vLatestInput[nStreamIdx].dims<=2 && vStreamInfos[nStreamIdx].size.dims()<=2,"bad raw image formatting (stream = %s, packet = %s)",pArrayLoader->getInputStreamName(nStreamIdx).c_str(),getInputName(nPacketIdx).c_str());
+                    vLatestInput[nStreamIdx] = transformImagePacket(nPacketIdx,vLatestInput[nStreamIdx],vStreamInfos[nStreamIdx]);
                 }
                 else
-                    lvAssert__(vStreamInfos[nStreamIdx].size.empty(),"unexpected empty raw stream (stream = %s, packet = %s)",pArrayLoader->getInputStreamName(nStreamIdx).c_str(),getInputName(nPacketIdx).c_str());
+                    lvAssert_(m_eInputType==UnspecifiedPacket,"unexpected packet type for not-array loader");
+                lvAssert__(vLatestInput[nStreamIdx].type()==vStreamInfos[nStreamIdx].type() && vLatestInput[nStreamIdx].size==vStreamInfos[nStreamIdx].size,
+                           "unexpected post-transform stream size/type --- need redirect override (stream = %s, packet = %s)",pArrayLoader->getInputStreamName(nStreamIdx).c_str(),getInputName(nPacketIdx).c_str());
             }
-            m_oLatestInput = lv::packData(vLatestInputs);
-            if(pArrayLoader->m_vPackedInputInfos.size()!=getInputCount())
-                pArrayLoader->m_vPackedInputInfos.resize(getInputCount());
-            pArrayLoader->m_vPackedInputInfos[nPacketIdx] = lv::MatInfo{m_oLatestInput.size,m_oLatestInput.type()};
+            else
+                lvAssert__(vStreamInfos[nStreamIdx].size.empty(),"unexpected empty raw stream (stream = %s, packet = %s)",pArrayLoader->getInputStreamName(nStreamIdx).c_str(),getInputName(nPacketIdx).c_str());
         }
-        else
-            lvError("unexpected data loader type");
+        return lv::packData(vLatestInput);
     }
-    const lv::MatInfo& oPacketInfo = getInputInfo(nPacketIdx);
-    if(!m_oLatestInput.empty() || !oPacketInfo.size.empty())
-        lvAssert__(m_oLatestInput.type()==oPacketInfo.type() && m_oLatestInput.size==oPacketInfo.size,"unexpected post-transform packet size/type --- need redirect override (packet = %s)",getInputName(nPacketIdx).c_str());
-    return m_oLatestInput;
 }
 
-const cv::Mat& lv::IIDataLoader::getGT_redirect(size_t nPacketIdx) {
+cv::Mat lv::IIDataLoader::getGT_redirect(size_t nPacketIdx) {
     lvDbgExceptionWatch;
     auto pNotArrayLoader = dynamic_cast<IDataLoader_<NotArray>*>(this);
     if(pNotArrayLoader) {
         lvDbgExceptionWatch;
         const lv::MatInfo& oPacketInfo = getGTInfo(nPacketIdx);
-        m_oLatestGT = pNotArrayLoader->getRawGT(nPacketIdx);
-        if(!m_oLatestGT.empty()) {
+        cv::Mat oLatestGT = pNotArrayLoader->getRawGT(nPacketIdx);
+        if(!oLatestGT.empty()) {
             if(m_eGTType==ImagePacket) {
-                lvAssert__(m_oLatestGT.dims<=2 && oPacketInfo.size.dims()<=2,"bad raw image formatting (gt packet #%d)",(int)nPacketIdx);
-                m_oLatestGT = transformImagePacket(nPacketIdx,m_oLatestGT,oPacketInfo);
+                lvAssert__(oLatestGT.dims<=2 && oPacketInfo.size.dims()<=2,"bad raw image formatting (gt packet #%d)",(int)nPacketIdx);
+                oLatestGT = transformImagePacket(nPacketIdx,oLatestGT,oPacketInfo);
             }
             else
                 lvAssert_(m_eGTType==UnspecifiedPacket,"unexpected packet type for not-array loader");
+            lvAssert__(oLatestGT.type()==oPacketInfo.type() && oLatestGT.size==oPacketInfo.size,"unexpected post-transform packet size/type --- need redirect override (gt packet #%d)",(int)nPacketIdx);
         }
         else
             lvAssert__(oPacketInfo.size.empty(),"unexpected empty raw image (gt packet #%d)",(int)nPacketIdx);
+        return oLatestGT;
     }
     else {
         auto pArrayLoader = dynamic_cast<IDataLoader_<Array>*>(this);
-        if(pArrayLoader) {
-            lvDbgExceptionWatch;
-            std::vector<cv::Mat> vLatestGTs = pArrayLoader->getRawGTArray(nPacketIdx);
-            lvAssert__(vLatestGTs.size()==pArrayLoader->getGTStreamCount(),"unexpected raw GT array size (gt packet #%d)",(int)nPacketIdx);
-            const std::vector<lv::MatInfo>& vStreamInfos = pArrayLoader->getGTInfoArray(nPacketIdx);
-            lvAssert__(vStreamInfos.size()==pArrayLoader->getGTStreamCount(),"unexpected raw GT info array size (gt packet #%d)",(int)nPacketIdx);
-            for(size_t nStreamIdx=0; nStreamIdx<vLatestGTs.size(); ++nStreamIdx) {
-                if(!vLatestGTs[nStreamIdx].empty()) {
-                    if(m_eGTType==ImageArrayPacket) {
-                        lvAssert__(vLatestGTs[nStreamIdx].dims<=2 && vStreamInfos[nStreamIdx].size.dims()<=2,"bad raw image formatting (stream = %s, gt packet #%d)",pArrayLoader->getGTStreamName(nStreamIdx).c_str(),(int)nPacketIdx);
-                        vLatestGTs[nStreamIdx] = transformImagePacket(nPacketIdx,vLatestGTs[nStreamIdx],vStreamInfos[nStreamIdx]);
-                    }
-                    else
-                        lvAssert_(m_eGTType==UnspecifiedPacket,"unexpected packet type for not-array loader");
-                    lvAssert__(vLatestGTs[nStreamIdx].type()==vStreamInfos[nStreamIdx].type() && vLatestGTs[nStreamIdx].size==vStreamInfos[nStreamIdx].size,
-                               "unexpected stream size/type --- need redirect override (stream = %s, gt packet #%d)",pArrayLoader->getGTStreamName(nStreamIdx).c_str(),(int)nPacketIdx);
+        lvDbgExceptionWatch;
+        lvAssert_(pArrayLoader,"unexpected loader type");
+        std::vector<cv::Mat> vLatestGT = pArrayLoader->getRawGTArray(nPacketIdx);
+        lvAssert__(vLatestGT.size()==pArrayLoader->getGTStreamCount(),"unexpected raw GT array size (gt packet #%d)",(int)nPacketIdx);
+        const std::vector<lv::MatInfo>& vStreamInfos = pArrayLoader->getGTInfoArray(nPacketIdx);
+        lvAssert__(vStreamInfos.size()==pArrayLoader->getGTStreamCount(),"unexpected raw GT info array size (gt packet #%d)",(int)nPacketIdx);
+        for(size_t nStreamIdx=0; nStreamIdx<vLatestGT.size(); ++nStreamIdx) {
+            if(!vLatestGT[nStreamIdx].empty()) {
+                if(m_eGTType==ImageArrayPacket) {
+                    lvAssert__(vLatestGT[nStreamIdx].dims<=2 && vStreamInfos[nStreamIdx].size.dims()<=2,"bad raw image formatting (stream = %s, gt packet #%d)",pArrayLoader->getGTStreamName(nStreamIdx).c_str(),(int)nPacketIdx);
+                    vLatestGT[nStreamIdx] = transformImagePacket(nPacketIdx,vLatestGT[nStreamIdx],vStreamInfos[nStreamIdx]);
                 }
                 else
-                    lvAssert__(vStreamInfos[nStreamIdx].size.empty(),"unexpected empty raw stream (stream = %s, gt packet #%d)",pArrayLoader->getGTStreamName(nStreamIdx).c_str(),(int)nPacketIdx);
+                    lvAssert_(m_eGTType==UnspecifiedPacket,"unexpected packet type for not-array loader");
+                lvAssert__(vLatestGT[nStreamIdx].type()==vStreamInfos[nStreamIdx].type() && vLatestGT[nStreamIdx].size==vStreamInfos[nStreamIdx].size,
+                           "unexpected post-transform stream size/type --- need redirect override (stream = %s, gt packet #%d)",pArrayLoader->getGTStreamName(nStreamIdx).c_str(),(int)nPacketIdx);
             }
-            m_oLatestGT = lv::packData(vLatestGTs);
-            if(pArrayLoader->m_vPackedGTInfos.size()!=getGTCount())
-                pArrayLoader->m_vPackedGTInfos.resize(getGTCount());
-            pArrayLoader->m_vPackedGTInfos[nPacketIdx] = lv::MatInfo{m_oLatestGT.size,m_oLatestGT.type()};
+            else
+                lvAssert__(vStreamInfos[nStreamIdx].size.empty(),"unexpected empty raw stream (stream = %s, gt packet #%d)",pArrayLoader->getGTStreamName(nStreamIdx).c_str(),(int)nPacketIdx);
         }
-        else
-            lvError("unexpected data loader type");
+        return lv::packData(vLatestGT);
     }
-    const lv::MatInfo& oPacketInfo = getGTInfo(nPacketIdx);
-    if(!m_oLatestGT.empty() || !oPacketInfo.size.empty())
-        lvAssert__(m_oLatestGT.type()==oPacketInfo.type() && m_oLatestGT.size==oPacketInfo.size,"unexpected post-transform packet size/type --- need redirect override (gt packet #%d)",(int)nPacketIdx);
-    return m_oLatestGT;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -722,16 +704,12 @@ const std::vector<cv::Mat>& lv::IDataLoader_<lv::Array>::getGTROIArray(size_t /*
     return m_vEmptyGTROIArray;
 }
 
-lv::MatInfo lv::IDataLoader_<lv::Array>::getInputInfo(size_t nPacketIdx) const {
-    if(nPacketIdx>=m_vPackedInputInfos.size())
-        return lv::MatInfo();
-    return m_vPackedInputInfos[nPacketIdx];
+lv::MatInfo lv::IDataLoader_<lv::Array>::getInputInfo(size_t /*nPacketIdx*/) const {
+    lvError("default getInputInfo impl called for array-based data loader (we do not hold packed info here)");
 }
 
-lv::MatInfo lv::IDataLoader_<lv::Array>::getGTInfo(size_t nPacketIdx) const {
-    if(nPacketIdx>=m_vPackedGTInfos.size())
-        return lv::MatInfo();
-    return m_vPackedGTInfos[nPacketIdx];
+lv::MatInfo lv::IDataLoader_<lv::Array>::getGTInfo(size_t /*nPacketIdx*/) const {
+    lvError("default getGTInfo impl called for array-based data loader (we do not hold packed info here)");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -910,6 +888,7 @@ size_t lv::IDataProducer_<lv::DatasetSource_VideoArray>::getExpectedLoadSize() c
     const std::vector<cv::Mat>& vROIArray = getFrameROIArray();
     const std::vector<lv::MatInfo>& vMatInfos = getInputInfoArray();
     lvAssert_(vROIArray.size()==vMatInfos.size(),"internal array sizes mismatch");
+    lvAssert_(vROIArray.size()==getInputStreamCount(),"internal array sizes mismatch");
     size_t nLoad = size_t(0);
     for(size_t nStreamIdx=0; nStreamIdx<vMatInfos.size(); ++nStreamIdx)
         nLoad += (vROIArray[nStreamIdx].empty()?vMatInfos[nStreamIdx].size.total():(size_t)cv::countNonZero(vROIArray[nStreamIdx]))*vMatInfos[nStreamIdx].type.elemSize()*getFrameCount();
@@ -1109,6 +1088,7 @@ size_t lv::IDataProducer_<lv::DatasetSource_ImageArray>::getExpectedLoadSize() c
         const std::vector<cv::Mat>& vROIArray = getInputROIArray(nPacketIdx);
         const std::vector<lv::MatInfo>& vMatInfos = getInputInfoArray(nPacketIdx);
         lvAssert_(vROIArray.size()==vMatInfos.size(),"internal array sizes mismatch");
+        lvAssert_(vROIArray.size()==getInputStreamCount(),"internal array sizes mismatch");
         for(size_t nStreamIdx=0; nStreamIdx<vMatInfos.size(); ++nStreamIdx)
             nLoad += (vROIArray[nStreamIdx].empty()?vMatInfos[nStreamIdx].size.total():(size_t)cv::countNonZero(vROIArray[nStreamIdx]))*vMatInfos[nStreamIdx].type.elemSize();
     }
