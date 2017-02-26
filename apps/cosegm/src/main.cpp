@@ -31,12 +31,15 @@
 #define DATASET_PRECACHING      1
 #define DATASET_SCALE_FACTOR    1.0
 #define DATASET_WORKTHREADS     1
+#define DATASET_VERBOSITY       3
 ////////////////////////////////
 
 #if (DATASET_VAPTRIMOD+DATASET_MINI_TESTS/*+...*/)!=1
 #error "Must pick a single dataset."
 #endif //(DATASET_+.../*+...*/)!=1
+#define DATASET_FEATURES_PATH "feat01"
 #if DATASET_VAPTRIMOD
+@@@@ untested, need to cleanup approx masks
 #define DATASET_ID Dataset_VAPtrimod2016
 #define DATASET_PARAMS \
     DATASET_OUTPUT_PATH,           /* => const std::string& sOutputDirName */ \
@@ -51,6 +54,8 @@
 #define DATASET_ID Dataset_CosegmTests
 #define DATASET_PARAMS \
     DATASET_OUTPUT_PATH,           /* => const std::string& sOutputDirName */ \
+    DATASET_FEATURES_PATH,         /* => const std::string& sFeaturesDirName */ \
+    1,                             /* => int nUseHalfGT */ \
     bool(WRITE_IMG_OUTPUT),        /* => bool bSaveOutput */ \
     bool(EVALUATE_OUTPUT),         /* => bool bUseEvaluator */ \
     DATASET_SCALE_FACTOR           /* => double dScaleFactor */
@@ -62,13 +67,13 @@ using DatasetType = lv::Dataset_<lv::DatasetTask_Cosegm,lv::DATASET_ID,lv::NonPa
 
 int main(int, char**) {
     try {
+        lv::datasets::setVerbosity(DATASET_VERBOSITY);
         DatasetType::Ptr pDataset = DatasetType::create(DATASET_PARAMS);
         lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false);
         const size_t nTotPackets = pDataset->getInputCount();
         const size_t nTotBatches = vpBatches.size();
         if(nTotBatches==0 || nTotPackets==0)
             lvError_("Could not parse any data for dataset '%s'",pDataset->getName().c_str());
-        std::cout << "Parsing complete. [" << nTotBatches << " batch(es)]" << std::endl;
         std::cout << "\n[" << lv::getTimeStamp() << "]\n" << std::endl;
         std::cout << "Executing algorithm with " << DATASET_WORKTHREADS << " thread(s)..." << std::endl;
         lv::WorkerPool<DATASET_WORKTHREADS> oPool;
@@ -95,82 +100,82 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
         lvAssert(oBatch.getInputPacketType()==lv::ImageArrayPacket && oBatch.getOutputPacketType()==lv::ImageArrayPacket);
         lvAssert(oBatch.getOutputStreamCount()>=2 && oBatch.getInputStreamCount()>=2); // app works with stereo heads (min 2 images at once)
+        lvAssert(oBatch.getIOMappingType()<=lv::IndexMapping && oBatch.getGTMappingType()==lv::ElemMapping); // will have more inputs than outputs, but still with pixel mapping
+        lvAssert(oBatch.getOutputStreamCount()*2==oBatch.getInputStreamCount()); // expect approx fg masks to be interlaced with input images
         if(DATASET_PRECACHING)
             oBatch.startPrecaching(!bool(EVALUATE_OUTPUT));
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
         std::cout << "\t\t" << sCurrBatchName << " @ init [" << sWorkerName << "]" << std::endl;
-        const size_t nTotPacketCount = oBatch.getFrameCount();
         const std::vector<cv::Mat>& vROIs = oBatch.getFrameROIArray();
         lvAssert(!vROIs.empty() && vROIs.size()==oBatch.getInputStreamCount());
         size_t nCurrIdx = 0;
-        const std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // mat content becomes invalid on next getInput call
-        lvAssert(!vInitInput.empty() && vInitInput.size()==oBatch.getInputStreamCount());
+        const std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // note: mat content becomes invalid on next getInput call
+        lvAssert(!vInitInput.empty() && vInitInput.size()==oBatch.getInputStreamCount() && vInitInput.size()>1);
+        for(size_t nStreamIdx=1; nStreamIdx<vInitInput.size(); ++nStreamIdx)
+            lvAssert(vInitInput[nStreamIdx].size()==vInitInput[0].size());
+        std::vector<lv::MatInfo> oInfoArray = oBatch.getInputInfoArray();
+        lv::MatSize oFrameSize = oInfoArray[0].size;
         std::vector<cv::Mat> vCurrFGMasks(oBatch.getOutputStreamCount());
         //std::shared_ptr<IEdgeDetector> pAlgo = std::make_shared<CosegmenterType>();
         // init & defaults...
 #if DISPLAY_OUTPUT>0
         lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
         //pAlgo->m_pDisplayHelper = pDisplayHelper;
-        std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs;
-        for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vInitInput.size(); ++nDisplayRowIdx) {
-            std::vector<std::pair<cv::Mat,std::string>> vRow(3);
-            vRow[0] = std::make_pair(vInitInput[nDisplayRowIdx].clone(),oBatch.getInputStreamName(nDisplayRowIdx));
-            vRow[1] = std::make_pair(cv::Mat(vInitInput[nDisplayRowIdx].size(),CV_8UC1,cv::Scalar_<uchar>(128)),"DEBUG");
-            vRow[2] = std::make_pair(cv::Mat(vInitInput[nDisplayRowIdx].size(),CV_8UC1,cv::Scalar_<uchar>(128)),"OUTPUT");
-            vvDisplayPairs.push_back(vRow);
+        lvAssert((vInitInput.size()%2)==0); // assume masks are interlaced with input images
+        std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs(vInitInput.size()/2);
+        for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vInitInput.size()/2; ++nDisplayRowIdx) {
+            std::vector<std::pair<cv::Mat,std::string>> vRow(4);
+            vRow[0] = std::make_pair(cv::Mat(oFrameSize(),vInitInput[nDisplayRowIdx*2].type()),oBatch.getInputStreamName(nDisplayRowIdx*2));
+            vRow[1] = std::make_pair(cv::Mat(oFrameSize(),CV_8UC1),"INIT APPROX");
+            vRow[2] = std::make_pair(cv::Mat(oFrameSize(),CV_8UC3),"DEBUG");
+            vRow[3] = std::make_pair(cv::Mat(oFrameSize(),CV_8UC1),"OUTPUT");
+            vvDisplayPairs[nDisplayRowIdx] = vRow;
         }
-        int nCurrTmpIdx = 0;
 #endif //DISPLAY_OUTPUT>0
+        const size_t nTotPacketCount = oBatch.getFrameCount();
         oBatch.startProcessing();
         while(nCurrIdx<nTotPacketCount) {
-            if(!((nCurrIdx+1)%100))
-                std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << "   [" << sWorkerName << "]" << std::endl;
+            //if(!((nCurrIdx+1)%100))
+                std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nCurrIdx/*+1*/ << "/" << nTotPacketCount << "   [" << sWorkerName << "]" << std::endl;
             const std::vector<cv::Mat>& vCurrInput = oBatch.getInputArray(nCurrIdx);
-            lvDbgAssert(vCurrInput.size()==vInitInput.size());
+            lvDbgAssert(vCurrInput.size()==oBatch.getInputStreamCount());
+            for(size_t nStreamIdx=0; nStreamIdx<vCurrInput.size(); ++nStreamIdx)
+                lvDbgAssert(oFrameSize==vCurrInput[nStreamIdx].size());
             //pAlgo->apply(vCurrInput,vCurrFGMasks,dDefaultThreshold);
+            lvAssert(vCurrFGMasks.size()==oBatch.getOutputStreamCount());
 #if DISPLAY_OUTPUT>0
             const std::vector<cv::Mat>& vCurrGT = oBatch.getGTArray(nCurrIdx);
             lvDbgAssert(vCurrGT.size()==vCurrFGMasks.size());
-
+#if DISPLAY_OUTPUT>1
             if(!vCurrGT[0].empty() && !vCurrGT[1].empty()) {
-
-                /*const std::string sTempOutPath = std::string(DATASET_OUTPUT_PATH)+"/tmp/";
-                cv::imwrite(cv::format("%simg%05da.png",sTempOutPath.c_str(),nCurrTmpIdx),vCurrInput[0]);
-                cv::imwrite(cv::format("%simg%05db.png",sTempOutPath.c_str(),nCurrTmpIdx),vCurrInput[1]);
-                cv::imwrite(cv::format("%sgt%05da.png",sTempOutPath.c_str(),nCurrTmpIdx),vCurrGT[0]);
-                cv::imwrite(cv::format("%sgt%05db.png",sTempOutPath.c_str(),nCurrTmpIdx),vCurrGT[1]);
-                cv::imwrite(sTempOutPath+"roia.png",vROIs[0]);
-                cv::imwrite(sTempOutPath+"roib.png",vROIs[1]);*/
-
-                cv::Mat test_rgb = vCurrInput[0].clone(), test_rgb_mask;
-                cv::bitwise_or(test_rgb/2,cv::Mat(vCurrInput[0].size(),CV_8UC3,cv::Scalar_<uchar>(127)),test_rgb_mask,vCurrGT[0]);
-                cv::imshow("rgb mask",test_rgb_mask);
-
-                cv::Mat test_thermal = vCurrInput[1].clone(), test_thermal_mask;
+                cv::Mat test_rgb = vCurrInput[0].clone(), gt_rgb_mask, approx_rgb_mask;
+                cv::bitwise_or(test_rgb/2,cv::Mat(vCurrInput[0].size(),CV_8UC3,cv::Scalar_<uchar>(127)),gt_rgb_mask,vCurrGT[0]);
+                cv::bitwise_or(test_rgb/2,cv::Mat(vCurrInput[0].size(),CV_8UC3,cv::Scalar_<uchar>(127)),approx_rgb_mask,vCurrInput[1]);
+                cv::imshow("gt_rgb_mask",gt_rgb_mask);
+                cv::imshow("approx_rgb_mask",approx_rgb_mask);
+                cv::Mat test_thermal = vCurrInput[2].clone(), gt_thermal_mask, approx_thermal_mask;
                 cv::cvtColor(test_thermal,test_thermal,cv::COLOR_GRAY2BGR);
-                cv::bitwise_or(test_thermal/2,cv::Mat(vCurrInput[1].size(),CV_8UC3,cv::Scalar_<uchar>(127)),test_thermal_mask,vCurrGT[1]);
-                cv::imshow("thermal mask",test_thermal_mask);
-
+                cv::bitwise_or(test_thermal/2,cv::Mat(vCurrInput[2].size(),CV_8UC3,cv::Scalar_<uchar>(127)),gt_thermal_mask,vCurrGT[1]);
+                cv::bitwise_or(test_thermal/2,cv::Mat(vCurrInput[2].size(),CV_8UC3,cv::Scalar_<uchar>(127)),approx_thermal_mask,vCurrInput[3]);
+                cv::imshow("gt_thermal_mask",gt_thermal_mask);
+                cv::imshow("approx_thermal_mask",approx_thermal_mask);
                 cv::Mat test_merge = test_rgb/2+test_thermal/2;
                 cv::imshow("merge",test_merge);
-
                 cv::Mat test_gt;
                 cv::merge(std::vector<cv::Mat>{vCurrGT[0]&vROIs[0],cv::Mat::zeros(vCurrGT[0].size(),CV_8UC1),vCurrGT[1]&vROIs[1]},test_gt);
                 cv::imshow("merge mask",test_gt);
-
             }
-
-            for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vCurrInput.size(); ++nDisplayRowIdx) {
-                vvDisplayPairs[nDisplayRowIdx][0].first = vCurrInput[nDisplayRowIdx];
-                //vvDisplayPairs[nDisplayRowIdx][1].first = ... output;
-                //vvDisplayPairs[nDisplayRowIdx][1].first = ... colored output;
+#endif //DISPLAY_OUTPUT>1
+            for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vCurrInput.size()/2; ++nDisplayRowIdx) {
+                vCurrInput[nDisplayRowIdx*2].copyTo(vvDisplayPairs[nDisplayRowIdx][0].first);
+                vCurrInput[nDisplayRowIdx*2+1].copyTo(vvDisplayPairs[nDisplayRowIdx][1].first);
+                // @@@@ cv::Mat(oFrameSize(),CV_8UC3,cv::Scalar_<uchar>::all(128)).copyTo(vvDisplayPairs[nDisplayRowIdx][2].first);
+                // @@@@ vCurrFGMasks[nDisplayRowIdx].copyTo(vvDisplayPairs[nDisplayRowIdx][3].first);
             }
             pDisplayHelper->display(vvDisplayPairs,cv::Size(320,240));
             const int nKeyPressed = pDisplayHelper->waitKey();
             if(nKeyPressed==(int)'q')
                 break;
-            else if(nKeyPressed==(int)'p')
-                ++nCurrTmpIdx;
 #endif //DISPLAY_OUTPUT>0
             oBatch.push(vCurrFGMasks,nCurrIdx++);
         }
