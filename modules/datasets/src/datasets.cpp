@@ -27,12 +27,12 @@ void lv::datasets::setRootPath(const std::string& sNewPath) {
     g_sDatasetsRootPath = lv::addDirSlashIfMissing(sNewPath);
 }
 
-int g_nDatasetsParserVerbosity = 1;
+int g_nDatasetsVerbosity = 1;
 
-int lv::datasets::getParserVerbosity() {
-    return g_nDatasetsParserVerbosity;
+int lv::datasets::getVerbosity() {
+    return g_nDatasetsVerbosity;
 }
 
-void lv::datasets::setParserVerbosity(int nLevel) {
-    g_nDatasetsParserVerbosity = nLevel;
+void lv::datasets::setVerbosity(int nLevel) {
+    g_nDatasetsVerbosity = nLevel;
 }

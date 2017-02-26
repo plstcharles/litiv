@@ -4,7 +4,7 @@
 #include "litiv/test.hpp"
 
 TEST(datasets_notarray,regression_custom) {
-    lv::datasets::setParserVerbosity(0);
+    lv::datasets::setVerbosity(0);
     using DatasetType = lv::Dataset_<lv::DatasetTask_EdgDet,lv::Dataset_Custom,lv::NonParallel>;
     const std::string sDatasetName = "customtest";
     const std::string sOutputRootPath = TEST_OUTPUT_DATA_ROOT "/custom_dataset_test/";
@@ -31,7 +31,7 @@ TEST(datasets_notarray,regression_custom) {
     ASSERT_FALSE(pDataset->isBare());
     ASSERT_TRUE(pDataset->isGroup());
     EXPECT_EQ(pDataset->getWorkBatchDirs(),vsWorkBatchDirs);
-    EXPECT_EQ(pDataset->getSkippedDirTokens(),std::vector<std::string>());
+    EXPECT_EQ(pDataset->getSkipTokens(),std::vector<std::string>());
     EXPECT_DOUBLE_EQ(pDataset->getScaleFactor(),1.0);
     EXPECT_EQ(pDataset->getParent(),lv::IDataHandlerConstPtr());
     EXPECT_TRUE(pDataset->isRoot());

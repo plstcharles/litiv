@@ -73,7 +73,6 @@ int main(int, char**) {
         const size_t nTotBatches = vpBatches.size();
         if(nTotBatches==0 || nTotPackets==0)
             lvError_("Could not parse any data for dataset '%s'",pDataset->getName().c_str());
-        std::cout << "Parsing complete. [" << nTotBatches << " batch(es)]" << std::endl;
         std::cout << "\n[" << lv::getTimeStamp() << "]\n" << std::endl;
         std::cout << "Executing algorithm with " << DATASET_WORKTHREADS << " thread(s)..." << std::endl;
         lv::WorkerPool<DATASET_WORKTHREADS> oPool;

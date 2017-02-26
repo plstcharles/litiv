@@ -7,7 +7,7 @@ TEST(datasets_array,regression_custom) {
 }
 
 TEST(datasets_array,regression_specialization) {
-    lv::datasets::setParserVerbosity(0);
+    lv::datasets::setVerbosity(0);
     using DatasetType = lv::Dataset_<lv::DatasetTask_Cosegm,lv::Dataset_Middlebury2005_demo,lv::NonParallel>;
     const std::string sOutputRootPath = TEST_OUTPUT_DATA_ROOT "/middlebury_test/";
     DatasetType::Ptr pDataset = DatasetType::create(sOutputRootPath,true);

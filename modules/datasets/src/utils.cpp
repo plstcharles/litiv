@@ -96,8 +96,23 @@ const std::string& lv::DataHandler::getRelativePath() const {
     return m_sRelativePath;
 }
 
-const std::vector<std::string>& lv::DataHandler::getSkippedDirTokens() const {
-    return m_oParent.getSkippedDirTokens();
+const std::vector<std::string>& lv::DataHandler::getSkipTokens() const {
+    return m_oParent.getSkipTokens();
+}
+
+std::string lv::DataHandler::printDataStructure(const std::string& sPrefix) const {
+    if(isGroup() && isBare()) {
+        auto vBatches = getBatches(true);
+        lvAssert(vBatches.size()==1);
+        return vBatches[0]->printDataStructure(sPrefix);
+    }
+    else if(isGroup()) {
+        std::string sOutput = sPrefix + " Group '" + getName() + "' [" + std::to_string(getExpectedLoadSize()/1024/1024) + " MB]\n";
+        for(auto& b : getBatches(true))
+            sOutput += b->printDataStructure(std::string(sPrefix.size(),' ')+"     \\=>");
+        return sOutput;
+    }
+    return sPrefix + " Batch '" + getName() + "' [" + std::to_string(getExpectedLoadSize()/1024/1024) + " MB]\n";
 }
 
 double lv::DataHandler::getScaleFactor() const {
@@ -130,7 +145,7 @@ bool lv::DataHandler::isEvaluating() const {
 
 inline const lv::IDataHandler& getRootNodeHelper(const lv::IDataHandler& oStart) {
     lvDbgExceptionWatch;
-    lv::IDataHandlerConstPtr p=oStart.shared_from_this();
+    lv::IDataHandlerConstPtr p = oStart.shared_from_this();
     while(!p->isRoot())
         p = p->getParent();
     return *p.get();
@@ -235,9 +250,8 @@ void lv::DataGroupHandler::parseData() {
     lvDbgExceptionWatch;
     m_vpBatches.clear();
     m_bIsBare = true;
-    if(!lv::string_contains_token(getName(),getSkippedDirTokens())) {
-        if(datasets::getParserVerbosity()>0)
-            std::cout << "\tParsing directory '" << getDataPath() << "' for work group '" << getName() << "'..." << std::endl;
+    if(!lv::string_contains_token(getName(),getSkipTokens())) {
+        lvDatasetsLog_(1,"\tParsing directory '%s' for work group '%s'...",getDataPath().c_str(),getName().c_str());
         // by default, all subdirs are considered work batch directories (if none, the category directory itself is a batch, and 'bare')
         const std::vector<std::string> vsWorkBatchPaths = lv::getSubDirsFromDir(getDataPath());
         if(vsWorkBatchPaths.empty())
@@ -247,7 +261,7 @@ void lv::DataGroupHandler::parseData() {
             for(const auto& sPathIter : vsWorkBatchPaths) {
                 const size_t nLastSlashPos = sPathIter.find_last_of("/\\");
                 const std::string sNewBatchName = nLastSlashPos==std::string::npos?sPathIter:sPathIter.substr(nLastSlashPos+1);
-                if(!lv::string_contains_token(sNewBatchName,getSkippedDirTokens()))
+                if(!lv::string_contains_token(sNewBatchName,getSkipTokens()))
                     m_vpBatches.push_back(createWorkBatch(sNewBatchName,getRelativePath()+lv::addDirSlashIfMissing(sNewBatchName)));
             }
         }
@@ -272,9 +286,12 @@ lv::DataPrecacher::~DataPrecacher() {
 
 const cv::Mat& lv::DataPrecacher::getPacket(size_t nIdx) {
     lvDbgExceptionWatch;
-    if(nIdx==m_nLastReqIdx)
+    if(nIdx==m_nLastReqIdx) {
+        lvDatasetsLog_(4,"data precacher [%" PRIxPTR "] skipping request, returning (last) packet at idx = %zu...",uintptr_t(this),nIdx);
         return m_oLastReqPacket;
+    }
     else if(!m_bIsActive) {
+        lvDatasetsLog_(4,"data precacher [%" PRIxPTR "] bypassing inactive precaching thread, fetching packet at idx = %zu...",uintptr_t(this),nIdx);
         m_oLastReqPacket = m_lCallback(nIdx);
         m_nLastReqIdx = nIdx;
         return m_oLastReqPacket;
@@ -285,12 +302,14 @@ const cv::Mat& lv::DataPrecacher::getPacket(size_t nIdx) {
     size_t nAnswIdx;
     do {
         m_oReqCondVar.notify_one();
+        lvDatasetsLog_(4,"data precacher [%" PRIxPTR "] sending request for packet at idx = %zu...",uintptr_t(this),nIdx);
         res = m_oSyncCondVar.wait_for(sync_lock,std::chrono::milliseconds(PRECACHE_REQUEST_TIMEOUT_MS));
         nAnswIdx = m_nAnswIdx.load();
-        if(datasets::getParserVerbosity()>2 && res==std::cv_status::timeout && nAnswIdx!=m_nReqIdx)
-            std::cout << "data precacher [" << uintptr_t(this) << "] retrying request for packet #" << nIdx << "..." << std::endl;
+        if(res==std::cv_status::timeout && nAnswIdx!=m_nReqIdx)
+            lvDatasetsLog_(3,"data precacher [%" PRIxPTR "] retrying request for packet #%zu...",uintptr_t(this),nIdx);
     } while(res==std::cv_status::timeout && nAnswIdx!=m_nReqIdx && !m_pWorkerException);
     if(m_pWorkerException) {
+        lvDatasetsLog_(0,"data precacher [%" PRIxPTR "] caught precacher exception while requesting packet #%zu, will rethrow...",uintptr_t(this),nIdx);
         m_bIsActive = false;
         m_hWorker.join();
         std::rethrow_exception(m_pWorkerException);
@@ -310,7 +329,9 @@ bool lv::DataPrecacher::startAsyncPrecaching(size_t nSuggestedBufferSize) {
         m_bIsActive = true;
         m_pWorkerException = nullptr;
         m_nAnswIdx = m_nReqIdx = size_t(-1);
-        m_hWorker = std::thread(&DataPrecacher::entry,this,std::max(std::min(nSuggestedBufferSize,CACHE_MAX_SIZE),CACHE_MIN_SIZE));
+        const size_t nBufferSize = std::max(std::min(nSuggestedBufferSize,CACHE_MAX_SIZE),CACHE_MIN_SIZE);
+        lvDatasetsLog_(2,"data precacher [%" PRIxPTR "] precaching thread init w/ buffer size = %zu mb",uintptr_t(this),(nBufferSize/1024)/1024);
+        m_hWorker = std::thread(&DataPrecacher::entry,this,nBufferSize);
     }
     return m_bIsActive;
 }
@@ -319,6 +340,7 @@ void lv::DataPrecacher::stopAsyncPrecaching() {
     lvDbgExceptionWatch;
     if(m_bIsActive) {
         m_bIsActive = false;
+        lvDatasetsLog_(2,"data precacher [%" PRIxPTR "] joining precaching thread",uintptr_t(this));
         m_hWorker.join();
     }
     if(m_pWorkerException)
@@ -329,8 +351,6 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
     lv::mutex_unique_lock sync_lock(m_oSyncMutex);
     try {
         lvDbgExceptionWatch;
-        if(datasets::getParserVerbosity()>1)
-            std::cout << "data precacher [" << uintptr_t(this) << "] init w/ buffer size = " << (nBufferSize/1024)/1024 << " mb" << std::endl;
         std::queue<cv::Mat> qoCache;
         std::vector<uchar> vcBuffer(nBufferSize);
         size_t nNextExpectedReqIdx = 0;
@@ -342,15 +362,19 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
             const cv::Mat oNextPacket = m_lCallback(nNextPrecacheIdx);
             const size_t nNextPacketSize = oNextPacket.total()*oNextPacket.elemSize();
             if(nNextPacketSize==0) {
+                if(!bReachedEnd)
+                    lvDatasetsLog_(3,"data precacher [%" PRIxPTR "] reached end of stream at idx = %zu",uintptr_t(this),nNextPrecacheIdx);
                 bReachedEnd = true;
                 return 0;
             }
-            else if(nFirstBufferIdx<=nNextBufferIdx) {
-                bReachedEnd = false;
-                if(nNextBufferIdx==size_t(-1) || (nNextBufferIdx+nNextPacketSize>=nBufferSize)) {
-                    if((nFirstBufferIdx!=size_t(-1) && nNextPacketSize>=nFirstBufferIdx) || nNextPacketSize>=nBufferSize)
+            bReachedEnd = false;
+            if(nFirstBufferIdx<=nNextBufferIdx) {
+                if(nNextBufferIdx==size_t(-1) || (nNextBufferIdx+nNextPacketSize>nBufferSize)) {
+                    if((nFirstBufferIdx!=size_t(-1) && nNextPacketSize>nFirstBufferIdx) || nNextPacketSize>nBufferSize) {
+                        lvDatasetsLog_(4,"data precacher [%" PRIxPTR "] cannot cache packet at idx = %zu with size = %zu kb (too big/cache full)",uintptr_t(this),nNextPrecacheIdx,nNextPacketSize/1024);
                         return 0;
-                    cv::Mat oNextPacket_cache(oNextPacket.size(),oNextPacket.type(),vcBuffer.data());
+                    }
+                    cv::Mat oNextPacket_cache(oNextPacket.dims,oNextPacket.size,oNextPacket.type(),vcBuffer.data());
                     oNextPacket.copyTo(oNextPacket_cache);
                     qoCache.push(oNextPacket_cache);
                     nNextBufferIdx = nNextPacketSize;
@@ -358,23 +382,24 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
                         nFirstBufferIdx = 0;
                 }
                 else { // nNextBufferIdx+nNextPacketSize<m_nBufferSize
-                    cv::Mat oNextPacket_cache(oNextPacket.size(),oNextPacket.type(),vcBuffer.data()+nNextBufferIdx);
+                    cv::Mat oNextPacket_cache(oNextPacket.dims,oNextPacket.size,oNextPacket.type(),vcBuffer.data()+nNextBufferIdx);
                     oNextPacket.copyTo(oNextPacket_cache);
                     qoCache.push(oNextPacket_cache);
                     nNextBufferIdx += nNextPacketSize;
                 }
             }
             else if(nNextBufferIdx+nNextPacketSize<nFirstBufferIdx) {
-                cv::Mat oNextPacket_cache(oNextPacket.size(),oNextPacket.type(),vcBuffer.data()+nNextBufferIdx);
+                cv::Mat oNextPacket_cache(oNextPacket.dims,oNextPacket.size,oNextPacket.type(),vcBuffer.data()+nNextBufferIdx);
                 oNextPacket.copyTo(oNextPacket_cache);
                 qoCache.push(oNextPacket_cache);
                 nNextBufferIdx += nNextPacketSize;
             }
-            else // nNextBufferIdx+nNextPacketSize>=nFirstBufferIdx
+            else {// nNextBufferIdx+nNextPacketSize>=nFirstBufferIdx
+                lvDatasetsLog_(4,"data precacher [%" PRIxPTR "] cannot cache packet at idx = %zu, with size = %zu kb (cache full)",uintptr_t(this),nNextPrecacheIdx,nNextPacketSize/1024);
                 return 0;
+            }
+            lvDatasetsLog_(4,"data precacher [%" PRIxPTR "] cached packet at idx = %zu, with size = %zu kb",uintptr_t(this),nNextPrecacheIdx,nNextPacketSize/1024);
             ++nNextPrecacheIdx;
-            if(datasets::getParserVerbosity()>3)
-                std::cout << "data precacher [" << uintptr_t(this) << "] filled one packet w/ size = " << nNextPacketSize/1024 << " kb" << std::endl;
             return nNextPacketSize;
         };
         const std::chrono::time_point<std::chrono::high_resolution_clock> nPrefillTick = std::chrono::high_resolution_clock::now();
@@ -382,10 +407,11 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
         while(m_bIsActive) {
             if(m_oReqCondVar.wait_for(sync_lock,std::chrono::milliseconds(bReachedEnd?PRECACHE_QUERY_END_TIMEOUT_MS:PRECACHE_QUERY_TIMEOUT_MS))!=std::cv_status::timeout) {
                 if(m_nReqIdx!=nNextExpectedReqIdx-1) {
+                    lvDatasetsLog_(4,"data precacher [%" PRIxPTR "] answering request for packet at idx = %zu...",uintptr_t(this),m_nReqIdx);
                     if(!qoCache.empty()) {
                         if(m_nReqIdx<nNextPrecacheIdx && m_nReqIdx>=nNextExpectedReqIdx) {
-                            if(datasets::getParserVerbosity()>2 && m_nReqIdx>nNextExpectedReqIdx)
-                                std::cout << "data precacher [" << uintptr_t(this) << "] popping " << m_nReqIdx-nNextExpectedReqIdx << " extra packet(s) from cache" << std::endl;
+                            if(m_nReqIdx>nNextExpectedReqIdx)
+                                lvDatasetsLog_(3,"data precacher [%" PRIxPTR "] popping %zu extra packet(s) from cache",uintptr_t(this),m_nReqIdx-nNextExpectedReqIdx);
                             while(m_nReqIdx-nNextExpectedReqIdx+1>0) {
                                 m_oReqPacket = qoCache.front();
                                 m_nAnswIdx = m_nReqIdx;
@@ -395,8 +421,7 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
                             }
                         }
                         else {
-                            if(datasets::getParserVerbosity()>2)
-                                std::cout << "data precacher [" << uintptr_t(this) << "] out-of-order request, destroying cache" << std::endl;
+                            lvDatasetsLog_(3,"data precacher [%" PRIxPTR "] out-of-order request (expected = %zu), destroying cache",uintptr_t(this),nNextExpectedReqIdx);
                             qoCache = std::queue<cv::Mat>();
                             m_oReqPacket = m_lCallback(m_nReqIdx);
                             m_nAnswIdx = m_nReqIdx;
@@ -406,24 +431,22 @@ void lv::DataPrecacher::entry(const size_t nBufferSize) {
                         }
                     }
                     else {
-                        if(datasets::getParserVerbosity()>2)
-                            std::cout << "data precacher [" << uintptr_t(this) << "] answering request manually, precaching is falling behind" << std::endl;
+                        lvDatasetsLog_(3,"data precacher [%" PRIxPTR "] answering request manually, precaching is falling behind",uintptr_t(this));
                         m_oReqPacket = m_lCallback(m_nReqIdx);
                         m_nAnswIdx = m_nReqIdx;
                         nFirstBufferIdx = nNextBufferIdx = size_t(-1);
                         nNextExpectedReqIdx = nNextPrecacheIdx = m_nReqIdx+1;
                     }
                 }
-                else if(datasets::getParserVerbosity()>2)
-                    std::cout << "data precacher [" << uintptr_t(this) << "] answering request using last packet" << std::endl;
+                else
+                    lvDatasetsLog_(3,"data precacher [%" PRIxPTR "] answering request using last packet at idx = %zu",uintptr_t(this),m_nReqIdx);
                 m_oSyncCondVar.notify_one();
                 lCacheNextPacket();
             }
             else if(!bReachedEnd) {
                 const size_t nUsedBufferSize = nFirstBufferIdx==size_t(-1)?0:(nFirstBufferIdx<nNextBufferIdx?nNextBufferIdx-nFirstBufferIdx:nBufferSize-nFirstBufferIdx+nNextBufferIdx);
                 if(nUsedBufferSize<nBufferSize/4) {
-                    if(datasets::getParserVerbosity()>2)
-                        std::cout << "data precacher [" << uintptr_t(this) << "] force refilling precache buffer... (current size = " << (nUsedBufferSize/1024)/1024 << " mb)" << std::endl;
+                    lvDatasetsLog_(3,"data precacher [%" PRIxPTR "] force refilling precache buffer... (current size = %zu mb)",uintptr_t(this),(nUsedBufferSize/1024)/1024);
                     size_t nFillCount = 0;
                     const std::chrono::time_point<std::chrono::high_resolution_clock> nRefillTick = std::chrono::high_resolution_clock::now();
                     while(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now()-nRefillTick).count()<PRECACHE_REFILL_TIMEOUT_MS && nFillCount++<10 && lCacheNextPacket());
@@ -444,6 +467,7 @@ void lv::IIDataLoader::startPrecaching(bool bPrecacheInputOnly, size_t nSuggeste
     lvDbgExceptionWatch;
     if(nSuggestedBufferSize==SIZE_MAX)
         nSuggestedBufferSize = getExpectedLoadSize();
+    lvDatasetsLog_(3,"data loader [%" PRIxPTR "] for batch '%s' will start precaching w/ buffer size = %zu mb\n\tnote: precacher ids = %" PRIxPTR ", %" PRIxPTR ", %" PRIxPTR,uintptr_t(this),getName().c_str(),(nSuggestedBufferSize/1024)/1024,uintptr_t(&m_oInputPrecacher),uintptr_t(&m_oGTPrecacher),uintptr_t(&m_oFeaturesPrecacher));
     lvAssert_(m_oInputPrecacher.startAsyncPrecaching(nSuggestedBufferSize),"could not start precaching input packets");
     if(!bPrecacheInputOnly) {
         lvAssert_(m_oGTPrecacher.startAsyncPrecaching(nSuggestedBufferSize),"could not start precaching gt packets");
@@ -828,24 +852,30 @@ void lv::IDataProducer_<lv::DatasetSource_Video>::parseData() {
     m_oInputInfo = lv::MatInfo();
     m_oGTInfo = lv::MatInfo();
     cv::Mat oTempImg;
-    m_voVideoReader.open(getDataPath());
+    std::string sVideoFilePath = getDataPath();
+    m_voVideoReader.open(sVideoFilePath);
     if(!m_voVideoReader.isOpened()) {
         m_vsInputPaths = lv::getFilesFromDir(getDataPath());
         if(m_vsInputPaths.size()>1) {
             oTempImg = cv::imread(m_vsInputPaths[0],cv::IMREAD_UNCHANGED);
             m_nFrameCount = m_vsInputPaths.size();
+            if(!oTempImg.empty())
+                lvDatasetsLog_(2,"default video data producer impl found valid frames at '%s'",getDataPath().c_str());
         }
-        else if(m_vsInputPaths.size()==1)
-            m_voVideoReader.open(m_vsInputPaths[0]);
+        else if(m_vsInputPaths.size()==1) {
+            sVideoFilePath = m_vsInputPaths[0];
+            m_voVideoReader.open(sVideoFilePath);
+        }
     }
     if(m_voVideoReader.isOpened()) {
+        lvDatasetsLog_(2,"default video data producer impl found valid video file at '%s'",sVideoFilePath.c_str());
         m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
         m_voVideoReader >> oTempImg;
         m_voVideoReader.set(cv::CAP_PROP_POS_FRAMES,0);
         m_nFrameCount = (size_t)m_voVideoReader.get(cv::CAP_PROP_FRAME_COUNT);
     }
     if(oTempImg.empty())
-        lvError_("Sequence '%s': video could not be opened via VideoReader or imread (you might need to implement your own DataProducer_ interface)",getName().c_str());
+        lvError_("video could not be opened via VideoReader or imread for batch '%s' (you might need to implement your own DataProducer_ interface)",getName().c_str());
     const double dScale = getScaleFactor();
     if(dScale!=1.0)
         cv::resize(oTempImg,oTempImg,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
@@ -1049,6 +1079,7 @@ void lv::IDataProducer_<lv::DatasetSource_Image>::parseData() {
     lv::filterFilePaths(m_vsInputPaths,{},{".jpg",".png",".bmp"});
     if(m_vsInputPaths.empty())
         lvError_("Set '%s' did not possess any jpg/png/bmp image files",getName().c_str());
+    lvDatasetsLog_(2,"default image data producer impl found %zu potential jpg/png/bmp files at '%s'",m_vsInputPaths.size(),getDataPath().c_str());
     m_vInputInfos.reserve(m_vsInputPaths.size());
     lv::MatInfo oLastInfo;
     const double dScale = getScaleFactor();
@@ -1163,6 +1194,7 @@ size_t lv::IDataCounter::getFinalOutputCount() {
 }
 
 void lv::IDataCounter::countOutput(size_t nPacketIdx) {
+    lvDatasetsLog_(4,"data counter for batch '%s' registered output packet with idx = %zu",getName().c_str(),nPacketIdx);
     m_mProcessedPackets.insert(nPacketIdx);
 }
 
@@ -1204,6 +1236,7 @@ size_t lv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
     cv::Mat oPacketCopy = oPacket.clone();
     size_t nPacketPosition;
     {
+        lvDatasetsLog_(4,"data writer [%" PRIxPTR "] received packet at idx = %zu...",uintptr_t(this),nIdx);
         lv::mutex_unique_lock sync_lock(m_oSyncMutex);
         if(!m_bAllowPacketDrop)
             m_oClearCondVar.wait(sync_lock,[&]{return m_nQueueSize+nPacketSize<=m_nQueueMaxSize;});
@@ -1216,13 +1249,12 @@ size_t lv::DataWriter::queue(const cv::Mat& oPacket, size_t nIdx) {
             m_oQueueCondVar.notify_one();
         }
         else {
-            if(datasets::getParserVerbosity()>2)
-                std::cout << "data writer [" << uintptr_t(this) << "] dropping packet #" << nIdx << std::endl;
+            lvDatasetsLog_(3,"data writer [%" PRIxPTR "] dropping packet at idx = %zu (reached max queue size)",uintptr_t(this),nIdx);
             nPacketPosition = SIZE_MAX; // packet dropped
         }
     }
-    if(datasets::getParserVerbosity()>2 && (nIdx%50)==0)
-        std::cout << "data writer [" << uintptr_t(this) << "] queue @ " << (int)(((float)m_nQueueSize*100)/m_nQueueMaxSize) << "% capacity" << std::endl;
+    if((nIdx%50)==0)
+        lvDatasetsLog_(3,"data writer [%" PRIxPTR "] queue currently at %d%% capacity",uintptr_t(this),(int)(((float)m_nQueueSize*100)/m_nQueueMaxSize));
     return nPacketPosition;
 }
 
@@ -1236,6 +1268,7 @@ bool lv::DataWriter::startAsyncWriting(size_t nSuggestedQueueSize, bool bDropPac
         m_nQueueCount = 0;
         m_mQueue.clear();
         m_vhWorkers.clear();
+        lvDatasetsLog_(2,"data writer [%" PRIxPTR "] writing thread init (%zu) w/ queue size = %zu mb",uintptr_t(this),nWorkers,(m_nQueueMaxSize/1024)/1024);
         for(size_t n=0; n<nWorkers; ++n)
             m_vhWorkers.emplace_back(std::bind(&DataWriter::entry,this));
     }
@@ -1246,6 +1279,7 @@ void lv::DataWriter::stopAsyncWriting() {
     lvDbgExceptionWatch;
     if(m_bIsActive) {
         {
+            lvDatasetsLog_(2,"data writer [%" PRIxPTR "] joining writing threads",uintptr_t(this));
             lv::mutex_unique_lock sync_lock(m_oSyncMutex);
             m_bIsActive = false;
             m_oQueueCondVar.notify_all();
@@ -1263,8 +1297,6 @@ void lv::DataWriter::stopAsyncWriting() {
 void lv::DataWriter::entry() {
     lvDbgExceptionWatch;
     lv::mutex_unique_lock sync_lock(m_oSyncMutex);
-    if(datasets::getParserVerbosity()>1)
-        std::cout << "data writer [" << uintptr_t(this) << "] init w/ max buffer size = " << (m_nQueueMaxSize/1024)/1024 << " mb" << std::endl;
     while(m_bIsActive || m_nQueueCount>0) {
         m_oQueueCondVar.wait(sync_lock,[&](){return !m_bIsActive || m_nQueueCount>0;});
         if(m_nQueueCount>0) {
@@ -1274,6 +1306,7 @@ void lv::DataWriter::entry() {
                 if(nPacketSize<=m_nQueueSize) {
                     try {
                         lv::unlock_guard<lv::mutex_unique_lock> oUnlock(sync_lock);
+                        lvDatasetsLog_(4,"data writer [%" PRIxPTR "] writing packet at idx = %zu, with size = %zu kb",uintptr_t(this),pCurrPacket->first,nPacketSize/1024);
                         m_lCallback(pCurrPacket->second,pCurrPacket->first);
                     }
                     catch(...) {
@@ -1593,8 +1626,18 @@ const std::vector<std::string>& lv::DatasetHandler::getWorkBatchDirs() const {
     return m_vsWorkBatchDirs;
 }
 
-const std::vector<std::string>& lv::DatasetHandler::getSkippedDirTokens() const {
+const std::vector<std::string>& lv::DatasetHandler::getSkipTokens() const {
     return m_vsSkippedDirTokens;
+}
+
+std::string lv::DatasetHandler::printDataStructure(const std::string& sPrefix) const {
+    auto vBatches = getBatches(true);
+    if(vBatches.empty())
+        return sPrefix + " Dataset '" + getName() + "' [empty]\n";
+    std::string sOutput = sPrefix + " Dataset '" + getName() + "' [" + std::to_string(getExpectedLoadSize()/1024/1024) + " MB]\n";
+    for(auto& b : getBatches(true))
+        sOutput += b->printDataStructure(sPrefix+"     \\=>");
+    return sOutput;
 }
 
 double lv::DatasetHandler::getScaleFactor() const {

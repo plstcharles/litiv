@@ -57,7 +57,6 @@ int main(int, char**) { // this sample uses no command line argument
         DatasetType::Ptr pDataset = DatasetType::create("results_test"); // 'results_test' is the name of the output folder where logs/results will be saved
         lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false); // returns a list of all work batches in the dataset without considering hierarchy
         lvAssert__(vpBatches.size()>0 && pDataset->getInputCount()>0,"Could not parse any data for dataset '%s'",pDataset->getName().c_str()); // check that data was indeed properly parsed
-        std::cout << "Parsing complete. [" << vpBatches.size() << " batch(es)]" << std::endl; // a 'batch' is an instance of evaluable work for the specified task (batches can also be grouped by category)
         for(auto& pBatch : vpBatches) { // loop over all batches (or over all image array sets, in this case)
             DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch); // cast the batch object for full task-specific interface accessibility
             std::cout << "\tDisplaying batch '" << oBatch.getName() << "'" << std::endl;
@@ -145,7 +144,6 @@ int main(int, char**) { // this sample uses no command line argument
 
         lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false); // returns a list of all work batches in the dataset without considering hierarchy
         lvAssert__(vpBatches.size()>0 && pDataset->getInputCount()>0,"Could not parse any data for dataset '%s'",pDataset->getName().c_str()); // check that data was indeed properly parsed
-        std::cout << "Parsing complete. [" << vpBatches.size() << " batch(es)]" << std::endl;
         std::shared_ptr<IEdgeDetector> pAlgo = std::make_shared<EdgeDetectorLBSP>(); // instantiate an edge detector algo with default parameters
         cv::Mat oEdgeMask; // no need to preallocate the output matrix (the algo will make sure it is allocated at some point)
         size_t nProcessedBatches = 0; // used to keep track of how many work batches have been processed (for display purposes only)

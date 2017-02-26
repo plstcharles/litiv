@@ -37,10 +37,10 @@ namespace lv {
         const std::string& getRootPath();
         /// sets the path where datasets should be found on the system (will be kept using a global variable)
         void setRootPath(const std::string& sNewPath);
-        /// returns the global dataset parser verbosity level (greater = more verbose)
-        int getParserVerbosity();
-        /// sets the global datset parser verbosity level (greater = more verbose)
-        void setParserVerbosity(int nLevel);
+        /// returns the datasets module verbosity level (greater = more verbose, default = 1)
+        int getVerbosity();
+        /// sets the datasets module verbosity level (greater = more verbose, default = 1)
+        void setVerbosity(int nLevel);
 
         /// global dataset object creation method with dataset impl specialization (forwards extra args to dataset constructor)
         template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl, typename... Targs>
@@ -73,7 +73,7 @@ namespace lv {
         struct WorkBatchGroup;
 
         /// fully implemented+specialized work batch for the current dataset specialization
-        struct WorkBatch :
+        struct WorkBatch final :
                 public DataHandler_<eDatasetTask,eDatasetSource,eDataset>,
                 public DataProducer_<eDatasetTask,eDatasetSource,eDataset>,
                 public DataTemplSpec_<eDatasetTask,eDatasetSource,eDataset,eDatasetEval>,
@@ -133,20 +133,19 @@ namespace lv {
         };
 
         /// fully implemented+specialized work batch group for the current dataset specialization
-        struct WorkBatchGroup :
+        struct WorkBatchGroup final :
                 public DataHandler_<eDatasetTask,eDatasetSource,eDataset>,
                 public DataGroupHandler_<eDatasetTask,eDatasetSource,eDataset>,
                 public DataTemplSpec_<eDatasetTask,eDatasetSource,eDataset,eDatasetEval>,
                 public DataReporter_<eDatasetEval,eDataset> {
             /// default destructor, should stay public so smart pointers can access it
             virtual ~WorkBatchGroup() = default;
-
         protected:
             /// creates and returns a work batch for a given relative dataset path
             virtual IDataHandlerPtr createWorkBatch(const std::string& sBatchName, const std::string& sRelativePath) const override {
                 lvDbgExceptionWatch;
                 static_assert((!std::is_abstract<WorkBatch>::value),"Work batch class must be non-abstract (check for missing virtual pure impls in interface specializations)");
-                auto p = std::shared_ptr<WorkBatch>(new WorkBatch(sBatchName,sRelativePath,*this));
+                auto p = std::shared_ptr<WorkBatch>(new WorkBatch(sBatchName,sRelativePath,*this)); // cannot use make_shared here due to final class & private constr
                 p->parseData();
                 return p;
             }
@@ -163,19 +162,19 @@ namespace lv {
         virtual IDataHandlerPtr createWorkBatch(const std::string& sBatchName, const std::string& sRelativePath) const override {
             lvDbgExceptionWatch;
             static_assert((!std::is_abstract<WorkBatchGroup>::value),"Work batch group class must be non-abstract (check for missing virtual pure impls in interface specializations)");
-            auto p = std::shared_ptr<WorkBatchGroup>(new WorkBatchGroup(sBatchName,sRelativePath,*this));
+            auto p = std::shared_ptr<WorkBatchGroup>(new WorkBatchGroup(sBatchName,sRelativePath,*this)); // cannot use make_shared here due to final class & private constr
             p->parseData();
             return p;
         }
         /// clears all batches and reparses them from the dataset metadata
         virtual void parseData() override final {
             lvDbgExceptionWatch;
-            if(datasets::getParserVerbosity()>0)
-                std::cout << "Parsing directory '" << this->getDataPath() << "' for dataset '" << this->getName() << "'..." << std::endl;
+            lvDatasetsLog_(1,"Parsing directory '%s' for dataset '%s'...",this->getDataPath().c_str(),this->getName().c_str());
             this->m_bIsBare = false; // always false by default for top level
             this->m_vpBatches.clear();
             for(const auto& sPathIter : this->getWorkBatchDirs())
-                this->m_vpBatches.push_back(createWorkBatch(sPathIter,lv::addDirSlashIfMissing(sPathIter)));
+                this->m_vpBatches.push_back(this->createWorkBatch(sPathIter,lv::addDirSlashIfMissing(sPathIter)));
+            lvDatasetsLog_(1,"Parsing complete. [%d batch(es)]\n%s",(int)this->getBatches(false).size(),this->printDataStructure("").c_str());
         }
     protected:
         /// full dataset constructor (copied from DatasetHandler to avoid msvc2015 bug); parameters are passed through lv::datasets::create<...>(...), and may be caught/simplified by a specialization
@@ -219,7 +218,7 @@ namespace lv {
                 DatasetWrapper(Targs&&... _args) : Dataset_<eDatasetTask,eDataset,eEvalImpl>(std::forward<Targs>(_args)...) {} // cant do 'using BaseCstr::BaseCstr;' since it keeps the access level
             };
             auto p = std::make_shared<DatasetWrapper>(std::forward<Targs>(args)...);
-            lvAssert__(lv::checkIfExists(p->getDataPath()),"\ndirectory for dataset '%s' not found!\n\t --- searched at '%s';\n\t --- try moving the root search path via lv::datasets::setRootPath(...)\n",p->getName().c_str(),p->getDataPath().c_str());
+            lvAssert__(lv::checkIfExists(p->getDataPath()),"\ntop directory for dataset '%s' not found!\n\t --- searched at '%s';\n\t --- try moving the root search path via lv::datasets::setRootPath(...)\n",p->getName().c_str(),p->getDataPath().c_str());
             p->parseData();
             return p;
         }

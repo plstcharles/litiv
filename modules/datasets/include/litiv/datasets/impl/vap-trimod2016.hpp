@@ -83,7 +83,7 @@ namespace lv {
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
             this->m_vpBatches.clear();
             this->m_bIsBare = true; // in this dataset, work batch groups are always bare
-            if(!lv::string_contains_token(this->getName(),this->getSkippedDirTokens()))
+            if(!lv::string_contains_token(this->getName(),this->getSkipTokens()))
                 this->m_vpBatches.push_back(this->createWorkBatch(this->getName(),this->getRelativePath()));
         }
     };

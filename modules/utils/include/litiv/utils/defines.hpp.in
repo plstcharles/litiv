@@ -108,6 +108,8 @@
     #define lvAssert(expr) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(0)
     #define lvAssert_(expr,msg) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(0)
     #define lvAssert__(expr,msg,...) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);} while(0)
+    #define lvDatasetsLog(level,msg) do {if(lv::datasets::getVerbosity()>=level) std::cout << msg << std::endl;} while(0)
+    #define lvDatasetsLog_(level,msg,...) do {if(lv::datasets::getVerbosity()>=level) std::cout << lv::putf(msg,__VA_ARGS__) << std::endl;} while(0)
     #define glErrorCheck do { \
         const GLenum __errn = glGetError(); \
         if(__errn!=GL_NO_ERROR) \
