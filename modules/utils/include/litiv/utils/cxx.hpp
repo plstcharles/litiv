@@ -271,6 +271,16 @@ namespace lv {
         return std::vector<typename std::iterator_traits<Titer>::value_type>(mMap.begin(),mMap.end());
     }
 
+    /// returns the vector of all integer values in the [a,b] range (empty if b<a)
+    template<typename Tinteger>
+    inline std::vector<Tinteger> make_range(Tinteger a, Tinteger b) {
+        if(b<a)
+            return std::vector<Tinteger>{};
+        std::vector<Tinteger> vRet(size_t(b-a)+1);
+        std::iota(vRet.begin(),vRet.end(),a);
+        return vRet;
+    }
+
     /// implements a work thread pool used to process packaged tasks asynchronously
     template<size_t nWorkers>
     struct WorkerPool {

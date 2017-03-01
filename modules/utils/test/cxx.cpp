@@ -199,6 +199,26 @@ TYPED_TEST(unique_fixture,regression) {
     EXPECT_EQ(lv::unique(vVals.begin(),vVals.end()),(std::vector<TypeParam>{TypeParam(-100),TypeParam(-1),TypeParam(0),TypeParam(1),TypeParam(3),TypeParam(7),TypeParam(8),TypeParam(100)}));
 }
 
+namespace {
+    template<typename T>
+    struct make_range_fixture : testing::Test {};
+    typedef testing::Types<char, uchar, short, ushort, int, uint, size_t> make_range_types;
+}
+TYPED_TEST_CASE(make_range_fixture,make_range_types);
+TYPED_TEST(make_range_fixture,regression) {
+    EXPECT_EQ((lv::make_range(TypeParam(0),TypeParam(0))),(std::vector<TypeParam>{0}));
+    EXPECT_EQ((lv::make_range(TypeParam(0),TypeParam(1))),(std::vector<TypeParam>{0,1}));
+    EXPECT_EQ((lv::make_range(TypeParam(1),TypeParam(0))),(std::vector<TypeParam>{}));
+    EXPECT_EQ((lv::make_range(TypeParam(0),TypeParam(5))),(std::vector<TypeParam>{0,1,2,3,4,5}));
+    EXPECT_EQ((lv::make_range(TypeParam(5),TypeParam(9))),(std::vector<TypeParam>{5,6,7,8,9}));
+    if(std::is_signed<TypeParam>::value) {
+        EXPECT_EQ((lv::make_range(TypeParam(-1),TypeParam(-10))),(std::vector<TypeParam>{}));
+        EXPECT_EQ((lv::make_range(TypeParam(-1),TypeParam(-1))),(std::vector<TypeParam>{TypeParam(-1)}));
+        EXPECT_EQ((lv::make_range(TypeParam(-1),TypeParam(0))),(std::vector<TypeParam>{TypeParam(-1),0}));
+        EXPECT_EQ((lv::make_range(TypeParam(-2),TypeParam(2))),(std::vector<TypeParam>{TypeParam(-2),TypeParam(-1),0,1,2}));
+    }
+}
+
 TEST(WorkerPool,regression_1thread) {
     lv::WorkerPool<1> wp1;
     std::future<size_t> nRes1 = wp1.queueTask([](){std::this_thread::sleep_for(std::chrono::seconds(1));return size_t(13);});
