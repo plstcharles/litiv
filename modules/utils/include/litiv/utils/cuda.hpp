@@ -23,7 +23,7 @@
     device::func<<<kparams.vGridSize,kparams.vBlockSize,kparams.nSharedMemSize,kparams.nStream>>>(__VA_ARGS__); \
     const cudaError_t __errn = cudaGetLastError(); \
     if(__errn!=cudaSuccess) { \
-        printf("cuda kernel '" #func "' execution failed [code=%d, msg=%s]\n\t... in function '%s' from %s(%d)\n",(int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
+        printf("cuda kernel '" #func "' execution failed [code=%d, msg=%s]\n\t... in function '%s'\n\t... from %s(%d)\n",(int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
         std::exit((int)__errn); \
     } \
 } while(0)

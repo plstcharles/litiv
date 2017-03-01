@@ -118,7 +118,7 @@
     #define cudaErrorCheck(test) do { \
         const cudaError_t __errn = test; \
         if(__errn!=cudaSuccess) { \
-            printf("cudaErrorCheck failed [code=%d, msg=%s]\n\t... in function '%s' from %s(%d)\n",(int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
+            printf("cudaErrorCheck failed [code=%d, msg=%s]\n\t... in function '%s'\n\t... from %s(%d)\n",(int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
             std::exit((int)__errn); \
         } \
     } while(0)
