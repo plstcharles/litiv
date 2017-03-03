@@ -211,11 +211,16 @@ TYPED_TEST(make_range_fixture,regression) {
     EXPECT_EQ((lv::make_range(TypeParam(1),TypeParam(0))),(std::vector<TypeParam>{}));
     EXPECT_EQ((lv::make_range(TypeParam(0),TypeParam(5))),(std::vector<TypeParam>{0,1,2,3,4,5}));
     EXPECT_EQ((lv::make_range(TypeParam(5),TypeParam(9))),(std::vector<TypeParam>{5,6,7,8,9}));
+    EXPECT_EQ((lv::make_range(TypeParam(5),TypeParam(9),TypeParam(2))),(std::vector<TypeParam>{5,7,9}));
+    EXPECT_EQ((lv::make_range(TypeParam(0),TypeParam(6),TypeParam(3))),(std::vector<TypeParam>{0,3,6}));
     if(std::is_signed<TypeParam>::value) {
         EXPECT_EQ((lv::make_range(TypeParam(-1),TypeParam(-10))),(std::vector<TypeParam>{}));
         EXPECT_EQ((lv::make_range(TypeParam(-1),TypeParam(-1))),(std::vector<TypeParam>{TypeParam(-1)}));
         EXPECT_EQ((lv::make_range(TypeParam(-1),TypeParam(0))),(std::vector<TypeParam>{TypeParam(-1),0}));
         EXPECT_EQ((lv::make_range(TypeParam(-2),TypeParam(2))),(std::vector<TypeParam>{TypeParam(-2),TypeParam(-1),0,1,2}));
+        EXPECT_EQ((lv::make_range(TypeParam(-2),TypeParam(2),TypeParam(2))),(std::vector<TypeParam>{TypeParam(-2),0,2}));
+        EXPECT_EQ((lv::make_range(TypeParam(-2),TypeParam(2),TypeParam(4))),(std::vector<TypeParam>{TypeParam(-2),2}));
+        EXPECT_EQ((lv::make_range(TypeParam(-10),TypeParam(-1),TypeParam(3))),(std::vector<TypeParam>{TypeParam(-10),TypeParam(-7),TypeParam(-4),TypeParam(-1)}));
     }
 }
 

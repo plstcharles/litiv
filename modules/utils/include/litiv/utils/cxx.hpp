@@ -271,13 +271,22 @@ namespace lv {
         return std::vector<typename std::iterator_traits<Titer>::value_type>(mMap.begin(),mMap.end());
     }
 
-    /// returns the vector of all integer values in the [a,b] range (empty if b<a)
+    /// returns the vector of all integer values in the [a,b] range (empty if b<a), with optional step size
     template<typename Tinteger>
-    inline std::vector<Tinteger> make_range(Tinteger a, Tinteger b) {
+    inline std::vector<Tinteger> make_range(Tinteger a, Tinteger b, Tinteger nStep=Tinteger(1)) {
+        static_assert(std::is_integral<Tinteger>::value,"input type must be integral");
         if(b<a)
             return std::vector<Tinteger>{};
-        std::vector<Tinteger> vRet(size_t(b-a)+1);
-        std::iota(vRet.begin(),vRet.end(),a);
+        if(nStep==Tinteger(1)) {
+            std::vector<Tinteger> vRet(size_t(b-a)+1);
+            std::iota(vRet.begin(),vRet.end(),a);
+            return vRet;
+        }
+        lvAssert_(nStep>0,"specified step size must be strictly positive");
+        lvAssert_((size_t(b-a)%nStep)==size_t(0),"interval size must be a multiple of integer step size");
+        std::vector<Tinteger> vRet(size_t(b-a)/nStep+1);
+        Tinteger nVal = (vRet[0]=a);
+        std::generate(vRet.begin()+1,vRet.end(),[&nVal,&nStep](){return nVal+=nStep;});
         return vRet;
     }
 
