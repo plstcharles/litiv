@@ -58,6 +58,19 @@ namespace lv {
         return (uintptr_t(pData)%nByteAlign)==0;
     }
 
+    /// returns whether a given matrix element type is opencv-compatible or not (i.e. whether it can be used in a cv::Mat_ class)
+    template<typename T>
+    constexpr bool isElemTypeCompat() {
+        return
+            std::is_same<uchar,T>::value ||
+            std::is_same<char,T>::value ||
+            std::is_same<short,T>::value ||
+            std::is_same<ushort,T>::value ||
+            std::is_same<int,T>::value ||
+            std::is_same<float,T>::value ||
+            std::is_same<double,T>::value;
+    }
+
     /// mat type helper struct which provides basic static traits info on ocv matrix element types
     template<int nCVType>
     struct MatType_ {
