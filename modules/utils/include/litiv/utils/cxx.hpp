@@ -214,14 +214,14 @@ namespace lv {
     }
 
     /// returns the index of all provided values in the reference array (uses std::find to match objects)
-    template<typename T>
-    inline std::vector<size_t> indices_of(const std::vector<T>& voVals, const std::vector<T>& voRefs) {
+    template<typename Tin, typename Tout=size_t>
+    inline std::vector<Tout> indices_of(const std::vector<Tin>& voVals, const std::vector<Tin>& voRefs) {
         if(voRefs.empty())
-            return std::vector<size_t>(voVals.size(),1); // all out-of-range indices
-        std::vector<size_t> vnIndices(voVals.size());
+            return std::vector<Tout>(voVals.size(),1); // all out-of-range indices
+        std::vector<Tout> vnIndices(voVals.size());
         size_t nIdx = 0;
-        std::for_each(voVals.begin(),voVals.end(),[&](const T& oVal){
-            vnIndices[nIdx++] = std::distance(voRefs.begin(),std::find(voRefs.begin(),voRefs.end(),oVal));
+        std::for_each(voVals.begin(),voVals.end(),[&](const Tin& oVal){
+            vnIndices[nIdx++] = (Tout)std::distance(voRefs.begin(),std::find(voRefs.begin(),voRefs.end(),oVal));
         });
         return vnIndices;
     }
