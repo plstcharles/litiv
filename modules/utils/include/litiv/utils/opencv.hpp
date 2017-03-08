@@ -611,10 +611,9 @@ namespace lv {
     template<typename T>
     inline void print(const cv::Mat_<T>& oMat, std::ostream& os=std::cout) {
         lvAssert_(oMat.dims==2,"function currently only defined for 2d mats; split dims and call for 2d slices");
-        if(oMat.empty() || oMat.size().area()==0) {
-            os << "   <empty>" << std::endl;
+        os << " CVMATRIX " << lv::MatInfo(oMat) << std::endl;
+        if(oMat.empty() || oMat.size().area()==0)
             return;
-        }
         const size_t nMaxMetaColWidth = (size_t)std::max(lv::digit_count(oMat.cols),lv::digit_count(oMat.rows));
         double dMin,dMax;
         cv::minMaxIdx(oMat,&dMin,&dMax);
@@ -627,19 +626,30 @@ namespace lv {
         const size_t nMaxColWidth = size_t(bIsFloat?(bIsNormalized?6:(std::max(lv::digit_count((int64_t)tMin),lv::digit_count((int64_t)tMax))+5+int(bHasNegative!=0))):(std::max(lv::digit_count(tMin),lv::digit_count(tMax))+int(bHasNegative!=0)));
         const std::string sFormat = bIsFloat?(bIsNormalized?std::string("%6.4f"):((bHasNegative?std::string("%+"):std::string("%"))+std::to_string(nMaxColWidth)+std::string(".4f"))):((bHasNegative?std::string("%+"):std::string("%"))+std::to_string(nMaxColWidth)+std::string(PRId64));
         const std::string sMetaFormat = std::string("%")+std::to_string(nMaxMetaColWidth)+"i";
-        const std::string sSpacer = "  ";
-        const auto lPrinter = [&](const T& v) {os << sSpacer << lv::putf(sFormat.c_str(),(PrintType)v);};
-        os << std::endl << std::string("   ")+std::string(nMaxMetaColWidth,' ')+std::string("x=");
+        const auto lPrinter = [&](const T& v) {os << "  " << lv::putf(sFormat.c_str(),(PrintType)v);};
+        os << std::string(nMaxMetaColWidth+3,' ') << "x=";
         for(int nColIdx=0; nColIdx<oMat.cols; ++nColIdx)
-            os << sSpacer << lv::clampString(lv::putf(sMetaFormat.c_str(),nColIdx),nMaxColWidth);
-        os << std::endl << std::endl;
+            os << "  " << lv::clampString(lv::putf(sMetaFormat.c_str(),nColIdx),nMaxColWidth);
+        os << std::endl;
+        os << std::string(nMaxMetaColWidth+5,' ');
+        for(int nColIdx=0; nColIdx<oMat.cols; ++nColIdx)
+            os << "--" << lv::clampString("-",nMaxColWidth,'-');
+        os << std::endl;
         for(int nRowIdx=0; nRowIdx<oMat.rows; ++nRowIdx) {
-            os << " y=" << lv::putf(sMetaFormat.c_str(),nRowIdx) << sSpacer;
+            os << " y=" << lv::putf(sMetaFormat.c_str(),nRowIdx) << " |";
             for(int nColIdx=0; nColIdx<oMat.cols; ++nColIdx)
                 lPrinter(oMat.template at<T>(nRowIdx,nColIdx));
             os << std::endl;
         }
         os << std::endl;
+    }
+
+    /// provides a printable string of the content of a matrix with constant output element size
+    template<typename T>
+    inline std::string to_string(const cv::Mat_<T>& oMat) {
+        std::stringstream ssStr;
+        lv::print(oMat,ssStr);
+        return ssStr.str();
     }
 
     /// removes all keypoints from voKPs which fall on null values (or outside the bounds) of oROI
