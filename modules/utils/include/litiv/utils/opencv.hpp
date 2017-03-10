@@ -125,6 +125,8 @@ namespace lv {
         static constexpr int type() {return nCVType;}
         /// returns the internal opencv mat type argument
         int operator()() const {return nCVType;}
+        /// implicit cast operation; returns the ocv type id
+        operator int() const {return nCVType;}
     };
 
     /// mat type helper struct which provides basic static traits info on raw matrix element types
@@ -148,6 +150,8 @@ namespace lv {
         static constexpr int type() {return CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels);}
         /// returns the internal opencv mat type argument
         int operator()() const {return CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels);}
+        /// implicit cast operation; returns the ocv type id
+        operator int() const {return CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels);}
     };
 
     /// mat type helper struct which provides basic dynamic info on ocv matrix element types
@@ -178,6 +182,8 @@ namespace lv {
         int type() const {return m_nCVType;}
         /// returns the internal opencv mat type argument
         int operator()() const {return m_nCVType;}
+        /// implicit cast operation; returns the ocv type id
+        operator int() const {return m_nCVType;}
         /// implicit cast operation; returns a string containing the ocv type id
         operator std::string() const {return CV_MAT_DEPTH_STR(m_nCVType)+"C"+std::to_string(CV_MAT_CN(m_nCVType));}
         /// is-equal test operator for other MatType structs
