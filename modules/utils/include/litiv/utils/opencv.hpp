@@ -29,6 +29,24 @@
     std::conditional_t<CV_MAT_DEPTH(cvtype_flag)==depth_flag,depth_type,depth_alt>
 #endif //ndef(CV_MAT_COND_DEPTH_TYPE)
 
+#ifndef CV_MAT_COND_DATA_TYPE
+#define CV_MAT_COND_DATA_TYPE(cvtype_flag) \
+    std::enable_if_t<(CV_MAT_DEPTH((cvtype_flag%8))>=0 && CV_MAT_DEPTH((cvtype_flag%8))<=6), \
+        CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),0,uchar, \
+            CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),1,char, \
+                CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),2,ushort, \
+                    CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),3,short, \
+                        CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),4,int, \
+                            CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),5,float, \
+                                CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),6,double,void)))))))>
+#endif //ndef(CV_MAT_COND_DATA_TYPE)
+
+#ifndef CV_MAT_COND_ELEM_TYPE
+#define CV_MAT_COND_ELEM_TYPE(cvtype_flag) \
+    std::enable_if_t<(CV_MAT_DEPTH((cvtype_flag%8))>=0 && CV_MAT_DEPTH((cvtype_flag%8))<=6 && CV_MAT_CN(cvtype_flag)>=1 && CV_MAT_CN(cvtype_flag)<=4), \
+        std::conditional_t<(CV_MAT_CN(cvtype_flag)>1),cv::Vec<CV_MAT_COND_DATA_TYPE(cvtype_flag),CV_MAT_CN(cvtype_flag)>,CV_MAT_COND_DATA_TYPE(cvtype_flag)>>
+#endif //ndef(CV_MAT_COND_ELEM_TYPE)
+
 #ifndef CV_MAT_DEPTH_BYTES
 #define CV_MAT_DEPTH_BYTES(cvtype_flag) \
     (size_t(CV_MAT_DEPTH(cvtype_flag)<=1?1:CV_MAT_DEPTH(cvtype_flag)<4?2:CV_MAT_DEPTH(cvtype_flag)<6?4:8))
@@ -58,31 +76,43 @@ namespace lv {
         return (uintptr_t(pData)%nByteAlign)==0;
     }
 
-    /// returns whether a given matrix element type is opencv-compatible or not (i.e. whether it can be used in a cv::Mat_ class)
-    template<typename T>
-    constexpr bool isElemTypeCompat() {
+    /// returns whether a given matrix data type is opencv-compatible or not (i.e. whether it can be used in a cv::Mat_ class)
+    template<typename TData>
+    constexpr bool isDataTypeCompat() {
         return
-            std::is_same<uchar,T>::value ||
-            std::is_same<char,T>::value ||
-            std::is_same<short,T>::value ||
-            std::is_same<ushort,T>::value ||
-            std::is_same<int,T>::value ||
-            std::is_same<float,T>::value ||
-            std::is_same<double,T>::value;
+            std::is_same<uchar,TData>::value ||
+            std::is_same<char,TData>::value ||
+            std::is_same<short,TData>::value ||
+            std::is_same<ushort,TData>::value ||
+            std::is_same<int,TData>::value ||
+            std::is_same<float,TData>::value ||
+            std::is_same<double,TData>::value;
+    }
+
+    /// returns the opencv depth flag for an opencv-compatible data type
+    template<typename TData>
+    constexpr int getCVDepthFromDataType() {
+        static_assert(isDataTypeCompat<TData>(),"data type is not opencv-compatible");
+        return
+            std::is_same<uchar,TData>::value?CV_8U:
+            std::is_same<char,TData>::value?CV_8S:
+            std::is_same<short,TData>::value?CV_16S:
+            std::is_same<ushort,TData>::value?CV_16U:
+            std::is_same<int,TData>::value?CV_32S:
+            std::is_same<float,TData>::value?CV_32F:
+            std::is_same<double,TData>::value?CV_64F:
+            throw(1);
     }
 
     /// mat type helper struct which provides basic static traits info on ocv matrix element types
     template<int nCVType>
-    struct MatType_ {
-        /// holds the typename for underlying mat data
-        typedef std::enable_if_t<(CV_MAT_DEPTH(nCVType)>=0 && CV_MAT_DEPTH(nCVType)<=6),
-            CV_MAT_COND_DEPTH_TYPE(nCVType,0/**/,uchar,
-                CV_MAT_COND_DEPTH_TYPE(nCVType,1,char,
-                    CV_MAT_COND_DEPTH_TYPE(nCVType,2,ushort,
-                        CV_MAT_COND_DEPTH_TYPE(nCVType,3,short,
-                            CV_MAT_COND_DEPTH_TYPE(nCVType,4,int,
-                                CV_MAT_COND_DEPTH_TYPE(nCVType,5,float,
-                                    CV_MAT_COND_DEPTH_TYPE(nCVType,6,double,void)))))))> base_type;
+    struct MatCVType_ {
+        static_assert(CV_MAT_DEPTH(nCVType%8)>=0 && CV_MAT_DEPTH(nCVType%8)<=6,"data type is not opencv-compatible");
+        static_assert(CV_MAT_CN(nCVType)>=1 && CV_MAT_CN(nCVType)<=4,"channel count is not opencv-compatible");
+        /// holds the typename for underlying mat data type
+        typedef CV_MAT_COND_DATA_TYPE(nCVType) data_type;
+        /// holds the typename for underlying mat elem type
+        typedef CV_MAT_COND_ELEM_TYPE(nCVType) elem_type;
         /// returns the channel count for the underlying mat data (i.e. smallest implicit mat dim)
         static constexpr int channels() {return CV_MAT_CN(nCVType);}
         /// returns the ocv depth id (NOT A BYTE COUNT!) for the underlying mat data
@@ -95,6 +125,29 @@ namespace lv {
         static constexpr int type() {return nCVType;}
         /// returns the internal opencv mat type argument
         int operator()() const {return nCVType;}
+    };
+
+    /// mat type helper struct which provides basic static traits info on raw matrix element types
+    template<typename TData, int nChannels=1>
+    struct MatRawType_ {
+        static_assert(isDataTypeCompat<TData>(),"data type is not opencv-compatible");
+        static_assert(nChannels>=1 && nChannels<=4,"channel count is not opencv-compatible");
+        /// holds the typename for underlying mat data type
+        typedef TData data_type;
+        /// holds the typename for underlying mat elem type
+        typedef std::conditional_t<(nChannels>1),cv::Vec<TData,nChannels>,TData> elem_type;
+        /// returns the channel count for the underlying mat data (i.e. smallest implicit mat dim)
+        static constexpr int channels() {return nChannels;}
+        /// returns the ocv depth id (NOT A BYTE COUNT!) for the underlying mat data
+        static constexpr int depth() {return getCVDepthFromDataType<TData>();}
+        /// returns the byte depth for the underlying mat data
+        static constexpr size_t depthBytes() {return sizeof(TData);}
+        /// returns the element size (in bytes) for the underlying mat data
+        static constexpr size_t elemSize() {return sizeof(TData)*size_t(nChannels);}
+        /// returns the internal opencv mat type argument
+        static constexpr int type() {return CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels);}
+        /// returns the internal opencv mat type argument
+        int operator()() const {return CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels);}
     };
 
     /// mat type helper struct which provides basic dynamic info on ocv matrix element types
