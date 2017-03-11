@@ -77,4 +77,12 @@ std::string lv::getLogStamp() {
     return std::string("\n")+lv::getVersionStamp()+"\n["+lv::getTimeStamp()+"]\n";
 }
 
-bool lv::Exception::s_bVerbose = true;
+int g_nVerbosity = 1;
+
+int lv::getVerbosity() {
+    return g_nVerbosity;
+}
+
+void lv::setVerbosity(int nLevel) {
+    g_nVerbosity = nLevel;
+}

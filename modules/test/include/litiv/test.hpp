@@ -27,16 +27,16 @@
 
 #define EXPECT_THROW_LV_QUIET(expr) \
 do { \
-    lv::Exception::setVerbose(false); \
+    lv::setVerbosity(0); \
     EXPECT_THROW(expr,lv::Exception); \
-    lv::Exception::setVerbose(true); \
+    lv::setVerbosity(1); \
 } while(0)
 
 #define ASSERT_THROW_LV_QUIET(expr) \
 do { \
-    lv::Exception::setVerbose(false); \
+    lv::setVerbosity(0); \
     ASSERT_THROW(expr,lv::Exception); \
-    lv::Exception::setVerbose(true); \
+    lv::setVerbosity(1); \
 } while(0)
 
 #define EXPECT_NEAR_MINRATIO(val1,val2,ratio) \

@@ -83,6 +83,10 @@ namespace lv {
     std::string getVersionStamp();
     /// returns a combined version of 'getVersionStamp()' and 'getTimeStamp()' for inline use by loggers
     std::string getLogStamp();
+    /// returns the global verbosity level (greater = more verbose, default = 1)
+    int getVerbosity();
+    /// sets the global verbosity level (greater = more verbose, default = 1)
+    void setVerbosity(int nLevel);
 
     /// helper struct used for compile-time integer expr printing via error; just write "IntegerPrinter<expr> test;"
     template<int>
@@ -102,7 +106,7 @@ namespace lv {
         const char* const m_sFile;
         const int m_nLine;
         inline ~UncaughtExceptionLogger() {
-            if(std::uncaught_exception())
+            if(std::uncaught_exception() && lv::getVerbosity()>=1)
                 std::cerr << lv::putf("Unwinding due to uncaught exception at function '%s'\n\t... from %s(%d)\n",m_sFunc,m_sFile,m_nLine);
         }
     };
@@ -117,12 +121,8 @@ namespace lv {
         inline Exception(const std::string& sErrMsg, const char* sFunc, const char* sFile, int nLine, Targs&&... args) :
                 std::runtime_error(lv::putf((std::string("Exception in function '%s'\n\t... from %s(%d)\n\t... what = ")+sErrMsg).c_str(),sFunc,sFile,nLine,std::forward<Targs>(args)...)),
                 m_acFuncName(sFunc),m_acFileName(sFile),m_nLineNumber(nLine) {
-            if(s_bVerbose)
+            if(lv::getVerbosity()>=1)
                 std::cerr << this->what() << std::endl;
-        }
-        /// sets whether exceptions should broadcast their error message to stderr on creation or not
-        static inline void setVerbose(bool bVal) {
-            s_bVerbose = bVal;
         }
         /// name of the function the exception originated from
         const char* const m_acFuncName;
@@ -130,9 +130,6 @@ namespace lv {
         const char* const m_acFileName;
         /// line number the exception originated from
         const int m_nLineNumber;
-    private:
-        /// internal toggle for stderr broadcast toggle
-        static bool s_bVerbose;
     };
 #endif //LV_EXCEPTION_DECL
 
