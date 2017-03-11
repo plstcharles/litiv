@@ -91,18 +91,17 @@
     #endif //ndef(TIMER_DEFS)
 #endif //ndef(__COMMON_LIBS_DEFS__)
 
-#ifndef __LV_VERSION_DEFS__
-    #define __LV_VERSION_DEFS__
-    #define LITIV_VERSION             @LITIV_VERSION@
-    #define LITIV_VERSION_STR         XSTR(LITIV_VERSION)
-    #define LITIV_VERSION_MAJOR       @LITIV_VERSION_MAJOR@
-    #define LITIV_VERSION_MINOR       @LITIV_VERSION_MINOR@
-    #define LITIV_VERSION_PATCH       @LITIV_VERSION_PATCH@
-    #define LITIV_VERSION_SHA1        "@GIT_SHA1@"
-#endif //ndef(__LV_VERSION_DEFS__)
-
-#ifndef __LV_EXCEP_DEFS__
-    #define __LV_EXCEP_DEFS__
+#ifndef __LV_UTILS_DEFS__
+    #define __LV_UTILS_DEFS__
+    #ifndef __LV_VERSION_DEFS__
+        #define __LV_VERSION_DEFS__
+        #define LITIV_VERSION             @LITIV_VERSION@
+        #define LITIV_VERSION_STR         XSTR(LITIV_VERSION)
+        #define LITIV_VERSION_MAJOR       @LITIV_VERSION_MAJOR@
+        #define LITIV_VERSION_MINOR       @LITIV_VERSION_MINOR@
+        #define LITIV_VERSION_PATCH       @LITIV_VERSION_PATCH@
+        #define LITIV_VERSION_SHA1        "@GIT_SHA1@"
+    #endif //ndef(__LV_VERSION_DEFS__)
     #define lvError(msg) throw lv::Exception(std::string("[lvError: ")+msg+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__)
     #define lvError_(msg,...) throw lv::Exception(std::string("[lvError: ")+msg+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
     #define lvAssert(expr) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(0)
@@ -175,11 +174,10 @@
             #define lvDbgAssertHR(expr) ((void)0)
         #endif //ndef(_DEBUG)
     #endif //def(_MSC_VER)
-#endif //ndef(__LV_EXCEP_DEFS__)
+#endif //ndef(__LV_UTILS_DEFS__)
 
 #ifndef __LV_CONFIG_DEFS__
     #define __LV_CONFIG_DEFS__
-
     // config defs that may still change from CMake values have ifndef's
     #ifndef USE_OPENCV_MAT_CONSTR_FIX
         #define USE_OPENCV_MAT_CONSTR_FIX   @USE_OPENCV_MAT_CONSTR_FIX@
@@ -276,11 +274,6 @@
         #error "Bad default number of threads specified."
     #endif //DEFAULT_NB_THREADS<1
 
-#endif //ndef(__LV_CONFIG_DEFS__)
-
-#ifndef __LV_EXTCONFIG_DEFS__
-    #define __LV_EXTCONFIG_DEFS__
-
     #define HAVE_GLSL                 @USE_GLSL@
     #if HAVE_GLSL
         #define TARGET_GL_VER_MAJOR   @TARGET_GL_VER_MAJOR@
@@ -352,5 +345,4 @@
     #ifndef HAVE_POSIX_ALIGNED_ALLOC
         #define HAVE_POSIX_ALIGNED_ALLOC      @USE_POSIX_ALIGNED_ALLOC@
     #endif //ndef(HAVE_POSIX_ALIGNED_ALLOC)
-
-#endif //ndef(__LV_EXTCONFIG_DEFS__)
+#endif //ndef(__LV_CONFIG_DEFS__)
