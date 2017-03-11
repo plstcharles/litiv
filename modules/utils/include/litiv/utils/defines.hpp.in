@@ -107,8 +107,11 @@
     #define lvAssert(expr) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(0)
     #define lvAssert_(expr,msg) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(0)
     #define lvAssert__(expr,msg,...) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);} while(0)
+    #define lvLog(level,msg) do {if(lv::getVerbosity()>=level) std::cout << msg << std::endl;} while(0)
+    #define lvLog_(level,msg,...) do {if(lv::getVerbosity()>=level) std::cout << lv::putf(msg,__VA_ARGS__) << std::endl;} while(0)
     #define lvDatasetsLog(level,msg) do {if(lv::datasets::getVerbosity()>=level) std::cout << msg << std::endl;} while(0)
     #define lvDatasetsLog_(level,msg,...) do {if(lv::datasets::getVerbosity()>=level) std::cout << lv::putf(msg,__VA_ARGS__) << std::endl;} while(0)
+    #define lvPrintEval(expr) do {std::cout << "[lvPrintEval @ " << __FILE__ << "(" << __LINE__ << "): "#expr" := " << (expr) << "]" << std::endl;} while(0)
     #define glErrorCheck do { \
         const GLenum __errn = glGetError(); \
         if(__errn!=GL_NO_ERROR) \
@@ -139,6 +142,10 @@
         #define lvDbgAssert_(expr,msg) lvAssert_(expr,msg)
         #define lvDbgAssert__(expr,msg,...) lvAssert__(expr,msg,__VA_ARGS__)
         #define lvDbgExceptionWatch lv::UncaughtExceptionLogger XSTR_CONCAT(__logger,__LINE__)(__PRETTY_FUNCTION__,__FILE__,__LINE__)
+        #define lvDbgLog(level,msg) lvLog(level,msg)
+        #define lvDbgLog_(level,msg,...) lvLog_(level,msg,__VA_ARGS__)
+        #define lvDbgDatasetsLog(level,msg) lvDatasetsLog(level,msg)
+        #define lvDbgDatasetsLog_(level,msg,...) lvDatasetsLog_(level,msg,__VA_ARGS__)
         #define glDbgErrorCheck glErrorCheck
         #define cudaDbgErrorCheck cudaErrorCheck
     #else //ndef(_DEBUG)
@@ -159,6 +166,10 @@
         #define lvDbgAssert_(expr,msg) ((void)0)
         #define lvDbgAssert__(expr,msg,...) ((void)0)
         #define lvDbgExceptionWatch ((void)0)
+        #define lvDbgLog(level,msg) ((void)0)
+        #define lvDbgLog_(level,msg,...) ((void)0)
+        #define lvDbgDatasetsLog(level,msg) ((void)0)
+        #define lvDbgDatasetsLog_(level,msg,...) ((void)0)
         #define glDbgErrorCheck ((void)0)
         #define cudaDbgErrorCheck ((void)0)
     #endif //ndef(_DEBUG)
