@@ -18,6 +18,13 @@
 #pragma once
 
 #include "litiv/utils/platform.hpp"
+#include "litiv/utils/console.hpp"
+#if !HAVE_OPENGM_EXTLIB
+#error "OpenGM utils require extlib."
+#endif //(!HAVE_OPENGM_EXTLIB)
+#if !HAVE_OPENGM_EXTLIB_QPBO
+#error "OpenGM utils require QPBO in extlib."
+#endif //(!HAVE_OPENGM_EXTLIB_QPBO)
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wignored-qualifiers"
@@ -39,12 +46,9 @@
 #elif defined(_MSC_VER)
 #pragma warning(push,0)
 #endif //defined(_MSC_VER)
-#if !HAVE_OPENGM_EXTLIB
-#error "OpenGM utils require extlib."
-#endif //(!HAVE_OPENGM_EXTLIB)
-#if !HAVE_OPENGM_EXTLIB_QPBO
-#error "OpenGM utils require QPBO in extlib."
-#endif //(!HAVE_OPENGM_EXTLIB_QPBO)
+#ifndef SYS_MEMORYINFO_ON
+#define SYS_MEMORYINFO_ON
+#endif //ndef(SYS_MEMORYINFO_ON)
 #include <opengm/graphicalmodel/graphicalmodel.hxx>
 #include <opengm/functions/potts.hxx>
 #include <opengm/graphicalmodel/space/simplediscretespace.hxx>
