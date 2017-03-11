@@ -60,6 +60,7 @@
 
 namespace lv {
 
+    struct MatType;
     struct DisplayHelper;
     using DisplayHelperPtr = std::shared_ptr<DisplayHelper>;
 
@@ -127,7 +128,17 @@ namespace lv {
         int operator()() const {return nCVType;}
         /// implicit cast operation; returns the ocv type id
         operator int() const {return nCVType;}
+        /// implicit cast operation; returns a string containing the ocv type id
+        operator std::string() const {return (std::string)MatType(nCVType);}
+        /// returns the result of the implicit std::string cast (i.e. ocv type id in a string)
+        std::string str() const {return (std::string)*this;}
     };
+
+    /// ostream-friendly overload for MatCVType_ (ADL will allow usage from this namespace)
+    template<int nCVType>
+    inline std::ostream& operator<<(std::ostream& os, const MatCVType_<nCVType>& oType) {
+        return os << oType.str();
+    }
 
     /// mat type helper struct which provides basic static traits info on raw matrix element types
     template<typename TData, int nChannels=1>
@@ -152,7 +163,17 @@ namespace lv {
         int operator()() const {return CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels);}
         /// implicit cast operation; returns the ocv type id
         operator int() const {return CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels);}
+        /// implicit cast operation; returns a string containing the ocv type id
+        operator std::string() const {return (std::string)MatType(CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels));}
+        /// returns the result of the implicit std::string cast (i.e. ocv type id in a string)
+        std::string str() const {return (std::string)*this;}
     };
+
+    /// ostream-friendly overload for MatRawType_ (ADL will allow usage from this namespace)
+    template<typename TData, int nChannels>
+    inline std::ostream& operator<<(std::ostream& os, const MatRawType_<TData,nChannels>& oType) {
+        return os << oType.str();
+    }
 
     /// mat type helper struct which provides basic dynamic info on ocv matrix element types
     struct MatType {
@@ -190,6 +211,8 @@ namespace lv {
         bool operator==(const MatType& o) const {return m_nCVType==o.m_nCVType;}
         /// is-not-equal test operator for other MatType structs
         bool operator!=(const MatType& o) const {return !(*this==o);}
+        /// returns the result of the implicit std::string cast (i.e. ocv type id in a string)
+        std::string str() const {return (std::string)*this;}
         /// returns whether the given typename is compatible with the internal opencv mat type (does not consider channels by default)
         template<typename T, bool bCheckWithChannels=false>
         bool isTypeCompat() const {
@@ -246,7 +269,7 @@ namespace lv {
 
     /// ostream-friendly overload for MatType (ADL will allow usage from this namespace)
     inline std::ostream& operator<<(std::ostream& os, const MatType& oType) {
-        return os << (std::string)oType;
+        return os << oType.str();
     }
 
     /// mat dim size helper which provides easy-to-use and safe conversions from cv::Size and cv::MatSize
@@ -342,6 +365,15 @@ namespace lv {
         operator const Tinteger*() const {
             return m_vSizes.data()+1;
         }
+        /// implicit conversion op to string (for printing/debug purposes only)
+        operator std::string() const {
+            if(dims()==Tinteger(0))
+                return "0-d:[]<empty>";
+            std::string res = std::to_string((int)dims())+"-d:[";
+            for(Tinteger nDimIdx=0; nDimIdx<dims(); ++nDimIdx)
+                res += std::to_string((int)size(nDimIdx))+(nDimIdx<dims()-1?",":"");
+            return res+"]"+(total()>0?"":"<empty>");
+        }
         /// implicit conversion op to cv::MatSize (non-trivial)
         operator cv::MatSize() const {
             m_vSizesExt.resize(m_vSizes.size());
@@ -436,6 +468,10 @@ namespace lv {
         bool empty() const {
             return total()==size_t(0);
         }
+        /// returns the result of the implicit std::string cast (i.e. dim count & sizes in a string)
+        std::string str() const {
+            return (std::string)*this;
+        }
     protected:
         static_assert(std::is_integral<Tinteger>::value,"need an integer type for dimensions/size indexing");
         template<typename Tinteger2>
@@ -473,12 +509,7 @@ namespace lv {
     /// ostream-friendly overload for MatSize (ADL will allow usage from this namespace)
     template<typename Tinteger>
     std::ostream& operator<<(std::ostream& os, const MatSize_<Tinteger>& oSize) {
-        if(oSize.dims()==Tinteger(0))
-            return os << "0-d:[]<empty>";
-        os << (int)oSize.dims() << "-d:[";
-        for(Tinteger nDimIdx=0; nDimIdx<oSize.dims(); ++nDimIdx)
-            os << (int)oSize[nDimIdx] << (nDimIdx<oSize.dims()-1?",":"");
-        return os << "]" << (oSize.total()>0?"":"<empty>");
+        return os << oSize.str();
     }
 
     /// simplified cv::Mat header info container for matrix preallocation
@@ -499,11 +530,15 @@ namespace lv {
         bool operator==(const MatInfo& o) const {return size==o.size && type==o.type;}
         /// is-not-equal test operator for other MatInfo structs
         bool operator!=(const MatInfo& o) const {return !(*this==o);}
+        /// implicit conversion op to string (for printing/debug purposes only)
+        operator std::string() const {return std::string("{")+((std::string)size)+" "+((std::string)type)+"}";}
+        /// returns the result of the implicit std::string cast (i.e. full type/size info in a string)
+        std::string str() const {return (std::string)*this;}
     };
 
     /// ostream-friendly overload for MatInfo (ADL will allow usage from this namespace)
     inline std::ostream& operator<<(std::ostream& os, const MatInfo& oInfo) {
-        return os << "{ " << oInfo.size << " " << oInfo.type << " }";
+        return os << oInfo.str();
     }
 
     /// helper function to zero-init sparse and non-sparse matrices (sparse mat overload)
