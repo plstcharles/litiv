@@ -78,6 +78,7 @@ namespace lv {
 
     namespace gm {
 
+        /// prints general information about a graphical model
         template<typename GraphModelType>
         inline void printModelInfo(const GraphModelType& oGM) {
             size_t nMinVarLabelCount = SIZE_MAX, nMaxVarLabelCount = 0;
@@ -95,6 +96,31 @@ namespace lv {
                 std::cout << "\t" << oOrderBin.second << " factors w/ order=" << oOrderBin.first << std::endl;
             }
         }
+
+        /// explicit function wrapper to bypass marray allocations and use views instead (interface similar to opengm::ExplicitFunction's)
+        template<typename TValue, typename TIndex=size_t, typename TLabel=size_t>
+        struct ExplicitViewFunction :
+                public marray::View<TValue>,
+                public opengm::FunctionBase<ExplicitViewFunction<TValue,TIndex,TLabel>,TValue,TIndex,TLabel> {
+            /// default constructor (null view data)
+            ExplicitViewFunction() : marray::View<TValue>() {}
+            /// copy constructor (this will point to other's view data)
+            ExplicitViewFunction(const ExplicitViewFunction& other) : marray::View<TValue>(other) {}
+            /// assignment operation (this will point to other's view data)
+            ExplicitViewFunction& operator=(const ExplicitViewFunction& other) {
+                marray::View<TValue>::operator=(other);
+                return *this;
+            }
+            /// empty data assignment (resets internal view struct)
+            void assign() {
+                this->marray::View<TValue>::assign();
+            }
+            /// view data assignment (note: data will be accessed in last-idx-major format)
+            template<class TShapeIterator>
+            void assign(TShapeIterator begin, TShapeIterator end, TValue* data) {
+                this->marray::View<TValue>::assign(begin,end,data);
+            }
+        };
 
     } // namespace gm
 
