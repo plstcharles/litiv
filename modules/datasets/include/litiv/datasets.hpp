@@ -37,10 +37,6 @@ namespace lv {
         const std::string& getRootPath();
         /// sets the path where datasets should be found on the system (will be kept using a global variable)
         void setRootPath(const std::string& sNewPath);
-        /// returns the datasets module verbosity level (greater = more verbose, default = 1)
-        int getVerbosity();
-        /// sets the datasets module verbosity level (greater = more verbose, default = 1)
-        void setVerbosity(int nLevel);
 
         /// global dataset object creation method with dataset impl specialization (forwards extra args to dataset constructor)
         template<DatasetTaskList eDatasetTask, DatasetList eDataset, lv::ParallelAlgoType eEvalImpl, typename... Targs>
@@ -169,12 +165,12 @@ namespace lv {
         /// clears all batches and reparses them from the dataset metadata
         virtual void parseData() override final {
             lvDbgExceptionWatch;
-            lvDatasetsLog_(1,"Parsing directory '%s' for dataset '%s'...",this->getDataPath().c_str(),this->getName().c_str());
+            lvLog_(1,"Parsing directory '%s' for dataset '%s'...",this->getDataPath().c_str(),this->getName().c_str());
             this->m_bIsBare = false; // always false by default for top level
             this->m_vpBatches.clear();
             for(const auto& sPathIter : this->getWorkBatchDirs())
                 this->m_vpBatches.push_back(this->createWorkBatch(sPathIter,lv::addDirSlashIfMissing(sPathIter)));
-            lvDatasetsLog_(1,"Parsing complete. [%d batch(es)]\n%s",(int)this->getBatches(false).size(),this->printDataStructure("").c_str());
+            lvLog_(1,"Parsing complete. [%d batch(es)]\n%s",(int)this->getBatches(false).size(),this->printDataStructure("").c_str());
         }
     protected:
         /// full dataset constructor (copied from DatasetHandler to avoid msvc2015 bug); parameters are passed through lv::datasets::create<...>(...), and may be caught/simplified by a specialization

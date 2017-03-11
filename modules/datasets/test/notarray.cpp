@@ -4,7 +4,7 @@
 #include "litiv/test.hpp"
 
 TEST(datasets_notarray,regression_custom) {
-    lv::datasets::setVerbosity(0);
+    lv::setVerbosity(0);
     using DatasetType = lv::Dataset_<lv::DatasetTask_EdgDet,lv::Dataset_Custom,lv::NonParallel>;
     const std::string sDatasetName = "customtest";
     const std::string sOutputRootPath = TEST_OUTPUT_DATA_ROOT "/custom_dataset_test/";

@@ -21,7 +21,7 @@
 
 void lv::IDataReporter_<lv::DatasetEval_None>::writeEvalReport() const {
     if(getCurrentOutputCount()==0) {
-        lvDatasetsLog_(2,"No report to write for '%s', skipping...",getName().c_str());
+        lvLog_(2,"No report to write for '%s', skipping...",getName().c_str());
         return;
     }
     for(const auto& pBatch : getBatches(true))
@@ -69,7 +69,7 @@ void lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::writeEvalReport() con
     IIMetricsCalculatorConstPtr pMetrics = getMetrics(true);
     lvDbgAssert(pMetrics.get());
     const BinClassifMetrics& oMetrics = dynamic_cast<const BinClassifMetricsCalculator&>(*pMetrics.get()).m_oMetrics;
-    if(datasets::getVerbosity()>0)
+    if(lv::getVerbosity()>0)
         std::cout << "\t" << lv::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oMetrics.dRecall << " Prc=" << oMetrics.dPrecision << " FM=" << oMetrics.dFMeasure << " MCC=" << oMetrics.dMCC << std::endl;
     std::ofstream oMetricsOutput(getOutputPath()+(isRoot()?"":"../")+getName()+".txt");
     if(oMetricsOutput.is_open()) {
@@ -124,7 +124,7 @@ void lv::IDataReporter_<lv::DatasetEval_BinaryClassifierArray>::writeEvalReport(
     const BinClassifMetricsCalculatorPtr pReducedMetrics = oMetrics.reduce();
     lvDbgAssert(pReducedMetrics);
     const BinClassifMetrics& oReducedMetrics = pReducedMetrics->m_oMetrics;
-    if(datasets::getVerbosity()>0)
+    if(lv::getVerbosity()>0)
         std::cout << "\t" << lv::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => Rcl=" << std::fixed << std::setprecision(4) << oReducedMetrics.dRecall << " Prc=" << oReducedMetrics.dPrecision << " FM=" << oReducedMetrics.dFMeasure << " MCC=" << oReducedMetrics.dMCC << std::endl;
     std::ofstream oMetricsOutput(getOutputPath()+(isRoot()?"":"../")+getName()+".txt");
     if(oMetricsOutput.is_open()) {
