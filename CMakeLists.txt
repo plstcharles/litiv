@@ -84,6 +84,7 @@ option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark implementatio
 option(USE_CVCORE_WITH_UTILS "Include OpenCV core components in utils module" ON)
 option(USE_LINK_TIME_OPTIM "Enable link time optimization" ON)
 option(USE_FAST_MATH "Enable fast math optimization" OFF)
+option(USE_OPENMP "Enable OpenMP in internal implementations" ON)
 if(NOT CMAKE_CROSSCOMPILING)
     option(BUILD_TESTS "Build regression and performance tests with Google Test/Benchmark frameworks" ON)
     option(BUILD_TESTS_PERF "Build & run performance tests alongside regression tests in CTest" OFF)
@@ -97,6 +98,7 @@ mark_as_advanced(
     USE_CVCORE_WITH_UTILS
     USE_LINK_TIME_OPTIM
     USE_FAST_MATH
+    USE_OPENMP
     DATASETS_CACHE_SIZE
 )
 
@@ -176,6 +178,13 @@ endif()
 
 ### OPENCL CHECK @@@@ add later for parallel utils & impls
 set_eval(USE_OPENCL 0)
+
+### OPENMP CHECK
+if(USE_OPENMP)
+    find_package(OpenMP REQUIRED)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
 
 ### Kinect SDK CHECK
 if(WIN32)
@@ -304,7 +313,6 @@ elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
     add_definitions(-D_SCL_SECURE_NO_WARNINGS)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
     add_definitions(/W1)
-    add_definitions(/openmp)
     add_definitions(/arch:AVX) # check performance difference? vs 387? @@@
     if(USE_LINK_TIME_OPTIM)
         set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /GL")

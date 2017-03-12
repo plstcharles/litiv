@@ -233,6 +233,7 @@
     #define LITIV_STATIC              (!(LITIV_SHARED))
     #define USING_LINK_TIME_OPTIM     @USE_LINK_TIME_OPTIM@
     #define USING_FAST_MATH           @USE_FAST_MATH@
+    #define USING_OPENMP              @USE_OPENMP@
     #define USING_WORLD_SOURCE_GLOB   @USE_WORLD_SOURCE_GLOB@
 
     #if (defined(_MSC_VER) || defined(_WIN32) || defined(WIN32) || defined(__CYGWIN__))
