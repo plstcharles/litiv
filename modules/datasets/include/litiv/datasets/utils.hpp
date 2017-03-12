@@ -586,10 +586,6 @@ namespace lv {
         using IIDataLoader::getInput;
         /// hides the 'packed' gt accessor from public interface
         using IIDataLoader::getGT;
-        /// hides the 'packed' features accessor from public interface
-        using IIDataLoader::loadFeatures;
-        /// hides the 'packed' features accessor from public interface
-        using IIDataLoader::saveFeatures;
         /// hides useless non-array-only function from public interface (can be unhidden by derived class)
         using IIDataLoader::getInputROI;
         /// hides useless non-array-only function from public interface (can be unhidden by derived class)
