@@ -77,6 +77,40 @@ TYPED_TEST(concat_fixture,regression) {
     EXPECT_EQ((lv::concat<TypeParam>(std::vector<TypeParam>{TypeParam(1),TypeParam(3)},std::vector<TypeParam>{TypeParam(2)})),(std::vector<TypeParam>{TypeParam(1),TypeParam(3),TypeParam(2)}));
 }
 
+namespace {
+    template<typename T>
+    struct cvtarrayvec_fixture : testing::Test {};
+    typedef testing::Types<char, int, ushort, size_t, float> cvtarrayvec_types;
+}
+TYPED_TEST_CASE(cvtarrayvec_fixture,cvtarrayvec_types);
+TYPED_TEST(cvtarrayvec_fixture,regression) {
+    {
+        auto a = std::array<TypeParam,0>{};
+        auto v = lv::convertArrayToVector(a);
+        EXPECT_EQ(a.size(),v.size());
+        EXPECT_TRUE(std::equal(a.begin(),a.end(),v.begin()));
+        auto a2 = lv::convertVectorToArray<0>(v);
+        EXPECT_EQ(a.size(),a2.size());
+        EXPECT_TRUE(std::equal(a.begin(),a.end(),a2.begin()));
+    }{
+        auto a = std::array<TypeParam,1>{TypeParam(2)};
+        auto v = lv::convertArrayToVector(a);
+        EXPECT_EQ(a.size(),v.size());
+        EXPECT_TRUE(std::equal(a.begin(),a.end(),v.begin()));
+        auto a2 = lv::convertVectorToArray<1>(v);
+        EXPECT_EQ(a.size(),a2.size());
+        EXPECT_TRUE(std::equal(a.begin(),a.end(),a2.begin()));
+    }{
+        auto a = std::array<TypeParam,4>{TypeParam(0),TypeParam(2),TypeParam(1),TypeParam(5)};
+        auto v = lv::convertArrayToVector(a);
+        EXPECT_EQ(a.size(),v.size());
+        EXPECT_TRUE(std::equal(a.begin(),a.end(),v.begin()));
+        auto a2 = lv::convertVectorToArray<4>(v);
+        EXPECT_EQ(a.size(),a2.size());
+        EXPECT_TRUE(std::equal(a.begin(),a.end(),a2.begin()));
+    }
+}
+
 TEST(filter_out,regression) {
     std::vector<std::string> vNoVals;
     EXPECT_EQ((lv::filter_out(vNoVals,vNoVals)),(vNoVals));

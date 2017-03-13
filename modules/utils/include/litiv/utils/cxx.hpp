@@ -184,6 +184,37 @@ namespace lv {
         return v;
     }
 
+    /// copies an array of objects to a vector (objects must be default-constructible)
+    template<size_t nSize, typename T>
+    inline void copyArrayToVector(const std::array<T,nSize>& aDataIn, std::vector<T>& vDataOut) {
+        vDataOut.resize(aDataIn.size());
+        std::copy_n(aDataIn.begin(),nSize,vDataOut.begin());
+    }
+
+    /// converts an array of objects to a vector (objects must be default-constructible)
+    template<size_t nSize, typename T>
+    inline std::vector<T> convertArrayToVector(const std::array<T,nSize>& aDataIn) {
+        std::vector<T> vDataOut;
+        copyArrayToVector(aDataIn,vDataOut);
+        return vDataOut;
+    }
+
+    /// copies a vector of objects to an array (must specify size in template, and objects must be default-constructible)
+    template<size_t nSize, typename T>
+    inline void copyVectorToArray(const std::vector<T>& vDataIn, std::array<T,nSize>& aDataOut) {
+        lvAssert_(vDataIn.size()==nSize,"bad input vector size");
+        std::copy_n(vDataIn.begin(),nSize,aDataOut.begin());
+    }
+
+    /// converts a vector of objects to an array (must specify size in template, and objects must be default-constructible)
+    template<size_t nSize, typename T>
+    inline std::array<T,nSize> convertVectorToArray(const std::vector<T>& vDataIn) {
+        lvAssert_(vDataIn.size()==nSize,"bad input vector size");
+        std::array<T,nSize> aDataOut;
+        copyVectorToArray(vDataIn,aDataOut);
+        return aDataOut;
+    }
+
     /// will return all elements of vVals which were not matched to an element in vTokens
     template<typename T>
     inline std::vector<T> filter_out(const std::vector<T>& vVals, const std::vector<T>& vTokens) {
