@@ -65,6 +65,8 @@ public:
     bool isPreProcessing() const;
 
     /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix, and all image points are described (note: descriptors close to borders will be invalid)
+    void compute2(const cv::Mat& oImage, cv::Mat& oDescMap);
+    /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix, and all image points are described (note: descriptors close to borders will be invalid)
     void compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescMap);
     /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix
     void compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat_<float>& oDescMap);

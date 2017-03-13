@@ -119,6 +119,15 @@ bool DASC::isPreProcessing() const {
     return m_bPreProcess;
 }
 
+void DASC::compute2(const cv::Mat& oImage, cv::Mat& oDescMap_) {
+    lvAssert_(oDescMap_.empty() || oDescMap_.type()==CV_32FC1,"wrong output desc map type");
+    cv::Mat_<float> oDescMap = oDescMap_;
+    const bool bEmptyInit = oDescMap.empty();
+    compute2(oImage,oDescMap);
+    if(bEmptyInit)
+        oDescMap_ = oDescMap;
+}
+
 void DASC::compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescMap) {
     if(m_bUsingRF)
         dasc_rf_impl(oImage,oDescMap);

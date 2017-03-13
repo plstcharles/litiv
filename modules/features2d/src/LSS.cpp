@@ -167,6 +167,15 @@ bool LSS::isPreProcessing() const {
     return m_bPreProcess;
 }
 
+void LSS::compute2(const cv::Mat& oImage, cv::Mat& oDescMap_) {
+    lvAssert_(oDescMap_.empty() || oDescMap_.type()==CV_32FC1,"wrong output desc map type");
+    cv::Mat_<float> oDescMap = oDescMap_;
+    const bool bEmptyInit = oDescMap.empty();
+    compute2(oImage,oDescMap);
+    if(bEmptyInit)
+        oDescMap_ = oDescMap;
+}
+
 void LSS::compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescMap) {
     ssdescs_impl(oImage,oDescMap);
 }
