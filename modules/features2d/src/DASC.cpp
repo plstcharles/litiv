@@ -95,6 +95,16 @@ int DASC::borderSize(int nDim) const {
     return pretrained::nRPAbsMax;
 }
 
+lv::MatInfo DASC::getOutputInfo(const lv::MatInfo& oInputInfo) const {
+    lvAssert_((oInputInfo.type.channels()==1 || oInputInfo.type.channels()==3) && (oInputInfo.type.depth()==CV_32F || oInputInfo.type.depth()==CV_8U),"invalid input image type");
+    lvAssert_(oInputInfo.size.dims()==size_t(2) && oInputInfo.size.total()>0,"invalid input image size");
+    const int nRows = (int)oInputInfo.size(0);
+    const int nCols = (int)oInputInfo.size(1);
+    lvAssert__(pretrained::nMaxPatternDiam<=nCols && pretrained::nMaxPatternDiam<=nRows,"image is too small to compute descriptors with current pattern size -- need at least (%d,%d) and got (%d,%d)",pretrained::nMaxPatternDiam,pretrained::nMaxPatternDiam,nCols,nRows);
+    const std::array<int,3> anDescDims = {nRows,nCols,(int)pretrained::nLUTSize};
+    return lv::MatInfo(lv::MatSize(anDescDims),CV_32FC1);
+}
+
 int DASC::descriptorSize() const {
     return int(pretrained::nLUTSize*sizeof(float));
 }

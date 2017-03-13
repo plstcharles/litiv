@@ -135,6 +135,17 @@ int LSS::borderSize(int nDim) const {
     return m_nCorrWinSize/2;
 }
 
+lv::MatInfo LSS::getOutputInfo(const lv::MatInfo& oInputInfo) const {
+    lvAssert_(oInputInfo.type()==CV_8UC1 || oInputInfo.type()==CV_8UC3,"invalid input image type");
+    lvAssert_(oInputInfo.size.dims()==size_t(2) && oInputInfo.size.total()>0,"invalid input image size");
+    const int nRows = (int)oInputInfo.size(0);
+    const int nCols = (int)oInputInfo.size(1);
+    lvAssert__(m_nCorrWinSize<=nCols && m_nCorrWinSize<=nRows,"input image size is too small to compute descriptors with current correlation area size -- need at least (%d,%d) and got (%d,%d)",m_nCorrWinSize,m_nCorrWinSize,nCols,nRows);
+    const int nDescSize = m_nRadialBins*m_nAngularBins;
+    const std::array<int,3> anDescDims = {nRows,nCols,nDescSize};
+    return lv::MatInfo(lv::MatSize(anDescDims),CV_32FC1);
+}
+
 int LSS::descriptorSize() const {
     return m_nRadialBins*m_nAngularBins*int(sizeof(float));
 }

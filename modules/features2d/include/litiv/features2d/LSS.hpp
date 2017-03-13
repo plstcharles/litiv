@@ -41,6 +41,8 @@ public:
     virtual cv::Size windowSize() const;
     /// returns the border size required around each keypoint in x or y direction (also gives the invalid descriptor border size for output maps to ignore)
     virtual int borderSize(int nDim=0) const; // typically equal to windowSize().width/2
+    /// returns the expected dense descriptor matrix output info, for a given input matrix size/type
+    virtual lv::MatInfo getOutputInfo(const lv::MatInfo& oInputInfo) const;
     /// returns the current descriptor size, in bytes (overrides cv::DescriptorExtractor's)
     virtual int descriptorSize() const override;
     /// returns the current descriptor data type (overrides cv::DescriptorExtractor's)

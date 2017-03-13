@@ -55,6 +55,15 @@ int LBSP::borderSize(int nDim) const {
     return int(PATCH_SIZE)/2;
 }
 
+lv::MatInfo LBSP::getOutputInfo(const lv::MatInfo& oInputInfo) const {
+    lvAssert_(oInputInfo.type()==CV_8UC1 || oInputInfo.type()==CV_8UC3,"invalid input image type");
+    lvAssert_(oInputInfo.size.dims()==size_t(2) && oInputInfo.size.total()>0,"invalid input image size");
+    const size_t nRows = oInputInfo.size(0);
+    const size_t nCols = oInputInfo.size(1);
+    lvAssert_(PATCH_SIZE<=nCols && PATCH_SIZE<=nRows,"input image size is too small to compute descriptors with current patch size");
+    return lv::MatInfo(oInputInfo.size,CV_16UC(oInputInfo.type.channels()));
+}
+
 int LBSP::descriptorSize() const {
     return LBSP::DESC_SIZE;
 }
