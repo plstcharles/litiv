@@ -703,11 +703,11 @@ namespace lv {
 
     /// prints the content of a matrix to the given stream with constant output element size
     template<typename T>
-    inline void print(const cv::Mat_<T>& oMat, std::ostream& os=std::cout) {
+    inline std::ostream& print(const cv::Mat_<T>& oMat, std::ostream& os=std::cout) {
         lvAssert_(oMat.dims==2,"function currently only defined for 2d mats; split dims and call for 2d slices");
         os << " CVMATRIX " << lv::MatInfo(oMat) << std::endl;
         if(oMat.empty() || oMat.size().area()==0)
-            return;
+            return os;
         const size_t nMaxMetaColWidth = (size_t)std::max(lv::digit_count(oMat.cols),lv::digit_count(oMat.rows));
         double dMin,dMax;
         cv::minMaxIdx(oMat,&dMin,&dMax);
@@ -736,6 +736,7 @@ namespace lv {
             os << std::endl;
         }
         os << std::endl;
+        return os;
     }
 
     /// provides a printable string of the content of a matrix with constant output element size
