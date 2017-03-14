@@ -747,6 +747,20 @@ namespace lv {
         return ssStr.str();
     }
 
+    /// prints the content of a vector to the given stream with constant output element size
+    template<typename T>
+    inline std::ostream& print(const std::vector<T>& oVec, std::ostream& os=std::cout) {
+        return lv::print(cv::Mat_<T>(1,(int)oVec.size(),const_cast<T*>(oVec.data())),os);
+    }
+
+    /// provides a printable string of the content of a vector with constant output element size
+    template<typename T>
+    inline std::string to_string(const std::vector<T>& oVec) {
+        std::stringstream ssStr;
+        lv::print(oVec,ssStr);
+        return ssStr.str();
+    }
+
     /// removes all keypoints from voKPs which fall on null values (or outside the bounds) of oROI
     inline void validateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoint>& voKPs) {
         if(oROI.empty())
@@ -1144,7 +1158,7 @@ namespace lv {
 
 } // namespace lv
 
-namespace cv { // extending cv for fixes
+namespace cv { // extending cv
 
 #if USE_OPENCV_MAT_CONSTR_FIX
     template<typename _Tp>
@@ -1152,4 +1166,18 @@ namespace cv { // extending cv for fixes
             Mat(_dims, _sz, DataType<_Tp>::type, _data, _steps) {}
 #endif //USE_OPENCV_MAT_CONSTR_FIX
 
+    template<typename T>
+    std::ostream& operator<<(std::ostream& os, const Mat_<T>& oMat) {
+        return lv::print(oMat,os);
+    }
+
 } // namespace cv
+
+namespace std { // extending std
+
+    template<typename T>
+    ostream& operator<<(ostream& os, const vector<T>& oVec) {
+        return lv::print(oVec,os);
+    }
+
+}
