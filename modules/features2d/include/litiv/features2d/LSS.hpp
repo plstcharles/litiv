@@ -17,10 +17,9 @@
 
 #pragma once
 
-#include <opencv2/core.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/features2d.hpp>
+#include "litiv/utils/opencv.hpp"
 #include "litiv/utils/math.hpp"
+#include <opencv2/features2d.hpp>
 
 /**
     Local Self-Similarirty (LSS) feature extractor
