@@ -731,7 +731,7 @@ namespace lv {
         using PrintType = std::conditional_t<bIsFloat,float,int64_t>;
         const bool bIsNormalized = tMax<=T(1) && tMin>=T(0); // useful for floats only
         const bool bHasNegative = int64_t(tMin)<int64_t(0);
-        const size_t nMaxColWidth = size_t(bIsFloat?(bIsNormalized?6:(std::max(lv::digit_count((int64_t)tMin),lv::digit_count((int64_t)tMax))+5+int(bHasNegative!=0))):(std::max(lv::digit_count(tMin),lv::digit_count(tMax))+int(bHasNegative!=0)));
+        const size_t nMaxColWidth = std::max(size_t(bIsFloat?(bIsNormalized?6:(std::max(lv::digit_count((int64_t)tMin),lv::digit_count((int64_t)tMax))+5+int(bHasNegative!=0))):(std::max(lv::digit_count(tMin),lv::digit_count(tMax))+int(bHasNegative!=0))),nMaxMetaColWidth);
         const std::string sFormat = bIsFloat?(bIsNormalized?std::string("%6.4f"):((bHasNegative?std::string("%+"):std::string("%"))+std::to_string(nMaxColWidth)+std::string(".4f"))):((bHasNegative?std::string("%+"):std::string("%"))+std::to_string(nMaxColWidth)+std::string(PRId64));
         const std::string sMetaFormat = std::string("%")+std::to_string(nMaxMetaColWidth)+"i";
         const auto lPrinter = [&](const T& v) {os << "  " << lv::putf(sFormat.c_str(),(PrintType)v);};
