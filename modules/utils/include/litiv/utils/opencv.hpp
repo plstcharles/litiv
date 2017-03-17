@@ -541,6 +541,19 @@ namespace lv {
         return os << oInfo.str();
     }
 
+    /// converts a generic (non-templated) cv mat to a basic (non-vector) templated cv mat, without copying data
+    template<typename T>
+    inline cv::Mat_<T> getBasicMat(const cv::Mat& oMat) {
+        static_assert(isDataTypeCompat<T>(),"matrix type must be cv-compatible, and non-vector");
+        lvAssert_(lv::MatType(oMat.type()).isTypeCompat<T>(),"input mat type is not compatible with required output type");
+        if(oMat.channels()==1)
+            return cv::Mat_<T>(oMat.dims,oMat.size,const_cast<T*>((const T*)oMat.data));
+        std::vector<int> vDims((size_t)(oMat.dims+1),oMat.channels());
+        for(int nDimIdx=0; nDimIdx<oMat.dims; ++nDimIdx)
+            vDims[nDimIdx] = oMat.size[nDimIdx];
+        return cv::Mat_<T>(oMat.dims+1,vDims.data(),const_cast<T*>((const T*)oMat.data));
+    }
+
     /// helper function to zero-init sparse and non-sparse matrices (sparse mat overload)
     template<typename T>
     inline void zeroMat(cv::SparseMat_<T>& oMat) {
@@ -704,6 +717,7 @@ namespace lv {
     /// prints the content of a matrix to the given stream with constant output element size
     template<typename T>
     inline std::ostream& print(const cv::Mat_<T>& oMat, std::ostream& os=std::cout) {
+        static_assert(isDataTypeCompat<T>(),"matrix type must be cv-compatible, and non-vector");
         lvAssert_(oMat.dims==2,"function currently only defined for 2d mats; split dims and call for 2d slices");
         os << " CVMATRIX " << lv::MatInfo(oMat) << std::endl;
         if(oMat.empty() || oMat.size().area()==0)
