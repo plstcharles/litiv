@@ -23,10 +23,10 @@ add_files(SOURCE_FILES
 )
 add_files(INCLUDE_FILES
     "include/litiv/imgproc/CosegmentationUtils.hpp"
+    "include/litiv/imgproc/CosegmentationUtils.inl.hpp"
     "include/litiv/imgproc/EdgeDetectionUtils.hpp"
     "include/litiv/imgproc/EdgeDetectorCanny.hpp"
     "include/litiv/imgproc/EdgeDetectorLBSP.hpp"
-    "include/litiv/imgproc/StereoMatcher.hpp"
     "include/litiv/imgproc.hpp"
 )
 
@@ -36,6 +36,12 @@ if(USE_CUDA)
     )
     add_files(INCLUDE_FILES
         "include/litiv/imgproc/SLIC.hpp"
+    )
+endif()
+if(USE_OPENGM)
+    add_files(INCLUDE_FILES
+        "include/litiv/imgproc/ForegroundStereoMatcher.hpp"
+        "include/litiv/imgproc/ForegroundStereoMatcher.inl.hpp"
     )
 endif()
 

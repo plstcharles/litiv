@@ -18,56 +18,65 @@
 #include "litiv/datasets.hpp"
 #include "litiv/imgproc.hpp"
 #include "litiv/video.hpp"
+#include "litiv/imgproc/ForegroundStereoMatcher.hpp"
 
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
 #define EVALUATE_OUTPUT         0
-#define DISPLAY_OUTPUT          1
+#define DISPLAY_OUTPUT          0
+#define GLOBAL_VERBOSITY        3
 ////////////////////////////////
 #define DATASET_VAPTRIMOD       0
 #define DATASET_MINI_TESTS      1
 ////////////////////////////////
 #define DATASET_OUTPUT_PATH     "results_test"
 #define DATASET_PRECACHING      1
-#define DATASET_SCALE_FACTOR    1.0
+#define DATASET_SCALE_FACTOR    1//0.5
 #define DATASET_WORKTHREADS     1
-#define DATASET_VERBOSITY       3
 ////////////////////////////////
+#define DATASET_USE_DISPARITY_EVAL         0
+#define DATASET_USE_HALF_GT_INPUT_FLAG     1
+#define DATASET_USE_PRECALC_FEATURES       0
+#define DATASET_SAVE_PRECALC_FEATURES      1
+#define DISPARITY_STEP size_t(1)
 
 #if (DATASET_VAPTRIMOD+DATASET_MINI_TESTS/*+...*/)!=1
 #error "Must pick a single dataset."
 #endif //(DATASET_+.../*+...*/)!=1
-#define DATASET_FEATURES_PATH "feat01"
 #if DATASET_VAPTRIMOD
 @@@@ untested, need to cleanup approx masks
 #define DATASET_ID Dataset_VAPtrimod2016
 #define DATASET_PARAMS \
-    DATASET_OUTPUT_PATH,           /* => const std::string& sOutputDirName */ \
-    bool(WRITE_IMG_OUTPUT),        /* => bool bSaveOutput */ \
-    bool(EVALUATE_OUTPUT),         /* => bool bUseEvaluator */ \
-    false,                         /* => bool bForce4ByteDataAlign */ \
-    DATASET_SCALE_FACTOR,          /* => double dScaleFactor */ \
-    false,                         /* disable depth loading */ \
-    true                           /* enable undistort-on-load */
+    DATASET_OUTPUT_PATH,            /* => const std::string& sOutputDirName */ \
+    bool(WRITE_IMG_OUTPUT),         /* => bool bSaveOutput */ \
+    bool(EVALUATE_OUTPUT),          /* => bool bUseEvaluator */ \
+    false,                          /* => bool bForce4ByteDataAlign */ \
+    DATASET_SCALE_FACTOR,           /* => double dScaleFactor */ \
+    false,                          /* disable depth loading */ \
+    true                            /* enable undistort-on-load */
 #elif DATASET_MINI_TESTS
 #include "cosegm_tests.hpp"
 #define DATASET_ID Dataset_CosegmTests
 #define DATASET_PARAMS \
-    DATASET_OUTPUT_PATH,           /* => const std::string& sOutputDirName */ \
-    DATASET_FEATURES_PATH,         /* => const std::string& sFeaturesDirName */ \
-    1,                             /* => int nUseHalfGT */ \
-    bool(WRITE_IMG_OUTPUT),        /* => bool bSaveOutput */ \
-    bool(EVALUATE_OUTPUT),         /* => bool bUseEvaluator */ \
-    DATASET_SCALE_FACTOR           /* => double dScaleFactor */
+    DATASET_OUTPUT_PATH,            /* => const std::string& sOutputDirName */ \
+    15,                             /* => int nExtraPixelBorderSize */ \
+    DATASET_USE_DISPARITY_EVAL,     /* => int nUseGTMaskAsInput */ \
+    DATASET_USE_HALF_GT_INPUT_FLAG, /* => int bEvalStereoDisp */ \
+    bool(WRITE_IMG_OUTPUT),         /* => bool bSaveOutput */ \
+    bool(EVALUATE_OUTPUT),          /* => bool bUseEvaluator */ \
+    DATASET_SCALE_FACTOR            /* => double dScaleFactor */
 //#elif DATASET_...
 #endif //DATASET_...
+#if (DATASET_USE_PRECALC_FEATURES+DATASET_SAVE_PRECALC_FEATURES)>1
+#error "Cannot use precalc feats & save them at the same time!"
+#endif //(DATASET_..._PRECALC_FEATURES)>1
 
 void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch);
 using DatasetType = lv::Dataset_<lv::DatasetTask_Cosegm,lv::DATASET_ID,lv::NonParallel>;
 
 int main(int, char**) {
     try {
-        lv::datasets::setVerbosity(DATASET_VERBOSITY);
+        lv::setVerbosity(GLOBAL_VERBOSITY);
         DatasetType::Ptr pDataset = DatasetType::create(DATASET_PARAMS);
         lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false);
         const size_t nTotPackets = pDataset->getInputCount();
@@ -98,10 +107,10 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
     //srand((unsigned int)time(NULL));
     try {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
-        lvAssert(oBatch.getInputPacketType()==lv::ImageArrayPacket && oBatch.getOutputPacketType()==lv::ImageArrayPacket);
-        lvAssert(oBatch.getOutputStreamCount()>=2 && oBatch.getInputStreamCount()>=2); // app works with stereo heads (min 2 images at once)
-        lvAssert(oBatch.getIOMappingType()<=lv::IndexMapping && oBatch.getGTMappingType()==lv::ElemMapping); // will have more inputs than outputs, but still with pixel mapping
-        lvAssert(oBatch.getOutputStreamCount()*2==oBatch.getInputStreamCount()); // expect approx fg masks to be interlaced with input images
+        lvAssert(oBatch.getInputPacketType()==lv::ImageArrayPacket && oBatch.getOutputPacketType()==lv::ImageArrayPacket); // app works with stereo heads (2 images at once)
+        lvAssert(oBatch.getIOMappingType()==lv::IndexMapping && oBatch.getGTMappingType()==lv::ElemMapping); // segmentation = 1:1 mapping between inputs and gtmasks
+        lvAssert(oBatch.getInputStreamCount()==4); // expect approx fg masks to be interlaced with input images
+        lvAssert(oBatch.getOutputStreamCount()==2); // we always only eval one output type at a time (fg masks or disparity)
         if(DATASET_PRECACHING)
             oBatch.startPrecaching(!bool(EVALUATE_OUTPUT));
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
@@ -110,25 +119,35 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         lvAssert(!vROIs.empty() && vROIs.size()==oBatch.getInputStreamCount());
         size_t nCurrIdx = 0;
         const std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // note: mat content becomes invalid on next getInput call
-        lvAssert(!vInitInput.empty() && vInitInput.size()==oBatch.getInputStreamCount() && vInitInput.size()>1);
-        for(size_t nStreamIdx=1; nStreamIdx<vInitInput.size(); ++nStreamIdx)
+        lvAssert(vInitInput.size()==oBatch.getInputStreamCount());
+        for(size_t nStreamIdx=0; nStreamIdx<vInitInput.size(); ++nStreamIdx) {
             lvAssert(vInitInput[nStreamIdx].size()==vInitInput[0].size());
-        std::vector<lv::MatInfo> oInfoArray = oBatch.getInputInfoArray();
-        lv::MatSize oFrameSize = oInfoArray[0].size;
-        std::vector<cv::Mat> vCurrFGMasks(oBatch.getOutputStreamCount());
-        //std::shared_ptr<IEdgeDetector> pAlgo = std::make_shared<CosegmenterType>();
-        // init & defaults...
+            lvLog_(2,"\tinput %d := %s",(int)nStreamIdx,lv::MatInfo(vInitInput[nStreamIdx]).str().c_str());
+        }
+        const std::vector<lv::MatInfo> oInfoArray = oBatch.getInputInfoArray();
+        const lv::MatSize oFrameSize = oInfoArray[0].size;
+        const int nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity();
+        std::shared_ptr<FGStereoMatcher> pAlgo = std::make_shared<FGStereoMatcher>(oFrameSize,nMinDisp,nMaxDisp,DISPARITY_STEP);
+        oBatch.setFeaturesDirName(pAlgo->getFeatureExtractorName());
+        constexpr size_t nExpectedAlgoInputCount = FGStereoMatcher::getInputStreamCount();
+        constexpr size_t nExpectedAlgoOutputCount = FGStereoMatcher::getOutputStreamCount();
+        static_assert(nExpectedAlgoInputCount==4,"unexpected input stream count for instanced algo");
+        static_assert(nExpectedAlgoOutputCount==4,"unexpected output stream count for instanced algo");
+        using OutputLabelType = FGStereoMatcher::LabelType;
+        std::vector<cv::Mat> vCurrOutput(nExpectedAlgoOutputCount);
+        std::vector<cv::Mat> vCurrFGMasks(nExpectedAlgoOutputCount/2);
+        std::vector<cv::Mat> vCurrStereoMaps(nExpectedAlgoOutputCount/2);
 #if DISPLAY_OUTPUT>0
         lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
-        //pAlgo->m_pDisplayHelper = pDisplayHelper;
+        pAlgo->m_pDisplayHelper = pDisplayHelper;
         lvAssert((vInitInput.size()%2)==0); // assume masks are interlaced with input images
         std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs(vInitInput.size()/2);
         for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vInitInput.size()/2; ++nDisplayRowIdx) {
             std::vector<std::pair<cv::Mat,std::string>> vRow(4);
-            vRow[0] = std::make_pair(cv::Mat(oFrameSize(),vInitInput[nDisplayRowIdx*2].type()),oBatch.getInputStreamName(nDisplayRowIdx*2));
-            vRow[1] = std::make_pair(cv::Mat(oFrameSize(),CV_8UC1),"INIT APPROX");
-            vRow[2] = std::make_pair(cv::Mat(oFrameSize(),CV_8UC3),"DEBUG");
-            vRow[3] = std::make_pair(cv::Mat(oFrameSize(),CV_8UC1),"OUTPUT");
+            vRow[0] = std::make_pair(cv::Mat(),oBatch.getInputStreamName(nDisplayRowIdx*2));
+            vRow[1] = std::make_pair(cv::Mat(),"INPUT MASK");
+            vRow[2] = std::make_pair(cv::Mat(),"OUTPUT DISP");
+            vRow[3] = std::make_pair(cv::Mat(),"OUTPUT MASK");
             vvDisplayPairs[nDisplayRowIdx] = vRow;
         }
 #endif //DISPLAY_OUTPUT>0
@@ -139,13 +158,33 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nCurrIdx/*+1*/ << "/" << nTotPacketCount << "   [" << sWorkerName << "]" << std::endl;
             const std::vector<cv::Mat>& vCurrInput = oBatch.getInputArray(nCurrIdx);
             lvDbgAssert(vCurrInput.size()==oBatch.getInputStreamCount());
+            lvDbgAssert(vCurrInput.size()==nExpectedAlgoInputCount);
             for(size_t nStreamIdx=0; nStreamIdx<vCurrInput.size(); ++nStreamIdx)
                 lvDbgAssert(oFrameSize==vCurrInput[nStreamIdx].size());
-            //pAlgo->apply(vCurrInput,vCurrFGMasks,dDefaultThreshold);
-            lvAssert(vCurrFGMasks.size()==oBatch.getOutputStreamCount());
+#if DATASET_USE_PRECALC_FEATURES
+            pAlgo->setNextFeatures(oBatch.loadFeatures(nCurrIdx));
+#elif DATASET_SAVE_PRECALC_FEATURES
+            cv::Mat oFeatsPack;
+            pAlgo->calcFeatures(lv::convertVectorToArray<nExpectedAlgoInputCount>(vCurrInput),&oFeatsPack);
+            lvDbgAssert(!oFeatsPack.empty());
+            oBatch.saveFeatures(nCurrIdx,oFeatsPack);
+            pAlgo->setNextFeatures(oFeatsPack);
+#endif //DATASET_SAVE_PRECALC_FEATURES
+            pAlgo->apply(vCurrInput,vCurrOutput/*,dDefaultThreshold*/);
+            lvDbgAssert(vCurrOutput.size()==nExpectedAlgoOutputCount);
+            for(size_t nOutputArrayIdx=0; nOutputArrayIdx<vCurrOutput.size(); ++nOutputArrayIdx) {
+                lvAssert(vCurrOutput[nOutputArrayIdx].type()==lv::MatRawType_<OutputLabelType>());
+                lvAssert(vCurrOutput[nOutputArrayIdx].size()==oFrameSize());
+                if(nOutputArrayIdx%2)
+                    vCurrStereoMaps[nOutputArrayIdx/2] = vCurrOutput[nOutputArrayIdx];
+                else
+                    vCurrFGMasks[nOutputArrayIdx/2] = vCurrOutput[nOutputArrayIdx];
+            }
+            lvDbgAssert(vCurrFGMasks.size()==oBatch.getOutputStreamCount());
+            lvDbgAssert(vCurrStereoMaps.size()==oBatch.getOutputStreamCount());
 #if DISPLAY_OUTPUT>0
             const std::vector<cv::Mat>& vCurrGT = oBatch.getGTArray(nCurrIdx);
-            lvDbgAssert(vCurrGT.size()==vCurrFGMasks.size());
+            lvAssert(vCurrGT.size()==vCurrFGMasks.size() && vCurrGT.size()==vCurrStereoMaps.size());
 #if DISPLAY_OUTPUT>1
             if(!vCurrGT[0].empty() && !vCurrGT[1].empty()) {
                 cv::Mat test_rgb = vCurrInput[0].clone(), gt_rgb_mask, approx_rgb_mask;
@@ -169,15 +208,32 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vCurrInput.size()/2; ++nDisplayRowIdx) {
                 vCurrInput[nDisplayRowIdx*2].copyTo(vvDisplayPairs[nDisplayRowIdx][0].first);
                 vCurrInput[nDisplayRowIdx*2+1].copyTo(vvDisplayPairs[nDisplayRowIdx][1].first);
-                // @@@@ cv::Mat(oFrameSize(),CV_8UC3,cv::Scalar_<uchar>::all(128)).copyTo(vvDisplayPairs[nDisplayRowIdx][2].first);
-                // @@@@ vCurrFGMasks[nDisplayRowIdx].copyTo(vvDisplayPairs[nDisplayRowIdx][3].first);
+                // @@@@@ ship color funcs to custom evaluator? or func in cosegm_tests.hpp?
+                vvDisplayPairs[nDisplayRowIdx][2].first.create(vCurrStereoMaps[nDisplayRowIdx].size(),CV_8UC3);
+                cv::Mat& oColoredStereoMap = vvDisplayPairs[nDisplayRowIdx][2].first;
+                for(int nRowIdx=0; nRowIdx<oColoredStereoMap.rows; ++nRowIdx) {
+                    for(int nColIdx=0; nColIdx<oColoredStereoMap.cols; ++nColIdx) {
+                        const OutputLabelType nCurrPxLabel = vCurrStereoMaps[nDisplayRowIdx].at<OutputLabelType>(nRowIdx,nColIdx);
+                        lvDbgAssert_(nCurrPxLabel<UCHAR_MAX,"cannot properly display all stereo label values with current label type");
+                        if(nCurrPxLabel==FGStereoMatcher::getStereoDontCareLabel())
+                            oColoredStereoMap.at<cv::Vec3b>(nRowIdx,nColIdx) = cv::Vec3b(255,0,255);
+                        else if(nCurrPxLabel==FGStereoMatcher::getStereoOccludedLabel())
+                            oColoredStereoMap.at<cv::Vec3b>(nRowIdx,nColIdx) = cv::Vec3b(255,0,0);
+                        else
+                            oColoredStereoMap.at<cv::Vec3b>(nRowIdx,nColIdx) = cv::Vec3b((uchar)nCurrPxLabel,(uchar)nCurrPxLabel,(uchar)nCurrPxLabel);
+                    }
+                }
+                vCurrFGMasks[nDisplayRowIdx].convertTo(vvDisplayPairs[nDisplayRowIdx][3].first,CV_8U,double(UCHAR_MAX));
             }
             pDisplayHelper->display(vvDisplayPairs,cv::Size(320,240));
             const int nKeyPressed = pDisplayHelper->waitKey();
             if(nKeyPressed==(int)'q')
                 break;
 #endif //DISPLAY_OUTPUT>0
-            oBatch.push(vCurrFGMasks,nCurrIdx++);
+            if(oBatch.isEvaluatingStereoDisp())
+                oBatch.push(vCurrStereoMaps,nCurrIdx++);
+            else
+                oBatch.push(vCurrFGMasks,nCurrIdx++);
         }
         oBatch.stopProcessing();
         const double dTimeElapsed = oBatch.getFinalProcessTime();

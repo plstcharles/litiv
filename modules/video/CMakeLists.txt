@@ -33,6 +33,7 @@ add_files(INCLUDE_FILES
     "include/litiv/video/BackgroundSubtractorSuBSENSE.hpp"
     "include/litiv/video/BackgroundSubtractorViBe.hpp"
     "include/litiv/video/VideoCosegmentationUtils.hpp"
+    "include/litiv/video/VideoCosegmentationUtils.inl.hpp"
     "include/litiv/video.hpp"
 )
 

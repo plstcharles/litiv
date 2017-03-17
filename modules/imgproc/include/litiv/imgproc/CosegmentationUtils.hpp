@@ -21,7 +21,12 @@
 
 /// super-interface for cosegmentation algos which exposes common interface functions
 template<typename TLabel, size_t nInputArraySize, size_t nOutputArraySize=nInputArraySize>
-struct ICosegmentor : public cv::Algorithm {
+struct IICosegmentor : public cv::Algorithm {
+    static_assert(lv::isDataTypeCompat<TLabel>(),"specified label type cannot be used in cv::Mat_'s");
+    /// templated size of the input image array
+    static constexpr size_t s_nInputArraySize = nInputArraySize;
+    /// templated size of the output image array
+    static constexpr size_t s_nOutputArraySize = nOutputArraySize;
     /// shortcut to label template typename parameter
     using LabelType = TLabel;
     /// shortcut to input matrix array type
@@ -30,34 +35,66 @@ struct ICosegmentor : public cv::Algorithm {
     using MatArrayOut = std::array<cv::Mat_<LabelType>,nOutputArraySize>;
     /// image cosegmentation function; will isolate visible structures common to all input images and label them similarily in all output masks
     virtual void apply(const MatArrayIn& aImages, MatArrayOut& aMasks) = 0;
-    /// image cosegmentation function; check that the input/output arrays are the right size+type, and redirect to the other 'apply' interface
-    void apply(cv::InputArrayOfArrays aImages, cv::OutputArrayOfArrays aMasks);
+    /// image cosegmentation function; check that the input/output vectors are the right size+type, and redirect to the 'apply' interface using static arrays
+    void apply(const std::vector<cv::Mat>& vImages, std::vector<cv::Mat_<LabelType>>& vMasks);
+    /// image cosegmentation function; check that the input/output arrays are the right size+type, and redirect to the 'apply' interface using static arrays
+    void apply(cv::InputArrayOfArrays vImages, cv::OutputArrayOfArrays vMasks);
     /// returns the maximum number of labels used in the output masks, or 0 if it cannot be predetermined
     virtual size_t getMaxLabelCount() const = 0;
     /// returns the list of labels used in the output masks, or an empty array if it cannot be predetermined
     virtual const std::vector<LabelType>& getLabels() const = 0;
+    /// returns the expected input stream array size
+    static constexpr size_t getInputStreamCount() {return nInputArraySize;}
+    /// returns the output stream array size
+    static constexpr size_t getOutputStreamCount() {return nOutputArraySize;}
     /// required for derived class destruction from this interface
-    virtual ~ICosegmentor() = default;
+    virtual ~IICosegmentor() = default;
+protected:
+    /// default impl constructor (for common parameters only -- none must be const to avoid constructor hell when deriving)
+    IICosegmentor();
+    /// input image infos
+    std::array<lv::MatInfo,nInputArraySize> m_anInputInfos;
+private:
+    IICosegmentor& operator=(const IICosegmentor&) = delete;
+    IICosegmentor(const IICosegmentor&) = delete;
 };
 
+/// interface for specialized cosegm algo impl types
+template<lv::ParallelAlgoType eImpl, typename TLabel, size_t nInputArraySize, size_t nOutputArraySize=nInputArraySize>
+struct ICosegmentor_;
+
+#if HAVE_CUDA
+
+/// interface for cuda cosegm algo impls
 template<typename TLabel, size_t nInputArraySize, size_t nOutputArraySize>
-void ICosegmentor<TLabel,nInputArraySize,nOutputArraySize>::apply(cv::InputArrayOfArrays _aImages, cv::OutputArrayOfArrays _aMasks) {
-    lvAssert_(_aImages.isMatVector(),"first argument must be a mat vector (or mat array)");
-    std::vector<cv::Mat> vImages;
-    _aImages.getMatVector(vImages);
-    MatArrayIn aImages;
-    lvAssert__(vImages.size()==aImages.size(),"number of images in the input array must match the predetermined one (%d)",(int)aImages.size());
-    std::copy_n(vImages.begin(),aImages.size(),aImages.begin());
-    MatArrayOut aMasks;
-    if(!_aMasks.empty()) {
-        lvAssert_(_aMasks.isMatVector(),"second argument must be an empty mat or a mat vector (or mat array)");
-        std::vector<cv::Mat> vMasks;
-        _aMasks.getMatVector(vMasks);
-        lvAssert__(vMasks.size()==aMasks.size(),"number of images in the output array must match the predetermined one (%d)",(int)aMasks.size());
-        for(size_t nArrayIdx=0; nArrayIdx<aMasks.size(); ++nArrayIdx) {
-            lvAssert_(vMasks[nArrayIdx].elemSize()==sizeof(LabelType),"depth of images in the output array must match sizeof(LabelType)");
-            aMasks[nArrayIdx] = vMasks[nArrayIdx];
-        }
-    }
-    apply(aImages,aMasks);
-}
+struct ICosegmentor_<lv::CUDA,TLabel,nInputArraySize,nOutputArraySize> :
+        public lv::IParallelAlgo_CUDA,
+        public IICosegmentor<TLabel,nInputArraySize,nOutputArraySize> {
+    /// required for derived class destruction from this interface
+    virtual ~ICosegmentor_() = default;
+    using IICosegmentor<TLabel,nInputArraySize,nOutputArraySize>::apply;
+};
+
+/// typename shortcut for cuda cosegm algo impls
+template<typename TLabel, size_t nInputArraySize, size_t nOutputArraySize=nInputArraySize>
+using ICosegmentor_CUDA = ICosegmentor_<lv::CUDA,TLabel,nInputArraySize,nOutputArraySize>;
+
+#endif
+
+/// interface for non-parallel (default) cosegm algo impls
+template<typename TLabel, size_t nInputArraySize, size_t nOutputArraySize>
+struct ICosegmentor_<lv::NonParallel,TLabel,nInputArraySize,nOutputArraySize> :
+        public lv::NonParallelAlgo,
+        public IICosegmentor<TLabel,nInputArraySize,nOutputArraySize> {
+    /// required for derived class destruction from this interface
+    virtual ~ICosegmentor_() = default;
+    using IICosegmentor<TLabel,nInputArraySize,nOutputArraySize>::apply;
+};
+
+/// typename shortcut for non-parallel (default) cosegm algo impls
+template<typename TLabel, size_t nInputArraySize, size_t nOutputArraySize=nInputArraySize>
+using ICosegmentor = ICosegmentor_<lv::NonParallel,TLabel,nInputArraySize,nOutputArraySize>;
+
+#define __LITIV_COSEGM_HPP__
+#include "litiv/imgproc/CosegmentationUtils.inl.hpp"
+#undef __LITIV_COSEGM_HPP__
