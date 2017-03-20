@@ -109,7 +109,7 @@
     #define lvAssert__(expr,msg,...) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);} while(0)
     #define lvLog(level,msg) do {if(lv::getVerbosity()>=level) std::cout << msg << std::endl;} while(0)
     #define lvLog_(level,msg,...) do {if(lv::getVerbosity()>=level) std::cout << lv::putf(msg,__VA_ARGS__) << std::endl;} while(0)
-    #define lvPrintEval(expr) do {std::cout << "[lvPrintEval @ " << __FILE__ << "(" << __LINE__ << "): "#expr" := " << (expr) << "]" << std::endl;} while(0)
+    #define lvPrint(expr) do {std::cout << "[lvPrint @ " << __FILE__ << "(" << __LINE__ << "): "#expr" := " << (expr) << "]" << std::endl;} while(0)
     #define glErrorCheck do { \
         const GLenum __errn = glGetError(); \
         if(__errn!=GL_NO_ERROR) \
