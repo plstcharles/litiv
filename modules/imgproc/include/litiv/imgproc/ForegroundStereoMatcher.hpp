@@ -98,6 +98,8 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
     static constexpr OutputLabelType getStereoDontCareLabel() {return s_nStereoDontCareLabel;}
     /// returns the output stereo label used to represent 'occluded' pixels
     static constexpr OutputLabelType getStereoOccludedLabel() {return s_nStereoOccludedLabel;}
+    /// returns the expected input stereo head count
+    static constexpr size_t getCameraCount() {return getInputStreamCount()/2;}
 
     /// holds graph model data for both stereo and resegmentation models
     struct GraphModelData {
@@ -188,6 +190,8 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         const lv::MatSize m_oGridSize;
         /// defines the minimum grid border size based on the features used
         const size_t m_nGridBorderSize;
+        /// defines the feature map count per input camera head
+        const size_t m_nFeatMapsPerCam;
         /// contains all 'real' stereo labels, plus the 'occluded'/'dontcare' labels
         const std::vector<OutputLabelType> m_vStereoLabels;
         /// contains the step size between stereo labels (i.e. the disparity granularity)

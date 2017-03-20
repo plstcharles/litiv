@@ -22,6 +22,8 @@
 #include "litiv/datasets.hpp"
 #include <fstream>
 
+#define BORDER_EXPAND_TYPE cv::BORDER_REPLICATE
+
 namespace lv {
 
     static const DatasetList Dataset_CosegmTests = DatasetList(Dataset_Custom+1); // cheat; might cause problems if exposed in multiple external/custom specializations
@@ -139,10 +141,10 @@ namespace lv {
                     cv::format("%simg%05db.png",this->getDataPath().c_str(),nCurrIdx),
                     cv::format(((this->isUsingGTMaskAsInput()&1)?"%sgtmask%05db.png":"%smask%05db.png"),this->getDataPath().c_str(),nCurrIdx),
                 };
-                const cv::Mat oInput0 = cv::imread(vCurrInputPaths[0],cv::IMREAD_UNCHANGED);
-                const cv::Mat oMask0 = cv::imread(vCurrInputPaths[1],cv::IMREAD_GRAYSCALE);
-                const cv::Mat oInput1 = cv::imread(vCurrInputPaths[2],cv::IMREAD_UNCHANGED);
-                const cv::Mat oMask1 = cv::imread(vCurrInputPaths[3],cv::IMREAD_GRAYSCALE);
+                cv::Mat oInput0 = cv::imread(vCurrInputPaths[0],cv::IMREAD_UNCHANGED);
+                cv::Mat oMask0 = cv::imread(vCurrInputPaths[1],cv::IMREAD_GRAYSCALE);
+                cv::Mat oInput1 = cv::imread(vCurrInputPaths[2],cv::IMREAD_UNCHANGED);
+                cv::Mat oMask1 = cv::imread(vCurrInputPaths[3],cv::IMREAD_GRAYSCALE);
                 if(oInput0.empty() || oMask0.empty() || oInput1.empty() || oMask1.empty())
                     break;
                 lvAssert(oInput0.size()==oInput1.size() && oMask0.size()==oMask1.size() && oInput0.size()==oMask0.size());
@@ -151,7 +153,10 @@ namespace lv {
                 //cv::imwrite(cv::format("%stmp/img%05db.png",this->getDataPath().c_str(),nCurrIdx),oInput1);
                 //cv::imwrite(cv::format(((this->isUsingGTMaskAsInput()&1)?"%stmp/gtmask%05db.png":"%stmp/mask%05db.png"),this->getDataPath().c_str(),nCurrIdx),oMask1);
                 if(nExtraPxBorderSize>0) {
-                    // cv::copyMakeBorder() @@@@@@@@@@@@@@@@@@@@@
+                    cv::copyMakeBorder(oInput0,oInput0,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,BORDER_EXPAND_TYPE);
+                    cv::copyMakeBorder(oMask0,oMask0,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,BORDER_EXPAND_TYPE);
+                    cv::copyMakeBorder(oInput1,oInput1,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,BORDER_EXPAND_TYPE);
+                    cv::copyMakeBorder(oMask1,oMask1,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,BORDER_EXPAND_TYPE);
                 }
                 this->m_vvsInputPaths.push_back(vCurrInputPaths);
                 if(this->m_vvsInputPaths.size()==size_t(1)) {
@@ -171,11 +176,12 @@ namespace lv {
                         cv::format(this->isEvaluatingStereoDisp()?"%sgtdisp%05da.png":"%sgtmask%05da.png",this->getDataPath().c_str(),nCurrIdx),
                         cv::format(this->isEvaluatingStereoDisp()?"%sgtdisp%05db.png":"%sgtmask%05db.png",this->getDataPath().c_str(),nCurrIdx),
                     };
-                    const cv::Mat oGT0 = cv::imread(vCurrGTPaths[0],cv::IMREAD_GRAYSCALE);
-                    const cv::Mat oGT1 = cv::imread(vCurrGTPaths[1],cv::IMREAD_GRAYSCALE);
+                    cv::Mat oGT0 = cv::imread(vCurrGTPaths[0],cv::IMREAD_GRAYSCALE);
+                    cv::Mat oGT1 = cv::imread(vCurrGTPaths[1],cv::IMREAD_GRAYSCALE);
                     lvAssert(!oGT0.empty() && !oGT1.empty() && oGT0.size()==oGT1.size() && oInput0.size()==oGT0.size());
                     if(nExtraPxBorderSize>0) {
-                        // cv::copyMakeBorder() @@@@@@@@@@@@@@@@@@@@@
+                        cv::copyMakeBorder(oGT0,oGT0,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,BORDER_EXPAND_TYPE);
+                        cv::copyMakeBorder(oGT1,oGT1,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,BORDER_EXPAND_TYPE);
                     }
                     this->m_vvsGTPaths.push_back(vCurrGTPaths);
                     if(this->m_vvsGTPaths.size()==size_t(1)) {
@@ -203,8 +209,11 @@ namespace lv {
             for(size_t a=0; a<2; ++a) {
                 if(aROIs[a].empty())
                     aROIs[a] = cv::Mat(oOrigSize,CV_8UC1,cv::Scalar_<uchar>(255));
-                else
+                else {
+                    if(nExtraPxBorderSize>0)
+                        cv::copyMakeBorder(aROIs[a],aROIs[a],nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,BORDER_EXPAND_TYPE);
                     lvAssert(aROIs[a].size()==oOrigSize);
+                }
                 if(dScale!=1.0)
                     cv::resize(aROIs[a],aROIs[a],cv::Size(),dScale,dScale,cv::INTER_NEAREST);
                 this->m_vInputROIs[2*a] = aROIs[a].clone();
