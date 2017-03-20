@@ -21,7 +21,7 @@
 #error "Cannot include .inl.hpp headers directly!"
 #endif //ndef(__LITIV_FGSTEREOM_HPP__)
 #pragma once
-#if (FGSTEREOMATCH_CONFIG_USE_DASC_FEATS+FGSTEREOMATCH_CONFIG_USE_LSS_FEATS/*+...*/)!=1
+#if (FGSTEREOMATCH_CONFIG_USE_DASCGF_FEATS+FGSTEREOMATCH_CONFIG_USE_DASCRF_FEATS+FGSTEREOMATCH_CONFIG_USE_LSS_FEATS/*+...*/)!=1
 #error "Must specify only one feature type to use."
 #endif //(features config ...)!=1
 
@@ -41,9 +41,10 @@ inline FGStereoMatcher::FGStereoMatcher(const cv::Size& oImageSize, int32_t nMin
     lvDbgAssert(nExpectedDispLabelCount==vStereoLabels.size());
     lvAssert_(vStereoLabels.size()>1,"graph must have at least two possible output labels, beyond reserved ones");
     const std::vector<OutputLabelType> vReservedStereoLabels = {s_nStereoDontCareLabel,s_nStereoOccludedLabel};
-#if FGSTEREOMATCH_CONFIG_USE_DASC_FEATS
-    //std::unique_ptr<DASC> pFeatsExtractor = std::make_unique<DASC>(DASC_DEFAULT_RF_SIGMAS,DASC_DEFAULT_RF_SIGMAR,DASC_DEFAULT_RF_ITERS,DASC_DEFAULT_PREPROCESS);
+#if FGSTEREOMATCH_CONFIG_USE_DASCGF_FEATS
     std::unique_ptr<DASC> pFeatsExtractor = std::make_unique<DASC>(DASC_DEFAULT_GF_RADIUS,DASC_DEFAULT_GF_EPS,DASC_DEFAULT_GF_SUBSPL,DASC_DEFAULT_PREPROCESS);
+#elif FGSTEREOMATCH_CONFIG_USE_DASCRF_FEATS
+    std::unique_ptr<DASC> pFeatsExtractor = std::make_unique<DASC>(DASC_DEFAULT_RF_SIGMAS,DASC_DEFAULT_RF_SIGMAR,DASC_DEFAULT_RF_ITERS,DASC_DEFAULT_PREPROCESS);
 #elif FGSTEREOMATCH_CONFIG_USE_LSS_FEATS
     @@@
 #endif //FGSTEREOMATCH_CONFIG_USE_..._FEATS
@@ -86,8 +87,10 @@ inline void FGStereoMatcher::setNextFeatures(const cv::Mat& oPackedFeats) {
 }
 
 inline std::string FGStereoMatcher::getFeatureExtractorName() const {
-#if FGSTEREOMATCH_CONFIG_USE_DASC_FEATS
-    return "dasc";
+#if FGSTEREOMATCH_CONFIG_USE_DASCGF_FEATS
+    return "dasc-gf";
+#elif FGSTEREOMATCH_CONFIG_USE_DASCRF_FEATS
+    return "dasc-rf";
 #elif FGSTEREOMATCH_CONFIG_USE_LSS_FEATS
     return "lss";
 #endif //FGSTEREOMATCH_CONFIG_USE_..._FEATS
@@ -353,12 +356,27 @@ inline void FGStereoMatcher::GraphModelData::updateModels(const MatArrayIn& aIma
     static_assert(getCameraCount()==2,"lots of stuff hardcoded below for 2-cam stereo");
     const std::array<cv::Mat,2> aInputFeats = {m_vNextFeats[0],m_vNextFeats[m_nFeatMapsPerCam]};
     lvDbgAssert(!aInputFeats.empty() && lv::MatInfo(aInputFeats[0])==lv::MatInfo(aInputFeats[1]));
+    lvDbgAssert(aInputFeats[0].dims==3 && aInputFeats[0].type()==CV_32FC1);
+    const int nDescSize = aInputFeats[0].size[2];
     const int nRows = (int)m_oGridSize(0);
     const int nCols = (int)m_oGridSize(1);
     const size_t nLabels = m_vStereoLabels.size();
     lvIgnore(nLabels);
     const size_t nRealLabels = m_vStereoLabels.size()-2;
     lvDbgAssert(nLabels>3);
+    const std::array<cv::Mat,2> aInputCropFeats = {m_vNextFeats[0](cv::Rect(15,15,20,1)),m_vNextFeats[m_nFeatMapsPerCam](cv::Rect(15,15,20,1))};
+    for(int i=0; i<m_vStereoLabels.size()-2; ++i) {
+        std::cout << "@@@@ disp = " << m_vStereoLabels[i] << std::endl;
+        const int len = 20-m_vStereoLabels[i];
+        lvAssert(len>0);
+        cv::Mat_<double> test(1,len);
+        for(int j=0; j<len; ++j) {
+            @@@@@@
+            test(j) = cv::norm(cv::Mat_<float>(1,nDescSize,(float*)aInputFeats[0].ptr<float>(15,15+j)),
+                               cv::Mat_<float>(1,nDescSize,(float*)aInputFeats[0].ptr<float>(15,15+j)),
+                               m_pFeatExtractor->defaultNorm());
+        }
+    }
     lvLog(1,"Updating graph models energy terms based on input data...");
     lv::StopWatch oLocalTimer;
     std::atomic_size_t nProcessedNodeCount(size_t(0));
@@ -376,13 +394,15 @@ inline void FGStereoMatcher::GraphModelData::updateModels(const MatArrayIn& aIma
                 lvDbgAssert((&m_pStereoModel->getFunction<StereoExplicitFunction>(m_vNodeInfos[nNodeIdx].pStereoVisSimUnaryFunc->first))==(&m_vNodeInfos[nNodeIdx].pStereoVisSimUnaryFunc->second));
                 StereoExplicitFunction& vUnaryFunc = m_vNodeInfos[nNodeIdx].pStereoVisSimUnaryFunc->second;
                 lvDbgAssert(vUnaryFunc.dimension()==1 && vUnaryFunc.size()==nLabels);
+                lvDbgAssert(m_pFeatExtractor->defaultNorm()==cv::NORM_L2);
                 for(StereoLabelType nLabelIdx=0; nLabelIdx<nRealLabels; ++nLabelIdx) {
                     const OutputLabelType nRealLabel = getRealLabel(nLabelIdx);
                     const int nOffsetColIdx = nColIdx-(int)nRealLabel;
                     if(nOffsetColIdx>=0 && nOffsetColIdx<nCols) {
-                        lvDbgAssert(aImages[0].type()==CV_8UC1 && aImages[2].type()==CV_8UC1);
-                        const int nColorDiff = (int)aImages[0].at<uchar>(nRowIdx,nColIdx)-(int)aImages[2].at<uchar>(nRowIdx,nOffsetColIdx);
-                        vUnaryFunc(nLabelIdx) = std::min(FGSTEREOMATCH_VISSIM_COST_MAXTRUNC,ValueType(nColorDiff*nColorDiff));
+                        const cv::Mat_<float> oDesc0(1,nDescSize,(float*)aInputFeats[0].ptr<float>(nRowIdx,nColIdx));
+                        const cv::Mat_<float> oDesc1(1,nDescSize,(float*)aInputFeats[1].ptr<float>(nRowIdx,nOffsetColIdx));
+                        const double dCurrVisSim = cv::norm(oDesc0,oDesc1,m_pFeatExtractor->defaultNorm());
+                        vUnaryFunc(nLabelIdx) = std::min(FGSTEREOMATCH_VISSIM_COST_MAXTRUNC,ValueType(dCurrVisSim*FGSTEREOMATCH_VISSIM_COST_SCALEFACT));
                     }
                     else if(nOffsetColIdx<0)
                         vUnaryFunc(nLabelIdx) = FGSTEREOMATCH_VISSIM_COST_OOBASSOC/(-nOffsetColIdx); // reduced cost near borders
@@ -438,11 +458,8 @@ inline void FGStereoMatcher::GraphModelData::calcFeatures(const MatArrayIn& aIma
         lvAssert__(aImages[nCamIdx*2+1].dims==2 && m_oGridSize==aImages[nCamIdx*2+1].size(),"input mask in array at index=%d had the wrong size",(int)nCamIdx);
         lvAssert_(aImages[nCamIdx*2].type()==CV_8UC1 || aImages[nCamIdx*2].type()==CV_8UC3,"unexpected input image type");
         lvAssert_(aImages[nCamIdx*2+1].type()==CV_8UC1,"unexpected input mask type");
-#if FGSTEREOMATCH_CONFIG_USE_DASC_FEATS
-        dynamic_cast<DASC&>(*m_pFeatExtractor).compute2(aImages[nCamIdx*2],m_vNextFeats[nCamIdx*m_nFeatMapsPerCam]);
-#elif FGSTEREOMATCH_CONFIG_USE_LSS_FEATS
-        @@@
-#endif //FGSTEREOMATCH_CONFIG_USE_..._FEATS
+        lvDbgAssert(m_pFeatExtractor);
+        m_pFeatExtractor->compute2(aImages[nCamIdx*2],m_vNextFeats[nCamIdx*m_nFeatMapsPerCam]);
         cv::Mat oBlurredInput;
         cv::GaussianBlur(aImages[nCamIdx*2],oBlurredInput,cv::Size(3,3),0);
         cv::Mat oBlurredGrayInput;
@@ -474,13 +491,8 @@ inline void FGStereoMatcher::GraphModelData::calcFeatures(const MatArrayIn& aIma
 inline void FGStereoMatcher::GraphModelData::setNextFeatures(const cv::Mat& oPackedFeats) {
     lvAssert_(!oPackedFeats.empty(),"features packet must be non-empty");
     std::vector<lv::MatInfo> vExpectedPackInfo;
-#if FGSTEREOMATCH_CONFIG_USE_DASC_FEATS
-    const lv::MatInfo oFeatsInfo = dynamic_cast<DASC&>(*m_pFeatExtractor).getOutputInfo(lv::MatInfo(m_oGridSize,CV_8UC3)); // @@@@ assume type wont change output info
-#elif FGSTEREOMATCH_CONFIG_USE_LSS_FEATS
-    const lv::MatInfo oFeatsInfo = dynamic_cast<LSS&>(*m_pFeatExtractor).getOutputInfo(lv::MatInfo(m_oGridSize,CV_8UC3)); // @@@@ assume type wont change output info
-#endif //FGSTEREOMATCH_CONFIG_USE_..._FEATS
     for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
-        vExpectedPackInfo.push_back(oFeatsInfo); // input features map
+        vExpectedPackInfo.push_back(m_pFeatExtractor->getOutputInfo(lv::MatInfo(m_oGridSize,CV_8UC3))); // @@@@ assume input type wont change output info
         vExpectedPackInfo.push_back(lv::MatInfo(m_oGridSize,CV_32FC1)); // dist transf map
         vExpectedPackInfo.push_back(lv::MatInfo(m_oGridSize,CV_8UC1)); // grad mag map
     }

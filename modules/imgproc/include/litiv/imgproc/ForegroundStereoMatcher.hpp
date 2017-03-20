@@ -23,7 +23,8 @@
 
 // config toggles/options
 #define FGSTEREOMATCH_CONFIG_ALLOC_IN_MODEL    0
-#define FGSTEREOMATCH_CONFIG_USE_DASC_FEATS    1
+#define FGSTEREOMATCH_CONFIG_USE_DASCGF_FEATS  1
+#define FGSTEREOMATCH_CONFIG_USE_DASCRF_FEATS  0
 #define FGSTEREOMATCH_CONFIG_USE_LSS_FEATS     0
 
 // default param values
@@ -33,6 +34,7 @@
 #define FGSTEREOMATCH_VISSIM_COST_OOBASSOC     (ValueType(1000))
 #define FGSTEREOMATCH_VISSIM_COST_OCCLUDED     (ValueType(2000))
 #define FGSTEREOMATCH_VISSIM_COST_MAXTRUNC     (ValueType(5000))
+#define FGSTEREOMATCH_VISSIM_COST_SCALEFACT    (ValueType(2000))
 #define FGSTEREOMATCH_UNIQUE_COST_OOBASSOC     (ValueType(500))
 #define FGSTEREOMATCH_UNIQUE_COST_OVERASSOC    (ValueType(500))
 // pairwise costs params
@@ -217,7 +219,11 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         /// stereo model smoothness pairwise functions base pointer
         ValueType* m_pStereoSmoothPairwFuncsDataBase;
         /// holds the feature extractor to use on input images
-        std::unique_ptr<cv::DescriptorExtractor> m_pFeatExtractor;
+#if FGSTEREOMATCH_CONFIG_USE_DASCGF_FEATS || FGSTEREOMATCH_CONFIG_USE_DASCRF_FEATS
+        std::unique_ptr<DASC> m_pFeatExtractor;
+#elif FGSTEREOMATCH_CONFIG_USE_LSS_FEATS
+        std::unique_ptr<LSS> m_pFeatExtractor;
+#endif //FGSTEREOMATCH_CONFIG_USE_..._FEATS
         /// holds the set of features to use next
         std::vector<cv::Mat> m_vNextFeats;
         /// holds the last features packet's info vector
