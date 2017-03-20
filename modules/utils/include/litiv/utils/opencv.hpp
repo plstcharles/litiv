@@ -541,10 +541,10 @@ namespace lv {
         return os << oInfo.str();
     }
 
-    /// converts a generic (non-templated) cv mat to a basic (non-vector) templated cv mat, without copying data
+    /// converts a generic (non-templated) cv mat to a basic (without channels) templated cv mat, without copying data
     template<typename T>
     inline cv::Mat_<T> getBasicMat(const cv::Mat& oMat) {
-        static_assert(isDataTypeCompat<T>(),"matrix type must be cv-compatible, and non-vector");
+        static_assert(isDataTypeCompat<T>(),"matrix type must be cv-compatible, and without channels");
         lvAssert_(lv::MatType(oMat.type()).isTypeCompat<T>(),"input mat type is not compatible with required output type");
         if(oMat.channels()==1)
             return cv::Mat_<T>(oMat.dims,oMat.size,const_cast<T*>((const T*)oMat.data));
@@ -717,7 +717,7 @@ namespace lv {
     /// prints the content of a matrix to the given stream with constant output element size
     template<typename T>
     inline std::ostream& print(const cv::Mat_<T>& oMat, std::ostream& os=std::cout) {
-        static_assert(isDataTypeCompat<T>(),"matrix type must be cv-compatible, and non-vector");
+        static_assert(isDataTypeCompat<T>(),"matrix type must be cv-compatible, and without channels");
         lvAssert_(oMat.dims==2,"function currently only defined for 2d mats; split dims and call for 2d slices");
         os << " CVMATRIX " << lv::MatInfo(oMat) << std::endl;
         if(oMat.empty() || oMat.size().area()==0)
@@ -749,7 +749,6 @@ namespace lv {
                 lPrinter(oMat.template at<T>(nRowIdx,nColIdx));
             os << std::endl;
         }
-        os << std::endl;
         return os;
     }
 
@@ -761,9 +760,22 @@ namespace lv {
         return ssStr.str();
     }
 
-    /// prints the content of a vector to the given stream with constant output element size
+    /// prints the content of a vector (via matrix formatting) to the given stream
     template<typename T>
-    inline std::ostream& print(const std::vector<T>& oVec, std::ostream& os=std::cout) {
+    std::enable_if_t<(!isDataTypeCompat<T>()),std::ostream&> print(const std::vector<T>& oVec, std::ostream& os=std::cout) {
+        os << " VECTOR (size=" << oVec.size() << ")" << std::endl;
+        if(oVec.empty())
+            return os;
+        const size_t nMaxMetaColWidth = (size_t)lv::digit_count(oVec.size());
+        const std::string sMetaFormat = std::string("%")+std::to_string(nMaxMetaColWidth)+"i";
+        for(size_t nElemIdx=0; nElemIdx<oVec.size(); ++nElemIdx)
+            os << "  x=" << lv::putf(sMetaFormat.c_str(),(int)nElemIdx) << "  :  " << oVec[nElemIdx] << std::endl;
+        return os;
+    }
+
+    /// prints the content of a vector (via matrix formatting) to the given stream
+    template<typename T>
+    std::enable_if_t<(isDataTypeCompat<T>()),std::ostream&> print(const std::vector<T>& oVec, std::ostream& os=std::cout) {
         return lv::print(cv::Mat_<T>(1,(int)oVec.size(),const_cast<T*>(oVec.data())),os);
     }
 
