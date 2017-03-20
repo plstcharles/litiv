@@ -51,14 +51,19 @@
 #include <GL/glew.h>
 #if HAVE_GLFW
 #include <GLFW/glfw3.h>
+#ifndef LV_GLFW_WINDOW_DELETER_DECL
+#define LV_GLFW_WINDOW_DELETER_DECL
 struct glfwWindowDeleter {
     void operator()(GLFWwindow* pWindow) {
         glfwDestroyWindow(pWindow);
     }
 };
+#endif //LV_GLFW_WINDOW_DELETER_DECL
 #endif //HAVE_GLFW
 #if HAVE_FREEGLUT
 #include <GL/freeglut.h>
+#ifndef LV_GLUT_WINDOW_DELETER_DECL
+#define LV_GLUT_WINDOW_DELETER_DECL
 struct glutHandle {
     glutHandle() : m_nHandle(0) {}
     glutHandle(std::nullptr_t) : m_nHandle(0) {}
@@ -75,10 +80,13 @@ struct glutWindowDeleter {
     }
     typedef glutHandle pointer;
 };
+#endif //LV_GLUT_WINDOW_DELETER_DECL
 #endif //HAVE_FREEGLUT
 
 namespace lv {
 
+#ifndef LV_UNCAUGHT_EXCEPT_LOGGER_DECL
+#define LV_UNCAUGHT_EXCEPT_LOGGER_DECL
     struct UncaughtExceptionLogger {
         UncaughtExceptionLogger(const char* sFunc, const char* sFile, int nLine) :
                 m_sFunc(sFunc),m_sFile(sFile),m_nLine(nLine) {}
@@ -90,7 +98,10 @@ namespace lv {
                 std::cerr << cv::format("Unwinding at function '%s' from %s(%d) due to uncaught exception\n",m_sFunc,m_sFile,m_nLine);
         }
     };
+#endif //LV_UNCAUGHT_EXCEPT_LOGGER_DECL
 
+#ifndef LV_EXCEPTION_DECL
+#define LV_EXCEPTION_DECL
     struct Exception : public std::runtime_error {
         template<typename... Targs>
         Exception(const std::string& sErrMsg, const char* sFunc, const char* sFile, int nLine, Targs&&... args) :
@@ -104,6 +115,7 @@ namespace lv {
         const char* const m_acFileName;
         const int m_nLineNumber;
     };
+#endif //LV_EXCEPTION_DECL
 
     template<typename T>
     inline bool isnan(T dVal) {
@@ -116,6 +128,8 @@ namespace lv {
 
     namespace gl {
 
+#ifndef LV_GL_CONTEXT_DECL
+#define LV_GL_CONTEXT_DECL
         class Context {
         public:
             Context(const cv::Size& oWinSize, const std::string& sWinName, bool bHide=true, size_t nGLVerMajor=3, size_t nGLVerMinor=0) {
@@ -185,6 +199,7 @@ namespace lv {
             Context(const Context&) = delete;
             static std::once_flag& getInitFlag() {static std::once_flag oInitFlag; return oInitFlag;}
         };
+#endif //LV_GL_CONTEXT_DECL
 
     } // namespace gl
 

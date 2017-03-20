@@ -48,14 +48,19 @@
 #include <windows.h>
 #endif //def(_MSC_VER)
 #include <GLFW/glfw3.h>
+#ifndef LV_GLFW_WINDOW_DELETER_DECL
+#define LV_GLFW_WINDOW_DELETER_DECL
 struct glfwWindowDeleter {
     void operator()(GLFWwindow* pWindow) {
         glfwDestroyWindow(pWindow);
     }
 };
+#endif //LV_GLFW_WINDOW_DELETER_DECL
 #endif //HAVE_GLFW
 #if HAVE_FREEGLUT
 #include <GL/freeglut.h>
+#ifndef LV_GLUT_WINDOW_DELETER_DECL
+#define LV_GLUT_WINDOW_DELETER_DECL
 struct glutHandle {
     glutHandle() : m_nHandle(0) {}
     glutHandle(std::nullptr_t) : m_nHandle(0) {}
@@ -72,12 +77,15 @@ struct glutWindowDeleter {
     }
     typedef glutHandle pointer;
 };
+#endif //LV_GLUT_WINDOW_DELETER_DECL
 #endif //HAVE_FREEGLUT
 
 namespace lv {
 
     namespace gl {
 
+#ifndef LV_GL_CONTEXT_DECL
+#define LV_GL_CONTEXT_DECL
         class Context {
         public:
             Context(const cv::Size& oWinSize,
@@ -114,6 +122,7 @@ namespace lv {
             Context& operator=(const Context&) = delete;
             Context(const Context&) = delete;
         };
+#endif //LV_GL_CONTEXT_DECL
 
         inline bool isInternalFormatSupported(GLenum eInternalFormat) {
             switch(eInternalFormat) {
