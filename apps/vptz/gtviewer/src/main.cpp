@@ -5,6 +5,8 @@
 //
 // Before running, set the input scenario/gt paths using the defines below.
 //
+// For a simpler introduction on how to use the VPTZ module, see the sample folder.
+//
 //======================================================================================
 
 #include "litiv/vptz/virtualptz.hpp"

@@ -92,6 +92,8 @@ namespace lv {
     template<typename T>
     struct TypePrinter;
 
+#ifndef LV_UNCAUGHT_EXCEPT_LOGGER_DECL
+#define LV_UNCAUGHT_EXCEPT_LOGGER_DECL
     /// debug helper class which prints status messages in console during stack unwinding (used through lvExceptionWatch macro)
     struct UncaughtExceptionLogger {
         inline UncaughtExceptionLogger(const char* sFunc, const char* sFile, int nLine) :
@@ -104,7 +106,10 @@ namespace lv {
                 std::cerr << lv::putf("Unwinding at function '%s' from %s(%d) due to uncaught exception\n",m_sFunc,m_sFile,m_nLine);
         }
     };
+#endif //LV_UNCAUGHT_EXCEPT_LOGGER_DECL
 
+#ifndef LV_EXCEPTION_DECL
+#define LV_EXCEPTION_DECL
     /// high-level (costly) exception class with extra mesagge + info on error location (used through lvAssert and lvError macros)
     struct Exception : public std::runtime_error {
         /// default lv exception constructor; all exception should be created via macros
@@ -129,6 +134,7 @@ namespace lv {
         /// internal toggle for stderr broadcast toggle
         static bool s_bVerbose;
     };
+#endif //LV_EXCEPTION_DECL
 
     /// unique pointer static cast helper utility (moves ownership to the returned pointer)
     template<typename TDerived, typename TBase, typename TDeleter>
