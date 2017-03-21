@@ -716,13 +716,13 @@ namespace lv {
 
     /// prints the content of a matrix to the given stream with constant output element size
     template<typename T>
-    inline std::ostream& print(const cv::Mat_<T>& oMat, std::ostream& os=std::cout) {
+    inline std::ostream& print(const cv::Mat_<T>& oMat, const cv::Point2i& oDisplayIdxOffset={0,0}, std::ostream& os=std::cout) {
         static_assert(isDataTypeCompat<T>(),"matrix type must be cv-compatible, and without channels");
         lvAssert_(oMat.dims==2,"function currently only defined for 2d mats; split dims and call for 2d slices");
         os << " CVMATRIX " << lv::MatInfo(oMat) << std::endl;
         if(oMat.empty() || oMat.size().area()==0)
             return os;
-        const size_t nMaxMetaColWidth = (size_t)std::max(lv::digit_count(oMat.cols),lv::digit_count(oMat.rows));
+        const size_t nMaxMetaColWidth = (size_t)std::max(lv::digit_count(oMat.cols+oDisplayIdxOffset.x),lv::digit_count(oMat.rows+oDisplayIdxOffset.y));
         double dMin,dMax;
         cv::minMaxIdx(oMat,&dMin,&dMax);
         const T tMin = (T)dMin;
@@ -737,14 +737,14 @@ namespace lv {
         const auto lPrinter = [&](const T& v) {os << "  " << lv::putf(sFormat.c_str(),(PrintType)v);};
         os << std::string(nMaxMetaColWidth+3,' ') << "x=";
         for(int nColIdx=0; nColIdx<oMat.cols; ++nColIdx)
-            os << "  " << lv::clampString(lv::putf(sMetaFormat.c_str(),nColIdx),nMaxColWidth);
+            os << "  " << lv::clampString(lv::putf(sMetaFormat.c_str(),nColIdx+oDisplayIdxOffset.x),nMaxColWidth);
         os << std::endl;
         os << std::string(nMaxMetaColWidth+5,' ');
         for(int nColIdx=0; nColIdx<oMat.cols; ++nColIdx)
             os << "--" << lv::clampString("-",nMaxColWidth,'-');
         os << std::endl;
         for(int nRowIdx=0; nRowIdx<oMat.rows; ++nRowIdx) {
-            os << " y=" << lv::putf(sMetaFormat.c_str(),nRowIdx) << " |";
+            os << " y=" << lv::putf(sMetaFormat.c_str(),nRowIdx+oDisplayIdxOffset.y) << " |";
             for(int nColIdx=0; nColIdx<oMat.cols; ++nColIdx)
                 lPrinter(oMat.template at<T>(nRowIdx,nColIdx));
             os << std::endl;
@@ -754,36 +754,36 @@ namespace lv {
 
     /// provides a printable string of the content of a matrix with constant output element size
     template<typename T>
-    inline std::string to_string(const cv::Mat_<T>& oMat) {
+    inline std::string to_string(const cv::Mat_<T>& oMat, const cv::Point2i& oDisplayIdxOffset={0,0}) {
         std::stringstream ssStr;
-        lv::print(oMat,ssStr);
+        lv::print(oMat,oDisplayIdxOffset,ssStr);
         return ssStr.str();
     }
 
     /// prints the content of a vector (via matrix formatting) to the given stream
     template<typename T>
-    std::enable_if_t<(!isDataTypeCompat<T>()),std::ostream&> print(const std::vector<T>& oVec, std::ostream& os=std::cout) {
+    std::enable_if_t<(!isDataTypeCompat<T>()),std::ostream&> print(const std::vector<T>& oVec, int nDisplayIdxOffset=0, std::ostream& os=std::cout) {
         os << " VECTOR (size=" << oVec.size() << ")" << std::endl;
         if(oVec.empty())
             return os;
-        const size_t nMaxMetaColWidth = (size_t)lv::digit_count(oVec.size());
+        const size_t nMaxMetaColWidth = (size_t)lv::digit_count((int)oVec.size()+nDisplayIdxOffset);
         const std::string sMetaFormat = std::string("%")+std::to_string(nMaxMetaColWidth)+"i";
         for(size_t nElemIdx=0; nElemIdx<oVec.size(); ++nElemIdx)
-            os << "  x=" << lv::putf(sMetaFormat.c_str(),(int)nElemIdx) << "  :  " << oVec[nElemIdx] << std::endl;
+            os << "  x=" << lv::putf(sMetaFormat.c_str(),(int)nElemIdx+nDisplayIdxOffset) << "  :  " << oVec[nElemIdx] << std::endl;
         return os;
     }
 
     /// prints the content of a vector (via matrix formatting) to the given stream
     template<typename T>
-    std::enable_if_t<(isDataTypeCompat<T>()),std::ostream&> print(const std::vector<T>& oVec, std::ostream& os=std::cout) {
-        return lv::print(cv::Mat_<T>(1,(int)oVec.size(),const_cast<T*>(oVec.data())),os);
+    std::enable_if_t<(isDataTypeCompat<T>()),std::ostream&> print(const std::vector<T>& oVec, int nDisplayIdxOffset=0, std::ostream& os=std::cout) {
+        return lv::print(cv::Mat_<T>(1,(int)oVec.size(),const_cast<T*>(oVec.data())),cv::Point2i(nDisplayIdxOffset,0),os);
     }
 
     /// provides a printable string of the content of a vector with constant output element size
     template<typename T>
-    inline std::string to_string(const std::vector<T>& oVec) {
+    inline std::string to_string(const std::vector<T>& oVec, int nDisplayIdxOffset=0) {
         std::stringstream ssStr;
-        lv::print(oVec,ssStr);
+        lv::print(oVec,nDisplayIdxOffset,ssStr);
         return ssStr.str();
     }
 
