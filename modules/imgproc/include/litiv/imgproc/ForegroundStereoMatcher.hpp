@@ -31,17 +31,20 @@
 #define FGSTEREOMATCH_DEFAULT_MAXITERCOUNT     (size_t(1000))
 
 // unary costs params
-#define FGSTEREOMATCH_VISSIM_COST_OOBASSOC     (ValueType(1000))
-#define FGSTEREOMATCH_VISSIM_COST_OCCLUDED     (ValueType(2000))
-#define FGSTEREOMATCH_VISSIM_COST_MAXTRUNC     (ValueType(5000))
-#define FGSTEREOMATCH_VISSIM_COST_SCALEFACT    (ValueType(2000))
-#define FGSTEREOMATCH_UNIQUE_COST_OOBASSOC     (ValueType(500))
-#define FGSTEREOMATCH_UNIQUE_COST_OVERASSOC    (ValueType(500))
+#define FGSTEREOMATCH_VISSIM_COST_OOB_CST          (ValueType(1000))
+#define FGSTEREOMATCH_VISSIM_COST_OCCLUDED_CST     (ValueType(2000))
+#define FGSTEREOMATCH_VISSIM_COST_MAXTRUNC_CST     (ValueType(5000))
+#define FGSTEREOMATCH_VISSIM_COST_DESC_SCALE       (1000)
+#define FGSTEREOMATCH_VISSIM_COST_RAW_SCALE        (2)
+#define FGSTEREOMATCH_UNIQUE_COST_OVER_SCALE       (500)
 // pairwise costs params
-#define FGSTEREOMATCH_LBLSIM_COST_MAXOCCL      (ValueType(5000))
-#define FGSTEREOMATCH_LBLSIM_COST_MAXTRUNC     (ValueType(5000))
+#define FGSTEREOMATCH_LBLSIM_COST_MAXOCCL          (ValueType(5000))
+#define FGSTEREOMATCH_LBLSIM_COST_MAXTRUNC         (ValueType(5000))
 // higher order costs params
 // ...
+
+// hardcoded term relations
+#define FGSTEREOMATCH_UNIQUE_COST_INCR_REL(n)      (float((n)*3)/((n)+2))
 
 /// this stereo matcher assumes both input images are rectified, and have the same size;
 /// it also expects four inputs (image0,mask0,image1,mask1), and provides 4 outputs (disp0,mask0,disp1,mask1)
@@ -51,8 +54,8 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
     using ResegmLabelType = uint8_t; ///< type used for internal fg/bg labeling
     using OutputLabelType = int32_t; ///< type used in returned labelings (i.e. output of 'apply')
     using AssocCountType = uint16_t; ///< type used for stereo association counting in cv::Mat_'s
-    using AssocCheckType = uint8_t; ///< type used for stereo association 'checking' in cv::Mat_'s
-    using ValueType = float; ///< type used for factor values (@@@@ could be integer? retest speed later?)
+    using AssocIdxType = int16_t; ///< type used for stereo association idx listing in cv::Mat_'s
+    using ValueType = int; ///< type used for factor values (@@@@ could be integer? retest speed later?)
     using IndexType = size_t; ///< type used for node indexing (note: pretty much hardcoded everywhere in impl below)
 #if FGSTEREOMATCH_CONFIG_ALLOC_IN_MODEL
     using StereoExplicitFunction = opengm::ExplicitFunction<ValueType,IndexType,StereoLabelType>; ///< shortcut for stereo explicit function
@@ -83,7 +86,7 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
     static_assert(size_t(std::numeric_limits<IndexType>::max())>=size_t(std::numeric_limits<ResegmLabelType>::max()),"Graph index type max value must be greater than resegm label type max value");
 
     /// full stereo graph matcher constructor; relies on provided parameters to build graphical model base
-    FGStereoMatcher(const cv::Size& oImageSize, int32_t nMinDispOffset, int32_t nMaxDispOffset, int32_t nDispStep=1);
+    FGStereoMatcher(const cv::Size& oImageSize, size_t nMinDispOffset, size_t nMaxDispOffset, size_t nDispStep=1);
     /// stereo matcher function; solves the graph model to find pixel-level matches on epipolar lines, and returns disparity maps + masks
     virtual void apply(const MatArrayIn& aImages, MatArrayOut& oMasks) override;
     /// (pre)calculates features required for model updates, and optionally returns them in packet format for archiving
@@ -143,28 +146,24 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         void calcFeatures(const MatArrayIn& aImages, cv::Mat* pFeatsPacket=nullptr);
         /// sets a previously precalculated features packet to be used in the next 'updateModels' call (do not modify it before that!)
         void setNextFeatures(const cv::Mat& oPackedFeats);
-        /// returns the minimum disparity offset label
-        OutputLabelType getMinOffset() const;
-        /// returns the maximum disparity offset label
-        OutputLabelType getMaxOffset() const;
         /// translate an internal graph label to a real disparity offset label
-        OutputLabelType getRealLabel(StereoLabelType nawLabel) const;
+        OutputLabelType getRealLabel(StereoLabelType nLabel) const;
         /// translate a real disparity offset label to an internal graph label
         StereoLabelType getInternalLabel(OutputLabelType nRealLabel) const;
-        /// returns a node index offset by an internal stereo disparity label (or INT_MAX if invalid)
-        int getOffsetCol(int nColIdx, StereoLabelType nLabel) const;
-        /// returns a column index offset by an internal stereo disparity label (or SIZE_MAX if invalid)
-        size_t getOffsetNode(size_t nNodeIdx, StereoLabelType nLabel) const;
         /// returns the stereo associations count for a given graph node by row/col indices
         AssocCountType getAssocCount(int nRowIdx, int nColIdx) const;
         /// adds a stereo association for a given node coord set & origin column idx
-        void addAssoc(int nRowIdx, int nColIdx, int nAssocColIdx) const;
+        void addAssoc(int nRowIdx, int nColIdx, StereoLabelType nLabel) const;
         /// removes a stereo association for a given node coord set & origin column idx
-        void removeAssoc(int nRowIdx, int nColIdx, int nAssocColIdx) const;
+        void removeAssoc(int nRowIdx, int nColIdx, StereoLabelType nLabel) const;
+        /// returns the cost of adding a stereo association for a given node coord set & origin column idx
+        ValueType calcAddAssocCost(int nRowIdx, int nColIdx, StereoLabelType nLabel) const;
+        /// returns the cost of removing a stereo association for a given node coord set & origin column idx
+        ValueType calcRemoveAssocCost(int nRowIdx, int nColIdx, StereoLabelType nLabel) const;
         /// returns the total stereo association cost for all grid nodes
-        ValueType getTotalAssocEnergy() const;
-        /// returns the stereo (re-)association difference cost for a given node + old/new labels pair
-        ValueType getAssocEnergyDiff(size_t nNodeIdx, StereoLabelType nCurrLabel, StereoLabelType nNewLabel) const;
+        ValueType calcTotalAssocCost() const;
+        /// fill internal temporary energy cost mats for the given move operation
+        void calcMoveCosts(StereoLabelType nNewLabel) const;
 
         /// max move making iteration count allowed in a single optimization pass
         size_t m_nMaxIterCount;
@@ -186,8 +185,12 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         mutable cv::Mat_<ResegmLabelType> m_oResegmLabeling;
         /// 2d map which contains how many associations a node possesses (mutable for inference algo)
         mutable cv::Mat_<AssocCountType> m_oAssocCounts;
-        /// 3d map which specifies the row association status for each node in the graph (mutable for inference algo)
-        mutable cv::Mat_<AssocCheckType> m_oAssocMap;
+        /// 3d map which lists the associations (by idx) for each node in the graph (mutable for inference algo)
+        mutable cv::Mat_<AssocIdxType> m_oAssocMap;
+        /// 2d map which contains transient association energy costs for all graph nodes (mutable for inference algo)
+        mutable cv::Mat_<ValueType> m_oAssocCosts;
+        /// 2d map which contains transient unary factor energy costs for all graph nodes (mutable for inference algo)
+        mutable cv::Mat_<ValueType> m_oUnaryCosts;
         /// contains the predetermined (max) 2D grid size for the graph models
         const lv::MatSize m_oGridSize;
         /// defines the minimum grid border size based on the features used
@@ -197,7 +200,11 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         /// contains all 'real' stereo labels, plus the 'occluded'/'dontcare' labels
         const std::vector<OutputLabelType> m_vStereoLabels;
         /// contains the step size between stereo labels (i.e. the disparity granularity)
-        const size_t m_nStereoLabelStep;
+        const size_t m_nDispOffsetStep;
+        /// contains the minimum disparity offset value
+        const size_t m_nMinDispOffset;
+        /// contains the maximum disparity offset value
+        const size_t m_nMaxDispOffset;
         /// internal label used for 'dont care' labeling
         const StereoLabelType m_nStereoDontCareLabelIdx;
         /// internal label used for 'occluded' labeling

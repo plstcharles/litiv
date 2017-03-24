@@ -38,7 +38,6 @@
 #define DATASET_USE_HALF_GT_INPUT_FLAG     1
 #define DATASET_USE_PRECALC_FEATURES       0
 #define DATASET_SAVE_PRECALC_FEATURES      1
-#define DISPARITY_STEP size_t(1)
 
 #if (DATASET_VAPTRIMOD+DATASET_MINI_TESTS/*+...*/)!=1
 #error "Must pick a single dataset."
@@ -126,8 +125,8 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         }
         const std::vector<lv::MatInfo> oInfoArray = oBatch.getInputInfoArray();
         const lv::MatSize oFrameSize = oInfoArray[0].size;
-        const int nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity();
-        std::shared_ptr<FGStereoMatcher> pAlgo = std::make_shared<FGStereoMatcher>(oFrameSize,nMinDisp,nMaxDisp,DISPARITY_STEP);
+        const size_t nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity(), nDispStep = oBatch.getDisparityStep();
+        std::shared_ptr<FGStereoMatcher> pAlgo = std::make_shared<FGStereoMatcher>(oFrameSize,nMinDisp,nMaxDisp,nDispStep);
         oBatch.setFeaturesDirName(pAlgo->getFeatureExtractorName());
         constexpr size_t nExpectedAlgoInputCount = FGStereoMatcher::getInputStreamCount();
         constexpr size_t nExpectedAlgoOutputCount = FGStereoMatcher::getOutputStreamCount();

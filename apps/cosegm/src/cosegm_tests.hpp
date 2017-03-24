@@ -102,12 +102,16 @@ namespace lv {
             lv::createDirIfNotExist(this->getFeaturesPath()+sDirName);
         }
 
-        int getMinDisparity() const {
+        size_t getMinDisparity() const {
             return this->m_nMinDisp;
         }
 
-        int getMaxDisparity() const {
+        size_t getMaxDisparity() const {
             return this->m_nMaxDisp;
+        }
+
+        size_t getDisparityStep() const {
+            return this->m_nDispStep;
         }
 
         virtual size_t getInputStreamCount() const override final {
@@ -157,6 +161,14 @@ namespace lv {
                     cv::copyMakeBorder(oMask0,oMask0,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,BORDER_EXPAND_TYPE);
                     cv::copyMakeBorder(oInput1,oInput1,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,BORDER_EXPAND_TYPE);
                     cv::copyMakeBorder(oMask1,oMask1,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,BORDER_EXPAND_TYPE);
+                    /*cv::Mat test0,test1;
+                    cv::resize(oInput0,test0,cv::Size(),20,20,cv::INTER_NEAREST);
+                    cv::imshow("test0",test0);
+                    lvPrint(oInput0);
+                    cv::resize(oInput1,test1,cv::Size(),20,20,cv::INTER_NEAREST);
+                    cv::imshow("test1",test1);
+                    lvPrint(oInput1);
+                    cv::waitKey(0);*/
                 }
                 this->m_vvsInputPaths.push_back(vCurrInputPaths);
                 if(this->m_vvsInputPaths.size()==size_t(1)) {
@@ -229,29 +241,50 @@ namespace lv {
                 this->m_vGTInfos[0] = lv::MatInfo(aROIs[0].size(),this->m_vGTInfos[0].type);
                 this->m_vGTInfos[1] = lv::MatInfo(aROIs[1].size(),this->m_vGTInfos[1].type);
             }
-            std::ifstream fDispRangeFile(this->getDataPath()+"drange.txt");
-            if(fDispRangeFile.is_open()) {
-                fDispRangeFile >> this->m_nMinDisp;
-                fDispRangeFile >> this->m_nMaxDisp;
-                this->m_nMinDisp *= dScale;
-                this->m_nMaxDisp *= dScale;
+            this->m_nMinDisp = size_t(0);
+            this->m_nMinDisp = size_t(100);
+            this->m_nDispStep = size_t(1);
+            std::ifstream oDispRangeFile(this->getDataPath()+"drange.txt");
+            if(oDispRangeFile.is_open() && !oDispRangeFile.eof()) {
+                oDispRangeFile >> this->m_nMinDisp;
+                if(!oDispRangeFile.eof()) {
+                    oDispRangeFile >> this->m_nMaxDisp;
+                    if(!oDispRangeFile.eof())
+                        oDispRangeFile >> this->m_nDispStep;
+                }
             }
-            else {
-                this->m_nMinDisp = 0;
-                this->m_nMaxDisp = 100;
+            this->m_nMinDisp *= dScale;
+            this->m_nMaxDisp *= dScale;
+            this->m_nDispStep = std::max((size_t)std::round(this->m_nDispStep*dScale),size_t(1));
+            lvAssert(((this->m_nMaxDisp-this->m_nMinDisp)%this->m_nDispStep)==0);
+        }
+
+        virtual std::vector<cv::Mat> getRawInputArray(size_t nPacketIdx) override final {
+            const int nExtraPxBorderSize = dynamic_cast<const ICosegmTestDataset&>(*this->getRoot()).getExtraPixelBorderSize();
+            std::vector<cv::Mat> vInputs = IDataProducer_<DatasetSource_VideoArray>::getRawInputArray(nPacketIdx);
+            for(size_t nStreamIdx=0; nStreamIdx<vInputs.size(); ++nStreamIdx) {
+                if(!vInputs[nStreamIdx].empty() && nExtraPxBorderSize>0)
+                    cv::copyMakeBorder(vInputs[nStreamIdx],vInputs[nStreamIdx],nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,BORDER_EXPAND_TYPE);
             }
+            return vInputs;
         }
 
         virtual std::vector<cv::Mat> getRawGTArray(size_t nPacketIdx) override final {
             lvAssert(this->isEvaluating());
+            const int nExtraPxBorderSize = dynamic_cast<const ICosegmTestDataset&>(*this->getRoot()).getExtraPixelBorderSize();
             std::vector<cv::Mat> vGTs = IDataProducer_<DatasetSource_VideoArray>::getRawGTArray(nPacketIdx);
-            if(this->isEvaluatingStereoDisp())
-                for(size_t nStreamIdx=0; nStreamIdx<vGTs.size(); ++nStreamIdx)
-                    vGTs[nStreamIdx] *= this->getScaleFactor();
+            for(size_t nStreamIdx=0; nStreamIdx<vGTs.size(); ++nStreamIdx) {
+                if(!vGTs[nStreamIdx].empty()) {
+                    if(this->isEvaluatingStereoDisp() && this->getScaleFactor()!=0)
+                        vGTs[nStreamIdx] *= this->getScaleFactor();
+                    if(nExtraPxBorderSize>0)
+                        cv::copyMakeBorder(vGTs[nStreamIdx],vGTs[nStreamIdx],nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,nExtraPxBorderSize,BORDER_EXPAND_TYPE);
+                }
+            }
             return vGTs;
         }
 
-        int m_nMinDisp,m_nMaxDisp;
+        size_t m_nMinDisp,m_nMaxDisp,m_nDispStep;
         std::string m_sFeaturesDirName;
 
     };
