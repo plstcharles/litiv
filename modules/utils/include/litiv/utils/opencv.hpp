@@ -889,39 +889,33 @@ namespace lv {
         if(a.dims!=b.dims || a.size!=b.size || a.type()!=b.type())
             return false;
         lvDbgAssert(a.total()*a.elemSize()==b.total()*b.elemSize());
-        if(a.isContinuous() && b.isContinuous())
+        if(a.isContinuous() && b.isContinuous()) {
+            lvAssert_(a.elemSize()>=sizeof(T),"unsupported element type for comparison");
             return std::equal((T*)a.data,(T*)(a.data+a.total()*a.elemSize()),(T*)b.data);
-        else {
-            lvAssert_(a.dims==2,"undefined for non-continuous, multi-dim matrices");
-            for(int nRowIdx=0; nRowIdx<a.rows; ++nRowIdx)
-                for(int nColIdx=0; nColIdx<a.cols; ++nColIdx)
-                    if(a.at<T>(nRowIdx,nColIdx)!=b.at<T>(nRowIdx,nColIdx))
-                        return false;
-            return true;
         }
+        lvAssert_(a.elemSize()==sizeof(T),"unsupported element type for comparison");
+        return std::equal(a.begin<T>(),a.end<T>(),b.begin<T>());
     }
 
     /// returns whether the two matrices are nearly equal or not, given a maximum allowed error
     template<typename T, typename Teps>
-    inline bool isNearlyEqual(const cv::Mat& a, const cv::Mat& b, Teps eps) {
-        if(a.empty() && b.empty())
+    inline bool isNearlyEqual(const cv::Mat& a_, const cv::Mat& b_, Teps eps) {
+        static_assert(isDataTypeCompat<T>(),"internal elem type must be cv-compatible, and not vectorized");
+        if(a_.empty() && b_.empty())
             return true;
-        if(a.dims!=b.dims || a.size!=b.size || a.type()!=b.type())
+        if(a_.dims!=b_.dims || a_.size!=b_.size || a_.type()!=b_.type())
             return false;
-        lvDbgAssert(a.total()*a.elemSize()==b.total()*b.elemSize());
+        lvDbgAssert(a_.total()*a_.elemSize()==b_.total()*b_.elemSize());
+        lvAssert_(lv::MatType(a_.type()).isTypeCompat<T>(),"templated element type mismatch with input mats");
+        cv::Mat_<T> a = lv::getBasicMat<T>(a_), b = lv::getBasicMat<T>(b_);
         const double dEps = double(eps);
         if(a.isContinuous() && b.isContinuous())
             return std::equal((T*)a.data,(T*)(a.data+a.total()*a.elemSize()),(T*)b.data,[&dEps](const T& _a, const T& _b){
                 return std::abs(double(_a)-double(_b))<=dEps;
             });
-        else {
-            lvAssert_(a.dims==2,"undefined for non-continuous, multi-dim matrices");
-            for(int nRowIdx=0; nRowIdx<a.rows; ++nRowIdx)
-                for(int nColIdx=0; nColIdx<a.cols; ++nColIdx)
-                    if(std::abs(double(a.at<T>(nRowIdx,nColIdx))-double(b.at<T>(nRowIdx,nColIdx)))>dEps)
-                        return false;
-            return true;
-        }
+        return std::equal(a.begin(),a.end(),b.begin(),[&dEps](const T& _a, const T& _b){
+            return std::abs(double(_a)-double(_b))<=dEps;
+        });
     }
 
     /// converts a single HSL triplet (0-360 hue, 0-1 sat & lightness) into an 8-bit RGB triplet
