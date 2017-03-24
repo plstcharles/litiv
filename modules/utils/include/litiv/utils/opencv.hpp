@@ -766,7 +766,7 @@ namespace lv {
         os << " CVMATRIX " << lv::MatInfo(oMat) << std::endl;
         if(oMat.empty() || oMat.size().area()==0)
             return os;
-        const size_t nMaxMetaColWidth = (size_t)std::max(lv::digit_count(oMat.cols+oDisplayIdxOffset.x),lv::digit_count(oMat.rows+oDisplayIdxOffset.y));
+        const size_t nMaxMetaColWidth = (size_t)std::max(std::max(lv::digit_count(oMat.cols+oDisplayIdxOffset.x),lv::digit_count(oMat.rows+oDisplayIdxOffset.y)),std::max(lv::digit_count(oDisplayIdxOffset.x),lv::digit_count(oDisplayIdxOffset.y)));
         double dMin,dMax;
         cv::minMaxIdx(oMat,&dMin,&dMax);
         const T tMin = (T)dMin;
@@ -810,7 +810,7 @@ namespace lv {
         os << " VECTOR (size=" << oVec.size() << ")" << std::endl;
         if(oVec.empty())
             return os;
-        const size_t nMaxMetaColWidth = (size_t)lv::digit_count((int)oVec.size()+nDisplayIdxOffset);
+        const size_t nMaxMetaColWidth = (size_t)std::max(lv::digit_count((int)oVec.size()+nDisplayIdxOffset),lv::digit_count(nDisplayIdxOffset));
         const std::string sMetaFormat = std::string("%")+std::to_string(nMaxMetaColWidth)+"i";
         for(size_t nElemIdx=0; nElemIdx<oVec.size(); ++nElemIdx)
             os << "  x=" << lv::putf(sMetaFormat.c_str(),(int)nElemIdx+nDisplayIdxOffset) << "  :  " << oVec[nElemIdx] << std::endl;
