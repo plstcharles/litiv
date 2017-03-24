@@ -592,10 +592,11 @@ namespace lv {
         return oMat(vRanges.data());
     }
 
-    /// returns a new mat header pointing to the same elements as the input, but without singleton dimensions (2d mats are unaffected)
+    /// returns a new mat containing the same elements as the input, but without singleton dimensions (2d mats are unaffected)
     inline cv::Mat squeeze(const cv::Mat& oMat) {
+        // note: need to clone data, as opencv often fucks up indexing if last dimension step is not the element size
         if(oMat.dims<=2 || oMat.total()==size_t(0))
-            return oMat;
+            return oMat.clone();
         std::vector<int> vSizes;
         std::vector<size_t> vSteps;
         for(int nDimIdx=0; nDimIdx<oMat.dims; ++nDimIdx) {
@@ -606,10 +607,17 @@ namespace lv {
         }
         if(vSizes.empty()) {
             lvDbgAssert(oMat.total()==size_t(1));
-            return cv::Mat(1,1,oMat.type(),oMat.data);
+            return cv::Mat(1,1,oMat.type(),oMat.data).clone();
+        }
+        else if(vSizes.size()==size_t(1)) {
+            lvDbgAssert(oMat.total()==size_t(vSizes[0]));
+            return cv::Mat(vSizes[0],1,oMat.type(),oMat.data,vSteps[0]).clone().reshape(0,1);
         }
         lvDbgAssert(std::accumulate(vSizes.begin(),vSizes.end(),1,[](int a, int b){return a*b;})==(int)oMat.total());
-        return cv::Mat((int)vSizes.size(),vSizes.data(),oMat.type(),oMat.data,vSteps.data());
+        const std::vector<int> vRealSizes = vSizes;
+        vSizes.push_back(1); // again, needed due to opencv commonly ignoring last dim step size
+        vSteps.push_back(lv::MatType(oMat.type()).elemSize());
+        return cv::Mat((int)vSizes.size(),vSizes.data(),oMat.type(),oMat.data,vSteps.data()).clone().reshape(0,(int)vRealSizes.size(),vRealSizes.data());
     }
 
     /// helper function to zero-init sparse and non-sparse matrices (sparse mat overload)
