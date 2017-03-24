@@ -80,14 +80,19 @@ namespace lv {
     /// returns whether a given matrix data type is opencv-compatible or not (i.e. whether it can be used in a cv::Mat_ class)
     template<typename TData>
     constexpr bool isDataTypeCompat() {
+        // lots of framework stuff will blow up if these fail on odd platforms
+        static_assert(sizeof(uchar)==sizeof(uint8_t),"unexpected uchar byte count");
+        static_assert(sizeof(char)==sizeof(int8_t),"unexpected char byte count");
+        static_assert(sizeof(ushort)==sizeof(uint16_t),"unexpected ushort byte count");
+        static_assert(sizeof(short)==sizeof(int16_t),"unexpected short byte count");
+        static_assert(sizeof(int)==sizeof(int32_t),"unexpected int byte count");
         return
-            std::is_same<uchar,TData>::value ||
-            std::is_same<char,TData>::value ||
-            std::is_same<short,TData>::value ||
-            std::is_same<ushort,TData>::value ||
-            std::is_same<int,TData>::value ||
-            std::is_same<float,TData>::value ||
-            std::is_same<double,TData>::value;
+            std::is_same<uchar,TData>::value || std::is_same<uint8_t,TData>::value ||
+            std::is_same<char,TData>::value || std::is_same<int8_t,TData>::value ||
+            std::is_same<ushort,TData>::value || std::is_same<uint16_t,TData>::value ||
+            std::is_same<short,TData>::value || std::is_same<int16_t,TData>::value ||
+            std::is_same<int,TData>::value || std::is_same<int32_t,TData>::value ||
+            std::is_same<float,TData>::value || std::is_same<double,TData>::value;
     }
 
     /// returns the opencv depth flag for an opencv-compatible data type
@@ -95,13 +100,13 @@ namespace lv {
     constexpr int getCVDepthFromDataType() {
         static_assert(isDataTypeCompat<TData>(),"data type is not opencv-compatible");
         return
-            std::is_same<uchar,TData>::value?CV_8U:
-            std::is_same<char,TData>::value?CV_8S:
-            std::is_same<short,TData>::value?CV_16S:
-            std::is_same<ushort,TData>::value?CV_16U:
-            std::is_same<int,TData>::value?CV_32S:
-            std::is_same<float,TData>::value?CV_32F:
-            std::is_same<double,TData>::value?CV_64F:
+            (std::is_same<uchar,TData>::value || std::is_same<uint8_t,TData>::value)?CV_8U:
+            (std::is_same<char,TData>::value || std::is_same<int8_t,TData>::value)?CV_8S:
+            (std::is_same<ushort,TData>::value || std::is_same<uint16_t,TData>::value)?CV_16U:
+            (std::is_same<short,TData>::value || std::is_same<int16_t,TData>::value)?CV_16S:
+            (std::is_same<int,TData>::value || std::is_same<int32_t,TData>::value)?CV_32S:
+            (std::is_same<float,TData>::value)?CV_32F:
+            (std::is_same<double,TData>::value)?CV_64F:
             throw(1);
     }
 
