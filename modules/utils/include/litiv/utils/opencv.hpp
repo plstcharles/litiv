@@ -796,9 +796,36 @@ namespace lv {
         return os;
     }
 
+    /// prints the content of a (non templated) matrix to the given stream with constant output element size
+    inline std::ostream& print(const cv::Mat& oMat, const cv::Point2i& oDisplayIdxOffset={0,0}, std::ostream& os=std::cout) {
+        if(oMat.depth()==CV_8U)
+            return lv::print<uint8_t>(lv::getBasicMat<uint8_t>(oMat),oDisplayIdxOffset,os);
+        else if(oMat.depth()==CV_8S)
+            return lv::print<int8_t>(lv::getBasicMat<int8_t>(oMat),oDisplayIdxOffset,os);
+        else if(oMat.depth()==CV_16U)
+            return lv::print<uint16_t>(lv::getBasicMat<uint16_t>(oMat),oDisplayIdxOffset,os);
+        else if(oMat.depth()==CV_16S)
+            return lv::print<int16_t>(lv::getBasicMat<int16_t>(oMat),oDisplayIdxOffset,os);
+        else if(oMat.depth()==CV_32S)
+            return lv::print<int32_t>(lv::getBasicMat<int32_t>(oMat),oDisplayIdxOffset,os);
+        else if(oMat.depth()==CV_32F)
+            return lv::print<float>(lv::getBasicMat<float>(oMat),oDisplayIdxOffset,os);
+        else if(oMat.depth()==CV_64F)
+            return lv::print<double>(lv::getBasicMat<double>(oMat),oDisplayIdxOffset,os);
+        else
+            lvError("unexpected input matrix depth");
+    }
+
     /// provides a printable string of the content of a matrix with constant output element size
     template<typename T>
     inline std::string to_string(const cv::Mat_<T>& oMat, const cv::Point2i& oDisplayIdxOffset={0,0}) {
+        std::stringstream ssStr;
+        lv::print<T>(oMat,oDisplayIdxOffset,ssStr);
+        return ssStr.str();
+    }
+
+    /// provides a printable string of the content of a (non-templated) matrix with constant output element size
+    inline std::string to_string(const cv::Mat& oMat, const cv::Point2i& oDisplayIdxOffset={0,0}) {
         std::stringstream ssStr;
         lv::print(oMat,oDisplayIdxOffset,ssStr);
         return ssStr.str();
@@ -820,14 +847,14 @@ namespace lv {
     /// prints the content of a vector (via matrix formatting) to the given stream
     template<typename T>
     std::enable_if_t<(isDataTypeCompat<T>()),std::ostream&> print(const std::vector<T>& oVec, int nDisplayIdxOffset=0, std::ostream& os=std::cout) {
-        return lv::print(cv::Mat_<T>(1,(int)oVec.size(),const_cast<T*>(oVec.data())),cv::Point2i(nDisplayIdxOffset,0),os);
+        return lv::print<T>(cv::Mat_<T>(1,(int)oVec.size(),const_cast<T*>(oVec.data())),cv::Point2i(nDisplayIdxOffset,0),os);
     }
 
     /// provides a printable string of the content of a vector with constant output element size
     template<typename T>
     inline std::string to_string(const std::vector<T>& oVec, int nDisplayIdxOffset=0) {
         std::stringstream ssStr;
-        lv::print(oVec,nDisplayIdxOffset,ssStr);
+        lv::print<T>(oVec,nDisplayIdxOffset,ssStr);
         return ssStr.str();
     }
 
