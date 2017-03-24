@@ -1259,7 +1259,7 @@ namespace cv { // extending cv
 
     template<typename T>
     std::ostream& operator<<(std::ostream& os, const Mat_<T>& oMat) {
-        return lv::print(oMat,os);
+        return lv::print(oMat,cv::Point2i{0,0},os);
     }
 
 } // namespace cv
@@ -1268,7 +1268,7 @@ namespace std { // extending std
 
     template<typename T>
     ostream& operator<<(ostream& os, const vector<T>& oVec) {
-        return lv::print(oVec,os);
+        return lv::print(oVec,0,os);
     }
 
 }
