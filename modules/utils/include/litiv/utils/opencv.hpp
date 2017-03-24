@@ -58,6 +58,20 @@
                  CV_MAT_DEPTH(cvtype_flag)==3?"CV_16S":CV_MAT_DEPTH(cvtype_flag)==4?"CV_32S":CV_MAT_DEPTH(cvtype_flag)==5?"CV_32F":"CV_64F"))
 #endif //ndef(CV_MAT_DEPTH_STR)
 
+namespace cv { // extending cv (decls only)
+
+    template<typename T>
+    std::ostream& operator<<(std::ostream& os, const Mat_<T>& oMat);
+
+} // namespace cv
+
+namespace std { // extending std (decls only)
+
+    template<typename T>
+    ostream& operator<<(ostream& os, const vector<T>& oVec);
+
+} // namespace std
+
 namespace lv {
 
     struct MatType;
@@ -1271,4 +1285,4 @@ namespace std { // extending std
         return lv::print(oVec,0,os);
     }
 
-}
+} // namespace std
