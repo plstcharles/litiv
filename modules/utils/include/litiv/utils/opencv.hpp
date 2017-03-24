@@ -559,6 +559,45 @@ namespace lv {
         return cv::Mat_<T>(oMat.dims+1,vDims.data(),const_cast<T*>((const T*)oMat.data));
     }
 
+    /// returns a subselection of a n-dimension matrix by specifying one dim+range pair, without copying data
+    inline cv::Mat getSubMat(const cv::Mat& oMat, int nTargetDimIdx, const cv::Range& aTargetElemIdxs) {
+        lvAssert_(nTargetDimIdx<oMat.dims,"target dimension out of bounds");
+        lvAssert_(aTargetElemIdxs!=cv::Range::all(),"using full range returns identical matrix");
+        lvAssert_(aTargetElemIdxs.start>=0 && aTargetElemIdxs.end<=oMat.size[oMat.dims-1],"target element indice(s) out of bounds");
+        std::vector<cv::Range> vRanges((size_t)oMat.dims,cv::Range::all());
+        vRanges[nTargetDimIdx] = aTargetElemIdxs;
+        return oMat(vRanges.data());
+    }
+
+    /// returns a subselection of a n-dimension matrix by specifying one dim+elemidx pair, without copying data
+    inline cv::Mat getSubMat(const cv::Mat& oMat, int nTargetDimIdx, int nTargetElemIdx) {
+        lvAssert_(nTargetDimIdx<oMat.dims,"target dimension out of bounds");
+        lvAssert_(nTargetElemIdx>=0 && nTargetElemIdx<oMat.size[oMat.dims-1],"target element index out of bounds");
+        std::vector<cv::Range> vRanges((size_t)oMat.dims,cv::Range::all());
+        vRanges[nTargetDimIdx] = cv::Range(nTargetElemIdx,nTargetElemIdx+1);
+        return oMat(vRanges.data());
+    }
+
+    /// returns a new mat header pointing to the same elements as the input, but without singleton dimensions (2d mats are unaffected)
+    inline cv::Mat squeeze(const cv::Mat& oMat) {
+        if(oMat.dims<=2 || oMat.total()==size_t(0))
+            return oMat;
+        std::vector<int> vSizes;
+        std::vector<size_t> vSteps;
+        for(int nDimIdx=0; nDimIdx<oMat.dims; ++nDimIdx) {
+            if(oMat.size[nDimIdx]>1) {
+                vSizes.push_back(oMat.size[nDimIdx]);
+                vSteps.push_back(oMat.step[nDimIdx]);
+            }
+        }
+        if(vSizes.empty()) {
+            lvDbgAssert(oMat.total()==size_t(1));
+            return cv::Mat(1,1,oMat.type(),oMat.data);
+        }
+        lvDbgAssert(std::accumulate(vSizes.begin(),vSizes.end(),1,[](int a, int b){return a*b;})==(int)oMat.total());
+        return cv::Mat((int)vSizes.size(),vSizes.data(),oMat.type(),oMat.data,vSteps.data());
+    }
+
     /// helper function to zero-init sparse and non-sparse matrices (sparse mat overload)
     template<typename T>
     inline void zeroMat(cv::SparseMat_<T>& oMat) {
