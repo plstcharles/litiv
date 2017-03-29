@@ -38,6 +38,7 @@
 #define DATASET_USE_HALF_GT_INPUT_FLAG     1
 #define DATASET_USE_PRECALC_FEATURES       0
 #define DATASET_SAVE_PRECALC_FEATURES      1
+#define DATASET_EXTRA_PIXEL_BORDER_SIZE    0
 
 #if (DATASET_VAPTRIMOD+DATASET_MINI_TESTS/*+...*/)!=1
 #error "Must pick a single dataset."
@@ -58,7 +59,7 @@
 #define DATASET_ID Dataset_CosegmTests
 #define DATASET_PARAMS \
     DATASET_OUTPUT_PATH,            /* => const std::string& sOutputDirName */ \
-    15,                             /* => int nExtraPixelBorderSize */ \
+    DATASET_EXTRA_PIXEL_BORDER_SIZE,/* => int nExtraPixelBorderSize */ \
     DATASET_USE_DISPARITY_EVAL,     /* => int nUseGTMaskAsInput */ \
     DATASET_USE_HALF_GT_INPUT_FLAG, /* => int bEvalStereoDisp */ \
     bool(WRITE_IMG_OUTPUT),         /* => bool bSaveOutput */ \

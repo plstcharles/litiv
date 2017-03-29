@@ -54,7 +54,8 @@ namespace lv {
                         lv::datasets::getRootPath()+"litiv/cosegm_tests/results/"+lv::addDirSlashIfMissing(sOutputDirName),
                         //std::vector<std::string>{"test01"},
                         //std::vector<std::string>{"art"},
-                        std::vector<std::string>{"noiseless_mini"},
+                        std::vector<std::string>{"noiseless"},
+                        //std::vector<std::string>{"noiseless_mini"},
                         std::vector<std::string>(),
                         bSaveOutput,
                         bUseEvaluator,
@@ -119,7 +120,7 @@ namespace lv {
         }
 
         virtual size_t getGTStreamCount() const override final {
-            return 2; // 2x fg masks
+            return 2; // 2x fg masks or disp maps
         }
 
         virtual std::string getFeaturesName(size_t nPacketIdx) const override final {

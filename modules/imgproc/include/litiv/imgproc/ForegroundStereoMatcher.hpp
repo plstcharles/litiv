@@ -33,13 +33,17 @@
 // unary costs params
 #define FGSTEREOMATCH_VISSIM_COST_OOB_CST          (ValueType(1000))
 #define FGSTEREOMATCH_VISSIM_COST_OCCLUDED_CST     (ValueType(2000))
-#define FGSTEREOMATCH_VISSIM_COST_MAXTRUNC_CST     (ValueType(5000))
-#define FGSTEREOMATCH_VISSIM_COST_DESC_SCALE       (1000)
+#define FGSTEREOMATCH_VISSIM_COST_MAXTRUNC_CST     (ValueType(2000))
+#define FGSTEREOMATCH_VISSIM_COST_DESC_SCALE       (2000)
 #define FGSTEREOMATCH_VISSIM_COST_RAW_SCALE        (2)
-#define FGSTEREOMATCH_UNIQUE_COST_OVER_SCALE       (500)
+#define FGSTEREOMATCH_UNIQUE_COST_OVER_SCALE       (600)
 // pairwise costs params
 #define FGSTEREOMATCH_LBLSIM_COST_MAXOCCL          (ValueType(5000))
 #define FGSTEREOMATCH_LBLSIM_COST_MAXTRUNC         (ValueType(5000))
+
+#define FGSTEREOMATCH_LBLSIM_COST_GRADPIVOT_CST    (32)
+#define FGSTEREOMATCH_LBLSIM_COST_MAXDIFF_CST      (10)
+#define FGSTEREOMATCH_LBLSIM_COST_GRADRAW_SCALE    (3)
 // higher order costs params
 // ...
 
@@ -87,10 +91,10 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
 
     /// full stereo graph matcher constructor; relies on provided parameters to build graphical model base
     FGStereoMatcher(const cv::Size& oImageSize, size_t nMinDispOffset, size_t nMaxDispOffset, size_t nDispStep=1);
-    /// stereo matcher function; solves the graph model to find pixel-level matches on epipolar lines, and returns disparity maps + masks
-    virtual void apply(const MatArrayIn& aImages, MatArrayOut& oMasks) override;
-    /// (pre)calculates features required for model updates, and optionally returns them in packet format for archiving
-    virtual void calcFeatures(const MatArrayIn& aImages, cv::Mat* pFeatsPacket=nullptr);
+    /// stereo matcher function; solves the graph model to find pixel-level matches on epipolar lines in the masked input images, and returns disparity maps + masks
+    virtual void apply(const MatArrayIn& aInputs, MatArrayOut& aOutputs) override;
+    /// (pre)calculates features required for model updates using the masked input images, and optionally returns them in packet format for archiving
+    virtual void calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeatsPacket=nullptr);
     /// sets a previously precalculated features packet to be used in the next 'apply' call (do not modify it before that!)
     virtual void setNextFeatures(const cv::Mat& oPackedFeats);
     /// returns the (friendly) name of the feature extractor that will be used internally
@@ -127,10 +131,12 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
             int nRowIdx,nColIdx;
             /// id for this node's stereo visual similarity (unary) factor
             size_t nStereoVisSimUnaryFactID;
-            /// ids for this node's two stereo smoothness (pairwise) factors
-            std::array<size_t,2> anStereoSmoothPairwFactIDs;
             /// pointer to this node's stereo visual similarity (unary) function
             StereoFunc* pStereoVisSimUnaryFunc;
+            /// ids for this node's two (pairwise) connected neighboring nodes
+            std::array<size_t,2> anPairwNodeIdxs;
+            /// ids for this node's two stereo smoothness (pairwise) factors
+            std::array<size_t,2> anStereoSmoothPairwFactIDs;
             /// pointer to this node's two stereo smoothness (pairwise) functions
             std::array<StereoFunc*,2> apStereoSmoothPairwFuncs;
         };
@@ -141,9 +147,9 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         /// resets the graph labelings using init state parameters
         void resetLabelings();
         /// updates graph models using new input images/masks
-        void updateModels(const MatArrayIn& aImages);
+        void updateModels(const MatArrayIn& aInputs);
         /// (pre)calculates features required for model updates, and optionally returns them in packet format
-        void calcFeatures(const MatArrayIn& aImages, cv::Mat* pFeatsPacket=nullptr);
+        void calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeatsPacket=nullptr);
         /// sets a previously precalculated features packet to be used in the next 'updateModels' call (do not modify it before that!)
         void setNextFeatures(const cv::Mat& oPackedFeats);
         /// translate an internal graph label to a real disparity offset label
@@ -191,6 +197,8 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         mutable cv::Mat_<ValueType> m_oAssocCosts;
         /// 2d map which contains transient unary factor energy costs for all graph nodes (mutable for inference algo)
         mutable cv::Mat_<ValueType> m_oUnaryCosts;
+        /// 2d map which contains transient pairwise factor energy costs for all graph nodes (mutable for inference algo, for debug only)
+        mutable cv::Mat_<ValueType> m_oPairwCosts;
         /// contains the predetermined (max) 2D grid size for the graph models
         const lv::MatSize m_oGridSize;
         /// defines the minimum grid border size based on the features used
@@ -237,6 +245,10 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         std::vector<lv::MatInfo> m_vFeatPackInfo;
         /// holds the set of (packed) features to use next
         cv::Mat m_oNextPackedFeats;
+        /// holds the latest input image/mask matrices
+        MatArrayIn m_aInputs;
+        /// holds the latest output disp/mask matrices
+        MatArrayOut m_aOutputs;
         /// defines whether the next call to 'updateModels' should use precalc feats
         bool m_bUsePrecalcFeatsNext;
         /// defines whether model is up-to-date, and ready for inference, or not
