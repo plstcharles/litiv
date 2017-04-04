@@ -34,21 +34,27 @@
 #define FGSTEREOMATCH_VISSIM_COST_OOB_CST          (ValueType(1000))
 #define FGSTEREOMATCH_VISSIM_COST_OCCLUDED_CST     (ValueType(2000))
 #define FGSTEREOMATCH_VISSIM_COST_MAXTRUNC_CST     (ValueType(2000))
-#define FGSTEREOMATCH_VISSIM_COST_DESC_SCALE       (2000)
+#define FGSTEREOMATCH_VISSIM_COST_DESC_SCALE       (5000)
 #define FGSTEREOMATCH_VISSIM_COST_RAW_SCALE        (2)
-#define FGSTEREOMATCH_UNIQUE_COST_OVER_SCALE       (600)
+#define FGSTEREOMATCH_UNIQUE_COST_OVER_SCALE       (500)
 // pairwise costs params
 #define FGSTEREOMATCH_LBLSIM_COST_MAXOCCL          (ValueType(5000))
 #define FGSTEREOMATCH_LBLSIM_COST_MAXTRUNC         (ValueType(5000))
-
-#define FGSTEREOMATCH_LBLSIM_COST_GRADPIVOT_CST    (32)
 #define FGSTEREOMATCH_LBLSIM_COST_MAXDIFF_CST      (10)
-#define FGSTEREOMATCH_LBLSIM_COST_GRADRAW_SCALE    (3)
+#define FGSTEREOMATCH_LBLSIM_USE_EXP_GRADPIVOT     (1)
+#if FGSTEREOMATCH_LBLSIM_USE_EXP_GRADPIVOT
+#define FGSTEREOMATCH_LBLSIM_COST_GRADRAW_SCALE    (8)
+#define FGSTEREOMATCH_LBLSIM_COST_GRADPIVOT_CST    (16)
+#else //!FGSTEREOMATCH_LBLSIM_USE_EXP_GRADPIVOT
+#define FGSTEREOMATCH_LBLSIM_COST_GRADRAW_SCALE    (10)
+#define FGSTEREOMATCH_LBLSIM_COST_GRADPIVOT_CST    (32)
+#endif //!FGSTEREOMATCH_LBLSIM_USE_EXP_GRADPIVOT
 // higher order costs params
 // ...
 
 // hardcoded term relations
 #define FGSTEREOMATCH_UNIQUE_COST_INCR_REL(n)      (float((n)*3)/((n)+2))
+#define FGSTEREOMATCH_UNIQUE_COST_ZERO_COUNT       (2)
 
 /// this stereo matcher assumes both input images are rectified, and have the same size;
 /// it also expects four inputs (image0,mask0,image1,mask1), and provides 4 outputs (disp0,mask0,disp1,mask1)
@@ -233,6 +239,13 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         ValueType* m_pStereoVisSimUnaryFuncsDataBase;
         /// stereo model smoothness pairwise functions base pointer
         ValueType* m_pStereoSmoothPairwFuncsDataBase;
+        /// lookup table for added association cost w.r.t. prior count
+        std::array<ValueType,UCHAR_MAX+1> m_aAssocCostAddLUT;
+        /// lookup table for removed association cost w.r.t. prior count
+        std::array<ValueType,UCHAR_MAX+1> m_aAssocCostRemLUT;
+        /// lookup table for total association cost w.r.t. prior count
+        std::array<ValueType,UCHAR_MAX+1> m_aAssocCostSumLUT;
+
         /// holds the feature extractor to use on input images
 #if FGSTEREOMATCH_CONFIG_USE_DASCGF_FEATS || FGSTEREOMATCH_CONFIG_USE_DASCRF_FEATS
         std::unique_ptr<DASC> m_pFeatExtractor;
