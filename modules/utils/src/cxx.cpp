@@ -86,3 +86,5 @@ int lv::getVerbosity() {
 void lv::setVerbosity(int nLevel) {
     g_nVerbosity = nLevel;
 }
+
+void lv::doNotOptimizeCharPointer(char const volatile*) {}
