@@ -539,8 +539,8 @@ namespace lv {
         return a+b;
     }
 
-    /// defines an stl-friendly aligned memory allocator to be used in container classes
-    template<typename T, std::size_t nByteAlign, bool bDefaultInit=false>
+    /// defines an stl-friendly aligned+default-init memory allocator to be used in container classes
+    template<typename T, std::size_t nByteAlign, bool bDefaultInit=true>
     struct AlignedMemAllocator {
         static_assert(nByteAlign>0,"byte alignment must be a non-null value");
         static_assert(!std::is_const<T>::value,"ill-formed: container of const elements forbidden");
@@ -637,8 +637,8 @@ namespace lv {
     };
 
     /// helper alias; std-friendly version of vector with N-byte aligned memory allocator
-    template<typename T, size_t N>
-    using aligned_vector = std::vector<T,lv::AlignedMemAllocator<T,N>>;
+    template<typename T, std::size_t nByteAlign, bool bDefaultInit=false> // vectors are typically value-init
+    using aligned_vector = std::vector<T,lv::AlignedMemAllocator<T,nByteAlign,bDefaultInit>>;
 
     /// helper structure to create lookup tables with generic functors (also exposes multiple lookup interfaces)
     template<typename Tx, typename Ty, size_t nBins, size_t nSafety=0, typename TStep=float>

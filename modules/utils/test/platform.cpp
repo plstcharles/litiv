@@ -37,20 +37,3 @@ TEST(filesystem_ops,regression) {
     EXPECT_EQ(lv::getSubDirsFromDir(sDirPath),(std::vector<std::string>{sDirPath+"subdir1",sDirPath+"subdir2"}));
     EXPECT_GT(lv::getCurrentPhysMemBytesUsed(),size_t(0));
 }
-
-namespace {
-    template<typename T>
-    struct AlignedMemAllocator_fixture : testing::Test {};
-    typedef testing::Types<char, short, int, uint8_t, uint16_t, float, double> AlignedMemAllocator_types;
-}
-TYPED_TEST_CASE(AlignedMemAllocator_fixture,AlignedMemAllocator_types);
-TYPED_TEST(AlignedMemAllocator_fixture,regression) {
-    std::vector<TypeParam,lv::AlignedMemAllocator<TypeParam,16>> vVec16a(100);
-    EXPECT_EQ(((uintptr_t)vVec16a.data()%16),size_t(0));
-    ASSERT_EQ(vVec16a[0],TypeParam(0));
-    ASSERT_TRUE(std::equal(vVec16a.begin()+1,vVec16a.end(),vVec16a.begin()));
-    std::vector<TypeParam,lv::AlignedMemAllocator<TypeParam,32>> vVec32a(100);
-    EXPECT_EQ(((uintptr_t)vVec32a.data()%32),size_t(0));
-    ASSERT_EQ(vVec32a[0],TypeParam(0));
-    ASSERT_TRUE(std::equal(vVec32a.begin()+1,vVec32a.end(),vVec32a.begin()));
-}

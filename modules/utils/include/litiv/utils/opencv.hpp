@@ -1238,15 +1238,14 @@ namespace lv {
             step[dims-1] = bAlignSingleElem?cv::alignSize(CV_ELEM_SIZE(type),nByteAlign):CV_ELEM_SIZE(type);
             for(int d=dims-2; d>=0; --d)
                 step[d] = cv::alignSize(step[d+1]*sizes[d+1],nByteAlign);
-            const size_t nTotBytes = (size_t)cv::alignSize(step[0]*size_t(sizes[0]),(int)nByteAlign);
             cv::UMatData* u = new cv::UMatData(this);
-            u->size = nTotBytes;
+            u->size = (size_t)cv::alignSize(step[0]*size_t(sizes[0]),(int)nByteAlign);
             if(data) {
                 u->data = u->origdata = static_cast<uchar*>(data);
                 u->flags |= cv::UMatData::USER_ALLOCATED;
             }
             else
-                u->data = u->origdata = lv::AlignedMemAllocator<uchar,nByteAlign>::allocate(nTotBytes);
+                u->data = u->origdata = lv::AlignedMemAllocator<uchar,nByteAlign,true>::allocate(u->size);
             return u;
         }
         virtual bool allocate(cv::UMatData* data, int /*accessFlags*/, cv::UMatUsageFlags /*usageFlags*/) const override {
@@ -1258,7 +1257,7 @@ namespace lv {
             lvDbgAssert(data->urefcount>=0 && data->refcount>=0);
             if(data->refcount==0) {
                 if(!(data->flags & cv::UMatData::USER_ALLOCATED)) {
-                    lv::AlignedMemAllocator<uchar,nByteAlign>::deallocate(data->origdata,data->size);
+                    lv::AlignedMemAllocator<uchar,nByteAlign,true>::deallocate(data->origdata,data->size);
                     data->origdata = nullptr;
                 }
                 delete data;
