@@ -405,6 +405,69 @@ TYPED_TEST(AlignedMemAllocator_fixture,regression) {
     ASSERT_TRUE(std::equal(vVec32a.begin()+1,vVec32a.end(),vVec32a.begin()));
 }
 
+namespace {
+    template<typename T>
+    struct AutoBuffer_fixture : testing::Test {};
+    typedef testing::Types<char, short, int, uint8_t, uint16_t, float, double> AutoBuffer_types;
+}
+TYPED_TEST_CASE(AutoBuffer_fixture,AutoBuffer_types);
+TYPED_TEST(AutoBuffer_fixture,regression) {
+    lv::AutoBuffer<TypeParam,10,16> buff;
+    ASSERT_FALSE(buff.empty());
+    ASSERT_EQ(buff.size(),size_t(10));
+    ASSERT_EQ(buff.max_static_size(),size_t(10));
+    ASSERT_TRUE((uintptr_t(buff.data())%16)==0);
+    ASSERT_EQ(buff.begin()+buff.size(),buff.end());
+    ASSERT_THROW_LV_QUIET(buff.at(10));
+    for(size_t i=0; i<buff.size(); ++i) {
+        buff[i] = TypeParam(rand());
+        ASSERT_EQ(buff.at(i),buff[i]);
+        ASSERT_EQ(buff.data()[i],buff[i]);
+        ASSERT_EQ(((TypeParam*)buff)[i],buff[i]);
+        ASSERT_EQ((*(buff.begin()+i)),buff[i]);
+    }
+    buff.resize(5);
+    ASSERT_EQ(buff.size(),size_t(5));
+    const lv::AutoBuffer<TypeParam,16,16> buff2(buff);
+    ASSERT_EQ(buff.size(),buff2.size());
+    ASSERT_TRUE((uintptr_t(buff2.data())%16)==0);
+    for(size_t i=0; i<buff2.size(); ++i)
+        ASSERT_EQ(buff.at(i),buff2.at(i));
+    const lv::AutoBuffer<TypeParam,10,16> buff3(std::move(buff2));
+    ASSERT_EQ(buff.size(),buff3.size());
+    ASSERT_TRUE((uintptr_t(buff3.data())%16)==0);
+    for(size_t i=0; i<buff3.size(); ++i)
+        ASSERT_EQ(buff.at(i),buff3.at(i));
+    buff.resize(buff.size()*4);
+    ASSERT_EQ(buff.size(),size_t(20));
+    ASSERT_TRUE((uintptr_t(buff.data())%16)==0);
+    for(size_t i=0; i<buff3.size(); ++i)
+        ASSERT_EQ(buff.at(i),buff3.at(i));
+    for(size_t i=0; i<buff.size(); ++i) {
+        buff[i] = TypeParam(rand());
+        ASSERT_EQ(buff.at(i),buff[i]);
+        ASSERT_EQ(buff.data()[i],buff[i]);
+        ASSERT_EQ(((TypeParam*)buff)[i],buff[i]);
+        ASSERT_EQ((*(buff.begin()+i)),buff[i]);
+    }
+    lv::AutoBuffer<TypeParam,3,16> buff4;
+    ASSERT_EQ(buff4.size(),size_t(3));
+    ASSERT_TRUE((uintptr_t(buff4.data())%16)==0);
+    buff4 = buff;
+    ASSERT_EQ(buff.size(),buff4.size());
+    ASSERT_TRUE((uintptr_t(buff4.data())%16)==0);
+    for(size_t i=0; i<buff4.size(); ++i)
+        ASSERT_EQ(buff.at(i),buff4.at(i));
+    lv::AutoBuffer<TypeParam,6,16> buff5;
+    ASSERT_EQ(buff5.size(),size_t(6));
+    ASSERT_TRUE((uintptr_t(buff5.data())%16)==0);
+    buff5 = std::move(buff4);
+    ASSERT_EQ(buff.size(),buff5.size());
+    ASSERT_TRUE((uintptr_t(buff5.data())%16)==0);
+    for(size_t i=0; i<buff5.size(); ++i)
+        ASSERT_EQ(buff.at(i),buff5.at(i));
+}
+
 TEST(LUT,regression_identity9) {
     constexpr size_t bins = 9;
     constexpr size_t safety = 0;

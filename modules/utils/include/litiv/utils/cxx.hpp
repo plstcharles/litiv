@@ -581,6 +581,7 @@ namespace lv {
             return reinterpret_cast<pointer>(ptr);
         }
         static inline void deallocate(pointer p, size_type) noexcept {_aligned_free(p);}
+        static inline void deallocate2(pointer p) noexcept {_aligned_free(p);}
         static inline void destroy(pointer p) {p->~value_type();UNUSED(p);}
 #else //(!def(_MSC_VER))
         static inline pointer allocate(size_type n) {
@@ -602,6 +603,7 @@ namespace lv {
             return reinterpret_cast<pointer>(ptr);
         }
         static inline void deallocate(pointer p, size_type) noexcept {free(p);}
+        static inline void deallocate2(pointer p) noexcept {free(p);}
         static inline void destroy(pointer p) {p->~value_type();}
 #endif //(!def(_MSC_VER))
         template<typename T2, typename... TArgs>
@@ -639,6 +641,82 @@ namespace lv {
     /// helper alias; std-friendly version of vector with N-byte aligned memory allocator
     template<typename T, std::size_t nByteAlign, bool bDefaultInit=false> // vectors are typically value-init
     using aligned_vector = std::vector<T,lv::AlignedMemAllocator<T,nByteAlign,bDefaultInit>>;
+
+    /// auto-alloc buffer with static cache & alignment for fast r/w ops (inspired from OpenCV's)
+    template<typename T, size_t nStaticSize=1024/sizeof(T)+8, size_t nByteAlign=16>
+    struct AutoBuffer {
+        static_assert(nStaticSize>=1,"static buffer must have at least one element");
+        typedef T value_type;
+        typedef T* pointer;
+        typedef T* iterator;
+        typedef T& reference;
+        typedef const T* const_pointer;
+        typedef const T* const_iterator;
+        typedef const T& const_reference;
+        typedef std::size_t size_type;
+        /// default constructor (uses static buffer)
+        AutoBuffer();
+        /// constructor with required buffer size (will use static buffer if possible, or allocate)
+        AutoBuffer(size_type nReqSize);
+        /// copy constructor
+        template<size_t nStaticSize2>
+        AutoBuffer(const AutoBuffer<T,nStaticSize2,nByteAlign>&);
+        /// move constructor
+        template<size_t nStaticSize2>
+        AutoBuffer(AutoBuffer<T,nStaticSize2,nByteAlign>&&);
+        /// copy assignment operator
+        template<size_t nStaticSize2>
+        AutoBuffer<T,nStaticSize,nByteAlign>& operator=(const AutoBuffer<T,nStaticSize2,nByteAlign>&);
+        /// move assignment operator
+        template<size_t nStaticSize2>
+        AutoBuffer<T,nStaticSize,nByteAlign>& operator=(AutoBuffer<T,nStaticSize2,nByteAlign>&&);
+        /// access specified element with bounds checking
+        reference at(size_type nPosIdx);
+        /// access specified element with bounds checking
+        const_reference at(size_type nPosIdx) const;
+        /// access specified element without bounds checking
+        reference operator[](size_type nPosIdx);
+        /// access specified element without bounds checking
+        const_reference operator[](size_type nPosIdx) const;
+        /// provides direct access to the underlying array
+        pointer data();
+        /// provides direct access to the underlying array
+        const_pointer data() const;
+        /// provides direct access to the underlying array
+        operator pointer();
+        /// provides direct access to the underlying array
+        operator const_pointer() const;
+        /// returns an iterator to the beginning of the underlying array
+        iterator begin();
+        /// returns an iterator to the beginning of the underlying array
+        const_iterator begin() const;
+        /// returns an iterator to the end
+        iterator end();
+        /// returns an iterator to the end
+        const_iterator end() const;
+        /// checks whether the container is empty
+        bool empty() const;
+        /// returns the number of elements in the container
+        size_type size() const;
+        /// returns the maximum number of elements that can be contained in the static buffer
+        size_type max_static_size() const;
+        /// changes the number of elements stored in the buffer (new values, if any, are default-init'd)
+        void resize(size_type nReqSize);
+        /// releases dynamic memory (if any) and resets internal buffer to static array (similar to default constr)
+        void reset();
+    protected:
+        /// pointer to the currently used buffer
+        pointer m_pBufferPtr;
+        /// size of the currently used buffer (in bytes)
+        size_type m_nBufferSize;
+        /// static buffer, which is not value-initialized by default
+        alignas(std::max(nByteAlign,alignof(value_type))) std::array<value_type,nStaticSize> m_aStaticBuffer;
+        /// dynamic buffer, which may be null, and is not value-initialized by default
+        std::unique_ptr<T[],decltype(&lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2)> m_aDynamicBuffer;
+        /// required friendship for member access when static array sizes do not match
+        template<typename T2, size_t nStaticSize2, size_t nByteAlign2>
+        friend struct AutoBuffer;
+    };
 
     /// helper structure to create lookup tables with generic functors (also exposes multiple lookup interfaces)
     template<typename Tx, typename Ty, size_t nBins, size_t nSafety=0, typename TStep=float>
@@ -876,4 +954,205 @@ void lv::WorkerPool<nWorkers>::entry() {
             task(); // if the execution throws, the exception will be contained in the shared state returned on queue
         }
     }
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+lv::AutoBuffer<T,nStaticSize,nByteAlign>::AutoBuffer() :
+        m_aDynamicBuffer(nullptr,lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2) {
+    m_pBufferPtr = m_aStaticBuffer.data();
+    m_nBufferSize = m_aStaticBuffer.size();
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+lv::AutoBuffer<T,nStaticSize,nByteAlign>::AutoBuffer(size_type nReqSize) :
+        m_aDynamicBuffer(nullptr,lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2) {
+    if(nReqSize<=m_aStaticBuffer.size())
+        m_pBufferPtr = m_aStaticBuffer.data();
+    else {
+        m_aDynamicBuffer = std::unique_ptr<T[],decltype(&lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2)>(new T[nReqSize],lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2);
+        m_pBufferPtr = m_aDynamicBuffer.get();
+    }
+    m_nBufferSize = nReqSize;
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+template<size_t nStaticSize2>
+lv::AutoBuffer<T,nStaticSize,nByteAlign>::AutoBuffer(const AutoBuffer<T,nStaticSize2,nByteAlign>& o) :
+        m_aDynamicBuffer(nullptr,lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2) {
+    if(o.size()<=m_aStaticBuffer.size())
+        m_pBufferPtr = m_aStaticBuffer.data();
+    else {
+        m_aDynamicBuffer = std::unique_ptr<T[],decltype(&lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2)>(new T[o.size()],lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2);
+        m_pBufferPtr = m_aDynamicBuffer.get();
+    }
+    m_nBufferSize = o.size();
+    std::copy_n(o.begin(),m_nBufferSize,begin());
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+template<size_t nStaticSize2>
+lv::AutoBuffer<T,nStaticSize,nByteAlign>::AutoBuffer(AutoBuffer<T,nStaticSize2,nByteAlign>&& o) :
+        m_aDynamicBuffer(nullptr,lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2) {
+    if(o.m_pBufferPtr==o.m_aDynamicBuffer.get()) {
+        std::swap(m_aDynamicBuffer,o.m_aDynamicBuffer);
+        m_pBufferPtr = m_aDynamicBuffer.get();
+        m_nBufferSize = o.m_nBufferSize;
+        o.m_pBufferPtr = o.m_aStaticBuffer.data();
+        o.m_nBufferSize = o.m_aStaticBuffer.size();
+    }
+    else {
+        if(o.size()<=m_aStaticBuffer.size())
+            m_pBufferPtr = m_aStaticBuffer.data();
+        else {
+            m_aDynamicBuffer = std::unique_ptr<T[],decltype(&lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2)>(new T[o.size()],lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2);
+            m_pBufferPtr = m_aDynamicBuffer.get();
+        }
+        m_nBufferSize = o.size();
+        std::copy_n(o.begin(),m_nBufferSize,begin());
+    }
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+template<size_t nStaticSize2>
+lv::AutoBuffer<T,nStaticSize,nByteAlign>& lv::AutoBuffer<T,nStaticSize,nByteAlign>::operator=(const AutoBuffer<T,nStaticSize2,nByteAlign>& o) {
+    if(uintptr_t(this)!=uintptr_t(&o)) {
+        if(o.size()<=m_aStaticBuffer.size()) {
+            m_aDynamicBuffer = nullptr;
+            m_pBufferPtr = m_aStaticBuffer.data();
+        }
+        else if(m_pBufferPtr!=m_aDynamicBuffer.get() || m_nBufferSize<o.size()) {
+            m_aDynamicBuffer = std::unique_ptr<T[],decltype(&lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2)>(new T[o.size()],lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2);
+            m_pBufferPtr = m_aDynamicBuffer.get();
+        }
+        m_nBufferSize = o.size();
+        std::copy_n(o.begin(),m_nBufferSize,begin());
+    }
+    return *this;
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+template<size_t nStaticSize2>
+lv::AutoBuffer<T,nStaticSize,nByteAlign>& lv::AutoBuffer<T,nStaticSize,nByteAlign>::operator=(AutoBuffer<T,nStaticSize2,nByteAlign>&& o) {
+    if(uintptr_t(this)!=uintptr_t(&o)) {
+        if(o.m_pBufferPtr==o.m_aDynamicBuffer.get()) {
+            m_aDynamicBuffer = nullptr;
+            std::swap(m_aDynamicBuffer,o.m_aDynamicBuffer);
+            m_pBufferPtr = m_aDynamicBuffer.get();
+            m_nBufferSize = o.m_nBufferSize;
+            o.m_pBufferPtr = o.m_aStaticBuffer.data();
+            o.m_nBufferSize = o.m_aStaticBuffer.size();
+        }
+        else {
+            if(o.size()<=m_aStaticBuffer.size()) {
+                m_aDynamicBuffer = nullptr;
+                m_pBufferPtr = m_aStaticBuffer.data();
+            }
+            else if(m_pBufferPtr!=m_aDynamicBuffer.get() || m_nBufferSize<o.size()) {
+                m_aDynamicBuffer = std::unique_ptr<T[],decltype(&lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2)>(new T[o.size()],lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2);
+                m_pBufferPtr = m_aDynamicBuffer.get();
+            }
+            m_nBufferSize = o.size();
+            std::copy_n(o.begin(),m_nBufferSize,begin());
+        }
+    }
+    return *this;
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+typename lv::AutoBuffer<T,nStaticSize,nByteAlign>::reference lv::AutoBuffer<T,nStaticSize,nByteAlign>::at(size_type nPosIdx) {
+    lvAssert__(nPosIdx<size(),"index out of bounds (req=%d, max=%d)",(int)nPosIdx,(int)size());
+    return m_pBufferPtr[nPosIdx];
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+typename lv::AutoBuffer<T,nStaticSize,nByteAlign>::const_reference lv::AutoBuffer<T,nStaticSize,nByteAlign>::at(size_type nPosIdx) const {
+    lvAssert__(nPosIdx<size(),"index out of bounds (req=%d, max=%d)",(int)nPosIdx,(int)size());
+    return m_pBufferPtr[nPosIdx];
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+typename lv::AutoBuffer<T,nStaticSize,nByteAlign>::reference lv::AutoBuffer<T,nStaticSize,nByteAlign>::operator[](size_type nPosIdx) {
+    return m_pBufferPtr[nPosIdx];
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+typename lv::AutoBuffer<T,nStaticSize,nByteAlign>::const_reference lv::AutoBuffer<T,nStaticSize,nByteAlign>::operator[](size_type nPosIdx) const {
+    return m_pBufferPtr[nPosIdx];
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+typename lv::AutoBuffer<T,nStaticSize,nByteAlign>::pointer lv::AutoBuffer<T,nStaticSize,nByteAlign>::data() {
+    return m_pBufferPtr;
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+typename lv::AutoBuffer<T,nStaticSize,nByteAlign>::const_pointer lv::AutoBuffer<T,nStaticSize,nByteAlign>::data() const {
+    return m_pBufferPtr;
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+lv::AutoBuffer<T,nStaticSize,nByteAlign>::operator pointer() {
+    return m_pBufferPtr;
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+lv::AutoBuffer<T,nStaticSize,nByteAlign>::operator const_pointer() const {
+    return m_pBufferPtr;
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+typename lv::AutoBuffer<T,nStaticSize,nByteAlign>::iterator lv::AutoBuffer<T,nStaticSize,nByteAlign>::begin() {
+    return m_pBufferPtr;
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+typename lv::AutoBuffer<T,nStaticSize,nByteAlign>::const_iterator lv::AutoBuffer<T,nStaticSize,nByteAlign>::begin() const {
+    return m_pBufferPtr;
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+typename lv::AutoBuffer<T,nStaticSize,nByteAlign>::iterator lv::AutoBuffer<T,nStaticSize,nByteAlign>::end() {
+    return m_pBufferPtr+size();
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+typename lv::AutoBuffer<T,nStaticSize,nByteAlign>::const_iterator lv::AutoBuffer<T,nStaticSize,nByteAlign>::end() const {
+    return m_pBufferPtr+size();
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+bool lv::AutoBuffer<T,nStaticSize,nByteAlign>::empty() const {
+    return size()==size_type(0);
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+typename lv::AutoBuffer<T,nStaticSize,nByteAlign>::size_type lv::AutoBuffer<T,nStaticSize,nByteAlign>::size() const {
+    return m_nBufferSize;
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+typename lv::AutoBuffer<T,nStaticSize,nByteAlign>::size_type lv::AutoBuffer<T,nStaticSize,nByteAlign>::max_static_size() const {
+    return nStaticSize;
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+void lv::AutoBuffer<T,nStaticSize,nByteAlign>::resize(size_type nReqSize) {
+    if(nReqSize==0) {
+        m_aDynamicBuffer = nullptr;
+        m_pBufferPtr = m_aStaticBuffer.data();
+    }
+    else if(nReqSize>m_nBufferSize && (m_pBufferPtr==m_aDynamicBuffer.get() || nReqSize>m_aStaticBuffer.size())) {
+        std::unique_ptr<T[],decltype(&lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2)> aNewBuffer(new T[nReqSize],lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2);
+        std::copy_n(m_pBufferPtr,m_nBufferSize,aNewBuffer.get());
+        m_aDynamicBuffer = std::move(aNewBuffer);
+        m_pBufferPtr = m_aDynamicBuffer.get();
+    }
+    m_nBufferSize = nReqSize;
+}
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+void lv::AutoBuffer<T,nStaticSize,nByteAlign>::reset() {
+    m_aDynamicBuffer = nullptr;
+    m_pBufferPtr = m_aStaticBuffer.data();
+    m_nBufferSize = m_aStaticBuffer.size();
 }
