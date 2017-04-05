@@ -413,7 +413,8 @@ namespace {
 TYPED_TEST_CASE(AutoBuffer_fixture,AutoBuffer_types);
 TYPED_TEST(AutoBuffer_fixture,regression) {
     lv::AutoBuffer<TypeParam,10,16> buff;
-    ASSERT_FALSE(buff.empty());
+    ASSERT_TRUE(buff.is_static());
+    ASSERT_TRUE(!buff.empty());
     ASSERT_EQ(buff.size(),size_t(10));
     ASSERT_EQ(buff.max_static_size(),size_t(10));
     ASSERT_TRUE((uintptr_t(buff.data())%16)==0);
@@ -428,19 +429,23 @@ TYPED_TEST(AutoBuffer_fixture,regression) {
     }
     buff.resize(5);
     ASSERT_EQ(buff.size(),size_t(5));
+    ASSERT_TRUE(buff.is_static());
     const lv::AutoBuffer<TypeParam,16,16> buff2(buff);
     ASSERT_EQ(buff.size(),buff2.size());
     ASSERT_TRUE((uintptr_t(buff2.data())%16)==0);
+    ASSERT_TRUE(buff2.is_static());
     for(size_t i=0; i<buff2.size(); ++i)
         ASSERT_EQ(buff.at(i),buff2.at(i));
     const lv::AutoBuffer<TypeParam,10,16> buff3(std::move(buff2));
     ASSERT_EQ(buff.size(),buff3.size());
     ASSERT_TRUE((uintptr_t(buff3.data())%16)==0);
+    ASSERT_TRUE(buff3.is_static());
     for(size_t i=0; i<buff3.size(); ++i)
         ASSERT_EQ(buff.at(i),buff3.at(i));
     buff.resize(buff.size()*4);
     ASSERT_EQ(buff.size(),size_t(20));
     ASSERT_TRUE((uintptr_t(buff.data())%16)==0);
+    ASSERT_TRUE(!buff.is_static());
     for(size_t i=0; i<buff3.size(); ++i)
         ASSERT_EQ(buff.at(i),buff3.at(i));
     for(size_t i=0; i<buff.size(); ++i) {
@@ -453,17 +458,22 @@ TYPED_TEST(AutoBuffer_fixture,regression) {
     lv::AutoBuffer<TypeParam,3,16> buff4;
     ASSERT_EQ(buff4.size(),size_t(3));
     ASSERT_TRUE((uintptr_t(buff4.data())%16)==0);
+    ASSERT_TRUE(buff4.is_static());
     buff4 = buff;
     ASSERT_EQ(buff.size(),buff4.size());
     ASSERT_TRUE((uintptr_t(buff4.data())%16)==0);
+    ASSERT_TRUE(!buff4.is_static());
     for(size_t i=0; i<buff4.size(); ++i)
         ASSERT_EQ(buff.at(i),buff4.at(i));
     lv::AutoBuffer<TypeParam,6,16> buff5;
     ASSERT_EQ(buff5.size(),size_t(6));
     ASSERT_TRUE((uintptr_t(buff5.data())%16)==0);
+    ASSERT_TRUE(buff5.is_static());
     buff5 = std::move(buff4);
     ASSERT_EQ(buff.size(),buff5.size());
     ASSERT_TRUE((uintptr_t(buff5.data())%16)==0);
+    ASSERT_TRUE(!buff.is_static());
+    ASSERT_TRUE(buff4.is_static());
     for(size_t i=0; i<buff5.size(); ++i)
         ASSERT_EQ(buff.at(i),buff5.at(i));
 }

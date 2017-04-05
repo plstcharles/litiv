@@ -696,6 +696,8 @@ namespace lv {
         const_iterator end() const;
         /// checks whether the container is empty
         bool empty() const;
+        /// checks whether the static buffer is being used
+        bool is_static() const;
         /// returns the number of elements in the container
         size_type size() const;
         /// returns the maximum number of elements that can be contained in the static buffer
@@ -1125,6 +1127,12 @@ typename lv::AutoBuffer<T,nStaticSize,nByteAlign>::const_iterator lv::AutoBuffer
 template<typename T, size_t nStaticSize, size_t nByteAlign>
 bool lv::AutoBuffer<T,nStaticSize,nByteAlign>::empty() const {
     return size()==size_type(0);
+}
+
+
+template<typename T, size_t nStaticSize, size_t nByteAlign>
+bool lv::AutoBuffer<T,nStaticSize,nByteAlign>::is_static() const {
+    return m_pBufferPtr==m_aStaticBuffer.data();
 }
 
 template<typename T, size_t nStaticSize, size_t nByteAlign>
