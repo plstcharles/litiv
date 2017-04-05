@@ -729,9 +729,9 @@ namespace lv {
                 m_tMidOffset((m_tMax+m_tMin)/2),m_tLowOffset(m_tMin),
                 m_tScale(TStep(nBins-1)/(m_tMax-m_tMin)),
                 m_tStep(TStep(m_tMax-m_tMin)/(nBins-1)),
-                m_vLUT(init(m_tMin,m_tMax,m_tStep,lFunc)),
-                m_pMid(m_vLUT.data()+nBins/2+nSafety),
-                m_pLow(m_vLUT.data()+nSafety) {}
+                m_aLUT(init(m_tMin,m_tMax,m_tStep,lFunc)),
+                m_pMid(m_aLUT.data()+nBins/2+nSafety),
+                m_pLow(m_aLUT.data()+nSafety) {}
         /// returns the evaluation result of lFunc(x) using the LUT mid pointer after offsetting and scaling x (i.e. assuming tOffset!=0)
         inline Ty eval_mid(Tx x) const {
             lvDbgAssert(ptrdiff_t((x-m_tMidOffset)*m_tScale)>=-ptrdiff_t(nBins/2+nSafety) && ptrdiff_t((x-m_tMidOffset)*m_tScale)<=ptrdiff_t(nBins/2+nSafety));
@@ -782,6 +782,8 @@ namespace lv {
             lvDbgAssert(x>=-ptrdiff_t(nSafety) && x<ptrdiff_t(nBins+nSafety));
             return m_pLow[x];
         }
+        /// default maximum static LUT size passed to autobuffer template
+        static constexpr size_t s_nMaxStaticLUTSize = 512;
         /// min/max lookup values passed to the constructor (LUT bounds)
         const Tx m_tMin,m_tMax;
         /// input value offsets for lookup
@@ -789,20 +791,20 @@ namespace lv {
         /// scale coefficient & step for lookup
         const TStep m_tScale,m_tStep;
         /// functor lookup table
-        const std::vector<Ty> m_vLUT;
+        const lv::AutoBuffer<Ty,s_nMaxStaticLUTSize> m_aLUT;
         /// base LUT pointers for lookup
         const Ty* m_pMid,*m_pLow;
     private:
         template<typename TFunc>
-        static std::vector<Ty> init(Tx tMin, Tx tMax, TStep tStep, TFunc lFunc) {
-            std::vector<Ty> vLUT(nBins+nSafety*2);
+        static lv::AutoBuffer<Ty,s_nMaxStaticLUTSize> init(Tx tMin, Tx tMax, TStep tStep, TFunc lFunc) {
+            lv::AutoBuffer<Ty,s_nMaxStaticLUTSize> aLUT(nBins+nSafety*2);
             for(size_t n=0; n<=nSafety; ++n)
-                vLUT[n] = lFunc(tMin);
+                aLUT[n] = lFunc(tMin);
             for(size_t n=nSafety+1; n<nBins+nSafety-1; ++n)
-                vLUT[n] = lFunc(tMin+Tx((n-nSafety)*tStep));
+                aLUT[n] = lFunc(tMin+Tx((n-nSafety)*tStep));
             for(size_t n=nBins+nSafety-1; n<nBins+nSafety*2; ++n)
-                vLUT[n] = lFunc(tMax);
-            return vLUT;
+                aLUT[n] = lFunc(tMax);
+            return aLUT;
         }
     };
 

@@ -473,9 +473,9 @@ TEST(LUT,regression_identity9) {
     constexpr size_t safety = 0;
     const auto func_identity = [&](float x){return x;};
     lv::LUT<float,float,bins,safety> lut(0.0f,1.0f,func_identity);
-    ASSERT_GE(lut.m_vLUT.size(),bins);
-    ASSERT_FLOAT_EQ(lut.m_vLUT[0],0.0f);
-    ASSERT_FLOAT_EQ(lut.m_vLUT[lut.m_vLUT.size()-1],1.0f);
+    ASSERT_GE(lut.m_aLUT.size(),bins);
+    ASSERT_FLOAT_EQ(lut.m_aLUT[0],0.0f);
+    ASSERT_FLOAT_EQ(lut.m_aLUT[lut.m_aLUT.size()-1],1.0f);
     ASSERT_FLOAT_EQ(lut.m_tMin,0.0f);
     ASSERT_FLOAT_EQ(lut.m_tMax,1.0f);
     ASSERT_FLOAT_EQ(lut.m_tMidOffset,0.5f);
@@ -504,9 +504,9 @@ TEST(LUT,regression_identity9_safe) {
     constexpr size_t safety = 2;
     const auto func_identity = [&](float x){return x;};
     lv::LUT<float,float,bins,safety> lut(0.0f,1.0f,func_identity);
-    ASSERT_GE(lut.m_vLUT.size(),bins+safety);
-    ASSERT_FLOAT_EQ(lut.m_vLUT[0],0.0f);
-    ASSERT_FLOAT_EQ(lut.m_vLUT[lut.m_vLUT.size()-1],1.0f);
+    ASSERT_GE(lut.m_aLUT.size(),bins+safety);
+    ASSERT_FLOAT_EQ(lut.m_aLUT[0],0.0f);
+    ASSERT_FLOAT_EQ(lut.m_aLUT[lut.m_aLUT.size()-1],1.0f);
     ASSERT_FLOAT_EQ(lut.m_tMin,0.0f);
     ASSERT_FLOAT_EQ(lut.m_tMax,1.0f);
     ASSERT_FLOAT_EQ(lut.m_tMidOffset,0.5f);
@@ -535,9 +535,9 @@ TEST(LUT,regression_arccos1000_safe) {
     constexpr size_t safety = 10;
     const auto func_acos = [&](float x){return std::acos(x);};
     lv::LUT<float,float,bins,safety> lut(-1.0f,1.0f,func_acos);
-    ASSERT_GE(lut.m_vLUT.size(),bins+safety);
-    ASSERT_FLOAT_EQ(lut.m_vLUT[0],func_acos(-1.0f));
-    ASSERT_FLOAT_EQ(lut.m_vLUT[lut.m_vLUT.size()-1],func_acos(1.0f));
+    ASSERT_GE(lut.m_aLUT.size(),bins+safety);
+    ASSERT_FLOAT_EQ(lut.m_aLUT[0],func_acos(-1.0f));
+    ASSERT_FLOAT_EQ(lut.m_aLUT[lut.m_aLUT.size()-1],func_acos(1.0f));
     ASSERT_FLOAT_EQ(lut.m_tMin,-1.0f);
     ASSERT_FLOAT_EQ(lut.m_tMax,1.0f);
     ASSERT_FLOAT_EQ(lut.m_tMidOffset,0.0f);
