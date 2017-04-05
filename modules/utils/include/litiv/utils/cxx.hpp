@@ -721,7 +721,7 @@ namespace lv {
     };
 
     /// helper structure to create lookup tables with generic functors (also exposes multiple lookup interfaces)
-    template<typename Tx, typename Ty, size_t nBins, size_t nSafety=0, typename TStep=float>
+    template<typename Tx, typename Ty, size_t nBins, size_t nSafety=0, bool bUseStaticBuffer=true, typename TStep=float>
     struct LUT {
         static_assert(nBins>1 && (nBins%2)==1,"LUT bin count must be at least two and odd");
         /// default constructor; will automatically fill the LUT array for lFunc([tMinLookup,tMaxLookup])
@@ -784,8 +784,8 @@ namespace lv {
             lvDbgAssert(x>=-ptrdiff_t(nSafety) && x<ptrdiff_t(nBins+nSafety));
             return m_pLow[x];
         }
-        /// default maximum static LUT size passed to autobuffer template
-        static constexpr size_t s_nMaxStaticLUTSize = 512;
+        /// max static buffer size to use in the internal autobuffer
+        static constexpr size_t s_nMaxStaticSize = bUseStaticBuffer?(nBins+nSafety*2):size_t(1);
         /// min/max lookup values passed to the constructor (LUT bounds)
         const Tx m_tMin,m_tMax;
         /// input value offsets for lookup
@@ -793,13 +793,13 @@ namespace lv {
         /// scale coefficient & step for lookup
         const TStep m_tScale,m_tStep;
         /// functor lookup table
-        const lv::AutoBuffer<Ty,s_nMaxStaticLUTSize> m_aLUT;
+        const lv::AutoBuffer<Ty,s_nMaxStaticSize> m_aLUT;
         /// base LUT pointers for lookup
         const Ty* m_pMid,*m_pLow;
     private:
         template<typename TFunc>
-        static lv::AutoBuffer<Ty,s_nMaxStaticLUTSize> init(Tx tMin, Tx tMax, TStep tStep, TFunc lFunc) {
-            lv::AutoBuffer<Ty,s_nMaxStaticLUTSize> aLUT(nBins+nSafety*2);
+        static lv::AutoBuffer<Ty,s_nMaxStaticSize> init(Tx tMin, Tx tMax, TStep tStep, TFunc lFunc) {
+            lv::AutoBuffer<Ty,s_nMaxStaticSize> aLUT(nBins+nSafety*2);
             for(size_t n=0; n<=nSafety; ++n)
                 aLUT[n] = lFunc(tMin);
             for(size_t n=nSafety+1; n<nBins+nSafety-1; ++n)
