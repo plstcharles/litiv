@@ -483,28 +483,28 @@ TEST(LUT,regression_identity9) {
     constexpr size_t safety = 0;
     const auto func_identity = [&](float x){return x;};
     lv::LUT<float,float,bins,safety> lut(0.0f,1.0f,func_identity);
-    ASSERT_GE(lut.m_aLUT.size(),bins);
-    ASSERT_FLOAT_EQ(lut.m_aLUT[0],0.0f);
-    ASSERT_FLOAT_EQ(lut.m_aLUT[lut.m_aLUT.size()-1],1.0f);
-    ASSERT_FLOAT_EQ(lut.m_tMin,0.0f);
-    ASSERT_FLOAT_EQ(lut.m_tMax,1.0f);
-    ASSERT_FLOAT_EQ(lut.m_tMidOffset,0.5f);
-    ASSERT_FLOAT_EQ(lut.m_tLowOffset,0.0f);
-    ASSERT_FLOAT_EQ(lut.m_tScale,float(bins-1));
-    ASSERT_FLOAT_EQ(lut.m_tStep,1.0f/(bins-1));
-    ASSERT_FLOAT_EQ(*lut.m_pMid,0.5f);
-    ASSERT_FLOAT_EQ(*lut.m_pLow,0.0f);
-    const float step = lut.m_tStep;
+    ASSERT_EQ(lut.size(),bins);
+    ASSERT_FLOAT_EQ(lut.data_raw()[0],0.0f);
+    ASSERT_FLOAT_EQ(lut.data_raw()[lut.size()-1],1.0f);
+    ASSERT_FLOAT_EQ(lut.domain_min(),0.0f);
+    ASSERT_FLOAT_EQ(lut.domain_max(),1.0f);
+    ASSERT_FLOAT_EQ(lut.domain_offset_mid(),0.5f);
+    ASSERT_FLOAT_EQ(lut.domain_offset_low(),0.0f);
+    ASSERT_FLOAT_EQ(lut.domain_index_scale(),float(bins-1));
+    ASSERT_FLOAT_EQ(lut.domain_index_step(),1.0f/(bins-1));
+    ASSERT_FLOAT_EQ(*lut.data_mid(),0.5f);
+    ASSERT_FLOAT_EQ(*lut.data_low(),0.0f);
+    const float step = lut.domain_index_step();
     for(size_t i=0; i<bins; ++i) {
         ASSERT_FLOAT_EQ(lut.eval(step*i),(step*i)) << "@ i=[" << i << "]";
         ASSERT_FLOAT_EQ(lut.eval_round(step*i),(step*i)) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_noffset(step*i-lut.m_tLowOffset),(step*i)) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_noffset_round(step*i-lut.m_tLowOffset),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_noffset(step*i-lut.domain_offset_low()),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_noffset_round(step*i-lut.domain_offset_low()),(step*i)) << "@ i=[" << i << "]";
         ASSERT_FLOAT_EQ(lut.eval_raw(i),(step*i)) << "@ i=[" << i << "]";
         ASSERT_FLOAT_EQ(lut.eval_mid(step*i),(step*i)) << "@ i=[" << i << "]";
         ASSERT_FLOAT_EQ(lut.eval_mid_round(step*i),(step*i)) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_mid_noffset(step*i-lut.m_tMidOffset),(step*i)) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_mid_noffset_round(step*i-lut.m_tMidOffset),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_noffset(step*i-lut.domain_offset_mid()),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_noffset_round(step*i-lut.domain_offset_mid()),(step*i)) << "@ i=[" << i << "]";
         ASSERT_FLOAT_EQ(lut.eval_mid_raw(i-bins/2),(step*i)) << "@ i=[" << i << "]";
     }
 }
@@ -514,28 +514,28 @@ TEST(LUT,regression_identity9_safe) {
     constexpr size_t safety = 2;
     const auto func_identity = [&](float x){return x;};
     lv::LUT<float,float,bins,safety> lut(0.0f,1.0f,func_identity);
-    ASSERT_GE(lut.m_aLUT.size(),bins+safety);
-    ASSERT_FLOAT_EQ(lut.m_aLUT[0],0.0f);
-    ASSERT_FLOAT_EQ(lut.m_aLUT[lut.m_aLUT.size()-1],1.0f);
-    ASSERT_FLOAT_EQ(lut.m_tMin,0.0f);
-    ASSERT_FLOAT_EQ(lut.m_tMax,1.0f);
-    ASSERT_FLOAT_EQ(lut.m_tMidOffset,0.5f);
-    ASSERT_FLOAT_EQ(lut.m_tLowOffset,0.0f);
-    ASSERT_FLOAT_EQ(lut.m_tScale,float(bins-1));
-    ASSERT_FLOAT_EQ(lut.m_tStep,1.0f/(bins-1));
-    ASSERT_FLOAT_EQ(*lut.m_pMid,0.5f);
-    ASSERT_FLOAT_EQ(*lut.m_pLow,0.0f);
-    const float step = lut.m_tStep;
+    ASSERT_EQ(lut.size(),bins+safety*2);
+    ASSERT_FLOAT_EQ(lut.data_raw()[0],0.0f);
+    ASSERT_FLOAT_EQ(lut.data_raw()[lut.size()-1],1.0f);
+    ASSERT_FLOAT_EQ(lut.domain_min(),0.0f);
+    ASSERT_FLOAT_EQ(lut.domain_max(),1.0f);
+    ASSERT_FLOAT_EQ(lut.domain_offset_mid(),0.5f);
+    ASSERT_FLOAT_EQ(lut.domain_offset_low(),0.0f);
+    ASSERT_FLOAT_EQ(lut.domain_index_scale(),float(bins-1));
+    ASSERT_FLOAT_EQ(lut.domain_index_step(),1.0f/(bins-1));
+    ASSERT_FLOAT_EQ(*lut.data_mid(),0.5f);
+    ASSERT_FLOAT_EQ(*lut.data_low(),0.0f);
+    const float step = lut.domain_index_step();
     for(size_t i=0; i<bins; ++i) {
         ASSERT_FLOAT_EQ(lut.eval(step*i),(step*i)) << "@ i=[" << i << "]";
         ASSERT_FLOAT_EQ(lut.eval_round(step*i),(step*i)) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_noffset(step*i-lut.m_tLowOffset),(step*i)) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_noffset_round(step*i-lut.m_tLowOffset),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_noffset(step*i-lut.domain_offset_low()),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_noffset_round(step*i-lut.domain_offset_low()),(step*i)) << "@ i=[" << i << "]";
         ASSERT_FLOAT_EQ(lut.eval_raw(ptrdiff_t(i)),(step*i)) << "@ i=[" << i << "]";
         ASSERT_FLOAT_EQ(lut.eval_mid(step*i),(step*i)) << "@ i=[" << i << "]";
         ASSERT_FLOAT_EQ(lut.eval_mid_round(step*i),(step*i)) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_mid_noffset(step*i-lut.m_tMidOffset),(step*i)) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_mid_noffset_round(step*i-lut.m_tMidOffset),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_noffset(step*i-lut.domain_offset_mid()),(step*i)) << "@ i=[" << i << "]";
+        ASSERT_FLOAT_EQ(lut.eval_mid_noffset_round(step*i-lut.domain_offset_mid()),(step*i)) << "@ i=[" << i << "]";
         ASSERT_FLOAT_EQ(lut.eval_mid_raw(ptrdiff_t(i)-bins/2),(step*i)) << "@ i=[" << i << "]";
     }
 }
@@ -545,50 +545,50 @@ TEST(LUT,regression_arccos1000_safe) {
     constexpr size_t safety = 10;
     const auto func_acos = [&](float x){return std::acos(x);};
     lv::LUT<float,float,bins,safety> lut(-1.0f,1.0f,func_acos);
-    ASSERT_GE(lut.m_aLUT.size(),bins+safety);
-    ASSERT_FLOAT_EQ(lut.m_aLUT[0],func_acos(-1.0f));
-    ASSERT_FLOAT_EQ(lut.m_aLUT[lut.m_aLUT.size()-1],func_acos(1.0f));
-    ASSERT_FLOAT_EQ(lut.m_tMin,-1.0f);
-    ASSERT_FLOAT_EQ(lut.m_tMax,1.0f);
-    ASSERT_FLOAT_EQ(lut.m_tMidOffset,0.0f);
-    ASSERT_FLOAT_EQ(lut.m_tLowOffset,-1.0f);
-    ASSERT_FLOAT_EQ(lut.m_tScale,float(bins-1)/2);
-    ASSERT_FLOAT_EQ(lut.m_tStep,2.0f/(bins-1));
-    ASSERT_NEAR(*lut.m_pMid,func_acos(0.0f),lut.m_tStep);
-    ASSERT_NEAR(*lut.m_pLow,func_acos(-1.0f),lut.m_tStep);
+    ASSERT_EQ(lut.size(),bins+safety*2);
+    ASSERT_FLOAT_EQ(lut.data_raw()[0],func_acos(-1.0f));
+    ASSERT_FLOAT_EQ(lut.data_raw()[lut.size()-1],func_acos(1.0f));
+    ASSERT_FLOAT_EQ(lut.domain_min(),-1.0f);
+    ASSERT_FLOAT_EQ(lut.domain_max(),1.0f);
+    ASSERT_FLOAT_EQ(lut.domain_offset_mid(),0.0f);
+    ASSERT_FLOAT_EQ(lut.domain_offset_low(),-1.0f);
+    ASSERT_FLOAT_EQ(lut.domain_index_scale(),float(bins-1)/2);
+    ASSERT_FLOAT_EQ(lut.domain_index_step(),2.0f/(bins-1));
+    ASSERT_NEAR(*lut.data_mid(),func_acos(0.0f),lut.domain_index_step());
+    ASSERT_NEAR(*lut.data_low(),func_acos(-1.0f),lut.domain_index_step());
     const float fMinX = -1.0f;
     for(size_t i=0; i<bins/2; ++i) {
-        const float fLastY = func_acos(i==0?fMinX:fMinX+lut.m_tStep*(i-1));
-        const float fX = fMinX+lut.m_tStep*i;
+        const float fLastY = func_acos(i==0?fMinX:fMinX+lut.domain_index_step()*(i-1));
+        const float fX = fMinX+lut.domain_index_step()*i;
         const float fY = func_acos(fX);
         const float fDelta = (std::abs(fLastY-fY))*1.2f; // 20% added generosity for strange fp on travis
         ASSERT_NEAR(lut.eval(fX),func_acos(fX),fDelta) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_round(fX),func_acos(fX)) << "@ i=[" << i << "]";
-        ASSERT_NEAR(lut.eval_noffset(fX-lut.m_tLowOffset),func_acos(fX),fDelta) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_noffset_round(fX-lut.m_tLowOffset),func_acos(fX)) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_raw(ptrdiff_t(i)),func_acos(fX)) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_round(fX),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_noffset(fX-lut.domain_offset_low()),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_noffset_round(fX-lut.domain_offset_low()),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_raw(ptrdiff_t(i)),func_acos(fX),fDelta) << "@ i=[" << i << "]";
         ASSERT_NEAR(lut.eval_mid(fX),func_acos(fX),fDelta) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_mid_round(fX),func_acos(fX)) << "@ i=[" << i << "]";
-        ASSERT_NEAR(lut.eval_mid_noffset(fX-lut.m_tMidOffset),func_acos(fX),fDelta) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_mid_noffset_round(fX-lut.m_tMidOffset),func_acos(fX)) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_mid_raw(ptrdiff_t(i)-bins/2),func_acos(fX)) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_mid_round(fX),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_mid_noffset(fX-lut.domain_offset_mid()),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_mid_noffset_round(fX-lut.domain_offset_mid()),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_mid_raw(ptrdiff_t(i)-bins/2),func_acos(fX),fDelta) << "@ i=[" << i << "]";
     }
     const float fMaxX = 1.0f;
     for(size_t i=bins/2; i<bins; ++i) {
-        const float fNextY = func_acos(i==(bins-1)?fMaxX:fMinX+lut.m_tStep*(i+1));
-        const float fX = fMinX+lut.m_tStep*i;
+        const float fNextY = func_acos(i==(bins-1)?fMaxX:fMinX+lut.domain_index_step()*(i+1));
+        const float fX = fMinX+lut.domain_index_step()*i;
         const float fY = func_acos(fX);
         const float fDelta = (std::abs(fY-fNextY))*1.2f; // 20% added generosity for strange fp on travis
         ASSERT_NEAR(lut.eval(fX),func_acos(fX),fDelta) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_round(fX),func_acos(fX)) << "@ i=[" << i << "]";
-        ASSERT_NEAR(lut.eval_noffset(fX-lut.m_tLowOffset),func_acos(fX),fDelta) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_noffset_round(fX-lut.m_tLowOffset),func_acos(fX)) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_raw(ptrdiff_t(i)),func_acos(fX)) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_round(fX),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_noffset(fX-lut.domain_offset_low()),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_noffset_round(fX-lut.domain_offset_low()),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_raw(ptrdiff_t(i)),func_acos(fX),fDelta) << "@ i=[" << i << "]";
         ASSERT_NEAR(lut.eval_mid(fX),func_acos(fX),fDelta) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_mid_round(fX),func_acos(fX)) << "@ i=[" << i << "]";
-        ASSERT_NEAR(lut.eval_mid_noffset(fX-lut.m_tMidOffset),func_acos(fX),fDelta) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_mid_noffset_round(fX-lut.m_tMidOffset),func_acos(fX)) << "@ i=[" << i << "]";
-        ASSERT_FLOAT_EQ(lut.eval_mid_raw(ptrdiff_t(i)-bins/2),func_acos(fX)) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_mid_round(fX),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_mid_noffset(fX-lut.domain_offset_mid()),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_mid_noffset_round(fX-lut.domain_offset_mid()),func_acos(fX),fDelta) << "@ i=[" << i << "]";
+        ASSERT_NEAR(lut.eval_mid_raw(ptrdiff_t(i)-bins/2),func_acos(fX),fDelta) << "@ i=[" << i << "]";
     }
 }
 

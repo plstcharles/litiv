@@ -721,93 +721,135 @@ namespace lv {
     };
 
     /// helper structure to create lookup tables with generic functors (also exposes multiple lookup interfaces)
-    template<typename Tx, typename Ty, size_t nBins, size_t nSafety=0, bool bUseStaticBuffer=true, typename TStep=float>
+    template<typename Tx, typename Ty, size_t nBins, size_t nSafety=0, bool bUseStaticBuffer=true>
     struct LUT {
-        static_assert(nBins>1 && (nBins%2)==1,"LUT bin count must be at least two and odd");
-        /// default constructor; will automatically fill the LUT array for lFunc([tMinLookup,tMaxLookup])
+        static_assert(nBins>1,"LUT bin count must be at least two");
+        /// default constructor
+        LUT() : m_bInitialized(false) {}
+        /// full constructor; will automatically fill the LUT array for lFunc([tMinLookup,tMaxLookup])
         template<typename TFunc>
-        LUT(Tx tMinLookup, Tx tMaxLookup, TFunc lFunc) :
-                m_tMin(std::min(tMinLookup,tMaxLookup)),m_tMax(std::max(tMinLookup,tMaxLookup)),
-                m_tMidOffset((m_tMax+m_tMin)/2),m_tLowOffset(m_tMin),
-                m_tScale(TStep(nBins-1)/(m_tMax-m_tMin)),
-                m_tStep(TStep(m_tMax-m_tMin)/(nBins-1)),
-                m_aLUT(init(m_tMin,m_tMax,m_tStep,lFunc)),
-                m_pMid(m_aLUT.data()+nBins/2+nSafety),
-                m_pLow(m_aLUT.data()+nSafety) {}
+        LUT(Tx tMinLookup, Tx tMaxLookup, TFunc lFunc) {init(tMinLookup,tMaxLookup,lFunc);}
+        /// LUT initialization function; will fill the array for lFunc([tMinLookup,tMaxLookup])
+        template<typename TFunc>
+        void init(Tx tMinLookup, Tx tMaxLookup, TFunc lFunc) {
+            lvAssert_(tMinLookup!=tMaxLookup,"lut domain too small");
+            m_aLUT.reset();
+            m_aLUT.resize(nBins+nSafety*2);
+            m_pMid = m_aLUT.data()+nBins/2+nSafety;
+            m_pLow = m_aLUT.data()+nSafety;
+            m_tMin = std::min(tMinLookup,tMaxLookup);
+            m_tMax = std::max(tMinLookup,tMaxLookup);
+            m_tMidOffset = (m_tMax+m_tMin)/2;
+            m_tLowOffset = m_tMin;
+            m_dScale = double(nBins-1)/(m_tMax-m_tMin);
+            m_dStep = double(m_tMax-m_tMin)/(nBins-1);
+            for(size_t n=0; n<=nSafety; ++n)
+                m_aLUT[n] = lFunc(m_tMin);
+            for(size_t n=nSafety+1; n<nBins+nSafety-1; ++n)
+                m_aLUT[n] = lFunc(m_tMin+Tx((n-nSafety)*m_dStep));
+            for(size_t n=nBins+nSafety-1; n<nBins+nSafety*2; ++n)
+                m_aLUT[n] = lFunc(m_tMax);
+            m_bInitialized = true;
+        }
         /// returns the evaluation result of lFunc(x) using the LUT mid pointer after offsetting and scaling x (i.e. assuming tOffset!=0)
-        inline Ty eval_mid(Tx x) const {
-            lvDbgAssert(ptrdiff_t((x-m_tMidOffset)*m_tScale)>=-ptrdiff_t(nBins/2+nSafety) && ptrdiff_t((x-m_tMidOffset)*m_tScale)<=ptrdiff_t(nBins/2+nSafety));
-            return m_pMid[ptrdiff_t((x-m_tMidOffset)*m_tScale)];
+        Ty eval_mid(Tx x) const {
+            lvDbgAssert_(m_bInitialized,"LUT not initialized; internal parameters unset!");
+            lvDbgAssert(ptrdiff_t((x-m_tMidOffset)*m_dScale)>=-ptrdiff_t(nBins/2+nSafety) && ptrdiff_t((x-m_tMidOffset)*m_dScale)<=ptrdiff_t(nBins/2+nSafety-s_nBinOdd));
+            return m_pMid[ptrdiff_t((x-m_tMidOffset)*m_dScale)];
         }
         /// returns the evaluation result of lFunc(x) using the LUT mid pointer after offsetting, scaling, and rounding x (i.e. assuming tOffset!=0)
-        inline Ty eval_mid_round(Tx x) const {
-            lvDbgAssert((ptrdiff_t)std::llround((x-m_tMidOffset)*m_tScale)>=-ptrdiff_t(nBins/2+nSafety) && (ptrdiff_t)std::llround((x-m_tMidOffset)*m_tScale)<=ptrdiff_t(nBins/2+nSafety));
-            return m_pMid[(ptrdiff_t)std::llround((x-m_tMidOffset)*m_tScale)];
+        Ty eval_mid_round(Tx x) const {
+            lvDbgAssert_(m_bInitialized,"LUT not initialized; internal parameters unset!");
+            lvDbgAssert((ptrdiff_t)std::llround((x-m_tMidOffset)*m_dScale)>=-ptrdiff_t(nBins/2+nSafety) && (ptrdiff_t)std::llround((x-m_tMidOffset)*m_dScale)<=ptrdiff_t(nBins/2+nSafety-s_nBinOdd));
+            return m_pMid[(ptrdiff_t)std::llround((x-m_tMidOffset)*m_dScale)];
         }
         /// returns the evaluation result of lFunc(x) using the LUT mid pointer after scaling x (i.e. assuming tOffset==0)
-        inline Ty eval_mid_noffset(Tx x) const {
-            lvDbgAssert(ptrdiff_t(x*m_tScale)>=-ptrdiff_t(nBins/2+nSafety) && ptrdiff_t(x*m_tScale)<=ptrdiff_t(nBins/2+nSafety));
-            return m_pMid[ptrdiff_t(x*m_tScale)];
+        Ty eval_mid_noffset(Tx x) const {
+            lvDbgAssert_(m_bInitialized,"LUT not initialized; internal parameters unset!");
+            lvDbgAssert(ptrdiff_t(x*m_dScale)>=-ptrdiff_t(nBins/2+nSafety) && ptrdiff_t(x*m_dScale)<=ptrdiff_t(nBins/2+nSafety-s_nBinOdd));
+            return m_pMid[ptrdiff_t(x*m_dScale)];
         }
         /// returns the evaluation result of lFunc(x) using the LUT mid pointer after scaling and rounding x (i.e. assuming tOffset==0)
-        inline Ty eval_mid_noffset_round(Tx x) const {
-            lvDbgAssert((ptrdiff_t)std::llround(x*m_tScale)>=-ptrdiff_t(nBins/2+nSafety) && (ptrdiff_t)std::llround(x*m_tScale)<=ptrdiff_t(nBins/2+nSafety));
-            return m_pMid[(ptrdiff_t)std::llround(x*m_tScale)];
+        Ty eval_mid_noffset_round(Tx x) const {
+            lvDbgAssert_(m_bInitialized,"LUT not initialized; internal parameters unset!");
+            lvDbgAssert((ptrdiff_t)std::llround(x*m_dScale)>=-ptrdiff_t(nBins/2+nSafety) && (ptrdiff_t)std::llround(x*m_dScale)<=ptrdiff_t(nBins/2+nSafety-s_nBinOdd));
+            return m_pMid[(ptrdiff_t)std::llround(x*m_dScale)];
         }
         /// returns the evaluation result of lFunc(x) using the LUT mid pointer with x as a direct index value
-        inline Ty eval_mid_raw(ptrdiff_t x) const {
-            lvDbgAssert(x>=-ptrdiff_t(nBins/2+nSafety) && x<=ptrdiff_t(nBins/2+nSafety));
+        Ty eval_mid_raw(ptrdiff_t x) const {
+            lvDbgAssert_(m_bInitialized,"LUT not initialized; internal parameters unset!");
+            lvDbgAssert(x>=-ptrdiff_t(nBins/2+nSafety) && x<=ptrdiff_t(nBins/2+nSafety-s_nBinOdd));
             return m_pMid[x];
         }
         /// returns the evaluation result of lFunc(x) using the LUT low pointer after offsetting and scaling x (i.e. assuming tOffset!=0)
-        inline Ty eval(Tx x) const {
-            lvDbgAssert(ptrdiff_t((x-m_tLowOffset)*m_tScale)>=-ptrdiff_t(nSafety) && ptrdiff_t((x-m_tLowOffset)*m_tScale)<ptrdiff_t(nBins+nSafety));
-            return m_pLow[ptrdiff_t((x-m_tLowOffset)*m_tScale)];
+        Ty eval(Tx x) const {
+            lvDbgAssert_(m_bInitialized,"LUT not initialized; internal parameters unset!");
+            lvDbgAssert(ptrdiff_t((x-m_tLowOffset)*m_dScale)>=-ptrdiff_t(nSafety) && ptrdiff_t((x-m_tLowOffset)*m_dScale)<ptrdiff_t(nBins+nSafety));
+            return m_pLow[ptrdiff_t((x-m_tLowOffset)*m_dScale)];
         }
         /// returns the evaluation result of lFunc(x) using the LUT low pointer after offsetting, scaling, and rounding x (i.e. assuming tOffset!=0)
-        inline Ty eval_round(Tx x) const {
-            lvDbgAssert((ptrdiff_t)std::llround((x-m_tLowOffset)*m_tScale)>=-ptrdiff_t(nSafety) && (ptrdiff_t)std::llround((x-m_tLowOffset)*m_tScale)<ptrdiff_t(nBins+nSafety));
-            return m_pLow[(ptrdiff_t)std::llround((x-m_tLowOffset)*m_tScale)];
+        Ty eval_round(Tx x) const {
+            lvDbgAssert_(m_bInitialized,"LUT not initialized; internal parameters unset!");
+            lvDbgAssert((ptrdiff_t)std::llround((x-m_tLowOffset)*m_dScale)>=-ptrdiff_t(nSafety) && (ptrdiff_t)std::llround((x-m_tLowOffset)*m_dScale)<ptrdiff_t(nBins+nSafety));
+            return m_pLow[(ptrdiff_t)std::llround((x-m_tLowOffset)*m_dScale)];
         }
         /// returns the evaluation result of lFunc(x) using the LUT low pointer after scaling x (i.e. assuming tOffset==0)
-        inline Ty eval_noffset(Tx x) const {
-            lvDbgAssert(ptrdiff_t(x*m_tScale)>=-ptrdiff_t(nSafety) && ptrdiff_t(x*m_tScale)<ptrdiff_t(nBins+nSafety));
-            return m_pLow[ptrdiff_t(x*m_tScale)];
+        Ty eval_noffset(Tx x) const {
+            lvDbgAssert_(m_bInitialized,"LUT not initialized; internal parameters unset!");
+            lvDbgAssert(ptrdiff_t(x*m_dScale)>=-ptrdiff_t(nSafety) && ptrdiff_t(x*m_dScale)<ptrdiff_t(nBins+nSafety));
+            return m_pLow[ptrdiff_t(x*m_dScale)];
         }
         /// returns the evaluation result of lFunc(x) using the LUT low pointer after scaling and rounding x (i.e. assuming tOffset==0)
-        inline Ty eval_noffset_round(Tx x) const {
-            lvDbgAssert((ptrdiff_t)std::llround(x*m_tScale)>=-ptrdiff_t(nSafety) && (ptrdiff_t)std::llround(x*m_tScale)<ptrdiff_t(nBins+nSafety));
-            return m_pLow[(ptrdiff_t)std::llround(x*m_tScale)];
+        Ty eval_noffset_round(Tx x) const {
+            lvDbgAssert_(m_bInitialized,"LUT not initialized; internal parameters unset!");
+            lvDbgAssert((ptrdiff_t)std::llround(x*m_dScale)>=-ptrdiff_t(nSafety) && (ptrdiff_t)std::llround(x*m_dScale)<ptrdiff_t(nBins+nSafety));
+            return m_pLow[(ptrdiff_t)std::llround(x*m_dScale)];
         }
         /// returns the evaluation result of lFunc(x) using the LUT low pointer with x as a direct index value
-        inline Ty eval_raw(ptrdiff_t x) const {
+        Ty eval_raw(ptrdiff_t x) const {
+            lvDbgAssert_(m_bInitialized,"LUT not initialized; internal parameters unset!");
             lvDbgAssert(x>=-ptrdiff_t(nSafety) && x<ptrdiff_t(nBins+nSafety));
             return m_pLow[x];
         }
+        /// checks whether the LUT is initialized and ready to be used or not
+        bool initialized() const {return m_bInitialized;}
+        /// returns the number of elements in the LUT
+        size_t size() const {return m_aLUT.size();}
+        /// returns the minimum domain value for the LUT
+        Tx domain_min() const {return m_tMin;}
+        /// returns the maximum domain value for the LUT
+        Tx domain_max() const {return m_tMax;}
+        /// returns the mid-lookup domain value offset
+        Tx domain_offset_mid() const {return m_tMidOffset;}
+        /// returns the low-lookup domain value offset
+        Tx domain_offset_low() const {return m_tLowOffset;}
+        /// return the scale coefficient for index-to-domain transformation
+        double domain_index_scale() const {return m_dScale;}
+        /// return the quantification step size for domain indexing
+        double domain_index_step() const {return m_dStep;}
+        /// returns a const pointer to the actual LUT buffer data block
+        const Ty* data_raw() const {return m_aLUT.data();}
+        /// returns a const pointer to the 'mid' offset lookup entrypoint
+        const Ty* data_mid() const {return m_pMid;}
+        /// returns a const pointer to the 'low' offset lookup entrypoint
+        const Ty* data_low() const {return m_pLow;}
+    protected:
         /// max static buffer size to use in the internal autobuffer
         static constexpr size_t s_nMaxStaticSize = bUseStaticBuffer?(nBins+nSafety*2):size_t(1);
-        /// min/max lookup values passed to the constructor (LUT bounds)
-        const Tx m_tMin,m_tMax;
+        /// index offset value to use in mid checks if using even bin count
+        static constexpr size_t s_nBinOdd = size_t(1)-nBins%2;
+        /// min/max domain (lookup) values passed to the constructor (i.e. LUT bounds)
+        Tx m_tMin,m_tMax;
         /// input value offsets for lookup
-        const Tx m_tMidOffset,m_tLowOffset;
+        Tx m_tMidOffset,m_tLowOffset;
         /// scale coefficient & step for lookup
-        const TStep m_tScale,m_tStep;
+        double m_dScale,m_dStep;
         /// functor lookup table
-        const lv::AutoBuffer<Ty,s_nMaxStaticSize> m_aLUT;
+        lv::AutoBuffer<Ty,s_nMaxStaticSize> m_aLUT;
         /// base LUT pointers for lookup
-        const Ty* m_pMid,*m_pLow;
-    private:
-        template<typename TFunc>
-        static lv::AutoBuffer<Ty,s_nMaxStaticSize> init(Tx tMin, Tx tMax, TStep tStep, TFunc lFunc) {
-            lv::AutoBuffer<Ty,s_nMaxStaticSize> aLUT(nBins+nSafety*2);
-            for(size_t n=0; n<=nSafety; ++n)
-                aLUT[n] = lFunc(tMin);
-            for(size_t n=nSafety+1; n<nBins+nSafety-1; ++n)
-                aLUT[n] = lFunc(tMin+Tx((n-nSafety)*tStep));
-            for(size_t n=nBins+nSafety-1; n<nBins+nSafety*2; ++n)
-                aLUT[n] = lFunc(tMax);
-            return aLUT;
-        }
+        Ty* m_pMid,*m_pLow;
+        /// saves whether the lut was initialized or not
+        bool m_bInitialized;
     };
 
     /// helper class used to unlock several mutexes in the current scope (logical inverse of lock_guard)
