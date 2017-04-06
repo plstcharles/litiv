@@ -145,8 +145,8 @@ inline FGStereoMatcher::GraphModelData::GraphModelData(const cv::Size& oImageSiz
     lvAssert_(m_nMinDispOffset<m_nMaxDispOffset,"min/max disp offsets mismatch");
     lvDbgAssert_(std::numeric_limits<AssocCountType>::max()>m_oGridSize[1],"grid width is too large for association counter type");
     lvDbgAssert(m_aAssocCostAddLUT.size()==m_aAssocCostSumLUT.size() && m_aAssocCostRemLUT.size()==m_aAssocCostSumLUT.size());
-    lvDbgAssert_(m_nMaxDispOffset>m_aAssocCostLUT.size(),"assoc cost lut size might not be large enough");
-    lvDbgAssert(FGSTEREOMATCH_UNIQUE_COST_ZERO_COUNT<m_aAssocCostLUT.size());
+    lvDbgAssert_(m_nMaxDispOffset<m_aAssocCostSumLUT.size(),"assoc cost lut size might not be large enough");
+    lvDbgAssert(FGSTEREOMATCH_UNIQUE_COST_ZERO_COUNT<m_aAssocCostSumLUT.size());
     lvDbgAssert(FGSTEREOMATCH_UNIQUE_COST_INCR_REL(0)==0.0f);
     std::fill_n(m_aAssocCostAddLUT.begin(),FGSTEREOMATCH_UNIQUE_COST_ZERO_COUNT,ValueType(0));
     std::fill_n(m_aAssocCostRemLUT.begin(),FGSTEREOMATCH_UNIQUE_COST_ZERO_COUNT,ValueType(0));
@@ -156,6 +156,20 @@ inline FGStereoMatcher::GraphModelData::GraphModelData(const cv::Size& oImageSiz
         m_aAssocCostRemLUT[n] = -ValueType(FGSTEREOMATCH_UNIQUE_COST_INCR_REL(n-FGSTEREOMATCH_UNIQUE_COST_ZERO_COUNT)*FGSTEREOMATCH_UNIQUE_COST_OVER_SCALE/m_nDispOffsetStep);
         m_aAssocCostSumLUT[n] = (n==size_t(0)?ValueType(0):(m_aAssocCostSumLUT[n-1]+m_aAssocCostAddLUT[n-1]));
     }
+#if FGSTEREOMATCH_LBLSIM_USE_EXP_GRADPIVOT
+    m_aLabelSimCostGradFactLUT.init(0,255,[](int nLocalGrad){
+        return (float)std::exp(float(FGSTEREOMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/FGSTEREOMATCH_LBLSIM_COST_GRADRAW_SCALE);
+    });
+#else //!FGSTEREOMATCH_LBLSIM_USE_EXP_GRADPIVOT
+    m_aLabelSimCostGradFactLUT.init(0,255,[](int nLocalGrad){
+        const float fGradPivotFact = 1.0f+(float(FGSTEREOMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/((nLocalGrad>=FGSTEREOMATCH_LBLSIM_COST_GRADPIVOT_CST)?(255-FGSTEREOMATCH_LBLSIM_COST_GRADPIVOT_CST):FGSTEREOMATCH_LBLSIM_COST_GRADPIVOT_CST));
+        const float fGradScaleFact = FGSTEREOMATCH_LBLSIM_COST_GRADRAW_SCALE*fGradPivotFact*fGradPivotFact;
+        lvDbgAssert(fGradScaleFact>=0.0f && fGradScaleFact<=4.0f*FGSTEREOMATCH_LBLSIM_COST_GRADRAW_SCALE);
+        return fGradScaleFact;
+    });
+#endif //!FGSTEREOMATCH_LBLSIM_USE_EXP_GRADPIVOT
+    lvDbgAssert(m_aLabelSimCostGradFactLUT.size()==size_t(256) && m_aLabelSimCostGradFactLUT.domain_offset_low()==0);
+    lvDbgAssert(m_aLabelSimCostGradFactLUT.domain_index_step()==1.0 && m_aLabelSimCostGradFactLUT.domain_index_scale()==1.0);
     ////////////////////////////////////////////// put in new func, dupe for resegm model
     const size_t nLabels = vStereoLabels.size();
     const size_t nRealLabels = vStereoLabels.size()-2;
@@ -458,6 +472,7 @@ inline void FGStereoMatcher::GraphModelData::updateModels(const MatArrayIn& aInp
                 else
                     vUnaryFunc(nLabelIdx) = FGSTEREOMATCH_VISSIM_COST_OOB_CST;
             }
+            // @@@@ add discriminativeness factor --- vect-append all vis sim vals, sort, setup discrim costs
             vUnaryFunc(m_nStereoDontCareLabelIdx) = ValueType(100000); // @@@@ check roi, if dc set to 0, otherwise set to inf
             vUnaryFunc(m_nStereoOccludedLabelIdx) = ValueType(100000);//FGSTEREOMATCH_VISSIM_COST_OCCLUDED_CST;
 
@@ -474,16 +489,9 @@ inline void FGStereoMatcher::GraphModelData::updateModels(const MatArrayIn& aInp
                             const OutputLabelType nRealLabel2 = getRealLabel(nLabelIdx2);
                             const int nRealLabelDiff = std::min(std::abs((int)nRealLabel1-(int)nRealLabel2),FGSTEREOMATCH_LBLSIM_COST_MAXDIFF_CST);
                             const int nLocalGrad = (int)((nOrientIdx==0)?aGradY[0]:(nOrientIdx==1)?aGradX[0]:aGradMag[0])(nRowIdx,nColIdx);
-                            const int nLocalGradPivot = FGSTEREOMATCH_LBLSIM_COST_GRADPIVOT_CST;
-                        #if FGSTEREOMATCH_LBLSIM_USE_EXP_GRADPIVOT
-                            const float fGradPivotFact = std::exp(float(nLocalGradPivot-nLocalGrad)/FGSTEREOMATCH_LBLSIM_COST_GRADRAW_SCALE);
-                            vPairwiseFunc(nLabelIdx1,nLabelIdx2) = ValueType((nRealLabelDiff*nRealLabelDiff)*fGradPivotFact);
-                        #else //!FGSTEREOMATCH_LBLSIM_USE_EXP_GRADPIVOT
-                            const float fGradPivotFact = 1.0f+(float(nLocalGradPivot-nLocalGrad)/((nLocalGrad>=nLocalGradPivot)?(255-nLocalGradPivot):nLocalGradPivot));
-                            const float fGradScaleFact = FGSTEREOMATCH_LBLSIM_COST_GRADRAW_SCALE*fGradPivotFact*fGradPivotFact;
-                            lvDbgAssert(fGradScaleFact>=0.0f && fGradScaleFact<=4.0f*FGSTEREOMATCH_LBLSIM_COST_GRADRAW_SCALE);
+                            const float fGradScaleFact = m_aLabelSimCostGradFactLUT.eval_raw(nLocalGrad);
+                            lvDbgAssert(fGradScaleFact==(float)std::exp(float(FGSTEREOMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/FGSTEREOMATCH_LBLSIM_COST_GRADRAW_SCALE));
                             vPairwiseFunc(nLabelIdx1,nLabelIdx2) = ValueType((nRealLabelDiff*nRealLabelDiff)*fGradScaleFact);
-                        #endif //!FGSTEREOMATCH_LBLSIM_USE_EXP_GRADPIVOT
                             const bool bValidDescOffsetNode1 = lHasValidDesc(nRowIdx,nColIdx-(int)nRealLabel1);
                             const bool bValidDescOffsetNode2 = lHasValidDesc(nRowIdx,nColIdx-(int)nRealLabel2);
                             if(!bValidDescOffsetNode1 || !bValidDescOffsetNode2)

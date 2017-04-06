@@ -240,11 +240,13 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         /// stereo model smoothness pairwise functions base pointer
         ValueType* m_pStereoSmoothPairwFuncsDataBase;
         /// lookup table for added association cost w.r.t. prior count
-        std::array<ValueType,UCHAR_MAX+1> m_aAssocCostAddLUT;
+        lv::AutoBuffer<ValueType,200> m_aAssocCostAddLUT;
         /// lookup table for removed association cost w.r.t. prior count
-        std::array<ValueType,UCHAR_MAX+1> m_aAssocCostRemLUT;
+        lv::AutoBuffer<ValueType,200> m_aAssocCostRemLUT;
         /// lookup table for total association cost w.r.t. prior count
-        std::array<ValueType,UCHAR_MAX+1> m_aAssocCostSumLUT;
+        lv::AutoBuffer<ValueType,200> m_aAssocCostSumLUT;
+        /// lookup table for label similarity cost gradient factor
+        lv::LUT<uchar,float,256> m_aLabelSimCostGradFactLUT;
 
         /// holds the feature extractor to use on input images
 #if FGSTEREOMATCH_CONFIG_USE_DASCGF_FEATS || FGSTEREOMATCH_CONFIG_USE_DASCRF_FEATS
