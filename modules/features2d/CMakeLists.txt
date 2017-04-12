@@ -20,12 +20,14 @@ add_files(SOURCE_FILES
     "src/LBSP.cpp"
     "src/LSS.cpp"
     "src/MI.cpp"
+    "src/SC.cpp"
 )
 add_files(INCLUDE_FILES
     "include/litiv/features2d/DASC.hpp"
     "include/litiv/features2d/LBSP.hpp"
     "include/litiv/features2d/LSS.hpp"
     "include/litiv/features2d/MI.hpp"
+    "include/litiv/features2d/SC.hpp"
     "include/litiv/features2d.hpp"
 )
 

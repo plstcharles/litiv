@@ -192,3 +192,4 @@ namespace lv {
 #include "litiv/features2d/LBSP.hpp"
 #include "litiv/features2d/LSS.hpp"
 #include "litiv/features2d/MI.hpp"
+#include "litiv/features2d/SC.hpp"
