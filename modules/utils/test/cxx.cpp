@@ -140,6 +140,16 @@ TEST(accumulateMembers,regression) {
     EXPECT_EQ((lv::accumulateMembers(std::vector<float>{1.0f,2.0f,3.0f},lObjEval,2.0f)),8.0f);
 }
 
+TEST(cumulativeSum,regression) {
+    std::vector<float> vTest = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    std::vector<float> vRes = lv::cumulativeSum<float,float>(vTest);
+    EXPECT_EQ(vRes[0],vTest[0]);
+    EXPECT_EQ(vRes[1],vTest[0]+vTest[1]);
+    EXPECT_EQ(vRes[2],vTest[0]+vTest[1]+vTest[2]);
+    EXPECT_EQ(vRes[3],vTest[0]+vTest[1]+vTest[2]+vTest[3]);
+    EXPECT_EQ(vRes[4],vTest[0]+vTest[1]+vTest[2]+vTest[3]+vTest[4]);
+}
+
 namespace {
     template<typename T>
     struct indices_of_fixture : testing::Test {};

@@ -253,6 +253,14 @@ namespace lv {
         });
     }
 
+    /// computes the cumulative sum array of the given scalar array
+    template<typename TVal, typename TSum=std::conditional_t<std::is_integral<TVal>::value,size_t,float>>
+    inline std::vector<TSum> cumulativeSum(const std::vector<TVal>& vArray) {
+        std::vector<TSum> vSums(vArray.size());
+        std::partial_sum(vArray.begin(),vArray.end(),vSums.begin(),std::plus<TSum>());
+        return vSums;
+    }
+
     /// returns the index of all provided values in the reference array (uses std::find to match objects)
     template<typename Tin, typename Tout=size_t>
     inline std::vector<Tout> indices_of(const std::vector<Tin>& voVals, const std::vector<Tin>& voRefs) {
