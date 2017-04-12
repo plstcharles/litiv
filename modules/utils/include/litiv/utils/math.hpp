@@ -729,6 +729,40 @@ namespace lv {
 
 #endif //HAVE_GLSL
 
+    /// returns the L1-EMD (earth mover's distance) between two normalized vectors of the same size
+    template<typename TVal, typename TDist=double>
+    inline TDist EMDL1dist(const std::vector<TVal>& vArr1, const std::vector<TVal>& vArr2) {
+        // special EMD case described by Rubner et al. in "The Earth Mover’s Distance as a Metric for Image Retrieval" (IJCV2000)
+        static_assert(std::is_floating_point<TVal>::value,"input must be floating point & normalized");
+        lvDbgAssert_(std::abs(std::accumulate(vArr1.begin(),vArr1.end(),0.0)-1.0)<FLT_EPSILON*vArr1.size(),"input array is not normalized");
+        lvDbgAssert_(std::abs(std::accumulate(vArr2.begin(),vArr2.end(),0.0)-1.0)<FLT_EPSILON*vArr2.size(),"input array is not normalized");
+        lvDbgAssert_(vArr1.size()==vArr2.size(),"input arrays must be same size");
+        const std::vector<TDist> vSums1 = lv::cumulativeSum<TVal,TDist>(vArr1);
+        const std::vector<TDist> vSums2 = lv::cumulativeSum<TVal,TDist>(vArr2);
+        return lv::L1dist<1,TDist,TDist>(vSums1.data(),vSums2.data(),vSums1.size());
+    }
+
+    /// returns the L1-CEMD (circular earth mover's distance) between two normalized vectors of the same size
+    template<typename TVal, typename TDist=double>
+    inline TDist CEMDL1dist(const std::vector<TVal>& vArr1, const std::vector<TVal>& vArr2) {
+        // 'circular' variant of EMDL1 described by Rabin et al. in "Circular Earth Mover’s Distance for the Comparison of Local Features" (ICPR2008)
+        static_assert(std::is_floating_point<TVal>::value,"input must be floating point & normalized");
+        lvDbgAssert_(std::abs(std::accumulate(vArr1.begin(),vArr1.end(),0.0)-1.0)<FLT_EPSILON*vArr1.size(),"input array is not normalized");
+        lvDbgAssert_(std::abs(std::accumulate(vArr2.begin(),vArr2.end(),0.0)-1.0)<FLT_EPSILON*vArr2.size(),"input array is not normalized");
+        lvDbgAssert_(vArr1.size()==vArr2.size(),"input arrays must be same size");
+        std::vector<TDist> vCumSumDiffs(1,TDist(0));
+        vCumSumDiffs.reserve(vArr1.size()+1);
+        std::transform(vArr1.begin(),vArr1.end(),vArr2.begin(),std::back_inserter(vCumSumDiffs),[&](const TVal& a, const TVal& b) {
+            return vCumSumDiffs.back()+TDist(a-b);
+        });
+        std::nth_element(vCumSumDiffs.begin()+1,vCumSumDiffs.begin()+1+vArr1.size()/2,vCumSumDiffs.end());
+        const TDist tMedian = vCumSumDiffs[1+vArr1.size()/2];
+        TDist tResult = TDist(0);
+        for(size_t nIdx=1; nIdx<vCumSumDiffs.size(); ++nIdx)
+            tResult += std::abs(vCumSumDiffs[nIdx]-tMedian);
+        return tResult;
+    }
+
     /// returns the index of the nearest neighbor of the requested value in the reference value array, using a custom distance functor
     template<typename Tval, typename Tcomp>
     inline size_t find_nn_index(const Tval& oReqVal, const std::vector<Tval>& vRefVals, Tcomp lCompFunc) {
