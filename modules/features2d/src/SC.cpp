@@ -176,9 +176,9 @@ void ShapeContext::validateROI(cv::Mat& oROI) const {
 
 double ShapeContext::calcDistance(const float* aDescriptor1, const float* aDescriptor2) const {
     const int nDescSize = m_nRadialBins*m_nAngularBins;
-    const cv::Mat_<float> oDesc1(1,nDescSize,const_cast<float*>(aDescriptor1));
-    const cv::Mat_<float> oDesc2(1,nDescSize,const_cast<float*>(aDescriptor2));
-    return cv::EMD(oDesc1,oDesc2,cv::NORM_L1,m_oEMDCostMap);
+    const cv::Mat_<float> oDesc1(nDescSize,1,const_cast<float*>(aDescriptor1));
+    const cv::Mat_<float> oDesc2(nDescSize,1,const_cast<float*>(aDescriptor2));
+    return cv::EMD(oDesc1,oDesc2,-1,m_oEMDCostMap);
 }
 
 double ShapeContext::calcDistance(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2) const {
@@ -186,10 +186,7 @@ double ShapeContext::calcDistance(const cv::Mat_<float>& oDescriptor1, const cv:
     lvAssert_(oDescriptor1.dims==2 || oDescriptor1.dims==3,"unexpected descriptor matrix dim count");
     lvAssert_(oDescriptor1.dims!=2 || oDescriptor1.total()==size_t(m_nRadialBins*m_nAngularBins),"unexpected descriptor size");
     lvAssert_(oDescriptor1.dims!=3 || (oDescriptor1.size[0]==1 && oDescriptor1.size[1]==1 && oDescriptor1.size[2]==m_nRadialBins*m_nAngularBins),"unexpected descriptor size");
-    const int nDescSize = m_nRadialBins*m_nAngularBins;
-    const cv::Mat_<float> oDesc1(1,nDescSize,const_cast<float*>(oDescriptor1.ptr<float>(0)));
-    const cv::Mat_<float> oDesc2(1,nDescSize,const_cast<float*>(oDescriptor2.ptr<float>(0)));
-    return cv::EMD(oDesc1,oDesc2,cv::NORM_L1,m_oEMDCostMap);
+    return calcDistance(oDescriptor1.ptr<float>(0),oDescriptor2.ptr<float>(0));
 }
 
 void ShapeContext::scdesc_generate_radmask(std::vector<double>& vRadialLimits) const {
@@ -210,7 +207,7 @@ void ShapeContext::scdesc_generate_angmask(std::vector<double>& vAngularLimits) 
         vAngularLimits[nBinIdx] = (dAccDelta+=dDelta);
 }
 
-void ShapeContext::scdesc_generate_emdmask(cv::Mat_<double>& oEMDCostMap) const {
+void ShapeContext::scdesc_generate_emdmask(cv::Mat_<float>& oEMDCostMap) const {
     const int nDescSize = m_nRadialBins*m_nAngularBins;
     oEMDCostMap.create(nDescSize,nDescSize);
     for(int nBaseRadIdx=0; nBaseRadIdx<m_nRadialBins; ++nBaseRadIdx) {
@@ -222,10 +219,9 @@ void ShapeContext::scdesc_generate_emdmask(cv::Mat_<double>& oEMDCostMap) const 
                     const int nRadDist = lv::L1dist(nBaseRadIdx,nRadIdx);
                     const int nBaseDescIdx = nBaseAngIdx+nBaseRadIdx*m_nAngularBins;
                     const int nDescIdx = nAngIdx+nRadIdx*m_nAngularBins;
-                    oEMDCostMap(nBaseDescIdx,nDescIdx) = double(nRadDist+nAngDist);
+                    oEMDCostMap(nBaseDescIdx,nDescIdx) = float(nRadDist+nAngDist);
                 }
             }
-
         }
     }
 }
@@ -321,11 +317,12 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
     oDescriptors = 0.0f;
     scdesc_fill_distmap();
     scdesc_fill_angmap();
-    size_t nValidPts = 0;
     for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx) {
         if(!m_vKeyInliers.empty() && !m_vKeyInliers[nKeyPtIdx])
             continue;
+        size_t nValidPts = 0;
         const cv::Point2f& vKeyPt = ((cv::Point2f*)m_oKeyPts.data)[nKeyPtIdx];
+        float* aDesc = bGenDescMap?oDescriptors.ptr<float>((int)std::round(vKeyPt.y),(int)std::round(vKeyPt.x)):oDescriptors.ptr<float>(nKeyPtIdx);
         for(int nContourPtIdx=0; nContourPtIdx<(int)m_oContourPts.total(); ++nContourPtIdx) {
             if(!m_vContourInliers.empty() && !m_vContourInliers[nContourPtIdx])
                 continue;
@@ -346,15 +343,13 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
                 }
             }
             if(nAngularBinMatch!=-1 && nRadialBinMatch!=-1) {
-                const int nDescIdx = nAngularBinMatch+nRadialBinMatch*m_nAngularBins;
-                if(bGenDescMap)
-                    ++oDescriptors((int)std::round(vKeyPt.y),(int)std::round(vKeyPt.x),nDescIdx);
-                else
-                    ++oDescriptors(nKeyPtIdx,nDescIdx);
+                ++aDesc[nAngularBinMatch+nRadialBinMatch*m_nAngularBins];
                 ++nValidPts;
             }
         }
+        if(m_bNormalizeBins && nValidPts>size_t(0)) {
+            for(int nDescIdx=0; nDescIdx<nDescSize; ++nDescIdx)
+                aDesc[nDescIdx] /= nValidPts;
+        }
     }
-    if(m_bNormalizeBins && nValidPts>size_t(0))
-        oDescriptors /= nValidPts;
 }

@@ -105,7 +105,7 @@ private:
     /// generates angle limits mask using internal parameters
     void scdesc_generate_angmask(std::vector<double>&) const;
     /// generates EMD distance cost map using internal parameters
-    void scdesc_generate_emdmask(cv::Mat_<double>& oEMDCostMap) const;
+    void scdesc_generate_emdmask(cv::Mat_<float>&) const;
     /// fills contour point map using provided binary image
     void scdesc_fill_contours(const cv::Mat& oImage);
     /// fills mean-normalized dist map using internal contour/key points
@@ -117,7 +117,8 @@ private:
 
     // helper variables for internal impl (helps avoid continuous mem realloc)
     std::vector<double> m_vAngularLimits,m_vRadialLimits;
-    cv::Mat_<double> m_oDistMap,m_oAngMap,m_oEMDCostMap;
+    cv::Mat_<double> m_oDistMap,m_oAngMap;
+    cv::Mat_<float> m_oEMDCostMap;
     cv::Mat_<cv::Point2f> m_oKeyPts,m_oContourPts;
     std::vector<int> m_vKeyInliers,m_vContourInliers;
     cv::Mat_<uchar> m_oDistMask;
