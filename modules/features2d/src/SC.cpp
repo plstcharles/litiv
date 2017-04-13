@@ -19,17 +19,17 @@
 
 #include "litiv/features2d.hpp"
 
-ShapeContext::ShapeContext(size_t nAngularBins, size_t nRadialBins, float fInnerRadius, float fOuterRadius, bool bRotationInvariant, bool bNormalizeBins) :
+ShapeContext::ShapeContext(size_t nAngularBins, size_t nRadialBins, double fInnerRadius, double fOuterRadius, bool bRotationInvariant, bool bNormalizeBins) :
         m_nAngularBins((int)nAngularBins),
         m_nRadialBins((int)nRadialBins),
-        m_fInnerRadius(fInnerRadius),
-        m_fOuterRadius(fOuterRadius),
+        m_dInnerRadius(fInnerRadius),
+        m_dOuterRadius(fOuterRadius),
         m_bRotationInvariant(bRotationInvariant),
         m_bNormalizeBins(bNormalizeBins) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
-    lvAssert_(m_fInnerRadius>0.0f,"invalid parameter");
-    lvAssert_(m_fOuterRadius>0.0f && m_fInnerRadius<m_fOuterRadius,"invalid parameter");
+    lvAssert_(m_dInnerRadius>0.0f,"invalid parameter");
+    lvAssert_(m_dOuterRadius>0.0f && m_dInnerRadius<m_dOuterRadius,"invalid parameter");
     scdesc_generate_angmask(m_vAngularLimits);
     scdesc_generate_radmask(m_vRadialLimits);
     scdesc_generate_emdmask(m_oEMDCostMap);
@@ -192,25 +192,25 @@ double ShapeContext::calcDistance(const cv::Mat_<float>& oDescriptor1, const cv:
     return cv::EMD(oDesc1,oDesc2,cv::NORM_L1,m_oEMDCostMap);
 }
 
-void ShapeContext::scdesc_generate_radmask(std::vector<float>& vRadialLimits) const {
-    const float fLogMin = std::log10(m_fInnerRadius);
-    const float fLogMax = std::log10(m_fOuterRadius);
-    const float fDelta = (fLogMax-fLogMin)/(m_nRadialBins-1);
-    float fAccDelta = 0.0f;
+void ShapeContext::scdesc_generate_radmask(std::vector<double>& vRadialLimits) const {
+    const double dLogMin = std::log10(m_dInnerRadius);
+    const double dLogMax = std::log10(m_dOuterRadius);
+    const double dDelta = (dLogMax-dLogMin)/(m_nRadialBins-1);
+    double dAccDelta = 0.0;
     vRadialLimits.resize((size_t)m_nRadialBins);
-    for(int nBinIdx=0; nBinIdx<m_nRadialBins; ++nBinIdx, fAccDelta+=fDelta)
-        vRadialLimits[nBinIdx] = (float)std::pow(10,fLogMin+fAccDelta);
+    for(int nBinIdx=0; nBinIdx<m_nRadialBins; ++nBinIdx, dAccDelta+=dDelta)
+        vRadialLimits[nBinIdx] = std::pow(10,dLogMin+dAccDelta);
 }
 
-void ShapeContext::scdesc_generate_angmask(std::vector<float>& vAngularLimits) const {
-    const float fDelta = (float)(2*CV_PI/m_nAngularBins);
-    float fAccDelta = 0.0f;
+void ShapeContext::scdesc_generate_angmask(std::vector<double>& vAngularLimits) const {
+    const double dDelta = 2*CV_PI/m_nAngularBins;
+    double dAccDelta = 0.0;
     vAngularLimits.resize((size_t)m_nAngularBins);
     for(int nBinIdx=0; nBinIdx<m_nAngularBins; ++nBinIdx)
-        vAngularLimits[nBinIdx] = (fAccDelta+=fDelta);
+        vAngularLimits[nBinIdx] = (dAccDelta+=dDelta);
 }
 
-void ShapeContext::scdesc_generate_emdmask(cv::Mat_<float>& oEMDCostMap) const {
+void ShapeContext::scdesc_generate_emdmask(cv::Mat_<double>& oEMDCostMap) const {
     const int nDescSize = m_nRadialBins*m_nAngularBins;
     oEMDCostMap.create(nDescSize,nDescSize);
     for(int nBaseRadIdx=0; nBaseRadIdx<m_nRadialBins; ++nBaseRadIdx) {
@@ -222,7 +222,7 @@ void ShapeContext::scdesc_generate_emdmask(cv::Mat_<float>& oEMDCostMap) const {
                     const int nRadDist = lv::L1dist(nBaseRadIdx,nRadIdx);
                     const int nBaseDescIdx = nBaseAngIdx+nBaseRadIdx*m_nAngularBins;
                     const int nDescIdx = nAngIdx+nRadIdx*m_nAngularBins;
-                    oEMDCostMap(nBaseDescIdx,nDescIdx) = float(nRadDist+nAngDist);
+                    oEMDCostMap(nBaseDescIdx,nDescIdx) = double(nRadDist+nAngDist);
                 }
             }
 
@@ -250,7 +250,7 @@ void ShapeContext::scdesc_fill_contours(const cv::Mat& oImage) {
         m_oContourPts.release();
 }
 
-void ShapeContext::scdesc_fill_distmap(float fMeanDist) {
+void ShapeContext::scdesc_fill_distmap(double dMeanDist) {
     lvDbgAssert(m_oContourPts.type()==CV_32FC2 && (m_oContourPts.total()==(size_t)m_oContourPts.rows || m_oContourPts.total()==(size_t)m_oContourPts.cols));
     lvDbgAssert(m_oKeyPts.type()==CV_32FC2 && (m_oKeyPts.total()==(size_t)m_oKeyPts.rows || m_oKeyPts.total()==(size_t)m_oKeyPts.cols));
     lvDbgAssert(m_vKeyInliers.empty() || m_oKeyPts.total()==m_vKeyInliers.size());
@@ -258,21 +258,21 @@ void ShapeContext::scdesc_fill_distmap(float fMeanDist) {
     lvDbgAssert(m_oKeyPts.total()>size_t(0));
     if(m_oContourPts.empty())
         return;
-    if(fMeanDist<0 && (!m_vKeyInliers.empty() || !m_vContourInliers.empty()))
+    if(dMeanDist<0 && (!m_vKeyInliers.empty() || !m_vContourInliers.empty()))
         m_oDistMask.create((int)m_oKeyPts.total(),(int)m_oContourPts.total());
     else
         m_oDistMask.release();
     m_oDistMap.create((int)m_oKeyPts.total(),(int)m_oContourPts.total());
     for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx) {
         for(int nContourPtIdx=0; nContourPtIdx<(int)m_oContourPts.total(); ++nContourPtIdx) {
-            m_oDistMap(nKeyPtIdx,nContourPtIdx) = (float)cv::norm(cv::Mat(((cv::Point2f*)m_oKeyPts.data)[nKeyPtIdx]-((cv::Point2f*)m_oContourPts.data)[nContourPtIdx]),cv::NORM_L2);
+            m_oDistMap(nKeyPtIdx,nContourPtIdx) = cv::norm(cv::Mat(((cv::Point2f*)m_oKeyPts.data)[nKeyPtIdx]-((cv::Point2f*)m_oContourPts.data)[nContourPtIdx]),cv::NORM_L2);
             if(!m_oDistMask.empty())
                 m_oDistMask(nKeyPtIdx,nContourPtIdx) = uchar((m_vKeyInliers.empty() || m_vKeyInliers[nKeyPtIdx]!=0) && (m_vContourInliers.empty() || m_vContourInliers[nContourPtIdx]!=0));
         }
     }
-    if(fMeanDist<0)
-        fMeanDist = (float)cv::mean(m_oDistMap,m_oDistMask.empty()?cv::noArray():m_oDistMask)[0];
-    m_oDistMap /= (fMeanDist+FLT_EPSILON);
+    if(dMeanDist<0)
+        dMeanDist = cv::mean(m_oDistMap,m_oDistMask.empty()?cv::noArray():m_oDistMask)[0];
+    m_oDistMap /= (dMeanDist+FLT_EPSILON);
 }
 
 void ShapeContext::scdesc_fill_angmap() {
@@ -293,16 +293,16 @@ void ShapeContext::scdesc_fill_angmap() {
         for(int nContourPtIdx=0; nContourPtIdx<(int)m_oContourPts.total(); ++nContourPtIdx) {
             const cv::Point2f& vKeyPt = ((cv::Point2f*)m_oKeyPts.data)[nKeyPtIdx];
             const cv::Point2f& vContourPt = ((cv::Point2f*)m_oContourPts.data)[nContourPtIdx];
-            if(vKeyPt==vContourPt)
-                m_oAngMap(nKeyPtIdx,nContourPtIdx) = 0.0f;
+            if(std::abs(vKeyPt.x-vContourPt.x)<0.01f && std::abs(vKeyPt.y-vContourPt.y)<0.01f)
+                m_oAngMap(nKeyPtIdx,nContourPtIdx) = 0.0;
             else {
-                const cv::Point2f vDiff = vContourPt-vKeyPt;
+                const cv::Point2d vDiff = vContourPt-vKeyPt;
                 m_oAngMap(nKeyPtIdx,nContourPtIdx) = std::atan2(-vDiff.y,vDiff.x); // flip y since origin = top-left
                 if(m_bRotationInvariant) {
-                    const cv::Point2f vRefPt = vContourPt-vMassCenter;
+                    const cv::Point2d vRefPt = vContourPt-vMassCenter;
                     m_oAngMap(nKeyPtIdx,nContourPtIdx) -= std::atan2(-vRefPt.y,vRefPt.x);
                 }
-                m_oAngMap(nKeyPtIdx,nContourPtIdx) = float(std::fmod(m_oAngMap(nKeyPtIdx,nContourPtIdx)+2*CV_PI+FLT_EPSILON,2*CV_PI));
+                m_oAngMap(nKeyPtIdx,nContourPtIdx) = std::fmod(m_oAngMap(nKeyPtIdx,nContourPtIdx)+2*CV_PI+FLT_EPSILON,2*CV_PI);
             }
         }
     }
@@ -321,6 +321,7 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
     oDescriptors = 0.0f;
     scdesc_fill_distmap();
     scdesc_fill_angmap();
+    size_t nValidPts = 0;
     for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx) {
         if(!m_vKeyInliers.empty() && !m_vKeyInliers[nKeyPtIdx])
             continue;
@@ -329,7 +330,7 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
             if(!m_vContourInliers.empty() && !m_vContourInliers[nContourPtIdx])
                 continue;
             const cv::Point2f& vContourPt = ((cv::Point2f*)m_oContourPts.data)[nContourPtIdx];
-            if(vKeyPt==vContourPt)
+            if(std::abs(vKeyPt.x-vContourPt.x)<0.01f && std::abs(vKeyPt.y-vContourPt.y)<0.01f)
                 continue;
             int nAngularBinMatch=-1,nRadialBinMatch=-1;
             for(int nRadialBinIdx=0; nRadialBinIdx<m_nRadialBins; ++nRadialBinIdx) {
@@ -347,18 +348,13 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
             if(nAngularBinMatch!=-1 && nRadialBinMatch!=-1) {
                 const int nDescIdx = nAngularBinMatch+nRadialBinMatch*m_nAngularBins;
                 if(bGenDescMap)
-                    ++oDescriptors((int)vKeyPt.y,(int)vKeyPt.x,nDescIdx);
+                    ++oDescriptors((int)std::round(vKeyPt.y),(int)std::round(vKeyPt.x),nDescIdx);
                 else
                     ++oDescriptors(nKeyPtIdx,nDescIdx);
+                ++nValidPts;
             }
         }
     }
-    if(m_bNormalizeBins && m_oContourPts.total()>size_t(0)) {
-        if(m_vContourInliers.empty())
-            oDescriptors /= m_oContourPts.total();
-        else
-            oDescriptors /= std::accumulate(m_vContourInliers.begin(),m_vContourInliers.end(),size_t(0),[](size_t nSum, int nFlag){
-               return nFlag?nSum+1:nSum;
-            });
-    }
+    if(m_bNormalizeBins && nValidPts>size_t(0))
+        oDescriptors /= nValidPts;
 }

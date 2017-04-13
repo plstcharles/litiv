@@ -33,7 +33,7 @@
 class ShapeContext : public cv::DescriptorExtractor {
 public:
     /// default constructor
-    ShapeContext(size_t nAngularBins=12, size_t nRadialBins=5, float fInnerRadius=0.1, float fOuterRadius=1.0, bool bRotationInvariant=false, bool bNormalizeBins=true);
+    ShapeContext(size_t nAngularBins=12, size_t nRadialBins=5, double fInnerRadius=0.1, double fOuterRadius=1.0, bool bRotationInvariant=false, bool bNormalizeBins=true);
     /// loads extractor params from the specified file node @@@@ not impl
     virtual void read(const cv::FileNode&) override;
     /// writes extractor params to the specified file storage @@@@ not impl
@@ -90,9 +90,9 @@ protected:
     /// number of radial bins to use
     const int m_nRadialBins; // default = 5
     /// inner radius of the descriptor (in 'mean-normalized' space)
-    const float m_fInnerRadius; // default = 0.1
+    const double m_dInnerRadius; // default = 0.1
     /// outer radius of the descriptor (in 'mean-normalized' space)
-    const float m_fOuterRadius; // default = 1.0
+    const double m_dOuterRadius; // default = 1.0
     /// defines whether descriptors will be made rotation-invariant or not
     const bool m_bRotationInvariant; // default = false
     /// defines whether descriptor bins will be 0-1 normalized or not
@@ -101,23 +101,23 @@ protected:
 private:
 
     /// generates radius limits mask using internal parameters
-    void scdesc_generate_radmask(std::vector<float>&) const;
+    void scdesc_generate_radmask(std::vector<double>&) const;
     /// generates angle limits mask using internal parameters
-    void scdesc_generate_angmask(std::vector<float>&) const;
+    void scdesc_generate_angmask(std::vector<double>&) const;
     /// generates EMD distance cost map using internal parameters
-    void scdesc_generate_emdmask(cv::Mat_<float>& oEMDCostMap) const;
+    void scdesc_generate_emdmask(cv::Mat_<double>& oEMDCostMap) const;
     /// fills contour point map using provided binary image
     void scdesc_fill_contours(const cv::Mat& oImage);
     /// fills mean-normalized dist map using internal contour/key points
-    void scdesc_fill_distmap(float fMeanDist=-1.0f);
+    void scdesc_fill_distmap(double dMeanDist=-1.0);
     /// fills angle map using internal contour/key points
     void scdesc_fill_angmap();
     /// fills descriptor using internal maps
     void scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDescMap);
 
     // helper variables for internal impl (helps avoid continuous mem realloc)
-    std::vector<float> m_vAngularLimits,m_vRadialLimits;
-    cv::Mat_<float> m_oDistMap,m_oAngMap,m_oEMDCostMap;
+    std::vector<double> m_vAngularLimits,m_vRadialLimits;
+    cv::Mat_<double> m_oDistMap,m_oAngMap,m_oEMDCostMap;
     cv::Mat_<cv::Point2f> m_oKeyPts,m_oContourPts;
     std::vector<int> m_vKeyInliers,m_vContourInliers;
     cv::Mat_<uchar> m_oDistMask;
