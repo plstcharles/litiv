@@ -22,20 +22,23 @@
 #include "litiv/imgproc.hpp"
 
 // config toggles/options
-#define FGSTEREOMATCH_CONFIG_ALLOC_IN_MODEL    0
-#define FGSTEREOMATCH_CONFIG_USE_DASCGF_FEATS  1
-#define FGSTEREOMATCH_CONFIG_USE_DASCRF_FEATS  0
-#define FGSTEREOMATCH_CONFIG_USE_LSS_FEATS     0
+#define FGSTEREOMATCH_CONFIG_ALLOC_IN_MODEL        0
+#define FGSTEREOMATCH_CONFIG_USE_DASCGF_FEATS      1
+#define FGSTEREOMATCH_CONFIG_USE_DASCRF_FEATS      0
+#define FGSTEREOMATCH_CONFIG_USE_LSS_FEATS         0
 
 // default param values
-#define FGSTEREOMATCH_DEFAULT_MAXITERCOUNT     (size_t(1000))
+#define FGSTEREOMATCH_DEFAULT_MAXITERCOUNT         (size_t(1000))
+#define FGSTEREOMATCH_DEFAULT_SHAPEDESC_RAD        (size_t(30))
+#define FGSTEREOMATCH_DEFAULT_GRAD_KERNEL_SIZE     (int(7))
 
 // unary costs params
-#define FGSTEREOMATCH_VISSIM_COST_OOB_CST          (ValueType(1000))
-#define FGSTEREOMATCH_VISSIM_COST_OCCLUDED_CST     (ValueType(2000))
-#define FGSTEREOMATCH_VISSIM_COST_MAXTRUNC_CST     (ValueType(2000))
+#define FGSTEREOMATCH_UNARY_COST_OOB_CST           (ValueType(1000))
+#define FGSTEREOMATCH_UNARY_COST_OCCLUDED_CST      (ValueType(2000))
+#define FGSTEREOMATCH_UNARY_COST_MAXTRUNC_CST      (ValueType(2000))
 #define FGSTEREOMATCH_VISSIM_COST_DESC_SCALE       (5000)
 #define FGSTEREOMATCH_VISSIM_COST_RAW_SCALE        (2)
+#define FGSTEREOMATCH_SHPSIM_COST_DESC_SCALE       (200)
 #define FGSTEREOMATCH_UNIQUE_COST_OVER_SCALE       (500)
 // pairwise costs params
 #define FGSTEREOMATCH_LBLSIM_COST_MAXOCCL          (ValueType(5000))
@@ -101,9 +104,9 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
     virtual void apply(const MatArrayIn& aInputs, MatArrayOut& aOutputs) override;
     /// (pre)calculates features required for model updates using the masked input images, and optionally returns them in packet format for archiving
     virtual void calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeatsPacket=nullptr);
-    /// sets a previously precalculated features packet to be used in the next 'apply' call (do not modify it before that!)
+    /// sets a previously precalculated features packet to be used in the next 'apply' call (do not modify its data before that!)
     virtual void setNextFeatures(const cv::Mat& oPackedFeats);
-    /// returns the (friendly) name of the feature extractor that will be used internally
+    /// returns the (friendly) name of the input image feature extractor that will be used internally
     virtual std::string getFeatureExtractorName() const;
     /// returns the (maximum) number of stereo disparity labels used in the output masks
     virtual size_t getMaxLabelCount() const override;
@@ -148,8 +151,7 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         };
 
         /// default constructor; receives model construction data from algo constructor
-        template<typename TFeatExtr>
-        GraphModelData(const cv::Size& oImageSize, std::unique_ptr<TFeatExtr> pFeatExtr, std::vector<OutputLabelType>&& vStereoLabels, size_t nStereoLabelStep);
+        GraphModelData(const cv::Size& oImageSize, std::vector<OutputLabelType>&& vStereoLabels, size_t nStereoLabelStep);
         /// resets the graph labelings using init state parameters
         void resetLabelings();
         /// updates graph models using new input images/masks
@@ -207,10 +209,6 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         mutable cv::Mat_<ValueType> m_oPairwCosts;
         /// contains the predetermined (max) 2D grid size for the graph models
         const lv::MatSize m_oGridSize;
-        /// defines the minimum grid border size based on the features used
-        const size_t m_nGridBorderSize;
-        /// defines the feature map count per input camera head
-        const size_t m_nFeatMapsPerCam;
         /// contains all 'real' stereo labels, plus the 'occluded'/'dontcare' labels
         const std::vector<OutputLabelType> m_vStereoLabels;
         /// contains the step size between stereo labels (i.e. the disparity granularity)
@@ -250,14 +248,18 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
 
         /// holds the feature extractor to use on input images
 #if FGSTEREOMATCH_CONFIG_USE_DASCGF_FEATS || FGSTEREOMATCH_CONFIG_USE_DASCRF_FEATS
-        std::unique_ptr<DASC> m_pFeatExtractor;
+        std::unique_ptr<DASC> m_pImageFeatExtractor;
 #elif FGSTEREOMATCH_CONFIG_USE_LSS_FEATS
-        std::unique_ptr<LSS> m_pFeatExtractor;
+        std::unique_ptr<LSS> m_pImageFeatExtractor;
 #endif //FGSTEREOMATCH_CONFIG_USE_..._FEATS
+        /// holds the feature extractor to use on input shapes
+        std::unique_ptr<ShapeContext> m_pShapeFeatExtractor;
+        /// defines the minimum grid border size based on the feature extractors used
+        size_t m_nGridBorderSize;
         /// holds the set of features to use next
         std::vector<cv::Mat> m_vNextFeats;
-        /// holds the last features packet's info vector
-        std::vector<lv::MatInfo> m_vFeatPackInfo;
+        /// holds the last/next features packet info vector
+        std::vector<lv::MatInfo> m_vExpectedFeatPackInfo,m_vNextFeatPackInfo;
         /// holds the set of (packed) features to use next
         cv::Mat m_oNextPackedFeats;
         /// holds the latest input image/mask matrices
@@ -268,6 +270,17 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         bool m_bUsePrecalcFeatsNext;
         /// defines whether model is up-to-date, and ready for inference, or not
         bool m_bModelUpToDate;
+        /// defines the indices of feature maps inside precalc packets (per camera head)
+        enum FeatPackingList {
+            FeatPack_ImageDescs=0,
+            FeatPack_ShapeDescs,
+            FeatPack_FGDistMap,
+            FeatPack_BGDistMap,
+            FeatPack_GradY,
+            FeatPack_GradX,
+            FeatPack_GradMag,
+            FeatPackCount
+        };
     };
 
     /// implements an inference strategy for a multi-label graphical model with non-submudular + higher-order terms
