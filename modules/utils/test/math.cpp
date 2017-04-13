@@ -952,6 +952,27 @@ TEST(EMDL1dist,regression_circular) {
     ASSERT_LE(lv::CEMDL1dist(v1,v2),lv::EMDL1dist(v1,v2));
 }
 
+#include <opencv2/xfeatures2d.hpp> // for rootSIFT test
+#include "litiv/utils/opencv.hpp"
+
+TEST(rootSIFT,regression) {
+    cv::Ptr<cv::xfeatures2d::SIFT> pSIFT = cv::xfeatures2d::SIFT::create();
+    const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
+    std::vector<cv::KeyPoint> vKeyPts;
+    cv::Mat oDescs;
+    pSIFT->detectAndCompute(oInput,cv::Mat(),vKeyPts,oDescs);
+    ASSERT_EQ(oDescs.dims,2);
+    ASSERT_EQ(oDescs.type(),CV_32FC1);
+    ASSERT_EQ(oDescs.rows,(int)vKeyPts.size());
+    for(size_t i=0; i<vKeyPts.size(); ++i) {
+        lv::rootSIFT(oDescs.ptr<float>((int)i),(size_t)oDescs.cols);
+        if(i==0)
+            ASSERT_EQ(cv::norm(oDescs.row((int)i),oDescs.row(0)),0.0);
+        else
+            ASSERT_GT(cv::norm(oDescs.row((int)i),oDescs.row(0)),0.0);
+    }
+}
+
 namespace {
     template<typename T>
     struct find_nn_index_fixture : testing::Test {

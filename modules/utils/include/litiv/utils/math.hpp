@@ -763,6 +763,32 @@ namespace lv {
         return tResult;
     }
 
+    /// performs 'root-sift'-like descriptor value adjustment via Hellinger kernel to improve matching performance
+    template<typename TVal, bool bUseL2Norm=false, bool bNegativeCompat=false>
+    inline void rootSIFT(TVal* aDesc, size_t nDescSize) {
+        // the original strategy consist of three steps: L1-normalization, per-elem square root, and L2-normalization.
+        // for some descriptors (e.g. SIFT), the final step (L2-norm) is not required (check bUseL2Norm appropriately)
+        // for more info, see Arandjelovic and Zisserman's "Three things everyone should know to improve object retrieval" (CVPR2012)
+        const double dL1Norm = std::accumulate(aDesc,aDesc+nDescSize,0.0,[](double dSum, TVal tVal){
+            lvDbgAssert_(bNegativeCompat || double(tVal)>=0.0,"bad function config, cannot handle negative descriptor bins");
+            return dSum+(bNegativeCompat?std::abs(tVal):tVal);
+        }) + DBL_EPSILON;
+        std::transform(aDesc,aDesc+nDescSize,aDesc,[&dL1Norm](TVal tVal){
+            if(bNegativeCompat && double(tVal)<0.0)
+                return (TVal)-std::sqrt(-tVal/dL1Norm);
+            else
+                return (TVal)std::sqrt(tVal/dL1Norm);
+        });
+        if(bUseL2Norm) {
+            const double dL2Norm = std::sqrt(std::accumulate(aDesc,aDesc+nDescSize,0.0,[](double dSum, TVal tVal){
+                return dSum+(tVal*tVal);
+            })) + DBL_EPSILON;
+            std::transform(aDesc,aDesc+nDescSize,aDesc,[&dL2Norm](TVal tVal){
+                return tVal/dL2Norm;
+            });
+        }
+    }
+
     /// returns the index of the nearest neighbor of the requested value in the reference value array, using a custom distance functor
     template<typename Tval, typename Tcomp>
     inline size_t find_nn_index(const Tval& oReqVal, const std::vector<Tval>& vRefVals, Tcomp lCompFunc) {
