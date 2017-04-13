@@ -383,20 +383,12 @@ namespace lv {
         static_assert(nChannels>1,"vectors should have more than one channel");
         bool bNonConstDist = false;
         bool bNonNullDist = (curr[0]!=bg[0]);
-        bool bNonNullBG = (bg[0]>0);
         for(size_t c=1; c<nChannels; ++c) {
             bNonConstDist |= (curr[c]!=curr[c-1]) || (bg[c]!=bg[c-1]);
             bNonNullDist |= (curr[c]!=bg[c]);
-            bNonNullBG |= (bg[c]>0);
         }
         if(!bNonConstDist || !bNonNullDist)
             return 0;
-        if(!bNonNullBG) {
-            size_t nulldist = 0;
-            for(size_t c=0; c<nChannels; ++c)
-                nulldist += curr[c];
-            return nulldist;
-        }
         uint64_t curr_sqr = 0;
         uint64_t bg_sqr = 0;
         uint64_t mix = 0;
@@ -405,7 +397,7 @@ namespace lv {
             bg_sqr += uint64_t(bg[c]*bg[c]);
             mix += uint64_t(curr[c]*bg[c]);
         }
-        const float fSqrDistort = (float)(curr_sqr-(mix*mix)/bg_sqr);
+        const float fSqrDistort = (float)(curr_sqr-(mix*mix)/std::max(bg_sqr,uint64_t(1)));
         return (size_t)std::sqrt(fSqrDistort); // will already be well optimized for integer output
     }
 
@@ -416,21 +408,13 @@ namespace lv {
         lvDbgAssert_(curr[0]>=0.0f && bg[0]>=0.0f,"cdist does not support negative values");
         bool bNonConstDist = false;
         bool bNonNullDist = (curr[0]!=bg[0]);
-        bool bNonNullBG = (bg[0]>0);
         for(size_t c=1; c<nChannels; ++c) {
             lvDbgAssert_(curr[c]>=0.0f && bg[c]>=0.0f,"cdist does not support negative values");
             bNonConstDist |= (curr[c]!=curr[c-1]) || (bg[c]!=bg[c-1]);
             bNonNullDist |= (curr[c]!=bg[c]);
-            bNonNullBG |= (bg[c]>0);
         }
         if(!bNonConstDist || !bNonNullDist)
             return (T)0;
-        if(!bNonNullBG) {
-            T nulldist = 0;
-            for(size_t c=0; c<nChannels; ++c)
-                nulldist += curr[c];
-            return nulldist;
-        }
         T curr_sqr = 0;
         T bg_sqr = 0;
         T mix = 0;
@@ -439,6 +423,7 @@ namespace lv {
             bg_sqr += bg[c]*bg[c];
             mix += curr[c]*bg[c];
         }
+        bg_sqr += std::numeric_limits<T>::epsilon();
         if(curr_sqr<=(mix*mix)/bg_sqr)
             return (T)0;
         else {

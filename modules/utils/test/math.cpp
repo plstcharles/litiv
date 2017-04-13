@@ -736,19 +736,19 @@ BENCHMARK_TEMPLATE2(cdist_perftest,uint8_t,BENCHMARK_NB_CHANNELS)->Args({1000000
 namespace {
     template<typename T>
     struct cdist_fixture : testing::Test {};
-    typedef testing::Types<uint8_t,uint16_t,uint32_t,float,double> cdist_types;
+    typedef testing::Types<uint8_t,uint16_t,uint32_t> cdist_types;
 }
-TYPED_TEST_CASE(cdist_fixture,L2dist_unsigned_types);
+TYPED_TEST_CASE(cdist_fixture,cdist_types);
 
 TYPED_TEST(cdist_fixture,regression_array) {
-    constexpr size_t nArraySize = 1000;
+    constexpr size_t nArraySize = 100000;
     const std::unique_ptr<TypeParam[]> aVals_0_1 = lv::test::genarray(nArraySize,TypeParam(0),TypeParam(1));
     const std::unique_ptr<TypeParam[]> aVals_0_255 = lv::test::genarray(nArraySize,TypeParam(0),TypeParam(255));
     #define __cdist_mch(c) \
         ASSERT_GE(double(lv::cdist<c>(aVals_0_1.get()+i,aVals_0_1.get()+i+nArraySize/2)),0.0); \
-        ASSERT_LE(double(lv::cdist<c>(aVals_0_1.get()+i,aVals_0_1.get()+i+nArraySize/2)),1.0*(c-1)); \
+        ASSERT_LE(double(lv::cdist<c>(aVals_0_1.get()+i,aVals_0_1.get()+i+nArraySize/2)),1.0*c); \
         ASSERT_GE(double(lv::cdist<c>(aVals_0_255.get()+i,aVals_0_255.get()+i+nArraySize/2)),0.0); \
-        ASSERT_LE(double(lv::cdist<c>(aVals_0_255.get()+i,aVals_0_255.get()+i+nArraySize/2)),255.0*(c-1)); \
+        ASSERT_LE(double(lv::cdist<c>(aVals_0_255.get()+i,aVals_0_255.get()+i+nArraySize/2)),255.0*c); \
         ASSERT_DOUBLE_EQ(double(lv::cdist<c>(aVals_0_1.get()+i,aVals_0_1.get()+i)),0.0); \
         ASSERT_DOUBLE_EQ(double(lv::cdist<c>(aVals_0_255.get()+i,aVals_0_255.get()+i)),0.0)
     for(size_t i=0; i<nArraySize/2-4; ++i) {
