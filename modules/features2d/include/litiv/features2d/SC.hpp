@@ -21,6 +21,13 @@
 #include "litiv/utils/math.hpp"
 #include <opencv2/features2d.hpp>
 
+#define SHAPECONTEXT_DEFAULT_ANG_BINS  (12)
+#define SHAPECONTEXT_DEFAULT_RAD_BINS  (5)
+#define SHAPECONTEXT_DEFAULT_INNER_RAD (0.1)
+#define SHAPECONTEXT_DEFAULT_OUTER_RAD (1.0)
+#define sHAPECONTEXT_DEFAULT_ROT_INVAR (false)
+#define SHAPECONTEXT_DEFAULT_NORM_BINS (true)
+
 /**
     Shape Context (SC) feature extractor
 
@@ -32,8 +39,20 @@
 */
 class ShapeContext : public cv::DescriptorExtractor {
 public:
-    /// default constructor
-    ShapeContext(size_t nAngularBins=12, size_t nRadialBins=5, double fInnerRadius=0.1, double fOuterRadius=1.0, bool bRotationInvariant=false, bool bNormalizeBins=true);
+    /// constructor for absolute description space (i.e. using absolute radii values)
+    explicit ShapeContext(size_t nInnerRadius,
+                          size_t nOuterRadius,
+                          size_t nAngularBins=SHAPECONTEXT_DEFAULT_ANG_BINS,
+                          size_t nRadialBins=SHAPECONTEXT_DEFAULT_RAD_BINS,
+                          bool bRotationInvariant=sHAPECONTEXT_DEFAULT_ROT_INVAR,
+                          bool bNormalizeBins=SHAPECONTEXT_DEFAULT_NORM_BINS);
+    /// constructor for mean-normalized description space (i.e. using relative radii values)
+    explicit ShapeContext(double dRelativeInnerRadius/*=SHAPECONTEXT_DEFAULT_INNER_RAD*/,
+                          double dRelativeOuterRadius/*=SHAPECONTEXT_DEFAULT_OUTER_RAD*/,
+                          size_t nAngularBins=SHAPECONTEXT_DEFAULT_ANG_BINS,
+                          size_t nRadialBins=SHAPECONTEXT_DEFAULT_RAD_BINS,
+                          bool bRotationInvariant=sHAPECONTEXT_DEFAULT_ROT_INVAR,
+                          bool bNormalizeBins=SHAPECONTEXT_DEFAULT_NORM_BINS);
     /// loads extractor params from the specified file node @@@@ not impl
     virtual void read(const cv::FileNode&) override;
     /// writes extractor params to the specified file storage @@@@ not impl
@@ -86,26 +105,34 @@ protected:
     /// classic 'compute' implementation, based on DescriptorExtractor's arguments & expected output
     virtual void detectAndCompute(cv::InputArray oImage, cv::InputArray oMask, std::vector<cv::KeyPoint>& voKeypoints, cv::OutputArray oDescriptors, bool bUseProvidedKeypoints=false) override;
     /// number of angular bins to use
-    const int m_nAngularBins; // default = 12
+    const int m_nAngularBins;
     /// number of radial bins to use
-    const int m_nRadialBins; // default = 5
-    /// inner radius of the descriptor (in 'mean-normalized' space)
-    const double m_dInnerRadius; // default = 0.1
-    /// outer radius of the descriptor (in 'mean-normalized' space)
-    const double m_dOuterRadius; // default = 1.0
+    const int m_nRadialBins;
+    /// total bin size of each descriptor
+    const int m_nDescSize;
+    /// absolute inner radius of the descriptor (in 'image' space)
+    const int m_nInnerRadius;
+    /// absolute outer radius of the descriptor (in 'image' space)
+    const int m_nOuterRadius;
+    /// relative inner radius of the descriptor (in 'mean-normalized' space)
+    const double m_dInnerRadius;
+    /// relative outer radius of the descriptor (in 'mean-normalized' space)
+    const double m_dOuterRadius;
+    /// defines whether descriptors will be made via 'mean-normalized' or 'image' space radii
+    const bool m_bUseRelativeSpace;
     /// defines whether descriptors will be made rotation-invariant or not
-    const bool m_bRotationInvariant; // default = false
+    const bool m_bRotationInvariant;
     /// defines whether descriptor bins will be 0-1 normalized or not
-    const bool m_bNormalizeBins; // default = true
+    const bool m_bNormalizeBins;
 
 private:
 
     /// generates radius limits mask using internal parameters
-    void scdesc_generate_radmask(std::vector<double>&) const;
+    void scdesc_generate_radmask();
     /// generates angle limits mask using internal parameters
-    void scdesc_generate_angmask(std::vector<double>&) const;
+    void scdesc_generate_angmask();
     /// generates EMD distance cost map using internal parameters
-    void scdesc_generate_emdmask(cv::Mat_<float>&) const;
+    void scdesc_generate_emdmask();
     /// fills contour point map using provided binary image
     void scdesc_fill_contours(const cv::Mat& oImage);
     /// fills mean-normalized dist map using internal contour/key points

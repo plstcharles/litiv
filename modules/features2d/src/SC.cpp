@@ -19,20 +19,48 @@
 
 #include "litiv/features2d.hpp"
 
-ShapeContext::ShapeContext(size_t nAngularBins, size_t nRadialBins, double fInnerRadius, double fOuterRadius, bool bRotationInvariant, bool bNormalizeBins) :
+ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAngularBins,
+                           size_t nRadialBins, bool bRotationInvariant, bool bNormalizeBins) :
         m_nAngularBins((int)nAngularBins),
         m_nRadialBins((int)nRadialBins),
-        m_dInnerRadius(fInnerRadius),
-        m_dOuterRadius(fOuterRadius),
+        m_nDescSize(m_nRadialBins*m_nAngularBins),
+        m_nInnerRadius((int)nInnerRadius),
+        m_nOuterRadius((int)nOuterRadius),
+        m_dInnerRadius(0.0),
+        m_dOuterRadius(0.0),
+        m_bUseRelativeSpace(false),
         m_bRotationInvariant(bRotationInvariant),
         m_bNormalizeBins(bNormalizeBins) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
-    lvAssert_(m_dInnerRadius>0.0f,"invalid parameter");
-    lvAssert_(m_dOuterRadius>0.0f && m_dInnerRadius<m_dOuterRadius,"invalid parameter");
-    scdesc_generate_angmask(m_vAngularLimits);
-    scdesc_generate_radmask(m_vRadialLimits);
-    scdesc_generate_emdmask(m_oEMDCostMap);
+    lvAssert_(m_nInnerRadius>0,"invalid parameter");
+    lvAssert_(m_nOuterRadius>0 && m_nInnerRadius<m_nOuterRadius,"invalid parameter");
+    scdesc_generate_angmask();
+    scdesc_generate_radmask();
+    scdesc_generate_emdmask();
+    lvAssert((int)m_vAngularLimits.size()==m_nAngularBins && (int)m_vRadialLimits.size()==m_nRadialBins);
+    lvAssert(m_oEMDCostMap.dims==2 && m_oEMDCostMap.rows==m_nRadialBins*m_nAngularBins && m_oEMDCostMap.cols==m_nRadialBins*m_nAngularBins);
+}
+
+ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRadius, size_t nAngularBins,
+                           size_t nRadialBins, bool bRotationInvariant, bool bNormalizeBins) :
+        m_nAngularBins((int)nAngularBins),
+        m_nRadialBins((int)nRadialBins),
+        m_nDescSize(m_nRadialBins*m_nAngularBins),
+        m_nInnerRadius(0),
+        m_nOuterRadius(0),
+        m_dInnerRadius(dRelativeInnerRadius),
+        m_dOuterRadius(dRelativeOuterRadius),
+        m_bUseRelativeSpace(true),
+        m_bRotationInvariant(bRotationInvariant),
+        m_bNormalizeBins(bNormalizeBins) {
+    lvAssert_(m_nAngularBins>0,"invalid parameter");
+    lvAssert_(m_nRadialBins>0,"invalid parameter");
+    lvAssert_(m_dInnerRadius>0.0,"invalid parameter");
+    lvAssert_(m_dOuterRadius>0.0 && m_dInnerRadius<m_dOuterRadius,"invalid parameter");
+    scdesc_generate_angmask();
+    scdesc_generate_radmask();
+    scdesc_generate_emdmask();
     lvAssert((int)m_vAngularLimits.size()==m_nAngularBins && (int)m_vRadialLimits.size()==m_nRadialBins);
     lvAssert(m_oEMDCostMap.dims==2 && m_oEMDCostMap.rows==m_nRadialBins*m_nAngularBins && m_oEMDCostMap.cols==m_nRadialBins*m_nAngularBins);
 }
@@ -59,8 +87,7 @@ lv::MatInfo ShapeContext::getOutputInfo(const lv::MatInfo& oInputInfo) const {
     lvAssert_(oInputInfo.size.dims()==size_t(2) && oInputInfo.size.total()>0,"invalid input image size");
     const int nRows = (int)oInputInfo.size(0);
     const int nCols = (int)oInputInfo.size(1);
-    const int nDescSize = m_nRadialBins*m_nAngularBins;
-    const std::array<int,3> anDescDims = {nRows,nCols,nDescSize};
+    const std::array<int,3> anDescDims = {nRows,nCols,m_nDescSize};
     return lv::MatInfo(lv::MatSize(anDescDims),CV_32FC1);
 }
 
@@ -175,9 +202,8 @@ void ShapeContext::validateROI(cv::Mat& oROI) const {
 }
 
 double ShapeContext::calcDistance(const float* aDescriptor1, const float* aDescriptor2) const {
-    const int nDescSize = m_nRadialBins*m_nAngularBins;
-    const cv::Mat_<float> oDesc1(nDescSize,1,const_cast<float*>(aDescriptor1));
-    const cv::Mat_<float> oDesc2(nDescSize,1,const_cast<float*>(aDescriptor2));
+    const cv::Mat_<float> oDesc1(m_nDescSize,1,const_cast<float*>(aDescriptor1));
+    const cv::Mat_<float> oDesc2(m_nDescSize,1,const_cast<float*>(aDescriptor2));
     return cv::EMD(oDesc1,oDesc2,-1,m_oEMDCostMap);
 }
 
@@ -189,27 +215,26 @@ double ShapeContext::calcDistance(const cv::Mat_<float>& oDescriptor1, const cv:
     return calcDistance(oDescriptor1.ptr<float>(0),oDescriptor2.ptr<float>(0));
 }
 
-void ShapeContext::scdesc_generate_radmask(std::vector<double>& vRadialLimits) const {
-    const double dLogMin = std::log10(m_dInnerRadius);
-    const double dLogMax = std::log10(m_dOuterRadius);
+void ShapeContext::scdesc_generate_radmask() {
+    const double dLogMin = std::log10(m_bUseRelativeSpace?m_dInnerRadius:(double)m_nInnerRadius);
+    const double dLogMax = std::log10(m_bUseRelativeSpace?m_dOuterRadius:(double)m_nOuterRadius);
     const double dDelta = (dLogMax-dLogMin)/(m_nRadialBins-1);
     double dAccDelta = 0.0;
-    vRadialLimits.resize((size_t)m_nRadialBins);
+    m_vRadialLimits.resize((size_t)m_nRadialBins);
     for(int nBinIdx=0; nBinIdx<m_nRadialBins; ++nBinIdx, dAccDelta+=dDelta)
-        vRadialLimits[nBinIdx] = std::pow(10,dLogMin+dAccDelta);
+        m_vRadialLimits[nBinIdx] = std::pow(10,dLogMin+dAccDelta);
 }
 
-void ShapeContext::scdesc_generate_angmask(std::vector<double>& vAngularLimits) const {
+void ShapeContext::scdesc_generate_angmask() {
     const double dDelta = 2*CV_PI/m_nAngularBins;
     double dAccDelta = 0.0;
-    vAngularLimits.resize((size_t)m_nAngularBins);
+    m_vAngularLimits.resize((size_t)m_nAngularBins);
     for(int nBinIdx=0; nBinIdx<m_nAngularBins; ++nBinIdx)
-        vAngularLimits[nBinIdx] = (dAccDelta+=dDelta);
+        m_vAngularLimits[nBinIdx] = (dAccDelta+=dDelta);
 }
 
-void ShapeContext::scdesc_generate_emdmask(cv::Mat_<float>& oEMDCostMap) const {
-    const int nDescSize = m_nRadialBins*m_nAngularBins;
-    oEMDCostMap.create(nDescSize,nDescSize);
+void ShapeContext::scdesc_generate_emdmask() {
+    m_oEMDCostMap.create(m_nDescSize,m_nDescSize);
     for(int nBaseRadIdx=0; nBaseRadIdx<m_nRadialBins; ++nBaseRadIdx) {
         for(int nBaseAngIdx=0; nBaseAngIdx<m_nAngularBins; ++nBaseAngIdx) {
             for(int nRadIdx=0; nRadIdx<m_nRadialBins; ++nRadIdx) {
@@ -219,7 +244,7 @@ void ShapeContext::scdesc_generate_emdmask(cv::Mat_<float>& oEMDCostMap) const {
                     const int nRadDist = lv::L1dist(nBaseRadIdx,nRadIdx);
                     const int nBaseDescIdx = nBaseAngIdx+nBaseRadIdx*m_nAngularBins;
                     const int nDescIdx = nAngIdx+nRadIdx*m_nAngularBins;
-                    oEMDCostMap(nBaseDescIdx,nDescIdx) = float(nRadDist+nAngDist);
+                    m_oEMDCostMap(nBaseDescIdx,nDescIdx) = float(nRadDist+nAngDist);
                 }
             }
         }
@@ -231,7 +256,7 @@ void ShapeContext::scdesc_fill_contours(const cv::Mat& oImage) {
     lvAssert_(oImage.type()==CV_8UC1,"input image type must be 8UC1");
     m_oCurrImageSize = oImage.size();
     std::vector<std::vector<cv::Point>> vvContours;
-    cv::findContours(oImage,vvContours,cv::RETR_LIST,cv::CHAIN_APPROX_NONE);
+    cv::findContours(oImage.clone(),vvContours,cv::RETR_LIST,cv::CHAIN_APPROX_NONE);
     size_t nContourPtCount = size_t(0);
     for(size_t nContourIdx=0; nContourIdx<vvContours.size(); ++nContourIdx)
         nContourPtCount += vvContours[nContourIdx].size();
@@ -254,7 +279,7 @@ void ShapeContext::scdesc_fill_distmap(double dMeanDist) {
     lvDbgAssert(m_oKeyPts.total()>size_t(0));
     if(m_oContourPts.empty())
         return;
-    if(dMeanDist<0 && (!m_vKeyInliers.empty() || !m_vContourInliers.empty()))
+    if(m_bUseRelativeSpace && dMeanDist<0 && (!m_vKeyInliers.empty() || !m_vContourInliers.empty()))
         m_oDistMask.create((int)m_oKeyPts.total(),(int)m_oContourPts.total());
     else
         m_oDistMask.release();
@@ -266,9 +291,11 @@ void ShapeContext::scdesc_fill_distmap(double dMeanDist) {
                 m_oDistMask(nKeyPtIdx,nContourPtIdx) = uchar((m_vKeyInliers.empty() || m_vKeyInliers[nKeyPtIdx]!=0) && (m_vContourInliers.empty() || m_vContourInliers[nContourPtIdx]!=0));
         }
     }
-    if(dMeanDist<0)
-        dMeanDist = cv::mean(m_oDistMap,m_oDistMask.empty()?cv::noArray():m_oDistMask)[0];
-    m_oDistMap /= (dMeanDist+FLT_EPSILON);
+    if(m_bUseRelativeSpace) {
+        if(dMeanDist<0)
+            dMeanDist = cv::mean(m_oDistMap,m_oDistMask.empty()?cv::noArray():m_oDistMask)[0];
+        m_oDistMap /= (dMeanDist+FLT_EPSILON);
+    }
 }
 
 void ShapeContext::scdesc_fill_angmap() {
@@ -309,11 +336,10 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
         oDescriptors.release();
         return;
     }
-    const int nDescSize = m_nRadialBins*m_nAngularBins;
     if(bGenDescMap)
-        oDescriptors.create(3,std::array<int,3>{m_oCurrImageSize.height,m_oCurrImageSize.width,nDescSize}.data());
+        oDescriptors.create(3,std::array<int,3>{m_oCurrImageSize.height,m_oCurrImageSize.width,m_nDescSize}.data());
     else
-        oDescriptors.create((int)m_oKeyPts.total(),nDescSize);
+        oDescriptors.create((int)m_oKeyPts.total(),m_nDescSize);
     oDescriptors = 0.0f;
     scdesc_fill_distmap();
     scdesc_fill_angmap();
@@ -348,7 +374,7 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
             }
         }
         if(m_bNormalizeBins && nValidPts>size_t(0)) {
-            for(int nDescIdx=0; nDescIdx<nDescSize; ++nDescIdx)
+            for(int nDescIdx=0; nDescIdx<m_nDescSize; ++nDescIdx)
                 aDesc[nDescIdx] /= nValidPts;
         }
     }
