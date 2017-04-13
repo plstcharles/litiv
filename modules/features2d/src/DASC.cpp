@@ -62,7 +62,8 @@ DASC::DASC(float fSigma_s, float fSigma_r, size_t nIters, bool bPreProcess) :
         m_nIters(nIters),
         m_nRadius(),
         m_fEpsilon(),
-        m_nSubSamplFrac() {
+        m_nSubSamplFrac(),
+        m_nLUTSize(pretrained::nLUTSize) {
     lvAssert_(fSigma_s>0.0f && fSigma_r>0.0f && nIters>0,"invalid parameter(s)");
 }
 
@@ -74,7 +75,8 @@ DASC::DASC(size_t nRadius, float fEpsilon, size_t nSubSamplFrac, bool bPreProces
         m_nIters(),
         m_nRadius(nRadius),
         m_fEpsilon(fEpsilon),
-        m_nSubSamplFrac(nSubSamplFrac) {
+        m_nSubSamplFrac(nSubSamplFrac),
+        m_nLUTSize(pretrained::nLUTSize) {
     lvAssert_(nRadius>0 && fEpsilon>0.0f && nSubSamplFrac>0 && nRadius>=nSubSamplFrac,"invalid parameter(s)");
 }
 
@@ -229,24 +231,7 @@ void DASC::validateROI(cv::Mat& oROI) {
     oROI = oROI_new;
 }
 
-double DASC::calcDistance(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2) {
-    lvAssert_(oDescriptor1.dims==oDescriptor2.dims && oDescriptor1.size==oDescriptor2.size,"descriptor mat sizes mismatch");
-    lvAssert_(oDescriptor1.dims==2 || oDescriptor1.dims==3,"unexpected descriptor matrix dim count");
-    if(oDescriptor1.dims==2) {
-        lvAssert_(oDescriptor1.total()==pretrained::nLUTSize,"unexpected descriptor size");
-        const cv::Mat_<float> oDesc1(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptor1.ptr<float>(0)));
-        const cv::Mat_<float> oDesc2(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptor2.ptr<float>(0)));
-        return cv::norm(oDesc1,oDesc2,cv::NORM_L2);
-    }
-    else { //oDescriptors1.dims==3
-        lvAssert_(oDescriptor1.size[0]==1 && oDescriptor1.size[1]==1 && oDescriptor1.size[2]==int(pretrained::nLUTSize),"unexpected descriptor size");
-        const cv::Mat_<float> oDesc1(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptor1.ptr<float>(0)));
-        const cv::Mat_<float> oDesc2(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptor2.ptr<float>(0)));
-        return cv::norm(oDesc1,oDesc2,cv::NORM_L2);
-    }
-}
-
-void DASC::calcDistance(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<float>& oDescriptors2, cv::Mat_<float>& oDistances) {
+void DASC::calcDistances(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<float>& oDescriptors2, cv::Mat_<float>& oDistances) {
     lvAssert_(oDescriptors1.dims==oDescriptors2.dims && oDescriptors1.size==oDescriptors2.size,"descriptor mat sizes mismatch");
     lvAssert_(oDescriptors1.dims==2 || oDescriptors1.dims==3,"unexpected descriptor matrix dim count");
     if(oDescriptors1.dims==2) {

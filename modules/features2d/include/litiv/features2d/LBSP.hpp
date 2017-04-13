@@ -85,7 +85,7 @@ public:
     /// utility function, used to filter out bad pixels in a ROI that would trigger out of bounds error because they're too close to the image border
     static void validateROI(cv::Mat& oROI);
     /// utility function, used to calculate per-desc Hamming distance between two descriptor sets/maps
-    static void calcDistance(const cv::Mat& oDescriptors1, const cv::Mat& oDescriptors2, cv::Mat_<uchar>& oDistances);
+    static void calcDistances(const cv::Mat& oDescriptors1, const cv::Mat& oDescriptors2, cv::Mat_<uchar>& oDistances);
 #if HAVE_GLSL
     /// utility function, returns the glsl source code required to describe an LBSP descriptor based on the image load store
     static std::string getShaderFunctionSource(size_t nChannels, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize);

@@ -201,20 +201,6 @@ void ShapeContext::validateROI(cv::Mat& oROI) const {
     lvAssert_(!oROI.empty() && oROI.type()==CV_8UC1,"input ROI must be non-empty and of type 8UC1");
 }
 
-double ShapeContext::calcDistance(const float* aDescriptor1, const float* aDescriptor2) const {
-    const cv::Mat_<float> oDesc1(m_nDescSize,1,const_cast<float*>(aDescriptor1));
-    const cv::Mat_<float> oDesc2(m_nDescSize,1,const_cast<float*>(aDescriptor2));
-    return cv::EMD(oDesc1,oDesc2,-1,m_oEMDCostMap);
-}
-
-double ShapeContext::calcDistance(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2) const {
-    lvAssert_(oDescriptor1.dims==oDescriptor2.dims && oDescriptor1.size==oDescriptor2.size,"descriptor mat sizes mismatch");
-    lvAssert_(oDescriptor1.dims==2 || oDescriptor1.dims==3,"unexpected descriptor matrix dim count");
-    lvAssert_(oDescriptor1.dims!=2 || oDescriptor1.total()==size_t(m_nRadialBins*m_nAngularBins),"unexpected descriptor size");
-    lvAssert_(oDescriptor1.dims!=3 || (oDescriptor1.size[0]==1 && oDescriptor1.size[1]==1 && oDescriptor1.size[2]==m_nRadialBins*m_nAngularBins),"unexpected descriptor size");
-    return calcDistance(oDescriptor1.ptr<float>(0),oDescriptor2.ptr<float>(0));
-}
-
 void ShapeContext::scdesc_generate_radmask() {
     const double dLogMin = std::log10(m_bUseRelativeSpace?m_dInnerRadius:(double)m_nInnerRadius);
     const double dLogMax = std::log10(m_bUseRelativeSpace?m_dOuterRadius:(double)m_nOuterRadius);

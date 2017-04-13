@@ -83,9 +83,21 @@ public:
     /// utility function, used to filter out bad pixels in a ROI that would trigger out of bounds error because they're too close to the image border
     static void validateROI(cv::Mat& oROI);
     /// utility function, used to calculate the L2 distance between two individual descriptors
-    static double calcDistance(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2);
+    inline double calcDistance(const float* aDescriptor1, const float* aDescriptor2) const {
+        const cv::Mat_<float> oDesc1(1,int(m_nLUTSize),const_cast<float*>(aDescriptor1));
+        const cv::Mat_<float> oDesc2(1,int(m_nLUTSize),const_cast<float*>(aDescriptor2));
+        return cv::norm(oDesc1,oDesc2,cv::NORM_L2);
+    }
+    /// utility function, used to calculate the L2 distance between two individual descriptors
+    inline double calcDistance(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2) {
+        lvAssert_(oDescriptor1.dims==oDescriptor2.dims && oDescriptor1.size==oDescriptor2.size,"descriptor mat sizes mismatch");
+        lvAssert_(oDescriptor1.dims==2 || oDescriptor1.dims==3,"unexpected descriptor matrix dim count");
+        lvAssert_(oDescriptor1.dims!=2 || oDescriptor1.total()==m_nLUTSize,"unexpected descriptor size");
+        lvAssert_(oDescriptor1.dims!=3 || (oDescriptor1.size[0]==1 && oDescriptor1.size[1]==1 && oDescriptor1.size[2]==int(m_nLUTSize)),"unexpected descriptor size");
+        return calcDistance(oDescriptor1.ptr<float>(0),oDescriptor2.ptr<float>(0));
+    }
     /// utility function, used to calculate per-desc L2 distance between two descriptor sets/maps
-    static void calcDistance(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<float>& oDescriptors2, cv::Mat_<float>& oDistances);
+    void calcDistances(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<float>& oDescriptors2, cv::Mat_<float>& oDistances);
 
 protected:
     /// hides default keypoint detection impl (this class is a descriptor extractor only)
@@ -108,6 +120,8 @@ protected:
     const float m_fEpsilon;
     /// parameter unique to guided-filtering-based approach
     const size_t m_nSubSamplFrac;
+    /// defines the size of the internal pre-trained descriptor LUT
+    const size_t m_nLUTSize;
 
 private:
     /// helper/util function for recursive filtering

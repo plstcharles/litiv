@@ -372,7 +372,7 @@ void LBSP::validateROI(cv::Mat& oROI) {
     oROI = oROI_new;
 }
 
-void LBSP::calcDistance(const cv::Mat& oDescriptors1, const cv::Mat& oDescriptors2, cv::Mat_<uchar>& oDistances) {
+void LBSP::calcDistances(const cv::Mat& oDescriptors1, const cv::Mat& oDescriptors2, cv::Mat_<uchar>& oDistances) {
     lvAssert_(oDescriptors1.dims==2 && oDescriptors2.dims==2 && oDescriptors1.size()==oDescriptors2.size(),"descriptor mat sizes mismatch");
     lvAssert_(oDescriptors1.depth()==CV_16U && oDescriptors2.depth()==CV_16U,"unexpected descriptor matrix type");
     lvAssert_(oDescriptors1.type()==oDescriptors2.type(),"descriptor mat types mismatch");

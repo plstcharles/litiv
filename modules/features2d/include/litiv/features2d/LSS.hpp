@@ -78,9 +78,21 @@ public:
     /// utility function, used to filter out bad pixels in a ROI that would trigger out of bounds error because they're too close to the image border
     void validateROI(cv::Mat& oROI) const;
     /// utility function, used to calculate the L2 distance between two individual descriptors
-    double calcDistance(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2) const;
+    inline double calcDistance(const float* aDescriptor1, const float* aDescriptor2) const {
+        const cv::Mat_<float> oDesc1(1,m_nRadialBins*m_nAngularBins,const_cast<float*>(aDescriptor1));
+        const cv::Mat_<float> oDesc2(1,m_nRadialBins*m_nAngularBins,const_cast<float*>(aDescriptor2));
+        return cv::norm(oDesc1,oDesc2,cv::NORM_L2);
+    }
+    /// utility function, used to calculate the L2 distance between two individual descriptors
+    inline double calcDistance(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2) const {
+        lvAssert_(oDescriptor1.dims==oDescriptor2.dims && oDescriptor1.size==oDescriptor2.size,"descriptor mat sizes mismatch");
+        lvAssert_(oDescriptor1.dims==2 || oDescriptor1.dims==3,"unexpected descriptor matrix dim count");
+        lvAssert_(oDescriptor1.dims!=2 || oDescriptor1.total()==size_t(m_nRadialBins*m_nAngularBins),"unexpected descriptor size");
+        lvAssert_(oDescriptor1.dims!=3 || (oDescriptor1.size[0]==1 && oDescriptor1.size[1]==1 && oDescriptor1.size[2]==m_nRadialBins*m_nAngularBins),"unexpected descriptor size");
+        return calcDistance(oDescriptor1.ptr<float>(0),oDescriptor2.ptr<float>(0));
+    }
     /// utility function, used to calculate per-desc L2 distance between two descriptor sets/maps
-    void calcDistance(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<float>& oDescriptors2, cv::Mat_<float>& oDistances) const;
+    void calcDistances(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<float>& oDescriptors2, cv::Mat_<float>& oDistances) const;
 
 protected:
     /// hides default keypoint detection impl (this class is a descriptor extractor only)

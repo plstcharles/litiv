@@ -60,7 +60,7 @@ TEST(lbsp,regression_compute) {
             for(int nChIdx=0; nChIdx<oInput.channels(); ++nChIdx)
                 ASSERT_EQ(oOutputDescMap1.ptr<ushort>(nRowIdx,nColIdx)[nChIdx],oOutputDescMap2.ptr<ushort>(nRowIdx,nColIdx)[nChIdx]);
     cv::Mat_<uchar> oDistMap;
-    pLBSP->calcDistance(oOutputDescMap1,oOutputDescMap2,oDistMap);
+    pLBSP->calcDistances(oOutputDescMap1,oOutputDescMap2,oDistMap);
     ASSERT_EQ(oDistMap.rows,oInputCrop.rows);
     ASSERT_EQ(oDistMap.cols,oInputCrop.cols);
     for(int nRowIdx=nBorderSize; nRowIdx<=nBorderSize+2*nPatchSize; ++nRowIdx)
