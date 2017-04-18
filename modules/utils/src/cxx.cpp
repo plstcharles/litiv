@@ -18,6 +18,7 @@
 #include "litiv/utils/cxx.hpp"
 
 std::string lv::putf(const char* acFormat, ...) {
+    lvDbgExceptionWatch;
     va_list vArgs;
     va_start(vArgs,acFormat);
     std::string vBuffer(1024,'\0');
@@ -75,6 +76,42 @@ std::string lv::getVersionStamp() {
 
 std::string lv::getLogStamp() {
     return std::string("\n")+lv::getVersionStamp()+"\n["+lv::getTimeStamp()+"]\n";
+}
+
+std::mutex g_oPrintMutex;
+
+std::mutex& lv::getLogMutex() {
+    return g_oPrintMutex;
+}
+
+std::ostream& lv::safe_print(std::ostream& os, const char* acFormat, ...) {
+    lvDbgExceptionWatch;
+    va_list vArgs;
+    va_start(vArgs,acFormat);
+    std::string vBuffer(1024,'\0');
+#ifdef _DEBUG
+    if(((&vBuffer[0])+vBuffer.size()-1)!=&vBuffer[vBuffer.size()-1])
+        throw std::runtime_error("basic_string should have contiguous memory (need C++11!)");
+#endif //defined(_DEBUG)
+    const int nWritten = vsnprintf(&vBuffer[0],(int)vBuffer.size(),acFormat,vArgs);
+    va_end(vArgs);
+    if(nWritten<0)
+        throw std::runtime_error("safe_print failed (1)");
+    if((size_t)nWritten<=vBuffer.size()) {
+        vBuffer.resize((size_t)nWritten);
+        std::lock_guard<std::mutex> oLock(getLogMutex());
+        return os << vBuffer;
+    }
+    vBuffer.resize((size_t)nWritten+1);
+    va_list vArgs2;
+    va_start(vArgs2,acFormat);
+    const int nWritten2 = vsnprintf(&vBuffer[0],(int)vBuffer.size(),acFormat,vArgs2);
+    va_end(vArgs2);
+    if(nWritten2<0 || (size_t)nWritten2>vBuffer.size())
+        throw std::runtime_error("safe_print failed (2)");
+    vBuffer.resize((size_t)nWritten2);
+    std::lock_guard<std::mutex> oLock(getLogMutex());
+    return os << vBuffer;
 }
 
 int g_nVerbosity = 1;

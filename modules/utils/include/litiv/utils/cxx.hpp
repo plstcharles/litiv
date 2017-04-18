@@ -83,13 +83,52 @@ namespace lv {
     std::string getVersionStamp();
     /// returns a combined version of 'getVersionStamp()' and 'getTimeStamp()' for inline use by loggers
     std::string getLogStamp();
+    /// returns a reference to the mutex used for thread-safe message logging in the framework
+    std::mutex& getLogMutex();
+    /// thread-safe ostream log helper (format-based)
+    std::ostream& safe_print(std::ostream& os, const char* acFormat, ...);
+    /// thread-safe ostream log helper (template-based; must overload operator<< for classes)
+    template<typename T>
+    std::ostream& safe_print(const T& obj, std::ostream& os=std::cout) {
+        std::lock_guard<std::mutex> oLock(lv::getLogMutex());
+        return os << obj;
+    }
     /// returns the global verbosity level (greater = more verbose, default = 1)
     int getVerbosity();
     /// sets the global verbosity level (greater = more verbose, default = 1)
     void setVerbosity(int nLevel);
+
+    /// output stream guard for thread-safe logging (will own logging mutex until destruction)
+    template<typename TSstr/*=std::basic_ostream<char,std::char_traits<char>>*/>
+    struct ostream_guard {
+        /// type for classic stream manip functions
+        typedef TSstr& (*StreamManipFunc)(TSstr&);
+        /// constructor; receives the stream to protect + the output verbosity level, and locks global log mutex
+        ostream_guard(TSstr& os, int nOutputVerbosity=0) :
+                m_oLock(getLogMutex()),m_oSstr(os),m_nVerbosity(nOutputVerbosity) {}
+        /// thread-safe output function (template-based; must overload operator<< for classes)
+        template<typename TObj, typename=std::enable_if_t<!std::is_same<TObj,StreamManipFunc>::value>>
+                ostream_guard& operator<<(const TObj& obj) {
+            if(lv::getVerbosity()>=m_nVerbosity)
+                m_oSstr << obj;
+            return *this;
+        }
+        /// thread-safe stream manipulation function
+        ostream_guard& operator<<(StreamManipFunc tFunc) {
+            if(lv::getVerbosity()>=m_nVerbosity)
+                tFunc(m_oSstr); // cannot reassign output due to deleted assign-op
+            return *this;
+        }
+        /// global log mutex guard
+        std::lock_guard<std::mutex> m_oLock;
+        /// guarded output stream
+        TSstr& m_oSstr;
+        /// ostream verbosity level
+        int m_nVerbosity;
+    };
+
     /// prevents a data block given by a char pointer from being optimized away
     void doNotOptimizeCharPointer(char const volatile*);
-
     /// prevents a value/expression from being optimized away (see https://youtu.be/nXaxk27zwlk?t=2441)
     template<typename T>
     inline void doNotOptimize(const T& v) {
