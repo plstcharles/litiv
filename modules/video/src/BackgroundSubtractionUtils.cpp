@@ -77,7 +77,7 @@ void IIBackgroundSubtractor::initialize_common(const cv::Mat& oInitImg, const cv
             if((bFoundChDiff=(cv::countNonZero(voInitImgs[0]!=voInitImgs[c])!=0)))
                 break;
         if(!bFoundChDiff)
-            std::cerr << "\n\tIIBackgroundSubtractor : Warning, grayscale images should always be passed in CV_8UC1 format for optimal performance.\n" << std::endl;
+            lvWarn("IIBackgroundSubtractor : Warning, grayscale images should always be passed in CV_8UC1 format for optimal performance.");
     }
     cv::Mat oNewBGROI;
     if(oROI.empty() && m_oROI.size()!=oInitImg.size()) {

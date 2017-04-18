@@ -102,14 +102,20 @@
         #define LITIV_VERSION_PATCH       @LITIV_VERSION_PATCH@
         #define LITIV_VERSION_SHA1        "@GIT_SHA1@"
     #endif //ndef(__LV_VERSION_DEFS__)
-    #define lvError(msg) throw lv::Exception(std::string("[lvError: ")+msg+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__)
-    #define lvError_(msg,...) throw lv::Exception(std::string("[lvError: ")+msg+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
+    #define lvError(msg) throw lv::Exception(std::string("[lvError: ")+(msg)+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__)
+    #define lvError_(msg,...) throw lv::Exception(std::string("[lvError: ")+(msg)+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
     #define lvAssert(expr) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(0)
-    #define lvAssert_(expr,msg) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(0)
-    #define lvAssert__(expr,msg,...) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);} while(0)
-    #define lvLog(level,msg) do {if(lv::getVerbosity()>=level) std::cout << msg << std::endl;} while(0)
-    #define lvLog_(level,msg,...) do {if(lv::getVerbosity()>=level) std::cout << lv::putf(msg,__VA_ARGS__) << std::endl;} while(0)
-    #define lvPrint(expr) (std::cout << "[lvPrint @ " << __FILE__ << "(" << __LINE__ << "): "#expr" := " << (expr) << "]" << "\n")
+    #define lvAssert_(expr,msg) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+(msg)+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(0)
+    #define lvAssert__(expr,msg,...) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+(msg)+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);} while(0)
+    #define lvLog(level,msg) (lv::ostream_guard<std::ostream>(std::cout,level) << (msg) << '\n')
+    #define lvLog_(level,msg,...) (lv::ostream_guard<std::ostream>(std::cout,level) << lv::putf(msg,__VA_ARGS__) << '\n')
+    #define lvWarn(msg) (lv::ostream_guard<std::ostream>(std::cerr) << "[lvWarn @ " << __FILE__ << "(" << __LINE__ << "):\n\t" << (msg) << "\n]\n")
+    #define lvWarn_(msg,...) (lv::ostream_guard<std::ostream>(std::cerr) << "[lvWarn @ " << __FILE__ << "(" << __LINE__ << "):\n\t" << lv::putf(msg,__VA_ARGS__) << "\n]\n")
+    #define lvPrint(expr) (lv::ostream_guard<std::ostream>(std::cout,1) << "[lvPrint @ " << __FILE__ << "(" << __LINE__ << "):\n\t"#expr" := " << (expr) << "\n]\n")
+    #define lvCout (lv::ostream_guard<std::ostream>(std::cout))
+    #define lvCout_(level) (lv::ostream_guard<std::ostream>(std::cout,level))
+    #define lvCerr (lv::ostream_guard<std::ostream>(std::cerr))
+    #define lvCerr_(level) (lv::ostream_guard<std::ostream>(std::cerr,level))
     #define glErrorCheck do { \
         const GLenum __errn = glGetError(); \
         if(__errn!=GL_NO_ERROR) \
@@ -142,6 +148,8 @@
         #define lvDbgExceptionWatch lv::UncaughtExceptionLogger XSTR_CONCAT(__logger,__LINE__)(__PRETTY_FUNCTION__,__FILE__,__LINE__)
         #define lvDbgLog(level,msg) lvLog(level,msg)
         #define lvDbgLog_(level,msg,...) lvLog_(level,msg,__VA_ARGS__)
+        #define lvDbgWarn(msg) lvWarn(msg)
+        #define lvDbgWarn_(msg,...) lvWarn_(msg,__VA_ARGS__)
         #define glDbgErrorCheck glErrorCheck
         #define cudaDbgErrorCheck cudaErrorCheck
     #else //ndef(_DEBUG)
@@ -164,6 +172,8 @@
         #define lvDbgExceptionWatch ((void)0)
         #define lvDbgLog(level,msg) ((void)0)
         #define lvDbgLog_(level,msg,...) ((void)0)
+        #define lvDbgWarn(msg) ((void)0)
+        #define lvDbgWarn_(msg,...) ((void)0)
         #define glDbgErrorCheck ((void)0)
         #define cudaDbgErrorCheck ((void)0)
     #endif //ndef(_DEBUG)

@@ -85,7 +85,7 @@ namespace lv {
             if(oROI.empty() || oTempROI.empty())
                 lvError_("CDnet sequence '%s' did not possess ROI.bmp/ROI.jpg files",this->getName().c_str());
             if(oROI.size()!=oTempROI.size()) {
-                std::cerr << "CDnet sequence '" << this->getName().c_str() << "' ROI images size mismatch; will keep smallest overlap." << std::endl;
+                lvWarn_("CDnet sequence '%s' ROI images size mismatch; will keep smallest overlap.",this->getName().c_str());
                 oROI = oROI(cv::Rect(0,0,std::min(oROI.cols,oTempROI.cols),std::min(oROI.rows,oTempROI.rows))).clone();
             }
             this->m_oInputROI = oROI>0;

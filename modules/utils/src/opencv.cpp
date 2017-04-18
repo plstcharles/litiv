@@ -183,18 +183,18 @@ void lv::write(const std::string& sFilePath, const cv::Mat& _oData, lv::MatArchi
     else if(eArchiveType==MatArchive_PLAINTEXT) {
         std::ofstream ssStr(sFilePath);
         lvAssert__(ssStr.is_open(),"could not open text file at '%s' for writing",sFilePath.c_str());
-        ssStr << "htag " << lv::getVersionStamp() << std::endl;
-        ssStr << "date " << lv::getTimeStamp() << std::endl;
-        ssStr << "nDataType " << (int32_t)oData.type() << std::endl;
-        ssStr << "nDataDepth " << (int32_t)oData.depth() << std::endl;
-        ssStr << "nChannels " << (int32_t)oData.channels() << std::endl;
-        ssStr << "nElemSize " << (uint64_t)oData.elemSize() << std::endl;
-        ssStr << "nElemCount " << (uint64_t)oData.total() << std::endl;
-        ssStr << "nDims " << (int32_t)oData.dims << std::endl;
+        ssStr << "htag " << lv::getVersionStamp() << '\n';
+        ssStr << "date " << lv::getTimeStamp() << '\n';
+        ssStr << "nDataType " << (int32_t)oData.type() << '\n';
+        ssStr << "nDataDepth " << (int32_t)oData.depth() << '\n';
+        ssStr << "nChannels " << (int32_t)oData.channels() << '\n';
+        ssStr << "nElemSize " << (uint64_t)oData.elemSize() << '\n';
+        ssStr << "nElemCount " << (uint64_t)oData.total() << '\n';
+        ssStr << "nDims " << (int32_t)oData.dims << '\n';
         ssStr << "anSizes";
         for(int nDimIdx=0; nDimIdx<oData.dims; ++nDimIdx)
             ssStr << " " << (int32_t)oData.size[nDimIdx];
-        ssStr << std::endl << std::endl;
+        ssStr << "\n\n";
         if(oData.depth()!=CV_64F)
             _oData.convertTo(oData,CV_64F);
         double* pdData = (double*)oData.data;
@@ -203,7 +203,7 @@ void lv::write(const std::string& sFilePath, const cv::Mat& _oData, lv::MatArchi
             for(int nElemPackIdx=1; nElemPackIdx<oData.channels(); ++nElemPackIdx)
                 ssStr << " " << *pdData++;
             if(((nElemIdx+1)%oData.size[oData.dims-1])==0)
-                ssStr << std::endl;
+                ssStr << "\n";
             else
                 ssStr << " ";
         }

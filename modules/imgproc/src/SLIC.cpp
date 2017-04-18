@@ -56,11 +56,11 @@ inline int iDivUp(int a, int b) {
 SLIC::SLIC() {
     int nbGpu = 0;
     cudaErrorCheck(cudaGetDeviceCount(&nbGpu));
-    std::cout << "Detected " << nbGpu << " cuda capable gpu" << std::endl;
+    lvCout << "Detected " << nbGpu << " cuda-capable gpu(s)\n";
     cudaErrorCheck(cudaSetDevice(m_deviceId));
     cudaErrorCheck(cudaGetDeviceProperties(&m_deviceProp, m_deviceId));
     if (m_deviceProp.major < 3) {
-        std::cerr << "compute capability found = " << m_deviceProp.major << ", compute capability >= 3 required !" << std::endl;
+        lvCerr_(-1) << "compute capability found = " << m_deviceProp.major << ", compute capability >= 3 required!\n";
         std::exit(EXIT_FAILURE);
     }
     lv::cuda::test(); // @@@ should succeed

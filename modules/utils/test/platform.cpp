@@ -21,11 +21,11 @@ TEST(filesystem_ops,regression) {
     ASSERT_TRUE(oTestFile.is_open());
     ASSERT_TRUE(lv::checkIfExists(sDirPath+"test1.txt"));
     ASSERT_FALSE(lv::checkIfExists(sDirPath+"test2.txt"));
-    oTestFile << "test" << std::endl;
+    oTestFile << "test\n";
     oTestFile.close();
     oTestFile = lv::createBinFileWithPrealloc(sDirPath+"test2.bin",1024);
     ASSERT_TRUE(oTestFile.is_open());
-    oTestFile << "test" << std::endl;
+    oTestFile << "test\n";
     oTestFile.close();
     EXPECT_EQ(lv::getFilesFromDir(sDirPath),(std::vector<std::string>{sDirPath+"test1.txt",sDirPath+"test2.bin"}));
     std::vector<std::string> vsFiles1 = lv::getFilesFromDir(sDirPath);

@@ -608,10 +608,8 @@ void lv::DataReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>::wr
     IIMetricsCalculatorConstPtr pMetrics = getMetrics(false);
     lvAssert(pMetrics.get());
     const MetricsCalculator_<DatasetEval_BinaryClassifier,Dataset_BSDS500>& oMetrics = dynamic_cast<const MetricsCalculator_<DatasetEval_BinaryClassifier,Dataset_BSDS500>&>(*pMetrics.get());
-    if(lv::getVerbosity()>0) {
-        std::cout << "\t" << lv::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => MaxRcl=" << std::fixed << std::setprecision(4) << oMetrics.dMaxRecall << " MaxPrc=" << oMetrics.dMaxPrecision << " MaxFM=" << oMetrics.dMaxFMeasure << std::endl;
-        std::cout << "\t" << "                BestRcl=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dRecall << " BestPrc=" << oMetrics.oBestScore.dPrecision << " BestFM=" << oMetrics.oBestScore.dFMeasure << "  (@ T=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dThreshold << ")" << std::endl;
-    }
+    lvCout_(1) << "\t" << lv::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => MaxRcl=" << std::fixed << std::setprecision(4) << oMetrics.dMaxRecall << " MaxPrc=" << oMetrics.dMaxPrecision << " MaxFM=" << oMetrics.dMaxFMeasure << '\n';
+    lvCout_(1) << "\t" << "                BestRcl=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dRecall << " BestPrc=" << oMetrics.oBestScore.dPrecision << " BestFM=" << oMetrics.oBestScore.dFMeasure << "  (@ T=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dThreshold << ")\n";
 #if USE_BSDS500_BENCHMARK
     const std::string sOutputPath = getOutputPath()+"../"+getName()+"_reimpl_eval/";
 #else //(!USE_BSDS500_BENCHMARK)
@@ -686,10 +684,8 @@ void lv::DatasetReporter_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS500>:
     IIMetricsCalculatorConstPtr pMetrics = getMetrics(false);
     lvAssert(pMetrics.get());
     const MetricsCalculator_<DatasetEval_BinaryClassifier,Dataset_BSDS500>& oMetrics = dynamic_cast<const MetricsCalculator_<DatasetEval_BinaryClassifier,Dataset_BSDS500>&>(*pMetrics.get());
-    if(lv::getVerbosity()>0) {
-        std::cout << lv::clampString(getName(),12) << " => MaxRcl=" << std::fixed << std::setprecision(4) << oMetrics.dMaxRecall << " MaxPrc=" << oMetrics.dMaxPrecision << " MaxFM=" << oMetrics.dMaxFMeasure << std::endl;
-        std::cout << "                BestRcl=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dRecall << " BestPrc=" << oMetrics.oBestScore.dPrecision << " BestFM=" << oMetrics.oBestScore.dFMeasure << "  (@ T=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dThreshold << ")" << std::endl;
-    }
+    lvCout_(1) << lv::clampString(getName(),12) << " => MaxRcl=" << std::fixed << std::setprecision(4) << oMetrics.dMaxRecall << " MaxPrc=" << oMetrics.dMaxPrecision << " MaxFM=" << oMetrics.dMaxFMeasure << '\n';
+    lvCout_(1) << "                BestRcl=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dRecall << " BestPrc=" << oMetrics.oBestScore.dPrecision << " BestFM=" << oMetrics.oBestScore.dFMeasure << "  (@ T=" << std::fixed << std::setprecision(4) << oMetrics.oBestScore.dThreshold << ")\n";
 #if USE_BSDS500_BENCHMARK
     std::ofstream oMetricsOutput(getOutputPath()+"overall_reimpl_eval.txt");
 #else //(!USE_BSDS500_BENCHMARK)

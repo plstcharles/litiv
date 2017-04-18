@@ -157,8 +157,8 @@ namespace lv {
         const char* const m_sFile;
         const int m_nLine;
         inline ~UncaughtExceptionLogger() {
-            if(std::uncaught_exception() && lv::getVerbosity()>=1)
-                std::cerr << lv::putf("Unwinding due to uncaught exception at function '%s'\n\t... from %s(%d)\n",m_sFunc,m_sFile,m_nLine);
+            if(std::uncaught_exception())
+                lvCerr_(1) << lv::putf("Unwinding due to uncaught exception at function '%s'\n\t... from %s(%d)\n",m_sFunc,m_sFile,m_nLine);
         }
     };
 #endif //LV_UNCAUGHT_EXCEPT_LOGGER_DECL
@@ -172,8 +172,7 @@ namespace lv {
         inline Exception(const std::string& sErrMsg, const char* sFunc, const char* sFile, int nLine, Targs&&... args) :
                 std::runtime_error(lv::putf((std::string("Exception in function '%s'\n\t... from %s(%d)\n\t... what = ")+sErrMsg).c_str(),sFunc,sFile,nLine,std::forward<Targs>(args)...)),
                 m_acFuncName(sFunc),m_acFileName(sFile),m_nLineNumber(nLine) {
-            if(lv::getVerbosity()>=1)
-                std::cerr << this->what() << std::endl;
+            lvCerr_(1) << this->what() << std::endl;
         }
         /// name of the function the exception originated from
         const char* const m_acFuncName;

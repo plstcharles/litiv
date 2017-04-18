@@ -93,7 +93,7 @@ void IVideoCosegmentor_<eImpl,TLabel,nInputArraySize,nOutputArraySize>::initiali
                 if((bFoundChDiff = (cv::countNonZero(vChannels[0]!=vChannels[c])!=0)))
                     break;
             if(!bFoundChDiff)
-                std::cerr << "\n\tIVideoCosegmentor_ : Warning, grayscale images should always be passed in CV_8UC1 format for optimal performance.\n" << std::endl;
+                lvWarn("IVideoCosegmentor_ : Warning, grayscale images should always be passed in CV_8UC1 format for optimal performance.");
         }
         if(aROIs[nArrayIdx].empty())
             aNewROIs[nArrayIdx] = cv::Mat_<uchar>(aImages[nArrayIdx].size(),uchar(UCHAR_MAX));

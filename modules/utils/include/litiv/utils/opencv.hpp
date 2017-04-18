@@ -785,7 +785,7 @@ namespace lv {
     inline std::ostream& print(const cv::Mat_<T>& oMat, const cv::Point2i& oDisplayIdxOffset={0,0}, std::ostream& os=std::cout) {
         static_assert(isDataTypeCompat<T>(),"matrix type must be cv-compatible, and without channels");
         lvAssert_(oMat.dims==2,"function currently only defined for 2d mats; split dims and call for 2d slices");
-        os << " CVMATRIX " << lv::MatInfo(oMat) << std::endl;
+        os << " CVMATRIX " << lv::MatInfo(oMat) << '\n';
         if(oMat.empty() || oMat.size().area()==0)
             return os;
         const size_t nMaxMetaColWidth = (size_t)std::max(std::max(lv::digit_count(oMat.cols+oDisplayIdxOffset.x),lv::digit_count(oMat.rows+oDisplayIdxOffset.y)),std::max(lv::digit_count(oDisplayIdxOffset.x),lv::digit_count(oDisplayIdxOffset.y)));
@@ -804,16 +804,16 @@ namespace lv {
         os << std::string(nMaxMetaColWidth+3,' ') << "x=";
         for(int nColIdx=0; nColIdx<oMat.cols; ++nColIdx)
             os << "  " << lv::clampString(lv::putf(sMetaFormat.c_str(),nColIdx+oDisplayIdxOffset.x),nMaxColWidth);
-        os << std::endl;
+        os << '\n';
         os << std::string(nMaxMetaColWidth+5,' ');
         for(int nColIdx=0; nColIdx<oMat.cols; ++nColIdx)
             os << "--" << lv::clampString("-",nMaxColWidth,'-');
-        os << std::endl;
+        os << '\n';
         for(int nRowIdx=0; nRowIdx<oMat.rows; ++nRowIdx) {
             os << " y=" << lv::putf(sMetaFormat.c_str(),nRowIdx+oDisplayIdxOffset.y) << " |";
             for(int nColIdx=0; nColIdx<oMat.cols; ++nColIdx)
                 lPrinter(oMat.template at<T>(nRowIdx,nColIdx));
-            os << std::endl;
+            os << '\n';
         }
         return os;
     }
@@ -856,13 +856,13 @@ namespace lv {
     /// prints the content of a vector (via matrix formatting) to the given stream
     template<typename T>
     std::enable_if_t<(!isDataTypeCompat<T>()),std::ostream&> print(const std::vector<T>& oVec, int nDisplayIdxOffset=0, std::ostream& os=std::cout) {
-        os << " VECTOR (size=" << oVec.size() << ")" << std::endl;
+        os << " VECTOR (size=" << oVec.size() << ")\n";
         if(oVec.empty())
             return os;
         const size_t nMaxMetaColWidth = (size_t)std::max(lv::digit_count((int)oVec.size()+nDisplayIdxOffset),lv::digit_count(nDisplayIdxOffset));
         const std::string sMetaFormat = std::string("%")+std::to_string(nMaxMetaColWidth)+"i";
         for(size_t nElemIdx=0; nElemIdx<oVec.size(); ++nElemIdx)
-            os << "  x=" << lv::putf(sMetaFormat.c_str(),(int)nElemIdx+nDisplayIdxOffset) << "  :  " << oVec[nElemIdx] << std::endl;
+            os << "  x=" << lv::putf(sMetaFormat.c_str(),(int)nElemIdx+nDisplayIdxOffset) << "  :  " << oVec[nElemIdx] << '\n';
         return os;
     }
 

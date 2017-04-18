@@ -360,19 +360,19 @@ void GLImageProcAlgo::apply_gl(const cv::Mat& oNextInput, bool bRebindAll) {
     }
     if(m_bUsingTimers) {
         GLuint64 nGLTimerValTot = 0;
-        std::cout << "\t\tGPU: ";
+        lvCout << "\t\tGPU: ";
         glGetQueryObjectui64v(m_nGLTimers[GLImageProcAlgo::GLTimer_TextureUpdate],GL_QUERY_RESULT,&m_nGLTimerVals[GLImageProcAlgo::GLTimer_TextureUpdate]);
-        std::cout << "TextureUpdate=" << m_nGLTimerVals[GLImageProcAlgo::GLTimer_TextureUpdate]*1.e-6 << "ms,  ";
+        lvCout << "TextureUpdate=" << m_nGLTimerVals[GLImageProcAlgo::GLTimer_TextureUpdate]*1.e-6 << "ms,  ";
         nGLTimerValTot += m_nGLTimerVals[GLImageProcAlgo::GLTimer_TextureUpdate];
         glGetQueryObjectui64v(m_nGLTimers[GLImageProcAlgo::GLTimer_ComputeDispatch],GL_QUERY_RESULT,&m_nGLTimerVals[GLImageProcAlgo::GLTimer_ComputeDispatch]);
-        std::cout << "ComputeDispatch=" << m_nGLTimerVals[GLImageProcAlgo::GLTimer_ComputeDispatch]*1.e-6 << "ms,  ";
+        lvCout << "ComputeDispatch=" << m_nGLTimerVals[GLImageProcAlgo::GLTimer_ComputeDispatch]*1.e-6 << "ms,  ";
         nGLTimerValTot += m_nGLTimerVals[GLImageProcAlgo::GLTimer_ComputeDispatch];
         if(m_bUsingDisplay) {
             glGetQueryObjectui64v(m_nGLTimers[GLImageProcAlgo::GLTimer_DisplayUpdate],GL_QUERY_RESULT,&m_nGLTimerVals[GLImageProcAlgo::GLTimer_DisplayUpdate]);
-            std::cout << "DisplayUpdate=" << m_nGLTimerVals[GLImageProcAlgo::GLTimer_DisplayUpdate]*1.e-6 << "ms,  ";
+            lvCout << "DisplayUpdate=" << m_nGLTimerVals[GLImageProcAlgo::GLTimer_DisplayUpdate]*1.e-6 << "ms,  ";
             nGLTimerValTot += m_nGLTimerVals[GLImageProcAlgo::GLTimer_DisplayUpdate];
         }
-        std::cout << " tot=" << nGLTimerValTot*1.e-6 << "ms" << std::endl;
+        lvCout << " tot=" << nGLTimerValTot*1.e-6 << "ms\n";
     }
     ++m_nInternalFrameIdx;
 }
@@ -565,7 +565,7 @@ GLImageProcEvaluatorAlgo::GLImageProcEvaluatorAlgo( const std::shared_ptr<GLImag
         while(m_nEvalBufferMaxSize<=m_nCurrEvalBufferSize)
             m_nCurrEvalBufferSize /= 2;
         m_nCurrEvalBufferSize -= (m_nCurrEvalBufferSize%(nCountersPerFrame*4));
-        std::cout << "\tWarning: atomic counter buffer size limit (" << m_nEvalBufferMaxSize/1024 << "kb) is smaller than required (" << m_nEvalBufferTotSize/1024 << "kb), will use " << m_nCurrEvalBufferSize/1024 << "kb instead, performance might be affected" << std::endl;
+        lvCerr << "\tWarning: atomic counter buffer size limit (" << m_nEvalBufferMaxSize/1024 << "kb) is smaller than required (" << m_nEvalBufferTotSize/1024 << "kb), will use " << m_nCurrEvalBufferSize/1024 << "kb instead, performance might be affected\n";
     }
     m_pParent->m_bUsingDisplay = false;
 }

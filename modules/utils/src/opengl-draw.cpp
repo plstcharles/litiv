@@ -279,7 +279,7 @@ GLDynamicTexture2DArray::GLDynamicTexture2DArray(GLsizei nLevels, const std::vec
         m_oTextureArrayFetchBuffer(glGetTextureSubImage?cv::Mat():cv::Mat(m_nHeight*m_nTextureCount,m_nWidth,voInitTextures[0].type())) {
     static bool s_bAlreadyWarned = false;
     if(!glGetTextureSubImage && !s_bAlreadyWarned) {
-        std::cout << "\tWarning: glGetTextureSubImage not supported, performance might be affected (full arrays will be transferred)" << std::endl;
+        lvWarn("glGetTextureSubImage not supported, performance might be affected (full arrays will be transferred)");
         s_bAlreadyWarned = true;
     }
 }
