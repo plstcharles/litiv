@@ -31,6 +31,8 @@
 #define FGSTEREOMATCH_DEFAULT_MAXITERCOUNT         (size_t(1000))
 #define FGSTEREOMATCH_DEFAULT_SHAPEDESC_RAD        (size_t(30))
 #define FGSTEREOMATCH_DEFAULT_GRAD_KERNEL_SIZE     (int(7))
+#define FGSTEREOMATCH_DEFAULT_DISTTRANSF_SCALE     (-0.1f)
+#define FGSTEREOMATCH_DEFAULT_DISTTRANSF_OFFSET    (0.1f)
 
 // unary costs params
 #define FGSTEREOMATCH_UNARY_COST_OOB_CST           (ValueType(1000))
@@ -274,8 +276,10 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         enum FeatPackingList {
             FeatPack_ImageDescs=0,
             FeatPack_ShapeDescs,
-            FeatPack_FGDistMap,
-            FeatPack_BGDistMap,
+            FeatPack_FGDist,
+            FeatPack_BGDist,
+            FeatPack_FGSim,
+            FeatPack_BGSim,
             FeatPack_GradY,
             FeatPack_GradX,
             FeatPack_GradMag,
