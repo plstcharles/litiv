@@ -154,10 +154,8 @@ private:
     void scdesc_generate_emdmask();
     /// fills contour point map using provided binary image
     void scdesc_fill_contours(const cv::Mat& oImage);
-    /// fills mean-normalized dist map using internal contour/key points
-    void scdesc_fill_distmap(double dMeanDist=-1.0);
-    /// fills angle map using internal contour/key points
-    void scdesc_fill_angmap();
+    /// fills mean-normalized dist map & angle map using internal contour/key points
+    void scdesc_fill_maps(double dMeanDist=-1.0);
     /// fills descriptor using internal maps
     void scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDescMap);
 

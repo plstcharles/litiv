@@ -257,7 +257,7 @@ void ShapeContext::scdesc_fill_contours(const cv::Mat& oImage) {
         m_oContourPts.release();
 }
 
-void ShapeContext::scdesc_fill_distmap(double dMeanDist) {
+void ShapeContext::scdesc_fill_maps(double dMeanDist) {
     lvDbgAssert(m_oContourPts.type()==CV_32FC2 && (m_oContourPts.total()==(size_t)m_oContourPts.rows || m_oContourPts.total()==(size_t)m_oContourPts.cols));
     lvDbgAssert(m_oKeyPts.type()==CV_32FC2 && (m_oKeyPts.total()==(size_t)m_oKeyPts.rows || m_oKeyPts.total()==(size_t)m_oKeyPts.cols));
     lvDbgAssert(m_vKeyInliers.empty() || m_oKeyPts.total()==m_vKeyInliers.size());
@@ -270,26 +270,6 @@ void ShapeContext::scdesc_fill_distmap(double dMeanDist) {
     else
         m_oDistMask.release();
     m_oDistMap.create((int)m_oKeyPts.total(),(int)m_oContourPts.total());
-    for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx) {
-        for(int nContourPtIdx=0; nContourPtIdx<(int)m_oContourPts.total(); ++nContourPtIdx) {
-            m_oDistMap(nKeyPtIdx,nContourPtIdx) = cv::norm(cv::Mat(((cv::Point2f*)m_oKeyPts.data)[nKeyPtIdx]-((cv::Point2f*)m_oContourPts.data)[nContourPtIdx]),cv::NORM_L2);
-            if(!m_oDistMask.empty())
-                m_oDistMask(nKeyPtIdx,nContourPtIdx) = uchar((m_vKeyInliers.empty() || m_vKeyInliers[nKeyPtIdx]!=0) && (m_vContourInliers.empty() || m_vContourInliers[nContourPtIdx]!=0));
-        }
-    }
-    if(m_bUseRelativeSpace) {
-        if(dMeanDist<0)
-            dMeanDist = cv::mean(m_oDistMap,m_oDistMask.empty()?cv::noArray():m_oDistMask)[0];
-        m_oDistMap /= (dMeanDist+FLT_EPSILON);
-    }
-}
-
-void ShapeContext::scdesc_fill_angmap() {
-    lvDbgAssert(m_oContourPts.type()==CV_32FC2 && (m_oContourPts.total()==(size_t)m_oContourPts.rows || m_oContourPts.total()==(size_t)m_oContourPts.cols));
-    lvDbgAssert(m_oKeyPts.type()==CV_32FC2 && (m_oKeyPts.total()==(size_t)m_oKeyPts.rows || m_oKeyPts.total()==(size_t)m_oKeyPts.cols));
-    lvDbgAssert(m_oKeyPts.total()>size_t(0));
-    if(m_oContourPts.empty())
-        return;
     m_oAngMap.create((int)m_oKeyPts.total(),(int)m_oContourPts.total());
     cv::Point2f vMassCenter(0,0);
     if(m_bRotationInvariant) {
@@ -302,18 +282,26 @@ void ShapeContext::scdesc_fill_angmap() {
         for(int nContourPtIdx=0; nContourPtIdx<(int)m_oContourPts.total(); ++nContourPtIdx) {
             const cv::Point2f& vKeyPt = ((cv::Point2f*)m_oKeyPts.data)[nKeyPtIdx];
             const cv::Point2f& vContourPt = ((cv::Point2f*)m_oContourPts.data)[nContourPtIdx];
-            if(std::abs(vKeyPt.x-vContourPt.x)<0.01f && std::abs(vKeyPt.y-vContourPt.y)<0.01f)
+            const cv::Point2f vDiff = vKeyPt-vContourPt;
+            m_oDistMap(nKeyPtIdx,nContourPtIdx) = cv::norm(cv::Mat(vDiff),cv::NORM_L2);
+            if(m_oDistMap(nKeyPtIdx,nContourPtIdx)<0.01)
                 m_oAngMap(nKeyPtIdx,nContourPtIdx) = 0.0;
             else {
-                const cv::Point2d vDiff = vContourPt-vKeyPt;
-                m_oAngMap(nKeyPtIdx,nContourPtIdx) = std::atan2(-vDiff.y,vDiff.x); // flip y since origin = top-left
+                m_oAngMap(nKeyPtIdx,nContourPtIdx) = std::atan2(vDiff.y,-vDiff.x);
                 if(m_bRotationInvariant) {
                     const cv::Point2d vRefPt = vContourPt-vMassCenter;
                     m_oAngMap(nKeyPtIdx,nContourPtIdx) -= std::atan2(-vRefPt.y,vRefPt.x);
                 }
                 m_oAngMap(nKeyPtIdx,nContourPtIdx) = std::fmod(m_oAngMap(nKeyPtIdx,nContourPtIdx)+2*CV_PI+FLT_EPSILON,2*CV_PI);
             }
+            if(!m_oDistMask.empty())
+                m_oDistMask(nKeyPtIdx,nContourPtIdx) = uchar((m_vKeyInliers.empty() || m_vKeyInliers[nKeyPtIdx]!=0) && (m_vContourInliers.empty() || m_vContourInliers[nContourPtIdx]!=0));
         }
+    }
+    if(m_bUseRelativeSpace) {
+        if(dMeanDist<0)
+            dMeanDist = cv::mean(m_oDistMap,m_oDistMask.empty()?cv::noArray():m_oDistMask)[0];
+        m_oDistMap /= (dMeanDist+FLT_EPSILON);
     }
 }
 
@@ -327,8 +315,7 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
     else
         oDescriptors.create((int)m_oKeyPts.total(),m_nDescSize);
     oDescriptors = 0.0f;
-    scdesc_fill_distmap();
-    scdesc_fill_angmap();
+    scdesc_fill_maps();
     for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx) {
         if(!m_vKeyInliers.empty() && !m_vKeyInliers[nKeyPtIdx])
             continue;
