@@ -91,11 +91,6 @@ namespace rlutil {
     typedef RLUTIL_STRING_TYPE str_t;
 #endif //ndef RLUTIL_STRING_TYPE
 
-    template<typename Tstr>
-    inline void RLUTIL_PRINT(Tstr str) {
-        std::cout << str;
-    }
-
     enum ColorCode {
         Color_BLACK=0,
         Color_BLUE,
@@ -344,7 +339,7 @@ namespace rlutil {
             SetConsoleTextAttribute(hConsole,(WORD)c);
         }
 #else //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
-        RLUTIL_PRINT(getANSIColor(c));
+        lv::safe_print(getANSIColor(c));
 #endif //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
     }
 
@@ -353,7 +348,7 @@ namespace rlutil {
 #if defined(_WIN32) && !defined(RLUTIL_USE_ANSI)
         system("cls");
 #else //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
-        RLUTIL_PRINT("\033[2J\033[H");
+        lv::safe_print("\033[2J\033[H");
 #endif
     }
 
@@ -367,7 +362,7 @@ namespace rlutil {
 #else //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
         std::ostringstream oss;
         oss << "\033[" << y << ";" << x << "H";
-        RLUTIL_PRINT(oss.str());
+        lv::safe_print(oss.str());
 #endif //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
     }
 
@@ -381,7 +376,7 @@ namespace rlutil {
         structCursorInfo.bVisible = FALSE;
         SetConsoleCursorInfo(hConsoleOutput,&structCursorInfo);
 #else //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
-        RLUTIL_PRINT("\033[?25l");
+        lv::safe_print("\033[?25l");
 #endif //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
     }
 
@@ -395,7 +390,7 @@ namespace rlutil {
         structCursorInfo.bVisible = TRUE;
         SetConsoleCursorInfo(hConsoleOutput,&structCursorInfo);
 #else //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
-        RLUTIL_PRINT("\033[?25h");
+        lv::safe_print("\033[?25h");
 #endif //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
     }
 
@@ -509,6 +504,7 @@ namespace lv {
     inline void updateConsoleProgressBar(const std::string& sMsg, float fCompletion, size_t nBarCols=20) {
         if(nBarCols==0)
             return;
+        std::lock_guard<std::mutex> oLock(lv::getLogMutex());
         const int nRows = rlutil::trows();
         const int nCols = rlutil::tcols();
         printf("\r%s  ",sMsg.c_str());
@@ -543,6 +539,7 @@ namespace lv {
     inline void cleanConsoleRow(int nRowIdx=INT_MAX) {
         if(nRowIdx<0)
             return;
+        std::lock_guard<std::mutex> oLock(lv::getLogMutex());
         const int nRows = rlutil::trows();
         const int nCols = rlutil::tcols();
         if(nRows>0 && nCols>0)
