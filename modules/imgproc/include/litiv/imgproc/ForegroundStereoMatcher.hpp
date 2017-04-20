@@ -39,8 +39,8 @@
 #define FGSTEREOMATCH_UNARY_COST_OCCLUDED_CST      (ValueType(2000))
 #define FGSTEREOMATCH_UNARY_COST_MAXTRUNC_CST      (ValueType(2000))
 #define FGSTEREOMATCH_VISSIM_COST_DESC_SCALE       (5000)
-#define FGSTEREOMATCH_VISSIM_COST_RAW_SCALE        (2)
-#define FGSTEREOMATCH_SHPSIM_COST_DESC_SCALE       (200)
+#define FGSTEREOMATCH_VISSIM_COST_RAW_SCALE        (2.0f/FGSTEREOMATCH_VISSIM_COST_DESC_SCALE)
+#define FGSTEREOMATCH_SHPSIM_COST_DESC_SCALE       (0)
 #define FGSTEREOMATCH_UNIQUE_COST_OVER_SCALE       (500)
 // pairwise costs params
 #define FGSTEREOMATCH_LBLSIM_COST_MAXOCCL          (ValueType(5000))
@@ -250,12 +250,12 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
 
         /// holds the feature extractor to use on input images
 #if FGSTEREOMATCH_CONFIG_USE_DASCGF_FEATS || FGSTEREOMATCH_CONFIG_USE_DASCRF_FEATS
-        std::unique_ptr<DASC> m_pImageFeatExtractor;
+        std::unique_ptr<DASC> m_pVisDescExtractor;
 #elif FGSTEREOMATCH_CONFIG_USE_LSS_FEATS
         std::unique_ptr<LSS> m_pImageFeatExtractor;
 #endif //FGSTEREOMATCH_CONFIG_USE_..._FEATS
         /// holds the feature extractor to use on input shapes
-        std::unique_ptr<ShapeContext> m_pShapeFeatExtractor;
+        std::unique_ptr<ShapeContext> m_pShpDescExtractor;
         /// defines the minimum grid border size based on the feature extractors used
         size_t m_nGridBorderSize;
         /// holds the set of features to use next
@@ -274,8 +274,10 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         bool m_bModelUpToDate;
         /// defines the indices of feature maps inside precalc packets (per camera head)
         enum FeatPackingList {
-            FeatPack_ImageDescs=0,
-            FeatPack_ShapeDescs,
+            FeatPack_VisDescs=0,
+            FeatPack_ShpDescs,
+            FeatPack_VisDist,
+            FeatPack_ShpDist,
             FeatPack_FGDist,
             FeatPack_BGDist,
             FeatPack_FGSim,
