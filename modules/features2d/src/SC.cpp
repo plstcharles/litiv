@@ -203,16 +203,19 @@ void ShapeContext::validateROI(cv::Mat& oROI) const {
 
 void ShapeContext::scdesc_generate_radmask() {
     m_vRadialLimits.resize((size_t)m_nRadialBins);
+    const double dMin = m_bUseRelativeSpace?m_dInnerRadius:(double)m_nInnerRadius;
+    const double dMax = m_bUseRelativeSpace?m_dOuterRadius:(double)m_nOuterRadius;
     if(m_nRadialBins==1) {
-        m_vRadialLimits[0] = m_bUseRelativeSpace?m_dOuterRadius:(double)m_nOuterRadius;
+        m_vRadialLimits[0] = dMax;
         return;
     }
-    const double dLogMin = std::log10(m_bUseRelativeSpace?m_dInnerRadius:(double)m_nInnerRadius);
-    const double dLogMax = std::log10(m_bUseRelativeSpace?m_dOuterRadius:(double)m_nOuterRadius);
+    const double dLogMin = std::log2(dMin);
+    const double dLogMax = std::log2(dMax);
     const double dDelta = (dLogMax-dLogMin)/(m_nRadialBins-1);
-    double dAccDelta = 0.0;
-    for(int nBinIdx=0; nBinIdx<m_nRadialBins; ++nBinIdx, dAccDelta+=dDelta)
-        m_vRadialLimits[nBinIdx] = std::pow(10,dLogMin+dAccDelta);
+    m_vRadialLimits[0] = dMin;
+    double dAccDelta=dDelta;
+    for(int nBinIdx=1; nBinIdx<m_nRadialBins; ++nBinIdx, dAccDelta+=dDelta)
+        m_vRadialLimits[nBinIdx] = std::exp2(dLogMin+dAccDelta);
 }
 
 void ShapeContext::scdesc_generate_angmask() {
