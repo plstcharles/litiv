@@ -202,11 +202,15 @@ void ShapeContext::validateROI(cv::Mat& oROI) const {
 }
 
 void ShapeContext::scdesc_generate_radmask() {
+    m_vRadialLimits.resize((size_t)m_nRadialBins);
+    if(m_nRadialBins==1) {
+        m_vRadialLimits[0] = m_bUseRelativeSpace?m_dOuterRadius:(double)m_nOuterRadius;
+        return;
+    }
     const double dLogMin = std::log10(m_bUseRelativeSpace?m_dInnerRadius:(double)m_nInnerRadius);
     const double dLogMax = std::log10(m_bUseRelativeSpace?m_dOuterRadius:(double)m_nOuterRadius);
     const double dDelta = (dLogMax-dLogMin)/(m_nRadialBins-1);
     double dAccDelta = 0.0;
-    m_vRadialLimits.resize((size_t)m_nRadialBins);
     for(int nBinIdx=0; nBinIdx<m_nRadialBins; ++nBinIdx, dAccDelta+=dDelta)
         m_vRadialLimits[nBinIdx] = std::pow(10,dLogMin+dAccDelta);
 }
