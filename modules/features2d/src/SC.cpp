@@ -319,7 +319,7 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
     for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx) {
         if(!m_vKeyInliers.empty() && !m_vKeyInliers[nKeyPtIdx])
             continue;
-        size_t nValidPts = 0;
+        size_t nValidPts = 1;
         const cv::Point2f& vKeyPt = ((cv::Point2f*)m_oKeyPts.data)[nKeyPtIdx];
         float* aDesc = bGenDescMap?oDescriptors.ptr<float>((int)std::round(vKeyPt.y),(int)std::round(vKeyPt.x)):oDescriptors.ptr<float>(nKeyPtIdx);
         for(int nContourPtIdx=0; nContourPtIdx<(int)m_oContourPts.total(); ++nContourPtIdx) {
@@ -346,9 +346,8 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
                 ++nValidPts;
             }
         }
-        if(m_bNormalizeBins && nValidPts>size_t(0)) {
+        if(m_bNormalizeBins)
             for(int nDescIdx=0; nDescIdx<m_nDescSize; ++nDescIdx)
-                aDesc[nDescIdx] /= nValidPts;
-        }
+                aDesc[nDescIdx] = (aDesc[nDescIdx] + 1.0f/m_nDescSize)/nValidPts;
     }
 }
