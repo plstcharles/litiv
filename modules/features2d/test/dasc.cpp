@@ -60,8 +60,11 @@ TEST(dasc_rf,regression_single_compute) {
     const cv::Mat_<float> oOutputKPDesc(3,std::array<int,3>{1,1,oOutputDescMap.size[2]}.data(),oOutputDescMap.ptr<float>(oWindowSize.width/2,oWindowSize.height/2));
     ASSERT_EQ(oOutputDesc.total(),oOutputKPDesc.total());
     ASSERT_EQ(oOutputDesc.size,oOutputKPDesc.size);
-    for(int nDescIdx=0; nDescIdx<oOutputDesc.size[2]; ++nDescIdx)
+    for(int nDescIdx=0; nDescIdx<oOutputDesc.size[2]; ++nDescIdx) {
         ASSERT_FLOAT_EQ(oOutputDesc.at<float>(0,0,nDescIdx),oOutputKPDesc.at<float>(0,0,nDescIdx));
+        ASSERT_FALSE(std::isnan(oOutputDesc.at<float>(0,0,nDescIdx)));
+        ASSERT_GE(oOutputDesc.at<float>(0,0,nDescIdx),0.0f);
+    }
     ASSERT_FLOAT_EQ(float(pDASC->calcDistance(oOutputDesc,oOutputKPDesc)),0.0f);
 }
 
@@ -88,10 +91,15 @@ TEST(dasc_rf,regression_large_compute) {
     ASSERT_EQ(oInputCrop.size[1],oOutputDescMap2.size[1]);
     ASSERT_EQ(vKeyPoints_modif.size(),vKeyPoints.size());
     ASSERT_EQ(oOutputDescMap1.size[2],oOutputDescMap2.size[2]);
-    for(int nRowIdx=oWindowSize.height/2; nRowIdx<=oWindowSize.height/2+2*nPatchSize; ++nRowIdx)
-        for(int nColIdx=oWindowSize.width/2; nColIdx<=oWindowSize.width/2+2*nPatchSize; ++nColIdx)
-            for(int nDescIdx=0; nDescIdx<oOutputDescMap1.size[2]; ++nDescIdx)
+    for(int nRowIdx=oWindowSize.height/2; nRowIdx<=oWindowSize.height/2+2*nPatchSize; ++nRowIdx) {
+        for(int nColIdx=oWindowSize.width/2; nColIdx<=oWindowSize.width/2+2*nPatchSize; ++nColIdx) {
+            for(int nDescIdx=0; nDescIdx<oOutputDescMap1.size[2]; ++nDescIdx) {
                 ASSERT_FLOAT_EQ(oOutputDescMap1.at<float>(nRowIdx,nColIdx,nDescIdx),oOutputDescMap2.at<float>(nRowIdx,nColIdx,nDescIdx));
+                ASSERT_FALSE(std::isnan(oOutputDescMap1.at<float>(nRowIdx,nColIdx,nDescIdx)));
+                ASSERT_GE(oOutputDescMap1.at<float>(nRowIdx,nColIdx,nDescIdx),0.0f);
+            }
+        }
+    }
     cv::Mat_<float> oDistMap;
     pDASC->calcDistances(oOutputDescMap1,oOutputDescMap2,oDistMap);
     ASSERT_EQ(oDistMap.rows,oInputCrop.rows);
@@ -170,8 +178,11 @@ TEST(dasc_gf,regression_single_compute) {
     const cv::Mat_<float> oOutputKPDesc(3,std::array<int,3>{1,1,oOutputDescMap.size[2]}.data(),oOutputDescMap.ptr<float>(oWindowSize.width/2,oWindowSize.height/2));
     ASSERT_EQ(oOutputDesc.total(),oOutputKPDesc.total());
     ASSERT_EQ(oOutputDesc.size,oOutputKPDesc.size);
-    for(int nDescIdx=0; nDescIdx<oOutputDesc.size[2]; ++nDescIdx)
+    for(int nDescIdx=0; nDescIdx<oOutputDesc.size[2]; ++nDescIdx) {
         ASSERT_FLOAT_EQ(oOutputDesc.at<float>(0,0,nDescIdx),oOutputKPDesc.at<float>(0,0,nDescIdx));
+        ASSERT_FALSE(std::isnan(oOutputDesc.at<float>(0,0,nDescIdx)));
+        ASSERT_GE(oOutputDesc.at<float>(0,0,nDescIdx),0.0f);
+    }
     ASSERT_FLOAT_EQ(float(pDASC->calcDistance(oOutputDesc,oOutputKPDesc)),0.0f);
 }
 
@@ -198,10 +209,15 @@ TEST(dasc_gf,regression_large_compute) {
     ASSERT_EQ(oInputCrop.size[1],oOutputDescMap2.size[1]);
     ASSERT_EQ(vKeyPoints_modif.size(),vKeyPoints.size());
     ASSERT_EQ(oOutputDescMap1.size[2],oOutputDescMap2.size[2]);
-    for(int nRowIdx=oWindowSize.height/2; nRowIdx<=oWindowSize.height/2+2*nPatchSize; ++nRowIdx)
-        for(int nColIdx=oWindowSize.width/2; nColIdx<=oWindowSize.width/2+2*nPatchSize; ++nColIdx)
-            for(int nDescIdx=0; nDescIdx<oOutputDescMap1.size[2]; ++nDescIdx)
+    for(int nRowIdx=oWindowSize.height/2; nRowIdx<=oWindowSize.height/2+2*nPatchSize; ++nRowIdx) {
+        for(int nColIdx=oWindowSize.width/2; nColIdx<=oWindowSize.width/2+2*nPatchSize; ++nColIdx) {
+            for(int nDescIdx=0; nDescIdx<oOutputDescMap1.size[2]; ++nDescIdx) {
                 ASSERT_FLOAT_EQ(oOutputDescMap1.at<float>(nRowIdx,nColIdx,nDescIdx),oOutputDescMap2.at<float>(nRowIdx,nColIdx,nDescIdx));
+                ASSERT_FALSE(std::isnan(oOutputDescMap1.at<float>(nRowIdx,nColIdx,nDescIdx)));
+                ASSERT_GE(oOutputDescMap1.at<float>(nRowIdx,nColIdx,nDescIdx),0.0f);
+            }
+        }
+    }
     cv::Mat_<float> oDistMap;
     pDASC->calcDistances(oOutputDescMap1,oOutputDescMap2,oDistMap);
     ASSERT_EQ(oDistMap.rows,oInputCrop.rows);

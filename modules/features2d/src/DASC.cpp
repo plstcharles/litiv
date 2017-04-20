@@ -17,6 +17,8 @@
 
 #include "litiv/features2d.hpp"
 
+#define LOCAL_EPS (1e-10)
+
 // @@@@ test with nan in oob lookup
 
 namespace pretrained { // obtained via middlebury dataset (imported here from original mat archives)
@@ -343,10 +345,8 @@ void DASC::dasc_rf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
                 const int nOffsetColIdx = nColIdx+pretrained::anRP1[nLUTIdx*2+1];
                 if(nOffsetRowIdx>0 && nOffsetRowIdx<nRows && nOffsetColIdx>0 && nOffsetColIdx<nCols) {
                     const float fCorrSurfDenom = std::sqrt((m_oImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)) * (m_oLookupImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)));
-                    if(fCorrSurfDenom>1e-10)
-                        oDescriptors(nRowIdx,nColIdx,nLUTIdx) = std::exp(-(1-(m_oLookupImage_AdaptiveMeanMix(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx))/fCorrSurfDenom)/0.5f);
-                    else
-                        oDescriptors(nRowIdx,nColIdx,nLUTIdx) = 1.0f;
+                    const float fVisDiff = m_oLookupImage_AdaptiveMeanMix(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx);
+                    oDescriptors(nRowIdx,nColIdx,nLUTIdx) = fCorrSurfDenom>LOCAL_EPS?std::min(std::exp(-(1-(fVisDiff)/fCorrSurfDenom)*2),1.0f):1.0f;
                 }
                 else
                     oDescriptors(nRowIdx,nColIdx,nLUTIdx) = 0.0f;
@@ -355,12 +355,12 @@ void DASC::dasc_rf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
     }
     for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
         for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
-            float fNorm = 0;
-            for(int nLUTIdx=0; nLUTIdx<(int)pretrained::nLUTSize; ++nLUTIdx)
-                fNorm += oDescriptors(nRowIdx,nColIdx,nLUTIdx)*oDescriptors(nRowIdx,nColIdx,nLUTIdx);
-            const float fNormSqrt = std::sqrt(fNorm);
-            for(int nLUTIdx=0; nLUTIdx<(int)pretrained::nLUTSize; ++nLUTIdx)
-                oDescriptors(nRowIdx,nColIdx,nLUTIdx) = (fNormSqrt>1e-10)?oDescriptors(nRowIdx,nColIdx,nLUTIdx)/fNormSqrt:0.0f;
+            cv::Mat_<float> oCurrDesc(1,(int)pretrained::nLUTSize,oDescriptors.ptr<float>(nRowIdx,nColIdx));
+            const double dNorm = cv::norm(oCurrDesc,cv::NORM_L2);
+            if(dNorm>LOCAL_EPS)
+                oCurrDesc /= dNorm;
+            else
+                oCurrDesc = std::sqrt(1.0f/pretrained::nLUTSize);
         }
     }
 }
@@ -437,10 +437,8 @@ void DASC::dasc_gf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
                 const int nOffsetColIdx = nColIdx+pretrained::anRP1[nLUTIdx*2+1];
                 if(nOffsetRowIdx>0 && nOffsetRowIdx<nRows && nOffsetColIdx>0 && nOffsetColIdx<nCols) {
                     const float fCorrSurfDenom = std::sqrt((m_oImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)) * (m_oLookupImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)));
-                    if(fCorrSurfDenom>1e-10)
-                        oDescriptors(nRowIdx,nColIdx,nLUTIdx) = std::exp(-(1-(m_oLookupImage_AdaptiveMeanMix(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx))/fCorrSurfDenom)/0.5f);
-                    else
-                        oDescriptors(nRowIdx,nColIdx,nLUTIdx) = 1.0f;
+                    const float fVisDiff = m_oLookupImage_AdaptiveMeanMix(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx);
+                    oDescriptors(nRowIdx,nColIdx,nLUTIdx) = fCorrSurfDenom>LOCAL_EPS?std::min(std::exp(-(1-(fVisDiff)/fCorrSurfDenom)*2),1.0f):1.0f;
                 }
                 else
                     oDescriptors(nRowIdx,nColIdx,nLUTIdx) = 0.0f;
@@ -449,12 +447,12 @@ void DASC::dasc_gf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
     }
     for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
         for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
-            float fNorm = 0;
-            for(int nLUTIdx=0; nLUTIdx<(int)pretrained::nLUTSize; ++nLUTIdx)
-                fNorm += oDescriptors(nRowIdx,nColIdx,nLUTIdx)*oDescriptors(nRowIdx,nColIdx,nLUTIdx);
-            const float fNormSqrt = std::sqrt(fNorm);
-            for(int nLUTIdx=0; nLUTIdx<(int)pretrained::nLUTSize; ++nLUTIdx)
-                oDescriptors(nRowIdx,nColIdx,nLUTIdx) = (fNormSqrt>1e-10)?oDescriptors(nRowIdx,nColIdx,nLUTIdx)/fNormSqrt:0.0f;
+            cv::Mat_<float> oCurrDesc(1,(int)pretrained::nLUTSize,oDescriptors.ptr<float>(nRowIdx,nColIdx));
+            const double dNorm = cv::norm(oCurrDesc,cv::NORM_L2);
+            if(dNorm>LOCAL_EPS)
+                oCurrDesc /= dNorm;
+            else
+                oCurrDesc = std::sqrt(1.0f/pretrained::nLUTSize);
         }
     }
 }
