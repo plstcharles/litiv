@@ -97,8 +97,14 @@ public:
     /// utility function, used to calculate the (C)EMD-L1 distance between two individual descriptors
     inline double calcDistance(const float* aDescriptor1, const float* aDescriptor2) const {
         lvDbgExceptionWatch;
-        lvPrint(m_nDescSize);
-        lvPrint(lv::MatInfo(m_oEMDCostMap));
+        lvDbgAssert(!std::all_of(aDescriptor1,aDescriptor1+m_nDescSize,[](float v){
+            lvDbgAssert(v>=0.0f);
+            return v==0.0f;
+        }));
+        lvDbgAssert(!std::all_of(aDescriptor2,aDescriptor2+m_nDescSize,[](float v){
+            lvDbgAssert(v>=0.0f);
+            return v==0.0f;
+        }));
         const cv::Mat_<float> oDesc1(m_nDescSize,1,const_cast<float*>(aDescriptor1));
         const cv::Mat_<float> oDesc2(m_nDescSize,1,const_cast<float*>(aDescriptor2));
         return cv::EMD(oDesc1,oDesc2,-1,m_oEMDCostMap);
