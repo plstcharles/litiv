@@ -224,17 +224,21 @@ void ShapeContext::scdesc_generate_angmask() {
 }
 
 void ShapeContext::scdesc_generate_emdmask() {
+    lvDbgAssert((int)m_vAngularLimits.size()==m_nAngularBins && (int)m_vRadialLimits.size()==m_nRadialBins);
     m_oEMDCostMap.create(m_nDescSize,m_nDescSize);
     for(int nBaseRadIdx=0; nBaseRadIdx<m_nRadialBins; ++nBaseRadIdx) {
+        const double dBaseMeanRadius = (m_vRadialLimits[nBaseRadIdx]+(nBaseRadIdx==0?0.0:m_vRadialLimits[nBaseRadIdx-1]))/2;
         for(int nBaseAngIdx=0; nBaseAngIdx<m_nAngularBins; ++nBaseAngIdx) {
-            for(int nRadIdx=0; nRadIdx<m_nRadialBins; ++nRadIdx) {
-                for(int nAngIdx=0; nAngIdx<m_nAngularBins; ++nAngIdx) {
-                    const int nAngAbsDiff = lv::L1dist(nBaseAngIdx,nAngIdx);
-                    const int nAngDist = (nAngAbsDiff>m_nAngularBins/2)?(m_nAngularBins-nAngAbsDiff):nAngAbsDiff;
-                    const int nRadDist = lv::L1dist(nBaseRadIdx,nRadIdx);
-                    const int nBaseDescIdx = nBaseAngIdx+nBaseRadIdx*m_nAngularBins;
-                    const int nDescIdx = nAngIdx+nRadIdx*m_nAngularBins;
-                    m_oEMDCostMap(nBaseDescIdx,nDescIdx) = float(nRadDist+nAngDist);
+            const double dBaseMeanAngle = (m_vAngularLimits[nBaseAngIdx]+(nBaseAngIdx==0?0.0:m_vAngularLimits[nBaseAngIdx-1]))/2;
+            const cv::Point2d vBaseCoord(dBaseMeanRadius*std::cos(dBaseMeanAngle),dBaseMeanRadius*std::sin(dBaseMeanAngle));
+            const int nBaseDescIdx = nBaseAngIdx+nBaseRadIdx*m_nAngularBins;
+            for(int nOffsetRadIdx=0; nOffsetRadIdx<m_nRadialBins; ++nOffsetRadIdx) {
+                const double dOffsetMeanRadius = (m_vRadialLimits[nOffsetRadIdx]+(nOffsetRadIdx==0?0.0:m_vRadialLimits[nOffsetRadIdx-1]))/2;
+                for(int nOffsetAngIdx=0; nOffsetAngIdx<m_nAngularBins; ++nOffsetAngIdx) {
+                    const double dOffsetMeanAngle = (m_vAngularLimits[nOffsetAngIdx]+(nOffsetAngIdx==0?0.0:m_vAngularLimits[nOffsetAngIdx-1]))/2;
+                    const cv::Point2d vOffsetCoord(dOffsetMeanRadius*std::cos(dOffsetMeanAngle),dOffsetMeanRadius*std::sin(dOffsetMeanAngle));
+                    const int nOffsetDescIdx = nOffsetAngIdx+nOffsetRadIdx*m_nAngularBins;
+                    m_oEMDCostMap(nBaseDescIdx,nOffsetDescIdx) = (float)cv::norm(cv::Mat(vOffsetCoord-vBaseCoord),cv::NORM_L2);
                 }
             }
         }

@@ -166,6 +166,5 @@ private:
     cv::Mat_<cv::Point2f> m_oKeyPts,m_oContourPts;
     std::vector<int> m_vKeyInliers,m_vContourInliers;
     cv::Mat_<uchar> m_oDistMask;
-
     cv::Size m_oCurrImageSize;
 };
