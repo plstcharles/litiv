@@ -21,6 +21,14 @@
 #include "litiv/utils/math.hpp"
 #include <opencv2/features2d.hpp>
 
+#define LSS_DEFAULT_PATCH_SIZE    (5)
+#define LSS_DEFAULT_DESC_RADIUS   (40)
+#define LSS_DEFAULT_RADIAL_BINS   (3)
+#define LSS_DEFAULT_ANGULAR_BINS  (12)
+#define LSS_DEFAULT_STATNOISE_VAR (300000.f)
+#define LSS_DEFAULT_NORM_BINS     (true)
+#define LSS_DEFAULT_PREPROCESS    (false)
+
 /**
     Local Self-Similarirty (LSS) feature extractor
 
@@ -31,7 +39,13 @@
 class LSS : public cv::DescriptorExtractor {
 public:
     /// default constructor
-    LSS(int nDescPatchSize=5, int nDescRadius=40, int nRadialBins=3, int nAngularBins=12, float fStaticNoiseVar=300000.f, bool bPreProcess=false);
+    LSS(int nDescPatchSize=LSS_DEFAULT_PATCH_SIZE,
+        int nDescRadius=LSS_DEFAULT_DESC_RADIUS,
+        int nRadialBins=LSS_DEFAULT_RADIAL_BINS,
+        int nAngularBins=LSS_DEFAULT_ANGULAR_BINS,
+        float fStaticNoiseVar=LSS_DEFAULT_STATNOISE_VAR,
+        bool bNormalizeBins=LSS_DEFAULT_NORM_BINS,
+        bool bPreProcess=LSS_DEFAULT_PREPROCESS);
     /// loads extractor params from the specified file node @@@@ not impl
     virtual void read(const cv::FileNode&) override;
     /// writes extractor params to the specified file storage @@@@ not impl
@@ -100,21 +114,23 @@ protected:
     /// classic 'compute' implementation, based on DescriptorExtractor's arguments & expected output
     virtual void detectAndCompute(cv::InputArray oImage, cv::InputArray oMask, std::vector<cv::KeyPoint>& voKeypoints, cv::OutputArray oDescriptors, bool bUseProvidedKeypoints=false) override;
     /// defines whether input images should be preprocessed using a gaussian filter or not
-    const bool m_bPreProcess; // default = false
+    const bool m_bPreProcess;
+    /// defines whether output descriptor bins should be normalized or not (better for illum variations)
+    const bool m_bNormalizeBins;
     /// size of internal ssd patches (must be odd)
-    const int m_nDescPatchSize; // default = 5
+    const int m_nDescPatchSize;
     /// radius of the LSS descriptor (center to patch ring distance)
-    const int m_nDescRadius; // default = 40
+    const int m_nDescRadius;
     /// size of the LSS descriptor correlation window
     const int m_nCorrWinSize; // deduced
     /// size of the SSD correlation output patch
     const int m_nCorrPatchSize; // deduced
     /// radial bins count
-    const int m_nRadialBins; // default = 3
+    const int m_nRadialBins;
     /// angular bins count
-    const int m_nAngularBins; // default = 12
+    const int m_nAngularBins;
     /// static noise suppression level to use while binning
-    const float m_fStaticNoiseVar; // default = 300000
+    const float m_fStaticNoiseVar;
 
 private:
     /// keypoint-based description approach impl

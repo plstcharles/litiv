@@ -25,7 +25,6 @@
 #define USE_CHATFIELD_MASK      0 // 0 == use Lienhart's mask
 #define USE_STATIC_VAR_NOISE    1 // 0 == dynamically determine variation based on original paper suggestion
 #define USE_ITERATIVE_SSD       0 // 0 == use per-pixel 'matchTemplate' call (less prone to cumulative float error)
-#define USE_POST_NORMALISATION  0 // 0 == leave descriptors as-is (may not match well during illum variations)
 
 #define _USE_MATH_DEFINES
 #include "litiv/features2d.hpp"
@@ -97,8 +96,9 @@ inline void ssdesc_genmask(int nMaskSize, int nRadialBins, int nAngularBins, cv:
     //cv::waitKey(0);
 }
 
-LSS::LSS(int nDescPatchSize, int nDescRadius, int nRadialBins, int nAngularBins, float fStaticNoiseVar, bool bPreProcess) :
+LSS::LSS(int nDescPatchSize, int nDescRadius, int nRadialBins, int nAngularBins, float fStaticNoiseVar, bool bNormalizeBins, bool bPreProcess) :
         m_bPreProcess(bPreProcess),
+        m_bNormalizeBins(bNormalizeBins),
         m_nDescPatchSize(nDescPatchSize),
         m_nDescRadius(nDescRadius),
         m_nCorrWinSize(m_nDescRadius*2+m_nDescPatchSize),
@@ -171,7 +171,7 @@ bool LSS::isUsingIterativeSSD() const {
 }
 
 bool LSS::isNormalizingBins() const {
-    return USE_POST_NORMALISATION;
+    return m_bNormalizeBins;
 }
 
 bool LSS::isPreProcessing() const {
@@ -322,9 +322,8 @@ void LSS::ssdescs_impl(const cv::Mat& _oImage, std::vector<cv::KeyPoint>& voKeyp
         oTempDesc *= fVarNormFact;
         cv::exp(oTempDesc,cv::Mat_<float>(1,m_nRadialBins*m_nAngularBins,bGenDescMap?oDescriptors.ptr<float>(nRowIdx,nColIdx):oDescriptors.ptr<float>(nKeyPtIdx)));
     }
-#if USE_POST_NORMALISATION
-    ssdescs_norm(oDescriptors);
-#endif //USE_POST_NORMALISATION
+    if(m_bNormalizeBins)
+        ssdescs_norm(oDescriptors);
 }
 
 void LSS::ssdescs_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
@@ -398,9 +397,8 @@ void LSS::ssdescs_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
     for(; nColIdx<nCols; ++nColIdx)
         for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx)
             std::fill_n(oDescriptors.ptr<float>(nRowIdx,nColIdx),nDescSize,0.0f);
-#if USE_POST_NORMALISATION
-    ssdescs_norm(oDescriptors);
-#endif //USE_POST_NORMALISATION
+    if(m_bNormalizeBins)
+        ssdescs_norm(oDescriptors);
 }
 
 void LSS::ssdescs_norm(cv::Mat_<float>& oDescriptors) const {
@@ -411,13 +409,11 @@ void LSS::ssdescs_norm(cv::Mat_<float>& oDescriptors) const {
     lvDbgAssert(oDescriptors.size[oDescriptors.dims-1]==nDescSize);
     lvDbgAssert(oDescriptors.isContinuous());
     for(size_t nDescIdx=0; nDescIdx<oDescriptors.total(); nDescIdx+=size_t(nDescSize)) {
-        float fMin = std::numeric_limits<float>::max(), fMax = std::numeric_limits<float>::min();
-        float* pfCurrDesc = ((float*)oDescriptors.data)+nDescIdx;
-        for(int nDescBinIdx=0; nDescBinIdx<nDescSize; ++nDescBinIdx) {
-            fMin = std::min(fMin,pfCurrDesc[nDescBinIdx]);
-            fMax = std::max(fMax,pfCurrDesc[nDescBinIdx]);
-        }
-        for(int nDescBinIdx=0; nDescBinIdx<nDescSize; ++nDescBinIdx)
-            pfCurrDesc[nDescBinIdx] = (pfCurrDesc[nDescBinIdx]-fMin)/(fMax-fMin);
+        cv::Mat_<float> oCurrDesc(1,nDescSize,((float*)oDescriptors.data)+nDescIdx);
+        const double dNorm = cv::norm(oCurrDesc,cv::NORM_L2);
+        if(dNorm>1e-6)
+            oCurrDesc /= dNorm;
+        else
+            oCurrDesc = std::sqrt(1.0f/nDescSize);
     }
 }

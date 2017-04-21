@@ -38,9 +38,15 @@
 class DASC : public cv::DescriptorExtractor {
 public:
     /// constructor for recursive filtering-based DASC feature descriptor extractor (see original paper for parameter info)
-    explicit DASC(float fSigma_s/*=DASC_DEFAULT_RF_SIGMAS*/, float fSigma_r/*=DASC_DEFAULT_RF_SIGMAR*/, size_t nIters=DASC_DEFAULT_RF_ITERS, bool bPreProcess=DASC_DEFAULT_PREPROCESS);
+    explicit DASC(float fSigma_s/*=DASC_DEFAULT_RF_SIGMAS*/,
+                  float fSigma_r/*=DASC_DEFAULT_RF_SIGMAR*/,
+                  size_t nIters=DASC_DEFAULT_RF_ITERS,
+                  bool bPreProcess=DASC_DEFAULT_PREPROCESS);
     /// constructor for guided filtering-based DASC feature descriptor extractor (see original paper for parameter info)
-    explicit DASC(size_t nRadius/*=DASC_DEFAULT_GF_RADIUS*/, float fEpsilon/*=DASC_DEFAULT_GF_EPS*/, size_t nSubSamplFrac=DASC_DEFAULT_GF_SUBSPL, bool bPreProcess=DASC_DEFAULT_PREPROCESS);
+    explicit DASC(size_t nRadius/*=DASC_DEFAULT_GF_RADIUS*/,
+                  float fEpsilon/*=DASC_DEFAULT_GF_EPS*/,
+                  size_t nSubSamplFrac=DASC_DEFAULT_GF_SUBSPL,
+                  bool bPreProcess=DASC_DEFAULT_PREPROCESS);
     /// loads extractor params from the specified file node @@@@ not impl
     virtual void read(const cv::FileNode&) override;
     /// writes extractor params to the specified file storage @@@@ not impl
