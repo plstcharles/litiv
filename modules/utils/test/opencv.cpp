@@ -307,6 +307,65 @@ TYPED_TEST(MatSize_fixture,regression_nd) {
     }
 }
 
+TEST(squeeze,regression_trivial) {
+    cv::Mat_<int> testmat(1,1);
+    lv::test::fillarray(testmat.begin(),testmat.end(),0,10000);
+    cv::Mat resmat = lv::squeeze(testmat);
+    ASSERT_EQ(lv::MatInfo(testmat),lv::MatInfo(resmat));
+    ASSERT_TRUE(std::equal(testmat.begin(),testmat.end(),resmat.begin<int>(),resmat.end<int>()));
+    testmat.create(2,1);
+    lv::test::fillarray(testmat.begin(),testmat.end(),0,10000);
+    resmat = lv::squeeze(testmat);
+    ASSERT_EQ(lv::MatInfo(testmat),lv::MatInfo(resmat));
+    ASSERT_TRUE(std::equal(testmat.begin(),testmat.end(),resmat.begin<int>(),resmat.end<int>()));
+    testmat.create(1,231);
+    lv::test::fillarray(testmat.begin(),testmat.end(),0,10000);
+    resmat = lv::squeeze(testmat);
+    ASSERT_EQ(lv::MatInfo(testmat),lv::MatInfo(resmat));
+    ASSERT_TRUE(std::equal(testmat.begin(),testmat.end(),resmat.begin<int>(),resmat.end<int>()));
+}
+
+TEST(squeeze,regression_single) {
+    cv::Mat_<int> testmat(3,std::array<int,3>{2,3,1}.data());
+    lv::test::fillarray(testmat.begin(),testmat.end(),0,10000);
+    cv::Mat resmat = lv::squeeze(testmat);
+    ASSERT_EQ(lv::MatInfo(std::array<int,2>{2,3},CV_32SC1),lv::MatInfo(resmat));
+    ASSERT_TRUE(std::equal(testmat.begin(),testmat.end(),resmat.begin<int>(),resmat.end<int>()));
+    testmat.create(3,std::array<int,3>{5,1,1}.data());
+    lv::test::fillarray(testmat.begin(),testmat.end(),0,10000);
+    resmat = lv::squeeze(testmat);
+    ASSERT_TRUE(lv::MatInfo(std::array<int,2>{5,1},CV_32SC1)==lv::MatInfo(resmat) || lv::MatInfo(std::array<int,2>{1,5},CV_32SC1)==lv::MatInfo(resmat));
+    ASSERT_TRUE(std::equal(testmat.begin(),testmat.end(),resmat.begin<int>(),resmat.end<int>()));
+    testmat.create(5,std::array<int,5>{5,3,4,2,1}.data());
+    lv::test::fillarray(testmat.begin(),testmat.end(),0,10000);
+    resmat = lv::squeeze(testmat);
+    ASSERT_EQ(lv::MatInfo(std::array<int,4>{5,3,4,2},CV_32SC1),lv::MatInfo(resmat));
+    ASSERT_TRUE(std::equal(testmat.begin(),testmat.end(),resmat.begin<int>(),resmat.end<int>()));
+    testmat.create(5,std::array<int,5>{2,5,1,2,4}.data());
+    lv::test::fillarray(testmat.begin(),testmat.end(),0,10000);
+    resmat = lv::squeeze(testmat);
+    ASSERT_EQ(lv::MatInfo(std::array<int,4>{2,5,2,4},CV_32SC1),lv::MatInfo(resmat));
+    ASSERT_TRUE(std::equal(testmat.begin(),testmat.end(),resmat.begin<int>(),resmat.end<int>()));
+}
+
+TEST(squeeze,regression_multi) {
+    cv::Mat_<int> testmat(4,std::array<int,4>{2,1,3,1}.data());
+    lv::test::fillarray(testmat.begin(),testmat.end(),0,10000);
+    cv::Mat resmat = lv::squeeze(testmat);
+    ASSERT_EQ(lv::MatInfo(std::array<int,2>{2,3},CV_32SC1),lv::MatInfo(resmat));
+    ASSERT_TRUE(std::equal(testmat.begin(),testmat.end(),resmat.begin<int>(),resmat.end<int>()));
+    testmat.create(5,std::array<int,5>{5,1,4,2,1}.data());
+    lv::test::fillarray(testmat.begin(),testmat.end(),0,10000);
+    resmat = lv::squeeze(testmat);
+    ASSERT_EQ(lv::MatInfo(std::array<int,3>{5,4,2},CV_32SC1),lv::MatInfo(resmat));
+    ASSERT_TRUE(std::equal(testmat.begin(),testmat.end(),resmat.begin<int>(),resmat.end<int>()));
+    testmat.create(7,std::array<int,7>{1,5,1,2,1,1,1}.data());
+    lv::test::fillarray(testmat.begin(),testmat.end(),0,10000);
+    resmat = lv::squeeze(testmat);
+    ASSERT_EQ(lv::MatInfo(std::array<int,2>{5,2},CV_32SC1),lv::MatInfo(resmat));
+    ASSERT_TRUE(std::equal(testmat.begin(),testmat.end(),resmat.begin<int>(),resmat.end<int>()));
+}
+
 TEST(clampImageCoords,regression) {
     const int nBS0 = 0;
     const int nBS5 = 5;
