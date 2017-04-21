@@ -39,7 +39,7 @@ TEST(dasc_rf,regression_single_compute) {
     pDASC->compute2(oInputCrop,oOutputDescMap);
     ASSERT_EQ(oInputCrop.size[0],oOutputDescMap.size[0]);
     ASSERT_EQ(oInputCrop.size[1],oOutputDescMap.size[1]);
-    const cv::Mat_<float> oOutputDesc = cv::Mat_<float>(3,std::array<int,3>{1,1,oOutputDescMap.size[2]}.data(),oOutputDescMap.ptr<float>(oWindowSize.width/2,oWindowSize.height/2)).clone();
+    const cv::Mat_<float> oOutputDesc = cv::Mat_<float>(3,std::array<int,3>{1,1,oOutputDescMap.size[2]}.data(),oOutputDescMap.ptr<float>(oWindowSize.height/2,oWindowSize.width/2)).clone();
     if(lv::checkIfExists(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_rf.bin")) {
         const cv::Mat_<float> oRefDesc = lv::read(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_rf.bin");
         ASSERT_EQ(oOutputDesc.total(),oRefDesc.total());
@@ -57,7 +57,7 @@ TEST(dasc_rf,regression_single_compute) {
     ASSERT_EQ(vKeyPoints.size(),size_t(1));
     ASSERT_FLOAT_EQ(vKeyPoints[0].pt.x,vKeyPoints_orig[0].pt.x);
     ASSERT_FLOAT_EQ(vKeyPoints[0].pt.y,vKeyPoints_orig[0].pt.y);
-    const cv::Mat_<float> oOutputKPDesc(3,std::array<int,3>{1,1,oOutputDescMap.size[2]}.data(),oOutputDescMap.ptr<float>(oWindowSize.width/2,oWindowSize.height/2));
+    const cv::Mat_<float> oOutputKPDesc(3,std::array<int,3>{1,1,oOutputDescMap.size[2]}.data(),oOutputDescMap.ptr<float>(oWindowSize.height/2,oWindowSize.width/2));
     ASSERT_EQ(oOutputDesc.total(),oOutputKPDesc.total());
     ASSERT_EQ(oOutputDesc.size,oOutputKPDesc.size);
     for(int nDescIdx=0; nDescIdx<oOutputDesc.size[2]; ++nDescIdx) {
@@ -157,7 +157,7 @@ TEST(dasc_gf,regression_single_compute) {
     pDASC->compute2(oInputCrop,oOutputDescMap);
     ASSERT_EQ(oInputCrop.size[0],oOutputDescMap.size[0]);
     ASSERT_EQ(oInputCrop.size[1],oOutputDescMap.size[1]);
-    const cv::Mat_<float> oOutputDesc = cv::Mat_<float>(3,std::array<int,3>{1,1,oOutputDescMap.size[2]}.data(),oOutputDescMap.ptr<float>(oWindowSize.width/2,oWindowSize.height/2)).clone();
+    const cv::Mat_<float> oOutputDesc = cv::Mat_<float>(3,std::array<int,3>{1,1,oOutputDescMap.size[2]}.data(),oOutputDescMap.ptr<float>(oWindowSize.height/2,oWindowSize.width/2)).clone();
     if(lv::checkIfExists(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_gf.bin")) {
         const cv::Mat_<float> oRefDesc = lv::read(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_gf.bin");
         ASSERT_EQ(oOutputDesc.total(),oRefDesc.total());
@@ -175,7 +175,7 @@ TEST(dasc_gf,regression_single_compute) {
     ASSERT_EQ(vKeyPoints.size(),size_t(1));
     ASSERT_FLOAT_EQ(vKeyPoints[0].pt.x,vKeyPoints_orig[0].pt.x);
     ASSERT_FLOAT_EQ(vKeyPoints[0].pt.y,vKeyPoints_orig[0].pt.y);
-    const cv::Mat_<float> oOutputKPDesc(3,std::array<int,3>{1,1,oOutputDescMap.size[2]}.data(),oOutputDescMap.ptr<float>(oWindowSize.width/2,oWindowSize.height/2));
+    const cv::Mat_<float> oOutputKPDesc(3,std::array<int,3>{1,1,oOutputDescMap.size[2]}.data(),oOutputDescMap.ptr<float>(oWindowSize.height/2,oWindowSize.width/2));
     ASSERT_EQ(oOutputDesc.total(),oOutputKPDesc.total());
     ASSERT_EQ(oOutputDesc.size,oOutputKPDesc.size);
     for(int nDescIdx=0; nDescIdx<oOutputDesc.size[2]; ++nDescIdx) {
