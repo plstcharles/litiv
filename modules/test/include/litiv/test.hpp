@@ -79,6 +79,27 @@ namespace lv {
             return std::move(v);
         }
 
+        /// fills a data array with random values between 'min' and 'max'
+        template<typename TIter, typename TVal>
+        void fillarray(TIter begin, TIter end, TVal min, TVal max) {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            typedef std::conditional_t<
+                    std::is_integral<TVal>::value,
+                    std::uniform_int_distribution<
+                            std::conditional_t<
+                                    std::is_same<uint64_t,TVal>::value,
+                                    uint64_t,
+                                    int64_t
+                            >
+                    >,
+                    std::uniform_real_distribution<double>
+            > unif_distr;
+            unif_distr uniform_dist(min,max);
+            for(; begin!=end; ++begin)
+                *begin = (TVal)uniform_dist(gen);
+        }
+
         /// prints framework version/build info to stdout; always returns true
         bool info();
 
