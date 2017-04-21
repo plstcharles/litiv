@@ -36,8 +36,8 @@
 ////////////////////////////////
 #define DATASET_USE_DISPARITY_EVAL         0
 #define DATASET_USE_HALF_GT_INPUT_FLAG     1
-#define DATASET_USE_PRECALC_FEATURES       1
-#define DATASET_SAVE_PRECALC_FEATURES      0
+#define DATASET_USE_PRECALC_FEATURES       0
+#define DATASET_SAVE_PRECALC_FEATURES      1
 #define DATASET_EXTRA_PIXEL_BORDER_SIZE    0
 
 #if (DATASET_VAPTRIMOD+DATASET_MINI_TESTS/*+...*/)!=1
@@ -162,7 +162,9 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             for(size_t nStreamIdx=0; nStreamIdx<vCurrInput.size(); ++nStreamIdx)
                 lvDbgAssert(oFrameSize==vCurrInput[nStreamIdx].size());
 #if DATASET_USE_PRECALC_FEATURES
-            pAlgo->setNextFeatures(oBatch.loadFeatures(nCurrIdx));
+            const cv::Mat& oNextFeatsPacket = oBatch.loadFeatures(nCurrIdx);
+            lvAssert__(!oNextFeatsPacket.empty(),"could not load precalc feature packet for idx=%d",(int)nCurrIdx);
+            pAlgo->setNextFeatures(oNextFeatsPacket);
 #elif DATASET_SAVE_PRECALC_FEATURES
             cv::Mat oFeatsPack;
             pAlgo->calcFeatures(lv::convertVectorToArray<nExpectedAlgoInputCount>(vCurrInput),&oFeatsPack);

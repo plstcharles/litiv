@@ -23,9 +23,10 @@
 
 // config toggles/options
 #define FGSTEREOMATCH_CONFIG_ALLOC_IN_MODEL        0
-#define FGSTEREOMATCH_CONFIG_USE_DASCGF_FEATS      1
+#define FGSTEREOMATCH_CONFIG_USE_DASCGF_FEATS      0
 #define FGSTEREOMATCH_CONFIG_USE_DASCRF_FEATS      0
-#define FGSTEREOMATCH_CONFIG_USE_LSS_FEATS         0
+#define FGSTEREOMATCH_CONFIG_USE_LSS_FEATS         1
+#define FGSTEREOMATCH_CONFIG_USE_SHAPE_EMD_SIM     0
 
 // default param values
 #define FGSTEREOMATCH_DEFAULT_MAXITERCOUNT         (size_t(1000))
@@ -99,6 +100,34 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
     static_assert(std::is_integral<ResegmLabelType>::value,"Graph resegm label type must be integral");
     static_assert(size_t(std::numeric_limits<IndexType>::max())>=size_t(std::numeric_limits<StereoLabelType>::max()),"Graph index type max value must be greater than stereo label type max value");
     static_assert(size_t(std::numeric_limits<IndexType>::max())>=size_t(std::numeric_limits<ResegmLabelType>::max()),"Graph index type max value must be greater than resegm label type max value");
+
+    /// defines the indices of provided matrices inside the input array
+    enum InputPackingList {
+        InputPackSize=4,
+        InputPackOffset=2,
+        // absolute values for direct indexing
+        InputPack_LeftImg=0,
+        InputPack_LeftMask=1,
+        InputPack_RightImg=2,
+        InputPack_RightMask=3,
+        // relative values for cam-based indexing
+        InputPackOffset_Img=0,
+        InputPackOffset_Mask=1,
+    };
+
+    /// defines the indices of provided matrices inside the input array
+    enum OutputPackingList {
+        OutputPackSize=4,
+        OutputPackOffset=2,
+        // absolute values for direct indexing
+        OutputPack_LeftDisp=0,
+        OutputPack_LeftMask=1,
+        OutputPack_RightDisp=2,
+        OutputPack_RightMask=3,
+        // relative values for cam-based indexing
+        OutputPackOffset_Disp=0,
+        OutputPackOffset_Mask=1,
+    };
 
     /// full stereo graph matcher constructor; relies on provided parameters to build graphical model base
     FGStereoMatcher(const cv::Size& oImageSize, size_t nMinDispOffset, size_t nMaxDispOffset, size_t nDispStep=1);
@@ -252,7 +281,7 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
 #if FGSTEREOMATCH_CONFIG_USE_DASCGF_FEATS || FGSTEREOMATCH_CONFIG_USE_DASCRF_FEATS
         std::unique_ptr<DASC> m_pVisDescExtractor;
 #elif FGSTEREOMATCH_CONFIG_USE_LSS_FEATS
-        std::unique_ptr<LSS> m_pImageFeatExtractor;
+        std::unique_ptr<LSS> m_pVisDescExtractor;
 #endif //FGSTEREOMATCH_CONFIG_USE_..._FEATS
         /// holds the feature extractor to use on input shapes
         std::unique_ptr<ShapeContext> m_pShpDescExtractor;
@@ -274,18 +303,39 @@ struct FGStereoMatcher : public ICosegmentor<int32_t,4> {
         bool m_bModelUpToDate;
         /// defines the indices of feature maps inside precalc packets (per camera head)
         enum FeatPackingList {
-            FeatPack_VisDescs=0,
-            FeatPack_ShpDescs,
-            FeatPack_VisDist,
-            FeatPack_ShpDist,
-            FeatPack_FGDist,
-            FeatPack_BGDist,
-            FeatPack_FGSim,
-            FeatPack_BGSim,
-            FeatPack_GradY,
-            FeatPack_GradX,
-            FeatPack_GradMag,
-            FeatPackCount
+            FeatPackSize=20,
+            FeatPackOffset=9,
+            // absolute values for direct indexing
+            FeatPack_LeftVisDescs=0,
+            FeatPack_LeftShpDescs=1,
+            FeatPack_LeftFGDist=2,
+            FeatPack_LeftBGDist=3,
+            FeatPack_LeftFGSim=4,
+            FeatPack_LeftBGSim=5,
+            FeatPack_LeftGradY=6,
+            FeatPack_LeftGradX=7,
+            FeatPack_LeftGradMag=8,
+            FeatPack_RightVisDescs=9,
+            FeatPack_RightShpDescs=10,
+            FeatPack_RightFGDist=11,
+            FeatPack_RightBGDist=12,
+            FeatPack_RightFGSim=13,
+            FeatPack_RightBGSim=14,
+            FeatPack_RightGradY=15,
+            FeatPack_RightGradX=16,
+            FeatPack_RightGradMag=17,
+            FeatPack_VisAffinity=18,
+            FeatPack_ShpAffinity=19,
+            // relative values for cam-based indexing
+            FeatPackOffset_VisDescs=0,
+            FeatPackOffset_ShpDescs=1,
+            FeatPackOffset_FGDist=2,
+            FeatPackOffset_BGDist=3,
+            FeatPackOffset_FGSim=4,
+            FeatPackOffset_BGSim=5,
+            FeatPackOffset_GradY=6,
+            FeatPackOffset_GradX=7,
+            FeatPackOffset_GradMag=8,
         };
     };
 

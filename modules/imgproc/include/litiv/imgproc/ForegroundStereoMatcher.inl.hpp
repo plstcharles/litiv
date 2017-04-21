@@ -15,8 +15,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <stdlib.h>
-
 #ifndef __LITIV_FGSTEREOM_HPP__
 #error "Cannot include .inl.hpp headers directly!"
 #endif //ndef(__LITIV_FGSTEREOM_HPP__)
@@ -28,6 +26,7 @@
 inline FGStereoMatcher::FGStereoMatcher(const cv::Size& oImageSize, size_t nMinDispOffset, size_t nMaxDispOffset, size_t nDispStep) :
         m_oImageSize(oImageSize) {
     static_assert(getInputStreamCount()==4 && getOutputStreamCount()==4 && getCameraCount()==2,"i/o stream must be two image-mask pairs");
+    static_assert(getInputStreamCount()==InputPackSize && getOutputStreamCount()==OutputPackSize,"bad i/o internal enum mapping");
     lvAssert_(m_oImageSize.area()>1,"graph grid must be 2D and have at least two nodes");
     lvAssert_(nDispStep>0,"specified disparity offset step size must be strictly positive");
     if(nMaxDispOffset<nMinDispOffset)
@@ -48,7 +47,7 @@ inline FGStereoMatcher::FGStereoMatcher(const cv::Size& oImageSize, size_t nMinD
 inline void FGStereoMatcher::apply(const MatArrayIn& aInputs, MatArrayOut& aOutputs) {
     for(size_t nInputIdx=0; nInputIdx<aInputs.size(); ++nInputIdx) {
         lvAssert__(aInputs[nInputIdx].dims==2 && m_oImageSize==aInputs[nInputIdx].size(),"input in array at index=%d had the wrong size",(int)nInputIdx);
-        lvAssert_((nInputIdx%2)==0 || aInputs[nInputIdx].type()==CV_8UC1,"unexpected input mask type");
+        lvAssert_((nInputIdx%InputPackOffset)==InputPackOffset_Img || aInputs[nInputIdx].type()==CV_8UC1,"unexpected input mask type");
         aInputs[nInputIdx].copyTo(m_pModelData->m_aInputs[nInputIdx]);
     }
     lvDbgAssert(m_pModelData && m_pStereoInf /*&& m_pResegmInf@@@@@*/);
@@ -136,7 +135,7 @@ inline FGStereoMatcher::GraphModelData::GraphModelData(const cv::Size& oImageSiz
 #elif FGSTEREOMATCH_CONFIG_USE_DASCRF_FEATS
     m_pVisDescExtractor = std::make_unique<DASC>(DASC_DEFAULT_RF_SIGMAS,DASC_DEFAULT_RF_SIGMAR,DASC_DEFAULT_RF_ITERS,DASC_DEFAULT_PREPROCESS);
 #elif FGSTEREOMATCH_CONFIG_USE_LSS_FEATS
-    @@@
+    m_pVisDescExtractor = std::make_unique<LSS>();
 #endif //FGSTEREOMATCH_CONFIG_USE_..._FEATS
     const size_t nShapeContextInnerRadius=2, nShapeContextOuterRadius=FGSTEREOMATCH_DEFAULT_SHAPEDESC_RAD;
     m_pShpDescExtractor = std::make_unique<ShapeContext>(nShapeContextInnerRadius,nShapeContextOuterRadius,SHAPECONTEXT_DEFAULT_ANG_BINS,SHAPECONTEXT_DEFAULT_RAD_BINS);
@@ -375,12 +374,10 @@ inline void FGStereoMatcher::GraphModelData::resetLabelings() {
 inline void FGStereoMatcher::GraphModelData::updateModels(const MatArrayIn& aInputs) {
     for(size_t nInputIdx=0; nInputIdx<aInputs.size(); ++nInputIdx)
         lvDbgAssert__(aInputs[nInputIdx].dims==2 && m_oGridSize==aInputs[nInputIdx].size(),"input at index=%d had the wrong size",(int)nInputIdx);
-    for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
-        lvDbgAssert_(aInputs[nCamIdx*2+1].type()==CV_8UC1,"unexpected input mask type");
-        /*const cv::Point2i oDisplayOffset = {-(int)m_nGridBorderSize,-(int)m_nGridBorderSize};
-        lvCout << "input" << nCamIdx << " = " << lv::to_string(aInputs[nCamIdx*2],oDisplayOffset) << std::endl;*/
-        cv::imshow(std::string("input")+std::to_string(nCamIdx),aInputs[nCamIdx*2]);
-    }
+    lvDbgAssert_(aInputs[InputPack_LeftMask].type()==CV_8UC1,"unexpected left input mask type");
+    lvDbgAssert_(aInputs[InputPack_RightMask].type()==CV_8UC1,"unexpected right input mask type");
+    cv::imshow("left input (a)",aInputs[InputPack_LeftImg]);//@@@@
+    cv::imshow("right input (b)",aInputs[InputPack_RightImg]);//@@@@
     const int nRows = (int)m_oGridSize(0);
     const int nCols = (int)m_oGridSize(1);
     const size_t nLabels = m_vStereoLabels.size();
@@ -393,22 +390,44 @@ inline void FGStereoMatcher::GraphModelData::updateModels(const MatArrayIn& aInp
     const auto lHasValidDesc = [&nMinDescRowIdx,&nMaxDescRowIdx,&nMinDescColIdx,&nMaxDescColIdx](int nRowIdx, int nColIdx) {
         return nRowIdx>=nMinDescRowIdx && nRowIdx<=nMaxDescRowIdx && nColIdx>=nMinDescColIdx && nColIdx<=nMaxDescColIdx;
     };
-    lvAssert_(!m_bUsePrecalcFeatsNext || m_vNextFeats.size()==FeatPackCount*getCameraCount(),"unexpected precalculated features vec size");
+    lvAssert_(!m_bUsePrecalcFeatsNext || m_vNextFeats.size()==FeatPackSize,"unexpected precalculated features vec size");
     if(!m_bUsePrecalcFeatsNext)
         calcFeatures(aInputs);
     else
         m_bUsePrecalcFeatsNext = false;
-    static_assert(getCameraCount()==2,"lots of stuff hardcoded below for 2-cam stereo");
-    const cv::Mat_<float> oVisDistMap = m_vNextFeats[FeatPack_VisDist];
-    const cv::Mat_<float> oShpDistMap = m_vNextFeats[FeatPack_ShpDist];
-    lvDbgAssert(oVisDistMap.dims==3 && oVisDistMap.size[0]==nRows && oVisDistMap.size[1]==nCols && oVisDistMap.size[2]==(int)nRealLabels);
-    lvDbgAssert(oShpDistMap.dims==3 && oShpDistMap.size[0]==nRows && oShpDistMap.size[1]==nCols && oShpDistMap.size[2]==(int)nRealLabels);
-    const std::array<cv::Mat_<float>,2> aFGDistMaps = {m_vNextFeats[FeatPack_FGDist],m_vNextFeats[FeatPackCount+FeatPack_FGDist]};
-    const std::array<cv::Mat_<float>,2> aBGDistMaps = {m_vNextFeats[FeatPack_BGDist],m_vNextFeats[FeatPackCount+FeatPack_BGDist]};
+    const cv::Mat_<float> oVisAffinity = m_vNextFeats[FeatPack_VisAffinity];
+    const cv::Mat_<float> oShpAffinityMap = m_vNextFeats[FeatPack_ShpAffinity];
+    exit(0);
+    /*const cv::Mat_<float> oVisDescMap = m_vNextFeats[FeatPack_VisDescs];
+    lvPrint(cv::Mat_<uchar>(3,3,const_cast<uchar*>(aInputs[InputPack_LeftImg].ptr<uchar>(77,87)),aInputs[InputPack_LeftImg].step[0]));
+    lvPrint(cv::Mat_<uchar>(3,3,const_cast<uchar*>(aInputs[InputPack_RightImg].ptr<uchar>(77,77)),aInputs[InputPack_RightImg].step[0]));
+    lvPrint(cv::Mat_<float>(1,oVisDescMap.size[2],const_cast<float*>(oVisDescMap.ptr<float>(78,88))));
+    lvPrint(cv::Mat_<float>(1,m_vNextFeats[FeatPackCount+FeatPack_VisDescs].size[2],m_vNextFeats[FeatPackCount+FeatPack_VisDescs].ptr<float>(78,78)));
+
+
+    for(size_t i=0; i<nRealLabels; ++i) {
+
+        cv::Mat_<float> tmp = lv::squeeze(lv::getSubMat(oVisAffinity,2,(int)i));
+        cv::Mat_<float> tmpdescs = lv::squeeze(lv::getSubMat(oVisDescMap,2,(int)i));
+        cv::Rect roi(0,128,256,1);
+        cv::imshow("tmp",tmp);
+        lvPrint(tmp(roi));
+        lvPrint(tmpdescs(roi));
+        cv::Mat_<float> exp;
+        cv::exp(-tmp,exp);
+        cv::imshow("exp",exp);
+        lvPrint(exp(roi));
+        cv::waitKey(0);
+    }*/
+
+    lvDbgAssert(oVisAffinity.dims==3 && oVisAffinity.size[0]==nRows && oVisAffinity.size[1]==nCols && oVisAffinity.size[2]==(int)nRealLabels);
+    lvDbgAssert(oShpAffinityMap.dims==3 && oShpAffinityMap.size[0]==nRows && oShpAffinityMap.size[1]==nCols && oShpAffinityMap.size[2]==(int)nRealLabels);
+    const std::array<cv::Mat_<float>,2> aFGDistMaps = {m_vNextFeats[FeatPack_LeftFGDist],m_vNextFeats[FeatPack_RightFGDist]};
+    const std::array<cv::Mat_<float>,2> aBGDistMaps = {m_vNextFeats[FeatPack_LeftBGDist],m_vNextFeats[FeatPack_RightBGDist]};
     lvDbgAssert(lv::MatInfo(aFGDistMaps[0])==lv::MatInfo(aFGDistMaps[1]) && m_oGridSize==aFGDistMaps[0].size);
     lvDbgAssert(lv::MatInfo(aBGDistMaps[0])==lv::MatInfo(aBGDistMaps[1]) && m_oGridSize==aBGDistMaps[0].size);
-    const std::array<cv::Mat_<float>,2> aFGSimMaps = {m_vNextFeats[FeatPack_FGSim],m_vNextFeats[FeatPackCount+FeatPack_FGSim]};
-    const std::array<cv::Mat_<float>,2> aBGSimMaps = {m_vNextFeats[FeatPack_BGSim],m_vNextFeats[FeatPackCount+FeatPack_BGSim]};
+    const std::array<cv::Mat_<float>,2> aFGSimMaps = {m_vNextFeats[FeatPack_LeftFGSim],m_vNextFeats[FeatPack_RightFGSim]};
+    const std::array<cv::Mat_<float>,2> aBGSimMaps = {m_vNextFeats[FeatPack_LeftBGSim],m_vNextFeats[FeatPack_RightBGSim]};
     lvDbgAssert(lv::MatInfo(aFGSimMaps[0])==lv::MatInfo(aFGSimMaps[1]) && m_oGridSize==aFGSimMaps[0].size);
     lvDbgAssert(lv::MatInfo(aBGSimMaps[0])==lv::MatInfo(aBGSimMaps[1]) && m_oGridSize==aBGSimMaps[0].size);
     /*for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
@@ -423,9 +442,9 @@ inline void FGStereoMatcher::GraphModelData::updateModels(const MatArrayIn& aInp
         cv::imshow(std::string("aBGDist")+std::to_string(nCamIdx),aBGDist[nCamIdx]/max);
     }
     cv::waitKey(0);*/
-    const std::array<cv::Mat_<uchar>,2> aGradYMaps = {m_vNextFeats[FeatPack_GradY],m_vNextFeats[FeatPackCount+FeatPack_GradY]};
-    const std::array<cv::Mat_<uchar>,2> aGradXMaps = {m_vNextFeats[FeatPack_GradX],m_vNextFeats[FeatPackCount+FeatPack_GradX]};
-    const std::array<cv::Mat_<uchar>,2> aGradMagMaps = {m_vNextFeats[FeatPack_GradMag],m_vNextFeats[FeatPackCount+FeatPack_GradMag]};
+    const std::array<cv::Mat_<uchar>,2> aGradYMaps = {m_vNextFeats[FeatPack_LeftGradY],m_vNextFeats[FeatPack_RightGradY]};
+    const std::array<cv::Mat_<uchar>,2> aGradXMaps = {m_vNextFeats[FeatPack_LeftGradX],m_vNextFeats[FeatPack_RightGradX]};
+    const std::array<cv::Mat_<uchar>,2> aGradMagMaps = {m_vNextFeats[FeatPack_LeftGradMag],m_vNextFeats[FeatPack_RightGradMag]};
     lvDbgAssert(lv::MatInfo(aGradYMaps[0])==lv::MatInfo(aGradYMaps[1]) && m_oGridSize==aGradYMaps[0].size);
     lvDbgAssert(lv::MatInfo(aGradXMaps[0])==lv::MatInfo(aGradXMaps[1]) && m_oGridSize==aGradXMaps[0].size);
     lvDbgAssert(lv::MatInfo(aGradMagMaps[0])==lv::MatInfo(aGradMagMaps[1]) && m_oGridSize==aGradMagMaps[0].size);
@@ -456,24 +475,24 @@ inline void FGStereoMatcher::GraphModelData::updateModels(const MatArrayIn& aInp
             StereoExplicitFunction& vUnaryFunc = oNode.pStereoVisSimUnaryFunc->second;
             lvDbgAssert(vUnaryFunc.dimension()==1 && vUnaryFunc.size()==nLabels);
             lvDbgAssert(m_pVisDescExtractor->defaultNorm()==cv::NORM_L2);
-            const float* pVisDistPtr = oVisDistMap.ptr<float>(nRowIdx,nColIdx);
-            const float* pShpDistPtr = oShpDistMap.ptr<float>(nRowIdx,nColIdx);
+            const float* pVisAffinityPtr = oVisAffinity.ptr<float>(nRowIdx,nColIdx);
+            const float* pShpAffinityPtr = oShpAffinityMap.ptr<float>(nRowIdx,nColIdx);
             for(StereoLabelType nLabelIdx=0; nLabelIdx<nRealLabels; ++nLabelIdx) {
                 const OutputLabelType nRealLabel = getRealLabel(nLabelIdx);
                 const int nOffsetColIdx = nColIdx-nRealLabel;
                 //const bool bValidDescOffsetNode = lHasValidDesc(nRowIdx,nOffsetColIdx); // @@@ update to use roi?
                 vUnaryFunc(nLabelIdx) = ValueType(0);
-                const float& fVisDist = pVisDistPtr[nLabelIdx];
-                const float& fShpDist = pShpDistPtr[nLabelIdx];
+                const float& fVisAffinity = pVisAffinityPtr[nLabelIdx];
+                const float& fShpAffinity = pShpAffinityPtr[nLabelIdx];
                 if(nOffsetColIdx>=0 && nOffsetColIdx<nCols) { // @@@ update to use roi?
-                    if(!(fVisDist>=0.0f && fShpDist>=0.0f))
-                        lvPrint(fVisDist) << "nRowIdx="<<nRowIdx << ", nColIdx=" << nColIdx <<", nLabelIdx="<<(int)nLabelIdx<<"\n";
-                    lvAssert(fVisDist>=0.0f && fShpDist>=0.0f);
-                    vUnaryFunc(nLabelIdx) += ValueType(fVisDist*FGSTEREOMATCH_VISSIM_COST_DESC_SCALE);
-                    vUnaryFunc(nLabelIdx) += ValueType(fShpDist*FGSTEREOMATCH_SHPSIM_COST_DESC_SCALE);
+                    if(!(fVisAffinity>=0.0f && fShpAffinity>=0.0f))
+                        lvPrint(fVisAffinity) << "nRowIdx="<<nRowIdx << ", nColIdx=" << nColIdx <<", nLabelIdx="<<(int)nLabelIdx<<"\n";
+                    lvAssert(fVisAffinity>=0.0f && fShpAffinity>=0.0f);
+                    vUnaryFunc(nLabelIdx) += ValueType(fVisAffinity*FGSTEREOMATCH_VISSIM_COST_DESC_SCALE);
+                    vUnaryFunc(nLabelIdx) += ValueType(fShpAffinity*FGSTEREOMATCH_SHPSIM_COST_DESC_SCALE);
                 }
                 else {
-                    lvAssert(fVisDist<1.0f && fShpDist<0.0f);
+                    lvAssert(fVisAffinity<1.0f && fShpAffinity<0.0f);
                     vUnaryFunc(nLabelIdx) += FGSTEREOMATCH_UNARY_COST_OOB_CST;
                 }
                 vUnaryFunc(nLabelIdx) = std::min(FGSTEREOMATCH_UNARY_COST_MAXTRUNC_CST,vUnaryFunc(nLabelIdx));
@@ -532,33 +551,58 @@ inline void FGStereoMatcher::GraphModelData::updateModels(const MatArrayIn& aInp
 inline void FGStereoMatcher::GraphModelData::calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeatsPacket) {
     static_assert(getCameraCount()==2,"lots of hardcoded indices below");
     for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
-        lvAssert__(aInputs[nCamIdx*2].dims==2 && m_oGridSize==aInputs[nCamIdx*2].size(),"input image in array at index=%d had the wrong size",(int)nCamIdx);
-        lvAssert__(aInputs[nCamIdx*2+1].dims==2 && m_oGridSize==aInputs[nCamIdx*2+1].size(),"input mask in array at index=%d had the wrong size",(int)nCamIdx);
-        lvAssert_(aInputs[nCamIdx*2].type()==CV_8UC1 || aInputs[nCamIdx*2].type()==CV_8UC3,"unexpected input image type");
-        lvAssert_(aInputs[nCamIdx*2+1].type()==CV_8UC1,"unexpected input mask type");
+        const cv::Mat& oInputImg = aInputs[nCamIdx*InputPackOffset+InputPackOffset_Img];
+        lvAssert__(oInputImg.dims==2 && m_oGridSize==oInputImg.size(),"input image in array at index=%d had the wrong size",(int)nCamIdx);
+        lvAssert_(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3,"unexpected input image type");
+        const cv::Mat& oInputMask = aInputs[nCamIdx*InputPackOffset+InputPackOffset_Mask];
+        lvAssert__(oInputMask.dims==2 && m_oGridSize==oInputMask.size(),"input mask in array at index=%d had the wrong size",(int)nCamIdx);
+        lvAssert_(oInputMask.type()==CV_8UC1,"unexpected input mask type");
     }
-    m_vNextFeats.resize(FeatPackCount*getCameraCount());
+    m_vNextFeats.resize(FeatPackSize);
     lvLog(1,"Calculating features maps...");
     lv::StopWatch oLocalTimer;
     #if USING_OPENMP
-    #pragma omp parallel for num_threads(getCameraCount())
+    //#pragma omp parallel for num_threads(getCameraCount())
     #endif //USING_OPENMP
     for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
+        const cv::Mat& oInputImg = aInputs[nCamIdx*InputPackOffset+InputPackOffset_Img];
+        const cv::Mat& oInputMask = aInputs[nCamIdx*InputPackOffset+InputPackOffset_Mask];
         lvDbgAssert(m_pVisDescExtractor && m_pShpDescExtractor);
-        m_pVisDescExtractor->compute2(aInputs[nCamIdx*2],m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_VisDescs]);
-        m_pShpDescExtractor->compute2(aInputs[nCamIdx*2+1],m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_ShpDescs]);
-        cv::distanceTransform(aInputs[nCamIdx*2+1]==0,m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_FGDist],cv::DIST_L2,cv::DIST_MASK_PRECISE,CV_32F);
-        cv::exp(FGSTEREOMATCH_DEFAULT_DISTTRANSF_SCALE*m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_FGDist],m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_FGSim]);
-        //lvPrint(cv::Mat_<float>(m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_FGSim](cv::Rect(0,128,256,1))));
-        cv::divide(1.0,m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_FGSim]+FGSTEREOMATCH_DEFAULT_DISTTRANSF_OFFSET,m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_FGDist]);
-        //lvPrint(cv::Mat_<float>(m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_FGDist](cv::Rect(0,128,256,1))));
-        cv::distanceTransform(aInputs[nCamIdx*2+1]>0,m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_BGDist],cv::DIST_L2,cv::DIST_MASK_PRECISE,CV_32F);
-        cv::exp(FGSTEREOMATCH_DEFAULT_DISTTRANSF_SCALE*m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_BGDist],m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_BGSim]);
-        //lvPrint(cv::Mat_<float>(m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_BGSim](cv::Rect(0,128,256,1))));
-        cv::divide(1.0,m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_BGSim]+FGSTEREOMATCH_DEFAULT_DISTTRANSF_OFFSET,m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_BGDist]);
-        //lvPrint(cv::Mat_<float>(m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_BGDist](cv::Rect(0,128,256,1))));
+        cv::Mat& oVisDescs = m_vNextFeats[nCamIdx*FeatPackOffset+FeatPackOffset_VisDescs];
+        m_pVisDescExtractor->compute2(oInputImg,oVisDescs);
+        cv::Mat& oShpDescs = m_vNextFeats[nCamIdx*FeatPackOffset+FeatPackOffset_ShpDescs];
+        m_pShpDescExtractor->compute2(oInputMask,oShpDescs);
+
+        /*if(nCamIdx==1) {
+            for(int i = 60; i<190; ++i) {
+                for(int j = 60; j<190; ++j) {
+                    cv::Mat_<float> tmp1(1,oVisDescs.size[2],oVisDescs.ptr<float>(i,j));
+                    cv::Mat_<float> tmp2(1,oVisDescs.size[2],m_vNextFeats[FeatPack_LeftVisDescs].ptr<float>(i,j+10));
+                    double dist = cv::norm(tmp1-tmp2);
+                    if(dist>1e-7) {
+                        std::cout << "@@@@@ i=" << i << ", j=" << j << ", d=" << dist << std::endl;
+                    }
+                }
+            }
+        }*/
+
+        cv::Mat& oFGDist = m_vNextFeats[nCamIdx*FeatPackOffset+FeatPackOffset_FGDist];
+        cv::distanceTransform(oInputMask==0,oFGDist,cv::DIST_L2,cv::DIST_MASK_PRECISE,CV_32F);
+        cv::Mat& oFGSim = m_vNextFeats[nCamIdx*FeatPackOffset+FeatPackOffset_FGSim];
+        cv::exp(FGSTEREOMATCH_DEFAULT_DISTTRANSF_SCALE*oFGDist,oFGSim);
+        //lvPrint(cv::Mat_<float>(oFGSim(cv::Rect(0,128,256,1))));
+        cv::divide(1.0,oFGSim+FGSTEREOMATCH_DEFAULT_DISTTRANSF_OFFSET,oFGDist);
+        //lvPrint(cv::Mat_<float>(oFGDist(cv::Rect(0,128,256,1))));
+
+        cv::Mat& oBGDist = m_vNextFeats[nCamIdx*FeatPackOffset+FeatPackOffset_BGDist];
+        cv::distanceTransform(oInputMask>0,oBGDist,cv::DIST_L2,cv::DIST_MASK_PRECISE,CV_32F);
+        cv::Mat& oBGSim = m_vNextFeats[nCamIdx*FeatPackOffset+FeatPackOffset_BGSim];
+        cv::exp(FGSTEREOMATCH_DEFAULT_DISTTRANSF_SCALE*oBGDist,oBGSim);
+        //lvPrint(cv::Mat_<float>(oBGSim(cv::Rect(0,128,256,1))));
+        cv::divide(1.0,oBGSim+FGSTEREOMATCH_DEFAULT_DISTTRANSF_OFFSET,oBGDist);
+        //lvPrint(cv::Mat_<float>(oBGDist(cv::Rect(0,128,256,1))));
         cv::Mat oBlurredInput;
-        cv::GaussianBlur(aInputs[nCamIdx*2],oBlurredInput,cv::Size(3,3),0);
+        cv::GaussianBlur(oInputImg,oBlurredInput,cv::Size(3,3),0);
         cv::Mat oBlurredGrayInput;
         if(oBlurredInput.channels()==3)
             cv::cvtColor(oBlurredInput,oBlurredGrayInput,cv::COLOR_BGR2GRAY);
@@ -567,9 +611,12 @@ inline void FGStereoMatcher::GraphModelData::calcFeatures(const MatArrayIn& aInp
         cv::Mat oGradInput_X,oGradInput_Y;
         cv::Sobel(oBlurredGrayInput,oGradInput_Y,CV_16S,0,1,FGSTEREOMATCH_DEFAULT_GRAD_KERNEL_SIZE);
         cv::Sobel(oBlurredGrayInput,oGradInput_X,CV_16S,1,0,FGSTEREOMATCH_DEFAULT_GRAD_KERNEL_SIZE);
-        cv::convertScaleAbs(oGradInput_Y,m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_GradY]);
-        cv::convertScaleAbs(oGradInput_X,m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_GradX]);
-        cv::addWeighted(m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_GradY],0.5,m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_GradX],0.5,0,m_vNextFeats[nCamIdx*FeatPackCount+FeatPack_GradMag]);
+        cv::Mat& oGradY = m_vNextFeats[nCamIdx*FeatPackOffset+FeatPackOffset_GradY];
+        cv::convertScaleAbs(oGradInput_Y,oGradY);
+        cv::Mat& oGradX = m_vNextFeats[nCamIdx*FeatPackOffset+FeatPackOffset_GradX];
+        cv::convertScaleAbs(oGradInput_X,oGradX);
+        cv::Mat& oGradMag = m_vNextFeats[nCamIdx*FeatPackOffset+FeatPackOffset_GradMag];
+        cv::addWeighted(oGradY,0.5,oGradX,0.5,0,oGradMag);
     }
     lvLog_(1,"Features maps computed in %f second(s).",oLocalTimer.tock());
     const int nRows = (int)m_oGridSize(0);
@@ -584,49 +631,59 @@ inline void FGStereoMatcher::GraphModelData::calcFeatures(const MatArrayIn& aInp
     const auto lHasValidDesc = [&nMinDescRowIdx,&nMaxDescRowIdx,&nMinDescColIdx,&nMaxDescColIdx](int nRowIdx, int nColIdx) {
         return nRowIdx>=nMinDescRowIdx && nRowIdx<=nMaxDescRowIdx && nColIdx>=nMinDescColIdx && nColIdx<=nMaxDescColIdx;
     };
-    const std::array<cv::Mat_<float>,2> aVisDescs = {m_vNextFeats[FeatPack_VisDescs],m_vNextFeats[FeatPackCount+FeatPack_VisDescs]};
-    const std::array<cv::Mat_<float>,2> aShpDescs = {m_vNextFeats[FeatPack_ShpDescs],m_vNextFeats[FeatPackCount+FeatPack_ShpDescs]};
+    const std::array<cv::Mat_<float>,2> aVisDescs = {m_vNextFeats[FeatPack_LeftVisDescs],m_vNextFeats[FeatPack_RightVisDescs]};
+    const std::array<cv::Mat_<float>,2> aShpDescs = {m_vNextFeats[FeatPack_LeftShpDescs],m_vNextFeats[FeatPack_RightShpDescs]};
     lvDbgAssert(lv::MatInfo(aVisDescs[0])==lv::MatInfo(aVisDescs[1]) && aVisDescs[0].dims==3);
     lvDbgAssert(lv::MatInfo(aShpDescs[0])==lv::MatInfo(aShpDescs[1]) && aShpDescs[0].dims==3);
     lvDbgAssert(aVisDescs[0].size[0]==nRows && aVisDescs[0].size[1]==nCols);
     lvDbgAssert(aShpDescs[0].size[0]==nRows && aShpDescs[0].size[1]==nCols);
+    lvLog(1,"Calculating affinity maps...");
     const std::array<int,3> anDistMapDims = {nRows,nCols,(int)nRealLabels};
-    m_vNextFeats[FeatPack_VisDist].create(3,anDistMapDims.data(),CV_32FC1);
-    m_vNextFeats[FeatPack_ShpDist].create(3,anDistMapDims.data(),CV_32FC1);
-    m_vNextFeats[FeatPack_VisDist] = -1.0f; // all OOB by default
-    m_vNextFeats[FeatPack_ShpDist] = -1.0f; // all OOB by default
+    cv::Mat& oVisAffinity = m_vNextFeats[FeatPack_VisAffinity];
+    cv::Mat& oShpAffinity = m_vNextFeats[FeatPack_ShpAffinity];
+    oVisAffinity.create(3,anDistMapDims.data(),CV_32FC1);
+    oShpAffinity.create(3,anDistMapDims.data(),CV_32FC1);
     std::atomic_size_t nProcessedNodeCount(size_t(0));
     std::mutex oPrintMutex;
-    lvLog(1,"Calculating affinity maps...");
     #if USING_OPENMP
     #pragma omp parallel for collapse(2)
     #endif //USING_OPENMP
     for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
         for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
-            float* pVisDistPtr = m_vNextFeats[FeatPack_VisDist].ptr<float>(nRowIdx,nColIdx);
-            float* pShpDistPtr = m_vNextFeats[FeatPack_ShpDist].ptr<float>(nRowIdx,nColIdx);
+            float* pVisAffinityPtr = oVisAffinity.ptr<float>(nRowIdx,nColIdx);
+            float* pShpAffinityPtr = oShpAffinity.ptr<float>(nRowIdx,nColIdx);
             const bool bValidDescNode = lHasValidDesc(nRowIdx,nColIdx);
-            lvDbgAssert(m_pVisDescExtractor->defaultNorm()==cv::NORM_L2);
+            //const StereoLabelType nLabelIdx = 10;
+            //const OutputLabelType nRealLabel = 10;
             for(StereoLabelType nLabelIdx=0; nLabelIdx<nRealLabels; ++nLabelIdx) {
                 const OutputLabelType nRealLabel = getRealLabel(nLabelIdx);
                 const int nOffsetColIdx = nColIdx-nRealLabel;
                 const bool bValidDescOffsetNode = lHasValidDesc(nRowIdx,nOffsetColIdx); // @@@ update to use roi?
-                // calc inter-spectral visual descriptor distance
                 if(bValidDescNode && bValidDescOffsetNode) {
                     // test w/ root-sift transform here? @@@@@
-                    pVisDistPtr[nLabelIdx] = (float)m_pVisDescExtractor->calcDistance(aVisDescs[0].ptr<float>(nRowIdx,nColIdx),aVisDescs[1].ptr<float>(nRowIdx,nOffsetColIdx));
+                    pVisAffinityPtr[nLabelIdx] = (float)m_pVisDescExtractor->calcDistance(aVisDescs[0].ptr<float>(nRowIdx,nColIdx),aVisDescs[1].ptr<float>(nRowIdx,nOffsetColIdx));
                     // @@@@ check if descs are really normalized by impl
                 }
                 else if(nOffsetColIdx>=0 && nOffsetColIdx<nCols) { // @@@ update to use roi?
-                    lvDbgAssert(aInputs[0].type()==CV_8UC1 && aInputs[2].type()==CV_8UC1);
-                    const int nCurrVisDiff = (int)aInputs[0].at<uchar>(nRowIdx,nColIdx)-(int)aInputs[2].at<uchar>(nRowIdx,nOffsetColIdx);
-                    pVisDistPtr[nLabelIdx] = (std::abs(nCurrVisDiff)*FGSTEREOMATCH_VISSIM_COST_RAW_SCALE);
+                    lvDbgAssert(aInputs[InputPack_LeftImg].type()==CV_8UC1 && aInputs[InputPack_RightImg].type()==CV_8UC1);
+                    const int nCurrVisDiff = (int)aInputs[InputPack_LeftImg].at<uchar>(nRowIdx,nColIdx)-(int)aInputs[InputPack_RightImg].at<uchar>(nRowIdx,nOffsetColIdx);
+                    pVisAffinityPtr[nLabelIdx] = (std::abs(nCurrVisDiff)*FGSTEREOMATCH_VISSIM_COST_RAW_SCALE);
                 }
-                // calc inter-spectral shape descriptor distance
+                else
+                    pVisAffinityPtr[nLabelIdx] = -1.0f; // OOB
                 if(nOffsetColIdx>=0 && nOffsetColIdx<nCols) { // @@@ update to use roi?
                     // test w/ root-sift transform here? @@@@@
-                    pShpDistPtr[nLabelIdx] = (float)m_pShpDescExtractor->calcDistance(aShpDescs[0].ptr<float>(nRowIdx,nColIdx),aShpDescs[1].ptr<float>(nRowIdx,nOffsetColIdx));
+#if FGSTEREOMATCH_CONFIG_USE_SHAPE_EMD_SIM
+                    // @@@@ add scale factor?
+                    pShpAffinityPtr[nLabelIdx] = (float)m_pShpDescExtractor->calcDistance(aShpDescs[0].ptr<float>(nRowIdx,nColIdx),aShpDescs[1].ptr<float>(nRowIdx,nOffsetColIdx));
+#else //!FGSTEREOMATCH_CONFIG_USE_SHAPE_EMD_SIM
+                    const cv::Mat_<float> oDesc1(1,aShpDescs[0].size[2],const_cast<float*>(aShpDescs[0].ptr<float>(nRowIdx,nColIdx)));
+                    const cv::Mat_<float> oDesc2(1,aShpDescs[0].size[2],const_cast<float*>(aShpDescs[1].ptr<float>(nRowIdx,nOffsetColIdx)));
+                    pShpAffinityPtr[nLabelIdx] = (float)cv::norm(oDesc1,oDesc2,cv::NORM_L2);
+#endif //!FGSTEREOMATCH_CONFIG_USE_SHAPE_EMD_SIM
                 }
+                else
+                    pShpAffinityPtr[nLabelIdx] = -1.0f; // OOB
             }
             const size_t nCurrNodeIdx = ++nProcessedNodeCount;
             if((nCurrNodeIdx%(size_t(nRows*nCols)/20))==0) {
@@ -636,10 +693,20 @@ inline void FGStereoMatcher::GraphModelData::calcFeatures(const MatArrayIn& aInp
         }
     }
     lv::cleanConsoleRow();
-    // same affinity maps for 2nd camera, but using negative disparity offsets indices inside
-    m_vNextFeats[FeatPack_VisDist].copyTo(m_vNextFeats[FeatPackCount+FeatPack_VisDist]);
-    m_vNextFeats[FeatPack_ShpDist].copyTo(m_vNextFeats[FeatPackCount+FeatPack_ShpDist]);
     lvLog_(1,"Affinity maps computed in %f second(s).",oLocalTimer.tock());
+    for(StereoLabelType nLabelIdx=0; nLabelIdx<nRealLabels; ++nLabelIdx) {
+        cv::Mat_<float> tmp = lv::squeeze(lv::getSubMat(oVisAffinity,2,(int)nLabelIdx));
+        //cv::Mat_<float> tmpdescs = lv::squeeze(lv::getSubMat(oVisDescMap,2,(int)i));
+        cv::Rect roi(0,128,256,1);
+        cv::imshow("tmp",tmp);
+        lvPrint(tmp(roi));
+        //lvPrint(tmpdescs(roi));
+        cv::Mat_<float> exp;
+        cv::exp(-tmp,exp);
+        cv::imshow("exp",exp);
+        lvPrint(exp(roi));
+        cv::waitKey(0);
+    }
     if(pFeatsPacket)
         *pFeatsPacket = lv::packData(m_vNextFeats,&m_vNextFeatPackInfo);
     else {
@@ -657,24 +724,24 @@ inline void FGStereoMatcher::GraphModelData::setNextFeatures(const cv::Mat& oPac
     lvAssert_(!oPackedFeats.empty(),"features packet must be non-empty");
     lvDbgExceptionWatch;
     if(m_vExpectedFeatPackInfo.empty()) {
+        m_vExpectedFeatPackInfo.resize(FeatPackSize);
+        for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
+            m_vExpectedFeatPackInfo[nCamIdx*FeatPackOffset+FeatPackOffset_VisDescs] = m_pVisDescExtractor->getOutputInfo(lv::MatInfo(m_oGridSize,CV_8UC3));
+            m_vExpectedFeatPackInfo[nCamIdx*FeatPackOffset+FeatPackOffset_ShpDescs] = m_pShpDescExtractor->getOutputInfo(lv::MatInfo(m_oGridSize,CV_8UC1));
+            m_vExpectedFeatPackInfo[nCamIdx*FeatPackOffset+FeatPackOffset_FGDist] = lv::MatInfo(m_oGridSize,CV_32FC1);
+            m_vExpectedFeatPackInfo[nCamIdx*FeatPackOffset+FeatPackOffset_BGDist] = lv::MatInfo(m_oGridSize,CV_32FC1);
+            m_vExpectedFeatPackInfo[nCamIdx*FeatPackOffset+FeatPackOffset_FGSim] = lv::MatInfo(m_oGridSize,CV_32FC1);
+            m_vExpectedFeatPackInfo[nCamIdx*FeatPackOffset+FeatPackOffset_BGSim] = lv::MatInfo(m_oGridSize,CV_32FC1);
+            m_vExpectedFeatPackInfo[nCamIdx*FeatPackOffset+FeatPackOffset_GradY] = lv::MatInfo(m_oGridSize,CV_8UC1);
+            m_vExpectedFeatPackInfo[nCamIdx*FeatPackOffset+FeatPackOffset_GradX] = lv::MatInfo(m_oGridSize,CV_8UC1);
+            m_vExpectedFeatPackInfo[nCamIdx*FeatPackOffset+FeatPackOffset_GradMag] = lv::MatInfo(m_oGridSize,CV_8UC1);
+        }
         const int nRows = (int)m_oGridSize(0);
         const int nCols = (int)m_oGridSize(1);
         const int nRealLabels = (int)m_vStereoLabels.size()-2;
         lvDbgAssert(nRealLabels>1);
-        m_vExpectedFeatPackInfo.resize(FeatPackCount*getCameraCount());
-        for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
-            m_vExpectedFeatPackInfo[nCamIdx*FeatPackCount+FeatPack_VisDescs] = m_pVisDescExtractor->getOutputInfo(lv::MatInfo(m_oGridSize,CV_8UC3));
-            m_vExpectedFeatPackInfo[nCamIdx*FeatPackCount+FeatPack_ShpDescs] = m_pShpDescExtractor->getOutputInfo(lv::MatInfo(m_oGridSize,CV_8UC1));
-            m_vExpectedFeatPackInfo[nCamIdx*FeatPackCount+FeatPack_VisDist] = lv::MatInfo(std::array<int,3>{nRows,nCols,nRealLabels},CV_32FC1);
-            m_vExpectedFeatPackInfo[nCamIdx*FeatPackCount+FeatPack_ShpDist] = lv::MatInfo(std::array<int,3>{nRows,nCols,nRealLabels},CV_32FC1);
-            m_vExpectedFeatPackInfo[nCamIdx*FeatPackCount+FeatPack_FGDist] = lv::MatInfo(m_oGridSize,CV_32FC1);
-            m_vExpectedFeatPackInfo[nCamIdx*FeatPackCount+FeatPack_BGDist] = lv::MatInfo(m_oGridSize,CV_32FC1);
-            m_vExpectedFeatPackInfo[nCamIdx*FeatPackCount+FeatPack_FGSim] = lv::MatInfo(m_oGridSize,CV_32FC1);
-            m_vExpectedFeatPackInfo[nCamIdx*FeatPackCount+FeatPack_BGSim] = lv::MatInfo(m_oGridSize,CV_32FC1);
-            m_vExpectedFeatPackInfo[nCamIdx*FeatPackCount+FeatPack_GradY] = lv::MatInfo(m_oGridSize,CV_8UC1);
-            m_vExpectedFeatPackInfo[nCamIdx*FeatPackCount+FeatPack_GradX] = lv::MatInfo(m_oGridSize,CV_8UC1);
-            m_vExpectedFeatPackInfo[nCamIdx*FeatPackCount+FeatPack_GradMag] = lv::MatInfo(m_oGridSize,CV_8UC1);
-        }
+        m_vExpectedFeatPackInfo[FeatPack_VisAffinity] = lv::MatInfo(std::array<int,3>{nRows,nCols,nRealLabels},CV_32FC1);
+        m_vExpectedFeatPackInfo[FeatPack_ShpAffinity] = lv::MatInfo(std::array<int,3>{nRows,nCols,nRealLabels},CV_32FC1);
     }
     m_oNextPackedFeats = oPackedFeats; // get pointer to data instead of copy; provider should not overwrite until next 'apply' call!
     m_vNextFeats = lv::unpackData(m_oNextPackedFeats,m_vExpectedFeatPackInfo);
@@ -948,8 +1015,8 @@ opengm::InferenceTermination FGStereoMatcher::StereoGraphInference::infer(TVisit
 
             const cv::Rect oLineROI(50,128,200,1);
             lvCout << "-----\n\n\n";
-            lvCout << "input0 = " << lv::to_string(m_oData.m_aInputs[0](oLineROI)) << '\n';
-            lvCout << "input1 = " << lv::to_string(m_oData.m_aInputs[2](oLineROI)) << '\n';
+            lvCout << "inputa = " << lv::to_string(m_oData.m_aInputs[InputPack_LeftImg](oLineROI)) << '\n';
+            lvCout << "inputb = " << lv::to_string(m_oData.m_aInputs[InputPack_RightImg](oLineROI)) << '\n';
             lvCout << "disp = " << lv::to_string(m_oData.m_oStereoLabeling(oLineROI)) << '\n';
             lvCout << "assoc_counts = " << lv::to_string(m_oData.m_oAssocCounts(oLineROI+cv::Point2i((int)m_oData.m_nMaxDispOffset,0))) << '\n';
             lvCout << "assoc_cost = " << lv::to_string(m_oData.m_oAssocCosts(oLineROI)) << '\n';
