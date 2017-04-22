@@ -276,10 +276,13 @@ void ShapeContext::scdesc_fill_maps(double dMeanDist) {
     lvDbgAssert(m_oKeyPts.total()>size_t(0));
     if(m_oContourPts.empty())
         return;
-    if(m_bUseRelativeSpace && dMeanDist<0 && (!m_vKeyInliers.empty() || !m_vContourInliers.empty()))
+    const bool bUseDistMask = m_bUseRelativeSpace && dMeanDist<0 && (!m_vKeyInliers.empty() || !m_vContourInliers.empty());
+    if(bUseDistMask) {
         m_oDistMask.create((int)m_oKeyPts.total(),(int)m_oContourPts.total());
-    else
-        m_oDistMask.release();
+        for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx)
+            for(int nContourPtIdx=0; nContourPtIdx<(int)m_oContourPts.total(); ++nContourPtIdx)
+                m_oDistMask(nKeyPtIdx,nContourPtIdx) = uchar((m_vKeyInliers.empty() || m_vKeyInliers[nKeyPtIdx]!=0) && (m_vContourInliers.empty() || m_vContourInliers[nContourPtIdx]!=0));
+    }
     m_oDistMap.create((int)m_oKeyPts.total(),(int)m_oContourPts.total());
     m_oAngMap.create((int)m_oKeyPts.total(),(int)m_oContourPts.total());
     cv::Point2f vMassCenter(0,0);
@@ -289,29 +292,29 @@ void ShapeContext::scdesc_fill_maps(double dMeanDist) {
         vMassCenter.x = vMassCenter.x/m_oContourPts.total();
         vMassCenter.y = vMassCenter.y/m_oContourPts.total();
     }
+    cv::Matx12f vPtDiff;
     for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx) {
         for(int nContourPtIdx=0; nContourPtIdx<(int)m_oContourPts.total(); ++nContourPtIdx) {
             const cv::Point2f& vKeyPt = ((cv::Point2f*)m_oKeyPts.data)[nKeyPtIdx];
             const cv::Point2f& vContourPt = ((cv::Point2f*)m_oContourPts.data)[nContourPtIdx];
-            const cv::Point2f vDiff = vKeyPt-vContourPt;
-            m_oDistMap(nKeyPtIdx,nContourPtIdx) = cv::norm(cv::Mat(vDiff),cv::NORM_L2);
+            vPtDiff(0) = vKeyPt.y-vContourPt.y;
+            vPtDiff(1) = vKeyPt.x-vContourPt.x;
+            m_oDistMap(nKeyPtIdx,nContourPtIdx) = cv::norm(vPtDiff,cv::NORM_L2);
             if(m_oDistMap(nKeyPtIdx,nContourPtIdx)<0.01)
                 m_oAngMap(nKeyPtIdx,nContourPtIdx) = 0.0;
             else {
-                m_oAngMap(nKeyPtIdx,nContourPtIdx) = std::atan2(vDiff.y,-vDiff.x);
+                m_oAngMap(nKeyPtIdx,nContourPtIdx) = std::atan2(vPtDiff(0),-vPtDiff(1));
                 if(m_bRotationInvariant) {
                     const cv::Point2d vRefPt = vContourPt-vMassCenter;
                     m_oAngMap(nKeyPtIdx,nContourPtIdx) -= std::atan2(-vRefPt.y,vRefPt.x);
                 }
                 m_oAngMap(nKeyPtIdx,nContourPtIdx) = std::fmod(m_oAngMap(nKeyPtIdx,nContourPtIdx)+2*CV_PI+FLT_EPSILON,2*CV_PI);
             }
-            if(!m_oDistMask.empty())
-                m_oDistMask(nKeyPtIdx,nContourPtIdx) = uchar((m_vKeyInliers.empty() || m_vKeyInliers[nKeyPtIdx]!=0) && (m_vContourInliers.empty() || m_vContourInliers[nContourPtIdx]!=0));
         }
     }
     if(m_bUseRelativeSpace) {
         if(dMeanDist<0)
-            dMeanDist = cv::mean(m_oDistMap,m_oDistMask.empty()?cv::noArray():m_oDistMask)[0];
+            dMeanDist = cv::mean(m_oDistMap,bUseDistMask?m_oDistMask:cv::noArray())[0];
         m_oDistMap /= (dMeanDist+FLT_EPSILON);
     }
 }
