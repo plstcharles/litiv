@@ -24,7 +24,7 @@
 #define WRITE_IMG_OUTPUT        0
 #define EVALUATE_OUTPUT         0
 #define DISPLAY_OUTPUT          0
-#define GLOBAL_VERBOSITY        3
+#define GLOBAL_VERBOSITY        2
 ////////////////////////////////
 #define DATASET_VAPTRIMOD       0
 #define DATASET_MINI_TESTS      1
@@ -36,8 +36,8 @@
 ////////////////////////////////
 #define DATASET_USE_DISPARITY_EVAL         0
 #define DATASET_USE_HALF_GT_INPUT_FLAG     1
-#define DATASET_USE_PRECALC_FEATURES       0
-#define DATASET_SAVE_PRECALC_FEATURES      1
+#define DATASET_USE_PRECALC_FEATURES       1
+#define DATASET_SAVE_PRECALC_FEATURES      0
 #define DATASET_EXTRA_PIXEL_BORDER_SIZE    0
 
 #if (DATASET_VAPTRIMOD+DATASET_MINI_TESTS/*+...*/)!=1

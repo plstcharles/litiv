@@ -34,7 +34,7 @@
 #define STEREOSEGMATCH_DEFAULT_SHAPEDESC_RAD        (size_t(30))
 #define STEREOSEGMATCH_DEFAULT_GRAD_KERNEL_SIZE     (int(7))
 #define STEREOSEGMATCH_DEFAULT_DISTTRANSF_SCALE     (-0.1f)
-#define STEREOSEGMATCH_DEFAULT_DISTTRANSF_OFFSET    (0.1f)
+#define STEREOSEGMATCH_DEFAULT_ITER_PER_RESEGM      ((nStereoLabels*3)/2)
 
 // unary costs params
 #define STEREOSEGMATCH_UNARY_COST_OOB_CST           (ValueType(1000))
@@ -44,6 +44,7 @@
 #define STEREOSEGMATCH_IMGSIM_COST_RAW_SCALE        (2.0f/STEREOSEGMATCH_IMGSIM_COST_DESC_SCALE)
 #define STEREOSEGMATCH_SHPSIM_COST_DESC_SCALE       (2500)
 #define STEREOSEGMATCH_UNIQUE_COST_OVER_SCALE       (500)
+#define STEREOSEGMATCH_SHPDIST_COST_SCALE           (1000)
 // pairwise costs params
 #define STEREOSEGMATCH_LBLSIM_COST_MAXOCCL          (ValueType(5000))
 #define STEREOSEGMATCH_LBLSIM_COST_MAXTRUNC         (ValueType(5000))
@@ -88,10 +89,12 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
     using StereoFunc = std::pair<StereoFuncID,ExplicitFunction&>; ///< stereo funcid-funcobj pair used as viewer to explicit data
     using ResegmFunc = std::pair<ResegmFuncID,ExplicitFunction&>; ///< stereo funcid-funcobj pair used as viewer to explicit data
     using ICosegmentor<OutputLabelType,s_nInputArraySize,s_nOutputArraySize>::apply; ///< helps avoid 'no matching function' issues for apply overloads
-    static constexpr OutputLabelType s_nStereoDontCareLabel = std::numeric_limits<OutputLabelType>::min(); ///< integer stereo label value reserved for 'dont care' pixels
-    static constexpr OutputLabelType s_nStereoOccludedLabel = std::numeric_limits<OutputLabelType>::max(); ///< integer stereo label value reserved for 'occluded' pixels
-    static constexpr OutputLabelType s_nForegroundLabel = OutputLabelType(std::numeric_limits<InternalLabelType>::max());
-    static constexpr OutputLabelType s_nBackgroundLabel = OutputLabelType(0);
+    static constexpr OutputLabelType s_nDontCareLabel = std::numeric_limits<OutputLabelType>::min(); ///< real label value reserved for 'dont care' pixels
+    static constexpr OutputLabelType s_nOccludedLabel = std::numeric_limits<OutputLabelType>::max(); ///< real label value reserved for 'occluded' pixels
+    static constexpr OutputLabelType s_nForegroundLabel = OutputLabelType(std::numeric_limits<InternalLabelType>::max()); ///< real label value reserved for foreground pixels
+    static constexpr OutputLabelType s_nBackgroundLabel = OutputLabelType(0); ///< real label value reserved for background pixels
+    static constexpr InternalLabelType s_nForegroundLabelIdx = InternalLabelType(1); ///< internal label value used for 'foreground' labeling
+    static constexpr InternalLabelType s_nBackgroundLabelIdx = InternalLabelType(0); ///< internal label value used for 'background' labeling
     static constexpr size_t s_nMaxOrder = /*@@@@*/s_nInputArraySize; ///< used to limit internal static assignment array sizes
     static constexpr size_t s_nMaxCliqueAssign = size_t(1)<<s_nMaxOrder; ///< used to limit internal static assignment array sizes
     static_assert(std::is_integral<IndexType>::value,"Graph index type must be integral");
@@ -143,9 +146,9 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
     /// returns the list of (real) stereo disparity labels used in the output masks
     virtual const std::vector<OutputLabelType>& getLabels() const override;
     /// returns the output stereo label used to represent 'dont care' pixels
-    static constexpr OutputLabelType getStereoDontCareLabel() {return s_nStereoDontCareLabel;}
+    static constexpr OutputLabelType getStereoDontCareLabel() {return s_nDontCareLabel;}
     /// returns the output stereo label used to represent 'occluded' pixels
-    static constexpr OutputLabelType getStereoOccludedLabel() {return s_nStereoOccludedLabel;}
+    static constexpr OutputLabelType getStereoOccludedLabel() {return s_nOccludedLabel;}
     /// returns the expected input stereo head count
     static constexpr size_t getCameraCount() {return getInputStreamCount()/2;}
 
@@ -187,36 +190,25 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
 
         /// default constructor; receives model construction data from algo constructor
         GraphModelData(const cv::Size& oImageSize, std::vector<OutputLabelType>&& vStereoLabels, size_t nStereoLabelStep);
-        /// resets the graph labelings using init state parameters (automatically called after updateModels)
-        void resetLabelings(const MatArrayIn& aInputs);
-        /// updates graph models using new input images/masks
-        void updateModels(const MatArrayIn& aInputs);
         /// (pre)calculates features required for model updates, and optionally returns them in packet format
         void calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeatsPacket=nullptr);
-        /// sets a previously precalculated features packet to be used in the next 'updateModels' call (do not modify it before that!)
+        /// sets a previously precalculated features packet to be used in the next model updates (do not modify it before that!)
         void setNextFeatures(const cv::Mat& oPackedFeats);
+        /// performs the actual bi-model inference
+        opengm::InferenceTermination infer();
+
         /// translate an internal graph label to a real disparity offset label
         OutputLabelType getRealLabel(InternalLabelType nLabel) const;
         /// translate a real disparity offset label to an internal graph label
         InternalLabelType getInternalLabel(OutputLabelType nRealLabel) const;
         /// returns the stereo associations count for a given graph node by row/col indices
         AssocCountType getAssocCount(int nRowIdx, int nColIdx) const;
-        /// adds a stereo association for a given node coord set & origin column idx
-        void addAssoc(int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
-        /// removes a stereo association for a given node coord set & origin column idx
-        void removeAssoc(int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
         /// returns the cost of adding a stereo association for a given node coord set & origin column idx
         ValueType calcAddAssocCost(int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
         /// returns the cost of removing a stereo association for a given node coord set & origin column idx
         ValueType calcRemoveAssocCost(int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
         /// returns the total stereo association cost for all grid nodes
         ValueType calcTotalAssocCost() const;
-        /// fill internal temporary energy cost mats for the given stereo move operation
-        void calcStereoMoveCosts(InternalLabelType nNewLabel) const;
-        /// fill internal temporary energy cost mats for the given resegm move operation
-        void calcResegmMoveCosts(InternalLabelType nNewLabel) const;
-        /// performs the actual bi-model inference using preset features (only modifies mutables vars)
-        opengm::InferenceTermination infer() const;
 
         /// max move making iteration count allowed in a single optimization pass
         size_t m_nMaxStereoIterCount,m_nMaxResegmIterCount;
@@ -251,9 +243,9 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         /// contains the maximum disparity offset value
         const size_t m_nMaxDispOffset;
         /// internal label used for 'dont care' labeling
-        const InternalLabelType m_nStereoDontCareLabelIdx;
+        const InternalLabelType m_nDontCareLabelIdx;
         /// internal label used for 'occluded' labeling
-        const InternalLabelType m_nStereoOccludedLabelIdx;
+        const InternalLabelType m_nOccludedLabelIdx;
         /// opengm stereo graph model object
         std::unique_ptr<StereoModelType> m_pStereoModel;
         /// opengm resegm graph model object
@@ -301,10 +293,8 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         MatArrayIn m_aInputs;
         /// holds the latest output disp/mask matrices
         MatArrayOut m_aOutputs;
-        /// defines whether the next call to 'updateModels' should use precalc feats
+        /// defines whether the next model update should use precalc feats
         bool m_bUsePrecalcFeatsNext;
-        /// defines whether model is up-to-date, and ready for inference, or not
-        bool m_bModelUpToDate;
         /// defines the indices of feature maps inside precalc packets (per camera head)
         enum FeatPackingList {
             FeatPackSize=20,
@@ -312,19 +302,19 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
             // absolute values for direct indexing
             FeatPack_LeftImgDescs=0,
             FeatPack_LeftShpDescs=1,
-            FeatPack_LeftFGDist=2,
-            FeatPack_LeftBGDist=3,
-            FeatPack_LeftFGSim=4,
-            FeatPack_LeftBGSim=5,
+            FeatPack_LeftInitFGDist=2,
+            FeatPack_LeftInitBGDist=3,
+            FeatPack_LeftFGDist=4,
+            FeatPack_LeftBGDist=5,
             FeatPack_LeftGradY=6,
             FeatPack_LeftGradX=7,
             FeatPack_LeftGradMag=8,
             FeatPack_RightImgDescs=9,
             FeatPack_RightShpDescs=10,
-            FeatPack_RightFGDist=11,
-            FeatPack_RightBGDist=12,
-            FeatPack_RightFGSim=13,
-            FeatPack_RightBGSim=14,
+            FeatPack_RightInitFGDist=11,
+            FeatPack_RightInitBGDist=12,
+            FeatPack_RightFGDist=13,
+            FeatPack_RightBGDist=14,
             FeatPack_RightGradY=15,
             FeatPack_RightGradX=16,
             FeatPack_RightGradMag=17,
@@ -333,20 +323,34 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
             // relative values for cam-based indexing
             FeatPackOffset_ImgDescs=0,
             FeatPackOffset_ShpDescs=1,
-            FeatPackOffset_FGDist=2,
-            FeatPackOffset_BGDist=3,
-            FeatPackOffset_FGSim=4,
-            FeatPackOffset_BGSim=5,
+            FeatPackOffset_InitFGDist=2,
+            FeatPackOffset_InitBGDist=3,
+            FeatPackOffset_FGDist=4,
+            FeatPackOffset_BGDist=5,
             FeatPackOffset_GradY=6,
             FeatPackOffset_GradX=7,
             FeatPackOffset_GradMag=8,
         };
 
     protected:
+        /// adds a stereo association for a given node coord set & origin column idx
+        void addAssoc(int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
+        /// removes a stereo association for a given node coord set & origin column idx
+        void removeAssoc(int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
+        /// resets the stereo graph labelings using init state parameters
+        void resetStereoLabelings();
+        /// updates stereo model using new feats data
+        void updateStereoModel(bool bInit);
+        /// updates shape model using new feats data
+        void updateResegmModel(bool bInit);
         /// calculates image features required for model updates using the provided input image array
-        void calcImageFeatures(const std::array<cv::Mat,InputPackSize/InputPackOffset>& aInputImages);
+        void calcImageFeatures(const std::array<cv::Mat,InputPackSize/InputPackOffset>& aInputImages, bool bInit);
         /// calculates shape features required for model updates using the provided input mask array
-        void calcShapeFeatures(const std::array<cv::Mat,InputPackSize/InputPackOffset>& aInputMasks);
+        void calcShapeFeatures(const std::array<cv::Mat,InputPackSize/InputPackOffset>& aInputMasks, bool bInit);
+        /// fill internal temporary energy cost mats for the given stereo move operation
+        void calcStereoMoveCosts(InternalLabelType nNewLabel) const;
+        /// fill internal temporary energy cost mats for the given resegm move operation
+        void calcResegmMoveCosts(InternalLabelType nNewLabel) const;
         /// holds stereo disparity graph inference algorithm impl (redirects for bi-model inference)
         std::unique_ptr<StereoGraphInference> m_pStereoInf;
         /// holds resegmentation graph inference algorithm impl (redirects for bi-model inference)
@@ -356,7 +360,7 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
     /// algo interface for multi-label graph model inference
     struct StereoGraphInference : opengm::Inference<StereoModelType,opengm::Minimizer> {
         /// full constructor of the inference algorithm; the graphical model must have already been constructed prior to this call
-        StereoGraphInference(const GraphModelData& oData);
+        StereoGraphInference(GraphModelData& oData);
         /// returns the name of this inference method, for debugging/identification purposes
         virtual std::string name() const override;
         /// returns a copy of the internal const reference to the graphical model to solve
@@ -373,14 +377,14 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         virtual void getOutput(cv::Mat_<OutputLabelType>& oLabeling) const;
         /// returns the energy of the current labeling solution
         virtual ValueType value() const override;
-        /// const ref to StereoSegmMatcher::m_pModelData
-        const GraphModelData& m_oData;
+        /// ref to StereoSegmMatcher::m_pModelData
+        GraphModelData& m_oData;
     };
 
     /// algo interface for binary label graph model inference
     struct ResegmGraphInference : opengm::Inference<ResegmModelType,opengm::Minimizer> {
         /// full constructor of the inference algorithm; the graphical model must have already been constructed prior to this call
-        ResegmGraphInference(const GraphModelData& oData);
+        ResegmGraphInference(GraphModelData& oData);
         /// returns the name of this inference method, for debugging/identification purposes
         virtual std::string name() const override;
         /// returns a copy of the internal const reference to the graphical model to solve
@@ -397,8 +401,8 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         virtual void getOutput(cv::Mat_<OutputLabelType>& oLabeling) const;
         /// returns the energy of the current labeling solution
         virtual ValueType value() const override;
-        /// const ref to StereoSegmMatcher::m_pModelData
-        const GraphModelData& m_oData;
+        /// ref to StereoSegmMatcher::m_pModelData
+        GraphModelData& m_oData;
     };
 
 protected:
