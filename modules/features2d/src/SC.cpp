@@ -246,6 +246,7 @@ void ShapeContext::scdesc_generate_emdmask() {
             }
         }
     }
+    m_oEMDCostMap /= m_vRadialLimits.back()/2; // @@@@@ normalize costs based on half desc radius
 }
 
 void ShapeContext::scdesc_fill_contours(const cv::Mat& oImage) {
