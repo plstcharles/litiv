@@ -58,13 +58,13 @@
 #include "cosegm_tests.hpp"
 #define DATASET_ID Dataset_CosegmTests
 #define DATASET_PARAMS \
-    DATASET_OUTPUT_PATH,            /* => const std::string& sOutputDirName */ \
-    DATASET_EXTRA_PIXEL_BORDER_SIZE,/* => int nExtraPixelBorderSize */ \
-    DATASET_USE_DISPARITY_EVAL,     /* => int nUseGTMaskAsInput */ \
-    DATASET_USE_HALF_GT_INPUT_FLAG, /* => int bEvalStereoDisp */ \
-    bool(WRITE_IMG_OUTPUT),         /* => bool bSaveOutput */ \
-    bool(EVALUATE_OUTPUT),          /* => bool bUseEvaluator */ \
-    DATASET_SCALE_FACTOR            /* => double dScaleFactor */
+    DATASET_OUTPUT_PATH,                                       /* => const std::string& sOutputDirName */ \
+    DATASET_EXTRA_PIXEL_BORDER_SIZE,                           /* => int nExtraPixelBorderSize */ \
+    DATASET_USE_DISPARITY_EVAL,                                /* => int nUseGTMaskAsInput */ \
+    DATASET_USE_HALF_GT_INPUT_FLAG,                            /* => int bEvalStereoDisp */ \
+    DATASET_USE_PRECALC_FEATURES?bool(WRITE_IMG_OUTPUT):false, /* => bool bSaveOutput */ \
+    DATASET_USE_PRECALC_FEATURES?bool(EVALUATE_OUTPUT):false,  /* => bool bUseEvaluator */ \
+    DATASET_SCALE_FACTOR                                       /* => double dScaleFactor */
 //#elif DATASET_...
 #endif //DATASET_...
 #if (DATASET_USE_PRECALC_FEATURES+DATASET_SAVE_PRECALC_FEATURES)>1
@@ -92,7 +92,9 @@ int main(int, char**) {
             vTaskResults.push_back(oPool.queueTask(Analyze,std::to_string(nCurrBatchIdx++)+"/"+std::to_string(nTotBatches),pBatch));
         for(std::future<void>& oTaskRes : vTaskResults)
             oTaskRes.get();
+    #if DATASET_USE_PRECALC_FEATURES
         pDataset->writeEvalReport();
+    #endif //DATASET_USE_PRECALC_FEATURES
     }
     catch(const lv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught lv::Exception (check stderr)\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
     catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception (check stderr)\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
@@ -127,17 +129,16 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         const std::vector<lv::MatInfo> oInfoArray = oBatch.getInputInfoArray();
         const lv::MatSize oFrameSize = oInfoArray[0].size;
         const size_t nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity(), nDispStep = oBatch.getDisparityStep();
-        std::shared_ptr<FGStereoMatcher> pAlgo = std::make_shared<FGStereoMatcher>(oFrameSize,nMinDisp,nMaxDisp,nDispStep);
+        std::shared_ptr<StereoSegmMatcher> pAlgo = std::make_shared<StereoSegmMatcher>(oFrameSize,nMinDisp,nMaxDisp,nDispStep);
         oBatch.setFeaturesDirName(pAlgo->getFeatureExtractorName());
-        constexpr size_t nExpectedAlgoInputCount = FGStereoMatcher::getInputStreamCount();
-        constexpr size_t nExpectedAlgoOutputCount = FGStereoMatcher::getOutputStreamCount();
+        constexpr size_t nExpectedAlgoInputCount = StereoSegmMatcher::getInputStreamCount();
+        constexpr size_t nExpectedAlgoOutputCount = StereoSegmMatcher::getOutputStreamCount();
         static_assert(nExpectedAlgoInputCount==4,"unexpected input stream count for instanced algo");
         static_assert(nExpectedAlgoOutputCount==4,"unexpected output stream count for instanced algo");
-        using OutputLabelType = FGStereoMatcher::LabelType;
         std::vector<cv::Mat> vCurrOutput(nExpectedAlgoOutputCount);
         std::vector<cv::Mat> vCurrFGMasks(nExpectedAlgoOutputCount/2);
         std::vector<cv::Mat> vCurrStereoMaps(nExpectedAlgoOutputCount/2);
-#if DISPLAY_OUTPUT>0
+    #if DISPLAY_OUTPUT>0
         lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
         lvAssert((vInitInput.size()%2)==0); // assume masks are interlaced with input images
@@ -150,7 +151,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             vRow[3] = std::make_pair(cv::Mat(),"OUTPUT MASK");
             vvDisplayPairs[nDisplayRowIdx] = vRow;
         }
-#endif //DISPLAY_OUTPUT>0
+    #endif //DISPLAY_OUTPUT>0
         const size_t nTotPacketCount = oBatch.getFrameCount();
         oBatch.startProcessing();
         while(nCurrIdx<nTotPacketCount) {
@@ -161,19 +162,13 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             lvDbgAssert(vCurrInput.size()==nExpectedAlgoInputCount);
             for(size_t nStreamIdx=0; nStreamIdx<vCurrInput.size(); ++nStreamIdx)
                 lvDbgAssert(oFrameSize==vCurrInput[nStreamIdx].size());
-#if DATASET_USE_PRECALC_FEATURES
+        #if DATASET_USE_PRECALC_FEATURES
             const cv::Mat& oNextFeatsPacket = oBatch.loadFeatures(nCurrIdx);
             lvAssert__(!oNextFeatsPacket.empty(),"could not load precalc feature packet for idx=%d",(int)nCurrIdx);
             pAlgo->setNextFeatures(oNextFeatsPacket);
-#elif DATASET_SAVE_PRECALC_FEATURES
-            cv::Mat oFeatsPack;
-            pAlgo->calcFeatures(lv::convertVectorToArray<nExpectedAlgoInputCount>(vCurrInput),&oFeatsPack);
-            lvDbgAssert(!oFeatsPack.empty());
-            oBatch.saveFeatures(nCurrIdx,oFeatsPack);
-            pAlgo->setNextFeatures(oFeatsPack);
-#endif //DATASET_SAVE_PRECALC_FEATURES
             pAlgo->apply(vCurrInput,vCurrOutput/*,dDefaultThreshold*/);
             lvDbgAssert(vCurrOutput.size()==nExpectedAlgoOutputCount);
+            using OutputLabelType = StereoSegmMatcher::LabelType;
             for(size_t nOutputArrayIdx=0; nOutputArrayIdx<vCurrOutput.size(); ++nOutputArrayIdx) {
                 lvAssert(vCurrOutput[nOutputArrayIdx].type()==lv::MatRawType_<OutputLabelType>());
                 lvAssert(vCurrOutput[nOutputArrayIdx].size()==oFrameSize());
@@ -184,10 +179,10 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             }
             lvDbgAssert(vCurrFGMasks.size()==oBatch.getOutputStreamCount());
             lvDbgAssert(vCurrStereoMaps.size()==oBatch.getOutputStreamCount());
-#if DISPLAY_OUTPUT>0
+        #if DISPLAY_OUTPUT>0
             const std::vector<cv::Mat>& vCurrGT = oBatch.getGTArray(nCurrIdx);
             lvAssert(vCurrGT.size()==vCurrFGMasks.size() && vCurrGT.size()==vCurrStereoMaps.size());
-#if DISPLAY_OUTPUT>1
+        #if DISPLAY_OUTPUT>1
             if(!vCurrGT[0].empty() && !vCurrGT[1].empty()) {
                 cv::Mat test_rgb = vCurrInput[0].clone(), gt_rgb_mask, approx_rgb_mask;
                 cv::bitwise_or(test_rgb/2,cv::Mat(vCurrInput[0].size(),CV_8UC3,cv::Scalar_<uchar>(127)),gt_rgb_mask,vCurrGT[0]);
@@ -206,7 +201,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 cv::merge(std::vector<cv::Mat>{vCurrGT[0]&vROIs[0],cv::Mat::zeros(vCurrGT[0].size(),CV_8UC1),vCurrGT[1]&vROIs[1]},test_gt);
                 cv::imshow("merge mask",test_gt);
             }
-#endif //DISPLAY_OUTPUT>1
+        #endif //DISPLAY_OUTPUT>1
             for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vCurrInput.size()/2; ++nDisplayRowIdx) {
                 vCurrInput[nDisplayRowIdx*2].copyTo(vvDisplayPairs[nDisplayRowIdx][0].first);
                 vCurrInput[nDisplayRowIdx*2+1].copyTo(vvDisplayPairs[nDisplayRowIdx][1].first);
@@ -217,9 +212,9 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                     for(int nColIdx=0; nColIdx<oColoredStereoMap.cols; ++nColIdx) {
                         const OutputLabelType nCurrPxLabel = vCurrStereoMaps[nDisplayRowIdx].at<OutputLabelType>(nRowIdx,nColIdx);
                         lvDbgAssert_(nCurrPxLabel<UCHAR_MAX,"cannot properly display all stereo label values with current label type");
-                        if(nCurrPxLabel==FGStereoMatcher::getStereoDontCareLabel())
+                        if(nCurrPxLabel==StereoSegmMatcher::getStereoDontCareLabel())
                             oColoredStereoMap.at<cv::Vec3b>(nRowIdx,nColIdx) = cv::Vec3b(255,0,255);
-                        else if(nCurrPxLabel==FGStereoMatcher::getStereoOccludedLabel())
+                        else if(nCurrPxLabel==StereoSegmMatcher::getStereoOccludedLabel())
                             oColoredStereoMap.at<cv::Vec3b>(nRowIdx,nColIdx) = cv::Vec3b(255,0,0);
                         else
                             oColoredStereoMap.at<cv::Vec3b>(nRowIdx,nColIdx) = cv::Vec3b((uchar)nCurrPxLabel,(uchar)nCurrPxLabel,(uchar)nCurrPxLabel);
@@ -231,17 +226,26 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             const int nKeyPressed = pDisplayHelper->waitKey();
             if(nKeyPressed==(int)'q')
                 break;
-#endif //DISPLAY_OUTPUT>0
+        #endif //DISPLAY_OUTPUT>0
             if(oBatch.isEvaluatingStereoDisp())
                 oBatch.push(vCurrStereoMaps,nCurrIdx++);
             else
                 oBatch.push(vCurrFGMasks,nCurrIdx++);
+        #elif DATASET_SAVE_PRECALC_FEATURES
+            cv::Mat oFeatsPack;
+            pAlgo->calcFeatures(lv::convertVectorToArray<nExpectedAlgoInputCount>(vCurrInput),&oFeatsPack);
+            lvDbgAssert(!oFeatsPack.empty());
+            oBatch.saveFeatures(nCurrIdx,oFeatsPack);
+            ++nCurrIdx;
+        #endif //DATASET_SAVE_PRECALC_FEATURES
         }
         oBatch.stopProcessing();
         const double dTimeElapsed = oBatch.getFinalProcessTime();
         const double dProcessSpeed = (double)nCurrIdx/dTimeElapsed;
         std::cout << "\t\t" << sCurrBatchName << " @ end [" << sWorkerName << "] (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
+    #if DATASET_USE_PRECALC_FEATURES
         oBatch.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
+    #endif //DATASET_USE_PRECALC_FEATURES
     }
     catch(const lv::Exception& e) {std::cout << "\nAnalyze caught lv::Exception (check stderr)\n" << std::endl;}
     catch(const cv::Exception& e) {std::cout << "\nAnalyze caught cv::Exception (check stderr)\n" << std::endl;}
