@@ -18,7 +18,6 @@
 #include "litiv/utils/cxx.hpp"
 
 std::string lv::putf(const char* acFormat, ...) {
-    lvDbgExceptionWatch;
     va_list vArgs;
     va_start(vArgs,acFormat);
     std::string vBuffer(1024,'\0');
@@ -85,7 +84,6 @@ std::mutex& lv::getLogMutex() {
 }
 
 std::ostream& lv::safe_print(std::ostream& os, const char* acFormat, ...) {
-    lvDbgExceptionWatch;
     va_list vArgs;
     va_start(vArgs,acFormat);
     std::string vBuffer(1024,'\0');
