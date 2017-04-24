@@ -29,8 +29,7 @@
 #define STEREOSEGMATCH_CONFIG_USE_SHAPE_EMD_SIM     0
 
 // default param values
-#define STEREOSEGMATCH_DEFAULT_STEREO_ITER          (size_t(1000))
-#define STEREOSEGMATCH_DEFAULT_RESEGM_ITER          (size_t(1000))
+#define STEREOSEGMATCH_DEFAULT_MAX_MOVE_ITER        (size_t(1000))
 #define STEREOSEGMATCH_DEFAULT_SHAPEDESC_RAD        (size_t(30))
 #define STEREOSEGMATCH_DEFAULT_GRAD_KERNEL_SIZE     (int(7))
 #define STEREOSEGMATCH_DEFAULT_DISTTRANSF_SCALE     (-0.1f)
@@ -210,8 +209,8 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         /// returns the total stereo association cost for all grid nodes
         ValueType calcTotalAssocCost() const;
 
-        /// max move making iteration count allowed in a single optimization pass
-        size_t m_nMaxStereoIterCount,m_nMaxResegmIterCount;
+        /// max move making iteration count allowed during inference
+        size_t m_nMaxMoveIterCount;
         /// boostrap labeling type to use for stereo graph initialization
         LabelInitType m_eStereoLabelInitType;
         /// label order type to use for iterative stereo move making

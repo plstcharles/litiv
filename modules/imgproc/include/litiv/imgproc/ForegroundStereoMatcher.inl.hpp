@@ -51,7 +51,7 @@ inline void StereoSegmMatcher::apply(const MatArrayIn& aInputs, MatArrayOut& aOu
         lvAssert_((nInputIdx%InputPackOffset)==InputPackOffset_Img || aInputs[nInputIdx].type()==CV_8UC1,"unexpected input mask type");
         aInputs[nInputIdx].copyTo(m_pModelData->m_aInputs[nInputIdx]);
     }
-    if(lv::getVerbosity()>=3) {
+    if(lv::getVerbosity()>=2) {
         cv::imshow("left input (a)",aInputs[InputPack_LeftImg]);
         cv::imshow("right input (b)",aInputs[InputPack_RightImg]);
     }
@@ -101,8 +101,7 @@ inline const std::vector<StereoSegmMatcher::OutputLabelType>& StereoSegmMatcher:
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 inline StereoSegmMatcher::GraphModelData::GraphModelData(const cv::Size& oImageSize, std::vector<OutputLabelType>&& vStereoLabels, size_t nStereoLabelStep) :
-        m_nMaxStereoIterCount(STEREOSEGMATCH_DEFAULT_STEREO_ITER),
-        m_nMaxResegmIterCount(STEREOSEGMATCH_DEFAULT_RESEGM_ITER),
+        m_nMaxMoveIterCount(STEREOSEGMATCH_DEFAULT_MAX_MOVE_ITER),
         m_eStereoLabelInitType(LabelInit_LocalOptim),
         m_eStereoLabelOrderType(LabelOrder_Default),
         m_nStereoLabelOrderRandomSeed(size_t(0)),
@@ -115,7 +114,7 @@ inline StereoSegmMatcher::GraphModelData::GraphModelData(const cv::Size& oImageS
         m_nDontCareLabelIdx(InternalLabelType(m_vStereoLabels.size()-2)),
         m_nOccludedLabelIdx(InternalLabelType(m_vStereoLabels.size()-1)),
         m_bUsePrecalcFeatsNext(false) {
-    lvAssert_(m_nMaxStereoIterCount>0 && m_nMaxResegmIterCount>0,"max iter counts must be positive");
+    lvAssert_(m_nMaxMoveIterCount>0,"max iter counts must be strictly positive");
     lvDbgAssert_(m_oGridSize.dims()==2 && m_oGridSize.total()>size_t(1),"graph grid must be 2D and have at least two nodes");
     lvAssert_(m_vStereoLabels.size()>3,"graph must have at least two possible output stereo labels, beyond reserved ones");
     lvAssert_(m_vStereoLabels.size()<=size_t(std::numeric_limits<InternalLabelType>::max()),"too many labels for internal type");
@@ -168,6 +167,7 @@ inline StereoSegmMatcher::GraphModelData::GraphModelData(const cv::Size& oImageS
     lvDbgAssert(m_aLabelSimCostGradFactLUT.size()==size_t(256) && m_aLabelSimCostGradFactLUT.domain_offset_low()==0);
     lvDbgAssert(m_aLabelSimCostGradFactLUT.domain_index_step()==1.0 && m_aLabelSimCostGradFactLUT.domain_index_scale()==1.0);
     ////////////////////////////////////////////// put in new func, dupe for resegm model
+    lvDbgExec(lvPrint(vStereoLabels));
     const size_t nStereoLabels = vStereoLabels.size();
     const size_t nRealStereoLabels = vStereoLabels.size()-2;
     const size_t nResegmLabels = size_t(2);
@@ -1131,12 +1131,11 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer() {
     lv::StopWatch oLocalTimer;
     ValueType tLastStereoEnergy = m_pStereoInf->value();
     ValueType tLastResegmEnergy = std::numeric_limits<ValueType>::max();
-    lvIgnore(tLastStereoEnergy);
-    lvIgnore(tLastResegmEnergy);
+    bool bJustUpdatedSegm = false;
     bool bResegmModelInitialized = false;
     // each iter below is an alpha-exp move based on A. Fix's primal-dual energy minimization method for higher-order MRFs
     // see "A Primal-Dual Algorithm for Higher-Order Multilabel Markov Random Fields" in CVPR2014 for more info (doi = 10.1109/CVPR.2014.149)
-    while(++nMoveIter<=m_nMaxStereoIterCount && nConsecUnchangedLabels<nStereoLabels) {
+    while(++nMoveIter<=m_nMaxMoveIterCount && nConsecUnchangedLabels<nStereoLabels) {
         if(lv::getVerbosity()>=2)
             lvCout << "\tdisp inf w/ lbl=" << (int)nStereoAlphaLabel << "   [iter #" << nMoveIter << "]\n";
         calcStereoMoveCosts(nStereoAlphaLabel);
@@ -1211,8 +1210,14 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer() {
         }
 
         // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ CHECK IF MINIMIZATION STILL HOLDS
+        const ValueType tCurrStereoEnergy = m_pStereoInf->value();
+        if(!bJustUpdatedSegm)
+            lvAssert__(tLastStereoEnergy>=tCurrStereoEnergy && tCurrStereoEnergy>=ValueType(0),"stereo energy not minimizing! curr=%f",(float)tCurrStereoEnergy);
+        if(lv::getVerbosity()>=2)
+            lvCout << "\t\tdisp e = " << (int)nStereoAlphaLabel << "   (delta=" << (tCurrStereoEnergy>tLastStereoEnergy?"+":"") << tCurrStereoEnergy-tLastStereoEnergy << ")\n";
+        tLastStereoEnergy = tCurrStereoEnergy;
+        bJustUpdatedSegm = false;
 
-        //lvAssert__(tLastStereoEnergy>=m_pStereoInf->value() && (tLastStereoEnergy=m_pStereoInf->value())>=ValueType(0),"stereo energy not minimizing! curr=%f",(float)m_pStereoInf->value());
         nConsecUnchangedLabels = (nChangedStereoLabels>0)?0:nConsecUnchangedLabels+1;
         nStereoAlphaLabel = m_vStereoLabelOrdering[(++nOrderingIdx%=nStereoLabels)]; // @@@@ order of future moves can be influenced by labels that cause the most changes? (but only late, to avoid bad local minima?)
 
@@ -1283,12 +1288,19 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer() {
                     cv::resize(oSegmSwaps,oSegmSwaps,cv::Size(),2,2,cv::INTER_NEAREST);
                     cv::imshow("segm-swaps",oSegmSwaps);
                 }
+                const ValueType tCurrResegmEnergy = m_pResegmInf->value();
+                //lvAssert__(tLastResegmEnergy>=tCurrResegmEnergy && tCurrResegmEnergy>=ValueType(0),"resegm energy not minimizing! curr=%f",(float)tCurrResegmEnergy);
+                tLastResegmEnergy = tCurrResegmEnergy;
+                if(lv::getVerbosity()>=2) {
+                    lvCout << "\t\tsegm e = " << (int)nResegmAlphaLabel << "   (delta=" << (tCurrResegmEnergy>tLastResegmEnergy?"+":"") << tCurrResegmEnergy-tLastResegmEnergy << ")\n";
+                    cv::waitKey(1);
+                }
                 if(nChangedResegmLabelings) {
                     // @@@@@ add change mask to calc shape features? avoid recalc stuff that's too far (descriptors)
                     calcShapeFeatures(std::array<cv::Mat,2>{m_oResegmLabeling,m_aInputs[InputPack_RightMask]},false); // @@@@@ make resegm graph infer both?
                     updateResegmModel(false);
+                    bJustUpdatedSegm = true;
                 }
-                //lvAssert__(tLastResegmEnergy>=m_pResegmInf->value() && (tLastResegmEnergy=m_pResegmInf->value())>=ValueType(0),"resegm energy not minimizing! curr=%f",(float)m_pResegmInf->value());
                 if(lv::getVerbosity()>=2)
                     cv::waitKey(1);
             }
@@ -1298,6 +1310,8 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer() {
             cv::waitKey(1);
     }
     lvLog_(1,"Inference completed in %f second(s).",oLocalTimer.tock());
+    if(lv::getVerbosity()>=2)
+        cv::waitKey(0);
     return opengm::InferenceTermination::NORMAL;
 }
 

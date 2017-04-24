@@ -126,6 +126,9 @@ void ShapeContext::compute2(const cv::Mat& oImage, cv::Mat& oDescMap_) {
 
 void ShapeContext::compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescMap) {
     scdesc_fill_contours(oImage);
+    //cv::imshow("SHAPE_INPUT",oImage);
+    //cv::waitKey(0);
+    //exit(0);
     m_oKeyPts.create((int)oImage.total(),1);
     int nKeyPtIdx = 0;
     for(int nRowIdx=0; nRowIdx<oImage.rows; ++nRowIdx)
