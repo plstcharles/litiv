@@ -257,7 +257,10 @@ namespace lv {
             this->m_nMinDisp *= dScale;
             this->m_nMaxDisp *= dScale;
             this->m_nDispStep = std::max((size_t)std::round(this->m_nDispStep*dScale),size_t(1));
+            lvAssert(this->m_nMaxDisp>this->m_nMinDisp);
+            this->m_nMaxDisp -= (this->m_nMaxDisp-this->m_nMinDisp)%this->m_nDispStep;
             lvAssert(((this->m_nMaxDisp-this->m_nMinDisp)%this->m_nDispStep)==0);
+            lvAssert(this->m_nMaxDisp>this->m_nMinDisp);
         }
 
         virtual std::vector<cv::Mat> getRawInputArray(size_t nPacketIdx) override final {
