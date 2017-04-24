@@ -142,6 +142,7 @@
                 #error "Current build config mismatch with LITIV external build config."
             #endif //!LITIV_DEBUG
         #endif //ndef(LITIV_BUILD)
+        #define lvDbgExec(expr) expr
         #define lvDbgAssert(expr) lvAssert(expr)
         #define lvDbgAssert_(expr,msg) lvAssert_(expr,msg)
         #define lvDbgAssert__(expr,msg,...) lvAssert__(expr,msg,__VA_ARGS__)
@@ -166,6 +167,7 @@
                 #error "Current build config mismatch with LITIV external build config."
             #endif //LITIV_DEBUG
         #endif //ndef(LITIV_BUILD)
+        #define lvDbgExec(expr) ((void)0)
         #define lvDbgAssert(expr) ((void)0)
         #define lvDbgAssert_(expr,msg) ((void)0)
         #define lvDbgAssert__(expr,msg,...) ((void)0)
