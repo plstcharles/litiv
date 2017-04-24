@@ -921,7 +921,7 @@ size_t lv::IDataProducer_<lv::DatasetSource_VideoArray>::getExpectedLoadSize() c
     lvAssert_(vROIArray.size()==getInputStreamCount(),"internal array sizes mismatch");
     size_t nLoad = size_t(0);
     for(size_t nStreamIdx=0; nStreamIdx<vMatInfos.size(); ++nStreamIdx)
-        nLoad += (vROIArray[nStreamIdx].empty()?vMatInfos[nStreamIdx].size.total():(size_t)cv::countNonZero(vROIArray[nStreamIdx]))*vMatInfos[nStreamIdx].type.elemSize()*getFrameCount();
+        nLoad += (vROIArray[nStreamIdx].empty()?vMatInfos[nStreamIdx].size.total():(size_t)cv::countNonZero(/***@@@@@@@CHECKEXCEPT****/vROIArray[nStreamIdx]))*vMatInfos[nStreamIdx].type.elemSize()*getFrameCount();
     return nLoad;
 }
 
@@ -1204,7 +1204,7 @@ void lv::IDataCounter::setOutputCountPromise() {
 
 void lv::IDataCounter::resetOutputCount() {
     m_mProcessedPackets.clear();
-    m_nPacketCountPromise = std::promise<size_t>();
+    m_nPacketCountPromise = std::promise<size_t>();/***@@@@@@@CHECKEXCEPT****/
     m_nPacketCountFuture = m_nPacketCountPromise.get_future();
     m_nFinalPacketCount = 0;
 }
