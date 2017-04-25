@@ -265,13 +265,11 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         ValueType* m_pStereoUnaryFuncsDataBase,*m_pResegmUnaryFuncsDataBase;
         /// stereo/resegm models pairwise functions base pointer
         ValueType* m_pStereoPairwFuncsDataBase,*m_pResegmPairwFuncsDataBase;
-        /// lookup table for added association cost w.r.t. prior count
-        lv::AutoBuffer<ValueType,200> m_aAssocCostAddLUT;
-        /// lookup table for removed association cost w.r.t. prior count
-        lv::AutoBuffer<ValueType,200> m_aAssocCostRemLUT;
-        /// lookup table for total association cost w.r.t. prior count
-        lv::AutoBuffer<ValueType,200> m_aAssocCostSumLUT;
-        /// lookup table for label similarity cost gradient factor
+        /// cost lookup table for adding/removing/summing associations
+        lv::AutoBuffer<ValueType,200> m_aAssocCostRealAddLUT,m_aAssocCostRealRemLUT,m_aAssocCostRealSumLUT;
+        /// cost lookup table for approximately (worse case) adding/removing associations
+        lv::AutoBuffer<ValueType,200> m_aAssocCostApproxAddLUT,m_aAssocCostApproxRemLUT;
+        /// gradient factor lookup table for label similarity
         lv::LUT<uchar,float,256> m_aLabelSimCostGradFactLUT;
 
         /// holds the feature extractor to use on input images
