@@ -53,8 +53,9 @@ namespace lv {
                         lv::datasets::getRootPath()+"litiv/cosegm_tests/",
                         lv::datasets::getRootPath()+"litiv/cosegm_tests/results/"+lv::addDirSlashIfMissing(sOutputDirName),
                         //std::vector<std::string>{"test01"},
-                        //std::vector<std::string>{"art"},
-                        std::vector<std::string>{"noiseless"},
+                        std::vector<std::string>{"art"},
+                        //std::vector<std::string>{"art_mini"},
+                        //std::vector<std::string>{"noiseless"},
                         //std::vector<std::string>{"noiseless_mini"},
                         std::vector<std::string>(),
                         bSaveOutput,
@@ -152,6 +153,32 @@ namespace lv {
                 cv::Mat oMask1 = cv::imread(vCurrInputPaths[3],cv::IMREAD_GRAYSCALE);
                 if(oInput0.empty() || oMask0.empty() || oInput1.empty() || oMask1.empty())
                     break;
+                /*const std::vector<std::string> in = {
+                    cv::format("%simg%05da.png",this->getDataPath().c_str(),nCurrIdx),
+                    cv::format("%simg%05db.png",this->getDataPath().c_str(),nCurrIdx),
+                    cv::format("%smask%05da.png",this->getDataPath().c_str(),nCurrIdx),
+                    cv::format("%smask%05db.png",this->getDataPath().c_str(),nCurrIdx),
+                    cv::format("%sgtmask%05da.png",this->getDataPath().c_str(),nCurrIdx),
+                    cv::format("%sgtmask%05db.png",this->getDataPath().c_str(),nCurrIdx),
+                    cv::format("%sgtdisp%05da.png",this->getDataPath().c_str(),nCurrIdx),
+                    cv::format("%sgtdisp%05db.png",this->getDataPath().c_str(),nCurrIdx),
+                };
+                const std::vector<std::string> out = {
+                    cv::format("%smini/img%05da.png",this->getDataPath().c_str(),nCurrIdx),
+                    cv::format("%smini/img%05db.png",this->getDataPath().c_str(),nCurrIdx),
+                    cv::format("%smini/mask%05da.png",this->getDataPath().c_str(),nCurrIdx),
+                    cv::format("%smini/mask%05db.png",this->getDataPath().c_str(),nCurrIdx),
+                    cv::format("%smini/gtmask%05da.png",this->getDataPath().c_str(),nCurrIdx),
+                    cv::format("%smini/gtmask%05db.png",this->getDataPath().c_str(),nCurrIdx),
+                    cv::format("%smini/gtdisp%05da.png",this->getDataPath().c_str(),nCurrIdx),
+                    cv::format("%smini/gtdisp%05db.png",this->getDataPath().c_str(),nCurrIdx),
+                };
+                cv::Rect croproi(13,132,340,200);
+                for(size_t i=0; i<in.size(); ++i) {
+                    cv::Mat img = cv::imread(in[i],cv::IMREAD_UNCHANGED);
+                    if(!img.empty())
+                        cv::imwrite(out[i],img(croproi));
+                }*/
                 lvAssert(oInput0.size()==oInput1.size() && oMask0.size()==oMask1.size() && oInput0.size()==oMask0.size());
                 //cv::imwrite(cv::format("%stmp/img%05da.png",this->getDataPath().c_str(),nCurrIdx),oInput0);
                 //cv::imwrite(cv::format(((this->isUsingGTMaskAsInput()&2)?"%stmp/gtmask%05da.png":"%stmp/mask%05da.png"),this->getDataPath().c_str(),nCurrIdx),oMask0);

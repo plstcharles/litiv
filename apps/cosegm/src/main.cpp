@@ -24,7 +24,7 @@
 #define WRITE_IMG_OUTPUT        0
 #define EVALUATE_OUTPUT         0
 #define DISPLAY_OUTPUT          0
-#define GLOBAL_VERBOSITY        3
+#define GLOBAL_VERBOSITY        2
 ////////////////////////////////
 #define DATASET_VAPTRIMOD       0
 #define DATASET_MINI_TESTS      1
@@ -35,9 +35,8 @@
 #define DATASET_WORKTHREADS     1
 ////////////////////////////////
 #define DATASET_USE_DISPARITY_EVAL         0
-#define DATASET_USE_HALF_GT_INPUT_FLAG     1
+#define DATASET_USE_HALF_GT_INPUT_FLAG     0
 #define DATASET_USE_PRECALC_FEATURES       1
-#define DATASET_SAVE_PRECALC_FEATURES      0
 #define DATASET_EXTRA_PIXEL_BORDER_SIZE    0
 
 #if (DATASET_VAPTRIMOD+DATASET_MINI_TESTS/*+...*/)!=1
@@ -67,9 +66,6 @@
     DATASET_SCALE_FACTOR                                       /* => double dScaleFactor */
 //#elif DATASET_...
 #endif //DATASET_...
-#if (DATASET_USE_PRECALC_FEATURES+DATASET_SAVE_PRECALC_FEATURES)>1
-#error "Cannot use precalc feats & save them at the same time!"
-#endif //(DATASET_..._PRECALC_FEATURES)>1
 
 void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch);
 using DatasetType = lv::Dataset_<lv::DatasetTask_Cosegm,lv::DATASET_ID,lv::NonParallel>;
@@ -119,7 +115,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         std::cout << "\t\t" << sCurrBatchName << " @ init [" << sWorkerName << "]" << std::endl;
         const std::vector<cv::Mat>& vROIs = oBatch.getFrameROIArray();
         lvAssert(!vROIs.empty() && vROIs.size()==oBatch.getInputStreamCount());
-        size_t nCurrIdx = 2;
+        size_t nCurrIdx = 0;
         const std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // note: mat content becomes invalid on next getInput call
         lvAssert(vInitInput.size()==oBatch.getInputStreamCount());
         for(size_t nStreamIdx=0; nStreamIdx<vInitInput.size(); ++nStreamIdx) {
@@ -231,13 +227,13 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 oBatch.push(vCurrStereoMaps,nCurrIdx++);
             else
                 oBatch.push(vCurrFGMasks,nCurrIdx++);
-        #elif DATASET_SAVE_PRECALC_FEATURES
+        #else //!DATASET_USE_PRECALC_FEATURES
             cv::Mat oFeatsPack;
             pAlgo->calcFeatures(lv::convertVectorToArray<nExpectedAlgoInputCount>(vCurrInput),&oFeatsPack);
             lvDbgAssert(!oFeatsPack.empty());
             oBatch.saveFeatures(nCurrIdx,oFeatsPack);
             ++nCurrIdx;
-        #endif //DATASET_SAVE_PRECALC_FEATURES
+        #endif //!DATASET_USE_PRECALC_FEATURES
         }
         oBatch.stopProcessing();
         const double dTimeElapsed = oBatch.getFinalProcessTime();
