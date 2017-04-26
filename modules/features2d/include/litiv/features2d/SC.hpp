@@ -157,6 +157,8 @@ private:
     void scdesc_fill_maps(double dMeanDist=-1.0);
     /// fills descriptor using internal maps
     void scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDescMap);
+    /// fills descriptor without using internal maps (only for absolute descs w/o rot inv)
+    void scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool bGenDescMap);
 
     // helper variables for internal impl (helps avoid continuous mem realloc)
     std::vector<double> m_vAngularLimits,m_vRadialLimits;
@@ -164,6 +166,6 @@ private:
     cv::Mat_<float> m_oEMDCostMap;
     cv::Mat_<cv::Point2f> m_oKeyPts,m_oContourPts;
     std::vector<int> m_vKeyInliers,m_vContourInliers;
-    cv::Mat_<uchar> m_oDistMask;
+    cv::Mat_<uchar> m_oBinMask,m_oDistMask,m_oDilateKernel;
     cv::Size m_oCurrImageSize;
 };

@@ -40,6 +40,12 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
     scdesc_generate_emdmask();
     lvAssert((int)m_vAngularLimits.size()==m_nAngularBins && (int)m_vRadialLimits.size()==m_nRadialBins);
     lvAssert(m_oEMDCostMap.dims==2 && m_oEMDCostMap.rows==m_nRadialBins*m_nAngularBins && m_oEMDCostMap.cols==m_nRadialBins*m_nAngularBins);
+    if(!m_bRotationInvariant) {
+        const int nKernelDiameter = int(nOuterRadius)*2+1;
+        m_oDilateKernel.create(nKernelDiameter,nKernelDiameter);
+        cv::circle(m_oDilateKernel,cv::Point(int(nOuterRadius),int(nOuterRadius)),int(nOuterRadius),cv::Scalar_<uchar>(255),-1);
+        m_oDilateKernel = m_oDilateKernel>0;
+    }
 }
 
 ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRadius, size_t nAngularBins,
@@ -126,15 +132,15 @@ void ShapeContext::compute2(const cv::Mat& oImage, cv::Mat& oDescMap_) {
 
 void ShapeContext::compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescMap) {
     scdesc_fill_contours(oImage);
-    //cv::imshow("SHAPE_INPUT",oImage);
-    //cv::waitKey(0);
-    //exit(0);
     m_oKeyPts.create((int)oImage.total(),1);
     int nKeyPtIdx = 0;
     for(int nRowIdx=0; nRowIdx<oImage.rows; ++nRowIdx)
         for(int nColIdx=0; nColIdx<oImage.cols; ++nColIdx)
             m_oKeyPts(nKeyPtIdx++) = cv::Point2f((float)nColIdx,(float)nRowIdx);
-    scdesc_fill_desc(oDescMap,true);
+    if(!m_bUseRelativeSpace && !m_bRotationInvariant)
+        scdesc_fill_desc_direct(oDescMap,true);
+    else
+        scdesc_fill_desc(oDescMap,true);
 }
 
 void ShapeContext::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat_<float>& oDescMap) {
@@ -150,7 +156,10 @@ void ShapeContext::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& vo
         for(size_t nKeyPtIdx=0; nKeyPtIdx<voKeypoints.size(); ++nKeyPtIdx)
             m_oKeyPts((int)nKeyPtIdx) = voKeypoints[nKeyPtIdx].pt;
     }
-    scdesc_fill_desc(oDescMap,true);
+    if(!m_bUseRelativeSpace && !m_bRotationInvariant)
+        scdesc_fill_desc_direct(oDescMap,true);
+    else
+        scdesc_fill_desc(oDescMap,true);
 }
 
 void ShapeContext::compute2(const std::vector<cv::Mat>& voImageCollection, std::vector<cv::Mat_<float>>& voDescMapCollection) {
@@ -187,7 +196,10 @@ void ShapeContext::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMas
         m_oKeyPts((int)nKeyPtIdx) = voKeypoints[nKeyPtIdx].pt;
     _oDescriptors.create((int)voKeypoints.size(),m_nRadialBins*m_nAngularBins,CV_32FC1);
     cv::Mat_<float> oDescriptors = cv::Mat_<float>(_oDescriptors.getMat());
-    scdesc_fill_desc(oDescriptors,false);
+    if(!m_bUseRelativeSpace && !m_bRotationInvariant)
+        scdesc_fill_desc_direct(oDescriptors,false);
+    else
+        scdesc_fill_desc(oDescriptors,false);
 }
 
 void ShapeContext::reshapeDesc(cv::Size oSize, cv::Mat& oDescriptors) const {
@@ -257,7 +269,10 @@ void ShapeContext::scdesc_fill_contours(const cv::Mat& oImage) {
     lvAssert_(oImage.type()==CV_8UC1,"input image type must be 8UC1");
     m_oCurrImageSize = oImage.size();
     std::vector<std::vector<cv::Point>> vvContours;
-    cv::findContours(oImage.clone(),vvContours,cv::RETR_LIST,cv::CHAIN_APPROX_NONE);
+    cv::compare(oImage,0,m_oBinMask,cv::CMP_GT);
+    if(!m_bUseRelativeSpace && !m_bRotationInvariant)
+        cv::dilate(m_oBinMask,m_oDistMask,m_oDilateKernel);
+    cv::findContours(m_oBinMask,vvContours,cv::RETR_LIST,cv::CHAIN_APPROX_NONE);
     size_t nContourPtCount = size_t(0);
     for(size_t nContourIdx=0; nContourIdx<vvContours.size(); ++nContourIdx)
         nContourPtCount += vvContours[nContourIdx].size();
@@ -362,6 +377,74 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
                 }
             }
             if(nAngularBinMatch!=-1 && nRadialBinMatch!=-1) {
+                ++(aDesc[nAngularBinMatch+nRadialBinMatch*m_nAngularBins]);
+                ++nValidPts;
+            }
+        }
+        if(m_bNormalizeBins) {
+            cv::Mat_<float> oDesc(1,m_nDescSize,aDesc);
+            oDesc += 1.0f/m_nDescSize;
+            oDesc *= 1.0f/nValidPts;
+        }
+    }
+}
+
+void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool bGenDescMap) {
+    lvAssert_(!m_bUseRelativeSpace && !m_bRotationInvariant,"mapless impl cannot handle relative dist space/rot inv");
+    // this impl specialization will likely be faster for very large shapes, but only handles the conditions above
+    if(m_oKeyPts.empty()) {
+        oDescriptors.release();
+        return;
+    }
+    if(bGenDescMap)
+        oDescriptors.create(3,std::array<int,3>{m_oCurrImageSize.height,m_oCurrImageSize.width,m_nDescSize}.data());
+    else
+        oDescriptors.create((int)m_oKeyPts.total(),m_nDescSize);
+    oDescriptors = 0.0f;
+    lvDbgAssert(m_oContourPts.type()==CV_32FC2 && (m_oContourPts.total()==(size_t)m_oContourPts.rows || m_oContourPts.total()==(size_t)m_oContourPts.cols));
+    lvDbgAssert(m_oKeyPts.type()==CV_32FC2 && (m_oKeyPts.total()==(size_t)m_oKeyPts.rows || m_oKeyPts.total()==(size_t)m_oKeyPts.cols));
+    lvDbgAssert(m_vKeyInliers.empty() || m_oKeyPts.total()==m_vKeyInliers.size());
+    lvDbgAssert(m_vContourInliers.empty() || m_oKeyPts.total()==m_vContourInliers.size());
+    lvDbgAssert(m_oKeyPts.total()>size_t(0));
+    lvDbgAssert(m_oDistMask.size()==m_oCurrImageSize);
+    cv::Matx12f vPtDiff;
+    for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx) {
+        if(!m_vKeyInliers.empty() && !m_vKeyInliers[nKeyPtIdx])
+            continue;
+        size_t nValidPts = 1;
+        const cv::Point2f& vKeyPt = ((cv::Point2f*)m_oKeyPts.data)[nKeyPtIdx];
+        const int nKeyPtRowIdx = (int)std::round(vKeyPt.y);
+        const int nKeyPtColIdx = (int)std::round(vKeyPt.x);
+        float* aDesc = bGenDescMap?oDescriptors.ptr<float>(nKeyPtRowIdx,nKeyPtColIdx):oDescriptors.ptr<float>(nKeyPtIdx);
+        if(m_oDistMask(nKeyPtRowIdx,nKeyPtColIdx)) {
+            for(int nContourPtIdx=0; nContourPtIdx<(int)m_oContourPts.total(); ++nContourPtIdx) {
+                if(!m_vContourInliers.empty() && !m_vContourInliers[nContourPtIdx])
+                    continue;
+                const cv::Point2f& vContourPt = ((cv::Point2f*)m_oContourPts.data)[nContourPtIdx];
+                vPtDiff(0) = vKeyPt.y-vContourPt.y;
+                vPtDiff(1) = vKeyPt.x-vContourPt.x;
+                const double dCurrDist = cv::norm(vPtDiff,cv::NORM_L2);
+                if(dCurrDist<0.01 || dCurrDist>m_vRadialLimits.back())
+                    continue;
+                int nRadialBinMatch=-1;
+                for(int nRadialBinIdx=0; nRadialBinIdx<m_nRadialBins; ++nRadialBinIdx) {
+                    if(dCurrDist<m_vRadialLimits[nRadialBinIdx]) {
+                        nRadialBinMatch = nRadialBinIdx;
+                        break;
+                    }
+                }
+                if(nRadialBinMatch<0)
+                    continue;
+                int nAngularBinMatch=-1;
+                const double dCurrAng = (dCurrDist<0.01)?0.0:std::fmod(std::atan2(vPtDiff(0),-vPtDiff(1))+2*CV_PI+FLT_EPSILON,2*CV_PI);
+                for(int nAngularBinIdx=0; nAngularBinIdx<m_nAngularBins; ++nAngularBinIdx) {
+                    if(dCurrAng<m_vAngularLimits[nAngularBinIdx]) {
+                        nAngularBinMatch = nAngularBinIdx;
+                        break;
+                    }
+                }
+                if(nAngularBinMatch<0)
+                    continue;
                 ++(aDesc[nAngularBinMatch+nRadialBinMatch*m_nAngularBins]);
                 ++nValidPts;
             }
