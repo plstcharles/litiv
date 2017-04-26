@@ -339,7 +339,9 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
             continue;
         size_t nValidPts = 1;
         const cv::Point2f& vKeyPt = ((cv::Point2f*)m_oKeyPts.data)[nKeyPtIdx];
-        float* aDesc = bGenDescMap?oDescriptors.ptr<float>((int)std::round(vKeyPt.y),(int)std::round(vKeyPt.x)):oDescriptors.ptr<float>(nKeyPtIdx);
+        const int nKeyPtRowIdx = (int)std::round(vKeyPt.y);
+        const int nKeyPtColIdx = (int)std::round(vKeyPt.x);
+        float* aDesc = bGenDescMap?oDescriptors.ptr<float>(nKeyPtRowIdx,nKeyPtColIdx):oDescriptors.ptr<float>(nKeyPtIdx);
         for(int nContourPtIdx=0; nContourPtIdx<(int)m_oContourPts.total(); ++nContourPtIdx) {
             if(!m_vContourInliers.empty() && !m_vContourInliers[nContourPtIdx])
                 continue;
@@ -360,12 +362,14 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
                 }
             }
             if(nAngularBinMatch!=-1 && nRadialBinMatch!=-1) {
-                ++aDesc[nAngularBinMatch+nRadialBinMatch*m_nAngularBins];
+                ++(aDesc[nAngularBinMatch+nRadialBinMatch*m_nAngularBins]);
                 ++nValidPts;
             }
         }
-        if(m_bNormalizeBins)
-            for(int nDescIdx=0; nDescIdx<m_nDescSize; ++nDescIdx)
-                aDesc[nDescIdx] = (aDesc[nDescIdx] + 1.0f/m_nDescSize)/nValidPts;
+        if(m_bNormalizeBins) {
+            cv::Mat_<float> oDesc(1,m_nDescSize,aDesc);
+            oDesc += 1.0f/m_nDescSize;
+            oDesc *= 1.0f/nValidPts;
+        }
     }
 }
