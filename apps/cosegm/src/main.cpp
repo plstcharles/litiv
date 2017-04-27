@@ -24,7 +24,7 @@
 #define WRITE_IMG_OUTPUT        0
 #define EVALUATE_OUTPUT         0
 #define DISPLAY_OUTPUT          0
-#define GLOBAL_VERBOSITY        2
+#define GLOBAL_VERBOSITY        4
 ////////////////////////////////
 #define DATASET_VAPTRIMOD       0
 #define DATASET_MINI_TESTS      1
@@ -36,7 +36,7 @@
 ////////////////////////////////
 #define DATASET_USE_DISPARITY_EVAL         0
 #define DATASET_USE_HALF_GT_INPUT_FLAG     0
-#define DATASET_USE_PRECALC_FEATURES       1
+#define DATASET_USE_PRECALC_FEATURES       0
 #define DATASET_EXTRA_PIXEL_BORDER_SIZE    0
 
 #if (DATASET_VAPTRIMOD+DATASET_MINI_TESTS/*+...*/)!=1
@@ -61,8 +61,8 @@
     DATASET_EXTRA_PIXEL_BORDER_SIZE,                           /* => int nExtraPixelBorderSize */ \
     DATASET_USE_DISPARITY_EVAL,                                /* => int nUseGTMaskAsInput */ \
     DATASET_USE_HALF_GT_INPUT_FLAG,                            /* => int bEvalStereoDisp */ \
-    DATASET_USE_PRECALC_FEATURES?bool(WRITE_IMG_OUTPUT):false, /* => bool bSaveOutput */ \
-    DATASET_USE_PRECALC_FEATURES?bool(EVALUATE_OUTPUT):false,  /* => bool bUseEvaluator */ \
+    bool(WRITE_IMG_OUTPUT),                                    /* => bool bSaveOutput */ \
+    bool(EVALUATE_OUTPUT),                                     /* => bool bUseEvaluator */ \
     DATASET_SCALE_FACTOR                                       /* => double dScaleFactor */
 //#elif DATASET_...
 #endif //DATASET_...
@@ -88,9 +88,7 @@ int main(int, char**) {
             vTaskResults.push_back(oPool.queueTask(Analyze,std::to_string(nCurrBatchIdx++)+"/"+std::to_string(nTotBatches),pBatch));
         for(std::future<void>& oTaskRes : vTaskResults)
             oTaskRes.get();
-    #if DATASET_USE_PRECALC_FEATURES
         pDataset->writeEvalReport();
-    #endif //DATASET_USE_PRECALC_FEATURES
     }
     catch(const lv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught lv::Exception (check stderr)\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
     catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception (check stderr)\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
@@ -162,6 +160,11 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             const cv::Mat& oNextFeatsPacket = oBatch.loadFeatures(nCurrIdx);
             lvAssert__(!oNextFeatsPacket.empty(),"could not load precalc feature packet for idx=%d",(int)nCurrIdx);
             pAlgo->setNextFeatures(oNextFeatsPacket);
+        #else //!DATASET_USE_PRECALC_FEATURES
+            cv::Mat oNextFeatsPacket;
+            pAlgo->calcFeatures(lv::convertVectorToArray<nExpectedAlgoInputCount>(vCurrInput),&oNextFeatsPacket);
+            oBatch.saveFeatures(nCurrIdx,oNextFeatsPacket);
+        #endif //!DATASET_USE_PRECALC_FEATURES
             pAlgo->apply(vCurrInput,vCurrOutput/*,dDefaultThreshold*/);
             lvDbgAssert(vCurrOutput.size()==nExpectedAlgoOutputCount);
             using OutputLabelType = StereoSegmMatcher::LabelType;
@@ -227,21 +230,12 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 oBatch.push(vCurrStereoMaps,nCurrIdx++);
             else
                 oBatch.push(vCurrFGMasks,nCurrIdx++);
-        #else //!DATASET_USE_PRECALC_FEATURES
-            cv::Mat oFeatsPack;
-            pAlgo->calcFeatures(lv::convertVectorToArray<nExpectedAlgoInputCount>(vCurrInput),&oFeatsPack);
-            lvDbgAssert(!oFeatsPack.empty());
-            oBatch.saveFeatures(nCurrIdx,oFeatsPack);
-            ++nCurrIdx;
-        #endif //!DATASET_USE_PRECALC_FEATURES
         }
         oBatch.stopProcessing();
         const double dTimeElapsed = oBatch.getFinalProcessTime();
         const double dProcessSpeed = (double)nCurrIdx/dTimeElapsed;
         std::cout << "\t\t" << sCurrBatchName << " @ end [" << sWorkerName << "] (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
-    #if DATASET_USE_PRECALC_FEATURES
         oBatch.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
-    #endif //DATASET_USE_PRECALC_FEATURES
     }
     catch(const lv::Exception& e) {std::cout << "\nAnalyze caught lv::Exception (check stderr)\n" << std::endl;}
     catch(const cv::Exception& e) {std::cout << "\nAnalyze caught cv::Exception (check stderr)\n" << std::endl;}

@@ -294,39 +294,35 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         bool m_bUsePrecalcFeatsNext;
         /// defines the indices of feature maps inside precalc packets (per camera head)
         enum FeatPackingList {
-            FeatPackSize=20,
-            FeatPackOffset=9,
+            FeatPackSize=18,
+            FeatPackOffset=7,
             // absolute values for direct indexing
-            FeatPack_LeftImgDescs=0,
-            FeatPack_LeftShpDescs=1,
-            FeatPack_LeftInitFGDist=2,
-            FeatPack_LeftInitBGDist=3,
-            FeatPack_LeftFGDist=4,
-            FeatPack_LeftBGDist=5,
-            FeatPack_LeftGradY=6,
-            FeatPack_LeftGradX=7,
-            FeatPack_LeftGradMag=8,
-            FeatPack_RightImgDescs=9,
-            FeatPack_RightShpDescs=10,
-            FeatPack_RightInitFGDist=11,
-            FeatPack_RightInitBGDist=12,
-            FeatPack_RightFGDist=13,
-            FeatPack_RightBGDist=14,
-            FeatPack_RightGradY=15,
-            FeatPack_RightGradX=16,
-            FeatPack_RightGradMag=17,
-            FeatPack_ImgAffinity=18,
-            FeatPack_ShpAffinity=19,
+            FeatPack_LeftInitFGDist=0,
+            FeatPack_LeftInitBGDist=1,
+            FeatPack_LeftFGDist=2,
+            FeatPack_LeftBGDist=3,
+            FeatPack_LeftGradY=4,
+            FeatPack_LeftGradX=5,
+            FeatPack_LeftGradMag=6,
+            FeatPack_RightInitFGDist=7,
+            FeatPack_RightInitBGDist=8,
+            FeatPack_RightFGDist=9,
+            FeatPack_RightBGDist=10,
+            FeatPack_RightGradY=11,
+            FeatPack_RightGradX=12,
+            FeatPack_RightGradMag=13,
+            FeatPack_ImgAffinity=14,
+            FeatPack_ShpAffinity=15,
+            FeatPack_ImgDiscrimPow=16,
+            FeatPack_ShpDiscrimPow=17,
             // relative values for cam-based indexing
-            FeatPackOffset_ImgDescs=0,
-            FeatPackOffset_ShpDescs=1,
-            FeatPackOffset_InitFGDist=2,
-            FeatPackOffset_InitBGDist=3,
-            FeatPackOffset_FGDist=4,
-            FeatPackOffset_BGDist=5,
-            FeatPackOffset_GradY=6,
-            FeatPackOffset_GradX=7,
-            FeatPackOffset_GradMag=8,
+            FeatPackOffset_InitFGDist=0,
+            FeatPackOffset_InitBGDist=1,
+            FeatPackOffset_FGDist=2,
+            FeatPackOffset_BGDist=3,
+            FeatPackOffset_GradY=4,
+            FeatPackOffset_GradX=5,
+            FeatPackOffset_GradMag=6,
         };
 
     protected:
@@ -408,7 +404,7 @@ protected:
     /// holds bimodel data & inference algo impls
     std::unique_ptr<GraphModelData> m_pModelData;
     /// helper func to display scaled disparity maps
-    static cv::Mat getStereoMapDisplay(const GraphModelData& oData);
+    static cv::Mat getStereoDispMapDisplay(const GraphModelData& oData);
     /// helper func to display scaled assoc count maps
     static cv::Mat getAssocCountsMapDisplay(const GraphModelData& oData);
 };
