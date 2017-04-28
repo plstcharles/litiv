@@ -164,6 +164,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             cv::Mat oNextFeatsPacket;
             pAlgo->calcFeatures(lv::convertVectorToArray<nExpectedAlgoInputCount>(vCurrInput),&oNextFeatsPacket);
             oBatch.saveFeatures(nCurrIdx,oNextFeatsPacket);
+            pAlgo->setNextFeatures(oNextFeatsPacket);
         #endif //!DATASET_USE_PRECALC_FEATURES
             pAlgo->apply(vCurrInput,vCurrOutput/*,dDefaultThreshold*/);
             lvDbgAssert(vCurrOutput.size()==nExpectedAlgoOutputCount);

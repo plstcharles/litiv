@@ -23,35 +23,42 @@
 
 // config toggles/options
 #define STEREOSEGMATCH_CONFIG_ALLOC_IN_MODEL        0
-#define STEREOSEGMATCH_CONFIG_USE_DASCGF_FEATS      1
-#define STEREOSEGMATCH_CONFIG_USE_DASCRF_FEATS      0
-#define STEREOSEGMATCH_CONFIG_USE_LSS_FEATS         0
+#define STEREOSEGMATCH_CONFIG_USE_DASCGF_AFFINITY   0
+#define STEREOSEGMATCH_CONFIG_USE_DASCRF_AFFINITY   0
+#define STEREOSEGMATCH_CONFIG_USE_LSS_AFFINITY      1
+#define STEREOSEGMATCH_CONFIG_USE_MI_AFFINITY       0
+#define STEREOSEGMATCH_CONFIG_USE_SSQDIFF_AFFINITY  0
 #define STEREOSEGMATCH_CONFIG_USE_SHAPE_EMD_SIM     0
 
 // default param values
 #define STEREOSEGMATCH_DEFAULT_MAX_MOVE_ITER        (size_t(1000))
 #define STEREOSEGMATCH_DEFAULT_SHAPEDESC_RAD        (size_t(30))
-#define STEREOSEGMATCH_DEFAULT_GRAD_KERNEL_SIZE     (int(7))
+#define STEREOSEGMATCH_DEFAULT_LSSDESC_RAD          (size_t(30))
+#define STEREOSEGMATCH_DEFAULT_LSSDESC_PATCH        (size_t(LSS_DEFAULT_PATCH_SIZE))
+#define STEREOSEGMATCH_DEFAULT_SSQDIFF_PATCH        (size_t(7))
+#define STEREOSEGMATCH_DEFAULT_MI_WINDOW_RAD        (size_t(12))
+#define STEREOSEGMATCH_DEFAULT_GRAD_KERNEL_SIZE     (int(1))
 #define STEREOSEGMATCH_DEFAULT_DISTTRANSF_SCALE     (-0.1f)
-#define STEREOSEGMATCH_DEFAULT_ITER_PER_RESEGM      ((nStereoLabels*3)/2)
+#define STEREOSEGMATCH_DEFAULT_ITER_PER_RESEGM      ((m_nStereoLabels*3)/2)
 
 // unary costs params
-#define STEREOSEGMATCH_UNARY_COST_OOB_CST           (ValueType(1000))
+#define STEREOSEGMATCH_UNARY_COST_OOB_CST           (ValueType(5000))
 #define STEREOSEGMATCH_UNARY_COST_OCCLUDED_CST      (ValueType(2000))
-#define STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST      (ValueType(4000))
+#define STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST      (ValueType(10000))
 #define STEREOSEGMATCH_IMGSIM_COST_DESC_SCALE       (2500)
 #define STEREOSEGMATCH_IMGSIM_COST_RAW_SCALE        (2.0f/STEREOSEGMATCH_IMGSIM_COST_DESC_SCALE)
 #define STEREOSEGMATCH_SHPSIM_COST_DESC_SCALE       (2500)
-#define STEREOSEGMATCH_UNIQUE_COST_OVER_SCALE       (500)
+#define STEREOSEGMATCH_UNIQUE_COST_OVER_SCALE       (100)
 #define STEREOSEGMATCH_SHPDIST_COST_SCALE           (1000)
 // pairwise costs params
 #define STEREOSEGMATCH_LBLSIM_COST_MAXOCCL          (ValueType(5000))
 #define STEREOSEGMATCH_LBLSIM_COST_MAXTRUNC_CST     (ValueType(10000))
+#define STEREOSEGMATCH_LBLSIM_COST_SCALE_CST        (ValueType(1))
 #define STEREOSEGMATCH_LBLSIM_COST_MAXDIFF_CST      (10)
 #define STEREOSEGMATCH_LBLSIM_USE_EXP_GRADPIVOT     (1)
 #if STEREOSEGMATCH_LBLSIM_USE_EXP_GRADPIVOT
-#define STEREOSEGMATCH_LBLSIM_COST_GRADRAW_SCALE    (4)
-#define STEREOSEGMATCH_LBLSIM_COST_GRADPIVOT_CST    (16)
+#define STEREOSEGMATCH_LBLSIM_COST_GRADRAW_SCALE    (32)
+#define STEREOSEGMATCH_LBLSIM_COST_GRADPIVOT_CST    (32)
 #else //!STEREOSEGMATCH_LBLSIM_USE_EXP_GRADPIVOT
 #define STEREOSEGMATCH_LBLSIM_COST_GRADRAW_SCALE    (10)
 #define STEREOSEGMATCH_LBLSIM_COST_GRADPIVOT_CST    (32)
@@ -153,19 +160,6 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
 
     /// holds graph model data for both stereo and resegmentation models
     struct GraphModelData {
-        /// list of boostrap labeling types allowed for graph initialization
-        enum LabelInitType {
-            LabelInit_Default, ///< initializes labeling matrices with zeros
-            LabelInit_Random, ///< initializes labeling matrices with random values via MT19937
-            LabelInit_LocalOptim, ///< initializes labeling matrices with local optimas by checking low order factors only
-            LabelInit_Explicit, ///< initializes labeling matrices with user-provided values
-        };
-        /// list of label order types allowed for iterative move making
-        enum LabelOrderType {
-            LabelOrder_Default, ///< uses ascending label ordering
-            LabelOrder_Random, ///< uses random (but non-repeating) label ordering
-            LabelOrder_Explicit, ///< uses user-provided label ordering
-        };
         /// basic info struct used for node-level graph model updates and data lookups
         struct NodeInfo {
             /// image grid coordinates associated this node model's index
@@ -186,16 +180,14 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
             std::array<StereoFunc*,2> apResegmPairwFuncs;
             // @@@@@ add higher o facts/funcptrs here
         };
-
         /// default constructor; receives model construction data from algo constructor
-        GraphModelData(const cv::Size& oImageSize, std::vector<OutputLabelType>&& vStereoLabels, size_t nStereoLabelStep);
+        GraphModelData(const cv::Size& oImageSize, const std::vector<OutputLabelType>& vRealStereoLabels, size_t nStereoLabelStep);
         /// (pre)calculates features required for model updates, and optionally returns them in packet format
         void calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeatsPacket=nullptr);
         /// sets a previously precalculated features packet to be used in the next model updates (do not modify it before that!)
         void setNextFeatures(const cv::Mat& oPackedFeats);
         /// performs the actual bi-model inference
         opengm::InferenceTermination infer();
-
         /// translate an internal graph label to a real disparity offset label
         OutputLabelType getRealLabel(InternalLabelType nLabel) const;
         /// translate a real disparity offset label to an internal graph label
@@ -211,10 +203,6 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
 
         /// max move making iteration count allowed during inference
         size_t m_nMaxMoveIterCount;
-        /// boostrap labeling type to use for stereo graph initialization
-        LabelInitType m_eStereoLabelInitType;
-        /// label order type to use for iterative stereo move making
-        LabelOrderType m_eStereoLabelOrderType;
         /// random seeds to use to initialize labeling/label-order arrays
         size_t m_nStereoLabelOrderRandomSeed,m_nStereoLabelingRandomSeed;
         /// contains the (internal) stereo label ordering to use for each iteration
@@ -235,6 +223,12 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         const lv::MatSize m_oGridSize;
         /// contains all 'real' stereo labels, plus the 'occluded'/'dontcare' labels
         const std::vector<OutputLabelType> m_vStereoLabels;
+        /// total number of (re)segmentation labels
+        static constexpr size_t s_nResegmLabels = 2;
+        /// number of 'real' (i.e. non-reserved) stereo disparity labels
+        const size_t m_nRealStereoLabels;
+        /// total number of stereo disparity labels (including reserved ones)
+        const size_t m_nStereoLabels;
         /// contains the step size between stereo labels (i.e. the disparity granularity)
         const size_t m_nDispOffsetStep;
         /// contains the minimum disparity offset value
@@ -273,11 +267,13 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         lv::LUT<uchar,float,256> m_aLabelSimCostGradFactLUT;
 
         /// holds the feature extractor to use on input images
-#if STEREOSEGMATCH_CONFIG_USE_DASCGF_FEATS || STEREOSEGMATCH_CONFIG_USE_DASCRF_FEATS
+#if STEREOSEGMATCH_CONFIG_USE_DASCGF_AFFINITY || STEREOSEGMATCH_CONFIG_USE_DASCRF_AFFINITY
         std::unique_ptr<DASC> m_pImgDescExtractor;
-#elif STEREOSEGMATCH_CONFIG_USE_LSS_FEATS
+#elif STEREOSEGMATCH_CONFIG_USE_LSS_AFFINITY
         std::unique_ptr<LSS> m_pImgDescExtractor;
-#endif //STEREOSEGMATCH_CONFIG_USE_..._FEATS
+#elif STEREOSEGMATCH_CONFIG_USE_MI_AFFINITY
+        std::unique_ptr<MutualInfo> m_pImgDescExtractor; // although not really a 'descriptor' extractor...
+#endif //STEREOSEGMATCH_CONFIG_USE_..._AFFINITY
         /// holds the feature extractor to use on input shapes
         std::unique_ptr<ShapeContext> m_pShpDescExtractor;
         /// defines the minimum grid border size based on the feature extractors used
