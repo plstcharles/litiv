@@ -313,21 +313,23 @@ namespace lv {
     }
 
     /// returns the indices mapping for the sorted value array
-    template<typename T>
-    inline std::vector<size_t> sort_indices(const std::vector<T>& voVals) {
-        std::vector<size_t> vnIndices(voVals.size());
-        std::iota(vnIndices.begin(),vnIndices.end(),0);
-        std::sort(vnIndices.begin(),vnIndices.end(),[&voVals](size_t n1, size_t n2) {
+    template<typename TIndex=size_t, typename T>
+    inline std::vector<TIndex> sort_indices(const std::vector<T>& voVals) {
+        static_assert(std::is_integral<TIndex>::value,"index type must be integral");
+        std::vector<TIndex> vnIndices(voVals.size());
+        std::iota(vnIndices.begin(),vnIndices.end(),TIndex(0));
+        std::sort(vnIndices.begin(),vnIndices.end(),[&voVals](TIndex n1, TIndex n2) {
             return voVals[n1]<voVals[n2];
         });
         return vnIndices;
     }
 
     /// returns the indices mapping for the sorted value array using a custom functor
-    template<typename T, typename P>
-    inline std::vector<size_t> sort_indices(const std::vector<T>& voVals, P oSortFunctor) {
-        std::vector<size_t> vnIndices(voVals.size());
-        std::iota(vnIndices.begin(),vnIndices.end(),0);
+    template<typename TIndex=size_t, typename T, typename P>
+    inline std::vector<TIndex> sort_indices(const std::vector<T>& voVals, P oSortFunctor) {
+        static_assert(std::is_integral<TIndex>::value,"index type must be integral");
+        std::vector<TIndex> vnIndices(voVals.size());
+        std::iota(vnIndices.begin(),vnIndices.end(),TIndex(0));
         std::sort(vnIndices.begin(),vnIndices.end(),oSortFunctor);
         return vnIndices;
     }
