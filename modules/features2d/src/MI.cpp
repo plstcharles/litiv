@@ -21,8 +21,17 @@
 
 #include "litiv/features2d/MI.hpp"
 
-MutualInfo::MutualInfo(const cv::Size& oWinSize, bool bUseDenseHist, bool bUse24BitPair) :
+namespace {
+    // helper variables for internal impl (helps avoid continuous mem realloc)
+    thread_local lv::JointSparseHistData<uchar,uchar> g_oSparseHistData;
+    thread_local lv::JointSparseHistData<ushort,uchar> g_oSparse24BitHistData;
+    thread_local lv::JointDenseHistData<uchar,uchar> g_oDenseHistData;
+    thread_local lv::JointDenseHistData<ushort,uchar> g_oDense24BitHistData;
+}
+
+MutualInfo::MutualInfo(const cv::Size& oWinSize, bool bNormalize, bool bUseDenseHist, bool bUse24BitPair) :
         m_oWinSize(oWinSize),
+        m_bNormalize(bNormalize),
         m_bUseDenseHist(bUseDenseHist),
         m_bUse24BitPair(bUse24BitPair) {
     lvAssert_(m_oWinSize.area()>0 && (m_oWinSize.height%2)==1 && (m_oWinSize.width%2)==1,"invalid parameter(s)");
@@ -46,22 +55,38 @@ int MutualInfo::borderSize(int nDim) const {
 }
 
 double MutualInfo::compute(const cv::Mat& _oImage1, const cv::Mat& _oImage2) {
-    lvAssert_(_oImage1.rows>=m_oWinSize.height && _oImage1.cols>=m_oWinSize.width && _oImage1.size()==_oImage2.size(),"invalid input image(s) size");
+    lvAssert_(_oImage1.rows==m_oWinSize.height && _oImage1.cols==m_oWinSize.width && _oImage1.size()==_oImage2.size(),"invalid input image(s) size");
     if(m_bUse24BitPair && ((_oImage1.type()==CV_8UC3 && _oImage2.type()==CV_8UC1) || (_oImage2.type()==CV_8UC3 && _oImage1.type()==CV_8UC1))) {
         const cv::Mat_<ushort> oImage1 = lv::cvtBGRToPackedYCbCr(_oImage1.type()==CV_8UC3?_oImage1:_oImage2);
         const cv::Mat_<uchar> oImage2 = _oImage1.type()==CV_8UC3?_oImage2:_oImage1;
-        if(m_bUseDenseHist)
-            return lv::calcMutualInfo<HIST_QUANTIF_FACTOR,false,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1,oImage2,&oDense24BitHistData);
-        else
-            return lv::calcMutualInfo<HIST_QUANTIF_FACTOR,true,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1,oImage2,&oSparse24BitHistData);
+        if(m_bUseDenseHist) {
+            if(m_bNormalize)
+                return lv::calcMutualInfo<HIST_QUANTIF_FACTOR,false,true,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1,oImage2,&g_oDense24BitHistData);
+            else
+                return lv::calcMutualInfo<HIST_QUANTIF_FACTOR,false,false,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1,oImage2,&g_oDense24BitHistData);
+        }
+        else {
+            if(m_bNormalize)
+                return lv::calcMutualInfo<HIST_QUANTIF_FACTOR,true,true,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1,oImage2,&g_oSparse24BitHistData);
+            else
+                return lv::calcMutualInfo<HIST_QUANTIF_FACTOR,true,false,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1,oImage2,&g_oSparse24BitHistData);
+        }
     }
     else if(_oImage1.type()==CV_8UC1 && _oImage2.type()==CV_8UC1) {
         const cv::Mat_<uchar> oImage1 = _oImage1;
         const cv::Mat_<uchar> oImage2 = _oImage2;
-        if(m_bUseDenseHist)
-            return lv::calcMutualInfo<HIST_QUANTIF_FACTOR,false,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1,oImage2,&oDenseHistData);
-        else
-            return lv::calcMutualInfo<HIST_QUANTIF_FACTOR,true,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1,oImage2,&oSparseHistData);
+        if(m_bUseDenseHist) {
+            if(m_bNormalize)
+                return lv::calcMutualInfo<HIST_QUANTIF_FACTOR,false,true,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1,oImage2,&g_oDenseHistData);
+            else
+                return lv::calcMutualInfo<HIST_QUANTIF_FACTOR,false,false,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1,oImage2,&g_oDenseHistData);
+        }
+        else {
+            if(m_bNormalize)
+                return lv::calcMutualInfo<HIST_QUANTIF_FACTOR,true,true,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1,oImage2,&g_oSparseHistData);
+            else
+                return lv::calcMutualInfo<HIST_QUANTIF_FACTOR,true,false,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1,oImage2,&g_oSparseHistData);
+        }
     }
     else
         lvError("unsupported input matrices types (need 8uc1 on both, or 8uc1+8uc3 if using 24bit pair)");
@@ -78,10 +103,18 @@ void MutualInfo::compute(const cv::Mat& _oImage1, const cv::Mat& _oImage2, const
             const cv::Point oTargetPt(int(std::round(voKeypoints[nKPIdx].pt.x)),int(std::round(voKeypoints[nKPIdx].pt.y)));
             const cv::Rect oTargetRect(oTargetPt.x-m_oWinSize.width/2,oTargetPt.y-m_oWinSize.height/2,m_oWinSize.width,m_oWinSize.height);
             lvAssert_(oSourceRect.contains(oTargetRect.tl()) && oSourceRect.contains(oTargetRect.br()-cv::Point2i(1,1)),"got invalid input keypoint (oob)");
-            if(m_bUseDenseHist)
-                vdScores[nKPIdx] = lv::calcMutualInfo<HIST_QUANTIF_FACTOR,false,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1(oTargetRect),oImage2(oTargetRect),&oDense24BitHistData);
-            else
-                vdScores[nKPIdx] = lv::calcMutualInfo<HIST_QUANTIF_FACTOR,true,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1(oTargetRect),oImage2(oTargetRect),&oSparse24BitHistData);
+            if(m_bUseDenseHist) {
+                if(m_bNormalize)
+                    vdScores[nKPIdx] = lv::calcMutualInfo<HIST_QUANTIF_FACTOR,false,true,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1(oTargetRect),oImage2(oTargetRect),&g_oDense24BitHistData);
+                else
+                    vdScores[nKPIdx] = lv::calcMutualInfo<HIST_QUANTIF_FACTOR,false,false,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1(oTargetRect),oImage2(oTargetRect),&g_oDense24BitHistData);
+            }
+            else {
+                if(m_bNormalize)
+                    vdScores[nKPIdx] = lv::calcMutualInfo<HIST_QUANTIF_FACTOR,true,true,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1(oTargetRect),oImage2(oTargetRect),&g_oSparse24BitHistData);
+                else
+                    vdScores[nKPIdx] = lv::calcMutualInfo<HIST_QUANTIF_FACTOR,true,false,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1(oTargetRect),oImage2(oTargetRect),&g_oSparse24BitHistData);
+            }
         }
     }
     else if(_oImage1.type()==CV_8UC1 && _oImage2.type()==CV_8UC1) {
@@ -92,10 +125,18 @@ void MutualInfo::compute(const cv::Mat& _oImage1, const cv::Mat& _oImage2, const
             const cv::Point oTargetPt(int(std::round(voKeypoints[nKPIdx].pt.x)),int(std::round(voKeypoints[nKPIdx].pt.y)));
             const cv::Rect oTargetRect(oTargetPt.x-m_oWinSize.width/2,oTargetPt.y-m_oWinSize.height/2,m_oWinSize.width,m_oWinSize.height);
             lvAssert_(oSourceRect.contains(oTargetRect.tl()) && oSourceRect.contains(oTargetRect.br()-cv::Point2i(1,1)),"got invalid input keypoint (oob)");
-            if(m_bUseDenseHist)
-                vdScores[nKPIdx] = lv::calcMutualInfo<HIST_QUANTIF_FACTOR,false,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1(oTargetRect),oImage2(oTargetRect),&oDenseHistData);
-            else
-                vdScores[nKPIdx] = lv::calcMutualInfo<HIST_QUANTIF_FACTOR,true,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1(oTargetRect),oImage2(oTargetRect),&oSparseHistData);
+            if(m_bUseDenseHist) {
+                if(m_bNormalize)
+                    vdScores[nKPIdx] = lv::calcMutualInfo<HIST_QUANTIF_FACTOR,false,true,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1(oTargetRect),oImage2(oTargetRect),&g_oDenseHistData);
+                else
+                    vdScores[nKPIdx] = lv::calcMutualInfo<HIST_QUANTIF_FACTOR,false,false,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1(oTargetRect),oImage2(oTargetRect),&g_oDenseHistData);
+            }
+            else {
+                if(m_bNormalize)
+                    vdScores[nKPIdx] = lv::calcMutualInfo<HIST_QUANTIF_FACTOR,true,true,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1(oTargetRect),oImage2(oTargetRect),&g_oSparseHistData);
+                else
+                    vdScores[nKPIdx] = lv::calcMutualInfo<HIST_QUANTIF_FACTOR,true,false,USE_FAST_NUM_APPROX,SKIP_MINMAX_HIST>(oImage1(oTargetRect),oImage2(oTargetRect),&g_oSparseHistData);
+            }
         }
     }
     else

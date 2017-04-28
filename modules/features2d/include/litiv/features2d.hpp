@@ -160,7 +160,7 @@ namespace lv {
     }
 
     /// computes the mutual information score for a given pair of matrices
-    template<size_t nHistQuantifStep=1, bool bUseSparseHistMats=true, bool bFastNumApprox=false, bool bSkipMinMax=false, typename T1, typename T2>
+    template<size_t nHistQuantifStep=1, bool bUseSparseHistMats=true, bool bNormalize=false, bool bFastNumApprox=false, bool bSkipMinMax=false, typename T1, typename T2>
     inline double calcMutualInfo(const cv::Mat_<T1>& oInput1, const cv::Mat_<T2>& oInput2, JointHistData<bUseSparseHistMats,T1,T2>* pJointProbHistOutput=nullptr) {
         std::unique_ptr<JointHistData<bUseSparseHistMats,T1,T2>> pNewJointProbHistOutput;
         if(!pJointProbHistOutput) {
@@ -179,10 +179,23 @@ namespace lv {
                 const float& fCurrElemMargProb1 = lv::getElem(pJointProbHistOutput->aMargHists[0],std::array<int,2>{anPos[0],0}.data());
                 const float& fCurrElemMargProb2 = lv::getElem(pJointProbHistOutput->aMargHists[1],std::array<int,2>{anPos[1],0}.data());
                 if(fCurrElemMargProb1>0 && fCurrElemMargProb2>0)
-                    dMutualInfoScore += double(fCurrElemJointProb*std::log(fCurrElemJointProb/fCurrElemMargProb1/fCurrElemMargProb2)); // @@@@ check precision/speed for mult instead of double-div? set as FastNumApprox?
+                    dMutualInfoScore += double(fCurrElemJointProb*std::log2(fCurrElemJointProb/fCurrElemMargProb1/fCurrElemMargProb2)); // @@@@ check precision/speed for mult instead of double-div? set as FastNumApprox?
             }
         }
-        dMutualInfoScore /= std::log(2.0);
+        if(bNormalize) {
+            std::array<double,2> adMargEntropy = {0.0,0.0};
+            for(size_t nInputIdx=0; nInputIdx<size_t(2); ++nInputIdx) {
+                for(auto pIter=pJointProbHistOutput->aMargHists[nInputIdx].begin(); pIter!=pJointProbHistOutput->aMargHists[nInputIdx].end(); ++pIter) {
+                    const double dMargHistProb = double(*pIter);
+                    lvDbgAssert(dMargHistProb>=0.0 && dMargHistProb<=1.0);
+                    if(dMargHistProb>0.0)
+                        adMargEntropy[nInputIdx] += -dMargHistProb*std::log2(dMargHistProb);
+                }
+            }
+            if(adMargEntropy[0]>0.0 && adMargEntropy[1]>0.0)
+                dMutualInfoScore /= std::sqrt(adMargEntropy[0]*adMargEntropy[1]);
+        }
+        lvDbgAssert(dMutualInfoScore>=0.0);
         return dMutualInfoScore;
     }
 
