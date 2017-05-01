@@ -30,10 +30,16 @@
 namespace lv {
 
     struct IVAPtrimod2016Dataset {
-        /// returns whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
+        /// returns whether the depth stream should be loaded & provided as input or not (if not, the dataset is used as a bimodal one)
         virtual bool isLoadingDepth() const = 0;
+        /// returns whether the approximated segmentation masks should be loaded or not (if so, each input stream will have a mask in each packet)
+        virtual bool isLoadingApproxMasks() const = 0;
         /// returns whether images should be undistorted when loaded or not, using the calib files provided with the dataset
         virtual bool isUndistorting() const = 0;
+        /// returns whether we should evaluate fg/bg segmentation or stereo disparity
+        virtual bool isEvaluatingStereoDisp() const = 0;
+        /// returns whether the input segmentation masks given should be half gt or not (useful for training) --- 1 = use thermal gt mask, 2 = use rgb gt mask, 0 = use no gt mask
+        virtual int isUsingGTMaskAsInput() const = 0;
     };
 
     template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
@@ -47,7 +53,10 @@ namespace lv {
                 bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
                 double dScaleFactor=1.0, ///< defines the scale factor to use to resize/rescale read packets
                 bool bLoadDepth=true, ///< defines whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
-                bool bUndistort=true ///< defines whether images should be undistorted when loaded or not, using the calib files provided with the dataset
+                bool bLoadApproxMasks=false, ///< defines whether the approximated segmentation masks should be loaded or not (if so, each input stream will have a mask in each packet)
+                bool bUndistort=true, ///< defines whether images should be undistorted when loaded or not, using the calib files provided with the dataset
+                bool bEvalStereoDisp=false, ///< defines whether we should evaluate fg/bg segmentation or stereo disparity
+                int nUseGTMaskAsInput=1 ///< defines whether the input masks given should be half gt or not (useful for training) --- 1 = use thermal gt mask, 2 = use rgb gt mask, 0 = use no gt mask
         ) :
                 IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016,lv::getDatasetEval<eDatasetTask,Dataset_VAPtrimod2016>(),eEvalImpl>(
                         "VAP-trimodal2016",
@@ -59,19 +68,30 @@ namespace lv {
                         bUseEvaluator,
                         false,
                         dScaleFactor
-                ), m_bLoadDepth(bLoadDepth),m_bUndistort(bUndistort) {}
+                ), m_bLoadDepth(bLoadDepth),m_bLoadApproxMasks(bLoadApproxMasks),m_bUndistort(bUndistort),m_bEvalStereoDisp(bEvalStereoDisp),m_nUseGTMaskAsInput(nUseGTMaskAsInput) {
+            lvAssert_(!m_bEvalStereoDisp,"missing impl @@@@@");
+        }
         /// returns the names of all work batch directories available for this dataset specialization
         static const std::vector<std::string>& getWorkBatchDirNames() {
             static const std::vector<std::string> s_vsWorkBatchDirs = {"Scene 1","Scene 2","Scene 3"};
             return s_vsWorkBatchDirs;
         }
-        /// returns whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
+        /// returns whether the depth stream should be loaded & provided as input or not (if not, the dataset is used as a bimodal one)
         virtual bool isLoadingDepth() const override {return m_bLoadDepth;}
+        /// returns whether the approximated segmentation masks should be loaded or not (if so, each input stream will have a mask in each packet)
+        virtual bool isLoadingApproxMasks() const override {return m_bLoadApproxMasks;}
         /// returns whether images should be undistorted when loaded or not, using the calib files provided with the dataset
         virtual bool isUndistorting() const override {return m_bUndistort;}
+        /// returns whether we should evaluate fg/bg segmentation or stereo disparity
+        virtual bool isEvaluatingStereoDisp() const override {return m_bEvalStereoDisp;}
+        /// returns whether the input segmentation masks given should be half gt or not (useful for training) --- 1 = use thermal gt mask, 2 = use rgb gt mask, 0 = use no gt mask
+        virtual int isUsingGTMaskAsInput() const override {return m_nUseGTMaskAsInput;}
     protected:
         const bool m_bLoadDepth;
+        const bool m_bLoadApproxMasks;
         const bool m_bUndistort;
+        const bool m_bEvalStereoDisp;
+        const int m_nUseGTMaskAsInput;
     };
 
     template<DatasetTaskList eDatasetTask>
@@ -91,18 +111,66 @@ namespace lv {
     template<DatasetTaskList eDatasetTask>
     struct DataProducer_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016> :
             public IDataProducerWrapper_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016> {
+        /// returns the number of parallel input streams (depends on whether loading depth or not)
         virtual size_t getInputStreamCount() const override final {
             return m_bLoadDepth?3:2;
         }
+        /// returns the number of parallel gt streams (depends on whether loading depth or not)
         virtual size_t getGTStreamCount() const override final {
             return m_bLoadDepth?3:2;
         }
+        /// returns the (friendly) name of an input stream specified by index
         virtual std::string getInputStreamName(size_t nStreamIdx) const override final {
             return ((nStreamIdx==0)?"RGB":(nStreamIdx==1)?"THERMAL":(nStreamIdx==2)?"DEPTH":"UNKNOWN");
         }
+        /// returns the (friendly) name of a gt stream specified by index
         virtual std::string getGTStreamName(size_t nStreamIdx) const override final {
             return getInputStreamName(nStreamIdx)+"_GT";
         }
+        /// returns whether the depth stream should be loaded & provided as input or not (if not, the dataset is used as a bimodal one)
+        bool isLoadingDepth() const {
+            return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isLoadingDepth();
+        }
+        /// returns whether the approximated segmentation masks should be loaded or not (if so, each input stream will have a mask in each packet)
+        bool isLoadingApproxMasks() const {
+            return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isLoadingApproxMasks();
+        }
+        /// returns whether images should be undistorted when loaded or not, using the calib files provided with the dataset
+        bool isUndistorting() const {
+            return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isUndistorting();
+        }
+        /// returns whether we should evaluate fg/bg segmentation or stereo disparity
+        bool isEvaluatingStereoDisp() const {
+            return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isEvaluatingStereoDisp();
+        }
+        /// returns whether the input segmentation masks given should be half gt or not (useful for training) --- 1 = use thermal gt mask, 2 = use rgb gt mask, 0 = use no gt mask
+        int isUsingGTMaskAsInput() const {
+            return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isUsingGTMaskAsInput();
+        }
+        /// returns the name of the directory where feature packets should be saved
+        std::string getFeaturesDirName() const {
+            return this->m_sFeaturesDirName;
+        }
+        /// sets the name of the directory where feature packets should be saved
+        void setFeaturesDirName(const std::string& sDirName) {
+            this->m_sFeaturesDirName = sDirName;
+            lv::createDirIfNotExist(this->getFeaturesPath()+sDirName);
+        }
+        /// returns the name of a feature packet (with its directory name as prefix)
+        virtual std::string getFeaturesName(size_t nPacketIdx) const override final {
+            std::array<char,32> acBuffer;
+            snprintf(acBuffer.data(),acBuffer.size(),nPacketIdx<size_t(1e7)?"%06zu":"%09zu",nPacketIdx);
+            return lv::addDirSlashIfMissing(this->m_sFeaturesDirName)+std::string(acBuffer.data());
+        }
+        /// returns the minimum scene disparity offset
+        size_t getMinDisparity() const {
+            return this->m_nMinDisp;
+        }
+        /// returns the maximum scene disparity offset
+        size_t getMaxDisparity() const {
+            return this->m_nMaxDisp;
+        }
+
     protected:
         virtual void parseData() override final {
             lvDbgExceptionWatch;
@@ -118,6 +186,8 @@ namespace lv {
                 lvError_("VAPtrimod2016 sequence '%s' did not possess the required groundtruth and input directories",this->getName().c_str());
             const IVAPtrimod2016Dataset& oDataset = dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot());
             this->m_bLoadDepth = oDataset.isLoadingDepth();
+            this->m_bLoadApproxMasks = oDataset.isLoadingApproxMasks();
+            lvAssert_(!m_bLoadApproxMasks,"missing impl @@@@");
             this->m_bUndistort = oDataset.isUndistorting();
             const size_t nStreamCount = this->m_bLoadDepth?3:2;
             this->m_vInputROIs.resize(nStreamCount);
@@ -256,6 +326,17 @@ namespace lv {
                 for(size_t nGTPacketIdx=0; nGTPacketIdx<vsDepthGTPaths.size(); ++nGTPacketIdx)
                     this->m_vvsGTPaths[nGTPacketIdx][2] = vsDepthGTPaths[nGTPacketIdx];
             }
+            this->m_nMinDisp = size_t(0);
+            this->m_nMaxDisp = size_t(100);
+            std::ifstream oDispRangeFile(this->getDataPath()+"drange.txt");
+            if(oDispRangeFile.is_open() && !oDispRangeFile.eof()) {
+                oDispRangeFile >> this->m_nMinDisp;
+                if(!oDispRangeFile.eof())
+                    oDispRangeFile >> this->m_nMaxDisp;
+            }
+            this->m_nMinDisp *= dScale;
+            this->m_nMaxDisp *= dScale;
+            lvAssert(this->m_nMaxDisp>this->m_nMinDisp);
         }
         virtual std::vector<cv::Mat> getRawInputArray(size_t nPacketIdx) override final {
             lvDbgExceptionWatch;
@@ -339,8 +420,9 @@ namespace lv {
             }
             return cv::Mat();
         }
-        bool m_bLoadDepth; ///< defines whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
-        bool m_bUndistort; ///< defines whether images should be undistorted when loaded or not, using the calib files provided with the dataset
+        bool m_bLoadDepth,m_bLoadApproxMasks,m_bUndistort;
+        size_t m_nMinDisp,m_nMaxDisp;
+        std::string m_sFeaturesDirName;
         cv::Mat m_oRGBCameraParams;
         cv::Mat m_oThermalCameraParams;
         cv::Mat m_oRGBDistortParams;
