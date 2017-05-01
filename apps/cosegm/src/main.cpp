@@ -43,16 +43,18 @@
 #error "Must pick a single dataset."
 #endif //(DATASET_+.../*+...*/)!=1
 #if DATASET_VAPTRIMOD
-@@@@ untested, need to cleanup approx masks
+//@@@@ untested, need to cleanup approx masks
 #define DATASET_ID Dataset_VAPtrimod2016
 #define DATASET_PARAMS \
     DATASET_OUTPUT_PATH,            /* => const std::string& sOutputDirName */ \
     bool(WRITE_IMG_OUTPUT),         /* => bool bSaveOutput */ \
     bool(EVALUATE_OUTPUT),          /* => bool bUseEvaluator */ \
-    false,                          /* => bool bForce4ByteDataAlign */ \
     DATASET_SCALE_FACTOR,           /* => double dScaleFactor */ \
-    false,                          /* disable depth loading */ \
-    true                            /* enable undistort-on-load */
+    false,                          /* => bool bLoadDepth */ \
+    true,                           /* => bool bLoadApproxMasks */ \
+    true,                           /* => bool bUndistort */ \
+    false,                          /* => bool bEvalStereoDisp */ \
+    0                               /* => int nUseGTMaskAsInput */
 #elif DATASET_MINI_TESTS
 #include "cosegm_tests.hpp"
 #define DATASET_ID Dataset_CosegmTests
@@ -122,8 +124,8 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         }
         const std::vector<lv::MatInfo> oInfoArray = oBatch.getInputInfoArray();
         const lv::MatSize oFrameSize = oInfoArray[0].size;
-        const size_t nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity(), nDispStep = oBatch.getDisparityStep();
-        std::shared_ptr<StereoSegmMatcher> pAlgo = std::make_shared<StereoSegmMatcher>(oFrameSize,nMinDisp,nMaxDisp,nDispStep);
+        const size_t nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity();
+        std::shared_ptr<StereoSegmMatcher> pAlgo = std::make_shared<StereoSegmMatcher>(oFrameSize,nMinDisp,nMaxDisp);
         oBatch.setFeaturesDirName(pAlgo->getFeatureExtractorName());
         constexpr size_t nExpectedAlgoInputCount = StereoSegmMatcher::getInputStreamCount();
         constexpr size_t nExpectedAlgoOutputCount = StereoSegmMatcher::getOutputStreamCount();

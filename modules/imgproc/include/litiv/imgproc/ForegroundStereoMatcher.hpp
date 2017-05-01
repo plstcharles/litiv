@@ -31,6 +31,7 @@
 #define STEREOSEGMATCH_CONFIG_USE_SHAPE_EMD_SIM     0
 
 // default param values
+#define STEREOSEGMATCH_DEFAULT_DISPARITY_STEP       (size_t(2))
 #define STEREOSEGMATCH_DEFAULT_MAX_MOVE_ITER        (size_t(1000))
 #define STEREOSEGMATCH_DEFAULT_SHAPEDESC_RAD        (size_t(30))
 #define STEREOSEGMATCH_DEFAULT_LSSDESC_RAD          (size_t(30))
@@ -138,7 +139,7 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
     };
 
     /// full stereo graph matcher constructor; relies on provided parameters to build graphical model base
-    StereoSegmMatcher(const cv::Size& oImageSize, size_t nMinDispOffset, size_t nMaxDispOffset, size_t nDispStep=1);
+    StereoSegmMatcher(const cv::Size& oImageSize, size_t nMinDispOffset, size_t nMaxDispOffset);
     /// stereo matcher function; solves the graph model to find pixel-level matches on epipolar lines in the masked input images, and returns disparity maps + masks
     virtual void apply(const MatArrayIn& aInputs, MatArrayOut& aOutputs) override;
     /// (pre)calculates initial features required for model updates, and optionally returns them in packet format for archiving
@@ -399,6 +400,8 @@ protected:
     const cv::Size m_oImageSize;
     /// holds bimodel data & inference algo impls
     std::unique_ptr<GraphModelData> m_pModelData;
+    /// helper func to display segmentation maps
+    static cv::Mat getResegmMapDisplay(const GraphModelData& oData);
     /// helper func to display scaled disparity maps
     static cv::Mat getStereoDispMapDisplay(const GraphModelData& oData);
     /// helper func to display scaled assoc count maps

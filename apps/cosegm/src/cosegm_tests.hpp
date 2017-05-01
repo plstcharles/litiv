@@ -20,7 +20,6 @@
 #include <opencv2/imgcodecs.hpp>
 #include "litiv/utils.hpp"
 #include "litiv/datasets.hpp"
-#include <fstream>
 
 #define BORDER_EXPAND_TYPE cv::BORDER_REPLICATE
 
@@ -52,8 +51,8 @@ namespace lv {
                         "cosegm_tests",
                         lv::datasets::getRootPath()+"litiv/cosegm_tests/",
                         lv::datasets::getRootPath()+"litiv/cosegm_tests/results/"+lv::addDirSlashIfMissing(sOutputDirName),
-                        //std::vector<std::string>{"test01"},
-                        std::vector<std::string>{"art"},
+                        std::vector<std::string>{"test01"},
+                        //std::vector<std::string>{"art"},
                         //std::vector<std::string>{"art_mini"},
                         //std::vector<std::string>{"noiseless"},
                         //std::vector<std::string>{"noiseless_mini"},
@@ -110,10 +109,6 @@ namespace lv {
 
         size_t getMaxDisparity() const {
             return this->m_nMaxDisp;
-        }
-
-        size_t getDisparityStep() const {
-            return this->m_nDispStep;
         }
 
         virtual size_t getInputStreamCount() const override final {
@@ -270,23 +265,15 @@ namespace lv {
                 this->m_vGTInfos[1] = lv::MatInfo(aROIs[1].size(),this->m_vGTInfos[1].type);
             }
             this->m_nMinDisp = size_t(0);
-            this->m_nMinDisp = size_t(100);
-            this->m_nDispStep = size_t(1);
+            this->m_nMaxDisp = size_t(100);
             std::ifstream oDispRangeFile(this->getDataPath()+"drange.txt");
             if(oDispRangeFile.is_open() && !oDispRangeFile.eof()) {
                 oDispRangeFile >> this->m_nMinDisp;
-                if(!oDispRangeFile.eof()) {
+                if(!oDispRangeFile.eof())
                     oDispRangeFile >> this->m_nMaxDisp;
-                    if(!oDispRangeFile.eof())
-                        oDispRangeFile >> this->m_nDispStep;
-                }
             }
             this->m_nMinDisp *= dScale;
             this->m_nMaxDisp *= dScale;
-            this->m_nDispStep = std::max((size_t)std::round(this->m_nDispStep*dScale),size_t(1));
-            lvAssert(this->m_nMaxDisp>this->m_nMinDisp);
-            this->m_nMaxDisp -= (this->m_nMaxDisp-this->m_nMinDisp)%this->m_nDispStep;
-            lvAssert(((this->m_nMaxDisp-this->m_nMinDisp)%this->m_nDispStep)==0);
             lvAssert(this->m_nMaxDisp>this->m_nMinDisp);
         }
 
@@ -315,7 +302,7 @@ namespace lv {
             return vGTs;
         }
 
-        size_t m_nMinDisp,m_nMaxDisp,m_nDispStep;
+        size_t m_nMinDisp,m_nMaxDisp;
         std::string m_sFeaturesDirName;
 
     };
