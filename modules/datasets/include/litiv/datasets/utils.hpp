@@ -22,6 +22,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <unordered_map>
+#include <fstream>
 #include <stack>
 
 #ifdef _MSC_VER

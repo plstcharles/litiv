@@ -1681,6 +1681,7 @@ lv::DatasetHandler::DatasetHandler(const std::string& sDatasetName, const std::s
         m_bUsingEvaluator(bUseEvaluator),
         m_bForce4ByteDataAlign(bForce4ByteDataAlign),
         m_dScaleFactor(dScaleFactor) {
+    lvAssert_(m_dScaleFactor>0.0,"dataset scale factor should be strictly positive");
     if(!m_sOutputPath.empty())
         lv::createDirIfNotExist(m_sOutputPath);
     lv::createDirIfNotExist(m_sFeaturesPath);
