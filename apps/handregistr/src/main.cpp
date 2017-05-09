@@ -22,6 +22,11 @@
 ////////////////////////////////
 #define USE_FMAT_RANSAC_ESTIM   0
 #define LOAD_POINTS_FROM_LAST   0
+#define LOAD_POINTS_FROM_MATLAB 1
+
+#if (LOAD_POINTS_FROM_LAST+LOAD_POINTS_FROM_MATLAB)>1
+#error "Must select a single origin for point file"
+#endif //(LOAD_POINTS_FROM_LAST+LOAD_POINTS_FROM_MATLAB)>1
 
 ////////////////////////////////
 #define DATASET_OUTPUT_PATH     "results_test"
@@ -32,7 +37,7 @@ void Analyze(lv::IDataHandlerPtr pBatch);
 
 int main(int, char**) {
     try {
-        DatasetType::Ptr pDataset = DatasetType::create(DATASET_OUTPUT_PATH,false,false,1.0,false,true);
+        DatasetType::Ptr pDataset = DatasetType::create(DATASET_OUTPUT_PATH,false,false,1.0,false,false,false,false,0);
         lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false);
         const size_t nTotPackets = pDataset->getInputCount();
         const size_t nTotBatches = vpBatches.size();
@@ -69,6 +74,46 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     std::array<std::vector<cv::Point2f>,2> avMarkers;
     oFS["pts0"] >> avMarkers[0];
     oFS["pts1"] >> avMarkers[1];
+#elif LOAD_POINTS_FROM_MATLAB
+    const std::string sBaseCalibDataPath = oBatch.getDataPath()+"calib/export/";
+    std::ifstream oMetaDataFile(sBaseCalibDataPath+"metadata.txt");
+    lvAssert(oMetaDataFile.is_open());
+    size_t nFirstIdx,nLastIdx;
+    lvAssert(oMetaDataFile >> nFirstIdx);
+    lvAssert(oMetaDataFile >> nLastIdx);
+    lvAssert(nFirstIdx<=nLastIdx);
+    std::array<std::vector<cv::Point2f>,2> avMarkers;
+    for(size_t nIdx=nFirstIdx; nIdx<=nLastIdx; ++nIdx) {
+        const std::string sIdxStr = std::to_string(nIdx);
+        cv::Mat oVisible = cv::imread(sBaseCalibDataPath+"RGB"+sIdxStr+".jpg",cv::IMREAD_COLOR);
+        cv::Mat oThermal = cv::imread(sBaseCalibDataPath+"T"+sIdxStr+".jpg",cv::IMREAD_COLOR);
+        std::ifstream oVisibleData(sBaseCalibDataPath+"RGB"+sIdxStr+".txt");
+        std::ifstream oThermalData(sBaseCalibDataPath+"T"+sIdxStr+".txt");
+        if(oVisible.empty() || oThermal.empty() || !oVisibleData.is_open() || !oThermalData.is_open()) {
+            lvCout << "  skipping '" << sIdxStr << "'...\n";
+            continue;
+        }
+        lvAssert(oVisible.size()==oThermal.size() && oVisible.size()==oOrigTileSize);
+        size_t nVisiblePointCount = 0, nThermalPointCount = 0;
+        float fWorldPosX,fWorldPosY,fUnused,fImagePosX,fImagePosY;
+        while(oVisibleData>>fWorldPosX && oVisibleData>>fWorldPosY && oVisibleData>>fUnused && oVisibleData>>fImagePosX && oVisibleData>>fImagePosY) {
+            avMarkers[0].emplace_back(fImagePosX,fImagePosY);
+            cv::circle(oVisible,avMarkers[0].back(),2,cv::Scalar_<uchar>(0,0,255),-1);
+            ++nVisiblePointCount;
+        }
+        while(oThermalData>>fWorldPosX && oThermalData>>fWorldPosY && oThermalData>>fUnused && oThermalData>>fImagePosX && oThermalData>>fImagePosY) {
+            avMarkers[1].emplace_back(fImagePosX,fImagePosY);
+            cv::circle(oThermal,avMarkers[1].back(),2,cv::Scalar_<uchar>(0,0,255),-1);
+            ++nThermalPointCount;
+        }
+        if(!(nThermalPointCount==nVisiblePointCount)) {
+            lvPrint("@@@");
+        }
+        lvAssert(nThermalPointCount==nVisiblePointCount);
+        /*cv::imshow("visible",oVisible);
+        cv::imshow("thermal",oThermal);
+        cv::waitKey(0);*/
+    }
 #else //!LOAD_POINTS_FROM_LAST
     lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName()+" calib",oBatch.getOutputPath()+"/../");
     std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs = {{
@@ -169,6 +214,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     pDisplayHelper->m_oFS << "pts1" << avMarkers[1];
     pDisplayHelper = nullptr; // makes sure output is saved (we wont reuse it anyway)
 #endif //LOAD_POINTS_FROM_LAST
+    lvAssert(avMarkers[0].size()==avMarkers[1].size());
     std::vector<uchar> vInlinerMask;
     std::array<std::vector<cv::Point2f>,2> avInlierMarkers;
     const int nRANSAC_MaxDist = 10;
