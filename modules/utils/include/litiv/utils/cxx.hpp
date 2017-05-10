@@ -77,6 +77,18 @@ namespace lv {
     bool string_contains_token(const std::string& s, const std::vector<std::string>& tokens);
     /// clamps a given string to a specific size, padding with a given character if the string is too small
     std::string clampString(const std::string& sInput, size_t nSize, char cPadding=' ');
+    /// splits a given string into substrings using a given delimiter, and returns substring in vector format
+    std::vector<std::string> split(const std::string& sInputStr, char cDelim=' ');
+    /// splits a given string into substrings using a given delimiter, returning them via the given output iterator
+    template<typename TStrIter>
+    void split(const std::string& sInputStr, TStrIter pOutputIter, char cDelim=' ') {
+        if(sInputStr.empty())
+            return;
+        std::stringstream ssStr(sInputStr);
+        std::string sToken;
+        while(std::getline(ssStr,sToken,cDelim))
+            *(pOutputIter++) = sToken;
+    }
     /// returns the string of the current 'localtime' output (useful for log tagging)
     std::string getTimeStamp();
     /// returns the string of the current framework version and version control hash (useful for log tagging)

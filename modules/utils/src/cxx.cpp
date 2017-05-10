@@ -62,6 +62,12 @@ std::string lv::clampString(const std::string& sInput, size_t nSize, char cPaddi
     return sInput.size()>nSize?sInput.substr(0,nSize):std::string(nSize-sInput.size(),cPadding)+sInput;
 }
 
+std::vector<std::string> lv::split(const std::string& sInputStr, char cDelim) {
+    std::vector<std::string> vsTokens;
+    lv::split(sInputStr,std::back_inserter(vsTokens),cDelim);
+    return vsTokens;
+}
+
 std::string lv::getTimeStamp() {
     std::time_t tNow = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
     char acBuffer[128];

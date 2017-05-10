@@ -63,6 +63,15 @@ TEST(clampString,regression) {
     EXPECT_EQ(lv::clampString("test",6,'x'),std::string("xxtest"));
 }
 
+TEST(split,regression) {
+    EXPECT_EQ(lv::split(""),(std::vector<std::string>{}));
+    EXPECT_EQ(lv::split(" "),(std::vector<std::string>{""}));
+    EXPECT_EQ(lv::split("a "),(std::vector<std::string>{"a"}));
+    EXPECT_EQ(lv::split(" b"),(std::vector<std::string>{"","b"}));
+    EXPECT_EQ(lv::split("a b c"),(std::vector<std::string>{"a","b","c"}));
+    EXPECT_EQ(lv::split("sdf,erw,sdghs,,df,,",','),(std::vector<std::string>{"sdf","erw","sdghs","","df",""}));
+}
+
 namespace {
     template<typename T>
     struct concat_fixture : testing::Test {};
