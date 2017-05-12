@@ -259,65 +259,171 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
 
 #else //!LOAD_CALIB_FROM_LAST
 
-    std::ifstream oMetaDataFile(sBaseCalibDataPath+"export/metadata.txt");
-    lvAssert(oMetaDataFile.is_open());
-    size_t nFirstIdx,nLastIdx;
-    lvAssert(oMetaDataFile >> nFirstIdx);
-    lvAssert(oMetaDataFile >> nLastIdx);
-    lvAssert(nFirstIdx<=nLastIdx);
-
     std::array<std::vector<std::vector<cv::Point2f>>,2> avvImagePts;
     std::array<std::vector<cv::Point2f>,2> avImagePts;
     std::vector<std::vector<cv::Point3f>> vvWorldPts;
     std::array<std::vector<cv::Mat>,2> avCalibInputs;
     lvCout << "\tloading exported calib data...\n";
-    for(size_t nIdx=nFirstIdx; nIdx<=nLastIdx; ++nIdx) {
-        const std::string sIdxStr = std::to_string(nIdx);
-        cv::Mat oVisible = cv::imread(sBaseCalibDataPath+"export/RGB"+sIdxStr+".jpg",cv::IMREAD_COLOR);
-        cv::Mat oThermal = cv::imread(sBaseCalibDataPath+"export/T"+sIdxStr+".jpg",cv::IMREAD_COLOR);
-        std::ifstream oVisibleData(sBaseCalibDataPath+"export/RGB"+sIdxStr+".txt");
-        std::ifstream oThermalData(sBaseCalibDataPath+"export/T"+sIdxStr+".txt");
-        if(oVisible.empty() || oThermal.empty() || !oVisibleData.is_open() || !oThermalData.is_open()) {
-            lvCout << "\t\tskipping exported pair #" << sIdxStr << "...\n";
-            continue;
-        }
-        lvAssert(oVisible.size()==oThermal.size() && oVisible.size()==oOrigImgSize);
-        avCalibInputs[0].push_back(oVisible.clone());
-        avCalibInputs[1].push_back(oThermal.clone());
-        size_t nVisiblePointCount = 0, nThermalPointCount = 0;
-        float fWorldPosX,fWorldPosY,fWorldPosZ,fImagePosX,fImagePosY;
-        std::vector<cv::Point3f> vWorldPtsValid;
-        vvWorldPts.emplace_back();
-        avvImagePts[0].emplace_back();
-        while(oVisibleData>>fWorldPosX && oVisibleData>>fWorldPosY && oVisibleData>>fWorldPosZ && oVisibleData>>fImagePosX && oVisibleData>>fImagePosY) {
-            vvWorldPts.back().emplace_back(fWorldPosY/1000,fWorldPosX/1000,fWorldPosZ/1000);
-            avvImagePts[0].back().emplace_back(fImagePosX,fImagePosY);
-            cv::circle(oVisible,avvImagePts[0].back().back(),2,cv::Scalar_<uchar>(0,0,255),-1);
-            ++nVisiblePointCount;
-        }
-        avImagePts[0].insert(avImagePts[0].end(),avvImagePts[0].back().begin(),avvImagePts[0].back().end());
-        avvImagePts[1].emplace_back();
-        while(oThermalData>>fWorldPosX && oThermalData>>fWorldPosY && oThermalData>>fWorldPosZ && oThermalData>>fImagePosX && oThermalData>>fImagePosY) {
-            vWorldPtsValid.emplace_back(fWorldPosY/1000,fWorldPosX/1000,fWorldPosZ/1000);
-            avvImagePts[1].back().emplace_back(fImagePosX,fImagePosY);
-            cv::circle(oThermal,avvImagePts[1].back().back(),2,cv::Scalar_<uchar>(0,0,255),-1);
-            ++nThermalPointCount;
-        }
-        avImagePts[1].insert(avImagePts[1].end(),avvImagePts[1].back().begin(),avvImagePts[1].back().end());
-        lvAssert(nThermalPointCount==nVisiblePointCount);
-        lvAssert(avvImagePts[0].back().size()==avvImagePts[1].back().size());
-        lvAssert(avvImagePts[0].back().size()==nVisiblePointCount);
-        lvAssert(avImagePts[0].size()==avImagePts[1].size());
-        lvAssert(vvWorldPts.back().size()==vWorldPtsValid.size());
-        lvAssert(vWorldPtsValid.size()==nVisiblePointCount);
-        for(size_t n=0; n<vWorldPtsValid.size(); ++n)
-            lvAssert(cv::norm(vvWorldPts.back()[n]-vWorldPtsValid[n])<0.01);
+    if(oBatch.getName()=="Scene 1") {
+        // scene 1 image calib data missing; use new exports from matlab calib toolbox
+        std::ifstream oMetaDataFile(sBaseCalibDataPath+"export/metadata.txt");
+        lvAssert(oMetaDataFile.is_open());
+        size_t nFirstIdx,nLastIdx;
+        lvAssert(oMetaDataFile >> nFirstIdx);
+        lvAssert(oMetaDataFile >> nLastIdx);
+        lvAssert(nFirstIdx<=nLastIdx);
+        for(size_t nIdx=nFirstIdx; nIdx<=nLastIdx; ++nIdx) {
+            const std::string sIdxStr = std::to_string(nIdx);
+            cv::Mat oVisible = cv::imread(sBaseCalibDataPath+"export/RGB"+sIdxStr+".jpg",cv::IMREAD_COLOR);
+            cv::Mat oThermal = cv::imread(sBaseCalibDataPath+"export/T"+sIdxStr+".jpg",cv::IMREAD_COLOR);
+            std::ifstream oVisibleData(sBaseCalibDataPath+"export/RGB"+sIdxStr+".txt");
+            std::ifstream oThermalData(sBaseCalibDataPath+"export/T"+sIdxStr+".txt");
+            if(oVisible.empty() || oThermal.empty() || !oVisibleData.is_open() || !oThermalData.is_open()) {
+                lvCout << "\t\tskipping exported pair #" << sIdxStr << "...\n";
+                continue;
+            }
+            lvAssert(oVisible.size()==oThermal.size() && oVisible.size()==oOrigImgSize);
+            avCalibInputs[0].push_back(oVisible.clone());
+            avCalibInputs[1].push_back(oThermal.clone());
+            size_t nVisiblePointCount = 0, nThermalPointCount = 0;
+            float fWorldPosX,fWorldPosY,fWorldPosZ,fImagePosX,fImagePosY;
+            std::vector<cv::Point3f> vWorldPtsValid;
+            vvWorldPts.emplace_back();
+            avvImagePts[0].emplace_back();
+            while(oVisibleData>>fWorldPosX && oVisibleData>>fWorldPosY && oVisibleData>>fWorldPosZ && oVisibleData>>fImagePosX && oVisibleData>>fImagePosY) {
+                // fix world pos exported from matlab (was 40mm, real is 35mm, and x/y inverted)
+                //vvWorldPts.back().emplace_back(((fWorldPosY*35)/40)/1000,((fWorldPosX*35)/40)/1000,((fWorldPosZ*35)/40)/1000);
+                vvWorldPts.back().emplace_back(fWorldPosY/1000,fWorldPosX/1000,fWorldPosZ/1000);
+                avvImagePts[0].back().emplace_back(fImagePosX,fImagePosY);
+                cv::circle(oVisible,avvImagePts[0].back().back(),2,cv::Scalar_<uchar>(0,0,255),-1);
+                ++nVisiblePointCount;
+            }
+            avImagePts[0].insert(avImagePts[0].end(),avvImagePts[0].back().begin(),avvImagePts[0].back().end());
+            avvImagePts[1].emplace_back();
+            while(oThermalData>>fWorldPosX && oThermalData>>fWorldPosY && oThermalData>>fWorldPosZ && oThermalData>>fImagePosX && oThermalData>>fImagePosY) {
+                // fix world pos exported from matlab (was 40mm, real is 35mm, and x/y inverted)
+                //vWorldPtsValid.emplace_back(((fWorldPosY*35)/40)/1000,((fWorldPosX*35)/40)/1000,((fWorldPosZ*35)/40)/1000);
+                vWorldPtsValid.emplace_back(fWorldPosY/1000,fWorldPosX/1000,fWorldPosZ/1000);
+                avvImagePts[1].back().emplace_back(fImagePosX,fImagePosY);
+                cv::circle(oThermal,avvImagePts[1].back().back(),2,cv::Scalar_<uchar>(0,0,255),-1);
+                ++nThermalPointCount;
+            }
+            avImagePts[1].insert(avImagePts[1].end(),avvImagePts[1].back().begin(),avvImagePts[1].back().end());
+            lvAssert(nThermalPointCount==nVisiblePointCount);
+            lvAssert(avvImagePts[0].back().size()==avvImagePts[1].back().size());
+            lvAssert(avvImagePts[0].back().size()==nVisiblePointCount);
+            lvAssert(avImagePts[0].size()==avImagePts[1].size());
+            lvAssert(vvWorldPts.back().size()==vWorldPtsValid.size());
+            lvAssert(vWorldPtsValid.size()==nVisiblePointCount);
+            for(size_t n=0; n<vWorldPtsValid.size(); ++n)
+                lvAssert(cv::norm(vvWorldPts.back()[n]-vWorldPtsValid[n])<0.01);
 
-        /*lvPrint(vvWorldPts.back());
-        lvPrint(avvImagePts[0].back());
-        cv::imshow("visible",oVisible);
-        cv::imshow("thermal",oThermal);
-        cv::waitKey(0);*/
+            /*lvPrint(vvWorldPts.back());
+            lvPrint(avvImagePts[0].back());
+            cv::imshow("visible",oVisible);
+            cv::imshow("thermal",oThermal);
+            cv::waitKey(0);*/
+        }
+    }
+    else {
+        // use original image calib points ('chessboard' text files)
+        std::ifstream oVisibleMetaDataFile(sBaseCalibDataPath+"lChessboard3D_nbrCorners.txt");
+        lvAssert(oVisibleMetaDataFile.is_open());
+        std::ifstream oThermalMetaDataFile(sBaseCalibDataPath+"rChessboard3D_nbrCorners.txt");
+        lvAssert(oThermalMetaDataFile.is_open());
+        std::string sIndicesLine,sIndicesLineValid;
+        lvAssert(std::getline(oVisibleMetaDataFile,sIndicesLine));
+        lvAssert(std::getline(oThermalMetaDataFile,sIndicesLineValid));
+        lvAssert(sIndicesLine==sIndicesLineValid);
+        const std::vector<std::string> vsImageIndices = lv::split(sIndicesLine,',');
+        std::vector<size_t> vnImageIndices(vsImageIndices.size());
+        for(size_t nImageIdx=0; nImageIdx<vsImageIndices.size(); ++nImageIdx)
+            std::stringstream(vsImageIndices[nImageIdx]) >> vnImageIndices[nImageIdx];
+        lvAssert(vnImageIndices.size()>0);
+        std::vector<cv::Size> vImagePointCounts(vnImageIndices.size());
+        for(size_t nIdx=0; nIdx<vnImageIndices.size(); ++nIdx) {
+            char cDelim;
+            int nCoordsX,nCoordsY;
+            lvAssert(oVisibleMetaDataFile>>nCoordsX);
+            lvAssert(oVisibleMetaDataFile>>cDelim);
+            lvAssert(oVisibleMetaDataFile>>nCoordsY);
+            vImagePointCounts[nIdx] = cv::Size(nCoordsX,nCoordsY);
+            lvAssert(oThermalMetaDataFile>>nCoordsX);
+            lvAssert(oThermalMetaDataFile>>cDelim);
+            lvAssert(oThermalMetaDataFile>>nCoordsY);
+            lvAssert(vImagePointCounts[nIdx]==cv::Size(nCoordsX,nCoordsY));
+        }
+        lvAssert(vnImageIndices.size()==vImagePointCounts.size());
+        std::ifstream oVisibleImagePtsFile(sBaseCalibDataPath+"lChessboard3D_imagec.txt");
+        std::ifstream oVisibleObjectPtsFile(sBaseCalibDataPath+"lChessboard3D_objectc.txt");
+        lvAssert(oVisibleImagePtsFile.is_open() && oVisibleObjectPtsFile.is_open());
+        std::ifstream oThermalImagePtsFile(sBaseCalibDataPath+"rChessboard3D_imagec.txt");
+        std::ifstream oThermalObjectPtsFile(sBaseCalibDataPath+"rChessboard3D_objectc.txt");
+        lvAssert(oThermalImagePtsFile.is_open() && oThermalObjectPtsFile.is_open());
+        const auto lPointReader = [](std::ifstream& oFile, size_t nIdx, bool bWorldPt) {
+            if(nIdx!=0) {
+                std::string sDummyLine;
+                lvAssert(std::getline(oFile,sDummyLine));
+            }
+            std::string sCoordsLineX,sCoordsLineY,sCoordsLineZ;
+            lvAssert(std::getline(oFile,sCoordsLineX));
+            lvAssert(std::getline(oFile,sCoordsLineY));
+            if(bWorldPt)
+                lvAssert(std::getline(oFile,sCoordsLineZ));
+            const std::vector<std::string> vsCoordsX = lv::split(sCoordsLineX,',');
+            const std::vector<std::string> vsCoordsY = lv::split(sCoordsLineY,',');
+            const std::vector<std::string> vsCoordsZ = lv::split(sCoordsLineZ,',');
+            lvAssert(vsCoordsX.size()==vsCoordsY.size() && (!bWorldPt || vsCoordsY.size()==vsCoordsZ.size()));
+            lvAssert(!vsCoordsX.empty());
+            const size_t nCoords = vsCoordsX.size();
+            std::vector<cv::Point3f> vPts(nCoords);
+            for(size_t nCoordIdx=0; nCoordIdx<nCoords; ++nCoordIdx) {
+                vPts[nCoordIdx].x = std::stof(vsCoordsX[nCoordIdx]);
+                vPts[nCoordIdx].y = std::stof(vsCoordsY[nCoordIdx]);
+                if(bWorldPt) {
+                    vPts[nCoordIdx].z = std::stof(vsCoordsZ[nCoordIdx]);
+                    std::swap(vPts[nCoordIdx].x,vPts[nCoordIdx].y);
+                    vPts[nCoordIdx] /= 1000;
+                }
+            }
+            return vPts;
+        };
+        const auto lPointConv = [](const std::vector<cv::Point3f>& vPtsIn) {
+            std::vector<cv::Point2f> vPtsOut(vPtsIn.size());
+            for(size_t nPtIdx=0; nPtIdx<vPtsIn.size(); ++nPtIdx)
+                vPtsOut[nPtIdx] = cv::Point2f(vPtsIn[nPtIdx].x,vPtsIn[nPtIdx].y);
+            return vPtsOut;
+        };
+        for(size_t nImageIdx=0; nImageIdx<vnImageIndices.size(); ++nImageIdx) {
+            const std::string sImageIdxStr = std::to_string(vnImageIndices[nImageIdx]);
+            cv::Mat oVisible = cv::imread(sBaseCalibDataPath+"RGB"+sImageIdxStr+".jpg",cv::IMREAD_COLOR);
+            cv::Mat oThermal = cv::imread(sBaseCalibDataPath+"T"+sImageIdxStr+".jpg",cv::IMREAD_COLOR);
+            lvAssert(!oVisible.empty() && !oThermal.empty());
+            lvAssert(oVisible.size()==oThermal.size() && oVisible.size()==oOrigImgSize);
+            avCalibInputs[0].push_back(oVisible.clone());
+            avCalibInputs[1].push_back(oThermal.clone());
+            const std::vector<cv::Point3f> vWorldPts = lPointReader(oVisibleObjectPtsFile,nImageIdx,true);
+            const std::vector<cv::Point3f> vWorldPtsValid = lPointReader(oThermalObjectPtsFile,nImageIdx,true);
+            lvAssert(vWorldPts==vWorldPtsValid);
+            const std::vector<cv::Point2f> vVisibleImagePts = lPointConv(lPointReader(oVisibleImagePtsFile,nImageIdx,false));
+            const std::vector<cv::Point2f> vThermalImagePts = lPointConv(lPointReader(oThermalImagePtsFile,nImageIdx,false));
+            lvAssert(vVisibleImagePts.size()==vWorldPts.size() && vThermalImagePts.size()==vWorldPts.size());
+            vvWorldPts.push_back(vWorldPts);
+            avvImagePts[0].push_back(vVisibleImagePts);
+            avvImagePts[1].push_back(vThermalImagePts);
+            const size_t nPts = vWorldPts.size();
+            for(size_t nPtIdx=0; nPtIdx<nPts; ++nPtIdx) {
+                avImagePts[0].push_back(vVisibleImagePts[nPtIdx]);
+                avImagePts[1].push_back(vThermalImagePts[nPtIdx]);
+                cv::circle(oVisible,vVisibleImagePts[nPtIdx],2,cv::Scalar_<uchar>(0,0,255),-1);
+                cv::circle(oThermal,vThermalImagePts[nPtIdx],2,cv::Scalar_<uchar>(0,0,255),-1);
+            }
+            /*lvPrint(vvWorldPts.back());
+            lvPrint(avvImagePts[0].back());
+            cv::imshow("visible",oVisible);
+            cv::imshow("thermal",oThermal);
+            cv::waitKey(0);*/
+        }
     }
     lvAssert(avCalibInputs[0].size()==avvImagePts[0].size());
 
