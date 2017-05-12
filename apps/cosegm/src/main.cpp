@@ -26,8 +26,8 @@
 #define DISPLAY_OUTPUT          0
 #define GLOBAL_VERBOSITY        4
 ////////////////////////////////
-#define DATASET_VAPTRIMOD       0
-#define DATASET_MINI_TESTS      1
+#define DATASET_VAPTRIMOD       1
+#define DATASET_MINI_TESTS      0
 ////////////////////////////////
 #define DATASET_OUTPUT_PATH     "results_test"
 #define DATASET_PRECACHING      1
@@ -37,7 +37,6 @@
 #define DATASET_USE_DISPARITY_EVAL         0
 #define DATASET_USE_HALF_GT_INPUT_FLAG     0
 #define DATASET_USE_PRECALC_FEATURES       0
-#define DATASET_EXTRA_PIXEL_BORDER_SIZE    0
 
 #if (DATASET_VAPTRIMOD+DATASET_MINI_TESTS/*+...*/)!=1
 #error "Must pick a single dataset."
@@ -46,26 +45,25 @@
 //@@@@ untested, need to cleanup approx masks
 #define DATASET_ID Dataset_VAPtrimod2016
 #define DATASET_PARAMS \
-    DATASET_OUTPUT_PATH,            /* => const std::string& sOutputDirName */ \
-    bool(WRITE_IMG_OUTPUT),         /* => bool bSaveOutput */ \
-    bool(EVALUATE_OUTPUT),          /* => bool bUseEvaluator */ \
-    DATASET_SCALE_FACTOR,           /* => double dScaleFactor */ \
-    false,                          /* => bool bLoadDepth */ \
-    true,                           /* => bool bLoadApproxMasks */ \
-    true,                           /* => bool bUndistort */ \
-    false,                          /* => bool bEvalStereoDisp */ \
-    0                               /* => int nUseGTMaskAsInput */
+    DATASET_OUTPUT_PATH,                          /* const std::string& sOutputDirName */\
+    bool(WRITE_IMG_OUTPUT),                       /* bool bSaveOutput=false */\
+    bool(EVALUATE_OUTPUT),                        /* bool bUseEvaluator=true */\
+    false,                                        /* bool bLoadDepth=true */\
+    true,                                         /* bool bUndistort=true */\
+    false,                                         /* bool bHorizRectify=false */\
+    false,                                        /* bool bEvalStereoDisp=false */\
+    7,                                            /* int nLoadInputMasks=0 */\
+    DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_MINI_TESTS
 #include "cosegm_tests.hpp"
 #define DATASET_ID Dataset_CosegmTests
 #define DATASET_PARAMS \
-    DATASET_OUTPUT_PATH,                                       /* => const std::string& sOutputDirName */ \
-    DATASET_EXTRA_PIXEL_BORDER_SIZE,                           /* => int nExtraPixelBorderSize */ \
-    DATASET_USE_DISPARITY_EVAL,                                /* => int nUseGTMaskAsInput */ \
-    DATASET_USE_HALF_GT_INPUT_FLAG,                            /* => int bEvalStereoDisp */ \
-    bool(WRITE_IMG_OUTPUT),                                    /* => bool bSaveOutput */ \
-    bool(EVALUATE_OUTPUT),                                     /* => bool bUseEvaluator */ \
-    DATASET_SCALE_FACTOR                                       /* => double dScaleFactor */
+    DATASET_OUTPUT_PATH,                          /* const std::string& sOutputDirName */\
+    bool(WRITE_IMG_OUTPUT),                       /* bool bSaveOutput=false */\
+    bool(EVALUATE_OUTPUT),                        /* bool bUseEvaluator=true */\
+    false,                                        /* bool bEvalStereoDisp=false */\
+    1,                                            /* int nLoadInputMasks=0 */\
+    DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 //#elif DATASET_...
 #endif //DATASET_...
 
@@ -121,7 +119,9 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         for(size_t nStreamIdx=0; nStreamIdx<vInitInput.size(); ++nStreamIdx) {
             lvAssert(vInitInput[nStreamIdx].size()==vInitInput[0].size());
             lvLog_(2,"\tinput %d := %s",(int)nStreamIdx,lv::MatInfo(vInitInput[nStreamIdx]).str().c_str());
+            cv::imshow(std::string("vInitInput_")+std::to_string(nStreamIdx),vInitInput[nStreamIdx]);
         }
+        cv::waitKey(0);
         const std::vector<lv::MatInfo> oInfoArray = oBatch.getInputInfoArray();
         const lv::MatSize oFrameSize = oInfoArray[0].size;
         const size_t nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity();
