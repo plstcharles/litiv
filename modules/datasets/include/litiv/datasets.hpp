@@ -59,6 +59,7 @@ namespace lv {
         /// static dataset object creation method with dataset impl specialization (forwards extra args to dataset constructor)
         template<typename... Targs>
         static inline DatasetPtr_<eDatasetTask,eDataset,eEvalImpl> create(Targs&&... args) {
+            lvDbgExceptionWatch;
             return lv::datasets::create<eDatasetTask,eDataset,eEvalImpl>(std::forward<Targs>(args)...);
         }
 
@@ -173,7 +174,7 @@ namespace lv {
             lvLog_(1,"Parsing complete. [%d batch(es)]\n%s",(int)this->getBatches(false).size(),this->printDataStructure("").c_str());
         }
     protected:
-        /// full dataset constructor (copied from DatasetHandler to avoid msvc2015 bug); parameters are passed through lv::datasets::create<...>(...), and may be caught/simplified by a specialization
+        /// full default (i.e. non-specialized) dataset constructor, copied from DatasetHandler to avoid msvc2015 bug; parameters are passed through lv::datasets::create<...>(...), and may be caught/simplified by a specialization
         IDataset_(
             const std::string& sDatasetName, ///< user-friendly dataset name (used for identification only)
             const std::string& sDatasetDirPath, ///< root path from which work batches can be parsed
@@ -185,6 +186,7 @@ namespace lv {
             bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned
             double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
         ) : DatasetHandler_<eDatasetTask,eDatasetSource,eDataset>(sDatasetName,sDatasetDirPath,sOutputDirPath,vsWorkBatchDirs,vsSkippedDirTokens,bSaveOutput,bUseEvaluator,bForce4ByteDataAlign,dScaleFactor) {}
+        // @@@@ TODO : replace all constr bools by common flag param, with overloadable vals in impls
     };
 
 } // namespace lv

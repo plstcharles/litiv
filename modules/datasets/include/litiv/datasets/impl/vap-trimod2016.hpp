@@ -24,76 +24,96 @@
 #include "litiv/datasets.hpp" // for parsers only, not truly required here
 #include <opencv2/calib3d.hpp>
 
-#define DATASETS_VAP_FIX_SCENE2_DISTORT 1
-#define DATASETS_VAP_FIX_SCENE3_OFFSET  1
+#define DATASETS_VAP_USE_OLD_CALIB_DATA     1
+#define DATASETS_VAP_FIX_GT_SCENE2_DISTORT  1
+#define DATASETS_VAP_FIX_GT_SCENE3_OFFSET   1
 
 namespace lv {
 
+    /// parameter interface for VAP trimodal dataset loader impl
     struct IVAPtrimod2016Dataset {
         /// returns whether the depth stream should be loaded & provided as input or not (if not, the dataset is used as a bimodal one)
         virtual bool isLoadingDepth() const = 0;
-        /// returns whether the approximated segmentation masks should be loaded or not (if so, each input stream will have a mask in each packet)
-        virtual bool isLoadingApproxMasks() const = 0;
         /// returns whether images should be undistorted when loaded or not, using the calib files provided with the dataset
         virtual bool isUndistorting() const = 0;
+        /// returns whether images should be horizontally rectified when loaded or not, using the calib files provided with the dataset
+        virtual bool isHorizRectifying() const = 0;
         /// returns whether we should evaluate fg/bg segmentation or stereo disparity
         virtual bool isEvaluatingStereoDisp() const = 0;
-        /// returns whether the input segmentation masks given should be half gt or not (useful for training) --- 1 = use thermal gt mask, 2 = use rgb gt mask, 0 = use no gt mask
-        virtual int isUsingGTMaskAsInput() const = 0;
+        /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
+        virtual int isLoadingInputMasks() const = 0;
     };
 
+    /// dataset loader impl specialization for VAP trimodal dataset -- instantiated via lv::datasets::create(...)
     template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
     struct Dataset_<eDatasetTask,Dataset_VAPtrimod2016,eEvalImpl> :
             public IVAPtrimod2016Dataset,
             public IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016,lv::getDatasetEval<eDatasetTask,Dataset_VAPtrimod2016>(),eEvalImpl> {
-    protected: // should still be protected, as creation should always be done via datasets::create
+    protected: // should still be protected, as creation should always be done via lv::datasets::create
+        /// specialization constructor, with all required extra parameters; these will be forwarded by lv::datasets::create(...)
         Dataset_(
                 const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving (will be created in VAP trimodal dataset results folder)
                 bool bSaveOutput=false, ///< defines whether results should be archived or not
                 bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
-                double dScaleFactor=1.0, ///< defines the scale factor to use to resize/rescale read packets
                 bool bLoadDepth=true, ///< defines whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
-                bool bLoadApproxMasks=false, ///< defines whether the approximated segmentation masks should be loaded or not (if so, each input stream will have a mask in each packet)
                 bool bUndistort=true, ///< defines whether images should be undistorted when loaded or not, using the calib files provided with the dataset
+                bool bHorizRectify=false, ///< defines whether images should be horizontally rectified when loaded or not, using the calib files provided with the dataset
                 bool bEvalStereoDisp=false, ///< defines whether we should evaluate fg/bg segmentation or stereo disparity
-                int nUseGTMaskAsInput=1 ///< defines whether the input masks given should be half gt or not (useful for training) --- 1 = use thermal gt mask, 2 = use rgb gt mask, 0 = use no gt mask
+                int nLoadInputMasks=0, ///< defines whether the input stream should be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
+                double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
         ) :
                 IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016,lv::getDatasetEval<eDatasetTask,Dataset_VAPtrimod2016>(),eEvalImpl>(
                         "VAP-trimodal2016",
                         lv::datasets::getRootPath()+"vap/rgbdt-stereo/",
                         lv::datasets::getRootPath()+"vap/rgbdt-stereo/results/"+lv::addDirSlashIfMissing(sOutputDirName),
-                        getWorkBatchDirNames(),
+                        getWorkBatchDirNames(bUndistort||bHorizRectify),
                         std::vector<std::string>(),
                         bSaveOutput,
                         bUseEvaluator,
                         false,
                         dScaleFactor
-                ), m_bLoadDepth(bLoadDepth),m_bLoadApproxMasks(bLoadApproxMasks),m_bUndistort(bUndistort),m_bEvalStereoDisp(bEvalStereoDisp),m_nUseGTMaskAsInput(nUseGTMaskAsInput) {
+                ),
+                m_bLoadDepth(bLoadDepth),
+                m_bUndistort(bUndistort||bHorizRectify),
+                m_bHorizRectify(bHorizRectify),
+                m_bEvalStereoDisp(bEvalStereoDisp),
+                m_nLoadInputMasks(nLoadInputMasks) {
             lvAssert_(!m_bEvalStereoDisp,"missing impl @@@@@");
         }
         /// returns the names of all work batch directories available for this dataset specialization
-        static const std::vector<std::string>& getWorkBatchDirNames() {
-            static const std::vector<std::string> s_vsWorkBatchDirs = {"Scene 1","Scene 2","Scene 3"};
-            return s_vsWorkBatchDirs;
+        static const std::vector<std::string>& getWorkBatchDirNames(bool bUndistortOrRectify) {
+            // dataset contains 3 scenes with GT for default use
+            static const std::vector<std::string> s_vsWorkBatchDirs_real = {
+                "Scene 1",
+                "Scene 2",
+                "Scene 3"
+            };
+            // 'Scene 2' does not have proper calibration data; must skip it if undistort/rectify required
+            static const std::vector<std::string> s_vsWorkBatchDirs_calibonly = {
+                "Scene 1",
+                "Scene 3"
+            };
+            return bUndistortOrRectify?s_vsWorkBatchDirs_calibonly:s_vsWorkBatchDirs_real;
         }
         /// returns whether the depth stream should be loaded & provided as input or not (if not, the dataset is used as a bimodal one)
         virtual bool isLoadingDepth() const override {return m_bLoadDepth;}
-        /// returns whether the approximated segmentation masks should be loaded or not (if so, each input stream will have a mask in each packet)
-        virtual bool isLoadingApproxMasks() const override {return m_bLoadApproxMasks;}
         /// returns whether images should be undistorted when loaded or not, using the calib files provided with the dataset
         virtual bool isUndistorting() const override {return m_bUndistort;}
+        /// returns whether images should be horizontally rectified when loaded or not, using the calib files provided with the dataset
+        virtual bool isHorizRectifying() const override {return m_bHorizRectify;}
         /// returns whether we should evaluate fg/bg segmentation or stereo disparity
         virtual bool isEvaluatingStereoDisp() const override {return m_bEvalStereoDisp;}
-        /// returns whether the input segmentation masks given should be half gt or not (useful for training) --- 1 = use thermal gt mask, 2 = use rgb gt mask, 0 = use no gt mask
-        virtual int isUsingGTMaskAsInput() const override {return m_nUseGTMaskAsInput;}
+        /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
+        virtual int isLoadingInputMasks() const override {return m_nLoadInputMasks;}
     protected:
         const bool m_bLoadDepth;
-        const bool m_bLoadApproxMasks;
         const bool m_bUndistort;
+        const bool m_bHorizRectify;
         const bool m_bEvalStereoDisp;
-        const int m_nUseGTMaskAsInput;
+        const int m_nLoadInputMasks;
     };
 
+    /// data grouper handler impl specialization for vap trimodal dataset; will skip groups entirely & forward data to batches
     template<DatasetTaskList eDatasetTask>
     struct DataGroupHandler_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016> :
             public DataGroupHandler {
@@ -108,44 +128,53 @@ namespace lv {
         }
     };
 
+    /// data producer impl specialization for vap trimodal dataset; provides required data i/o and undistort support
     template<DatasetTaskList eDatasetTask>
     struct DataProducer_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016> :
             public IDataProducerWrapper_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016> {
         /// returns the number of parallel input streams (depends on whether loading depth or not)
         virtual size_t getInputStreamCount() const override final {
-            return m_bLoadDepth?3:2;
+            return size_t((m_bLoadDepth?3:2)*(m_nLoadInputMasks?2:1));
         }
         /// returns the number of parallel gt streams (depends on whether loading depth or not)
         virtual size_t getGTStreamCount() const override final {
-            return m_bLoadDepth?3:2;
+            return size_t(m_bLoadDepth?3:2);
         }
         /// returns the (friendly) name of an input stream specified by index
         virtual std::string getInputStreamName(size_t nStreamIdx) const override final {
-            return ((nStreamIdx==0)?"RGB":(nStreamIdx==1)?"THERMAL":(nStreamIdx==2)?"DEPTH":"UNKNOWN");
+            lvAssert(nStreamIdx<getInputStreamCount());
+            if(m_nLoadInputMasks) {
+                const std::string sBaseName = (((nStreamIdx/2)==0)?"RGB":((nStreamIdx/2)==1)?"THERMAL":((nStreamIdx/2)==2)?"DEPTH":"UNKNOWN");
+                return sBaseName+std::string((nStreamIdx%2)?"_MASK":"");
+            }
+            else
+                return ((nStreamIdx==0)?"RGB":(nStreamIdx==1)?"THERMAL":(nStreamIdx==2)?"DEPTH":"UNKNOWN");
         }
         /// returns the (friendly) name of a gt stream specified by index
         virtual std::string getGTStreamName(size_t nStreamIdx) const override final {
-            return getInputStreamName(nStreamIdx)+"_GT";
+            lvAssert(nStreamIdx<getGTStreamCount());
+            const std::string sBaseName = ((nStreamIdx==0)?"RGB":(nStreamIdx==1)?"THERMAL":(nStreamIdx==2)?"DEPTH":"UNKNOWN");
+            return sBaseName+"_GT";
         }
         /// returns whether the depth stream should be loaded & provided as input or not (if not, the dataset is used as a bimodal one)
         bool isLoadingDepth() const {
             return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isLoadingDepth();
         }
-        /// returns whether the approximated segmentation masks should be loaded or not (if so, each input stream will have a mask in each packet)
-        bool isLoadingApproxMasks() const {
-            return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isLoadingApproxMasks();
-        }
         /// returns whether images should be undistorted when loaded or not, using the calib files provided with the dataset
         bool isUndistorting() const {
             return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isUndistorting();
+        }
+        /// returns whether images should be horizontally rectified when loaded or not, using the calib files provided with the dataset
+        bool isHorizRectifying() const {
+            return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isHorizRectifying();
         }
         /// returns whether we should evaluate fg/bg segmentation or stereo disparity
         bool isEvaluatingStereoDisp() const {
             return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isEvaluatingStereoDisp();
         }
-        /// returns whether the input segmentation masks given should be half gt or not (useful for training) --- 1 = use thermal gt mask, 2 = use rgb gt mask, 0 = use no gt mask
-        int isUsingGTMaskAsInput() const {
-            return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isUsingGTMaskAsInput();
+        /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
+        int isLoadingInputMasks() const {
+            return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isLoadingInputMasks();
         }
         /// returns the name of the directory where feature packets should be saved
         std::string getFeaturesDirName() const {
@@ -173,38 +202,67 @@ namespace lv {
 
     protected:
         virtual void parseData() override final {
+            // note: this function is called right after the constructor, so initialize everything for other calls here
             lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
-            const std::vector<std::string> vsSubDirs = lv::getSubDirsFromDir(this->getDataPath());
-            auto psDepthGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"depthMasks");
-            auto psDepthDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"SyncD");
-            auto psRGBGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"rgbMasks");
-            auto psRGBDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"SyncRGB");
-            auto psThermalGTDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"thermalMasks");
-            auto psThermalDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"SyncT");
-            if((psDepthDir==vsSubDirs.end() || psDepthGTDir==vsSubDirs.end()) || (psRGBDir==vsSubDirs.end() || psRGBGTDir==vsSubDirs.end()) || (psThermalDir==vsSubDirs.end() || psThermalGTDir==vsSubDirs.end()))
-                lvError_("VAPtrimod2016 sequence '%s' did not possess the required groundtruth and input directories",this->getName().c_str());
             const IVAPtrimod2016Dataset& oDataset = dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot());
             this->m_bLoadDepth = oDataset.isLoadingDepth();
-            this->m_bLoadApproxMasks = oDataset.isLoadingApproxMasks();
-            lvAssert_(!m_bLoadApproxMasks,"missing impl @@@@");
+            this->m_nLoadInputMasks = oDataset.isLoadingInputMasks();
             this->m_bUndistort = oDataset.isUndistorting();
-            const size_t nStreamCount = this->m_bLoadDepth?3:2;
-            this->m_vInputROIs.resize(nStreamCount);
-            this->m_vGTROIs.resize(nStreamCount);
-            this->m_vInputInfos.resize(nStreamCount);
-            this->m_vGTInfos.resize(nStreamCount);
+            this->m_bHorizRectify = oDataset.isHorizRectifying();
+            lvAssert(!this->m_bHorizRectify || this->m_bUndistort);
+            const bool bUseInterlacedMasks = this->m_nLoadInputMasks!=0;
+            const bool bUseApproxRGBMask = (this->m_nLoadInputMasks&2)==0;
+            const bool bUseApproxThermalMask = (this->m_nLoadInputMasks&4)==0;
+            const bool bUseApproxDepthMask = (this->m_nLoadInputMasks&8)==0;
+            const size_t nInputStreamCount = this->getInputStreamCount();
+            const size_t nGTStreamCount = this->getGTStreamCount();
+            constexpr size_t nInputRGBStreamIdx = 0;
+            const size_t nInputThermalStreamIdx = bUseInterlacedMasks?2:1;
+            const size_t nInputDepthStreamIdx = bUseInterlacedMasks?4:2;
+            constexpr size_t nInputRGBMaskStreamIdx = 1;
+            constexpr size_t nInputThermalMaskStreamIdx = 3;
+            constexpr size_t nInputDepthMaskStreamIdx = 5;
+            constexpr size_t nGTRGBMaskStreamIdx = 0;
+            constexpr size_t nGTThermalMaskStreamIdx = 1;
+            constexpr size_t nGTDepthMaskStreamIdx = 2;
+            const std::vector<std::string> vsSubDirs = lv::getSubDirsFromDir(this->getDataPath());
+            auto psRGBGTMasksDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"rgbMasks");
+            auto psRGBApproxMasksDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"rgbApproxMasks");
+            auto psRGBDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"SyncRGB");
+            auto psThermalGTMasksDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"thermalMasks");
+            auto psThermalApproxMasksDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"thermalApproxMasks");
+            auto psThermalDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"SyncT");
+            auto psDepthGTMasksDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"depthMasks");
+            auto psDepthApproxMasksDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"depthApproxMasks");
+            auto psDepthDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"SyncD");
+            if((psDepthDir==vsSubDirs.end() || psDepthGTMasksDir==vsSubDirs.end()) || (psRGBDir==vsSubDirs.end() || psRGBGTMasksDir==vsSubDirs.end()) || (psThermalDir==vsSubDirs.end() || psThermalGTMasksDir==vsSubDirs.end()))
+                lvError_("VAPtrimod2016 sequence '%s' did not possess the required groundtruth and input directories",this->getName().c_str());
+            if(bUseInterlacedMasks) {
+                if(bUseApproxRGBMask && psRGBApproxMasksDir==vsSubDirs.end())
+                    lvError_("VAPtrimod2016 sequence '%s' did not possess the required approx input mask directory ('rgbApproxMasks')",this->getName().c_str());
+                if(bUseApproxThermalMask && psThermalApproxMasksDir==vsSubDirs.end())
+                    lvError_("VAPtrimod2016 sequence '%s' did not possess the required approx input mask directory ('thermalApproxMasks')",this->getName().c_str());
+                if(this->m_bLoadDepth && bUseApproxDepthMask && psDepthApproxMasksDir==vsSubDirs.end())
+                    lvError_("VAPtrimod2016 sequence '%s' did not possess the required approx input mask directory ('depthApproxMasks')",this->getName().c_str());
+            }
+            this->m_vInputROIs.resize(nInputStreamCount);
+            this->m_vGTROIs.resize(nGTStreamCount);
+            this->m_vInputInfos.resize(nInputStreamCount);
+            this->m_vGTInfos.resize(nGTStreamCount);
             cv::Mat oGlobalROI(480,640,CV_8UC1,cv::Scalar_<uchar>(255));
             const double dScale = this->getScaleFactor();
             if(dScale!=1.0)
                 cv::resize(oGlobalROI,oGlobalROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
-            for(size_t s=0; s<nStreamCount; ++s) {
-                this->m_vInputInfos[s] = lv::MatInfo{oGlobalROI.size(),(s==0?CV_8UC3:CV_8UC1)};
-                this->m_vGTInfos[s] = lv::MatInfo{oGlobalROI.size(),CV_8UC1};
-            }
+            for(size_t nStreamIdx=0; nStreamIdx<nInputStreamCount; ++nStreamIdx)
+                this->m_vInputInfos[nStreamIdx] = lv::MatInfo{oGlobalROI.size(),(nStreamIdx==nInputRGBStreamIdx?CV_8UC3:CV_8UC1)};
+            for(size_t nStreamIdx=0; nStreamIdx<nGTStreamCount; ++nStreamIdx)
+                this->m_vGTInfos[nStreamIdx] = lv::MatInfo{oGlobalROI.size(),CV_8UC1};
             const cv::Size oImageSize(640,480);
-            const double dUndistortMapCameraMatrixAlpha = -1.0;
             if(this->m_bUndistort) {
+            #if DATASETS_VAP_USE_OLD_CALIB_DATA
+                lvAssert_(!this->m_bHorizRectify,"missing calib data for rectification");
+                const double dUndistortMapCameraMatrixAlpha = -1.0;
                 cv::FileStorage oParamsFS(this->getDataPath()+"calibVars.yml",cv::FileStorage::READ);
                 lvAssert_(oParamsFS.isOpened(),"could not open calibration yml file");
                 oParamsFS["rgbCamMat"] >> this->m_oRGBCameraParams;
@@ -219,25 +277,35 @@ namespace lv {
                 cv::initUndistortRectifyMap(this->m_oThermalCameraParams,this->m_oThermalDistortParams,cv::Mat(),
                                             (dUndistortMapCameraMatrixAlpha<0)?this->m_oThermalCameraParams:cv::getOptimalNewCameraMatrix(this->m_oThermalCameraParams,this->m_oThermalDistortParams,oImageSize,dUndistortMapCameraMatrixAlpha,oImageSize,0),
                                             oImageSize,CV_16SC2,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2);
+            #else //!DATASETS_VAP_USE_OLD_CALIB_DATA
+                @@@
+                if(this->m_bHorizRectify) {
+                    lvAssert_(!this->m_bLoadDepth,"missing depth image rectification impl");
+
+                }
+            #endif //!DATASETS_VAP_USE_OLD_CALIB_DATA
             }
-            //
-            // NOTE: internal stream indexing
-            //    stream[0] = RGB     (default:CV_8UC3)
-            //    stream[1] = thermal (default:?)
-            //    stream[2] = depth   (default:?) --- if enabled only
-            //
             const std::vector<std::string> vsRGBPaths = lv::getFilesFromDir(*psRGBDir);
             if(vsRGBPaths.empty() || cv::imread(vsRGBPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected RGB data",this->getName().c_str());
-            this->m_vvsInputPaths.resize(vsRGBPaths.size());
-            std::vector<std::string> vsTempInputFileNames(vsRGBPaths.size());
-            for(size_t nInputPacketIdx=0; nInputPacketIdx<vsRGBPaths.size(); ++nInputPacketIdx) {
-                this->m_vvsInputPaths[nInputPacketIdx].resize(nStreamCount);
-                this->m_vvsInputPaths[nInputPacketIdx][0] = vsRGBPaths[nInputPacketIdx];
+            const size_t nInputPackets = vsRGBPaths.size();
+            this->m_vvsInputPaths.resize(nInputPackets);
+            std::vector<std::string> vsTempInputFileNames(nInputPackets);
+            for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx) {
+                this->m_vvsInputPaths[nInputPacketIdx].resize(nInputStreamCount);
+                this->m_vvsInputPaths[nInputPacketIdx][nInputRGBStreamIdx] = vsRGBPaths[nInputPacketIdx];
                 const size_t nLastInputSlashPos = vsRGBPaths[nInputPacketIdx].find_last_of("/\\");
                 const std::string sInputFileNameExt = nLastInputSlashPos==std::string::npos?vsRGBPaths[nInputPacketIdx]:vsRGBPaths[nInputPacketIdx].substr(nLastInputSlashPos+1);
                 const size_t nLastInputDotPos = sInputFileNameExt.find_last_of('.');
                 vsTempInputFileNames[nInputPacketIdx] = nLastInputDotPos==std::string::npos?sInputFileNameExt:sInputFileNameExt.substr(0,nLastInputDotPos);
+            }
+            if(bUseInterlacedMasks && bUseApproxRGBMask) {
+                const std::vector<std::string> vsRGBApproxMasksPaths = lv::getFilesFromDir(*psRGBApproxMasksDir);
+                if(vsRGBApproxMasksPaths.empty() || cv::imread(vsRGBApproxMasksPaths[0]).size()!=oImageSize)
+                    lvError_("VAPtrimod2016 sequence '%s' did not possess expected RGB approx mask data",this->getName().c_str());
+                lvAssert_(vsRGBApproxMasksPaths.size()==nInputPackets,"rgb approx mask count did not match input image count");
+                for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx)
+                    this->m_vvsInputPaths[nInputPacketIdx][nInputRGBMaskStreamIdx] = vsRGBApproxMasksPaths[nInputPacketIdx];
             }
             cv::Mat oRGBROI = cv::imread(this->getDataPath()+"rgb_roi.png",cv::IMREAD_GRAYSCALE);
             if(!oRGBROI.empty()) {
@@ -246,22 +314,23 @@ namespace lv {
             }
             else
                 oRGBROI = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
-            if(oRGBROI.size()!=this->m_vInputInfos[0].size())
-                cv::resize(oRGBROI,oRGBROI,this->m_vInputInfos[0].size(),0,0,cv::INTER_NEAREST);
-            if(this->m_bUndistort)
+            if(oRGBROI.size()!=this->m_vInputInfos[nInputRGBStreamIdx].size())
+                cv::resize(oRGBROI,oRGBROI,this->m_vInputInfos[nInputRGBStreamIdx].size(),0,0,cv::INTER_NEAREST);
+            if(this->m_bUndistort || this->m_bHorizRectify)
                 cv::remap(oRGBROI.clone(),oRGBROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_NEAREST);
-            this->m_vInputROIs[0] = oRGBROI.clone();
-            this->m_vGTROIs[0] = oRGBROI.clone();
-            const std::vector<std::string> vsRGBGTPaths = lv::getFilesFromDir(*psRGBGTDir);
-            if(vsRGBGTPaths.empty() || cv::imread(vsRGBGTPaths[0]).size()!=oImageSize)
+            this->m_vInputROIs[nInputRGBStreamIdx] = oRGBROI.clone();
+            this->m_vGTROIs[nGTRGBMaskStreamIdx] = oRGBROI.clone();
+            const std::vector<std::string> vsRGBGTMasksPaths = lv::getFilesFromDir(*psRGBGTMasksDir);
+            if(vsRGBGTMasksPaths.empty() || cv::imread(vsRGBGTMasksPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected RGB gt data",this->getName().c_str());
-            this->m_vvsGTPaths.resize(vsRGBGTPaths.size());
+            const size_t nGTPackets = vsRGBGTMasksPaths.size();
+            this->m_vvsGTPaths.resize(nGTPackets);
             this->m_mGTIndexLUT.clear();
-            for(size_t nGTPacketIdx=0; nGTPacketIdx<vsRGBGTPaths.size(); ++nGTPacketIdx) {
-                this->m_vvsGTPaths[nGTPacketIdx].resize(nStreamCount);
-                this->m_vvsGTPaths[nGTPacketIdx][0] = vsRGBGTPaths[nGTPacketIdx];
-                const size_t nLastGTSlashPos = vsRGBGTPaths[nGTPacketIdx].find_last_of("/\\");
-                const std::string sGTFileNameExt = nLastGTSlashPos==std::string::npos?vsRGBGTPaths[nGTPacketIdx]:vsRGBGTPaths[nGTPacketIdx].substr(nLastGTSlashPos+1);
+            for(size_t nGTPacketIdx=0; nGTPacketIdx<nGTPackets; ++nGTPacketIdx) {
+                this->m_vvsGTPaths[nGTPacketIdx].resize(nGTStreamCount);
+                this->m_vvsGTPaths[nGTPacketIdx][nGTRGBMaskStreamIdx] = vsRGBGTMasksPaths[nGTPacketIdx];
+                const size_t nLastGTSlashPos = vsRGBGTMasksPaths[nGTPacketIdx].find_last_of("/\\");
+                const std::string sGTFileNameExt = nLastGTSlashPos==std::string::npos?vsRGBGTMasksPaths[nGTPacketIdx]:vsRGBGTMasksPaths[nGTPacketIdx].substr(nLastGTSlashPos+1);
                 const size_t nLastGTDotPos = sGTFileNameExt.find_last_of('.');
                 const std::string sGTFileName = nLastGTDotPos==std::string::npos?sGTFileNameExt:sGTFileNameExt.substr(0,nLastGTDotPos);
                 lvAssert(!sGTFileName.empty());
@@ -272,13 +341,27 @@ namespace lv {
                 lvAssert(nInputPacketIdx<vsTempInputFileNames.size());
                 this->m_mGTIndexLUT[nInputPacketIdx] = nGTPacketIdx; // direct gt path index to frame index mapping
             }
+            if(bUseInterlacedMasks && !bUseApproxRGBMask) {
+                lvAssert_(vsRGBGTMasksPaths.size()==nInputPackets,"rgb gt mask count did not match input image count");
+                for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx)
+                    this->m_vvsInputPaths[nInputPacketIdx][nInputRGBMaskStreamIdx] = vsRGBGTMasksPaths[nInputPacketIdx];
+            }
+            //////////////////////////////////////////////////////////////////////////////////////////
             const std::vector<std::string> vsThermalPaths = lv::getFilesFromDir(*psThermalDir);
             if(vsThermalPaths.empty() || cv::imread(vsThermalPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected thermal data",this->getName().c_str());
-            if(vsThermalPaths.size()!=vsRGBPaths.size())
+            if(vsThermalPaths.size()!=nInputPackets)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/thermal frames",this->getName().c_str());
             for(size_t nInputPacketIdx=0; nInputPacketIdx<vsThermalPaths.size(); ++nInputPacketIdx)
-                this->m_vvsInputPaths[nInputPacketIdx][1] = vsThermalPaths[nInputPacketIdx];
+                this->m_vvsInputPaths[nInputPacketIdx][nInputThermalStreamIdx] = vsThermalPaths[nInputPacketIdx];
+            if(bUseInterlacedMasks && bUseApproxThermalMask) {
+                const std::vector<std::string> vsThermalApproxMasksPaths = lv::getFilesFromDir(*psThermalApproxMasksDir);
+                if(vsThermalApproxMasksPaths.empty() || cv::imread(vsThermalApproxMasksPaths[0]).size()!=oImageSize)
+                    lvError_("VAPtrimod2016 sequence '%s' did not possess expected thermal approx mask data",this->getName().c_str());
+                lvAssert_(vsThermalApproxMasksPaths.size()==nInputPackets,"thermal approx mask count did not match input image count");
+                for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx)
+                    this->m_vvsInputPaths[nInputPacketIdx][nInputThermalMaskStreamIdx] = vsThermalApproxMasksPaths[nInputPacketIdx];
+            }
             cv::Mat oThermalROI = cv::imread(this->getDataPath()+"thermal_roi.png",cv::IMREAD_GRAYSCALE);
             if(!oThermalROI.empty()) {
                 lvAssert(oThermalROI.type()==CV_8UC1 && oThermalROI.size()==oImageSize);
@@ -286,27 +369,41 @@ namespace lv {
             }
             else
                 oThermalROI = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
-            if(oThermalROI.size()!=this->m_vInputInfos[1].size())
-                cv::resize(oThermalROI,oThermalROI,this->m_vInputInfos[1].size(),0,0,cv::INTER_NEAREST);
-            if(this->m_bUndistort)
+            if(oThermalROI.size()!=this->m_vInputInfos[nInputThermalStreamIdx].size())
+                cv::resize(oThermalROI,oThermalROI,this->m_vInputInfos[nInputThermalStreamIdx].size(),0,0,cv::INTER_NEAREST);
+            if(this->m_bUndistort || this->m_bHorizRectify)
                 cv::remap(oThermalROI.clone(),oThermalROI,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_NEAREST);
-            this->m_vInputROIs[1] = oThermalROI.clone();
-            this->m_vGTROIs[1] = oThermalROI.clone();
-            const std::vector<std::string> vsThermalGTPaths = lv::getFilesFromDir(*psThermalGTDir);
-            if(vsThermalGTPaths.empty() || cv::imread(vsThermalGTPaths[0]).size()!=oImageSize)
+            this->m_vInputROIs[nInputThermalStreamIdx] = oThermalROI.clone();
+            this->m_vGTROIs[nGTThermalMaskStreamIdx] = oThermalROI.clone();
+            const std::vector<std::string> vsThermalGTMasksPaths = lv::getFilesFromDir(*psThermalGTMasksDir);
+            if(vsThermalGTMasksPaths.empty() || cv::imread(vsThermalGTMasksPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected thermal gt data",this->getName().c_str());
-            if(vsThermalGTPaths.size()!=vsRGBGTPaths.size())
+            if(vsThermalGTMasksPaths.size()!=nGTPackets)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/thermal gt frames",this->getName().c_str());
-            for(size_t nGTPacketIdx=0; nGTPacketIdx<vsThermalGTPaths.size(); ++nGTPacketIdx)
-                this->m_vvsGTPaths[nGTPacketIdx][1] = vsThermalGTPaths[nGTPacketIdx];
+            for(size_t nGTPacketIdx=0; nGTPacketIdx<vsThermalGTMasksPaths.size(); ++nGTPacketIdx)
+                this->m_vvsGTPaths[nGTPacketIdx][nGTThermalMaskStreamIdx] = vsThermalGTMasksPaths[nGTPacketIdx];
+            if(bUseInterlacedMasks && !bUseApproxThermalMask) {
+                lvAssert_(vsThermalGTMasksPaths.size()==nInputPackets,"thermal gt mask count did not match input image count");
+                for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx)
+                    this->m_vvsInputPaths[nInputPacketIdx][nInputThermalMaskStreamIdx] = vsThermalGTMasksPaths[nInputPacketIdx];
+            }
+            //////////////////////////////////////////////////////////////////////////////////////////
             if(this->m_bLoadDepth) {
                 const std::vector<std::string> vsDepthPaths = lv::getFilesFromDir(*psDepthDir);
                 if(vsDepthPaths.empty() || cv::imread(vsDepthPaths[0]).size()!=oImageSize)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess expected depth data",this->getName().c_str());
-                if(vsDepthPaths.size()!=vsRGBPaths.size())
+                if(vsDepthPaths.size()!=nInputPackets)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/depth frames",this->getName().c_str());
                 for(size_t nInputPacketIdx=0; nInputPacketIdx<vsDepthPaths.size(); ++nInputPacketIdx)
-                    this->m_vvsInputPaths[nInputPacketIdx][2] = vsDepthPaths[nInputPacketIdx];
+                    this->m_vvsInputPaths[nInputPacketIdx][nInputDepthStreamIdx] = vsDepthPaths[nInputPacketIdx];
+                if(bUseInterlacedMasks && bUseApproxDepthMask) {
+                    const std::vector<std::string> vsDepthApproxMasksPaths = lv::getFilesFromDir(*psDepthApproxMasksDir);
+                    if(vsDepthApproxMasksPaths.empty() || cv::imread(vsDepthApproxMasksPaths[0]).size()!=oImageSize)
+                        lvError_("VAPtrimod2016 sequence '%s' did not possess expected depth approx mask data",this->getName().c_str());
+                    lvAssert_(vsDepthApproxMasksPaths.size()==nInputPackets,"depth approx mask count did not match input image count");
+                    for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx)
+                        this->m_vvsInputPaths[nInputPacketIdx][nInputDepthMaskStreamIdx] = vsDepthApproxMasksPaths[nInputPacketIdx];
+                }
                 cv::Mat oDepthROI = cv::imread(this->getDataPath()+"depth_roi.png",cv::IMREAD_GRAYSCALE);
                 if(!oDepthROI.empty()) {
                     lvAssert(oDepthROI.type()==CV_8UC1 && oDepthROI.size()==oImageSize);
@@ -314,18 +411,24 @@ namespace lv {
                 }
                 else
                     oDepthROI = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
-                if(oDepthROI.size()!=this->m_vInputInfos[2].size())
-                    cv::resize(oDepthROI,oDepthROI,this->m_vInputInfos[2].size(),0,0,cv::INTER_NEAREST);
-                this->m_vInputROIs[2] = oDepthROI.clone();
-                this->m_vGTROIs[2] = oDepthROI.clone();
-                const std::vector<std::string> vsDepthGTPaths = lv::getFilesFromDir(*psDepthGTDir);
-                if(vsDepthGTPaths.empty() || cv::imread(vsDepthGTPaths[0]).size()!=oImageSize)
+                if(oDepthROI.size()!=this->m_vInputInfos[nInputDepthStreamIdx].size())
+                    cv::resize(oDepthROI,oDepthROI,this->m_vInputInfos[nInputDepthStreamIdx].size(),0,0,cv::INTER_NEAREST);
+                this->m_vInputROIs[nInputDepthStreamIdx] = oDepthROI.clone();
+                this->m_vGTROIs[nGTDepthMaskStreamIdx] = oDepthROI.clone();
+                const std::vector<std::string> vsDepthGTMasksPaths = lv::getFilesFromDir(*psDepthGTMasksDir);
+                if(vsDepthGTMasksPaths.empty() || cv::imread(vsDepthGTMasksPaths[0]).size()!=oImageSize)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess expected depth gt data",this->getName().c_str());
-                if(vsDepthGTPaths.size()!=vsRGBGTPaths.size())
+                if(vsDepthGTMasksPaths.size()!=nGTPackets)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/depth gt frames",this->getName().c_str());
-                for(size_t nGTPacketIdx=0; nGTPacketIdx<vsDepthGTPaths.size(); ++nGTPacketIdx)
-                    this->m_vvsGTPaths[nGTPacketIdx][2] = vsDepthGTPaths[nGTPacketIdx];
+                for(size_t nGTPacketIdx=0; nGTPacketIdx<vsDepthGTMasksPaths.size(); ++nGTPacketIdx)
+                    this->m_vvsGTPaths[nGTPacketIdx][nGTDepthMaskStreamIdx] = vsDepthGTMasksPaths[nGTPacketIdx];
+                if(bUseInterlacedMasks && !bUseApproxDepthMask) {
+                    lvAssert_(vsDepthGTMasksPaths.size()==nInputPackets,"depth gt mask count did not match input image count");
+                    for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx)
+                        this->m_vvsInputPaths[nInputPacketIdx][nInputDepthMaskStreamIdx] = vsDepthGTMasksPaths[nInputPacketIdx];
+                }
             }
+            //////////////////////////////////////////////////////////////////////////////////////////////////
             this->m_nMinDisp = size_t(0);
             this->m_nMaxDisp = size_t(100);
             std::ifstream oDispRangeFile(this->getDataPath()+"drange.txt");
@@ -337,90 +440,136 @@ namespace lv {
             this->m_nMinDisp *= dScale;
             this->m_nMaxDisp *= dScale;
             lvAssert(this->m_nMaxDisp>this->m_nMinDisp);
+            if(this->m_bHorizRectify) {
+                lvAssert(false);// @@@@ missing impl
+                // transpose all matrices
+            }
         }
         virtual std::vector<cv::Mat> getRawInputArray(size_t nPacketIdx) override final {
             lvDbgExceptionWatch;
             if(nPacketIdx>=this->m_vvsInputPaths.size())
                 return std::vector<cv::Mat>(this->getInputStreamCount());
+            const bool bUseInterlacedMasks = this->m_nLoadInputMasks!=0;
+            constexpr size_t nInputRGBStreamIdx = 0;
+            const size_t nInputThermalStreamIdx = bUseInterlacedMasks?2:1;
+            const size_t nInputDepthStreamIdx = bUseInterlacedMasks?4:2;
+            constexpr size_t nInputRGBMaskStreamIdx = 1;
+            constexpr size_t nInputThermalMaskStreamIdx = 3;
+            constexpr size_t nInputDepthMaskStreamIdx = 5;
             const std::vector<std::string>& vsInputPaths = this->m_vvsInputPaths[nPacketIdx];
             lvDbgAssert(!vsInputPaths.empty() && vsInputPaths.size()==this->getInputStreamCount());
             const std::vector<lv::MatInfo>& vInputInfos = this->m_vInputInfos;
             lvDbgAssert(!vInputInfos.empty() && vInputInfos.size()==getInputStreamCount());
             std::vector<cv::Mat> vInputs(vsInputPaths.size());
-            cv::Mat oRGBPacket = cv::imread(vsInputPaths[0],cv::IMREAD_COLOR);
+            ///////////////////////////////////////////////////////////////////////////////////
+            cv::Mat oRGBPacket = cv::imread(vsInputPaths[nInputRGBStreamIdx],cv::IMREAD_COLOR);
             lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC3 && oRGBPacket.size()==cv::Size(640,480));
-            if(oRGBPacket.size()!=vInputInfos[0].size())
-                cv::resize(oRGBPacket,oRGBPacket,vInputInfos[0].size());
-            if(this->m_bUndistort)
-                cv::remap(oRGBPacket.clone(),oRGBPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
-            vInputs[0] = oRGBPacket;
-            cv::Mat oThermalPacket = cv::imread(vsInputPaths[1],cv::IMREAD_GRAYSCALE);
+            if(oRGBPacket.size()!=vInputInfos[nInputRGBStreamIdx].size())
+                cv::resize(oRGBPacket,oRGBPacket,vInputInfos[nInputRGBStreamIdx].size(),0,0,cv::INTER_CUBIC);
+            if(this->m_bUndistort || this->m_bHorizRectify)
+                cv::remap(oRGBPacket.clone(),oRGBPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_CUBIC);
+            vInputs[nInputRGBStreamIdx] = oRGBPacket;
+            if(bUseInterlacedMasks) {
+                cv::Mat oRGBMaskPacket = cv::imread(vsInputPaths[nInputRGBMaskStreamIdx],cv::IMREAD_GRAYSCALE);
+                lvAssert(!oRGBMaskPacket.empty() && oRGBMaskPacket.type()==CV_8UC1 && oRGBMaskPacket.size()==cv::Size(640,480));
+                if(oRGBMaskPacket.size()!=vInputInfos[nInputRGBStreamIdx].size())
+                    cv::resize(oRGBMaskPacket,oRGBMaskPacket,vInputInfos[nInputRGBStreamIdx].size(),cv::INTER_NEAREST);
+                if(this->m_bUndistort || this->m_bHorizRectify)
+                    cv::remap(oRGBMaskPacket.clone(),oRGBMaskPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_NEAREST);
+                vInputs[nInputRGBMaskStreamIdx] = oRGBMaskPacket;
+            }
+            ///////////////////////////////////////////////////////////////////////////////////
+            cv::Mat oThermalPacket = cv::imread(vsInputPaths[nInputThermalStreamIdx],cv::IMREAD_GRAYSCALE);
             lvAssert(!oThermalPacket.empty() && oThermalPacket.type()==CV_8UC1 && oThermalPacket.size()==cv::Size(640,480));
-            if(oThermalPacket.size()!=vInputInfos[1].size())
-                cv::resize(oThermalPacket,oThermalPacket,vInputInfos[1].size());
-            if(this->m_bUndistort)
+            if(oThermalPacket.size()!=vInputInfos[nInputThermalStreamIdx].size())
+                cv::resize(oThermalPacket,oThermalPacket,vInputInfos[nInputThermalStreamIdx].size());
+            if(this->m_bUndistort || this->m_bHorizRectify)
                 cv::remap(oThermalPacket.clone(),oThermalPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_LINEAR);
-            vInputs[1] = oThermalPacket;
+            vInputs[nInputThermalStreamIdx] = oThermalPacket;
+            if(bUseInterlacedMasks) {
+                cv::Mat oThermalMaskPacket = cv::imread(vsInputPaths[nInputThermalMaskStreamIdx],cv::IMREAD_GRAYSCALE);
+                lvAssert(!oThermalMaskPacket.empty() && oThermalMaskPacket.type()==CV_8UC1 && oThermalMaskPacket.size()==cv::Size(640,480));
+                if(oThermalMaskPacket.size()!=vInputInfos[nInputThermalStreamIdx].size())
+                    cv::resize(oThermalMaskPacket,oThermalMaskPacket,vInputInfos[nInputThermalStreamIdx].size(),cv::INTER_NEAREST);
+                if(this->m_bUndistort || this->m_bHorizRectify)
+                    cv::remap(oThermalMaskPacket.clone(),oThermalMaskPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_NEAREST);
+                vInputs[nInputThermalMaskStreamIdx] = oThermalMaskPacket;
+            }
+            ///////////////////////////////////////////////////////////////////////////////////
             if(this->m_bLoadDepth) {
-                cv::Mat oDepthPacket = cv::imread(vsInputPaths[2],cv::IMREAD_ANYDEPTH);
+                cv::Mat oDepthPacket = cv::imread(vsInputPaths[nInputDepthStreamIdx],cv::IMREAD_ANYDEPTH);
                 lvAssert(!oDepthPacket.empty() && oDepthPacket.type()==CV_16UC1 && oDepthPacket.size()==cv::Size(640,480));
-                if(oDepthPacket.size()!=vInputInfos[2].size())
-                    cv::resize(oDepthPacket,oDepthPacket,vInputInfos[2].size());
+                if(oDepthPacket.size()!=vInputInfos[nInputDepthStreamIdx].size())
+                    cv::resize(oDepthPacket,oDepthPacket,vInputInfos[nInputDepthStreamIdx].size());
                 // depth should be already undistorted
-                vInputs[2] = oThermalPacket;
+                lvAssert_(!this->m_bHorizRectify,"missing depth image rectification impl");
+                vInputs[nInputDepthStreamIdx] = oDepthPacket;
+                if(bUseInterlacedMasks) {
+                    cv::Mat oDepthMaskPacket = cv::imread(vsInputPaths[nInputDepthMaskStreamIdx],cv::IMREAD_GRAYSCALE);
+                    lvAssert(!oDepthMaskPacket.empty() && oDepthMaskPacket.type()==CV_8UC1 && oDepthMaskPacket.size()==cv::Size(640,480));
+                    if(oDepthMaskPacket.size()!=vInputInfos[nInputDepthStreamIdx].size())
+                        cv::resize(oDepthMaskPacket,oDepthMaskPacket,vInputInfos[nInputDepthStreamIdx].size(),cv::INTER_NEAREST);
+                    lvAssert_(!this->m_bHorizRectify,"missing depth image rectification impl");
+                    vInputs[nInputDepthMaskStreamIdx] = oDepthMaskPacket;
+                }
             }
             return vInputs;
         }
         virtual std::vector<cv::Mat> getRawGTArray(size_t nPacketIdx) override final {
             lvDbgExceptionWatch;
+            constexpr size_t nGTRGBMaskStreamIdx = 0;
+            constexpr size_t nGTThermalMaskStreamIdx = 1;
+            constexpr size_t nGTDepthMaskStreamIdx = 2;
             if(this->m_mGTIndexLUT.count(nPacketIdx)) {
                 const size_t nGTIdx = this->m_mGTIndexLUT[nPacketIdx];
                 lvDbgAssert(nGTIdx<this->m_vvsGTPaths.size());
-                const std::vector<std::string>& vsGTPaths = this->m_vvsGTPaths[nGTIdx];
-                lvDbgAssert(!vsGTPaths.empty() && vsGTPaths.size()==getGTStreamCount());
+                const std::vector<std::string>& vsGTMasksPaths = this->m_vvsGTPaths[nGTIdx];
+                lvDbgAssert(!vsGTMasksPaths.empty() && vsGTMasksPaths.size()==getGTStreamCount());
                 const std::vector<lv::MatInfo>& vGTInfos = this->m_vGTInfos;
                 lvDbgAssert(!vGTInfos.empty() && vGTInfos.size()==getGTStreamCount());
-                std::vector<cv::Mat> vGTs(vsGTPaths.size());
-                cv::Mat oRGBPacket = cv::imread(vsGTPaths[0],cv::IMREAD_GRAYSCALE);
+                std::vector<cv::Mat> vGTs(vsGTMasksPaths.size());
+                cv::Mat oRGBPacket = cv::imread(vsGTMasksPaths[nGTRGBMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                 lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC1 && oRGBPacket.size()==cv::Size(640,480));
-                if(oRGBPacket.size()!=vGTInfos[0].size())
-                    cv::resize(oRGBPacket,oRGBPacket,vGTInfos[0].size(),0,0,cv::INTER_NEAREST);
-                if(this->m_bUndistort)
+                if(oRGBPacket.size()!=vGTInfos[nGTRGBMaskStreamIdx].size())
+                    cv::resize(oRGBPacket,oRGBPacket,vGTInfos[nGTRGBMaskStreamIdx].size(),0,0,cv::INTER_NEAREST);
+                if(this->m_bUndistort || this->m_bHorizRectify)
                     cv::remap(oRGBPacket.clone(),oRGBPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_NEAREST);
-                vGTs[0] = oRGBPacket;
-                cv::Mat oThermalPacket = cv::imread(vsGTPaths[1],cv::IMREAD_GRAYSCALE);
+                vGTs[nGTRGBMaskStreamIdx] = oRGBPacket;
+                cv::Mat oThermalPacket = cv::imread(vsGTMasksPaths[nGTThermalMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                 lvAssert(!oThermalPacket.empty() && oThermalPacket.type()==CV_8UC1 && oThermalPacket.size()==cv::Size(640,480));
-#if DATASETS_VAP_FIX_SCENE3_OFFSET
+#if DATASETS_VAP_FIX_GT_SCENE3_OFFSET
                 // fail: calibration really breaks up for scene 3 (need to translate [x,y]=[13,4], and it's still not great)
                 if(this->getName()=="Scene 3") {
                     static const cv::Mat_<double> oAffineTransf = (cv::Mat_<double>(2,3) << 1.0,0.0,13.0,0.0,1.0,4.0);
                     cv::warpAffine(oThermalPacket.clone(),oThermalPacket,oAffineTransf,oThermalPacket.size());
                 }
-#endif //DATASETS_VAP_FIX_SCENE3_OFFSET
-                if(oThermalPacket.size()!=vGTInfos[1].size())
-                    cv::resize(oThermalPacket,oThermalPacket,vGTInfos[1].size(),0,0,cv::INTER_NEAREST);
-#if DATASETS_VAP_FIX_SCENE2_DISTORT
+#endif //DATASETS_VAP_FIX_GT_SCENE3_OFFSET
+                if(oThermalPacket.size()!=vGTInfos[nGTThermalMaskStreamIdx].size())
+                    cv::resize(oThermalPacket,oThermalPacket,vGTInfos[nGTThermalMaskStreamIdx].size(),0,0,cv::INTER_NEAREST);
+#if DATASETS_VAP_FIX_GT_SCENE2_DISTORT
                 // fail: 'distorted' thermal gt images are actually already undistorted in 'Scene 2' (so no need to remap again)
                 if(this->getName()!="Scene 2")
-#endif //DATASETS_VAP_FIX_SCENE2_DISTORT
+#endif //DATASETS_VAP_FIX_GT_SCENE2_DISTORT
                 {
-                    if(this->m_bUndistort)
+                    if(this->m_bUndistort || this->m_bHorizRectify)
                         cv::remap(oThermalPacket.clone(),oThermalPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_NEAREST);
                 }
-                vGTs[1] = oThermalPacket;
+                vGTs[nGTThermalMaskStreamIdx] = oThermalPacket;
                 if(this->m_bLoadDepth) {
-                    cv::Mat oDepthPacket = cv::imread(vsGTPaths[2],cv::IMREAD_GRAYSCALE);
+                    cv::Mat oDepthPacket = cv::imread(vsGTMasksPaths[nGTDepthMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                     lvAssert(!oDepthPacket.empty() && oDepthPacket.type()==CV_8UC1 && oDepthPacket.size()==cv::Size(640,480));
-                    if(oDepthPacket.size()!=vGTInfos[2].size())
-                        cv::resize(oDepthPacket,oDepthPacket,vGTInfos[2].size(),0,0,cv::INTER_NEAREST);
+                    if(oDepthPacket.size()!=vGTInfos[nGTDepthMaskStreamIdx].size())
+                        cv::resize(oDepthPacket,oDepthPacket,vGTInfos[nGTDepthMaskStreamIdx].size(),0,0,cv::INTER_NEAREST);
                     // depth should be already undistorted
-                    vGTs[2] = oDepthPacket;
+                    lvAssert_(!this->m_bHorizRectify,"missing depth image rectification impl");
+                    vGTs[nGTDepthMaskStreamIdx] = oDepthPacket;
                 }
                 return vGTs;
             }
             return cv::Mat();
         }
-        bool m_bLoadDepth,m_bLoadApproxMasks,m_bUndistort;
+        bool m_bLoadDepth,m_bUndistort,m_bHorizRectify;
+        int m_nLoadInputMasks;
         size_t m_nMinDisp,m_nMaxDisp;
         std::string m_sFeaturesDirName;
         cv::Mat m_oRGBCameraParams;
