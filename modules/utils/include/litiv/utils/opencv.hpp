@@ -483,6 +483,11 @@ namespace lv {
                 nElem *= size_t(size(nDimIdx));
             return nElem;
         }
+        /// returns a transposed version of the current size (only valid for 2 dimensions)
+        MatSize_ transpose() const {
+            lvAssert__(dims()==2,"size struct must have 2 dimensions (had %d)",(int)dims());
+            return lv::MatSize_<Tinteger>(size(1),size(0));
+        }
         /// returns whether the current configuration contains elements or not (i.e. if all dim sizes are non-null)
         bool empty() const {
             return total()==size_t(0);

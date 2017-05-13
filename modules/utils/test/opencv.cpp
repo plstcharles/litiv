@@ -240,6 +240,7 @@ TYPED_TEST(MatSize_fixture,regression_2d) {
     ASSERT_TRUE(((cv::MatSize)test)==cv::MatSize(arr_alt.data()+1));
     ASSERT_TRUE(((cv::Size)test)!=cv::Size());
     ASSERT_TRUE(((cv::Size)test)==cv::Size(12,34));
+    ASSERT_TRUE(((cv::Size)test.transpose())==cv::Size(34,12));
     ASSERT_EQ(test.total(),size_t(12*34));
     ASSERT_FALSE(test.empty());
     lv::MatSize test_alt3 = test;
