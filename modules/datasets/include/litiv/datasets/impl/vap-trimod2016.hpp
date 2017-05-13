@@ -354,6 +354,8 @@ namespace lv {
             if(this->m_bUndistort || this->m_bHorizRectify)
                 cv::remap(oRGBROI.clone(),oRGBROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_NEAREST);
             this->m_vInputROIs[nInputRGBStreamIdx] = oRGBROI.clone();
+            if(bUseInterlacedMasks)
+                this->m_vInputROIs[nInputRGBMaskStreamIdx] = oRGBROI.clone();
             this->m_vGTROIs[nGTRGBMaskStreamIdx] = oRGBROI.clone();
             const std::vector<std::string> vsRGBGTMasksPaths = lv::getFilesFromDir(*psRGBGTMasksDir);
             if(vsRGBGTMasksPaths.empty() || cv::imread(vsRGBGTMasksPaths[0]).size()!=oImageSize)
@@ -409,6 +411,8 @@ namespace lv {
             if(this->m_bUndistort || this->m_bHorizRectify)
                 cv::remap(oThermalROI.clone(),oThermalROI,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_NEAREST);
             this->m_vInputROIs[nInputThermalStreamIdx] = oThermalROI.clone();
+            if(bUseInterlacedMasks)
+                this->m_vInputROIs[nInputThermalMaskStreamIdx] = oThermalROI.clone();
             this->m_vGTROIs[nGTThermalMaskStreamIdx] = oThermalROI.clone();
             const std::vector<std::string> vsThermalGTMasksPaths = lv::getFilesFromDir(*psThermalGTMasksDir);
             if(vsThermalGTMasksPaths.empty() || cv::imread(vsThermalGTMasksPaths[0]).size()!=oImageSize)
@@ -449,6 +453,8 @@ namespace lv {
                 if(oDepthROI.size()!=this->m_vInputInfos[nInputDepthStreamIdx].size())
                     cv::resize(oDepthROI,oDepthROI,this->m_vInputInfos[nInputDepthStreamIdx].size(),0,0,cv::INTER_NEAREST);
                 this->m_vInputROIs[nInputDepthStreamIdx] = oDepthROI.clone();
+                if(bUseInterlacedMasks)
+                    this->m_vInputROIs[nInputDepthMaskStreamIdx] = oDepthROI.clone();
                 this->m_vGTROIs[nGTDepthMaskStreamIdx] = oDepthROI.clone();
                 const std::vector<std::string> vsDepthGTMasksPaths = lv::getFilesFromDir(*psDepthGTMasksDir);
                 if(vsDepthGTMasksPaths.empty() || cv::imread(vsDepthGTMasksPaths[0]).size()!=oImageSize)
