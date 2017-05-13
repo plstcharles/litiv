@@ -24,7 +24,7 @@
 #include "litiv/datasets.hpp" // for parsers only, not truly required here
 #include <opencv2/calib3d.hpp>
 
-#define DATASETS_VAP_USE_OLD_CALIB_DATA     1
+#define DATASETS_VAP_USE_OLD_CALIB_DATA     0
 #define DATASETS_VAP_FIX_GT_SCENE2_DISTORT  1
 #define DATASETS_VAP_FIX_GT_SCENE3_OFFSET   1
 
@@ -278,10 +278,45 @@ namespace lv {
                                             (dUndistortMapCameraMatrixAlpha<0)?this->m_oThermalCameraParams:cv::getOptimalNewCameraMatrix(this->m_oThermalCameraParams,this->m_oThermalDistortParams,oImageSize,dUndistortMapCameraMatrixAlpha,oImageSize,0),
                                             oImageSize,CV_16SC2,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2);
             #else //!DATASETS_VAP_USE_OLD_CALIB_DATA
-                @@@
+                cv::FileStorage oParamsFS(this->getDataPath()+"calib/calibdata.yml",cv::FileStorage::READ);
+                lvAssert_(oParamsFS.isOpened(),"could not open calibration yml file");
+                oParamsFS["aCamMats0"] >> this->m_oRGBCameraParams;
+                oParamsFS["aDistCoeffs0"] >> this->m_oRGBDistortParams;
+                lvAssert_(!this->m_oRGBCameraParams.empty() && !this->m_oRGBDistortParams.empty(),"failed to load RGB camera calibration parameters");
+                oParamsFS["aCamMats1"] >> this->m_oThermalCameraParams;
+                oParamsFS["aDistCoeffs1"] >> this->m_oThermalDistortParams;
+                lvAssert_(!this->m_oThermalCameraParams.empty() && !this->m_oThermalDistortParams.empty(),"failed to load thermal camera calibration parameters");
                 if(this->m_bHorizRectify) {
                     lvAssert_(!this->m_bLoadDepth,"missing depth image rectification impl");
-
+                    std::array<cv::Mat,2> aRectifRotMats,aRectifProjMats;
+                    cv::Mat oDispToDepthMap,oRotMat,oTranslMat;
+                    oParamsFS["oRotMat"] >> oRotMat;
+                    oParamsFS["oTranslMat"] >> oTranslMat;
+                    lvAssert_(!this->m_oThermalCameraParams.empty() && !this->m_oThermalDistortParams.empty(),"failed to load thermal camera calibration parameters");
+                    cv::stereoRectify(this->m_oRGBCameraParams,this->m_oRGBDistortParams,
+                                      this->m_oThermalCameraParams,this->m_oThermalDistortParams,
+                                      oImageSize,oRotMat,oTranslMat,
+                                      aRectifRotMats[0],aRectifRotMats[1],
+                                      aRectifProjMats[0],aRectifProjMats[1],
+                                      oDispToDepthMap,
+                                      //0,
+                                      cv::CALIB_ZERO_DISPARITY,
+                                      -1,cv::Size());
+                    cv::initUndistortRectifyMap(this->m_oRGBCameraParams,this->m_oRGBDistortParams,
+                                                aRectifRotMats[0],aRectifProjMats[0],oImageSize,
+                                                CV_16SC2,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2);
+                    cv::initUndistortRectifyMap(this->m_oThermalCameraParams,this->m_oThermalDistortParams,
+                                                aRectifRotMats[1],aRectifProjMats[1],oImageSize,
+                                                CV_16SC2,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2);
+                }
+                else {
+                    const double dUndistortMapCameraMatrixAlpha = -1.0;
+                    cv::initUndistortRectifyMap(this->m_oRGBCameraParams,this->m_oRGBDistortParams,cv::Mat(),
+                                                (dUndistortMapCameraMatrixAlpha<0)?this->m_oRGBCameraParams:cv::getOptimalNewCameraMatrix(this->m_oRGBCameraParams,this->m_oRGBDistortParams,oImageSize,dUndistortMapCameraMatrixAlpha,oImageSize,0),
+                                                oImageSize,CV_16SC2,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2);
+                    cv::initUndistortRectifyMap(this->m_oThermalCameraParams,this->m_oThermalDistortParams,cv::Mat(),
+                                                (dUndistortMapCameraMatrixAlpha<0)?this->m_oThermalCameraParams:cv::getOptimalNewCameraMatrix(this->m_oThermalCameraParams,this->m_oThermalDistortParams,oImageSize,dUndistortMapCameraMatrixAlpha,oImageSize,0),
+                                                oImageSize,CV_16SC2,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2);
                 }
             #endif //!DATASETS_VAP_USE_OLD_CALIB_DATA
             }
@@ -440,9 +475,19 @@ namespace lv {
             this->m_nMinDisp *= dScale;
             this->m_nMaxDisp *= dScale;
             lvAssert(this->m_nMaxDisp>this->m_nMinDisp);
+            this->m_vOrigInputInfos = this->m_vInputInfos;
+            this->m_vOrigGTInfos = this->m_vGTInfos;
             if(this->m_bHorizRectify) {
-                lvAssert(false);// @@@@ missing impl
-                // transpose all matrices
+                if(this->m_bLoadDepth)
+                    lvAssert_(false,"missing impl");
+                for(size_t nIdx=0; nIdx<this->m_vInputROIs.size(); ++nIdx) {
+                    cv::transpose(this->m_vInputROIs[nIdx],this->m_vInputROIs[nIdx]);
+                    this->m_vInputInfos[nIdx].size = this->m_vInputInfos[nIdx].size.transpose();
+                }
+                for(size_t nIdx=0; nIdx<this->m_vGTROIs.size(); ++nIdx) {
+                    cv::transpose(this->m_vGTROIs[nIdx],this->m_vGTROIs[nIdx]);
+                    this->m_vGTInfos[nIdx].size = this->m_vGTInfos[nIdx].size.transpose();
+                }
             }
         }
         virtual std::vector<cv::Mat> getRawInputArray(size_t nPacketIdx) override final {
@@ -458,7 +503,7 @@ namespace lv {
             constexpr size_t nInputDepthMaskStreamIdx = 5;
             const std::vector<std::string>& vsInputPaths = this->m_vvsInputPaths[nPacketIdx];
             lvDbgAssert(!vsInputPaths.empty() && vsInputPaths.size()==this->getInputStreamCount());
-            const std::vector<lv::MatInfo>& vInputInfos = this->m_vInputInfos;
+            const std::vector<lv::MatInfo>& vInputInfos = this->m_vOrigInputInfos;
             lvDbgAssert(!vInputInfos.empty() && vInputInfos.size()==getInputStreamCount());
             std::vector<cv::Mat> vInputs(vsInputPaths.size());
             ///////////////////////////////////////////////////////////////////////////////////
@@ -513,6 +558,14 @@ namespace lv {
                     vInputs[nInputDepthMaskStreamIdx] = oDepthMaskPacket;
                 }
             }
+            if(this->m_bHorizRectify) {
+                if(this->m_bLoadDepth)
+                    lvAssert_(false,"missing impl");
+                for(size_t nIdx=0; nIdx<vInputs.size(); ++nIdx) {
+                    cv::transpose(vInputs[nIdx],vInputs[nIdx]);
+                    lvDbgAssert(lv::MatInfo(vInputs[nIdx])==this->m_vInputInfos[nIdx]);
+                }
+            }
             return vInputs;
         }
         virtual std::vector<cv::Mat> getRawGTArray(size_t nPacketIdx) override final {
@@ -525,7 +578,7 @@ namespace lv {
                 lvDbgAssert(nGTIdx<this->m_vvsGTPaths.size());
                 const std::vector<std::string>& vsGTMasksPaths = this->m_vvsGTPaths[nGTIdx];
                 lvDbgAssert(!vsGTMasksPaths.empty() && vsGTMasksPaths.size()==getGTStreamCount());
-                const std::vector<lv::MatInfo>& vGTInfos = this->m_vGTInfos;
+                const std::vector<lv::MatInfo>& vGTInfos = this->m_vOrigGTInfos;
                 lvDbgAssert(!vGTInfos.empty() && vGTInfos.size()==getGTStreamCount());
                 std::vector<cv::Mat> vGTs(vsGTMasksPaths.size());
                 cv::Mat oRGBPacket = cv::imread(vsGTMasksPaths[nGTRGBMaskStreamIdx],cv::IMREAD_GRAYSCALE);
@@ -564,6 +617,14 @@ namespace lv {
                     lvAssert_(!this->m_bHorizRectify,"missing depth image rectification impl");
                     vGTs[nGTDepthMaskStreamIdx] = oDepthPacket;
                 }
+                if(this->m_bHorizRectify) {
+                    if(this->m_bLoadDepth)
+                        lvAssert_(false,"missing impl");
+                    for(size_t nIdx=0; nIdx<vGTs.size(); ++nIdx) {
+                        cv::transpose(vGTs[nIdx],vGTs[nIdx]);
+                        lvDbgAssert(lv::MatInfo(vGTs[nIdx])==this->m_vGTInfos[nIdx]);
+                    }
+                }
                 return vGTs;
             }
             return cv::Mat();
@@ -578,6 +639,7 @@ namespace lv {
         cv::Mat m_oThermalDistortParams;
         cv::Mat m_oRGBCalibMap1,m_oRGBCalibMap2;
         cv::Mat m_oThermalCalibMap1,m_oThermalCalibMap2;
+        std::vector<lv::MatInfo> m_vOrigInputInfos,m_vOrigGTInfos;
     };
 
 } // namespace lv
