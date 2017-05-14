@@ -299,8 +299,7 @@ namespace lv {
                                       aRectifRotMats[0],aRectifRotMats[1],
                                       aRectifProjMats[0],aRectifProjMats[1],
                                       oDispToDepthMap,
-                                      //0,
-                                      cv::CALIB_ZERO_DISPARITY,
+                                      0,//cv::CALIB_ZERO_DISPARITY,
                                       -1,cv::Size());
                     cv::initUndistortRectifyMap(this->m_oRGBCameraParams,this->m_oRGBDistortParams,
                                                 aRectifRotMats[0],aRectifProjMats[0],oImageSize,
@@ -351,8 +350,10 @@ namespace lv {
                 oRGBROI = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
             if(oRGBROI.size()!=this->m_vInputInfos[nInputRGBStreamIdx].size())
                 cv::resize(oRGBROI,oRGBROI,this->m_vInputInfos[nInputRGBStreamIdx].size(),0,0,cv::INTER_NEAREST);
-            if(this->m_bUndistort || this->m_bHorizRectify)
+            if(this->m_bUndistort || this->m_bHorizRectify) {
                 cv::remap(oRGBROI.clone(),oRGBROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_NEAREST);
+                cv::erode(oRGBROI,oRGBROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
+            }
             this->m_vInputROIs[nInputRGBStreamIdx] = oRGBROI.clone();
             if(bUseInterlacedMasks)
                 this->m_vInputROIs[nInputRGBMaskStreamIdx] = oRGBROI.clone();
@@ -408,8 +409,10 @@ namespace lv {
                 oThermalROI = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
             if(oThermalROI.size()!=this->m_vInputInfos[nInputThermalStreamIdx].size())
                 cv::resize(oThermalROI,oThermalROI,this->m_vInputInfos[nInputThermalStreamIdx].size(),0,0,cv::INTER_NEAREST);
-            if(this->m_bUndistort || this->m_bHorizRectify)
+            if(this->m_bUndistort || this->m_bHorizRectify) {
                 cv::remap(oThermalROI.clone(),oThermalROI,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_NEAREST);
+                cv::erode(oThermalROI,oThermalROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
+            }
             this->m_vInputROIs[nInputThermalStreamIdx] = oThermalROI.clone();
             if(bUseInterlacedMasks)
                 this->m_vInputROIs[nInputThermalMaskStreamIdx] = oThermalROI.clone();
@@ -488,10 +491,12 @@ namespace lv {
                     lvAssert_(false,"missing impl");
                 for(size_t nIdx=0; nIdx<this->m_vInputROIs.size(); ++nIdx) {
                     cv::transpose(this->m_vInputROIs[nIdx],this->m_vInputROIs[nIdx]);
+                    cv::flip(this->m_vInputROIs[nIdx],this->m_vInputROIs[nIdx],1);
                     this->m_vInputInfos[nIdx].size = this->m_vInputInfos[nIdx].size.transpose();
                 }
                 for(size_t nIdx=0; nIdx<this->m_vGTROIs.size(); ++nIdx) {
                     cv::transpose(this->m_vGTROIs[nIdx],this->m_vGTROIs[nIdx]);
+                    cv::flip(this->m_vGTROIs[nIdx],this->m_vGTROIs[nIdx],1);
                     this->m_vGTInfos[nIdx].size = this->m_vGTInfos[nIdx].size.transpose();
                 }
             }
@@ -569,6 +574,7 @@ namespace lv {
                     lvAssert_(false,"missing impl");
                 for(size_t nIdx=0; nIdx<vInputs.size(); ++nIdx) {
                     cv::transpose(vInputs[nIdx],vInputs[nIdx]);
+                    cv::flip(vInputs[nIdx],vInputs[nIdx],1);
                     lvDbgAssert(lv::MatInfo(vInputs[nIdx])==this->m_vInputInfos[nIdx]);
                 }
             }
@@ -628,6 +634,7 @@ namespace lv {
                         lvAssert_(false,"missing impl");
                     for(size_t nIdx=0; nIdx<vGTs.size(); ++nIdx) {
                         cv::transpose(vGTs[nIdx],vGTs[nIdx]);
+                        cv::flip(vGTs[nIdx],vGTs[nIdx],1);
                         lvDbgAssert(lv::MatInfo(vGTs[nIdx])==this->m_vGTInfos[nIdx]);
                     }
                 }
