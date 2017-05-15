@@ -29,9 +29,10 @@
 #define STEREOSEGMATCH_CONFIG_USE_MI_AFFINITY       0
 #define STEREOSEGMATCH_CONFIG_USE_SSQDIFF_AFFINITY  0
 #define STEREOSEGMATCH_CONFIG_USE_SHAPE_EMD_SIM     0
+#define STEREOSEGMATCH_CONFIG_USE_UNARY_ONLY_FIRST  1
 
 // default param values
-#define STEREOSEGMATCH_DEFAULT_DISPARITY_STEP       (size_t(2))
+#define STEREOSEGMATCH_DEFAULT_DISPARITY_STEP       (size_t(1))
 #define STEREOSEGMATCH_DEFAULT_MAX_MOVE_ITER        (size_t(1000))
 #define STEREOSEGMATCH_DEFAULT_SHAPEDESC_RAD        (size_t(30))
 #define STEREOSEGMATCH_DEFAULT_LSSDESC_RAD          (size_t(30))
@@ -138,8 +139,10 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         OutputPackOffset_Mask=1,
     };
 
-    /// full stereo graph matcher constructor; relies on provided parameters to build graphical model base
-    StereoSegmMatcher(const cv::Size& oImageSize, size_t nMinDispOffset, size_t nMaxDispOffset);
+    /// full stereo graph matcher constructor; only takes parameters to ready graphical model base initialization
+    StereoSegmMatcher(size_t nMinDispOffset, size_t nMaxDispOffset);
+    /// stereo graph matcher initialization function; will allocate & initialize graph model using provided ROI data
+    virtual void initialize(const std::array<cv::Mat,2>& aROIs);
     /// stereo matcher function; solves the graph model to find pixel-level matches on epipolar lines in the masked input images, and returns disparity maps + masks
     virtual void apply(const MatArrayIn& aInputs, MatArrayOut& aOutputs) override;
     /// (pre)calculates initial features required for model updates, and optionally returns them in packet format for archiving
@@ -163,16 +166,22 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
     struct GraphModelData {
         /// basic info struct used for node-level graph model updates and data lookups
         struct NodeInfo {
-            /// image grid coordinates associated this node model's index
+            /// holds whether this is a valid node (in-graph) or not
+            bool bValidGraphNode;
+            /// if valid, this holds whether this node is near graph borders or not
+            bool bNearGraphBorders;
+            /// node graph index used for model indexing
+            size_t nGraphNodeIdx;
+            /// image grid coordinates associated this node
             int nRowIdx,nColIdx;
-            /// id for this node's unary factors
+            /// id for this node's unary factors (not SIZE_MAX only if valid)
             size_t nStereoUnaryFactID,nResegmUnaryFactID;
-            /// pointer to this node's stereo unary function
+            /// pointer to this node's stereo unary function (non-null only if valid)
             StereoFunc* pStereoUnaryFunc;
-            /// pointer to this node's resegm unary function
+            /// pointer to this node's resegm unary function (non-null only if valid)
             ResegmFunc* pResegmUnaryFunc;
             /// ids for this node's two (pairwise) connected neighboring nodes
-            std::array<size_t,2> anPairwNodeIdxs;
+            std::array<size_t,2> anPairwLUTNodeIdxs,anPairwGraphNodeIdxs;
             /// ids for this node's two pairwise factors
             std::array<size_t,2> anStereoPairwFactIDs,anResegmPairwFactIDs;
             /// pointer to this node's two stereo pairwise functions
@@ -182,7 +191,7 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
             // @@@@@ add higher o facts/funcptrs here
         };
         /// default constructor; receives model construction data from algo constructor
-        GraphModelData(const cv::Size& oImageSize, const std::vector<OutputLabelType>& vRealStereoLabels, size_t nStereoLabelStep);
+        GraphModelData(const std::array<cv::Mat,2>& aROIs, const std::vector<OutputLabelType>& vRealStereoLabels, size_t nStereoLabelStep);
         /// (pre)calculates features required for model updates, and optionally returns them in packet format
         void calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeatsPacket=nullptr);
         /// sets a previously precalculated features packet to be used in the next model updates (do not modify it before that!)
@@ -220,6 +229,8 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         mutable cv::Mat_<ValueType> m_oStereoPairwCosts,m_oResegmPairwCosts;
         /// holds the set of features to use during the next inference (mutable, as shape features will change during inference)
         mutable std::vector<cv::Mat> m_vNextFeats;
+        /// contains the ROIs used for grid setup passed in the constructor
+        const std::array<cv::Mat_<uchar>,2> m_aROIs;
         /// contains the predetermined (max) 2D grid size for the graph models
         const lv::MatSize m_oGridSize;
         /// contains all 'real' stereo labels, plus the 'occluded'/'dontcare' labels
@@ -244,6 +255,10 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         std::unique_ptr<StereoModelType> m_pStereoModel;
         /// opengm resegm graph model object
         std::unique_ptr<ResegmModelType> m_pResegmModel;
+        /// number of valid nodes in the graph (based on ROI)
+        size_t m_nValidGraphNodes;
+        /// indices of valid nodes in the graph (based on ROI)
+        std::vector<size_t> m_vValidLUTNodeIdxs;
         /// model info lookup array
         std::vector<NodeInfo> m_vNodeInfos;
         /// stereo model unary functions
@@ -396,8 +411,10 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
     };
 
 protected:
-    /// expected size for all input images
-    const cv::Size m_oImageSize;
+    /// disparity label step size (will be passed to model constr)
+    size_t m_nDispStep;
+    /// output disparity label set (will be passed to model constr)
+    std::vector<OutputLabelType> m_vStereoLabels;
     /// holds bimodel data & inference algo impls
     std::unique_ptr<GraphModelData> m_pModelData;
     /// helper func to display segmentation maps

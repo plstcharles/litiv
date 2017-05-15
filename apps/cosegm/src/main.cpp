@@ -30,13 +30,13 @@
 #define DATASET_MINI_TESTS      0
 ////////////////////////////////
 #define DATASET_OUTPUT_PATH     "results_test"
-#define DATASET_PRECACHING      1
+#define DATASET_PRECACHING      0
 #define DATASET_SCALE_FACTOR    1//0.5
 #define DATASET_WORKTHREADS     1
 ////////////////////////////////
 #define DATASET_USE_DISPARITY_EVAL         0
 #define DATASET_USE_HALF_GT_INPUT_FLAG     0
-#define DATASET_USE_PRECALC_FEATURES       0
+#define DATASET_USE_PRECALC_FEATURES       1
 
 #if (DATASET_VAPTRIMOD+DATASET_MINI_TESTS/*+...*/)!=1
 #error "Must pick a single dataset."
@@ -50,7 +50,7 @@
     bool(EVALUATE_OUTPUT),                        /* bool bUseEvaluator=true */\
     false,                                        /* bool bLoadDepth=true */\
     true,                                         /* bool bUndistort=true */\
-    false,                                         /* bool bHorizRectify=false */\
+    true,                                         /* bool bHorizRectify=false */\
     false,                                        /* bool bEvalStereoDisp=false */\
     7,                                            /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
@@ -113,19 +113,22 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         std::cout << "\t\t" << sCurrBatchName << " @ init [" << sWorkerName << "]" << std::endl;
         const std::vector<cv::Mat>& vROIs = oBatch.getFrameROIArray();
         lvAssert(!vROIs.empty() && vROIs.size()==oBatch.getInputStreamCount());
-        size_t nCurrIdx = 0;
+        size_t nCurrIdx = 25;
         const std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // note: mat content becomes invalid on next getInput call
         lvAssert(vInitInput.size()==oBatch.getInputStreamCount());
         for(size_t nStreamIdx=0; nStreamIdx<vInitInput.size(); ++nStreamIdx) {
             lvAssert(vInitInput[nStreamIdx].size()==vInitInput[0].size());
-            lvLog_(2,"\tinput %d := %s",(int)nStreamIdx,lv::MatInfo(vInitInput[nStreamIdx]).str().c_str());
-            cv::imshow(std::string("vInitInput_")+std::to_string(nStreamIdx),vInitInput[nStreamIdx]);
+            lvLog_(2,"\tinput %d := %s   (roi=%s)",(int)nStreamIdx,lv::MatInfo(vInitInput[nStreamIdx]).str().c_str(),lv::MatInfo(vROIs[nStreamIdx]).str().c_str());
+            //cv::imshow(std::string("vInitInput_")+std::to_string(nStreamIdx),vInitInput[nStreamIdx]);
+            //cv::imshow(std::string("vROI_")+std::to_string(nStreamIdx),vROIs[nStreamIdx]);
         }
-        cv::waitKey(0);
+        //cv::waitKey(0);
         const std::vector<lv::MatInfo> oInfoArray = oBatch.getInputInfoArray();
         const lv::MatSize oFrameSize = oInfoArray[0].size;
         const size_t nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity();
-        std::shared_ptr<StereoSegmMatcher> pAlgo = std::make_shared<StereoSegmMatcher>(oFrameSize,nMinDisp,nMaxDisp);
+        lvLog_(2,"\tdisp = [%d,%d]",(int)nMinDisp,(int)nMaxDisp);
+        std::shared_ptr<StereoSegmMatcher> pAlgo = std::make_shared<StereoSegmMatcher>(nMinDisp,nMaxDisp);
+        pAlgo->initialize(std::array<cv::Mat,2>{vROIs[0],vROIs[2]});
         oBatch.setFeaturesDirName(pAlgo->getFeatureExtractorName());
         constexpr size_t nExpectedAlgoInputCount = StereoSegmMatcher::getInputStreamCount();
         constexpr size_t nExpectedAlgoOutputCount = StereoSegmMatcher::getOutputStreamCount();
