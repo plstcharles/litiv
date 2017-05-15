@@ -447,13 +447,14 @@ inline void StereoSegmMatcher::GraphModelData::resetStereoLabelings() {
     m_oAssocCounts = (AssocCountType)0;
     m_oAssocMap = (AssocIdxType)-1;
     std::vector<int> vLabelCounts(m_nStereoLabels,0);
-    for(int nRowIdx=0; nRowIdx<(int)m_oGridSize[0]; ++nRowIdx) {
-        for(int nColIdx=0; nColIdx<(int)m_oGridSize[1]; ++nColIdx) {
-            const InternalLabelType nLabel = m_oStereoLabeling(nRowIdx,nColIdx);
-            if(nLabel<m_nDontCareLabelIdx) // both special labels avoided here
-                addAssoc(nRowIdx,nColIdx,nLabel);
-            ++vLabelCounts[nLabel];
-        }
+    for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_nValidGraphNodes; ++nGraphNodeIdx) {
+        const size_t nLUTNodeIdx = m_vValidLUTNodeIdxs[nGraphNodeIdx];
+        const NodeInfo& oNode = m_vNodeInfos[nLUTNodeIdx];
+        lvDbgAssert(nLUTNodeIdx==(oNode.nRowIdx*m_oGridSize[1]+oNode.nColIdx));
+        const InternalLabelType nLabel = ((InternalLabelType*)m_oStereoLabeling.data)[nLUTNodeIdx];
+        if(nLabel<m_nDontCareLabelIdx) // both special labels avoided here
+            addAssoc(oNode.nRowIdx,oNode.nColIdx,nLabel);
+        ++vLabelCounts[nLabel];
     }
     m_vStereoLabelOrdering = lv::sort_indices<InternalLabelType>(vLabelCounts,[&vLabelCounts](int a, int b){return vLabelCounts[a]>vLabelCounts[b];});
     lvDbgAssert(lv::unique(m_vStereoLabelOrdering.begin(),m_vStereoLabelOrdering.end())==lv::make_range(InternalLabelType(0),InternalLabelType(m_nStereoLabels-1)));
