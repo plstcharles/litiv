@@ -1380,11 +1380,16 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer() {
                 cv::findNonZero(oDisparitySwaps,swappts);
                 lvPrint(swappts.total());
                 cv::Point pt = swappts.at<cv::Point>(0);
-                lvPrint(pt);
+                lvPrint(pt) << "x=" << pt.x << "   y=" << pt.y;
                 InternalLabelType nLastLabel = oLastStereoLabeling(pt);
                 lvPrint((int)nLastLabel);
+                int nNeighbRadius = 1;
+                if(pt.x>=nNeighbRadius && pt.x<oLastStereoLabeling.cols-nNeighbRadius && pt.y>=nNeighbRadius && pt.y<oLastStereoLabeling.rows-nNeighbRadius)
+                    lvPrint(oLastStereoLabeling(cv::Rect(pt.x-nNeighbRadius,pt.y-nNeighbRadius,nNeighbRadius*2+1,nNeighbRadius*2+1)));
                 InternalLabelType nNewLabel = m_oStereoLabeling(pt);
                 lvPrint((int)nNewLabel);
+                if(pt.x>=nNeighbRadius && pt.x<m_oStereoLabeling.cols-nNeighbRadius && pt.y>=nNeighbRadius && pt.y<m_oStereoLabeling.rows-nNeighbRadius)
+                    lvPrint(m_oStereoLabeling(cv::Rect(pt.x-nNeighbRadius,pt.y-nNeighbRadius,nNeighbRadius*2+1,nNeighbRadius*2+1)));
                 lvPrint(ValueType(m_vNextFeats[FeatPack_ImgAffinity].at<float>(pt.y,pt.x,nLastLabel)*STEREOSEGMATCH_IMGSIM_COST_DESC_SCALE));
                 lvPrint(ValueType(m_vNextFeats[FeatPack_ImgAffinity].at<float>(pt.y,pt.x,nNewLabel)*STEREOSEGMATCH_IMGSIM_COST_DESC_SCALE));
                 lvPrint(ValueType(m_vNextFeats[FeatPack_ShpAffinity].at<float>(pt.y,pt.x,nLastLabel)*STEREOSEGMATCH_SHPSIM_COST_DESC_SCALE));
@@ -1590,7 +1595,17 @@ inline void StereoSegmMatcher::StereoGraphInference::getOutput(cv::Mat_<OutputLa
 
 inline StereoSegmMatcher::ValueType StereoSegmMatcher::StereoGraphInference::value() const {
     lvDbgAssert_(m_oData.m_oGridSize.dims()==2 && m_oData.m_oGridSize==m_oData.m_oStereoLabeling.size,"output labeling must be a 2d grid");
-    return m_oData.m_pStereoModel->evaluate((InternalLabelType*)m_oData.m_oStereoLabeling.data)+m_oData.calcTotalAssocCost();
+    const ValueType tTotAssocCost = m_oData.calcTotalAssocCost();
+    struct GraphNodeLabelIter {
+        GraphNodeLabelIter(const GraphModelData& oData) : m_oData(oData) {}
+        InternalLabelType operator[](size_t nGraphNodeIdx) {
+            const size_t nLUTNodeIdx = m_oData.m_vValidLUTNodeIdxs[nGraphNodeIdx];
+            return ((InternalLabelType*)m_oData.m_oStereoLabeling.data)[nLUTNodeIdx];
+        }
+        const GraphModelData& m_oData;
+    } oLabelIter(m_oData);
+    const ValueType tTotStereoLabelCost = m_oData.m_pStereoModel->evaluate(oLabelIter);
+    return tTotAssocCost+tTotStereoLabelCost;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1651,7 +1666,16 @@ inline void StereoSegmMatcher::ResegmGraphInference::getOutput(cv::Mat_<OutputLa
 
 inline StereoSegmMatcher::ValueType StereoSegmMatcher::ResegmGraphInference::value() const {
     lvDbgAssert_(m_oData.m_oGridSize.dims()==2 && m_oData.m_oGridSize==m_oData.m_oResegmLabeling.size,"output labeling must be a 2d grid");
-    return m_oData.m_pResegmModel->evaluate((InternalLabelType*)m_oData.m_oResegmLabeling.data)+m_oData.calcTotalAssocCost();
+    struct GraphNodeLabelIter {
+        GraphNodeLabelIter(const GraphModelData& oData) : m_oData(oData) {}
+        InternalLabelType operator[](size_t nGraphNodeIdx) {
+            const size_t nLUTNodeIdx = m_oData.m_vValidLUTNodeIdxs[nGraphNodeIdx];
+            return ((InternalLabelType*)m_oData.m_oResegmLabeling.data)[nLUTNodeIdx];
+        }
+        const GraphModelData& m_oData;
+    } oLabelIter(m_oData);
+    const ValueType tTotResegmLabelCost = m_oData.m_pResegmModel->evaluate(oLabelIter);
+    return tTotResegmLabelCost;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
