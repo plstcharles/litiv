@@ -19,10 +19,11 @@
 
 #include "litiv/features2d.hpp"
 
-ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAngularBins,
-                           size_t nRadialBins, bool bRotationInvariant, bool bNormalizeBins) :
+ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAngularBins, size_t nRadialBins,
+                           size_t nBlurRadius, bool bRotationInvariant, bool bNormalizeBins) :
         m_nAngularBins((int)nAngularBins),
         m_nRadialBins((int)nRadialBins),
+        m_nBlurRadius((int)nBlurRadius),
         m_nDescSize(m_nRadialBins*m_nAngularBins),
         m_nInnerRadius((int)nInnerRadius),
         m_nOuterRadius((int)nOuterRadius),
@@ -33,6 +34,7 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
         m_bNormalizeBins(bNormalizeBins) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
+    lvAssert_(m_nBlurRadius>=0 && (m_nBlurRadius==0 || (m_nBlurRadius%2)==1),"invalid parameter");
     lvAssert_(m_nInnerRadius>0,"invalid parameter");
     lvAssert_(m_nOuterRadius>0 && m_nInnerRadius<m_nOuterRadius,"invalid parameter");
     scdesc_generate_angmask();
@@ -48,10 +50,11 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
     }
 }
 
-ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRadius, size_t nAngularBins,
-                           size_t nRadialBins, bool bRotationInvariant, bool bNormalizeBins) :
+ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRadius, size_t nAngularBins, size_t nRadialBins,
+                           size_t nBlurRadius, bool bRotationInvariant, bool bNormalizeBins) :
         m_nAngularBins((int)nAngularBins),
         m_nRadialBins((int)nRadialBins),
+        m_nBlurRadius((int)nBlurRadius),
         m_nDescSize(m_nRadialBins*m_nAngularBins),
         m_nInnerRadius(0),
         m_nOuterRadius(0),
@@ -62,6 +65,7 @@ ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRad
         m_bNormalizeBins(bNormalizeBins) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
+    lvAssert_(m_nBlurRadius>=0 && (m_nBlurRadius==0 || (m_nBlurRadius%2)==1),"invalid parameter");
     lvAssert_(m_dInnerRadius>0.0,"invalid parameter");
     lvAssert_(m_dOuterRadius>0.0 && m_dInnerRadius<m_dOuterRadius,"invalid parameter");
     scdesc_generate_angmask();
@@ -347,7 +351,7 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
         oDescriptors.create(3,std::array<int,3>{m_oCurrImageSize.height,m_oCurrImageSize.width,m_nDescSize}.data());
     else
         oDescriptors.create((int)m_oKeyPts.total(),m_nDescSize);
-    oDescriptors = 0.0f;
+    oDescriptors = m_bNormalizeBins?1.0f/m_nDescSize:0.0f;
     scdesc_fill_maps();
     for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx) {
         if(!m_vKeyInliers.empty() && !m_vKeyInliers[nKeyPtIdx])
@@ -381,10 +385,26 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
                 ++nValidPts;
             }
         }
-        if(m_bNormalizeBins) {
-            cv::Mat_<float> oDesc(1,m_nDescSize,aDesc);
-            oDesc += 1.0f/m_nDescSize;
-            oDesc *= 1.0f/nValidPts;
+        if(m_bNormalizeBins && nValidPts>1)
+            cv::Mat_<float>(1,m_nDescSize,aDesc) *= 1.0f/nValidPts;
+    }
+    if(m_nBlurRadius) {
+        lvAssert_(bGenDescMap,"post-proc blur only available when using descriptor maps, and not keypoint lists");
+        //const cv::Mat oBlurKernel = cv::getGaussianKernel(m_nBlurRadius,-1,CV_32F);
+        cv::Mat_<float> oDescMapSliceCopy;
+        for(int nDescIdx=0; nDescIdx<m_nDescSize; ++nDescIdx) {
+            cv::Mat_<float> oDescMapSlice = lv::getSubMat(oDescriptors,2,nDescIdx);
+            lv::squeeze(oDescMapSlice,oDescMapSliceCopy);
+            //cv::sepFilter2D(oDescMapSliceCopy,oDescMapSliceCopy,-1,oBlurKernel,oBlurKernel);
+            cv::blur(oDescMapSliceCopy,oDescMapSliceCopy,cv::Size(m_nBlurRadius,m_nBlurRadius));
+            lvDbgAssert(oDescMapSliceCopy.isContinuous());
+            lvDbgAssert(oDescMapSliceCopy.total()==size_t(m_oCurrImageSize.area()));
+            lvDbgAssert(oDescMapSlice.size[0]*oDescMapSlice.size[1]==m_oCurrImageSize.area());
+            lvDbgAssert(oDescMapSlice.step[0]==size_t(m_oCurrImageSize.width*m_nDescSize*4));
+            lvDbgAssert(oDescMapSlice.step[1]==size_t(m_nDescSize*4));
+            float* pDescMapSliceData = (float*)oDescMapSlice.data;
+            for(int nMapIdx=0; nMapIdx<m_oCurrImageSize.area(); ++nMapIdx)
+                pDescMapSliceData[nMapIdx*m_nDescSize] = ((float*)oDescMapSliceCopy.data)[nMapIdx];
         }
     }
 }
@@ -400,7 +420,7 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
         oDescriptors.create(3,std::array<int,3>{m_oCurrImageSize.height,m_oCurrImageSize.width,m_nDescSize}.data());
     else
         oDescriptors.create((int)m_oKeyPts.total(),m_nDescSize);
-    oDescriptors = 0.0f;
+    oDescriptors = m_bNormalizeBins?1.0f/m_nDescSize:0.0f;
     lvDbgAssert(m_oContourPts.type()==CV_32FC2 && (m_oContourPts.total()==(size_t)m_oContourPts.rows || m_oContourPts.total()==(size_t)m_oContourPts.cols));
     lvDbgAssert(m_oKeyPts.type()==CV_32FC2 && (m_oKeyPts.total()==(size_t)m_oKeyPts.rows || m_oKeyPts.total()==(size_t)m_oKeyPts.cols));
     lvDbgAssert(m_vKeyInliers.empty() || m_oKeyPts.total()==m_vKeyInliers.size());
@@ -449,10 +469,26 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
                 ++nValidPts;
             }
         }
-        if(m_bNormalizeBins) {
-            cv::Mat_<float> oDesc(1,m_nDescSize,aDesc);
-            oDesc += 1.0f/m_nDescSize;
-            oDesc *= 1.0f/nValidPts;
+        if(m_bNormalizeBins && nValidPts>1)
+            cv::Mat_<float>(1,m_nDescSize,aDesc) *= 1.0f/nValidPts;
+    }
+    if(m_nBlurRadius) {
+        lvAssert_(bGenDescMap,"post-proc blur only available when using descriptor maps, and not keypoint lists");
+        //const cv::Mat oBlurKernel = cv::getGaussianKernel(m_nBlurRadius,-1,CV_32F);
+        cv::Mat_<float> oDescMapSliceCopy;
+        for(int nDescIdx=0; nDescIdx<m_nDescSize; ++nDescIdx) {
+            cv::Mat_<float> oDescMapSlice = lv::getSubMat(oDescriptors,2,nDescIdx);
+            lv::squeeze(oDescMapSlice,oDescMapSliceCopy);
+            //cv::sepFilter2D(oDescMapSliceCopy,oDescMapSliceCopy,-1,oBlurKernel,oBlurKernel);
+            cv::blur(oDescMapSliceCopy,oDescMapSliceCopy,cv::Size(m_nBlurRadius,m_nBlurRadius));
+            lvDbgAssert(oDescMapSliceCopy.isContinuous());
+            lvDbgAssert(oDescMapSliceCopy.total()==size_t(m_oCurrImageSize.area()));
+            lvDbgAssert(oDescMapSlice.size[0]*oDescMapSlice.size[1]==m_oCurrImageSize.area());
+            lvDbgAssert(oDescMapSlice.step[0]==size_t(m_oCurrImageSize.width*m_nDescSize*4));
+            lvDbgAssert(oDescMapSlice.step[1]==size_t(m_nDescSize*4));
+            float* pDescMapSliceData = (float*)oDescMapSlice.data;
+            for(int nMapIdx=0; nMapIdx<m_oCurrImageSize.area(); ++nMapIdx)
+                pDescMapSliceData[nMapIdx*m_nDescSize] = ((float*)oDescMapSliceCopy.data)[nMapIdx];
         }
     }
 }
