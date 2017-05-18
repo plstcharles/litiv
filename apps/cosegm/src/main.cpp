@@ -24,7 +24,7 @@
 #define WRITE_IMG_OUTPUT        0
 #define EVALUATE_OUTPUT         0
 #define DISPLAY_OUTPUT          0
-#define GLOBAL_VERBOSITY        4
+#define GLOBAL_VERBOSITY        2
 ////////////////////////////////
 #define DATASET_VAPTRIMOD       1
 #define DATASET_MINI_TESTS      0
@@ -42,7 +42,6 @@
 #error "Must pick a single dataset."
 #endif //(DATASET_+.../*+...*/)!=1
 #if DATASET_VAPTRIMOD
-//@@@@ untested, need to cleanup approx masks
 #define DATASET_ID Dataset_VAPtrimod2016
 #define DATASET_PARAMS \
     DATASET_OUTPUT_PATH,                          /* const std::string& sOutputDirName */\
