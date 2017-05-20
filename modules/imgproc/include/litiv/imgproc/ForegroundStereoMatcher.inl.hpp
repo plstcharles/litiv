@@ -967,6 +967,7 @@ inline void StereoSegmMatcher::GraphModelData::calcShapeFeatures(const std::arra
         const int nColIdx = oNode.nColIdx;
 
         // @@@@@ use swap mask to prevent recalc of identical descriptors? (swap + radius based on desc)
+        // convert 8ui mask to keypoint list, then pass to compute2 (keeps desc struct/old values for untouched kps)
 
         float* pAffinityPtr = oAffinity.ptr<float>(nRowIdx,nColIdx);
         std::vector<float> vValidAffinityVals;
@@ -1002,6 +1003,9 @@ inline void StereoSegmMatcher::GraphModelData::calcShapeFeatures(const std::arra
         if(oNode.bNearGraphBorders && fCurrDiscrimPow>0.0f)
             fCurrDiscrimPow /= 2;
 #endif //STEREOSEGMATCH_CONFIG_USE_DISCRIM_MAP_LBRD
+        const cv::Mat& oFGDist = m_vNextFeats[FeatPack_LeftFGDist];
+        const float fCurrFGDist = oFGDist.at<float>(nRowIdx,nColIdx);
+        fCurrDiscrimPow *= std::max(1-fCurrFGDist/STEREOSEGMATCH_DEFAULT_DISCRIM_SHP_RAD,0.0f);
         oDiscrimPow.at<float>(nRowIdx,nColIdx) = fCurrDiscrimPow;
         const size_t nCurrNodeIdx = ++nProcessedNodeCount;
         if((nCurrNodeIdx%(size_t(nRows*nCols)/20))==0 && oLocalTimer.elapsed()>2.0) {

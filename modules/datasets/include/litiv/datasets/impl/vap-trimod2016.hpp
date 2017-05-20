@@ -91,7 +91,7 @@ namespace lv {
             // 'Scene 2' does not have proper calibration data; must skip it if undistort/rectify required
             static const std::vector<std::string> s_vsWorkBatchDirs_calibonly = {
                 "Scene 1",
-                "Scene 3"
+                //"Scene 3"
             };
             return bUndistortOrRectify?s_vsWorkBatchDirs_calibonly:s_vsWorkBatchDirs_real;
         }
@@ -278,8 +278,9 @@ namespace lv {
                                             (dUndistortMapCameraMatrixAlpha<0)?this->m_oThermalCameraParams:cv::getOptimalNewCameraMatrix(this->m_oThermalCameraParams,this->m_oThermalDistortParams,oImageSize,dUndistortMapCameraMatrixAlpha,oImageSize,0),
                                             oImageSize,CV_16SC2,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2);
             #else //!DATASETS_VAP_USE_OLD_CALIB_DATA
-                cv::FileStorage oParamsFS(this->getDataPath()+"calib/calibdata.yml",cv::FileStorage::READ);
-                lvAssert_(oParamsFS.isOpened(),"could not open calibration yml file");
+                const std::string sCalibDataFilePath = this->getDataPath()+"calib/calibdata.yml";
+                cv::FileStorage oParamsFS(sCalibDataFilePath,cv::FileStorage::READ);
+                lvAssert__(oParamsFS.isOpened(),"could not open calibration yml file at '%s'",sCalibDataFilePath.c_str());
                 oParamsFS["aCamMats0"] >> this->m_oRGBCameraParams;
                 oParamsFS["aDistCoeffs0"] >> this->m_oRGBDistortParams;
                 lvAssert_(!this->m_oRGBCameraParams.empty() && !this->m_oRGBDistortParams.empty(),"failed to load RGB camera calibration parameters");
