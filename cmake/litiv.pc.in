@@ -1,0 +1,13 @@
+# Package Information for pkg-config
+
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${exec_prefix}/include
+
+Name: litiv
+Description: LITIV Computer Vision Framework
+Version: @LITIV_VERSION@
+Libs: -L${exec_prefix}/lib -llitiv_world
+Libs.private: @LITIV_PRIVATE_LIBS_STR@
+Cflags: -I${includedir}@LITIV_MARCH_FLAG@

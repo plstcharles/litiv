@@ -49,14 +49,16 @@ foreach(litiv_module_name ${litiv_modules})
     if(EXISTS "${includedir}")
         list(APPEND litiv_build_includedirs "${includedir}")
     endif()
-    list(APPEND LITIV_COMPONENTS "${litiv_module_name}")
+    list(APPEND LITIV_COMPONENTS "litiv_${litiv_module_name}")
 endforeach()
+set(LITIV_COMPONENTS_NO_WORLD ${LITIV_COMPONENTS})
+list(APPEND LITIV_COMPONENTS "litiv_world")
 
 set(RUNTIME_INSTALL_DIR "bin")
 set(INCLUDE_INSTALL_DIR "include")
 set(LIBRARY_INSTALL_DIR "lib")
-set(MODULES_INSTALL_DIR "lib/cmake/Modules")
-set(CONFIG_INSTALL_DIR "etc/litiv")
+set(MODULES_INSTALL_DIR "share/cmake/Modules")
+set(CONFIG_INSTALL_DIR "share/litiv")
 write_basic_package_version_file(
     "${CMAKE_BINARY_DIR}/cmake/generated/litiv-config-version.cmake"
     VERSION
@@ -85,12 +87,13 @@ file(
 if(WIN32)
     set(package_config_install_dirs
         "lib/cmake/litiv"
-        "lib"
+        "share/litiv"
         "${CMAKE_INSTALL_PREFIX}"
     )
 else()
     set(package_config_install_dirs
         "lib/cmake/litiv"
+        "share/litiv"
     )
     if("${CMAKE_INSTALL_PREFIX}" STREQUAL "${CMAKE_BINARY_DIR}/install")
         list(APPEND package_config_install_dirs "${CMAKE_INSTALL_PREFIX}")
@@ -145,13 +148,13 @@ install(
     DIRECTORY
         "${CMAKE_SOURCE_DIR}/cmake/checks"
     DESTINATION
-        "lib/cmake"
+        "share/cmake"
 )
 install(
     DIRECTORY
         "${CMAKE_SOURCE_DIR}/cmake/Modules"
     DESTINATION
-        "lib/cmake"
+        "share/cmake"
 )
 
 set(CURRENT_CONFIG_INSTALL 0)
@@ -166,3 +169,28 @@ configure_file(
     "${CMAKE_BINARY_DIR}/litiv-config.cmake"
     @ONLY
 )
+
+if(UNIX)
+    get_link_libraries(external_libs litiv_world)
+    set(LITIV_PRIVATE_LIBS ${LITIV_COMPONENTS_NO_WORLD})
+    list(APPEND LITIV_PRIVATE_LIBS ${external_libs})
+    list(REMOVE_DUPLICATES LITIV_PRIVATE_LIBS)
+    xfix_list_tokens(LITIV_PRIVATE_LIBS "-l" "")
+    string(REPLACE ";" " " LITIV_PRIVATE_LIBS_STR "${LITIV_PRIVATE_LIBS}")
+    if(NOT CMAKE_CROSSCOMPILING)
+        set(LITIV_MARCH_FLAG " -march=native")
+    else()
+        set(LITIV_MARCH_FLAG "")
+    endif()
+    configure_file(
+        "${CMAKE_SOURCE_DIR}/cmake/litiv.pc.in"
+        "${CMAKE_BINARY_DIR}/cmake/generated/litiv.pc"
+        @ONLY
+    )
+    install(
+        FILES
+            "${CMAKE_BINARY_DIR}/cmake/generated/litiv.pc"
+        DESTINATION
+            "lib/pkgconfig"
+    )
+endif()
