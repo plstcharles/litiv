@@ -18,7 +18,7 @@
 macro(xfix_list_tokens list_name prefix suffix)
     set(${list_name}_TMP)
     foreach(l ${${list_name}})
-        list(APPEND ${list_name}_TMP ${prefix}${l}${suffix} )
+        list(APPEND ${list_name}_TMP "${prefix}${l}${suffix}")
     endforeach(l ${${list_name}})
     set(${list_name} "${${list_name}_TMP}")
     unset(${list_name}_TMP)
@@ -102,6 +102,12 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
         PUBLIC
             "LITIV_DEBUG=$<CONFIG:Debug>"
     )
+    if(NOT CMAKE_CROSSCOMPILING)
+        target_compile_options(${PROJECT_NAME}
+            INTERFACE
+                "-march=native"
+        )
+    endif()
     target_include_directories(${PROJECT_NAME}
         PUBLIC
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
