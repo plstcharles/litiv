@@ -177,24 +177,24 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
                         "${CMAKE_BINARY_DIR}/bin/${utestbinname}"
                         "--gtest_output=xml:${CMAKE_BINARY_DIR}/Testing/${utestbinname}.xml"
                 )
-                add_executable(litiv_ptest_app_${testname} "${testfile}")
-                target_compile_definitions(litiv_ptest_app_${testname}
-                    PUBLIC
-                        PERFTEST=1
-                        UNITTEST=0
-                        "TEST_CURR_INPUT_DATA_ROOT=\"${TEST_CURR_INPUT_DATA_ROOT}\""
-                )
-                target_link_libraries(litiv_ptest_app_${testname}
-                    ${PROJECT_NAME}
-                    litiv_test
-                    benchmark_main
-                )
-                set_target_properties(litiv_ptest_app_${testname}
-                    PROPERTIES
-                        FOLDER "tests/${libname}"
-                        DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
-                )
                 if(BUILD_TESTS_PERF)
+                    add_executable(litiv_ptest_app_${testname} "${testfile}")
+                    target_compile_definitions(litiv_ptest_app_${testname}
+                        PUBLIC
+                            PERFTEST=1
+                            UNITTEST=0
+                            "TEST_CURR_INPUT_DATA_ROOT=\"${TEST_CURR_INPUT_DATA_ROOT}\""
+                    )
+                    target_link_libraries(litiv_ptest_app_${testname}
+                        ${PROJECT_NAME}
+                        litiv_test
+                        benchmark_main
+                    )
+                    set_target_properties(litiv_ptest_app_${testname}
+                        PROPERTIES
+                            FOLDER "tests/${libname}"
+                            DEBUG_POSTFIX "${CMAKE_DEBUG_POSTFIX}"
+                    )
                     set(ptestbinname "litiv_ptest_app_${testname}$<$<CONFIG:Debug>:${CMAKE_DEBUG_POSTFIX}>")
                     add_test(
                         NAME
