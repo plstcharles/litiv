@@ -36,7 +36,7 @@
 ////////////////////////////////
 #define DATASET_USE_DISPARITY_EVAL         0
 #define DATASET_USE_HALF_GT_INPUT_FLAG     0
-#define DATASET_USE_PRECALC_FEATURES       1
+#define DATASET_USE_PRECALC_FEATURES       0
 
 #if (DATASET_VAPTRIMOD+DATASET_MINI_TESTS/*+...*/)!=1
 #error "Must pick a single dataset."
