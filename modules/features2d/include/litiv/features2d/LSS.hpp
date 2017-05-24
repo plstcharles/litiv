@@ -27,7 +27,7 @@
 #define LSS_DEFAULT_ANGULAR_BINS  (12)
 #define LSS_DEFAULT_STATNOISE_VAR (300000.f)
 #define LSS_DEFAULT_NORM_BINS     (true)
-#define LSS_DEFAULT_PREPROCESS    (false)
+#define LSS_DEFAULT_PREPROCESS    (true)
 
 /**
     Local Self-Similarirty (LSS) feature extractor
@@ -67,8 +67,6 @@ public:
 
     /// returns whether the noise variation levels will be dynamically determined or not for internal normalization
     bool isUsingDynamicNoiseVarNorm() const;
-    /// returns whether the algorithm will use iterative SSD processing for fast dense description (with approx result)
-    bool isUsingIterativeSSD() const;
     /// returns whether descriptor bin arrays will be 0-1 normalized before returning or not
     bool isNormalizingBins() const;
     /// returns whether input images will be preprocessed using a gaussian filter or not
@@ -139,9 +137,8 @@ private:
     void ssdescs_impl(const cv::Mat& oImage, cv::Mat_<float>& oDescriptors);
     /// descriptor normalisation approach impl
     void ssdescs_norm(cv::Mat_<float>& oDescriptors) const;
-
-    // helper variables for internal impl (helps avoid continuous mem realloc)
-    cv::Mat_<float> m_oCorrMap,m_oCorrDiffMap,m_oFullColCorrMap;
+    /// descriptor bin lookup map
     cv::Mat_<int> m_oDescLUMap;
+    /// indices of first/last non-null map lookups
     int m_nFirstMaskIdx,m_nLastMaskIdx;
 };

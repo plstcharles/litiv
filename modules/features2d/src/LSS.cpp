@@ -24,11 +24,9 @@
 
 #define USE_CHATFIELD_MASK      0 // 0 == use Lienhart's mask
 #define USE_STATIC_VAR_NOISE    1 // 0 == dynamically determine variation based on original paper suggestion
-#define USE_ITERATIVE_SSD       0 // 0 == use per-pixel 'matchTemplate' call (less prone to cumulative float error)
 
 #define _USE_MATH_DEFINES
 #include "litiv/features2d.hpp"
-#include "litiv/utils/opencv.hpp"
 
 inline void ssdesc_genmask(int nMaskSize, int nRadialBins, int nAngularBins, cv::Mat_<int>& oMask, int& nFirstMaskIdx, int& nLastMaskIdx) {
     lvDbgAssert_(nMaskSize>0 && (nMaskSize%2)==1,"mask size must be non-null, positive, odd value");
@@ -114,8 +112,6 @@ LSS::LSS(int nDescPatchSize, int nDescRadius, int nRadialBins, int nAngularBins,
     ssdesc_genmask(m_nCorrPatchSize,m_nRadialBins,m_nAngularBins,m_oDescLUMap,m_nFirstMaskIdx,m_nLastMaskIdx);
     lvDbgAssert(m_oDescLUMap.cols==m_nCorrPatchSize && m_oDescLUMap.rows==m_nCorrPatchSize);
     lvDbgAssert(m_nFirstMaskIdx>=0 && m_nLastMaskIdx>=m_nFirstMaskIdx);
-    m_oCorrMap.create(m_oDescLUMap.size());
-    m_oCorrDiffMap.create(m_nCorrPatchSize-1,m_nCorrPatchSize);
 }
 
 void LSS::read(const cv::FileNode& /*fn*/) {
@@ -164,10 +160,6 @@ bool LSS::empty() const {
 
 bool LSS::isUsingDynamicNoiseVarNorm() const {
     return USE_STATIC_VAR_NOISE;
-}
-
-bool LSS::isUsingIterativeSSD() const {
-    return USE_ITERATIVE_SSD;
 }
 
 bool LSS::isNormalizingBins() const {
@@ -279,9 +271,9 @@ void LSS::calcDistances(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<flo
 }
 
 void LSS::ssdescs_impl(const cv::Mat& _oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat_<float>& oDescriptors, bool bGenDescMap) {
-    // this method specialization for targeted keypoint description is slower (per keypoint) than the dense description method
     lvAssert_(!_oImage.empty() && ((_oImage.type()==CV_8UC1) || (_oImage.type()==CV_8UC3)),"invalid input image");
     lvAssert__(m_nCorrWinSize<=_oImage.cols && m_nCorrWinSize<=_oImage.rows,"image is too small to compute descriptors with current correlation area size -- need at least (%d,%d) and got (%d,%d)",m_nCorrWinSize,m_nCorrWinSize,_oImage.cols,_oImage.rows);
+    lvDbgAssert(m_oDescLUMap.rows==m_nCorrPatchSize && m_oDescLUMap.cols==m_nCorrPatchSize);
     cv::KeyPointsFilter::runByImageBorder(voKeypoints,_oImage.size(),m_nCorrWinSize/2);
     if(voKeypoints.empty()) {
         oDescriptors.release();
@@ -292,59 +284,27 @@ void LSS::ssdescs_impl(const cv::Mat& _oImage, std::vector<cv::KeyPoint>& voKeyp
         cv::GaussianBlur(_oImage,oImage,cv::Size(7,7),1.0);
     else
         oImage = _oImage;
-    std::vector<float> aTempDesc(size_t(m_nRadialBins*m_nAngularBins));
-    cv::Mat_<float> oTempDesc(1,m_nRadialBins*m_nAngularBins,aTempDesc.data());
+    const int nCorrWinRadius = m_nCorrWinSize/2;
+    const int nDescPatchRadius = m_nDescPatchSize/2;
+    const int nDescSize = m_nRadialBins*m_nAngularBins;
+    static thread_local lv::AutoBuffer<float> s_aCorrData;
+    s_aCorrData.resize(size_t(m_nCorrPatchSize*m_nCorrPatchSize));
+    cv::Mat_<float> oCorrMap(m_nCorrPatchSize,m_nCorrPatchSize,s_aCorrData.data());
+    static thread_local lv::AutoBuffer<float> s_aTempDesc;
+    s_aTempDesc.resize(((size_t)nDescSize));
+    cv::Mat_<float> oTempDesc(1,nDescSize,s_aTempDesc.data());
     if(bGenDescMap)
-        oDescriptors.create(3,std::array<int,3>{oImage.rows,oImage.cols,m_nRadialBins*m_nAngularBins}.data());
+        oDescriptors.create(3,std::array<int,3>{oImage.rows,oImage.cols,nDescSize}.data());
     else
-        oDescriptors.create(int(voKeypoints.size()),m_nRadialBins*m_nAngularBins);
+        oDescriptors.create(int(voKeypoints.size()),nDescSize);
     for(int nKeyPtIdx=0; nKeyPtIdx<int(voKeypoints.size()); ++nKeyPtIdx) {
         const cv::KeyPoint& oCurrKeyPt = voKeypoints[nKeyPtIdx];
         const int nRowIdx = int(oCurrKeyPt.pt.y);
         const int nColIdx = int(oCurrKeyPt.pt.x);
         lvDbgAssert(nRowIdx>=0 && nColIdx>=0);
-        const cv::Mat oWindow = oImage(cv::Rect(nColIdx-m_nCorrWinSize/2,nRowIdx-m_nCorrWinSize/2,m_nCorrWinSize,m_nCorrWinSize));
-        const cv::Mat oTempl = oImage(cv::Rect(nColIdx-m_nDescPatchSize/2,nRowIdx-m_nDescPatchSize/2,m_nDescPatchSize,m_nDescPatchSize));
-        cv::matchTemplate(oWindow,oTempl,m_oCorrMap,cv::TM_SQDIFF);
-#if USE_STATIC_VAR_NOISE
-        const float fVarNormFact = -1.0f/m_fStaticNoiseVar;
-#else //!USE_STATIC_VAR_NOISE
-        float fMaxLocalVarNoise = 1000.0f;
-        for(int nRowOffset=-1; nRowOffset<=1 ; ++nRowOffset)
-            for(int nColOffset=-1; nColOffset<=1; ++nColOffset)
-                fMaxLocalVarNoise = std::max(fMaxLocalVarNoise,m_oCorrMap(m_nCorrPatchSize/2+nRowOffset,m_nCorrPatchSize/2+nColOffset));
-        const float fVarNormFact = -1.0f/fMaxLocalVarNoise;
-#endif //!USE_STATIC_VAR_NOISE
-        oTempDesc = std::numeric_limits<float>::max();
-        for(int nDescBinIdx=m_nFirstMaskIdx; nDescBinIdx<=m_nLastMaskIdx; ++nDescBinIdx)
-            if(m_oDescLUMap(nDescBinIdx)!=-1)
-                aTempDesc[m_oDescLUMap(nDescBinIdx)] = std::min(aTempDesc[m_oDescLUMap(nDescBinIdx)],((float*)m_oCorrMap.data)[nDescBinIdx]);
-        oTempDesc *= fVarNormFact;
-        cv::exp(oTempDesc,cv::Mat_<float>(1,m_nRadialBins*m_nAngularBins,bGenDescMap?oDescriptors.ptr<float>(nRowIdx,nColIdx):oDescriptors.ptr<float>(nKeyPtIdx)));
-    }
-    if(m_bNormalizeBins)
-        ssdescs_norm(oDescriptors);
-}
-
-void LSS::ssdescs_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
-    lvAssert_(!_oImage.empty() && ((_oImage.type()==CV_8UC1) || (_oImage.type()==CV_8UC3)),"invalid input image");
-    lvAssert__(m_nCorrWinSize<=_oImage.cols && m_nCorrWinSize<=_oImage.rows,"image is too small to compute descriptors with current correlation area size -- need at least (%d,%d) and got (%d,%d)",m_nCorrWinSize,m_nCorrWinSize,_oImage.cols,_oImage.rows);
-    cv::Mat oImage;
-    if(m_bPreProcess)
-        cv::GaussianBlur(_oImage,oImage,cv::Size(7,7),1.0);
-    else
-        oImage = _oImage;
-    const int nRows = oImage.rows;
-    const int nCols = oImage.cols;
-    const int nCorrWinRadius = m_nCorrWinSize/2;
-    const int nDescPatchRadius = m_nDescPatchSize/2;
-    const int nDescSize = m_nRadialBins*m_nAngularBins;
-    std::vector<float> aTempDesc((size_t)nDescSize,0.0f);
-    cv::Mat_<float> oTempDesc(1,nDescSize,aTempDesc.data());
-    const int anDescDims[3] = {nRows,nCols,nDescSize};
-    oDescriptors.create(3,anDescDims);
-    m_oFullColCorrMap.create(m_nCorrPatchSize+nRows-m_nCorrWinSize+1,m_nCorrPatchSize);
-    const auto lCompDescr = [&](int nColIdx, int nRowIdx, const cv::Mat_<float>& oCorrMap) {
+        const cv::Mat oWindow = oImage(cv::Rect(nColIdx-nCorrWinRadius,nRowIdx-nCorrWinRadius,m_nCorrWinSize,m_nCorrWinSize));
+        const cv::Mat oTempl = oImage(cv::Rect(nColIdx-nDescPatchRadius,nRowIdx-nDescPatchRadius,m_nDescPatchSize,m_nDescPatchSize));
+        cv::matchTemplate(oWindow,oTempl,oCorrMap,cv::TM_SQDIFF);
 #if USE_STATIC_VAR_NOISE
         const float fVarNormFact = -1.0f/m_fStaticNoiseVar;
 #else //!USE_STATIC_VAR_NOISE
@@ -357,46 +317,65 @@ void LSS::ssdescs_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
         oTempDesc = std::numeric_limits<float>::max();
         for(int nDescBinIdx=m_nFirstMaskIdx; nDescBinIdx<=m_nLastMaskIdx; ++nDescBinIdx)
             if(m_oDescLUMap(nDescBinIdx)!=-1)
-                aTempDesc[m_oDescLUMap(nDescBinIdx)] = std::min(aTempDesc[m_oDescLUMap(nDescBinIdx)],((float*)oCorrMap.data)[nDescBinIdx]);
+                s_aTempDesc[m_oDescLUMap(nDescBinIdx)] = std::min(s_aTempDesc[m_oDescLUMap(nDescBinIdx)],((float*)oCorrMap.data)[nDescBinIdx]);
         oTempDesc *= fVarNormFact;
-        cv::exp(oTempDesc,cv::Mat_<float>(1,nDescSize,oDescriptors.ptr<float>(nRowIdx,nColIdx)));
-    };
-    int nColIdx = 0;
-    for(; nColIdx<nCorrWinRadius; ++nColIdx)
-        for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx)
-            std::fill_n(oDescriptors.ptr<float>(nRowIdx,nColIdx),nDescSize,0.0f);
-    for(; nColIdx<nCols-nCorrWinRadius; ++nColIdx) {
-        int nRowIdx = 0;
-        for(; nRowIdx<nCorrWinRadius; ++nRowIdx)
-            std::fill_n(oDescriptors.ptr<float>(nRowIdx,nColIdx),nDescSize,0.0f);
-        const cv::Mat oInitWindow = oImage(cv::Rect(nColIdx-nCorrWinRadius,nRowIdx-nCorrWinRadius,m_nCorrWinSize,m_nCorrWinSize));
-        const cv::Mat oInitTempl = oImage(cv::Rect(nColIdx-nDescPatchRadius,nRowIdx-nDescPatchRadius,m_nDescPatchSize,m_nDescPatchSize));
-        cv::Mat_<float> oCorrMap(m_nCorrPatchSize,m_nCorrPatchSize,(float*)m_oFullColCorrMap.data);
-        cv::matchTemplate(oInitWindow,oInitTempl,oCorrMap,cv::TM_SQDIFF);
-        lCompDescr(nColIdx,nRowIdx++,oCorrMap);
-        for(; nRowIdx<nRows-nCorrWinRadius; ++nRowIdx) {
+        cv::exp(oTempDesc,cv::Mat_<float>(1,nDescSize,bGenDescMap?oDescriptors.ptr<float>(nRowIdx,nColIdx):oDescriptors.ptr<float>(nKeyPtIdx)));
+    }
+    if(m_bNormalizeBins)
+        ssdescs_norm(oDescriptors);
+}
+
+void LSS::ssdescs_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
+    lvAssert_(!_oImage.empty() && ((_oImage.type()==CV_8UC1) || (_oImage.type()==CV_8UC3)),"invalid input image");
+    lvAssert__(m_nCorrWinSize<=_oImage.cols && m_nCorrWinSize<=_oImage.rows,"image is too small to compute descriptors with current correlation area size -- need at least (%d,%d) and got (%d,%d)",m_nCorrWinSize,m_nCorrWinSize,_oImage.cols,_oImage.rows);
+    lvDbgAssert(m_oDescLUMap.rows==m_nCorrPatchSize && m_oDescLUMap.cols==m_nCorrPatchSize);
+    cv::Mat oImage;
+    if(m_bPreProcess)
+        cv::GaussianBlur(_oImage,oImage,cv::Size(7,7),1.0);
+    else
+        oImage = _oImage;
+    const int nRows = oImage.rows;
+    const int nCols = oImage.cols;
+    const int nCorrWinRadius = m_nCorrWinSize/2;
+    const int nDescPatchRadius = m_nDescPatchSize/2;
+    const int nDescSize = m_nRadialBins*m_nAngularBins;
+    const int anDescDims[3] = {nRows,nCols,nDescSize};
+    oDescriptors.create(3,anDescDims);
+    std::fill_n(oDescriptors.ptr<float>(0,0),nDescSize*nCorrWinRadius*nCols,0.0f);
+    std::fill_n(oDescriptors.ptr<float>(nRows-nCorrWinRadius,0),nDescSize*nCorrWinRadius*nCols,0.0f);
+#if USING_OPENMP
+    #pragma omp parallel for
+#endif //USING_OPENMP
+    for(int nRowIdx=nCorrWinRadius; nRowIdx<nRows-nCorrWinRadius; ++nRowIdx) {
+        static thread_local lv::AutoBuffer<float> s_aCorrData;
+        s_aCorrData.resize(size_t(m_nCorrPatchSize*m_nCorrPatchSize));
+        cv::Mat_<float> oCorrMap(m_nCorrPatchSize,m_nCorrPatchSize,s_aCorrData.data());
+        static thread_local lv::AutoBuffer<float> s_aTempDesc;
+        s_aTempDesc.resize(size_t(nDescSize));
+        cv::Mat_<float> oTempDesc(1,nDescSize,s_aTempDesc.data());
+        std::fill_n(oDescriptors.ptr<float>(nRowIdx,0),nDescSize*nCorrWinRadius,0.0f);
+        std::fill_n(oDescriptors.ptr<float>(nRowIdx,nCols-nCorrWinRadius),nDescSize*nCorrWinRadius,0.0f);
+        for(int nColIdx=nCorrWinRadius; nColIdx<nCols-nCorrWinRadius; ++nColIdx) {
             const cv::Mat oWindow = oImage(cv::Rect(nColIdx-nCorrWinRadius,nRowIdx-nCorrWinRadius,m_nCorrWinSize,m_nCorrWinSize));
             const cv::Mat oTempl = oImage(cv::Rect(nColIdx-nDescPatchRadius,nRowIdx-nDescPatchRadius,m_nDescPatchSize,m_nDescPatchSize));
-#if USE_ITERATIVE_SSD
-            oCorrMap = cv::Mat_<float>(m_nCorrPatchSize,m_nCorrPatchSize,((float*)m_oFullColCorrMap.data)+m_nCorrPatchSize*nRowIdx);
-            const cv::Mat oTemplMinus = oImage(cv::Rect(nColIdx-nDescPatchRadius,nRowIdx-nDescPatchRadius-1,m_nDescPatchSize,1));
-            cv::matchTemplate(oWindow.rowRange(nDescPatchRadius,m_nCorrWinSize-nDescPatchRadius-1),oTemplMinus,m_oCorrDiffMap,cv::TM_SQDIFF);
-            oCorrMap.rowRange(0,m_nCorrPatchSize-1) -= m_oCorrDiffMap;
-            const cv::Mat oTemplPlus = oImage(cv::Rect(nColIdx-nDescPatchRadius,(nRowIdx-nDescPatchRadius-1)+m_nDescPatchSize,m_nDescPatchSize,1));
-            cv::matchTemplate(oWindow.rowRange(nDescPatchRadius,m_nCorrWinSize-nDescPatchRadius-1),oTemplPlus,m_oCorrDiffMap,cv::TM_SQDIFF);
-            oCorrMap.rowRange(0,m_nCorrPatchSize-1) += m_oCorrDiffMap;
-            cv::matchTemplate(oWindow.rowRange(m_nCorrWinSize-m_nDescPatchSize,m_nCorrWinSize),oTempl,oCorrMap.row(m_nCorrPatchSize-1),cv::TM_SQDIFF);
-#else //!USE_ITERATIVE_SSD
             cv::matchTemplate(oWindow,oTempl,oCorrMap,cv::TM_SQDIFF);
-#endif //!USE_ITERATIVE_SSD
-            lCompDescr(nColIdx,nRowIdx,oCorrMap);
+#if USE_STATIC_VAR_NOISE
+            const float fVarNormFact = -1.0f/m_fStaticNoiseVar;
+#else //!USE_STATIC_VAR_NOISE
+            float fMaxLocalVarNoise = 1000.0f;
+            for(int nRowOffset=-1; nRowOffset<=1 ; ++nRowOffset)
+                for(int nColOffset=-1; nColOffset<=1; ++nColOffset)
+                    fMaxLocalVarNoise = std::max(fMaxLocalVarNoise,oCorrMap(m_nCorrPatchSize/2+nRowOffset,m_nCorrPatchSize/2+nColOffset));
+            const float fVarNormFact = -1.0f/fMaxLocalVarNoise;
+#endif //!USE_STATIC_VAR_NOISE
+            oTempDesc = std::numeric_limits<float>::max();
+            for(int nDescBinIdx=m_nFirstMaskIdx; nDescBinIdx<=m_nLastMaskIdx; ++nDescBinIdx)
+                if(m_oDescLUMap(nDescBinIdx)!=-1)
+                    s_aTempDesc[m_oDescLUMap(nDescBinIdx)] = std::min(s_aTempDesc[m_oDescLUMap(nDescBinIdx)],((float*)oCorrMap.data)[nDescBinIdx]);
+            oTempDesc *= fVarNormFact;
+            cv::exp(oTempDesc,cv::Mat_<float>(1,nDescSize,oDescriptors.ptr<float>(nRowIdx,nColIdx)));
         }
-        for(; nRowIdx<nRows; ++nRowIdx)
-            std::fill_n(oDescriptors.ptr<float>(nRowIdx,nColIdx),nDescSize,0.0f);
     }
-    for(; nColIdx<nCols; ++nColIdx)
-        for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx)
-            std::fill_n(oDescriptors.ptr<float>(nRowIdx,nColIdx),nDescSize,0.0f);
     if(m_bNormalizeBins)
         ssdescs_norm(oDescriptors);
 }
