@@ -714,10 +714,8 @@ namespace lv {
         typedef const T* const_iterator;
         typedef const T& const_reference;
         typedef std::size_t size_type;
-        /// default constructor (uses static buffer)
-        AutoBuffer();
         /// constructor with required buffer size (will use static buffer if possible, or allocate)
-        AutoBuffer(size_type nReqSize);
+        AutoBuffer(size_type nReqSize=nStaticSize);
         /// copy constructor
         template<size_t nStaticSize2>
         AutoBuffer(const AutoBuffer<T,nStaticSize2,nByteAlign>&);
@@ -1060,13 +1058,6 @@ void lv::WorkerPool<nWorkers>::entry() {
             task(); // if the execution throws, the exception will be contained in the shared state returned on queue
         }
     }
-}
-
-template<typename T, size_t nStaticSize, size_t nByteAlign>
-lv::AutoBuffer<T,nStaticSize,nByteAlign>::AutoBuffer() :
-        m_aDynamicBuffer(nullptr,lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2) {
-    m_pBufferPtr = m_aStaticBuffer.data();
-    m_nBufferSize = m_aStaticBuffer.size();
 }
 
 template<typename T, size_t nStaticSize, size_t nByteAlign>
