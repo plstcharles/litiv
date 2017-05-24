@@ -155,7 +155,7 @@ inline StereoSegmMatcher::GraphModelData::GraphModelData(const std::array<cv::Ma
 #elif STEREOSEGMATCH_CONFIG_USE_DASCRF_AFFINITY
     m_pImgDescExtractor = std::make_unique<DASC>(DASC_DEFAULT_RF_SIGMAS,DASC_DEFAULT_RF_SIGMAR,DASC_DEFAULT_RF_ITERS,DASC_DEFAULT_PREPROCESS);
 #elif STEREOSEGMATCH_CONFIG_USE_LSS_AFFINITY
-    m_pImgDescExtractor = std::make_unique<LSS>(STEREOSEGMATCH_DEFAULT_LSSDESC_PATCH,STEREOSEGMATCH_DEFAULT_LSSDESC_RAD);
+    m_pImgDescExtractor = std::make_unique<LSS>(STEREOSEGMATCH_DEFAULT_LSSDESC_PATCH,STEREOSEGMATCH_DEFAULT_LSSDESC_RAD,STEREOSEGMATCH_DEFAULT_LSSDESC_RAD_BINS,STEREOSEGMATCH_DEFAULT_LSSDESC_ANG_BINS);
 #elif STEREOSEGMATCH_CONFIG_USE_MI_AFFINITY
     cv::Size oMIWinSize(int(STEREOSEGMATCH_DEFAULT_MI_WINDOW_RAD)*2+1,int(STEREOSEGMATCH_DEFAULT_MI_WINDOW_RAD)*2+1);
     m_pImgDescExtractor = std::make_unique<MutualInfo>(oMIWinSize,true);
@@ -802,8 +802,10 @@ inline void StereoSegmMatcher::GraphModelData::calcImageFeatures(const std::arra
     std::atomic_size_t nProcessedNodeCount(size_t(0));
     std::atomic_bool bProgressDisplayed(false);
     std::mutex oPrintMutex;
+    cv::Mat_<cv::Vec3b> testmask(nRows,nCols);
+    testmask = cv::Vec3b(0,0,255);
 #if USING_OPENMP
-#pragma omp parallel for
+//#pragma omp parallel for
 #endif //USING_OPENMP
     for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_nValidGraphNodes; ++nGraphNodeIdx) {
         const size_t nLUTNodeIdx = m_vValidLUTNodeIdxs[nGraphNodeIdx];
@@ -813,7 +815,9 @@ inline void StereoSegmMatcher::GraphModelData::calcImageFeatures(const std::arra
         const int nColIdx = oNode.nColIdx;
         float* pAffinityPtr = oAffinity.ptr<float>(nRowIdx,nColIdx);
         std::vector<float> vValidAffinityVals;
+        std::vector<InternalLabelType> vValidAffinityIdxs;
         vValidAffinityVals.reserve(m_nRealStereoLabels);
+        vValidAffinityIdxs.reserve(m_nRealStereoLabels);
         for(InternalLabelType nLabelIdx=0; nLabelIdx<m_nRealStereoLabels; ++nLabelIdx) {
             const OutputLabelType nRealLabel = getRealLabel(nLabelIdx);
             const int nOffsetColIdx = nColIdx-nRealLabel;
@@ -835,23 +839,27 @@ inline void StereoSegmMatcher::GraphModelData::calcImageFeatures(const std::arra
             #endif //!STEREOSEGMATCH_CONFIG_USE_MI_AFFINITY
                 lvDbgAssert(pAffinityPtr[nLabelIdx]>=0.0f && pAffinityPtr[nLabelIdx]<=(float)M_SQRT2);
                 vValidAffinityVals.push_back(pAffinityPtr[nLabelIdx]);
+                vValidAffinityIdxs.push_back(nLabelIdx);
             }
         }
-        const size_t nValidAffinityVals = vValidAffinityVals.size();
-        std::sort(vValidAffinityVals.begin(),vValidAffinityVals.end());
-        cv::Scalar vMean,vStdDev;
-        cv::meanStdDev(vValidAffinityVals,vMean,vStdDev);
-        const float fAlpha = (float)std::max(vStdDev[0],STEREOSEGMATCH_DEFAULT_DISCRIM_STDDEV_MIN);
-        const float fMin = vValidAffinityVals[0];
-        float fCurrDiscrimPowSum = 0.0f;
-        for(size_t nAffinityIdx=1; nAffinityIdx<nValidAffinityVals; ++nAffinityIdx)
-            fCurrDiscrimPowSum += (vValidAffinityVals[nAffinityIdx]-(fMin+fAlpha/2))/fAlpha;
-        float fCurrDiscrimPow = nValidAffinityVals>0?(fCurrDiscrimPowSum/(nValidAffinityVals-1)):0.0f;
-#if STEREOSEGMATCH_CONFIG_USE_DISCRIM_MAP_LBRD
-        if(oNode.bNearGraphBorders && fCurrDiscrimPow>0.0f)
-            fCurrDiscrimPow /= 2;
-#endif //STEREOSEGMATCH_CONFIG_USE_DISCRIM_MAP_LBRD
-        oDiscrimPow.at<float>(nRowIdx,nColIdx) = fCurrDiscrimPow;
+        if(!vValidAffinityVals.empty()) {
+            const size_t nValidAffinityVals = vValidAffinityVals.size();
+            const std::vector<size_t> vValidAffinitySubIdxs = lv::sort_indices(vValidAffinityVals);
+            cv::Scalar vMean,vStdDev;
+            cv::meanStdDev(vValidAffinityVals,vMean,vStdDev);
+            const float fAlpha = (float)std::max(vStdDev[0],STEREOSEGMATCH_DEFAULT_DISCRIM_STDDEV_MIN);
+            const float fMin = vValidAffinityVals[vValidAffinitySubIdxs[0]];
+            testmask(nRowIdx,nColIdx) = cv::Vec3b::all(uchar(float(vValidAffinityIdxs[vValidAffinitySubIdxs[0]])/m_nMaxDispOffset*255));
+            float fCurrDiscrimPowSum = 0.0f;
+            for(size_t nAffinityIdx=1; nAffinityIdx<nValidAffinityVals; ++nAffinityIdx)
+                fCurrDiscrimPowSum += (vValidAffinityVals[nAffinityIdx]-(fMin+fAlpha/2))/fAlpha;
+            float fCurrDiscrimPow = nValidAffinityVals>0?(fCurrDiscrimPowSum/(nValidAffinityVals-1)):0.0f;
+#if STEREOSEGMATCH_CONFIG_USE_DISCRIM_MAP_BORDR
+            if(oNode.bNearGraphBorders && fCurrDiscrimPow>0.0f)
+                fCurrDiscrimPow /= 2;
+#endif //STEREOSEGMATCH_CONFIG_USE_DISCRIM_MAP_BORDR
+            oDiscrimPow.at<float>(nRowIdx,nColIdx) = fCurrDiscrimPow;
+        }
         const size_t nCurrNodeIdx = ++nProcessedNodeCount;
         if((nCurrNodeIdx%(size_t(nRows*nCols)/20))==0 && oLocalTimer.elapsed()>2.0) {
             lv::mutex_lock_guard oLock(oPrintMutex);
@@ -871,21 +879,16 @@ inline void StereoSegmMatcher::GraphModelData::calcImageFeatures(const std::arra
     lvLog_(1,"Image affinity/discrim maps computed in %f second(s).",oLocalTimer.tock());
     /*for(InternalLabelType nLabelIdx=0; nLabelIdx<m_nRealStereoLabels; ++nLabelIdx) {
         cv::Mat_<float> tmp = lv::squeeze(lv::getSubMat(oAffinity,2,(int)nLabelIdx));
-        cv::Rect roi(0,128,256,1);
-        cv::imshow("tmp",tmp);
-        lvPrint(tmp(roi));
-        //lvPrint(tmpdescs(roi));
-        cv::Mat_<float> exp;
-        cv::exp(-tmp,exp);
-        cv::imshow("exp",exp);
-        lvPrint(exp(roi));
+        cv::imshow(std::string("aff@")+std::to_string(nLabelIdx),tmp);
         cv::waitKey(0);
     }*/
-    /*cv::imshow("oDiscrimPow_Img",oDiscrimPow);
-    cv::imshow("oDiscrimPow_Img>0.25",oDiscrimPow>0.25);
+    cv::imshow("oDiscrimPow_Img",oDiscrimPow);
+    /*cv::imshow("oDiscrimPow_Img>0.25",oDiscrimPow>0.25);
     cv::imshow("oDiscrimPow_Img>0.50",oDiscrimPow>0.50);
     cv::imshow("oDiscrimPow_Img>0.75",oDiscrimPow>0.75);
     cv::waitKey(0);*/
+    cv::imshow("testmask_img",testmask);
+    cv::waitKey(0);
 }
 
 inline void StereoSegmMatcher::GraphModelData::calcShapeFeatures(const std::array<cv::Mat,InputPackSize/InputPackOffset>& aInputMasks, bool bInit) {
@@ -956,6 +959,8 @@ inline void StereoSegmMatcher::GraphModelData::calcShapeFeatures(const std::arra
     std::atomic_size_t nProcessedNodeCount(size_t(0));
     std::atomic_bool bProgressDisplayed(false);
     std::mutex oPrintMutex;
+    cv::Mat_<cv::Vec3b> testmask(nRows,nCols);
+    testmask = cv::Vec3b(0,0,255);
 #if USING_OPENMP
 //#pragma omp parallel for
 #endif //USING_OPENMP
@@ -971,7 +976,9 @@ inline void StereoSegmMatcher::GraphModelData::calcShapeFeatures(const std::arra
 
         float* pAffinityPtr = oAffinity.ptr<float>(nRowIdx,nColIdx);
         std::vector<float> vValidAffinityVals;
+        std::vector<InternalLabelType> vValidAffinityIdxs;
         vValidAffinityVals.reserve(m_nRealStereoLabels);
+        vValidAffinityIdxs.reserve(m_nRealStereoLabels);
         for(InternalLabelType nLabelIdx=0; nLabelIdx<m_nRealStereoLabels; ++nLabelIdx) {
             const OutputLabelType nRealLabel = getRealLabel(nLabelIdx);
             const int nOffsetColIdx = nColIdx-nRealLabel;
@@ -987,26 +994,30 @@ inline void StereoSegmMatcher::GraphModelData::calcShapeFeatures(const std::arra
 #endif //!STEREOSEGMATCH_CONFIG_USE_SHAPE_EMD_SIM
                 lvDbgAssert(pAffinityPtr[nLabelIdx]>=0.0f && pAffinityPtr[nLabelIdx]<=(float)M_SQRT2);
                 vValidAffinityVals.push_back(pAffinityPtr[nLabelIdx]);
+                vValidAffinityIdxs.push_back(nLabelIdx);
             }
         }
-        const size_t nValidAffinityVals = vValidAffinityVals.size();
-        std::sort(vValidAffinityVals.begin(),vValidAffinityVals.end());
-        cv::Scalar vMean,vStdDev;
-        cv::meanStdDev(vValidAffinityVals,vMean,vStdDev);
-        const float fAlpha = (float)std::max(vStdDev[0],STEREOSEGMATCH_DEFAULT_DISCRIM_STDDEV_MIN);
-        const float fMin = vValidAffinityVals[0];
-        float fCurrDiscrimPowSum = 0.0f;
-        for(size_t nAffinityIdx=1; nAffinityIdx<nValidAffinityVals; ++nAffinityIdx)
-            fCurrDiscrimPowSum += (vValidAffinityVals[nAffinityIdx]-(fMin+fAlpha/2))/fAlpha;
-        float fCurrDiscrimPow = nValidAffinityVals>0?(fCurrDiscrimPowSum/(nValidAffinityVals-1)):0.0f;
-#if STEREOSEGMATCH_CONFIG_USE_DISCRIM_MAP_LBRD
-        if(oNode.bNearGraphBorders && fCurrDiscrimPow>0.0f)
-            fCurrDiscrimPow /= 2;
-#endif //STEREOSEGMATCH_CONFIG_USE_DISCRIM_MAP_LBRD
-        const cv::Mat& oFGDist = m_vNextFeats[FeatPack_LeftFGDist];
-        const float fCurrFGDist = oFGDist.at<float>(nRowIdx,nColIdx);
-        fCurrDiscrimPow *= std::max(1-fCurrFGDist/STEREOSEGMATCH_DEFAULT_DISCRIM_SHP_RAD,0.0f);
-        oDiscrimPow.at<float>(nRowIdx,nColIdx) = fCurrDiscrimPow;
+        if(!vValidAffinityVals.empty()) {
+            const size_t nValidAffinityVals = vValidAffinityVals.size();
+            const std::vector<size_t> vValidAffinitySubIdxs = lv::sort_indices(vValidAffinityVals);
+            cv::Scalar vMean,vStdDev;
+            cv::meanStdDev(vValidAffinityVals,vMean,vStdDev);
+            const float fAlpha = (float)std::max(vStdDev[0],STEREOSEGMATCH_DEFAULT_DISCRIM_STDDEV_MIN);
+            const float fMin = vValidAffinityVals[vValidAffinitySubIdxs[0]];
+            testmask(nRowIdx,nColIdx) = cv::Vec3b::all(uchar(float(vValidAffinityIdxs[vValidAffinitySubIdxs[0]])/m_nMaxDispOffset*255));
+            float fCurrDiscrimPowSum = 0.0f;
+            for(size_t nAffinityIdx=1; nAffinityIdx<nValidAffinityVals; ++nAffinityIdx)
+                fCurrDiscrimPowSum += (vValidAffinityVals[nAffinityIdx]-(fMin+fAlpha/2))/fAlpha;
+            float fCurrDiscrimPow = nValidAffinityVals>0?(fCurrDiscrimPowSum/(nValidAffinityVals-1)):0.0f;
+#if STEREOSEGMATCH_CONFIG_USE_DISCRIM_MAP_BORDR
+            if(oNode.bNearGraphBorders && fCurrDiscrimPow>0.0f)
+                fCurrDiscrimPow /= 2;
+#endif //STEREOSEGMATCH_CONFIG_USE_DISCRIM_MAP_BORDR
+            const cv::Mat& oFGDist = m_vNextFeats[FeatPack_LeftFGDist];
+            const float fCurrFGDist = oFGDist.at<float>(nRowIdx,nColIdx);
+            fCurrDiscrimPow *= std::max(1-fCurrFGDist/STEREOSEGMATCH_DEFAULT_DISCRIM_SHP_RAD,0.0f);
+            oDiscrimPow.at<float>(nRowIdx,nColIdx) = fCurrDiscrimPow;
+        }
         const size_t nCurrNodeIdx = ++nProcessedNodeCount;
         if((nCurrNodeIdx%(size_t(nRows*nCols)/20))==0 && oLocalTimer.elapsed()>2.0) {
             lv::mutex_lock_guard oLock(oPrintMutex);
@@ -1036,11 +1047,13 @@ inline void StereoSegmMatcher::GraphModelData::calcShapeFeatures(const std::arra
         lvPrint(exp(roi));
         cv::waitKey(0);
     }*/
-    /*cv::imshow("oDiscrimPow_Shp",oDiscrimPow);
-    cv::imshow("oDiscrimPow_Shp>0.25",oDiscrimPow>0.25);
+    cv::imshow("oDiscrimPow_Shp",oDiscrimPow);
+    /*cv::imshow("oDiscrimPow_Shp>0.25",oDiscrimPow>0.25);
     cv::imshow("oDiscrimPow_Shp>0.50",oDiscrimPow>0.50);
     cv::imshow("oDiscrimPow_Shp>0.75",oDiscrimPow>0.75);
     cv::waitKey(0);*/
+    cv::imshow("testmask_shp",testmask);
+    cv::waitKey(0);
 }
 
 inline void StereoSegmMatcher::GraphModelData::setNextFeatures(const cv::Mat& oPackedFeats) {
