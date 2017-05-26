@@ -599,6 +599,14 @@ namespace lv {
         return a+b;
     }
 
+    /// returns whether a given memory address is aligned to the templated step or not
+    template<size_t nByteAlign, typename Taddr>
+    bool isAligned(Taddr pData) {
+        static_assert(std::is_pointer<Taddr>::value,"need to pass pointer type");
+        static_assert(nByteAlign>0,"byte align must be positive value");
+        return (uintptr_t(pData)%nByteAlign)==0;
+    }
+
     /// defines an stl-friendly aligned+default-init memory allocator to be used in container classes
     template<typename T, std::size_t nByteAlign, bool bDefaultInit=true>
     struct AlignedMemAllocator {

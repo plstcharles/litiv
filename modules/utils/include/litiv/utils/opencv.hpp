@@ -83,14 +83,6 @@ namespace lv {
     /// returns a 16-byte aligned matrix allocator for AVX(1/2) support (should never be modified, despite non-const!)
     cv::MatAllocator* getMatAllocator32a();
 
-    /// returns whether a given memory address is aligned to the templated step or not
-    template<size_t nByteAlign, typename Taddr>
-    bool isAligned(Taddr pData) {
-        static_assert(std::is_pointer<Taddr>::value,"need to pass pointer type");
-        static_assert(nByteAlign>0,"byte align must be positive value");
-        return (uintptr_t(pData)%nByteAlign)==0;
-    }
-
     /// returns whether a given matrix data type is opencv-compatible or not (i.e. whether it can be used in a cv::Mat_ class)
     template<typename TData>
     constexpr bool isDataTypeCompat() {
