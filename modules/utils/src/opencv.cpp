@@ -192,7 +192,7 @@ void lv::DisplayHelper::displayAlbumAndWaitKey(const std::vector<std::pair<cv::M
             lDisplay(nCurrAlbumIdx=nNewAlbumIdx);
         }
     }
-    while(nKeyPressed!=27);
+    while((nKeyPressed&255)!=27);
 }
 
 void lv::DisplayHelper::setMouseCallback(std::function<void(const CallbackData&)> lCallback) {
