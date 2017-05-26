@@ -18,6 +18,9 @@
 #pragma once
 
 #include "litiv/utils/simd.hpp"
+#if USE_CVCORE_WITH_UTILS
+#include "litiv/utils/opencv.hpp"
+#endif //USE_CVCORE_WITH_UTILS
 
 namespace lv {
 
@@ -773,6 +776,22 @@ namespace lv {
             });
         }
     }
+
+#if USE_CVCORE_WITH_UTILS
+
+    /// computes Hoyer's sparseness metric over the vector ("Non-negative Matrix Factorization with Sparseness Constraints", JMLR2004)
+    template<typename TVal>
+    inline double sparseness(const TVal* aVec, size_t nSize) {
+        // 'sparse'-valued vectors will have output close to 1, 'uniform'-valued vectors close to 0
+        static_assert(lv::isDataTypeCompat<TVal>(),"array type must be cv-compatible, and without channels");
+        lvAssert_(nSize>1,"vector size must be greater than one");
+        const double dL1Norm = cv::norm(cv::Mat_<TVal>(1,(int)nSize,const_cast<TVal*>(aVec)),cv::NORM_L1);
+        const double dL2Norm = cv::norm(cv::Mat_<TVal>(1,(int)nSize,const_cast<TVal*>(aVec)),cv::NORM_L2);
+        const double dSizeRoot = std::sqrt(double(nSize));
+        return (dSizeRoot-dL1Norm/dL2Norm)/(dSizeRoot-1);
+    }
+
+#endif //USE_CVCORE_WITH_UTILS
 
     /// returns the index of the nearest neighbor of the requested value in the reference value array, using a custom distance functor
     template<typename Tval, typename Tcomp>
