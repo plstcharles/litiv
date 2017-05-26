@@ -641,10 +641,34 @@ namespace lv {
         oMat.clear();
     }
 
-    /// helper function to zero-init sparse and non-sparse matrices (regular mat specialization)
+    /// helper function to zero-init sparse and non-sparse matrices (regular mat overload)
     template<typename T>
     inline void zeroMat(cv::Mat_<T>& oMat) {
         oMat = T();
+    }
+
+    /// helper function to allocate (via 'create') different matrix types (sparse mat overload)
+    template<typename T>
+    inline void allocMat(cv::SparseMat_<T>& oMat, const std::vector<int>& aSizes, int nType) {
+        lvAssert_(oMat.type()==nType,"bad runtime alloc type for specialized mat");
+        oMat.create((int)aSizes.size(),aSizes.data());
+    }
+
+    /// helper function to allocate (via 'create') different matrix types (sparse mat overload)
+    inline void allocMat(cv::SparseMat& oMat, const std::vector<int>& aSizes, int nType) {
+        oMat.create((int)aSizes.size(),aSizes.data(),nType);
+    }
+
+    /// helper function to allocate (via 'create') different matrix types (dense mat overload)
+    template<typename T>
+    inline void allocMat(cv::Mat_<T>& oMat, const std::vector<int>& aSizes, int nType) {
+        lvAssert_(oMat.type()==nType,"bad runtime alloc type for specialized mat");
+        oMat.create((int)aSizes.size(),aSizes.data());
+    }
+
+    /// helper function to allocate (via 'create') different matrix types (dense mat overload)
+    inline void allocMat(cv::Mat& oMat, const std::vector<int>& aSizes, int nType) {
+        oMat.create((int)aSizes.size(),aSizes.data(),nType);
     }
 
     /// helper function to fetch iterator location from sparse and non-sparse matrices (sparse iter overload)
