@@ -712,6 +712,51 @@ namespace lv {
         return oMat.total();
     }
 
+    /// concatenates all given matrices into one matrix horizontally or vertically, resizing each to the first matrix's size if needed
+    template<int nResizeInterpFlag=cv::INTER_CUBIC, typename TMat>
+    inline void concat(const std::vector<TMat>& vMats, TMat& oOutput, bool bHorizontal=true) {
+        lvAssert_(!vMats.empty(),"mat array must not be empty");
+        if(vMats.size()==1) {
+            vMats[0].copyTo(oOutput);
+            return;
+        }
+        for(size_t nMatIdx=1; nMatIdx<vMats.size(); ++nMatIdx) {
+            lvAssert_(vMats[nMatIdx].type()==vMats[0].type(),"all mat types must be identical");
+            lvAssert_(vMats[nMatIdx].dims==2,"function only supports 2d mats");
+        }
+        const int nMats = int(vMats.size());
+        const cv::Size oOrigSize = vMats[0].size();
+        lv::allocMat(oOutput,{bHorizontal?oOrigSize.height:oOrigSize.height*nMats,bHorizontal?oOrigSize.width*nMats:oOrigSize.width},vMats[0].type());
+        vMats[0].copyTo(oOutput(cv::Rect(0,0,oOrigSize.width,oOrigSize.height)));
+        for(int nMatIdx=1; nMatIdx<nMats; ++nMatIdx) {
+            const cv::Rect oOutputRect(bHorizontal?oOrigSize.width*nMatIdx:0,bHorizontal?0:oOrigSize.height*nMatIdx,oOrigSize.width,oOrigSize.height);
+            if(vMats[nMatIdx].size()==oOrigSize)
+                vMats[nMatIdx].copyTo(oOutput(oOutputRect));
+            else
+                cv::resize(vMats[nMatIdx],oOutput(oOutputRect),oOrigSize,0,0,nResizeInterpFlag);
+        }
+    }
+
+    /// concatenates all given matrices into one matrix horizontally or vertically, resizing each to the first matrix's size if needed
+    template<int nResizeInterpFlag=cv::INTER_CUBIC, typename TMat>
+    inline TMat concat(const std::vector<TMat>& vMats, bool bHorizontal=true) {
+        TMat oOutput;
+        lv::concat<nResizeInterpFlag>(vMats,oOutput,bHorizontal);
+        return oOutput;
+    }
+
+    /// concatenates all given matrices into one matrix horizontally or vertically, resizing each to the first matrix's size if needed
+    template<int nResizeInterpFlag=cv::INTER_CUBIC, typename TMat>
+    inline TMat hconcat(const std::vector<TMat>& vMats) {
+        return lv::concat<nResizeInterpFlag>(vMats,true);
+    }
+
+    /// concatenates all given matrices into one matrix horizontally or vertically, resizing each to the first matrix's size if needed
+    template<int nResizeInterpFlag=cv::INTER_CUBIC, typename TMat>
+    inline TMat vconcat(const std::vector<TMat>& vMats) {
+        return lv::concat<nResizeInterpFlag>(vMats,false);
+    }
+
     /// returns pixel coordinates clamped to the given image & border size
     inline void clampImageCoords(int& nSampleCoord_X, int& nSampleCoord_Y, const int nBorderSize, const cv::Size& oImageSize) {
         lvDbgAssert_(nBorderSize>=0,"border size cannot be negative");
