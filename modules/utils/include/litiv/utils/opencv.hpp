@@ -1160,9 +1160,9 @@ namespace lv {
         const std::string m_sDisplayName;
         /// displayed window maximum size (specified on creation)
         const cv::Size m_oMaxDisplaySize;
-        /// general-use file storage tied to the display helper (will be closed & printed on helper destruction)
+        /// general-use file storage tied to the display helper (will be closed & flushed on destruction)
         cv::FileStorage m_oFS;
-        /// public mutex that should be always used if m_oLatestMouseEvent is accessed externally
+        /// public mutex that should be always used if callback data is accessed externally
         std::mutex m_oEventMutex;
         /// raw-interpreted callback data structure
         struct CallbackData {
@@ -1181,6 +1181,8 @@ namespace lv {
         void display(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oOutputImg, size_t nIdx);
         /// will reformat the given images, print their names and mouse cursor point on them, and show them based on row-col ordering
         void display(const std::vector<std::vector<std::pair<cv::Mat,std::string>>>& vvImageNamePairs, const cv::Size& oSuggestedTileSize);
+        /// will reformat the given images, print their names and mouse cursor point on them, show them as a scrollable album via arrow keys, and loop-block
+        void displayAlbumAndWaitKey(const std::vector<std::pair<cv::Mat,std::string>>& vImageNamePairs, int nDefaultSleepDelay=1);
         /// sets the provided external function to be called when mouse events are captured for the displayed window
         void setMouseCallback(std::function<void(const CallbackData&)> lCallback);
         /// sets whether the waitKey call should block and wait for a key press or allow timeouts and return without one

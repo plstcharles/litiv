@@ -131,6 +131,70 @@ void lv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
     m_oLastTileSize = oNewTileSize;
 }
 
+void lv::DisplayHelper::displayAlbumAndWaitKey(const std::vector<std::pair<cv::Mat,std::string>>& vImageNamePairs, int nDefaultSleepDelay) {
+    lvAssert_(!vImageNamePairs.empty(),"must provide at least one image to display");
+    for(size_t nImgIdx=0; nImgIdx<vImageNamePairs.size(); ++nImgIdx) {
+        const cv::Mat& oImage = vImageNamePairs[nImgIdx].first;
+        lvAssert_(!oImage.empty(),"all images must be non-null");
+        lvAssert_(oImage.channels()==1 || oImage.channels()==3 || oImage.channels()==4,"all images must be 1/3/4 channels");
+        lvAssert_(oImage.depth()==CV_8U || oImage.depth()==CV_16U || oImage.depth()==CV_32S || oImage.depth()==CV_32F,"all images must be 8u/16u/32s/32f depth");
+    }
+    cv::Size oCurrDisplaySize(vImageNamePairs[0].first.cols,vImageNamePairs[0].first.rows);
+    if(m_oMaxDisplaySize.area()>0 && (oCurrDisplaySize.width>m_oMaxDisplaySize.width || oCurrDisplaySize.height>m_oMaxDisplaySize.height)) {
+        if(oCurrDisplaySize.width>m_oMaxDisplaySize.width && oCurrDisplaySize.width>oCurrDisplaySize.height)
+            oCurrDisplaySize = cv::Size(m_oMaxDisplaySize.width,int(m_oMaxDisplaySize.width*float(oCurrDisplaySize.height)/oCurrDisplaySize.width));
+        else
+            oCurrDisplaySize = cv::Size(int(m_oMaxDisplaySize.height*(float(oCurrDisplaySize.width)/oCurrDisplaySize.height)),m_oMaxDisplaySize.height);
+    }
+    m_bFirstDisplay = true;
+    const auto lDisplay = [&](size_t nAlbumIdx) {
+        lvDbgAssert(nAlbumIdx<vImageNamePairs.size());
+        const cv::Mat& oImage = vImageNamePairs[nAlbumIdx].first;
+        cv::Mat oImageBYTE3;
+        if(oImage.depth()==CV_16U) // expected input range = [0..USHRT_MAX]
+            oImage.convertTo(oImageBYTE3,CV_8U,double(UCHAR_MAX)/(USHRT_MAX));
+        else if(oImage.depth()==CV_32S) // expected input range = [INT_MIN..INT_MAX]
+            oImage.convertTo(oImageBYTE3,CV_8U,double(UCHAR_MAX)/(INT_MAX),double(UCHAR_MAX/2));
+        else if(oImage.depth()==CV_32F) // expected input range = [0,1]
+            oImage.convertTo(oImageBYTE3,CV_8U,double(UCHAR_MAX));
+        else
+            oImageBYTE3 = oImage.clone();
+        if(oImageBYTE3.channels()==1)
+            cv::cvtColor(oImageBYTE3,oImageBYTE3,cv::COLOR_GRAY2BGR);
+        else if(oImageBYTE3.channels()==4)
+            cv::cvtColor(oImageBYTE3,oImageBYTE3,cv::COLOR_BGRA2BGR);
+        if(oImageBYTE3.size()!=oCurrDisplaySize)
+            cv::resize(oImageBYTE3,oImageBYTE3,oCurrDisplaySize);
+        putText(oImageBYTE3,vImageNamePairs[nAlbumIdx].second+" ["+std::to_string(nAlbumIdx+1)+"/"+std::to_string(vImageNamePairs.size())+"]",cv::Scalar_<uchar>(0,0,255));
+        const cv::Point2i& oDisplayPt = m_oLatestMouseEvent.oInternalPosition;
+        if(oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oCurrDisplaySize.width && oDisplayPt.y<oCurrDisplaySize.height && m_oLatestMouseEvent.oTileSize==oCurrDisplaySize)
+            cv::circle(oImageBYTE3,oDisplayPt,5,cv::Scalar(255,255,255));
+        m_oLastDisplay = oImageBYTE3;
+        if(m_bFirstDisplay) {
+            putText(m_oLastDisplay,"[Press escape to exit album]",cv::Scalar_<uchar>(0,0,255),true,cv::Point2i(m_oLastDisplay.cols/2-115,15),1,1.0);
+            m_bFirstDisplay = false;
+        }
+        cv::imshow(m_sDisplayName,m_oLastDisplay);
+    };
+    size_t nCurrAlbumIdx = 0;
+    lDisplay(nCurrAlbumIdx);
+    m_oLastTileSize = m_oLastDisplaySize = m_oLastDisplay.size();
+    int nKeyPressed;
+    do {
+        nKeyPressed = cv::waitKey(nDefaultSleepDelay);
+        size_t nNewAlbumIdx = nCurrAlbumIdx;
+        if((nKeyPressed&255)=='d' || nKeyPressed==2490368 || nKeyPressed==1113939 || (nKeyPressed&255)==28) // right arrow, or 'd'
+            nNewAlbumIdx = (nCurrAlbumIdx+1)%vImageNamePairs.size();
+        else if((nKeyPressed&255)=='a' || nKeyPressed==2424832 || nKeyPressed==1113937 || (nKeyPressed&255)==31) // left arrow, or 'a'
+            nNewAlbumIdx = (nCurrAlbumIdx>0)?(nCurrAlbumIdx-1):(vImageNamePairs.size()-1);
+        if(nNewAlbumIdx!=nCurrAlbumIdx) {
+            lv::mutex_lock_guard oLock(m_oEventMutex);
+            lDisplay(nCurrAlbumIdx=nNewAlbumIdx);
+        }
+    }
+    while(nKeyPressed!=27);
+}
+
 void lv::DisplayHelper::setMouseCallback(std::function<void(const CallbackData&)> lCallback) {
     lv::mutex_lock_guard oLock(m_oEventMutex);
     m_lExternalCallback = lCallback;
