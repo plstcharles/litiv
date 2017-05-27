@@ -23,7 +23,7 @@
 ////////////////////////////////
 #define WRITE_IMG_OUTPUT        0
 #define EVALUATE_OUTPUT         0
-#define DISPLAY_OUTPUT          0
+#define DISPLAY_OUTPUT          1
 #define GLOBAL_VERBOSITY        2
 ////////////////////////////////
 #define DATASET_VAPTRIMOD       1
@@ -127,8 +127,6 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         const size_t nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity();
         lvLog_(2,"\tdisp = [%d,%d]",(int)nMinDisp,(int)nMaxDisp);
         std::shared_ptr<StereoSegmMatcher> pAlgo = std::make_shared<StereoSegmMatcher>(nMinDisp,nMaxDisp);
-        pAlgo->initialize(std::array<cv::Mat,2>{vROIs[0],vROIs[2]});
-        oBatch.setFeaturesDirName(pAlgo->getFeatureExtractorName());
         constexpr size_t nExpectedAlgoInputCount = StereoSegmMatcher::getInputStreamCount();
         constexpr size_t nExpectedAlgoOutputCount = StereoSegmMatcher::getOutputStreamCount();
         static_assert(nExpectedAlgoInputCount==4,"unexpected input stream count for instanced algo");
@@ -150,6 +148,8 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             vvDisplayPairs[nDisplayRowIdx] = vRow;
         }
     #endif //DISPLAY_OUTPUT>0
+        pAlgo->initialize(std::array<cv::Mat,2>{vROIs[0],vROIs[2]});
+        oBatch.setFeaturesDirName(pAlgo->getFeatureExtractorName());
         const size_t nTotPacketCount = oBatch.getFrameCount();
         oBatch.startProcessing();
         while(nCurrIdx<nTotPacketCount) {

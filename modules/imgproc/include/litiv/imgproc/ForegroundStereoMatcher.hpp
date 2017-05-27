@@ -30,23 +30,22 @@
 #define STEREOSEGMATCH_CONFIG_USE_SSQDIFF_AFFINITY  0
 #define STEREOSEGMATCH_CONFIG_USE_SHAPE_EMD_SIM     0
 #define STEREOSEGMATCH_CONFIG_USE_UNARY_ONLY_FIRST  1
-#define STEREOSEGMATCH_CONFIG_USE_SCDESC_BLUR_PPROC 1
-#define STEREOSEGMATCH_CONFIG_USE_DISCRIM_MAP_BLUR  1
+#define STEREOSEGMATCH_CONFIG_USE_SCDESC_BLUR_PPROC 0 // try with gaussian? box is bad @@@
 #define STEREOSEGMATCH_CONFIG_USE_DISCRIM_MAP_BORDR 1
-#define STEREOSEGMATCH_CONFIG_USE_ROOT_SIFT_DESCS   1
-#define STEREOSEGMATCH_CONFIG_USE_SPARSENESS_DISCR  1
+#define STEREOSEGMATCH_CONFIG_USE_ROOT_SIFT_DESCS   0
+#define STEREOSEGMATCH_CONFIG_USE_MULTILEVEL_AFFIN  0
 
 // default param values
 #define STEREOSEGMATCH_DEFAULT_DISPARITY_STEP       (size_t(1))
 #define STEREOSEGMATCH_DEFAULT_MAX_MOVE_ITER        (size_t(1000))
-#define STEREOSEGMATCH_DEFAULT_SCDESC_WIN_RAD       (size_t(50))
-#define STEREOSEGMATCH_DEFAULT_SCDESC_BLUR_RAD      (size_t(7))
-#define STEREOSEGMATCH_DEFAULT_SCDESC_RAD_BINS      (size_t(5))
-#define STEREOSEGMATCH_DEFAULT_SCDESC_ANG_BINS      (size_t(12))
-#define STEREOSEGMATCH_DEFAULT_LSSDESC_RAD          (size_t(40))
+#define STEREOSEGMATCH_DEFAULT_SCDESC_WIN_RAD       (size_t(20))
+#define STEREOSEGMATCH_DEFAULT_SCDESC_BLUR_RAD      (size_t(5))
+#define STEREOSEGMATCH_DEFAULT_SCDESC_RAD_BINS      (size_t(3))
+#define STEREOSEGMATCH_DEFAULT_SCDESC_ANG_BINS      (size_t(10))
+#define STEREOSEGMATCH_DEFAULT_LSSDESC_RAD          (size_t(20))
 #define STEREOSEGMATCH_DEFAULT_LSSDESC_PATCH        (size_t(5))
-#define STEREOSEGMATCH_DEFAULT_LSSDESC_RAD_BINS     (size_t(5))
-#define STEREOSEGMATCH_DEFAULT_LSSDESC_ANG_BINS     (size_t(12))
+#define STEREOSEGMATCH_DEFAULT_LSSDESC_RAD_BINS     (size_t(3))
+#define STEREOSEGMATCH_DEFAULT_LSSDESC_ANG_BINS     (size_t(10))
 #define STEREOSEGMATCH_DEFAULT_SSQDIFF_PATCH        (size_t(7))
 #define STEREOSEGMATCH_DEFAULT_MI_WINDOW_RAD        (size_t(12))
 #define STEREOSEGMATCH_DEFAULT_GRAD_KERNEL_SIZE     (int(1))
@@ -267,6 +266,8 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         std::unique_ptr<StereoModelType> m_pStereoModel;
         /// opengm resegm graph model object
         std::unique_ptr<ResegmModelType> m_pResegmModel;
+        /// contains the eroded ROIs used for valid descriptor lookups
+        std::array<cv::Mat_<uchar>,2> m_aDescROIs;
         /// number of valid nodes in the graph (based on ROI)
         size_t m_nValidGraphNodes;
         /// indices of valid nodes in the graph (based on ROI)
@@ -316,6 +317,8 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         MatArrayOut m_aOutputs;
         /// defines whether the next model update should use precalc feats
         bool m_bUsePrecalcFeatsNext;
+        /// used for debug only; passed from top-level algo when available
+        lv::DisplayHelperPtr m_pDisplayHelper;
         /// defines the indices of feature maps inside precalc packets (per camera head)
         enum FeatPackingList {
             FeatPackSize=18,
