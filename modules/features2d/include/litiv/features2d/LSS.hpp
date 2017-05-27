@@ -22,7 +22,7 @@
 #include <opencv2/features2d.hpp>
 
 #define LSS_DEFAULT_PATCH_SIZE    (5)
-#define LSS_DEFAULT_DESC_RADIUS   (40)
+#define LSS_DEFAULT_DESC_RADIUS   (20)
 #define LSS_DEFAULT_RADIAL_BINS   (3)
 #define LSS_DEFAULT_ANGULAR_BINS  (12)
 #define LSS_DEFAULT_STATNOISE_VAR (300000.f)
