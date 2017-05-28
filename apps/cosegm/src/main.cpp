@@ -21,6 +21,7 @@
 #include "litiv/imgproc/ForegroundStereoMatcher.hpp"
 
 ////////////////////////////////
+#define PROCESS_PREPROC_BGSEGM  1
 #define WRITE_IMG_OUTPUT        0
 #define EVALUATE_OUTPUT         0
 #define DISPLAY_OUTPUT          1
@@ -51,7 +52,7 @@
     true,                                         /* bool bUndistort=true */\
     true,                                         /* bool bHorizRectify=false */\
     false,                                        /* bool bEvalStereoDisp=false */\
-    7,                                            /* int nLoadInputMasks=0 */\
+    PROCESS_PREPROC_BGSEGM?0:7,                   /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_MINI_TESTS
 #include "cosegm_tests.hpp"
@@ -104,7 +105,11 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         DatasetType::WorkBatch& oBatch = dynamic_cast<DatasetType::WorkBatch&>(*pBatch);
         lvAssert(oBatch.getInputPacketType()==lv::ImageArrayPacket && oBatch.getOutputPacketType()==lv::ImageArrayPacket); // app works with stereo heads (2 images at once)
         lvAssert(oBatch.getIOMappingType()==lv::IndexMapping && oBatch.getGTMappingType()==lv::ElemMapping); // segmentation = 1:1 mapping between inputs and gtmasks
+#if PROCESS_PREPROC_BGSEGM
+        lvAssert(oBatch.getInputStreamCount()==2); // expect only one input image per camera
+#else //!PROCESS_PREPROC_BGSEGM
         lvAssert(oBatch.getInputStreamCount()==4); // expect approx fg masks to be interlaced with input images
+#endif //!PROCESS_PREPROC_BGSEGM
         lvAssert(oBatch.getOutputStreamCount()==2); // we always only eval one output type at a time (fg masks or disparity)
         if(DATASET_PRECACHING)
             oBatch.startPrecaching(!bool(EVALUATE_OUTPUT));
@@ -124,6 +129,16 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         //cv::waitKey(0);
         const std::vector<lv::MatInfo> oInfoArray = oBatch.getInputInfoArray();
         const lv::MatSize oFrameSize = oInfoArray[0].size;
+#if PROCESS_PREPROC_BGSEGM
+        std::vector<std::shared_ptr<IBackgroundSubtractor>> vAlgos = {std::make_shared<BackgroundSubtractorSuBSENSE>(),std::make_shared<BackgroundSubtractorSuBSENSE>()};
+        const double dDefaultLearningRate = vAlgos[0]->getDefaultLearningRate();
+        for(size_t nCamIdx=0; nCamIdx<2; ++nCamIdx)
+            vAlgos[nCamIdx]->initialize(vInitInput[nCamIdx],vROIs[nCamIdx]);
+        std::vector<cv::Mat> vCurrFGMasks(2);
+#if DISPLAY_OUTPUT>0
+        lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
+#endif //DISPLAY_OUTPUT>0
+#else //!PROCESS_PREPROC_BGSEGM
         const size_t nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity();
         lvLog_(2,"\tdisp = [%d,%d]",(int)nMinDisp,(int)nMaxDisp);
         std::shared_ptr<StereoSegmMatcher> pAlgo = std::make_shared<StereoSegmMatcher>(nMinDisp,nMaxDisp);
@@ -150,6 +165,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
     #endif //DISPLAY_OUTPUT>0
         pAlgo->initialize(std::array<cv::Mat,2>{vROIs[0],vROIs[2]});
         oBatch.setFeaturesDirName(pAlgo->getFeatureExtractorName());
+#endif //!PROCESS_PREPROC_BGSEGM
         const size_t nTotPacketCount = oBatch.getFrameCount();
         oBatch.startProcessing();
         while(nCurrIdx<nTotPacketCount) {
@@ -160,6 +176,41 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             lvDbgAssert(vCurrInput.size()==nExpectedAlgoInputCount);
             for(size_t nStreamIdx=0; nStreamIdx<vCurrInput.size(); ++nStreamIdx)
                 lvDbgAssert(oFrameSize==vCurrInput[nStreamIdx].size());
+        #if PROCESS_PREPROC_BGSEGM
+            const double dCurrLearningRate = nCurrIdx<=100?1:dDefaultLearningRate;
+        #if USING_OPENMP
+            #pragma omp parallel sections
+        #endif //USING_OPENMP
+            {
+            #if USING_OPENMP
+                #pragma omp section
+            #endif //USING_OPENMP
+                {vAlgos[0]->apply(vCurrInput[0],vCurrFGMasks[0],dCurrLearningRate);}
+            #if USING_OPENMP
+                #pragma omp section
+            #endif //USING_OPENMP
+                {vAlgos[1]->apply(vCurrInput[1],vCurrFGMasks[1],dCurrLearningRate);}
+            }
+#if DISPLAY_OUTPUT>0
+            std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs(2);
+            for(size_t nCamIdx=0; nCamIdx<2; ++nCamIdx) {
+                vvDisplayPairs[nCamIdx].resize(3);
+                vvDisplayPairs[nCamIdx][0].first = vCurrInput[nCamIdx];
+                vvDisplayPairs[nCamIdx][0].second = std::to_string(nCurrIdx);
+                vAlgos[nCamIdx]->getBackgroundImage(vvDisplayPairs[nCamIdx][1].first);
+                vCurrFGMasks[nCamIdx].copyTo(vvDisplayPairs[nCamIdx][2].first);
+                if(!vROIs[nCamIdx].empty()) {
+                    cv::bitwise_or(vvDisplayPairs[nCamIdx][1].first,UCHAR_MAX/2,vvDisplayPairs[nCamIdx][1].first,vROIs[nCamIdx]==0);
+                    cv::bitwise_or(vvDisplayPairs[nCamIdx][2].first,UCHAR_MAX/2,vvDisplayPairs[nCamIdx][2].first,vROIs[nCamIdx]==0);
+                }
+            }
+            pDisplayHelper->display(vvDisplayPairs,oFrameSize);
+            const int nKeyPressed = pDisplayHelper->waitKey();
+            if(nKeyPressed==(int)'q')
+                break;
+#endif //DISPLAY_OUTPUT>0
+            oBatch.push(vCurrFGMasks,nCurrIdx++);
+        #else //!PROCESS_PREPROC_BGSEGM
         #if DATASET_USE_PRECALC_FEATURES
             const cv::Mat& oNextFeatsPacket = oBatch.loadFeatures(nCurrIdx);
             lvAssert__(!oNextFeatsPacket.empty(),"could not load precalc feature packet for idx=%d",(int)nCurrIdx);
@@ -235,6 +286,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 oBatch.push(vCurrStereoMaps,nCurrIdx++);
             else
                 oBatch.push(vCurrFGMasks,nCurrIdx++);
+        #endif //!PROCESS_PREPROC_BGSEGM
         }
         oBatch.stopProcessing();
         const double dTimeElapsed = oBatch.getFinalProcessTime();
