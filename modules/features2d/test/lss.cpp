@@ -31,12 +31,12 @@ TEST(lss,regression_default_params) {
 TEST(lss,regression_single_compute) {
     std::unique_ptr<LSS> pLSS = std::make_unique<LSS>(
         LSS_DEFAULT_PATCH_SIZE,
-        LSS_DEFAULT_DESC_RADIUS,
+        /*LSS_DEFAULT_DESC_RADIUS*/40,
         LSS_DEFAULT_RADIAL_BINS,
         LSS_DEFAULT_ANGULAR_BINS,
         LSS_DEFAULT_STATNOISE_VAR,
         /*LSS_DEFAULT_NORM_BINS*/false,
-        LSS_DEFAULT_PREPROCESS
+        /*LSS_DEFAULT_PREPROCESS*/false
     );
     const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
     const cv::Point2i oTargetPt(364,135);
@@ -75,12 +75,12 @@ TEST(lss,regression_single_compute) {
 TEST(lss,regression_single_normalized_compute) {
     std::unique_ptr<LSS> pLSS = std::make_unique<LSS>(
         LSS_DEFAULT_PATCH_SIZE,
-        LSS_DEFAULT_DESC_RADIUS,
+        /*LSS_DEFAULT_DESC_RADIUS*/40,
         LSS_DEFAULT_RADIAL_BINS,
         LSS_DEFAULT_ANGULAR_BINS,
         LSS_DEFAULT_STATNOISE_VAR,
         LSS_DEFAULT_NORM_BINS,
-        LSS_DEFAULT_PREPROCESS
+        /*LSS_DEFAULT_PREPROCESS*/false
     );
     const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
     const cv::Point2i oTargetPt(364,135);
