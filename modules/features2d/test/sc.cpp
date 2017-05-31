@@ -181,3 +181,24 @@ TEST(sc,regression_emd_check) {
             ASSERT_GT(pShapeContext->calcDistance(aDesc1,aDesc2),0.0);
     }
 }
+
+namespace {
+
+    void sc_abs_perftest(benchmark::State& state) {
+        std::unique_ptr<ShapeContext> pShapeContext = std::make_unique<ShapeContext>(size_t(state.range(0)),size_t(state.range(1)));
+        cv::Mat oInput(257,257,CV_8UC1);
+        oInput = 0;
+        cv::circle(oInput,cv::Point(128,128),7,cv::Scalar_<uchar>(255),-1);
+        cv::rectangle(oInput,cv::Point(180,180),cv::Point(190,190),cv::Scalar_<uchar>(255),-1);
+        oInput = oInput>0;
+        cv::Mat_<float> oOutputDescMap;
+        while (state.KeepRunning()) {
+            pShapeContext->compute2(oInput,oOutputDescMap);
+            lvDbgAssert(oInput.size[0]==oOutputDescMap.size[0]);
+            lvDbgAssert(oInput.size[1]==oOutputDescMap.size[1]);
+            benchmark::DoNotOptimize(oOutputDescMap);
+        }
+    }
+}
+
+BENCHMARK(sc_abs_perftest)->Args({2,20})->Args({2,30})->Args({2,40})->Args({5,40})->Args({5,80});
