@@ -18,10 +18,9 @@
 #include "litiv/datasets.hpp"
 #include "litiv/imgproc.hpp"
 #include "litiv/video.hpp"
-#include "litiv/imgproc/ForegroundStereoMatcher.hpp"
 
 ////////////////////////////////
-#define PROCESS_PREPROC_BGSEGM  1
+#define PROCESS_PREPROC_BGSEGM  0
 #define WRITE_IMG_OUTPUT        0
 #define EVALUATE_OUTPUT         0
 #define DISPLAY_OUTPUT          1
@@ -66,6 +65,11 @@
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 //#elif DATASET_...
 #endif //DATASET_...
+#if PROCESS_PREPROC_BGSEGM
+#define BGSEGM_ALGO_TYPE BackgroundSubtractorPAWCS
+#else //!PROCESS_PREPROC_BGSEGM
+#include "litiv/imgproc/ForegroundStereoMatcher.hpp"
+#endif //!PROCESS_PREPROC_BGSEGM
 
 void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch);
 using DatasetType = lv::Dataset_<lv::DatasetTask_Cosegm,lv::DATASET_ID,lv::NonParallel>;
@@ -118,6 +122,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         const std::vector<cv::Mat>& vROIs = oBatch.getFrameROIArray();
         lvAssert(!vROIs.empty() && vROIs.size()==oBatch.getInputStreamCount());
         size_t nCurrIdx = 25;
+        //size_t nCurrIdx = 0;
         const std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // note: mat content becomes invalid on next getInput call
         lvAssert(vInitInput.size()==oBatch.getInputStreamCount());
         for(size_t nStreamIdx=0; nStreamIdx<vInitInput.size(); ++nStreamIdx) {
@@ -130,7 +135,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         const std::vector<lv::MatInfo> oInfoArray = oBatch.getInputInfoArray();
         const lv::MatSize oFrameSize = oInfoArray[0].size;
 #if PROCESS_PREPROC_BGSEGM
-        std::vector<std::shared_ptr<IBackgroundSubtractor>> vAlgos = {std::make_shared<BackgroundSubtractorSuBSENSE>(),std::make_shared<BackgroundSubtractorSuBSENSE>()};
+        std::vector<std::shared_ptr<IBackgroundSubtractor>> vAlgos = {std::make_shared<BGSEGM_ALGO_TYPE>(),std::make_shared<BGSEGM_ALGO_TYPE>()};
         const double dDefaultLearningRate = vAlgos[0]->getDefaultLearningRate();
         for(size_t nCamIdx=0; nCamIdx<2; ++nCamIdx)
             vAlgos[nCamIdx]->initialize(vInitInput[nCamIdx],vROIs[nCamIdx]);
@@ -138,6 +143,11 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
 #if DISPLAY_OUTPUT>0
         lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
 #endif //DISPLAY_OUTPUT>0
+#if PROCESS_PREPROC_BGSEGM>1
+        const size_t nMaxInitLoops = 50, nMaxInitLoopIdx = 6;
+        size_t nCurrInitLoop = 0;
+        bool bIncreasingIdxs = true;
+#endif //PROCESS_PREPROC_BGSEGM>1
 #else //!PROCESS_PREPROC_BGSEGM
         const size_t nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity();
         lvLog_(2,"\tdisp = [%d,%d]",(int)nMinDisp,(int)nMaxDisp);
@@ -174,8 +184,17 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             const std::vector<cv::Mat>& vCurrInput = oBatch.getInputArray(nCurrIdx);
             lvDbgAssert(vCurrInput.size()==oBatch.getInputStreamCount());
             lvDbgAssert(vCurrInput.size()==nExpectedAlgoInputCount);
-            for(size_t nStreamIdx=0; nStreamIdx<vCurrInput.size(); ++nStreamIdx)
+            for(size_t nStreamIdx=0; nStreamIdx<vCurrInput.size(); ++nStreamIdx) {
                 lvDbgAssert(oFrameSize==vCurrInput[nStreamIdx].size());
+            #if PROCESS_PREPROC_BGSEGM>2
+                if(nCurrInitLoop<nMaxInitLoops) {
+                    const float fStdDev = 0.01;
+                    cv::Mat oGaussianNoise(vCurrInput[nStreamIdx].size(),CV_32FC(vCurrInput[nStreamIdx].channels())),oGaussianNoise_BYTE;
+                    cv::randn(oGaussianNoise,cv::Scalar(0,0,0),cv::Scalar(fStdDev,fStdDev,fStdDev));
+                    cv::add(vCurrInput[nStreamIdx].clone(),oGaussianNoise*255,vCurrInput[nStreamIdx],cv::noArray(),CV_8UC(vCurrInput[nStreamIdx].channels()));
+                }
+            #endif //PROCESS_PREPROC_BGSEGM>2
+            }
         #if PROCESS_PREPROC_BGSEGM
             const double dCurrLearningRate = nCurrIdx<=100?1:dDefaultLearningRate;
         #if USING_OPENMP
@@ -191,7 +210,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             #endif //USING_OPENMP
                 {vAlgos[1]->apply(vCurrInput[1],vCurrFGMasks[1],dCurrLearningRate);}
             }
-#if DISPLAY_OUTPUT>0
+        #if DISPLAY_OUTPUT>0
             std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs(2);
             for(size_t nCamIdx=0; nCamIdx<2; ++nCamIdx) {
                 vvDisplayPairs[nCamIdx].resize(3);
@@ -208,8 +227,27 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             const int nKeyPressed = pDisplayHelper->waitKey();
             if(nKeyPressed==(int)'q')
                 break;
-#endif //DISPLAY_OUTPUT>0
-            oBatch.push(vCurrFGMasks,nCurrIdx++);
+        #endif //DISPLAY_OUTPUT>0
+            oBatch.push(vCurrFGMasks,nCurrIdx);
+        #if PROCESS_PREPROC_BGSEGM>1
+            if(nCurrInitLoop<nMaxInitLoops) {
+                const size_t nMaxPretrainFrames = nMaxInitLoops*(nMaxInitLoopIdx+1)*2;
+                const size_t nCurrPretrainFrame = nCurrInitLoop*(nMaxInitLoopIdx+1)*2 + ((bIncreasingIdxs)?(nCurrIdx+1):(2*(nMaxInitLoopIdx+1)-nCurrIdx));
+                std::cout << "\t\t\t   pretrain @ " <<  nCurrPretrainFrame << "/" << nMaxPretrainFrames << "   [" << sWorkerName << "]" << std::endl;
+                if(nCurrIdx==nMaxInitLoopIdx && bIncreasingIdxs)
+                    bIncreasingIdxs = false;
+                else if(bIncreasingIdxs)
+                    ++nCurrIdx;
+                else if(nCurrIdx==0)
+                    bIncreasingIdxs = bool(++nCurrInitLoop);
+                else
+                    --nCurrIdx;
+            }
+            else
+                ++nCurrIdx;
+        #else //!(PROCESS_PREPROC_BGSEGM>1)
+            ++nCurrIdx;
+        #endif //!(PROCESS_PREPROC_BGSEGM>1)
         #else //!PROCESS_PREPROC_BGSEGM
         #if DATASET_USE_PRECALC_FEATURES
             const cv::Mat& oNextFeatsPacket = oBatch.loadFeatures(nCurrIdx);
