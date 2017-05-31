@@ -3,19 +3,6 @@
 #include "litiv/utils/opencv.hpp"
 #include "litiv/test.hpp"
 
-TEST(sc,regression_constr) {
-    EXPECT_THROW_LV_QUIET(std::make_unique<ShapeContext>(0.0,1.0));
-    EXPECT_THROW_LV_QUIET(std::make_unique<ShapeContext>(0.1,0.0));
-    EXPECT_THROW_LV_QUIET(std::make_unique<ShapeContext>(0.1,0.1));
-    EXPECT_THROW_LV_QUIET(std::make_unique<ShapeContext>(0.1,1.0,0));
-    EXPECT_THROW_LV_QUIET(std::make_unique<ShapeContext>(0.1,1.0,2,0));
-    EXPECT_THROW_LV_QUIET(std::make_unique<ShapeContext>(size_t(0),size_t(2)));
-    EXPECT_THROW_LV_QUIET(std::make_unique<ShapeContext>(size_t(2),size_t(0)));
-    EXPECT_THROW_LV_QUIET(std::make_unique<ShapeContext>(size_t(2),size_t(2)));
-    EXPECT_THROW_LV_QUIET(std::make_unique<ShapeContext>(size_t(2),size_t(3),0));
-    EXPECT_THROW_LV_QUIET(std::make_unique<ShapeContext>(size_t(2),size_t(3),2,0));
-}
-
 TEST(sc,regression_default_params) {
     std::unique_ptr<ShapeContext> pShapeContext = std::make_unique<ShapeContext>(size_t(2),size_t(5));
     EXPECT_GE(pShapeContext->windowSize().width,0);
@@ -81,8 +68,11 @@ TEST(sc,regression_full_compute_abs) {
         ASSERT_EQ(oOutputDescs.total(),oRefDescs.total());
         ASSERT_EQ(oOutputDescs.size,oRefDescs.size);
         for(int i=0; i<(int)vTargetPts.size(); ++i) {
+            //lvPrint(vTargetPts[i].pt);
             float* aDesc1 = oOutputDescs.ptr<float>(i);
+            //lvPrint(cv::Mat_<float>(5,12,aDesc1));
             float* aDesc2 = oRefDescs.ptr<float>(i);
+            //lvPrint(cv::Mat_<float>(5,12,aDesc2));
             for(int j=0; j<nDescSize; ++j)
                 ASSERT_FLOAT_EQ(aDesc1[j],aDesc2[j]) << "i=" << i << ", j=" << j;
         }

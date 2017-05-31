@@ -19,11 +19,12 @@
 
 #include "litiv/features2d.hpp"
 
-ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAngularBins, size_t nRadialBins,
-                           size_t nBlurRadius, bool bRotationInvariant, bool bNormalizeBins) :
+#define USE_LIENHART_LOOKUP_MASK 1
+
+ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAngularBins,
+                           size_t nRadialBins, bool bRotationInvariant, bool bNormalizeBins) :
         m_nAngularBins((int)nAngularBins),
         m_nRadialBins((int)nRadialBins),
-        m_nBlurRadius((int)nBlurRadius),
         m_nDescSize(m_nRadialBins*m_nAngularBins),
         m_nInnerRadius((int)nInnerRadius),
         m_nOuterRadius((int)nOuterRadius),
@@ -34,7 +35,6 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
         m_bNormalizeBins(bNormalizeBins) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
-    lvAssert_(m_nBlurRadius>=0 && (m_nBlurRadius==0 || (m_nBlurRadius%2)==1),"invalid parameter");
     lvAssert_(m_nInnerRadius>0,"invalid parameter");
     lvAssert_(m_nOuterRadius>0 && m_nInnerRadius<m_nOuterRadius,"invalid parameter");
     scdesc_generate_angmask();
@@ -47,14 +47,18 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
         m_oDilateKernel.create(nKernelDiameter,nKernelDiameter);
         cv::circle(m_oDilateKernel,cv::Point(int(nOuterRadius),int(nOuterRadius)),int(nOuterRadius),cv::Scalar_<uchar>(255),-1);
         m_oDilateKernel = m_oDilateKernel>0;
+#if USE_LIENHART_LOOKUP_MASK
+        const int nMaskSize = m_nOuterRadius*2+1;
+        lv::getLogPolarMask(nMaskSize,m_nRadialBins,m_nAngularBins,m_oAbsDescLUMap,true,(float)m_nInnerRadius);
+        lvDbgAssert(m_oAbsDescLUMap.cols==nMaskSize && m_oAbsDescLUMap.rows==nMaskSize);
+#endif //USE_LIENHART_LOOKUP_MASK
     }
 }
 
-ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRadius, size_t nAngularBins, size_t nRadialBins,
-                           size_t nBlurRadius, bool bRotationInvariant, bool bNormalizeBins) :
+ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRadius, size_t nAngularBins,
+                           size_t nRadialBins, bool bRotationInvariant, bool bNormalizeBins) :
         m_nAngularBins((int)nAngularBins),
         m_nRadialBins((int)nRadialBins),
-        m_nBlurRadius((int)nBlurRadius),
         m_nDescSize(m_nRadialBins*m_nAngularBins),
         m_nInnerRadius(0),
         m_nOuterRadius(0),
@@ -65,7 +69,6 @@ ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRad
         m_bNormalizeBins(bNormalizeBins) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
-    lvAssert_(m_nBlurRadius>=0 && (m_nBlurRadius==0 || (m_nBlurRadius%2)==1),"invalid parameter");
     lvAssert_(m_dInnerRadius>0.0,"invalid parameter");
     lvAssert_(m_dOuterRadius>0.0 && m_dInnerRadius<m_dOuterRadius,"invalid parameter");
     scdesc_generate_angmask();
@@ -388,25 +391,6 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
         if(m_bNormalizeBins && nValidPts>1)
             cv::Mat_<float>(1,m_nDescSize,aDesc) *= 1.0f/nValidPts;
     }
-    if(m_nBlurRadius) {
-        lvAssert_(bGenDescMap,"post-proc blur only available when using descriptor maps, and not keypoint lists");
-        //const cv::Mat oBlurKernel = cv::getGaussianKernel(m_nBlurRadius,-1,CV_32F);
-        cv::Mat_<float> oDescMapSliceCopy;
-        for(int nDescIdx=0; nDescIdx<m_nDescSize; ++nDescIdx) {
-            cv::Mat_<float> oDescMapSlice = lv::getSubMat(oDescriptors,2,nDescIdx);
-            lv::squeeze(oDescMapSlice,oDescMapSliceCopy);
-            //cv::sepFilter2D(oDescMapSliceCopy,oDescMapSliceCopy,-1,oBlurKernel,oBlurKernel);
-            cv::blur(oDescMapSliceCopy,oDescMapSliceCopy,cv::Size(m_nBlurRadius,m_nBlurRadius));
-            lvDbgAssert(oDescMapSliceCopy.isContinuous());
-            lvDbgAssert(oDescMapSliceCopy.total()==size_t(m_oCurrImageSize.area()));
-            lvDbgAssert(oDescMapSlice.size[0]*oDescMapSlice.size[1]==m_oCurrImageSize.area());
-            lvDbgAssert(oDescMapSlice.step[0]==size_t(m_oCurrImageSize.width*m_nDescSize*4));
-            lvDbgAssert(oDescMapSlice.step[1]==size_t(m_nDescSize*4));
-            float* pDescMapSliceData = (float*)oDescMapSlice.data;
-            for(int nMapIdx=0; nMapIdx<m_oCurrImageSize.area(); ++nMapIdx)
-                pDescMapSliceData[nMapIdx*m_nDescSize] = ((float*)oDescMapSliceCopy.data)[nMapIdx];
-        }
-    }
 }
 
 void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool bGenDescMap) {
@@ -427,7 +411,9 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
     lvDbgAssert(m_vContourInliers.empty() || m_oKeyPts.total()==m_vContourInliers.size());
     lvDbgAssert(m_oKeyPts.total()>size_t(0));
     lvDbgAssert(m_oDistMask.size()==m_oCurrImageSize);
-    cv::Matx12f vPtDiff;
+#if USE_LIENHART_LOOKUP_MASK
+    lvDbgAssert(!m_oAbsDescLUMap.empty() && m_oAbsDescLUMap.rows==m_nOuterRadius*2+1 && m_oAbsDescLUMap.rows==m_oAbsDescLUMap.cols);
+#endif //USE_LIENHART_LOOKUP_MASK
     for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx) {
         if(!m_vKeyInliers.empty() && !m_vKeyInliers[nKeyPtIdx])
             continue;
@@ -441,6 +427,17 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
                 if(!m_vContourInliers.empty() && !m_vContourInliers[nContourPtIdx])
                     continue;
                 const cv::Point2f& vContourPt = ((cv::Point2f*)m_oContourPts.data)[nContourPtIdx];
+#if USE_LIENHART_LOOKUP_MASK
+                const int nLookupRow = (int)std::round(vContourPt.y-vKeyPt.y)+m_nOuterRadius;
+                const int nLookupCol = (int)std::round(vContourPt.x-vKeyPt.x)+m_nOuterRadius;
+                if(nLookupRow<0 || nLookupRow>=m_oAbsDescLUMap.rows || nLookupCol<0 || nLookupCol>=m_oAbsDescLUMap.cols)
+                    continue;
+                const int nDescIdx = m_oAbsDescLUMap(nLookupRow,nLookupCol);
+                if(nDescIdx==-1)
+                    continue;
+                ++(aDesc[nDescIdx]);
+#else //!USE_LIENHART_LOOKUP_MASK
+                cv::Matx12f vPtDiff;
                 vPtDiff(0) = vKeyPt.y-vContourPt.y;
                 vPtDiff(1) = vKeyPt.x-vContourPt.x;
                 const double dCurrDist = cv::norm(vPtDiff,cv::NORM_L2);
@@ -466,29 +463,11 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
                 if(nAngularBinMatch<0)
                     continue;
                 ++(aDesc[nAngularBinMatch+nRadialBinMatch*m_nAngularBins]);
+#endif //!USE_LIENHART_LOOKUP_MASK
                 ++nValidPts;
             }
         }
         if(m_bNormalizeBins && nValidPts>1)
             cv::Mat_<float>(1,m_nDescSize,aDesc) *= 1.0f/nValidPts;
-    }
-    if(m_nBlurRadius) {
-        lvAssert_(bGenDescMap,"post-proc blur only available when using descriptor maps, and not keypoint lists");
-        //const cv::Mat oBlurKernel = cv::getGaussianKernel(m_nBlurRadius,-1,CV_32F);
-        cv::Mat_<float> oDescMapSliceCopy;
-        for(int nDescIdx=0; nDescIdx<m_nDescSize; ++nDescIdx) {
-            cv::Mat_<float> oDescMapSlice = lv::getSubMat(oDescriptors,2,nDescIdx);
-            lv::squeeze(oDescMapSlice,oDescMapSliceCopy);
-            //cv::sepFilter2D(oDescMapSliceCopy,oDescMapSliceCopy,-1,oBlurKernel,oBlurKernel);
-            cv::blur(oDescMapSliceCopy,oDescMapSliceCopy,cv::Size(m_nBlurRadius,m_nBlurRadius));
-            lvDbgAssert(oDescMapSliceCopy.isContinuous());
-            lvDbgAssert(oDescMapSliceCopy.total()==size_t(m_oCurrImageSize.area()));
-            lvDbgAssert(oDescMapSlice.size[0]*oDescMapSlice.size[1]==m_oCurrImageSize.area());
-            lvDbgAssert(oDescMapSlice.step[0]==size_t(m_oCurrImageSize.width*m_nDescSize*4));
-            lvDbgAssert(oDescMapSlice.step[1]==size_t(m_nDescSize*4));
-            float* pDescMapSliceData = (float*)oDescMapSlice.data;
-            for(int nMapIdx=0; nMapIdx<m_oCurrImageSize.area(); ++nMapIdx)
-                pDescMapSliceData[nMapIdx*m_nDescSize] = ((float*)oDescMapSliceCopy.data)[nMapIdx];
-        }
     }
 }

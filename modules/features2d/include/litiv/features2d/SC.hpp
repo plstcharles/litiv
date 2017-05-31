@@ -23,7 +23,6 @@
 
 #define SHAPECONTEXT_DEFAULT_ANG_BINS  (12)
 #define SHAPECONTEXT_DEFAULT_RAD_BINS  (5)
-#define SHAPECONTEXT_DEFAULT_BLUR_RAD  (0)
 #define SHAPECONTEXT_DEFAULT_INNER_RAD (0.1)
 #define SHAPECONTEXT_DEFAULT_OUTER_RAD (1.0)
 #define sHAPECONTEXT_DEFAULT_ROT_INVAR (false)
@@ -45,7 +44,6 @@ public:
                           size_t nOuterRadius,
                           size_t nAngularBins=SHAPECONTEXT_DEFAULT_ANG_BINS,
                           size_t nRadialBins=SHAPECONTEXT_DEFAULT_RAD_BINS,
-                          size_t nBlurRadius=SHAPECONTEXT_DEFAULT_BLUR_RAD,
                           bool bRotationInvariant=sHAPECONTEXT_DEFAULT_ROT_INVAR,
                           bool bNormalizeBins=SHAPECONTEXT_DEFAULT_NORM_BINS);
     /// constructor for mean-normalized description space (i.e. using relative radii values)
@@ -53,7 +51,6 @@ public:
                           double dRelativeOuterRadius/*=SHAPECONTEXT_DEFAULT_OUTER_RAD*/,
                           size_t nAngularBins=SHAPECONTEXT_DEFAULT_ANG_BINS,
                           size_t nRadialBins=SHAPECONTEXT_DEFAULT_RAD_BINS,
-                          size_t nBlurRadius=SHAPECONTEXT_DEFAULT_BLUR_RAD,
                           bool bRotationInvariant=sHAPECONTEXT_DEFAULT_ROT_INVAR,
                           bool bNormalizeBins=SHAPECONTEXT_DEFAULT_NORM_BINS);
     /// loads extractor params from the specified file node @@@@ not impl
@@ -129,8 +126,6 @@ protected:
     const int m_nAngularBins;
     /// number of radial bins to use
     const int m_nRadialBins;
-    /// radius of the blur filter to use in post-processing (0 means no blur)
-    const int m_nBlurRadius;
     /// total bin size of each descriptor
     const int m_nDescSize;
     /// absolute inner radius of the descriptor (in 'image' space)
@@ -169,6 +164,7 @@ private:
     std::vector<double> m_vAngularLimits,m_vRadialLimits;
     cv::Mat_<double> m_oDistMap,m_oAngMap;
     cv::Mat_<float> m_oEMDCostMap;
+    cv::Mat_<int> m_oAbsDescLUMap;
     cv::Mat_<cv::Point2f> m_oKeyPts,m_oContourPts;
     std::vector<int> m_vKeyInliers,m_vContourInliers;
     cv::Mat_<uchar> m_oBinMask,m_oDistMask,m_oDilateKernel;
