@@ -27,81 +27,6 @@
 #define _USE_MATH_DEFINES
 #include "litiv/features2d.hpp"
 
-inline void ssdesc_genmask(int nMaskSize, int nRadialBins, int nAngularBins, float fRadiusOffset, cv::Mat_<int>& oMask, int& nFirstMaskIdx, int& nLastMaskIdx, bool bUseLienhartMask) {
-    lvDbgAssert_(nMaskSize>0 && (nMaskSize%2)==1,"mask size must be non-null, positive, odd value");
-    lvDbgAssert_(nRadialBins>0,"radial bin count must be non-null positive value");
-    lvDbgAssert_(nAngularBins>0,"angular bin count must be non-null positive value");
-    lvDbgAssert_(fRadiusOffset>=0,"radius offset must be positive or null value");
-    oMask.create(nMaskSize,nMaskSize);
-    oMask = -1;
-    nFirstMaskIdx = nMaskSize*nMaskSize-1;
-    nLastMaskIdx = 0;
-    int nCurrMaskIdx = 0;
-    const int nInitDistBin = 0; // previously passed as param; fix? @@@
-    if(bUseLienhartMask) {
-        const int nCenterIdx = (nMaskSize-1)/2;
-        std::vector<float> vRadBinDists(nRadialBins);
-        const float fRadBinPowBase = (float)std::pow(nRadialBins,1/(float)nRadialBins);
-        for(int nRadBinIdx=0; nRadBinIdx<nRadialBins; ++nRadBinIdx)
-            vRadBinDists[nRadBinIdx] = ((std::pow(fRadBinPowBase,nRadBinIdx+1)-1)/(nRadialBins-1)*nCenterIdx)+((nRadBinIdx==(nRadialBins-1))?0.0f:fRadiusOffset);
-        for(int nRowIdx=0; nRowIdx<nMaskSize; ++nRowIdx) {
-            int* const pnMaskRow = oMask.ptr<int>(nRowIdx);
-            for(int nColIdx=0; nColIdx<nMaskSize; ++nColIdx,++nCurrMaskIdx) {
-                if((nRowIdx==nCenterIdx) && (nColIdx==nCenterIdx))
-                    continue;
-                const float fDist = std::sqrt((float)((nCenterIdx-nRowIdx)*(nCenterIdx-nRowIdx)+(nCenterIdx-nColIdx)*(nCenterIdx-nColIdx)));
-                int nRadBinIdx;
-                for(nRadBinIdx=0; nRadBinIdx<nRadialBins; ++nRadBinIdx)
-                    if(fDist<=vRadBinDists[nRadBinIdx])
-                        break;
-                if(nRadBinIdx>=nInitDistBin && nRadBinIdx<nRadialBins) {
-                    const float fAng = std::atan2((float)(nCenterIdx-nColIdx),(float)(nCenterIdx-nRowIdx))+float(M_PI);
-                    const int nAngleBinIdx = int((fAng*nAngularBins)/float(2*M_PI))%nAngularBins;
-                    pnMaskRow[nColIdx] = nAngleBinIdx*(nRadialBins-nInitDistBin)+((nRadialBins-nInitDistBin-1)-(nRadBinIdx-nInitDistBin));
-                    nFirstMaskIdx = std::min(nFirstMaskIdx,nCurrMaskIdx);
-                    nLastMaskIdx = std::max(nLastMaskIdx,nCurrMaskIdx);
-                }
-            }
-        }
-    }
-    else {
-        lvAssert_(fRadiusOffset==0.0f,"chatfield mask does not support hardcoded inner radius offset");
-        const int nPatchRadius = nMaskSize/2, nAngBinSize = 360/nAngularBins;
-        const float fRadBinLogBase = nRadialBins/(float)std::log10(nPatchRadius);
-        for(int nRowIdx=-nPatchRadius; nRowIdx<=nPatchRadius; ++nRowIdx) {
-            int* const pnMaskRow = oMask.ptr<int>(nRowIdx+nPatchRadius);
-            for(int nColIdx=-nPatchRadius; nColIdx<=nPatchRadius; ++nColIdx,++nCurrMaskIdx) {
-                if(nRowIdx==0 && nColIdx==0)
-                    continue;
-                const float fDist = std::sqrt((float)(nColIdx*nColIdx) + (float)(nRowIdx*nRowIdx));
-                const int nRadBinIdx = int(fDist>0.0f?std::log10(fDist)*fRadBinLogBase:0.0f);
-                if(nRadBinIdx>=nInitDistBin && nRadBinIdx<nRadialBins) {
-                    const float fAng = std::atan2((float)nRowIdx,(float)nColIdx)/float(M_PI)*180.0f;
-                    const int nAngleBinIdx = (((int)std::round(fAng<0?fAng+360.0f:fAng)+nAngBinSize/2)%360)/nAngBinSize;
-                    pnMaskRow[nColIdx+nPatchRadius] = nAngleBinIdx*(nRadialBins-nInitDistBin)+((nRadialBins-nInitDistBin-1)-(nRadBinIdx-nInitDistBin));
-                    nFirstMaskIdx = std::min(nFirstMaskIdx,nCurrMaskIdx);
-                    nLastMaskIdx = std::max(nLastMaskIdx,nCurrMaskIdx);
-                }
-            }
-        }
-    }
-    if(lv::getVerbosity()>=5) {
-        lvCout << "LSS MASK INITIALIZED : \n";
-        lvCout << "\tUSE_CHATFIELD_MASK = " << bUseLienhartMask << "\n";
-        lvCout << "\tnMaskSize = " << nMaskSize << "\n";
-        lvCout << "\tnAngularBins = " << nAngularBins << "\n";
-        lvCout << "\tnRadialBins = " << nRadialBins << "\n";
-        lvCout << "\toMask = \n";
-        lvCout << lv::to_string(oMask) << "\n";
-        if(lv::getVerbosity()>=6) {
-            cv::Mat oMask_out = lv::getUniqueColorMap(oMask);
-            cv::resize(oMask_out,oMask_out,cv::Size(400,400),0,0,cv::INTER_NEAREST);
-            cv::imshow("LSS MASK",oMask_out);
-            cv::waitKey(0);
-        }
-    }
-}
-
 LSS::LSS(int nInnerRadius, int nOuterRadius, int nDescPatchSize, int nAngularBins, int nRadialBins, float fStaticNoiseVar, bool bNormalizeBins, bool bPreProcess, bool bUseLienhartMask) :
         m_bPreProcess(bPreProcess),
         m_bNormalizeBins(bNormalizeBins),
@@ -120,7 +45,7 @@ LSS::LSS(int nInnerRadius, int nOuterRadius, int nDescPatchSize, int nAngularBin
     lvAssert_(m_nRadialBins>0,"invalid parameter");
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_fStaticNoiseVar>0.0f,"invalid parameter");
-    ssdesc_genmask(m_nCorrPatchSize,m_nRadialBins,m_nAngularBins,(float)m_nInnerRadius,m_oDescLUMap,m_nFirstMaskIdx,m_nLastMaskIdx,m_bUsingLienhartMask);
+    lv::getLogPolarMask(m_nCorrPatchSize,m_nRadialBins,m_nAngularBins,m_oDescLUMap,m_bUsingLienhartMask,(float)m_nInnerRadius,&m_nFirstMaskIdx,&m_nLastMaskIdx);
     lvDbgAssert(m_oDescLUMap.cols==m_nCorrPatchSize && m_oDescLUMap.rows==m_nCorrPatchSize);
     lvDbgAssert(m_nFirstMaskIdx>=0 && m_nLastMaskIdx>=m_nFirstMaskIdx);
 }

@@ -859,6 +859,9 @@ namespace lv {
         getRandNeighborPosition<24>(s_anNeighborPattern,nNeighborCoord_X,nNeighborCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
     }
 
+    /// computes & returns a logpolar lookup mask using the given output square matrix size & angular/radial bin counts
+    void getLogPolarMask(int nMaskSize, int nRadialBins, int nAngularBins, cv::Mat_<int>& oOutputMask, bool bUseLienhartMask=true, float fRadiusOffset=0.0f, int* pnFirstMaskIdx=nullptr, int* pnLastMaskIdx=nullptr);
+
     /// writes a given text string on an image using the original cv::putText
     inline void putText(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom=false, const cv::Point2i& oOffset=cv::Point2i(4,15), int nThickness=2, double dScale=1.2) {
         cv::putText(oImg,sText,cv::Point(oOffset.x,bBottom?(oImg.rows-oOffset.y):oOffset.y),cv::FONT_HERSHEY_PLAIN,dScale,vColor,nThickness,cv::LINE_AA);

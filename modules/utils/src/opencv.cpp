@@ -26,6 +26,90 @@ lv::AlignedMatAllocator<32,false> g_oMatAlloc32a = lv::AlignedMatAllocator<32,fa
 cv::MatAllocator* lv::getMatAllocator16a() {return (cv::MatAllocator*)&g_oMatAlloc16a;}
 cv::MatAllocator* lv::getMatAllocator32a() {return (cv::MatAllocator*)&g_oMatAlloc32a;}
 
+void lv::getLogPolarMask(int nMaskSize, int nRadialBins, int nAngularBins, cv::Mat_<int>& oOutputMask, bool bUseLienhartMask, float fRadiusOffset, int* pnFirstMaskIdx, int* pnLastMaskIdx) {
+    // the mask computation strategies of Lienhart and Chatfield are inspired from their LSS implementations; see the originals at:
+    //    http://www.robots.ox.ac.uk/~vgg/software/SelfSimilarity/
+    //    https://github.com/opencv/opencv/blob/2.4/modules/contrib/src/selfsimilarity.cpp
+    lvAssert_(nMaskSize>0 && (nMaskSize%2)==1,"mask size must be a non-null, positive, odd value");
+    lvAssert_(nRadialBins>0,"radial bin count must be a non-null positive value");
+    lvAssert_(nAngularBins>0,"angular bin count must be a non-null positive value");
+    lvAssert_(bUseLienhartMask || fRadiusOffset==0.0f,"chatfield mask does not support hardcoded inner radius offset");
+    lvAssert_(fRadiusOffset>=0,"radius offset must be positive or null value");
+    oOutputMask.create(nMaskSize,nMaskSize);
+    oOutputMask = -1;
+    if(pnFirstMaskIdx)
+        *pnFirstMaskIdx = nMaskSize*nMaskSize-1;
+    if(pnLastMaskIdx)
+        *pnLastMaskIdx = 0;
+    int nCurrMaskIdx = 0;
+    const int nInitDistBin = 0; // previously passed as param; fix? @@@
+    if(bUseLienhartMask) {
+        const int nCenterIdx = (nMaskSize-1)/2;
+        std::vector<float> vRadBinDists((size_t)nRadialBins);
+        const float fRadBinPowBase = (float)std::pow(nRadialBins,1/(float)nRadialBins);
+        for(int nRadBinIdx=0; nRadBinIdx<nRadialBins; ++nRadBinIdx)
+            vRadBinDists[nRadBinIdx] = float(((std::pow(fRadBinPowBase,nRadBinIdx+1)-1)/(nRadialBins-1)*nCenterIdx)+((nRadBinIdx==(nRadialBins-1))?0.0f:fRadiusOffset));
+        for(int nRowIdx=0; nRowIdx<nMaskSize; ++nRowIdx) {
+            int* const pnMaskRow = oOutputMask.ptr<int>(nRowIdx);
+            for(int nColIdx=0; nColIdx<nMaskSize; ++nColIdx,++nCurrMaskIdx) {
+                if((nRowIdx==nCenterIdx) && (nColIdx==nCenterIdx))
+                    continue;
+                const float fDist = std::sqrt((float)((nCenterIdx-nRowIdx)*(nCenterIdx-nRowIdx)+(nCenterIdx-nColIdx)*(nCenterIdx-nColIdx)));
+                int nRadBinIdx;
+                for(nRadBinIdx=0; nRadBinIdx<nRadialBins; ++nRadBinIdx)
+                    if(fDist<=vRadBinDists[nRadBinIdx])
+                        break;
+                if(nRadBinIdx>=nInitDistBin && nRadBinIdx<nRadialBins) {
+                    const float fAng = std::atan2((float)(nCenterIdx-nColIdx),(float)(nCenterIdx-nRowIdx))+float(M_PI);
+                    const int nAngleBinIdx = int((fAng*nAngularBins)/float(2*M_PI))%nAngularBins;
+                    pnMaskRow[nColIdx] = nAngleBinIdx*(nRadialBins-nInitDistBin)+((nRadialBins-nInitDistBin-1)-(nRadBinIdx-nInitDistBin));
+                    if(pnFirstMaskIdx)
+                        *pnFirstMaskIdx = std::min(*pnFirstMaskIdx,nCurrMaskIdx);
+                    if(pnLastMaskIdx)
+                        *pnLastMaskIdx = std::max(*pnLastMaskIdx,nCurrMaskIdx);
+                }
+            }
+        }
+    }
+    else {
+        const int nPatchRadius = nMaskSize/2, nAngBinSize = 360/nAngularBins;
+        const float fRadBinLogBase = nRadialBins/(float)std::log10(nPatchRadius);
+        for(int nRowIdx=-nPatchRadius; nRowIdx<=nPatchRadius; ++nRowIdx) {
+            int* const pnMaskRow = oOutputMask.ptr<int>(nRowIdx+nPatchRadius);
+            for(int nColIdx=-nPatchRadius; nColIdx<=nPatchRadius; ++nColIdx,++nCurrMaskIdx) {
+                if(nRowIdx==0 && nColIdx==0)
+                    continue;
+                const float fDist = std::sqrt((float)(nColIdx*nColIdx) + (float)(nRowIdx*nRowIdx));
+                const int nRadBinIdx = int(fDist>0.0f?std::log10(fDist)*fRadBinLogBase:0.0f);
+                if(nRadBinIdx>=nInitDistBin && nRadBinIdx<nRadialBins) {
+                    const float fAng = std::atan2((float)nRowIdx,(float)nColIdx)/float(M_PI)*180.0f;
+                    const int nAngleBinIdx = (((int)std::round(fAng<0?fAng+360.0f:fAng)+nAngBinSize/2)%360)/nAngBinSize;
+                    pnMaskRow[nColIdx+nPatchRadius] = nAngleBinIdx*(nRadialBins-nInitDistBin)+((nRadialBins-nInitDistBin-1)-(nRadBinIdx-nInitDistBin));
+                    if(pnFirstMaskIdx)
+                        *pnFirstMaskIdx = std::min(*pnFirstMaskIdx,nCurrMaskIdx);
+                    if(pnLastMaskIdx)
+                        *pnLastMaskIdx = std::max(*pnLastMaskIdx,nCurrMaskIdx);
+                }
+            }
+        }
+    }
+    if(lv::getVerbosity()>=5) {
+        lvCout << "LOGPOLAR MASK INITIALIZED : \n";
+        lvCout << "\tbUseLienhartMask = " << bUseLienhartMask << "\n";
+        lvCout << "\tnMaskSize = " << nMaskSize << "\n";
+        lvCout << "\tnAngularBins = " << nAngularBins << "\n";
+        lvCout << "\tnRadialBins = " << nRadialBins << "\n";
+        lvCout << "\toOutputMask = \n";
+        lvCout << lv::to_string(oOutputMask) << "\n";
+        if(lv::getVerbosity()>=6) {
+            cv::Mat oOutputMask_display = lv::getUniqueColorMap(oOutputMask);
+            cv::resize(oOutputMask_display,oOutputMask_display,cv::Size(400,400),0,0,cv::INTER_NEAREST);
+            cv::imshow("MASK",oOutputMask_display);
+            cv::waitKey(0);
+        }
+    }
+}
+
 lv::DisplayHelperPtr lv::DisplayHelper::create(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) {
     struct DisplayHelperWrapper : public DisplayHelper {
         DisplayHelperWrapper(const std::string& _sDisplayName, const std::string& _sDebugFSDirPath, const cv::Size& _oMaxSize, int _nWindowFlags) :
