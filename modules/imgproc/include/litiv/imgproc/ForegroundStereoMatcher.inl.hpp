@@ -173,10 +173,9 @@ inline StereoSegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>
 #endif //STEREOSEGMATCH_CONFIG_USE_..._AFFINITY
     const size_t nShapeContextInnerRadius = 2;
     const size_t nShapeContextOuterRadius = STEREOSEGMATCH_DEFAULT_SCDESC_WIN_RAD;
-    const size_t nShapeContextBlurRadius = STEREOSEGMATCH_CONFIG_USE_SCDESC_BLUR_PPROC?STEREOSEGMATCH_DEFAULT_SCDESC_BLUR_RAD:0;
     const size_t nShapeContextAngBins = STEREOSEGMATCH_DEFAULT_SCDESC_ANG_BINS;
     const size_t nShapeContextRadBins = STEREOSEGMATCH_DEFAULT_SCDESC_RAD_BINS;
-    m_pShpDescExtractor = std::make_unique<ShapeContext>(nShapeContextInnerRadius,nShapeContextOuterRadius,nShapeContextAngBins,nShapeContextRadBins,nShapeContextBlurRadius);
+    m_pShpDescExtractor = std::make_unique<ShapeContext>(nShapeContextInnerRadius,nShapeContextOuterRadius,nShapeContextAngBins,nShapeContextRadBins);
 #if STEREOSEGMATCH_CONFIG_USE_SSQDIFF_AFFINITY
     constexpr int nSSqrDiffKernelSize = int(STEREOSEGMATCH_DEFAULT_SSQDIFF_PATCH);
     const cv::Size oDescWinSize(nSSqrDiffKernelSize,nSSqrDiffKernelSize);
