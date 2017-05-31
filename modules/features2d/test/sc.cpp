@@ -191,4 +191,4 @@ namespace {
     }
 }
 
-BENCHMARK(sc_abs_perftest)->Args({2,20})->Args({2,30})->Args({2,40})->Args({5,40})->Args({5,80});
+BENCHMARK(sc_abs_perftest)->Args({2,20})->Args({2,30})->Args({2,40})->Args({5,40})->Args({5,80})->Repetitions(15)->ReportAggregatesOnly(true);
