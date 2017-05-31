@@ -477,7 +477,7 @@ namespace lv {
     /// computes the color distortion between two generic arrays (note: for very large arrays, using ocv matrix ops will be faster)
     template<typename Tin, typename Tout=decltype(cdist<3>((Tin*)0,(Tin*)0))>
     inline Tout cdist(const Tin* a, const Tin* b, size_t nElements, size_t nChannels, const uint8_t* m=nullptr) {
-        lvAssert_(nChannels>1 && nChannels<=4,"untemplated distance function only defined for 2 to 4 channels");
+        lvAssert__(nChannels>1 && nChannels<=4,"untemplated distance function only defined for 2 to 4 channels (asked for %d)",(int)nChannels);
         switch(nChannels) {
             case 2: return cdist<2,Tin,Tout>(a,b,nElements,m);
             case 3: return cdist<3,Tin,Tout>(a,b,nElements,m);
