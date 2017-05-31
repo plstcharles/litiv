@@ -3,15 +3,7 @@
 #include "litiv/utils/opencv.hpp"
 #include "litiv/test.hpp"
 
-TEST(lss,regression_constr) {
-    EXPECT_THROW_LV_QUIET(std::make_unique<LSS>(0));
-    EXPECT_THROW_LV_QUIET(std::make_unique<LSS>(2));
-    EXPECT_THROW_LV_QUIET(std::make_unique<LSS>(3,1));
-    EXPECT_THROW_LV_QUIET(std::make_unique<LSS>(1,3,0));
-    EXPECT_THROW_LV_QUIET(std::make_unique<LSS>(1,3,2,0));
-}
-
-TEST(lss,regression_default_params) {
+TEST(lss,regression_default_constr) {
     std::unique_ptr<LSS> pLSS = std::make_unique<LSS>();
     EXPECT_GT(pLSS->windowSize().width,0);
     EXPECT_GT(pLSS->windowSize().height,0);
@@ -30,13 +22,15 @@ TEST(lss,regression_default_params) {
 
 TEST(lss,regression_single_compute) {
     std::unique_ptr<LSS> pLSS = std::make_unique<LSS>(
-        LSS_DEFAULT_PATCH_SIZE,
-        /*LSS_DEFAULT_DESC_RADIUS*/40,
-        LSS_DEFAULT_RADIAL_BINS,
-        LSS_DEFAULT_ANGULAR_BINS,
-        LSS_DEFAULT_STATNOISE_VAR,
+        /*LSS_DEFAULT_INNER_RADIUS*/0,
+        /*LSS_DEFAULT_OUTER_RADIUS*/40,
+        /*LSS_DEFAULT_PATCH_SIZE*/5,
+        /*LSS_DEFAULT_ANGULAR_BINS*/12,
+        /*LSS_DEFAULT_RADIAL_BINS*/3,
+        /*LSS_DEFAULT_STATNOISE_VAR*/300000.f,
         /*LSS_DEFAULT_NORM_BINS*/false,
-        /*LSS_DEFAULT_PREPROCESS*/false
+        /*LSS_DEFAULT_PREPROCESS*/false,
+        /*LSS_DEFAULT_USE_LIENH_MASK*/false
     );
     const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
     const cv::Point2i oTargetPt(364,135);
@@ -74,13 +68,15 @@ TEST(lss,regression_single_compute) {
 
 TEST(lss,regression_single_normalized_compute) {
     std::unique_ptr<LSS> pLSS = std::make_unique<LSS>(
-        LSS_DEFAULT_PATCH_SIZE,
-        /*LSS_DEFAULT_DESC_RADIUS*/40,
-        LSS_DEFAULT_RADIAL_BINS,
-        LSS_DEFAULT_ANGULAR_BINS,
-        LSS_DEFAULT_STATNOISE_VAR,
-        LSS_DEFAULT_NORM_BINS,
-        /*LSS_DEFAULT_PREPROCESS*/false
+        /*LSS_DEFAULT_INNER_RADIUS*/0,
+        /*LSS_DEFAULT_OUTER_RADIUS*/40,
+        /*LSS_DEFAULT_PATCH_SIZE*/5,
+        /*LSS_DEFAULT_ANGULAR_BINS*/12,
+        /*LSS_DEFAULT_RADIAL_BINS*/3,
+        /*LSS_DEFAULT_STATNOISE_VAR*/300000.f,
+        /*LSS_DEFAULT_NORM_BINS*/true,
+        /*LSS_DEFAULT_PREPROCESS*/false,
+        /*LSS_DEFAULT_USE_LIENH_MASK*/false
     );
     const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
     const cv::Point2i oTargetPt(364,135);

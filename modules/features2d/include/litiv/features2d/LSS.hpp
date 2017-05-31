@@ -21,13 +21,15 @@
 #include "litiv/utils/math.hpp"
 #include <opencv2/features2d.hpp>
 
-#define LSS_DEFAULT_PATCH_SIZE    (5)
-#define LSS_DEFAULT_DESC_RADIUS   (20)
-#define LSS_DEFAULT_RADIAL_BINS   (3)
-#define LSS_DEFAULT_ANGULAR_BINS  (12)
-#define LSS_DEFAULT_STATNOISE_VAR (300000.f)
-#define LSS_DEFAULT_NORM_BINS     (true)
-#define LSS_DEFAULT_PREPROCESS    (true)
+#define LSS_DEFAULT_INNER_RADIUS   (0)
+#define LSS_DEFAULT_OUTER_RADIUS   (20)
+#define LSS_DEFAULT_PATCH_SIZE     (5)
+#define LSS_DEFAULT_RADIAL_BINS    (3)
+#define LSS_DEFAULT_ANGULAR_BINS   (12)
+#define LSS_DEFAULT_STATNOISE_VAR  (300000.f)
+#define LSS_DEFAULT_NORM_BINS      (true)
+#define LSS_DEFAULT_PREPROCESS     (true)
+#define LSS_DEFAULT_USE_LIENH_MASK (true)
 
 /**
     Local Self-Similarirty (LSS) feature extractor
@@ -39,13 +41,15 @@
 class LSS : public cv::DescriptorExtractor {
 public:
     /// default constructor
-    LSS(int nDescPatchSize=LSS_DEFAULT_PATCH_SIZE,
-        int nDescRadius=LSS_DEFAULT_DESC_RADIUS,
-        int nRadialBins=LSS_DEFAULT_RADIAL_BINS,
+    LSS(int nInnerRadius=LSS_DEFAULT_INNER_RADIUS,
+        int nOuterRadius=LSS_DEFAULT_OUTER_RADIUS,
+        int nPatchSize=LSS_DEFAULT_PATCH_SIZE,
         int nAngularBins=LSS_DEFAULT_ANGULAR_BINS,
+        int nRadialBins=LSS_DEFAULT_RADIAL_BINS,
         float fStaticNoiseVar=LSS_DEFAULT_STATNOISE_VAR,
         bool bNormalizeBins=LSS_DEFAULT_NORM_BINS,
-        bool bPreProcess=LSS_DEFAULT_PREPROCESS);
+        bool bPreProcess=LSS_DEFAULT_PREPROCESS,
+        bool bUseLienhartMask=LSS_DEFAULT_USE_LIENH_MASK);
     /// loads extractor params from the specified file node @@@@ not impl
     virtual void read(const cv::FileNode&) override;
     /// writes extractor params to the specified file storage @@@@ not impl
@@ -71,6 +75,8 @@ public:
     bool isNormalizingBins() const;
     /// returns whether input images will be preprocessed using a gaussian filter or not
     bool isPreProcessing() const;
+    /// returns whether using Lienhart's lookup mask implementation instead of Chatfield's
+    bool isUsingLienhartMask() const;
 
     /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix, and all image points are described (note: descriptors close to borders will be invalid)
     void compute2(const cv::Mat& oImage, cv::Mat& oDescMap);
@@ -115,11 +121,15 @@ protected:
     const bool m_bPreProcess;
     /// defines whether output descriptor bins should be normalized or not (better for illum variations)
     const bool m_bNormalizeBins;
+    /// defines whether using Lienhart's lookup mask implementation instead of Chatfield's
+    const bool m_bUsingLienhartMask;
     /// size of internal ssd patches (must be odd)
-    const int m_nDescPatchSize;
-    /// radius of the LSS descriptor (center to patch ring distance)
-    const int m_nDescRadius;
-    /// size of the LSS descriptor correlation window
+    const int m_nPatchSize;
+    /// inner radius of the LSS descriptor (added to inner patch rings distance)
+    const int m_nInnerRadius;
+    /// outer radius of the LSS descriptor (maximum reach of outer patch ring)
+    const int m_nOuterRadius;
+    /// size of the LSS descriptor correlation window (deduced from outer radius and patch size)
     const int m_nCorrWinSize; // deduced
     /// size of the SSD correlation output patch
     const int m_nCorrPatchSize; // deduced
