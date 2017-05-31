@@ -121,7 +121,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         std::cout << "\t\t" << sCurrBatchName << " @ init [" << sWorkerName << "]" << std::endl;
         const std::vector<cv::Mat>& vROIs = oBatch.getFrameROIArray();
         lvAssert(!vROIs.empty() && vROIs.size()==oBatch.getInputStreamCount());
-        size_t nCurrIdx = 25;
+        size_t nCurrIdx = 125;
         //size_t nCurrIdx = 0;
         const std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // note: mat content becomes invalid on next getInput call
         lvAssert(vInitInput.size()==oBatch.getInputStreamCount());
