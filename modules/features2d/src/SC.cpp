@@ -33,7 +33,8 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
         m_bUseRelativeSpace(false),
         m_bRotationInvariant(bRotationInvariant),
         m_bNormalizeBins(bNormalizeBins),
-        m_bNonZeroInitBins(bUseNonZeroInit) {
+        m_bNonZeroInitBins(bUseNonZeroInit),
+        m_bUsingFullKeyPtMap(false) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
     lvAssert_(m_nInnerRadius>0,"invalid parameter");
@@ -44,9 +45,10 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
     lvAssert((int)m_vAngularLimits.size()==m_nAngularBins && (int)m_vRadialLimits.size()==m_nRadialBins);
     lvAssert(m_oEMDCostMap.dims==2 && m_oEMDCostMap.rows==m_nRadialBins*m_nAngularBins && m_oEMDCostMap.cols==m_nRadialBins*m_nAngularBins);
     if(!m_bRotationInvariant) {
-        const int nKernelDiameter = int(nOuterRadius)*2+1;
+        const int nKernelDiameter = m_nOuterRadius*2+5;
         m_oDilateKernel.create(nKernelDiameter,nKernelDiameter);
-        cv::circle(m_oDilateKernel,cv::Point(int(nOuterRadius),int(nOuterRadius)),int(nOuterRadius),cv::Scalar_<uchar>(255),-1);
+        m_oDilateKernel = 0;
+        cv::circle(m_oDilateKernel,cv::Point(m_nOuterRadius+2,m_nOuterRadius+2),m_nOuterRadius+2,cv::Scalar_<uchar>(255),-1);
         m_oDilateKernel = m_oDilateKernel>0;
 #if USE_LIENHART_LOOKUP_MASK
         const int nMaskSize = m_nOuterRadius*2+1;
@@ -68,7 +70,8 @@ ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRad
         m_bUseRelativeSpace(true),
         m_bRotationInvariant(bRotationInvariant),
         m_bNormalizeBins(bNormalizeBins),
-        m_bNonZeroInitBins(bUseNonZeroInit) {
+        m_bNonZeroInitBins(bUseNonZeroInit),
+        m_bUsingFullKeyPtMap(false) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
     lvAssert_(m_dInnerRadius>0.0,"invalid parameter");
@@ -145,11 +148,14 @@ void ShapeContext::compute2(const cv::Mat& oImage, cv::Mat& oDescMap_) {
 
 void ShapeContext::compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescMap) {
     scdesc_fill_contours(oImage);
-    m_oKeyPts.create((int)oImage.total(),1);
-    int nKeyPtIdx = 0;
-    for(int nRowIdx=0; nRowIdx<oImage.rows; ++nRowIdx)
-        for(int nColIdx=0; nColIdx<oImage.cols; ++nColIdx)
-            m_oKeyPts(nKeyPtIdx++) = cv::Point2f((float)nColIdx,(float)nRowIdx);
+    if(!m_bUsingFullKeyPtMap) {
+        m_oKeyPts.create((int)oImage.total(),1);
+        int nKeyPtIdx = 0;
+        for(int nRowIdx=0; nRowIdx<oImage.rows; ++nRowIdx)
+            for(int nColIdx=0; nColIdx<oImage.cols; ++nColIdx)
+                m_oKeyPts(nKeyPtIdx++) = cv::Point2f((float)nColIdx,(float)nRowIdx);
+        m_bUsingFullKeyPtMap = true;
+    }
     if(!m_bUseRelativeSpace && !m_bRotationInvariant)
         scdesc_fill_desc_direct(oDescMap,true);
     else
@@ -158,6 +164,7 @@ void ShapeContext::compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescMap) {
 
 void ShapeContext::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat_<float>& oDescMap) {
     scdesc_fill_contours(oImage);
+    m_bUsingFullKeyPtMap = false;
     if(voKeypoints.empty()) {
         voKeypoints.resize(m_oContourPts.total());
         for(size_t nContourPtIdx=0; nContourPtIdx<voKeypoints.size(); ++nContourPtIdx)
@@ -204,6 +211,7 @@ void ShapeContext::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMas
         _oDescriptors.release();
         return;
     }
+    m_bUsingFullKeyPtMap = false;
     m_oKeyPts.create((int)voKeypoints.size(),1);
     for(size_t nKeyPtIdx=0; nKeyPtIdx<voKeypoints.size(); ++nKeyPtIdx)
         m_oKeyPts((int)nKeyPtIdx) = voKeypoints[nKeyPtIdx].pt;
@@ -303,18 +311,9 @@ void ShapeContext::scdesc_fill_contours(const cv::Mat& oImage) {
 void ShapeContext::scdesc_fill_maps(double dMeanDist) {
     lvDbgAssert(m_oContourPts.type()==CV_32FC2 && (m_oContourPts.total()==(size_t)m_oContourPts.rows || m_oContourPts.total()==(size_t)m_oContourPts.cols));
     lvDbgAssert(m_oKeyPts.type()==CV_32FC2 && (m_oKeyPts.total()==(size_t)m_oKeyPts.rows || m_oKeyPts.total()==(size_t)m_oKeyPts.cols));
-    lvDbgAssert(m_vKeyInliers.empty() || m_oKeyPts.total()==m_vKeyInliers.size());
-    lvDbgAssert(m_vContourInliers.empty() || m_oKeyPts.total()==m_vContourInliers.size());
     lvDbgAssert(m_oKeyPts.total()>size_t(0));
     if(m_oContourPts.empty())
         return;
-    const bool bUseDistMask = m_bUseRelativeSpace && dMeanDist<0 && (!m_vKeyInliers.empty() || !m_vContourInliers.empty());
-    if(bUseDistMask) {
-        m_oDistMask.create((int)m_oKeyPts.total(),(int)m_oContourPts.total());
-        for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx)
-            for(int nContourPtIdx=0; nContourPtIdx<(int)m_oContourPts.total(); ++nContourPtIdx)
-                m_oDistMask(nKeyPtIdx,nContourPtIdx) = uchar((m_vKeyInliers.empty() || m_vKeyInliers[nKeyPtIdx]!=0) && (m_vContourInliers.empty() || m_vContourInliers[nContourPtIdx]!=0));
-    }
     m_oDistMap.create((int)m_oKeyPts.total(),(int)m_oContourPts.total());
     m_oAngMap.create((int)m_oKeyPts.total(),(int)m_oContourPts.total());
     cv::Point2f vMassCenter(0,0);
@@ -346,7 +345,7 @@ void ShapeContext::scdesc_fill_maps(double dMeanDist) {
     }
     if(m_bUseRelativeSpace) {
         if(dMeanDist<0)
-            dMeanDist = cv::mean(m_oDistMap,bUseDistMask?m_oDistMask:cv::noArray())[0];
+            dMeanDist = cv::mean(m_oDistMap)[0];
         m_oDistMap /= (dMeanDist+FLT_EPSILON);
     }
 }
@@ -363,15 +362,11 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
     oDescriptors = m_bNonZeroInitBins?std::max(10.0f/m_nDescSize,0.5f):0.0f;
     scdesc_fill_maps();
     for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx) {
-        if(!m_vKeyInliers.empty() && !m_vKeyInliers[nKeyPtIdx])
-            continue;
         const cv::Point2f& vKeyPt = ((cv::Point2f*)m_oKeyPts.data)[nKeyPtIdx];
         const int nKeyPtRowIdx = (int)std::round(vKeyPt.y);
         const int nKeyPtColIdx = (int)std::round(vKeyPt.x);
         float* aDesc = bGenDescMap?oDescriptors.ptr<float>(nKeyPtRowIdx,nKeyPtColIdx):oDescriptors.ptr<float>(nKeyPtIdx);
         for(int nContourPtIdx=0; nContourPtIdx<(int)m_oContourPts.total(); ++nContourPtIdx) {
-            if(!m_vContourInliers.empty() && !m_vContourInliers[nContourPtIdx])
-                continue;
             const cv::Point2f& vContourPt = ((cv::Point2f*)m_oContourPts.data)[nContourPtIdx];
             if(std::abs(vKeyPt.x-vContourPt.x)<0.01f && std::abs(vKeyPt.y-vContourPt.y)<0.01f)
                 continue;
@@ -410,63 +405,57 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
     oDescriptors = m_bNonZeroInitBins?std::max(10.0f/m_nDescSize,0.5f):0.0f;
     lvDbgAssert(m_oContourPts.type()==CV_32FC2 && (m_oContourPts.total()==(size_t)m_oContourPts.rows || m_oContourPts.total()==(size_t)m_oContourPts.cols));
     lvDbgAssert(m_oKeyPts.type()==CV_32FC2 && (m_oKeyPts.total()==(size_t)m_oKeyPts.rows || m_oKeyPts.total()==(size_t)m_oKeyPts.cols));
-    lvDbgAssert(m_vKeyInliers.empty() || m_oKeyPts.total()==m_vKeyInliers.size());
-    lvDbgAssert(m_vContourInliers.empty() || m_oKeyPts.total()==m_vContourInliers.size());
     lvDbgAssert(m_oKeyPts.total()>size_t(0));
     lvDbgAssert(m_oDistMask.size()==m_oCurrImageSize);
 #if USE_LIENHART_LOOKUP_MASK
     lvDbgAssert(!m_oAbsDescLUMap.empty() && m_oAbsDescLUMap.rows==m_nOuterRadius*2+1 && m_oAbsDescLUMap.rows==m_oAbsDescLUMap.cols);
 #endif //USE_LIENHART_LOOKUP_MASK
+#if USING_OPENMP
+    #pragma omp parallel for
+#endif //USING_OPENMP
     for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx) {
-        if(!m_vKeyInliers.empty() && !m_vKeyInliers[nKeyPtIdx])
-            continue;
         const cv::Point2f& vKeyPt = ((cv::Point2f*)m_oKeyPts.data)[nKeyPtIdx];
         const int nKeyPtRowIdx = (int)std::round(vKeyPt.y);
         const int nKeyPtColIdx = (int)std::round(vKeyPt.x);
+        if(!m_oDistMask(nKeyPtRowIdx,nKeyPtColIdx))
+            continue;
         float* aDesc = bGenDescMap?oDescriptors.ptr<float>(nKeyPtRowIdx,nKeyPtColIdx):oDescriptors.ptr<float>(nKeyPtIdx);
-        if(m_oDistMask(nKeyPtRowIdx,nKeyPtColIdx)) {
-            for(int nContourPtIdx=0; nContourPtIdx<(int)m_oContourPts.total(); ++nContourPtIdx) {
-                if(!m_vContourInliers.empty() && !m_vContourInliers[nContourPtIdx])
-                    continue;
-                const cv::Point2f& vContourPt = ((cv::Point2f*)m_oContourPts.data)[nContourPtIdx];
+        for(int nContourPtIdx=0; nContourPtIdx<(int)m_oContourPts.total(); ++nContourPtIdx) {
+            const cv::Point2f& vContourPt = ((cv::Point2f*)m_oContourPts.data)[nContourPtIdx];
 #if USE_LIENHART_LOOKUP_MASK
-                const int nLookupRow = (int)std::round(vContourPt.y-vKeyPt.y)+m_nOuterRadius;
-                const int nLookupCol = (int)std::round(vContourPt.x-vKeyPt.x)+m_nOuterRadius;
-                if(nLookupRow<0 || nLookupRow>=m_oAbsDescLUMap.rows || nLookupCol<0 || nLookupCol>=m_oAbsDescLUMap.cols)
-                    continue;
-                const int nDescIdx = m_oAbsDescLUMap(nLookupRow,nLookupCol);
-                if(nDescIdx==-1)
-                    continue;
-                ++(aDesc[nDescIdx]);
+            const int nLookupRow = (int)std::round(vContourPt.y-vKeyPt.y)+m_nOuterRadius;
+            const int nLookupCol = (int)std::round(vContourPt.x-vKeyPt.x)+m_nOuterRadius;
+            if(nLookupRow<0 || nLookupRow>=m_oAbsDescLUMap.rows || nLookupCol<0 || nLookupCol>=m_oAbsDescLUMap.cols || m_oAbsDescLUMap(nLookupRow,nLookupCol)==-1)
+                continue;
+            ++(aDesc[m_oAbsDescLUMap(nLookupRow,nLookupCol)]);
 #else //!USE_LIENHART_LOOKUP_MASK
-                cv::Matx12f vPtDiff;
-                vPtDiff(0) = vKeyPt.y-vContourPt.y;
-                vPtDiff(1) = vKeyPt.x-vContourPt.x;
-                const double dCurrDist = cv::norm(vPtDiff,cv::NORM_L2);
-                if(dCurrDist<0.01 || dCurrDist>m_vRadialLimits.back())
-                    continue;
-                int nRadialBinMatch=-1;
-                for(int nRadialBinIdx=0; nRadialBinIdx<m_nRadialBins; ++nRadialBinIdx) {
-                    if(dCurrDist<m_vRadialLimits[nRadialBinIdx]) {
-                        nRadialBinMatch = nRadialBinIdx;
-                        break;
-                    }
+            cv::Matx12f vPtDiff;
+            vPtDiff(0) = vKeyPt.y-vContourPt.y;
+            vPtDiff(1) = vKeyPt.x-vContourPt.x;
+            const double dCurrDist = cv::norm(vPtDiff,cv::NORM_L2);
+            if(dCurrDist<0.01 || dCurrDist>m_vRadialLimits.back())
+                continue;
+            int nRadialBinMatch=-1;
+            for(int nRadialBinIdx=0; nRadialBinIdx<m_nRadialBins; ++nRadialBinIdx) {
+                if(dCurrDist<m_vRadialLimits[nRadialBinIdx]) {
+                    nRadialBinMatch = nRadialBinIdx;
+                    break;
                 }
-                if(nRadialBinMatch<0)
-                    continue;
-                int nAngularBinMatch=-1;
-                const double dCurrAng = (dCurrDist<0.01)?0.0:std::fmod(std::atan2(vPtDiff(0),-vPtDiff(1))+2*CV_PI+FLT_EPSILON,2*CV_PI);
-                for(int nAngularBinIdx=0; nAngularBinIdx<m_nAngularBins; ++nAngularBinIdx) {
-                    if(dCurrAng<m_vAngularLimits[nAngularBinIdx]) {
-                        nAngularBinMatch = nAngularBinIdx;
-                        break;
-                    }
-                }
-                if(nAngularBinMatch<0)
-                    continue;
-                ++(aDesc[nAngularBinMatch+nRadialBinMatch*m_nAngularBins]);
-#endif //!USE_LIENHART_LOOKUP_MASK
             }
+            if(nRadialBinMatch<0)
+                continue;
+            int nAngularBinMatch=-1;
+            const double dCurrAng = (dCurrDist<0.01)?0.0:std::fmod(std::atan2(vPtDiff(0),-vPtDiff(1))+2*CV_PI+FLT_EPSILON,2*CV_PI);
+            for(int nAngularBinIdx=0; nAngularBinIdx<m_nAngularBins; ++nAngularBinIdx) {
+                if(dCurrAng<m_vAngularLimits[nAngularBinIdx]) {
+                    nAngularBinMatch = nAngularBinIdx;
+                    break;
+                }
+            }
+            if(nAngularBinMatch<0)
+                continue;
+            ++(aDesc[nAngularBinMatch+nRadialBinMatch*m_nAngularBins]);
+#endif //!USE_LIENHART_LOOKUP_MASK
         }
     }
     if(m_bNormalizeBins)
@@ -480,6 +469,9 @@ void ShapeContext::scdesc_norm(cv::Mat_<float>& oDescriptors) const {
     lvDbgAssert(oDescriptors.size[oDescriptors.dims-1]==m_nDescSize);
     lvDbgAssert(oDescriptors.isContinuous());
     const float fDefaultVal = std::sqrt(1.0f/m_nDescSize);
+#if USING_OPENMP
+    #pragma omp parallel for
+#endif //USING_OPENMP
     for(size_t nDescIdx=0; nDescIdx<oDescriptors.total(); nDescIdx+=size_t(m_nDescSize)) {
         cv::Mat_<float> oCurrDesc(1,m_nDescSize,((float*)oDescriptors.data)+nDescIdx);
         const double dNorm = cv::norm(oCurrDesc,cv::NORM_L2);

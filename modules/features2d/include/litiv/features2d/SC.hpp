@@ -175,7 +175,7 @@ private:
     cv::Mat_<float> m_oEMDCostMap;
     cv::Mat_<int> m_oAbsDescLUMap;
     cv::Mat_<cv::Point2f> m_oKeyPts,m_oContourPts;
-    std::vector<int> m_vKeyInliers,m_vContourInliers;
     cv::Mat_<uchar> m_oBinMask,m_oDistMask,m_oDilateKernel;
     cv::Size m_oCurrImageSize;
+    bool m_bUsingFullKeyPtMap;
 };
