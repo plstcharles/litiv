@@ -100,7 +100,7 @@ public:
     /// utility function, used to filter out bad pixels in a ROI that would trigger out of bounds error because they're too close to the image border
     void validateROI(cv::Mat& oROI) const;
     /// utility function, used to calculate the (C)EMD-L1 distance between two individual descriptors
-    inline double calcDistance(const float* aDescriptor1, const float* aDescriptor2) const {
+    inline double calcDistance_EMD(const float* aDescriptor1, const float* aDescriptor2) const {
         lvDbgAssert_(!std::all_of(aDescriptor1,aDescriptor1+m_nDescSize,[](float v){
             lvDbgAssert(v>=0.0f);
             return v==0.0f;
@@ -114,12 +114,26 @@ public:
         return cv::EMD(oDesc1,oDesc2,-1,m_oEMDCostMap);
     }
     /// utility function, used to calculate the (C)EMD-L1 distance between two individual descriptors
-    inline double calcDistance(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2) const {
+    inline double calcDistance_EMD(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2) const {
         lvAssert_(oDescriptor1.dims==oDescriptor2.dims && oDescriptor1.size==oDescriptor2.size,"descriptor mat sizes mismatch");
         lvAssert_(oDescriptor1.dims==2 || oDescriptor1.dims==3,"unexpected descriptor matrix dim count");
         lvAssert_(oDescriptor1.dims!=2 || oDescriptor1.total()==size_t(m_nRadialBins*m_nAngularBins),"unexpected descriptor size");
         lvAssert_(oDescriptor1.dims!=3 || (oDescriptor1.size[0]==1 && oDescriptor1.size[1]==1 && oDescriptor1.size[2]==m_nRadialBins*m_nAngularBins),"unexpected descriptor size");
-        return calcDistance(oDescriptor1.ptr<float>(0),oDescriptor2.ptr<float>(0));
+        return calcDistance_EMD(oDescriptor1.ptr<float>(0),oDescriptor2.ptr<float>(0));
+    }
+    /// utility function, used to calculate the L2 distance between two individual descriptors
+    inline double calcDistance_L2(const float* aDescriptor1, const float* aDescriptor2) const {
+        const cv::Mat_<float> oDesc1(1,m_nRadialBins*m_nAngularBins,const_cast<float*>(aDescriptor1));
+        const cv::Mat_<float> oDesc2(1,m_nRadialBins*m_nAngularBins,const_cast<float*>(aDescriptor2));
+        return cv::norm(oDesc1,oDesc2,cv::NORM_L2);
+    }
+    /// utility function, used to calculate the L2 distance between two individual descriptors
+    inline double calcDistance_L2(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2) const {
+        lvAssert_(oDescriptor1.dims==oDescriptor2.dims && oDescriptor1.size==oDescriptor2.size,"descriptor mat sizes mismatch");
+        lvAssert_(oDescriptor1.dims==2 || oDescriptor1.dims==3,"unexpected descriptor matrix dim count");
+        lvAssert_(oDescriptor1.dims!=2 || oDescriptor1.total()==size_t(m_nRadialBins*m_nAngularBins),"unexpected descriptor size");
+        lvAssert_(oDescriptor1.dims!=3 || (oDescriptor1.size[0]==1 && oDescriptor1.size[1]==1 && oDescriptor1.size[2]==m_nRadialBins*m_nAngularBins),"unexpected descriptor size");
+        return calcDistance_L2(oDescriptor1.ptr<float>(0),oDescriptor2.ptr<float>(0));
     }
 
 protected:

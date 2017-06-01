@@ -41,9 +41,7 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
     lvAssert_(m_nOuterRadius>0 && m_nInnerRadius<m_nOuterRadius,"invalid parameter");
     scdesc_generate_angmask();
     scdesc_generate_radmask();
-    scdesc_generate_emdmask();
     lvAssert((int)m_vAngularLimits.size()==m_nAngularBins && (int)m_vRadialLimits.size()==m_nRadialBins);
-    lvAssert(m_oEMDCostMap.dims==2 && m_oEMDCostMap.rows==m_nRadialBins*m_nAngularBins && m_oEMDCostMap.cols==m_nRadialBins*m_nAngularBins);
     if(!m_bRotationInvariant) {
         const int nKernelDiameter = m_nOuterRadius*2+5;
         m_oDilateKernel.create(nKernelDiameter,nKernelDiameter);
@@ -56,6 +54,8 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
         lvDbgAssert(m_oAbsDescLUMap.cols==nMaskSize && m_oAbsDescLUMap.rows==nMaskSize);
 #endif //USE_LIENHART_LOOKUP_MASK
     }
+    scdesc_generate_emdmask();
+    lvAssert(m_oEMDCostMap.dims==2 && m_oEMDCostMap.rows==m_nRadialBins*m_nAngularBins && m_oEMDCostMap.cols==m_nRadialBins*m_nAngularBins);
 }
 
 ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRadius, size_t nAngularBins, size_t nRadialBins,
@@ -78,8 +78,8 @@ ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRad
     lvAssert_(m_dOuterRadius>0.0 && m_dInnerRadius<m_dOuterRadius,"invalid parameter");
     scdesc_generate_angmask();
     scdesc_generate_radmask();
-    scdesc_generate_emdmask();
     lvAssert((int)m_vAngularLimits.size()==m_nAngularBins && (int)m_vRadialLimits.size()==m_nRadialBins);
+    scdesc_generate_emdmask();
     lvAssert(m_oEMDCostMap.dims==2 && m_oEMDCostMap.rows==m_nRadialBins*m_nAngularBins && m_oEMDCostMap.cols==m_nRadialBins*m_nAngularBins);
 }
 
@@ -263,26 +263,59 @@ void ShapeContext::scdesc_generate_angmask() {
 }
 
 void ShapeContext::scdesc_generate_emdmask() {
-    lvDbgAssert((int)m_vAngularLimits.size()==m_nAngularBins && (int)m_vRadialLimits.size()==m_nRadialBins);
-    m_oEMDCostMap.create(m_nDescSize,m_nDescSize);
-    for(int nBaseRadIdx=0; nBaseRadIdx<m_nRadialBins; ++nBaseRadIdx) {
-        const double dBaseMeanRadius = (m_vRadialLimits[nBaseRadIdx]+(nBaseRadIdx==0?0.0:m_vRadialLimits[nBaseRadIdx-1]))/2;
-        for(int nBaseAngIdx=0; nBaseAngIdx<m_nAngularBins; ++nBaseAngIdx) {
-            const double dBaseMeanAngle = (m_vAngularLimits[nBaseAngIdx]+(nBaseAngIdx==0?0.0:m_vAngularLimits[nBaseAngIdx-1]))/2;
-            const cv::Point2d vBaseCoord(dBaseMeanRadius*std::cos(dBaseMeanAngle),dBaseMeanRadius*std::sin(dBaseMeanAngle));
-            const int nBaseDescIdx = nBaseAngIdx+nBaseRadIdx*m_nAngularBins;
-            for(int nOffsetRadIdx=0; nOffsetRadIdx<m_nRadialBins; ++nOffsetRadIdx) {
-                const double dOffsetMeanRadius = (m_vRadialLimits[nOffsetRadIdx]+(nOffsetRadIdx==0?0.0:m_vRadialLimits[nOffsetRadIdx-1]))/2;
-                for(int nOffsetAngIdx=0; nOffsetAngIdx<m_nAngularBins; ++nOffsetAngIdx) {
-                    const double dOffsetMeanAngle = (m_vAngularLimits[nOffsetAngIdx]+(nOffsetAngIdx==0?0.0:m_vAngularLimits[nOffsetAngIdx-1]))/2;
-                    const cv::Point2d vOffsetCoord(dOffsetMeanRadius*std::cos(dOffsetMeanAngle),dOffsetMeanRadius*std::sin(dOffsetMeanAngle));
-                    const int nOffsetDescIdx = nOffsetAngIdx+nOffsetRadIdx*m_nAngularBins;
-                    m_oEMDCostMap(nBaseDescIdx,nOffsetDescIdx) = (float)cv::norm(cv::Mat(vOffsetCoord-vBaseCoord),cv::NORM_L2);
+    if(!m_bUseRelativeSpace && !m_bRotationInvariant && USE_LIENHART_LOOKUP_MASK) {
+        const int nMaskSize = m_nOuterRadius*2+1;
+        lvDbgAssert(m_oAbsDescLUMap.cols==nMaskSize && m_oAbsDescLUMap.rows==nMaskSize);
+        std::vector<std::vector<cv::Point2d>> vvDescBinPoints((size_t)m_nDescSize);
+        for(int nRowIdx=0; nRowIdx<nMaskSize; ++nRowIdx) {
+            for(int nColIdx=0; nColIdx<nMaskSize; ++nColIdx) {
+                const int nDescIdx = m_oAbsDescLUMap(nRowIdx,nColIdx);
+                if(nDescIdx==-1)
+                    continue;
+                lvAssert(nDescIdx<m_nDescSize);
+                vvDescBinPoints[nDescIdx].push_back(cv::Point2d(nColIdx,nRowIdx));
+            }
+        }
+        std::vector<cv::Point2d> vDescBinCenters((size_t)m_nDescSize,cv::Point2d(0,0));
+        for(size_t nDescIdx=0; nDescIdx<vvDescBinPoints.size(); ++nDescIdx) {
+            if(!vvDescBinPoints[nDescIdx].empty()) {
+                for(size_t nPtIdx=0; nPtIdx<vvDescBinPoints[nDescIdx].size(); ++nPtIdx)
+                    vDescBinCenters[nDescIdx] +=vvDescBinPoints[nDescIdx][nPtIdx];
+                vDescBinCenters[nDescIdx] /= (int)vvDescBinPoints[nDescIdx].size();
+            }
+        }
+        m_oEMDCostMap.create(m_nDescSize,m_nDescSize);
+        for(int nBaseDescIdx=0; nBaseDescIdx<m_nDescSize; ++nBaseDescIdx) {
+            const cv::Point2d& vBaseCoord = vDescBinCenters[nBaseDescIdx];
+            for(int nOffsetDescIdx=0; nOffsetDescIdx<m_nDescSize; ++nOffsetDescIdx) {
+                const cv::Point2d& vOffsetCoord = vDescBinCenters[nOffsetDescIdx];
+                m_oEMDCostMap(nBaseDescIdx,nOffsetDescIdx) = (float)cv::norm(cv::Mat(vOffsetCoord-vBaseCoord),cv::NORM_L2);
+            }
+        }
+        m_oEMDCostMap /= double(m_nOuterRadius)/2; // @@@@@ normalize costs based on half desc radius
+    }
+    else {
+        lvDbgAssert((int)m_vAngularLimits.size()==m_nAngularBins && (int)m_vRadialLimits.size()==m_nRadialBins);
+        m_oEMDCostMap.create(m_nDescSize,m_nDescSize);
+        for(int nBaseRadIdx=0; nBaseRadIdx<m_nRadialBins; ++nBaseRadIdx) {
+            const double dBaseMeanRadius = (m_vRadialLimits[nBaseRadIdx]+(nBaseRadIdx==0?0.0:m_vRadialLimits[nBaseRadIdx-1]))/2;
+            for(int nBaseAngIdx=0; nBaseAngIdx<m_nAngularBins; ++nBaseAngIdx) {
+                const double dBaseMeanAngle = (m_vAngularLimits[nBaseAngIdx]+(nBaseAngIdx==0?0.0:m_vAngularLimits[nBaseAngIdx-1]))/2;
+                const cv::Point2d vBaseCoord(dBaseMeanRadius*std::cos(dBaseMeanAngle),dBaseMeanRadius*std::sin(dBaseMeanAngle));
+                const int nBaseDescIdx = nBaseAngIdx+nBaseRadIdx*m_nAngularBins;
+                for(int nOffsetRadIdx=0; nOffsetRadIdx<m_nRadialBins; ++nOffsetRadIdx) {
+                    const double dOffsetMeanRadius = (m_vRadialLimits[nOffsetRadIdx]+(nOffsetRadIdx==0?0.0:m_vRadialLimits[nOffsetRadIdx-1]))/2;
+                    for(int nOffsetAngIdx=0; nOffsetAngIdx<m_nAngularBins; ++nOffsetAngIdx) {
+                        const double dOffsetMeanAngle = (m_vAngularLimits[nOffsetAngIdx]+(nOffsetAngIdx==0?0.0:m_vAngularLimits[nOffsetAngIdx-1]))/2;
+                        const cv::Point2d vOffsetCoord(dOffsetMeanRadius*std::cos(dOffsetMeanAngle),dOffsetMeanRadius*std::sin(dOffsetMeanAngle));
+                        const int nOffsetDescIdx = nOffsetAngIdx+nOffsetRadIdx*m_nAngularBins;
+                        m_oEMDCostMap(nBaseDescIdx,nOffsetDescIdx) = (float)cv::norm(cv::Mat(vOffsetCoord-vBaseCoord),cv::NORM_L2);
+                    }
                 }
             }
         }
+        m_oEMDCostMap /= m_vRadialLimits.back()/2; // @@@@@ normalize costs based on half desc radius
     }
-    m_oEMDCostMap /= m_vRadialLimits.back()/2; // @@@@@ normalize costs based on half desc radius
 }
 
 void ShapeContext::scdesc_fill_contours(const cv::Mat& oImage) {

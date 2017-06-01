@@ -166,9 +166,9 @@ TEST(sc,regression_emd_check) {
         const float* aDesc1 = oOutputDescs.ptr<float>(0);
         const float* aDesc2 = oOutputDescs.ptr<float>(i);
         if(i==0)
-            ASSERT_EQ(pShapeContext->calcDistance(aDesc1,aDesc2),0.0);
+            ASSERT_EQ(pShapeContext->calcDistance_EMD(aDesc1,aDesc2),0.0);
         else
-            ASSERT_GT(pShapeContext->calcDistance(aDesc1,aDesc2),0.0);
+            ASSERT_GT(pShapeContext->calcDistance_EMD(aDesc1,aDesc2),0.0);
     }
 }
 
