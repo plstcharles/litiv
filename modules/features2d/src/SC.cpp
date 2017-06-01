@@ -21,8 +21,8 @@
 
 #define USE_LIENHART_LOOKUP_MASK 1
 
-ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAngularBins,
-                           size_t nRadialBins, bool bRotationInvariant, bool bNormalizeBins) :
+ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAngularBins, size_t nRadialBins,
+                           bool bRotationInvariant, bool bNormalizeBins, bool bUseNonZeroInit) :
         m_nAngularBins((int)nAngularBins),
         m_nRadialBins((int)nRadialBins),
         m_nDescSize(m_nRadialBins*m_nAngularBins),
@@ -32,7 +32,8 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
         m_dOuterRadius(0.0),
         m_bUseRelativeSpace(false),
         m_bRotationInvariant(bRotationInvariant),
-        m_bNormalizeBins(bNormalizeBins) {
+        m_bNormalizeBins(bNormalizeBins),
+        m_bNonZeroInitBins(bUseNonZeroInit) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
     lvAssert_(m_nInnerRadius>0,"invalid parameter");
@@ -55,8 +56,8 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
     }
 }
 
-ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRadius, size_t nAngularBins,
-                           size_t nRadialBins, bool bRotationInvariant, bool bNormalizeBins) :
+ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRadius, size_t nAngularBins, size_t nRadialBins,
+                           bool bRotationInvariant, bool bNormalizeBins, bool bUseNonZeroInit) :
         m_nAngularBins((int)nAngularBins),
         m_nRadialBins((int)nRadialBins),
         m_nDescSize(m_nRadialBins*m_nAngularBins),
@@ -66,7 +67,8 @@ ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRad
         m_dOuterRadius(dRelativeOuterRadius),
         m_bUseRelativeSpace(true),
         m_bRotationInvariant(bRotationInvariant),
-        m_bNormalizeBins(bNormalizeBins) {
+        m_bNormalizeBins(bNormalizeBins),
+        m_bNonZeroInitBins(bUseNonZeroInit) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
     lvAssert_(m_dInnerRadius>0.0,"invalid parameter");
@@ -122,6 +124,10 @@ bool ShapeContext::empty() const {
 
 bool ShapeContext::isNormalizingBins() const {
     return m_bNormalizeBins;
+}
+
+bool ShapeContext::isNonZeroInitBins() const {
+    return m_bNonZeroInitBins;
 }
 
 int ShapeContext::chainDetectMethod() const {
@@ -354,12 +360,11 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
         oDescriptors.create(3,std::array<int,3>{m_oCurrImageSize.height,m_oCurrImageSize.width,m_nDescSize}.data());
     else
         oDescriptors.create((int)m_oKeyPts.total(),m_nDescSize);
-    oDescriptors = m_bNormalizeBins?1.0f/m_nDescSize:0.0f;
+    oDescriptors = m_bNonZeroInitBins?std::max(10.0f/m_nDescSize,0.5f):0.0f;
     scdesc_fill_maps();
     for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx) {
         if(!m_vKeyInliers.empty() && !m_vKeyInliers[nKeyPtIdx])
             continue;
-        size_t nValidPts = 1;
         const cv::Point2f& vKeyPt = ((cv::Point2f*)m_oKeyPts.data)[nKeyPtIdx];
         const int nKeyPtRowIdx = (int)std::round(vKeyPt.y);
         const int nKeyPtColIdx = (int)std::round(vKeyPt.x);
@@ -383,14 +388,12 @@ void ShapeContext::scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDesc
                     break;
                 }
             }
-            if(nAngularBinMatch!=-1 && nRadialBinMatch!=-1) {
+            if(nAngularBinMatch!=-1 && nRadialBinMatch!=-1)
                 ++(aDesc[nAngularBinMatch+nRadialBinMatch*m_nAngularBins]);
-                ++nValidPts;
-            }
         }
-        if(m_bNormalizeBins && nValidPts>1)
-            cv::Mat_<float>(1,m_nDescSize,aDesc) *= 1.0f/nValidPts;
     }
+    if(m_bNormalizeBins)
+        scdesc_norm(oDescriptors);
 }
 
 void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool bGenDescMap) {
@@ -404,7 +407,7 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
         oDescriptors.create(3,std::array<int,3>{m_oCurrImageSize.height,m_oCurrImageSize.width,m_nDescSize}.data());
     else
         oDescriptors.create((int)m_oKeyPts.total(),m_nDescSize);
-    oDescriptors = m_bNormalizeBins?1.0f/m_nDescSize:0.0f;
+    oDescriptors = m_bNonZeroInitBins?std::max(10.0f/m_nDescSize,0.5f):0.0f;
     lvDbgAssert(m_oContourPts.type()==CV_32FC2 && (m_oContourPts.total()==(size_t)m_oContourPts.rows || m_oContourPts.total()==(size_t)m_oContourPts.cols));
     lvDbgAssert(m_oKeyPts.type()==CV_32FC2 && (m_oKeyPts.total()==(size_t)m_oKeyPts.rows || m_oKeyPts.total()==(size_t)m_oKeyPts.cols));
     lvDbgAssert(m_vKeyInliers.empty() || m_oKeyPts.total()==m_vKeyInliers.size());
@@ -417,7 +420,6 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
     for(int nKeyPtIdx=0; nKeyPtIdx<(int)m_oKeyPts.total(); ++nKeyPtIdx) {
         if(!m_vKeyInliers.empty() && !m_vKeyInliers[nKeyPtIdx])
             continue;
-        size_t nValidPts = 1;
         const cv::Point2f& vKeyPt = ((cv::Point2f*)m_oKeyPts.data)[nKeyPtIdx];
         const int nKeyPtRowIdx = (int)std::round(vKeyPt.y);
         const int nKeyPtColIdx = (int)std::round(vKeyPt.x);
@@ -464,10 +466,26 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
                     continue;
                 ++(aDesc[nAngularBinMatch+nRadialBinMatch*m_nAngularBins]);
 #endif //!USE_LIENHART_LOOKUP_MASK
-                ++nValidPts;
             }
         }
-        if(m_bNormalizeBins && nValidPts>1)
-            cv::Mat_<float>(1,m_nDescSize,aDesc) *= 1.0f/nValidPts;
+    }
+    if(m_bNormalizeBins)
+        scdesc_norm(oDescriptors);
+}
+
+void ShapeContext::scdesc_norm(cv::Mat_<float>& oDescriptors) const {
+    if(oDescriptors.empty())
+        return;
+    lvDbgAssert((oDescriptors.total()%size_t(m_nDescSize))==0);
+    lvDbgAssert(oDescriptors.size[oDescriptors.dims-1]==m_nDescSize);
+    lvDbgAssert(oDescriptors.isContinuous());
+    const float fDefaultVal = std::sqrt(1.0f/m_nDescSize);
+    for(size_t nDescIdx=0; nDescIdx<oDescriptors.total(); nDescIdx+=size_t(m_nDescSize)) {
+        cv::Mat_<float> oCurrDesc(1,m_nDescSize,((float*)oDescriptors.data)+nDescIdx);
+        const double dNorm = cv::norm(oCurrDesc,cv::NORM_L2);
+        if(dNorm>1e-5)
+            oCurrDesc /= dNorm;
+        else
+            oCurrDesc = fDefaultVal;
     }
 }

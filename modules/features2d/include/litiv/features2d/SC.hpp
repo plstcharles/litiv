@@ -21,12 +21,13 @@
 #include "litiv/utils/math.hpp"
 #include <opencv2/features2d.hpp>
 
-#define SHAPECONTEXT_DEFAULT_ANG_BINS  (12)
-#define SHAPECONTEXT_DEFAULT_RAD_BINS  (5)
-#define SHAPECONTEXT_DEFAULT_INNER_RAD (0.1)
-#define SHAPECONTEXT_DEFAULT_OUTER_RAD (1.0)
-#define sHAPECONTEXT_DEFAULT_ROT_INVAR (false)
-#define SHAPECONTEXT_DEFAULT_NORM_BINS (true)
+#define SHAPECONTEXT_DEFAULT_ANG_BINS    (12)
+#define SHAPECONTEXT_DEFAULT_RAD_BINS    (5)
+#define SHAPECONTEXT_DEFAULT_INNER_RAD   (0.1)
+#define SHAPECONTEXT_DEFAULT_OUTER_RAD   (1.0)
+#define sHAPECONTEXT_DEFAULT_ROT_INVAR   (false)
+#define SHAPECONTEXT_DEFAULT_NORM_BINS   (true)
+#define SHAPECONTEXT_DEFAULT_USE_NZ_INIT (true)
 
 /**
     Shape Context (SC) feature extractor
@@ -45,14 +46,16 @@ public:
                           size_t nAngularBins=SHAPECONTEXT_DEFAULT_ANG_BINS,
                           size_t nRadialBins=SHAPECONTEXT_DEFAULT_RAD_BINS,
                           bool bRotationInvariant=sHAPECONTEXT_DEFAULT_ROT_INVAR,
-                          bool bNormalizeBins=SHAPECONTEXT_DEFAULT_NORM_BINS);
+                          bool bNormalizeBins=SHAPECONTEXT_DEFAULT_NORM_BINS,
+                          bool bUseNonZeroInit=SHAPECONTEXT_DEFAULT_USE_NZ_INIT);
     /// constructor for mean-normalized description space (i.e. using relative radii values)
     explicit ShapeContext(double dRelativeInnerRadius/*=SHAPECONTEXT_DEFAULT_INNER_RAD*/,
                           double dRelativeOuterRadius/*=SHAPECONTEXT_DEFAULT_OUTER_RAD*/,
                           size_t nAngularBins=SHAPECONTEXT_DEFAULT_ANG_BINS,
                           size_t nRadialBins=SHAPECONTEXT_DEFAULT_RAD_BINS,
                           bool bRotationInvariant=sHAPECONTEXT_DEFAULT_ROT_INVAR,
-                          bool bNormalizeBins=SHAPECONTEXT_DEFAULT_NORM_BINS);
+                          bool bNormalizeBins=SHAPECONTEXT_DEFAULT_NORM_BINS,
+                          bool bUseNonZeroInit=SHAPECONTEXT_DEFAULT_USE_NZ_INIT);
     /// loads extractor params from the specified file node @@@@ not impl
     virtual void read(const cv::FileNode&) override;
     /// writes extractor params to the specified file storage @@@@ not impl
@@ -74,6 +77,8 @@ public:
 
     /// returns whether descriptor bin arrays will be 0-1 normalized before returning or not
     bool isNormalizingBins() const;
+    /// returns whether descriptor bins will be initialized with (small) nonzero values or not
+    bool isNonZeroInitBins() const;
     /// returns the cv::ContourApproximationModes detection strategy to use when finding contours in binary images
     int chainDetectMethod() const;
 
@@ -142,6 +147,8 @@ protected:
     const bool m_bRotationInvariant;
     /// defines whether descriptor bins will be 0-1 normalized or not
     const bool m_bNormalizeBins;
+    /// defines whether descriptor bins should be initialized with (small) nonzero values or not
+    const bool m_bNonZeroInitBins;
 
 private:
 
@@ -159,6 +166,8 @@ private:
     void scdesc_fill_desc(cv::Mat_<float>& oDescriptors, bool bGenDescMap);
     /// fills descriptor without using internal maps (only for absolute descs w/o rot inv)
     void scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool bGenDescMap);
+    /// descriptor normalisation approach impl
+    void scdesc_norm(cv::Mat_<float>& oDescriptors) const;
 
     // helper variables for internal impl (helps avoid continuous mem realloc)
     std::vector<double> m_vAngularLimits,m_vRadialLimits;
