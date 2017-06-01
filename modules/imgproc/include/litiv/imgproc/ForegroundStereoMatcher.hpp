@@ -27,7 +27,7 @@
 #define STEREOSEGMATCH_CONFIG_USE_LSS_AFFINITY      1
 #define STEREOSEGMATCH_CONFIG_USE_MI_AFFINITY       0
 #define STEREOSEGMATCH_CONFIG_USE_SSQDIFF_AFFINITY  0
-#define STEREOSEGMATCH_CONFIG_USE_SHAPE_EMD_SIM     0
+#define STEREOSEGMATCH_CONFIG_USE_SHAPE_EMD_AFFIN   0
 #define STEREOSEGMATCH_CONFIG_USE_UNARY_ONLY_FIRST  1
 #define STEREOSEGMATCH_CONFIG_USE_SALIENT_MAP_BORDR 1
 #define STEREOSEGMATCH_CONFIG_USE_ROOT_SIFT_DESCS   0
@@ -49,15 +49,15 @@
 #define STEREOSEGMATCH_DEFAULT_DISTTRANSF_SCALE     (-0.1f)
 #define STEREOSEGMATCH_DEFAULT_ITER_PER_RESEGM      ((m_nStereoLabels*3)/2)
 #define STEREOSEGMATCH_DEFAULT_SALIENT_SHP_RAD      (3)
-#define STEREOSEGMATCH_DEFAULT_DESC_PATCH_HEIGHT    (7)
-#define STEREOSEGMATCH_DEFAULT_DESC_PATCH_WIDTH     (7)
+#define STEREOSEGMATCH_DEFAULT_DESC_PATCH_HEIGHT    (15)
+#define STEREOSEGMATCH_DEFAULT_DESC_PATCH_WIDTH     (15)
 
 // unary costs params
 #define STEREOSEGMATCH_UNARY_COST_OOB_CST           (ValueType(5000))
 #define STEREOSEGMATCH_UNARY_COST_OCCLUDED_CST      (ValueType(2000))
 #define STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST      (ValueType(10000))
 #define STEREOSEGMATCH_IMGSIM_COST_DESC_SCALE       (100)
-#define STEREOSEGMATCH_SHPSIM_COST_DESC_SCALE       (0)
+#define STEREOSEGMATCH_SHPSIM_COST_DESC_SCALE       (100)
 #define STEREOSEGMATCH_UNIQUE_COST_OVER_SCALE       (200)
 #define STEREOSEGMATCH_SHPDIST_COST_SCALE           (1000)
 // pairwise costs params
@@ -312,8 +312,8 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         lv::DisplayHelperPtr m_pDisplayHelper;
         /// defines the indices of feature maps inside precalc packets (per camera head)
         enum FeatPackingList {
-            FeatPackSize=18,
-            FeatPackOffset=8,
+            FeatPackSize=20,
+            FeatPackOffset=9,
             // absolute values for direct indexing
             FeatPack_LeftInitFGDist=0,
             FeatPack_LeftInitBGDist=1,
@@ -322,17 +322,19 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
             FeatPack_LeftGradY=4,
             FeatPack_LeftGradX=5,
             FeatPack_LeftGradMag=6,
-            FeatPack_LeftSaliency=7,
-            FeatPack_RightInitFGDist=8,
-            FeatPack_RightInitBGDist=9,
-            FeatPack_RightFGDist=10,
-            FeatPack_RightBGDist=11,
-            FeatPack_RightGradY=12,
-            FeatPack_RightGradX=13,
-            FeatPack_RightGradMag=14,
-            FeatPack_RightSaliency=15,
-            FeatPack_ImgAffinity=16,
-            FeatPack_ShpAffinity=17,
+            FeatPack_LeftImgSaliency=7,
+            FeatPack_LeftShpSaliency=8,
+            FeatPack_RightInitFGDist=9,
+            FeatPack_RightInitBGDist=10,
+            FeatPack_RightFGDist=11,
+            FeatPack_RightBGDist=12,
+            FeatPack_RightGradY=13,
+            FeatPack_RightGradX=14,
+            FeatPack_RightGradMag=15,
+            FeatPack_RightImgSaliency=16,
+            FeatPack_RightShpSaliency=17,
+            FeatPack_ImgAffinity=18,
+            FeatPack_ShpAffinity=19,
             // relative values for cam-based indexing
             FeatPackOffset_InitFGDist=0,
             FeatPackOffset_InitBGDist=1,
@@ -341,7 +343,8 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
             FeatPackOffset_GradY=4,
             FeatPackOffset_GradX=5,
             FeatPackOffset_GradMag=6,
-            FeatPackOffset_Saliency=7,
+            FeatPackOffset_ImgSaliency=7,
+            FeatPackOffset_ShpSaliency=8,
         };
 
     protected:

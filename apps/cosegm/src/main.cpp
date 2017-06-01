@@ -24,7 +24,7 @@
 #define WRITE_IMG_OUTPUT        0
 #define EVALUATE_OUTPUT         0
 #define DISPLAY_OUTPUT          1
-#define GLOBAL_VERBOSITY        2
+#define GLOBAL_VERBOSITY        3
 ////////////////////////////////
 #define DATASET_VAPTRIMOD       1
 #define DATASET_MINI_TESTS      0
