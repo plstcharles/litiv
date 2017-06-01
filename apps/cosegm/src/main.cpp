@@ -51,7 +51,7 @@
     true,                                         /* bool bUndistort=true */\
     true,                                         /* bool bHorizRectify=false */\
     false,                                        /* bool bEvalStereoDisp=false */\
-    PROCESS_PREPROC_BGSEGM?0:7,                   /* int nLoadInputMasks=0 */\
+    PROCESS_PREPROC_BGSEGM?0:2,                   /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_MINI_TESTS
 #include "cosegm_tests.hpp"
