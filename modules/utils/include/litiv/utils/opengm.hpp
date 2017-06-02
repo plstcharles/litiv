@@ -49,6 +49,12 @@
 #ifndef SYS_MEMORYINFO_ON
 #define SYS_MEMORYINFO_ON
 #endif //ndef(SYS_MEMORYINFO_ON)
+#if OPENGM_ENABLE_FAST_DEBUG_MAT_OPS
+#ifndef NDEBUG
+#define ADDED_NDEBUG
+#define NDEBUG
+#endif //ndef(NDEBUG)
+#endif //OPENGM_ENABLE_FAST_DEBUG_MAT_OPS
 #include <opengm/graphicalmodel/graphicalmodel.hxx>
 #include <opengm/functions/potts.hxx>
 #include <opengm/graphicalmodel/space/simplediscretespace.hxx>
@@ -66,6 +72,10 @@
 #endif //ndef(FASTPDLABELVALUE)
 #include <opengm/inference/external/fastPD.hxx>
 #endif //HAVE_OPENGM_EXTLIB_FASTPD
+#ifdef ADDED_NDEBUG
+#undef ADDED_NDEBUG
+#undef NDEBUG
+#endif //def(ADDED_NDEBUG)
 #if defined(_MSC_VER)
 #pragma warning(pop)
 #elif (defined(__GNUC__) || defined(__GNUG__))
