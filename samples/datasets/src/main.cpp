@@ -31,7 +31,7 @@
 
 #define USE_MIDDLEBURY_SPECIALIZATION 1
 
-#include "litiv/datasets.hpp" // includes all datasets module utilities (along with pre-implemented datset specializations)
+#include "litiv/datasets.hpp" // includes all datasets module utilities (along with pre-implemented dataset specializations)
 #if USE_MIDDLEBURY_SPECIALIZATION
 #include "middlebury2005.hpp" // includes a custom dataset specialization used to parse middlebury stereo 2005 two-views data
 #else //!USE_MIDDLEBURY_SPECIALIZATION
@@ -45,7 +45,7 @@ int main(int, char**) { // this sample uses no command line argument
 #if USE_MIDDLEBURY_SPECIALIZATION
 
         // The 'DatasetType' alias below is only used to simplify templating; the 'Dataset_' interface
-        // has three enum template parameters, namely the dataset task type ('eDatasetTask'), the datset
+        // has three enum template parameters, namely the dataset task type ('eDatasetTask'), the dataset
         // identifier ('eDataset'), and the implementation type ('eEvalImpl'). For this example, we ask for
         // the cosegmentation task interface since it is compatible with stereo disparity estimation; we are
         // also using our own specialized dataset implementation, so we set the dataset identifier to our own
@@ -75,7 +75,7 @@ int main(int, char**) { // this sample uses no command line argument
 #else //!USE_MIDDLEBURY_SPECIALIZATION
 
         // The 'DatasetType' alias below is only used to simplify templating; the 'Dataset_' interface
-        // has three enum template parameters, namely the dataset task type ('eDatasetTask'), the datset
+        // has three enum template parameters, namely the dataset task type ('eDatasetTask'), the dataset
         // identifier ('eDataset'), and the implementation type ('eEvalImpl'). For this example, we use
         // an edge detection algo, so we set the task type as 'DatasetTask_EdgDet'; we are also defining
         // a custom run-time dataset, so we set the dataset identifier as 'Dataset_Custom'; finally, we
@@ -87,7 +87,7 @@ int main(int, char**) { // this sample uses no command line argument
         // the directory structure expected by the parser to make sure all data can be found automatically:
         //
         //  <SAMPLES_DATA_ROOT>/custom_dataset_ex/    => this is the 'dataset root' folder, in which the named batch directories (provided in the constructor below) can be found
-        //        |------batch1/                      =< this is the first work batch in the datset; it could contain a set of training/testing images, or images of a specific category requiring independent evaluation
+        //        |------batch1/                      =< this is the first work batch in the dataset; it could contain a set of training/testing images, or images of a specific category requiring independent evaluation
         //        |        |----- (some image).jpg    => all data packets (or images, in this case) will be assigned a packet index based on the order they are parsed in; this first image would have ID=1 in 'batch1' (and so on)
         //        |        |----- (some image).jpg    => images do not need to all be using the same container (e.g. jpg's can be mixed with png's)
         //        |        \----- (some image).jpg
@@ -111,7 +111,7 @@ int main(int, char**) { // this sample uses no command line argument
         // the dataset identifier). These arguments (along with their parameter name) are described below:
         //
         //   1.   "Custom Dataset Example"                    => const std::string& sDatasetName => verbose name of the dataset, used for display/debug/logging purposes only
-        //   2.   "<SAMPLES_DATA_ROOT>/custom_dataset_ex/"    => const std::string& sDatasetDirPath => full path to the datset's top-level directory, where work batches can be found
+        //   2.   "<SAMPLES_DATA_ROOT>/custom_dataset_ex/"    => const std::string& sDatasetDirPath => full path to the dataset's top-level directory, where work batches can be found
         //   3.   "results_test"                              => const std::string& sOutputDirPath => full path to the output directory, where logs/evaluation results will be written
         //   4.   {"batch1","batch2","batch3"}                => const std::vector<std::string>& vsWorkBatchDirs => list of dataset directory names to be treated as work batches
         //   5.   {}                                          => const std::vector<std::string>& vsSkippedDirTokens => list of tokens which, if found in a directory/batch name, will remove it from the dataset

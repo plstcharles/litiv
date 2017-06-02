@@ -418,7 +418,7 @@ namespace lv {
     protected:
         /// creates and returns a work batch for a given relative dataset path
         virtual IDataHandlerPtr createWorkBatch(const std::string& sBatchName, const std::string& sRelativePath) const = 0;
-        /// creates group/nongroup workbatches based on internal datset info and current relative path, and recursively calls parse data on all childrens
+        /// creates group/nongroup workbatches based on internal dataset info and current relative path, and recursively calls parse data on all childrens
         virtual void parseData() override;
         /// protected default constructor; automatically sets 'isBare' to true
         inline DataGroupHandler() : m_bIsBare(true) {}
