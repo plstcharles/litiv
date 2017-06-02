@@ -37,6 +37,7 @@
 #define DATASET_USE_DISPARITY_EVAL         0
 #define DATASET_USE_HALF_GT_INPUT_FLAG     0
 #define DATASET_USE_PRECALC_FEATURES       0
+#define DATASET_BATCH_START_INDEX          125
 
 #if (DATASET_VAPTRIMOD+DATASET_MINI_TESTS/*+...*/)!=1
 #error "Must pick a single dataset."
@@ -48,10 +49,10 @@
     bool(WRITE_IMG_OUTPUT),                       /* bool bSaveOutput=false */\
     bool(EVALUATE_OUTPUT),                        /* bool bUseEvaluator=true */\
     false,                                        /* bool bLoadDepth=true */\
-    true,                                         /* bool bUndistort=true */\
-    true,                                         /* bool bHorizRectify=false */\
+    PROCESS_PREPROC_BGSEGM?false:true,            /* bool bUndistort=true */\
+    PROCESS_PREPROC_BGSEGM?false:true,            /* bool bHorizRectify=false */\
     false,                                        /* bool bEvalStereoDisp=false */\
-    PROCESS_PREPROC_BGSEGM?0:2,                   /* int nLoadInputMasks=0 */\
+    PROCESS_PREPROC_BGSEGM?0:4,                   /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_MINI_TESTS
 #include "cosegm_tests.hpp"
@@ -121,17 +122,19 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         std::cout << "\t\t" << sCurrBatchName << " @ init [" << sWorkerName << "]" << std::endl;
         const std::vector<cv::Mat>& vROIs = oBatch.getFrameROIArray();
         lvAssert(!vROIs.empty() && vROIs.size()==oBatch.getInputStreamCount());
-        size_t nCurrIdx = 125;
-        //size_t nCurrIdx = 0;
+        size_t nCurrIdx = DATASET_BATCH_START_INDEX;
         const std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // note: mat content becomes invalid on next getInput call
         lvAssert(vInitInput.size()==oBatch.getInputStreamCount());
         for(size_t nStreamIdx=0; nStreamIdx<vInitInput.size(); ++nStreamIdx) {
             lvAssert(vInitInput[nStreamIdx].size()==vInitInput[0].size());
             lvLog_(2,"\tinput %d := %s   (roi=%s)",(int)nStreamIdx,lv::MatInfo(vInitInput[nStreamIdx]).str().c_str(),lv::MatInfo(vROIs[nStreamIdx]).str().c_str());
-            //cv::imshow(std::string("vInitInput_")+std::to_string(nStreamIdx),vInitInput[nStreamIdx]);
-            //cv::imshow(std::string("vROI_")+std::to_string(nStreamIdx),vROIs[nStreamIdx]);
+            if(lv::getVerbosity()>=6) {
+                cv::imshow(std::string("vInitInput_")+std::to_string(nStreamIdx),vInitInput[nStreamIdx]);
+                cv::imshow(std::string("vROI_")+std::to_string(nStreamIdx),vROIs[nStreamIdx]);
+            }
         }
-        //cv::waitKey(0);
+        if(lv::getVerbosity()>=6)
+            cv::waitKey(0);
         const std::vector<lv::MatInfo> oInfoArray = oBatch.getInputInfoArray();
         const lv::MatSize oFrameSize = oInfoArray[0].size;
 #if PROCESS_PREPROC_BGSEGM

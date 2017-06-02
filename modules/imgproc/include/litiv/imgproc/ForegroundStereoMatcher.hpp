@@ -17,6 +17,8 @@
 
 #pragma once
 
+#define OPENGM_ENABLE_FAST_DEBUG_MAT_OPS 1
+
 #include "litiv/utils/opengm.hpp"
 #include "litiv/features2d.hpp"
 #include "litiv/imgproc.hpp"
@@ -198,20 +200,20 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         void calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeatsPacket=nullptr);
         /// sets a previously precalculated features packet to be used in the next model updates (do not modify it before that!)
         void setNextFeatures(const cv::Mat& oPackedFeats);
-        /// performs the actual bi-model inference
-        opengm::InferenceTermination infer(size_t nCamIdx);
+        /// performs the actual bi-model, bi-spectral inference
+        opengm::InferenceTermination infer(size_t nPrimaryCamIdx=0);
         /// translate an internal graph label to a real disparity offset label
         OutputLabelType getRealLabel(InternalLabelType nLabel) const;
         /// translate a real disparity offset label to an internal graph label
         InternalLabelType getInternalLabel(OutputLabelType nRealLabel) const;
         /// returns the stereo associations count for a given graph node by row/col indices
-        AssocCountType getAssocCount(int nRowIdx, int nColIdx) const;
+        AssocCountType getAssocCount(size_t nCamIdx, int nRowIdx, int nColIdx) const;
         /// returns the cost of adding a stereo association for a given node coord set & origin column idx
-        ValueType calcAddAssocCost(int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
+        ValueType calcAddAssocCost(size_t nCamIdx, int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
         /// returns the cost of removing a stereo association for a given node coord set & origin column idx
-        ValueType calcRemoveAssocCost(int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
+        ValueType calcRemoveAssocCost(size_t nCamIdx, int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
         /// returns the total stereo association cost for all grid nodes
-        ValueType calcTotalAssocCost() const;
+        ValueType calcTotalAssocCost(size_t nCamIdx) const;
 
         /// max move making iteration count allowed during inference
         size_t m_nMaxMoveIterCount;
@@ -219,18 +221,18 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         size_t m_nStereoLabelOrderRandomSeed,m_nStereoLabelingRandomSeed;
         /// contains the (internal) stereo label ordering to use for each iteration
         std::vector<InternalLabelType> m_vStereoLabelOrdering;
-        /// contains the (internal) labeling of the stereo/resegm graphs (mutable for inference)
-        mutable CamArray<cv::Mat_<InternalLabelType>> m_aStereoLabelings,m_aResegmLabelings;
-        /// 2d map which contains how many associations a node possesses (mutable for inference)
-        mutable cv::Mat_<AssocCountType> m_oAssocCounts;
-        /// 3d map which lists the associations (by idx) for each node in the graph (mutable for inference)
-        mutable cv::Mat_<AssocIdxType> m_oAssocMap;
-        /// 2d map which contains transient unary factor energy costs for all graph nodes (mutable for inference)
-        mutable cv::Mat_<ValueType> m_oAssocCosts,m_oStereoUnaryCosts,m_oResegmUnaryCosts;
-        /// 2d map which contains transient pairwise factor energy costs for all graph nodes (mutable for inference, for debug only)
-        mutable cv::Mat_<ValueType> m_oStereoPairwCosts,m_oResegmPairwCosts;
         /// holds the set of features to use during the next inference (mutable, as shape features will change during inference)
         mutable std::vector<cv::Mat> m_vNextFeats;
+        /// contains the (internal) labelings of the stereo/resegm graphs (mutable for inference)
+        mutable CamArray<cv::Mat_<InternalLabelType>> m_aStereoLabelings,m_aResegmLabelings;
+        /// 2d maps which contain how many associations a graph node possesses (mutable for inference)
+        mutable CamArray<cv::Mat_<AssocCountType>> m_aAssocCounts;
+        /// 3d maps which list the associations (by idx) for each graph node (mutable for inference)
+        mutable CamArray<cv::Mat_<AssocIdxType>> m_aAssocMaps;
+        /// 2d maps which contain transient unary factor energy costs for all graph nodes (mutable for inference)
+        mutable CamArray<cv::Mat_<ValueType>> m_aAssocCosts,m_aStereoUnaryCosts,m_aResegmUnaryCosts;
+        /// 2d maps which contain transient pairwise factor energy costs for all graph nodes (mutable for inference, for debug only)
+        mutable CamArray<cv::Mat_<ValueType>> m_aStereoPairwCosts,m_aResegmPairwCosts;
         /// contains the ROIs used for grid setup passed in the constructor
         const CamArray<cv::Mat_<uchar>> m_aROIs;
         /// contains the predetermined (max) 2D grid size for the graph models
@@ -273,12 +275,12 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         CamArray<std::vector<ResegmFunc>> m_avResegmUnaryFuncs;
         /// resegm model pairwise functions array
         CamArray<std::array<std::vector<ResegmFunc>,2>> m_aavResegmPairwFuncs;
-        /// functions data arrays (contiguous blocks, shared between camera heads)
-        std::unique_ptr<ValueType[]> m_aStereoFuncsData,m_aResegmFuncsData;
-        /// stereo/resegm models unary functions base pointer
-        ValueType* m_pStereoUnaryFuncsDataBase,*m_pResegmUnaryFuncsDataBase;
-        /// stereo/resegm models pairwise functions base pointer
-        ValueType* m_pStereoPairwFuncsDataBase,*m_pResegmPairwFuncsDataBase;
+        /// functions data arrays (contiguous blocks for all factors)
+        CamArray<std::unique_ptr<ValueType[]>> m_aaStereoFuncsData,m_aaResegmFuncsData;
+        /// stereo/resegm models unary functions base pointers
+        CamArray<ValueType*> m_apStereoUnaryFuncsDataBase,m_apResegmUnaryFuncsDataBase;
+        /// stereo/resegm models pairwise functions base pointers
+        CamArray<ValueType*> m_apStereoPairwFuncsDataBase,m_apResegmPairwFuncsDataBase;
         /// cost lookup table for adding/removing/summing associations
         lv::AutoBuffer<ValueType,200> m_aAssocCostRealAddLUT,m_aAssocCostRealRemLUT,m_aAssocCostRealSumLUT;
         /// cost lookup table for approximately (worse case) adding/removing associations
@@ -349,15 +351,15 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
 
     protected:
         /// adds a stereo association for a given node coord set & origin column idx
-        void addAssoc(int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
+        void addAssoc(size_t nCamIdx, int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
         /// removes a stereo association for a given node coord set & origin column idx
-        void removeAssoc(int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
-        /// resets the graph labelings using init state parameters
-        void resetLabelings(size_t nCamIdx);
-        /// updates stereo model using new feats data
-        void updateStereoModel(size_t nCamIdx, bool bInit);
-        /// updates shape model using new feats data
-        void updateResegmModel(size_t nCamIdx, bool bInit);
+        void removeAssoc(size_t nCamIdx, int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
+        /// resets graph labelings using init state parameters
+        void resetLabelings();
+        /// updates both stereo graph models using new feats data
+        void updateStereoModels(bool bInit);
+        /// updates both shape graph models using new feats data
+        void updateResegmModels(bool bInit);
         /// calculates image features required for model updates using the provided input image array
         void calcImageFeatures(const CamArray<cv::Mat>& aInputImages, bool bInit);
         /// calculates shape features required for model updates using the provided input mask array
