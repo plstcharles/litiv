@@ -33,7 +33,7 @@
 #define DATASET_OUTPUT_PATH     "results_test"
 #define DATASET_PRECACHING      1
 
-using DatasetType = lv::Dataset_<lv::DatasetTask_Cosegm,lv::Dataset_VAPtrimod2016,lv::NonParallel>;
+using DatasetType = lv::Dataset_<lv::DatasetTask_Cosegm,lv::Dataset_VAP_trimod2016,lv::NonParallel>;
 void Analyze(lv::IDataHandlerPtr pBatch);
 
 int main(int, char**) {

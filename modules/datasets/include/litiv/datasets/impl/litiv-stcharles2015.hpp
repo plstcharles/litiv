@@ -38,8 +38,8 @@ namespace lv {
         ) :
                 IDataset_<eDatasetType_VideoRegistr,Dataset_VideoRegistr_LITIV2012b,eEvalImpl>(
                         "LITIV 2012b (CVPRW2015 update)",
-                        lv::datasets::getRootPath()+"litiv/litiv2012b/",
-                        lv::datasets::getRootPath()+"litiv/litiv2012b/"+lv::addDirSlashIfMissing(sOutputDirName),
+                        lv::datasets::getRootPath()+"litiv/stcharles2015/",
+                        lv::datasets::getRootPath()+"litiv/stcharles2015/"+lv::addDirSlashIfMissing(sOutputDirName),
                         getWorkBatchDirNames(),
                         getSkippedWorkBatchDirNames(),
                         getGrayscaleWorkBatchDirNames(),
@@ -64,8 +64,8 @@ namespace lv {
     };
 
     template<DatasetTaskList eDatasetTask>
-    struct DataProducer_<eDatasetTask,DatasetSource_Video,Dataset_LITIV2012b> :
-            public IDataProducerWrapper_<eDatasetTask,DatasetSource_Video,Dataset_LITIV2012b> {
+    struct DataProducer_<eDatasetTask,DatasetSource_Video,Dataset_LITIV_stcharles2015> :
+            public IDataProducerWrapper_<eDatasetTask,DatasetSource_Video,Dataset_LITIV_stcharles2015> {
     protected:
         virtual void parseData() override final {
             lvDbgExceptionWatch;

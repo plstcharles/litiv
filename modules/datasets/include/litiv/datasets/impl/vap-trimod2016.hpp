@@ -46,9 +46,9 @@ namespace lv {
 
     /// dataset loader impl specialization for VAP trimodal dataset -- instantiated via lv::datasets::create(...)
     template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl>
-    struct Dataset_<eDatasetTask,Dataset_VAPtrimod2016,eEvalImpl> :
+    struct Dataset_<eDatasetTask,Dataset_VAP_trimod2016,eEvalImpl> :
             public IVAPtrimod2016Dataset,
-            public IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016,lv::getDatasetEval<eDatasetTask,Dataset_VAPtrimod2016>(),eEvalImpl> {
+            public IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAP_trimod2016,lv::getDatasetEval<eDatasetTask,Dataset_VAP_trimod2016>(),eEvalImpl> {
     protected: // should still be protected, as creation should always be done via lv::datasets::create
         /// specialization constructor, with all required extra parameters; these will be forwarded by lv::datasets::create(...)
         Dataset_(
@@ -62,7 +62,7 @@ namespace lv {
                 int nLoadInputMasks=0, ///< defines whether the input stream should be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
                 double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
         ) :
-                IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016,lv::getDatasetEval<eDatasetTask,Dataset_VAPtrimod2016>(),eEvalImpl>(
+                IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAP_trimod2016,lv::getDatasetEval<eDatasetTask,Dataset_VAP_trimod2016>(),eEvalImpl>(
                         "VAP-trimodal2016",
                         lv::datasets::getRootPath()+"vap/rgbdt-stereo/",
                         lv::datasets::getRootPath()+"vap/rgbdt-stereo/results/"+lv::addDirSlashIfMissing(sOutputDirName),
@@ -115,7 +115,7 @@ namespace lv {
 
     /// data grouper handler impl specialization for vap trimodal dataset; will skip groups entirely & forward data to batches
     template<DatasetTaskList eDatasetTask>
-    struct DataGroupHandler_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016> :
+    struct DataGroupHandler_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAP_trimod2016> :
             public DataGroupHandler {
     protected:
         virtual void parseData() override {
@@ -130,8 +130,8 @@ namespace lv {
 
     /// data producer impl specialization for vap trimodal dataset; provides required data i/o and undistort support
     template<DatasetTaskList eDatasetTask>
-    struct DataProducer_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016> :
-            public IDataProducerWrapper_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAPtrimod2016> {
+    struct DataProducer_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAP_trimod2016> :
+            public IDataProducerWrapper_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAP_trimod2016> {
         /// returns the number of parallel input streams (depends on whether loading depth or not)
         virtual size_t getInputStreamCount() const override final {
             return size_t((m_bLoadDepth?3:2)*(m_nLoadInputMasks?2:1));

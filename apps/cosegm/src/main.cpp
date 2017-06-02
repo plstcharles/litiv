@@ -42,7 +42,7 @@
 #error "Must pick a single dataset."
 #endif //(DATASET_+.../*+...*/)!=1
 #if DATASET_VAPTRIMOD
-#define DATASET_ID Dataset_VAPtrimod2016
+#define DATASET_ID Dataset_VAP_trimod2016
 #define DATASET_PARAMS \
     DATASET_OUTPUT_PATH,                          /* const std::string& sOutputDirName */\
     bool(WRITE_IMG_OUTPUT),                       /* bool bSaveOutput=false */\
