@@ -26,7 +26,8 @@
 #define DISPLAY_OUTPUT          1
 #define GLOBAL_VERBOSITY        3
 ////////////////////////////////
-#define DATASET_VAPTRIMOD       1
+#define DATASET_VAPTRIMOD       0
+#define DATASET_LITIV2014       1
 #define DATASET_MINI_TESTS      0
 ////////////////////////////////
 #define DATASET_OUTPUT_PATH     "results_test"
@@ -37,9 +38,9 @@
 #define DATASET_USE_DISPARITY_EVAL         0
 #define DATASET_USE_HALF_GT_INPUT_FLAG     0
 #define DATASET_USE_PRECALC_FEATURES       0
-#define DATASET_BATCH_START_INDEX          125
+#define DATASET_BATCH_START_INDEX          0
 
-#if (DATASET_VAPTRIMOD+DATASET_MINI_TESTS/*+...*/)!=1
+#if (DATASET_VAPTRIMOD+DATASET_LITIV2014+DATASET_MINI_TESTS/*+...*/)!=1
 #error "Must pick a single dataset."
 #endif //(DATASET_+.../*+...*/)!=1
 #if DATASET_VAPTRIMOD
@@ -53,6 +54,18 @@
     PROCESS_PREPROC_BGSEGM?false:true,            /* bool bHorizRectify=false */\
     false,                                        /* bool bEvalStereoDisp=false */\
     PROCESS_PREPROC_BGSEGM?0:4,                   /* int nLoadInputMasks=0 */\
+    DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
+#elif DATASET_LITIV2014
+#define DATASET_ID Dataset_LITIV_bilodeau2014
+#define DATASET_PARAMS \
+    DATASET_OUTPUT_PATH,                          /* const std::string& sOutputDirName */\
+    bool(WRITE_IMG_OUTPUT),                       /* bool bSaveOutput=false */\
+    bool(EVALUATE_OUTPUT),                        /* bool bUseEvaluator=true */\
+    false,                                        /* bool bLoadFullVideos=false */\
+    true,                                         /* bool bEvalStereoDisp=true */\
+    true,                                         /* bool bFlipDisparities=false */\
+    -1,                                           /* int nLoadPersonSets=-1 */\
+    PROCESS_PREPROC_BGSEGM?0:1,                   /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_MINI_TESTS
 #include "cosegm_tests.hpp"
@@ -323,7 +336,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             if(nKeyPressed==(int)'q')
                 break;
         #endif //DISPLAY_OUTPUT>0
-            if(oBatch.isEvaluatingStereoDisp())
+            if(oBatch.isEvaluatingDisparities())
                 oBatch.push(vCurrStereoMaps,nCurrIdx++);
             else
                 oBatch.push(vCurrFGMasks,nCurrIdx++);
