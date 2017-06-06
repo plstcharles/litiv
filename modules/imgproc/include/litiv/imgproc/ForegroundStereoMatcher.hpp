@@ -206,6 +206,8 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         OutputLabelType getRealLabel(InternalLabelType nLabel) const;
         /// translate a real disparity offset label to an internal graph label
         InternalLabelType getInternalLabel(OutputLabelType nRealLabel) const;
+        /// returns the offset column to use for indexing pixels in the other camera image
+        int getOffsetColIdx(size_t nCamIdx, int nColIdx, InternalLabelType nLabel) const;
         /// returns the stereo associations count for a given graph node by row/col indices
         AssocCountType getAssocCount(size_t nCamIdx, int nRowIdx, int nColIdx) const;
         /// returns the cost of adding a stereo association for a given node coord set & origin column idx
