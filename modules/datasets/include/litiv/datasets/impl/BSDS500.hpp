@@ -49,7 +49,7 @@ namespace lv {
                 IDataset_<eDatasetTask,DatasetSource_Image,Dataset_BSDS500,lv::getDatasetEval<eDatasetTask,Dataset_BSDS500>(),eEvalImpl>(
                         "BSDS500",
                         lv::datasets::getRootPath()+"BSDS500/data/images/",
-                        lv::datasets::getRootPath()+"BSDS500/BSR/"+lv::addDirSlashIfMissing(sOutputDirName),
+                        DataHandler::createOutputDir(lv::datasets::getRootPath()+"BSDS500/BSR/",sOutputDirName),
                         getWorkBatchDirNames(eType),
                         std::vector<std::string>(),
                         bSaveOutput,

@@ -39,7 +39,7 @@ namespace lv {
                 IDataset_<eDatasetType_VideoRegistr,Dataset_VideoRegistr_LITIV2012b,eEvalImpl>(
                         "LITIV 2012b (CVPRW2015 update)",
                         lv::datasets::getRootPath()+"litiv/stcharles2015/",
-                        lv::datasets::getRootPath()+"litiv/stcharles2015/"+lv::addDirSlashIfMissing(sOutputDirName),
+                        DataHandler::createOutputDir(lv::datasets::getRootPath()+"litiv/stcharles2015/results/",sOutputDirName),
                         getWorkBatchDirNames(),
                         getSkippedWorkBatchDirNames(),
                         getGrayscaleWorkBatchDirNames(),

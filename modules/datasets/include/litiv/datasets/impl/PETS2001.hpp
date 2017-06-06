@@ -39,7 +39,7 @@ namespace lv {
                 IDataset_<eDatasetTask,DatasetSource_Video,Dataset_PETS2001D3TC1,lv::getDatasetEval<eDatasetTask,Dataset_PETS2001D3TC1>(),eEvalImpl>(
                         "PETS2001 Dataset#3",
                         lv::datasets::getRootPath()+"PETS2001/DATASET3/",
-                        lv::datasets::getRootPath()+"PETS2001/DATASET3/"+lv::addDirSlashIfMissing(sOutputDirName),
+                        DataHandler::createOutputDir(lv::datasets::getRootPath()+"PETS2001/DATASET3/results",sOutputDirName),
                         getWorkBatchDirNames(),
                         std::vector<std::string>(),
                         bSaveOutput,

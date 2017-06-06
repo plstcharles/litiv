@@ -39,7 +39,7 @@ namespace lv {
                 IDataset_<eDatasetTask,DatasetSource_Video,Dataset_Wallflower,lv::getDatasetEval<eDatasetTask,Dataset_Wallflower>(),eEvalImpl>(
                         "Wallflower",
                         lv::datasets::getRootPath()+"Wallflower/dataset/",
-                        lv::datasets::getRootPath()+"Wallflower/"+lv::addDirSlashIfMissing(sOutputDirName),
+                        DataHandler::createOutputDir(lv::datasets::getRootPath()+"Wallflower/results",sOutputDirName),
                         getWorkBatchDirNames(),
                         std::vector<std::string>(),
                         bSaveOutput,

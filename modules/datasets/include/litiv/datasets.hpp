@@ -175,7 +175,7 @@ namespace lv {
         }
     protected:
         /// full default (i.e. non-specialized) dataset constructor, copied from DatasetHandler to avoid msvc2015 bug; parameters are passed through lv::datasets::create<...>(...), and may be caught/simplified by a specialization
-        IDataset_(
+        inline IDataset_(
             const std::string& sDatasetName, ///< user-friendly dataset name (used for identification only)
             const std::string& sDatasetDirPath, ///< root path from which work batches can be parsed
             const std::string& sOutputDirPath, ///< root path for work batch output (debug logs, evaluation reports, and generated results)
@@ -185,8 +185,8 @@ namespace lv {
             bool bUseEvaluator, ///< defines whether results should be fully evaluated, or simply acknowledged
             bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned
             double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
+            // @@@@ TODO : replace all constr bools by common flag param, with overloadable vals in impls
         ) : DatasetHandler_<eDatasetTask,eDatasetSource,eDataset>(sDatasetName,sDatasetDirPath,sOutputDirPath,vsWorkBatchDirs,vsSkippedDirTokens,bSaveOutput,bUseEvaluator,bForce4ByteDataAlign,dScaleFactor) {}
-        // @@@@ TODO : replace all constr bools by common flag param, with overloadable vals in impls
     };
 
 } // namespace lv

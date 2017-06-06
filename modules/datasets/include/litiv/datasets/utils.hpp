@@ -364,6 +364,8 @@ namespace lv {
         virtual bool isSavingOutput() const override;
         /// returns whether the pushed results will be evaluated or not
         virtual bool isEvaluating() const override;
+        /// assembles & creates an output directory path string from a global part (which is created if needed) and a local suffix
+        static std::string createOutputDir(const std::string& sGlobalDir, const std::string& sLocalDirSuffix);
     protected:
         /// fills internal impl parameters based on batch name, dataset parameters & current relative data path
         DataHandler(const std::string& sBatchName, const std::string& sRelativePath, const IDataHandler& oParent);

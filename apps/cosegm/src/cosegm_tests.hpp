@@ -28,7 +28,7 @@ namespace lv {
     static const DatasetList Dataset_CosegmTests = DatasetList(Dataset_Custom+1337); // cheat; might cause problems if exposed in multiple external/custom specializations
 
     struct ICosegmTestDataset {
-        virtual bool isEvaluatingStereoDisp() const = 0;
+        virtual bool isEvaluatingDisparities() const = 0;
         virtual int isLoadingInputMasks() const = 0;
     };
 
@@ -41,14 +41,14 @@ namespace lv {
                 const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving
                 bool bSaveOutput=false, ///< defines whether results should be archived or not
                 bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
-                bool bEvalStereoDisp=false, ///< defines whether we should evaluate fg/bg segmentation or stereo disparity
+                bool bEvalDisparities=false, ///< defines whether we should evaluate fg/bg segmentation or stereo disparities
                 int nLoadInputMasks=0, ///< defines whether the input stream should be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
                 double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
         ) :
                 IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_CosegmTests,DatasetEval_BinaryClassifierArray,eEvalImpl>(
                         "cosegm_tests",
                         lv::datasets::getRootPath()+"litiv/cosegm_tests/",
-                        lv::datasets::getRootPath()+"litiv/cosegm_tests/results/"+lv::addDirSlashIfMissing(sOutputDirName),
+                        DataHandler::createOutputDir(lv::datasets::getRootPath()+"litiv/cosegm_tests/results/",sOutputDirName),
                         std::vector<std::string>{"test01"},
                         //std::vector<std::string>{"art"},
                         //std::vector<std::string>{"art_mini"},
@@ -59,11 +59,11 @@ namespace lv {
                         bUseEvaluator,
                         false,
                         dScaleFactor
-                ),m_bEvalStereoDisp(bEvalStereoDisp),m_nLoadInputMasks(nLoadInputMasks) {}
-        virtual bool isEvaluatingStereoDisp() const override final {return m_bEvalStereoDisp;}
+                ),m_bEvalDisparities(bEvalDisparities),m_nLoadInputMasks(nLoadInputMasks) {}
+        virtual bool isEvaluatingDisparities() const override final {return m_bEvalDisparities;}
         virtual int isLoadingInputMasks() const override final {return m_nLoadInputMasks;}
     protected:
-        const bool m_bEvalStereoDisp;
+        const bool m_bEvalDisparities;
         const int m_nLoadInputMasks;
     };
 
@@ -91,8 +91,8 @@ namespace lv {
             return 2; // 2x fg masks or disp maps
         }
 
-        bool isEvaluatingStereoDisp() const {
-            return dynamic_cast<const ICosegmTestDataset&>(*this->getRoot()).isEvaluatingStereoDisp();
+        bool isEvaluatingDisparities() const {
+            return dynamic_cast<const ICosegmTestDataset&>(*this->getRoot()).isEvaluatingDisparities();
         }
 
         int isLoadingInputMasks() const {
@@ -210,8 +210,8 @@ namespace lv {
                 }
                 if(this->isEvaluating()) {
                     const std::vector<std::string> vCurrGTPaths = {
-                        cv::format(this->isEvaluatingStereoDisp()?"%sgtdisp%05da.png":"%sgtmask%05da.png",this->getDataPath().c_str(),nCurrIdx),
-                        cv::format(this->isEvaluatingStereoDisp()?"%sgtdisp%05db.png":"%sgtmask%05db.png",this->getDataPath().c_str(),nCurrIdx),
+                        cv::format(this->isEvaluatingDisparities()?"%sgtdisp%05da.png":"%sgtmask%05da.png",this->getDataPath().c_str(),nCurrIdx),
+                        cv::format(this->isEvaluatingDisparities()?"%sgtdisp%05db.png":"%sgtmask%05db.png",this->getDataPath().c_str(),nCurrIdx),
                     };
                     cv::Mat oGT0 = cv::imread(vCurrGTPaths[0],cv::IMREAD_GRAYSCALE);
                     cv::Mat oGT1 = cv::imread(vCurrGTPaths[1],cv::IMREAD_GRAYSCALE);
@@ -283,7 +283,7 @@ namespace lv {
             std::vector<cv::Mat> vGTs = IDataProducer_<DatasetSource_VideoArray>::getRawGTArray(nPacketIdx);
             for(size_t nStreamIdx=0; nStreamIdx<vGTs.size(); ++nStreamIdx) {
                 if(!vGTs[nStreamIdx].empty()) {
-                    if(this->isEvaluatingStereoDisp() && this->getScaleFactor()!=0)
+                    if(this->isEvaluatingDisparities() && this->getScaleFactor()!=0)
                         vGTs[nStreamIdx] *= this->getScaleFactor();
                 }
             }

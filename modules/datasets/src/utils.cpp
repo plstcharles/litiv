@@ -151,18 +151,30 @@ inline const lv::IDataHandler& getRootNodeHelper(const lv::IDataHandler& oStart)
     return *p.get();
 }
 
+std::string lv::DataHandler::createOutputDir(const std::string& sGlobalDir, const std::string& sLocalDirSuffix) {
+    lvAssert_(!sGlobalDir.empty() && !sLocalDirSuffix.empty(),"dataset output directory name cannot be empty");
+    const std::string sGlobalDirPath = lv::addDirSlashIfMissing(sGlobalDir);
+    if(!sGlobalDirPath.empty())
+        lv::createDirIfNotExist(sGlobalDirPath);
+    size_t nNextSlashPos = sLocalDirSuffix.find('/');
+    while(nNextSlashPos!=std::string::npos && nNextSlashPos!=sLocalDirSuffix.size()-1) {
+        lv::createDirIfNotExist(sGlobalDirPath+sLocalDirSuffix.substr(0,nNextSlashPos));
+        nNextSlashPos = sLocalDirSuffix.find('/',nNextSlashPos+1);
+    }
+    const std::string sOutputDirPath = lv::addDirSlashIfMissing(sGlobalDirPath+sLocalDirSuffix);
+    if(!sOutputDirPath.empty())
+        lv::createDirIfNotExist(sOutputDirPath);
+    return sOutputDirPath;
+}
+
 lv::DataHandler::DataHandler(const std::string& sBatchName, const std::string& sRelativePath, const IDataHandler& oParent) :
         m_sBatchName(sBatchName),
         m_sRelativePath(lv::addDirSlashIfMissing(sRelativePath)),
         m_sDataPath(getRootNodeHelper(oParent).getDataPath()+lv::addDirSlashIfMissing(sRelativePath)),
-        m_sOutputPath(getRootNodeHelper(oParent).getOutputPath()+lv::addDirSlashIfMissing(sRelativePath)),
-        m_sFeaturesPath(getRootNodeHelper(oParent).getOutputPath()+lv::addDirSlashIfMissing(sRelativePath)+"precomp/"),
+        m_sOutputPath(createOutputDir(getRootNodeHelper(oParent).getOutputPath(),sRelativePath)),
+        m_sFeaturesPath(createOutputDir(getRootNodeHelper(oParent).getOutputPath(),lv::addDirSlashIfMissing(sRelativePath)+"precomp/")),
         m_oParent(oParent),
-        m_oRoot(getRootNodeHelper(oParent)) {
-    if(!m_sOutputPath.empty())
-        lv::createDirIfNotExist(m_sOutputPath);
-    lv::createDirIfNotExist(m_sFeaturesPath);
-}
+        m_oRoot(getRootNodeHelper(oParent)) {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -38,8 +38,8 @@ namespace lv {
         virtual bool isUndistorting() const = 0;
         /// returns whether images should be horizontally rectified when loaded or not, using the calib files provided with the dataset
         virtual bool isHorizRectifying() const = 0;
-        /// returns whether we should evaluate fg/bg segmentation or stereo disparity
-        virtual bool isEvaluatingStereoDisp() const = 0;
+        /// returns whether we should evaluate fg/bg segmentation or stereo disparities
+        virtual bool isEvaluatingDisparities() const = 0;
         /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
         virtual int isLoadingInputMasks() const = 0;
     };
@@ -58,14 +58,14 @@ namespace lv {
                 bool bLoadDepth=true, ///< defines whether the depth stream should be loaded or not (if not, the dataset is used as a bimodal one)
                 bool bUndistort=true, ///< defines whether images should be undistorted when loaded or not, using the calib files provided with the dataset
                 bool bHorizRectify=false, ///< defines whether images should be horizontally rectified when loaded or not, using the calib files provided with the dataset
-                bool bEvalStereoDisp=false, ///< defines whether we should evaluate fg/bg segmentation or stereo disparity
+                bool bEvalDisparities=false, ///< defines whether we should evaluate fg/bg segmentation or stereo disparities
                 int nLoadInputMasks=0, ///< defines whether the input stream should be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
                 double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
         ) :
                 IDataset_<eDatasetTask,DatasetSource_VideoArray,Dataset_VAP_trimod2016,lv::getDatasetEval<eDatasetTask,Dataset_VAP_trimod2016>(),eEvalImpl>(
                         "VAP-trimodal2016",
                         lv::datasets::getRootPath()+"vap/rgbdt-stereo/",
-                        lv::datasets::getRootPath()+"vap/rgbdt-stereo/results/"+lv::addDirSlashIfMissing(sOutputDirName),
+                        DataHandler::createOutputDir(lv::datasets::getRootPath()+"vap/rgbdt-stereo/results/",sOutputDirName),
                         getWorkBatchDirNames(bUndistort||bHorizRectify),
                         std::vector<std::string>(),
                         bSaveOutput,
@@ -76,9 +76,9 @@ namespace lv {
                 m_bLoadDepth(bLoadDepth),
                 m_bUndistort(bUndistort||bHorizRectify),
                 m_bHorizRectify(bHorizRectify),
-                m_bEvalStereoDisp(bEvalStereoDisp),
+                m_bEvalDisparities(bEvalDisparities),
                 m_nLoadInputMasks(nLoadInputMasks) {
-            lvAssert_(!m_bEvalStereoDisp,"missing impl @@@@@");
+            lvAssert_(!m_bEvalDisparities,"missing impl @@@@@");
         }
         /// returns the names of all work batch directories available for this dataset specialization
         static const std::vector<std::string>& getWorkBatchDirNames(bool bUndistortOrRectify) {
@@ -101,15 +101,15 @@ namespace lv {
         virtual bool isUndistorting() const override {return m_bUndistort;}
         /// returns whether images should be horizontally rectified when loaded or not, using the calib files provided with the dataset
         virtual bool isHorizRectifying() const override {return m_bHorizRectify;}
-        /// returns whether we should evaluate fg/bg segmentation or stereo disparity
-        virtual bool isEvaluatingStereoDisp() const override {return m_bEvalStereoDisp;}
+        /// returns whether we should evaluate fg/bg segmentation or stereo disparities
+        virtual bool isEvaluatingDisparities() const override {return m_bEvalDisparities;}
         /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
         virtual int isLoadingInputMasks() const override {return m_nLoadInputMasks;}
     protected:
         const bool m_bLoadDepth;
         const bool m_bUndistort;
         const bool m_bHorizRectify;
-        const bool m_bEvalStereoDisp;
+        const bool m_bEvalDisparities;
         const int m_nLoadInputMasks;
     };
 
@@ -168,9 +168,9 @@ namespace lv {
         bool isHorizRectifying() const {
             return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isHorizRectifying();
         }
-        /// returns whether we should evaluate fg/bg segmentation or stereo disparity
-        bool isEvaluatingStereoDisp() const {
-            return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isEvaluatingStereoDisp();
+        /// returns whether we should evaluate fg/bg segmentation or stereo disparities
+        bool isEvaluatingDisparities() const {
+            return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isEvaluatingDisparities();
         }
         /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
         int isLoadingInputMasks() const {
