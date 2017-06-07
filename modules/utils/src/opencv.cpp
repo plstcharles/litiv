@@ -121,6 +121,7 @@ lv::DisplayHelperPtr lv::DisplayHelper::create(const std::string& sDisplayName, 
 lv::DisplayHelper::DisplayHelper(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) :
         m_sDisplayName(sDisplayName),
         m_oMaxDisplaySize(oMaxSize),
+        m_nDisplayFlags(nWindowFlags),
         m_oFS(lv::addDirSlashIfMissing(sDebugFSDirPath)+sDisplayName+".yml",cv::FileStorage::WRITE),
         m_oLastDisplaySize(cv::Size(0,0)),
         m_oLastTileSize(cv::Size(0,0)),
@@ -131,8 +132,6 @@ lv::DisplayHelper::DisplayHelper(const std::string& sDisplayName, const std::str
         m_oFS << "htag" << lv::getVersionStamp();
         m_oFS << "date" << lv::getTimeStamp();
     }
-    cv::namedWindow(m_sDisplayName,nWindowFlags); // @@@ if it blocks, recompile opencv without Qt (bug still here as of OpenCV 3.1)
-    cv::setMouseCallback(m_sDisplayName,onMouseEvent,(void*)&m_lInternalCallback);
 }
 
 lv::DisplayHelper::~DisplayHelper() {
@@ -214,6 +213,8 @@ void lv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
         m_bFirstDisplay = false;
     }
     lvAssert(m_oLastDisplay.size()==oFinalDisplaySize);
+    cv::namedWindow(m_sDisplayName,m_nDisplayFlags); // @@@ if it blocks, recompile opencv without Qt (bug still here as of OpenCV 3.1)
+    cv::setMouseCallback(m_sDisplayName,onMouseEvent,(void*)&m_lInternalCallback);
     cv::imshow(m_sDisplayName,m_oLastDisplay);
     m_oLastDisplaySize = m_oLastDisplay.size();
     m_oLastTileSize = oNewTileSize;
@@ -265,6 +266,8 @@ void lv::DisplayHelper::displayAlbumAndWaitKey(const std::vector<std::pair<cv::M
         cv::imshow(m_sDisplayName,m_oLastDisplay);
     };
     size_t nCurrAlbumIdx = 0;
+    cv::namedWindow(m_sDisplayName,m_nDisplayFlags); // @@@ if it blocks, recompile opencv without Qt (bug still here as of OpenCV 3.1)
+    cv::setMouseCallback(m_sDisplayName,onMouseEvent,(void*)&m_lInternalCallback);
     lDisplay(nCurrAlbumIdx);
     m_oLastTileSize = m_oLastDisplaySize = m_oLastDisplay.size();
     int nKeyPressed;
@@ -281,6 +284,7 @@ void lv::DisplayHelper::displayAlbumAndWaitKey(const std::vector<std::pair<cv::M
         }
     }
     while((nKeyPressed&255)!=27);
+    cv::destroyWindow(m_sDisplayName);
 }
 
 void lv::DisplayHelper::setMouseCallback(std::function<void(const CallbackData&)> lCallback) {

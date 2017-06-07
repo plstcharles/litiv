@@ -1232,6 +1232,8 @@ namespace lv {
         const std::string m_sDisplayName;
         /// displayed window maximum size (specified on creation)
         const cv::Size m_oMaxDisplaySize;
+        /// displayed window flags (specified on creation)
+        const int m_nDisplayFlags;
         /// general-use file storage tied to the display helper (will be closed & flushed on destruction)
         cv::FileStorage m_oFS;
         /// public mutex that should be always used if callback data is accessed externally
