@@ -454,6 +454,12 @@ namespace lv {
             this->m_nMinDisp *= dScale;
             this->m_nMaxDisp *= dScale;
             lvAssert(this->m_nMaxDisp>this->m_nMinDisp);
+            if(this->m_bFlipDisparities) {
+                for(size_t nStreamIdx=0; nStreamIdx<this->getInputStreamCount(); ++nStreamIdx)
+                    cv::flip(this->m_vInputROIs[nStreamIdx],this->m_vInputROIs[nStreamIdx],1);
+                for(size_t nStreamIdx=0; nStreamIdx<this->getGTStreamCount(); ++nStreamIdx)
+                    cv::flip(this->m_vGTROIs[nStreamIdx],this->m_vGTROIs[nStreamIdx],1);
+            }
         }
         virtual std::vector<cv::Mat> getRawInputArray(size_t nPacketIdx) override final {
             lvDbgExceptionWatch;
