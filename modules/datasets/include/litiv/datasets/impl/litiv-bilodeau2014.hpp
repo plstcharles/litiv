@@ -489,6 +489,8 @@ namespace lv {
                 if(bUseInterlacedMasks) {
                     cv::Mat oRGBMaskPacket = cv::imread(vsInputPaths[nInputRGBMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                     lvAssert(!oRGBMaskPacket.empty() && oRGBMaskPacket.type()==CV_8UC1 && oRGBMaskPacket.size()==oImageSize);
+                    oRGBMaskPacket = (oRGBMaskPacket!=255); // background is white & noisy
+                    cv::morphologyEx(oRGBMaskPacket,oRGBMaskPacket,cv::MORPH_OPEN,cv::Mat(),cv::Point(-1,-1),2);
                     if(oRGBMaskPacket.size()!=vInputInfos[nInputRGBStreamIdx].size())
                         cv::resize(oRGBMaskPacket,oRGBMaskPacket,vInputInfos[nInputRGBStreamIdx].size(),cv::INTER_NEAREST);
                     vInputs[nInputRGBMaskStreamIdx] = oRGBMaskPacket;
@@ -502,6 +504,8 @@ namespace lv {
                 if(bUseInterlacedMasks) {
                     cv::Mat oThermalMaskPacket = cv::imread(vsInputPaths[nInputThermalMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                     lvAssert(!oThermalMaskPacket.empty() && oThermalMaskPacket.type()==CV_8UC1 && oThermalMaskPacket.size()==oImageSize);
+                    oThermalMaskPacket = (oThermalMaskPacket!=255); // background is white & noisy
+                    cv::morphologyEx(oThermalMaskPacket,oThermalMaskPacket,cv::MORPH_OPEN,cv::Mat(),cv::Point(-1,-1),2);
                     if(oThermalMaskPacket.size()!=vInputInfos[nInputThermalStreamIdx].size())
                         cv::resize(oThermalMaskPacket,oThermalMaskPacket,vInputInfos[nInputThermalStreamIdx].size(),cv::INTER_NEAREST);
                     vInputs[nInputThermalMaskStreamIdx] = oThermalMaskPacket;
