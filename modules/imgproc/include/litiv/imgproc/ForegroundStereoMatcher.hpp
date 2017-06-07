@@ -54,19 +54,23 @@
 #define STEREOSEGMATCH_DEFAULT_DESC_PATCH_HEIGHT    (15)
 #define STEREOSEGMATCH_DEFAULT_DESC_PATCH_WIDTH     (15)
 
+
 // unary costs params
 #define STEREOSEGMATCH_UNARY_COST_OOB_CST           (ValueType(5000))
 #define STEREOSEGMATCH_UNARY_COST_OCCLUDED_CST      (ValueType(2000))
 #define STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST      (ValueType(10000))
-#define STEREOSEGMATCH_IMGSIM_COST_DESC_SCALE       (100)
-#define STEREOSEGMATCH_SHPSIM_COST_DESC_SCALE       (100)
+#define STEREOSEGMATCH_IMGSIM_COST_DESC_SCALE       (400)
+#define STEREOSEGMATCH_SHPSIM_COST_DESC_SCALE       (400)
 #define STEREOSEGMATCH_UNIQUE_COST_OVER_SCALE       (200)
 #define STEREOSEGMATCH_SHPDIST_COST_SCALE           (1000)
+#define STEREOSEGMATCH_SHPDIST_INTERSPEC_SCALE      (0.5f)
+#define STEREOSEGMATCH_SHPDIST_INITDIST_SCALE       (0.5f)
 // pairwise costs params
 #define STEREOSEGMATCH_LBLSIM_COST_MAXOCCL          (ValueType(5000))
 #define STEREOSEGMATCH_LBLSIM_COST_MAXTRUNC_CST     (ValueType(10000))
-#define STEREOSEGMATCH_LBLSIM_COST_SCALE_CST        (0.1f)
-#define STEREOSEGMATCH_LBLSIM_COST_MAXDIFF_CST      (10)
+#define STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST      (200.0f)
+#define STEREOSEGMATCH_LBLSIM_STEREO_SCALE_CST      (0.1f)
+#define STEREOSEGMATCH_LBLSIM_STEREO_MAXDIFF_CST    (10)
 #define STEREOSEGMATCH_LBLSIM_USE_EXP_GRADPIVOT     (1)
 #if STEREOSEGMATCH_LBLSIM_USE_EXP_GRADPIVOT
 #define STEREOSEGMATCH_LBLSIM_COST_GRADRAW_SCALE    (32)
@@ -275,10 +279,12 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         CamArray<std::unique_ptr<ResegmModelType>> m_apResegmModels;
         /// contains the eroded ROIs used for valid descriptor lookups
         CamArray<cv::Mat_<uchar>> m_aDescROIs;
-        /// number of valid nodes in the graph (based on each ROI)
-        CamArray<size_t> m_anValidGraphNodes;
         /// indices of valid nodes in the graph (based on each ROI)
         CamArray<std::vector<size_t>> m_avValidLUTNodeIdxs;
+        /// number of valid nodes in the graph (based on each ROI)
+        CamArray<size_t> m_anValidGraphNodes;
+        /// total number of valid graph nodes, across cameras
+        size_t m_nTotValidGraphNodes;
         /// model info lookup array
         std::vector<NodeInfo> m_vNodeInfos;
         /// stereo model unary functions

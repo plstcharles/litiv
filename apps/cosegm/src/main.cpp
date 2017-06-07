@@ -23,7 +23,7 @@
 #define PROCESS_PREPROC_BGSEGM  0
 #define WRITE_IMG_OUTPUT        0
 #define EVALUATE_OUTPUT         0
-#define GLOBAL_VERBOSITY        2
+#define GLOBAL_VERBOSITY        3
 ////////////////////////////////
 #define DATASET_VAPTRIMOD       0
 #define DATASET_LITIV2014       1
@@ -63,7 +63,7 @@
     false,                                        /* bool bLoadFullVideos=false */\
     true,                                         /* bool bEvalStereoDisp=true */\
     true,                                         /* bool bFlipDisparities=false */\
-    -1,                                           /* int nLoadPersonSets=-1 */\
+    16/*-1*/,                                     /* int nLoadPersonSets=-1 */\
     PROCESS_PREPROC_BGSEGM?0:1,                   /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_MINI_TESTS
