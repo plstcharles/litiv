@@ -23,8 +23,7 @@
 #define PROCESS_PREPROC_BGSEGM  0
 #define WRITE_IMG_OUTPUT        0
 #define EVALUATE_OUTPUT         0
-#define DISPLAY_OUTPUT          1
-#define GLOBAL_VERBOSITY        3
+#define GLOBAL_VERBOSITY        2
 ////////////////////////////////
 #define DATASET_VAPTRIMOD       0
 #define DATASET_LITIV2014       1
@@ -141,30 +140,31 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         for(size_t nStreamIdx=0; nStreamIdx<vInitInput.size(); ++nStreamIdx) {
             lvAssert(vInitInput[nStreamIdx].size()==vInitInput[0].size());
             lvLog_(2,"\tinput %d := %s   (roi=%s)",(int)nStreamIdx,lv::MatInfo(vInitInput[nStreamIdx]).str().c_str(),lv::MatInfo(vROIs[nStreamIdx]).str().c_str());
-            if(lv::getVerbosity()>=6) {
+            if(lv::getVerbosity()>=4) {
                 cv::imshow(std::string("vInitInput_")+std::to_string(nStreamIdx),vInitInput[nStreamIdx]);
                 cv::imshow(std::string("vROI_")+std::to_string(nStreamIdx),vROIs[nStreamIdx]);
             }
         }
-        if(lv::getVerbosity()>=6)
+        if(lv::getVerbosity()>=5)
             cv::waitKey(0);
         const std::vector<lv::MatInfo> oInfoArray = oBatch.getInputInfoArray();
         const lv::MatSize oFrameSize = oInfoArray[0].size;
+        lv::DisplayHelperPtr pDisplayHelper;
+        if(lv::getVerbosity()>=1)
+            pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
 #if PROCESS_PREPROC_BGSEGM
         std::vector<std::shared_ptr<IBackgroundSubtractor>> vAlgos = {std::make_shared<BGSEGM_ALGO_TYPE>(),std::make_shared<BGSEGM_ALGO_TYPE>()};
         const double dDefaultLearningRate = vAlgos[0]->getDefaultLearningRate();
         for(size_t nCamIdx=0; nCamIdx<2; ++nCamIdx)
             vAlgos[nCamIdx]->initialize(vInitInput[nCamIdx],vROIs[nCamIdx]);
         std::vector<cv::Mat> vCurrFGMasks(2);
-#if DISPLAY_OUTPUT>0
-        lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
-#endif //DISPLAY_OUTPUT>0
 #if PROCESS_PREPROC_BGSEGM>1
         const size_t nMaxInitLoops = 50, nMaxInitLoopIdx = 6;
         size_t nCurrInitLoop = 0;
         bool bIncreasingIdxs = true;
 #endif //PROCESS_PREPROC_BGSEGM>1
 #else //!PROCESS_PREPROC_BGSEGM
+        lvAssert(vInitInput.size()==4 && (vInitInput.size()%2)==0); // assume masks are interlaced with input images
         const size_t nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity();
         lvLog_(2,"\tdisp = [%d,%d]",(int)nMinDisp,(int)nMaxDisp);
         std::shared_ptr<StereoSegmMatcher> pAlgo = std::make_shared<StereoSegmMatcher>(nMinDisp,nMaxDisp);
@@ -175,20 +175,18 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         std::vector<cv::Mat> vCurrOutput(nExpectedAlgoOutputCount);
         std::vector<cv::Mat> vCurrFGMasks(nExpectedAlgoOutputCount/2);
         std::vector<cv::Mat> vCurrStereoMaps(nExpectedAlgoOutputCount/2);
-    #if DISPLAY_OUTPUT>0
-        lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
-        lvAssert((vInitInput.size()%2)==0); // assume masks are interlaced with input images
         std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs(vInitInput.size()/2);
-        for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vInitInput.size()/2; ++nDisplayRowIdx) {
-            std::vector<std::pair<cv::Mat,std::string>> vRow(4);
-            vRow[0] = std::make_pair(cv::Mat(),oBatch.getInputStreamName(nDisplayRowIdx*2));
-            vRow[1] = std::make_pair(cv::Mat(),"INPUT MASK");
-            vRow[2] = std::make_pair(cv::Mat(),"OUTPUT DISP");
-            vRow[3] = std::make_pair(cv::Mat(),"OUTPUT MASK");
-            vvDisplayPairs[nDisplayRowIdx] = vRow;
+        if(lv::getVerbosity()>=2) {
+            for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vInitInput.size()/2; ++nDisplayRowIdx) {
+                std::vector<std::pair<cv::Mat,std::string>> vRow(4);
+                vRow[0] = std::make_pair(cv::Mat(),oBatch.getInputStreamName(nDisplayRowIdx*2));
+                vRow[1] = std::make_pair(cv::Mat(),"INPUT MASK");
+                vRow[2] = std::make_pair(cv::Mat(),"OUTPUT DISP");
+                vRow[3] = std::make_pair(cv::Mat(),"OUTPUT MASK");
+                vvDisplayPairs[nDisplayRowIdx] = vRow;
+            }
         }
-    #endif //DISPLAY_OUTPUT>0
         pAlgo->initialize(std::array<cv::Mat,2>{vROIs[0],vROIs[2]});
         oBatch.setFeaturesDirName(pAlgo->getFeatureExtractorName());
 #endif //!PROCESS_PREPROC_BGSEGM
@@ -226,24 +224,25 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             #endif //USING_OPENMP
                 {vAlgos[1]->apply(vCurrInput[1],vCurrFGMasks[1],dCurrLearningRate);}
             }
-        #if DISPLAY_OUTPUT>0
-            std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs(2);
-            for(size_t nCamIdx=0; nCamIdx<2; ++nCamIdx) {
-                vvDisplayPairs[nCamIdx].resize(3);
-                vvDisplayPairs[nCamIdx][0].first = vCurrInput[nCamIdx];
-                vvDisplayPairs[nCamIdx][0].second = std::to_string(nCurrIdx);
-                vAlgos[nCamIdx]->getBackgroundImage(vvDisplayPairs[nCamIdx][1].first);
-                vCurrFGMasks[nCamIdx].copyTo(vvDisplayPairs[nCamIdx][2].first);
-                if(!vROIs[nCamIdx].empty()) {
-                    cv::bitwise_or(vvDisplayPairs[nCamIdx][1].first,UCHAR_MAX/2,vvDisplayPairs[nCamIdx][1].first,vROIs[nCamIdx]==0);
-                    cv::bitwise_or(vvDisplayPairs[nCamIdx][2].first,UCHAR_MAX/2,vvDisplayPairs[nCamIdx][2].first,vROIs[nCamIdx]==0);
+            if(lv::getVerbosity()>=2) {
+                std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs(2);
+                for(size_t nCamIdx=0; nCamIdx<2; ++nCamIdx) {
+                    vvDisplayPairs[nCamIdx].resize(3);
+                    vvDisplayPairs[nCamIdx][0].first = vCurrInput[nCamIdx];
+                    vvDisplayPairs[nCamIdx][0].second = std::to_string(nCurrIdx);
+                    vAlgos[nCamIdx]->getBackgroundImage(vvDisplayPairs[nCamIdx][1].first);
+                    vCurrFGMasks[nCamIdx].copyTo(vvDisplayPairs[nCamIdx][2].first);
+                    if(!vROIs[nCamIdx].empty()) {
+                        cv::bitwise_or(vvDisplayPairs[nCamIdx][1].first,UCHAR_MAX/2,vvDisplayPairs[nCamIdx][1].first,vROIs[nCamIdx]==0);
+                        cv::bitwise_or(vvDisplayPairs[nCamIdx][2].first,UCHAR_MAX/2,vvDisplayPairs[nCamIdx][2].first,vROIs[nCamIdx]==0);
+                    }
                 }
+                lvAssert(pDisplayHelper);
+                pDisplayHelper->display(vvDisplayPairs,oFrameSize);
+                const int nKeyPressed = pDisplayHelper->waitKey();
+                if(nKeyPressed==(int)'q')
+                    break;
             }
-            pDisplayHelper->display(vvDisplayPairs,oFrameSize);
-            const int nKeyPressed = pDisplayHelper->waitKey();
-            if(nKeyPressed==(int)'q')
-                break;
-        #endif //DISPLAY_OUTPUT>0
             oBatch.push(vCurrFGMasks,nCurrIdx);
         #if PROCESS_PREPROC_BGSEGM>1
             if(nCurrInitLoop<nMaxInitLoops) {
@@ -288,54 +287,21 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             }
             lvDbgAssert(vCurrFGMasks.size()==oBatch.getOutputStreamCount());
             lvDbgAssert(vCurrStereoMaps.size()==oBatch.getOutputStreamCount());
-        #if DISPLAY_OUTPUT>0
-            const std::vector<cv::Mat>& vCurrGT = oBatch.getGTArray(nCurrIdx);
-            lvAssert(vCurrGT.size()==vCurrFGMasks.size() && vCurrGT.size()==vCurrStereoMaps.size());
-        #if DISPLAY_OUTPUT>1
-            if(!vCurrGT[0].empty() && !vCurrGT[1].empty()) {
-                cv::Mat test_rgb = vCurrInput[0].clone(), gt_rgb_mask, approx_rgb_mask;
-                cv::bitwise_or(test_rgb/2,cv::Mat(vCurrInput[0].size(),CV_8UC3,cv::Scalar_<uchar>(127)),gt_rgb_mask,vCurrGT[0]);
-                cv::bitwise_or(test_rgb/2,cv::Mat(vCurrInput[0].size(),CV_8UC3,cv::Scalar_<uchar>(127)),approx_rgb_mask,vCurrInput[1]);
-                cv::imshow("gt_rgb_mask",gt_rgb_mask);
-                cv::imshow("approx_rgb_mask",approx_rgb_mask);
-                cv::Mat test_thermal = vCurrInput[2].clone(), gt_thermal_mask, approx_thermal_mask;
-                cv::cvtColor(test_thermal,test_thermal,cv::COLOR_GRAY2BGR);
-                cv::bitwise_or(test_thermal/2,cv::Mat(vCurrInput[2].size(),CV_8UC3,cv::Scalar_<uchar>(127)),gt_thermal_mask,vCurrGT[1]);
-                cv::bitwise_or(test_thermal/2,cv::Mat(vCurrInput[2].size(),CV_8UC3,cv::Scalar_<uchar>(127)),approx_thermal_mask,vCurrInput[3]);
-                cv::imshow("gt_thermal_mask",gt_thermal_mask);
-                cv::imshow("approx_thermal_mask",approx_thermal_mask);
-                cv::Mat test_merge = test_rgb/2+test_thermal/2;
-                cv::imshow("merge",test_merge);
-                cv::Mat test_gt;
-                cv::merge(std::vector<cv::Mat>{vCurrGT[0]&vROIs[0],cv::Mat::zeros(vCurrGT[0].size(),CV_8UC1),vCurrGT[1]&vROIs[1]},test_gt);
-                cv::imshow("merge mask",test_gt);
-            }
-        #endif //DISPLAY_OUTPUT>1
-            for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vCurrInput.size()/2; ++nDisplayRowIdx) {
-                vCurrInput[nDisplayRowIdx*2].copyTo(vvDisplayPairs[nDisplayRowIdx][0].first);
-                vCurrInput[nDisplayRowIdx*2+1].copyTo(vvDisplayPairs[nDisplayRowIdx][1].first);
-                // @@@@@ ship color funcs to custom evaluator? or func in cosegm_tests.hpp?
-                vvDisplayPairs[nDisplayRowIdx][2].first.create(vCurrStereoMaps[nDisplayRowIdx].size(),CV_8UC3);
-                cv::Mat& oColoredStereoMap = vvDisplayPairs[nDisplayRowIdx][2].first;
-                for(int nRowIdx=0; nRowIdx<oColoredStereoMap.rows; ++nRowIdx) {
-                    for(int nColIdx=0; nColIdx<oColoredStereoMap.cols; ++nColIdx) {
-                        const OutputLabelType nCurrPxLabel = vCurrStereoMaps[nDisplayRowIdx].at<OutputLabelType>(nRowIdx,nColIdx);
-                        lvDbgAssert_(nCurrPxLabel<UCHAR_MAX,"cannot properly display all stereo label values with current label type");
-                        if(nCurrPxLabel==StereoSegmMatcher::getStereoDontCareLabel())
-                            oColoredStereoMap.at<cv::Vec3b>(nRowIdx,nColIdx) = cv::Vec3b(255,0,255);
-                        else if(nCurrPxLabel==StereoSegmMatcher::getStereoOccludedLabel())
-                            oColoredStereoMap.at<cv::Vec3b>(nRowIdx,nColIdx) = cv::Vec3b(255,0,0);
-                        else
-                            oColoredStereoMap.at<cv::Vec3b>(nRowIdx,nColIdx) = cv::Vec3b((uchar)nCurrPxLabel,(uchar)nCurrPxLabel,(uchar)nCurrPxLabel);
-                    }
+            if(lv::getVerbosity()>=2) {
+                const std::vector<cv::Mat>& vCurrGT = oBatch.getGTArray(nCurrIdx);
+                lvAssert(vCurrGT.size()==vCurrFGMasks.size() && vCurrGT.size()==vCurrStereoMaps.size());
+                for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vCurrInput.size()/2; ++nDisplayRowIdx) {
+                    vCurrInput[nDisplayRowIdx*2].copyTo(vvDisplayPairs[nDisplayRowIdx][0].first);
+                    vCurrInput[nDisplayRowIdx*2+1].copyTo(vvDisplayPairs[nDisplayRowIdx][1].first);
+                    pAlgo->getResegmMapDisplay(nDisplayRowIdx).copyTo(vvDisplayPairs[nDisplayRowIdx][3].first);
+                    pAlgo->getStereoDispMapDisplay(nDisplayRowIdx).copyTo(vvDisplayPairs[nDisplayRowIdx][2].first);
                 }
-                vCurrFGMasks[nDisplayRowIdx].convertTo(vvDisplayPairs[nDisplayRowIdx][3].first,CV_8U,double(UCHAR_MAX));
+                lvAssert(pDisplayHelper);
+                pDisplayHelper->display(vvDisplayPairs,cv::Size(320,240));
+                const int nKeyPressed = pDisplayHelper->waitKey();
+                if(nKeyPressed==(int)'q')
+                    break;
             }
-            pDisplayHelper->display(vvDisplayPairs,cv::Size(320,240));
-            const int nKeyPressed = pDisplayHelper->waitKey();
-            if(nKeyPressed==(int)'q')
-                break;
-        #endif //DISPLAY_OUTPUT>0
             if(oBatch.isEvaluatingDisparities())
                 oBatch.push(vCurrStereoMaps,nCurrIdx++);
             else

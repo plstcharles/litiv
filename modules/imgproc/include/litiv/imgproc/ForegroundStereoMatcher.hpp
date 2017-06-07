@@ -165,6 +165,12 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
     virtual size_t getMaxLabelCount() const override;
     /// returns the list of (real) stereo disparity labels used in the output masks
     virtual const std::vector<OutputLabelType>& getLabels() const override;
+    /// helper func to display segmentation maps
+    cv::Mat getResegmMapDisplay(size_t nCamIdx) const;
+    /// helper func to display scaled disparity maps
+    cv::Mat getStereoDispMapDisplay(size_t nCamIdx) const;
+    /// helper func to display scaled assoc count maps
+    cv::Mat getAssocCountsMapDisplay(size_t nCamIdx) const;
 
     /// holds graph model data for both stereo and resegmentation models
     struct GraphModelData {
@@ -216,6 +222,12 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         ValueType calcRemoveAssocCost(size_t nCamIdx, int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
         /// returns the total stereo association cost for all grid nodes
         ValueType calcTotalAssocCost(size_t nCamIdx) const;
+        /// helper func to display segmentation maps
+        cv::Mat getResegmMapDisplay(size_t nCamIdx) const;
+        /// helper func to display scaled disparity maps
+        cv::Mat getStereoDispMapDisplay(size_t nCamIdx) const;
+        /// helper func to display scaled assoc count maps
+        cv::Mat getAssocCountsMapDisplay(size_t nCamIdx) const;
 
         /// max move making iteration count allowed during inference
         size_t m_nMaxMoveIterCount;
@@ -435,12 +447,6 @@ protected:
     std::vector<OutputLabelType> m_vStereoLabels;
     /// holds bimodel data & inference algo impls
     std::unique_ptr<GraphModelData> m_pModelData;
-    /// helper func to display segmentation maps
-    static cv::Mat getResegmMapDisplay(size_t nCamIdx, const GraphModelData& oData);
-    /// helper func to display scaled disparity maps
-    static cv::Mat getStereoDispMapDisplay(size_t nCamIdx, const GraphModelData& oData);
-    /// helper func to display scaled assoc count maps
-    static cv::Mat getAssocCountsMapDisplay(size_t nCamIdx, const GraphModelData& oData);
 };
 
 #define __LITIV_FGSTEREOM_HPP__
