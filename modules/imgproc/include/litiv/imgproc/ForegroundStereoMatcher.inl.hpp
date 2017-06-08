@@ -627,7 +627,7 @@ inline void StereoSegmMatcher::GraphModelData::updateStereoModels(bool bInit) {
     lvLog_(2,"Stereo graphs energy terms update completed in %f second(s).",oLocalTimer.tock());
 }
 
-inline void StereoSegmMatcher::GraphModelData::updateResegmModels(bool bInit) {
+inline void StereoSegmMatcher::GraphModelData::updateResegmModels(bool /*bInit*/) {
     static_assert(getCameraCount()==2,"bad static array size, hardcoded stuff below (incl xor) will break");
     lvDbgExceptionWatch;
     for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
@@ -652,6 +652,7 @@ inline void StereoSegmMatcher::GraphModelData::updateResegmModels(bool bInit) {
     lvDbgAssert(lv::MatInfo(aGradX[0])==lv::MatInfo(aGradX[1]) && m_oGridSize==aGradX[0].size);
     lvDbgAssert(lv::MatInfo(aGradMag[0])==lv::MatInfo(aGradMag[1]) && m_oGridSize==aGradMag[0].size);
     const float fInitDistScale = STEREOSEGMATCH_SHPDIST_INITDIST_SCALE;
+    const float fMaxDist = STEREOSEGMATCH_SHPDIST_PX_MAX_CST;
     lvLog(2,"Updating resegm graph models energy terms based on new features...");
     lv::StopWatch oLocalTimer;
     std::atomic_size_t nProcessedNodeCount(size_t(0));
@@ -672,35 +673,27 @@ inline void StereoSegmMatcher::GraphModelData::updateResegmModels(bool bInit) {
             lvDbgAssert((&m_apResegmModels[nCamIdx]->getFunction<ExplicitFunction>(oNode.apResegmUnaryFuncs[nCamIdx]->first))==(&oNode.apResegmUnaryFuncs[nCamIdx]->second));
             ExplicitFunction& vUnaryResegmFunc = oNode.apResegmUnaryFuncs[nCamIdx]->second;
             lvDbgAssert(vUnaryResegmFunc.dimension()==1 && vUnaryResegmFunc.size()==s_nResegmLabels);
-            const float fInitFGDist = ((float*)aInitFGDist[nCamIdx].data)[nLUTNodeIdx];
-            const float fCurrFGDist = ((float*)aFGDist[nCamIdx].data)[nLUTNodeIdx];
-            vUnaryResegmFunc(s_nForegroundLabelIdx) = std::min(ValueType((fCurrFGDist+fInitFGDist*fInitDistScale)*STEREOSEGMATCH_SHPDIST_COST_SCALE),STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
+            const float fInitFGDist = std::min(((float*)aInitFGDist[nCamIdx].data)[nLUTNodeIdx],fMaxDist);
+            const float fCurrFGDist = std::min(((float*)aFGDist[nCamIdx].data)[nLUTNodeIdx],fMaxDist);
+            const ValueType tMaxForegroundUnaryCost = ValueType((fCurrFGDist+fInitFGDist*fInitDistScale)*STEREOSEGMATCH_SHPDIST_COST_SCALE);
+            vUnaryResegmFunc(s_nForegroundLabelIdx) = std::min(tMaxForegroundUnaryCost,STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
             lvDbgAssert(vUnaryResegmFunc(s_nForegroundLabelIdx)>=ValueType(0));
-            const float fInitBGDist = ((float*)aInitBGDist[nCamIdx].data)[nLUTNodeIdx];
-            const float fCurrBGDist = ((float*)aBGDist[nCamIdx].data)[nLUTNodeIdx];
-            vUnaryResegmFunc(s_nBackgroundLabelIdx) = std::min(ValueType((fCurrBGDist+fInitBGDist*fInitDistScale)*STEREOSEGMATCH_SHPDIST_COST_SCALE),STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
+            const float fInitBGDist = std::min(((float*)aInitBGDist[nCamIdx].data)[nLUTNodeIdx],fMaxDist);
+            const float fCurrBGDist = std::min(((float*)aBGDist[nCamIdx].data)[nLUTNodeIdx],fMaxDist);
+            const ValueType tMaxBackgroundUnaryCost = ValueType((fCurrBGDist+fInitBGDist*fInitDistScale)*STEREOSEGMATCH_SHPDIST_COST_SCALE);
+            vUnaryResegmFunc(s_nBackgroundLabelIdx) = std::min(tMaxBackgroundUnaryCost,STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
             lvDbgAssert(vUnaryResegmFunc(s_nBackgroundLabelIdx)>=ValueType(0));
             const InternalLabelType nStereoLabelIdx = ((InternalLabelType*)m_aStereoLabelings[nCamIdx].data)[nLUTNodeIdx];
-            if(nStereoLabelIdx<m_nRealStereoLabels) {
-                const int nOffsetColIdx = getOffsetColIdx(nCamIdx,nColIdx,nStereoLabelIdx);
-                if(nOffsetColIdx>=0 && nOffsetColIdx<nCols && m_aROIs[nCamIdx^1](nRowIdx,nOffsetColIdx)) {
-                    const float fInitOffsetFGDist = aInitFGDist[nCamIdx^1](nRowIdx,nOffsetColIdx);
-                    const float fCurrOffsetFGDist = aFGDist[nCamIdx^1](nRowIdx,nOffsetColIdx);
-                    //vUnaryResegmFunc(s_nForegroundLabelIdx) = std::min(ValueType((fCurrOffsetFGDist+fInitOffsetFGDist*fInitDistScale)*STEREOSEGMATCH_SHPDIST_COST_SCALE),vUnaryResegmFunc(s_nForegroundLabelIdx));
-                    vUnaryResegmFunc(s_nForegroundLabelIdx) += ValueType((fCurrOffsetFGDist+fInitOffsetFGDist*fInitDistScale)*STEREOSEGMATCH_SHPDIST_COST_SCALE*STEREOSEGMATCH_SHPDIST_INTERSPEC_SCALE);
-                    vUnaryResegmFunc(s_nForegroundLabelIdx) = std::min(vUnaryResegmFunc(s_nForegroundLabelIdx),STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
-                    const float fInitOffsetBGDist = aInitBGDist[nCamIdx^1](nRowIdx,nOffsetColIdx);
-                    const float fCurrOffsetBGDist = aBGDist[nCamIdx^1](nRowIdx,nOffsetColIdx);
-                    //vUnaryResegmFunc(s_nBackgroundLabelIdx) = std::min(ValueType((fCurrOffsetBGDist+fInitOffsetBGDist*fInitDistScale)*STEREOSEGMATCH_SHPDIST_COST_SCALE),vUnaryResegmFunc(s_nBackgroundLabelIdx));
-                    vUnaryResegmFunc(s_nBackgroundLabelIdx) += ValueType((fCurrOffsetBGDist+fInitOffsetBGDist*fInitDistScale)*STEREOSEGMATCH_SHPDIST_COST_SCALE*STEREOSEGMATCH_SHPDIST_INTERSPEC_SCALE);
-                    vUnaryResegmFunc(s_nBackgroundLabelIdx) = std::min(vUnaryResegmFunc(s_nBackgroundLabelIdx),STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
-                }
-                else {
-                    vUnaryResegmFunc(s_nForegroundLabelIdx) = STEREOSEGMATCH_UNARY_COST_OOB_CST;
-                    vUnaryResegmFunc(s_nBackgroundLabelIdx) = ValueType(0);
-                }
-            }
-            if(bInit) { // inter-spectral pairwise term updates do not change w.r.t. segm or stereo updates
+            const int nOffsetColIdx = (nStereoLabelIdx<m_nRealStereoLabels)?getOffsetColIdx(nCamIdx,nColIdx,nStereoLabelIdx):INT_MAX;
+            if(nOffsetColIdx>=0 && nOffsetColIdx<nCols && m_aROIs[nCamIdx^1](nRowIdx,nOffsetColIdx)) {
+                const float fInitOffsetFGDist = std::min(aInitFGDist[nCamIdx^1](nRowIdx,nOffsetColIdx),fMaxDist);
+                const float fCurrOffsetFGDist = std::min(aFGDist[nCamIdx^1](nRowIdx,nOffsetColIdx),fMaxDist);
+                const ValueType tAddedForegroundUnaryCost = ValueType((fCurrOffsetFGDist+fInitOffsetFGDist*fInitDistScale)*STEREOSEGMATCH_SHPDIST_COST_SCALE*STEREOSEGMATCH_SHPDIST_INTERSPEC_SCALE);
+                vUnaryResegmFunc(s_nForegroundLabelIdx) = std::min(vUnaryResegmFunc(s_nForegroundLabelIdx)+tAddedForegroundUnaryCost,STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
+                const float fInitOffsetBGDist = std::min(aInitBGDist[nCamIdx^1](nRowIdx,nOffsetColIdx),fMaxDist);
+                const float fCurrOffsetBGDist = std::min(aBGDist[nCamIdx^1](nRowIdx,nOffsetColIdx),fMaxDist);
+                const ValueType tAddedBackgroundUnaryCost = ValueType((fCurrOffsetBGDist+fInitOffsetBGDist*fInitDistScale)*STEREOSEGMATCH_SHPDIST_COST_SCALE*STEREOSEGMATCH_SHPDIST_INTERSPEC_SCALE);
+                vUnaryResegmFunc(s_nBackgroundLabelIdx) = std::min(vUnaryResegmFunc(s_nBackgroundLabelIdx)+tAddedBackgroundUnaryCost,STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
                 for(size_t nOrientIdx=0; nOrientIdx<oNode.aanResegmPairwFactIDs[nCamIdx].size(); ++nOrientIdx) {
                     if(oNode.aanResegmPairwFactIDs[nCamIdx][nOrientIdx]!=SIZE_MAX) {
                         lvDbgAssert(oNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx]);
@@ -710,13 +703,40 @@ inline void StereoSegmMatcher::GraphModelData::updateResegmModels(bool bInit) {
                         ExplicitFunction& vPairwiseResegmFunc = oNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx]->second;
                         lvDbgAssert(vPairwiseResegmFunc.dimension()==2 && vPairwiseResegmFunc.size()==s_nResegmLabels*s_nResegmLabels);
                         const int nLocalGrad = (int)(((nOrientIdx==0)?aGradY[nCamIdx]:(nOrientIdx==1)?aGradX[nCamIdx]:aGradMag[nCamIdx])(nRowIdx,nColIdx));
-                        const float fGradScaleFact = m_aLabelSimCostGradFactLUT.eval_raw(nLocalGrad);
-                        lvDbgAssert(fGradScaleFact==(float)std::exp(float(STEREOSEGMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/STEREOSEGMATCH_LBLSIM_COST_GRADRAW_SCALE));
-                        // @@@@@@@@@@@@@@@@@@ change weight w.r.t gradient in other spectrum??
+                        const int nOffsetGrad = (int)(((nOrientIdx==0)?aGradY[nCamIdx^1]:(nOrientIdx==1)?aGradX[nCamIdx^1]:aGradMag[nCamIdx^1])(nRowIdx,nOffsetColIdx));
+                        const float fLocalScaleFact = m_aLabelSimCostGradFactLUT.eval_raw(nLocalGrad);
+                        const float fOffsetScaleFact = m_aLabelSimCostGradFactLUT.eval_raw(nOffsetGrad);
+                        lvDbgAssert(fLocalScaleFact==(float)std::exp(float(STEREOSEGMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/STEREOSEGMATCH_LBLSIM_COST_GRADRAW_SCALE));
+                        lvDbgAssert(fOffsetScaleFact==(float)std::exp(float(STEREOSEGMATCH_LBLSIM_COST_GRADPIVOT_CST-nOffsetGrad)/STEREOSEGMATCH_LBLSIM_COST_GRADRAW_SCALE));
+                        //const float fScaleFact = std::min(fLocalScaleFact,fOffsetScaleFact);
+                        const float fScaleFact = fLocalScaleFact*fOffsetScaleFact;
                         for(InternalLabelType nLabelIdx1=0; nLabelIdx1<s_nResegmLabels; ++nLabelIdx1) {
                             for(InternalLabelType nLabelIdx2=0; nLabelIdx2<s_nResegmLabels; ++nLabelIdx2) {
-                                vPairwiseResegmFunc(nLabelIdx1,nLabelIdx2) = ValueType((1+(nLabelIdx1^nLabelIdx2))*fGradScaleFact*STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST);
-                                vPairwiseResegmFunc(nLabelIdx1,nLabelIdx2) = std::min(vPairwiseResegmFunc(nLabelIdx1,nLabelIdx2),STEREOSEGMATCH_LBLSIM_COST_MAXTRUNC_CST);
+                                const ValueType tPairwiseCost = ValueType((nLabelIdx1^nLabelIdx2)*fScaleFact*STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST);
+                                vPairwiseResegmFunc(nLabelIdx1,nLabelIdx2) = std::min(tPairwiseCost,STEREOSEGMATCH_LBLSIM_COST_MAXTRUNC_CST);
+                            }
+                        }
+                    }
+                }
+            }
+            else {
+                vUnaryResegmFunc(s_nForegroundLabelIdx) = STEREOSEGMATCH_UNARY_COST_OOB_CST;
+                vUnaryResegmFunc(s_nBackgroundLabelIdx) = ValueType(0);
+                for(size_t nOrientIdx=0; nOrientIdx<oNode.aanResegmPairwFactIDs[nCamIdx].size(); ++nOrientIdx) {
+                    if(oNode.aanResegmPairwFactIDs[nCamIdx][nOrientIdx]!=SIZE_MAX) {
+                        lvDbgAssert(oNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx]);
+                        lvDbgAssert(oNode.aanPairwLUTNodeIdxs[nCamIdx][nOrientIdx]!=SIZE_MAX);
+                        lvDbgAssert(m_vNodeInfos[oNode.aanPairwLUTNodeIdxs[nCamIdx][nOrientIdx]].abValidGraphNode[nCamIdx]);
+                        lvDbgAssert((&m_apResegmModels[nCamIdx]->getFunction<ExplicitFunction>(oNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx]->first))==(&oNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx]->second));
+                        ExplicitFunction& vPairwiseResegmFunc = oNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx]->second;
+                        lvDbgAssert(vPairwiseResegmFunc.dimension()==2 && vPairwiseResegmFunc.size()==s_nResegmLabels*s_nResegmLabels);
+                        const int nLocalGrad = (int)(((nOrientIdx==0)?aGradY[nCamIdx]:(nOrientIdx==1)?aGradX[nCamIdx]:aGradMag[nCamIdx])(nRowIdx,nColIdx));
+                        const float fLocalScaleFact = m_aLabelSimCostGradFactLUT.eval_raw(nLocalGrad);
+                        lvDbgAssert(fLocalScaleFact==(float)std::exp(float(STEREOSEGMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/STEREOSEGMATCH_LBLSIM_COST_GRADRAW_SCALE));
+                        for(InternalLabelType nLabelIdx1=0; nLabelIdx1<s_nResegmLabels; ++nLabelIdx1) {
+                            for(InternalLabelType nLabelIdx2=0; nLabelIdx2<s_nResegmLabels; ++nLabelIdx2) {
+                                const ValueType tPairwiseCost = ValueType((nLabelIdx1^nLabelIdx2)*fLocalScaleFact*STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST);
+                                vPairwiseResegmFunc(nLabelIdx1,nLabelIdx2) = std::min(tPairwiseCost,STEREOSEGMATCH_LBLSIM_COST_MAXTRUNC_CST);
                             }
                         }
                     }
