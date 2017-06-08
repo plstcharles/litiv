@@ -15,6 +15,13 @@ Short summary of the License (covers the main points only):
 
 ...but of course, you should read the whole thing below for the true legalese.
 
+Besides, some of the source code contained in the LITIV Framework has been
+reimplemented from sources within the OpenCV library, or from code fragments
+taken from OpenCV's mailing list, bug tracker, or unmerged branches. You must
+therefore abide by OpenCV's License to use the LITIV Framework. The full license
+is available at https://github.com/opencv/opencv/ and a copy has been added at
+the bottom of this file.
+
 ---------------------------------------------------------------------------------
 
                                  Apache License
@@ -193,4 +200,43 @@ Short summary of the License (covers the main points only):
       of your accepting any such warranty or additional liability.
 
    END OF TERMS AND CONDITIONS
+
+---------------------------------------------------------------------------------
+
+                          License Agreement
+               For Open Source Computer Vision Library
+                       (3-clause BSD License)
+
+Copyright (C) 2000-2016, Intel Corporation, all rights reserved.
+Copyright (C) 2009-2011, Willow Garage Inc., all rights reserved.
+Copyright (C) 2009-2016, NVIDIA Corporation, all rights reserved.
+Copyright (C) 2010-2013, Advanced Micro Devices, Inc., all rights reserved.
+Copyright (C) 2015-2016, OpenCV Foundation, all rights reserved.
+Copyright (C) 2015-2016, Itseez Inc., all rights reserved.
+Third party copyrights are property of their respective owners.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+  * Redistributions of source code must retain the above copyright notice,
+    this list of conditions and the following disclaimer.
+
+  * Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+
+  * Neither the names of the copyright holders nor the names of the contributors
+    may be used to endorse or promote products derived from this software
+    without specific prior written permission.
+
+This software is provided by the copyright holders and contributors "as is" and
+any express or implied warranties, including, but not limited to, the implied
+warranties of merchantability and fitness for a particular purpose are disclaimed.
+In no event shall copyright holders or contributors be liable for any direct,
+indirect, incidental, special, exemplary, or consequential damages
+(including, but not limited to, procurement of substitute goods or services;
+loss of use, data, or profits; or business interruption) however caused
+and on any theory of liability, whether in contract, strict liability,
+or tort (including negligence or otherwise) arising in any way out of
+the use of this software, even if advised of the possibility of such damage.
 
