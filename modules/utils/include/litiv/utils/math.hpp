@@ -947,13 +947,19 @@ namespace lv {
 
     /// returns the determinant of a square matrix via LU decomposition --- only efficient for small matrices
     template<size_t N, typename TVal>
-    double determinant(const TVal* aMat) {
+    double determinant(const TVal* m) {
         static_assert(std::is_arithmetic<TVal>::value,"input type must be arithmetic");
         static_assert(N>size_t(0),"input matrix size must be positive");
-        lvDbgAssert_(aMat!=nullptr,"invalid matrix");
+        lvDbgAssert_(m!=nullptr,"invalid matrix");
+        if(N==1)
+            return m[0];
+        else if(N==2)
+            return m[0]*m[3] - m[1]*m[2];
+        else if(N==3)
+            return m[0]*(m[4]*m[8]-m[5]*m[7]) - m[1]*(m[3]*m[8]-m[5]*m[6]) + m[2]*(m[3]*m[7]-m[4]*m[6]);
         static thread_local lv::AutoBuffer<TVal,N*N> s_aMatCopy;
         lvDbgAssert(s_aMatCopy.size()==N*N && s_aMatCopy.is_static());
-        std::copy_n(aMat,N*N,s_aMatCopy.data());
+        std::copy_n(m,N*N,s_aMatCopy.data());
         double p = lv::LU(s_aMatCopy.data(),N*sizeof(TVal),int(N));
         if(p==0)
             return p;
@@ -961,10 +967,63 @@ namespace lv {
         return 1.0/p;
     }
 
+    /// computes the inverse of a square matrix via LU decomposition --- only efficient for small matrices (returns false if singular)
+    template<size_t N, typename TVal>
+    bool invert(const TVal* in, TVal* out) {
+        static_assert(std::is_arithmetic<TVal>::value,"input type must be arithmetic");
+        static_assert(N>size_t(1),"matrix size must be greater than one");
+        lvDbgAssert_(in!=nullptr,"invalid input matrix");
+        lvDbgAssert_(out!=nullptr,"invalid output matrix");
+        if(N==2) {
+            const double dDet = lv::determinant<N,TVal>(in);
+            if(dDet==0)
+                return false;
+            const double dDetInv = 1.0/dDet;
+            out[3] = TVal(in[0]*dDetInv);
+            out[0] = TVal(in[3]*dDetInv);
+            out[1] = TVal(in[1]*-dDetInv);
+            out[2] = TVal(in[2]*-dDetInv);
+            return true;
+        }
+        else if(N==3) {
+            const double dDet = lv::determinant<N,TVal>(in);
+            if(dDet==0)
+                return false;
+            const double dDetInv = 1.0/dDet;
+            out[0] = TVal((in[4]*in[8] - in[5]*in[7])*dDetInv);
+            out[1] = TVal((in[2]*in[7] - in[1]*in[8])*dDetInv);
+            out[2] = TVal((in[1]*in[5] - in[2]*in[4])*dDetInv);
+            out[3] = TVal((in[5]*in[6] - in[3]*in[8])*dDetInv);
+            out[4] = TVal((in[0]*in[8] - in[2]*in[6])*dDetInv);
+            out[5] = TVal((in[2]*in[3] - in[0]*in[5])*dDetInv);
+            out[6] = TVal((in[3]*in[7] - in[4]*in[6])*dDetInv);
+            out[7] = TVal((in[1]*in[6] - in[0]*in[7])*dDetInv);
+            out[8] = TVal((in[0]*in[4] - in[1]*in[3])*dDetInv);
+            return true;
+        }
+        static thread_local lv::AutoBuffer<TVal,N*N> s_aMatCopy;
+        lvDbgAssert(s_aMatCopy.size()==N*N && s_aMatCopy.is_static());
+        std::copy_n(in,N*N,s_aMatCopy.data());
+        std::fill_n(out,N*N,TVal(0));
+        lv::unroll<N>([&](size_t n){out[n*N+n] = TVal(1);});
+        const size_t nRowStep_byte = N*sizeof(TVal);
+        return lv::LU(s_aMatCopy.data(),nRowStep_byte,int(N),out,nRowStep_byte,int(N))!=0;
+    }
+
+#if USE_CVCORE_WITH_UTILS
+
     /// returns the determinant of a square matrix via LU decomposition --- only efficient for small matrices
     template<size_t N, typename TVal>
     double determinant(const cv::Matx<TVal,N,N>& oMat) {
         return lv::determinant<N,TVal>(oMat.val);
     }
+
+    /// computes the inverse of a square matrix via LU decomposition --- only efficient for small matrices (returns false if singular)
+    template<size_t N, typename TVal>
+    bool invert(const cv::Matx<TVal,N,N>& oInput, cv::Matx<TVal,N,N>& oOutput) {
+        return lv::invert<N,TVal>(oInput.val,oOutput.val);
+    }
+
+#endif //USE_CVCORE_WITH_UTILS
 
 } // namespace lv
