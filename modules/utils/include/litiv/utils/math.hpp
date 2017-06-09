@@ -893,4 +893,78 @@ namespace lv {
         return (T)(bool((nBits&(1<<n))!=0)<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,T>(nBits,n-1):(T)0);
     }
 
+    /// performs LU decomposition of a MxM matrix A (function signature is the same as OpenCV's LU32f/LU64f) --- only efficient for small matrices
+    template<typename TVal>
+    int LU(TVal* A, size_t nRowStep_A_byte, int m, TVal* B=nullptr, size_t nRowStep_B_byte=0, int n=0) {
+        static_assert(std::is_arithmetic<TVal>::value,"input type must be arithmetic");
+        lvDbgAssert_(A!=nullptr && m>0,"invalid A matrix");
+        const size_t nRowStep_A = nRowStep_A_byte/sizeof(TVal);
+        lvDbgAssert_(nRowStep_A>0,"invalid A matrix row size");
+        const size_t nRowStep_B = nRowStep_B_byte/sizeof(TVal);
+        lvDbgAssert_(B==nullptr || nRowStep_B>0,"invalid B matrix row size");
+        constexpr bool bIsDouble = std::is_same<double,std::remove_cv_t<TVal>>::value;
+        //constexpr bool bIsFloat = std::is_same<float,std::remove_cv_t<TVal>>::value;
+        constexpr double dEps = std::is_integral<TVal>::value?0.0:(bIsDouble?DBL_EPSILON*100.0:/*bIsFloat*/FLT_EPSILON*10.0);
+        int p = 1;
+        for(int i=0; i<m; ++i) {
+            int k = i;
+            for(int j=i+1; j<m; ++j)
+                if(std::abs(A[j*nRowStep_A+i])>std::abs(A[k*nRowStep_A+i]))
+                    k = j;
+            if(double(std::abs(A[k*nRowStep_A+i]))<dEps)
+                return 0; // matrix is degenerate; return null permutation sign
+            if(k!=i) {
+                for(int j=i; j<m; ++j)
+                    std::swap(A[i*nRowStep_A+j], A[k*nRowStep_A+j]);
+                if(B)
+                    for(int j=0; j<n; ++j)
+                        std::swap(B[i*nRowStep_B+j], B[k*nRowStep_B+j]);
+                p = -p;
+            }
+            TVal d = -1/A[i*nRowStep_A+i];
+            for(int j=i+1; j<m; ++j) {
+                TVal alpha = A[j*nRowStep_A+i]*d;
+                for(k=i+1; k<m; ++k)
+                    A[j*nRowStep_A+k] += alpha*A[i*nRowStep_A+k];
+                if(B)
+                    for(k=0; k<n; ++k)
+                        B[j*nRowStep_B+k] += alpha*B[i*nRowStep_B+k];
+            }
+            A[i*nRowStep_A+i] = -d;
+        }
+        if(B) {
+            for(int i=m-1; i>=0; --i) {
+                for(int j=0; j<n; ++j) {
+                    TVal s = B[i*nRowStep_B+j];
+                    for(int k=i+1; k<m; ++k)
+                        s -= A[i*nRowStep_A+k]*B[k*nRowStep_B+j];
+                    B[i*nRowStep_B+j] = s*A[i*nRowStep_A+i];
+                }
+            }
+        }
+        return p; // return permutation matrix sign
+    }
+
+    /// returns the determinant of a square matrix via LU decomposition --- only efficient for small matrices
+    template<size_t N, typename TVal>
+    double determinant(const TVal* aMat) {
+        static_assert(std::is_arithmetic<TVal>::value,"input type must be arithmetic");
+        static_assert(N>size_t(0),"input matrix size must be positive");
+        lvDbgAssert_(aMat!=nullptr,"invalid matrix");
+        static thread_local lv::AutoBuffer<TVal,N*N> s_aMatCopy;
+        lvDbgAssert(s_aMatCopy.size()==N*N && s_aMatCopy.is_static());
+        std::copy_n(aMat,N*N,s_aMatCopy.data());
+        double p = lv::LU(s_aMatCopy.data(),N*sizeof(TVal),int(N));
+        if(p==0)
+            return p;
+        lv::unroll<N>([&](size_t n){p *= s_aMatCopy[n*N+n];});
+        return 1.0/p;
+    }
+
+    /// returns the determinant of a square matrix via LU decomposition --- only efficient for small matrices
+    template<size_t N, typename TVal>
+    double determinant(const cv::Matx<TVal,N,N>& oMat) {
+        return lv::determinant<N,TVal>(oMat.val);
+    }
+
 } // namespace lv
