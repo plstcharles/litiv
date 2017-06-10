@@ -57,13 +57,13 @@ namespace lv {
 
     /// initializes foreground and background GMM parameters via KNN using the given image and mask (where values <128 are considered background)
     template<size_t nKMeansIters=10, size_t nC, size_t nD>
-    void initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel);
+    void initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel, const cv::Mat& oROI=cv::Mat());
     /// assigns each input image pixel its most likely GMM component in the output map, using the BG or FG model as dictated by the input mask
     template<size_t nC, size_t nD>
-    void assignGaussianMixtureComponents(const cv::Mat& oInput, const cv::Mat& oMask, cv::Mat& oAssignMap, const lv::GMM<nC,nD>& oBGModel, const lv::GMM<nC,nD>& oFGModel);
+    void assignGaussianMixtureComponents(const cv::Mat& oInput, const cv::Mat& oMask, cv::Mat& oAssignMap, const lv::GMM<nC,nD>& oBGModel, const lv::GMM<nC,nD>& oFGModel, const cv::Mat& oROI=cv::Mat());
     /// learns the ideal foreground and background GMM parameters to fit the components assigned to the pixels of the input image
     template<size_t nC, size_t nD>
-    void learnGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oAssignMap, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel);
+    void learnGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oAssignMap, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel, const cv::Mat& oROI=cv::Mat());
 
 } // namespace lv
 
@@ -157,20 +157,24 @@ bool lv::isLocalMaximum_Diagonal(const Tr* const anMap, const size_t nMapColStep
 }
 
 template<size_t nKMeansIters, size_t nC, size_t nD>
-void lv::initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel) {
+void lv::initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel, const cv::Mat& oROI) {
     static_assert(nKMeansIters>0,"bad iter count for kmeans");
     lvAssert_(!oInput.empty() && !oMask.empty() && oInput.size==oMask.size,"bad input image/mask size");
-    lvAssert_(oMask.type()==CV_8UC1,"input mask type must be 8UC1 (where all values <128 are considered background)");
-    lvAssert_(oMask.depth()==CV_8U,"input image type should be 8U (only supported for now)");
+    lvAssert_(oInput.isContinuous() && oMask.isContinuous(),"need continuous mats (raw indexing in impl)");
+    lvAssert_(oInput.depth()==CV_8U,"input image type should be 8U (only supported for now)");
     lvAssert_(oInput.channels()==int(nD),"input image channel count must match gmm sample dims");
+    lvAssert_(oMask.type()==CV_8UC1,"input mask type must be 8UC1 (where all values <128 are considered background)");
+    lvAssert_(oROI.empty() || (oROI.size==oInput.size && oROI.isContinuous() && oROI.type()==CV_8UC1),"bad ROI size/type");
     static thread_local lv::AutoBuffer<float> s_aBGSamples,s_aFGSamples;
     size_t nBGSamples=0,nFGSamples=0;
-    s_aBGSamples.resize(oInput.total()*nD);
-    s_aFGSamples.resize(oInput.total()*nD);
-    for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {
-        for(int nColIdx=0; nColIdx<oInput.cols; ++nColIdx) {
-            const uchar* pPixelData = oInput.at<cv::Vec<uchar,nD>>(nRowIdx,nColIdx).val;
-            if(oMask.at<uchar>(nRowIdx,nColIdx)<128)
+    const size_t nTotSamples = oInput.total();
+    s_aBGSamples.resize(nTotSamples*nD);
+    s_aFGSamples.resize(nTotSamples*nD);
+    const uchar* pROI = oROI.empty()?nullptr:oROI.data;
+    for(size_t nSampleIdx=0; nSampleIdx<nTotSamples; ++nSampleIdx) {
+        if(!pROI || pROI[nSampleIdx]) {
+            const uchar* pPixelData = oInput.data+nSampleIdx*nD;
+            if(oMask.data[nSampleIdx]<128)
                 std::transform(pPixelData,pPixelData+nD,&s_aBGSamples[(nBGSamples++)*nD],[](uchar n){return float(n);});
             else
                 std::transform(pPixelData,pPixelData+nD,&s_aFGSamples[(nFGSamples++)*nD],[](uchar n){return float(n);});
@@ -198,29 +202,48 @@ void lv::initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, 
 }
 
 template<size_t nC, size_t nD>
-void lv::assignGaussianMixtureComponents(const cv::Mat& oInput, const cv::Mat& oMask, cv::Mat& oAssignMap, const lv::GMM<nC,nD>& oBGModel, const lv::GMM<nC,nD>& oFGModel) {
+void lv::assignGaussianMixtureComponents(const cv::Mat& oInput, const cv::Mat& oMask, cv::Mat& oAssignMap, const lv::GMM<nC,nD>& oBGModel, const lv::GMM<nC,nD>& oFGModel, const cv::Mat& oROI) {
+    lvAssert_(!oInput.empty() && !oMask.empty() && oInput.size==oMask.size,"bad input image/mask size");
+    lvAssert_(oInput.isContinuous() && oMask.isContinuous(),"need continuous mats (raw indexing in impl)");
+    lvAssert_(oInput.depth()==CV_8U,"input image type should be 8U (only supported for now)");
+    lvAssert_(oInput.channels()==int(nD),"input image channel count must match gmm sample dims");
+    lvAssert_(oMask.type()==CV_8UC1,"input mask type must be 8UC1 (where all values <128 are considered background)");
+    oAssignMap.create(oInput.dims,oInput.size,CV_32SC1);
+    lvAssert_(oAssignMap.isContinuous(),"need continuous mats (raw indexing in impl)");
+    lvAssert_(oROI.empty() || (oROI.size==oInput.size && oROI.isContinuous() && oROI.type()==CV_8UC1),"bad ROI size/type");
     std::array<double,nD> aSample;
-    for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {
-        for(int nColIdx=0; nColIdx<oInput.cols; ++nColIdx) {
-            const uchar* pPixelData = oInput.at<cv::Vec<uchar,nD>>(nRowIdx,nColIdx).val;
+    const size_t nTotSamples = oInput.total();
+    const uchar* pROI = oROI.empty()?nullptr:oROI.data;
+    for(size_t nSampleIdx=0; nSampleIdx<nTotSamples; ++nSampleIdx) {
+        if(!pROI || pROI[nSampleIdx]) {
+            const uchar* pPixelData = oInput.data+nSampleIdx*nD;
             lv::unroll<nD>([&](size_t nDimIdx){aSample[nDimIdx] = double(pPixelData[nDimIdx]);});
-            oAssignMap.at<int>(nRowIdx,nColIdx) = int((oMask.at<uchar>(nRowIdx,nColIdx)<128)?oBGModel.getBestComponent(aSample):oFGModel.getBestComponent(aSample));
+            ((int*)oAssignMap.data)[nSampleIdx] = int((oMask.data[nSampleIdx]<128)?oBGModel.getBestComponent(aSample):oFGModel.getBestComponent(aSample));
         }
     }
 }
 
 template<size_t nC, size_t nD>
-void lv::learnGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oAssignMap, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel) {
+void lv::learnGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oAssignMap, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel, const cv::Mat& oROI) {
+    lvAssert_(!oInput.empty() && !oMask.empty() && !oAssignMap.empty() && oInput.size==oMask.size && oInput.size==oAssignMap.size,"bad input image/mask/assignmap size");
+    lvAssert_(oInput.isContinuous() && oMask.isContinuous() && oAssignMap.isContinuous(),"need continuous mats (raw indexing in impl)");
+    lvAssert_(oInput.depth()==CV_8U,"input image type should be 8U (only supported for now)");
+    lvAssert_(oInput.channels()==int(nD),"input image channel count must match gmm sample dims");
+    lvAssert_(oMask.type()==CV_8UC1,"input mask type must be 8UC1 (where all values <128 are considered background)");
+    lvAssert_(oAssignMap.type()==CV_32SC1,"input component assignment map must be 32SC1 (see 'assignGaussianMixtureComponents')");
+    lvAssert_(oROI.empty() || (oROI.size==oInput.size && oROI.isContinuous() && oROI.type()==CV_8UC1),"bad ROI size/type");
     oBGModel.initLearning();
     oFGModel.initLearning();
     std::array<double,nD> aSample;
-    for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {
-        for(int nColIdx=0; nColIdx<oInput.cols; ++nColIdx) {
-            const int nCompLabel = oAssignMap.at<int>(nRowIdx,nColIdx);
+    const size_t nTotSamples = oInput.total();
+    const uchar* pROI = oROI.empty()?nullptr:oROI.data;
+    for(size_t nSampleIdx=0; nSampleIdx<nTotSamples; ++nSampleIdx) {
+        if(!pROI || pROI[nSampleIdx]) {
+            const int nCompLabel = ((const int*)oAssignMap.data)[nSampleIdx];
             if(nCompLabel>=0 && nCompLabel<int(nC)) {
-                const uchar* pPixelData = oInput.at<cv::Vec<uchar,nD>>(nRowIdx,nColIdx).val;
+                const uchar* pPixelData = oInput.data+nSampleIdx*nD;
                 lv::unroll<nD>([&](size_t nDimIdx){aSample[nDimIdx] = double(pPixelData[nDimIdx]);});
-                if(oMask.at<uchar>(nRowIdx,nColIdx)<128)
+                if(oMask.data[nSampleIdx]<128)
                     oBGModel.addSample(size_t(nCompLabel),aSample);
                 else
                     oFGModel.addSample(size_t(nCompLabel),aSample);
