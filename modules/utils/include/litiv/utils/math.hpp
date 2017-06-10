@@ -971,10 +971,16 @@ namespace lv {
     template<size_t N, typename TVal>
     bool invert(const TVal* in, TVal* out) {
         static_assert(std::is_arithmetic<TVal>::value,"input type must be arithmetic");
-        static_assert(N>size_t(1),"matrix size must be greater than one");
+        static_assert(N>size_t(0),"input matrix size must be positive");
         lvDbgAssert_(in!=nullptr,"invalid input matrix");
         lvDbgAssert_(out!=nullptr,"invalid output matrix");
-        if(N==2) {
+        if(N==1) {
+            if(in[0]==0)
+                return false;
+            out[0] = TVal(1.0/in[0]);
+            return true;
+        }
+        else if(N==2) {
             const double dDet = lv::determinant<N,TVal>(in);
             if(dDet==0)
                 return false;
