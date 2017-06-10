@@ -1026,4 +1026,199 @@ namespace lv {
 
 #endif //USE_CVCORE_WITH_UTILS
 
+    /// Gaussian Mixture Model estimator class
+    template<size_t nComps=5, size_t nDims=3>
+    struct GMM {
+        static_assert(nComps>0,"bad component count");
+        static_assert(nDims>0,"bad dimension size");
+        /// evaluates the probability that a given data sample fits with the learned model
+        double operator()(const std::array<double,nDims>& aSample) const;
+        /// evaluates the probability that a given data sample fits with the learned model
+        double operator()(const double* aSample) const;
+        /// evaluates the probability that a given data sample fits with a specific component
+        double operator()(size_t nCompIdx, const std::array<double,nDims>& aSample) const;
+        /// evaluates the probability that a given data sample fits with a specific component
+        double operator()(size_t nCompIdx, const double* aSample) const;
+        /// returns the best-fitting component index for a given sample
+        size_t getBestComponent(const std::array<double,nDims>& aSample) const;
+        /// returns the best-fitting component index for a given sample
+        size_t getBestComponent(const double* aSample) const;
+        /// initializes learning mode (enables 'addSample' to learn new model params)
+        void initLearning();
+        /// adds a new data sample to a specific component for model param estimation
+        void addSample(size_t nCompIdx, const std::array<double,nDims>& aSample);
+        /// adds a new data sample to a specific component for model param estimation
+        void addSample(size_t nCompIdx, const double* aSample);
+        /// disables learning mode, and estimates ideal model params using added samples
+        void endLearning();
+        /// returns the number of gaussian components in the mixture model (templated param)
+        static constexpr size_t getComponentCount() {return nComps;}
+        /// returns the dimensionality of input samples (templated param)
+        static constexpr size_t getDimensionCount() {return nDims;}
+        /// returns the model data size (in elements, not bytes!)
+        static constexpr size_t getModelSize() {return (nDims+nDims*nDims*2+2)*nComps;}
+        /// returns the underlying model data for debugging/serialization/overwriting
+        inline double* getModelData() {return m_aModelData.data();}
+        /// default constructor; initializes all model params to zero
+        GMM();
+    protected:
+        static constexpr size_t getStaticBufferSize() {return std::min(getModelSize(),size_t(128));}
+        lv::AutoBuffer<double,getStaticBufferSize()> m_aModelData;
+        double* m_aCoeffs;
+        double* m_aMeans;
+        double* m_aCovMats;
+        double* m_aInvCovMats;
+        double* m_aCovMatDeterms;
+        double m_aSampleSums[nComps][nDims];
+        double m_aSampleProds[nComps][nDims][nDims];
+        size_t m_nSampleCounts[nComps];
+        size_t m_nTotSampleCount;
+        bool m_bLearningModeOn;
+    };
+
 } // namespace lv
+
+template<size_t nComps, size_t nDims>
+lv::GMM<nComps,nDims>::GMM() : m_bLearningModeOn(false) {
+    m_aModelData.resize(getModelSize());
+    m_aCoeffs = m_aModelData.data();
+    m_aMeans = m_aCoeffs+nComps;
+    m_aCovMats = m_aMeans+nDims*nComps;
+    m_aInvCovMats = m_aCovMats+nDims*nDims*nComps;
+    m_aCovMatDeterms = m_aInvCovMats+nDims*nDims*nComps;
+    lvDbgAssert((m_aCovMatDeterms+nComps)==getModelData()+getModelSize());
+    lvDbgAssert(m_aModelData.is_static()); // @@@@
+    std::fill_n(m_aModelData.data(),getModelSize(),0.0);
+}
+
+template<size_t nComps, size_t nDims>
+double lv::GMM<nComps,nDims>::operator()(const std::array<double,nDims>& aSample) const {
+    return operator()(aSample.data());
+}
+
+template<size_t nComps, size_t nDims>
+double lv::GMM<nComps,nDims>::operator()(const double* aSample) const {
+    lvDbgAssert(!m_bLearningModeOn);
+    lvDbgAssert(aSample!=nullptr);
+    double dRes = m_aCoeffs[nComps-1]*(*this)(nComps-1,aSample);
+    lv::unroll<nComps-1>([&](size_t nCompIdx){
+        dRes += m_aCoeffs[nCompIdx]*(*this)(nCompIdx,aSample);
+    });
+    return dRes;
+}
+
+template<size_t nComps, size_t nDims>
+double lv::GMM<nComps,nDims>::operator()(size_t nCompIdx, const std::array<double,nDims>& aSample) const {
+    return operator()(nCompIdx,aSample.data());
+}
+
+template<size_t nComps, size_t nDims>
+double lv::GMM<nComps,nDims>::operator()(size_t nCompIdx, const double* aSample) const {
+    lvDbgAssert(!m_bLearningModeOn);
+    lvDbgAssert(nCompIdx<nComps);
+    lvDbgAssert(aSample!=nullptr);
+    double dRes = 0.0;
+    if(m_aCoeffs[nCompIdx]>0) {
+        lvDbgAssert(m_aCovMatDeterms[nCompIdx]>std::numeric_limits<double>::epsilon());
+        std::array<double,nDims> aDiff;
+        const double* aMean = m_aMeans+nDims*nCompIdx;
+        lv::unroll<nDims>([&](size_t nDimIdx){
+            aDiff[nDimIdx] = aSample[nDimIdx]-aMean[nDimIdx];
+        });
+        double dSum1 = 0.0;
+        lv::unroll<nDims>([&](size_t nDimIdx1){
+            double dSum2 = aDiff[nDims-1]*m_aInvCovMats[(nCompIdx*nDims+(nDims-1))*nDims+nDimIdx1];
+            lv::unroll<nDims-1>([&](size_t nDimIdx2){
+                dSum2 += aDiff[nDimIdx2]*m_aInvCovMats[(nCompIdx*nDims+nDimIdx2)*nDims+nDimIdx1];
+            });
+            dSum1 += aDiff[nDimIdx1]*dSum2;
+        });
+        dRes = 1.0/std::sqrt(m_aCovMatDeterms[nCompIdx])*std::exp(-0.5*dSum1);
+    }
+    return dRes;
+}
+
+template<size_t nComps, size_t nDims>
+size_t lv::GMM<nComps,nDims>::getBestComponent(const std::array<double,nDims>& aSample) const {
+    return getBestComponent(aSample.data());
+}
+
+template<size_t nComps, size_t nDims>
+size_t lv::GMM<nComps,nDims>::getBestComponent(const double* aSample) const {
+    lvDbgAssert(!m_bLearningModeOn);
+    lvDbgAssert(aSample!=nullptr);
+    size_t nBestCompIdx = nComps-1;
+    double dMaxProb = (*this)(nComps-1,aSample);
+    lv::unroll<nComps-1>([&](size_t nCompIdx){
+        double dCurrProb = (*this)(nCompIdx,aSample);
+        if(dCurrProb>dMaxProb) {
+            nBestCompIdx = nCompIdx;
+            dMaxProb = dCurrProb;
+        }
+    });
+    return nBestCompIdx;
+}
+
+template<size_t nComps, size_t nDims>
+void lv::GMM<nComps,nDims>::initLearning() {
+    std::fill_n(&m_aSampleSums[0][0],nComps*nDims,0.0);
+    std::fill_n(&m_aSampleProds[0][0][0],nComps*nDims*nDims,0.0);
+    std::fill_n(&m_nSampleCounts[0],nComps,size_t(0));
+    m_nTotSampleCount = size_t(0);
+    m_bLearningModeOn = true;
+}
+
+template<size_t nComps, size_t nDims>
+void lv::GMM<nComps,nDims>::addSample(size_t nCompIdx, const std::array<double,nDims>& aSample) {
+    addSample(nCompIdx,aSample.data());
+}
+
+template<size_t nComps, size_t nDims>
+void lv::GMM<nComps,nDims>::addSample(size_t nCompIdx, const double* aSample) {
+    lvDbgAssert(m_bLearningModeOn);
+    lvDbgAssert(nCompIdx<nComps);
+    lvDbgAssert(aSample!=nullptr);
+    lv::unroll<nDims>([&](size_t nDimIdx1){
+        m_aSampleSums[nCompIdx][nDimIdx1] += aSample[nDimIdx1];
+        lv::unroll<nDims>([&](size_t nDimIdx2){
+            m_aSampleProds[nCompIdx][nDimIdx1][nDimIdx2] += aSample[nDimIdx1]*aSample[nDimIdx2];
+        });
+    });
+    ++m_nSampleCounts[nCompIdx];
+    ++m_nTotSampleCount;
+}
+
+template<size_t nComps, size_t nDims>
+void lv::GMM<nComps,nDims>::endLearning() {
+    lvDbgAssert(m_bLearningModeOn);
+    lv::unroll<nComps>([&](size_t nCompIdx){
+        if(m_nSampleCounts[nCompIdx]==size_t(0))
+            m_aCoeffs[nCompIdx] = 0;
+        else {
+            m_aCoeffs[nCompIdx] = (double)m_nSampleCounts[nCompIdx]/m_nTotSampleCount;
+            double* aMean = m_aMeans+nDims*nCompIdx;
+            lv::unroll<nDims>([&](size_t nDimIdx){
+                aMean[nDimIdx] = m_aSampleSums[nCompIdx][nDimIdx]/m_nSampleCounts[nCompIdx];
+            });
+            double* aCovariance = m_aCovMats+nDims*nDims*nCompIdx;
+            lv::unroll<nDims>([&](size_t nDimIdx1){
+                lv::unroll<nDims>([&](size_t nDimIdx2){
+                    aCovariance[nDimIdx1*nDims+nDimIdx2] = m_aSampleProds[nCompIdx][nDimIdx1][nDimIdx2]/m_nSampleCounts[nCompIdx] - aMean[nDimIdx1]*aMean[nDimIdx2];
+                });
+            });
+            const double dDeterminant = lv::determinant<nDims>(aCovariance);
+            if(dDeterminant<=std::numeric_limits<double>::epsilon()) {
+                // adds white noise to avoid singular covariance matrix
+                constexpr double dMinVariance = 0.01;
+                lv::unroll<nDims>([&](size_t nDimIdx){
+                    aCovariance[nDimIdx*nDims+nDimIdx] += dMinVariance;
+                });
+                m_aCovMatDeterms[nCompIdx] = lv::determinant<nDims>(aCovariance);
+            }
+            else
+                m_aCovMatDeterms[nCompIdx] = dDeterminant;
+            lvAssert(lv::invert<nDims>(aCovariance,m_aInvCovMats+nCompIdx*nDims*nDims));
+        }
+    });
+    m_bLearningModeOn = false;
+}
