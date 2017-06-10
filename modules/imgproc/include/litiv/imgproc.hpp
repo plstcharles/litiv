@@ -44,92 +44,32 @@ namespace lv {
 
     /// determines if '*anMap' is a local maximum on the horizontal axis, given 'nMapColStep' spacing between horizontal elements in 'anMap'
     template<size_t nHalfWinSize, typename Tr>
-    inline bool isLocalMaximum_Horizontal(const Tr* const anMap, const size_t nMapColStep, const size_t /*nMapRowStep*/) {
-        static_assert(nHalfWinSize>=1,"Window size needs to be at least 3x3");
-        const Tr nVal = *anMap;
-        bool bRes = true;
-        lv::unroll<nHalfWinSize>([&](int n){
-            bRes &= nVal>anMap[(-n-1)*nMapColStep];
-        });
-        lv::unroll<nHalfWinSize>([&](int n){
-            bRes &= nVal>=anMap[(n+1)*nMapColStep];
-        });
-        return bRes;
-    }
-
+    bool isLocalMaximum_Horizontal(const Tr* const anMap, const size_t nMapColStep, const size_t /*nMapRowStep*/);
     /// determines if '*anMap' is a local maximum on the vertical axis, given 'nMapRowStep' spacing between vertical elements in 'anMap'
     template<size_t nHalfWinSize, typename Tr>
-    inline bool isLocalMaximum_Vertical(const Tr* const anMap, const size_t /*nMapColStep*/, const size_t nMapRowStep) {
-        static_assert(nHalfWinSize>=1,"Window size needs to be at least 3x3");
-        const Tr nVal = *anMap;
-        bool bRes = true;
-        lv::unroll<nHalfWinSize>([&](int n){
-            bRes &= nVal>anMap[(-n-1)*nMapRowStep];
-        });
-        lv::unroll<nHalfWinSize>([&](int n){
-            bRes &= nVal>=anMap[(n+1)*nMapRowStep];
-        });
-        return bRes;
-    }
-
+    bool isLocalMaximum_Vertical(const Tr* const anMap, const size_t /*nMapColStep*/, const size_t nMapRowStep);
     /// determines if '*anMap' is a local maximum on the diagonal, given 'nMapColStep'/'nMapColStep' spacing between horizontal/vertical elements in 'anMap'
     template<size_t nHalfWinSize, bool bInvDiag, typename Tr>
-    inline bool isLocalMaximum_Diagonal(const Tr* const anMap, const size_t nMapColStep, const size_t nMapRowStep) {
-        static_assert(nHalfWinSize>=1,"Window size needs to be at least 3x3");
-        const Tr nVal = *anMap;
-        bool bRes = true;
-        lv::unroll<nHalfWinSize>([&](int n){
-            bRes &= nVal>anMap[(bInvDiag?-1:1)*(-n-1)*nMapColStep+(-n-1)*nMapRowStep];
-        });
-        lv::unroll<nHalfWinSize>([&](int n){
-            bRes &= nVal>=anMap[(bInvDiag?-1:1)*(n+1)*nMapColStep+(n+1)*nMapRowStep];
-        });
-        return bRes;
-    }
-
+    bool isLocalMaximum_Diagonal(const Tr* const anMap, const size_t nMapColStep, const size_t nMapRowStep);
     /// determines if '*anMap' is a local maximum on the diagonal, given 'nMapColStep'/'nMapColStep' spacing between horizontal/vertical elements in 'anMap'
     template<size_t nHalfWinSize, typename Tr>
-    inline bool isLocalMaximum_Diagonal(const Tr* const anMap, const size_t nMapColStep, const size_t nMapRowStep, bool bInvDiag) {
-        if(bInvDiag)
-            return isLocalMaximum_Diagonal<nHalfWinSize,true>(anMap,nMapColStep,nMapRowStep);
-        else
-            return isLocalMaximum_Diagonal<nHalfWinSize,false>(anMap,nMapColStep,nMapRowStep);
-    }
+    bool isLocalMaximum_Diagonal(const Tr* const anMap, const size_t nMapColStep, const size_t nMapRowStep, bool bInvDiag);
+
+    /// initializes foreground and background GMM parameters via KNN using the given image and mask (where values <128 are considered background)
+    template<size_t nKMeansIters=10, size_t nC, size_t nD>
+    void initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel);
+    /// assigns each input image pixel its most likely GMM component in the output map, using the BG or FG model as dictated by the input mask
+    template<size_t nC, size_t nD>
+    void assignGaussianMixtureComponents(const cv::Mat& oInput, const cv::Mat& oMask, cv::Mat& oAssignMap, const lv::GMM<nC,nD>& oBGModel, const lv::GMM<nC,nD>& oFGModel);
+    /// learns the ideal foreground and background GMM parameters to fit the components assigned to the pixels of the input image
+    template<size_t nC, size_t nD>
+    void learnGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oAssignMap, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel);
 
 } // namespace lv
 
 template<int nWinSize>
 void lv::nonMaxSuppression(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat& oMask) {
-    //  http://code.opencv.org/attachments/994/nms.cpp
-    //  Copyright (c) 2012, Willow Garage, Inc.
-    //  All rights reserved.
-    //
-    //  Redistribution and use in source and binary forms, with or without
-    //  modification, are permitted provided that the following conditions
-    //  are met:
-    //
-    //   * Redistributions of source code must retain the above copyright
-    //     notice, this list of conditions and the following disclaimer.
-    //   * Redistributions in binary form must reproduce the above
-    //     copyright notice, this list of conditions and the following
-    //     disclaimer in the documentation and/or other materials provided
-    //     with the distribution.
-    //   * Neither the name of Willow Garage, Inc. nor the names of its
-    //     contributors may be used to endorse or promote products derived
-    //     from this software without specific prior written permission.
-    //
-    //  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-    //  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-    //  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-    //  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-    //  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-    //  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-    //  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-    //  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-    //  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-    //  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-    //  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-    //  POSSIBILITY OF SUCH DAMAGE.
+    // reimplemented from http://code.opencv.org/attachments/994/nms.cpp
     lvAssert(oInput.dims==2 && oInput.channels()==1);
     // initialise the block oMask and destination
     const int M = oInput.rows;
@@ -164,4 +104,129 @@ void lv::nonMaxSuppression(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Ma
                 oOutput.at<uint8_t>(cc.y, cc.x) = 255;
         }
     }
+}
+
+template<size_t nHalfWinSize, typename Tr>
+bool lv::isLocalMaximum_Horizontal(const Tr* const anMap, const size_t nMapColStep, const size_t /*nMapRowStep*/) {
+    static_assert(nHalfWinSize>=1,"Window size needs to be at least 3x3");
+    const Tr nVal = *anMap;
+    bool bRes = true;
+    lv::unroll<nHalfWinSize>([&](int n){
+        bRes &= nVal>anMap[(-n-1)*nMapColStep];
+    });
+    lv::unroll<nHalfWinSize>([&](int n){
+        bRes &= nVal>=anMap[(n+1)*nMapColStep];
+    });
+    return bRes;
+}
+
+template<size_t nHalfWinSize, typename Tr>
+bool lv::isLocalMaximum_Vertical(const Tr* const anMap, const size_t /*nMapColStep*/, const size_t nMapRowStep) {
+    static_assert(nHalfWinSize>=1,"Window size needs to be at least 3x3");
+    const Tr nVal = *anMap;
+    bool bRes = true;
+    lv::unroll<nHalfWinSize>([&](int n){
+        bRes &= nVal>anMap[(-n-1)*nMapRowStep];
+    });
+    lv::unroll<nHalfWinSize>([&](int n){
+        bRes &= nVal>=anMap[(n+1)*nMapRowStep];
+    });
+    return bRes;
+}
+
+template<size_t nHalfWinSize, bool bInvDiag, typename Tr>
+bool lv::isLocalMaximum_Diagonal(const Tr* const anMap, const size_t nMapColStep, const size_t nMapRowStep) {
+    static_assert(nHalfWinSize>=1,"Window size needs to be at least 3x3");
+    const Tr nVal = *anMap;
+    bool bRes = true;
+    lv::unroll<nHalfWinSize>([&](int n){
+        bRes &= nVal>anMap[(bInvDiag?-1:1)*(-n-1)*nMapColStep+(-n-1)*nMapRowStep];
+    });
+    lv::unroll<nHalfWinSize>([&](int n){
+        bRes &= nVal>=anMap[(bInvDiag?-1:1)*(n+1)*nMapColStep+(n+1)*nMapRowStep];
+    });
+    return bRes;
+}
+
+template<size_t nHalfWinSize, typename Tr>
+bool lv::isLocalMaximum_Diagonal(const Tr* const anMap, const size_t nMapColStep, const size_t nMapRowStep, bool bInvDiag) {
+    if(bInvDiag)
+        return isLocalMaximum_Diagonal<nHalfWinSize,true>(anMap,nMapColStep,nMapRowStep);
+    else
+        return isLocalMaximum_Diagonal<nHalfWinSize,false>(anMap,nMapColStep,nMapRowStep);
+}
+
+template<size_t nKMeansIters, size_t nC, size_t nD>
+void lv::initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel) {
+    static_assert(nKMeansIters>0,"bad iter count for kmeans");
+    lvAssert_(!oInput.empty() && !oMask.empty() && oInput.size==oMask.size,"bad input image/mask size");
+    lvAssert_(oMask.type()==CV_8UC1,"input mask type must be 8UC1 (where all values <128 are considered background)");
+    lvAssert_(oMask.depth()==CV_8U,"input image type should be 8U (only supported for now)");
+    lvAssert_(oInput.channels()==int(nD),"input image channel count must match gmm sample dims");
+    static thread_local lv::AutoBuffer<float> s_aBGSamples,s_aFGSamples;
+    size_t nBGSamples=0,nFGSamples=0;
+    s_aBGSamples.resize(oInput.total()*nD);
+    s_aFGSamples.resize(oInput.total()*nD);
+    for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {
+        for(int nColIdx=0; nColIdx<oInput.cols; ++nColIdx) {
+            const uchar* pPixelData = oInput.at<cv::Vec<uchar,nD>>(nRowIdx,nColIdx).val;
+            if(oMask.at<uchar>(nRowIdx,nColIdx)<128)
+                std::transform(pPixelData,pPixelData+nD,&s_aBGSamples[(nBGSamples++)*nD],[](uchar n){return float(n);});
+            else
+                std::transform(pPixelData,pPixelData+nD,&s_aFGSamples[(nFGSamples++)*nD],[](uchar n){return float(n);});
+        }
+    }
+    lvAssert_(nBGSamples>0 && nFGSamples>0,"must have at least one foreground and one background sample");
+    cv::Mat oBGLabels,oFGLabels;
+    std::array<double,nD> aSample;
+    cv::Mat oBGSamples(int(nBGSamples),(int)nD,CV_32FC1,s_aBGSamples.data());
+    cv::kmeans(oBGSamples,int(nC),oBGLabels,cv::TermCriteria(CV_TERMCRIT_ITER,(int)nKMeansIters,0.0),0,cv::KMEANS_PP_CENTERS);
+    oBGModel.initLearning();
+    for(size_t nSampleIdx=0; nSampleIdx<nBGSamples; ++nSampleIdx) {
+        lv::unroll<nD>([&](size_t nDimIdx){aSample[nDimIdx] = double(s_aBGSamples[nSampleIdx*nD+nDimIdx]);});
+        oBGModel.addSample(size_t(oBGLabels.at<int>(int(nSampleIdx),0)),aSample);
+    }
+    oBGModel.endLearning();
+    cv::Mat oFGSamples(int(nFGSamples),(int)nD,CV_32FC1,s_aFGSamples.data());
+    cv::kmeans(oFGSamples,int(nC),oFGLabels,cv::TermCriteria(CV_TERMCRIT_ITER,(int)nKMeansIters,0.0),0,cv::KMEANS_PP_CENTERS);
+    oFGModel.initLearning();
+    for(size_t nSampleIdx=0; nSampleIdx<nFGSamples; ++nSampleIdx) {
+        lv::unroll<nD>([&](size_t nDimIdx){aSample[nDimIdx] = double(s_aFGSamples[nSampleIdx*nD+nDimIdx]);});
+        oFGModel.addSample(size_t(oFGLabels.at<int>(int(nSampleIdx),0)),aSample);
+    }
+    oFGModel.endLearning();
+}
+
+template<size_t nC, size_t nD>
+void lv::assignGaussianMixtureComponents(const cv::Mat& oInput, const cv::Mat& oMask, cv::Mat& oAssignMap, const lv::GMM<nC,nD>& oBGModel, const lv::GMM<nC,nD>& oFGModel) {
+    std::array<double,nD> aSample;
+    for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {
+        for(int nColIdx=0; nColIdx<oInput.cols; ++nColIdx) {
+            const uchar* pPixelData = oInput.at<cv::Vec<uchar,nD>>(nRowIdx,nColIdx).val;
+            lv::unroll<nD>([&](size_t nDimIdx){aSample[nDimIdx] = double(pPixelData[nDimIdx]);});
+            oAssignMap.at<int>(nRowIdx,nColIdx) = int((oMask.at<uchar>(nRowIdx,nColIdx)<128)?oBGModel.getBestComponent(aSample):oFGModel.getBestComponent(aSample));
+        }
+    }
+}
+
+template<size_t nC, size_t nD>
+void lv::learnGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oAssignMap, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel) {
+    oBGModel.initLearning();
+    oFGModel.initLearning();
+    std::array<double,nD> aSample;
+    for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {
+        for(int nColIdx=0; nColIdx<oInput.cols; ++nColIdx) {
+            const int nCompLabel = oAssignMap.at<int>(nRowIdx,nColIdx);
+            if(nCompLabel>=0 && nCompLabel<int(nC)) {
+                const uchar* pPixelData = oInput.at<cv::Vec<uchar,nD>>(nRowIdx,nColIdx).val;
+                lv::unroll<nD>([&](size_t nDimIdx){aSample[nDimIdx] = double(pPixelData[nDimIdx]);});
+                if(oMask.at<uchar>(nRowIdx,nColIdx)<128)
+                    oBGModel.addSample(size_t(nCompLabel),aSample);
+                else
+                    oFGModel.addSample(size_t(nCompLabel),aSample);
+            }
+        }
+    }
+    oBGModel.endLearning();
+    oFGModel.endLearning();
 }
