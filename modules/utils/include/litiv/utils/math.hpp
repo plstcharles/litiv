@@ -1065,6 +1065,12 @@ namespace lv {
         static constexpr size_t getModelSize() {return (nDims+nDims*nDims*2+2)*nComps;}
         /// returns the underlying model data for debugging/serialization/overwriting
         inline double* getModelData() {return m_aModelData.data();}
+        /// returns the mean array pointer for a given component index
+        inline double* getComponentMean(size_t nCompIdx) {return m_aMeans+nDims*nCompIdx;}
+        /// returns the covariance matrix array pointer for a given component index
+        inline double* getComponentCovMat(size_t nCompIdx) {return m_aCovMats+nDims*nDims*nCompIdx;}
+        /// returns the weight value for a given component index
+        inline double getComponentWeight(size_t nCompIdx) {return m_aCoeffs[nCompIdx];}
         /// default constructor; initializes all model params to zero
         GMM();
     protected:
