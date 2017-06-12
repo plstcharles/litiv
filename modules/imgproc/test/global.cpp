@@ -19,8 +19,8 @@ TEST(gmm_init,regression_opencv) {
     oRNG.state = 0xffffffff;
     lv::GMM<5,3> oBGModel,oFGModel;
     lv::initGaussianMixtureParams(oInput,oMask,oBGModel,oFGModel);
-    ASSERT_EQ(oBGModel.getModelSize(),size_t(115));
-    ASSERT_EQ(oFGModel.getModelSize(),size_t(115));
+    ASSERT_EQ(oBGModel.getModelSize(),size_t(120));
+    ASSERT_EQ(oFGModel.getModelSize(),size_t(120));
     for(size_t nModelIdx=0; nModelIdx<size_t(65); ++nModelIdx) {
         ASSERT_FLOAT_EQ(oBGModelData.at<double>(0,int(nModelIdx)),oBGModel.getModelData()[nModelIdx]);
         ASSERT_FLOAT_EQ(oFGModelData.at<double>(0,int(nModelIdx)),oFGModel.getModelData()[nModelIdx]);
@@ -37,14 +37,14 @@ TEST(gmm_init,regression_local) {
     oRNG.state = 0xffffffff;
     lv::GMM<5,3> oBGModel,oFGModel;
     lv::initGaussianMixtureParams(oInput,oMask,oBGModel,oFGModel);
-    ASSERT_EQ(oBGModel.getModelSize(),size_t(115));
-    ASSERT_EQ(oFGModel.getModelSize(),size_t(115));
+    ASSERT_EQ(oBGModel.getModelSize(),size_t(120));
+    ASSERT_EQ(oFGModel.getModelSize(),size_t(120));
     const std::string sInitBGDataPath = TEST_CURR_INPUT_DATA_ROOT "/test_gmm_init_bg.bin";
     const std::string sInitFGDataPath = TEST_CURR_INPUT_DATA_ROOT "/test_gmm_init_fg.bin";
     if(lv::checkIfExists(sInitBGDataPath) && lv::checkIfExists(sInitFGDataPath)) {
         const cv::Mat_<double> oRefBGData = lv::read(sInitBGDataPath);
         const cv::Mat_<double> oRefFGData = lv::read(sInitFGDataPath);
-        for(size_t nModelIdx=0; nModelIdx<size_t(115); ++nModelIdx) {
+        for(size_t nModelIdx=0; nModelIdx<size_t(120); ++nModelIdx) {
             ASSERT_FLOAT_EQ(oRefBGData.at<double>(0,int(nModelIdx)),oBGModel.getModelData()[nModelIdx]);
             ASSERT_FLOAT_EQ(oRefFGData.at<double>(0,int(nModelIdx)),oFGModel.getModelData()[nModelIdx]);
         }
@@ -72,8 +72,8 @@ TEST(gmm_learn,regression_opencv) {
     oRNG.state = 0xffffffff;
     lv::GMM<5,3> oBGModel,oFGModel;
     lv::initGaussianMixtureParams(oInput,oMask,oBGModel,oFGModel);
-    ASSERT_EQ(oBGModel.getModelSize(),size_t(115));
-    ASSERT_EQ(oFGModel.getModelSize(),size_t(115));
+    ASSERT_EQ(oBGModel.getModelSize(),size_t(120));
+    ASSERT_EQ(oFGModel.getModelSize(),size_t(120));
     cv::Mat oAssignMap(oInput.size(),CV_32SC1);
     lv::assignGaussianMixtureComponents(oInput,oMask,oAssignMap,oBGModel,oFGModel);
     lv::learnGaussianMixtureParams(oInput,oMask,oAssignMap,oBGModel,oFGModel);
@@ -93,8 +93,8 @@ TEST(gmm_learn,regression_local) {
     oRNG.state = 0xffffffff;
     lv::GMM<5,3> oBGModel,oFGModel;
     lv::initGaussianMixtureParams(oInput,oMask,oBGModel,oFGModel);
-    ASSERT_EQ(oBGModel.getModelSize(),size_t(115));
-    ASSERT_EQ(oFGModel.getModelSize(),size_t(115));
+    ASSERT_EQ(oBGModel.getModelSize(),size_t(120));
+    ASSERT_EQ(oFGModel.getModelSize(),size_t(120));
     cv::Mat oAssignMap(oInput.size(),CV_32SC1);
     lv::assignGaussianMixtureComponents(oInput,oMask,oAssignMap,oBGModel,oFGModel);
     lv::learnGaussianMixtureParams(oInput,oMask,oAssignMap,oBGModel,oFGModel);
@@ -103,7 +103,7 @@ TEST(gmm_learn,regression_local) {
     if(lv::checkIfExists(sBGDataPath) && lv::checkIfExists(sFGDataPath)) {
         const cv::Mat_<double> oRefBGData = lv::read(sBGDataPath);
         const cv::Mat_<double> oRefFGData = lv::read(sFGDataPath);
-        for(size_t nModelIdx=0; nModelIdx<size_t(115); ++nModelIdx) {
+        for(size_t nModelIdx=0; nModelIdx<size_t(120); ++nModelIdx) {
             ASSERT_FLOAT_EQ(oRefBGData.at<double>(0,int(nModelIdx)),oBGModel.getModelData()[nModelIdx]);
             ASSERT_FLOAT_EQ(oRefFGData.at<double>(0,int(nModelIdx)),oFGModel.getModelData()[nModelIdx]);
         }

@@ -1037,22 +1037,22 @@ namespace lv {
     struct GMM {
         static_assert(nComps>0,"bad component count");
         static_assert(nDims>0,"bad dimension size");
-        /// evaluates the probability that a given data sample fits with the learned model
+        /// evaluates the probability density for a given data sample in the mixture model
         template<typename TVal>
         double operator()(const std::array<TVal,nDims>& aSample) const;
-        /// evaluates the probability that a given data sample fits with the learned model
+        /// evaluates the probability density for a given data sample in the mixture model
         template<typename TVal>
         double operator()(const TVal* aSample) const;
-        /// evaluates the probability that a given data sample fits with a specific component
+        /// evaluates the probability density for a given data sample in a single model component
         template<typename TVal>
         double operator()(size_t nCompIdx, const std::array<TVal,nDims>& aSample) const;
-        /// evaluates the probability that a given data sample fits with a specific component
+        /// evaluates the probability density for a given data sample in a single model component
         template<typename TVal>
         double operator()(size_t nCompIdx, const TVal* aSample) const;
-        /// returns the best-fitting component index for a given sample
+        /// returns the best-fitting component for a given sample
         template<typename TVal>
         size_t getBestComponent(const std::array<TVal,nDims>& aSample) const;
-        /// returns the best-fitting component index for a given sample
+        /// returns the best-fitting component for a given sample
         template<typename TVal>
         size_t getBestComponent(const TVal* aSample) const;
         /// initializes learning mode (enables 'addSample' to learn new model params)
@@ -1070,7 +1070,7 @@ namespace lv {
         /// returns the dimensionality of input samples (templated param)
         static constexpr size_t getDimensionCount() {return nDims;}
         /// returns the model data size (in elements, not bytes!)
-        static constexpr size_t getModelSize() {return (nDims+nDims*nDims*2+2)*nComps;}
+        static constexpr size_t getModelSize() {return (nDims+nDims*nDims*2+3)*nComps;}
         /// returns the underlying model data for debugging/serialization/overwriting
         inline double* getModelData() {return m_aModelData.data();}
         /// returns the mean array pointer for a given component index
@@ -1082,13 +1082,15 @@ namespace lv {
         /// default constructor; initializes all model params to zero
         GMM();
     protected:
-        static constexpr size_t getStaticBufferSize() {return std::min(getModelSize(),size_t(128));}
-        lv::AutoBuffer<double,getStaticBufferSize()> m_aModelData;
+        static constexpr double s_dSigmaFactor = std::pow(2.0*M_PI,(double)nDims);
+        static constexpr size_t s_nStaticBuffSize = std::min(getModelSize(),size_t(128));
+        lv::AutoBuffer<double,s_nStaticBuffSize> m_aModelData;
         double* m_aCoeffs;
         double* m_aMeans;
         double* m_aCovMats;
         double* m_aInvCovMats;
         double* m_aCovMatDeterms;
+        double* m_aGaussPDFFactors;
         double m_aSampleSums[nComps][nDims];
         double m_aSampleProds[nComps][nDims][nDims];
         size_t m_nSampleCounts[nComps];
@@ -1106,8 +1108,8 @@ lv::GMM<nComps,nDims>::GMM() : m_bLearningModeOn(false) {
     m_aCovMats = m_aMeans+nDims*nComps;
     m_aInvCovMats = m_aCovMats+nDims*nDims*nComps;
     m_aCovMatDeterms = m_aInvCovMats+nDims*nDims*nComps;
-    lvDbgAssert((m_aCovMatDeterms+nComps)==getModelData()+getModelSize());
-    lvDbgAssert(m_aModelData.is_static()); // @@@@
+    m_aGaussPDFFactors = m_aCovMatDeterms+nComps;
+    lvDbgAssert((m_aGaussPDFFactors+nComps)==getModelData()+getModelSize());
     std::fill_n(m_aModelData.data(),getModelSize(),0.0);
 }
 
@@ -1120,8 +1122,6 @@ double lv::GMM<nComps,nDims>::operator()(const std::array<TVal,nDims>& aSample) 
 template<size_t nComps, size_t nDims>
 template<typename TVal>
 double lv::GMM<nComps,nDims>::operator()(const TVal* aSample) const {
-    lvDbgAssert(!m_bLearningModeOn);
-    lvDbgAssert(aSample!=nullptr);
     double dRes = m_aCoeffs[nComps-1]*(*this)(nComps-1,aSample);
     lv::unroll<nComps-1>([&](size_t nCompIdx){
         dRes += m_aCoeffs[nCompIdx]*(*this)(nCompIdx,aSample);
@@ -1149,15 +1149,17 @@ double lv::GMM<nComps,nDims>::operator()(size_t nCompIdx, const TVal* aSample) c
         lv::unroll<nDims>([&](size_t nDimIdx){
             aDiff[nDimIdx] = double(aSample[nDimIdx])-aMean[nDimIdx];
         });
+        const double* aInvCovMat = m_aInvCovMats+nCompIdx*nDims*nDims;
         double dSum1 = 0.0;
         lv::unroll<nDims>([&](size_t nDimIdx1){
-            double dSum2 = aDiff[nDims-1]*m_aInvCovMats[(nCompIdx*nDims+(nDims-1))*nDims+nDimIdx1];
+            double dSum2 = aDiff[nDims-1]*aInvCovMat[(nDims-1)*nDims+nDimIdx1];
             lv::unroll<nDims-1>([&](size_t nDimIdx2){
-                dSum2 += aDiff[nDimIdx2]*m_aInvCovMats[(nCompIdx*nDims+nDimIdx2)*nDims+nDimIdx1];
+                dSum2 += aDiff[nDimIdx2]*aInvCovMat[nDimIdx2*nDims+nDimIdx1];
             });
             dSum1 += aDiff[nDimIdx1]*dSum2;
         });
-        dRes = 1.0/std::sqrt(m_aCovMatDeterms[nCompIdx])*std::exp(-0.5*dSum1);
+        dRes = m_aGaussPDFFactors[nCompIdx]*std::exp(-0.5*dSum1);
+        lvDbgAssert(dRes>=0.0);
     }
     return dRes;
 }
@@ -1171,8 +1173,6 @@ size_t lv::GMM<nComps,nDims>::getBestComponent(const std::array<TVal,nDims>& aSa
 template<size_t nComps, size_t nDims>
 template<typename TVal>
 size_t lv::GMM<nComps,nDims>::getBestComponent(const TVal* aSample) const {
-    lvDbgAssert(!m_bLearningModeOn);
-    lvDbgAssert(aSample!=nullptr);
     size_t nBestCompIdx = nComps-1;
     double dMaxProb = (*this)(nComps-1,aSample);
     lv::unroll<nComps-1>([&](size_t nCompIdx){
@@ -1246,6 +1246,7 @@ void lv::GMM<nComps,nDims>::endLearning() {
             else
                 m_aCovMatDeterms[nCompIdx] = dDeterminant;
             lvAssert(lv::invert<nDims>(aCovariance,m_aInvCovMats+nCompIdx*nDims*nDims));
+            m_aGaussPDFFactors[nCompIdx] = 1.0/std::sqrt(s_dSigmaFactor*m_aCovMatDeterms[nCompIdx]);
         }
     });
     m_bLearningModeOn = false;
