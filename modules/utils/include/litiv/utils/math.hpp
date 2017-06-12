@@ -1038,23 +1038,31 @@ namespace lv {
         static_assert(nComps>0,"bad component count");
         static_assert(nDims>0,"bad dimension size");
         /// evaluates the probability that a given data sample fits with the learned model
-        double operator()(const std::array<double,nDims>& aSample) const;
+        template<typename TVal>
+        double operator()(const std::array<TVal,nDims>& aSample) const;
         /// evaluates the probability that a given data sample fits with the learned model
-        double operator()(const double* aSample) const;
+        template<typename TVal>
+        double operator()(const TVal* aSample) const;
         /// evaluates the probability that a given data sample fits with a specific component
-        double operator()(size_t nCompIdx, const std::array<double,nDims>& aSample) const;
+        template<typename TVal>
+        double operator()(size_t nCompIdx, const std::array<TVal,nDims>& aSample) const;
         /// evaluates the probability that a given data sample fits with a specific component
-        double operator()(size_t nCompIdx, const double* aSample) const;
+        template<typename TVal>
+        double operator()(size_t nCompIdx, const TVal* aSample) const;
         /// returns the best-fitting component index for a given sample
-        size_t getBestComponent(const std::array<double,nDims>& aSample) const;
+        template<typename TVal>
+        size_t getBestComponent(const std::array<TVal,nDims>& aSample) const;
         /// returns the best-fitting component index for a given sample
-        size_t getBestComponent(const double* aSample) const;
+        template<typename TVal>
+        size_t getBestComponent(const TVal* aSample) const;
         /// initializes learning mode (enables 'addSample' to learn new model params)
         void initLearning();
         /// adds a new data sample to a specific component for model param estimation
-        void addSample(size_t nCompIdx, const std::array<double,nDims>& aSample);
+        template<typename TVal>
+        void addSample(size_t nCompIdx, const std::array<TVal,nDims>& aSample);
         /// adds a new data sample to a specific component for model param estimation
-        void addSample(size_t nCompIdx, const double* aSample);
+        template<typename TVal>
+        void addSample(size_t nCompIdx, const TVal* aSample);
         /// disables learning mode, and estimates ideal model params using added samples
         void endLearning();
         /// returns the number of gaussian components in the mixture model (templated param)
@@ -1104,12 +1112,14 @@ lv::GMM<nComps,nDims>::GMM() : m_bLearningModeOn(false) {
 }
 
 template<size_t nComps, size_t nDims>
-double lv::GMM<nComps,nDims>::operator()(const std::array<double,nDims>& aSample) const {
+template<typename TVal>
+double lv::GMM<nComps,nDims>::operator()(const std::array<TVal,nDims>& aSample) const {
     return operator()(aSample.data());
 }
 
 template<size_t nComps, size_t nDims>
-double lv::GMM<nComps,nDims>::operator()(const double* aSample) const {
+template<typename TVal>
+double lv::GMM<nComps,nDims>::operator()(const TVal* aSample) const {
     lvDbgAssert(!m_bLearningModeOn);
     lvDbgAssert(aSample!=nullptr);
     double dRes = m_aCoeffs[nComps-1]*(*this)(nComps-1,aSample);
@@ -1120,12 +1130,14 @@ double lv::GMM<nComps,nDims>::operator()(const double* aSample) const {
 }
 
 template<size_t nComps, size_t nDims>
-double lv::GMM<nComps,nDims>::operator()(size_t nCompIdx, const std::array<double,nDims>& aSample) const {
+template<typename TVal>
+double lv::GMM<nComps,nDims>::operator()(size_t nCompIdx, const std::array<TVal,nDims>& aSample) const {
     return operator()(nCompIdx,aSample.data());
 }
 
 template<size_t nComps, size_t nDims>
-double lv::GMM<nComps,nDims>::operator()(size_t nCompIdx, const double* aSample) const {
+template<typename TVal>
+double lv::GMM<nComps,nDims>::operator()(size_t nCompIdx, const TVal* aSample) const {
     lvDbgAssert(!m_bLearningModeOn);
     lvDbgAssert(nCompIdx<nComps);
     lvDbgAssert(aSample!=nullptr);
@@ -1135,7 +1147,7 @@ double lv::GMM<nComps,nDims>::operator()(size_t nCompIdx, const double* aSample)
         std::array<double,nDims> aDiff;
         const double* aMean = m_aMeans+nDims*nCompIdx;
         lv::unroll<nDims>([&](size_t nDimIdx){
-            aDiff[nDimIdx] = aSample[nDimIdx]-aMean[nDimIdx];
+            aDiff[nDimIdx] = double(aSample[nDimIdx])-aMean[nDimIdx];
         });
         double dSum1 = 0.0;
         lv::unroll<nDims>([&](size_t nDimIdx1){
@@ -1151,12 +1163,14 @@ double lv::GMM<nComps,nDims>::operator()(size_t nCompIdx, const double* aSample)
 }
 
 template<size_t nComps, size_t nDims>
-size_t lv::GMM<nComps,nDims>::getBestComponent(const std::array<double,nDims>& aSample) const {
+template<typename TVal>
+size_t lv::GMM<nComps,nDims>::getBestComponent(const std::array<TVal,nDims>& aSample) const {
     return getBestComponent(aSample.data());
 }
 
 template<size_t nComps, size_t nDims>
-size_t lv::GMM<nComps,nDims>::getBestComponent(const double* aSample) const {
+template<typename TVal>
+size_t lv::GMM<nComps,nDims>::getBestComponent(const TVal* aSample) const {
     lvDbgAssert(!m_bLearningModeOn);
     lvDbgAssert(aSample!=nullptr);
     size_t nBestCompIdx = nComps-1;
@@ -1181,19 +1195,21 @@ void lv::GMM<nComps,nDims>::initLearning() {
 }
 
 template<size_t nComps, size_t nDims>
-void lv::GMM<nComps,nDims>::addSample(size_t nCompIdx, const std::array<double,nDims>& aSample) {
+template<typename TVal>
+void lv::GMM<nComps,nDims>::addSample(size_t nCompIdx, const std::array<TVal,nDims>& aSample) {
     addSample(nCompIdx,aSample.data());
 }
 
 template<size_t nComps, size_t nDims>
-void lv::GMM<nComps,nDims>::addSample(size_t nCompIdx, const double* aSample) {
+template<typename TVal>
+void lv::GMM<nComps,nDims>::addSample(size_t nCompIdx, const TVal* aSample) {
     lvDbgAssert(m_bLearningModeOn);
     lvDbgAssert(nCompIdx<nComps);
     lvDbgAssert(aSample!=nullptr);
     lv::unroll<nDims>([&](size_t nDimIdx1){
-        m_aSampleSums[nCompIdx][nDimIdx1] += aSample[nDimIdx1];
+        m_aSampleSums[nCompIdx][nDimIdx1] += double(aSample[nDimIdx1]);
         lv::unroll<nDims>([&](size_t nDimIdx2){
-            m_aSampleProds[nCompIdx][nDimIdx1][nDimIdx2] += aSample[nDimIdx1]*aSample[nDimIdx2];
+            m_aSampleProds[nCompIdx][nDimIdx1][nDimIdx2] += double(aSample[nDimIdx1])*double(aSample[nDimIdx2]);
         });
     });
     ++m_nSampleCounts[nCompIdx];
