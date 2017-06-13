@@ -160,9 +160,10 @@ void lv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
         nColCount = vvImageNamePairs[nRowIdx].size();
         for(size_t nColIdx=0; nColIdx<nColCount; ++nColIdx) {
             const cv::Mat& oImage = vvImageNamePairs[nRowIdx][nColIdx].first;
-            lvAssert_(!oImage.empty(),"all images must be non-null");
-            lvAssert_(oImage.channels()==1 || oImage.channels()==3 || oImage.channels()==4,"all images must be 1/3/4 channels");
-            lvAssert_(oImage.depth()==CV_8U || oImage.depth()==CV_16U || oImage.depth()==CV_32S || oImage.depth()==CV_32F,"all images must be 8u/16u/32s/32f depth");
+            if(!oImage.empty()) {
+                lvAssert_(oImage.channels()==1 || oImage.channels()==3 || oImage.channels()==4,"all images must be 1/3/4 channels");
+                lvAssert_(oImage.depth()==CV_8U || oImage.depth()==CV_16U || oImage.depth()==CV_32S || oImage.depth()==CV_32F,"all images must be 8u/16u/32s/32f depth");
+            }
         }
     }
     cv::Size oCurrDisplaySize(int(oSuggestedTileSize.width*nColCount),int(oSuggestedTileSize.height*nRowCount));
@@ -180,7 +181,9 @@ void lv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
         for(size_t nColIdx=0; nColIdx<nColCount; ++nColIdx) {
             const cv::Mat& oImage = vvImageNamePairs[nRowIdx][nColIdx].first;
             cv::Mat oImageBYTE3;
-            if(oImage.depth()==CV_16U) // expected input range = [0..USHRT_MAX]
+            if(oImage.empty())
+                oImageBYTE3 = cv::Mat(oNewTileSize,CV_8UC3,cv::Scalar::all(0));
+            else if(oImage.depth()==CV_16U) // expected input range = [0..USHRT_MAX]
                 oImage.convertTo(oImageBYTE3,CV_8U,double(UCHAR_MAX)/(USHRT_MAX));
             else if(oImage.depth()==CV_32S) // expected input range = [INT_MIN..INT_MAX]
                 oImage.convertTo(oImageBYTE3,CV_8U,double(UCHAR_MAX)/(INT_MAX),double(UCHAR_MAX/2));
