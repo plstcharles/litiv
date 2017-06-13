@@ -56,14 +56,14 @@ namespace lv {
     bool isLocalMaximum_Diagonal(const Tr* const anMap, const size_t nMapColStep, const size_t nMapRowStep, bool bInvDiag);
 
     /// initializes foreground and background GMM parameters via KNN using the given image and mask (where all values >0 are considered foreground)
-    template<size_t nKMeansIters=10, size_t nC, size_t nD>
-    void initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel, const cv::Mat& oROI=cv::Mat());
+    template<size_t nKMeansIters=10, size_t nC1, size_t nC2, size_t nD>
+    void initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, lv::GMM<nC1,nD>& oBGModel, lv::GMM<nC2,nD>& oFGModel, const cv::Mat& oROI=cv::Mat());
     /// assigns each input image pixel its most likely GMM component in the output map, using the BG or FG model as dictated by the input mask
-    template<size_t nC, size_t nD>
-    void assignGaussianMixtureComponents(const cv::Mat& oInput, const cv::Mat& oMask, cv::Mat& oAssignMap, const lv::GMM<nC,nD>& oBGModel, const lv::GMM<nC,nD>& oFGModel, const cv::Mat& oROI=cv::Mat());
+    template<size_t nC1, size_t nC2, size_t nD>
+    void assignGaussianMixtureComponents(const cv::Mat& oInput, const cv::Mat& oMask, cv::Mat& oAssignMap, const lv::GMM<nC1,nD>& oBGModel, const lv::GMM<nC2,nD>& oFGModel, const cv::Mat& oROI=cv::Mat());
     /// learns the ideal foreground and background GMM parameters to fit the components assigned to the pixels of the input image
-    template<size_t nC, size_t nD>
-    void learnGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oAssignMap, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel, const cv::Mat& oROI=cv::Mat());
+    template<size_t nC1, size_t nC2, size_t nD>
+    void learnGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oAssignMap, lv::GMM<nC1,nD>& oBGModel, lv::GMM<nC2,nD>& oFGModel, const cv::Mat& oROI=cv::Mat());
 
 } // namespace lv
 
@@ -156,8 +156,8 @@ bool lv::isLocalMaximum_Diagonal(const Tr* const anMap, const size_t nMapColStep
         return isLocalMaximum_Diagonal<nHalfWinSize,false>(anMap,nMapColStep,nMapRowStep);
 }
 
-template<size_t nKMeansIters, size_t nC, size_t nD>
-void lv::initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel, const cv::Mat& oROI) {
+template<size_t nKMeansIters, size_t nC1, size_t nC2, size_t nD>
+void lv::initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, lv::GMM<nC1,nD>& oBGModel, lv::GMM<nC2,nD>& oFGModel, const cv::Mat& oROI) {
     static_assert(nKMeansIters>0,"bad iter count for kmeans");
     lvAssert_(!oInput.empty() && !oMask.empty() && oInput.size==oMask.size,"bad input image/mask size");
     lvAssert_(oInput.isContinuous() && oMask.isContinuous(),"need continuous mats (raw indexing in impl)");
@@ -185,7 +185,7 @@ void lv::initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, 
     oBGModel.initLearning();
     if(nBGSamples>0) {
         cv::Mat oBGSamples(int(nBGSamples),(int)nD,CV_32FC1,s_aBGSamples.data());
-        cv::kmeans(oBGSamples,int(nC),oClusterLabels,cv::TermCriteria(CV_TERMCRIT_ITER,(int)nKMeansIters,0.0),0,cv::KMEANS_PP_CENTERS);
+        cv::kmeans(oBGSamples,int(nC1),oClusterLabels,cv::TermCriteria(CV_TERMCRIT_ITER,(int)nKMeansIters,0.0),0,cv::KMEANS_PP_CENTERS);
         for(size_t nSampleIdx=0; nSampleIdx<nBGSamples; ++nSampleIdx) {
             lv::unroll<nD>([&](size_t nDimIdx){aSample[nDimIdx] = double(s_aBGSamples[nSampleIdx*nD+nDimIdx]);});
             oBGModel.addSample(size_t(oClusterLabels.at<int>(int(nSampleIdx),0)),aSample);
@@ -195,7 +195,7 @@ void lv::initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, 
     oFGModel.initLearning();
     if(nFGSamples>0) {
         cv::Mat oFGSamples(int(nFGSamples),(int)nD,CV_32FC1,s_aFGSamples.data());
-        cv::kmeans(oFGSamples,int(nC),oClusterLabels,cv::TermCriteria(CV_TERMCRIT_ITER,(int)nKMeansIters,0.0),0,cv::KMEANS_PP_CENTERS);
+        cv::kmeans(oFGSamples,int(nC2),oClusterLabels,cv::TermCriteria(CV_TERMCRIT_ITER,(int)nKMeansIters,0.0),0,cv::KMEANS_PP_CENTERS);
         for(size_t nSampleIdx=0; nSampleIdx<nFGSamples; ++nSampleIdx) {
             lv::unroll<nD>([&](size_t nDimIdx){aSample[nDimIdx] = double(s_aFGSamples[nSampleIdx*nD+nDimIdx]);});
             oFGModel.addSample(size_t(oClusterLabels.at<int>(int(nSampleIdx),0)),aSample);
@@ -204,8 +204,8 @@ void lv::initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, 
     oFGModel.endLearning();
 }
 
-template<size_t nC, size_t nD>
-void lv::assignGaussianMixtureComponents(const cv::Mat& oInput, const cv::Mat& oMask, cv::Mat& oAssignMap, const lv::GMM<nC,nD>& oBGModel, const lv::GMM<nC,nD>& oFGModel, const cv::Mat& oROI) {
+template<size_t nC1, size_t nC2, size_t nD>
+void lv::assignGaussianMixtureComponents(const cv::Mat& oInput, const cv::Mat& oMask, cv::Mat& oAssignMap, const lv::GMM<nC1,nD>& oBGModel, const lv::GMM<nC2,nD>& oFGModel, const cv::Mat& oROI) {
     lvAssert_(!oInput.empty() && !oMask.empty() && oInput.size==oMask.size,"bad input image/mask size");
     lvAssert_(oInput.isContinuous() && oMask.isContinuous(),"need continuous mats (raw indexing in impl)");
     lvAssert_(oInput.depth()==CV_8U,"input image type should be 8U (only supported for now)");
@@ -226,8 +226,8 @@ void lv::assignGaussianMixtureComponents(const cv::Mat& oInput, const cv::Mat& o
     }
 }
 
-template<size_t nC, size_t nD>
-void lv::learnGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oAssignMap, lv::GMM<nC,nD>& oBGModel, lv::GMM<nC,nD>& oFGModel, const cv::Mat& oROI) {
+template<size_t nC1, size_t nC2, size_t nD>
+void lv::learnGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oAssignMap, lv::GMM<nC1,nD>& oBGModel, lv::GMM<nC2,nD>& oFGModel, const cv::Mat& oROI) {
     lvAssert_(!oInput.empty() && !oMask.empty() && !oAssignMap.empty() && oInput.size==oMask.size && oInput.size==oAssignMap.size,"bad input image/mask/assignmap size");
     lvAssert_(oInput.isContinuous() && oMask.isContinuous() && oAssignMap.isContinuous(),"need continuous mats (raw indexing in impl)");
     lvAssert_(oInput.depth()==CV_8U,"input image type should be 8U (only supported for now)");
@@ -243,10 +243,11 @@ void lv::learnGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask,
     for(size_t nSampleIdx=0; nSampleIdx<nTotSamples; ++nSampleIdx) {
         if(!pROI || pROI[nSampleIdx]) {
             const int nCompLabel = ((const int*)oAssignMap.data)[nSampleIdx];
-            if(nCompLabel>=0 && nCompLabel<int(nC)) {
+            const bool bForeground = bool(oMask.data[nSampleIdx]);
+            if(nCompLabel>=0 && nCompLabel<int(bForeground?nC2:nC1)) {
                 const uchar* pPixelData = oInput.data+nSampleIdx*nD;
                 lv::unroll<nD>([&](size_t nDimIdx){aSample[nDimIdx] = double(pPixelData[nDimIdx]);});
-                if(oMask.data[nSampleIdx])
+                if(bForeground)
                     oFGModel.addSample(size_t(nCompLabel),aSample);
                 else
                     oBGModel.addSample(size_t(nCompLabel),aSample);
