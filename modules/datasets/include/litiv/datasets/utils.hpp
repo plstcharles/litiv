@@ -117,7 +117,7 @@ namespace lv {
             (eDatasetTask==DatasetTask_Registr)?UnspecifiedPacket:
             (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
             // ...
-            throw -1;
+            lvStdError_(domain_error,"unknown input task id");
     }
 
     /// returns the output packet type policy to use based on the dataset task type (can also be overridden by dataset type)
@@ -130,7 +130,7 @@ namespace lv {
             (eDatasetTask==DatasetTask_Registr)?UnspecifiedPacket:
             (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
             // ...
-            throw -1;
+            lvStdError_(domain_error,"unknown input task id");
     }
 
     /// returns the GT packet mapping style policy to use based on the dataset task type (can also be overridden by dataset type)
@@ -143,7 +143,7 @@ namespace lv {
             (eDatasetTask==DatasetTask_Registr)?NoMapping:
             (eDatasetTask==DatasetTask_EdgDet)?ElemMapping:
             // ...
-            throw -1;
+            lvStdError_(domain_error,"unknown input task id");
     }
 
     /// returns the I/O packet mapping style policy to use based on the dataset task type (can also be overridden by dataset type)
@@ -156,7 +156,7 @@ namespace lv {
             (eDatasetTask==DatasetTask_Registr)?NoMapping:
             (eDatasetTask==DatasetTask_EdgDet)?ElemMapping:
             // ...
-            throw -1;
+            lvStdError_(domain_error,"unknown input task id");
     }
 
     /// returns the eval type policy to use based on the dataset task type (can also be overridden by dataset type)
@@ -182,7 +182,7 @@ namespace lv {
             (eDatasetTask==DatasetTask_Registr)?DatasetSource_VideoArray:
             (eDatasetTask==DatasetTask_EdgDet)?DatasetSource_Image:
             // ...
-            throw -1;
+            lvStdError_(domain_error,"unknown input task id");
     }
 
     /// returns whether task, source, and eval types are all compatible (can also be overridden by dataset type)
@@ -208,7 +208,7 @@ namespace lv {
             (eDatasetEval==DatasetEval_Registr)?NotArray:
             (eDatasetEval==DatasetEval_BoundingBox)?NotArray:
             // ...
-            throw -1;
+            lvStdError_(domain_error,"unknown input eval id");
     }
 
     /// default (specializable) forward declaration of output array policy helper, to toggle with NoEval

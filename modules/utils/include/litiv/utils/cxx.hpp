@@ -446,7 +446,7 @@ namespace lv {
         inline std::shared_ptr<const Tcast> shared_from_this_cast(bool bThrowIfFail=false) const {
             auto pCast = std::dynamic_pointer_cast<const Tcast>(this->shared_from_this());
             if(bThrowIfFail && !pCast)
-                throw std::bad_cast();
+                lvStdError(bad_cast);
             return pCast;
         }
         /// cast helper function (non-const version)
@@ -454,7 +454,7 @@ namespace lv {
         inline std::shared_ptr<Tcast> shared_from_this_cast(bool bThrowIfFail=false) {
             auto pCast = std::dynamic_pointer_cast<Tcast>(this->shared_from_this());
             if(bThrowIfFail && !pCast)
-                throw std::bad_cast();
+                lvStdError(bad_cast);
             return pCast;
         }
     };
@@ -566,7 +566,7 @@ namespace lv {
     /// computes a 1D array -> 1D scalar reduction with constexpr support (iterator-based version)
     template<typename TFunc, typename TValue>
     constexpr auto static_reduce(const TValue* begin, const TValue* end, TFunc lOp) -> decltype(lOp(*begin,*begin)) {
-        return (begin>=end)?throw std::runtime_error("bad iters"):(begin+1)==end?*begin:lOp(*begin,static_reduce(begin+1,end,lOp));
+        return (begin>=end)?lvStdError_(runtime_error,"bad iters"):(begin+1)==end?*begin:lOp(*begin,static_reduce(begin+1,end,lOp));
     }
 
     /// computes a 1D array -> 1D scalar reduction with constexpr support (array-based version, impl, specialization for last array value)
@@ -645,7 +645,7 @@ namespace lv {
                 alloc_size += alignment - alloc_size%alignment;
             void* ptr = _aligned_malloc(alloc_size,nByteAlign);
             if(ptr==nullptr)
-                throw std::bad_alloc();
+                lvStdError(bad_alloc);
             return reinterpret_cast<pointer>(ptr);
         }
         static inline void deallocate(pointer p, size_type) noexcept {_aligned_free(p);}
@@ -662,12 +662,12 @@ namespace lv {
 #elif HAVE_POSIX_ALIGNED_ALLOC
             void* ptr;
             if(posix_memalign(&ptr,alignment,alloc_size)!=0)
-                throw std::bad_alloc();
+                lvStdError(bad_alloc);
 #else //HAVE_..._ALIGNED_ALLOC
 #error "Missing aligned mem allocator"
 #endif //HAVE_..._ALIGNED_ALLOC
             if(ptr==nullptr)
-                throw std::bad_alloc();
+                lvStdError(bad_alloc);
             return reinterpret_cast<pointer>(ptr);
         }
         static inline void deallocate(pointer p, size_type) noexcept {free(p);}
@@ -1040,7 +1040,7 @@ template<size_t nWorkers>
 template<typename Tfunc, typename... Targs>
 std::future<std::result_of_t<Tfunc(Targs...)>> lv::WorkerPool<nWorkers>::queueTask(Tfunc&& lTaskEntryPoint, Targs&&... args) {
     if(!m_bIsActive)
-        throw std::runtime_error("cannot queue task, destruction in progress");
+        lvStdError_(runtime_error,"cannot queue task, destruction in progress");
     using task_return_t = std::result_of_t<Tfunc(Targs...)>;
     using task_t = std::packaged_task<task_return_t()>;
     // http://stackoverflow.com/questions/28179817/how-can-i-store-generic-packaged-tasks-in-a-container

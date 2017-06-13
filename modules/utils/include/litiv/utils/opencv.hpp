@@ -113,7 +113,7 @@ namespace lv {
             (std::is_same<int,TData>::value || std::is_same<int32_t,TData>::value)?CV_32S:
             (std::is_same<float,TData>::value)?CV_32F:
             (std::is_same<double,TData>::value)?CV_64F:
-            throw(1);
+            lvStdError_(domain_error,"input type not cv-compatible");
     }
 
     /// mat type helper struct which provides basic static traits info on ocv matrix element types

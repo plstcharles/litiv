@@ -823,7 +823,7 @@ namespace lv {
                 Tx dX = vX[i+1]-vX[i];
 #ifdef _DEBUG
                 if(dX<0)
-                    throw std::invalid_argument("input domain vector must be sorted");
+                    lvStdError_(invalid_argument,"input domain vector must be sorted");
 #endif //defined(_DEBUG)
                 Ty dY = vY[i+1]-vY[i];
                 tSlope = Ty(dY/dX);
@@ -841,7 +841,7 @@ namespace lv {
                 vYReq[i] = vSlope[nNNIdx]*vXReq[i]+vOffset[nNNIdx];
             }
             else
-                throw std::domain_error("extrapolation not supported");
+                lvStdError_(domain_error,"extrapolation not supported");
         }
         return vYReq;
     }

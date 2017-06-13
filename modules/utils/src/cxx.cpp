@@ -23,12 +23,12 @@ std::string lv::putf(const char* acFormat, ...) {
     std::string vBuffer(1024,'\0');
 #ifdef _DEBUG
     if(((&vBuffer[0])+vBuffer.size()-1)!=&vBuffer[vBuffer.size()-1])
-        throw std::runtime_error("basic_string should have contiguous memory (need C++11!)");
+        lvStdError_(runtime_error,"basic_string should have contiguous memory (need C++11!)");
 #endif //defined(_DEBUG)
     const int nWritten = vsnprintf(&vBuffer[0],(int)vBuffer.size(),acFormat,vArgs);
     va_end(vArgs);
     if(nWritten<0)
-        throw std::runtime_error("putf failed (1)");
+        lvStdError_(runtime_error,"putf failed (1)");
     if((size_t)nWritten<=vBuffer.size()) {
         vBuffer.resize((size_t)nWritten);
         return vBuffer;
@@ -39,7 +39,7 @@ std::string lv::putf(const char* acFormat, ...) {
     const int nWritten2 = vsnprintf(&vBuffer[0],(int)vBuffer.size(),acFormat,vArgs2);
     va_end(vArgs2);
     if(nWritten2<0 || (size_t)nWritten2>vBuffer.size())
-        throw std::runtime_error("putf failed (2)");
+        lvStdError_(runtime_error,"putf failed (2)");
     vBuffer.resize((size_t)nWritten2);
     return vBuffer;
 }
@@ -95,12 +95,12 @@ std::ostream& lv::safe_print(std::ostream& os, const char* acFormat, ...) {
     std::string vBuffer(1024,'\0');
 #ifdef _DEBUG
     if(((&vBuffer[0])+vBuffer.size()-1)!=&vBuffer[vBuffer.size()-1])
-        throw std::runtime_error("basic_string should have contiguous memory (need C++11!)");
+        lvStdError_(runtime_error,"basic_string should have contiguous memory (need C++11!)");
 #endif //defined(_DEBUG)
     const int nWritten = vsnprintf(&vBuffer[0],(int)vBuffer.size(),acFormat,vArgs);
     va_end(vArgs);
     if(nWritten<0)
-        throw std::runtime_error("safe_print failed (1)");
+        lvStdError_(runtime_error,"safe_print failed (1)");
     if((size_t)nWritten<=vBuffer.size()) {
         vBuffer.resize((size_t)nWritten);
         std::lock_guard<std::mutex> oLock(getLogMutex());
@@ -112,7 +112,7 @@ std::ostream& lv::safe_print(std::ostream& os, const char* acFormat, ...) {
     const int nWritten2 = vsnprintf(&vBuffer[0],(int)vBuffer.size(),acFormat,vArgs2);
     va_end(vArgs2);
     if(nWritten2<0 || (size_t)nWritten2>vBuffer.size())
-        throw std::runtime_error("safe_print failed (2)");
+        lvStdError_(runtime_error,"safe_print failed (2)");
     vBuffer.resize((size_t)nWritten2);
     std::lock_guard<std::mutex> oLock(getLogMutex());
     return os << vBuffer;

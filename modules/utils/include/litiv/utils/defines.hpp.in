@@ -102,6 +102,9 @@
         #define LITIV_VERSION_PATCH       @LITIV_VERSION_PATCH@
         #define LITIV_VERSION_SHA1        "@GIT_SHA1@"
     #endif //ndef(__LV_VERSION_DEFS__)
+    #define lvStdError(errtype) throw std::errtype()
+    #define lvStdError_(errtype,msg) throw std::errtype(msg)
+    #define lvStdError__(errtype,msg,...) throw std::errtype(lv::putf(msg,__VA_ARGS__))
     #define lvError(msg) throw lv::Exception(std::string("[lvError: ")+(msg)+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__)
     #define lvError_(msg,...) throw lv::Exception(std::string("[lvError: ")+(msg)+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
     #define lvAssert(expr) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(0)
