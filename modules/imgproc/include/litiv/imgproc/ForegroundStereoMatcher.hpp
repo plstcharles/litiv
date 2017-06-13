@@ -58,6 +58,7 @@
 #define STEREOSEGMATCH_UNARY_COST_OOB_CST           (ValueType(5000))
 #define STEREOSEGMATCH_UNARY_COST_OCCLUDED_CST      (ValueType(2000))
 #define STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST      (ValueType(10000))
+#define STEREOSEGMATCH_IMGSIM_COST_COLOR_SCALE      (300)
 #define STEREOSEGMATCH_IMGSIM_COST_DESC_SCALE       (400)
 #define STEREOSEGMATCH_SHPSIM_COST_DESC_SCALE       (400)
 #define STEREOSEGMATCH_UNIQUE_COST_OVER_SCALE       (200)
@@ -301,6 +302,12 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         CamArray<ValueType*> m_apStereoUnaryFuncsDataBase,m_apResegmUnaryFuncsDataBase;
         /// stereo/resegm models pairwise functions base pointers
         CamArray<ValueType*> m_apStereoPairwFuncsDataBase,m_apResegmPairwFuncsDataBase;
+        /// gmm fg/bg models used for intra-spectral visual-data-based segmentation (3ch)
+        CamArray<lv::GMM<5,3>> m_aFGModels_3ch,m_aBGModels_3ch;
+        /// gmm fg/bg models used for intra-spectral visual-data-based segmentation (1ch)
+        CamArray<lv::GMM<3,1>> m_aFGModels_1ch,m_aBGModels_1ch;
+        /// gmm label component maps used for model learning (kept here to avoid reallocs)
+        CamArray<cv::Mat_<int>> m_aGMMCompAssignMap;
         /// cost lookup table for adding/removing/summing associations
         lv::AutoBuffer<ValueType,200> m_aAssocCostRealAddLUT,m_aAssocCostRealRemLUT,m_aAssocCostRealSumLUT;
         /// cost lookup table for approximately (worse case) adding/removing associations
