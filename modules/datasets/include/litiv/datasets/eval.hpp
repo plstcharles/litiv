@@ -104,6 +104,7 @@ namespace lv {
         /// overrides 'processOutput' from IDataConsumer_ to evaluate the provided output packet
         virtual void processOutput(const cv::Mat& oClassif, size_t nIdx) override {
             if(isEvaluating()) {
+                lvDbgAssert(m_pMetricsBase);
                 lvAssert_(!oClassif.empty(),"output must be non-empty for evaluation");
                 auto pLoader = shared_from_this_cast<IIDataLoader>(true);
                 lvAssert_(pLoader->getOutputPacketType()==ImagePacket && pLoader->getGTPacketType()==ImagePacket && pLoader->getGTMappingType()==ElemMapping,"default impl cannot evaluate without 1:1 image pixel mapping");
@@ -130,8 +131,8 @@ namespace lv {
             const std::vector<cv::Mat>& vGTArray = pLoader->getGTArray(nIdx);
             const std::vector<cv::Mat>& vGTROIArray = pLoader->getGTROIArray(nIdx);
             lvAssert_(vClassif.size()==vGTArray.size() && (vGTROIArray.empty() || vClassif.size()==vGTROIArray.size()),"array size mistmatch");
-            for(size_t s=0; s<vClassif.size(); ++s)
-                vMasks.push_back(BinClassif::getColoredMask(vClassif[s],vGTArray[s],vGTROIArray.empty()?cv::Mat():vGTROIArray[s]));
+            for(size_t nSteamIdx=0; nSteamIdx<vClassif.size(); ++nSteamIdx)
+                vMasks.push_back(BinClassif::getColoredMask(vClassif[nSteamIdx],vGTArray[nSteamIdx],vGTROIArray.empty()?cv::Mat():vGTROIArray[nSteamIdx]));
             return vMasks;
         }
         /// resets internal packet count + classification metrics
@@ -147,6 +148,7 @@ namespace lv {
         /// overrides 'processOutput' from IDataConsumer_ to evaluate the provided output packet
         virtual void processOutput(const std::vector<cv::Mat>& vClassif, size_t nIdx) override {
             if(isEvaluating()) {
+                lvDbgAssert(m_pMetricsBase);
                 lvAssert_(!vClassif.empty(),"output array must be non-empty for evaluation");
                 auto pLoader = shared_from_this_cast<IDataLoader_<Array>>(true);
                 lvAssert_(pLoader->getOutputPacketType()==ImageArrayPacket && pLoader->getGTPacketType()==ImageArrayPacket && pLoader->getGTMappingType()==ElemMapping,"default impl cannot evaluate without 1:1 image pixel mapping");
@@ -154,8 +156,12 @@ namespace lv {
                 const std::vector<cv::Mat>& vGTArray = pLoader->getGTArray(nIdx);
                 const std::vector<cv::Mat>& vGTROIArray = pLoader->getGTROIArray(nIdx);
                 lvAssert_(vClassif.size()==vGTArray.size() && (vGTROIArray.empty() || vClassif.size()==vGTROIArray.size()),"gt/output array size mistmatch");
-                for(size_t s=0; s<vClassif.size(); ++s)
-                    m_pMetricsBase->m_vCounters[s].accumulate(vClassif[s],vGTArray[s],vGTROIArray.empty()?cv::Mat():vGTROIArray[s]);
+                if(m_pMetricsBase->m_vCounters.empty() || m_pMetricsBase->m_vsStreamNames.empty()) {
+                    m_pMetricsBase->m_vCounters.resize(vClassif.size());
+                    m_pMetricsBase->m_vsStreamNames.resize(vClassif.size());
+                }
+                for(size_t nSteamIdx=0; nSteamIdx<vClassif.size(); ++nSteamIdx)
+                    m_pMetricsBase->m_vCounters[nSteamIdx].accumulate(vClassif[nSteamIdx],vGTArray[nSteamIdx],vGTROIArray.empty()?cv::Mat():vGTROIArray[nSteamIdx]);
             }
         }
         /// default constructor; automatically creates an instance of the base metrics accumulator object

@@ -28,7 +28,7 @@
 
 namespace lv {
 
-    // classfication counters list for binary classifiers (not all counters have to be used)
+    /// classfication counters list for binary classifiers (not all counters have to be used)
     struct BinClassif {
         uint64_t nTP; ///< 'true positive' count
         uint64_t nTN; ///< 'true negative' count
@@ -153,7 +153,7 @@ namespace lv {
         using IMetricsAccumulator_<eDatasetEval>::IMetricsAccumulator_;
     };
 
-    // classfication metrics list for binary classifiers (not all metrics have to be used)
+    /// classfication metrics list for binary classifiers (not all metrics have to be used)
     struct BinClassifMetrics {
         double dRecall; ///< 'recall'/'sensitivity' value [0,1], where 1 is best
         double dSpecificity; ///< 'specificity' (1-FPR) value [0,1], where 1 is best

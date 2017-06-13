@@ -1216,7 +1216,7 @@ void lv::IDataCounter::setOutputCountPromise() {
 
 void lv::IDataCounter::resetOutputCount() {
     m_mProcessedPackets.clear();
-    m_nPacketCountPromise = std::promise<size_t>();/***@@@@@@@CHECKEXCEPT****/
+    m_nPacketCountPromise = std::promise<size_t>();
     m_nPacketCountFuture = m_nPacketCountPromise.get_future();
     m_nFinalPacketCount = 0;
 }
