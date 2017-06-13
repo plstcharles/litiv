@@ -345,14 +345,17 @@ namespace lv {
             cv::Mat oRGBROI = cv::imread(this->getDataPath()+"rgb_roi.png",cv::IMREAD_GRAYSCALE);
             if(!oRGBROI.empty()) {
                 lvAssert(oRGBROI.type()==CV_8UC1 && oRGBROI.size()==oImageSize);
-                oRGBROI = oRGBROI>0;
+                oRGBROI = oRGBROI>128;
             }
             else
                 oRGBROI = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
-            if(oRGBROI.size()!=this->m_vInputInfos[nInputRGBStreamIdx].size())
-                cv::resize(oRGBROI,oRGBROI,this->m_vInputInfos[nInputRGBStreamIdx].size(),0,0,cv::INTER_NEAREST);
+            if(oRGBROI.size()!=this->m_vInputInfos[nInputRGBStreamIdx].size()) {
+                cv::resize(oRGBROI,oRGBROI,this->m_vInputInfos[nInputRGBStreamIdx].size(),0,0,cv::INTER_LINEAR);
+                oRGBROI = oRGBROI>128;
+            }
             if(this->m_bUndistort || this->m_bHorizRectify) {
-                cv::remap(oRGBROI.clone(),oRGBROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_NEAREST);
+                cv::remap(oRGBROI.clone(),oRGBROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
+                oRGBROI = oRGBROI>128;
                 cv::erode(oRGBROI,oRGBROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
             }
             this->m_vInputROIs[nInputRGBStreamIdx] = oRGBROI.clone();
@@ -404,14 +407,17 @@ namespace lv {
             cv::Mat oThermalROI = cv::imread(this->getDataPath()+"thermal_roi.png",cv::IMREAD_GRAYSCALE);
             if(!oThermalROI.empty()) {
                 lvAssert(oThermalROI.type()==CV_8UC1 && oThermalROI.size()==oImageSize);
-                oThermalROI = oThermalROI>0;
+                oThermalROI = oThermalROI>128;
             }
             else
                 oThermalROI = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
-            if(oThermalROI.size()!=this->m_vInputInfos[nInputThermalStreamIdx].size())
-                cv::resize(oThermalROI,oThermalROI,this->m_vInputInfos[nInputThermalStreamIdx].size(),0,0,cv::INTER_NEAREST);
+            if(oThermalROI.size()!=this->m_vInputInfos[nInputThermalStreamIdx].size()) {
+                cv::resize(oThermalROI,oThermalROI,this->m_vInputInfos[nInputThermalStreamIdx].size(),0,0,cv::INTER_LINEAR);
+                oThermalROI = oThermalROI>128;
+            }
             if(this->m_bUndistort || this->m_bHorizRectify) {
-                cv::remap(oThermalROI.clone(),oThermalROI,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_NEAREST);
+                cv::remap(oThermalROI.clone(),oThermalROI,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_LINEAR);
+                oThermalROI = oThermalROI>128;
                 cv::erode(oThermalROI,oThermalROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
             }
             this->m_vInputROIs[nInputThermalStreamIdx] = oThermalROI.clone();
@@ -450,12 +456,14 @@ namespace lv {
                 cv::Mat oDepthROI = cv::imread(this->getDataPath()+"depth_roi.png",cv::IMREAD_GRAYSCALE);
                 if(!oDepthROI.empty()) {
                     lvAssert(oDepthROI.type()==CV_8UC1 && oDepthROI.size()==oImageSize);
-                    oDepthROI = oDepthROI>0;
+                    oDepthROI = oDepthROI>128;
                 }
                 else
                     oDepthROI = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
-                if(oDepthROI.size()!=this->m_vInputInfos[nInputDepthStreamIdx].size())
-                    cv::resize(oDepthROI,oDepthROI,this->m_vInputInfos[nInputDepthStreamIdx].size(),0,0,cv::INTER_NEAREST);
+                if(oDepthROI.size()!=this->m_vInputInfos[nInputDepthStreamIdx].size()) {
+                    cv::resize(oDepthROI,oDepthROI,this->m_vInputInfos[nInputDepthStreamIdx].size(),0,0,cv::INTER_LINEAR);
+                    oDepthROI = oDepthROI>128;
+                }
                 this->m_vInputROIs[nInputDepthStreamIdx] = oDepthROI.clone();
                 if(bUseInterlacedMasks)
                     this->m_vInputROIs[nInputDepthMaskStreamIdx] = oDepthROI.clone();
@@ -531,26 +539,28 @@ namespace lv {
                 cv::Mat oRGBMaskPacket = cv::imread(vsInputPaths[nInputRGBMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                 lvAssert(!oRGBMaskPacket.empty() && oRGBMaskPacket.type()==CV_8UC1 && oRGBMaskPacket.size()==oImageSize);
                 if(oRGBMaskPacket.size()!=vInputInfos[nInputRGBStreamIdx].size())
-                    cv::resize(oRGBMaskPacket,oRGBMaskPacket,vInputInfos[nInputRGBStreamIdx].size(),cv::INTER_NEAREST);
+                    cv::resize(oRGBMaskPacket,oRGBMaskPacket,vInputInfos[nInputRGBStreamIdx].size(),cv::INTER_LINEAR);
                 if(this->m_bUndistort || this->m_bHorizRectify)
-                    cv::remap(oRGBMaskPacket.clone(),oRGBMaskPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_NEAREST);
+                    cv::remap(oRGBMaskPacket.clone(),oRGBMaskPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
+                oRGBMaskPacket = oRGBMaskPacket>128;
                 vInputs[nInputRGBMaskStreamIdx] = oRGBMaskPacket;
             }
             ///////////////////////////////////////////////////////////////////////////////////
             cv::Mat oThermalPacket = cv::imread(vsInputPaths[nInputThermalStreamIdx],cv::IMREAD_GRAYSCALE);
             lvAssert(!oThermalPacket.empty() && oThermalPacket.type()==CV_8UC1 && oThermalPacket.size()==oImageSize);
             if(oThermalPacket.size()!=vInputInfos[nInputThermalStreamIdx].size())
-                cv::resize(oThermalPacket,oThermalPacket,vInputInfos[nInputThermalStreamIdx].size());
+                cv::resize(oThermalPacket,oThermalPacket,vInputInfos[nInputThermalStreamIdx].size(),0,0,cv::INTER_CUBIC);
             if(this->m_bUndistort || this->m_bHorizRectify)
-                cv::remap(oThermalPacket.clone(),oThermalPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_LINEAR);
+                cv::remap(oThermalPacket.clone(),oThermalPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_CUBIC);
             vInputs[nInputThermalStreamIdx] = oThermalPacket;
             if(bUseInterlacedMasks) {
                 cv::Mat oThermalMaskPacket = cv::imread(vsInputPaths[nInputThermalMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                 lvAssert(!oThermalMaskPacket.empty() && oThermalMaskPacket.type()==CV_8UC1 && oThermalMaskPacket.size()==oImageSize);
                 if(oThermalMaskPacket.size()!=vInputInfos[nInputThermalStreamIdx].size())
-                    cv::resize(oThermalMaskPacket,oThermalMaskPacket,vInputInfos[nInputThermalStreamIdx].size(),cv::INTER_NEAREST);
+                    cv::resize(oThermalMaskPacket,oThermalMaskPacket,vInputInfos[nInputThermalStreamIdx].size(),cv::INTER_LINEAR);
                 if(this->m_bUndistort || this->m_bHorizRectify)
-                    cv::remap(oThermalMaskPacket.clone(),oThermalMaskPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_NEAREST);
+                    cv::remap(oThermalMaskPacket.clone(),oThermalMaskPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_LINEAR);
+                oThermalMaskPacket = oThermalMaskPacket>128;
                 vInputs[nInputThermalMaskStreamIdx] = oThermalMaskPacket;
             }
             ///////////////////////////////////////////////////////////////////////////////////
@@ -558,7 +568,7 @@ namespace lv {
                 cv::Mat oDepthPacket = cv::imread(vsInputPaths[nInputDepthStreamIdx],cv::IMREAD_ANYDEPTH);
                 lvAssert(!oDepthPacket.empty() && oDepthPacket.type()==CV_16UC1 && oDepthPacket.size()==oImageSize);
                 if(oDepthPacket.size()!=vInputInfos[nInputDepthStreamIdx].size())
-                    cv::resize(oDepthPacket,oDepthPacket,vInputInfos[nInputDepthStreamIdx].size());
+                    cv::resize(oDepthPacket,oDepthPacket,vInputInfos[nInputDepthStreamIdx].size(),0,0,cv::INTER_CUBIC);
                 // depth should be already undistorted
                 lvAssert_(!this->m_bHorizRectify,"missing depth image rectification impl");
                 vInputs[nInputDepthStreamIdx] = oDepthPacket;
@@ -566,8 +576,9 @@ namespace lv {
                     cv::Mat oDepthMaskPacket = cv::imread(vsInputPaths[nInputDepthMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                     lvAssert(!oDepthMaskPacket.empty() && oDepthMaskPacket.type()==CV_8UC1 && oDepthMaskPacket.size()==oImageSize);
                     if(oDepthMaskPacket.size()!=vInputInfos[nInputDepthStreamIdx].size())
-                        cv::resize(oDepthMaskPacket,oDepthMaskPacket,vInputInfos[nInputDepthStreamIdx].size(),cv::INTER_NEAREST);
+                        cv::resize(oDepthMaskPacket,oDepthMaskPacket,vInputInfos[nInputDepthStreamIdx].size(),cv::INTER_LINEAR);
                     lvAssert_(!this->m_bHorizRectify,"missing depth image rectification impl");
+                    oDepthMaskPacket = oDepthMaskPacket>128;
                     vInputs[nInputDepthMaskStreamIdx] = oDepthMaskPacket;
                 }
             }
@@ -599,9 +610,10 @@ namespace lv {
                 cv::Mat oRGBPacket = cv::imread(vsGTMasksPaths[nGTRGBMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                 lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC1 && oRGBPacket.size()==oImageSize);
                 if(oRGBPacket.size()!=vGTInfos[nGTRGBMaskStreamIdx].size())
-                    cv::resize(oRGBPacket,oRGBPacket,vGTInfos[nGTRGBMaskStreamIdx].size(),0,0,cv::INTER_NEAREST);
+                    cv::resize(oRGBPacket,oRGBPacket,vGTInfos[nGTRGBMaskStreamIdx].size(),0,0,cv::INTER_LINEAR);
                 if(this->m_bUndistort || this->m_bHorizRectify)
-                    cv::remap(oRGBPacket.clone(),oRGBPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_NEAREST);
+                    cv::remap(oRGBPacket.clone(),oRGBPacket,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
+                oRGBPacket = oRGBPacket>128;
                 vGTs[nGTRGBMaskStreamIdx] = oRGBPacket;
                 cv::Mat oThermalPacket = cv::imread(vsGTMasksPaths[nGTThermalMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                 lvAssert(!oThermalPacket.empty() && oThermalPacket.type()==CV_8UC1 && oThermalPacket.size()==oImageSize);
@@ -613,23 +625,25 @@ namespace lv {
                 }
 #endif //DATASETS_VAP_FIX_GT_SCENE3_OFFSET
                 if(oThermalPacket.size()!=vGTInfos[nGTThermalMaskStreamIdx].size())
-                    cv::resize(oThermalPacket,oThermalPacket,vGTInfos[nGTThermalMaskStreamIdx].size(),0,0,cv::INTER_NEAREST);
+                    cv::resize(oThermalPacket,oThermalPacket,vGTInfos[nGTThermalMaskStreamIdx].size(),0,0,cv::INTER_LINEAR);
 #if DATASETS_VAP_FIX_GT_SCENE2_DISTORT
                 // fail: 'distorted' thermal gt images are actually already undistorted in 'Scene 2' (so no need to remap again)
                 if(this->getName()!="Scene 2")
 #endif //DATASETS_VAP_FIX_GT_SCENE2_DISTORT
                 {
                     if(this->m_bUndistort || this->m_bHorizRectify)
-                        cv::remap(oThermalPacket.clone(),oThermalPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_NEAREST);
+                        cv::remap(oThermalPacket.clone(),oThermalPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_LINEAR);
                 }
+                oThermalPacket = oThermalPacket>128;
                 vGTs[nGTThermalMaskStreamIdx] = oThermalPacket;
                 if(this->m_bLoadDepth) {
                     cv::Mat oDepthPacket = cv::imread(vsGTMasksPaths[nGTDepthMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                     lvAssert(!oDepthPacket.empty() && oDepthPacket.type()==CV_8UC1 && oDepthPacket.size()==oImageSize);
                     if(oDepthPacket.size()!=vGTInfos[nGTDepthMaskStreamIdx].size())
-                        cv::resize(oDepthPacket,oDepthPacket,vGTInfos[nGTDepthMaskStreamIdx].size(),0,0,cv::INTER_NEAREST);
+                        cv::resize(oDepthPacket,oDepthPacket,vGTInfos[nGTDepthMaskStreamIdx].size(),0,0,cv::INTER_LINEAR);
                     // depth should be already undistorted
                     lvAssert_(!this->m_bHorizRectify,"missing depth image rectification impl");
+                    oDepthPacket = oDepthPacket>128;
                     vGTs[nGTDepthMaskStreamIdx] = oDepthPacket;
                 }
                 if(this->m_bHorizRectify) {
