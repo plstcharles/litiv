@@ -181,7 +181,7 @@ std::string lv::IDataReporter_<lv::DatasetEval_BinaryClassifierArray>::writeInli
     lvDbgAssert(pReducedMetrics);
     const BinClassifMetrics& oReducedMetrics = pReducedMetrics->m_oMetrics;
     ssStr << lv::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
-             lv::clampString("all/reduced",nCellSize) << "|" <<
+             lv::clampString("all:reduced",nCellSize) << "||" <<
              std::setw(nCellSize) << oReducedMetrics.dRecall << "|" <<
              std::setw(nCellSize) << oReducedMetrics.dSpecificity << "|" <<
              std::setw(nCellSize) << oReducedMetrics.dFPR << "|" <<
