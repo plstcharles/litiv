@@ -78,6 +78,7 @@ void lv::IDataReporter_<lv::DatasetEval_BinaryClassifier>::writeEvalReport() con
         oMetricsOutput << "------------|------------|------------|------------|------------|------------|------------|------------|------------\n";
         oMetricsOutput << IDataReporter_<DatasetEval_BinaryClassifier>::writeInlineBinClassifEvalReport(0);
         oMetricsOutput << "\nHz: " << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
+        oMetricsOutput << "Count: " << getCurrentOutputCount() << "\n";
         oMetricsOutput << lv::getLogStamp();
     }
 }
@@ -134,6 +135,7 @@ void lv::IDataReporter_<lv::DatasetEval_BinaryClassifierArray>::writeEvalReport(
         oMetricsOutput << "------------|------------||------------|------------|------------|------------|------------|------------|------------|------------\n";
         oMetricsOutput << IDataReporter_<DatasetEval_BinaryClassifierArray>::writeInlineBinClassifArrayReducedEvalReport(0);
         oMetricsOutput << "\nHz: " << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
+        oMetricsOutput << "Count: " << getCurrentOutputCount() << "\n";
         oMetricsOutput << lv::getLogStamp();
     }
 }
