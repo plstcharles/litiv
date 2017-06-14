@@ -50,6 +50,7 @@
 #define STEREOSEGMATCH_DEFAULT_GRAD_KERNEL_SIZE     (int(1))
 #define STEREOSEGMATCH_DEFAULT_DISTTRANSF_SCALE     (-0.1f)
 #define STEREOSEGMATCH_DEFAULT_ITER_PER_RESEGM      ((m_nStereoLabels*3)/2)
+#define STEREOSEGMATCH_DEFAULT_RESEGM_PER_LOOP      (1)
 #define STEREOSEGMATCH_DEFAULT_SALIENT_SHP_RAD      (3)
 #define STEREOSEGMATCH_DEFAULT_DESC_PATCH_HEIGHT    (15)
 #define STEREOSEGMATCH_DEFAULT_DESC_PATCH_WIDTH     (15)
@@ -390,7 +391,7 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         /// calculates image features required for model updates using the provided input image array
         void calcImageFeatures(const CamArray<cv::Mat>& aInputImages, bool bInit);
         /// calculates shape features required for model updates using the provided input mask array
-        void calcShapeFeatures(const CamArray<cv::Mat_<InternalLabelType>>& aInputMasks, bool bInit);
+        void calcShapeFeatures(const CamArray<cv::Mat_<InternalLabelType>>& aInputMasks, bool bWithDescs, bool bInit);
         /// fill internal temporary energy cost mats for the given stereo move operation
         void calcStereoMoveCosts(size_t nCamIdx, InternalLabelType nNewLabel) const;
         /// fill internal temporary energy cost mats for the given resegm move operation

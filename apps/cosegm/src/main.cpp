@@ -21,23 +21,23 @@
 
 ////////////////////////////////
 #define PROCESS_PREPROC_BGSEGM  0
-#define WRITE_IMG_OUTPUT        0
-#define EVALUATE_OUTPUT         0
+#define WRITE_IMG_OUTPUT        1
+#define EVALUATE_OUTPUT         1
 #define GLOBAL_VERBOSITY        3
 ////////////////////////////////
-#define DATASET_VAPTRIMOD       0
-#define DATASET_LITIV2014       1
+#define DATASET_VAPTRIMOD       1
+#define DATASET_LITIV2014       0
 #define DATASET_MINI_TESTS      0
 ////////////////////////////////
-#define DATASET_OUTPUT_PATH     "results_test"
+#define DATASET_OUTPUT_PATH     "results_resegm_full"
 #define DATASET_PRECACHING      0
 #define DATASET_SCALE_FACTOR    1//0.5
 #define DATASET_WORKTHREADS     1
 ////////////////////////////////
-#define DATASET_USE_DISPARITY_EVAL         0
-#define DATASET_USE_HALF_GT_INPUT_FLAG     0
-#define DATASET_USE_PRECALC_FEATURES       0
-#define DATASET_BATCH_START_INDEX          0
+#define DATASET_FORCE_RECALC_FEATURES      0
+#define DATASET_EVAL_APPROX_MASKS_ONLY     0
+#define DATASET_BATCH_START_INDEX          34
+#define DATASET_BATCH_STOP_MAX_INDEX       9999
 
 #if (DATASET_VAPTRIMOD+DATASET_LITIV2014+DATASET_MINI_TESTS/*+...*/)!=1
 #error "Must pick a single dataset."
@@ -52,7 +52,8 @@
     PROCESS_PREPROC_BGSEGM?false:true,            /* bool bUndistort=true */\
     PROCESS_PREPROC_BGSEGM?false:true,            /* bool bHorizRectify=false */\
     false,                                        /* bool bEvalStereoDisp=false */\
-    PROCESS_PREPROC_BGSEGM?0:4,                   /* int nLoadInputMasks=0 */\
+    false,                                        /* bool bLoadFrameSubset=false */\
+    PROCESS_PREPROC_BGSEGM?0:1/*4*/,              /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_LITIV2014
 #define DATASET_ID Dataset_LITIV_bilodeau2014
@@ -63,8 +64,9 @@
     false,                                        /* bool bLoadFullVideos=false */\
     true,                                         /* bool bEvalStereoDisp=true */\
     true,                                         /* bool bFlipDisparities=false */\
+    false,                                        /* bool bLoadFrameSubset=false */\
     16/*-1*/,                                     /* int nLoadPersonSets=-1 */\
-    PROCESS_PREPROC_BGSEGM?0:1,                   /* int nLoadInputMasks=0 */\
+    PROCESS_PREPROC_BGSEGM?0:1/*4*/,              /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_MINI_TESTS
 #include "cosegm_tests.hpp"
@@ -74,6 +76,7 @@
     bool(WRITE_IMG_OUTPUT),                       /* bool bSaveOutput=false */\
     bool(EVALUATE_OUTPUT),                        /* bool bUseEvaluator=true */\
     false,                                        /* bool bEvalStereoDisp=false */\
+    false,                                        /* bool bLoadFrameSubset=false */\
     1,                                            /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 //#elif DATASET_...
@@ -152,6 +155,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         lv::DisplayHelperPtr pDisplayHelper;
         if(lv::getVerbosity()>=1)
             pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
+        pDisplayHelper->setContinuousUpdates(true);
 #if PROCESS_PREPROC_BGSEGM
         std::vector<std::shared_ptr<IBackgroundSubtractor>> vAlgos = {std::make_shared<BGSEGM_ALGO_TYPE>(),std::make_shared<BGSEGM_ALGO_TYPE>()};
         const double dDefaultLearningRate = vAlgos[0]->getDefaultLearningRate();
@@ -167,30 +171,36 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         lvAssert(vInitInput.size()==4 && (vInitInput.size()%2)==0); // assume masks are interlaced with input images
         const size_t nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity();
         lvLog_(2,"\tdisp = [%d,%d]",(int)nMinDisp,(int)nMaxDisp);
-        std::shared_ptr<StereoSegmMatcher> pAlgo = std::make_shared<StereoSegmMatcher>(nMinDisp,nMaxDisp);
+        constexpr size_t nCameraCount = StereoSegmMatcher::getCameraCount();
         constexpr size_t nExpectedAlgoInputCount = StereoSegmMatcher::getInputStreamCount();
         constexpr size_t nExpectedAlgoOutputCount = StereoSegmMatcher::getOutputStreamCount();
+        static_assert(nCameraCount==2,"unexpected algo internal camera head count");
         static_assert(nExpectedAlgoInputCount==4,"unexpected input stream count for instanced algo");
         static_assert(nExpectedAlgoOutputCount==4,"unexpected output stream count for instanced algo");
-        std::vector<cv::Mat> vCurrOutput(nExpectedAlgoOutputCount);
-        std::vector<cv::Mat> vCurrFGMasks(nExpectedAlgoOutputCount/2);
-        std::vector<cv::Mat> vCurrStereoMaps(nExpectedAlgoOutputCount/2);
-        pAlgo->m_pDisplayHelper = pDisplayHelper;
-        std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs(vInitInput.size()/2);
+        using OutputType = StereoSegmMatcher::OutputLabelType;
+        std::vector<cv::Mat_<OutputType>> vCurrOutput(nExpectedAlgoOutputCount);
+        std::vector<cv::Mat> vCurrFGMasks(nCameraCount);
+        std::vector<cv::Mat> vCurrStereoMaps(nCameraCount);
+        std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs(nCameraCount);
         if(lv::getVerbosity()>=2) {
-            for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vInitInput.size()/2; ++nDisplayRowIdx) {
-                std::vector<std::pair<cv::Mat,std::string>> vRow(4);
+            for(size_t nDisplayRowIdx=0; nDisplayRowIdx<nCameraCount; ++nDisplayRowIdx) {
+                std::vector<std::pair<cv::Mat,std::string>> vRow(5);
                 vRow[0] = std::make_pair(cv::Mat(),oBatch.getInputStreamName(nDisplayRowIdx*2));
                 vRow[1] = std::make_pair(cv::Mat(),"INPUT MASK");
                 vRow[2] = std::make_pair(cv::Mat(),"OUTPUT DISP");
                 vRow[3] = std::make_pair(cv::Mat(),"OUTPUT MASK");
+                vRow[4] = std::make_pair(cv::Mat(),"GT EVAL");
                 vvDisplayPairs[nDisplayRowIdx] = vRow;
             }
         }
+#if !DATASET_EVAL_APPROX_MASKS_ONLY
+        std::shared_ptr<StereoSegmMatcher> pAlgo = std::make_shared<StereoSegmMatcher>(nMinDisp,nMaxDisp);
+        pAlgo->m_pDisplayHelper = pDisplayHelper;
         pAlgo->initialize(std::array<cv::Mat,2>{vROIs[0],vROIs[2]});
         oBatch.setFeaturesDirName(pAlgo->getFeatureExtractorName());
+#endif //!DATASET_EVAL_APPROX_MASKS_ONLY
 #endif //!PROCESS_PREPROC_BGSEGM
-        const size_t nTotPacketCount = oBatch.getFrameCount();
+        const size_t nTotPacketCount = std::min(oBatch.getFrameCount(),size_t(DATASET_BATCH_STOP_MAX_INDEX+1));
         oBatch.startProcessing();
         while(nCurrIdx<nTotPacketCount) {
             //if(!((nCurrIdx+1)%100))
@@ -264,37 +274,58 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             ++nCurrIdx;
         #endif //!(PROCESS_PREPROC_BGSEGM>1)
         #else //!PROCESS_PREPROC_BGSEGM
-        #if DATASET_USE_PRECALC_FEATURES
+        #if DATASET_EVAL_APPROX_MASKS_ONLY
+            for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx) {
+                const size_t nInputMaskIdx = nCamIdx*StereoSegmMatcher::InputPackOffset+StereoSegmMatcher::InputPackOffset_Mask;
+                const size_t nOutputMaskIdx = nCamIdx*StereoSegmMatcher::OutputPackOffset+StereoSegmMatcher::OutputPackOffset_Mask;
+                const size_t nOutputDispIdx = nCamIdx*StereoSegmMatcher::OutputPackOffset+StereoSegmMatcher::OutputPackOffset_Disp;
+                vCurrInput[nInputMaskIdx].convertTo(vCurrOutput[nOutputDispIdx],CV_32S); // only to fool output checks
+                vCurrInput[nInputMaskIdx].convertTo(vCurrOutput[nOutputMaskIdx],CV_32S,1.0/255);
+            }
+        #else //!DATASET_EVAL_APPROX_MASKS_ONLY
+        #if !DATASET_FORCE_RECALC_FEATURES
             const cv::Mat& oNextFeatsPacket = oBatch.loadFeatures(nCurrIdx);
-            lvAssert__(!oNextFeatsPacket.empty(),"could not load precalc feature packet for idx=%d",(int)nCurrIdx);
-            pAlgo->setNextFeatures(oNextFeatsPacket);
-        #else //!DATASET_USE_PRECALC_FEATURES
-            cv::Mat oNextFeatsPacket;
-            pAlgo->calcFeatures(lv::convertVectorToArray<nExpectedAlgoInputCount>(vCurrInput),&oNextFeatsPacket);
-            oBatch.saveFeatures(nCurrIdx,oNextFeatsPacket);
-            pAlgo->setNextFeatures(oNextFeatsPacket);
-        #endif //!DATASET_USE_PRECALC_FEATURES
+            if(!oNextFeatsPacket.empty())
+                pAlgo->setNextFeatures(oNextFeatsPacket);
+            else
+        #endif //!DATASET_FORCE_RECALC_FEATURES
+            {
+                cv::Mat oNewFeatsPacket;
+                pAlgo->calcFeatures(lv::convertVectorToArray<nExpectedAlgoInputCount>(vCurrInput),&oNewFeatsPacket);
+                oBatch.saveFeatures(nCurrIdx,oNewFeatsPacket);
+                pAlgo->setNextFeatures(oNewFeatsPacket);
+            }
             pAlgo->apply(vCurrInput,vCurrOutput/*,dDefaultThreshold*/);
+        #endif //!DATASET_EVAL_APPROX_MASKS_ONLY
             lvDbgAssert(vCurrOutput.size()==nExpectedAlgoOutputCount);
             using OutputLabelType = StereoSegmMatcher::LabelType;
             for(size_t nOutputArrayIdx=0; nOutputArrayIdx<vCurrOutput.size(); ++nOutputArrayIdx) {
                 lvAssert(vCurrOutput[nOutputArrayIdx].type()==lv::MatRawType_<OutputLabelType>());
                 lvAssert(vCurrOutput[nOutputArrayIdx].size()==oFrameSize());
-                if(nOutputArrayIdx%2)
-                    vCurrStereoMaps[nOutputArrayIdx/2] = vCurrOutput[nOutputArrayIdx];
-                else
-                    vCurrFGMasks[nOutputArrayIdx/2] = vCurrOutput[nOutputArrayIdx];
+                const size_t nRealOutputArrayIdx = nOutputArrayIdx/StereoSegmMatcher::OutputPackOffset;
+                if((nOutputArrayIdx%StereoSegmMatcher::OutputPackOffset)==StereoSegmMatcher::OutputPackOffset_Disp) {
+                    double dMin,dMax;
+                    cv::minMaxIdx(vCurrOutput[nOutputArrayIdx],&dMin,&dMax);
+                    lvDbgAssert_(dMin>=0 && dMax<=255,"unexpected min/max disp for 8u mats");
+                    vCurrOutput[nOutputArrayIdx].convertTo(vCurrStereoMaps[nRealOutputArrayIdx],CV_8U);
+                }
+                else if((nOutputArrayIdx%StereoSegmMatcher::OutputPackOffset)==StereoSegmMatcher::OutputPackOffset_Mask)
+                    vCurrFGMasks[nRealOutputArrayIdx] = vCurrOutput[nOutputArrayIdx]!=0;
             }
             lvDbgAssert(vCurrFGMasks.size()==oBatch.getOutputStreamCount());
             lvDbgAssert(vCurrStereoMaps.size()==oBatch.getOutputStreamCount());
             if(lv::getVerbosity()>=2) {
                 const std::vector<cv::Mat>& vCurrGT = oBatch.getGTArray(nCurrIdx);
                 lvAssert(vCurrGT.size()==vCurrFGMasks.size() && vCurrGT.size()==vCurrStereoMaps.size());
-                for(size_t nDisplayRowIdx=0; nDisplayRowIdx<vCurrInput.size()/2; ++nDisplayRowIdx) {
+                const std::vector<cv::Mat>& vCurrEvalRes = oBatch.getColoredMaskArray(oBatch.isEvaluatingDisparities()?vCurrStereoMaps:vCurrFGMasks,nCurrIdx);
+                for(size_t nDisplayRowIdx=0; nDisplayRowIdx<nCameraCount; ++nDisplayRowIdx) {
                     vCurrInput[nDisplayRowIdx*2].copyTo(vvDisplayPairs[nDisplayRowIdx][0].first);
                     vCurrInput[nDisplayRowIdx*2+1].copyTo(vvDisplayPairs[nDisplayRowIdx][1].first);
-                    pAlgo->getResegmMapDisplay(nDisplayRowIdx).copyTo(vvDisplayPairs[nDisplayRowIdx][3].first);
+                #if !DATASET_EVAL_APPROX_MASKS_ONLY
                     pAlgo->getStereoDispMapDisplay(nDisplayRowIdx).copyTo(vvDisplayPairs[nDisplayRowIdx][2].first);
+                    pAlgo->getResegmMapDisplay(nDisplayRowIdx).copyTo(vvDisplayPairs[nDisplayRowIdx][3].first);
+                #endif //!DATASET_EVAL_APPROX_MASKS_ONLY
+                    vCurrEvalRes[nDisplayRowIdx].copyTo(vvDisplayPairs[nDisplayRowIdx][4].first);
                 }
                 lvAssert(pDisplayHelper);
                 pDisplayHelper->display(vvDisplayPairs,cv::Size(320,240));
