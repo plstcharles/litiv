@@ -29,6 +29,7 @@ namespace lv {
 
     struct ICosegmTestDataset {
         virtual bool isEvaluatingDisparities() const = 0;
+        virtual bool isLoadingFrameSubset() const = 0;
         virtual int isLoadingInputMasks() const = 0;
     };
 
@@ -42,6 +43,7 @@ namespace lv {
                 bool bSaveOutput=false, ///< defines whether results should be archived or not
                 bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
                 bool bEvalDisparities=false, ///< defines whether we should evaluate fg/bg segmentation or stereo disparities
+                bool bLoadFrameSubset=false, ///< defines whether only a subset of the dataset's frames will be loaded or not
                 int nLoadInputMasks=0, ///< defines whether the input stream should be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
                 double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
         ) :
@@ -59,11 +61,16 @@ namespace lv {
                         bUseEvaluator,
                         false,
                         dScaleFactor
-                ),m_bEvalDisparities(bEvalDisparities),m_nLoadInputMasks(nLoadInputMasks) {}
+                ),
+                m_bEvalDisparities(bEvalDisparities),
+                m_bLoadFrameSubset(bLoadFrameSubset),
+                m_nLoadInputMasks(nLoadInputMasks) {}
         virtual bool isEvaluatingDisparities() const override final {return m_bEvalDisparities;}
+        virtual bool isLoadingFrameSubset() const override {return m_bLoadFrameSubset;}
         virtual int isLoadingInputMasks() const override final {return m_nLoadInputMasks;}
     protected:
         const bool m_bEvalDisparities;
+        const bool m_bLoadFrameSubset;
         const int m_nLoadInputMasks;
     };
 
@@ -93,6 +100,10 @@ namespace lv {
 
         bool isEvaluatingDisparities() const {
             return dynamic_cast<const ICosegmTestDataset&>(*this->getRoot()).isEvaluatingDisparities();
+        }
+
+        bool isLoadingFrameSubset() const {
+            return dynamic_cast<const ICosegmTestDataset&>(*this->getRoot()).isLoadingFrameSubset();
         }
 
         int isLoadingInputMasks() const {
@@ -127,6 +138,7 @@ namespace lv {
         virtual void parseData() override final {
             lvDbgExceptionWatch;
             const int nLoadInputMasks = this->isLoadingInputMasks();
+            const bool bLoadFrameSubset = this->isLoadingFrameSubset();
             const bool bUseInterlacedMasks = nLoadInputMasks!=0;
             const bool bUseApproxMask0 = (nLoadInputMasks&2)==0;
             const bool bUseApproxMask1 = (nLoadInputMasks&4)==0;
