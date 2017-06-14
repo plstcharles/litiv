@@ -34,6 +34,8 @@ namespace lv {
         virtual bool isEvaluatingDisparities() const = 0;
         /// returns whether frames should be flipped to use inverted disparities (from rgb to thermal) or not
         virtual bool isFlippingDisparities() const = 0;
+        /// returns whether only a subset of the dataset's frames will be loaded or not
+        virtual bool isLoadingFrameSubset() const = 0;
         /// returns which 'person' sets will be loaded as work batches (-1=all sets, (1<<(X-1))=load set 'XPerson')
         virtual int isLoadingPersonSets() const = 0;
         /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
@@ -59,6 +61,7 @@ namespace lv {
                 bool bLoadFullVideos=false, ///< defines whether we should load full videos via avi's instead of specific stills via jpg's
                 bool bEvalDisparities=true, ///< defines whether we should evaluate fg/bg segmentation or stereo disparities
                 bool bFlipDisparities=false, ///< defines whether frames should be flipped to use inverted disparities (from rgb to thermal) or not
+                bool bLoadFrameSubset=false, ///< defines whether only a subset of the dataset's frames will be loaded or not
                 int nLoadPersonSets=-1, ///< defines which 'person' sets will be loaded as work batches (-1=all sets, (1<<(X))=load set 'XPerson')
                 int nLoadInputMasks=0, ///< defines whether the input stream should be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
                 double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
@@ -77,6 +80,7 @@ namespace lv {
                 m_bLoadFullVideos(bLoadFullVideos),
                 m_bEvalDisparities(bEvalDisparities),
                 m_bFlipDisparities(bFlipDisparities),
+                m_bLoadFrameSubset(bLoadFrameSubset),
                 m_nLoadPersonSets(nLoadPersonSets),
                 m_nLoadInputMasks(nLoadInputMasks) {
             lvAssert_(nLoadPersonSets!=0,"must load at least one person set");
@@ -106,6 +110,8 @@ namespace lv {
         virtual bool isEvaluatingDisparities() const override {return m_bEvalDisparities;}
         /// returns whether frames should be flipped to use inverted disparities (from rgb to thermal) or not
         virtual bool isFlippingDisparities() const override {return m_bFlipDisparities;}
+        /// returns whether only a subset of the dataset's frames will be loaded or not
+        virtual bool isLoadingFrameSubset() const override {return m_bLoadFrameSubset;}
         /// returns which 'person' sets will be loaded as work batches (-1=all sets, (1<<(X))=load set 'XPerson')
         virtual int isLoadingPersonSets() const override {return m_nLoadPersonSets;}
         /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
@@ -114,6 +120,7 @@ namespace lv {
         const bool m_bLoadFullVideos;
         const bool m_bEvalDisparities;
         const bool m_bFlipDisparities;
+        const bool m_bLoadFrameSubset;
         const int m_nLoadPersonSets;
         const int m_nLoadInputMasks;
     };
@@ -198,6 +205,10 @@ namespace lv {
         bool isFlippingDisparities() const {
             return dynamic_cast<const ILITIVBilodeau2014Dataset&>(*this->getRoot()).isFlippingDisparities();
         }
+        /// returns whether only a subset of the dataset's frames will be loaded or not
+        bool isLoadingFrameSubset() const {
+            return dynamic_cast<const ILITIVBilodeau2014Dataset&>(*this->getRoot()).isLoadingFrameSubset();
+        }
         /// returns which 'person' sets will be loaded as work batches (-1=all sets, (1<<(X-1))=load set 'XPerson')
         int isLoadingPersonSets() const {
             return dynamic_cast<const ILITIVBilodeau2014Dataset&>(*this->getRoot()).isLoadingPersonSets();
@@ -236,6 +247,8 @@ namespace lv {
             lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
             const ILITIVBilodeau2014Dataset& oDataset = dynamic_cast<const ILITIVBilodeau2014Dataset&>(*this->getRoot());
+            const bool bLoadFrameSubset = this->isLoadingFrameSubset();
+            lvAssert_(!bLoadFrameSubset,"missing impl @@@@");
             this->m_bLoadFullVideos = oDataset.isLoadingFullVideos();
             this->m_nLoadInputMasks = oDataset.isLoadingInputMasks();
             this->m_bEvalDisparities = oDataset.isEvaluatingDisparities();
