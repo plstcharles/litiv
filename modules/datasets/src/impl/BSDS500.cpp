@@ -425,7 +425,6 @@ void lv::MetricsAccumulator_<lv::DatasetEval_BinaryClassifier,lv::Dataset_BSDS50
         const float fCompltRatio = float(nThresholdBinIdx)/oMetricsBase.vnThresholds.size();
         lv::updateConsoleProgressBar("BSDS500 eval:",fCompltRatio);
     }
-    lv::cleanConsoleRow();
     m_voMetricsBase.push_back(oMetricsBase);
 }
 

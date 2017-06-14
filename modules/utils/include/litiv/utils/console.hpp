@@ -500,14 +500,18 @@ namespace lv {
     }
 #endif //defined(_MSC_VER)
 
-    /// shows a progression bar in the console
-    inline void updateConsoleProgressBar(const std::string& sMsg, float fCompletion, size_t nBarCols=20) {
+    /// shows a progression bar in the console (20 cols wide & without self-overwrite by default)
+    inline void updateConsoleProgressBar(const std::string& sPrefix, float fCompletion, bool bUseCarrRet=false, size_t nBarCols=20) {
+        lvDbgAssert_(fCompletion>=0.0f && fCompletion<=1.0f,"completion must be given as fraction");
+        lvDbgAssert_(nBarCols>0,"number of columns in progress bar must be positive");
+        fCompletion = std::min(std::max(0.0f,fCompletion),1.0f);
         if(nBarCols==0)
             return;
-        std::lock_guard<std::mutex> oLock(lv::getLogMutex());
         const int nRows = rlutil::trows();
         const int nCols = rlutil::tcols();
-        printf("\r%s  ",sMsg.c_str());
+        if(bUseCarrRet)
+            printf("\r");
+        printf(" %s  ",sPrefix.c_str());
         if(nRows>0 && nCols>0)
             rlutil::setColor(rlutil::Color_BOLDWHITE);
         printf("[");
@@ -531,7 +535,10 @@ namespace lv {
         printf("]");
         if(nRows>0 && nCols>0)
             rlutil::setColor(rlutil::Color_RESET);
-        printf(" ");
+        if(bUseCarrRet)
+            printf(" ");
+        else
+            printf("\n");
         fflush(stdout);
     }
 
@@ -539,7 +546,6 @@ namespace lv {
     inline void cleanConsoleRow(int nRowIdx=INT_MAX) {
         if(nRowIdx<0)
             return;
-        std::lock_guard<std::mutex> oLock(lv::getLogMutex());
         const int nRows = rlutil::trows();
         const int nCols = rlutil::tcols();
         if(nRows>0 && nCols>0)
@@ -548,5 +554,59 @@ namespace lv {
             printf("\r");
         fflush(stdout);
     }
+
+    /// progress bar display manager for multi-threaded applications
+    struct ProgressBarManager {
+        /// initializes the progres bar, & prints initial empty state if init refresh <= 0
+        inline ProgressBarManager(const std::string& sPrefix="",
+                                  double dInitRefresh_sec=2.0,
+                                  double dRefreshRate_sec=0.5,
+                                  bool bUseCarrRet=false,
+                                  size_t nBarCols=20) :
+                m_sBarPrefix(sPrefix),
+                m_nBarCols(nBarCols),
+                m_bUseCarrRet(bUseCarrRet),
+                m_dRefreshRate_sec(dRefreshRate_sec),
+                m_dInitRefresh_sec(dInitRefresh_sec) {
+            lvAssert_(m_dRefreshRate_sec>0.0,"refresh rate must be positive");
+            lvDbgAssert_(m_nBarCols>0,"number of columns in progress bar must be positive");
+            m_fLatestCompletion = 0.0f;
+            m_nLatestComplBars = size_t(0);
+            if(dInitRefresh_sec<=0.0)
+                lv::updateConsoleProgressBar(m_sBarPrefix,m_fLatestCompletion,m_bUseCarrRet,m_nBarCols);
+        }
+        /// updates the progress bar, but only if enough time has elapsed and completion is increasing
+        inline bool update(float fCompletion) {
+            lvDbgAssert_(fCompletion>=0.0f && fCompletion<=1.0f,"completion must be given as fraction");
+            const size_t nComplBars = size_t(fCompletion*m_nBarCols);
+            std::lock_guard<std::mutex> oLock(lv::getLogMutex());
+            if(fCompletion<=m_fLatestCompletion || nComplBars<=m_nLatestComplBars ||
+               (m_nLatestComplBars==size_t(0) && m_oLocalTimer.elapsed()<m_dInitRefresh_sec) ||
+               (m_nLatestComplBars>size_t(0) && m_oLocalTimer.elapsed()<m_dRefreshRate_sec))
+                return false;
+            lv::updateConsoleProgressBar(m_sBarPrefix,fCompletion,m_bUseCarrRet,m_nBarCols);
+            m_fLatestCompletion = fCompletion;
+            m_nLatestComplBars = nComplBars;
+            m_oLocalTimer.tock();
+            return true;
+        }
+        /// reinitializes the progress bar to its default state
+        inline void reset() {
+            std::lock_guard<std::mutex> oLock(lv::getLogMutex());
+            m_fLatestCompletion = 0.0f;
+            m_nLatestComplBars = size_t(0);
+            lv::updateConsoleProgressBar(m_sBarPrefix,m_fLatestCompletion,m_bUseCarrRet,m_nBarCols);
+            m_oLocalTimer.tock();
+        }
+    protected:
+        const std::string m_sBarPrefix;
+        const size_t m_nBarCols;
+        const bool m_bUseCarrRet;
+        const double m_dRefreshRate_sec;
+        const double m_dInitRefresh_sec;
+        lv::StopWatch m_oLocalTimer;
+        float m_fLatestCompletion;
+        size_t m_nLatestComplBars;
+    };
 
 } // namespace lv
