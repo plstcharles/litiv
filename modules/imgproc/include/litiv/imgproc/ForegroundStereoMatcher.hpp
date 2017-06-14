@@ -389,9 +389,9 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         /// updates both shape graph models using new feats data
         void updateResegmModels(bool bInit);
         /// calculates image features required for model updates using the provided input image array
-        void calcImageFeatures(const CamArray<cv::Mat>& aInputImages, bool bInit);
+        void calcImageFeatures(const CamArray<cv::Mat>& aInputImages);
         /// calculates shape features required for model updates using the provided input mask array
-        void calcShapeFeatures(const CamArray<cv::Mat_<InternalLabelType>>& aInputMasks, bool bWithDescs, bool bInit);
+        void calcShapeFeatures(const CamArray<cv::Mat_<InternalLabelType>>& aInputMasks, bool bForStereo=true);
         /// fill internal temporary energy cost mats for the given stereo move operation
         void calcStereoMoveCosts(size_t nCamIdx, InternalLabelType nNewLabel) const;
         /// fill internal temporary energy cost mats for the given resegm move operation
