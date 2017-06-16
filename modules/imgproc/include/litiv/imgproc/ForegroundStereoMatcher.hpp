@@ -34,10 +34,11 @@
 #define STEREOSEGMATCH_CONFIG_USE_SALIENT_MAP_BORDR 1
 #define STEREOSEGMATCH_CONFIG_USE_ROOT_SIFT_DESCS   0
 #define STEREOSEGMATCH_CONFIG_USE_MULTILEVEL_AFFIN  0
+#define STEREOSEGMATCH_CONFIG_USE_GMM_LOCAL_BACKGR  1
 
 // default param values
 #define STEREOSEGMATCH_DEFAULT_DISPARITY_STEP       (size_t(1))
-#define STEREOSEGMATCH_DEFAULT_MAX_MOVE_ITER        (size_t(1000))
+#define STEREOSEGMATCH_DEFAULT_MAX_MOVE_ITER        (size_t(500))
 #define STEREOSEGMATCH_DEFAULT_SCDESC_WIN_RAD       (size_t(40))
 #define STEREOSEGMATCH_DEFAULT_SCDESC_RAD_BINS      (size_t(3))
 #define STEREOSEGMATCH_DEFAULT_SCDESC_ANG_BINS      (size_t(10))
@@ -50,7 +51,7 @@
 #define STEREOSEGMATCH_DEFAULT_GRAD_KERNEL_SIZE     (int(1))
 #define STEREOSEGMATCH_DEFAULT_DISTTRANSF_SCALE     (-0.1f)
 #define STEREOSEGMATCH_DEFAULT_ITER_PER_RESEGM      ((m_nStereoLabels*3)/2)
-#define STEREOSEGMATCH_DEFAULT_RESEGM_PER_LOOP      (1)
+#define STEREOSEGMATCH_DEFAULT_RESEGM_PER_LOOP      (3)
 #define STEREOSEGMATCH_DEFAULT_SALIENT_SHP_RAD      (3)
 #define STEREOSEGMATCH_DEFAULT_DESC_PATCH_HEIGHT    (15)
 #define STEREOSEGMATCH_DEFAULT_DESC_PATCH_WIDTH     (15)
@@ -59,18 +60,18 @@
 #define STEREOSEGMATCH_UNARY_COST_OOB_CST           (ValueType(5000))
 #define STEREOSEGMATCH_UNARY_COST_OCCLUDED_CST      (ValueType(2000))
 #define STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST      (ValueType(10000))
-#define STEREOSEGMATCH_IMGSIM_COST_COLOR_SCALE      (300)
+#define STEREOSEGMATCH_IMGSIM_COST_COLOR_SCALE      (30)
 #define STEREOSEGMATCH_IMGSIM_COST_DESC_SCALE       (400)
 #define STEREOSEGMATCH_SHPSIM_COST_DESC_SCALE       (400)
 #define STEREOSEGMATCH_UNIQUE_COST_OVER_SCALE       (200)
-#define STEREOSEGMATCH_SHPDIST_COST_SCALE           (1000)
+#define STEREOSEGMATCH_SHPDIST_COST_SCALE           (400)
 #define STEREOSEGMATCH_SHPDIST_PX_MAX_CST           (10.0f)
-#define STEREOSEGMATCH_SHPDIST_INTERSPEC_SCALE      (0.5f)
-#define STEREOSEGMATCH_SHPDIST_INITDIST_SCALE       (0.5f)
+#define STEREOSEGMATCH_SHPDIST_INTERSPEC_SCALE      (0.50f)
+#define STEREOSEGMATCH_SHPDIST_INITDIST_SCALE       (0.00f)
 // pairwise costs params
 #define STEREOSEGMATCH_LBLSIM_COST_MAXOCCL          (ValueType(5000))
-#define STEREOSEGMATCH_LBLSIM_COST_MAXTRUNC_CST     (ValueType(10000))
-#define STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST      (50.0f)
+#define STEREOSEGMATCH_LBLSIM_COST_MAXTRUNC_CST     (ValueType(5000))
+#define STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST      (200)
 #define STEREOSEGMATCH_LBLSIM_STEREO_SCALE_CST      (0.1f)
 #define STEREOSEGMATCH_LBLSIM_STEREO_MAXDIFF_CST    (10)
 #define STEREOSEGMATCH_LBLSIM_USE_EXP_GRADPIVOT     (1)
@@ -382,16 +383,18 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         void addAssoc(size_t nCamIdx, int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
         /// removes a stereo association for a given node coord set & origin column idx
         void removeAssoc(size_t nCamIdx, int nRowIdx, int nColIdx, InternalLabelType nLabel) const;
-        /// resets graph labelings using init state parameters
-        void resetLabelings();
-        /// updates both stereo graph models using new feats data
-        void updateStereoModels(bool bInit);
-        /// updates both shape graph models using new feats data
-        void updateResegmModels(bool bInit);
+        /// resets stereo graph labelings using init state parameters
+        void resetStereoLabelings(size_t nCamIdx, bool bIsPrimaryCam);
+        /// updates a stereo graph model using new feats data
+        void updateStereoModel(size_t nCamIdx, bool bInit);
+        /// updates a shape graph model using new feats data
+        void updateResegmModel(size_t nCamIdx, bool bInit);
         /// calculates image features required for model updates using the provided input image array
         void calcImageFeatures(const CamArray<cv::Mat>& aInputImages);
         /// calculates shape features required for model updates using the provided input mask array
-        void calcShapeFeatures(const CamArray<cv::Mat_<InternalLabelType>>& aInputMasks, bool bForStereo=true);
+        void calcShapeFeatures(const CamArray<cv::Mat_<InternalLabelType>>& aInputMasks);
+        /// calculates shape mask distance features required for model updates using the provided input mask & camera index
+        void calcShapeDistFeatures(const cv::Mat_<InternalLabelType>& oInputMask, size_t nCamIdx);
         /// fill internal temporary energy cost mats for the given stereo move operation
         void calcStereoMoveCosts(size_t nCamIdx, InternalLabelType nNewLabel) const;
         /// fill internal temporary energy cost mats for the given resegm move operation

@@ -29,14 +29,14 @@
 #define DATASET_LITIV2014       0
 #define DATASET_MINI_TESTS      0
 ////////////////////////////////
-#define DATASET_OUTPUT_PATH     "results_resegm_full"
+#define DATASET_OUTPUT_PATH     "results_resegm_subset2_r001"
 #define DATASET_PRECACHING      0
 #define DATASET_SCALE_FACTOR    1//0.5
 #define DATASET_WORKTHREADS     1
 ////////////////////////////////
 #define DATASET_FORCE_RECALC_FEATURES      0
 #define DATASET_EVAL_APPROX_MASKS_ONLY     0
-#define DATASET_BATCH_START_INDEX          34
+#define DATASET_BATCH_START_INDEX          0
 #define DATASET_BATCH_STOP_MAX_INDEX       9999
 
 #if (DATASET_VAPTRIMOD+DATASET_LITIV2014+DATASET_MINI_TESTS/*+...*/)!=1
@@ -52,7 +52,7 @@
     PROCESS_PREPROC_BGSEGM?false:true,            /* bool bUndistort=true */\
     PROCESS_PREPROC_BGSEGM?false:true,            /* bool bHorizRectify=false */\
     false,                                        /* bool bEvalStereoDisp=false */\
-    false,                                        /* bool bLoadFrameSubset=false */\
+    true,                                         /* bool bLoadFrameSubset=false */\
     PROCESS_PREPROC_BGSEGM?0:1/*4*/,              /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_LITIV2014
