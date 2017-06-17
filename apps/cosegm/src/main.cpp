@@ -23,7 +23,7 @@
 #define PROCESS_PREPROC_BGSEGM  0
 #define WRITE_IMG_OUTPUT        1
 #define EVALUATE_OUTPUT         1
-#define GLOBAL_VERBOSITY        3
+#define GLOBAL_VERBOSITY        2
 ////////////////////////////////
 #define DATASET_VAPTRIMOD       1
 #define DATASET_LITIV2014       0
@@ -143,7 +143,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         for(size_t nStreamIdx=0; nStreamIdx<vInitInput.size(); ++nStreamIdx) {
             lvAssert(vInitInput[nStreamIdx].size()==vInitInput[0].size());
             lvLog_(2,"\tinput %d := %s   (roi=%s)",(int)nStreamIdx,lv::MatInfo(vInitInput[nStreamIdx]).str().c_str(),lv::MatInfo(vROIs[nStreamIdx]).str().c_str());
-            if(lv::getVerbosity()>=4) {
+            if(lv::getVerbosity()>=5) {
                 cv::imshow(std::string("vInitInput_")+std::to_string(nStreamIdx),vInitInput[nStreamIdx]);
                 cv::imshow(std::string("vROI_")+std::to_string(nStreamIdx),vROIs[nStreamIdx]);
             }

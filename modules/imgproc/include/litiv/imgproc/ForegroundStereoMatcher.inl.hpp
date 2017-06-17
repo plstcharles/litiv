@@ -462,6 +462,9 @@ inline StereoSegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>
 inline void StereoSegmMatcher::GraphModelData::resetStereoLabelings(size_t nCamIdx, bool bIsPrimaryCam) {
     lvDbgAssert_(nCamIdx<getCameraCount(),"bad input cam index");
     lvDbgExceptionWatch;
+    const int nRows = (int)m_oGridSize(0);
+    const int nCols = (int)m_oGridSize(1);
+    lvIgnore(nRows); lvIgnore(nCols);
     std::fill(m_aStereoLabelings[nCamIdx].begin(),m_aStereoLabelings[nCamIdx].end(),m_nDontCareLabelIdx);
     lvDbgAssert(m_anValidGraphNodes[nCamIdx]==m_avValidLUTNodeIdxs[nCamIdx].size());
     for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_anValidGraphNodes[nCamIdx]; ++nGraphNodeIdx) {
@@ -483,7 +486,49 @@ inline void StereoSegmMatcher::GraphModelData::resetStereoLabelings(size_t nCamI
             }
         }
         else {
-            lvAssert(false); // missing impl @@@@ (init-fill one disp map with the other)
+            // results will be pretty rough!
+            const int nColIdx = oNode.nColIdx;
+            const int nRowIdx = oNode.nRowIdx;
+            std::map<InternalLabelType,size_t> mWTALookupCounts;
+            for(InternalLabelType nLookupLabel=0; nLookupLabel<m_nRealStereoLabels; ++nLookupLabel) {
+                const int nOffsetColIdx = getOffsetColIdx(nCamIdx,nColIdx,nLookupLabel);
+                if(nOffsetColIdx>=0 && nOffsetColIdx<nCols && m_aROIs[nCamIdx^1](nRowIdx,nOffsetColIdx))
+                    if(m_aStereoLabelings[nCamIdx^1](nRowIdx,nOffsetColIdx)==nLookupLabel)
+                        ++mWTALookupCounts[nLookupLabel];
+            }
+            auto pWTAPairIter = std::max_element(mWTALookupCounts.begin(),mWTALookupCounts.end(),[](const auto& p1, const auto& p2) {
+                return p1.second<p2.second;
+            });
+            if(pWTAPairIter!=mWTALookupCounts.end() && pWTAPairIter->second>size_t(0))
+                m_aStereoLabelings[nCamIdx](nRowIdx,nColIdx) = pWTAPairIter->first;
+        }
+    }
+    if(!bIsPrimaryCam) {
+        for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_anValidGraphNodes[nCamIdx]; ++nGraphNodeIdx) {
+            const NodeInfo& oNode = m_vNodeInfos[m_avValidLUTNodeIdxs[nCamIdx][nGraphNodeIdx]];
+            const int nColIdx = oNode.nColIdx;
+            const int nRowIdx = oNode.nRowIdx;
+            InternalLabelType& nCurrLabel = m_aStereoLabelings[nCamIdx](nRowIdx,nColIdx);
+            if(nCurrLabel==m_nDontCareLabelIdx && m_aROIs[nCamIdx](nRowIdx,nColIdx)) {
+                for(int nOffset=0; nOffset<=(int)m_nMaxDispOffset; ++nOffset) {
+                    const int nOffsetColIdx_pos = oNode.nColIdx+nOffset;
+                    if(nOffsetColIdx_pos>=0 && nOffsetColIdx_pos<nCols && m_aROIs[nCamIdx](nRowIdx,nOffsetColIdx_pos)) {
+                        const InternalLabelType& nNewLabel = m_aStereoLabelings[nCamIdx](nRowIdx,nOffsetColIdx_pos);
+                        if(nNewLabel!=m_nDontCareLabelIdx) {
+                            nCurrLabel = nNewLabel;
+                            break;
+                        }
+                    }
+                    const int nOffsetColIdx_neg = oNode.nColIdx-nOffset;
+                    if(nOffsetColIdx_neg>=0 && nOffsetColIdx_neg<nCols && m_aROIs[nCamIdx](nRowIdx,nOffsetColIdx_neg)) {
+                        const InternalLabelType& nNewLabel = m_aStereoLabelings[nCamIdx](nRowIdx,nOffsetColIdx_neg);
+                        if(nNewLabel!=m_nDontCareLabelIdx) {
+                            nCurrLabel = nNewLabel;
+                            break;
+                        }
+                    }
+                }
+            }
         }
     }
     m_aAssocCounts[nCamIdx] = (AssocCountType)0;
@@ -1584,7 +1629,7 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
     static_assert(s_nInputArraySize==4 && getCameraCount()==2,"hardcoded indices below will break");
     lvAssert_(nPrimaryCamIdx==size_t(0) || nPrimaryCamIdx==size_t(1),"bad primary camera index");
     lvDbgExceptionWatch;
-    cv::Mat_<uchar> oDisparitySwaps,oSegmSwaps;
+    const size_t nSecondaryCamIdx = nPrimaryCamIdx^1;
     if(lv::getVerbosity()>=3) {
         cv::Mat oTargetImg = m_aInputs[nPrimaryCamIdx*InputPackOffset+InputPackOffset_Img].clone();
         if(oTargetImg.channels()==1)
@@ -1593,20 +1638,14 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
         cv::cvtColor(oTargetMask,oTargetMask,cv::COLOR_GRAY2BGR);
         oTargetMask &= cv::Vec3b(255,0,0);
         cv::imshow("target input",(oTargetImg+oTargetMask)/2);
-        cv::Mat oOtherImg = m_aInputs[(nPrimaryCamIdx^1)*InputPackOffset+InputPackOffset_Img].clone();
+        cv::Mat oOtherImg = m_aInputs[(nSecondaryCamIdx)*InputPackOffset+InputPackOffset_Img].clone();
         if(oOtherImg.channels()==1)
             cv::cvtColor(oOtherImg,oOtherImg,cv::COLOR_GRAY2BGR);
-        cv::Mat oOtherMask = m_aInputs[(nPrimaryCamIdx^1)*InputPackOffset+InputPackOffset_Mask].clone();
+        cv::Mat oOtherMask = m_aInputs[(nSecondaryCamIdx)*InputPackOffset+InputPackOffset_Mask].clone();
         cv::cvtColor(oOtherMask,oOtherMask,cv::COLOR_GRAY2BGR);
         oOtherMask &= cv::Vec3b(255,0,0);
         cv::imshow("other input",(oOtherImg+oOtherMask)/2);
         cv::waitKey(1);
-        if(lv::getVerbosity()>=4) {
-            oDisparitySwaps.create(m_oGridSize());
-            oSegmSwaps.create(m_oGridSize());
-            oDisparitySwaps = 0;
-            oSegmSwaps = 0;
-        }
     }
     for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
         if(nPrimaryCamIdx==nCamIdx) {
@@ -1712,20 +1751,12 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
                     addAssoc(nPrimaryCamIdx,nRowIdx,nColIdx,nStereoAlphaLabel);
                 ++nChangedStereoLabels;
             }
-            if(lv::getVerbosity()>=4)
-                oDisparitySwaps(nRowIdx,nColIdx) = uchar((nMoveLabel==1)?255:0);
         }
         if(lv::getVerbosity()>=3) {
             cv::Mat oCurrLabelingDisplay = getStereoDispMapDisplay(nPrimaryCamIdx);
             if(oCurrLabelingDisplay.size().area()<640*480)
                 cv::resize(oCurrLabelingDisplay,oCurrLabelingDisplay,cv::Size(),2,2,cv::INTER_NEAREST);
-            cv::imshow("disp",oCurrLabelingDisplay);
-            if(lv::getVerbosity()>=4) {
-                cv::Mat oDisparitySwapsDisplay = oDisparitySwaps.clone();
-                if(oDisparitySwapsDisplay.size().area()<640*480)
-                    cv::resize(oDisparitySwapsDisplay,oDisparitySwapsDisplay,cv::Size(),2,2,cv::INTER_NEAREST);
-                cv::imshow("disp-swaps",oDisparitySwapsDisplay);
-            }
+            cv::imshow(std::string("disp-")+std::to_string(nPrimaryCamIdx),oCurrLabelingDisplay);
             cv::waitKey(1);
         }
         const ValueType tCurrStereoEnergy = m_apStereoInfs[nPrimaryCamIdx]->value();
@@ -1747,6 +1778,14 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
         nConsecUnchangedLabels = (nChangedStereoLabels>0)?0:nConsecUnchangedLabels+1;
         nStereoAlphaLabel = m_vStereoLabelOrdering[(++nOrderingIdx%=m_nStereoLabels)];
         if((nMoveIter%STEREOSEGMATCH_DEFAULT_ITER_PER_RESEGM)==0) {
+            resetStereoLabelings(nSecondaryCamIdx,false);
+            if(lv::getVerbosity()>=3) {
+                cv::Mat oCurrLabelingDisplay = getStereoDispMapDisplay(nSecondaryCamIdx);
+                if(oCurrLabelingDisplay.size().area()<640*480)
+                    cv::resize(oCurrLabelingDisplay,oCurrLabelingDisplay,cv::Size(),2,2,cv::INTER_NEAREST);
+                cv::imshow(std::string("disp-")+std::to_string(nSecondaryCamIdx),oCurrLabelingDisplay);
+                cv::waitKey(1);
+            }
             size_t nTotChangedResegmLabelings = 0;
             for(size_t nResegmLoopIdx=0; nResegmLoopIdx<STEREOSEGMATCH_DEFAULT_RESEGM_PER_LOOP; ++nResegmLoopIdx) {
                 for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
@@ -1785,20 +1824,12 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
                                 oCurrResegmLabeling(nRowIdx,nColIdx) = nResegmAlphaLabel;
                                 ++nChangedResegmLabelings;
                             }
-                            if(lv::getVerbosity()>=4)
-                                oSegmSwaps(nRowIdx,nColIdx) = uchar((nMoveLabel==1)?255:0);
                         }
                         if(lv::getVerbosity()>=3) {
                             cv::Mat oCurrLabelingDisplay = getResegmMapDisplay(nCamIdx);
                             if(oCurrLabelingDisplay.size().area()<640*480)
                                 cv::resize(oCurrLabelingDisplay,oCurrLabelingDisplay,cv::Size(),2,2,cv::INTER_NEAREST);
                             cv::imshow(std::string("segm-")+std::to_string(nCamIdx),oCurrLabelingDisplay);
-                            if(lv::getVerbosity()>=4) {
-                                cv::Mat oSegmSwapsDisplay = oSegmSwaps.clone();
-                                if(oSegmSwapsDisplay.size().area()<640*480)
-                                    cv::resize(oSegmSwapsDisplay,oSegmSwapsDisplay,cv::Size(),2,2,cv::INTER_NEAREST);
-                                cv::imshow(std::string("segm-swaps-")+std::to_string(nCamIdx),oSegmSwapsDisplay);
-                            }
                             cv::waitKey(1);
                         }
                         const ValueType tCurrResegmEnergy = m_apResegmInfs[nCamIdx]->value();
@@ -1833,7 +1864,6 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
             tLastResegmEnergyTotal = tCurrResegmEnergyTotal;
         }
     }
-    //resetStereoLabelings(nPrimaryCamIdx^1,false);
     lvLog_(2,"Inference for primary camera idx=%d completed in %f second(s).",(int)nPrimaryCamIdx,oLocalTimer.tock());
     if(lv::getVerbosity()>=3)
         cv::waitKey(0);
