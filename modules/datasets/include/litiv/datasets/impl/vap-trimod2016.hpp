@@ -95,7 +95,7 @@ namespace lv {
             // 'Scene 2' does not have proper calibration data; must skip it if undistort/rectify required
             static const std::vector<std::string> s_vsWorkBatchDirs_calibonly = {
                 "Scene 1",
-                //"Scene 3"
+                "Scene 3"
             };
             return bUndistortOrRectify?s_vsWorkBatchDirs_calibonly:s_vsWorkBatchDirs_real;
         }
@@ -464,6 +464,8 @@ namespace lv {
             }
             if(this->m_bUndistort || this->m_bHorizRectify) {
                 cv::remap(oThermalROI.clone(),oThermalROI,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_LINEAR);
+                if(this->m_nThermalDispOffset!=0)
+                    lv::shift(oThermalROI.clone(),oThermalROI,cv::Point2f(0.0f,-float(this->m_nThermalDispOffset)));
                 oThermalROI = oThermalROI>128;
                 cv::erode(oThermalROI,oThermalROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
             }
@@ -539,12 +541,19 @@ namespace lv {
             //////////////////////////////////////////////////////////////////////////////////////////////////
             this->m_nMinDisp = size_t(0);
             this->m_nMaxDisp = size_t(100);
+            this->m_nThermalDispOffset = 0;
             std::ifstream oDispRangeFile(this->getDataPath()+"drange.txt");
             if(oDispRangeFile.is_open() && !oDispRangeFile.eof()) {
                 oDispRangeFile >> this->m_nMinDisp;
                 if(!oDispRangeFile.eof())
                     oDispRangeFile >> this->m_nMaxDisp;
             }
+            if(this->m_nMinDisp>size_t(0)) {
+                this->m_nThermalDispOffset = int(this->m_nMinDisp);
+                this->m_nMaxDisp -= this->m_nMinDisp;
+                this->m_nMinDisp = size_t(0);
+            }
+            this->m_nThermalDispOffset *= dScale;
             this->m_nMinDisp *= dScale;
             this->m_nMaxDisp *= dScale;
             lvAssert(this->m_nMaxDisp>this->m_nMinDisp);
@@ -605,16 +614,22 @@ namespace lv {
             lvAssert(!oThermalPacket.empty() && oThermalPacket.type()==CV_8UC1 && oThermalPacket.size()==oImageSize);
             if(oThermalPacket.size()!=vInputInfos[nInputThermalStreamIdx].size())
                 cv::resize(oThermalPacket,oThermalPacket,vInputInfos[nInputThermalStreamIdx].size(),0,0,cv::INTER_CUBIC);
-            if(this->m_bUndistort || this->m_bHorizRectify)
+            if(this->m_bUndistort || this->m_bHorizRectify) {
                 cv::remap(oThermalPacket.clone(),oThermalPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_CUBIC);
+                if(this->m_nThermalDispOffset!=0)
+                    lv::shift(oThermalPacket.clone(),oThermalPacket,cv::Point2f(0.0f,-float(this->m_nThermalDispOffset)));
+            }
             vInputs[nInputThermalStreamIdx] = oThermalPacket;
             if(bUseInterlacedMasks) {
                 cv::Mat oThermalMaskPacket = cv::imread(vsInputPaths[nInputThermalMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                 lvAssert(!oThermalMaskPacket.empty() && oThermalMaskPacket.type()==CV_8UC1 && oThermalMaskPacket.size()==oImageSize);
                 if(oThermalMaskPacket.size()!=vInputInfos[nInputThermalStreamIdx].size())
                     cv::resize(oThermalMaskPacket,oThermalMaskPacket,vInputInfos[nInputThermalStreamIdx].size(),cv::INTER_LINEAR);
-                if(this->m_bUndistort || this->m_bHorizRectify)
+                if(this->m_bUndistort || this->m_bHorizRectify) {
                     cv::remap(oThermalMaskPacket.clone(),oThermalMaskPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_LINEAR);
+                    if(this->m_nThermalDispOffset!=0)
+                        lv::shift(oThermalMaskPacket.clone(),oThermalMaskPacket,cv::Point2f(0.0f,-float(this->m_nThermalDispOffset)));
+                }
                 oThermalMaskPacket = oThermalMaskPacket>128;
                 vInputs[nInputThermalMaskStreamIdx] = oThermalMaskPacket;
             }
@@ -689,6 +704,8 @@ namespace lv {
                     if(this->m_bUndistort || this->m_bHorizRectify)
                         cv::remap(oThermalPacket.clone(),oThermalPacket,this->m_oThermalCalibMap1,this->m_oThermalCalibMap2,cv::INTER_LINEAR);
                 }
+                if((this->m_bUndistort || this->m_bHorizRectify) && this->m_nThermalDispOffset!=0)
+                    lv::shift(oThermalPacket.clone(),oThermalPacket,cv::Point2f(0.0f,-float(this->m_nThermalDispOffset)));
                 oThermalPacket = oThermalPacket>128;
                 vGTs[nGTThermalMaskStreamIdx] = oThermalPacket;
                 if(this->m_bLoadDepth) {
@@ -716,6 +733,7 @@ namespace lv {
         }
         bool m_bLoadDepth,m_bUndistort,m_bHorizRectify;
         int m_nLoadInputMasks;
+        int m_nThermalDispOffset;
         size_t m_nMinDisp,m_nMaxDisp;
         std::string m_sFeaturesDirName;
         cv::Mat m_oRGBCameraParams;
