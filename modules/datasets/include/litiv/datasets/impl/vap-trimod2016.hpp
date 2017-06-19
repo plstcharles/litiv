@@ -417,6 +417,18 @@ namespace lv {
                 cv::remap(oRGBROI.clone(),oRGBROI,this->m_oRGBCalibMap1,this->m_oRGBCalibMap2,cv::INTER_LINEAR);
                 oRGBROI = oRGBROI>128;
                 cv::erode(oRGBROI,oRGBROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
+                cv::Mat oRGBROI_undist = cv::imread(this->getDataPath()+"rgb_undist_roi.png",cv::IMREAD_GRAYSCALE);
+                if(!oRGBROI_undist.empty()) {
+                    lvAssert(oRGBROI_undist.type()==CV_8UC1 && oRGBROI_undist.size()==oImageSize);
+                    oRGBROI_undist = oRGBROI_undist>128;
+                }
+                else
+                    oRGBROI_undist = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
+                if(oRGBROI_undist.size()!=this->m_vInputInfos[nInputRGBStreamIdx].size()) {
+                    cv::resize(oRGBROI_undist,oRGBROI_undist,this->m_vInputInfos[nInputRGBStreamIdx].size(),0,0,cv::INTER_LINEAR);
+                    oRGBROI_undist = oRGBROI_undist>128;
+                }
+                oRGBROI &= oRGBROI_undist;
             }
             this->m_vInputROIs[nInputRGBStreamIdx] = oRGBROI.clone();
             if(bUseInterlacedMasks)
@@ -487,6 +499,18 @@ namespace lv {
                     lv::shift(oThermalROI.clone(),oThermalROI,cv::Point2f(0.0f,-float(this->m_nThermalDispOffset)));
                 oThermalROI = oThermalROI>128;
                 cv::erode(oThermalROI,oThermalROI,cv::Mat(),cv::Point(-1,-1),1,cv::BORDER_CONSTANT,cv::Scalar_<uchar>(0));
+                cv::Mat oThermalROI_undist = cv::imread(this->getDataPath()+"thermal_undist_roi.png",cv::IMREAD_GRAYSCALE);
+                if(!oThermalROI_undist.empty()) {
+                    lvAssert(oThermalROI_undist.type()==CV_8UC1 && oThermalROI_undist.size()==oImageSize);
+                    oThermalROI_undist = oThermalROI_undist>128;
+                }
+                else
+                    oThermalROI_undist = cv::Mat(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
+                if(oThermalROI_undist.size()!=this->m_vInputInfos[nInputRGBStreamIdx].size()) {
+                    cv::resize(oThermalROI_undist,oThermalROI_undist,this->m_vInputInfos[nInputRGBStreamIdx].size(),0,0,cv::INTER_LINEAR);
+                    oThermalROI_undist = oThermalROI_undist>128;
+                }
+                oThermalROI &= oThermalROI_undist;
             }
             this->m_vInputROIs[nInputThermalStreamIdx] = oThermalROI.clone();
             if(bUseInterlacedMasks)
