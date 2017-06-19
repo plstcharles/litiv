@@ -712,7 +712,7 @@ inline void StereoSegmMatcher::GraphModelData::updateResegmModel(size_t nCamIdx,
             lv::learnGaussianMixtureParams(oInputImg,m_aResegmLabelings[nCamIdx],m_aGMMCompAssignMap[nCamIdx],m_aBGModels_3ch[nCamIdx],m_aFGModels_3ch[nCamIdx],oGMMROI);
         }
     }
-    if(lv::getVerbosity()>=0) {
+    if(lv::getVerbosity()>=4) {
         cv::Mat_<int> oClusterLabels = m_aGMMCompAssignMap[nCamIdx].clone();
         for(size_t nNodeIdx=0; nNodeIdx<m_aResegmLabelings[nCamIdx].total(); ++nNodeIdx)
             if(((InternalLabelType*)m_aResegmLabelings[nCamIdx].data)[nNodeIdx])
