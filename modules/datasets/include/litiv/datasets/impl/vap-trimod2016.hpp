@@ -357,6 +357,25 @@ namespace lv {
                 }
             #endif //!DATASETS_VAP_USE_OLD_CALIB_DATA
             }
+            this->m_nMinDisp = size_t(0);
+            this->m_nMaxDisp = size_t(100);
+            this->m_nThermalDispOffset = 0;
+            std::ifstream oDispRangeFile(this->getDataPath()+"drange.txt");
+            if(oDispRangeFile.is_open() && !oDispRangeFile.eof()) {
+                oDispRangeFile >> this->m_nMinDisp;
+                if(!oDispRangeFile.eof())
+                    oDispRangeFile >> this->m_nMaxDisp;
+            }
+            if(this->m_nMinDisp>size_t(0)) {
+                this->m_nThermalDispOffset = int(this->m_nMinDisp);
+                this->m_nMaxDisp -= this->m_nMinDisp;
+                this->m_nMinDisp = size_t(0);
+            }
+            this->m_nThermalDispOffset *= dScale;
+            this->m_nMinDisp *= dScale;
+            this->m_nMaxDisp *= dScale;
+            lvAssert(this->m_nMaxDisp>this->m_nMinDisp);
+            //////////////////////////////////////////////////////////////////////////////////////////////////
             std::vector<std::string> vsRGBPaths = lv::getFilesFromDir(*psRGBDir);
             if(vsRGBPaths.empty() || cv::imread(vsRGBPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected RGB data",this->getName().c_str());
@@ -539,24 +558,6 @@ namespace lv {
                 }
             }
             //////////////////////////////////////////////////////////////////////////////////////////////////
-            this->m_nMinDisp = size_t(0);
-            this->m_nMaxDisp = size_t(100);
-            this->m_nThermalDispOffset = 0;
-            std::ifstream oDispRangeFile(this->getDataPath()+"drange.txt");
-            if(oDispRangeFile.is_open() && !oDispRangeFile.eof()) {
-                oDispRangeFile >> this->m_nMinDisp;
-                if(!oDispRangeFile.eof())
-                    oDispRangeFile >> this->m_nMaxDisp;
-            }
-            if(this->m_nMinDisp>size_t(0)) {
-                this->m_nThermalDispOffset = int(this->m_nMinDisp);
-                this->m_nMaxDisp -= this->m_nMinDisp;
-                this->m_nMinDisp = size_t(0);
-            }
-            this->m_nThermalDispOffset *= dScale;
-            this->m_nMinDisp *= dScale;
-            this->m_nMaxDisp *= dScale;
-            lvAssert(this->m_nMaxDisp>this->m_nMinDisp);
             this->m_vOrigInputInfos = this->m_vInputInfos;
             this->m_vOrigGTInfos = this->m_vGTInfos;
             if(this->m_bHorizRectify) {
