@@ -23,13 +23,13 @@
 #define PROCESS_PREPROC_BGSEGM  0
 #define WRITE_IMG_OUTPUT        1
 #define EVALUATE_OUTPUT         1
-#define GLOBAL_VERBOSITY        2
+#define GLOBAL_VERBOSITY        3
 ////////////////////////////////
 #define DATASET_VAPTRIMOD       1
 #define DATASET_LITIV2014       0
 #define DATASET_MINI_TESTS      0
 ////////////////////////////////
-#define DATASET_OUTPUT_PATH     "results_resegm_subset2_r001"
+#define DATASET_OUTPUT_PATH     "results_resegm_subset_final"
 #define DATASET_PRECACHING      0
 #define DATASET_SCALE_FACTOR    1//0.5
 #define DATASET_WORKTHREADS     1
@@ -52,7 +52,7 @@
     PROCESS_PREPROC_BGSEGM?false:true,            /* bool bUndistort=true */\
     PROCESS_PREPROC_BGSEGM?false:true,            /* bool bHorizRectify=false */\
     false,                                        /* bool bEvalStereoDisp=false */\
-    true,                                         /* bool bLoadFrameSubset=false */\
+    PROCESS_PREPROC_BGSEGM?false:true,            /* bool bLoadFrameSubset=false */\
     PROCESS_PREPROC_BGSEGM?0:1/*4*/,              /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_LITIV2014
@@ -157,13 +157,17 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
         pDisplayHelper->setContinuousUpdates(true);
 #if PROCESS_PREPROC_BGSEGM
-        std::vector<std::shared_ptr<IBackgroundSubtractor>> vAlgos = {std::make_shared<BGSEGM_ALGO_TYPE>(),std::make_shared<BGSEGM_ALGO_TYPE>()};
+        std::vector<std::shared_ptr<IBackgroundSubtractor>> vAlgos = {
+                std::make_shared<BGSEGM_ALGO_TYPE>(),
+                std::make_shared<BGSEGM_ALGO_TYPE>(/*2,30*/)
+        };
         const double dDefaultLearningRate = vAlgos[0]->getDefaultLearningRate();
         for(size_t nCamIdx=0; nCamIdx<2; ++nCamIdx)
             vAlgos[nCamIdx]->initialize(vInitInput[nCamIdx],vROIs[nCamIdx]);
         std::vector<cv::Mat> vCurrFGMasks(2);
 #if PROCESS_PREPROC_BGSEGM>1
         const size_t nMaxInitLoops = 50, nMaxInitLoopIdx = 6;
+        //const size_t nMaxInitLoops = 8, nMaxInitLoopIdx = 87;
         size_t nCurrInitLoop = 0;
         bool bIncreasingIdxs = true;
 #endif //PROCESS_PREPROC_BGSEGM>1
@@ -234,7 +238,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             #endif //USING_OPENMP
                 {vAlgos[1]->apply(vCurrInput[1],vCurrFGMasks[1],dCurrLearningRate);}
             }
-            if(lv::getVerbosity()>=2) {
+            if(lv::getVerbosity()>=3) {
                 std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs(2);
                 for(size_t nCamIdx=0; nCamIdx<2; ++nCamIdx) {
                     vvDisplayPairs[nCamIdx].resize(3);
@@ -281,6 +285,8 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 const size_t nOutputDispIdx = nCamIdx*StereoSegmMatcher::OutputPackOffset+StereoSegmMatcher::OutputPackOffset_Disp;
                 vCurrInput[nInputMaskIdx].convertTo(vCurrOutput[nOutputDispIdx],CV_32S); // only to fool output checks
                 vCurrInput[nInputMaskIdx].convertTo(vCurrOutput[nOutputMaskIdx],CV_32S,1.0/255);
+                //cv::imshow(std::string("in_")+std::to_string(nCamIdx),vCurrInput[nCamIdx]);
+                //cv::imshow(std::string("in_")+std::to_string(nCamIdx),vCurrInput[nCamIdx*2]);
             }
         #else //!DATASET_EVAL_APPROX_MASKS_ONLY
         #if !DATASET_FORCE_RECALC_FEATURES
@@ -314,7 +320,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             }
             lvDbgAssert(vCurrFGMasks.size()==oBatch.getOutputStreamCount());
             lvDbgAssert(vCurrStereoMaps.size()==oBatch.getOutputStreamCount());
-            if(lv::getVerbosity()>=2) {
+            if(lv::getVerbosity()>=3) {
                 const std::vector<cv::Mat>& vCurrGT = oBatch.getGTArray(nCurrIdx);
                 lvAssert(vCurrGT.size()==vCurrFGMasks.size() && vCurrGT.size()==vCurrStereoMaps.size());
                 const std::vector<cv::Mat>& vCurrEvalRes = oBatch.getColoredMaskArray(oBatch.isEvaluatingDisparities()?vCurrStereoMaps:vCurrFGMasks,nCurrIdx);
