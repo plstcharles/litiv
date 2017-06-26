@@ -1864,6 +1864,7 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
             tLastResegmEnergyTotal = tCurrResegmEnergyTotal;
         }
     }
+    resetStereoLabelings(nSecondaryCamIdx,false);
     lvLog_(2,"Inference for primary camera idx=%d completed in %f second(s).",(int)nPrimaryCamIdx,oLocalTimer.tock());
     if(lv::getVerbosity()>=4)
         cv::waitKey(0);
