@@ -44,7 +44,7 @@ namespace lv {
     enum DatasetTaskList { // note: from the task type, we can derive the source and eval types
         DatasetTask_Segm, ///< image/video segmentation task id
         DatasetTask_Cosegm, ///< image/video cosegmentation task id (always array-based)
-        DatasetTask_Registr, ///< image/video registration task id (always array-based) @@@ wip/todo
+        DatasetTask_StereoReg, ///< image/video registration task id (always array-based)
         DatasetTask_EdgDet, ///< image edge detection task id
         // ...
         DatasetTask_Unspecified ///< unspecified task id; requires full specialization of dataset interfaces
@@ -66,7 +66,7 @@ namespace lv {
         DatasetEval_BinaryClassifierArray, ///< binary classification (multi-array) evaluation id
         DatasetEval_MultiClassifier, ///< multilabel classification evaluation id @@@ wip/todo
         DatasetEval_MultiClassifierArray, ///< multilabel classification (multi-array) evaluation id @@@ wip/todo
-        DatasetEval_Registr, ///< registration evaluation id @@@ wip/todo
+        DatasetEval_StereoDisparityEstim, ///< multilabel classification specialized for stereo disparity evaluation id
         DatasetEval_BoundingBox, ///< bounding box (for detection/tracking) evaluation id @@@ wip/todo
         // ...
         DatasetEval_None ///< no evaluation id; data consumer will only count packets & monitor processing time
@@ -114,7 +114,7 @@ namespace lv {
         return
             (eDatasetTask==DatasetTask_Segm)?ImagePacket:
             (eDatasetTask==DatasetTask_Cosegm)?ImageArrayPacket:
-            (eDatasetTask==DatasetTask_Registr)?UnspecifiedPacket:
+            (eDatasetTask==DatasetTask_StereoReg)?ImageArrayPacket:
             (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
             // ...
             lvStdError_(domain_error,"unknown input task id");
@@ -127,7 +127,7 @@ namespace lv {
         return
             (eDatasetTask==DatasetTask_Segm)?ImagePacket:
             (eDatasetTask==DatasetTask_Cosegm)?ImageArrayPacket:
-            (eDatasetTask==DatasetTask_Registr)?UnspecifiedPacket:
+            (eDatasetTask==DatasetTask_StereoReg)?ImageArrayPacket:
             (eDatasetTask==DatasetTask_EdgDet)?ImagePacket:
             // ...
             lvStdError_(domain_error,"unknown input task id");
@@ -140,7 +140,7 @@ namespace lv {
         return
             (eDatasetTask==DatasetTask_Segm)?ElemMapping:
             (eDatasetTask==DatasetTask_Cosegm)?ElemMapping:
-            (eDatasetTask==DatasetTask_Registr)?NoMapping:
+            (eDatasetTask==DatasetTask_StereoReg)?ElemMapping:
             (eDatasetTask==DatasetTask_EdgDet)?ElemMapping:
             // ...
             lvStdError_(domain_error,"unknown input task id");
@@ -153,7 +153,7 @@ namespace lv {
         return
             (eDatasetTask==DatasetTask_Segm)?ElemMapping:
             (eDatasetTask==DatasetTask_Cosegm)?IndexMapping: // may use interlaced input streams for same segmentation output
-            (eDatasetTask==DatasetTask_Registr)?NoMapping:
+            (eDatasetTask==DatasetTask_StereoReg)?IndexMapping:
             (eDatasetTask==DatasetTask_EdgDet)?ElemMapping:
             // ...
             lvStdError_(domain_error,"unknown input task id");
@@ -166,7 +166,7 @@ namespace lv {
         return
             (eDatasetTask==DatasetTask_Segm)?DatasetEval_BinaryClassifier:
             (eDatasetTask==DatasetTask_Cosegm)?DatasetEval_BinaryClassifierArray:
-            (eDatasetTask==DatasetTask_Registr)?DatasetEval_Registr:
+            (eDatasetTask==DatasetTask_StereoReg)?DatasetEval_StereoDisparityEstim:
             (eDatasetTask==DatasetTask_EdgDet)?DatasetEval_BinaryClassifier:
             // ...
             DatasetEval_None;
@@ -179,7 +179,7 @@ namespace lv {
         return
             (eDatasetTask==DatasetTask_Segm)?DatasetSource_Video:
             (eDatasetTask==DatasetTask_Cosegm)?DatasetSource_VideoArray:
-            (eDatasetTask==DatasetTask_Registr)?DatasetSource_VideoArray:
+            (eDatasetTask==DatasetTask_StereoReg)?DatasetSource_ImageArray:
             (eDatasetTask==DatasetTask_EdgDet)?DatasetSource_Image:
             // ...
             lvStdError_(domain_error,"unknown input task id");
@@ -191,7 +191,7 @@ namespace lv {
         return
             (eDatasetTask==DatasetTask_Segm)?(((eDatasetSource==DatasetSource_Video)||(eDatasetSource==DatasetSource_Image))&&((eDatasetEval==DatasetEval_BinaryClassifier)||(eDatasetEval==DatasetEval_MultiClassifier)||(eDatasetEval==DatasetEval_None))):
             (eDatasetTask==DatasetTask_Cosegm)?(((eDatasetSource==DatasetSource_VideoArray)||(eDatasetSource==DatasetSource_ImageArray))&&((eDatasetEval==DatasetEval_BinaryClassifierArray)||(eDatasetEval==DatasetEval_MultiClassifierArray)||(eDatasetEval==DatasetEval_None))):
-            (eDatasetTask==DatasetTask_Registr)?(((eDatasetSource==DatasetSource_VideoArray)||(eDatasetSource==DatasetSource_ImageArray))&&((eDatasetEval==DatasetEval_Registr)||(eDatasetEval==DatasetEval_None))):
+            (eDatasetTask==DatasetTask_StereoReg)?(((eDatasetSource==DatasetSource_VideoArray)||(eDatasetSource==DatasetSource_ImageArray))&&((eDatasetEval==DatasetEval_StereoDisparityEstim)||(eDatasetEval==DatasetEval_None))):
             (eDatasetTask==DatasetTask_EdgDet)?(((eDatasetSource==DatasetSource_Video)||(eDatasetSource==DatasetSource_Image))&&((eDatasetEval==DatasetEval_BinaryClassifier)||(eDatasetEval==DatasetEval_None))):
             // ...
             false;
@@ -205,7 +205,7 @@ namespace lv {
             (eDatasetEval==DatasetEval_BinaryClassifierArray)?Array:
             (eDatasetEval==DatasetEval_MultiClassifier)?NotArray:
             (eDatasetEval==DatasetEval_MultiClassifierArray)?Array:
-            (eDatasetEval==DatasetEval_Registr)?NotArray:
+            (eDatasetEval==DatasetEval_StereoDisparityEstim)?Array:
             (eDatasetEval==DatasetEval_BoundingBox)?NotArray:
             // ...
             lvStdError_(domain_error,"unknown input eval id");

@@ -196,6 +196,86 @@ std::string lv::IDataReporter_<lv::DatasetEval_BinaryClassifierArray>::writeInli
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void lv::IDataReporter_<lv::DatasetEval_StereoDisparityEstim>::writeEvalReport() const {
+    if(getCurrentOutputCount()==0 || !isEvaluating()) {
+        IDataReporter_<lv::DatasetEval_None>::writeEvalReport();
+        return;
+    }
+    for(const auto& pBatch : getBatches(true))
+        pBatch->shared_from_this_cast<const IDataReporter_<DatasetEval_StereoDisparityEstim>>(true)->IDataReporter_<DatasetEval_StereoDisparityEstim>::writeEvalReport();
+    if(isBare())
+        return;
+    IIMetricsCalculatorConstPtr pMetrics = getMetrics(true);
+    lvDbgAssert(pMetrics.get());
+    const StereoDispMetricsCalculator& oMetrics = dynamic_cast<const StereoDispMetricsCalculator&>(*pMetrics.get());
+    const StereoDispErrorMetrics oReducedMetrics = oMetrics.reduce();
+    lvCout_(1) << "\t" << lv::clampString(std::string(size_t(!isGroup()),'>')+getName(),12) << " => %@1=" << std::fixed << std::setprecision(2) << oReducedMetrics.dBadPercent_1 << " %@4=" << oReducedMetrics.dBadPercent_4 << " avg=" << oReducedMetrics.dAverageError << " rms=" << oReducedMetrics.dRMS << '\n';
+    std::ofstream oMetricsOutput(getOutputPath()+(isRoot()?"":"../")+getName()+".txt");
+    if(oMetricsOutput.is_open()) {
+        oMetricsOutput << std::fixed;
+        oMetricsOutput << "Binary classification evaluation report for dataset '" << getName() << "' :\n\n";
+        oMetricsOutput << "            |   Stream   || % bad @0.5 | % bad @1.0 | % bad @2.0 | % bad @4.0 | average er |  rms error \n";
+        oMetricsOutput << "------------|------------||------------|------------|------------|------------|------------|------------\n";
+        oMetricsOutput << IDataReporter_<DatasetEval_StereoDisparityEstim>::writeInlineStereoDisparityEvalReport(0);
+        oMetricsOutput << "------------|------------||------------|------------|------------|------------|------------|------------\n";
+        oMetricsOutput << IDataReporter_<DatasetEval_StereoDisparityEstim>::writeInlineStereoDisparityReducedEvalReport(0);
+        oMetricsOutput << "\nHz: " << getCurrentOutputCount()/getCurrentProcessTime() << "\n";
+        oMetricsOutput << "Count: " << getCurrentOutputCount() << "\n";
+        oMetricsOutput << lv::getLogStamp();
+    }
+}
+
+std::string lv::IDataReporter_<lv::DatasetEval_StereoDisparityEstim>::writeInlineStereoDisparityEvalReport(size_t nIndentSize) const {
+    if(getCurrentOutputCount()==0)
+        return std::string();
+    const size_t nCellSize = 12;
+    std::stringstream ssStr;
+    ssStr << std::fixed;
+    if(isGroup() && !isBare())
+        for(const auto& pBatch : getBatches(true))
+            ssStr << pBatch->shared_from_this_cast<const IDataReporter_<DatasetEval_StereoDisparityEstim>>(true)->IDataReporter_<DatasetEval_StereoDisparityEstim>::writeInlineStereoDisparityEvalReport(nIndentSize+1);
+    IIMetricsCalculatorConstPtr pMetrics = getMetrics(true);
+    lvDbgAssert(pMetrics.get());
+    const StereoDispMetricsCalculator& oMetrics = dynamic_cast<const StereoDispMetricsCalculator&>(*pMetrics.get());
+    lvDbgAssert(oMetrics.m_vsStreamNames.size()==oMetrics.m_vMetrics.size());
+    for(size_t s=0; s<oMetrics.m_vMetrics.size(); ++s)
+        ssStr << lv::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
+              lv::clampString((oMetrics.m_vsStreamNames[s].empty())?std::string("s")+std::to_string(s):(oMetrics.m_vsStreamNames[s]),nCellSize) << "||" <<
+              std::setw(nCellSize) << oMetrics.m_vMetrics[s].dBadPercent_05 << "|" <<
+              std::setw(nCellSize) << oMetrics.m_vMetrics[s].dBadPercent_1 << "|" <<
+              std::setw(nCellSize) << oMetrics.m_vMetrics[s].dBadPercent_2 << "|" <<
+              std::setw(nCellSize) << oMetrics.m_vMetrics[s].dBadPercent_4 << "|" <<
+              std::setw(nCellSize) << oMetrics.m_vMetrics[s].dAverageError << "|" <<
+              std::setw(nCellSize) << oMetrics.m_vMetrics[s].dRMS << "\n";
+    return ssStr.str();
+}
+
+std::string lv::IDataReporter_<lv::DatasetEval_StereoDisparityEstim>::writeInlineStereoDisparityReducedEvalReport(size_t nIndentSize) const {
+    if(getCurrentOutputCount()==0)
+        return std::string();
+    const size_t nCellSize = 12;
+    std::stringstream ssStr;
+    ssStr << std::fixed;
+    if(isGroup() && !isBare())
+        for(const auto& pBatch : getBatches(true))
+            ssStr << pBatch->shared_from_this_cast<const IDataReporter_<DatasetEval_StereoDisparityEstim>>(true)->IDataReporter_<DatasetEval_StereoDisparityEstim>::writeInlineStereoDisparityReducedEvalReport(nIndentSize+1);
+    IIMetricsCalculatorConstPtr pMetrics = getMetrics(true);
+    lvDbgAssert(pMetrics.get());
+    const StereoDispMetricsCalculator& oMetrics = dynamic_cast<const StereoDispMetricsCalculator&>(*pMetrics.get());
+    const StereoDispErrorMetrics oReducedMetrics = oMetrics.reduce();
+    ssStr << lv::clampString((std::string(nIndentSize,'>')+' '+getName()),nCellSize) << "|" <<
+          lv::clampString("all:reduced",nCellSize) << "||" <<
+          std::setw(nCellSize) << oReducedMetrics.dBadPercent_05 << "|" <<
+          std::setw(nCellSize) << oReducedMetrics.dBadPercent_1 << "|" <<
+          std::setw(nCellSize) << oReducedMetrics.dBadPercent_2 << "|" <<
+          std::setw(nCellSize) << oReducedMetrics.dBadPercent_4 << "|" <<
+          std::setw(nCellSize) << oReducedMetrics.dAverageError << "|" <<
+          std::setw(nCellSize) << oReducedMetrics.dRMS << "\n";
+    return ssStr.str();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 

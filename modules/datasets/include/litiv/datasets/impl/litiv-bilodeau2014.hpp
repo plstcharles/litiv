@@ -28,13 +28,11 @@ namespace lv {
 
     /// parameter interface for LITIV stereo registration dataset loader impl
     struct ILITIVBilodeau2014Dataset {
-        /// returns whether the implementation is loading all video frames via avi's instead of specific stills via jpg's
-        virtual bool isLoadingFullVideos() const = 0;
         /// returns whether we should evaluate fg/bg segmentation or stereo disparities
         virtual bool isEvaluatingDisparities() const = 0;
         /// returns whether frames should be flipped to use inverted disparities (from rgb to thermal) or not
         virtual bool isFlippingDisparities() const = 0;
-        /// returns whether only a subset of the dataset's frames will be loaded or not
+        /// returns whether only a subset of the dataset's frames will be loaded or not, instead of full avi sequences
         virtual bool isLoadingFrameSubset() const = 0;
         /// returns which 'person' sets will be loaded as work batches (-1=all sets, (1<<(X-1))=load set 'XPerson')
         virtual int isLoadingPersonSets() const = 0;
@@ -58,10 +56,9 @@ namespace lv {
                 const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving (will be created in root directory's results folder)
                 bool bSaveOutput=false, ///< defines whether results should be archived or not
                 bool bUseEvaluator=false, ///< defines whether results should be fully evaluated, or simply acknowledged
-                bool bLoadFullVideos=false, ///< defines whether we should load full videos via avi's instead of specific stills via jpg's
                 bool bEvalDisparities=true, ///< defines whether we should evaluate fg/bg segmentation or stereo disparities
                 bool bFlipDisparities=false, ///< defines whether frames should be flipped to use inverted disparities (from rgb to thermal) or not
-                bool bLoadFrameSubset=false, ///< defines whether only a subset of the dataset's frames will be loaded or not
+                bool bLoadFrameSubset=true, ///< defines whether only a subset of the dataset's frames will be loaded or not, instead of full avi sequences
                 int nLoadPersonSets=-1, ///< defines which 'person' sets will be loaded as work batches (-1=all sets, (1<<(X))=load set 'XPerson')
                 int nLoadInputMasks=0, ///< defines whether the input stream should be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
                 double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
@@ -77,13 +74,13 @@ namespace lv {
                         false,
                         dScaleFactor
                 ),
-                m_bLoadFullVideos(bLoadFullVideos),
                 m_bEvalDisparities(bEvalDisparities),
                 m_bFlipDisparities(bFlipDisparities),
                 m_bLoadFrameSubset(bLoadFrameSubset),
                 m_nLoadPersonSets(nLoadPersonSets),
                 m_nLoadInputMasks(nLoadInputMasks) {
-            lvAssert_(nLoadPersonSets!=0,"must load at least one person set");
+            lvAssert_(m_nLoadPersonSets!=0,"must load at least one person set");
+            lvAssert_(m_bEvalDisparities,"missing impl, dataset does not contain gt segm masks");
         }
         /// returns the names of all work batch directories available for this dataset specialization
         static std::vector<std::string> getWorkBatchDirNames(int nLoadPersonSets) {
@@ -104,20 +101,17 @@ namespace lv {
             vsWorkBatchDirs.push_back("vid3");
             return vsWorkBatchDirs;
         }
-        /// returns whether the implementation is loading all video frames via avi's instead of specific stills via jpg's
-        virtual bool isLoadingFullVideos() const override {return m_bLoadFullVideos;}
         /// returns whether we should evaluate fg/bg segmentation or stereo disparities
         virtual bool isEvaluatingDisparities() const override {return m_bEvalDisparities;}
         /// returns whether frames should be flipped to use inverted disparities (from rgb to thermal) or not
         virtual bool isFlippingDisparities() const override {return m_bFlipDisparities;}
-        /// returns whether only a subset of the dataset's frames will be loaded or not
+        /// returns whether only a subset of the dataset's frames will be loaded or not, instead of full avi sequences
         virtual bool isLoadingFrameSubset() const override {return m_bLoadFrameSubset;}
         /// returns which 'person' sets will be loaded as work batches (-1=all sets, (1<<(X))=load set 'XPerson')
         virtual int isLoadingPersonSets() const override {return m_nLoadPersonSets;}
         /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
         virtual int isLoadingInputMasks() const override {return m_nLoadInputMasks;}
     protected:
-        const bool m_bLoadFullVideos;
         const bool m_bEvalDisparities;
         const bool m_bFlipDisparities;
         const bool m_bLoadFrameSubset;
@@ -137,7 +131,7 @@ namespace lv {
             this->m_bIsBare = true;
             if(!lv::string_contains_token(this->getName(),this->getSkipTokens())) {
                 const ILITIVBilodeau2014Dataset& oDataset = dynamic_cast<const ILITIVBilodeau2014Dataset&>(*this->getRoot());
-                const bool bLoadingFullVideos = oDataset.isLoadingFullVideos();
+                const bool bLoadingFullVideos = !oDataset.isLoadingFrameSubset();
                 if(bLoadingFullVideos)
                     m_vpBatches.push_back(createWorkBatch(this->getName(),getRelativePath()));
                 else {
@@ -193,10 +187,6 @@ namespace lv {
             const std::string sBaseName = ((nStreamIdx==0)?"RGB":(nStreamIdx==1)?"THERMAL":"UNKNOWN");
             return sBaseName+"_GT";
         }
-        /// returns whether the implementation is loading all video frames via avi's instead of specific stills via jpg's
-        bool isLoadingFullVideos() const {
-            return dynamic_cast<const ILITIVBilodeau2014Dataset&>(*this->getRoot()).isLoadingFullVideos();
-        }
         /// returns whether we should evaluate fg/bg segmentation or stereo disparities
         bool isEvaluatingDisparities() const {
             return dynamic_cast<const ILITIVBilodeau2014Dataset&>(*this->getRoot()).isEvaluatingDisparities();
@@ -205,7 +195,7 @@ namespace lv {
         bool isFlippingDisparities() const {
             return dynamic_cast<const ILITIVBilodeau2014Dataset&>(*this->getRoot()).isFlippingDisparities();
         }
-        /// returns whether only a subset of the dataset's frames will be loaded or not
+        /// returns whether only a subset of the dataset's frames will be loaded or not, instead of full avi sequences
         bool isLoadingFrameSubset() const {
             return dynamic_cast<const ILITIVBilodeau2014Dataset&>(*this->getRoot()).isLoadingFrameSubset();
         }
@@ -247,9 +237,7 @@ namespace lv {
             lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
             const ILITIVBilodeau2014Dataset& oDataset = dynamic_cast<const ILITIVBilodeau2014Dataset&>(*this->getRoot());
-            const bool bLoadFrameSubset = this->isLoadingFrameSubset();
-            lvAssert_(!bLoadFrameSubset,"missing impl @@@@");
-            this->m_bLoadFullVideos = oDataset.isLoadingFullVideos();
+            this->m_bLoadFullVideos = !this->isLoadingFrameSubset();
             this->m_nLoadInputMasks = oDataset.isLoadingInputMasks();
             this->m_bEvalDisparities = oDataset.isEvaluatingDisparities();
             this->m_bFlipDisparities = oDataset.isFlippingDisparities();
@@ -285,7 +273,7 @@ namespace lv {
             for(size_t nStreamIdx=0; nStreamIdx<nGTStreamCount; ++nStreamIdx)
                 this->m_vGTInfos[nStreamIdx] = lv::MatInfo{oGlobalROI.size(),CV_8UC1};
             if(this->m_bLoadFullVideos) {
-                lvAssert(false); // missing impl @@@@
+                lvAssert_(false,"missing impl"); // @@@@
                 // need to add video reader, override getInputCount, ...
             }
             else {
@@ -345,13 +333,13 @@ namespace lv {
                             lvAssert(lv::checkIfExists(this->m_vvsInputPaths[nPacketIdx][nInputThermalMaskStreamIdx]));
                         }
                         else
-                            lvAssert(false); // @@@@ missing impl; dataset does not contain gt segm masks
+                            lvAssert_(false,"missing impl, dataset does not contain gt segm masks");
                         if(bUseApproxRGBMask) {
                             this->m_vvsInputPaths[nPacketIdx][nInputRGBMaskStreamIdx] = *psApproxMasksDir+"/VisForeground"+vsFileNames[nPacketIdx]+".jpg";
                             lvAssert(lv::checkIfExists(this->m_vvsInputPaths[nPacketIdx][nInputRGBMaskStreamIdx]));
                         }
                         else
-                            lvAssert(false); // @@@@ missing impl; dataset does not contain gt segm masks
+                            lvAssert_(false,"missing impl, dataset does not contain gt segm masks");
                     }
                 }
 
@@ -406,7 +394,7 @@ namespace lv {
                 }
                 else {
                     lvIgnore(psGTMasksDir);
-                    lvAssert(false); // @@@@ missing impl; dataset does not contain gt segm masks
+                    lvAssert_(false,"missing impl, dataset does not contain gt segm masks");
                 }
                 if(vsThermalGTMasksPaths.empty() || cv::imread(vsThermalGTMasksPaths[0]).size()!=oImageSize)
                     lvError_("LITIV-bilodeau2014 sequence '%s' did not possess expected thermal gt data",this->getName().c_str());
@@ -558,6 +546,11 @@ namespace lv {
                     lvAssert(!oThermalPacket.empty() && oThermalPacket.type()==CV_8UC1 && oThermalPacket.size()==oImageSize);
                     if(oThermalPacket.size()!=vGTInfos[nGTThermalMaskStreamIdx].size())
                         cv::resize(oThermalPacket,oThermalPacket,vGTInfos[nGTThermalMaskStreamIdx].size(),0,0,cv::INTER_NEAREST);
+                    cv::Mat oOldDontCareMask = (oThermalPacket==255);
+                    cv::dilate(oOldDontCareMask,oOldDontCareMask,cv::Mat(),cv::Point(-1,-1),3);
+                    oThermalPacket *= 0.333; // yup, pretty bad, and borders are off too
+                    oThermalPacket *= this->getScaleFactor();
+                    cv::Mat_<uchar>(oThermalPacket.size(),uchar(255)).copyTo(oThermalPacket,oOldDontCareMask);
                     vGTs[nGTThermalMaskStreamIdx] = oThermalPacket;
                 }
                 if(this->m_bFlipDisparities)

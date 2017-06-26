@@ -82,7 +82,7 @@ namespace lv {
                 m_bEvalDisparities(bEvalDisparities),
                 m_bLoadFrameSubset(bLoadFrameSubset),
                 m_nLoadInputMasks(nLoadInputMasks) {
-            lvAssert_(!m_bEvalDisparities,"missing impl @@@@@");
+            lvAssert_(!m_bEvalDisparities,"missing impl (no stereo disparity gt in dataset)");
         }
         /// returns the names of all work batch directories available for this dataset specialization
         static const std::vector<std::string>& getWorkBatchDirNames(bool bUndistortOrRectify) {
