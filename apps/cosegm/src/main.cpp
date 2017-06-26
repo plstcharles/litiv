@@ -23,7 +23,7 @@
 #define PROCESS_PREPROC_BGSEGM  0
 #define WRITE_IMG_OUTPUT        1
 #define EVALUATE_OUTPUT         1
-#define GLOBAL_VERBOSITY        3
+#define GLOBAL_VERBOSITY        2
 ////////////////////////////////
 #define DATASET_VAPTRIMOD       1
 #define DATASET_LITIV2014       0

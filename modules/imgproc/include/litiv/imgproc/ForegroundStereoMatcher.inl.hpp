@@ -1706,8 +1706,8 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
     CamArray<ValueType> atLastResegmEnergies = {std::numeric_limits<ValueType>::max(),std::numeric_limits<ValueType>::max()};
     cv::Mat_<InternalLabelType>& oCurrStereoLabeling = m_aStereoLabelings[nPrimaryCamIdx];
     bool bJustUpdatedSegm = false;
-    // each iter below is an alpha-exp move based on A. Fix's primal-dual energy minimization method for higher-order MRFs
-    // see "A Primal-Dual Algorithm for Higher-Order Multilabel Markov Random Fields" in CVPR2014 for more info (doi = 10.1109/CVPR.2014.149)
+    // each iter below is a fusion move based on A. Fix's energy minimization method for higher-order MRFs
+    // see "A Graph Cut Algorithm for Higher-order Markov Random Fields" in ICCV2011 for more info (doi = 10.1109/ICCV.2011.6126347)
     while(++nMoveIter<=m_nMaxMoveIterCount && nConsecUnchangedLabels<m_nStereoLabels) {
         const bool bNullifyStereoPairwCosts = (STEREOSEGMATCH_CONFIG_USE_UNARY_ONLY_FIRST)&&nMoveIter<=m_nStereoLabels;
         calcStereoMoveCosts(nPrimaryCamIdx,nStereoAlphaLabel);
@@ -1865,7 +1865,7 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
         }
     }
     lvLog_(2,"Inference for primary camera idx=%d completed in %f second(s).",(int)nPrimaryCamIdx,oLocalTimer.tock());
-    if(lv::getVerbosity()>=3)
+    if(lv::getVerbosity()>=4)
         cv::waitKey(0);
     return opengm::InferenceTermination::NORMAL;
 }
