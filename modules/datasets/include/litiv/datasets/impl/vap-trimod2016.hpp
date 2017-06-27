@@ -615,7 +615,7 @@ namespace lv {
             lvDbgAssert(!vsInputPaths.empty() && vsInputPaths.size()==this->getInputStreamCount());
             const std::vector<lv::MatInfo>& vInputInfos = this->m_vOrigInputInfos;
             lvDbgAssert(!vInputInfos.empty() && vInputInfos.size()==getInputStreamCount());
-            std::vector<cv::Mat> vInputs(vsInputPaths.size());
+            std::vector<cv::Mat> vInputs(getInputStreamCount());
             ///////////////////////////////////////////////////////////////////////////////////
             cv::Mat oRGBPacket = cv::imread(vsInputPaths[nInputRGBStreamIdx],cv::IMREAD_COLOR);
             lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC3 && oRGBPacket.size()==oImageSize);
@@ -694,6 +694,7 @@ namespace lv {
             constexpr size_t nGTRGBMaskStreamIdx = 0;
             constexpr size_t nGTThermalMaskStreamIdx = 1;
             constexpr size_t nGTDepthMaskStreamIdx = 2;
+            std::vector<cv::Mat> vGTs(getGTStreamCount());
             if(this->m_mGTIndexLUT.count(nPacketIdx)) {
                 const size_t nGTIdx = this->m_mGTIndexLUT[nPacketIdx];
                 lvDbgAssert(nGTIdx<this->m_vvsGTPaths.size());
@@ -701,7 +702,6 @@ namespace lv {
                 lvDbgAssert(!vsGTMasksPaths.empty() && vsGTMasksPaths.size()==getGTStreamCount());
                 const std::vector<lv::MatInfo>& vGTInfos = this->m_vOrigGTInfos;
                 lvDbgAssert(!vGTInfos.empty() && vGTInfos.size()==getGTStreamCount());
-                std::vector<cv::Mat> vGTs(vsGTMasksPaths.size());
                 cv::Mat oRGBPacket = cv::imread(vsGTMasksPaths[nGTRGBMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                 lvAssert(!oRGBPacket.empty() && oRGBPacket.type()==CV_8UC1 && oRGBPacket.size()==oImageSize);
                 if(oRGBPacket.size()!=vGTInfos[nGTRGBMaskStreamIdx].size())
@@ -752,9 +752,8 @@ namespace lv {
                         lvDbgAssert(lv::MatInfo(vGTs[nIdx])==this->m_vGTInfos[nIdx]);
                     }
                 }
-                return vGTs;
             }
-            return cv::Mat();
+            return vGTs;
         }
         bool m_bLoadDepth,m_bUndistort,m_bHorizRectify;
         int m_nLoadInputMasks;

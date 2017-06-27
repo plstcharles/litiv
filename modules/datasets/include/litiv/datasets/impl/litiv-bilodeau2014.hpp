@@ -387,10 +387,15 @@ namespace lv {
                     this->m_vInputROIs[nInputRGBMaskStreamIdx] = oRGBROI.clone();
                 this->m_vGTROIs[nGTRGBMaskStreamIdx] = oRGBROI.clone();
 
-                std::vector<std::string> vsThermalGTMasksPaths;
+                std::vector<std::string> vsThermalGTMasksPaths,vsThermalGTMasksNames;
                 if(this->m_bEvalDisparities) {
-                    vsThermalGTMasksPaths = vsDisparityMasksPaths;
-                    lv::filterFilePaths(vsThermalGTMasksPaths,{},{"DisparityIR"});
+                    std::vector<std::string> vsThermalGTMasksPaths_prefilter = vsDisparityMasksPaths;
+                    lv::filterFilePaths(vsThermalGTMasksPaths_prefilter,{},{"DisparityIR"});
+                    for(const std::string& sPath : vsThermalGTMasksPaths_prefilter)
+                        vsThermalGTMasksNames.push_back(lFileNameExtractor(sPath,"DisparityIR"));
+                    vsThermalGTMasksNames = lv::filter_in(vsThermalGTMasksNames,vsFileNames);
+                    for(const std::string& sName : vsThermalGTMasksNames)
+                        vsThermalGTMasksPaths.push_back(*psDisparityMasksDir+"/DisparityIR"+sName+".bmp");
                 }
                 else {
                     lvIgnore(psGTMasksDir);
@@ -399,18 +404,13 @@ namespace lv {
                 if(vsThermalGTMasksPaths.empty() || cv::imread(vsThermalGTMasksPaths[0]).size()!=oImageSize)
                     lvError_("LITIV-bilodeau2014 sequence '%s' did not possess expected thermal gt data",this->getName().c_str());
                 const size_t nMaxGTPackets = vsThermalGTMasksPaths.size();
+                lvAssert(vsThermalGTMasksPaths.size()==vsThermalGTMasksNames.size());
                 this->m_vvsGTPaths.clear();
                 this->m_mGTIndexLUT.clear();
                 for(size_t nGTPacketIdx=0; nGTPacketIdx<nMaxGTPackets; ++nGTPacketIdx) {
-                    const size_t nLastGTSlashPos = vsThermalGTMasksPaths[nGTPacketIdx].find_last_of("/\\");
-                    const std::string sGTFileNameExt = nLastGTSlashPos==std::string::npos?vsThermalGTMasksPaths[nGTPacketIdx]:vsThermalGTMasksPaths[nGTPacketIdx].substr(nLastGTSlashPos+1);
-                    const size_t nLastGTDotPos = sGTFileNameExt.find_last_of('.');
-                    lvAssert(nLastGTDotPos>11);
-                    const std::string sGTFileName = nLastGTDotPos==std::string::npos?sGTFileNameExt:sGTFileNameExt.substr(11,nLastGTDotPos-11);
-                    lvAssert(!sGTFileName.empty());
                     size_t nPacketIdx = 0;
                     for(; nPacketIdx<vsFileNames.size(); ++nPacketIdx)
-                        if(sGTFileName==vsFileNames[nPacketIdx])
+                        if(vsThermalGTMasksNames[nGTPacketIdx]==vsFileNames[nPacketIdx])
                             break;
                     if(nPacketIdx<vsFileNames.size()) {
                         this->m_vvsGTPaths.push_back(std::vector<std::string>(nGTStreamCount));
@@ -522,12 +522,12 @@ namespace lv {
             const cv::Size oImageSize(480,360);
             constexpr size_t nGTRGBMaskStreamIdx = 0;
             constexpr size_t nGTThermalMaskStreamIdx = 1;
+            std::vector<cv::Mat> vGTs(getGTStreamCount());
             if(this->m_mGTIndexLUT.count(nPacketIdx)) {
                 const size_t nGTIdx = this->m_mGTIndexLUT[nPacketIdx];
                 lvDbgAssert(nGTIdx<this->m_vvsGTPaths.size());
                 const std::vector<lv::MatInfo>& vGTInfos = this->m_vGTInfos;
                 lvDbgAssert(!vGTInfos.empty() && vGTInfos.size()==getGTStreamCount());
-                std::vector<cv::Mat> vGTs(getGTStreamCount());
                 if(this->m_bLoadFullVideos) {
                     lvAssert(false); // missing impl @@@@
                 }
@@ -556,9 +556,8 @@ namespace lv {
                 if(this->m_bFlipDisparities)
                     for(size_t nGTStreamIdx=0; nGTStreamIdx<this->getGTStreamCount(); ++nGTStreamIdx)
                         cv::flip(vGTs[nGTStreamIdx],vGTs[nGTStreamIdx],1);
-                return vGTs;
             }
-            return std::vector<cv::Mat>();
+            return vGTs;
         }
         bool m_bLoadFullVideos;
         bool m_bEvalDisparities;
