@@ -24,6 +24,8 @@
 #include "litiv/datasets.hpp" // for parsers only, not truly required here
 #include <opencv2/calib3d.hpp>
 
+#define DATASETS_LV2014_USE_PREMADE_DISPARITY_MAPS   0
+
 namespace lv {
 
     /// parameter interface for LITIV stereo registration dataset loader impl
@@ -272,6 +274,13 @@ namespace lv {
                 this->m_vInputInfos[nStreamIdx] = lv::MatInfo{oGlobalROI.size(),(nStreamIdx==nInputRGBStreamIdx?CV_8UC3:CV_8UC1)};
             for(size_t nStreamIdx=0; nStreamIdx<nGTStreamCount; ++nStreamIdx)
                 this->m_vGTInfos[nStreamIdx] = lv::MatInfo{oGlobalROI.size(),CV_8UC1};
+            std::string sGTDispFileNamePrefix = this->getParent()->getName();
+            sGTDispFileNamePrefix.erase(std::remove(sGTDispFileNamePrefix.begin(),sGTDispFileNamePrefix.end(),'/'),sGTDispFileNamePrefix.end());
+            std::string sGTDispFileNameSuffix = this->getName().substr(this->getParent()->getName().size()+1);
+            sGTDispFileNameSuffix.erase(std::remove(sGTDispFileNameSuffix.begin(),sGTDispFileNameSuffix.end(),'/'),sGTDispFileNameSuffix.end());
+            const std::string sGTDispFilePath = this->getDataPath()+sGTDispFileNamePrefix+"_"+sGTDispFileNameSuffix+".txt";
+            std::ifstream oGTDispFile(sGTDispFilePath);
+            lvAssert__(oGTDispFile.is_open(),"could not open gt disparity file at '%s'",sGTDispFilePath.c_str());
             if(this->m_bLoadFullVideos) {
                 lvAssert_(false,"missing impl"); // @@@@
                 // need to add video reader, override getInputCount, ...
@@ -279,10 +288,12 @@ namespace lv {
             else {
                 const std::vector<std::string> vsInputPaths = lv::getFilesFromDir(*psInputDir);
                 const std::vector<std::string> vsApproxMasksPaths = lv::getFilesFromDir(*psApproxMasksDir);
+            #if DATASETS_LV2014_USE_PREMADE_DISPARITY_MAPS
                 auto psDisparityMasksDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"IRDisparitymap");
                 if(psDisparityMasksDir==vsSubDirs.end())
                     psDisparityMasksDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"IRDisparityMap");
                 const std::vector<std::string> vsDisparityMasksPaths = (psDisparityMasksDir==vsSubDirs.end())?std::vector<std::string>{}:lv::getFilesFromDir(*psDisparityMasksDir);
+            #endif //DATASETS_LV2014_USE_PREMADE_DISPARITY_MAPS
                 auto psGTMasksDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"IRForegroundmap");
                 const std::vector<std::string> vsGTMasksPaths = (psGTMasksDir==vsSubDirs.end())?std::vector<std::string>{}:lv::getFilesFromDir(*psGTMasksDir);
                 //////////////////////////////////////////////////////////////////////////////////////////
@@ -304,10 +315,10 @@ namespace lv {
                     lvError_("LITIV-bilodeau2014 sequence '%s' did not possess expected RGB approx mask data",this->getName().c_str());
                 const auto lFileNameExtractor = [](const std::string& sFilePath, const std::string& sNamePrefix="") {
                     const size_t nLastSlashPos = sFilePath.find_last_of("/\\");
-                    const std::string sFileNameExt = nLastSlashPos==std::string::npos?sFilePath:sFilePath.substr(nLastSlashPos+1);
-                    const size_t nLastDotPos = sFileNameExt.find_last_of('.');
+                    const std::string sFileNameWithExt = nLastSlashPos==std::string::npos?sFilePath:sFilePath.substr(nLastSlashPos+1);
+                    const size_t nLastDotPos = sFileNameWithExt.find_last_of('.');
                     lvAssert(nLastDotPos>sNamePrefix.size());
-                    return nLastDotPos==std::string::npos?sFileNameExt:sFileNameExt.substr(sNamePrefix.size(),nLastDotPos-sNamePrefix.size());
+                    return nLastDotPos==std::string::npos?sFileNameWithExt:sFileNameWithExt.substr(sNamePrefix.size(),nLastDotPos-sNamePrefix.size());
                 };
                 std::vector<std::string> vsThermalFileNames,vsRGBFileNames,vsThermalApproxMasksFileNames,vsRGBApproxMasksFileNames;
                 for(const std::string& sPath : vsThermalInputPaths)
@@ -386,9 +397,11 @@ namespace lv {
                 if(bUseInterlacedMasks)
                     this->m_vInputROIs[nInputRGBMaskStreamIdx] = oRGBROI.clone();
                 this->m_vGTROIs[nGTRGBMaskStreamIdx] = oRGBROI.clone();
-
                 std::vector<std::string> vsThermalGTMasksPaths,vsThermalGTMasksNames;
+                std::map<std::string,std::vector<std::pair<cv::Point2i,int>>> mvThermalGTPointDisps;
                 if(this->m_bEvalDisparities) {
+                #if DATASETS_LV2014_USE_PREMADE_DISPARITY_MAPS
+                    lvIgnore(mvThermalGTPointDisps);
                     std::vector<std::string> vsThermalGTMasksPaths_prefilter = vsDisparityMasksPaths;
                     lv::filterFilePaths(vsThermalGTMasksPaths_prefilter,{},{"DisparityIR"});
                     for(const std::string& sPath : vsThermalGTMasksPaths_prefilter)
@@ -396,17 +409,44 @@ namespace lv {
                     vsThermalGTMasksNames = lv::filter_in(vsThermalGTMasksNames,vsFileNames);
                     for(const std::string& sName : vsThermalGTMasksNames)
                         vsThermalGTMasksPaths.push_back(*psDisparityMasksDir+"/DisparityIR"+sName+".bmp");
+                    if(vsThermalGTMasksPaths.empty() || cv::imread(vsThermalGTMasksPaths[0]).size()!=oImageSize)
+                        lvError_("LITIV-bilodeau2014 sequence '%s' did not possess expected thermal gt data",this->getName().c_str());
+                    lvAssert(vsThermalGTMasksPaths.size()==vsThermalGTMasksNames.size());
+                #else //!DATASETS_LV2014_USE_PREMADE_DISPARITY_MAPS
+                    lvIgnore(vsThermalGTMasksPaths);
+                    std::string sLineBuffer;
+                    std::pair<cv::Point2i,int> oGTPointDisp;
+                    while(oGTDispFile) {
+                        lvDbgExceptionWatch;
+                        if(!std::getline(oGTDispFile,sLineBuffer)) // ir foreground image name
+                            break;
+                        const std::string sThermalImageName = lFileNameExtractor(sLineBuffer,"IRForeground");
+                        lvAssert(!sThermalImageName.empty());
+                        if(std::find(vsThermalGTMasksNames.begin(),vsThermalGTMasksNames.end(),sThermalImageName)==vsThermalGTMasksNames.end())
+                            vsThermalGTMasksNames.push_back(sThermalImageName);
+                        std::getline(oGTDispFile,sLineBuffer); // vis foreground image name
+                        std::getline(oGTDispFile,sLineBuffer); // x coord in ir image
+                        oGTPointDisp.first.x = std::stoi(sLineBuffer);
+                        lvAssert(oGTPointDisp.first.x>=0 && oGTPointDisp.first.x<oImageSize.width);
+                        std::getline(oGTDispFile,sLineBuffer); // y coord in ir image
+                        oGTPointDisp.first.y = std::stoi(sLineBuffer);
+                        lvAssert(oGTPointDisp.first.y>=0 && oGTPointDisp.first.y<oImageSize.height);
+                        std::getline(oGTDispFile,sLineBuffer); // disparity value (ir to vis, negative)
+                        oGTPointDisp.second = std::stoi(sLineBuffer);
+                        lvAssert(oGTPointDisp.second>=0 && oGTPointDisp.second<100);
+                        mvThermalGTPointDisps[sThermalImageName].push_back(oGTPointDisp);
+                    }
+                    lvAssert(vsThermalGTMasksNames.size()==mvThermalGTPointDisps.size());
+                #endif //!DATASETS_LV2014_USE_PREMADE_DISPARITY_MAPS
                 }
                 else {
                     lvIgnore(psGTMasksDir);
                     lvAssert_(false,"missing impl, dataset does not contain gt segm masks");
                 }
-                if(vsThermalGTMasksPaths.empty() || cv::imread(vsThermalGTMasksPaths[0]).size()!=oImageSize)
-                    lvError_("LITIV-bilodeau2014 sequence '%s' did not possess expected thermal gt data",this->getName().c_str());
-                const size_t nMaxGTPackets = vsThermalGTMasksPaths.size();
-                lvAssert(vsThermalGTMasksPaths.size()==vsThermalGTMasksNames.size());
+                const size_t nMaxGTPackets = vsThermalGTMasksNames.size();
                 this->m_vvsGTPaths.clear();
                 this->m_mGTIndexLUT.clear();
+                this->m_vvThermalGTPointDisps.clear();
                 for(size_t nGTPacketIdx=0; nGTPacketIdx<nMaxGTPackets; ++nGTPacketIdx) {
                     size_t nPacketIdx = 0;
                     for(; nPacketIdx<vsFileNames.size(); ++nPacketIdx)
@@ -414,7 +454,20 @@ namespace lv {
                             break;
                     if(nPacketIdx<vsFileNames.size()) {
                         this->m_vvsGTPaths.push_back(std::vector<std::string>(nGTStreamCount));
-                        this->m_vvsGTPaths.back()[nGTThermalMaskStreamIdx] = vsThermalGTMasksPaths[nGTPacketIdx];
+                        if(this->m_bEvalDisparities) {
+                        #if DATASETS_LV2014_USE_PREMADE_DISPARITY_MAPS
+                            this->m_vvsGTPaths.back()[nGTThermalMaskStreamIdx] = vsThermalGTMasksPaths[nGTPacketIdx];
+                        #else //!DATASETS_LV2014_USE_PREMADE_DISPARITY_MAPS
+                            this->m_vvsGTPaths.back()[nGTThermalMaskStreamIdx] = vsThermalGTMasksNames[nGTPacketIdx];
+                            this->m_vvThermalGTPointDisps.push_back(std::vector<std::pair<cv::Point2i,int>>());
+                            const auto& vThermalGTPointDispList = mvThermalGTPointDisps[vsThermalGTMasksNames[nGTPacketIdx]];
+                            lvAssert(!vThermalGTPointDispList.empty());
+                            this->m_vvThermalGTPointDisps.back().insert(this->m_vvThermalGTPointDisps.back().end(),vThermalGTPointDispList.begin(),vThermalGTPointDispList.end());
+                        #endif //!DATASETS_LV2014_USE_PREMADE_DISPARITY_MAPS
+                        }
+                        else {
+                            lvAssert_(false,"missing impl, dataset does not contain gt segm masks");
+                        }
                         this->m_mGTIndexLUT[nPacketIdx] = this->m_vvsGTPaths.size()-1;
                     }
                 }
@@ -428,13 +481,8 @@ namespace lv {
                     oDispRangeFile >> this->m_nMaxDisp;
             }
             else {
-                std::string sGTDispFileNamePrefix = this->getParent()->getName();
-                sGTDispFileNamePrefix.erase(std::remove(sGTDispFileNamePrefix.begin(),sGTDispFileNamePrefix.end(),'/'),sGTDispFileNamePrefix.end());
-                std::string sGTDispFileNameSuffix = this->getName().substr(this->getParent()->getName().size()+1);
-                sGTDispFileNameSuffix.erase(std::remove(sGTDispFileNameSuffix.begin(),sGTDispFileNameSuffix.end(),'/'),sGTDispFileNameSuffix.end());
-                const std::string sGTDispFilePath = this->getDataPath()+sGTDispFileNamePrefix+"_"+sGTDispFileNameSuffix+".txt";
-                std::ifstream oGTDispFile(sGTDispFilePath);
-                lvAssert__(oGTDispFile.is_open(),"could not open gt disparity file at '%s'",sGTDispFilePath.c_str());
+                oGTDispFile.clear();
+                oGTDispFile.seekg(0);
                 std::string sLineBuffer;
                 int nCurrMaxDisp = 0;
                 while(oGTDispFile) {
@@ -542,6 +590,7 @@ namespace lv {
                     if(oRGBPacket.size()!=vGTInfos[nGTRGBMaskStreamIdx].size())
                         cv::resize(oRGBPacket,oRGBPacket,vGTInfos[nGTRGBMaskStreamIdx].size(),0,0,cv::INTER_NEAREST);
                     vGTs[nGTRGBMaskStreamIdx] = oRGBPacket;
+                #if DATASETS_LV2014_USE_PREMADE_DISPARITY_MAPS
                     cv::Mat oThermalPacket = cv::imread(vsGTMasksPaths[nGTThermalMaskStreamIdx],cv::IMREAD_GRAYSCALE);
                     lvAssert(!oThermalPacket.empty() && oThermalPacket.type()==CV_8UC1 && oThermalPacket.size()==oImageSize);
                     if(oThermalPacket.size()!=vGTInfos[nGTThermalMaskStreamIdx].size())
@@ -551,6 +600,21 @@ namespace lv {
                     oThermalPacket *= 0.333; // yup, pretty bad, and borders are off too
                     oThermalPacket *= this->getScaleFactor();
                     cv::Mat_<uchar>(oThermalPacket.size(),uchar(255)).copyTo(oThermalPacket,oOldDontCareMask);
+                #else //!DATASETS_LV2014_USE_PREMADE_DISPARITY_MAPS
+                    lvIgnore(vsGTMasksPaths);
+                    const std::vector<std::pair<cv::Point2i,int>>& vThermalGTPointDisps = this->m_vvThermalGTPointDisps[nGTIdx];
+                    cv::Mat oThermalPacket(oImageSize,CV_8UC1,cv::Scalar_<uchar>(255));
+                    for(const auto& oPointDisp : vThermalGTPointDisps) {
+                        lvAssert(oPointDisp.second>=0 && oPointDisp.second<255);
+                        oThermalPacket.at<uchar>(oPointDisp.first) = uchar(oPointDisp.second);
+                    }
+                    if(oThermalPacket.size()!=vGTInfos[nGTThermalMaskStreamIdx].size()) {
+                        cv::resize(oThermalPacket,oThermalPacket,vGTInfos[nGTThermalMaskStreamIdx].size(),0,0,cv::INTER_NEAREST);
+                        cv::Mat oOldDontCareMask = (oThermalPacket==255);
+                        oThermalPacket *= this->getScaleFactor();
+                        cv::Mat_<uchar>(oThermalPacket.size(),uchar(255)).copyTo(oThermalPacket,oOldDontCareMask);
+                    }
+                #endif //!DATASETS_LV2014_USE_PREMADE_DISPARITY_MAPS
                     vGTs[nGTThermalMaskStreamIdx] = oThermalPacket;
                 }
                 if(this->m_bFlipDisparities)
@@ -559,6 +623,7 @@ namespace lv {
             }
             return vGTs;
         }
+        std::vector<std::vector<std::pair<cv::Point2i,int>>> m_vvThermalGTPointDisps;
         bool m_bLoadFullVideos;
         bool m_bEvalDisparities;
         bool m_bFlipDisparities;
