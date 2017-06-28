@@ -120,8 +120,8 @@ cv::Mat lv::BinClassif::getColoredMask(const cv::Mat& oClassif, const cv::Mat& o
 
 void lv::StereoDispErrors::accumulate(const cv::Mat& _oDispMap, const cv::Mat& _oGT, const cv::Mat& oROI) {
     lvAssert_(!_oDispMap.empty() && _oDispMap.dims==2 && _oDispMap.isContinuous(),"input disp map must be non-empty and 2d");
-    lvAssert_(_oDispMap.type()==CV_8UC1 || _oDispMap.type()==CV_16UC1 || _oDispMap.type()==CV_32SC1 || _oDispMap.type()==CV_32FC1,"binary classifier results must be non-empty and of type 8UC1/16UC1/32SC1/32FC1");
-    lvAssert_(_oGT.empty() || (_oGT.isContinuous() && (_oGT.type()==CV_8UC1 || _oGT.type()==CV_16UC1 || _oGT.type()==CV_32SC1 || _oGT.type()==CV_32FC1)),"gt mat must be empty, or of type 8UC1/16UC1/32SC1");
+    lvAssert_(_oDispMap.type()==CV_8UC1 || _oDispMap.type()==CV_8SC1 || _oDispMap.type()==CV_16UC1 || _oDispMap.type()==CV_16SC1 || _oDispMap.type()==CV_32SC1 || _oDispMap.type()==CV_32FC1,"binary classifier results must be of type 8UC1/8SC1/16UC1/16SC1/32SC1/32FC1");
+    lvAssert_(_oGT.empty() || (_oGT.isContinuous() && (_oGT.type()==CV_8UC1 || _oGT.type()==CV_8SC1 || _oGT.type()==CV_16UC1 || _oGT.type()==CV_16SC1 || _oGT.type()==CV_32SC1 || _oGT.type()==CV_32FC1)),"gt mat must be empty, or of type 8UC1/8SC1/16UC1/16SC1/32SC1/32FC1");
     lvAssert_(oROI.empty() || (oROI.isContinuous() && oROI.type()==CV_8UC1),"ROI mat must be empty, or of type 8UC1");
     lvAssert_((_oGT.empty() || _oDispMap.size()==_oGT.size()) && (oROI.empty() || _oDispMap.size()==oROI.size()),"all input mat sizes must match");
     if(_oGT.empty()) {
@@ -140,12 +140,16 @@ void lv::StereoDispErrors::accumulate(const cv::Mat& _oDispMap, const cv::Mat& _
     cv::Mat_<uchar> oGTValidMask;
     if(_oGT.type()==CV_8UC1)
         oGTValidMask = (_oGT!=std::numeric_limits<uchar>::max());
+    else if(_oGT.type()==CV_8SC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<char>::max()) & (_oGT>=0);
     else if(_oGT.type()==CV_16UC1)
         oGTValidMask = (_oGT!=std::numeric_limits<ushort>::max());
+    else if(_oGT.type()==CV_16SC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<short>::max()) & (_oGT>=0);
     else if(_oGT.type()==CV_32SC1)
-        oGTValidMask = (_oGT!=std::numeric_limits<int>::max());
+        oGTValidMask = (_oGT!=std::numeric_limits<int>::max()) & (_oGT>=0);
     else if(_oGT.type()==CV_32FC1)
-        oGTValidMask = (_oGT!=std::numeric_limits<float>::max());
+        oGTValidMask = (_oGT!=std::numeric_limits<float>::max()) & (_oGT>=0);
     else
         lvError("unexpected gt map type");
     vErrors.reserve(vErrors.size()+oDispMap.total());
@@ -165,8 +169,8 @@ void lv::StereoDispErrors::accumulate(const cv::Mat& _oDispMap, const cv::Mat& _
 
 cv::Mat lv::StereoDispErrors::getColoredMask(const cv::Mat& _oDispMap, const cv::Mat& _oGT, float fMaxError, const cv::Mat& oROI) {
     lvAssert_(!_oDispMap.empty() && _oDispMap.dims==2 && _oDispMap.isContinuous(),"input disp map must be non-empty and 2d");
-    lvAssert_(_oDispMap.type()==CV_8UC1 || _oDispMap.type()==CV_16UC1 || _oDispMap.type()==CV_32SC1 || _oDispMap.type()==CV_32FC1,"binary classifier results must be non-empty and of type 8UC1/16UC1/32SC1/32FC1");
-    lvAssert_(_oGT.empty() || (_oGT.isContinuous() && (_oGT.type()==CV_8UC1 || _oGT.type()==CV_16UC1 || _oGT.type()==CV_32SC1 || _oGT.type()==CV_32FC1)),"gt mat must be empty, or of type 8UC1/16UC1/32SC1");
+    lvAssert_(_oDispMap.type()==CV_8UC1 || _oDispMap.type()==CV_8SC1 || _oDispMap.type()==CV_16UC1 || _oDispMap.type()==CV_16SC1 || _oDispMap.type()==CV_32SC1 || _oDispMap.type()==CV_32FC1,"binary classifier results must be of type 8UC1/8SC1/16UC1/16SC1/32SC1/32FC1");
+    lvAssert_(_oGT.empty() || (_oGT.isContinuous() && (_oGT.type()==CV_8UC1 || _oGT.type()==CV_8SC1 || _oGT.type()==CV_16UC1 || _oGT.type()==CV_16SC1 || _oGT.type()==CV_32SC1 || _oGT.type()==CV_32FC1)),"gt mat must be empty, or of type 8UC1/8SC1/16UC1/16SC1/32SC1/32FC1");
     lvAssert_(oROI.empty() || (oROI.isContinuous() && oROI.type()==CV_8UC1),"ROI mat must be empty, or of type 8UC1");
     lvAssert_((_oGT.empty() || _oDispMap.size()==_oGT.size()) && (oROI.empty() || _oDispMap.size()==oROI.size()),"all input mat sizes must match");
     lvAssert_(fMaxError>0.0f,"bad max disparity error value for color map scaling");
@@ -184,12 +188,16 @@ cv::Mat lv::StereoDispErrors::getColoredMask(const cv::Mat& _oDispMap, const cv:
     cv::Mat_<uchar> oGTValidMask;
     if(_oGT.type()==CV_8UC1)
         oGTValidMask = (_oGT!=std::numeric_limits<uchar>::max());
+    else if(_oGT.type()==CV_8SC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<char>::max()) & (_oGT>=0);
     else if(_oGT.type()==CV_16UC1)
         oGTValidMask = (_oGT!=std::numeric_limits<ushort>::max());
+    else if(_oGT.type()==CV_16SC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<short>::max()) & (_oGT>=0);
     else if(_oGT.type()==CV_32SC1)
-        oGTValidMask = (_oGT!=std::numeric_limits<int>::max());
+        oGTValidMask = (_oGT!=std::numeric_limits<int>::max()) & (_oGT>=0);
     else if(_oGT.type()==CV_32FC1)
-        oGTValidMask = (_oGT!=std::numeric_limits<float>::max());
+        oGTValidMask = (_oGT!=std::numeric_limits<float>::max()) & (_oGT>=0);
     else
         lvError("unexpected gt map type");
     oErrorMap.create(oDispMap.size());

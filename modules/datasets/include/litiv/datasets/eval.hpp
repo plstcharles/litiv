@@ -190,7 +190,7 @@ namespace lv {
             public IDataConsumer_<DatasetEval_StereoDisparityEstim>,
             public DataReporter_<DatasetEval_StereoDisparityEstim,eDataset> {
         /// provides a visual feedback on result quality based on evaluation guidelines
-        virtual std::vector<cv::Mat> getColoredMaskArray(const std::vector<cv::Mat>& vDispMaps, size_t nIdx) {
+        virtual std::vector<cv::Mat> getColoredMaskArray(const std::vector<cv::Mat>& vDispMaps, size_t nIdx, float fMaxDispError=20.0f) {
             lvAssert_(!vDispMaps.empty(),"output array must be non-empty for display");
             auto pLoader = shared_from_this_cast<IDataLoader_<Array>>(true);
             lvAssert_(pLoader->getOutputPacketType()==ImageArrayPacket && pLoader->getGTPacketType()==ImageArrayPacket && pLoader->getGTMappingType()==ElemMapping,"default impl cannot display mask without 1:1 image pixel mapping");
@@ -199,7 +199,7 @@ namespace lv {
             const std::vector<cv::Mat>& vGTROIArray = pLoader->getGTROIArray(nIdx);
             lvAssert_(vDispMaps.size()==vGTArray.size() && (vGTROIArray.empty() || vDispMaps.size()==vGTROIArray.size()),"array size mistmatch");
             for(size_t nSteamIdx=0; nSteamIdx<vDispMaps.size(); ++nSteamIdx)
-                vMasks.push_back(StereoDispErrors::getColoredMask(vDispMaps[nSteamIdx],vGTArray[nSteamIdx],20.0f,vGTROIArray.empty()?cv::Mat():vGTROIArray[nSteamIdx]));
+                vMasks.push_back(StereoDispErrors::getColoredMask(vDispMaps[nSteamIdx],vGTArray[nSteamIdx],fMaxDispError,vGTROIArray.empty()?cv::Mat():vGTROIArray[nSteamIdx]));
             return vMasks;
         }
         /// resets internal packet count + classification metrics
