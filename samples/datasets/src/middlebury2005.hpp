@@ -30,30 +30,25 @@ namespace lv {
         return DatasetEval_None;
     }
 
-    // override the dataset evaluation type utility getter function to always set the eval type for this dataset as 'none' when used for registr
-    template<> // full specialization of 'getDatasetEval' declared in datasets/utils.hpp
-    constexpr DatasetEvalList getDatasetEval<DatasetTask_Registr,Dataset_Middlebury2005_demo>() {
-        return DatasetEval_None;
-    }
-
     // top-level dataset interface specialization; this allows us to simplify the default constructor
     template<DatasetTaskList eDatasetTask, lv::ParallelAlgoType eEvalImpl> // two parameters that will be specified by the user at compile time
     struct Dataset_<eDatasetTask,Dataset_Middlebury2005_demo,eEvalImpl> : // partial specialization of 'Dataset_' declared in datasets/utils.hpp
-            public IDataset_<eDatasetTask,DatasetSource_ImageArray,Dataset_Middlebury2005_demo,DatasetEval_None,eEvalImpl> { // dataset specializations should always inherit from 'IDataset_'
-        static_assert((eDatasetTask==DatasetTask_Cosegm || eDatasetTask==DatasetTask_Registr),"bad task chosen for middlebury stereo dataset"); // this dataset only supports two task types
+            public IDataset_<eDatasetTask,DatasetSource_ImageArray,Dataset_Middlebury2005_demo,lv::getDatasetEval<eDatasetTask,Dataset_Middlebury2005_demo>(),eEvalImpl> { // dataset specializations should always inherit from 'IDataset_'
+        static_assert((eDatasetTask==DatasetTask_Cosegm || eDatasetTask==DatasetTask_StereoReg),"bad task chosen for middlebury stereo dataset"); // this dataset only supports two task types
     protected: // should still be protected, as creation should always be done via datasets::create (avoids problems with shared_from_this)
         Dataset_( // local specialization constructor (can receive any extra parameters you may which to have)
             const std::string& sOutputDirPath, // output directory path for debug logs, evaluation reports and pushed results
+            bool bEvalOutput=false, // defines whether pushed results should be evaluated or not
             bool bSaveOutput=true // defines whether pushed results should be saved or not
         ) :
-                IDataset_<eDatasetTask,DatasetSource_ImageArray,Dataset_Middlebury2005_demo,DatasetEval_None,eEvalImpl>( // need to provide all necessary params to base 'IDataset_' constructor
+                IDataset_<eDatasetTask,DatasetSource_ImageArray,Dataset_Middlebury2005_demo,lv::getDatasetEval<eDatasetTask,Dataset_Middlebury2005_demo>(),eEvalImpl>( // need to provide all necessary params to base 'IDataset_' constructor
                         "middlebury2005", // name of the dataset (for debug purposes only)
                         lv::addDirSlashIfMissing(SAMPLES_DATA_ROOT)+"middlebury2005_dataset_ex/", // location of the dataset's root folder
                         sOutputDirPath, // location of the dataet's output folder
                         std::vector<std::string>{"art","dolls"}, // name of work batches for this dataset (here, one work batch = one stereo pair)
                         std::vector<std::string>(), // names of directories which should be ignored by the parser (here, none in particular)
                         bSaveOutput, // toggles whether pushed results will be saved or not
-                        false // toggles whether pushed results should be evaluated or not
+                        bEvalOutput // toggles whether pushed results should be evaluated or not
                 ) {}
     };
 
@@ -110,6 +105,23 @@ namespace lv {
             this->m_vvInputInfos = std::vector<std::vector<lv::MatInfo>>{{lv::MatInfo{oInput_L.size(),oInput_L.type()},lv::MatInfo{oInput_R.size(),oInput_R.type()}}};
             this->m_vvGTInfos = std::vector<std::vector<lv::MatInfo>>{{lv::MatInfo{oGT_L.size(),oGT_L.type()},lv::MatInfo{oGT_R.size(),oGT_R.type()}}};
             this->m_mGTIndexLUT[0] = 0; // gt packet with index #0 is associated with input packet with index #0
+        }
+        // overrides the default getRawGTArray implementation to properly scale disparity values
+        virtual std::vector<cv::Mat> getRawGTArray(size_t nPacketIdx) override final {
+            const cv::Size oImageSize(463,370); // size of the expected GT frames
+            std::vector<cv::Mat> vGTs(getGTStreamCount()); // output gt array (which may keep empty mats)
+            if(this->m_mGTIndexLUT.count(nPacketIdx)) { // if the GT LUT maps to an existing index
+                const size_t nGTIdx = this->m_mGTIndexLUT[nPacketIdx]; // get the corresponding GT packet index
+                if(nGTIdx<this->m_vvsGTPaths.size()) { // make sure it maps to a valid GT path array
+                    const std::vector<std::string>& vsGTPaths = this->m_vvsGTPaths[nGTIdx]; // shorthand for access
+                    lvAssert_(vsGTPaths.size()==getGTStreamCount(),"GT path count did not match stream count");
+                    for(size_t nStreamIdx=0; nStreamIdx<vsGTPaths.size(); ++nStreamIdx) {
+                        vGTs[nStreamIdx] = cv::imread(vsGTPaths[nStreamIdx],cv::IMREAD_UNCHANGED);
+                        vGTs[nStreamIdx] /= 3; // scale down pixel values (disparities) due to 1/3 size dataset
+                    }
+                }
+            }
+            return vGTs;
         }
     };
 
