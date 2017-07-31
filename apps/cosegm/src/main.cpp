@@ -21,21 +21,21 @@
 
 ////////////////////////////////
 #define PROCESS_PREPROC_BGSEGM  0
-#define WRITE_IMG_OUTPUT        1
-#define EVALUATE_OUTPUT         1
-#define GLOBAL_VERBOSITY        2
+#define WRITE_IMG_OUTPUT        0
+#define EVALUATE_OUTPUT         0
+#define GLOBAL_VERBOSITY        3
 ////////////////////////////////
-#define DATASET_VAPTRIMOD       0
-#define DATASET_LITIV2014       1
+#define DATASET_VAPTRIMOD       1
+#define DATASET_LITIV2014       0
 #define DATASET_MINI_TESTS      0
 ////////////////////////////////
-#define DATASET_OUTPUT_PATH     "results_cosegm__full"
+#define DATASET_OUTPUT_PATH     "results_cosegm_test"
 #define DATASET_PRECACHING      0
 #define DATASET_SCALE_FACTOR    1//0.5
 #define DATASET_WORKTHREADS     1
 ////////////////////////////////
 #define DATASET_FORCE_RECALC_FEATURES      0
-#define DATASET_EVAL_DISPARITY_MASKS       1
+#define DATASET_EVAL_DISPARITY_MASKS       0
 #define DATASET_EVAL_APPROX_MASKS_ONLY     0
 #define DATASET_EVAL_OUTPUT_MASKS_ONLY     0
 #define DATASET_BATCH_START_INDEX          0

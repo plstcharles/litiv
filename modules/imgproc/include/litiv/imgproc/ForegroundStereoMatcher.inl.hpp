@@ -28,6 +28,7 @@
 #error "Must specify only one image affinity map computation approach to use."
 #endif //(features config ...)!=1
 #define STEREOSEGMATCH_CONFIG_USE_DESC_BASED_AFFINITY (STEREOSEGMATCH_CONFIG_USE_DASCGF_AFFINITY||STEREOSEGMATCH_CONFIG_USE_DASCRF_AFFINITY||STEREOSEGMATCH_CONFIG_USE_LSS_AFFINITY)
+#include <opengm/inference/external/fastPD.hxx>
 
 inline StereoSegmMatcher::StereoSegmMatcher(size_t nMinDispOffset, size_t nMaxDispOffset) {
     static_assert(getInputStreamCount()==4 && getOutputStreamCount()==4 && getCameraCount()==2,"i/o stream must be two image-mask pairs");
@@ -631,22 +632,22 @@ inline void StereoSegmMatcher::GraphModelData::updateStereoModel(size_t nCamIdx,
                     const int nLocalGrad = (int)((nOrientIdx==0)?aGradY[nCamIdx]:(nOrientIdx==1)?aGradX[nCamIdx]:aGradMag[nCamIdx])(nRowIdx,nColIdx);
                     const float fGradScaleFact = m_aLabelSimCostGradFactLUT.eval_raw(nLocalGrad);
                     lvDbgAssert(fGradScaleFact==(float)std::exp(float(STEREOSEGMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/STEREOSEGMATCH_LBLSIM_COST_GRADRAW_SCALE));
+                    const float fPairwWeight = float(fGradScaleFact*STEREOSEGMATCH_LBLSIM_STEREO_SCALE_CST); // should be constant & uncapped for use in fastpd/bcd
                     for(InternalLabelType nLabelIdx1=0; nLabelIdx1<m_nRealStereoLabels; ++nLabelIdx1) {
                         for(InternalLabelType nLabelIdx2=0; nLabelIdx2<m_nRealStereoLabels; ++nLabelIdx2) {
                             const OutputLabelType nRealLabel1 = getRealLabel(nLabelIdx1);
                             const OutputLabelType nRealLabel2 = getRealLabel(nLabelIdx2);
                             const int nRealLabelDiff = std::min(std::abs((int)nRealLabel1-(int)nRealLabel2),STEREOSEGMATCH_LBLSIM_STEREO_MAXDIFF_CST);
-                            vPairwiseStereoFunc(nLabelIdx1,nLabelIdx2) = ValueType((nRealLabelDiff*nRealLabelDiff)*fGradScaleFact*STEREOSEGMATCH_LBLSIM_STEREO_SCALE_CST);
-                            vPairwiseStereoFunc(nLabelIdx1,nLabelIdx2) = std::min(vPairwiseStereoFunc(nLabelIdx1,nLabelIdx2),STEREOSEGMATCH_LBLSIM_COST_MAXTRUNC_CST);
+                            vPairwiseStereoFunc(nLabelIdx1,nLabelIdx2) = ValueType((nRealLabelDiff*nRealLabelDiff)*fPairwWeight);
                         }
                     }
                     for(size_t nLabelIdx=0; nLabelIdx<m_nRealStereoLabels; ++nLabelIdx) {
                         // @@@ change later for img-data-dependent or roi-dependent energies?
                         // @@@@ outside-roi-dc to inside-roi-something is ok (0 cost)
-                        vPairwiseStereoFunc(m_nDontCareLabelIdx,nLabelIdx) = ValueType(10000);
-                        vPairwiseStereoFunc(m_nOccludedLabelIdx,nLabelIdx) = ValueType(10000); // @@@@ STEREOSEGMATCH_LBLSIM_COST_MAXOCCL scaled down if other label is high disp
-                        vPairwiseStereoFunc(nLabelIdx,m_nDontCareLabelIdx) = ValueType(10000);
-                        vPairwiseStereoFunc(nLabelIdx,m_nOccludedLabelIdx) = ValueType(10000); // @@@@ STEREOSEGMATCH_LBLSIM_COST_MAXOCCL scaled down if other label is high disp
+                        vPairwiseStereoFunc(m_nDontCareLabelIdx,nLabelIdx) = ValueType(10000*fPairwWeight);
+                        vPairwiseStereoFunc(m_nOccludedLabelIdx,nLabelIdx) = ValueType(10000*fPairwWeight); // @@@@ STEREOSEGMATCH_LBLSIM_COST_MAXOCCL scaled down if other label is high disp
+                        vPairwiseStereoFunc(nLabelIdx,m_nDontCareLabelIdx) = ValueType(10000*fPairwWeight);
+                        vPairwiseStereoFunc(nLabelIdx,m_nOccludedLabelIdx) = ValueType(10000*fPairwWeight); // @@@@ STEREOSEGMATCH_LBLSIM_COST_MAXOCCL scaled down if other label is high disp
                     }
                     vPairwiseStereoFunc(m_nDontCareLabelIdx,m_nDontCareLabelIdx) = ValueType(0);
                     vPairwiseStereoFunc(m_nOccludedLabelIdx,m_nOccludedLabelIdx) = ValueType(0);
@@ -807,8 +808,7 @@ inline void StereoSegmMatcher::GraphModelData::updateResegmModel(size_t nCamIdx,
                     const float fScaleFact = (fLocalScaleFact+fOffsetScaleFact*fInterSpectrScale)/fInterSpectrRatioTot;
                     for(InternalLabelType nLabelIdx1=0; nLabelIdx1<s_nResegmLabels; ++nLabelIdx1) {
                         for(InternalLabelType nLabelIdx2=0; nLabelIdx2<s_nResegmLabels; ++nLabelIdx2) {
-                            const ValueType tPairwiseCost = ValueType((nLabelIdx1^nLabelIdx2)*fScaleFact*STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST);
-                            vPairwiseResegmFunc(nLabelIdx1,nLabelIdx2) = std::min(tPairwiseCost,STEREOSEGMATCH_LBLSIM_COST_MAXTRUNC_CST);
+                            vPairwiseResegmFunc(nLabelIdx1,nLabelIdx2) = ValueType((nLabelIdx1^nLabelIdx2)*fScaleFact*STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST);
                         }
                     }
                 }
@@ -830,8 +830,7 @@ inline void StereoSegmMatcher::GraphModelData::updateResegmModel(size_t nCamIdx,
                     lvDbgAssert(fLocalScaleFact==(float)std::exp(float(STEREOSEGMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/STEREOSEGMATCH_LBLSIM_COST_GRADRAW_SCALE));
                     for(InternalLabelType nLabelIdx1=0; nLabelIdx1<s_nResegmLabels; ++nLabelIdx1) {
                         for(InternalLabelType nLabelIdx2=0; nLabelIdx2<s_nResegmLabels; ++nLabelIdx2) {
-                            const ValueType tPairwiseCost = ValueType((nLabelIdx1^nLabelIdx2)*fLocalScaleFact*STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST);
-                            vPairwiseResegmFunc(nLabelIdx1,nLabelIdx2) = std::min(tPairwiseCost,STEREOSEGMATCH_LBLSIM_COST_MAXTRUNC_CST);
+                            vPairwiseResegmFunc(nLabelIdx1,nLabelIdx2) = ValueType((nLabelIdx1^nLabelIdx2)*fLocalScaleFact*STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST);
                         }
                     }
                 }
@@ -1708,6 +1707,27 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
     bool bJustUpdatedSegm = false;
     // each iter below is a fusion move based on A. Fix's energy minimization method for higher-order MRFs
     // see "A Graph Cut Algorithm for Higher-order Markov Random Fields" in ICCV2011 for more info (doi = 10.1109/ICCV.2011.6126347)
+
+
+    std::cout << "m_oGridSize = " << m_oGridSize << std::endl;
+    opengm::external::FastPD<StereoModelType> oStereoMinimizer2(*m_apStereoModels[nPrimaryCamIdx],opengm::external::FastPD<StereoModelType>::Parameter());
+    oStereoMinimizer2.infer();
+    std::vector<uchar> outputlabels;
+    oStereoMinimizer2.arg(outputlabels);
+
+    std::transform(
+            outputlabels.begin(),
+            outputlabels.end(),
+            m_aStereoLabelings[nPrimaryCamIdx].begin(),
+            [&](const InternalLabelType& nLabel){return getRealLabel(nLabel);}
+                  );
+    {
+        cv::Mat oCurrLabelingDisplay = getStereoDispMapDisplay(nPrimaryCamIdx);
+        if(oCurrLabelingDisplay.size().area()<640*480)
+            cv::resize(oCurrLabelingDisplay,oCurrLabelingDisplay,cv::Size(),2,2,cv::INTER_NEAREST);
+        cv::imshow(std::string("disp-")+std::to_string(nPrimaryCamIdx),oCurrLabelingDisplay);
+        cv::waitKey(0);
+    }
     while(++nMoveIter<=m_nMaxMoveIterCount && nConsecUnchangedLabels<m_nStereoLabels) {
         const bool bNullifyStereoPairwCosts = (STEREOSEGMATCH_CONFIG_USE_UNARY_ONLY_FIRST)&&nMoveIter<=m_nStereoLabels;
         calcStereoMoveCosts(nPrimaryCamIdx,nStereoAlphaLabel);
