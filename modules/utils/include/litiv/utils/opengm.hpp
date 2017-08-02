@@ -57,6 +57,7 @@
 #endif //OPENGM_ENABLE_FAST_DEBUG_MAT_OPS
 #include <opengm/graphicalmodel/graphicalmodel.hxx>
 #include <opengm/functions/potts.hxx>
+#include <opengm/functions/explicit_function.hxx>
 #include <opengm/graphicalmodel/space/simplediscretespace.hxx>
 #include <opengm/graphicalmodel/space/static_simplediscretespace.hxx>
 #include <opengm/inference/inference.hxx>
@@ -65,10 +66,10 @@
 #include <opengm/inference/external/qpbo/QPBO.h>
 #if HAVE_OPENGM_EXTLIB_FASTPD
 #ifndef FASTPDENERGYVALUE
-#define FASTPDENERGYVALUE float
+#define FASTPDENERGYVALUE double
 #endif //ndef(FASTPDENERGYVALUE)
 #ifndef FASTPDLABELVALUE
-#define FASTPDLABELVALUE uint8_t
+#define FASTPDLABELVALUE size_t
 #endif //ndef(FASTPDLABELVALUE)
 #include <opengm/inference/external/fastPD.hxx>
 #endif //HAVE_OPENGM_EXTLIB_FASTPD

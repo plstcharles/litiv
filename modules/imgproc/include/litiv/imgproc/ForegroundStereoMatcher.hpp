@@ -97,10 +97,11 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
     using OutputLabelType = int32_t; ///< type used in returned labelings (i.e. output of 'apply')
     using AssocCountType = uint16_t; ///< type used for stereo association counting in cv::Mat_'s
     using AssocIdxType = int16_t; ///< type used for stereo association idx listing in cv::Mat_'s
-    using ValueType = int; ///< type used for factor values (@@@@ could be integer? retest speed later?)
+    using ValueType =  double; ///< type used for factor values (@@@@ could be integer? retest speed later?)
     using IndexType = size_t; ///< type used for node indexing (note: pretty much hardcoded everywhere in impl below)
     using ExplicitFunction = lv::gm::ExplicitViewFunction<ValueType,IndexType,InternalLabelType>; ///< shortcut for explicit view function
-    using FunctionTypeList = opengm::meta::TypeListGenerator<ExplicitFunction/*,...*/>::type;  ///< list of all functions the models can use
+    using ExplicitAllocFunction = opengm::ExplicitFunction<ValueType,IndexType,InternalLabelType>; ///< shortcut for explicit allocated function
+    using FunctionTypeList = opengm::meta::TypeListGenerator<ExplicitFunction,ExplicitAllocFunction/*,...*/>::type;  ///< list of all functions the models can use
     using StereoSpaceType = opengm::SimpleDiscreteSpace<IndexType,InternalLabelType>; ///< shortcut for discrete stereo space type (simple = all nodes have the same # of labels)
     using ResegmSpaceType = opengm::StaticSimpleDiscreteSpace<2,IndexType,InternalLabelType>; ///< shortcut for discrete resegm space type (binary labels for fg/bg)
     using StereoModelType = opengm::GraphicalModel<ValueType,opengm::Adder,FunctionTypeList,StereoSpaceType>; ///< shortcut for stereo graphical model type
@@ -201,9 +202,11 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
             CamArray<std::array<size_t,2>> aanPairwLUTNodeIdxs,aanPairwGraphNodeIdxs;
             /// ids for this node's two pairwise factors
             CamArray<std::array<size_t,2>> aanStereoPairwFactIDs,aanResegmPairwFactIDs;
+            /// weights for this node's two stereo pairwise costs (constant post-init)
+            mutable CamArray<std::array<float,2>> aafStereoPairwWeights;
             /// pointer to this node's two stereo pairwise functions
             CamArray<std::array<StereoFunc*,2>> aapStereoPairwFuncs;
-            /// pointer to this node's two stereo pairwise functions
+            /// pointer to this node's two resegm pairwise functions
             CamArray<std::array<StereoFunc*,2>> aapResegmPairwFuncs;
             // @@@@@ add higher o facts/funcptrs here
         };
@@ -292,8 +295,10 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         std::vector<NodeInfo> m_vNodeInfos;
         /// stereo model unary functions
         CamArray<std::vector<StereoFunc>> m_avStereoUnaryFuncs;
-        /// stereo model pairwise functions array
+        /// stereo model pairwise functions array (for already-weighted lookups)
         CamArray<std::array<std::vector<StereoFunc>,2>> m_aavStereoPairwFuncs;
+        /// stereo model pairwise function ids (for shared base lookups without weights)
+        CamArray<std::array<StereoFuncID,2>> m_aaStereoPairwFuncIDs_base;
         /// resegm model unary functions
         CamArray<std::vector<ResegmFunc>> m_avResegmUnaryFuncs;
         /// resegm model pairwise functions array
@@ -464,6 +469,14 @@ protected:
     std::vector<OutputLabelType> m_vStereoLabels;
     /// holds bimodel data & inference algo impls
     std::unique_ptr<GraphModelData> m_pModelData;
+    /*/// converts a floating point value to the model's value type, rounding if necessary
+    template<typename TVal>
+    static inline std::enable_if_t<std::is_floating_point<TVal>::value,ValueType> cost_cast(TVal val) {return (ValueType)std::round(val);}
+    /// converts an integral value to the model's value type
+    template<typename TVal>
+    static inline std::enable_if_t<std::is_integral<TVal>::value,ValueType> cost_cast(TVal val) {return (ValueType)val;}*/
+    template<typename TVal>
+    static inline ValueType cost_cast(TVal val) {return (ValueType)val;}
 };
 
 #define __LITIV_FGSTEREOM_HPP__
