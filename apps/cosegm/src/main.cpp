@@ -34,7 +34,7 @@
 #define DATASET_SCALE_FACTOR    1//0.5
 #define DATASET_WORKTHREADS     1
 ////////////////////////////////
-#define DATASET_FORCE_RECALC_FEATURES      0
+#define DATASET_FORCE_RECALC_FEATURES      1
 #define DATASET_EVAL_DISPARITY_MASKS       0
 #define DATASET_EVAL_APPROX_MASKS_ONLY     0
 #define DATASET_EVAL_OUTPUT_MASKS_ONLY     0
@@ -370,6 +370,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 oBatch.push(vCurrStereoMaps,nCurrIdx++);
             else
                 oBatch.push(vCurrFGMasks,nCurrIdx++);
+            break;
         #endif //!PROCESS_PREPROC_BGSEGM
         }
         oBatch.stopProcessing();

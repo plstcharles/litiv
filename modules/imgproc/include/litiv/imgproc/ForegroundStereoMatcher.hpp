@@ -38,10 +38,13 @@
 #define STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF   0
 #define STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF 1
 #define STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF  0
+#define STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF   1
+#define STEREOSEGMATCH_CONFIG_USE_SOSPD_RESEGM_INF  0
+#define STEREOSEGMATCH_CONFIG_USE_PROGRESS_BARS     0
 
 // default param values
 #define STEREOSEGMATCH_DEFAULT_DISPARITY_STEP       (size_t(1))
-#define STEREOSEGMATCH_DEFAULT_MAX_MOVE_ITER        (size_t(500))
+#define STEREOSEGMATCH_DEFAULT_MAX_MOVE_ITER        (size_t(300))
 #define STEREOSEGMATCH_DEFAULT_SCDESC_WIN_RAD       (size_t(40))
 #define STEREOSEGMATCH_DEFAULT_SCDESC_RAD_BINS      (size_t(3))
 #define STEREOSEGMATCH_DEFAULT_SCDESC_ANG_BINS      (size_t(10))
@@ -91,13 +94,6 @@
 // hardcoded term relations
 #define STEREOSEGMATCH_UNIQUE_COST_INCR_REL(n)      (float((n)*3)/((n)+2))
 #define STEREOSEGMATCH_UNIQUE_COST_ZERO_COUNT       (2)
-
-// preliminary config checks
-#if STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
-#if !HAVE_OPENGM_EXTLIB_FASTPD
-#error "StereoSegmMatcher config requires FastPD impl from OpenGM external lib."
-#endif //!HAVE_OPENGM_EXTLIB_FASTPD
-#endif //STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
 
 /// this stereo matcher assumes both input images are rectified, and have the same size;
 /// it also expects four inputs (image0,mask0,image1,mask1), and provides 4 outputs (disp0,mask0,disp1,mask1)
@@ -418,14 +414,7 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         CamArray<std::unique_ptr<StereoGraphInference>> m_apStereoInfs;
         /// holds resegmentation graph inference algorithm interface (redirects for bi-model inference)
         CamArray<std::unique_ptr<ResegmGraphInference>> m_apResegmInfs;
-    #if STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
-        /// holds stereo disparity graph inference algorithm impl (used internally)
-        CamArray<std::unique_ptr<fastPDLib::CV_Fast_PD>> m_apStereoMinimizers;
-    #endif //STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
-    #if STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF
-        /// holds stereo disparity graph inference algorithm impl (used internally)
-        //CamArray<std::unique_ptr<SoSPD>> m_apStereoMinimizers;
-    #endif //STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF
+        // @@@@ add internally-used minimizers here?
     };
 
     /// algo interface for multi-label graph model inference
