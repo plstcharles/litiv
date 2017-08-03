@@ -35,6 +35,9 @@
 #define STEREOSEGMATCH_CONFIG_USE_ROOT_SIFT_DESCS   0
 #define STEREOSEGMATCH_CONFIG_USE_MULTILEVEL_AFFIN  0
 #define STEREOSEGMATCH_CONFIG_USE_GMM_LOCAL_BACKGR  1
+#define STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF   0
+#define STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF 1
+#define STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF  0
 
 // default param values
 #define STEREOSEGMATCH_DEFAULT_DISPARITY_STEP       (size_t(1))
@@ -71,8 +74,8 @@
 // pairwise costs params
 #define STEREOSEGMATCH_LBLSIM_COST_MAXOCCL          (ValueType(5000))
 #define STEREOSEGMATCH_LBLSIM_COST_MAXTRUNC_CST     (ValueType(5000))
-#define STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST      (200)
-#define STEREOSEGMATCH_LBLSIM_STEREO_SCALE_CST      (0.1f)
+#define STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST      (400)
+#define STEREOSEGMATCH_LBLSIM_STEREO_SCALE_CST      (1.f)
 #define STEREOSEGMATCH_LBLSIM_STEREO_MAXDIFF_CST    (10)
 #define STEREOSEGMATCH_LBLSIM_USE_EXP_GRADPIVOT     (1)
 #if STEREOSEGMATCH_LBLSIM_USE_EXP_GRADPIVOT
@@ -88,6 +91,13 @@
 // hardcoded term relations
 #define STEREOSEGMATCH_UNIQUE_COST_INCR_REL(n)      (float((n)*3)/((n)+2))
 #define STEREOSEGMATCH_UNIQUE_COST_ZERO_COUNT       (2)
+
+// preliminary config checks
+#if STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
+#if !HAVE_OPENGM_EXTLIB_FASTPD
+#error "StereoSegmMatcher config requires FastPD impl from OpenGM external lib."
+#endif //!HAVE_OPENGM_EXTLIB_FASTPD
+#endif //STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
 
 /// this stereo matcher assumes both input images are rectified, and have the same size;
 /// it also expects four inputs (image0,mask0,image1,mask1), and provides 4 outputs (disp0,mask0,disp1,mask1)
@@ -323,13 +333,13 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         lv::LUT<uchar,float,256> m_aLabelSimCostGradFactLUT;
 
         /// holds the feature extractor to use on input images
-#if STEREOSEGMATCH_CONFIG_USE_DASCGF_AFFINITY || STEREOSEGMATCH_CONFIG_USE_DASCRF_AFFINITY
+    #if STEREOSEGMATCH_CONFIG_USE_DASCGF_AFFINITY || STEREOSEGMATCH_CONFIG_USE_DASCRF_AFFINITY
         std::unique_ptr<DASC> m_pImgDescExtractor;
-#elif STEREOSEGMATCH_CONFIG_USE_LSS_AFFINITY
+    #elif STEREOSEGMATCH_CONFIG_USE_LSS_AFFINITY
         std::unique_ptr<LSS> m_pImgDescExtractor;
-#elif STEREOSEGMATCH_CONFIG_USE_MI_AFFINITY
+    #elif STEREOSEGMATCH_CONFIG_USE_MI_AFFINITY
         std::unique_ptr<MutualInfo> m_pImgDescExtractor; // although not really a 'descriptor' extractor...
-#endif //STEREOSEGMATCH_CONFIG_USE_..._AFFINITY
+    #endif //STEREOSEGMATCH_CONFIG_USE_..._AFFINITY
         /// holds the feature extractor to use on input shapes
         std::unique_ptr<ShapeContext> m_pShpDescExtractor;
         /// defines the minimum grid border size based on the feature extractors used
@@ -404,10 +414,18 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         void calcStereoMoveCosts(size_t nCamIdx, InternalLabelType nNewLabel) const;
         /// fill internal temporary energy cost mats for the given resegm move operation
         void calcResegmMoveCosts(size_t nCamIdx, InternalLabelType nNewLabel) const;
-        /// holds stereo disparity graph inference algorithm impl (redirects for bi-model inference)
+        /// holds stereo disparity graph inference algorithm interface (redirects for bi-model inference)
         CamArray<std::unique_ptr<StereoGraphInference>> m_apStereoInfs;
-        /// holds resegmentation graph inference algorithm impl (redirects for bi-model inference)
+        /// holds resegmentation graph inference algorithm interface (redirects for bi-model inference)
         CamArray<std::unique_ptr<ResegmGraphInference>> m_apResegmInfs;
+    #if STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
+        /// holds stereo disparity graph inference algorithm impl (used internally)
+        CamArray<std::unique_ptr<fastPDLib::CV_Fast_PD>> m_apStereoMinimizers;
+    #endif //STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
+    #if STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF
+        /// holds stereo disparity graph inference algorithm impl (used internally)
+        //CamArray<std::unique_ptr<SoSPD>> m_apStereoMinimizers;
+    #endif //STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF
     };
 
     /// algo interface for multi-label graph model inference
@@ -479,6 +497,9 @@ protected:
     static inline ValueType cost_cast(TVal val) {return (ValueType)val;}
 };
 
+#ifdef __LITIV_FGSTEREOM_HPP__
+#error "bad inline header config"
+#endif //def(__LITIV_FGSTEREOM_HPP__)
 #define __LITIV_FGSTEREOM_HPP__
 #include "litiv/imgproc/ForegroundStereoMatcher.inl.hpp"
 #undef __LITIV_FGSTEREOM_HPP__

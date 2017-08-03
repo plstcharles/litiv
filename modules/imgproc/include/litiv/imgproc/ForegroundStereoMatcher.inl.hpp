@@ -18,7 +18,7 @@
 #ifndef __LITIV_FGSTEREOM_HPP__
 #error "Cannot include .inl.hpp headers directly!"
 #endif //ndef(__LITIV_FGSTEREOM_HPP__)
-#pragma once
+
 #if (STEREOSEGMATCH_CONFIG_USE_DASCGF_AFFINITY+\
      STEREOSEGMATCH_CONFIG_USE_DASCRF_AFFINITY+\
      STEREOSEGMATCH_CONFIG_USE_LSS_AFFINITY+\
@@ -28,8 +28,12 @@
 #error "Must specify only one image affinity map computation approach to use."
 #endif //(features config ...)!=1
 #define STEREOSEGMATCH_CONFIG_USE_DESC_BASED_AFFINITY (STEREOSEGMATCH_CONFIG_USE_DASCGF_AFFINITY||STEREOSEGMATCH_CONFIG_USE_DASCRF_AFFINITY||STEREOSEGMATCH_CONFIG_USE_LSS_AFFINITY)
-#include <opengm/inference/external/fastPD.hxx>
-#include "ForegroundStereoMatcher.hpp"
+#if (STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF+\
+     STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF+\
+     STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF/*+...*/\
+    )!=1
+#error "Must specify only one stereo inference approach to use."
+#endif //(stereo inf config ...)!=1
 
 inline StereoSegmMatcher::StereoSegmMatcher(size_t nMinDispOffset, size_t nMaxDispOffset) {
     static_assert(getInputStreamCount()==4 && getOutputStreamCount()==4 && getCameraCount()==2,"i/o stream must be two image-mask pairs");
@@ -129,7 +133,6 @@ inline const std::vector<StereoSegmMatcher::OutputLabelType>& StereoSegmMatcher:
     lvAssert_(m_pModelData,"model must be initialized first");
     return m_pModelData->m_vStereoLabels;
 }
-
 
 inline cv::Mat StereoSegmMatcher::getResegmMapDisplay(size_t nCamIdx) const {
     lvDbgExceptionWatch;
@@ -662,25 +665,10 @@ inline void StereoSegmMatcher::GraphModelData::updateStereoModel(size_t nCamIdx,
                     lvDbgAssert(fGradScaleFact==(float)std::exp(float(STEREOSEGMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/STEREOSEGMATCH_LBLSIM_COST_GRADRAW_SCALE));
                     const float fPairwWeight = (float)(fGradScaleFact*STEREOSEGMATCH_LBLSIM_STEREO_SCALE_CST); // should be constant & uncapped for use in fastpd/bcd
                     oNode.aafStereoPairwWeights[nCamIdx][nOrientIdx] = fPairwWeight;
-                    /*if(nGraphNodeIdx==2 && nOrientIdx==0) {
-                        std::cout << "@@@@ orient = " << nOrientIdx << std::endl;
-                        std::cout << "@@@@ func id = " << oNode.aapStereoPairwFuncs[nCamIdx][nOrientIdx]->first.functionIndex << std::endl;
-                        std::cout << "@@@@ node graph = " << nGraphNodeIdx << std::endl;
-                        std::cout << "@@@@ node graph connect = " << oNode.aanPairwGraphNodeIdxs[nCamIdx][nOrientIdx] << std::endl;
-                        std::cout << "@@@@ node lut = " << nLUTNodeIdx << std::endl;
-                        std::cout << "@@@@ node lut connect = " << oNode.aanPairwLUTNodeIdxs[nCamIdx][nOrientIdx] << std::endl;
-                        std::cout << "@@@@ fPairwWeight = " << fPairwWeight << std::endl;
-                    }*/
                     // all stereo pairw functions are identical, but weighted differently (see base init in constructor)
-                    for(InternalLabelType nLabelIdx1=0; nLabelIdx1<m_nStereoLabels; ++nLabelIdx1) {
-                        for(InternalLabelType nLabelIdx2=0; nLabelIdx2<m_nStereoLabels; ++nLabelIdx2) {
+                    for(InternalLabelType nLabelIdx1=0; nLabelIdx1<m_nStereoLabels; ++nLabelIdx1)
+                        for(InternalLabelType nLabelIdx2=0; nLabelIdx2<m_nStereoLabels; ++nLabelIdx2)
                             vPairwiseStereoFunc(nLabelIdx1,nLabelIdx2) = cost_cast(vPairwiseStereoBaseFunc(nLabelIdx1,nLabelIdx2)*fPairwWeight);
-                            /*if(nGraphNodeIdx==2 && nOrientIdx==0 && nLabelIdx1==0) {
-                                std::cout << "\t " << (int)nLabelIdx1 << "," << (int)nLabelIdx2 << " @@@@ vPairwiseStereoBaseFunc(nLabelIdx1,nLabelIdx2) = " << vPairwiseStereoBaseFunc(nLabelIdx1,nLabelIdx2) << std::endl;
-                                std::cout << "\t " << (int)nLabelIdx1 << "," << (int)nLabelIdx2 << " @@@@ vPairwiseStereoFunc(nLabelIdx1,nLabelIdx2) = " << vPairwiseStereoFunc(nLabelIdx1,nLabelIdx2) << std::endl;
-                            }*/
-                        }
-                    }
                 }
             }
         }
@@ -1698,7 +1686,6 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
     CamArray<HOEReducer> aResegmReducers;
     size_t nMoveIter=0, nConsecUnchangedLabels=0, nOrderingIdx=0;
     lvDbgAssert(m_vStereoLabelOrdering.size()==m_vStereoLabels.size());
-    InternalLabelType nStereoAlphaLabel = m_vStereoLabelOrdering[nOrderingIdx];
     const auto lFactorReducer = [&](auto& oGraphFactor, size_t nFactOrder, HOEReducer& oReducer, InternalLabelType nAlphaLabel, const size_t* pValidLUTNodeIdxs, const InternalLabelType* aLabeling) {
         lvDbgAssert(oGraphFactor.numberOfVariables()==nFactOrder);
         std::array<typename HOEReducer::VarId,s_nMaxOrder> aTermEnergyLUT;
@@ -1735,16 +1722,15 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
     CamArray<ValueType> atLastResegmEnergies = {std::numeric_limits<ValueType>::max(),std::numeric_limits<ValueType>::max()};
     cv::Mat_<InternalLabelType>& oCurrStereoLabeling = m_aStereoLabelings[nPrimaryCamIdx];
     bool bJustUpdatedSegm = false;
-    // each iter below is a fusion move based on A. Fix's energy minimization method for higher-order MRFs
-    // see "A Graph Cut Algorithm for Higher-order Markov Random Fields" in ICCV2011 for more info (doi = 10.1109/ICCV.2011.6126347)
-
-
-    opengm::external::FastPD<StereoModelType> oStereoMinimizer2(*m_apStereoModels[nPrimaryCamIdx],opengm::external::FastPD<StereoModelType>::Parameter());
-    oStereoMinimizer2.infer();
-    std::vector<InternalLabelType> outputlabels;
-    oStereoMinimizer2.arg(outputlabels);
-    {
+    while(++nMoveIter<=m_nMaxMoveIterCount && nConsecUnchangedLabels<m_nStereoLabels) {
         size_t nChangedStereoLabels = 0;
+        const bool bNullifyStereoPairwCosts = (STEREOSEGMATCH_CONFIG_USE_UNARY_ONLY_FIRST)&&nMoveIter<=m_nStereoLabels;
+    #if STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
+        lvIgnore(nOrderingIdx);
+        opengm::external::FastPD<StereoModelType> oStereoMinimizer2(*m_apStereoModels[nPrimaryCamIdx],opengm::external::FastPD<StereoModelType>::Parameter());
+        oStereoMinimizer2.infer();
+        std::vector<InternalLabelType> outputlabels;
+        oStereoMinimizer2.arg(outputlabels);
         lvAssert(outputlabels.size()==m_anValidGraphNodes[nPrimaryCamIdx]);
         for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_anValidGraphNodes[nPrimaryCamIdx]; ++nGraphNodeIdx) {
             const size_t& nLUTNodeIdx = m_avValidLUTNodeIdxs[nPrimaryCamIdx][nGraphNodeIdx];
@@ -1756,22 +1742,17 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
                 if(nOldLabel<m_nDontCareLabelIdx)
                     removeAssoc(nPrimaryCamIdx,nRowIdx,nColIdx,nOldLabel);
                 oCurrStereoLabeling(nRowIdx,nColIdx) = nNewLabel;
-                if(nStereoAlphaLabel<m_nDontCareLabelIdx)
-                    addAssoc(nPrimaryCamIdx,nRowIdx,nColIdx,nStereoAlphaLabel);
+                if(nNewLabel<m_nDontCareLabelIdx)
+                    addAssoc(nPrimaryCamIdx,nRowIdx,nColIdx,nNewLabel);
                 ++nChangedStereoLabels;
             }
         }
-        if(lv::getVerbosity()>=3) {
-            cv::Mat oCurrLabelingDisplay = getStereoDispMapDisplay(nPrimaryCamIdx);
-            if(oCurrLabelingDisplay.size().area()<640*480)
-                cv::resize(oCurrLabelingDisplay,oCurrLabelingDisplay,cv::Size(),2,2,cv::INTER_NEAREST);
-            cv::imshow(std::string("disp-")+std::to_string(nPrimaryCamIdx),oCurrLabelingDisplay);
-            cv::waitKey(0);
-        }
-    }
-    exit(13);
-    while(++nMoveIter<=m_nMaxMoveIterCount && nConsecUnchangedLabels<m_nStereoLabels) {
-        const bool bNullifyStereoPairwCosts = (STEREOSEGMATCH_CONFIG_USE_UNARY_ONLY_FIRST)&&nMoveIter<=m_nStereoLabels;
+        const bool bResegmNext = true;
+    #elif STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF
+        // each iter below is a fusion move based on A. Fix's energy minimization method for higher-order MRFs
+        // see "A Graph Cut Algorithm for Higher-order Markov Random Fields" in ICCV2011 for more info (doi = 10.1109/ICCV.2011.6126347)
+        // (note: this approach is very generic, and not very well adapted to a dynamic MRF problem!)
+        const InternalLabelType nStereoAlphaLabel = m_vStereoLabelOrdering[nOrderingIdx];
         calcStereoMoveCosts(nPrimaryCamIdx,nStereoAlphaLabel);
         oStereoReducer.Clear();
         oStereoReducer.AddVars((int)m_anValidGraphNodes[nPrimaryCamIdx]);
@@ -1797,7 +1778,6 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
         oStereoReducer.ToQuadratic(oStereoMinimizer);
         oStereoMinimizer.Solve();
         oStereoMinimizer.ComputeWeakPersistencies(); // @@@@ check if any good
-        size_t nChangedStereoLabels = 0;
         for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_anValidGraphNodes[nPrimaryCamIdx]; ++nGraphNodeIdx) {
             const size_t& nLUTNodeIdx = m_avValidLUTNodeIdxs[nPrimaryCamIdx][nGraphNodeIdx];
             const int& nRowIdx = m_vNodeInfos[nLUTNodeIdx].nRowIdx;
@@ -1814,12 +1794,17 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
                 ++nChangedStereoLabels;
             }
         }
+        ++nOrderingIdx %= m_nStereoLabels;
+        const bool bResegmNext = (nMoveIter%STEREOSEGMATCH_DEFAULT_ITER_PER_RESEGM)==0;
+    #elif STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF
+        @@@ todo
+    #endif //STEREOSEGMATCH_CONFIG_USE_..._STEREO_INF
         if(lv::getVerbosity()>=3) {
             cv::Mat oCurrLabelingDisplay = getStereoDispMapDisplay(nPrimaryCamIdx);
             if(oCurrLabelingDisplay.size().area()<640*480)
                 cv::resize(oCurrLabelingDisplay,oCurrLabelingDisplay,cv::Size(),2,2,cv::INTER_NEAREST);
             cv::imshow(std::string("disp-")+std::to_string(nPrimaryCamIdx),oCurrLabelingDisplay);
-            cv::waitKey(1);
+            cv::waitKey(100);
         }
         const ValueType tCurrStereoEnergy = m_apStereoInfs[nPrimaryCamIdx]->value();
         lvDbgAssert(tCurrStereoEnergy>=cost_cast(0));
@@ -1828,7 +1813,11 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
             ssStereoEnergyDiff << "null";
         else
             ssStereoEnergyDiff << std::showpos << tCurrStereoEnergy-tLastStereoEnergy;
+    #if STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF
         lvLog_(2,"\t\tdisp [+label:%d]   e = %d   (delta=%s)      [iter=%d]",(int)nStereoAlphaLabel,(int)tCurrStereoEnergy,ssStereoEnergyDiff.str().c_str(),(int)nMoveIter);
+    #else //!STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
+        lvLog_(2,"\t\tdisp      e = %d      (delta=%s)      [iter=%d]",(int)tCurrStereoEnergy,ssStereoEnergyDiff.str().c_str(),(int)nMoveIter);
+    #endif //!STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
         if(bNullifyStereoPairwCosts)
             lvLog(2,"\t\t\t(nullifying pairw costs)");
         else if(bJustUpdatedSegm)
@@ -1838,8 +1827,7 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
         tLastStereoEnergy = tCurrStereoEnergy;
         bJustUpdatedSegm = false;
         nConsecUnchangedLabels = (nChangedStereoLabels>0)?0:nConsecUnchangedLabels+1;
-        nStereoAlphaLabel = m_vStereoLabelOrdering[(++nOrderingIdx%=m_nStereoLabels)];
-        if((nMoveIter%STEREOSEGMATCH_DEFAULT_ITER_PER_RESEGM)==0) {
+        if(bResegmNext) {
             resetStereoLabelings(nSecondaryCamIdx,false);
             if(lv::getVerbosity()>=3) {
                 cv::Mat oCurrLabelingDisplay = getStereoDispMapDisplay(nSecondaryCamIdx);
