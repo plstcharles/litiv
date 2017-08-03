@@ -36,8 +36,8 @@
 #define STEREOSEGMATCH_CONFIG_USE_MULTILEVEL_AFFIN  0
 #define STEREOSEGMATCH_CONFIG_USE_GMM_LOCAL_BACKGR  1
 #define STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF   0
-#define STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF 1
-#define STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF  0
+#define STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF 0
+#define STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF  1
 #define STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF   1
 #define STEREOSEGMATCH_CONFIG_USE_SOSPD_RESEGM_INF  0
 #define STEREOSEGMATCH_CONFIG_USE_PROGRESS_BARS     0
@@ -103,7 +103,7 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
     using OutputLabelType = int32_t; ///< type used in returned labelings (i.e. output of 'apply')
     using AssocCountType = uint16_t; ///< type used for stereo association counting in cv::Mat_'s
     using AssocIdxType = int16_t; ///< type used for stereo association idx listing in cv::Mat_'s
-    using ValueType =  double; ///< type used for factor values (@@@@ could be integer? retest speed later?)
+    using ValueType =  int64_t; ///< type used for factor values (@@@@ could be integer? retest speed later?)
     using IndexType = size_t; ///< type used for node indexing (note: pretty much hardcoded everywhere in impl below)
     using ExplicitFunction = lv::gm::ExplicitViewFunction<ValueType,IndexType,InternalLabelType>; ///< shortcut for explicit view function
     using ExplicitAllocFunction = opengm::ExplicitFunction<ValueType,IndexType,InternalLabelType>; ///< shortcut for explicit allocated function
@@ -259,10 +259,8 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         mutable CamArray<cv::Mat_<AssocCountType>> m_aAssocCounts;
         /// 3d maps which list the associations (by idx) for each graph node (mutable for inference)
         mutable CamArray<cv::Mat_<AssocIdxType>> m_aAssocMaps;
-        /// 2d maps which contain transient unary factor energy costs for all graph nodes (mutable for inference)
-        mutable CamArray<cv::Mat_<ValueType>> m_aAssocCosts,m_aStereoUnaryCosts,m_aResegmUnaryCosts;
-        /// 2d maps which contain transient pairwise factor energy costs for all graph nodes (mutable for inference, for debug only)
-        mutable CamArray<cv::Mat_<ValueType>> m_aStereoPairwCosts,m_aResegmPairwCosts;
+        /// 2d maps which contain transient unary factor labeling costs for all graph nodes (mutable for inference)
+        mutable CamArray<cv::Mat_<ValueType>> m_aStereoUnaryCosts,m_aResegmUnaryCosts;
         /// contains the ROIs used for grid setup passed in the constructor
         const CamArray<cv::Mat_<uchar>> m_aROIs;
         /// contains the predetermined (max) 2D grid size for the graph models
@@ -406,15 +404,64 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         void calcShapeFeatures(const CamArray<cv::Mat_<InternalLabelType>>& aInputMasks);
         /// calculates shape mask distance features required for model updates using the provided input mask & camera index
         void calcShapeDistFeatures(const cv::Mat_<InternalLabelType>& oInputMask, size_t nCamIdx);
+        /// calculates a stereo unary move cost for a single graph node
+        ValueType calcStereoUnaryMoveCost(size_t nCamIdx, size_t nGraphNodeIdx, InternalLabelType nOldLabel, InternalLabelType nNewLabel) const;
+    #if STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF
         /// fill internal temporary energy cost mats for the given stereo move operation
         void calcStereoMoveCosts(size_t nCamIdx, InternalLabelType nNewLabel) const;
+    #endif //STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF
+    #if STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF
         /// fill internal temporary energy cost mats for the given resegm move operation
         void calcResegmMoveCosts(size_t nCamIdx, InternalLabelType nNewLabel) const;
+    #endif //STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF
+    #if (STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF || STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF)
+        /// fill internal temporary energy cost mats for all stereo label move operations
+        void calcStereoCosts(size_t nCamIdx) const;
+    #endif //(STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF || STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF)
+    #if STEREOSEGMATCH_CONFIG_USE_SOSPD_RESEGM_INF
+        /// fill internal temporary energy cost mats for all resegm label move operations
+        void calcResegmCosts(size_t nCamIdx) const;
+    #endif //STEREOSEGMATCH_CONFIG_USE_SOSPD_RESEGM_INF
+    #if STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF
+        /// runs sospd inference algorithm either to completion, or for a specific number of iterations
+        typedef int VarId;
+        typedef size_t Label;
+        typedef std::vector<REAL> LambdaAlpha;
+        typedef std::vector<std::pair<size_t, size_t>> NodeNeighborList;
+        typedef std::vector<NodeNeighborList> NodeCliqueList;
+        REAL ComputeHeightDiff(VarId i, Label l1, Label l2);
+        void SetupAlphaEnergy(SubmodularIBFS& crf);
+        bool InitialFusionLabeling();
+        void PreEditDual(SubmodularIBFS& crf);
+        bool UpdatePrimalDual(SubmodularIBFS& crf);
+        void PostEditDual(SubmodularIBFS& crf);
+        size_t __cam;
+        size_t m_nStereoCliqueCount;
+        InternalLabelType __alpha;
+        REAL& Height(VarId i, Label l) {
+            return m_heights[i*m_nStereoLabels+l];
+        }
+        REAL& dualVariable(int alpha, VarId i, Label l) {
+            return m_dual[alpha][i*m_nStereoLabels+l];
+        }
+        REAL& dualVariable(LambdaAlpha& lambdaAlpha,VarId i, Label l) {
+            return lambdaAlpha[i*m_nStereoLabels+l];
+        }
+        LambdaAlpha& lambdaAlpha(int alpha){
+            return m_dual[alpha];
+        }
+        //void HeightAlphaProposal();
+        //void AlphaProposal();
+        NodeCliqueList m_node_clique_list;
+        // @@@ FIXME(afix) change way m_dual is stored. Put lambda_alpha as separate REAL* for each clique, indexed by i, l.
+        std::vector<LambdaAlpha> m_dual;
+        std::vector<REAL> m_heights;
+        //ProposalCallback m_pc;
+    #endif //STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF
         /// holds stereo disparity graph inference algorithm interface (redirects for bi-model inference)
         CamArray<std::unique_ptr<StereoGraphInference>> m_apStereoInfs;
         /// holds resegmentation graph inference algorithm interface (redirects for bi-model inference)
         CamArray<std::unique_ptr<ResegmGraphInference>> m_apResegmInfs;
-        // @@@@ add internally-used minimizers here?
     };
 
     /// algo interface for multi-label graph model inference
