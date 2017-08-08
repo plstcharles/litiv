@@ -65,6 +65,7 @@ if(USE_OPENGM_WITH_EXTLIB)
         NAMES
             "opengm-external"
         HINTS
+            "${OpenGM_LIBRARYDIR}"
             "${OpenGM_LIBRARY_DIR}"
             "${OpenGM_ROOT_DIR}/build/install/lib/"
             "${OpenGM_ROOT_DIR}/build/lib/Release/"
@@ -83,7 +84,9 @@ if(USE_OPENGM_WITH_EXTLIB)
         NAMES
             opengm/opengm.hxx
         HINTS
+            "${OpenGM_INCLUDEDIR}"
             "${OpenGM_LIBRARY_ROOT}/../include"
+            "${OpenGM_LIBRARYDIR}/../include"
             "${OpenGM_LIBRARY_DIR}/../include"
             "${OpenGM_ROOT_DIR}/build/install/include/"
             "${OpenGM_ROOT_DIR}/include/"
@@ -128,6 +131,7 @@ else()
         NAMES
             opengm/opengm.hxx
         HINTS
+            "${OpenGM_INCLUDEDIR}"
             "${OpenGM_ROOT_DIR}/build/install/include/"
             "${OpenGM_ROOT_DIR}/include/"
             "$ENV{OPENGM_ROOT}/build/install/include/"

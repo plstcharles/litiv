@@ -19,12 +19,6 @@
 
 #include "litiv/utils/platform.hpp"
 #include "litiv/utils/console.hpp"
-#if !HAVE_OPENGM_EXTLIB
-#error "OpenGM utils require extlib."
-#endif //(!HAVE_OPENGM_EXTLIB)
-#if !HAVE_OPENGM_EXTLIB_QPBO
-#error "OpenGM utils require QPBO in extlib."
-#endif //(!HAVE_OPENGM_EXTLIB_QPBO)
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wignored-qualifiers"
@@ -62,8 +56,11 @@
 #include <opengm/graphicalmodel/space/static_simplediscretespace.hxx>
 #include <opengm/inference/inference.hxx>
 #include <opengm/inference/visitors/visitors.hxx>
+#if HAVE_OPENGM_EXTLIB
+#if HAVE_OPENGM_EXTLIB_QPBO
 #include <opengm/inference/fix-fusion/higher-order-energy.hpp>
 #include <opengm/inference/external/qpbo/QPBO.h>
+#endif //HAVE_OPENGM_EXTLIB_QPBO
 #if HAVE_OPENGM_EXTLIB_FASTPD
 #ifndef FASTPDENERGYVALUE
 #define FASTPDENERGYVALUE double
@@ -73,6 +70,7 @@
 #endif //ndef(FASTPDLABELVALUE)
 #include <opengm/inference/external/fastPD.hxx>
 #endif //HAVE_OPENGM_EXTLIB_FASTPD
+#endif //HAVE_OPENGM_EXTLIB
 #ifdef ADDED_NDEBUG
 #undef ADDED_NDEBUG
 #undef NDEBUG
