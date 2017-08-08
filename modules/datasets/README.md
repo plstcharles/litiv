@@ -1,13 +1,13 @@
 LITIV *datasets* Module
 -----------------------
-This folder contains standalone dataset parsing and result evaluation utilities with support for data precaching, async processing and on-the-fly custom work batch generation. The implementations here are largely based on template specialization and multiple interface inheritance. The only header required to use the module is [datasets.hpp](./include/litiv/datasets.hpp). The interfaces currently support image/video-based data parsing and saving, and evaluation for binary classification problems (including BSDS500 via a custom evaluator). As of v1.3.0, the interfaces also offer parallel stream processing (e.g. for cosegmentation or registration) and evaluation.
+This folder contains standalone dataset parsing and result evaluation utilities with support for data precaching, async processing and on-the-fly custom work batch generation. The implementations here are largely based on template specialization and multiple interface inheritance. The only header required to use the module is [datasets.hpp](./include/litiv/datasets.hpp). The interfaces currently support image/video-based data parsing and saving, and evaluation for binary classification problems (including BSDS500 via a custom evaluator) and stereo registration problems.
 
 List of (non-LITIV) datasets with out-of-the-box specialization (more should be added over time):
   - Foreground-background video segmentation & background subtraction:
     - [ChangeDetection.net 2012](http://wordpress-jodoin.dmi.usherb.ca/cdw2012)
     - [ChangeDetection.net 2014](http://wordpress-jodoin.dmi.usherb.ca/cdw2014)
     - Wallflower
-    - PETS2006 (dataset#3)
+    - PETS2001 (dataset#3)
   - Boundary segmentation & edge detection:
     - [BSDS500](http://www.eecs.berkeley.edu/Research/Projects/CS/vision/grouping/resources.html)
   - Multimodal video cosegmentation

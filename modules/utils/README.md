@@ -16,53 +16,84 @@ Here is a non-exhaustive (and probably not fully up-to-date) list of features:
     - GLSL source code for passthrough fragment/vertex/compute shaders
     - Pre-coded shaders for various compute operations (parallel sums, shared data preloading, ...)
     - Image processing GLSL algorithm interface (hides all the ugly binding/prep calls)
+  - Defines:
+    - Forward declarations of all CMake options as defines (including SIMD bit flags)
+    - Assert/DbgAssert and Warn/Error/Log one-liners with logging support
+    - Mutex'd cerr and cout printers
+    - Symbol export/import logic for WIN32 via LV_PUBLIC and LV_LOCAL macros
   - CUDA:
     - helper functions for error handling, + basic test kernel
   - OpenCV:
-    - Display helper object with mouse feedback for debugging
+    - Type compatiblity lookup helpers (templated, constexpr)
+    - Mat type/size helpers w/ support for printing in ostreams
+    - Submatrix getters & squeezers for templated opencv matrices
+    - Generic matrix allocators/element getters for sparse/dense mats
+    - Vector-based opencv matrix concatenator
     - Random pixel lookup functions (based on 4-NN, 8-NN, Gaussian kernels, ...)
+    - Matrix printer for 1D/2D templated array types
+    - Matrix element unique/equal testing functions
+    - BGR to HSL to BGR image color converters
+    - BGR to packed YCbCr to BGR image color converters
+    - Color map generator for 2d arrays with unique labels
+    - Display helper object with mouse feedback for debugging
     - Generic cv::Mat archiver/loader (binary, text, or YML format)
-    - Aligned memory allocator for OpenCV matrices
+    - Matrix pixel circular shifting algorithm
+    - Aligned memory allocator for opencv matrices
+  - OpenGM:
+    - Graph model info printer utility
+    - ExplicitViewFunction implementation to avoid in-graph reallocations
   - SIMD:
     - Wrappers for missing SSE calls (e.g. _mm_mullo_epi32, _mm_extract_epi32)
     - Horizontal SSE sums/min/max functions
   - Platform:
     - Files/subdirectories query functions with name filtering
-    - Aligned memory allocator for STL containers
-    - Default-init memory allocator for STL containers
+    - File creation function with prealloc size on disk
+    - Multi-platform console signal event registration function
+    - Memory usage request function
   - Kinect:
     - Data structures re-implementation for body joint tracking
   - Console:
     - Various line/symbol/block drawing & updating utilities (most taken from [rlutil](https://github.com/tapio/rlutil))
     - Console window/buffer resizing utilities (win32 only)
-    - Progress bar
+    - Progress bar w/ global console mutex
   - Cxx:
+    - Generic C++ string-generating printf (putf) function
+    - String comparison/transformation functions (lowercase, clamping, split, ...)
+    - Time, version stamp generators for loggers
+    - Global framework logging verbosity getter/setter
+    - Stream guard for non-overlapping logging in multithreaded algos
     - Exception extenders & loggers
     - STL unique_pointer type casting helpers
-    - Loop unroller
-    - String manipulation (caseless comparison, token search, ...)
-    - Vector manipulation (concat, filter, member accumulation, ...)
-    - Sort utilities (sort indices, uniques, nearest neighbor, ...)
+    - Static loop unroller (templated, constexpr)
+    - Digit counter for templated arithmetic types
+    - Vector manipulation functions (concat, filter, member accumulation, ...)
+    - Sorting utilities (sort indices, uniques, nearest neighbor, ...)
     - Worker thread pool implementation for generic tasking/queueing
     - High-precision stopwatch
-    - Time, version stamp generators for loggers
     - enable_shared_from_this wrapper with cast function
     - has_const_iterator type traits helper
     - get_bigger_integer type traits helper
-    - Tuple for_each, unpack, unpack_call
-    - Static array in-place transformation/reduction w/ constexpr support
-    - Lookup Table impl w/ support for generic functions
+    - Tuple for_each, unpack, unpack_call, reduce, transform
+    - Aligned memory allocator for STL containers
+    - Default-init memory allocator for STL containers
+    - AutoBuffer implementation for static-alloc and dynamic swap at runtime
+    - Lookup Table implementation for templated types and runtime defined funcs
     - Mutex unlock guards
     - C++11 semaphore implementation
-    - C++11 make_unique
   - Math:
-    - Type-templated L1/L2sqr/L2/Hamming/Gradient/ColorDistortion distance functions
+    - Type-templated L1/L2sqr/L2/Hamming/Gradient/ColorDistortion distance functions (w/ some GLSL impls)
     - LUT-based Hamming weight functions for processors that do not support Intel's POPCNT
-    - GLSL implementations of various distance functions
+    - Earth mover's (L1) distance function with circular distance variation
+    - Array sparseness evaluator (uses Hoyer's metric)
+    - Array descriptor root sift transformation function
     - Nearest neighbor helper function
     - L1 vector/pointset interpolation function (matlab-compat)
     - Linearly separated vector generator function (matlab-compat)
     - Integer flag bit expander
+    - Lower-Upper (LU) matrix decomposition function (templated)
+    - Matrix determinant computation function (templated)
+    - Matrix inverter function (templated)
+    - Gaussian Mixture Model implementation w/ fitting and probability density evaluation
 
 
 This module also links all external dependencies for the framework, meaning that executables only have to link to this target (along with other LITIV targets, as needed) to fully link to, e.g., OpenCV. Also, note that most important CMake variables have symbol entrypoints in the [defines.hpp.in](./include/litiv/utils/defines.hpp.in) file, which is converted by CMake into an actual header file.
