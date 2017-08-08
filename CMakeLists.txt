@@ -142,13 +142,25 @@ else()
     unset(USE_VPTZ_STANDALONE CACHE)
 endif()
 
+### BOOST CHECK
+find_package(Boost QUIET COMPONENTS chrono date_time system filesystem program_options regex serialization)
+option(USE_BOOST "Specifies whether Boost should be included/linked or not; if false, projects that depend on it (e.g. SoSPD, cosegmenters) will be disabled" ${Boost_FOUND})
+if(USE_BOOST)
+    find_package(Boost COMPONENTS chrono date_time system filesystem program_options regex serialization)
+    if(NOT Boost_FOUND)
+        message(FATAL_ERROR "Unable to find boost include/library directories; user must set BOOST_ROOT, BOOST_INCLUDEDIR or BOOST_LIBRARYDIR to be used as hints.")
+    endif()
+else()
+    message("Without Boost support, projects that depend on it (e.g. SoSPD, cosegmenters) will be disabled.")
+endif()
+
 ### OPENGM CHECK
 find_package(OpenGM QUIET COMPONENTS ext)
-option(USE_OPENGM "Specifies whether OpenGM should be included/linked or not; if false, projects that depend on it will be disabled" ${OpenGM_FOUND})
+option(USE_OPENGM "Specifies whether OpenGM should be included/linked or not; if false, projects that depend on it (e.g. cosegmenters) will be disabled" ${OpenGM_FOUND})
 if(USE_OPENGM)
     find_package(OpenGM REQUIRED COMPONENTS ext)
 else()
-    message("Without OpenGM support w/ external dependencies enabled, cosegm project & utilities will be disabled.")
+    message("Without OpenGM support w/ external dependencies enabled, cosegmentation project & utilities will be disabled.")
 endif()
 
 ### CUDA CHECK

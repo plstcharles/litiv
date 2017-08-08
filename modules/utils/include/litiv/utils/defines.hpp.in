@@ -317,6 +317,17 @@
         // ...
     #endif //HAVE_OPENCL
 
+    #define HAVE_BOOST                @USE_BOOST@
+    #if HAVE_BOOST
+        #define HAVE_BOOST_CHRONO     @Boost_CHRONO_FOUND@
+        #define HAVE_BOOST_DATETIME   @Boost_DATE_TIME_FOUND@
+        #define HAVE_BOOST_SYSTEM     @Boost_SYSTEM_FOUND@
+        #define HAVE_BOOST_FILESYSTEM @Boost_FILESYSTEM_FOUND@
+        #define HAVE_BOOST_PROGOPTS   @Boost_PROGRAM_OPTIONS_FOUND@
+        #define HAVE_BOOST_REGEX      @Boost_REGEX_FOUND@
+        #define HAVE_BOOST_SERIALIZ   @Boost_SERIALIZATION_FOUND@
+    #endif //HAVE_BOOST
+
     #define HAVE_OPENGM               @USE_OPENGM@
     #if HAVE_OPENGM
         #define HAVE_OPENGM_CPLEX          @USE_OPENGM_WITH_CPLEX@
