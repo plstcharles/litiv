@@ -82,6 +82,11 @@
 #elif defined(__clang__)
 #pragma clang diagnostic pop
 #endif //defined(__clang__)
+#if HAVE_BOOST
+#include "litiv/3rdparty/sospd/submodular-ibfs.hpp"
+#include "litiv/3rdparty/sospd/parametric-submodular-ibfs.hpp"
+#include "litiv/3rdparty/sospd/submodular-functions.hpp"
+#endif //HAVE_BOOST
 
 namespace lv {
 

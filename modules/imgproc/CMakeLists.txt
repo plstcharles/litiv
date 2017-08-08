@@ -51,3 +51,10 @@ target_link_libraries(litiv_imgproc
         litiv_features2d
         litiv_utils
 )
+
+if(USE_OPENGM AND USE_BOOST)
+    target_link_libraries(litiv_imgproc
+        PUBLIC
+            litiv_3rdparty_sospd
+    )
+endif()
