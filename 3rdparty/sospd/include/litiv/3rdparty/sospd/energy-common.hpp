@@ -1,11 +1,11 @@
 #ifndef _ENERGY_COMMON_HPP_
 #define _ENERGY_COMMON_HPP_
 
-#include <stdint.h>
+#include <cstdint>
 #include <limits>
 #include <vector>
 #include <memory>
-#include <assert.h>
+#include <cassert>
 #include <stdexcept>
 #include <string>
 

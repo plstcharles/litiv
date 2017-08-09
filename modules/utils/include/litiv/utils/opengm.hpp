@@ -22,6 +22,7 @@
 #if defined(__clang__)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wignored-qualifiers"
+#pragma clang diagnostic ignored "-Wsign-compare"
 #pragma clang diagnostic ignored "-Wunused-local-typedefs"
 #pragma clang diagnostic ignored "-Wshadow"
 #pragma clang diagnostic ignored "-Wpedantic"
@@ -31,6 +32,7 @@
 #elif (defined(__GNUC__) || defined(__GNUG__))
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wignored-qualifiers"
+#pragma GCC diagnostic ignored "-Wsign-compare"
 #pragma GCC diagnostic ignored "-Wunused-local-typedefs"
 #pragma GCC diagnostic ignored "-Wshadow"
 #pragma GCC diagnostic ignored "-Wpedantic"
@@ -84,7 +86,6 @@
 #endif //defined(__clang__)
 #if HAVE_BOOST
 #include "litiv/3rdparty/sospd/submodular-ibfs.hpp"
-#include "litiv/3rdparty/sospd/parametric-submodular-ibfs.hpp"
 #include "litiv/3rdparty/sospd/submodular-functions.hpp"
 #endif //HAVE_BOOST
 

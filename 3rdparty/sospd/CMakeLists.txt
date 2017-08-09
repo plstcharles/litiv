@@ -82,7 +82,6 @@ add_files(INCLUDE_FILES
     "include/litiv/3rdparty/sospd/gen-random.hpp"
     "include/litiv/3rdparty/sospd/higher-order-energy.hpp"
     "include/litiv/3rdparty/sospd/multilabel-energy.hpp"
-    "include/litiv/3rdparty/sospd/parametric-submodular-ibfs.hpp"
     "include/litiv/3rdparty/sospd/sos-graph.hpp"
     "include/litiv/3rdparty/sospd/sospd.hpp"
     "include/litiv/3rdparty/sospd/submodular-functions.hpp"

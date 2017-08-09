@@ -18,7 +18,7 @@
 #include "litiv/3rdparty/sospd/submodular-functions.hpp"
 
 
-/** Graph structure and algorithm for sum-of-submodular IBFS 
+/** Graph structure and algorithm for sum-of-submodular IBFS
  */
 class SoSGraph {
     public:
@@ -38,7 +38,7 @@ class SoSGraph {
 
         SoSGraph()
             : m_num_nodes(0),
-            s(-1), 
+            s(-1),
             t(-1),
             m_num_cliques(0)
         { }
@@ -56,7 +56,7 @@ class SoSGraph {
         /** Zero the capacities on the s-i and i-t edges
          */
         void ClearTerminals();
-        
+
         // Add Clique defined by nodes and energy table given
         IBFSEnergyTableClique& AddClique(const std::vector<NodeId>& nodes, const std::vector<REAL>& energyTable);
 
@@ -107,8 +107,8 @@ class SoSGraph {
                     m_energy(energy),
                     m_alpha_energy(energy),
                     m_min_tight_set(nodes.size(), (1 << nodes.size()) - 1)
-                { 
-                    ASSERT(nodes.size() <= 31); 
+                {
+                    ASSERT(nodes.size() <= 31);
                 }
 
                 virtual REAL ComputeEnergy(const std::vector<int>& labels) const;
@@ -138,7 +138,7 @@ class SoSGraph {
             int cliqueIdx;
             int cliqueSize;
             SoSGraph* graph;
-            
+
             bool operator!=(const ArcIterator& a) {
                 return (cIter != a.cIter) || (cliqueIdx != a.cliqueIdx);
             }
@@ -193,7 +193,7 @@ class SoSGraph {
             ArcIterator parent_arc;
             NodeId parent;
             NeighborList cliques;
-            Node(NodeId _id) 
+            Node(NodeId _id)
                 : id(_id)
                 , state(NodeState::N)
                 , dis(std::numeric_limits<int>::max())
@@ -293,7 +293,7 @@ inline void SoSGraph::ClearTerminals() {
         m_phi_si[i] = m_phi_it[i] = 0;
     }
 }
-        
+
 inline SoSGraph::IBFSEnergyTableClique& SoSGraph::AddClique(const std::vector<NodeId>& nodes, const std::vector<REAL>& energyTable) {
     ASSERT(s == -1);
     m_cliques.emplace_back(nodes, energyTable);
@@ -319,7 +319,7 @@ inline void SoSGraph::ResetFlow() {
         node.parent = i;
         m_phi_si[i] = m_phi_it[i] = 0;
     }
-    
+
     // Reset Clique parameters
     for (int cid = 0; cid < m_num_cliques; ++cid) {
         auto& c = m_cliques[cid];
@@ -444,8 +444,8 @@ inline REAL SoSGraph::IBFSEnergyTableClique::ExchangeCapacity(size_t u_idx, size
 }
 
 inline void SoSGraph::IBFSEnergyTableClique::Push(size_t u_idx, size_t v_idx, REAL delta) {
-    ASSERT(u_idx >= 0 && u_idx < this->m_nodes.size());
-    ASSERT(v_idx >= 0 && v_idx < this->m_nodes.size());
+    ASSERT(u_idx < this->m_nodes.size());
+    ASSERT(v_idx < this->m_nodes.size());
     m_alpha_Ci[u_idx] += delta;
     m_alpha_Ci[v_idx] -= delta;
     const size_t n = this->m_nodes.size();
@@ -561,7 +561,7 @@ inline void SoSGraph::UpperBoundCliques(UBfn ub, NormStats* stats) {
     UpperBoundCliques(ub, std::vector<bool>{}, std::vector<int>{}, stats);
 }
 
-inline void SoSGraph::UpperBoundCliques(UBfn ub, const std::vector<bool>& fixedVars, const std::vector<int>& labels, NormStats* stats) {
+inline void SoSGraph::UpperBoundCliques(UBfn ub, const std::vector<bool>& fixedVars, const std::vector<int>& /*labels*/, NormStats* stats) {
     switch (ub) {
         case UBfn::chen: UpperBoundCliques<ChenUpperBound>(fixedVars, stats);
                     break;
