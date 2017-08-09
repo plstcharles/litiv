@@ -65,9 +65,11 @@
 #endif //HAVE_OPENGM_EXTLIB_QPBO
 #if HAVE_OPENGM_EXTLIB_FASTPD
 #ifndef FASTPDENERGYVALUE
+// this define must match the type given to cmake while building opengm
 #define FASTPDENERGYVALUE double
 #endif //ndef(FASTPDENERGYVALUE)
 #ifndef FASTPDLABELVALUE
+// this define must match the type given to cmake while building opengm
 #define FASTPDLABELVALUE size_t
 #endif //ndef(FASTPDLABELVALUE)
 #include <opengm/inference/external/fastPD.hxx>

@@ -36,8 +36,8 @@
 #define STEREOSEGMATCH_CONFIG_USE_MULTILEVEL_AFFIN  0
 #define STEREOSEGMATCH_CONFIG_USE_GMM_LOCAL_BACKGR  1
 #define STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF   0
-#define STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF 0
-#define STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF  1
+#define STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF 1
+#define STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF  0
 #define STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF   1
 #define STEREOSEGMATCH_CONFIG_USE_SOSPD_RESEGM_INF  0
 #define STEREOSEGMATCH_CONFIG_USE_PROGRESS_BARS     0
@@ -103,7 +103,7 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
     using OutputLabelType = int32_t; ///< type used in returned labelings (i.e. output of 'apply')
     using AssocCountType = uint16_t; ///< type used for stereo association counting in cv::Mat_'s
     using AssocIdxType = int16_t; ///< type used for stereo association idx listing in cv::Mat_'s
-    using ValueType =  int64_t; ///< type used for factor values (@@@@ could be integer? retest speed later?)
+    using ValueType =  double; ///< type used for factor values (@@@@ could be integer? retest speed later?)
     using IndexType = size_t; ///< type used for node indexing (note: pretty much hardcoded everywhere in impl below)
     using ExplicitFunction = lv::gm::ExplicitViewFunction<ValueType,IndexType,InternalLabelType>; ///< shortcut for explicit view function
     using ExplicitAllocFunction = opengm::ExplicitFunction<ValueType,IndexType,InternalLabelType>; ///< shortcut for explicit allocated function
@@ -264,8 +264,8 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         const lv::MatSize m_oGridSize;
         /// contains all 'real' stereo labels, plus the 'occluded'/'dontcare' labels
         const std::vector<OutputLabelType> m_vStereoLabels;
-        /// total number of (re)segmentation labels
-        static constexpr size_t s_nResegmLabels = 2;
+        /// total number of (re)segmentation labels (could be constexpr, but messes up linking w/ gcc @@@@)
+        const size_t m_nResegmLabels;
         /// number of 'real' (i.e. non-reserved) stereo disparity labels
         const size_t m_nRealStereoLabels;
         /// total number of stereo disparity labels (including reserved ones)
@@ -294,6 +294,8 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         size_t m_nTotValidGraphNodes;
         /// model info lookup array
         std::vector<NodeInfo> m_vNodeInfos;
+        /// graph model factor counts used for validation in debug mode
+        CamArray<size_t> m_anUnaryFactCounts,m_anPairwFactCounts;
         /// graph model unary functions
         CamArray<std::vector<FuncPairType>> m_avStereoUnaryFuncs,m_avResegmUnaryFuncs;
         /// graph model pairwise functions arrays (for already-weighted lookups)
