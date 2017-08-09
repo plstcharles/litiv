@@ -137,6 +137,83 @@ namespace lv {
             }
         };
 
+        /// clique interface used used for faster factor/energy/nodes access through graph model
+        /// note: for optimal performance, users that know the clique's size should cast, and use derived public members instead of virtual functions
+        template<typename TValue, typename TIndex=size_t, typename TLabel=size_t, typename TFunc=ExplicitViewFunction<TValue,TIndex,TLabel>>
+        struct IClique {
+            /// returns whether the clique is initialized/in use or not
+            virtual bool isValid() const = 0;
+            /// returns the clique size for the derived object
+            virtual TIndex getSize() const = 0;
+            /// returns the graph factor index for this clique
+            virtual TIndex getFactorId() const = 0;
+            /// returns this clique's function tied to its graph factor
+            virtual TFunc* getFunctionPtr() const = 0;
+            /// returns a LUT node index for a member of this clique
+            virtual TIndex getLUTNodeIdx(TIndex nInternalIdx) const = 0;
+            /// returns a graph node index for a member of this clique
+            virtual TIndex getGraphNodeIdx(TIndex nInternalIdx) const = 0;
+            /// implicit bool conversion operator returns whether this clique is valid or not
+            operator bool() const {return isValid();}
+        };
+
+        /// clique implementation used for faster factor/energy/nodes access through graph model
+        /// note: for optimal performance, users that know the clique's size should use public members instead of virtual functions
+        template<size_t nSize, typename TValue, typename TIndex=size_t, typename TLabel=size_t, typename TFunc=ExplicitViewFunction<TValue,TIndex,TLabel>>
+        struct Clique : IClique<TValue,TIndex,TLabel,TFunc> {
+            /// default constructor; fills all members with invalid values that must be specified later
+            Clique() {
+                m_bValid = false;
+                m_nGraphFactorId = std::numeric_limits<TIndex>::max();
+                m_pGraphFunctionPtr = nullptr;
+                std::fill_n(m_anLUTNodeIdxs.begin(),nSize,std::numeric_limits<TIndex>::max());
+                std::fill_n(m_anGraphNodeIdxs.begin(),nSize,std::numeric_limits<TIndex>::max());
+            }
+            /// returns whether the clique is initialized/in use or not through the virtual interface
+            virtual bool isValid() const override final {
+                return m_bValid;
+            }
+            /// returns the clique size of this object through the virtual interface (for casting)
+            virtual TIndex getSize() const override final {
+                return nSize;
+            }
+            /// returns the graph factor index for this clique through the virtual interface
+            virtual TIndex getFactorId() const override final {
+                return m_nGraphFactorId;
+            }
+            /// returns this clique's function tied to its graph factor through the virtual interface
+            virtual TFunc* getFunctionPtr() const override final {
+                return m_pGraphFunctionPtr;
+            }
+            /// returns a LUT node index for a member of this clique through the virtual interface
+            virtual TIndex getLUTNodeIdx(TIndex nInternalIdx) const override final {
+                lvDbgAssert(nInternalIdx<nSize);
+                return m_anLUTNodeIdxs[nInternalIdx];
+            }
+            /// returns the in-graph index of a node in this clique through the virtual interface
+            virtual TIndex getGraphNodeIdx(TIndex nInternalIdx) const override final {
+                lvDbgAssert(nInternalIdx<nSize);
+                return m_anGraphNodeIdxs[nInternalIdx];
+            }
+            /// implicit bool conversion operator returns whether this clique is valid or not
+            operator bool() const {
+                return m_bValid;
+            }
+            /// specifies whether this clique is valid or not (i.e. initialized and/or used)
+            bool m_bValid;
+            /// graph factor id for this clique
+            TIndex m_nGraphFactorId;
+            /// graph factor function for this clique
+            TFunc* m_pGraphFunctionPtr;
+            /// LUT node indices for members of this clique (useful when mapping ROIs to a graph)
+            std::array<TIndex,nSize> m_anLUTNodeIdxs;
+            /// graph node indices for members of this clique (should always be a valid index in gmodel)
+            std::array<TIndex,nSize> m_anGraphNodeIdxs;
+            /// static size member of this clique (for type traits ops)
+            static constexpr TIndex s_nCliqueSize = nSize;
+            static_assert(s_nCliqueSize>=TIndex(1),"clique size must be strictly positive");
+        };
+
     } // namespace gm
 
 } // namespace lv
