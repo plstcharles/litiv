@@ -217,3 +217,6 @@ namespace lv {
     } // namespace gm
 
 } // namespace lv
+
+template<size_t nSize, typename TValue, typename TIndex, typename TLabel, typename TFunc>
+constexpr TIndex lv::gm::Clique<nSize,TValue,TIndex,TLabel,TFunc>::s_nCliqueSize;
