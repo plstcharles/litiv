@@ -81,7 +81,7 @@ inline StereoSegmMatcher::StereoSegmMatcher(size_t nMinDispOffset, size_t nMaxDi
     lvAssert_(m_vStereoLabels.size()>1,"graph must have at least two possible output labels, beyond reserved ones");
 }
 
-inline void StereoSegmMatcher::initialize(const std::array<cv::Mat,2>& aROIs) {
+inline void StereoSegmMatcher::initialize(const std::array<cv::Mat,s_nCameraCount>& aROIs) {
     static_assert(getCameraCount()==2,"bad static array size, mismatch with cam head count (hardcoded stuff below will break)");
     lvDbgExceptionWatch;
     lvAssert_(!aROIs[0].empty() && aROIs[0].total()>1 && aROIs[0].type()==CV_8UC1,"bad input ROI size/type");
@@ -351,13 +351,8 @@ inline StereoSegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>
                 m_vNodeInfos[nLUTNodeIdx].anResegmUnaryFactIDs[nCamIdx] = SIZE_MAX;
                 m_vNodeInfos[nLUTNodeIdx].apStereoUnaryFuncs[nCamIdx] = nullptr;
                 m_vNodeInfos[nLUTNodeIdx].apResegmUnaryFuncs[nCamIdx] = nullptr;
-                m_vNodeInfos[nLUTNodeIdx].aanPairwLUTNodeIdxs[nCamIdx] = std::array<size_t,2>{SIZE_MAX,SIZE_MAX};
-                m_vNodeInfos[nLUTNodeIdx].aanPairwGraphNodeIdxs[nCamIdx] = std::array<size_t,2>{SIZE_MAX,SIZE_MAX};
-                m_vNodeInfos[nLUTNodeIdx].aanStereoPairwFactIDs[nCamIdx] = std::array<size_t,2>{SIZE_MAX,SIZE_MAX};
-                m_vNodeInfos[nLUTNodeIdx].aanResegmPairwFactIDs[nCamIdx] = std::array<size_t,2>{SIZE_MAX,SIZE_MAX};
-                m_vNodeInfos[nLUTNodeIdx].aafStereoPairwWeights[nCamIdx] = std::array<float,2>{0.0f,0.0f};
-                m_vNodeInfos[nLUTNodeIdx].aapStereoPairwFuncs[nCamIdx] = std::array<StereoFunc*,2>{nullptr,nullptr};
-                m_vNodeInfos[nLUTNodeIdx].aapResegmPairwFuncs[nCamIdx] = std::array<ResegmFunc*,2>{nullptr,nullptr};
+                std::fill_n(m_vNodeInfos[nLUTNodeIdx].aafStereoPairwWeights[nCamIdx].begin(),s_nPairwOrients,0.0f);
+                // aaStereoPairwCliques,aaResegmPairwCliques are fine when default-constructed
             }
         }
     }
@@ -367,7 +362,7 @@ inline StereoSegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>
         m_nTotValidGraphNodes += m_anValidGraphNodes[nCamIdx];
         m_avStereoUnaryFuncs[nCamIdx].reserve(m_anValidGraphNodes[nCamIdx]);
         m_avResegmUnaryFuncs[nCamIdx].reserve(m_anValidGraphNodes[nCamIdx]);
-        for(size_t nOrientIdx=0; nOrientIdx<m_aavStereoPairwFuncs[nCamIdx].size(); ++nOrientIdx) {
+        for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
             m_aavStereoPairwFuncs[nCamIdx][nOrientIdx].reserve(m_anValidGraphNodes[nCamIdx]);
             m_aavResegmPairwFuncs[nCamIdx][nOrientIdx].reserve(m_anValidGraphNodes[nCamIdx]);
         }
@@ -387,26 +382,29 @@ inline StereoSegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>
             NodeInfo& oNode = m_vNodeInfos[nLUTNodeIdx];
             m_avStereoUnaryFuncs[nCamIdx].push_back(m_apStereoModels[nCamIdx]->addFunctionWithRefReturn(ExplicitFunction()));
             m_avResegmUnaryFuncs[nCamIdx].push_back(m_apResegmModels[nCamIdx]->addFunctionWithRefReturn(ExplicitFunction()));
-            StereoFunc& oStereoFunc = m_avStereoUnaryFuncs[nCamIdx].back();
-            ResegmFunc& oResegmFunc = m_avResegmUnaryFuncs[nCamIdx].back();
+            FuncPairType& oStereoFunc = m_avStereoUnaryFuncs[nCamIdx].back();
+            FuncPairType& oResegmFunc = m_avResegmUnaryFuncs[nCamIdx].back();
             oStereoFunc.second.assign(aUnaryStereoFuncDims.begin(),aUnaryStereoFuncDims.end(),m_apStereoUnaryFuncsDataBase[nCamIdx]+(nGraphNodeIdx*m_nStereoLabels));
             oResegmFunc.second.assign(aUnaryResegmFuncDims.begin(),aUnaryResegmFuncDims.end(),m_apResegmUnaryFuncsDataBase[nCamIdx]+(nGraphNodeIdx*s_nResegmLabels));
             lvDbgAssert(oStereoFunc.second.strides(0)==1 && oResegmFunc.second.strides(0)==1); // expect no padding
             const std::array<size_t,1> aGraphNodeIndices = {nGraphNodeIdx};
             oNode.anStereoUnaryFactIDs[nCamIdx] = m_apStereoModels[nCamIdx]->addFactorNonFinalized(oStereoFunc.first,aGraphNodeIndices.begin(),aGraphNodeIndices.end());
             oNode.anResegmUnaryFactIDs[nCamIdx] = m_apResegmModels[nCamIdx]->addFactorNonFinalized(oResegmFunc.first,aGraphNodeIndices.begin(),aGraphNodeIndices.end());
-            oNode.apStereoUnaryFuncs[nCamIdx] = &oStereoFunc;
-            oNode.apResegmUnaryFuncs[nCamIdx] = &oResegmFunc;
+            lvDbgAssert(FuncIdentifType((*m_apStereoModels[nCamIdx])[oNode.anStereoUnaryFactIDs[nCamIdx]].functionIndex(),(*m_apStereoModels[nCamIdx])[oNode.anStereoUnaryFactIDs[nCamIdx]].functionType())==oStereoFunc.first);
+            lvDbgAssert((&m_apStereoModels[nCamIdx]->getFunction<ExplicitFunction>(oStereoFunc.first))==(&oStereoFunc.second));
+            oNode.apStereoUnaryFuncs[nCamIdx] = &oStereoFunc.second;
+            lvDbgAssert(FuncIdentifType((*m_apResegmModels[nCamIdx])[oNode.anResegmUnaryFactIDs[nCamIdx]].functionIndex(),(*m_apResegmModels[nCamIdx])[oNode.anResegmUnaryFactIDs[nCamIdx]].functionType())==oResegmFunc.first);
+            lvDbgAssert((&m_apResegmModels[nCamIdx]->getFunction<ExplicitFunction>(oResegmFunc.first))==(&oResegmFunc.second));
+            oNode.apResegmUnaryFuncs[nCamIdx] = &oResegmFunc.second;
         }
     }
     lvLog(2,"\tadding pairwise factors to each graph node pair...");
     for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
-        const std::array<size_t,2> aPairwiseStereoFuncDims = {m_nStereoLabels,m_nStereoLabels};
-        const std::array<size_t,2> aPairwiseResegmFuncDims = {s_nResegmLabels,s_nResegmLabels};
-        std::array<size_t,2> aGraphNodeIndices;
+        const std::vector<size_t> aPairwiseStereoFuncDims(s_nPairwOrients,m_nStereoLabels);
+        const std::vector<size_t> aPairwiseResegmFuncDims(s_nPairwOrients,s_nResegmLabels);
         // note: current def w/ explicit stereo function will require too much memory if using >>50 disparity labels
         // note2: if inference is based on fastpd/bcd and stereo pairw terms are shared + weighted, *could* remove indiv pairw allocs
-        for(size_t nOrientIdx=0; nOrientIdx<m_aavStereoPairwFuncs[nCamIdx].size(); ++nOrientIdx) {
+        for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
             m_aaStereoPairwFuncIDs_base[nCamIdx][nOrientIdx] = m_apStereoModels[nCamIdx]->addFunction(ExplicitAllocFunction(aPairwiseStereoFuncDims.begin(),aPairwiseStereoFuncDims.end()));
             ExplicitAllocFunction& oStereoBaseFunc = m_apStereoModels[nCamIdx]->getFunction<ExplicitAllocFunction>(m_aaStereoPairwFuncIDs_base[nCamIdx][nOrientIdx]);
             lvDbgAssert(oStereoBaseFunc.size()==m_nStereoLabels*m_nStereoLabels);
@@ -428,56 +426,53 @@ inline StereoSegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>
             oStereoBaseFunc(m_nDontCareLabelIdx,m_nDontCareLabelIdx) = cost_cast(0);
             oStereoBaseFunc(m_nOccludedLabelIdx,m_nOccludedLabelIdx) = cost_cast(0);
         }
+
         for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_anValidGraphNodes[nCamIdx]; ++nGraphNodeIdx) {
             const size_t nBaseLUTNodeIdx = m_avValidLUTNodeIdxs[nCamIdx][nGraphNodeIdx];
             NodeInfo& oBaseNode = m_vNodeInfos[nBaseLUTNodeIdx];
             if(!oBaseNode.abValidGraphNode[nCamIdx])
                 continue;
+            const auto lPairwCliqueCreator = [&](size_t nOrientIdx, size_t nOffsetLUTNodeIdx) {
+                const NodeInfo& oOffsetNode = m_vNodeInfos[nOffsetLUTNodeIdx];
+                if(oOffsetNode.abValidGraphNode[nCamIdx]) {
+                    m_aavStereoPairwFuncs[nCamIdx][nOrientIdx].push_back(m_apStereoModels[nCamIdx]->addFunctionWithRefReturn(ExplicitFunction()));
+                    m_aavResegmPairwFuncs[nCamIdx][nOrientIdx].push_back(m_apResegmModels[nCamIdx]->addFunctionWithRefReturn(ExplicitFunction()));
+                    FuncPairType& oStereoFunc = m_aavStereoPairwFuncs[nCamIdx][nOrientIdx].back();
+                    FuncPairType& oResegmFunc = m_aavResegmPairwFuncs[nCamIdx][nOrientIdx].back();
+                    oStereoFunc.second.assign(aPairwiseStereoFuncDims.begin(),aPairwiseStereoFuncDims.end(),m_apStereoPairwFuncsDataBase[nCamIdx]+((nGraphNodeIdx*2+nOrientIdx)*m_nStereoLabels*m_nStereoLabels));
+                    oResegmFunc.second.assign(aPairwiseResegmFuncDims.begin(),aPairwiseResegmFuncDims.end(),m_apResegmPairwFuncsDataBase[nCamIdx]+((nGraphNodeIdx*2+nOrientIdx)*s_nResegmLabels*s_nResegmLabels));
+                    lvDbgAssert(oStereoFunc.second.strides(0)==1 && oStereoFunc.second.strides(1)==m_nStereoLabels && oResegmFunc.second.strides(0)==1 && oResegmFunc.second.strides(1)==s_nResegmLabels); // expect last-idx-major
+                    lvDbgAssert((&m_apStereoModels[nCamIdx]->getFunction<ExplicitFunction>(oStereoFunc.first))==(&oStereoFunc.second));
+                    lvDbgAssert((&m_apResegmModels[nCamIdx]->getFunction<ExplicitFunction>(oResegmFunc.first))==(&oResegmFunc.second));
+                    PairwClique& oStereoClique = oBaseNode.aaStereoPairwCliques[nCamIdx][nOrientIdx];
+                    PairwClique& oResegmClique = oBaseNode.aaResegmPairwCliques[nCamIdx][nOrientIdx];
+                    oStereoClique.m_bValid = true;
+                    oResegmClique.m_bValid = true;
+                    const std::array<size_t,2> aLUTNodeIndices = {nBaseLUTNodeIdx,nOffsetLUTNodeIdx};
+                    oStereoClique.m_anLUTNodeIdxs = aLUTNodeIndices;
+                    oResegmClique.m_anLUTNodeIdxs = aLUTNodeIndices;
+                    const std::array<size_t,2> aGraphNodeIndices = {nGraphNodeIdx,oOffsetNode.anGraphNodeIdxs[nCamIdx]};
+                    oStereoClique.m_anGraphNodeIdxs = aGraphNodeIndices;
+                    oResegmClique.m_anGraphNodeIdxs = aGraphNodeIndices;
+                    oStereoClique.m_nGraphFactorId = m_apStereoModels[nCamIdx]->addFactorNonFinalized(oStereoFunc.first,aGraphNodeIndices.begin(),aGraphNodeIndices.end());
+                    oResegmClique.m_nGraphFactorId = m_apResegmModels[nCamIdx]->addFactorNonFinalized(oResegmFunc.first,aGraphNodeIndices.begin(),aGraphNodeIndices.end());
+                    oStereoClique.m_pGraphFunctionPtr = &oStereoFunc.second;
+                    oResegmClique.m_pGraphFunctionPtr = &oResegmFunc.second;
+                }
+            };
             const size_t nRowIdx = (size_t)oBaseNode.nRowIdx;
             const size_t nColIdx = (size_t)oBaseNode.nColIdx;
-            aGraphNodeIndices[0] = nGraphNodeIdx;
             if(nRowIdx+1<nRows) { // vertical pair
                 const size_t nOrientIdx = size_t(0);
                 const size_t nOffsetLUTNodeIdx = (nRowIdx+1)*nCols+nColIdx;
-                const NodeInfo& oOffsetNode = m_vNodeInfos[nOffsetLUTNodeIdx];
-                if(oOffsetNode.abValidGraphNode[nCamIdx]) {
-                    aGraphNodeIndices[1] = oOffsetNode.anGraphNodeIdxs[nCamIdx];
-                    m_aavStereoPairwFuncs[nCamIdx][nOrientIdx].push_back(m_apStereoModels[nCamIdx]->addFunctionWithRefReturn(ExplicitFunction()));
-                    m_aavResegmPairwFuncs[nCamIdx][nOrientIdx].push_back(m_apResegmModels[nCamIdx]->addFunctionWithRefReturn(ExplicitFunction()));
-                    StereoFunc& oStereoFunc = m_aavStereoPairwFuncs[nCamIdx][nOrientIdx].back();
-                    ResegmFunc& oResegmFunc = m_aavResegmPairwFuncs[nCamIdx][nOrientIdx].back();
-                    oStereoFunc.second.assign(aPairwiseStereoFuncDims.begin(),aPairwiseStereoFuncDims.end(),m_apStereoPairwFuncsDataBase[nCamIdx]+((aGraphNodeIndices[0]*2+nOrientIdx)*m_nStereoLabels*m_nStereoLabels));
-                    oResegmFunc.second.assign(aPairwiseResegmFuncDims.begin(),aPairwiseResegmFuncDims.end(),m_apResegmPairwFuncsDataBase[nCamIdx]+((aGraphNodeIndices[0]*2+nOrientIdx)*s_nResegmLabels*s_nResegmLabels));
-                    lvDbgAssert(oStereoFunc.second.strides(0)==1 && oStereoFunc.second.strides(1)==m_nStereoLabels && oResegmFunc.second.strides(0)==1 && oResegmFunc.second.strides(1)==s_nResegmLabels); // expect last-idx-major
-                    oBaseNode.aanStereoPairwFactIDs[nCamIdx][nOrientIdx] = m_apStereoModels[nCamIdx]->addFactorNonFinalized(oStereoFunc.first,aGraphNodeIndices.begin(),aGraphNodeIndices.end());
-                    oBaseNode.aanResegmPairwFactIDs[nCamIdx][nOrientIdx] = m_apResegmModels[nCamIdx]->addFactorNonFinalized(oResegmFunc.first,aGraphNodeIndices.begin(),aGraphNodeIndices.end());
-                    oBaseNode.aapStereoPairwFuncs[nCamIdx][nOrientIdx] = &oStereoFunc;
-                    oBaseNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx] = &oResegmFunc;
-                    oBaseNode.aanPairwLUTNodeIdxs[nCamIdx][nOrientIdx] = nOffsetLUTNodeIdx;
-                    oBaseNode.aanPairwGraphNodeIdxs[nCamIdx][nOrientIdx] = aGraphNodeIndices[1];
-                }
+                lPairwCliqueCreator(nOrientIdx,nOffsetLUTNodeIdx);
             }
             if(nColIdx+1<nCols) { // horizontal pair
                 const size_t nOrientIdx = size_t(1);
                 const size_t nOffsetLUTNodeIdx = nRowIdx*nCols+nColIdx+1;
-                const NodeInfo& oOffsetNode = m_vNodeInfos[nOffsetLUTNodeIdx];
-                if(oOffsetNode.abValidGraphNode[nCamIdx]) {
-                    aGraphNodeIndices[1] = oOffsetNode.anGraphNodeIdxs[nCamIdx];
-                    m_aavStereoPairwFuncs[nCamIdx][nOrientIdx].push_back(m_apStereoModels[nCamIdx]->addFunctionWithRefReturn(ExplicitFunction()));
-                    m_aavResegmPairwFuncs[nCamIdx][nOrientIdx].push_back(m_apResegmModels[nCamIdx]->addFunctionWithRefReturn(ExplicitFunction()));
-                    StereoFunc& oStereoFunc = m_aavStereoPairwFuncs[nCamIdx][nOrientIdx].back();
-                    ResegmFunc& oResegmFunc = m_aavResegmPairwFuncs[nCamIdx][nOrientIdx].back();
-                    oStereoFunc.second.assign(aPairwiseStereoFuncDims.begin(),aPairwiseStereoFuncDims.end(),m_apStereoPairwFuncsDataBase[nCamIdx]+((aGraphNodeIndices[0]*2+nOrientIdx)*m_nStereoLabels*m_nStereoLabels));
-                    oResegmFunc.second.assign(aPairwiseResegmFuncDims.begin(),aPairwiseResegmFuncDims.end(),m_apResegmPairwFuncsDataBase[nCamIdx]+((aGraphNodeIndices[0]*2+nOrientIdx)*s_nResegmLabels*s_nResegmLabels));
-                    lvDbgAssert(oStereoFunc.second.strides(0)==1 && oStereoFunc.second.strides(1)==m_nStereoLabels && oResegmFunc.second.strides(0)==1 && oResegmFunc.second.strides(1)==s_nResegmLabels); // expect last-idx-major
-                    oBaseNode.aanStereoPairwFactIDs[nCamIdx][nOrientIdx] = m_apStereoModels[nCamIdx]->addFactorNonFinalized(oStereoFunc.first,aGraphNodeIndices.begin(),aGraphNodeIndices.end());
-                    oBaseNode.aanResegmPairwFactIDs[nCamIdx][nOrientIdx] = m_apResegmModels[nCamIdx]->addFactorNonFinalized(oResegmFunc.first,aGraphNodeIndices.begin(),aGraphNodeIndices.end());
-                    oBaseNode.aapStereoPairwFuncs[nCamIdx][nOrientIdx] = &oStereoFunc;
-                    oBaseNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx] = &oResegmFunc;
-                    oBaseNode.aanPairwLUTNodeIdxs[nCamIdx][nOrientIdx] = nOffsetLUTNodeIdx;
-                    oBaseNode.aanPairwGraphNodeIdxs[nCamIdx][nOrientIdx] = aGraphNodeIndices[1];
-                }
+                lPairwCliqueCreator(nOrientIdx,nOffsetLUTNodeIdx);
             }
+            static_assert(s_nPairwOrients==2,"missing some pairw instantiations here");
         }
     }
     /*
@@ -534,11 +529,11 @@ inline void StereoSegmMatcher::GraphModelData::resetStereoLabelings(size_t nCamI
         if(bIsPrimaryCam) {
             lvDbgAssert(oNode.anStereoUnaryFactIDs[nCamIdx]<m_apStereoModels[nCamIdx]->numberOfFactors());
             lvDbgAssert(m_apStereoModels[nCamIdx]->numberOfLabels(oNode.anStereoUnaryFactIDs[nCamIdx])==m_nStereoLabels);
-            lvDbgAssert(StereoFuncID((*m_apStereoModels[nCamIdx])[oNode.anStereoUnaryFactIDs[nCamIdx]].functionIndex(),(*m_apStereoModels[nCamIdx])[oNode.anStereoUnaryFactIDs[nCamIdx]].functionType())==oNode.apStereoUnaryFuncs[nCamIdx]->first);
             InternalLabelType nEvalLabel = m_aStereoLabelings[nCamIdx](oNode.nRowIdx,oNode.nColIdx) = 0;
-            ValueType fOptimalEnergy = oNode.apStereoUnaryFuncs[nCamIdx]->second(&nEvalLabel);
+            const ExplicitFunction& vUnaryStereoLUT = *oNode.apStereoUnaryFuncs[nCamIdx];
+            ValueType fOptimalEnergy = vUnaryStereoLUT(&nEvalLabel);
             for(nEvalLabel=1; nEvalLabel<m_nStereoLabels; ++nEvalLabel) {
-                const ValueType fCurrEnergy = oNode.apStereoUnaryFuncs[nCamIdx]->second(&nEvalLabel);
+                const ValueType fCurrEnergy = vUnaryStereoLUT(&nEvalLabel);
                 if(fOptimalEnergy>fCurrEnergy) {
                     m_aStereoLabelings[nCamIdx](oNode.nRowIdx,oNode.nColIdx) = nEvalLabel;
                     fOptimalEnergy = fCurrEnergy;
@@ -650,21 +645,20 @@ inline void StereoSegmMatcher::GraphModelData::updateStereoModel(size_t nCamIdx,
 #endif //USING_OPENMP
     for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_anValidGraphNodes[nCamIdx]; ++nGraphNodeIdx) {
         const size_t nLUTNodeIdx = m_avValidLUTNodeIdxs[nCamIdx][nGraphNodeIdx];
-        const NodeInfo& oNode = m_vNodeInfos[nLUTNodeIdx];
+        NodeInfo& oNode = m_vNodeInfos[nLUTNodeIdx];
         const int nRowIdx = oNode.nRowIdx;
         const int nColIdx = oNode.nColIdx;
         // update unary terms for each grid node
         lvDbgAssert(nLUTNodeIdx==(oNode.nRowIdx*m_oGridSize[1]+oNode.nColIdx));
         lvDbgAssert(oNode.apStereoUnaryFuncs[nCamIdx] && oNode.anStereoUnaryFactIDs[nCamIdx]!=SIZE_MAX);
-        lvDbgAssert((&m_apStereoModels[nCamIdx]->getFunction<ExplicitFunction>(oNode.apStereoUnaryFuncs[nCamIdx]->first))==(&oNode.apStereoUnaryFuncs[nCamIdx]->second));
-        ExplicitFunction& vUnaryStereoFunc = oNode.apStereoUnaryFuncs[nCamIdx]->second;
-        lvDbgAssert(vUnaryStereoFunc.dimension()==1 && vUnaryStereoFunc.size()==m_nStereoLabels);
+        ExplicitFunction& vUnaryStereoLUT = *oNode.apStereoUnaryFuncs[nCamIdx];
+        lvDbgAssert(vUnaryStereoLUT.dimension()==1 && vUnaryStereoLUT.size()==m_nStereoLabels);
         lvDbgAssert__(aImgSaliency[nCamIdx](nRowIdx,nColIdx)>=-1e-6f && aImgSaliency[nCamIdx](nRowIdx,nColIdx)<=1.0f,"fImgSaliency = %1.10f @ [%d,%d]",aImgSaliency[nCamIdx](nRowIdx,nColIdx),nRowIdx,nColIdx);
         lvDbgAssert__(aShpSaliency[nCamIdx](nRowIdx,nColIdx)>=-1e-6f && aShpSaliency[nCamIdx](nRowIdx,nColIdx)<=1.0f,"fShpSaliency = %1.10f @ [%d,%d]",aShpSaliency[nCamIdx](nRowIdx,nColIdx),nRowIdx,nColIdx);
         const float fImgSaliency = std::max(aImgSaliency[nCamIdx](nRowIdx,nColIdx),0.0f);
         const float fShpSaliency = std::max(aShpSaliency[nCamIdx](nRowIdx,nColIdx),0.0f);
         for(InternalLabelType nLabelIdx=0; nLabelIdx<m_nRealStereoLabels; ++nLabelIdx) {
-            vUnaryStereoFunc(nLabelIdx) = cost_cast(0);
+            vUnaryStereoLUT(nLabelIdx) = cost_cast(0);
             const int nOffsetColIdx = getOffsetColIdx(nCamIdx,nColIdx,nLabelIdx);
             if(nOffsetColIdx>=0 && nOffsetColIdx<nCols && m_aROIs[nCamIdx^1](nRowIdx,nOffsetColIdx)) {
                 const int nAffMapColIdx = (nCamIdx==size_t(0))?nColIdx:nOffsetColIdx;
@@ -672,25 +666,26 @@ inline void StereoSegmMatcher::GraphModelData::updateStereoModel(size_t nCamIdx,
                 const float fShpAffinity = oShpAffinity(nRowIdx,nAffMapColIdx,nLabelIdx);
                 lvDbgAssert__(fImgAffinity>=0.0f && fImgAffinity<=(float)M_SQRT2,"fImgAffinity = %1.10f @ [%d,%d]",fImgAffinity,nRowIdx,nColIdx);
                 lvDbgAssert__(fShpAffinity>=0.0f && fShpAffinity<=(float)M_SQRT2,"fShpAffinity = %1.10f @ [%d,%d]",fShpAffinity,nRowIdx,nColIdx);
-                vUnaryStereoFunc(nLabelIdx) += cost_cast(fImgAffinity*fImgSaliency*STEREOSEGMATCH_IMGSIM_COST_DESC_SCALE);
-                vUnaryStereoFunc(nLabelIdx) += cost_cast(fShpAffinity*fShpSaliency*STEREOSEGMATCH_SHPSIM_COST_DESC_SCALE);
-                vUnaryStereoFunc(nLabelIdx) = std::min(vUnaryStereoFunc(nLabelIdx),STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
+                vUnaryStereoLUT(nLabelIdx) += cost_cast(fImgAffinity*fImgSaliency*STEREOSEGMATCH_IMGSIM_COST_DESC_SCALE);
+                vUnaryStereoLUT(nLabelIdx) += cost_cast(fShpAffinity*fShpSaliency*STEREOSEGMATCH_SHPSIM_COST_DESC_SCALE);
+                vUnaryStereoLUT(nLabelIdx) = std::min(vUnaryStereoLUT(nLabelIdx),STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
             }
             else {
-                vUnaryStereoFunc(nLabelIdx) = STEREOSEGMATCH_UNARY_COST_OOB_CST;
+                vUnaryStereoLUT(nLabelIdx) = STEREOSEGMATCH_UNARY_COST_OOB_CST;
             }
         }
-        vUnaryStereoFunc(m_nDontCareLabelIdx) = cost_cast(10000); // @@@@ check roi, if dc set to 0, otherwise set to inf
-        vUnaryStereoFunc(m_nOccludedLabelIdx) = cost_cast(10000);//STEREOSEGMATCH_IMGSIM_COST_OCCLUDED_CST;
+        vUnaryStereoLUT(m_nDontCareLabelIdx) = cost_cast(10000); // @@@@ check roi, if dc set to 0, otherwise set to inf
+        vUnaryStereoLUT(m_nOccludedLabelIdx) = cost_cast(10000);//STEREOSEGMATCH_IMGSIM_COST_OCCLUDED_CST;
         if(bInit) { // inter-spectral pairwise term updates do not change w.r.t. segm or stereo updates
-            for(size_t nOrientIdx=0; nOrientIdx<oNode.aanStereoPairwFactIDs[nCamIdx].size(); ++nOrientIdx) {
+            for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
                 ExplicitAllocFunction& vPairwiseStereoBaseFunc = m_apStereoModels[nCamIdx]->getFunction<ExplicitAllocFunction>(m_aaStereoPairwFuncIDs_base[nCamIdx][nOrientIdx]);
-                if(oNode.aanStereoPairwFactIDs[nCamIdx][nOrientIdx]!=SIZE_MAX) {
-                    lvDbgAssert(oNode.aapStereoPairwFuncs[nCamIdx][nOrientIdx]);
-                    lvDbgAssert(oNode.aanPairwLUTNodeIdxs[nCamIdx][nOrientIdx]!=SIZE_MAX);
-                    lvDbgAssert(m_vNodeInfos[oNode.aanPairwLUTNodeIdxs[nCamIdx][nOrientIdx]].abValidGraphNode[nCamIdx]);
-                    lvDbgAssert((&m_apStereoModels[nCamIdx]->getFunction<ExplicitFunction>(oNode.aapStereoPairwFuncs[nCamIdx][nOrientIdx]->first))==(&oNode.aapStereoPairwFuncs[nCamIdx][nOrientIdx]->second));
-                    ExplicitFunction& vPairwiseStereoFunc = oNode.aapStereoPairwFuncs[nCamIdx][nOrientIdx]->second;
+                PairwClique& oClique = oNode.aaStereoPairwCliques[nCamIdx][nOrientIdx];
+                if(oClique) {
+                    lvDbgAssert(oClique.m_nGraphFactorId!=SIZE_MAX && oClique.m_pGraphFunctionPtr);
+                    lvDbgAssert(oClique.m_anGraphNodeIdxs[0]!=SIZE_MAX && oClique.m_anLUTNodeIdxs[0]!=SIZE_MAX);
+                    lvDbgAssert(oClique.m_anGraphNodeIdxs[1]!=SIZE_MAX && oClique.m_anLUTNodeIdxs[1]!=SIZE_MAX);
+                    lvDbgAssert(m_vNodeInfos[oClique.m_anLUTNodeIdxs[1]].abValidGraphNode[nCamIdx] && oClique.m_pGraphFunctionPtr);
+                    ExplicitFunction& vPairwiseStereoFunc = *oClique.m_pGraphFunctionPtr;
                     lvDbgAssert(vPairwiseStereoFunc.dimension()==2 && vPairwiseStereoFunc.size()==m_nStereoLabels*m_nStereoLabels);
                     const int nLocalGrad = (int)((nOrientIdx==0)?aGradY[nCamIdx]:(nOrientIdx==1)?aGradX[nCamIdx]:aGradMag[nCamIdx])(nRowIdx,nColIdx);
                     const float fGradScaleFact = m_aLabelSimCostGradFactLUT.eval_raw(nLocalGrad);
@@ -796,15 +791,14 @@ inline void StereoSegmMatcher::GraphModelData::updateResegmModel(size_t nCamIdx,
 #endif //USING_OPENMP
     for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_anValidGraphNodes[nCamIdx]; ++nGraphNodeIdx) {
         const size_t nLUTNodeIdx = m_avValidLUTNodeIdxs[nCamIdx][nGraphNodeIdx];
-        const NodeInfo& oNode = m_vNodeInfos[nLUTNodeIdx];
+        NodeInfo& oNode = m_vNodeInfos[nLUTNodeIdx];
         const int nRowIdx = oNode.nRowIdx;
         const int nColIdx = oNode.nColIdx;
         // update unary terms for each grid node
         lvDbgAssert(nLUTNodeIdx==(oNode.nRowIdx*m_oGridSize[1]+oNode.nColIdx));
         lvDbgAssert(oNode.apResegmUnaryFuncs[nCamIdx] && oNode.anResegmUnaryFactIDs[nCamIdx]!=SIZE_MAX);
-        lvDbgAssert((&m_apResegmModels[nCamIdx]->getFunction<ExplicitFunction>(oNode.apResegmUnaryFuncs[nCamIdx]->first))==(&oNode.apResegmUnaryFuncs[nCamIdx]->second));
-        ExplicitFunction& vUnaryResegmFunc = oNode.apResegmUnaryFuncs[nCamIdx]->second;
-        lvDbgAssert(vUnaryResegmFunc.dimension()==1 && vUnaryResegmFunc.size()==s_nResegmLabels);
+        ExplicitFunction& vUnaryResegmLUT = *oNode.apResegmUnaryFuncs[nCamIdx];
+        lvDbgAssert(vUnaryResegmLUT.dimension()==1 && vUnaryResegmLUT.size()==s_nResegmLabels);
         const double dMinProbDensity = 1e-10;
         const double dMaxProbDensity = 1.0;
         const uchar* acInputColorSample = bUsing3ChannelInput?(oInputImg.data+nLUTNodeIdx*3):(oInputImg.data+nLUTNodeIdx);
@@ -818,8 +812,8 @@ inline void StereoSegmMatcher::GraphModelData::updateResegmModel(size_t nCamIdx,
         dMaxFGProb = std::max(dMaxFGProb,dColorFGProb);*/
         const ValueType tFGColorUnaryCost = cost_cast(-std::log2(dColorFGProb)*STEREOSEGMATCH_IMGSIM_COST_COLOR_SCALE);
         lvDbgAssert(tFGColorUnaryCost>=cost_cast(0));
-        vUnaryResegmFunc(s_nForegroundLabelIdx) = std::min(tFGDistUnaryCost+tFGColorUnaryCost,STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
-        lvDbgAssert(vUnaryResegmFunc(s_nForegroundLabelIdx)>=cost_cast(0));
+        vUnaryResegmLUT(s_nForegroundLabelIdx) = std::min(tFGDistUnaryCost+tFGColorUnaryCost,STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
+        lvDbgAssert(vUnaryResegmLUT(s_nForegroundLabelIdx)>=cost_cast(0));
         const float fInitBGDist = std::min(((float*)aInitBGDist[nCamIdx].data)[nLUTNodeIdx],fMaxDist);
         const float fCurrBGDist = std::min(((float*)aBGDist[nCamIdx].data)[nLUTNodeIdx],fMaxDist);
         const ValueType tBGDistUnaryCost = cost_cast((fCurrBGDist+fInitBGDist*fInitDistScale)*STEREOSEGMATCH_SHPDIST_COST_SCALE);
@@ -830,27 +824,28 @@ inline void StereoSegmMatcher::GraphModelData::updateResegmModel(size_t nCamIdx,
         dMaxBGProb = std::max(dMaxBGProb,dColorBGProb);*/
         const ValueType tBGColorUnaryCost = cost_cast(-std::log2(dColorBGProb)*STEREOSEGMATCH_IMGSIM_COST_COLOR_SCALE);
         lvDbgAssert(tBGColorUnaryCost>=cost_cast(0));
-        vUnaryResegmFunc(s_nBackgroundLabelIdx) = std::min(tBGDistUnaryCost+tBGColorUnaryCost,STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
-        lvDbgAssert(vUnaryResegmFunc(s_nBackgroundLabelIdx)>=cost_cast(0));
+        vUnaryResegmLUT(s_nBackgroundLabelIdx) = std::min(tBGDistUnaryCost+tBGColorUnaryCost,STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
+        lvDbgAssert(vUnaryResegmLUT(s_nBackgroundLabelIdx)>=cost_cast(0));
         const InternalLabelType nStereoLabelIdx = ((InternalLabelType*)m_aStereoLabelings[nCamIdx].data)[nLUTNodeIdx];
         const int nOffsetColIdx = (nStereoLabelIdx<m_nRealStereoLabels)?getOffsetColIdx(nCamIdx,nColIdx,nStereoLabelIdx):INT_MAX;
         if(nOffsetColIdx>=0 && nOffsetColIdx<nCols && m_aROIs[nCamIdx^1](nRowIdx,nOffsetColIdx)) {
             const float fInitOffsetFGDist = std::min(aInitFGDist[nCamIdx^1](nRowIdx,nOffsetColIdx),fMaxDist);
             const float fCurrOffsetFGDist = std::min(aFGDist[nCamIdx^1](nRowIdx,nOffsetColIdx),fMaxDist);
             const ValueType tAddedFGDistUnaryCost = cost_cast((fCurrOffsetFGDist+fInitOffsetFGDist*fInitDistScale)*fInterSpectrScale*STEREOSEGMATCH_SHPDIST_COST_SCALE);
-            vUnaryResegmFunc(s_nForegroundLabelIdx) = std::min(vUnaryResegmFunc(s_nForegroundLabelIdx)+tAddedFGDistUnaryCost,STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
+            vUnaryResegmLUT(s_nForegroundLabelIdx) = std::min(vUnaryResegmLUT(s_nForegroundLabelIdx)+tAddedFGDistUnaryCost,STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
             const float fInitOffsetBGDist = std::min(aInitBGDist[nCamIdx^1](nRowIdx,nOffsetColIdx),fMaxDist);
             const float fCurrOffsetBGDist = std::min(aBGDist[nCamIdx^1](nRowIdx,nOffsetColIdx),fMaxDist);
             const ValueType tAddedBGDistUnaryCost = cost_cast((fCurrOffsetBGDist+fInitOffsetBGDist*fInitDistScale)*fInterSpectrScale*STEREOSEGMATCH_SHPDIST_COST_SCALE);
-            vUnaryResegmFunc(s_nBackgroundLabelIdx) = std::min(vUnaryResegmFunc(s_nBackgroundLabelIdx)+tAddedBGDistUnaryCost,STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
-            for(size_t nOrientIdx=0; nOrientIdx<oNode.aanResegmPairwFactIDs[nCamIdx].size(); ++nOrientIdx) {
-                if(oNode.aanResegmPairwFactIDs[nCamIdx][nOrientIdx]!=SIZE_MAX) {
-                    lvDbgAssert(oNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx]);
-                    lvDbgAssert(oNode.aanPairwLUTNodeIdxs[nCamIdx][nOrientIdx]!=SIZE_MAX);
-                    lvDbgAssert(m_vNodeInfos[oNode.aanPairwLUTNodeIdxs[nCamIdx][nOrientIdx]].abValidGraphNode[nCamIdx]);
-                    lvDbgAssert((&m_apResegmModels[nCamIdx]->getFunction<ExplicitFunction>(oNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx]->first))==(&oNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx]->second));
-                    ExplicitFunction& vPairwiseResegmFunc = oNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx]->second;
-                    lvDbgAssert(vPairwiseResegmFunc.dimension()==2 && vPairwiseResegmFunc.size()==s_nResegmLabels*s_nResegmLabels);
+            vUnaryResegmLUT(s_nBackgroundLabelIdx) = std::min(vUnaryResegmLUT(s_nBackgroundLabelIdx)+tAddedBGDistUnaryCost,STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST);
+            for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
+                PairwClique& oClique = oNode.aaResegmPairwCliques[nCamIdx][nOrientIdx];
+                if(oClique) {
+                    lvDbgAssert(oClique.m_nGraphFactorId!=SIZE_MAX && oClique.m_pGraphFunctionPtr);
+                    lvDbgAssert(oClique.m_anGraphNodeIdxs[0]!=SIZE_MAX && oClique.m_anLUTNodeIdxs[0]!=SIZE_MAX);
+                    lvDbgAssert(oClique.m_anGraphNodeIdxs[1]!=SIZE_MAX && oClique.m_anLUTNodeIdxs[1]!=SIZE_MAX);
+                    lvDbgAssert(m_vNodeInfos[oClique.m_anLUTNodeIdxs[1]].abValidGraphNode[nCamIdx] && oClique.m_pGraphFunctionPtr);
+                    ExplicitFunction& vPairwResegmLUT = *oClique.m_pGraphFunctionPtr;
+                    lvDbgAssert(vPairwResegmLUT.dimension()==2 && vPairwResegmLUT.size()==s_nResegmLabels*s_nResegmLabels);
                     const int nLocalGrad = (int)(((nOrientIdx==0)?aGradY[nCamIdx]:(nOrientIdx==1)?aGradX[nCamIdx]:aGradMag[nCamIdx])(nRowIdx,nColIdx));
                     const int nOffsetGrad = (int)(((nOrientIdx==0)?aGradY[nCamIdx^1]:(nOrientIdx==1)?aGradX[nCamIdx^1]:aGradMag[nCamIdx^1])(nRowIdx,nOffsetColIdx));
                     const float fLocalScaleFact = m_aLabelSimCostGradFactLUT.eval_raw(nLocalGrad);
@@ -862,29 +857,30 @@ inline void StereoSegmMatcher::GraphModelData::updateResegmModel(size_t nCamIdx,
                     const float fScaleFact = (fLocalScaleFact+fOffsetScaleFact*fInterSpectrScale)/fInterSpectrRatioTot;
                     for(InternalLabelType nLabelIdx1=0; nLabelIdx1<s_nResegmLabels; ++nLabelIdx1) {
                         for(InternalLabelType nLabelIdx2=0; nLabelIdx2<s_nResegmLabels; ++nLabelIdx2) {
-                            vPairwiseResegmFunc(nLabelIdx1,nLabelIdx2) = cost_cast((nLabelIdx1^nLabelIdx2)*fScaleFact*STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST);
+                            vPairwResegmLUT(nLabelIdx1,nLabelIdx2) = cost_cast((nLabelIdx1^nLabelIdx2)*fScaleFact*STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST);
                         }
                     }
                 }
             }
         }
         else {
-            vUnaryResegmFunc(s_nForegroundLabelIdx) = STEREOSEGMATCH_UNARY_COST_OOB_CST;
-            vUnaryResegmFunc(s_nBackgroundLabelIdx) = cost_cast(0);
-            for(size_t nOrientIdx=0; nOrientIdx<oNode.aanResegmPairwFactIDs[nCamIdx].size(); ++nOrientIdx) {
-                if(oNode.aanResegmPairwFactIDs[nCamIdx][nOrientIdx]!=SIZE_MAX) {
-                    lvDbgAssert(oNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx]);
-                    lvDbgAssert(oNode.aanPairwLUTNodeIdxs[nCamIdx][nOrientIdx]!=SIZE_MAX);
-                    lvDbgAssert(m_vNodeInfos[oNode.aanPairwLUTNodeIdxs[nCamIdx][nOrientIdx]].abValidGraphNode[nCamIdx]);
-                    lvDbgAssert((&m_apResegmModels[nCamIdx]->getFunction<ExplicitFunction>(oNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx]->first))==(&oNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx]->second));
-                    ExplicitFunction& vPairwiseResegmFunc = oNode.aapResegmPairwFuncs[nCamIdx][nOrientIdx]->second;
-                    lvDbgAssert(vPairwiseResegmFunc.dimension()==2 && vPairwiseResegmFunc.size()==s_nResegmLabels*s_nResegmLabels);
+            vUnaryResegmLUT(s_nForegroundLabelIdx) = STEREOSEGMATCH_UNARY_COST_OOB_CST;
+            vUnaryResegmLUT(s_nBackgroundLabelIdx) = cost_cast(0);
+            for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
+                PairwClique& oClique = oNode.aaResegmPairwCliques[nCamIdx][nOrientIdx];
+                if(oClique) {
+                    lvDbgAssert(oClique.m_nGraphFactorId!=SIZE_MAX && oClique.m_pGraphFunctionPtr);
+                    lvDbgAssert(oClique.m_anGraphNodeIdxs[0]!=SIZE_MAX && oClique.m_anLUTNodeIdxs[0]!=SIZE_MAX);
+                    lvDbgAssert(oClique.m_anGraphNodeIdxs[1]!=SIZE_MAX && oClique.m_anLUTNodeIdxs[1]!=SIZE_MAX);
+                    lvDbgAssert(m_vNodeInfos[oClique.m_anLUTNodeIdxs[1]].abValidGraphNode[nCamIdx] && oClique.m_pGraphFunctionPtr);
+                    ExplicitFunction& vPairwResegmLUT = *oClique.m_pGraphFunctionPtr;
+                    lvDbgAssert(vPairwResegmLUT.dimension()==2 && vPairwResegmLUT.size()==s_nResegmLabels*s_nResegmLabels);
                     const int nLocalGrad = (int)(((nOrientIdx==0)?aGradY[nCamIdx]:(nOrientIdx==1)?aGradX[nCamIdx]:aGradMag[nCamIdx])(nRowIdx,nColIdx));
                     const float fLocalScaleFact = m_aLabelSimCostGradFactLUT.eval_raw(nLocalGrad);
                     lvDbgAssert(fLocalScaleFact==(float)std::exp(float(STEREOSEGMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/STEREOSEGMATCH_LBLSIM_COST_GRADRAW_SCALE));
                     for(InternalLabelType nLabelIdx1=0; nLabelIdx1<s_nResegmLabels; ++nLabelIdx1) {
                         for(InternalLabelType nLabelIdx2=0; nLabelIdx2<s_nResegmLabels; ++nLabelIdx2) {
-                            vPairwiseResegmFunc(nLabelIdx1,nLabelIdx2) = cost_cast((nLabelIdx1^nLabelIdx2)*fLocalScaleFact*STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST);
+                            vPairwResegmLUT(nLabelIdx1,nLabelIdx2) = cost_cast((nLabelIdx1^nLabelIdx2)*fLocalScaleFact*STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST);
                         }
                     }
                 }
@@ -1607,8 +1603,9 @@ inline StereoSegmMatcher::ValueType StereoSegmMatcher::GraphModelData::calcStere
     if(nOldLabel!=nNewLabel) {
         lvDbgAssert(nOldLabel<m_nStereoLabels && nNewLabel<m_nStereoLabels);
         //const ValueType tAssocEnergyCost = calcRemoveAssocCost(nCamIdx,oNode.nRowIdx,oNode.nColIdx,nOldLabel)+calcAddAssocCost(nCamIdx,oNode.nRowIdx,oNode.nColIdx,nNewLabel);
-        const ValueType tUnaryEnergyInit = oNode.apStereoUnaryFuncs[nCamIdx]->second(&nOldLabel);
-        const ValueType tUnaryEnergyModif = oNode.apStereoUnaryFuncs[nCamIdx]->second(&nNewLabel);
+        const ExplicitFunction& vUnaryStereoLUT = *oNode.apStereoUnaryFuncs[nCamIdx];
+        const ValueType tUnaryEnergyInit = vUnaryStereoLUT(&nOldLabel);
+        const ValueType tUnaryEnergyModif = vUnaryStereoLUT(&nNewLabel);
         return /*tAssocEnergyCost+*/tUnaryEnergyModif-tUnaryEnergyInit;
     }
     else
@@ -1665,7 +1662,8 @@ inline REAL StereoSegmMatcher::GraphModelData::ComputeHeightDiff(VarId i, Label 
     const size_t nLUTNodeIdx = m_avValidLUTNodeIdxs[__cam][nGraphNodeIdx];
     const NodeInfo& oNode = m_vNodeInfos[nLUTNodeIdx];
     lvDbgAssert(oNode.abValidGraphNode[__cam]);
-    ValueType ret = oNode.apStereoUnaryFuncs[__cam]->second(&l1) - oNode.apStereoUnaryFuncs[__cam]->second(&l2);
+    const ExplicitFunction& vUnaryStereoLUT = *oNode.apStereoUnaryFuncs[__cam];
+    ValueType ret = vUnaryStereoLUT(&l1) - vUnaryStereoLUT(&l2);
     for (const auto& p : m_node_clique_list[i])
         ret += dualVariable((int)p.first, (int)p.second, l1) - dualVariable((int)p.first, (int)p.second, l2);
     return ret;
@@ -1717,21 +1715,22 @@ inline void StereoSegmMatcher::GraphModelData::PreEditDual(SubmodularIBFS& crf) 
     std::vector<REAL> current_lambda;
     std::vector<REAL> fusion_lambda;
 
-    auto& ibfs_cliques = crf.Graph().GetCliques();
-    lvDbgAssert(ibfs_cliques.size() == m_nStereoCliqueCount);
+    auto& crf_cliques = crf.Graph().GetCliques();
+    lvDbgAssert(crf_cliques.size() == m_nStereoCliqueCount);
     int clique_index = 0;
     for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_anValidGraphNodes[__cam]; ++nGraphNodeIdx) {
         const size_t& nLUTNodeIdx = m_avValidLUTNodeIdxs[__cam][nGraphNodeIdx];
         const NodeInfo& oNode = m_vNodeInfos[nLUTNodeIdx];
         lvDbgAssert(oNode.abValidGraphNode[__cam]);
-        for(size_t nOrientIdx=0; nOrientIdx<oNode.aanStereoPairwFactIDs[__cam].size(); ++nOrientIdx) {
-            constexpr size_t nCliqueSize = 2;
-            if(oNode.aanStereoPairwFactIDs[__cam][nOrientIdx]!=SIZE_MAX) {
+        for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
+            const PairwClique& oStereoClique = oNode.aaStereoPairwCliques[__cam][nOrientIdx];
+            if(oStereoClique) {
+                constexpr size_t nCliqueSize = oStereoClique.s_nCliqueSize;
                 auto& lambda_a = lambdaAlpha(clique_index);
-                auto& ibfs_c = ibfs_cliques[clique_index];
-                lvDbgAssert(nCliqueSize == ibfs_c.Size());
-                std::vector<REAL>& energy_table = ibfs_c.EnergyTable();
-                Assgn max_assgn = 1 << nCliqueSize;
+                auto& crf_c = crf_cliques[clique_index];
+                lvDbgAssert(nCliqueSize == crf_c.Size());
+                std::vector<REAL>& energy_table = crf_c.EnergyTable();
+                Assgn max_assgn = Assgn(size_t(1)<<nCliqueSize);
                 lvDbgAssert(energy_table.size() == max_assgn);
                 psi.resize(nCliqueSize);
                 current_labels.resize(nCliqueSize);
@@ -1739,17 +1738,17 @@ inline void StereoSegmMatcher::GraphModelData::PreEditDual(SubmodularIBFS& crf) 
                 current_lambda.resize(nCliqueSize);
                 fusion_lambda.resize(nCliqueSize);
                 for(size_t i = 0; i < nCliqueSize; ++i) {
-                    current_labels[i] = pLabeling[m_avValidLUTNodeIdxs[__cam][ibfs_c.Nodes()[i]]];
+                    current_labels[i] = pLabeling[m_avValidLUTNodeIdxs[__cam][crf_c.Nodes()[i]]];
                     fusion_labels[i] = __alpha;
                     current_lambda[i] = dualVariable(lambda_a, i, current_labels[i]);
                     fusion_lambda[i] = dualVariable(lambda_a, i, fusion_labels[i]);
                 }
                 // compute costs of all fusion assignments
-                ExplicitFunction& vPairwiseStereoFunc = oNode.aapStereoPairwFuncs[__cam][nOrientIdx]->second;
+                const ExplicitFunction& vPairwStereoLUT = *oStereoClique.m_pGraphFunctionPtr;
                 Assgn last_gray = 0;
                 for (size_t i_idx = 0; i_idx < nCliqueSize; ++i_idx)
                     label_buf[i_idx] = current_labels[i_idx];
-                energy_table[0] = vPairwiseStereoFunc(label_buf);
+                energy_table[0] = vPairwStereoLUT(label_buf);
                 for (Assgn a = 1; a < max_assgn; ++a) {
                     Assgn gray = a ^ (a >> 1);
                     Assgn diff = gray ^ last_gray;
@@ -1759,7 +1758,7 @@ inline void StereoSegmMatcher::GraphModelData::PreEditDual(SubmodularIBFS& crf) 
                     else
                         label_buf[changed_idx] = current_labels[changed_idx];
                     last_gray = gray;
-                    energy_table[gray] = vPairwiseStereoFunc(label_buf);
+                    energy_table[gray] = vPairwStereoLUT(label_buf);
                 }
                 // compute the residual function: g(S) - lambda_fusion(S) - lambda_current(C\S)
                 SubtractLinear(nCliqueSize,energy_table,fusion_lambda,current_lambda);
@@ -1789,13 +1788,14 @@ inline bool StereoSegmMatcher::GraphModelData::UpdatePrimalDual(SubmodularIBFS& 
         const size_t& nLUTNodeIdx = m_avValidLUTNodeIdxs[__cam][nGraphNodeIdx];
         const NodeInfo& oNode = m_vNodeInfos[nLUTNodeIdx];
         lvDbgAssert(oNode.abValidGraphNode[__cam]);
-        for(size_t nOrientIdx=0; nOrientIdx<oNode.aanStereoPairwFactIDs[__cam].size(); ++nOrientIdx) {
-            if(oNode.aanStereoPairwFactIDs[__cam][nOrientIdx]!=SIZE_MAX) {
-                auto& ibfs_c = clique[nCliqueIdx];
-                const std::vector<REAL>& phiCi = ibfs_c.AlphaCi();
+        for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
+            const PairwClique& oStereoClique = oNode.aaStereoPairwCliques[__cam][nOrientIdx];
+            if(oStereoClique) {
+                auto& crf_c = clique[nCliqueIdx];
+                const std::vector<REAL>& phiCi = crf_c.AlphaCi();
                 for (size_t j = 0; j < phiCi.size(); ++j) {
                     dualVariable((int)nCliqueIdx, (int)j, __alpha) += phiCi[j];
-                    Height(ibfs_c.Nodes()[j], __alpha) += phiCi[j];
+                    Height(crf_c.Nodes()[j], __alpha) += phiCi[j];
                 }
                 ++nCliqueIdx;
             }
@@ -1813,18 +1813,19 @@ inline void StereoSegmMatcher::GraphModelData::PostEditDual(SubmodularIBFS& crf/
         const size_t& nLUTNodeIdx = m_avValidLUTNodeIdxs[__cam][nGraphNodeIdx];
         const NodeInfo& oNode = m_vNodeInfos[nLUTNodeIdx];
         lvDbgAssert(oNode.abValidGraphNode[__cam]);
-        for(size_t nOrientIdx=0; nOrientIdx<oNode.aanStereoPairwFactIDs[__cam].size(); ++nOrientIdx) {
-            if(oNode.aanStereoPairwFactIDs[__cam][nOrientIdx]!=SIZE_MAX) {
-                auto& ibfs_c = clique[clique_index];
-                int k = (int)ibfs_c.Nodes().size();
+        for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
+            const PairwClique& oStereoClique = oNode.aaStereoPairwCliques[__cam][nOrientIdx];
+            if(oStereoClique) {
+                auto& crf_c = clique[clique_index];
+                int k = (int)crf_c.Nodes().size();
                 ASSERT(k < 32);
                 REAL lambdaSum = 0;
                 for (int i = 0; i < k; ++i) {
-                    labelBuf[i] = pLabeling[m_avValidLUTNodeIdxs[__cam][ibfs_c.Nodes()[i]]];
+                    labelBuf[i] = pLabeling[m_avValidLUTNodeIdxs[__cam][crf_c.Nodes()[i]]];
                     lambdaSum += dualVariable(clique_index, i, labelBuf[i]);
                 }
-                ExplicitFunction& vPairwiseStereoFunc = oNode.aapStereoPairwFuncs[__cam][nOrientIdx]->second;
-                REAL energy = vPairwiseStereoFunc(labelBuf);
+                const ExplicitFunction& vPairwStereoLUT = *oStereoClique.m_pGraphFunctionPtr;
+                REAL energy = vPairwStereoLUT(labelBuf);
                 REAL correction = energy - lambdaSum;
                 if (correction > 0) {
                     std::cout << "Bad clique in PostEditDual!\t Id:" << clique_index << "\n";
@@ -1844,11 +1845,11 @@ inline void StereoSegmMatcher::GraphModelData::PostEditDual(SubmodularIBFS& crf/
                 }
                 for (int i = 0; i < k; ++i) {
                     auto& lambda_ail = dualVariable(clique_index,  i, labelBuf[i]);
-                    Height(ibfs_c.Nodes()[i], labelBuf[i]) -= lambda_ail;
+                    Height(crf_c.Nodes()[i], labelBuf[i]) -= lambda_ail;
                     lambda_ail += avg;
                     if (i < remainder)
                         lambda_ail += 1;
-                    Height(ibfs_c.Nodes()[i], labelBuf[i]) += lambda_ail;
+                    Height(crf_c.Nodes()[i], labelBuf[i]) += lambda_ail;
                 }
                 ++clique_index;
             }
@@ -1875,8 +1876,9 @@ inline void StereoSegmMatcher::GraphModelData::calcResegmMoveCosts(size_t nCamId
         ValueType& tUnaryCost = ((ValueType*)m_aResegmUnaryCosts[nCamIdx].data)[nLUTNodeIdx];
         lvDbgAssert(&tUnaryCost==&m_aResegmUnaryCosts[nCamIdx](oNode.nRowIdx,oNode.nColIdx));
         if(nInitLabel!=nNewLabel) {
-            const ValueType tEnergyInit = oNode.apResegmUnaryFuncs[nCamIdx]->second(&nInitLabel);
-            const ValueType tEnergyModif = oNode.apResegmUnaryFuncs[nCamIdx]->second(&nNewLabel);
+            const ExplicitFunction& vUnaryResegmLUT = *oNode.apResegmUnaryFuncs[nCamIdx];
+            const ValueType tEnergyInit = vUnaryResegmLUT(&nInitLabel);
+            const ValueType tEnergyModif = vUnaryResegmLUT(&nNewLabel);
             tUnaryCost = tEnergyModif-tEnergyInit;
         }
         else
@@ -1951,7 +1953,7 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
             oReducer.AddTerm(aCliqueCoeffs[nAssignSubsetIdx],nCurrTermDegree,aTermEnergyLUT.data());
         }
     };
-    lvIgnore(lFactorReducer);
+    lvIgnore(lFactorReducer); // @@@@ make inline func? move up like sospd helpers?
 #endif //(STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF || STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF)
 #if STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
     //calcStereoCosts(nPrimaryCamIdx);
@@ -1989,11 +1991,11 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
     lvAssert_(!bUseHeightAlphaExp,"missing impl"); // @@@@
     size_t nOrderingIdx = 0;
     // setup graph/dual/cliquelist
-    SubmodularIBFS ibfs; //oStereoMinimizer @@@@
+    SubmodularIBFS crf; //oStereoMinimizer @@@@
     __cam = nPrimaryCamIdx;
     m_nStereoCliqueCount = size_t(0);
     {
-        ibfs.AddNode((int)m_anValidGraphNodes[nPrimaryCamIdx]);
+        crf.AddNode((int)m_anValidGraphNodes[nPrimaryCamIdx]);
         m_heights.resize(m_anValidGraphNodes[nPrimaryCamIdx]*m_nStereoLabels);
         std::fill_n(m_heights.begin(),m_anValidGraphNodes[nPrimaryCamIdx]*m_nStereoLabels,cost_cast(0));
         m_dual.clear();
@@ -2006,27 +2008,28 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
             const NodeInfo& oNode = m_vNodeInfos[nLUTNodeIdx];
             lvDbgAssert(oNode.abValidGraphNode[nPrimaryCamIdx]);
             const InternalLabelType& nInitLabel = pLabeling[nLUTNodeIdx];
+            const ExplicitFunction& vUnaryStereoLUT = *oNode.apStereoUnaryFuncs[nPrimaryCamIdx];
             for(size_t nStereoLabel=0; nStereoLabel<m_nStereoLabels; ++nStereoLabel)
-                m_heights[nGraphNodeIdx*m_nStereoLabels+nStereoLabel] += oNode.apStereoUnaryFuncs[nPrimaryCamIdx]->second(&nStereoLabel);
-            for(size_t nOrientIdx=0; nOrientIdx<oNode.aanStereoPairwFactIDs[nPrimaryCamIdx].size(); ++nOrientIdx) {
-                constexpr size_t nCliqueSize = 2;
-                if(oNode.aanStereoPairwFactIDs[nPrimaryCamIdx][nOrientIdx]!=SIZE_MAX) {
-                    lvDbgAssert(oNode.aapStereoPairwFuncs[nPrimaryCamIdx][nOrientIdx]);
-                    const size_t& nOffsetLUTNodeIdx = oNode.aanPairwLUTNodeIdxs[nPrimaryCamIdx][nOrientIdx];
-                    lvDbgAssert(nOffsetLUTNodeIdx!=SIZE_MAX);
-                    lvDbgAssert(m_vNodeInfos[nOffsetLUTNodeIdx].abValidGraphNode[nPrimaryCamIdx]);
-                    const size_t& nOffsetGraphNodeIdx = oNode.aanPairwGraphNodeIdxs[nPrimaryCamIdx][nOrientIdx];
+                m_heights[nGraphNodeIdx*m_nStereoLabels+nStereoLabel] += vUnaryStereoLUT(&nStereoLabel);
+            for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
+                const PairwClique& oStereoClique = oNode.aaStereoPairwCliques[__cam][nOrientIdx];
+                if(oStereoClique) {
+                    constexpr size_t nCliqueSize = oStereoClique.s_nCliqueSize;
+                    const size_t& nOffsetLUTNodeIdx = oStereoClique.m_anLUTNodeIdxs[1];
+                    lvDbgAssert(nOffsetLUTNodeIdx!=SIZE_MAX && m_vNodeInfos[nOffsetLUTNodeIdx].abValidGraphNode[nPrimaryCamIdx]);
+                    const size_t& nOffsetGraphNodeIdx = oStereoClique.m_anGraphNodeIdxs[1];
                     lvDbgAssert(nOffsetGraphNodeIdx!=SIZE_MAX);
-                    ibfs.AddClique( // get rid of NodeId, use IndexType instead
+                    crf.AddClique( // get rid of NodeId, use IndexType instead
                         std::vector<SubmodularIBFS::NodeId>{(SubmodularIBFS::NodeId)nGraphNodeIdx,(SubmodularIBFS::NodeId)nOffsetGraphNodeIdx},
                         std::vector<ValueType>(size_t(1<<nCliqueSize),cost_cast(0))
                     );
                     m_dual.emplace_back(nCliqueSize*m_nStereoLabels,0); // @@@ 0-sized vec init
                     LambdaAlpha& lambda_a = m_dual.back();
-                    ExplicitFunction& vPairwiseStereoFunc = oNode.aapStereoPairwFuncs[nPrimaryCamIdx][nOrientIdx]->second;
-                    lvDbgAssert(vPairwiseStereoFunc.dimension()==2 && vPairwiseStereoFunc.size()==m_nStereoLabels*m_nStereoLabels);
+                    lvDbgAssert(oStereoClique.m_pGraphFunctionPtr);
+                    const ExplicitFunction& vPairwStereoLUT = *oStereoClique.m_pGraphFunctionPtr;
+                    lvDbgAssert(vPairwStereoLUT.dimension()==2 && vPairwStereoLUT.size()==m_nStereoLabels*m_nStereoLabels);
                     const InternalLabelType& nOffsetInitLabel = pLabeling[nOffsetLUTNodeIdx];
-                    const ValueType tCurrPairwCost = vPairwiseStereoFunc(nInitLabel,nOffsetInitLabel);
+                    const ValueType tCurrPairwCost = vPairwStereoLUT(nInitLabel,nOffsetInitLabel);
                     lvDbgAssert(tCurrPairwCost>=cost_cast(0));
                     m_heights[nGraphNodeIdx*m_nStereoLabels+nInitLabel] += (dualVariable(lambda_a,IndexType(0),nInitLabel) = tCurrPairwCost - tCurrPairwCost/2);
                     m_heights[nOffsetGraphNodeIdx*m_nStereoLabels+nOffsetInitLabel] += (dualVariable(lambda_a,IndexType(1),nOffsetInitLabel) = tCurrPairwCost/2);
@@ -2107,10 +2110,11 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
                 oStereoReducer.AddUnaryTerm((int)nGraphNodeIdx,tUnaryCost);
             }
             if(!bNullifyStereoPairwCosts) {
-                if(oNode.aanStereoPairwFactIDs[nPrimaryCamIdx][0]!=SIZE_MAX)
-                    lFactorReducer(m_apStereoModels[nPrimaryCamIdx]->operator[](oNode.aanStereoPairwFactIDs[nPrimaryCamIdx][0]),2,oStereoReducer,nStereoAlphaLabel,m_avValidLUTNodeIdxs[nPrimaryCamIdx].data(),(InternalLabelType*)oCurrStereoLabeling.data);
-                if(oNode.aanStereoPairwFactIDs[nPrimaryCamIdx][1]!=SIZE_MAX)
-                    lFactorReducer(m_apStereoModels[nPrimaryCamIdx]->operator[](oNode.aanStereoPairwFactIDs[nPrimaryCamIdx][1]),2,oStereoReducer,nStereoAlphaLabel,m_avValidLUTNodeIdxs[nPrimaryCamIdx].data(),(InternalLabelType*)oCurrStereoLabeling.data);
+                for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
+                    const PairwClique& oStereoClique = oNode.aaStereoPairwCliques[nPrimaryCamIdx][nOrientIdx];
+                    if(oStereoClique)
+                        lFactorReducer(m_apStereoModels[nPrimaryCamIdx]->operator[](oStereoClique.m_nGraphFactorId),2,oStereoReducer,nStereoAlphaLabel,m_avValidLUTNodeIdxs[nPrimaryCamIdx].data(),(InternalLabelType*)oCurrStereoLabeling.data);
+                }
                 // @@@@@ add higher o facts here (3-conn on epi lines?)
             }
         }
@@ -2145,9 +2149,9 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
         __alpha = nStereoAlphaLabel;
 
         if(InitialFusionLabeling()) {
-            PreEditDual(ibfs);
-            nConsecUnchangedLabels = UpdatePrimalDual(ibfs)?0:nConsecUnchangedLabels+1;
-            PostEditDual(ibfs);
+            PreEditDual(crf);
+            nConsecUnchangedLabels = UpdatePrimalDual(crf)?0:nConsecUnchangedLabels+1;
+            PostEditDual(crf);
             lvIgnore(oCurrStereoLabeling);
         }
 
@@ -2209,10 +2213,11 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
                                 lvDbgAssert(&tUnaryCost==&m_aResegmUnaryCosts[nCamIdx](oNode.nRowIdx,oNode.nColIdx));
                                 aResegmReducers[nCamIdx].AddUnaryTerm((int)nGraphNodeIdx,tUnaryCost);
                             }
-                            if(oNode.aanResegmPairwFactIDs[nCamIdx][0]!=SIZE_MAX)
-                                lFactorReducer(m_apResegmModels[nCamIdx]->operator[](oNode.aanResegmPairwFactIDs[nCamIdx][0]),2,aResegmReducers[nCamIdx],nResegmAlphaLabel,m_avValidLUTNodeIdxs[nCamIdx].data(),(InternalLabelType*)oCurrResegmLabeling.data);
-                            if(oNode.aanResegmPairwFactIDs[nCamIdx][1]!=SIZE_MAX)
-                                lFactorReducer(m_apResegmModels[nCamIdx]->operator[](oNode.aanResegmPairwFactIDs[nCamIdx][1]),2,aResegmReducers[nCamIdx],nResegmAlphaLabel,m_avValidLUTNodeIdxs[nCamIdx].data(),(InternalLabelType*)oCurrResegmLabeling.data);
+                            for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
+                                const PairwClique& oResegmClique = oNode.aaResegmPairwCliques[nPrimaryCamIdx][nOrientIdx];
+                                if(oResegmClique)
+                                    lFactorReducer(m_apResegmModels[nCamIdx]->operator[](oResegmClique.m_nGraphFactorId),2,aResegmReducers[nCamIdx],nResegmAlphaLabel,m_avValidLUTNodeIdxs[nCamIdx].data(),(InternalLabelType*)oCurrResegmLabeling.data);
+                            }
                             // @@@@@ add higher o facts here (3/4-conn spatiotemporal?)
                         }
                         apResegmMinimizers[nCamIdx]->Reset();

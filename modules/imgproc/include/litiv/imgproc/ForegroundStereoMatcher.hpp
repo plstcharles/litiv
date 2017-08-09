@@ -108,17 +108,18 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
     using ExplicitFunction = lv::gm::ExplicitViewFunction<ValueType,IndexType,InternalLabelType>; ///< shortcut for explicit view function
     using ExplicitAllocFunction = opengm::ExplicitFunction<ValueType,IndexType,InternalLabelType>; ///< shortcut for explicit allocated function
     using FunctionTypeList = opengm::meta::TypeListGenerator<ExplicitFunction,ExplicitAllocFunction/*,...*/>::type;  ///< list of all functions the models can use
+    using PairwClique = lv::gm::Clique<size_t(2),ValueType,IndexType,InternalLabelType,ExplicitFunction>; ///< pairwise clique implementation wrapper
     using StereoSpaceType = opengm::SimpleDiscreteSpace<IndexType,InternalLabelType>; ///< shortcut for discrete stereo space type (simple = all nodes have the same # of labels)
     using ResegmSpaceType = opengm::StaticSimpleDiscreteSpace<2,IndexType,InternalLabelType>; ///< shortcut for discrete resegm space type (binary labels for fg/bg)
     using StereoModelType = opengm::GraphicalModel<ValueType,opengm::Adder,FunctionTypeList,StereoSpaceType>; ///< shortcut for stereo graphical model type
     using ResegmModelType = opengm::GraphicalModel<ValueType,opengm::Adder,FunctionTypeList,ResegmSpaceType>; ///< shortcut for resegm graphical model type
-    using StereoFuncID = StereoModelType::FunctionIdentifier; ///< shortcut for stereo model function identifier type
-    using ResegmFuncID = ResegmModelType::FunctionIdentifier; ///< shortcut for resegm model function identifier type
-    using StereoFunc = std::pair<StereoFuncID,ExplicitFunction&>; ///< stereo funcid-funcobj pair used as viewer to explicit data
-    using ResegmFunc = std::pair<ResegmFuncID,ExplicitFunction&>; ///< stereo funcid-funcobj pair used as viewer to explicit data
+    static_assert(std::is_same<StereoModelType::FunctionIdentifier,ResegmModelType::FunctionIdentifier>::value,"mismatched function identifier for stereo/resegm graphs");
+    using FuncIdentifType = StereoModelType::FunctionIdentifier; ///< shortcut for graph model function identifier type (for both stereo and resegm models)
+    using FuncPairType = std::pair<FuncIdentifType,ExplicitFunction&>; ///< funcid-funcobj pair used as viewer to explicit data (for both stereo and resegm models)
     using ICosegmentor<OutputLabelType,s_nInputArraySize,s_nOutputArraySize>::apply; ///< helps avoid 'no matching function' issues for apply overloads
     template<typename T> using CamArray = std::array<T,getInputStreamCount()/2>; ///< shortcut typename for variables and members that are assigned to each camera head
     static constexpr size_t getCameraCount() {return getInputStreamCount()/2;} ///< returns the expected input camera head count
+    static constexpr size_t s_nCameraCount = getInputStreamCount()/2; ///< holds the expected input camera head count
     static constexpr OutputLabelType s_nDontCareLabel = std::numeric_limits<OutputLabelType>::min(); ///< real label value reserved for 'dont care' pixels
     static constexpr OutputLabelType s_nOccludedLabel = std::numeric_limits<OutputLabelType>::max(); ///< real label value reserved for 'occluded' pixels
     static constexpr OutputLabelType s_nForegroundLabel = OutputLabelType(std::numeric_limits<InternalLabelType>::max()); ///< real label value reserved for foreground pixels
@@ -127,6 +128,7 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
     static constexpr InternalLabelType s_nBackgroundLabelIdx = InternalLabelType(0); ///< internal label value used for 'background' labeling
     static constexpr size_t s_nMaxOrder = /*@@@@*/s_nInputArraySize; ///< used to limit internal static assignment array sizes
     static constexpr size_t s_nMaxCliqueAssign = size_t(1)<<s_nMaxOrder; ///< used to limit internal static assignment array sizes
+    static constexpr size_t s_nPairwOrients = size_t(2); ///< number of pairwise links owned by each node in the graph (2 = 1st order neighb connections)
     static constexpr OutputLabelType getStereoDontCareLabel() {return s_nDontCareLabel;} ///< returns the output stereo label used to represent 'dont care' pixels
     static constexpr OutputLabelType getStereoOccludedLabel() {return s_nOccludedLabel;} ///< returns the output stereo label used to represent 'occluded' pixels
     static_assert(std::is_integral<IndexType>::value,"Graph index type must be integral");
@@ -166,7 +168,7 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
     /// full stereo graph matcher constructor; only takes parameters to ready graphical model base initialization
     StereoSegmMatcher(size_t nMinDispOffset, size_t nMaxDispOffset);
     /// stereo graph matcher initialization function; will allocate & initialize graph model using provided ROI data (one ROI per camera head)
-    virtual void initialize(const std::array<cv::Mat,2>& aROIs);
+    virtual void initialize(const std::array<cv::Mat,s_nCameraCount>& aROIs);
     /// stereo matcher function; solves the graph model to find pixel-level matches on epipolar lines in the masked input images, and returns disparity maps + masks
     virtual void apply(const MatArrayIn& aInputs, MatArrayOut& aOutputs) override;
     /// (pre)calculates initial features required for model updates, and optionally returns them in packet format for archiving
@@ -198,22 +200,17 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
             CamArray<bool> abNearGraphBorders;
             /// node graph index used for model indexing
             CamArray<size_t> anGraphNodeIdxs;
+
             /// id for this node's unary factors (not SIZE_MAX only if valid)
             CamArray<size_t> anStereoUnaryFactIDs,anResegmUnaryFactIDs;
-            /// pointer to this node's stereo unary function (non-null only if valid)
-            CamArray<StereoFunc*> apStereoUnaryFuncs;
-            /// pointer to this node's resegm unary function (non-null only if valid)
-            CamArray<ResegmFunc*> apResegmUnaryFuncs;
-            /// ids for this node's two (pairwise) connected neighboring nodes
-            CamArray<std::array<size_t,2>> aanPairwLUTNodeIdxs,aanPairwGraphNodeIdxs;
-            /// ids for this node's two pairwise factors
-            CamArray<std::array<size_t,2>> aanStereoPairwFactIDs,aanResegmPairwFactIDs;
-            /// weights for this node's two stereo pairwise costs (constant post-init)
-            mutable CamArray<std::array<float,2>> aafStereoPairwWeights;
-            /// pointer to this node's two stereo pairwise functions
-            CamArray<std::array<StereoFunc*,2>> aapStereoPairwFuncs;
-            /// pointer to this node's two resegm pairwise functions
-            CamArray<std::array<StereoFunc*,2>> aapResegmPairwFuncs;
+            /// pointer to this node's unary functions (non-null only if valid)
+            CamArray<ExplicitFunction*> apStereoUnaryFuncs,apResegmUnaryFuncs;
+
+            /// weights for this node's stereo pairwise costs (constant post-init)
+            mutable CamArray<std::array<float,s_nPairwOrients>> aafStereoPairwWeights;
+            /// array of pairwise cliques owned by this node as 1st member
+            CamArray<std::array<PairwClique,s_nPairwOrients>> aaStereoPairwCliques,aaResegmPairwCliques;
+
             // @@@@@ add higher o facts/funcptrs here
         };
         /// default constructor; receives model construction data from algo constructor
@@ -297,16 +294,12 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         size_t m_nTotValidGraphNodes;
         /// model info lookup array
         std::vector<NodeInfo> m_vNodeInfos;
-        /// stereo model unary functions
-        CamArray<std::vector<StereoFunc>> m_avStereoUnaryFuncs;
-        /// stereo model pairwise functions array (for already-weighted lookups)
-        CamArray<std::array<std::vector<StereoFunc>,2>> m_aavStereoPairwFuncs;
+        /// graph model unary functions
+        CamArray<std::vector<FuncPairType>> m_avStereoUnaryFuncs,m_avResegmUnaryFuncs;
+        /// graph model pairwise functions arrays (for already-weighted lookups)
+        CamArray<std::array<std::vector<FuncPairType>,s_nPairwOrients>> m_aavStereoPairwFuncs,m_aavResegmPairwFuncs;
         /// stereo model pairwise function ids (for shared base lookups without weights)
-        CamArray<std::array<StereoFuncID,2>> m_aaStereoPairwFuncIDs_base;
-        /// resegm model unary functions
-        CamArray<std::vector<ResegmFunc>> m_avResegmUnaryFuncs;
-        /// resegm model pairwise functions array
-        CamArray<std::array<std::vector<ResegmFunc>,2>> m_aavResegmPairwFuncs;
+        CamArray<std::array<FuncIdentifType,s_nPairwOrients>> m_aaStereoPairwFuncIDs_base;
         /// functions data arrays (contiguous blocks for all factors)
         CamArray<std::unique_ptr<ValueType[]>> m_aaStereoFuncsData,m_aaResegmFuncsData;
         /// stereo/resegm models unary functions base pointers
