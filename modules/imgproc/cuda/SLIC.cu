@@ -48,23 +48,27 @@
 
 #include "SLIC.cuh"
 
-__device__ inline float2 operator-(const float2 & a, const float2 & b) {
-    return make_float2(a.x - b.x, a.y - b.y);
-}
+namespace {
 
-__device__ inline float3 operator-(const float3 & a, const float3 & b) {
-    return make_float3(a.x - b.x, a.y - b.y, a.z - b.z);
-}
+    __device__ inline float2 operator-(const float2& a,const float2& b) {
+        return make_float2(a.x-b.x,a.y-b.y);
+    }
 
-__device__ inline int2 operator+(const int2 & a, const int2 & b) {
-    return make_int2(a.x + b.x, a.y + b.y);
-}
+    __device__ inline float3 operator-(const float3& a,const float3& b) {
+        return make_float3(a.x-b.x,a.y-b.y,a.z-b.z);
+    }
 
-__device__ inline float computeDistance(float2 c_p_xy, float3 c_p_Lab, float areaSpx, float wc2) {
-    float ds2 = pow(c_p_xy.x, 2) + pow(c_p_xy.y, 2);
-    float dc2 = pow(c_p_Lab.x, 2) + pow(c_p_Lab.y, 2) + pow(c_p_Lab.z, 2);
-    float dist = sqrt(dc2 + ds2/areaSpx*wc2);
-    return dist;
+    /*__device__ inline int2 operator+(const int2& a,const int2& b) {
+        return make_int2(a.x+b.x,a.y+b.y);
+    }*/
+
+    __device__ inline float computeDistance(float2 c_p_xy,float3 c_p_Lab,float areaSpx,float wc2) {
+        float ds2 = pow(c_p_xy.x,2)+pow(c_p_xy.y,2);
+        float dc2 = pow(c_p_Lab.x,2)+pow(c_p_Lab.y,2)+pow(c_p_Lab.z,2);
+        float dist = sqrt(dc2+ds2/areaSpx*wc2);
+        return dist;
+    }
+
 }
 
 /////////////////////////////////////////////////////////////////////////
