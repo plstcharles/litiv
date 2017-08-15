@@ -18,17 +18,35 @@
 #pragma once
 
 #ifdef __CUDACC__
+#include <array>
 #include <cstdio>
+#include <exception>
+#include <opencv2/core/cuda/common.hpp>
+#include <opencv2/core/cuda/vec_traits.hpp>
+#include <opencv2/core/cuda/vec_math.hpp>
+#include <opencv2/core/cuda/limits.hpp>
+#ifdef CUDA_EXIT_ON_ERROR
+#define CUDA_ERROR_HANDLER(errn,msg) do { printf(msg); std::exit(errn); } while(0)
+#else //ndef(CUDA_EXIT_ON_ERROR)
+#define CUDA_ERROR_HANDLER(errn,msg) do { (void)errn; throw std::runtime_error(msg); } while(0)
+#endif //ndef(CUDA_..._ON_ERROR)
 #define cudaKernelWrap(func,kparams,...) do { \
-    device::func<<<kparams.vGridSize,kparams.vBlockSize,kparams.nSharedMemSize,kparams.nStream>>>(__VA_ARGS__); \
-    const cudaError_t __errn = cudaGetLastError(); \
-    if(__errn!=cudaSuccess) { \
-        printf("cuda kernel '" #func "' execution failed [code=%d, msg=%s]\n\t... in function '%s'\n\t... from %s(%d)\n",(int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
-        std::exit((int)__errn); \
-    } \
-} while(0)
-#endif //def(__CUDACC__)
+        device::func<<<kparams.vGridSize,kparams.vBlockSize,kparams.nSharedMemSize,kparams.nStream>>>(__VA_ARGS__); \
+        const cudaError_t __errn = cudaGetLastError(); \
+        if(__errn!=cudaSuccess) { \
+            std::array<char,1024> acBuffer; \
+            snprintf(acBuffer.data(),acBuffer.size(),"cuda kernel '" #func "' execution failed [code=%d, msg=%s]\n\t... in function '%s'\n\t... from %s(%d)\n",(int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
+            CUDA_ERROR_HANDLER((int)__errn,acBuffer.data()); \
+        } \
+    } while(0)
+#else //ndef(__CUDACC__)
+#include <cuda.h>
 #include <cuda_runtime.h>
+#include <npp.h>
+#include <opencv2/core/cuda.hpp>
+#include <opencv2/core/cuda_stream_accessor.hpp>
+#include <opencv2/core/cuda/common.hpp>
+#endif //ndef(__CUDACC__)
 
 namespace lv {
 

@@ -116,12 +116,16 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
     if(USE_CUDA AND (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cuda"))
         file(GLOB cudasources ${CMAKE_CURRENT_SOURCE_DIR}/cuda/*.cu)
         if(cudasources)
+            cuda_include_directories(${OpenCV_INCLUDE_DIRS}) # for opencv cuda utils in core module only
             cuda_include_directories(${CMAKE_SOURCE_DIR}/modules/utils/include) # for litiv/utils/cuda.hpp only
             file(GLOB cudaheaders ${CMAKE_CURRENT_SOURCE_DIR}/cuda/*.cuh)
             if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
                 cuda_add_library(${PROJECT_NAME}_cuda "${cudasources};${cudaheaders}" STATIC OPTIONS "-Xcompiler -fPIC")
             else()
                 cuda_add_library(${PROJECT_NAME}_cuda "${cudasources};${cudaheaders}" STATIC)
+            endif()
+            if(CUDA_EXIT_ON_ERROR)
+                target_compile_definitions(${PROJECT_NAME}_cuda PRIVATE CUDA_EXIT_ON_ERROR)
             endif()
             target_link_libraries(${PROJECT_NAME} PUBLIC ${PROJECT_NAME}_cuda)
             target_include_directories(${PROJECT_NAME}
