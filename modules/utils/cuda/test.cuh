@@ -22,12 +22,12 @@
 
 namespace device {
 
-    __global__ void test(int n);
+    __global__ void test(int nVerbosity);
 
 } // namespace device
 
 namespace host {
 
-    void test(const lv::cuda::KernelParams& oKParams, int n);
+    void test(const lv::cuda::KernelParams& oKParams, int nVerbosity);
 
 } // namespace host

@@ -18,22 +18,27 @@
 
 #include "test.cuh"
 
-__global__ void device::test(int n) {
-    const int px = blockIdx.x*blockDim.x + threadIdx.x;
-    const int py = blockIdx.y*blockDim.y + threadIdx.y;
-    const int pz = blockIdx.z*blockDim.z + threadIdx.z;
-    printf("cuda test kernel @ px = %d, py = %d, pz = %d, with n = %d\n",px,py,pz,n);
+__global__ void device::test(int nVerbosity) {
+    if(nVerbosity>=2)
+        printf("running cuda test kernel for device warmup...\n");
+    if(nVerbosity>=3) {
+        printf("internal warp size = %d\n",warpSize);
+        const int px = blockIdx.x*blockDim.x+threadIdx.x;
+        const int py = blockIdx.y*blockDim.y+threadIdx.y;
+        const int pz = blockIdx.z*blockDim.z+threadIdx.z;
+        printf("px = %d, py = %d, pz = %d, with n = %d\n",px,py,pz,nVerbosity);
+    }
 }
 
-void host::test(const lv::cuda::KernelParams& oKParams, int n) {
-    cudaKernelWrap(test,oKParams,n);
+void host::test(const lv::cuda::KernelParams& oKParams, int nVerbosity) {
+    cudaKernelWrap(test,oKParams,nVerbosity);
 }
 
 // for use via extern in litiv/utils/cuda.hpp
 namespace lv {
     namespace cuda {
-        void test(const lv::cuda::KernelParams& oKParams, int n) {
-            host::test(oKParams,n);
+        void test(int nVerbosity) {
+            host::test(lv::cuda::KernelParams(dim3(1),dim3(1)),nVerbosity);
         }
     }
 }

@@ -20,6 +20,7 @@
 #ifdef __CUDACC__
 #include <array>
 #include <cstdio>
+#include <sstream>
 #include <exception>
 #include <opencv2/core/cuda/common.hpp>
 #include <opencv2/core/cuda/vec_traits.hpp>
@@ -35,7 +36,8 @@
         const cudaError_t __errn = cudaGetLastError(); \
         if(__errn!=cudaSuccess) { \
             std::array<char,1024> acBuffer; \
-            snprintf(acBuffer.data(),acBuffer.size(),"cuda kernel '" #func "' execution failed [code=%d, msg=%s]\n\t... in function '%s'\n\t... from %s(%d)\n",(int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
+            snprintf(acBuffer.data(),acBuffer.size(),"cuda kernel '" #func "' execution failed [code=%d, msg=%s]\n\t... in function '%s'\n\t... from %s(%d)\n\t... with kernel params = %s\n", \
+                     (int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__,((std::string)kparams).c_str()); \
             CUDA_ERROR_HANDLER((int)__errn,acBuffer.data()); \
         } \
     } while(0)
@@ -46,6 +48,7 @@
 #include <opencv2/core/cuda.hpp>
 #include <opencv2/core/cuda_stream_accessor.hpp>
 #include <opencv2/core/cuda/common.hpp>
+#include "litiv/utils/cxx.hpp"
 #endif //ndef(__CUDACC__)
 
 namespace lv {
@@ -64,12 +67,53 @@ namespace lv {
             dim3 vBlockSize;
             size_t nSharedMemSize;
             cudaStream_t nStream;
+            /// is-equal test operator for other KernelParams structs
+            bool operator==(const KernelParams& o) const {
+                return
+                    vGridSize.x==o.vGridSize.x && vGridSize.y==o.vGridSize.y && vGridSize.z==o.vGridSize.z &&
+                    vBlockSize.x==o.vBlockSize.x && vBlockSize.y==o.vBlockSize.y && vBlockSize.z==o.vBlockSize.z &&
+                    nSharedMemSize==o.nSharedMemSize &&
+                    nStream==o.nStream;
+            }
+            /// is-not-equal test operator for other KernelParams structs
+            bool operator!=(const KernelParams& o) const {
+                return !(*this==o);
+            }
+            /// implicit conversion op to string (for printing/debug purposes only)
+            operator std::string() const {
+                std::stringstream ssStr;
+                ssStr << "{ ";
+                ssStr << "grid=[" << vGridSize.x << "," << vGridSize.y << "," << vGridSize.z << "], ";
+                ssStr << "block=[" << vBlockSize.x << "," << vBlockSize.y << "," << vBlockSize.z << "], ";
+                ssStr << "shmem=" << nSharedMemSize << ", stream=" << (void*)nStream;
+                ssStr << " }";
+                return ssStr.str();
+            }
+            /// returns the result of the implicit std::string cast (for printing/debug purposes only)
+            std::string str() const {
+                return (std::string)*this;
+            }
         };
 
 #ifndef __CUDACC__
 
         /// used to launch a trivial kernel to test if device connection & compute arch are good
-        extern void test(const lv::cuda::KernelParams& oKParams=lv::cuda::KernelParams(dim3(1),dim3(1)), int n=1);
+        extern void test(int nVerbosity);
+
+        /// initializes cuda on the given device id for the current thread, and checks for compute compatibility
+        inline void init(int nDeviceID=0) {
+            const int nDeviceCount = cv::cuda::getCudaEnabledDeviceCount();
+            lvAssert_(nDeviceCount>0,"no valid cuda-enabled device found on system");
+            lvAssert__(nDeviceCount>nDeviceID,"provided device ID out of range (device count=%d)",nDeviceCount);
+            cv::cuda::setDevice(nDeviceID);
+            lvAssert(cv::cuda::getDevice()==nDeviceID);
+            lvAssert_(cv::cuda::deviceSupports(LITIV_CUDA_MIN_COMPUTE_CAP),"device does not support min compute capabilities required by framework");
+            if(lv::getVerbosity()>=1) {
+                lvCout << "Initialized CUDA-enabled device w/ id=" << nDeviceID << std::endl;
+                cv::cuda::printShortCudaDeviceInfo(nDeviceID);
+            }
+            lv::cuda::test(lv::getVerbosity()); // warm-up kernel; should always succeed
+        }
 
 #endif //ndef(__CUDACC__)
 
