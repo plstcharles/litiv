@@ -89,13 +89,13 @@ namespace lv {
             // dataset contains 3 scenes with GT for default use
             static const std::vector<std::string> s_vsWorkBatchDirs_real = {
                 "Scene 1",
-               // "Scene 2",
-              //  "Scene 3"
+                "Scene 2",
+                "Scene 3"
             };
             // 'Scene 2' does not have proper calibration data; must skip it if undistort/rectify required
             static const std::vector<std::string> s_vsWorkBatchDirs_calibonly = {
                 "Scene 1",
-             //   "Scene 3"
+                "Scene 3"
             };
             return bUndistortOrRectify?s_vsWorkBatchDirs_calibonly:s_vsWorkBatchDirs_real;
         }
