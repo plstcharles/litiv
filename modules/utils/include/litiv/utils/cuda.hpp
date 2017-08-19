@@ -21,11 +21,12 @@
 #include <array>
 #include <cstdio>
 #include <sstream>
-#include <exception>
+#include <cassert>
 #include <opencv2/core/cuda/common.hpp>
 #include <opencv2/core/cuda/vec_traits.hpp>
 #include <opencv2/core/cuda/vec_math.hpp>
 #include <opencv2/core/cuda/limits.hpp>
+#include <opencv2/cudev.hpp>
 #ifdef CUDA_EXIT_ON_ERROR
 #define CUDA_ERROR_HANDLER(errn,msg) do { printf(msg); std::exit(errn); } while(0)
 #else //ndef(CUDA_EXIT_ON_ERROR)
@@ -42,13 +43,14 @@
         } \
     } while(0)
 #else //ndef(__CUDACC__)
+#include "litiv/utils/cxx.hpp"
+#if !HAVE_CUDA
+#error "cuda util header included without cuda support in framework"
+#endif //!HAVE_CUDA
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <npp.h>
-#include <opencv2/core/cuda.hpp>
-#include <opencv2/core/cuda_stream_accessor.hpp>
-#include <opencv2/core/cuda/common.hpp>
-#include "litiv/utils/cxx.hpp"
+#include "litiv/utils/opencv.hpp"
 #endif //ndef(__CUDACC__)
 
 namespace lv {
@@ -108,7 +110,7 @@ namespace lv {
             cv::cuda::setDevice(nDeviceID);
             lvAssert(cv::cuda::getDevice()==nDeviceID);
             lvAssert_(cv::cuda::deviceSupports(LITIV_CUDA_MIN_COMPUTE_CAP),"device does not support min compute capabilities required by framework");
-            if(lv::getVerbosity()>=1) {
+            if(lv::getVerbosity()>=2) {
                 lvCout << "Initialized CUDA-enabled device w/ id=" << nDeviceID << std::endl;
                 cv::cuda::printShortCudaDeviceInfo(nDeviceID);
             }

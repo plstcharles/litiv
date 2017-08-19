@@ -21,6 +21,9 @@
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#if HAVE_CUDA
+#include <opencv2/core/cuda.hpp>
+#endif //HAVE_CUDA
 #include <unordered_set>
 #include <map>
 
