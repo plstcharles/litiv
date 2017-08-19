@@ -18,6 +18,9 @@
 // note: this implementation is inspired by OpenCV's SCD class (see shape module)
 
 #include "litiv/features2d.hpp"
+#if HAVE_CUDA
+#include "SC.cuh"
+#endif //HAVE_CUDA
 
 #define USE_LIENHART_LOOKUP_MASK 1
 
@@ -34,7 +37,8 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
         m_bRotationInvariant(bRotationInvariant),
         m_bNormalizeBins(bNormalizeBins),
         m_bNonZeroInitBins(bUseNonZeroInit),
-        m_bUsingFullKeyPtMap(false) {
+        m_bUsingFullKeyPtMap(false),
+        m_bUseCUDA(false)  {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
     lvAssert_(m_nInnerRadius>0,"invalid parameter");
@@ -43,16 +47,28 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
     scdesc_generate_radmask();
     lvAssert((int)m_vAngularLimits.size()==m_nAngularBins && (int)m_vRadialLimits.size()==m_nRadialBins);
     if(!m_bRotationInvariant) {
+    #if HAVE_CUDA
+        try {
+            lv::cuda::init();
+            m_bUseCUDA = true;
+        } catch(...) {
+            lvWarn("CUDA init failed in ShapeContext constr, impl will not use GPU");
+        }
+    #endif //HAVE_CUDA
         const int nKernelDiameter = m_nOuterRadius*2+5;
         m_oDilateKernel.create(nKernelDiameter,nKernelDiameter);
         m_oDilateKernel = 0;
         cv::circle(m_oDilateKernel,cv::Point(m_nOuterRadius+2,m_nOuterRadius+2),m_nOuterRadius+2,cv::Scalar_<uchar>(255),-1);
         m_oDilateKernel = m_oDilateKernel>0;
-#if USE_LIENHART_LOOKUP_MASK
+    #if USE_LIENHART_LOOKUP_MASK
         const int nMaskSize = m_nOuterRadius*2+1;
         lv::getLogPolarMask(nMaskSize,m_nRadialBins,m_nAngularBins,m_oAbsDescLUMap,true,(float)m_nInnerRadius);
         lvDbgAssert(m_oAbsDescLUMap.cols==nMaskSize && m_oAbsDescLUMap.rows==nMaskSize);
-#endif //USE_LIENHART_LOOKUP_MASK
+    #if HAVE_CUDA
+        if(m_bUseCUDA)
+            m_oDescLUMap_dev.upload(m_oAbsDescLUMap); // blocking call @@@
+    #endif //HAVE_CUDA
+    #endif //USE_LIENHART_LOOKUP_MASK
     }
     scdesc_generate_emdmask();
     lvAssert(m_oEMDCostMap.dims==2 && m_oEMDCostMap.rows==m_nRadialBins*m_nAngularBins && m_oEMDCostMap.cols==m_nRadialBins*m_nAngularBins);
@@ -71,7 +87,8 @@ ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRad
         m_bRotationInvariant(bRotationInvariant),
         m_bNormalizeBins(bNormalizeBins),
         m_bNonZeroInitBins(bUseNonZeroInit),
-        m_bUsingFullKeyPtMap(false) {
+        m_bUsingFullKeyPtMap(false),
+        m_bUseCUDA(false) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
     lvAssert_(m_dInnerRadius>0.0,"invalid parameter");
@@ -155,6 +172,10 @@ void ShapeContext::compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescMap) {
             for(int nColIdx=0; nColIdx<oImage.cols; ++nColIdx)
                 m_oKeyPts(nKeyPtIdx++) = cv::Point2f((float)nColIdx,(float)nRowIdx);
         m_bUsingFullKeyPtMap = true;
+    #if HAVE_CUDA
+        if(m_bUseCUDA)
+            m_oKeyPts_dev.upload(m_oKeyPts); // blocking call @@@
+    #endif //HAVE_CUDA
     }
     if(!m_bUseRelativeSpace && !m_bRotationInvariant)
         scdesc_fill_desc_direct(oDescMap,true);
@@ -176,6 +197,10 @@ void ShapeContext::compute2(const cv::Mat& oImage, std::vector<cv::KeyPoint>& vo
         for(size_t nKeyPtIdx=0; nKeyPtIdx<voKeypoints.size(); ++nKeyPtIdx)
             m_oKeyPts((int)nKeyPtIdx) = voKeypoints[nKeyPtIdx].pt;
     }
+#if HAVE_CUDA
+    if(m_bUseCUDA)
+        m_oKeyPts_dev.upload(m_oKeyPts); // blocking call @@@
+#endif //HAVE_CUDA
     if(!m_bUseRelativeSpace && !m_bRotationInvariant)
         scdesc_fill_desc_direct(oDescMap,true);
     else
@@ -215,6 +240,10 @@ void ShapeContext::detectAndCompute(cv::InputArray _oImage, cv::InputArray _oMas
     m_oKeyPts.create((int)voKeypoints.size(),1);
     for(size_t nKeyPtIdx=0; nKeyPtIdx<voKeypoints.size(); ++nKeyPtIdx)
         m_oKeyPts((int)nKeyPtIdx) = voKeypoints[nKeyPtIdx].pt;
+#if HAVE_CUDA
+    if(m_bUseCUDA)
+        m_oKeyPts_dev.upload(m_oKeyPts); // blocking call @@@
+#endif //HAVE_CUDA
     _oDescriptors.create((int)voKeypoints.size(),m_nRadialBins*m_nAngularBins,CV_32FC1);
     cv::Mat_<float> oDescriptors = cv::Mat_<float>(_oDescriptors.getMat());
     if(!m_bUseRelativeSpace && !m_bRotationInvariant)
@@ -339,6 +368,12 @@ void ShapeContext::scdesc_fill_contours(const cv::Mat& oImage) {
     }
     else
         m_oContourPts.release();
+#if HAVE_CUDA
+    if(m_bUseCUDA) {
+        m_oDistMask_dev.upload(m_oDistMask);
+        m_oContourPts_dev.upload(m_oContourPts); // blocking call @@@
+    }
+#endif //HAVE_CUDA
 }
 
 void ShapeContext::scdesc_fill_maps(double dMeanDist) {
@@ -436,6 +471,24 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
     else
         oDescriptors.create((int)m_oKeyPts.total(),m_nDescSize);
     oDescriptors = m_bNonZeroInitBins?std::max(10.0f/m_nDescSize,0.5f):0.0f;
+#if HAVE_CUDA
+#if !USE_LIENHART_LOOKUP_MASK
+#error "cuda impl only available for lienhart lookup"
+#endif //!USE_LIENHART_LOOKUP_MASK
+    if(m_bUseCUDA) {
+        const int nDescCount = bGenDescMap?(m_oCurrImageSize.height*m_oCurrImageSize.width):((int)m_oKeyPts.total());
+        cv::Mat_<float> oDescriptors_host = bGenDescMap?oDescriptors.reshape(0,2,std::array<int,2>{nDescCount,m_nDescSize}.data()):oDescriptors;
+        m_oDescriptors_dev.upload(oDescriptors_host); // blocking call @@@
+        lv::cuda::KernelParams oParams;
+        oParams.vBlockSize.x = (uint)cv::cuda::DeviceInfo().warpSize();
+        oParams.vGridSize = bGenDescMap?dim3((uint)m_oCurrImageSize.width,(uint)m_oCurrImageSize.height):dim3((uint)nDescCount);
+        host::scdesc_fill_desc_direct(oParams,m_oKeyPts_dev,m_oContourPts_dev,m_oDistMask_dev,m_oDescLUMap_dev,m_oDescriptors_dev,bGenDescMap);
+        m_oDescriptors_dev.download(oDescriptors_host); // blocking call @@@
+        if(m_bNormalizeBins)
+            scdesc_norm(oDescriptors_host);
+        return;
+    }
+#endif //HAVE_CUDA
     lvDbgAssert(m_oContourPts.type()==CV_32FC2 && (m_oContourPts.total()==(size_t)m_oContourPts.rows || m_oContourPts.total()==(size_t)m_oContourPts.cols));
     lvDbgAssert(m_oKeyPts.type()==CV_32FC2 && (m_oKeyPts.total()==(size_t)m_oKeyPts.rows || m_oKeyPts.total()==(size_t)m_oKeyPts.cols));
     lvDbgAssert(m_oKeyPts.total()>size_t(0));
