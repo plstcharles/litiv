@@ -33,7 +33,7 @@
 #define CUDA_ERROR_HANDLER(errn,msg) do { (void)errn; throw std::runtime_error(msg); } while(0)
 #endif //ndef(CUDA_..._ON_ERROR)
 #define cudaKernelWrap(func,kparams,...) do { \
-        device::func<<<kparams.vGridSize,kparams.vBlockSize,kparams.nSharedMemSize,kparams.nStream>>>(__VA_ARGS__); \
+        impl::func<<<kparams.vGridSize,kparams.vBlockSize,kparams.nSharedMemSize,kparams.nStream>>>(__VA_ARGS__); \
         const cudaError_t __errn = cudaGetLastError(); \
         if(__errn!=cudaSuccess) { \
             std::array<char,1024> acBuffer; \

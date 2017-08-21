@@ -98,12 +98,12 @@ __global__ void device::scdesc_fill_desc_direct(const cv::cuda::PtrStep<cv::Poin
 
 /////////////////////////////////////////////////////////////////////////
 
-void host::scdesc_fill_desc_direct(const lv::cuda::KernelParams& oKParams,
-                                   const cv::cuda::PtrStep<cv::Point2f> oKeyPts,
-                                   const cv::cuda::PtrStepSz<cv::Point2f> oContourPts,
-                                   const cv::cuda::PtrStep<uchar> oDistMask,
-                                   const cv::cuda::PtrStepSzi oDescLUMask,
-                                   cv::cuda::PtrStepSzf oDescs, bool bNonZeroInitBins,
-                                   bool bGenDescMap, bool bNormalizeBins) {
+void device::scdesc_fill_desc_direct(const lv::cuda::KernelParams& oKParams,
+                                     const cv::cuda::PtrStep<cv::Point2f> oKeyPts,
+                                     const cv::cuda::PtrStepSz<cv::Point2f> oContourPts,
+                                     const cv::cuda::PtrStep<uchar> oDistMask,
+                                     const cv::cuda::PtrStepSzi oDescLUMask,
+                                     cv::cuda::PtrStepSzf oDescs, bool bNonZeroInitBins,
+                                     bool bGenDescMap, bool bNormalizeBins) {
     cudaKernelWrap(scdesc_fill_desc_direct,oKParams,oKeyPts,oContourPts,oDistMask,oDescLUMask,oDescs,bNonZeroInitBins,bGenDescMap,bNormalizeBins);
 }

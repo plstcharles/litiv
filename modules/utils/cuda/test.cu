@@ -19,20 +19,19 @@
 #include "test.cuh"
 #include <vector>
 
-__global__ void device::test(uchar* pTestData, int nVerbosity) {
-    if(nVerbosity>=3) {
-        printf("internal warp size = %d\n",warpSize);
-        const int px = blockIdx.x*blockDim.x+threadIdx.x;
-        const int py = blockIdx.y*blockDim.y+threadIdx.y;
-        const int pz = blockIdx.z*blockDim.z+threadIdx.z;
-        printf("px = %d, py = %d, pz = %d, with n = %d\n",px,py,pz,nVerbosity);
-    }
-    assert(pTestData[0]==1);
-    assert(pTestData[13]==0);
-    pTestData[13] = 1;
-}
+namespace impl {
 
-void host::test(const lv::cuda::KernelParams& oKParams, uchar* pTestData, int nVerbosity) {
+    __global__ void test(uchar* pTestData, int nVerbosity) {
+        if(nVerbosity>=3)
+            printf("internal warp size = %d, n = %d\n",warpSize,nVerbosity);
+        assert(pTestData[0]==1);
+        assert(pTestData[13]==0);
+        pTestData[13] = 1;
+    }
+
+} // namespace impl
+
+void device::test(const lv::cuda::KernelParams& oKParams, uchar* pTestData, int nVerbosity) {
     cudaKernelWrap(test,oKParams,pTestData,nVerbosity);
 }
 
@@ -50,7 +49,7 @@ namespace lv {
             cudaMemcpy(pTest_host.data(),pTest_dev,nTestSize,cudaMemcpyDeviceToHost);
             pTest_host[13] = 0;
             cudaMemcpy(pTest_dev,pTest_host.data(),nTestSize,cudaMemcpyHostToDevice);
-            host::test(lv::cuda::KernelParams(dim3(1),dim3(1)),pTest_dev,nVerbosity);
+            device::test(lv::cuda::KernelParams(dim3(1),dim3(1)),pTest_dev,nVerbosity);
             cudaMemcpy(pTest_host.data(),pTest_dev,nTestSize,cudaMemcpyDeviceToHost);
             assert(pTest_host[13]==1);
             cudaFree(pTest_dev);
