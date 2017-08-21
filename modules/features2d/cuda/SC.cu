@@ -21,14 +21,16 @@ __global__ void device::scdesc_fill_desc_direct(const cv::cuda::PtrStep<cv::Poin
                                                 const cv::cuda::PtrStepSz<cv::Point2f> oContourPts,
                                                 const cv::cuda::PtrStep<uchar> oDistMask,
                                                 const cv::cuda::PtrStepSzi oDescLUMask,
-                                                cv::cuda::PtrStepf oDescs,
-                                                bool bGenDescMap) {
+                                                cv::cuda::PtrStepSzf oDescs, bool bNonZeroInitBins,
+                                                bool bGenDescMap, bool bNormalizeBins) {
     assert(oContourPts.cols==1);
     assert(blockDim.x==warpSize);
     assert(oDescLUMask.rows==oDescLUMask.cols);
     assert((oDescLUMask.rows%2)==1);
     int2 vKeyPt_i;
     float2 vKeyPt_f;
+    const int nDescSize = oDescs.cols;
+    extern __shared__ float aTmpDesc[];
     float* aDesc;
     if(bGenDescMap) {
         vKeyPt_i = make_int2(blockIdx.x,blockIdx.y);
@@ -40,6 +42,12 @@ __global__ void device::scdesc_fill_desc_direct(const cv::cuda::PtrStep<cv::Poin
         vKeyPt_i = make_int2(__float2int_rn(oKeyPt.x),__float2int_rn(oKeyPt.y));
         vKeyPt_f = make_float2(oKeyPt.x,oKeyPt.y);
         aDesc = oDescs.ptr(blockIdx.x);
+    }
+    int nBaseDescIdx = 0;
+    while(nBaseDescIdx<nDescSize) {
+        int nDescIdx = nBaseDescIdx+threadIdx.x;
+        aTmpDesc[nDescIdx] = bNonZeroInitBins?max(10.0f/nDescSize,0.5f):0.0f;
+        nBaseDescIdx += blockDim.x;
     }
     if(oDistMask(vKeyPt_i.y,vKeyPt_i.x)) {
         const int nContourPts = oContourPts.rows;
@@ -58,6 +66,34 @@ __global__ void device::scdesc_fill_desc_direct(const cv::cuda::PtrStep<cv::Poin
             nContourPtIdx += blockDim.x;
         }
     }
+    /*@@@
+    if(bNormalizeBins) {
+        nBaseDescIdx = 0;
+        while(nBaseDescIdx<nDescSize) {
+            int nDescIdx = nBaseDescIdx+threadIdx.x;
+            aTmpDesc[nDescIdx] = aDesc[nDescIdx]*aDesc[nDescIdx];
+            nBaseDescIdx += blockDim.x;
+        }
+        for(int d=nBaseDescIdx>>1; d>=1; d>>=1) {
+            __syncthreads();
+            int nDescIdx = threadIdx.x;
+            while(nDescIdx<d) {
+                aTmpDesc[nDescIdx] += aTmpDesc[nDescIdx+d];
+                nDescIdx += blockDim.x;
+            }
+        }
+        float fInvNorm;
+        if(threadIdx.x==0)
+            fInvNorm = rsqrt(aTmpDesc[0]);
+        __syncthreads();
+        __shfl(fInvNorm,0);
+        nBaseDescIdx = 0;
+        while(nBaseDescIdx<nDescSize) {
+            int nDescIdx = nBaseDescIdx+threadIdx.x;
+            aDesc[nDescIdx] = aTmpDesc[nDescIdx]*fInvNorm;
+            nBaseDescIdx += blockDim.x;
+        }
+    }*/
 }
 
 /////////////////////////////////////////////////////////////////////////
@@ -67,7 +103,7 @@ void host::scdesc_fill_desc_direct(const lv::cuda::KernelParams& oKParams,
                                    const cv::cuda::PtrStepSz<cv::Point2f> oContourPts,
                                    const cv::cuda::PtrStep<uchar> oDistMask,
                                    const cv::cuda::PtrStepSzi oDescLUMask,
-                                   cv::cuda::PtrStepf oDescs,
-                                   bool bGenDescMap) {
-    cudaKernelWrap(scdesc_fill_desc_direct,oKParams,oKeyPts,oContourPts,oDistMask,oDescLUMask,oDescs,bGenDescMap);
+                                   cv::cuda::PtrStepSzf oDescs, bool bNonZeroInitBins,
+                                   bool bGenDescMap, bool bNormalizeBins) {
+    cudaKernelWrap(scdesc_fill_desc_direct,oKParams,oKeyPts,oContourPts,oDistMask,oDescLUMask,oDescs,bNonZeroInitBins,bGenDescMap,bNormalizeBins);
 }

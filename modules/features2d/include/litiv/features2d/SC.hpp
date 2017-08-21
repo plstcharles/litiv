@@ -74,6 +74,8 @@ public:
     virtual int defaultNorm() const override;
     /// return true if detector object is empty (overrides cv::DescriptorExtractor's)
     virtual bool empty() const override;
+    /// sets whether cuda should be used internally (if possible) or not
+    virtual bool setUseCUDA(bool bVal, int nDeviceID=0);
 
     /// returns whether descriptor bin arrays will be 0-1 normalized before returning or not
     bool isNormalizingBins() const;

@@ -25,8 +25,8 @@ namespace device {
                                             const cv::cuda::PtrStepSz<cv::Point2f> oContourPts,
                                             const cv::cuda::PtrStep<uchar> oDistMask,
                                             const cv::cuda::PtrStepSzi oDescLUMask,
-                                            cv::cuda::PtrStepf oDescs,
-                                            bool bGenDescMap);
+                                            cv::cuda::PtrStepSzf oDescs, bool bNonZeroInitBins,
+                                            bool bGenDescMap, bool bNormalizeBins);
 
 } // namespace device
 
@@ -37,7 +37,7 @@ namespace host {
                                  const cv::cuda::PtrStepSz<cv::Point2f> oContourPts,
                                  const cv::cuda::PtrStep<uchar> oDistMask,
                                  const cv::cuda::PtrStepSzi oDescLUMask,
-                                 cv::cuda::PtrStepf oDescs,
-                                 bool bGenDescMap);
+                                 cv::cuda::PtrStepSzf oDescs, bool bNonZeroInitBins,
+                                 bool bGenDescMap, bool bNormalizeBins);
 
 } // namespace host
