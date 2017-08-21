@@ -144,6 +144,7 @@ bool ShapeContext::empty() const {
 
 bool ShapeContext::setUseCUDA(bool bVal, int nDeviceID) {
 #if !HAVE_CUDA
+    lvIgnore(nDeviceID);
     lvAssert_(!bVal,"framework not compiled with CUDA support");
 #else //HAVE_CUDA
     lvAssert_(!bVal||(!m_bUseRelativeSpace && !m_bRotationInvariant),"missing CUDA impl for current config");
