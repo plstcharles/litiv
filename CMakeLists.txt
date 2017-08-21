@@ -143,7 +143,7 @@ else()
 endif()
 
 ### BOOST CHECK
-find_package(Boost QUIET COMPONENTS chrono date_time system filesystem program_options regex serialization)
+find_package(Boost QUIET)
 option(USE_BOOST "Specifies whether Boost should be included/linked or not; if false, projects that depend on it (e.g. SoSPD, cosegmenters) will be disabled" ${Boost_FOUND})
 if(USE_BOOST)
     find_package(Boost COMPONENTS chrono date_time system filesystem program_options regex serialization)
