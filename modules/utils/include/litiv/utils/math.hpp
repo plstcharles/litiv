@@ -41,6 +41,18 @@ namespace lv {
         return ((nVal&(nVal-1))==0);
     }
 
+    /// returns the nearest (rounded up) power of two to the given 32-bit unsigned integer
+    inline uint32_t get_next_pow2(uint32_t nVal) {
+        lvDbgAssert_(nVal>0,"given value must be greater than 0 (returns 0 otherwise)");
+        --nVal;
+        nVal |= nVal>>1;
+        nVal |= nVal>>2;
+        nVal |= nVal>>4;
+        nVal |= nVal>>8;
+        nVal |= nVal>>16;
+        return ++nVal;
+    }
+
 #ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wstrict-aliasing"
