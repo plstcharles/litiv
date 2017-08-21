@@ -37,8 +37,9 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
         m_bRotationInvariant(bRotationInvariant),
         m_bNormalizeBins(bNormalizeBins),
         m_bNonZeroInitBins(bUseNonZeroInit),
+        m_nBlockSize(0),
         m_bUsingFullKeyPtMap(false),
-        m_bUseCUDA(false)  {
+        m_bUseCUDA(false) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
     lvAssert_(m_nInnerRadius>0,"invalid parameter");
@@ -87,6 +88,7 @@ ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRad
         m_bRotationInvariant(bRotationInvariant),
         m_bNormalizeBins(bNormalizeBins),
         m_bNonZeroInitBins(bUseNonZeroInit),
+        m_nBlockSize(0),
         m_bUsingFullKeyPtMap(false),
         m_bUseCUDA(false) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
@@ -160,6 +162,12 @@ bool ShapeContext::setUseCUDA(bool bVal, int nDeviceID) {
     }
 #endif //HAVE_CUDA
     m_bUseCUDA = bVal;
+    return true;
+}
+
+bool ShapeContext::setBlockSize(size_t nThreadCount) {
+    lvAssert_((nThreadCount%cv::cuda::DeviceInfo().warpSize())==0,"block thread count must be multiple of warp size");
+    m_nBlockSize = nThreadCount;
     return true;
 }
 
@@ -487,30 +495,6 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
         oDescriptors.release();
         return;
     }
-    if(bGenDescMap)
-        oDescriptors.create(3,std::array<int,3>{m_oCurrImageSize.height,m_oCurrImageSize.width,m_nDescSize}.data());
-    else
-        oDescriptors.create((int)m_oKeyPts.total(),m_nDescSize);
-#if HAVE_CUDA
-#if !USE_LIENHART_LOOKUP_MASK
-#error "cuda impl only available for lienhart lookup"
-#endif //!USE_LIENHART_LOOKUP_MASK
-    if(m_bUseCUDA) {
-        const int nDescCount = bGenDescMap?(m_oCurrImageSize.height*m_oCurrImageSize.width):((int)m_oKeyPts.total());
-        lv::cuda::KernelParams oParams;
-        const uint nWarpSize = (uint)cv::cuda::DeviceInfo().warpSize();
-        oParams.vBlockSize.x = nWarpSize;
-        oParams.vGridSize = bGenDescMap?dim3((uint)m_oCurrImageSize.width,(uint)m_oCurrImageSize.height):dim3((uint)nDescCount);
-        oParams.nSharedMemSize = m_bNormalizeBins?size_t(ceil(float(m_nDescSize)/nWarpSize)*nWarpSize):size_t(0);
-        lvDbgAssert((oParams.nSharedMemSize%nWarpSize)==0);
-        host::scdesc_fill_desc_direct(oParams,m_oKeyPts_dev,m_oContourPts_dev,m_oDistMask_dev,m_oDescLUMap_dev,m_oDescriptors_dev,m_bNonZeroInitBins,bGenDescMap,m_bNormalizeBins);
-        cv::Mat_<float> oDescriptors_host = bGenDescMap?oDescriptors.reshape(0,2,std::array<int,2>{nDescCount,m_nDescSize}.data()):oDescriptors;
-        m_oDescriptors_dev.download(oDescriptors_host); // blocking call @@@
-        if(m_bNormalizeBins)
-            scdesc_norm(oDescriptors_host);
-        return;
-    }
-#endif //HAVE_CUDA
     lvDbgAssert(m_oContourPts.type()==CV_32FC2 && (m_oContourPts.total()==(size_t)m_oContourPts.rows || m_oContourPts.total()==(size_t)m_oContourPts.cols));
     lvDbgAssert(m_oKeyPts.type()==CV_32FC2 && (m_oKeyPts.total()==(size_t)m_oKeyPts.rows || m_oKeyPts.total()==(size_t)m_oKeyPts.cols));
     lvDbgAssert(m_oKeyPts.total()>size_t(0));
@@ -518,6 +502,32 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
 #if USE_LIENHART_LOOKUP_MASK
     lvDbgAssert(!m_oAbsDescLUMap.empty() && m_oAbsDescLUMap.rows==m_nOuterRadius*2+1 && m_oAbsDescLUMap.rows==m_oAbsDescLUMap.cols);
 #endif //USE_LIENHART_LOOKUP_MASK
+#if HAVE_CUDA
+#if !USE_LIENHART_LOOKUP_MASK
+#error "cuda impl only available for lienhart lookup"
+#endif //!USE_LIENHART_LOOKUP_MASK
+    if(m_bUseCUDA) {
+        const int nDescCount = bGenDescMap?(m_oCurrImageSize.height*m_oCurrImageSize.width):((int)m_oKeyPts.total());
+        m_oDescriptors_dev.create(nDescCount,m_nDescSize,CV_32FC1);
+        oDescriptors.create(nDescCount,m_nDescSize);
+        lv::cuda::KernelParams oParams;
+        const uint nWarpSize = (uint)cv::cuda::DeviceInfo().warpSize();
+        oParams.vBlockSize.x = (uint)(m_nBlockSize?m_nBlockSize:size_t(cv::cuda::DeviceInfo().warpSize()));
+        oParams.vGridSize = bGenDescMap?dim3((uint)m_oCurrImageSize.width,(uint)m_oCurrImageSize.height):dim3((uint)nDescCount);
+        oParams.nSharedMemSize = size_t(std::ceil(float(m_nDescSize)/nWarpSize)*nWarpSize*2)*sizeof(float);
+        device::scdesc_fill_desc_direct(oParams,m_oKeyPts_dev,m_oContourPts_dev,m_oDistMask_dev,m_oDescLUMap_dev,m_oDescriptors_dev,m_bNonZeroInitBins,bGenDescMap,m_bNormalizeBins);
+        m_oDescriptors_dev.download(oDescriptors); // blocking call @@@
+        /*if(m_bNormalizeBins)
+            scdesc_norm(oDescriptors);*/
+        if(bGenDescMap)
+            oDescriptors = oDescriptors.reshape(0,3,std::array<int,3>{m_oCurrImageSize.height,m_oCurrImageSize.width,m_nDescSize}.data());
+        return;
+    }
+#endif //HAVE_CUDA
+    if(bGenDescMap)
+        oDescriptors.create(3,std::array<int,3>{m_oCurrImageSize.height,m_oCurrImageSize.width,m_nDescSize}.data());
+    else
+        oDescriptors.create((int)m_oKeyPts.total(),m_nDescSize);
     oDescriptors = m_bNonZeroInitBins?std::max(10.0f/m_nDescSize,0.5f):0.0f;
 #if USING_OPENMP
     #pragma omp parallel for

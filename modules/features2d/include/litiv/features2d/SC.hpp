@@ -76,6 +76,8 @@ public:
     virtual bool empty() const override;
     /// sets whether cuda should be used internally (if possible) or not
     virtual bool setUseCUDA(bool bVal, int nDeviceID=0);
+    /// sets the block size to use in the cuda kernel (might speed up compute when using many kpts)
+    virtual bool setBlockSize(size_t nThreadCount=size_t(cv::cuda::DeviceInfo().warpSize()));
 
     /// returns whether descriptor bin arrays will be 0-1 normalized before returning or not
     bool isNormalizingBins() const;
@@ -198,6 +200,7 @@ private:
     cv::Mat_<cv::Point2f> m_oKeyPts,m_oContourPts;
     cv::Mat_<uchar> m_oBinMask,m_oDistMask,m_oDilateKernel;
     cv::Size m_oCurrImageSize;
+    size_t m_nBlockSize;
     bool m_bUsingFullKeyPtMap;
     bool m_bUseCUDA;
 };
