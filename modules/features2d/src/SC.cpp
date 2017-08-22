@@ -66,8 +66,21 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
         lv::getLogPolarMask(nMaskSize,m_nRadialBins,m_nAngularBins,m_oAbsDescLUMap,true,(float)m_nInnerRadius);
         lvDbgAssert(m_oAbsDescLUMap.cols==nMaskSize && m_oAbsDescLUMap.rows==nMaskSize);
     #if HAVE_CUDA
-        if(m_bUseCUDA)
-            m_oDescLUMap_dev.upload(m_oAbsDescLUMap); // blocking call @@@
+        if(m_bUseCUDA) {
+            m_oDescLUMap_dev.upload(m_oAbsDescLUMap);
+            cudaResourceDesc oResDesc;
+            memset(&oResDesc,0,sizeof(oResDesc));
+            oResDesc.resType = cudaResourceTypePitch2D;
+            oResDesc.res.pitch2D.devPtr = m_oDescLUMap_dev.data;
+            oResDesc.res.pitch2D.height = (size_t)m_oDescLUMap_dev.rows;
+            oResDesc.res.pitch2D.width = (size_t)m_oDescLUMap_dev.cols;
+            oResDesc.res.pitch2D.pitchInBytes = m_oDescLUMap_dev.step;
+            oResDesc.res.pitch2D.desc = cudaCreateChannelDesc<int>();
+            cudaTextureDesc oTexDesc;
+            memset(&oTexDesc,0,sizeof(oTexDesc));
+            oTexDesc.readMode = cudaReadModeElementType;
+            cudaCreateTextureObject(&m_pDescLUMap_tex,&oResDesc,&oTexDesc,nullptr);
+        }
     #endif //HAVE_CUDA
     #endif //USE_LIENHART_LOOKUP_MASK
     }
@@ -515,10 +528,8 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
         oParams.vBlockSize.x = (uint)(m_nBlockSize?m_nBlockSize:size_t(cv::cuda::DeviceInfo().warpSize()));
         oParams.vGridSize = bGenDescMap?dim3((uint)m_oCurrImageSize.width,(uint)m_oCurrImageSize.height):dim3((uint)nDescCount);
         oParams.nSharedMemSize = size_t(std::ceil(float(m_nDescSize)/nWarpSize)*nWarpSize*2)*sizeof(float);
-        device::scdesc_fill_desc_direct(oParams,m_oKeyPts_dev,m_oContourPts_dev,m_oDistMask_dev,m_oDescLUMap_dev,m_oDescriptors_dev,m_bNonZeroInitBins,bGenDescMap,m_bNormalizeBins);
+        device::scdesc_fill_desc_direct(oParams,m_oKeyPts_dev,m_oContourPts_dev,m_oDistMask_dev,m_pDescLUMap_tex,m_oAbsDescLUMap.rows,m_oDescriptors_dev,m_bNonZeroInitBins,bGenDescMap,m_bNormalizeBins);
         m_oDescriptors_dev.download(oDescriptors); // blocking call @@@
-        /*if(m_bNormalizeBins)
-            scdesc_norm(oDescriptors);*/
         if(bGenDescMap)
             oDescriptors = oDescriptors.reshape(0,3,std::array<int,3>{m_oCurrImageSize.height,m_oCurrImageSize.width,m_nDescSize}.data());
         return;

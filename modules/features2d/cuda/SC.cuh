@@ -25,7 +25,7 @@ namespace device {
                                  const cv::cuda::PtrStep<cv::Point2f> oKeyPts,
                                  const cv::cuda::PtrStepSz<cv::Point2f> oContourPts,
                                  const cv::cuda::PtrStep<uchar> oDistMask,
-                                 const cv::cuda::PtrStepSzi oDescLUMask,
+                                 const cudaTextureObject_t pDescLUMask_tex, int nMaskSize,
                                  cv::cuda::PtrStepSzf oDescs, bool bNonZeroInitBins,
                                  bool bGenDescMap, bool bNormalizeBins);
 

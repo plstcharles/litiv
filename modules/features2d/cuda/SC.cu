@@ -19,14 +19,15 @@
 
 namespace impl {
 
+    template<bool bGenDescMap>
     __global__ void scdesc_fill_desc_direct(const cv::cuda::PtrStep<cv::Point2f> oKeyPts,
                                             const cv::cuda::PtrStepSz<cv::Point2f> oContourPts,
                                             const cv::cuda::PtrStep<uchar> oDistMask,
-                                            const cv::cuda::PtrStepSzi oDescLUMask,
-                                            cv::cuda::PtrStepSzf oDescs, bool bNonZeroInitBins,
-                                            bool bGenDescMap, bool bNormalizeBins) {
+                                            const cudaTextureObject_t pDescLUMask_tex, int nMaskSize,
+                                            cv::cuda::PtrStepSzf oDescs,
+                                            bool bNonZeroInitBins, bool bNormalizeBins) {
         assert(oContourPts.cols==1);
-        assert(oDescLUMask.rows==oDescLUMask.cols && (oDescLUMask.rows%2)==1);
+        assert((nMaskSize%2)==1);
         assert((blockDim.x%warpSize)==0 && blockDim.y==1 && blockDim.z==1);
         const int nDescSize = oDescs.cols;
         assert(nDescSize>0);
@@ -58,7 +59,6 @@ namespace impl {
         __syncthreads();
         if(oDistMask(vKeyPt_i.y,vKeyPt_i.x)) {
             const int nContourPts = oContourPts.rows;
-            const int nMaskSize = oDescLUMask.rows;
             const int nHalfMaskSize = nMaskSize/2;
             int nContourPtIdx = threadIdx.x;
             while(nContourPtIdx<nContourPts) {
@@ -66,7 +66,7 @@ namespace impl {
                 const int nLookupRow = __float2int_rn(oContourPt.y-vKeyPt_f.y)+nHalfMaskSize;
                 const int nLookupCol = __float2int_rn(oContourPt.x-vKeyPt_f.x)+nHalfMaskSize;
                 if(nLookupRow>=0 && nLookupRow<nMaskSize && nLookupCol>=0 && nLookupCol<nMaskSize) {
-                    const int nDescBinIdx = oDescLUMask(nLookupRow,nLookupCol);
+                    const int nDescBinIdx = tex2D<int>(pDescLUMask_tex,nLookupCol,nLookupRow);
                     if(nDescBinIdx>=0)
                         atomicAdd((float*)aTmpDesc+nDescBinIdx,1.0f);
                 }
@@ -145,8 +145,11 @@ void device::scdesc_fill_desc_direct(const lv::cuda::KernelParams& oKParams,
                                      const cv::cuda::PtrStep<cv::Point2f> oKeyPts,
                                      const cv::cuda::PtrStepSz<cv::Point2f> oContourPts,
                                      const cv::cuda::PtrStep<uchar> oDistMask,
-                                     const cv::cuda::PtrStepSzi oDescLUMask,
+                                     const cudaTextureObject_t pDescLUMask_tex, int nMaskSize,
                                      cv::cuda::PtrStepSzf oDescs, bool bNonZeroInitBins,
                                      bool bGenDescMap, bool bNormalizeBins) {
-    cudaKernelWrap(scdesc_fill_desc_direct,oKParams,oKeyPts,oContourPts,oDistMask,oDescLUMask,oDescs,bNonZeroInitBins,bGenDescMap,bNormalizeBins);
+    if(bGenDescMap)
+        cudaKernelWrap(template scdesc_fill_desc_direct<true>,oKParams,oKeyPts,oContourPts,oDistMask,pDescLUMask_tex,nMaskSize,oDescs,bNonZeroInitBins,bNormalizeBins);
+    else
+        cudaKernelWrap(template scdesc_fill_desc_direct<false>,oKParams,oKeyPts,oContourPts,oDistMask,pDescLUMask_tex,nMaskSize,oDescs,bNonZeroInitBins,bNormalizeBins);
 }

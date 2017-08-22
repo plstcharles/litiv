@@ -194,8 +194,9 @@ private:
     cv::Mat_<int> m_oAbsDescLUMap;
 #if HAVE_CUDA
     cv::cuda::GpuMat m_oDescriptors_dev;
-    cv::cuda::GpuMat m_oDistMask_dev,m_oDescLUMap_dev;
     cv::cuda::GpuMat m_oKeyPts_dev,m_oContourPts_dev;
+    cv::cuda::GpuMat m_oDistMask_dev,m_oDescLUMap_dev;
+    unsigned long long m_pDescLUMap_tex;
 #endif //HAVE_CUDA
     cv::Mat_<cv::Point2f> m_oKeyPts,m_oContourPts;
     cv::Mat_<uchar> m_oBinMask,m_oDistMask,m_oDilateKernel;
