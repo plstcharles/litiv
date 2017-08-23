@@ -21,7 +21,7 @@
 
 namespace impl {
 
-    __global__ void test(uchar* pTestData, int nVerbosity) {
+    __global__ void test_kernel(uchar* pTestData, int nVerbosity) {
         if(nVerbosity>=3)
             printf("internal warp size = %d, n = %d\n",warpSize,nVerbosity);
         assert(pTestData[0]==1);
@@ -31,28 +31,6 @@ namespace impl {
 
 } // namespace impl
 
-void device::test(const lv::cuda::KernelParams& oKParams, uchar* pTestData, int nVerbosity) {
-    cudaKernelWrap(test,oKParams,pTestData,nVerbosity);
-}
-
-// for use via extern in litiv/utils/cuda.hpp
-namespace lv {
-    namespace cuda {
-        void test(int nVerbosity) {
-            if(nVerbosity>=2)
-                printf("running cuda test kernel for device warmup...\n");
-            const size_t nTestSize = size_t(10000);
-            uchar* pTest_dev;
-            cudaMalloc(&pTest_dev,nTestSize);
-            cudaMemset(pTest_dev,1,nTestSize);
-            std::vector<uchar> pTest_host(nTestSize);
-            cudaMemcpy(pTest_host.data(),pTest_dev,nTestSize,cudaMemcpyDeviceToHost);
-            pTest_host[13] = 0;
-            cudaMemcpy(pTest_dev,pTest_host.data(),nTestSize,cudaMemcpyHostToDevice);
-            device::test(lv::cuda::KernelParams(dim3(1),dim3(1)),pTest_dev,nVerbosity);
-            cudaMemcpy(pTest_host.data(),pTest_dev,nTestSize,cudaMemcpyDeviceToHost);
-            assert(pTest_host[13]==1);
-            cudaFree(pTest_dev);
-        }
-    }
+void device::test_kernel(const lv::cuda::KernelParams& oKParams, uchar* pTestData, int nVerbosity) {
+    cudaKernelWrap(test_kernel,oKParams,pTestData,nVerbosity);
 }

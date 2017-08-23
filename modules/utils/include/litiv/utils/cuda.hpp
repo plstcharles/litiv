@@ -99,23 +99,14 @@ namespace lv {
 
 #ifndef __CUDACC__
 
+        /// used to set a global default device ID to use in CUDA-based impls
+        void setDefaultDeviceID(int nDeviceID);
+        /// used to query the global default device ID to use in CUDA-based impls
+        int getDefaultDeviceID();
         /// used to launch a trivial kernel to test if device connection & compute arch are good
-        extern void test(int nVerbosity);
-
+        void test_kernel(int nVerbosity);
         /// initializes cuda on the given device id for the current thread, and checks for compute compatibility
-        inline void init(int nDeviceID=0) {
-            const int nDeviceCount = cv::cuda::getCudaEnabledDeviceCount();
-            lvAssert_(nDeviceCount>0,"no valid cuda-enabled device found on system");
-            lvAssert__(nDeviceCount>nDeviceID,"provided device ID out of range (device count=%d)",nDeviceCount);
-            cv::cuda::setDevice(nDeviceID);
-            lvAssert(cv::cuda::getDevice()==nDeviceID);
-            lvAssert_(cv::cuda::deviceSupports(LITIV_CUDA_MIN_COMPUTE_CAP),"device does not support min compute capabilities required by framework");
-            if(lv::getVerbosity()>=2) {
-                lvCout << "Initialized CUDA-enabled device w/ id=" << nDeviceID << std::endl;
-                cv::cuda::printShortCudaDeviceInfo(nDeviceID);
-            }
-            lv::cuda::test(lv::getVerbosity()); // warm-up kernel; should always succeed
-        }
+        void init(int nDeviceID=getDefaultDeviceID());
 
 #endif //ndef(__CUDACC__)
 

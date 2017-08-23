@@ -79,6 +79,9 @@ if(USE_CVCORE_WITH_UTILS)
     endif(USE_OPENGM)
 endif()
 if(USE_CUDA)
+    add_files(SOURCE_FILES
+        "src/cuda.cpp"
+    )
     add_files(INCLUDE_FILES
         "include/litiv/utils/cuda.hpp"
     )

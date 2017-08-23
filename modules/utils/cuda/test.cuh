@@ -22,6 +22,6 @@
 
 namespace device {
 
-    void test(const lv::cuda::KernelParams& oKParams, uchar* pTestData, int nVerbosity);
+    void test_kernel(const lv::cuda::KernelParams& oKParams, uchar* pTestData, int nVerbosity);
 
 } // namespace host
