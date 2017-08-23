@@ -26,6 +26,9 @@
 
 ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAngularBins, size_t nRadialBins,
                            bool bRotationInvariant, bool bNormalizeBins, bool bUseNonZeroInit) :
+#if HAVE_CUDA
+        lv::IParallelAlgo_<lv::CUDA>(false),
+#endif //HAVE_CUDA
         m_nAngularBins((int)nAngularBins),
         m_nRadialBins((int)nRadialBins),
         m_nDescSize(m_nRadialBins*m_nAngularBins),
@@ -38,8 +41,7 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
         m_bNormalizeBins(bNormalizeBins),
         m_bNonZeroInitBins(bUseNonZeroInit),
         m_nBlockSize(0),
-        m_bUsingFullKeyPtMap(false),
-        m_bUseCUDA(false) {
+        m_bUsingFullKeyPtMap(false) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
     lvAssert_(m_nInnerRadius>0,"invalid parameter");
@@ -48,14 +50,6 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
     scdesc_generate_radmask();
     lvAssert((int)m_vAngularLimits.size()==m_nAngularBins && (int)m_vRadialLimits.size()==m_nRadialBins);
     if(!m_bRotationInvariant) {
-    #if HAVE_CUDA
-        try {
-            lv::cuda::init();
-            m_bUseCUDA = true;
-        } catch(...) {
-            lvWarn("CUDA init failed in ShapeContext constr, impl will not use GPU");
-        }
-    #endif //HAVE_CUDA
         const int nKernelDiameter = m_nOuterRadius*2+5;
         m_oDilateKernel.create(nKernelDiameter,nKernelDiameter);
         m_oDilateKernel = 0;
@@ -66,7 +60,7 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
         lv::getLogPolarMask(nMaskSize,m_nRadialBins,m_nAngularBins,m_oAbsDescLUMap,true,(float)m_nInnerRadius);
         lvDbgAssert(m_oAbsDescLUMap.cols==nMaskSize && m_oAbsDescLUMap.rows==nMaskSize);
     #if HAVE_CUDA
-        if(m_bUseCUDA) {
+        if(tryInitEnableCUDA()) {
             m_oDescLUMap_dev.upload(m_oAbsDescLUMap);
             cudaResourceDesc oResDesc;
             memset(&oResDesc,0,sizeof(oResDesc));
@@ -90,6 +84,9 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
 
 ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRadius, size_t nAngularBins, size_t nRadialBins,
                            bool bRotationInvariant, bool bNormalizeBins, bool bUseNonZeroInit) :
+#if HAVE_CUDA
+        lv::IParallelAlgo_<lv::CUDA>(false),
+#endif //HAVE_CUDA
         m_nAngularBins((int)nAngularBins),
         m_nRadialBins((int)nRadialBins),
         m_nDescSize(m_nRadialBins*m_nAngularBins),
@@ -102,8 +99,7 @@ ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRad
         m_bNormalizeBins(bNormalizeBins),
         m_bNonZeroInitBins(bUseNonZeroInit),
         m_nBlockSize(0),
-        m_bUsingFullKeyPtMap(false),
-        m_bUseCUDA(false) {
+        m_bUsingFullKeyPtMap(false) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
     lvAssert_(m_dInnerRadius>0.0,"invalid parameter");
@@ -154,27 +150,6 @@ int ShapeContext::defaultNorm() const {
 }
 
 bool ShapeContext::empty() const {
-    return true;
-}
-
-bool ShapeContext::setUseCUDA(bool bVal, int nDeviceID) {
-#if !HAVE_CUDA
-    lvIgnore(nDeviceID);
-    lvAssert_(!bVal,"framework not compiled with CUDA support");
-#else //HAVE_CUDA
-    lvAssert_(!bVal||(!m_bUseRelativeSpace && !m_bRotationInvariant),"missing CUDA impl for current config");
-    if(bVal && (!m_bUseCUDA || nDeviceID!=cv::cuda::getDevice())) {
-        try {
-            lv::cuda::init(nDeviceID);
-            m_bUseCUDA = true;
-        } catch(...) {
-            lvWarn("CUDA init failed in ShapeContext, impl will not use GPU");
-            m_bUseCUDA = false;
-            return false;
-        }
-    }
-#endif //HAVE_CUDA
-    m_bUseCUDA = bVal;
     return true;
 }
 

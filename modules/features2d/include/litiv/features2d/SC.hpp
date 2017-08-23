@@ -17,8 +17,7 @@
 
 #pragma once
 
-#include "litiv/utils/opencv.hpp"
-#include "litiv/utils/math.hpp"
+#include "litiv/utils/algo.hpp"
 #include <opencv2/features2d.hpp>
 
 #define SHAPECONTEXT_DEFAULT_ANG_BINS    (12)
@@ -38,7 +37,13 @@
     Matching and Object Recognition Using Shape Contexts", in IEEE TPAMI2002.
 
 */
-class ShapeContext : public cv::DescriptorExtractor {
+class ShapeContext :
+#if HAVE_CUDA
+        public lv::IParallelAlgo_CUDA,
+#else //!HAVE_CUDA
+        public lv::NonParallelAlgo,
+#endif //!HAVE_CUDA
+        public cv::DescriptorExtractor {
 public:
     /// constructor for absolute description space (i.e. using absolute radii values)
     explicit ShapeContext(size_t nInnerRadius,
@@ -74,10 +79,8 @@ public:
     virtual int defaultNorm() const override;
     /// return true if detector object is empty (overrides cv::DescriptorExtractor's)
     virtual bool empty() const override;
-    /// sets whether cuda should be used internally (if possible) or not
-    virtual bool setUseCUDA(bool bVal, int nDeviceID=0);
     /// sets the block size to use in the cuda kernel (might speed up compute when using many kpts)
-    virtual bool setBlockSize(size_t nThreadCount=size_t(cv::cuda::DeviceInfo().warpSize()));
+    bool setBlockSize(size_t nThreadCount);
 
     /// returns whether descriptor bin arrays will be 0-1 normalized before returning or not
     bool isNormalizingBins() const;
@@ -203,5 +206,4 @@ private:
     cv::Size m_oCurrImageSize;
     size_t m_nBlockSize;
     bool m_bUsingFullKeyPtMap;
-    bool m_bUseCUDA;
 };
