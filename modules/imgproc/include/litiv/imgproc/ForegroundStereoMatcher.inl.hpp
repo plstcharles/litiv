@@ -967,11 +967,9 @@ inline void StereoSegmMatcher::GraphModelData::calcImageFeatures(const CamArray<
     const int nWinRadius = (int)m_nGridBorderSize;
     const int nWinSize = nWinRadius*2+1;
     lvIgnore(nWinSize);
-    CamArray<cv::Mat> aEnlargedInput,aDownScaledEnlargedInput;
+    CamArray<cv::Mat> aEnlargedInput;
 #if STEREOSEGMATCH_CONFIG_USE_DESC_BASED_AFFINITY
-    // @@@@ remove downscaled once sure is bad?
-    CamArray<cv::Mat_<float>> aFullScaledEnlargedDescs,aDownScaledEnlargedDescs;
-    CamArray<cv::Mat_<float>> aFullScaledDescs,aDownScaledDescs;
+    CamArray<cv::Mat_<float>> aEnlargedDescs,aDescs;
     const cv::Size oPatchSize(STEREOSEGMATCH_DEFAULT_DESC_PATCH_WIDTH,STEREOSEGMATCH_DEFAULT_DESC_PATCH_HEIGHT);
     lvAssert_(oPatchSize.area()>=1,"patch area must be strictly positive");
     lvAssert_((oPatchSize.height%2)==1 && (oPatchSize.width%2)==1,"patch sizes must be odd (will use radius)");
@@ -982,49 +980,28 @@ inline void StereoSegmMatcher::GraphModelData::calcImageFeatures(const CamArray<
 #endif //USING_OPENMP
     for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
         cv::copyMakeBorder(aInputImages[nCamIdx],aEnlargedInput[nCamIdx],nWinRadius,nWinRadius,nWinRadius,nWinRadius,cv::BORDER_DEFAULT);
-        const int nDownScaledRows = std::max(1,aInputImages[nCamIdx].rows/2);
-        const int nDownScaledCols = std::max(1,aInputImages[nCamIdx].cols/2);
-        cv::Mat oTempInput(nDownScaledRows,nDownScaledCols,aInputImages[nCamIdx].type());
-        cv::pyrDown(aInputImages[nCamIdx],oTempInput,cv::Size(nDownScaledCols,nDownScaledRows));
-        cv::copyMakeBorder(oTempInput,aDownScaledEnlargedInput[nCamIdx],nWinRadius,nWinRadius,nWinRadius,nWinRadius,cv::BORDER_DEFAULT);
     #if STEREOSEGMATCH_CONFIG_USE_MI_AFFINITY
-        if(aEnlargedInput[nCamIdx].channels()==3) {
+        if(aEnlargedInput[nCamIdx].channels()==3)
             cv::cvtColor(aEnlargedInput[nCamIdx],aEnlargedInput[nCamIdx],cv::COLOR_BGR2GRAY);
-            cv::cvtColor(aDownScaledEnlargedInput[nCamIdx],aDownScaledEnlargedInput[nCamIdx],cv::COLOR_BGR2GRAY);
-        }
     #elif STEREOSEGMATCH_CONFIG_USE_SSQDIFF_AFFINITY
-        if(aEnlargedInput[nCamIdx].channels()==3) {
+        if(aEnlargedInput[nCamIdx].channels()==3)
             cv::cvtColor(aEnlargedInput[nCamIdx],aEnlargedInput[nCamIdx],cv::COLOR_BGR2GRAY);
-            cv::cvtColor(aDownScaledEnlargedInput[nCamIdx],aDownScaledEnlargedInput[nCamIdx],cv::COLOR_BGR2GRAY);
-        }
         aEnlargedInput[nCamIdx].convertTo(aEnlargedInput[nCamIdx],CV_64F,(1.0/UCHAR_MAX)/nWinSize);
         aEnlargedInput[nCamIdx] -= cv::mean(aEnlargedInput[nCamIdx])[0];
-        aDownScaledEnlargedInput[nCamIdx].convertTo(aDownScaledEnlargedInput[nCamIdx],CV_64F,(1.0/UCHAR_MAX)/nWinSize);
-        aDownScaledEnlargedInput[nCamIdx] -= cv::mean(aDownScaledEnlargedInput[nCamIdx])[0];
     #elif STEREOSEGMATCH_CONFIG_USE_DESC_BASED_AFFINITY
         lvLog_(3,"\tcam[%d] image descriptors...",(int)nCamIdx);
-        m_pImgDescExtractor->compute2(aEnlargedInput[nCamIdx],aFullScaledEnlargedDescs[nCamIdx]);
-        m_pImgDescExtractor->compute2(aDownScaledEnlargedInput[nCamIdx],aDownScaledEnlargedDescs[nCamIdx]);
-        lvDbgAssert(aFullScaledEnlargedDescs[nCamIdx].dims==3 && aFullScaledEnlargedDescs[nCamIdx].size[0]==nRows+nWinRadius*2 && aFullScaledEnlargedDescs[nCamIdx].size[1]==nCols+nWinRadius*2);
-        lvDbgAssert(aDownScaledEnlargedDescs[nCamIdx].dims==3 && aDownScaledEnlargedDescs[nCamIdx].size[0]==nDownScaledRows+nWinRadius*2 && aDownScaledEnlargedDescs[nCamIdx].size[1]==nDownScaledCols+nWinRadius*2);
-        lvDbgAssert(aFullScaledEnlargedDescs[nCamIdx].size[2]==aDownScaledEnlargedDescs[nCamIdx].size[2]);
+        m_pImgDescExtractor->compute2(aEnlargedInput[nCamIdx],aEnlargedDescs[nCamIdx]);
+        lvDbgAssert(aEnlargedDescs[nCamIdx].dims==3 && aEnlargedDescs[nCamIdx].size[0]==nRows+nWinRadius*2 && aEnlargedDescs[nCamIdx].size[1]==nCols+nWinRadius*2);
         std::vector<cv::Range> vRanges(size_t(3),cv::Range::all());
         vRanges[0] = cv::Range(nWinRadius,nRows+nWinRadius);
         vRanges[1] = cv::Range(nWinRadius,nCols+nWinRadius);
-        aFullScaledDescs[nCamIdx] = aFullScaledEnlargedDescs[nCamIdx](vRanges.data());
-        vRanges[0] = cv::Range(nWinRadius,nDownScaledRows+nWinRadius);
-        vRanges[1] = cv::Range(nWinRadius,nDownScaledCols+nWinRadius);
-        aDownScaledDescs[nCamIdx] = aDownScaledEnlargedDescs[nCamIdx](vRanges.data());
-        lvDbgAssert(aFullScaledDescs[nCamIdx].dims==3 && aFullScaledDescs[nCamIdx].size[0]==nRows && aFullScaledDescs[nCamIdx].size[1]==nCols);
-        lvDbgAssert(aDownScaledDescs[nCamIdx].dims==3 && aDownScaledDescs[nCamIdx].size[0]==nDownScaledRows && aDownScaledDescs[nCamIdx].size[1]==nDownScaledCols);
-        lvDbgAssert(std::equal(aFullScaledDescs[nCamIdx].ptr<float>(0,0),aFullScaledDescs[nCamIdx].ptr<float>(0,0)+aFullScaledDescs[nCamIdx].size[2],aFullScaledEnlargedDescs[nCamIdx].ptr<float>(nWinRadius,nWinRadius)));
-        lvDbgAssert(std::equal(aDownScaledDescs[nCamIdx].ptr<float>(0,0),aDownScaledDescs[nCamIdx].ptr<float>(0,0)+aDownScaledDescs[nCamIdx].size[2],aDownScaledEnlargedDescs[nCamIdx].ptr<float>(nWinRadius,nWinRadius)));
+        aDescs[nCamIdx] = aEnlargedDescs[nCamIdx](vRanges.data());
+        lvDbgAssert(aDescs[nCamIdx].dims==3 && aDescs[nCamIdx].size[0]==nRows && aDescs[nCamIdx].size[1]==nCols);
+        lvDbgAssert(std::equal(aDescs[nCamIdx].ptr<float>(0,0),aDescs[nCamIdx].ptr<float>(0,0)+aDescs[nCamIdx].size[2],aEnlargedDescs[nCamIdx].ptr<float>(nWinRadius,nWinRadius)));
     #if STEREOSEGMATCH_CONFIG_USE_ROOT_SIFT_DESCS
-        const size_t nDescSize = size_t(aFullScaledDescs[nCamIdx].size[2]);
-        for(size_t nDescIdx=0; nDescIdx<aFullScaledDescs[nCamIdx].total(); nDescIdx+=nDescSize)
-            lv::rootSIFT(((float*)aFullScaledDescs[nCamIdx].data)+nDescIdx,nDescSize);
-        for(size_t nDescIdx=0; nDescIdx<aDownScaledDescs[nCamIdx].total(); nDescIdx+=nDescSize)
-            lv::rootSIFT(((float*)aDownScaledDescs[nCamIdx].data)+nDescIdx,nDescSize);
+        const size_t nDescSize = size_t(aDescs[nCamIdx].size[2]);
+        for(size_t nDescIdx=0; nDescIdx<aDescs[nCamIdx].total(); nDescIdx+=nDescSize)
+            lv::rootSIFT(((float*)aDescs[nCamIdx].data)+nDescIdx,nDescSize);
     #endif //STEREOSEGMATCH_CONFIG_USE_ROOT_SIFT_DESCS
     #endif //STEREOSEGMATCH_CONFIG_USE_DESC_BASED_AFFINITY
         lvLog_(3,"\tcam[%d] image gradient magnitudes...",(int)nCamIdx);
@@ -1075,18 +1052,10 @@ inline void StereoSegmMatcher::GraphModelData::calcImageFeatures(const CamArray<
                 const int nOffsetColIdx = getOffsetColIdx(0,nColIdx,nLabelIdx);
                 if(nOffsetColIdx<0 || nOffsetColIdx>=nCols || !m_aROIs[1](nRowIdx,nOffsetColIdx))
                     continue;
-                const float* pFullScaledDesc = aFullScaledDescs[0].ptr<float>(nRowIdx,nColIdx);
-                const float* pFullScaledOffsetDesc = aFullScaledDescs[1].ptr<float>(nRowIdx,nOffsetColIdx);
-                const double dFullScaledAffinity = m_pImgDescExtractor->calcDistance(pFullScaledDesc,pFullScaledOffsetDesc);
-                const float* pDownScaledDesc = aDownScaledDescs[0].ptr<float>(nRowIdx/2,nColIdx/2);
-                const float* pDownScaledOffsetDesc = aDownScaledDescs[1].ptr<float>(nRowIdx/2,nOffsetColIdx/2);
-                const double dDownScaledAffinity = m_pImgDescExtractor->calcDistance(pDownScaledDesc,pDownScaledOffsetDesc);
-            #if STEREOSEGMATCH_CONFIG_USE_MULTILEVEL_AFFIN
-                pRawAffinityPtr[nLabelIdx] = float((dFullScaledAffinity+dDownScaledAffinity)/2);
-            #else //!STEREOSEGMATCH_CONFIG_USE_MULTILEVEL_AFFIN
-                pRawAffinityPtr[nLabelIdx] = float(dFullScaledAffinity);
-                lvIgnore(dDownScaledAffinity);
-            #endif //!STEREOSEGMATCH_CONFIG_USE_MULTILEVEL_AFFIN
+                const float* pDesc = aDescs[0].ptr<float>(nRowIdx,nColIdx);
+                const float* pOffsetDesc = aDescs[1].ptr<float>(nRowIdx,nOffsetColIdx);
+                const double dAffinity = m_pImgDescExtractor->calcDistance(pDesc,pOffsetDesc);
+                pRawAffinityPtr[nLabelIdx] = float(dAffinity);
                 lvDbgAssert(pRawAffinityPtr[nLabelIdx]>=0.0f && pRawAffinityPtr[nLabelIdx]<=(float)M_SQRT2);
             }
         }
@@ -1204,7 +1173,7 @@ inline void StereoSegmMatcher::GraphModelData::calcImageFeatures(const CamArray<
                 }
             }
             const float fCurrDistSparseness = vValidAffinityVals.size()>1?(float)lv::sparseness(vValidAffinityVals.data(),vValidAffinityVals.size()):0.0f;
-            const float fCurrDescSparseness = (float)lv::sparseness(aFullScaledDescs[nCamIdx].ptr<float>(nRowIdx,nColIdx),size_t(aFullScaledDescs[nCamIdx].size[2]));
+            const float fCurrDescSparseness = (float)lv::sparseness(aDescs[nCamIdx].ptr<float>(nRowIdx,nColIdx),size_t(aDescs[nCamIdx].size[2]));
             oSaliency.at<float>(nRowIdx,nColIdx) = std::max(fCurrDescSparseness,fCurrDistSparseness);
         }
         cv::normalize(oSaliency,oSaliency,1,0,cv::NORM_MINMAX,-1,m_aROIs[nCamIdx]);
