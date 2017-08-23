@@ -1,6 +1,5 @@
 
 #include "litiv/features2d/SC.hpp"
-#include "litiv/utils/opencv.hpp"
 #include "litiv/test.hpp"
 
 TEST(sc,regression_default_params) {
@@ -28,7 +27,7 @@ TEST(sc,regression_default_params) {
 
 TEST(sc,regression_full_compute_abs_nogpu) {
     std::unique_ptr<ShapeContext> pShapeContext = std::make_unique<ShapeContext>(size_t(2),size_t(40),12,5);
-    pShapeContext->setUseCUDA(false);
+    pShapeContext->enableCUDA(false);
     cv::Mat oInput(257,257,CV_8UC1);
     oInput = 0;
     cv::circle(oInput,cv::Point(128,128),7,cv::Scalar_<uchar>(255),-1);
@@ -151,7 +150,7 @@ TEST(sc,regression_full_compute_abs) {
 TEST(sc,regression_compute_abs_gpu_config_6_4) {
     std::unique_ptr<ShapeContext> pShapeContext_gpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),6,4);
     std::unique_ptr<ShapeContext> pShapeContext_nogpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),6,4);
-    pShapeContext_nogpu->setUseCUDA(false);
+    pShapeContext_nogpu->enableCUDA(false);
     const int nDescSize = 6*4;
     cv::Mat oInput(257,257,CV_8UC1);
     oInput = 0;
@@ -185,7 +184,7 @@ TEST(sc,regression_compute_abs_gpu_config_6_4) {
 TEST(sc,regression_compute_abs_gpu_config_8_8) {
     std::unique_ptr<ShapeContext> pShapeContext_gpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),8,8);
     std::unique_ptr<ShapeContext> pShapeContext_nogpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),8,8);
-    pShapeContext_nogpu->setUseCUDA(false);
+    pShapeContext_nogpu->enableCUDA(false);
     const int nDescSize = 8*8;
     cv::Mat oInput(257,257,CV_8UC1);
     oInput = 0;
@@ -219,7 +218,7 @@ TEST(sc,regression_compute_abs_gpu_config_8_8) {
 TEST(sc,regression_compute_abs_gpu_config_8_8_64threads) {
     std::unique_ptr<ShapeContext> pShapeContext_gpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),8,8);
     std::unique_ptr<ShapeContext> pShapeContext_nogpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),8,8);
-    pShapeContext_nogpu->setUseCUDA(false);
+    pShapeContext_nogpu->enableCUDA(false);
     pShapeContext_gpu->setBlockSize(size_t(64));
     const int nDescSize = 8*8;
     cv::Mat oInput(257,257,CV_8UC1);
@@ -254,7 +253,7 @@ TEST(sc,regression_compute_abs_gpu_config_8_8_64threads) {
 TEST(sc,regression_compute_abs_gpu_config_12_8) {
     std::unique_ptr<ShapeContext> pShapeContext_gpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),12,8);
     std::unique_ptr<ShapeContext> pShapeContext_nogpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),12,8);
-    pShapeContext_nogpu->setUseCUDA(false);
+    pShapeContext_nogpu->enableCUDA(false);
     const int nDescSize = 12*8;
     cv::Mat oInput(257,257,CV_8UC1);
     oInput = 0;
@@ -288,7 +287,7 @@ TEST(sc,regression_compute_abs_gpu_config_12_8) {
 TEST(sc,regression_compute_abs_gpu_config_16_8) {
     std::unique_ptr<ShapeContext> pShapeContext_gpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),16,8);
     std::unique_ptr<ShapeContext> pShapeContext_nogpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),16,8);
-    pShapeContext_nogpu->setUseCUDA(false);
+    pShapeContext_nogpu->enableCUDA(false);
     const int nDescSize = 16*8;
     cv::Mat oInput(257,257,CV_8UC1);
     oInput = 0;
@@ -322,7 +321,7 @@ TEST(sc,regression_compute_abs_gpu_config_16_8) {
 TEST(sc,regression_compute_abs_gpu_config_16_8_64threads) {
     std::unique_ptr<ShapeContext> pShapeContext_gpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),16,8);
     std::unique_ptr<ShapeContext> pShapeContext_nogpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),16,8);
-    pShapeContext_nogpu->setUseCUDA(false);
+    pShapeContext_nogpu->enableCUDA(false);
     pShapeContext_gpu->setBlockSize(size_t(64));
     const int nDescSize = 16*8;
     cv::Mat oInput(257,257,CV_8UC1);
