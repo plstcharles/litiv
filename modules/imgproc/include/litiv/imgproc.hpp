@@ -35,12 +35,30 @@ namespace lv {
         ThinningMode_LamLeeSuen
     };
 
+    enum AffinityDistType {
+        AffinityDist_L2=0,
+        AffinityDist_EMD,
+        AffinityDist_MI,
+        AffinityDist_SSD
+    };
+
     /// 'thins' the provided image (currently only works on 1ch 8UC1 images, treated as binary)
     void thinning(const cv::Mat& oInput, cv::Mat& oOutput, ThinningMode eMode=ThinningMode_LamLeeSuen);
 
     /// performs non-maximum suppression on the input image, with a (nWinSize)x(nWinSize) window
     template<int nWinSize>
     void nonMaxSuppression(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat& oMask=cv::Mat());
+
+    /// computes a 3d affinity map from two images by matching them in patches across a given stereo disparity range
+    void computeImageAffinity(const cv::Mat& oImage1, const cv::Mat& oImage2, int nPatchSize,
+                              cv::Mat_<float>& oAffinityMap, const std::vector<int>& vDispRange, AffinityDistType eDist,
+                              const cv::Mat_<uchar>& oROI1=cv::Mat(), const cv::Mat_<uchar>& oROI2=cv::Mat());
+
+    /// computes a 3d affinity map from two 2d descriptor maps by matching them in patches across a given stereo disparity range
+    void computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::Mat_<float>& oDescMap2, int nPatchSize,
+                                   cv::Mat_<float>& oAffinityMap, const std::vector<int>& vDispRange, AffinityDistType eDist,
+                                   const cv::Mat_<uchar>& oROI1=cv::Mat(), const cv::Mat_<uchar>& oROI2=cv::Mat(),
+                                   const cv::Mat_<float>& oEMDCostMap=cv::Mat());
 
     /// determines if '*anMap' is a local maximum on the horizontal axis, given 'nMapColStep' spacing between horizontal elements in 'anMap'
     template<size_t nHalfWinSize, typename Tr>
