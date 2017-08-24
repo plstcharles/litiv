@@ -106,6 +106,8 @@ public:
     void validateKeyPoints(std::vector<cv::KeyPoint>& voKeypoints, cv::Size oImgSize) const;
     /// utility function, used to filter out bad pixels in a ROI that would trigger out of bounds error because they're too close to the image border
     void validateROI(cv::Mat& oROI) const;
+    /// utility function, returns the (C)EMD-L1 distance cost map to use for the internal descriptor size
+    inline cv::Mat_<float> getEMDCostMap() const {return m_oEMDCostMap;}
     /// utility function, used to calculate the (C)EMD-L1 distance between two individual descriptors
     inline double calcDistance_EMD(const float* aDescriptor1, const float* aDescriptor2) const {
         lvDbgAssert_(!std::all_of(aDescriptor1,aDescriptor1+m_nDescSize,[](float v){
