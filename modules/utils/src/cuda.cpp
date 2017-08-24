@@ -55,6 +55,8 @@ void lv::cuda::init(int nDeviceID) {
     if(lv::getVerbosity()>=2) {
         lvCout << "Initialized CUDA-enabled device w/ id=" << nDeviceID << std::endl;
         cv::cuda::printShortCudaDeviceInfo(nDeviceID);
+        const cv::cuda::DeviceInfo oInfo;
+        lvCout << "warp size = " << oInfo.warpSize() << ", async eng count = " << oInfo.asyncEngineCount() << ", concurrent kernels = " << oInfo.concurrentKernels() << std::endl;
     }
     lv::cuda::test_kernel(lv::getVerbosity()); // warm-up kernel; should always succeed
 }
