@@ -58,8 +58,7 @@
 #define STEREOSEGMATCH_DEFAULT_ITER_PER_RESEGM      ((m_nStereoLabels*3)/2)
 #define STEREOSEGMATCH_DEFAULT_RESEGM_PER_LOOP      (3)
 #define STEREOSEGMATCH_DEFAULT_SALIENT_SHP_RAD      (3)
-#define STEREOSEGMATCH_DEFAULT_DESC_PATCH_HEIGHT    (15)
-#define STEREOSEGMATCH_DEFAULT_DESC_PATCH_WIDTH     (15)
+#define STEREOSEGMATCH_DEFAULT_DESC_PATCH_SIZE      (15)
 
 // unary costs params
 #define STEREOSEGMATCH_UNARY_COST_OOB_CST           (ValueType(5000))
@@ -224,6 +223,8 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         OutputLabelType getRealLabel(InternalLabelType nLabel) const;
         /// translate a real disparity offset label to an internal graph label
         InternalLabelType getInternalLabel(OutputLabelType nRealLabel) const;
+        /// returns the offset value to use for indexing pixels in the other camera image
+        int getOffsetValue(size_t nCamIdx, InternalLabelType nLabel) const;
         /// returns the offset column to use for indexing pixels in the other camera image
         int getOffsetColIdx(size_t nCamIdx, int nColIdx, InternalLabelType nLabel) const;
         /// returns the stereo associations count for a given graph node by row/col indices
