@@ -10,7 +10,7 @@ This framework contains various libraries, executables and scripts originating f
 
 Most of the source code behind the LITIV framework is available under the [Apache 2.0 license](https://tldrlegal.com/license/apache-license-2.0-(apache-2.0)); see the [LICENSE](./LICENSE.txt) file for more information. Some third-party libraries and utilities are provided under their own BSD ([2-clause](https://tldrlegal.com/license/bsd-2-clause-license-(freebsd)) or [3-clause](https://tldrlegal.com/license/bsd-3-clause-license-(revised))) licenses. Specific licensing details are available in each source file or folder. While this means the LITIV framework source code can be used in distributed commercial applications, be aware that external algorithms that may be used therein (e.g. ViBe, FastPD) are covered by patents in some countries. Note that we will offer no legal advice on possible patent infringements cases; the LITIV framework should be primarily used for testing, evaluation, research, and development purposes in an academic setting.
 
-Unfortunately, the framework currently has little documentation outside doxygen comments in header files. If you want to learn more about the algorithms, your best bet is to read the papers that introduced them. More minimalist code samples & unit tests are also on the 'big TODO list'. For now, module behavior validation primarily relies on assertions, and most of these are only enabled for debug builds. If you are looking for a place to start digging, it is recommended to start in the [*apps*](./apps/) and [*samples*](./samples/) folders; their executable projects can provide a high-level look at some features of the framework. The [*apps*](./apps/) folder contains mostly development sandboxes and testbenches (mostly uncommented), while the [*samples*](./samples/) folder contains cleaner use-case examples with more adequate descriptions.
+The framework currently has little documentation outside doxygen comments in header files. If you want to learn more about the algorithms, your best bet is to read the papers that introduced them. More minimalist code samples & unit tests are also always in the works. For now, module behavior validation primarily relies on assertions, and part of these are only enabled for debug builds. If you are looking for a place to start digging, it is recommended to start in the [*apps*](./apps/) and [*samples*](./samples/) folders; their executable projects can provide a high-level look at some features of the framework. The [*apps*](./apps/) folder contains mostly development sandboxes and testbenches (mostly uncommented), while the [*samples*](./samples/) folder contains cleaner use-case examples with more adequate descriptions.
 
 Structure Overview
 ------------------
@@ -28,9 +28,9 @@ The primary goal here is to have the framework core only depend on OpenCV/CMake,
 * [GLFW](http://www.glfw.org/) >= 3.0.0 or [FreeGLUT](http://freeglut.sourceforge.net/) >= 2.8.0 (optional, for GLSL implementations)
 * [GLEW](http://glew.sourceforge.net/) >= 1.9.0 (optional, for GLSL implementations)
 * [GLM](http://glm.g-truc.net/) (optional, for GLSL implementations)
-* [CUDA](https://developer.nvidia.com/cuda-toolkit) >= 7.0 with compute >=3.0 (optional, for some algo implementations)
-* [Boost](http://www.boost.org/) >= 1.49 (optional, for some 3rdparty algo implementations)
-* [OpenGM](https://github.com/plstcharles/opengm) (optional, for graph-based algo implementations)
+* [CUDA](https://developer.nvidia.com/cuda-toolkit) >= 7.0 with compute >=3.0 (optional, for some optimizations)
+* [Boost](http://www.boost.org/) >= 1.49 (optional, for some 3rdparty implementations)
+* [OpenGM](https://github.com/plstcharles/opengm) (optional, for graph-based implementations)
 
 A dockerfile which builds an Ubuntu image including all these dependencies is available [here](./Dockerfile). The images built by Travis are periodically uploaded to Docker Hub [here](https://hub.docker.com/r/plstcharles/litiv-base/) and [here](https://hub.docker.com/r/plstcharles/litiv/).
 
