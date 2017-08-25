@@ -18,6 +18,6 @@
 if(WIN32 AND KinectSDK2_FOUND) # only for WIN32 due to Kinectv2SDK & DirectShow
 
     litiv_app(capture "src/main.cpp")
-    target_link_libraries(${PROJECT_NAME} litiv_3rdparty_dshowbase)
+    target_link_libraries(${PROJECT_NAME} PUBLIC litiv_3rdparty_dshowbase)
 
 endif()
