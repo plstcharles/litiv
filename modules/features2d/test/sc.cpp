@@ -27,7 +27,9 @@ TEST(sc,regression_default_params) {
 
 TEST(sc,regression_full_compute_abs_nogpu) {
     std::unique_ptr<ShapeContext> pShapeContext = std::make_unique<ShapeContext>(size_t(2),size_t(40),12,5);
+#if HAVE_CUDA
     pShapeContext->enableCUDA(false);
+#endif //HAVE_CUDA
     cv::Mat oInput(257,257,CV_8UC1);
     oInput = 0;
     cv::circle(oInput,cv::Point(128,128),7,cv::Scalar_<uchar>(255),-1);

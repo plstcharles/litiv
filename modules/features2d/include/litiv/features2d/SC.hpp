@@ -202,10 +202,10 @@ private:
     cv::cuda::GpuMat m_oKeyPts_dev,m_oContourPts_dev;
     cv::cuda::GpuMat m_oDistMask_dev,m_oDescLUMap_dev;
     unsigned long long m_pDescLUMap_tex;
+    size_t m_nBlockSize;
 #endif //HAVE_CUDA
     cv::Mat_<cv::Point2f> m_oKeyPts,m_oContourPts;
     cv::Mat_<uchar> m_oBinMask,m_oDistMask,m_oDilateKernel;
     cv::Size m_oCurrImageSize;
-    size_t m_nBlockSize;
     bool m_bUsingFullKeyPtMap;
 };

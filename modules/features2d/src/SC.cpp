@@ -40,7 +40,6 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
         m_bRotationInvariant(bRotationInvariant),
         m_bNormalizeBins(bNormalizeBins),
         m_bNonZeroInitBins(bUseNonZeroInit),
-        m_nBlockSize(0),
         m_bUsingFullKeyPtMap(false) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
@@ -61,6 +60,7 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
         lvDbgAssert(m_oAbsDescLUMap.cols==nMaskSize && m_oAbsDescLUMap.rows==nMaskSize);
     #if HAVE_CUDA
         if(tryInitEnableCUDA()) {
+            m_nBlockSize = size_t(0);
             m_oDescLUMap_dev.upload(m_oAbsDescLUMap);
             cudaResourceDesc oResDesc;
             memset(&oResDesc,0,sizeof(oResDesc));
@@ -98,7 +98,6 @@ ShapeContext::ShapeContext(double dRelativeInnerRadius, double dRelativeOuterRad
         m_bRotationInvariant(bRotationInvariant),
         m_bNormalizeBins(bNormalizeBins),
         m_bNonZeroInitBins(bUseNonZeroInit),
-        m_nBlockSize(0),
         m_bUsingFullKeyPtMap(false) {
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
@@ -153,11 +152,15 @@ bool ShapeContext::empty() const {
     return true;
 }
 
+#if HAVE_CUDA
+
 bool ShapeContext::setBlockSize(size_t nThreadCount) {
     lvAssert_((nThreadCount%cv::cuda::DeviceInfo().warpSize())==0,"block thread count must be multiple of warp size");
     m_nBlockSize = nThreadCount;
     return true;
 }
+
+#endif //HAVE_CUDA
 
 bool ShapeContext::isNormalizingBins() const {
     return m_bNormalizeBins;
@@ -491,10 +494,8 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
     lvDbgAssert(!m_oAbsDescLUMap.empty() && m_oAbsDescLUMap.rows==m_nOuterRadius*2+1 && m_oAbsDescLUMap.rows==m_oAbsDescLUMap.cols);
 #endif //USE_LIENHART_LOOKUP_MASK
 #if HAVE_CUDA
-#if !USE_LIENHART_LOOKUP_MASK
-#error "cuda impl only available for lienhart lookup"
-#endif //!USE_LIENHART_LOOKUP_MASK
     if(m_bUseCUDA) {
+        lvAssert_(USE_LIENHART_LOOKUP_MASK,"only lienhart-style lookup in shapecontext impl available with cuda");
         const int nDescCount = bGenDescMap?(m_oCurrImageSize.height*m_oCurrImageSize.width):((int)m_oKeyPts.total());
         m_oDescriptors_dev.create(nDescCount,m_nDescSize,CV_32FC1);
         oDescriptors.create(nDescCount,m_nDescSize);
