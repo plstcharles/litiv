@@ -57,6 +57,10 @@ namespace lv {
 
     // @@@@ TODO, ship common cuda utils here
 
+    // warp leader selection code for divergent code flow: (requires sm_20)
+    //     int mask = __ballot(1);  // mask of active lanes
+    //     int leader = __ffs(mask) - 1;  // -1 for 0-based indexing
+
     namespace cuda {
 
         /// container for cuda kernel execution configuration parameters
