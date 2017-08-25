@@ -171,7 +171,7 @@ void lv::computeImageAffinity(const cv::Mat& oImage1, const cv::Mat& oImage2, in
     const int nCols = oImage1.cols;
     const int nPatchRadius = nPatchSize/2;
     const int nOffsets = (int)vDispRange.size();
-    const std::array<int,3> anAffinityMapDims = {nRows,nCols,nOffsets};
+    const std::array<int,3> anAffinityMapDims = {nRows-nPatchRadius*2,nCols-nPatchRadius*2,nOffsets};
     oAffinityMap.create(3,anAffinityMapDims.data());
     oAffinityMap = -1.0f; // default value for OOB pixels
     thread_local lv::JointSparseHistData<uchar,uchar> oSparseHistData;
@@ -189,10 +189,10 @@ void lv::computeImageAffinity(const cv::Mat& oImage1, const cv::Mat& oImage2, in
                 const cv::Rect oOffsetWindow(nOffsetColIdx-nPatchRadius,nRowIdx-nPatchRadius,nPatchSize,nPatchSize);
                 if(eDist==lv::AffinityDist_MI) {
                     const double dMutualInfoScore = lv::calcMutualInfo<1,true,true,false,false>(oImage1_uchar(oWindow),oImage2_uchar(oOffsetWindow),&oSparseHistData);
-                    oAffinityMap.at<float>(nRowIdx,nColIdx,nOffsetIdx) = std::max(float(1.0-dMutualInfoScore),0.0f);
+                    oAffinityMap.at<float>(nRowIdx-nPatchRadius,nColIdx-nPatchRadius,nOffsetIdx) = std::max(float(1.0-dMutualInfoScore),0.0f);
                 }
                 else /*if(eDist==lv::AffinityDist_SSD)*/ {
-                    oAffinityMap.at<float>(nRowIdx,nColIdx,nOffsetIdx) = (float)cv::norm(oImage1(oWindow),oImage2(oOffsetWindow),cv::NORM_L2);
+                    oAffinityMap.at<float>(nRowIdx-nPatchRadius,nColIdx-nPatchRadius,nOffsetIdx) = (float)cv::norm(oImage1(oWindow),oImage2(oOffsetWindow),cv::NORM_L2);
                 }
             }
         }
