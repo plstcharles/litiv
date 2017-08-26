@@ -176,7 +176,11 @@ void lv::computeImageAffinity(const cv::Mat& oImage1, const cv::Mat& oImage2, in
     oAffinityMap = -1.0f; // default value for OOB pixels
     thread_local lv::JointSparseHistData<uchar,uchar> oSparseHistData;
 #if USING_OPENMP
-    #pragma omp parallel for collapse(2)
+#ifdef _MSC_VER
+    #pragma omp parallel for // msvc only supports openmp 2.0
+#else //ndef(_MSC_VER)
+    #pragma omp parallel for collapse(3)
+#endif //ndef(_MSC_VER)
 #endif //USING_OPENMP
     for(int nRowIdx=nPatchRadius; nRowIdx<nRows-nPatchRadius; ++nRowIdx) {
         for(int nColIdx=nPatchRadius; nColIdx<nCols-nPatchRadius; ++nColIdx) {
@@ -232,7 +236,11 @@ void lv::computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::M
     else
         oRawAffinity = oAffinityMap;
 #if USING_OPENMP
+#ifdef _MSC_VER
+    #pragma omp parallel for // msvc only supports openmp 2.0
+#else //ndef(_MSC_VER)
     #pragma omp parallel for collapse(2)
+#endif //ndef(_MSC_VER)
 #endif //USING_OPENMP
     for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
         for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
@@ -271,7 +279,11 @@ void lv::computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::M
     if(nPatchSize==1)
         return;
 #if USING_OPENMP
+#ifdef _MSC_VER
+    #pragma omp parallel for // msvc only supports openmp 2.0
+#else //ndef(_MSC_VER)
     #pragma omp parallel for collapse(3)
+#endif //ndef(_MSC_VER)
 #endif //USING_OPENMP
     for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
         for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
