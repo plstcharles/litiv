@@ -952,8 +952,11 @@ TEST(EMDL1dist,regression_circular) {
     ASSERT_LE((lv::CEMDL1dist<float,float>(v1,v2)),(lv::EMDL1dist<float,float>(v1,v2)));
 }
 
-#include <opencv2/xfeatures2d.hpp> // for rootSIFT test
 #include "litiv/utils/opencv.hpp"
+
+#ifdef OPENCV_ENABLE_NONFREE
+
+#include <opencv2/xfeatures2d.hpp> // for rootSIFT test
 
 TEST(rootSIFT,regression) {
     cv::Ptr<cv::xfeatures2d::SIFT> pSIFT = cv::xfeatures2d::SIFT::create();
@@ -972,6 +975,8 @@ TEST(rootSIFT,regression) {
             ASSERT_GT(cv::norm(oDescs.row((int)i),oDescs.row(0)),0.0);
     }
 }
+
+#endif //def(OPENCV_ENABLE_NONFREE)
 
 namespace {
     template<typename T>
