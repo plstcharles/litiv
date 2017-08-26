@@ -39,8 +39,14 @@ TEST(gmm_init,regression_local) {
     lv::initGaussianMixtureParams(oInput,oMask,oBGModel,oFGModel);
     ASSERT_EQ(oBGModel.getModelSize(),size_t(120));
     ASSERT_EQ(oFGModel.getModelSize(),size_t(120));
+#if (defined(_MSC_VER) && _MSC_VER==1900)
+    // seems ocv's RNG state is not platform-independent; use specific bin version here
+    const std::string sInitBGDataPath = TEST_CURR_INPUT_DATA_ROOT "/test_gmm_init_bg.msc1900.bin";
+    const std::string sInitFGDataPath = TEST_CURR_INPUT_DATA_ROOT "/test_gmm_init_fg.msc1900.bin";
+#else //!(defined(_MSC_VER) && _MSC_VER==1500)
     const std::string sInitBGDataPath = TEST_CURR_INPUT_DATA_ROOT "/test_gmm_init_bg.bin";
     const std::string sInitFGDataPath = TEST_CURR_INPUT_DATA_ROOT "/test_gmm_init_fg.bin";
+#endif //!(defined(_MSC_VER) && _MSC_VER==1500)
     if(lv::checkIfExists(sInitBGDataPath) && lv::checkIfExists(sInitFGDataPath)) {
         const cv::Mat_<double> oRefBGData = lv::read(sInitBGDataPath);
         const cv::Mat_<double> oRefFGData = lv::read(sInitFGDataPath);
@@ -98,8 +104,14 @@ TEST(gmm_learn,regression_local) {
     cv::Mat oAssignMap(oInput.size(),CV_32SC1);
     lv::assignGaussianMixtureComponents(oInput,oMask,oAssignMap,oBGModel,oFGModel);
     lv::learnGaussianMixtureParams(oInput,oMask,oAssignMap,oBGModel,oFGModel);
+#if (defined(_MSC_VER) && _MSC_VER==1900)
+    // seems ocv's RNG state is not platform-independent; use specific bin version here
+    const std::string sBGDataPath = TEST_CURR_INPUT_DATA_ROOT "/test_gmm_learn_bg.msc1900.bin";
+    const std::string sFGDataPath = TEST_CURR_INPUT_DATA_ROOT "/test_gmm_learn_fg.msc1900.bin";
+#else //!(defined(_MSC_VER) && _MSC_VER==1500)
     const std::string sBGDataPath = TEST_CURR_INPUT_DATA_ROOT "/test_gmm_learn_bg.bin";
     const std::string sFGDataPath = TEST_CURR_INPUT_DATA_ROOT "/test_gmm_learn_fg.bin";
+#endif //!(defined(_MSC_VER) && _MSC_VER==1500)
     if(lv::checkIfExists(sBGDataPath) && lv::checkIfExists(sFGDataPath)) {
         const cv::Mat_<double> oRefBGData = lv::read(sBGDataPath);
         const cv::Mat_<double> oRefFGData = lv::read(sFGDataPath);
