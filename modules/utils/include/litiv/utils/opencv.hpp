@@ -21,6 +21,7 @@
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/opencv_modules.hpp>
 #if HAVE_CUDA
 #include <opencv2/core/cuda.hpp>
 #endif //HAVE_CUDA
@@ -943,6 +944,10 @@ namespace lv {
         return ssStr.str();
     }
 
+#ifndef _MSC_VER
+
+    // the SFINAE trick below fails on MSVC2015v3; must find alternative (avoid constexpr?)
+
     /// prints the content of a vector (via matrix formatting) to the given stream
     template<typename T>
     std::enable_if_t<(!isDataTypeCompat<T>()),std::ostream&> print(const std::vector<T>& oVec, int nDisplayIdxOffset=0, std::ostream& os=std::cout) {
@@ -958,9 +963,11 @@ namespace lv {
 
     /// prints the content of a vector (via matrix formatting) to the given stream
     template<typename T>
-    std::enable_if_t<(isDataTypeCompat<T>()),std::ostream&> print(const std::vector<T>& oVec, int nDisplayIdxOffset=0, std::ostream& os=std::cout) {
+    std::enable_if_t<(isDataTypeCompat<T>()),std::ostream&> print(const std::vector<T>& oVec, int nDisplayIdxOffset, std::ostream& os) {
         return lv::print<T>(cv::Mat_<T>(1,(int)oVec.size(),const_cast<T*>(oVec.data())),cv::Point2i(nDisplayIdxOffset,0),os);
     }
+
+#endif //ndef(_MSC_VER)
 
     /// provides a printable string of the content of a vector with constant output element size
     template<typename T>
