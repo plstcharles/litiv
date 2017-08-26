@@ -75,18 +75,18 @@ STDMETHODIMP lv::initMatFromMediaType(const AM_MEDIA_TYPE* pmt, cv::Mat& oOutput
 
 lv::DShowFrameGrabber::DShowFrameGrabber(const CComPtr<ISampleGrabber>& pSG) {
     if(pSG==nullptr)
-        lvStdError_(invalid_argument,"bad sample grabber interface");
+        throw std::invalid_argument("bad sample grabber interface");
     AM_MEDIA_TYPE mt;
     ZeroMemory(&mt,sizeof(mt));
     if(pSG->GetConnectedMediaType(&mt)!=S_OK)
-        lvStdError_(runtime_error,"cannot get sample grabber media type");
+        throw std::runtime_error("cannot get sample grabber media type");
     if(initMatFromMediaType(&mt,m_oInternalSampleCopy)!=S_OK) {
         FreeMediaType(mt);
-        lvStdError_(runtime_error,"unhandled media type");
+        throw std::runtime_error("unhandled media type");
     }
     FreeMediaType(mt);
     if(m_oInternalSampleCopy.empty())
-        lvStdError_(runtime_error,"bad internal sample copy type");
+        throw std::runtime_error("bad internal sample copy type");
     m_bKeepInternalCopy = true;
     m_pParent = pSG;
     m_pParent->SetCallback(this,0);
