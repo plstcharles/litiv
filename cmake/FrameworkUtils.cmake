@@ -93,6 +93,13 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
                     OUTPUT_NAME "${PROJECT_NAME}${LITIV_VERSION_PLAIN}"
             )
         endif()
+    else()
+        if(NOT CMAKE_CROSSCOMPILING)
+            target_compile_options(${PROJECT_NAME}
+                INTERFACE
+                    "-march=native"
+            )
+        endif()
     endif()
     set_target_properties(${PROJECT_NAME}
         PROPERTIES
@@ -102,12 +109,6 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
         PUBLIC
             "LITIV_DEBUG=$<CONFIG:Debug>"
     )
-    if(NOT CMAKE_CROSSCOMPILING)
-        target_compile_options(${PROJECT_NAME}
-            INTERFACE
-                "-march=native"
-        )
-    endif()
     target_include_directories(${PROJECT_NAME}
         PUBLIC
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
