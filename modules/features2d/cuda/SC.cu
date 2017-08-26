@@ -19,12 +19,19 @@
 
 namespace impl {
 
-    template<bool bGenDescMap>
+    // note: as of 2017/08 with cuda 8.0 and msvc2015, nvcc fails to compile the kernel below
+    // with the proper values for 'bGenDescMap' via template parameter on release builds
+    //
+    // ...no matter what template parameter value is given in the device call, the value in
+    //    the kernel always evaluates to 'false' (wtf)
+    //
+    // ...current workaround with a regular parameter might be slightly slower
+
     __global__ void scdesc_fill_desc_direct(const cv::cuda::PtrStep<cv::Point2f> oKeyPts,
                                             const cv::cuda::PtrStepSz<cv::Point2f> oContourPts,
                                             const cv::cuda::PtrStep<uchar> oDistMask,
                                             const cudaTextureObject_t pDescLUMask_tex, int nMaskSize,
-                                            cv::cuda::PtrStepSzf oDescs,
+                                            cv::cuda::PtrStepSzf oDescs, bool bGenDescMap,
                                             bool bNonZeroInitBins, bool bNormalizeBins) {
         assert(oContourPts.cols==1);
         assert((nMaskSize%2)==1);
@@ -148,8 +155,5 @@ void device::scdesc_fill_desc_direct(const lv::cuda::KernelParams& oKParams,
                                      const cudaTextureObject_t pDescLUMask_tex, int nMaskSize,
                                      cv::cuda::PtrStepSzf oDescs, bool bNonZeroInitBins,
                                      bool bGenDescMap, bool bNormalizeBins) {
-    if(bGenDescMap)
-        cudaKernelWrap(template scdesc_fill_desc_direct<true>,oKParams,oKeyPts,oContourPts,oDistMask,pDescLUMask_tex,nMaskSize,oDescs,bNonZeroInitBins,bNormalizeBins);
-    else
-        cudaKernelWrap(template scdesc_fill_desc_direct<false>,oKParams,oKeyPts,oContourPts,oDistMask,pDescLUMask_tex,nMaskSize,oDescs,bNonZeroInitBins,bNormalizeBins);
+    cudaKernelWrap(scdesc_fill_desc_direct,oKParams,oKeyPts,oContourPts,oDistMask,pDescLUMask_tex,nMaskSize,oDescs,bGenDescMap,bNonZeroInitBins,bNormalizeBins);
 }

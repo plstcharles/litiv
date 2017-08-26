@@ -103,25 +103,35 @@ TEST(sc,regression_full_compute_abs) {
         cv::KeyPoint(cv::Point2f(188,188),1.0f),
     };
     const auto vTargetPtsOrig = vTargetPts;
-    cv::Mat_<float> oOutputDescs;
-    pShapeContext->compute(oInput,vTargetPts,oOutputDescs);
-    ASSERT_EQ(vTargetPts.size(),vTargetPtsOrig.size());
-    for(int i=0; i<(int)vTargetPts.size(); ++i)
-        ASSERT_EQ(vTargetPts[i].pt,vTargetPtsOrig[i].pt);
-    ASSERT_EQ(oOutputDescs.rows,(int)vTargetPts.size());
     cv::Mat_<float> oOutputDescMap;
     pShapeContext->compute2(oInput,vTargetPts,oOutputDescMap);
     ASSERT_EQ(vTargetPts.size(),vTargetPtsOrig.size());
+    ASSERT_TRUE(oOutputDescMap.isContinuous());
+    ASSERT_TRUE(cv::countNonZero(oOutputDescMap>0.001f)>0);
+    for(int i=0; i<(int)vTargetPts.size(); ++i)
+        ASSERT_EQ(vTargetPts[i].pt,vTargetPtsOrig[i].pt);
+    ASSERT_EQ(oOutputDescMap.dims,3);
+    ASSERT_EQ(oInput.size[0],oOutputDescMap.size[0]);
+    ASSERT_EQ(oInput.size[1],oOutputDescMap.size[1]);
+    cv::Mat_<float> oOutputDescs;
+    pShapeContext->compute(oInput,vTargetPts,oOutputDescs);
+    ASSERT_EQ(vTargetPts.size(),vTargetPtsOrig.size());
+    ASSERT_TRUE(oOutputDescs.isContinuous());
+    ASSERT_TRUE(cv::countNonZero(oOutputDescs>0.001f)>0);
     for(int i=0; i<(int)vTargetPts.size(); ++i)
         ASSERT_EQ(vTargetPts[i].pt,vTargetPtsOrig[i].pt);
     ASSERT_EQ(oOutputDescs.rows,(int)vTargetPts.size());
-    ASSERT_EQ(oInput.size[0],oOutputDescMap.size[0]);
-    ASSERT_EQ(oInput.size[1],oOutputDescMap.size[1]);
     ASSERT_EQ(oOutputDescs.cols,oOutputDescMap.size[2]);
     const int nDescSize = oOutputDescMap.size[2];
+    if(std::any_of(oOutputDescs.begin(),oOutputDescs.end(),[](float f){return f>0.001f;}))
+        ASSERT_TRUE(std::any_of(oOutputDescMap.begin(),oOutputDescMap.end(),[](float f){return f>0.001f;}));
     for(int i=0; i<(int)vTargetPts.size(); ++i) {
-        float* aDesc1 = oOutputDescs.ptr<float>(i);
-        float* aDesc2 = oOutputDescMap.ptr<float>(int(vTargetPts[i].pt.y),int(vTargetPts[i].pt.x));
+        const float* aDesc1 = oOutputDescs.ptr<float>(i);
+        ASSERT_EQ(aDesc1,((float*)oOutputDescs.data)+nDescSize*i);
+        const int nRowIdx = (int)std::round(vTargetPts[i].pt.y);
+        const int nColIdx = (int)std::round(vTargetPts[i].pt.x);
+        const float* aDesc2 = oOutputDescMap.ptr<float>(nRowIdx,nColIdx);
+        ASSERT_EQ(aDesc2,((float*)oOutputDescMap.data)+(oInput.size[1]*nRowIdx+nColIdx)*nDescSize);
         for(int n=0; n<nDescSize; ++n)
             ASSERT_FLOAT_EQ(aDesc1[n],aDesc2[n]) << "for n = " << n;
     }
