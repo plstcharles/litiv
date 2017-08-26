@@ -175,6 +175,11 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
                     litiv_test
                     gtest_main
                 )
+                if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
+                    target_compile_options(litiv_utest_app_${testname}
+                        PRIVATE "/bigobj"
+                    )
+                endif()
                 set_target_properties(litiv_utest_app_${testname}
                     PROPERTIES
                         FOLDER "tests/${libname}"
@@ -201,6 +206,11 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
                         litiv_test
                         benchmark_main
                     )
+                    if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
+                        target_compile_options(litiv_ptest_app_${testname}
+                            PRIVATE "/bigobj"
+                        )
+                    endif()
                     set_target_properties(litiv_ptest_app_${testname}
                         PROPERTIES
                             FOLDER "tests/${libname}"
