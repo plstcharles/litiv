@@ -780,10 +780,12 @@ namespace lv {
         /// static buffer, which is not value-initialized by default
         alignas(std::max(nByteAlign,alignof(value_type))) std::array<value_type,nStaticSize> m_aStaticBuffer;
         /// dynamic buffer, which may be null, and is not value-initialized by default
-        std::unique_ptr<T[],decltype(&lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2)> m_aDynamicBuffer;
+        std::unique_ptr<T[],std::function<void(T*)>> m_aDynamicBuffer;
         /// required friendship for member access when static array sizes do not match
         template<typename T2, size_t nStaticSize2, size_t nByteAlign2>
         friend struct AutoBuffer;
+        /// internal alias to aligned memory allocator specialization
+        using Allocator = lv::AlignedMemAllocator<T,nByteAlign,true>;
     };
 
     /// helper structure to create lookup tables with generic functors (also exposes multiple lookup interfaces)
@@ -1069,12 +1071,11 @@ void lv::WorkerPool<nWorkers>::entry() {
 }
 
 template<typename T, size_t nStaticSize, size_t nByteAlign>
-lv::AutoBuffer<T,nStaticSize,nByteAlign>::AutoBuffer(size_type nReqSize) :
-        m_aDynamicBuffer(nullptr,lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2) {
+lv::AutoBuffer<T,nStaticSize,nByteAlign>::AutoBuffer(size_type nReqSize) {
     if(nReqSize<=m_aStaticBuffer.size())
         m_pBufferPtr = m_aStaticBuffer.data();
     else {
-        m_aDynamicBuffer = std::unique_ptr<T[],decltype(&lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2)>(new T[nReqSize],lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2);
+        m_aDynamicBuffer = std::unique_ptr<T[],std::function<void(T*)>>(Allocator::allocate(nReqSize),[](T* p){Allocator::deallocate2(p);});
         m_pBufferPtr = m_aDynamicBuffer.get();
     }
     m_nBufferSize = nReqSize;
@@ -1082,12 +1083,11 @@ lv::AutoBuffer<T,nStaticSize,nByteAlign>::AutoBuffer(size_type nReqSize) :
 
 template<typename T, size_t nStaticSize, size_t nByteAlign>
 template<size_t nStaticSize2>
-lv::AutoBuffer<T,nStaticSize,nByteAlign>::AutoBuffer(const AutoBuffer<T,nStaticSize2,nByteAlign>& o) :
-        m_aDynamicBuffer(nullptr,lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2) {
+lv::AutoBuffer<T,nStaticSize,nByteAlign>::AutoBuffer(const AutoBuffer<T,nStaticSize2,nByteAlign>& o) {
     if(o.size()<=m_aStaticBuffer.size())
         m_pBufferPtr = m_aStaticBuffer.data();
     else {
-        m_aDynamicBuffer = std::unique_ptr<T[],decltype(&lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2)>(new T[o.size()],lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2);
+        m_aDynamicBuffer = std::unique_ptr<T[],std::function<void(T*)>>(Allocator::allocate(o.size()),[](T* p){Allocator::deallocate2(p);});
         m_pBufferPtr = m_aDynamicBuffer.get();
     }
     m_nBufferSize = o.size();
@@ -1096,8 +1096,7 @@ lv::AutoBuffer<T,nStaticSize,nByteAlign>::AutoBuffer(const AutoBuffer<T,nStaticS
 
 template<typename T, size_t nStaticSize, size_t nByteAlign>
 template<size_t nStaticSize2>
-lv::AutoBuffer<T,nStaticSize,nByteAlign>::AutoBuffer(AutoBuffer<T,nStaticSize2,nByteAlign>&& o) :
-        m_aDynamicBuffer(nullptr,lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2) {
+lv::AutoBuffer<T,nStaticSize,nByteAlign>::AutoBuffer(AutoBuffer<T,nStaticSize2,nByteAlign>&& o) {
     if(o.m_pBufferPtr==o.m_aDynamicBuffer.get()) {
         std::swap(m_aDynamicBuffer,o.m_aDynamicBuffer);
         m_pBufferPtr = m_aDynamicBuffer.get();
@@ -1109,7 +1108,7 @@ lv::AutoBuffer<T,nStaticSize,nByteAlign>::AutoBuffer(AutoBuffer<T,nStaticSize2,n
         if(o.size()<=m_aStaticBuffer.size())
             m_pBufferPtr = m_aStaticBuffer.data();
         else {
-            m_aDynamicBuffer = std::unique_ptr<T[],decltype(&lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2)>(new T[o.size()],lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2);
+            m_aDynamicBuffer = std::unique_ptr<T[],std::function<void(T*)>>(Allocator::allocate(o.size()),[](T* p){Allocator::deallocate2(p);});
             m_pBufferPtr = m_aDynamicBuffer.get();
         }
         m_nBufferSize = o.size();
@@ -1126,7 +1125,7 @@ lv::AutoBuffer<T,nStaticSize,nByteAlign>& lv::AutoBuffer<T,nStaticSize,nByteAlig
             m_pBufferPtr = m_aStaticBuffer.data();
         }
         else if(m_pBufferPtr!=m_aDynamicBuffer.get() || m_nBufferSize<o.size()) {
-            m_aDynamicBuffer = std::unique_ptr<T[],decltype(&lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2)>(new T[o.size()],lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2);
+            m_aDynamicBuffer = std::unique_ptr<T[],std::function<void(T*)>>(Allocator::allocate(o.size()),[](T* p){Allocator::deallocate2(p);});
             m_pBufferPtr = m_aDynamicBuffer.get();
         }
         m_nBufferSize = o.size();
@@ -1153,7 +1152,7 @@ lv::AutoBuffer<T,nStaticSize,nByteAlign>& lv::AutoBuffer<T,nStaticSize,nByteAlig
                 m_pBufferPtr = m_aStaticBuffer.data();
             }
             else if(m_pBufferPtr!=m_aDynamicBuffer.get() || m_nBufferSize<o.size()) {
-                m_aDynamicBuffer = std::unique_ptr<T[],decltype(&lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2)>(new T[o.size()],lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2);
+                m_aDynamicBuffer = std::unique_ptr<T[],std::function<void(T*)>>(Allocator::allocate(o.size()),[](T* p){Allocator::deallocate2(p);});
                 m_pBufferPtr = m_aDynamicBuffer.get();
             }
             m_nBufferSize = o.size();
@@ -1253,7 +1252,7 @@ void lv::AutoBuffer<T,nStaticSize,nByteAlign>::resize(size_type nReqSize) {
         m_pBufferPtr = m_aStaticBuffer.data();
     }
     else if(nReqSize>m_nBufferSize && (m_pBufferPtr==m_aDynamicBuffer.get() || nReqSize>m_aStaticBuffer.size())) {
-        std::unique_ptr<T[],decltype(&lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2)> aNewBuffer(new T[nReqSize],lv::AlignedMemAllocator<T,nByteAlign,true>::deallocate2);
+        std::unique_ptr<T[],std::function<void(T*)>> aNewBuffer(Allocator::allocate(nReqSize),Allocator::deallocate2);
         std::copy_n(m_pBufferPtr,m_nBufferSize,aNewBuffer.get());
         m_aDynamicBuffer = std::move(aNewBuffer);
         m_pBufferPtr = m_aDynamicBuffer.get();
