@@ -214,7 +214,7 @@ namespace {
             const size_t nCurrLoopSize = nLoopSize;
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx = (nArrayIdx+2)%nCurrArraySize;
+                nArrayIdx = (nArrayIdx+2)%(nCurrArraySize-1);
                 volatile auto tLast = bUseFast?(lv::_L1dist_cheat(afVals[nArrayIdx],afVals[nArrayIdx+1])):(lv::_L1dist_nocheat(afVals[nArrayIdx],afVals[nArrayIdx+1]));
                 benchmark::DoNotOptimize(tLast);
             }
@@ -236,8 +236,8 @@ namespace {
             const size_t nCurrLoopSize = nLoopSize;
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx1 = (nArrayIdx1+nChannels)%nCurrArraySize;
-                nArrayIdx2 = (nArrayIdx2+nChannels)%nCurrArraySize;
+                nArrayIdx1 = (nArrayIdx1+nChannels)%(nCurrArraySize-nChannels+1);
+                nArrayIdx2 = (nArrayIdx2+nChannels)%(nCurrArraySize-nChannels+1);
                 volatile auto tLast = lv::L1dist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
                 benchmark::DoNotOptimize(tLast);
             }
@@ -410,8 +410,8 @@ namespace {
             const size_t nCurrLoopSize = nLoopSize;
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx1 = (nArrayIdx1+nChannels)%nCurrArraySize;
-                nArrayIdx2 = (nArrayIdx2+nChannels)%nCurrArraySize;
+                nArrayIdx1 = (nArrayIdx1+nChannels)%(nCurrArraySize-nChannels+1);
+                nArrayIdx2 = (nArrayIdx2+nChannels)%(nCurrArraySize-nChannels+1);
                 volatile auto tLast = lv::L2sqrdist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
                 benchmark::DoNotOptimize(tLast);
             }
@@ -576,8 +576,8 @@ namespace {
             const size_t nCurrLoopSize = nLoopSize;
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx1 = (nArrayIdx1+nChannels)%nCurrArraySize;
-                nArrayIdx2 = (nArrayIdx2+nChannels)%nCurrArraySize;
+                nArrayIdx1 = (nArrayIdx1+nChannels)%(nCurrArraySize-nChannels+1);
+                nArrayIdx2 = (nArrayIdx2+nChannels)%(nCurrArraySize-nChannels+1);
                 volatile auto tLast = lv::L2dist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
                 benchmark::DoNotOptimize(tLast);
             }
@@ -718,8 +718,8 @@ namespace {
             const size_t nCurrLoopSize = nLoopSize;
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx1 = (nArrayIdx1+nChannels)%nCurrArraySize;
-                nArrayIdx2 = (nArrayIdx2+nChannels)%nCurrArraySize;
+                nArrayIdx1 = (nArrayIdx1+nChannels)%(nCurrArraySize-nChannels+1);
+                nArrayIdx2 = (nArrayIdx2+nChannels)%(nCurrArraySize-nChannels+1);
                 volatile auto tLast = lv::cdist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
                 benchmark::DoNotOptimize(tLast);
             }
@@ -837,7 +837,7 @@ namespace {
             const size_t nCurrLoopSize = nLoopSize;
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx = (nArrayIdx+nChannels)%nCurrArraySize;
+                nArrayIdx = (nArrayIdx+nChannels)%(nCurrArraySize-nChannels+1);
                 volatile auto tLast = lv::popcount<nChannels>(&aVals[nArrayIdx]);
                 benchmark::DoNotOptimize(tLast);
             }
@@ -910,8 +910,8 @@ namespace {
             const size_t nCurrLoopSize = nLoopSize;
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx1 = (nArrayIdx1+nChannels)%nCurrArraySize;
-                nArrayIdx2 = (nArrayIdx2+nChannels)%nCurrArraySize;
+                nArrayIdx1 = (nArrayIdx1+nChannels)%(nCurrArraySize-nChannels+1);
+                nArrayIdx2 = (nArrayIdx2+nChannels)%(nCurrArraySize-nChannels+1);
                 volatile auto tLast = lv::hdist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
                 benchmark::DoNotOptimize(tLast);
             }
