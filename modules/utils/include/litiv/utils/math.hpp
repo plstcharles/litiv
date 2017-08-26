@@ -18,6 +18,9 @@
 #pragma once
 
 #include "litiv/utils/simd.hpp"
+#if USE_CVCORE_WITH_UTILS
+#include "litiv/utils/opencv.hpp"
+#endif //USE_CVCORE_WITH_UTILS
 
 namespace lv {
 
@@ -36,6 +39,18 @@ namespace lv {
     inline bool ispow2(T nVal) {
         static_assert(std::is_integral<T>::value,"ispow2 only excepts integer types");
         return ((nVal&(nVal-1))==0);
+    }
+
+    /// returns the nearest (rounded up) power of two to the given 32-bit unsigned integer
+    inline uint32_t get_next_pow2(uint32_t nVal) {
+        lvDbgAssert_(nVal>0,"given value must be greater than 0 (returns 0 otherwise)");
+        --nVal;
+        nVal |= nVal>>1;
+        nVal |= nVal>>2;
+        nVal |= nVal>>4;
+        nVal |= nVal>>8;
+        nVal |= nVal>>16;
+        return ++nVal;
     }
 
 #ifdef __clang__
@@ -383,20 +398,12 @@ namespace lv {
         static_assert(nChannels>1,"vectors should have more than one channel");
         bool bNonConstDist = false;
         bool bNonNullDist = (curr[0]!=bg[0]);
-        bool bNonNullBG = (bg[0]>0);
         for(size_t c=1; c<nChannels; ++c) {
             bNonConstDist |= (curr[c]!=curr[c-1]) || (bg[c]!=bg[c-1]);
             bNonNullDist |= (curr[c]!=bg[c]);
-            bNonNullBG |= (bg[c]>0);
         }
         if(!bNonConstDist || !bNonNullDist)
             return 0;
-        if(!bNonNullBG) {
-            size_t nulldist = 0;
-            for(size_t c=0; c<nChannels; ++c)
-                nulldist += curr[c];
-            return nulldist;
-        }
         uint64_t curr_sqr = 0;
         uint64_t bg_sqr = 0;
         uint64_t mix = 0;
@@ -405,7 +412,7 @@ namespace lv {
             bg_sqr += uint64_t(bg[c]*bg[c]);
             mix += uint64_t(curr[c]*bg[c]);
         }
-        const float fSqrDistort = (float)(curr_sqr-(mix*mix)/bg_sqr);
+        const float fSqrDistort = (float)(curr_sqr-(mix*mix)/std::max(bg_sqr,uint64_t(1)));
         return (size_t)std::sqrt(fSqrDistort); // will already be well optimized for integer output
     }
 
@@ -416,21 +423,13 @@ namespace lv {
         lvDbgAssert_(curr[0]>=0.0f && bg[0]>=0.0f,"cdist does not support negative values");
         bool bNonConstDist = false;
         bool bNonNullDist = (curr[0]!=bg[0]);
-        bool bNonNullBG = (bg[0]>0);
         for(size_t c=1; c<nChannels; ++c) {
             lvDbgAssert_(curr[c]>=0.0f && bg[c]>=0.0f,"cdist does not support negative values");
             bNonConstDist |= (curr[c]!=curr[c-1]) || (bg[c]!=bg[c-1]);
             bNonNullDist |= (curr[c]!=bg[c]);
-            bNonNullBG |= (bg[c]>0);
         }
         if(!bNonConstDist || !bNonNullDist)
             return (T)0;
-        if(!bNonNullBG) {
-            T nulldist = 0;
-            for(size_t c=0; c<nChannels; ++c)
-                nulldist += curr[c];
-            return nulldist;
-        }
         T curr_sqr = 0;
         T bg_sqr = 0;
         T mix = 0;
@@ -439,6 +438,7 @@ namespace lv {
             bg_sqr += bg[c]*bg[c];
             mix += curr[c]*bg[c];
         }
+        bg_sqr += std::numeric_limits<T>::epsilon();
         if(curr_sqr<=(mix*mix)/bg_sqr)
             return (T)0;
         else {
@@ -489,7 +489,7 @@ namespace lv {
     /// computes the color distortion between two generic arrays (note: for very large arrays, using ocv matrix ops will be faster)
     template<typename Tin, typename Tout=decltype(cdist<3>((Tin*)0,(Tin*)0))>
     inline Tout cdist(const Tin* a, const Tin* b, size_t nElements, size_t nChannels, const uint8_t* m=nullptr) {
-        lvAssert_(nChannels>1 && nChannels<=4,"untemplated distance function only defined for 2 to 4 channels");
+        lvAssert__(nChannels>1 && nChannels<=4,"untemplated distance function only defined for 2 to 4 channels (asked for %d)",(int)nChannels);
         switch(nChannels) {
             case 2: return cdist<2,Tin,Tout>(a,b,nElements,m);
             case 3: return cdist<3,Tin,Tout>(a,b,nElements,m);
@@ -729,6 +729,82 @@ namespace lv {
 
 #endif //HAVE_GLSL
 
+    /// returns the L1-EMD (earth mover's distance) between two normalized vectors of the same size
+    template<typename TVal, typename TDist=double>
+    inline TDist EMDL1dist(const std::vector<TVal>& vArr1, const std::vector<TVal>& vArr2) {
+        // special EMD case described by Rubner et al. in "The Earth Mover’s Distance as a Metric for Image Retrieval" (IJCV2000)
+        static_assert(std::is_floating_point<TVal>::value,"input must be floating point & normalized");
+        lvDbgAssert_(std::abs(std::accumulate(vArr1.begin(),vArr1.end(),0.0)-1.0)<FLT_EPSILON*vArr1.size(),"input array is not normalized");
+        lvDbgAssert_(std::abs(std::accumulate(vArr2.begin(),vArr2.end(),0.0)-1.0)<FLT_EPSILON*vArr2.size(),"input array is not normalized");
+        lvDbgAssert_(vArr1.size()==vArr2.size(),"input arrays must be same size");
+        const std::vector<TDist> vSums1 = lv::cumulativeSum<TVal,TDist>(vArr1);
+        const std::vector<TDist> vSums2 = lv::cumulativeSum<TVal,TDist>(vArr2);
+        return lv::L1dist<1,TDist,TDist>(vSums1.data(),vSums2.data(),vSums1.size());
+    }
+
+    /// returns the L1-CEMD (circular earth mover's distance) between two normalized vectors of the same size
+    template<typename TVal, typename TDist=double>
+    inline TDist CEMDL1dist(const std::vector<TVal>& vArr1, const std::vector<TVal>& vArr2) {
+        // 'circular' variant of EMDL1 described by Rabin et al. in "Circular Earth Mover’s Distance for the Comparison of Local Features" (ICPR2008)
+        static_assert(std::is_floating_point<TVal>::value,"input must be floating point & normalized");
+        lvDbgAssert_(std::abs(std::accumulate(vArr1.begin(),vArr1.end(),0.0)-1.0)<FLT_EPSILON*vArr1.size(),"input array is not normalized");
+        lvDbgAssert_(std::abs(std::accumulate(vArr2.begin(),vArr2.end(),0.0)-1.0)<FLT_EPSILON*vArr2.size(),"input array is not normalized");
+        lvDbgAssert_(vArr1.size()==vArr2.size(),"input arrays must be same size");
+        std::vector<TDist> vCumSumDiffs(1,TDist(0));
+        vCumSumDiffs.reserve(vArr1.size()+1);
+        std::transform(vArr1.begin(),vArr1.end(),vArr2.begin(),std::back_inserter(vCumSumDiffs),[&](const TVal& a, const TVal& b) {
+            return vCumSumDiffs.back()+TDist(a-b);
+        });
+        std::nth_element(vCumSumDiffs.begin()+1,vCumSumDiffs.begin()+1+vArr1.size()/2,vCumSumDiffs.end());
+        const TDist tMedian = vCumSumDiffs[1+vArr1.size()/2];
+        TDist tResult = TDist(0);
+        for(size_t nIdx=1; nIdx<vCumSumDiffs.size(); ++nIdx)
+            tResult += std::abs(vCumSumDiffs[nIdx]-tMedian);
+        return tResult;
+    }
+
+    /// performs 'root-sift'-like descriptor value adjustment via Hellinger kernel to improve matching performance
+    template<typename TVal, bool bUseL2Norm=false, bool bNegativeCompat=false>
+    inline void rootSIFT(TVal* aDesc, size_t nDescSize) {
+        // the original strategy consist of three steps: L1-normalization, per-elem square root, and L2-normalization.
+        // for some descriptors (e.g. SIFT), the final step (L2-norm) is not required (check bUseL2Norm appropriately)
+        // for more info, see Arandjelovic and Zisserman's "Three things everyone should know to improve object retrieval" (CVPR2012)
+        const double dL1Norm = std::accumulate(aDesc,aDesc+nDescSize,0.0,[](double dSum, TVal tVal){
+            lvDbgAssert_(bNegativeCompat || double(tVal)>=0.0,"bad function config, cannot handle negative descriptor bins");
+            return dSum+(bNegativeCompat?std::abs(tVal):tVal);
+        }) + DBL_EPSILON;
+        std::transform(aDesc,aDesc+nDescSize,aDesc,[&dL1Norm](TVal tVal){
+            if(bNegativeCompat && double(tVal)<0.0)
+                return (TVal)-std::sqrt(-tVal/dL1Norm);
+            else
+                return (TVal)std::sqrt(tVal/dL1Norm);
+        });
+        if(bUseL2Norm) {
+            const double dL2Norm = std::sqrt(std::accumulate(aDesc,aDesc+nDescSize,0.0,[](double dSum, TVal tVal){
+                return dSum+(tVal*tVal);
+            })) + DBL_EPSILON;
+            std::transform(aDesc,aDesc+nDescSize,aDesc,[&dL2Norm](TVal tVal){
+                return tVal/dL2Norm;
+            });
+        }
+    }
+
+#if USE_CVCORE_WITH_UTILS
+
+    /// computes Hoyer's sparseness metric over the vector ("Non-negative Matrix Factorization with Sparseness Constraints", JMLR2004)
+    template<typename TVal>
+    inline double sparseness(const TVal* aVec, size_t nSize) {
+        // 'sparse'-valued vectors will have output close to 1, 'uniform'-valued vectors close to 0
+        static_assert(lv::isDataTypeCompat<TVal>(),"array type must be cv-compatible, and without channels");
+        lvAssert_(nSize>1,"vector size must be greater than one");
+        const double dL1Norm = cv::norm(cv::Mat_<TVal>(1,(int)nSize,const_cast<TVal*>(aVec)),cv::NORM_L1);
+        const double dL2Norm = cv::norm(cv::Mat_<TVal>(1,(int)nSize,const_cast<TVal*>(aVec)),cv::NORM_L2);
+        const double dSizeRoot = std::sqrt(double(nSize));
+        return (dSizeRoot-dL1Norm/dL2Norm)/(dSizeRoot-1);
+    }
+
+#endif //USE_CVCORE_WITH_UTILS
+
     /// returns the index of the nearest neighbor of the requested value in the reference value array, using a custom distance functor
     template<typename Tval, typename Tcomp>
     inline size_t find_nn_index(const Tval& oReqVal, const std::vector<Tval>& vRefVals, Tcomp lCompFunc) {
@@ -759,7 +835,7 @@ namespace lv {
                 Tx dX = vX[i+1]-vX[i];
 #ifdef _DEBUG
                 if(dX<0)
-                    throw std::invalid_argument("input domain vector must be sorted");
+                    lvStdError_(invalid_argument,"input domain vector must be sorted");
 #endif //defined(_DEBUG)
                 Ty dY = vY[i+1]-vY[i];
                 tSlope = Ty(dY/dX);
@@ -777,7 +853,7 @@ namespace lv {
                 vYReq[i] = vSlope[nNNIdx]*vXReq[i]+vOffset[nNNIdx];
             }
             else
-                throw std::domain_error("extrapolation not supported");
+                lvStdError_(domain_error,"extrapolation not supported");
         }
         return vYReq;
     }
@@ -829,4 +905,375 @@ namespace lv {
         return (T)(bool((nBits&(1<<n))!=0)<<(n*nWordBitSize)) + ((n>=1)?expand_bits<nWordBitSize,T>(nBits,n-1):(T)0);
     }
 
+    /// performs LU decomposition of a MxM matrix A (function signature is the same as OpenCV's LU32f/LU64f) --- only efficient for small matrices
+    template<typename TVal>
+    int LU(TVal* A, size_t nRowStep_A_byte, int m, TVal* B=nullptr, size_t nRowStep_B_byte=0, int n=0) {
+        static_assert(std::is_arithmetic<TVal>::value,"input type must be arithmetic");
+        lvDbgAssert_(A!=nullptr && m>0,"invalid A matrix");
+        const size_t nRowStep_A = nRowStep_A_byte/sizeof(TVal);
+        lvDbgAssert_(nRowStep_A>0,"invalid A matrix row size");
+        const size_t nRowStep_B = nRowStep_B_byte/sizeof(TVal);
+        lvDbgAssert_(B==nullptr || nRowStep_B>0,"invalid B matrix row size");
+        constexpr bool bIsDouble = std::is_same<double,std::remove_cv_t<TVal>>::value;
+        //constexpr bool bIsFloat = std::is_same<float,std::remove_cv_t<TVal>>::value;
+        constexpr double dEps = std::is_integral<TVal>::value?0.0:(bIsDouble?DBL_EPSILON*100.0:/*bIsFloat*/FLT_EPSILON*10.0);
+        int p = 1;
+        for(int i=0; i<m; ++i) {
+            int k = i;
+            for(int j=i+1; j<m; ++j)
+                if(std::abs(A[j*nRowStep_A+i])>std::abs(A[k*nRowStep_A+i]))
+                    k = j;
+            if(double(std::abs(A[k*nRowStep_A+i]))<dEps)
+                return 0; // matrix is degenerate; return null permutation sign
+            if(k!=i) {
+                for(int j=i; j<m; ++j)
+                    std::swap(A[i*nRowStep_A+j], A[k*nRowStep_A+j]);
+                if(B)
+                    for(int j=0; j<n; ++j)
+                        std::swap(B[i*nRowStep_B+j], B[k*nRowStep_B+j]);
+                p = -p;
+            }
+            TVal d = -1/A[i*nRowStep_A+i];
+            for(int j=i+1; j<m; ++j) {
+                TVal alpha = A[j*nRowStep_A+i]*d;
+                for(k=i+1; k<m; ++k)
+                    A[j*nRowStep_A+k] += alpha*A[i*nRowStep_A+k];
+                if(B)
+                    for(k=0; k<n; ++k)
+                        B[j*nRowStep_B+k] += alpha*B[i*nRowStep_B+k];
+            }
+            A[i*nRowStep_A+i] = -d;
+        }
+        if(B) {
+            for(int i=m-1; i>=0; --i) {
+                for(int j=0; j<n; ++j) {
+                    TVal s = B[i*nRowStep_B+j];
+                    for(int k=i+1; k<m; ++k)
+                        s -= A[i*nRowStep_A+k]*B[k*nRowStep_B+j];
+                    B[i*nRowStep_B+j] = s*A[i*nRowStep_A+i];
+                }
+            }
+        }
+        return p; // return permutation matrix sign
+    }
+
+    /// returns the determinant of a square matrix via LU decomposition --- only efficient for small matrices
+    template<size_t N, typename TVal>
+    double determinant(const TVal* m) {
+        static_assert(std::is_arithmetic<TVal>::value,"input type must be arithmetic");
+        static_assert(N>size_t(0),"input matrix size must be positive");
+        lvDbgAssert_(m!=nullptr,"invalid matrix");
+    #ifdef _MSC_VER
+    #pragma warning(push)
+    #pragma warning(disable:4127)
+    #endif //def(_MSC_VER)
+        if(N==1)
+            return m[0];
+        else if(N==2)
+            return m[0]*m[3] - m[1]*m[2];
+        else if(N==3)
+            return m[0]*(m[4]*m[8]-m[5]*m[7]) - m[1]*(m[3]*m[8]-m[5]*m[6]) + m[2]*(m[3]*m[7]-m[4]*m[6]);
+    #ifdef _MSC_VER
+    #pragma warning(pop)
+    #endif //def(_MSC_VER)
+        static thread_local lv::AutoBuffer<TVal,N*N> s_aMatCopy;
+        lvDbgAssert(s_aMatCopy.size()==N*N && s_aMatCopy.is_static());
+        std::copy_n(m,N*N,s_aMatCopy.data());
+        double p = lv::LU(s_aMatCopy.data(),N*sizeof(TVal),int(N));
+        if(p==0)
+            return p;
+        lv::unroll<N>([&](size_t n){p *= s_aMatCopy[n*N+n];});
+        return 1.0/p;
+    }
+
+    /// computes the inverse of a square matrix via LU decomposition --- only efficient for small matrices (returns false if singular)
+    template<size_t N, typename TVal>
+    bool invert(const TVal* in, TVal* out) {
+        static_assert(std::is_arithmetic<TVal>::value,"input type must be arithmetic");
+        static_assert(N>size_t(0),"input matrix size must be positive");
+        lvDbgAssert_(in!=nullptr,"invalid input matrix");
+        lvDbgAssert_(out!=nullptr,"invalid output matrix");
+    #ifdef _MSC_VER
+    #pragma warning(push)
+    #pragma warning(disable:4127)
+    #endif //def(_MSC_VER)
+        if(N==1) {
+            if(in[0]==0)
+                return false;
+            out[0] = TVal(1.0/in[0]);
+            return true;
+        }
+        else if(N==2) {
+            const double dDet = lv::determinant<N,TVal>(in);
+            if(dDet==0)
+                return false;
+            const double dDetInv = 1.0/dDet;
+            out[3] = TVal(in[0]*dDetInv);
+            out[0] = TVal(in[3]*dDetInv);
+            out[1] = TVal(in[1]*-dDetInv);
+            out[2] = TVal(in[2]*-dDetInv);
+            return true;
+        }
+        else if(N==3) {
+            const double dDet = lv::determinant<N,TVal>(in);
+            if(dDet==0)
+                return false;
+            const double dDetInv = 1.0/dDet;
+            out[0] = TVal((in[4]*in[8] - in[5]*in[7])*dDetInv);
+            out[1] = TVal((in[2]*in[7] - in[1]*in[8])*dDetInv);
+            out[2] = TVal((in[1]*in[5] - in[2]*in[4])*dDetInv);
+            out[3] = TVal((in[5]*in[6] - in[3]*in[8])*dDetInv);
+            out[4] = TVal((in[0]*in[8] - in[2]*in[6])*dDetInv);
+            out[5] = TVal((in[2]*in[3] - in[0]*in[5])*dDetInv);
+            out[6] = TVal((in[3]*in[7] - in[4]*in[6])*dDetInv);
+            out[7] = TVal((in[1]*in[6] - in[0]*in[7])*dDetInv);
+            out[8] = TVal((in[0]*in[4] - in[1]*in[3])*dDetInv);
+            return true;
+        }
+    #ifdef _MSC_VER
+    #pragma warning(pop)
+    #endif //def(_MSC_VER)
+        static thread_local lv::AutoBuffer<TVal,N*N> s_aMatCopy;
+        lvDbgAssert(s_aMatCopy.size()==N*N && s_aMatCopy.is_static());
+        std::copy_n(in,N*N,s_aMatCopy.data());
+        std::fill_n(out,N*N,TVal(0));
+        lv::unroll<N>([&](size_t n){out[n*N+n] = TVal(1);});
+        const size_t nRowStep_byte = N*sizeof(TVal);
+        return lv::LU(s_aMatCopy.data(),nRowStep_byte,int(N),out,nRowStep_byte,int(N))!=0;
+    }
+
+#if USE_CVCORE_WITH_UTILS
+
+    /// returns the determinant of a square matrix via LU decomposition --- only efficient for small matrices
+    template<size_t N, typename TVal>
+    double determinant(const cv::Matx<TVal,N,N>& oMat) {
+        return lv::determinant<N,TVal>(oMat.val);
+    }
+
+    /// computes the inverse of a square matrix via LU decomposition --- only efficient for small matrices (returns false if singular)
+    template<size_t N, typename TVal>
+    bool invert(const cv::Matx<TVal,N,N>& oInput, cv::Matx<TVal,N,N>& oOutput) {
+        return lv::invert<N,TVal>(oInput.val,oOutput.val);
+    }
+
+#endif //USE_CVCORE_WITH_UTILS
+
+    /// Gaussian Mixture Model estimator class
+    template<size_t nComps=5, size_t nDims=3>
+    struct GMM {
+        static_assert(nComps>0,"bad component count");
+        static_assert(nDims>0,"bad dimension size");
+        /// evaluates the probability density for a given data sample in the mixture model
+        template<typename TVal>
+        double operator()(const std::array<TVal,nDims>& aSample) const;
+        /// evaluates the probability density for a given data sample in the mixture model
+        template<typename TVal>
+        double operator()(const TVal* aSample) const;
+        /// evaluates the probability density for a given data sample in a single model component
+        template<typename TVal>
+        double operator()(size_t nCompIdx, const std::array<TVal,nDims>& aSample) const;
+        /// evaluates the probability density for a given data sample in a single model component
+        template<typename TVal>
+        double operator()(size_t nCompIdx, const TVal* aSample) const;
+        /// returns the best-fitting component for a given sample
+        template<typename TVal>
+        size_t getBestComponent(const std::array<TVal,nDims>& aSample) const;
+        /// returns the best-fitting component for a given sample
+        template<typename TVal>
+        size_t getBestComponent(const TVal* aSample) const;
+        /// initializes learning mode (enables 'addSample' to learn new model params)
+        void initLearning();
+        /// adds a new data sample to a specific component for model param estimation
+        template<typename TVal>
+        void addSample(size_t nCompIdx, const std::array<TVal,nDims>& aSample);
+        /// adds a new data sample to a specific component for model param estimation
+        template<typename TVal>
+        void addSample(size_t nCompIdx, const TVal* aSample);
+        /// disables learning mode, and estimates ideal model params using added samples
+        void endLearning();
+        /// returns the number of gaussian components in the mixture model (templated param)
+        static constexpr size_t getComponentCount() {return nComps;}
+        /// returns the dimensionality of input samples (templated param)
+        static constexpr size_t getDimensionCount() {return nDims;}
+        /// returns the model data size (in elements, not bytes!)
+        static constexpr size_t getModelSize() {return (nDims+nDims*nDims*2+3)*nComps;}
+        /// returns the underlying model data for debugging/serialization/overwriting
+        inline double* getModelData() {return m_aModelData.data();}
+        /// returns the mean array pointer for a given component index
+        inline double* getComponentMean(size_t nCompIdx) {return m_aMeans+nDims*nCompIdx;}
+        /// returns the covariance matrix array pointer for a given component index
+        inline double* getComponentCovMat(size_t nCompIdx) {return m_aCovMats+nDims*nDims*nCompIdx;}
+        /// returns the weight value for a given component index
+        inline double getComponentWeight(size_t nCompIdx) {return m_aCoeffs[nCompIdx];}
+        /// default constructor; initializes all model params to zero
+        GMM();
+    protected:
+        static constexpr size_t s_nStaticBuffSize = std::min(getModelSize(),size_t(128));
+        lv::AutoBuffer<double,s_nStaticBuffSize> m_aModelData;
+        double* m_aCoeffs;
+        double* m_aMeans;
+        double* m_aCovMats;
+        double* m_aInvCovMats;
+        double* m_aCovMatDeterms;
+        double* m_aGaussPDFFactors;
+        double m_aSampleSums[nComps][nDims];
+        double m_aSampleProds[nComps][nDims][nDims];
+        size_t m_nSampleCounts[nComps];
+        size_t m_nTotSampleCount;
+        bool m_bLearningModeOn;
+    };
+
 } // namespace lv
+
+template<size_t nComps, size_t nDims>
+lv::GMM<nComps,nDims>::GMM() : m_bLearningModeOn(false) {
+    m_aModelData.resize(getModelSize());
+    m_aCoeffs = m_aModelData.data();
+    m_aMeans = m_aCoeffs+nComps;
+    m_aCovMats = m_aMeans+nDims*nComps;
+    m_aInvCovMats = m_aCovMats+nDims*nDims*nComps;
+    m_aCovMatDeterms = m_aInvCovMats+nDims*nDims*nComps;
+    m_aGaussPDFFactors = m_aCovMatDeterms+nComps;
+    lvDbgAssert((m_aGaussPDFFactors+nComps)==getModelData()+getModelSize());
+    std::fill_n(m_aModelData.data(),getModelSize(),0.0);
+}
+
+template<size_t nComps, size_t nDims>
+template<typename TVal>
+double lv::GMM<nComps,nDims>::operator()(const std::array<TVal,nDims>& aSample) const {
+    return operator()(aSample.data());
+}
+
+template<size_t nComps, size_t nDims>
+template<typename TVal>
+double lv::GMM<nComps,nDims>::operator()(const TVal* aSample) const {
+    double dRes = m_aCoeffs[nComps-1]*(*this)(nComps-1,aSample);
+    lv::unroll<nComps-1>([&](size_t nCompIdx){
+        dRes += m_aCoeffs[nCompIdx]*(*this)(nCompIdx,aSample);
+    });
+    return dRes;
+}
+
+template<size_t nComps, size_t nDims>
+template<typename TVal>
+double lv::GMM<nComps,nDims>::operator()(size_t nCompIdx, const std::array<TVal,nDims>& aSample) const {
+    return operator()(nCompIdx,aSample.data());
+}
+
+template<size_t nComps, size_t nDims>
+template<typename TVal>
+double lv::GMM<nComps,nDims>::operator()(size_t nCompIdx, const TVal* aSample) const {
+    lvDbgAssert(!m_bLearningModeOn);
+    lvDbgAssert(nCompIdx<nComps);
+    lvDbgAssert(aSample!=nullptr);
+    double dRes = 0.0;
+    if(m_aCoeffs[nCompIdx]>0) {
+        lvDbgAssert(m_aCovMatDeterms[nCompIdx]>std::numeric_limits<double>::epsilon());
+        std::array<double,nDims> aDiff;
+        const double* aMean = m_aMeans+nDims*nCompIdx;
+        lv::unroll<nDims>([&](size_t nDimIdx){
+            aDiff[nDimIdx] = double(aSample[nDimIdx])-aMean[nDimIdx];
+        });
+        const double* aInvCovMat = m_aInvCovMats+nCompIdx*nDims*nDims;
+        double dSum1 = 0.0;
+        lv::unroll<nDims>([&](size_t nDimIdx1){
+            double dSum2 = aDiff[nDims-1]*aInvCovMat[(nDims-1)*nDims+nDimIdx1];
+            lv::unroll<nDims-1>([&](size_t nDimIdx2){
+                dSum2 += aDiff[nDimIdx2]*aInvCovMat[nDimIdx2*nDims+nDimIdx1];
+            });
+            dSum1 += aDiff[nDimIdx1]*dSum2;
+        });
+        dRes = m_aGaussPDFFactors[nCompIdx]*std::exp(-0.5*dSum1);
+        lvDbgAssert(dRes>=0.0);
+    }
+    return dRes;
+}
+
+template<size_t nComps, size_t nDims>
+template<typename TVal>
+size_t lv::GMM<nComps,nDims>::getBestComponent(const std::array<TVal,nDims>& aSample) const {
+    return getBestComponent(aSample.data());
+}
+
+template<size_t nComps, size_t nDims>
+template<typename TVal>
+size_t lv::GMM<nComps,nDims>::getBestComponent(const TVal* aSample) const {
+    size_t nBestCompIdx = nComps-1;
+    double dMaxProb = (*this)(nComps-1,aSample);
+    lv::unroll<nComps-1>([&](size_t nCompIdx){
+        double dCurrProb = (*this)(nCompIdx,aSample);
+        if(dCurrProb>dMaxProb) {
+            nBestCompIdx = nCompIdx;
+            dMaxProb = dCurrProb;
+        }
+    });
+    return nBestCompIdx;
+}
+
+template<size_t nComps, size_t nDims>
+void lv::GMM<nComps,nDims>::initLearning() {
+    std::fill_n(&m_aSampleSums[0][0],nComps*nDims,0.0);
+    std::fill_n(&m_aSampleProds[0][0][0],nComps*nDims*nDims,0.0);
+    std::fill_n(&m_nSampleCounts[0],nComps,size_t(0));
+    m_nTotSampleCount = size_t(0);
+    m_bLearningModeOn = true;
+}
+
+template<size_t nComps, size_t nDims>
+template<typename TVal>
+void lv::GMM<nComps,nDims>::addSample(size_t nCompIdx, const std::array<TVal,nDims>& aSample) {
+    addSample(nCompIdx,aSample.data());
+}
+
+template<size_t nComps, size_t nDims>
+template<typename TVal>
+void lv::GMM<nComps,nDims>::addSample(size_t nCompIdx, const TVal* aSample) {
+    lvDbgAssert(m_bLearningModeOn);
+    lvDbgAssert(nCompIdx<nComps);
+    lvDbgAssert(aSample!=nullptr);
+    lv::unroll<nDims>([&](size_t nDimIdx1){
+        m_aSampleSums[nCompIdx][nDimIdx1] += double(aSample[nDimIdx1]);
+        lv::unroll<nDims>([&](size_t nDimIdx2){
+            m_aSampleProds[nCompIdx][nDimIdx1][nDimIdx2] += double(aSample[nDimIdx1])*double(aSample[nDimIdx2]);
+        });
+    });
+    ++m_nSampleCounts[nCompIdx];
+    ++m_nTotSampleCount;
+}
+
+template<size_t nComps, size_t nDims>
+void lv::GMM<nComps,nDims>::endLearning() {
+    lvDbgAssert(m_bLearningModeOn);
+    static const double s_dSigmaFactor = std::pow(2.0*M_PI,(double)nDims); // cannot constexpr std::pow on msvc2015
+    lv::unroll<nComps>([&](size_t nCompIdx){
+        if(m_nSampleCounts[nCompIdx]==size_t(0))
+            m_aCoeffs[nCompIdx] = 0;
+        else {
+            m_aCoeffs[nCompIdx] = (double)m_nSampleCounts[nCompIdx]/m_nTotSampleCount;
+            double* aMean = m_aMeans+nDims*nCompIdx;
+            lv::unroll<nDims>([&](size_t nDimIdx){
+                aMean[nDimIdx] = m_aSampleSums[nCompIdx][nDimIdx]/m_nSampleCounts[nCompIdx];
+            });
+            double* aCovariance = m_aCovMats+nDims*nDims*nCompIdx;
+            lv::unroll<nDims>([&](size_t nDimIdx1){
+                lv::unroll<nDims>([&](size_t nDimIdx2){
+                    aCovariance[nDimIdx1*nDims+nDimIdx2] = m_aSampleProds[nCompIdx][nDimIdx1][nDimIdx2]/m_nSampleCounts[nCompIdx] - aMean[nDimIdx1]*aMean[nDimIdx2];
+                });
+            });
+            const double dDeterminant = lv::determinant<nDims>(aCovariance);
+            if(dDeterminant<=std::numeric_limits<double>::epsilon()) {
+                // adds white noise to avoid singular covariance matrix
+                constexpr double dMinVariance = 0.01;
+                lv::unroll<nDims>([&](size_t nDimIdx){
+                    aCovariance[nDimIdx*nDims+nDimIdx] += dMinVariance;
+                });
+                m_aCovMatDeterms[nCompIdx] = lv::determinant<nDims>(aCovariance);
+            }
+            else
+                m_aCovMatDeterms[nCompIdx] = dDeterminant;
+            lvAssert(lv::invert<nDims>(aCovariance,m_aInvCovMats+nCompIdx*nDims*nDims));
+            m_aGaussPDFFactors[nCompIdx] = 1.0/std::sqrt(s_dSigmaFactor*m_aCovMatDeterms[nCompIdx]);
+        }
+    });
+    m_bLearningModeOn = false;
+}

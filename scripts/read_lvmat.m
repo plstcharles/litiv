@@ -18,7 +18,7 @@
 %/////////////////////////////////////////////////////////////////////////////
 %//
 %// This function provides a way to load matrix data saved in C++ using the
-%// LITIV framework OpenCV utility function 'cv::write(...)'. Fully supports
+%// LITIV framework OpenCV utility function 'lv::write(...)'. Fully supports
 %// all CV mat types, and preserves element ordering.
 %//
 %/////////////////////////////////////////////////////////////////////////////

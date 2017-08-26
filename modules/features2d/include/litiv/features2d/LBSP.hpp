@@ -17,13 +17,12 @@
 
 #pragma once
 
-#include <opencv2/core.hpp>
-#include <opencv2/imgproc.hpp>
-#include <opencv2/features2d.hpp>
+#include "litiv/utils/opencv.hpp"
 #include "litiv/utils/math.hpp"
 #if HAVE_GLSL
 #include "litiv/utils/opengl-imgproc.hpp"
 #endif //HAVE_GLSL
+#include <opencv2/features2d.hpp>
 
 /**
     Local Binary Similarity Pattern (LBSP) feature extractor
@@ -48,6 +47,8 @@ public:
     virtual cv::Size windowSize() const;
     /// returns the border size required around each keypoint in x or y direction (also gives the invalid descriptor border size for output maps to ignore)
     virtual int borderSize(int nDim=0) const; // typically equal to windowSize().width/2
+    /// returns the expected dense descriptor matrix output info, for a given input matrix size/type
+    virtual lv::MatInfo getOutputInfo(const lv::MatInfo& oInputInfo) const;
     /// returns the current descriptor size, in bytes (overrides cv::DescriptorExtractor's)
     virtual int descriptorSize() const override;
     /// returns the current descriptor data type (overrides cv::DescriptorExtractor's)
@@ -84,7 +85,7 @@ public:
     /// utility function, used to filter out bad pixels in a ROI that would trigger out of bounds error because they're too close to the image border
     static void validateROI(cv::Mat& oROI);
     /// utility function, used to calculate per-desc Hamming distance between two descriptor sets/maps
-    static void calcDistance(const cv::Mat& oDescriptors1, const cv::Mat& oDescriptors2, cv::Mat_<uchar>& oDistances);
+    static void calcDistances(const cv::Mat& oDescriptors1, const cv::Mat& oDescriptors2, cv::Mat_<uchar>& oDistances);
 #if HAVE_GLSL
     /// utility function, returns the glsl source code required to describe an LBSP descriptor based on the image load store
     static std::string getShaderFunctionSource(size_t nChannels, bool bUseSharedDataPreload, const glm::uvec2& vWorkGroupSize);

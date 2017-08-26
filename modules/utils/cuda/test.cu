@@ -17,23 +17,20 @@
 //
 
 #include "test.cuh"
+#include <vector>
 
-__global__ void device::test(int n) {
-    const int px = blockIdx.x*blockDim.x + threadIdx.x;
-    const int py = blockIdx.y*blockDim.y + threadIdx.y;
-    const int pz = blockIdx.z*blockDim.z + threadIdx.z;
-    printf("cuda test kernel @ px = %d, py = %d, pz = %d, with n = %d\n",px,py,pz,n);
-}
+namespace impl {
 
-void host::test(const lv::cuda::KernelParams& oKParams, int n) {
-    cudaKernelWrap(test,oKParams,n);
-}
-
-// for use via extern in litiv/utils/cuda.hpp
-namespace lv {
-    namespace cuda {
-        void test(const lv::cuda::KernelParams& oKParams, int n) {
-            host::test(oKParams,n);
-        }
+    __global__ void test_kernel(uchar* pTestData, int nVerbosity) {
+        if(nVerbosity>=3)
+            printf("internal warp size = %d, n = %d\n",warpSize,nVerbosity);
+        assert(pTestData[0]==1);
+        assert(pTestData[13]==0);
+        pTestData[13] = 1;
     }
+
+} // namespace impl
+
+void device::test_kernel(const lv::cuda::KernelParams& oKParams, uchar* pTestData, int nVerbosity) {
+    cudaKernelWrap(test_kernel,oKParams,pTestData,nVerbosity);
 }

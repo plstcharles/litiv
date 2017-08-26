@@ -19,9 +19,9 @@
 
 bool lv::info() {
 #if LITIV_DEBUG
-    std::cout << lv::getVersionStamp() << " [Build='Debug']" << std::endl;
+    lvCout_(-1) << lv::getVersionStamp() << " [Build='Debug']\n";
 #else //!LITIV_DEBUG
-    std::cout << lv::getVersionStamp() << " [Build='Release']" << std::endl;
+    lvCout_(-1) << lv::getVersionStamp() << " [Build='Release']\n";
 #endif //!LITIV_DEBUG
     return true;
 }

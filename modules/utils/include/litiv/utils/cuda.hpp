@@ -18,21 +18,48 @@
 #pragma once
 
 #ifdef __CUDACC__
+#include <array>
 #include <cstdio>
+#include <sstream>
+#include <cassert>
+#include <opencv2/core/cuda/common.hpp>
+#include <opencv2/core/cuda/vec_traits.hpp>
+#include <opencv2/core/cuda/vec_math.hpp>
+#include <opencv2/core/cuda/limits.hpp>
+#include <opencv2/cudev.hpp>
+#ifdef CUDA_EXIT_ON_ERROR
+#define CUDA_ERROR_HANDLER(errn,msg) do { printf("%s",msg); std::exit(errn); } while(0)
+#else //ndef(CUDA_EXIT_ON_ERROR)
+#define CUDA_ERROR_HANDLER(errn,msg) do { (void)errn; throw std::runtime_error(msg); } while(0)
+#endif //ndef(CUDA_..._ON_ERROR)
 #define cudaKernelWrap(func,kparams,...) do { \
-    device::func<<<kparams.vGridSize,kparams.vBlockSize,kparams.nSharedMemSize,kparams.nStream>>>(__VA_ARGS__); \
-    const cudaError_t __errn = cudaGetLastError(); \
-    if(__errn!=cudaSuccess) { \
-        printf("cuda kernel '" #func "' execution failed [code=%d, msg=%s]\n\t... in function '%s' from %s(%d)\n",(int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
-        std::exit((int)__errn); \
-    } \
-} while(0)
-#endif //def(__CUDACC__)
+        impl::func<<<kparams.vGridSize,kparams.vBlockSize,kparams.nSharedMemSize,kparams.nStream>>>(__VA_ARGS__); \
+        const cudaError_t __errn = cudaGetLastError(); \
+        if(__errn!=cudaSuccess) { \
+            std::array<char,1024> acBuffer; \
+            snprintf(acBuffer.data(),acBuffer.size(),"cuda kernel '" #func "' execution failed [code=%d, msg=%s]\n\t... in function '%s'\n\t... from %s(%d)\n\t... with kernel params = %s\n", \
+                     (int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__,kparams.str().c_str()); \
+            CUDA_ERROR_HANDLER((int)__errn,acBuffer.data()); \
+        } \
+    } while(0)
+#else //ndef(__CUDACC__)
+#include "litiv/utils/cxx.hpp"
+#if !HAVE_CUDA
+#error "cuda util header included without cuda support in framework"
+#endif //!HAVE_CUDA
+#include <cuda.h>
 #include <cuda_runtime.h>
+#include <npp.h>
+#include "litiv/utils/opencv.hpp"
+#endif //ndef(__CUDACC__)
 
 namespace lv {
 
     // @@@@ TODO, ship common cuda utils here
+
+    // warp leader selection code for divergent code flow: (requires sm_20)
+    //     int mask = __ballot(1);  // mask of active lanes
+    //     int leader = __ffs(mask) - 1;  // -1 for 0-based indexing
 
     namespace cuda {
 
@@ -46,12 +73,44 @@ namespace lv {
             dim3 vBlockSize;
             size_t nSharedMemSize;
             cudaStream_t nStream;
+            /// is-equal test operator for other KernelParams structs
+            bool operator==(const KernelParams& o) const {
+                return
+                    vGridSize.x==o.vGridSize.x && vGridSize.y==o.vGridSize.y && vGridSize.z==o.vGridSize.z &&
+                    vBlockSize.x==o.vBlockSize.x && vBlockSize.y==o.vBlockSize.y && vBlockSize.z==o.vBlockSize.z &&
+                    nSharedMemSize==o.nSharedMemSize &&
+                    nStream==o.nStream;
+            }
+            /// is-not-equal test operator for other KernelParams structs
+            bool operator!=(const KernelParams& o) const {
+                return !(*this==o);
+            }
+            /// implicit conversion op to string (for printing/debug purposes only)
+            operator std::string() const {
+                std::stringstream ssStr;
+                ssStr << "{ ";
+                ssStr << "grid=[" << vGridSize.x << "," << vGridSize.y << "," << vGridSize.z << "], ";
+                ssStr << "block=[" << vBlockSize.x << "," << vBlockSize.y << "," << vBlockSize.z << "], ";
+                ssStr << "shmem=" << nSharedMemSize << ", stream=" << (void*)nStream;
+                ssStr << " }";
+                return ssStr.str();
+            }
+            /// returns the result of the implicit std::string cast (for printing/debug purposes only)
+            std::string str() const {
+                return (std::string)*this;
+            }
         };
 
 #ifndef __CUDACC__
 
+        /// used to set a global default device ID to use in CUDA-based impls
+        void setDefaultDeviceID(int nDeviceID);
+        /// used to query the global default device ID to use in CUDA-based impls
+        int getDefaultDeviceID();
         /// used to launch a trivial kernel to test if device connection & compute arch are good
-        extern void test(const lv::cuda::KernelParams& oKParams=lv::cuda::KernelParams(dim3(1),dim3(1)), int n=1);
+        void test_kernel(int nVerbosity);
+        /// initializes cuda on the given device id for the current thread, and checks for compute compatibility
+        void init(int nDeviceID=getDefaultDeviceID());
 
 #endif //ndef(__CUDACC__)
 

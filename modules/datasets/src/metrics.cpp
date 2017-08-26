@@ -19,9 +19,9 @@
 #include "litiv/datasets/metrics.hpp"
 
 void lv::BinClassif::accumulate(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
-    lvAssert_(!oClassif.empty() && oClassif.type()==CV_8UC1,"binary classifier results must be non-empty and of type 8UC1");
-    lvAssert_(oGT.empty() || oGT.type()==CV_8UC1,"gt mat must be empty, or of type 8UC1");
-    lvAssert_(oROI.empty() || oROI.type()==CV_8UC1,"ROI mat must be empty, or of type 8UC1");
+    lvAssert_(!oClassif.empty() && oClassif.dims==2 && oClassif.isContinuous() && oClassif.type()==CV_8UC1,"binary classifier results must be non-empty and of type 8UC1");
+    lvAssert_(oGT.empty() || (oGT.type()==CV_8UC1 && oGT.isContinuous()),"gt mat must be empty, or of type 8UC1");
+    lvAssert_(oROI.empty() || (oROI.type()==CV_8UC1 && oGT.isContinuous()),"ROI mat must be empty, or of type 8UC1");
     lvAssert_((oGT.empty() || oClassif.size()==oGT.size()) && (oROI.empty() || oClassif.size()==oROI.size()),"all input mat sizes must match");
     if(oGT.empty()) {
         nDC += oClassif.size().area();
@@ -61,9 +61,9 @@ void lv::BinClassif::accumulate(const cv::Mat& oClassif, const cv::Mat& oGT, con
 }
 
 cv::Mat lv::BinClassif::getColoredMask(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI) {
-    lvAssert_(!oClassif.empty() && oClassif.type()==CV_8UC1,"binary classifier results must be non-empty and of type 8UC1");
-    lvAssert_(oGT.empty() || oGT.type()==CV_8UC1,"gt mat must be empty, or of type 8UC1");
-    lvAssert_(oROI.empty() || oROI.type()==CV_8UC1,"ROI mat must be empty, or of type 8UC1");
+    lvAssert_(!oClassif.empty() && oClassif.dims==2 && oClassif.isContinuous() && oClassif.type()==CV_8UC1,"binary classifier results must be non-empty and of type 8UC1");
+    lvAssert_(oGT.empty() || (oGT.type()==CV_8UC1 && oGT.isContinuous()),"gt mat must be empty, or of type 8UC1");
+    lvAssert_(oROI.empty() || (oROI.type()==CV_8UC1 && oGT.isContinuous()),"ROI mat must be empty, or of type 8UC1");
     lvAssert_((oGT.empty() || oClassif.size()==oGT.size()) && (oROI.empty() || oClassif.size()==oROI.size()),"all input mat sizes must match");
     if(oGT.empty()) {
         cv::Mat oResult;
@@ -114,6 +114,112 @@ cv::Mat lv::BinClassif::getColoredMask(const cv::Mat& oClassif, const cv::Mat& o
         }
     }
     return oResult;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void lv::StereoDispErrors::accumulate(const cv::Mat& _oDispMap, const cv::Mat& _oGT, const cv::Mat& oROI) {
+    lvAssert_(!_oDispMap.empty() && _oDispMap.dims==2 && _oDispMap.isContinuous(),"input disp map must be non-empty and 2d");
+    lvAssert_(_oDispMap.type()==CV_8UC1 || _oDispMap.type()==CV_8SC1 || _oDispMap.type()==CV_16UC1 || _oDispMap.type()==CV_16SC1 || _oDispMap.type()==CV_32SC1 || _oDispMap.type()==CV_32FC1,"binary classifier results must be of type 8UC1/8SC1/16UC1/16SC1/32SC1/32FC1");
+    lvAssert_(_oGT.empty() || (_oGT.isContinuous() && (_oGT.type()==CV_8UC1 || _oGT.type()==CV_8SC1 || _oGT.type()==CV_16UC1 || _oGT.type()==CV_16SC1 || _oGT.type()==CV_32SC1 || _oGT.type()==CV_32FC1)),"gt mat must be empty, or of type 8UC1/8SC1/16UC1/16SC1/32SC1/32FC1");
+    lvAssert_(oROI.empty() || (oROI.isContinuous() && oROI.type()==CV_8UC1),"ROI mat must be empty, or of type 8UC1");
+    lvAssert_((_oGT.empty() || _oDispMap.size()==_oGT.size()) && (oROI.empty() || _oDispMap.size()==oROI.size()),"all input mat sizes must match");
+    if(_oGT.empty()) {
+        nDC += _oDispMap.size().area();
+        return;
+    }
+    cv::Mat_<float> oDispMap,oGT;
+    if(_oDispMap.type()==CV_32FC1)
+        oDispMap = _oDispMap;
+    else
+        _oDispMap.convertTo(oDispMap,CV_32F);
+    if(_oGT.type()==CV_32FC1)
+        oGT = _oGT;
+    else
+        _oGT.convertTo(oGT,CV_32F);
+    cv::Mat_<uchar> oGTValidMask;
+    if(_oGT.type()==CV_8UC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<uchar>::max());
+    else if(_oGT.type()==CV_8SC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<char>::max()) & (_oGT>=0);
+    else if(_oGT.type()==CV_16UC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<ushort>::max());
+    else if(_oGT.type()==CV_16SC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<short>::max()) & (_oGT>=0);
+    else if(_oGT.type()==CV_32SC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<int>::max()) & (_oGT>=0);
+    else if(_oGT.type()==CV_32FC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<float>::max()) & (_oGT>=0);
+    else
+        lvError("unexpected gt map type");
+    vErrors.reserve(vErrors.size()+oDispMap.total());
+    for(int nRowIdx=0; nRowIdx<oDispMap.rows; ++nRowIdx) {
+        const float* pInputDispPtr = oDispMap.ptr<float>(nRowIdx);
+        const float* pGTDispPtr = oGT.ptr<float>(nRowIdx);
+        const uchar* pGTValidPtr = oGTValidMask.ptr<uchar>(nRowIdx);
+        const uchar* pROIPtr = oROI.empty()?pGTValidPtr:oROI.ptr<uchar>(nRowIdx);
+        for(int nColIdx=0; nColIdx<oDispMap.cols; ++nColIdx) {
+            if(pGTValidPtr[nColIdx] && pROIPtr[nColIdx])
+                vErrors.push_back(std::abs(pInputDispPtr[nColIdx]-pGTDispPtr[nColIdx]));
+            else
+                ++nDC;
+        }
+    }
+}
+
+cv::Mat lv::StereoDispErrors::getColoredMask(const cv::Mat& _oDispMap, const cv::Mat& _oGT, float fMaxError, const cv::Mat& oROI) {
+    lvAssert_(!_oDispMap.empty() && _oDispMap.dims==2 && _oDispMap.isContinuous(),"input disp map must be non-empty and 2d");
+    lvAssert_(_oDispMap.type()==CV_8UC1 || _oDispMap.type()==CV_8SC1 || _oDispMap.type()==CV_16UC1 || _oDispMap.type()==CV_16SC1 || _oDispMap.type()==CV_32SC1 || _oDispMap.type()==CV_32FC1,"binary classifier results must be of type 8UC1/8SC1/16UC1/16SC1/32SC1/32FC1");
+    lvAssert_(_oGT.empty() || (_oGT.isContinuous() && (_oGT.type()==CV_8UC1 || _oGT.type()==CV_8SC1 || _oGT.type()==CV_16UC1 || _oGT.type()==CV_16SC1 || _oGT.type()==CV_32SC1 || _oGT.type()==CV_32FC1)),"gt mat must be empty, or of type 8UC1/8SC1/16UC1/16SC1/32SC1/32FC1");
+    lvAssert_(oROI.empty() || (oROI.isContinuous() && oROI.type()==CV_8UC1),"ROI mat must be empty, or of type 8UC1");
+    lvAssert_((_oGT.empty() || _oDispMap.size()==_oGT.size()) && (oROI.empty() || _oDispMap.size()==oROI.size()),"all input mat sizes must match");
+    lvAssert_(fMaxError>0.0f,"bad max disparity error value for color map scaling");
+    if(_oGT.empty())
+        return cv::Mat(_oDispMap.size(),CV_8UC3,cv::Scalar::all(0));
+    cv::Mat_<float> oDispMap,oGT,oErrorMap;
+    if(_oDispMap.type()==CV_32FC1)
+        oDispMap = _oDispMap;
+    else
+        _oDispMap.convertTo(oDispMap,CV_32F);
+    if(_oGT.type()==CV_32FC1)
+        oGT = _oGT;
+    else
+        _oGT.convertTo(oGT,CV_32F);
+    cv::Mat_<uchar> oGTValidMask;
+    if(_oGT.type()==CV_8UC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<uchar>::max());
+    else if(_oGT.type()==CV_8SC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<char>::max()) & (_oGT>=0);
+    else if(_oGT.type()==CV_16UC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<ushort>::max());
+    else if(_oGT.type()==CV_16SC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<short>::max()) & (_oGT>=0);
+    else if(_oGT.type()==CV_32SC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<int>::max()) & (_oGT>=0);
+    else if(_oGT.type()==CV_32FC1)
+        oGTValidMask = (_oGT!=std::numeric_limits<float>::max()) & (_oGT>=0);
+    else
+        lvError("unexpected gt map type");
+    oErrorMap.create(oDispMap.size());
+    for(int nRowIdx=0; nRowIdx<oErrorMap.rows; ++nRowIdx) {
+        const float* pInputDispPtr = oDispMap.ptr<float>(nRowIdx);
+        const float* pGTDispPtr = oGT.ptr<float>(nRowIdx);
+        const uchar* pGTValidPtr = oGTValidMask.ptr<uchar>(nRowIdx);
+        const uchar* pROIPtr = oROI.empty()?pGTValidPtr:oROI.ptr<uchar>(nRowIdx);
+        for(int nColIdx=0; nColIdx<oErrorMap.cols; ++nColIdx) {
+            if(pGTValidPtr[nColIdx] && pROIPtr[nColIdx])
+                oErrorMap(nRowIdx,nColIdx) = std::min(std::abs(pInputDispPtr[nColIdx]-pGTDispPtr[nColIdx]),fMaxError);
+            else
+                oErrorMap(nRowIdx,nColIdx) = 0.0f;
+        }
+    }
+    const float fOldErrorMapCornerVal = oErrorMap(0,0);
+    oErrorMap(0,0) = fMaxError;
+    cv::Mat oOutput;
+    cv::normalize(oErrorMap,oOutput,255,0,cv::NORM_MINMAX,CV_8U);
+    oOutput.at<uchar>(0,0) = uchar((fOldErrorMapCornerVal/fMaxError)*255);
+    cv::applyColorMap(oOutput,oOutput,cv::COLORMAP_HOT);
+    return oOutput;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -171,6 +277,47 @@ lv::BinClassifMetricsAccumulatorPtr lv::IMetricsAccumulator_<lv::DatasetEval_Bin
 
 lv::IMetricsAccumulator_<lv::DatasetEval_BinaryClassifierArray>::IMetricsAccumulator_(size_t nArraySize) :
         m_vCounters(nArraySize),m_vsStreamNames(nArraySize) {}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool lv::IMetricsAccumulator_<lv::DatasetEval_StereoDisparityEstim>::isEqual(const IIMetricsAccumulatorConstPtr& m) const {
+    const auto& m2 = dynamic_cast<const IMetricsAccumulator_<lv::DatasetEval_StereoDisparityEstim>&>(*m.get());
+    if(this->m_vErrorLists.size()!=m2.m_vErrorLists.size())
+        return false;
+    for(size_t s=0; s<this->m_vErrorLists.size(); ++s)
+        if(!this->m_vErrorLists[s].isEqual(m2.m_vErrorLists[s]))
+            return false;
+    return true;
+}
+
+lv::IIMetricsAccumulatorPtr lv::IMetricsAccumulator_<lv::DatasetEval_StereoDisparityEstim>::accumulate(const IIMetricsAccumulatorConstPtr& m) {
+    const auto& m2 = dynamic_cast<const IMetricsAccumulator_<lv::DatasetEval_StereoDisparityEstim>&>(*m.get());
+    if(m_vErrorLists.empty())
+        m_vErrorLists.resize(m2.m_vErrorLists.size());
+    else
+        lvAssert_(this->m_vErrorLists.size()==m2.m_vErrorLists.size(),"array size mismatch");
+    if(m_vsStreamNames.empty())
+        m_vsStreamNames = m2.m_vsStreamNames;
+    else
+        lvAssert_(this->m_vsStreamNames.size()==m2.m_vsStreamNames.size(),"array size mismatch");
+    lvAssert_(this->m_vErrorLists.size()==this->m_vsStreamNames.size(),"array size mismatch");
+    for(size_t s=0; s<this->m_vErrorLists.size(); ++s) {
+        this->m_vErrorLists[s].accumulate(m2.m_vErrorLists[s]);
+        if(this->m_vsStreamNames[s].empty())
+            this->m_vsStreamNames[s] = m2.m_vsStreamNames[s];
+    }
+    return shared_from_this();
+}
+
+lv::StereoDispErrors lv::IMetricsAccumulator_<lv::DatasetEval_StereoDisparityEstim>::reduce() const {
+    StereoDispErrors m;
+    for(size_t s=0; s<this->m_vErrorLists.size(); ++s)
+        m.accumulate(this->m_vErrorLists[s]);
+    return m;
+}
+
+lv::IMetricsAccumulator_<lv::DatasetEval_StereoDisparityEstim>::IMetricsAccumulator_(size_t nArraySize) :
+        m_vErrorLists(nArraySize),m_vsStreamNames(nArraySize) {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -258,6 +405,62 @@ lv::IMetricsCalculator_<lv::DatasetEval_BinaryClassifierArray>::IMetricsCalculat
 }
 
 lv::IMetricsCalculator_<lv::DatasetEval_BinaryClassifierArray>::IMetricsCalculator_(const std::vector<BinClassifMetrics>& vm, const std::vector<std::string>& vs) :
+        m_vMetrics(vm),m_vsStreamNames(vs) {
+    lvAssert(m_vMetrics.size()==m_vsStreamNames.size());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+lv::IIMetricsCalculatorPtr lv::IMetricsCalculator_<lv::DatasetEval_StereoDisparityEstim>::accumulate(const IIMetricsCalculatorConstPtr& m) {
+    const auto& m2 = dynamic_cast<const IMetricsCalculator_<lv::DatasetEval_StereoDisparityEstim>&>(*m.get());
+    lvAssert_(this->m_vMetrics.size()==m2.m_vMetrics.size(),"array size mismatch");
+    const size_t nTotWeight = this->nWeight+m2.nWeight;
+    for(size_t s=0; s<this->m_vMetrics.size(); ++s) {
+        this->m_vMetrics[s].dBadPercent_05 = (m2.m_vMetrics[s].dBadPercent_05*m2.nWeight + this->m_vMetrics[s].dBadPercent_05*this->nWeight)/nTotWeight;
+        this->m_vMetrics[s].dBadPercent_1 = (m2.m_vMetrics[s].dBadPercent_1*m2.nWeight + this->m_vMetrics[s].dBadPercent_1*this->nWeight)/nTotWeight;
+        this->m_vMetrics[s].dBadPercent_2 = (m2.m_vMetrics[s].dBadPercent_2*m2.nWeight + this->m_vMetrics[s].dBadPercent_2*this->nWeight)/nTotWeight;
+        this->m_vMetrics[s].dBadPercent_4 = (m2.m_vMetrics[s].dBadPercent_4*m2.nWeight + this->m_vMetrics[s].dBadPercent_4*this->nWeight)/nTotWeight;
+        this->m_vMetrics[s].dAverageError = (m2.m_vMetrics[s].dAverageError*m2.nWeight + this->m_vMetrics[s].dAverageError*this->nWeight)/nTotWeight;
+        this->m_vMetrics[s].dRMS = (m2.m_vMetrics[s].dRMS*m2.nWeight + this->m_vMetrics[s].dRMS*this->nWeight)/nTotWeight;
+    }
+    this->nWeight = nTotWeight;
+    return shared_from_this();
+}
+
+lv::StereoDispErrorMetrics lv::IMetricsCalculator_<lv::DatasetEval_StereoDisparityEstim>::reduce() const {
+    lvAssert_(this->m_vMetrics.size()>0,"need at least array size one");
+    StereoDispErrorMetrics m(this->m_vMetrics[0]);
+    for(size_t s=1; s<this->m_vMetrics.size(); ++s) {
+        m.dBadPercent_05 += this->m_vMetrics[s].dBadPercent_05;
+        m.dBadPercent_1 += this->m_vMetrics[s].dBadPercent_1;
+        m.dBadPercent_2 += this->m_vMetrics[s].dBadPercent_2;
+        m.dBadPercent_4 += this->m_vMetrics[s].dBadPercent_4;
+        m.dAverageError += this->m_vMetrics[s].dAverageError;
+        m.dRMS += this->m_vMetrics[s].dRMS;
+    }
+    m.dBadPercent_05 /= this->m_vMetrics.size();
+    m.dBadPercent_1 /= this->m_vMetrics.size();
+    m.dBadPercent_2 /= this->m_vMetrics.size();
+    m.dBadPercent_4 /= this->m_vMetrics.size();
+    m.dAverageError /= this->m_vMetrics.size();
+    m.dRMS /= this->m_vMetrics.size();
+    return m;
+}
+
+inline std::vector<lv::StereoDispErrorMetrics> initMetricsArray(const lv::StereoDispMetricsAccumulator& m) {
+    std::vector<lv::StereoDispErrorMetrics> vMetrics;
+    for(const lv::StereoDispErrors& m2 : m.m_vErrorLists)
+        vMetrics.push_back(lv::StereoDispErrorMetrics(m2));
+    return vMetrics;
+}
+
+lv::IMetricsCalculator_<lv::DatasetEval_StereoDisparityEstim>::IMetricsCalculator_(const IIMetricsAccumulatorConstPtr& m) :
+        m_vMetrics(initMetricsArray(dynamic_cast<const StereoDispMetricsAccumulator&>(*m.get()))),
+        m_vsStreamNames(dynamic_cast<const StereoDispMetricsAccumulator&>(*m.get()).m_vsStreamNames) {
+    lvAssert(m_vMetrics.size()==m_vsStreamNames.size());
+}
+
+lv::IMetricsCalculator_<lv::DatasetEval_StereoDisparityEstim>::IMetricsCalculator_(const std::vector<StereoDispErrorMetrics>& vm, const std::vector<std::string>& vs) :
         m_vMetrics(vm),m_vsStreamNames(vs) {
     lvAssert(m_vMetrics.size()==m_vsStreamNames.size());
 }

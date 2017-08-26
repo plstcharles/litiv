@@ -22,6 +22,8 @@ add_files(SOURCE_FILES
     "src/imgproc.cpp"
 )
 add_files(INCLUDE_FILES
+    "include/litiv/imgproc/CosegmentationUtils.hpp"
+    "include/litiv/imgproc/CosegmentationUtils.inl.hpp"
     "include/litiv/imgproc/EdgeDetectionUtils.hpp"
     "include/litiv/imgproc/EdgeDetectorCanny.hpp"
     "include/litiv/imgproc/EdgeDetectorLBSP.hpp"
@@ -36,6 +38,12 @@ if(USE_CUDA)
         "include/litiv/imgproc/SLIC.hpp"
     )
 endif()
+if(USE_OPENGM)
+    add_files(INCLUDE_FILES
+        "include/litiv/imgproc/ForegroundStereoMatcher.hpp"
+        "include/litiv/imgproc/ForegroundStereoMatcher.inl.hpp"
+    )
+endif()
 
 litiv_module(imgproc SOURCE_FILES INCLUDE_FILES)
 target_link_libraries(litiv_imgproc
@@ -43,3 +51,10 @@ target_link_libraries(litiv_imgproc
         litiv_features2d
         litiv_utils
 )
+
+if(USE_OPENGM AND USE_BOOST)
+    target_link_libraries(litiv_imgproc
+        PUBLIC
+            litiv_3rdparty_sospd
+    )
+endif()

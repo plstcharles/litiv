@@ -70,7 +70,7 @@ int main(int, char**) { // this sample uses no command line argument
                 vdMatchRes_LSS[nTestIdx] = pLSS->calcDistance(oRefDesc_LSS,oSearchDesc_LSS); // calculate the distance between the reference image and search image descriptors
             }
             std::cout << "\nLSS Match Results (offset = " << (oTargetPoint.x+nMinOffset) << ") : \n";
-            cv::printMatrix(cv::Mat_<double>(1,nTestCount,vdMatchRes_LSS.data())); // prints the match score matrix (one line, and one match score per column)
+            lv::print(cv::Mat_<double>(1,nTestCount,vdMatchRes_LSS.data())); // prints the match score matrix (one line, and one match score per column)
             const auto pMinScoreIter_LSS = std::min_element(vdMatchRes_LSS.begin(),vdMatchRes_LSS.end());
             std::cout << "... best match score = '" << *pMinScoreIter_LSS << "', at x = " << int((oTargetPoint.x+nMinOffset)+std::distance(vdMatchRes_LSS.begin(),pMinScoreIter_LSS)) << std::endl;
 
@@ -92,7 +92,7 @@ int main(int, char**) { // this sample uses no command line argument
                 vdMatchRes_DASC[nTestIdx] = pDASC->calcDistance(oRefDesc_DASC,oSearchDesc_DASC); // calculate the distance between the reference image and search image descriptors
             }
             std::cout << "\nDASC Match Results (offset = " << (oTargetPoint.x+nMinOffset) << ") : \n";
-            cv::printMatrix(cv::Mat_<double>(1,nTestCount,vdMatchRes_DASC.data())); // prints the match score matrix (one line, and one match score per column)
+            lv::print(cv::Mat_<double>(1,nTestCount,vdMatchRes_DASC.data())); // prints the match score matrix (one line, and one match score per column)
             const auto pMinScoreIter_DASC = std::min_element(vdMatchRes_DASC.begin(),vdMatchRes_DASC.end());
             std::cout << "... best match score = '" << *pMinScoreIter_DASC << "', at x = " << int((oTargetPoint.x+nMinOffset)+std::distance(vdMatchRes_DASC.begin(),pMinScoreIter_DASC)) << std::endl;
 
@@ -108,7 +108,7 @@ int main(int, char**) { // this sample uses no command line argument
                 vdMatchRes_MI[nOffset-nMinOffset] = pMI->compute(oRef_MI,oCurrSearch_MI); // calculate the mutual info score between the reference image and search image
             }
             std::cout << "\nMI Match Results (offset = " << (oTargetPoint.x+nMinOffset) << ") : \n";
-            cv::printMatrix(cv::Mat_<double>(1,nTestCount,vdMatchRes_MI.data())); // prints the match score matrix (one line, and one match score per column)
+            lv::print(cv::Mat_<double>(1,nTestCount,vdMatchRes_MI.data())); // prints the match score matrix (one line, and one match score per column)
             const auto pMaxScoreIter_MI = std::max_element(vdMatchRes_MI.begin(),vdMatchRes_MI.end());
             std::cout << "... best match score = '" << *pMaxScoreIter_MI << "', at x = " << int((oTargetPoint.x+nMinOffset)+std::distance(vdMatchRes_MI.begin(),pMaxScoreIter_MI)) << std::endl;
         };
@@ -127,7 +127,8 @@ int main(int, char**) { // this sample uses no command line argument
         }
         std::cout << "\nAll done.\n" << std::endl;
     }
-    catch(const cv::Exception& e) {std::cout << "\nmain caught cv::Exception:\n" << e.what() << "\n" << std::endl; return -1;}
+    catch(const lv::Exception&) {std::cout << "\nmain caught lv::Exception (check stderr)\n" << std::endl; return -1;}
+    catch(const cv::Exception&) {std::cout << "\nmain caught cv::Exception (check stderr)\n" << std::endl; return -1;}
     catch(const std::exception& e) {std::cout << "\nmain caught std::exception:\n" << e.what() << "\n" << std::endl; return -1;}
     catch(...) {std::cout << "\nmain caught unhandled exception\n" << std::endl; return -1;}
     return 0;

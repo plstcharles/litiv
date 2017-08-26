@@ -35,16 +35,16 @@ TEST(lbsp,regression_compute) {
     if(lv::checkIfExists(TEST_CURR_INPUT_DATA_ROOT "/test_lbsp.bin")) {
         const cv::Rect oValidZone(nBorderSize,nBorderSize,oInputCrop.cols-nBorderSize*2,oInputCrop.rows-nBorderSize*2);
         const cv::Mat oOutputDescMap1_valid = oOutputDescMap1(oValidZone).clone();
-        const cv::Mat oDescRefMap = cv::read(TEST_CURR_INPUT_DATA_ROOT "/test_lbsp.bin");
+        const cv::Mat oDescRefMap = lv::read(TEST_CURR_INPUT_DATA_ROOT "/test_lbsp.bin");
         const cv::Mat oDescRefMap_valid = oDescRefMap(oValidZone).clone();
         for(int i=0; i<oDescRefMap_valid.rows; ++i)
             for(int j=0; j<oDescRefMap_valid.cols; ++j)
                 for(int k=0; k<oDescRefMap_valid.channels(); ++k)
                     EXPECT_EQ(oOutputDescMap1_valid.ptr<ushort>(i,j)[k],oDescRefMap_valid.ptr<ushort>(i,j)[k]) << "i=" << i << ", j=" << j << ", k=" << k;
-        ASSERT_TRUE(cv::isEqual<uchar>(oOutputDescMap1_valid,oDescRefMap_valid));
+        ASSERT_TRUE(lv::isEqual<uchar>(oOutputDescMap1_valid,oDescRefMap_valid));
     }
     else
-        cv::write(TEST_CURR_INPUT_DATA_ROOT "/test_lbsp.bin",oOutputDescMap1);
+        lv::write(TEST_CURR_INPUT_DATA_ROOT "/test_lbsp.bin",oOutputDescMap1);
     std::vector<cv::KeyPoint> vKeyPoints;
     for(int nRowIdx=nBorderSize; nRowIdx<=nBorderSize+2*nPatchSize; ++nRowIdx)
         for(int nColIdx=nBorderSize; nColIdx<=nBorderSize+2*nPatchSize; ++nColIdx)
@@ -60,7 +60,7 @@ TEST(lbsp,regression_compute) {
             for(int nChIdx=0; nChIdx<oInput.channels(); ++nChIdx)
                 ASSERT_EQ(oOutputDescMap1.ptr<ushort>(nRowIdx,nColIdx)[nChIdx],oOutputDescMap2.ptr<ushort>(nRowIdx,nColIdx)[nChIdx]);
     cv::Mat_<uchar> oDistMap;
-    pLBSP->calcDistance(oOutputDescMap1,oOutputDescMap2,oDistMap);
+    pLBSP->calcDistances(oOutputDescMap1,oOutputDescMap2,oDistMap);
     ASSERT_EQ(oDistMap.rows,oInputCrop.rows);
     ASSERT_EQ(oDistMap.cols,oInputCrop.cols);
     for(int nRowIdx=nBorderSize; nRowIdx<=nBorderSize+2*nPatchSize; ++nRowIdx)

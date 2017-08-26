@@ -22,100 +22,32 @@
 
 // @@@@ test with nan in oob lookup
 
-#define USE_CHATFIELD_MASK      0 // 0 == use Lienhart's mask
 #define USE_STATIC_VAR_NOISE    1 // 0 == dynamically determine variation based on original paper suggestion
-#define USE_ITERATIVE_SSD       0 // 0 == use per-pixel 'matchTemplate' call (less prone to cumulative float error)
-#define USE_POST_NORMALISATION  0 // 0 == leave descriptors as-is (may not match well during illum variations)
 
 #define _USE_MATH_DEFINES
 #include "litiv/features2d.hpp"
-#include "litiv/utils/opencv.hpp"
 
-inline void ssdesc_genmask(int nMaskSize, int nRadialBins, int nAngularBins, cv::Mat_<int>& oMask, int& nFirstMaskIdx, int& nLastMaskIdx) {
-    lvDbgAssert_(nMaskSize>0 && (nMaskSize%2)==1,"mask size must be non-null, positive, odd value");
-    lvDbgAssert_(nRadialBins>0,"radial bin count must be non-null positive value");
-    lvDbgAssert_(nAngularBins>0,"angular bin count must be non-null positive value");
-    oMask.create(nMaskSize,nMaskSize);
-    oMask = -1;
-    nFirstMaskIdx = nMaskSize*nMaskSize-1;
-    nLastMaskIdx = 0;
-    int nCurrMaskIdx = 0;
-    const int nInitDistBin = 0; // previously passed as param; fix? @@@
-#if USE_CHATFIELD_MASK
-    const int nCenterIdx = (nMaskSize-1)/2;
-    std::vector<float> vRadBinDists(nRadialBins);
-    const float fRadBinPowBase = (float)std::pow(nRadialBins,1/(float)nRadialBins);
-    for(int nRadBinIdx=0; nRadBinIdx<nRadialBins; ++nRadBinIdx)
-        vRadBinDists[nRadBinIdx] = (std::pow(fRadBinPowBase,nRadBinIdx+1)-1)/(nRadialBins-1)*nCenterIdx;
-    for(int nRowIdx=0; nRowIdx<nMaskSize; ++nRowIdx) {
-        int* const pnMaskRow = oMask.ptr<int>(nRowIdx);
-        for(int nColIdx=0; nColIdx<nMaskSize; ++nColIdx,++nCurrMaskIdx) {
-            if((nRowIdx==nCenterIdx) && (nColIdx==nCenterIdx))
-                continue;
-            const float fDist = std::sqrt((float)((nCenterIdx-nRowIdx)*(nCenterIdx-nRowIdx)+(nCenterIdx-nColIdx)*(nCenterIdx-nColIdx)));
-            int nRadBinIdx;
-            for(nRadBinIdx=0; nRadBinIdx<nRadialBins; ++nRadBinIdx)
-                if(fDist<=vRadBinDists[nRadBinIdx])
-                    break;
-            if(nRadBinIdx>=nInitDistBin && nRadBinIdx<nRadialBins) {
-                const float fAng = std::atan2((float)(nCenterIdx-nColIdx),(float)(nCenterIdx-nRowIdx))+float(M_PI);
-                const int nAngleBinIdx = int((fAng*nAngularBins)/float(2*M_PI))%nAngularBins;
-                pnMaskRow[nColIdx] = nAngleBinIdx*(nRadialBins-nInitDistBin)+((nRadialBins-nInitDistBin-1)-(nRadBinIdx-nInitDistBin));
-                nFirstMaskIdx = std::min(nFirstMaskIdx,nCurrMaskIdx);
-                nLastMaskIdx = std::max(nLastMaskIdx,nCurrMaskIdx);
-            }
-        }
-    }
-#else //!USE_CHATFIELD_MASK
-    const int nPatchRadius = nMaskSize/2, nAngBinSize = 360/nAngularBins;
-    const float fRadBinLogBase = nRadialBins/(float)std::log10(nPatchRadius);
-    for(int nRowIdx=-nPatchRadius; nRowIdx<=nPatchRadius; ++nRowIdx) {
-        int* const pnMaskRow = oMask.ptr<int>(nRowIdx+nPatchRadius);
-        for(int nColIdx=-nPatchRadius; nColIdx<=nPatchRadius; ++nColIdx,++nCurrMaskIdx) {
-            if(nRowIdx==0 && nColIdx==0)
-                continue;
-            const float fDist = std::sqrt((float)(nColIdx*nColIdx) + (float)(nRowIdx*nRowIdx));
-            const int nRadBinIdx = int(fDist>0.0f?std::log10(fDist)*fRadBinLogBase:0.0f);
-            if(nRadBinIdx>=nInitDistBin && nRadBinIdx<nRadialBins) {
-                const float fAng = std::atan2((float)nRowIdx,(float)nColIdx)/float(M_PI)*180.0f;
-                const int nAngleBinIdx = (((int)std::round(fAng<0?fAng+360.0f:fAng)+nAngBinSize/2)%360)/nAngBinSize;
-                pnMaskRow[nColIdx+nPatchRadius] = nAngleBinIdx*(nRadialBins-nInitDistBin)+((nRadialBins-nInitDistBin-1)-(nRadBinIdx-nInitDistBin));
-                nFirstMaskIdx = std::min(nFirstMaskIdx,nCurrMaskIdx);
-                nLastMaskIdx = std::max(nLastMaskIdx,nCurrMaskIdx);
-            }
-        }
-    }
-#endif //!USE_CHATFIELD_MASK
-    //std::cout << "nMaskSize = " << nMaskSize << std::endl;
-    //std::cout << "nAngularBins = " << nAngularBins << std::endl;
-    //std::cout << "nRadialBins = " << nRadialBins << std::endl;
-    //std::cout << "oMask = \n";
-    //cv::printMatrix(oMask);
-    //cv::Mat oMask_out = cv::getUniqueColorMap(oMask);
-    //cv::resize(oMask_out,oMask_out,cv::Size(400,400),0,0,cv::INTER_NEAREST);
-    //cv::imshow("oMask",oMask_out);
-    //cv::waitKey(0);
-}
-
-LSS::LSS(int nDescPatchSize, int nDescRadius, int nRadialBins, int nAngularBins, float fStaticNoiseVar, bool bPreProcess) :
+LSS::LSS(int nInnerRadius, int nOuterRadius, int nDescPatchSize, int nAngularBins, int nRadialBins, float fStaticNoiseVar, bool bNormalizeBins, bool bPreProcess, bool bUseLienhartMask) :
         m_bPreProcess(bPreProcess),
-        m_nDescPatchSize(nDescPatchSize),
-        m_nDescRadius(nDescRadius),
-        m_nCorrWinSize(m_nDescRadius*2+m_nDescPatchSize),
-        m_nCorrPatchSize(m_nCorrWinSize-m_nDescPatchSize+1),
+        m_bNormalizeBins(bNormalizeBins),
+        m_bUsingLienhartMask(bUseLienhartMask),
+        m_nPatchSize(nDescPatchSize),
+        m_nInnerRadius(nInnerRadius),
+        m_nOuterRadius(nOuterRadius),
+        m_nCorrWinSize(m_nOuterRadius*2+m_nPatchSize),
+        m_nCorrPatchSize(m_nCorrWinSize-m_nPatchSize+1),
         m_nRadialBins(nRadialBins),
         m_nAngularBins(nAngularBins),
         m_fStaticNoiseVar(fStaticNoiseVar) {
-    lvAssert_(m_nDescPatchSize>0 && (m_nDescPatchSize%2)==1,"invalid parameter");
-    lvAssert_(m_nDescRadius>0 && m_nDescRadius>=m_nDescPatchSize,"invalid parameter");
+    lvAssert_(m_nPatchSize>0 && (m_nPatchSize%2)==1,"invalid parameter");
+    lvAssert_(m_nOuterRadius>0 && m_nOuterRadius>=m_nPatchSize,"invalid parameter");
+    lvAssert_(m_nInnerRadius>=0 && m_nOuterRadius>m_nInnerRadius,"invalid parameter");
     lvAssert_(m_nRadialBins>0,"invalid parameter");
     lvAssert_(m_nAngularBins>0,"invalid parameter");
     lvAssert_(m_fStaticNoiseVar>0.0f,"invalid parameter");
-    ssdesc_genmask(m_nCorrPatchSize,m_nRadialBins,m_nAngularBins,m_oDescLUMap,m_nFirstMaskIdx,m_nLastMaskIdx);
+    lv::getLogPolarMask(m_nCorrPatchSize,m_nRadialBins,m_nAngularBins,m_oDescLUMap,m_bUsingLienhartMask,(float)m_nInnerRadius,&m_nFirstMaskIdx,&m_nLastMaskIdx);
     lvDbgAssert(m_oDescLUMap.cols==m_nCorrPatchSize && m_oDescLUMap.rows==m_nCorrPatchSize);
     lvDbgAssert(m_nFirstMaskIdx>=0 && m_nLastMaskIdx>=m_nFirstMaskIdx);
-    m_oCorrMap.create(m_oDescLUMap.size());
-    m_oCorrDiffMap.create(m_nCorrPatchSize-1,m_nCorrPatchSize);
 }
 
 void LSS::read(const cv::FileNode& /*fn*/) {
@@ -133,6 +65,17 @@ cv::Size LSS::windowSize() const {
 int LSS::borderSize(int nDim) const {
     lvAssert(nDim==0 || nDim==1);
     return m_nCorrWinSize/2;
+}
+
+lv::MatInfo LSS::getOutputInfo(const lv::MatInfo& oInputInfo) const {
+    lvAssert_(oInputInfo.type()==CV_8UC1 || oInputInfo.type()==CV_8UC3,"invalid input image type");
+    lvAssert_(oInputInfo.size.dims()==size_t(2) && oInputInfo.size.total()>0,"invalid input image size");
+    const int nRows = (int)oInputInfo.size(0);
+    const int nCols = (int)oInputInfo.size(1);
+    lvAssert__(m_nCorrWinSize<=nCols && m_nCorrWinSize<=nRows,"input image size is too small to compute descriptors with current correlation area size -- need at least (%d,%d) and got (%d,%d)",m_nCorrWinSize,m_nCorrWinSize,nCols,nRows);
+    const int nDescSize = m_nRadialBins*m_nAngularBins;
+    const std::array<int,3> anDescDims = {nRows,nCols,nDescSize};
+    return lv::MatInfo(lv::MatSize(anDescDims),CV_32FC1);
 }
 
 int LSS::descriptorSize() const {
@@ -155,16 +98,25 @@ bool LSS::isUsingDynamicNoiseVarNorm() const {
     return USE_STATIC_VAR_NOISE;
 }
 
-bool LSS::isUsingIterativeSSD() const {
-    return USE_ITERATIVE_SSD;
-}
-
 bool LSS::isNormalizingBins() const {
-    return USE_POST_NORMALISATION;
+    return m_bNormalizeBins;
 }
 
 bool LSS::isPreProcessing() const {
     return m_bPreProcess;
+}
+
+bool LSS::isUsingLienhartMask() const {
+    return m_bUsingLienhartMask;
+}
+
+void LSS::compute2(const cv::Mat& oImage, cv::Mat& oDescMap_) {
+    lvAssert_(oDescMap_.empty() || oDescMap_.type()==CV_32FC1,"wrong output desc map type");
+    cv::Mat_<float> oDescMap = oDescMap_;
+    const bool bEmptyInit = oDescMap.empty();
+    compute2(oImage,oDescMap);
+    if(bEmptyInit)
+        oDescMap_ = oDescMap;
 }
 
 void LSS::compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescMap) {
@@ -233,24 +185,7 @@ void LSS::validateROI(cv::Mat& oROI) const {
     oROI = oROI_new;
 }
 
-double LSS::calcDistance(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2) const {
-    lvAssert_(oDescriptor1.dims==oDescriptor2.dims && oDescriptor1.size==oDescriptor2.size,"descriptor mat sizes mismatch");
-    lvAssert_(oDescriptor1.dims==2 || oDescriptor1.dims==3,"unexpected descriptor matrix dim count");
-    if(oDescriptor1.dims==2) {
-        lvAssert_(oDescriptor1.total()==size_t(m_nRadialBins*m_nAngularBins),"unexpected descriptor size");
-        const cv::Mat_<float> oDesc1(1,m_nRadialBins*m_nAngularBins,const_cast<float*>(oDescriptor1.ptr<float>(0)));
-        const cv::Mat_<float> oDesc2(1,m_nRadialBins*m_nAngularBins,const_cast<float*>(oDescriptor2.ptr<float>(0)));
-        return cv::norm(oDesc1,oDesc2,cv::NORM_L2);
-    }
-    else { //oDescriptors1.dims==3
-        lvAssert_(oDescriptor1.size[0]==1 && oDescriptor1.size[1]==1 && oDescriptor1.size[2]==m_nRadialBins*m_nAngularBins,"unexpected descriptor size");
-        const cv::Mat_<float> oDesc1(1,m_nRadialBins*m_nAngularBins,const_cast<float*>(oDescriptor1.ptr<float>(0)));
-        const cv::Mat_<float> oDesc2(1,m_nRadialBins*m_nAngularBins,const_cast<float*>(oDescriptor2.ptr<float>(0)));
-        return cv::norm(oDesc1,oDesc2,cv::NORM_L2);
-    }
-}
-
-void LSS::calcDistance(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<float>& oDescriptors2, cv::Mat_<float>& oDistances) const {
+void LSS::calcDistances(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<float>& oDescriptors2, cv::Mat_<float>& oDistances) const {
     lvAssert_(oDescriptors1.dims==oDescriptors2.dims && oDescriptors1.size==oDescriptors2.size,"descriptor mat sizes mismatch");
     lvAssert_(oDescriptors1.dims==2 || oDescriptors1.dims==3,"unexpected descriptor matrix dim count");
     if(oDescriptors1.dims==2) {
@@ -276,9 +211,9 @@ void LSS::calcDistance(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<floa
 }
 
 void LSS::ssdescs_impl(const cv::Mat& _oImage, std::vector<cv::KeyPoint>& voKeypoints, cv::Mat_<float>& oDescriptors, bool bGenDescMap) {
-    // this method specialization for targeted keypoint description is slower (per keypoint) than the dense description method
     lvAssert_(!_oImage.empty() && ((_oImage.type()==CV_8UC1) || (_oImage.type()==CV_8UC3)),"invalid input image");
     lvAssert__(m_nCorrWinSize<=_oImage.cols && m_nCorrWinSize<=_oImage.rows,"image is too small to compute descriptors with current correlation area size -- need at least (%d,%d) and got (%d,%d)",m_nCorrWinSize,m_nCorrWinSize,_oImage.cols,_oImage.rows);
+    lvDbgAssert(m_oDescLUMap.rows==m_nCorrPatchSize && m_oDescLUMap.cols==m_nCorrPatchSize);
     cv::KeyPointsFilter::runByImageBorder(voKeypoints,_oImage.size(),m_nCorrWinSize/2);
     if(voKeypoints.empty()) {
         oDescriptors.release();
@@ -289,60 +224,27 @@ void LSS::ssdescs_impl(const cv::Mat& _oImage, std::vector<cv::KeyPoint>& voKeyp
         cv::GaussianBlur(_oImage,oImage,cv::Size(7,7),1.0);
     else
         oImage = _oImage;
-    std::vector<float> aTempDesc(size_t(m_nRadialBins*m_nAngularBins));
-    cv::Mat_<float> oTempDesc(1,m_nRadialBins*m_nAngularBins,aTempDesc.data());
+    const int nCorrWinRadius = m_nCorrWinSize/2;
+    const int nPatchRadius = m_nPatchSize/2;
+    const int nDescSize = m_nRadialBins*m_nAngularBins;
+    static thread_local lv::AutoBuffer<float> s_aCorrData;
+    s_aCorrData.resize(size_t(m_nCorrPatchSize*m_nCorrPatchSize));
+    cv::Mat_<float> oCorrMap(m_nCorrPatchSize,m_nCorrPatchSize,s_aCorrData.data());
+    static thread_local lv::AutoBuffer<float> s_aTempDesc;
+    s_aTempDesc.resize(((size_t)nDescSize));
+    cv::Mat_<float> oTempDesc(1,nDescSize,s_aTempDesc.data());
     if(bGenDescMap)
-        oDescriptors.create(3,std::array<int,3>{oImage.rows,oImage.cols,m_nRadialBins*m_nAngularBins}.data());
+        oDescriptors.create(3,std::array<int,3>{oImage.rows,oImage.cols,nDescSize}.data());
     else
-        oDescriptors.create(int(voKeypoints.size()),m_nRadialBins*m_nAngularBins);
+        oDescriptors.create(int(voKeypoints.size()),nDescSize);
     for(int nKeyPtIdx=0; nKeyPtIdx<int(voKeypoints.size()); ++nKeyPtIdx) {
         const cv::KeyPoint& oCurrKeyPt = voKeypoints[nKeyPtIdx];
         const int nRowIdx = int(oCurrKeyPt.pt.y);
         const int nColIdx = int(oCurrKeyPt.pt.x);
         lvDbgAssert(nRowIdx>=0 && nColIdx>=0);
-        const cv::Mat oWindow = oImage(cv::Rect(nColIdx-m_nCorrWinSize/2,nRowIdx-m_nCorrWinSize/2,m_nCorrWinSize,m_nCorrWinSize));
-        const cv::Mat oTempl = oImage(cv::Rect(nColIdx-m_nDescPatchSize/2,nRowIdx-m_nDescPatchSize/2,m_nDescPatchSize,m_nDescPatchSize));
-        cv::matchTemplate(oWindow,oTempl,m_oCorrMap,cv::TM_SQDIFF);
-#if USE_STATIC_VAR_NOISE
-        const float fVarNormFact = -1.0f/m_fStaticNoiseVar;
-#else //!USE_STATIC_VAR_NOISE
-        float fMaxLocalVarNoise = 1000.0f;
-        for(int nRowOffset=-1; nRowOffset<=1 ; ++nRowOffset)
-            for(int nColOffset=-1; nColOffset<=1; ++nColOffset)
-                fMaxLocalVarNoise = std::max(fMaxLocalVarNoise,m_oCorrMap(m_nCorrPatchSize/2+nRowOffset,m_nCorrPatchSize/2+nColOffset));
-        const float fVarNormFact = -1.0f/fMaxLocalVarNoise;
-#endif //!USE_STATIC_VAR_NOISE
-        oTempDesc = std::numeric_limits<float>::max();
-        for(int nDescBinIdx=m_nFirstMaskIdx; nDescBinIdx<=m_nLastMaskIdx; ++nDescBinIdx)
-            if(m_oDescLUMap(nDescBinIdx)!=-1)
-                aTempDesc[m_oDescLUMap(nDescBinIdx)] = std::min(aTempDesc[m_oDescLUMap(nDescBinIdx)],((float*)m_oCorrMap.data)[nDescBinIdx]);
-        oTempDesc *= fVarNormFact;
-        cv::exp(oTempDesc,cv::Mat_<float>(1,m_nRadialBins*m_nAngularBins,bGenDescMap?oDescriptors.ptr<float>(nRowIdx,nColIdx):oDescriptors.ptr<float>(nKeyPtIdx)));
-    }
-#if USE_POST_NORMALISATION
-    ssdescs_norm(oDescriptors);
-#endif //USE_POST_NORMALISATION
-}
-
-void LSS::ssdescs_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
-    lvAssert_(!_oImage.empty() && ((_oImage.type()==CV_8UC1) || (_oImage.type()==CV_8UC3)),"invalid input image");
-    lvAssert__(m_nCorrWinSize<=_oImage.cols && m_nCorrWinSize<=_oImage.rows,"image is too small to compute descriptors with current correlation area size -- need at least (%d,%d) and got (%d,%d)",m_nCorrWinSize,m_nCorrWinSize,_oImage.cols,_oImage.rows);
-    cv::Mat oImage;
-    if(m_bPreProcess)
-        cv::GaussianBlur(_oImage,oImage,cv::Size(7,7),1.0);
-    else
-        oImage = _oImage;
-    const int nRows = oImage.rows;
-    const int nCols = oImage.cols;
-    const int nCorrWinRadius = m_nCorrWinSize/2;
-    const int nDescPatchRadius = m_nDescPatchSize/2;
-    const int nDescSize = m_nRadialBins*m_nAngularBins;
-    std::vector<float> aTempDesc((size_t)nDescSize,0.0f);
-    cv::Mat_<float> oTempDesc(1,nDescSize,aTempDesc.data());
-    const int anDescDims[3] = {nRows,nCols,nDescSize};
-    oDescriptors.create(3,anDescDims);
-    m_oFullColCorrMap.create(m_nCorrPatchSize+nRows-m_nCorrWinSize+1,m_nCorrPatchSize);
-    const auto lCompDescr = [&](int nColIdx, int nRowIdx, const cv::Mat_<float>& oCorrMap) {
+        const cv::Mat oWindow = oImage(cv::Rect(nColIdx-nCorrWinRadius,nRowIdx-nCorrWinRadius,m_nCorrWinSize,m_nCorrWinSize));
+        const cv::Mat oTempl = oImage(cv::Rect(nColIdx-nPatchRadius,nRowIdx-nPatchRadius,m_nPatchSize,m_nPatchSize));
+        cv::matchTemplate(oWindow,oTempl,oCorrMap,cv::TM_SQDIFF);
 #if USE_STATIC_VAR_NOISE
         const float fVarNormFact = -1.0f/m_fStaticNoiseVar;
 #else //!USE_STATIC_VAR_NOISE
@@ -355,49 +257,67 @@ void LSS::ssdescs_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
         oTempDesc = std::numeric_limits<float>::max();
         for(int nDescBinIdx=m_nFirstMaskIdx; nDescBinIdx<=m_nLastMaskIdx; ++nDescBinIdx)
             if(m_oDescLUMap(nDescBinIdx)!=-1)
-                aTempDesc[m_oDescLUMap(nDescBinIdx)] = std::min(aTempDesc[m_oDescLUMap(nDescBinIdx)],((float*)oCorrMap.data)[nDescBinIdx]);
+                s_aTempDesc[m_oDescLUMap(nDescBinIdx)] = std::min(s_aTempDesc[m_oDescLUMap(nDescBinIdx)],((float*)oCorrMap.data)[nDescBinIdx]);
         oTempDesc *= fVarNormFact;
-        cv::exp(oTempDesc,cv::Mat_<float>(1,nDescSize,oDescriptors.ptr<float>(nRowIdx,nColIdx)));
-    };
-    int nColIdx = 0;
-    for(; nColIdx<nCorrWinRadius; ++nColIdx)
-        for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx)
-            std::fill_n(oDescriptors.ptr<float>(nRowIdx,nColIdx),nDescSize,0.0f);
-    for(; nColIdx<nCols-nCorrWinRadius; ++nColIdx) {
-        int nRowIdx = 0;
-        for(; nRowIdx<nCorrWinRadius; ++nRowIdx)
-            std::fill_n(oDescriptors.ptr<float>(nRowIdx,nColIdx),nDescSize,0.0f);
-        const cv::Mat oInitWindow = oImage(cv::Rect(nColIdx-nCorrWinRadius,nRowIdx-nCorrWinRadius,m_nCorrWinSize,m_nCorrWinSize));
-        const cv::Mat oInitTempl = oImage(cv::Rect(nColIdx-nDescPatchRadius,nRowIdx-nDescPatchRadius,m_nDescPatchSize,m_nDescPatchSize));
-        cv::Mat_<float> oCorrMap(m_nCorrPatchSize,m_nCorrPatchSize,(float*)m_oFullColCorrMap.data);
-        cv::matchTemplate(oInitWindow,oInitTempl,oCorrMap,cv::TM_SQDIFF);
-        lCompDescr(nColIdx,nRowIdx++,oCorrMap);
-        for(; nRowIdx<nRows-nCorrWinRadius; ++nRowIdx) {
-            const cv::Mat oWindow = oImage(cv::Rect(nColIdx-nCorrWinRadius,nRowIdx-nCorrWinRadius,m_nCorrWinSize,m_nCorrWinSize));
-            const cv::Mat oTempl = oImage(cv::Rect(nColIdx-nDescPatchRadius,nRowIdx-nDescPatchRadius,m_nDescPatchSize,m_nDescPatchSize));
-#if USE_ITERATIVE_SSD
-            oCorrMap = cv::Mat_<float>(m_nCorrPatchSize,m_nCorrPatchSize,((float*)m_oFullColCorrMap.data)+m_nCorrPatchSize*nRowIdx);
-            const cv::Mat oTemplMinus = oImage(cv::Rect(nColIdx-nDescPatchRadius,nRowIdx-nDescPatchRadius-1,m_nDescPatchSize,1));
-            cv::matchTemplate(oWindow.rowRange(nDescPatchRadius,m_nCorrWinSize-nDescPatchRadius-1),oTemplMinus,m_oCorrDiffMap,cv::TM_SQDIFF);
-            oCorrMap.rowRange(0,m_nCorrPatchSize-1) -= m_oCorrDiffMap;
-            const cv::Mat oTemplPlus = oImage(cv::Rect(nColIdx-nDescPatchRadius,(nRowIdx-nDescPatchRadius-1)+m_nDescPatchSize,m_nDescPatchSize,1));
-            cv::matchTemplate(oWindow.rowRange(nDescPatchRadius,m_nCorrWinSize-nDescPatchRadius-1),oTemplPlus,m_oCorrDiffMap,cv::TM_SQDIFF);
-            oCorrMap.rowRange(0,m_nCorrPatchSize-1) += m_oCorrDiffMap;
-            cv::matchTemplate(oWindow.rowRange(m_nCorrWinSize-m_nDescPatchSize,m_nCorrWinSize),oTempl,oCorrMap.row(m_nCorrPatchSize-1),cv::TM_SQDIFF);
-#else //!USE_ITERATIVE_SSD
-            cv::matchTemplate(oWindow,oTempl,oCorrMap,cv::TM_SQDIFF);
-#endif //!USE_ITERATIVE_SSD
-            lCompDescr(nColIdx,nRowIdx,oCorrMap);
-        }
-        for(; nRowIdx<nRows; ++nRowIdx)
-            std::fill_n(oDescriptors.ptr<float>(nRowIdx,nColIdx),nDescSize,0.0f);
+        cv::exp(oTempDesc,cv::Mat_<float>(1,nDescSize,bGenDescMap?oDescriptors.ptr<float>(nRowIdx,nColIdx):oDescriptors.ptr<float>(nKeyPtIdx)));
     }
-    for(; nColIdx<nCols; ++nColIdx)
-        for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx)
-            std::fill_n(oDescriptors.ptr<float>(nRowIdx,nColIdx),nDescSize,0.0f);
-#if USE_POST_NORMALISATION
-    ssdescs_norm(oDescriptors);
-#endif //USE_POST_NORMALISATION
+    if(m_bNormalizeBins)
+        ssdescs_norm(oDescriptors);
+}
+
+void LSS::ssdescs_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
+    lvAssert_(!_oImage.empty() && ((_oImage.type()==CV_8UC1) || (_oImage.type()==CV_8UC3)),"invalid input image");
+    lvAssert__(m_nCorrWinSize<=_oImage.cols && m_nCorrWinSize<=_oImage.rows,"image is too small to compute descriptors with current correlation area size -- need at least (%d,%d) and got (%d,%d)",m_nCorrWinSize,m_nCorrWinSize,_oImage.cols,_oImage.rows);
+    lvDbgAssert(m_oDescLUMap.rows==m_nCorrPatchSize && m_oDescLUMap.cols==m_nCorrPatchSize);
+    cv::Mat oImage;
+    if(m_bPreProcess)
+        cv::GaussianBlur(_oImage,oImage,cv::Size(7,7),1.0);
+    else
+        oImage = _oImage;
+    const int nRows = oImage.rows;
+    const int nCols = oImage.cols;
+    const int nCorrWinRadius = m_nCorrWinSize/2;
+    const int nPatchRadius = m_nPatchSize/2;
+    const int nDescSize = m_nRadialBins*m_nAngularBins;
+    const int anDescDims[3] = {nRows,nCols,nDescSize};
+    oDescriptors.create(3,anDescDims);
+    std::fill_n(oDescriptors.ptr<float>(0,0),nDescSize*nCorrWinRadius*nCols,0.0f);
+    std::fill_n(oDescriptors.ptr<float>(nRows-nCorrWinRadius,0),nDescSize*nCorrWinRadius*nCols,0.0f);
+#if USING_OPENMP
+    #pragma omp parallel for
+#endif //USING_OPENMP
+    for(int nRowIdx=nCorrWinRadius; nRowIdx<nRows-nCorrWinRadius; ++nRowIdx) {
+        static thread_local lv::AutoBuffer<float> s_aCorrData;
+        s_aCorrData.resize(size_t(m_nCorrPatchSize*m_nCorrPatchSize));
+        cv::Mat_<float> oCorrMap(m_nCorrPatchSize,m_nCorrPatchSize,s_aCorrData.data());
+        static thread_local lv::AutoBuffer<float> s_aTempDesc;
+        s_aTempDesc.resize(size_t(nDescSize));
+        cv::Mat_<float> oTempDesc(1,nDescSize,s_aTempDesc.data());
+        std::fill_n(oDescriptors.ptr<float>(nRowIdx,0),nDescSize*nCorrWinRadius,0.0f);
+        std::fill_n(oDescriptors.ptr<float>(nRowIdx,nCols-nCorrWinRadius),nDescSize*nCorrWinRadius,0.0f);
+        for(int nColIdx=nCorrWinRadius; nColIdx<nCols-nCorrWinRadius; ++nColIdx) {
+            const cv::Mat oWindow = oImage(cv::Rect(nColIdx-nCorrWinRadius,nRowIdx-nCorrWinRadius,m_nCorrWinSize,m_nCorrWinSize));
+            const cv::Mat oTempl = oImage(cv::Rect(nColIdx-nPatchRadius,nRowIdx-nPatchRadius,m_nPatchSize,m_nPatchSize));
+            cv::matchTemplate(oWindow,oTempl,oCorrMap,cv::TM_SQDIFF);
+#if USE_STATIC_VAR_NOISE
+            const float fVarNormFact = -1.0f/m_fStaticNoiseVar;
+#else //!USE_STATIC_VAR_NOISE
+            float fMaxLocalVarNoise = 1000.0f;
+            for(int nRowOffset=-1; nRowOffset<=1 ; ++nRowOffset)
+                for(int nColOffset=-1; nColOffset<=1; ++nColOffset)
+                    fMaxLocalVarNoise = std::max(fMaxLocalVarNoise,oCorrMap(m_nCorrPatchSize/2+nRowOffset,m_nCorrPatchSize/2+nColOffset));
+            const float fVarNormFact = -1.0f/fMaxLocalVarNoise;
+#endif //!USE_STATIC_VAR_NOISE
+            oTempDesc = std::numeric_limits<float>::max();
+            for(int nDescBinIdx=m_nFirstMaskIdx; nDescBinIdx<=m_nLastMaskIdx; ++nDescBinIdx)
+                if(m_oDescLUMap(nDescBinIdx)!=-1)
+                    s_aTempDesc[m_oDescLUMap(nDescBinIdx)] = std::min(s_aTempDesc[m_oDescLUMap(nDescBinIdx)],((float*)oCorrMap.data)[nDescBinIdx]);
+            oTempDesc *= fVarNormFact;
+            cv::exp(oTempDesc,cv::Mat_<float>(1,nDescSize,oDescriptors.ptr<float>(nRowIdx,nColIdx)));
+        }
+    }
+    if(m_bNormalizeBins)
+        ssdescs_norm(oDescriptors);
 }
 
 void LSS::ssdescs_norm(cv::Mat_<float>& oDescriptors) const {
@@ -408,13 +328,11 @@ void LSS::ssdescs_norm(cv::Mat_<float>& oDescriptors) const {
     lvDbgAssert(oDescriptors.size[oDescriptors.dims-1]==nDescSize);
     lvDbgAssert(oDescriptors.isContinuous());
     for(size_t nDescIdx=0; nDescIdx<oDescriptors.total(); nDescIdx+=size_t(nDescSize)) {
-        float fMin = std::numeric_limits<float>::max(), fMax = std::numeric_limits<float>::min();
-        float* pfCurrDesc = ((float*)oDescriptors.data)+nDescIdx;
-        for(int nDescBinIdx=0; nDescBinIdx<nDescSize; ++nDescBinIdx) {
-            fMin = std::min(fMin,pfCurrDesc[nDescBinIdx]);
-            fMax = std::max(fMax,pfCurrDesc[nDescBinIdx]);
-        }
-        for(int nDescBinIdx=0; nDescBinIdx<nDescSize; ++nDescBinIdx)
-            pfCurrDesc[nDescBinIdx] = (pfCurrDesc[nDescBinIdx]-fMin)/(fMax-fMin);
+        cv::Mat_<float> oCurrDesc(1,nDescSize,((float*)oDescriptors.data)+nDescIdx);
+        const double dNorm = cv::norm(oCurrDesc,cv::NORM_L2);
+        if(dNorm>1e-6)
+            oCurrDesc /= dNorm;
+        else
+            oCurrDesc = std::sqrt(1.0f/nDescSize);
     }
 }

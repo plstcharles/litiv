@@ -63,6 +63,20 @@ namespace lv {
         std::string writeInlineBinClassifArrayReducedEvalReport(size_t nIndentSize) const;
     };
 
+    /// data reporter specialization for stereo disparity estimation work batch report writing
+    template<>
+    struct IDataReporter_<DatasetEval_StereoDisparityEstim> :
+            public IDataReporter_<DatasetEval_None>,
+            protected virtual IIMetricRetriever {
+        /// writes an evaluation report listing high-level metrics for current batch(es)
+        virtual void writeEvalReport() const override;
+    protected:
+        /// returns a one-line string listing high-level metrics for current batch(es)
+        std::string writeInlineStereoDisparityEvalReport(size_t nIndentSize) const;
+        /// returns a one-line string listing high-level metrics for current batch(es) (reduced version)
+        std::string writeInlineStereoDisparityReducedEvalReport(size_t nIndentSize) const;
+    };
+
     /// data reporter wrapper for metrics retriever override impl based on dataset type
     template<DatasetEvalList eDatasetEval, DatasetList eDataset>
     struct DataReporterWrapper_ :
@@ -104,6 +118,7 @@ namespace lv {
         /// overrides 'processOutput' from IDataConsumer_ to evaluate the provided output packet
         virtual void processOutput(const cv::Mat& oClassif, size_t nIdx) override {
             if(isEvaluating()) {
+                lvDbgAssert(m_pMetricsBase);
                 lvAssert_(!oClassif.empty(),"output must be non-empty for evaluation");
                 auto pLoader = shared_from_this_cast<IIDataLoader>(true);
                 lvAssert_(pLoader->getOutputPacketType()==ImagePacket && pLoader->getGTPacketType()==ImagePacket && pLoader->getGTMappingType()==ElemMapping,"default impl cannot evaluate without 1:1 image pixel mapping");
@@ -130,8 +145,8 @@ namespace lv {
             const std::vector<cv::Mat>& vGTArray = pLoader->getGTArray(nIdx);
             const std::vector<cv::Mat>& vGTROIArray = pLoader->getGTROIArray(nIdx);
             lvAssert_(vClassif.size()==vGTArray.size() && (vGTROIArray.empty() || vClassif.size()==vGTROIArray.size()),"array size mistmatch");
-            for(size_t s=0; s<vClassif.size(); ++s)
-                vMasks.push_back(BinClassif::getColoredMask(vClassif[s],vGTArray[s],vGTROIArray.empty()?cv::Mat():vGTROIArray[s]));
+            for(size_t nSteamIdx=0; nSteamIdx<vClassif.size(); ++nSteamIdx)
+                vMasks.push_back(BinClassif::getColoredMask(vClassif[nSteamIdx],vGTArray[nSteamIdx],vGTROIArray.empty()?cv::Mat():vGTROIArray[nSteamIdx]));
             return vMasks;
         }
         /// resets internal packet count + classification metrics
@@ -147,6 +162,7 @@ namespace lv {
         /// overrides 'processOutput' from IDataConsumer_ to evaluate the provided output packet
         virtual void processOutput(const std::vector<cv::Mat>& vClassif, size_t nIdx) override {
             if(isEvaluating()) {
+                lvDbgAssert(m_pMetricsBase);
                 lvAssert_(!vClassif.empty(),"output array must be non-empty for evaluation");
                 auto pLoader = shared_from_this_cast<IDataLoader_<Array>>(true);
                 lvAssert_(pLoader->getOutputPacketType()==ImageArrayPacket && pLoader->getGTPacketType()==ImageArrayPacket && pLoader->getGTMappingType()==ElemMapping,"default impl cannot evaluate without 1:1 image pixel mapping");
@@ -154,14 +170,71 @@ namespace lv {
                 const std::vector<cv::Mat>& vGTArray = pLoader->getGTArray(nIdx);
                 const std::vector<cv::Mat>& vGTROIArray = pLoader->getGTROIArray(nIdx);
                 lvAssert_(vClassif.size()==vGTArray.size() && (vGTROIArray.empty() || vClassif.size()==vGTROIArray.size()),"gt/output array size mistmatch");
-                for(size_t s=0; s<vClassif.size(); ++s)
-                    m_pMetricsBase->m_vCounters[s].accumulate(vClassif[s],vGTArray[s],vGTROIArray.empty()?cv::Mat():vGTROIArray[s]);
+                if(m_pMetricsBase->m_vCounters.empty() || m_pMetricsBase->m_vsStreamNames.empty()) {
+                    m_pMetricsBase->m_vCounters.resize(vClassif.size());
+                    m_pMetricsBase->m_vsStreamNames.resize(vClassif.size());
+                }
+                for(size_t nSteamIdx=0; nSteamIdx<vClassif.size(); ++nSteamIdx)
+                    m_pMetricsBase->m_vCounters[nSteamIdx].accumulate(vClassif[nSteamIdx],vGTArray[nSteamIdx],vGTROIArray.empty()?cv::Mat():vGTROIArray[nSteamIdx]);
             }
         }
         /// default constructor; automatically creates an instance of the base metrics accumulator object
         inline DataEvaluatorWrapper_() : m_pMetricsBase(IIMetricsAccumulator::create<MetricsAccumulator_<DatasetEval_BinaryClassifierArray,eDataset>>()) {}
         /// contains low-level metric accumulation logic
         BinClassifMetricsArrayAccumulatorPtr m_pMetricsBase;
+    };
+
+    /// data evaluator specialization wrapper for stereo disparity estimation work batch performance evaluation
+    template<DatasetList eDataset>
+    struct DataEvaluatorWrapper_<DatasetEval_StereoDisparityEstim,eDataset,lv::NonParallel> :
+            public IDataConsumer_<DatasetEval_StereoDisparityEstim>,
+            public DataReporter_<DatasetEval_StereoDisparityEstim,eDataset> {
+        /// provides a visual feedback on result quality based on evaluation guidelines
+        virtual std::vector<cv::Mat> getColoredMaskArray(const std::vector<cv::Mat>& vDispMaps, size_t nIdx, float fMaxDispError=20.0f) {
+            lvAssert_(!vDispMaps.empty(),"output array must be non-empty for display");
+            auto pLoader = shared_from_this_cast<IDataLoader_<Array>>(true);
+            lvAssert_(pLoader->getOutputPacketType()==ImageArrayPacket && pLoader->getGTPacketType()==ImageArrayPacket && pLoader->getGTMappingType()==ElemMapping,"default impl cannot display mask without 1:1 image pixel mapping");
+            std::vector<cv::Mat> vMasks;
+            const std::vector<cv::Mat>& vGTArray = pLoader->getGTArray(nIdx);
+            const std::vector<cv::Mat>& vGTROIArray = pLoader->getGTROIArray(nIdx);
+            lvAssert_(vDispMaps.size()==vGTArray.size() && (vGTROIArray.empty() || vDispMaps.size()==vGTROIArray.size()),"array size mistmatch");
+            for(size_t nSteamIdx=0; nSteamIdx<vDispMaps.size(); ++nSteamIdx)
+                vMasks.push_back(StereoDispErrors::getColoredMask(vDispMaps[nSteamIdx],vGTArray[nSteamIdx],fMaxDispError,vGTROIArray.empty()?cv::Mat():vGTROIArray[nSteamIdx]));
+            return vMasks;
+        }
+        /// resets internal packet count + classification metrics
+        virtual void resetMetrics() override {
+            IDataConsumer_<DatasetEval_StereoDisparityEstim>::resetMetrics();
+            m_pMetricsBase = IIMetricsAccumulator::create<MetricsAccumulator_<DatasetEval_StereoDisparityEstim,eDataset>>();
+        }
+    protected:
+        /// overrides 'getMetricsBase' from IIMetricRetriever for non-group-impl (as always required)
+        virtual IIMetricsAccumulatorConstPtr getMetricsBase() const override final {
+            return m_pMetricsBase;
+        }
+        /// overrides 'processOutput' from IDataConsumer_ to evaluate the provided output packet
+        virtual void processOutput(const std::vector<cv::Mat>& vDispMaps, size_t nIdx) override {
+            if(isEvaluating()) {
+                lvDbgAssert(m_pMetricsBase);
+                lvAssert_(!vDispMaps.empty(),"output array must be non-empty for evaluation");
+                auto pLoader = shared_from_this_cast<IDataLoader_<Array>>(true);
+                lvAssert_(pLoader->getOutputPacketType()==ImageArrayPacket && pLoader->getGTPacketType()==ImageArrayPacket && pLoader->getGTMappingType()==ElemMapping,"default impl cannot evaluate without 1:1 image pixel mapping");
+                lvAssert_(pLoader->getGTStreamCount()==getOutputStreamCount() && vDispMaps.size()==getOutputStreamCount(),"gt/output array size mismatch");
+                const std::vector<cv::Mat>& vGTArray = pLoader->getGTArray(nIdx);
+                const std::vector<cv::Mat>& vGTROIArray = pLoader->getGTROIArray(nIdx);
+                lvAssert_(vDispMaps.size()==vGTArray.size() && (vGTROIArray.empty() || vDispMaps.size()==vGTROIArray.size()),"gt/output array size mistmatch");
+                if(m_pMetricsBase->m_vErrorLists.empty() || m_pMetricsBase->m_vsStreamNames.empty()) {
+                    m_pMetricsBase->m_vErrorLists.resize(vDispMaps.size());
+                    m_pMetricsBase->m_vsStreamNames.resize(vDispMaps.size());
+                }
+                for(size_t nSteamIdx=0; nSteamIdx<vDispMaps.size(); ++nSteamIdx)
+                    m_pMetricsBase->m_vErrorLists[nSteamIdx].accumulate(vDispMaps[nSteamIdx],vGTArray[nSteamIdx],vGTROIArray.empty()?cv::Mat():vGTROIArray[nSteamIdx]);
+            }
+        }
+        /// default constructor; automatically creates an instance of the base metrics accumulator object
+        inline DataEvaluatorWrapper_() : m_pMetricsBase(IIMetricsAccumulator::create<MetricsAccumulator_<DatasetEval_StereoDisparityEstim,eDataset>>()) {}
+        /// contains low-level metric accumulation logic
+        StereoDispMetricsAccumulatorPtr m_pMetricsBase;
     };
 
 #if HAVE_GLSL

@@ -65,7 +65,7 @@ void BackgroundSubtractorViBe_1ch::initialize(const cv::Mat& oInitImg) {
         for(int y_orig=0; y_orig<m_oImgSize.height; y_orig++) {
             for(int x_orig=0; x_orig<m_oImgSize.width; x_orig++) {
                 int y_sample, x_sample;
-                cv::getRandSamplePosition_7x7_std2(x_sample,y_sample,x_orig,y_orig,0,m_oImgSize);
+                lv::getRandSamplePosition_7x7_std2(x_sample,y_sample,x_orig,y_orig,0,m_oImgSize);
                 m_voBGImg[s].at<uchar>(y_orig,x_orig) = oInitImg.at<uchar>(y_sample,x_sample);
             }
         }
@@ -97,7 +97,7 @@ void BackgroundSubtractorViBe_1ch::apply(cv::InputArray _image, cv::OutputArray 
                     m_voBGImg[rand()%m_nBGSamples].at<uchar>(y,x)=oInputImg.at<uchar>(y,x);
                 if((rand()%nLearningRate)==0) {
                     int x_rand,y_rand;
-                    cv::getRandNeighborPosition_3x3(x_rand,y_rand,x,y,0,m_oImgSize);
+                    lv::getRandNeighborPosition_3x3(x_rand,y_rand,x,y,0,m_oImgSize);
                     m_voBGImg[rand()%m_nBGSamples].at<uchar>(y_rand,x_rand) = oInputImg.at<uchar>(y,x);
                 }
             }
@@ -127,7 +127,7 @@ void BackgroundSubtractorViBe_3ch::initialize(const cv::Mat& oInitImg) {
         m_voBGImg[s] = cv::Scalar(0,0,0);
         for(int y_orig=0; y_orig<m_oImgSize.height; y_orig++) {
             for(int x_orig=0; x_orig<m_oImgSize.width; x_orig++) {
-                cv::getRandSamplePosition_7x7_std2(x_sample,y_sample,x_orig,y_orig,0,m_oImgSize);
+                lv::getRandSamplePosition_7x7_std2(x_sample,y_sample,x_orig,y_orig,0,m_oImgSize);
                 m_voBGImg[s].at<cv::Vec3b>(y_orig,x_orig) = oInitImgRGB.at<cv::Vec3b>(y_sample,x_sample);
             }
         }
@@ -181,7 +181,7 @@ void BackgroundSubtractorViBe_3ch::apply(cv::InputArray _image, cv::OutputArray 
                     m_voBGImg[rand()%m_nBGSamples].at<cv::Vec3b>(y,x)=oInputImgRGB.at<cv::Vec3b>(y,x);
                 if((rand()%nLearningRate)==0) {
                     int x_rand,y_rand;
-                    cv::getRandNeighborPosition_3x3(x_rand,y_rand,x,y,0,m_oImgSize);
+                    lv::getRandNeighborPosition_3x3(x_rand,y_rand,x,y,0,m_oImgSize);
                     const size_t s_rand = rand()%m_nBGSamples;
                     m_voBGImg[s_rand].at<cv::Vec3b>(y_rand,x_rand) = oInputImgRGB.at<cv::Vec3b>(y,x);
                 }

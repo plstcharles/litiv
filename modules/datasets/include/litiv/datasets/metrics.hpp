@@ -28,7 +28,7 @@
 
 namespace lv {
 
-    // classfication counters list for binary classifiers (not all counters have to be used)
+    /// classfication counters list for binary classifiers (not all counters have to be used)
     struct BinClassif {
         uint64_t nTP; ///< 'true positive' count
         uint64_t nTN; ///< 'true negative' count
@@ -64,6 +64,30 @@ namespace lv {
         static cv::Mat getColoredMask(const cv::Mat& oClassif, const cv::Mat& oGT, const cv::Mat& oROI=cv::Mat());
         /// default constructor; sets all counters to zero
         inline BinClassif() : nTP(0),nTN(0),nFP(0),nFN(0),nSE(0),nDC(0) {}
+    };
+
+    /// stereo disparity map error computation utilities
+    struct StereoDispErrors {
+        std::vector<float> vErrors; ///< list of pixel-wise disparity label error distances
+        uint64_t nDC; ///< 'dont care' label count (usage is optional -- useful for e.g. unknowns or small ROIs)
+        /// returns the total disparity error test count (without 'dont cares', by default)
+        inline uint64_t total(bool bWithDontCare=false) const {
+            return vErrors.size()+(bWithDontCare?nDC:uint64_t(0));
+        }
+        /// returns whether dc counts as well as all internal disparity errors are equal to those of 'c'
+        inline bool isEqual(const StereoDispErrors& c) const {
+            return this->nDC==c.nDC && this->vErrors.size()==c.vErrors.size() && std::equal(this->vErrors.begin(),this->vErrors.end(),c.vErrors.begin());
+        }
+        /// appends the error distance and DC counts of 'c' into the internal members
+        inline void accumulate(const StereoDispErrors& c) {
+            this->nDC += c.nDC; this->vErrors.insert(this->vErrors.end(),c.vErrors.begin(),c.vErrors.end());
+        }
+        /// accumulates the pixel-wise disparity estimation errors of 'oDispMap' vs 'oGT' into the internal members
+        void accumulate(const cv::Mat& oDispMap, const cv::Mat& oGT, const cv::Mat& oROI=cv::Mat());
+        /// returns a colored disparity error mask for visualization based on good/bad estimations of 'oDispMap' vs 'oGT'
+        static cv::Mat getColoredMask(const cv::Mat& oDispMap, const cv::Mat& oGT, float fMaxError, const cv::Mat& oROI=cv::Mat());
+        /// default constructor
+        inline StereoDispErrors() : nDC(0) {}
     };
 
     /// basic metrics accumulator super-interface
@@ -145,6 +169,28 @@ namespace lv {
     using BinClassifMetricsArrayAccumulatorPtr = std::shared_ptr<BinClassifMetricsArrayAccumulator>;
     using BinClassifMetricsArrayAccumulatorConstPtr = std::shared_ptr<const BinClassifMetricsArrayAccumulator>;
 
+    /// basic metrics accumulator specialized to evaluate an array of stereo disparity maps
+    template<>
+    struct IMetricsAccumulator_<DatasetEval_StereoDisparityEstim> :
+            public IIMetricsAccumulator {
+        /// returns whether the error list of 'm' is equal to that of this object (ignores stream names)
+        virtual bool isEqual(const IIMetricsAccumulatorConstPtr& m) const override;
+        /// appends the error lists of 'm' into those of this object
+        virtual IIMetricsAccumulatorPtr accumulate(const IIMetricsAccumulatorConstPtr& m) override;
+        /// appends all internal stream error lists into one, and returns it
+        virtual StereoDispErrors reduce() const;
+        /// contains the actual error lists used for disparity map evaluation (one per stream)
+        std::vector<StereoDispErrors> m_vErrorLists;
+        /// contains the stream names used for printing eval reports (should be the same size as m_vvErrors)
+        std::vector<std::string> m_vsStreamNames;
+    protected:
+        /// default constructor; resizes the counters array based on array size
+        IMetricsAccumulator_(size_t nArraySize=0);
+    };
+    using StereoDispMetricsAccumulator = IMetricsAccumulator_<DatasetEval_StereoDisparityEstim>;
+    using StereoDispMetricsAccumulatorPtr = std::shared_ptr<StereoDispMetricsAccumulator>;
+    using StereoDispMetricsAccumulatorConstPtr = std::shared_ptr<const StereoDispMetricsAccumulator>;
+
     /// basic metrics accumulator full (default) specialization --- can be overridden by dataset type in 'impl' headers
     template<DatasetEvalList eDatasetEval, DatasetList eDataset>
     struct MetricsAccumulator_ : public IMetricsAccumulator_<eDatasetEval> {
@@ -153,7 +199,7 @@ namespace lv {
         using IMetricsAccumulator_<eDatasetEval>::IMetricsAccumulator_;
     };
 
-    // classfication metrics list for binary classifiers (not all metrics have to be used)
+    /// classfication metrics list for binary classifiers (not all metrics have to be used)
     struct BinClassifMetrics {
         double dRecall; ///< 'recall'/'sensitivity' value [0,1], where 1 is best
         double dSpecificity; ///< 'specificity' (1-FPR) value [0,1], where 1 is best
@@ -209,6 +255,42 @@ namespace lv {
         }
         /// default contructor requires a base metrics counters, as otherwise, we would obtain NaN's
         inline BinClassifMetrics(const BinClassif& m) : dRecall(CalcRecall(m)),dSpecificity(CalcSpecificity(m)),dFPR(CalcFalsePositiveRate(m)),dFNR(CalcFalseNegativeRate(m)),dPBC(CalcPercentBadClassifs(m)),dPrecision(CalcPrecision(m)),dFMeasure(CalcFMeasure(m)),dMCC(CalcMatthewsCorrCoeff(m)) {}
+    };
+
+    /// disparity map estimation metrics list (not all metrics have to be used --- inspired by Middlebury's)
+    struct StereoDispErrorMetrics {
+        double dBadPercent_05; ///< percentage of pixels with a label distance error greater than 0.5
+        double dBadPercent_1; ///< percentage of pixels with a label distance error greater than 1.0
+        double dBadPercent_2; ///< percentage of pixels with a label distance error greater than 2.0
+        double dBadPercent_4; ///< percentage of pixels with a label distance error greater than 4.0
+        double dAverageError; ///< average pixel label distance error
+        double dRMS; ///< root-mean-square label distance error
+        /// computes the percentage of values above a certain error margin
+        static inline double CalcPercentBad(const std::vector<float>& vVals, float fMargin) {
+            if(vVals.empty())
+                return 0.0;
+            size_t nBadVals = 0;
+            for(size_t nValIdx=0; nValIdx<vVals.size(); ++nValIdx)
+                if(vVals[nValIdx]>fMargin)
+                    ++nBadVals;
+            return (float(nBadVals)/vVals.size())*100;
+        }
+        /// computes the average of all values in a vector
+        static inline double CalcAverage(const std::vector<float>& vVals) {
+            if(vVals.empty())
+                return 0.0;
+            return std::accumulate(vVals.begin(),vVals.end(),double(0))/vVals.size();
+        }
+        /// computes the root-mean-square of all values in a vector
+        static inline double CalcRMS(const std::vector<float>& vVals) {
+            if(vVals.empty())
+                return 0.0;
+            return std::sqrt(std::accumulate(vVals.begin(),vVals.end(),double(0),[](double dSum, float fVal){
+                return dSum + fVal*fVal;
+            })/vVals.size());
+        }
+        /// default contructor which requires a non-empty error list, as otherwise, we would obtain NaN's
+        inline StereoDispErrorMetrics(const StereoDispErrors& m) : dBadPercent_05(CalcPercentBad(m.vErrors,0.5f)),dBadPercent_1(CalcPercentBad(m.vErrors,1.0f)),dBadPercent_2(CalcPercentBad(m.vErrors,2.0f)),dBadPercent_4(CalcPercentBad(m.vErrors,4.0f)),dAverageError(CalcAverage(m.vErrors)),dRMS(CalcRMS(m.vErrors)) {}
     };
 
     /// high-level metrics calculator super-interface (relies on IIMetricsAccumulator internally)
@@ -282,6 +364,28 @@ namespace lv {
     using BinClassifMetricsArrayCalculatorPtr = std::shared_ptr<BinClassifMetricsArrayCalculator>;
     using BinClassifMetricsArrayCalculatorConstPtr = std::shared_ptr<const BinClassifMetricsArrayCalculator>;
 
+    /// metrics calculator specialized to evaluate stereo disparity estimation maps
+    template<>
+    struct IMetricsCalculator_<DatasetEval_StereoDisparityEstim> :
+            public IIMetricsCalculator {
+        /// accumulates the disparity error metrics of 'm' into those of this object (considers relative weights of metrics)
+        virtual IIMetricsCalculatorPtr accumulate(const IIMetricsCalculatorConstPtr& m) override;
+        /// sum-reduces the disparity error metrics of this object into those of a single 'StereoDispErrorMetrics' object
+        virtual StereoDispErrorMetrics reduce() const;
+        /// contains the actual metrics used for binary classification evaluation
+        std::vector<StereoDispErrorMetrics> m_vMetrics;
+        /// contains the stream names used for printing eval reports (should be the same size as m_vMetrics)
+        std::vector<std::string> m_vsStreamNames;
+    protected:
+        /// default contructor; requires a base metrics counters, as otherwise, we would obtain NaN's
+        IMetricsCalculator_(const IIMetricsAccumulatorConstPtr& m);
+        /// default contructor; requires pre-filled StereoDispErrorMetrics array object + stream names array
+        IMetricsCalculator_(const std::vector<StereoDispErrorMetrics>& vm, const std::vector<std::string>& vs);
+    };
+    using StereoDispMetricsCalculator = IMetricsCalculator_<DatasetEval_StereoDisparityEstim>;
+    using StereoDispMetricsCalculatorPtr = std::shared_ptr<StereoDispMetricsCalculator>;
+    using StereoDispMetricsCalculatorConstPtr = std::shared_ptr<const StereoDispMetricsCalculator>;
+
     /// basic metrics calculator full (default) specialization --- can be overridden by dataset type in 'impl' headers
     template<DatasetEvalList eDatasetEval, DatasetList eDataset>
     struct MetricsCalculator_ : public IMetricsCalculator_<eDatasetEval> {
@@ -320,7 +424,7 @@ namespace lv {
                 auto ppBatchIter = vpBatches.begin();
                 for(; ppBatchIter!=vpBatches.end() && (*ppBatchIter)->getCurrentOutputCount()==0; ++ppBatchIter) {}
                 lvAssert_(ppBatchIter!=vpBatches.end(),"found no processed output packets");
-                IIMetricsCalculatorPtr pMetrics = dynamic_cast<const IIMetricRetriever&>(**ppBatchIter).getMetrics(bAverage);
+                IIMetricsCalculatorPtr pMetrics = dynamic_cast<const IIMetricRetriever&>(**ppBatchIter++).getMetrics(bAverage);
                 for(; ppBatchIter!=vpBatches.end(); ++ppBatchIter)
                     if((*ppBatchIter)->getCurrentOutputCount()>0)
                         pMetrics->accumulate(dynamic_cast<const IIMetricRetriever&>(**ppBatchIter).getMetrics(bAverage));

@@ -27,16 +27,16 @@
 
 #define EXPECT_THROW_LV_QUIET(expr) \
 do { \
-    lv::Exception::setVerbose(false); \
+    lv::setVerbosity(0); \
     EXPECT_THROW(expr,lv::Exception); \
-    lv::Exception::setVerbose(true); \
+    lv::setVerbosity(1); \
 } while(0)
 
 #define ASSERT_THROW_LV_QUIET(expr) \
 do { \
-    lv::Exception::setVerbose(false); \
+    lv::setVerbosity(0); \
     ASSERT_THROW(expr,lv::Exception); \
-    lv::Exception::setVerbose(true); \
+    lv::setVerbosity(1); \
 } while(0)
 
 #define EXPECT_NEAR_MINRATIO(val1,val2,ratio) \
@@ -77,6 +77,27 @@ namespace lv {
             for(size_t i=0; i<n; ++i)
                 v[i] = (T)uniform_dist(gen);
             return std::move(v);
+        }
+
+        /// fills a data array with random values between 'min' and 'max'
+        template<typename TIter, typename TVal>
+        void fillarray(TIter begin, TIter end, TVal min, TVal max) {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            typedef std::conditional_t<
+                    std::is_integral<TVal>::value,
+                    std::uniform_int_distribution<
+                            std::conditional_t<
+                                    std::is_same<uint64_t,TVal>::value,
+                                    uint64_t,
+                                    int64_t
+                            >
+                    >,
+                    std::uniform_real_distribution<double>
+            > unif_distr;
+            unif_distr uniform_dist(min,max);
+            for(; begin!=end; ++begin)
+                *begin = (TVal)uniform_dist(gen);
         }
 
         /// prints framework version/build info to stdout; always returns true

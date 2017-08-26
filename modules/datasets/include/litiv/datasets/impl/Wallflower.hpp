@@ -39,11 +39,8 @@ namespace lv {
                 IDataset_<eDatasetTask,DatasetSource_Video,Dataset_Wallflower,lv::getDatasetEval<eDatasetTask,Dataset_Wallflower>(),eEvalImpl>(
                         "Wallflower",
                         lv::datasets::getRootPath()+"Wallflower/dataset/",
-                        lv::datasets::getRootPath()+"Wallflower/"+lv::addDirSlashIfMissing(sOutputDirName),
-                        "bin",
-                        ".png",
+                        DataHandler::createOutputDir(lv::datasets::getRootPath()+"Wallflower/results",sOutputDirName),
                         getWorkBatchDirNames(),
-                        std::vector<std::string>(),
                         std::vector<std::string>(),
                         bSaveOutput,
                         bUseEvaluator,
@@ -65,6 +62,8 @@ namespace lv {
             lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
             // @@@@ untested since 2016/01 refactoring
+            this->m_vsInputPaths.clear();
+            this->m_vsGTPaths.clear();
             const std::vector<std::string> vsImgPaths = lv::getFilesFromDir(this->getDataPath());
             bool bFoundScript=false, bFoundGTFile=false;
             const std::string sGTFilePrefix("hand_segmented_");
@@ -95,7 +94,8 @@ namespace lv {
             if(dScale!=1.0)
                 cv::resize(this->m_oInputROI,this->m_oInputROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
             this->m_oGTROI = this->m_oInputROI;
-            this->m_oInputSize = this->m_oGTSize = this->m_oInputROI.size();
+            this->m_oInputInfo = lv::MatInfo{this->m_oInputROI.size(),(this->is4ByteAligned()?CV_8UC4:CV_8UC3)};
+            this->m_oGTInfo = lv::MatInfo{this->m_oInputROI.size(),CV_8UC1};
             this->m_nFrameCount = this->m_vsInputPaths.size();
             lvAssert_(this->m_nFrameCount>0,"could not find any input frames");
         }

@@ -54,16 +54,9 @@ inline int iDivUp(int a, int b) {
 }
 
 SLIC::SLIC() {
-    int nbGpu = 0;
-    cudaErrorCheck(cudaGetDeviceCount(&nbGpu));
-    std::cout << "Detected " << nbGpu << " cuda capable gpu" << std::endl;
-    cudaErrorCheck(cudaSetDevice(m_deviceId));
+    lv::cuda::init(m_deviceId);
     cudaErrorCheck(cudaGetDeviceProperties(&m_deviceProp, m_deviceId));
-    if (m_deviceProp.major < 3) {
-        std::cerr << "compute capability found = " << m_deviceProp.major << ", compute capability >= 3 required !" << std::endl;
-        std::exit(EXIT_FAILURE);
-    }
-    lv::cuda::test(); // @@@ should succeed
+    lvAssert_(m_deviceProp.major>=3,"compute capability for selected device too low (need >=30)");
 }
 
 SLIC::~SLIC() {
@@ -151,12 +144,12 @@ void SLIC::segment(const cv::Mat& frameBGR) {
         const int blockH = blockW;
         CV_Assert(blockW*blockH <= m_deviceProp.maxThreadsPerBlock);
         const lv::cuda::KernelParams oParams(dim3(iDivUp(m_FrameWidth,blockW),iDivUp(m_FrameHeight,blockH)),dim3(blockW,blockH));
-        host::kRgb2CIELab(oParams,oTexFrameBGRA,oSurfFrameLab,m_FrameWidth,m_FrameHeight);
+        device::kRgb2CIELab(oParams,oTexFrameBGRA,oSurfFrameLab,m_FrameWidth,m_FrameHeight);
     }
     {
         const int blockW = 16;
         const lv::cuda::KernelParams oParams(dim3(iDivUp(m_nbSpx, blockW)),dim3(blockW));
-        host::kInitClusters(oParams,oSurfFrameLab,d_fClusters,m_FrameWidth,m_FrameHeight,m_nbSpxPerRow,m_nbSpxPerCol,m_SpxDiam/2.f);
+        device::kInitClusters(oParams,oSurfFrameLab,d_fClusters,m_FrameWidth,m_FrameHeight,m_nbSpxPerRow,m_nbSpxPerCol,m_SpxDiam/2.f);
     }
     for (int i = 0; i<m_nbIteration; i++) {
         assignment();
@@ -176,7 +169,7 @@ void SLIC::assignment() {
 
     CV_Assert(blockSize.x >= 3 && blockSize.y >= 3);
     const float wc2 = m_wc * m_wc;
-    host::kAssignment(lv::cuda::KernelParams(gridSize, blockSize),
+    device::kAssignment(lv::cuda::KernelParams(gridSize, blockSize),
         oSurfFrameLab,
         d_fClusters,
         m_FrameWidth,
@@ -190,7 +183,7 @@ void SLIC::assignment() {
 }
 
 void SLIC::update() {
-    host::kUpdate(lv::cuda::KernelParams(dim3(iDivUp(m_nbSpx, m_deviceProp.maxThreadsPerBlock)),dim3(m_deviceProp.maxThreadsPerBlock)),m_nbSpx,d_fClusters,d_fAccAtt);
+    device::kUpdate(lv::cuda::KernelParams(dim3(iDivUp(m_nbSpx, m_deviceProp.maxThreadsPerBlock)),dim3(m_deviceProp.maxThreadsPerBlock)),m_nbSpx,d_fClusters,d_fAccAtt);
 }
 
 int SLIC::enforceConnectivity() {

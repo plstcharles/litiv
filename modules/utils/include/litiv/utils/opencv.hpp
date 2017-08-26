@@ -21,14 +21,64 @@
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/opencv_modules.hpp>
+#if HAVE_CUDA
+#include <opencv2/core/cuda.hpp>
+#endif //HAVE_CUDA
 #include <unordered_set>
 #include <map>
 
-#define MAT_COND_DEPTH_TYPE(depth_flag,depth_type,depth_alt) \
-    std::conditional_t<CV_MAT_DEPTH(nTypeFlag)==depth_flag,depth_type,depth_alt>
+#ifndef CV_MAT_COND_DEPTH_TYPE
+#define CV_MAT_COND_DEPTH_TYPE(cvtype_flag,depth_flag,depth_type,depth_alt) \
+    std::conditional_t<CV_MAT_DEPTH(cvtype_flag)==depth_flag,depth_type,depth_alt>
+#endif //ndef(CV_MAT_COND_DEPTH_TYPE)
 
-namespace cv { // extending cv
+#ifndef CV_MAT_COND_DATA_TYPE
+#define CV_MAT_COND_DATA_TYPE(cvtype_flag) \
+    std::enable_if_t<(CV_MAT_DEPTH((cvtype_flag%8))>=0 && CV_MAT_DEPTH((cvtype_flag%8))<=6), \
+        CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),0,uchar, \
+            CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),1,char, \
+                CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),2,ushort, \
+                    CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),3,short, \
+                        CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),4,int, \
+                            CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),5,float, \
+                                CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),6,double,void)))))))>
+#endif //ndef(CV_MAT_COND_DATA_TYPE)
 
+#ifndef CV_MAT_COND_ELEM_TYPE
+#define CV_MAT_COND_ELEM_TYPE(cvtype_flag) \
+    std::enable_if_t<(CV_MAT_DEPTH((cvtype_flag%8))>=0 && CV_MAT_DEPTH((cvtype_flag%8))<=6 && CV_MAT_CN(cvtype_flag)>=1 && CV_MAT_CN(cvtype_flag)<=4), \
+        std::conditional_t<(CV_MAT_CN(cvtype_flag)>1),cv::Vec<CV_MAT_COND_DATA_TYPE(cvtype_flag),CV_MAT_CN(cvtype_flag)>,CV_MAT_COND_DATA_TYPE(cvtype_flag)>>
+#endif //ndef(CV_MAT_COND_ELEM_TYPE)
+
+#ifndef CV_MAT_DEPTH_BYTES
+#define CV_MAT_DEPTH_BYTES(cvtype_flag) \
+    (size_t(CV_MAT_DEPTH(cvtype_flag)<=1?1:CV_MAT_DEPTH(cvtype_flag)<4?2:CV_MAT_DEPTH(cvtype_flag)<6?4:8))
+#endif //ndef(CV_MAT_DEPTH_BYTES)
+
+#ifndef CV_MAT_DEPTH_STR
+#define CV_MAT_DEPTH_STR(cvtype_flag) \
+    (std::string(CV_MAT_DEPTH(cvtype_flag)==0?"CV_8U":CV_MAT_DEPTH(cvtype_flag)==1?"CV_8S":CV_MAT_DEPTH(cvtype_flag)==2?"CV_16U":\
+                 CV_MAT_DEPTH(cvtype_flag)==3?"CV_16S":CV_MAT_DEPTH(cvtype_flag)==4?"CV_32S":CV_MAT_DEPTH(cvtype_flag)==5?"CV_32F":"CV_64F"))
+#endif //ndef(CV_MAT_DEPTH_STR)
+
+namespace cv { // extending cv (decls only)
+
+    template<typename T>
+    std::ostream& operator<<(std::ostream& os, const Mat_<T>& oMat);
+
+} // namespace cv
+
+namespace std { // extending std (decls only)
+
+    template<typename T>
+    ostream& operator<<(ostream& os, const vector<T>& oVec);
+
+} // namespace std
+
+namespace lv {
+
+    struct MatType;
     struct DisplayHelper;
     using DisplayHelperPtr = std::shared_ptr<DisplayHelper>;
 
@@ -37,62 +87,245 @@ namespace cv { // extending cv
     /// returns a 16-byte aligned matrix allocator for AVX(1/2) support (should never be modified, despite non-const!)
     cv::MatAllocator* getMatAllocator32a();
 
-    /// returns whether a given memory address is aligned to the templated step or not
-    template<size_t nByteAlign, typename Taddr>
-    bool isAligned(Taddr pData) {
-        static_assert(std::is_pointer<Taddr>::value,"need to pass pointer type");
-        static_assert(nByteAlign>0,"byte align must be positive value");
-        return (uintptr_t(pData)%nByteAlign)==0;
+    /// returns whether a given matrix data type is opencv-compatible or not (i.e. whether it can be used in a cv::Mat_ class)
+    template<typename TData>
+    constexpr bool isDataTypeCompat() {
+        // lots of framework stuff will blow up if these fail on odd platforms
+        static_assert(sizeof(uchar)==sizeof(uint8_t),"unexpected uchar byte count");
+        static_assert(sizeof(char)==sizeof(int8_t),"unexpected char byte count");
+        static_assert(sizeof(ushort)==sizeof(uint16_t),"unexpected ushort byte count");
+        static_assert(sizeof(short)==sizeof(int16_t),"unexpected short byte count");
+        static_assert(sizeof(int)==sizeof(int32_t),"unexpected int byte count");
+        return
+            std::is_same<uchar,TData>::value || std::is_same<uint8_t,TData>::value ||
+            std::is_same<char,TData>::value || std::is_same<int8_t,TData>::value ||
+            std::is_same<ushort,TData>::value || std::is_same<uint16_t,TData>::value ||
+            std::is_same<short,TData>::value || std::is_same<int16_t,TData>::value ||
+            std::is_same<int,TData>::value || std::is_same<int32_t,TData>::value ||
+            std::is_same<float,TData>::value || std::is_same<double,TData>::value;
     }
 
-    /// type traits helper which provides basic static info on ocv matrix element types
-    template<int nTypeFlag>
-    struct MatTypeInfo {
-        typedef std::enable_if_t<(CV_MAT_DEPTH(nTypeFlag)>=0 && CV_MAT_DEPTH(nTypeFlag)<=6),
-            MAT_COND_DEPTH_TYPE(0,uchar,
-                MAT_COND_DEPTH_TYPE(1,char,
-                    MAT_COND_DEPTH_TYPE(2,ushort,
-                        MAT_COND_DEPTH_TYPE(3,short,
-                            MAT_COND_DEPTH_TYPE(4,int,
-                                MAT_COND_DEPTH_TYPE(5,float,
-                                    MAT_COND_DEPTH_TYPE(6,double,void)))))))> base_type;
-        static constexpr int nChannels = CV_MAT_CN(nTypeFlag);
+    /// returns the opencv depth flag for an opencv-compatible data type
+    template<typename TData>
+    constexpr int getCVDepthFromDataType() {
+        static_assert(isDataTypeCompat<TData>(),"data type is not opencv-compatible");
+        return
+            (std::is_same<uchar,TData>::value || std::is_same<uint8_t,TData>::value)?CV_8U:
+            (std::is_same<char,TData>::value || std::is_same<int8_t,TData>::value)?CV_8S:
+            (std::is_same<ushort,TData>::value || std::is_same<uint16_t,TData>::value)?CV_16U:
+            (std::is_same<short,TData>::value || std::is_same<int16_t,TData>::value)?CV_16S:
+            (std::is_same<int,TData>::value || std::is_same<int32_t,TData>::value)?CV_32S:
+            (std::is_same<float,TData>::value)?CV_32F:
+            (std::is_same<double,TData>::value)?CV_64F:
+            lvStdError_(domain_error,"input type not cv-compatible");
+    }
+
+    /// mat type helper struct which provides basic static traits info on ocv matrix element types
+    template<int nCVType>
+    struct MatCVType_ {
+        static_assert(CV_MAT_DEPTH(nCVType%8)>=0 && CV_MAT_DEPTH(nCVType%8)<=6,"data type is not opencv-compatible");
+        static_assert(CV_MAT_CN(nCVType)>=1 && CV_MAT_CN(nCVType)<=4,"channel count is not opencv-compatible");
+        /// holds the typename for underlying mat data type
+        typedef CV_MAT_COND_DATA_TYPE(nCVType) data_type;
+        /// holds the typename for underlying mat elem type
+        typedef CV_MAT_COND_ELEM_TYPE(nCVType) elem_type;
+        /// returns the channel count for the underlying mat data (i.e. smallest implicit mat dim)
+        static constexpr int channels() {return CV_MAT_CN(nCVType);}
+        /// returns the ocv depth id (NOT A BYTE COUNT!) for the underlying mat data
+        static constexpr int depth() {return CV_MAT_DEPTH(nCVType);}
+        /// returns the byte depth for the underlying mat data
+        static constexpr size_t depthBytes() {return CV_MAT_DEPTH_BYTES(nCVType);}
+        /// returns the element size (in bytes) for the underlying mat data
+        static constexpr size_t elemSize() {return CV_MAT_DEPTH_BYTES(nCVType)*size_t(CV_MAT_CN(nCVType));}
+        /// returns the internal opencv mat type argument
+        static constexpr int type() {return nCVType;}
+        /// returns the internal opencv mat type argument
+        int operator()() const {return nCVType;}
+        /// implicit cast operation; returns the ocv type id
+        operator int() const {return nCVType;}
+        /// implicit cast operation; returns a string containing the ocv type id
+        operator std::string() const {return (std::string)MatType(nCVType);}
+        /// returns the result of the implicit std::string cast (i.e. ocv type id in a string)
+        std::string str() const {return (std::string)*this;}
     };
 
-    /// dim helper which provides easy-to-use and safe conversions from cv::Size and cv::MatSize (note: internally using 'major' dimension == first in vec)
+    /// ostream-friendly overload for MatCVType_ (ADL will allow usage from this namespace)
+    template<int nCVType>
+    inline std::ostream& operator<<(std::ostream& os, const MatCVType_<nCVType>& oType) {
+        return os << oType.str();
+    }
+
+    /// mat type helper struct which provides basic static traits info on raw matrix element types
+    template<typename TData, int nChannels=1>
+    struct MatRawType_ {
+        static_assert(isDataTypeCompat<TData>(),"data type is not opencv-compatible");
+        static_assert(nChannels>=1 && nChannels<=4,"channel count is not opencv-compatible");
+        /// holds the typename for underlying mat data type
+        typedef TData data_type;
+        /// holds the typename for underlying mat elem type
+        typedef std::conditional_t<(nChannels>1),cv::Vec<TData,nChannels>,TData> elem_type;
+        /// returns the channel count for the underlying mat data (i.e. smallest implicit mat dim)
+        static constexpr int channels() {return nChannels;}
+        /// returns the ocv depth id (NOT A BYTE COUNT!) for the underlying mat data
+        static constexpr int depth() {return getCVDepthFromDataType<TData>();}
+        /// returns the byte depth for the underlying mat data
+        static constexpr size_t depthBytes() {return sizeof(TData);}
+        /// returns the element size (in bytes) for the underlying mat data
+        static constexpr size_t elemSize() {return sizeof(TData)*size_t(nChannels);}
+        /// returns the internal opencv mat type argument
+        static constexpr int type() {return CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels);}
+        /// returns the internal opencv mat type argument
+        int operator()() const {return CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels);}
+        /// implicit cast operation; returns the ocv type id
+        operator int() const {return CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels);}
+        /// implicit cast operation; returns a string containing the ocv type id
+        operator std::string() const {return (std::string)MatType(CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels));}
+        /// returns the result of the implicit std::string cast (i.e. ocv type id in a string)
+        std::string str() const {return (std::string)*this;}
+    };
+
+    /// ostream-friendly overload for MatRawType_ (ADL will allow usage from this namespace)
+    template<typename TData, int nChannels>
+    inline std::ostream& operator<<(std::ostream& os, const MatRawType_<TData,nChannels>& oType) {
+        return os << oType.str();
+    }
+
+    /// mat type helper struct which provides basic dynamic info on ocv matrix element types
+    struct MatType {
+        /// default constructor; assigns type as CV_8UC1 internally
+        MatType() : m_nCVType(CV_8UC1) {}
+        /// cv type-based constructor; also validates m_nCVType for possible ocv mat configs
+        MatType(int nCVType) : m_nCVType(nCVType) {
+            lvAssert__((CV_MAT_DEPTH(m_nCVType)>=0 && CV_MAT_DEPTH(m_nCVType)<=6),"bad ocv type depth (type=%d, depth=%d)",m_nCVType,CV_MAT_DEPTH(m_nCVType));
+            lvAssert__((CV_MAT_CN(m_nCVType)>0 && CV_MAT_CN(m_nCVType)<=4),"bad ocv type channels (type=%d, channels=%d)",m_nCVType,CV_MAT_CN(m_nCVType));
+        }
+        /// assignment operator for new opencv matrix data type
+        MatType& operator=(int nCVType) {
+            lvAssert__((CV_MAT_DEPTH(nCVType)>=0 && CV_MAT_DEPTH(nCVType)<=6),"bad ocv type depth (type=%d, depth=%d)",nCVType,CV_MAT_DEPTH(nCVType));
+            lvAssert__((CV_MAT_CN(nCVType)>0 && CV_MAT_CN(nCVType)<=4),"bad ocv type channels (type=%d, channels=%d)",nCVType,CV_MAT_CN(nCVType));
+            m_nCVType = nCVType;
+            return *this;
+        }
+        /// returns the channel count for the underlying mat data (i.e. smallest implicit mat dim)
+        int channels() const {return CV_MAT_CN(m_nCVType);}
+        /// returns the ocv depth id (NOT A BYTE COUNT!) for the underlying mat data
+        int depth() const {return CV_MAT_DEPTH(m_nCVType);}
+        /// returns the byte depth for the underlying mat data
+        size_t depthBytes() const {return CV_MAT_DEPTH_BYTES(m_nCVType);}
+        /// returns the element size (in bytes) for the underlying mat data
+        size_t elemSize() const {return CV_MAT_DEPTH_BYTES(m_nCVType)*size_t(CV_MAT_CN(m_nCVType));}
+        /// returns the internal opencv mat type argument
+        int type() const {return m_nCVType;}
+        /// returns the internal opencv mat type argument
+        int operator()() const {return m_nCVType;}
+        /// implicit cast operation; returns the ocv type id
+        operator int() const {return m_nCVType;}
+        /// implicit cast operation; returns a string containing the ocv type id
+        operator std::string() const {return CV_MAT_DEPTH_STR(m_nCVType)+"C"+std::to_string(CV_MAT_CN(m_nCVType));}
+        /// is-equal test operator for other MatType structs
+        bool operator==(const MatType& o) const {return m_nCVType==o.m_nCVType;}
+        /// is-not-equal test operator for other MatType structs
+        bool operator!=(const MatType& o) const {return !(*this==o);}
+        /// returns the result of the implicit std::string cast (i.e. ocv type id in a string)
+        std::string str() const {return (std::string)*this;}
+        /// returns whether the given typename is compatible with the internal opencv mat type (does not consider channels by default)
+        template<typename T, bool bCheckWithChannels=false>
+        bool isTypeCompat() const {
+            const int nChannels = channels();
+            const int nDepth = depth();
+            #if defined(_MSC_VER)
+            #pragma warning(push,0)
+            #endif //defined(_MSC_VER)
+            if(bCheckWithChannels && nChannels>1) {
+            #if defined(_MSC_VER)
+            #pragma warning(pop)
+            #endif //defined(_MSC_VER)
+                if(nChannels==2)
+                    return
+                        (nDepth==CV_8U && std::is_same<T,cv::Vec<uint8_t,2>>::value) ||
+                        (nDepth==CV_8S && std::is_same<T,cv::Vec<int8_t,2>>::value) ||
+                        (nDepth==CV_16U && std::is_same<T,cv::Vec<uint16_t,2>>::value) ||
+                        (nDepth==CV_16S && std::is_same<T,cv::Vec<int16_t,2>>::value) ||
+                        (nDepth==CV_32S && std::is_same<T,cv::Vec<int32_t,2>>::value) ||
+                        (nDepth==CV_32F && std::is_same<T,cv::Vec<float,2>>::value) ||
+                        (nDepth==CV_64F && std::is_same<T,cv::Vec<double,2>>::value);
+                else if(nChannels==3)
+                    return
+                        (nDepth==CV_8U && std::is_same<T,cv::Vec<uint8_t,3>>::value) ||
+                        (nDepth==CV_8S && std::is_same<T,cv::Vec<int8_t,3>>::value) ||
+                        (nDepth==CV_16U && std::is_same<T,cv::Vec<uint16_t,3>>::value) ||
+                        (nDepth==CV_16S && std::is_same<T,cv::Vec<int16_t,3>>::value) ||
+                        (nDepth==CV_32S && std::is_same<T,cv::Vec<int32_t,3>>::value) ||
+                        (nDepth==CV_32F && std::is_same<T,cv::Vec<float,3>>::value) ||
+                        (nDepth==CV_64F && std::is_same<T,cv::Vec<double,3>>::value);
+                else //if(nChannels==4)
+                    return
+                        (nDepth==CV_8U && std::is_same<T,cv::Vec<uint8_t,4>>::value) ||
+                        (nDepth==CV_8S && std::is_same<T,cv::Vec<int8_t,4>>::value) ||
+                        (nDepth==CV_16U && std::is_same<T,cv::Vec<uint16_t,4>>::value) ||
+                        (nDepth==CV_16S && std::is_same<T,cv::Vec<int16_t,4>>::value) ||
+                        (nDepth==CV_32S && std::is_same<T,cv::Vec<int32_t,4>>::value) ||
+                        (nDepth==CV_32F && std::is_same<T,cv::Vec<float,4>>::value) ||
+                        (nDepth==CV_64F && std::is_same<T,cv::Vec<double,4>>::value);
+            }
+            return
+                (nDepth==CV_8U && std::is_same<T,uint8_t>::value) ||
+                (nDepth==CV_8S && std::is_same<T,int8_t>::value) ||
+                (nDepth==CV_16U && std::is_same<T,uint16_t>::value) ||
+                (nDepth==CV_16S && std::is_same<T,int16_t>::value) ||
+                (nDepth==CV_32S && std::is_same<T,int32_t>::value) ||
+                (nDepth==CV_32F && std::is_same<T,float>::value) ||
+                (nDepth==CV_64F && std::is_same<T,double>::value);
+        }
+    private:
+        /// holds the internal opencv mat type argument
+        int m_nCVType;
+    };
+
+    /// ostream-friendly overload for MatType (ADL will allow usage from this namespace)
+    inline std::ostream& operator<<(std::ostream& os, const MatType& oType) {
+        return os << oType.str();
+    }
+
+    /// mat dim size helper which provides easy-to-use and safe conversions from cv::Size and cv::MatSize
+    /// (note: internally using 'major' dimension == first in vec)
     template<typename Tinteger>
-    struct MatSizeInfo_ {
+    struct MatSize_ {
         /// default constructor; initializes internal config as zero-dim (empty)
-        MatSizeInfo_() :
-                m_vSizes{Tinteger(0)},m_aSizes(nullptr) {}
+        MatSize_() :
+                m_vSizes{Tinteger(0)} {}
         /// cv::MatSize-based constructor
-        MatSizeInfo_(const cv::MatSize& oSize) :
-                m_vSizes(cvtSizes(oSize.p)),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
+        MatSize_(const cv::MatSize& oSize) :
+                m_vSizes(cvtSizes(oSize.p)) {}
         /// cv::Size-based constructor
-        MatSizeInfo_(const cv::Size& oSize) : // row-major by default, like opencv
-                m_vSizes{Tinteger(2),Tinteger(oSize.height),Tinteger(oSize.width)},m_aSizes(m_vSizes.data()+1) {
+        MatSize_(const cv::Size& oSize) : // row-major by default, like opencv
+                m_vSizes{Tinteger(2),Tinteger(oSize.height),Tinteger(oSize.width)} {
             lvAssert_(oSize.width>=0 && oSize.height>=0,"sizes must be null or positive values");
         }
         /// array-based constructor
         template<size_t nDims, typename Tinteger2>
-        MatSizeInfo_(const std::array<Tinteger2,nDims>& aSizes) :
-                m_vSizes(cvtSizes((Tinteger2)nDims,aSizes.data())),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
+        MatSize_(const std::array<Tinteger2,nDims>& aSizes) :
+                m_vSizes(cvtSizes((Tinteger2)nDims,aSizes.data())) {}
         /// vector-based constructor
         template<typename Tinteger2>
-        MatSizeInfo_(const std::vector<Tinteger2>& vSizes) :
-                m_vSizes(cvtSizes((Tinteger2)vSizes.size(),vSizes.data())),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
+        MatSize_(const std::vector<Tinteger2>& vSizes) :
+                m_vSizes(cvtSizes((Tinteger2)vSizes.size(),vSizes.data())) {}
+        /// initlist-based constructor
+        template<typename Tinteger2>
+        MatSize_(const std::initializer_list<Tinteger2>& aSizes) :
+                m_vSizes(cvtSizes((Tinteger2)aSizes.size(),aSizes.begin())) {}
         /// explicit dims constructor; initializes internal config by casting all provided args
         template<typename... Tintegers>
-        MatSizeInfo_(Tintegers... anSizes) :
-                m_vSizes{Tinteger(sizeof...(anSizes)),Tinteger(anSizes)...},m_aSizes(m_vSizes.data()+1) {
+        MatSize_(Tintegers... anSizes) :
+                m_vSizes{Tinteger(sizeof...(anSizes)),Tinteger(anSizes)...} {
             static_assert(lv::static_reduce(std::array<bool,sizeof...(Tintegers)>{(std::is_integral<Tintegers>::value)...},lv::static_reduce_and),"all given args should be integral");
-            for(int nDimIdx=0; nDimIdx<dims(); ++nDimIdx)
-                lvAssert_(m_aSizes[nDimIdx]>=Tinteger(0),"sizes must be null or positive values");
+            for(Tinteger nDimIdx=0; nDimIdx<dims(); ++nDimIdx)
+                lvAssert_(size(nDimIdx)>=Tinteger(0),"sizes must be null or positive values");
         }
         /// copy constructor for similar struct
         template<typename Tinteger2>
-        MatSizeInfo_(const cv::MatSizeInfo_<Tinteger2>& oSize) :
-                m_vSizes(cvtSizes(oSize.m_vSizes.data()+1)),m_aSizes(m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr) {}
+        MatSize_(const MatSize_<Tinteger2>& oSize) :
+                m_vSizes(cvtSizes(oSize.m_vSizes.data()+1)) {}
         /// returns the dimension count
         const Tinteger& dims() const {
             lvDbgAssert(!m_vSizes.empty()); // all constructors should guarantee proper sizing
@@ -103,14 +336,21 @@ namespace cv { // extending cv
         const Tinteger& size(Tindex nDimIdx) const {
             static_assert(std::is_integral<Tindex>::value,"need an integer type for dimensions/size indexing");
             lvDbgAssert__((Tinteger)nDimIdx<dims(),"dimension index is out of bounds (dims=%d)",(int)dims());
-            return m_aSizes[nDimIdx];
+            return m_vSizes[nDimIdx+1];
         }
         /// returns the (modifiable) size at a given dimension index
         template<typename Tindex>
         Tinteger& size(Tindex nDimIdx) {
             static_assert(std::is_integral<Tindex>::value,"need an integer type for dimensions/size indexing");
             lvDbgAssert__((Tinteger)nDimIdx<dims(),"dimension index is out of bounds (dims=%d)",(int)dims());
-            return m_aSizes[nDimIdx];
+            return m_vSizes[nDimIdx+1];
+        }
+        /// returns the (unmodifiable) size array converted to int, for inline cv mat creation (non-trivial)
+        const int* sizes() const {
+            m_vSizesExt.resize(m_vSizes.size());
+            for(size_t nIdx=0; nIdx<m_vSizes.size(); ++nIdx)
+                m_vSizesExt[nIdx] = (int)m_vSizes[nIdx];
+            return m_vSizesExt.data()+1;
         }
         /// returns the size at a given dimension index
         template<typename Tindex>
@@ -132,9 +372,22 @@ namespace cv { // extending cv
         Tinteger& operator()(Tindex nDimIdx) {
             return size(nDimIdx);
         }
+        /// converts the internal sizes and returns them as a cv::Size struct
+        cv::Size operator()() const {
+            return (cv::Size)*this;
+        }
         /// implicit conversion op to raw 'Tinteger' size lookup array
         operator const Tinteger*() const {
-            return m_aSizes;
+            return m_vSizes.data()+1;
+        }
+        /// implicit conversion op to string (for printing/debug purposes only)
+        operator std::string() const {
+            if(dims()==Tinteger(0))
+                return "0-d:[]<empty>";
+            std::string res = std::to_string((int)dims())+"-d:[";
+            for(Tinteger nDimIdx=0; nDimIdx<dims(); ++nDimIdx)
+                res += std::to_string((int)size(nDimIdx))+(nDimIdx<dims()-1?",":"");
+            return res+"]"+(total()>0?"":"<empty>");
         }
         /// implicit conversion op to cv::MatSize (non-trivial)
         operator cv::MatSize() const {
@@ -164,7 +417,7 @@ namespace cv { // extending cv
             else if(nDims==Tinteger(2))
                 return size(0)==(Tinteger)oSize[0] && size(1)==(Tinteger)oSize[1];
             for(Tinteger nDimIdx=0; nDimIdx<nDims; ++nDimIdx)
-                if(size(nDimIdx)!=(Tinteger)oSize[nDimIdx])
+                if(size(nDimIdx)!=(Tinteger)oSize[(int)nDimIdx])
                     return false;
             return true;
         }
@@ -172,9 +425,9 @@ namespace cv { // extending cv
         bool operator!=(const cv::MatSize& oSize) const {
             return !(*this==oSize);
         }
-        /// is-equal test operator for other MatSizeInfo_ structs
+        /// is-equal test operator for other MatSize_ structs
         template<typename Tinteger2>
-        bool operator==(const MatSizeInfo_<Tinteger2>& oSize) const {
+        bool operator==(const MatSize_<Tinteger2>& oSize) const {
             if(empty() && oSize.empty())
                 return true;
             const Tinteger nDims = dims();
@@ -187,17 +440,35 @@ namespace cv { // extending cv
                     return false;
             return true;
         }
-        /// is-not-equal test operator for other MatSizeInfo_ structs
+        /// is-not-equal test operator for other MatSize_ structs
         template<typename Tinteger2>
-        bool operator!=(const MatSizeInfo_<Tinteger2>& oSize) const {
+        bool operator!=(const MatSize_<Tinteger2>& oSize) const {
             return !(*this==oSize);
         }
-        /// assignment operator for different templated integer struct
+        /// assignment operator for other MatSize_ structs
         template<typename Tinteger2>
-        MatSizeInfo_& operator=(const cv::MatSizeInfo_<Tinteger2>& oSize) {
+        MatSize_& operator=(const MatSize_<Tinteger2>& oSize) {
             m_vSizes = cvtSizes(oSize.m_vSizes.data()+1);
-            m_aSizes = m_vSizes[0]>Tinteger(0)?m_vSizes.data()+1:nullptr;
             return *this;
+        }
+        /// move-assignment operator for other MatSize_ structs
+        template<typename Tinteger2>
+        MatSize_& operator=(MatSize_<Tinteger2>&& oSize) {
+            m_vSizes = cvtSizes(oSize.m_vSizes.data()+1);
+            return *this;
+        }
+        /// mult-assign operator to rescale all internal dimensions at once
+        MatSize_& operator*=(double dScale) {
+            for(Tinteger nDimIdx=0; nDimIdx<dims(); ++nDimIdx)
+                size(nDimIdx) *= dScale;
+            return *this;
+        }
+        /// mult operator which returns a rescaled copy of this object
+        MatSize_ operator*(double dScale) const {
+            lv::MatSize_<Tinteger> oNewSize = *this;
+            for(Tinteger nDimIdx=0; nDimIdx<oNewSize.dims(); ++nDimIdx)
+                oNewSize.size(nDimIdx) *= dScale;
+            return oNewSize;
         }
         /// returns the number of elements in the current configuration (i.e. by multiplying all dim sizes)
         size_t total() const {
@@ -208,9 +479,18 @@ namespace cv { // extending cv
                 nElem *= size_t(size(nDimIdx));
             return nElem;
         }
+        /// returns a transposed version of the current size (only valid for 2 dimensions)
+        MatSize_ transpose() const {
+            lvAssert__(dims()==2,"size struct must have 2 dimensions (had %d)",(int)dims());
+            return lv::MatSize_<Tinteger>(size(1),size(0));
+        }
         /// returns whether the current configuration contains elements or not (i.e. if all dim sizes are non-null)
         bool empty() const {
             return total()==size_t(0);
+        }
+        /// returns the result of the implicit std::string cast (i.e. dim count & sizes in a string)
+        std::string str() const {
+            return (std::string)*this;
         }
     protected:
         static_assert(std::is_integral<Tinteger>::value,"need an integer type for dimensions/size indexing");
@@ -238,34 +518,126 @@ namespace cv { // extending cv
         }
     private:
         template<typename Tinteger2>
-        friend struct MatSizeInfo_;
-        mutable std::vector<int> m_vSizesExt; // needed for cast to MatSize/int* only
+        friend struct MatSize_;
+        mutable std::vector<int> m_vSizesExt; // needed for cast to cv::MatSize/int* only
         std::vector<Tinteger> m_vSizes;
-        Tinteger* m_aSizes;
     };
 
-    /// default MatSizeInfo struct defaults to size_t for dim/size indexing
-    using MatSizeInfo = MatSizeInfo_<size_t>;
+    /// mat dim size helper struct defaults to size_t for dim/size indexing
+    using MatSize = MatSize_<size_t>;
 
-    /// ostream-friendly overload for MatSizeInfo (ADL will allow usage from this namespace)
+    /// ostream-friendly overload for MatSize (ADL will allow usage from this namespace)
     template<typename Tinteger>
-    std::ostream& operator<<(std::ostream& os, const MatSizeInfo_<Tinteger>& oSize) {
-        if(oSize.dims()==Tinteger(0))
-            return os << "0-d:[]<empty>";
-        os << (int)oSize.dims() << "-d:[";
-        for(Tinteger nDimIdx=0; nDimIdx<oSize.dims(); ++nDimIdx)
-            os << (int)oSize[nDimIdx] << (nDimIdx<oSize.dims()-1?",":"");
-        return os << "]" << (oSize.total()>0?"":"<empty>");
+    std::ostream& operator<<(std::ostream& os, const MatSize_<Tinteger>& oSize) {
+        return os << oSize.str();
     }
 
-    /// simplified cv::Mat header info container for usage in datasets module; contains all required info to preallocate matrix packets
+    /// simplified cv::Mat header info container for matrix preallocation
     struct MatInfo {
         /// contains info about the layout of the matrix's elements
-        MatSizeInfo m_oSize;
-        /// contains info about the type of the matrix's elements (i.e. using the OpenCV type defines)
-        int m_nCVType;
-        // @@@@ todo, add to datasets module to replace all cv::Size
+        MatSize size;
+        /// contains info about the type of the matrix's elements
+        MatType type;
+        /// default MatInfo constructor
+        MatInfo() = default;
+        /// cv::Mat-based constructor
+        MatInfo(const cv::Mat& m) : size(m.size),type(m.type()) {}
+        /// size/type-based constructor
+        MatInfo(const MatSize& s, const MatType& t) : size(s),type(t) {}
+        /// copy constructor
+        MatInfo(const MatInfo& o) = default;
+        /// is-equal test operator for other MatInfo structs
+        bool operator==(const MatInfo& o) const {return size==o.size && type==o.type;}
+        /// is-not-equal test operator for other MatInfo structs
+        bool operator!=(const MatInfo& o) const {return !(*this==o);}
+        /// implicit conversion op to string (for printing/debug purposes only)
+        operator std::string() const {return std::string("{")+((std::string)size)+" "+((std::string)type)+"}";}
+        /// returns the result of the implicit std::string cast (i.e. full type/size info in a string)
+        std::string str() const {return (std::string)*this;}
     };
+
+    /// ostream-friendly overload for MatInfo (ADL will allow usage from this namespace)
+    inline std::ostream& operator<<(std::ostream& os, const MatInfo& oInfo) {
+        return os << oInfo.str();
+    }
+
+    /// converts a generic (non-templated) cv mat to a basic (without channels) templated cv mat, without copying data
+    template<typename T>
+    inline cv::Mat_<T> getBasicMat(const cv::Mat& oMat) {
+        static_assert(isDataTypeCompat<T>(),"matrix type must be cv-compatible, and without channels");
+        lvAssert_(lv::MatType(oMat.type()).isTypeCompat<T>(),"input mat type is not compatible with required output type");
+        if(oMat.channels()==1)
+            return cv::Mat_<T>(oMat.dims,oMat.size,const_cast<T*>((const T*)oMat.data));
+        std::vector<int> vDims((size_t)(oMat.dims+1),oMat.channels());
+        for(int nDimIdx=0; nDimIdx<oMat.dims; ++nDimIdx)
+            vDims[nDimIdx] = oMat.size[nDimIdx];
+        return cv::Mat_<T>(oMat.dims+1,vDims.data(),const_cast<T*>((const T*)oMat.data));
+    }
+
+    /// returns a subselection of a n-dimension matrix by specifying one dim+range pair, without copying data
+    template<typename TMat>
+    inline TMat getSubMat(const TMat& oMat, int nTargetDimIdx, const cv::Range& aTargetElemIdxs) {
+        lvAssert_(nTargetDimIdx<oMat.dims,"target dimension out of bounds");
+        lvAssert_(aTargetElemIdxs!=cv::Range::all(),"using full range returns identical matrix");
+        lvAssert_(aTargetElemIdxs.start>=0 && aTargetElemIdxs.end<=oMat.size[oMat.dims-1],"target element indice(s) out of bounds");
+        std::vector<cv::Range> vRanges((size_t)oMat.dims,cv::Range::all());
+        vRanges[nTargetDimIdx] = aTargetElemIdxs;
+        return oMat(vRanges.data());
+    }
+
+    /// returns a subselection of a n-dimension matrix by specifying one dim+elemidx pair, without copying data
+    template<typename TMat>
+    inline TMat getSubMat(const TMat& oMat, int nTargetDimIdx, int nTargetElemIdx) {
+        lvAssert_(nTargetDimIdx<oMat.dims,"target dimension out of bounds");
+        lvAssert_(nTargetElemIdx>=0 && nTargetElemIdx<oMat.size[oMat.dims-1],"target element index out of bounds");
+        std::vector<cv::Range> vRanges((size_t)oMat.dims,cv::Range::all());
+        vRanges[nTargetDimIdx] = cv::Range(nTargetElemIdx,nTargetElemIdx+1);
+        return oMat(vRanges.data());
+    }
+
+    /// fills the output mat with the same elements as the input, reshaping it to avoid singleton dimensions (2d mats are unaffected)
+    template<typename TMat>
+    inline void squeeze(const TMat& oInput, TMat& oOutput) {
+        // note: cannot operate in-place as opencv often fucks up indexing if last dimension step is not the element size
+        if(oInput.dims<=2 || oInput.total()==size_t(0)) {
+            oInput.copyTo(oOutput);
+            return;
+        }
+        std::vector<int> vSizes;
+        std::vector<size_t> vSteps;
+        for(int nDimIdx=0; nDimIdx<oInput.dims; ++nDimIdx) {
+            if(oInput.size[nDimIdx]>1) {
+                vSizes.push_back(oInput.size[nDimIdx]);
+                vSteps.push_back(oInput.step[nDimIdx]);
+            }
+        }
+        if(vSizes.empty()) {
+            lvDbgAssert(oInput.total()==size_t(1));
+            cv::Mat(1,1,oInput.type(),oInput.data).copyTo(oOutput);
+            return;
+        }
+        else if(vSizes.size()==size_t(1)) {
+            lvDbgAssert(oInput.total()==size_t(vSizes[0]));
+            cv::Mat(vSizes[0],1,oInput.type(),oInput.data,vSteps[0]).copyTo(oOutput);
+            oOutput = oOutput.reshape(0,1);
+            return;
+        }
+        lvDbgAssert(std::accumulate(vSizes.begin(),vSizes.end(),1,[](int a, int b){return a*b;})==(int)oInput.total());
+        const std::vector<int> vRealSizes = vSizes;
+        vSizes.push_back(1); // again, needed due to opencv commonly ignoring last dim step size
+        vSteps.push_back(lv::MatType(oInput.type()).elemSize());
+        cv::Mat((int)vSizes.size(),vSizes.data(),oInput.type(),oInput.data,vSteps.data()).copyTo(oOutput);
+        oOutput = oOutput.reshape(0,(int)vRealSizes.size(),vRealSizes.data());
+    }
+
+    /// returns a new (cloned) mat containing the same elements as the input, but without singleton dimensions (2d mats are unaffected)
+    template<typename TMat>
+    inline TMat squeeze(const TMat& oInput) {
+        // note: cannot operate in-place as opencv often fucks up indexing if last dimension step is not the element size
+        TMat oOutput;
+        lv::squeeze(oInput,oOutput);
+        return oOutput;
+    }
 
     /// helper function to zero-init sparse and non-sparse matrices (sparse mat overload)
     template<typename T>
@@ -273,10 +645,34 @@ namespace cv { // extending cv
         oMat.clear();
     }
 
-    /// helper function to zero-init sparse and non-sparse matrices (regular mat specialization)
+    /// helper function to zero-init sparse and non-sparse matrices (regular mat overload)
     template<typename T>
     inline void zeroMat(cv::Mat_<T>& oMat) {
         oMat = T();
+    }
+
+    /// helper function to allocate (via 'create') different matrix types (sparse mat overload)
+    template<typename T>
+    inline void allocMat(cv::SparseMat_<T>& oMat, const std::vector<int>& aSizes, int nType) {
+        lvAssert_(oMat.type()==nType,"bad runtime alloc type for specialized mat");
+        oMat.create((int)aSizes.size(),aSizes.data());
+    }
+
+    /// helper function to allocate (via 'create') different matrix types (sparse mat overload)
+    inline void allocMat(cv::SparseMat& oMat, const std::vector<int>& aSizes, int nType) {
+        oMat.create((int)aSizes.size(),aSizes.data(),nType);
+    }
+
+    /// helper function to allocate (via 'create') different matrix types (dense mat overload)
+    template<typename T>
+    inline void allocMat(cv::Mat_<T>& oMat, const std::vector<int>& aSizes, int nType) {
+        lvAssert_(oMat.type()==nType,"bad runtime alloc type for specialized mat");
+        oMat.create((int)aSizes.size(),aSizes.data());
+    }
+
+    /// helper function to allocate (via 'create') different matrix types (dense mat overload)
+    inline void allocMat(cv::Mat& oMat, const std::vector<int>& aSizes, int nType) {
+        oMat.create((int)aSizes.size(),aSizes.data(),nType);
     }
 
     /// helper function to fetch iterator location from sparse and non-sparse matrices (sparse iter overload)
@@ -318,6 +714,51 @@ namespace cv { // extending cv
     template<typename T>
     inline size_t getElemCount(const cv::Mat_<T>& oMat) {
         return oMat.total();
+    }
+
+    /// concatenates all given matrices into one matrix horizontally or vertically, resizing each to the first matrix's size if needed
+    template<int nResizeInterpFlag=cv::INTER_CUBIC, typename TMat>
+    inline void concat(const std::vector<TMat>& vMats, TMat& oOutput, bool bHorizontal=true) {
+        lvAssert_(!vMats.empty(),"mat array must not be empty");
+        if(vMats.size()==1) {
+            vMats[0].copyTo(oOutput);
+            return;
+        }
+        for(size_t nMatIdx=1; nMatIdx<vMats.size(); ++nMatIdx) {
+            lvAssert_(vMats[nMatIdx].type()==vMats[0].type(),"all mat types must be identical");
+            lvAssert_(vMats[nMatIdx].dims==2,"function only supports 2d mats");
+        }
+        const int nMats = int(vMats.size());
+        const cv::Size oOrigSize = vMats[0].size();
+        lv::allocMat(oOutput,{bHorizontal?oOrigSize.height:oOrigSize.height*nMats,bHorizontal?oOrigSize.width*nMats:oOrigSize.width},vMats[0].type());
+        vMats[0].copyTo(oOutput(cv::Rect(0,0,oOrigSize.width,oOrigSize.height)));
+        for(int nMatIdx=1; nMatIdx<nMats; ++nMatIdx) {
+            const cv::Rect oOutputRect(bHorizontal?oOrigSize.width*nMatIdx:0,bHorizontal?0:oOrigSize.height*nMatIdx,oOrigSize.width,oOrigSize.height);
+            if(vMats[nMatIdx].size()==oOrigSize)
+                vMats[nMatIdx].copyTo(oOutput(oOutputRect));
+            else
+                cv::resize(vMats[nMatIdx],oOutput(oOutputRect),oOrigSize,0,0,nResizeInterpFlag);
+        }
+    }
+
+    /// concatenates all given matrices into one matrix horizontally or vertically, resizing each to the first matrix's size if needed
+    template<int nResizeInterpFlag=cv::INTER_CUBIC, typename TMat>
+    inline TMat concat(const std::vector<TMat>& vMats, bool bHorizontal=true) {
+        TMat oOutput;
+        lv::concat<nResizeInterpFlag>(vMats,oOutput,bHorizontal);
+        return oOutput;
+    }
+
+    /// concatenates all given matrices into one matrix horizontally or vertically, resizing each to the first matrix's size if needed
+    template<int nResizeInterpFlag=cv::INTER_CUBIC, typename TMat>
+    inline TMat hconcat(const std::vector<TMat>& vMats) {
+        return lv::concat<nResizeInterpFlag>(vMats,true);
+    }
+
+    /// concatenates all given matrices into one matrix horizontally or vertically, resizing each to the first matrix's size if needed
+    template<int nResizeInterpFlag=cv::INTER_CUBIC, typename TMat>
+    inline TMat vconcat(const std::vector<TMat>& vMats) {
+        return lv::concat<nResizeInterpFlag>(vMats,false);
     }
 
     /// returns pixel coordinates clamped to the given image & border size
@@ -422,20 +863,23 @@ namespace cv { // extending cv
         getRandNeighborPosition<24>(s_anNeighborPattern,nNeighborCoord_X,nNeighborCoord_Y,nOrigCoord_X,nOrigCoord_Y,nBorderSize,oImageSize);
     }
 
-    /// writes a given text string on an image using the original cv::putText (this function only acts as a simplification wrapper)
+    /// computes & returns a logpolar lookup mask using the given output square matrix size & angular/radial bin counts
+    void getLogPolarMask(int nMaskSize, int nRadialBins, int nAngularBins, cv::Mat_<int>& oOutputMask, bool bUseLienhartMask=true, float fRadiusOffset=0.0f, int* pnFirstMaskIdx=nullptr, int* pnLastMaskIdx=nullptr);
+
+    /// writes a given text string on an image using the original cv::putText
     inline void putText(cv::Mat& oImg, const std::string& sText, const cv::Scalar& vColor, bool bBottom=false, const cv::Point2i& oOffset=cv::Point2i(4,15), int nThickness=2, double dScale=1.2) {
         cv::putText(oImg,sText,cv::Point(oOffset.x,bBottom?(oImg.rows-oOffset.y):oOffset.y),cv::FONT_HERSHEY_PLAIN,dScale,vColor,nThickness,cv::LINE_AA);
     }
 
     /// prints the content of a matrix to the given stream with constant output element size
     template<typename T>
-    inline void printMatrix(const cv::Mat_<T>& oMat, std::ostream& os=std::cout) {
+    inline std::ostream& print(const cv::Mat_<T>& oMat, const cv::Point2i& oDisplayIdxOffset={0,0}, std::ostream& os=std::cout) {
+        static_assert(isDataTypeCompat<T>(),"matrix type must be cv-compatible, and without channels");
         lvAssert_(oMat.dims==2,"function currently only defined for 2d mats; split dims and call for 2d slices");
-        if(oMat.empty() || oMat.size().area()==0) {
-            os << "   <empty>" << std::endl;
-            return;
-        }
-        const size_t nMaxMetaColWidth = (size_t)std::max(lv::digit_count(oMat.cols),lv::digit_count(oMat.rows));
+        os << " CVMATRIX " << lv::MatInfo(oMat) << '\n';
+        if(oMat.empty() || oMat.size().area()==0)
+            return os;
+        const size_t nMaxMetaColWidth = (size_t)std::max(std::max(lv::digit_count(oMat.cols+oDisplayIdxOffset.x),lv::digit_count(oMat.rows+oDisplayIdxOffset.y)),std::max(lv::digit_count(oDisplayIdxOffset.x),lv::digit_count(oDisplayIdxOffset.y)));
         double dMin,dMax;
         cv::minMaxIdx(oMat,&dMin,&dMax);
         const T tMin = (T)dMin;
@@ -444,22 +888,93 @@ namespace cv { // extending cv
         using PrintType = std::conditional_t<bIsFloat,float,int64_t>;
         const bool bIsNormalized = tMax<=T(1) && tMin>=T(0); // useful for floats only
         const bool bHasNegative = int64_t(tMin)<int64_t(0);
-        const size_t nMaxColWidth = size_t(bIsFloat?(bIsNormalized?6:(std::max(lv::digit_count((int64_t)tMin),lv::digit_count((int64_t)tMax))+5+int(bHasNegative!=0))):(std::max(lv::digit_count(tMin),lv::digit_count(tMax))+int(bHasNegative!=0)));
+        const size_t nMaxColWidth = std::max(size_t(bIsFloat?(bIsNormalized?6:(std::max(lv::digit_count((int64_t)tMin),lv::digit_count((int64_t)tMax))+5+int(bHasNegative!=0))):(std::max(lv::digit_count(tMin),lv::digit_count(tMax))+int(bHasNegative!=0))),nMaxMetaColWidth);
         const std::string sFormat = bIsFloat?(bIsNormalized?std::string("%6.4f"):((bHasNegative?std::string("%+"):std::string("%"))+std::to_string(nMaxColWidth)+std::string(".4f"))):((bHasNegative?std::string("%+"):std::string("%"))+std::to_string(nMaxColWidth)+std::string(PRId64));
         const std::string sMetaFormat = std::string("%")+std::to_string(nMaxMetaColWidth)+"i";
-        const std::string sSpacer = "  ";
-        const auto lPrinter = [&](const T& v) {os << sSpacer << lv::putf(sFormat.c_str(),(PrintType)v);};
-        os << std::endl << std::string("   ")+std::string(nMaxMetaColWidth,' ')+std::string("x=");
+        const auto lPrinter = [&](const T& v) {os << "  " << lv::putf(sFormat.c_str(),(PrintType)v);};
+        os << std::string(nMaxMetaColWidth+3,' ') << "x=";
         for(int nColIdx=0; nColIdx<oMat.cols; ++nColIdx)
-            os << sSpacer << lv::clampString(lv::putf(sMetaFormat.c_str(),nColIdx),nMaxColWidth);
-        os << std::endl << std::endl;
+            os << "  " << lv::clampString(lv::putf(sMetaFormat.c_str(),nColIdx+oDisplayIdxOffset.x),nMaxColWidth);
+        os << '\n';
+        os << std::string(nMaxMetaColWidth+5,' ');
+        for(int nColIdx=0; nColIdx<oMat.cols; ++nColIdx)
+            os << "--" << lv::clampString("-",nMaxColWidth,'-');
+        os << '\n';
         for(int nRowIdx=0; nRowIdx<oMat.rows; ++nRowIdx) {
-            os << " y=" << lv::putf(sMetaFormat.c_str(),nRowIdx) << sSpacer;
+            os << " y=" << lv::putf(sMetaFormat.c_str(),nRowIdx+oDisplayIdxOffset.y) << " |";
             for(int nColIdx=0; nColIdx<oMat.cols; ++nColIdx)
                 lPrinter(oMat.template at<T>(nRowIdx,nColIdx));
-            os << std::endl;
+            os << '\n';
         }
-        os << std::endl;
+        return os;
+    }
+
+    /// prints the content of a (non templated) matrix to the given stream with constant output element size
+    inline std::ostream& print(const cv::Mat& oMat, const cv::Point2i& oDisplayIdxOffset={0,0}, std::ostream& os=std::cout) {
+        if(oMat.depth()==CV_8U)
+            return lv::print<uint8_t>(lv::getBasicMat<uint8_t>(oMat),oDisplayIdxOffset,os);
+        else if(oMat.depth()==CV_8S)
+            return lv::print<int8_t>(lv::getBasicMat<int8_t>(oMat),oDisplayIdxOffset,os);
+        else if(oMat.depth()==CV_16U)
+            return lv::print<uint16_t>(lv::getBasicMat<uint16_t>(oMat),oDisplayIdxOffset,os);
+        else if(oMat.depth()==CV_16S)
+            return lv::print<int16_t>(lv::getBasicMat<int16_t>(oMat),oDisplayIdxOffset,os);
+        else if(oMat.depth()==CV_32S)
+            return lv::print<int32_t>(lv::getBasicMat<int32_t>(oMat),oDisplayIdxOffset,os);
+        else if(oMat.depth()==CV_32F)
+            return lv::print<float>(lv::getBasicMat<float>(oMat),oDisplayIdxOffset,os);
+        else if(oMat.depth()==CV_64F)
+            return lv::print<double>(lv::getBasicMat<double>(oMat),oDisplayIdxOffset,os);
+        else
+            lvError("unexpected input matrix depth");
+    }
+
+    /// provides a printable string of the content of a matrix with constant output element size
+    template<typename T>
+    inline std::string to_string(const cv::Mat_<T>& oMat, const cv::Point2i& oDisplayIdxOffset={0,0}) {
+        std::stringstream ssStr;
+        lv::print<T>(oMat,oDisplayIdxOffset,ssStr);
+        return ssStr.str();
+    }
+
+    /// provides a printable string of the content of a (non-templated) matrix with constant output element size
+    inline std::string to_string(const cv::Mat& oMat, const cv::Point2i& oDisplayIdxOffset={0,0}) {
+        std::stringstream ssStr;
+        lv::print(oMat,oDisplayIdxOffset,ssStr);
+        return ssStr.str();
+    }
+
+#ifndef _MSC_VER
+
+    // the SFINAE trick below fails on MSVC2015v3; must find alternative (avoid constexpr?)
+
+    /// prints the content of a vector (via matrix formatting) to the given stream
+    template<typename T>
+    std::enable_if_t<(!isDataTypeCompat<T>()),std::ostream&> print(const std::vector<T>& oVec, int nDisplayIdxOffset=0, std::ostream& os=std::cout) {
+        os << " VECTOR (size=" << oVec.size() << ")\n";
+        if(oVec.empty())
+            return os;
+        const size_t nMaxMetaColWidth = (size_t)std::max(lv::digit_count((int)oVec.size()+nDisplayIdxOffset),lv::digit_count(nDisplayIdxOffset));
+        const std::string sMetaFormat = std::string("%")+std::to_string(nMaxMetaColWidth)+"i";
+        for(size_t nElemIdx=0; nElemIdx<oVec.size(); ++nElemIdx)
+            os << "  x=" << lv::putf(sMetaFormat.c_str(),(int)nElemIdx+nDisplayIdxOffset) << "  :  " << oVec[nElemIdx] << '\n';
+        return os;
+    }
+
+    /// prints the content of a vector (via matrix formatting) to the given stream
+    template<typename T>
+    std::enable_if_t<(isDataTypeCompat<T>()),std::ostream&> print(const std::vector<T>& oVec, int nDisplayIdxOffset, std::ostream& os) {
+        return lv::print<T>(cv::Mat_<T>(1,(int)oVec.size(),const_cast<T*>(oVec.data())),cv::Point2i(nDisplayIdxOffset,0),os);
+    }
+
+#endif //ndef(_MSC_VER)
+
+    /// provides a printable string of the content of a vector with constant output element size
+    template<typename T>
+    inline std::string to_string(const std::vector<T>& oVec, int nDisplayIdxOffset=0) {
+        std::stringstream ssStr;
+        lv::print<T>(oVec,nDisplayIdxOffset,ssStr);
+        return ssStr.str();
     }
 
     /// removes all keypoints from voKPs which fall on null values (or outside the bounds) of oROI
@@ -493,39 +1008,33 @@ namespace cv { // extending cv
         if(a.dims!=b.dims || a.size!=b.size || a.type()!=b.type())
             return false;
         lvDbgAssert(a.total()*a.elemSize()==b.total()*b.elemSize());
-        if(a.isContinuous() && b.isContinuous())
+        if(a.isContinuous() && b.isContinuous()) {
+            lvAssert_(a.elemSize()>=sizeof(T),"unsupported element type for comparison");
             return std::equal((T*)a.data,(T*)(a.data+a.total()*a.elemSize()),(T*)b.data);
-        else {
-            lvAssert_(a.dims==2,"undefined for non-continuous, multi-dim matrices");
-            for(int nRowIdx=0; nRowIdx<a.rows; ++nRowIdx)
-                for(int nColIdx=0; nColIdx<a.cols; ++nColIdx)
-                    if(a.at<T>(nRowIdx,nColIdx)!=b.at<T>(nRowIdx,nColIdx))
-                        return false;
-            return true;
         }
+        lvAssert_(a.elemSize()==sizeof(T),"unsupported element type for comparison");
+        return std::equal(a.begin<T>(),a.end<T>(),b.begin<T>());
     }
 
     /// returns whether the two matrices are nearly equal or not, given a maximum allowed error
     template<typename T, typename Teps>
-    inline bool isNearlyEqual(const cv::Mat& a, const cv::Mat& b, Teps eps) {
-        if(a.empty() && b.empty())
+    inline bool isNearlyEqual(const cv::Mat& a_, const cv::Mat& b_, Teps eps) {
+        static_assert(isDataTypeCompat<T>(),"internal elem type must be cv-compatible, and not vectorized");
+        if(a_.empty() && b_.empty())
             return true;
-        if(a.dims!=b.dims || a.size!=b.size || a.type()!=b.type())
+        if(a_.dims!=b_.dims || a_.size!=b_.size || a_.type()!=b_.type())
             return false;
-        lvDbgAssert(a.total()*a.elemSize()==b.total()*b.elemSize());
+        lvDbgAssert(a_.total()*a_.elemSize()==b_.total()*b_.elemSize());
+        lvAssert_(lv::MatType(a_.type()).isTypeCompat<T>(),"templated element type mismatch with input mats");
+        cv::Mat_<T> a = lv::getBasicMat<T>(a_), b = lv::getBasicMat<T>(b_);
         const double dEps = double(eps);
         if(a.isContinuous() && b.isContinuous())
             return std::equal((T*)a.data,(T*)(a.data+a.total()*a.elemSize()),(T*)b.data,[&dEps](const T& _a, const T& _b){
                 return std::abs(double(_a)-double(_b))<=dEps;
             });
-        else {
-            lvAssert_(a.dims==2,"undefined for non-continuous, multi-dim matrices");
-            for(int nRowIdx=0; nRowIdx<a.rows; ++nRowIdx)
-                for(int nColIdx=0; nColIdx<a.cols; ++nColIdx)
-                    if(std::abs(double(a.at<T>(nRowIdx,nColIdx))-double(b.at<T>(nRowIdx,nColIdx)))>dEps)
-                        return false;
-            return true;
-        }
+        return std::equal(a.begin(),a.end(),b.begin(),[&dEps](const T& _a, const T& _b){
+            return std::abs(double(_a)-double(_b))<=dEps;
+        });
     }
 
     /// converts a single HSL triplet (0-360 hue, 0-1 sat & lightness) into an 8-bit RGB triplet
@@ -594,7 +1103,7 @@ namespace cv { // extending cv
         oOutput.allocator = voInputs[0].allocator = voInputs[1].allocator = voInputs[2].allocator = getMatAllocator16a();
         cv::split(oInput_YCrCb,voInputs);
         lvDbgAssert(voInputs.size()==size_t(3) && voInputs[0].size==oInput.size && voInputs[1].size==oInput.size && voInputs[2].size==oInput.size);
-        oOutput.create(oInput.dims,oInput.size.operator const int *());
+        oOutput.create(oInput.dims,oInput.size.operator const int*());
         for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {
             const uchar* pYRow = voInputs[0].ptr<uchar>(nRowIdx), *pCrRow = voInputs[1].ptr<uchar>(nRowIdx), *pCbRow = voInputs[2].ptr<uchar>(nRowIdx);
             ushort* pOutputRow = oOutput.ptr<ushort>(nRowIdx);
@@ -687,7 +1196,7 @@ namespace cv { // extending cv
         lvAssert_(m.dims==2,"function currently only defined for 2d mats; split dims and call for 2d slices");
         if(m.empty())
             return cv::Mat();
-        const std::vector<T> vUniques = cv::unique(m);
+        const std::vector<T> vUniques = lv::unique(m);
         const size_t nColors = vUniques.size();
         if(nColors<=1)
             return cv::Mat(m.size(),CV_8UC3,cv::Scalar::all(255));
@@ -709,7 +1218,7 @@ namespace cv { // extending cv
                 while(mDivAngSet.count(nCurrAng))
                     ++nCurrAng %= 360;
                 mDivAngSet.insert(nCurrAng);
-                vColors[nColorIdx++] = cv::getBGRFromHSL(float(nCurrAng),fCurrSat,fCurrLight);
+                vColors[nColorIdx++] = lv::getBGRFromHSL(float(nCurrAng),fCurrSat,fCurrLight);
                 nCurrAng = (nCurrAng+360/nSampleCount)%360;
             }
         }
@@ -733,9 +1242,11 @@ namespace cv { // extending cv
         const std::string m_sDisplayName;
         /// displayed window maximum size (specified on creation)
         const cv::Size m_oMaxDisplaySize;
-        /// general-use file storage tied to the display helper (will be closed & printed on helper destruction)
+        /// displayed window flags (specified on creation)
+        const int m_nDisplayFlags;
+        /// general-use file storage tied to the display helper (will be closed & flushed on destruction)
         cv::FileStorage m_oFS;
-        /// public mutex that should be always used if m_oLatestMouseEvent is accessed externally
+        /// public mutex that should be always used if callback data is accessed externally
         std::mutex m_oEventMutex;
         /// raw-interpreted callback data structure
         struct CallbackData {
@@ -754,6 +1265,8 @@ namespace cv { // extending cv
         void display(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oOutputImg, size_t nIdx);
         /// will reformat the given images, print their names and mouse cursor point on them, and show them based on row-col ordering
         void display(const std::vector<std::vector<std::pair<cv::Mat,std::string>>>& vvImageNamePairs, const cv::Size& oSuggestedTileSize);
+        /// will reformat the given images, print their names and mouse cursor point on them, show them as a scrollable album via arrow keys, and loop-block
+        void displayAlbumAndWaitKey(const std::vector<std::pair<cv::Mat,std::string>>& vImageNamePairs, int nDefaultSleepDelay=1);
         /// sets the provided external function to be called when mouse events are captured for the displayed window
         void setMouseCallback(std::function<void(const CallbackData&)> lCallback);
         /// sets whether the waitKey call should block and wait for a key press or allow timeouts and return without one
@@ -779,7 +1292,7 @@ namespace cv { // extending cv
         DisplayHelper& operator=(const DisplayHelper&) = delete;
     };
 
-    /// list of archive types supported by cv::write and cv::read
+    /// list of archive types supported by lv::write and lv::read
     enum MatArchiveList {
         MatArchive_FILESTORAGE,
         MatArchive_PLAINTEXT,
@@ -793,9 +1306,14 @@ namespace cv { // extending cv
     /// reads matrix data locally using a binary/yml/text file format (inline version)
     inline cv::Mat read(const std::string& sFilePath, MatArchiveList eArchiveType=MatArchive_BINARY) {
         cv::Mat oData;
-        cv::read(sFilePath,oData,eArchiveType);
+        lv::read(sFilePath,oData,eArchiveType);
         return oData;
     }
+
+    /// packs the data of several matrices into a bigger one (memalloc defrag helper)
+    cv::Mat packData(const std::vector<cv::Mat>& vMats, std::vector<MatInfo>* pvOutputPackInfo=nullptr);
+    /// unpacks the data of a matrix into several matrices (note: no allocation is done! lifetime of mat vec is tied to lifetime of input mat)
+    std::vector<cv::Mat> unpackData(const cv::Mat& oPacket, const std::vector<MatInfo>& vPackInfo);
 
     /// shifts the values in a matrix by an (x,y) offset (see definition for full info)
     void shift(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Point2f& vDelta, int nFillType=cv::BORDER_CONSTANT, const cv::Scalar& vConstantFillValue=cv::Scalar(0,0,0,0));
@@ -804,27 +1322,6 @@ namespace cv { // extending cv
     inline const cv::Mat& emptyMat() {
         static const cv::Mat s_oEmptyMat = cv::Mat();
         return s_oEmptyMat;
-    }
-    /// returns an always-empty-size by reference
-    inline const cv::Size& emptySize() {
-        static const cv::Size s_oEmptySize = cv::Size();
-        return s_oEmptySize;
-    }
-    /// returns an always-empty-mat-size by reference
-    inline const cv::MatSize& emptyMatSize() {
-        static const std::array<int,3> anDims = {0,0,0};
-        static const cv::MatSize s_oEmptyMatSize = cv::MatSize(const_cast<int*>(&anDims[1]));
-        return s_oEmptyMatSize;
-    }
-    /// returns an always-empty-mat by reference
-    inline const std::vector<cv::Mat>& emptyMatArray() {
-        static const std::vector<cv::Mat> s_vEmptyMatArray = std::vector<cv::Mat>();
-        return s_vEmptyMatArray;
-    }
-    /// returns an always-empty-size by reference
-    inline const std::vector<cv::Size>& emptySizeArray() {
-        static const std::vector<cv::Size> s_vEmptySizeArray = std::vector<cv::Size>();
-        return s_vEmptySizeArray;
     }
 
     /// defines an aligned memory allocator to be used in matrices
@@ -836,21 +1333,20 @@ namespace cv { // extending cv
         AlignedMatAllocator() noexcept {}
         AlignedMatAllocator(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept {}
         template<typename T2>
-        this_type& operator=(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept {}
+        this_type& operator=(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept {return *this;}
         virtual ~AlignedMatAllocator() noexcept {}
         virtual cv::UMatData* allocate(int dims, const int* sizes, int type, void* data, size_t* step, int /*flags*/, cv::UMatUsageFlags /*usageFlags*/) const override {
             step[dims-1] = bAlignSingleElem?cv::alignSize(CV_ELEM_SIZE(type),nByteAlign):CV_ELEM_SIZE(type);
             for(int d=dims-2; d>=0; --d)
                 step[d] = cv::alignSize(step[d+1]*sizes[d+1],nByteAlign);
-            const size_t nTotBytes = (size_t)cv::alignSize(step[0]*size_t(sizes[0]),(int)nByteAlign);
             cv::UMatData* u = new cv::UMatData(this);
-            u->size = nTotBytes;
+            u->size = (size_t)cv::alignSize(step[0]*size_t(sizes[0]),(int)nByteAlign);
             if(data) {
                 u->data = u->origdata = static_cast<uchar*>(data);
                 u->flags |= cv::UMatData::USER_ALLOCATED;
             }
             else
-                u->data = u->origdata = lv::AlignedMemAllocator<uchar,nByteAlign>::allocate(nTotBytes);
+                u->data = u->origdata = lv::AlignedMemAllocator<uchar,nByteAlign,true>::allocate(u->size);
             return u;
         }
         virtual bool allocate(cv::UMatData* data, int /*accessFlags*/, cv::UMatUsageFlags /*usageFlags*/) const override {
@@ -862,7 +1358,7 @@ namespace cv { // extending cv
             lvDbgAssert(data->urefcount>=0 && data->refcount>=0);
             if(data->refcount==0) {
                 if(!(data->flags & cv::UMatData::USER_ALLOCATED)) {
-                    lv::AlignedMemAllocator<uchar,nByteAlign>::deallocate(data->origdata,data->size);
+                    lv::AlignedMemAllocator<uchar,nByteAlign,true>::deallocate(data->origdata,data->size);
                     data->origdata = nullptr;
                 }
                 delete data;
@@ -873,10 +1369,28 @@ namespace cv { // extending cv
     /// temp function; msvc seems to disable cuda output unless it is passed as argument to an external-lib function call...?
     void doNotOptimize(const cv::Mat& m);
 
+} // namespace lv
+
+namespace cv { // extending cv
+
 #if USE_OPENCV_MAT_CONSTR_FIX
     template<typename _Tp>
     Mat_<_Tp>::Mat_(int _dims, const int* _sz, _Tp* _data, const size_t* _steps) :
             Mat(_dims, _sz, DataType<_Tp>::type, _data, _steps) {}
 #endif //USE_OPENCV_MAT_CONSTR_FIX
 
+    template<typename T>
+    std::ostream& operator<<(std::ostream& os, const Mat_<T>& oMat) {
+        return lv::print(oMat,cv::Point2i{0,0},os);
+    }
+
 } // namespace cv
+
+namespace std { // extending std
+
+    template<typename T>
+    ostream& operator<<(ostream& os, const vector<T>& oVec) {
+        return lv::print(oVec,0,os);
+    }
+
+} // namespace std

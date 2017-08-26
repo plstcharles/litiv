@@ -33,19 +33,16 @@ namespace lv {
                 const std::string& sOutputDirName, ///< output directory name for debug logs, evaluation reports and results archiving (will be created in CDnet dataset folder)
                 bool bSaveOutput=false, ///< defines whether results should be archived or not
                 bool bUseEvaluator=true, ///< defines whether results should be fully evaluated, or simply acknowledged
-                bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned (useful for GPU upload)
+                bool bForce4ByteDataAlign=false, ///< defines whether data packets should be 4-byte aligned
                 double dScaleFactor=1.0, ///< defines the scale factor to use to resize/rescale read packets
                 bool b2014=true ///< defines whether to use the 2012 or 2014 version of the dataset (each should have its own folder in dataset root)
         ) :
                 IDataset_<eDatasetTask,DatasetSource_Video,Dataset_CDnet,lv::getDatasetEval<eDatasetTask,Dataset_CDnet>(),eEvalImpl>(
                         b2014?"CDnet 2014":"CDnet 2012",
                         lv::datasets::getRootPath()+std::string(b2014?"CDNet2014/dataset/":"CDNet/dataset/"),
-                        lv::datasets::getRootPath()+std::string(b2014?"CDNet2014/":"CDNet/")+lv::addDirSlashIfMissing(sOutputDirName),
-                        "bin",
-                        ".png",
+                        DataHandler::createOutputDir(lv::datasets::getRootPath()+std::string(b2014?"CDNet2014/":"CDNet/")+"results/",sOutputDirName),
                         getWorkBatchDirNames(b2014),
                         std::vector<std::string>(),
-                        getGrayscaleWorkBatchDirNames(),
                         bSaveOutput,
                         bUseEvaluator,
                         bForce4ByteDataAlign,
@@ -62,11 +59,6 @@ namespace lv {
             else
                 return s_vsWorkBatchDirs_2012;
         }
-        /// returns the names of all work batch directories which should be treated as grayscale for this dataset speialization
-        static const std::vector<std::string>& getGrayscaleWorkBatchDirNames() {
-            static const std::vector<std::string> s_vsGrayscaleWorkBatchDirs = {"thermal","turbulence"};
-            return s_vsGrayscaleWorkBatchDirs;
-        }
     };
 
     template<DatasetTaskList eDatasetTask>
@@ -76,11 +68,12 @@ namespace lv {
         virtual void parseData() override final {
             lvDbgExceptionWatch;
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
+            const bool bIsGrayscale = this->getRelativePath().find("thermal")!=std::string::npos || this->getRelativePath().find("turbulence")!=std::string::npos;
             const std::vector<std::string> vsSubDirs = lv::getSubDirsFromDir(this->getDataPath());
             auto gtDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"groundtruth");
             auto inputDir = std::find(vsSubDirs.begin(),vsSubDirs.end(),this->getDataPath()+"input");
             if(gtDir==vsSubDirs.end() || inputDir==vsSubDirs.end())
-                lvError_("CDnet sequence '%s' did not possess the required groundtruth and input directories",this->getName().c_str());
+                lvError_("CDnet sequence '%s' at '%s' did not possess the required groundtruth and input directories",this->getName().c_str(),this->getDataPath().c_str());
             this->m_vsInputPaths = lv::getFilesFromDir(*inputDir);
             this->m_vsGTPaths = lv::getFilesFromDir(*gtDir);
             this->m_nFrameCount = this->m_vsInputPaths.size();
@@ -92,7 +85,7 @@ namespace lv {
             if(oROI.empty() || oTempROI.empty())
                 lvError_("CDnet sequence '%s' did not possess ROI.bmp/ROI.jpg files",this->getName().c_str());
             if(oROI.size()!=oTempROI.size()) {
-                std::cerr << "CDnet sequence '" << this->getName().c_str() << "' ROI images size mismatch; will keep smallest overlap." << std::endl;
+                lvWarn_("CDnet sequence '%s' ROI images size mismatch; will keep smallest overlap.",this->getName().c_str());
                 oROI = oROI(cv::Rect(0,0,std::min(oROI.cols,oTempROI.cols),std::min(oROI.rows,oTempROI.rows))).clone();
             }
             this->m_oInputROI = oROI>0;
@@ -100,7 +93,8 @@ namespace lv {
             if(dScale!=1.0)
                 cv::resize(this->m_oInputROI,this->m_oInputROI,cv::Size(),dScale,dScale,cv::INTER_NEAREST);
             this->m_oGTROI = this->m_oInputROI;
-            this->m_oInputSize = this->m_oGTSize = this->m_oInputROI.size();
+            this->m_oInputInfo = lv::MatInfo{this->m_oInputROI.size(),(bIsGrayscale?CV_8UC1:this->is4ByteAligned()?CV_8UC4:CV_8UC3)};
+            this->m_oGTInfo = lv::MatInfo{this->m_oInputROI.size(),CV_8UC1};
             this->m_mGTIndexLUT.clear();
             for(size_t i=0; i<this->m_nFrameCount; ++i)
                 this->m_mGTIndexLUT[i] = i; // direct gt path index to frame index mapping
@@ -110,9 +104,10 @@ namespace lv {
     template<DatasetEvalList eDatasetEval, lv::ParallelAlgoType eEvalImpl>
     struct DataEvaluator_<eDatasetEval,Dataset_CDnet,eEvalImpl> :
             public DataEvaluatorWrapper_<eDatasetEval,Dataset_CDnet,eEvalImpl> {
+        // standardized names needed here since we might evaluate externally using matlab/python scripts
         virtual std::string getOutputName(size_t nPacketIdx) const override final {
             std::array<char,32> acBuffer;
-            snprintf(acBuffer.data(),acBuffer.size(),"%06zu",nPacketIdx+1);
+            snprintf(acBuffer.data(),acBuffer.size(),"bin%06zu",nPacketIdx+1);
             return std::string(acBuffer.data());
         }
     };

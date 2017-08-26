@@ -56,8 +56,8 @@ list(APPEND CMAKE_PREFIX_PATH
 
 project(litiv)
 set(LITIV_VERSION_MAJOR 1) # last change: 2015/10
-set(LITIV_VERSION_MINOR 4) # last change: 2017/01
-set(LITIV_VERSION_PATCH 0) # last change: 2017/01
+set(LITIV_VERSION_MINOR 5) # last change: 2017/08
+set(LITIV_VERSION_PATCH 0) # last change: 2017/08
 set(LITIV_VERSION "${LITIV_VERSION_MAJOR}.${LITIV_VERSION_MINOR}.${LITIV_VERSION_PATCH}")
 set(LITIV_VERSION_PLAIN "${LITIV_VERSION_MAJOR}${LITIV_VERSION_MINOR}${LITIV_VERSION_PATCH}")
 set(LITIV_VERSION_ABI 0) # still unstable
@@ -81,9 +81,11 @@ else()
 endif()
 option(USE_WORLD_SOURCE_GLOB "Compile all LITIV modules as part of the world module instead of soft-linking them" OFF)
 option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark implementation in litiv_datasets (cleaned 3rd party code; will use an approximative solution otherwise)" ON)
+option(USE_DEBUG_SYMBOLS "Enable debug symbols in all configs, for all targets" OFF)
 option(USE_CVCORE_WITH_UTILS "Include OpenCV core components in utils module" ON)
 option(USE_LINK_TIME_OPTIM "Enable link time optimization" ON)
 option(USE_FAST_MATH "Enable fast math optimization" OFF)
+option(USE_OPENMP "Enable OpenMP in internal implementations" ON)
 if(NOT CMAKE_CROSSCOMPILING)
     option(BUILD_TESTS "Build regression and performance tests with Google Test/Benchmark frameworks" ON)
     option(BUILD_TESTS_PERF "Build & run performance tests alongside regression tests in CTest" OFF)
@@ -97,6 +99,7 @@ mark_as_advanced(
     USE_CVCORE_WITH_UTILS
     USE_LINK_TIME_OPTIM
     USE_FAST_MATH
+    USE_OPENMP
     DATASETS_CACHE_SIZE
 )
 
@@ -105,11 +108,11 @@ find_package(OpenCV 3.0 REQUIRED)
 message(STATUS "Found OpenCV >=3.0 at '${OpenCV_DIR}'")
 
 ### GLSL CHECK
-find_package(OpenGL)
-find_package(FREEGLUT)
-find_package(GLFW)
-find_package(GLEW)
-find_package(GLM)
+find_package(OpenGL QUIET)
+find_package(FREEGLUT QUIET)
+find_package(GLFW QUIET)
+find_package(GLEW QUIET)
+find_package(GLM QUIET)
 set_eval(USE_GLSL_INIT ((${GLFW_FOUND} OR ${FREEGLUT_FOUND}) AND ${OPENGL_FOUND} AND ${GLEW_FOUND} AND ${GLM_FOUND}))
 option(USE_GLSL "Specifies whether GLSL support should be enabled or not; if false, projects that depend on it will be disabled" ${USE_GLSL_INIT})
 if(USE_GLSL)
@@ -139,13 +142,28 @@ else()
     unset(USE_VPTZ_STANDALONE CACHE)
 endif()
 
-### OPENGM CHECK
-find_package(OpenGM COMPONENTS ext)
-option(USE_OPENGM "Specifies whether OpenGM should be included/linked or not; if false, projects that depend on it will be disabled" ${OpenGM_FOUND})
-if(USE_OPENGM)
-    find_package(OpenGM REQUIRED COMPONENTS ext)
+### BOOST CHECK
+find_package(Boost QUIET)
+option(USE_BOOST "Specifies whether Boost should be included/linked or not; if false, projects that depend on it (e.g. SoSPD, cosegmenters) will be disabled" ${Boost_FOUND})
+if(USE_BOOST)
+    find_package(Boost COMPONENTS chrono date_time system filesystem program_options regex serialization)
+    if(NOT Boost_FOUND)
+        message(FATAL_ERROR "Unable to find boost include/library directories; user must set BOOST_ROOT, BOOST_INCLUDEDIR or BOOST_LIBRARYDIR to be used as hints.")
+    endif()
 else()
-    message("Without OpenGM support w/ external dependencies enabled, cosegm project & utilities will be disabled.")
+    message("Without Boost support, projects that depend on it (e.g. SoSPD, cosegmenters) will be disabled.")
+endif()
+
+### OPENGM CHECK
+find_package(OpenGM QUIET COMPONENTS ext)
+option(USE_OPENGM "Specifies whether OpenGM should be included/linked or not; if false, projects that depend on it (e.g. cosegmenters) will be disabled" ${OpenGM_FOUND})
+if(USE_OPENGM)
+    find_package(OpenGM COMPONENTS ext)
+    if(NOT OpenGM_FOUND)
+        message(FATAL_ERROR "Unable to find OpenGM include/library directories; user must set OpenGM_INCLUDEDIR and/or OpenGM_LIBRARYDIR to be used as hints.")
+    endif()
+else()
+    message("Without OpenGM support w/ external dependencies enabled, cosegmentation project & utilities will be disabled.")
 endif()
 
 ### CUDA CHECK
@@ -153,10 +171,13 @@ if(CMAKE_CROSSCOMPILING OR (WIN32 AND NOT MSVC) OR (CMAKE_COMPILER_IS_GNUCXX AND
     set_eval(USE_CUDA 0)
     message("Cannot use CUDA, invalid platform/compiler combination.")
 else()
-    find_package(CUDA)
+    find_package(CUDA ${OpenCV_CUDA_VERSION} QUIET)
     option(USE_CUDA "Specifies whether CUDA should be included/linked or not; if false, projects that depend on it will be disabled" ${CUDA_FOUND})
     if(USE_CUDA)
-        find_package(CUDA REQUIRED)
+        if(NOT OpenCV_CUDA_VERSION)
+            message(FATAL_ERROR "Framework requires OpenCV to also be built with cuda support for internal use")
+        endif()
+        find_package(CUDA ${OpenCV_CUDA_VERSION} REQUIRED)
         if(CUDA_VERSION VERSION_LESS 7.0)
             message(FATAL_ERROR "Framework requires a CUDA version of at least 7.0")
         endif()
@@ -169,6 +190,9 @@ else()
         if(USE_FAST_MATH)
             set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} --use_fast_math)
         endif()
+        set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} --expt-relaxed-constexpr) # required by utilities in opencv2/core/cuda/vec_math.hpp
+        option(CUDA_EXIT_ON_ERROR "Specifies whether CUDA calls should cause program abortion on error, or throw an exception" ON)
+        mark_as_advanced(CUDA_EXIT_ON_ERROR)
     else()
         message("Without CUDA support enabled, some imgproc utilities will be disabled.")
     endif()
@@ -177,9 +201,16 @@ endif()
 ### OPENCL CHECK @@@@ add later for parallel utils & impls
 set_eval(USE_OPENCL 0)
 
+### OPENMP CHECK
+if(USE_OPENMP)
+    find_package(OpenMP REQUIRED)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+endif()
+
 ### Kinect SDK CHECK
 if(WIN32)
-    find_package(KinectSDK2)
+    find_package(KinectSDK2 QUIET)
     mark_as_advanced(
         KinectSDK2_FACE
         KinectSDK2_FUSION
@@ -284,6 +315,9 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
           endif()
         endif()
     endif()
+    if(USE_DEBUG_SYMBOLS)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+    endif()
 elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
     if(MSVC_VERSION LESS 1900)
         message(FATAL_ERROR "MSVC toolchains older than 2015 (v140) are not supported!")
@@ -304,13 +338,15 @@ elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
     add_definitions(-D_SCL_SECURE_NO_WARNINGS)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
     add_definitions(/W1)
-    add_definitions(/openmp)
     add_definitions(/arch:AVX) # check performance difference? vs 387? @@@
     if(USE_LINK_TIME_OPTIM)
         set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /GL")
         set(CMAKE_STATIC_LINKER_FLAGS_RELEASE "${CMAKE_STATIC_LINKER_FLAGS_RELEASE} /LTCG")
         set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /LTCG")
         set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /LTCG")
+    endif()
+    if(USE_DEBUG_SYMBOLS)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zi")
     endif()
 elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Intel")
     message(FATAL_ERROR "Intel compiler still unsupported; please edit the main CMakeList.txt file to add proper configuration.")

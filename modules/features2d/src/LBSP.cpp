@@ -55,6 +55,15 @@ int LBSP::borderSize(int nDim) const {
     return int(PATCH_SIZE)/2;
 }
 
+lv::MatInfo LBSP::getOutputInfo(const lv::MatInfo& oInputInfo) const {
+    lvAssert_(oInputInfo.type()==CV_8UC1 || oInputInfo.type()==CV_8UC3,"invalid input image type");
+    lvAssert_(oInputInfo.size.dims()==size_t(2) && oInputInfo.size.total()>0,"invalid input image size");
+    const size_t nRows = oInputInfo.size(0);
+    const size_t nCols = oInputInfo.size(1);
+    lvAssert_(PATCH_SIZE<=nCols && PATCH_SIZE<=nRows,"input image size is too small to compute descriptors with current patch size");
+    return lv::MatInfo(oInputInfo.size,CV_16UC(oInputInfo.type.channels()));
+}
+
 int LBSP::descriptorSize() const {
     return LBSP::DESC_SIZE;
 }
@@ -363,7 +372,7 @@ void LBSP::validateROI(cv::Mat& oROI) {
     oROI = oROI_new;
 }
 
-void LBSP::calcDistance(const cv::Mat& oDescriptors1, const cv::Mat& oDescriptors2, cv::Mat_<uchar>& oDistances) {
+void LBSP::calcDistances(const cv::Mat& oDescriptors1, const cv::Mat& oDescriptors2, cv::Mat_<uchar>& oDistances) {
     lvAssert_(oDescriptors1.dims==2 && oDescriptors2.dims==2 && oDescriptors1.size()==oDescriptors2.size(),"descriptor mat sizes mismatch");
     lvAssert_(oDescriptors1.depth()==CV_16U && oDescriptors2.depth()==CV_16U,"unexpected descriptor matrix type");
     lvAssert_(oDescriptors1.type()==oDescriptors2.type(),"descriptor mat types mismatch");

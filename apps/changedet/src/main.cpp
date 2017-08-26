@@ -53,11 +53,8 @@
     "@@@@",                                                      /* => const std::string& sDatasetName */ \
     "@@@@",                                                      /* => const std::string& sDatasetDirPath */ \
     DATASET_OUTPUT_PATH,                                         /* => const std::string& sOutputDirPath */ \
-    "segm_mask_",                                                /* => const std::string& sOutputNamePrefix */ \
-    ".png",                                                      /* => const std::string& sOutputNameSuffix */ \
     std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsWorkBatchDirs */ \
     std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsSkippedDirTokens */ \
-    std::vector<std::string>{"@@@","@@@","@@@","..."},           /* => const std::vector<std::string>& vsGrayscaleDirTokens */ \
     bool(WRITE_IMG_OUTPUT),                                      /* => bool bSaveOutput */ \
     bool(EVALUATE_OUTPUT),                                       /* => bool bUseEvaluator */ \
     bool(USE_GPU_IMPL),                                          /* => bool bForce4ByteDataAlign */ \
@@ -94,18 +91,19 @@ int main(int, char**) {
         const size_t nTotBatches = vpBatches.size();
         if(nTotBatches==0 || nTotPackets==0)
             lvError_("Could not parse any data for dataset '%s'",pDataset->getName().c_str());
-        std::cout << "Parsing complete. [" << nTotBatches << " batch(es)]" << std::endl;
         std::cout << "\n[" << lv::getTimeStamp() << "]\n" << std::endl;
         std::cout << "Executing algorithm with " << (USE_GPU_IMPL?1:DATASET_WORKTHREADS) << " thread(s)..." << std::endl;
         lv::WorkerPool<(USE_GPU_IMPL?1:DATASET_WORKTHREADS)> oPool;
         std::vector<std::future<void>> vTaskResults;
+        size_t nCurrBatchIdx = 1;
         for(lv::IDataHandlerPtr pBatch : vpBatches)
-            vTaskResults.push_back(oPool.queueTask(Analyze,std::to_string(nTotBatches-vpBatches.size()+1)+"/"+std::to_string(nTotBatches),pBatch));
+            vTaskResults.push_back(oPool.queueTask(Analyze,std::to_string(nCurrBatchIdx++)+"/"+std::to_string(nTotBatches),pBatch));
         for(std::future<void>& oTaskRes : vTaskResults)
             oTaskRes.get();
         pDataset->writeEvalReport();
     }
-    catch(const cv::Exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
+    catch(const lv::Exception&) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught lv::Exception (check stderr)\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
+    catch(const cv::Exception&) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught cv::Exception (check stderr)\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
     catch(const std::exception& e) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught std::exception:\n" << e.what() << "\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
     catch(...) {std::cout << "\n!!!!!!!!!!!!!!\nTop level caught unhandled exception\n!!!!!!!!!!!!!!\n" << std::endl; return -1;}
     std::cout << "\n[" << lv::getTimeStamp() << "]\n" << std::endl;
@@ -121,14 +119,14 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         lvAssert(oBatch.getInputPacketType()==lv::ImagePacket && oBatch.getOutputPacketType()==lv::ImagePacket);
         lvAssert(oBatch.getFrameCount()>1);
         if(DATASET_PRECACHING)
-            oBatch.startPrecaching(EVALUATE_OUTPUT);
+            oBatch.startPrecaching(!bool(EVALUATE_OUTPUT));
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
         std::cout << "\t\t" << sCurrBatchName << " @ init [" << sWorkerName << "]" << std::endl;
         const size_t nTotPacketCount = oBatch.getFrameCount();
         lv::gl::Context oContext(oBatch.getFrameSize(),oBatch.getName()+" [GPU]",DISPLAY_OUTPUT==0);
         std::shared_ptr<IBackgroundSubtractor_<lv::GLSL>> pAlgo = std::make_shared<BackgroundSubtractorType>();
 #if DISPLAY_OUTPUT>1
-        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
+        lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
 #endif //DISPLAY_OUTPUT>1
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
@@ -141,7 +139,6 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nNextIdx+1 << "/" << nTotPacketCount << " [" << sWorkerName << "]" << std::endl;
             const double dCurrLearningRate = nNextIdx<=100?1:dDefaultLearningRate;
             oBatch.apply_gl(pAlgo,nNextIdx++,false,dCurrLearningRate);
-            //pGLSLAlgoEvaluator->apply_gl(oNextGTMask);
             glErrorCheck;
             if(oContext.pollEventsAndCheckIfShouldClose())
                 break;
@@ -163,12 +160,12 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         oBatch.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
     }
     catch(const lv::Exception& e) {
-        std::cout << "\nAnalyze caught Exception:\n" << e.what();
+        std::cout << "\nAnalyze caught lv::Exception (check stderr)\n" << std::endl;
         const std::string sContextErrMsg = lv::gl::Context::getLatestErrorMessage();
         if(!sContextErrMsg.empty())
-            std::cout << "\nContext error: " << sContextErrMsg << "\n" << std::endl;
+            std::cout << "\n\tContext error: " << sContextErrMsg << "\n" << std::endl;
     }
-    catch(const cv::Exception& e) {std::cout << "\nAnalyze caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
+    catch(const cv::Exception& e) {std::cout << "\nAnalyze caught cv::Exception (check stderr)\n" << std::endl;}
     catch(const std::exception& e) {std::cout << "\nAnalyze caught std::exception:\n" << e.what() << "\n" << std::endl;}
     catch(...) {std::cout << "\nAnalyze caught unhandled exception\n" << std::endl;}
     try {
@@ -192,7 +189,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         lvAssert(oBatch.getInputPacketType()==lv::ImagePacket && oBatch.getOutputPacketType()==lv::ImagePacket);
         lvAssert(oBatch.getFrameCount()>1);
         if(DATASET_PRECACHING)
-            oBatch.startPrecaching(EVALUATE_OUTPUT);
+            oBatch.startPrecaching(!bool(EVALUATE_OUTPUT));
         const std::string sCurrBatchName = lv::clampString(oBatch.getName(),12);
         std::cout << "\t\t" << sCurrBatchName << " @ init [" << sWorkerName << "]" << std::endl;
         const size_t nTotPacketCount = oBatch.getFrameCount();
@@ -205,7 +202,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         const double dDefaultLearningRate = pAlgo->getDefaultLearningRate();
         pAlgo->initialize(oCurrInput,oROI);
 #if DISPLAY_OUTPUT>0
-        cv::DisplayHelperPtr pDisplayHelper = cv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
+        lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"../");
         pAlgo->m_pDisplayHelper = pDisplayHelper;
 #endif //DISPLAY_OUTPUT>0
         oBatch.startProcessing();
@@ -235,7 +232,8 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         std::cout << "\t\t" << sCurrBatchName << " @ end [" << sWorkerName << "] (" << std::fixed << std::setw(4) << dTimeElapsed << " sec, " << std::setw(4) << dProcessSpeed << " Hz)" << std::endl;
         oBatch.writeEvalReport(); // this line is optional; it allows results to be read before all batches are processed
     }
-    catch(const cv::Exception& e) {std::cout << "\nAnalyze caught cv::Exception:\n" << e.what() << "\n" << std::endl;}
+    catch(const lv::Exception&) {std::cout << "\nAnalyze caught lv::Exception (check stderr)\n" << std::endl;}
+    catch(const cv::Exception&) {std::cout << "\nAnalyze caught cv::Exception (check stderr)\n" << std::endl;}
     catch(const std::exception& e) {std::cout << "\nAnalyze caught std::exception:\n" << e.what() << "\n" << std::endl;}
     catch(...) {std::cout << "\nAnalyze caught unhandled exception\n" << std::endl;}
     try {

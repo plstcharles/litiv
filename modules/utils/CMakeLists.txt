@@ -72,8 +72,16 @@ if(USE_CVCORE_WITH_UTILS)
             "include/litiv/utils/opengl.hpp"
         )
     endif(USE_GLSL)
+    if(USE_OPENGM)
+        add_files(INCLUDE_FILES
+            "include/litiv/utils/opengm.hpp"
+        )
+    endif(USE_OPENGM)
 endif()
 if(USE_CUDA)
+    add_files(SOURCE_FILES
+        "src/cuda.cpp"
+    )
     add_files(INCLUDE_FILES
         "include/litiv/utils/cuda.hpp"
     )
@@ -139,6 +147,16 @@ if(KinectSDK2_FOUND)
     target_link_libraries(litiv_utils
         PUBLIC
             "${KinectSDK2_LIBRARIES}"
+    )
+endif()
+if(USE_OPENGM)
+    target_include_directories(litiv_utils
+        PUBLIC
+            "$<BUILD_INTERFACE:${OpenGM_INCLUDE_DIRS}>"
+    )
+    target_link_libraries(litiv_utils
+        PUBLIC
+            "${OpenGM_LIBRARIES}"
     )
 endif()
 if(UNIX AND NOT ANDROID AND NOT (APPLE AND CMAKE_COMPILER_IS_CLANGCXX))

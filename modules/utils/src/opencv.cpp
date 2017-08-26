@@ -20,13 +20,97 @@
 #include <fstream>
 
 // these are really empty shells, but we need actual allocation due to ocv's virtual interface
-cv::AlignedMatAllocator<16,false> g_oMatAlloc16a = cv::AlignedMatAllocator<16,false>();
-cv::AlignedMatAllocator<32,false> g_oMatAlloc32a = cv::AlignedMatAllocator<32,false>();
+lv::AlignedMatAllocator<16,false> g_oMatAlloc16a = lv::AlignedMatAllocator<16,false>();
+lv::AlignedMatAllocator<32,false> g_oMatAlloc32a = lv::AlignedMatAllocator<32,false>();
 
-cv::MatAllocator* cv::getMatAllocator16a() {return (cv::MatAllocator*)&g_oMatAlloc16a;}
-cv::MatAllocator* cv::getMatAllocator32a() {return (cv::MatAllocator*)&g_oMatAlloc32a;}
+cv::MatAllocator* lv::getMatAllocator16a() {return (cv::MatAllocator*)&g_oMatAlloc16a;}
+cv::MatAllocator* lv::getMatAllocator32a() {return (cv::MatAllocator*)&g_oMatAlloc32a;}
 
-cv::DisplayHelperPtr cv::DisplayHelper::create(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) {
+void lv::getLogPolarMask(int nMaskSize, int nRadialBins, int nAngularBins, cv::Mat_<int>& oOutputMask, bool bUseLienhartMask, float fRadiusOffset, int* pnFirstMaskIdx, int* pnLastMaskIdx) {
+    // the mask computation strategies of Lienhart and Chatfield are inspired from their LSS implementations; see the originals at:
+    //    http://www.robots.ox.ac.uk/~vgg/software/SelfSimilarity/
+    //    https://github.com/opencv/opencv/blob/2.4/modules/contrib/src/selfsimilarity.cpp
+    lvAssert_(nMaskSize>0 && (nMaskSize%2)==1,"mask size must be a non-null, positive, odd value");
+    lvAssert_(nRadialBins>0,"radial bin count must be a non-null positive value");
+    lvAssert_(nAngularBins>0,"angular bin count must be a non-null positive value");
+    lvAssert_(bUseLienhartMask || fRadiusOffset==0.0f,"chatfield mask does not support hardcoded inner radius offset");
+    lvAssert_(fRadiusOffset>=0,"radius offset must be positive or null value");
+    oOutputMask.create(nMaskSize,nMaskSize);
+    oOutputMask = -1;
+    if(pnFirstMaskIdx)
+        *pnFirstMaskIdx = nMaskSize*nMaskSize-1;
+    if(pnLastMaskIdx)
+        *pnLastMaskIdx = 0;
+    int nCurrMaskIdx = 0;
+    const int nInitDistBin = 0; // previously passed as param; fix? @@@
+    if(bUseLienhartMask) {
+        const int nCenterIdx = (nMaskSize-1)/2;
+        std::vector<float> vRadBinDists((size_t)nRadialBins);
+        const float fRadBinPowBase = (float)std::pow(nRadialBins,1/(float)nRadialBins);
+        for(int nRadBinIdx=0; nRadBinIdx<nRadialBins; ++nRadBinIdx)
+            vRadBinDists[nRadBinIdx] = float(((std::pow(fRadBinPowBase,nRadBinIdx+1)-1)/(nRadialBins-1)*nCenterIdx)+((nRadBinIdx==(nRadialBins-1))?0.0f:fRadiusOffset));
+        for(int nRowIdx=0; nRowIdx<nMaskSize; ++nRowIdx) {
+            int* const pnMaskRow = oOutputMask.ptr<int>(nRowIdx);
+            for(int nColIdx=0; nColIdx<nMaskSize; ++nColIdx,++nCurrMaskIdx) {
+                if((nRowIdx==nCenterIdx) && (nColIdx==nCenterIdx))
+                    continue;
+                const float fDist = std::sqrt((float)((nCenterIdx-nRowIdx)*(nCenterIdx-nRowIdx)+(nCenterIdx-nColIdx)*(nCenterIdx-nColIdx)));
+                int nRadBinIdx;
+                for(nRadBinIdx=0; nRadBinIdx<nRadialBins; ++nRadBinIdx)
+                    if(fDist<=vRadBinDists[nRadBinIdx])
+                        break;
+                if(nRadBinIdx>=nInitDistBin && nRadBinIdx<nRadialBins) {
+                    const float fAng = std::atan2((float)(nCenterIdx-nColIdx),(float)(nCenterIdx-nRowIdx))+float(M_PI);
+                    const int nAngleBinIdx = int((fAng*nAngularBins)/float(2*M_PI))%nAngularBins;
+                    pnMaskRow[nColIdx] = nAngleBinIdx*(nRadialBins-nInitDistBin)+((nRadialBins-nInitDistBin-1)-(nRadBinIdx-nInitDistBin));
+                    if(pnFirstMaskIdx)
+                        *pnFirstMaskIdx = std::min(*pnFirstMaskIdx,nCurrMaskIdx);
+                    if(pnLastMaskIdx)
+                        *pnLastMaskIdx = std::max(*pnLastMaskIdx,nCurrMaskIdx);
+                }
+            }
+        }
+    }
+    else {
+        const int nPatchRadius = nMaskSize/2, nAngBinSize = 360/nAngularBins;
+        const float fRadBinLogBase = nRadialBins/(float)std::log10(nPatchRadius);
+        for(int nRowIdx=-nPatchRadius; nRowIdx<=nPatchRadius; ++nRowIdx) {
+            int* const pnMaskRow = oOutputMask.ptr<int>(nRowIdx+nPatchRadius);
+            for(int nColIdx=-nPatchRadius; nColIdx<=nPatchRadius; ++nColIdx,++nCurrMaskIdx) {
+                if(nRowIdx==0 && nColIdx==0)
+                    continue;
+                const float fDist = std::sqrt((float)(nColIdx*nColIdx) + (float)(nRowIdx*nRowIdx));
+                const int nRadBinIdx = int(fDist>0.0f?std::log10(fDist)*fRadBinLogBase:0.0f);
+                if(nRadBinIdx>=nInitDistBin && nRadBinIdx<nRadialBins) {
+                    const float fAng = std::atan2((float)nRowIdx,(float)nColIdx)/float(M_PI)*180.0f;
+                    const int nAngleBinIdx = (((int)std::round(fAng<0?fAng+360.0f:fAng)+nAngBinSize/2)%360)/nAngBinSize;
+                    pnMaskRow[nColIdx+nPatchRadius] = nAngleBinIdx*(nRadialBins-nInitDistBin)+((nRadialBins-nInitDistBin-1)-(nRadBinIdx-nInitDistBin));
+                    if(pnFirstMaskIdx)
+                        *pnFirstMaskIdx = std::min(*pnFirstMaskIdx,nCurrMaskIdx);
+                    if(pnLastMaskIdx)
+                        *pnLastMaskIdx = std::max(*pnLastMaskIdx,nCurrMaskIdx);
+                }
+            }
+        }
+    }
+    if(lv::getVerbosity()>=5) {
+        lvCout << "LOGPOLAR MASK INITIALIZED : \n";
+        lvCout << "\tbUseLienhartMask = " << bUseLienhartMask << "\n";
+        lvCout << "\tnMaskSize = " << nMaskSize << "\n";
+        lvCout << "\tnAngularBins = " << nAngularBins << "\n";
+        lvCout << "\tnRadialBins = " << nRadialBins << "\n";
+        lvCout << "\toOutputMask = \n";
+        lvCout << lv::to_string(oOutputMask) << "\n";
+        if(lv::getVerbosity()>=6) {
+            cv::Mat oOutputMask_display = lv::getUniqueColorMap(oOutputMask);
+            cv::resize(oOutputMask_display,oOutputMask_display,cv::Size(400,400),0,0,cv::INTER_NEAREST);
+            cv::imshow("MASK",oOutputMask_display);
+            cv::waitKey(0);
+        }
+    }
+}
+
+lv::DisplayHelperPtr lv::DisplayHelper::create(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) {
     struct DisplayHelperWrapper : public DisplayHelper {
         DisplayHelperWrapper(const std::string& _sDisplayName, const std::string& _sDebugFSDirPath, const cv::Size& _oMaxSize, int _nWindowFlags) :
                 DisplayHelper(_sDisplayName,_sDebugFSDirPath,_oMaxSize,_nWindowFlags) {}
@@ -34,27 +118,30 @@ cv::DisplayHelperPtr cv::DisplayHelper::create(const std::string& sDisplayName, 
     return std::make_shared<DisplayHelperWrapper>(sDisplayName,sDebugFSDirPath,oMaxSize,nWindowFlags);
 }
 
-cv::DisplayHelper::DisplayHelper(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) :
+lv::DisplayHelper::DisplayHelper(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) :
         m_sDisplayName(sDisplayName),
         m_oMaxDisplaySize(oMaxSize),
+        m_nDisplayFlags(nWindowFlags),
         m_oFS(lv::addDirSlashIfMissing(sDebugFSDirPath)+sDisplayName+".yml",cv::FileStorage::WRITE),
         m_oLastDisplaySize(cv::Size(0,0)),
         m_oLastTileSize(cv::Size(0,0)),
         m_bContinuousUpdates(false),
         m_bFirstDisplay(true),
         m_lInternalCallback(std::bind(&DisplayHelper::onMouseEventCallback,this,std::placeholders::_1,std::placeholders::_2,std::placeholders::_3,std::placeholders::_4)) {
-    cv::namedWindow(m_sDisplayName,nWindowFlags); // @@@ if it blocks, recompile opencv without Qt (bug still here as of OpenCV 3.1)
-    cv::setMouseCallback(m_sDisplayName,onMouseEvent,(void*)&m_lInternalCallback);
+    if(m_oFS.isOpened()) {
+        m_oFS << "htag" << lv::getVersionStamp();
+        m_oFS << "date" << lv::getTimeStamp();
+    }
 }
 
-cv::DisplayHelper::~DisplayHelper() {
+lv::DisplayHelper::~DisplayHelper() {
     cv::destroyWindow(m_sDisplayName);
 }
 
-void cv::DisplayHelper::display(const cv::Mat& oImage, size_t nIdx) {
+void lv::DisplayHelper::display(const cv::Mat& oImage, size_t nIdx) {
     display(std::vector<std::vector<std::pair<cv::Mat,std::string>>>{{std::make_pair(oImage,cv::format("Image #%d",(int)nIdx))}},oImage.size());
 }
-void cv::DisplayHelper::display(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oOutputImg, size_t nIdx) {
+void lv::DisplayHelper::display(const cv::Mat& oInputImg, const cv::Mat& oDebugImg, const cv::Mat& oOutputImg, size_t nIdx) {
     display(std::vector<std::vector<std::pair<cv::Mat,std::string>>>{{
         std::make_pair(oInputImg,cv::format("Input #%d",(int)nIdx)),
         std::make_pair(oDebugImg,std::string("Debug")),
@@ -62,7 +149,7 @@ void cv::DisplayHelper::display(const cv::Mat& oInputImg, const cv::Mat& oDebugI
     }},oInputImg.size());
 }
 
-void cv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,std::string>>>& vvImageNamePairs, const cv::Size& oSuggestedTileSize) {
+void lv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,std::string>>>& vvImageNamePairs, const cv::Size& oSuggestedTileSize) {
     lvAssert_(!vvImageNamePairs.empty(),"must provide at least one row to display");
     lvAssert_(oSuggestedTileSize.area()>0,"must provide non-null tile size");
     const size_t nRowCount = vvImageNamePairs.size();
@@ -73,9 +160,10 @@ void cv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
         nColCount = vvImageNamePairs[nRowIdx].size();
         for(size_t nColIdx=0; nColIdx<nColCount; ++nColIdx) {
             const cv::Mat& oImage = vvImageNamePairs[nRowIdx][nColIdx].first;
-            lvAssert_(!oImage.empty(),"all images must be non-null");
-            lvAssert_(oImage.channels()==1 || oImage.channels()==3 || oImage.channels()==4,"all images must be 1/3/4 channels");
-            lvAssert_(oImage.depth()==CV_8U || oImage.depth()==CV_16U || oImage.depth()==CV_32F,"all images must be 8u/16u/32f depth");
+            if(!oImage.empty()) {
+                lvAssert_(oImage.channels()==1 || oImage.channels()==3 || oImage.channels()==4,"all images must be 1/3/4 channels");
+                lvAssert_(oImage.depth()==CV_8U || oImage.depth()==CV_16U || oImage.depth()==CV_32S || oImage.depth()==CV_32F,"all images must be 8u/16u/32s/32f depth");
+            }
         }
     }
     cv::Size oCurrDisplaySize(int(oSuggestedTileSize.width*nColCount),int(oSuggestedTileSize.height*nRowCount));
@@ -93,9 +181,13 @@ void cv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
         for(size_t nColIdx=0; nColIdx<nColCount; ++nColIdx) {
             const cv::Mat& oImage = vvImageNamePairs[nRowIdx][nColIdx].first;
             cv::Mat oImageBYTE3;
-            if(oImage.depth()==CV_16U)
+            if(oImage.empty())
+                oImageBYTE3 = cv::Mat(oNewTileSize,CV_8UC3,cv::Scalar::all(0));
+            else if(oImage.depth()==CV_16U) // expected input range = [0..USHRT_MAX]
                 oImage.convertTo(oImageBYTE3,CV_8U,double(UCHAR_MAX)/(USHRT_MAX));
-            else if(oImage.depth()==CV_32F)
+            else if(oImage.depth()==CV_32S) // expected input range = [INT_MIN..INT_MAX]
+                oImage.convertTo(oImageBYTE3,CV_8U,double(UCHAR_MAX)/(INT_MAX),double(UCHAR_MAX/2));
+            else if(oImage.depth()==CV_32F) // expected input range = [0,1]
                 oImage.convertTo(oImageBYTE3,CV_8U,double(UCHAR_MAX));
             else
                 oImageBYTE3 = oImage.clone();
@@ -124,21 +216,90 @@ void cv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
         m_bFirstDisplay = false;
     }
     lvAssert(m_oLastDisplay.size()==oFinalDisplaySize);
+    cv::namedWindow(m_sDisplayName,m_nDisplayFlags); // @@@ if it blocks, recompile opencv without Qt (bug still here as of OpenCV 3.1)
+    cv::setMouseCallback(m_sDisplayName,onMouseEvent,(void*)&m_lInternalCallback);
     cv::imshow(m_sDisplayName,m_oLastDisplay);
     m_oLastDisplaySize = m_oLastDisplay.size();
     m_oLastTileSize = oNewTileSize;
 }
 
-void cv::DisplayHelper::setMouseCallback(std::function<void(const CallbackData&)> lCallback) {
+void lv::DisplayHelper::displayAlbumAndWaitKey(const std::vector<std::pair<cv::Mat,std::string>>& vImageNamePairs, int nDefaultSleepDelay) {
+    lvAssert_(!vImageNamePairs.empty(),"must provide at least one image to display");
+    for(size_t nImgIdx=0; nImgIdx<vImageNamePairs.size(); ++nImgIdx) {
+        const cv::Mat& oImage = vImageNamePairs[nImgIdx].first;
+        lvAssert_(!oImage.empty(),"all images must be non-null");
+        lvAssert_(oImage.channels()==1 || oImage.channels()==3 || oImage.channels()==4,"all images must be 1/3/4 channels");
+        lvAssert_(oImage.depth()==CV_8U || oImage.depth()==CV_16U || oImage.depth()==CV_32S || oImage.depth()==CV_32F,"all images must be 8u/16u/32s/32f depth");
+    }
+    cv::Size oCurrDisplaySize(vImageNamePairs[0].first.cols,vImageNamePairs[0].first.rows);
+    if(m_oMaxDisplaySize.area()>0 && (oCurrDisplaySize.width>m_oMaxDisplaySize.width || oCurrDisplaySize.height>m_oMaxDisplaySize.height)) {
+        if(oCurrDisplaySize.width>m_oMaxDisplaySize.width && oCurrDisplaySize.width>oCurrDisplaySize.height)
+            oCurrDisplaySize = cv::Size(m_oMaxDisplaySize.width,int(m_oMaxDisplaySize.width*float(oCurrDisplaySize.height)/oCurrDisplaySize.width));
+        else
+            oCurrDisplaySize = cv::Size(int(m_oMaxDisplaySize.height*(float(oCurrDisplaySize.width)/oCurrDisplaySize.height)),m_oMaxDisplaySize.height);
+    }
+    m_bFirstDisplay = true;
+    const auto lDisplay = [&](size_t nAlbumIdx) {
+        lvDbgAssert(nAlbumIdx<vImageNamePairs.size());
+        const cv::Mat& oImage = vImageNamePairs[nAlbumIdx].first;
+        cv::Mat oImageBYTE3;
+        if(oImage.depth()==CV_16U) // expected input range = [0..USHRT_MAX]
+            oImage.convertTo(oImageBYTE3,CV_8U,double(UCHAR_MAX)/(USHRT_MAX));
+        else if(oImage.depth()==CV_32S) // expected input range = [INT_MIN..INT_MAX]
+            oImage.convertTo(oImageBYTE3,CV_8U,double(UCHAR_MAX)/(INT_MAX),double(UCHAR_MAX/2));
+        else if(oImage.depth()==CV_32F) // expected input range = [0,1]
+            oImage.convertTo(oImageBYTE3,CV_8U,double(UCHAR_MAX));
+        else
+            oImageBYTE3 = oImage.clone();
+        if(oImageBYTE3.channels()==1)
+            cv::cvtColor(oImageBYTE3,oImageBYTE3,cv::COLOR_GRAY2BGR);
+        else if(oImageBYTE3.channels()==4)
+            cv::cvtColor(oImageBYTE3,oImageBYTE3,cv::COLOR_BGRA2BGR);
+        if(oImageBYTE3.size()!=oCurrDisplaySize)
+            cv::resize(oImageBYTE3,oImageBYTE3,oCurrDisplaySize);
+        putText(oImageBYTE3,vImageNamePairs[nAlbumIdx].second+" ["+std::to_string(nAlbumIdx+1)+"/"+std::to_string(vImageNamePairs.size())+"]",cv::Scalar_<uchar>(0,0,255));
+        const cv::Point2i& oDisplayPt = m_oLatestMouseEvent.oInternalPosition;
+        if(oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oCurrDisplaySize.width && oDisplayPt.y<oCurrDisplaySize.height && m_oLatestMouseEvent.oTileSize==oCurrDisplaySize)
+            cv::circle(oImageBYTE3,oDisplayPt,5,cv::Scalar(255,255,255));
+        m_oLastDisplay = oImageBYTE3;
+        if(m_bFirstDisplay) {
+            putText(m_oLastDisplay,"[Press escape to exit album]",cv::Scalar_<uchar>(0,0,255),true,cv::Point2i(m_oLastDisplay.cols/2-115,15),1,1.0);
+            m_bFirstDisplay = false;
+        }
+        cv::imshow(m_sDisplayName,m_oLastDisplay);
+    };
+    size_t nCurrAlbumIdx = 0;
+    cv::namedWindow(m_sDisplayName,m_nDisplayFlags); // @@@ if it blocks, recompile opencv without Qt (bug still here as of OpenCV 3.1)
+    cv::setMouseCallback(m_sDisplayName,onMouseEvent,(void*)&m_lInternalCallback);
+    lDisplay(nCurrAlbumIdx);
+    m_oLastTileSize = m_oLastDisplaySize = m_oLastDisplay.size();
+    int nKeyPressed;
+    do {
+        nKeyPressed = cv::waitKey(nDefaultSleepDelay);
+        size_t nNewAlbumIdx = nCurrAlbumIdx;
+        if((nKeyPressed&255)=='d' || nKeyPressed==2490368 || nKeyPressed==1113939 || (nKeyPressed&255)==28) // right arrow, or 'd'
+            nNewAlbumIdx = (nCurrAlbumIdx+1)%vImageNamePairs.size();
+        else if((nKeyPressed&255)=='a' || nKeyPressed==2424832 || nKeyPressed==1113937 || (nKeyPressed&255)==31) // left arrow, or 'a'
+            nNewAlbumIdx = (nCurrAlbumIdx>0)?(nCurrAlbumIdx-1):(vImageNamePairs.size()-1);
+        if(nNewAlbumIdx!=nCurrAlbumIdx) {
+            lv::mutex_lock_guard oLock(m_oEventMutex);
+            lDisplay(nCurrAlbumIdx=nNewAlbumIdx);
+        }
+    }
+    while((nKeyPressed&255)!=27);
+    cv::destroyWindow(m_sDisplayName);
+}
+
+void lv::DisplayHelper::setMouseCallback(std::function<void(const CallbackData&)> lCallback) {
     lv::mutex_lock_guard oLock(m_oEventMutex);
     m_lExternalCallback = lCallback;
 }
 
-void cv::DisplayHelper::setContinuousUpdates(bool b) {
+void lv::DisplayHelper::setContinuousUpdates(bool b) {
     m_bContinuousUpdates = b;
 }
 
-int cv::DisplayHelper::waitKey(int nDefaultSleepDelay) {
+int lv::DisplayHelper::waitKey(int nDefaultSleepDelay) {
     int nKeyPressed;
     if(m_bContinuousUpdates)
         nKeyPressed = cv::waitKey(nDefaultSleepDelay);
@@ -151,7 +312,7 @@ int cv::DisplayHelper::waitKey(int nDefaultSleepDelay) {
     return nKeyPressed;
 }
 
-void cv::DisplayHelper::onMouseEventCallback(int nEvent, int x, int y, int nFlags) {
+void lv::DisplayHelper::onMouseEventCallback(int nEvent, int x, int y, int nFlags) {
     lv::mutex_lock_guard oLock(m_oEventMutex);
     m_oLatestMouseEvent.oPosition = m_oLatestMouseEvent.oInternalPosition = cv::Point2i(x,y);
     m_oLatestMouseEvent.oTileSize = m_oLastTileSize;
@@ -164,11 +325,11 @@ void cv::DisplayHelper::onMouseEventCallback(int nEvent, int x, int y, int nFlag
         m_lExternalCallback(m_oLatestMouseEvent);
 }
 
-void cv::DisplayHelper::onMouseEvent(int nEvent, int x, int y, int nFlags, void* pData) {
+void lv::DisplayHelper::onMouseEvent(int nEvent, int x, int y, int nFlags, void* pData) {
     (*(std::function<void(int,int,int,int)>*)pData)(nEvent,x,y,nFlags);
 }
 
-void cv::write(const std::string& sFilePath, const cv::Mat& _oData, cv::MatArchiveList eArchiveType) {
+void lv::write(const std::string& sFilePath, const cv::Mat& _oData, lv::MatArchiveList eArchiveType) {
     lvAssert_(!sFilePath.empty() && !_oData.empty(),"output file path and matrix must both be non-empty");
     cv::Mat oData = _oData.isContinuous()?_oData:_oData.clone();
     if(eArchiveType==MatArchive_FILESTORAGE) {
@@ -181,18 +342,18 @@ void cv::write(const std::string& sFilePath, const cv::Mat& _oData, cv::MatArchi
     else if(eArchiveType==MatArchive_PLAINTEXT) {
         std::ofstream ssStr(sFilePath);
         lvAssert__(ssStr.is_open(),"could not open text file at '%s' for writing",sFilePath.c_str());
-        ssStr << "htag " << lv::getVersionStamp() << std::endl;
-        ssStr << "date " << lv::getTimeStamp() << std::endl;
-        ssStr << "nDataType " << (int32_t)oData.type() << std::endl;
-        ssStr << "nDataDepth " << (int32_t)oData.depth() << std::endl;
-        ssStr << "nChannels " << (int32_t)oData.channels() << std::endl;
-        ssStr << "nElemSize " << (uint64_t)oData.elemSize() << std::endl;
-        ssStr << "nElemCount " << (uint64_t)oData.total() << std::endl;
-        ssStr << "nDims " << (int32_t)oData.dims << std::endl;
+        ssStr << "htag " << lv::getVersionStamp() << '\n';
+        ssStr << "date " << lv::getTimeStamp() << '\n';
+        ssStr << "nDataType " << (int32_t)oData.type() << '\n';
+        ssStr << "nDataDepth " << (int32_t)oData.depth() << '\n';
+        ssStr << "nChannels " << (int32_t)oData.channels() << '\n';
+        ssStr << "nElemSize " << (uint64_t)oData.elemSize() << '\n';
+        ssStr << "nElemCount " << (uint64_t)oData.total() << '\n';
+        ssStr << "nDims " << (int32_t)oData.dims << '\n';
         ssStr << "anSizes";
         for(int nDimIdx=0; nDimIdx<oData.dims; ++nDimIdx)
             ssStr << " " << (int32_t)oData.size[nDimIdx];
-        ssStr << std::endl << std::endl;
+        ssStr << "\n\n";
         if(oData.depth()!=CV_64F)
             _oData.convertTo(oData,CV_64F);
         double* pdData = (double*)oData.data;
@@ -201,7 +362,7 @@ void cv::write(const std::string& sFilePath, const cv::Mat& _oData, cv::MatArchi
             for(int nElemPackIdx=1; nElemPackIdx<oData.channels(); ++nElemPackIdx)
                 ssStr << " " << *pdData++;
             if(((nElemIdx+1)%oData.size[oData.dims-1])==0)
-                ssStr << std::endl;
+                ssStr << "\n";
             else
                 ssStr << " ";
         }
@@ -229,7 +390,7 @@ void cv::write(const std::string& sFilePath, const cv::Mat& _oData, cv::MatArchi
         lvError("unrecognized mat archive type flag");
 }
 
-void cv::read(const std::string& sFilePath, cv::Mat& oData, cv::MatArchiveList eArchiveType) {
+void lv::read(const std::string& sFilePath, cv::Mat& oData, lv::MatArchiveList eArchiveType) {
     lvAssert_(!sFilePath.empty(),"input file path must be non-empty");
     if(eArchiveType==MatArchive_FILESTORAGE) {
         cv::FileStorage oArchive(sFilePath,cv::FileStorage::READ);
@@ -288,8 +449,80 @@ void cv::read(const std::string& sFilePath, cv::Mat& oData, cv::MatArchiveList e
         lvError("unrecognized mat archive type flag");
 }
 
-void cv::doNotOptimize(const cv::Mat& m) {
-    lv::doNotOptimize(m); // we don't even need to call this it seems...
+cv::Mat lv::packData(const std::vector<cv::Mat>& vMats, std::vector<lv::MatInfo>* pvOutputPackInfo) {
+    if(pvOutputPackInfo!=nullptr) {
+        std::vector<lv::MatInfo>& vPackInfo = *pvOutputPackInfo;
+        vPackInfo.resize(vMats.size());
+        for(size_t nMatIdx=0; nMatIdx<vMats.size(); ++nMatIdx) {
+            vPackInfo[nMatIdx].size = vMats[nMatIdx].size;
+            vPackInfo[nMatIdx].type = vMats[nMatIdx].type();
+        }
+    }
+    if(vMats.empty())
+        return cv::Mat();
+    if(vMats.size()==1)
+        return vMats[0].clone();
+    size_t nTotPacketSize = 0;
+    size_t nFirstNonEmptyMatIdx = size_t(-1);
+    bool bAllSameType = true;
+    for(size_t nMatIdx=0; nMatIdx<vMats.size(); ++nMatIdx) {
+        const size_t nCurrPacketSize = vMats[nMatIdx].total()*vMats[nMatIdx].elemSize();
+        if(nCurrPacketSize>0) {
+            if(nFirstNonEmptyMatIdx==size_t(-1))
+                nFirstNonEmptyMatIdx = nMatIdx;
+            nTotPacketSize += nCurrPacketSize;
+            bAllSameType &= vMats[nMatIdx].type()==vMats[nFirstNonEmptyMatIdx].type();
+        }
+    }
+    if(nTotPacketSize==0)
+        return cv::Mat();
+    lvDbgAssert_(nTotPacketSize<(size_t)std::numeric_limits<int>::max(),"packed mat data alloc too big");
+    lvDbgAssert(nFirstNonEmptyMatIdx!=size_t(-1));
+    cv::Mat oPacket;
+    if(bAllSameType)
+        oPacket.create(1,(int)(nTotPacketSize/vMats[nFirstNonEmptyMatIdx].elemSize()),vMats[nFirstNonEmptyMatIdx].type());
+    else
+        oPacket.create(1,(int)nTotPacketSize,CV_8UC1);
+    size_t nCurrPacketIdxOffset = 0;
+    for(size_t nMatIdx=0; nMatIdx<vMats.size(); ++nMatIdx) {
+        const size_t nCurrPacketSize = vMats[nMatIdx].total()*vMats[nMatIdx].elemSize();
+        if(nCurrPacketSize>0) {
+            lvDbgAssert_(nCurrPacketIdxOffset+nCurrPacketSize<=nTotPacketSize,"pack out-of-bounds");
+            vMats[nMatIdx].copyTo(cv::Mat(vMats[nMatIdx].dims,vMats[nMatIdx].size,vMats[nMatIdx].type(),oPacket.data+nCurrPacketIdxOffset));
+            nCurrPacketIdxOffset += nCurrPacketSize;
+        }
+    }
+    lvDbgAssert_(nCurrPacketIdxOffset==nTotPacketSize,"unpack has leftover data");
+    return oPacket;
+}
+
+std::vector<cv::Mat> lv::unpackData(const cv::Mat& oPacket, const std::vector<lv::MatInfo>& vPackInfo) {
+    if(oPacket.empty()) {
+        bool bAllEmpty = true;
+        for(size_t nPackInfoIdx=0; nPackInfoIdx<vPackInfo.size(); ++nPackInfoIdx)
+            bAllEmpty &= vPackInfo[nPackInfoIdx].size.empty();
+        lvAssert_(bAllEmpty,"empty matrix given with non-empty pack");
+        return std::vector<cv::Mat>(vPackInfo.size());
+    }
+    lvAssert_(oPacket.isContinuous(),"input packed matrix must be continuous");
+    lvAssert_(!vPackInfo.empty(),"did not provide any mat unpacking info");
+    size_t nTotPacketSize = 0;
+    for(size_t nPackInfoIdx=0; nPackInfoIdx<vPackInfo.size(); ++nPackInfoIdx)
+        nTotPacketSize += vPackInfo[nPackInfoIdx].size.total()*vPackInfo[nPackInfoIdx].type.elemSize();
+    lvAssert_(nTotPacketSize>0,"trying to unpack non-empty mat with empty packing info");
+    lvAssert_(nTotPacketSize==oPacket.total()*oPacket.elemSize(),"input mat and packing info total byte size mismatch");
+    std::vector<cv::Mat> vOutputMats(vPackInfo.size());
+    size_t nCurrPacketIdxOffset = 0;
+    for(size_t nPackInfoIdx=0; nPackInfoIdx<vPackInfo.size(); ++nPackInfoIdx) {
+        const size_t nCurrPacketSize = vPackInfo[nPackInfoIdx].size.total()*vPackInfo[nPackInfoIdx].type.elemSize();
+        if(nCurrPacketSize>0) {
+            lvDbgAssert_(nCurrPacketIdxOffset+nCurrPacketSize<=nTotPacketSize,"unpack out-of-bounds");
+            vOutputMats[nPackInfoIdx] = cv::Mat((int)vPackInfo[nPackInfoIdx].size.dims(),vPackInfo[nPackInfoIdx].size.sizes(),vPackInfo[nPackInfoIdx].type(),(void*)(oPacket.data+nCurrPacketIdxOffset));
+            nCurrPacketIdxOffset += nCurrPacketSize;
+        }
+    }
+    lvDbgAssert_(nCurrPacketIdxOffset==nTotPacketSize,"unpack has leftover data");
+    return vOutputMats;
 }
 
 /** @brief shift the values in a matrix by an (x,y) offset
@@ -339,7 +572,7 @@ void cv::doNotOptimize(const cv::Mat& m) {
  * @param nFillType the method used to fill the null entries, defaults to BORDER_CONSTANT
  * @param vConstantFillValue the value of the null entries if the fill type is BORDER_CONSTANT
  */
-void cv::shift(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Point2f& vDelta, int nFillType, const cv::Scalar& vConstantFillValue) {
+void lv::shift(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Point2f& vDelta, int nFillType, const cv::Scalar& vConstantFillValue) {
     /*
      *  ORIGINAL SOURCE : http://code.opencv.org/issues/2299
      *
@@ -413,4 +646,8 @@ void cv::shift(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Point2f& vDelt
     }
     const cv::Rect oROI = cv::Rect(std::max(-vDeltaInt.x,0),std::max(-vDeltaInt.y,0),0,0)+oInput.size();
     oOutput = oPaddedInput(oROI);
+}
+
+void lv::doNotOptimize(const cv::Mat& m) {
+    lv::doNotOptimize(m.data);
 }

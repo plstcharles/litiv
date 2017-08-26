@@ -91,23 +91,34 @@
     #endif //ndef(TIMER_DEFS)
 #endif //ndef(__COMMON_LIBS_DEFS__)
 
-#ifndef __LV_VERSION_DEFS__
-    #define __LV_VERSION_DEFS__
-    #define LITIV_VERSION             @LITIV_VERSION@
-    #define LITIV_VERSION_STR         XSTR(LITIV_VERSION)
-    #define LITIV_VERSION_MAJOR       @LITIV_VERSION_MAJOR@
-    #define LITIV_VERSION_MINOR       @LITIV_VERSION_MINOR@
-    #define LITIV_VERSION_PATCH       @LITIV_VERSION_PATCH@
-    #define LITIV_VERSION_SHA1        "@GIT_SHA1@"
-#endif //ndef(__LV_VERSION_DEFS__)
-
-#ifndef __LV_EXCEP_DEFS__
-    #define __LV_EXCEP_DEFS__
-    #define lvError(msg) throw lv::Exception(std::string("[lvError: ")+msg+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__)
-    #define lvError_(msg,...) throw lv::Exception(std::string("[lvError: ")+msg+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
+#ifndef __LV_UTILS_DEFS__
+    #define __LV_UTILS_DEFS__
+    #ifndef __LV_VERSION_DEFS__
+        #define __LV_VERSION_DEFS__
+        #define LITIV_VERSION             @LITIV_VERSION@
+        #define LITIV_VERSION_STR         XSTR(LITIV_VERSION)
+        #define LITIV_VERSION_MAJOR       @LITIV_VERSION_MAJOR@
+        #define LITIV_VERSION_MINOR       @LITIV_VERSION_MINOR@
+        #define LITIV_VERSION_PATCH       @LITIV_VERSION_PATCH@
+        #define LITIV_VERSION_SHA1        "@GIT_SHA1@"
+    #endif //ndef(__LV_VERSION_DEFS__)
+    #define lvStdError(errtype) throw std::errtype()
+    #define lvStdError_(errtype,msg) throw std::errtype(msg)
+    #define lvStdError__(errtype,msg,...) throw std::errtype(lv::putf(msg,__VA_ARGS__))
+    #define lvError(msg) throw lv::Exception(std::string("[lvError: ")+(msg)+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__)
+    #define lvError_(msg,...) throw lv::Exception(std::string("[lvError: ")+(msg)+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
     #define lvAssert(expr) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(0)
-    #define lvAssert_(expr,msg) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(0)
-    #define lvAssert__(expr,msg,...) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+msg+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);} while(0)
+    #define lvAssert_(expr,msg) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+(msg)+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(0)
+    #define lvAssert__(expr,msg,...) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+(msg)+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);} while(0)
+    #define lvLog(level,msg) (lv::ostream_guard<std::ostream>(std::cout,level) << (msg) << '\n')
+    #define lvLog_(level,msg,...) (lv::ostream_guard<std::ostream>(std::cout,level) << lv::putf(msg,__VA_ARGS__) << '\n')
+    #define lvWarn(msg) (lv::ostream_guard<std::ostream>(std::cerr) << "[lvWarn @ " << __FILE__ << "(" << __LINE__ << "):\n\t" << (msg) << "\n]\n")
+    #define lvWarn_(msg,...) (lv::ostream_guard<std::ostream>(std::cerr) << "[lvWarn @ " << __FILE__ << "(" << __LINE__ << "):\n\t" << lv::putf(msg,__VA_ARGS__) << "\n]\n")
+    #define lvPrint(expr) (lv::ostream_guard<std::ostream>(std::cout,1) << "[lvPrint @ " << __FILE__ << "(" << __LINE__ << "):\n\t"#expr" := " << (expr) << "\n]\n")
+    #define lvCout (lv::ostream_guard<std::ostream>(std::cout))
+    #define lvCout_(level) (lv::ostream_guard<std::ostream>(std::cout,level))
+    #define lvCerr (lv::ostream_guard<std::ostream>(std::cerr))
+    #define lvCerr_(level) (lv::ostream_guard<std::ostream>(std::cerr,level))
     #define glErrorCheck do { \
         const GLenum __errn = glGetError(); \
         if(__errn!=GL_NO_ERROR) \
@@ -116,7 +127,7 @@
     #define cudaErrorCheck(test) do { \
         const cudaError_t __errn = test; \
         if(__errn!=cudaSuccess) { \
-            printf("cudaErrorCheck failed [code=%d, msg=%s]\n\t... in function '%s' from %s(%d)\n",(int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
+            printf("cudaErrorCheck failed [code=%d, msg=%s]\n\t... in function '%s'\n\t... from %s(%d)\n",(int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
             std::exit((int)__errn); \
         } \
     } while(0)
@@ -134,10 +145,15 @@
                 #error "Current build config mismatch with LITIV external build config."
             #endif //!LITIV_DEBUG
         #endif //ndef(LITIV_BUILD)
+        #define lvDbgExec(expr) do {expr;} while(0)
         #define lvDbgAssert(expr) lvAssert(expr)
         #define lvDbgAssert_(expr,msg) lvAssert_(expr,msg)
         #define lvDbgAssert__(expr,msg,...) lvAssert__(expr,msg,__VA_ARGS__)
         #define lvDbgExceptionWatch lv::UncaughtExceptionLogger XSTR_CONCAT(__logger,__LINE__)(__PRETTY_FUNCTION__,__FILE__,__LINE__)
+        #define lvDbgLog(level,msg) lvLog(level,msg)
+        #define lvDbgLog_(level,msg,...) lvLog_(level,msg,__VA_ARGS__)
+        #define lvDbgWarn(msg) lvWarn(msg)
+        #define lvDbgWarn_(msg,...) lvWarn_(msg,__VA_ARGS__)
         #define glDbgErrorCheck glErrorCheck
         #define cudaDbgErrorCheck cudaErrorCheck
     #else //ndef(_DEBUG)
@@ -154,10 +170,15 @@
                 #error "Current build config mismatch with LITIV external build config."
             #endif //LITIV_DEBUG
         #endif //ndef(LITIV_BUILD)
+        #define lvDbgExec(expr) ((void)0)
         #define lvDbgAssert(expr) ((void)0)
         #define lvDbgAssert_(expr,msg) ((void)0)
         #define lvDbgAssert__(expr,msg,...) ((void)0)
         #define lvDbgExceptionWatch ((void)0)
+        #define lvDbgLog(level,msg) ((void)0)
+        #define lvDbgLog_(level,msg,...) ((void)0)
+        #define lvDbgWarn(msg) ((void)0)
+        #define lvDbgWarn_(msg,...) ((void)0)
         #define glDbgErrorCheck ((void)0)
         #define cudaDbgErrorCheck ((void)0)
     #endif //ndef(_DEBUG)
@@ -173,11 +194,10 @@
             #define lvDbgAssertHR(expr) ((void)0)
         #endif //ndef(_DEBUG)
     #endif //def(_MSC_VER)
-#endif //ndef(__LV_EXCEP_DEFS__)
+#endif //ndef(__LV_UTILS_DEFS__)
 
 #ifndef __LV_CONFIG_DEFS__
     #define __LV_CONFIG_DEFS__
-
     // config defs that may still change from CMake values have ifndef's
     #ifndef USE_OPENCV_MAT_CONSTR_FIX
         #define USE_OPENCV_MAT_CONSTR_FIX   @USE_OPENCV_MAT_CONSTR_FIX@
@@ -228,6 +248,7 @@
     #define LITIV_STATIC              (!(LITIV_SHARED))
     #define USING_LINK_TIME_OPTIM     @USE_LINK_TIME_OPTIM@
     #define USING_FAST_MATH           @USE_FAST_MATH@
+    #define USING_OPENMP              @USE_OPENMP@
     #define USING_WORLD_SOURCE_GLOB   @USE_WORLD_SOURCE_GLOB@
 
     #if (defined(_MSC_VER) || defined(_WIN32) || defined(WIN32) || defined(__CYGWIN__))
@@ -274,11 +295,6 @@
         #error "Bad default number of threads specified."
     #endif //DEFAULT_NB_THREADS<1
 
-#endif //ndef(__LV_CONFIG_DEFS__)
-
-#ifndef __LV_EXTCONFIG_DEFS__
-    #define __LV_EXTCONFIG_DEFS__
-
     #define HAVE_GLSL                 @USE_GLSL@
     #if HAVE_GLSL
         #define TARGET_GL_VER_MAJOR   @TARGET_GL_VER_MAJOR@
@@ -291,7 +307,8 @@
 
     #define HAVE_CUDA                      @USE_CUDA@
     #if HAVE_CUDA
-        #define CUDA_VERSION               XSTR(@CUDA_VERSION@)
+        #define LITIV_CUDA_VERSION         XSTR(@CUDA_VERSION@)
+        #define LITIV_CUDA_MIN_COMPUTE_CAP cv::cuda::FEATURE_SET_COMPUTE_35
         #define CUDA_64_BIT_DEVICE_CODE    @CUDA_64_BIT_DEVICE_CODE@
         #define CUDA_PROPAGATE_HOST_FLAGS  @CUDA_PROPAGATE_HOST_FLAGS@
     #endif //HAVE_CUDA
@@ -301,12 +318,25 @@
         // ...
     #endif //HAVE_OPENCL
 
+    #define HAVE_BOOST                @USE_BOOST@
+    #if HAVE_BOOST
+        #define HAVE_BOOST_CHRONO     @Boost_CHRONO_FOUND@
+        #define HAVE_BOOST_DATETIME   @Boost_DATE_TIME_FOUND@
+        #define HAVE_BOOST_SYSTEM     @Boost_SYSTEM_FOUND@
+        #define HAVE_BOOST_FILESYSTEM @Boost_FILESYSTEM_FOUND@
+        #define HAVE_BOOST_PROGOPTS   @Boost_PROGRAM_OPTIONS_FOUND@
+        #define HAVE_BOOST_REGEX      @Boost_REGEX_FOUND@
+        #define HAVE_BOOST_SERIALIZ   @Boost_SERIALIZATION_FOUND@
+    #endif //HAVE_BOOST
+
     #define HAVE_OPENGM               @USE_OPENGM@
     #if HAVE_OPENGM
-        #define HAVE_OPENGM_EXTLIB    @USE_OPENGM_WITH_EXTLIB@
-        #define HAVE_OPENGM_CPLEX     @USE_OPENGM_WITH_CPLEX@
-        #define HAVE_OPENGM_GUROBI    @USE_OPENGM_WITH_GUROBI@
-        #define HAVE_OPENGM_HDF5      @USE_OPENGM_WITH_HDF5@
+        #define HAVE_OPENGM_CPLEX          @USE_OPENGM_WITH_CPLEX@
+        #define HAVE_OPENGM_GUROBI         @USE_OPENGM_WITH_GUROBI@
+        #define HAVE_OPENGM_HDF5           @USE_OPENGM_WITH_HDF5@
+        #define HAVE_OPENGM_EXTLIB         @USE_OPENGM_WITH_EXTLIB@
+        #define HAVE_OPENGM_EXTLIB_FASTPD  @HAVE_OPENGM_EXTLIB_FASTPD@
+        #define HAVE_OPENGM_EXTLIB_QPBO    @HAVE_OPENGM_EXTLIB_QPBO@
     #endif //HAVE_OPENGM
 
     #define HAVE_KINECTSDK            @USE_KINECTSDK@
@@ -348,5 +378,4 @@
     #ifndef HAVE_POSIX_ALIGNED_ALLOC
         #define HAVE_POSIX_ALIGNED_ALLOC      @USE_POSIX_ALIGNED_ALLOC@
     #endif //ndef(HAVE_POSIX_ALIGNED_ALLOC)
-
-#endif //ndef(__LV_EXTCONFIG_DEFS__)
+#endif //ndef(__LV_CONFIG_DEFS__)

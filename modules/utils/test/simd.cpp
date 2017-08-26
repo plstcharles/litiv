@@ -5,7 +5,7 @@
 #if HAVE_MMX
 
 TEST(hsum_8ui,regression_32bit) {
-    std::vector<uint8_t,lv::AlignedMemAllocator<uint8_t,16>> vData(8);
+    std::vector<uint8_t,lv::AlignedMemAllocator<uint8_t,16,false>> vData(8);
     ASSERT_EQ(((uintptr_t)vData.data()%16),uintptr_t(0));
     ASSERT_EQ(lv::hsum_8ui(*(__m64*)vData.data()),uint32_t(0));
     std::iota(vData.begin(),vData.end(),uint8_t(1));
@@ -66,7 +66,7 @@ namespace {
 TYPED_TEST_CASE(aligned_cast_load_fixture,aligned_cast_load_types);
 TYPED_TEST(aligned_cast_load_fixture,regression) {
     constexpr size_t nVals = sizeof(__m128i)/sizeof(TypeParam);
-    std::vector<TypeParam,lv::AlignedMemAllocator<TypeParam,16>> vData(nVals);
+    std::vector<TypeParam,lv::AlignedMemAllocator<TypeParam,16,false>> vData(nVals);
     std::iota(vData.begin(),vData.end(),TypeParam(1));
     union {
         TypeParam n[nVals];
@@ -79,7 +79,7 @@ TYPED_TEST(aligned_cast_load_fixture,regression) {
 }
 
 TEST(hsum_8ui,regression) {
-    std::vector<uint8_t,lv::AlignedMemAllocator<uint8_t,16>> vData(16);
+    std::vector<uint8_t,lv::AlignedMemAllocator<uint8_t,16,false>> vData(16);
     ASSERT_EQ(((uintptr_t)vData.data()%16),uintptr_t(0));
     ASSERT_EQ(lv::hsum_8ui(_mm_load_si128((__m128i*)vData.data())),uint32_t(0));
     std::iota(vData.begin(),vData.end(),uint8_t(1));
@@ -94,7 +94,7 @@ TEST(hsum_8ui,regression) {
 }
 
 TEST(hsum_32ui,regression) {
-    std::vector<uint32_t,lv::AlignedMemAllocator<uint32_t,16>> vData(4);
+    std::vector<uint32_t,lv::AlignedMemAllocator<uint32_t,16,false>> vData(4);
     ASSERT_EQ(((uintptr_t)vData.data()%16),uintptr_t(0));
     ASSERT_EQ(lv::hsum_32i(_mm_load_si128((__m128i*)vData.data())),int32_t(0));
     std::iota(vData.begin(),vData.end(),uint32_t(1));
@@ -109,7 +109,7 @@ TEST(hsum_32ui,regression) {
 }
 
 TEST(hsum_32si,regression) {
-    std::vector<int32_t,lv::AlignedMemAllocator<int32_t,16>> vData(4);
+    std::vector<int32_t,lv::AlignedMemAllocator<int32_t,16,false>> vData(4);
     ASSERT_EQ(((uintptr_t)vData.data()%16),uintptr_t(0));
     ASSERT_EQ(lv::hsum_32i(_mm_load_si128((__m128i*)vData.data())),int32_t(0));
     std::iota(vData.begin(),vData.end(),int32_t(1));
@@ -124,7 +124,7 @@ TEST(hsum_32si,regression) {
 }
 
 TEST(store1_8ui,regression) {
-    std::vector<uint8_t,lv::AlignedMemAllocator<uint8_t,16>> vData(16);
+    std::vector<uint8_t,lv::AlignedMemAllocator<uint8_t,16,false>> vData(16);
     ASSERT_EQ(((uintptr_t)vData.data()%16),uintptr_t(0));
     for(uint8_t v=0; v<255; ++v) {
         lv::store1_8ui((__m128i*)vData.data(),uint8_t(v));
@@ -134,7 +134,7 @@ TEST(store1_8ui,regression) {
 
 TEST(store_8ui,regression) {
     for(size_t i=0; i<10; ++i) {
-        std::vector<uint8_t,lv::AlignedMemAllocator<uint8_t,16>> vData((1ULL<<i)*size_t(16));
+        std::vector<uint8_t,lv::AlignedMemAllocator<uint8_t,16,false>> vData((1ULL<<i)*size_t(16));
         ASSERT_EQ(((uintptr_t)vData.data()%16),uintptr_t(0));
         for(uint8_t v=0; v<255; ++v) {
             lv::store_8ui((__m128i*)vData.data(),vData.size()/16,uint8_t(v));

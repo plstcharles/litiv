@@ -32,6 +32,9 @@
 #include "litiv/utils/opengl-shaders.hpp"
 #include "litiv/utils/opengl-imgproc.hpp"
 #endif //HAVE_GLSL
+#if HAVE_OPENGM
+#include "litiv/utils/opengm.hpp"
+#endif //HAVE_OPENGM
 #if HAVE_CUDA
 #include "litiv/utils/cuda.hpp"
 #endif //HAVE_CUDA

@@ -214,7 +214,7 @@ namespace {
             const size_t nCurrLoopSize = nLoopSize;
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx = (nArrayIdx+2)%nCurrArraySize;
+                nArrayIdx = (nArrayIdx+2)%(nCurrArraySize-1);
                 volatile auto tLast = bUseFast?(lv::_L1dist_cheat(afVals[nArrayIdx],afVals[nArrayIdx+1])):(lv::_L1dist_nocheat(afVals[nArrayIdx],afVals[nArrayIdx+1]));
                 benchmark::DoNotOptimize(tLast);
             }
@@ -236,8 +236,8 @@ namespace {
             const size_t nCurrLoopSize = nLoopSize;
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx1 = (nArrayIdx1+nChannels)%nCurrArraySize;
-                nArrayIdx2 = (nArrayIdx2+nChannels)%nCurrArraySize;
+                nArrayIdx1 = (nArrayIdx1+nChannels)%(nCurrArraySize-nChannels+1);
+                nArrayIdx2 = (nArrayIdx2+nChannels)%(nCurrArraySize-nChannels+1);
                 volatile auto tLast = lv::L1dist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
                 benchmark::DoNotOptimize(tLast);
             }
@@ -410,8 +410,8 @@ namespace {
             const size_t nCurrLoopSize = nLoopSize;
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx1 = (nArrayIdx1+nChannels)%nCurrArraySize;
-                nArrayIdx2 = (nArrayIdx2+nChannels)%nCurrArraySize;
+                nArrayIdx1 = (nArrayIdx1+nChannels)%(nCurrArraySize-nChannels+1);
+                nArrayIdx2 = (nArrayIdx2+nChannels)%(nCurrArraySize-nChannels+1);
                 volatile auto tLast = lv::L2sqrdist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
                 benchmark::DoNotOptimize(tLast);
             }
@@ -576,8 +576,8 @@ namespace {
             const size_t nCurrLoopSize = nLoopSize;
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx1 = (nArrayIdx1+nChannels)%nCurrArraySize;
-                nArrayIdx2 = (nArrayIdx2+nChannels)%nCurrArraySize;
+                nArrayIdx1 = (nArrayIdx1+nChannels)%(nCurrArraySize-nChannels+1);
+                nArrayIdx2 = (nArrayIdx2+nChannels)%(nCurrArraySize-nChannels+1);
                 volatile auto tLast = lv::L2dist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
                 benchmark::DoNotOptimize(tLast);
             }
@@ -718,8 +718,8 @@ namespace {
             const size_t nCurrLoopSize = nLoopSize;
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx1 = (nArrayIdx1+nChannels)%nCurrArraySize;
-                nArrayIdx2 = (nArrayIdx2+nChannels)%nCurrArraySize;
+                nArrayIdx1 = (nArrayIdx1+nChannels)%(nCurrArraySize-nChannels+1);
+                nArrayIdx2 = (nArrayIdx2+nChannels)%(nCurrArraySize-nChannels+1);
                 volatile auto tLast = lv::cdist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
                 benchmark::DoNotOptimize(tLast);
             }
@@ -736,19 +736,19 @@ BENCHMARK_TEMPLATE2(cdist_perftest,uint8_t,BENCHMARK_NB_CHANNELS)->Args({1000000
 namespace {
     template<typename T>
     struct cdist_fixture : testing::Test {};
-    typedef testing::Types<uint8_t,uint16_t,uint32_t,float,double> cdist_types;
+    typedef testing::Types<uint8_t,uint16_t,uint32_t> cdist_types;
 }
-TYPED_TEST_CASE(cdist_fixture,L2dist_unsigned_types);
+TYPED_TEST_CASE(cdist_fixture,cdist_types);
 
 TYPED_TEST(cdist_fixture,regression_array) {
-    constexpr size_t nArraySize = 1000;
+    constexpr size_t nArraySize = 100000;
     const std::unique_ptr<TypeParam[]> aVals_0_1 = lv::test::genarray(nArraySize,TypeParam(0),TypeParam(1));
     const std::unique_ptr<TypeParam[]> aVals_0_255 = lv::test::genarray(nArraySize,TypeParam(0),TypeParam(255));
     #define __cdist_mch(c) \
         ASSERT_GE(double(lv::cdist<c>(aVals_0_1.get()+i,aVals_0_1.get()+i+nArraySize/2)),0.0); \
-        ASSERT_LE(double(lv::cdist<c>(aVals_0_1.get()+i,aVals_0_1.get()+i+nArraySize/2)),1.0*(c-1)); \
+        ASSERT_LE(double(lv::cdist<c>(aVals_0_1.get()+i,aVals_0_1.get()+i+nArraySize/2)),1.0*c); \
         ASSERT_GE(double(lv::cdist<c>(aVals_0_255.get()+i,aVals_0_255.get()+i+nArraySize/2)),0.0); \
-        ASSERT_LE(double(lv::cdist<c>(aVals_0_255.get()+i,aVals_0_255.get()+i+nArraySize/2)),255.0*(c-1)); \
+        ASSERT_LE(double(lv::cdist<c>(aVals_0_255.get()+i,aVals_0_255.get()+i+nArraySize/2)),255.0*c); \
         ASSERT_DOUBLE_EQ(double(lv::cdist<c>(aVals_0_1.get()+i,aVals_0_1.get()+i)),0.0); \
         ASSERT_DOUBLE_EQ(double(lv::cdist<c>(aVals_0_255.get()+i,aVals_0_255.get()+i)),0.0)
     for(size_t i=0; i<nArraySize/2-4; ++i) {
@@ -837,7 +837,7 @@ namespace {
             const size_t nCurrLoopSize = nLoopSize;
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx = (nArrayIdx+nChannels)%nCurrArraySize;
+                nArrayIdx = (nArrayIdx+nChannels)%(nCurrArraySize-nChannels+1);
                 volatile auto tLast = lv::popcount<nChannels>(&aVals[nArrayIdx]);
                 benchmark::DoNotOptimize(tLast);
             }
@@ -910,8 +910,8 @@ namespace {
             const size_t nCurrLoopSize = nLoopSize;
             const size_t nCurrArraySize = nArraySize;
             for(size_t nLoopIdx=0; nLoopIdx<nCurrLoopSize; ++nLoopIdx) {
-                nArrayIdx1 = (nArrayIdx1+nChannels)%nCurrArraySize;
-                nArrayIdx2 = (nArrayIdx2+nChannels)%nCurrArraySize;
+                nArrayIdx1 = (nArrayIdx1+nChannels)%(nCurrArraySize-nChannels+1);
+                nArrayIdx2 = (nArrayIdx2+nChannels)%(nCurrArraySize-nChannels+1);
                 volatile auto tLast = lv::hdist<nChannels>(&aVals[nArrayIdx1],&aVals[nArrayIdx2]);
                 benchmark::DoNotOptimize(tLast);
             }
@@ -931,6 +931,52 @@ BENCHMARK_TEMPLATE2(hdist_perftest,int8_t,BENCHMARK_NB_CHANNELS)->Args({1000000,
 BENCHMARK_TEMPLATE2(hdist_perftest,uint8_t,BENCHMARK_NB_CHANNELS)->Args({1000000,100})->Repetitions(10)->ReportAggregatesOnly(true);
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include <opencv2/imgproc.hpp> // for emd test
+
+TEST(EMDL1dist,regression) {
+    const std::vector<float> v1 = {1.0f/6,1.0f/6,2.0f/6,1.0f/6,1.0f/6};
+    const std::vector<float> v2 = {1.0f/6,1.0f/6,1.0f/6,1.0f/6,2.0f/6};
+    ASSERT_FLOAT_EQ((lv::EMDL1dist<float,float>(v1,v2)),2.0f/6);
+    std::vector<float> v1_w_coords = {1.0f/6,0.0f,  1.0f/6,1.0f,  2.0f/6,2.0f,  1.0f/6,3.0f,  1.0f/6,4.0f};
+    std::vector<float> v2_w_coords = {1.0f/6,0.0f,  1.0f/6,1.0f,  1.0f/6,2.0f,  1.0f/6,3.0f,  2.0f/6,4.0f};
+    const cv::Mat_<float> desc1(5,2,v1_w_coords.data());
+    const cv::Mat_<float> desc2(5,2,v2_w_coords.data());
+    ASSERT_FLOAT_EQ((lv::EMDL1dist<float,float>(v1,v2)),cv::EMD(desc1,desc2,cv::NORM_L1));
+}
+
+TEST(EMDL1dist,regression_circular) {
+    const std::vector<float> v1 = {1.0f/6,1.0f/6,1.0f/6,1.0f/6,2.0f/6};
+    const std::vector<float> v2 = {2.0f/6,1.0f/6,1.0f/6,1.0f/6,1.0f/6};
+    ASSERT_FLOAT_EQ((float)lv::CEMDL1dist(v1,v2),1.0f/6);
+    ASSERT_LE((lv::CEMDL1dist<float,float>(v1,v2)),(lv::EMDL1dist<float,float>(v1,v2)));
+}
+
+#include "litiv/utils/opencv.hpp"
+
+#ifdef OPENCV_ENABLE_NONFREE
+
+#include <opencv2/xfeatures2d.hpp> // for rootSIFT test
+
+TEST(rootSIFT,regression) {
+    cv::Ptr<cv::xfeatures2d::SIFT> pSIFT = cv::xfeatures2d::SIFT::create();
+    const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
+    std::vector<cv::KeyPoint> vKeyPts;
+    cv::Mat oDescs;
+    pSIFT->detectAndCompute(oInput,cv::Mat(),vKeyPts,oDescs);
+    ASSERT_EQ(oDescs.dims,2);
+    ASSERT_EQ(oDescs.type(),CV_32FC1);
+    ASSERT_EQ(oDescs.rows,(int)vKeyPts.size());
+    for(size_t i=0; i<vKeyPts.size(); ++i) {
+        lv::rootSIFT(oDescs.ptr<float>((int)i),(size_t)oDescs.cols);
+        if(i==0)
+            ASSERT_EQ(cv::norm(oDescs.row((int)i),oDescs.row(0)),0.0);
+        else
+            ASSERT_GT(cv::norm(oDescs.row((int)i),oDescs.row(0)),0.0);
+    }
+}
+
+#endif //def(OPENCV_ENABLE_NONFREE)
 
 namespace {
     template<typename T>

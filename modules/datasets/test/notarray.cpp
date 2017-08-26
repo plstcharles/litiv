@@ -4,21 +4,16 @@
 #include "litiv/test.hpp"
 
 TEST(datasets_notarray,regression_custom) {
-    lv::datasets::setParserVerbosity(0);
+    lv::setVerbosity(0);
     using DatasetType = lv::Dataset_<lv::DatasetTask_EdgDet,lv::Dataset_Custom,lv::NonParallel>;
     const std::string sDatasetName = "customtest";
     const std::string sOutputRootPath = TEST_OUTPUT_DATA_ROOT "/custom_dataset_test/";
     const std::vector<std::string> vsWorkBatchDirs = {"batch1","batch2","batch3"};
-    const std::string sOutputPrefix = "edge_mask_";
-    const std::string sOutputSuffix = ".png";
     DatasetType::Ptr pDataset = DatasetType::create(
         sDatasetName,
         lv::addDirSlashIfMissing(SAMPLES_DATA_ROOT)+"custom_dataset_ex/",
         sOutputRootPath,
-        sOutputPrefix,
-        sOutputSuffix,
         vsWorkBatchDirs,
-        std::vector<std::string>(),
         std::vector<std::string>(),
         true,
         false,
@@ -35,17 +30,13 @@ TEST(datasets_notarray,regression_custom) {
     ASSERT_EQ(pDataset->getGTCount(),size_t(0));
     ASSERT_FALSE(pDataset->isBare());
     ASSERT_TRUE(pDataset->isGroup());
-    ASSERT_EQ(pDataset->getOutputNamePrefix(),sOutputPrefix);
-    ASSERT_EQ(pDataset->getOutputNameSuffix(),sOutputSuffix);
     EXPECT_EQ(pDataset->getWorkBatchDirs(),vsWorkBatchDirs);
-    EXPECT_EQ(pDataset->getSkippedDirTokens(),std::vector<std::string>());
-    EXPECT_EQ(pDataset->getGrayscaleDirTokens(),std::vector<std::string>());
+    EXPECT_EQ(pDataset->getSkipTokens(),std::vector<std::string>());
     EXPECT_DOUBLE_EQ(pDataset->getScaleFactor(),1.0);
     EXPECT_EQ(pDataset->getParent(),lv::IDataHandlerConstPtr());
     EXPECT_TRUE(pDataset->isRoot());
     EXPECT_EQ(pDataset->getRoot(),pDataset);
-    EXPECT_FALSE(pDataset->isGrayscale());
-    EXPECT_GE(pDataset->getExpectedLoad(),0.0);
+    EXPECT_GE(pDataset->getExpectedLoadSize(),size_t(0));
     std::shared_ptr<IEdgeDetector> pAlgo = std::make_shared<EdgeDetectorLBSP>();
     size_t nBatchIdx = 0;
     for(auto pBatchIter = vpBatches.begin(); pBatchIter!=vpBatches.end(); ++pBatchIter) {
@@ -53,13 +44,10 @@ TEST(datasets_notarray,regression_custom) {
         ASSERT_TRUE(lv::checkIfExists(sOutputRootPath+oBatch.getName()));
         ASSERT_FALSE(oBatch.isBare());
         ASSERT_FALSE(oBatch.isGroup());
-        ASSERT_EQ(oBatch.getOutputNamePrefix(),sOutputPrefix);
-        ASSERT_EQ(oBatch.getOutputNameSuffix(),sOutputSuffix);
         EXPECT_DOUBLE_EQ(oBatch.getScaleFactor(),1.0);
         EXPECT_FALSE(oBatch.isRoot());
         EXPECT_EQ(oBatch.getRoot(),pDataset);
-        EXPECT_FALSE(oBatch.isGrayscale());
-        EXPECT_GE(oBatch.getExpectedLoad(),0.0);
+        EXPECT_GE(oBatch.getExpectedLoadSize(),size_t(0));
         ASSERT_EQ(oBatch.getImageCount(),oBatch.getInputCount());
         EXPECT_EQ(oBatch.getBatches(false),lv::IDataHandlerPtrArray());
         ASSERT_EQ(oBatch.getDatasetTask(),lv::DatasetTask_EdgDet);
@@ -77,11 +65,15 @@ TEST(datasets_notarray,regression_custom) {
             cv::Mat oEdgeMask;
             pAlgo->apply(oImage,oEdgeMask);
             oBatch.push(oEdgeMask,nProcessedPackets);
+            oBatch.saveFeatures(nProcessedPackets,oEdgeMask);
             std::stringstream sstr;
-            sstr << sOutputRootPath << "/" << oBatch.getName() << "/" << sOutputPrefix << oBatch.getOutputName(nProcessedPackets++) << sOutputSuffix;
+            sstr << sOutputRootPath << "/" << oBatch.getName() << "/" << oBatch.getOutputName(nProcessedPackets) << ".png";
             ASSERT_TRUE(lv::checkIfExists(sstr.str()));
             cv::Mat oOut = cv::imread(sstr.str(),cv::IMREAD_GRAYSCALE);
-            ASSERT_TRUE(cv::isEqual<uint8_t>(oEdgeMask,oOut));
+            ASSERT_TRUE(lv::isEqual<uint8_t>(oEdgeMask,oOut));
+            const cv::Mat oFeatures = oBatch.loadFeatures(nProcessedPackets);
+            ASSERT_TRUE(lv::isEqual<uint8_t>(oEdgeMask,oFeatures));
+            ++nProcessedPackets;
         }
         oBatch.stopProcessing();
         EXPECT_GT(oBatch.getFinalProcessTime(),0.0);

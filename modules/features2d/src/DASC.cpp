@@ -17,6 +17,8 @@
 
 #include "litiv/features2d.hpp"
 
+#define LOCAL_EPS (1e-10)
+
 // @@@@ test with nan in oob lookup
 
 namespace pretrained { // obtained via middlebury dataset (imported here from original mat archives)
@@ -62,7 +64,8 @@ DASC::DASC(float fSigma_s, float fSigma_r, size_t nIters, bool bPreProcess) :
         m_nIters(nIters),
         m_nRadius(),
         m_fEpsilon(),
-        m_nSubSamplFrac() {
+        m_nSubSamplFrac(),
+        m_nLUTSize(pretrained::nLUTSize) {
     lvAssert_(fSigma_s>0.0f && fSigma_r>0.0f && nIters>0,"invalid parameter(s)");
 }
 
@@ -74,7 +77,8 @@ DASC::DASC(size_t nRadius, float fEpsilon, size_t nSubSamplFrac, bool bPreProces
         m_nIters(),
         m_nRadius(nRadius),
         m_fEpsilon(fEpsilon),
-        m_nSubSamplFrac(nSubSamplFrac) {
+        m_nSubSamplFrac(nSubSamplFrac),
+        m_nLUTSize(pretrained::nLUTSize) {
     lvAssert_(nRadius>0 && fEpsilon>0.0f && nSubSamplFrac>0 && nRadius>=nSubSamplFrac,"invalid parameter(s)");
 }
 
@@ -93,6 +97,16 @@ cv::Size DASC::windowSize() const {
 int DASC::borderSize(int nDim) const {
     lvAssert(nDim==0 || nDim==1);
     return pretrained::nRPAbsMax;
+}
+
+lv::MatInfo DASC::getOutputInfo(const lv::MatInfo& oInputInfo) const {
+    lvAssert_((oInputInfo.type.channels()==1 || oInputInfo.type.channels()==3) && (oInputInfo.type.depth()==CV_32F || oInputInfo.type.depth()==CV_8U),"invalid input image type");
+    lvAssert_(oInputInfo.size.dims()==size_t(2) && oInputInfo.size.total()>0,"invalid input image size");
+    const int nRows = (int)oInputInfo.size(0);
+    const int nCols = (int)oInputInfo.size(1);
+    lvAssert__(pretrained::nMaxPatternDiam<=nCols && pretrained::nMaxPatternDiam<=nRows,"image is too small to compute descriptors with current pattern size -- need at least (%d,%d) and got (%d,%d)",pretrained::nMaxPatternDiam,pretrained::nMaxPatternDiam,nCols,nRows);
+    const std::array<int,3> anDescDims = {nRows,nCols,(int)pretrained::nLUTSize};
+    return lv::MatInfo(lv::MatSize(anDescDims),CV_32FC1);
 }
 
 int DASC::descriptorSize() const {
@@ -117,6 +131,15 @@ bool DASC::isUsingRF() const {
 
 bool DASC::isPreProcessing() const {
     return m_bPreProcess;
+}
+
+void DASC::compute2(const cv::Mat& oImage, cv::Mat& oDescMap_) {
+    lvAssert_(oDescMap_.empty() || oDescMap_.type()==CV_32FC1,"wrong output desc map type");
+    cv::Mat_<float> oDescMap = oDescMap_;
+    const bool bEmptyInit = oDescMap.empty();
+    compute2(oImage,oDescMap);
+    if(bEmptyInit)
+        oDescMap_ = oDescMap;
 }
 
 void DASC::compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescMap) {
@@ -210,24 +233,7 @@ void DASC::validateROI(cv::Mat& oROI) {
     oROI = oROI_new;
 }
 
-double DASC::calcDistance(const cv::Mat_<float>& oDescriptor1, const cv::Mat_<float>& oDescriptor2) {
-    lvAssert_(oDescriptor1.dims==oDescriptor2.dims && oDescriptor1.size==oDescriptor2.size,"descriptor mat sizes mismatch");
-    lvAssert_(oDescriptor1.dims==2 || oDescriptor1.dims==3,"unexpected descriptor matrix dim count");
-    if(oDescriptor1.dims==2) {
-        lvAssert_(oDescriptor1.total()==pretrained::nLUTSize,"unexpected descriptor size");
-        const cv::Mat_<float> oDesc1(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptor1.ptr<float>(0)));
-        const cv::Mat_<float> oDesc2(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptor2.ptr<float>(0)));
-        return cv::norm(oDesc1,oDesc2,cv::NORM_L2);
-    }
-    else { //oDescriptors1.dims==3
-        lvAssert_(oDescriptor1.size[0]==1 && oDescriptor1.size[1]==1 && oDescriptor1.size[2]==int(pretrained::nLUTSize),"unexpected descriptor size");
-        const cv::Mat_<float> oDesc1(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptor1.ptr<float>(0)));
-        const cv::Mat_<float> oDesc2(1,int(pretrained::nLUTSize),const_cast<float*>(oDescriptor2.ptr<float>(0)));
-        return cv::norm(oDesc1,oDesc2,cv::NORM_L2);
-    }
-}
-
-void DASC::calcDistance(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<float>& oDescriptors2, cv::Mat_<float>& oDistances) {
+void DASC::calcDistances(const cv::Mat_<float>& oDescriptors1, const cv::Mat_<float>& oDescriptors2, cv::Mat_<float>& oDistances) {
     lvAssert_(oDescriptors1.dims==oDescriptors2.dims && oDescriptors1.size==oDescriptors2.size,"descriptor mat sizes mismatch");
     lvAssert_(oDescriptors1.dims==2 || oDescriptors1.dims==3,"unexpected descriptor matrix dim count");
     if(oDescriptors1.dims==2) {
@@ -339,10 +345,8 @@ void DASC::dasc_rf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
                 const int nOffsetColIdx = nColIdx+pretrained::anRP1[nLUTIdx*2+1];
                 if(nOffsetRowIdx>0 && nOffsetRowIdx<nRows && nOffsetColIdx>0 && nOffsetColIdx<nCols) {
                     const float fCorrSurfDenom = std::sqrt((m_oImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)) * (m_oLookupImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)));
-                    if(fCorrSurfDenom>1e-10)
-                        oDescriptors(nRowIdx,nColIdx,nLUTIdx) = std::exp(-(1-(m_oLookupImage_AdaptiveMeanMix(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx))/fCorrSurfDenom)/0.5f);
-                    else
-                        oDescriptors(nRowIdx,nColIdx,nLUTIdx) = 1.0f;
+                    const float fVisDiff = m_oLookupImage_AdaptiveMeanMix(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx);
+                    oDescriptors(nRowIdx,nColIdx,nLUTIdx) = fCorrSurfDenom>LOCAL_EPS?std::min(std::exp(-(1-(fVisDiff)/fCorrSurfDenom)*2),1.0f):1.0f;
                 }
                 else
                     oDescriptors(nRowIdx,nColIdx,nLUTIdx) = 0.0f;
@@ -351,12 +355,12 @@ void DASC::dasc_rf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
     }
     for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
         for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
-            float fNorm = 0;
-            for(int nLUTIdx=0; nLUTIdx<(int)pretrained::nLUTSize; ++nLUTIdx)
-                fNorm += oDescriptors(nRowIdx,nColIdx,nLUTIdx)*oDescriptors(nRowIdx,nColIdx,nLUTIdx);
-            const float fNormSqrt = std::sqrt(fNorm);
-            for(int nLUTIdx=0; nLUTIdx<(int)pretrained::nLUTSize; ++nLUTIdx)
-                oDescriptors(nRowIdx,nColIdx,nLUTIdx) = (fNormSqrt>1e-10)?oDescriptors(nRowIdx,nColIdx,nLUTIdx)/fNormSqrt:0.0f;
+            cv::Mat_<float> oCurrDesc(1,(int)pretrained::nLUTSize,oDescriptors.ptr<float>(nRowIdx,nColIdx));
+            const double dNorm = cv::norm(oCurrDesc,cv::NORM_L2);
+            if(dNorm>LOCAL_EPS)
+                oCurrDesc /= dNorm;
+            else
+                oCurrDesc = std::sqrt(1.0f/pretrained::nLUTSize);
         }
     }
 }
@@ -433,10 +437,8 @@ void DASC::dasc_gf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
                 const int nOffsetColIdx = nColIdx+pretrained::anRP1[nLUTIdx*2+1];
                 if(nOffsetRowIdx>0 && nOffsetRowIdx<nRows && nOffsetColIdx>0 && nOffsetColIdx<nCols) {
                     const float fCorrSurfDenom = std::sqrt((m_oImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)) * (m_oLookupImage_AdaptiveMeanSqr(nOffsetRowIdx,nOffsetColIdx)-m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)));
-                    if(fCorrSurfDenom>1e-10)
-                        oDescriptors(nRowIdx,nColIdx,nLUTIdx) = std::exp(-(1-(m_oLookupImage_AdaptiveMeanMix(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx))/fCorrSurfDenom)/0.5f);
-                    else
-                        oDescriptors(nRowIdx,nColIdx,nLUTIdx) = 1.0f;
+                    const float fVisDiff = m_oLookupImage_AdaptiveMeanMix(nOffsetRowIdx,nOffsetColIdx)-m_oImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx)*m_oLookupImage_AdaptiveMean(nOffsetRowIdx,nOffsetColIdx);
+                    oDescriptors(nRowIdx,nColIdx,nLUTIdx) = fCorrSurfDenom>LOCAL_EPS?std::min(std::exp(-(1-(fVisDiff)/fCorrSurfDenom)*2),1.0f):1.0f;
                 }
                 else
                     oDescriptors(nRowIdx,nColIdx,nLUTIdx) = 0.0f;
@@ -445,12 +447,12 @@ void DASC::dasc_gf_impl(const cv::Mat& _oImage, cv::Mat_<float>& oDescriptors) {
     }
     for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
         for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
-            float fNorm = 0;
-            for(int nLUTIdx=0; nLUTIdx<(int)pretrained::nLUTSize; ++nLUTIdx)
-                fNorm += oDescriptors(nRowIdx,nColIdx,nLUTIdx)*oDescriptors(nRowIdx,nColIdx,nLUTIdx);
-            const float fNormSqrt = std::sqrt(fNorm);
-            for(int nLUTIdx=0; nLUTIdx<(int)pretrained::nLUTSize; ++nLUTIdx)
-                oDescriptors(nRowIdx,nColIdx,nLUTIdx) = (fNormSqrt>1e-10)?oDescriptors(nRowIdx,nColIdx,nLUTIdx)/fNormSqrt:0.0f;
+            cv::Mat_<float> oCurrDesc(1,(int)pretrained::nLUTSize,oDescriptors.ptr<float>(nRowIdx,nColIdx));
+            const double dNorm = cv::norm(oCurrDesc,cv::NORM_L2);
+            if(dNorm>LOCAL_EPS)
+                oCurrDesc /= dNorm;
+            else
+                oCurrDesc = std::sqrt(1.0f/pretrained::nLUTSize);
         }
     }
 }

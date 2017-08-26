@@ -91,11 +91,6 @@ namespace rlutil {
     typedef RLUTIL_STRING_TYPE str_t;
 #endif //ndef RLUTIL_STRING_TYPE
 
-    template<typename Tstr>
-    inline void RLUTIL_PRINT(Tstr str) {
-        std::cout << str;
-    }
-
     enum ColorCode {
         Color_BLACK=0,
         Color_BLUE,
@@ -141,26 +136,26 @@ namespace rlutil {
      * ANSI_BOLDWHITE - White (bold/bright)
      * ANSI_RESET - Resets formatting
      */
-    str_t ANSI_CLS = "\033[2J";
-    str_t ANSI_BLACK = "\033[22;30m";
-    str_t ANSI_RED = "\033[22;31m";
-    str_t ANSI_BOLDRED = "\033[22;31;1m";
-    str_t ANSI_GREEN = "\033[22;32m";
-    str_t ANSI_BOLDGREEN = "\033[22;32;1m";
-    str_t ANSI_BROWN = "\033[22;33m";
-    str_t ANSI_BLUE = "\033[22;34m";
-    str_t ANSI_MAGENTA = "\033[22;35m";
-    str_t ANSI_CYAN = "\033[22;36m";
-    str_t ANSI_GREY = "\033[22;37m";
-    str_t ANSI_DARKGREY = "\033[01;30m";
-    str_t ANSI_LIGHTRED = "\033[01;31m";
-    str_t ANSI_LIGHTGREEN = "\033[01;32m";
-    str_t ANSI_BOLDYELLOW = "\033[01;33m";
-    str_t ANSI_LIGHTBLUE = "\033[01;34m";
-    str_t ANSI_LIGHTMAGENTA = "\033[01;35m";
-    str_t ANSI_LIGHTCYAN = "\033[01;36m";
-    str_t ANSI_BOLDWHITE = "\033[01;37m";
-    str_t ANSI_RESET = "\033[39;49m\033[0m";
+    constexpr str_t ANSI_CLS = "\033[2J";
+    constexpr str_t ANSI_BLACK = "\033[22;30m";
+    constexpr str_t ANSI_RED = "\033[22;31m";
+    constexpr str_t ANSI_BOLDRED = "\033[22;31;1m";
+    constexpr str_t ANSI_GREEN = "\033[22;32m";
+    constexpr str_t ANSI_BOLDGREEN = "\033[22;32;1m";
+    constexpr str_t ANSI_BROWN = "\033[22;33m";
+    constexpr str_t ANSI_BLUE = "\033[22;34m";
+    constexpr str_t ANSI_MAGENTA = "\033[22;35m";
+    constexpr str_t ANSI_CYAN = "\033[22;36m";
+    constexpr str_t ANSI_GREY = "\033[22;37m";
+    constexpr str_t ANSI_DARKGREY = "\033[01;30m";
+    constexpr str_t ANSI_LIGHTRED = "\033[01;31m";
+    constexpr str_t ANSI_LIGHTGREEN = "\033[01;32m";
+    constexpr str_t ANSI_BOLDYELLOW = "\033[01;33m";
+    constexpr str_t ANSI_LIGHTBLUE = "\033[01;34m";
+    constexpr str_t ANSI_LIGHTMAGENTA = "\033[01;35m";
+    constexpr str_t ANSI_LIGHTCYAN = "\033[01;36m";
+    constexpr str_t ANSI_BOLDWHITE = "\033[01;37m";
+    constexpr str_t ANSI_RESET = "\033[39;49m\033[0m";
 
     /**
      * Key codes for keyhit()
@@ -202,46 +197,46 @@ namespace rlutil {
      * KEY_NUMPAD8 - Numpad 8
      * KEY_NUMPAD9 - Numpad 9
      */
-    const int KEY_ESCAPE  = 0;
-    const int KEY_ENTER   = 1;
-    const int KEY_SPACE   = 32;
+    constexpr int KEY_ESCAPE  = 0;
+    constexpr int KEY_ENTER   = 1;
+    constexpr int KEY_SPACE   = 32;
 
-    const int KEY_INSERT  = 2;
-    const int KEY_HOME    = 3;
-    const int KEY_PGUP    = 4;
-    const int KEY_DELETE  = 5;
-    const int KEY_END     = 6;
-    const int KEY_PGDOWN  = 7;
+    constexpr int KEY_INSERT  = 2;
+    constexpr int KEY_HOME    = 3;
+    constexpr int KEY_PGUP    = 4;
+    constexpr int KEY_DELETE  = 5;
+    constexpr int KEY_END     = 6;
+    constexpr int KEY_PGDOWN  = 7;
 
-    const int KEY_UP      = 14;
-    const int KEY_DOWN    = 15;
-    const int KEY_LEFT    = 16;
-    const int KEY_RIGHT   = 17;
+    constexpr int KEY_UP      = 14;
+    constexpr int KEY_DOWN    = 15;
+    constexpr int KEY_LEFT    = 16;
+    constexpr int KEY_RIGHT   = 17;
 
-    const int KEY_F1      = 18;
-    const int KEY_F2      = 19;
-    const int KEY_F3      = 20;
-    const int KEY_F4      = 21;
-    const int KEY_F5      = 22;
-    const int KEY_F6      = 23;
-    const int KEY_F7      = 24;
-    const int KEY_F8      = 25;
-    const int KEY_F9      = 26;
-    const int KEY_F10     = 27;
-    const int KEY_F11     = 28;
-    const int KEY_F12     = 29;
+    constexpr int KEY_F1      = 18;
+    constexpr int KEY_F2      = 19;
+    constexpr int KEY_F3      = 20;
+    constexpr int KEY_F4      = 21;
+    constexpr int KEY_F5      = 22;
+    constexpr int KEY_F6      = 23;
+    constexpr int KEY_F7      = 24;
+    constexpr int KEY_F8      = 25;
+    constexpr int KEY_F9      = 26;
+    constexpr int KEY_F10     = 27;
+    constexpr int KEY_F11     = 28;
+    constexpr int KEY_F12     = 29;
 
-    const int KEY_NUMDEL  = 30;
-    const int KEY_NUMPAD0 = 31;
-    const int KEY_NUMPAD1 = 127;
-    const int KEY_NUMPAD2 = 128;
-    const int KEY_NUMPAD3 = 129;
-    const int KEY_NUMPAD4 = 130;
-    const int KEY_NUMPAD5 = 131;
-    const int KEY_NUMPAD6 = 132;
-    const int KEY_NUMPAD7 = 133;
-    const int KEY_NUMPAD8 = 134;
-    const int KEY_NUMPAD9 = 135;
+    constexpr int KEY_NUMDEL  = 30;
+    constexpr int KEY_NUMPAD0 = 31;
+    constexpr int KEY_NUMPAD1 = 127;
+    constexpr int KEY_NUMPAD2 = 128;
+    constexpr int KEY_NUMPAD3 = 129;
+    constexpr int KEY_NUMPAD4 = 130;
+    constexpr int KEY_NUMPAD5 = 131;
+    constexpr int KEY_NUMPAD6 = 132;
+    constexpr int KEY_NUMPAD7 = 133;
+    constexpr int KEY_NUMPAD8 = 134;
+    constexpr int KEY_NUMPAD9 = 135;
 
     // reads a key press (blocking) and returns a key code; see key codes for info (note: only Arrows, Esc, Enter and Space are currently working properly)
     inline int getkey(void) {
@@ -310,29 +305,28 @@ namespace rlutil {
     }
 
     // returns ANSI color escape sequence for specified color enum
-    inline str_t getANSIColor(const ColorCode c) {
-        switch(c) {
-            case Color_BLACK : return ANSI_BLACK;
-            case Color_BLUE : return ANSI_BLUE; // non-ANSI
-            case Color_GREEN : return ANSI_GREEN;
-            case Color_BOLDGREEN : return ANSI_BOLDGREEN;
-            case Color_CYAN : return ANSI_CYAN; // non-ANSI
-            case Color_RED : return ANSI_RED; // non-ANSI
-            case Color_BOLDRED : return ANSI_BOLDRED;
-            case Color_MAGENTA : return ANSI_MAGENTA;
-            case Color_BROWN : return ANSI_BROWN;
-            case Color_GREY : return ANSI_GREY;
-            case Color_DARKGREY : return ANSI_DARKGREY;
-            case Color_LIGHTBLUE : return ANSI_LIGHTBLUE; // non-ANSI
-            case Color_LIGHTGREEN: return ANSI_LIGHTGREEN;
-            case Color_LIGHTCYAN: return ANSI_LIGHTCYAN; // non-ANSI;
-            case Color_LIGHTRED: return ANSI_LIGHTRED; // non-ANSI;
-            case Color_LIGHTMAGENTA: return ANSI_LIGHTMAGENTA;
-            case Color_BOLDYELLOW: return ANSI_BOLDYELLOW; // non-ANSI
-            case Color_BOLDWHITE: return ANSI_BOLDWHITE;
-            case Color_RESET: return ANSI_RESET;
-            default: return "";
-        }
+    constexpr str_t getANSIColor(ColorCode c) {
+        return
+            c==Color_BLACK?ANSI_BLACK:
+            c==Color_BLUE?ANSI_BLUE: // non-ANSI
+            c==Color_GREEN?ANSI_GREEN:
+            c==Color_BOLDGREEN?ANSI_BOLDGREEN:
+            c==Color_CYAN?ANSI_CYAN: // non-ANSI
+            c==Color_RED?ANSI_RED: // non-ANSI
+            c==Color_BOLDRED?ANSI_BOLDRED:
+            c==Color_MAGENTA?ANSI_MAGENTA:
+            c==Color_BROWN?ANSI_BROWN:
+            c==Color_GREY?ANSI_GREY:
+            c==Color_DARKGREY?ANSI_DARKGREY:
+            c==Color_LIGHTBLUE?ANSI_LIGHTBLUE: // non-ANSI
+            c==Color_LIGHTGREEN?ANSI_LIGHTGREEN:
+            c==Color_LIGHTCYAN?ANSI_LIGHTCYAN: // non-ANSI;
+            c==Color_LIGHTRED?ANSI_LIGHTRED: // non-ANSI;
+            c==Color_LIGHTMAGENTA?ANSI_LIGHTMAGENTA:
+            c==Color_BOLDYELLOW?ANSI_BOLDYELLOW: // non-ANSI
+            c==Color_BOLDWHITE?ANSI_BOLDWHITE:
+            c==Color_RESET?ANSI_RESET:
+            "";
     }
 
     // changes color specified by enum (Windows / QBasic colors)
@@ -345,7 +339,7 @@ namespace rlutil {
             SetConsoleTextAttribute(hConsole,(WORD)c);
         }
 #else //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
-        RLUTIL_PRINT(getANSIColor(c));
+        lv::safe_print(getANSIColor(c));
 #endif //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
     }
 
@@ -354,7 +348,7 @@ namespace rlutil {
 #if defined(_WIN32) && !defined(RLUTIL_USE_ANSI)
         system("cls");
 #else //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
-        RLUTIL_PRINT("\033[2J\033[H");
+        lv::safe_print("\033[2J\033[H");
 #endif
     }
 
@@ -368,7 +362,7 @@ namespace rlutil {
 #else //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
         std::ostringstream oss;
         oss << "\033[" << y << ";" << x << "H";
-        RLUTIL_PRINT(oss.str());
+        lv::safe_print(oss.str());
 #endif //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
     }
 
@@ -382,7 +376,7 @@ namespace rlutil {
         structCursorInfo.bVisible = FALSE;
         SetConsoleCursorInfo(hConsoleOutput,&structCursorInfo);
 #else //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
-        RLUTIL_PRINT("\033[?25l");
+        lv::safe_print("\033[?25l");
 #endif //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
     }
 
@@ -396,7 +390,7 @@ namespace rlutil {
         structCursorInfo.bVisible = TRUE;
         SetConsoleCursorInfo(hConsoleOutput,&structCursorInfo);
 #else //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
-        RLUTIL_PRINT("\033[?25h");
+        lv::safe_print("\033[?25h");
 #endif //(!defined(_WIN32) || defined(RLUTIL_USE_ANSI))
     }
 
@@ -506,13 +500,18 @@ namespace lv {
     }
 #endif //defined(_MSC_VER)
 
-    /// shows a progression bar in the console
-    inline void updateConsoleProgressBar(const std::string& sMsg, float fCompletion, size_t nBarCols=20) {
+    /// shows a progression bar in the console (20 cols wide & without self-overwrite by default)
+    inline void updateConsoleProgressBar(const std::string& sPrefix, float fCompletion, bool bUseCarrRet=false, size_t nBarCols=20) {
+        lvDbgAssert_(fCompletion>=0.0f && fCompletion<=1.0f,"completion must be given as fraction");
+        lvDbgAssert_(nBarCols>0,"number of columns in progress bar must be positive");
+        fCompletion = std::min(std::max(0.0f,fCompletion),1.0f);
         if(nBarCols==0)
             return;
         const int nRows = rlutil::trows();
         const int nCols = rlutil::tcols();
-        printf("\r%s  ",sMsg.c_str());
+        if(bUseCarrRet)
+            printf("\r");
+        printf(" %s  ",sPrefix.c_str());
         if(nRows>0 && nCols>0)
             rlutil::setColor(rlutil::Color_BOLDWHITE);
         printf("[");
@@ -536,7 +535,10 @@ namespace lv {
         printf("]");
         if(nRows>0 && nCols>0)
             rlutil::setColor(rlutil::Color_RESET);
-        printf(" ");
+        if(bUseCarrRet)
+            printf(" ");
+        else
+            printf("\n");
         fflush(stdout);
     }
 
@@ -552,5 +554,59 @@ namespace lv {
             printf("\r");
         fflush(stdout);
     }
+
+    /// progress bar display manager for multi-threaded applications
+    struct ProgressBarManager {
+        /// initializes the progres bar, & prints initial empty state if init refresh <= 0
+        inline ProgressBarManager(const std::string& sPrefix="",
+                                  double dInitRefresh_sec=2.0,
+                                  double dRefreshRate_sec=0.5,
+                                  bool bUseCarrRet=false,
+                                  size_t nBarCols=20) :
+                m_sBarPrefix(sPrefix),
+                m_nBarCols(nBarCols),
+                m_bUseCarrRet(bUseCarrRet),
+                m_dRefreshRate_sec(dRefreshRate_sec),
+                m_dInitRefresh_sec(dInitRefresh_sec) {
+            lvAssert_(m_dRefreshRate_sec>0.0,"refresh rate must be positive");
+            lvDbgAssert_(m_nBarCols>0,"number of columns in progress bar must be positive");
+            m_fLatestCompletion = 0.0f;
+            m_nLatestComplBars = size_t(0);
+            if(dInitRefresh_sec<=0.0)
+                lv::updateConsoleProgressBar(m_sBarPrefix,m_fLatestCompletion,m_bUseCarrRet,m_nBarCols);
+        }
+        /// updates the progress bar, but only if enough time has elapsed and completion is increasing
+        inline bool update(float fCompletion) {
+            lvDbgAssert_(fCompletion>=0.0f && fCompletion<=1.0f,"completion must be given as fraction");
+            const size_t nComplBars = size_t(fCompletion*m_nBarCols);
+            std::lock_guard<std::mutex> oLock(lv::getLogMutex());
+            if(fCompletion<=m_fLatestCompletion || nComplBars<=m_nLatestComplBars ||
+               (m_nLatestComplBars==size_t(0) && m_oLocalTimer.elapsed()<m_dInitRefresh_sec) ||
+               (m_nLatestComplBars>size_t(0) && m_oLocalTimer.elapsed()<m_dRefreshRate_sec))
+                return false;
+            lv::updateConsoleProgressBar(m_sBarPrefix,fCompletion,m_bUseCarrRet,m_nBarCols);
+            m_fLatestCompletion = fCompletion;
+            m_nLatestComplBars = nComplBars;
+            m_oLocalTimer.tock();
+            return true;
+        }
+        /// reinitializes the progress bar to its default state
+        inline void reset() {
+            std::lock_guard<std::mutex> oLock(lv::getLogMutex());
+            m_fLatestCompletion = 0.0f;
+            m_nLatestComplBars = size_t(0);
+            lv::updateConsoleProgressBar(m_sBarPrefix,m_fLatestCompletion,m_bUseCarrRet,m_nBarCols);
+            m_oLocalTimer.tock();
+        }
+    protected:
+        const std::string m_sBarPrefix;
+        const size_t m_nBarCols;
+        const bool m_bUseCarrRet;
+        const double m_dRefreshRate_sec;
+        const double m_dInitRefresh_sec;
+        lv::StopWatch m_oLocalTimer;
+        float m_fLatestCompletion;
+        size_t m_nLatestComplBars;
+    };
 
 } // namespace lv
