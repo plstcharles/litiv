@@ -963,12 +963,19 @@ namespace lv {
         static_assert(std::is_arithmetic<TVal>::value,"input type must be arithmetic");
         static_assert(N>size_t(0),"input matrix size must be positive");
         lvDbgAssert_(m!=nullptr,"invalid matrix");
+    #ifdef _MSC_VER
+    #pragma warning(push)
+    #pragma warning(disable:4127)
+    #endif //def(_MSC_VER)
         if(N==1)
             return m[0];
         else if(N==2)
             return m[0]*m[3] - m[1]*m[2];
         else if(N==3)
             return m[0]*(m[4]*m[8]-m[5]*m[7]) - m[1]*(m[3]*m[8]-m[5]*m[6]) + m[2]*(m[3]*m[7]-m[4]*m[6]);
+    #ifdef _MSC_VER
+    #pragma warning(pop)
+    #endif //def(_MSC_VER)
         static thread_local lv::AutoBuffer<TVal,N*N> s_aMatCopy;
         lvDbgAssert(s_aMatCopy.size()==N*N && s_aMatCopy.is_static());
         std::copy_n(m,N*N,s_aMatCopy.data());
@@ -986,6 +993,10 @@ namespace lv {
         static_assert(N>size_t(0),"input matrix size must be positive");
         lvDbgAssert_(in!=nullptr,"invalid input matrix");
         lvDbgAssert_(out!=nullptr,"invalid output matrix");
+    #ifdef _MSC_VER
+    #pragma warning(push)
+    #pragma warning(disable:4127)
+    #endif //def(_MSC_VER)
         if(N==1) {
             if(in[0]==0)
                 return false;
@@ -1019,6 +1030,9 @@ namespace lv {
             out[8] = TVal((in[0]*in[4] - in[1]*in[3])*dDetInv);
             return true;
         }
+    #ifdef _MSC_VER
+    #pragma warning(pop)
+    #endif //def(_MSC_VER)
         static thread_local lv::AutoBuffer<TVal,N*N> s_aMatCopy;
         lvDbgAssert(s_aMatCopy.size()==N*N && s_aMatCopy.is_static());
         std::copy_n(in,N*N,s_aMatCopy.data());
