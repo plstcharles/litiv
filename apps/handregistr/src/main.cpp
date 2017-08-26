@@ -39,15 +39,16 @@ void Analyze(lv::IDataHandlerPtr pBatch);
 int main(int, char**) {
     try {
         DatasetType::Ptr pDataset = DatasetType::create(
-                DATASET_OUTPUT_PATH,    // const std::string& sOutputDirName
-                false,                  // bool bSaveOutput=false
-                false,                  // bool bUseEvaluator=true
-                false,                  // bool bLoadDepth=true
-                false,                  // bool bUndistort=true
-                false,                  // bool bHorizRectify=false
-                false,                  // bool bEvalStereoDisp=false
-                0,                      // int nLoadInputMasks=0
-                1.0                     // double dScaleFactor=1.0
+                DATASET_OUTPUT_PATH, // const std::string& sOutputDirName
+                false, //bool bSaveOutput
+                false, //bool bUseEvaluator
+                false, //bool bLoadDepth
+                false, //bool bUndistort
+                false, //bool bHorizRectify
+                false, //bool bEvalDisparities
+                false, //bool bLoadFrameSubset
+                0, // int nLoadInputMasks
+                1.0 //double dScaleFactor
         );
         lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false);
         const size_t nTotPackets = pDataset->getInputCount();
