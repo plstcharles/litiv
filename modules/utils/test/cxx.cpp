@@ -509,11 +509,11 @@ TEST(LUT,regression_identity9) {
     ASSERT_FLOAT_EQ(lut.domain_max(),1.0f);
     ASSERT_FLOAT_EQ(lut.domain_offset_mid(),0.5f);
     ASSERT_FLOAT_EQ(lut.domain_offset_low(),0.0f);
-    ASSERT_FLOAT_EQ(lut.domain_index_scale(),float(bins-1));
-    ASSERT_FLOAT_EQ(lut.domain_index_step(),1.0f/(bins-1));
+    ASSERT_FLOAT_EQ((float)lut.domain_index_scale(),float(bins-1));
+    ASSERT_FLOAT_EQ((float)lut.domain_index_step(),1.0f/(bins-1));
     ASSERT_FLOAT_EQ(*lut.data_mid(),0.5f);
     ASSERT_FLOAT_EQ(*lut.data_low(),0.0f);
-    const float step = lut.domain_index_step();
+    const float step = (float)lut.domain_index_step();
     for(size_t i=0; i<bins; ++i) {
         ASSERT_FLOAT_EQ(lut.eval(step*i),(step*i)) << "@ i=[" << i << "]";
         ASSERT_FLOAT_EQ(lut.eval_round(step*i),(step*i)) << "@ i=[" << i << "]";
@@ -540,11 +540,11 @@ TEST(LUT,regression_identity9_safe) {
     ASSERT_FLOAT_EQ(lut.domain_max(),1.0f);
     ASSERT_FLOAT_EQ(lut.domain_offset_mid(),0.5f);
     ASSERT_FLOAT_EQ(lut.domain_offset_low(),0.0f);
-    ASSERT_FLOAT_EQ(lut.domain_index_scale(),float(bins-1));
-    ASSERT_FLOAT_EQ(lut.domain_index_step(),1.0f/(bins-1));
+    ASSERT_FLOAT_EQ((float)lut.domain_index_scale(),float(bins-1));
+    ASSERT_FLOAT_EQ((float)lut.domain_index_step(),1.0f/(bins-1));
     ASSERT_FLOAT_EQ(*lut.data_mid(),0.5f);
     ASSERT_FLOAT_EQ(*lut.data_low(),0.0f);
-    const float step = lut.domain_index_step();
+    const float step = (float)lut.domain_index_step();
     for(size_t i=0; i<bins; ++i) {
         ASSERT_FLOAT_EQ(lut.eval(step*i),(step*i)) << "@ i=[" << i << "]";
         ASSERT_FLOAT_EQ(lut.eval_round(step*i),(step*i)) << "@ i=[" << i << "]";
@@ -571,14 +571,14 @@ TEST(LUT,regression_arccos1000_safe) {
     ASSERT_FLOAT_EQ(lut.domain_max(),1.0f);
     ASSERT_FLOAT_EQ(lut.domain_offset_mid(),0.0f);
     ASSERT_FLOAT_EQ(lut.domain_offset_low(),-1.0f);
-    ASSERT_FLOAT_EQ(lut.domain_index_scale(),float(bins-1)/2);
-    ASSERT_FLOAT_EQ(lut.domain_index_step(),2.0f/(bins-1));
+    ASSERT_FLOAT_EQ((float)lut.domain_index_scale(),float(bins-1)/2);
+    ASSERT_FLOAT_EQ((float)lut.domain_index_step(),2.0f/(bins-1));
     ASSERT_NEAR(*lut.data_mid(),func_acos(0.0f),lut.domain_index_step());
     ASSERT_NEAR(*lut.data_low(),func_acos(-1.0f),lut.domain_index_step());
     const float fMinX = -1.0f;
     for(size_t i=0; i<bins/2; ++i) {
-        const float fLastY = func_acos(i==0?fMinX:fMinX+lut.domain_index_step()*(i-1));
-        const float fX = fMinX+lut.domain_index_step()*i;
+        const float fLastY = func_acos(i==0?fMinX:fMinX+(float)lut.domain_index_step()*(i-1));
+        const float fX = fMinX+(float)lut.domain_index_step()*i;
         const float fY = func_acos(fX);
         const float fDelta = (std::abs(fLastY-fY))*1.2f; // 20% added generosity for strange fp on travis
         ASSERT_NEAR(lut.eval(fX),func_acos(fX),fDelta) << "@ i=[" << i << "]";
@@ -594,8 +594,8 @@ TEST(LUT,regression_arccos1000_safe) {
     }
     const float fMaxX = 1.0f;
     for(size_t i=bins/2; i<bins; ++i) {
-        const float fNextY = func_acos(i==(bins-1)?fMaxX:fMinX+lut.domain_index_step()*(i+1));
-        const float fX = fMinX+lut.domain_index_step()*i;
+        const float fNextY = func_acos(i==(bins-1)?fMaxX:fMinX+(float)lut.domain_index_step()*(i+1));
+        const float fX = fMinX+(float)lut.domain_index_step()*i;
         const float fY = func_acos(fX);
         const float fDelta = (std::abs(fY-fNextY))*1.2f; // 20% added generosity for strange fp on travis
         ASSERT_NEAR(lut.eval(fX),func_acos(fX),fDelta) << "@ i=[" << i << "]";

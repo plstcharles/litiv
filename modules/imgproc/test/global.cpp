@@ -22,8 +22,8 @@ TEST(gmm_init,regression_opencv) {
     ASSERT_EQ(oBGModel.getModelSize(),size_t(120));
     ASSERT_EQ(oFGModel.getModelSize(),size_t(120));
     for(size_t nModelIdx=0; nModelIdx<size_t(65); ++nModelIdx) {
-        ASSERT_FLOAT_EQ(oBGModelData.at<double>(0,int(nModelIdx)),oBGModel.getModelData()[nModelIdx]);
-        ASSERT_FLOAT_EQ(oFGModelData.at<double>(0,int(nModelIdx)),oFGModel.getModelData()[nModelIdx]);
+        ASSERT_DOUBLE_EQ(oBGModelData.at<double>(0,int(nModelIdx)),oBGModel.getModelData()[nModelIdx]);
+        ASSERT_DOUBLE_EQ(oFGModelData.at<double>(0,int(nModelIdx)),oFGModel.getModelData()[nModelIdx]);
     }
 }
 
@@ -45,8 +45,8 @@ TEST(gmm_init,regression_local) {
         const cv::Mat_<double> oRefBGData = lv::read(sInitBGDataPath);
         const cv::Mat_<double> oRefFGData = lv::read(sInitFGDataPath);
         for(size_t nModelIdx=0; nModelIdx<size_t(120); ++nModelIdx) {
-            ASSERT_FLOAT_EQ(oRefBGData.at<double>(0,int(nModelIdx)),oBGModel.getModelData()[nModelIdx]);
-            ASSERT_FLOAT_EQ(oRefFGData.at<double>(0,int(nModelIdx)),oFGModel.getModelData()[nModelIdx]);
+            ASSERT_DOUBLE_EQ(oRefBGData.at<double>(0,int(nModelIdx)),oBGModel.getModelData()[nModelIdx]) << "nModelIdx=" << nModelIdx;
+            ASSERT_DOUBLE_EQ(oRefFGData.at<double>(0,int(nModelIdx)),oFGModel.getModelData()[nModelIdx]) << "nModelIdx=" << nModelIdx;
         }
     }
     else {
@@ -78,8 +78,8 @@ TEST(gmm_learn,regression_opencv) {
     lv::assignGaussianMixtureComponents(oInput,oMask,oAssignMap,oBGModel,oFGModel);
     lv::learnGaussianMixtureParams(oInput,oMask,oAssignMap,oBGModel,oFGModel);
     for(size_t nModelIdx=0; nModelIdx<size_t(65); ++nModelIdx) {
-        ASSERT_FLOAT_EQ(oBGModelData.at<double>(0,int(nModelIdx)),oBGModel.getModelData()[nModelIdx]);
-        ASSERT_FLOAT_EQ(oFGModelData.at<double>(0,int(nModelIdx)),oFGModel.getModelData()[nModelIdx]);
+        ASSERT_DOUBLE_EQ(oBGModelData.at<double>(0,int(nModelIdx)),oBGModel.getModelData()[nModelIdx]);
+        ASSERT_DOUBLE_EQ(oFGModelData.at<double>(0,int(nModelIdx)),oFGModel.getModelData()[nModelIdx]);
     }
 }
 
@@ -104,8 +104,8 @@ TEST(gmm_learn,regression_local) {
         const cv::Mat_<double> oRefBGData = lv::read(sBGDataPath);
         const cv::Mat_<double> oRefFGData = lv::read(sFGDataPath);
         for(size_t nModelIdx=0; nModelIdx<size_t(120); ++nModelIdx) {
-            ASSERT_FLOAT_EQ(oRefBGData.at<double>(0,int(nModelIdx)),oBGModel.getModelData()[nModelIdx]);
-            ASSERT_FLOAT_EQ(oRefFGData.at<double>(0,int(nModelIdx)),oFGModel.getModelData()[nModelIdx]);
+            ASSERT_DOUBLE_EQ(oRefBGData.at<double>(0,int(nModelIdx)),oBGModel.getModelData()[nModelIdx]) << "nModelIdx=" << nModelIdx;
+            ASSERT_DOUBLE_EQ(oRefFGData.at<double>(0,int(nModelIdx)),oFGModel.getModelData()[nModelIdx]) << "nModelIdx=" << nModelIdx;
         }
     }
     else {

@@ -43,7 +43,7 @@ namespace lv {
         /// returns whether a specific person variable (1/2/3/4/5) is set in a given flag
         static bool checkPersonSetInFlag(int nPersonFlag, int nPersonId) {
             lvAssert_(nPersonId>=1 && nPersonId<=5,"person set id only goes from 1 to 5");
-            return bool(nPersonFlag&(1<<(nPersonId-1)));
+            return (nPersonFlag&(1<<(nPersonId-1)))!=0;
         }
     };
 

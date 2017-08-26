@@ -371,9 +371,9 @@ namespace lv {
                 this->m_nMaxDisp -= this->m_nMinDisp;
                 this->m_nMinDisp = size_t(0);
             }
-            this->m_nThermalDispOffset *= dScale;
-            this->m_nMinDisp *= dScale;
-            this->m_nMaxDisp *= dScale;
+            this->m_nThermalDispOffset = int(dScale*this->m_nThermalDispOffset);
+            this->m_nMinDisp = size_t(dScale*this->m_nMinDisp);
+            this->m_nMaxDisp = size_t(dScale*this->m_nMaxDisp);
             lvAssert(this->m_nMaxDisp>this->m_nMinDisp);
             //////////////////////////////////////////////////////////////////////////////////////////////////
             std::vector<std::string> vsRGBPaths = lv::getFilesFromDir(*psRGBDir);

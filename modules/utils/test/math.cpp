@@ -937,19 +937,19 @@ BENCHMARK_TEMPLATE2(hdist_perftest,uint8_t,BENCHMARK_NB_CHANNELS)->Args({1000000
 TEST(EMDL1dist,regression) {
     const std::vector<float> v1 = {1.0f/6,1.0f/6,2.0f/6,1.0f/6,1.0f/6};
     const std::vector<float> v2 = {1.0f/6,1.0f/6,1.0f/6,1.0f/6,2.0f/6};
-    ASSERT_FLOAT_EQ(lv::EMDL1dist(v1,v2),2.0f/6);
+    ASSERT_FLOAT_EQ((lv::EMDL1dist<float,float>(v1,v2)),2.0f/6);
     std::vector<float> v1_w_coords = {1.0f/6,0.0f,  1.0f/6,1.0f,  2.0f/6,2.0f,  1.0f/6,3.0f,  1.0f/6,4.0f};
     std::vector<float> v2_w_coords = {1.0f/6,0.0f,  1.0f/6,1.0f,  1.0f/6,2.0f,  1.0f/6,3.0f,  2.0f/6,4.0f};
     const cv::Mat_<float> desc1(5,2,v1_w_coords.data());
     const cv::Mat_<float> desc2(5,2,v2_w_coords.data());
-    ASSERT_FLOAT_EQ(lv::EMDL1dist(v1,v2),cv::EMD(desc1,desc2,cv::NORM_L1));
+    ASSERT_FLOAT_EQ((lv::EMDL1dist<float,float>(v1,v2)),cv::EMD(desc1,desc2,cv::NORM_L1));
 }
 
 TEST(EMDL1dist,regression_circular) {
     const std::vector<float> v1 = {1.0f/6,1.0f/6,1.0f/6,1.0f/6,2.0f/6};
     const std::vector<float> v2 = {2.0f/6,1.0f/6,1.0f/6,1.0f/6,1.0f/6};
-    ASSERT_FLOAT_EQ(lv::CEMDL1dist(v1,v2),1.0f/6);
-    ASSERT_LE(lv::CEMDL1dist(v1,v2),lv::EMDL1dist(v1,v2));
+    ASSERT_FLOAT_EQ((float)lv::CEMDL1dist(v1,v2),1.0f/6);
+    ASSERT_LE((lv::CEMDL1dist<float,float>(v1,v2)),(lv::EMDL1dist<float,float>(v1,v2)));
 }
 
 #include <opencv2/xfeatures2d.hpp> // for rootSIFT test

@@ -261,7 +261,7 @@ void lv::learnGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask,
     for(size_t nSampleIdx=0; nSampleIdx<nTotSamples; ++nSampleIdx) {
         if(!pROI || pROI[nSampleIdx]) {
             const int nCompLabel = ((const int*)oAssignMap.data)[nSampleIdx];
-            const bool bForeground = bool(oMask.data[nSampleIdx]);
+            const bool bForeground = (oMask.data[nSampleIdx])!=0;
             if(nCompLabel>=0 && nCompLabel<int(bForeground?nC2:nC1)) {
                 const uchar* pPixelData = oInput.data+nSampleIdx*nD;
                 lv::unroll<nD>([&](size_t nDimIdx){aSample[nDimIdx] = double(pPixelData[nDimIdx]);});

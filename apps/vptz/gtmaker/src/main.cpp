@@ -324,7 +324,7 @@ int main(int /*argc*/, char** /*argv*/) {
                         g_oTargetBB.top_left.y = std::min(g_oTargetBB.top_left.y+1,g_oTargetBB.bottom_right.y-2);
                     }
                     else {
-                        unsigned char key = tolower(key_orig);
+                        unsigned char key = (unsigned char)tolower(key_orig);
                         switch(key) {
                             case 'a':
                                 horiAngleVar += 1.0;

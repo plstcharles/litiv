@@ -578,7 +578,7 @@ void ShapeContext::scdesc_norm(cv::Mat_<float>& oDescriptors) const {
 #if USING_OPENMP
     #pragma omp parallel for
 #endif //USING_OPENMP
-    for(size_t nDescIdx=0; nDescIdx<oDescriptors.total(); nDescIdx+=size_t(m_nDescSize)) {
+    for(int nDescIdx=0; nDescIdx<(int)oDescriptors.total(); nDescIdx+=m_nDescSize) {
         cv::Mat_<float> oCurrDesc(1,m_nDescSize,((float*)oDescriptors.data)+nDescIdx);
         const double dNorm = cv::norm(oCurrDesc,cv::NORM_L2);
         if(dNorm>1e-5)
