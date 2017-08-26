@@ -1108,7 +1108,6 @@ namespace lv {
         /// default constructor; initializes all model params to zero
         GMM();
     protected:
-        static constexpr double s_dSigmaFactor = std::pow(2.0*M_PI,(double)nDims);
         static constexpr size_t s_nStaticBuffSize = std::min(getModelSize(),size_t(128));
         lv::AutoBuffer<double,s_nStaticBuffSize> m_aModelData;
         double* m_aCoeffs;
@@ -1245,6 +1244,7 @@ void lv::GMM<nComps,nDims>::addSample(size_t nCompIdx, const TVal* aSample) {
 template<size_t nComps, size_t nDims>
 void lv::GMM<nComps,nDims>::endLearning() {
     lvDbgAssert(m_bLearningModeOn);
+    static const double s_dSigmaFactor = std::pow(2.0*M_PI,(double)nDims); // cannot constexpr std::pow on msvc2015
     lv::unroll<nComps>([&](size_t nCompIdx){
         if(m_nSampleCounts[nCompIdx]==size_t(0))
             m_aCoeffs[nCompIdx] = 0;
