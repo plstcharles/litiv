@@ -37,19 +37,36 @@ macro(initialize_internal_list list_name)
 endmacro(initialize_internal_list)
 
 macro(litiv_library libname groupname canbeshared sourcelist headerlist)
+    if(USE_CUDA AND (${ARGC} EQUAL 7)) # got cuda_sourcelist and cuda_headerlist; will copy internally
+        set(cuda_sourcelist_internal "${${ARGV5}}")
+        if(${ARGV6})
+            set(cuda_headerlist_internal "${${ARGV6}}")
+        else()
+            set(cuda_headerlist_internal "")
+        endif()
+    elseif(USE_CUDA AND (${ARGC} EQUAL 5)) # no cuda_sourcelist and cuda_headerlist; will init as empty
+        set(cuda_sourcelist_internal "")
+        set(cuda_headerlist_internal "")
+    else()
+        message(FATAL_ERROR "bad number of args passed to litiv_library")
+    endif()
     if(${groupname} STREQUAL "module")
         project(litiv_${libname})
         if((NOT(${libname} STREQUAL "world")) AND (NOT(${libname} STREQUAL "test")))
             append_internal_list(litiv_modules ${libname})
             foreach(source ${${sourcelist}})
-                append_internal_list(litiv_modules_sourcelist "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/${source}")
+                append_internal_list(litiv_modules_sourcelist
+                    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/${source}"
+                )
             endforeach()
         endif()
     else()
         project(litiv_${groupname}_${libname})
         append_internal_list(litiv_${groupname}_modules ${libname})
         foreach(source ${${sourcelist}})
-            append_internal_list(litiv_${groupname}_modules_sourcelist "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/${source}")
+            append_internal_list(litiv_${groupname}_modules_sourcelist
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>/${source}"
+            )
         endforeach()
         set(libname ${groupname}_${libname})
     endif()
@@ -79,7 +96,9 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
         endif()
     else()
         add_library(${PROJECT_NAME} STATIC ${${sourcelist}} ${${headerlist}})
-        if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
+        if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR
+           ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR
+           ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
             target_compile_options(${PROJECT_NAME}
                 PRIVATE
                     -fPIC
@@ -114,40 +133,58 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
     )
-    if(USE_CUDA AND (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cuda"))
-        file(GLOB cudasources ${CMAKE_CURRENT_SOURCE_DIR}/cuda/*.cu)
-        if(cudasources)
-            cuda_include_directories(${OpenCV_INCLUDE_DIRS}) # for opencv cuda utils in core module only
-            cuda_include_directories(${CMAKE_SOURCE_DIR}/modules/utils/include) # for litiv/utils/cuda.hpp only
-            file(GLOB cudaheaders ${CMAKE_CURRENT_SOURCE_DIR}/cuda/*.cuh)
-            if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
-                cuda_add_library(${PROJECT_NAME}_cuda "${cudasources};${cudaheaders}" STATIC OPTIONS "-Xcompiler -fPIC")
-            else()
-                cuda_add_library(${PROJECT_NAME}_cuda "${cudasources};${cudaheaders}" STATIC)
-            endif()
-            if(CUDA_EXIT_ON_ERROR)
-                target_compile_definitions(${PROJECT_NAME}_cuda PRIVATE CUDA_EXIT_ON_ERROR)
-            endif()
-            target_link_libraries(${PROJECT_NAME} PUBLIC ${PROJECT_NAME}_cuda)
-            target_include_directories(${PROJECT_NAME}
-                PRIVATE
-                    "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/cuda>"
-                    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cuda>"
+    if(USE_CUDA AND cuda_sourcelist_internal)
+        if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR
+           ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR
+           ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
+            cuda_add_library(${PROJECT_NAME}_cuda
+                "${cuda_sourcelist_internal};${cuda_headerlist_internal}"
+                STATIC
+                OPTIONS
+                    "-Xcompiler -fPIC"
             )
-            set(project_install_targets ${project_install_targets} ${PROJECT_NAME}_cuda)
-            if(WIN32)
-                if(USE_VERSION_TAGS)
-                    set_target_properties(${PROJECT_NAME}_cuda
-                        PROPERTIES
-                            OUTPUT_NAME "${PROJECT_NAME}_cuda${LITIV_VERSION_PLAIN}"
-                    )
-                endif()
-            endif()
-            set_target_properties(${PROJECT_NAME}_cuda
-                PROPERTIES
-                    FOLDER "${groupname}/cuda"
+        else()
+            cuda_add_library(${PROJECT_NAME}_cuda
+                "${cuda_sourcelist_internal};${cuda_headerlist_internal}"
+                STATIC
             )
         endif()
+        if(CUDA_EXIT_ON_ERROR)
+            target_compile_definitions(${PROJECT_NAME}_cuda
+                PRIVATE
+                    CUDA_EXIT_ON_ERROR
+            )
+        endif()
+        target_include_directories(${PROJECT_NAME}_cuda
+            PRIVATE
+                "${OpenCV_INCLUDE_DIRS}" # for opencv cuda utils in core module only
+                "${CMAKE_SOURCE_DIR}/modules/utils/include" # for litiv/utils/cuda.hpp only
+        )
+        target_link_libraries(${PROJECT_NAME}
+            PUBLIC
+                ${PROJECT_NAME}_cuda
+        )
+        target_include_directories(${PROJECT_NAME}
+            PRIVATE
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/cuda>"
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cuda>"
+        )
+        set(project_install_targets
+            ${project_install_targets}
+            ${PROJECT_NAME}_cuda
+        )
+        if(WIN32)
+            if(USE_VERSION_TAGS)
+                set_target_properties(${PROJECT_NAME}_cuda
+                    PROPERTIES
+                        OUTPUT_NAME "${PROJECT_NAME}_cuda${LITIV_VERSION_PLAIN}"
+                )
+            endif()
+        endif()
+        set_target_properties(${PROJECT_NAME}_cuda
+            PROPERTIES
+                FOLDER "${groupname}/cuda"
+        )
     endif()
     if(NOT(${libname} STREQUAL "test"))
         if(BUILD_TESTS AND (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test"))
@@ -260,11 +297,23 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
 endmacro(litiv_library)
 
 macro(litiv_module name sourcelist headerlist)
-    litiv_library(${name} "module" TRUE ${sourcelist} ${headerlist})
+    if(USE_CUDA AND (${ARGC} EQUAL 5)) # ok, expect cuda_sourcelist and cuda_headerlist
+        litiv_library(${name} "module" TRUE ${sourcelist} ${headerlist} ${ARGV3} ${ARGV4})
+    elseif(${ARGC} EQUAL 3)
+        litiv_library(${name} "module" TRUE ${sourcelist} ${headerlist})
+    else()
+        message(FATAL_ERROR "bad number of args passed to litiv_module")
+    endif()
 endmacro(litiv_module)
 
 macro(litiv_3rdparty_module name sourcelist headerlist)
-    litiv_library(${name} "3rdparty" FALSE ${sourcelist} ${headerlist})
+    if(USE_CUDA AND (${ARGC} EQUAL 5)) # ok, expect cuda_sourcelist and cuda_headerlist
+        litiv_library(${name} "3rdparty" FALSE ${sourcelist} ${headerlist} ${ARGV3} ${ARGV4})
+    elseif(${ARGC} EQUAL 3)
+        litiv_library(${name} "3rdparty" FALSE ${sourcelist} ${headerlist})
+    else()
+        message(FATAL_ERROR "bad number of args passed to litiv_3rdparty_module")
+    endif()
 endmacro(litiv_3rdparty_module)
 
 macro(litiv_app name sources)

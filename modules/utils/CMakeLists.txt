@@ -85,9 +85,20 @@ if(USE_CUDA)
     add_files(INCLUDE_FILES
         "include/litiv/utils/cuda.hpp"
     )
+    add_files(CUDA_SOURCE_FILES
+        "cuda/test.cu"
+    )
+    add_files(CUDA_INCLUDE_FILES
+        "cuda/test.cuh"
+    )
 endif()
 
-litiv_module(utils SOURCE_FILES INCLUDE_FILES)
+litiv_module(utils
+    SOURCE_FILES
+    INCLUDE_FILES
+    CUDA_SOURCE_FILES
+    CUDA_INCLUDE_FILES
+)
 
 if(USE_CVCORE_WITH_UTILS)
     # opencv include dirs auto-added due to proper packaging

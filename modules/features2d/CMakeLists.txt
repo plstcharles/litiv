@@ -31,7 +31,22 @@ add_files(INCLUDE_FILES
     "include/litiv/features2d.hpp"
 )
 
-litiv_module(features2d SOURCE_FILES INCLUDE_FILES)
+if(USE_CUDA)
+    add_files(CUDA_SOURCE_FILES
+        "cuda/SC.cu"
+    )
+    add_files(CUDA_INCLUDE_FILES
+        "cuda/SC.cuh"
+    )
+endif()
+
+litiv_module(features2d
+    SOURCE_FILES
+    INCLUDE_FILES
+    CUDA_SOURCE_FILES
+    CUDA_INCLUDE_FILES
+)
+
 target_link_libraries(litiv_features2d
     PUBLIC
         litiv_utils

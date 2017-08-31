@@ -186,7 +186,7 @@ void ShapeContext::compute2(const cv::Mat& oImage, cv::cuda::GpuMat& oDescMap) {
         m_oDescriptors_dev.create(nDescCount,m_nDescSize,CV_32FC1);
         lv::cuda::KernelParams oParams;
         const uint nWarpSize = (uint)cv::cuda::DeviceInfo().warpSize();
-        oParams.vBlockSize.x = (uint)(m_nBlockSize?m_nBlockSize:size_t(cv::cuda::DeviceInfo().warpSize()));
+        oParams.vBlockSize.x = (m_nBlockSize?(uint)m_nBlockSize:nWarpSize);
         oParams.vGridSize = dim3((uint)m_oCurrImageSize.width,(uint)m_oCurrImageSize.height);
         oParams.nSharedMemSize = size_t(std::ceil(float(m_nDescSize)/nWarpSize)*nWarpSize*2)*sizeof(float);
         device::scdesc_fill_desc_direct(oParams,m_oKeyPts_dev,m_oContourPts_dev,m_oDistMask_dev,m_pDescLUMap_tex,m_oAbsDescLUMap.rows,m_oDescriptors_dev,m_bNonZeroInitBins,true,m_bNormalizeBins);

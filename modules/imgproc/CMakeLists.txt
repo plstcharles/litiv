@@ -37,7 +37,16 @@ if(USE_CUDA)
     add_files(INCLUDE_FILES
         "include/litiv/imgproc/SLIC.hpp"
     )
+    add_files(CUDA_SOURCE_FILES
+        "cuda/affinity.cu"
+        "cuda/SLIC.cu"
+    )
+    add_files(CUDA_INCLUDE_FILES
+        "cuda/affinity.cuh"
+        "cuda/SLIC.cuh"
+    )
 endif()
+
 if(USE_OPENGM)
     add_files(INCLUDE_FILES
         "include/litiv/imgproc/ForegroundStereoMatcher.hpp"
@@ -45,7 +54,13 @@ if(USE_OPENGM)
     )
 endif()
 
-litiv_module(imgproc SOURCE_FILES INCLUDE_FILES)
+litiv_module(imgproc
+    SOURCE_FILES
+    INCLUDE_FILES
+    CUDA_SOURCE_FILES
+    CUDA_INCLUDE_FILES
+)
+
 target_link_libraries(litiv_imgproc
     PUBLIC
         litiv_features2d
