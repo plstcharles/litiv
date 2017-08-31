@@ -184,12 +184,13 @@ void ShapeContext::compute2(const cv::Mat& oImage, cv::Mat& oDescMap_) {
 }
 
 void ShapeContext::compute2(const cv::Mat& oImage, cv::Mat_<float>& oDescMap) {
+    const cv::Size oOldImageSize = m_oCurrImageSize;
     scdesc_fill_contours(oImage);
-    if(!m_bUsingFullKeyPtMap) {
-        m_oKeyPts.create((int)oImage.total(),1);
+    if(!m_bUsingFullKeyPtMap || oOldImageSize!=m_oCurrImageSize) {
+        m_oKeyPts.create(m_oCurrImageSize.area(),1);
         int nKeyPtIdx = 0;
-        for(int nRowIdx=0; nRowIdx<oImage.rows; ++nRowIdx)
-            for(int nColIdx=0; nColIdx<oImage.cols; ++nColIdx)
+        for(int nRowIdx=0; nRowIdx<m_oCurrImageSize.height; ++nRowIdx)
+            for(int nColIdx=0; nColIdx<m_oCurrImageSize.width; ++nColIdx)
                 m_oKeyPts(nKeyPtIdx++) = cv::Point2f((float)nColIdx,(float)nRowIdx);
         m_bUsingFullKeyPtMap = true;
     #if HAVE_CUDA
@@ -528,13 +529,13 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
         float* aDesc = bGenDescMap?oDescriptors.ptr<float>(nKeyPtRowIdx,nKeyPtColIdx):oDescriptors.ptr<float>(nKeyPtIdx);
         for(int nContourPtIdx=0; nContourPtIdx<(int)m_oContourPts.total(); ++nContourPtIdx) {
             const cv::Point2f& vContourPt = ((cv::Point2f*)m_oContourPts.data)[nContourPtIdx];
-#if USE_LIENHART_LOOKUP_MASK
+        #if USE_LIENHART_LOOKUP_MASK
             const int nLookupRow = (int)std::round(vContourPt.y-vKeyPt.y)+m_nOuterRadius;
             const int nLookupCol = (int)std::round(vContourPt.x-vKeyPt.x)+m_nOuterRadius;
             if(nLookupRow<0 || nLookupRow>=m_oAbsDescLUMap.rows || nLookupCol<0 || nLookupCol>=m_oAbsDescLUMap.cols || m_oAbsDescLUMap(nLookupRow,nLookupCol)==-1)
                 continue;
             ++(aDesc[m_oAbsDescLUMap(nLookupRow,nLookupCol)]);
-#else //!USE_LIENHART_LOOKUP_MASK
+        #else //!USE_LIENHART_LOOKUP_MASK
             cv::Matx12f vPtDiff;
             vPtDiff(0) = vKeyPt.y-vContourPt.y;
             vPtDiff(1) = vKeyPt.x-vContourPt.x;
@@ -561,7 +562,7 @@ void ShapeContext::scdesc_fill_desc_direct(cv::Mat_<float>& oDescriptors, bool b
             if(nAngularBinMatch<0)
                 continue;
             ++(aDesc[nAngularBinMatch+nRadialBinMatch*m_nAngularBins]);
-#endif //!USE_LIENHART_LOOKUP_MASK
+        #endif //!USE_LIENHART_LOOKUP_MASK
         }
     }
     if(m_bNormalizeBins)
