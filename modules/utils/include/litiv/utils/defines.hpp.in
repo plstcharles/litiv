@@ -107,9 +107,9 @@
     #define lvStdError__(errtype,msg,...) throw std::errtype(lv::putf(msg,__VA_ARGS__))
     #define lvError(msg) throw lv::Exception(std::string("[lvError: ")+(msg)+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__)
     #define lvError_(msg,...) throw lv::Exception(std::string("[lvError: ")+(msg)+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
-    #define lvAssert(expr) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(0)
-    #define lvAssert_(expr,msg) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+(msg)+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(0)
-    #define lvAssert__(expr,msg,...) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+(msg)+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);} while(0)
+    #define lvAssert(expr) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(false)
+    #define lvAssert_(expr,msg) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+(msg)+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(false)
+    #define lvAssert__(expr,msg,...) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+(msg)+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);} while(false)
     #define lvLog(level,msg) (lv::ostream_guard<std::ostream>(std::cout,level) << (msg) << '\n')
     #define lvLog_(level,msg,...) (lv::ostream_guard<std::ostream>(std::cout,level) << lv::putf(msg,__VA_ARGS__) << '\n')
     #define lvWarn(msg) (lv::ostream_guard<std::ostream>(std::cerr) << "[lvWarn @ " << __FILE__ << "(" << __LINE__ << "):\n\t" << (msg) << "\n]\n")
@@ -123,14 +123,14 @@
         const GLenum __errn = glGetError(); \
         if(__errn!=GL_NO_ERROR) \
             lvError_("glErrorCheck failed [code=%d, msg=%s]",(int)__errn,gluErrorString(__errn)); \
-    } while(0)
+    } while(false)
     #define cudaErrorCheck(test) do { \
         const cudaError_t __errn = test; \
         if(__errn!=cudaSuccess) { \
             printf("cudaErrorCheck failed [code=%d, msg=%s]\n\t... in function '%s'\n\t... from %s(%d)\n",(int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
             std::exit((int)__errn); \
         } \
-    } while(0)
+    } while(false)
     #ifdef _DEBUG
         #ifdef LITIV_BUILD
             #ifndef LITIV_DEBUG
@@ -145,7 +145,7 @@
                 #error "Current build config mismatch with LITIV external build config."
             #endif //!LITIV_DEBUG
         #endif //ndef(LITIV_BUILD)
-        #define lvDbgExec(expr) do {expr;} while(0)
+        #define lvDbgExec(expr) do {expr;} while(false)
         #define lvDbgAssert(expr) lvAssert(expr)
         #define lvDbgAssert_(expr,msg) lvAssert_(expr,msg)
         #define lvDbgAssert__(expr,msg,...) lvAssert__(expr,msg,__VA_ARGS__)

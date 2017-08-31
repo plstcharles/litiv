@@ -180,7 +180,7 @@
         ASSERT_TRUE((lv::MatRawType_<double,ch>::depth()==CV_64F));\
         ASSERT_TRUE((lv::MatRawType_<double,ch>::depthBytes()==size_t(8)));\
         ASSERT_TRUE((lv::MatRawType_<double,ch>::type()==CV_64FC(ch)));\
-    } while(0)
+    } while(false)
 
 TEST(MatType,regression) {
 #if defined(_MSC_VER)

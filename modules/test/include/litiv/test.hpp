@@ -30,27 +30,26 @@ do { \
     lv::setVerbosity(0); \
     EXPECT_THROW(expr,lv::Exception); \
     lv::setVerbosity(1); \
-} while(0)
+} while(false)
 
 #define ASSERT_THROW_LV_QUIET(expr) \
 do { \
     lv::setVerbosity(0); \
     ASSERT_THROW(expr,lv::Exception); \
     lv::setVerbosity(1); \
-} while(0)
+} while(false)
 
 #define EXPECT_NEAR_MINRATIO(val1,val2,ratio) \
 do { \
     const auto v1 = val1, v2 = val2; \
     EXPECT_NEAR(v1,v2,std::min(v1,v2)*ratio) << "with ratio = " << ratio; \
-} while(0)
-
+} while(false)
 
 #define ASSERT_NEAR_MINRATIO(val1,val2,ratio) \
 do { \
     const auto v1 = val1, v2 = val2; \
     ASSERT_NEAR(v1,v2,std::min(v1,v2)*ratio) << "with ratio = " << ratio; \
-} while(0)
+} while(false)
 
 namespace lv {
 

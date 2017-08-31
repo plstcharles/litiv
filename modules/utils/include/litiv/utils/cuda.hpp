@@ -28,9 +28,9 @@
 #include <opencv2/core/cuda/limits.hpp>
 #include <opencv2/cudev.hpp>
 #ifdef CUDA_EXIT_ON_ERROR
-#define CUDA_ERROR_HANDLER(errn,msg) do { printf("%s",msg); std::exit(errn); } while(0)
+#define CUDA_ERROR_HANDLER(errn,msg) do { printf("%s",msg); std::exit(errn); } while(false)
 #else //ndef(CUDA_EXIT_ON_ERROR)
-#define CUDA_ERROR_HANDLER(errn,msg) do { (void)errn; throw std::runtime_error(msg); } while(0)
+#define CUDA_ERROR_HANDLER(errn,msg) do { (void)errn; throw std::runtime_error(msg); } while(false)
 #endif //ndef(CUDA_..._ON_ERROR)
 #define cudaKernelWrap(func,kparams,...) do { \
         impl::func<<<kparams.vGridSize,kparams.vBlockSize,kparams.nSharedMemSize,kparams.nStream>>>(__VA_ARGS__); \
@@ -41,7 +41,7 @@
                      (int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__,kparams.str().c_str()); \
             CUDA_ERROR_HANDLER((int)__errn,acBuffer.data()); \
         } \
-    } while(0)
+    } while(false)
 #else //ndef(__CUDACC__)
 #include "litiv/utils/cxx.hpp"
 #if !HAVE_CUDA

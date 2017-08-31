@@ -10,7 +10,7 @@
 #include <string>
 
 #ifndef DNO_ASSERT
-#define ASSERT(cond) do { if (!(cond)) { throw std::logic_error((std::string("Assertion failure at " __FILE__ ":")+std::to_string(__LINE__)+std::string(" -- " #cond)).c_str() ); }} while(0)
+#define ASSERT(cond) do { if (!(cond)) { throw std::logic_error((std::string("Assertion failure at " __FILE__ ":")+std::to_string(__LINE__)+std::string(" -- " #cond)).c_str() ); }} while(false)
 #else
 #define ASSERT(cond) (void)0
 #endif
