@@ -79,8 +79,12 @@ public:
     virtual int defaultNorm() const override;
     /// return true if detector object is empty (overrides cv::DescriptorExtractor's)
     virtual bool empty() const override;
-    /// sets the block size to use in the cuda kernel (might speed up compute when using many kpts)
+#if HAVE_CUDA
+    /// sets the block size to use in the cuda kernel (more threads might speed up compute when using many kpts)
     bool setBlockSize(size_t nThreadCount);
+    /// similar to DescriptorExtractor::compute(const cv::Mat& image, ...), but in this case, the descriptors matrix has the same shape as the input matrix, and all image points are described (note: descriptors close to borders will be invalid)
+    void compute2(const cv::Mat& oImage, cv::cuda::GpuMat& oDescMap);
+#endif //HAVE_CUDA
 
     /// returns whether descriptor bin arrays will be 0-1 normalized before returning or not
     bool isNormalizingBins() const;

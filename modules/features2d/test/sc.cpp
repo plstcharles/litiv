@@ -365,6 +365,31 @@ TEST(sc,regression_compute_abs_gpu_config_16_8_64threads) {
     }
 }
 
+TEST(sc,regression_compute_gpu_mat) {
+    std::unique_ptr<ShapeContext> pShapeContext = std::make_unique<ShapeContext>(size_t(2),size_t(40),16,8);
+    const int nDescSize = 16*8;
+    cv::Mat oInput(257,257,CV_8UC1);
+    oInput = 0;
+    cv::circle(oInput,cv::Point(128,128),7,cv::Scalar_<uchar>(255),-1);
+    cv::rectangle(oInput,cv::Point(180,180),cv::Point(190,190),cv::Scalar_<uchar>(255),-1);
+    oInput = oInput>0;
+    cv::Mat_<float> oOutputDescs;
+    cv::cuda::GpuMat oOutputDescs_dev;
+    pShapeContext->compute2(oInput,oOutputDescs);
+    lv::doNotOptimize(oInput);
+    lv::doNotOptimize(oOutputDescs);
+    pShapeContext->compute2(oInput,oOutputDescs_dev);
+    ASSERT_EQ(oOutputDescs.type(),oOutputDescs_dev.type());
+    ASSERT_EQ(oOutputDescs.total(),(size_t)oOutputDescs_dev.size().area());
+    cv::Mat_<float> oOutputDescs_host;
+    oOutputDescs_dev.download(oOutputDescs_host);
+    ASSERT_EQ(oOutputDescs.total(),oOutputDescs_host.total());
+    ASSERT_EQ(oOutputDescs_host.cols,nDescSize);
+    ASSERT_EQ(oOutputDescs_host.rows,(int)oInput.total());
+    oOutputDescs_host = oOutputDescs_host.reshape(0,3,std::array<int,3>{oInput.rows,oInput.cols,nDescSize}.data());
+    ASSERT_TRUE(lv::isEqual<float>(oOutputDescs,oOutputDescs_host));
+}
+
 #endif //HAVE_CUDA
 
 TEST(sc,regression_full_compute_rel) {
