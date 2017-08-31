@@ -125,3 +125,59 @@ TEST(gmm_learn,regression_local) {
         lv::write(sFGDataPath,cv::Mat_<double>(1,(int)oFGModel.getModelSize(),oFGModel.getModelData()));
     }
 }
+
+#include "litiv/features2d/SC.hpp"
+
+TEST(descriptor_affinity,regression_p7_r15_L2) {
+    std::unique_ptr<ShapeContext> pShapeContext = std::make_unique<ShapeContext>(size_t(2),size_t(40),12,5);
+    cv::Mat oInput(257,257,CV_8UC1);
+    oInput = 0;
+    cv::circle(oInput,cv::Point(128,128),7,cv::Scalar_<uchar>(255),-1);
+    cv::rectangle(oInput,cv::Point(180,180),cv::Point(190,190),cv::Scalar_<uchar>(255),-1);
+    cv::rectangle(oInput,cv::Point(151,19),cv::Point(194,193),cv::Scalar_<uchar>(255),-1);
+    oInput = oInput>0;
+    //cv::imshow("in1",oInput);
+    cv::Mat_<float> oDescMap1;
+    pShapeContext->compute2(oInput,oDescMap1);
+    oInput = 0;
+    cv::circle(oInput,cv::Point(52,62),5,cv::Scalar_<uchar>(255),-1);
+    cv::circle(oInput,cv::Point(124,124),8,cv::Scalar_<uchar>(255),-1);
+    cv::rectangle(oInput,cv::Point(185,185),cv::Point(195,195),cv::Scalar_<uchar>(255),-1);
+    cv::rectangle(oInput,cv::Point(161,19),cv::Point(204,193),cv::Scalar_<uchar>(255),-1);
+    oInput = oInput>0;
+    //cv::imshow("in2",oInput);
+    cv::Mat_<float> oDescMap2;
+    pShapeContext->compute2(oInput,oDescMap2);
+    ASSERT_EQ(oDescMap1.dims,oDescMap2.dims);
+    ASSERT_EQ(oDescMap1.size,oDescMap2.size);
+    ASSERT_EQ(oDescMap1.type(),oDescMap2.type());
+    ASSERT_EQ(oDescMap1.size[0],oInput.rows);
+    ASSERT_EQ(oDescMap1.size[1],oInput.cols);
+    cv::Mat_<float> oAffMap;
+    lv::computeDescriptorAffinity(oDescMap1,oDescMap2,7,oAffMap,lv::make_range(0,15),lv::AffinityDist_L2);
+    const std::string sAffMapBinPath_noroi = TEST_CURR_INPUT_DATA_ROOT "/test_affmap_p7_r15_L2_noroi.bin";
+    if(lv::checkIfExists(sAffMapBinPath_noroi)) {
+        cv::Mat_<float> oRefMap = lv::read(sAffMapBinPath_noroi);
+        ASSERT_EQ(oAffMap.total(),oRefMap.total());
+        ASSERT_EQ(oAffMap.size,oRefMap.size);
+        ASSERT_TRUE(lv::isEqual<float>(oAffMap,oRefMap));
+    }
+    else
+        lv::write(sAffMapBinPath_noroi,oAffMap);
+    cv::Mat_<uchar> oROI1(oInput.size(),uchar(0)),oROI2(oInput.size(),uchar(0));
+    oROI1(cv::Rect(0,1,205,204)) = uchar(255);
+    //cv::imshow("roi1",oROI1);
+    oROI2(cv::Rect(51,55,169,173)) = uchar(255);
+    //cv::imshow("roi2",oROI2);
+    lv::computeDescriptorAffinity(oDescMap1,oDescMap2,7,oAffMap,lv::make_range(0,15),lv::AffinityDist_L2,oROI1,oROI2);
+    const std::string sAffMapBinPath_roi = TEST_CURR_INPUT_DATA_ROOT "/test_affmap_p7_r15_L2_roi.bin";
+    if(lv::checkIfExists(sAffMapBinPath_roi)) {
+        cv::Mat_<float> oRefMap = lv::read(sAffMapBinPath_roi);
+        ASSERT_EQ(oAffMap.total(),oRefMap.total());
+        ASSERT_EQ(oAffMap.size,oRefMap.size);
+        ASSERT_TRUE(lv::isEqual<float>(oAffMap,oRefMap));
+    }
+    else
+        lv::write(sAffMapBinPath_roi,oAffMap);
+    //cv::waitKey(0);
+}
