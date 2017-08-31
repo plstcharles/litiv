@@ -954,7 +954,7 @@ TEST(EMDL1dist,regression_circular) {
 
 #include "litiv/utils/opencv.hpp"
 
-#ifdef OPENCV_ENABLE_NONFREE
+#ifdef HAVE_OPENCV_XFEATURES2D
 
 #include <opencv2/xfeatures2d.hpp> // for rootSIFT test
 
@@ -976,7 +976,7 @@ TEST(rootSIFT,regression) {
     }
 }
 
-#endif //def(OPENCV_ENABLE_NONFREE)
+#endif //def(HAVE_OPENCV_XFEATURES2D)
 
 namespace {
     template<typename T>
