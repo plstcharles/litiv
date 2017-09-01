@@ -59,6 +59,13 @@ namespace lv {
                                    cv::Mat_<float>& oAffinityMap, const std::vector<int>& vDispRange, AffinityDistType eDist,
                                    const cv::Mat_<uchar>& oROI1=cv::Mat(), const cv::Mat_<uchar>& oROI2=cv::Mat(),
                                    const cv::Mat_<float>& oEMDCostMap=cv::Mat());
+#if HAVE_CUDA
+    /// computes a 3d affinity map from two 2d descriptor maps by matching them in patches across a given stereo disparity range
+    /// note: expects descriptor maps to have 2d size (nxm)xd, where nxm is the map size, and d is the desc length
+    void computeDescriptorAffinity(const cv::cuda::GpuMat& oDescMap1, const cv::cuda::GpuMat& oDescMap2, const cv::Size& oMapSize, int nPatchSize,
+                                   cv::cuda::GpuMat& oAffinityMap, const std::vector<int>& vDispRange, AffinityDistType eDist,
+                                   const cv::cuda::GpuMat& oROI1=cv::cuda::GpuMat(), const cv::cuda::GpuMat& oROI2=cv::cuda::GpuMat());
+#endif //HAVE_CUDA
 
     /// determines if '*anMap' is a local maximum on the horizontal axis, given 'nMapColStep' spacing between horizontal elements in 'anMap'
     template<size_t nHalfWinSize, typename Tr>

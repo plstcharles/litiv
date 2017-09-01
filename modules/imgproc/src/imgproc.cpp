@@ -17,6 +17,9 @@
 
 #include "litiv/imgproc.hpp"
 #include "litiv/features2d/MI.hpp"
+#if HAVE_CUDA
+#include "affinity.cuh"
+#endif //HAVE_CUDA
 
 void thinning_internal_ZhangSuen(cv::Mat& oInput, cv::Mat& oTempMarker, bool bIter) {
     oTempMarker.create(oInput.size(),CV_8UC1);
@@ -170,7 +173,7 @@ void lv::computeImageAffinity(const cv::Mat& oImage1, const cv::Mat& oImage2, in
     const int nRows = oImage1.rows;
     const int nCols = oImage1.cols;
     const int nPatchRadius = nPatchSize/2;
-    const int nOffsets = (int)vDispRange.size();
+    const int nOffsets = int(vDispRange.size());
     const std::array<int,3> anAffinityMapDims = {nRows-nPatchRadius*2,nCols-nPatchRadius*2,nOffsets};
     oAffinityMap.create(3,anAffinityMapDims.data());
     oAffinityMap = -1.0f; // default value for OOB pixels
@@ -211,19 +214,40 @@ void lv::computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::M
     lvAssert_(oROI2.empty() || (oROI2.dims==2 && oROI2.rows==oDescMap2.size[0] && oROI2.cols==oDescMap2.size[1]),"bad ROI2 map size");
     lvAssert_(eDist==lv::AffinityDist_L2 || eDist==lv::AffinityDist_EMD,"unsupported distance type");
     lvAssert_(nPatchSize>=1 && (nPatchSize%2)==1,"bad patch size");
-    lvAssert_(vDispRange.size()>=1,"bad disparity range");
+    lvAssert_(!vDispRange.empty(),"bad disparity range");
     if(eDist==lv::AffinityDist_EMD) {
         lvAssert_(!oEMDCostMap.empty() && oEMDCostMap.dims==2 && oEMDCostMap.rows==oEMDCostMap.cols,"bad emd cost map size");
         lvAssert_(oEMDCostMap.rows==oDescMap1.size[2],"bad emd cost map size for given desc size");
     }
-    const bool bValidROI1 = !oROI1.empty();
-    const bool bValidROI2 = !oROI2.empty();
     const int nRows = oDescMap1.size[0];
     const int nCols = oDescMap1.size[1];
     const int nDescSize = oDescMap1.size[2];
-    const int nPatchRadius = nPatchSize/2;
-    const int nOffsets = (int)vDispRange.size();
+    const int nOffsets = int(vDispRange.size());
     const std::array<int,3> anAffinityMapDims = {nRows,nCols,nOffsets};
+#if HAVE_CUDA
+    static thread_local cv::cuda::GpuMat s_oDescMap1_dev,s_oDescMap2_dev,s_oAffinityMap_dev,s_oROI1_dev,s_oROI2_dev;
+    if(eDist==lv::AffinityDist_L2 && oROI1.empty()==oROI2.empty() /*@@@@*/ && nPatchSize==1) {
+        lvAssert_(cv::cuda::deviceSupports(LITIV_CUDA_MIN_COMPUTE_CAP),"device compute capabilities too low");
+        // all uploads/downloads below are blocking calls @@@
+        s_oDescMap1_dev.upload(oDescMap1.reshape(0,2,std::array<int,2>{nRows*nCols,nDescSize}.data()));
+        s_oDescMap2_dev.upload(oDescMap2.reshape(0,2,std::array<int,2>{nRows*nCols,nDescSize}.data()));
+        if(!oROI1.empty()) {
+            s_oROI1_dev.upload(oROI1);
+            s_oROI2_dev.upload(oROI2);
+        }
+        else {
+            s_oROI1_dev.release();
+            s_oROI2_dev.release();
+        }
+        lv::computeDescriptorAffinity(s_oDescMap1_dev,s_oDescMap2_dev,cv::Size(nCols,nRows),nPatchSize,s_oAffinityMap_dev,vDispRange,lv::AffinityDist_L2,s_oROI1_dev,s_oROI2_dev);
+        s_oAffinityMap_dev.download(oAffinityMap);
+        oAffinityMap = oAffinityMap.reshape(0,3,anAffinityMapDims.data());
+        return;
+    }
+#endif //HAVE_CUDA
+    const bool bValidROI1 = !oROI1.empty();
+    const bool bValidROI2 = !oROI2.empty();
+    const int nPatchRadius = nPatchSize/2;
     oAffinityMap.create(3,anAffinityMapDims.data());
     oAffinityMap = -1.0f; // default value for OOB pixels
     cv::Mat_<float> oRawAffinity; // used to cache pixel-wise descriptor distances
@@ -305,3 +329,47 @@ void lv::computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::M
         }
     }
 }
+
+#if HAVE_CUDA
+
+void lv::computeDescriptorAffinity(const cv::cuda::GpuMat& oDescMap1, const cv::cuda::GpuMat& oDescMap2, const cv::Size& oMapSize, int nPatchSize,
+                                   cv::cuda::GpuMat& oAffinityMap, const std::vector<int>& vDispRange, AffinityDistType eDist,
+                                   const cv::cuda::GpuMat& oROI1, const cv::cuda::GpuMat& oROI2) {
+    lvAssert_(!oDescMap1.empty() && oDescMap1.size()==oDescMap2.size(),"bad input desc map sizes");
+    lvAssert_(oMapSize.area()>0 && oDescMap1.rows==oMapSize.area(),"bad 2d map size");
+    lvAssert_(oROI1.empty() || (oROI1.size()==oMapSize && oROI1.type()==CV_8UC1),"bad ROI1 map size");
+    lvAssert_(oROI2.empty() || (oROI2.size()==oMapSize && oROI2.type()==CV_8UC1),"bad ROI2 map size");
+    lvAssert_((oROI1.empty() && oROI2.empty()) || (!oROI1.empty() && !oROI1.empty()),"both ROIs must be empty or non-empty");
+    lvAssert_(eDist==lv::AffinityDist_L2,"unsupported distance type"); // @@@@ todo add emd distnace
+    lvAssert_(nPatchSize>=1 && (nPatchSize%2)==1,"bad patch size");
+    lvAssert_(!vDispRange.empty(),"bad disparity range");
+    static constexpr size_t nMaxDispOffsets = AFF_MAP_DISP_RANGE_MAX;
+    lvAssert_(vDispRange.size()<=nMaxDispOffsets,"disp offset count over impl limit");
+    const int nOffsets = int(vDispRange.size());
+    const int nDescSize = oDescMap1.cols;
+    oAffinityMap.create(oMapSize.height*oMapSize.width,nOffsets,CV_32FC1);
+    static std::mutex s_oConstMemKernelCallMutex; {
+        std::lock_guard<std::mutex> oConstMemKernelCallLock(s_oConstMemKernelCallMutex);
+        static thread_local std::array<int,nMaxDispOffsets> s_vDispRange_dev{};
+        if(!std::equal(vDispRange.begin(),vDispRange.end(),s_vDispRange_dev.begin())) {
+            std::copy(vDispRange.begin(),vDispRange.end(),s_vDispRange_dev.begin());
+            device::setDisparityRange(s_vDispRange_dev);
+        }
+        lv::cuda::KernelParams oParams;
+        const uint nWarpSize = (uint)cv::cuda::DeviceInfo().warpSize();
+        oParams.vBlockSize.x = nWarpSize*2; // min 64, step=64, but always larger or eq to nOffsets @@@@
+        oParams.vGridSize = dim3((uint)oMapSize.width,(uint)oMapSize.height);
+        //const size_t nOffsets_LUT = size_t(std::ceil(float(nOffsets)/oParams.vBlockSize.x)*oParams.vBlockSize.x);
+        //const size_t nDescSize_LUT = size_t(std::ceil(float(nDescSize)/oParams.vBlockSize.x)*oParams.vBlockSize.x);
+        oParams.nSharedMemSize = 10000;//sizeof(float**)*2*nOffsets_LUT + sizeof(float)*nDescSize_LUT;
+        if(oROI1.empty())
+            device::compute_desc_affinity_l2(oParams,oDescMap1,oDescMap2,oAffinityMap,nOffsets,nDescSize);
+        else
+            device::compute_desc_affinity_l2_roi(oParams,oDescMap1,oROI1,oDescMap2,oROI2,oAffinityMap,nOffsets,nDescSize);
+    }
+    if(nPatchSize>1) {
+        lvError("missing impl"); // @@@ use 3d grid
+    }
+}
+
+#endif //HAVE_CUDA
