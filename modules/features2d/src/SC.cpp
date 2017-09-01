@@ -73,7 +73,7 @@ ShapeContext::ShapeContext(size_t nInnerRadius, size_t nOuterRadius, size_t nAng
             cudaTextureDesc oTexDesc;
             memset(&oTexDesc,0,sizeof(oTexDesc));
             oTexDesc.readMode = cudaReadModeElementType;
-            cudaCreateTextureObject(&m_pDescLUMap_tex,&oResDesc,&oTexDesc,nullptr);
+            cudaErrorCheck(cudaCreateTextureObject(&m_pDescLUMap_tex,&oResDesc,&oTexDesc,nullptr));
         }
     #endif //HAVE_CUDA
     #endif //USE_LIENHART_LOOKUP_MASK

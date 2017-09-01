@@ -124,13 +124,6 @@
         if(__errn!=GL_NO_ERROR) \
             lvError_("glErrorCheck failed [code=%d, msg=%s]",(int)__errn,gluErrorString(__errn)); \
     } while(false)
-    #define cudaErrorCheck(test) do { \
-        const cudaError_t __errn = test; \
-        if(__errn!=cudaSuccess) { \
-            printf("cudaErrorCheck failed [code=%d, msg=%s]\n\t... in function '%s'\n\t... from %s(%d)\n",(int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
-            std::exit((int)__errn); \
-        } \
-    } while(false)
     #ifdef _DEBUG
         #ifdef LITIV_BUILD
             #ifndef LITIV_DEBUG
@@ -155,7 +148,6 @@
         #define lvDbgWarn(msg) lvWarn(msg)
         #define lvDbgWarn_(msg,...) lvWarn_(msg,__VA_ARGS__)
         #define glDbgErrorCheck glErrorCheck
-        #define cudaDbgErrorCheck cudaErrorCheck
     #else //ndef(_DEBUG)
         #ifdef LITIV_BUILD
             #ifndef LITIV_DEBUG
@@ -180,7 +172,6 @@
         #define lvDbgWarn(msg) ((void)0)
         #define lvDbgWarn_(msg,...) ((void)0)
         #define glDbgErrorCheck ((void)0)
-        #define cudaDbgErrorCheck ((void)0)
     #endif //ndef(_DEBUG)
     #define lvIgnore(x) (void)(x)
     #ifndef UNUSED

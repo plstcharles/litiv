@@ -42,6 +42,15 @@
             CUDA_ERROR_HANDLER((int)__errn,acBuffer.data()); \
         } \
     } while(false)
+#define cudaErrorCheck(test) do { \
+        const cudaError_t __errn = test; \
+        if(__errn!=cudaSuccess) { \
+            std::array<char,1024> acBuffer; \
+            snprintf(acBuffer.data(),acBuffer.size(),"cudaErrorCheck failed [code=%d, msg=%s]\n\t... in function '%s'\n\t... from %s(%d)\n", \
+                     (int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
+            CUDA_ERROR_HANDLER((int)__errn,acBuffer.data()); \
+        } \
+    } while(false)
 #else //ndef(__CUDACC__)
 #include "litiv/utils/cxx.hpp"
 #if !HAVE_CUDA
@@ -51,6 +60,13 @@
 #include <cuda_runtime.h>
 #include <npp.h>
 #include "litiv/utils/opencv.hpp"
+#define cudaErrorCheck(test) do { \
+        const cudaError_t __errn = test; \
+        if(__errn!=cudaSuccess) { \
+            lvError_("cudaErrorCheck failed [code=%d, msg=%s]\n\t... in function '%s'\n\t... from %s(%d)\n", \
+                     (int)__errn,cudaGetErrorString(__errn),__PRETTY_FUNCTION__,__FILE__,__LINE__); \
+        } \
+    } while(false)
 #endif //ndef(__CUDACC__)
 
 namespace lv {
