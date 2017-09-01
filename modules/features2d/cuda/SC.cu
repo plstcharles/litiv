@@ -120,9 +120,11 @@ namespace impl {
                     }
                     else {
                         assert(nLUTSize==blockDim.x);
-                        for(int nStep=blockDim.x/2; nStep>0; nStep>>=1)
+                        for(int nStep=blockDim.x/2; nStep>0; nStep>>=1) {
                             if(threadIdx.x + nStep < nLUTSize)
                                 aTmpLUT[threadIdx.x] += aTmpLUT[threadIdx.x + nStep];
+                            __syncthreads();
+                        }
                     }
                 }
                 fSum = aTmpLUT[0];
