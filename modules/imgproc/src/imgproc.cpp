@@ -348,6 +348,9 @@ void lv::computeDescriptorAffinity(const cv::cuda::GpuMat& oDescMap1, const cv::
     const int nOffsets = int(vDispRange.size());
     const int nDescSize = oDescMap1.cols;
     oAffinityMap.create(oMapSize.height*oMapSize.width,nOffsets,CV_32FC1);
+    static thread_local cv::cuda::GpuMat oRawAffinityMap;
+    if(nPatchSize>1)
+        oRawAffinityMap.create(oMapSize.height*oMapSize.width,nOffsets,CV_32FC1);
     static std::mutex s_oConstMemKernelCallMutex; {
         std::lock_guard<std::mutex> oConstMemKernelCallLock(s_oConstMemKernelCallMutex);
         static thread_local std::array<int,nMaxDispOffsets> s_vDispRange_dev{};
@@ -356,19 +359,29 @@ void lv::computeDescriptorAffinity(const cv::cuda::GpuMat& oDescMap1, const cv::
             device::setDisparityRange(s_vDispRange_dev);
         }
         lv::cuda::KernelParams oParams;
-        const uint nWarpSize = (uint)cv::cuda::DeviceInfo().warpSize();
-        oParams.vBlockSize.x = nWarpSize*2; // min 64, step=64, but always larger or eq to nOffsets @@@@
+        const int nMinThreads = cv::cuda::DeviceInfo().warpSize()*2;
+        const int nThreads = (nOffsets>nMinThreads)?(int)std::ceil(float(nOffsets)/nMinThreads)*nMinThreads:nMinThreads;
+        lvDbgAssert((nThreads%nMinThreads)==0);
+        const size_t nOffsets_LUT = size_t(std::ceil(float(nOffsets)/nThreads)*nThreads);
+        const size_t nDescSize_LUT = size_t(std::ceil(float(nDescSize)/nThreads)*nThreads);
+        oParams.vBlockSize.x = (uint)nThreads;
         oParams.vGridSize = dim3((uint)oMapSize.width,(uint)oMapSize.height);
-        const size_t nOffsets_LUT = size_t(std::ceil(float(nOffsets)/oParams.vBlockSize.x)*oParams.vBlockSize.x);
-        const size_t nDescSize_LUT = size_t(std::ceil(float(nDescSize)/oParams.vBlockSize.x)*oParams.vBlockSize.x);
         oParams.nSharedMemSize = (sizeof(device::DistCalcLUT)*nOffsets_LUT + sizeof(float)*nDescSize_LUT);
         if(oROI1.empty())
-            device::compute_desc_affinity_l2(oParams,oDescMap1,oDescMap2,oAffinityMap,nOffsets,nDescSize);
+            device::compute_desc_affinity_l2(oParams,oDescMap1,oDescMap2,nPatchSize>1?oRawAffinityMap:oAffinityMap,nOffsets,nDescSize);
         else
-            device::compute_desc_affinity_l2_roi(oParams,oDescMap1,oROI1,oDescMap2,oROI2,oAffinityMap,nOffsets,nDescSize);
+            device::compute_desc_affinity_l2_roi(oParams,oDescMap1,oROI1,oDescMap2,oROI2,nPatchSize>1?oRawAffinityMap:oAffinityMap,nOffsets,nDescSize);
     }
     if(nPatchSize>1) {
-        lvError("missing impl"); // @@@ use 3d grid
+        lv::cuda::KernelParams oParams;
+        const int nMinThreads = cv::cuda::DeviceInfo().warpSize();
+        const int nPatchBins = nPatchSize*nPatchSize;
+        const int nThreads = int(std::ceil(float(nPatchBins)/nMinThreads)*nMinThreads);
+        lvDbgAssert((nThreads%nMinThreads)==0 && nThreads/nPatchSize>1);
+        oParams.vBlockSize.x = (uint)nThreads;
+        oParams.vGridSize = dim3((uint)oMapSize.width,(uint)oMapSize.height,(uint)nOffsets);
+        oParams.nSharedMemSize = ((sizeof(int)+sizeof(float))*nThreads);
+        device::compute_desc_affinity_patch(oParams,oRawAffinityMap,oAffinityMap,nPatchSize);
     }
 }
 

@@ -93,7 +93,7 @@ namespace impl {
                     pDistCalcLUT->aDesc2 = oDescMap2.ptr(nRowIdx*nCols+nOffsetColIdx);
                 }
                 else
-                    aAffArray[nOffsetIdx] = -1.0f;
+                    aAffArray[nOffsetIdx] = -1.0f; // default value for OOB pixels
             }
         }
         __syncthreads();
@@ -124,7 +124,7 @@ namespace impl {
                 const int nOffsetIdx = nThreads*nStep+nThreadIdx;
                 assert(nOffsetIdx<nOffsets_LUT);
                 if(nOffsetIdx<nOffsets)
-                    aAffArray[nOffsetIdx] = -1.0f;
+                    aAffArray[nOffsetIdx] = -1.0f; // default value for OOB pixels
             }
             return;
         }
@@ -143,12 +143,52 @@ namespace impl {
                     pDistCalcLUT->aDesc2 = oDescMap2.ptr(nRowIdx*nCols+nOffsetColIdx);
                 }
                 else
-                    aAffArray[nOffsetIdx] = -1.0f;
+                    aAffArray[nOffsetIdx] = -1.0f; // default value for OOB pixels
             }
         }
         __syncthreads();
         float* aDescCalcLUT = (float*)(aDistCalcLUTs+nOffsets_LUT);
         l2dist_lu_exec(aDistCalcLUTs,aDescCalcLUT,aAffArray,nOffsets,nDescSize);
+    }
+
+    __global__ void compute_desc_affinity_patch(const cv::cuda::PtrStep<float> oRawAffinityMap,
+                                                cv::cuda::PtrStep<float> oAffinityMap, int nPatchSize) {
+        assert((blockDim.x%warpSize)==0 && blockDim.y==1 && blockDim.z==1);
+        assert(nPatchSize*nPatchSize<=blockDim.x);
+        const int nRows = gridDim.y;
+        const int nCols = gridDim.x;
+        const int nRowIdx = blockIdx.y;
+        const int nColIdx = blockIdx.x;
+        const int nOffsetIdx = blockIdx.z;
+        const int nThreads = blockDim.x;
+        const int nThreadIdx = threadIdx.x;
+        const int nPatchRadius = nPatchSize/2;
+        const int nPatchRowIdx = threadIdx.x/nPatchSize;
+        const int nOffsetRowIdx = nRowIdx+nPatchRowIdx-nPatchRadius;
+        const int nOffsetColIdx = nColIdx+threadIdx.x%nPatchSize-nPatchRadius;
+        const bool bValid = nPatchRowIdx<nPatchSize && nOffsetRowIdx>=0 && nOffsetRowIdx<nRows && nOffsetColIdx>=0 && nOffsetColIdx<nCols;
+        extern __shared__ int aTmpCommon_patch[];
+        int* anCounts = aTmpCommon_patch;
+        float* afAffinities = (float*)(anCounts+nThreads);
+        float fRawAffinity;
+        if(bValid && (fRawAffinity = oRawAffinityMap(nOffsetRowIdx*nCols+nOffsetColIdx,nOffsetIdx))!=-1.0f) {
+            anCounts[nThreadIdx] = 1;
+            afAffinities[nThreadIdx] = fRawAffinity;
+        }
+        else {
+            anCounts[nThreadIdx] = 0;
+            afAffinities[nThreadIdx] = 0.0f;
+        }
+        __syncthreads();
+        for(int nStep=nThreads/2; nStep>0; nStep>>=1) {
+            if(nThreadIdx+nStep<nThreads) {
+                anCounts[nThreadIdx] += anCounts[nThreadIdx+nStep];
+                afAffinities[nThreadIdx] += afAffinities[nThreadIdx+nStep];
+            }
+            __syncthreads();
+        }
+        if(nThreadIdx==0)
+            oAffinityMap(nRowIdx*nCols+nColIdx,nOffsetIdx) = anCounts[0]?(afAffinities[0]/anCounts[0]):-1.0f;
     }
 
 } // namespace impl
@@ -161,6 +201,10 @@ void device::compute_desc_affinity_l2(const lv::cuda::KernelParams& oKParams, co
 
 void device::compute_desc_affinity_l2_roi(const lv::cuda::KernelParams& oKParams, const cv::cuda::PtrStep<float> oDescMap1, const cv::cuda::PtrStep<uchar> oROI1, const cv::cuda::PtrStep<float> oDescMap2, const cv::cuda::PtrStep<uchar> oROI2, cv::cuda::PtrStep<float> oAffinityMap, int nOffsets, int nDescSize) {
     cudaKernelWrap(compute_desc_affinity_l2_roi,oKParams,oDescMap1,oROI1,oDescMap2,oROI2,oAffinityMap,nOffsets,nDescSize);
+}
+
+void device::compute_desc_affinity_patch(const lv::cuda::KernelParams& oKParams, const cv::cuda::PtrStep<float> oRawAffinityMap, cv::cuda::PtrStep<float> oAffinityMap, int nPatchSize) {
+    cudaKernelWrap(compute_desc_affinity_patch,oKParams,oRawAffinityMap,oAffinityMap,nPatchSize);
 }
 
 void device::setDisparityRange(const std::array<int,AFF_MAP_DISP_RANGE_MAX>& aDispRange) {

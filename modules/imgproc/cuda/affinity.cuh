@@ -42,6 +42,10 @@ namespace device {
                                       cv::cuda::PtrStep<float> oAffinityMap,
                                       int nOffsets, int nDescSize);
 
+    void compute_desc_affinity_patch(const lv::cuda::KernelParams& oKParams,
+                                     const cv::cuda::PtrStep<float> oRawAffinityMap,
+                                     cv::cuda::PtrStep<float> oAffinityMap, int nPatchSize);
+
     void setDisparityRange(const std::array<int,AFF_MAP_DISP_RANGE_MAX>& aDispRange);
 
 } // namespace device
