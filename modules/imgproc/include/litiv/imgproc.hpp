@@ -58,7 +58,7 @@ namespace lv {
     void computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::Mat_<float>& oDescMap2, int nPatchSize,
                                    cv::Mat_<float>& oAffinityMap, const std::vector<int>& vDispRange, AffinityDistType eDist,
                                    const cv::Mat_<uchar>& oROI1=cv::Mat(), const cv::Mat_<uchar>& oROI2=cv::Mat(),
-                                   const cv::Mat_<float>& oEMDCostMap=cv::Mat());
+                                   const cv::Mat_<float>& oEMDCostMap=cv::Mat(), bool bAllowCUDA=true);
 #if HAVE_CUDA
     /// computes a 3d affinity map from two 2d descriptor maps by matching them in patches across a given stereo disparity range
     /// note: expects descriptor maps to have 2d size (nxm)xd, where nxm is the map size, and d is the desc length

@@ -206,9 +206,10 @@ void lv::computeImageAffinity(const cv::Mat& oImage1, const cv::Mat& oImage2, in
     }
 }
 
-void lv::computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::Mat_<float>& oDescMap2, int nPatchSize,
-                                   cv::Mat_<float>& oAffinityMap, const std::vector<int>& vDispRange, AffinityDistType eDist,
-                                   const cv::Mat_<uchar>& oROI1, const cv::Mat_<uchar>& oROI2, const cv::Mat_<float>& oEMDCostMap) {
+void lv::computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::Mat_<float>& oDescMap2,
+                                   int nPatchSize, cv::Mat_<float>& oAffinityMap, const std::vector<int>& vDispRange,
+                                   AffinityDistType eDist, const cv::Mat_<uchar>& oROI1, const cv::Mat_<uchar>& oROI2,
+                                   const cv::Mat_<float>& oEMDCostMap, bool bAllowCUDA) {
     lvAssert_(!oDescMap1.empty() && oDescMap1.size==oDescMap2.size && oDescMap1.dims==3 && oDescMap1.size[2]>1,"bad input desc map sizes");
     lvAssert_(oROI1.empty() || (oROI1.dims==2 && oROI1.rows==oDescMap1.size[0] && oROI1.cols==oDescMap1.size[1]),"bad ROI1 map size");
     lvAssert_(oROI2.empty() || (oROI2.dims==2 && oROI2.rows==oDescMap2.size[0] && oROI2.cols==oDescMap2.size[1]),"bad ROI2 map size");
@@ -224,9 +225,10 @@ void lv::computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::M
     const int nDescSize = oDescMap1.size[2];
     const int nOffsets = int(vDispRange.size());
     const std::array<int,3> anAffinityMapDims = {nRows,nCols,nOffsets};
+    lvIgnore(bAllowCUDA);
 #if HAVE_CUDA
     static thread_local cv::cuda::GpuMat s_oDescMap1_dev,s_oDescMap2_dev,s_oAffinityMap_dev,s_oROI1_dev,s_oROI2_dev;
-    if(eDist==lv::AffinityDist_L2 && oROI1.empty()==oROI2.empty()) {
+    if(bAllowCUDA && eDist==lv::AffinityDist_L2 && oROI1.empty()==oROI2.empty() && (nRows*nCols>64 || nOffsets>16 || nDescSize>32)) {
         lvAssert_(cv::cuda::deviceSupports(LITIV_CUDA_MIN_COMPUTE_CAP),"device compute capabilities too low");
         // all uploads/downloads below are blocking calls @@@
         s_oDescMap1_dev.upload(oDescMap1.reshape(0,2,std::array<int,2>{nRows*nCols,nDescSize}.data()));

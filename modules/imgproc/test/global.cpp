@@ -139,6 +139,10 @@ TEST(descriptor_affinity,regression_L2) {
     //cv::imshow("in1",oInput);
     cv::Mat_<float> oDescMap1;
     pShapeContext->compute2(oInput,oDescMap1);
+#if HAVE_CUDA
+    cv::cuda::GpuMat oDescMap1_dev;
+    pShapeContext->compute2(oInput,oDescMap1_dev);
+#endif //HAVE_CUDA
     oInput = 0;
     cv::circle(oInput,cv::Point(52,62),5,cv::Scalar_<uchar>(255),-1);
     cv::circle(oInput,cv::Point(124,124),8,cv::Scalar_<uchar>(255),-1);
@@ -148,6 +152,10 @@ TEST(descriptor_affinity,regression_L2) {
     //cv::imshow("in2",oInput);
     cv::Mat_<float> oDescMap2;
     pShapeContext->compute2(oInput,oDescMap2);
+#if HAVE_CUDA
+    cv::cuda::GpuMat oDescMap2_dev;
+    pShapeContext->compute2(oInput,oDescMap2_dev);
+#endif //HAVE_CUDA
     ASSERT_EQ(oDescMap1.dims,oDescMap2.dims);
     ASSERT_EQ(oDescMap1.size,oDescMap2.size);
     ASSERT_EQ(oDescMap1.type(),oDescMap2.type());
@@ -160,10 +168,29 @@ TEST(descriptor_affinity,regression_L2) {
     //cv::imshow("roi1",oROI1);
     oROI2(cv::Rect(51,55,169,173)) = uchar(255);
     //cv::imshow("roi2",oROI2);
-    lv::computeDescriptorAffinity(oDescMap1,oDescMap2,1,oAffMap,vDispRange,lv::AffinityDist_L2,oROI1,oROI2);
+    lv::computeDescriptorAffinity(oDescMap1,oDescMap2,1,oAffMap,vDispRange,lv::AffinityDist_L2,oROI1,oROI2,cv::Mat(),false);
     ASSERT_EQ(oAffMap.size[0],oInput.rows);
     ASSERT_EQ(oAffMap.size[1],oInput.cols);
     ASSERT_EQ(oAffMap.size[2],(int)vDispRange.size());
+#if HAVE_CUDA
+    ASSERT_EQ(oDescMap1_dev.size(),oDescMap2_dev.size());
+    ASSERT_EQ(oDescMap1_dev.type(),oDescMap2_dev.type());
+    ASSERT_EQ(oDescMap1_dev.rows,oDescMap1.size[0]*oDescMap1.size[1]);
+    ASSERT_EQ(oDescMap1_dev.cols,oDescMap1.size[2]);
+    cv::cuda::GpuMat oAffMap_dev,oROI1_dev,oROI2_dev;
+    oROI1_dev.upload(oROI1);
+    oROI2_dev.upload(oROI2);
+    lv::computeDescriptorAffinity(oDescMap1_dev,oDescMap2_dev,cv::Size(oInput.cols,oInput.rows),1,oAffMap_dev,vDispRange,lv::AffinityDist_L2,oROI1_dev,oROI2_dev);
+    ASSERT_EQ(oAffMap_dev.rows,oInput.rows*oInput.cols);
+    ASSERT_EQ(oAffMap_dev.cols,(int)vDispRange.size());
+    cv::Mat_<float> oAffMapTmp;
+    oAffMap_dev.download(oAffMapTmp);
+    oAffMapTmp = oAffMapTmp.reshape(0,3,std::array<int,3>{oInput.rows,oInput.cols,(int)vDispRange.size()}.data());
+    for(int i=0; i<oAffMap.size[0]; ++i)
+        for(int j=0; j<oAffMap.size[1]; ++j)
+            for(int k=0; k<oAffMap.size[2]; ++k)
+                ASSERT_FLOAT_EQ(oAffMap(i,j,k),oAffMapTmp(i,j,k)) << "ijk=[" << i << "," << j << "," << k << "]";
+#endif //HAVE_CUDA
     oAffMap = lv::getSubMat(oAffMap,0,cv::Range(45,70));
     const std::string sAffMapBinPath_p1 = TEST_CURR_INPUT_DATA_ROOT "/test_affmap_p1_r5_L2.bin";
     if(lv::checkIfExists(sAffMapBinPath_p1)) {
@@ -177,10 +204,21 @@ TEST(descriptor_affinity,regression_L2) {
     }
     else
         lv::write(sAffMapBinPath_p1,oAffMap);
-    lv::computeDescriptorAffinity(oDescMap1,oDescMap2,7,oAffMap,vDispRange,lv::AffinityDist_L2,oROI1,oROI2);
+    lv::computeDescriptorAffinity(oDescMap1,oDescMap2,7,oAffMap,vDispRange,lv::AffinityDist_L2,oROI1,oROI2,cv::Mat(),false);
     ASSERT_EQ(oAffMap.size[0],oInput.rows);
     ASSERT_EQ(oAffMap.size[1],oInput.cols);
     ASSERT_EQ(oAffMap.size[2],(int)vDispRange.size());
+#if HAVE_CUDA
+    lv::computeDescriptorAffinity(oDescMap1_dev,oDescMap2_dev,cv::Size(oInput.cols,oInput.rows),7,oAffMap_dev,vDispRange,lv::AffinityDist_L2,oROI1_dev,oROI2_dev);
+    ASSERT_EQ(oAffMap_dev.rows,oInput.rows*oInput.cols);
+    ASSERT_EQ(oAffMap_dev.cols,(int)vDispRange.size());
+    oAffMap_dev.download(oAffMapTmp);
+    oAffMapTmp = oAffMapTmp.reshape(0,3,std::array<int,3>{oInput.rows,oInput.cols,(int)vDispRange.size()}.data());
+    for(int i=0; i<oAffMap.size[0]; ++i)
+        for(int j=0; j<oAffMap.size[1]; ++j)
+            for(int k=0; k<oAffMap.size[2]; ++k)
+                ASSERT_FLOAT_EQ(oAffMap(i,j,k),oAffMapTmp(i,j,k)) << "ijk=[" << i << "," << j << "," << k << "]";
+#endif //HAVE_CUDA
     oAffMap = lv::getSubMat(oAffMap,0,cv::Range(160,185));
     const std::string sAffMapBinPath_p7 = TEST_CURR_INPUT_DATA_ROOT "/test_affmap_p7_r5_L2.bin";
     if(lv::checkIfExists(sAffMapBinPath_p7)) {
