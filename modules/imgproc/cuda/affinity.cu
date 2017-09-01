@@ -21,7 +21,7 @@ __constant__ int g_anDispRange[AFF_MAP_DISP_RANGE_MAX];
 
 namespace impl {
 
-    __device__ inline void l2dist_lu_exec(const float** aDistCalcLUT, volatile float* aDescCalcLUT, float* aAffArray, int nOffsets, int nDescSize) {
+    __device__ inline void l2dist_lu_exec(const float** aDistCalcLUT, float* aDescCalcLUT, float* aAffArray, int nOffsets, int nDescSize) {
         const int nThreads = blockDim.x;
         const int nThreadIdx = threadIdx.x;
         const int nStepPerDesc = __float2int_ru(float(nDescSize)/nThreads);
@@ -30,18 +30,19 @@ namespace impl {
         assert(nDescSize_LUT>=nDescSize);
         for(int nOffsetIdx=0; nOffsetIdx<nOffsets; ++nOffsetIdx) {
             __syncthreads();
-            const float** fDistCalcCell = aDistCalcLUT+nOffsetIdx*2;
-            if(fDistCalcCell[0]) {
+            const float** apDistCalcCell = aDistCalcLUT+nOffsetIdx*2;
+            if(apDistCalcCell[0]) {
                 for(int nStep=0; nStep<nStepPerDesc; ++nStep) {
                     const int nDescBinIdx = nThreads*nStep + nThreadIdx;
                     assert(nDescBinIdx<nDescSize_LUT);
                     if(nDescBinIdx<nDescSize) {
-                        const float fDescBinDiff = fDistCalcCell[0][nDescBinIdx]-fDistCalcCell[1][nDescBinIdx];
+                        const float fDescBinDiff = apDistCalcCell[0][nDescBinIdx]-apDistCalcCell[1][nDescBinIdx];
                         aDescCalcLUT[nDescBinIdx] = fDescBinDiff*fDescBinDiff;
                     }
                     else
                         aDescCalcLUT[nDescBinIdx] = 0.0f;
                 }
+                __syncthreads();
                 if(nDescSize_LUT>nThreads) {
                     assert(nDescSize_LUT>=nThreads*2);
                     for(int nStep=nDescSize_LUT-nThreads; nStep>=nThreads; nStep-=nThreads)
@@ -79,27 +80,25 @@ namespace impl {
         float* aAffArray = oAffinityMap.ptr(nRowIdx*nCols+nColIdx);
         extern __shared__ char aTmpCommon[];
         const float** aDistCalcLUT = (const float**)aTmpCommon;
-        const int nDistCalcLUTSize = nOffsets_LUT*2;
-        volatile float* aDescCalcLUT = (float*)(aDistCalcLUT+nDistCalcLUTSize);
         for(int nStep=0; nStep<nStepPerPixel; ++nStep) {
             const int nOffsetIdx = nThreads*nStep + nThreadIdx;
             assert(nOffsetIdx<nOffsets_LUT);
-            const float** fDistCalcCell = aDistCalcLUT+nOffsetIdx*2;
+            const float** apDistCalcCell = aDistCalcLUT+nOffsetIdx*2;
             bool bFilled = false;
             if(nOffsetIdx<nOffsets) {
-                const int nOffset = g_anDispRange[nOffsetIdx];
-                const int nOffsetColIdx = nColIdx+nOffset;
+                const int nOffsetColIdx = nColIdx+g_anDispRange[nOffsetIdx];
                 if(nOffsetColIdx>=0 && nOffsetColIdx<nCols) {
-                    fDistCalcCell[0] = oDescMap1.ptr(nRowIdx*nCols+nColIdx);
-                    fDistCalcCell[1] = oDescMap2.ptr(nRowIdx*nCols+nOffsetColIdx);
+                    apDistCalcCell[0] = oDescMap1.ptr(nRowIdx*nCols+nColIdx);
+                    apDistCalcCell[1] = oDescMap2.ptr(nRowIdx*nCols+nOffsetColIdx);
                     bFilled = true;
                 }
+                else
+                    aAffArray[nOffsetIdx] = -1.0f;
             }
-            if(!bFilled) {
-                fDistCalcCell[0] = nullptr;
-                aAffArray[nOffsetIdx] = -1.0f;
-            }
+            if(!bFilled)
+                apDistCalcCell[0] = nullptr;
         }
+        float* aDescCalcLUT = (float*)(aDistCalcLUT+nOffsets_LUT*2);
         l2dist_lu_exec(aDistCalcLUT,aDescCalcLUT,aAffArray,nOffsets,nDescSize);
     }
 
@@ -133,27 +132,25 @@ namespace impl {
         const uchar* aROI2Array = oROI2.ptr(nRowIdx);
         extern __shared__ char aTmpCommon[];
         const float** aDistCalcLUT = (const float**)aTmpCommon;
-        const int nDistCalcLUTSize = nOffsets_LUT*2;
-        volatile float* aDescCalcLUT = (float*)(aDistCalcLUT+nDistCalcLUTSize);
         for(int nStep=0; nStep<nStepPerPixel; ++nStep) {
             const int nOffsetIdx = nThreads*nStep + nThreadIdx;
             assert(nOffsetIdx<nOffsets_LUT);
-            const float** fDistCalcCell = aDistCalcLUT+nOffsetIdx*2;
+            const float** apDistCalcCell = aDistCalcLUT+nOffsetIdx*2;
             bool bFilled = false;
             if(nOffsetIdx<nOffsets) {
-                const int nOffset = g_anDispRange[nOffsetIdx];
-                const int nOffsetColIdx = nColIdx+nOffset;
+                const int nOffsetColIdx = nColIdx+g_anDispRange[nOffsetIdx];
                 if(nOffsetColIdx>=0 && nOffsetColIdx<nCols && aROI2Array[nOffsetColIdx]!=0) {
-                    fDistCalcCell[0] = oDescMap1.ptr(nRowIdx*nCols+nColIdx);
-                    fDistCalcCell[1] = oDescMap2.ptr(nRowIdx*nCols+nOffsetColIdx);
+                    apDistCalcCell[0] = oDescMap1.ptr(nRowIdx*nCols+nColIdx);
+                    apDistCalcCell[1] = oDescMap2.ptr(nRowIdx*nCols+nOffsetColIdx);
                     bFilled = true;
                 }
+                else
+                    aAffArray[nOffsetIdx] = -1.0f;
             }
-            if(!bFilled) {
-                fDistCalcCell[0] = nullptr;
-                aAffArray[nOffsetIdx] = -1.0f;
-            }
+            if(!bFilled)
+                apDistCalcCell[0] = nullptr;
         }
+        float* aDescCalcLUT = (float*)(aDistCalcLUT+nOffsets_LUT*2);
         l2dist_lu_exec(aDistCalcLUT,aDescCalcLUT,aAffArray,nOffsets,nDescSize);
     }
 
