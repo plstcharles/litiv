@@ -141,7 +141,6 @@ namespace impl {
                 nDescIdx += blockDim.x;
             }
         }
-        __syncthreads();
     }
 
 } // namespace impl
