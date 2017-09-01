@@ -579,7 +579,7 @@ namespace lv {
     inline TMat getSubMat(const TMat& oMat, int nTargetDimIdx, const cv::Range& aTargetElemIdxs) {
         lvAssert_(nTargetDimIdx<oMat.dims,"target dimension out of bounds");
         lvAssert_(aTargetElemIdxs!=cv::Range::all(),"using full range returns identical matrix");
-        lvAssert_(aTargetElemIdxs.start>=0 && aTargetElemIdxs.end<=oMat.size[oMat.dims-1],"target element indice(s) out of bounds");
+        lvAssert_(aTargetElemIdxs.start>=0 && aTargetElemIdxs.end<=oMat.size[nTargetDimIdx],"target element indice(s) out of bounds");
         std::vector<cv::Range> vRanges((size_t)oMat.dims,cv::Range::all());
         vRanges[nTargetDimIdx] = aTargetElemIdxs;
         return oMat(vRanges.data());
@@ -589,7 +589,7 @@ namespace lv {
     template<typename TMat>
     inline TMat getSubMat(const TMat& oMat, int nTargetDimIdx, int nTargetElemIdx) {
         lvAssert_(nTargetDimIdx<oMat.dims,"target dimension out of bounds");
-        lvAssert_(nTargetElemIdx>=0 && nTargetElemIdx<oMat.size[oMat.dims-1],"target element index out of bounds");
+        lvAssert_(nTargetElemIdx>=0 && nTargetElemIdx<oMat.size[nTargetDimIdx],"target element index out of bounds");
         std::vector<cv::Range> vRanges((size_t)oMat.dims,cv::Range::all());
         vRanges[nTargetDimIdx] = cv::Range(nTargetElemIdx,nTargetElemIdx+1);
         return oMat(vRanges.data());
