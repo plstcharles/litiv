@@ -226,7 +226,7 @@ void lv::computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::M
     const std::array<int,3> anAffinityMapDims = {nRows,nCols,nOffsets};
 #if HAVE_CUDA
     static thread_local cv::cuda::GpuMat s_oDescMap1_dev,s_oDescMap2_dev,s_oAffinityMap_dev,s_oROI1_dev,s_oROI2_dev;
-    if(eDist==lv::AffinityDist_L2 && oROI1.empty()==oROI2.empty() /*@@@@*/ && nPatchSize==1) {
+    if(eDist==lv::AffinityDist_L2 && oROI1.empty()==oROI2.empty()) {
         lvAssert_(cv::cuda::deviceSupports(LITIV_CUDA_MIN_COMPUTE_CAP),"device compute capabilities too low");
         // all uploads/downloads below are blocking calls @@@
         s_oDescMap1_dev.upload(oDescMap1.reshape(0,2,std::array<int,2>{nRows*nCols,nDescSize}.data()));
@@ -359,9 +359,9 @@ void lv::computeDescriptorAffinity(const cv::cuda::GpuMat& oDescMap1, const cv::
         const uint nWarpSize = (uint)cv::cuda::DeviceInfo().warpSize();
         oParams.vBlockSize.x = nWarpSize*2; // min 64, step=64, but always larger or eq to nOffsets @@@@
         oParams.vGridSize = dim3((uint)oMapSize.width,(uint)oMapSize.height);
-        //const size_t nOffsets_LUT = size_t(std::ceil(float(nOffsets)/oParams.vBlockSize.x)*oParams.vBlockSize.x);
-        //const size_t nDescSize_LUT = size_t(std::ceil(float(nDescSize)/oParams.vBlockSize.x)*oParams.vBlockSize.x);
-        oParams.nSharedMemSize = 10000;//sizeof(float**)*2*nOffsets_LUT + sizeof(float)*nDescSize_LUT;
+        const size_t nOffsets_LUT = size_t(std::ceil(float(nOffsets)/oParams.vBlockSize.x)*oParams.vBlockSize.x);
+        const size_t nDescSize_LUT = size_t(std::ceil(float(nDescSize)/oParams.vBlockSize.x)*oParams.vBlockSize.x);
+        oParams.nSharedMemSize = (sizeof(device::DistCalcLUT)*nOffsets_LUT + sizeof(float)*nDescSize_LUT);
         if(oROI1.empty())
             device::compute_desc_affinity_l2(oParams,oDescMap1,oDescMap2,oAffinityMap,nOffsets,nDescSize);
         else

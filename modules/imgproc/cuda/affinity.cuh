@@ -23,6 +23,11 @@
 
 namespace device {
 
+    struct DistCalcLUT {
+        const float* aDesc1;
+        const float* aDesc2;
+    };
+
     void compute_desc_affinity_l2(const lv::cuda::KernelParams& oKParams,
                                   const cv::cuda::PtrStep<float> oDescMap1,
                                   const cv::cuda::PtrStep<float> oDescMap2,
