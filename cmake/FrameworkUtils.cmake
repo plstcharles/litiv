@@ -44,7 +44,7 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
         else()
             set(cuda_headerlist_internal "")
         endif()
-    elseif(USE_CUDA AND (${ARGC} EQUAL 5)) # no cuda_sourcelist and cuda_headerlist; will init as empty
+    elseif((NOT USE_CUDA) OR (${ARGC} EQUAL 5)) # no cuda_sourcelist and cuda_headerlist; will init as empty
         set(cuda_sourcelist_internal "")
         set(cuda_headerlist_internal "")
     else()
@@ -299,20 +299,16 @@ endmacro(litiv_library)
 macro(litiv_module name sourcelist headerlist)
     if(USE_CUDA AND (${ARGC} EQUAL 5)) # ok, expect cuda_sourcelist and cuda_headerlist
         litiv_library(${name} "module" TRUE ${sourcelist} ${headerlist} ${ARGV3} ${ARGV4})
-    elseif(${ARGC} EQUAL 3)
-        litiv_library(${name} "module" TRUE ${sourcelist} ${headerlist})
     else()
-        message(FATAL_ERROR "bad number of args passed to litiv_module")
+        litiv_library(${name} "module" TRUE ${sourcelist} ${headerlist})
     endif()
 endmacro(litiv_module)
 
 macro(litiv_3rdparty_module name sourcelist headerlist)
     if(USE_CUDA AND (${ARGC} EQUAL 5)) # ok, expect cuda_sourcelist and cuda_headerlist
         litiv_library(${name} "3rdparty" FALSE ${sourcelist} ${headerlist} ${ARGV3} ${ARGV4})
-    elseif(${ARGC} EQUAL 3)
-        litiv_library(${name} "3rdparty" FALSE ${sourcelist} ${headerlist})
     else()
-        message(FATAL_ERROR "bad number of args passed to litiv_3rdparty_module")
+        litiv_library(${name} "3rdparty" FALSE ${sourcelist} ${headerlist})
     endif()
 endmacro(litiv_3rdparty_module)
 
