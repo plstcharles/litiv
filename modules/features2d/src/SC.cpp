@@ -160,7 +160,7 @@ bool ShapeContext::setBlockSize(size_t nThreadCount) {
     return true;
 }
 
-void ShapeContext::compute2(const cv::Mat& oImage, cv::cuda::GpuMat& oDescMap) {
+void ShapeContext::compute2(const cv::Mat& oImage, cv::cuda::GpuMat& oDescMap_dev) {
     lvAssert_(m_bUseCUDA,"cuda disabled, cannot use gpumat override");
     const cv::Size oOldImageSize = m_oCurrImageSize;
     scdesc_fill_contours(oImage);
@@ -183,14 +183,13 @@ void ShapeContext::compute2(const cv::Mat& oImage, cv::cuda::GpuMat& oDescMap) {
     #endif //USE_LIENHART_LOOKUP_MASK
         lvAssert_(USE_LIENHART_LOOKUP_MASK,"only lienhart-style lookup in shapecontext impl available with cuda");
         const int nDescCount = m_oCurrImageSize.height*m_oCurrImageSize.width;
-        m_oDescriptors_dev.create(nDescCount,m_nDescSize,CV_32FC1);
+        oDescMap_dev.create(nDescCount,m_nDescSize,CV_32FC1);
         lv::cuda::KernelParams oParams;
         const uint nWarpSize = (uint)cv::cuda::DeviceInfo().warpSize();
         oParams.vBlockSize.x = (m_nBlockSize?(uint)m_nBlockSize:nWarpSize);
         oParams.vGridSize = dim3((uint)m_oCurrImageSize.width,(uint)m_oCurrImageSize.height);
         oParams.nSharedMemSize = size_t(std::ceil(float(m_nDescSize)/nWarpSize)*nWarpSize*2)*sizeof(float);
-        device::scdesc_fill_desc_direct(oParams,m_oKeyPts_dev,m_oContourPts_dev,m_oDistMask_dev,m_pDescLUMap_tex,m_oAbsDescLUMap.rows,m_oDescriptors_dev,m_bNonZeroInitBins,true,m_bNormalizeBins);
-        oDescMap = m_oDescriptors_dev; // non-blocking; can be passed to other kernels as input
+        device::scdesc_fill_desc_direct(oParams,m_oKeyPts_dev,m_oContourPts_dev,m_oDistMask_dev,m_pDescLUMap_tex,m_oAbsDescLUMap.rows,oDescMap_dev,m_bNonZeroInitBins,true,m_bNormalizeBins);
     }
     else
         lvError("missing impl for non-direct desc computation w/ cuda");

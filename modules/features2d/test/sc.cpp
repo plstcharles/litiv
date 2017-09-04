@@ -159,6 +159,39 @@ TEST(sc,regression_full_compute_abs) {
 
 #if HAVE_CUDA
 
+TEST(sc,regression_compute_abs_gpu_config_map) {
+    std::unique_ptr<ShapeContext> pShapeContext_gpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),6,4);
+    std::unique_ptr<ShapeContext> pShapeContext_nogpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),6,4);
+    pShapeContext_nogpu->enableCUDA(false);
+    const int nDescSize = 6*4;
+    const int nMapSize = 257;
+    cv::Mat oInput(nMapSize,nMapSize,CV_8UC1);
+    oInput = 0;
+    cv::circle(oInput,cv::Point(128,128),7,cv::Scalar_<uchar>(255),-1);
+    cv::rectangle(oInput,cv::Point(180,180),cv::Point(190,190),cv::Scalar_<uchar>(255),-1);
+    cv::rectangle(oInput,cv::Point(151,19),cv::Point(194,193),cv::Scalar_<uchar>(255),-1);
+    oInput = oInput>0;
+    cv::Mat_<float> oOutputDescMap_gpu,oOutputDescMap_nogpu;
+    pShapeContext_nogpu->compute2(oInput,oOutputDescMap_nogpu);
+    ASSERT_EQ(lv::MatInfo(lv::MatSize(nMapSize,nMapSize,nDescSize),CV_32FC1),lv::MatInfo(oOutputDescMap_nogpu));
+    pShapeContext_gpu->compute2(oInput,oOutputDescMap_gpu);
+    ASSERT_EQ(lv::MatInfo(lv::MatSize(nMapSize,nMapSize,nDescSize),CV_32FC1),lv::MatInfo(oOutputDescMap_gpu));
+    for(int i=0; i<nMapSize; ++i)
+        for(int j=0; j<nMapSize; ++j)
+            for(int k=0; k<nDescSize; ++k)
+                ASSERT_FLOAT_EQ(oOutputDescMap_gpu(i,j,k),oOutputDescMap_nogpu(i,j,k)) << "ijk=[" << i << "," << j << "," << k << "]";
+    cv::cuda::GpuMat oOutputDescMap_gpu_dev;
+    pShapeContext_gpu->compute2(oInput,oOutputDescMap_gpu_dev);
+    cv::Mat_<float> oOutputDescMap_gpu_tmp;
+    oOutputDescMap_gpu_dev.download(oOutputDescMap_gpu_tmp);
+    oOutputDescMap_gpu_tmp = oOutputDescMap_gpu_tmp.reshape(0,3,std::array<int,3>{nMapSize,nMapSize,nDescSize}.data());
+    ASSERT_EQ(lv::MatInfo(lv::MatSize(nMapSize,nMapSize,nDescSize),CV_32FC1),lv::MatInfo(oOutputDescMap_gpu_tmp));
+    for(int i=0; i<nMapSize; ++i)
+        for(int j=0; j<nMapSize; ++j)
+            for(int k=0; k<nDescSize; ++k)
+                ASSERT_FLOAT_EQ(oOutputDescMap_gpu_tmp(i,j,k),oOutputDescMap_nogpu(i,j,k)) << "ijk=[" << i << "," << j << "," << k << "]";
+}
+
 TEST(sc,regression_compute_abs_gpu_config_6_4) {
     std::unique_ptr<ShapeContext> pShapeContext_gpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),6,4);
     std::unique_ptr<ShapeContext> pShapeContext_nogpu = std::make_unique<ShapeContext>(size_t(2),size_t(40),6,4);
