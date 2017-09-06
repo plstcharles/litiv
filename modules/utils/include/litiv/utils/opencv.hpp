@@ -306,6 +306,10 @@ namespace lv {
         template<size_t nDims, typename Tinteger2>
         MatSize_(const std::array<Tinteger2,nDims>& aSizes) :
                 m_vSizes(cvtSizes((Tinteger2)nDims,aSizes.data())) {}
+        /// c-array-based constructor
+        template<typename Tinteger2>
+        MatSize_(Tinteger2 nDims, const Tinteger2* aSizes) :
+                m_vSizes(cvtSizes(nDims,aSizes)) {}
         /// vector-based constructor
         template<typename Tinteger2>
         MatSize_(const std::vector<Tinteger2>& vSizes) :
