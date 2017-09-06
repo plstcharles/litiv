@@ -210,6 +210,7 @@ void lv::computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::M
                                    int nPatchSize, cv::Mat_<float>& oAffinityMap, const std::vector<int>& vDispRange,
                                    AffinityDistType eDist, const cv::Mat_<uchar>& oROI1, const cv::Mat_<uchar>& oROI2,
                                    const cv::Mat_<float>& oEMDCostMap, bool bAllowCUDA) {
+    lvDbgExceptionWatch;
     lvAssert_(!oDescMap1.empty() && oDescMap1.size==oDescMap2.size && oDescMap1.dims==3 && oDescMap1.size[2]>1,"bad input desc map sizes");
     lvAssert_(oROI1.empty() || (oROI1.dims==2 && oROI1.rows==oDescMap1.size[0] && oROI1.cols==oDescMap1.size[1]),"bad ROI1 map size");
     lvAssert_(oROI2.empty() || (oROI2.dims==2 && oROI2.rows==oDescMap2.size[0] && oROI2.cols==oDescMap2.size[1]),"bad ROI2 map size");
@@ -230,9 +231,11 @@ void lv::computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::M
     static thread_local cv::cuda::GpuMat s_oDescMap1_dev,s_oDescMap2_dev,s_oAffinityMap_dev,s_oROI1_dev,s_oROI2_dev;
     if(bAllowCUDA && eDist==lv::AffinityDist_L2 && oROI1.empty()==oROI2.empty() && (nRows*nCols>64 || nOffsets>16 || nDescSize>32)) {
         lvAssert_(cv::cuda::deviceSupports(LITIV_CUDA_MIN_COMPUTE_CAP),"device compute capabilities too low");
+        lvAssert_(oDescMap1.isContinuous() && oDescMap2.isContinuous(),"non-continuous n-dim matrices cannot be reshaped by opencv (check inputs)");
         // all uploads/downloads below are blocking calls @@@
-        s_oDescMap1_dev.upload(oDescMap1.reshape(0,2,std::array<int,2>{nRows*nCols,nDescSize}.data()));
-        s_oDescMap2_dev.upload(oDescMap2.reshape(0,2,std::array<int,2>{nRows*nCols,nDescSize}.data()));
+        const std::array<int,2> anDescMapDims_dev = {nRows*nCols,nDescSize};
+        s_oDescMap1_dev.upload(oDescMap1.reshape(0,2,anDescMapDims_dev.data()));
+        s_oDescMap2_dev.upload(oDescMap2.reshape(0,2,anDescMapDims_dev.data()));
         if(!oROI1.empty()) {
             s_oROI1_dev.upload(oROI1);
             s_oROI2_dev.upload(oROI2);
@@ -242,6 +245,9 @@ void lv::computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::M
             s_oROI2_dev.release();
         }
         lv::computeDescriptorAffinity(s_oDescMap1_dev,s_oDescMap2_dev,cv::Size(nCols,nRows),nPatchSize,s_oAffinityMap_dev,vDispRange,lv::AffinityDist_L2,s_oROI1_dev,s_oROI2_dev);
+        oAffinityMap.create(3,anAffinityMapDims.data());
+        const std::array<int,2> anAffinityMapDims_dev = {nRows*nCols,nOffsets};
+        oAffinityMap = oAffinityMap.reshape(0,2,anAffinityMapDims_dev.data());
         s_oAffinityMap_dev.download(oAffinityMap);
         oAffinityMap = oAffinityMap.reshape(0,3,anAffinityMapDims.data());
         return;
@@ -261,6 +267,7 @@ void lv::computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::M
     }
     else
         oRawAffinity = oAffinityMap;
+    lvDbgExceptionWatch;
 #if USING_OPENMP
 #ifdef _MSC_VER
     #pragma omp parallel for // msvc only supports openmp 2.0
@@ -304,6 +311,7 @@ void lv::computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::M
     }
     if(nPatchSize==1)
         return;
+    lvDbgExceptionWatch;
 #if USING_OPENMP
 #ifdef _MSC_VER
     #pragma omp parallel for // msvc only supports openmp 2.0
@@ -337,6 +345,7 @@ void lv::computeDescriptorAffinity(const cv::Mat_<float>& oDescMap1, const cv::M
 void lv::computeDescriptorAffinity(const cv::cuda::GpuMat& oDescMap1, const cv::cuda::GpuMat& oDescMap2, const cv::Size& oMapSize, int nPatchSize,
                                    cv::cuda::GpuMat& oAffinityMap, const std::vector<int>& vDispRange, AffinityDistType eDist,
                                    const cv::cuda::GpuMat& oROI1, const cv::cuda::GpuMat& oROI2) {
+    lvDbgExceptionWatch;
     lvAssert_(!oDescMap1.empty() && oDescMap1.size()==oDescMap2.size(),"bad input desc map sizes");
     lvAssert_(oMapSize.area()>0 && oDescMap1.rows==oMapSize.area(),"bad 2d map size");
     lvAssert_(oROI1.empty() || (oROI1.size()==oMapSize && oROI1.type()==CV_8UC1),"bad ROI1 map size");
@@ -374,6 +383,7 @@ void lv::computeDescriptorAffinity(const cv::cuda::GpuMat& oDescMap1, const cv::
         else
             device::compute_desc_affinity_l2_roi(oParams,oDescMap1,oROI1,oDescMap2,oROI2,nPatchSize>1?oRawAffinityMap:oAffinityMap,nOffsets,nDescSize);
     }
+    lvDbgExceptionWatch;
     if(nPatchSize>1) {
         lv::cuda::KernelParams oParams;
         const int nMinThreads = cv::cuda::DeviceInfo().warpSize();

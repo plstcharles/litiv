@@ -1002,7 +1002,7 @@ inline void StereoSegmMatcher::GraphModelData::calcImageFeatures(const CamArray<
         std::vector<cv::Range> vRanges(size_t(3),cv::Range::all());
         vRanges[0] = cv::Range(nWinRadius,nRows+nWinRadius);
         vRanges[1] = cv::Range(nWinRadius,nCols+nWinRadius);
-        aDescs[nCamIdx] = aEnlargedDescs[nCamIdx](vRanges.data());
+        aEnlargedDescs[nCamIdx](vRanges.data()).copyTo(aDescs[nCamIdx]); // copy to avoid bugs when reshaping non-continuous data
         lvDbgAssert(aDescs[nCamIdx].dims==3 && aDescs[nCamIdx].size[0]==nRows && aDescs[nCamIdx].size[1]==nCols);
         lvDbgAssert(std::equal(aDescs[nCamIdx].ptr<float>(0,0),aDescs[nCamIdx].ptr<float>(0,0)+aDescs[nCamIdx].size[2],aEnlargedDescs[nCamIdx].ptr<float>(nWinRadius,nWinRadius)));
     #if STEREOSEGMATCH_CONFIG_USE_ROOT_SIFT_DESCS
@@ -1052,6 +1052,7 @@ inline void StereoSegmMatcher::GraphModelData::calcImageFeatures(const CamArray<
 #elif STEREOSEGMATCH_CONFIG_USE_SSQDIFF_AFFINITY
     lv::computeImageAffinity(aEnlargedInput[0],aEnlargedInput[1],nWinSize,oAffinity,vDisparityOffsets,lv::AffinityDist_SSD,aEnlargedROIs[0],aEnlargedROIs[1]);
 #endif //STEREOSEGMATCH_CONFIG_USE_..._AFFINITY
+    lvDbgAssert(lv::MatInfo(oAffinity)==lv::MatInfo(lv::MatSize(3,anAffinityMapDims.data()),CV_32FC1));
     lvDbgAssert(m_vNextFeats[FeatPack_ImgAffinity].data==oAffinity.data);
     lvLog_(3,"Image affinity map computed in %f second(s).",oLocalTimer.tock());
     lvLog(3,"Calculating image saliency maps...");
@@ -1095,7 +1096,7 @@ inline void StereoSegmMatcher::GraphModelData::calcImageFeatures(const CamArray<
         lvDbgExec( // cv::normalize leftover fp errors are sometimes awful; need to 0-max when using map
             for(int nRowIdx=0; nRowIdx<oSaliency.rows; ++nRowIdx)
                 for(int nColIdx=0; nColIdx<oSaliency.cols; ++nColIdx)
-                    lvDbgAssert(oSaliency.at<float>(nRowIdx,nColIdx)>=-1e-6f || m_aROIs[nCamIdx](nRowIdx,nColIdx)==0);
+                    lvDbgAssert((oSaliency.at<float>(nRowIdx,nColIdx)>=-1e-6f && oSaliency.at<float>(nRowIdx,nColIdx)<=1.0f) || m_aROIs[nCamIdx](nRowIdx,nColIdx)==0);
         );
     #if STEREOSEGMATCH_CONFIG_USE_SALIENT_MAP_BORDR
         cv::multiply(oSaliency,cv::Mat_<float>(oSaliency.size(),1.0f).setTo(0.5f,m_aDescROIs[nCamIdx]==0),oSaliency);
@@ -1162,6 +1163,7 @@ inline void StereoSegmMatcher::GraphModelData::calcShapeFeatures(const CamArray<
 #else //!STEREOSEGMATCH_CONFIG_USE_SHAPE_EMD_AFFIN
     lv::computeDescriptorAffinity(aDescs[0],aDescs[1],nPatchSize,oAffinity,vDisparityOffsets,lv::AffinityDist_L2,m_aROIs[0],m_aROIs[1]);
 #endif //!STEREOSEGMATCH_CONFIG_USE_SHAPE_EMD_AFFIN
+    lvDbgAssert(lv::MatInfo(oAffinity)==lv::MatInfo(lv::MatSize(3,anAffinityMapDims.data()),CV_32FC1));
     lvDbgAssert(m_vNextFeats[FeatPack_ShpAffinity].data==oAffinity.data);
     lvLog_(3,"Shape affinity map computed in %f second(s).",oLocalTimer.tock());
     lvLog(3,"Calculating shape saliency maps...");
@@ -1205,7 +1207,7 @@ inline void StereoSegmMatcher::GraphModelData::calcShapeFeatures(const CamArray<
         lvDbgExec( // cv::normalize leftover fp errors are sometimes awful; need to 0-max when using map
             for(int nRowIdx=0; nRowIdx<oSaliency.rows; ++nRowIdx)
                 for(int nColIdx=0; nColIdx<oSaliency.cols; ++nColIdx)
-                    lvDbgAssert(oSaliency.at<float>(nRowIdx,nColIdx)>=-1e-6f || m_aROIs[nCamIdx](nRowIdx,nColIdx)==0);
+                    lvDbgAssert((oSaliency.at<float>(nRowIdx,nColIdx)>=-1e-6f && oSaliency.at<float>(nRowIdx,nColIdx)<=1.0f) || m_aROIs[nCamIdx](nRowIdx,nColIdx)==0);
         );
     #if STEREOSEGMATCH_CONFIG_USE_SALIENT_MAP_BORDR
         cv::multiply(oSaliency,cv::Mat_<float>(oSaliency.size(),1.0f).setTo(0.5f,m_aDescROIs[nCamIdx]==0),oSaliency);

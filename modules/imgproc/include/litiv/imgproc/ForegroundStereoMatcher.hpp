@@ -419,6 +419,7 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
     #endif //STEREOSEGMATCH_CONFIG_USE_SOSPD_RESEGM_INF
     #if STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF
         /// runs sospd inference algorithm either to completion, or for a specific number of iterations
+        // ... @@@ todo
         typedef int VarId;
         typedef size_t Label;
         typedef std::vector<REAL> LambdaAlpha;
