@@ -67,31 +67,11 @@ endif()
 #    "include/litiv/3rdparty/QPBO/QPBO.h"
 #)
 
-add_files(SOURCE_FILES
-    #"src/alpha-expansion.cpp"
-    "src/bidirectional-ibfs.cpp"
-    #"src/gen-random.cpp"
-    "src/parametric-ibfs.cpp"
-    "src/sospd.cpp"
-    "src/source-ibfs.cpp"
-    "src/submodular-functions.cpp"
-    "src/submodular-ibfs.cpp"
-)
+set(SOURCE_FILES "") # module is header-only as of v1.5.0
 
 add_files(INCLUDE_FILES
-    #"include/litiv/3rdparty/qpbo.hpp"
-    #"include/litiv/3rdparty/QPBO/block.h"
-    #"include/litiv/3rdparty/QPBO/QPBO.h"
-    #"include/litiv/3rdparty/HOCR/HOCR.h"
-    #"include/litiv/3rdparty/HOCR/HOCR0.h"
-    #"include/litiv/3rdparty/HOCR/Image.h"
-    #"include/litiv/3rdparty/sospd/alpha-expansion.hpp"
     "include/litiv/3rdparty/sospd/energy-common.hpp"
     "include/litiv/3rdparty/sospd/flow-solver.hpp"
-    #"include/litiv/3rdparty/sospd/fusion-move.hpp"
-    #"include/litiv/3rdparty/sospd/generic-higher-order.hpp"
-    #"include/litiv/3rdparty/sospd/gen-random.hpp"
-    #"include/litiv/3rdparty/sospd/higher-order-energy.hpp"
     "include/litiv/3rdparty/sospd/multilabel-energy.hpp"
     "include/litiv/3rdparty/sospd/sos-graph.hpp"
     "include/litiv/3rdparty/sospd/sospd.hpp"
@@ -102,10 +82,8 @@ add_files(INCLUDE_FILES
 litiv_3rdparty_module(sospd SOURCE_FILES INCLUDE_FILES)
 
 target_include_directories(litiv_3rdparty_sospd
-    PUBLIC
+    INTERFACE
         #"$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include/litiv/3rdparty/QPBO>"
         "$<BUILD_INTERFACE:${Boost_INCLUDE_DIRS}>"
         #"$<INSTALL_INTERFACE:include/litiv/3rdparty/QPBO>"
-    PRIVATE
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
 )

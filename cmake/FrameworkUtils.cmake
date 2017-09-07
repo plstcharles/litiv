@@ -38,6 +38,9 @@ endmacro(initialize_internal_list)
 
 macro(litiv_library libname groupname canbeshared sourcelist headerlist)
     if(USE_CUDA AND (${ARGC} EQUAL 7)) # got cuda_sourcelist and cuda_headerlist; will copy internally
+        if(NOT ${ARGV5})
+            message(FATAL_ERROR "cuda source list must not be empty")
+        endif()
         set(cuda_sourcelist_internal "${${ARGV5}}")
         if(${ARGV6})
             set(cuda_headerlist_internal "${${ARGV6}}")
@@ -72,67 +75,90 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
     endif()
     append_internal_list(litiv_projects ${PROJECT_NAME})
     set(project_install_targets "${PROJECT_NAME}")
-    if(${BUILD_SHARED_LIBS} AND ${canbeshared})
-        add_library(${PROJECT_NAME} SHARED ${${sourcelist}} ${${headerlist}})
-        set_target_properties(${PROJECT_NAME}
+    set_eval(project_header_only (NOT ${sourcelist}))
+    if(project_header_only)
+        if(NOT ${headerlist})
+            message(FATAL_ERROR "library cannot be completely empty...")
+        endif()
+        add_library(${PROJECT_NAME} INTERFACE)
+        #target_sources(${PROJECT_NAME} INTERFACE ${${headerlist}}) reevaluate usefulness w/ cmake >3.3
+        add_custom_target(${PROJECT_NAME}_headers SOURCES ${${headerlist}}) # used only to list the headers in IDEs
+        set_target_properties(${PROJECT_NAME}_headers
             PROPERTIES
-                VERSION "${LITIV_VERSION}"
-                SOVERSION "${LITIV_VERSION_ABI}"
+                FOLDER "${groupname}"
         )
         target_compile_definitions(${PROJECT_NAME}
-            PRIVATE
-                "LV_EXPORT_API"
             INTERFACE
-                "LV_IMPORT_API"
+                "LITIV_DEBUG=$<CONFIG:Debug>"
         )
-        if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
-            # disables C4251 + C4275 to allow STL/template classes to be used in exported classes/members
-            # need to eliminate these using pImpl idiom in exported classes to add abstraction layer @@@@
-            target_compile_options(${PROJECT_NAME}
-                PUBLIC
-                    /wd4251 # disables C4251, "'identifier' : class 'type' needs to have dll-interface to be used by clients of class 'type2'"
-                    /wd4275 # disables C4275, "non DLL-interface classkey 'identifier' used as base for DLL-interface classkey 'identifier'"
-            )
-        endif()
+        target_include_directories(${PROJECT_NAME}
+            INTERFACE
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+        )
     else()
-        add_library(${PROJECT_NAME} STATIC ${${sourcelist}} ${${headerlist}})
-        if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR
-           ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR
-           ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
-            target_compile_options(${PROJECT_NAME}
-                PRIVATE
-                    -fPIC
-            )
-        endif()
-    endif()
-    if(WIN32)
-        if(USE_VERSION_TAGS)
+        if(${BUILD_SHARED_LIBS} AND ${canbeshared})
+            add_library(${PROJECT_NAME} SHARED ${${sourcelist}} ${${headerlist}})
             set_target_properties(${PROJECT_NAME}
                 PROPERTIES
-                    OUTPUT_NAME "${PROJECT_NAME}${LITIV_VERSION_PLAIN}"
+                    VERSION "${LITIV_VERSION}"
+                    SOVERSION "${LITIV_VERSION_ABI}"
             )
-        endif()
-    else()
-        if(NOT CMAKE_CROSSCOMPILING)
-            target_compile_options(${PROJECT_NAME}
+            target_compile_definitions(${PROJECT_NAME}
+                PRIVATE
+                    "LV_EXPORT_API"
                 INTERFACE
-                    "-march=native"
+                    "LV_IMPORT_API"
             )
+            if("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
+                # disables C4251 + C4275 to allow STL/template classes to be used in exported classes/members
+                # need to eliminate these using pImpl idiom in exported classes to add abstraction layer @@@@
+                target_compile_options(${PROJECT_NAME}
+                    PUBLIC
+                        /wd4251 # disables C4251, "'identifier' : class 'type' needs to have dll-interface to be used by clients of class 'type2'"
+                        /wd4275 # disables C4275, "non DLL-interface classkey 'identifier' used as base for DLL-interface classkey 'identifier'"
+                )
+            endif()
+        else()
+            add_library(${PROJECT_NAME} STATIC ${${sourcelist}} ${${headerlist}})
+            if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR
+               ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR
+               ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
+                target_compile_options(${PROJECT_NAME}
+                    PRIVATE
+                        -fPIC
+                )
+            endif()
         endif()
+        if(WIN32)
+            if(USE_VERSION_TAGS)
+                set_target_properties(${PROJECT_NAME}
+                    PROPERTIES
+                        OUTPUT_NAME "${PROJECT_NAME}${LITIV_VERSION_PLAIN}"
+                )
+            endif()
+        else()
+            if(NOT CMAKE_CROSSCOMPILING)
+                target_compile_options(${PROJECT_NAME}
+                    INTERFACE
+                        "-march=native"
+                )
+            endif()
+        endif()
+        set_target_properties(${PROJECT_NAME}
+            PROPERTIES
+                FOLDER "${groupname}"
+        )
+        target_compile_definitions(${PROJECT_NAME}
+            PUBLIC
+                "LITIV_DEBUG=$<CONFIG:Debug>"
+        )
+        target_include_directories(${PROJECT_NAME}
+            PUBLIC
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
+                "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+        )
     endif()
-    set_target_properties(${PROJECT_NAME}
-        PROPERTIES
-            FOLDER "${groupname}"
-    )
-    target_compile_definitions(${PROJECT_NAME}
-        PUBLIC
-            "LITIV_DEBUG=$<CONFIG:Debug>"
-    )
-    target_include_directories(${PROJECT_NAME}
-        PUBLIC
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-    )
     if(USE_CUDA AND cuda_sourcelist_internal)
         if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR
            ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR

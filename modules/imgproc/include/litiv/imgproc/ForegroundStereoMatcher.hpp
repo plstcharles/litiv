@@ -421,16 +421,17 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         /// runs sospd inference algorithm either to completion, or for a specific number of iterations
         // ... @@@ todo
         typedef int VarId;
-        typedef size_t Label;
+        typedef InternalLabelType Label;
+        typedef ValueType REAL;
         typedef std::vector<REAL> LambdaAlpha;
         typedef std::vector<std::pair<size_t, size_t>> NodeNeighborList;
         typedef std::vector<NodeNeighborList> NodeCliqueList;
         REAL ComputeHeightDiff(VarId i, Label l1, Label l2);
-        void SetupAlphaEnergy(SubmodularIBFS& crf);
+        void SetupAlphaEnergy(SubmodularIBFS<ValueType,VarId>& crf);
         bool InitialFusionLabeling();
-        void PreEditDual(SubmodularIBFS& crf);
-        bool UpdatePrimalDual(SubmodularIBFS& crf);
-        void PostEditDual(SubmodularIBFS& crf);
+        void PreEditDual(SubmodularIBFS<ValueType,VarId>& crf);
+        bool UpdatePrimalDual(SubmodularIBFS<ValueType,VarId>& crf);
+        void PostEditDual(SubmodularIBFS<ValueType,VarId>& crf);
         size_t __cam;
         size_t m_nStereoCliqueCount;
         InternalLabelType __alpha;

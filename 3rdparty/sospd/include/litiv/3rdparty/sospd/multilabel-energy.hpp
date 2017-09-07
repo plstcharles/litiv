@@ -8,6 +8,7 @@
 
 #include "litiv/3rdparty/sospd/energy-common.hpp"
 
+template<typename ValueType, typename IndexType/*=int*/, typename LabelType/*=size_t*/>
 class Clique;
 
 /** A multilabel energy function, which splits as a sum of clique energies
@@ -18,15 +19,20 @@ class Clique;
  * functions \f$f_C\f$ defined over a set of cliques \f$C\f$ which are subsets
  * of the variables.
  */
+template<typename ValueType, typename IndexType/*=int*/, typename LabelType/*=size_t*/>
 class MultilabelEnergy {
+    static_assert(std::is_arithmetic<ValueType>::value,"value type must be arithmetic");
+    static_assert(std::is_integral<IndexType>::value,"index type must be integral");
+    static_assert(std::is_integral<LabelType>::value,"label type must be integral");
     public:
-        typedef int VarId;
-        typedef size_t Label;
-        typedef std::unique_ptr<Clique> CliquePtr;
+        typedef ValueType REAL;
+        typedef IndexType VarId;
+        typedef LabelType Label;
+        typedef std::unique_ptr<Clique<ValueType,IndexType,LabelType>> CliquePtr;
 
         /** Construct an empty energy function with labels 0,...,max_label-1
          */
-        MultilabelEnergy(Label max_label);
+        explicit MultilabelEnergy(Label max_label);
 
         /** Add variables to the MRF. Default to add a single variable
          *
@@ -87,10 +93,12 @@ class MultilabelEnergy {
  *
  * Non-copyable and non-movable to prevent slicing of derived class data.
  */
+template<typename ValueType, typename IndexType/*=int*/, typename LabelType/*=size_t*/>
 class Clique {
     public:
-        typedef MultilabelEnergy::VarId VarId;
-        typedef MultilabelEnergy::Label Label;
+        typedef typename MultilabelEnergy<ValueType,IndexType,LabelType>::REAL REAL;
+        typedef typename MultilabelEnergy<ValueType,IndexType,LabelType>::VarId VarId;
+        typedef typename MultilabelEnergy<ValueType,IndexType,LabelType>::Label Label;
         Clique() { }
         virtual ~Clique() = default;
 
@@ -130,13 +138,16 @@ class Clique {
  *
  * Template parameter Degree is the number of nodes in the clique.
  */
-template <int Degree>
-class PottsClique : public Clique {
+template<int Degree, typename ValueType, typename IndexType/*=int*/, typename LabelType/*=size_t*/>
+class PottsClique : public Clique<ValueType,IndexType,LabelType> {
     public:
+        typedef typename Clique<ValueType,IndexType,LabelType>::REAL REAL;
+        typedef typename Clique<ValueType,IndexType,LabelType>::VarId VarId;
+        typedef typename Clique<ValueType,IndexType,LabelType>::Label Label;
+
         /** Construct a PottsClique on a set of variables.
          */
-        PottsClique(const std::vector<VarId>& nodes, REAL same_cost,
-                REAL diff_cost)
+        PottsClique(const std::vector<VarId>& nodes, REAL same_cost, REAL diff_cost)
             : m_sameCost(same_cost),
             m_diffCost(diff_cost)
         {
@@ -168,7 +179,8 @@ class PottsClique : public Clique {
 
 /********* Multilabel Implementation ***************/
 
-inline MultilabelEnergy::MultilabelEnergy(Label max_label)
+template<typename V, typename I, typename L>
+inline MultilabelEnergy<V,I,L>::MultilabelEnergy(Label max_label)
     : m_maxLabel(max_label),
     m_numVars(0),
     m_constantTerm(0),
@@ -176,7 +188,8 @@ inline MultilabelEnergy::MultilabelEnergy(Label max_label)
     m_cliques()
 { }
 
-inline MultilabelEnergy::VarId MultilabelEnergy::addVar(int i) {
+template<typename V, typename I, typename L>
+inline typename MultilabelEnergy<V,I,L>::VarId MultilabelEnergy<V,I,L>::addVar(int i) {
     VarId ret = m_numVars;
     for (int j = 0; j < i; ++j) {
         m_unary.push_back(std::vector<REAL>(m_maxLabel, 0));
@@ -185,11 +198,13 @@ inline MultilabelEnergy::VarId MultilabelEnergy::addVar(int i) {
     return ret;
 }
 
-inline void MultilabelEnergy::addConstantTerm(REAL /*c*/) {
+template<typename V, typename I, typename L>
+inline void MultilabelEnergy<V,I,L>::addConstantTerm(REAL /*c*/) {
     m_constantTerm++;
 }
 
-inline void MultilabelEnergy::addUnaryTerm(VarId i,
+template<typename V, typename I, typename L>
+inline void MultilabelEnergy<V,I,L>::addUnaryTerm(VarId i,
         const std::vector<REAL>& coeffs) {
     ASSERT(i < m_numVars);
     ASSERT(Label(coeffs.size()) == m_maxLabel);
@@ -197,7 +212,8 @@ inline void MultilabelEnergy::addUnaryTerm(VarId i,
         m_unary[i][l] += coeffs[l];
 }
 
-inline void MultilabelEnergy::addClique(CliquePtr c) {
+template<typename V, typename I, typename L>
+inline void MultilabelEnergy<V,I,L>::addClique(CliquePtr c) {
     if (c->size() == 1) {
         auto node = *c->nodes();
         std::vector<REAL> costs(m_maxLabel, 0);
@@ -210,13 +226,13 @@ inline void MultilabelEnergy::addClique(CliquePtr c) {
     }
 }
 
-inline REAL
-MultilabelEnergy::computeEnergy(const std::vector<Label>& labels) const {
+template<typename V, typename I, typename L>
+inline typename MultilabelEnergy<V,I,L>::REAL MultilabelEnergy<V,I,L>::computeEnergy(const std::vector<Label>& labels) const {
     ASSERT(VarId(labels.size()) == m_numVars);
     REAL energy = 0;
     std::vector<Label> label_buf;
     for (const CliquePtr& cp : m_cliques) {
-        int k = cp->size();
+        int k = (int)cp->size();
         label_buf.resize(k);
         const VarId* nodes = cp->nodes();
         for (int i = 0; i < k; ++i)

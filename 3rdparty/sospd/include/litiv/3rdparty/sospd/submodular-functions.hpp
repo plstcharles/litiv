@@ -7,53 +7,113 @@
 #include <cstdint>
 #include <cmath>
 
-typedef uint32_t Assgn;
+namespace sospd {
 
-typedef void (*UpperBoundFunction)(int, const std::vector<REAL>&, std::vector<REAL>&);
-void SubmodularUpperBound(int n, const std::vector<REAL>& oldEnergy, std::vector<REAL>& normalizedEnergy);
-REAL SubmodularLowerBound(int n, std::vector<REAL>& energyTable, bool early_finish = false);
-void UpperBoundCVPR14(int n, const std::vector<REAL>& origEnergy, std::vector<REAL>& energyTable);
+    typedef uint32_t Assgn;
+    typedef std::chrono::system_clock::time_point TimePt;
+    typedef std::chrono::duration<double> Duration;
+    typedef std::chrono::system_clock Clock;
 
-// Takes in a set s (given by bitstring) and returns new energy such that
-// f(t | s) = f(t) for all t. Does not change f(t) for t disjoint from s
-// I.e., creates a set s whose members have zero marginal gain for all t
-void ZeroMarginalSet(int n, std::vector<REAL>& energyTable, Assgn s);
+    template<typename REAL>
+    using UpperBoundFunction =  void(*)(int,const std::vector<REAL>&,std::vector<REAL>&);
+    template<typename REAL>
+    REAL SubmodularLowerBound(int n, std::vector<REAL>& energyTable, bool early_finish=false);
+    template<typename REAL>
+    void UpperBoundCVPR14(int n, const std::vector<REAL>& origEnergy, std::vector<REAL>& energyTable);
+    template<typename REAL>
+    void ChenUpperBound(int n, const std::vector<REAL>& origEnergy, std::vector<REAL>& energyTable);
 
-// Updates f to f'(S) = f(S) + psi(S)
-void AddLinear(int n, std::vector<REAL>& energyTable, const std::vector<REAL>& psi);
+    // Takes in a set s (given by bitstring) and returns new energy such that
+    // f(t | s) = f(t) for all t. Does not change f(t) for t disjoint from s
+    // I.e., creates a set s whose members have zero marginal gain for all t
+    template<typename REAL>
+    void ZeroMarginalSet(int n, std::vector<REAL>& energyTable, Assgn s);
 
-// Updates f to f'(S) = f(S) - psi1(S) - psi2(V\S)
-void SubtractLinear(int n, std::vector<REAL>& energyTable, 
-        const std::vector<REAL>& psi1, const std::vector<REAL>& psi2);
+    // Updates f to f'(S) = f(S) + psi(S)
+    template<typename REAL>
+    void AddLinear(int n, std::vector<REAL>& energyTable, const std::vector<REAL>& psi);
 
-// Modifies an energy function to be >= 0, with f(0) = f(V) = 0
-// energyTable is modified in place, must be submodular
-// psi must be length n, gets filled so that 
-//  f'(S) = f(S) + psi(S)
-// where f' is the new energyTable, and f is the old one
-void Normalize(int n, std::vector<REAL>& energyTable, std::vector<REAL>& psi);
+    // Updates f to f'(S) = f(S) - psi1(S) - psi2(V\S)
+    template<typename REAL>
+    void SubtractLinear(int n, std::vector<REAL>& energyTable, const std::vector<REAL>& psi1, const std::vector<REAL>& psi2);
 
-bool CheckSubmodular(int n, const std::vector<REAL>& energyTable);
-bool CheckUpperBoundInvariants(int n, const std::vector<REAL>& energyTable,
-        const std::vector<REAL>& upperBound);
+    // Modifies an energy function to be >= 0, with f(0) = f(V) = 0
+    // energyTable is modified in place, must be submodular
+    // psi must be length n, gets filled so that
+    //  f'(S) = f(S) + psi(S)
+    // where f' is the new energyTable, and f is the old one
+    template<typename REAL>
+    void Normalize(int n, std::vector<REAL>& energyTable, std::vector<REAL>& psi);
 
-double DiffL1(const std::vector<REAL>& e1, const std::vector<REAL>& e2);
-double DiffL2(const std::vector<REAL>& e1, const std::vector<REAL>& e2);
-double DiffLInfty(const std::vector<REAL>& e1, const std::vector<REAL>& e2);
+    template<typename REAL>
+    bool CheckSubmodular(int n, const std::vector<REAL>& energyTable);
+    template<typename REAL>
+    bool CheckUpperBoundInvariants(int n, const std::vector<REAL>& energyTable, const std::vector<REAL>& upperBound);
 
-/********************** Implementation *************************/
+    template<typename REAL>
+    double DiffL1(const std::vector<REAL>& e1, const std::vector<REAL>& e2);
+    template<typename REAL>
+    double DiffL2(const std::vector<REAL>& e1, const std::vector<REAL>& e2);
+    template<typename REAL>
+    double DiffLInfty(const std::vector<REAL>& e1, const std::vector<REAL>& e2);
 
-static inline Assgn NextPerm(Assgn v) {
-    Assgn t = v | (v - 1); // t gets v's least significant 0 bits set to 1
-    // Next set to 1 the most significant bit to change,
-    // set to 0 the least significant ones, and add the necessary 1 bits.
-    return (t + 1) | (((~t & -~t) - 1) >> (__builtin_ctz(v) + 1));
+    inline Assgn NextPerm(Assgn v) {
+        Assgn t = v | (v - 1); // t gets v's least significant 0 bits set to 1
+        // Next set to 1 the most significant bit to change,
+        // set to 0 the least significant ones, and add the necessary 1 bits.
+        return (t + 1) | (((~t & -~t) - 1) >> (__builtin_ctz(v) + 1));
+    }
+
+} // namespace sospd
+
+template<typename REAL>
+inline REAL sospd::SubmodularLowerBound(int n, std::vector<REAL>& energyTable, bool early_finish) {
+    static_assert(std::is_arithmetic<REAL>::value,"value type must be arithmetic");
+    ASSERT(n < 32);
+    Assgn max_assgn = 1u << n;
+    ASSERT(energyTable.size() == max_assgn);
+    REAL max_diff = 0;
+
+    // Need to iterate over all k bit subsets in increasing k
+    for (int k = 1; k <= n; ++k) {
+        bool changed = false;
+        Assgn bound;
+        if (k == 0) bound = 0;
+        else bound = max_assgn - 1;
+        Assgn s = (1u << k) - 1;
+        do {
+            REAL subtract_from_s = 0;
+            for (int i = 0; i < n; ++i) {
+                Assgn s_i = s ^ (1 << i); // Set s - i
+                if (s_i >= s) continue;
+                for (int j = i+1; j < n; ++j) {
+                    Assgn s_j = s ^ (1 << j); // Set s - j
+                    if (s_j >= s) continue;
+                    Assgn s_ij = s_i & s_j;
+                    REAL submodularity = energyTable[s] + energyTable[s_ij]
+                                         - energyTable[s_i] - energyTable[s_j];
+                    if (submodularity > subtract_from_s) {
+                        subtract_from_s = submodularity;
+                    }
+                }
+            }
+            energyTable[s] -= subtract_from_s;
+            changed |= (subtract_from_s > 0);
+            max_diff = std::max(max_diff, subtract_from_s);
+            s = NextPerm(s);
+        } while (s < bound);
+        if (early_finish && !changed)
+            break;
+    }
+    return max_diff;
 }
 
-inline void UpperBoundCVPR14(int n, const std::vector<REAL>& origEnergy, std::vector<REAL>& energyTable) {
+template<typename REAL>
+inline void sospd::UpperBoundCVPR14(int n, const std::vector<REAL>& origEnergy, std::vector<REAL>& energyTable) {
+    static_assert(std::is_arithmetic<REAL>::value,"value type must be arithmetic");
     ASSERT(n < 32);
-    int max_assgn = 1 << n;
-    for (int i = 0; i < max_assgn; ++i)
+    Assgn max_assgn = 1u << n;
+    for (Assgn i = 0; i < max_assgn; ++i)
         energyTable[i] = origEnergy[i];
     std::vector<REAL> psi(max_assgn, 0);
     while (!CheckSubmodular(n, energyTable)) {
@@ -64,13 +124,13 @@ inline void UpperBoundCVPR14(int n, const std::vector<REAL>& origEnergy, std::ve
         for (int k = n-2; k >= 0; --k) {
             // Pattern to iterate over k bit subsets is: start with (1 << k) - 1
             // which has k bits set, and then increment each time with NextPerm
-            // which gives the next k bit subset, until we get a subset with the 
+            // which gives the next k bit subset, until we get a subset with the
             // n-th bit set (which will be >= max_assgn)
             // We also special case 0, which needs a different bound
             Assgn bound;
             if (k == 0) bound = 0;
             else bound = max_assgn - 1;
-            Assgn s = (1 << k) - 1;
+            Assgn s = (1u << k) - 1;
             do {
                 for (int i = 0; i < n; ++i) {
                     Assgn s_i = s | (1 << i); // Set s + i
@@ -93,18 +153,19 @@ inline void UpperBoundCVPR14(int n, const std::vector<REAL>& origEnergy, std::ve
             } while (s < bound);
             // Then, add psi[s] to energyTable[s] for every k+1 bit subset s
             bound = max_assgn - 1;
-            s = (1 << (k+1)) - 1;
+            s = (1u << (k+1)) - 1;
             do {
                 energyTable[s] += psi[s];
                 s = NextPerm(s);
             } while (s < bound);
-            
+
         }
     }
 }
 
-
-inline void ChenUpperBound(int n, const std::vector<REAL>& origEnergy, std::vector<REAL>& energyTable) {
+template<typename REAL>
+inline void sospd::ChenUpperBound(int n, const std::vector<REAL>& origEnergy, std::vector<REAL>& energyTable) {
+    static_assert(std::is_arithmetic<REAL>::value,"value type must be arithmetic");
     ASSERT(n < 32);
     int max_assgn = 1 << n;
     for (int i = 0; i < max_assgn; ++i)
@@ -181,55 +242,19 @@ inline void ChenUpperBound(int n, const std::vector<REAL>& origEnergy, std::vect
     }
 }
 
-inline REAL SubmodularLowerBound(int n, std::vector<REAL>& energyTable, bool early_finish) {
-    ASSERT(n < 32);
-    Assgn max_assgn = 1 << n;
-    ASSERT(energyTable.size() == max_assgn);
-    REAL max_diff = 0;
-
-    // Need to iterate over all k bit subsets in increasing k
-    for (int k = 1; k <= n; ++k) {
-        bool changed = false;
-        Assgn bound;
-        if (k == 0) bound = 0;
-        else bound = max_assgn - 1;
-        Assgn s = (1 << k) - 1;
-        do {
-            REAL subtract_from_s = 0;
-            for (int i = 0; i < n; ++i) {
-                Assgn s_i = s ^ (1 << i); // Set s - i
-                if (s_i >= s) continue;
-                for (int j = i+1; j < n; ++j) {
-                    Assgn s_j = s ^ (1 << j); // Set s - j
-                    if (s_j >= s) continue;
-                    Assgn s_ij = s_i & s_j;
-                    REAL submodularity = energyTable[s] + energyTable[s_ij]
-                        - energyTable[s_i] - energyTable[s_j];
-                    if (submodularity > subtract_from_s) {
-                        subtract_from_s = submodularity;
-                    }
-                }
-            }
-            energyTable[s] -= subtract_from_s;
-            changed |= (subtract_from_s > 0);
-            max_diff = std::max(max_diff, subtract_from_s);
-            s = NextPerm(s);
-        } while (s < bound);
-        if (early_finish && !changed)
-            break;
-    }
-    return max_diff;
-}
-
-inline void ZeroMarginalSet(int n, std::vector<REAL>& energyTable, Assgn s) {
-    Assgn base_set = (1 << n) - 1;
+template<typename REAL>
+inline void sospd::ZeroMarginalSet(int n, std::vector<REAL>& energyTable, Assgn s) {
+    static_assert(std::is_arithmetic<REAL>::value,"value type must be arithmetic");
+    Assgn base_set = (1u << n) - 1;
     Assgn not_s = base_set & (~s);
     for (Assgn t = 0; t <= base_set; ++t)
         energyTable[t] = energyTable[t & not_s];
 }
 
-inline void AddLinear(int n, std::vector<REAL>& energyTable, const std::vector<REAL>& psi) {
-    Assgn max_assgn = 1 << n;
+template<typename REAL>
+inline void sospd::AddLinear(int n, std::vector<REAL>& energyTable, const std::vector<REAL>& psi) {
+    static_assert(std::is_arithmetic<REAL>::value,"value type must be arithmetic");
+    Assgn max_assgn = 1u << n;
     ASSERT(max_assgn == energyTable.size());
     ASSERT(n == int(psi.size()));
     REAL sum = 0;
@@ -247,9 +272,10 @@ inline void AddLinear(int n, std::vector<REAL>& energyTable, const std::vector<R
     }
 }
 
-inline void SubtractLinear(int n, std::vector<REAL>& energyTable, 
-        const std::vector<REAL>& psi1, const std::vector<REAL>& psi2) {
-    Assgn max_assgn = 1 << n;
+template<typename REAL>
+inline void sospd::SubtractLinear(int n, std::vector<REAL>& energyTable, const std::vector<REAL>& psi1, const std::vector<REAL>& psi2) {
+    static_assert(std::is_arithmetic<REAL>::value,"value type must be arithmetic");
+    Assgn max_assgn = 1u << n;
     ASSERT(max_assgn == energyTable.size());
     ASSERT(n == int(psi1.size()));
     ASSERT(n == int(psi2.size()));
@@ -271,8 +297,10 @@ inline void SubtractLinear(int n, std::vector<REAL>& energyTable,
     }
 }
 
-inline void Normalize(int n, std::vector<REAL>& energyTable, std::vector<REAL>& psi) {
-    Assgn max_assgn = 1 << n;
+template<typename REAL>
+inline void sospd::Normalize(int n, std::vector<REAL>& energyTable, std::vector<REAL>& psi) {
+    static_assert(std::is_arithmetic<REAL>::value,"value type must be arithmetic");
+    Assgn max_assgn = 1u << n;
     ASSERT(max_assgn == energyTable.size());
     ASSERT(n == int(psi.size()));
     auto constTerm = energyTable[0];
@@ -293,9 +321,11 @@ inline void Normalize(int n, std::vector<REAL>& energyTable, std::vector<REAL>& 
     ASSERT(energyTable[max_assgn-1] == 0);
 }
 
-inline bool CheckSubmodular(int n, const std::vector<REAL>& energyTable) {
+template<typename REAL>
+inline bool sospd::CheckSubmodular(int n, const std::vector<REAL>& energyTable) {
+    static_assert(std::is_arithmetic<REAL>::value,"value type must be arithmetic");
     ASSERT(n < 32);
-    Assgn max_assgn = 1 << n;
+    Assgn max_assgn = 1u << n;
     ASSERT(energyTable.size() == max_assgn);
 
     for (Assgn s = 0; s < max_assgn; ++s) {
@@ -321,9 +351,10 @@ inline bool CheckSubmodular(int n, const std::vector<REAL>& energyTable) {
     return true;
 }
 
-inline bool CheckUpperBoundInvariants(int n, const std::vector<REAL>& energyTable,
-        const std::vector<REAL>& upperBound) {
-    int energy_len = energyTable.size();
+template<typename REAL>
+inline bool sospd::CheckUpperBoundInvariants(int n, const std::vector<REAL>& energyTable, const std::vector<REAL>& upperBound) {
+    static_assert(std::is_arithmetic<REAL>::value,"value type must be arithmetic");
+    int energy_len = (int)energyTable.size();
     ASSERT(energy_len == int(upperBound.size()));
     REAL max_energy = std::numeric_limits<REAL>::min();
     for (int i = 0; i < energy_len; ++i) {
@@ -336,6 +367,32 @@ inline bool CheckUpperBoundInvariants(int n, const std::vector<REAL>& energyTabl
             return false;
     }
     return CheckSubmodular(n, upperBound);
+}
+
+template<typename REAL>
+inline double sospd::DiffL1(const std::vector<REAL>& e1, const std::vector<REAL>& e2) {
+    double norm = 0;
+    for(size_t i = 0; i < e1.size(); ++i)
+        norm += std::abs(static_cast<double>(e1[i] - e2[i]));
+    return norm;
+}
+
+template<typename REAL>
+inline double sospd::DiffL2(const std::vector<REAL>& e1, const std::vector<REAL>& e2) {
+    double norm = 0;
+    for(size_t i = 0; i < e1.size(); ++i) {
+        double diff = std::abs(static_cast<double>(e1[i] - e2[i]));
+        norm += diff*diff;
+    }
+    return norm;
+}
+
+template<typename REAL>
+inline double sospd::DiffLInfty(const std::vector<REAL>& e1, const std::vector<REAL>& e2) {
+    double norm = 0;
+    for(size_t i = 0; i < e1.size(); ++i)
+        norm = std::max(norm, std::abs(static_cast<double>(e1[i] - e2[i])));
+    return norm;
 }
 
 #endif
