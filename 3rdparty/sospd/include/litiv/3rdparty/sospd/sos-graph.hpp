@@ -1,22 +1,14 @@
 #ifndef _SOS_GRAPH_HPP_
 #define _SOS_GRAPH_HPP_
 
-
 /** \file sos-graph.hpp
  * Graph class for sum-of-submodular flow algorithms
  */
 
-#include "energy-common.hpp"
-#include <array>
-#include <iostream>
-#include <vector>
-#include <algorithm>
 #include <boost/intrusive/list.hpp>
 #include <boost/intrusive/slist.hpp>
 #include <boost/intrusive/options.hpp>
-
 #include "litiv/3rdparty/sospd/submodular-functions.hpp"
-
 
 /** Graph structure and algorithm for sum-of-submodular IBFS
  */

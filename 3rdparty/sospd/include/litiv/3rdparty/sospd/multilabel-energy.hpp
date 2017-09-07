@@ -2,7 +2,7 @@
 #define _SOSOPT_CLIQUE_HPP_
 
 /** \file multilabel-energy.hpp
- * Classes for defining multi-label energy functions, i.e., Markov Random 
+ * Classes for defining multi-label energy functions, i.e., Markov Random
  * Fields.
  */
 
@@ -18,7 +18,7 @@ class Clique;
  * functions \f$f_C\f$ defined over a set of cliques \f$C\f$ which are subsets
  * of the variables.
  */
-class MultilabelEnergy { 
+class MultilabelEnergy {
     public:
         typedef int VarId;
         typedef size_t Label;
@@ -49,7 +49,7 @@ class MultilabelEnergy {
 
         /** Add a clique function to the energy
          *
-         * Because Clique is polymorphic, these must be constructed on the 
+         * Because Clique is polymorphic, these must be constructed on the
          * heap. MultilabelEnergy takes ownership (via unique_ptr).
          */
         void addClique(CliquePtr c);
@@ -57,7 +57,7 @@ class MultilabelEnergy {
         /** Compute the energy of a given labeling
          *
          * \param labels is a vector of length numVars() where each entry is
-         * in 0,...,numLabels()-1. 
+         * in 0,...,numLabels()-1.
          */
         REAL computeEnergy(const std::vector<Label>& labels) const;
 
@@ -75,12 +75,12 @@ class MultilabelEnergy {
         REAL m_constantTerm;
         std::vector<std::vector<REAL>> m_unary;
         std::vector<CliquePtr> m_cliques;
-        
+
     private:
         MultilabelEnergy() = delete;
 };
 
-/** Abstract Base Class for defining a clique function for use with 
+/** Abstract Base Class for defining a clique function for use with
  * MultilabelEnergy
  *
  * Users inherit from this class, implementing the pure-virtual methods.
@@ -88,7 +88,7 @@ class MultilabelEnergy {
  * Non-copyable and non-movable to prevent slicing of derived class data.
  */
 class Clique {
-    public:   
+    public:
         typedef MultilabelEnergy::VarId VarId;
         typedef MultilabelEnergy::Label Label;
         Clique() { }
@@ -96,7 +96,7 @@ class Clique {
 
         /** Return the energy of the clique function at a given labeling
          *
-         * \param labels An array of length size(), whose entries are the 
+         * \param labels An array of length size(), whose entries are the
          * variables \f$x_i\f$ for the desired labeling.
          */
         virtual REAL energy(const Label* labels) const = 0;
@@ -125,7 +125,7 @@ class Clique {
  * This energy function has \f$f_C(x_C)\f$ equal to same_cost if all variables
  * have the same label, and diff_cost if any labels are different.
  *
- * Additionally demonstrates how a user may use MultilabelEnergy for their own 
+ * Additionally demonstrates how a user may use MultilabelEnergy for their own
  * functions by deriving from Clique.
  *
  * Template parameter Degree is the number of nodes in the clique.
@@ -135,11 +135,11 @@ class PottsClique : public Clique {
     public:
         /** Construct a PottsClique on a set of variables.
          */
-        PottsClique(const std::vector<VarId>& nodes, REAL same_cost, 
+        PottsClique(const std::vector<VarId>& nodes, REAL same_cost,
                 REAL diff_cost)
             : m_sameCost(same_cost),
             m_diffCost(diff_cost)
-        { 
+        {
             ASSERT(m_diffCost >= m_sameCost);
             for (int i = 0; i < Degree; ++i)
                 m_nodes[i] = nodes[i];
@@ -185,7 +185,7 @@ inline MultilabelEnergy::VarId MultilabelEnergy::addVar(int i) {
     return ret;
 }
 
-inline void MultilabelEnergy::addConstantTerm(REAL c) {
+inline void MultilabelEnergy::addConstantTerm(REAL /*c*/) {
     m_constantTerm++;
 }
 
@@ -210,7 +210,7 @@ inline void MultilabelEnergy::addClique(CliquePtr c) {
     }
 }
 
-inline REAL 
+inline REAL
 MultilabelEnergy::computeEnergy(const std::vector<Label>& labels) const {
     ASSERT(VarId(labels.size()) == m_numVars);
     REAL energy = 0;

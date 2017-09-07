@@ -6,11 +6,6 @@
  * Sum-of-submodular flow using Iterated Breadth First Search
  */
 
-#include "litiv/3rdparty/sospd/energy-common.hpp"
-
-#include <memory>
-#include <vector>
-
 #include "litiv/3rdparty/sospd/sos-graph.hpp"
 
 struct SubmodularIBFSParams {
@@ -30,7 +25,7 @@ struct SubmodularIBFSParams {
 };
 
 class FlowSolver;
-/** Algorithm for sum-of-submodular IBFS 
+/** Algorithm for sum-of-submodular IBFS
  */
 class SubmodularIBFS {
     public:
@@ -47,7 +42,7 @@ class SubmodularIBFS {
 
         /** Get cut label of node
          *
-         * \return 1, 0 or -1 if n is in S, not in S, or haven't computed flow 
+         * \return 1, 0 or -1 if n is in S, not in S, or haven't computed flow
          * yet, respectively
          */
         int GetLabel(NodeId n) const;
