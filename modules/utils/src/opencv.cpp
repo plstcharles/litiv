@@ -16,7 +16,6 @@
 // limitations under the License.
 
 #include "litiv/utils/opencv.hpp"
-#include "litiv/utils/platform.hpp"
 #include <fstream>
 
 // these are really empty shells, but we need actual allocation due to ocv's virtual interface

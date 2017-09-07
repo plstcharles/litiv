@@ -1,6 +1,5 @@
 
 #include "litiv/features2d/LBSP.hpp"
-#include "litiv/utils/opencv.hpp"
 #include "litiv/test.hpp"
 
 TEST(lbsp,regression_constr) {

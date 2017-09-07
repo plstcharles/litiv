@@ -1,6 +1,5 @@
 
 #include "litiv/features2d/DASC.hpp"
-#include "litiv/utils/opencv.hpp"
 #include "litiv/test.hpp"
 
 TEST(dasc_rf,regression_constr) {

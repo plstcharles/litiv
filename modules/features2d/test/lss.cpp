@@ -1,6 +1,5 @@
 
 #include "litiv/features2d/LSS.hpp"
-#include "litiv/utils/opencv.hpp"
 #include "litiv/test.hpp"
 
 TEST(lss,regression_default_constr) {

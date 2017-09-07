@@ -23,7 +23,9 @@
 #include "litiv/utils/platform.hpp"
 #include "litiv/utils/kinect.hpp"
 #include "litiv/utils/simd.hpp"
-#include "litiv/utils/math.hpp"
+#if HAVE_OPENGM
+#include "litiv/utils/opengm.hpp"
+#endif //HAVE_OPENGM
 #if USE_CVCORE_WITH_UTILS
 #include "litiv/utils/opencv.hpp"
 #if HAVE_GLSL
@@ -32,9 +34,6 @@
 #include "litiv/utils/opengl-shaders.hpp"
 #include "litiv/utils/opengl-imgproc.hpp"
 #endif //HAVE_GLSL
-#if HAVE_OPENGM
-#include "litiv/utils/opengm.hpp"
-#endif //HAVE_OPENGM
 #if HAVE_CUDA
 #include "litiv/utils/cuda.hpp"
 #endif //HAVE_CUDA
@@ -42,4 +41,5 @@
 // ...
 #endif //HAVE_OPENCL
 #endif //USE_CVCORE_WITH_UTILS
+#include "litiv/utils/math.hpp"
 #include "litiv/utils/algo.hpp"

@@ -1,6 +1,5 @@
 
 #include "litiv/features2d/MI.hpp"
-#include "litiv/utils/opencv.hpp"
 #include "litiv/test.hpp"
 
 TEST(mi,regression_constr) {

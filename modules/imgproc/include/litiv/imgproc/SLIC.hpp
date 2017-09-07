@@ -48,7 +48,6 @@
 
 #pragma once
 
-#include "litiv/utils/opencv.hpp"
 #include "litiv/utils/cuda.hpp"
 
 /// SLIC superpixel segmentation algorithm

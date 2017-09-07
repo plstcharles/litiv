@@ -79,8 +79,7 @@
 #pragma clang diagnostic pop
 #endif //defined(__clang__)
 #if HAVE_BOOST
-#include "litiv/3rdparty/sospd/submodular-ibfs.hpp"
-#include "litiv/3rdparty/sospd/submodular-functions.hpp"
+#include "litiv/3rdparty/sospd/sospd.hpp"
 #endif //HAVE_BOOST
 
 namespace lv {
