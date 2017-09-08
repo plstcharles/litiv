@@ -34,10 +34,10 @@ struct SubmodularIBFSParams {
     std::vector<bool> fixedVars;
 };
 
-template<typename ValueType, typename IndexType/*=int*/>
+template<typename ValueType, typename IndexType>
 class SubmodularIBFS;
 
-template<typename ValueType, typename IndexType/*=int*/>
+template<typename ValueType, typename IndexType>
 class FlowSolver {
 public:
     FlowSolver() = default;
@@ -51,14 +51,14 @@ public:
 
 namespace sospd {
 
-    template<typename ValueType, typename IndexType/*=int*/>
+    template<typename ValueType, typename IndexType>
     std::unique_ptr<FlowSolver<ValueType,IndexType>> GetSolver(const SubmodularIBFSParams& params);
 
 } // namespace sospd
 
 /** Graph structure and algorithm for sum-of-submodular IBFS
  */
-template<typename ValueType, typename IndexType/*=int*/>
+template<typename ValueType, typename IndexType>
 class SoSGraph {
     static_assert(std::is_arithmetic<ValueType>::value,"value type must be arithmetic");
     static_assert(std::is_integral<IndexType>::value,"index type must be integral");
@@ -71,13 +71,13 @@ class SoSGraph {
             S, T, S_orphan, T_orphan, N
         };
         class IBFSEnergyTableClique;
-        typedef std::tuple<sospd::UBfn,std::string,sospd::UpperBoundFunction<REAL>> UBParam;
+        typedef std::tuple<sospd::UBfn,std::string,sospd::UpperBoundFunction<ValueType,IndexType>> UBParam;
         static const std::vector<UBParam> ubParamList;
 
         SoSGraph()
             : m_num_nodes(0),
-            s(-1),
-            t(-1),
+            s(NodeId(-1)),
+            t(NodeId(-1)),
             m_num_cliques(0)
         { }
 
@@ -85,7 +85,7 @@ class SoSGraph {
          *
          * \return Index of first created node
          */
-        NodeId AddNode(int n = 1);
+        NodeId AddNode(IndexType n = 1);
 
         /** Add weights to s-i and i-t edges, respectively
          */
@@ -119,11 +119,11 @@ class SoSGraph {
             virtual REAL ComputeEnergy(const std::vector<int>& labels) const = 0;
 
             const NodeVec& Nodes() const { return m_nodes; }
-            size_t Size() const { return m_nodes.size(); }
+            IndexType Size() const { return IndexType(m_nodes.size()); }
             std::vector<REAL>& AlphaCi() { return m_alpha_Ci; }
             const std::vector<REAL>& AlphaCi() const { return m_alpha_Ci; }
-            size_t GetIndex(NodeId i) const {
-                return std::find(this->m_nodes.begin(), this->m_nodes.end(), i) - this->m_nodes.begin();
+            IndexType GetIndex(NodeId i) const {
+                return IndexType(std::find(this->m_nodes.begin(), this->m_nodes.end(), i) - this->m_nodes.begin());
             }
 
             protected:
@@ -150,11 +150,11 @@ class SoSGraph {
 
                 virtual REAL ComputeEnergy(const std::vector<int>& labels) const;
                 REAL ComputeAlphaEnergy(const std::vector<int>& labels) const;
-                REAL ExchangeCapacity(size_t u_idx, size_t v_idx) const;
-                bool NonzeroCapacity(size_t u_idx, size_t v_idx) const;
+                REAL ExchangeCapacity(IndexType u_idx, IndexType v_idx) const;
+                bool NonzeroCapacity(IndexType u_idx, IndexType v_idx) const;
                 void NormalizeEnergy(std::vector<REAL>& psi, REAL& constantTerm);
 
-                void Push(size_t u_idx, size_t v_idx, REAL delta);
+                void Push(IndexType u_idx, IndexType v_idx, REAL delta);
                 void ComputeMinTightSets();
                 std::vector<REAL>& EnergyTable() { return m_energy; }
                 const std::vector<REAL>& EnergyTable() const { return m_energy; }
@@ -172,8 +172,8 @@ class SoSGraph {
         struct ArcIterator {
             NodeId source;
             typename NeighborList::iterator cIter;
-            int cliqueIdx;
-            int cliqueSize;
+            IndexType cliqueIdx;
+            IndexType cliqueSize;
             SoSGraph* graph;
 
             bool operator!=(const ArcIterator& a) {
@@ -191,12 +191,12 @@ class SoSGraph {
                 //ASSERT(*cIter < static_cast<int>(graph->m_cliques.size()));
                 cliqueIdx++;
                 if (cliqueIdx == cliqueSize) {
-                    cliqueIdx = 0;
+                    cliqueIdx = IndexType(0);
                     cIter++;
                     if (cIter != graph->m_neighbors[source].end())
                         cliqueSize = graph->m_cliques[*cIter].Size();
                     else
-                        cliqueSize = 0;
+                        cliqueSize = IndexType(0);
                 }
                 //ASSERT(cIter == graph->m_neighbors[source].end() || *cIter < static_cast<int>(graph->m_cliques.size()));
                 //ASSERT(cIter == graph->m_neighbors[source].end() || cliqueIdx < static_cast<int>(graph->m_cliques[*cIter].Nodes().size()));
@@ -210,14 +210,14 @@ class SoSGraph {
                 //ASSERT(cliqueIdx < static_cast<int>(graph->m_cliques[*cIter].Nodes().size()));
                 return graph->m_cliques[*cIter].Nodes()[cliqueIdx];
             }
-            int SourceIdx() const { return graph->m_cliques[*cIter].GetIndex(source); }
-            int TargetIdx() const { return cliqueIdx; }
+            IndexType SourceIdx() const { return graph->m_cliques[*cIter].GetIndex(source); }
+            IndexType TargetIdx() const { return cliqueIdx; }
             CliqueId cliqueId() const { return *cIter; }
             ArcIterator Reverse() const {
                 auto newSource = Target();
                 auto newCIter = std::find(graph->m_neighbors[newSource].begin(), graph->m_neighbors[newSource].end(), *cIter);
                 auto newCliqueIdx = graph->GetCliques()[*newCIter].GetIndex(source);
-                return {newSource, newCIter, static_cast<int>(newCliqueIdx), static_cast<int>(graph->m_cliques[*newCIter].Size()), graph};
+                return {newSource, newCIter, newCliqueIdx, graph->m_cliques[*newCIter].Size(), graph};
             }
         };
 
@@ -226,15 +226,16 @@ class SoSGraph {
         struct Node : public ListHook, OrphanListHook {
             NodeId id;
             NodeState state;
-            int dis;
+            IndexType dis;
             ArcIterator parent_arc;
             NodeId parent;
             NeighborList cliques;
-            Node(NodeId _id)
+            explicit Node(NodeId _id)
                 : id(_id)
                 , state(NodeState::N)
-                , dis(std::numeric_limits<int>::max())
+                , dis(std::numeric_limits<IndexType>::max())
                 , parent_arc()
+                , parent()
                 , cliques() { }
         };
 
@@ -245,7 +246,7 @@ class SoSGraph {
             auto cIter = m_neighbors[i].begin();
             if (cIter == m_neighbors[i].end())
                 return ArcsEnd(i);
-            return {i, cIter, 0, static_cast<int>(m_cliques[*cIter].Size()), this};
+            return {i, cIter, 0, m_cliques[*cIter].Size(), this};
         }
         ArcIterator ArcsEnd(NodeId i) {
             auto& neighborList = m_neighbors[i];
@@ -310,11 +311,11 @@ const std::vector<typename SoSGraph<V,I>::UBParam> SoSGraph<V,I>::ubParamList = 
 };
 
 template<typename V, typename I>
-inline typename SoSGraph<V,I>::NodeId SoSGraph<V,I>::AddNode(int n) {
-    ASSERT(n >= 1);
-    ASSERT(s == -1);
+inline typename SoSGraph<V,I>::NodeId SoSGraph<V,I>::AddNode(I n) {
+    ASSERT(n >= I(1));
+    ASSERT(s == I(-1));
     NodeId first_node = m_num_nodes;
-    for (int i = 0; i < n; ++i) {
+    for(I i = 0; i < n; ++i) {
         m_nodes.push_back(Node(m_num_nodes));
         m_c_si.push_back(0);
         m_c_it.push_back(0);
@@ -342,7 +343,7 @@ inline void SoSGraph<V,I>::ClearTerminals() {
 
 template<typename V, typename I>
 inline typename SoSGraph<V,I>::IBFSEnergyTableClique& SoSGraph<V,I>::AddClique(const std::vector<NodeId>& nodes, const std::vector<REAL>& energyTable) {
-    ASSERT(s == -1);
+    ASSERT(s == I(-1));
     m_cliques.emplace_back(nodes, energyTable);
     for (NodeId i : nodes) {
         ASSERT(0 <= i && i < m_num_nodes);
@@ -354,22 +355,22 @@ inline typename SoSGraph<V,I>::IBFSEnergyTableClique& SoSGraph<V,I>::AddClique(c
 template<typename V, typename I>
 inline void SoSGraph<V,I>::ResetFlow() {
     // Initialize source, sink (only do once)
-    if (s == -1) {
+    if (s == I(-1)) {
         s = m_num_nodes; t = m_num_nodes + 1;
         m_nodes.push_back(Node(s));
         m_nodes.push_back(Node(t));
     }
     // reset distance, state and parent
-    for (int i = 0; i < m_num_nodes + 2; ++i) {
+    for (I i = 0; i < m_num_nodes + 2; ++i) {
         Node& node = m_nodes[i];
-        node.dis = std::numeric_limits<int>::max();
+        node.dis = std::numeric_limits<I>::max();
         node.state = NodeState::N;
         node.parent = i;
         m_phi_si[i] = m_phi_it[i] = 0;
     }
 
     // Reset Clique parameters
-    for (int cid = 0; cid < m_num_cliques; ++cid) {
+    for (I cid = 0; cid < m_num_cliques; ++cid) {
         auto& c = m_cliques[cid];
         c.ResetAlpha();
         c.ComputeMinTightSets();
@@ -379,7 +380,7 @@ inline void SoSGraph<V,I>::ResetFlow() {
 
 template<typename V, typename I>
 inline typename SoSGraph<V,I>::REAL SoSGraph<V,I>::ResCap(const ArcIterator& arc, bool forwardArc) {
-    ASSERT(arc.cliqueId() >= 0 && arc.cliqueId() < static_cast<int>(m_cliques.size()));
+    ASSERT(arc.cliqueId() >= 0 && arc.cliqueId() < I(m_cliques.size()));
     if (forwardArc)
         return m_cliques[arc.cliqueId()].ExchangeCapacity(arc.SourceIdx(), arc.TargetIdx());
     else
@@ -397,25 +398,25 @@ inline bool SoSGraph<V,I>::NonzeroCap(const ArcIterator& arc, bool forwardArc) {
 template<typename V, typename I>
 inline void SoSGraph<V,I>::IBFSEnergyTableClique::NormalizeEnergy(std::vector<REAL>& psi, REAL& constantTerm) {
     ASSERT(false /* Should not be calling this function*/);
-    const size_t n = this->m_nodes.size();
+    const I n = I(this->m_nodes.size());
     ASSERT(sospd::CheckSubmodular((int)n,m_energy));
     const Assignment num_assignments = 1u << n;
     REAL allOnes = m_energy[num_assignments - 1];
     constantTerm += allOnes;
     psi.resize(n);
     Assignment assgn = num_assignments - 1; // The all 1 assignment
-    for (size_t i = 0; i < n; ++i) {
-        Assignment next_assgn = assgn ^ (1 << i);
+    for (I i = 0; i < n; ++i) {
+        Assignment next_assgn = assgn ^ (1u << i);
         psi[i] = (m_energy[assgn] - m_energy[next_assgn]);
         assgn = next_assgn;
     }
 
     for (Assignment a = 0; a < num_assignments; ++a) {
         m_energy[a] -= allOnes;
-        for (size_t i = 0; i < n; ++i) {
-            if (!(a & (1 << i))) m_energy[a] += psi[i];
+        for (I i = 0; i < n; ++i) {
+            if (!(a & (1u << i))) m_energy[a] += psi[i];
         }
-        ASSERT(m_energy[a] >= 0);
+        ASSERT(m_energy[a] >= V(0));
         m_alpha_energy[a] = m_energy[a];
     }
     ComputeMinTightSets();
@@ -425,10 +426,10 @@ inline void SoSGraph<V,I>::IBFSEnergyTableClique::NormalizeEnergy(std::vector<RE
 template<typename V, typename I>
 inline typename SoSGraph<V,I>::REAL SoSGraph<V,I>::IBFSEnergyTableClique::ComputeEnergy(const std::vector<int>& labels) const {
     Assignment assgn = 0;
-    for (size_t i = 0; i < this->m_nodes.size(); ++i) {
+    for (I i = 0; i < I(this->m_nodes.size()); ++i) {
         NodeId n = this->m_nodes[i];
         if (labels[n] == 1) {
-            assgn |= 1 << i;
+            assgn |= 1u << i;
         }
     }
     return m_energy[assgn];
@@ -437,21 +438,20 @@ inline typename SoSGraph<V,I>::REAL SoSGraph<V,I>::IBFSEnergyTableClique::Comput
 template<typename V, typename I>
 inline typename SoSGraph<V,I>::REAL SoSGraph<V,I>::IBFSEnergyTableClique::ComputeAlphaEnergy(const std::vector<int>& labels) const {
     Assignment assgn = 0;
-    for (size_t i = 0; i < this->m_nodes.size(); ++i) {
+    for (I i = 0; i < I(this->m_nodes.size()); ++i) {
         NodeId n = this->m_nodes[i];
         if (labels[n] == 1) {
-            assgn |= 1 << i;
+            assgn |= 1u << i;
         }
     }
     return m_alpha_energy[assgn];
 }
 
 template<typename V, typename I>
-inline typename SoSGraph<V,I>::REAL SoSGraph<V,I>::IBFSEnergyTableClique::ExchangeCapacity(size_t u_idx, size_t v_idx) const {
-    const size_t n = this->m_nodes.size();
+inline typename SoSGraph<V,I>::REAL SoSGraph<V,I>::IBFSEnergyTableClique::ExchangeCapacity(I u_idx, I v_idx) const {
+    const I n = I(this->m_nodes.size());
     ASSERT(u_idx < n);
     ASSERT(v_idx < n);
-
     REAL min_energy = std::numeric_limits<REAL>::max();
     Assignment num_assgns = 1u << n;
     const Assignment bound = num_assgns-1;
@@ -473,12 +473,12 @@ inline typename SoSGraph<V,I>::REAL SoSGraph<V,I>::IBFSEnergyTableClique::Exchan
 }
 
 template<typename V, typename I>
-inline void SoSGraph<V,I>::IBFSEnergyTableClique::Push(size_t u_idx, size_t v_idx, REAL delta) {
+inline void SoSGraph<V,I>::IBFSEnergyTableClique::Push(I u_idx, I v_idx, REAL delta) {
     ASSERT(u_idx < this->m_nodes.size());
     ASSERT(v_idx < this->m_nodes.size());
     Clique::m_alpha_Ci[u_idx] += delta;
     Clique::m_alpha_Ci[v_idx] -= delta;
-    const size_t n = this->m_nodes.size();
+    const I n = I(this->m_nodes.size());
     Assignment num_assgns = 1u << n;
     const Assignment bound = num_assgns-1;
     const Assignment u_mask = 1u << u_idx;
@@ -501,17 +501,17 @@ inline void SoSGraph<V,I>::IBFSEnergyTableClique::Push(size_t u_idx, size_t v_id
 
 template<typename V, typename I>
 inline void SoSGraph<V,I>::IBFSEnergyTableClique::ComputeMinTightSets() {
-    size_t n = this->m_nodes.size();
+    I n = I(this->m_nodes.size());
     Assignment num_assgns = 1u << n;
     const Assignment bound = num_assgns-1;
     for (auto& a : m_min_tight_set)
         a = bound;
     for (Assignment assgn = bound-1; assgn >= 1; --assgn) {
         if (m_alpha_energy[assgn] == 0) {
-            for (size_t i = 0; i < n; ++i) {
+            for (I i = 0; i < n; ++i) {
                 //ASSERT(m_alpha_energy[m_min_tight_set[i] & assgn] == 0);
                 //ASSERT(m_alpha_energy[m_min_tight_set[i] | assgn] == 0);
-                if ((assgn & (1 << i)) != 0)
+                if ((assgn & (1u << i)) != 0)
                     m_min_tight_set[i] = assgn;
             }
         }
@@ -519,9 +519,9 @@ inline void SoSGraph<V,I>::IBFSEnergyTableClique::ComputeMinTightSets() {
 }
 
 template<typename V, typename I>
-inline bool SoSGraph<V,I>::IBFSEnergyTableClique::NonzeroCapacity(size_t u_idx, size_t v_idx) const {
+inline bool SoSGraph<V,I>::IBFSEnergyTableClique::NonzeroCapacity(I u_idx, I v_idx) const {
     Assignment min_set = m_min_tight_set[u_idx];
-    return (min_set & (1 << v_idx)) != 0;
+    return (min_set & (1u << v_idx)) != 0;
 }
 
 template<typename V, typename I>
@@ -529,7 +529,7 @@ inline void SoSGraph<V,I>::IBFSEnergyTableClique::ResetAlpha() {
     for (auto& a : this->m_alpha_Ci) {
         a = 0;
     }
-    const size_t n = this->m_nodes.size();
+    const I n = I(this->m_nodes.size());
     const Assignment num_assignments = 1u << n;
     for (Assignment a = 0; a < num_assignments; ++a) {
         m_alpha_energy[a] = m_energy[a];
@@ -541,7 +541,7 @@ template<typename SoSGraph<V,I>::BoundFn UB>
 void SoSGraph<V,I>::UpperBoundCliques(const std::vector<bool>& fixedVars, NormStats* stats) {
     std::vector<REAL> psi;
     //int nCliques = m_cliques.size();
-    int cliquesDone = 0;
+    I cliquesDone = 0;
     /*
      *std::cout << "Upper Bounding Cliques: ";
      *std::cout.flush();
@@ -555,14 +555,14 @@ void SoSGraph<V,I>::UpperBoundCliques(const std::vector<bool>& fixedVars, NormSt
          */
         cliquesDone++;
         auto& newEnergy = c.AlphaEnergy();
-        int k = c.Size();
+        I k = I(c.Size());
         psi.resize(k);
         // Compute upper bound g of clique energy
         UB(k, c.EnergyTable(), newEnergy);
 
         if (!fixedVars.empty()) {
-            uint32_t fixedSet = 0;
-            for (int i = 0; i < k; ++i)
+            I fixedSet = 0;
+            for (I i = 0; i < k; ++i)
                 fixedSet |= (fixedVars[c.Nodes()[i]] << i);
             sospd::ZeroMarginalSet(k, newEnergy, fixedSet);
         }
@@ -579,7 +579,7 @@ void SoSGraph<V,I>::UpperBoundCliques(const std::vector<bool>& fixedVars, NormSt
          */
 
         auto& alpha_Ci = c.AlphaCi();
-        for (int i = 0; i < k; ++i) {
+        for (I i = 0; i < k; ++i) {
             alpha_Ci[i] = -psi[i];
             m_phi_it[c.Nodes()[i]] += psi[i];
         }

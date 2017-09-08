@@ -12,7 +12,7 @@
  *
  * Implements SoSPD algorithm from Fix, Wang, Zabih in CVPR 14.
  */
-template<typename ValueType, typename IndexType/*=int*/, typename LabelType/*=size_t*/, typename Flow = SubmodularIBFS<ValueType,IndexType>>
+template<typename ValueType, typename IndexType, typename LabelType, typename Flow = SubmodularIBFS<ValueType,IndexType>>
 class SoSPD {
     public:
         typedef MultilabelEnergy<ValueType,IndexType,LabelType> MLE;
@@ -25,11 +25,7 @@ class SoSPD {
          * labeling (as a vector of labels) and write the next proposal to the
          * final parameter.
          */
-        typedef std::function<
-              void(int niter,
-                   const std::vector<Label>& current,
-                   std::vector<Label>& proposed)
-            > ProposalCallback;
+        typedef std::function<void(IndexType niter,const std::vector<Label>& current,std::vector<Label>& proposed)> ProposalCallback;
 
         /** Set up SoSPD to optimize a particular energy function
          *
@@ -48,10 +44,10 @@ class SoSPD {
          *
          * \param niters Number of iterations
          */
-        void Solve(int niters = std::numeric_limits<int>::max());
+        void Solve(IndexType niters = std::numeric_limits<IndexType>::max());
 
         /** Return label of a node i, returns -1 if Solve has not been called.*/
-        int GetLabel(VarId i) const;
+        LabelType GetLabel(VarId i) const;
 
         /** Give hint that energy is expansion submodular. Enables optimizations
          * because we don't need to find submodular upper/lower bounds for the
@@ -72,7 +68,7 @@ class SoSPD {
          * a constant labeling (i.e., all "alpha") at each iteration.
          */
         void SetAlphaExpansion() {
-            m_pc = [&](int, const std::vector<Label>&, std::vector<Label>&) {
+            m_pc = [&](IndexType,const std::vector<Label>&,std::vector<Label>&) {
                 AlphaProposal();
             };
         }
@@ -84,7 +80,7 @@ class SoSPD {
          * heights.
          */
         void SetHeightAlphaExpansion() {
-            m_pc = [&](int, const std::vector<Label>&, std::vector<Label>&) {
+            m_pc = [&](IndexType,const std::vector<Label>&,std::vector<Label>&) {
                 HeightAlphaProposal();
             };
         }
@@ -92,13 +88,13 @@ class SoSPD {
         /** Return lower bound on optimum, determined by current dual */
         double LowerBound();
 
-        REAL dualVariable(int alpha, VarId i, Label l) const;
+        REAL dualVariable(IndexType alpha, VarId i, Label l) const;
         Flow* GetFlow() { return &m_ibfs; }
 
     private:
         typedef typename MLE::CliquePtr CliquePtr;
         typedef std::vector<REAL> LambdaAlpha;
-        typedef std::vector<std::pair<size_t, size_t>> NodeNeighborList;
+        typedef std::vector<std::pair<IndexType,IndexType>> NodeNeighborList;
         typedef std::vector<NodeNeighborList> NodeCliqueList;
 
         REAL ComputeHeight(VarId, Label);
@@ -116,13 +112,13 @@ class SoSPD {
         void DualFit();
         REAL& Height(VarId i, Label l) { return m_heights[i*m_num_labels+l]; }
 
-        REAL& dualVariable(int alpha, VarId i, Label l);
+        REAL& dualVariable(IndexType alpha, VarId i, Label l);
         REAL dualVariable(const LambdaAlpha& lambdaAlpha,
                 VarId i, Label l) const;
         REAL& dualVariable(LambdaAlpha& lambdaAlpha,
                 VarId i, Label l);
-        LambdaAlpha& lambdaAlpha(int alpha);
-        const LambdaAlpha& lambdaAlpha(int alpha) const;
+        LambdaAlpha& lambdaAlpha(IndexType alpha);
+        const LambdaAlpha& lambdaAlpha(IndexType alpha) const;
 
         // Move Proposals
         void HeightAlphaProposal();
@@ -131,7 +127,7 @@ class SoSPD {
         const MLE* m_energy;
         // Unique ptr so we can forward declare?
         Flow m_ibfs;
-        const size_t m_num_labels;
+        const IndexType m_num_labels;
         std::vector<Label> m_labels;
         /// The proposed labeling in a given iteration
         std::vector<Label> m_fusion_labels;
@@ -143,7 +139,7 @@ class SoSPD {
         std::vector<REAL> m_heights;
         bool m_expansion_submodular;
         bool m_lower_bound;
-        int m_iter;
+        IndexType m_iter;
         ProposalCallback m_pc;
 };
 
@@ -156,7 +152,7 @@ inline SoSPD<V,I,L,F>::SoSPD(const MLE* energy)
           m_expansion_submodular(false),
           m_lower_bound(false),
           m_iter(0),
-          m_pc([&](int, const std::vector<Label>&, std::vector<Label>&) { HeightAlphaProposal(); })
+          m_pc([&](I,const std::vector<Label>&,std::vector<Label>&) {HeightAlphaProposal();})
 { }
 
 template<typename V, typename I, typename L, typename F>
@@ -169,12 +165,12 @@ inline SoSPD<V,I,L,F>::SoSPD(const MLE* energy, SubmodularIBFSParams& params)
           m_expansion_submodular(false),
           m_lower_bound(false),
           m_iter(0),
-          m_pc([&](int, const std::vector<Label>&, std::vector<Label>&) { HeightAlphaProposal(); })
+          m_pc([&](I,const std::vector<Label>&,std::vector<Label>&) {HeightAlphaProposal();})
 { }
 
 template<typename V, typename I, typename L, typename F>
-inline int SoSPD<V,I,L,F>::GetLabel(VarId i) const {
-    return m_labels[i];
+inline L SoSPD<V,I,L,F>::GetLabel(VarId i) const {
+    return L(m_labels[i]);
 }
 
 template<typename V, typename I, typename L, typename F>
@@ -182,7 +178,7 @@ inline void SoSPD<V,I,L,F>::InitialLabeling() {
     const VarId n = m_energy->numVars();
     for (VarId i = 0; i < n; ++i) {
         REAL best_cost = std::numeric_limits<REAL>::max();
-        for (size_t l = 0; l < m_num_labels; ++l) {
+        for (I l = 0; l < m_num_labels; ++l) {
             if (m_energy->unary(i, l) < best_cost) {
                 best_cost = m_energy->unary(i, l);
                 m_labels[i] = l;
@@ -204,9 +200,9 @@ inline void SoSPD<V,I,L,F>::InitialDual() {
     for (const CliquePtr& cp : m_energy->cliques()) {
         const Clique<V,I,L>& c = *cp;
         const VarId* nodes = c.nodes();
-        int k = (int)c.size();
-        ASSERT(k < 32);
-        for (int i = 0; i < k; ++i) {
+        I k = I(c.size());
+        ASSERT(k < I(32));
+        for (I i = 0; i < k; ++i) {
             labelBuf[i] = m_labels[nodes[i]];
         }
         REAL energy = c.energy(labelBuf);
@@ -215,12 +211,12 @@ inline void SoSPD<V,I,L,F>::InitialDual() {
 
         ASSERT(energy >= 0);
         REAL avg = energy / k;
-        int remainder = energy % k;
-        for (int i = 0; i < k; ++i) {
+        int remainder = int(energy) % k;
+        for (I i = 0; i < k; ++i) {
             Label l = m_labels[nodes[i]];
             REAL& lambda_ail = dualVariable(lambda_a, i, l);
             lambda_ail = avg;
-            if (i < remainder) // Have to distribute remainder to maintain average
+            if(int(i) < remainder) // Have to distribute remainder to maintain average
                 lambda_ail += 1;
             Height(nodes[i], l) += lambda_ail;
         }
@@ -229,16 +225,16 @@ inline void SoSPD<V,I,L,F>::InitialDual() {
 
 template<typename V, typename I, typename L, typename F>
 inline void SoSPD<V,I,L,F>::InitialNodeCliqueList() {
-    size_t n = m_labels.size();
+    I n = I(m_labels.size());
     m_node_clique_list.clear();
     m_node_clique_list.resize(n);
 
-    int clique_index = 0;
+    I clique_index = 0;
     for (const CliquePtr& cp : m_energy->cliques()) {
         const Clique<V,I,L>& c = *cp;
         const VarId* nodes = c.nodes();
-        const size_t k = c.size();
-        for (size_t i = 0; i < k; ++i) {
+        const I k = I(c.size());
+        for (I i = 0; i < k; ++i) {
             m_node_clique_list[nodes[i]].push_back(std::make_pair(clique_index, i));
         }
         ++clique_index;
@@ -249,7 +245,7 @@ template<typename V, typename I, typename L, typename F>
 inline void SoSPD<V,I,L,F>::PreEditDual(F& crf) {
     auto& fixedVars = crf.Params().fixedVars;
     fixedVars.resize(m_labels.size());
-    for (size_t i = 0; i < m_labels.size(); ++i)
+    for (I i = 0; i < I(m_labels.size()); ++i)
         fixedVars[i] = (m_labels[i] == m_fusion_labels[i]);
 
     // Allocate all the buffers we need in one place, resize as necessary
@@ -262,11 +258,11 @@ inline void SoSPD<V,I,L,F>::PreEditDual(F& crf) {
 
     auto& ibfs_cliques = crf.Graph().GetCliques();
     ASSERT(ibfs_cliques.size() == m_energy->cliques().size());
-    int clique_index = 0;
+    I clique_index = 0;
     for (const CliquePtr& cp : m_energy->cliques()) {
         const Clique<V,I,L>& c = *cp;
-        const size_t k = c.size();
-        ASSERT(k < 32);
+        const I k = I(c.size());
+        ASSERT(k < I(32));
 
         auto& lambda_a = lambdaAlpha(clique_index);
 
@@ -281,7 +277,7 @@ inline void SoSPD<V,I,L,F>::PreEditDual(F& crf) {
         fusion_labels.resize(k);
         current_lambda.resize(k);
         fusion_lambda.resize(k);
-        for (size_t i = 0; i < k; ++i) {
+        for (I i = 0; i < k; ++i) {
             current_labels[i] = m_labels[c.nodes()[i]];
             fusion_labels[i] = m_fusion_labels[c.nodes()[i]];
             /*
@@ -296,7 +292,7 @@ inline void SoSPD<V,I,L,F>::PreEditDual(F& crf) {
         // Compute costs of all fusion assignments
         {
             Assgn last_gray = 0;
-            for (size_t i_idx = 0; i_idx < k; ++i_idx)
+            for (I i_idx = 0; i_idx < k; ++i_idx)
                 label_buf[i_idx] = current_labels[i_idx];
             energy_table[0] = c.energy(label_buf);
             for (Assgn a = 1; a < max_assgn; ++a) {
@@ -342,15 +338,13 @@ inline typename SoSPD<V,I,L,F>::REAL SoSPD<V,I,L,F>::ComputeHeightDiff(VarId i, 
 
 template<typename V, typename I, typename L, typename F>
 inline void SoSPD<V,I,L,F>::SetupGraph(F& crf) {
-    typedef int32_t Assgn;
-    const size_t n = m_labels.size();
+    const I n = I(m_labels.size());
     crf.AddNode(n);
-
     for (const CliquePtr& cp : m_energy->cliques()) {
         const Clique<V,I,L>& c = *cp;
-        const size_t k = c.size();
-        ASSERT(k < 32);
-        const Assgn max_assgn = 1 << k;
+        const I k = I(c.size());
+        ASSERT(k < I(32));
+        const I max_assgn = 1u << k;
         std::vector<typename F::NodeId> nodes(c.nodes(), c.nodes() + c.size());
         crf.AddClique(nodes, std::vector<REAL>(max_assgn, 0));
     }
@@ -358,11 +352,10 @@ inline void SoSPD<V,I,L,F>::SetupGraph(F& crf) {
 
 template<typename V, typename I, typename L, typename F>
 inline void SoSPD<V,I,L,F>::SetupAlphaEnergy(F& crf) {
-    //typedef int32_t Assgn;
-    const size_t n = m_labels.size();
+    const I n = I(m_labels.size());
     crf.ClearUnaries();
     crf.AddConstantTerm(-crf.GetConstantTerm());
-    for (size_t i = 0; i < n; ++i) {
+    for (I i = 0; i < n; ++i) {
         REAL height_diff = ComputeHeightDiff(i, m_labels[i], m_fusion_labels[i]);
         if (height_diff > 0) {
             crf.AddUnaryTerm(i, height_diff, 0);
@@ -388,12 +381,12 @@ inline bool SoSPD<V,I,L,F>::UpdatePrimalDual(F& crf) {
         }
     }
     const auto& clique = crf.Graph().GetCliques();
-    size_t i = 0;
+    I i = 0;
     for (const CliquePtr& cp : m_energy->cliques()) {
         const Clique<V,I,L>& c = *cp;
         auto& ibfs_c = clique[i];
         const std::vector<REAL>& phiCi = ibfs_c.AlphaCi();
-        for (size_t j = 0; j < phiCi.size(); ++j) {
+        for (I j = 0; j < I(phiCi.size()); ++j) {
             dualVariable(i, j, m_fusion_labels[c.nodes()[j]]) += phiCi[j];
             Height(c.nodes()[j], m_fusion_labels[c.nodes()[j]]) += phiCi[j];
         }
@@ -405,14 +398,14 @@ inline bool SoSPD<V,I,L,F>::UpdatePrimalDual(F& crf) {
 template<typename V, typename I, typename L, typename F>
 inline void SoSPD<V,I,L,F>::PostEditDual() {
     Label labelBuf[32];
-    int clique_index = 0;
+    I clique_index = 0;
     for (const CliquePtr& cp : m_energy->cliques()) {
         const Clique<V,I,L>& c = *cp;
         const VarId* nodes = c.nodes();
-        int k = (int)c.size();
-        ASSERT(k < 32);
+        I k = I(c.size());
+        ASSERT(k < I(32));
         REAL lambdaSum = 0;
-        for (int i = 0; i < k; ++i) {
+        for (I i = 0; i < k; ++i) {
             labelBuf[i] = m_labels[nodes[i]];
             lambdaSum += dualVariable(clique_index, i, labelBuf[i]);
         }
@@ -429,16 +422,16 @@ inline void SoSPD<V,I,L,F>::PostEditDual() {
         }
         ASSERT(correction <= 0);
         REAL avg = correction / k;
-        int remainder = correction % k;
+        int remainder = int(correction) % k;
         if (remainder < 0) {
             avg -= 1;
             remainder += k;
         }
-        for (int i = 0; i < k; ++i) {
+        for (I i = 0; i < k; ++i) {
             auto& lambda_ail = dualVariable(clique_index,  i, labelBuf[i]);
             Height(nodes[i], labelBuf[i]) -= lambda_ail;
             lambda_ail += avg;
-            if (i < remainder)
+            if (int(i) < remainder)
                 lambda_ail += 1;
             Height(nodes[i], labelBuf[i]) += lambda_ail;
         }
@@ -451,9 +444,9 @@ inline void SoSPD<V,I,L,F>::DualFit() {
     // FIXME: This is the only function that doesn't work with integer division.
     // It's also not really used for anything at the moment
     /*
-	for (size_t i = 0; i < m_dual.size(); ++i)
-		for (size_t j = 0; j < m_dual[i].size(); ++j)
-			for (size_t k = 0; k < m_dual[i][j].size(); ++k)
+	for (I i = 0; i < I(m_dual.size()); ++i)
+		for (I j = 0; j < I(m_dual[i].size()); ++j)
+			for (I k = 0; k < I(m_dual[i][j].size()); ++k)
 				m_dual[i][j][k] /= (m_mu * m_rho);
                 */
     ASSERT(false /* unimplemented */);
@@ -463,7 +456,7 @@ template<typename V, typename I, typename L, typename F>
 inline bool SoSPD<V,I,L,F>::InitialFusionLabeling() {
     m_pc(m_iter, m_labels, m_fusion_labels);
     bool allDiff = false;
-    for (size_t i = 0; i < m_labels.size(); ++i) {
+    for (I i = 0; i < I(m_labels.size()); ++i) {
         if (m_fusion_labels[i] < 0) m_fusion_labels[i] = 0;
         if (m_fusion_labels[i] >= m_num_labels) m_fusion_labels[i] = m_num_labels-1;
         if (m_labels[i] != m_fusion_labels[i])
@@ -474,14 +467,14 @@ inline bool SoSPD<V,I,L,F>::InitialFusionLabeling() {
 
 template<typename V, typename I, typename L, typename F>
 inline void SoSPD<V,I,L,F>::HeightAlphaProposal() {
-    const size_t n = m_labels.size();
+    const I n = I(m_labels.size());
     REAL max_s_capacity = 0;
     Label alpha = 0;
     for (Label l = 0; l < m_num_labels; ++l) {
         REAL s_capacity = 0;
-        for (size_t i = 0; i < n; ++i) {
+        for (I i = 0; i < n; ++i) {
             REAL diff = Height(i, m_labels[i]) - Height(i, l);
-            if (diff > 0)
+            if (diff > V(0))
                 s_capacity += diff;
         }
         if (s_capacity > max_s_capacity) {
@@ -489,22 +482,22 @@ inline void SoSPD<V,I,L,F>::HeightAlphaProposal() {
             alpha = l;
         }
     }
-    for (size_t i = 0; i < n; ++i)
+    for (I i = 0; i < n; ++i)
         m_fusion_labels[i] = alpha;
 }
 
 template<typename V, typename I, typename L, typename F>
 inline void SoSPD<V,I,L,F>::AlphaProposal() {
     Label alpha = m_iter % m_num_labels;
-    const size_t n = m_labels.size();
-    for (size_t i = 0; i < n; ++i)
+    const I n = I(m_labels.size());
+    for (I i = 0; i < n; ++i)
         m_fusion_labels[i] = alpha;
 }
 
 
 template<typename V, typename I, typename L, typename F>
-inline void SoSPD<V,I,L,F>::Solve(int niters) {
-    if (m_iter == 0) {
+inline void SoSPD<V,I,L,F>::Solve(I niters) {
+    if (m_iter == I(0)) {
         SetupGraph(m_ibfs);
         InitialLabeling();
         InitialDual();
@@ -515,7 +508,7 @@ inline void SoSPD<V,I,L,F>::Solve(int niters) {
 		std::cout << "Iteration " << m_iter << ": " << energy << std::endl;
 #endif
     bool labelChanged = true;
-    int this_iter = 0;
+    I this_iter = 0;
     while (labelChanged && this_iter < niters){
         labelChanged = InitialFusionLabeling();
         if (!labelChanged) break;
@@ -533,12 +526,12 @@ inline void SoSPD<V,I,L,F>::Solve(int niters) {
 }
 
 template<typename V, typename I, typename L, typename F>
-inline typename SoSPD<V,I,L,F>::REAL SoSPD<V,I,L,F>::dualVariable(int alpha, VarId i, Label l) const {
+inline typename SoSPD<V,I,L,F>::REAL SoSPD<V,I,L,F>::dualVariable(I alpha, VarId i, Label l) const {
     return m_dual[alpha][i*m_num_labels+l];
 }
 
 template<typename V, typename I, typename L, typename F>
-inline typename SoSPD<V,I,L,F>::REAL& SoSPD<V,I,L,F>::dualVariable(int alpha, VarId i, Label l) {
+inline typename SoSPD<V,I,L,F>::REAL& SoSPD<V,I,L,F>::dualVariable(I alpha, VarId i, Label l) {
     return m_dual[alpha][i*m_num_labels+l];
 }
 
@@ -553,12 +546,12 @@ inline typename SoSPD<V,I,L,F>::REAL& SoSPD<V,I,L,F>::dualVariable(LambdaAlpha& 
 }
 
 template<typename V, typename I, typename L, typename F>
-inline typename SoSPD<V,I,L,F>::LambdaAlpha& SoSPD<V,I,L,F>::lambdaAlpha(int alpha) {
+inline typename SoSPD<V,I,L,F>::LambdaAlpha& SoSPD<V,I,L,F>::lambdaAlpha(I alpha) {
     return m_dual[alpha];
 }
 
 template<typename V, typename I, typename L, typename F>
-inline const typename SoSPD<V,I,L,F>::LambdaAlpha& SoSPD<V,I,L,F>::lambdaAlpha(int alpha) const {
+inline const typename SoSPD<V,I,L,F>::LambdaAlpha& SoSPD<V,I,L,F>::lambdaAlpha(I alpha) const {
     return m_dual[alpha];
 }
 
@@ -566,10 +559,10 @@ template<typename V, typename I, typename L, typename F>
 inline double SoSPD<V,I,L,F>::LowerBound() {
     std::cout << "Computing Lower Bound\n";
     double max_ratio = 0;
-    int clique_index = 0;
+    I clique_index = 0;
     for (const CliquePtr& cp : m_energy->cliques()) {
         const Clique<V,I,L>& c = *cp;
-        const size_t k = c.size();
+        const I k = I(c.size());
         ASSERT(k == 3); // Lower bound doesn't work for larger numbers
         Label buf[3];
         for (buf[0] = 0; buf[0] < m_num_labels; ++buf[0]) {
@@ -580,7 +573,7 @@ inline double SoSPD<V,I,L,F>::LowerBound() {
                                    + dualVariable(clique_index, 1, buf[1])
                                    + dualVariable(clique_index, 2, buf[2]);
                     if (energy == 0) {
-                        for (int i = 0; i < 3; ++i) {
+                        for (I i = 0; i < I(3); ++i) {
                             if (buf[i] != m_labels[c.nodes()[i]]) {
                                 dualVariable(clique_index, i, buf[i]) -= dualSum - energy;
                                 Height(c.nodes()[i], buf[i]) -= dualSum - energy;

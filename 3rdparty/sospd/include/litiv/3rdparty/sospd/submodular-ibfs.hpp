@@ -11,7 +11,7 @@
 
 /** Algorithm for sum-of-submodular IBFS
  */
-template<typename ValueType, typename IndexType/*=int*/>
+template<typename ValueType, typename IndexType>
 class SubmodularIBFS {
     public:
         typedef SoSGraph<ValueType,IndexType> GraphType;

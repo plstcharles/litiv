@@ -8,7 +8,7 @@
 
 #include "litiv/3rdparty/sospd/energy-common.hpp"
 
-template<typename ValueType, typename IndexType/*=int*/, typename LabelType/*=size_t*/>
+template<typename ValueType, typename IndexType, typename LabelType>
 class Clique;
 
 /** A multilabel energy function, which splits as a sum of clique energies
@@ -19,7 +19,7 @@ class Clique;
  * functions \f$f_C\f$ defined over a set of cliques \f$C\f$ which are subsets
  * of the variables.
  */
-template<typename ValueType, typename IndexType/*=int*/, typename LabelType/*=size_t*/>
+template<typename ValueType, typename IndexType, typename LabelType>
 class MultilabelEnergy {
     static_assert(std::is_arithmetic<ValueType>::value,"value type must be arithmetic");
     static_assert(std::is_integral<IndexType>::value,"index type must be integral");
@@ -93,7 +93,7 @@ class MultilabelEnergy {
  *
  * Non-copyable and non-movable to prevent slicing of derived class data.
  */
-template<typename ValueType, typename IndexType/*=int*/, typename LabelType/*=size_t*/>
+template<typename ValueType, typename IndexType, typename LabelType>
 class Clique {
     public:
         typedef typename MultilabelEnergy<ValueType,IndexType,LabelType>::REAL REAL;
@@ -138,7 +138,7 @@ class Clique {
  *
  * Template parameter Degree is the number of nodes in the clique.
  */
-template<int Degree, typename ValueType, typename IndexType/*=int*/, typename LabelType/*=size_t*/>
+template<int Degree, typename ValueType, typename IndexType, typename LabelType>
 class PottsClique : public Clique<ValueType,IndexType,LabelType> {
     public:
         typedef typename Clique<ValueType,IndexType,LabelType>::REAL REAL;

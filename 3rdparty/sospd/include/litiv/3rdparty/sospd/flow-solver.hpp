@@ -3,7 +3,7 @@
 
 #include "litiv/3rdparty/sospd/sos-graph.hpp"
 
-template<typename ValueType, typename IndexType/*=int*/>
+template<typename ValueType, typename IndexType>
 class BidirectionalIBFS : public FlowSolver<ValueType,IndexType> {
     public:
         BidirectionalIBFS() = default;
@@ -45,8 +45,8 @@ class BidirectionalIBFS : public FlowSolver<ValueType,IndexType> {
         std::vector<NodeQueue> m_sink_layers;
         OrphanList m_source_orphans;
         OrphanList m_sink_orphans;
-        int m_source_tree_d;
-        int m_sink_tree_d;
+        IndexType m_source_tree_d;
+        IndexType m_sink_tree_d;
         typedef typename NodeQueue::iterator queue_iterator;
         queue_iterator m_search_node_iter;
         queue_iterator m_search_node_end;
@@ -63,7 +63,7 @@ class BidirectionalIBFS : public FlowSolver<ValueType,IndexType> {
         size_t m_num_clique_pushes = 0;
 };
 
-template<typename ValueType, typename IndexType/*=int*/>
+template<typename ValueType, typename IndexType>
 class SourceIBFS : public FlowSolver<ValueType,IndexType> {
     public:
         SourceIBFS() = default;
@@ -103,7 +103,7 @@ class SourceIBFS : public FlowSolver<ValueType,IndexType> {
         // Layers store vertices by distance.
         std::vector<NodeQueue> m_source_layers;
         OrphanList m_source_orphans;
-        int m_source_tree_d;
+        IndexType m_source_tree_d;
         typedef typename NodeQueue::iterator queue_iterator;
         queue_iterator m_search_node_iter;
         queue_iterator m_search_node_end;
@@ -119,7 +119,7 @@ class SourceIBFS : public FlowSolver<ValueType,IndexType> {
         size_t m_num_clique_pushes = 0;
 };
 
-template<typename ValueType, typename IndexType/*=int*/>
+template<typename ValueType, typename IndexType>
 class ParametricIBFS : public FlowSolver<ValueType,IndexType> {
     public:
         ParametricIBFS() = default;
@@ -159,7 +159,7 @@ class ParametricIBFS : public FlowSolver<ValueType,IndexType> {
         // Layers store vertices by distance.
         std::vector<NodeQueue> m_source_layers;
         OrphanList m_source_orphans;
-        int m_source_tree_d;
+        IndexType m_source_tree_d;
         typedef typename NodeQueue::iterator queue_iterator;
         queue_iterator m_search_node_iter;
         queue_iterator m_search_node_end;
@@ -186,7 +186,7 @@ inline void BidirectionalIBFS<V,I>::IBFSInit()
 {
     auto start = sospd::Clock::now();
 
-    const int n = m_graph->NumNodes();
+    const I n = m_graph->NumNodes();
 
     m_source_layers = std::vector<NodeQueue>(n+1);
     m_sink_layers = std::vector<NodeQueue>(n+1);
@@ -197,11 +197,11 @@ inline void BidirectionalIBFS<V,I>::IBFSInit()
     auto& nodes = m_graph->GetNodes();
     auto& sNode = nodes[m_graph->GetS()];
     sNode.state = NodeState::S;
-    sNode.dis = 0;
+    sNode.dis = I(0);
     m_source_layers[0].push_back(sNode);
     auto& tNode = nodes[m_graph->GetT()];
     tNode.state = NodeState::T;
-    tNode.dis = 0;
+    tNode.dis = I(0);
     m_sink_layers[0].push_back(tNode);
 
     // saturate all s-i-t paths
@@ -213,14 +213,14 @@ inline void BidirectionalIBFS<V,I>::IBFSInit()
         if (m_graph->m_c_si[i] > m_graph->m_phi_si[i]) {
             auto& node = m_graph->node(i);
             node.state = NodeState::S;
-            node.dis = 1;
+            node.dis = I(1);
             AddToLayer(i);
             node.parent_arc = m_graph->ArcsEnd(i);
             node.parent = m_graph->GetS();
         } else if (m_graph->m_c_it[i] > m_graph->m_phi_it[i]) {
             auto& node = m_graph->node(i);
             node.state = NodeState::T;
-            node.dis = 1;
+            node.dis = I(1);
             AddToLayer(i);
             node.parent_arc = m_graph->ArcsEnd(i);
             node.parent = m_graph->GetT();
@@ -236,8 +236,8 @@ template<typename V, typename I>
 inline void BidirectionalIBFS<V,I>::IBFS() {
     auto start = sospd::Clock::now();
     m_forward_search = false;
-    m_source_tree_d = 1;
-    m_sink_tree_d = 0;
+    m_source_tree_d = I(1);
+    m_sink_tree_d = I(0);
 
     IBFSInit();
 
@@ -277,7 +277,7 @@ inline void BidirectionalIBFS<V,I>::IBFS() {
         }
         Node& n = *m_search_node_iter;
         NodeId search_node = n.id;
-        int distance;
+        I distance;
         if (m_forward_search) {
             distance = m_source_tree_d;
         } else {
@@ -292,8 +292,8 @@ inline void BidirectionalIBFS<V,I>::IBFS() {
             NodeId neighbor = m_search_arc.Target();
             NodeState neighbor_state = m_graph->node(neighbor).state;
             if (neighbor_state == n.state) {
-                ASSERT(m_graph->node(neighbor).dis <= n.dis + 1);
-                if (m_graph->node(neighbor).dis == n.dis+1) {
+                ASSERT(m_graph->node(neighbor).dis <= n.dis+I(1));
+                if (m_graph->node(neighbor).dis == n.dis+I(1)) {
                     auto reverseArc = m_search_arc.Reverse();
                     if (reverseArc < m_graph->node(neighbor).parent_arc) {
                         m_graph->node(neighbor).parent_arc = reverseArc;
@@ -304,7 +304,7 @@ inline void BidirectionalIBFS<V,I>::IBFS() {
             } else if (neighbor_state == NodeState::N) {
                 // Then we found an unlabeled node, add it to the tree
                 m_graph->node(neighbor).state = n.state;
-                m_graph->node(neighbor).dis = n.dis + 1;
+                m_graph->node(neighbor).dis = n.dis+I(1);
                 AddToLayer(neighbor);
                 auto reverseArc = m_search_arc.Reverse();
                 m_graph->node(neighbor).parent_arc = reverseArc;
@@ -407,12 +407,12 @@ inline void BidirectionalIBFS<V,I>::Adopt() {
         Node& n = m_source_orphans.front();
         NodeId i = n.id;
         m_source_orphans.pop_front();
-        int old_dist = n.dis;
+        I old_dist = n.dis;
         while (n.parent_arc != m_graph->ArcsEnd(i)
                && (m_graph->node(n.parent).state == NodeState::T
                    || m_graph->node(n.parent).state == NodeState::T_orphan
                    || m_graph->node(n.parent).state == NodeState::N
-                   || m_graph->node(n.parent).dis != old_dist - 1
+                   || m_graph->node(n.parent).dis != old_dist-1
                    || !m_graph->NonzeroCap(n.parent_arc, false))) {
             ++n.parent_arc;
             if (n.parent_arc != m_graph->ArcsEnd(i))
@@ -421,7 +421,7 @@ inline void BidirectionalIBFS<V,I>::Adopt() {
         if (n.parent_arc == m_graph->ArcsEnd(i)) {
             RemoveFromLayer(i);
             // We didn't find a new parent with the same label, so do a relabel
-            n.dis = std::numeric_limits<int>::max()-1;
+            n.dis = std::numeric_limits<I>::max()-1;
             for (auto newParentArc = m_graph->ArcsBegin(i); newParentArc != m_graph->ArcsEnd(i); ++newParentArc) {
                 auto target = newParentArc.Target();
                 if (m_graph->node(target).dis < n.dis
@@ -435,7 +435,7 @@ inline void BidirectionalIBFS<V,I>::Adopt() {
                 }
             }
             n.dis++;
-            int cutoff_distance = m_source_tree_d;
+            I cutoff_distance = m_source_tree_d;
             if (m_forward_search) cutoff_distance += 1;
             if (n.dis > cutoff_distance) {
                 n.state = NodeState::N;
@@ -460,7 +460,7 @@ inline void BidirectionalIBFS<V,I>::Adopt() {
         Node& n = m_sink_orphans.front();
         NodeId i = n.id;
         m_sink_orphans.pop_front();
-        int old_dist = n.dis;
+        I old_dist = n.dis;
         while (n.parent_arc != m_graph->ArcsEnd(i)
                && (m_graph->node(n.parent).state == NodeState::S
                    || m_graph->node(n.parent).state == NodeState::S_orphan
@@ -474,7 +474,7 @@ inline void BidirectionalIBFS<V,I>::Adopt() {
         if (n.parent_arc == m_graph->ArcsEnd(i)) {
             RemoveFromLayer(i);
             // We didn't find a new parent with the same label, so do a relabel
-            n.dis = std::numeric_limits<int>::max()-1;
+            n.dis = std::numeric_limits<I>::max()-1;
             for (auto newParentArc = m_graph->ArcsBegin(i); newParentArc != m_graph->ArcsEnd(i); ++newParentArc) {
                 auto target = newParentArc.Target();
                 if (m_graph->node(target).dis < n.dis
@@ -488,7 +488,7 @@ inline void BidirectionalIBFS<V,I>::Adopt() {
                 }
             }
             n.dis++;
-            int cutoff_distance = m_sink_tree_d;
+            I cutoff_distance = m_sink_tree_d;
             if (!m_forward_search) cutoff_distance += 1;
             if (n.dis > cutoff_distance) {
                 n.state = NodeState::N;
@@ -574,7 +574,7 @@ inline void BidirectionalIBFS<V,I>::Solve(SubmodularIBFS<V,I>* energy) {
 template<typename V, typename I>
 inline void BidirectionalIBFS<V,I>::AddToLayer(NodeId i) {
     auto& node = m_graph->node(i);
-    int dis = node.dis;
+    I dis = node.dis;
     if (node.state == NodeState::S) {
         m_source_layers[dis].push_back(node);
         if (m_forward_search && node.dis == m_source_tree_d)
@@ -593,7 +593,7 @@ inline void BidirectionalIBFS<V,I>::RemoveFromLayer(NodeId i) {
     auto& node = m_graph->node(i);
     if (m_search_node_iter != m_search_node_end && m_search_node_iter->id == i)
         AdvanceSearchNode();
-    int dis = node.dis;
+    I dis = node.dis;
     if (node.state == NodeState::S || node.state == NodeState::S_orphan) {
         auto& layer = m_source_layers[dis];
         layer.erase(layer.iterator_to(node));
@@ -628,7 +628,7 @@ inline void SourceIBFS<V,I>::IBFSInit()
 {
     auto start = sospd::Clock::now();
 
-    const int n = m_graph->NumNodes();
+    const I n = m_graph->NumNodes();
 
     m_source_layers = std::vector<NodeQueue>(n+1);
 
@@ -637,11 +637,11 @@ inline void SourceIBFS<V,I>::IBFSInit()
     auto& nodes = m_graph->GetNodes();
     auto& sNode = nodes[m_graph->GetS()];
     sNode.state = NodeState::S;
-    sNode.dis = 0;
+    sNode.dis = I(0);
     m_source_layers[0].push_back(sNode);
     auto& tNode = nodes[m_graph->GetT()];
     tNode.state = NodeState::T;
-    tNode.dis = 0;
+    tNode.dis = I(0);
 
     // saturate all s-i-t paths
     for (NodeId i = 0; i < n; ++i) {
@@ -652,7 +652,7 @@ inline void SourceIBFS<V,I>::IBFSInit()
         if (m_graph->m_c_si[i] > m_graph->m_phi_si[i]) {
             auto& node = m_graph->node(i);
             node.state = NodeState::S;
-            node.dis = 1;
+            node.dis = I(1);
             AddToLayer(i);
             node.parent_arc = m_graph->ArcsEnd(i);
             node.parent = m_graph->GetS();
@@ -672,7 +672,7 @@ inline void SourceIBFS<V,I>::IBFSInit()
 template<typename V, typename I>
 inline void SourceIBFS<V,I>::IBFS() {
     auto start = sospd::Clock::now();
-    m_source_tree_d = 0;
+    m_source_tree_d = I(0);
 
     IBFSInit();
 
@@ -700,7 +700,7 @@ inline void SourceIBFS<V,I>::IBFS() {
         }
         Node& n = *m_search_node_iter;
         NodeId search_node = n.id;
-        int distance = m_source_tree_d;
+        I distance = m_source_tree_d;
         ASSERT(n.dis == distance);
         // Advance m_search_arc until we find a residual arc
         while (m_search_arc != m_search_arc_end && !m_graph->NonzeroCap(m_search_arc, true))
@@ -710,7 +710,7 @@ inline void SourceIBFS<V,I>::IBFS() {
             NodeId neighbor = m_search_arc.Target();
             NodeState neighbor_state = m_graph->node(neighbor).state;
             if (neighbor_state == n.state) {
-                ASSERT(m_graph->node(neighbor).dis <= n.dis + 1);
+                ASSERT(m_graph->node(neighbor).dis <= n.dis+1);
                 if (m_graph->node(neighbor).dis == n.dis+1) {
                     auto reverseArc = m_search_arc.Reverse();
                     if (reverseArc < m_graph->node(neighbor).parent_arc) {
@@ -722,7 +722,7 @@ inline void SourceIBFS<V,I>::IBFS() {
             } else if (neighbor_state == NodeState::N) {
                 // Then we found an unlabeled node, add it to the tree
                 m_graph->node(neighbor).state = n.state;
-                m_graph->node(neighbor).dis = n.dis + 1;
+                m_graph->node(neighbor).dis = n.dis+1;
                 AddToLayer(neighbor);
                 auto reverseArc = m_search_arc.Reverse();
                 m_graph->node(neighbor).parent_arc = reverseArc;
@@ -772,7 +772,7 @@ inline void SourceIBFS<V,I>::Augment(ArcIterator& arc) {
     current = j;
     ASSERT(m_graph->node(current).parent == m_graph->GetT());
     bottleneck = std::min(bottleneck, m_graph->m_c_it[current] - m_graph->m_phi_it[current]);
-    ASSERT(bottleneck > 0);
+    ASSERT(bottleneck > V(0));
 
     // Found the bottleneck, now do pushes on the arcs in the path
     Push(arc, true, bottleneck);
@@ -805,7 +805,7 @@ inline void SourceIBFS<V,I>::Adopt() {
         Node& n = m_source_orphans.front();
         NodeId i = n.id;
         m_source_orphans.pop_front();
-        int old_dist = n.dis;
+        I old_dist = n.dis;
         while (n.parent_arc != m_graph->ArcsEnd(i)
                && (m_graph->node(n.parent).state == NodeState::T
                    || m_graph->node(n.parent).state == NodeState::N
@@ -818,7 +818,7 @@ inline void SourceIBFS<V,I>::Adopt() {
         if (n.parent_arc == m_graph->ArcsEnd(i)) {
             RemoveFromLayer(i);
             // We didn't find a new parent with the same label, so do a relabel
-            n.dis = std::numeric_limits<int>::max()-1;
+            n.dis = std::numeric_limits<I>::max()-1;
             for (auto newParentArc = m_graph->ArcsBegin(i); newParentArc != m_graph->ArcsEnd(i); ++newParentArc) {
                 auto target = newParentArc.Target();
                 if (m_graph->node(target).dis < n.dis
@@ -832,7 +832,7 @@ inline void SourceIBFS<V,I>::Adopt() {
                 }
             }
             n.dis++;
-            int cutoff_distance = m_source_tree_d + 1;
+            I cutoff_distance = m_source_tree_d + 1;
             if (n.dis > cutoff_distance) {
                 n.state = NodeState::N;
             } else {
@@ -918,7 +918,7 @@ inline void SourceIBFS<V,I>::Solve(SubmodularIBFS<V,I>* energy) {
 template<typename V, typename I>
 inline void SourceIBFS<V,I>::AddToLayer(NodeId i) {
     auto& node = m_graph->node(i);
-    int dis = node.dis;
+    I dis = node.dis;
     if (node.state == NodeState::S) {
         m_source_layers[dis].push_back(node);
         if (node.dis == m_source_tree_d)
@@ -933,7 +933,7 @@ inline void SourceIBFS<V,I>::RemoveFromLayer(NodeId i) {
     auto& node = m_graph->node(i);
     if (m_search_node_iter != m_search_node_end && &(*m_search_node_iter) == &node)
         AdvanceSearchNode();
-    int dis = node.dis;
+    I dis = node.dis;
     if (node.state == NodeState::S || node.state == NodeState::S_orphan) {
         auto& layer = m_source_layers[dis];
         layer.erase(layer.iterator_to(node));
@@ -959,7 +959,7 @@ inline void ParametricIBFS<V,I>::IBFSInit()
 {
     auto start = sospd::Clock::now();
 
-    const int n = m_graph->NumNodes();
+    const I n = m_graph->NumNodes();
 
     m_source_layers = std::vector<NodeQueue>(n+1);
 
@@ -968,11 +968,11 @@ inline void ParametricIBFS<V,I>::IBFSInit()
     auto& nodes = m_graph->GetNodes();
     auto& sNode = nodes[m_graph->GetS()];
     sNode.state = NodeState::S;
-    sNode.dis = 0;
+    sNode.dis = I(0);
     m_source_layers[0].push_back(sNode);
     auto& tNode = nodes[m_graph->GetT()];
     tNode.state = NodeState::T;
-    tNode.dis = 0;
+    tNode.dis = I(0);
 
     // saturate all s-i-t paths
     for (NodeId i = 0; i < n; ++i) {
@@ -983,7 +983,7 @@ inline void ParametricIBFS<V,I>::IBFSInit()
         if (m_graph->m_c_si[i] > m_graph->m_phi_si[i]) {
             auto& node = m_graph->node(i);
             node.state = NodeState::S;
-            node.dis = 1;
+            node.dis = I(1);
             AddToLayer(i);
             node.parent_arc = m_graph->ArcsEnd(i);
             node.parent = m_graph->GetS();
@@ -1031,7 +1031,7 @@ inline void ParametricIBFS<V,I>::IBFS() {
         }
         Node& n = *m_search_node_iter;
         NodeId search_node = n.id;
-        int distance = m_source_tree_d;
+        I distance = m_source_tree_d;
         ASSERT(n.dis == distance);
         // Advance m_search_arc until we find a residual arc
         while (m_search_arc != m_search_arc_end && !m_graph->NonzeroCap(m_search_arc, true))
@@ -1136,7 +1136,7 @@ inline void ParametricIBFS<V,I>::Adopt() {
         Node& n = m_source_orphans.front();
         NodeId i = n.id;
         m_source_orphans.pop_front();
-        int old_dist = n.dis;
+        I old_dist = n.dis;
         while (n.parent_arc != m_graph->ArcsEnd(i)
                && (m_graph->node(n.parent).state == NodeState::T
                    || m_graph->node(n.parent).state == NodeState::N
@@ -1149,7 +1149,7 @@ inline void ParametricIBFS<V,I>::Adopt() {
         if (n.parent_arc == m_graph->ArcsEnd(i)) {
             RemoveFromLayer(i);
             // We didn't find a new parent with the same label, so do a relabel
-            n.dis = std::numeric_limits<int>::max()-1;
+            n.dis = std::numeric_limits<I>::max()-1;
             for (auto newParentArc = m_graph->ArcsBegin(i); newParentArc != m_graph->ArcsEnd(i); ++newParentArc) {
                 auto target = newParentArc.Target();
                 if (m_graph->node(target).dis < n.dis
@@ -1163,7 +1163,7 @@ inline void ParametricIBFS<V,I>::Adopt() {
                 }
             }
             n.dis++;
-            int cutoff_distance = m_source_tree_d + 1;
+            I cutoff_distance = m_source_tree_d + 1;
             if (n.dis > cutoff_distance) {
                 n.state = NodeState::N;
             } else {
@@ -1249,7 +1249,7 @@ inline void ParametricIBFS<V,I>::Solve(SubmodularIBFS<V,I>* energy) {
 template<typename V, typename I>
 inline void ParametricIBFS<V,I>::AddToLayer(NodeId i) {
     auto& node = m_graph->node(i);
-    int dis = node.dis;
+    I dis = node.dis;
     if (node.state == NodeState::S) {
         m_source_layers[dis].push_back(node);
         if (node.dis == m_source_tree_d)
@@ -1264,7 +1264,7 @@ inline void ParametricIBFS<V,I>::RemoveFromLayer(NodeId i) {
     auto& node = m_graph->node(i);
     if (m_search_node_iter != m_search_node_end && &(*m_search_node_iter) == &node)
         AdvanceSearchNode();
-    int dis = node.dis;
+    I dis = node.dis;
     if (node.state == NodeState::S || node.state == NodeState::S_orphan) {
         auto& layer = m_source_layers[dis];
         layer.erase(layer.iterator_to(node));
