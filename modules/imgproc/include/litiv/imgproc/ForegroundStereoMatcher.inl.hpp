@@ -671,8 +671,8 @@ inline void StereoSegmMatcher::GraphModelData::updateStereoModel(size_t nCamIdx,
         lvDbgAssert(m_apResegmModels[nCamIdx]->operator[](oNode.anResegmUnaryFactIDs[nCamIdx]).numberOfVariables()==size_t(1));
         ExplicitFunction& vUnaryStereoLUT = *oNode.apStereoUnaryFuncs[nCamIdx];
         lvDbgAssert(vUnaryStereoLUT.dimension()==1 && vUnaryStereoLUT.size()==m_nStereoLabels);
-        lvDbgAssert__(aImgSaliency[nCamIdx](nRowIdx,nColIdx)>=-1e-6f && aImgSaliency[nCamIdx](nRowIdx,nColIdx)<=1.0f,"fImgSaliency = %1.10f @ [%d,%d]",aImgSaliency[nCamIdx](nRowIdx,nColIdx),nRowIdx,nColIdx);
-        lvDbgAssert__(aShpSaliency[nCamIdx](nRowIdx,nColIdx)>=-1e-6f && aShpSaliency[nCamIdx](nRowIdx,nColIdx)<=1.0f,"fShpSaliency = %1.10f @ [%d,%d]",aShpSaliency[nCamIdx](nRowIdx,nColIdx),nRowIdx,nColIdx);
+        lvDbgAssert__(aImgSaliency[nCamIdx](nRowIdx,nColIdx)>=-1e-6f && aImgSaliency[nCamIdx](nRowIdx,nColIdx)<=1.0f+1e-6f,"fImgSaliency = %1.10f @ [%d,%d]",aImgSaliency[nCamIdx](nRowIdx,nColIdx),nRowIdx,nColIdx);
+        lvDbgAssert__(aShpSaliency[nCamIdx](nRowIdx,nColIdx)>=-1e-6f && aShpSaliency[nCamIdx](nRowIdx,nColIdx)<=1.0f+1e-6f,"fShpSaliency = %1.10f @ [%d,%d]",aShpSaliency[nCamIdx](nRowIdx,nColIdx),nRowIdx,nColIdx);
         const float fImgSaliency = std::max(aImgSaliency[nCamIdx](nRowIdx,nColIdx),0.0f);
         const float fShpSaliency = std::max(aShpSaliency[nCamIdx](nRowIdx,nColIdx),0.0f);
         for(InternalLabelType nLabelIdx=0; nLabelIdx<m_nRealStereoLabels; ++nLabelIdx) {
@@ -1096,7 +1096,7 @@ inline void StereoSegmMatcher::GraphModelData::calcImageFeatures(const CamArray<
         lvDbgExec( // cv::normalize leftover fp errors are sometimes awful; need to 0-max when using map
             for(int nRowIdx=0; nRowIdx<oSaliency.rows; ++nRowIdx)
                 for(int nColIdx=0; nColIdx<oSaliency.cols; ++nColIdx)
-                    lvDbgAssert((oSaliency.at<float>(nRowIdx,nColIdx)>=-1e-6f && oSaliency.at<float>(nRowIdx,nColIdx)<=1.0f) || m_aROIs[nCamIdx](nRowIdx,nColIdx)==0);
+                    lvDbgAssert((oSaliency.at<float>(nRowIdx,nColIdx)>=-1e-6f && oSaliency.at<float>(nRowIdx,nColIdx)<=1.0f+1e-6f) || m_aROIs[nCamIdx](nRowIdx,nColIdx)==0);
         );
     #if STEREOSEGMATCH_CONFIG_USE_SALIENT_MAP_BORDR
         cv::multiply(oSaliency,cv::Mat_<float>(oSaliency.size(),1.0f).setTo(0.5f,m_aDescROIs[nCamIdx]==0),oSaliency);
@@ -1207,7 +1207,7 @@ inline void StereoSegmMatcher::GraphModelData::calcShapeFeatures(const CamArray<
         lvDbgExec( // cv::normalize leftover fp errors are sometimes awful; need to 0-max when using map
             for(int nRowIdx=0; nRowIdx<oSaliency.rows; ++nRowIdx)
                 for(int nColIdx=0; nColIdx<oSaliency.cols; ++nColIdx)
-                    lvDbgAssert((oSaliency.at<float>(nRowIdx,nColIdx)>=-1e-6f && oSaliency.at<float>(nRowIdx,nColIdx)<=1.0f) || m_aROIs[nCamIdx](nRowIdx,nColIdx)==0);
+                    lvDbgAssert((oSaliency.at<float>(nRowIdx,nColIdx)>=-1e-6f && oSaliency.at<float>(nRowIdx,nColIdx)<=1.0f+1e-6f) || m_aROIs[nCamIdx](nRowIdx,nColIdx)==0);
         );
     #if STEREOSEGMATCH_CONFIG_USE_SALIENT_MAP_BORDR
         cv::multiply(oSaliency,cv::Mat_<float>(oSaliency.size(),1.0f).setTo(0.5f,m_aDescROIs[nCamIdx]==0),oSaliency);
