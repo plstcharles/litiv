@@ -35,8 +35,8 @@
 #define STEREOSEGMATCH_CONFIG_USE_ROOT_SIFT_DESCS   0
 #define STEREOSEGMATCH_CONFIG_USE_GMM_LOCAL_BACKGR  1
 #define STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF   0
-#define STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF 1
-#define STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF  0
+#define STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF 0
+#define STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF  1
 #define STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF   1
 #define STEREOSEGMATCH_CONFIG_USE_SOSPD_RESEGM_INF  0
 #define STEREOSEGMATCH_CONFIG_USE_PROGRESS_BARS     0
@@ -101,7 +101,7 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
     using OutputLabelType = int32_t; ///< type used in returned labelings (i.e. output of 'apply')
     using AssocCountType = uint16_t; ///< type used for stereo association counting in cv::Mat_'s
     using AssocIdxType = int16_t; ///< type used for stereo association idx listing in cv::Mat_'s
-    using ValueType =  double; ///< type used for factor values (@@@@ could be integer? retest speed later?)
+    using ValueType =  int64_t; ///< type used for factor values (@@@@ could be integer? retest speed later?)
     using IndexType = size_t; ///< type used for node indexing (note: pretty much hardcoded everywhere in impl below)
     using ExplicitFunction = lv::gm::ExplicitViewFunction<ValueType,IndexType,InternalLabelType>; ///< shortcut for explicit view function
     using ExplicitAllocFunction = opengm::ExplicitFunction<ValueType,IndexType,InternalLabelType>; ///< shortcut for explicit allocated function
@@ -401,26 +401,18 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         void calcShapeDistFeatures(const cv::Mat_<InternalLabelType>& oInputMask, size_t nCamIdx);
         /// calculates a stereo unary move cost for a single graph node
         ValueType calcStereoUnaryMoveCost(size_t nCamIdx, size_t nGraphNodeIdx, InternalLabelType nOldLabel, InternalLabelType nNewLabel) const;
-    #if STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF
+    #if (STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF || STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF)
         /// fill internal temporary energy cost mats for the given stereo move operation
         void calcStereoMoveCosts(size_t nCamIdx, InternalLabelType nNewLabel) const;
-    #endif //STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF
-    #if STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF
+    #endif //(STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF || STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF)
+    #if (STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF || STEREOSEGMATCH_CONFIG_USE_SOSPD_RESEGM_INF)
         /// fill internal temporary energy cost mats for the given resegm move operation
         void calcResegmMoveCosts(size_t nCamIdx, InternalLabelType nNewLabel) const;
-    #endif //STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF
-    #if (STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF || STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF)
-        /// fill internal temporary energy cost mats for all stereo label move operations
-        void calcStereoCosts(size_t nCamIdx) const;
-    #endif //(STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF || STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF)
-    #if STEREOSEGMATCH_CONFIG_USE_SOSPD_RESEGM_INF
-        /// fill internal temporary energy cost mats for all resegm label move operations
-        void calcResegmCosts(size_t nCamIdx) const;
-    #endif //STEREOSEGMATCH_CONFIG_USE_SOSPD_RESEGM_INF
+    #endif //(STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF || STEREOSEGMATCH_CONFIG_USE_SOSPD_RESEGM_INF)
     #if STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF
         /// runs sospd inference algorithm either to completion, or for a specific number of iterations
         // ... @@@ todo
-        typedef int VarId;
+        typedef IndexType VarId;
         typedef InternalLabelType Label;
         typedef ValueType REAL;
         typedef std::vector<REAL> LambdaAlpha;
@@ -435,18 +427,14 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> {
         size_t __cam;
         size_t m_nStereoCliqueCount;
         InternalLabelType __alpha;
-        REAL& Height(VarId i, Label l) {
-            return m_heights[i*m_nStereoLabels+l];
-        }
-        REAL& dualVariable(int alpha, VarId i, Label l) {
-            return m_dual[alpha][i*m_nStereoLabels+l];
-        }
-        REAL& dualVariable(LambdaAlpha& lambdaAlpha,VarId i, Label l) {
-            return lambdaAlpha[i*m_nStereoLabels+l];
-        }
-        LambdaAlpha& lambdaAlpha(int alpha){
-            return m_dual[alpha];
-        }
+        REAL& Height(VarId i, Label l) {return m_heights[i*m_nStereoLabels+l];}
+        const REAL& Height(VarId i, Label l) const {return m_heights[i*m_nStereoLabels+l];}
+        REAL& dualVariable(int alpha, VarId i, Label l) {return m_dual[alpha][i*m_nStereoLabels+l];}
+        const REAL& dualVariable(int alpha, VarId i, Label l) const {return m_dual[alpha][i*m_nStereoLabels+l];}
+        REAL& dualVariable(LambdaAlpha& lambdaAlpha,VarId i, Label l) {return lambdaAlpha[i*m_nStereoLabels+l];}
+        const REAL& dualVariable(LambdaAlpha& lambdaAlpha,VarId i, Label l) const {return lambdaAlpha[i*m_nStereoLabels+l];}
+        LambdaAlpha& lambdaAlpha(int alpha) {return m_dual[alpha];}
+        const LambdaAlpha& lambdaAlpha(int alpha) const {return m_dual[alpha];}
         //void HeightAlphaProposal();
         //void AlphaProposal();
         NodeCliqueList m_node_clique_list;
