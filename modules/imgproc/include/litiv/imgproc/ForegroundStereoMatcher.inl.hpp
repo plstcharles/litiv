@@ -330,9 +330,7 @@ inline StereoSegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>
     #elif STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
         m_aStereoUnaryCosts[nCamIdx].create(int(m_nStereoLabels),int(anValidNodes[nCamIdx])); // @@@ flip for optim?
     #endif //STEREOSEGMATCH_CONFIG_USE_..._STEREO_INF
-    #if STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF
         m_aResegmUnaryCosts[nCamIdx].create(m_oGridSize);
-    #endif //STEREOSEGMATCH_CONFIG_USE_..._RESEGM_INF
         m_vNodeInfos.resize(m_oGridSize.total());
         m_avValidLUTNodeIdxs[nCamIdx].reserve(anValidNodes[nCamIdx]);
     }
@@ -1717,36 +1715,6 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
     lvLog_(2,"Running inference for primary camera idx=%d...",(int)nPrimaryCamIdx);
 #if (STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF || STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF)
     using HOEReducer = HigherOrderEnergy<ValueType,s_nMaxOrder>;
-    const auto lFactorReducer = [&](auto& oGraphFactor, size_t nFactOrder, HOEReducer& oReducer, InternalLabelType nAlphaLabel, const size_t* pValidLUTNodeIdxs, const InternalLabelType* aLabeling) {
-        lvDbgAssert(oGraphFactor.numberOfVariables()==nFactOrder);
-        std::array<typename HOEReducer::VarId,s_nMaxOrder> aTermEnergyLUT;
-        std::array<InternalLabelType,s_nMaxOrder> aCliqueLabels;
-        std::array<ValueType,s_nMaxCliqueAssign> aCliqueCoeffs;
-        const size_t nAssignCount = 1UL<<nFactOrder;
-        std::fill_n(aCliqueCoeffs.begin(),nAssignCount,cost_cast(0));
-        for(size_t nAssignIdx=0; nAssignIdx<nAssignCount; ++nAssignIdx) {
-            for(size_t nVarIdx=0; nVarIdx<nFactOrder; ++nVarIdx)
-                aCliqueLabels[nVarIdx] = (nAssignIdx&(1<<nVarIdx))?nAlphaLabel:aLabeling[pValidLUTNodeIdxs[oGraphFactor.variableIndex(nVarIdx)]];
-            for(size_t nAssignSubsetIdx=1; nAssignSubsetIdx<nAssignCount; ++nAssignSubsetIdx) {
-                if(!(nAssignIdx&~nAssignSubsetIdx)) {
-                    int nParityBit = 0;
-                    for(size_t nVarIdx=0; nVarIdx<nFactOrder; ++nVarIdx)
-                        nParityBit ^= (((nAssignIdx^nAssignSubsetIdx)&(1<<nVarIdx))!=0);
-                    const ValueType fCurrAssignEnergy = oGraphFactor(aCliqueLabels.begin());
-                    aCliqueCoeffs[nAssignSubsetIdx] += nParityBit?-fCurrAssignEnergy:fCurrAssignEnergy;
-                }
-            }
-        }
-        for(size_t nAssignSubsetIdx=1; nAssignSubsetIdx<nAssignCount; ++nAssignSubsetIdx) {
-            int nCurrTermDegree = 0;
-            for(size_t nVarIdx=0; nVarIdx<nFactOrder; ++nVarIdx)
-                if(nAssignSubsetIdx&(1<<nVarIdx))
-                    aTermEnergyLUT[nCurrTermDegree++] = (typename HigherOrderEnergy<ValueType,s_nMaxOrder>::VarId)oGraphFactor.variableIndex(nVarIdx);
-            std::sort(aTermEnergyLUT.begin(),aTermEnergyLUT.begin()+nCurrTermDegree);
-            oReducer.AddTerm(aCliqueCoeffs[nAssignSubsetIdx],nCurrTermDegree,aTermEnergyLUT.data());
-        }
-    };
-    lvIgnore(lFactorReducer); // @@@@ make inline func? move up like sospd helpers?
 #endif //(STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF || STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF)
 #if STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
     //calcStereoCosts(nPrimaryCamIdx);
@@ -1851,7 +1819,6 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
     CamArray<ValueType> atLastResegmEnergies = {std::numeric_limits<ValueType>::max(),std::numeric_limits<ValueType>::max()};
     cv::Mat_<InternalLabelType>& oCurrStereoLabeling = m_aStereoLabelings[nPrimaryCamIdx];
     bool bJustUpdatedSegm = false;
-
     while(++nMoveIter<=m_nMaxMoveIterCount && nConsecUnchangedLabels<m_nStereoLabels) {
         const bool bNullifyStereoPairwCosts = false;//(STEREOSEGMATCH_CONFIG_USE_UNARY_ONLY_FIRST)&&nMoveIter<=m_nStereoLabels;
     #if STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
@@ -1906,7 +1873,7 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
                 for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
                     const PairwClique& oStereoClique = oNode.aaStereoPairwCliques[nPrimaryCamIdx][nOrientIdx];
                     if(oStereoClique)
-                        lFactorReducer(m_apStereoModels[nPrimaryCamIdx]->operator[](oStereoClique.m_nGraphFactorId),2,oStereoReducer,nStereoAlphaLabel,m_avValidLUTNodeIdxs[nPrimaryCamIdx].data(),(InternalLabelType*)oCurrStereoLabeling.data);
+                        lv::gm::factorReducer<s_nMaxOrder,ValueType>(m_apStereoModels[nPrimaryCamIdx]->operator[](oStereoClique.m_nGraphFactorId),2,oStereoReducer,nStereoAlphaLabel,m_avValidLUTNodeIdxs[nPrimaryCamIdx].data(),(InternalLabelType*)oCurrStereoLabeling.data);
                 }
                 // @@@@@ add higher o facts here (3-conn on epi lines?)
             }
@@ -2010,7 +1977,7 @@ inline opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer(siz
                             for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
                                 const PairwClique& oResegmClique = oNode.aaResegmPairwCliques[nCamIdx][nOrientIdx];
                                 if(oResegmClique)
-                                    lFactorReducer(m_apResegmModels[nCamIdx]->operator[](oResegmClique.m_nGraphFactorId),2,aResegmReducers[nCamIdx],nResegmAlphaLabel,m_avValidLUTNodeIdxs[nCamIdx].data(),(InternalLabelType*)oCurrResegmLabeling.data);
+                                    lv::gm::factorReducer<s_nMaxOrder,ValueType>(m_apResegmModels[nCamIdx]->operator[](oResegmClique.m_nGraphFactorId),2,aResegmReducers[nCamIdx],nResegmAlphaLabel,m_avValidLUTNodeIdxs[nCamIdx].data(),(InternalLabelType*)oCurrResegmLabeling.data);
                             }
                             // @@@@@ add higher o facts here (3/4-conn spatiotemporal?)
                         }
