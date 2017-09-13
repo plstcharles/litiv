@@ -41,9 +41,8 @@ namespace lv {
         return ((nVal&(nVal-1))==0);
     }
 
-    /// returns the nearest (rounded up) power of two to the given 32-bit unsigned integer
-    inline uint32_t get_next_pow2(uint32_t nVal) {
-        lvDbgAssert_(nVal>0,"given value must be greater than 0 (returns 0 otherwise)");
+    /// returns the nearest (rounded up) power of two to the given 32-bit unsigned integer, but returns 0 if input is 0
+    constexpr inline uint32_t get_next_pow2(uint32_t nVal) {
         --nVal;
         nVal |= nVal>>1;
         nVal |= nVal>>2;
