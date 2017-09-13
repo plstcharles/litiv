@@ -44,9 +44,9 @@ struct IICosegmentor : public cv::Algorithm {
     /// returns the list of labels used in the output masks, or an empty array if it cannot be predetermined
     virtual const std::vector<LabelType>& getLabels() const = 0;
     /// returns the expected input stream array size
-    static constexpr size_t getInputStreamCount() {return nInputArraySize;}
+    static constexpr size_t getInputStreamCount() noexcept {return nInputArraySize;}
     /// returns the output stream array size
-    static constexpr size_t getOutputStreamCount() {return nOutputArraySize;}
+    static constexpr size_t getOutputStreamCount() noexcept {return nOutputArraySize;}
     /// required for derived class destruction from this interface
     virtual ~IICosegmentor() = default;
 protected:

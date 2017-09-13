@@ -50,7 +50,9 @@ endif()
 if(USE_OPENGM)
     add_files(INCLUDE_FILES
         "include/litiv/imgproc/ForegroundStereoMatcher.hpp"
-        "include/litiv/imgproc/ForegroundStereoMatcher.inl.hpp"
+    )
+    add_files(SOURCE_FILES
+        "src/ForegroundStereoMatcher.cpp"
     )
 endif()
 
