@@ -176,23 +176,33 @@ namespace lv {
             virtual TFunc* getFunctionPtr() const = 0;
             /// returns a LUT node index for a member of this clique
             virtual TIndex getLUTNodeIdx(TIndex nInternalIdx) const = 0;
+            /// returns the beginning LUT node iterator for this clique
+            virtual const TIndex* getLUTNodeIter() const = 0;
             /// returns a graph node index for a member of this clique
             virtual TIndex getGraphNodeIdx(TIndex nInternalIdx) const = 0;
+            /// returns the beginning graph node iterator for this clique
+            virtual const TIndex* getGraphNodeIter() const = 0;
             /// implicit bool conversion operator returns whether this clique is valid or not
             operator bool() const {return isValid();}
         };
 
         /// clique implementation used for faster factor/energy/nodes access through graph model
         /// note: for optimal performance, users that know the clique's size should use public members instead of virtual functions
-        template<size_t nSize, typename TValue, typename TIndex=size_t, typename TLabel=size_t, typename TFunc=ExplicitViewFunction<TValue,TIndex,TLabel>>
-        struct Clique : IClique<TValue,TIndex,TLabel,TFunc> {
+        template<size_t nSize, typename TValue, typename TIndex=size_t, typename TLabel=size_t, typename TFunc=ExplicitViewFunction<TValue,TIndex,TLabel>, typename ENABLE=void>
+        struct Clique;
+
+        /// clique implementation used for faster factor/energy/nodes access through graph model (with non-null size specialization)
+        /// note: for optimal performance, users that know the clique's size should use public members instead of virtual functions
+        template<size_t nSize, typename TValue, typename TIndex, typename TLabel, typename TFunc>
+        struct Clique<nSize,TValue,TIndex,TLabel,TFunc,std::enable_if_t<(nSize>size_t(0))>> :
+                IClique<TValue,TIndex,TLabel,TFunc> {
             /// default constructor; fills all members with invalid values that must be specified later
             Clique() {
                 m_bValid = false;
                 m_nGraphFactorId = std::numeric_limits<TIndex>::max();
                 m_pGraphFunctionPtr = nullptr;
-                std::fill_n(m_anLUTNodeIdxs.begin(),nSize,std::numeric_limits<TIndex>::max());
-                std::fill_n(m_anGraphNodeIdxs.begin(),nSize,std::numeric_limits<TIndex>::max());
+                std::fill_n(m_anLUTNodeIdxs.begin(),s_nCliqueSize,std::numeric_limits<TIndex>::max());
+                std::fill_n(m_anGraphNodeIdxs.begin(),s_nCliqueSize,std::numeric_limits<TIndex>::max());
             }
             /// returns whether the clique is initialized/in use or not through the virtual interface
             virtual bool isValid() const override final {
@@ -200,7 +210,7 @@ namespace lv {
             }
             /// returns the clique size of this object through the virtual interface (for casting)
             virtual TIndex getSize() const override final {
-                return nSize;
+                return s_nCliqueSize;
             }
             /// returns the graph factor index for this clique through the virtual interface
             virtual TIndex getFactorId() const override final {
@@ -212,13 +222,21 @@ namespace lv {
             }
             /// returns a LUT node index for a member of this clique through the virtual interface
             virtual TIndex getLUTNodeIdx(TIndex nInternalIdx) const override final {
-                lvDbgAssert(nInternalIdx<nSize);
+                lvDbgAssert(nInternalIdx<s_nCliqueSize);
                 return m_anLUTNodeIdxs[nInternalIdx];
+            }
+            /// returns the beginning LUT node iterator for this clique
+            virtual const TIndex* getLUTNodeIter() const override final {
+                return m_anLUTNodeIdxs.begin();
             }
             /// returns the in-graph index of a node in this clique through the virtual interface
             virtual TIndex getGraphNodeIdx(TIndex nInternalIdx) const override final {
-                lvDbgAssert(nInternalIdx<nSize);
+                lvDbgAssert(nInternalIdx<s_nCliqueSize);
                 return m_anGraphNodeIdxs[nInternalIdx];
+            }
+            /// returns the beginning graph node iterator for this clique
+            virtual const TIndex* getGraphNodeIter() const override final {
+                return m_anGraphNodeIdxs.begin();
             }
             /// implicit bool conversion operator returns whether this clique is valid or not
             operator bool() const {
@@ -235,8 +253,54 @@ namespace lv {
             /// graph node indices for members of this clique (should always be a valid index in gmodel)
             std::array<TIndex,nSize> m_anGraphNodeIdxs;
             /// static size member of this clique (for type traits ops)
-            static constexpr TIndex s_nCliqueSize = nSize;
-            static_assert(s_nCliqueSize>=TIndex(1),"clique size must be strictly positive");
+            static constexpr TIndex s_nCliqueSize = TIndex(nSize);
+        };
+
+        /// clique implementation used for faster factor/energy/nodes access through graph model (with null size specialization)
+        /// note: for optimal performance, users that know the clique's size should use public members instead of virtual functions
+        template<size_t nSize, typename TValue, typename TIndex, typename TLabel, typename TFunc>
+        struct Clique<nSize,TValue,TIndex,TLabel,TFunc,std::enable_if_t<(nSize==size_t(0))>> :
+                IClique<TValue,TIndex,TLabel,TFunc> {
+            /// default constructor (empty for null-sized clique)
+            Clique() = default;
+            /// returns whether the clique is initialized/in use or not through the virtual interface
+            virtual bool isValid() const override final {
+                return false;
+            }
+            /// returns the clique size of this object through the virtual interface (for casting)
+            virtual TIndex getSize() const override final {
+                return TIndex(0);
+            }
+            /// returns the graph factor index for this clique through the virtual interface
+            virtual TIndex getFactorId() const override final {
+                return std::numeric_limits<TIndex>::max();
+            }
+            /// returns this clique's function tied to its graph factor through the virtual interface
+            virtual TFunc* getFunctionPtr() const override final {
+                return nullptr;
+            }
+            /// returns a LUT node index for a member of this clique through the virtual interface
+            virtual TIndex getLUTNodeIdx(TIndex) const override final {
+                return std::numeric_limits<TIndex>::max();
+            }
+            /// returns the beginning LUT node iterator for this clique
+            virtual const TIndex* getLUTNodeIter() const override final {
+                return nullptr;
+            }
+            /// returns the in-graph index of a node in this clique through the virtual interface
+            virtual TIndex getGraphNodeIdx(TIndex) const override final {
+                return std::numeric_limits<TIndex>::max();
+            }
+            /// returns the beginning graph node iterator for this clique
+            virtual const TIndex* getGraphNodeIter() const override final {
+                return nullptr;
+            }
+            /// implicit bool conversion operator returns whether this clique is valid or not
+            operator bool() const {
+                return false;
+            }
+            /// static size member of this clique (for type traits ops)
+            static constexpr TIndex s_nCliqueSize = TIndex(0);
         };
 
     } // namespace gm
@@ -244,4 +308,7 @@ namespace lv {
 } // namespace lv
 
 template<size_t nSize, typename TValue, typename TIndex, typename TLabel, typename TFunc>
-constexpr TIndex lv::gm::Clique<nSize,TValue,TIndex,TLabel,TFunc>::s_nCliqueSize;
+constexpr TIndex lv::gm::Clique<nSize,TValue,TIndex,TLabel,TFunc,std::enable_if_t<(nSize>size_t(0))>>::s_nCliqueSize;
+
+template<size_t nSize, typename TValue, typename TIndex, typename TLabel, typename TFunc>
+constexpr TIndex lv::gm::Clique<nSize,TValue,TIndex,TLabel,TFunc,std::enable_if_t<(nSize==size_t(0))>>::s_nCliqueSize;
