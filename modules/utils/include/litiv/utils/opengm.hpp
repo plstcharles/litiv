@@ -98,10 +98,10 @@ namespace lv {
             for(size_t f=0; f<oGM.numberOfFactors(); ++f)
                 mFactOrderHist[oGM.operator[](f).numberOfVariables()] += 1;
             lvAssert_(std::accumulate(mFactOrderHist.begin(),mFactOrderHist.end(),size_t(0),[](const size_t n, const auto& p){return n+p.second;})==oGM.numberOfFactors(),"factor count mismatch");
-            lvCout << "Model has " << oGM.numberOfVariables() << " variables (" << ((nMinVarLabelCount==nMaxVarLabelCount)?std::to_string(nMinVarLabelCount)+" labels each)":std::to_string(nMinVarLabelCount)+" labels min, "+std::to_string(nMaxVarLabelCount)+" labels max)") << '\n';
-            lvCout << "Model has " << oGM.numberOfFactors() << " factors;\n";
+            lvCout << "\tmodel has " << oGM.numberOfVariables() << " variables (" << ((nMinVarLabelCount==nMaxVarLabelCount)?std::to_string(nMinVarLabelCount)+" labels each)":std::to_string(nMinVarLabelCount)+" labels min, "+std::to_string(nMaxVarLabelCount)+" labels max)") << '\n';
+            lvCout << "\tmodel has " << oGM.numberOfFactors() << " factors;\n";
             for(const auto& oOrderBin : mFactOrderHist) {
-                lvCout << "\t" << oOrderBin.second << " factors w/ order=" << oOrderBin.first << '\n';
+                lvCout << "\t\t" << oOrderBin.second << " factors w/ order=" << oOrderBin.first << '\n';
             }
         }
 
