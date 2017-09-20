@@ -170,9 +170,9 @@ namespace impl {
         const int nThreads = blockDim.x;
         const int nThreadIdx = threadIdx.x;
         const int nPatchRadius = nPatchSize/2;
-        const int nPatchRowIdx = threadIdx.x/nPatchSize;
+        const int nPatchRowIdx = nThreadIdx/nPatchSize;
         const int nOffsetRowIdx = nRowIdx+nPatchRowIdx-nPatchRadius;
-        const int nOffsetColIdx = nColIdx+threadIdx.x%nPatchSize-nPatchRadius;
+        const int nOffsetColIdx = nColIdx+nThreadIdx%nPatchSize-nPatchRadius;
         const bool bValid = nPatchRowIdx<nPatchSize && nOffsetRowIdx>=0 && nOffsetRowIdx<nRows && nOffsetColIdx>=0 && nOffsetColIdx<nCols;
         extern __shared__ int aTmpCommon_patch[];
         int* anCounts = aTmpCommon_patch;
@@ -186,13 +186,14 @@ namespace impl {
             anCounts[nThreadIdx] = 0;
             afAffinities[nThreadIdx] = 0.0f;
         }
-        __syncthreads();
         for(int nStep=nThreads/2; nStep>0; nStep>>=1) {
-            if(nThreadIdx+nStep<nThreads) {
-                anCounts[nThreadIdx] += anCounts[nThreadIdx+nStep];
-                afAffinities[nThreadIdx] += afAffinities[nThreadIdx+nStep];
-            }
+            const bool bInRange = (nThreadIdx+nStep)<nThreads;
             __syncthreads();
+            const int nCurrCount = bInRange?anCounts[nThreadIdx+nStep]:0;
+            const float fCurrAff = bInRange?afAffinities[nThreadIdx+nStep]:0.0f;
+            __syncthreads();
+            anCounts[nThreadIdx] += nCurrCount;
+            afAffinities[nThreadIdx] += fCurrAff;
         }
         if(nThreadIdx==0)
             oAffinityMap(nRowIdx*nCols+nColIdx,nOffsetIdx) = anCounts[0]?(afAffinities[0]/anCounts[0]):-1.0f;
