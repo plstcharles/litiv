@@ -128,7 +128,7 @@ TEST(gmm_learn,regression_local) {
 
 #include "litiv/features2d/SC.hpp"
 
-TEST(descriptor_affinity,regression_L2) {
+TEST(descriptor_affinity,regression_L2_sc) {
     std::unique_ptr<ShapeContext> pShapeContext = std::make_unique<ShapeContext>(size_t(2),size_t(40),12,5);
     const int nSize = 257;
     const cv::Size oSize(nSize,nSize);
@@ -245,4 +245,84 @@ TEST(descriptor_affinity,regression_L2) {
     else
         lv::write(sAffMapBinPath_p7,oAffMap);
     //cv::waitKey(0);
+}
+
+#include "litiv/features2d/DASC.hpp"
+
+TEST(descriptor_affinity,regression_L2_dasc) {
+    std::unique_ptr<DASC> pDASC = std::make_unique<DASC>(size_t(2),0.09f);
+    const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
+    ASSERT_TRUE(!oInput.empty());
+    cv::Mat oInput1=oInput.clone(),oInput2=oInput.clone();
+    lv::shift(oInput2,oInput2,cv::Point2f(-1.5f,4.5f),cv::BORDER_REFLECT101);
+    cv::GaussianBlur(oInput2,oInput2,cv::Size(5,5),0);
+    lvAssert(oInput2.depth()==CV_32F);
+    oInput2.convertTo(oInput2,CV_8U);
+    //cv::imshow("in1",oInput);
+    //cv::imshow("in2",oInput);
+    cv::Mat_<float> oDescMap1,oDescMap2;
+    pDASC->compute2(oInput1,oDescMap1);
+    pDASC->compute2(oInput2,oDescMap2);
+    ASSERT_EQ(lv::MatInfo(oDescMap1),lv::MatInfo(oDescMap2));
+    ASSERT_FALSE(std::equal(oDescMap1.begin(),oDescMap1.end(),oDescMap2.begin()));
+    cv::Mat_<float> oAffMap;
+    const std::vector<int> vDispRange = lv::make_range(-3,0);
+    cv::Mat_<uchar> oROI1(oInput2.size(),uchar(0)),oROI2(oInput2.size(),uchar(0));
+    const int nBorderSize = pDASC->borderSize();
+    oROI1(cv::Rect(nBorderSize,nBorderSize,oInput.cols-nBorderSize*2,oInput.rows-nBorderSize*2)) = uchar(255);
+    oROI2(cv::Rect(nBorderSize,nBorderSize,oInput.cols-nBorderSize*2,oInput.rows-nBorderSize*2)) = uchar(255);
+    //cv::imshow("roi1",oROI1);
+    //cv::imshow("roi2",oROI2);
+    //cv::waitKey(0);
+    lv::computeDescriptorAffinity(oDescMap1,oDescMap2,1,oAffMap,vDispRange,lv::AffinityDist_L2,oROI1,oROI2,cv::Mat(),false);
+    ASSERT_EQ(oAffMap.size[0],oInput.rows);
+    ASSERT_EQ(oAffMap.size[1],oInput.cols);
+    ASSERT_EQ(oAffMap.size[2],(int)vDispRange.size());
+#if HAVE_CUDA
+    cv::Mat_<float> oAffMap_gpu;
+    lv::computeDescriptorAffinity(oDescMap1,oDescMap2,1,oAffMap_gpu,vDispRange,lv::AffinityDist_L2,oROI1,oROI2,cv::Mat(),true);
+    ASSERT_EQ(lv::MatInfo(oAffMap_gpu),lv::MatInfo(oAffMap));
+    for(int i=0; i<oAffMap.size[0]; ++i)
+        for(int j=0; j<oAffMap.size[1]; ++j)
+            for(int k=0; k<oAffMap.size[2]; ++k)
+                ASSERT_FLOAT_EQ(oAffMap(i,j,k),oAffMap_gpu(i,j,k)) << "ijk=[" << i << "," << j << "," << k << "]";
+#endif //HAVE_CUDA
+    oAffMap = lv::getSubMat(oAffMap,0,cv::Range(45,70));
+    const std::string sAffMapBinPath_p1 = TEST_CURR_INPUT_DATA_ROOT "/test_affmap_p1_r4_L2.bin";
+    if(lv::checkIfExists(sAffMapBinPath_p1)) {
+        cv::Mat_<float> oRefMap = lv::read(sAffMapBinPath_p1);
+        ASSERT_EQ(oAffMap.total(),oRefMap.total());
+        ASSERT_EQ(oAffMap.size,oRefMap.size);
+        for(int i=0; i<oAffMap.size[0]; ++i)
+            for(int j=0; j<oAffMap.size[1]; ++j)
+                for(int k=0; k<oAffMap.size[2]; ++k)
+                    ASSERT_FLOAT_EQ(oAffMap(i,j,k),oRefMap(i,j,k)) << "ijk=[" << i << "," << j << "," << k << "]";
+    }
+    else
+        lv::write(sAffMapBinPath_p1,oAffMap);
+    lv::computeDescriptorAffinity(oDescMap1,oDescMap2,7,oAffMap,vDispRange,lv::AffinityDist_L2,oROI1,oROI2,cv::Mat(),false);
+    ASSERT_EQ(oAffMap.size[0],oInput.rows);
+    ASSERT_EQ(oAffMap.size[1],oInput.cols);
+    ASSERT_EQ(oAffMap.size[2],(int)vDispRange.size());
+#if HAVE_CUDA
+    lv::computeDescriptorAffinity(oDescMap1,oDescMap2,7,oAffMap_gpu,vDispRange,lv::AffinityDist_L2,oROI1,oROI2,cv::Mat(),true);
+    ASSERT_EQ(lv::MatInfo(oAffMap_gpu),lv::MatInfo(oAffMap));
+    for(int i=0; i<oAffMap.size[0]; ++i)
+        for(int j=0; j<oAffMap.size[1]; ++j)
+            for(int k=0; k<oAffMap.size[2]; ++k)
+                ASSERT_FLOAT_EQ(oAffMap(i,j,k),oAffMap_gpu(i,j,k)) << "ijk=[" << i << "," << j << "," << k << "]";
+#endif //HAVE_CUDA
+    oAffMap = lv::getSubMat(oAffMap,0,cv::Range(160,185));
+    const std::string sAffMapBinPath_p7 = TEST_CURR_INPUT_DATA_ROOT "/test_affmap_p7_r4_L2.bin";
+    if(lv::checkIfExists(sAffMapBinPath_p7)) {
+        cv::Mat_<float> oRefMap = lv::read(sAffMapBinPath_p7);
+        ASSERT_EQ(oAffMap.total(),oRefMap.total());
+        ASSERT_EQ(oAffMap.size,oRefMap.size);
+        for(int i=0; i<oAffMap.size[0]; ++i)
+            for(int j=0; j<oAffMap.size[1]; ++j)
+                for(int k=0; k<oAffMap.size[2]; ++k)
+                    ASSERT_FLOAT_EQ(oAffMap(i,j,k),oRefMap(i,j,k)) << "ijk=[" << i << "," << j << "," << k << "]";
+    }
+    else
+        lv::write(sAffMapBinPath_p7,oAffMap);
 }

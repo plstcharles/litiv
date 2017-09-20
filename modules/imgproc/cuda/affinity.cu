@@ -21,7 +21,7 @@ __constant__ int g_anDispRange[AFF_MAP_DISP_RANGE_MAX];
 
 namespace impl {
 
-    __device__ inline void l2dist_lu_exec(device::DistCalcLUT* aDistCalcLUTs, float* aDescCalcLUT, float* aAffArray, int nOffsets, int nDescSize) {
+    __device__ inline void l2dist_lu_exec(const device::DistCalcLUT* aDistCalcLUTs, float* aDescCalcLUT, float* aAffArray, int nOffsets, int nDescSize) {
         const int nThreads = blockDim.x;
         const int nThreadIdx = threadIdx.x;
         const int nStepPerDesc = __float2int_ru(float(nDescSize)/nThreads);
@@ -29,25 +29,32 @@ namespace impl {
         const int nDescSize_LUT = nStepPerDesc*nThreads;
         assert(nDescSize_LUT>=nDescSize);
         for(int nOffsetIdx=0; nOffsetIdx<nOffsets; ++nOffsetIdx) {
-            device::DistCalcLUT* pDistCalcLUT = aDistCalcLUTs+nOffsetIdx;
-            if(pDistCalcLUT->aDesc1) {
+            const device::DistCalcLUT& aDistCalcLUT = aDistCalcLUTs[nOffsetIdx];
+            if(aDistCalcLUT.aDesc1) {
                 for(int nStep=0; nStep<nStepPerDesc; ++nStep) {
                     const int nDescBinIdx = nThreads*nStep + nThreadIdx;
                     assert(nDescBinIdx<nDescSize_LUT);
                     if(nDescBinIdx<nDescSize) {
-                        const float fDescBinDiff = pDistCalcLUT->aDesc1[nDescBinIdx]-pDistCalcLUT->aDesc2[nDescBinIdx];
+                        const float fDescBinDiff = aDistCalcLUT.aDesc1[nDescBinIdx]-aDistCalcLUT.aDesc2[nDescBinIdx];
                         aDescCalcLUT[nDescBinIdx] = fDescBinDiff*fDescBinDiff;
                     }
                     else
                         aDescCalcLUT[nDescBinIdx] = 0.0f;
                 }
                 __syncthreads();
+                assert((nDescSize_LUT%nThreads)==0);
                 if(nDescSize_LUT>nThreads) {
-                    assert((nDescSize_LUT%nThreads)==0);
-                    for(int nStep=nDescSize_LUT-nThreads; nStep>=nThreads; nStep-=nThreads)
-                        aDescCalcLUT[nThreadIdx+(nStep-nThreads)] += aDescCalcLUT[nThreadIdx+nStep];
-                    for(int nStep=nThreads/2; nStep>0; nStep>>=1)
+                    assert(nDescSize_LUT>=nThreads*2);
+                    for(int nStep=nThreads; nStep<nDescSize_LUT; nStep+=nThreads)
                         aDescCalcLUT[nThreadIdx] += aDescCalcLUT[nThreadIdx+nStep];
+                    __syncthreads();
+                    for(int nStep=nThreads/2; nStep>0; nStep>>=1) {
+                        // barrier-less reduction works in sc desc impl, but not here...?
+                        float tmp = aDescCalcLUT[nThreadIdx+nStep];
+                        __syncthreads();
+                        aDescCalcLUT[nThreadIdx] += tmp;
+                        __syncthreads();
+                    }
                 }
                 else {
                     assert(nDescSize_LUT==nThreads);
@@ -84,13 +91,13 @@ namespace impl {
         for(int nStep=0; nStep<nStepPerPixel; ++nStep) {
             const int nOffsetIdx = nThreads*nStep + nThreadIdx;
             assert(nOffsetIdx<nOffsets_LUT);
-            device::DistCalcLUT* pDistCalcLUT = aDistCalcLUTs+nOffsetIdx;
-            pDistCalcLUT->aDesc1 = nullptr;
+            device::DistCalcLUT& aDistCalcLUT = aDistCalcLUTs[nOffsetIdx];
+            aDistCalcLUT.aDesc1 = nullptr;
             if(nOffsetIdx<nOffsets) {
                 const int nOffsetColIdx = nColIdx+g_anDispRange[nOffsetIdx];
                 if(nOffsetColIdx>=0 && nOffsetColIdx<nCols) {
-                    pDistCalcLUT->aDesc1 = oDescMap1.ptr(nRowIdx*nCols+nColIdx);
-                    pDistCalcLUT->aDesc2 = oDescMap2.ptr(nRowIdx*nCols+nOffsetColIdx);
+                    aDistCalcLUT.aDesc1 = oDescMap1.ptr(nRowIdx*nCols+nColIdx);
+                    aDistCalcLUT.aDesc2 = oDescMap2.ptr(nRowIdx*nCols+nOffsetColIdx);
                 }
                 else
                     aAffArray[nOffsetIdx] = -1.0f; // default value for OOB pixels
@@ -134,13 +141,13 @@ namespace impl {
         for(int nStep=0; nStep<nStepPerPixel; ++nStep) {
             const int nOffsetIdx = nThreads*nStep + nThreadIdx;
             assert(nOffsetIdx<nOffsets_LUT);
-            device::DistCalcLUT* pDistCalcLUT = aDistCalcLUTs+nOffsetIdx;
-            pDistCalcLUT->aDesc1 = nullptr;
+            device::DistCalcLUT& aDistCalcLUT = aDistCalcLUTs[nOffsetIdx];
+            aDistCalcLUT.aDesc1 = nullptr;
             if(nOffsetIdx<nOffsets) {
                 const int nOffsetColIdx = nColIdx+g_anDispRange[nOffsetIdx];
                 if(nOffsetColIdx>=0 && nOffsetColIdx<nCols && aROI2Array[nOffsetColIdx]!=0) {
-                    pDistCalcLUT->aDesc1 = oDescMap1.ptr(nRowIdx*nCols+nColIdx);
-                    pDistCalcLUT->aDesc2 = oDescMap2.ptr(nRowIdx*nCols+nOffsetColIdx);
+                    aDistCalcLUT.aDesc1 = oDescMap1.ptr(nRowIdx*nCols+nColIdx);
+                    aDistCalcLUT.aDesc2 = oDescMap2.ptr(nRowIdx*nCols+nOffsetColIdx);
                 }
                 else
                     aAffArray[nOffsetIdx] = -1.0f; // default value for OOB pixels
