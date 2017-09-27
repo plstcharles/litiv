@@ -17,6 +17,7 @@
 
 set_eval(USE_OPENCV_MAT_CONSTR_FIX_EVAL ((${OpenCV_VERSION_MAJOR} LESS 4) AND (${OpenCV_VERSION_MINOR} LESS 2)))
 option(USE_OPENCV_MAT_CONSTR_FIX "Use internal fix for OpenCV's cv::Mat_<T> missing constructor" ${USE_OPENCV_MAT_CONSTR_FIX_EVAL})
+option(USE_OPENCV_x264_TEST "Use internal unit test to see if x264-encoded videos can be parsed by ffmpeg" OFF)
 option(USE_SIGNEXT_SHIFT_TRICK "Use sign-extended right shift bit trick in float absolute value computation" OFF)
 option(USE_FAST_SQRT_FOR_CDIST "Use fast approximate square root inside floating point version of color distortion" OFF)
 option(USE_RLUTIL_ANSI_DEFINE "Use ANSI escape sequences also on Windows in console utils (defaults to using WinAPI otherwise)" OFF)
@@ -24,6 +25,7 @@ set(RLUTIL_STRING_TYPE "const char*" CACHE STRING "Preferred string type for con
 
 mark_as_advanced(
     USE_OPENCV_MAT_CONSTR_FIX
+    USE_OPENCV_x264_TEST
     USE_SIGNEXT_SHIFT_TRICK
     USE_FAST_SQRT_FOR_CDIST
     USE_RLUTIL_ANSI_DEFINE

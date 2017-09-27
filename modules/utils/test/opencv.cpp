@@ -781,6 +781,8 @@ TEST(AlignedMatAllocatorPremade,regression) {
     ASSERT_TRUE(((uintptr_t)oTest.datastart%32)==size_t(0));
 }
 
+#if USE_OPENCV_x264_TEST
+
 TEST(ffmpeg_compat,read_x264) {
     const std::string sFileLocation = SAMPLES_DATA_ROOT "/tractor.mp4";
     cv::VideoCapture oCap(sFileLocation);
@@ -792,3 +794,5 @@ TEST(ffmpeg_compat,read_x264) {
     oCap >> oFrame;
     ASSERT_TRUE(!oFrame.empty() && oFrame.type()==CV_8UC3 && oFrame.size()==cv::Size(1920,1080));
 }
+
+#endif //USE_OPENCV_x264_TEST
