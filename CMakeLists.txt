@@ -80,6 +80,7 @@ elseif(CMAKE_SIZEOF_VOID_P EQUAL 4) # 32-bit toolchain/platform
 else()
     message(FATAL_ERROR "Could not detect x64/x86 platform identity using void pointer size (s=${CMAKE_SIZEOF_VOID_P}).")
 endif()
+option(USE_3RDPARTY_OPTFLOW_KROEGER2016 "Link & use 3rdparty GPLv3 optical flow implementation from Kroeger et al." ON)
 option(USE_WORLD_SOURCE_GLOB "Compile all LITIV modules as part of the world module instead of soft-linking them" OFF)
 option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark implementation in litiv_datasets (cleaned 3rd party code; will use an approximative solution otherwise)" ON)
 option(USE_DEBUG_SYMBOLS "Enable debug symbols in all configs, for all targets" OFF)
@@ -294,7 +295,7 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
     endif()
     add_definitions(-Wall)
     add_definitions(-Wfatal-errors)
-    add_definitions(-ftemplate-depth=900) # already default for gcc, but not for clang
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftemplate-depth=900") # already default for gcc, but not for clang
     check_function_exists(aligned_alloc USE_STL_ALIGNED_ALLOC)
     if(NOT USE_STL_ALIGNED_ALLOC)
         set(USE_STL_ALIGNED_ALLOC 0 CACHE INTERNAL "Have function aligned_alloc")
