@@ -184,8 +184,11 @@ if(OpenGM_FOUND)
     elseif(NOT OpenGM_FIND_QUIETLY)
         message(STATUS "Will use OpenGM without HDF5 support, some I/O methods might be disabled.")
     endif()
-
     mark_as_advanced(
+        HDF5_CORE_LIBRARY
+        HDF5_CPP_LIBRARY
+        HDF5_HL_LIBRARY
+        HDF5_INCLUDE_DIR
         OpenGM_INCLUDE_DIR
         OpenGM_INCLUDE_DIRS
         OpenGM_EXT_LIBRARY
