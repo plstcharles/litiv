@@ -50,6 +50,7 @@ list(APPEND CMAKE_PREFIX_PATH
     "$ENV{USER_DEVELOP}/glew/build-litiv/install/" "$ENV{USER_DEVELOP}/glew/build/install/" "$ENV{USER_DEVELOP}/glew/"
     "$ENV{USER_DEVELOP}/glm/build-litiv/install/" "$ENV{USER_DEVELOP}/glm/build/install/" "$ENV{USER_DEVELOP}/glm/"
     "$ENV{USER_DEVELOP}/opengm/build-litiv/install/" "$ENV{USER_DEVELOP}/opengm/build/install/" "$ENV{USER_DEVELOP}/opengm/"
+    "$ENV{USER_DEVELOP}/eigen3/build-litiv/install/" "$ENV{USER_DEVELOP}/eigen3/build/install/" "$ENV{USER_DEVELOP}/eigen3/"
 )
 
 ################################################################
