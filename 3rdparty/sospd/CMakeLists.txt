@@ -15,11 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(NOT USE_OPENGM)
-    return()
-endif()
-
-if(NOT USE_BOOST)
+if(NOT USE_SOSPD)
     return()
 endif()
 

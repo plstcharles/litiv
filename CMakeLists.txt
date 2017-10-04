@@ -275,6 +275,10 @@ if(BUILD_TESTS)
     file(MAKE_DIRECTORY ${TEST_OUTPUT_DATA_ROOT})
 endif()
 
+set_eval(USE_SOSPD_EVAL (${USE_OPENGM} AND ${USE_BOOST}))
+set(USE_SOSPD ${USE_SOSPD_EVAL} CACHE INTERNAL "")
+set(USE_OFDIS ${USE_3RDPARTY_OPTFLOW_KROEGER2016} CACHE INTERNAL "")
+
 initialize_internal_list(litiv_projects)
 initialize_internal_list(litiv_3rdparty_modules)
 initialize_internal_list(litiv_3rdparty_modules_sourcelist)
@@ -287,6 +291,9 @@ add_subdirectory(cmake/checks/simd)
 add_definitions(-DLITIV_BUILD)
 if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
     option(BUILD_SHARED_LIBS "Build shared libraries (.so) instead of static ones (.a)" ON)
+    if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang") OR ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang"))
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftemplate-depth=900") # already default for gcc, but not for clang
+    endif()
     if(NOT CMAKE_CROSSCOMPILING)
         add_definitions(-march=native)
     endif()
@@ -295,7 +302,6 @@ if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR ("${CMAKE_CXX_COMPILER_ID}" ST
     endif()
     add_definitions(-Wall)
     add_definitions(-Wfatal-errors)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftemplate-depth=900") # already default for gcc, but not for clang
     check_function_exists(aligned_alloc USE_STL_ALIGNED_ALLOC)
     if(NOT USE_STL_ALIGNED_ALLOC)
         set(USE_STL_ALIGNED_ALLOC 0 CACHE INTERNAL "Have function aligned_alloc")

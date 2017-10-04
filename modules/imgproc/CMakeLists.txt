@@ -69,9 +69,15 @@ target_link_libraries(litiv_imgproc
         litiv_utils
 )
 
-if(USE_OPENGM AND USE_BOOST)
+if(USE_SOSPD)
     target_link_libraries(litiv_imgproc
         PUBLIC
             litiv_3rdparty_sospd
+    )
+endif()
+if(USE_OFDIS)
+    target_link_libraries(litiv_imgproc
+        PUBLIC
+            litiv_3rdparty_ofdis
     )
 endif()
