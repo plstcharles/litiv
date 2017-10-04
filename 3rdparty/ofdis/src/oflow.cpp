@@ -1,5 +1,7 @@
 
+#define OFDIS_INTERNAL
 #include <Eigen/Core>
+#include "litiv/3rdparty/ofdis/fdf/image.h"
 #include <litiv/3rdparty/ofdis/utils.hpp>
 #include "litiv/3rdparty/ofdis/oflow.hpp"
 #include "litiv/3rdparty/ofdis/patchgrid.hpp"
@@ -109,8 +111,8 @@ ofdis::OFClass<eInput,eOutput>::OFClass(
         gettimeofday(&tv_start_all,nullptr);
 
     // Create grids on each scale
-    std::vector<ofdis::PatGridClass*> grid_fw(op.noscales);
-    std::vector<ofdis::PatGridClass*> grid_bw(op.noscales); // grid for backward OF computation, only needed if 'usefbcon' is set to 1.
+    std::vector<ofdis::PatGridClass<eInput,eOutput>*> grid_fw(op.noscales);
+    std::vector<ofdis::PatGridClass<eInput,eOutput>*> grid_bw(op.noscales); // grid for backward OF computation, only needed if 'usefbcon' is set to 1.
     std::vector<float*> flow_fw(op.noscales);
     std::vector<float*> flow_bw(op.noscales);
     cpl.resize(op.noscales);
@@ -135,11 +137,11 @@ ofdis::OFClass<eInput,eOutput>::OFClass(
         cpr[i].camlr = 1;
 
         flow_fw[i] = new float[op.nop*cpl[i].width*cpl[i].height];
-        grid_fw[i] = new ofdis::PatGridClass(&(cpl[i]),&(cpr[i]),&op);
+        grid_fw[i] = new ofdis::PatGridClass<eInput,eOutput>(&(cpl[i]),&(cpr[i]),&op);
 
         if(op.usefbcon) { // for merging forward and backward flow
             flow_bw[i] = new float[op.nop*cpr[i].width*cpr[i].height];
-            grid_bw[i] = new ofdis::PatGridClass(&(cpr[i]),&(cpl[i]),&op);
+            grid_bw[i] = new ofdis::PatGridClass<eInput,eOutput>(&(cpr[i]),&(cpl[i]),&op);
 
             // Make grids known to each other, necessary for AggregateFlowDense();
             grid_fw[i]->SetComplGrid(grid_bw[i]);
@@ -200,49 +202,49 @@ ofdis::OFClass<eInput,eOutput>::OFClass(
         if(op.usefbcon)
             grid_bw[ii]->Optimize();
 
-    // Timing, DIS
-    if(op.verbosity>1) {
-        gettimeofday(&tv_end_all,nullptr);
-        tt_patoptim[ii] = (tv_end_all.tv_sec-tv_start_all.tv_sec)*1000.0f+(tv_end_all.tv_usec-tv_start_all.tv_usec)/1000.0f;
-        tt_all[ii] += tt_patoptim[ii];
-        gettimeofday(&tv_start_all,nullptr);
+        // Timing, DIS
+        if(op.verbosity>1) {
+            gettimeofday(&tv_end_all,nullptr);
+            tt_patoptim[ii] = (tv_end_all.tv_sec-tv_start_all.tv_sec)*1000.0f+(tv_end_all.tv_usec-tv_start_all.tv_usec)/1000.0f;
+            tt_all[ii] += tt_patoptim[ii];
+            gettimeofday(&tv_start_all,nullptr);
+        }
+
+        // Densification. (Step 4 in Algorithm 1 of paper)
+        float* tmp_ptr = flow_fw[ii];
+        if(sl==op.sc_l)
+            tmp_ptr = outflow;
+
+        grid_fw[ii]->AggregateFlowDense(tmp_ptr);
+
+        if(op.usefbcon && sl>op.sc_l)  // skip at last scale, backward flow no longer needed
+            grid_bw[ii]->AggregateFlowDense(flow_bw[ii]);
+
+
+        // Timing, Densification
+        if(op.verbosity>1) {
+            gettimeofday(&tv_end_all,nullptr);
+            tt_compflow[ii] = (tv_end_all.tv_sec-tv_start_all.tv_sec)*1000.0f+(tv_end_all.tv_usec-tv_start_all.tv_usec)/1000.0f;
+            tt_all[ii] += tt_compflow[ii];
+            gettimeofday(&tv_start_all,nullptr);
+        }
+
+
+        // Variational refinement, (Step 5 in Algorithm 1 of paper)
+        if(op.usetvref) {
+            ofdis::VarRefClass<eInput,eOutput> varref_fw(im_ao[sl],im_ao_dx[sl],im_ao_dy[sl],im_bo[sl],im_bo_dx[sl],im_bo_dy[sl],&(cpl[ii]),&(cpr[ii]),&op,tmp_ptr);
+            if(op.usefbcon && sl>op.sc_l)    // skip at last scale, backward flow no longer needed
+                ofdis::VarRefClass<eInput,eOutput> varref_bw(im_bo[sl],im_bo_dx[sl],im_bo_dy[sl],im_ao[sl],im_ao_dx[sl],im_ao_dy[sl],&(cpr[ii]),&(cpl[ii]),&op,flow_bw[ii]);
+        }
+
+        // Timing, Variational Refinement
+        if(op.verbosity>1) {
+            gettimeofday(&tv_end_all,nullptr);
+            tt_tvopt[ii] = (tv_end_all.tv_sec-tv_start_all.tv_sec)*1000.0f+(tv_end_all.tv_usec-tv_start_all.tv_usec)/1000.0f;
+            tt_all[ii] += tt_tvopt[ii];
+            printf("TIME (Sc: %i, #p:%6i, pconst, pinit, poptim, cflow, tvopt, total): %8.2f %8.2f %8.2f %8.2f %8.2f -> %8.2f ms.\n",sl,grid_fw[ii]->GetNoPatches(),tt_patconstr[ii],tt_patinit[ii],tt_patoptim[ii],tt_compflow[ii],tt_tvopt[ii],tt_all[ii]);
+        }
     }
-
-    // Densification. (Step 4 in Algorithm 1 of paper)
-    float* tmp_ptr = flow_fw[ii];
-    if(sl==op.sc_l)
-        tmp_ptr = outflow;
-
-    grid_fw[ii]->AggregateFlowDense(tmp_ptr);
-
-    if(op.usefbcon && sl>op.sc_l)  // skip at last scale, backward flow no longer needed
-        grid_bw[ii]->AggregateFlowDense(flow_bw[ii]);
-
-
-    // Timing, Densification
-    if(op.verbosity>1) {
-        gettimeofday(&tv_end_all,nullptr);
-        tt_compflow[ii] = (tv_end_all.tv_sec-tv_start_all.tv_sec)*1000.0f+(tv_end_all.tv_usec-tv_start_all.tv_usec)/1000.0f;
-        tt_all[ii] += tt_compflow[ii];
-        gettimeofday(&tv_start_all,nullptr);
-    }
-
-
-    // Variational refinement, (Step 5 in Algorithm 1 of paper)
-    if(op.usetvref) {
-        ofdis::VarRefClass varref_fw(im_ao[sl],im_ao_dx[sl],im_ao_dy[sl],im_bo[sl],im_bo_dx[sl],im_bo_dy[sl],&(cpl[ii]),&(cpr[ii]),&op,tmp_ptr);
-        if(op.usefbcon && sl>op.sc_l)    // skip at last scale, backward flow no longer needed
-            ofdis::VarRefClass varref_bw(im_bo[sl],im_bo_dx[sl],im_bo_dy[sl],im_ao[sl],im_ao_dx[sl],im_ao_dy[sl],&(cpr[ii]),&(cpl[ii]),&op,flow_bw[ii]);
-    }
-
-    // Timing, Variational Refinement
-    if(op.verbosity>1) {
-        gettimeofday(&tv_end_all,nullptr);
-        tt_tvopt[ii] = (tv_end_all.tv_sec-tv_start_all.tv_sec)*1000.0f+(tv_end_all.tv_usec-tv_start_all.tv_usec)/1000.0f;
-        tt_all[ii] += tt_tvopt[ii];
-        printf("TIME (Sc: %i, #p:%6i, pconst, pinit, poptim, cflow, tvopt, total): %8.2f %8.2f %8.2f %8.2f %8.2f -> %8.2f ms.\n",sl,grid_fw[ii]->GetNoPatches(),tt_patconstr[ii],tt_patinit[ii],tt_patoptim[ii],tt_compflow[ii],tt_tvopt[ii],tt_all[ii]);
-    }
-}
 
     // Clean up
     for(int sl = op.sc_f; sl>=op.sc_l; --sl) {

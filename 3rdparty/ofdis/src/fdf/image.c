@@ -4,7 +4,6 @@
 #include <string.h>
 #include <malloc.h>
 #include <math.h>
-
 #include "litiv/3rdparty/ofdis/fdf/image.h"
 
 #if defined(_MSC_VER)
@@ -64,8 +63,8 @@ void image_delete(image_t *image){
     if(image == NULL){
         //fprintf(stderr, "Warning: Delete image --> Ignore action (image not allocated)\n");
     }else{
-    free(image->c1);
-    free(image);
+        free(image->c1);
+        free(image);
     }
 }
 
@@ -85,8 +84,8 @@ color_image_t *color_image_new(const int width, const int height){
         fprintf(stderr, "Error: color_image_new() - not enough memory !\n");
         exit(1);
     }
-    image->c2 =  image->c1+image->stride*height;
-    image->c3 =  image->c2+image->stride*height;
+    image->c2 = image->c1+image->stride*height;
+    image->c3 = image->c2+image->stride*height;
     return image;
 }
 
@@ -184,14 +183,14 @@ static void image_resize_vert(image_t *dst, const image_t *src){
     for(i = 0; i < dst->width; i++){
         int j;
         for(j = 0; j < dst->height; j++){
-	    const int y = floor((float) j * real_scale);
-        const float dy = j * real_scale - y;
-	    if(y >= (src->height - 1)){
-	            dst->c1[j * dst->stride + i] = src->c1[i + (src->height - 1) * src->stride];
+            const int y = floor((float) j * real_scale);
+            const float dy = j * real_scale - y;
+            if(y >= (src->height - 1)){
+                dst->c1[j * dst->stride + i] = src->c1[i + (src->height - 1) * src->stride];
             }else{
-	            dst->c1[j * dst->stride + i] =
-		            (1.0f - dy) * src->c1[i + (y    ) * src->stride] +
-		            (       dy) * src->c1[i + (y + 1) * src->stride];
+                dst->c1[j * dst->stride + i] =
+                    (1.0f - dy) * src->c1[i + (y    ) * src->stride] +
+                    (       dy) * src->c1[i + (y + 1) * src->stride];
             }
         }
     }

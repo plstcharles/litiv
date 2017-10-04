@@ -1,6 +1,10 @@
 
 #pragma once
 
+// note: this is the litiv API entrypoint for optical flow and stereo depth computation methods
+// of Kroeger et al.; see the original code at 'https://github.com/tikroeger/OF_DIS' for more info
+
+#define OFDIS_API
 #include "litiv/3rdparty/ofdis/utils.hpp"
 #include <opencv2/core/core.hpp>
 

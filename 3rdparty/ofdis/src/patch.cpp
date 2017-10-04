@@ -1,39 +1,44 @@
 
+#define OFDIS_INTERNAL
 #include <Eigen/Core>
 #include <Eigen/LU>
 #include <Eigen/Dense>
+#include "litiv/3rdparty/ofdis/fdf/image.h"
 #include "litiv/3rdparty/ofdis/patch.hpp"
 
-ofdis::PatClass::PatClass(
-        const camparam* cpt_in,
-        const camparam* cpo_in,
-        const optparam* op_in,
-        const int patchid_in) :
+template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
+ofdis::PatClass<eInput,eOutput>::PatClass(const camparam* cpt_in,
+                                          const camparam* cpo_in,
+                                          const optparam* op_in,
+                                          const int patchid_in) :
         cpt(cpt_in),
         cpo(cpo_in),
         op(op_in),
         patchid(patchid_in) {
-    pc = new patchstate();
+    pc = new patchstate<eOutput>();
     CreateStatusStruct(pc);
     tmp.resize(op->novals,1);
     dxx_tmp.resize(op->novals,1);
     dyy_tmp.resize(op->novals,1);
 }
 
-void ofdis::PatClass::CreateStatusStruct(patchstate * psin) {
+template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
+void ofdis::PatClass<eInput,eOutput>::CreateStatusStruct(patchstate<eOutput>* psin) {
     // get reference / template patch
     psin->pdiff.resize(op->novals,1);
     psin->pweight.resize(op->novals,1);
 }
 
-ofdis::PatClass::~PatClass() {
+template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
+ofdis::PatClass<eInput,eOutput>::~PatClass() {
     delete pc;
 }
 
-void ofdis::PatClass::InitializePatch(Eigen::Map<const Eigen::MatrixXf>* im_ao_in,
-                                      Eigen::Map<const Eigen::MatrixXf>* im_ao_dx_in,
-                                      Eigen::Map<const Eigen::MatrixXf>* im_ao_dy_in,
-                                      const Eigen::Vector2f pt_ref_in) {
+template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
+void ofdis::PatClass<eInput,eOutput>::InitializePatch(Eigen::Map<const Eigen::MatrixXf>* im_ao_in,
+                                                      Eigen::Map<const Eigen::MatrixXf>* im_ao_dx_in,
+                                                      Eigen::Map<const Eigen::MatrixXf>* im_ao_dy_in,
+                                                      const Eigen::Vector2f pt_ref_in) {
     im_ao = im_ao_in;
     im_ao_dx = im_ao_dx_in;
     im_ao_dy = im_ao_dy_in;
@@ -43,34 +48,37 @@ void ofdis::PatClass::InitializePatch(Eigen::Map<const Eigen::MatrixXf>* im_ao_i
     ComputeHessian();
 }
 
-void ofdis::PatClass::ComputeHessian() {
-#if (SELECTMODE==1)
-    pc->Hes(0,0) = (dxx_tmp.array() * dxx_tmp.array()).sum();
-    pc->Hes(0,1) = (dxx_tmp.array() * dyy_tmp.array()).sum();
-    pc->Hes(1,1) = (dyy_tmp.array() * dyy_tmp.array()).sum();
-    pc->Hes(1,0) = pc->Hes(0,1);
-    if (pc->Hes.determinant()==0)
-    {
-    pc->Hes(0,0)+=1e-10;
-    pc->Hes(1,1)+=1e-10;
+template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
+void ofdis::PatClass<eInput,eOutput>::ComputeHessian() {
+    if(eOutput==ofdis::FlowOutput_OpticalFlow) {
+        pc->Hes(0,0) = (dxx_tmp.array()*dxx_tmp.array()).sum();
+        pc->Hes(0,1) = (dxx_tmp.array()*dyy_tmp.array()).sum();
+        pc->Hes(1,1) = (dyy_tmp.array()*dyy_tmp.array()).sum();
+        pc->Hes(1,0) = pc->Hes(0,1);
+        if(pc->Hes.determinant()==0) {
+            pc->Hes(0,0) += 1e-10;
+            pc->Hes(1,1) += 1e-10;
+        }
     }
-#else
-    pc->Hes(0,0) = (dxx_tmp.array() * dxx_tmp.array()).sum();
-    if (pc->Hes.sum()==0)
-    pc->Hes(0,0)+=1e-10;
-#endif
+    else {
+        pc->Hes(0,0) = (dxx_tmp.array()*dxx_tmp.array()).sum();
+        if(pc->Hes.sum()==0)
+            pc->Hes(0,0) += 1e-10;
+    }
 }
 
-void ofdis::PatClass::SetTargetImage(Eigen::Map<const Eigen::MatrixXf>* im_bo_in,
-                                     Eigen::Map<const Eigen::MatrixXf>* im_bo_dx_in,
-                                     Eigen::Map<const Eigen::MatrixXf>* im_bo_dy_in) {
+template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
+void ofdis::PatClass<eInput,eOutput>::SetTargetImage(Eigen::Map<const Eigen::MatrixXf>* im_bo_in,
+                                                     Eigen::Map<const Eigen::MatrixXf>* im_bo_dx_in,
+                                                     Eigen::Map<const Eigen::MatrixXf>* im_bo_dy_in) {
     im_bo = im_bo_in;
     im_bo_dx = im_bo_dx_in;
     im_bo_dy = im_bo_dy_in;
     ResetPatch();
 }
 
-void ofdis::PatClass::ResetPatch() {
+template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
+void ofdis::PatClass<eInput,eOutput>::ResetPatch() {
     pc->hasconverged=0;
     pc->hasoptstarted=0;
     pc->pt_st = pt_ref;
@@ -86,11 +94,8 @@ void ofdis::PatClass::ResetPatch() {
     pc->invalid = false;
 }
 
-#if (SELECTMODE==1)
-void ofdis::PatClass::OptimizeStart(const Eigen::Vector2f p_in_arg) {
-#else
-void ofdis::PatClass::OptimizeStart(const Eigen::Matrix<float,1,1> p_in_arg) {
-#endif
+template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
+void ofdis::PatClass<eInput,eOutput>::OptimizeStart(const point_type& p_in_arg) {
     pc->p_in   = p_in_arg;
     pc->p_iter = p_in_arg;
 
@@ -122,11 +127,8 @@ void ofdis::PatClass::OptimizeStart(const Eigen::Matrix<float,1,1> p_in_arg) {
     }
 }
 
-#if (SELECTMODE==1)
-void ofdis::PatClass::OptimizeIter(const Eigen::Vector2f p_in_arg, const bool untilconv) {
-#else
-void ofdis::PatClass::OptimizeIter(const Eigen::Matrix<float,1,1> p_in_arg, const bool untilconv) {
-#endif
+template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
+void ofdis::PatClass<eInput,eOutput>::OptimizeIter(const point_type& p_in_arg, const bool untilconv) {
     if(!pc->hasoptstarted) {
         ResetPatch();
         OptimizeStart(p_in_arg);
@@ -135,29 +137,23 @@ void ofdis::PatClass::OptimizeIter(const Eigen::Matrix<float,1,1> p_in_arg, cons
     // optimize patch until convergence, or do only one iteration if DIS visualization is used
     while(!(pc->hasconverged || (untilconv == false && (pc->cnt > oldcnt)))) {
         pc->cnt++;
-
-        // Projection onto sd_images
-    #if (SELECTMODE==1)
-        pc->delta_p[0] = (dxx_tmp.array() * pc->pdiff.array()).sum();
-        pc->delta_p[1] = (dyy_tmp.array() * pc->pdiff.array()).sum();
-    #else
-        pc->delta_p[0] = (dxx_tmp.array() * pc->pdiff.array()).sum();
-    #endif
-
-        pc->delta_p = pc->Hes.llt().solve(pc->delta_p); // solve linear system
-
-        pc->p_iter -= pc->delta_p; // update flow vector
-
-        #if (SELECTMODE==2) // if stereo depth
-        if (cpt->camlr==0)
-            pc->p_iter[0] = std::min(pc->p_iter[0],0.0f); // disparity in t can only be negative (in right image)
+        // projection onto sd_images
+        if(eOutput==ofdis::FlowOutput_OpticalFlow) {
+            pc->delta_p[0] = (dxx_tmp.array()*pc->pdiff.array()).sum();
+            pc->delta_p[1] = (dyy_tmp.array()*pc->pdiff.array()).sum();
+        }
         else
-            pc->p_iter[0] = std::max(pc->p_iter[0],0.0f); // ... positive (in left image)
-        #endif
-
+            pc->delta_p[0] = (dxx_tmp.array()*pc->pdiff.array()).sum();
+        pc->delta_p = pc->Hes.llt().solve(pc->delta_p); // solve linear system
+        pc->p_iter -= pc->delta_p; // update flow vector
+        if(eOutput==ofdis::FlowOutput_StereoDepth) {
+            if(cpt->camlr==0)
+                pc->p_iter[0] = std::min(pc->p_iter[0],0.0f); // disparity in t can only be negative (in right image)
+            else
+                pc->p_iter[0] = std::max(pc->p_iter[0],0.0f); // ... positive (in left image)
+        }
         // compute patch locations based on new parameter vector
         paramtopt();
-
         // check if patch(es) moved too far from starting location, if yes, stop iteration and reset to starting location
         if((pc->pt_st - pc->pt_iter).norm() > op->outlierthresh || // check if query patch moved more than >padval from starting location -> most likely outlier
             pc->pt_iter[0] < cpt->tmp_lb  || pc->pt_iter[1] < cpt->tmp_lb || // check patch left valid image region
@@ -171,15 +167,16 @@ void ofdis::PatClass::OptimizeIter(const Eigen::Matrix<float,1,1> p_in_arg, cons
     }
 }
 
-void ofdis::PatClass::paramtopt() {
-#if (SELECTMODE==1)
-    pc->pt_iter = pt_ref + pc->p_iter;    // for optical flow the point displacement and the parameter vector are equivalent
-#else
-    pc->pt_iter[0] = pt_ref[0] + pc->p_iter[0];
-#endif
+template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
+void ofdis::PatClass<eInput,eOutput>::paramtopt() {
+    if(eOutput==ofdis::FlowOutput_OpticalFlow)
+        pc->pt_iter = pt_ref + pc->p_iter; // for optical flow the point displacement and the parameter vector are equivalent
+    else
+        pc->pt_iter[0] = pt_ref[0] + pc->p_iter[0];
 }
 
-void ofdis::PatClass::LossComputeErrorImage(Eigen::Matrix<float,Eigen::Dynamic,1>* patdest,
+template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
+void ofdis::PatClass<eInput,eOutput>::LossComputeErrorImage(Eigen::Matrix<float,Eigen::Dynamic,1>* patdest,
                                             Eigen::Matrix<float,Eigen::Dynamic,1>* wdest,
                                             const Eigen::Matrix<float,Eigen::Dynamic,1>* patin,
                                             const Eigen::Matrix<float,Eigen::Dynamic,1>* tmpin) {
@@ -222,7 +219,8 @@ void ofdis::PatClass::LossComputeErrorImage(Eigen::Matrix<float,Eigen::Dynamic,1
     }
 }
 
-void ofdis::PatClass::OptimizeComputeErrImg() {
+template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
+void ofdis::PatClass<eInput,eOutput>::OptimizeComputeErrImg() {
     getPatchStaticBil(im_bo->data(), &(pc->pt_iter), &(pc->pdiff));
     // Get photometric patch error
     LossComputeErrorImage(&pc->pdiff, &pc->pweight, &pc->pdiff, &tmp);
@@ -232,7 +230,7 @@ void ofdis::PatClass::OptimizeComputeErrImg() {
         pc->delta_p_sqnorm_init = pc->delta_p_sqnorm;
     // Check early termination criterions
     pc->mares_old = pc->mares;
-    pc->mares = pc->pweight.lpNorm<1>() / (op->novals);
+    pc->mares = pc->pweight.template lpNorm<1>() / (op->novals);
     if( ! ((pc->cnt < op->max_iter) & (pc->mares  > op->res_thresh) &
           ((pc->cnt < op->min_iter) | (pc->delta_p_sqnorm / pc->delta_p_sqnorm_init >= op->dp_thresh)) &
           ((pc->cnt < op->min_iter) | (pc->mares / pc->mares_old <= op->dr_thresh))) )
@@ -240,48 +238,61 @@ void ofdis::PatClass::OptimizeComputeErrImg() {
 }
 
 // Extract patch on integer position, and gradients, No Bilinear interpolation
-void ofdis::PatClass::getPatchStaticNNGrad(const float* img,
+template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
+void ofdis::PatClass<eInput,eOutput>::getPatchStaticNNGrad(const float* img,
                                            const float* img_dx,
                                            const float* img_dy,
                                            const Eigen::Vector2f* mid_in,
                                            Eigen::Matrix<float,Eigen::Dynamic,1>* tmp_in_e,
                                            Eigen::Matrix<float,Eigen::Dynamic,1>* tmp_dx_in_e,
                                            Eigen::Matrix<float,Eigen::Dynamic,1>* tmp_dy_in_e) {
-    float *tmp_in    = tmp_in_e->data();
-    float *tmp_dx_in = tmp_dx_in_e->data();
-    float *tmp_dy_in = tmp_dy_in_e->data();
+    float* tmp_in = tmp_in_e->data();
+    float* tmp_dx_in = tmp_dx_in_e->data();
+    float* tmp_dy_in = tmp_dy_in_e->data();
     Eigen::Vector2i pos;
     Eigen::Vector2i pos_it;
-    pos[0] = round((*mid_in)[0]) + cpt->imgpadding;
-    pos[1] = round((*mid_in)[1]) + cpt->imgpadding;
+    pos[0] = round((*mid_in)[0])+cpt->imgpadding;
+    pos[1] = round((*mid_in)[1])+cpt->imgpadding;
     int posxx = 0;
     int lb = -op->p_samp_s/2;
     int ub = op->p_samp_s/2-1;
-    for(int j=lb; j <= ub; ++j) {
-        for(int i=lb; i <= ub; ++i, ++posxx) {
+    for(int j = lb; j<=ub; ++j) {
+        for(int i = lb; i<=ub; ++i,++posxx) {
             pos_it[0] = pos[0]+i;
             pos_it[1] = pos[1]+j;
-            int idx = pos_it[0] + pos_it[1] * cpt->tmp_w;
-            #if (SELECTCHANNEL==1 | SELECTCHANNEL==2)  // Single channel
+            int idx = pos_it[0]+pos_it[1]*cpt->tmp_w;
+            if(eInput==ofdis::FlowInput_RGB) {
+                idx *= 3;
                 tmp_in[posxx] = img[idx];
                 tmp_dx_in[posxx] = img_dx[idx];
                 tmp_dy_in[posxx] = img_dy[idx];
-            #else  // 3 RGB channels
-                idx *= 3;
-                tmp_in[posxx] = img[idx]; tmp_dx_in[posxx] = img_dx[idx]; tmp_dy_in[posxx] = img_dy[idx]; ++posxx; ++idx;
-                tmp_in[posxx] = img[idx]; tmp_dx_in[posxx] = img_dx[idx]; tmp_dy_in[posxx] = img_dy[idx]; ++posxx; ++idx;
-                tmp_in[posxx] = img[idx]; tmp_dx_in[posxx] = img_dx[idx]; tmp_dy_in[posxx] = img_dy[idx];
-            #endif
+                ++posxx;
+                ++idx;
+                tmp_in[posxx] = img[idx];
+                tmp_dx_in[posxx] = img_dx[idx];
+                tmp_dy_in[posxx] = img_dy[idx];
+                ++posxx;
+                ++idx;
+                tmp_in[posxx] = img[idx];
+                tmp_dx_in[posxx] = img_dx[idx];
+                tmp_dy_in[posxx] = img_dy[idx];
+            }
+            else {
+                tmp_in[posxx] = img[idx];
+                tmp_dx_in[posxx] = img_dx[idx];
+                tmp_dy_in[posxx] = img_dy[idx];
+            }
         }
     }
     // PATCH NORMALIZATION
     if(op->patnorm>0)
-        tmp_in_e->array() -= (tmp_in_e->sum() / op->novals);
+        tmp_in_e->array() -= (tmp_in_e->sum()/op->novals);
 }
 
 // Extract patch on float position with bilinear interpolation, no gradients.
-void ofdis::PatClass::getPatchStaticBil(const float* img, const Eigen::Vector2f* mid_in, Eigen::Matrix<float,Eigen::Dynamic,1>* tmp_in_e) {
-    float *tmp_in    = tmp_in_e->data();
+template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
+void ofdis::PatClass<eInput,eOutput>::getPatchStaticBil(const float* img, const Eigen::Vector2f* mid_in, Eigen::Matrix<float,Eigen::Dynamic,1>* tmp_in_e) {
+    float* tmp_in = tmp_in_e->data();
     Eigen::Vector2f resid;
     Eigen::Vector4f we; // bilinear weight vector
     Eigen::Vector4i pos;
@@ -291,51 +302,57 @@ void ofdis::PatClass::getPatchStaticBil(const float* img, const Eigen::Vector2f*
     pos[1] = ceil((*mid_in)[1]+.00001f);
     pos[2] = floor((*mid_in)[0]);
     pos[3] = floor((*mid_in)[1]);
-    resid[0] = (*mid_in)[0] - (float)pos[2];
-    resid[1] = (*mid_in)[1] - (float)pos[3];
+    resid[0] = (*mid_in)[0]-(float)pos[2];
+    resid[1] = (*mid_in)[1]-(float)pos[3];
     we[0] = resid[0]*resid[1];
     we[1] = (1-resid[0])*resid[1];
     we[2] = resid[0]*(1-resid[1]);
     we[3] = (1-resid[0])*(1-resid[1]);
     pos[0] += cpt->imgpadding;
     pos[1] += cpt->imgpadding;
-    float * tmp_it = tmp_in;
-    const float * img_a, * img_b, * img_c, * img_d, *img_e;
-    #if (SELECTCHANNEL==1 | SELECTCHANNEL==2)  // 1 channel image
-    img_e = img    + pos[0]-op->p_samp_s/2;
-    #else                                       // 3-channel RGB image
-    img_e = img    + (pos[0]-op->p_samp_s/2)*3;
-    #endif
-
+    float* tmp_it = tmp_in;
+    const float* img_a,* img_b,* img_c,* img_d,* img_e;
+    if(eInput==ofdis::FlowInput_RGB)
+        img_e = img+(pos[0]-op->p_samp_s/2)*3;
+    else
+        img_e = img+pos[0]-op->p_samp_s/2;
     int lb = -op->p_samp_s/2;
     int ub = op->p_samp_s/2-1;
-
-    for(pos_it[1]=pos[1]+lb; pos_it[1] <= pos[1]+ub; ++pos_it[1]) {
-        #if (SELECTCHANNEL==1 | SELECTCHANNEL==2)  // 1 channel image
-        img_a = img_e +  pos_it[1]    * cpt->tmp_w;
-        img_c = img_e + (pos_it[1]-1) * cpt->tmp_w;
-        img_b = img_a-1;
-        img_d = img_c-1;
-        #else                                     // 3-channel RGB image
-        img_a = img_e +  pos_it[1]    * cpt->tmp_w * 3;
-        img_c = img_e + (pos_it[1]-1) * cpt->tmp_w * 3;
-        img_b = img_a-3;
-        img_d = img_c-3;
-        #endif
-
-
-        for(pos_it[0]=pos[0]+lb; pos_it[0] <= pos[0]+ub; ++pos_it[0],
-                ++tmp_it,++img_a,++img_b,++img_c,++img_d) {
-          #if (SELECTCHANNEL==1 | SELECTCHANNEL==2)  // Single channel
-            (*tmp_it)     = we[0] * (*img_a) + we[1] * (*img_b) + we[2] * (*img_c) + we[3] * (*img_d);
-          #else // 3-channel RGB image
-            (*tmp_it)     = we[0] * (*img_a) + we[1] * (*img_b) + we[2] * (*img_c) + we[3] * (*img_d); ++tmp_it; ++img_a; ++img_b; ++img_c; ++img_d;
-            (*tmp_it)     = we[0] * (*img_a) + we[1] * (*img_b) + we[2] * (*img_c) + we[3] * (*img_d); ++tmp_it; ++img_a; ++img_b; ++img_c; ++img_d;
-            (*tmp_it)     = we[0] * (*img_a) + we[1] * (*img_b) + we[2] * (*img_c) + we[3] * (*img_d);
-          #endif
+    for(pos_it[1] = pos[1]+lb; pos_it[1]<=pos[1]+ub; ++pos_it[1]) {
+        if(eInput==ofdis::FlowInput_RGB) {
+            img_a = img_e+pos_it[1]*cpt->tmp_w*3;
+            img_c = img_e+(pos_it[1]-1)*cpt->tmp_w*3;
+            img_b = img_a-3;
+            img_d = img_c-3;
+        }
+        else {
+            img_a = img_e+pos_it[1]*cpt->tmp_w;
+            img_c = img_e+(pos_it[1]-1)*cpt->tmp_w;
+            img_b = img_a-1;
+            img_d = img_c-1;
+        }
+        for(pos_it[0] = pos[0]+lb; pos_it[0]<=pos[0]+ub; ++pos_it[0],++tmp_it,++img_a,++img_b,++img_c,++img_d) {
+            if(eInput==ofdis::FlowInput_RGB) {
+                (*tmp_it) = we[0]*(*img_a)+we[1]*(*img_b)+we[2]*(*img_c)+we[3]*(*img_d);
+                ++tmp_it;
+                ++img_a;
+                ++img_b;
+                ++img_c;
+                ++img_d;
+                (*tmp_it) = we[0]*(*img_a)+we[1]*(*img_b)+we[2]*(*img_c)+we[3]*(*img_d);
+                ++tmp_it;
+                ++img_a;
+                ++img_b;
+                ++img_c;
+                ++img_d;
+                (*tmp_it) = we[0]*(*img_a)+we[1]*(*img_b)+we[2]*(*img_c)+we[3]*(*img_d);
+            }
+            else {
+                (*tmp_it) = we[0]*(*img_a)+we[1]*(*img_b)+we[2]*(*img_c)+we[3]*(*img_d);
+            }
         }
     }
     // PATCH NORMALIZATION
     if(op->patnorm>0) // Subtract Mean
-        tmp_in_e->array() -= (tmp_in_e->sum() / op->novals);
+        tmp_in_e->array() -= (tmp_in_e->sum()/op->novals);
 }

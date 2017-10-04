@@ -1,5 +1,5 @@
-#ifndef __IMAGE_H_
-#define __IMAGE_H_
+#ifndef _FDF_IMAGE_H_
+#define _FDF_IMAGE_H_
 
 #include <stdio.h>
 
@@ -11,21 +11,18 @@
 extern "C" {
 #endif
 
-
 /********** STRUCTURES *********/
 
 /* structure for 1-channel image */
-typedef struct image_s
-{
-  int width;		/* Width of the image */
-  int height;		/* Height of the image */
-  int stride;		/* Width of the memory (width + paddind such that it is a multiple of 4) */
-  float *c1;		/* Image data, aligned */
+typedef struct image_s {
+    int width;		/* Width of the image */
+    int height;		/* Height of the image */
+    int stride;		/* Width of the memory (width + paddind such that it is a multiple of 4) */
+    float *c1;		/* Image data, aligned */
 } image_t;
 
 /* structure for 3-channels image stored with one layer per color, it assumes that c2 = c1+width*height and c3 = c2+width*height. */
-typedef struct color_image_s
-{
+typedef struct color_image_s {
     int width;			/* Width of the image */
     int height;			/* Height of the image */
     int stride;         /* Width of the memory (width + paddind such that it is a multiple of 4) */
@@ -35,17 +32,15 @@ typedef struct color_image_s
 } color_image_t;
 
 /* structure for color image pyramid */
-typedef struct color_image_pyramid_s 
-{
-  float scale_factor;          /* difference of scale between two levels */
-  int min_size;                /* minimum size for width or height at the coarsest level */
-  int size;                    /* number of levels in the pyramid */
-  color_image_t **images;      /* list of images with images[0] the original one, images[size-1] the finest one */
+typedef struct color_image_pyramid_s {
+    float scale_factor;          /* difference of scale between two levels */
+    int min_size;                /* minimum size for width or height at the coarsest level */
+    int size;                    /* number of levels in the pyramid */
+    color_image_t **images;      /* list of images with images[0] the original one, images[size-1] the finest one */
 } color_image_pyramid_t;
 
 /* structure for convolutions */
-typedef struct convolution_s
-{
+typedef struct convolution_s {
     int order;			/* Order of the convolution */
     float *coeffs;		/* Coefficients */
     float *coeffs_accu;	/* Accumulated coefficients */
@@ -130,7 +125,4 @@ void color_image_pyramid_delete(color_image_pyramid_t *pyr);
 }
 #endif
 
-
-#endif
-
-
+#endif //ndef(_FDF_IMAGE_H_)

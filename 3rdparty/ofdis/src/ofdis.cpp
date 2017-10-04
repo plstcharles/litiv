@@ -1,5 +1,7 @@
 
+#define OFDIS_INTERNAL
 #include <opencv2/imgproc.hpp>
+#include "litiv/3rdparty/ofdis/fdf/image.h"
 #include "litiv/3rdparty/ofdis/ofdis.hpp"
 #include "litiv/3rdparty/ofdis/oflow.hpp"
 

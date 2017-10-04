@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(NOT USE_3RDPARTY_OPTFLOW_KROEGER2016)
+if(NOT USE_OFDIS)
     return()
 endif()
 
@@ -24,7 +24,7 @@ if(NOT USE_SSE4_2)
 endif()
 
 if((NOT DEFINED $ENV{EIGEN3_ROOT}) OR (NOT $ENV{EIGEN3_ROOT}) OR (NOT EXISTS $ENV{EIGEN3_ROOT}))
-    set(ENV{EIGEN3_ROOT} "/store/pistc/litiv/build/3rdparty/eigen3/eigen3-src/")
+    set(ENV{EIGEN3_ROOT} "${CMAKE_BINARY_DIR}/3rdparty/eigen3/eigen3-src/")
 endif()
 
 find_package(Eigen3 REQUIRED)
@@ -32,7 +32,7 @@ mark_as_advanced(Eigen3_DIR)
 
 add_files(SOURCE_FILES
     "src/fdf/image.c"
-    "src/fdf/opticalflow_aux.c"
+    "src/fdf/opticalflow_aux.cpp"
     "src/fdf/solver.c"
     "src/oflow.cpp"
     "src/patch.cpp"
@@ -43,13 +43,14 @@ add_files(SOURCE_FILES
 
 add_files(INCLUDE_FILES
     "include/litiv/3rdparty/ofdis/fdf/image.h"
-    "include/litiv/3rdparty/ofdis/fdf/opticalflow_aux.h"
+    "include/litiv/3rdparty/ofdis/fdf/opticalflow_aux.hpp"
     "include/litiv/3rdparty/ofdis/fdf/solver.h"
     "include/litiv/3rdparty/ofdis/oflow.hpp"
     "include/litiv/3rdparty/ofdis/patch.hpp"
     "include/litiv/3rdparty/ofdis/patchgrid.hpp"
     "include/litiv/3rdparty/ofdis/refine_variational.hpp"
     "include/litiv/3rdparty/ofdis/ofdis.hpp"
+    "include/litiv/3rdparty/ofdis/utils.hpp"
 )
 
 litiv_3rdparty_module(ofdis SOURCE_FILES INCLUDE_FILES)

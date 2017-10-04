@@ -1,6 +1,10 @@
 
 #pragma once
 
+#ifndef OFDIS_INTERNAL
+#error "must only include 'ofdis.hpp' header for API"
+#endif //ndef(OFDIS_INTERNAL)
+
 #include "litiv/3rdparty/ofdis/patch.hpp"
 #include "litiv/3rdparty/ofdis/oflow.hpp" // For camera intrinsic and opt. parameter struct
 
@@ -9,6 +13,7 @@ namespace ofdis {
     // Class implements step (3.) in Algorithm 1 of the paper:
     //   I holds all patch objects on a specific scale, and
     //   organizes 1) the dense inverse search, 2) densification
+    template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
     class PatGridClass {
     public:
         PatGridClass(const camparam* cpt_in,const camparam* cpo_in,const optparam* op_in);
@@ -39,13 +44,13 @@ namespace ofdis {
         int nopw;
         int noph;
         int nopatches;
-        std::vector<PatClass*> pat; // Patch Objects
-        std::vector<Eigen::Vector2f> pt_ref; // Midpoints for reference patches
-#if (SELECTMODE==1)
-        std::vector<Eigen::Vector2f>            p_init; // starting parameters for query patches, use only 1 for depth, 2 for OF, all 4 for scene flow
-#else
-        std::vector<Eigen::Matrix<float,1,1>> p_init; // starting parameters for query patches, use only 1 for depth, 2 for OF, all 4 for scene flow
-#endif
+        // patch objects
+        std::vector<PatClass<eInput,eOutput>*> pat;
+        // midpoints for reference patches
+        std::vector<Eigen::Vector2f> pt_ref;
+        // starting parameters for query patches, use only 1 for depth, 2 for OF, all 4 for scene flow
+        using p_init_type = std::conditional_t<(eOutput==ofdis::FlowOutput_OpticalFlow),std::vector<Eigen::Vector2f>,std::vector<Eigen::Matrix<float,1,1>>>;
+        p_init_type p_init;
         const PatGridClass* cg = nullptr;
     };
 

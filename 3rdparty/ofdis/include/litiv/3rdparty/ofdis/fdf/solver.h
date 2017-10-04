@@ -1,7 +1,10 @@
+#ifndef _FDF_SOLVER_H_
+#define _FDF_SOLVER_H_
+
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "image.h"
+#include "litiv/3rdparty/ofdis/fdf/image.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,3 +20,5 @@ void sor_coupled_slow_but_readable_DE(image_t *du, const image_t *a11, const ima
 #ifdef __cplusplus
 }
 #endif
+
+#endif //ndef(_FDF_SOLVER_H_)

@@ -1,6 +1,10 @@
 
 #pragma once
 
+#ifndef OFDIS_INTERNAL
+#error "must only include 'ofdis.hpp' header for API"
+#endif //ndef(OFDIS_INTERNAL)
+
 #include "litiv/3rdparty/ofdis/utils.hpp"
 
 namespace ofdis {
