@@ -153,7 +153,7 @@ TEST(ofdis_optflow,regression) {
         for(int i=0; i<oFlowMap.size[0]; ++i)
             for(int j=0; j<oFlowMap.size[1]; ++j)
                 for(int k=0; k<2; ++k)
-                    ASSERT_FLOAT_EQ(oFlowMap.at<cv::Vec2f>(i,j)[k],oRefMap.at<cv::Vec2f>(i,j)[k]) << "ijk=[" << i << "," << j << "," << k << "]";
+                    ASSERT_NEAR(oFlowMap.at<cv::Vec2f>(i,j)[k],oRefMap.at<cv::Vec2f>(i,j)[k],0.0001f) << "ijk=[" << i << "," << j << "," << k << "]";
     }
     else
         lv::write(sFlowMapBinPath,oFlowMap);
@@ -331,7 +331,7 @@ TEST(descriptor_affinity,regression_L2_dasc) {
         for(int i=0; i<oAffMap.size[0]; ++i)
             for(int j=0; j<oAffMap.size[1]; ++j)
                 for(int k=0; k<oAffMap.size[2]; ++k)
-                    ASSERT_FLOAT_EQ(oAffMap(i,j,k),oRefMap(i,j,k)) << "ijk=[" << i << "," << j << "," << k << "]";
+                    ASSERT_NEAR(oAffMap(i,j,k),oRefMap(i,j,k),0.001f) << "ijk=[" << i << "," << j << "," << k << "]";
     }
     else
         lv::write(sAffMapBinPath_p1,oAffMap);
@@ -345,7 +345,7 @@ TEST(descriptor_affinity,regression_L2_dasc) {
     for(int i=0; i<oAffMap.size[0]; ++i)
         for(int j=0; j<oAffMap.size[1]; ++j)
             for(int k=0; k<oAffMap.size[2]; ++k)
-                ASSERT_FLOAT_EQ(oAffMap(i,j,k),oAffMap_gpu(i,j,k)) << "ijk=[" << i << "," << j << "," << k << "]";
+                ASSERT_NEAR(oAffMap(i,j,k),oAffMap_gpu(i,j,k),0.001f) << "ijk=[" << i << "," << j << "," << k << "]";
 #endif //HAVE_CUDA
     oAffMap = lv::getSubMat(oAffMap,0,cv::Range(160,185));
     const std::string sAffMapBinPath_p7 = TEST_CURR_INPUT_DATA_ROOT "/test_affmap_p7_r4_L2.bin";
@@ -356,7 +356,7 @@ TEST(descriptor_affinity,regression_L2_dasc) {
         for(int i=0; i<oAffMap.size[0]; ++i)
             for(int j=0; j<oAffMap.size[1]; ++j)
                 for(int k=0; k<oAffMap.size[2]; ++k)
-                    ASSERT_FLOAT_EQ(oAffMap(i,j,k),oRefMap(i,j,k)) << "ijk=[" << i << "," << j << "," << k << "]";
+                    ASSERT_NEAR(oAffMap(i,j,k),oRefMap(i,j,k),0.001f) << "ijk=[" << i << "," << j << "," << k << "]";
     }
     else
         lv::write(sAffMapBinPath_p7,oAffMap);
