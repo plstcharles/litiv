@@ -3,6 +3,14 @@
 #include <Eigen/Core>
 #include "litiv/3rdparty/ofdis/refine_variational.hpp"
 
+inline void local_image_delete(image_t *src) {
+    image_delete(src);
+}
+
+inline void local_image_delete(color_image_t *src) {
+    color_image_delete(src);
+}
+
 template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
 ofdis::VarRefClass<eInput,eOutput>::VarRefClass(const float * im_ao_in, const float * im_ao_dx_in, const float * im_ao_dy_in,
                                                 const float * im_bo_in, const float * im_bo_dx_in, const float * im_bo_dy_in,
@@ -62,14 +70,18 @@ ofdis::VarRefClass<eInput,eOutput>::VarRefClass(const float * im_ao_in, const fl
         image_delete(flow_sep[i]);
     convolution_delete(deriv);
     convolution_delete(deriv_flow);
-    if(eInput==ofdis::FlowInput_RGB) {
-        color_image_delete(im_ao);
-        color_image_delete(im_bo);
-    }
-    else {
-        image_delete(im_ao);
-        image_delete(im_bo);
-    }
+    local_image_delete(im_ao);
+    local_image_delete(im_bo);
+}
+
+inline void local_image_copy_pixel(image_t *img_t, int i, const float* img_st) {
+    img_t->c1[i] = (*img_st);
+}
+
+inline void local_image_copy_pixel(color_image_t *img_t, int i, const float*& img_st) {
+    img_t->c1[i] = (*img_st);
+    ++img_st; img_t->c2[i] =  (*img_st);
+    ++img_st; img_t->c3[i] =  (*img_st);
 }
 
 template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
@@ -78,12 +90,7 @@ void ofdis::VarRefClass<eInput,eOutput>::copyimage(const float* img, InputImageT
     const float* img_st = img+((eInput==ofdis::FlowInput_RGB)?3:1)*(cpt->tmp_w+1)*(cpt->imgpadding);
     for(int yi = 0; yi<cpt->height; ++yi) {
         for(int xi = 0; xi<cpt->width; ++xi,++img_st) {
-            int i = yi*img_t->stride+xi;
-            img_t->c1[i] = (*img_st);
-            if(eInput==ofdis::FlowInput_RGB) {
-                ++img_st; img_t->c2[i] =  (*img_st);
-                ++img_st; img_t->c3[i] =  (*img_st);
-            }
+            local_image_copy_pixel(img_t,yi*img_t->stride+xi,img_st);
         }
         img_st += ((eInput==ofdis::FlowInput_RGB)?3:1)*2*cpt->imgpadding;
     }
@@ -106,9 +113,9 @@ void ofdis::VarRefClass<eInput,eOutput>::RefLevelOF(image_t *wx, image_t *wy, co
                    *Ix = lImageCreator(), *Iy = lImageCreator(), *Iz = lImageCreator(), // first order derivatives
                    *Ixx = lImageCreator(), *Ixy = lImageCreator(), *Iyy = lImageCreator(), *Ixz = lImageCreator(), *Iyz = lImageCreator(); // second order derivatives
     // warp second image
-    image_warp(w_im2, mask, im2, wx, wy);
+    fdf::image_warp<eInput>(w_im2, mask, im2, wx, wy);
     // compute derivatives
-    get_derivatives(im1, w_im2, deriv, Ix, Iy, Iz, Ixx, Ixy, Iyy, Ixz, Iyz);
+    fdf::get_derivatives<eInput>(im1, w_im2, deriv, Ix, Iy, Iz, Ixx, Ixy, Iyy, Ixz, Iyz);
     // erase du and dv
     image_erase(du);
     image_erase(dv);
@@ -120,7 +127,7 @@ void ofdis::VarRefClass<eInput,eOutput>::RefLevelOF(image_t *wx, image_t *wy, co
         //  compute robust function and system
         fdf::compute_smoothness(smooth_horiz, smooth_vert, uu, vv, deriv_flow, tvparams.tmp_quarter_alpha );
         //compute_data_and_match(a11, a12, a22, b1, b2, mask, wx, wy, du, dv, uu, vv, Ix, Iy, Iz, Ixx, Ixy, Iyy, Ixz, Iyz, desc_weight, desc_flow_x, desc_flow_y, tvparams.tmp_half_delta_over3, tvparams.tmp_half_beta, tvparams.tmp_half_gamma_over3);
-        fdf::compute_data(a11, a12, a22, b1, b2, mask, wx, wy, du, dv, uu, vv, Ix, Iy, Iz, Ixx, Ixy, Iyy, Ixz, Iyz, tvparams.tmp_half_delta_over3, tvparams.tmp_half_beta, tvparams.tmp_half_gamma_over3);
+        fdf::compute_data<eInput>(a11, a12, a22, b1, b2, mask, wx, wy, du, dv, uu, vv, Ix, Iy, Iz, Ixx, Ixy, Iyy, Ixz, Iyz, tvparams.tmp_half_delta_over3, tvparams.tmp_half_beta, tvparams.tmp_half_gamma_over3);
         fdf::sub_laplacian(b1, wx, smooth_horiz, smooth_vert);
         fdf::sub_laplacian(b2, wy, smooth_horiz, smooth_vert);
         // solve system
@@ -154,16 +161,15 @@ void ofdis::VarRefClass<eInput,eOutput>::RefLevelOF(image_t *wx, image_t *wy, co
     image_delete(a22);
     image_delete(b1);
     image_delete(b2);
-    const auto lImageDeletor = [&](auto* img){(eInput==ofdis::FlowInput_RGB)?color_image_delete(img):image_delete(img);};
-    lImageDeletor(w_im2);
-    lImageDeletor(Ix);
-    lImageDeletor(Iy);
-    lImageDeletor(Iz);
-    lImageDeletor(Ixx);
-    lImageDeletor(Ixy);
-    lImageDeletor(Iyy);
-    lImageDeletor(Ixz);
-    lImageDeletor(Iyz);
+    local_image_delete(w_im2);
+    local_image_delete(Ix);
+    local_image_delete(Iy);
+    local_image_delete(Iz);
+    local_image_delete(Ixx);
+    local_image_delete(Ixy);
+    local_image_delete(Iyy);
+    local_image_delete(Ixz);
+    local_image_delete(Iyz);
 }
 
 template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
@@ -184,9 +190,9 @@ void ofdis::VarRefClass<eInput,eOutput>::RefLevelDE(image_t *wx, const InputImag
                    *Ix = lImageCreator(), *Iy = lImageCreator(), *Iz = lImageCreator(), // first order derivatives
                    *Ixx = lImageCreator(), *Ixy = lImageCreator(), *Iyy = lImageCreator(), *Ixz = lImageCreator(), *Iyz = lImageCreator(); // second order derivatives
     // warp second image
-    image_warp(w_im2, mask, im2, wx, wy_dummy);
+    fdf::image_warp<eInput>(w_im2, mask, im2, wx, wy_dummy);
     // compute derivatives
-    get_derivatives(im1, w_im2, deriv, Ix, Iy, Iz, Ixx, Ixy, Iyy, Ixz, Iyz);
+    fdf::get_derivatives<eInput>(im1, w_im2, deriv, Ix, Iy, Iz, Ixx, Ixy, Iyy, Ixz, Iyz);
     // erase du and dv
     image_erase(du);
     // initialize uu and vv
@@ -195,7 +201,7 @@ void ofdis::VarRefClass<eInput,eOutput>::RefLevelDE(image_t *wx, const InputImag
     for(i_inner_iteration=0; i_inner_iteration<tvparams.n_inner_iteration; i_inner_iteration++) {
         //  compute robust function and system
         fdf::compute_smoothness(smooth_horiz, smooth_vert, uu, wy_dummy, deriv_flow, tvparams.tmp_quarter_alpha );
-        fdf::compute_data_DE(a11, b1, mask, wx, du, uu, Ix, Iy, Iz, Ixx, Ixy, Iyy, Ixz, Iyz, tvparams.tmp_half_delta_over3, tvparams.tmp_half_beta, tvparams.tmp_half_gamma_over3);
+        fdf::compute_data_DE<eInput>(a11, b1, mask, wx, du, uu, Ix, Iy, Iz, Ixx, Ixy, Iyy, Ixz, Iyz, tvparams.tmp_half_delta_over3, tvparams.tmp_half_beta, tvparams.tmp_half_gamma_over3);
         fdf::sub_laplacian(b1, wx, smooth_horiz, smooth_vert);
         // solve system
         sor_coupled_slow_but_readable_DE(du, a11, b1, smooth_horiz, smooth_vert, tvparams.n_solver_iteration, tvparams.sor_omega);
@@ -226,14 +232,20 @@ void ofdis::VarRefClass<eInput,eOutput>::RefLevelDE(image_t *wx, const InputImag
     image_delete(uu);
     image_delete(a11);
     image_delete(b1);
-    const auto lImageDeletor = [&](auto* img){(eInput==ofdis::FlowInput_RGB)?color_image_delete(img):image_delete(img);};
-    lImageDeletor(w_im2);
-    lImageDeletor(Ix);
-    lImageDeletor(Iy);
-    lImageDeletor(Iz);
-    lImageDeletor(Ixx);
-    lImageDeletor(Ixy);
-    lImageDeletor(Iyy);
-    lImageDeletor(Ixz);
-    lImageDeletor(Iyz);
+    local_image_delete(w_im2);
+    local_image_delete(Ix);
+    local_image_delete(Iy);
+    local_image_delete(Iz);
+    local_image_delete(Ixx);
+    local_image_delete(Ixy);
+    local_image_delete(Iyy);
+    local_image_delete(Ixz);
+    local_image_delete(Iyz);
 }
+
+template class ofdis::VarRefClass<ofdis::FlowInput_Grayscale,ofdis::FlowOutput_OpticalFlow>;
+template class ofdis::VarRefClass<ofdis::FlowInput_Gradient,ofdis::FlowOutput_OpticalFlow>;
+template class ofdis::VarRefClass<ofdis::FlowInput_RGB,ofdis::FlowOutput_OpticalFlow>;
+template class ofdis::VarRefClass<ofdis::FlowInput_Grayscale,ofdis::FlowOutput_StereoDepth>;
+template class ofdis::VarRefClass<ofdis::FlowInput_Gradient,ofdis::FlowOutput_StereoDepth>;
+template class ofdis::VarRefClass<ofdis::FlowInput_RGB,ofdis::FlowOutput_StereoDepth>;

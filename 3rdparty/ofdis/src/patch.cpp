@@ -94,13 +94,21 @@ void ofdis::PatClass<eInput,eOutput>::ResetPatch() {
     pc->invalid = false;
 }
 
+inline void paramtopt(Eigen::Vector2f& pt_iter, const Eigen::Vector2f& pt_ref, const Eigen::Vector2f& p_iter) {
+    pt_iter = pt_ref + p_iter; // for optical flow the point displacement and the parameter vector are equivalent
+}
+
+inline void paramtopt(Eigen::Vector2f& pt_iter, const Eigen::Vector2f& pt_ref, const Eigen::Matrix<float,1,1>& p_iter) {
+    pt_iter[0] = pt_ref[0] + p_iter[0];
+}
+
 template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
 void ofdis::PatClass<eInput,eOutput>::OptimizeStart(const point_type& p_in_arg) {
     pc->p_in   = p_in_arg;
     pc->p_iter = p_in_arg;
 
     // convert from input parameters to 2D query location(s) for patches
-    paramtopt();
+    paramtopt(pc->pt_iter,pt_ref,pc->p_iter);
 
     // save starting location, only needed for outlier check
     pc->pt_st = pc->pt_iter;
@@ -153,26 +161,18 @@ void ofdis::PatClass<eInput,eOutput>::OptimizeIter(const point_type& p_in_arg, c
                 pc->p_iter[0] = std::max(pc->p_iter[0],0.0f); // ... positive (in left image)
         }
         // compute patch locations based on new parameter vector
-        paramtopt();
+        paramtopt(pc->pt_iter,pt_ref,pc->p_iter);
         // check if patch(es) moved too far from starting location, if yes, stop iteration and reset to starting location
         if((pc->pt_st - pc->pt_iter).norm() > op->outlierthresh || // check if query patch moved more than >padval from starting location -> most likely outlier
             pc->pt_iter[0] < cpt->tmp_lb  || pc->pt_iter[1] < cpt->tmp_lb || // check patch left valid image region
             pc->pt_iter[0] > cpt->tmp_ubw || pc->pt_iter[1] > cpt->tmp_ubh) {
             pc->p_iter = pc->p_in; // reset
-            paramtopt();
+            paramtopt(pc->pt_iter,pt_ref,pc->p_iter);
             pc->hasconverged=1;
             pc->hasoptstarted=1;
         }
         OptimizeComputeErrImg();
     }
-}
-
-template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
-void ofdis::PatClass<eInput,eOutput>::paramtopt() {
-    if(eOutput==ofdis::FlowOutput_OpticalFlow)
-        pc->pt_iter = pt_ref + pc->p_iter; // for optical flow the point displacement and the parameter vector are equivalent
-    else
-        pc->pt_iter[0] = pt_ref[0] + pc->p_iter[0];
 }
 
 template<ofdis::FlowInputType eInput, ofdis::FlowOutputType eOutput>
@@ -356,3 +356,10 @@ void ofdis::PatClass<eInput,eOutput>::getPatchStaticBil(const float* img, const 
     if(op->patnorm>0) // Subtract Mean
         tmp_in_e->array() -= (tmp_in_e->sum()/op->novals);
 }
+
+template class ofdis::PatClass<ofdis::FlowInput_Grayscale,ofdis::FlowOutput_OpticalFlow>;
+template class ofdis::PatClass<ofdis::FlowInput_Gradient,ofdis::FlowOutput_OpticalFlow>;
+template class ofdis::PatClass<ofdis::FlowInput_RGB,ofdis::FlowOutput_OpticalFlow>;
+template class ofdis::PatClass<ofdis::FlowInput_Grayscale,ofdis::FlowOutput_StereoDepth>;
+template class ofdis::PatClass<ofdis::FlowInput_Gradient,ofdis::FlowOutput_StereoDepth>;
+template class ofdis::PatClass<ofdis::FlowInput_RGB,ofdis::FlowOutput_StereoDepth>;

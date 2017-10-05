@@ -263,3 +263,10 @@ ofdis::OFClass<eInput,eOutput>::OFClass(
         printf("TIME (O.Flow Run-Time   ) (ms): %3g\n",tt);
     }
 }
+
+template class ofdis::OFClass<ofdis::FlowInput_Grayscale,ofdis::FlowOutput_OpticalFlow>;
+template class ofdis::OFClass<ofdis::FlowInput_Gradient,ofdis::FlowOutput_OpticalFlow>;
+template class ofdis::OFClass<ofdis::FlowInput_RGB,ofdis::FlowOutput_OpticalFlow>;
+template class ofdis::OFClass<ofdis::FlowInput_Grayscale,ofdis::FlowOutput_StereoDepth>;
+template class ofdis::OFClass<ofdis::FlowInput_Gradient,ofdis::FlowOutput_StereoDepth>;
+template class ofdis::OFClass<ofdis::FlowInput_RGB,ofdis::FlowOutput_StereoDepth>;

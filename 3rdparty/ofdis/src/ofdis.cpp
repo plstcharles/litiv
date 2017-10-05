@@ -22,7 +22,7 @@ ofdis::FlowParams::FlowParams(int sel_oppoint_) {
     tv_innerit = 1;
     tv_solverit = 3;
     tv_sor = 1.6;
-    verbosity = 2; // Default: Plot detailed timings
+    verbosity = 0;
     sel_oppoint = sel_oppoint_;
 }
 
@@ -144,7 +144,7 @@ void ofdis::computeFlow(const cv::Mat& oInput1, const cv::Mat& oInput2, cv::Mat&
         copyMakeBorder(oInput2,s_oEnlargedInput2,floor((float)padh/2.0f),ceil((float)padh/2.0f),floor((float)padw/2.0f),ceil((float)padw/2.0f),cv::BORDER_REPLICATE);
         s_oEnlargedInput1.convertTo(img_ao_fmat,CV_32F);
         s_oEnlargedInput2.convertTo(img_bo_fmat,CV_32F);
-        sz = oInput1.size();
+        sz = img_ao_fmat.size();
     }
     else {
         oInput1.convertTo(img_ao_fmat,CV_32F);
@@ -177,7 +177,8 @@ void ofdis::computeFlow(const cv::Mat& oInput1, const cv::Mat& oInput2, cv::Mat&
         oOutput *= scfct2;
         cv::resize(oOutput,oOutput,cv::Size(),scfct2,scfct2,cv::INTER_LINEAR);
     }
-    oOutput = oOutput(cv::Rect((int)floor((float)padw/2.0f),(int)floor((float)padh/2.0f),width_org,height_org));
+    const cv::Rect oOutCrop((int)floor((float)padw/2.0f),(int)floor((float)padh/2.0f),width_org,height_org);
+    oOutput = oOutput(oOutCrop);
 }
 
 template void ofdis::computeFlow<ofdis::FlowInput_Grayscale,ofdis::FlowOutput_OpticalFlow>(const cv::Mat&,const cv::Mat&,cv::Mat&,FlowParams);

@@ -56,7 +56,6 @@ namespace ofdis {
     private:
         void OptimizeStart(const point_type& p_in_arg);
         void OptimizeComputeErrImg();
-        void paramtopt();
         void ResetPatch();
         void ComputeHessian();
         void CreateStatusStruct(patchstate<eOutput>* psin);

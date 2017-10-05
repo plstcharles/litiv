@@ -258,3 +258,10 @@ void ofdis::PatGridClass<eInput,eOutput>::AggregateFlowDense(float *flowout) con
     }
     delete[] we;
 }
+
+template class ofdis::PatGridClass<ofdis::FlowInput_Grayscale,ofdis::FlowOutput_OpticalFlow>;
+template class ofdis::PatGridClass<ofdis::FlowInput_Gradient,ofdis::FlowOutput_OpticalFlow>;
+template class ofdis::PatGridClass<ofdis::FlowInput_RGB,ofdis::FlowOutput_OpticalFlow>;
+template class ofdis::PatGridClass<ofdis::FlowInput_Grayscale,ofdis::FlowOutput_StereoDepth>;
+template class ofdis::PatGridClass<ofdis::FlowInput_Gradient,ofdis::FlowOutput_StereoDepth>;
+template class ofdis::PatGridClass<ofdis::FlowInput_RGB,ofdis::FlowOutput_StereoDepth>;

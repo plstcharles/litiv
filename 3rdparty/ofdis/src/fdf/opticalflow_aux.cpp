@@ -15,6 +15,32 @@ using ofdis::v4sf;
 #define epsilon_desc (0.001f*0.001f)//0.000001f
 #define epsilon_smooth (0.001f*0.001f)//0.000001f
 
+inline void local_warp_pixel(color_image_t* dst, int offset, const color_image_t* src, int y1, int x1, int y2, int x2, float dy, float dx) {
+    dst->c1[offset] =
+            src->c1[y1*src->stride+x1]*(1.0f-dx)*(1.0f-dy) +
+            src->c1[y1*src->stride+x2]*dx*(1.0f-dy) +
+            src->c1[y2*src->stride+x1]*(1.0f-dx)*dy +
+            src->c1[y2*src->stride+x2]*dx*dy;
+    dst->c2[offset] =
+            src->c2[y1*src->stride+x1]*(1.0f-dx)*(1.0f-dy) +
+            src->c2[y1*src->stride+x2]*dx*(1.0f-dy) +
+            src->c2[y2*src->stride+x1]*(1.0f-dx)*dy +
+            src->c2[y2*src->stride+x2]*dx*dy;
+    dst->c3[offset] =
+            src->c3[y1*src->stride+x1]*(1.0f-dx)*(1.0f-dy) +
+            src->c3[y1*src->stride+x2]*dx*(1.0f-dy) +
+            src->c3[y2*src->stride+x1]*(1.0f-dx)*dy +
+            src->c3[y2*src->stride+x2]*dx*dy;
+}
+
+inline void local_warp_pixel(image_t* dst, int offset, const image_t* src, int y1, int x1, int y2, int x2, float dy, float dx) {
+    dst->c1[offset] =
+            src->c1[y1*src->stride+x1]*(1.0f-dx)*(1.0f-dy) +
+            src->c1[y1*src->stride+x2]*dx*(1.0f-dy) +
+            src->c1[y2*src->stride+x1]*(1.0f-dx)*dy +
+            src->c1[y2*src->stride+x2]*dx*dy;
+}
+
 /* warp a color image according to a flow. src is the input image, wx and wy, the input flow. dst is the warped image and mask contains 0 or 1 if the pixels goes outside/inside image boundaries */
 template<ofdis::FlowInputType eInput>
 void fdf::image_warp(ofdis::InputImageType<eInput>* dst, image_t *mask, const ofdis::InputImageType<eInput>* src, const image_t *wx, const image_t *wy) {
@@ -35,26 +61,30 @@ void fdf::image_warp(ofdis::InputImageType<eInput>* dst, image_t *mask, const of
 	        x2 = MINMAX_TA(x+1,src->width);
 	        y1 = MINMAX_TA(y,src->height);
 	        y2 = MINMAX_TA(y+1,src->height);
-	        dst->c1[offset] =
-	            src->c1[y1*src->stride+x1]*(1.0f-dx)*(1.0f-dy) +
-	            src->c1[y1*src->stride+x2]*dx*(1.0f-dy) +
-	            src->c1[y2*src->stride+x1]*(1.0f-dx)*dy +
-	            src->c1[y2*src->stride+x2]*dx*dy;
-            if(eInput==ofdis::FlowInput_RGB) {
-                dst->c2[offset] =
-                    src->c2[y1*src->stride+x1]*(1.0f-dx)*(1.0f-dy) +
-                    src->c2[y1*src->stride+x2]*dx*(1.0f-dy) +
-                    src->c2[y2*src->stride+x1]*(1.0f-dx)*dy +
-                    src->c2[y2*src->stride+x2]*dx*dy;
-                dst->c3[offset] =
-                    src->c3[y1*src->stride+x1]*(1.0f-dx)*(1.0f-dy) +
-                    src->c3[y1*src->stride+x2]*dx*(1.0f-dy) +
-                    src->c3[y2*src->stride+x1]*(1.0f-dx)*dy +
-                    src->c3[y2*src->stride+x2]*dx*dy;
-            }
+            local_warp_pixel(dst,offset,src,y1,x1,y2,x2,dy,dx);
 	    }
         offset += incr_line;
     }
+}
+
+template void fdf::image_warp<ofdis::FlowInput_Grayscale>(ofdis::InputImageType<ofdis::FlowInput_Grayscale>*, image_t*, const ofdis::InputImageType<ofdis::FlowInput_Grayscale>*, const image_t*, const image_t*);
+template void fdf::image_warp<ofdis::FlowInput_Gradient>(ofdis::InputImageType<ofdis::FlowInput_Gradient>*, image_t*, const ofdis::InputImageType<ofdis::FlowInput_Gradient>*, const image_t*, const image_t*);
+template void fdf::image_warp<ofdis::FlowInput_RGB>(ofdis::InputImageType<ofdis::FlowInput_RGB>*, image_t*, const ofdis::InputImageType<ofdis::FlowInput_RGB>*, const image_t*, const image_t*);
+
+inline void local_image_convolve_hv(color_image_t *dst, const color_image_t *src, const convolution_t *horiz_conv, const convolution_t *vert_conv) {
+    color_image_convolve_hv(dst,src,horiz_conv,vert_conv);
+}
+
+inline void local_image_convolve_hv(image_t *dst, const image_t *src, const convolution_t *horiz_conv, const convolution_t *vert_conv) {
+    image_convolve_hv(dst,src,horiz_conv,vert_conv);
+}
+
+inline void local_image_delete(image_t *src) {
+    image_delete(src);
+}
+
+inline void local_image_delete(color_image_t *src) {
+    color_image_delete(src);
 }
 
 /* compute image first and second order spatio-temporal derivatives of a color image */
@@ -62,7 +92,7 @@ template<ofdis::FlowInputType eInput>
 void fdf::get_derivatives(const ofdis::InputImageType<eInput>* im1, const ofdis::InputImageType<eInput>* im2, const convolution_t *deriv, ofdis::InputImageType<eInput>* dx, ofdis::InputImageType<eInput>* dy, ofdis::InputImageType<eInput>* dt, ofdis::InputImageType<eInput>* dxx, ofdis::InputImageType<eInput>* dxy, ofdis::InputImageType<eInput>* dyy, ofdis::InputImageType<eInput>* dxt, ofdis::InputImageType<eInput>* dyt) {
     // derivatives are computed on the mean of the first image and the warped second image
     if(eInput==ofdis::FlowInput_RGB) {
-        color_image_t *tmp_im2 = color_image_new(im2->width,im2->height);
+        typename ofdis::InputImageType<eInput>* tmp_im2 = (typename ofdis::InputImageType<eInput>*)color_image_new(im2->width,im2->height);
         v4sf *tmp_im2p = (v4sf*) tmp_im2->c1, *dtp = (v4sf*) dt->c1, *im1p = (v4sf*) im1->c1, *im2p = (v4sf*) im2->c1;
         const v4sf half = {0.5f,0.5f,0.5f,0.5f};
         int i=0;
@@ -72,18 +102,18 @@ void fdf::get_derivatives(const ofdis::InputImageType<eInput>* im1, const ofdis:
             dtp+=1; im1p+=1; im2p+=1; tmp_im2p+=1;
         }
         // compute all other derivatives
-        color_image_convolve_hv(dx, tmp_im2, deriv, NULL);
-        color_image_convolve_hv(dy, tmp_im2, NULL, deriv);
-        color_image_convolve_hv(dxx, dx, deriv, NULL);
-        color_image_convolve_hv(dxy, dx, NULL, deriv);
-        color_image_convolve_hv(dyy, dy, NULL, deriv);
-        color_image_convolve_hv(dxt, dt, deriv, NULL);
-        color_image_convolve_hv(dyt, dt, NULL, deriv);
+        local_image_convolve_hv(dx, tmp_im2, deriv, NULL);
+        local_image_convolve_hv(dy, tmp_im2, NULL, deriv);
+        local_image_convolve_hv(dxx, dx, deriv, NULL);
+        local_image_convolve_hv(dxy, dx, NULL, deriv);
+        local_image_convolve_hv(dyy, dy, NULL, deriv);
+        local_image_convolve_hv(dxt, dt, deriv, NULL);
+        local_image_convolve_hv(dyt, dt, NULL, deriv);
         // free memory
-        color_image_delete(tmp_im2);
+        local_image_delete(tmp_im2);
     }
     else {
-        image_t *tmp_im2 = image_new(im2->width,im2->height);
+        typename ofdis::InputImageType<eInput>* tmp_im2 = (typename ofdis::InputImageType<eInput>*)image_new(im2->width,im2->height);
         v4sf *tmp_im2p = (v4sf*) tmp_im2->c1, *dtp = (v4sf*) dt->c1, *im1p = (v4sf*) im1->c1, *im2p = (v4sf*) im2->c1;
         const v4sf half = {0.5f,0.5f,0.5f,0.5f};
         int i=0;
@@ -93,23 +123,27 @@ void fdf::get_derivatives(const ofdis::InputImageType<eInput>* im1, const ofdis:
             dtp+=1; im1p+=1; im2p+=1; tmp_im2p+=1;
         }
         // compute all other derivatives
-        image_convolve_hv(dx, tmp_im2, deriv, NULL);
-        image_convolve_hv(dy, tmp_im2, NULL, deriv);
-        image_convolve_hv(dxx, dx, deriv, NULL);
-        image_convolve_hv(dxy, dx, NULL, deriv);
-        image_convolve_hv(dyy, dy, NULL, deriv);
-        image_convolve_hv(dxt, dt, deriv, NULL);
-        image_convolve_hv(dyt, dt, NULL, deriv);
+        local_image_convolve_hv(dx, tmp_im2, deriv, NULL);
+        local_image_convolve_hv(dy, tmp_im2, NULL, deriv);
+        local_image_convolve_hv(dxx, dx, deriv, NULL);
+        local_image_convolve_hv(dxy, dx, NULL, deriv);
+        local_image_convolve_hv(dyy, dy, NULL, deriv);
+        local_image_convolve_hv(dxt, dt, deriv, NULL);
+        local_image_convolve_hv(dyt, dt, NULL, deriv);
         // free memory
-        image_delete(tmp_im2);
+        local_image_delete(tmp_im2);
     }
 }
+
+template void fdf::get_derivatives<ofdis::FlowInput_Grayscale>(const ofdis::InputImageType<ofdis::FlowInput_Grayscale>*, const ofdis::InputImageType<ofdis::FlowInput_Grayscale>*, const convolution_t*, ofdis::InputImageType<ofdis::FlowInput_Grayscale>*, ofdis::InputImageType<ofdis::FlowInput_Grayscale>*, ofdis::InputImageType<ofdis::FlowInput_Grayscale>*, ofdis::InputImageType<ofdis::FlowInput_Grayscale>*, ofdis::InputImageType<ofdis::FlowInput_Grayscale>*, ofdis::InputImageType<ofdis::FlowInput_Grayscale>*, ofdis::InputImageType<ofdis::FlowInput_Grayscale>*, ofdis::InputImageType<ofdis::FlowInput_Grayscale>*);
+template void fdf::get_derivatives<ofdis::FlowInput_Gradient>(const ofdis::InputImageType<ofdis::FlowInput_Gradient>*, const ofdis::InputImageType<ofdis::FlowInput_Gradient>*, const convolution_t*, ofdis::InputImageType<ofdis::FlowInput_Gradient>*, ofdis::InputImageType<ofdis::FlowInput_Gradient>*, ofdis::InputImageType<ofdis::FlowInput_Gradient>*, ofdis::InputImageType<ofdis::FlowInput_Gradient>*, ofdis::InputImageType<ofdis::FlowInput_Gradient>*, ofdis::InputImageType<ofdis::FlowInput_Gradient>*, ofdis::InputImageType<ofdis::FlowInput_Gradient>*, ofdis::InputImageType<ofdis::FlowInput_Gradient>*);
+template void fdf::get_derivatives<ofdis::FlowInput_RGB>(const ofdis::InputImageType<ofdis::FlowInput_RGB>*, const ofdis::InputImageType<ofdis::FlowInput_RGB>*, const convolution_t*, ofdis::InputImageType<ofdis::FlowInput_RGB>*, ofdis::InputImageType<ofdis::FlowInput_RGB>*, ofdis::InputImageType<ofdis::FlowInput_RGB>*, ofdis::InputImageType<ofdis::FlowInput_RGB>*, ofdis::InputImageType<ofdis::FlowInput_RGB>*, ofdis::InputImageType<ofdis::FlowInput_RGB>*, ofdis::InputImageType<ofdis::FlowInput_RGB>*, ofdis::InputImageType<ofdis::FlowInput_RGB>*);
 
 /* compute the smoothness term */
 /* It is represented as two images, the first one for horizontal smoothness, the second for vertical
    in dst_horiz, the pixel i,j represents the smoothness weight between pixel i,j and i,j+1
    in dst_vert, the pixel i,j represents the smoothness weight between pixel i,j and i+1,j */
-void compute_smoothness(image_t *dst_horiz, image_t *dst_vert, const image_t *uu, const image_t *vv, const convolution_t *deriv_flow, const float quarter_alpha){
+void fdf::compute_smoothness(image_t *dst_horiz, image_t *dst_vert, const image_t *uu, const image_t *vv, const convolution_t *deriv_flow, const float quarter_alpha){
     const int width = uu->width, height = vv->height, stride = uu->stride;
     int j;
     image_t *ux = image_new(width,height), *vx = image_new(width,height), *uy = image_new(width,height), *vy = image_new(width,height), *smoothness = image_new(width,height);
@@ -154,7 +188,7 @@ void compute_smoothness(image_t *dst_horiz, image_t *dst_vert, const image_t *uu
 }
 
 /* sub the laplacian (smoothness term) to the right-hand term */
-void sub_laplacian(image_t *dst, const image_t *src, const image_t *weight_horiz, const image_t *weight_vert){
+void fdf::sub_laplacian(image_t *dst, const image_t *src, const image_t *weight_horiz, const image_t *weight_vert){
     int j;
     const int offsetline = src->stride-src->width;
     float *src_ptr = src->c1, *dst_ptr = dst->c1, *weight_horiz_ptr = weight_horiz->c1;
@@ -186,7 +220,7 @@ void sub_laplacian(image_t *dst, const image_t *src, const image_t *weight_horiz
 /* compute the dataterm and the matching term
    a11 a12 a22 represents the 2x2 diagonal matrix, b1 and b2 the right hand side
    other (color) images are input */
-void compute_data_and_match(image_t *a11, image_t *a12, image_t *a22, image_t *b1, image_t *b2, image_t *mask, image_t *wx, image_t *wy, image_t *du, image_t *dv, image_t *uu, image_t *vv, color_image_t *Ix, color_image_t *Iy, color_image_t *Iz, color_image_t *Ixx, color_image_t *Ixy, color_image_t *Iyy, color_image_t *Ixz, color_image_t *Iyz, image_t *desc_weight, image_t *desc_flow_x, image_t *desc_flow_y, const float half_delta_over3, const float half_beta, const float half_gamma_over3){
+void fdf::compute_data_and_match(image_t *a11, image_t *a12, image_t *a22, image_t *b1, image_t *b2, image_t *mask, image_t *wx, image_t *wy, image_t *du, image_t *dv, image_t *uu, image_t *vv, color_image_t *Ix, color_image_t *Iy, color_image_t *Iz, color_image_t *Ixx, color_image_t *Ixy, color_image_t *Iyy, color_image_t *Ixz, color_image_t *Iyz, image_t *desc_weight, image_t *desc_flow_x, image_t *desc_flow_y, const float half_delta_over3, const float half_beta, const float half_gamma_over3){
 
     const v4sf dnorm = {datanorm, datanorm, datanorm, datanorm};
     const v4sf hdover3 = {half_delta_over3, half_delta_over3, half_delta_over3, half_delta_over3};
@@ -288,6 +322,22 @@ void compute_data_and_match(image_t *a11, image_t *a12, image_t *a22, image_t *b
     }
 }
 
+inline float* local_get_c2(color_image_t* img) {
+    return img->c2;
+}
+
+inline float* local_get_c3(color_image_t* img) {
+    return img->c3;
+}
+
+inline float* local_get_c2(image_t* img) {
+    return nullptr;
+}
+
+inline float* local_get_c3(image_t* img) {
+    return nullptr;
+}
+
 /* compute the dataterm // REMOVED MATCHING TERM
    a11 a12 a22 represents the 2x2 diagonal matrix, b1 and b2 the right hand side
    other (color) images are input */
@@ -306,13 +356,9 @@ void fdf::compute_data(image_t *a11, image_t *a12, image_t *a22, image_t *b1, im
         *a11p = (v4sf*) a11->c1, *a12p = (v4sf*) a12->c1, *a22p = (v4sf*) a22->c1,
         *b1p = (v4sf*) b1->c1, *b2p = (v4sf*) b2->c1,
         *ix1p=(v4sf*)Ix->c1, *iy1p=(v4sf*)Iy->c1, *iz1p=(v4sf*)Iz->c1, *ixx1p=(v4sf*)Ixx->c1, *ixy1p=(v4sf*)Ixy->c1, *iyy1p=(v4sf*)Iyy->c1, *ixz1p=(v4sf*)Ixz->c1, *iyz1p=(v4sf*) Iyz->c1,
-        *ix2p, *iy2p, *iz2p, *ixx2p, *ixy2p, *iyy2p, *ixz2p, *iyz2p,
-        *ix3p, *iy3p, *iz3p, *ixx3p, *ixy3p, *iyy3p, *ixz3p, *iyz3p,
+        *ix2p=(v4sf*)local_get_c2(Ix), *iy2p=(v4sf*)local_get_c2(Iy), *iz2p=(v4sf*)local_get_c2(Iz), *ixx2p=(v4sf*)local_get_c2(Ixx), *ixy2p=(v4sf*)local_get_c2(Ixy), *iyy2p=(v4sf*)local_get_c2(Iyy), *ixz2p=(v4sf*)local_get_c2(Ixz), *iyz2p=(v4sf*)local_get_c2(Iyz),
+        *ix3p=(v4sf*)local_get_c3(Ix), *iy3p=(v4sf*)local_get_c3(Iy), *iz3p=(v4sf*)local_get_c3(Iz), *ixx3p=(v4sf*)local_get_c3(Ixx), *ixy3p=(v4sf*)local_get_c3(Ixy), *iyy3p=(v4sf*)local_get_c3(Iyy), *ixz3p=(v4sf*)local_get_c3(Ixz), *iyz3p=(v4sf*)local_get_c3(Iyz),
         *uup = (v4sf*) uu->c1, *vvp = (v4sf*)vv->c1, *wxp = (v4sf*)wx->c1, *wyp = (v4sf*)wy->c1;
-    if(eInput==ofdis::FlowInput_RGB) {
-        ix2p=(v4sf*)Ix->c2; iy2p=(v4sf*)Iy->c2; iz2p=(v4sf*)Iz->c2; ixx2p=(v4sf*)Ixx->c2; ixy2p=(v4sf*)Ixy->c2; iyy2p=(v4sf*)Iyy->c2; ixz2p=(v4sf*)Ixz->c2; iyz2p=(v4sf*) Iyz->c2;
-        ix3p=(v4sf*)Ix->c3; iy3p=(v4sf*)Iy->c3; iz3p=(v4sf*)Iz->c3; ixx3p=(v4sf*)Ixx->c3; ixy3p=(v4sf*)Ixy->c3; iyy3p=(v4sf*)Iyy->c3; ixz3p=(v4sf*)Ixz->c3; iyz3p=(v4sf*) Iyz->c3;
-    }
 
     memset(a11->c1, 0, sizeof(float)*uu->height*uu->stride);
     memset(a12->c1, 0, sizeof(float)*uu->height*uu->stride);
@@ -416,6 +462,10 @@ void fdf::compute_data(image_t *a11, image_t *a12, image_t *a22, image_t *b1, im
     }
 }
 
+template void fdf::compute_data<ofdis::FlowInput_Grayscale>(image_t *a11, image_t *a12, image_t *a22, image_t *b1, image_t *b2, image_t *mask, image_t *wx, image_t *wy, image_t *du, image_t *dv, image_t *uu, image_t *vv, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Ix, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Iy, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Iz, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Ixx, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Ixy, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Iyy, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Ixz, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Iyz, const float half_delta_over3, const float half_beta, const float half_gamma_over3);
+template void fdf::compute_data<ofdis::FlowInput_Gradient>(image_t *a11, image_t *a12, image_t *a22, image_t *b1, image_t *b2, image_t *mask, image_t *wx, image_t *wy, image_t *du, image_t *dv, image_t *uu, image_t *vv, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Ix, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Iy, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Iz, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Ixx, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Ixy, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Iyy, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Ixz, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Iyz, const float half_delta_over3, const float half_beta, const float half_gamma_over3);
+template void fdf::compute_data<ofdis::FlowInput_RGB>(image_t *a11, image_t *a12, image_t *a22, image_t *b1, image_t *b2, image_t *mask, image_t *wx, image_t *wy, image_t *du, image_t *dv, image_t *uu, image_t *vv, ofdis::InputImageType<ofdis::FlowInput_RGB> *Ix, ofdis::InputImageType<ofdis::FlowInput_RGB> *Iy, ofdis::InputImageType<ofdis::FlowInput_RGB> *Iz, ofdis::InputImageType<ofdis::FlowInput_RGB> *Ixx, ofdis::InputImageType<ofdis::FlowInput_RGB> *Ixy, ofdis::InputImageType<ofdis::FlowInput_RGB> *Iyy, ofdis::InputImageType<ofdis::FlowInput_RGB> *Ixz, ofdis::InputImageType<ofdis::FlowInput_RGB> *Iyz, const float half_delta_over3, const float half_beta, const float half_gamma_over3);
+
 /* compute the dataterm // REMOVED MATCHING TERM
    a11 a12 a22 represents the 2x2 diagonal matrix, b1 and b2 the right hand side
    other (color) images are input */
@@ -434,13 +484,9 @@ void fdf::compute_data_DE(image_t *a11, image_t *b1, image_t *mask, image_t *wx,
         *a11p = (v4sf*) a11->c1,
         *b1p = (v4sf*) b1->c1,
         *ix1p=(v4sf*)Ix->c1, *iy1p=(v4sf*)Iy->c1, *iz1p=(v4sf*)Iz->c1, *ixx1p=(v4sf*)Ixx->c1, *ixy1p=(v4sf*)Ixy->c1, *iyy1p=(v4sf*)Iyy->c1, *ixz1p=(v4sf*)Ixz->c1, *iyz1p=(v4sf*) Iyz->c1,
-        *ix2p, *iy2p, *iz2p, *ixx2p, *ixy2p, *iyy2p, *ixz2p, *iyz2p,
-        *ix3p, *iy3p, *iz3p, *ixx3p, *ixy3p, *iyy3p, *ixz3p, *iyz3p,
+        *ix2p=(v4sf*)local_get_c2(Ix), *iy2p=(v4sf*)local_get_c2(Iy), *iz2p=(v4sf*)local_get_c2(Iz), *ixx2p=(v4sf*)local_get_c2(Ixx), *ixy2p=(v4sf*)local_get_c2(Ixy), *iyy2p=(v4sf*)local_get_c2(Iyy), *ixz2p=(v4sf*)local_get_c2(Ixz), *iyz2p=(v4sf*)local_get_c2(Iyz),
+        *ix3p=(v4sf*)local_get_c3(Ix), *iy3p=(v4sf*)local_get_c3(Iy), *iz3p=(v4sf*)local_get_c3(Iz), *ixx3p=(v4sf*)local_get_c3(Ixx), *ixy3p=(v4sf*)local_get_c3(Ixy), *iyy3p=(v4sf*)local_get_c3(Iyy), *ixz3p=(v4sf*)local_get_c3(Ixz), *iyz3p=(v4sf*)local_get_c3(Iyz),
         *uup = (v4sf*) uu->c1, *wxp = (v4sf*)wx->c1;
-    if(eInput==ofdis::FlowInput_RGB) {
-        ix2p=(v4sf*)Ix->c2; iy2p=(v4sf*)Iy->c2; iz2p=(v4sf*)Iz->c2; ixx2p=(v4sf*)Ixx->c2; ixy2p=(v4sf*)Ixy->c2; iyy2p=(v4sf*)Iyy->c2; ixz2p=(v4sf*)Ixz->c2; iyz2p=(v4sf*) Iyz->c2;
-        ix3p=(v4sf*)Ix->c3; iy3p=(v4sf*)Iy->c3; iz3p=(v4sf*)Iz->c3; ixx3p=(v4sf*)Ixx->c3; ixy3p=(v4sf*)Ixy->c3; iyy3p=(v4sf*)Iyy->c3; ixz3p=(v4sf*)Ixz->c3; iyz3p=(v4sf*) Iyz->c3;
-    }
 
     memset(a11->c1, 0, sizeof(float)*uu->height*uu->stride);
     memset(b1->c1 , 0, sizeof(float)*uu->height*uu->stride);
@@ -520,8 +566,12 @@ void fdf::compute_data_DE(image_t *a11, image_t *b1, image_t *mask, image_t *wx,
     }
 }
 
+template void fdf::compute_data_DE<ofdis::FlowInput_Grayscale>(image_t *a11, image_t *b1, image_t *mask, image_t *wx, image_t *du, image_t *uu, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Ix, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Iy, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Iz, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Ixx, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Ixy, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Iyy, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Ixz, ofdis::InputImageType<ofdis::FlowInput_Grayscale> *Iyz, const float half_delta_over3, const float half_beta, const float half_gamma_over3);
+template void fdf::compute_data_DE<ofdis::FlowInput_Gradient>(image_t *a11, image_t *b1, image_t *mask, image_t *wx, image_t *du, image_t *uu, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Ix, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Iy, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Iz, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Ixx, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Ixy, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Iyy, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Ixz, ofdis::InputImageType<ofdis::FlowInput_Gradient> *Iyz, const float half_delta_over3, const float half_beta, const float half_gamma_over3);
+template void fdf::compute_data_DE<ofdis::FlowInput_RGB>(image_t *a11, image_t *b1, image_t *mask, image_t *wx, image_t *du, image_t *uu, ofdis::InputImageType<ofdis::FlowInput_RGB> *Ix, ofdis::InputImageType<ofdis::FlowInput_RGB> *Iy, ofdis::InputImageType<ofdis::FlowInput_RGB> *Iz, ofdis::InputImageType<ofdis::FlowInput_RGB> *Ixx, ofdis::InputImageType<ofdis::FlowInput_RGB> *Ixy, ofdis::InputImageType<ofdis::FlowInput_RGB> *Iyy, ofdis::InputImageType<ofdis::FlowInput_RGB> *Ixz, ofdis::InputImageType<ofdis::FlowInput_RGB> *Iyz, const float half_delta_over3, const float half_beta, const float half_gamma_over3);
+
 /* resize the descriptors to the new size using a weighted mean */
-void descflow_resize(image_t *dst_flow_x, image_t *dst_flow_y, image_t *dst_weight, const image_t *src_flow_x, const image_t *src_flow_y, const image_t *src_weight){
+void fdf::descflow_resize(image_t *dst_flow_x, image_t *dst_flow_y, image_t *dst_weight, const image_t *src_flow_x, const image_t *src_flow_y, const image_t *src_weight){
     const int src_width = src_flow_x->width, src_height = src_flow_x->height, src_stride = src_flow_x->stride,
                 dst_width = dst_flow_x->width, dst_height = dst_flow_x->height, dst_stride = dst_flow_x->stride;
     const float scale_x = ((float)dst_width-1)/((float)src_width-1), scale_y = ((float)dst_height-1)/((float)src_height-1);
@@ -574,7 +624,7 @@ void descflow_resize(image_t *dst_flow_x, image_t *dst_flow_y, image_t *dst_weig
 }
 
 /* resize the descriptors to the new size using a nearest neighbor method while keeping the descriptor with the higher weight at the end */
-void descflow_resize_nn(image_t *dst_flow_x, image_t *dst_flow_y, image_t *dst_weight, const image_t *src_flow_x, const image_t *src_flow_y, const image_t *src_weight){
+void fdf::descflow_resize_nn(image_t *dst_flow_x, image_t *dst_flow_y, image_t *dst_weight, const image_t *src_flow_x, const image_t *src_flow_y, const image_t *src_weight){
     const int src_width = src_flow_x->width, src_height = src_flow_x->height, src_stride = src_flow_x->stride,
                 dst_width = dst_flow_x->width, dst_height = dst_flow_x->height, dst_stride = dst_flow_x->stride;
     const float scale_x = ((float)dst_width-1)/((float)src_width-1), scale_y = ((float)dst_height-1)/((float)src_height-1);
