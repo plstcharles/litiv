@@ -1240,6 +1240,9 @@ namespace lv {
         return oOutputMap;
     }
 
+    /// returns a 8uc3 color map to visualize an optical flow map given by 2d float vectors (intensities are normalized via min-maxing)
+    cv::Mat getFlowColorMap(const cv::Mat& oOpticalFlowMap);
+
     /// helper struct for image display & callback management (must be created via DisplayHelper::create due to enable_shared_from_this interface)
     struct DisplayHelper : lv::enable_shared_from_this<DisplayHelper> {
         /// displayed window title (specified on creation)

@@ -109,6 +109,32 @@ void lv::getLogPolarMask(int nMaskSize, int nRadialBins, int nAngularBins, cv::M
     }
 }
 
+cv::Mat lv::getFlowColorMap(const cv::Mat& oFlow) {
+    if(oFlow.empty())
+        return cv::Mat();
+    lvAssert_(oFlow.type()==CV_32SC2 || oFlow.type()==CV_32FC2 || oFlow.type()==CV_64FC2,"bad internal map element type");
+    cv::Mat oFlow_64f;
+    if(oFlow.type()!=CV_64FC2)
+        oFlow.convertTo(oFlow_64f,CV_64F);
+    else
+        oFlow_64f = oFlow;
+    std::vector<cv::Mat> vFlow_64f;
+    cv::split(oFlow_64f,vFlow_64f);
+    lvAssert(vFlow_64f.size()==size_t(2));
+    cv::Mat oMag,oMagNorm,oAng,oOutput;
+    cv::cartToPolar(vFlow_64f[1],vFlow_64f[0],oMag,oAng,true);
+    cv::normalize(oMag,oMagNorm,0,255,cv::NORM_MINMAX,CV_8U);
+    std::vector<cv::Mat> vHSVMap;
+    for(int n=0; n<3; ++n)
+        vHSVMap.emplace_back(oFlow.size(),CV_8UC1);
+    ((cv::Mat)(cv::min(oAng,359)/2)).convertTo(vHSVMap[0],CV_8U);
+    vHSVMap[1] = 255;
+    vHSVMap[2] = oMagNorm;
+    cv::merge(vHSVMap,oOutput);
+    cv::cvtColor(oOutput,oOutput,cv::COLOR_HSV2BGR);
+    return oOutput;
+}
+
 lv::DisplayHelperPtr lv::DisplayHelper::create(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags) {
     struct DisplayHelperWrapper : public DisplayHelper {
         DisplayHelperWrapper(const std::string& _sDisplayName, const std::string& _sDebugFSDirPath, const cv::Size& _oMaxSize, int _nWindowFlags) :
