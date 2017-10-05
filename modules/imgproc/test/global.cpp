@@ -126,6 +126,41 @@ TEST(gmm_learn,regression_local) {
     }
 }
 
+#if USING_OFDIS
+
+#include "litiv/3rdparty/ofdis/ofdis.hpp"
+
+TEST(ofdis_optflow,regression) {
+    const cv::Mat oImage1 = cv::imread(SAMPLES_DATA_ROOT "/middlebury2005_dataset_ex/dolls/view1.png");
+    ASSERT_FALSE(oImage1.empty());
+    ASSERT_EQ(oImage1.type(),CV_8UC3);
+    ASSERT_EQ(oImage1.size(),cv::Size(463,370));
+    const cv::Mat oImage2 = cv::imread(SAMPLES_DATA_ROOT "/middlebury2005_dataset_ex/dolls/view0.png");
+    ASSERT_FALSE(oImage2.empty());
+    ASSERT_EQ(oImage1.type(),oImage2.type());
+    ASSERT_EQ(oImage1.size(),oImage2.size());
+    cv::Mat oFlowMap;
+    ofdis::computeFlow<ofdis::FlowInput_RGB,ofdis::FlowOutput_OpticalFlow>(oImage1,oImage2,oFlowMap);
+    ASSERT_EQ(oFlowMap.size(),oImage1.size());
+    ASSERT_EQ(oFlowMap.type(),CV_32FC2);
+    oFlowMap = oFlowMap(cv::Rect(200,200,100,100));
+    const std::string sFlowMapBinPath = TEST_CURR_INPUT_DATA_ROOT "/test_flowmap_ofdis.bin";
+    if(lv::checkIfExists(sFlowMapBinPath)) {
+        cv::Mat oRefMap = lv::read(sFlowMapBinPath);
+        ASSERT_EQ(oFlowMap.size,oRefMap.size);
+        ASSERT_EQ(oFlowMap.type(),oRefMap.type());
+        ASSERT_EQ(oFlowMap.total(),oRefMap.total());
+        for(int i=0; i<oFlowMap.size[0]; ++i)
+            for(int j=0; j<oFlowMap.size[1]; ++j)
+                for(int k=0; k<2; ++k)
+                    ASSERT_FLOAT_EQ(oFlowMap.at<cv::Vec2f>(i,j)[k],oRefMap.at<cv::Vec2f>(i,j)[k]) << "ijk=[" << i << "," << j << "," << k << "]";
+    }
+    else
+        lv::write(sFlowMapBinPath,oFlowMap);
+}
+
+#endif //USING_OFDIS
+
 #include "litiv/features2d/SC.hpp"
 
 TEST(descriptor_affinity,regression_L2_sc) {
