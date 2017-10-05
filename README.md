@@ -34,6 +34,19 @@ The primary goal here is to have the framework core only depend on OpenCV/CMake,
 
 A dockerfile which builds an Ubuntu image including all these dependencies is available [here](./Dockerfile). The images built by Travis are periodically uploaded to Docker Hub [here](https://hub.docker.com/r/plstcharles/litiv-base/) and [here](https://hub.docker.com/r/plstcharles/litiv/).
 
+Building
+--------
+
+This is a CMake-based project; to get your desired solution format (Makefiles, .sln, ...) and compile the framework, you must create a 'build' directory somewhere (ideally, in this directory), startup cmake from there (via command-line or gui), and point to the source directory (where this README is located). For example, in command-line:
+```
+git clone https://github.com/plstcharles/litiv
+cd litiv
+mkdir build
+cd build
+cmake ../
+```
+Using the CMake GUI is highly encouraged, as you will have direct access to more options when configuring the framework. It is also easier to set paths to missing/optional 3rd party libraries using the interface.
+
 Modules Overview
 ----------------
 
