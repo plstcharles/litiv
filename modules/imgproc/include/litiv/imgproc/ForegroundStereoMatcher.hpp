@@ -23,80 +23,6 @@
 #include "litiv/features2d.hpp"
 #include "litiv/imgproc.hpp"
 
-// config options
-#define STEREOSEGMATCH_CONFIG_USE_DASCGF_AFFINITY   1
-#define STEREOSEGMATCH_CONFIG_USE_DASCRF_AFFINITY   0
-#define STEREOSEGMATCH_CONFIG_USE_LSS_AFFINITY      0
-#define STEREOSEGMATCH_CONFIG_USE_MI_AFFINITY       0
-#define STEREOSEGMATCH_CONFIG_USE_SSQDIFF_AFFINITY  0
-#define STEREOSEGMATCH_CONFIG_USE_SHAPE_EMD_AFFIN   0
-#define STEREOSEGMATCH_CONFIG_USE_UNARY_ONLY_FIRST  1
-#define STEREOSEGMATCH_CONFIG_USE_SALIENT_MAP_BORDR 1
-#define STEREOSEGMATCH_CONFIG_USE_ROOT_SIFT_DESCS   0
-#define STEREOSEGMATCH_CONFIG_USE_GMM_LOCAL_BACKGR  1
-#define STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF   1
-#define STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF 0
-#define STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF  0
-#define STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF   1
-#define STEREOSEGMATCH_CONFIG_USE_SOSPD_RESEGM_INF  0
-#define STEREOSEGMATCH_CONFIG_USE_PROGRESS_BARS     0
-#define STEREOSEGMATCH_CONFIG_USE_EPIPOLAR_CONN     0
-
-// default param values
-#define STEREOSEGMATCH_DEFAULT_TEMPORAL_DEPTH       (size_t(0))
-#define STEREOSEGMATCH_DEFAULT_DISPARITY_STEP       (size_t(1))
-#define STEREOSEGMATCH_DEFAULT_MAX_MOVE_ITER        (size_t(300))
-#define STEREOSEGMATCH_DEFAULT_SCDESC_WIN_RAD       (size_t(40))
-#define STEREOSEGMATCH_DEFAULT_SCDESC_RAD_BINS      (size_t(3))
-#define STEREOSEGMATCH_DEFAULT_SCDESC_ANG_BINS      (size_t(10))
-#define STEREOSEGMATCH_DEFAULT_LSSDESC_RAD          (size_t(40))
-#define STEREOSEGMATCH_DEFAULT_LSSDESC_PATCH        (size_t(7))
-#define STEREOSEGMATCH_DEFAULT_LSSDESC_RAD_BINS     (size_t(3))
-#define STEREOSEGMATCH_DEFAULT_LSSDESC_ANG_BINS     (size_t(10))
-#define STEREOSEGMATCH_DEFAULT_SSQDIFF_PATCH        (size_t(7))
-#define STEREOSEGMATCH_DEFAULT_MI_WINDOW_RAD        (size_t(12))
-#define STEREOSEGMATCH_DEFAULT_GRAD_KERNEL_SIZE     (int(1))
-#define STEREOSEGMATCH_DEFAULT_DISTTRANSF_SCALE     (-0.1f)
-#define STEREOSEGMATCH_DEFAULT_ITER_PER_RESEGM      ((m_nStereoLabels*3)/2)
-#define STEREOSEGMATCH_DEFAULT_RESEGM_PER_LOOP      (3)
-#define STEREOSEGMATCH_DEFAULT_SALIENT_SHP_RAD      (3)
-#define STEREOSEGMATCH_DEFAULT_DESC_PATCH_SIZE      (15)
-
-// unary costs params
-#define STEREOSEGMATCH_UNARY_COST_OOB_CST           (ValueType(5000))
-#define STEREOSEGMATCH_UNARY_COST_OCCLUDED_CST      (ValueType(2000))
-#define STEREOSEGMATCH_UNARY_COST_MAXTRUNC_CST      (ValueType(10000))
-#define STEREOSEGMATCH_IMGSIM_COST_COLOR_SCALE      (40)
-#define STEREOSEGMATCH_IMGSIM_COST_DESC_SCALE       (400)
-#define STEREOSEGMATCH_SHPSIM_COST_DESC_SCALE       (400)
-#define STEREOSEGMATCH_UNIQUE_COST_OVER_SCALE       (400)
-#define STEREOSEGMATCH_SHPDIST_COST_SCALE           (400)
-#define STEREOSEGMATCH_SHPDIST_PX_MAX_CST           (10.0f)
-#define STEREOSEGMATCH_SHPDIST_INTERSPEC_SCALE      (0.50f)
-#define STEREOSEGMATCH_SHPDIST_INITDIST_SCALE       (0.00f)
-// pairwise costs params
-#define STEREOSEGMATCH_LBLSIM_COST_MAXOCCL          (ValueType(5000))
-#define STEREOSEGMATCH_LBLSIM_COST_MAXTRUNC_CST     (ValueType(5000))
-#define STEREOSEGMATCH_LBLSIM_RESEGM_SCALE_CST      (400)
-#define STEREOSEGMATCH_LBLSIM_STEREO_SCALE_CST      (1.f)
-#define STEREOSEGMATCH_LBLSIM_STEREO_MAXDIFF_CST    (10)
-#define STEREOSEGMATCH_LBLSIM_USE_EXP_GRADPIVOT     (1)
-#if STEREOSEGMATCH_LBLSIM_USE_EXP_GRADPIVOT
-#define STEREOSEGMATCH_LBLSIM_COST_GRADRAW_SCALE    (32)
-#define STEREOSEGMATCH_LBLSIM_COST_GRADPIVOT_CST    (32)
-#else //!STEREOSEGMATCH_LBLSIM_USE_EXP_GRADPIVOT
-#define STEREOSEGMATCH_LBLSIM_COST_GRADRAW_SCALE    (10)
-#define STEREOSEGMATCH_LBLSIM_COST_GRADPIVOT_CST    (32)
-#endif //!STEREOSEGMATCH_LBLSIM_USE_EXP_GRADPIVOT
-// higher order costs params
-#define STEREOSEGMATCH_HOENERGY_STEREO_STRIDE       (size_t(1))
-#define STEREOSEGMATCH_HOENERGY_RESEGM_STRIDE       (size_t(1))
-// ...
-
-// hardcoded term relations
-#define STEREOSEGMATCH_UNIQUE_COST_INCR_REL(n)      (float((n)*3)/((n)+2))
-#define STEREOSEGMATCH_UNIQUE_COST_ZERO_COUNT       (2)
-
 /// this stereo matcher assumes both input images are rectified, and have the same size;
 /// it also expects four inputs (image0,mask0,image1,mask1), and provides 4 outputs (disp0,mask0,disp1,mask1)
 struct StereoSegmMatcher : ICosegmentor<int32_t,4> { // camera count could be templated... (n-view generalization)
@@ -164,9 +90,9 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> { // camera count could be te
     /// stereo matcher function; solves the graph model to find pixel-level matches on epipolar lines in the masked input images, and returns disparity maps + masks
     virtual void apply(const MatArrayIn& aInputs, MatArrayOut& aOutputs) override;
     /// (pre)calculates initial features required for model updates, and optionally returns them in packet format for archiving
-    virtual void calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeatsPacket=nullptr);
+    virtual void calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeaturesPacket=nullptr);
     /// sets a previously precalculated initial features packet to be used in the next 'apply' call (do not modify its data before that!)
-    virtual void setNextFeatures(const cv::Mat& oPackedFeats);
+    virtual void setNextFeatures(const cv::Mat& oPackedFeatures);
     /// returns the (friendly) name of the input image feature extractor that will be used internally
     virtual std::string getFeatureExtractorName() const;
     /// returns the (maximum) number of stereo disparity labels used in the output masks
@@ -174,9 +100,9 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> { // camera count could be te
     /// returns the list of (real) stereo disparity labels used in the output masks
     virtual const std::vector<OutputLabelType>& getLabels() const override;
     /// helper func to display segmentation maps
-    cv::Mat getResegmMapDisplay(size_t nCamIdx) const;
+    cv::Mat getResegmMapDisplay(size_t nLayerIdx, size_t nCamIdx) const;
     /// helper func to display scaled disparity maps
-    cv::Mat getStereoDispMapDisplay(size_t nCamIdx) const;
+    cv::Mat getStereoDispMapDisplay(size_t nLayerIdx, size_t nCamIdx) const;
     /// helper func to display scaled assoc count maps (for primary cam only)
     cv::Mat getAssocCountsMapDisplay() const;
 

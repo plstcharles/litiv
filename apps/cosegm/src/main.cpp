@@ -355,8 +355,8 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                     vCurrInput[nDisplayRowIdx*2].copyTo(vvDisplayPairs[nDisplayRowIdx][0].first);
                     vCurrInput[nDisplayRowIdx*2+1].copyTo(vvDisplayPairs[nDisplayRowIdx][1].first);
                 #if !DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_MASKS_ONLY
-                    pAlgo->getStereoDispMapDisplay(nDisplayRowIdx).copyTo(vvDisplayPairs[nDisplayRowIdx][2].first);
-                    pAlgo->getResegmMapDisplay(nDisplayRowIdx).copyTo(vvDisplayPairs[nDisplayRowIdx][3].first);
+                    pAlgo->getStereoDispMapDisplay(0,nDisplayRowIdx).copyTo(vvDisplayPairs[nDisplayRowIdx][2].first);
+                    pAlgo->getResegmMapDisplay(0,nDisplayRowIdx).copyTo(vvDisplayPairs[nDisplayRowIdx][3].first);
                 #endif //!DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_MASKS_ONLY
                     vCurrEvalRes[nDisplayRowIdx].copyTo(vvDisplayPairs[nDisplayRowIdx][4].first);
                 }
@@ -390,4 +390,5 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         std::cout << "\nAnalyze caught unhandled exception while attempting to stop batch processing.\n" << std::endl;
         throw;
     }
+    std::exit(1);
 }
