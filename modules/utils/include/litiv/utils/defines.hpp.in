@@ -32,18 +32,6 @@
 
 #ifndef __COMMON_LIBS_DEFS__
     #define __COMMON_LIBS_DEFS__
-    #ifndef D2R
-        #define D2R(d) ((d)*(M_PI/180.0))
-    #endif //ndef(D2R)
-    #ifndef R2D
-        #define R2D(r) ((r)*(180.0/M_PI))
-    #endif //ndef(R2D)
-    #ifndef __STDC_FORMAT_MACROS
-        #define __STDC_FORMAT_MACROS
-    #endif //ndef(__STDC_FORMAT_MACROS)
-    #ifndef _USE_MATH_DEFINES
-        #define _USE_MATH_DEFINES
-    #endif //ndef(_USE_MATH_DEFINES)
     #ifndef __XSTR_DEFINES__
         #define __XSTR_DEFINES__
         #define XSTR_CONCAT(s1,s2) XSTR_CONCAT_BASE(s1,s2)
@@ -51,44 +39,58 @@
         #define XSTR(s) XSTR_BASE(s)
         #define XSTR_BASE(s) #s
     #endif //ndef(__XSTR_DEFINES__)
-    #if defined(_MSC_VER)
-        #if _MSC_VER<1900 // need >= MSVC 2015 (v140) toolchain
-            #error "This project requires full C++14 support (including constexpr and SFINAE)."
-        #endif //_MSC_VER<1900
-        #ifndef __PRETTY_FUNCTION__
-            #define __PRETTY_FUNCTION__ __FUNCSIG__
-        #endif //ndef(__PRETTY_FUNCTION__)
-        #ifndef NOMINMAX
-            #define NOMINMAX // go ahead, try using std::numeric_limits<...>::max() with the 'max' macro enabled
-        #endif //ndef(NOMINMAX)
-        #ifndef __func__
-            #define __func__ __FUNCTION__
-        #endif //ndef(__func__)
-        #ifndef _SCL_SECURE_NO_WARNINGS
-            #define _SCL_SECURE_NO_WARNINGS
-        #endif //ndef(_SCL_SECURE_NO_WARNINGS)
-        #ifndef _CRT_SECURE_NO_WARNINGS
-            #define _CRT_SECURE_NO_WARNINGS
-        #endif //ndef(_CRT_SECURE_NO_WARNINGS)
-        #ifndef MAY_ALIAS
-            #define MAY_ALIAS
-        #endif //MAY_ALIAS
-    #else //ndef(_MSC_VER)
-        #if __cplusplus<201402L
-            #error "This project requires full C++14 support (including constexpr and SFINAE)."
-        #endif //__cplusplus<201402L
-        #if (defined(__GNUC__) || defined(__clang__))
+    #ifdef __cplusplus
+        #ifndef D2R
+            #define D2R(d) ((d)*(M_PI/180.0))
+        #endif //ndef(D2R)
+        #ifndef R2D
+            #define R2D(r) ((r)*(180.0/M_PI))
+        #endif //ndef(R2D)
+        #ifndef __STDC_FORMAT_MACROS
+            #define __STDC_FORMAT_MACROS
+        #endif //ndef(__STDC_FORMAT_MACROS)
+        #ifndef _USE_MATH_DEFINES
+            #define _USE_MATH_DEFINES
+        #endif //ndef(_USE_MATH_DEFINES)
+        #if defined(_MSC_VER)
+            #if _MSC_VER<1900 // need >= MSVC 2015 (v140) toolchain
+                #error "This project requires full C++14 support (including constexpr and SFINAE)."
+            #endif //_MSC_VER<1900
+            #ifndef __PRETTY_FUNCTION__
+                #define __PRETTY_FUNCTION__ __FUNCSIG__
+            #endif //ndef(__PRETTY_FUNCTION__)
+            #ifndef NOMINMAX
+                #define NOMINMAX // go ahead, try using std::numeric_limits<...>::max() with the 'max' macro enabled
+            #endif //ndef(NOMINMAX)
+            #ifndef __func__
+                #define __func__ __FUNCTION__
+            #endif //ndef(__func__)
+            #ifndef _SCL_SECURE_NO_WARNINGS
+                #define _SCL_SECURE_NO_WARNINGS
+            #endif //ndef(_SCL_SECURE_NO_WARNINGS)
+            #ifndef _CRT_SECURE_NO_WARNINGS
+                #define _CRT_SECURE_NO_WARNINGS
+            #endif //ndef(_CRT_SECURE_NO_WARNINGS)
             #ifndef MAY_ALIAS
-                #define MAY_ALIAS __attribute__((__may_alias__))
+                #define MAY_ALIAS
             #endif //MAY_ALIAS
-        #endif //(defined(__GNUC__) || defined(__clang__))
-    #endif //ndef(_MSC_VER)
-    #ifndef TIMER_DEFS
-        #define TIMER_DEFS
-        #define TIMER_TIC(x) int64 XSTR_CONCAT(__nCPUTimerTick_,x) = cv::getTickCount()
-        #define TIMER_TOC(x) int64 XSTR_CONCAT(__nCPUTimerVal_,x) = cv::getTickCount()-XSTR_CONCAT(__nCPUTimerTick_,x)
-        #define TIMER_ELAPSED_MS(x) (double(XSTR_CONCAT(__nCPUTimerVal_,x))/(cv::getTickFrequency()/1000))
-    #endif //ndef(TIMER_DEFS)
+        #else //ndef(_MSC_VER)
+            #if __cplusplus<201402L
+                #error "This project requires full C++14 support (including constexpr and SFINAE)."
+            #endif //__cplusplus<201402L
+            #if (defined(__GNUC__) || defined(__clang__))
+                #ifndef MAY_ALIAS
+                    #define MAY_ALIAS __attribute__((__may_alias__))
+                #endif //MAY_ALIAS
+            #endif //(defined(__GNUC__) || defined(__clang__))
+        #endif //ndef(_MSC_VER)
+        #ifndef TIMER_DEFS
+            #define TIMER_DEFS
+            #define TIMER_TIC(x) int64 XSTR_CONCAT(__nCPUTimerTick_,x) = cv::getTickCount()
+            #define TIMER_TOC(x) int64 XSTR_CONCAT(__nCPUTimerVal_,x) = cv::getTickCount()-XSTR_CONCAT(__nCPUTimerTick_,x)
+            #define TIMER_ELAPSED_MS(x) (double(XSTR_CONCAT(__nCPUTimerVal_,x))/(cv::getTickFrequency()/1000))
+        #endif //ndef(TIMER_DEFS)
+    #endif //def(__cplusplus)
 #endif //ndef(__COMMON_LIBS_DEFS__)
 
 #ifndef __LV_UTILS_DEFS__
@@ -102,28 +104,30 @@
         #define LITIV_VERSION_PATCH       @LITIV_VERSION_PATCH@
         #define LITIV_VERSION_SHA1        "@GIT_SHA1@"
     #endif //ndef(__LV_VERSION_DEFS__)
-    #define lvStdError(errtype) throw std::errtype()
-    #define lvStdError_(errtype,msg) throw std::errtype(msg)
-    #define lvStdError__(errtype,msg,...) throw std::errtype(lv::putf(msg,__VA_ARGS__))
-    #define lvError(msg) throw lv::Exception(std::string("[lvError: ")+(msg)+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__)
-    #define lvError_(msg,...) throw lv::Exception(std::string("[lvError: ")+(msg)+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
-    #define lvAssert(expr) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(false)
-    #define lvAssert_(expr,msg) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+(msg)+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(false)
-    #define lvAssert__(expr,msg,...) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+(msg)+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);} while(false)
-    #define lvLog(level,msg) (lv::ostream_guard<std::ostream>(std::cout,level) << (msg) << '\n')
-    #define lvLog_(level,msg,...) (lv::ostream_guard<std::ostream>(std::cout,level) << lv::putf(msg,__VA_ARGS__) << '\n')
-    #define lvWarn(msg) (lv::ostream_guard<std::ostream>(std::cerr) << "[lvWarn @ " << __FILE__ << "(" << __LINE__ << "):\n\t" << (msg) << "\n]\n")
-    #define lvWarn_(msg,...) (lv::ostream_guard<std::ostream>(std::cerr) << "[lvWarn @ " << __FILE__ << "(" << __LINE__ << "):\n\t" << lv::putf(msg,__VA_ARGS__) << "\n]\n")
-    #define lvPrint(expr) (lv::ostream_guard<std::ostream>(std::cout,1) << "[lvPrint @ " << __FILE__ << "(" << __LINE__ << "):\n\t"#expr" := " << (expr) << "\n]\n")
-    #define lvCout (lv::ostream_guard<std::ostream>(std::cout))
-    #define lvCout_(level) (lv::ostream_guard<std::ostream>(std::cout,level))
-    #define lvCerr (lv::ostream_guard<std::ostream>(std::cerr))
-    #define lvCerr_(level) (lv::ostream_guard<std::ostream>(std::cerr,level))
-    #define glErrorCheck do { \
-        const GLenum __errn = glGetError(); \
-        if(__errn!=GL_NO_ERROR) \
-            lvError_("glErrorCheck failed [code=%d, msg=%s]",(int)__errn,gluErrorString(__errn)); \
-    } while(false)
+    #ifdef __cplusplus
+        #define lvStdError(errtype) throw std::errtype()
+        #define lvStdError_(errtype,msg) throw std::errtype(msg)
+        #define lvStdError__(errtype,msg,...) throw std::errtype(lv::putf(msg,__VA_ARGS__))
+        #define lvError(msg) throw lv::Exception(std::string("[lvError: ")+(msg)+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__)
+        #define lvError_(msg,...) throw lv::Exception(std::string("[lvError: ")+(msg)+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
+        #define lvAssert(expr) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(false)
+        #define lvAssert_(expr,msg) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+(msg)+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(false)
+        #define lvAssert__(expr,msg,...) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+(msg)+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);} while(false)
+        #define lvLog(level,msg) (lv::ostream_guard<std::ostream>(std::cout,level) << (msg) << '\n')
+        #define lvLog_(level,msg,...) (lv::ostream_guard<std::ostream>(std::cout,level) << lv::putf(msg,__VA_ARGS__) << '\n')
+        #define lvWarn(msg) (lv::ostream_guard<std::ostream>(std::cerr) << "[lvWarn @ " << __FILE__ << "(" << __LINE__ << "):\n\t" << (msg) << "\n]\n")
+        #define lvWarn_(msg,...) (lv::ostream_guard<std::ostream>(std::cerr) << "[lvWarn @ " << __FILE__ << "(" << __LINE__ << "):\n\t" << lv::putf(msg,__VA_ARGS__) << "\n]\n")
+        #define lvPrint(expr) (lv::ostream_guard<std::ostream>(std::cout,1) << "[lvPrint @ " << __FILE__ << "(" << __LINE__ << "):\n\t"#expr" := " << (expr) << "\n]\n")
+        #define lvCout (lv::ostream_guard<std::ostream>(std::cout))
+        #define lvCout_(level) (lv::ostream_guard<std::ostream>(std::cout,level))
+        #define lvCerr (lv::ostream_guard<std::ostream>(std::cerr))
+        #define lvCerr_(level) (lv::ostream_guard<std::ostream>(std::cerr,level))
+        #define glErrorCheck do { \
+            const GLenum __errn = glGetError(); \
+            if(__errn!=GL_NO_ERROR) \
+                lvError_("glErrorCheck failed [code=%d, msg=%s]",(int)__errn,gluErrorString(__errn)); \
+        } while(false)
+    #endif //def(__cplusplus)
     #ifdef _DEBUG
         #ifdef LITIV_BUILD
             #ifndef LITIV_DEBUG
@@ -138,16 +142,18 @@
                 #error "Current build config mismatch with LITIV external build config."
             #endif //!LITIV_DEBUG
         #endif //ndef(LITIV_BUILD)
-        #define lvDbgExec(expr) do {expr;} while(false)
-        #define lvDbgAssert(expr) lvAssert(expr)
-        #define lvDbgAssert_(expr,msg) lvAssert_(expr,msg)
-        #define lvDbgAssert__(expr,msg,...) lvAssert__(expr,msg,__VA_ARGS__)
-        #define lvDbgExceptionWatch lv::UncaughtExceptionLogger XSTR_CONCAT(__logger,__LINE__)(__PRETTY_FUNCTION__,__FILE__,__LINE__)
-        #define lvDbgLog(level,msg) lvLog(level,msg)
-        #define lvDbgLog_(level,msg,...) lvLog_(level,msg,__VA_ARGS__)
-        #define lvDbgWarn(msg) lvWarn(msg)
-        #define lvDbgWarn_(msg,...) lvWarn_(msg,__VA_ARGS__)
-        #define glDbgErrorCheck glErrorCheck
+        #ifdef __cplusplus
+            #define lvDbgExec(expr) do {expr;} while(false)
+            #define lvDbgAssert(expr) lvAssert(expr)
+            #define lvDbgAssert_(expr,msg) lvAssert_(expr,msg)
+            #define lvDbgAssert__(expr,msg,...) lvAssert__(expr,msg,__VA_ARGS__)
+            #define lvDbgExceptionWatch lv::UncaughtExceptionLogger XSTR_CONCAT(__logger,__LINE__)(__PRETTY_FUNCTION__,__FILE__,__LINE__)
+            #define lvDbgLog(level,msg) lvLog(level,msg)
+            #define lvDbgLog_(level,msg,...) lvLog_(level,msg,__VA_ARGS__)
+            #define lvDbgWarn(msg) lvWarn(msg)
+            #define lvDbgWarn_(msg,...) lvWarn_(msg,__VA_ARGS__)
+            #define glDbgErrorCheck glErrorCheck
+        #endif //def(__cplusplus)
     #else //ndef(_DEBUG)
         #ifdef LITIV_BUILD
             #ifndef LITIV_DEBUG
@@ -162,16 +168,18 @@
                 #error "Current build config mismatch with LITIV external build config."
             #endif //LITIV_DEBUG
         #endif //ndef(LITIV_BUILD)
-        #define lvDbgExec(expr) ((void)0)
-        #define lvDbgAssert(expr) ((void)0)
-        #define lvDbgAssert_(expr,msg) ((void)0)
-        #define lvDbgAssert__(expr,msg,...) ((void)0)
-        #define lvDbgExceptionWatch ((void)0)
-        #define lvDbgLog(level,msg) ((void)0)
-        #define lvDbgLog_(level,msg,...) ((void)0)
-        #define lvDbgWarn(msg) ((void)0)
-        #define lvDbgWarn_(msg,...) ((void)0)
-        #define glDbgErrorCheck ((void)0)
+        #ifdef __cplusplus
+            #define lvDbgExec(expr) ((void)0)
+            #define lvDbgAssert(expr) ((void)0)
+            #define lvDbgAssert_(expr,msg) ((void)0)
+            #define lvDbgAssert__(expr,msg,...) ((void)0)
+            #define lvDbgExceptionWatch ((void)0)
+            #define lvDbgLog(level,msg) ((void)0)
+            #define lvDbgLog_(level,msg,...) ((void)0)
+            #define lvDbgWarn(msg) ((void)0)
+            #define lvDbgWarn_(msg,...) ((void)0)
+            #define glDbgErrorCheck ((void)0)
+        #endif //def(__cplusplus)
     #endif //ndef(_DEBUG)
     #define lvIgnore(x) (void)(x)
     #ifndef UNUSED
