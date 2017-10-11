@@ -5,6 +5,7 @@
 #include <malloc.h>
 #include "litiv/3rdparty/ofdis/fdf/image.h"
 #include "litiv/3rdparty/ofdis/fdf/solver.h"
+#include "litiv/utils/defines.hpp" // only used here for compiler flags
 
 #if defined(_MSC_VER)
 #include <intrin.h>
@@ -23,7 +24,9 @@ void sor_coupled_slow_but_readable(image_t *du, image_t *dv, image_t *a11, image
     int i,j,iter;
     for(iter = 0 ; iter<iterations ; iter++)
     {
+    #if USE_OPENMP
     #pragma omp parallel for
+    #endif //USE_OPENMP
     for(j=0 ; j<du->height ; j++)
     {
       float sigma_u,sigma_v,sum_dpsis,A11,A22,A12,B1,B2;//,det;
@@ -422,7 +425,9 @@ void sor_coupled_slow_but_readable_DE(image_t *du, const image_t *a11, const ima
 {
     int i,j,iter;
     for(iter = 0 ; iter<iterations ; iter++) {
+    #if USE_OPENMP
 	#pragma omp parallel for
+    #endif //USE_OPENMP
         for(j=0 ; j<du->height ; j++) {
 	        float sigma_u,sum_dpsis,A11,B1;
 	        for(i=0 ; i<du->width ; i++){
