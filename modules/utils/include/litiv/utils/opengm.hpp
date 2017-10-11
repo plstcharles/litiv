@@ -105,38 +105,6 @@ namespace lv {
             }
         }
 
-        /// higher-order term reducer (used by FGBZ solver w/ QPBO-compatible interface)
-        template<size_t nMaxOrder, typename ValueType, typename LabelType, typename FactorType, typename ReducerType>
-        inline void factorReducer(FactorType& oGraphFactor, size_t nFactOrder, ReducerType& oReducer, LabelType nAlphaLabel, const size_t* pValidLUTNodeIdxs, const LabelType* aLabeling) {
-            lvDbgAssert(oGraphFactor.numberOfVariables()==nFactOrder);
-            std::array<typename ReducerType::VarId,nMaxOrder> aTermEnergyLUT;
-            std::array<LabelType,nMaxOrder> aCliqueLabels;
-            std::array<ValueType,(1u<<nMaxOrder)> aCliqueCoeffs;
-            const size_t nAssignCount = 1UL<<nFactOrder;
-            std::fill_n(aCliqueCoeffs.begin(),nAssignCount,ValueType(0));
-            for(size_t nAssignIdx=0; nAssignIdx<nAssignCount; ++nAssignIdx) {
-                for(size_t nVarIdx=0; nVarIdx<nFactOrder; ++nVarIdx)
-                    aCliqueLabels[nVarIdx] = (nAssignIdx&(1<<nVarIdx))?nAlphaLabel:aLabeling[pValidLUTNodeIdxs[oGraphFactor.variableIndex(nVarIdx)]];
-                for(size_t nAssignSubsetIdx=1; nAssignSubsetIdx<nAssignCount; ++nAssignSubsetIdx) {
-                    if(!(nAssignIdx&~nAssignSubsetIdx)) {
-                        int nParityBit = 0;
-                        for(size_t nVarIdx=0; nVarIdx<nFactOrder; ++nVarIdx)
-                            nParityBit ^= (((nAssignIdx^nAssignSubsetIdx)&(1<<nVarIdx))!=0);
-                        const ValueType fCurrAssignEnergy = oGraphFactor(aCliqueLabels.begin());
-                        aCliqueCoeffs[nAssignSubsetIdx] += nParityBit?-fCurrAssignEnergy:fCurrAssignEnergy;
-                    }
-                }
-            }
-            for(size_t nAssignSubsetIdx=1; nAssignSubsetIdx<nAssignCount; ++nAssignSubsetIdx) {
-                int nCurrTermDegree = 0;
-                for(size_t nVarIdx=0; nVarIdx<nFactOrder; ++nVarIdx)
-                    if(nAssignSubsetIdx&(1<<nVarIdx))
-                        aTermEnergyLUT[nCurrTermDegree++] = (typename HigherOrderEnergy<ValueType,nMaxOrder>::VarId)oGraphFactor.variableIndex(nVarIdx);
-                std::sort(aTermEnergyLUT.begin(),aTermEnergyLUT.begin()+nCurrTermDegree);
-                oReducer.AddTerm(aCliqueCoeffs[nAssignSubsetIdx],nCurrTermDegree,aTermEnergyLUT.data());
-            }
-        }
-
         /// explicit function wrapper to bypass marray allocations and use views instead (interface similar to opengm::ExplicitFunction's)
         template<typename TValue, typename TIndex=size_t, typename TLabel=size_t>
         struct ExplicitViewFunction :
@@ -302,6 +270,70 @@ namespace lv {
             /// static size member of this clique (for type traits ops)
             static constexpr TIndex s_nCliqueSize = TIndex(0);
         };
+
+        /// higher-order term reducer (used by FGBZ solver w/ QPBO-compatible interface)
+        template<size_t nOrder, typename TValue, typename TIndex, typename TLabel, typename TFunc, typename ReducerType>
+        inline void factorReducer(const Clique<nOrder,TValue,TIndex,TLabel,TFunc>& oClique, ReducerType& oReducer, TLabel nAlphaLabel, const TLabel* aLabeling) {
+            if(oClique) {
+                std::array<typename ReducerType::VarId,nOrder> aTermEnergyLUT;
+                std::array<TLabel,nOrder> aCliqueLabels;
+                std::array<TValue,(1u<<nOrder)> aCliqueCoeffs{};
+                constexpr size_t nAssignCount = 1UL<<nOrder;
+                for(size_t nAssignIdx=0; nAssignIdx<nAssignCount; ++nAssignIdx) {
+                    for(size_t nVarIdx=0; nVarIdx<nOrder; ++nVarIdx)
+                        aCliqueLabels[nVarIdx] = (nAssignIdx&(1<<nVarIdx))?nAlphaLabel:aLabeling[oClique.m_anLUTNodeIdxs[nVarIdx]];
+                    for(size_t nAssignSubsetIdx=1; nAssignSubsetIdx<nAssignCount; ++nAssignSubsetIdx) {
+                        if(!(nAssignIdx&~nAssignSubsetIdx)) {
+                            int nParityBit = 0;
+                            for(size_t nVarIdx=0; nVarIdx<nOrder; ++nVarIdx)
+                                nParityBit ^= (((nAssignIdx^nAssignSubsetIdx)&(1<<nVarIdx))!=0);
+                            const TValue fCurrAssignEnergy = (*oClique.m_pGraphFunctionPtr)(aCliqueLabels.begin());
+                            aCliqueCoeffs[nAssignSubsetIdx] += nParityBit?-fCurrAssignEnergy:fCurrAssignEnergy;
+                        }
+                    }
+                }
+                for(size_t nAssignSubsetIdx=1; nAssignSubsetIdx<nAssignCount; ++nAssignSubsetIdx) {
+                    int nCurrTermDegree = 0;
+                    for(size_t nVarIdx=0; nVarIdx<nOrder; ++nVarIdx)
+                        if(nAssignSubsetIdx&(1<<nVarIdx))
+                            aTermEnergyLUT[nCurrTermDegree++] = (typename ReducerType::VarId)oClique.m_anGraphNodeIdxs[nVarIdx];
+                    std::sort(aTermEnergyLUT.begin(),aTermEnergyLUT.begin()+nCurrTermDegree);
+                    oReducer.AddTerm(aCliqueCoeffs[nAssignSubsetIdx],nCurrTermDegree,aTermEnergyLUT.data());
+                }
+            }
+        }
+
+        /// higher-order term reducer (opengm variation; used by FGBZ solver w/ QPBO-compatible interface)
+        template<size_t nMaxOrder, typename ValueType, typename LabelType, typename FactorType, typename ReducerType>
+        inline void factorReducer(FactorType& oGraphFactor, size_t nFactOrder, ReducerType& oReducer, LabelType nAlphaLabel, const size_t* pValidLUTNodeIdxs, const LabelType* aLabeling) {
+            lvDbgAssert(oGraphFactor.numberOfVariables()==nFactOrder);
+            std::array<typename ReducerType::VarId,nMaxOrder> aTermEnergyLUT;
+            std::array<LabelType,nMaxOrder> aCliqueLabels;
+            std::array<ValueType,(1u<<nMaxOrder)> aCliqueCoeffs;
+            const size_t nAssignCount = 1UL<<nFactOrder;
+            std::fill_n(aCliqueCoeffs.begin(),nAssignCount,ValueType(0));
+            for(size_t nAssignIdx=0; nAssignIdx<nAssignCount; ++nAssignIdx) {
+                for(size_t nVarIdx=0; nVarIdx<nFactOrder; ++nVarIdx)
+                    aCliqueLabels[nVarIdx] = (nAssignIdx&(1<<nVarIdx))?nAlphaLabel:aLabeling[pValidLUTNodeIdxs[oGraphFactor.variableIndex(nVarIdx)]];
+                for(size_t nAssignSubsetIdx=1; nAssignSubsetIdx<nAssignCount; ++nAssignSubsetIdx) {
+                    if(!(nAssignIdx&~nAssignSubsetIdx)) {
+                        int nParityBit = 0;
+                        for(size_t nVarIdx=0; nVarIdx<nFactOrder; ++nVarIdx)
+                            nParityBit ^= (((nAssignIdx^nAssignSubsetIdx)&(1<<nVarIdx))!=0);
+                        const ValueType fCurrAssignEnergy = oGraphFactor(aCliqueLabels.begin());
+                        aCliqueCoeffs[nAssignSubsetIdx] += nParityBit?-fCurrAssignEnergy:fCurrAssignEnergy;
+                    }
+                }
+            }
+            for(size_t nAssignSubsetIdx=1; nAssignSubsetIdx<nAssignCount; ++nAssignSubsetIdx) {
+                int nCurrTermDegree = 0;
+                for(size_t nVarIdx=0; nVarIdx<nFactOrder; ++nVarIdx)
+                    if(nAssignSubsetIdx&(1<<nVarIdx))
+                        aTermEnergyLUT[nCurrTermDegree++] = (typename ReducerType::VarId)oGraphFactor.variableIndex(nVarIdx);
+                std::sort(aTermEnergyLUT.begin(),aTermEnergyLUT.begin()+nCurrTermDegree);
+                oReducer.AddTerm(aCliqueCoeffs[nAssignSubsetIdx],nCurrTermDegree,aTermEnergyLUT.data());
+            }
+        }
 
     } // namespace gm
 
