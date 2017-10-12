@@ -1,5 +1,4 @@
-#ifndef _SUBMODULAR_FUNCTIONS_HPP_
-#define _SUBMODULAR_FUNCTIONS_HPP_
+#pragma once
 
 #include "litiv/3rdparty/sospd/energy-common.hpp"
 #include <iostream>
@@ -392,5 +391,3 @@ inline double sospd::DiffLInfty(const std::vector<REAL>& e1, const std::vector<R
         norm = std::max(norm, std::abs(static_cast<double>(e1[i] - e2[i])));
     return norm;
 }
-
-#endif

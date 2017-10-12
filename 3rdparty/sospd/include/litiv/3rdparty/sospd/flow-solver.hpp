@@ -1,188 +1,191 @@
-#ifndef _FLOW_SOLVER_HPP_
-#define _FLOW_SOLVER_HPP_
+#pragma once
 
 #include "litiv/3rdparty/sospd/sos-graph.hpp"
 
-template<typename ValueType, typename IndexType>
-class BidirectionalIBFS : public FlowSolver<ValueType,IndexType> {
-    public:
-        BidirectionalIBFS() = default;
-        virtual ~BidirectionalIBFS() = default;
-        virtual void Solve(SubmodularIBFS<ValueType,IndexType>* energy);
-        void IBFS();
-        void ComputeMinCut();
+namespace sospd {
 
-    private:
-        typedef SoSGraph<ValueType,IndexType> Graph;
-        typedef typename Graph::REAL REAL;
-        typedef typename Graph::NodeId NodeId;
-        typedef typename Graph::CliqueId CliqueId;
-        typedef typename Graph::Node Node;
-        typedef typename Graph::NodeState NodeState;
-        typedef typename Graph::NeighborList NeighborList;
-        typedef typename Graph::ArcIterator ArcIterator;
-        typedef typename Graph::NodeQueue NodeQueue;
-        typedef typename Graph::OrphanList OrphanList;
-        typedef typename Graph::CliqueVec CliqueVec;
+    template<typename ValueType, typename IndexType>
+    class BidirectionalIBFS : public FlowSolver<ValueType,IndexType> {
+        public:
+            BidirectionalIBFS() = default;
+            virtual ~BidirectionalIBFS() = default;
+            virtual void Solve(SubmodularIBFS<ValueType,IndexType>* energy);
+            void IBFS();
+            void ComputeMinCut();
 
-        // Helper functions
-        void Push(ArcIterator& arc, bool forwardArc, REAL delta);
-        void Augment(ArcIterator& arc);
-        void Adopt();
-        void MakeOrphan(NodeId i);
-        void RemoveFromLayer(NodeId i);
-        void AddToLayer(NodeId i);
-        void AdvanceSearchNode();
+        private:
+            typedef SoSGraph<ValueType,IndexType> Graph;
+            typedef typename Graph::REAL REAL;
+            typedef typename Graph::NodeId NodeId;
+            typedef typename Graph::CliqueId CliqueId;
+            typedef typename Graph::Node Node;
+            typedef typename Graph::NodeState NodeState;
+            typedef typename Graph::NeighborList NeighborList;
+            typedef typename Graph::ArcIterator ArcIterator;
+            typedef typename Graph::NodeQueue NodeQueue;
+            typedef typename Graph::OrphanList OrphanList;
+            typedef typename Graph::CliqueVec CliqueVec;
 
-        void IBFSInit();
+            // Helper functions
+            void Push(ArcIterator& arc, bool forwardArc, REAL delta);
+            void Augment(ArcIterator& arc);
+            void Adopt();
+            void MakeOrphan(NodeId i);
+            void RemoveFromLayer(NodeId i);
+            void AddToLayer(NodeId i);
+            void AdvanceSearchNode();
 
-        /* Algorithm data */
+            void IBFSInit();
 
-        Graph* m_graph;
-        SubmodularIBFS<ValueType,IndexType>* m_energy;
-        // Layers store vertices by distance.
-        std::vector<NodeQueue> m_source_layers;
-        std::vector<NodeQueue> m_sink_layers;
-        OrphanList m_source_orphans;
-        OrphanList m_sink_orphans;
-        IndexType m_source_tree_d;
-        IndexType m_sink_tree_d;
-        typedef typename NodeQueue::iterator queue_iterator;
-        queue_iterator m_search_node_iter;
-        queue_iterator m_search_node_end;
-        ArcIterator m_search_arc;
-        ArcIterator m_search_arc_end;
-        bool m_forward_search;
+            /* Algorithm data */
 
-        // Statistics
+            Graph* m_graph;
+            SubmodularIBFS<ValueType,IndexType>* m_energy;
+            // Layers store vertices by distance.
+            std::vector<NodeQueue> m_source_layers;
+            std::vector<NodeQueue> m_sink_layers;
+            OrphanList m_source_orphans;
+            OrphanList m_sink_orphans;
+            IndexType m_source_tree_d;
+            IndexType m_sink_tree_d;
+            typedef typename NodeQueue::iterator queue_iterator;
+            queue_iterator m_search_node_iter;
+            queue_iterator m_search_node_end;
+            ArcIterator m_search_arc;
+            ArcIterator m_search_arc_end;
+            bool m_forward_search;
 
-        double m_totalTime = 0;
-        double m_initTime = 0;
-        double m_augmentTime = 0;
-        double m_adoptTime = 0;
-        size_t m_num_clique_pushes = 0;
-};
+            // Statistics
 
-template<typename ValueType, typename IndexType>
-class SourceIBFS : public FlowSolver<ValueType,IndexType> {
-    public:
-        SourceIBFS() = default;
-        virtual ~SourceIBFS() = default;
-        virtual void Solve(SubmodularIBFS<ValueType,IndexType>* energy);
-        void IBFS();
-        void ComputeMinCut();
+            double m_totalTime = 0;
+            double m_initTime = 0;
+            double m_augmentTime = 0;
+            double m_adoptTime = 0;
+            size_t m_num_clique_pushes = 0;
+    };
 
-    protected:
-        typedef SoSGraph<ValueType,IndexType> Graph;
-        typedef typename Graph::REAL REAL;
-        typedef typename Graph::NodeId NodeId;
-        typedef typename Graph::CliqueId CliqueId;
-        typedef typename Graph::Node Node;
-        typedef typename Graph::NodeState NodeState;
-        typedef typename Graph::NeighborList NeighborList;
-        typedef typename Graph::ArcIterator ArcIterator;
-        typedef typename Graph::NodeQueue NodeQueue;
-        typedef typename Graph::OrphanList OrphanList;
-        typedef typename Graph::CliqueVec CliqueVec;
+    template<typename ValueType, typename IndexType>
+    class SourceIBFS : public FlowSolver<ValueType,IndexType> {
+        public:
+            SourceIBFS() = default;
+            virtual ~SourceIBFS() = default;
+            virtual void Solve(SubmodularIBFS<ValueType,IndexType>* energy);
+            void IBFS();
+            void ComputeMinCut();
 
-        // Helper functions
-        void Push(ArcIterator& arc, bool forwardArc, REAL delta);
-        void Augment(ArcIterator& arc);
-        void Adopt();
-        void MakeOrphan(NodeId i);
-        void RemoveFromLayer(NodeId i);
-        void AddToLayer(NodeId i);
-        void AdvanceSearchNode();
+        protected:
+            typedef SoSGraph<ValueType,IndexType> Graph;
+            typedef typename Graph::REAL REAL;
+            typedef typename Graph::NodeId NodeId;
+            typedef typename Graph::CliqueId CliqueId;
+            typedef typename Graph::Node Node;
+            typedef typename Graph::NodeState NodeState;
+            typedef typename Graph::NeighborList NeighborList;
+            typedef typename Graph::ArcIterator ArcIterator;
+            typedef typename Graph::NodeQueue NodeQueue;
+            typedef typename Graph::OrphanList OrphanList;
+            typedef typename Graph::CliqueVec CliqueVec;
 
-        void IBFSInit();
+            // Helper functions
+            void Push(ArcIterator& arc, bool forwardArc, REAL delta);
+            void Augment(ArcIterator& arc);
+            void Adopt();
+            void MakeOrphan(NodeId i);
+            void RemoveFromLayer(NodeId i);
+            void AddToLayer(NodeId i);
+            void AdvanceSearchNode();
 
-        /* Algorithm data */
+            void IBFSInit();
 
-        Graph* m_graph;
-        SubmodularIBFS<ValueType,IndexType>* m_energy;
-        // Layers store vertices by distance.
-        std::vector<NodeQueue> m_source_layers;
-        OrphanList m_source_orphans;
-        IndexType m_source_tree_d;
-        typedef typename NodeQueue::iterator queue_iterator;
-        queue_iterator m_search_node_iter;
-        queue_iterator m_search_node_end;
-        ArcIterator m_search_arc;
-        ArcIterator m_search_arc_end;
+            /* Algorithm data */
 
-        /* Statistics */
+            Graph* m_graph;
+            SubmodularIBFS<ValueType,IndexType>* m_energy;
+            // Layers store vertices by distance.
+            std::vector<NodeQueue> m_source_layers;
+            OrphanList m_source_orphans;
+            IndexType m_source_tree_d;
+            typedef typename NodeQueue::iterator queue_iterator;
+            queue_iterator m_search_node_iter;
+            queue_iterator m_search_node_end;
+            ArcIterator m_search_arc;
+            ArcIterator m_search_arc_end;
 
-        double m_totalTime = 0;
-        double m_initTime = 0;
-        double m_augmentTime = 0;
-        double m_adoptTime = 0;
-        size_t m_num_clique_pushes = 0;
-};
+            /* Statistics */
 
-template<typename ValueType, typename IndexType>
-class ParametricIBFS : public FlowSolver<ValueType,IndexType> {
-    public:
-        ParametricIBFS() = default;
-        virtual ~ParametricIBFS() = default;
-        virtual void Solve(SubmodularIBFS<ValueType,IndexType>* energy);
-        void IBFS();
-        void ComputeMinCut();
+            double m_totalTime = 0;
+            double m_initTime = 0;
+            double m_augmentTime = 0;
+            double m_adoptTime = 0;
+            size_t m_num_clique_pushes = 0;
+    };
 
-    protected:
-        typedef SoSGraph<ValueType,IndexType> Graph;
-        typedef typename Graph::REAL REAL;
-        typedef typename Graph::NodeId NodeId;
-        typedef typename Graph::CliqueId CliqueId;
-        typedef typename Graph::Node Node;
-        typedef typename Graph::NodeState NodeState;
-        typedef typename Graph::NeighborList NeighborList;
-        typedef typename Graph::ArcIterator ArcIterator;
-        typedef typename Graph::NodeQueue NodeQueue;
-        typedef typename Graph::OrphanList OrphanList;
-        typedef typename Graph::CliqueVec CliqueVec;
+    template<typename ValueType, typename IndexType>
+    class ParametricIBFS : public FlowSolver<ValueType,IndexType> {
+        public:
+            ParametricIBFS() = default;
+            virtual ~ParametricIBFS() = default;
+            virtual void Solve(SubmodularIBFS<ValueType,IndexType>* energy);
+            void IBFS();
+            void ComputeMinCut();
 
-        // Helper functions
-        void Push(ArcIterator& arc, bool forwardArc, REAL delta);
-        void Augment(ArcIterator& arc);
-        void Adopt();
-        void MakeOrphan(NodeId i);
-        void RemoveFromLayer(NodeId i);
-        void AddToLayer(NodeId i);
-        void AdvanceSearchNode();
+        protected:
+            typedef SoSGraph<ValueType,IndexType> Graph;
+            typedef typename Graph::REAL REAL;
+            typedef typename Graph::NodeId NodeId;
+            typedef typename Graph::CliqueId CliqueId;
+            typedef typename Graph::Node Node;
+            typedef typename Graph::NodeState NodeState;
+            typedef typename Graph::NeighborList NeighborList;
+            typedef typename Graph::ArcIterator ArcIterator;
+            typedef typename Graph::NodeQueue NodeQueue;
+            typedef typename Graph::OrphanList OrphanList;
+            typedef typename Graph::CliqueVec CliqueVec;
 
-        void IBFSInit();
+            // Helper functions
+            void Push(ArcIterator& arc, bool forwardArc, REAL delta);
+            void Augment(ArcIterator& arc);
+            void Adopt();
+            void MakeOrphan(NodeId i);
+            void RemoveFromLayer(NodeId i);
+            void AddToLayer(NodeId i);
+            void AdvanceSearchNode();
 
-        /* Algorithm data */
+            void IBFSInit();
 
-        Graph* m_graph;
-        SubmodularIBFS<ValueType,IndexType>* m_energy;
-        // Layers store vertices by distance.
-        std::vector<NodeQueue> m_source_layers;
-        OrphanList m_source_orphans;
-        IndexType m_source_tree_d;
-        typedef typename NodeQueue::iterator queue_iterator;
-        queue_iterator m_search_node_iter;
-        queue_iterator m_search_node_end;
-        ArcIterator m_search_arc;
-        ArcIterator m_search_arc_end;
+            /* Algorithm data */
 
-        /* Statistics */
+            Graph* m_graph;
+            SubmodularIBFS<ValueType,IndexType>* m_energy;
+            // Layers store vertices by distance.
+            std::vector<NodeQueue> m_source_layers;
+            OrphanList m_source_orphans;
+            IndexType m_source_tree_d;
+            typedef typename NodeQueue::iterator queue_iterator;
+            queue_iterator m_search_node_iter;
+            queue_iterator m_search_node_end;
+            ArcIterator m_search_arc;
+            ArcIterator m_search_arc_end;
 
-        double m_totalTime = 0;
-        double m_initTime = 0;
-        double m_augmentTime = 0;
-        double m_adoptTime = 0;
-        size_t m_num_clique_pushes = 0;
+            /* Statistics */
 
-        /* Parametric flow data */
+            double m_totalTime = 0;
+            double m_initTime = 0;
+            double m_augmentTime = 0;
+            double m_adoptTime = 0;
+            size_t m_num_clique_pushes = 0;
 
-        std::vector<REAL> m_orig_c_si;
-        std::vector<REAL> m_orig_c_it;
-        std::vector<REAL> m_parametricUnaries;
-};
+            /* Parametric flow data */
+
+            std::vector<REAL> m_orig_c_si;
+            std::vector<REAL> m_orig_c_it;
+            std::vector<REAL> m_parametricUnaries;
+    };
+
+} // namespace sospd
 
 template<typename V, typename I>
-inline void BidirectionalIBFS<V,I>::IBFSInit()
+inline void sospd::BidirectionalIBFS<V,I>::IBFSInit()
 {
     auto start = sospd::Clock::now();
 
@@ -233,7 +236,7 @@ inline void BidirectionalIBFS<V,I>::IBFSInit()
 }
 
 template<typename V, typename I>
-inline void BidirectionalIBFS<V,I>::IBFS() {
+inline void sospd::BidirectionalIBFS<V,I>::IBFS() {
     auto start = sospd::Clock::now();
     m_forward_search = false;
     m_source_tree_d = I(1);
@@ -332,7 +335,7 @@ inline void BidirectionalIBFS<V,I>::IBFS() {
 }
 
 template<typename V, typename I>
-inline void BidirectionalIBFS<V,I>::Augment(ArcIterator& arc) {
+inline void sospd::BidirectionalIBFS<V,I>::Augment(ArcIterator& arc) {
     auto start = sospd::Clock::now();
 
     NodeId i, j;
@@ -401,7 +404,7 @@ inline void BidirectionalIBFS<V,I>::Augment(ArcIterator& arc) {
 }
 
 template<typename V, typename I>
-inline void BidirectionalIBFS<V,I>::Adopt() {
+inline void sospd::BidirectionalIBFS<V,I>::Adopt() {
     auto start = sospd::Clock::now();
     while (!m_source_orphans.empty()) {
         Node& n = m_source_orphans.front();
@@ -513,7 +516,7 @@ inline void BidirectionalIBFS<V,I>::Adopt() {
 }
 
 template<typename V, typename I>
-inline void BidirectionalIBFS<V,I>::MakeOrphan(NodeId i) {
+inline void sospd::BidirectionalIBFS<V,I>::MakeOrphan(NodeId i) {
     Node& n = m_graph->node(i);
     if (n.state != NodeState::S && n.state != NodeState::T)
         return;
@@ -527,7 +530,7 @@ inline void BidirectionalIBFS<V,I>::MakeOrphan(NodeId i) {
 }
 
 template<typename V, typename I>
-inline void BidirectionalIBFS<V,I>::Push(ArcIterator& arc, bool forwardArc, REAL delta) {
+inline void sospd::BidirectionalIBFS<V,I>::Push(ArcIterator& arc, bool forwardArc, REAL delta) {
     ASSERT(delta > 0);
     m_num_clique_pushes++;
     auto& c = m_graph->clique(arc.cliqueId());
@@ -546,7 +549,7 @@ inline void BidirectionalIBFS<V,I>::Push(ArcIterator& arc, bool forwardArc, REAL
 }
 
 template<typename V, typename I>
-inline void BidirectionalIBFS<V,I>::ComputeMinCut() {
+inline void sospd::BidirectionalIBFS<V,I>::ComputeMinCut() {
     auto& labels = m_energy->GetLabels();
     for (NodeId i = 0; i < m_graph->NumNodes(); ++i) {
         if (m_graph->node(i).state == NodeState::T)
@@ -562,7 +565,7 @@ inline void BidirectionalIBFS<V,I>::ComputeMinCut() {
 }
 
 template<typename V, typename I>
-inline void BidirectionalIBFS<V,I>::Solve(SubmodularIBFS<V,I>* energy) {
+inline void sospd::BidirectionalIBFS<V,I>::Solve(SubmodularIBFS<V,I>* energy) {
     m_energy = energy;
     m_graph = &energy->Graph();
     m_graph->ResetFlow();
@@ -572,7 +575,7 @@ inline void BidirectionalIBFS<V,I>::Solve(SubmodularIBFS<V,I>* energy) {
 }
 
 template<typename V, typename I>
-inline void BidirectionalIBFS<V,I>::AddToLayer(NodeId i) {
+inline void sospd::BidirectionalIBFS<V,I>::AddToLayer(NodeId i) {
     auto& node = m_graph->node(i);
     I dis = node.dis;
     if (node.state == NodeState::S) {
@@ -589,7 +592,7 @@ inline void BidirectionalIBFS<V,I>::AddToLayer(NodeId i) {
 }
 
 template<typename V, typename I>
-inline void BidirectionalIBFS<V,I>::RemoveFromLayer(NodeId i) {
+inline void sospd::BidirectionalIBFS<V,I>::RemoveFromLayer(NodeId i) {
     auto& node = m_graph->node(i);
     if (m_search_node_iter != m_search_node_end && m_search_node_iter->id == i)
         AdvanceSearchNode();
@@ -606,7 +609,7 @@ inline void BidirectionalIBFS<V,I>::RemoveFromLayer(NodeId i) {
 }
 
 template<typename V, typename I>
-inline void BidirectionalIBFS<V,I>::AdvanceSearchNode() {
+inline void sospd::BidirectionalIBFS<V,I>::AdvanceSearchNode() {
     m_search_node_iter++;
     if (m_search_node_iter != m_search_node_end) {
         Node& n = *m_search_node_iter;
@@ -624,7 +627,7 @@ inline void BidirectionalIBFS<V,I>::AdvanceSearchNode() {
 }
 
 template<typename V, typename I>
-inline void SourceIBFS<V,I>::IBFSInit()
+inline void sospd::SourceIBFS<V,I>::IBFSInit()
 {
     auto start = sospd::Clock::now();
 
@@ -670,7 +673,7 @@ inline void SourceIBFS<V,I>::IBFSInit()
 }
 
 template<typename V, typename I>
-inline void SourceIBFS<V,I>::IBFS() {
+inline void sospd::SourceIBFS<V,I>::IBFS() {
     auto start = sospd::Clock::now();
     m_source_tree_d = I(0);
 
@@ -750,7 +753,7 @@ inline void SourceIBFS<V,I>::IBFS() {
 }
 
 template<typename V, typename I>
-inline void SourceIBFS<V,I>::Augment(ArcIterator& arc) {
+inline void sospd::SourceIBFS<V,I>::Augment(ArcIterator& arc) {
     auto start = sospd::Clock::now();
 
     NodeId i, j;
@@ -799,7 +802,7 @@ inline void SourceIBFS<V,I>::Augment(ArcIterator& arc) {
 }
 
 template<typename V, typename I>
-inline void SourceIBFS<V,I>::Adopt() {
+inline void sospd::SourceIBFS<V,I>::Adopt() {
     auto start = sospd::Clock::now();
     while (!m_source_orphans.empty()) {
         Node& n = m_source_orphans.front();
@@ -856,7 +859,7 @@ inline void SourceIBFS<V,I>::Adopt() {
 }
 
 template<typename V, typename I>
-inline void SourceIBFS<V,I>::MakeOrphan(NodeId i) {
+inline void sospd::SourceIBFS<V,I>::MakeOrphan(NodeId i) {
     Node& n = m_graph->node(i);
     if (n.state != NodeState::S && n.state != NodeState::T)
         return;
@@ -869,7 +872,7 @@ inline void SourceIBFS<V,I>::MakeOrphan(NodeId i) {
 }
 
 template<typename V, typename I>
-inline void SourceIBFS<V,I>::Push(ArcIterator& arc, bool forwardArc, REAL delta) {
+inline void sospd::SourceIBFS<V,I>::Push(ArcIterator& arc, bool forwardArc, REAL delta) {
     ASSERT(delta > 0);
     //ASSERT(delta > -1e-7);//Chen
     m_num_clique_pushes++;
@@ -890,7 +893,7 @@ inline void SourceIBFS<V,I>::Push(ArcIterator& arc, bool forwardArc, REAL delta)
 }
 
 template<typename V, typename I>
-inline void SourceIBFS<V,I>::ComputeMinCut() {
+inline void sospd::SourceIBFS<V,I>::ComputeMinCut() {
     auto& labels = m_energy->GetLabels();
     for (NodeId i = 0; i < m_graph->NumNodes(); ++i) {
         if (m_graph->node(i).state == NodeState::T)
@@ -906,7 +909,7 @@ inline void SourceIBFS<V,I>::ComputeMinCut() {
 }
 
 template<typename V, typename I>
-inline void SourceIBFS<V,I>::Solve(SubmodularIBFS<V,I>* energy) {
+inline void sospd::SourceIBFS<V,I>::Solve(SubmodularIBFS<V,I>* energy) {
     m_energy = energy;
     m_graph = &energy->Graph();
     m_graph->ResetFlow();
@@ -916,7 +919,7 @@ inline void SourceIBFS<V,I>::Solve(SubmodularIBFS<V,I>* energy) {
 }
 
 template<typename V, typename I>
-inline void SourceIBFS<V,I>::AddToLayer(NodeId i) {
+inline void sospd::SourceIBFS<V,I>::AddToLayer(NodeId i) {
     auto& node = m_graph->node(i);
     I dis = node.dis;
     if (node.state == NodeState::S) {
@@ -929,7 +932,7 @@ inline void SourceIBFS<V,I>::AddToLayer(NodeId i) {
 }
 
 template<typename V, typename I>
-inline void SourceIBFS<V,I>::RemoveFromLayer(NodeId i) {
+inline void sospd::SourceIBFS<V,I>::RemoveFromLayer(NodeId i) {
     auto& node = m_graph->node(i);
     if (m_search_node_iter != m_search_node_end && &(*m_search_node_iter) == &node)
         AdvanceSearchNode();
@@ -943,7 +946,7 @@ inline void SourceIBFS<V,I>::RemoveFromLayer(NodeId i) {
 }
 
 template<typename V, typename I>
-inline void SourceIBFS<V,I>::AdvanceSearchNode() {
+inline void sospd::SourceIBFS<V,I>::AdvanceSearchNode() {
     m_search_node_iter++;
     if (m_search_node_iter != m_search_node_end) {
         Node& n = *m_search_node_iter;
@@ -955,8 +958,7 @@ inline void SourceIBFS<V,I>::AdvanceSearchNode() {
 }
 
 template<typename V, typename I>
-inline void ParametricIBFS<V,I>::IBFSInit()
-{
+inline void sospd::ParametricIBFS<V,I>::IBFSInit() {
     auto start = sospd::Clock::now();
 
     const I n = m_graph->NumNodes();
@@ -1001,7 +1003,7 @@ inline void ParametricIBFS<V,I>::IBFSInit()
 }
 
 template<typename V, typename I>
-inline void ParametricIBFS<V,I>::IBFS() {
+inline void sospd::ParametricIBFS<V,I>::IBFS() {
     auto start = sospd::Clock::now();
     m_source_tree_d = 0;
 
@@ -1081,7 +1083,7 @@ inline void ParametricIBFS<V,I>::IBFS() {
 }
 
 template<typename V, typename I>
-inline void ParametricIBFS<V,I>::Augment(ArcIterator& arc) {
+inline void sospd::ParametricIBFS<V,I>::Augment(ArcIterator& arc) {
     auto start = sospd::Clock::now();
 
     NodeId i, j;
@@ -1130,7 +1132,7 @@ inline void ParametricIBFS<V,I>::Augment(ArcIterator& arc) {
 }
 
 template<typename V, typename I>
-inline void ParametricIBFS<V,I>::Adopt() {
+inline void sospd::ParametricIBFS<V,I>::Adopt() {
     auto start = sospd::Clock::now();
     while (!m_source_orphans.empty()) {
         Node& n = m_source_orphans.front();
@@ -1187,7 +1189,7 @@ inline void ParametricIBFS<V,I>::Adopt() {
 }
 
 template<typename V, typename I>
-inline void ParametricIBFS<V,I>::MakeOrphan(NodeId i) {
+inline void sospd::ParametricIBFS<V,I>::MakeOrphan(NodeId i) {
     Node& n = m_graph->node(i);
     if (n.state != NodeState::S && n.state != NodeState::T)
         return;
@@ -1200,7 +1202,7 @@ inline void ParametricIBFS<V,I>::MakeOrphan(NodeId i) {
 }
 
 template<typename V, typename I>
-inline void ParametricIBFS<V,I>::Push(ArcIterator& arc, bool forwardArc, REAL delta) {
+inline void sospd::ParametricIBFS<V,I>::Push(ArcIterator& arc, bool forwardArc, REAL delta) {
     ASSERT(delta > 0);
     //ASSERT(delta > -1e-7);//Chen
     m_num_clique_pushes++;
@@ -1221,7 +1223,7 @@ inline void ParametricIBFS<V,I>::Push(ArcIterator& arc, bool forwardArc, REAL de
 }
 
 template<typename V, typename I>
-inline void ParametricIBFS<V,I>::ComputeMinCut() {
+inline void sospd::ParametricIBFS<V,I>::ComputeMinCut() {
     auto& labels = m_energy->GetLabels();
     for (NodeId i = 0; i < m_graph->NumNodes(); ++i) {
         if (m_graph->node(i).state == NodeState::T)
@@ -1237,7 +1239,7 @@ inline void ParametricIBFS<V,I>::ComputeMinCut() {
 }
 
 template<typename V, typename I>
-inline void ParametricIBFS<V,I>::Solve(SubmodularIBFS<V,I>* energy) {
+inline void sospd::ParametricIBFS<V,I>::Solve(SubmodularIBFS<V,I>* energy) {
     m_energy = energy;
     m_graph = &energy->Graph();
     m_graph->ResetFlow();
@@ -1247,7 +1249,7 @@ inline void ParametricIBFS<V,I>::Solve(SubmodularIBFS<V,I>* energy) {
 }
 
 template<typename V, typename I>
-inline void ParametricIBFS<V,I>::AddToLayer(NodeId i) {
+inline void sospd::ParametricIBFS<V,I>::AddToLayer(NodeId i) {
     auto& node = m_graph->node(i);
     I dis = node.dis;
     if (node.state == NodeState::S) {
@@ -1260,7 +1262,7 @@ inline void ParametricIBFS<V,I>::AddToLayer(NodeId i) {
 }
 
 template<typename V, typename I>
-inline void ParametricIBFS<V,I>::RemoveFromLayer(NodeId i) {
+inline void sospd::ParametricIBFS<V,I>::RemoveFromLayer(NodeId i) {
     auto& node = m_graph->node(i);
     if (m_search_node_iter != m_search_node_end && &(*m_search_node_iter) == &node)
         AdvanceSearchNode();
@@ -1274,7 +1276,7 @@ inline void ParametricIBFS<V,I>::RemoveFromLayer(NodeId i) {
 }
 
 template<typename V, typename I>
-inline void ParametricIBFS<V,I>::AdvanceSearchNode() {
+inline void sospd::ParametricIBFS<V,I>::AdvanceSearchNode() {
     m_search_node_iter++;
     if (m_search_node_iter != m_search_node_end) {
         Node& n = *m_search_node_iter;
@@ -1286,7 +1288,7 @@ inline void ParametricIBFS<V,I>::AdvanceSearchNode() {
 }
 
 template<typename V, typename I>
-inline std::unique_ptr<FlowSolver<V,I>> sospd::GetSolver(const SubmodularIBFSParams& params) {
+inline std::unique_ptr<sospd::FlowSolver<V,I>> sospd::GetSolver(const SubmodularIBFSParams& params) {
     switch(params.alg) {
         case sospd::FlowAlgorithm::bidirectional:
             return std::unique_ptr<FlowSolver<V,I>>{ new BidirectionalIBFS<V,I>{} };
@@ -1298,5 +1300,3 @@ inline std::unique_ptr<FlowSolver<V,I>> sospd::GetSolver(const SubmodularIBFSPar
             throw std::logic_error("bad solver type");
     }
 }
-
-#endif
