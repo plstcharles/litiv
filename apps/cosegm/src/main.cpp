@@ -94,7 +94,7 @@
 #if PROCESS_PREPROC_BGSEGM
 #define BGSEGM_ALGO_TYPE BackgroundSubtractorPAWCS
 #else //!PROCESS_PREPROC_BGSEGM
-#include "litiv/imgproc/ForegroundStereoMatcher.hpp"
+#include "litiv/imgproc/SegmMatcher.hpp"
 #endif //!PROCESS_PREPROC_BGSEGM
 
 void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch);
@@ -189,13 +189,13 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         lvAssert(vInitInput.size()==4 && (vInitInput.size()%2)==0); // assume masks are interlaced with input images
         const size_t nMinDisp = oBatch.getMinDisparity(), nMaxDisp = oBatch.getMaxDisparity();
         lvLog_(2,"\tdisp = [%d,%d]",(int)nMinDisp,(int)nMaxDisp);
-        constexpr size_t nCameraCount = StereoSegmMatcher::getCameraCount();
-        constexpr size_t nExpectedAlgoInputCount = StereoSegmMatcher::getInputStreamCount();
-        constexpr size_t nExpectedAlgoOutputCount = StereoSegmMatcher::getOutputStreamCount();
+        constexpr size_t nCameraCount = SegmMatcher::getCameraCount();
+        constexpr size_t nExpectedAlgoInputCount = SegmMatcher::getInputStreamCount();
+        constexpr size_t nExpectedAlgoOutputCount = SegmMatcher::getOutputStreamCount();
         static_assert(nCameraCount==2,"unexpected algo internal camera head count");
         static_assert(nExpectedAlgoInputCount==4,"unexpected input stream count for instanced algo");
         static_assert(nExpectedAlgoOutputCount==4,"unexpected output stream count for instanced algo");
-        using OutputType = StereoSegmMatcher::OutputLabelType;
+        using OutputType = SegmMatcher::OutputLabelType;
         std::vector<cv::Mat_<OutputType>> vCurrOutput(nExpectedAlgoOutputCount);
         std::vector<cv::Mat> vCurrFGMasks(nCameraCount);
         std::vector<cv::Mat> vCurrStereoMaps(nCameraCount);
@@ -212,7 +212,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             }
         }
 #if (!DATASET_EVAL_APPROX_MASKS_ONLY && !DATASET_EVAL_OUTPUT_MASKS_ONLY)
-        std::shared_ptr<StereoSegmMatcher> pAlgo = std::make_shared<StereoSegmMatcher>(nMinDisp,nMaxDisp);
+        std::shared_ptr<SegmMatcher> pAlgo = std::make_shared<SegmMatcher>(nMinDisp,nMaxDisp);
         pAlgo->m_pDisplayHelper = pDisplayHelper;
         pAlgo->initialize(std::array<cv::Mat,2>{vROIs[0],vROIs[2]});
         oBatch.setFeaturesDirName(pAlgo->getFeatureExtractorName());
@@ -297,10 +297,10 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             const std::vector<cv::Mat> vArchivedOutput = oBatch.loadOutputArray(nCurrIdx);
         #endif //DATASET_EVAL_OUTPUT_MASKS_ONLY
             for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx) {
-                const size_t nOutputMaskIdx = nCamIdx*StereoSegmMatcher::OutputPackOffset+StereoSegmMatcher::OutputPackOffset_Mask;
-                const size_t nOutputDispIdx = nCamIdx*StereoSegmMatcher::OutputPackOffset+StereoSegmMatcher::OutputPackOffset_Disp;
+                const size_t nOutputMaskIdx = nCamIdx*SegmMatcher::OutputPackOffset+SegmMatcher::OutputPackOffset_Mask;
+                const size_t nOutputDispIdx = nCamIdx*SegmMatcher::OutputPackOffset+SegmMatcher::OutputPackOffset_Disp;
         #if DATASET_EVAL_APPROX_MASKS_ONLY
-                const size_t nInputMaskIdx = nCamIdx*StereoSegmMatcher::InputPackOffset+StereoSegmMatcher::InputPackOffset_Mask;
+                const size_t nInputMaskIdx = nCamIdx*SegmMatcher::InputPackOffset+SegmMatcher::InputPackOffset_Mask;
                 vCurrInput[nInputMaskIdx].convertTo(vCurrOutput[nOutputDispIdx],CV_32S); // only to fool output checks
                 vCurrInput[nInputMaskIdx].convertTo(vCurrOutput[nOutputMaskIdx],CV_32S,1.0/255);
         #endif //DATASET_EVAL_APPROX_MASKS_ONLY
@@ -331,18 +331,18 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             pAlgo->apply(vCurrInput,vCurrOutput/*,dDefaultThreshold*/);
         #endif //!(DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_MASKS_ONLY)
             lvDbgAssert(vCurrOutput.size()==nExpectedAlgoOutputCount);
-            using OutputLabelType = StereoSegmMatcher::LabelType;
+            using OutputLabelType = SegmMatcher::LabelType;
             for(size_t nOutputArrayIdx=0; nOutputArrayIdx<vCurrOutput.size(); ++nOutputArrayIdx) {
                 lvAssert(vCurrOutput[nOutputArrayIdx].type()==lv::MatRawType_<OutputLabelType>());
                 lvAssert(vCurrOutput[nOutputArrayIdx].size()==oFrameSize());
-                const size_t nRealOutputArrayIdx = nOutputArrayIdx/StereoSegmMatcher::OutputPackOffset;
-                if((nOutputArrayIdx%StereoSegmMatcher::OutputPackOffset)==StereoSegmMatcher::OutputPackOffset_Disp) {
+                const size_t nRealOutputArrayIdx = nOutputArrayIdx/SegmMatcher::OutputPackOffset;
+                if((nOutputArrayIdx%SegmMatcher::OutputPackOffset)==SegmMatcher::OutputPackOffset_Disp) {
                     double dMin,dMax;
                     cv::minMaxIdx(vCurrOutput[nOutputArrayIdx],&dMin,&dMax);
                     lvDbgAssert_(dMin>=0 && dMax<=255,"unexpected min/max disp for 8u mats");
                     vCurrOutput[nOutputArrayIdx].convertTo(vCurrStereoMaps[nRealOutputArrayIdx],CV_8U);
                 }
-                else if((nOutputArrayIdx%StereoSegmMatcher::OutputPackOffset)==StereoSegmMatcher::OutputPackOffset_Mask)
+                else if((nOutputArrayIdx%SegmMatcher::OutputPackOffset)==SegmMatcher::OutputPackOffset_Mask)
                     vCurrFGMasks[nRealOutputArrayIdx] = vCurrOutput[nOutputArrayIdx]!=0;
             }
             lvDbgAssert(vCurrFGMasks.size()==oBatch.getOutputStreamCount());

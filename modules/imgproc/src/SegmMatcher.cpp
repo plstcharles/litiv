@@ -15,7 +15,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "litiv/imgproc/ForegroundStereoMatcher.hpp"
+#include "litiv/imgproc/SegmMatcher.hpp"
 
 // config options
 #define STEREOSEGMATCH_CONFIG_USE_DASCGF_AFFINITY   1
@@ -95,23 +95,23 @@
 
 #if (STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF || STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF)
 #if !HAVE_OPENGM_EXTLIB
-#error "ForegroundStereoMatcher config requires OpenGM external lib w/ QPBO for inference."
+#error "SegmMatcher config requires OpenGM external lib w/ QPBO for inference."
 #endif //!HAVE_OPENGM_EXTLIB
 #if !HAVE_OPENGM_EXTLIB_QPBO
-#error "ForegroundStereoMatcher config requires OpenGM external lib w/ QPBO for inference."
+#error "SegmMatcher config requires OpenGM external lib w/ QPBO for inference."
 #endif //!HAVE_OPENGM_EXTLIB_QPBO
 #endif //(STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF || STEREOSEGMATCH_CONFIG_USE_FGBZ_RESEGM_INF)
 #if STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
 #if !HAVE_OPENGM_EXTLIB
-#error "ForegroundStereoMatcher config requires OpenGM external lib w/ FastPD for inference."
+#error "SegmMatcher config requires OpenGM external lib w/ FastPD for inference."
 #endif //!HAVE_OPENGM_EXTLIB
 #if !HAVE_OPENGM_EXTLIB_FASTPD
-#error "ForegroundStereoMatcher config requires OpenGM external lib w/ FastPD for inference."
+#error "SegmMatcher config requires OpenGM external lib w/ FastPD for inference."
 #endif //!HAVE_OPENGM_EXTLIB_FASTPD
 #endif //STEREOSEGMATCH_CONFIG_USE_FASTPD_STEREO_INF
 #if (STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF || STEREOSEGMATCH_CONFIG_USE_SOSPD_RESEGM_INF)
 #if !HAVE_BOOST
-#error "ForegroundStereoMatcher config requires boost due to 3rdparty sospd module for inference."
+#error "SegmMatcher config requires boost due to 3rdparty sospd module for inference."
 #endif //!HAVE_BOOST
 #define STEREOSEGMATCH_CONFIG_USE_SOSPD_ALPHA_HEIGHTS_LABEL_ORDERING 0
 #endif //(STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF || STEREOSEGMATCH_CONFIG_USE_SOSPD_RESEGM_INF)
@@ -138,12 +138,12 @@
 
 namespace {
 
-    using InternalLabelType = StereoSegmMatcher::InternalLabelType;
-    using OutputLabelType = StereoSegmMatcher::OutputLabelType;
-    using AssocCountType = StereoSegmMatcher::AssocCountType;
-    using AssocIdxType = StereoSegmMatcher::AssocIdxType;
-    using ValueType =  StereoSegmMatcher::ValueType;
-    using IndexType = StereoSegmMatcher::IndexType;
+    using InternalLabelType = SegmMatcher::InternalLabelType;
+    using OutputLabelType = SegmMatcher::OutputLabelType;
+    using AssocCountType = SegmMatcher::AssocCountType;
+    using AssocIdxType = SegmMatcher::AssocIdxType;
+    using ValueType =  SegmMatcher::ValueType;
+    using IndexType = SegmMatcher::IndexType;
 
     using ExplicitFunction = lv::gm::ExplicitViewFunction<ValueType,IndexType,InternalLabelType>; ///< shortcut for explicit view function
     using ExplicitAllocFunction = opengm::ExplicitFunction<ValueType,IndexType,InternalLabelType>; ///< shortcut for explicit allocated function
@@ -172,7 +172,7 @@ namespace {
     constexpr size_t s_nMaxOrder = lv::get_next_pow2((uint32_t)std::max(std::max(s_nTemporalCliqueOrder,s_nEpipolarCliqueOrder),size_t(2))); ///< used to limit internal static array sizes
     constexpr size_t s_nPairwOrients = size_t(2); ///< number of pairwise links owned by each node in the graph (2 = 1st order neighb connections)
     static_assert(s_nPairwOrients>size_t(0),"pairwise orientation count must be strictly positive");
-    template<typename T> using CamArray = StereoSegmMatcher::CamArray<T>; ///< shortcut typename for variables and members that are assigned to each camera head
+    template<typename T> using CamArray = SegmMatcher::CamArray<T>; ///< shortcut typename for variables and members that are assigned to each camera head
     template<typename T> using TemporalArray = std::array<T,getTemporalLayerCount()>; ///< shortcut typename for variables and members that are assigned to each temporal layer
 
     /// defines the indices of feature maps inside precalc packets (per camera head)
@@ -255,7 +255,7 @@ namespace {
 } // anonymous namespace
 
 /// holds graph model data for both stereo and resegmentation models
-struct StereoSegmMatcher::GraphModelData {
+struct SegmMatcher::GraphModelData {
     /// default constructor; receives model construction data from algo constructor
     GraphModelData(const CamArray<cv::Mat>& aROIs, const std::vector<OutputLabelType>& vRealStereoLabels, size_t nStereoLabelStep, size_t nPrimaryCamIdx);
     /// (pre)calculates features required for model updates, and optionally returns them in packet format
@@ -439,8 +439,6 @@ protected:
     /// fill internal temporary energy cost mats for the given resegm move operation
     void calcResegmMoveCosts(InternalLabelType nNewLabel) const;
 #if STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF
-    /// runs sospd inference algorithm either to completion, or for a specific number of iterations
-    // ... @@@ todo
     typedef std::vector<ValueType> LambdaAlpha;
     typedef std::vector<std::pair<IndexType,IndexType>> NodeNeighborList;
     typedef std::vector<NodeNeighborList> NodeCliqueList;
@@ -451,12 +449,8 @@ protected:
     const ValueType& dualVariable(int alpha, IndexType i, InternalLabelType l) const {return m_dual[alpha][i*m_nStereoLabels+l];}
     ValueType& dualVariable(LambdaAlpha& lambdaAlpha,IndexType i, InternalLabelType l) {return lambdaAlpha[i*m_nStereoLabels+l];}
     const ValueType& dualVariable(LambdaAlpha& lambdaAlpha,IndexType i, InternalLabelType l) const {return lambdaAlpha[i*m_nStereoLabels+l];}
-    //void HeightAlphaProposal();
-    //void AlphaProposal();
     NodeCliqueList m_node_clique_list;
     cv::Mat_<ValueType> m_dual,m_heights;
-    //std::vector<ValueType> m_heights;
-    //ProposalCallback m_pc;
 #endif //STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF
     /// holds stereo disparity graph inference algorithm interface (redirects for bi-model inference)
     std::unique_ptr<StereoGraphInference> m_pStereoInf;
@@ -465,7 +459,7 @@ protected:
 };
 
 /// algo interface for multi-label graph model inference
-struct StereoSegmMatcher::StereoGraphInference : opengm::Inference<StereoModelType,opengm::Minimizer> {
+struct SegmMatcher::StereoGraphInference : opengm::Inference<StereoModelType,opengm::Minimizer> {
     /// full constructor of the inference algorithm; the graphical model must have already been constructed prior to this call
     StereoGraphInference(GraphModelData& oData);
     /// returns the name of this inference method, for debugging/identification purposes
@@ -484,14 +478,14 @@ struct StereoSegmMatcher::StereoGraphInference : opengm::Inference<StereoModelTy
     virtual void getOutput(cv::Mat_<OutputLabelType>& oLabeling) const;
     /// returns the energy of the current labeling solution
     virtual ValueType value() const override;
-    /// ref to StereoSegmMatcher::m_pModelData
+    /// ref to SegmMatcher::m_pModelData
     GraphModelData& m_oData;
     /// camera head index targeted by the inference algo
     const size_t m_nPrimaryCamIdx;
 };
 
 /// algo interface for binary label graph model inference
-struct StereoSegmMatcher::ResegmGraphInference : opengm::Inference<ResegmModelType,opengm::Minimizer> {
+struct SegmMatcher::ResegmGraphInference : opengm::Inference<ResegmModelType,opengm::Minimizer> {
     /// full constructor of the inference algorithm; the graphical model must have already been constructed prior to this call
     ResegmGraphInference(GraphModelData& oData);
     /// returns the name of this inference method, for debugging/identification purposes
@@ -510,7 +504,7 @@ struct StereoSegmMatcher::ResegmGraphInference : opengm::Inference<ResegmModelTy
     virtual void getOutput(TemporalArray<CamArray<cv::Mat_<OutputLabelType>>>& aaLabeling) const;
     /// returns the energy of the current labeling solution
     virtual ValueType value() const override;
-    /// ref to StereoSegmMatcher::m_pModelData
+    /// ref to SegmMatcher::m_pModelData
     GraphModelData& m_oData;
 };
 
@@ -534,7 +528,7 @@ namespace {
         explicit StereoGraphNodeIter(IndexType nInitGraphNodeIdx={})  :
                 m_pData(nullptr),m_nGraphNodeIdx(nInitGraphNodeIdx) {}
         /// full iterator constructor, produces valid deref nodes if init is already in range
-        explicit StereoGraphNodeIter(StereoSegmMatcher::GraphModelData* pData, IndexType nInitGraphNodeIdx={}) :
+        explicit StereoGraphNodeIter(SegmMatcher::GraphModelData* pData, IndexType nInitGraphNodeIdx={}) :
                 m_pData(pData),m_nGraphNodeIdx(nInitGraphNodeIdx) {
             lvDbgAssert(!m_pData || (m_pData->m_vStereoNodeInfos.size()>=m_pData->m_nValidStereoGraphNodes));
         }
@@ -585,7 +579,7 @@ namespace {
             lvDbgAssert(m_pData && (difference_type(m_nGraphNodeIdx)+n)>0 && (difference_type(m_nGraphNodeIdx)+n)<difference_type(m_pData->m_nValidStereoGraphNodes));
             return m_pData->m_vStereoNodeInfos[m_pData->m_vValidStereoLUTNodeIdxs[m_nGraphNodeIdx+n]];
         }
-        StereoSegmMatcher::GraphModelData* m_pData;
+        SegmMatcher::GraphModelData* m_pData;
         IndexType m_nGraphNodeIdx;
     };
 
@@ -607,7 +601,7 @@ namespace {
         explicit ResegmGraphNodeIter(IndexType nInitGraphNodeIdx={})  :
                 m_pData(nullptr),m_nGraphNodeIdx(nInitGraphNodeIdx) {}
         /// full iterator constructor, produces valid deref nodes if init is already in range
-        explicit ResegmGraphNodeIter(StereoSegmMatcher::GraphModelData* pData, IndexType nInitGraphNodeIdx={}) :
+        explicit ResegmGraphNodeIter(SegmMatcher::GraphModelData* pData, IndexType nInitGraphNodeIdx={}) :
                 m_pData(pData),m_nGraphNodeIdx(nInitGraphNodeIdx) {
             lvDbgAssert(!m_pData || (m_pData->m_vResegmNodeInfos.size()>=m_pData->m_nValidResegmGraphNodes));
         }
@@ -658,7 +652,7 @@ namespace {
             lvDbgAssert(m_pData && (difference_type(m_nGraphNodeIdx)+n)>0 && (difference_type(m_nGraphNodeIdx)+n)<difference_type(m_pData->m_nValidResegmGraphNodes));
             return m_pData->m_vResegmNodeInfos[m_pData->m_vValidResegmLUTNodeIdxs[m_nGraphNodeIdx+n]];
         }
-        StereoSegmMatcher::GraphModelData* m_pData;
+        SegmMatcher::GraphModelData* m_pData;
         IndexType m_nGraphNodeIdx;
     };
 
@@ -666,7 +660,7 @@ namespace {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-StereoSegmMatcher::StereoSegmMatcher(size_t nMinDispOffset, size_t nMaxDispOffset) {
+SegmMatcher::SegmMatcher(size_t nMinDispOffset, size_t nMaxDispOffset) {
     static_assert(getInputStreamCount()==4 && getOutputStreamCount()==4 && getCameraCount()==2,"i/o stream must be two image-mask pairs");
     static_assert(getInputStreamCount()==InputPackSize && getOutputStreamCount()==OutputPackSize,"bad i/o internal enum mapping");
     lvDbgExceptionWatch;
@@ -686,9 +680,9 @@ StereoSegmMatcher::StereoSegmMatcher(size_t nMinDispOffset, size_t nMaxDispOffse
     lvAssert_(m_vStereoLabels.size()>1,"graph must have at least two possible output labels, beyond reserved ones");
 }
 
-StereoSegmMatcher::~StereoSegmMatcher() {}
+SegmMatcher::~SegmMatcher() {}
 
-void StereoSegmMatcher::initialize(const std::array<cv::Mat,s_nCameraCount>& aROIs, size_t nPrimaryCamIdx) {
+void SegmMatcher::initialize(const std::array<cv::Mat,s_nCameraCount>& aROIs, size_t nPrimaryCamIdx) {
     static_assert(getCameraCount()==2,"bad static array size, mismatch with cam head count (hardcoded stuff below will break)");
     lvDbgExceptionWatch;
     lvAssert_(!aROIs[0].empty() && aROIs[0].total()>1 && aROIs[0].type()==CV_8UC1,"bad input ROI size/type");
@@ -701,7 +695,7 @@ void StereoSegmMatcher::initialize(const std::array<cv::Mat,s_nCameraCount>& aRO
         m_pModelData->m_pDisplayHelper = m_pDisplayHelper;
 }
 
-void StereoSegmMatcher::apply(const MatArrayIn& aInputs, MatArrayOut& aOutputs) {
+void SegmMatcher::apply(const MatArrayIn& aInputs, MatArrayOut& aOutputs) {
     static_assert(s_nInputArraySize==4 && getCameraCount()==2,"lots of hardcoded indices below");
     lvDbgExceptionWatch;
     lvAssert_(m_pModelData,"model must be initialized first");
@@ -747,19 +741,19 @@ void StereoSegmMatcher::apply(const MatArrayIn& aInputs, MatArrayOut& aOutputs) 
     }
 }
 
-void StereoSegmMatcher::calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeaturesPacket) {
+void SegmMatcher::calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeaturesPacket) {
     lvDbgExceptionWatch;
     lvAssert_(m_pModelData,"model must be initialized first");
     m_pModelData->calcFeatures(aInputs,pFeaturesPacket);
 }
 
-void StereoSegmMatcher::setNextFeatures(const cv::Mat& oPackedFeatures) {
+void SegmMatcher::setNextFeatures(const cv::Mat& oPackedFeatures) {
     lvDbgExceptionWatch;
     lvAssert_(m_pModelData,"model must be initialized first");
     m_pModelData->setNextFeatures(oPackedFeatures);
 }
 
-std::string StereoSegmMatcher::getFeatureExtractorName() const {
+std::string SegmMatcher::getFeatureExtractorName() const {
 #if STEREOSEGMATCH_CONFIG_USE_DASCGF_AFFINITY
     return "sc-dasc-gf";
 #elif STEREOSEGMATCH_CONFIG_USE_DASCRF_AFFINITY
@@ -773,31 +767,31 @@ std::string StereoSegmMatcher::getFeatureExtractorName() const {
 #endif //STEREOSEGMATCH_CONFIG_USE_..._AFFINITY
 }
 
-size_t StereoSegmMatcher::getMaxLabelCount() const {
+size_t SegmMatcher::getMaxLabelCount() const {
     lvDbgExceptionWatch;
     lvAssert_(m_pModelData,"model must be initialized first");
     return m_pModelData->m_vStereoLabels.size();
 }
 
-const std::vector<StereoSegmMatcher::OutputLabelType>& StereoSegmMatcher::getLabels() const {
+const std::vector<SegmMatcher::OutputLabelType>& SegmMatcher::getLabels() const {
     lvDbgExceptionWatch;
     lvAssert_(m_pModelData,"model must be initialized first");
     return m_pModelData->m_vStereoLabels;
 }
 
-cv::Mat StereoSegmMatcher::getResegmMapDisplay(size_t nLayerIdx, size_t nCamIdx) const {
+cv::Mat SegmMatcher::getResegmMapDisplay(size_t nLayerIdx, size_t nCamIdx) const {
     lvDbgExceptionWatch;
     lvAssert_(m_pModelData,"model must be initialized first");
     return m_pModelData->getResegmMapDisplay(nLayerIdx,nCamIdx);
 }
 
-cv::Mat StereoSegmMatcher::getStereoDispMapDisplay(size_t nLayerIdx, size_t nCamIdx) const {
+cv::Mat SegmMatcher::getStereoDispMapDisplay(size_t nLayerIdx, size_t nCamIdx) const {
     lvDbgExceptionWatch;
     lvAssert_(m_pModelData,"model must be initialized first");
     return m_pModelData->getStereoDispMapDisplay(nLayerIdx,nCamIdx);
 }
 
-cv::Mat StereoSegmMatcher::getAssocCountsMapDisplay() const {
+cv::Mat SegmMatcher::getAssocCountsMapDisplay() const {
     lvDbgExceptionWatch;
     lvAssert_(m_pModelData,"model must be initialized first");
     return m_pModelData->getAssocCountsMapDisplay();
@@ -805,7 +799,7 @@ cv::Mat StereoSegmMatcher::getAssocCountsMapDisplay() const {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-StereoSegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs, const std::vector<OutputLabelType>& vRealStereoLabels, size_t nStereoLabelStep, size_t nPrimaryCamIdx) :
+SegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs, const std::vector<OutputLabelType>& vRealStereoLabels, size_t nStereoLabelStep, size_t nPrimaryCamIdx) :
         m_nFramesProcessed(size_t(0)),
         m_nMaxStereoMoveCount(STEREOSEGMATCH_DEFAULT_MAX_STEREO_ITER),
         m_nMaxResegmMoveCount(STEREOSEGMATCH_DEFAULT_MAX_RESEGM_ITER),
@@ -1063,7 +1057,7 @@ StereoSegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs
     lvLog_(2,"Graph models built in %f second(s).\n",oLocalTimer.tock());
 }
 
-void StereoSegmMatcher::GraphModelData::buildStereoModel() {
+void SegmMatcher::GraphModelData::buildStereoModel() {
     lvDbgExceptionWatch;
     lvLog(2,"\tadding base functions to stereo graph...");
     // reserves on graph created below need to be accurate (or larger than needed), otherwise function vectors will be reallocated, and pointers will be bad
@@ -1171,7 +1165,7 @@ void StereoSegmMatcher::GraphModelData::buildStereoModel() {
         lv::gm::printModelInfo(*m_pStereoModel);
 }
 
-void StereoSegmMatcher::GraphModelData::updateStereoModel(bool bInit) {
+void SegmMatcher::GraphModelData::updateStereoModel(bool bInit) {
     static_assert(getCameraCount()==2,"bad static array size, hardcoded stuff below (incl xor) will break");
     lvDbgExceptionWatch;
     lvDbgAssert_(m_nPrimaryCamIdx<getCameraCount(),"bad primary cam index");
@@ -1273,7 +1267,7 @@ void StereoSegmMatcher::GraphModelData::updateStereoModel(bool bInit) {
     lvLog_(4,"Stereo graph model energy terms update completed in %f second(s).",oLocalTimer.tock());
 }
 
-void StereoSegmMatcher::GraphModelData::resetStereoLabelings(size_t nCamIdx) {
+void SegmMatcher::GraphModelData::resetStereoLabelings(size_t nCamIdx) {
     lvDbgExceptionWatch;
     lvDbgAssert_(nCamIdx<getCameraCount(),"bad input cam index");
     lvDbgAssert_(m_pStereoModel,"model must be initialized first!");
@@ -1368,7 +1362,7 @@ void StereoSegmMatcher::GraphModelData::resetStereoLabelings(size_t nCamIdx) {
     }
 }
 
-void StereoSegmMatcher::GraphModelData::buildResegmModel() {
+void SegmMatcher::GraphModelData::buildResegmModel() {
     lvLog(2,"\tadding base functions to resegm graph...");
     // reserves on graph created below need to be accurate (or larger than needed), otherwise function vectors will be reallocated, and pointers will be bad
     const size_t nTemporalLayerCount = getTemporalLayerCount();
@@ -1493,7 +1487,7 @@ void StereoSegmMatcher::GraphModelData::buildResegmModel() {
         lv::gm::printModelInfo(*m_pResegmModel);
 }
 
-void StereoSegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
+void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
     static_assert(getCameraCount()==2,"bad static array size, hardcoded stuff below (incl xor) will break");
     lvDbgExceptionWatch;
     const size_t nCameraCount = getCameraCount();
@@ -1713,7 +1707,7 @@ void StereoSegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
     lvLog_(4,"Resegm graph model energy terms update completed in %f second(s).",oLocalTimer.tock());
 }
 
-void StereoSegmMatcher::GraphModelData::calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeaturesPacket) {
+void SegmMatcher::GraphModelData::calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeaturesPacket) {
     static_assert(s_nInputArraySize==4 && getCameraCount()==2,"lots of hardcoded indices below");
     lvDbgExceptionWatch;
     for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
@@ -1745,7 +1739,7 @@ void StereoSegmMatcher::GraphModelData::calcFeatures(const MatArrayIn& aInputs, 
     lvAssert_(m_vLatestFeatPackInfo==m_vExpectedFeatPackInfo,"packed features info mismatch (should stay constant for all inputs)");
 }
 
-void StereoSegmMatcher::GraphModelData::calcImageFeatures(const CamArray<cv::Mat>& aInputImages, std::vector<cv::Mat>& vFeatures) {
+void SegmMatcher::GraphModelData::calcImageFeatures(const CamArray<cv::Mat>& aInputImages, std::vector<cv::Mat>& vFeatures) {
     static_assert(getCameraCount()==2,"bad input image array size");
     lvDbgExceptionWatch;
     for(size_t nInputIdx=0; nInputIdx<aInputImages.size(); ++nInputIdx) {
@@ -1895,7 +1889,7 @@ void StereoSegmMatcher::GraphModelData::calcImageFeatures(const CamArray<cv::Mat
     }*/
 }
 
-void StereoSegmMatcher::GraphModelData::calcShapeFeatures(const CamArray<cv::Mat_<InternalLabelType>>& aInputMasks, std::vector<cv::Mat>& vFeatures) {
+void SegmMatcher::GraphModelData::calcShapeFeatures(const CamArray<cv::Mat_<InternalLabelType>>& aInputMasks, std::vector<cv::Mat>& vFeatures) {
     static_assert(getCameraCount()==2,"bad input mask array size");
     lvDbgExceptionWatch;
     for(size_t nInputIdx=0; nInputIdx<aInputMasks.size(); ++nInputIdx) {
@@ -1987,7 +1981,7 @@ void StereoSegmMatcher::GraphModelData::calcShapeFeatures(const CamArray<cv::Mat
     }*/
 }
 
-void StereoSegmMatcher::GraphModelData::calcShapeDistFeatures(const cv::Mat_<InternalLabelType>& oInputMask, size_t nCamIdx, std::vector<cv::Mat>& vFeatures) {
+void SegmMatcher::GraphModelData::calcShapeDistFeatures(const cv::Mat_<InternalLabelType>& oInputMask, size_t nCamIdx, std::vector<cv::Mat>& vFeatures) {
     lvDbgExceptionWatch;
     lvDbgAssert_(nCamIdx<getCameraCount(),"bad input cam index");
     lvDbgAssert_(oInputMask.dims==2 && m_oGridSize==oInputMask.size(),"input had the wrong size");
@@ -2011,28 +2005,28 @@ void StereoSegmMatcher::GraphModelData::calcShapeDistFeatures(const cv::Mat_<Int
     //lvPrint(cv::Mat_<float>(oBGDist(cv::Rect(0,128,256,1))));
 }
 
-void StereoSegmMatcher::GraphModelData::initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oROI, size_t nCamIdx) {
+void SegmMatcher::GraphModelData::initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oROI, size_t nCamIdx) {
     if(oInput.channels()==1)
         lv::initGaussianMixtureParams(oInput,oMask,m_aBGModels_1ch[nCamIdx],m_aFGModels_1ch[nCamIdx],oROI);
     else // 3ch
         lv::initGaussianMixtureParams(oInput,oMask,m_aBGModels_3ch[nCamIdx],m_aFGModels_3ch[nCamIdx],oROI);
 }
 
-void StereoSegmMatcher::GraphModelData::assignGaussianMixtureComponents(const cv::Mat& oInput, const cv::Mat& oMask, cv::Mat& oAssignMap, const cv::Mat& oROI, size_t nCamIdx) {
+void SegmMatcher::GraphModelData::assignGaussianMixtureComponents(const cv::Mat& oInput, const cv::Mat& oMask, cv::Mat& oAssignMap, const cv::Mat& oROI, size_t nCamIdx) {
     if(oInput.channels()==1)
         lv::assignGaussianMixtureComponents(oInput,oMask,oAssignMap,m_aBGModels_1ch[nCamIdx],m_aFGModels_1ch[nCamIdx],oROI);
     else // 3ch
         lv::assignGaussianMixtureComponents(oInput,oMask,oAssignMap,m_aBGModels_3ch[nCamIdx],m_aFGModels_3ch[nCamIdx],oROI);
 }
 
-void StereoSegmMatcher::GraphModelData::learnGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oAssignMap, const cv::Mat& oROI, size_t nCamIdx) {
+void SegmMatcher::GraphModelData::learnGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oAssignMap, const cv::Mat& oROI, size_t nCamIdx) {
     if(oInput.channels()==1)
         lv::learnGaussianMixtureParams(oInput,oMask,oAssignMap,m_aBGModels_1ch[nCamIdx],m_aFGModels_1ch[nCamIdx],oROI);
     else // 3ch
         lv::learnGaussianMixtureParams(oInput,oMask,oAssignMap,m_aBGModels_3ch[nCamIdx],m_aFGModels_3ch[nCamIdx],oROI);
 }
 
-double StereoSegmMatcher::GraphModelData::getGMMFGProb(const cv::Mat& oInput, size_t nElemIdx, size_t nCamIdx) const {
+double SegmMatcher::GraphModelData::getGMMFGProb(const cv::Mat& oInput, size_t nElemIdx, size_t nCamIdx) const {
     lvDbgAssert(!oInput.empty() && oInput.depth()==CV_8U && nElemIdx<oInput.total());
     if(oInput.channels()==1)
         return m_aFGModels_1ch[nCamIdx](oInput.data+nElemIdx);
@@ -2040,7 +2034,7 @@ double StereoSegmMatcher::GraphModelData::getGMMFGProb(const cv::Mat& oInput, si
         return m_aFGModels_3ch[nCamIdx](oInput.data+nElemIdx*oInput.channels());
 }
 
-double StereoSegmMatcher::GraphModelData::getGMMBGProb(const cv::Mat& oInput, size_t nElemIdx, size_t nCamIdx) const {
+double SegmMatcher::GraphModelData::getGMMBGProb(const cv::Mat& oInput, size_t nElemIdx, size_t nCamIdx) const {
     lvDbgAssert(!oInput.empty() && oInput.depth()==CV_8U && nElemIdx<oInput.total());
     if(oInput.channels()==1)
         return m_aBGModels_1ch[nCamIdx](oInput.data+nElemIdx);
@@ -2048,7 +2042,7 @@ double StereoSegmMatcher::GraphModelData::getGMMBGProb(const cv::Mat& oInput, si
         return m_aBGModels_3ch[nCamIdx](oInput.data+nElemIdx*oInput.channels());
 }
 
-void StereoSegmMatcher::GraphModelData::setNextFeatures(const cv::Mat& oPackedFeatures) {
+void SegmMatcher::GraphModelData::setNextFeatures(const cv::Mat& oPackedFeatures) {
     lvDbgExceptionWatch;
     lvAssert_(!oPackedFeatures.empty() && oPackedFeatures.isContinuous(),"features packet must be non-empty and continuous");
     if(m_vExpectedFeatPackInfo.empty()) {
@@ -2072,13 +2066,13 @@ void StereoSegmMatcher::GraphModelData::setNextFeatures(const cv::Mat& oPackedFe
     m_bUsePrecalcFeaturesNext = true;
 }
 
-inline StereoSegmMatcher::OutputLabelType StereoSegmMatcher::GraphModelData::getRealLabel(InternalLabelType nLabel) const {
+inline SegmMatcher::OutputLabelType SegmMatcher::GraphModelData::getRealLabel(InternalLabelType nLabel) const {
     lvDbgExceptionWatch;
     lvDbgAssert(nLabel<m_vStereoLabels.size());
     return m_vStereoLabels[nLabel];
 }
 
-inline StereoSegmMatcher::InternalLabelType StereoSegmMatcher::GraphModelData::getInternalLabel(OutputLabelType nRealLabel) const {
+inline SegmMatcher::InternalLabelType SegmMatcher::GraphModelData::getInternalLabel(OutputLabelType nRealLabel) const {
     lvDbgExceptionWatch;
     lvDbgAssert(nRealLabel==s_nOccludedLabel || nRealLabel==s_nDontCareLabel);
     lvDbgAssert(nRealLabel>=(OutputLabelType)m_nMinDispOffset && nRealLabel<=(OutputLabelType)m_nMaxDispOffset);
@@ -2086,7 +2080,7 @@ inline StereoSegmMatcher::InternalLabelType StereoSegmMatcher::GraphModelData::g
     return (InternalLabelType)std::distance(m_vStereoLabels.begin(),std::find(m_vStereoLabels.begin(),m_vStereoLabels.end(),nRealLabel));
 }
 
-inline int StereoSegmMatcher::GraphModelData::getOffsetValue(size_t nCamIdx, InternalLabelType nLabel) const {
+inline int SegmMatcher::GraphModelData::getOffsetValue(size_t nCamIdx, InternalLabelType nLabel) const {
     static_assert(getCameraCount()==2,"bad hardcoded offset sign");
     lvDbgExceptionWatch;
     lvDbgAssert(nCamIdx==size_t(0) || nCamIdx==size_t(1));
@@ -2096,13 +2090,13 @@ inline int StereoSegmMatcher::GraphModelData::getOffsetValue(size_t nCamIdx, Int
     return (nCamIdx==size_t(0))?(-nRealLabel):(nRealLabel);
 }
 
-inline int StereoSegmMatcher::GraphModelData::getOffsetColIdx(size_t nCamIdx, int nColIdx, InternalLabelType nLabel) const {
+inline int SegmMatcher::GraphModelData::getOffsetColIdx(size_t nCamIdx, int nColIdx, InternalLabelType nLabel) const {
     lvDbgExceptionWatch;
     lvDbgAssert(nColIdx>=0 && nColIdx<(int)m_oGridSize[1]);
     return nColIdx+getOffsetValue(nCamIdx,nLabel);
 }
 
-inline StereoSegmMatcher::AssocCountType StereoSegmMatcher::GraphModelData::getAssocCount(int nRowIdx, int nColIdx) const {
+inline SegmMatcher::AssocCountType SegmMatcher::GraphModelData::getAssocCount(int nRowIdx, int nColIdx) const {
     lvDbgExceptionWatch;
     lvDbgAssert(nRowIdx>=0 && nRowIdx<(int)m_oGridSize[0]);
     lvDbgAssert(m_nPrimaryCamIdx==1 || (nColIdx>=-(int)m_nMaxDispOffset && nColIdx<(int)m_oGridSize[1]));
@@ -2112,7 +2106,7 @@ inline StereoSegmMatcher::AssocCountType StereoSegmMatcher::GraphModelData::getA
     return ((AssocCountType*)m_oAssocCounts.data)[nRowIdx*m_oAssocCounts.cols + (nColIdx+nMapOffset)/m_nDispOffsetStep];
 }
 
-inline void StereoSegmMatcher::GraphModelData::addAssoc(int nRowIdx, int nColIdx, InternalLabelType nLabel) const {
+inline void SegmMatcher::GraphModelData::addAssoc(int nRowIdx, int nColIdx, InternalLabelType nLabel) const {
     static_assert(getCameraCount()==2,"bad hardcoded assoc range check");
     lvDbgExceptionWatch;
     lvDbgAssert(nLabel<m_nDontCareLabelIdx);
@@ -2135,7 +2129,7 @@ inline void StereoSegmMatcher::GraphModelData::addAssoc(int nRowIdx, int nColIdx
     ++nAssocCount;
 }
 
-inline void StereoSegmMatcher::GraphModelData::removeAssoc(int nRowIdx, int nColIdx, InternalLabelType nLabel) const {
+inline void SegmMatcher::GraphModelData::removeAssoc(int nRowIdx, int nColIdx, InternalLabelType nLabel) const {
     static_assert(getCameraCount()==2,"bad hardcoded assoc range check");
     lvDbgExceptionWatch;
     lvDbgAssert(nLabel<m_nDontCareLabelIdx);
@@ -2158,7 +2152,7 @@ inline void StereoSegmMatcher::GraphModelData::removeAssoc(int nRowIdx, int nCol
     --nAssocCount;
 }
 
-inline StereoSegmMatcher::ValueType StereoSegmMatcher::GraphModelData::calcAddAssocCost(int nRowIdx, int nColIdx, InternalLabelType nLabel) const {
+inline SegmMatcher::ValueType SegmMatcher::GraphModelData::calcAddAssocCost(int nRowIdx, int nColIdx, InternalLabelType nLabel) const {
     static_assert(getCameraCount()==2,"bad hardcoded assoc range check");
     lvDbgExceptionWatch;
     lvDbgAssert(nRowIdx>=0 && nRowIdx<(int)m_oGridSize[0] && nColIdx>=0 && nColIdx<(int)m_oGridSize[1]);
@@ -2173,7 +2167,7 @@ inline StereoSegmMatcher::ValueType StereoSegmMatcher::GraphModelData::calcAddAs
     return cost_cast(100000); // @@@@ dirty
 }
 
-inline StereoSegmMatcher::ValueType StereoSegmMatcher::GraphModelData::calcRemoveAssocCost(int nRowIdx, int nColIdx, InternalLabelType nLabel) const {
+inline SegmMatcher::ValueType SegmMatcher::GraphModelData::calcRemoveAssocCost(int nRowIdx, int nColIdx, InternalLabelType nLabel) const {
     static_assert(getCameraCount()==2,"bad hardcoded assoc range check");
     lvDbgExceptionWatch;
     lvDbgAssert(nRowIdx>=0 && nRowIdx<(int)m_oGridSize[0] && nColIdx>=0 && nColIdx<(int)m_oGridSize[1]);
@@ -2189,7 +2183,7 @@ inline StereoSegmMatcher::ValueType StereoSegmMatcher::GraphModelData::calcRemov
     return -cost_cast(100000); // @@@@ dirty
 }
 
-StereoSegmMatcher::ValueType StereoSegmMatcher::GraphModelData::calcTotalAssocCost() const {
+SegmMatcher::ValueType SegmMatcher::GraphModelData::calcTotalAssocCost() const {
     lvDbgExceptionWatch;
     lvDbgAssert(m_oGridSize.total()==m_vStereoNodeInfos.size());
     ValueType tEnergy = cost_cast(0);
@@ -2202,7 +2196,7 @@ StereoSegmMatcher::ValueType StereoSegmMatcher::GraphModelData::calcTotalAssocCo
     return tEnergy;
 }
 
-inline StereoSegmMatcher::ValueType StereoSegmMatcher::GraphModelData::calcStereoUnaryMoveCost(size_t nGraphNodeIdx, InternalLabelType nOldLabel, InternalLabelType nNewLabel) const {
+inline SegmMatcher::ValueType SegmMatcher::GraphModelData::calcStereoUnaryMoveCost(size_t nGraphNodeIdx, InternalLabelType nOldLabel, InternalLabelType nNewLabel) const {
     lvDbgExceptionWatch;
     lvDbgAssert(nGraphNodeIdx<m_nValidStereoGraphNodes);
     const size_t nLUTNodeIdx = m_vValidStereoLUTNodeIdxs[nGraphNodeIdx];
@@ -2222,7 +2216,7 @@ inline StereoSegmMatcher::ValueType StereoSegmMatcher::GraphModelData::calcStere
 
 #if (STEREOSEGMATCH_CONFIG_USE_FGBZ_STEREO_INF || STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF)
 
-void StereoSegmMatcher::GraphModelData::calcStereoMoveCosts(InternalLabelType nNewLabel) const {
+void SegmMatcher::GraphModelData::calcStereoMoveCosts(InternalLabelType nNewLabel) const {
     lvDbgExceptionWatch;
     lvDbgAssert(m_oGridSize.total()==m_vStereoNodeInfos.size() && m_oGridSize.total()>1 && m_oGridSize==m_oStereoUnaryCosts.size);
     const InternalLabelType* pInitLabeling = ((InternalLabelType*)m_aaStereoLabelings[0][m_nPrimaryCamIdx].data);
@@ -2255,7 +2249,7 @@ void StereoSegmMatcher::GraphModelData::calcStereoMoveCosts(InternalLabelType nN
 
 #if STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF
 
-void StereoSegmMatcher::GraphModelData::PreEditDual(sospd::SubmodularIBFS<ValueType,IndexType>& crf, InternalLabelType nStereoAlphaLabel) {
+void SegmMatcher::GraphModelData::PreEditDual(sospd::SubmodularIBFS<ValueType,IndexType>& crf, InternalLabelType nStereoAlphaLabel) {
     auto& fixedVars = crf.Params().fixedVars;
     fixedVars.resize(m_nValidStereoGraphNodes);
     for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_nValidStereoGraphNodes; ++nGraphNodeIdx) {
@@ -2321,7 +2315,7 @@ void StereoSegmMatcher::GraphModelData::PreEditDual(sospd::SubmodularIBFS<ValueT
     }
 }
 
-bool StereoSegmMatcher::GraphModelData::UpdatePrimalDual(sospd::SubmodularIBFS<ValueType,IndexType>& crf, InternalLabelType nStereoAlphaLabel) {
+bool SegmMatcher::GraphModelData::UpdatePrimalDual(sospd::SubmodularIBFS<ValueType,IndexType>& crf, InternalLabelType nStereoAlphaLabel) {
     bool ret = false;
     crf.ClearUnaries();
     crf.AddConstantTerm(-crf.GetConstantTerm());
@@ -2378,7 +2372,7 @@ bool StereoSegmMatcher::GraphModelData::UpdatePrimalDual(sospd::SubmodularIBFS<V
     return ret;
 }
 
-void StereoSegmMatcher::GraphModelData::PostEditDual(sospd::SubmodularIBFS<ValueType,IndexType>& crf/*temp for clique nodes & dbg*/) {
+void SegmMatcher::GraphModelData::PostEditDual(sospd::SubmodularIBFS<ValueType,IndexType>& crf/*temp for clique nodes & dbg*/) {
     InternalLabelType labelBuf[32];
     int clique_index = 0;
     const auto& clique = crf.Graph().GetCliques();
@@ -2432,7 +2426,7 @@ void StereoSegmMatcher::GraphModelData::PostEditDual(sospd::SubmodularIBFS<Value
 
 #endif //STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF
 
-void StereoSegmMatcher::GraphModelData::calcResegmMoveCosts(InternalLabelType nNewLabel) const {
+void SegmMatcher::GraphModelData::calcResegmMoveCosts(InternalLabelType nNewLabel) const {
     lvDbgExceptionWatch;
     lvDbgAssert(m_oResegmUnaryCosts.rows==int(m_oGridSize[0]*getTemporalLayerCount()*getCameraCount()) && m_oResegmUnaryCosts.cols==int(m_oGridSize[1]));
     // @@@@@ openmp here?
@@ -2455,7 +2449,7 @@ void StereoSegmMatcher::GraphModelData::calcResegmMoveCosts(InternalLabelType nN
     }
 }
 
-opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer() {
+opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
     static_assert(s_nInputArraySize==4 && getCameraCount()==2,"hardcoded indices below will break");
     lvDbgExceptionWatch;
     const size_t nCameraCount = getCameraCount();
@@ -2522,7 +2516,7 @@ opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer() {
     HOEReducer oStereoReducer;
     size_t nStereoLabelOrderingIdx = 0;
 #elif STEREOSEGMATCH_CONFIG_USE_SOSPD_STEREO_INF
-    static_assert(std::is_integral<StereoSegmMatcher::ValueType>::value,"sospd height weight redistr requires integer type"); // @@@ could rewrite for float type
+    static_assert(std::is_integral<SegmMatcher::ValueType>::value,"sospd height weight redistr requires integer type"); // @@@ could rewrite for float type
     //calcStereoCosts(m_nPrimaryCamIdx);
     constexpr bool bUseHeightAlphaExp = STEREOSEGMATCH_CONFIG_USE_SOSPD_ALPHA_HEIGHTS_LABEL_ORDERING;
     lvAssert_(!bUseHeightAlphaExp,"missing impl"); // @@@@
@@ -2852,7 +2846,7 @@ opengm::InferenceTermination StereoSegmMatcher::GraphModelData::infer() {
     return opengm::InferenceTermination::NORMAL;
 }
 
-cv::Mat StereoSegmMatcher::GraphModelData::getResegmMapDisplay(size_t nLayerIdx, size_t nCamIdx) const {
+cv::Mat SegmMatcher::GraphModelData::getResegmMapDisplay(size_t nLayerIdx, size_t nCamIdx) const {
     lvDbgExceptionWatch;
     lvAssert_(nLayerIdx<getTemporalLayerCount(),"layer index out of range");
     lvAssert_(nCamIdx<getCameraCount(),"camera index out of range");
@@ -2883,7 +2877,7 @@ cv::Mat StereoSegmMatcher::GraphModelData::getResegmMapDisplay(size_t nLayerIdx,
     return oOutput;
 }
 
-cv::Mat StereoSegmMatcher::GraphModelData::getStereoDispMapDisplay(size_t nLayerIdx, size_t nCamIdx) const {
+cv::Mat SegmMatcher::GraphModelData::getStereoDispMapDisplay(size_t nLayerIdx, size_t nCamIdx) const {
     lvDbgExceptionWatch;
     lvAssert_(nLayerIdx<getTemporalLayerCount(),"layer index out of range");
     lvAssert_(nCamIdx<getCameraCount(),"camera index out of range");
@@ -2914,7 +2908,7 @@ cv::Mat StereoSegmMatcher::GraphModelData::getStereoDispMapDisplay(size_t nLayer
     return oOutput;
 }
 
-cv::Mat StereoSegmMatcher::GraphModelData::getAssocCountsMapDisplay() const {
+cv::Mat SegmMatcher::GraphModelData::getAssocCountsMapDisplay() const {
     lvDbgExceptionWatch;
     lvAssert(m_nMaxDispOffset>m_nMinDispOffset);
     lvAssert(!m_oAssocCounts.empty() && m_oAssocCounts.rows==int(m_oGridSize(0)));
@@ -2939,7 +2933,7 @@ cv::Mat StereoSegmMatcher::GraphModelData::getAssocCountsMapDisplay() const {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-StereoSegmMatcher::StereoGraphInference::StereoGraphInference(GraphModelData& oData) :
+SegmMatcher::StereoGraphInference::StereoGraphInference(GraphModelData& oData) :
         m_oData(oData),m_nPrimaryCamIdx(oData.m_nPrimaryCamIdx) {
     lvDbgExceptionWatch;
     lvAssert_(m_nPrimaryCamIdx<getCameraCount(),"camera index out of range");
@@ -2953,36 +2947,36 @@ StereoSegmMatcher::StereoGraphInference::StereoGraphInference(GraphModelData& oD
         lvDbgAssert_(oGM.numberOfLabels(nGraphNodeIdx)==m_oData.m_vStereoLabels.size(),"graph nodes must all have the same number of labels");
 }
 
-std::string StereoSegmMatcher::StereoGraphInference::name() const {
+std::string SegmMatcher::StereoGraphInference::name() const {
     return std::string("litiv-stereo-matcher");
 }
 
-const StereoModelType& StereoSegmMatcher::StereoGraphInference::graphicalModel() const {
+const StereoModelType& SegmMatcher::StereoGraphInference::graphicalModel() const {
     lvDbgExceptionWatch;
     lvDbgAssert(m_oData.m_pStereoModel);
     return *m_oData.m_pStereoModel;
 }
 
-opengm::InferenceTermination StereoSegmMatcher::StereoGraphInference::infer() {
+opengm::InferenceTermination SegmMatcher::StereoGraphInference::infer() {
     lvDbgExceptionWatch;
     return m_oData.infer();
 }
 
-void StereoSegmMatcher::StereoGraphInference::setStartingPoint(typename std::vector<InternalLabelType>::const_iterator begin) {
+void SegmMatcher::StereoGraphInference::setStartingPoint(typename std::vector<InternalLabelType>::const_iterator begin) {
     lvDbgExceptionWatch;
     lvDbgAssert_(lv::filter_out(lv::unique(begin,begin+m_oData.m_oGridSize.total()),lv::make_range(InternalLabelType(0),InternalLabelType(m_oData.m_vStereoLabels.size()-1))).empty(),"provided labeling possesses invalid/out-of-range labels");
     lvDbgAssert_(m_oData.m_aaStereoLabelings[0][m_nPrimaryCamIdx].isContinuous() && m_oData.m_aaStereoLabelings[0][m_nPrimaryCamIdx].total()==m_oData.m_oGridSize.total(),"unexpected internal labeling size");
     std::copy_n(begin,m_oData.m_oGridSize.total(),m_oData.m_aaStereoLabelings[0][m_nPrimaryCamIdx].begin());
 }
 
-void StereoSegmMatcher::StereoGraphInference::setStartingPoint(const cv::Mat_<OutputLabelType>& oLabeling) {
+void SegmMatcher::StereoGraphInference::setStartingPoint(const cv::Mat_<OutputLabelType>& oLabeling) {
     lvDbgExceptionWatch;
     lvDbgAssert_(lv::filter_out(lv::unique(oLabeling.begin(),oLabeling.end()),m_oData.m_vStereoLabels).empty(),"provided labeling possesses invalid/out-of-range labels");
     lvAssert_(m_oData.m_oGridSize==oLabeling.size && oLabeling.isContinuous(),"provided labeling must fit grid size & be continuous");
     std::transform(oLabeling.begin(),oLabeling.end(),m_oData.m_aaStereoLabelings[0][m_nPrimaryCamIdx].begin(),[&](const OutputLabelType& nRealLabel){return m_oData.getInternalLabel(nRealLabel);});
 }
 
-opengm::InferenceTermination StereoSegmMatcher::StereoGraphInference::arg(std::vector<InternalLabelType>& oLabeling, const size_t n) const {
+opengm::InferenceTermination SegmMatcher::StereoGraphInference::arg(std::vector<InternalLabelType>& oLabeling, const size_t n) const {
     lvDbgExceptionWatch;
     if(n==1) {
         lvDbgAssert_(m_oData.m_aaStereoLabelings[0][m_nPrimaryCamIdx].total()==m_oData.m_oGridSize.total(),"mismatch between internal graph label count and labeling mat size");
@@ -2993,7 +2987,7 @@ opengm::InferenceTermination StereoSegmMatcher::StereoGraphInference::arg(std::v
     return opengm::InferenceTermination::UNKNOWN;
 }
 
-void StereoSegmMatcher::StereoGraphInference::getOutput(cv::Mat_<OutputLabelType>& oLabeling) const {
+void SegmMatcher::StereoGraphInference::getOutput(cv::Mat_<OutputLabelType>& oLabeling) const {
     lvDbgExceptionWatch;
     lvDbgAssert_(m_oData.m_aaStereoLabelings[0][m_nPrimaryCamIdx].isContinuous() && m_oData.m_aaStereoLabelings[0][m_nPrimaryCamIdx].total()==m_oData.m_oGridSize.total(),"unexpected internal labeling size");
     oLabeling.create(m_oData.m_aaStereoLabelings[0][m_nPrimaryCamIdx].size());
@@ -3001,7 +2995,7 @@ void StereoSegmMatcher::StereoGraphInference::getOutput(cv::Mat_<OutputLabelType
     std::transform(m_oData.m_aaStereoLabelings[0][m_nPrimaryCamIdx].begin(),m_oData.m_aaStereoLabelings[0][m_nPrimaryCamIdx].end(),oLabeling.begin(),[&](const InternalLabelType& nLabel){return m_oData.getRealLabel(nLabel);});
 }
 
-StereoSegmMatcher::ValueType StereoSegmMatcher::StereoGraphInference::value() const {
+SegmMatcher::ValueType SegmMatcher::StereoGraphInference::value() const {
     lvDbgExceptionWatch;
     lvDbgAssert_(m_oData.m_oGridSize.dims()==2 && m_oData.m_oGridSize==m_oData.m_aaStereoLabelings[0][m_nPrimaryCamIdx].size,"output labeling must be a 2d grid");
     const ValueType tTotAssocCost = m_oData.calcTotalAssocCost();
@@ -3022,7 +3016,7 @@ StereoSegmMatcher::ValueType StereoSegmMatcher::StereoGraphInference::value() co
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-StereoSegmMatcher::ResegmGraphInference::ResegmGraphInference(GraphModelData& oData) :
+SegmMatcher::ResegmGraphInference::ResegmGraphInference(GraphModelData& oData) :
         m_oData(oData) {
     lvDbgExceptionWatch;
     lvAssert_(m_oData.m_pResegmModel,"invalid graph");
@@ -3035,29 +3029,29 @@ StereoSegmMatcher::ResegmGraphInference::ResegmGraphInference(GraphModelData& oD
         lvDbgAssert_(oGM.numberOfLabels(nGraphNodeIdx)==size_t(2),"graph nodes must all have the same number of labels");
 }
 
-std::string StereoSegmMatcher::ResegmGraphInference::name() const {
+std::string SegmMatcher::ResegmGraphInference::name() const {
     return std::string("litiv-segm-matcher");
 }
 
-const ResegmModelType& StereoSegmMatcher::ResegmGraphInference::graphicalModel() const {
+const ResegmModelType& SegmMatcher::ResegmGraphInference::graphicalModel() const {
     lvDbgExceptionWatch;
     lvDbgAssert(m_oData.m_pResegmModel);
     return *m_oData.m_pResegmModel;
 }
 
-opengm::InferenceTermination StereoSegmMatcher::ResegmGraphInference::infer() {
+opengm::InferenceTermination SegmMatcher::ResegmGraphInference::infer() {
     lvDbgExceptionWatch;
     return m_oData.infer();
 }
 
-void StereoSegmMatcher::ResegmGraphInference::setStartingPoint(typename std::vector<InternalLabelType>::const_iterator begin) {
+void SegmMatcher::ResegmGraphInference::setStartingPoint(typename std::vector<InternalLabelType>::const_iterator begin) {
     lvDbgExceptionWatch;
     lvDbgAssert_(lv::filter_out(lv::unique(begin,begin+m_oData.m_oGridSize.total()),std::vector<InternalLabelType>{s_nBackgroundLabelIdx,s_nForegroundLabelIdx}).empty(),"provided labeling possesses invalid/out-of-range labels");
     lvDbgAssert_(m_oData.m_oSuperStackedResegmLabeling.isContinuous() && m_oData.m_oSuperStackedResegmLabeling.total()==m_oData.m_oGridSize.total()*getTemporalLayerCount()*getCameraCount(),"unexpected internal labeling size");
     std::copy_n(begin,m_oData.m_oGridSize.total()*getTemporalLayerCount()*getCameraCount(),m_oData.m_oSuperStackedResegmLabeling.begin());
 }
 
-void StereoSegmMatcher::ResegmGraphInference::setStartingPoint(const TemporalArray<CamArray<cv::Mat_<OutputLabelType>>>& aaLabeling) {
+void SegmMatcher::ResegmGraphInference::setStartingPoint(const TemporalArray<CamArray<cv::Mat_<OutputLabelType>>>& aaLabeling) {
     lvDbgExceptionWatch;
     for(size_t nLayerIdx=0; nLayerIdx<getTemporalLayerCount(); ++nLayerIdx) {
         for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
@@ -3068,7 +3062,7 @@ void StereoSegmMatcher::ResegmGraphInference::setStartingPoint(const TemporalArr
     }
 }
 
-opengm::InferenceTermination StereoSegmMatcher::ResegmGraphInference::arg(std::vector<InternalLabelType>& oLabeling, const size_t n) const {
+opengm::InferenceTermination SegmMatcher::ResegmGraphInference::arg(std::vector<InternalLabelType>& oLabeling, const size_t n) const {
     lvDbgExceptionWatch;
     if(n==1) {
         lvDbgAssert_(m_oData.m_oSuperStackedResegmLabeling.total()==m_oData.m_oGridSize.total()*getTemporalLayerCount()*getCameraCount(),"mismatch between internal graph label count and labeling mat size");
@@ -3079,7 +3073,7 @@ opengm::InferenceTermination StereoSegmMatcher::ResegmGraphInference::arg(std::v
     return opengm::InferenceTermination::UNKNOWN;
 }
 
-void StereoSegmMatcher::ResegmGraphInference::getOutput(TemporalArray<CamArray<cv::Mat_<OutputLabelType>>>& aaLabeling) const {
+void SegmMatcher::ResegmGraphInference::getOutput(TemporalArray<CamArray<cv::Mat_<OutputLabelType>>>& aaLabeling) const {
     lvDbgExceptionWatch;
     for(size_t nLayerIdx=0; nLayerIdx<getTemporalLayerCount(); ++nLayerIdx) {
         for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
@@ -3091,7 +3085,7 @@ void StereoSegmMatcher::ResegmGraphInference::getOutput(TemporalArray<CamArray<c
     }
 }
 
-StereoSegmMatcher::ValueType StereoSegmMatcher::ResegmGraphInference::value() const {
+SegmMatcher::ValueType SegmMatcher::ResegmGraphInference::value() const {
     lvDbgExceptionWatch;
     struct GraphNodeLabelIter {
         GraphNodeLabelIter(const GraphModelData& oData) : m_oData(oData) {}

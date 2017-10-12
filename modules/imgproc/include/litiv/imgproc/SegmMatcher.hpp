@@ -25,7 +25,7 @@
 
 /// this stereo matcher assumes both input images are rectified, and have the same size;
 /// it also expects four inputs (image0,mask0,image1,mask1), and provides 4 outputs (disp0,mask0,disp1,mask1)
-struct StereoSegmMatcher : ICosegmentor<int32_t,4> { // camera count could be templated... (n-view generalization)
+struct SegmMatcher : ICosegmentor<int32_t,4> { // camera count could be templated... (n-view generalization)
     using InternalLabelType = uint8_t; ///< type used for internal labeling (disparity + fg/bg)
     using OutputLabelType = int32_t; ///< type used in returned labelings (i.e. output of 'apply')
     using AssocCountType = uint16_t; ///< type used for stereo association counting in cv::Mat_'s
@@ -82,9 +82,9 @@ struct StereoSegmMatcher : ICosegmentor<int32_t,4> { // camera count could be te
     struct ResegmGraphInference;
 
     /// full stereo graph matcher constructor; only takes parameters to ready graphical model base initialization
-    StereoSegmMatcher(size_t nMinDispOffset, size_t nMaxDispOffset);
+    SegmMatcher(size_t nMinDispOffset, size_t nMaxDispOffset);
     /// default (empty) destructor (required explicitly here due to pimpl idiom and unique_ptr usage)
-    ~StereoSegmMatcher();
+    ~SegmMatcher();
     /// stereo graph matcher initialization function; will allocate & initialize graph model using provided ROI data (one ROI per camera head)
     virtual void initialize(const std::array<cv::Mat,s_nCameraCount>& aROIs, size_t nPrimaryCamIdx=0);
     /// stereo matcher function; solves the graph model to find pixel-level matches on epipolar lines in the masked input images, and returns disparity maps + masks
