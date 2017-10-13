@@ -431,7 +431,21 @@ namespace {
 }
 TYPED_TEST_CASE(AutoBuffer_fixture,AutoBuffer_types);
 TYPED_TEST(AutoBuffer_fixture,regression) {
-    lv::AutoBuffer<TypeParam,10,16> buff;
+    {
+        // constr checks here
+        lv::AutoBuffer<TypeParam,10,16> buff0;
+        ASSERT_TRUE(buff0.is_static());
+        ASSERT_TRUE(buff0.empty());
+        lv::AutoBuffer<TypeParam,10,16> buff5(5);
+        ASSERT_TRUE(buff5.is_static());
+        ASSERT_TRUE(!buff5.empty());
+        ASSERT_EQ(buff5.size(),size_t(5));
+        lv::AutoBuffer<TypeParam,10,16> buff11(11);
+        ASSERT_TRUE(!buff11.is_static());
+        ASSERT_TRUE(!buff11.empty());
+        ASSERT_EQ(buff11.size(),size_t(11));
+    }
+    lv::AutoBuffer<TypeParam,10,16> buff(10);
     ASSERT_TRUE(buff.is_static());
     ASSERT_TRUE(!buff.empty());
     ASSERT_EQ(buff.size(),size_t(10));
@@ -475,7 +489,7 @@ TYPED_TEST(AutoBuffer_fixture,regression) {
         ASSERT_EQ((*(buff.begin()+i)),buff[i]);
     }
     lv::AutoBuffer<TypeParam,3,16> buff4;
-    ASSERT_EQ(buff4.size(),size_t(3));
+    ASSERT_EQ(buff4.size(),size_t(0));
     ASSERT_TRUE((uintptr_t(buff4.data())%16)==0);
     ASSERT_TRUE(buff4.is_static());
     buff4 = buff;
@@ -484,7 +498,7 @@ TYPED_TEST(AutoBuffer_fixture,regression) {
     ASSERT_TRUE(!buff4.is_static());
     for(size_t i=0; i<buff4.size(); ++i)
         ASSERT_EQ(buff.at(i),buff4.at(i));
-    lv::AutoBuffer<TypeParam,6,16> buff5;
+    lv::AutoBuffer<TypeParam,6,16> buff5(6);
     ASSERT_EQ(buff5.size(),size_t(6));
     ASSERT_TRUE((uintptr_t(buff5.data())%16)==0);
     ASSERT_TRUE(buff5.is_static());
@@ -495,6 +509,97 @@ TYPED_TEST(AutoBuffer_fixture,regression) {
     ASSERT_TRUE(buff4.is_static());
     for(size_t i=0; i<buff5.size(); ++i)
         ASSERT_EQ(buff.at(i),buff5.at(i));
+    lv::AutoBuffer<TypeParam,6,16> buff6(2);
+    ASSERT_EQ(buff6.size(),size_t(2));
+    ASSERT_TRUE((uintptr_t(buff6.data())%16)==0);
+    ASSERT_TRUE(buff6.is_static());
+    buff6.push_back(TypeParam{});
+    ASSERT_EQ(buff6.size(),size_t(3));
+    ASSERT_TRUE((uintptr_t(buff6.data())%16)==0);
+    ASSERT_TRUE(buff6.is_static());
+    buff6.push_back(TypeParam{});
+    buff6.push_back(TypeParam{});
+    buff6.push_back(TypeParam{});
+    ASSERT_EQ(buff6.size(),size_t(6));
+    ASSERT_TRUE((uintptr_t(buff6.data())%16)==0);
+    ASSERT_TRUE(buff6.is_static());
+    ASSERT_TRUE(buff6.capacity()==size_t(6));
+    buff6.push_back(TypeParam{});
+    ASSERT_EQ(buff6.size(),size_t(7));
+    ASSERT_TRUE((uintptr_t(buff6.data())%16)==0);
+    ASSERT_TRUE(!buff6.is_static());
+    ASSERT_TRUE(buff6.capacity()>=size_t(7));
+    buff6.push_back(TypeParam{});
+    ASSERT_EQ(buff6.size(),size_t(8));
+    ASSERT_TRUE((uintptr_t(buff6.data())%16)==0);
+    ASSERT_TRUE(!buff6.is_static());
+    ASSERT_TRUE(buff6.capacity()>=size_t(8));
+    for(size_t nIter=0; nIter<50; ++nIter)
+        buff6.push_back(TypeParam(nIter));
+    ASSERT_EQ(buff6.size(),size_t(58));
+    ASSERT_TRUE((uintptr_t(buff6.data())%16)==0);
+    ASSERT_TRUE(!buff6.is_static());
+    ASSERT_TRUE(buff6.capacity()>=size_t(58));
+    for(size_t nIter=0; nIter<50; ++nIter)
+        ASSERT_EQ(buff6[8+nIter],TypeParam(nIter));
+    buff6.resize(size_t(20));
+    ASSERT_TRUE(buff6.capacity()>=size_t(58));
+    for(size_t nIter=0; nIter<6; ++nIter)
+        buff6[nIter] = TypeParam(nIter);
+    buff6.resize_static();
+    ASSERT_EQ(buff6.size(),size_t(6));
+    ASSERT_TRUE((uintptr_t(buff6.data())%16)==0);
+    ASSERT_TRUE(buff6.is_static());
+    ASSERT_TRUE(buff6.capacity()==size_t(6));
+    for(size_t nIter=0; nIter<6; ++nIter)
+        ASSERT_EQ(buff6[nIter],TypeParam(nIter));
+    lv::AutoBuffer<TypeParam,10,16> buff7;
+    buff7 = buff6;
+    ASSERT_EQ(buff7.size(),size_t(6));
+    ASSERT_TRUE((uintptr_t(buff7.data())%16)==0);
+    ASSERT_TRUE(buff7.is_static());
+    ASSERT_TRUE(buff7.capacity()==size_t(10));
+    for(size_t nIter=0; nIter<6; ++nIter)
+        ASSERT_EQ(buff6[nIter],buff7[nIter]);
+    buff7.reserve(8);
+    ASSERT_EQ(buff7.size(),size_t(6));
+    ASSERT_TRUE((uintptr_t(buff7.data())%16)==0);
+    ASSERT_TRUE(buff7.is_static());
+    ASSERT_TRUE(buff7.capacity()==size_t(10));
+    for(size_t nIter=0; nIter<6; ++nIter)
+        ASSERT_EQ(buff6[nIter],buff7[nIter]);
+    buff7.reserve(12);
+    ASSERT_EQ(buff7.size(),size_t(6));
+    ASSERT_TRUE((uintptr_t(buff7.data())%16)==0);
+    ASSERT_TRUE(!buff7.is_static());
+    ASSERT_TRUE(buff7.capacity()==size_t(12));
+    for(size_t nIter=0; nIter<6; ++nIter)
+        ASSERT_EQ(buff6[nIter],buff7[nIter]);
+    const TypeParam* const pBuff7Data = buff7.data();
+    buff7.resize(10);
+    ASSERT_EQ(buff7.size(),size_t(10));
+    ASSERT_TRUE((uintptr_t(buff7.data())%16)==0);
+    ASSERT_TRUE(!buff7.is_static());
+    ASSERT_TRUE(buff7.capacity()==size_t(12));
+    for(size_t nIter=0; nIter<6; ++nIter)
+        ASSERT_EQ(buff6[nIter],buff7[nIter]);
+    ASSERT_TRUE(pBuff7Data==buff7.data());
+    buff7.reserve(11);
+    ASSERT_TRUE(buff7.capacity()==size_t(12));
+    ASSERT_TRUE(pBuff7Data==buff7.data());
+    buff7.reserve(13);
+    ASSERT_EQ(buff7.size(),size_t(10));
+    ASSERT_TRUE((uintptr_t(buff7.data())%16)==0);
+    ASSERT_TRUE(!buff7.is_static());
+    ASSERT_TRUE(buff7.capacity()==size_t(13));
+    for(size_t nIter=0; nIter<6; ++nIter)
+        ASSERT_EQ(buff6[nIter],buff7[nIter]);
+    ASSERT_TRUE(pBuff7Data!=buff7.data());
+    buff7.clear();
+    ASSERT_EQ(buff7.size(),size_t(0));
+    ASSERT_TRUE((uintptr_t(buff7.data())%16)==0);
+    ASSERT_TRUE(buff7.is_static());
+    ASSERT_TRUE(buff7.capacity()==size_t(10));
 }
 
 TEST(LUT,regression_identity9) {

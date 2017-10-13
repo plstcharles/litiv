@@ -975,7 +975,7 @@ namespace lv {
     #ifdef _MSC_VER
     #pragma warning(pop)
     #endif //def(_MSC_VER)
-        static thread_local lv::AutoBuffer<TVal,N*N> s_aMatCopy;
+        static thread_local lv::AutoBuffer<TVal,N*N> s_aMatCopy(N*N);
         lvDbgAssert(s_aMatCopy.size()==N*N && s_aMatCopy.is_static());
         std::copy_n(m,N*N,s_aMatCopy.data());
         double p = lv::LU(s_aMatCopy.data(),N*sizeof(TVal),int(N));
@@ -1032,7 +1032,7 @@ namespace lv {
     #ifdef _MSC_VER
     #pragma warning(pop)
     #endif //def(_MSC_VER)
-        static thread_local lv::AutoBuffer<TVal,N*N> s_aMatCopy;
+        static thread_local lv::AutoBuffer<TVal,N*N> s_aMatCopy(N*N);
         lvDbgAssert(s_aMatCopy.size()==N*N && s_aMatCopy.is_static());
         std::copy_n(in,N*N,s_aMatCopy.data());
         std::fill_n(out,N*N,TVal(0));
