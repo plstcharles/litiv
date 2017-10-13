@@ -33,8 +33,8 @@ namespace sospd {
     void AddLinear(IDX n, std::vector<REAL>& energyTable, const std::vector<REAL>& psi);
 
     // Updates f to f'(S) = f(S) - psi1(S) - psi2(V\S)
-    template<typename REAL, typename IDX>
-    void SubtractLinear(IDX n, std::vector<REAL>& energyTable, const std::vector<REAL>& psi1, const std::vector<REAL>& psi2);
+    template<typename REAL, typename IDX, typename REALARRAY>
+    void SubtractLinear(IDX n, std::vector<REAL>& energyTable, const REALARRAY& psi1, const REALARRAY& psi2);
 
     // Modifies an energy function to be >= 0, with f(0) = f(V) = 0
     // energyTable is modified in place, must be submodular
@@ -271,13 +271,13 @@ inline void sospd::AddLinear(IDX n, std::vector<REAL>& energyTable, const std::v
     }
 }
 
-template<typename REAL, typename IDX>
-inline void sospd::SubtractLinear(IDX n, std::vector<REAL>& energyTable, const std::vector<REAL>& psi1, const std::vector<REAL>& psi2) {
+template<typename REAL, typename IDX, typename REALARRAY>
+inline void sospd::SubtractLinear(IDX n, std::vector<REAL>& energyTable, const REALARRAY& psi1, const REALARRAY& psi2) {
     static_assert(std::is_arithmetic<REAL>::value,"value type must be arithmetic");
     Assgn max_assgn = 1u << n;
     ASSERT(max_assgn == energyTable.size());
-    ASSERT(n == IDX(psi1.size()));
-    ASSERT(n == IDX(psi2.size()));
+    ASSERT(n <= IDX(psi1.size()));
+    ASSERT(n <= IDX(psi2.size()));
     REAL sum = 0;
     for (IDX i = 0; i < n; ++i)
         sum += psi2[i];
