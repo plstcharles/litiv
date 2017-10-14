@@ -1311,6 +1311,7 @@ void lv::AutoBuffer<TVal,nStaticSize,nByteAlign>::resize_static() {
         m_pBufferPtr = m_aStaticBuffer.data();
         m_aDynamicBuffer = nullptr;
     }
+    m_nUsedBufferSize = m_nBufferSize;
 }
 
 template<typename TVal, size_t nStaticSize, size_t nByteAlign>
