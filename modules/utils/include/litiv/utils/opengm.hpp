@@ -51,6 +51,9 @@
 #define NDEBUG
 #endif //ndef(NDEBUG)
 #endif //OPENGM_ENABLE_FAST_DEBUG_MAT_OPS
+#ifndef HAVE_CPP0X_VARIADIC_TEMPLATES
+#define HAVE_CPP0X_VARIADIC_TEMPLATES
+#endif //ndef(HAVE_CPP0X_VARIADIC_TEMPLATES)
 #include <opengm/graphicalmodel/graphicalmodel.hxx>
 #include <opengm/functions/potts.hxx>
 #include <opengm/functions/explicit_function.hxx>
