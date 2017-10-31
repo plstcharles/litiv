@@ -1353,7 +1353,6 @@ void lv::AutoBuffer<TVal,nStaticSize,nByteAlign>::push_back(const value_type& o)
 template<typename TVal, size_t nStaticSize, size_t nByteAlign>
 void lv::AutoBuffer<TVal,nStaticSize,nByteAlign>::push_back(value_type&& o) {
     lvDbgAssert(m_nUsedBufferSize<=m_nBufferSize);
-    lvDbgAssert(m_nUsedBufferSize<=m_nBufferSize);
     if(m_nUsedBufferSize==m_nBufferSize) {
         reserve(m_nBufferSize*2);
         lvDbgAssert(m_nBufferSize>m_nUsedBufferSize+1);
