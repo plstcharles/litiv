@@ -971,6 +971,25 @@ namespace lv {
         return lv::print<T>(cv::Mat_<T>(1,(int)oVec.size(),const_cast<T*>(oVec.data())),cv::Point2i(nDisplayIdxOffset,0),os);
     }
 
+    /// prints the content of an array (via matrix formatting) to the given stream
+    template<typename T, size_t N>
+    std::enable_if_t<(!isDataTypeCompat<T>()),std::ostream&> print(const std::array<T,N>& oArray, int nDisplayIdxOffset=0, std::ostream& os=std::cout) {
+        os << " ARRAY (size=" << oArray.size() << ")\n";
+        if(oArray.empty())
+            return os;
+        const size_t nMaxMetaColWidth = (size_t)std::max(lv::digit_count((int)oArray.size()+nDisplayIdxOffset),lv::digit_count(nDisplayIdxOffset));
+        const std::string sMetaFormat = std::string("%")+std::to_string(nMaxMetaColWidth)+"i";
+        for(size_t nElemIdx=0; nElemIdx<oArray.size(); ++nElemIdx)
+            os << "  x=" << lv::putf(sMetaFormat.c_str(),(int)nElemIdx+nDisplayIdxOffset) << "  :  " << oArray[nElemIdx] << '\n';
+        return os;
+    }
+
+    /// prints the content of an array (via matrix formatting) to the given stream
+    template<typename T, size_t N>
+    std::enable_if_t<(isDataTypeCompat<T>()),std::ostream&> print(const std::array<T,N>& oArray, int nDisplayIdxOffset, std::ostream& os) {
+        return lv::print<T>(cv::Mat_<T>(1,(int)oArray.size(),const_cast<T*>(oArray.data())),cv::Point2i(nDisplayIdxOffset,0),os);
+    }
+
 #endif //ndef(_MSC_VER)
 
     /// provides a printable string of the content of a vector with constant output element size
@@ -1398,6 +1417,11 @@ namespace std { // extending std
     template<typename T>
     ostream& operator<<(ostream& os, const vector<T>& oVec) {
         return lv::print(oVec,0,os);
+    }
+
+    template<typename T, size_t N>
+    ostream& operator<<(ostream& os, const array<T,N>& oArray) {
+        return lv::print(oArray,0,os);
     }
 
 } // namespace std
