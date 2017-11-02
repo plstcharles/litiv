@@ -28,4 +28,19 @@ namespace ofdis {
     template<FlowInputType eInput, FlowOutputType eOutput>
     void computeFlow(const cv::Mat& oInput1, const cv::Mat& oInput2, cv::Mat& oOutput, FlowParams oParams);
 
+    /// ofdis algorithm interface w/ explicit type check/branch, with all specialized input/output combos pre-instantiated
+    template<FlowOutputType eOutput=FlowOutput_OpticalFlow>
+    inline void computeFlow(const cv::Mat& oInput1, const cv::Mat& oInput2, cv::Mat& oOutput, FlowParams oParams=FlowParams()) {
+        CV_Assert(!oInput1.empty() && oInput1.dims==2);
+        CV_Assert(oInput1.size()==oInput2.size());
+        if(oInput1.channels()==1)
+            computeFlow<FlowInput_Grayscale,eOutput>(oInput1,oInput2,oOutput,oParams);
+        else if(oInput1.channels()==2)
+            computeFlow<FlowInput_Gradient,eOutput>(oInput1,oInput2,oOutput,oParams);
+        else if(oInput1.channels()==3)
+            computeFlow<FlowInput_RGB,eOutput>(oInput1,oInput2,oOutput,oParams);
+        else
+            CV_Error(-1,"unexpected channel count");
+    }
+
 } // namespace ofdis
