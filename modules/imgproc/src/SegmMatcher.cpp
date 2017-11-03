@@ -937,6 +937,9 @@ SegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs, cons
     lvDbgAssert(m_aLabelSimCostGradFactLUT.domain_index_step()==1.0 && m_aLabelSimCostGradFactLUT.domain_index_scale()==1.0);
     lvLog_(2,"\toutput disp labels:\n%s\n",lv::to_string(std::vector<OutputLabelType>(m_vStereoLabels.begin(),m_vStereoLabels.begin()+m_nRealStereoLabels)).c_str());
     const int nRows=(int)m_oGridSize(0),nCols=(int)m_oGridSize(1);
+    lvDbgAssert(nRows>1 && nCols>1);
+    const size_t nTemporalLayerCount = getTemporalLayerCount();
+    lvDbgAssert(nTemporalLayerCount>size_t(0));
     static_assert(getCameraCount()==2,"bad static array size, hardcoded stuff below will break");
     size_t nTotValidNodes = 0;
     CamArray<size_t> anValidGraphNodes = {};
@@ -952,8 +955,8 @@ SegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs, cons
     const size_t nStereoFuncDataSize = nStereoUnaryFuncDataSize+nStereoPairwFuncDataSize+nStereoEpipolarFuncDataSize;
     CamArray<size_t> anResegmUnaryFuncDataSize={},anResegmPairwFuncDataSize={},anResegmTemporalFuncDataSize={},anResegmFuncDataSize={};
     for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
-        anResegmUnaryFuncDataSize[nCamIdx] = anValidGraphNodes[nCamIdx]*m_nResegmLabels;
-        anResegmPairwFuncDataSize[nCamIdx] = anValidGraphNodes[nCamIdx]*s_nPairwOrients*(m_nResegmLabels*m_nResegmLabels);
+        anResegmUnaryFuncDataSize[nCamIdx] = anValidGraphNodes[nCamIdx]*m_nResegmLabels*nTemporalLayerCount;
+        anResegmPairwFuncDataSize[nCamIdx] = anValidGraphNodes[nCamIdx]*s_nPairwOrients*(m_nResegmLabels*m_nResegmLabels)*nTemporalLayerCount;
         anResegmTemporalFuncDataSize[nCamIdx] = SEGMMATCH_CONFIG_USE_TEMPORAL_CONN?(anValidGraphNodes[nCamIdx]*(int)std::pow((int)m_nResegmLabels,(int)s_nTemporalCliqueOrder)):size_t(0); // temporal stride not taken into account here
         anResegmFuncDataSize[nCamIdx] = anResegmUnaryFuncDataSize[nCamIdx]+anResegmPairwFuncDataSize[nCamIdx]+anResegmTemporalFuncDataSize[nCamIdx];
     }
@@ -967,10 +970,8 @@ SegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs, cons
     lvAssert__(nModelSize<(CACHE_MAX_SIZE_GB*1024*1024*1024),"too many nodes/labels; model is unlikely to fit in memory (estimated: %zu MB)",nModelSize/1024/1024);
     lvLog(2,"Initializing graph lookup tables...");
     const size_t nCameraCount = getCameraCount();
-    const size_t nTemporalLayerCount = getTemporalLayerCount();
     const size_t nLayerSize = m_oGridSize.total();
     lvDbgAssert(nCameraCount>size_t(0));
-    lvDbgAssert(nTemporalLayerCount>size_t(0));
     lvDbgAssert(nLayerSize>size_t(0));
     const int nStackedLayersRows = (int)(m_oGridSize[0]*nTemporalLayerCount);
     const int nStackedLayersCols = (int)(m_oGridSize[1]);
@@ -984,12 +985,14 @@ SegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs, cons
 #endif //SEGMMATCH_CONFIG_USE_..._STEREO_INF
     m_oResegmUnaryCosts.create(int(nStackedLayersRows*nCameraCount),nStackedLayersCols);
     m_vStereoGraphIdxToMapIdxLUT.reserve(anValidGraphNodes[m_nPrimaryCamIdx]);
-    m_vResegmGraphIdxToMapIdxLUT.reserve(nTotValidNodes*getTemporalLayerCount());
+    m_vResegmGraphIdxToMapIdxLUT.reserve(nTotValidNodes*nTemporalLayerCount);
     m_vStereoNodeMap.resize(nLayerSize);
-    m_vResegmNodeMap.resize(nLayerSize*nCameraCount*getTemporalLayerCount());
+    m_vResegmNodeMap.resize(nLayerSize*nCameraCount*nTemporalLayerCount);
     /// contains the (internal) labelings of the stereo/resegm graph (mutable for inference)
     m_oSuperStackedStereoLabeling.create(int(nStackedLayersRows*nCameraCount),nStackedLayersCols);
     m_oSuperStackedResegmLabeling.create(int(nStackedLayersRows*nCameraCount),nStackedLayersCols);
+    m_oSuperStackedStereoLabeling = m_nDontCareLabelIdx;
+    m_oSuperStackedResegmLabeling = getResegmBackgroundLabelIdx();
     for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx) {
         m_aStackedInputMasks[nCamIdx].create(nStackedLayersRows,nStackedLayersCols,CV_8UC1);
         m_aStackedStereoLabelings[nCamIdx] = cv::Mat_<InternalLabelType>(nStackedLayersRows,nStackedLayersCols,((InternalLabelType*)m_oSuperStackedStereoLabeling.data)+nLayerSize*nTemporalLayerCount*nCamIdx);
@@ -1416,6 +1419,7 @@ void SegmMatcher::GraphModelData::buildResegmModel() {
         ResegmNodeInfo& oNode = m_vResegmNodeMap[nLUTNodeIdx];
         oNode.vpCliques.clear();
         oNode.vCliqueMemberLUT.clear();
+        lvDbgAssert(oNode.bValidGraphNode);
         FuncPairType oResegmFunc = m_pResegmModel->addFunctionWithRefReturn(ExplicitFunction());
         lvDbgAssert((&m_pResegmModel->getFunction<ExplicitFunction>(oResegmFunc.first))==(&oResegmFunc.second));
         oResegmFunc.second.assign(aUnaryResegmFuncDims.begin(),aUnaryResegmFuncDims.end(),m_pResegmUnaryFuncsDataBase+(nGraphNodeIdx*m_nResegmLabels));
