@@ -45,7 +45,21 @@ void lv::cuda::test_kernel(int nVerbosity) {
     cudaFree(pTest_dev);
 }
 
-void lv::cuda::init(int nDeviceID) {
+void lv::cuda::init(int nDeviceID, bool bReset) {
+    if(bReset) {
+        lvLog(3,"cuda device resetting...");
+        const cudaError_t nErrReset = cudaDeviceReset();
+        lvAssert__(nErrReset==cudaSuccess,"could not reset device (%s)",cudaGetErrorString(nErrReset));
+        // note: the above error should never happen, but using ASAN w/ GCC 4.8 seems to trigger it
+    }
+    const cudaError_t nErrSync = cudaGetLastError();
+    if(nErrSync!=cudaSuccess)
+        lvLog_(3,"cuda init caught previous sync error: %s",cudaGetErrorString(nErrSync));
+    const cudaError_t nErrAsync = cudaDeviceSynchronize();
+    if(nErrAsync!=cudaSuccess)
+        lvLog_(3,"cuda init caught previous async kernel error: %s",cudaGetErrorString(nErrAsync));
+    const cudaError_t nLatestErrSync = cudaGetLastError();
+    lvAssert__(nLatestErrSync==cudaSuccess,"could not clear cuda error state; might need device reset (%s)",cudaGetErrorString(nLatestErrSync));
     const int nDeviceCount = cv::cuda::getCudaEnabledDeviceCount();
     lvAssert_(nDeviceCount>0,"no valid cuda-enabled device found on system");
     lvAssert__(nDeviceCount>nDeviceID,"provided device ID out of range (device count=%d)",nDeviceCount);

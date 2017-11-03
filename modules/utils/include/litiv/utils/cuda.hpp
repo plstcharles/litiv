@@ -126,7 +126,7 @@ namespace lv {
         /// used to launch a trivial kernel to test if device connection & compute arch are good
         void test_kernel(int nVerbosity);
         /// initializes cuda on the given device id for the current thread, and checks for compute compatibility
-        void init(int nDeviceID=getDefaultDeviceID());
+        void init(int nDeviceID=getDefaultDeviceID(), bool bReset=false);
 
 #endif //ndef(__CUDACC__)
 
