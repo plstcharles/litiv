@@ -51,6 +51,7 @@ list(APPEND CMAKE_PREFIX_PATH
     "$ENV{USER_DEVELOP}/glm/build-litiv/install/" "$ENV{USER_DEVELOP}/glm/build/install/" "$ENV{USER_DEVELOP}/glm/"
     "$ENV{USER_DEVELOP}/opengm/build-litiv/install/" "$ENV{USER_DEVELOP}/opengm/build/install/" "$ENV{USER_DEVELOP}/opengm/"
     "$ENV{USER_DEVELOP}/eigen3/build-litiv/install/" "$ENV{USER_DEVELOP}/eigen3/build/install/" "$ENV{USER_DEVELOP}/eigen3/"
+    "$ENV{USER_DEVELOP}/llvm/build-litiv/install/" "$ENV{USER_DEVELOP}/llvm/build/install/" "$ENV{USER_DEVELOP}/llvm/"
 )
 
 ################################################################
@@ -273,6 +274,61 @@ if(BUILD_TESTS)
     set(TEST_OUTPUT_DATA_ROOT "${CMAKE_BINARY_DIR}/Testing/data" CACHE PATH "Test output data root folder (used internally for testing, light external data may be downloaded and kept there)")
     mark_as_advanced(TEST_INPUT_DATA_ROOT TEST_OUTPUT_DATA_ROOT)
     file(MAKE_DIRECTORY ${TEST_OUTPUT_DATA_ROOT})
+endif()
+
+### clang-tidy CHECK (will always use if available)
+find_program(CLANG_TIDY_BIN NAMES "clang-tidy")
+if(CLANG_TIDY_BIN)
+    message(STATUS "clang-tidy found: ${CLANG_TIDY_BIN}")
+    option(USE_CLANG_TIDY_IN_BUILD "Specifies whether the clang-tidy C++ linter should be used or not at compile time" OFF)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ${USE_CLANG_TIDY})
+    set(CLANG_TIDY_CHECKS "*,-boost-*,-hicpp-*,-llvm-*,-mpi-*,-objc-*")
+    #set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cert-dcl58-cpp") # (std extension) not disabled, but using NOLINT hints
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cert-msc50-cpp,-cert-msc30-c") # disable checks for std::rand()
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-clang-analyzer-osx*") # disable osx-specific tests
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cppcoreguidelines-owning-memory")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cppcoreguidelines-pro-bounds-array-to-pointer-decay")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cppcoreguidelines-pro-bounds-constant-array-index")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cppcoreguidelines-pro-bounds-pointer-arithmetic")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cppcoreguidelines-pro-type-const-cast")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cppcoreguidelines-pro-type-cstyle-cast")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cppcoreguidelines-pro-type-member-init") # https://llvm.org/bugs/show_bug.cgi?id=31039
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cppcoreguidelines-pro-type-reinterpret-cast")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cppcoreguidelines-pro-type-static-cast-downcast")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cppcoreguidelines-pro-type-union-access")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cppcoreguidelines-pro-type-vararg")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cppcoreguidelines-special-member-functions")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-google-readability-braces-around-statements")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-google-readability-casting")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-google-readability-function-size")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-google-readability-todo")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-google-runtime-int")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-google-runtime-references")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-misc-misplaced-widening-cast") # should be used...
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-modernize-raw-string-literal")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-modernize-return-braced-init-list")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-modernize-use-auto")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-modernize-use-bool-literals")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-modernize-use-default-member-init") # should be used...
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-modernize-use-transparent-functors")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-modernize-use-using") # should be used...
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-readability-braces-around-statements")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-readability-else-after-return")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-readability-function-size")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-readability-identifier-naming")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-readability-named-parameter")
+    set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-readability-redundant-member-init") # https://bugs.llvm.org/show_bug.cgi?id=32966
+    set(CLANG_TIDY_ARGS "-checks='${CLANG_TIDY_CHECKS}'" CACHE STRING "Argument list given to clang-tidy")
+    mark_as_advanced(CLANG_TIDY_ARGS USE_CLANG_TIDY_IN_BUILD)
+    add_custom_target(tidy
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Running clang-tidy on all '$<CONFIG>' targets..."
+    )
+    set_target_properties(tidy
+        PROPERTIES
+            EXCLUDE_FROM_ALL
+                TRUE
+    )
 endif()
 
 set_eval(USE_SOSPD_EVAL (${USE_OPENGM} AND ${USE_BOOST}))

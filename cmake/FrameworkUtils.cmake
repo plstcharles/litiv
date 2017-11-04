@@ -158,6 +158,30 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
                 "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
                 "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         )
+        if(CLANG_TIDY_BIN)
+            set(CLANG_TIDY_FULL_ARGS -p "${CMAKE_BINARY_DIR}/compile_commands.json" ${CLANG_TIDY_ARGS} -header-filter=.* ${${sourcelist}})
+            if(USE_CLANG_TIDY_IN_BUILD)
+                add_custom_command(TARGET ${PROJECT_NAME}
+                    PRE_BUILD
+                    COMMAND "${CLANG_TIDY_BIN}" ${CLANG_TIDY_FULL_ARGS}
+                    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+                    COMMENT "Running clang-tidy for target '${PROJECT_NAME}'..."
+                    #VERBATIM # option prevents warning output in console if used here...
+                )
+            endif()
+            add_custom_target(${PROJECT_NAME}_tidy
+                COMMAND "${CLANG_TIDY_BIN}" ${CLANG_TIDY_FULL_ARGS}
+                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                COMMENT "Running clang-tidy for target '${PROJECT_NAME}'..."
+                #VERBATIM # option prevents warning output in console if used here...
+            )
+            set_target_properties(${PROJECT_NAME}_tidy
+                PROPERTIES
+                    EXCLUDE_FROM_ALL
+                        TRUE
+            )
+            add_dependencies(tidy ${PROJECT_NAME}_tidy)
+        endif()
     endif()
     if(USE_CUDA AND cuda_sourcelist_internal)
         if(("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU") OR
