@@ -20,17 +20,17 @@
 GLShader* GLShader::s_pCurrActiveShader = nullptr;
 
 bool GLShader::useShaderProgram(GLShader* pNewShader) {
-    if(pNewShader) {
+    if(pNewShader!=nullptr) {
         if(pNewShader->m_bIsActive && s_pCurrActiveShader==pNewShader)
             return true;
         if(!pNewShader->m_bIsLinked && !pNewShader->link())
             return false;
     }
-    if(!pNewShader || (pNewShader->m_bIsEmpty && !pNewShader->m_nProgID) || pNewShader->m_bIsLinked) {
-        if(pNewShader) {
+    if(pNewShader==nullptr || (pNewShader->m_bIsEmpty && pNewShader->m_nProgID==0u) || pNewShader->m_bIsLinked) {
+        if(pNewShader!=nullptr) {
             glUseProgram(pNewShader->m_nProgID);
             glErrorCheck;
-            if(s_pCurrActiveShader)
+            if(s_pCurrActiveShader!=nullptr)
                 s_pCurrActiveShader->m_bIsActive = false;
             pNewShader->m_bIsActive = true;
             s_pCurrActiveShader = pNewShader;
@@ -38,7 +38,7 @@ bool GLShader::useShaderProgram(GLShader* pNewShader) {
         else {
             glUseProgram(0);
             glErrorCheck;
-            if(s_pCurrActiveShader)
+            if(s_pCurrActiveShader!=nullptr)
                 s_pCurrActiveShader->m_bIsActive = false;
             s_pCurrActiveShader = nullptr;
         }
@@ -53,13 +53,13 @@ GLShader::GLShader(bool bFixedFunct) :
         m_bIsActive(false),
         m_bIsEmpty(true),
         m_nProgID(bFixedFunct?0:glCreateProgram()) {
-    if(!bFixedFunct && !m_nProgID)
+    if(!bFixedFunct && m_nProgID==0u)
         lvError("glCreateProgram failed");
     glErrorCheck;
 }
 
 GLShader::~GLShader() {
-    if(m_nProgID) {
+    if(m_nProgID!=0u) {
         while(!m_mShaderSources.empty())
             removeSource(m_mShaderSources.begin()->first);
         glDeleteProgram(m_nProgID);
@@ -67,11 +67,11 @@ GLShader::~GLShader() {
 }
 
 GLuint GLShader::addSource(const std::string& sSource, GLenum eType) {
-    if(!m_nProgID)
+    if(m_nProgID==0u)
         lvError("attempted to add source to default shader pipeline program");
     GLuint shaderID = glCreateShader(eType);
     glErrorCheck;
-    try {
+    try { // NOLINT
         const char* acSourcePtr = sSource.c_str();
         glShaderSource(shaderID,1,&acSourcePtr,nullptr);
         glErrorCheck;
@@ -101,7 +101,7 @@ bool GLShader::removeSource(GLuint id) {
 }
 
 bool GLShader::compile() {
-    if(!m_nProgID)
+    if(m_nProgID==0u)
         return true;
     GLboolean bCompilerSupport;
     glGetBooleanv(GL_SHADER_COMPILER,&bCompilerSupport);
@@ -128,14 +128,14 @@ bool GLShader::compile() {
 }
 
 bool GLShader::link(bool bDiscardSources) {
-    if(!m_nProgID)
+    if(m_nProgID==0u)
         return true;
     if(!compile() && !m_bIsEmpty)
         return false;
     if(m_bIsLinked && m_bIsEmpty)
         return true;
-    for(auto oSrcIter=m_mShaderSources.begin(); oSrcIter!=m_mShaderSources.end(); ++oSrcIter) {
-        glAttachShader(m_nProgID,oSrcIter->first);
+    for(const auto& oShaderSrc : m_mShaderSources) {
+        glAttachShader(m_nProgID,oShaderSrc.first);
         glErrorCheck;
     }
     glLinkProgram(m_nProgID);
@@ -206,7 +206,7 @@ bool GLShader::setUniform4fm(const std::string& sName, const glm::mat4& mfVals) 
     GLint nLoc = getUniformLocFromName(sName);
     if(nLoc==-1)
         return false;
-    glProgramUniformMatrix4fv(m_nProgID,nLoc,1,false,(GLfloat*)&mfVals);
+    glProgramUniformMatrix4fv(m_nProgID,nLoc,1,(GLboolean)false,(GLfloat*)&mfVals);
     glDbgErrorCheck;
     return true;
 }
@@ -246,7 +246,7 @@ bool GLShader::setUniform4fv(GLint nLoc, const glm::vec4& afVals) {
 bool GLShader::setUniform4fm(GLint nLoc, const glm::mat4& mfVals) {
     if(nLoc<0)
         return false;
-    glProgramUniformMatrix4fv(m_nProgID,nLoc,1,false,(GLfloat*)&mfVals);
+    glProgramUniformMatrix4fv(m_nProgID,nLoc,1,(GLboolean)false,(GLfloat*)&mfVals);
     glDbgErrorCheck;
     return true;
 }
@@ -304,41 +304,41 @@ std::string GLShader::getVertexShaderSource_PassThrough_ConstArray(GLuint nVerte
     std::stringstream ssSrc;
     ssSrc << "#version 430\n"
              "const vec4 positions[" << nVertexCount << "] = vec4[" << nVertexCount << "](\n";
-    for(size_t nVertexIter=0; nVertexIter<nVertexCount; ++nVertexIter) ssSrc <<
-                 "\tvec4(" << aVertices[nVertexIter].vPosition[0] << "," <<
-                              aVertices[nVertexIter].vPosition[1] << "," <<
-                              aVertices[nVertexIter].vPosition[2] << "," <<
-                              aVertices[nVertexIter].vPosition[3] << (nVertexIter==nVertexCount-1?")\n":"),\n");
-    ssSrc << ");\n";
+    for(size_t nVertexIter=0; nVertexIter<nVertexCount; ++nVertexIter) ssSrc << // NOLINT
+                 "\tvec4(" << aVertices[nVertexIter].vPosition[0] << "," << // NOLINT
+                              aVertices[nVertexIter].vPosition[1] << "," << // NOLINT
+                              aVertices[nVertexIter].vPosition[2] << "," << // NOLINT
+                              aVertices[nVertexIter].vPosition[3] << (nVertexIter==(nVertexCount-1)?")\n":"),\n"); // NOLINT
+    ssSrc << ");\n"; // NOLINT
     if(bPassNormals) { ssSrc <<
              "const vec4 normals[" << nVertexCount << "] = vec4[" << nVertexCount << "](\n";
-        for(size_t nVertexIter=0; nVertexIter<nVertexCount; ++nVertexIter) ssSrc <<
-                 "\tvec4(" << aVertices[nVertexIter].vNormal[0] << "," <<
-                              aVertices[nVertexIter].vNormal[1] << "," <<
-                              aVertices[nVertexIter].vNormal[2] << "," <<
-                              aVertices[nVertexIter].vNormal[3] << (nVertexIter==nVertexCount-1?")\n":"),\n");
+        for(size_t nVertexIter=0; nVertexIter<nVertexCount; ++nVertexIter) ssSrc << // NOLINT
+                 "\tvec4(" << aVertices[nVertexIter].vNormal[0] << "," << // NOLINT
+                              aVertices[nVertexIter].vNormal[1] << "," << // NOLINT
+                              aVertices[nVertexIter].vNormal[2] << "," << // NOLINT
+                              aVertices[nVertexIter].vNormal[3] << (nVertexIter==(nVertexCount-1)?")\n":"),\n"); // NOLINT
         ssSrc <<
              ");\n"
              "layout(location=" << GLVertex::VertexAttrib_NormalIdx << ") out vec4 out_normal;\n";
     }
     if(bPassColors) { ssSrc <<
              "const vec4 colors[" << nVertexCount << "] = vec4[" << nVertexCount << "](\n";
-        for(size_t nVertexIter=0; nVertexIter<nVertexCount; ++nVertexIter) ssSrc <<
-                 "\tvec4(" << aVertices[nVertexIter].vColor[0] << "," <<
-                              aVertices[nVertexIter].vColor[1] << "," <<
-                              aVertices[nVertexIter].vColor[2] << "," <<
-                              aVertices[nVertexIter].vColor[3] << (nVertexIter==nVertexCount-1?")\n":"),\n");
+        for(size_t nVertexIter=0; nVertexIter<nVertexCount; ++nVertexIter) ssSrc << // NOLINT
+                 "\tvec4(" << aVertices[nVertexIter].vColor[0] << "," << // NOLINT
+                              aVertices[nVertexIter].vColor[1] << "," << // NOLINT
+                              aVertices[nVertexIter].vColor[2] << "," << // NOLINT
+                              aVertices[nVertexIter].vColor[3] << (nVertexIter==(nVertexCount-1)?")\n":"),\n"); // NOLINT
         ssSrc <<
              ");\n"
              "layout(location=" << GLVertex::VertexAttrib_ColorIdx << ") out vec4 out_color;\n";
     }
     if(bPassTexCoords) { ssSrc <<
              "const vec4 texCoords[" << nVertexCount << "] = vec4[" << nVertexCount << "](\n";
-        for(size_t nVertexIter=0; nVertexIter<nVertexCount; ++nVertexIter) ssSrc <<
-                 "\tvec4(" << aVertices[nVertexIter].vTexCoord[0] << "," <<
-                              aVertices[nVertexIter].vTexCoord[1] << "," <<
-                              aVertices[nVertexIter].vTexCoord[2] << "," <<
-                              aVertices[nVertexIter].vTexCoord[3] << (nVertexIter==nVertexCount-1?")\n":"),\n");
+        for(size_t nVertexIter=0; nVertexIter<nVertexCount; ++nVertexIter) ssSrc << // NOLINT
+                 "\tvec4(" << aVertices[nVertexIter].vTexCoord[0] << "," << // NOLINT
+                              aVertices[nVertexIter].vTexCoord[1] << "," << // NOLINT
+                              aVertices[nVertexIter].vTexCoord[2] << "," << // NOLINT
+                              aVertices[nVertexIter].vTexCoord[3] << (nVertexIter==(nVertexCount-1)?")\n":"),\n"); // NOLINT
         ssSrc <<
              ");\n"
              "layout(location=" << GLVertex::VertexAttrib_TexCoordIdx << ") out vec4 out_texCoord;\n";
@@ -361,9 +361,9 @@ std::string GLShader::getFragmentShaderSource_PassThrough_ConstColor(glm::vec4 v
              "layout(location=0) out vec4 out_color;\n"
              "void main() {\n"
              "    out_color = vec4(" << vColor[0] << "," <<
-                                        vColor[1] << "," <<
-                                        vColor[2] << "," <<
-                                        vColor[3] << ");\n"
+                                        vColor[1] << "," << // NOLINT
+                                        vColor[2] << "," << // NOLINT
+                                        vColor[3] << ");\n" // NOLINT
              "}\n";
     return ssSrc.str();
 }

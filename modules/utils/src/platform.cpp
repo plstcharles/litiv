@@ -41,7 +41,7 @@ std::string lv::getCurrentWorkDirPath() {
 #if defined(_MSC_VER)
     if(!_getcwd(acCurrentPath.data(),int(acCurrentPath.size()-1)))
 #else //(!defined(_MSC_VER))
-    if(!getcwd(acCurrentPath.data(),acCurrentPath.size()-1))
+    if(getcwd(acCurrentPath.data(),acCurrentPath.size()-1)==nullptr)
 #endif //(!defined(_MSC_VER))
         return std::string();
     return std::string(acCurrentPath.data());
@@ -102,8 +102,7 @@ std::vector<std::string> lv::getFilesFromDir(const std::string& sDirPath) {
                 struct stat sb;
                 std::string sFullPath = addDirSlashIfMissing(sDirPath)+dirp->d_name;
                 int ret = stat(sFullPath.c_str(),&sb);
-                if(!ret && S_ISREG(sb.st_mode)
-                        && strcmp(dirp->d_name,"Thumbs.db"))
+                if(ret==0 && S_ISREG(sb.st_mode) && strcmp(dirp->d_name,"Thumbs.db")!=0)
                     vsFilePaths.push_back(sFullPath);
             }
             std::sort(vsFilePaths.begin(),vsFilePaths.end());
@@ -158,9 +157,7 @@ std::vector<std::string> lv::getSubDirsFromDir(const std::string& sDirPath) {
                 struct stat sb;
                 std::string sFullPath = addDirSlashIfMissing(sDirPath)+dirp->d_name;
                 int ret = stat(sFullPath.c_str(),&sb);
-                if(!ret && S_ISDIR(sb.st_mode)
-                        && strcmp(dirp->d_name,".")
-                        && strcmp(dirp->d_name,"..")) // @@@ also ignore all hidden folders/files + system folders/files?
+                if(ret==0 && S_ISDIR(sb.st_mode) && strcmp(dirp->d_name,".")!=0 && strcmp(dirp->d_name,"..")!=0)
                     vsSubDirPaths.push_back(sFullPath);
             }
             std::sort(vsSubDirPaths.begin(),vsSubDirPaths.end());
@@ -175,11 +172,11 @@ void lv::filterFilePaths(std::vector<std::string>& vsFilePaths, const std::vecto
     // note: remove tokens take precedence over keep tokens, and no keep tokens means all are kept by default
     std::vector<std::string> vsResultFilePaths;
     vsResultFilePaths.reserve(vsFilePaths.size());
-    for(auto pPathIter=vsFilePaths.begin(); pPathIter!=vsFilePaths.end(); ++pPathIter) {
-        if(!vsRemoveTokens.empty() && string_contains_token(*pPathIter,vsRemoveTokens))
+    for(const auto& sPath : vsFilePaths) {
+        if(!vsRemoveTokens.empty() && string_contains_token(sPath,vsRemoveTokens))
             continue;
-        else if(vsKeepTokens.empty() || string_contains_token(*pPathIter,vsKeepTokens))
-            vsResultFilePaths.push_back(*pPathIter);
+        else if(vsKeepTokens.empty() || string_contains_token(sPath,vsKeepTokens))
+            vsResultFilePaths.push_back(sPath);
     }
     vsFilePaths = vsResultFilePaths;
 }
@@ -201,7 +198,7 @@ bool lv::createDirIfNotExist(const std::string& sDirPath) {
 #else //(!defined(_MSC_VER))
     struct stat st;
     if(stat(sDirPath.c_str(),&st)==-1)
-        return !mkdir(sDirPath.c_str(),0777);
+        return mkdir(sDirPath.c_str(),0777)==0;
     else
         return (stat(sDirPath.c_str(),&st)==0 && S_ISDIR(st.st_mode));
 #endif //(!defined(_MSC_VER))
@@ -245,10 +242,10 @@ size_t lv::getCurrentPhysMemBytesUsed() {
     return (size_t)info.WorkingSetSize;
 #else //ndef(_MSC_VER)
     FILE* fp = nullptr;
-    if(!(fp=fopen("/proc/self/statm","r")))
+    if((fp=fopen("/proc/self/statm","r"))==nullptr)
         return size_t(0);
     long nMemUsed = 0L;
-    if(fscanf(fp,"%*s%ld",&nMemUsed)!=1) {
+    if(fscanf(fp,"%*s%ld",&nMemUsed)!=1) { // NOLINT
         fclose(fp);
         return size_t(0);
     }

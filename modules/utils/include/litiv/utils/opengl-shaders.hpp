@@ -23,7 +23,7 @@
 
 class GLShader {
 public:
-    GLShader(bool bFixedFunct=false);
+    explicit GLShader(bool bFixedFunct=false);
     ~GLShader();
 
     GLuint addSource(const std::string& sSource, GLenum eType);

@@ -63,7 +63,7 @@ struct glfwWindowDeleter {
 #define LV_GLUT_WINDOW_DELETER_DECL
 struct glutHandle {
     glutHandle() : m_nHandle(0) {}
-    glutHandle(std::nullptr_t) : m_nHandle(0) {}
+    glutHandle(std::nullptr_t) : m_nHandle(0) {} // NOLINT
     explicit glutHandle(int v) : m_nHandle(v) {}
     glutHandle& operator=(std::nullptr_t) {m_nHandle = 0; return *this;}
     explicit operator bool() const {return m_nHandle!=0;}

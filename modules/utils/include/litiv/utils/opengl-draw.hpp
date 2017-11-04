@@ -100,7 +100,7 @@ struct GLTexture2D : GLTexture {
     GLTexture2D(GLsizei nLevels, GLenum eInternalFormat, GLsizei nWidth, GLsizei nHeight,
                 GLvoid* pData=nullptr, GLenum eDataFormat=GL_BGRA, GLenum eDataType=GL_UNSIGNED_BYTE);
     GLTexture2D(GLsizei nLevels, const cv::Mat& oTexture, bool bUseIntegralFormat);
-    virtual ~GLTexture2D();
+    virtual ~GLTexture2D() = default; // NOLINT
     virtual void bindToImage(GLuint nUnit, int nLevel, GLenum eAccess);
     virtual void bindToSampler(GLuint nUnit);
     const bool m_bUseIntegralFormat;
@@ -117,7 +117,7 @@ struct GLTexture2DArray : GLTexture {
     GLTexture2DArray(GLsizei nTextureCount, GLsizei nLevels, GLenum eInternalFormat, GLsizei nWidth, GLsizei nHeight,
                      GLvoid* pData=nullptr, GLenum eDataFormat=GL_BGRA, GLenum eDataType=GL_UNSIGNED_BYTE);
     GLTexture2DArray(GLsizei nLevels, const std::vector<cv::Mat>& voTextures, bool bUseIntegralFormat);
-    virtual ~GLTexture2DArray();
+    virtual ~GLTexture2DArray() = default; // NOLINT
     virtual void bindToImage(GLuint nUnit, int nLevel, int nLayer, GLenum eAccess);
     virtual void bindToImageArray(GLuint nUnit, int nLevel, GLenum eAccess);
     virtual void bindToSamplerArray(GLuint nUnit);
@@ -134,7 +134,7 @@ struct GLTexture2DArray : GLTexture {
 
 struct GLDynamicTexture2D : GLTexture2D {
     GLDynamicTexture2D(GLsizei nLevels, const cv::Mat& oInitTexture, bool bUseIntegralFormat);
-    virtual ~GLDynamicTexture2D();
+    virtual ~GLDynamicTexture2D() = default; // NOLINT
     virtual void updateTexture(const cv::Mat& oTexture, bool bRebindAll=false);
     virtual void updateTexture(const GLPixelBufferObject& oPBO, bool bRebindAll=false);
     virtual void fetchTexture(cv::Mat& oTexture);
@@ -143,7 +143,7 @@ struct GLDynamicTexture2D : GLTexture2D {
 
 struct GLDynamicTexture2DArray : GLTexture2DArray {
     GLDynamicTexture2DArray(GLsizei nLevels, const std::vector<cv::Mat>& voInitTextures, bool bUseIntegralFormat);
-    virtual ~GLDynamicTexture2DArray();
+    virtual ~GLDynamicTexture2DArray() = default; // NOLINT
     virtual void updateTexture(const cv::Mat& oTexture, int nLayer, bool bRebindAll=false, bool bRegenMipmaps=false);
     virtual void updateTexture(const GLPixelBufferObject& oPBO, int nLayer, bool bRebindAll=false);
     virtual void fetchTexture(cv::Mat& oTexture, int nLayer);
@@ -154,8 +154,8 @@ private:
 
 struct GLScreenBillboard : GLVertexArrayObject {
     GLScreenBillboard();
-    virtual ~GLScreenBillboard();
-    virtual void render(GLMatrices /*oMats*/=GLMatrices());
+    virtual ~GLScreenBillboard(); // NOLINT
+    void render(GLMatrices /*oMats*/=GLMatrices()) override;
     inline GLuint getVBOId() {return m_nVBO;}
     inline GLuint getIBOId() {return m_nIBO;}
     static const GLuint s_nVertexCount;

@@ -198,7 +198,7 @@ TEST(MatType,regression) {
 namespace {
     template<typename T>
     struct MatSize_fixture : testing::Test {};
-    typedef testing::Types<uint8_t,int16_t,uint16_t,int,uint,size_t> Size_types;
+    typedef testing::Types<uchar,uint8_t,short,ushort,uint16_t,int,uint,uint32_t,size_t,uint64_t,int64_t> Size_types;
 }
 
 TYPED_TEST_CASE(MatSize_fixture,Size_types);

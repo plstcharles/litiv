@@ -36,9 +36,9 @@ void lv::getLogPolarMask(int nMaskSize, int nRadialBins, int nAngularBins, cv::M
     lvAssert_(fRadiusOffset>=0,"radius offset must be positive or null value");
     oOutputMask.create(nMaskSize,nMaskSize);
     oOutputMask = -1;
-    if(pnFirstMaskIdx)
+    if(pnFirstMaskIdx!=nullptr)
         *pnFirstMaskIdx = nMaskSize*nMaskSize-1;
-    if(pnLastMaskIdx)
+    if(pnLastMaskIdx!=nullptr)
         *pnLastMaskIdx = 0;
     int nCurrMaskIdx = 0;
     const int nInitDistBin = 0; // previously passed as param; fix? @@@
@@ -62,9 +62,9 @@ void lv::getLogPolarMask(int nMaskSize, int nRadialBins, int nAngularBins, cv::M
                     const float fAng = std::atan2((float)(nCenterIdx-nColIdx),(float)(nCenterIdx-nRowIdx))+float(M_PI);
                     const int nAngleBinIdx = int((fAng*nAngularBins)/float(2*M_PI))%nAngularBins;
                     pnMaskRow[nColIdx] = nAngleBinIdx*(nRadialBins-nInitDistBin)+((nRadialBins-nInitDistBin-1)-(nRadBinIdx-nInitDistBin));
-                    if(pnFirstMaskIdx)
+                    if(pnFirstMaskIdx!=nullptr)
                         *pnFirstMaskIdx = std::min(*pnFirstMaskIdx,nCurrMaskIdx);
-                    if(pnLastMaskIdx)
+                    if(pnLastMaskIdx!=nullptr)
                         *pnLastMaskIdx = std::max(*pnLastMaskIdx,nCurrMaskIdx);
                 }
             }
@@ -84,9 +84,9 @@ void lv::getLogPolarMask(int nMaskSize, int nRadialBins, int nAngularBins, cv::M
                     const float fAng = std::atan2((float)nRowIdx,(float)nColIdx)/float(M_PI)*180.0f;
                     const int nAngleBinIdx = (((int)std::round(fAng<0?fAng+360.0f:fAng)+nAngBinSize/2)%360)/nAngBinSize;
                     pnMaskRow[nColIdx+nPatchRadius] = nAngleBinIdx*(nRadialBins-nInitDistBin)+((nRadialBins-nInitDistBin-1)-(nRadBinIdx-nInitDistBin));
-                    if(pnFirstMaskIdx)
+                    if(pnFirstMaskIdx!=nullptr)
                         *pnFirstMaskIdx = std::min(*pnFirstMaskIdx,nCurrMaskIdx);
-                    if(pnLastMaskIdx)
+                    if(pnLastMaskIdx!=nullptr)
                         *pnLastMaskIdx = std::max(*pnLastMaskIdx,nCurrMaskIdx);
                 }
             }
@@ -191,6 +191,7 @@ void lv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
             }
         }
     }
+    lvAssert(nColCount>0 && nRowCount>0);
     cv::Size oCurrDisplaySize(int(oSuggestedTileSize.width*nColCount),int(oSuggestedTileSize.height*nRowCount));
     if(m_oMaxDisplaySize.area()>0 && (oCurrDisplaySize.width>m_oMaxDisplaySize.width || oCurrDisplaySize.height>m_oMaxDisplaySize.height)) {
         if(oCurrDisplaySize.width>m_oMaxDisplaySize.width && oCurrDisplaySize.width>oCurrDisplaySize.height)
@@ -223,7 +224,7 @@ void lv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
             if(oImageBYTE3.size()!=oNewTileSize)
                 cv::resize(oImageBYTE3,oImageBYTE3,oNewTileSize);
             if(!vvImageNamePairs[nRowIdx][nColIdx].second.empty())
-                putText(oImageBYTE3,vvImageNamePairs[nRowIdx][nColIdx].second,cv::Scalar_<uchar>(0,0,255));
+                putText(oImageBYTE3,vvImageNamePairs[nRowIdx][nColIdx].second,cv::Scalar_<uint8_t>(0,0,255));
             if(oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oNewTileSize.width && oDisplayPt.y<oNewTileSize.height && m_oLatestMouseEvent.oTileSize==oNewTileSize)
                 cv::circle(oImageBYTE3,oDisplayPt,5,cv::Scalar(255,255,255));
             if(oOutputRow.empty())
@@ -237,7 +238,7 @@ void lv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
             cv::vconcat(m_oLastDisplay,oOutputRow,m_oLastDisplay);
     }
     if(m_bFirstDisplay && !m_bContinuousUpdates) {
-        putText(m_oLastDisplay,"[Press space to continue]",cv::Scalar_<uchar>(0,0,255),true,cv::Point2i(m_oLastDisplay.cols/2-100,15),1,1.0);
+        putText(m_oLastDisplay,"[Press space to continue]",cv::Scalar_<uint8_t>(0,0,255),true,cv::Point2i(m_oLastDisplay.cols/2-100,15),1,1.0);
         m_bFirstDisplay = false;
     }
     lvAssert(m_oLastDisplay.size()==oFinalDisplaySize);
@@ -250,8 +251,8 @@ void lv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
 
 void lv::DisplayHelper::displayAlbumAndWaitKey(const std::vector<std::pair<cv::Mat,std::string>>& vImageNamePairs, int nDefaultSleepDelay) {
     lvAssert_(!vImageNamePairs.empty(),"must provide at least one image to display");
-    for(size_t nImgIdx=0; nImgIdx<vImageNamePairs.size(); ++nImgIdx) {
-        const cv::Mat& oImage = vImageNamePairs[nImgIdx].first;
+    for(const auto& oImageNairPair : vImageNamePairs) {
+        const cv::Mat& oImage = oImageNairPair.first;
         lvAssert_(!oImage.empty(),"all images must be non-null");
         lvAssert_(oImage.channels()==1 || oImage.channels()==3 || oImage.channels()==4,"all images must be 1/3/4 channels");
         lvAssert_(oImage.depth()==CV_8U || oImage.depth()==CV_16U || oImage.depth()==CV_32S || oImage.depth()==CV_32F,"all images must be 8u/16u/32s/32f depth");
@@ -282,13 +283,13 @@ void lv::DisplayHelper::displayAlbumAndWaitKey(const std::vector<std::pair<cv::M
             cv::cvtColor(oImageBYTE3,oImageBYTE3,cv::COLOR_BGRA2BGR);
         if(oImageBYTE3.size()!=oCurrDisplaySize)
             cv::resize(oImageBYTE3,oImageBYTE3,oCurrDisplaySize);
-        putText(oImageBYTE3,vImageNamePairs[nAlbumIdx].second+" ["+std::to_string(nAlbumIdx+1)+"/"+std::to_string(vImageNamePairs.size())+"]",cv::Scalar_<uchar>(0,0,255));
+        putText(oImageBYTE3,vImageNamePairs[nAlbumIdx].second+" ["+std::to_string(nAlbumIdx+1)+"/"+std::to_string(vImageNamePairs.size())+"]",cv::Scalar_<uint8_t>(0,0,255));
         const cv::Point2i& oDisplayPt = m_oLatestMouseEvent.oInternalPosition;
         if(oDisplayPt.x>=0 && oDisplayPt.y>=0 && oDisplayPt.x<oCurrDisplaySize.width && oDisplayPt.y<oCurrDisplaySize.height && m_oLatestMouseEvent.oTileSize==oCurrDisplaySize)
             cv::circle(oImageBYTE3,oDisplayPt,5,cv::Scalar(255,255,255));
         m_oLastDisplay = oImageBYTE3;
         if(m_bFirstDisplay) {
-            putText(m_oLastDisplay,"[Press escape to exit album]",cv::Scalar_<uchar>(0,0,255),true,cv::Point2i(m_oLastDisplay.cols/2-115,15),1,1.0);
+            putText(m_oLastDisplay,"[Press escape to exit album]",cv::Scalar_<uint8_t>(0,0,255),true,cv::Point2i(m_oLastDisplay.cols/2-115,15),1,1.0);
             m_bFirstDisplay = false;
         }
         cv::imshow(m_sDisplayName,m_oLastDisplay);
@@ -496,7 +497,7 @@ cv::Mat lv::packData(const std::vector<cv::Mat>& vMats, std::vector<lv::MatInfo>
             if(nFirstNonEmptyMatIdx==size_t(-1))
                 nFirstNonEmptyMatIdx = nMatIdx;
             nTotPacketSize += nCurrPacketSize;
-            bAllSameType &= vMats[nMatIdx].type()==vMats[nFirstNonEmptyMatIdx].type();
+            bAllSameType = bAllSameType && (vMats[nMatIdx].type()==vMats[nFirstNonEmptyMatIdx].type());
         }
     }
     if(nTotPacketSize==0)
@@ -509,11 +510,11 @@ cv::Mat lv::packData(const std::vector<cv::Mat>& vMats, std::vector<lv::MatInfo>
     else
         oPacket.create(1,(int)nTotPacketSize,CV_8UC1);
     size_t nCurrPacketIdxOffset = 0;
-    for(size_t nMatIdx=0; nMatIdx<vMats.size(); ++nMatIdx) {
-        const size_t nCurrPacketSize = vMats[nMatIdx].total()*vMats[nMatIdx].elemSize();
+    for(const auto& oMat : vMats) {
+        const size_t nCurrPacketSize = oMat.total()*oMat.elemSize();
         if(nCurrPacketSize>0) {
             lvDbgAssert_(nCurrPacketIdxOffset+nCurrPacketSize<=nTotPacketSize,"pack out-of-bounds");
-            vMats[nMatIdx].copyTo(cv::Mat(vMats[nMatIdx].dims,vMats[nMatIdx].size,vMats[nMatIdx].type(),oPacket.data+nCurrPacketIdxOffset));
+            oMat.copyTo(cv::Mat(oMat.dims,oMat.size,oMat.type(),oPacket.data+nCurrPacketIdxOffset));
             nCurrPacketIdxOffset += nCurrPacketSize;
         }
     }
@@ -524,16 +525,16 @@ cv::Mat lv::packData(const std::vector<cv::Mat>& vMats, std::vector<lv::MatInfo>
 std::vector<cv::Mat> lv::unpackData(const cv::Mat& oPacket, const std::vector<lv::MatInfo>& vPackInfo) {
     if(oPacket.empty()) {
         bool bAllEmpty = true;
-        for(size_t nPackInfoIdx=0; nPackInfoIdx<vPackInfo.size(); ++nPackInfoIdx)
-            bAllEmpty &= vPackInfo[nPackInfoIdx].size.empty();
+        for(const auto& oPackInfo : vPackInfo)
+            bAllEmpty = bAllEmpty && oPackInfo.size.empty();
         lvAssert_(bAllEmpty,"empty matrix given with non-empty pack");
         return std::vector<cv::Mat>(vPackInfo.size());
     }
     lvAssert_(oPacket.isContinuous(),"input packed matrix must be continuous");
     lvAssert_(!vPackInfo.empty(),"did not provide any mat unpacking info");
     size_t nTotPacketSize = 0;
-    for(size_t nPackInfoIdx=0; nPackInfoIdx<vPackInfo.size(); ++nPackInfoIdx)
-        nTotPacketSize += vPackInfo[nPackInfoIdx].size.total()*vPackInfo[nPackInfoIdx].type.elemSize();
+    for(const auto& oPackInfo : vPackInfo)
+        nTotPacketSize += oPackInfo.size.total()*oPackInfo.type.elemSize();
     lvAssert_(nTotPacketSize>0,"trying to unpack non-empty mat with empty packing info");
     lvAssert_(nTotPacketSize==oPacket.total()*oPacket.elemSize(),"input mat and packing info total byte size mismatch");
     std::vector<cv::Mat> vOutputMats(vPackInfo.size());
@@ -640,22 +641,22 @@ void lv::shift(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Point2f& vDelt
     lvAssert_(std::abs(vDelta.x)<oInput.cols && std::abs(vDelta.y)<oInput.rows,"delta too big; cannot loop-shift mat data");
     const cv::Point2i vDeltaInt((int)std::ceil(vDelta.x),(int)std::ceil(vDelta.y));
     const cv::Point2f vDeltaSubPx(std::abs(vDelta.x-vDeltaInt.x),std::abs(vDelta.y-vDeltaInt.y));
-    const int nTop = (vDeltaInt.y>0)?vDeltaInt.y:0;
-    const int nBottom = (vDeltaInt.y<0)?-vDeltaInt.y:0;
-    const int nLeft = (vDeltaInt.x>0)?vDeltaInt.x:0;
-    const int nRight = (vDeltaInt.x<0)?-vDeltaInt.x:0;
+    const int nTop = (vDeltaInt.y>0)?vDeltaInt.y:0;     // NOLINT
+    const int nBottom = (vDeltaInt.y<0)?-vDeltaInt.y:0; // NOLINT
+    const int nLeft = (vDeltaInt.x>0)?vDeltaInt.x:0;    // NOLINT
+    const int nRight = (vDeltaInt.x<0)?-vDeltaInt.x:0;  // NOLINT
     cv::Mat oPaddedInput;
     cv::copyMakeBorder(oInput,oPaddedInput,nTop,nBottom,nLeft,nRight,nFillType,vConstantFillValue);
     if(vDeltaSubPx.x>std::numeric_limits<float>::epsilon() || vDeltaSubPx.y>std::numeric_limits<float>::epsilon()) {
         switch(oInput.depth()) {
             case CV_32F: {
-                cv::Matx<float,1,2> dx(1-vDeltaSubPx.x,vDeltaSubPx.x);
+                cv::Matx<float,1,2> dx(1-vDeltaSubPx.x,vDeltaSubPx.x); // NOLINT
                 cv::Matx<float,2,1> dy(1-vDeltaSubPx.y,vDeltaSubPx.y);
                 cv::sepFilter2D(oPaddedInput,oPaddedInput,-1,dx,dy,cv::Point(0,0),0,cv::BORDER_CONSTANT);
                 break;
             }
             case CV_64F: {
-                cv::Matx<double,1,2> dx(1-vDeltaSubPx.x,vDeltaSubPx.x);
+                cv::Matx<double,1,2> dx(1-vDeltaSubPx.x,vDeltaSubPx.x); // NOLINT
                 cv::Matx<double,2,1> dy(1-vDeltaSubPx.y,vDeltaSubPx.y);
                 cv::sepFilter2D(oPaddedInput,oPaddedInput,-1,dx,dy,cv::Point(0,0),0,cv::BORDER_CONSTANT);
                 break;

@@ -50,7 +50,7 @@ bool GLPixelBufferObject::updateBuffer(const cv::Mat& oBufferData, bool bRealloc
     if(bRealloc)
         glBufferData(m_eBufferTarget,m_nBufferSize,nullptr,m_eBufferUsage);
     void* pBufferClientPtr = glMapBuffer(m_eBufferTarget,GL_WRITE_ONLY);
-    if(pBufferClientPtr) {
+    if(pBufferClientPtr!=nullptr) {
         memcpy(pBufferClientPtr,oBufferData.data,m_nBufferSize);
         glUnmapBuffer(m_eBufferTarget);
     }
@@ -64,7 +64,7 @@ bool GLPixelBufferObject::fetchBuffer(cv::Mat& oBufferData, bool bRebindAll) {
     lvDbgAssert(oBufferData.type()==m_nFrameType && oBufferData.size()==m_oFrameSize && oBufferData.isContinuous());
     glBindBuffer(m_eBufferTarget,m_nPBO);
     void* pBufferClientPtr = glMapBuffer(m_eBufferTarget,GL_READ_ONLY);
-    if(pBufferClientPtr) {
+    if(pBufferClientPtr!=nullptr) {
         memcpy(oBufferData.data,pBufferClientPtr,m_nBufferSize);
         glUnmapBuffer(m_eBufferTarget);
     }
@@ -138,8 +138,6 @@ GLTexture2D::GLTexture2D(GLsizei nLevels, const cv::Mat& oTexture, bool bUseInte
     glErrorCheck;
 }
 
-GLTexture2D::~GLTexture2D() {}
-
 void GLTexture2D::bindToImage(GLuint nUnit, int nLevel, GLenum eAccess) {
     lvDbgAssert(nLevel>=0 && nLevel<m_nLevels);
     glBindImageTexture(nUnit,getTexId(),nLevel,GL_FALSE,0,eAccess,m_eInternalFormat);
@@ -212,8 +210,6 @@ GLTexture2DArray::GLTexture2DArray(GLsizei nLevels, const std::vector<cv::Mat>& 
     glErrorCheck;
 }
 
-GLTexture2DArray::~GLTexture2DArray() {}
-
 void GLTexture2DArray::bindToImage(GLuint nUnit, int nLevel, int nLayer, GLenum eAccess) {
     lvDbgAssert(nLevel>=0 && nLevel<m_nLevels && nLayer>=0 && nLayer<m_nTextureCount);
     glBindImageTexture(nUnit,getTexId(),nLevel,GL_FALSE,nLayer,eAccess,m_eInternalFormat);
@@ -231,8 +227,6 @@ void GLTexture2DArray::bindToSamplerArray(GLuint nUnit) {
 
 GLDynamicTexture2D::GLDynamicTexture2D(GLsizei nLevels, const cv::Mat& oInitTexture, bool bUseIntegralFormat) :
         GLTexture2D(nLevels,oInitTexture,bUseIntegralFormat) {}
-
-GLDynamicTexture2D::~GLDynamicTexture2D() {}
 
 void GLDynamicTexture2D::updateTexture(const cv::Mat& oTexture, bool bRebindAll) {
     lvDbgAssert(!oTexture.empty());
@@ -283,8 +277,6 @@ GLDynamicTexture2DArray::GLDynamicTexture2DArray(GLsizei nLevels, const std::vec
         s_bAlreadyWarned = true;
     }
 }
-
-GLDynamicTexture2DArray::~GLDynamicTexture2DArray() {}
 
 void GLDynamicTexture2DArray::updateTexture(const cv::Mat& oTexture, int nLayer, bool bRebindAll, bool bRegenMipmaps) {
     lvDbgAssert(!oTexture.empty());
@@ -369,7 +361,7 @@ GLScreenBillboard::~GLScreenBillboard() {
 
 void GLScreenBillboard::render(GLMatrices /*oMats*/) {
     glBindVertexArray(getVAOId());
-    glDrawElements(GL_TRIANGLES,GLScreenBillboard::s_nIndexCount,GL_UNSIGNED_BYTE,0);
+    glDrawElements(GL_TRIANGLES,GLScreenBillboard::s_nIndexCount,GL_UNSIGNED_BYTE,nullptr);
     glDbgErrorCheck;
 }
 

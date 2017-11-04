@@ -84,12 +84,6 @@
                 #endif //MAY_ALIAS
             #endif //(defined(__GNUC__) || defined(__clang__))
         #endif //ndef(_MSC_VER)
-        #ifndef TIMER_DEFS
-            #define TIMER_DEFS
-            #define TIMER_TIC(x) int64 XSTR_CONCAT(__nCPUTimerTick_,x) = cv::getTickCount()
-            #define TIMER_TOC(x) int64 XSTR_CONCAT(__nCPUTimerVal_,x) = cv::getTickCount()-XSTR_CONCAT(__nCPUTimerTick_,x)
-            #define TIMER_ELAPSED_MS(x) (double(XSTR_CONCAT(__nCPUTimerVal_,x))/(cv::getTickFrequency()/1000))
-        #endif //ndef(TIMER_DEFS)
     #endif //def(__cplusplus)
 #endif //ndef(__COMMON_LIBS_DEFS__)
 
@@ -108,11 +102,11 @@
         #define lvStdError(errtype) throw std::errtype()
         #define lvStdError_(errtype,msg) throw std::errtype(msg)
         #define lvStdError__(errtype,msg,...) throw std::errtype(lv::putf(msg,__VA_ARGS__))
-        #define lvError(msg) throw lv::Exception(std::string("[lvError: ")+(msg)+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__)
-        #define lvError_(msg,...) throw lv::Exception(std::string("[lvError: ")+(msg)+"]",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
+        #define lvError(msg) throw lv::Exception(std::string("[lvError: ").append((msg)).append("]"),__PRETTY_FUNCTION__,__FILE__,__LINE__)
+        #define lvError_(msg,...) throw lv::Exception(std::string("[lvError: ").append((msg)).append("]"),__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__)
         #define lvAssert(expr) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(false)
-        #define lvAssert_(expr,msg) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+(msg)+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(false)
-        #define lvAssert__(expr,msg,...) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ")+(msg)+"] ("#expr")",__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);} while(false)
+        #define lvAssert_(expr,msg) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ").append((msg)).append("] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__);} while(false)
+        #define lvAssert__(expr,msg,...) do {if(!!(expr)); else throw lv::Exception(std::string("[lvAssertError: ").append((msg)).append("] ("#expr")"),__PRETTY_FUNCTION__,__FILE__,__LINE__,__VA_ARGS__);} while(false)
         #define lvLog(level,msg) (lv::ostream_guard<std::ostream>(std::cout,level) << (msg) << '\n')
         #define lvLog_(level,msg,...) (lv::ostream_guard<std::ostream>(std::cout,level) << lv::putf(msg,__VA_ARGS__) << '\n')
         #define lvWarn(msg) (lv::ostream_guard<std::ostream>(std::cerr) << "[lvWarn @ " << __FILE__ << "(" << __LINE__ << "):\n\t" << (msg) << "\n]\n")

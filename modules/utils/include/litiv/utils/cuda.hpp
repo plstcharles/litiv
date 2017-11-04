@@ -33,7 +33,7 @@
 #define CUDA_ERROR_HANDLER(errn,msg) do { (void)errn; throw std::runtime_error(msg); } while(false)
 #endif //ndef(CUDA_..._ON_ERROR)
 #define cudaKernelWrap(func,kparams,...) do { \
-        impl::func<<<kparams.vGridSize,kparams.vBlockSize,kparams.nSharedMemSize,kparams.nStream>>>(__VA_ARGS__); \
+        impl::func<<<kparams.vGridSize,kparams.vBlockSize,kparams.nSharedMemSize,kparams.pStream>>>(__VA_ARGS__); \
         const cudaError_t __errn = cudaGetLastError(); \
         if(__errn!=cudaSuccess) { \
             std::array<char,1024> acBuffer; \
@@ -82,20 +82,20 @@ namespace lv {
         /// container for cuda kernel execution configuration parameters
         struct KernelParams {
             KernelParams() :
-                    vGridSize(0),vBlockSize(0),nSharedMemSize(0),nStream(0) {}
-            KernelParams(const dim3& _vGridSize, const dim3& _vBlockSize, size_t _nSharedMemSize=0, cudaStream_t _nStream=0) :
-                    vGridSize(_vGridSize),vBlockSize(_vBlockSize),nSharedMemSize(_nSharedMemSize),nStream(_nStream) {}
+                    vGridSize(0),vBlockSize(0),nSharedMemSize(0),pStream(nullptr) {}
+            KernelParams(dim3 vGridSize_, dim3 vBlockSize_, size_t nSharedMemSize_=0, cudaStream_t pStream_=nullptr) :
+                    vGridSize(std::move(vGridSize_)),vBlockSize(std::move(vBlockSize_)),nSharedMemSize(nSharedMemSize_),pStream(pStream_) {} // NOLINT
             dim3 vGridSize;
             dim3 vBlockSize;
             size_t nSharedMemSize;
-            cudaStream_t nStream;
+            cudaStream_t pStream;
             /// is-equal test operator for other KernelParams structs
             bool operator==(const KernelParams& o) const {
                 return
                     vGridSize.x==o.vGridSize.x && vGridSize.y==o.vGridSize.y && vGridSize.z==o.vGridSize.z &&
                     vBlockSize.x==o.vBlockSize.x && vBlockSize.y==o.vBlockSize.y && vBlockSize.z==o.vBlockSize.z &&
                     nSharedMemSize==o.nSharedMemSize &&
-                    nStream==o.nStream;
+                    pStream==o.pStream;
             }
             /// is-not-equal test operator for other KernelParams structs
             bool operator!=(const KernelParams& o) const {
@@ -107,7 +107,7 @@ namespace lv {
                 ssStr << "{ ";
                 ssStr << "grid=[" << vGridSize.x << "," << vGridSize.y << "," << vGridSize.z << "], ";
                 ssStr << "block=[" << vBlockSize.x << "," << vBlockSize.y << "," << vBlockSize.z << "], ";
-                ssStr << "shmem=" << nSharedMemSize << ", stream=" << (void*)nStream;
+                ssStr << "shmem=" << nSharedMemSize << ", stream=" << (void*)pStream;
                 ssStr << " }";
                 return ssStr.str();
             }

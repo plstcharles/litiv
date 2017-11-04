@@ -32,8 +32,8 @@
 
 class GLImageProcAlgo {
 public:
-    GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs, size_t nExtraImages, size_t nExtraTextures,
-                     int nOutputType, int nDebugType, bool bUseInput, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
+    GLImageProcAlgo(size_t nLevels, size_t nComputeStages, size_t nExtraSSBOs, size_t nExtraACBOs, size_t nExtraImages, size_t nExtraTextures,
+                    int nOutputType, int nDebugType, bool bUseInput, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
     virtual ~GLImageProcAlgo();
 
     virtual std::string getVertexShaderSource() const;
@@ -158,18 +158,18 @@ class GLImageProcEvaluatorAlgo : public GLImageProcAlgo {
 public:
     GLImageProcEvaluatorAlgo(const std::shared_ptr<GLImageProcAlgo>& pParent, size_t nTotFrameCount, size_t nCountersPerFrame,
                              int nDebugType, int nGroundtruthType, bool bUseIntegralFormat);
-    virtual ~GLImageProcEvaluatorAlgo();
+    virtual ~GLImageProcEvaluatorAlgo() = default; // NOLINT
     const cv::Mat& getEvaluationAtomicCounterBuffer();
-    virtual std::string getFragmentShaderSource() const;
+    std::string getFragmentShaderSource() const override;
 
     /// initialize internal texture arrays and shader programs for evaluator+algo; should be called in top-level evaluator init function
     virtual void initialize_gl(const cv::Mat& oInitInput, const cv::Mat& oInitGT, const cv::Mat& oROI);
     /// initialize internal texture arrays and shader programs for evaluator only; should be called in top-level evaluator init function
-    virtual void initialize_gl(const cv::Mat& oInitGT, const cv::Mat& oROI);
+    void initialize_gl(const cv::Mat& oInitGT, const cv::Mat& oROI) override;
     /// uploads the next input/gt texture to GPU, processes the input/gt/output textures currently on GPU, and fetches (if required) the last output texture
     virtual void apply_gl(const cv::Mat& oNextInput, const cv::Mat& oNextGT, bool bRebindAll=false);
     /// uploads the next gt texture to GPU, processes the output/gt textures currently on GPU, and fetches (if required) the last output texture
-    virtual void apply_gl(const cv::Mat& oNextGT, bool bRebindAll=false);
+    void apply_gl(const cv::Mat& oNextGT, bool bRebindAll=false) override;
 
 protected:
     const int m_nGroundtruthType;
@@ -188,7 +188,7 @@ private:
 class GLImagePassThroughAlgo : public GLImageProcAlgo {
 public:
     GLImagePassThroughAlgo(int nFrameType, bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
-    virtual std::string getComputeShaderSource(size_t nStage) const;
+    std::string getComputeShaderSource(size_t nStage) const override;
 };
 
 class BinaryMedianFilter : public GLImageProcAlgo {
@@ -200,7 +200,7 @@ public:
     BinaryMedianFilter( size_t nKernelSize, size_t nBorderSize, const cv::Mat& oROI,
                         bool bUseOutputPBOs, bool bUseInputPBOs, bool bUseTexArrays,
                         bool bUseDisplay, bool bUseTimers, bool bUseIntegralFormat);
-    virtual std::string getComputeShaderSource(size_t nStage) const;
+    std::string getComputeShaderSource(size_t nStage) const override;
     const size_t m_nKernelSize;
     const size_t m_nBorderSize;
     static const size_t m_nPPSMaxRowSize;
@@ -210,5 +210,5 @@ protected:
     std::vector<glm::uvec3> m_vvComputeShaderDispatchSizes;
     static const GLuint Image_PPSAccumulator;
     static const GLuint Image_PPSAccumulator_T;
-    virtual void dispatch(size_t nStage, GLShader& oShader);
+    void dispatch(size_t nStage, GLShader& oShader) override;
 };

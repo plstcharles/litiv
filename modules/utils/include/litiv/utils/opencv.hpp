@@ -30,24 +30,24 @@
 
 #ifndef CV_MAT_COND_DEPTH_TYPE
 #define CV_MAT_COND_DEPTH_TYPE(cvtype_flag,depth_flag,depth_type,depth_alt) \
-    std::conditional_t<CV_MAT_DEPTH(cvtype_flag)==depth_flag,depth_type,depth_alt>
+    std::conditional_t<(CV_MAT_DEPTH((cvtype_flag))==(depth_flag)),depth_type,depth_alt>
 #endif //ndef(CV_MAT_COND_DEPTH_TYPE)
 
 #ifndef CV_MAT_COND_DATA_TYPE
 #define CV_MAT_COND_DATA_TYPE(cvtype_flag) \
-    std::enable_if_t<(CV_MAT_DEPTH((cvtype_flag%8))>=0 && CV_MAT_DEPTH((cvtype_flag%8))<=6), \
-        CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),0,uint8_t, \
-            CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),1,int8_t, \
-                CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),2,uint16_t, \
-                    CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),3,int16_t, \
-                        CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),4,int32_t, \
-                            CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),5,float, \
-                                CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),6,double,void)))))))>
+    std::enable_if_t<(CV_MAT_DEPTH(((cvtype_flag)%8))>=0 && CV_MAT_DEPTH(((cvtype_flag)%8))<=6), \
+        CV_MAT_COND_DEPTH_TYPE(((cvtype_flag)%8),0,uint8_t, \
+            CV_MAT_COND_DEPTH_TYPE(((cvtype_flag)%8),1,int8_t, \
+                CV_MAT_COND_DEPTH_TYPE(((cvtype_flag)%8),2,uint16_t, \
+                    CV_MAT_COND_DEPTH_TYPE(((cvtype_flag)%8),3,int16_t, \
+                        CV_MAT_COND_DEPTH_TYPE(((cvtype_flag)%8),4,int32_t, \
+                            CV_MAT_COND_DEPTH_TYPE(((cvtype_flag)%8),5,float, \
+                                CV_MAT_COND_DEPTH_TYPE(((cvtype_flag)%8),6,double,void)))))))>
 #endif //ndef(CV_MAT_COND_DATA_TYPE)
 
 #ifndef CV_MAT_COND_ELEM_TYPE
 #define CV_MAT_COND_ELEM_TYPE(cvtype_flag) \
-    std::enable_if_t<(CV_MAT_DEPTH((cvtype_flag%8))>=0 && CV_MAT_DEPTH((cvtype_flag%8))<=6 && CV_MAT_CN(cvtype_flag)>=1 && CV_MAT_CN(cvtype_flag)<=4), \
+    std::enable_if_t<(CV_MAT_DEPTH(((cvtype_flag)%8))>=0 && CV_MAT_DEPTH(((cvtype_flag)%8))<=6 && CV_MAT_CN(cvtype_flag)>=1 && CV_MAT_CN(cvtype_flag)<=4), \
         std::conditional_t<(CV_MAT_CN(cvtype_flag)>1),cv::Vec<CV_MAT_COND_DATA_TYPE(cvtype_flag),CV_MAT_CN(cvtype_flag)>,CV_MAT_COND_DATA_TYPE(cvtype_flag)>>
 #endif //ndef(CV_MAT_COND_ELEM_TYPE)
 
@@ -97,12 +97,12 @@ namespace lv {
         static_assert(sizeof(short)==sizeof(int16_t),"unexpected short byte count");
         static_assert(sizeof(int)==sizeof(int32_t),"unexpected int byte count");
         return
-            std::is_same<uchar,TData>::value || std::is_same<uint8_t,TData>::value ||
-            std::is_same<char,TData>::value || std::is_same<int8_t,TData>::value ||
-            std::is_same<ushort,TData>::value || std::is_same<uint16_t,TData>::value ||
-            std::is_same<short,TData>::value || std::is_same<int16_t,TData>::value ||
-            std::is_same<int,TData>::value || std::is_same<int32_t,TData>::value ||
-            std::is_same<float,TData>::value || std::is_same<double,TData>::value;
+            std::is_same<uchar,TData>::value || std::is_same<uint8_t,TData>::value || // NOLINT
+            std::is_same<char,TData>::value || std::is_same<int8_t,TData>::value || // NOLINT
+            std::is_same<ushort,TData>::value || std::is_same<uint16_t,TData>::value || // NOLINT
+            std::is_same<short,TData>::value || std::is_same<int16_t,TData>::value || // NOLINT
+            std::is_same<int,TData>::value || std::is_same<int32_t,TData>::value || // NOLINT
+            std::is_same<float,TData>::value || std::is_same<double,TData>::value; // NOLINT
     }
 
     /// returns the opencv depth flag for an opencv-compatible data type
@@ -142,9 +142,9 @@ namespace lv {
         /// returns the internal opencv mat type argument
         int operator()() const {return nCVType;}
         /// implicit cast operation; returns the ocv type id
-        operator int() const {return nCVType;}
+        operator int() const {return nCVType;} // NOLINT
         /// implicit cast operation; returns a string containing the ocv type id
-        operator std::string() const {return (std::string)MatType(nCVType);}
+        explicit operator std::string() const {return (std::string)MatType(nCVType);}
         /// returns the result of the implicit std::string cast (i.e. ocv type id in a string)
         std::string str() const {return (std::string)*this;}
     };
@@ -177,9 +177,9 @@ namespace lv {
         /// returns the internal opencv mat type argument
         int operator()() const {return CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels);}
         /// implicit cast operation; returns the ocv type id
-        operator int() const {return CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels);}
+        operator int() const {return CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels);} // NOLINT
         /// implicit cast operation; returns a string containing the ocv type id
-        operator std::string() const {return (std::string)MatType(CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels));}
+        explicit operator std::string() const {return (std::string)MatType(CV_MAKE_TYPE(getCVDepthFromDataType<TData>(),nChannels));}
         /// returns the result of the implicit std::string cast (i.e. ocv type id in a string)
         std::string str() const {return (std::string)*this;}
     };
@@ -195,7 +195,7 @@ namespace lv {
         /// default constructor; assigns type as CV_8UC1 internally
         MatType() : m_nCVType(CV_8UC1) {}
         /// cv type-based constructor; also validates m_nCVType for possible ocv mat configs
-        MatType(int nCVType) : m_nCVType(nCVType) {
+        MatType(int nCVType) : m_nCVType(nCVType) { // NOLINT
             lvAssert__((CV_MAT_DEPTH(m_nCVType)>=0 && CV_MAT_DEPTH(m_nCVType)<=6),"bad ocv type depth (type=%d, depth=%d)",m_nCVType,CV_MAT_DEPTH(m_nCVType));
             lvAssert__((CV_MAT_CN(m_nCVType)>0 && CV_MAT_CN(m_nCVType)<=4),"bad ocv type channels (type=%d, channels=%d)",m_nCVType,CV_MAT_CN(m_nCVType));
         }
@@ -219,9 +219,9 @@ namespace lv {
         /// returns the internal opencv mat type argument
         int operator()() const {return m_nCVType;}
         /// implicit cast operation; returns the ocv type id
-        operator int() const {return m_nCVType;}
+        operator int() const {return m_nCVType;} // NOLINT
         /// implicit cast operation; returns a string containing the ocv type id
-        operator std::string() const {return CV_MAT_DEPTH_STR(m_nCVType)+"C"+std::to_string(CV_MAT_CN(m_nCVType));}
+        explicit operator std::string() const {return CV_MAT_DEPTH_STR(m_nCVType)+"C"+std::to_string(CV_MAT_CN(m_nCVType));}
         /// is-equal test operator for other MatType structs
         bool operator==(const MatType& o) const {return m_nCVType==o.m_nCVType;}
         /// is-not-equal test operator for other MatType structs
@@ -295,16 +295,16 @@ namespace lv {
         MatSize_() :
                 m_vSizes{Tinteger(0)} {}
         /// cv::MatSize-based constructor
-        MatSize_(const cv::MatSize& oSize) :
+        MatSize_(const cv::MatSize& oSize) : // NOLINT
                 m_vSizes(cvtSizes(oSize.p)) {}
         /// cv::Size-based constructor
-        MatSize_(const cv::Size& oSize) : // row-major by default, like opencv
-                m_vSizes{Tinteger(2),Tinteger(oSize.height),Tinteger(oSize.width)} {
+        MatSize_(const cv::Size& oSize) : // NOLINT
+                m_vSizes{Tinteger(2),Tinteger(oSize.height),Tinteger(oSize.width)} { // row-major by default, like opencv
             lvAssert_(oSize.width>=0 && oSize.height>=0,"sizes must be null or positive values");
         }
         /// array-based constructor
         template<size_t nDims, typename Tinteger2>
-        MatSize_(const std::array<Tinteger2,nDims>& aSizes) :
+        MatSize_(const std::array<Tinteger2,nDims>& aSizes) : // NOLINT
                 m_vSizes(cvtSizes((Tinteger2)nDims,aSizes.data())) {}
         /// c-array-based constructor
         template<typename Tinteger2>
@@ -312,7 +312,7 @@ namespace lv {
                 m_vSizes(cvtSizes(nDims,aSizes)) {}
         /// vector-based constructor
         template<typename Tinteger2>
-        MatSize_(const std::vector<Tinteger2>& vSizes) :
+        MatSize_(const std::vector<Tinteger2>& vSizes) : // NOLINT
                 m_vSizes(cvtSizes((Tinteger2)vSizes.size(),vSizes.data())) {}
         /// initlist-based constructor
         template<typename Tinteger2>
@@ -320,7 +320,7 @@ namespace lv {
                 m_vSizes(cvtSizes((Tinteger2)aSizes.size(),aSizes.begin())) {}
         /// explicit dims constructor; initializes internal config by casting all provided args
         template<typename... Tintegers>
-        MatSize_(Tintegers... anSizes) :
+        explicit MatSize_(Tintegers... anSizes) :
                 m_vSizes{Tinteger(sizeof...(anSizes)),Tinteger(anSizes)...} {
             static_assert(lv::static_reduce(std::array<bool,sizeof...(Tintegers)>{(std::is_integral<Tintegers>::value)...},lv::static_reduce_and),"all given args should be integral");
             for(Tinteger nDimIdx=0; nDimIdx<dims(); ++nDimIdx)
@@ -328,7 +328,7 @@ namespace lv {
         }
         /// copy constructor for similar struct
         template<typename Tinteger2>
-        MatSize_(const MatSize_<Tinteger2>& oSize) :
+        MatSize_(const MatSize_<Tinteger2>& oSize) : // NOLINT
                 m_vSizes(cvtSizes(oSize.m_vSizes.data()+1)) {}
         /// returns the dimension count
         const Tinteger& dims() const {
@@ -340,14 +340,14 @@ namespace lv {
         const Tinteger& size(Tindex nDimIdx) const {
             static_assert(std::is_integral<Tindex>::value,"need an integer type for dimensions/size indexing");
             lvDbgAssert__((Tinteger)nDimIdx<dims(),"dimension index is out of bounds (dims=%d)",(int)dims());
-            return m_vSizes[nDimIdx+1];
+            return m_vSizes[nDimIdx+1]; // NOLINT
         }
         /// returns the (modifiable) size at a given dimension index
         template<typename Tindex>
         Tinteger& size(Tindex nDimIdx) {
             static_assert(std::is_integral<Tindex>::value,"need an integer type for dimensions/size indexing");
             lvDbgAssert__((Tinteger)nDimIdx<dims(),"dimension index is out of bounds (dims=%d)",(int)dims());
-            return m_vSizes[nDimIdx+1];
+            return m_vSizes[nDimIdx+1]; // NOLINT
         }
         /// returns the (unmodifiable) size array converted to int, for inline cv mat creation (non-trivial)
         const int* sizes() const {
@@ -381,11 +381,11 @@ namespace lv {
             return (cv::Size)*this;
         }
         /// implicit conversion op to raw 'Tinteger' size lookup array
-        operator const Tinteger*() const {
+        operator const Tinteger*() const { // NOLINT
             return m_vSizes.data()+1;
         }
         /// implicit conversion op to string (for printing/debug purposes only)
-        operator std::string() const {
+        explicit operator std::string() const {
             if(dims()==Tinteger(0))
                 return "0-d:[]<empty>";
             std::string res = std::to_string((int)dims())+"-d:[";
@@ -394,7 +394,7 @@ namespace lv {
             return res+"]"+(total()>0?"":"<empty>");
         }
         /// implicit conversion op to cv::MatSize (non-trivial)
-        operator cv::MatSize() const {
+        operator cv::MatSize() const { // NOLINT
             m_vSizesExt.resize(m_vSizes.size());
             for(size_t nIdx=0; nIdx<m_vSizes.size(); ++nIdx)
                 m_vSizesExt[nIdx] = (int)m_vSizes[nIdx];
@@ -505,7 +505,7 @@ namespace lv {
             vOutput[0] = (Tinteger)aSizes[-1];
             for(int nDimIdx=0; nDimIdx<(int)aSizes[-1]; ++nDimIdx) {
                 lvAssert_((int)aSizes[nDimIdx]>=0,"MatSize sizes must be null or positive values");
-                vOutput[nDimIdx+1] = (Tinteger)aSizes[nDimIdx];
+                vOutput[nDimIdx+1] = (Tinteger)aSizes[nDimIdx]; // NOLINT
             }
             return vOutput;
         }
@@ -516,7 +516,7 @@ namespace lv {
             vOutput[0] = (Tinteger)nDims;
             for(int nDimIdx=0; nDimIdx<(int)nDims; ++nDimIdx) {
                 lvAssert_((int)aSizes[nDimIdx]>=0,"MatSize sizes must be null or positive values");
-                vOutput[nDimIdx+1] = (Tinteger)aSizes[nDimIdx];
+                vOutput[nDimIdx+1] = (Tinteger)aSizes[nDimIdx]; // NOLINT
             }
             return vOutput;
         }
@@ -545,9 +545,9 @@ namespace lv {
         /// default MatInfo constructor
         MatInfo() = default;
         /// cv::Mat-based constructor
-        MatInfo(const cv::Mat& m) : size(m.size),type(m.type()) {}
+        explicit MatInfo(const cv::Mat& m) : size(m.size),type(m.type()) {}
         /// size/type-based constructor
-        MatInfo(const MatSize& s, const MatType& t) : size(s),type(t) {}
+        MatInfo(MatSize s, MatType t) : size(std::move(s)),type(std::move(t)) {} // NOLINT
         /// copy constructor
         MatInfo(const MatInfo& o) = default;
         /// is-equal test operator for other MatInfo structs
@@ -555,7 +555,7 @@ namespace lv {
         /// is-not-equal test operator for other MatInfo structs
         bool operator!=(const MatInfo& o) const {return !(*this==o);}
         /// implicit conversion op to string (for printing/debug purposes only)
-        operator std::string() const {return std::string("{")+((std::string)size)+" "+((std::string)type)+"}";}
+        explicit operator std::string() const {return std::string("{")+((std::string)size)+" "+((std::string)type)+"}";}
         /// returns the result of the implicit std::string cast (i.e. full type/size info in a string)
         std::string str() const {return (std::string)*this;}
     };
@@ -1000,18 +1000,18 @@ namespace lv {
         return ssStr.str();
     }
 
-    /// removes all keypoints from voKPs which fall on null values (or outside the bounds) of oROI
-    inline void validateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoint>& voKPs) {
+    /// removes all keypoints from the vector which fall on null values (or outside the bounds) of the ROI
+    inline void validateKeyPoints(const cv::Mat& oROI, std::vector<cv::KeyPoint>& vKPs) {
         if(oROI.empty())
             return;
         lvAssert_(oROI.type()==CV_8UC1,"input ROI must be of type 8UC1");
-        std::vector<cv::KeyPoint> voNewKPs;
-        voNewKPs.reserve(voKPs.size());
-        for(size_t k=0; k<voKPs.size(); ++k) {
-            if(voKPs[k].pt.x>=0 && voKPs[k].pt.x<oROI.cols && voKPs[k].pt.y>=0 && voKPs[k].pt.y<oROI.rows && oROI.at<uchar>(voKPs[k].pt)>0)
-                voNewKPs.push_back(voKPs[k]);
+        std::vector<cv::KeyPoint> vNewKPs;
+        vNewKPs.reserve(vKPs.size());
+        for(const auto& oKP : vKPs) {
+            if(oKP.pt.x>=0 && oKP.pt.x<oROI.cols && oKP.pt.y>=0 && oKP.pt.y<oROI.rows && oROI.at<uint8_t>(oKP.pt)>0)
+                vNewKPs.push_back(oKP);
         }
-        voKPs = voNewKPs;
+        vKPs = vNewKPs;
     }
 
     /// returns the vector of all sorted unique values contained in a templated matrix
@@ -1067,7 +1067,7 @@ namespace lv {
         lvDbgAssert__(fSaturation>=0.0f && fSaturation<=1.0f,"bad input saturation range (fSaturation=%f)",fSaturation);
         lvDbgAssert__(fLightness>=0.0f && fLightness<=1.0f,"bad input lightness range (fLightness=%f)",fLightness);
         if(fSaturation==0.0f)
-            return cv::Vec3b::all(cv::saturate_cast<uchar>(std::round(fLightness*255)));
+            return cv::Vec3b::all(cv::saturate_cast<uint8_t>(std::round(fLightness*255)));
         if(fLightness==0.0f)
             return cv::Vec3b::all(0);
         if(fLightness==1.0f)
@@ -1088,7 +1088,7 @@ namespace lv {
         const float q = (fLightness<0.5f)?fLightness*(1+fSaturation):fLightness+fSaturation-fLightness*fSaturation;
         const float p = 2.0f*fLightness-q;
         const float h = fHue/360.0f;
-        return cv::Vec3b(cv::saturate_cast<uchar>(std::round(lH2RGB(p,q,h-1.0f/3)*255)),cv::saturate_cast<uchar>(std::round(lH2RGB(p,q,h)*255)),cv::saturate_cast<uchar>(std::round(lH2RGB(p,q,h+1.0f/3)*255)));
+        return cv::Vec3b(cv::saturate_cast<uint8_t>(std::round(lH2RGB(p,q,h-1.0f/3)*255)),cv::saturate_cast<uint8_t>(std::round(lH2RGB(p,q,h)*255)),cv::saturate_cast<uint8_t>(std::round(lH2RGB(p,q,h+1.0f/3)*255)));
     }
 
     /// converts a single HSL triplet (0-360 hue, 0-1 sat & lightness) into an 8-bit RGB triplet
@@ -1111,8 +1111,8 @@ namespace lv {
         return cv::Vec3f(fHue,fSaturation,fLightness);
     }
 
-    /// converts a 3-ch RGB image into a packed ushort YCbCr image where Cb and Cr are quantified to 4 bits each
-    inline void cvtBGRToPackedYCbCr(const cv::Mat_<cv::Vec3b>& oInput, cv::Mat_<ushort>& oOutput) {
+    /// converts a 3-ch RGB image into a packed uint16_t YCbCr image where Cb and Cr are quantified to 4 bits each
+    inline void cvtBGRToPackedYCbCr(const cv::Mat_<cv::Vec3b>& oInput, cv::Mat_<uint16_t>& oOutput) {
         lvAssert_(oInput.dims==2,"function only defined for 2-dims, 3-ch matrices");
         if(oInput.empty()) {
             oOutput.release();
@@ -1120,7 +1120,7 @@ namespace lv {
         }
         cv::Mat_<cv::Vec3b> oInput_YCrCb;
         cv::cvtColor(oInput,oInput_YCrCb,cv::COLOR_BGR2YCrCb);
-        std::vector<cv::Mat_<uchar>> voInputs(3);
+        std::vector<cv::Mat_<uint8_t>> voInputs(3);
         if(!oOutput.empty() && oOutput.allocator!=getMatAllocator16a())
             oOutput.release();
         oOutput.allocator = voInputs[0].allocator = voInputs[1].allocator = voInputs[2].allocator = getMatAllocator16a();
@@ -1128,8 +1128,8 @@ namespace lv {
         lvDbgAssert(voInputs.size()==size_t(3) && voInputs[0].size==oInput.size && voInputs[1].size==oInput.size && voInputs[2].size==oInput.size);
         oOutput.create(oInput.dims,oInput.size.operator const int*());
         for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {
-            const uchar* pYRow = voInputs[0].ptr<uchar>(nRowIdx), *pCrRow = voInputs[1].ptr<uchar>(nRowIdx), *pCbRow = voInputs[2].ptr<uchar>(nRowIdx);
-            ushort* pOutputRow = oOutput.ptr<ushort>(nRowIdx);
+            const uint8_t* pYRow = voInputs[0].ptr<uint8_t>(nRowIdx), *pCrRow = voInputs[1].ptr<uint8_t>(nRowIdx), *pCbRow = voInputs[2].ptr<uint8_t>(nRowIdx);
+            uint16_t* pOutputRow = oOutput.ptr<uint16_t>(nRowIdx);
             lvDbgAssert(isAligned<16>(pYRow) && isAligned<16>(pCrRow) && isAligned<16>(pCbRow) && isAligned<16>(pOutputRow));
             int nColIdx = 0;
         #if HAVE_SSE2
@@ -1150,38 +1150,38 @@ namespace lv {
             }
         #endif //HAVE_SSE2
             for(; nColIdx<oInput.cols; ++nColIdx)
-                pOutputRow[nColIdx] = ushort(pYRow[nColIdx]+((pCrRow[nColIdx]>>4)<<8)+((pCbRow[nColIdx]>>4)<<12));
+                pOutputRow[nColIdx] = uint16_t(pYRow[nColIdx]+((pCrRow[nColIdx]>>4)<<8)+((pCbRow[nColIdx]>>4)<<12));
         }
     }
 
-    /// converts a 3-ch RGB image into a packed ushort YCbCr image where Cb and Cr are quantified to 4 bits each (inline version)
-    inline cv::Mat_<ushort> cvtBGRToPackedYCbCr(const cv::Mat_<cv::Vec3b>& oInput) {
-        cv::Mat_<ushort> oOutput;
+    /// converts a 3-ch RGB image into a packed uint16_t YCbCr image where Cb and Cr are quantified to 4 bits each (inline version)
+    inline cv::Mat_<uint16_t> cvtBGRToPackedYCbCr(const cv::Mat_<cv::Vec3b>& oInput) {
+        cv::Mat_<uint16_t> oOutput;
         cvtBGRToPackedYCbCr(oInput,oOutput);
         return oOutput;
     }
 
-    /// converts a packed ushort YCbCr image where Cb and Cr are quantified to 4 bits each into a 3-ch RGB image
-    inline void cvtPackedYCbCrToBGR(const cv::Mat_<ushort>& oInput, cv::Mat_<cv::Vec3b>& oOutput) {
+    /// converts a packed uint16_t YCbCr image where Cb and Cr are quantified to 4 bits each into a 3-ch RGB image
+    inline void cvtPackedYCbCrToBGR(const cv::Mat_<uint16_t>& oInput, cv::Mat_<cv::Vec3b>& oOutput) {
         lvAssert_(oInput.dims==2,"function only defined for 2-dims matrices");
         if(oInput.empty()) {
             oOutput.release();
             return;
         }
-        std::vector<cv::Mat_<uchar>> voOutputs(3);
+        std::vector<cv::Mat_<uint8_t>> voOutputs(3);
         if(!oOutput.empty() && oOutput.allocator!=getMatAllocator16a())
             oOutput.release();
         oOutput.allocator = voOutputs[0].allocator = voOutputs[1].allocator = voOutputs[2].allocator = getMatAllocator16a();
         oOutput.create(oInput.size()); voOutputs[0].create(oInput.size()); voOutputs[1].create(oInput.size()); voOutputs[2].create(oInput.size());
         for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {
-            const ushort* pPackedRow = oInput.ptr<ushort>(nRowIdx);
-            uchar* pYRow = voOutputs[0].ptr<uchar>(nRowIdx), *pCrRow = voOutputs[1].ptr<uchar>(nRowIdx), *pCbRow = voOutputs[2].ptr<uchar>(nRowIdx);
+            const uint16_t* pPackedRow = oInput.ptr<uint16_t>(nRowIdx);
+            uint8_t* pYRow = voOutputs[0].ptr<uint8_t>(nRowIdx), *pCrRow = voOutputs[1].ptr<uint8_t>(nRowIdx), *pCbRow = voOutputs[2].ptr<uint8_t>(nRowIdx);
             lvDbgAssert(isAligned<16>(pYRow) && isAligned<16>(pCrRow) && isAligned<16>(pCbRow));
             int nColIdx = 0;
         #if HAVE_SSE2
             const bool bPackedRowAligned = isAligned<16>(pPackedRow);
-            const __m128i aCrMask = _mm_set1_epi16(short(15));
-            const __m128i aYMask = _mm_set1_epi16(short(255));
+            const __m128i aCrMask = _mm_set1_epi16(int16_t(15));
+            const __m128i aYMask = _mm_set1_epi16(int16_t(255));
             for(; nColIdx<=oInput.cols-16; nColIdx+=16) {
                 lvDbgAssert(!bPackedRowAligned || (isAligned<16>(pPackedRow+nColIdx) && isAligned<16>(pPackedRow+nColIdx+8)));
                 const __m128i aPackedVals_lo = bPackedRowAligned?_mm_load_si128((__m128i*)(pPackedRow+nColIdx)):_mm_loadu_si128((__m128i*)(pPackedRow+nColIdx));
@@ -1195,9 +1195,9 @@ namespace lv {
             }
         #endif //HAVE_SSE2
             for(; nColIdx<oInput.cols; ++nColIdx) {
-                pYRow[nColIdx] = uchar(pPackedRow[nColIdx]);
-                pCrRow[nColIdx] = uchar(((pPackedRow[nColIdx]>>8)&15)<<4);
-                pCbRow[nColIdx] = uchar((pPackedRow[nColIdx]>>12)<<4);
+                pYRow[nColIdx] = uint8_t(pPackedRow[nColIdx]);
+                pCrRow[nColIdx] = uint8_t(((pPackedRow[nColIdx]>>8)&15)<<4);
+                pCbRow[nColIdx] = uint8_t((pPackedRow[nColIdx]>>12)<<4);
             }
         }
         cv::Mat_<cv::Vec3b> oOutput_YCrCb;
@@ -1205,8 +1205,8 @@ namespace lv {
         cv::cvtColor(oOutput_YCrCb,oOutput,cv::COLOR_YCrCb2BGR);
     }
 
-    /// converts a packed ushort YCbCr image where Cb and Cr are quantified to 4 bits each into a 3-ch RGB image (inline version)
-    inline cv::Mat_<cv::Vec3b> cvtPackedYCbCrToBGR(const cv::Mat_<ushort>& oInput) {
+    /// converts a packed uint16_t YCbCr image where Cb and Cr are quantified to 4 bits each into a 3-ch RGB image (inline version)
+    inline cv::Mat_<cv::Vec3b> cvtPackedYCbCrToBGR(const cv::Mat_<uint16_t>& oInput) {
         cv::Mat_<cv::Vec3b> oOutput;
         cvtPackedYCbCrToBGR(oInput,oOutput);
         return oOutput;
@@ -1234,8 +1234,8 @@ namespace lv {
             const size_t nSampleCount = std::min(std::max(nColors/(size_t(1)<<(nDivIdx+1)),(360/nMaxAng)-1),nColors-nColorIdx);
             const float fCurrSat = 1.0f; //const float fCurrSat = fMaxSat-((fMaxSat-fMinSat)/nDivs)*nDivIdx;
             const float fCurrLight = fAvgLight + int(nDivIdx>0)*(((nDivIdx%2)?-fVarLight:fVarLight)/((std::max(nDivIdx,size_t(1))+1)/2));
-            std::unordered_set<ushort> mDivAngSet;
-            ushort nCurrAng = ushort(rand())%nMaxAng;
+            std::unordered_set<uint16_t> mDivAngSet;
+            uint16_t nCurrAng = uint16_t(rand())%nMaxAng;
             for(size_t nSampleIdx=0; nSampleIdx<nSampleCount; ++nSampleIdx) {
                 lvDbgAssert(mDivAngSet.size()<360);
                 while(mDivAngSet.count(nCurrAng))
@@ -1260,7 +1260,7 @@ namespace lv {
     }
 
     /// returns a 8uc3 color map to visualize an optical flow map given by 2d float vectors (intensities are normalized via min-maxing)
-    cv::Mat getFlowColorMap(const cv::Mat& oOpticalFlowMap);
+    cv::Mat getFlowColorMap(const cv::Mat& oFlow);
 
     /// helper struct for image display & callback management (must be created via DisplayHelper::create due to enable_shared_from_this interface)
     struct DisplayHelper : lv::enable_shared_from_this<DisplayHelper> {
@@ -1301,6 +1301,8 @@ namespace lv {
         int waitKey(int nDefaultSleepDelay=1);
         /// desctructor automatically closes its window
         ~DisplayHelper();
+        DisplayHelper(const DisplayHelper&) = delete;
+        DisplayHelper& operator=(const DisplayHelper&) = delete;
     protected:
         /// should always be constructor via static 'create' member due to enable_shared_from_this interface
         DisplayHelper(const std::string& sDisplayName, const std::string& sDebugFSDirPath, const cv::Size& oMaxSize, int nWindowFlags);
@@ -1313,9 +1315,6 @@ namespace lv {
         cv::Mat m_oLastDisplay;
         std::function<void(int,int,int,int)> m_lInternalCallback;
         std::function<void(const CallbackData&)> m_lExternalCallback;
-    private:
-        DisplayHelper(const DisplayHelper&) = delete;
-        DisplayHelper& operator=(const DisplayHelper&) = delete;
     };
 
     /// list of archive types supported by lv::write and lv::read
@@ -1356,35 +1355,35 @@ namespace lv {
         static_assert(nByteAlign>0,"byte alignment must be a non-null value");
     public:
         typedef AlignedMatAllocator<nByteAlign,bAlignSingleElem> this_type;
-        AlignedMatAllocator() noexcept {}
-        AlignedMatAllocator(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept {}
+        AlignedMatAllocator() noexcept {} // NOLINT
+        AlignedMatAllocator(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept = default;
         template<typename T2>
         this_type& operator=(const AlignedMatAllocator<nByteAlign,bAlignSingleElem>&) noexcept {return *this;}
-        virtual ~AlignedMatAllocator() noexcept {}
-        virtual cv::UMatData* allocate(int dims, const int* sizes, int type, void* data, size_t* step, int /*flags*/, cv::UMatUsageFlags /*usageFlags*/) const override {
+        virtual ~AlignedMatAllocator() noexcept {}; // NOLINT
+        cv::UMatData* allocate(int dims, const int* sizes, int type, void* data, size_t* step, int /*flags*/, cv::UMatUsageFlags /*usageFlags*/) const override {
             step[dims-1] = bAlignSingleElem?cv::alignSize(CV_ELEM_SIZE(type),nByteAlign):CV_ELEM_SIZE(type);
             for(int d=dims-2; d>=0; --d)
                 step[d] = cv::alignSize(step[d+1]*sizes[d+1],nByteAlign);
             cv::UMatData* u = new cv::UMatData(this);
             u->size = (size_t)cv::alignSize(step[0]*size_t(sizes[0]),(int)nByteAlign);
-            if(data) {
-                u->data = u->origdata = static_cast<uchar*>(data);
+            if(data!=nullptr) {
+                u->data = u->origdata = static_cast<uint8_t*>(data);
                 u->flags |= cv::UMatData::USER_ALLOCATED;
             }
             else
-                u->data = u->origdata = lv::AlignedMemAllocator<uchar,nByteAlign,true>::allocate(u->size);
+                u->data = u->origdata = lv::AlignedMemAllocator<uint8_t,nByteAlign,true>::allocate(u->size);
             return u;
         }
-        virtual bool allocate(cv::UMatData* data, int /*accessFlags*/, cv::UMatUsageFlags /*usageFlags*/) const override {
+        bool allocate(cv::UMatData* data, int /*accessFlags*/, cv::UMatUsageFlags /*usageFlags*/) const override {
             return (data!=nullptr);
         }
-        virtual void deallocate(cv::UMatData* data) const override {
+        void deallocate(cv::UMatData* data) const override {
             if(data==nullptr)
                 return;
             lvDbgAssert(data->urefcount>=0 && data->refcount>=0);
             if(data->refcount==0) {
-                if(!(data->flags & cv::UMatData::USER_ALLOCATED)) {
-                    lv::AlignedMemAllocator<uchar,nByteAlign,true>::deallocate(data->origdata,data->size);
+                if((data->flags & cv::UMatData::USER_ALLOCATED)==0) {
+                    lv::AlignedMemAllocator<uint8_t,nByteAlign,true>::deallocate(data->origdata,data->size);
                     data->origdata = nullptr;
                 }
                 delete data;
@@ -1401,7 +1400,7 @@ namespace cv { // extending cv
 
 #if USE_OPENCV_MAT_CONSTR_FIX
     template<typename _Tp>
-    Mat_<_Tp>::Mat_(int _dims, const int* _sz, _Tp* _data, const size_t* _steps) :
+    Mat_<_Tp>::Mat_(int _dims, const int* _sz, _Tp* _data, const size_t* _steps) : // NOLINT
             Mat(_dims, _sz, DataType<_Tp>::type, _data, _steps) {}
 #endif //USE_OPENCV_MAT_CONSTR_FIX
 

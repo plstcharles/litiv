@@ -34,7 +34,7 @@
 #include <atomic>
 #include <future>
 #include <memory>
-#include <inttypes.h>
+#include <cinttypes>
 #include <cstddef>
 #include <cstdarg>
 #include <cstdint>
@@ -116,7 +116,7 @@ namespace lv {
         /// type for classic stream manip functions
         typedef TSstr& (*StreamManipFunc)(TSstr&);
         /// constructor; receives the stream to protect + the output verbosity level, and locks global log mutex
-        ostream_guard(TSstr& os, int nOutputVerbosity=0) :
+        explicit ostream_guard(TSstr& os, int nOutputVerbosity=0) :
                 m_oLock(getLogMutex()),m_oSstr(os),m_nVerbosity(nOutputVerbosity) {}
         /// thread-safe output function (template-based; must overload operator<< for classes)
         template<typename TObj, typename=std::enable_if_t<!std::is_same<TObj,StreamManipFunc>::value>>
@@ -401,6 +401,8 @@ namespace lv {
         /// queues a task to be processed by the pool, and returns a future tied to its result
         template<typename Tfunc, typename... Targs>
         std::future<std::result_of_t<Tfunc(Targs...)>> queueTask(Tfunc&& lTaskEntryPoint, Targs&&... args);
+        WorkerPool(const WorkerPool&) = delete;
+        WorkerPool& operator=(const WorkerPool&) = delete;
     protected:
         std::queue<std::function<void()>> m_qTasks;
         std::vector<std::thread> m_vhWorkers;
@@ -409,8 +411,6 @@ namespace lv {
         std::atomic_bool m_bIsActive;
     private:
         void entry();
-        WorkerPool(const WorkerPool&) = delete;
-        WorkerPool& operator=(const WorkerPool&) = delete;
     };
 
     /// stopwatch/chrono helper class; relies on std::chrono::high_resolution_clock internally
@@ -465,8 +465,8 @@ namespace lv {
     private:
         template<typename T>
         static char test(typename T::const_iterator*) {return char(0);}
-        template<typename T>
-        static int test(...) {return int(0);}
+        template<typename... TArgs>
+        static int test(TArgs...) {return int(0);}
     public:
         enum {value=(sizeof(test<TContainer>(0))==sizeof(char))};
     };
@@ -625,16 +625,16 @@ namespace lv {
         using similar_type = AlignedMemAllocator<T2,nByteAlign,bDefaultInit>;
         template<typename T2>
         struct rebind {typedef similar_type<T2> other;};
-        inline AlignedMemAllocator() noexcept {}
+        inline AlignedMemAllocator() noexcept = default;
         template<typename T2>
-        inline AlignedMemAllocator(const similar_type<T2>&) noexcept {}
+        inline AlignedMemAllocator(const similar_type<T2>&) noexcept {} // NOLINT fixes error: a template cannot be defaulted
         template<typename T2>
         inline this_type& operator=(const similar_type<T2>&) noexcept {return *this;}
         template<typename T2>
-        inline AlignedMemAllocator(similar_type<T2>&&) noexcept {}
+        inline AlignedMemAllocator(similar_type<T2>&&) noexcept {} // NOLINT fixes error: a template cannot be defaulted
         template<typename T2>
         inline this_type& operator=(similar_type<T2>&&) noexcept {return *this;}
-        inline ~AlignedMemAllocator() noexcept {}
+        inline ~AlignedMemAllocator() noexcept = default;
         static inline pointer address(reference r) noexcept {return std::addressof(r);}
         static inline const_pointer address(const_reference r) noexcept {return std::addressof(r);}
 #ifdef _MSC_VER
@@ -643,13 +643,13 @@ namespace lv {
             size_t alloc_size = n*sizeof(value_type);
             if((alloc_size%alignment)!=0)
                 alloc_size += alignment - alloc_size%alignment;
-            void* ptr = _aligned_malloc(alloc_size,nByteAlign);
+            void* ptr = _aligned_malloc(alloc_size,nByteAlign); // NOLINT
             if(ptr==nullptr)
                 lvStdError(bad_alloc);
             return reinterpret_cast<pointer>(ptr);
         }
-        static inline void deallocate(pointer p, size_type) noexcept {_aligned_free(p);}
-        static inline void deallocate2(pointer p) noexcept {_aligned_free(p);}
+        static inline void deallocate(pointer p, size_type) noexcept {_aligned_free(p);} // NOLINT
+        static inline void deallocate2(pointer p) noexcept {_aligned_free(p);} // NOLINT
         static inline void destroy(pointer p) {p->~value_type();UNUSED(p);}
 #else //(!def(_MSC_VER))
         static inline pointer allocate(size_type n) {
@@ -658,10 +658,10 @@ namespace lv {
             if((alloc_size%alignment)!=0)
                 alloc_size += alignment - alloc_size%alignment;
 #if HAVE_STL_ALIGNED_ALLOC
-            void* ptr = aligned_alloc(alignment,alloc_size);
+            void* ptr = aligned_alloc(alignment,alloc_size); // NOLINT
 #elif HAVE_POSIX_ALIGNED_ALLOC
             void* ptr;
-            if(posix_memalign(&ptr,alignment,alloc_size)!=0)
+            if(posix_memalign(&ptr,alignment,alloc_size)!=0) // NOLINT
                 lvStdError(bad_alloc);
 #else //HAVE_..._ALIGNED_ALLOC
 #error "Missing aligned mem allocator"
@@ -670,8 +670,8 @@ namespace lv {
                 lvStdError(bad_alloc);
             return reinterpret_cast<pointer>(ptr);
         }
-        static inline void deallocate(pointer p, size_type) noexcept {free(p);}
-        static inline void deallocate2(pointer p) noexcept {free(p);}
+        static inline void deallocate(pointer p, size_type) noexcept {free(p);} // NOLINT
+        static inline void deallocate2(pointer p) noexcept {free(p);} // NOLINT
         static inline void destroy(pointer p) {p->~value_type();}
 #endif //(!def(_MSC_VER))
         template<typename T2, typename... TArgs>
@@ -947,10 +947,10 @@ namespace lv {
         ~unlock_guard() {
             lv::unpack_and_call<void(TMutexes&...)>(m_aMutexes,std::lock);
         }
-    private:
-        std::tuple<TMutexes&...> m_aMutexes;
         unlock_guard(const unlock_guard&) = delete;
         unlock_guard& operator=(const unlock_guard&) = delete;
+    private:
+        std::tuple<TMutexes&...> m_aMutexes;
     };
 
     /// helper class used to unlock a mutex in the current scope (logical inverse of lock_guard)
@@ -965,10 +965,10 @@ namespace lv {
         ~unlock_guard() {
             m_oMutex.lock();
         }
-    private:
-        TMutex& m_oMutex;
         unlock_guard(const unlock_guard&) = delete;
         unlock_guard& operator=(const unlock_guard&) = delete;
+    private:
+        TMutex& m_oMutex;
     };
 
     /// simple semaphore implementation based on STL's conditional variable/mutex combo
@@ -1024,12 +1024,12 @@ namespace lv {
         inline native_handle_type native_handle() {
             return m_oCondVar.native_handle();
         }
+        Semaphore(const Semaphore&) = delete;
+        Semaphore& operator=(const Semaphore&) = delete;
     private:
         std::condition_variable m_oCondVar;
         std::mutex m_oMutex;
         size_t m_nCount;
-        Semaphore(const Semaphore&) = delete;
-        Semaphore& operator=(const Semaphore&) = delete;
     };
 
     using mutex_lock_guard = std::lock_guard<std::mutex>;

@@ -17,7 +17,7 @@
 
 #include "litiv/utils/cxx.hpp"
 
-std::string lv::putf(const char* acFormat, ...) {
+std::string lv::putf(const char* acFormat, ...) { // NOLINT; reused in non-C++11 projs
     va_list vArgs;
     va_start(vArgs,acFormat);
     std::string vBuffer(1024,'\0');
@@ -52,8 +52,8 @@ bool lv::compare_lowercase(const std::string& i, const std::string& j) {
 }
 
 bool lv::string_contains_token(const std::string& s, const std::vector<std::string>& tokens) {
-    for(size_t i=0; i<tokens.size(); ++i)
-        if(s.find(tokens[i])!=std::string::npos)
+    for(const auto& token : tokens)
+        if(s.find(token)!=std::string::npos)
             return true;
     return false;
 }
@@ -89,7 +89,7 @@ std::mutex& lv::getLogMutex() {
     return g_oPrintMutex;
 }
 
-std::ostream& lv::safe_print(std::ostream& os, const char* acFormat, ...) {
+std::ostream& lv::safe_print(std::ostream& os, const char* acFormat, ...) { // NOLINT; reused in non-C++11 projs
     va_list vArgs;
     va_start(vArgs,acFormat);
     std::string vBuffer(1024,'\0');

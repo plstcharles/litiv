@@ -75,11 +75,11 @@ GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t 
         lvError("atomic bo bindings limit is too small for the current impl");
     if(m_bUsingTimers)
         glGenQueries((GLsizei)m_nGLTimers.size(),m_nGLTimers.data());
-    if(m_nSSBOs) {
+    if(m_nSSBOs!=0u) {
         m_vnSSBO.resize(m_nSSBOs);
         glGenBuffers((GLsizei)m_nSSBOs,m_vnSSBO.data());
     }
-    if(m_nACBOs) {
+    if(m_nACBOs!=0u) {
         m_vnACBO.resize(m_nACBOs);
         glGenBuffers((GLsizei)m_nACBOs,m_vnACBO.data());
     }
@@ -88,9 +88,9 @@ GLImageProcAlgo::GLImageProcAlgo( size_t nLevels, size_t nComputeStages, size_t 
 GLImageProcAlgo::~GLImageProcAlgo() {
     if(m_bUsingTimers)
         glDeleteQueries((GLsizei)m_nGLTimers.size(),m_nGLTimers.data());
-    if(m_nACBOs)
+    if(m_nACBOs!=0u)
         glDeleteBuffers((GLsizei)m_nACBOs,m_vnACBO.data());
-    if(m_nSSBOs)
+    if(m_nSSBOs!=0u)
         glDeleteBuffers((GLsizei)m_nSSBOs,m_vnSSBO.data());
 }
 
@@ -570,13 +570,11 @@ GLImageProcEvaluatorAlgo::GLImageProcEvaluatorAlgo( const std::shared_ptr<GLImag
     m_pParent->m_bUsingDisplay = false;
 }
 
-GLImageProcEvaluatorAlgo::~GLImageProcEvaluatorAlgo() {}
-
 const cv::Mat& GLImageProcEvaluatorAlgo::getEvaluationAtomicCounterBuffer() {
     lvAssert_(m_bGLInitialized,"algo must be initialized first");
     glMemoryBarrier(GL_ATOMIC_COUNTER_BARRIER_BIT);
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER,getACBOId(GLImageProcAlgo::AtomicCounterBuffer_EvalBinding));
-    if(m_nCurrEvalBufferOffsetPtr)
+    if(m_nCurrEvalBufferOffsetPtr!=0u)
         glGetBufferSubData(GL_ATOMIC_COUNTER_BUFFER,0,m_nCurrEvalBufferOffsetPtr,m_oEvalQueryBuffer.data+m_nCurrEvalBufferOffsetBlock);
     return m_oEvalQueryBuffer;
 }
@@ -598,21 +596,21 @@ void GLImageProcEvaluatorAlgo::initialize_gl(const cv::Mat& oInitGT, const cv::M
     m_bGLInitialized = false;
     m_oFrameSize = oROI.size();
     for(size_t nPBOIter=0; nPBOIter<2; ++nPBOIter) {
-        if(m_bUsingDebugPBOs)
+        if(m_bUsingDebugPBOs) // NOLINT
             m_apDebugPBOs[nPBOIter] = std::make_unique<GLPixelBufferObject>(cv::Mat(m_oFrameSize,m_nDebugType),GL_PIXEL_PACK_BUFFER,GL_STREAM_READ);
         if(m_bUsingInputPBOs)
             m_apInputPBOs[nPBOIter] = std::make_unique<GLPixelBufferObject>(oInitGT,GL_PIXEL_UNPACK_BUFFER,GL_STREAM_DRAW);
     }
     if(m_bUsingTexArrays) {
-        if(m_bUsingDebug) {
+        if(m_bUsingDebug) { // NOLINT
             m_pDebugArray = std::make_unique<GLDynamicTexture2DArray>(1,std::vector<cv::Mat>(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT,cv::Mat(m_oFrameSize,m_nDebugType)),m_bUsingIntegralFormat);
             m_pDebugArray->bindToSamplerArray(GLImageProcAlgo::Texture_DebugBinding);
         }
         m_pInputArray = std::make_unique<GLDynamicTexture2DArray>(1,std::vector<cv::Mat>(GLUTILS_IMGPROC_DEFAULT_LAYER_COUNT,cv::Mat(m_oFrameSize,m_nGroundtruthType)),m_bUsingIntegralFormat);
         m_pInputArray->bindToSamplerArray(GLImageProcAlgo::Texture_GTBinding);
         if(m_bUsingInputPBOs) {
-            m_pInputArray->updateTexture(*m_apInputPBOs[m_nCurrPBO],(int)m_nCurrLayer,true);
-            m_pInputArray->updateTexture(*m_apInputPBOs[m_nCurrPBO],(int)m_nNextLayer,true);
+            m_pInputArray->updateTexture(*m_apInputPBOs[m_nCurrPBO],(int)m_nCurrLayer,true); // NOLINT
+            m_pInputArray->updateTexture(*m_apInputPBOs[m_nCurrPBO],(int)m_nNextLayer,true); // NOLINT
         }
         else {
             m_pInputArray->updateTexture(oInitGT,(int)m_nCurrLayer,true);
@@ -630,14 +628,14 @@ void GLImageProcEvaluatorAlgo::initialize_gl(const cv::Mat& oInitGT, const cv::M
             m_vpInputArray[nLayerIter] = std::make_unique<GLDynamicTexture2D>((GLsizei)m_nLevels,cv::Mat(m_oFrameSize,m_nGroundtruthType),m_bUsingIntegralFormat);
             m_vpInputArray[nLayerIter]->bindToSampler((GLuint)getTextureBinding(nLayerIter,GLImageProcAlgo::Texture_GTBinding));
             if(m_bUsingInputPBOs) {
-                if(nLayerIter==m_nCurrLayer)
+                if(nLayerIter==m_nCurrLayer) // NOLINT
                     m_vpInputArray[m_nCurrLayer]->updateTexture(*m_apInputPBOs[m_nCurrPBO],true);
                 else if(nLayerIter==m_nNextLayer)
                     m_vpInputArray[m_nNextLayer]->updateTexture(*m_apInputPBOs[m_nCurrPBO],true);
             }
             else {
                 if(nLayerIter==m_nCurrLayer)
-                    m_vpInputArray[m_nCurrLayer]->updateTexture(oInitGT,true);
+                    m_vpInputArray[m_nCurrLayer]->updateTexture(oInitGT,true); // NOLINT
                 else if(nLayerIter==m_nNextLayer)
                     m_vpInputArray[m_nNextLayer]->updateTexture(oInitGT,true);
             }
@@ -649,7 +647,7 @@ void GLImageProcEvaluatorAlgo::initialize_gl(const cv::Mat& oInitGT, const cv::M
         m_oLastDebug = cv::Mat(m_oFrameSize,m_nDebugType);
     m_vpImgProcShaders.resize(m_nComputeStages);
     for(size_t nCurrStageIter=0; nCurrStageIter<m_nComputeStages; ++nCurrStageIter) {
-        m_vpImgProcShaders[nCurrStageIter] = std::make_unique<GLShader>();
+        m_vpImgProcShaders[nCurrStageIter] = std::make_unique<GLShader>(); // NOLINT
         m_vpImgProcShaders[nCurrStageIter]->addSource(getComputeShaderSource(nCurrStageIter),GL_COMPUTE_SHADER);
         if(!m_vpImgProcShaders[nCurrStageIter]->link())
             lvError("Could not link image processing shader");
@@ -657,11 +655,10 @@ void GLImageProcEvaluatorAlgo::initialize_gl(const cv::Mat& oInitGT, const cv::M
     m_oDisplayShader.clear();
     m_oDisplayShader.addSource(this->getVertexShaderSource(),GL_VERTEX_SHADER);
     m_oDisplayShader.addSource(this->getFragmentShaderSource(),GL_FRAGMENT_SHADER);
-    if(!m_oDisplayShader.link())
-        lvError("Could not link display shader");
+    lvAssert_(m_oDisplayShader.link(),"Could not link display shader"); // NOLINT
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER,getACBOId(GLImageProcAlgo::AtomicCounterBuffer_EvalBinding));
-    glBufferData(GL_ATOMIC_COUNTER_BUFFER,m_nCurrEvalBufferSize,NULL,GL_DYNAMIC_READ);
-    glClearBufferData(GL_ATOMIC_COUNTER_BUFFER,GL_R32UI,GL_RED_INTEGER,GL_INT,NULL);
+    glBufferData(GL_ATOMIC_COUNTER_BUFFER,m_nCurrEvalBufferSize,nullptr,GL_DYNAMIC_READ);
+    glClearBufferData(GL_ATOMIC_COUNTER_BUFFER,GL_R32UI,GL_RED_INTEGER,GL_INT,nullptr);
     /*GLuint* pAtomicCountersPtr = (GLuint*)glMapBufferRange(GL_ATOMIC_COUNTER_BUFFER,0,m_nCurrEvalBufferSize,GL_MAP_WRITE_BIT|GL_MAP_INVALIDATE_BUFFER_BIT|GL_MAP_UNSYNCHRONIZED_BIT);
     if(!pAtomicCountersPtr)
         lvError("Could not init atomic counters");
@@ -693,7 +690,7 @@ void GLImageProcEvaluatorAlgo::apply_gl(const cv::Mat& oNextGT, bool bRebindAll)
     if(m_nCurrEvalBufferOffsetPtr+m_nEvalBufferFrameSize>m_nCurrEvalBufferSize) {
         glBindBuffer(GL_ATOMIC_COUNTER_BUFFER,getACBOId(GLImageProcAlgo::AtomicCounterBuffer_EvalBinding));
         glGetBufferSubData(GL_ATOMIC_COUNTER_BUFFER,0,m_nCurrEvalBufferSize,m_oEvalQueryBuffer.data+m_nCurrEvalBufferOffsetBlock);
-        glClearBufferData(GL_ATOMIC_COUNTER_BUFFER,GL_R32UI,GL_RED_INTEGER,GL_INT,NULL);
+        glClearBufferData(GL_ATOMIC_COUNTER_BUFFER,GL_R32UI,GL_RED_INTEGER,GL_INT,nullptr);
         m_nCurrEvalBufferOffsetBlock += m_nCurrEvalBufferSize;
         m_nCurrEvalBufferOffsetPtr = 0;
     }

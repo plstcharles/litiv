@@ -31,7 +31,7 @@ lv::gl::Context::Context(const cv::Size& oWinSize,
         m_nGLVerMajor(nGLVerMajor),
         m_nGLVerMinor(nGLVerMinor) {
 #if HAVE_GLFW
-    std::call_once(s_oInitFlag,[](){
+    std::call_once(s_oInitFlag,[](){ // NOLINT
         glfwSetErrorCallback(onGLFWErrorCallback);
         if(glfwInit()==GL_FALSE)
             lvError("Failed to init GLFW");
@@ -49,16 +49,15 @@ lv::gl::Context::Context(const cv::Size& oWinSize,
         lvError_("Failed to create [%d,%d] window via GLFW for core GL profile v%d.%d",oWinSize.width,oWinSize.height,nGLVerMajor,nGLVerMinor);
     glfwMakeContextCurrent(m_pWindowHandle.get());
 #elif HAVE_FREEGLUT
-    std::call_once(s_oInitFlag,[](){
+    std::call_once(s_oInitFlag,[](){ // NOLINT
         int argc = 0;
-        glutInit(&argc,NULL);
+        glutInit(&argc,nullptr);
     });
     glutInitDisplayMode(GLUT_SINGLE);
     glutInitWindowSize(oWinSize.width,oWinSize.height);
     glutInitWindowPosition(0,0);
     m_oWindowHandle = std::unique_ptr<glutHandle,glutWindowDeleter>(glutHandle(glutCreateWindow(sWinName.c_str())),glutWindowDeleter());
-    if(!(m_oWindowHandle.get().m_nHandle))
-        lvError("Failed to create window via glut");
+    lvAssert_(m_oWindowHandle.get().m_nHandle!=0,"Failed to create window via glut"); // NOLINT
     glutSetWindow(m_oWindowHandle.get().m_nHandle);
     if(bHide)
         glutHideWindow();
@@ -151,7 +150,7 @@ void lv::gl::Context::initGLEW(size_t nGLVerMajor, size_t nGLVerMinor) {
     if(errn!=GL_NO_ERROR && errn!=GL_INVALID_ENUM)
         lvError_("Unexpected GLEW init error [code=%d, msg=%s]",errn,gluErrorString(errn));
     const std::string sGLEWVersionString = std::string("GL_VERSION_")+std::to_string(nGLVerMajor)+"_"+std::to_string(nGLVerMinor);
-    if(!glewIsSupported(sGLEWVersionString.c_str()))
+    if(glewIsSupported(sGLEWVersionString.c_str())==0u)
         lvError_("Bad GL core/ext version detected (target is %s)",sGLEWVersionString.c_str());
 }
 
@@ -187,14 +186,13 @@ std::string lv::gl::addLineNumbersToString(const std::string& sSrc, bool bPrefix
     std::stringstream ssRes;
     int nCurrLine = 1;
     ssRes << (bPrefixTab?cv::format("\t%06d: ",nCurrLine):cv::format("%06d: ",nCurrLine));
-    for(auto pcSrcCharIter=sSrc.begin(); pcSrcCharIter!=sSrc.end(); ++pcSrcCharIter) {
-        if(*pcSrcCharIter=='\n') {
+    for(char cChar : sSrc) {
+        if(cChar=='\n') {
             ++nCurrLine;
             ssRes << (bPrefixTab?"\n\t":"\n") << cv::format("%06d: ",nCurrLine);
         }
         else
-            ssRes << *pcSrcCharIter;
-
+            ssRes << cChar;
     }
     return ssRes.str();
 }
@@ -208,9 +206,9 @@ void lv::gl::TMT32GenParams::initTinyMT32Generators(glm::uvec3 vGeneratorLayout,
     for(size_t z=0; z<vGeneratorLayout.z; ++z) {
         const size_t nStepSize_Z = z*vGeneratorLayout.y*vGeneratorLayout.x;
         for(size_t y=0; y<vGeneratorLayout.y; ++y) {
-            const size_t nStepSize_Y = y*vGeneratorLayout.x + nStepSize_Z;
+            const size_t nStepSize_Y = y*vGeneratorLayout.x + nStepSize_Z; // NOLINT
             for(size_t x=0; x<vGeneratorLayout.x; ++x) {
-                const size_t nStepSize_X = x + nStepSize_Y;
+                const size_t nStepSize_X = x + nStepSize_Y; // NOLINT
                 TMT32GenParams* pCurrGenParams = pData+nStepSize_X;
                 pCurrGenParams->status[0] = (uint)rand();
                 pCurrGenParams->status[1] = pCurrGenParams->mat1 = 0xF20D1B78;
@@ -218,9 +216,9 @@ void lv::gl::TMT32GenParams::initTinyMT32Generators(glm::uvec3 vGeneratorLayout,
                 pCurrGenParams->status[3] = pCurrGenParams->tmat = 0x30FBDFFF;
                 pCurrGenParams->pad = 1337;
                 for(int nLoop=1; nLoop<8; ++nLoop)
-                    pCurrGenParams->status[nLoop&3] ^= nLoop+UINT32_C(1812433253)*((pCurrGenParams->status[(nLoop-1)&3])^(pCurrGenParams->status[(nLoop-1)&3]>>30));
+                    pCurrGenParams->status[nLoop&3] ^= nLoop+UINT32_C(1812433253)*((pCurrGenParams->status[(nLoop-1)&3])^(pCurrGenParams->status[(nLoop-1)&3]>>30)); // NOLINT
                 for(int nLoop=0; nLoop<8; ++nLoop) {
-                    uint s0 = pCurrGenParams->status[3];
+                    uint s0 = pCurrGenParams->status[3]; // NOLINT
                     uint s1 = (pCurrGenParams->status[0]&UINT32_C(0x7fffffff))^(pCurrGenParams->status[1])^(pCurrGenParams->status[2]);
                     s1 ^= (s1<<1);
                     s0 ^= (s0>>1)^s1;
