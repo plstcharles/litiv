@@ -281,7 +281,7 @@ find_program(CLANG_TIDY_BIN NAMES "clang-tidy")
 if(CLANG_TIDY_BIN)
     message(STATUS "clang-tidy found: ${CLANG_TIDY_BIN}")
     option(USE_CLANG_TIDY_IN_BUILD "Specifies whether the clang-tidy C++ linter should be used or not at compile time" OFF)
-    set(CMAKE_EXPORT_COMPILE_COMMANDS ${USE_CLANG_TIDY})
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
     set(CLANG_TIDY_CHECKS "*,-boost-*,-hicpp-*,-llvm-*,-mpi-*,-objc-*")
     #set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cert-dcl58-cpp") # (std extension) not disabled, but using NOLINT hints
     set(CLANG_TIDY_CHECKS "${CLANG_TIDY_CHECKS},-cert-msc50-cpp,-cert-msc30-c") # disable checks for std::rand()
