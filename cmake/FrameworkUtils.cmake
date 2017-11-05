@@ -159,7 +159,7 @@ macro(litiv_library libname groupname canbeshared sourcelist headerlist)
                 "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
         )
         if(CLANG_TIDY_BIN)
-            set(CLANG_TIDY_FULL_ARGS -p "${CMAKE_BINARY_DIR}/compile_commands.json" ${CLANG_TIDY_ARGS} -header-filter=.* ${${sourcelist}})
+            set(CLANG_TIDY_FULL_ARGS -p "${CMAKE_BINARY_DIR}/compile_commands.json" ${CLANG_TIDY_ARGS} -header-filter=litiv/.* ${${sourcelist}})
             if(USE_CLANG_TIDY_IN_BUILD)
                 add_custom_command(TARGET ${PROJECT_NAME}
                     PRE_BUILD
