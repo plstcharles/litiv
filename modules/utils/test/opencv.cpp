@@ -16,20 +16,20 @@
             ASSERT_TRUE((oType8U.isTypeCompat<cv::Vec<uint8_t,ch>,true>())); \
             ASSERT_FALSE((oType8U.isTypeCompat<cv::Vec<int8_t,ch>,true>())); \
         } \
-        ASSERT_TRUE((std::is_same<lv::MatCVType_<CV_8UC(ch)>::data_type,uchar>::value));\
-        ASSERT_TRUE((chv==1 || std::is_same<lv::MatCVType_<CV_8UC(ch)>::elem_type,cv::Vec<uchar,ch>>::value));\
-        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatCVType_<CV_8UC(ch)>::elem_type,uchar>::value));\
+        ASSERT_TRUE((std::is_same<lv::MatCVType_<CV_8UC(ch)>::data_type,uint8_t>::value));\
+        ASSERT_TRUE((chv==1 || std::is_same<lv::MatCVType_<CV_8UC(ch)>::elem_type,cv::Vec<uint8_t,ch>>::value));\
+        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatCVType_<CV_8UC(ch)>::elem_type,uint8_t>::value));\
         ASSERT_TRUE(lv::MatCVType_<CV_8UC(ch)>::channels()==ch);\
         ASSERT_TRUE(lv::MatCVType_<CV_8UC(ch)>::depth()==CV_8U);\
         ASSERT_TRUE(lv::MatCVType_<CV_8UC(ch)>::depthBytes()==size_t(1));\
         ASSERT_TRUE(lv::MatCVType_<CV_8UC(ch)>::type()==CV_8UC(ch));\
-        ASSERT_TRUE((std::is_same<lv::MatRawType_<uchar,ch>::data_type,uchar>::value));\
-        ASSERT_TRUE((chv==1 || std::is_same<lv::MatRawType_<uchar,ch>::elem_type,cv::Vec<uchar,ch>>::value));\
-        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatRawType_<uchar,ch>::elem_type,uchar>::value));\
-        ASSERT_TRUE((lv::MatRawType_<uchar,ch>::channels()==ch));\
-        ASSERT_TRUE((lv::MatRawType_<uchar,ch>::depth()==CV_8U));\
-        ASSERT_TRUE((lv::MatRawType_<uchar,ch>::depthBytes()==size_t(1)));\
-        ASSERT_TRUE((lv::MatRawType_<uchar,ch>::type()==CV_8UC(ch)));\
+        ASSERT_TRUE((std::is_same<lv::MatRawType_<uint8_t,ch>::data_type,uint8_t>::value));\
+        ASSERT_TRUE((chv==1 || std::is_same<lv::MatRawType_<uint8_t,ch>::elem_type,cv::Vec<uint8_t,ch>>::value));\
+        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatRawType_<uint8_t,ch>::elem_type,uint8_t>::value));\
+        ASSERT_TRUE((lv::MatRawType_<uint8_t,ch>::channels()==ch));\
+        ASSERT_TRUE((lv::MatRawType_<uint8_t,ch>::depth()==CV_8U));\
+        ASSERT_TRUE((lv::MatRawType_<uint8_t,ch>::depthBytes()==size_t(1)));\
+        ASSERT_TRUE((lv::MatRawType_<uint8_t,ch>::type()==CV_8UC(ch)));\
         const lv::MatType oType8S(CV_8SC(ch)); \
         ASSERT_TRUE(oType8S.channels()==ch);\
         ASSERT_TRUE(oType8S.depth()==CV_8S);\
@@ -41,20 +41,20 @@
             ASSERT_TRUE((oType8S.isTypeCompat<cv::Vec<int8_t,ch>,true>())); \
             ASSERT_FALSE((oType8S.isTypeCompat<cv::Vec<uint8_t,ch>,true>())); \
         } \
-        ASSERT_TRUE((std::is_same<lv::MatCVType_<CV_8SC(ch)>::data_type,char>::value));\
-        ASSERT_TRUE((chv==1 || std::is_same<lv::MatCVType_<CV_8SC(ch)>::elem_type,cv::Vec<char,ch>>::value));\
-        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatCVType_<CV_8SC(ch)>::elem_type,char>::value));\
+        ASSERT_TRUE((std::is_same<lv::MatCVType_<CV_8SC(ch)>::data_type,int8_t>::value));\
+        ASSERT_TRUE((chv==1 || std::is_same<lv::MatCVType_<CV_8SC(ch)>::elem_type,cv::Vec<int8_t,ch>>::value));\
+        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatCVType_<CV_8SC(ch)>::elem_type,int8_t>::value));\
         ASSERT_TRUE(lv::MatCVType_<CV_8SC(ch)>::channels()==ch);\
         ASSERT_TRUE(lv::MatCVType_<CV_8SC(ch)>::depth()==CV_8S);\
         ASSERT_TRUE(lv::MatCVType_<CV_8SC(ch)>::depthBytes()==size_t(1));\
         ASSERT_TRUE(lv::MatCVType_<CV_8SC(ch)>::type()==CV_8SC(ch));\
-        ASSERT_TRUE((std::is_same<lv::MatRawType_<char,ch>::data_type,char>::value));\
-        ASSERT_TRUE((chv==1 || std::is_same<lv::MatRawType_<char,ch>::elem_type,cv::Vec<char,ch>>::value));\
-        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatRawType_<char,ch>::elem_type,char>::value));\
-        ASSERT_TRUE((lv::MatRawType_<char,ch>::channels()==ch));\
-        ASSERT_TRUE((lv::MatRawType_<char,ch>::depth()==CV_8S));\
-        ASSERT_TRUE((lv::MatRawType_<char,ch>::depthBytes()==size_t(1)));\
-        ASSERT_TRUE((lv::MatRawType_<char,ch>::type()==CV_8SC(ch)));\
+        ASSERT_TRUE((std::is_same<lv::MatRawType_<int8_t,ch>::data_type,int8_t>::value));\
+        ASSERT_TRUE((chv==1 || std::is_same<lv::MatRawType_<int8_t,ch>::elem_type,cv::Vec<int8_t,ch>>::value));\
+        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatRawType_<int8_t,ch>::elem_type,int8_t>::value));\
+        ASSERT_TRUE((lv::MatRawType_<int8_t,ch>::channels()==ch));\
+        ASSERT_TRUE((lv::MatRawType_<int8_t,ch>::depth()==CV_8S));\
+        ASSERT_TRUE((lv::MatRawType_<int8_t,ch>::depthBytes()==size_t(1)));\
+        ASSERT_TRUE((lv::MatRawType_<int8_t,ch>::type()==CV_8SC(ch)));\
         const lv::MatType oType16U(CV_16UC(ch)); \
         ASSERT_TRUE(oType16U.channels()==ch);\
         ASSERT_TRUE(oType16U.depth()==CV_16U);\
@@ -66,20 +66,20 @@
             ASSERT_TRUE((oType16U.isTypeCompat<cv::Vec<uint16_t,ch>,true>())); \
             ASSERT_FALSE((oType16U.isTypeCompat<cv::Vec<uint8_t,ch>,true>())); \
         } \
-        ASSERT_TRUE((std::is_same<lv::MatCVType_<CV_16UC(ch)>::data_type,ushort>::value));\
-        ASSERT_TRUE((chv==1 || std::is_same<lv::MatCVType_<CV_16UC(ch)>::elem_type,cv::Vec<ushort,ch>>::value));\
-        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatCVType_<CV_16UC(ch)>::elem_type,ushort>::value));\
+        ASSERT_TRUE((std::is_same<lv::MatCVType_<CV_16UC(ch)>::data_type,uint16_t>::value));\
+        ASSERT_TRUE((chv==1 || std::is_same<lv::MatCVType_<CV_16UC(ch)>::elem_type,cv::Vec<uint16_t,ch>>::value));\
+        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatCVType_<CV_16UC(ch)>::elem_type,uint16_t>::value));\
         ASSERT_TRUE(lv::MatCVType_<CV_16UC(ch)>::channels()==ch);\
         ASSERT_TRUE(lv::MatCVType_<CV_16UC(ch)>::depth()==CV_16U);\
         ASSERT_TRUE(lv::MatCVType_<CV_16UC(ch)>::depthBytes()==size_t(2));\
         ASSERT_TRUE(lv::MatCVType_<CV_16UC(ch)>::type()==CV_16UC(ch));\
-        ASSERT_TRUE((std::is_same<lv::MatRawType_<ushort,ch>::data_type,ushort>::value));\
-        ASSERT_TRUE((chv==1 || std::is_same<lv::MatRawType_<ushort,ch>::elem_type,cv::Vec<ushort,ch>>::value));\
-        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatRawType_<ushort,ch>::elem_type,ushort>::value));\
-        ASSERT_TRUE((lv::MatRawType_<ushort,ch>::channels()==ch));\
-        ASSERT_TRUE((lv::MatRawType_<ushort,ch>::depth()==CV_16U));\
-        ASSERT_TRUE((lv::MatRawType_<ushort,ch>::depthBytes()==size_t(2)));\
-        ASSERT_TRUE((lv::MatRawType_<ushort,ch>::type()==CV_16UC(ch)));\
+        ASSERT_TRUE((std::is_same<lv::MatRawType_<uint16_t,ch>::data_type,uint16_t>::value));\
+        ASSERT_TRUE((chv==1 || std::is_same<lv::MatRawType_<uint16_t,ch>::elem_type,cv::Vec<uint16_t,ch>>::value));\
+        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatRawType_<uint16_t,ch>::elem_type,uint16_t>::value));\
+        ASSERT_TRUE((lv::MatRawType_<uint16_t,ch>::channels()==ch));\
+        ASSERT_TRUE((lv::MatRawType_<uint16_t,ch>::depth()==CV_16U));\
+        ASSERT_TRUE((lv::MatRawType_<uint16_t,ch>::depthBytes()==size_t(2)));\
+        ASSERT_TRUE((lv::MatRawType_<uint16_t,ch>::type()==CV_16UC(ch)));\
         const lv::MatType oType16S(CV_16SC(ch)); \
         ASSERT_TRUE(oType16S.channels()==ch);\
         ASSERT_TRUE(oType16S.depth()==CV_16S);\
@@ -91,20 +91,20 @@
             ASSERT_TRUE((oType16S.isTypeCompat<cv::Vec<int16_t,ch>,true>())); \
             ASSERT_FALSE((oType16S.isTypeCompat<cv::Vec<uint8_t,ch>,true>())); \
         } \
-        ASSERT_TRUE((std::is_same<lv::MatCVType_<CV_16SC(ch)>::data_type,short>::value));\
-        ASSERT_TRUE((chv==1 || std::is_same<lv::MatCVType_<CV_16SC(ch)>::elem_type,cv::Vec<short,ch>>::value));\
-        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatCVType_<CV_16SC(ch)>::elem_type,short>::value));\
+        ASSERT_TRUE((std::is_same<lv::MatCVType_<CV_16SC(ch)>::data_type,int16_t>::value));\
+        ASSERT_TRUE((chv==1 || std::is_same<lv::MatCVType_<CV_16SC(ch)>::elem_type,cv::Vec<int16_t,ch>>::value));\
+        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatCVType_<CV_16SC(ch)>::elem_type,int16_t>::value));\
         ASSERT_TRUE(lv::MatCVType_<CV_16SC(ch)>::channels()==ch);\
         ASSERT_TRUE(lv::MatCVType_<CV_16SC(ch)>::depth()==CV_16S);\
         ASSERT_TRUE(lv::MatCVType_<CV_16SC(ch)>::depthBytes()==size_t(2));\
         ASSERT_TRUE(lv::MatCVType_<CV_16SC(ch)>::type()==CV_16SC(ch));\
-        ASSERT_TRUE((std::is_same<lv::MatRawType_<short,ch>::data_type,short>::value));\
-        ASSERT_TRUE((chv==1 || std::is_same<lv::MatRawType_<short,ch>::elem_type,cv::Vec<short,ch>>::value));\
-        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatRawType_<short,ch>::elem_type,short>::value));\
-        ASSERT_TRUE((lv::MatRawType_<short,ch>::channels()==ch));\
-        ASSERT_TRUE((lv::MatRawType_<short,ch>::depth()==CV_16S));\
-        ASSERT_TRUE((lv::MatRawType_<short,ch>::depthBytes()==size_t(2)));\
-        ASSERT_TRUE((lv::MatRawType_<short,ch>::type()==CV_16SC(ch)));\
+        ASSERT_TRUE((std::is_same<lv::MatRawType_<int16_t,ch>::data_type,int16_t>::value));\
+        ASSERT_TRUE((chv==1 || std::is_same<lv::MatRawType_<int16_t,ch>::elem_type,cv::Vec<int16_t,ch>>::value));\
+        ASSERT_TRUE((chv!=1 || std::is_same<lv::MatRawType_<int16_t,ch>::elem_type,int16_t>::value));\
+        ASSERT_TRUE((lv::MatRawType_<int16_t,ch>::channels()==ch));\
+        ASSERT_TRUE((lv::MatRawType_<int16_t,ch>::depth()==CV_16S));\
+        ASSERT_TRUE((lv::MatRawType_<int16_t,ch>::depthBytes()==size_t(2)));\
+        ASSERT_TRUE((lv::MatRawType_<int16_t,ch>::type()==CV_16SC(ch)));\
         const lv::MatType oType32S(CV_32SC(ch)); \
         ASSERT_TRUE(oType32S.channels()==ch);\
         ASSERT_TRUE(oType32S.depth()==CV_32S);\
@@ -198,7 +198,7 @@ TEST(MatType,regression) {
 namespace {
     template<typename T>
     struct MatSize_fixture : testing::Test {};
-    typedef testing::Types<uchar,short,ushort,int,uint,size_t> Size_types;
+    typedef testing::Types<uint8_t,int16_t,uint16_t,int,uint,size_t> Size_types;
 }
 
 TYPED_TEST_CASE(MatSize_fixture,Size_types);
@@ -245,9 +245,9 @@ TYPED_TEST(MatSize_fixture,regression_2d) {
     ASSERT_FALSE(test.empty());
     lv::MatSize test_alt3 = test;
     ASSERT_TRUE(test==test_alt3);
-    lv::MatSize_<int> test_alt4(uchar(34),ushort(12));
+    lv::MatSize_<int> test_alt4(uint8_t(34),uint16_t(12));
     ASSERT_TRUE(test==test_alt4);
-    lv::MatSize_<int> test_alt6{uchar(34),uchar(12)};
+    lv::MatSize_<int> test_alt6{uint8_t(34),uint8_t(12)};
     ASSERT_TRUE(test==test_alt6);
     std::stringstream sstr1;
     sstr1 << test;
@@ -437,20 +437,20 @@ TEST(validateKeyPoints,regression) {
     lv::validateKeyPoints(oROI,vKPs0);
     ASSERT_TRUE(vKPs0.empty());
     oROI.create(640,480,CV_8UC1);
-    oROI = cv::Scalar_<uchar>(255);
+    oROI = cv::Scalar_<uint8_t>(255);
     lv::validateKeyPoints(oROI,vKPs0);
     ASSERT_TRUE(vKPs0.empty());
     std::vector<cv::KeyPoint> vKPs1_orig = {cv::KeyPoint(cv::Point2f(10.0f,15.0f),-1.0f)}, vKPs1=vKPs1_orig;
     lv::validateKeyPoints(oROI,vKPs1);
     ASSERT_TRUE(std::equal(vKPs1.begin(),vKPs1.end(),vKPs1_orig.begin(),lComp));
-    oROI = cv::Scalar_<uchar>(0);
-    oROI.at<uchar>(15,10) = 255;
+    oROI = cv::Scalar_<uint8_t>(0);
+    oROI.at<uint8_t>(15,10) = 255;
     lv::validateKeyPoints(oROI,vKPs1);
     ASSERT_TRUE(std::equal(vKPs1.begin(),vKPs1.end(),vKPs1_orig.begin(),lComp));
     vKPs1.push_back(cv::KeyPoint(cv::Point2f(25.0f,25.0f),-1.0f));
     lv::validateKeyPoints(oROI,vKPs1);
     ASSERT_TRUE(std::equal(vKPs1.begin(),vKPs1.end(),vKPs1_orig.begin(),lComp));
-    oROI = cv::Scalar_<uchar>(0);
+    oROI = cv::Scalar_<uint8_t>(0);
     lv::validateKeyPoints(oROI,vKPs1);
     ASSERT_TRUE(std::equal(vKPs1.begin(),vKPs1.end(),vKPs0.begin(),lComp));
 }
@@ -458,7 +458,7 @@ TEST(validateKeyPoints,regression) {
 namespace {
     template<typename T>
     struct cvunique_fixture : testing::Test {};
-    typedef testing::Types<char, int, float> cvunique_types;
+    typedef testing::Types<int8_t, int, float> cvunique_types;
 }
 TYPED_TEST_CASE(cvunique_fixture,cvunique_types);
 TYPED_TEST(cvunique_fixture,regression) {
@@ -476,7 +476,7 @@ TYPED_TEST(cvunique_fixture,regression) {
 namespace {
     template<typename T>
     struct isEqual_fixture : testing::Test {};
-    typedef testing::Types<char,short,int,float> isEqual_types;
+    typedef testing::Types<int8_t,int16_t,int,float> isEqual_types;
 }
 
 TYPED_TEST_CASE(isEqual_fixture,isEqual_types);
@@ -501,7 +501,7 @@ TYPED_TEST(isEqual_fixture,regression_mdims) {
 
 TEST(isEqual,regression_mchannels) {
     cv::Mat a,b;
-    EXPECT_TRUE(lv::isEqual<uchar>(a,b));
+    EXPECT_TRUE(lv::isEqual<uint8_t>(a,b));
     EXPECT_TRUE(lv::isEqual<float>(a,b));
     cv::RNG rng((unsigned int)time(NULL));
     for(size_t i=0; i<1000; ++i) {
@@ -513,8 +513,8 @@ TEST(isEqual,regression_mchannels) {
         rng.fill(a,cv::RNG::UNIFORM,-200,200,true);
         b = a.clone();
         ASSERT_TRUE(lv::isEqual<cv::Vec3b>(a,b));
-        char& oVal = *(((char*)(b.data))+rand()%b.total());
-        oVal += char(1);
+        int8_t& oVal = *(((int8_t*)(b.data))+rand()%b.total());
+        oVal += int8_t(1);
         ASSERT_FALSE(lv::isEqual<cv::Vec3b>(a,b));
     }
 }
@@ -522,43 +522,43 @@ TEST(isEqual,regression_mchannels) {
 TEST(cvtcolor,hsl2bgr) {
     {
         const cv::Vec3b& vBGR1 = lv::getBGRFromHSL(0.0f,0.0f,0.0f);
-        EXPECT_EQ(vBGR1[0],uchar(0));
-        EXPECT_EQ(vBGR1[1],uchar(0));
-        EXPECT_EQ(vBGR1[2],uchar(0));
+        EXPECT_EQ(vBGR1[0],uint8_t(0));
+        EXPECT_EQ(vBGR1[1],uint8_t(0));
+        EXPECT_EQ(vBGR1[2],uint8_t(0));
         const cv::Vec3b& vBGR2 = lv::getBGRFromHSL(127.0f,0.0f,0.0f);
         EXPECT_EQ(vBGR1,vBGR2);
     }
     {
         const cv::Vec3b& vBGR1 = lv::getBGRFromHSL(0.0f,1.0f,1.0f);
-        EXPECT_EQ(vBGR1[0],uchar(255));
-        EXPECT_EQ(vBGR1[1],uchar(255));
-        EXPECT_EQ(vBGR1[2],uchar(255));
+        EXPECT_EQ(vBGR1[0],uint8_t(255));
+        EXPECT_EQ(vBGR1[1],uint8_t(255));
+        EXPECT_EQ(vBGR1[2],uint8_t(255));
         const cv::Vec3b& vBGR2 = lv::getBGRFromHSL(278.0f,1.0f,1.0f);
         EXPECT_EQ(vBGR1,vBGR2);
     }
     {
         const cv::Vec3b& vBGR = lv::getBGRFromHSL(0.0f,0.0f,0.5f);
-        EXPECT_EQ(vBGR[0],uchar(128));
-        EXPECT_EQ(vBGR[1],uchar(128));
-        EXPECT_EQ(vBGR[2],uchar(128));
+        EXPECT_EQ(vBGR[0],uint8_t(128));
+        EXPECT_EQ(vBGR[1],uint8_t(128));
+        EXPECT_EQ(vBGR[2],uint8_t(128));
     }
     {
         const cv::Vec3b& vBGR = lv::getBGRFromHSL(0.0f,1.0f,0.5f);
-        EXPECT_EQ(vBGR[0],uchar(0));
-        EXPECT_EQ(vBGR[1],uchar(0));
-        EXPECT_EQ(vBGR[2],uchar(255));
+        EXPECT_EQ(vBGR[0],uint8_t(0));
+        EXPECT_EQ(vBGR[1],uint8_t(0));
+        EXPECT_EQ(vBGR[2],uint8_t(255));
     }
     {
         const cv::Vec3b& vBGR = lv::getBGRFromHSL(120.0f,1.0f,0.5f);
-        EXPECT_EQ(vBGR[0],uchar(0));
-        EXPECT_EQ(vBGR[1],uchar(255));
-        EXPECT_EQ(vBGR[2],uchar(0));
+        EXPECT_EQ(vBGR[0],uint8_t(0));
+        EXPECT_EQ(vBGR[1],uint8_t(255));
+        EXPECT_EQ(vBGR[2],uint8_t(0));
     }
     {
         const cv::Vec3b& vBGR = lv::getBGRFromHSL(240.0f,1.0f,0.5f);
-        EXPECT_EQ(vBGR[0],uchar(255));
-        EXPECT_EQ(vBGR[1],uchar(0));
-        EXPECT_EQ(vBGR[2],uchar(0));
+        EXPECT_EQ(vBGR[0],uint8_t(255));
+        EXPECT_EQ(vBGR[1],uint8_t(0));
+        EXPECT_EQ(vBGR[2],uint8_t(0));
     }
 }
 
@@ -599,25 +599,25 @@ TEST(cvtcolor,bgr2hsl) {
 TEST(cvtcolor,bgr2hsl2bgr) {
     srand((uint)time((time_t*)nullptr));
     for(size_t i=0; i<10000; ++i) {
-        const cv::Vec3b vBGR = cv::Vec3b(uchar(rand()%256),uchar(rand()%256),uchar(rand()%256));
+        const cv::Vec3b vBGR = cv::Vec3b(uint8_t(rand()%256),uint8_t(rand()%256),uint8_t(rand()%256));
         ASSERT_EQ(vBGR,lv::getBGRFromHSL(lv::getHSLFromBGR(vBGR))) << " @ " << i << "/10000";
     }
 }
 
 TEST(cvtcolor,bgr2packedycbcr_gray) {
-    const cv::Mat test(20,20,CV_8UC3,cv::Scalar_<uchar>::all(128));
-    cv::Mat_<ushort> oOutput;
+    const cv::Mat test(20,20,CV_8UC3,cv::Scalar_<uint8_t>::all(128));
+    cv::Mat_<uint16_t> oOutput;
     lv::cvtBGRToPackedYCbCr(test,oOutput);
-    ASSERT_EQ(cv::countNonZero(oOutput==ushort(34944)),test.size().area());
+    ASSERT_EQ(cv::countNonZero(oOutput==uint16_t(34944)),test.size().area());
     cv::Mat_<cv::Vec3b> rebuilt;
     lv::cvtPackedYCbCrToBGR(oOutput,rebuilt);
     ASSERT_TRUE(lv::isEqual<cv::Vec3b>(test,rebuilt));
 }
 
 TEST(cvtcolor,bgr2packedycbcr_red) {
-    cv::Mat test(20,20,CV_8UC3,cv::Scalar_<uchar>(0,0,128));
+    cv::Mat test(20,20,CV_8UC3,cv::Scalar_<uint8_t>(0,0,128));
     test.at<cv::Vec3b>(2,5) = cv::Vec3b(160,160,160);
-    cv::Mat_<ushort> oOutput;
+    cv::Mat_<uint16_t> oOutput;
     lv::cvtBGRToPackedYCbCr(test,oOutput);
     {
         cv::Mat_<cv::Vec3b> rebuilt;
@@ -625,28 +625,28 @@ TEST(cvtcolor,bgr2packedycbcr_red) {
         std::vector<cv::Mat> vrebuilt;
         cv::split(rebuilt,vrebuilt);
         ASSERT_EQ(vrebuilt.size(),size_t(3));
-        ASSERT_EQ(cv::countNonZero(vrebuilt[0]==ushort(0)),test.size().area()-1);
-        ASSERT_EQ(cv::countNonZero(vrebuilt[1]==ushort(3)),test.size().area()-1); // noise in green channel due to quantification
-        ASSERT_EQ(cv::countNonZero(vrebuilt[2]==ushort(128)),test.size().area()-1);
-        ASSERT_EQ(cv::countNonZero(vrebuilt[0]==ushort(160)),1);
-        ASSERT_EQ(cv::countNonZero(vrebuilt[1]==ushort(160)),1);
-        ASSERT_EQ(cv::countNonZero(vrebuilt[2]==ushort(160)),1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[0]==uint16_t(0)),test.size().area()-1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[1]==uint16_t(3)),test.size().area()-1); // noise in green channel due to quantification
+        ASSERT_EQ(cv::countNonZero(vrebuilt[2]==uint16_t(128)),test.size().area()-1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[0]==uint16_t(160)),1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[1]==uint16_t(160)),1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[2]==uint16_t(160)),1);
     }
     {
-        std::unique_ptr<ushort[]> pData(new ushort[20*20+7]);
-        cv::Mat_<ushort> oOutput_unaligned(oOutput.rows,oOutput.cols,pData.get()+7);
+        std::unique_ptr<uint16_t[]> pData(new uint16_t[20*20+7]);
+        cv::Mat_<uint16_t> oOutput_unaligned(oOutput.rows,oOutput.cols,pData.get()+7);
         oOutput.copyTo(oOutput_unaligned);
         cv::Mat_<cv::Vec3b> rebuilt;
         lv::cvtPackedYCbCrToBGR(oOutput_unaligned,rebuilt);
         std::vector<cv::Mat> vrebuilt;
         cv::split(rebuilt,vrebuilt);
         ASSERT_EQ(vrebuilt.size(),size_t(3));
-        ASSERT_EQ(cv::countNonZero(vrebuilt[0]==ushort(0)),test.size().area()-1);
-        ASSERT_EQ(cv::countNonZero(vrebuilt[1]==ushort(3)),test.size().area()-1); // noise in green channel due to quantification
-        ASSERT_EQ(cv::countNonZero(vrebuilt[2]==ushort(128)),test.size().area()-1);
-        ASSERT_EQ(cv::countNonZero(vrebuilt[0]==ushort(160)),1);
-        ASSERT_EQ(cv::countNonZero(vrebuilt[1]==ushort(160)),1);
-        ASSERT_EQ(cv::countNonZero(vrebuilt[2]==ushort(160)),1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[0]==uint16_t(0)),test.size().area()-1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[1]==uint16_t(3)),test.size().area()-1); // noise in green channel due to quantification
+        ASSERT_EQ(cv::countNonZero(vrebuilt[2]==uint16_t(128)),test.size().area()-1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[0]==uint16_t(160)),1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[1]==uint16_t(160)),1);
+        ASSERT_EQ(cv::countNonZero(vrebuilt[2]==uint16_t(160)),1);
     }
 
 }
@@ -654,7 +654,7 @@ TEST(cvtcolor,bgr2packedycbcr_red) {
 namespace {
     template<typename T>
     struct readwrite_fixture : testing::Test {};
-    typedef testing::Types<char, short, int, uint8_t, uint16_t, float, double> readwrite_types;
+    typedef testing::Types<int8_t, int16_t, int, uint8_t, uint16_t, float, double> readwrite_types;
 }
 TYPED_TEST_CASE(readwrite_fixture,readwrite_types);
 TYPED_TEST(readwrite_fixture,regression) {
@@ -715,7 +715,7 @@ TEST(pack_unpack,regression) {
         const std::vector<cv::Mat> vNewMats = lv::unpackData(oPacket,vPackInfo);
         ASSERT_EQ(vPackInfo.size(),vNewMats.size());
         for(size_t nMatIdx=0; nMatIdx<nMats; ++nMatIdx)
-            ASSERT_TRUE(lv::isEqual<uchar>(vMats[nMatIdx],vNewMats[nMatIdx]));
+            ASSERT_TRUE(lv::isEqual<uint8_t>(vMats[nMatIdx],vNewMats[nMatIdx]));
     }
 }
 
@@ -746,7 +746,7 @@ TEST(shift,regression_intconstborder) {
 namespace {
     template<typename T>
     struct AlignedMatAllocator_fixture : testing::Test {};
-    typedef testing::Types<char, short, int, uint8_t, uint16_t, float, double> AlignedMatAllocator_types;
+    typedef testing::Types<int8_t, int16_t, int, uint8_t, uint16_t, float, double> AlignedMatAllocator_types;
 }
 TYPED_TEST_CASE(AlignedMatAllocator_fixture,AlignedMatAllocator_types);
 TYPED_TEST(AlignedMatAllocator_fixture,regression) {

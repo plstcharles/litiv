@@ -448,7 +448,7 @@ TEST(sc,regression_emd_check) {
         const float* aDesc1 = oOutputDescs.ptr<float>(0);
         const float* aDesc2 = oOutputDescs.ptr<float>(i);
         if(i==0)
-            ASSERT_EQ(pShapeContext->calcDistance_EMD(aDesc1,aDesc2),0.0);
+            ASSERT_NEAR(pShapeContext->calcDistance_EMD(aDesc1,aDesc2),0.0,1e-15); // never actually 'equal' on arm64...
         else
             ASSERT_GT(pShapeContext->calcDistance_EMD(aDesc1,aDesc2),0.0);
     }

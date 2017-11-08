@@ -75,7 +75,7 @@ TEST(split,regression) {
 namespace {
     template<typename T>
     struct concat_fixture : testing::Test {};
-    typedef testing::Types<char, int, ushort, size_t, float> concat_types;
+    typedef testing::Types<int8_t, int, int16_t, size_t, float> concat_types;
 }
 TYPED_TEST_CASE(concat_fixture,concat_types);
 TYPED_TEST(concat_fixture,regression) {
@@ -89,7 +89,7 @@ TYPED_TEST(concat_fixture,regression) {
 namespace {
     template<typename T>
     struct cvtarrayvec_fixture : testing::Test {};
-    typedef testing::Types<char, int, ushort, size_t, float> cvtarrayvec_types;
+    typedef testing::Types<int8_t, int, int16_t, size_t, float> cvtarrayvec_types;
 }
 TYPED_TEST_CASE(cvtarrayvec_fixture,cvtarrayvec_types);
 TYPED_TEST(cvtarrayvec_fixture,regression) {
@@ -162,7 +162,7 @@ TEST(cumulativeSum,regression) {
 namespace {
     template<typename T>
     struct indices_of_fixture : testing::Test {};
-    typedef testing::Types<char, int, size_t, float> indices_of_types;
+    typedef testing::Types<int8_t, int, size_t, float> indices_of_types;
 }
 TYPED_TEST_CASE(indices_of_fixture,indices_of_types);
 TYPED_TEST(indices_of_fixture,regression) {
@@ -190,7 +190,7 @@ namespace {
             }
         };
     };
-    typedef testing::Types<char, int, float> sort_indices_types;
+    typedef testing::Types<int8_t, int, float> sort_indices_types;
 }
 TYPED_TEST_CASE(sort_indices_fixture,sort_indices_types);
 TYPED_TEST(sort_indices_fixture,regression) {
@@ -222,7 +222,7 @@ namespace {
             }
         };
     };
-    typedef testing::Types<char, int, float> unique_indices_types;
+    typedef testing::Types<int8_t, int, float> unique_indices_types;
 }
 TYPED_TEST_CASE(unique_indices_fixture,unique_indices_types);
 TYPED_TEST(unique_indices_fixture,regression) {
@@ -240,7 +240,7 @@ TYPED_TEST(unique_indices_fixture,regression) {
 namespace {
     template<typename T>
     struct unique_fixture : testing::Test {};
-    typedef testing::Types<char, int, float> unique_types;
+    typedef testing::Types<int8_t, int, float> unique_types;
 }
 TYPED_TEST_CASE(unique_fixture,unique_types);
 TYPED_TEST(unique_fixture,regression) {
@@ -255,7 +255,7 @@ TYPED_TEST(unique_fixture,regression) {
 namespace {
     template<typename T>
     struct make_range_fixture : testing::Test {};
-    typedef testing::Types<char, uchar, short, ushort, int, uint, size_t> make_range_types;
+    typedef testing::Types<int8_t, uint8_t, int16_t, uint16_t, int, uint, size_t> make_range_types;
 }
 TYPED_TEST_CASE(make_range_fixture,make_range_types);
 TYPED_TEST(make_range_fixture,regression) {
@@ -345,7 +345,7 @@ TEST(has_const_iterator,regression) {
 }
 
 TEST(for_each,regression) {
-    const auto test1 = std::make_tuple(uchar(1),int(-34),3.2f,size_t(52),-13.34);
+    const auto test1 = std::make_tuple(uint8_t(1),int(-34),3.2f,size_t(52),-13.34);
     float tot = 0.0f;
     lv::for_each(test1,[&tot](const auto& v){tot += float(v);});
     EXPECT_FLOAT_EQ(tot,1.0f-34.0f+3.2f+52.0f-13.34f);
@@ -362,7 +362,7 @@ TEST(for_each,regression) {
 }
 
 TEST(unpack_and_call,regression) {
-    const auto test1 = std::make_tuple(uchar(1),int(-34),3.2f,size_t(52),-13.34);
+    const auto test1 = std::make_tuple(uint8_t(1),int(-34),3.2f,size_t(52),-13.34);
     const auto testfunc = [](auto v1, auto v2, auto v3, auto v4, auto v5) {
         return double(v1)+double(v2)+double(v3)+double(v4)+double(v5);
     };
@@ -410,7 +410,7 @@ TEST(static_reduce,regression_runtime) {
 namespace {
     template<typename T>
     struct AlignedMemAllocator_fixture : testing::Test {};
-    typedef testing::Types<char, short, int, uint8_t, uint16_t, float, double> AlignedMemAllocator_types;
+    typedef testing::Types<int8_t, int16_t, int, uint8_t, uint16_t, float, double> AlignedMemAllocator_types;
 }
 TYPED_TEST_CASE(AlignedMemAllocator_fixture,AlignedMemAllocator_types);
 TYPED_TEST(AlignedMemAllocator_fixture,regression) {
@@ -427,7 +427,7 @@ TYPED_TEST(AlignedMemAllocator_fixture,regression) {
 namespace {
     template<typename T>
     struct AutoBuffer_fixture : testing::Test {};
-    typedef testing::Types<char, short, int, uint8_t, uint16_t, float, double> AutoBuffer_types;
+    typedef testing::Types<int8_t, int16_t, int, uint8_t, uint16_t, float, double> AutoBuffer_types;
 }
 TYPED_TEST_CASE(AutoBuffer_fixture,AutoBuffer_types);
 TYPED_TEST(AutoBuffer_fixture,regression) {

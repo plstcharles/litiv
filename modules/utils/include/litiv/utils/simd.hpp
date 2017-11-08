@@ -26,7 +26,9 @@
 #define HAVE_MMX 0
 #endif //TARGET_PLATFORM_x64 && HAVE_MMX
 #else //(!defined(_MSC_VER))
+#if defined(__i386__) || defined(__amd64__)
 #include <x86intrin.h>
+#endif //(defined() || defined())
 #endif //(!defined(_MSC_VER))
 
 namespace lv {

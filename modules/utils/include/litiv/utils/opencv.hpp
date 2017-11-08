@@ -36,11 +36,11 @@
 #ifndef CV_MAT_COND_DATA_TYPE
 #define CV_MAT_COND_DATA_TYPE(cvtype_flag) \
     std::enable_if_t<(CV_MAT_DEPTH((cvtype_flag%8))>=0 && CV_MAT_DEPTH((cvtype_flag%8))<=6), \
-        CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),0,uchar, \
-            CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),1,char, \
-                CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),2,ushort, \
-                    CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),3,short, \
-                        CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),4,int, \
+        CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),0,uint8_t, \
+            CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),1,int8_t, \
+                CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),2,uint16_t, \
+                    CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),3,int16_t, \
+                        CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),4,int32_t, \
                             CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),5,float, \
                                 CV_MAT_COND_DEPTH_TYPE((cvtype_flag%8),6,double,void)))))))>
 #endif //ndef(CV_MAT_COND_DATA_TYPE)
@@ -1152,11 +1152,11 @@ namespace lv {
         oOutput.create(oInput.size()); voOutputs[0].create(oInput.size()); voOutputs[1].create(oInput.size()); voOutputs[2].create(oInput.size());
         for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx) {
             const ushort* pPackedRow = oInput.ptr<ushort>(nRowIdx);
-            const bool bPackedRowAligned = isAligned<16>(pPackedRow);
             uchar* pYRow = voOutputs[0].ptr<uchar>(nRowIdx), *pCrRow = voOutputs[1].ptr<uchar>(nRowIdx), *pCbRow = voOutputs[2].ptr<uchar>(nRowIdx);
             lvDbgAssert(isAligned<16>(pYRow) && isAligned<16>(pCrRow) && isAligned<16>(pCbRow));
             int nColIdx = 0;
         #if HAVE_SSE2
+            const bool bPackedRowAligned = isAligned<16>(pPackedRow);
             const __m128i aCrMask = _mm_set1_epi16(short(15));
             const __m128i aYMask = _mm_set1_epi16(short(255));
             for(; nColIdx<=oInput.cols-16; nColIdx+=16) {
