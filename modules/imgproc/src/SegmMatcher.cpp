@@ -321,7 +321,7 @@ struct SegmMatcher::GraphModelData {
     const lv::MatSize m_oGridSize;
     /// contains all 'real' stereo labels, plus the 'occluded'/'dontcare' labels
     const std::vector<OutputLabelType> m_vStereoLabels;
-    /// total number of (re)segmentation labels (could be constexpr, but messes up linking w/ gcc @@@@)
+    /// total number of (re)segmentation labels (could be constexpr, but messes up linking w/ gcc)
     const size_t m_nResegmLabels;
     /// number of 'real' (i.e. non-reserved) stereo disparity labels
     const size_t m_nRealStereoLabels;
@@ -345,8 +345,10 @@ struct SegmMatcher::GraphModelData {
     std::unique_ptr<ResegmModelType> m_pResegmModel;
     /// contains the eroded ROIs used for valid descriptor lookups
     CamArray<cv::Mat_<uchar>> m_aDescROIs;
+    /// contains the super-stacked ROI used for grid setup passed in the constructor (for temporal ops)
+    cv::Mat_<uchar> m_oSuperStackedROI;
     /// contains stacked ROIs used for grid setup passed in the constructor (for temporal ops)
-    CamArray<cv::Mat_<uchar>> m_aStackedROIs;
+    CamArray<cv::Mat_<uchar>> m_aStackedROIs; // note: these mats point to the super-stacked version above
     /// indices of valid nodes in the stereo/resegm graphs (based on primary ROI)
     std::vector<size_t> m_vStereoGraphIdxToMapIdxLUT,m_vResegmGraphIdxToMapIdxLUT;
     /// number of valid nodes/cliques in the stereo/resegm graphs (based on primary ROI)
@@ -379,6 +381,8 @@ struct SegmMatcher::GraphModelData {
     lv::AutoBuffer<ValueType,200> m_aAssocCostApproxAddLUT,m_aAssocCostApproxRemLUT;
     /// gradient factor lookup table for label similarity
     lv::LUT<uchar,float,256> m_aLabelSimCostGradFactLUT;
+    /// temporary features vectors used as swap buffers for precomputation
+    std::vector<cv::Mat> m_vTempFeatures,m_vLoadedFeatures;
 
     /// holds the feature extractor to use on input images
 #if SEGMMATCH_CONFIG_USE_DASCGF_AFFINITY || SEGMMATCH_CONFIG_USE_DASCRF_AFFINITY
@@ -394,8 +398,6 @@ struct SegmMatcher::GraphModelData {
     size_t m_nGridBorderSize;
     /// holds the last/next features packet info vector
     std::vector<lv::MatInfo> m_vExpectedFeatPackInfo,m_vLatestFeatPackInfo;
-    /// holds the next packed features set to unpack when calling 'apply'
-    cv::Mat m_oLatestPackedFeatures;
     /// holds the latest input image/mask matrices (vertically stacked for each layer, for each camera head)
     CamArray<cv::Mat> m_aStackedInputImages,m_aStackedInputMasks;
     /// holds the latest input image/mask matrices (note: mats point to stacked versions above)
@@ -461,7 +463,7 @@ protected:
     void solvePrimalDual(sospd::SubmodularIBFS<ValueType,IndexType>& oMinimizer,
                          const std::vector<TNode>& vNodeMap,
                          const std::vector<size_t>& vGraphIdxToMapIdxLUT,
-                         const cv::Mat_<InternalLabelType>& oLabeling,
+                         cv::Mat_<InternalLabelType>& oLabeling,
                          cv::Mat_<ValueType>& oUnaryCostMap,
                          cv::Mat_<ValueType>& oDualMap,
                          cv::Mat_<ValueType>& oHeightMap,
@@ -719,9 +721,9 @@ void SegmMatcher::apply(const MatArrayIn& aInputs, MatArrayOut& aOutputs) {
     lvDbgExceptionWatch;
     lvAssert_(m_pModelData,"model must be initialized first");
     const size_t nLayerSize = m_pModelData->m_oGridSize.total();
-    for(size_t nInputIdx=0; nInputIdx<aInputs.size(); ++nInputIdx)
+    for(size_t nInputIdx=0u; nInputIdx<aInputs.size(); ++nInputIdx)
         lvAssert__(m_pModelData->m_oGridSize==aInputs[nInputIdx].size,"input in array at index=%d had the wrong size",(int)nInputIdx);
-    for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
+    for(size_t nCamIdx=0u; nCamIdx<getCameraCount(); ++nCamIdx) {
         const cv::Mat& oInputImg = aInputs[nCamIdx*InputPackOffset+InputPackOffset_Img];
         const cv::Mat& oInputMask = aInputs[nCamIdx*InputPackOffset+InputPackOffset_Mask];
         lvAssert_(oInputImg.type()==CV_8UC1 || oInputImg.type()==CV_8UC3,"unexpected input image type");
@@ -729,30 +731,47 @@ void SegmMatcher::apply(const MatArrayIn& aInputs, MatArrayOut& aOutputs) {
         lvAssert_((cv::countNonZero(oInputMask==0)+cv::countNonZero(oInputMask==255))==(int)oInputMask.total(),"input mask must be binary (0 or 255 only)");
         if(m_pModelData->m_aStackedInputImages[nCamIdx].empty() || oInputImg.type()!=m_pModelData->m_aStackedInputImages[nCamIdx].type()) {
             m_pModelData->m_aStackedInputImages[nCamIdx].create(oInputImg.rows*(int)getTemporalLayerCount(),oInputImg.cols,oInputImg.type());
-            for(size_t nLayerIdx=0; nLayerIdx<getTemporalLayerCount(); ++nLayerIdx)
+            for(size_t nLayerIdx=0u; nLayerIdx<getTemporalLayerCount(); ++nLayerIdx)
                 m_pModelData->m_aaInputs[nLayerIdx][nCamIdx*InputPackOffset+InputPackOffset_Img] = cv::Mat(oInputImg.size(),oInputImg.type(),m_pModelData->m_aStackedInputImages[nCamIdx].data+nLayerSize*oInputImg.channels()*nLayerIdx);
         }
     }
     lvAssert_(!m_pModelData->m_bUsePrecalcFeaturesNext || m_pModelData->m_vExpectedFeatPackInfo.size()==FeatPackSize,"unexpected precalculated features vec size");
-    lvDbgAssert(getTemporalLayerCount()>size_t(0));
-    for(size_t nLayerIdx=getTemporalLayerCount()-1; nLayerIdx>0; --nLayerIdx) {
-        for(size_t nInputIdx=0; nInputIdx<aInputs.size(); ++nInputIdx) // copy over all 'old' inputs by sliding one layer at a time
-            m_pModelData->m_aaInputs[nLayerIdx-1][nInputIdx].copyTo(m_pModelData->m_aaInputs[nLayerIdx][nInputIdx]);
-        std::swap(m_pModelData->m_avFeatures[nLayerIdx],m_pModelData->m_avFeatures[nLayerIdx-1]);
+    for(size_t nLayerIdx=getTemporalLayerCount()-1u; nLayerIdx>0; --nLayerIdx) {
+        // copy over all 'old' inputs by sliding one layer at a time
+        for(size_t nInputIdx=0u; nInputIdx<aInputs.size(); ++nInputIdx)
+            m_pModelData->m_aaInputs[nLayerIdx-1u][nInputIdx].copyTo(m_pModelData->m_aaInputs[nLayerIdx][nInputIdx]);
+        for(size_t nCamIdx=0u; nCamIdx<getCameraCount(); ++nCamIdx) {
+            m_pModelData->m_aaStereoLabelings[nLayerIdx-1u][nCamIdx].copyTo(m_pModelData->m_aaStereoLabelings[nLayerIdx][nCamIdx]);
+            m_pModelData->m_aaResegmLabelings[nLayerIdx-1u][nCamIdx].copyTo(m_pModelData->m_aaResegmLabelings[nLayerIdx][nCamIdx]);
+        }
+        std::swap(m_pModelData->m_avFeatures[nLayerIdx],m_pModelData->m_avFeatures[nLayerIdx-1u]);
     }
-    for(size_t nInputIdx=0; nInputIdx<aInputs.size(); ++nInputIdx) // copy new inputs to first layer
+    for(size_t nInputIdx=0u; nInputIdx<aInputs.size(); ++nInputIdx) // copy new inputs to first layer
         aInputs[nInputIdx].copyTo(m_pModelData->m_aaInputs[0][nInputIdx]);
     if(m_pModelData->m_bUsePrecalcFeaturesNext) {
         m_pModelData->m_bUsePrecalcFeaturesNext = false;
-        lvDbgAssert(!m_pModelData->m_oLatestPackedFeatures.empty() && m_pModelData->m_vExpectedFeatPackInfo.size()==FeatPackSize);
-        const std::vector<cv::Mat> vLatestUnpackedFeatures = lv::unpackData(m_pModelData->m_oLatestPackedFeatures,m_pModelData->m_vExpectedFeatPackInfo);
-        std::vector<cv::Mat>& vLatestFeatures = m_pModelData->m_avFeatures[0];
-        for(size_t nFeatsIdx=0; nFeatsIdx<vLatestUnpackedFeatures.size(); ++nFeatsIdx)
-            vLatestUnpackedFeatures[nFeatsIdx].copyTo(vLatestFeatures[nFeatsIdx]);
+        lvDbgAssert(m_pModelData->m_vLoadedFeatures.size()==FeatPackSize);
+        std::swap(m_pModelData->m_vLoadedFeatures,m_pModelData->m_avFeatures[0]);
     }
-    else
+    else {
         m_pModelData->calcFeatures(m_pModelData->m_aaInputs[0]);
+        lvDbgAssert(m_pModelData->m_vTempFeatures.size()==FeatPackSize);
+        std::swap(m_pModelData->m_vTempFeatures,m_pModelData->m_avFeatures[0]);
+    }
+    for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) // only overwrite current resegm labeling temporal layer
+        cv::Mat(((m_pModelData->m_aaInputs[0][nCamIdx*InputPackOffset+InputPackOffset_Mask]>0)&m_pModelData->m_aROIs[nCamIdx])&s_nForegroundLabelIdx).copyTo(m_pModelData->m_aaResegmLabelings[0][nCamIdx]);
+    if(m_pModelData->m_nFramesProcessed==0u) {
+        for(size_t nLayerIdx=1u; nLayerIdx<getTemporalLayerCount(); ++nLayerIdx) {
+            for(size_t nInputIdx=0u; nInputIdx<aInputs.size(); ++nInputIdx) // copy initial inputs to all layers
+                m_pModelData->m_aaInputs[0][nInputIdx].copyTo(m_pModelData->m_aaInputs[nLayerIdx][nInputIdx]);
+            for(size_t nFeatsIdx=0; nFeatsIdx<m_pModelData->m_avFeatures[0].size(); ++nFeatsIdx) // copy initial features to all layers
+                m_pModelData->m_avFeatures[0][nFeatsIdx].copyTo(m_pModelData->m_avFeatures[nLayerIdx][nFeatsIdx]);
+            for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) // copy initial resegm labeling to all layers
+                m_pModelData->m_aaResegmLabelings[0][nCamIdx].copyTo(m_pModelData->m_aaResegmLabelings[nLayerIdx][nCamIdx]);
+        }
+    }
     m_pModelData->infer();
+    ++m_pModelData->m_nFramesProcessed;
     for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
         // copy over latest labelings as output; note: the segm masks may change over future iterations --- user will have to revalidate
         m_pModelData->m_aaStereoLabelings[0][nCamIdx].copyTo(aOutputs[nCamIdx*OutputPackOffset+OutputPackOffset_Disp]);
@@ -819,28 +838,28 @@ cv::Mat SegmMatcher::getAssocCountsMapDisplay() const {
 ////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 SegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs, const std::vector<OutputLabelType>& vRealStereoLabels, size_t nStereoLabelStep, size_t nPrimaryCamIdx) :
-        m_nFramesProcessed(size_t(0)),
+        m_nFramesProcessed(0u),
         m_nMaxStereoMoveCount(SEGMMATCH_DEFAULT_MAX_STEREO_ITER),
         m_nMaxResegmMoveCount(SEGMMATCH_DEFAULT_MAX_RESEGM_ITER),
-        m_nStereoLabelOrderRandomSeed(size_t(0)),
-        m_nStereoLabelingRandomSeed(size_t(0)),
+        m_nStereoLabelOrderRandomSeed(0u),
+        m_nStereoLabelingRandomSeed(0u),
         m_aROIs(CamArray<cv::Mat_<uchar>>{aROIs[0]>0,aROIs[1]>0}),
         m_oGridSize(m_aROIs[0].size()),
         m_vStereoLabels(lv::concat<OutputLabelType>(vRealStereoLabels,std::vector<OutputLabelType>{s_nDontCareLabel,s_nOccludedLabel})),
-        m_nResegmLabels(2),
+        m_nResegmLabels(2u),
         m_nRealStereoLabels(vRealStereoLabels.size()),
-        m_nStereoLabels(vRealStereoLabels.size()+2),
+        m_nStereoLabels(vRealStereoLabels.size()+2u),
         m_nDispOffsetStep(nStereoLabelStep),
         m_nMinDispOffset(size_t(m_vStereoLabels[0])),
-        m_nMaxDispOffset(size_t(m_vStereoLabels.size()>3?m_vStereoLabels[m_vStereoLabels.size()-3]:m_vStereoLabels.back())),
+        m_nMaxDispOffset(size_t(m_vStereoLabels.size()>3u?m_vStereoLabels[m_vStereoLabels.size()-3u]:m_vStereoLabels.back())),
         m_nPrimaryCamIdx(nPrimaryCamIdx),
-        m_nDontCareLabelIdx(InternalLabelType(m_vStereoLabels.size()-2)),
-        m_nOccludedLabelIdx(InternalLabelType(m_vStereoLabels.size()-1)),
+        m_nDontCareLabelIdx(InternalLabelType(m_vStereoLabels.size()-2u)),
+        m_nOccludedLabelIdx(InternalLabelType(m_vStereoLabels.size()-1u)),
         m_bUsePrecalcFeaturesNext(false) {
     static_assert(getCameraCount()==2,"bad static array size, hardcoded stuff in constr init list and below will break");
     lvDbgExceptionWatch;
-    lvAssert_(m_nMaxStereoMoveCount>0 && m_nMaxResegmMoveCount>0,"max iter counts must be strictly positive");
-    for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
+    lvAssert_(m_nMaxStereoMoveCount>0u && m_nMaxResegmMoveCount>0u,"max iter counts must be strictly positive");
+    for(size_t nCamIdx=0u; nCamIdx<getCameraCount(); ++nCamIdx) {
         lvAssert_(lv::MatInfo(m_aROIs[0])==lv::MatInfo(m_aROIs[nCamIdx]),"ROIs info must match");
         lvAssert_(cv::countNonZero(m_aROIs[nCamIdx]>0)>1,"ROIs must have at least two nodes");
     }
@@ -977,8 +996,6 @@ SegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs, cons
     const size_t nLayerSize = m_oGridSize.total();
     lvDbgAssert(nCameraCount>size_t(0));
     lvDbgAssert(nLayerSize>size_t(0));
-    const int nStackedLayersRows = (int)(m_oGridSize[0]*nTemporalLayerCount);
-    const int nStackedLayersCols = (int)(m_oGridSize[1]);
     const std::array<int,3> anAssocMapDims{int(m_oGridSize[0]),int((m_oGridSize[1]+m_nMaxDispOffset/*for oob usage*/)/m_nDispOffsetStep),int(m_nRealStereoLabels*m_nDispOffsetStep)};
     m_oAssocCounts.create(2,anAssocMapDims.data());
     m_oAssocMap.create(3,anAssocMapDims.data());
@@ -987,22 +1004,25 @@ SegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs, cons
 #elif SEGMMATCH_CONFIG_USE_FASTPD_STEREO_INF
     m_oStereoUnaryCosts.create(int(m_nStereoLabels),int(anValidGraphNodes[m_nPrimaryCamIdx])); // @@@ flip for optim?
 #endif //SEGMMATCH_CONFIG_USE_..._STEREO_INF
-    m_oResegmUnaryCosts.create(int(nStackedLayersRows*nCameraCount),nStackedLayersCols);
+    m_oResegmUnaryCosts.create(int(m_oGridSize[0]*nTemporalLayerCount*nCameraCount),int(m_oGridSize[1]));
     m_vStereoGraphIdxToMapIdxLUT.reserve(anValidGraphNodes[m_nPrimaryCamIdx]);
     m_vResegmGraphIdxToMapIdxLUT.reserve(nTotValidNodes*nTemporalLayerCount);
     m_vStereoNodeMap.resize(nLayerSize);
     m_vResegmNodeMap.resize(nLayerSize*nCameraCount*nTemporalLayerCount);
     /// contains the (internal) labelings of the stereo/resegm graph (mutable for inference)
-    m_oSuperStackedStereoLabeling.create(int(nStackedLayersRows*nCameraCount),nStackedLayersCols);
-    m_oSuperStackedResegmLabeling.create(int(nStackedLayersRows*nCameraCount),nStackedLayersCols);
+    m_oSuperStackedStereoLabeling.create(int(m_oGridSize[0]*nTemporalLayerCount*nCameraCount),int(m_oGridSize[1]));
+    m_oSuperStackedResegmLabeling.create(int(m_oGridSize[0]*nTemporalLayerCount*nCameraCount),int(m_oGridSize[1]));
+    m_oSuperStackedROI.create(int(m_oGridSize[0]*nTemporalLayerCount*nCameraCount),int(m_oGridSize[1]));
     m_oSuperStackedStereoLabeling = m_nDontCareLabelIdx;
     m_oSuperStackedResegmLabeling = getResegmBackgroundLabelIdx();
+    m_oSuperStackedROI = 0u;
     for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx) {
-        m_aStackedInputMasks[nCamIdx].create(nStackedLayersRows,nStackedLayersCols,CV_8UC1);
-        m_aStackedStereoLabelings[nCamIdx] = cv::Mat_<InternalLabelType>(nStackedLayersRows,nStackedLayersCols,((InternalLabelType*)m_oSuperStackedStereoLabeling.data)+nLayerSize*nTemporalLayerCount*nCamIdx);
-        m_aStackedResegmLabelings[nCamIdx] = cv::Mat_<InternalLabelType>(nStackedLayersRows,nStackedLayersCols,((InternalLabelType*)m_oSuperStackedResegmLabeling.data)+nLayerSize*nTemporalLayerCount*nCamIdx);
-        m_aGMMCompAssignMap[nCamIdx].create(nStackedLayersRows,nStackedLayersCols);
-        m_aStackedROIs[nCamIdx].create(nStackedLayersRows,nStackedLayersCols);
+        m_aStackedInputMasks[nCamIdx].create(int(m_oGridSize[0]*nTemporalLayerCount),int(m_oGridSize[1]),CV_8UC1);
+        m_aStackedInputMasks[nCamIdx] = getResegmBackgroundLabelIdx();
+        m_aStackedStereoLabelings[nCamIdx] = cv::Mat_<InternalLabelType>(int(m_oGridSize[0]*nTemporalLayerCount),int(m_oGridSize[1]),((InternalLabelType*)m_oSuperStackedStereoLabeling.data)+nLayerSize*nTemporalLayerCount*nCamIdx);
+        m_aStackedResegmLabelings[nCamIdx] = cv::Mat_<InternalLabelType>(int(m_oGridSize[0]*nTemporalLayerCount),int(m_oGridSize[1]),((InternalLabelType*)m_oSuperStackedResegmLabeling.data)+nLayerSize*nTemporalLayerCount*nCamIdx);
+        m_aStackedROIs[nCamIdx] = cv::Mat_<uchar>(int(m_oGridSize[0]*nTemporalLayerCount),int(m_oGridSize[1]),((uchar*)m_oSuperStackedROI.data)+nLayerSize*nTemporalLayerCount*nCamIdx);
+        m_aGMMCompAssignMap[nCamIdx].create(int(m_oGridSize[0]*nTemporalLayerCount),int(m_oGridSize[1]));
         for(size_t nLayerIdx=0; nLayerIdx<nTemporalLayerCount; ++nLayerIdx) {
             m_aaInputs[nLayerIdx][nCamIdx*InputPackOffset+InputPackOffset_Mask] = cv::Mat(m_oGridSize,CV_8UC1,m_aStackedInputMasks[nCamIdx].data+nLayerSize*nLayerIdx);
             m_aaStereoLabelings[nLayerIdx][nCamIdx] = cv::Mat_<InternalLabelType>(nRows,nCols,((InternalLabelType*)m_aStackedStereoLabelings[nCamIdx].data)+nLayerSize*nLayerIdx);
@@ -1011,34 +1031,36 @@ SegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs, cons
         }
     }
     m_nValidStereoGraphNodes = m_nValidResegmGraphNodes = size_t(0);
-    for(int nRowIdx = 0; nRowIdx<nRows; ++nRowIdx) {
-        for(int nColIdx = 0; nColIdx<nCols; ++nColIdx) {
-            // could count cliques w/ stride here to make sure alloc below is perfect size...
-            const size_t nMapIdx = size_t(nRowIdx*nCols+nColIdx);
-            lvDbgAssert(nMapIdx<m_vStereoNodeMap.size());
-            StereoNodeInfo& oStereoNode = m_vStereoNodeMap[nMapIdx];
-            oStereoNode.nRowIdx = nRowIdx;
-            oStereoNode.nColIdx = nColIdx;
-            oStereoNode.bValidGraphNode = m_aROIs[m_nPrimaryCamIdx](nRowIdx,nColIdx)>0;
-            oStereoNode.bNearBorders = m_aDescROIs[m_nPrimaryCamIdx](nRowIdx,nColIdx)==0;
-            oStereoNode.nGraphNodeIdx = SIZE_MAX;
-            oStereoNode.nMapIdx = nMapIdx;
-            oStereoNode.nLUTIdx = nMapIdx; // full map LUT size is the actual map size in stereo graph
-            oStereoNode.nCamIdx = m_nPrimaryCamIdx; // always the same for stereo graph
-            oStereoNode.nLayerIdx = 0; // stereo graph also only has one layer
-            oStereoNode.nUnaryFactID = SIZE_MAX;
-            oStereoNode.pUnaryFunc = nullptr;
-            std::fill_n(oStereoNode.afPairwWeights.begin(),s_nPairwOrients,0.0f);
-            if(oStereoNode.bValidGraphNode) {
-                oStereoNode.nGraphNodeIdx = m_nValidStereoGraphNodes++;
-                m_vStereoGraphIdxToMapIdxLUT.push_back(nMapIdx);
-            }
-            for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx) {
-                const size_t nCamIdxOffset = nTemporalLayerCount*nLayerSize*nCamIdx;
-                const bool bValidGraphNode = m_aROIs[nCamIdx](nRowIdx,nColIdx)>0;
-                const bool bNearBorders = m_aDescROIs[nCamIdx](nRowIdx,nColIdx)==0;
-                for(size_t nLayerIdx=0; nLayerIdx<nTemporalLayerCount; ++nLayerIdx) {
-                    const size_t nLayerIdxOffset = nLayerIdx*nLayerSize;
+    for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx) {
+        const size_t nCamIdxOffset = nTemporalLayerCount*nLayerSize*nCamIdx;
+        for(size_t nLayerIdx=0; nLayerIdx<nTemporalLayerCount; ++nLayerIdx) {
+            const size_t nLayerIdxOffset = nLayerIdx*nLayerSize;
+            for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
+                for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
+                    // could count cliques w/ stride here to make sure alloc below is perfect size...
+                    const size_t nMapIdx = size_t(nRowIdx*nCols+nColIdx);
+                    lvDbgAssert(nMapIdx<m_vStereoNodeMap.size());
+                    const bool bValidGraphNode = m_aROIs[nCamIdx](nRowIdx,nColIdx)>0;
+                    const bool bNearBorders = m_aDescROIs[nCamIdx](nRowIdx,nColIdx)==0;
+                    if(nLayerIdx==0u && nCamIdx==m_nPrimaryCamIdx) {
+                        StereoNodeInfo& oStereoNode = m_vStereoNodeMap[nMapIdx];
+                        oStereoNode.nRowIdx = nRowIdx;
+                        oStereoNode.nColIdx = nColIdx;
+                        oStereoNode.bValidGraphNode = m_aROIs[m_nPrimaryCamIdx](nRowIdx,nColIdx)>0;
+                        oStereoNode.bNearBorders = m_aDescROIs[m_nPrimaryCamIdx](nRowIdx,nColIdx)==0;
+                        oStereoNode.nGraphNodeIdx = SIZE_MAX;
+                        oStereoNode.nMapIdx = nMapIdx;
+                        oStereoNode.nLUTIdx = nMapIdx; // full map LUT size is the actual map size in stereo graph
+                        oStereoNode.nCamIdx = m_nPrimaryCamIdx; // always the same for stereo graph
+                        oStereoNode.nLayerIdx = 0; // stereo graph also only has one layer
+                        oStereoNode.nUnaryFactID = SIZE_MAX;
+                        oStereoNode.pUnaryFunc = nullptr;
+                        std::fill_n(oStereoNode.afPairwWeights.begin(),s_nPairwOrients,0.0f);
+                        if(oStereoNode.bValidGraphNode) {
+                            oStereoNode.nGraphNodeIdx = m_nValidStereoGraphNodes++;
+                            m_vStereoGraphIdxToMapIdxLUT.push_back(nMapIdx);
+                        }
+                    }
                     const size_t nStackedMapIdx = nMapIdx+nLayerIdxOffset;
                     const size_t nLUTIdx = nStackedMapIdx+nCamIdxOffset;
                     lvDbgAssert(nLUTIdx<m_vResegmNodeMap.size());
@@ -1065,6 +1087,7 @@ SegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs, cons
         }
     }
     lvAssert(m_nValidStereoGraphNodes==anValidGraphNodes[m_nPrimaryCamIdx]);
+    lvAssert(m_nValidResegmGraphNodes==nTotValidNodes*nTemporalLayerCount);
     lvAssert(m_vStereoGraphIdxToMapIdxLUT.size()==anValidGraphNodes[m_nPrimaryCamIdx]);
     m_aStereoFuncsData = std::make_unique<ValueType[]>(nStereoFuncDataSize);
     m_pStereoUnaryFuncsDataBase = m_aStereoFuncsData.get();
@@ -1292,7 +1315,7 @@ void SegmMatcher::GraphModelData::updateStereoModel(bool bInit) {
                             vPairwiseStereoFunc(nLabelIdx1,nLabelIdx2) = cost_cast(vPairwiseStereoBaseFunc(nLabelIdx1,nLabelIdx2)*fPairwWeight);
                 }
             }
-            lvAssert(!SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN); // add epipolar terms update here; missing impl @@@
+            lvAssert(!SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN); // add epipolar terms update here; missing impl
         }
     #if SEGMMATCH_CONFIG_USE_PROGRESS_BARS
         if(lv::getVerbosity()>=3)
@@ -1313,6 +1336,7 @@ void SegmMatcher::GraphModelData::resetStereoLabelings(size_t nCamIdx) {
     std::fill(oLabeling.begin(),oLabeling.end(),m_nDontCareLabelIdx);
     lvDbgAssert(m_nValidStereoGraphNodes==m_vStereoGraphIdxToMapIdxLUT.size());
     if(bIsPrimaryCam) {
+        // @@@@@ check if init w/ optflow'd last is better (try both?)
         for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_nValidStereoGraphNodes; ++nGraphNodeIdx) {
             const size_t nLUTNodeIdx = m_vStereoGraphIdxToMapIdxLUT[nGraphNodeIdx];
             const StereoNodeInfo& oNode = m_vStereoNodeMap[nLUTNodeIdx];
@@ -1483,19 +1507,20 @@ void SegmMatcher::GraphModelData::buildResegmModel() {
     lvLog(2,"\tadding temporal factors to resegm graph...");
     m_nResegmTemporalFactCount = size_t(0);
 #if SEGMMATCH_CONFIG_USE_TEMPORAL_CONN // needed here since struct members not instantiated for 0-sized cliques
-    if(nTemporalLayerCount>size_t(1)) {
+    if(nTemporalLayerCount>1u) {
         const std::vector<size_t> aTemporalResegmFuncDims(nTemporalLayerCount,m_nResegmLabels);
         for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_nValidResegmGraphNodes; ++nGraphNodeIdx) {
             const size_t nBaseLUTNodeIdx = m_vResegmGraphIdxToMapIdxLUT[nGraphNodeIdx];
             ResegmNodeInfo& oBaseNode = m_vResegmNodeMap[nBaseLUTNodeIdx];
             lvDbgAssert(oBaseNode.bValidGraphNode);
             oBaseNode.oTemporalClique = {};
-            if(oBaseNode.nLayerIdx!=(nTemporalLayerCount-1) || (oBaseNode.nRowIdx%s_nTemporalCliqueStride) || (oBaseNode.nColIdx%s_nTemporalCliqueStride))
+            if(oBaseNode.nLayerIdx!=(nTemporalLayerCount-1u) || (oBaseNode.nRowIdx%s_nTemporalCliqueStride) || (oBaseNode.nColIdx%s_nTemporalCliqueStride))
                 continue;
             std::vector<size_t> vnLUTNodeIdxs(1,nBaseLUTNodeIdx),vnGraphNodeIdxs(1,nGraphNodeIdx);
-            lvDbgAssert(nBaseLUTNodeIdx>=(oBaseNode.nCamIdx*nTemporalLayerCount+nTemporalLayerCount-1)*nLayerSize);
-            lvDbgAssert(oBaseNode.nRowIdx*nCols+oBaseNode.nColIdx+int(((oBaseNode.nCamIdx+1)*nTemporalLayerCount-1)*nLayerSize)==int(nBaseLUTNodeIdx));
+            lvDbgAssert(nBaseLUTNodeIdx>=(oBaseNode.nCamIdx*nTemporalLayerCount+nTemporalLayerCount-1u)*nLayerSize);
+            lvDbgAssert(oBaseNode.nRowIdx*nCols+oBaseNode.nColIdx+int(((oBaseNode.nCamIdx+1u)*nTemporalLayerCount-1u)*nLayerSize)==int(nBaseLUTNodeIdx));
             for(size_t nOffsetLayerIdx=1; nOffsetLayerIdx<nTemporalLayerCount; ++nOffsetLayerIdx) {
+                lvDbgAssert(nBaseLUTNodeIdx>=nOffsetLayerIdx*nLayerSize);
                 const size_t nOffsetLUTNodeIdx = nBaseLUTNodeIdx-nOffsetLayerIdx*nLayerSize; // for initialization, just pick nodes with no displacement --- will update indices later
                 lvDbgAssert(nOffsetLUTNodeIdx<m_vResegmNodeMap.size());
                 const ResegmNodeInfo& oOffsetNode = m_vResegmNodeMap[nOffsetLUTNodeIdx];
@@ -1520,9 +1545,6 @@ void SegmMatcher::GraphModelData::buildResegmModel() {
             lvDbgAssert(m_pResegmModel->operator[](oTemporalClique.m_nGraphFactorId).numberOfVariables()==nTemporalLayerCount);
             lvDbgAssert(oTemporalClique.m_nGraphFactorId==m_nResegmUnaryFactCount+m_nResegmPairwFactCount+m_nResegmTemporalFactCount);
             oTemporalClique.m_pGraphFunctionPtr = &oResegmFunc.second;
-            oBaseNode.vpCliques.push_back(&oBaseNode.oTemporalClique); // will later have to make sure it stays in there only if valid
-            for(size_t nLayerIdx=0; nLayerIdx<nTemporalLayerCount; ++nLayerIdx)
-                m_vResegmNodeMap[vnLUTNodeIdxs[nLayerIdx]].vCliqueMemberLUT.push_back(std::make_pair(m_nResegmCliqueCount,nLayerIdx));
             ++m_nResegmTemporalFactCount;
             ++m_nResegmCliqueCount;
         }
@@ -1554,7 +1576,9 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
         lvDbgAssert(m_aStackedResegmLabelings[nCamIdx].size==m_aStackedInputImages[nCamIdx].size);
         for(size_t nLayerIdx=0; nLayerIdx<nTemporalLayerCount; ++nLayerIdx) {
             lvDbgAssert(m_aaInputs[nLayerIdx][nCamIdx*InputPackOffset+InputPackOffset_Img].type()==m_aStackedInputImages[nCamIdx].type());
-            lvDbgAssert(m_oGridSize==m_aaResegmLabelings[nLayerIdx][nCamIdx].size && m_oGridSize==m_aaInputs[nLayerIdx][nCamIdx*InputPackOffset+InputPackOffset_Img].size);
+            lvDbgAssert(m_oGridSize==m_aaResegmLabelings[nLayerIdx][nCamIdx].size);
+            lvDbgAssert(m_oGridSize==m_aaStereoLabelings[nLayerIdx][nCamIdx].size);
+            lvDbgAssert(m_oGridSize==m_aaInputs[nLayerIdx][nCamIdx*InputPackOffset+InputPackOffset_Img].size);
         }
     }
 #if SEGMMATCH_CONFIG_USE_GMM_LOCAL_BACKGR
@@ -1566,6 +1590,8 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
             cv::bitwise_and(oCurrGMMROILayer,m_aROIs[nCamIdx],oCurrGMMROILayer);
             lvDbgAssert(oCurrGMMROILayer.data==aGMMROIs[nCamIdx].data+nLayerSize*nLayerIdx); // ... should stay in-place
         }
+        //cv::imshow(std::string("aGMMROIs-")+std::to_string(nCamIdx),aGMMROIs[nCamIdx]);
+        //cv::waitKey(1);
     }
 #else //!SEGMMATCH_CONFIG_USE_GMM_LOCAL_BACKGR
     CamArray<cv::Mat_<uchar>> aGMMROIs = {(m_aStackedROIs[0]>0),(m_aStackedROIs[1]>0)};
@@ -1579,7 +1605,7 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
             assignGaussianMixtureComponents(m_aStackedInputImages[nCamIdx],m_aStackedResegmLabelings[nCamIdx],m_aGMMCompAssignMap[nCamIdx],aGMMROIs[nCamIdx],nCamIdx);
             learnGaussianMixtureParams(m_aStackedInputImages[nCamIdx],m_aStackedResegmLabelings[nCamIdx],m_aGMMCompAssignMap[nCamIdx],aGMMROIs[nCamIdx],nCamIdx);
         }
-        if(lv::getVerbosity()>=4) {
+        /*if(lv::getVerbosity()>=4) {
             cv::Mat_<int> oClusterLabels = m_aGMMCompAssignMap[nCamIdx].clone();
             for(size_t nNodeIdx=0; nNodeIdx<m_aStackedResegmLabelings[nCamIdx].total(); ++nNodeIdx)
                 if(((InternalLabelType*)m_aStackedResegmLabelings[nCamIdx].data)[nNodeIdx])
@@ -1587,7 +1613,7 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
             cv::Mat oClusterLabelsDisplay = lv::getUniqueColorMap(oClusterLabels);
             cv::imshow(std::string("gmm_clusters_")+std::to_string(nCamIdx),oClusterLabelsDisplay);
             cv::waitKey(1);
-        }
+        }*/
     }
     const float fInterSpectrScale = SEGMMATCH_SHPDIST_INTERSPEC_SCALE;
     const float fInterSpectrRatioTot = 1.0f+fInterSpectrScale;
@@ -1606,6 +1632,8 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
         aaBGDist[nLayerIdx] = {m_avFeatures[nLayerIdx][FeatPack_LeftBGDist],m_avFeatures[nLayerIdx][FeatPack_RightBGDist]};
         lvDbgAssert(lv::MatInfo(aaFGDist[nLayerIdx][0])==lv::MatInfo(aaFGDist[nLayerIdx][1]) && m_oGridSize==aaFGDist[nLayerIdx][0].size);
         lvDbgAssert(lv::MatInfo(aaBGDist[nLayerIdx][0])==lv::MatInfo(aaBGDist[nLayerIdx][1]) && m_oGridSize==aaBGDist[nLayerIdx][0].size);
+        //cv::imshow(std::string("aaFGDist-c0")+"-t"+std::to_string(nLayerIdx),aaFGDist[nLayerIdx][0]);
+        //cv::imshow(std::string("aaBGDist-c0")+"-t"+std::to_string(nLayerIdx),aaBGDist[nLayerIdx][0]);
         aaGradY[nLayerIdx] = {m_avFeatures[nLayerIdx][FeatPack_LeftGradY],m_avFeatures[nLayerIdx][FeatPack_RightGradY]};
         aaGradX[nLayerIdx] = {m_avFeatures[nLayerIdx][FeatPack_LeftGradX],m_avFeatures[nLayerIdx][FeatPack_RightGradX]};
         aaGradMag[nLayerIdx] = {m_avFeatures[nLayerIdx][FeatPack_LeftGradMag],m_avFeatures[nLayerIdx][FeatPack_RightGradMag]};
@@ -1614,10 +1642,10 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
         lvDbgAssert(lv::MatInfo(aaGradMag[nLayerIdx][0])==lv::MatInfo(aaGradMag[nLayerIdx][1]) && m_oGridSize==aaGradMag[nLayerIdx][0].size);
         aaOptFlow[0][nLayerIdx] = m_avFeatures[nLayerIdx][FeatPack_LeftOptFlow];
         aaOptFlow[1][nLayerIdx] = m_avFeatures[nLayerIdx][FeatPack_RightOptFlow];
-        if(bInit && nTemporalLayerCount>size_t(1) && m_nFramesProcessed>=nTemporalLayerCount)
-            lvDbgAssert(lv::MatInfo(aaOptFlow[nLayerIdx][0])==lv::MatInfo(aaOptFlow[nLayerIdx][1]) && m_oGridSize==aaOptFlow[nLayerIdx][0].size);
+        lvDbgAssert(lv::MatInfo(aaOptFlow[0][nLayerIdx])==lv::MatInfo(aaOptFlow[1][nLayerIdx]) && m_oGridSize==aaOptFlow[0][nLayerIdx].size);
     }
     if(bInit) {
+        // need to clear clique infos; will update temporal links below
         for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_nValidResegmGraphNodes; ++nGraphNodeIdx) {
             const size_t nLUTNodeIdx = m_vResegmGraphIdxToMapIdxLUT[nGraphNodeIdx];
             ResegmNodeInfo& oNode = m_vResegmNodeMap[nLUTNodeIdx];
@@ -1630,14 +1658,28 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
 #if SEGMMATCH_CONFIG_USE_PROGRESS_BARS
     lv::ProgressBarManager oProgressBarMgr("\tprogress:");
 #endif //SEGMMATCH_CONFIG_USE_PROGRESS_BARS
-    //const cv::Mat oInputImg = m_aInputs[nCamIdx*InputPackOffset+InputPackOffset_Img];
-    //const bool bUsing3ChannelInput = oInputImg.channels()==3;
-    /*cv::Mat_<double> oFGProbMap(m_oGridSize),oBGProbMap(m_oGridSize);
-    oFGProbMap = 0.0; oBGProbMap = 0.0;
-    double dMinFGProb,dMinBGProb;
-    dMinFGProb = dMinBGProb = 9999999;
-    double dMaxFGProb,dMaxBGProb;
-    dMaxFGProb = dMaxBGProb = 0;*/
+    cv::Mat_<double> oFGProbMap,oBGProbMap;
+    cv::Mat_<double> oFGDistMap,oBGDistMap;
+    CamArray<double> adMaxFGProb,adMaxBGProb;
+    CamArray<cv::Mat> aTempLinkDbgImgs;
+    const bool bDisplayDbgMaps = lv::getVerbosity()>=4;
+    if(bDisplayDbgMaps) {
+        lvDbgAssert(m_oSuperStackedResegmLabeling.dims==2);
+        oFGProbMap.create(m_oSuperStackedResegmLabeling.size());
+        oBGProbMap.create(m_oSuperStackedResegmLabeling.size());
+        oFGDistMap.create(m_oSuperStackedResegmLabeling.size());
+        oBGDistMap.create(m_oSuperStackedResegmLabeling.size());
+        oFGProbMap = 0.0; oBGProbMap = 0.0; oFGDistMap = 0.0; oBGDistMap = 0.0;
+        std::fill(adMaxFGProb.begin(),adMaxFGProb.end(),0);
+        std::fill(adMaxBGProb.begin(),adMaxBGProb.end(),0);
+        for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx) {
+            aTempLinkDbgImgs[nCamIdx] = m_aaInputs[0][nCamIdx*InputPackOffset+InputPackOffset_Img].clone();
+            lvDbgAssert(aTempLinkDbgImgs[nCamIdx].channels()==1 || aTempLinkDbgImgs[nCamIdx].channels()==3);
+            if(aTempLinkDbgImgs[nCamIdx].channels()==1)
+                cv::cvtColor(aTempLinkDbgImgs[nCamIdx],aTempLinkDbgImgs[nCamIdx],cv::COLOR_GRAY2BGR);
+            lvDbgAssert(aTempLinkDbgImgs[nCamIdx].type()==CV_8UC3);
+        }
+    }
     size_t nCliqueIdx = 0;
 #if USING_OPENMP
     #pragma omp parallel for
@@ -1653,7 +1695,7 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
         const size_t nMapIdx = oNode.nMapIdx;
         const size_t nStackedIdx = oNode.nStackedIdx;
         lvDbgAssert(nCamIdx<nCameraCount && nLayerIdx<nTemporalLayerCount && nMapIdx<nLayerSize && nStackedIdx<nLayerSize*nTemporalLayerCount);
-        lvDbgAssert(nLUTNodeIdx==(nCamIdx*nTemporalLayerCount*nLayerSize+nLayerIdx*nLayerSize+nRowIdx*nCols+nColIdx));
+        lvDbgAssert(nLUTNodeIdx==(nCamIdx*nTemporalLayerCount*nLayerSize+nLayerIdx*nLayerSize+nMapIdx) && nMapIdx==size_t(nRowIdx*nCols+nColIdx));
         // update unary terms for each grid node
         lvDbgAssert(oNode.nUnaryFactID!=SIZE_MAX && oNode.nUnaryFactID<m_nResegmUnaryFactCount && oNode.pUnaryFunc);
         lvDbgAssert(m_pResegmModel->operator[](oNode.nUnaryFactID).numberOfVariables()==size_t(1));
@@ -1666,9 +1708,6 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
         const ValueType tFGDistUnaryCost = cost_cast((fCurrFGDist+fInitFGDist*fInitDistScale)*SEGMMATCH_SHPDIST_COST_SCALE);
         lvDbgAssert(tFGDistUnaryCost>=cost_cast(0));
         const double dColorFGProb = std::min(std::max(getGMMFGProb(m_aStackedInputImages[nCamIdx],nStackedIdx,nCamIdx),dMinProbDensity),dMaxProbDensity);
-        /*((double*)oFGProbMap.data)[nLUTNodeIdx] = dColorFGProb;
-        dMinFGProb = std::min(dMinFGProb,dColorFGProb);
-        dMaxFGProb = std::max(dMaxFGProb,dColorFGProb);*/
         const ValueType tFGColorUnaryCost = cost_cast(-std::log2(dColorFGProb)*SEGMMATCH_IMGSIM_COST_COLOR_SCALE);
         lvDbgAssert(tFGColorUnaryCost>=cost_cast(0));
         vUnaryResegmLUT(s_nForegroundLabelIdx) = std::min(tFGDistUnaryCost+tFGColorUnaryCost,SEGMMATCH_UNARY_COST_MAXTRUNC_CST);
@@ -1678,13 +1717,18 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
         const ValueType tBGDistUnaryCost = cost_cast((fCurrBGDist+fInitBGDist*fInitDistScale)*SEGMMATCH_SHPDIST_COST_SCALE);
         lvDbgAssert(tBGDistUnaryCost>=cost_cast(0));
         const double dColorBGProb = std::min(std::max(getGMMBGProb(m_aStackedInputImages[nCamIdx],nStackedIdx,nCamIdx),dMinProbDensity),dMaxProbDensity);
-        /*((double*)oBGProbMap.data)[nLUTNodeIdx] = dColorBGProb;
-        dMinBGProb = std::min(dMinBGProb,dColorBGProb);
-        dMaxBGProb = std::max(dMaxBGProb,dColorBGProb);*/
         const ValueType tBGColorUnaryCost = cost_cast(-std::log2(dColorBGProb)*SEGMMATCH_IMGSIM_COST_COLOR_SCALE);
         lvDbgAssert(tBGColorUnaryCost>=cost_cast(0));
         vUnaryResegmLUT(s_nBackgroundLabelIdx) = std::min(tBGDistUnaryCost+tBGColorUnaryCost,SEGMMATCH_UNARY_COST_MAXTRUNC_CST);
         lvDbgAssert(vUnaryResegmLUT(s_nBackgroundLabelIdx)>=cost_cast(0));
+        if(bDisplayDbgMaps) {
+            ((double*)oFGProbMap.data)[nLUTNodeIdx] = dColorFGProb;
+            ((double*)oBGProbMap.data)[nLUTNodeIdx] = dColorBGProb;
+            ((double*)oFGDistMap.data)[nLUTNodeIdx] = fCurrFGDist;
+            ((double*)oBGDistMap.data)[nLUTNodeIdx] = fCurrBGDist;
+            adMaxFGProb[nCamIdx] = std::max(adMaxFGProb[nCamIdx],dColorFGProb);
+            adMaxBGProb[nCamIdx] = std::max(adMaxBGProb[nCamIdx],dColorBGProb);
+        }
         const InternalLabelType nStereoLabelIdx = ((InternalLabelType*)m_oSuperStackedStereoLabeling.data)[nLUTNodeIdx];
         const int nOffsetColIdx = (nStereoLabelIdx<m_nRealStereoLabels)?getOffsetColIdx(nCamIdx,nColIdx,nStereoLabelIdx):INT_MAX;
         if(nOffsetColIdx>=0 && nOffsetColIdx<nCols && m_aROIs[nCamIdx^1](nRowIdx,nOffsetColIdx)) {
@@ -1730,7 +1774,7 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
                         #pragma omp critical
                     #endif //USING_OPENMP
                         {
-                            for(size_t nPairIdx=0; nPairIdx<2; ++nPairIdx)
+                            for(size_t nPairIdx=0; nPairIdx<2u; ++nPairIdx)
                                 m_vResegmNodeMap[oPairwClique.m_anLUTNodeIdxs[nPairIdx]].vCliqueMemberLUT.push_back(std::make_pair(nCliqueIdx,nPairIdx));
                             ++nCliqueIdx;
                         }
@@ -1765,7 +1809,7 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
                         #pragma omp critical
                     #endif //USING_OPENMP
                         {
-                            for(size_t nPairIdx=0; nPairIdx<2; ++nPairIdx)
+                            for(size_t nPairIdx=0; nPairIdx<2u; ++nPairIdx)
                                 m_vResegmNodeMap[oPairwClique.m_anLUTNodeIdxs[nPairIdx]].vCliqueMemberLUT.push_back(std::make_pair(nCliqueIdx,nPairIdx));
                             ++nCliqueIdx;
                         }
@@ -1775,27 +1819,45 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
         }
     #if SEGMMATCH_CONFIG_USE_TEMPORAL_CONN // needed here since struct members not instantiated for 0-sized cliques
         TemporalClique& oTemporalClique = oNode.oTemporalClique;
-        if(bInit && nTemporalLayerCount>size_t(1) && m_nFramesProcessed>=nTemporalLayerCount && oTemporalClique.m_nGraphFactorId!=SIZE_MAX) {
+        if(bInit && nTemporalLayerCount>1u && m_nFramesProcessed>=(nTemporalLayerCount-1u) && oTemporalClique.m_nGraphFactorId!=SIZE_MAX) {
             lvDbgAssert(nLayerIdx==nTemporalLayerCount-1 && oTemporalClique.m_anGraphNodeIdxs.back()==nGraphNodeIdx);
             lvDbgAssert(oTemporalClique.m_pGraphFunctionPtr && m_pResegmModel->operator[](oTemporalClique.m_nGraphFactorId).numberOfVariables()==oTemporalClique.getSize());
             std::vector<size_t> vnLUTNodeIdxs(1,nLUTNodeIdx),vnGraphNodeIdxs(1,nGraphNodeIdx);
             lvDbgAssert(nLUTNodeIdx>=(nCamIdx*nTemporalLayerCount+nTemporalLayerCount-1)*nLayerSize);
             lvDbgAssert(nRowIdx*nCols+nColIdx+int(((nCamIdx+1)*nTemporalLayerCount-1)*nLayerSize)==int(nLUTNodeIdx));
-            oTemporalClique.m_bValid = true;
+            oTemporalClique.m_bValid = true; // temporary assignment, may be revoked by checks below
             for(size_t nOffsetLayerIdx=1; nOffsetLayerIdx<nTemporalLayerCount; ++nOffsetLayerIdx) {
                 const size_t nPreviousLUTNodeIdx = vnLUTNodeIdxs.back();
+                lvDbgAssert(nPreviousLUTNodeIdx<nCameraCount*nTemporalLayerCount*nLayerSize);
                 const ResegmNodeInfo& oPreviousNode = m_vResegmNodeMap[nPreviousLUTNodeIdx];
                 const cv::Vec2f& vFlowDir = aaOptFlow[nCamIdx][nLayerIdx-nOffsetLayerIdx](oPreviousNode.nRowIdx,oPreviousNode.nColIdx);
-                const int nRowOffset = std::max(std::min((int)std::round((float)oPreviousNode.nRowIdx+vFlowDir[0]),nRows),0)-oPreviousNode.nRowIdx;
-                const int nColOffset = std::max(std::min((int)std::round((float)oPreviousNode.nColIdx+vFlowDir[1]),nCols),0)-oPreviousNode.nColIdx;
-                const size_t nOffsetLUTNodeIdx = nPreviousLUTNodeIdx-nLayerSize+(nRowOffset*nCols+nColOffset);
-                lvDbgAssert(nOffsetLUTNodeIdx<((nCamIdx*nTemporalLayerCount+oPreviousNode.nLayerIdx)*nLayerSize));
-                lvDbgAssert(nOffsetLUTNodeIdx>=((nCamIdx*nTemporalLayerCount+oPreviousNode.nLayerIdx-1)*nLayerSize));
+                const int nOffset_Y = (int)std::round((float)oPreviousNode.nRowIdx+vFlowDir[1]);
+                const int nOffset_X = (int)std::round((float)oPreviousNode.nColIdx+vFlowDir[0]);
+                const int nRowOffset = std::max(std::min(nOffset_Y,nRows-1),0)-oPreviousNode.nRowIdx;
+                const int nColOffset = std::max(std::min(nOffset_X,nCols-1),0)-oPreviousNode.nColIdx;
+                const size_t nOffsetLUTNodeIdx = (nPreviousLUTNodeIdx+(nRowOffset*nCols+nColOffset))-nLayerSize;
+                lvDbgAssert__(nOffsetLUTNodeIdx<((nCamIdx*nTemporalLayerCount+(oPreviousNode.nLayerIdx+1u))*nLayerSize),"%d oob",(int)nOffsetLUTNodeIdx);
+                lvDbgAssert__(nOffsetLUTNodeIdx>=((nCamIdx*nTemporalLayerCount+(oPreviousNode.nLayerIdx-1u))*nLayerSize),"%d oob",(int)nOffsetLUTNodeIdx);
                 const ResegmNodeInfo& oOffsetNode = m_vResegmNodeMap[nOffsetLUTNodeIdx];
-                lvDbgAssert(oOffsetNode.nCamIdx==nCamIdx && oOffsetNode.nLayerIdx==(nLayerIdx-nOffsetLayerIdx));
+                lvDbgAssert(oOffsetNode.nCamIdx==nCamIdx);
+                lvDbgAssert(oOffsetNode.nLayerIdx==(nLayerIdx-nOffsetLayerIdx));
                 vnLUTNodeIdxs.push_back(nOffsetLUTNodeIdx);
                 vnGraphNodeIdxs.push_back(oOffsetNode.nGraphNodeIdx);
                 oTemporalClique.m_bValid &= oOffsetNode.bValidGraphNode;
+                if(bDisplayDbgMaps) {
+                    if(nOffsetLayerIdx==(nTemporalLayerCount-1u) && oPreviousNode.bValidGraphNode && oOffsetNode.bValidGraphNode) {
+                        if((oPreviousNode.nRowIdx%16)==0 && (oPreviousNode.nColIdx%16)==0) {
+                            const cv::Point vInit(oPreviousNode.nColIdx,oPreviousNode.nRowIdx),vEnd(oOffsetNode.nColIdx,oOffsetNode.nRowIdx);
+                            if(vInit!=vEnd) {
+                                cv::line(aTempLinkDbgImgs[oOffsetNode.nCamIdx],vInit,vEnd,cv::Scalar_<uchar>(255,0,0),1);
+                                cv::circle(aTempLinkDbgImgs[oPreviousNode.nCamIdx],vInit,1,cv::Scalar_<uchar>(0,0,255),-1);
+                                cv::circle(aTempLinkDbgImgs[oOffsetNode.nCamIdx],vEnd,1,cv::Scalar_<uchar>(0,255,0),-1);
+                            }
+                            else
+                                cv::circle(aTempLinkDbgImgs[oOffsetNode.nCamIdx],vEnd,1,cv::Scalar_<uchar>(0,255,255),-1);
+                        }
+                    }
+                }
             }
             if(oTemporalClique.m_bValid) {
                 std::reverse_copy(vnLUTNodeIdxs.begin(),vnLUTNodeIdxs.end(),oTemporalClique.m_anLUTNodeIdxs.begin());
@@ -1843,15 +1905,39 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
             oProgressBarMgr.update(float(nGraphNodeIdx)/m_anValidGraphNodes[nCamIdx]);
     #endif //SEGMMATCH_CONFIG_USE_PROGRESS_BARS
     }
-    if(bInit) {
+#if SEGMMATCH_CONFIG_USE_TEMPORAL_CONN
+    if(bInit && nTemporalLayerCount>1u && m_nFramesProcessed>=(nTemporalLayerCount-1u))
         m_pResegmModel->finalize(); // needed due to possible temporal clique updates
-        lvDbgAssert(nCliqueIdx<=m_nResegmCliqueCount);
+#endif //SEGMMATCH_CONFIG_USE_TEMPORAL_CONN
+    if(bDisplayDbgMaps) {
+        for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx) {
+            lvDbgAssert(m_aStackedResegmLabelings[nCamIdx].dims==2);
+            cv::Mat_<double> oLocalFGProbMap(2,m_aStackedResegmLabelings[nCamIdx].size,((double*)oFGProbMap.data)+m_aStackedResegmLabelings[nCamIdx].total()*nCamIdx);
+            cv::multiply(oLocalFGProbMap,1.0/adMaxFGProb[nCamIdx],oLocalFGProbMap);
+            cv::Mat_<double> oLocalBGProbMap(2,m_aStackedResegmLabelings[nCamIdx].size,((double*)oBGProbMap.data)+m_aStackedResegmLabelings[nCamIdx].total()*nCamIdx);
+            cv::multiply(oLocalBGProbMap,1.0/adMaxBGProb[nCamIdx],oLocalBGProbMap);
+        }
+        cv::normalize(oFGDistMap,oFGDistMap,1,0,cv::NORM_MINMAX);
+        cv::normalize(oBGDistMap,oBGDistMap,1,0,cv::NORM_MINMAX);
+        cv::Mat oStereoDispMap;
+        m_oSuperStackedStereoLabeling.convertTo(oStereoDispMap,CV_32F,1.0/m_nStereoLabels);
+        if(oFGProbMap.rows>1024 || oFGProbMap.cols>1024) {
+            cv::resize(oStereoDispMap,oStereoDispMap,cv::Size(),0.25,0.25);
+            cv::resize(oFGProbMap,oFGProbMap,cv::Size(),0.25,0.25);
+            cv::resize(oBGProbMap,oBGProbMap,cv::Size(),0.25,0.25);
+            cv::resize(oFGDistMap,oFGDistMap,cv::Size(),0.25,0.25);
+            cv::resize(oBGDistMap,oBGDistMap,cv::Size(),0.25,0.25);
+        }
+        cv::imshow("oStereoDispMap",oStereoDispMap);
+        cv::imshow("oFGProbMap",oFGProbMap);
+        cv::imshow("oBGProbMap",oBGProbMap);
+        cv::imshow("oFGDistMap",oFGDistMap);
+        cv::imshow("oBGDistMap",oBGDistMap);
+        if(bInit && nTemporalLayerCount>1u && m_nFramesProcessed>=(nTemporalLayerCount-1u))
+            for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx)
+                cv::imshow(std::string("dbg-resegm-init-")+std::to_string(nCamIdx),aTempLinkDbgImgs[nCamIdx]);
+        cv::waitKey(1);
     }
-    /*cv::imshow(std::string("oFGProbMap_")+std::to_string(nCamIdx),oFGProbMap);
-    lvCout << " fg : min=" << dMinFGProb << ", max=" << dMaxFGProb << std::endl;
-    cv::imshow(std::string("oBGProbMap_")+std::to_string(nCamIdx),oBGProbMap);
-    lvCout << " bg : min=" << dMinBGProb << ", max=" << dMaxBGProb << std::endl;
-    cv::waitKey(0);*/
     lvLog_(4,"Resegm graph model energy terms update completed in %f second(s).",oLocalTimer.tock());
 }
 
@@ -1866,21 +1952,21 @@ void SegmMatcher::GraphModelData::calcFeatures(const MatArrayIn& aInputs, cv::Ma
         lvAssert__(oInputMask.dims==2 && m_oGridSize==oInputMask.size(),"input mask in array at index=%d had the wrong size",(int)nCamIdx);
         lvAssert_(oInputMask.type()==CV_8UC1,"unexpected input mask type");
     }
-    std::vector<cv::Mat>& vLatestFeatures = m_avFeatures[0];
-    calcImageFeatures(CamArray<cv::Mat>{aInputs[InputPack_LeftImg],aInputs[InputPack_RightImg]},vLatestFeatures);
-    calcShapeFeatures(CamArray<cv::Mat_<InternalLabelType>>{aInputs[InputPack_LeftMask],aInputs[InputPack_RightMask]},vLatestFeatures);
+    m_vTempFeatures.resize(FeatPackSize); // if features must not be returned immediately, they will be swapped from this temporary to the internal array
+    calcImageFeatures(CamArray<cv::Mat>{aInputs[InputPack_LeftImg],aInputs[InputPack_RightImg]},m_vTempFeatures);
+    calcShapeFeatures(CamArray<cv::Mat_<InternalLabelType>>{aInputs[InputPack_LeftMask],aInputs[InputPack_RightMask]},m_vTempFeatures);
     for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
-        vLatestFeatures[nCamIdx*FeatPackOffset+FeatPackOffset_FGDist].copyTo(vLatestFeatures[nCamIdx*FeatPackOffset+FeatPackOffset_InitFGDist]);
-        vLatestFeatures[nCamIdx*FeatPackOffset+FeatPackOffset_BGDist].copyTo(vLatestFeatures[nCamIdx*FeatPackOffset+FeatPackOffset_InitBGDist]);
+        m_vTempFeatures[nCamIdx*FeatPackOffset+FeatPackOffset_FGDist].copyTo(m_vTempFeatures[nCamIdx*FeatPackOffset+FeatPackOffset_InitFGDist]);
+        m_vTempFeatures[nCamIdx*FeatPackOffset+FeatPackOffset_BGDist].copyTo(m_vTempFeatures[nCamIdx*FeatPackOffset+FeatPackOffset_InitBGDist]);
     }
-    for(cv::Mat& oFeatMap : vLatestFeatures)
+    for(cv::Mat& oFeatMap : m_vTempFeatures)
         lvAssert_(oFeatMap.isContinuous(),"internal func used non-continuous data block for feature maps");
     if(pFeaturesPacket)
-        *pFeaturesPacket = lv::packData(vLatestFeatures,&m_vLatestFeatPackInfo);
+        *pFeaturesPacket = lv::packData(m_vTempFeatures,&m_vLatestFeatPackInfo);
     else { // fill pack info manually
-        m_vLatestFeatPackInfo.resize(vLatestFeatures.size());
-        for(size_t nFeatMapIdx=0; nFeatMapIdx<vLatestFeatures.size(); ++nFeatMapIdx)
-            m_vLatestFeatPackInfo[nFeatMapIdx] = lv::MatInfo(vLatestFeatures[nFeatMapIdx]);
+        m_vLatestFeatPackInfo.resize(m_vTempFeatures.size());
+        for(size_t nFeatMapIdx=0; nFeatMapIdx<m_vTempFeatures.size(); ++nFeatMapIdx)
+            m_vLatestFeatPackInfo[nFeatMapIdx] = lv::MatInfo(m_vTempFeatures[nFeatMapIdx]);
     }
     if(m_vExpectedFeatPackInfo.empty())
         m_vExpectedFeatPackInfo = m_vLatestFeatPackInfo;
@@ -1967,7 +2053,7 @@ void SegmMatcher::GraphModelData::calcImageFeatures(const CamArray<cv::Mat>& aIn
         cv::waitKey(0);*/
         cv::Mat& oOptFlow = vFeatures[nCamIdx*FeatPackOffset+FeatPackOffset_OptFlow];
         oOptFlow.create(m_oGridSize,CV_32FC2);
-        if(getTemporalLayerCount()>size_t(1) && m_nFramesProcessed) {
+        if(getTemporalLayerCount()>1u && m_nFramesProcessed>0u) {
             cv::Mat oPreviousInputImg;
             if(aInputImages[nCamIdx].data==m_aaInputs[0][nCamIdx*InputPackOffset+InputPackOffset_Img].data)
                 oPreviousInputImg = m_aaInputs[1][nCamIdx*InputPackOffset+InputPackOffset_Img];
@@ -1976,8 +2062,9 @@ void SegmMatcher::GraphModelData::calcImageFeatures(const CamArray<cv::Mat>& aIn
             lvDbgAssert(lv::MatInfo(aInputImages[nCamIdx])==lv::MatInfo(oPreviousInputImg));
             ofdis::computeFlow(oPreviousInputImg,aInputImages[nCamIdx],oOptFlow);
             lvDbgAssert(m_oGridSize==oOptFlow.size && oOptFlow.type()==CV_32FC2);
-            if(lv::getVerbosity()>=3) {
-                cv::imshow("oOptFlow",lv::getFlowColorMap(oOptFlow));
+            lvDbgAssert(oOptFlow.data==vFeatures[nCamIdx*FeatPackOffset+FeatPackOffset_OptFlow].data);
+            if(lv::getVerbosity()>=4) {
+                cv::imshow(std::string("oOptFlow-")+std::to_string(nCamIdx),lv::getFlowColorMap(oOptFlow));
                 cv::waitKey(1);
             }
         }
@@ -2156,19 +2243,15 @@ void SegmMatcher::GraphModelData::calcShapeDistFeatures(const cv::Mat_<InternalL
     cv::Mat& oFGDist = vFeatures[nCamIdx*FeatPackOffset+FeatPackOffset_FGDist];
     cv::distanceTransform(oInputMask==0,oFGDist,cv::DIST_L2,cv::DIST_MASK_PRECISE,CV_32F);
     cv::exp(SEGMMATCH_DEFAULT_DISTTRANSF_SCALE*oFGDist,oFGDist);
-    //lvPrint(cv::Mat_<float>(oFGDist(cv::Rect(0,128,256,1))));
     cv::divide(1.0,oFGDist,oFGDist);
     oFGDist -= 1.0f;
     cv::min(oFGDist,1000.0f,oFGDist);
-    //lvPrint(cv::Mat_<float>(oFGDist(cv::Rect(0,128,256,1))));
     cv::Mat& oBGDist = vFeatures[nCamIdx*FeatPackOffset+FeatPackOffset_BGDist];
     cv::distanceTransform(oInputMask>0,oBGDist,cv::DIST_L2,cv::DIST_MASK_PRECISE,CV_32F);
     cv::exp(SEGMMATCH_DEFAULT_DISTTRANSF_SCALE*oBGDist,oBGDist);
-    //lvPrint(cv::Mat_<float>(oBGSim(cv::Rect(0,128,256,1))));
     cv::divide(1.0,oBGDist,oBGDist);
     oBGDist -= 1.0f;
     cv::min(oBGDist,1000.0f,oBGDist);
-    //lvPrint(cv::Mat_<float>(oBGDist(cv::Rect(0,128,256,1))));
 }
 
 void SegmMatcher::GraphModelData::initGaussianMixtureParams(const cv::Mat& oInput, const cv::Mat& oMask, const cv::Mat& oROI, size_t nCamIdx) {
@@ -2229,7 +2312,10 @@ void SegmMatcher::GraphModelData::setNextFeatures(const cv::Mat& oPackedFeatures
         m_vExpectedFeatPackInfo[FeatPack_ImgAffinity] = lv::MatInfo(std::array<int,3>{(int)m_oGridSize(0),(int)m_oGridSize(1),(int)m_nRealStereoLabels},CV_32FC1);
         m_vExpectedFeatPackInfo[FeatPack_ShpAffinity] = lv::MatInfo(std::array<int,3>{(int)m_oGridSize(0),(int)m_oGridSize(1),(int)m_nRealStereoLabels},CV_32FC1);
     }
-    m_oLatestPackedFeatures = oPackedFeatures; // get pointer to data instead of copy; provider should not overwrite until next 'apply' call!
+    const std::vector<cv::Mat> vLatestUnpackedFeatures = lv::unpackData(oPackedFeatures,m_vExpectedFeatPackInfo);
+    m_vLoadedFeatures.resize(FeatPackSize);
+    for(size_t nFeatsIdx=0; nFeatsIdx<vLatestUnpackedFeatures.size(); ++nFeatsIdx)
+        vLatestUnpackedFeatures[nFeatsIdx].copyTo(m_vLoadedFeatures[nFeatsIdx]); // makes internal copy, user can discard packet before next 'apply' call
     m_bUsePrecalcFeaturesNext = true;
 }
 
@@ -2441,7 +2527,7 @@ size_t SegmMatcher::GraphModelData::initMinimizer(sospd::SubmodularIBFS<ValueTyp
             const IndexType nCliqueSize = oClique.getSize();
             lvDbgAssert(nCliqueSize<=s_nMaxOrder);
             const IndexType* aGraphNodeIdxs = oClique.getGraphNodeIter();
-            lvDbgAssert(aGraphNodeIdxs[0]==nGraphNodeIdx);
+            lvDbgAssert(std::find(aGraphNodeIdxs,aGraphNodeIdxs+nCliqueSize,nGraphNodeIdx)<aGraphNodeIdxs+nCliqueSize);
             for(size_t nDimIdx=0; nDimIdx<nCliqueSize; ++nDimIdx)
                 lvDbgAssert(aGraphNodeIdxs[nDimIdx]<nGraphNodes);
             oMinimizer.AddClique(
@@ -2463,6 +2549,7 @@ void SegmMatcher::GraphModelData::setupPrimalDual(const std::vector<TNode>& vNod
                                                   size_t nTotLabels, size_t nTotCliques) {
     const size_t nGraphNodes = vGraphIdxToMapIdxLUT.size();
     lvDbgAssert(nGraphNodes>size_t(0) && nTotCliques>size_t(0));
+    lvDbgAssert(nGraphNodes<=oLabeling.total());
     oHeightMap.create((int)nGraphNodes,(int)nTotLabels);
     oHeightMap = cost_cast(0);
     oDualMap.create((int)nTotCliques,(int)(s_nMaxOrder*nTotLabels));
@@ -2494,7 +2581,7 @@ void SegmMatcher::GraphModelData::setupPrimalDual(const std::vector<TNode>& vNod
             ValueType tAvgCost = tCurrCost/nCliqueSize;
             const int tRemainderCost = int(tCurrCost)%int(nCliqueSize);
             const IndexType* aGraphNodeIdxs = oClique.getGraphNodeIter();
-            lvDbgAssert(aGraphNodeIdxs[0]==nGraphNodeIdx);
+            lvDbgAssert(std::find(aGraphNodeIdxs,aGraphNodeIdxs+nCliqueSize,nGraphNodeIdx)<aGraphNodeIdxs+nCliqueSize);
             for(IndexType nDimIdx=0; nDimIdx<nCliqueSize; ++nDimIdx) {
                 const IndexType nOffsetGraphNodeIdx = aGraphNodeIdxs[nDimIdx];
                 lvDbgAssert(nOffsetGraphNodeIdx!=SIZE_MAX && nOffsetGraphNodeIdx<nGraphNodes);
@@ -2513,7 +2600,7 @@ template<typename TNode>
 void SegmMatcher::GraphModelData::solvePrimalDual(sospd::SubmodularIBFS<ValueType,IndexType>& oMinimizer,
                                                   const std::vector<TNode>& vNodeMap,
                                                   const std::vector<size_t>& vGraphIdxToMapIdxLUT,
-                                                  const cv::Mat_<InternalLabelType>& oLabeling,
+                                                  cv::Mat_<InternalLabelType>& oLabeling,
                                                   cv::Mat_<ValueType>& oUnaryCostMap,
                                                   cv::Mat_<ValueType>& oDualMap,
                                                   cv::Mat_<ValueType>& oHeightMap,
@@ -2601,6 +2688,12 @@ void SegmMatcher::GraphModelData::solvePrimalDual(sospd::SubmodularIBFS<ValueTyp
             oMinimizer.AddUnaryTerm((int)nGraphNodeIdx,0,-tUnaryCost);
     }
     oMinimizer.Solve();
+    /*cv::Mat_<uchar> oLabelSwapMap;
+    const bool bDisplaySwapMap = lv::getVerbosity()>=4;
+    if(bDisplaySwapMap) {
+        oLabelSwapMap.create(oLabeling.dims,oLabeling.size);
+        oLabelSwapMap = 0u;
+    }*/
     for(size_t nGraphNodeIdx=0; nGraphNodeIdx<nGraphNodes; ++nGraphNodeIdx) {
         const int nMoveLabel = oMinimizer.GetLabel((int)nGraphNodeIdx);
         lvDbgAssert(nMoveLabel==0 || nMoveLabel==1 || nMoveLabel<0);
@@ -2615,9 +2708,15 @@ void SegmMatcher::GraphModelData::solvePrimalDual(sospd::SubmodularIBFS<ValueTyp
                 if(bUpdateAssocs && nAlphaLabel<m_nDontCareLabelIdx)
                     addAssoc(oNode.nRowIdx,oNode.nColIdx,nAlphaLabel);
                 ++aanChangedLabels[oNode.nLayerIdx][oNode.nCamIdx];
+                /*if(bDisplaySwapMap)
+                    oLabelSwapMap.data[nLUTNodeIdx] = UCHAR_MAX;*/
             }
         }
     }
+    /*if(bDisplaySwapMap) {
+        cv::imshow("curr-swaps",oLabelSwapMap);
+        cv::waitKey(1);
+    }*/
     for(size_t nCliqueIdx=0; nCliqueIdx<nCliqueCount; ++nCliqueIdx) {
         auto& oMinimizer_c = oMinimizer_cliques[nCliqueIdx];
         const std::vector<ValueType>& phiCi = oMinimizer_c.AlphaCi();
@@ -2672,7 +2771,6 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
     static_assert(s_nInputArraySize==4 && getCameraCount()==2,"hardcoded indices below will break");
     lvDbgExceptionWatch;
     const size_t nCameraCount = getCameraCount();
-    const size_t nTemporalLayerCount = getTemporalLayerCount();
     if(lv::getVerbosity()>=3) {
         cv::Mat oTargetImg = m_aaInputs[0][m_nPrimaryCamIdx*InputPackOffset+InputPackOffset_Img].clone();
         if(oTargetImg.channels()==1)
@@ -2693,24 +2791,22 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
         }
         cv::waitKey(1);
     }
+    const size_t nTemporalLayerCount = getTemporalLayerCount();
     updateStereoModel(true);
-    resetStereoLabelings(m_nPrimaryCamIdx);
-    for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx) {
-        cv::Mat(((m_aaInputs[0][nCamIdx*InputPackOffset+InputPackOffset_Mask]>0)&m_aROIs[nCamIdx])&s_nForegroundLabelIdx).copyTo(m_aaResegmLabelings[0][nCamIdx]);
-        lvDbgAssert(m_oGridSize.dims()==2 && m_oGridSize==m_aaStereoLabelings[0][nCamIdx].size && m_oGridSize==m_aaResegmLabelings[0][nCamIdx].size);
-    }
+    resetStereoLabelings(m_nPrimaryCamIdx); // only overwrite current stereo labeling temporal layer, others have been kept & shifted in 'apply'
     lvDbgAssert(m_nValidResegmGraphNodes==m_vResegmGraphIdxToMapIdxLUT.size());
     lvLog_(2,"Running inference for primary camera idx=%d...",(int)m_nPrimaryCamIdx);
 #if (SEGMMATCH_CONFIG_USE_FGBZ_STEREO_INF || SEGMMATCH_CONFIG_USE_FGBZ_RESEGM_INF)
     using HOEReducer = HigherOrderEnergy<ValueType,s_nMaxOrder>;
 #endif //(SEGMMATCH_CONFIG_USE_FGBZ_STEREO_INF || SEGMMATCH_CONFIG_USE_FGBZ_RESEGM_INF)
+    cv::Mat_<InternalLabelType>& oCurrStereoLabeling = m_aaStereoLabelings[0][m_nPrimaryCamIdx];
 #if SEGMMATCH_CONFIG_USE_FASTPD_STEREO_INF
     //calcStereoCosts(m_nPrimaryCamIdx);
     //const size_t nStereoPairwCount = m_nValidStereoGraphNodes*s_nPairwOrients; (max, not actual) // numPairs_
     // pairs_ : lookup node, 1st pairw node idx + 2nd pairw node idx
     // distance_[2ndlabel*nlabels + 1stlabel] : m_aaStereoPairwFuncIDs_base[nCamIdx][nOrientIdx](1stlabel,2ndlabel)
     // weights_ : lookup node, each orient has its weight
-    /*@@@ todo fastpd setup
+    /* still need to cleanup fastpd setup...
     setLabelCosts();
     getNumPairs();
     setPairs();
@@ -2726,7 +2822,7 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
             parameter_.numberOfIterations_,
             weights_
     );*/
-    // @@@@ see if maxflow used in fastpd can be replaced by https://github.com/gerddie/maxflow?
+    // see if maxflow used in fastpd can be replaced by https://github.com/gerddie/maxflow?
 #elif SEGMMATCH_CONFIG_USE_FGBZ_STEREO_INF
     constexpr int nMaxStereoEdgesPerNode = (s_nPairwOrients+s_nEpipolarCliqueEdges);
     kolmogorov::qpbo::QPBO<ValueType> oStereoMinimizer((int)m_nValidStereoGraphNodes,(int)m_nValidStereoGraphNodes*nMaxStereoEdgesPerNode);
@@ -2742,7 +2838,7 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
     lvAssert(nInternalStereoCliqueCount==m_nStereoCliqueCount);
     setupPrimalDual(m_vStereoNodeMap,
                     m_vStereoGraphIdxToMapIdxLUT,
-                    m_aaStereoLabelings[0][m_nPrimaryCamIdx],
+                    oCurrStereoLabeling,
                     m_oStereoDualMap,
                     m_oStereoHeightMap,
                     m_nStereoLabels,
@@ -2759,7 +2855,6 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
     lvDbgAssert(m_vStereoLabelOrdering.size()==m_vStereoLabels.size());
     lv::StopWatch oLocalTimer;
     ValueType tLastStereoEnergy=m_pStereoInf->value(),tLastResegmEnergy=std::numeric_limits<ValueType>::max();
-    cv::Mat_<InternalLabelType>& oCurrStereoLabeling = m_aaStereoLabelings[0][m_nPrimaryCamIdx];
     bool bJustUpdatedSegm = false;
     while(++nStereoMoveIter<=m_nMaxStereoMoveCount && nConsecUnchangedStereoLabels<m_nStereoLabels) {
         const bool bDisableStereoCliques = (SEGMMATCH_CONFIG_USE_UNARY_ONLY_FIRST)&&(nStereoMoveIter<=m_nStereoLabels);
@@ -2772,8 +2867,7 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
         oStereoMinimizer2.arg(outputlabels);
         lvAssert(outputlabels.size()==m_anValidGraphNodes[nPrimaryCamIdx]);
 
-        //pdInference_->run(); @@@ just one iter at a time --- split and use while above
-        // @@@ nullify stereo pairw costs?
+        //pdInference_->run(); just one iter at a time --- split and use while above; add nullify stereo pairw costs?
 
         size_t nChangedStereoLabels = 0;
         for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_anValidGraphNodes[nPrimaryCamIdx]; ++nGraphNodeIdx) {
@@ -2814,13 +2908,15 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
             if(!bDisableStereoCliques) {
                 for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx)
                     lv::gm::factorReducer(oNode.aPairwCliques[nOrientIdx],oStereoReducer,nStereoAlphaLabel,(InternalLabelType*)oCurrStereoLabeling.data);
-                lvAssert(!SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN); // @@@@@ add higher o facts here (3-conn on epi lines?); missing impl
+            #if SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN
+                lv::gm::factorReducer(oNode.oEpipolarClique,oStereoReducer,nStereoAlphaLabel,(InternalLabelType*)oCurrStereoLabeling.data);
+            #endif //SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN
             }
         }
         oStereoMinimizer.Reset();
         oStereoReducer.ToQuadratic(oStereoMinimizer);
         oStereoMinimizer.Solve();
-        oStereoMinimizer.ComputeWeakPersistencies(); // @@@@ check if any good
+        oStereoMinimizer.ComputeWeakPersistencies();
         size_t nChangedStereoLabels = 0;
         for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_nValidStereoGraphNodes; ++nGraphNodeIdx) {
             const size_t nLUTNodeIdx = m_vStereoGraphIdxToMapIdxLUT[nGraphNodeIdx];
@@ -2846,7 +2942,7 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
         const InternalLabelType nStereoAlphaLabel = m_vStereoLabelOrdering[nStereoLabelOrderingIdx];
         calcStereoMoveCosts(nStereoAlphaLabel);
         const bool bStereoMoveCanFlipLabels = std::any_of(StereoGraphNodeIter(this,0),StereoGraphNodeIter(this,m_nValidStereoGraphNodes),[&](const StereoNodeInfo& oNode) {
-            return (((InternalLabelType*)m_aaStereoLabelings[0][m_nPrimaryCamIdx].data)[oNode.nMapIdx])!=nStereoAlphaLabel;
+            return (((InternalLabelType*)oCurrStereoLabeling.data)[oNode.nMapIdx])!=nStereoAlphaLabel;
         });
         TemporalArray<CamArray<size_t>> aanChangedStereoLabels{};
         if(bStereoMoveCanFlipLabels)
@@ -2880,7 +2976,7 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
         else
             ssStereoEnergyDiff << std::showpos << tCurrStereoEnergy-tLastStereoEnergy;
     #if SEGMMATCH_CONFIG_USE_FASTPD_STEREO_INF
-        // no control on label w/ fastpd (could decompose algo later on...) @@@
+        // no control on label w/ fastpd (could decompose algo later on...)
         lvLog_(2,"\t\tdisp      e = %d      (delta=%s)      [stereo-iter=%d]",(int)tCurrStereoEnergy,ssStereoEnergyDiff.str().c_str(),(int)nStereoMoveIter);
     #else //!SEGMMATCH_CONFIG_USE_FASTPD_STEREO_INF
         lvLog_(2,"\t\tdisp [+label:%d]   e = %d   (delta=%s)      [stereo-iter=%d]",(int)nStereoAlphaLabel,(int)tCurrStereoEnergy,ssStereoEnergyDiff.str().c_str(),(int)nStereoMoveIter);
@@ -2906,6 +3002,10 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
                     }
                 }
             }
+            if(m_nFramesProcessed==0u) // copy latest stereo labeling to all temporal layers if initial frame
+                for(size_t nLayerIdx=1u; nLayerIdx<getTemporalLayerCount(); ++nLayerIdx)
+                    for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx)
+                        m_aaStereoLabelings[0][nCamIdx].copyTo(m_aaStereoLabelings[nLayerIdx][nCamIdx]);
             size_t nTotChangedResegmLabels=0,nConsecUnchangedResegmLabels=0;
             constexpr std::array<InternalLabelType,2> anResegmLabels = {s_nForegroundLabelIdx,s_nBackgroundLabelIdx};
             const size_t nInitResegmMoveIter = nResegmMoveIter;
@@ -2932,14 +3032,14 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
                     }
                     for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx)
                         lv::gm::factorReducer(oNode.aPairwCliques[nOrientIdx],oResegmReducer,nResegmAlphaLabel,(InternalLabelType*)m_oSuperStackedResegmLabeling.data);
-            #if SEGMMATCH_CONFIG_USE_TEMPORAL_CONN
+                #if SEGMMATCH_CONFIG_USE_TEMPORAL_CONN
                     lv::gm::factorReducer(oNode.oTemporalClique,oResegmReducer,nResegmAlphaLabel,(InternalLabelType*)m_oSuperStackedResegmLabeling.data);
-            #endif //SEGMMATCH_CONFIG_USE_TEMPORAL_CONN
+                #endif //SEGMMATCH_CONFIG_USE_TEMPORAL_CONN
                 }
                 oResegmMinimizer.Reset();
                 oResegmReducer.ToQuadratic(oResegmMinimizer);
                 oResegmMinimizer.Solve();
-                oResegmMinimizer.ComputeWeakPersistencies(); // @@@@ check if any good
+                oResegmMinimizer.ComputeWeakPersistencies();
                 for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_nValidResegmGraphNodes; ++nGraphNodeIdx) {
                     const size_t nLUTNodeIdx = m_vResegmGraphIdxToMapIdxLUT[nGraphNodeIdx];
                     const ResegmNodeInfo& oNode = m_vResegmNodeMap[nLUTNodeIdx];
@@ -2981,19 +3081,6 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
                                     m_nResegmLabels,false,
                                     aanChangedResegmLabels);
             #endif //SEGMMATCH_CONFIG_USE_..._RESEGM_INF
-                if(lv::getVerbosity()>=3) {
-                    for(size_t nLayerIdx=0; nLayerIdx<nTemporalLayerCount; ++nLayerIdx) {
-                        if(m_nFramesProcessed>=nLayerIdx) {
-                            for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx) {
-                                cv::Mat oCurrLabelingDisplay = getResegmMapDisplay(nLayerIdx,nCamIdx);
-                                if(oCurrLabelingDisplay.size().area()<640*480)
-                                    cv::resize(oCurrLabelingDisplay,oCurrLabelingDisplay,cv::Size(),2,2,cv::INTER_NEAREST);
-                                cv::imshow(std::string("segm-")+std::to_string(nCamIdx)+" @ t="+std::to_string(nLayerIdx),oCurrLabelingDisplay);
-                                cv::waitKey(1);
-                            }
-                        }
-                    }
-                }
                 const ValueType tCurrResegmEnergy = m_pResegmInf->value();
                 lvDbgAssert(tCurrResegmEnergy>=cost_cast(0));
                 std::stringstream ssResegmEnergyDiff;
@@ -3015,9 +3102,22 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
                 nConsecUnchangedResegmLabels = (nChangedResegmLabels>0)?0:nConsecUnchangedResegmLabels+1;
                 nTotChangedResegmLabels += nChangedResegmLabels;
                 tLastResegmEnergy = tCurrResegmEnergy;
+                if(lv::getVerbosity()>=3) {
+                    for(size_t nLayerIdx=0; nLayerIdx<nTemporalLayerCount; ++nLayerIdx) {
+                        if(m_nFramesProcessed>=nLayerIdx) {
+                            for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx) {
+                                cv::Mat oCurrLabelingDisplay = getResegmMapDisplay(nLayerIdx,nCamIdx);
+                                if(oCurrLabelingDisplay.size().area()<640*480)
+                                    cv::resize(oCurrLabelingDisplay,oCurrLabelingDisplay,cv::Size(),2,2,cv::INTER_NEAREST);
+                                cv::imshow(std::string("segm-")+std::to_string(nCamIdx)+" @ t="+std::to_string(nLayerIdx),oCurrLabelingDisplay);
+                                cv::waitKey(1);
+                            }
+                        }
+                    }
+                }
             }
             if(nTotChangedResegmLabels) {
-                calcShapeFeatures(m_aaResegmLabelings[0],m_avFeatures[0]);
+                calcShapeFeatures(m_aaResegmLabelings[0],m_avFeatures[0]); // only need to update latest labeling set for stereo
                 updateStereoModel(false);
                 bJustUpdatedSegm = true;
                 nConsecUnchangedStereoLabels = 0;
@@ -3030,7 +3130,6 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
     lvLog_(2,"Inference for primary camera idx=%d completed in %f second(s).",(int)m_nPrimaryCamIdx,oLocalTimer.tock());
     if(lv::getVerbosity()>=4)
         cv::waitKey(0);
-    ++m_nFramesProcessed;
     return opengm::InferenceTermination::NORMAL;
 }
 
@@ -3048,11 +3147,11 @@ cv::Mat SegmMatcher::GraphModelData::getResegmMapDisplay(size_t nLayerIdx, size_
         for(int nColIdx=0; nColIdx<m_aaResegmLabelings[nLayerIdx][nCamIdx].cols; ++nColIdx) {
             const InternalLabelType nCurrLabel = m_aaResegmLabelings[nLayerIdx][nCamIdx](nRowIdx,nColIdx);
             const uchar nInitLabel = m_aaInputs[nLayerIdx][nCamIdx*InputPackOffset+InputPackOffset_Mask].at<uchar>(nRowIdx,nColIdx);
-            if(nCurrLabel==s_nForegroundLabelIdx && nInitLabel>0)
+            if(nCurrLabel==s_nForegroundLabelIdx && nInitLabel>0u)
                 oOutput.at<cv::Vec3b>(nRowIdx,nColIdx) = cv::Vec3b(127,127,127);
-            else if(nCurrLabel==s_nBackgroundLabelIdx && nInitLabel>0)
+            else if(nCurrLabel==s_nBackgroundLabelIdx && nInitLabel>0u)
                 oOutput.at<cv::Vec3b>(nRowIdx,nColIdx) = cv::Vec3b(0,0,127);
-            else if(nCurrLabel==s_nForegroundLabelIdx && nInitLabel==0)
+            else if(nCurrLabel==s_nForegroundLabelIdx && nInitLabel==0u)
                 oOutput.at<cv::Vec3b>(nRowIdx,nColIdx) = cv::Vec3b(0,127,0);
             else
                 oOutput.at<cv::Vec3b>(nRowIdx,nColIdx) = cv::Vec3b(0,0,0);

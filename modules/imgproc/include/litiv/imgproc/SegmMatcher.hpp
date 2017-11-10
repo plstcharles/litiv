@@ -30,7 +30,7 @@ struct SegmMatcher : ICosegmentor<int32_t,4> { // camera count could be template
     using OutputLabelType = int32_t; ///< type used in returned labelings (i.e. output of 'apply')
     using AssocCountType = uint16_t; ///< type used for stereo association counting in cv::Mat_'s
     using AssocIdxType = int16_t; ///< type used for stereo association idx listing in cv::Mat_'s
-    using ValueType =  int64_t; ///< type used for factor values (@@@@ could be integer? retest speed later?)
+    using ValueType =  int32_t; ///< type used for factor values (@@@@ could be integer? retest speed later?)
     using IndexType = size_t; ///< type used for node indexing (note: pretty much hardcoded everywhere in impl below)
     using ICosegmentor<OutputLabelType,s_nInputArraySize,s_nOutputArraySize>::apply; ///< helps avoid 'no matching function' issues for apply overloads
     template<typename T> using CamArray = std::array<T,getInputStreamCount()/2>; ///< shortcut typename for variables and members that are assigned to each camera head
@@ -93,7 +93,7 @@ struct SegmMatcher : ICosegmentor<int32_t,4> { // camera count could be template
     virtual void initialize(const std::array<cv::Mat,s_nCameraCount>& aROIs, size_t nPrimaryCamIdx=0);
     /// stereo matcher function; solves the graph model to find pixel-level matches on epipolar lines in the masked input images, and returns disparity maps + masks
     virtual void apply(const MatArrayIn& aInputs, MatArrayOut& aOutputs) override;
-    /// (pre)calculates initial features required for model updates, and optionally returns them in packet format for archiving
+    /// (pre)calculates features required for model updates, and optionally returns them in packet format
     virtual void calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeaturesPacket=nullptr);
     /// sets a previously precalculated initial features packet to be used in the next 'apply' call (do not modify its data before that!)
     virtual void setNextFeatures(const cv::Mat& oPackedFeatures);
