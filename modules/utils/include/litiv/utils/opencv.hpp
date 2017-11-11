@@ -199,11 +199,37 @@ namespace lv {
             lvAssert__((CV_MAT_DEPTH(m_nCVType)>=0 && CV_MAT_DEPTH(m_nCVType)<=6),"bad ocv type depth (type=%d, depth=%d)",m_nCVType,CV_MAT_DEPTH(m_nCVType));
             lvAssert__((CV_MAT_CN(m_nCVType)>0 && CV_MAT_CN(m_nCVType)<=4),"bad ocv type channels (type=%d, channels=%d)",m_nCVType,CV_MAT_CN(m_nCVType));
         }
+        /// cv mat-based constructor (non-templated); only validates m_nCVType in debug config
+        MatType(const cv::Mat& oMat) : m_nCVType(oMat.type()) { // NOLINT
+            lvDbgAssert__((CV_MAT_DEPTH(m_nCVType)>=0 && CV_MAT_DEPTH(m_nCVType)<=6),"bad ocv type depth (type=%d, depth=%d)",m_nCVType,CV_MAT_DEPTH(m_nCVType));
+            lvDbgAssert__((CV_MAT_CN(m_nCVType)>0 && CV_MAT_CN(m_nCVType)<=4),"bad ocv type channels (type=%d, channels=%d)",m_nCVType,CV_MAT_CN(m_nCVType));
+        }
+        /// cv mat-based constructor (templated); only validates m_nCVType in debug config
+        template<typename TVal>
+        MatType(const cv::Mat_<TVal>& oMat) : m_nCVType(oMat.type()) { // NOLINT
+            lvDbgAssert__((CV_MAT_DEPTH(m_nCVType)>=0 && CV_MAT_DEPTH(m_nCVType)<=6),"bad ocv type depth (type=%d, depth=%d)",m_nCVType,CV_MAT_DEPTH(m_nCVType));
+            lvDbgAssert__((CV_MAT_CN(m_nCVType)>0 && CV_MAT_CN(m_nCVType)<=4),"bad ocv type channels (type=%d, channels=%d)",m_nCVType,CV_MAT_CN(m_nCVType));
+        }
         /// assignment operator for new opencv matrix data type
         MatType& operator=(int nCVType) {
             lvAssert__((CV_MAT_DEPTH(nCVType)>=0 && CV_MAT_DEPTH(nCVType)<=6),"bad ocv type depth (type=%d, depth=%d)",nCVType,CV_MAT_DEPTH(nCVType));
             lvAssert__((CV_MAT_CN(nCVType)>0 && CV_MAT_CN(nCVType)<=4),"bad ocv type channels (type=%d, channels=%d)",nCVType,CV_MAT_CN(nCVType));
             m_nCVType = nCVType;
+            return *this;
+        }
+        /// assignment operator for new opencv matrix (non-templated)
+        MatType& operator=(const cv::Mat& oMat) {
+            lvDbgAssert__((CV_MAT_DEPTH(oMat.type())>=0 && CV_MAT_DEPTH(oMat.type())<=6),"bad ocv type depth (type=%d, depth=%d)",oMat.type(),CV_MAT_DEPTH(oMat.type()));
+            lvDbgAssert__((CV_MAT_CN(oMat.type())>0 && CV_MAT_CN(oMat.type())<=4),"bad ocv type channels (type=%d, channels=%d)",oMat.type(),CV_MAT_CN(oMat.type()));
+            m_nCVType = oMat.type();
+            return *this;
+        }
+        /// assignment operator for new opencv matrix (templated)
+        template<typename TVal>
+        MatType& operator=(const cv::Mat_<TVal>& oMat) {
+            lvDbgAssert__((CV_MAT_DEPTH(oMat.type())>=0 && CV_MAT_DEPTH(oMat.type())<=6),"bad ocv type depth (type=%d, depth=%d)",oMat.type(),CV_MAT_DEPTH(oMat.type()));
+            lvDbgAssert__((CV_MAT_CN(oMat.type())>0 && CV_MAT_CN(oMat.type())<=4),"bad ocv type channels (type=%d, channels=%d)",oMat.type(),CV_MAT_CN(oMat.type()));
+            m_nCVType = oMat.type();
             return *this;
         }
         /// returns the channel count for the underlying mat data (i.e. smallest implicit mat dim)
@@ -302,6 +328,13 @@ namespace lv {
                 m_vSizes{Tinteger(2),Tinteger(oSize.height),Tinteger(oSize.width)} { // row-major by default, like opencv
             lvAssert_(oSize.width>=0 && oSize.height>=0,"sizes must be null or positive values");
         }
+        /// cv::Mat-based constructor (non-templated)
+        MatSize_(const cv::Mat& oMat) : // NOLINT
+                m_vSizes(cvtSizes(oMat.size.p)) {}
+        /// cv::Mat-based constructor (templated)
+        template<typename TVal>
+        MatSize_(const cv::Mat_<TVal>& oMat) : // NOLINT
+                m_vSizes(cvtSizes(oMat.size.p)) {}
         /// array-based constructor
         template<size_t nDims, typename Tinteger2>
         MatSize_(const std::array<Tinteger2,nDims>& aSizes) : // NOLINT
@@ -380,11 +413,11 @@ namespace lv {
         cv::Size operator()() const {
             return (cv::Size)*this;
         }
-        /// implicit conversion op to raw 'Tinteger' size lookup array
-        operator const Tinteger*() const { // NOLINT
+        /// conversion op to raw 'Tinteger' size lookup array
+        explicit operator const Tinteger*() const {
             return m_vSizes.data()+1;
         }
-        /// implicit conversion op to string (for printing/debug purposes only)
+        /// conversion op to string (for printing/debug purposes only)
         explicit operator std::string() const {
             if(dims()==Tinteger(0))
                 return "0-d:[]<empty>";
@@ -401,7 +434,7 @@ namespace lv {
             return cv::MatSize(m_vSizesExt.data()+1);
         }
         /// implicit conversion op to cv::Size (fails if this object contains more than two dimensions)
-        operator cv::Size() const {
+        operator cv::Size() const { // NOLINT
             lvAssert__(dims()<=Tinteger(2),"cannot fit dim count (%d) into cv::Size object",(int)dims());
             return (dims()==Tinteger(0))?cv::Size():(dims()==Tinteger(1))?cv::Size((int)size(0),1):cv::Size((int)size(1),(int)size(0));
         }
@@ -544,8 +577,11 @@ namespace lv {
         MatType type;
         /// default MatInfo constructor
         MatInfo() = default;
-        /// cv::Mat-based constructor
-        explicit MatInfo(const cv::Mat& m) : size(m.size),type(m.type()) {}
+        /// cv::Mat-based constructor (non-templated)
+        MatInfo(const cv::Mat& m) : size(m.size),type(m.type()) {} // NOLINT
+        /// cv::Mat-based constructor (templated)
+        template<typename TVal>
+        MatInfo(const cv::Mat_<TVal>& m) : size(m.size),type(m.type()) {} // NOLINT
         /// size/type-based constructor
         MatInfo(MatSize s, MatType t) : size(std::move(s)),type(std::move(t)) {} // NOLINT
         /// copy constructor
@@ -1223,7 +1259,7 @@ namespace lv {
         const size_t nColors = vUniques.size();
         if(nColors<=1)
             return cv::Mat(m.size(),CV_8UC3,cv::Scalar::all(255));
-        lvAssert_(nColors<720,"too many uniques for internal multi-slice HSL model");
+        lvAssert__(nColors<720,"too many uniques for internal multi-slice HSL model (got %d)",(int)nColors);
         const size_t nMaxAng = 45;
         //const float fMinSat = 0.33f, fMaxSat = 1.0f;
         const float fAvgLight = 0.50f, fVarLight = 0.25f;
