@@ -635,6 +635,60 @@ namespace lv {
         return oMat(vRanges.data());
     }
 
+    /// returns a subpixel value in a 2d matrix by bilinear interpolation (note: slower than a pre-mapped version!)
+    template<typename TMatVal, int nChannels, typename TRetVal=TMatVal>
+    inline cv::Vec<TRetVal,nChannels> getSubPix(const cv::Mat_<cv::Vec<TMatVal,nChannels>>& oMat, float fX, float fY, int nBorderType=cv::BORDER_REPLICATE) {
+        static_assert(lv::isDataTypeCompat<TMatVal>(),"bad templated data type used for sub pixel sampling");
+        static_assert(std::is_arithmetic<TRetVal>::value,"output type must be arithmetic type");
+        lvDbgAssert_(!oMat.empty() && oMat.dims==2,"bad input matrix");
+        const int nRows=oMat.rows,nCols=oMat.cols,nX=(int)fX,nY=(int)fY;
+        const int nX0=cv::borderInterpolate(nX,nCols,nBorderType),nX1=cv::borderInterpolate(nX+1,nCols,nBorderType);
+        const int nY0=cv::borderInterpolate(nY,nRows,nBorderType),nY1=cv::borderInterpolate(nY+1,nRows,nBorderType);
+        const float fDX=fX-(float)nX,fDY=fY-(float)nY;
+        cv::Vec<TRetVal,nChannels> vRes;
+        for(int nCh=0; nCh<nChannels; ++nCh) {
+            const float fRY0 = oMat(nY0,nX0)[nCh]*(1.f-fDX)+oMat(nY0,nX1)[nCh]*fDX;
+            const float fRY1 = oMat(nY1,nX0)[nCh]*(1.f-fDX)+oMat(nY1,nX1)[nCh]*fDX;
+            const float fR = fRY0*(1.f-fDY)+fRY1*fDY;
+            vRes[nCh] = (std::is_floating_point<TRetVal>::value)?((TRetVal)fR):((TRetVal)std::round(fR));
+        }
+        return vRes;
+    }
+
+    /// returns a subpixel value in a 2d matrix by bilinear interpolation (note: slower than a pre-mapped version!)
+    template<typename TMatVal, int nChannels, typename TRetVal=TMatVal>
+    inline auto getSubPix(const cv::Mat& oMat, float fX, float fY, int nBorderType=cv::BORDER_REPLICATE) {
+        static_assert(lv::isDataTypeCompat<TMatVal>(),"bad templated data type used for sub pixel sampling");
+        static_assert(std::is_arithmetic<TRetVal>::value,"output type must be arithmetic type");
+        lvDbgAssert_((lv::MatType(oMat).isTypeCompat<cv::Vec<TMatVal,nChannels>,true>()),"internal mat type incompatible with templated one");
+        return getSubPix<TMatVal,nChannels,TRetVal>(cv::Mat_<TMatVal>(oMat),fX,fY,nBorderType);
+    }
+
+    /// returns a subpixel value in a 2d matrix by bilinear interpolation (note: slower than a pre-mapped version!)
+    template<typename TMatVal, typename TRetVal=TMatVal>
+    inline TRetVal getSubPix(const cv::Mat_<TMatVal>& oMat, float fX, float fY, int nBorderType=cv::BORDER_REPLICATE) {
+        static_assert(lv::isDataTypeCompat<TMatVal>(),"bad templated data type used for sub pixel sampling");
+        static_assert(std::is_arithmetic<TRetVal>::value,"output type must be arithmetic type");
+        lvDbgAssert_(!oMat.empty() && oMat.dims==2 && oMat.channels()==1,"bad input matrix");
+        const int nRows=oMat.rows,nCols=oMat.cols,nX=(int)fX,nY=(int)fY;
+        const int nX0=cv::borderInterpolate(nX,nCols,nBorderType),nX1=cv::borderInterpolate(nX+1,nCols,nBorderType);
+        const int nY0=cv::borderInterpolate(nY,nRows,nBorderType),nY1=cv::borderInterpolate(nY+1,nRows,nBorderType);
+        const float fDX = fX-(float)nX, fDY=fY-(float)nY;
+        const float fRY0 = oMat(nY0,nX0)*(1.f-fDX)+oMat(nY0,nX1)*fDX;
+        const float fRY1 = oMat(nY1,nX0)*(1.f-fDX)+oMat(nY1,nX1)*fDX;
+        const float fR = fRY0*(1.f-fDY)+fRY1*fDY;
+        return (std::is_floating_point<TRetVal>::value)?((TRetVal)fR):((TRetVal)std::round(fR));
+    }
+
+    /// returns a subpixel value in a 2d matrix by bilinear interpolation (note: slower than a pre-mapped version!)
+    template<typename TMatVal, typename TRetVal=TMatVal>
+    inline auto getSubPix(const cv::Mat& oMat, float fX, float fY, int nBorderType=cv::BORDER_REPLICATE) {
+        static_assert(lv::isDataTypeCompat<TMatVal>(),"bad templated data type used for sub pixel sampling");
+        static_assert(std::is_arithmetic<TRetVal>::value,"output type must be arithmetic type");
+        lvDbgAssert_(lv::MatType(oMat).isTypeCompat<TMatVal>(),"internal mat type incompatible with templated one");
+        return getSubPix<TMatVal,TRetVal>(cv::Mat_<TMatVal>(oMat),fX,fY,nBorderType);
+    }
+
     /// fills the output mat with the same elements as the input, reshaping it to avoid singleton dimensions (2d mats are unaffected)
     template<typename TMat>
     inline void squeeze(const TMat& oInput, TMat& oOutput) {
