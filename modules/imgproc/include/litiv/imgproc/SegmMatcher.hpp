@@ -40,12 +40,6 @@ struct SegmMatcher : ICosegmentor<int32_t,4> { // camera count could be template
     static constexpr OutputLabelType s_nBackgroundLabel = OutputLabelType(0); ///< real label value reserved for background pixels
     static constexpr InternalLabelType s_nForegroundLabelIdx = InternalLabelType(1); ///< internal label value used for 'foreground' labeling
     static constexpr InternalLabelType s_nBackgroundLabelIdx = InternalLabelType(0); ///< internal label value used for 'background' labeling
-    static constexpr OutputLabelType getStereoDontCareLabel() {return s_nDontCareLabel;} ///< returns the output stereo label used to represent 'dont care' pixels
-    static constexpr OutputLabelType getStereoOccludedLabel() {return s_nOccludedLabel;} ///< returns the output stereo label used to represent 'occluded' pixels
-    static constexpr OutputLabelType getResegmForegroundLabel() {return s_nForegroundLabel;} ///< returns the output resegm label used to represent 'foreground' pixels
-    static constexpr OutputLabelType getResegmBackgroundLabel() {return s_nBackgroundLabel;} ///< returns the output resegm label used to represent 'background' pixels
-    static constexpr InternalLabelType getResegmForegroundLabelIdx() {return s_nForegroundLabelIdx;} ///< returns the internal resegm label used to represent 'foreground' pixels
-    static constexpr InternalLabelType getResegmBackgroundLabelIdx() {return s_nBackgroundLabelIdx;} ///< returns the internal resegm label used to represent 'background' pixels
     static constexpr size_t getCameraCount() {return getInputStreamCount()/2;} ///< returns the expected input camera head count
     static constexpr size_t s_nCameraCount = getInputStreamCount()/2; ///< holds the expected input camera head count
     static_assert(std::is_integral<IndexType>::value,"Graph index type must be integral");
