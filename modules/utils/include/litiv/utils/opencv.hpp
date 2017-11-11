@@ -92,13 +92,13 @@ namespace lv {
     constexpr bool isDataTypeCompat() {
         // lots of framework stuff will blow up if these fail on odd platforms
         static_assert(sizeof(uchar)==sizeof(uint8_t),"unexpected uchar byte count");
-        static_assert(sizeof(char)==sizeof(int8_t),"unexpected char byte count");
+        static_assert(sizeof(schar)==sizeof(int8_t),"unexpected schar byte count");
         static_assert(sizeof(ushort)==sizeof(uint16_t),"unexpected ushort byte count");
         static_assert(sizeof(short)==sizeof(int16_t),"unexpected short byte count");
         static_assert(sizeof(int)==sizeof(int32_t),"unexpected int byte count");
         return
             std::is_same<uchar,TData>::value || std::is_same<uint8_t,TData>::value || // NOLINT
-            std::is_same<char,TData>::value || std::is_same<int8_t,TData>::value || // NOLINT
+            std::is_same<schar,TData>::value || std::is_same<int8_t,TData>::value || // NOLINT
             std::is_same<ushort,TData>::value || std::is_same<uint16_t,TData>::value || // NOLINT
             std::is_same<short,TData>::value || std::is_same<int16_t,TData>::value || // NOLINT
             std::is_same<int,TData>::value || std::is_same<int32_t,TData>::value || // NOLINT
@@ -111,7 +111,7 @@ namespace lv {
         static_assert(isDataTypeCompat<TData>(),"data type is not opencv-compatible");
         return
             (std::is_same<uchar,TData>::value || std::is_same<uint8_t,TData>::value)?CV_8U:
-            (std::is_same<char,TData>::value || std::is_same<int8_t,TData>::value)?CV_8S:
+            (std::is_same<schar,TData>::value || std::is_same<int8_t,TData>::value)?CV_8S:
             (std::is_same<ushort,TData>::value || std::is_same<uint16_t,TData>::value)?CV_16U:
             (std::is_same<short,TData>::value || std::is_same<int16_t,TData>::value)?CV_16S:
             (std::is_same<int,TData>::value || std::is_same<int32_t,TData>::value)?CV_32S:
@@ -242,38 +242,38 @@ namespace lv {
             #endif //defined(_MSC_VER)
                 if(nChannels==2)
                     return
-                        (nDepth==CV_8U && std::is_same<T,cv::Vec<uint8_t,2>>::value) ||
-                        (nDepth==CV_8S && std::is_same<T,cv::Vec<int8_t,2>>::value) ||
-                        (nDepth==CV_16U && std::is_same<T,cv::Vec<uint16_t,2>>::value) ||
-                        (nDepth==CV_16S && std::is_same<T,cv::Vec<int16_t,2>>::value) ||
-                        (nDepth==CV_32S && std::is_same<T,cv::Vec<int32_t,2>>::value) ||
+                        (nDepth==CV_8U && (std::is_same<T,cv::Vec<uint8_t,2>>::value||std::is_same<T,cv::Vec<uchar,2>>::value)) ||
+                        (nDepth==CV_8S && (std::is_same<T,cv::Vec<int8_t,2>>::value||std::is_same<T,cv::Vec<schar,2>>::value)) ||
+                        (nDepth==CV_16U && (std::is_same<T,cv::Vec<uint16_t,2>>::value||std::is_same<T,cv::Vec<ushort,2>>::value)) ||
+                        (nDepth==CV_16S && (std::is_same<T,cv::Vec<int16_t,2>>::value||std::is_same<T,cv::Vec<short,2>>::value)) ||
+                        (nDepth==CV_32S && (std::is_same<T,cv::Vec<int32_t,2>>::value||std::is_same<T,cv::Vec<int,2>>::value)) ||
                         (nDepth==CV_32F && std::is_same<T,cv::Vec<float,2>>::value) ||
                         (nDepth==CV_64F && std::is_same<T,cv::Vec<double,2>>::value);
                 else if(nChannels==3)
                     return
-                        (nDepth==CV_8U && std::is_same<T,cv::Vec<uint8_t,3>>::value) ||
-                        (nDepth==CV_8S && std::is_same<T,cv::Vec<int8_t,3>>::value) ||
-                        (nDepth==CV_16U && std::is_same<T,cv::Vec<uint16_t,3>>::value) ||
-                        (nDepth==CV_16S && std::is_same<T,cv::Vec<int16_t,3>>::value) ||
-                        (nDepth==CV_32S && std::is_same<T,cv::Vec<int32_t,3>>::value) ||
+                        (nDepth==CV_8U && (std::is_same<T,cv::Vec<uint8_t,3>>::value||std::is_same<T,cv::Vec<uchar,3>>::value)) ||
+                        (nDepth==CV_8S && (std::is_same<T,cv::Vec<int8_t,3>>::value||std::is_same<T,cv::Vec<schar,3>>::value)) ||
+                        (nDepth==CV_16U && (std::is_same<T,cv::Vec<uint16_t,3>>::value||std::is_same<T,cv::Vec<ushort,3>>::value)) ||
+                        (nDepth==CV_16S && (std::is_same<T,cv::Vec<int16_t,3>>::value||std::is_same<T,cv::Vec<short,3>>::value)) ||
+                        (nDepth==CV_32S && (std::is_same<T,cv::Vec<int32_t,3>>::value||std::is_same<T,cv::Vec<int,3>>::value)) ||
                         (nDepth==CV_32F && std::is_same<T,cv::Vec<float,3>>::value) ||
                         (nDepth==CV_64F && std::is_same<T,cv::Vec<double,3>>::value);
                 else //if(nChannels==4)
                     return
-                        (nDepth==CV_8U && std::is_same<T,cv::Vec<uint8_t,4>>::value) ||
-                        (nDepth==CV_8S && std::is_same<T,cv::Vec<int8_t,4>>::value) ||
-                        (nDepth==CV_16U && std::is_same<T,cv::Vec<uint16_t,4>>::value) ||
-                        (nDepth==CV_16S && std::is_same<T,cv::Vec<int16_t,4>>::value) ||
-                        (nDepth==CV_32S && std::is_same<T,cv::Vec<int32_t,4>>::value) ||
+                        (nDepth==CV_8U && (std::is_same<T,cv::Vec<uint8_t,4>>::value||std::is_same<T,cv::Vec<uchar,4>>::value)) ||
+                        (nDepth==CV_8S && (std::is_same<T,cv::Vec<int8_t,4>>::value||std::is_same<T,cv::Vec<schar,4>>::value)) ||
+                        (nDepth==CV_16U && (std::is_same<T,cv::Vec<uint16_t,4>>::value||std::is_same<T,cv::Vec<ushort,4>>::value)) ||
+                        (nDepth==CV_16S && (std::is_same<T,cv::Vec<int16_t,4>>::value||std::is_same<T,cv::Vec<short,4>>::value)) ||
+                        (nDepth==CV_32S && (std::is_same<T,cv::Vec<int32_t,4>>::value||std::is_same<T,cv::Vec<int,4>>::value)) ||
                         (nDepth==CV_32F && std::is_same<T,cv::Vec<float,4>>::value) ||
                         (nDepth==CV_64F && std::is_same<T,cv::Vec<double,4>>::value);
             }
             return
-                (nDepth==CV_8U && std::is_same<T,uint8_t>::value) ||
-                (nDepth==CV_8S && std::is_same<T,int8_t>::value) ||
-                (nDepth==CV_16U && std::is_same<T,uint16_t>::value) ||
-                (nDepth==CV_16S && std::is_same<T,int16_t>::value) ||
-                (nDepth==CV_32S && std::is_same<T,int32_t>::value) ||
+                (nDepth==CV_8U && (std::is_same<T,uint8_t>::value||std::is_same<T,uchar>::value)) ||
+                (nDepth==CV_8S && (std::is_same<T,int8_t>::value||std::is_same<T,schar>::value)) ||
+                (nDepth==CV_16U && (std::is_same<T,uint16_t>::value||std::is_same<T,ushort>::value)) ||
+                (nDepth==CV_16S && (std::is_same<T,int16_t>::value||std::is_same<T,short>::value)) ||
+                (nDepth==CV_32S && (std::is_same<T,int32_t>::value||std::is_same<T,int>::value)) ||
                 (nDepth==CV_32F && std::is_same<T,float>::value) ||
                 (nDepth==CV_64F && std::is_same<T,double>::value);
         }
