@@ -70,6 +70,9 @@ namespace lv {
                                    const cv::cuda::GpuMat& oROI1=cv::cuda::GpuMat(), const cv::cuda::GpuMat& oROI2=cv::cuda::GpuMat());
 #endif //HAVE_CUDA
 
+    /// computes the 'temporal' absolute difference between two 8U images given their optical flow map (with optional smoothing); output is a 32F image
+    void computeTemporalAbsDiff(const cv::Mat& oImage1, const cv::Mat& oImage2, const cv::Mat& oFlow, cv::Mat& oOutput, int nSmoothKernelSize=1);
+
     /// determines if '*anMap' is a local maximum on the horizontal axis, given 'nMapColStep' spacing between horizontal elements in 'anMap'
     template<size_t nHalfWinSize, typename Tr>
     bool isLocalMaximum_Horizontal(const Tr* const anMap, const size_t nMapColStep, const size_t /*nMapRowStep*/);

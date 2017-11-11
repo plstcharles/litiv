@@ -409,3 +409,34 @@ void lv::computeDescriptorAffinity(const cv::cuda::GpuMat& oDescMap1, const cv::
 }
 
 #endif //HAVE_CUDA
+
+void lv::computeTemporalAbsDiff(const cv::Mat& oImage1, const cv::Mat& oImage2, const cv::Mat& oFlow, cv::Mat& oOutput, int nSmoothKernelSize) {
+    lvAssert_(!oImage1.empty() && !oImage2.empty() && !oFlow.empty() && nSmoothKernelSize>=0,"invalid parameter(s)");
+    lvAssert_(oImage1.dims==2 && oImage1.depth()==CV_8U && lv::MatInfo(oImage1)==lv::MatInfo(oImage2),"invalid image type/size");
+    lvAssert_(oImage1.isContinuous() && oImage2.isContinuous() && oFlow.isContinuous(),"all inputs must be continuous mats");
+    lvAssert_(oFlow.type()==CV_32FC2 && lv::MatSize(oImage1)==lv::MatSize(oFlow),"invalid flow type/size");
+    lvAssert_(nSmoothKernelSize==0 || (nSmoothKernelSize%2)==1,"smoothing kernel size must be odd or null");
+    lvAssert_(oImage1.channels()==1 || oImage1.channels()==3,"current impl only supports 1 or 3 channels due to bilin subsampl");
+    const int nRows = oImage1.rows, nCols = oImage1.cols, nChannels = oImage1.channels();
+    oOutput.create(nRows,nCols,CV_32FC(nChannels));
+    lvDbgAssert(oOutput.isContinuous());
+    for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
+        for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
+            const float fOffsetX = ((float*)oFlow.data)[(nRowIdx*nCols+nColIdx)*2];
+            const float fOffsetY = ((float*)oFlow.data)[(nRowIdx*nCols+nColIdx)*2+1];
+            if(nChannels==1) {
+                const int nOld = ((uint8_t*)oImage1.data)[nRowIdx*nCols+nColIdx];
+                const float fNew = lv::getSubPix<uint8_t,float>(cv::Mat_<uint8_t>(oImage2),nColIdx+fOffsetX,nRowIdx+fOffsetY);
+                ((float*)oOutput.data)[nRowIdx*nCols+nColIdx] = std::abs(nOld-fNew);
+            }
+            else { // nChannels==3
+                const cv::Vec3b& vOld = oImage1.at<cv::Vec3b>(nRowIdx,nColIdx);
+                const cv::Vec3f vNew = lv::getSubPix<uint8_t,3,float>(cv::Mat_<cv::Vec3b>(oImage2),nColIdx+fOffsetX,nRowIdx+fOffsetY);
+                for(int nChIdx=0; nChIdx<nChannels; ++nChIdx)
+                    ((float*)oOutput.data)[(nRowIdx*nCols+nColIdx)*nChannels+nChIdx] = std::abs(vOld[nChIdx]-vNew[nChIdx]);
+            }
+        }
+    }
+    if(nSmoothKernelSize>1)
+        cv::GaussianBlur(oOutput,oOutput,cv::Size(nSmoothKernelSize,nSmoothKernelSize),0);
+}
