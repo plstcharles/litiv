@@ -42,6 +42,7 @@ struct SegmMatcher : ICosegmentor<int32_t,4> { // camera count could be template
     static constexpr InternalLabelType s_nBackgroundLabelIdx = InternalLabelType(0); ///< internal label value used for 'background' labeling
     static constexpr size_t getCameraCount() {return getInputStreamCount()/2;} ///< returns the expected input camera head count
     static constexpr size_t s_nCameraCount = getInputStreamCount()/2; ///< holds the expected input camera head count
+    static size_t getTemporalDepth(); ///< returns the internal temporal link depth used for resegm (const define)
     static_assert(std::is_integral<IndexType>::value,"Graph index type must be integral");
     static_assert(std::is_integral<InternalLabelType>::value,"Graph internal label type must be integral");
     static_assert(size_t(std::numeric_limits<IndexType>::max())>=size_t(std::numeric_limits<InternalLabelType>::max()),"Graph index type max value must be greater than internal label type max value");

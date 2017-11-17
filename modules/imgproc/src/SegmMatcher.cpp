@@ -30,9 +30,9 @@
 #define SEGMMATCH_CONFIG_USE_ROOT_SIFT_DESCS   0
 #define SEGMMATCH_CONFIG_USE_THERMAL_HEURIST   1
 #define SEGMMATCH_CONFIG_USE_GMM_LOCAL_BACKGR  1
-#define SEGMMATCH_CONFIG_USE_FGBZ_STEREO_INF   0
+#define SEGMMATCH_CONFIG_USE_FGBZ_STEREO_INF   1
 #define SEGMMATCH_CONFIG_USE_FASTPD_STEREO_INF 0
-#define SEGMMATCH_CONFIG_USE_SOSPD_STEREO_INF  1
+#define SEGMMATCH_CONFIG_USE_SOSPD_STEREO_INF  0
 #define SEGMMATCH_CONFIG_USE_FGBZ_RESEGM_INF   0
 #define SEGMMATCH_CONFIG_USE_SOSPD_RESEGM_INF  1
 #define SEGMMATCH_CONFIG_USE_PROGRESS_BARS     0
@@ -460,8 +460,8 @@ protected:
     void solvePrimalDual(sospd::SubmodularIBFS<ValueType,IndexType>& oMinimizer,
                          const std::vector<TNode>& vNodeMap,
                          const std::vector<size_t>& vGraphIdxToMapIdxLUT,
+                         const cv::Mat_<ValueType>& oUnaryCostMap,
                          cv::Mat_<InternalLabelType>& oLabeling,
-                         cv::Mat_<ValueType>& oUnaryCostMap,
                          cv::Mat_<ValueType>& oDualMap,
                          cv::Mat_<ValueType>& oHeightMap,
                          InternalLabelType nAlphaLabel,
@@ -685,6 +685,8 @@ constexpr OutputLabelType SegmMatcher::s_nBackgroundLabel;
 constexpr InternalLabelType SegmMatcher::s_nForegroundLabelIdx;
 constexpr InternalLabelType SegmMatcher::s_nBackgroundLabelIdx;
 constexpr size_t SegmMatcher::s_nCameraCount;
+
+size_t SegmMatcher::getTemporalDepth() {return s_nTemporalCliqueDepth;}
 
 SegmMatcher::SegmMatcher(size_t nMinDispOffset, size_t nMaxDispOffset) {
     static_assert(getInputStreamCount()==4 && getOutputStreamCount()==4 && getCameraCount()==2,"i/o stream must be two image-mask pairs");
@@ -2678,8 +2680,8 @@ template<typename TNode>
 void SegmMatcher::GraphModelData::solvePrimalDual(sospd::SubmodularIBFS<ValueType,IndexType>& oMinimizer,
                                                   const std::vector<TNode>& vNodeMap,
                                                   const std::vector<size_t>& vGraphIdxToMapIdxLUT,
+                                                  const cv::Mat_<ValueType>& oUnaryCostMap,
                                                   cv::Mat_<InternalLabelType>& oLabeling,
-                                                  cv::Mat_<ValueType>& oUnaryCostMap,
                                                   cv::Mat_<ValueType>& oDualMap,
                                                   cv::Mat_<ValueType>& oHeightMap,
                                                   InternalLabelType nAlphaLabel,
@@ -3029,8 +3031,8 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
             solvePrimalDual(oStereoMinimizer,
                             m_vStereoNodeMap,
                             m_vStereoGraphIdxToMapIdxLUT,
-                            oCurrStereoLabeling,
                             m_oStereoUnaryCosts,
+                            oCurrStereoLabeling,
                             m_oStereoDualMap,
                             m_oStereoHeightMap,
                             nStereoAlphaLabel,
@@ -3163,8 +3165,8 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
                     solvePrimalDual(oResegmMinimizer,
                                     m_vResegmNodeMap,
                                     m_vResegmGraphIdxToMapIdxLUT,
-                                    m_oSuperStackedResegmLabeling,
                                     m_oResegmUnaryCosts,
+                                    m_oSuperStackedResegmLabeling,
                                     m_oResegmDualMap,
                                     m_oResegmHeightMap,
                                     nResegmAlphaLabel,
@@ -3228,7 +3230,7 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
         if(nCamIdx!=m_nPrimaryCamIdx)
             resetStereoLabelings(nCamIdx);
     lvLog_(2,"Inference for primary camera idx=%d completed in %f second(s).",(int)m_nPrimaryCamIdx,oLocalTimer.tock());
-    if(lv::getVerbosity()>=5)
+    if(lv::getVerbosity()>=3)
         cv::waitKey(0);
     return opengm::InferenceTermination::NORMAL;
 }
