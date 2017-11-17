@@ -42,6 +42,8 @@ namespace lv {
         virtual bool isEvaluatingDisparities() const = 0;
         /// returns whether only a subset of the dataset's frames will be loaded or not
         virtual bool isLoadingFrameSubset() const = 0;
+        /// returns whether only a subset of the dataset's frames will be evaluated or not
+        virtual bool isEvaluatingOnlyFrameSubset() const = 0;
         /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
         virtual int isLoadingInputMasks() const = 0;
     };
@@ -62,6 +64,7 @@ namespace lv {
                 bool bHorizRectify=false, ///< defines whether images should be horizontally rectified when loaded or not, using the calib files provided with the dataset
                 bool bEvalDisparities=false, ///< defines whether we should evaluate fg/bg segmentation or stereo disparities
                 bool bLoadFrameSubset=false, ///< defines whether only a subset of the dataset's frames will be loaded or not
+                bool bEvalOnlyFrameSubset=false, ///<  defines whether only a subset of the dataset's frames will be evaluated or not (if bLoadFrameSubset==true, has no effect)
                 int nLoadInputMasks=0, ///< defines whether the input stream should be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
                 double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
         ) :
@@ -81,6 +84,7 @@ namespace lv {
                 m_bHorizRectify(bHorizRectify),
                 m_bEvalDisparities(bEvalDisparities),
                 m_bLoadFrameSubset(bLoadFrameSubset),
+                m_bEvalOnlyFrameSubset(bEvalOnlyFrameSubset),
                 m_nLoadInputMasks(nLoadInputMasks) {
             lvAssert_(!m_bEvalDisparities,"missing impl (no stereo disparity gt in dataset)");
         }
@@ -109,6 +113,8 @@ namespace lv {
         virtual bool isEvaluatingDisparities() const override {return m_bEvalDisparities;}
         /// returns whether only a subset of the dataset's frames will be loaded or not
         virtual bool isLoadingFrameSubset() const override {return m_bLoadFrameSubset;}
+        /// returns whether only a subset of the dataset's frames will be evaluated or not
+        virtual bool isEvaluatingOnlyFrameSubset() const override {return m_bEvalOnlyFrameSubset;}
         /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
         virtual int isLoadingInputMasks() const override {return m_nLoadInputMasks;}
     protected:
@@ -117,6 +123,7 @@ namespace lv {
         const bool m_bHorizRectify;
         const bool m_bEvalDisparities;
         const bool m_bLoadFrameSubset;
+        const bool m_bEvalOnlyFrameSubset;
         const int m_nLoadInputMasks;
     };
 
@@ -183,6 +190,10 @@ namespace lv {
         bool isLoadingFrameSubset() const {
             return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isLoadingFrameSubset();
         }
+        /// returns whether only a subset of the dataset's frames will be evaluated or not
+        bool isEvaluatingOnlyFrameSubset() const {
+            return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isEvaluatingOnlyFrameSubset();
+        }
         /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
         int isLoadingInputMasks() const {
             return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isLoadingInputMasks();
@@ -218,6 +229,7 @@ namespace lv {
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
             const IVAPtrimod2016Dataset& oDataset = dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot());
             const bool bLoadFrameSubset = this->isLoadingFrameSubset();
+            const bool bEvalOnlyFrameSubset = this->isEvaluatingOnlyFrameSubset();
             this->m_bLoadDepth = oDataset.isLoadingDepth();
             this->m_nLoadInputMasks = oDataset.isLoadingInputMasks();
             this->m_bUndistort = oDataset.isUndistorting();
@@ -259,7 +271,7 @@ namespace lv {
                     lvError_("VAPtrimod2016 sequence '%s' did not possess the required approx input mask directory ('depthApproxMasks')",this->getName().c_str());
             }
             std::set<size_t> mSubset;
-            if(bLoadFrameSubset) {
+            if(bLoadFrameSubset || bEvalOnlyFrameSubset) {
                 const std::string sSubsetFilePath = this->getDataPath()+"subset.txt";
                 std::ifstream oSubsetFile(sSubsetFilePath);
                 lvAssert__(oSubsetFile.is_open(),"could not open frame subset file at '%s'",sSubsetFilePath.c_str());
@@ -437,7 +449,7 @@ namespace lv {
             std::vector<std::string> vsRGBGTMasksPaths = lv::getFilesFromDir(*psRGBGTMasksDir);
             if(vsRGBGTMasksPaths.empty() || cv::imread(vsRGBGTMasksPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected RGB gt data",this->getName().c_str());
-            if(bLoadFrameSubset)
+            if(bLoadFrameSubset || bEvalOnlyFrameSubset)
                 lSubsetCleaner(vsRGBGTMasksPaths);
             const size_t nGTPackets = vsRGBGTMasksPaths.size();
             this->m_vvsGTPaths.resize(nGTPackets);
@@ -458,6 +470,7 @@ namespace lv {
                 this->m_mGTIndexLUT[nInputPacketIdx] = nGTPacketIdx; // direct gt path index to frame index mapping
             }
             if(bUseInterlacedMasks && !bUseApproxRGBMask) {
+                lvAssert_(!(bLoadFrameSubset^bEvalOnlyFrameSubset),"cannot interlace gt when loading only subset for eval");
                 lvAssert_(vsRGBGTMasksPaths.size()==nInputPackets,"rgb gt mask count did not match input image count");
                 for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx)
                     this->m_vvsInputPaths[nInputPacketIdx][nInputRGBMaskStreamIdx] = vsRGBGTMasksPaths[nInputPacketIdx];
@@ -519,13 +532,14 @@ namespace lv {
             std::vector<std::string> vsThermalGTMasksPaths = lv::getFilesFromDir(*psThermalGTMasksDir);
             if(vsThermalGTMasksPaths.empty() || cv::imread(vsThermalGTMasksPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected thermal gt data",this->getName().c_str());
-            if(bLoadFrameSubset)
+            if(bLoadFrameSubset || bEvalOnlyFrameSubset)
                 lSubsetCleaner(vsThermalGTMasksPaths);
             if(vsThermalGTMasksPaths.size()!=nGTPackets)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/thermal gt frames",this->getName().c_str());
             for(size_t nGTPacketIdx=0; nGTPacketIdx<vsThermalGTMasksPaths.size(); ++nGTPacketIdx)
                 this->m_vvsGTPaths[nGTPacketIdx][nGTThermalMaskStreamIdx] = vsThermalGTMasksPaths[nGTPacketIdx];
             if(bUseInterlacedMasks && !bUseApproxThermalMask) {
+                lvAssert_(!(bLoadFrameSubset^bEvalOnlyFrameSubset),"cannot interlace gt when loading only subset for eval");
                 lvAssert_(vsThermalGTMasksPaths.size()==nInputPackets,"thermal gt mask count did not match input image count");
                 for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx)
                     this->m_vvsInputPaths[nInputPacketIdx][nInputThermalMaskStreamIdx] = vsThermalGTMasksPaths[nInputPacketIdx];
@@ -569,13 +583,14 @@ namespace lv {
                 std::vector<std::string> vsDepthGTMasksPaths = lv::getFilesFromDir(*psDepthGTMasksDir);
                 if(vsDepthGTMasksPaths.empty() || cv::imread(vsDepthGTMasksPaths[0]).size()!=oImageSize)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess expected depth gt data",this->getName().c_str());
-                if(bLoadFrameSubset)
+                if(bLoadFrameSubset || bEvalOnlyFrameSubset)
                     lSubsetCleaner(vsDepthGTMasksPaths);
                 if(vsDepthGTMasksPaths.size()!=nGTPackets)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/depth gt frames",this->getName().c_str());
                 for(size_t nGTPacketIdx=0; nGTPacketIdx<vsDepthGTMasksPaths.size(); ++nGTPacketIdx)
                     this->m_vvsGTPaths[nGTPacketIdx][nGTDepthMaskStreamIdx] = vsDepthGTMasksPaths[nGTPacketIdx];
                 if(bUseInterlacedMasks && !bUseApproxDepthMask) {
+                    lvAssert_(!(bLoadFrameSubset^bEvalOnlyFrameSubset),"cannot interlace gt when loading only subset for eval");
                     lvAssert_(vsDepthGTMasksPaths.size()==nInputPackets,"depth gt mask count did not match input image count");
                     for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx)
                         this->m_vvsInputPaths[nInputPacketIdx][nInputDepthMaskStreamIdx] = vsDepthGTMasksPaths[nInputPacketIdx];

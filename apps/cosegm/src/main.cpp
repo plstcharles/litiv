@@ -63,7 +63,8 @@
     PROCESS_PREPROC_BGSEGM?false:true,            /* bool bUndistort=true */\
     PROCESS_PREPROC_BGSEGM?false:true,            /* bool bHorizRectify=false */\
     DATASET_EVAL_DISPARITY_MASKS,                 /* bool bEvalStereoDisp=false */\
-    PROCESS_PREPROC_BGSEGM?false:false,            /* bool bLoadFrameSubset=false */\
+    PROCESS_PREPROC_BGSEGM?false:/*true*/false,   /* bool bLoadFrameSubset=false */\
+    /*false*/true,                                /* bool bEvalOnlyFrameSubset=false */\
     PROCESS_PREPROC_BGSEGM?0:1/*4*/,              /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_LITIV2014
