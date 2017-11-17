@@ -39,6 +39,7 @@
 #define SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN     0
 #define SEGMMATCH_CONFIG_USE_TEMPORAL_CONN     1
 #define SEGMMATCH_CONFIG_USE_CONT_RESEGM_UPDT  1
+#define SEGMMATCH_CONFIG_USE_TEMPORAL_U_CST    0
 
 // default param values
 #define SEGMMATCH_DEFAULT_TEMPORAL_DEPTH       (size_t(1))
@@ -64,6 +65,7 @@
 #define SEGMMATCH_UNARY_COST_OOB_CST           (ValueType(5000))
 #define SEGMMATCH_UNARY_COST_OCCLUDED_CST      (ValueType(2000))
 #define SEGMMATCH_UNARY_COST_MAXTRUNC_CST      (ValueType(10000))
+#define SEGMMATCH_UNARY_COST_TEMPORAL_CST      (ValueType(100))
 #define SEGMMATCH_IMGSIM_COST_COLOR_SCALE      (40)
 #define SEGMMATCH_IMGSIM_COST_DESC_SCALE       (400)
 #define SEGMMATCH_SHPSIM_COST_DESC_SCALE       (400)
@@ -302,7 +304,7 @@ struct SegmMatcher::GraphModelData {
     /// holds the set of features to use (or used) during the next (or past) inference (mutable, as shape features will change during inference)
     mutable TemporalArray<std::vector<cv::Mat>> m_avFeatures;
     /// contains the (internal) labelings of the stereo/resegm graph (mutable for inference)
-    mutable cv::Mat_<InternalLabelType> m_oSuperStackedStereoLabeling,m_oSuperStackedResegmLabeling;
+    mutable cv::Mat_<InternalLabelType> m_oSuperStackedStereoLabeling,m_oSuperStackedResegmLabeling,m_oInitSuperStackedResegmLabeling;
     /// contains the (internal) labelings of the stereo/resegm graph (mutable for inference)
     mutable CamArray<cv::Mat_<InternalLabelType>> m_aStackedStereoLabelings,m_aStackedResegmLabelings; // note: these mats point to the super-stacked labeling version above
     /// contains the (internal) labelings of the stereo/resegm graph (mutable for inference)
@@ -2562,17 +2564,17 @@ inline SegmMatcher::ValueType SegmMatcher::GraphModelData::calcStereoUnaryMoveCo
 void SegmMatcher::GraphModelData::calcStereoMoveCosts(InternalLabelType nNewLabel) const {
     lvDbgExceptionWatch;
     lvDbgAssert(m_oGridSize.total()==m_vStereoNodeMap.size() && m_oGridSize.total()>1 && m_oGridSize==m_oStereoUnaryCosts.size);
-    const InternalLabelType* pInitLabeling = ((InternalLabelType*)m_aaStereoLabelings[0][m_nPrimaryCamIdx].data);
+    const InternalLabelType* pCurrLabeling = ((InternalLabelType*)m_aaStereoLabelings[0][m_nPrimaryCamIdx].data);
     // @@@@@ openmp here?
     for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_nValidStereoGraphNodes; ++nGraphNodeIdx) {
         const size_t nLUTNodeIdx = m_vStereoGraphIdxToMapIdxLUT[nGraphNodeIdx];
         const StereoNodeInfo& oNode = m_vStereoNodeMap[nLUTNodeIdx];
-        const InternalLabelType& nInitLabel = pInitLabeling[nLUTNodeIdx];
+        const InternalLabelType& nCurrLabel = pCurrLabeling[nLUTNodeIdx];
         lvIgnore(oNode); lvDbgAssert(oNode.bValidGraphNode);
-        lvDbgAssert(&nInitLabel==&m_aaStereoLabelings[0][m_nPrimaryCamIdx](oNode.nRowIdx,oNode.nColIdx));
+        lvDbgAssert(&nCurrLabel==&m_aaStereoLabelings[0][m_nPrimaryCamIdx](oNode.nRowIdx,oNode.nColIdx));
         ValueType& tUnaryCost = ((ValueType*)m_oStereoUnaryCosts.data)[nLUTNodeIdx];
         lvDbgAssert(&tUnaryCost==&m_oStereoUnaryCosts(oNode.nRowIdx,oNode.nColIdx));
-        tUnaryCost = calcStereoUnaryMoveCost(nGraphNodeIdx,nInitLabel,nNewLabel);
+        tUnaryCost = calcStereoUnaryMoveCost(nGraphNodeIdx,nCurrLabel,nNewLabel);
     }
 }
 
@@ -2583,16 +2585,24 @@ void SegmMatcher::GraphModelData::calcResegmMoveCosts(InternalLabelType nNewLabe
     for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_nValidResegmGraphNodes; ++nGraphNodeIdx) {
         const size_t nLUTNodeIdx = m_vResegmGraphIdxToMapIdxLUT[nGraphNodeIdx];
         const ResegmNodeInfo& oNode = m_vResegmNodeMap[nLUTNodeIdx];
-        const InternalLabelType& nInitLabel = ((InternalLabelType*)m_oSuperStackedResegmLabeling.data)[nLUTNodeIdx];
-        lvDbgAssert(&nInitLabel==&m_aaResegmLabelings[oNode.nLayerIdx][oNode.nCamIdx](oNode.nRowIdx,oNode.nColIdx));
-        lvDbgAssert(nInitLabel==s_nForegroundLabelIdx || nInitLabel==s_nBackgroundLabelIdx);
+        const InternalLabelType& nCurrLabel = ((InternalLabelType*)m_oSuperStackedResegmLabeling.data)[nLUTNodeIdx];
+        lvDbgAssert(&nCurrLabel==&m_aaResegmLabelings[oNode.nLayerIdx][oNode.nCamIdx](oNode.nRowIdx,oNode.nColIdx));
+        lvDbgAssert(nCurrLabel==s_nForegroundLabelIdx || nCurrLabel==s_nBackgroundLabelIdx);
         ValueType& tUnaryCost = ((ValueType*)m_oResegmUnaryCosts.data)[nLUTNodeIdx];
         lvDbgAssert(&tUnaryCost==&m_oResegmUnaryCosts(oNode.nRowIdx+int((oNode.nCamIdx*getTemporalLayerCount()+oNode.nLayerIdx)*m_oGridSize[0]),oNode.nColIdx));
-        if(nInitLabel!=nNewLabel) {
+        if(nCurrLabel!=nNewLabel) {
             const ExplicitFunction& vUnaryResegmLUT = *oNode.pUnaryFunc;
-            const ValueType tEnergyInit = vUnaryResegmLUT(nInitLabel);
+        #if SEGMMATCH_CONFIG_USE_TEMPORAL_U_CST
+            const ValueType tLayerCost = (oNode.nLayerIdx>0u)?SEGMMATCH_UNARY_COST_TEMPORAL_CST:cost_cast(0);
+            const InternalLabelType& nInitLabel = ((InternalLabelType*)m_oInitSuperStackedResegmLabeling.data)[nLUTNodeIdx];
+            lvDbgAssert(nInitLabel==s_nForegroundLabelIdx || nInitLabel==s_nBackgroundLabelIdx);
+            const ValueType tEnergyCurr = vUnaryResegmLUT(nCurrLabel)+((nCurrLabel==nInitLabel)?cost_cast(0):tLayerCost);
+            const ValueType tEnergyModif = vUnaryResegmLUT(nNewLabel)+((nNewLabel==nInitLabel)?cost_cast(0):tLayerCost);
+        #else //!SEGMMATCH_CONFIG_USE_TEMPORAL_U_CST
+            const ValueType tEnergyCurr = vUnaryResegmLUT(nCurrLabel);
             const ValueType tEnergyModif = vUnaryResegmLUT(nNewLabel);
-            tUnaryCost = tEnergyModif-tEnergyInit;
+        #endif //!SEGMMATCH_CONFIG_USE_TEMPORAL_U_CST
+            tUnaryCost = tEnergyModif-tEnergyCurr;
         }
         else
             tUnaryCost = cost_cast(0);
