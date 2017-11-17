@@ -38,6 +38,7 @@
 #define SEGMMATCH_CONFIG_USE_PROGRESS_BARS     0
 #define SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN     0
 #define SEGMMATCH_CONFIG_USE_TEMPORAL_CONN     1
+#define SEGMMATCH_CONFIG_USE_CONT_RESEGM_UPDT  1
 
 // default param values
 #define SEGMMATCH_DEFAULT_TEMPORAL_DEPTH       (size_t(1))
@@ -2935,8 +2936,9 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
     lvDbgAssert(m_vStereoLabelOrdering.size()==m_vStereoLabels.size());
     lv::StopWatch oLocalTimer;
     ValueType tLastStereoEnergy=m_pStereoInf->value(),tLastResegmEnergy=std::numeric_limits<ValueType>::max();
-    cv::Mat_<InternalLabelType> oPreUpdateStereoLabeling = m_oSuperStackedResegmLabeling.clone();
-    cv::Mat_<InternalLabelType> oPreUpdateResegmLabeling = m_oSuperStackedResegmLabeling.clone();
+    m_oSuperStackedResegmLabeling.copyTo(m_oInitSuperStackedResegmLabeling);
+    cv::Mat_<InternalLabelType> oPreStereoUpdateLabeling = m_oSuperStackedResegmLabeling.clone();
+    cv::Mat_<InternalLabelType> oPreResegmUpdateLabeling = m_oSuperStackedResegmLabeling.clone();
     bool bJustUpdatedSegm = false;
     while(++nStereoMoveIter<=m_nMaxStereoMoveCount && nConsecUnchangedStereoLabels<m_nStereoLabels) {
         const bool bDisableStereoCliques = (SEGMMATCH_CONFIG_USE_UNARY_ONLY_FIRST)&&(nStereoMoveIter<=m_nStereoLabels);
@@ -3064,9 +3066,9 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
         lvLog_(2,"\t\tdisp [+label:%d]   e = %d   (delta=%s)      [stereo-iter=%d]",(int)nStereoAlphaLabel,(int)tCurrStereoEnergy,ssStereoEnergyDiff.str().c_str(),(int)nStereoMoveIter);
     #endif //!SEGMMATCH_CONFIG_USE_FASTPD_STEREO_INF
         if(bDisableStereoCliques)
-            lvLog(2,"\t\t\t(disabling clique costs)");
+            lvLog(4,"\t\t\t(disabling clique costs)");
         else if(bJustUpdatedSegm) // if segmentation changes, stereo priors change, and energy can spike up
-            lvLog(2,"\t\t\t(just updated segmentation)");
+            lvLog(4,"\t\t\t(just updated segmentation)");
         else
             lvAssert_(tLastStereoEnergy>=tCurrStereoEnergy,"stereo energy not minimizing!");
         tLastStereoEnergy = tCurrStereoEnergy;
@@ -3101,14 +3103,15 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
                 const bool bInitResegmIter = (nResegmMoveIter-nInitResegmMoveIter)==1u;
                 const bool bNewResegmIter = ((nResegmMoveIter-nInitResegmMoveIter)%s_nResegmLabels)==1u;
                 const InternalLabelType nResegmAlphaLabel = anResegmLabels[nResegmMoveIter%s_nResegmLabels];
-                if(bNewResegmIter) {
+                if(bNewResegmIter || SEGMMATCH_CONFIG_USE_CONT_RESEGM_UPDT) {
                     for(size_t nLayerIdx=0; nLayerIdx<nTemporalLayerCount; ++nLayerIdx)
                         for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx)
                             if(aanChangedResegmLabels[nLayerIdx][nCamIdx]>0u)
                                 calcShapeDistFeatures(m_aaResegmLabelings[nLayerIdx][nCamIdx],nCamIdx,m_avFeatures[nLayerIdx]);
                     aanChangedResegmLabels = TemporalArray<CamArray<size_t>>{};
                     updateResegmModel(bInitResegmIter);
-                    m_oSuperStackedResegmLabeling.copyTo(oPreUpdateResegmLabeling);
+                    if(bNewResegmIter)
+                        m_oSuperStackedResegmLabeling.copyTo(oPreResegmUpdateLabeling);
                 }
             #if SEGMMATCH_CONFIG_USE_FGBZ_RESEGM_INF
                 calcResegmMoveCosts(nResegmAlphaLabel);
@@ -3143,7 +3146,7 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
                     }
                 }
             #elif SEGMMATCH_CONFIG_USE_SOSPD_RESEGM_INF
-                if(bNewResegmIter) {
+                if(bNewResegmIter || SEGMMATCH_CONFIG_USE_CONT_RESEGM_UPDT) {
                     if(bInitResegmIter) { // on the very first iteration, init minimizer with updated clique count
                         nInternalResegmCliqueCount = initMinimizer(oResegmMinimizer,m_vResegmNodeMap,m_vResegmGraphIdxToMapIdxLUT);
                         lvDbgAssert(nInternalResegmCliqueCount<=m_nResegmCliqueCount);
@@ -3203,7 +3206,7 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
                             nChangedResegmLabels += aanChangedResegmLabels[nLayerIdx][nCamIdx];
                     nConsecUnchangedResegmLabels = (nChangedResegmLabels>0u)?0u:nConsecUnchangedResegmLabels+s_nResegmLabels;
                     nTotChangedResegmLabels += nChangedResegmLabels;
-                    const double dResegmIterChangeFraction = ((double)cv::countNonZero(oPreUpdateResegmLabeling^m_oSuperStackedResegmLabeling))/m_oSuperStackedResegmLabeling.total();
+                    const double dResegmIterChangeFraction = ((double)cv::countNonZero(oPreResegmUpdateLabeling^m_oSuperStackedResegmLabeling))/m_oSuperStackedResegmLabeling.total();
                     //lvPrint(dResegmIterChangeFraction);
                     if(dResegmIterChangeFraction<1e-4) {
                         lvLog(2,"\t\tsegm early break, local minima detected");
@@ -3217,20 +3220,20 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
                 bJustUpdatedSegm = true;
                 nConsecUnchangedStereoLabels = 0;
             }
-            const double dStereoIterChangeFraction = ((double)cv::countNonZero(oPreUpdateStereoLabeling^m_oSuperStackedResegmLabeling))/m_oSuperStackedResegmLabeling.total();
+            const double dStereoIterChangeFraction = ((double)cv::countNonZero(oPreStereoUpdateLabeling^m_oSuperStackedResegmLabeling))/m_oSuperStackedResegmLabeling.total();
             //lvPrint(dStereoIterChangeFraction);
             if(dStereoIterChangeFraction<1e-3) {
                 lvLog(2,"\t\tstereo early break, local minima detected");
                 break;
             }
-            m_oSuperStackedResegmLabeling.copyTo(oPreUpdateStereoLabeling);
+            m_oSuperStackedResegmLabeling.copyTo(oPreStereoUpdateLabeling);
         }
     }
     for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx)
         if(nCamIdx!=m_nPrimaryCamIdx)
             resetStereoLabelings(nCamIdx);
     lvLog_(2,"Inference for primary camera idx=%d completed in %f second(s).",(int)m_nPrimaryCamIdx,oLocalTimer.tock());
-    if(lv::getVerbosity()>=3)
+    if(lv::getVerbosity()>=4)
         cv::waitKey(0);
     return opengm::InferenceTermination::NORMAL;
 }
