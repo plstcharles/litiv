@@ -15,6 +15,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// @@@@@ CURRENT VERSION NEVER USING TEMPORAL POST-PROC RESULT
+
 #include "litiv/datasets.hpp"
 #include "litiv/imgproc.hpp"
 #include "litiv/video.hpp"
@@ -22,8 +24,8 @@
 ////////////////////////////////
 #define PROCESS_PREPROC_BGSEGM  0
 #define WRITE_IMG_OUTPUT        0
-#define EVALUATE_OUTPUT         0
-#define GLOBAL_VERBOSITY        2
+#define EVALUATE_OUTPUT         1
+#define GLOBAL_VERBOSITY        3
 ////////////////////////////////
 #define DATASET_VAPTRIMOD       1
 #define DATASET_LITIV2014       0
@@ -38,7 +40,9 @@
 #define DATASET_EVAL_DISPARITY_MASKS       0
 #define DATASET_EVAL_APPROX_MASKS_ONLY     0
 #define DATASET_EVAL_OUTPUT_MASKS_ONLY     0
-#define DATASET_BATCH_START_INDEX          25
+#define DATASET_EVAL_INPUT_SUBSET          1
+#define DATASET_EVAL_GT_SUBSET             1
+#define DATASET_BATCH_START_INDEX          0
 #define DATASET_BATCH_STOP_MAX_INDEX       9999
 
 #if (DATASET_VAPTRIMOD+DATASET_LITIV2014+DATASET_MINI_TESTS/*+...*/)!=1
@@ -63,8 +67,9 @@
     PROCESS_PREPROC_BGSEGM?false:true,            /* bool bUndistort=true */\
     PROCESS_PREPROC_BGSEGM?false:true,            /* bool bHorizRectify=false */\
     DATASET_EVAL_DISPARITY_MASKS,                 /* bool bEvalStereoDisp=false */\
-    PROCESS_PREPROC_BGSEGM?false:/*true*/false,   /* bool bLoadFrameSubset=false */\
-    /*false*/true,                                /* bool bEvalOnlyFrameSubset=false */\
+    PROCESS_PREPROC_BGSEGM?false:DATASET_EVAL_INPUT_SUBSET,/* bool bLoadFrameSubset=false */\
+    DATASET_EVAL_GT_SUBSET,                       /* bool bEvalOnlyFrameSubset=false */\
+    (int)SegmMatcher::getTemporalDepth(),         /* int nEvalTemporalWindowSize=0*/\
     PROCESS_PREPROC_BGSEGM?0:1/*4*/,              /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_LITIV2014
@@ -317,6 +322,12 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         #endif //DATASET_EVAL_OUTPUT_MASKS_ONLY
             }
         #else //!(DATASET_EVAL_APPROX_MASKS_ONLY || DATASET_EVAL_OUTPUT_MASKS_ONLY)
+            if(oBatch.isTemporalWindowBreak(nCurrIdx)) {
+                // only useful for subset processing; should never be triggered in other conditions
+                lvDbgAssert(DATASET_EVAL_INPUT_SUBSET || DATASET_EVAL_GT_SUBSET);
+                std::cout << "\t\t\t" << " -> temporal break detected, resetting temporal model" << std::endl;
+                pAlgo->resetTemporalModel();
+            }
         #if !DATASET_FORCE_RECALC_FEATURES
             const cv::Mat& oNextFeatsPacket = oBatch.loadFeatures(nCurrIdx);
             if(!oNextFeatsPacket.empty())
@@ -371,7 +382,6 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 oBatch.push(vCurrStereoMaps,nCurrIdx++);
             else
                 oBatch.push(vCurrFGMasks,nCurrIdx++);
-            //break;
         #endif //!PROCESS_PREPROC_BGSEGM
         }
         oBatch.stopProcessing();
@@ -391,5 +401,4 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         std::cout << "\nAnalyze caught unhandled exception while attempting to stop batch processing.\n" << std::endl;
         throw;
     }
-    std::exit(1);
 }

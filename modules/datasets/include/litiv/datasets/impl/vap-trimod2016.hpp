@@ -44,6 +44,8 @@ namespace lv {
         virtual bool isLoadingFrameSubset() const = 0;
         /// returns whether only a subset of the dataset's frames will be evaluated or not
         virtual bool isEvaluatingOnlyFrameSubset() const = 0;
+        /// returns the evaluation window temporal size used around each frame in subset mode
+        virtual int getEvalTemporalWindowSize() const = 0;
         /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
         virtual int isLoadingInputMasks() const = 0;
     };
@@ -64,7 +66,8 @@ namespace lv {
                 bool bHorizRectify=false, ///< defines whether images should be horizontally rectified when loaded or not, using the calib files provided with the dataset
                 bool bEvalDisparities=false, ///< defines whether we should evaluate fg/bg segmentation or stereo disparities
                 bool bLoadFrameSubset=false, ///< defines whether only a subset of the dataset's frames will be loaded or not
-                bool bEvalOnlyFrameSubset=false, ///<  defines whether only a subset of the dataset's frames will be evaluated or not (if bLoadFrameSubset==true, has no effect)
+                bool bEvalOnlyFrameSubset=false, ///< defines whether only a subset of the dataset's frames will be evaluated or not (if bLoadFrameSubset==true, has no effect)
+                int nEvalTemporalWindowSize=0, ///< defines the evaluation window temporal size around each frame to eval in subset mode (if bLoadFrameSubset==false and bEvalOnlyFrameSubset==false, has no effect)
                 int nLoadInputMasks=0, ///< defines whether the input stream should be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
                 double dScaleFactor=1.0 ///< defines the scale factor to use to resize/rescale read packets
         ) :
@@ -85,6 +88,7 @@ namespace lv {
                 m_bEvalDisparities(bEvalDisparities),
                 m_bLoadFrameSubset(bLoadFrameSubset),
                 m_bEvalOnlyFrameSubset(bEvalOnlyFrameSubset),
+                m_nEvalTemporalWindowSize(nEvalTemporalWindowSize),
                 m_nLoadInputMasks(nLoadInputMasks) {
             lvAssert_(!m_bEvalDisparities,"missing impl (no stereo disparity gt in dataset)");
         }
@@ -115,6 +119,8 @@ namespace lv {
         virtual bool isLoadingFrameSubset() const override {return m_bLoadFrameSubset;}
         /// returns whether only a subset of the dataset's frames will be evaluated or not
         virtual bool isEvaluatingOnlyFrameSubset() const override {return m_bEvalOnlyFrameSubset;}
+        /// returns the evaluation window temporal size used around each frame in subset mode
+        virtual int getEvalTemporalWindowSize() const override {return m_nEvalTemporalWindowSize;}
         /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
         virtual int isLoadingInputMasks() const override {return m_nLoadInputMasks;}
     protected:
@@ -124,6 +130,7 @@ namespace lv {
         const bool m_bEvalDisparities;
         const bool m_bLoadFrameSubset;
         const bool m_bEvalOnlyFrameSubset;
+        const int m_nEvalTemporalWindowSize;
         const int m_nLoadInputMasks;
     };
 
@@ -194,6 +201,10 @@ namespace lv {
         bool isEvaluatingOnlyFrameSubset() const {
             return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isEvaluatingOnlyFrameSubset();
         }
+        /// returns the evaluation window temporal size used around each frame in subset mode
+        int getEvalTemporalWindowSize() const {
+            return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).getEvalTemporalWindowSize();
+        }
         /// returns whether the input stream will be interlaced with fg/bg masks (0=no interlacing masks, -1=all gt masks, 1=all approx masks, (1<<(X+1))=gt mask for stream 'X')
         int isLoadingInputMasks() const {
             return dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot()).isLoadingInputMasks();
@@ -221,6 +232,26 @@ namespace lv {
         size_t getMaxDisparity() const {
             return this->m_nMaxDisp;
         }
+        /// returns whether the given packet index is at a break between two temporal windows (only useful when subset-processing, always false otherwise)
+        bool isTemporalWindowBreak(size_t nPacketIdx) const {
+            const bool bLoadFrameSubset = this->isLoadingFrameSubset();
+            const bool bEvalOnlyFrameSubset = this->isEvaluatingOnlyFrameSubset();
+            if(!bLoadFrameSubset && !bEvalOnlyFrameSubset)
+                return false;
+            lvAssert_(!m_mSubset.empty(),"must parse data first");
+            const int nEvalTemporalWindowSize = this->getEvalTemporalWindowSize();
+            lvAssert_(nEvalTemporalWindowSize>=0,"bad temporal window size");
+            if(nEvalTemporalWindowSize==0)
+                return true;
+            lvAssert_(nPacketIdx<m_mSubset.size(),"input packet index oob");
+            auto pPacketIter = m_mSubset.begin();
+            const size_t nPrevPacketIdx = (nPacketIdx>0u)?(nPacketIdx-1u):0u;
+            std::advance(pPacketIter,nPrevPacketIdx);
+            const size_t nRealPrevPacketIdx = *pPacketIter;
+            std::advance(pPacketIter,nPacketIdx-nPrevPacketIdx);
+            const size_t nRealCurrPacketIdx = *pPacketIter;
+            return ((nRealPrevPacketIdx+1u)!=nRealCurrPacketIdx);
+        }
 
     protected:
         virtual void parseData() override final {
@@ -230,6 +261,8 @@ namespace lv {
             const IVAPtrimod2016Dataset& oDataset = dynamic_cast<const IVAPtrimod2016Dataset&>(*this->getRoot());
             const bool bLoadFrameSubset = this->isLoadingFrameSubset();
             const bool bEvalOnlyFrameSubset = this->isEvaluatingOnlyFrameSubset();
+            const int nEvalTemporalWindowSize = this->getEvalTemporalWindowSize();
+            lvAssert_(nEvalTemporalWindowSize>=0,"bad temporal window size");
             this->m_bLoadDepth = oDataset.isLoadingDepth();
             this->m_nLoadInputMasks = oDataset.isLoadingInputMasks();
             this->m_bUndistort = oDataset.isUndistorting();
@@ -270,7 +303,8 @@ namespace lv {
                 if(this->m_bLoadDepth && bUseApproxDepthMask && psDepthApproxMasksDir==vsSubDirs.end())
                     lvError_("VAPtrimod2016 sequence '%s' did not possess the required approx input mask directory ('depthApproxMasks')",this->getName().c_str());
             }
-            std::set<size_t> mSubset;
+            m_mRealSubset.clear();
+            m_mSubset.clear();
             if(bLoadFrameSubset || bEvalOnlyFrameSubset) {
                 const std::string sSubsetFilePath = this->getDataPath()+"subset.txt";
                 std::ifstream oSubsetFile(sSubsetFilePath);
@@ -284,14 +318,24 @@ namespace lv {
                         continue;
                     const int nCurrIdx = std::stoi(sLineBuffer);
                     lvAssert(nCurrIdx>=0 && nCurrIdx<2500);
-                    mSubset.insert(size_t(nCurrIdx));
+                    m_mRealSubset.insert(size_t(nCurrIdx));
+                    for(int nOffsetIdx=nCurrIdx-nEvalTemporalWindowSize; nOffsetIdx<=nCurrIdx+nEvalTemporalWindowSize; ++nOffsetIdx)
+                        if(nOffsetIdx>=0 && nOffsetIdx<2500)
+                            m_mSubset.insert(size_t(nOffsetIdx));
                 }
-                lvAssert(mSubset.size()>0);
+                lvAssert(m_mSubset.size()>0);
             }
-            const auto lSubsetCleaner = [&](std::vector<std::string>& vsPaths) {
-                lvAssert(!mSubset.empty() && vsPaths.size()>*mSubset.rbegin());
+            const auto lInputSubsetCleaner = [&](std::vector<std::string>& vsPaths) {
+                lvAssert(!m_mSubset.empty() && vsPaths.size()>*m_mSubset.rbegin());
                 std::vector<std::string> vsKeptPaths;
-                for(const auto& nIdx : mSubset)
+                for(const auto& nIdx : m_mSubset)
+                    vsKeptPaths.push_back(vsPaths[nIdx]);
+                vsPaths = vsKeptPaths;
+            };
+            const auto lGTSubsetCleaner = [&](std::vector<std::string>& vsPaths) {
+                lvAssert(!m_mRealSubset.empty() && vsPaths.size()>*m_mRealSubset.rbegin());
+                std::vector<std::string> vsKeptPaths;
+                for(const auto& nIdx : m_mRealSubset)
                     vsKeptPaths.push_back(vsPaths[nIdx]);
                 vsPaths = vsKeptPaths;
             };
@@ -392,7 +436,7 @@ namespace lv {
             if(vsRGBPaths.empty() || cv::imread(vsRGBPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected RGB data",this->getName().c_str());
             if(bLoadFrameSubset)
-                lSubsetCleaner(vsRGBPaths);
+                lInputSubsetCleaner(vsRGBPaths);
             const size_t nInputPackets = vsRGBPaths.size();
             this->m_vvsInputPaths.resize(nInputPackets);
             std::vector<std::string> vsTempInputFileNames(nInputPackets);
@@ -409,7 +453,7 @@ namespace lv {
                 if(vsRGBApproxMasksPaths.empty() || cv::imread(vsRGBApproxMasksPaths[0]).size()!=oImageSize)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess expected RGB approx mask data",this->getName().c_str());
                 if(bLoadFrameSubset)
-                    lSubsetCleaner(vsRGBApproxMasksPaths);
+                    lInputSubsetCleaner(vsRGBApproxMasksPaths);
                 lvAssert_(vsRGBApproxMasksPaths.size()==nInputPackets,"rgb approx mask count did not match input image count");
                 for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx)
                     this->m_vvsInputPaths[nInputPacketIdx][nInputRGBMaskStreamIdx] = vsRGBApproxMasksPaths[nInputPacketIdx];
@@ -450,7 +494,7 @@ namespace lv {
             if(vsRGBGTMasksPaths.empty() || cv::imread(vsRGBGTMasksPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected RGB gt data",this->getName().c_str());
             if(bLoadFrameSubset || bEvalOnlyFrameSubset)
-                lSubsetCleaner(vsRGBGTMasksPaths);
+                lGTSubsetCleaner(vsRGBGTMasksPaths);
             const size_t nGTPackets = vsRGBGTMasksPaths.size();
             this->m_vvsGTPaths.resize(nGTPackets);
             this->m_mGTIndexLUT.clear();
@@ -480,7 +524,7 @@ namespace lv {
             if(vsThermalPaths.empty() || cv::imread(vsThermalPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected thermal data",this->getName().c_str());
             if(bLoadFrameSubset)
-                lSubsetCleaner(vsThermalPaths);
+                lInputSubsetCleaner(vsThermalPaths);
             if(vsThermalPaths.size()!=nInputPackets)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/thermal frames",this->getName().c_str());
             for(size_t nInputPacketIdx=0; nInputPacketIdx<vsThermalPaths.size(); ++nInputPacketIdx)
@@ -490,7 +534,7 @@ namespace lv {
                 if(vsThermalApproxMasksPaths.empty() || cv::imread(vsThermalApproxMasksPaths[0]).size()!=oImageSize)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess expected thermal approx mask data",this->getName().c_str());
                 if(bLoadFrameSubset)
-                    lSubsetCleaner(vsThermalApproxMasksPaths);
+                    lInputSubsetCleaner(vsThermalApproxMasksPaths);
                 lvAssert_(vsThermalApproxMasksPaths.size()==nInputPackets,"thermal approx mask count did not match input image count");
                 for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx)
                     this->m_vvsInputPaths[nInputPacketIdx][nInputThermalMaskStreamIdx] = vsThermalApproxMasksPaths[nInputPacketIdx];
@@ -533,7 +577,7 @@ namespace lv {
             if(vsThermalGTMasksPaths.empty() || cv::imread(vsThermalGTMasksPaths[0]).size()!=oImageSize)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess expected thermal gt data",this->getName().c_str());
             if(bLoadFrameSubset || bEvalOnlyFrameSubset)
-                lSubsetCleaner(vsThermalGTMasksPaths);
+                lGTSubsetCleaner(vsThermalGTMasksPaths);
             if(vsThermalGTMasksPaths.size()!=nGTPackets)
                 lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/thermal gt frames",this->getName().c_str());
             for(size_t nGTPacketIdx=0; nGTPacketIdx<vsThermalGTMasksPaths.size(); ++nGTPacketIdx)
@@ -550,7 +594,7 @@ namespace lv {
                 if(vsDepthPaths.empty() || cv::imread(vsDepthPaths[0]).size()!=oImageSize)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess expected depth data",this->getName().c_str());
                 if(bLoadFrameSubset)
-                    lSubsetCleaner(vsDepthPaths);
+                    lInputSubsetCleaner(vsDepthPaths);
                 if(vsDepthPaths.size()!=nInputPackets)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/depth frames",this->getName().c_str());
                 for(size_t nInputPacketIdx=0; nInputPacketIdx<vsDepthPaths.size(); ++nInputPacketIdx)
@@ -560,7 +604,7 @@ namespace lv {
                     if(vsDepthApproxMasksPaths.empty() || cv::imread(vsDepthApproxMasksPaths[0]).size()!=oImageSize)
                         lvError_("VAPtrimod2016 sequence '%s' did not possess expected depth approx mask data",this->getName().c_str());
                     if(bLoadFrameSubset)
-                        lSubsetCleaner(vsDepthApproxMasksPaths);
+                        lInputSubsetCleaner(vsDepthApproxMasksPaths);
                     lvAssert_(vsDepthApproxMasksPaths.size()==nInputPackets,"depth approx mask count did not match input image count");
                     for(size_t nInputPacketIdx=0; nInputPacketIdx<nInputPackets; ++nInputPacketIdx)
                         this->m_vvsInputPaths[nInputPacketIdx][nInputDepthMaskStreamIdx] = vsDepthApproxMasksPaths[nInputPacketIdx];
@@ -584,7 +628,7 @@ namespace lv {
                 if(vsDepthGTMasksPaths.empty() || cv::imread(vsDepthGTMasksPaths[0]).size()!=oImageSize)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess expected depth gt data",this->getName().c_str());
                 if(bLoadFrameSubset || bEvalOnlyFrameSubset)
-                    lSubsetCleaner(vsDepthGTMasksPaths);
+                    lGTSubsetCleaner(vsDepthGTMasksPaths);
                 if(vsDepthGTMasksPaths.size()!=nGTPackets)
                     lvError_("VAPtrimod2016 sequence '%s' did not possess same amount of RGB/depth gt frames",this->getName().c_str());
                 for(size_t nGTPacketIdx=0; nGTPacketIdx<vsDepthGTMasksPaths.size(); ++nGTPacketIdx)
@@ -770,6 +814,7 @@ namespace lv {
             }
             return vGTs;
         }
+        std::set<size_t> m_mRealSubset,m_mSubset;
         bool m_bLoadDepth,m_bUndistort,m_bHorizRectify;
         int m_nLoadInputMasks;
         int m_nThermalDispOffset;
