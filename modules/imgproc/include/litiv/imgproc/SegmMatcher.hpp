@@ -92,6 +92,8 @@ struct SegmMatcher : ICosegmentor<int32_t,4> { // camera count could be template
     virtual void calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeaturesPacket=nullptr);
     /// sets a previously precalculated initial features packet to be used in the next 'apply' call (do not modify its data before that!)
     virtual void setNextFeatures(const cv::Mat& oPackedFeatures);
+    /// reinitializes internal model by resetting the internal frame counter, essentially breaking future temporal links until enough new frames have been processed
+    virtual void resetTemporalModel();
     /// returns the (friendly) name of the input image feature extractor that will be used internally
     virtual std::string getFeatureExtractorName() const;
     /// returns the (maximum) number of stereo disparity labels used in the output masks

@@ -799,6 +799,11 @@ void SegmMatcher::setNextFeatures(const cv::Mat& oPackedFeatures) {
     m_pModelData->setNextFeatures(oPackedFeatures);
 }
 
+void SegmMatcher::resetTemporalModel() {
+    lvDbgExceptionWatch;
+    m_pModelData->m_nFramesProcessed = 0u;
+}
+
 std::string SegmMatcher::getFeatureExtractorName() const {
 #if SEGMMATCH_CONFIG_USE_DASCGF_AFFINITY
     return "sc-dasc-gf";
