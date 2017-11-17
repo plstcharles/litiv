@@ -1601,9 +1601,18 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
     for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx) {
         for(size_t nLayerIdx=0; nLayerIdx<nTemporalLayerCount; ++nLayerIdx) {
             cv::Mat_<uchar> oCurrGMMROILayer(nRows,nCols,aGMMROIs[nCamIdx].data+nLayerSize*nLayerIdx);
+            cv::Mat_<uchar> oInitSegmLayerDilated,oInitSegmLayerEroded;
+            cv::dilate(oCurrGMMROILayer,oInitSegmLayerDilated,cv::getStructuringElement(cv::MORPH_RECT,cv::Size(9,9)));
+            cv::erode(oCurrGMMROILayer,oInitSegmLayerEroded,cv::getStructuringElement(cv::MORPH_RECT,cv::Size(9,9)));
+            cv::Mat_<uchar> oInitSegmContourMask = ~(oInitSegmLayerDilated^oInitSegmLayerEroded);
+            //cv::imshow("oInitSegmContourMask",oInitSegmContourMask);
+            //cv::imshow("oCurrGMMROILayer",oCurrGMMROILayer);
             cv::dilate(oCurrGMMROILayer,oCurrGMMROILayer,cv::getStructuringElement(cv::MORPH_RECT,cv::Size(75,75)));
+            cv::bitwise_and(oCurrGMMROILayer,oInitSegmContourMask,oCurrGMMROILayer);
             cv::bitwise_and(oCurrGMMROILayer,m_aROIs[nCamIdx],oCurrGMMROILayer);
             lvDbgAssert(oCurrGMMROILayer.data==aGMMROIs[nCamIdx].data+nLayerSize*nLayerIdx); // ... should stay in-place
+            //cv::imshow("oCurrGMMROILayer",oCurrGMMROILayer);
+            //cv::waitKey(0);
         }
     }
 #else //!SEGMMATCH_CONFIG_USE_GMM_LOCAL_BACKGR
