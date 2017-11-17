@@ -15,6 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if(USE_OPENGM)
+if(USE_OPENGM AND USE_BOOST) # as of 2017/11, SegmMatcher requires SoSPD, which requires boost
     litiv_app(cosegm "src/main.cpp" "src/cosegm_tests.hpp")
 endif()

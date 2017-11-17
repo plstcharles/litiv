@@ -47,7 +47,7 @@ if(USE_CUDA)
     )
 endif()
 
-if(USE_OPENGM)
+if(USE_OPENGM AND USE_BOOST) # as of 2017/11, SegmMatcher requires SoSPD, which requires boost
     add_files(INCLUDE_FILES
         "include/litiv/imgproc/SegmMatcher.hpp"
     )
