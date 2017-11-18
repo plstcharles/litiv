@@ -267,7 +267,7 @@ TYPED_TEST(MatSize_fixture,regression_2d) {
 
 TYPED_TEST(MatSize_fixture,regression_nd) {
     for(size_t i=0; i<100000; ++i) {
-        const TypeParam nDims = TypeParam(rand()%10);
+        const TypeParam nDims = TypeParam(rand()%6);
         std::vector<int> vnDimsPaddedInt(nDims+1);
         std::vector<int> vnDimsInt(nDims);
         std::vector<TypeParam> vnDimsPadded(nDims+1);
@@ -276,7 +276,7 @@ TYPED_TEST(MatSize_fixture,regression_nd) {
         vnDimsPadded[0] = nDims;
         size_t nElems = 0;
         for(int n=0; n<int(nDims); ++n) {
-            vnDims[n] = vnDimsPadded[n+1] = TypeParam(rand()%50);
+            vnDims[n] = vnDimsPadded[n+1] = TypeParam(rand()%40);
             vnDimsInt[n] = vnDimsPaddedInt[n+1] = (int)vnDims[n];
             if(n==TypeParam(0))
                 nElems = size_t(vnDims[n]);
