@@ -233,7 +233,6 @@ TYPED_TEST(MatSize_fixture,regression_2d) {
     ASSERT_EQ(test.dims(),TypeParam(2));
     ASSERT_EQ(test.size(0),TypeParam(34));
     ASSERT_EQ(test.size(1),TypeParam(12));
-    ASSERT_NE(test,(const TypeParam*)nullptr);
     ASSERT_EQ(((cv::MatSize)test).p[-1],2);
     ASSERT_EQ(((cv::Size)test),cv::Size(12,34));
     ASSERT_TRUE(((cv::MatSize)test)!=cv::MatSize(arr.data()+1));
