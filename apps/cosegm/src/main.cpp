@@ -21,18 +21,18 @@
 
 ////////////////////////////////
 #define PROCESS_PREPROC_BGSEGM  0
-#define WRITE_IMG_OUTPUT        0
+#define WRITE_IMG_OUTPUT        1
 #define EVALUATE_OUTPUT         1
-#define GLOBAL_VERBOSITY        3
+#define GLOBAL_VERBOSITY        2
 ////////////////////////////////
 #define DATASET_VAPTRIMOD       1
 #define DATASET_LITIV2014       0
 #define DATASET_MINI_TESTS      0
 ////////////////////////////////
-#define DATASET_OUTPUT_PATH     "results_cosegm_test"
+#define DATASET_OUTPUT_PATH     "results_cosegm_b2_t35"
 #define DATASET_PRECACHING      0
 #define DATASET_SCALE_FACTOR    1//0.5
-#define DATASET_WORKTHREADS     1
+#define DATASET_WORKTHREADS     2
 ////////////////////////////////
 #define DATASET_FORCE_RECALC_FEATURES      1
 #define DATASET_EVAL_DISPARITY_MASKS       0
@@ -337,7 +337,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             {
                 cv::Mat oNewFeatsPacket;
                 pAlgo->calcFeatures(lv::convertVectorToArray<nExpectedAlgoInputCount>(vCurrInput),&oNewFeatsPacket);
-                oBatch.saveFeatures(nCurrIdx,oNewFeatsPacket);
+                //oBatch.saveFeatures(nCurrIdx,oNewFeatsPacket);
                 pAlgo->setNextFeatures(oNewFeatsPacket);
             }
             pAlgo->apply(vCurrInput,vCurrOutput/*,dDefaultThreshold*/);

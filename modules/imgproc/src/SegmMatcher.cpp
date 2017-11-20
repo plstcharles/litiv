@@ -19,15 +19,15 @@
 #include "litiv/3rdparty/ofdis/ofdis.hpp"
 
 // config options
-#define SEGMMATCH_CONFIG_USE_DASCGF_AFFINITY   1
-#define SEGMMATCH_CONFIG_USE_DASCRF_AFFINITY   0
+#define SEGMMATCH_CONFIG_USE_DASCGF_AFFINITY   0
+#define SEGMMATCH_CONFIG_USE_DASCRF_AFFINITY   1
 #define SEGMMATCH_CONFIG_USE_LSS_AFFINITY      0
 #define SEGMMATCH_CONFIG_USE_MI_AFFINITY       0
 #define SEGMMATCH_CONFIG_USE_SSQDIFF_AFFINITY  0
 #define SEGMMATCH_CONFIG_USE_SHAPE_EMD_AFFIN   0
 #define SEGMMATCH_CONFIG_USE_UNARY_ONLY_FIRST  1
 #define SEGMMATCH_CONFIG_USE_SALIENT_MAP_BORDR 1
-#define SEGMMATCH_CONFIG_USE_ROOT_SIFT_DESCS   0
+#define SEGMMATCH_CONFIG_USE_ROOT_SIFT_DESCS   1
 #define SEGMMATCH_CONFIG_USE_THERMAL_HEURIST   1
 #define SEGMMATCH_CONFIG_USE_GMM_LOCAL_BACKGR  1
 #define SEGMMATCH_CONFIG_USE_FGBZ_STEREO_INF   1
@@ -39,14 +39,14 @@
 #define SEGMMATCH_CONFIG_USE_EPIPOLAR_CONN     0
 #define SEGMMATCH_CONFIG_USE_TEMPORAL_CONN     1
 #define SEGMMATCH_CONFIG_USE_CONT_RESEGM_UPDT  1
-#define SEGMMATCH_CONFIG_USE_TEMPORAL_U_CST    0
+#define SEGMMATCH_CONFIG_USE_TEMPORAL_U_CST    1
 
 // default param values
 #define SEGMMATCH_DEFAULT_TEMPORAL_DEPTH       (size_t(1))
 #define SEGMMATCH_DEFAULT_DISPARITY_STEP       (size_t(1))
 #define SEGMMATCH_DEFAULT_MAX_STEREO_ITER      (size_t(300))
 #define SEGMMATCH_DEFAULT_MAX_RESEGM_ITER      (size_t(30))
-#define SEGMMATCH_DEFAULT_SCDESC_WIN_RAD       (size_t(40))
+#define SEGMMATCH_DEFAULT_SCDESC_WIN_RAD       (size_t(50))
 #define SEGMMATCH_DEFAULT_SCDESC_RAD_BINS      (size_t(3))
 #define SEGMMATCH_DEFAULT_SCDESC_ANG_BINS      (size_t(10))
 #define SEGMMATCH_DEFAULT_LSSDESC_RAD          (size_t(40))
@@ -57,16 +57,20 @@
 #define SEGMMATCH_DEFAULT_MI_WINDOW_RAD        (size_t(12))
 #define SEGMMATCH_DEFAULT_GRAD_KERNEL_SIZE     (int(1))
 #define SEGMMATCH_DEFAULT_DISTTRANSF_SCALE     (-0.1f)
-#define SEGMMATCH_DEFAULT_ITER_PER_RESEGM      ((m_nStereoLabels*3)/2)
+#define SEGMMATCH_DEFAULT_ITER_PER_RESEGM      (m_nStereoLabels)
 #define SEGMMATCH_DEFAULT_SALIENT_SHP_RAD      (3)
 #define SEGMMATCH_DEFAULT_DESC_PATCH_SIZE      (15)
+#define SEGMMATCH_DEFAULT_CONTOUR_DC_SIZE      (0)
+#define SEGMMATCH_DEFAULT_BG_ZONE_SIZE         (45)
+#define SEGMMATCH_DEFAULT_GMM_3CH_COMPONENTS   (6)
+#define SEGMMATCH_DEFAULT_GMM_1CH_COMPONENTS   (3)
 
 // unary costs params
 #define SEGMMATCH_UNARY_COST_OOB_CST           (ValueType(5000))
 #define SEGMMATCH_UNARY_COST_OCCLUDED_CST      (ValueType(2000))
 #define SEGMMATCH_UNARY_COST_MAXTRUNC_CST      (ValueType(10000))
-#define SEGMMATCH_UNARY_COST_TEMPORAL_CST      (ValueType(100))
-#define SEGMMATCH_IMGSIM_COST_COLOR_SCALE      (40)
+#define SEGMMATCH_UNARY_COST_TEMPORAL_CST      (ValueType(200))
+#define SEGMMATCH_IMGSIM_COST_COLOR_SCALE      (50)
 #define SEGMMATCH_IMGSIM_COST_DESC_SCALE       (400)
 #define SEGMMATCH_SHPSIM_COST_DESC_SCALE       (400)
 #define SEGMMATCH_UNIQUE_COST_OVER_SCALE       (400)
@@ -76,7 +80,7 @@
 // pairwise costs params
 #define SEGMMATCH_LBLSIM_COST_MAXOCCL          (ValueType(5000))
 #define SEGMMATCH_LBLSIM_COST_MAXTRUNC_CST     (ValueType(5000))
-#define SEGMMATCH_LBLSIM_RESEGM_SCALE_CST      (400)
+#define SEGMMATCH_LBLSIM_RESEGM_SCALE_CST      (200)
 #define SEGMMATCH_LBLSIM_STEREO_SCALE_CST      (1.f)
 #define SEGMMATCH_LBLSIM_STEREO_MAXDIFF_CST    (10)
 #define SEGMMATCH_LBLSIM_USE_EXP_GRADPIVOT     (1)
@@ -89,7 +93,7 @@
 #endif //!SEGMMATCH_LBLSIM_USE_EXP_GRADPIVOT
 // higher order costs params
 #define SEGMMATCH_HOENERGY_STEREO_STRIDE       (size_t(1))
-#define SEGMMATCH_HOENERGY_RESEGM_STRIDE       (size_t(1))
+#define SEGMMATCH_HOENERGY_RESEGM_STRIDE       (size_t(2))
 // ...
 
 // hardcoded term relations
@@ -370,9 +374,9 @@ struct SegmMatcher::GraphModelData {
     /// resegm model unary/pairw/temporal functions base pointers
     ValueType *m_pResegmUnaryFuncsDataBase,*m_pResegmPairwFuncsDataBase,*m_pResegmTemporalFuncsDataBase,*m_pResegmFuncsDataEnd;
     /// gmm fg/bg models used for intra-spectral visual-data-based segmentation (3ch)
-    CamArray<lv::GMM<5,3>> m_aFGModels_3ch,m_aBGModels_3ch;
+    CamArray<lv::GMM<SEGMMATCH_DEFAULT_GMM_3CH_COMPONENTS,3>> m_aFGModels_3ch,m_aBGModels_3ch;
     /// gmm fg/bg models used for intra-spectral visual-data-based segmentation (1ch)
-    CamArray<lv::GMM<3,1>> m_aFGModels_1ch,m_aBGModels_1ch;
+    CamArray<lv::GMM<SEGMMATCH_DEFAULT_GMM_1CH_COMPONENTS,1>> m_aFGModels_1ch,m_aBGModels_1ch;
     /// gmm label component maps used for model learning (kept here to avoid reallocs)
     CamArray<cv::Mat_<int>> m_aGMMCompAssignMap; // note: maps contain the temporal depth as stacked layers
     /// cost lookup table for adding/removing/summing associations
@@ -1614,14 +1618,19 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
     for(size_t nCamIdx=0; nCamIdx<nCameraCount; ++nCamIdx) {
         for(size_t nLayerIdx=0; nLayerIdx<nTemporalLayerCount; ++nLayerIdx) {
             cv::Mat_<uchar> oCurrGMMROILayer(nRows,nCols,aGMMROIs[nCamIdx].data+nLayerSize*nLayerIdx);
+        #if SEGMMATCH_DEFAULT_CONTOUR_DC_SIZE>0
+            const int nDontCarePatchSize = SEGMMATCH_DEFAULT_CONTOUR_DC_SIZE;
             cv::Mat_<uchar> oInitSegmLayerDilated,oInitSegmLayerEroded;
-            cv::dilate(oCurrGMMROILayer,oInitSegmLayerDilated,cv::getStructuringElement(cv::MORPH_RECT,cv::Size(9,9)));
-            cv::erode(oCurrGMMROILayer,oInitSegmLayerEroded,cv::getStructuringElement(cv::MORPH_RECT,cv::Size(9,9)));
+            cv::dilate(oCurrGMMROILayer,oInitSegmLayerDilated,cv::getStructuringElement(cv::MORPH_RECT,cv::Size(nDontCarePatchSize,nDontCarePatchSize)));
+            cv::erode(oCurrGMMROILayer,oInitSegmLayerEroded,cv::getStructuringElement(cv::MORPH_RECT,cv::Size(nDontCarePatchSize,nDontCarePatchSize)));
             cv::Mat_<uchar> oInitSegmContourMask = ~(oInitSegmLayerDilated^oInitSegmLayerEroded);
             //cv::imshow("oInitSegmContourMask",oInitSegmContourMask);
-            //cv::imshow("oCurrGMMROILayer",oCurrGMMROILayer);
-            cv::dilate(oCurrGMMROILayer,oCurrGMMROILayer,cv::getStructuringElement(cv::MORPH_RECT,cv::Size(75,75)));
+        #endif //SEGMMATCH_DEFAULT_CONTOUR_DC_SIZE>0
+            const int nBGZonePatchSize = SEGMMATCH_DEFAULT_BG_ZONE_SIZE;
+            cv::dilate(oCurrGMMROILayer,oCurrGMMROILayer,cv::getStructuringElement(cv::MORPH_RECT,cv::Size(nBGZonePatchSize,nBGZonePatchSize)));
+        #if SEGMMATCH_DEFAULT_CONTOUR_DC_SIZE>0
             cv::bitwise_and(oCurrGMMROILayer,oInitSegmContourMask,oCurrGMMROILayer);
+        #endif //SEGMMATCH_DEFAULT_CONTOUR_DC_SIZE>0
             cv::bitwise_and(oCurrGMMROILayer,m_aROIs[nCamIdx],oCurrGMMROILayer);
             lvDbgAssert(oCurrGMMROILayer.data==aGMMROIs[nCamIdx].data+nLayerSize*nLayerIdx); // ... should stay in-place
             //cv::imshow("oCurrGMMROILayer",oCurrGMMROILayer);
@@ -2604,7 +2613,7 @@ void SegmMatcher::GraphModelData::calcResegmMoveCosts(InternalLabelType nNewLabe
         if(nCurrLabel!=nNewLabel) {
             const ExplicitFunction& vUnaryResegmLUT = *oNode.pUnaryFunc;
         #if SEGMMATCH_CONFIG_USE_TEMPORAL_U_CST
-            const ValueType tLayerCost = (oNode.nLayerIdx>0u)?SEGMMATCH_UNARY_COST_TEMPORAL_CST:cost_cast(0);
+            const ValueType tLayerCost = cost_cast(SEGMMATCH_UNARY_COST_TEMPORAL_CST*oNode.nLayerIdx);
             const InternalLabelType& nInitLabel = ((InternalLabelType*)m_oInitSuperStackedResegmLabeling.data)[nLUTNodeIdx];
             lvDbgAssert(nInitLabel==s_nForegroundLabelIdx || nInitLabel==s_nBackgroundLabelIdx);
             const ValueType tEnergyCurr = vUnaryResegmLUT(nCurrLabel)+((nCurrLabel==nInitLabel)?cost_cast(0):tLayerCost);
