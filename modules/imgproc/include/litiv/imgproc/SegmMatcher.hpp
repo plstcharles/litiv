@@ -86,8 +86,10 @@ struct SegmMatcher : ICosegmentor<int32_t,4> { // camera count could be template
     ~SegmMatcher();
     /// stereo graph matcher initialization function; will allocate & initialize graph model using provided ROI data (one ROI per camera head)
     virtual void initialize(const std::array<cv::Mat,s_nCameraCount>& aROIs, size_t nPrimaryCamIdx=0);
-    /// stereo matcher function; solves the graph model to find pixel-level matches on epipolar lines in the masked input images, and returns disparity maps + masks
+    /// stereo matcher function; solves the graph model to find pixel-level matches on epipolar lines in the masked input images, and returns disparity + segmentation labelings
     virtual void apply(const MatArrayIn& aInputs, MatArrayOut& aOutputs) override;
+    /// stereo matcher function; returns disparity + segmentation labelings for a given temporal layer index (previous results might have changed over time due to new inferences)
+    virtual void getOutput(size_t nTemporalLayerIdx, MatArrayOut& aOutputs) const;
     /// (pre)calculates features required for model updates, and optionally returns them in packet format
     virtual void calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeaturesPacket=nullptr);
     /// sets a previously precalculated initial features packet to be used in the next 'apply' call (do not modify its data before that!)

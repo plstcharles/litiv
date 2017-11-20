@@ -789,6 +789,17 @@ void SegmMatcher::apply(const MatArrayIn& aInputs, MatArrayOut& aOutputs) {
     }
 }
 
+void SegmMatcher::getOutput(size_t nTemporalLayerIdx, MatArrayOut& aOutputs) const {
+    lvDbgExceptionWatch;
+    lvAssert_(m_pModelData,"model must be initialized first");
+    lvAssert_(m_pModelData->m_nFramesProcessed>0u,"model must have processed at least one frame");
+    lvAssert_(nTemporalLayerIdx<getTemporalLayerCount(),"temporal layer index out of range");
+    for(size_t nCamIdx=0; nCamIdx<getCameraCount(); ++nCamIdx) {
+        m_pModelData->m_aaStereoLabelings[nTemporalLayerIdx][nCamIdx].copyTo(aOutputs[nCamIdx*OutputPackOffset+OutputPackOffset_Disp]);
+        m_pModelData->m_aaResegmLabelings[nTemporalLayerIdx][nCamIdx].copyTo(aOutputs[nCamIdx*OutputPackOffset+OutputPackOffset_Mask]);
+    }
+}
+
 void SegmMatcher::calcFeatures(const MatArrayIn& aInputs, cv::Mat* pFeaturesPacket) {
     lvDbgExceptionWatch;
     lvAssert_(m_pModelData,"model must be initialized first");
