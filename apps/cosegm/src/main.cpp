@@ -15,8 +15,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// @@@@@ CURRENT VERSION NEVER USING TEMPORAL POST-PROC RESULT
-
 #include "litiv/datasets.hpp"
 #include "litiv/imgproc.hpp"
 #include "litiv/video.hpp"
@@ -42,6 +40,7 @@
 #define DATASET_EVAL_OUTPUT_MASKS_ONLY     0
 #define DATASET_EVAL_INPUT_SUBSET          1
 #define DATASET_EVAL_GT_SUBSET             1
+#define DATASET_EVAL_FINAL_UPDATE          1
 #define DATASET_BATCH_START_INDEX          0
 #define DATASET_BATCH_STOP_MAX_INDEX       9999
 
@@ -157,7 +156,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
         std::cout << "\t\t" << sCurrBatchName << " @ init [" << sWorkerName << "]" << std::endl;
         const std::vector<cv::Mat>& vROIs = oBatch.getFrameROIArray();
         lvAssert(!vROIs.empty() && vROIs.size()==oBatch.getInputStreamCount());
-        size_t nCurrIdx = DATASET_BATCH_START_INDEX;
+        size_t nCurrIdx = DATASET_BATCH_START_INDEX, nLastTemporalBreakIdx = DATASET_BATCH_START_INDEX;
         const std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // note: mat content becomes invalid on next getInput call
         lvAssert(vInitInput.size()==oBatch.getInputStreamCount());
         for(size_t nStreamIdx=0; nStreamIdx<vInitInput.size(); ++nStreamIdx) {
@@ -327,6 +326,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 lvDbgAssert(DATASET_EVAL_INPUT_SUBSET || DATASET_EVAL_GT_SUBSET);
                 std::cout << "\t\t\t" << " -> temporal break detected, resetting temporal model" << std::endl;
                 pAlgo->resetTemporalModel();
+                nLastTemporalBreakIdx = nCurrIdx;
             }
         #if !DATASET_FORCE_RECALC_FEATURES
             const cv::Mat& oNextFeatsPacket = oBatch.loadFeatures(nCurrIdx);
@@ -355,7 +355,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                     vCurrOutput[nOutputArrayIdx].convertTo(vCurrStereoMaps[nRealOutputArrayIdx],CV_8U);
                 }
                 else if((nOutputArrayIdx%SegmMatcher::OutputPackOffset)==SegmMatcher::OutputPackOffset_Mask)
-                    vCurrFGMasks[nRealOutputArrayIdx] = vCurrOutput[nOutputArrayIdx]!=0;
+                    cv::Mat(vCurrOutput[nOutputArrayIdx]!=0).copyTo(vCurrFGMasks[nRealOutputArrayIdx]);
             }
             lvDbgAssert(vCurrFGMasks.size()==oBatch.getOutputStreamCount());
             lvDbgAssert(vCurrStereoMaps.size()==oBatch.getOutputStreamCount());
@@ -378,10 +378,41 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 if(nKeyPressed==(int)'q')
                     break;
             }
+        #if DATASET_EVAL_FINAL_UPDATE
+            if((nCurrIdx-nLastTemporalBreakIdx)>=SegmMatcher::getTemporalDepth()) {
+                // outputs can be improved over new iterations; push the top temporal layer for eval only
+                SegmMatcher::MatArrayOut aUpdatedOutputs;
+                pAlgo->getOutput(SegmMatcher::getTemporalDepth(),aUpdatedOutputs);
+                lvDbgAssert(aUpdatedOutputs.size()==nExpectedAlgoOutputCount);
+                for(size_t nOutputArrayIdx=0; nOutputArrayIdx<aUpdatedOutputs.size(); ++nOutputArrayIdx) {
+                    lvAssert(aUpdatedOutputs[nOutputArrayIdx].type()==lv::MatRawType_<OutputLabelType>());
+                    lvAssert(aUpdatedOutputs[nOutputArrayIdx].size()==oFrameSize());
+                    const size_t nRealOutputArrayIdx = nOutputArrayIdx/SegmMatcher::OutputPackOffset;
+                    if((nOutputArrayIdx%SegmMatcher::OutputPackOffset)==SegmMatcher::OutputPackOffset_Disp) {
+                        double dMin,dMax;
+                        cv::minMaxIdx(aUpdatedOutputs[nOutputArrayIdx],&dMin,&dMax);
+                        lvDbgAssert_(dMin>=0 && dMax<=255,"unexpected min/max disp for 8u mats");
+                        aUpdatedOutputs[nOutputArrayIdx].convertTo(vCurrStereoMaps[nRealOutputArrayIdx],CV_8U);
+                    }
+                    else if((nOutputArrayIdx%SegmMatcher::OutputPackOffset)==SegmMatcher::OutputPackOffset_Mask)
+                        cv::Mat(aUpdatedOutputs[nOutputArrayIdx]!=0).copyTo(vCurrFGMasks[nRealOutputArrayIdx]);
+                }
+                lvDbgAssert(vCurrFGMasks.size()==oBatch.getOutputStreamCount());
+                lvDbgAssert(vCurrStereoMaps.size()==oBatch.getOutputStreamCount());
+                const size_t nEvalIdx = nCurrIdx++-SegmMatcher::getTemporalDepth();
+                if(oBatch.isEvaluatingDisparities())
+                    oBatch.push(vCurrStereoMaps,nEvalIdx);
+                else
+                    oBatch.push(vCurrFGMasks,nEvalIdx);
+            }
+            else
+                ++nCurrIdx;
+        #else //!DATASET_EVAL_FINAL_UPDATE
             if(oBatch.isEvaluatingDisparities())
                 oBatch.push(vCurrStereoMaps,nCurrIdx++);
             else
                 oBatch.push(vCurrFGMasks,nCurrIdx++);
+        #endif //!DATASET_EVAL_FINAL_UPDATE
         #endif //!PROCESS_PREPROC_BGSEGM
         }
         oBatch.stopProcessing();
