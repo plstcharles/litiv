@@ -150,17 +150,6 @@ void lv::thinning(const cv::Mat& oInput, cv::Mat& oOutput, ThinningMode eMode) {
     while(!bEq);
 }
 
-void lv::remap_offset(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat& oOffsetMap, int nInterpType, int nBorderMode, const cv::Scalar& vBorderValue) {
-    lvAssert_(!oInput.empty() && !oOffsetMap.empty() && oOffsetMap.type()==CV_32FC2,"invalid params");
-    lvAssert_(oInput.dims==2 && lv::MatSize(oInput)==lv::MatSize(oOffsetMap),"invalid map size");
-    oOutput.create(oInput.size(),oInput.type());
-    cv::Mat_<cv::Vec2f> oLocalIdxMap(oInput.size());
-    for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx)
-        for(int nColIdx=0; nColIdx<oInput.cols; ++nColIdx)
-            oLocalIdxMap(nRowIdx,nColIdx) = cv::Vec2f(nColIdx-oOffsetMap.at<cv::Vec2f>(nRowIdx,nColIdx)[0],nRowIdx-oOffsetMap.at<cv::Vec2f>(nRowIdx,nColIdx)[1]);
-    cv::remap(oInput,oOutput,oLocalIdxMap,cv::Mat(),nInterpType,nBorderMode,vBorderValue);
-}
-
 void lv::computeImageAffinity(const cv::Mat& oImage1, const cv::Mat& oImage2, int nPatchSize,
                               cv::Mat_<float>& oAffinityMap, const std::vector<int>& vDispRange, AffinityDistType eDist,
                               const cv::Mat_<uchar>& oROI1, const cv::Mat_<uchar>& oROI2) {
@@ -439,4 +428,15 @@ void lv::computeTemporalAbsDiff(const cv::Mat& oImage1, const cv::Mat& oImage2, 
     }
     if(nSmoothKernelSize>1)
         cv::GaussianBlur(oOutput,oOutput,cv::Size(nSmoothKernelSize,nSmoothKernelSize),0);
+}
+
+void lv::remap_offset(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat& oOffsetMap, int nInterpType, int nBorderMode, const cv::Scalar& vBorderValue) {
+    lvAssert_(!oInput.empty() && !oOffsetMap.empty() && oOffsetMap.type()==CV_32FC2,"invalid params");
+    lvAssert_(oInput.dims==2 && lv::MatSize(oInput)==lv::MatSize(oOffsetMap),"invalid map size");
+    oOutput.create(oInput.size(),oInput.type());
+    cv::Mat_<cv::Vec2f> oLocalIdxMap(oInput.size());
+    for(int nRowIdx=0; nRowIdx<oInput.rows; ++nRowIdx)
+        for(int nColIdx=0; nColIdx<oInput.cols; ++nColIdx)
+            oLocalIdxMap(nRowIdx,nColIdx) = cv::Vec2f(nColIdx-oOffsetMap.at<cv::Vec2f>(nRowIdx,nColIdx)[0],nRowIdx-oOffsetMap.at<cv::Vec2f>(nRowIdx,nColIdx)[1]);
+    cv::remap(oInput,oOutput,oLocalIdxMap,cv::Mat(),nInterpType,nBorderMode,vBorderValue);
 }

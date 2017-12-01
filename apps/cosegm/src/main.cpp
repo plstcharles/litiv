@@ -29,7 +29,7 @@
 #define DATASET_LITIV2014       0
 #define DATASET_MINI_TESTS      0
 ////////////////////////////////
-#define DATASET_OUTPUT_PATH     "results_cosegm_b2_t35"
+#define DATASET_OUTPUT_PATH     "results_cosegm_b3_stereo-warp-init" // @@@ try no appearance term, no shape term, no saliency factor, no temporal term...
 #define DATASET_PRECACHING      0
 #define DATASET_SCALE_FACTOR    1//0.5
 #define DATASET_WORKTHREADS     2

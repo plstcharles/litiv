@@ -49,9 +49,6 @@ namespace lv {
     template<int nWinSize>
     void nonMaxSuppression(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat& oMask=cv::Mat());
 
-    /// computes a map-transform of an image using relative pixel offsets; see cv::remap for more information
-    void remap_offset(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat& oOffsetMap, int nInterpType, int nBorderMode=cv::BORDER_CONSTANT, const cv::Scalar& vBorderValue=cv::Scalar());
-
     /// computes a 3d affinity map from two images by matching them in patches across a given stereo disparity range
     void computeImageAffinity(const cv::Mat& oImage1, const cv::Mat& oImage2, int nPatchSize,
                               cv::Mat_<float>& oAffinityMap, const std::vector<int>& vDispRange, AffinityDistType eDist,
@@ -72,6 +69,8 @@ namespace lv {
 
     /// computes the 'temporal' absolute difference between two 8U images given their optical flow map (with optional smoothing); output is a 32F image
     void computeTemporalAbsDiff(const cv::Mat& oImage1, const cv::Mat& oImage2, const cv::Mat& oFlow, cv::Mat& oOutput, int nSmoothKernelSize=1);
+    /// computes a map-transform of an image using relative xy pixel offsets; see cv::remap for more information
+    void remap_offset(const cv::Mat& oInput, cv::Mat& oOutput, const cv::Mat& oOffsetMap, int nInterpType, int nBorderMode=cv::BORDER_CONSTANT, const cv::Scalar& vBorderValue=cv::Scalar());
 
     /// determines if '*anMap' is a local maximum on the horizontal axis, given 'nMapColStep' spacing between horizontal elements in 'anMap'
     template<size_t nHalfWinSize, typename Tr>
