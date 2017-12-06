@@ -232,6 +232,10 @@ namespace lv {
         size_t getMaxDisparity() const {
             return this->m_nMaxDisp;
         }
+        /// used for compatibility with vap dataset interface; always returns true if loading subset, false otherwise
+        bool isTemporalWindowBreak(size_t /*nPacketIdx*/) const {
+            return this->isLoadingFrameSubset();
+        }
 
     protected:
         virtual void parseData() override final {
@@ -240,6 +244,7 @@ namespace lv {
             // 'this' is required below since name lookup is done during instantiation because of not-fully-specialized class template
             const ILITIVBilodeau2014Dataset& oDataset = dynamic_cast<const ILITIVBilodeau2014Dataset&>(*this->getRoot());
             this->m_bLoadFullVideos = !this->isLoadingFrameSubset();
+            lvAssert_(!this->m_bLoadFullVideos,"missing impl");
             this->m_nLoadInputMasks = oDataset.isLoadingInputMasks();
             this->m_bEvalDisparities = oDataset.isEvaluatingDisparities();
             this->m_bFlipDisparities = oDataset.isFlippingDisparities();
@@ -332,6 +337,7 @@ namespace lv {
                 const std::vector<std::string> vsFileNames = lv::filter_in(lv::filter_in(lv::filter_in(vsThermalFileNames,vsRGBFileNames),vsThermalApproxMasksFileNames),vsRGBApproxMasksFileNames);
                 const size_t nInputPackets = vsFileNames.size();
                 lvAssert_(nInputPackets>0,"found no matching rgb/thermal frame/mask name");
+                this->m_mRealInputIndexLUT.clear();
                 this->m_vvsInputPaths.resize(nInputPackets,std::vector<std::string>(nInputStreamCount));
                 for(size_t nPacketIdx=0; nPacketIdx<nInputPackets; ++nPacketIdx) {
                     this->m_vvsInputPaths[nPacketIdx][nInputThermalStreamIdx] = *psInputDir+"/IR"+vsFileNames[nPacketIdx]+".jpg";
@@ -352,6 +358,9 @@ namespace lv {
                         else
                             lvAssert_(false,"missing impl, dataset does not contain gt segm masks");
                     }
+                    const int nRealPacketIdx = std::stoi(vsFileNames[nPacketIdx]);
+                    lvAssert(nRealPacketIdx>=0 && nRealPacketIdx<10000);
+                    this->m_mRealInputIndexLUT[nPacketIdx] = (size_t)nRealPacketIdx;
                 }
 
                 cv::Mat oThermalROI = cv::imread(this->getDataPath()+"IRROI.png",cv::IMREAD_GRAYSCALE);
@@ -446,11 +455,13 @@ namespace lv {
                 const size_t nMaxGTPackets = vsThermalGTMasksNames.size();
                 this->m_vvsGTPaths.clear();
                 this->m_mGTIndexLUT.clear();
+                this->m_mRealGTIndexLUT.clear();
                 this->m_vvThermalGTPointDisps.clear();
                 for(size_t nGTPacketIdx=0; nGTPacketIdx<nMaxGTPackets; ++nGTPacketIdx) {
                     size_t nPacketIdx = 0;
+                    const std::string& sThermalGTMaskName = vsThermalGTMasksNames[nGTPacketIdx];
                     for(; nPacketIdx<vsFileNames.size(); ++nPacketIdx)
-                        if(vsThermalGTMasksNames[nGTPacketIdx]==vsFileNames[nPacketIdx])
+                        if(sThermalGTMaskName==vsFileNames[nPacketIdx])
                             break;
                     if(nPacketIdx<vsFileNames.size()) {
                         this->m_vvsGTPaths.push_back(std::vector<std::string>(nGTStreamCount));
@@ -458,9 +469,9 @@ namespace lv {
                         #if DATASETS_LV2014_USE_PREMADE_DISPARITY_MAPS
                             this->m_vvsGTPaths.back()[nGTThermalMaskStreamIdx] = vsThermalGTMasksPaths[nGTPacketIdx];
                         #else //!DATASETS_LV2014_USE_PREMADE_DISPARITY_MAPS
-                            this->m_vvsGTPaths.back()[nGTThermalMaskStreamIdx] = vsThermalGTMasksNames[nGTPacketIdx];
+                            this->m_vvsGTPaths.back()[nGTThermalMaskStreamIdx] = sThermalGTMaskName;
                             this->m_vvThermalGTPointDisps.push_back(std::vector<std::pair<cv::Point2i,int>>());
-                            const auto& vThermalGTPointDispList = mvThermalGTPointDisps[vsThermalGTMasksNames[nGTPacketIdx]];
+                            const auto& vThermalGTPointDispList = mvThermalGTPointDisps[sThermalGTMaskName];
                             lvAssert(!vThermalGTPointDispList.empty());
                             this->m_vvThermalGTPointDisps.back().insert(this->m_vvThermalGTPointDisps.back().end(),vThermalGTPointDispList.begin(),vThermalGTPointDispList.end());
                         #endif //!DATASETS_LV2014_USE_PREMADE_DISPARITY_MAPS
@@ -469,6 +480,9 @@ namespace lv {
                             lvAssert_(false,"missing impl, dataset does not contain gt segm masks");
                         }
                         this->m_mGTIndexLUT[nPacketIdx] = this->m_vvsGTPaths.size()-1;
+                        const int nRealPacketIdx = std::stoi(sThermalGTMaskName);
+                        lvAssert(nRealPacketIdx>=0 && nRealPacketIdx<10000);
+                        this->m_mRealGTIndexLUT[nPacketIdx] = (size_t)nRealPacketIdx;
                     }
                 }
             }
@@ -624,6 +638,7 @@ namespace lv {
             return vGTs;
         }
         std::vector<std::vector<std::pair<cv::Point2i,int>>> m_vvThermalGTPointDisps;
+        std::map<size_t,size_t> m_mRealInputIndexLUT,m_mRealGTIndexLUT;
         bool m_bLoadFullVideos;
         bool m_bEvalDisparities;
         bool m_bFlipDisparities;
