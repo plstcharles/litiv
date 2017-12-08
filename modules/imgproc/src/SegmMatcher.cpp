@@ -27,7 +27,8 @@
 #define SEGMMATCH_CONFIG_USE_SHAPE_EMD_AFFIN   0
 #define SEGMMATCH_CONFIG_USE_SALIENT_MAP_BORDR 1
 #define SEGMMATCH_CONFIG_USE_ROOT_SIFT_DESCS   0
-#define SEGMMATCH_CONFIG_USE_THERMAL_HEURIST   1
+#define SEGMMATCH_CONFIG_USE_SEGM_FLIR_HRST    1
+#define SEGMMATCH_CONFIG_USE_DISP_BG_HRST      1
 #define SEGMMATCH_CONFIG_USE_GMM_LOCAL_BACKGR  1
 #define SEGMMATCH_CONFIG_USE_FGBZ_STEREO_INF   1
 #define SEGMMATCH_CONFIG_USE_FASTPD_STEREO_INF 0
@@ -70,7 +71,7 @@
 #define SEGMMATCH_UNARY_COST_OCCLUDED_CST      (ValueType(2000))
 #define SEGMMATCH_UNARY_COST_MAXTRUNC_CST      (ValueType(10000))
 #define SEGMMATCH_UNARY_COST_TEMPORAL_CST      (ValueType(200))
-#define SEGMMATCH_IMGSIM_COST_COLOR_SCALE      (50)
+#define SEGMMATCH_IMGSIM_COST_COLOR_SCALE      (30)
 #define SEGMMATCH_IMGSIM_COST_DESC_SCALE       (1000)
 #define SEGMMATCH_SHPSIM_COST_DESC_SCALE       (1000)
 #define SEGMMATCH_UNIQUE_COST_OVER_SCALE       (400)
@@ -1323,6 +1324,10 @@ void SegmMatcher::GraphModelData::updateStereoModel(bool bInit) {
             else {
                 vUnaryStereoLUT(nLabelIdx) = SEGMMATCH_UNARY_COST_OOB_CST;
             }
+        #if SEGMMATCH_CONFIG_USE_DISP_BG_HRST
+            if(((InternalLabelType*)(m_aaResegmLabelings[oNode.nLayerIdx][oNode.nCamIdx]).data)[oNode.nMapIdx]==s_nBackgroundLabelIdx)
+                vUnaryStereoLUT(nLabelIdx) += cost_cast((float(nLabelIdx)/m_nRealStereoLabels)*SEGMMATCH_IMGSIM_COST_DESC_SCALE);
+        #endif //SEGMMATCH_CONFIG_USE_DISP_BG_HRST
         }
         vUnaryStereoLUT(m_nDontCareLabelIdx) = cost_cast(10000); // @@@@ check roi, if dc set to 0, otherwise set to inf
         vUnaryStereoLUT(m_nOccludedLabelIdx) = cost_cast(10000);//SEGMMATCH_IMGSIM_COST_OCCLUDED_CST;
@@ -1411,22 +1416,30 @@ void SegmMatcher::GraphModelData::resetStereoLabelings(size_t nCamIdx) {
         }
     }
     else {
-        for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
+        cv::Mat_<int> oRowVoteMap(nCols,(int)m_nRealStereoLabels);
+        for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) { // @@@@ test w/ foreground only?
+            oRowVoteMap = 0;
             for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
-                if(!m_aROIs[nCamIdx](nRowIdx,nColIdx))
-                    continue;
-                std::map<InternalLabelType,size_t> mWTALookupCounts;
-                for(InternalLabelType nLookupLabel=0; nLookupLabel<m_nRealStereoLabels; ++nLookupLabel) {
-                    const int nOffsetColIdx = getOffsetColIdx(nCamIdx,nColIdx,nLookupLabel);
-                    if(nOffsetColIdx>=0 && nOffsetColIdx<nCols && m_aROIs[m_nPrimaryCamIdx](nRowIdx,nOffsetColIdx))
-                        if(m_aStackedStereoLabelings[m_nPrimaryCamIdx](nRowIdx,nOffsetColIdx)==nLookupLabel)
-                            ++mWTALookupCounts[nLookupLabel];
+                const InternalLabelType nCurrLabelIdx = m_aaStereoLabelings[0][m_nPrimaryCamIdx](nRowIdx,nColIdx);
+                lvDbgAssert((int)m_nRealStereoLabels==(int)m_nDontCareLabelIdx);
+                if(nCurrLabelIdx<m_nRealStereoLabels) {
+                    const int nOffsetColIdx = getOffsetColIdx(m_nPrimaryCamIdx,nColIdx,nCurrLabelIdx);
+                    if(nOffsetColIdx>=0 && nOffsetColIdx<nCols && m_aROIs[nCamIdx](nRowIdx,nOffsetColIdx)) {
+                        // reverse voting so that foreground has advantage on WTA
+                        ++oRowVoteMap(nOffsetColIdx,(int)((m_nRealStereoLabels-1u)-nCurrLabelIdx));
+                    }
                 }
-                auto pWTAPairIter = std::max_element(mWTALookupCounts.begin(),mWTALookupCounts.end(),[](const auto& p1, const auto& p2) {
-                    return p1.second<p2.second;
-                });
-                if(pWTAPairIter!=mWTALookupCounts.end() && pWTAPairIter->second>size_t(0))
-                    oLabeling(nRowIdx,nColIdx) = pWTAPairIter->first;
+            }
+            for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
+                if(m_aROIs[nCamIdx](nRowIdx,nColIdx)) {
+                    lvDbgAssert(size_t(ptrdiff_t(oRowVoteMap.ptr<int>(nColIdx+1)-oRowVoteMap.ptr<int>(nColIdx)))==m_nRealStereoLabels);
+                    const int* pWTAWinner = std::max_element(oRowVoteMap.ptr<int>(nColIdx),oRowVoteMap.ptr<int>(nColIdx+1));
+                    if(pWTAWinner!=oRowVoteMap.ptr<int>(nColIdx+1) && (*pWTAWinner)>0) {
+                        const InternalLabelType nWinnerLabel = InternalLabelType((m_nRealStereoLabels-1u)-ptrdiff_t(pWTAWinner-oRowVoteMap.ptr<int>(nColIdx)));
+                        lvDbgAssert(nWinnerLabel<m_nDontCareLabelIdx);
+                        oLabeling(nRowIdx,nColIdx) = nWinnerLabel;
+                    }
+                }
             }
         }
     }
@@ -1451,15 +1464,19 @@ void SegmMatcher::GraphModelData::resetStereoLabelings(size_t nCamIdx) {
         // note: sospd might not follow this label order if using alpha heights strategy (reimpl to use same strat in every solver?) @@@
     }
     else {
+        cv::medianBlur(oLabeling,oLabeling,5);
         for(int nRowIdx=0; nRowIdx<nRows; ++nRowIdx) {
-            for(int nColIdx=0; nColIdx<nCols; ++nColIdx) {
+            for(int nColIdx=nCols-1; nColIdx>=0; --nColIdx) {
                 InternalLabelType& nCurrLabel = oLabeling(nRowIdx,nColIdx);
-                if(nCurrLabel==m_nDontCareLabelIdx && m_aROIs[nCamIdx](nRowIdx,nColIdx)) {
+                if(m_aROIs[nCamIdx](nRowIdx,nColIdx)==0u)
+                    nCurrLabel = m_nDontCareLabelIdx;
+                else if(nCurrLabel>=m_nRealStereoLabels) {
+                    // note: missing handlingfor occluded label here
                     for(int nOffset=0; nOffset<=(int)m_nMaxDispOffset; ++nOffset) {
                         const int nOffsetColIdx_pos = nColIdx+nOffset;
                         if(nOffsetColIdx_pos>=0 && nOffsetColIdx_pos<nCols && m_aROIs[nCamIdx](nRowIdx,nOffsetColIdx_pos)) {
                             const InternalLabelType& nNewLabel = oLabeling(nRowIdx,nOffsetColIdx_pos);
-                            if(nNewLabel!=m_nDontCareLabelIdx) {
+                            if(nNewLabel<m_nRealStereoLabels) {
                                 nCurrLabel = nNewLabel;
                                 break;
                             }
@@ -1467,15 +1484,18 @@ void SegmMatcher::GraphModelData::resetStereoLabelings(size_t nCamIdx) {
                         const int nOffsetColIdx_neg = nColIdx-nOffset;
                         if(nOffsetColIdx_neg>=0 && nOffsetColIdx_neg<nCols && m_aROIs[nCamIdx](nRowIdx,nOffsetColIdx_neg)) {
                             const InternalLabelType& nNewLabel = oLabeling(nRowIdx,nOffsetColIdx_neg);
-                            if(nNewLabel!=m_nDontCareLabelIdx) {
+                            if(nNewLabel<m_nRealStereoLabels) {
                                 nCurrLabel = nNewLabel;
                                 break;
                             }
                         }
+                        if(nOffset==(int)m_nMaxDispOffset)
+                            nCurrLabel = InternalLabelType(0);
                     }
                 }
             }
         }
+        lvDbgAssert(cv::countNonZero((oLabeling>=m_nRealStereoLabels)&(m_aROIs[nCamIdx]))==0);
     }
 }
 
@@ -1845,11 +1865,11 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
                     lvDbgAssert(fOffsetScaleFact==(float)std::exp(float(SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST-nOffsetGrad)/SEGMMATCH_LBLSIM_COST_GRADRAW_SCALE));
                     //const float fScaleFact = std::min(fLocalScaleFact,fOffsetScaleFact);
                     //const float fScaleFact = fLocalScaleFact*fOffsetScaleFact;
-                #if SEGMMATCH_CONFIG_USE_THERMAL_HEURIST
+                #if SEGMMATCH_CONFIG_USE_SEGM_FLIR_HRST
                     const float fScaleFact = (((nCamIdx==1)?(fLocalScaleFact*fLocalScaleFact):(fLocalScaleFact))+fOffsetScaleFact*fInterSpectrScale)/fInterSpectrRatioTot;
-                #else //!SEGMMATCH_CONFIG_USE_THERMAL_HEURIST
+                #else //!SEGMMATCH_CONFIG_USE_SEGM_FLIR_HRST
                     const float fScaleFact = (fLocalScaleFact+fOffsetScaleFact*fInterSpectrScale)/fInterSpectrRatioTot;
-                #endif //!SEGMMATCH_CONFIG_USE_THERMAL_HEURIST
+                #endif //!SEGMMATCH_CONFIG_USE_SEGM_FLIR_HRST
                     for(InternalLabelType nLabelIdx1=0; nLabelIdx1<s_nResegmLabels; ++nLabelIdx1) {
                         for(InternalLabelType nLabelIdx2=0; nLabelIdx2<s_nResegmLabels; ++nLabelIdx2) {
                             vPairwResegmLUT(nLabelIdx1,nLabelIdx2) = cost_cast((nLabelIdx1^nLabelIdx2)*fScaleFact*SEGMMATCH_LBLSIM_RESEGM_SCALE_CST);
