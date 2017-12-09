@@ -92,6 +92,7 @@ option(USE_BSDS500_BENCHMARK "Link & use BSDS500 dataset benchmark implementatio
 option(USE_DEBUG_SYMBOLS "Enable debug symbols in all configs, for all targets" OFF)
 option(USE_CVCORE_WITH_UTILS "Include OpenCV core components in utils module" ON)
 option(USE_LINK_TIME_OPTIM "Enable link time optimization" ON)
+option(USE_INLINE_INTRINSIC_FUNCS "Enable use of built-in inline intrinsic functions" ON)
 option(USE_FAST_MATH "Enable fast math optimization" OFF)
 option(USE_OPENMP "Enable OpenMP in internal implementations" ON)
 if(NOT CMAKE_CROSSCOMPILING)
@@ -106,6 +107,7 @@ mark_as_advanced(
     USE_BSDS500_BENCHMARK
     USE_CVCORE_WITH_UTILS
     USE_LINK_TIME_OPTIM
+    USE_INLINE_INTRINSIC_FUNCS
     USE_FAST_MATH
     USE_OPENMP
     DATASETS_CACHE_SIZE
@@ -429,6 +431,9 @@ elseif("x${CMAKE_CXX_COMPILER_ID}" STREQUAL "xMSVC")
         set(CMAKE_STATIC_LINKER_FLAGS_RELEASE "${CMAKE_STATIC_LINKER_FLAGS_RELEASE} /LTCG")
         set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} /LTCG")
         set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /LTCG")
+    endif()
+    if(USE_INLINE_INTRINSIC_FUNCS)
+        set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /Oi")
     endif()
     if(USE_DEBUG_SYMBOLS)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zi")
