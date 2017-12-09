@@ -1383,9 +1383,10 @@ void SegmMatcher::GraphModelData::resetStereoLabelings(size_t nCamIdx) {
             //    cv::resize(oCurrLabelingDisplay,oCurrLabelingDisplay,cv::Size(),2,2,cv::INTER_NEAREST);
             //cv::imshow(std::string("prewarp-")+std::to_string(nCamIdx),oCurrLabelingDisplay);
             //cv::imshow("flow",lv::getFlowColorMap(m_avFeatures[0][FeatPackOffset*nCamIdx+FeatPackOffset_OptFlow]));
-            lv::remap_offset(m_aaStereoLabelings[1][nCamIdx],m_aaStereoLabelings[0][nCamIdx],m_avFeatures[0][FeatPackOffset*nCamIdx+FeatPackOffset_OptFlow],cv::INTER_NEAREST);
-            lvDbgAssert(((InternalLabelType*)m_aaStereoLabelings[0][nCamIdx].data)+m_aaStereoLabelings[0][nCamIdx].total()==((InternalLabelType*)m_aaStereoLabelings[1][nCamIdx].data));
-            lvDbgAssert(cv::countNonZero(m_aaStereoLabelings[0][nCamIdx]>=m_nStereoLabels)==0);
+            lv::remap_offset(m_aaStereoLabelings[1][nCamIdx],oLabeling,m_avFeatures[0][FeatPackOffset*nCamIdx+FeatPackOffset_OptFlow],cv::INTER_NEAREST);
+            cv::Mat_<InternalLabelType>(m_oGridSize,m_nDontCareLabelIdx).copyTo(oLabeling,m_aROIs[nCamIdx]==0u);
+            lvDbgAssert(((InternalLabelType*)oLabeling.data)+oLabeling.total()==((InternalLabelType*)m_aaStereoLabelings[1][nCamIdx].data));
+            lvDbgAssert(cv::countNonZero(oLabeling>=m_nStereoLabels)==0);
             //oCurrLabelingDisplay = getStereoDispMapDisplay(0,nCamIdx);
             //if(oCurrLabelingDisplay.size().area()<640*480)
             //    cv::resize(oCurrLabelingDisplay,oCurrLabelingDisplay,cv::Size(),2,2,cv::INTER_NEAREST);
@@ -1393,15 +1394,14 @@ void SegmMatcher::GraphModelData::resetStereoLabelings(size_t nCamIdx) {
             //cv::waitKey(1);
             lvLog(4,"stereo-warp-init");
         }
-        else
 #endif //SEGMMATCH_CONFIG_USE_LAST_STEREO_INIT
-        {
-            for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_nValidStereoGraphNodes; ++nGraphNodeIdx) {
-                const size_t nLUTNodeIdx = m_vStereoGraphIdxToMapIdxLUT[nGraphNodeIdx];
-                const StereoNodeInfo& oNode = m_vStereoNodeMap[nLUTNodeIdx];
-                lvDbgAssert(oNode.bValidGraphNode && oNode.nGraphNodeIdx==nGraphNodeIdx);
-                lvDbgAssert(oNode.nUnaryFactID<m_pStereoModel->numberOfFactors());
-                lvDbgAssert(m_pStereoModel->numberOfLabels(oNode.nUnaryFactID)==m_nStereoLabels);
+        for(size_t nGraphNodeIdx=0; nGraphNodeIdx<m_nValidStereoGraphNodes; ++nGraphNodeIdx) {
+            const size_t nLUTNodeIdx = m_vStereoGraphIdxToMapIdxLUT[nGraphNodeIdx];
+            const StereoNodeInfo& oNode = m_vStereoNodeMap[nLUTNodeIdx];
+            lvDbgAssert(oNode.bValidGraphNode && oNode.nGraphNodeIdx==nGraphNodeIdx);
+            lvDbgAssert(oNode.nUnaryFactID<m_pStereoModel->numberOfFactors());
+            lvDbgAssert(m_pStereoModel->numberOfLabels(oNode.nUnaryFactID)==m_nStereoLabels);
+            if(oLabeling(oNode.nRowIdx,oNode.nColIdx)==m_nDontCareLabelIdx) {
                 InternalLabelType nEvalLabel = oLabeling(oNode.nRowIdx,oNode.nColIdx) = 0;
                 const ExplicitFunction& vUnaryStereoLUT = *oNode.pUnaryFunc;
                 ValueType fOptimalEnergy = vUnaryStereoLUT(nEvalLabel);
