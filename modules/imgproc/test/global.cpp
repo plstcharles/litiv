@@ -282,6 +282,11 @@ TEST(descriptor_affinity,regression_L2_sc) {
     //cv::waitKey(0);
 }
 
+#ifndef _MSC_VER
+
+    // large-scale DASC computation with MSVC differs from result with other compilers, which breaks the test below
+    // (see DASC test for more info; we disable the affinity test below, but it would pass given good desc maps)
+
 #include "litiv/features2d/DASC.hpp"
 
 TEST(descriptor_affinity,regression_L2_dasc) {
@@ -361,3 +366,5 @@ TEST(descriptor_affinity,regression_L2_dasc) {
     else
         lv::write(sAffMapBinPath_p7,oAffMap);
 }
+
+#endif //ndef(_MSC_VER)

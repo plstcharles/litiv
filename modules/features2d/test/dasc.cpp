@@ -36,9 +36,17 @@ TEST(dasc_rf,regression_single_compute) {
     const cv::Mat oInputCrop = oInput(cv::Rect(oTargetPt.x-oWindowSize.width/2,oTargetPt.y-oWindowSize.height/2,oWindowSize.width,oWindowSize.height)).clone();
     cv::Mat_<float> oOutputDescMap;
     pDASC->compute2(oInputCrop,oOutputDescMap);
+    ASSERT_EQ(oOutputDescMap.dims,3);
     ASSERT_EQ(oInputCrop.size[0],oOutputDescMap.size[0]);
     ASSERT_EQ(oInputCrop.size[1],oOutputDescMap.size[1]);
+    ASSERT_EQ((size_t)pDASC->descriptorSize(),oOutputDescMap.size[2]*sizeof(float));
     const cv::Mat_<float> oOutputDesc = cv::Mat_<float>(3,std::array<int,3>{1,1,oOutputDescMap.size[2]}.data(),oOutputDescMap.ptr<float>(oWindowSize.height/2,oWindowSize.width/2)).clone();
+    bool bGotNonNullBin = false;
+    for(int nDescIdx=0; nDescIdx<oOutputDescMap.size[2]; ++nDescIdx) {
+        ASSERT_GE(oOutputDesc.at<float>(0,0,nDescIdx),0.0f);
+        bGotNonNullBin |= (oOutputDesc.at<float>(0,0,nDescIdx)>0.0f);
+    }
+    ASSERT_TRUE(bGotNonNullBin);
     if(lv::checkIfExists(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_rf.bin")) {
         const cv::Mat_<float> oRefDesc = lv::read(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_rf.bin");
         ASSERT_EQ(oOutputDesc.total(),oRefDesc.total());
@@ -113,11 +121,27 @@ TEST(dasc_rf,regression_large_compute) {
     int nKeyPointIdx = 0;
     for(int nRowIdx=oWindowSize.height/2; nRowIdx<=oWindowSize.height/2+2*nPatchSize; ++nRowIdx) {
         for(int nColIdx=oWindowSize.width/2; nColIdx<=oWindowSize.width/2+2*nPatchSize; ++nColIdx) {
+            ASSERT_FLOAT_EQ(vKeyPoints_modif[nKeyPointIdx].pt.x,vKeyPoints[nKeyPointIdx].pt.x);
+            ASSERT_FLOAT_EQ(vKeyPoints_modif[nKeyPointIdx].pt.y,vKeyPoints[nKeyPointIdx].pt.y);
             for(int nDescIdx=0; nDescIdx<oOutputDescMap1.size[2]; ++nDescIdx)
                 ASSERT_FLOAT_EQ(oOutputDescMap1.at<float>(nRowIdx,nColIdx,nDescIdx),oOutputDescs.at<float>(nKeyPointIdx,nDescIdx));
             ++nKeyPointIdx;
         }
     }
+#ifndef _MSC_VER
+    // large-scale DASC computation with MSVC differs due to some wild float operations somewhere... (descriptors still seem valid however)
+    // probably due to fp model selection, intrinsics, or a bug in external lib implementation (STL or opencv) -- will have to debug later
+    if(lv::checkIfExists(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_rf_large.bin")) {
+        const cv::Mat_<float> oRefDesc = lv::read(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_rf_large.bin");
+        ASSERT_EQ(oOutputDescs.total(),oRefDesc.total());
+        ASSERT_EQ(oOutputDescs.size,oRefDesc.size);
+        for(nKeyPointIdx=0; nKeyPointIdx<oRefDesc.size[0]; ++nKeyPointIdx)
+            for(int nDescIdx=0; nDescIdx<oRefDesc.size[1]; ++nDescIdx)
+                ASSERT_NEAR(oOutputDescs.at<float>(nKeyPointIdx,nDescIdx),oRefDesc.at<float>(nKeyPointIdx,nDescIdx),0.0001f);
+    }
+    else
+        lv::write(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_rf_large.bin",oOutputDescs);
+#endif //ndef(_MSC_VER)
 }
 
 TEST(dasc_gf,regression_constr) {
@@ -154,9 +178,17 @@ TEST(dasc_gf,regression_single_compute) {
     const cv::Mat oInputCrop = oInput(cv::Rect(oTargetPt.x-oWindowSize.width/2,oTargetPt.y-oWindowSize.height/2,oWindowSize.width,oWindowSize.height)).clone();
     cv::Mat_<float> oOutputDescMap;
     pDASC->compute2(oInputCrop,oOutputDescMap);
+    ASSERT_EQ(oOutputDescMap.dims,3);
     ASSERT_EQ(oInputCrop.size[0],oOutputDescMap.size[0]);
     ASSERT_EQ(oInputCrop.size[1],oOutputDescMap.size[1]);
+    ASSERT_EQ((size_t)pDASC->descriptorSize(),oOutputDescMap.size[2]*sizeof(float));
     const cv::Mat_<float> oOutputDesc = cv::Mat_<float>(3,std::array<int,3>{1,1,oOutputDescMap.size[2]}.data(),oOutputDescMap.ptr<float>(oWindowSize.height/2,oWindowSize.width/2)).clone();
+    bool bGotNonNullBin = false;
+    for(int nDescIdx=0; nDescIdx<oOutputDescMap.size[2]; ++nDescIdx) {
+        ASSERT_GE(oOutputDesc.at<float>(0,0,nDescIdx),0.0f);
+        bGotNonNullBin |= (oOutputDesc.at<float>(0,0,nDescIdx)>0.0f);
+    }
+    ASSERT_TRUE(bGotNonNullBin);
     if(lv::checkIfExists(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_gf.bin")) {
         const cv::Mat_<float> oRefDesc = lv::read(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_gf.bin");
         ASSERT_EQ(oOutputDesc.total(),oRefDesc.total());
@@ -231,9 +263,25 @@ TEST(dasc_gf,regression_large_compute) {
     int nKeyPointIdx = 0;
     for(int nRowIdx=oWindowSize.height/2; nRowIdx<=oWindowSize.height/2+2*nPatchSize; ++nRowIdx) {
         for(int nColIdx=oWindowSize.width/2; nColIdx<=oWindowSize.width/2+2*nPatchSize; ++nColIdx) {
+            ASSERT_FLOAT_EQ(vKeyPoints_modif[nKeyPointIdx].pt.x,vKeyPoints[nKeyPointIdx].pt.x);
+            ASSERT_FLOAT_EQ(vKeyPoints_modif[nKeyPointIdx].pt.y,vKeyPoints[nKeyPointIdx].pt.y);
             for(int nDescIdx=0; nDescIdx<oOutputDescMap1.size[2]; ++nDescIdx)
                 ASSERT_FLOAT_EQ(oOutputDescMap1.at<float>(nRowIdx,nColIdx,nDescIdx),oOutputDescs.at<float>(nKeyPointIdx,nDescIdx));
             ++nKeyPointIdx;
         }
     }
+#ifndef _MSC_VER
+    // large-scale DASC computation with MSVC differs due to some wild float operations somewhere... (descriptors still seem valid however)
+    // probably due to fp model selection, intrinsics, or a bug in external lib implementation (STL or opencv) -- will have to debug later
+    if(lv::checkIfExists(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_gf_large.bin")) {
+        const cv::Mat_<float> oRefDesc = lv::read(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_gf_large.bin");
+        ASSERT_EQ(oOutputDescs.total(),oRefDesc.total());
+        ASSERT_EQ(oOutputDescs.size,oRefDesc.size);
+        for(nKeyPointIdx=0; nKeyPointIdx<oRefDesc.size[0]; ++nKeyPointIdx)
+            for(int nDescIdx=0; nDescIdx<oRefDesc.size[1]; ++nDescIdx)
+                ASSERT_NEAR(oOutputDescs.at<float>(nKeyPointIdx,nDescIdx),oRefDesc.at<float>(nKeyPointIdx,nDescIdx),0.0001f);
+    }
+    else
+        lv::write(TEST_CURR_INPUT_DATA_ROOT "/test_dasc_gf_large.bin",oOutputDescs);
+#endif //ndef(_MSC_VER)
 }
