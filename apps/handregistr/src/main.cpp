@@ -47,7 +47,9 @@ int main(int, char**) {
                 false, //bool bHorizRectify
                 false, //bool bEvalDisparities
                 false, //bool bLoadFrameSubset
-                0, // int nLoadInputMasks
+                false, //bool bEvalOnlyFrameSubset
+                0, //int nEvalTemporalWindowSize
+                0, //int nLoadInputMasks
                 1.0 //double dScaleFactor
         );
         lv::IDataHandlerPtrArray vpBatches = pDataset->getBatches(false);

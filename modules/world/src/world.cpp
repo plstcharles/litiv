@@ -18,6 +18,7 @@
 #include "litiv/litiv.hpp"
 
 bool lv::info() {
+    // @@@@ could add cpu instr support check for gcc via __builtin_cpu_init and __builtin_cpu_supports
 #if LITIV_DEBUG
     lvCout_(-1) << lv::getVersionStamp() << " [Build='Debug']\n";
 #else //!LITIV_DEBUG

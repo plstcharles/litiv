@@ -41,6 +41,8 @@ namespace lv {
         return ((nVal&(nVal-1))==0);
     }
 
+#if (!defined(_MSC_VER) || _MSC_VER>=1910) // extended constexpr only supported in visual studio 2017
+
     /// returns the nearest (rounded up) power of two to the given 32-bit unsigned integer, but returns 0 if input is 0
     constexpr inline uint32_t get_next_pow2(uint32_t nVal) {
         --nVal;
@@ -51,6 +53,8 @@ namespace lv {
         nVal |= nVal>>16;
         return ++nVal;
     }
+
+#endif //(!defined(_MSC_VER) || _MSC_VER>=1910)
 
 #ifdef __clang__
 #pragma clang diagnostic push
@@ -773,7 +777,14 @@ namespace lv {
             return dSum+(bNegativeCompat?std::abs(tVal):tVal);
         }) + DBL_EPSILON;
         std::transform(aDesc,aDesc+nDescSize,aDesc,[&dL1Norm](TVal tVal){
+        #ifdef _MSC_VER
+        #pragma warning(push)
+        #pragma warning(disable:4127)
+        #endif //def(_MSC_VER)
             if(bNegativeCompat && double(tVal)<0.0)
+        #ifdef _MSC_VER
+        #pragma warning(pop)
+        #endif //def(_MSC_VER)
                 return (TVal)-std::sqrt(-tVal/dL1Norm);
             else
                 return (TVal)std::sqrt(tVal/dL1Norm);

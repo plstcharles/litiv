@@ -60,11 +60,14 @@ SLIC::SLIC() {
 }
 
 SLIC::~SLIC() {
-    cudaErrorCheck(cudaFree(d_fClusters));
-    cudaErrorCheck(cudaFree(d_fAccAtt));
-    cudaErrorCheck(cudaFreeArray(cuArrayFrameBGRA));
-    cudaErrorCheck(cudaFreeArray(cuArrayFrameLab));
-    cudaErrorCheck(cudaFreeArray(cuArrayLabels));
+    bool bAllClean = true;
+    bAllClean &= (cudaFree(d_fClusters)==cudaSuccess);
+    bAllClean &= (cudaFree(d_fAccAtt)==cudaSuccess);
+    bAllClean &= (cudaFreeArray(cuArrayFrameBGRA)==cudaSuccess);
+    bAllClean &= (cudaFreeArray(cuArrayFrameLab)==cudaSuccess);
+    bAllClean &= (cudaFreeArray(cuArrayLabels)==cudaSuccess);
+    if(!bAllClean) // non-throwing cleanup to avoid termination even in really bad cases
+        lvWarn("SLIC destructor cleanup failed, might have memory leak");
 }
 
 void SLIC::initialize(const cv::Size& size, const int diamSpxOrNbSpx , const InitType initType, const float wc , const int nbIteration ) {
