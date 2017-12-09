@@ -234,6 +234,8 @@ namespace lv {
         }
         /// returns whether the given packet index is at a break between two temporal windows (only useful when subset-processing, always false otherwise)
         bool isTemporalWindowBreak(size_t nPacketIdx) const {
+            if(nPacketIdx==0u)
+                return true;
             const bool bLoadFrameSubset = this->isLoadingFrameSubset();
             const bool bEvalOnlyFrameSubset = this->isEvaluatingOnlyFrameSubset();
             if(!bLoadFrameSubset && !bEvalOnlyFrameSubset)
@@ -241,14 +243,13 @@ namespace lv {
             lvAssert_(!m_mSubset.empty(),"must parse data first");
             const int nEvalTemporalWindowSize = this->getEvalTemporalWindowSize();
             lvAssert_(nEvalTemporalWindowSize>=0,"bad temporal window size");
-            if(nEvalTemporalWindowSize==0)
+            if(nEvalTemporalWindowSize==0 || nPacketIdx>=m_mSubset.size()) // treat oob lookups as temporal breaks
                 return true;
-            lvAssert_(nPacketIdx<m_mSubset.size(),"input packet index oob");
             auto pPacketIter = m_mSubset.begin();
-            const size_t nPrevPacketIdx = (nPacketIdx>0u)?(nPacketIdx-1u):0u;
+            const size_t nPrevPacketIdx = nPacketIdx-1u;
             std::advance(pPacketIter,nPrevPacketIdx);
             const size_t nRealPrevPacketIdx = *pPacketIter;
-            std::advance(pPacketIter,nPacketIdx-nPrevPacketIdx);
+            std::advance(pPacketIter,1u);
             const size_t nRealCurrPacketIdx = *pPacketIter;
             return ((nRealPrevPacketIdx+1u)!=nRealCurrPacketIdx);
         }

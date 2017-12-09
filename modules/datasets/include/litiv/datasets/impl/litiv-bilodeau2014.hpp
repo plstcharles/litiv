@@ -233,7 +233,9 @@ namespace lv {
             return this->m_nMaxDisp;
         }
         /// used for compatibility with vap dataset interface; always returns true if loading subset, false otherwise
-        bool isTemporalWindowBreak(size_t /*nPacketIdx*/) const {
+        bool isTemporalWindowBreak(size_t nPacketIdx) const {
+            if(nPacketIdx==0u)
+                return true;
             return this->isLoadingFrameSubset();
         }
 

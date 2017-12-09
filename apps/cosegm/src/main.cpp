@@ -328,6 +328,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 pAlgo->resetTemporalModel();
                 nLastTemporalBreakIdx = nCurrIdx;
             }
+            const bool bNextIdxIsTemporalBreak = oBatch.isTemporalWindowBreak(nCurrIdx+1u);
         #if !DATASET_FORCE_RECALC_FEATURES
             const cv::Mat& oNextFeatsPacket = oBatch.loadFeatures(nCurrIdx);
             if(!oNextFeatsPacket.empty())
@@ -360,8 +361,7 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
             lvDbgAssert(vCurrFGMasks.size()==oBatch.getOutputStreamCount());
             lvDbgAssert(vCurrStereoMaps.size()==oBatch.getOutputStreamCount());
             if(lv::getVerbosity()>=3) {
-                const std::vector<cv::Mat>& vCurrGT = oBatch.getGTArray(nCurrIdx);
-                lvAssert(vCurrGT.size()==vCurrFGMasks.size() && vCurrGT.size()==vCurrStereoMaps.size());
+                lvAssert(oBatch.getGTStreamCount()==vCurrFGMasks.size() && oBatch.getGTStreamCount()==vCurrStereoMaps.size());
                 const std::vector<cv::Mat>& vCurrEvalRes = oBatch.getColoredMaskArray(oBatch.isEvaluatingDisparities()?vCurrStereoMaps:vCurrFGMasks,nCurrIdx);
                 for(size_t nDisplayRowIdx=0; nDisplayRowIdx<nCameraCount; ++nDisplayRowIdx) {
                     vCurrInput[nDisplayRowIdx*2].copyTo(vvDisplayPairs[nDisplayRowIdx][0].first);
@@ -379,9 +379,38 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                     break;
             }
         #if DATASET_EVAL_FINAL_UPDATE
-            if((nCurrIdx-nLastTemporalBreakIdx)>=SegmMatcher::getTemporalDepth()) {
-                // outputs can be improved over new iterations; push the top temporal layer for eval only
-                SegmMatcher::MatArrayOut aUpdatedOutputs;
+            SegmMatcher::MatArrayOut aUpdatedOutputs;
+            if(bNextIdxIsTemporalBreak) {
+                // here, we have catching up to do, as the model will be reset next frame; all results need to be pushed
+                const size_t nOutputsToPush = std::min(nCurrIdx-nLastTemporalBreakIdx,SegmMatcher::getTemporalDepth())+1u;
+                for(size_t nPushOffsetIdx=nOutputsToPush; nPushOffsetIdx>0; --nPushOffsetIdx) {
+                    lvDbgAssert(SegmMatcher::getTemporalDepth()>=(nPushOffsetIdx-1u));
+                    pAlgo->getOutput(nPushOffsetIdx-1u,aUpdatedOutputs);
+                    lvDbgAssert(aUpdatedOutputs.size()==nExpectedAlgoOutputCount);
+                    for(size_t nOutputArrayIdx=0; nOutputArrayIdx<aUpdatedOutputs.size(); ++nOutputArrayIdx) {
+                        lvAssert(aUpdatedOutputs[nOutputArrayIdx].type()==lv::MatRawType_<OutputLabelType>());
+                        lvAssert(aUpdatedOutputs[nOutputArrayIdx].size()==oFrameSize());
+                        const size_t nRealOutputArrayIdx = nOutputArrayIdx/SegmMatcher::OutputPackOffset;
+                        if((nOutputArrayIdx%SegmMatcher::OutputPackOffset)==SegmMatcher::OutputPackOffset_Disp) {
+                            double dMin,dMax;
+                            cv::minMaxIdx(aUpdatedOutputs[nOutputArrayIdx],&dMin,&dMax);
+                            lvDbgAssert_(dMin>=0 && dMax<=255,"unexpected min/max disp for 8u mats");
+                            aUpdatedOutputs[nOutputArrayIdx].convertTo(vCurrStereoMaps[nRealOutputArrayIdx],CV_8U);
+                        }
+                        else if((nOutputArrayIdx%SegmMatcher::OutputPackOffset)==SegmMatcher::OutputPackOffset_Mask)
+                            cv::Mat(aUpdatedOutputs[nOutputArrayIdx]!=0).copyTo(vCurrFGMasks[nRealOutputArrayIdx]);
+                    }
+                    lvDbgAssert(vCurrFGMasks.size()==oBatch.getOutputStreamCount());
+                    lvDbgAssert(vCurrStereoMaps.size()==oBatch.getOutputStreamCount());
+                    const size_t nEvalIdx = nCurrIdx-(nPushOffsetIdx-1u);
+                    if(oBatch.isEvaluatingDisparities())
+                        oBatch.push(vCurrStereoMaps,nEvalIdx);
+                    else
+                        oBatch.push(vCurrFGMasks,nEvalIdx);
+                }
+            }
+            else if((nCurrIdx-nLastTemporalBreakIdx)>=SegmMatcher::getTemporalDepth()) {
+                // outputs can be improved over new iterations; by default, we only push the top temporal layer for eval
                 pAlgo->getOutput(SegmMatcher::getTemporalDepth(),aUpdatedOutputs);
                 lvDbgAssert(aUpdatedOutputs.size()==nExpectedAlgoOutputCount);
                 for(size_t nOutputArrayIdx=0; nOutputArrayIdx<aUpdatedOutputs.size(); ++nOutputArrayIdx) {
@@ -399,14 +428,13 @@ void Analyze(std::string sWorkerName, lv::IDataHandlerPtr pBatch) {
                 }
                 lvDbgAssert(vCurrFGMasks.size()==oBatch.getOutputStreamCount());
                 lvDbgAssert(vCurrStereoMaps.size()==oBatch.getOutputStreamCount());
-                const size_t nEvalIdx = nCurrIdx++-SegmMatcher::getTemporalDepth();
+                const size_t nEvalIdx = nCurrIdx-SegmMatcher::getTemporalDepth();
                 if(oBatch.isEvaluatingDisparities())
                     oBatch.push(vCurrStereoMaps,nEvalIdx);
                 else
                     oBatch.push(vCurrFGMasks,nEvalIdx);
             }
-            else
-                ++nCurrIdx;
+            ++nCurrIdx;
         #else //!DATASET_EVAL_FINAL_UPDATE
             if(oBatch.isEvaluatingDisparities())
                 oBatch.push(vCurrStereoMaps,nCurrIdx++);
