@@ -28,7 +28,7 @@
 #define SEGMMATCH_CONFIG_USE_SALIENT_MAP_BORDR 1
 #define SEGMMATCH_CONFIG_USE_ROOT_SIFT_DESCS   0
 #define SEGMMATCH_CONFIG_USE_SEGM_FLIR_HRST    1
-#define SEGMMATCH_CONFIG_USE_DISP_BG_HRST      1
+#define SEGMMATCH_CONFIG_USE_DISP_BG_HRST      0
 #define SEGMMATCH_CONFIG_USE_GMM_LOCAL_BACKGR  1
 #define SEGMMATCH_CONFIG_USE_FGBZ_STEREO_INF   1
 #define SEGMMATCH_CONFIG_USE_FASTPD_STEREO_INF 0
@@ -68,8 +68,6 @@
 
 // unary costs params
 #define SEGMMATCH_UNARY_COST_OOB_CST           (ValueType(5000))
-#define SEGMMATCH_UNARY_COST_OCCLUDED_CST      (ValueType(2000))
-#define SEGMMATCH_UNARY_COST_MAXTRUNC_CST      (ValueType(10000))
 #define SEGMMATCH_UNARY_COST_TEMPORAL_CST      (ValueType(200))
 #define SEGMMATCH_IMGSIM_COST_COLOR_SCALE      (30)
 #define SEGMMATCH_IMGSIM_COST_DESC_SCALE       (1000)
@@ -79,24 +77,14 @@
 #define SEGMMATCH_SHPDIST_PX_MAX_CST           (10.0f)
 #define SEGMMATCH_SHPDIST_INTERSPEC_SCALE      (0.50f)
 // pairwise costs params
-#define SEGMMATCH_LBLSIM_COST_MAXOCCL          (ValueType(5000))
-#define SEGMMATCH_LBLSIM_COST_MAXTRUNC_CST     (ValueType(5000))
 #define SEGMMATCH_LBLSIM_RESEGM_SCALE_CST      (200)
 #define SEGMMATCH_LBLSIM_STEREO_SCALE_CST      (1.f)
 #define SEGMMATCH_LBLSIM_STEREO_MAXDIFF_CST    (10)
-#define SEGMMATCH_LBLSIM_USE_EXP_GRADPIVOT     (1)
-#if SEGMMATCH_LBLSIM_USE_EXP_GRADPIVOT
 #define SEGMMATCH_LBLSIM_COST_GRADRAW_SCALE    (30)
 #define SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST    (30)
-#else //!SEGMMATCH_LBLSIM_USE_EXP_GRADPIVOT
-#define SEGMMATCH_LBLSIM_COST_GRADRAW_SCALE    (10)
-#define SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST    (32)
-#endif //!SEGMMATCH_LBLSIM_USE_EXP_GRADPIVOT
 // higher order costs params
 #define SEGMMATCH_HOENERGY_STEREO_STRIDE       (size_t(1))
 #define SEGMMATCH_HOENERGY_RESEGM_STRIDE       (size_t(2))
-// ...
-
 // hardcoded term relations
 #define SEGMMATCH_UNIQUE_COST_INCR_REL(n)      (float((n)*3)/((n)+2))
 #define SEGMMATCH_UNIQUE_COST_ZERO_COUNT       (1)
@@ -976,18 +964,9 @@ SegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs, cons
             m_aAssocCostApproxAddLUT[nIdx] = cost_cast(float(m_aAssocCostApproxAddLUT[nIdx])/m_nDispOffsetStep+0.5f);
         }
     }
-#if SEGMMATCH_LBLSIM_USE_EXP_GRADPIVOT
     m_aLabelSimCostGradFactLUT.init(0,255,[](int nLocalGrad){
-        return (float)std::exp(float(SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/SEGMMATCH_LBLSIM_COST_GRADRAW_SCALE);
+        return std::max(std::exp(float(SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/SEGMMATCH_LBLSIM_COST_GRADRAW_SCALE)-0.5f,0.0f);
     });
-#else //!SEGMMATCH_LBLSIM_USE_EXP_GRADPIVOT
-    m_aLabelSimCostGradFactLUT.init(0,255,[](int nLocalGrad){
-        const float fGradPivotFact = 1.0f+(float(SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/((nLocalGrad>=SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST)?(255-SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST):SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST));
-        const float fGradScaleFact = SEGMMATCH_LBLSIM_COST_GRADRAW_SCALE*fGradPivotFact*fGradPivotFact;
-        lvDbgAssert(fGradScaleFact>=0.0f && fGradScaleFact<=4.0f*SEGMMATCH_LBLSIM_COST_GRADRAW_SCALE);
-        return fGradScaleFact;
-    });
-#endif //!SEGMMATCH_LBLSIM_USE_EXP_GRADPIVOT
     lvDbgAssert(m_aLabelSimCostGradFactLUT.size()==size_t(256) && m_aLabelSimCostGradFactLUT.domain_offset_low()==0);
     lvDbgAssert(m_aLabelSimCostGradFactLUT.domain_index_step()==1.0 && m_aLabelSimCostGradFactLUT.domain_index_scale()==1.0);
     lvLog_(2,"\toutput disp labels:\n%s\n",lv::to_string(std::vector<OutputLabelType>(m_vStereoLabels.begin(),m_vStereoLabels.begin()+m_nRealStereoLabels)).c_str());
@@ -1034,7 +1013,7 @@ SegmMatcher::GraphModelData::GraphModelData(const CamArray<cv::Mat>& aROIs, cons
 #if SEGMMATCH_CONFIG_USE_FGBZ_STEREO_INF || SEGMMATCH_CONFIG_USE_SOSPD_STEREO_INF
     m_oStereoUnaryCosts.create(m_oGridSize);
 #elif SEGMMATCH_CONFIG_USE_FASTPD_STEREO_INF
-    m_oStereoUnaryCosts.create(int(m_nStereoLabels),int(anValidGraphNodes[m_nPrimaryCamIdx])); // @@@ flip for optim?
+    m_oStereoUnaryCosts.create(int(m_nStereoLabels),int(anValidGraphNodes[m_nPrimaryCamIdx])); // flip for optim?
 #endif //SEGMMATCH_CONFIG_USE_..._STEREO_INF
     m_oResegmUnaryCosts.create(int(m_oGridSize[0]*nTemporalLayerCount*nCameraCount),int(m_oGridSize[1]));
     m_vStereoGraphIdxToMapIdxLUT.reserve(anValidGraphNodes[m_nPrimaryCamIdx]);
@@ -1168,9 +1147,9 @@ void SegmMatcher::GraphModelData::buildStereoModel() {
     for(size_t nLabelIdx=0; nLabelIdx<m_nRealStereoLabels; ++nLabelIdx) {
         // @@@@ outside-roi-dc to inside-roi-something is ok (0 cost)
         oStereoBaseFunc(m_nDontCareLabelIdx,nLabelIdx) = cost_cast(10000);
-        oStereoBaseFunc(m_nOccludedLabelIdx,nLabelIdx) = cost_cast(10000); // @@@@ SEGMMATCH_LBLSIM_COST_MAXOCCL scaled down if other label is high disp
+        oStereoBaseFunc(m_nOccludedLabelIdx,nLabelIdx) = cost_cast(10000);
         oStereoBaseFunc(nLabelIdx,m_nDontCareLabelIdx) = cost_cast(10000);
-        oStereoBaseFunc(nLabelIdx,m_nOccludedLabelIdx) = cost_cast(10000); // @@@@ SEGMMATCH_LBLSIM_COST_MAXOCCL scaled down if other label is high disp
+        oStereoBaseFunc(nLabelIdx,m_nOccludedLabelIdx) = cost_cast(10000);
     }
     oStereoBaseFunc(m_nDontCareLabelIdx,m_nDontCareLabelIdx) = cost_cast(0);
     oStereoBaseFunc(m_nOccludedLabelIdx,m_nOccludedLabelIdx) = cost_cast(0);
@@ -1319,7 +1298,6 @@ void SegmMatcher::GraphModelData::updateStereoModel(bool bInit) {
                 lvDbgAssert__(fShpAffinity>=0.0f,"fShpAffinity = %1.10f @ [%d,%d]",fShpAffinity,nRowIdx,nColIdx);
                 vUnaryStereoLUT(nLabelIdx) += cost_cast(fImgAffinity*fImgSaliency*SEGMMATCH_IMGSIM_COST_DESC_SCALE);
                 vUnaryStereoLUT(nLabelIdx) += cost_cast(fShpAffinity*fShpSaliency*SEGMMATCH_SHPSIM_COST_DESC_SCALE);
-                vUnaryStereoLUT(nLabelIdx) = std::min(vUnaryStereoLUT(nLabelIdx),SEGMMATCH_UNARY_COST_MAXTRUNC_CST);
             }
             else {
                 vUnaryStereoLUT(nLabelIdx) = SEGMMATCH_UNARY_COST_OOB_CST;
@@ -1731,7 +1709,6 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
         aBGLogProb[nCamIdx] *= dLogProbFactor;
     }
     const float fInterSpectrScale = SEGMMATCH_SHPDIST_INTERSPEC_SCALE;
-    const float fInterSpectrRatioTot = 1.0f+fInterSpectrScale;
     TemporalArray<CamArray<cv::Mat_<float>>> aaFGDist,aaBGDist;
     TemporalArray<CamArray<cv::Mat_<uchar>>> aaGradY,aaGradX,aaGradMag;
     CamArray<TemporalArray<cv::Mat_<cv::Vec2f>>> aaOptFlow;
@@ -1798,20 +1775,16 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
         lvDbgAssert(vUnaryResegmLUT.dimension()==1 && vUnaryResegmLUT.size()==s_nResegmLabels);
         const float fCurrFGDist = ((float*)aaFGDist[nLayerIdx][nCamIdx].data)[nMapIdx];
         const ValueType tFGDistUnaryCost = cost_cast(fCurrFGDist*SEGMMATCH_SHPDIST_COST_SCALE);
-        lvDbgAssert(tFGDistUnaryCost>=cost_cast(0));
         const double dColorFGLogProb = ((double*)aFGLogProb[nCamIdx].data)[nStackedIdx];
         const ValueType tFGColorUnaryCost = cost_cast(dColorFGLogProb*SEGMMATCH_IMGSIM_COST_COLOR_SCALE);
-        lvDbgAssert(tFGColorUnaryCost>=cost_cast(0));
-        vUnaryResegmLUT(s_nForegroundLabelIdx) = std::min(tFGDistUnaryCost+tFGColorUnaryCost,SEGMMATCH_UNARY_COST_MAXTRUNC_CST);
-        lvDbgAssert(vUnaryResegmLUT(s_nForegroundLabelIdx)>=cost_cast(0));
+        lvDbgAssert(tFGColorUnaryCost>=cost_cast(0) && tFGDistUnaryCost>=cost_cast(0));
+        vUnaryResegmLUT(s_nForegroundLabelIdx) = tFGDistUnaryCost+tFGColorUnaryCost;
         const float fCurrBGDist = ((float*)aaBGDist[nLayerIdx][nCamIdx].data)[nMapIdx];
         const ValueType tBGDistUnaryCost = cost_cast(fCurrBGDist*SEGMMATCH_SHPDIST_COST_SCALE);
-        lvDbgAssert(tBGDistUnaryCost>=cost_cast(0));
         const double dColorBGLogProb = ((double*)aBGLogProb[nCamIdx].data)[nStackedIdx];
         const ValueType tBGColorUnaryCost = cost_cast(dColorBGLogProb*SEGMMATCH_IMGSIM_COST_COLOR_SCALE);
-        lvDbgAssert(tBGColorUnaryCost>=cost_cast(0));
-        vUnaryResegmLUT(s_nBackgroundLabelIdx) = std::min(tBGDistUnaryCost+tBGColorUnaryCost,SEGMMATCH_UNARY_COST_MAXTRUNC_CST);
-        lvDbgAssert(vUnaryResegmLUT(s_nBackgroundLabelIdx)>=cost_cast(0));
+        lvDbgAssert(tBGColorUnaryCost>=cost_cast(0) && tBGDistUnaryCost>=cost_cast(0));
+        vUnaryResegmLUT(s_nBackgroundLabelIdx) = tBGDistUnaryCost+tBGColorUnaryCost;
         if(bInit) {
             // need to clear clique infos; will update temporal links in next loop
             oNode.vpCliques.clear();
@@ -1842,11 +1815,11 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
         const int nOffsetColIdx = (nStereoLabelIdx<m_nRealStereoLabels)?getOffsetColIdx(nCamIdx,nColIdx,nStereoLabelIdx):INT_MAX;
         if(nOffsetColIdx>=0 && nOffsetColIdx<nCols && m_aROIs[nCamIdx^1](nRowIdx,nOffsetColIdx)) {
             const float fCurrOffsetFGDist = aaFGDist[nLayerIdx][nCamIdx^1](nRowIdx,nOffsetColIdx);
-            const ValueType tAddedFGDistUnaryCost = cost_cast(fCurrOffsetFGDist*fInterSpectrScale*SEGMMATCH_SHPDIST_COST_SCALE);
-            vUnaryResegmLUT(s_nForegroundLabelIdx) = std::min(vUnaryResegmLUT(s_nForegroundLabelIdx)+tAddedFGDistUnaryCost,SEGMMATCH_UNARY_COST_MAXTRUNC_CST);
+            const ValueType tOffsetFGDistUnaryCost = cost_cast(fCurrOffsetFGDist*SEGMMATCH_SHPDIST_COST_SCALE*SEGMMATCH_SHPDIST_INTERSPEC_SCALE);
+            vUnaryResegmLUT(s_nForegroundLabelIdx) += tOffsetFGDistUnaryCost;
             const float fCurrOffsetBGDist = aaBGDist[nLayerIdx][nCamIdx^1](nRowIdx,nOffsetColIdx);
-            const ValueType tAddedBGDistUnaryCost = cost_cast(fCurrOffsetBGDist*fInterSpectrScale*SEGMMATCH_SHPDIST_COST_SCALE);
-            vUnaryResegmLUT(s_nBackgroundLabelIdx) = std::min(vUnaryResegmLUT(s_nBackgroundLabelIdx)+tAddedBGDistUnaryCost,SEGMMATCH_UNARY_COST_MAXTRUNC_CST);
+            const ValueType tOffsetBGDistUnaryCost = cost_cast(fCurrOffsetBGDist*SEGMMATCH_SHPDIST_COST_SCALE*SEGMMATCH_SHPDIST_INTERSPEC_SCALE);
+            vUnaryResegmLUT(s_nBackgroundLabelIdx) += tOffsetBGDistUnaryCost;
             for(size_t nOrientIdx=0; nOrientIdx<s_nPairwOrients; ++nOrientIdx) {
                 PairwClique& oPairwClique = oNode.aPairwCliques[nOrientIdx];
                 if(oPairwClique) {
@@ -1863,13 +1836,8 @@ void SegmMatcher::GraphModelData::updateResegmModel(bool bInit) {
                     const float fOffsetScaleFact = m_aLabelSimCostGradFactLUT.eval_raw(nOffsetGrad);
                     lvDbgAssert(fLocalScaleFact==(float)std::exp(float(SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST-nLocalGrad)/SEGMMATCH_LBLSIM_COST_GRADRAW_SCALE));
                     lvDbgAssert(fOffsetScaleFact==(float)std::exp(float(SEGMMATCH_LBLSIM_COST_GRADPIVOT_CST-nOffsetGrad)/SEGMMATCH_LBLSIM_COST_GRADRAW_SCALE));
-                    //const float fScaleFact = std::min(fLocalScaleFact,fOffsetScaleFact);
-                    //const float fScaleFact = fLocalScaleFact*fOffsetScaleFact;
-                #if SEGMMATCH_CONFIG_USE_SEGM_FLIR_HRST
-                    const float fScaleFact = (((nCamIdx==1)?(fLocalScaleFact*fLocalScaleFact):(fLocalScaleFact))+fOffsetScaleFact*fInterSpectrScale)/fInterSpectrRatioTot;
-                #else //!SEGMMATCH_CONFIG_USE_SEGM_FLIR_HRST
-                    const float fScaleFact = (fLocalScaleFact+fOffsetScaleFact*fInterSpectrScale)/fInterSpectrRatioTot;
-                #endif //!SEGMMATCH_CONFIG_USE_SEGM_FLIR_HRST
+                    const float fScaleFact = std::min(fLocalScaleFact,fOffsetScaleFact/fInterSpectrScale); // simplified, and better w/ more layers
+                    //const float fScaleFact = (fLocalScaleFact+fOffsetScaleFact*fInterSpectrScale)/(fInterSpectrScale+1.0f);
                     for(InternalLabelType nLabelIdx1=0; nLabelIdx1<s_nResegmLabels; ++nLabelIdx1) {
                         for(InternalLabelType nLabelIdx2=0; nLabelIdx2<s_nResegmLabels; ++nLabelIdx2) {
                             vPairwResegmLUT(nLabelIdx1,nLabelIdx2) = cost_cast((nLabelIdx1^nLabelIdx2)*fScaleFact*SEGMMATCH_LBLSIM_RESEGM_SCALE_CST);
@@ -3131,7 +3099,7 @@ opengm::InferenceTermination SegmMatcher::GraphModelData::infer() {
         nConsecUnchangedStereoLabels = bGotStereoLabelChange?0:nConsecUnchangedStereoLabels+1;
         const bool bResegmNext = (nStereoMoveIter++%SEGMMATCH_DEFAULT_ITER_PER_RESEGM)==0;
     #endif //SEGMMATCH_CONFIG_USE_..._STEREO_INF
-        if(lv::getVerbosity()>=4) {
+        if(lv::getVerbosity()>=3) {
             cv::Mat oCurrLabelingDisplay = getStereoDispMapDisplay(0,m_nPrimaryCamIdx);
             if(oCurrLabelingDisplay.size().area()<640*480)
                 cv::resize(oCurrLabelingDisplay,oCurrLabelingDisplay,cv::Size(),2,2,cv::INTER_NEAREST);

@@ -29,7 +29,7 @@
 #define DATASET_LITIV2014       0
 #define DATASET_MINI_TESTS      0
 ////////////////////////////////
-#define DATASET_OUTPUT_PATH     "results_cosegm_b3_stereo-warp-init" // @@@ try no appearance term, no shape term, no saliency factor, no temporal term...
+#define DATASET_OUTPUT_PATH     "results_cosegm_out_default"
 #define DATASET_PRECACHING      0
 #define DATASET_SCALE_FACTOR    1//0.5
 #define DATASET_WORKTHREADS     2
@@ -80,7 +80,7 @@
     DATASET_EVAL_DISPARITY_MASKS,                 /* bool bEvalStereoDisp=true */\
     true,                                         /* bool bFlipDisparities=false */\
     true,                                         /* bool bLoadFrameSubset=true */\
-    16/*-1*/,                                     /* int nLoadPersonSets=-1 */\
+    -1,                                           /* int nLoadPersonSets=-1 */\
     PROCESS_PREPROC_BGSEGM?0:1/*4*/,              /* int nLoadInputMasks=0 */\
     DATASET_SCALE_FACTOR                          /* double dScaleFactor=1.0 */
 #elif DATASET_MINI_TESTS
