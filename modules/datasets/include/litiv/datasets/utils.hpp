@@ -79,6 +79,7 @@ namespace lv {
         Dataset_PETS2001D3TC1, ///< PETS2001 Dataset 3 Track 1 dataset id
         Dataset_BSDS500, ///< Berkeley Segmentation Dataset (BSDS) dataset id
         Dataset_LITIV_stcharles2015, ///< LITIV planar registration (rev2) dataset id
+        Dataset_LITIV_stcharles2018, ///< LITIV cosegm/registration (rev1) dataset id
         Dataset_LITIV_bilodeau2014, ///< LITIV stereo registration (rev3) dataset id
         Dataset_VAP_trimod2016, ///< VAP Trimodal people Segmentation dataset id
         // ...

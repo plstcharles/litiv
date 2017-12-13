@@ -31,6 +31,7 @@ add_files(INCLUDE_FILES
     "include/litiv/datasets/impl/BSDS500.hpp"
     "include/litiv/datasets/impl/CDnet.hpp"
     "include/litiv/datasets/impl/litiv-stcharles2015.hpp"
+    "include/litiv/datasets/impl/litiv-stcharles2018.hpp"
     "include/litiv/datasets/impl/litiv-bilodeau2014.hpp"
     "include/litiv/datasets/impl/PETS2001.hpp"
     "include/litiv/datasets/impl/vap-trimod2016.hpp"

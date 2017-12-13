@@ -33,11 +33,11 @@
 #define STRUCT_FILE_PREALLOC_SIZE   1024*1024*20 // tot = 200MB per struct file
 /////////////////////////////////
 //// cv::VideoWriter params /////          filename           fourcc  framerate       frame size      is color
-#define FLIR_OUTPUT_VIDEO_PARAMS    "c:/temp/test_flir.avi",    -1,     30.0,     cv::Size(320,240),   false
-#define BODYIDX_OUTPUT_VIDEO_PARAMS "c:/temp/test_bodyidx.avi", -1,     30.0,     cv::Size(512,424),   false
-#define NIR_OUTPUT_VIDEO_PARAMS     "c:/temp/test_nir.avi",     -1,     30.0,     cv::Size(512,424),   false
-#define DEPTH_OUTPUT_VIDEO_PARAMS   "c:/temp/test_depth.avi",   -1,     30.0,     cv::Size(512,424),   false
-#define COLOR_OUTPUT_VIDEO_PARAMS   "e:/temp/test_color.avi",   -1,     30.0,     cv::Size(1920,1080), true
+#define FLIR_OUTPUT_VIDEO_PARAMS    "c:/temp/test_flir.avi",    -1,     30.0,     cv::Size(320,240),   false    // ffdshow?
+#define BODYIDX_OUTPUT_VIDEO_PARAMS "c:/temp/test_bodyidx.avi", -1,     30.0,     cv::Size(512,424),   false    // save as png?
+#define NIR_OUTPUT_VIDEO_PARAMS     "c:/temp/test_nir.avi",     -1,     30.0,     cv::Size(512,424),   false    // toggle off via define?
+#define DEPTH_OUTPUT_VIDEO_PARAMS   "c:/temp/test_depth.avi",   -1,     30.0,     cv::Size(512,424),   false    // save as png?
+#define COLOR_OUTPUT_VIDEO_PARAMS   "e:/temp/test_color.avi",   -1,     30.0,     cv::Size(1920,1080), true     // x264/mpeg4?
 /////////////////////////////////
 #define BODY_DATA_OUTPUT_PARAMS     "c:/temp/test_body.bin",     std::ios::out|std::ios::binary
 #define META_DATA_OUTPUT_PARAMS     "c:/temp/test_metadata.yml", cv::FileStorage::WRITE

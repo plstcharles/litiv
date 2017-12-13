@@ -15,9 +15,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "litiv/datasets.hpp"
-#include "litiv/imgproc.hpp"
-#include <opencv2/calib3d.hpp>
 
 ////////////////////////////////
 #define USE_UNCALIB_FMAT_ESTIM  0
@@ -25,15 +22,22 @@
 #define LOAD_POINTS_FROM_LAST   1
 #define USE_FMAT_RANSAC_ESTIM   0
 #else //!USE_UNCALIB_FMAT_ESTIM
+#define USE_CORNER_SUBPIX_OPTIM 0
+#define USE_OPENCV_CALIB        0
 #define USE_INTRINSIC_GUESS     0
 #define LOAD_CALIB_FROM_LAST    0
 #endif //!USE_UNCALIB_FMAT_ESTIM
-
 ////////////////////////////////
 #define DATASET_OUTPUT_PATH     "results_test"
 #define DATASET_PRECACHING      1
+////////////////////////////////
+#define DATASETS_LITIV2018_LOAD_CALIB_DATA 1
 
-using DatasetType = lv::Dataset_<lv::DatasetTask_Cosegm,lv::Dataset_VAP_trimod2016,lv::NonParallel>;
+#include "litiv/datasets.hpp"
+#include "litiv/imgproc.hpp"
+#include <opencv2/calib3d.hpp>
+
+using DatasetType = lv::Dataset_<lv::DatasetTask_Cosegm,lv::Dataset_LITIV_stcharles2018,lv::NonParallel>;
 void Analyze(lv::IDataHandlerPtr pBatch);
 
 int main(int, char**) {
@@ -46,6 +50,7 @@ int main(int, char**) {
                 false, //bool bUndistort
                 false, //bool bHorizRectify
                 false, //bool bEvalDisparities
+                false, //bool bFlipDisparities
                 false, //bool bLoadFrameSubset
                 false, //bool bEvalOnlyFrameSubset
                 0, //int nEvalTemporalWindowSize
@@ -80,15 +85,20 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     size_t nCurrIdx = 0;
     const std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // mat content becomes invalid on next getInput call
     lvAssert(!vInitInput.empty() && vInitInput.size()==oBatch.getInputStreamCount());
-    const cv::Size oOrigImgSize = vInitInput[0].size();
-    lvAssert(vInitInput[1].size()==oOrigImgSize);
+    std::array<cv::Size,2> aOrigSizes;
+    for(size_t a=0u; a<2u; ++a)
+        aOrigSizes[a] = vInitInput[a].size();
+    const cv::Size oRGBSize=aOrigSizes[0],oLWIRSize=aOrigSizes[1];
+    lvIgnore(oRGBSize);lvIgnore(oLWIRSize);
 #if USE_UNCALIB_FMAT_ESTIM
 #if LOAD_POINTS_FROM_LAST
-    cv::FileStorage oFS(oBatch.getOutputPath()+"/../"+oBatch.getName()+" calib.yml",cv::FileStorage::READ);
-    lvAssert(oFS.isOpened());
-    std::array<std::vector<cv::Point2f>,2> avMarkers;
-    oFS["pts0"] >> avMarkers[0];
-    oFS["pts1"] >> avMarkers[1];
+    {
+        cv::FileStorage oFS(oBatch.getOutputPath()+"/../"+oBatch.getName()+" calib.yml",cv::FileStorage::READ);
+        lvAssert(oFS.isOpened());
+        std::array<std::vector<cv::Point2f>,2> avMarkers;
+        oFS["pts0"] >> avMarkers[0];
+        oFS["pts1"] >> avMarkers[1];
+    }
 #else //!LOAD_POINTS_FROM_LAST
     lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName()+" calib",oBatch.getOutputPath()+"/../");
     std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs = {{
@@ -245,202 +255,174 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     }
 #else //!USE_UNCALIB_FMAT_ESTIM
 
-    const std::string sBaseCalibDataPath = oBatch.getDataPath()+"calib/";
-    std::array<cv::Mat,2> aCamMats,aDistCoeffs;
-    cv::Mat oRotMat,oTranslMat,oEssMat,oFundMat;
+    const std::string sBaseCalibDataPath = oBatch.getDataPath();
+    std::array<cv::Mat_<double>,2> aCamMats,aDistCoeffs;
+    cv::Mat_<double> oRotMat,oTranslMat,oEssMat,oFundMat;
 
 #if LOAD_CALIB_FROM_LAST
-
-    cv::FileStorage oCalibFile(sBaseCalibDataPath+"calibdata.yml",cv::FileStorage::READ);
-    lvAssert(oCalibFile.isOpened());
-    std::string sVerStr;
-    oCalibFile["ver"] >> sVerStr;
-    lvAssert(!sVerStr.empty());
-    lvCout << "Loading calib data from '" << sVerStr << "'...\n";
-    oCalibFile["aCamMats0"] >> aCamMats[0];
-    oCalibFile["aCamMats1"] >> aCamMats[1];
-    oCalibFile["aDistCoeffs0"] >> aDistCoeffs[0];
-    oCalibFile["aDistCoeffs1"] >> aDistCoeffs[1];
-    oCalibFile["oRotMat"] >> oRotMat;
-    oCalibFile["oTranslMat"] >> oTranslMat;
-    oCalibFile["oEssMat"] >> oEssMat;
-    oCalibFile["oFundMat"] >> oFundMat;
-    double dStereoCalibErr;
-    oCalibFile["dStereoCalibErr"] >> dStereoCalibErr;
-    lvAssert(dStereoCalibErr>=0.0);
-    lvCout << "\t(calib error was " << dStereoCalibErr << ")\n";
-
+    {
+        cv::FileStorage oCalibFile(sBaseCalibDataPath+"calibdata.yml",cv::FileStorage::READ);
+        lvAssert(oCalibFile.isOpened());
+        std::string sVerStr;
+        oCalibFile["ver"] >> sVerStr;
+        lvAssert(!sVerStr.empty());
+        lvCout << "Loading calib data from '" << sVerStr << "'...\n";
+        oCalibFile["aCamMats0"] >> aCamMats[0];
+        oCalibFile["aCamMats1"] >> aCamMats[1];
+        oCalibFile["aDistCoeffs0"] >> aDistCoeffs[0];
+        oCalibFile["aDistCoeffs1"] >> aDistCoeffs[1];
+        oCalibFile["oRotMat"] >> oRotMat;
+        oCalibFile["oTranslMat"] >> oTranslMat;
+        oCalibFile["oEssMat"] >> oEssMat;
+        oCalibFile["oFundMat"] >> oFundMat;
+        double dStereoCalibErr;
+        oCalibFile["dStereoCalibErr"] >> dStereoCalibErr;
+        lvAssert(dStereoCalibErr>=0.0);
+        lvCout << "\t(calib error was " << dStereoCalibErr << ")\n";
+    }
 #else //!LOAD_CALIB_FROM_LAST
 
-    std::array<std::vector<std::vector<cv::Point2f>>,2> avvImagePts;
-    std::array<std::vector<cv::Point2f>,2> avImagePts;
-    std::vector<std::vector<cv::Point3f>> vvWorldPts;
-    std::array<std::vector<cv::Mat>,2> avCalibInputs;
-    lvCout << "\tloading exported calib data...\n";
-    if(oBatch.getName()=="Scene 1") {
-        // scene 1 image calib data missing; use new exports from matlab calib toolbox
-        std::ifstream oMetaDataFile(sBaseCalibDataPath+"export/metadata.txt");
-        lvAssert(oMetaDataFile.is_open());
-        size_t nFirstIdx,nLastIdx;
-        lvAssert(oMetaDataFile >> nFirstIdx);
-        lvAssert(oMetaDataFile >> nLastIdx);
-        lvAssert(nFirstIdx<=nLastIdx);
-        for(size_t nIdx=nFirstIdx; nIdx<=nLastIdx; ++nIdx) {
-            const std::string sIdxStr = std::to_string(nIdx);
-            cv::Mat oVisible = cv::imread(sBaseCalibDataPath+"export/RGB"+sIdxStr+".jpg",cv::IMREAD_COLOR);
-            cv::Mat oThermal = cv::imread(sBaseCalibDataPath+"export/T"+sIdxStr+".jpg",cv::IMREAD_COLOR);
-            std::ifstream oVisibleData(sBaseCalibDataPath+"export/RGB"+sIdxStr+".txt");
-            std::ifstream oThermalData(sBaseCalibDataPath+"export/T"+sIdxStr+".txt");
-            if(oVisible.empty() || oThermal.empty() || !oVisibleData.is_open() || !oThermalData.is_open()) {
-                lvCout << "\t\tskipping exported pair #" << sIdxStr << "...\n";
-                continue;
-            }
-            lvAssert(oVisible.size()==oThermal.size() && oVisible.size()==oOrigImgSize);
-            avCalibInputs[0].push_back(oVisible.clone());
-            avCalibInputs[1].push_back(oThermal.clone());
-            size_t nVisiblePointCount = 0, nThermalPointCount = 0;
-            float fWorldPosX,fWorldPosY,fWorldPosZ,fImagePosX,fImagePosY;
-            std::vector<cv::Point3f> vWorldPtsValid;
-            vvWorldPts.emplace_back();
-            avvImagePts[0].emplace_back();
-            while(oVisibleData>>fWorldPosX && oVisibleData>>fWorldPosY && oVisibleData>>fWorldPosZ && oVisibleData>>fImagePosX && oVisibleData>>fImagePosY) {
-                // fix world pos exported from matlab (was 40mm, real is 35mm, and x/y inverted)
-                //vvWorldPts.back().emplace_back(((fWorldPosY*35)/40)/1000,((fWorldPosX*35)/40)/1000,((fWorldPosZ*35)/40)/1000);
-                vvWorldPts.back().emplace_back(fWorldPosY/1000,fWorldPosX/1000,fWorldPosZ/1000);
-                avvImagePts[0].back().emplace_back(fImagePosX,fImagePosY);
-                cv::circle(oVisible,avvImagePts[0].back().back(),2,cv::Scalar_<uchar>(0,0,255),-1);
-                ++nVisiblePointCount;
-            }
-            avImagePts[0].insert(avImagePts[0].end(),avvImagePts[0].back().begin(),avvImagePts[0].back().end());
-            avvImagePts[1].emplace_back();
-            while(oThermalData>>fWorldPosX && oThermalData>>fWorldPosY && oThermalData>>fWorldPosZ && oThermalData>>fImagePosX && oThermalData>>fImagePosY) {
-                // fix world pos exported from matlab (was 40mm, real is 35mm, and x/y inverted)
-                //vWorldPtsValid.emplace_back(((fWorldPosY*35)/40)/1000,((fWorldPosX*35)/40)/1000,((fWorldPosZ*35)/40)/1000);
-                vWorldPtsValid.emplace_back(fWorldPosY/1000,fWorldPosX/1000,fWorldPosZ/1000);
-                avvImagePts[1].back().emplace_back(fImagePosX,fImagePosY);
-                cv::circle(oThermal,avvImagePts[1].back().back(),2,cv::Scalar_<uchar>(0,0,255),-1);
-                ++nThermalPointCount;
-            }
-            avImagePts[1].insert(avImagePts[1].end(),avvImagePts[1].back().begin(),avvImagePts[1].back().end());
-            lvAssert(nThermalPointCount==nVisiblePointCount);
-            lvAssert(avvImagePts[0].back().size()==avvImagePts[1].back().size());
-            lvAssert(avvImagePts[0].back().size()==nVisiblePointCount);
-            lvAssert(avImagePts[0].size()==avImagePts[1].size());
-            lvAssert(vvWorldPts.back().size()==vWorldPtsValid.size());
-            lvAssert(vWorldPtsValid.size()==nVisiblePointCount);
-            for(size_t n=0; n<vWorldPtsValid.size(); ++n)
-                lvAssert(cv::norm(vvWorldPts.back()[n]-vWorldPtsValid[n])<0.01);
+    std::array<std::vector<std::vector<cv::Point2f>>,2> avvImagePts{std::vector<std::vector<cv::Point2f>>(nTotPacketCount),std::vector<std::vector<cv::Point2f>>(nTotPacketCount)};
+    std::vector<std::vector<cv::Point3f>> vvWorldPts(nTotPacketCount);
+    cv::FileStorage oMetadataFS(oBatch.getDataPath()+"metadata.yml",cv::FileStorage::READ);
+    lvAssert(oMetadataFS.isOpened());
+    float fSquareSize_in,fSquareSizeMatlab_m;
+    int nSquareCount_x,nSquareCount_y;
+    cv::FileNode oCalibBoardData = oMetadataFS["calib_board"];
+    oCalibBoardData["square_size_real_in"] >> fSquareSize_in;
+    oCalibBoardData["square_size_matlab_m"] >> fSquareSizeMatlab_m;
+    oCalibBoardData["square_count_x"] >> nSquareCount_x;
+    oCalibBoardData["square_count_y"] >> nSquareCount_y;
+    lvAssert(fSquareSize_in>0.0f && fSquareSizeMatlab_m>0.0f && nSquareCount_x>0 && nSquareCount_y>0);
+    const float fSquareSize_m = 0.0254f*fSquareSize_in;
+    const cv::Size oPatternSize(nSquareCount_x-1,nSquareCount_y-1); // -1 since we count inner corners
 
-            /*lvPrint(vvWorldPts.back());
-            lvPrint(avvImagePts[0].back());
-            cv::imshow("visible",oVisible);
-            cv::imshow("thermal",oThermal);
-            cv::waitKey(0);*/
+#if USE_OPENCV_CALIB
+    // assume all calib board views have full pattern in sight
+    while(nCurrIdx<nTotPacketCount) {
+        std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << std::endl;
+        const std::vector<cv::Mat>& vCurrInput = oBatch.getInputArray(nCurrIdx);
+        lvDbgAssert(vCurrInput.size()==vInitInput.size());
+        for(size_t a=0u; a<vCurrInput.size(); ++a) {
+            cv::Mat oInput=vCurrInput[a].clone(), oInputDisplay=vCurrInput[a].clone(), oInputDisplay_gray=vCurrInput[a].clone();
+            if(oInputDisplay.channels()!=1)
+                cv::cvtColor(oInputDisplay,oInputDisplay_gray,cv::COLOR_BGR2GRAY);
+            else
+                cv::cvtColor(oInputDisplay_gray,oInputDisplay,cv::COLOR_GRAY2BGR);
+
+
+            const bool bFound = cv::findChessboardCorners(oInput,oPatternSize,avvImagePts[a][nCurrIdx],(cv::CALIB_CB_ADAPTIVE_THRESH+cv::CALIB_CB_NORMALIZE_IMAGE+cv::DEBUG_));
+            if(bFound) {
+                lvAssert_(cv::find4QuadCornerSubpix(oInputDisplay_gray,avvImagePts[a][nCurrIdx],cv::Size(15,15)),"subpix optimization failed");
+                vvWorldPts[nCurrIdx].resize(size_t(nSquareCount_y*nSquareCount_x));
+                // indices start at 1, we are interested in inner corners only
+                for(int nSquareRowIdx=1; nSquareRowIdx<nSquareCount_y; ++nSquareRowIdx)
+                    for(int nSquareColIdx=1; nSquareColIdx<nSquareCount_x; ++nSquareColIdx)
+                        vvWorldPts[nCurrIdx][nSquareRowIdx*nSquareCount_x+nSquareColIdx] = cv::Point3f(nSquareColIdx*fSquareSize_m,nSquareRowIdx*fSquareSize_m,0.0f);
+            }
+            cv::drawChessboardCorners(oInputDisplay,oPatternSize,avvImagePts[a][nCurrIdx],bFound);
+
+            if(oInputDisplay.size().area()>1024*768)
+                cv::resize(oInputDisplay,oInputDisplay,cv::Size(),0.5,0.5);
+            if(oInputDisplay.size().area()<640*480)
+                cv::resize(oInputDisplay,oInputDisplay,cv::Size(),2.0,2.0);
+            cv::imshow(std::string("vCurrInput_")+std::to_string(a),oInputDisplay);
         }
+        int nKeyPressed = cv::waitKey(0);
+        if(nKeyPressed==(int)'q' || nKeyPressed==27/*escape*/)
+            break;
+        else if(nKeyPressed==8/*backspace*/ && nCurrIdx>0u)
+            --nCurrIdx;
+        else if(nKeyPressed!=8/*backspace*/)
+            ++nCurrIdx;
     }
-    else {
-        // use original image calib points ('chessboard' text files)
-        std::ifstream oVisibleMetaDataFile(sBaseCalibDataPath+"lChessboard3D_nbrCorners.txt");
-        lvAssert(oVisibleMetaDataFile.is_open());
-        std::ifstream oThermalMetaDataFile(sBaseCalibDataPath+"rChessboard3D_nbrCorners.txt");
-        lvAssert(oThermalMetaDataFile.is_open());
-        std::string sIndicesLine,sIndicesLineValid;
-        lvAssert(std::getline(oVisibleMetaDataFile,sIndicesLine));
-        lvAssert(std::getline(oThermalMetaDataFile,sIndicesLineValid));
-        lvAssert(sIndicesLine==sIndicesLineValid);
-        const std::vector<std::string> vsImageIndices = lv::split(sIndicesLine,',');
-        std::vector<size_t> vnImageIndices(vsImageIndices.size());
-        for(size_t nImageIdx=0; nImageIdx<vsImageIndices.size(); ++nImageIdx)
-            std::stringstream(vsImageIndices[nImageIdx]) >> vnImageIndices[nImageIdx];
-        lvAssert(vnImageIndices.size()>0);
-        std::vector<cv::Size> vImagePointCounts(vnImageIndices.size());
-        for(size_t nIdx=0; nIdx<vnImageIndices.size(); ++nIdx) {
-            char cDelim;
-            int nCoordsX,nCoordsY;
-            lvAssert(oVisibleMetaDataFile>>nCoordsX);
-            lvAssert(oVisibleMetaDataFile>>cDelim);
-            lvAssert(oVisibleMetaDataFile>>nCoordsY);
-            vImagePointCounts[nIdx] = cv::Size(nCoordsX,nCoordsY);
-            lvAssert(oThermalMetaDataFile>>nCoordsX);
-            lvAssert(oThermalMetaDataFile>>cDelim);
-            lvAssert(oThermalMetaDataFile>>nCoordsY);
-            lvAssert(vImagePointCounts[nIdx]==cv::Size(nCoordsX,nCoordsY));
+
+#else //!USE_OPENCV_CALIB
+
+    // opencv chessboard detection fails in lwir (contrast issues); use exports from matlab calib toolbox
+    while(nCurrIdx<nTotPacketCount) {
+        const std::string sIdxStr = lv::putf("%04d",(int)nCurrIdx+1);
+        cv::Mat oRGBFrame = cv::imread(sBaseCalibDataPath+"color_frames_subset/"+sIdxStr+".jpg",cv::IMREAD_COLOR);
+        cv::Mat oLWIRFrame = cv::imread(sBaseCalibDataPath+"lwir_frames_subset/"+sIdxStr+".jpg",cv::IMREAD_GRAYSCALE);
+        std::ifstream oRGBData(sBaseCalibDataPath+"color_frames_subset/imagepts"+std::to_string(nCurrIdx+1u)+".txt");
+        std::ifstream oLWIRData(sBaseCalibDataPath+"lwir_frames_subset/imagepts"+std::to_string(nCurrIdx+1u)+".txt");
+        if(oRGBFrame.empty() || oLWIRFrame.empty() || !oRGBData.is_open() || !oLWIRData.is_open()) {
+            lvWarn_("\t\tskipping exported pair #%s...",sIdxStr.c_str());
+            continue;
         }
-        lvAssert(vnImageIndices.size()==vImagePointCounts.size());
-        std::ifstream oVisibleImagePtsFile(sBaseCalibDataPath+"lChessboard3D_imagec.txt");
-        std::ifstream oVisibleObjectPtsFile(sBaseCalibDataPath+"lChessboard3D_objectc.txt");
-        lvAssert(oVisibleImagePtsFile.is_open() && oVisibleObjectPtsFile.is_open());
-        std::ifstream oThermalImagePtsFile(sBaseCalibDataPath+"rChessboard3D_imagec.txt");
-        std::ifstream oThermalObjectPtsFile(sBaseCalibDataPath+"rChessboard3D_objectc.txt");
-        lvAssert(oThermalImagePtsFile.is_open() && oThermalObjectPtsFile.is_open());
-        const auto lPointReader = [](std::ifstream& oFile, size_t nIdx, bool bWorldPt) {
-            if(nIdx!=0) {
-                std::string sDummyLine;
-                lvAssert(std::getline(oFile,sDummyLine));
+        lvAssert(oRGBFrame.size()==oRGBSize && oLWIRFrame.size()==oLWIRSize);
+        size_t nRGBPointCount=0u,nLWIRPointCount=0u,nWorldPointCount=0u;
+        float fImagePosX,fImagePosY;
+        float fClosestTRDist=9999.f,fClosestBLDist=9999.f;
+        size_t nClosestTRIdx=0u,nClosestBLIdx=0u;
+        vvWorldPts[nCurrIdx].resize(size_t(oPatternSize.area()));
+        // indices are offset as we are interested in inner corners only
+        for(int nSquareColIdx=oPatternSize.width-1; nSquareColIdx>=0; --nSquareColIdx)
+            for(int nSquareRowIdx=0; nSquareRowIdx<oPatternSize.height; ++nSquareRowIdx)
+                vvWorldPts[nCurrIdx][nWorldPointCount++] = cv::Point3f((nSquareColIdx+1)*fSquareSize_m,(nSquareRowIdx+1)*fSquareSize_m,0.0f);
+        avvImagePts[0][nCurrIdx].clear();
+        while(oRGBData>>fImagePosX && oRGBData>>fImagePosY) {
+            avvImagePts[0][nCurrIdx].emplace_back(fImagePosX,fImagePosY);
+            //cv::circle(oRGBFrame,avvImagePts[0][nCurrIdx].back(),2,cv::Scalar_<uchar>(0,0,255),-1);
+            const float fCurrTRDist = (float)cv::norm(cv::Point2f(float(oRGBSize.width),0.0f)-cv::Point2f(fImagePosX,fImagePosY));
+            const float fCurrBLDist = (float)cv::norm(cv::Point2f(0.0f,float(oRGBSize.height))-cv::Point2f(fImagePosX,fImagePosY));
+            if(fCurrTRDist<fClosestTRDist) {
+                fClosestTRDist = fCurrTRDist;
+                nClosestTRIdx = nRGBPointCount;
             }
-            std::string sCoordsLineX,sCoordsLineY,sCoordsLineZ;
-            lvAssert(std::getline(oFile,sCoordsLineX));
-            lvAssert(std::getline(oFile,sCoordsLineY));
-            if(bWorldPt)
-                lvAssert(std::getline(oFile,sCoordsLineZ));
-            const std::vector<std::string> vsCoordsX = lv::split(sCoordsLineX,',');
-            const std::vector<std::string> vsCoordsY = lv::split(sCoordsLineY,',');
-            const std::vector<std::string> vsCoordsZ = lv::split(sCoordsLineZ,',');
-            lvAssert(vsCoordsX.size()==vsCoordsY.size() && (!bWorldPt || vsCoordsY.size()==vsCoordsZ.size()));
-            lvAssert(!vsCoordsX.empty());
-            const size_t nCoords = vsCoordsX.size();
-            std::vector<cv::Point3f> vPts(nCoords);
-            for(size_t nCoordIdx=0; nCoordIdx<nCoords; ++nCoordIdx) {
-                vPts[nCoordIdx].x = std::stof(vsCoordsX[nCoordIdx]);
-                vPts[nCoordIdx].y = std::stof(vsCoordsY[nCoordIdx]);
-                if(bWorldPt) {
-                    vPts[nCoordIdx].z = std::stof(vsCoordsZ[nCoordIdx]);
-                    std::swap(vPts[nCoordIdx].x,vPts[nCoordIdx].y);
-                    vPts[nCoordIdx] /= 1000;
-                }
+            if(fCurrBLDist<fClosestBLDist) {
+                fClosestBLDist = fCurrBLDist;
+                nClosestBLIdx = nRGBPointCount;
             }
-            return vPts;
-        };
-        const auto lPointConv = [](const std::vector<cv::Point3f>& vPtsIn) {
-            std::vector<cv::Point2f> vPtsOut(vPtsIn.size());
-            for(size_t nPtIdx=0; nPtIdx<vPtsIn.size(); ++nPtIdx)
-                vPtsOut[nPtIdx] = cv::Point2f(vPtsIn[nPtIdx].x,vPtsIn[nPtIdx].y);
-            return vPtsOut;
-        };
-        for(size_t nImageIdx=0; nImageIdx<vnImageIndices.size(); ++nImageIdx) {
-            const std::string sImageIdxStr = std::to_string(vnImageIndices[nImageIdx]);
-            cv::Mat oVisible = cv::imread(sBaseCalibDataPath+"RGB"+sImageIdxStr+".jpg",cv::IMREAD_COLOR);
-            cv::Mat oThermal = cv::imread(sBaseCalibDataPath+"T"+sImageIdxStr+".jpg",cv::IMREAD_COLOR);
-            lvAssert(!oVisible.empty() && !oThermal.empty());
-            lvAssert(oVisible.size()==oThermal.size() && oVisible.size()==oOrigImgSize);
-            avCalibInputs[0].push_back(oVisible.clone());
-            avCalibInputs[1].push_back(oThermal.clone());
-            const std::vector<cv::Point3f> vWorldPts = lPointReader(oVisibleObjectPtsFile,nImageIdx,true);
-            const std::vector<cv::Point3f> vWorldPtsValid = lPointReader(oThermalObjectPtsFile,nImageIdx,true);
-            lvAssert(vWorldPts==vWorldPtsValid);
-            const std::vector<cv::Point2f> vVisibleImagePts = lPointConv(lPointReader(oVisibleImagePtsFile,nImageIdx,false));
-            const std::vector<cv::Point2f> vThermalImagePts = lPointConv(lPointReader(oThermalImagePtsFile,nImageIdx,false));
-            lvAssert(vVisibleImagePts.size()==vWorldPts.size() && vThermalImagePts.size()==vWorldPts.size());
-            vvWorldPts.push_back(vWorldPts);
-            avvImagePts[0].push_back(vVisibleImagePts);
-            avvImagePts[1].push_back(vThermalImagePts);
-            const size_t nPts = vWorldPts.size();
-            for(size_t nPtIdx=0; nPtIdx<nPts; ++nPtIdx) {
-                avImagePts[0].push_back(vVisibleImagePts[nPtIdx]);
-                avImagePts[1].push_back(vThermalImagePts[nPtIdx]);
-                cv::circle(oVisible,vVisibleImagePts[nPtIdx],2,cv::Scalar_<uchar>(0,0,255),-1);
-                cv::circle(oThermal,vThermalImagePts[nPtIdx],2,cv::Scalar_<uchar>(0,0,255),-1);
-            }
-            /*lvPrint(vvWorldPts.back());
-            lvPrint(avvImagePts[0].back());
-            cv::imshow("visible",oVisible);
-            cv::imshow("thermal",oThermal);
-            cv::waitKey(0);*/
+            ++nRGBPointCount;
         }
+        lvAssert(nClosestTRIdx==0u && nClosestBLIdx==(nRGBPointCount-1u)); // @@@@ only for calib runs with perpendicular board
+    #if USE_CORNER_SUBPIX_OPTIM
+        cv::Mat oRGBFrame_gray; cv::cvtColor(oRGBFrame,oRGBFrame_gray,cv::COLOR_BGR2GRAY);
+        cv::find4QuadCornerSubpix(oRGBFrame_gray,avvImagePts[0][nCurrIdx],cv::Size(5,5));
+    #endif //USE_CORNER_SUBPIX_OPTIM
+
+        avvImagePts[1][nCurrIdx].clear();
+        fClosestTRDist=9999.f;fClosestBLDist=9999.f;
+        nClosestTRIdx=0u;nClosestBLIdx=0u;
+        while(oLWIRData>>fImagePosX && oLWIRData>>fImagePosY) {
+            avvImagePts[1][nCurrIdx].emplace_back(fImagePosX,fImagePosY);
+            //cv::circle(oLWIRFrame,avvImagePts[1][nCurrIdx].back(),2,cv::Scalar_<uchar>(0,0,255),-1);
+            const float fCurrTRDist = (float)cv::norm(cv::Point2f(float(oLWIRSize.width),0.0f)-cv::Point2f(fImagePosX,fImagePosY));
+            const float fCurrBLDist = (float)cv::norm(cv::Point2f(0.0f,float(oLWIRSize.height))-cv::Point2f(fImagePosX,fImagePosY));
+            if(fCurrTRDist<fClosestTRDist) {
+                fClosestTRDist = fCurrTRDist;
+                nClosestTRIdx = nLWIRPointCount;
+            }
+            if(fCurrBLDist<fClosestBLDist) {
+                fClosestBLDist = fCurrBLDist;
+                nClosestBLIdx = nLWIRPointCount;
+            }
+            ++nLWIRPointCount;
+        }
+        lvAssert(nClosestTRIdx==0u && nClosestBLIdx==(nLWIRPointCount-1u)); // @@@@ only for calib runs with perpendicular board
+    #if USE_CORNER_SUBPIX_OPTIM
+        cv::find4QuadCornerSubpix(oLWIRFrame,avvImagePts[1][nCurrIdx],cv::Size(3,3));
+    #endif //USE_CORNER_SUBPIX_OPTIM
+
+        lvAssert(nLWIRPointCount==nRGBPointCount && nLWIRPointCount==nWorldPointCount);
+        //lvPrint(vvWorldPts[nCurrIdx]);
+        //lvPrint(avvImagePts[0][nCurrIdx]);
+        //cv::imshow("rgb",oRGBFrame);
+        //cv::imshow("lwir",oLWIRFrame);
+        //int nKeyPressed = cv::waitKey(0);
+        //if(nKeyPressed==(int)'q' || nKeyPressed==27/*escape*/)
+        //    break;
+        //else if(nKeyPressed==8/*backspace*/ && nCurrIdx>0u)
+        //    --nCurrIdx;
+        //else if(nKeyPressed!=8/*backspace*/)
+            ++nCurrIdx;
     }
-    lvAssert(avCalibInputs[0].size()==avvImagePts[0].size());
+
+#endif //!USE_OPENCV_CALIB
 
 #if USE_INTRINSIC_GUESS
+    @@@cleanup, retest
     aCamMats[0] = cv::initCameraMatrix2D(vvWorldPts,avvImagePts[0],oOrigImgSize,/*1.0*/1.27);
     //aCamMats[0] = (cv::Mat_<double>(3,3) << 531.15,0,320,  0,416.35,240,  0,0,1);
     aCamMats[1] = cv::initCameraMatrix2D(vvWorldPts,avvImagePts[1],oOrigImgSize,/*1.0*/1.27);
@@ -465,20 +447,30 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         }
         cv::waitKey(0);
     }
-#endif //USE_INTRINSIC_GUESS
+#else //!USE_INTRINSIC_GUESS
+    for(size_t a=0u; a<2u; ++a) {
+        cv::Mat_<double> oPerViewErrors;
+        aDistCoeffs[a] = 0.0;
+        cv::calibrateCamera(vvWorldPts,avvImagePts[a],aOrigSizes[a],aCamMats[a],aDistCoeffs[a],
+                            cv::noArray(),cv::noArray(),cv::noArray(),cv::noArray(),oPerViewErrors,
+                            cv::CALIB_ZERO_TANGENT_DIST,
+                            cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS,1000,1e-7));
+        lvLog_(1,"\tmean calib err for cam[%d] : %f",int(a),cv::mean(oPerViewErrors)[0]);
+    }
+#endif //!USE_INTRINSIC_GUESS
 
     const double dStereoCalibErr = cv::stereoCalibrate(vvWorldPts,avvImagePts[0],avvImagePts[1],
                                                        aCamMats[0],aDistCoeffs[0],aCamMats[1],aDistCoeffs[1],
-                                                       oOrigImgSize,oRotMat,oTranslMat,oEssMat,oFundMat,
-                                                       USE_INTRINSIC_GUESS?cv::CALIB_USE_INTRINSIC_GUESS:0,
-                                                       //0,
+                                                       cv::Size(),
+                                                       oRotMat,oTranslMat,oEssMat,oFundMat,
+                                                       cv::CALIB_USE_INTRINSIC_GUESS+cv::CALIB_ZERO_TANGENT_DIST,
                                                        //cv::CALIB_FIX_INTRINSIC,
                                                        //CV_CALIB_USE_INTRINSIC_GUESS+CV_CALIB_FIX_PRINCIPAL_POINT+CV_CALIB_FIX_ASPECT_RATIO+CV_CALIB_ZERO_TANGENT_DIST,
                                                        //cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_USE_INTRINSIC_GUESS + cv::CALIB_SAME_FOCAL_LENGTH + cv::CALIB_RATIONAL_MODEL + cv::CALIB_FIX_K3 + cv::CALIB_FIX_K4 + cv::CALIB_FIX_K5,
                                                        //cv::CALIB_RATIONAL_MODEL + cv::CALIB_FIX_K3 + cv::CALIB_FIX_K4 + cv::CALIB_FIX_K5,
                                                        //cv::CALIB_ZERO_TANGENT_DIST,
-                                                       cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS,1000,1e-6));
-    lvPrint(dStereoCalibErr);
+                                                       cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS,1000,1e-7));
+    lvLog_(1,"\tmean stereo calib err : %f",dStereoCalibErr);
 
     /*for(size_t n=0; n<avCalibInputs[0].size(); ++n) {
         std::array<cv::Mat,2> aUndistortInput;
@@ -528,16 +520,20 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
 
     std::array<cv::Mat,2> aRectifRotMats,aRectifProjMats;
     cv::Mat oDispToDepthMap;
-    cv::stereoRectify(aCamMats[0],aDistCoeffs[0],aCamMats[1],aDistCoeffs[1],oOrigImgSize,oRotMat,oTranslMat,
-                      aRectifRotMats[0],aRectifRotMats[1],aRectifProjMats[0],aRectifProjMats[1],oDispToDepthMap,
-                      //0,
-                      cv::CALIB_ZERO_DISPARITY,
-                      -1,cv::Size());
+    cv::stereoRectify(aCamMats[0],aDistCoeffs[0],aCamMats[1],aDistCoeffs[1],
+                      DATASETS_LITIV2018_RECTIFIED_SIZE,oRotMat,oTranslMat,
+                      aRectifRotMats[0],aRectifRotMats[1],
+                      aRectifProjMats[0],aRectifProjMats[1],
+                      oDispToDepthMap,
+                      0,//cv::CALIB_ZERO_DISPARITY,
+                      -1,DATASETS_LITIV2018_RECTIFIED_SIZE);
 
     std::array<std::array<cv::Mat,2>,2> aaRectifMaps;
-    cv::initUndistortRectifyMap(aCamMats[0],aDistCoeffs[0],aRectifRotMats[0],aRectifProjMats[0],oOrigImgSize,
+    cv::initUndistortRectifyMap(aCamMats[0],aDistCoeffs[0],aRectifRotMats[0],aRectifProjMats[0],
+                                DATASETS_LITIV2018_RECTIFIED_SIZE,
                                 CV_16SC2,aaRectifMaps[0][0],aaRectifMaps[0][1]);
-    cv::initUndistortRectifyMap(aCamMats[1],aDistCoeffs[1],aRectifRotMats[1],aRectifProjMats[1],oOrigImgSize,
+    cv::initUndistortRectifyMap(aCamMats[1],aDistCoeffs[1],aRectifRotMats[1],aRectifProjMats[1],
+                                DATASETS_LITIV2018_RECTIFIED_SIZE,
                                 CV_16SC2,aaRectifMaps[1][0],aaRectifMaps[1][1]);
 
     nCurrIdx = 0;
