@@ -61,6 +61,26 @@ TEST(gmm_init,regression_local) {
     }
 }
 
+TEST(gmm_init,regression_badmask_local) {
+    const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
+    ASSERT_TRUE(!oInput.empty() && oInput.size()==cv::Size(481,321) && oInput.channels()==3);
+    cv::Mat oMask(oInput.size(),CV_8UC1,cv::Scalar_<uchar>(0));
+    // try several times (rng will use different seeds, none should cause crashes)
+    for(size_t n = 0u; n<10u; ++n) {
+        lv::GMM<5,3> oBGModel,oFGModel;
+        lv::initGaussianMixtureParams(oInput,oMask,oBGModel,oFGModel);
+        ASSERT_EQ(oBGModel.getModelSize(),size_t(120));
+        ASSERT_EQ(oFGModel.getModelSize(),size_t(120));
+    }
+    oMask = uchar(255);
+    for(size_t n = 0u; n<10u; ++n) {
+        lv::GMM<5,3> oBGModel,oFGModel;
+        lv::initGaussianMixtureParams(oInput,oMask,oBGModel,oFGModel);
+        ASSERT_EQ(oBGModel.getModelSize(),size_t(120));
+        ASSERT_EQ(oFGModel.getModelSize(),size_t(120));
+    }
+}
+
 TEST(gmm_learn,regression_opencv) {
     const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
     ASSERT_TRUE(!oInput.empty() && oInput.size()==cv::Size(481,321) && oInput.channels()==3);
@@ -123,6 +143,48 @@ TEST(gmm_learn,regression_local) {
     else {
         lv::write(sBGDataPath,cv::Mat_<double>(1,(int)oBGModel.getModelSize(),oBGModel.getModelData()));
         lv::write(sFGDataPath,cv::Mat_<double>(1,(int)oFGModel.getModelSize(),oFGModel.getModelData()));
+    }
+}
+
+TEST(gmm_learn,regression_badmask_local) {
+    const cv::Mat oInput = cv::imread(SAMPLES_DATA_ROOT "/108073.jpg");
+    ASSERT_TRUE(!oInput.empty() && oInput.size()==cv::Size(481,321) && oInput.channels()==3);
+    cv::Mat oMask(oInput.size(),CV_8UC1,cv::Scalar_<uchar>(0));
+    // try several times (rng will use different seeds, none should cause crashes)
+    for(size_t n = 0u; n<10u; ++n) {
+        lv::GMM<5,3> oBGModel,oFGModel;
+        lv::initGaussianMixtureParams(oInput,oMask,oBGModel,oFGModel);
+        ASSERT_EQ(oBGModel.getModelSize(),size_t(120));
+        ASSERT_EQ(oFGModel.getModelSize(),size_t(120));
+        cv::Mat oAssignMap(oInput.size(),CV_32SC1);
+        lv::assignGaussianMixtureComponents(oInput,oMask,oAssignMap,oBGModel,oFGModel);
+        ASSERT_EQ(cv::countNonZero(oMask!=0u),0);
+        lv::learnGaussianMixtureParams(oInput,oMask,oAssignMap,oBGModel,oFGModel);
+        ASSERT_EQ(oBGModel.getModelSize(),size_t(120));
+        ASSERT_EQ(oFGModel.getModelSize(),size_t(120));
+        lv::assignGaussianMixtureComponents(oInput,oMask,oAssignMap,oBGModel,oFGModel);
+        ASSERT_EQ(cv::countNonZero(oMask!=0u),0);
+        lv::learnGaussianMixtureParams(oInput,oMask,oAssignMap,oBGModel,oFGModel);
+        ASSERT_EQ(oBGModel.getModelSize(),size_t(120));
+        ASSERT_EQ(oFGModel.getModelSize(),size_t(120));
+    }
+    oMask = uchar(255);
+    for(size_t n = 0u; n<10u; ++n) {
+        lv::GMM<5,3> oBGModel,oFGModel;
+        lv::initGaussianMixtureParams(oInput,oMask,oBGModel,oFGModel);
+        ASSERT_EQ(oBGModel.getModelSize(),size_t(120));
+        ASSERT_EQ(oFGModel.getModelSize(),size_t(120));
+        cv::Mat oAssignMap(oInput.size(),CV_32SC1);
+        lv::assignGaussianMixtureComponents(oInput,oMask,oAssignMap,oBGModel,oFGModel);
+        ASSERT_EQ(cv::countNonZero(oMask!=255u),0);
+        lv::learnGaussianMixtureParams(oInput,oMask,oAssignMap,oBGModel,oFGModel);
+        ASSERT_EQ(oBGModel.getModelSize(),size_t(120));
+        ASSERT_EQ(oFGModel.getModelSize(),size_t(120));
+        lv::assignGaussianMixtureComponents(oInput,oMask,oAssignMap,oBGModel,oFGModel);
+        ASSERT_EQ(cv::countNonZero(oMask!=255u),0);
+        lv::learnGaussianMixtureParams(oInput,oMask,oAssignMap,oBGModel,oFGModel);
+        ASSERT_EQ(oBGModel.getModelSize(),size_t(120));
+        ASSERT_EQ(oFGModel.getModelSize(),size_t(120));
     }
 }
 

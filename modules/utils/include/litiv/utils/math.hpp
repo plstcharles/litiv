@@ -1271,7 +1271,7 @@ void lv::GMM<nComps,nDims>::endLearning() {
                 });
             });
             const double dDeterminant = lv::determinant<nDims>(aCovariance);
-            if(dDeterminant<=std::numeric_limits<double>::epsilon()) {
+            if(std::abs(dDeterminant)<1e-6) {
                 // adds white noise to avoid singular covariance matrix
                 constexpr double dMinVariance = 0.01;
                 lv::unroll<nDims>([&](size_t nDimIdx){
