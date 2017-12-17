@@ -1373,7 +1373,7 @@ namespace lv {
         /// by default, comes with a filestorage algorithms can use for debug
         static DisplayHelperPtr create(const std::string& sDisplayName,
                                        const std::string& sDebugFSDirPath="./",
-                                       const cv::Size& oMaxSize=cv::Size(1920,1080),
+                                       const cv::Size& oMaxSize=cv::Size(2560,1440),
                                        int nWindowFlags=cv::WINDOW_AUTOSIZE);
         /// will reformat the given image, print the index and mouse cursor point on it, and show it
         void display(const cv::Mat& oImage, size_t nIdx);
