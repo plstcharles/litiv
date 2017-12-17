@@ -152,6 +152,7 @@ lv::DisplayHelper::DisplayHelper(const std::string& sDisplayName, const std::str
         m_oLastTileSize(cv::Size(0,0)),
         m_bContinuousUpdates(false),
         m_bFirstDisplay(true),
+        m_bMustDestroy(false),
         m_lInternalCallback(std::bind(&DisplayHelper::onMouseEventCallback,this,std::placeholders::_1,std::placeholders::_2,std::placeholders::_3,std::placeholders::_4)) {
     if(m_oFS.isOpened()) {
         m_oFS << "htag" << lv::getVersionStamp();
@@ -160,7 +161,8 @@ lv::DisplayHelper::DisplayHelper(const std::string& sDisplayName, const std::str
 }
 
 lv::DisplayHelper::~DisplayHelper() {
-    cv::destroyWindow(m_sDisplayName);
+    if(m_bMustDestroy)
+        cv::destroyWindow(m_sDisplayName);
 }
 
 void lv::DisplayHelper::display(const cv::Mat& oImage, size_t nIdx) {
@@ -247,6 +249,7 @@ void lv::DisplayHelper::display(const std::vector<std::vector<std::pair<cv::Mat,
     cv::imshow(m_sDisplayName,m_oLastDisplay);
     m_oLastDisplaySize = m_oLastDisplay.size();
     m_oLastTileSize = oNewTileSize;
+    m_bMustDestroy = true;
 }
 
 void lv::DisplayHelper::displayAlbumAndWaitKey(const std::vector<std::pair<cv::Mat,std::string>>& vImageNamePairs, int nDefaultSleepDelay) {
@@ -293,6 +296,7 @@ void lv::DisplayHelper::displayAlbumAndWaitKey(const std::vector<std::pair<cv::M
             m_bFirstDisplay = false;
         }
         cv::imshow(m_sDisplayName,m_oLastDisplay);
+        m_bMustDestroy = true;
     };
     size_t nCurrAlbumIdx = 0;
     cv::namedWindow(m_sDisplayName,m_nDisplayFlags); // @@@ if it blocks, recompile opencv without Qt (bug still here as of OpenCV 3.1)

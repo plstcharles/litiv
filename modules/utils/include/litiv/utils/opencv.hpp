@@ -1401,7 +1401,7 @@ namespace lv {
         /// global entrypoint for opencv mouse callbacks
         static void onMouseEvent(int nEvent, int x, int y, int nFlags, void* pData);
         cv::Size m_oLastDisplaySize,m_oLastTileSize;
-        bool m_bContinuousUpdates,m_bFirstDisplay;
+        bool m_bContinuousUpdates,m_bFirstDisplay,m_bMustDestroy;
         cv::Mat m_oLastDisplay;
         std::function<void(int,int,int,int)> m_lInternalCallback;
         std::function<void(const CallbackData&)> m_lExternalCallback;
