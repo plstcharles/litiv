@@ -335,13 +335,17 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         lvAssert(oRGBFrame.size()==oRGBSize && oLWIRFrame.size()==oLWIRSize);
         aCurrInputs = std::array<cv::Mat,2>{oRGBFrame,oLWIRFrame};
         int nKeyPressed = -1;
-        while(nKeyPressed!=(int)'q' && nKeyPressed!=27/*escape*/ && nKeyPressed!=8/*backspace*/ && nKeyPressed!=32/*space*/) {
+        while(nKeyPressed!=(int)'q' && nKeyPressed!=27/*escape*/ && nKeyPressed!=8/*backspace*/ && (nKeyPressed%256)!=10/*lf*/ && (nKeyPressed%256)!=13/*enter*/) {
             for(size_t a=0u; a<2u; ++a) {
                 lvAssert(vvDisplayPairs[0][a].first.channels()==3);
                 if(bIsZoomedIn) {
                     aZoomedPatches[a].copyTo(vvDisplayPairs[0][a].first);
-                    cv::circle(vvDisplayPairs[0][a].first,cv::Point(oDisplayTileSize.width/2,oDisplayTileSize.height/2),2,cv::Scalar_<uchar>::all(0),-1);
-                    cv::circle(vvDisplayPairs[0][a].first,cv::Point(oDisplayTileSize.width/2,oDisplayTileSize.height/2),1,cv::Scalar_<uchar>(0,0,255),-1);
+                    const cv::Size oCurrSize(vvDisplayPairs[0][a].first.size());
+                    cv::rectangle(vvDisplayPairs[0][a].first,cv::Point(0,oCurrSize.height/2),cv::Point(oCurrSize.width-1,oCurrSize.height/2),cv::Scalar_<uchar>::all(0),-1);
+                    cv::rectangle(vvDisplayPairs[0][a].first,cv::Point(oCurrSize.width/2,0),cv::Point(oCurrSize.width/2,oCurrSize.height-1),cv::Scalar_<uchar>::all(0),-1);
+                    cv::rectangle(vvDisplayPairs[0][a].first,cv::Rect(oCurrSize.width/2-oCurrSize.height/4,oCurrSize.height/4,oCurrSize.height/2,oCurrSize.height/2),cv::Scalar_<uchar>::all(0),1);
+                    cv::circle(vvDisplayPairs[0][a].first,cv::Point(oCurrSize.width/2,oCurrSize.height/2),2,cv::Scalar_<uchar>::all(0),-1);
+                    cv::circle(vvDisplayPairs[0][a].first,cv::Point(oCurrSize.width/2,oCurrSize.height/2),1,cv::Scalar_<uchar>(0,0,255),-1);
                 }
                 else {
                     aCurrInputs[a].copyTo(vvDisplayPairs[0][a].first);
@@ -364,7 +368,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             break;
         else if(nKeyPressed==8/*backspace*/ && nCurrIdx>0u)
             --nCurrIdx;
-        else if(nKeyPressed==32/*space*/ && nCurrIdx<(nTotPacketCount-1u))
+        else if(((nKeyPressed%256)==10/*lf*/ || (nKeyPressed%256)==13/*enter*/) && nCurrIdx<(nTotPacketCount-1u))
             ++nCurrIdx;
     }
     cv::destroyWindow("calib");
@@ -421,6 +425,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         cv::waitKey(0);
     }
 #else //!USE_INTRINSIC_GUESS
+    lvLog(1,"Running per-camera calibration...");
     for(size_t a=0u; a<2u; ++a) {
         cv::Mat_<double> oPerViewErrors;
         aDistCoeffs[a] = 0.0;
@@ -433,7 +438,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         lvPrint(oPerViewErrors);
     }
 #endif //!USE_INTRINSIC_GUESS
-
+    lvLog(1,"Running stereo calibration...");
     const double dStereoCalibErr = cv::stereoCalibrate(vvWorldPts,avvImagePts[0],avvImagePts[1],
                                                        aCamMats[0],aDistCoeffs[0],aCamMats[1],aDistCoeffs[1],
                                                        cv::Size(),
