@@ -34,24 +34,26 @@ using DatasetType = lv::Dataset_<lv::DatasetTask_Cosegm,lv::Dataset_LITIV_stchar
 void Analyze(lv::IDataHandlerPtr pBatch);
 
 inline cv::Mat drawWorldPointsMap(const std::vector<cv::Point3f>& vPts, const cv::Size& oPatternSize, const cv::Size& oMapSize, size_t nSelectedPoint=SIZE_MAX) {
-    lvAssert(oMapSize.area()>1 && oPatternSize.area()>1 && !vPts.empty());
-    lvAssert((int)vPts.size()==oPatternSize.area());
-    lvAssert(nSelectedPoint==SIZE_MAX || nSelectedPoint<vPts.size());
+    lvAssert(oMapSize.area()>1 && oPatternSize.area()>1);
+    lvAssert((int)vPts.size()==oPatternSize.area() || vPts.empty());
     cv::Mat oMap(oMapSize,CV_8UC3,cv::Scalar::all(66));
-    cv::Point3f vMin=vPts[0],vMax=vPts[0];
-    for(size_t nIdx=1u; nIdx<vPts.size(); ++nIdx) {
-        const double dDist = cv::norm(vPts[nIdx]);
-        if(dDist<cv::norm(vMin))
-            vMin = vPts[nIdx];
-        if(dDist>cv::norm(vMax))
-            vMax = vPts[nIdx];
-    }
-    vMax += vMin;
-    for(size_t nPtIdx=0u; nPtIdx<vPts.size(); ++nPtIdx) {
-        const cv::Point2i oImagePt((int)std::round((vPts[nPtIdx].x/vMax.x)*oMapSize.width),(int)std::round((vPts[nPtIdx].y/vMax.y)*oMapSize.height));
-        if(nSelectedPoint==nPtIdx)
-            cv::circle(oMap,oImagePt,18,cv::Scalar_<uchar>::all(1u),-1);
-        cv::circle(oMap,oImagePt,10,cv::Scalar_<uchar>(lv::getBGRFromHSL(360*float(nPtIdx)/vPts.size(),1.0f,0.5f)),-1);
+    if(!vPts.empty()) {
+        lvAssert(nSelectedPoint==SIZE_MAX || nSelectedPoint<vPts.size());
+        cv::Point3f vMin=vPts[0],vMax=vPts[0];
+        for(size_t nIdx=1u; nIdx<vPts.size(); ++nIdx) {
+            const double dDist = cv::norm(vPts[nIdx]);
+            if(dDist<cv::norm(vMin))
+                vMin = vPts[nIdx];
+            if(dDist>cv::norm(vMax))
+                vMax = vPts[nIdx];
+        }
+        vMax += vMin;
+        for(size_t nPtIdx=0u; nPtIdx<vPts.size(); ++nPtIdx) {
+            const cv::Point2i oImagePt((int)std::round((vPts[nPtIdx].x/vMax.x)*oMapSize.width),(int)std::round((vPts[nPtIdx].y/vMax.y)*oMapSize.height));
+            if(nSelectedPoint==nPtIdx)
+                cv::circle(oMap,oImagePt,18,cv::Scalar_<uchar>::all(1u),-1);
+            cv::circle(oMap,oImagePt,10,cv::Scalar_<uchar>(lv::getBGRFromHSL(360*float(nPtIdx)/vPts.size(),1.0f,0.5f)),-1);
+        }
     }
     return oMap;
 }
@@ -272,7 +274,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     size_t nSelectedPoint = SIZE_MAX;
     const cv::Size oZoomedNeigbSize(24,16);
     const std::array<int,2> anMarkerSizes{4,1};
-    const cv::Size oDisplayTileSize(/*1024,768*/1600,1200);
+    const cv::Size oDisplayTileSize(1024,768);
     std::array<cv::Mat,2> aCurrInputs,aZoomedPatches;
     pDisplayHelper->setMouseCallback([&](const lv::DisplayHelper::CallbackData& oData) {
         if(oData.nEvent==cv::EVENT_LBUTTONUP || oData.nEvent==cv::EVENT_RBUTTONUP) {
@@ -397,6 +399,15 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     }
 
 #endif //!USE_OPENCV_CALIB
+
+    for(size_t nIdx=0u; nIdx<vvWorldPts.size(); ++nIdx) {
+        if(vvWorldPts[nIdx].empty()) {
+            vvWorldPts.erase(vvWorldPts.begin()+nIdx);
+            avvImagePts[0].erase(avvImagePts[0].begin()+nIdx);
+            avvImagePts[1].erase(avvImagePts[1].begin()+nIdx);
+            nIdx = 0u;
+        }
+    }
 
 #if USE_INTRINSIC_GUESS
     @@@cleanup, retest
