@@ -15,9 +15,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 ////////////////////////////////
 #define USE_OPENCV_CALIB        0
+#define USE_FINE_TUNING_PASS    0
 #define USE_INTRINSIC_GUESS     0
 #define LOAD_CALIB_FROM_LAST    0
 ////////////////////////////////
@@ -100,14 +100,17 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     lvAssert(oBatch.getName()=="calib");
     const size_t nTotPacketCount = oBatch.getInputCount();
     size_t nCurrIdx = 0;
-    const std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // mat content becomes invalid on next getInput call
+    std::vector<cv::Mat> vInitInput = oBatch.getInputArray(nCurrIdx); // mat content becomes invalid on next getInput call
     lvAssert(!vInitInput.empty() && vInitInput.size()==oBatch.getInputStreamCount());
     std::array<cv::Size,2> aOrigSizes;
-    for(size_t a=0u; a<2u; ++a)
+    for(size_t a=0u; a<2u; ++a) {
         aOrigSizes[a] = vInitInput[a].size();
+        vInitInput[a] = vInitInput[a].clone();
+    }
     const cv::Size oRGBSize=aOrigSizes[0],oLWIRSize=aOrigSizes[1];
     lvIgnore(oRGBSize);lvIgnore(oLWIRSize);
 
+    const cv::Size oTargetSize(DATASETS_LITIV2018_RECTIFIED_SIZE);
     std::array<cv::Mat_<double>,2> aCamMats,aDistCoeffs;
     cv::Mat_<double> oRotMat,oTranslMat,oEssMat,oFundMat;
 
@@ -153,33 +156,45 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
 #if USE_OPENCV_CALIB
     // assume all calib board views have full pattern in sight
     while(nCurrIdx<nTotPacketCount) {
-        std::cout << "\t\t" << sCurrBatchName << " @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << std::endl;
-        const std::vector<cv::Mat>& vCurrInput = oBatch.getInputArray(nCurrIdx);
-        lvDbgAssert(vCurrInput.size()==vInitInput.size());
+        std::cout << "\t\t @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << std::endl;
+        std::vector<cv::Mat> vCurrInput = oBatch.getInputArray(nCurrIdx);
+        lvDbgAssert(vCurrInput.size()==aOrigSizes[a]);
+        bool bGotChessboards = true;
         for(size_t a=0u; a<vCurrInput.size(); ++a) {
-            cv::Mat oInput=vCurrInput[a].clone(), oInputDisplay=vCurrInput[a].clone(), oInputDisplay_gray=vCurrInput[a].clone();
+            bool bDoubledSize = false;
+            cv::Mat oOrigInput = vCurrInput[a].clone();
+            if(oOrigInput.size().area()<640*480) {
+                cv::resize(oOrigInput,oOrigInput,cv::Size(),2.0,2.0,cv::INTER_CUBIC);
+                bDoubledSize = true;
+            }
+            cv::Mat oInput=oOrigInput.clone(), oInputDisplay=oOrigInput.clone(), oInputDisplay_gray=oOrigInput.clone();
             if(oInputDisplay.channels()!=1)
                 cv::cvtColor(oInputDisplay,oInputDisplay_gray,cv::COLOR_BGR2GRAY);
             else
                 cv::cvtColor(oInputDisplay_gray,oInputDisplay,cv::COLOR_GRAY2BGR);
-
-
-            const bool bFound = cv::findChessboardCorners(oInput,oPatternSize,avvImagePts[a][nCurrIdx],(cv::CALIB_CB_ADAPTIVE_THRESH+cv::CALIB_CB_NORMALIZE_IMAGE+cv::DEBUG_));
-            if(bFound) {
+            const bool bGotCurrChessboard = cv::findChessboardCorners(oInput,oPatternSize,avvImagePts[a][nCurrIdx],(cv::CALIB_CB_ADAPTIVE_THRESH+cv::CALIB_CB_NORMALIZE_IMAGE));
+            if(bGotCurrChessboard)
                 lvAssert_(cv::find4QuadCornerSubpix(oInputDisplay_gray,avvImagePts[a][nCurrIdx],cv::Size(15,15)),"subpix optimization failed");
-                vvWorldPts[nCurrIdx].resize(size_t(nSquareCount_y*nSquareCount_x));
-                // indices start at 1, we are interested in inner corners only
-                for(int nSquareRowIdx=1; nSquareRowIdx<nSquareCount_y; ++nSquareRowIdx)
-                    for(int nSquareColIdx=1; nSquareColIdx<nSquareCount_x; ++nSquareColIdx)
-                        vvWorldPts[nCurrIdx][nSquareRowIdx*nSquareCount_x+nSquareColIdx] = cv::Point3f(nSquareColIdx*fSquareSize_m,nSquareRowIdx*fSquareSize_m,0.0f);
-            }
-            cv::drawChessboardCorners(oInputDisplay,oPatternSize,avvImagePts[a][nCurrIdx],bFound);
-
+            bGotChessboards &= bGotCurrChessboard;
+            cv::drawChessboardCorners(oInputDisplay,oPatternSize,avvImagePts[a][nCurrIdx],bGotCurrChessboard);
             if(oInputDisplay.size().area()>1024*768)
                 cv::resize(oInputDisplay,oInputDisplay,cv::Size(),0.5,0.5);
             if(oInputDisplay.size().area()<640*480)
                 cv::resize(oInputDisplay,oInputDisplay,cv::Size(),2.0,2.0);
             cv::imshow(std::string("vCurrInput_")+std::to_string(a),oInputDisplay);
+            if(bDoubledSize) {
+                for(size_t nPtIdx=0u; nPtIdx<avvImagePts[a][nCurrIdx].size(); ++nPtIdx) {
+                    avvImagePts[a][nCurrIdx][nPtIdx].x /= 2.0f;
+                    avvImagePts[a][nCurrIdx][nPtIdx].y /= 2.0f;
+                }
+            }
+        }
+        if(bGotChessboards) {
+            vvWorldPts[nCurrIdx].resize(size_t(nSquareCount_y*nSquareCount_x));
+            // indices start at 1, we are interested in inner corners only
+            for(int nSquareRowIdx=1; nSquareRowIdx<nSquareCount_y; ++nSquareRowIdx)
+                for(int nSquareColIdx=1; nSquareColIdx<nSquareCount_x; ++nSquareColIdx)
+                    vvWorldPts[nCurrIdx][nSquareRowIdx*nSquareCount_x+nSquareColIdx] = cv::Point3f(nSquareColIdx*fSquareSize_m,nSquareRowIdx*fSquareSize_m,0.0f);
         }
         int nKeyPressed = cv::waitKey(0);
         if(nKeyPressed==(int)'q' || nKeyPressed==27/*escape*/)
@@ -264,7 +279,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             ++nCurrIdx;
         }
     }
-
+#if USE_FINE_TUNING_PASS
     lv::DisplayHelperPtr pDisplayHelper = lv::DisplayHelper::create(oBatch.getName(),oBatch.getOutputPath()+"/../");
     std::vector<std::vector<std::pair<cv::Mat,std::string>>> vvDisplayPairs = {{
         std::make_pair(vInitInput[0].clone(),oBatch.getInputStreamName(0)),
@@ -397,20 +412,44 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
             oPointsFS << (std::string("f")+std::to_string(nIdx)) << avvImagePts[1][nIdx];
         oPointsFS << "}";
     }
-
+#endif //USE_FINE_TUNING_PASS
 #endif //!USE_OPENCV_CALIB
 
-    for(size_t nIdx=0u; nIdx<vvWorldPts.size(); ++nIdx) {
-        if(vvWorldPts[nIdx].empty()) {
-            vvWorldPts.erase(vvWorldPts.begin()+nIdx);
-            avvImagePts[0].erase(avvImagePts[0].begin()+nIdx);
-            avvImagePts[1].erase(avvImagePts[1].begin()+nIdx);
-            nIdx = 0u;
+    for(size_t a=0u; a<2u; ++a) {
+        const cv::Size oOrigSize = aOrigSizes[a];
+        if(oOrigSize!=oTargetSize) {
+            for(size_t nFrameIdx=0u; nFrameIdx<avvImagePts[a].size(); ++nFrameIdx) {
+                //const std::vector<cv::Mat>& vCurrInput = oBatch.getInputArray(nFrameIdx);
+                //cv::Mat display = vCurrInput[a].clone();
+                //cv::resize(display,display,oTargetSize);
+                //if(display.channels()==1)
+                //    cv::cvtColor(display,display,cv::COLOR_GRAY2BGR);
+                for(size_t nPtIdx=0u; nPtIdx<avvImagePts[a][nFrameIdx].size(); ++nPtIdx) {
+                    cv::Point2f& oPt = avvImagePts[a][nFrameIdx][nPtIdx];
+                    oPt.x *= float(oTargetSize.width)/oOrigSize.width;
+                    oPt.y *= float(oTargetSize.height)/oOrigSize.height;
+                    lvAssert(oPt.x<oTargetSize.width);
+                    lvAssert(oPt.y<oTargetSize.height);
+                    //cv::circle(display,oPt,3,cv::Scalar(0,0,255),-1);
+                }
+                //cv::imshow("display",display);
+                //cv::waitKey(0);
+            }
         }
     }
+    for(size_t nFrameIdx=0u; nFrameIdx<vvWorldPts.size(); ++nFrameIdx) {
+        if(vvWorldPts[nFrameIdx].empty()) {
+            vvWorldPts.erase(vvWorldPts.begin()+nFrameIdx);
+            avvImagePts[0].erase(avvImagePts[0].begin()+nFrameIdx);
+            avvImagePts[1].erase(avvImagePts[1].begin()+nFrameIdx);
+            nFrameIdx = 0u;
+        }
+    }
+    lvAssert(vvWorldPts.size()==avvImagePts[0].size() && vvWorldPts.size()==avvImagePts[1].size());
+    lvAssert(!vvWorldPts.empty());
 
 #if USE_INTRINSIC_GUESS
-    @@@cleanup, retest
+    @@@cleanup, retest (with target scale)
     aCamMats[0] = cv::initCameraMatrix2D(vvWorldPts,avvImagePts[0],oOrigImgSize,/*1.0*/1.27);
     //aCamMats[0] = (cv::Mat_<double>(3,3) << 531.15,0,320,  0,416.35,240,  0,0,1);
     aCamMats[1] = cv::initCameraMatrix2D(vvWorldPts,avvImagePts[1],oOrigImgSize,/*1.0*/1.27);
@@ -438,28 +477,25 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
 #else //!USE_INTRINSIC_GUESS
     lvLog(1,"Running per-camera calibration...");
     for(size_t a=0u; a<2u; ++a) {
-        cv::Mat_<double> oPerViewErrors;
+        //cv::Mat_<double> oPerViewErrors;
+        //aCamMats[a] = cv::initCameraMatrix2D(vvWorldPts,avvImagePts[a],oTargetSize);
         aDistCoeffs[a] = 0.0;
         const double dReprojErr =
-            cv::calibrateCamera(vvWorldPts,avvImagePts[a],aOrigSizes[a],aCamMats[a],aDistCoeffs[a],
-                                cv::noArray(),cv::noArray(),cv::noArray(),cv::noArray(),oPerViewErrors,
-                                cv::CALIB_ZERO_TANGENT_DIST,
+            cv::calibrateCamera(vvWorldPts,avvImagePts[a],oTargetSize,aCamMats[a],aDistCoeffs[a],
+                                cv::noArray(),cv::noArray(),/*cv::noArray(),cv::noArray(),oPerViewErrors,*/
+                                cv::CALIB_ZERO_TANGENT_DIST+cv::CALIB_FIX_K3,
                                 cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS,1000,1e-7));
         lvLog_(1,"\tcalib err for cam[%d] : %f",int(a),dReprojErr);
-        lvPrint(oPerViewErrors);
+        //lvPrint(oPerViewErrors);
+        lvPrint(aCamMats[a]);
+        lvPrint(aDistCoeffs[a]);
     }
 #endif //!USE_INTRINSIC_GUESS
     lvLog(1,"Running stereo calibration...");
     const double dStereoCalibErr = cv::stereoCalibrate(vvWorldPts,avvImagePts[0],avvImagePts[1],
                                                        aCamMats[0],aDistCoeffs[0],aCamMats[1],aDistCoeffs[1],
-                                                       cv::Size(),
-                                                       oRotMat,oTranslMat,oEssMat,oFundMat,
-                                                       cv::CALIB_USE_INTRINSIC_GUESS+cv::CALIB_ZERO_TANGENT_DIST,
-                                                       //cv::CALIB_FIX_INTRINSIC,
-                                                       //CV_CALIB_USE_INTRINSIC_GUESS+CV_CALIB_FIX_PRINCIPAL_POINT+CV_CALIB_FIX_ASPECT_RATIO+CV_CALIB_ZERO_TANGENT_DIST,
-                                                       //cv::CALIB_FIX_ASPECT_RATIO + cv::CALIB_ZERO_TANGENT_DIST + cv::CALIB_USE_INTRINSIC_GUESS + cv::CALIB_SAME_FOCAL_LENGTH + cv::CALIB_RATIONAL_MODEL + cv::CALIB_FIX_K3 + cv::CALIB_FIX_K4 + cv::CALIB_FIX_K5,
-                                                       //cv::CALIB_RATIONAL_MODEL + cv::CALIB_FIX_K3 + cv::CALIB_FIX_K4 + cv::CALIB_FIX_K5,
-                                                       //cv::CALIB_ZERO_TANGENT_DIST,
+                                                       oTargetSize,oRotMat,oTranslMat,oEssMat,oFundMat,
+                                                       cv::CALIB_USE_INTRINSIC_GUESS+cv::CALIB_ZERO_TANGENT_DIST+cv::CALIB_FIX_K3,
                                                        cv::TermCriteria(cv::TermCriteria::COUNT+cv::TermCriteria::EPS,1000,1e-7));
     lvLog_(1,"\tmean stereo calib err : %f",dStereoCalibErr);
 
@@ -492,6 +528,7 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
     }
     cv::waitKey(0);*/
 
+    lvLog(1,"Saving stereo calibration...");
     {
         cv::FileStorage oCalibFile(oBatch.getDataPath()+"calibdata.yml",cv::FileStorage::WRITE);
         lvAssert(oCalibFile.isOpened());
@@ -504,57 +541,65 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         oCalibFile << "oTranslMat" << oTranslMat;
         oCalibFile << "oEssMat" << oEssMat;
         oCalibFile << "oFundMat" << oFundMat;
+        oCalibFile << "oTargetSize" << oTargetSize;
         oCalibFile << "dStereoCalibErr" << dStereoCalibErr;
     }
 
 #endif //!LOAD_CALIB_FROM_LAST
 
+    lvLog(1,"Running live stereo rectification...");
     nCurrIdx = 0;
     double dRectifAlpha = -1;
     while(nCurrIdx<nTotPacketCount) {
-        std::cout << "\t\t calib @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << std::endl;
         const std::vector<cv::Mat>& vCurrInput = oBatch.getInputArray(nCurrIdx);
-        lvDbgAssert(vCurrInput.size()==vInitInput.size());
+        lvAssert(vCurrInput.size()==aOrigSizes.size());
         std::array<cv::Mat,2> aRectifRotMats,aRectifProjMats;
         cv::Mat oDispToDepthMap;
         cv::stereoRectify(aCamMats[0],aDistCoeffs[0],aCamMats[1],aDistCoeffs[1],
-                          DATASETS_LITIV2018_RECTIFIED_SIZE,oRotMat,oTranslMat,
+                          oTargetSize,oRotMat,oTranslMat,
                           aRectifRotMats[0],aRectifRotMats[1],
                           aRectifProjMats[0],aRectifProjMats[1],
                           oDispToDepthMap,
                           0,//cv::CALIB_ZERO_DISPARITY,
-                          dRectifAlpha,DATASETS_LITIV2018_RECTIFIED_SIZE);
+                          dRectifAlpha,oTargetSize);
 
         std::array<std::array<cv::Mat,2>,2> aaRectifMaps;
         cv::initUndistortRectifyMap(aCamMats[0],aDistCoeffs[0],aRectifRotMats[0],aRectifProjMats[0],
-                                    DATASETS_LITIV2018_RECTIFIED_SIZE,
-                                    CV_16SC2,aaRectifMaps[0][0],aaRectifMaps[0][1]);
+                                    oTargetSize,CV_16SC2,aaRectifMaps[0][0],aaRectifMaps[0][1]);
         cv::initUndistortRectifyMap(aCamMats[1],aDistCoeffs[1],aRectifRotMats[1],aRectifProjMats[1],
-                                    DATASETS_LITIV2018_RECTIFIED_SIZE,
-                                    CV_16SC2,aaRectifMaps[1][0],aaRectifMaps[1][1]);
+                                    oTargetSize,CV_16SC2,aaRectifMaps[1][0],aaRectifMaps[1][1]);
         std::array<cv::Mat,2> aCurrRectifInput;
         for(size_t a=0; a<2; ++a) {
-            cv::remap(vCurrInput[a],aCurrRectifInput[a],aaRectifMaps[a][0],aaRectifMaps[a][1],cv::INTER_LINEAR);
+            cv::Mat oCurrInput = vCurrInput[a].clone();
+            lvAssert(oCurrInput.size()==aOrigSizes[a]);
+            if(oCurrInput.size()!=oTargetSize)
+                cv::resize(oCurrInput,oCurrInput,oTargetSize);
+            cv::remap(oCurrInput,aCurrRectifInput[a],aaRectifMaps[a][0],aaRectifMaps[a][1],cv::INTER_LINEAR);
             cv::imshow(std::string("aCurrRectifInput_")+std::to_string(a),aCurrRectifInput[a]);
         }
-        int nKeyPressed = cv::waitKey(0);
-        if(nKeyPressed==(int)'q' || nKeyPressed==27/*escape*/)
+        const int nKeyPressed = cv::waitKey(0);
+        const uchar cKeyPressed = uchar(nKeyPressed);
+        if(cKeyPressed=='q' || nKeyPressed==27/*escape*/)
             break;
-        else if(nKeyPressed==8/*backspace*/ && nCurrIdx>0u)
+        else if(nKeyPressed==8/*backspace*/ && nCurrIdx>0u) {
             --nCurrIdx;
-        else if(((nKeyPressed%256)==10/*lf*/ || (nKeyPressed%256)==13/*enter*/) && nCurrIdx<(nTotPacketCount-1u))
+            std::cout << "\t\t calib @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << std::endl;
+        }
+        else if(((nKeyPressed%256)==10/*lf*/ || (nKeyPressed%256)==13/*enter*/) && nCurrIdx<(nTotPacketCount-1u)) {
             ++nCurrIdx;
-        else if(nKeyPressed=='+' || nKeyPressed=='=') {
+            std::cout << "\t\t calib @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << std::endl;
+        }
+        else if(cKeyPressed=='+' || cKeyPressed=='=' || cKeyPressed=='p') {
             dRectifAlpha = std::max(std::min(dRectifAlpha+0.05,1.0),0.0);
-            lvPrint(dRectifAlpha);
+            lvLog_(1,"dRectifAlpha = %f",dRectifAlpha);
         }
-        else if(nKeyPressed=='-') {
+        else if(cKeyPressed=='-' || cKeyPressed=='l') {
             dRectifAlpha = std::min(std::max(dRectifAlpha-0.05,0.0),1.0);
-            lvPrint(dRectifAlpha);
+            lvLog_(1,"dRectifAlpha = %f",dRectifAlpha);
         }
-        else if(nKeyPressed=='0') {
+        else if(cKeyPressed=='0') {
             dRectifAlpha = -1.0;
-            lvPrint(dRectifAlpha);
+            lvLog_(1,"dRectifAlpha = %f",dRectifAlpha);
         }
     }
 }
