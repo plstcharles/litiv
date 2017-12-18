@@ -509,29 +509,29 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
 
 #endif //!LOAD_CALIB_FROM_LAST
 
-    std::array<cv::Mat,2> aRectifRotMats,aRectifProjMats;
-    cv::Mat oDispToDepthMap;
-    cv::stereoRectify(aCamMats[0],aDistCoeffs[0],aCamMats[1],aDistCoeffs[1],
-                      DATASETS_LITIV2018_RECTIFIED_SIZE,oRotMat,oTranslMat,
-                      aRectifRotMats[0],aRectifRotMats[1],
-                      aRectifProjMats[0],aRectifProjMats[1],
-                      oDispToDepthMap,
-                      0,//cv::CALIB_ZERO_DISPARITY,
-                      -1,DATASETS_LITIV2018_RECTIFIED_SIZE);
-
-    std::array<std::array<cv::Mat,2>,2> aaRectifMaps;
-    cv::initUndistortRectifyMap(aCamMats[0],aDistCoeffs[0],aRectifRotMats[0],aRectifProjMats[0],
-                                DATASETS_LITIV2018_RECTIFIED_SIZE,
-                                CV_16SC2,aaRectifMaps[0][0],aaRectifMaps[0][1]);
-    cv::initUndistortRectifyMap(aCamMats[1],aDistCoeffs[1],aRectifRotMats[1],aRectifProjMats[1],
-                                DATASETS_LITIV2018_RECTIFIED_SIZE,
-                                CV_16SC2,aaRectifMaps[1][0],aaRectifMaps[1][1]);
-
     nCurrIdx = 0;
+    double dRectifAlpha = -1;
     while(nCurrIdx<nTotPacketCount) {
         std::cout << "\t\t calib @ F:" << std::setfill('0') << std::setw(lv::digit_count((int)nTotPacketCount)) << nCurrIdx+1 << "/" << nTotPacketCount << std::endl;
         const std::vector<cv::Mat>& vCurrInput = oBatch.getInputArray(nCurrIdx);
         lvDbgAssert(vCurrInput.size()==vInitInput.size());
+        std::array<cv::Mat,2> aRectifRotMats,aRectifProjMats;
+        cv::Mat oDispToDepthMap;
+        cv::stereoRectify(aCamMats[0],aDistCoeffs[0],aCamMats[1],aDistCoeffs[1],
+                          DATASETS_LITIV2018_RECTIFIED_SIZE,oRotMat,oTranslMat,
+                          aRectifRotMats[0],aRectifRotMats[1],
+                          aRectifProjMats[0],aRectifProjMats[1],
+                          oDispToDepthMap,
+                          0,//cv::CALIB_ZERO_DISPARITY,
+                          dRectifAlpha,DATASETS_LITIV2018_RECTIFIED_SIZE);
+
+        std::array<std::array<cv::Mat,2>,2> aaRectifMaps;
+        cv::initUndistortRectifyMap(aCamMats[0],aDistCoeffs[0],aRectifRotMats[0],aRectifProjMats[0],
+                                    DATASETS_LITIV2018_RECTIFIED_SIZE,
+                                    CV_16SC2,aaRectifMaps[0][0],aaRectifMaps[0][1]);
+        cv::initUndistortRectifyMap(aCamMats[1],aDistCoeffs[1],aRectifRotMats[1],aRectifProjMats[1],
+                                    DATASETS_LITIV2018_RECTIFIED_SIZE,
+                                    CV_16SC2,aaRectifMaps[1][0],aaRectifMaps[1][1]);
         std::array<cv::Mat,2> aCurrRectifInput;
         for(size_t a=0; a<2; ++a) {
             cv::remap(vCurrInput[a],aCurrRectifInput[a],aaRectifMaps[a][0],aaRectifMaps[a][1],cv::INTER_LINEAR);
@@ -540,9 +540,21 @@ void Analyze(lv::IDataHandlerPtr pBatch) {
         int nKeyPressed = cv::waitKey(0);
         if(nKeyPressed==(int)'q' || nKeyPressed==27/*escape*/)
             break;
-        else if(nKeyPressed==8/*backspace*/ && nCurrIdx>0)
+        else if(nKeyPressed==8/*backspace*/ && nCurrIdx>0u)
             --nCurrIdx;
-        else if(nKeyPressed!=8/*backspace*/)
+        else if(((nKeyPressed%256)==10/*lf*/ || (nKeyPressed%256)==13/*enter*/) && nCurrIdx<(nTotPacketCount-1u))
             ++nCurrIdx;
+        else if(nKeyPressed=='+' || nKeyPressed=='=') {
+            dRectifAlpha = std::max(std::min(dRectifAlpha+0.05,1.0),0.0);
+            lvPrint(dRectifAlpha);
+        }
+        else if(nKeyPressed=='-') {
+            dRectifAlpha = std::min(std::max(dRectifAlpha-0.05,0.0),1.0);
+            lvPrint(dRectifAlpha);
+        }
+        else if(nKeyPressed=='0') {
+            dRectifAlpha = -1.0;
+            lvPrint(dRectifAlpha);
+        }
     }
 }
